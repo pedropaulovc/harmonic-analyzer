@@ -7,9 +7,11 @@ dimension NAME map + notes from here; ``draw_sm_gooseneck`` keeps exactly
 The end plug is tapped #8-32 UNC-2B THRU per the
 owner ruling 2026-10-26 (#1951, option B), superseding the #6-32 the 2026-10-10
 option-B note named: the clamped MHA-SM-04 eye passes its full preload through
-the plug-face thread, which no #6-32 root carried at SF 2.  Its worst-case wall
-and engagement live in ``sm_gooseneck_spring_joint`` (``PLUG_WALL_MIN``,
-``ENGAGEMENT_MIN``).
+the plug-face thread, which no #6-32 root carried at SF 2.  The arm-end
+counterbore clears MHA-SM-04's die run-out with the loop clamped coil-bound
+(codjiflo P1 on #1997).  Its worst-case walls, depth and engagement live in
+``sm_gooseneck_spring_joint`` (``PLUG_WALL_MIN``, ``COUNTERBORE_WALL_MIN``,
+``COUNTERBORE_DEPTH_MIN``, ``ENGAGEMENT_MIN``).
 """
 
 from __future__ import annotations
@@ -18,6 +20,10 @@ import sm_gooseneck_geom
 from sm_gooseneck_spring_joint import (
     BRAZE_CLEARANCE_MAX,
     BRAZE_CLEARANCE_MIN,
+    COUNTERBORE_AXIS_OFFSET_MAX,
+    COUNTERBORE_DEPTH_MAX,
+    COUNTERBORE_DEPTH_MIN,
+    COUNTERBORE_DIA,
     DRILL_WANDER_MAX,
     EDGE_BREAK,
     ENGAGEMENT_MIN,
@@ -66,7 +72,10 @@ DRAWING_NOTES = "\n".join(
         f"4. AFTER BRAZE: {TAP_SPEC.size} UNC-{TAP_SPEC.thread_class} THRU PLUG.",
         f"   THREAD AXIS TO TUBE AXIS +/-{THREAD_AXIS_OFFSET_MAX:.2f};",
         f"   DRILL WANDER {DRILL_WANDER_MAX:.2f} MAX; SQUARE TO END FACE.",
-        f"   BREAK BOTH TAP ENDS {EDGE_BREAK:.2f} X 45 DEG.",
+        f"   ARM END C'BORE <MOD-DIAM>{COUNTERBORE_DIA:.2f} X"
+        f" {COUNTERBORE_DEPTH_MIN:.2f}-{COUNTERBORE_DEPTH_MAX:.2f} DEEP,",
+        f"   ON TAP AXIS WITHIN {COUNTERBORE_AXIS_OFFSET_MAX:.2f}.",
+        f"   BREAK INNER TAP END {EDGE_BREAK:.2f} X 45 DEG.",
         f"   FULL THREAD {ENGAGEMENT_NOMINAL:.2f} NOMINAL; {ENGAGEMENT_MIN:.2f} MIN.",
         "5. MHA-SM-04 SPRING SCREW: MADE SEPARATELY;",
         "   NOT INCLUDED IN THIS WELDMENT. SEE ASSEMBLY.",

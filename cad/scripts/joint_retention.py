@@ -1570,8 +1570,10 @@ JOINTS: tuple[Joint, ...] = (
         axial_capture=(
             "made MHA-SM-04 fillister head clamps the double-loop band, seated on the "
             "screw's plain Ø3.50 shoulder, to the brazed plug end face; full thread "
-            "engagement is limited by the #8-32 through-tapped plug. The screw tip "
-            "continues into the hollow arm, not into a blind bottom."
+            "engagement is limited by the #8-32 through-tapped plug past its arm-end "
+            "counterbore, which keeps the screw's die run-out out of the plug's full "
+            "thread. The screw tip continues into the hollow arm, not into a blind "
+            "bottom."
         ),
         lock=Lock.NONE,
         evidence=(
@@ -1579,7 +1581,8 @@ JOINTS: tuple[Joint, ...] = (
             "eye, no threadlocker; owner ruling 2026-10-26 (#1951, option B): "
             "Ø3.50 shoulder seat, #8-32 thread and retapped plug; "
             "sm_gooseneck_spring_joint.py "
-            "ENGAGEMENT_MIN/MATED_ENGAGEMENT_MIN/PLUG_WALL_MIN/HEAD_RETENTION_MIN/"
+            "ENGAGEMENT_MIN/COUNTERBORE_DEPTH_MIN/SCREW_RUNOUT_INTRUSION_MAX/"
+            "PLUG_WALL_MIN/COUNTERBORE_WALL_MIN/HEAD_RETENTION_MIN/"
             "LOOP_LEAD_CLEARANCE_MIN/LOOP_CORNER_CLEARANCE_MIN/"
             "SCREW_REACH/TIP_PROTRUSION_MIN; "
             "build_sm_summing_assembly.py gooseneck spring screw lock_mate "

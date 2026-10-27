@@ -45,6 +45,7 @@ f32e260c67c6d7e2687eb6c37b10ee742d8e53dd0ccbe5b7c3d90ede2ee17d4a).
 from __future__ import annotations
 
 import math
+from enum import Enum
 
 import _config
 import sm_gooseneck_geom as gooseneck
@@ -194,16 +195,30 @@ _PASS_LOADS = (
 )
 
 
-def _path1_moment(x: float, span: float, guided: bool) -> float:
+class HeadEnd(Enum):
+    """Path 1's bracket on the head's rotation."""
+
+    GUIDED = "guided"  # M = PL/2 at both ends
+    FREE = "free"  # M = PL at the far support
+
+
+class SpanEnds(Enum):
+    """Path 2's bracket on both supports."""
+
+    FIXED = "fixed"
+    SIMPLE = "simple"
+
+
+def _path1_moment(x: float, span: float, head: HeadEnd) -> float:
     half = _F / 2.0
-    return abs(half * (x - span / 2.0)) if guided else half * x
+    return abs(half * (x - span / 2.0)) if head is HeadEnd.GUIDED else half * x
 
 
-def _path2_moment(x: float, span: float, loads, fixed: bool) -> float:
+def _path2_moment(x: float, span: float, loads, ends: SpanEnds) -> float:
     moment = 0.0
     for load, a in loads:
         b = span - a
-        if fixed:
+        if ends is SpanEnds.FIXED:
             reaction = load * b * b * (3.0 * a + b) / span**3
             end_moment = -load * a * b * b / span**2
         else:
@@ -213,11 +228,11 @@ def _path2_moment(x: float, span: float, loads, fixed: bool) -> float:
 
 
 _MOMENT_CASES = (
-    *(lambda x, g=g: _path1_moment(x, STRENGTH_SPAN, g) for g in (True, False)),
+    *(lambda x, h=h: _path1_moment(x, STRENGTH_SPAN, h) for h in HeadEnd),
     *(
-        lambda x, ld=ld, f=f: _path2_moment(x, STRENGTH_SPAN, ld, f)
+        lambda x, ld=ld, e=e: _path2_moment(x, STRENGTH_SPAN, ld, e)
         for ld in _PASS_LOADS
-        for f in (True, False)
+        for e in SpanEnds
     ),
 )
 
@@ -257,15 +272,20 @@ def tightening_safety_factor(mu_clamp: float, mu_thread: float) -> float:
     return _von_mises_sf(preload, 0.0, torsion, THREAD_MINOR_2A_MIN_EST)
 
 
-SERVICE_SF = {pair: round(service_safety_factor(*pair), 3) for pair in FRICTION_PAIRS}
-TIGHTENING_SF = {
-    pair: round(tightening_safety_factor(*pair), 3) for pair in FRICTION_PAIRS
+_SERVICE_SF_EXACT = {pair: service_safety_factor(*pair) for pair in FRICTION_PAIRS}
+_TIGHTENING_SF_EXACT = {
+    pair: tightening_safety_factor(*pair) for pair in FRICTION_PAIRS
 }
-if min((*SERVICE_SF.values(), *TIGHTENING_SF.values())) < STRENGTH_SF_TARGET:
+# Acceptance reads the unrounded factors; the rounded tables are for print.
+if min((*_SERVICE_SF_EXACT.values(), *_TIGHTENING_SF_EXACT.values())) < (
+    STRENGTH_SF_TARGET
+):
     raise AssertionError(
-        f"MHA-SM-04 clamp strength SF service {SERVICE_SF}, tightening "
-        f"{TIGHTENING_SF} under {STRENGTH_SF_TARGET}"
+        f"MHA-SM-04 clamp strength SF service {_SERVICE_SF_EXACT}, tightening "
+        f"{_TIGHTENING_SF_EXACT} under {STRENGTH_SF_TARGET}"
     )
+SERVICE_SF = {pair: round(sf, 3) for pair, sf in _SERVICE_SF_EXACT.items()}
+TIGHTENING_SF = {pair: round(sf, 3) for pair, sf in _TIGHTENING_SF_EXACT.items()}
 # Fatigue does not govern: the summing lever is quasi-static and the pull
 # swings about +/-1.2 N about a 46.9-47.1 N service load (#1951 sketch), so
 # first-load yield at the low-friction preload sets the margin.

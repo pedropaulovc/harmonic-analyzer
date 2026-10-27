@@ -51,6 +51,7 @@ import json
 import math
 import os
 import sys
+import tempfile
 import traceback
 from dataclasses import asdict, replace
 from enum import Enum
@@ -540,13 +541,29 @@ class CalibrationMode(Enum):
     COUNTER = "counter"  # the listed presets' counters only; channel seats kept
 
 
+def _same_file(first: Path, second: Path) -> bool:
+    """True when the two paths name one file: the same resolved path, or (when
+    both exist) the same file by another name, e.g. a hard link."""
+    first, second = first.resolve(), second.resolve()
+    return first == second or (
+        first.exists() and second.exists() and os.path.samefile(first, second)
+    )
+
+
 def _refuse_unsafe_run(presets: list[str], output: Path, write: Path | None) -> None:
     """Refuse, before any native work, a run whose write would leave a stale
-    seat or whose report would overwrite the table it writes."""
+    seat or whose report would overwrite a seat table."""
     table = _config.machine("springs", "presets")
     unknown = [name for name in presets if name not in table]
     if unknown:
         raise ValueError(f"unknown presets {unknown}; have {sorted(table)}")
+    # The report is written last, even when calibration fails, so aimed at the
+    # source table it would replace springs.yaml with JSON whatever --write is.
+    if _same_file(output, SPRINGS_YAML):
+        raise ValueError(
+            f"--output {output.resolve()} is the source seat table "
+            f"{SPRINGS_YAML}; the report would overwrite it"
+        )
     if write is None:
         return
     # A written table keeps the counter of any preset this run did not measure,
@@ -560,14 +577,31 @@ def _refuse_unsafe_run(presets: list[str], output: Path, write: Path | None) -> 
             f"keeps a stale seat; missing {omitted}. Calibrate {sorted(table)} "
             "together, or drop --write."
         )
-    output, write = output.resolve(), write.resolve()
-    if output == write or (
-        output.exists() and write.exists() and os.path.samefile(output, write)
-    ):
+    if _same_file(output, write):
         raise ValueError(
-            f"--output {output} is the --write table {write}; the report would "
-            "overwrite it"
+            f"--output {output.resolve()} is the --write table {write.resolve()}; "
+            "the report would overwrite it"
         )
+
+
+def _replace_bytes(path: Path, data: bytes) -> None:
+    """Write ``data`` to ``path`` whole or not at all: into a temporary sibling,
+    then renamed over it, so a failed write leaves the previous file intact.
+
+    Binary, not _layout_audit.replace_text: its text-mode stream would turn
+    LF into CRLF on Windows, and the merged table must stay byte-for-byte what
+    springs.yaml holds."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle, temporary = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    try:
+        with os.fdopen(handle, "wb") as stream:
+            stream.write(data)
+        os.replace(temporary, path)
+    except BaseException:
+        Path(temporary).unlink(missing_ok=True)
+        raise
 
 
 def _merge_yaml(
@@ -592,8 +626,7 @@ def _merge_yaml(
         springs["presets"][preset]["counter"] = counter
     text = yaml.safe_dump(document, sort_keys=False, allow_unicode=False, width=88)
     header = "\n".join(line for line in original.splitlines() if line.startswith("#"))
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(header + "\n" + text, encoding="utf-8", newline="\n")
+    _replace_bytes(path, (header + "\n" + text).encode("utf-8"))
 
 
 async def calibrate(
@@ -652,9 +685,9 @@ async def calibrate(
         report["error"] = traceback.format_exc()
         raise
     finally:
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(
-            json.dumps(report, indent=2, allow_nan=False) + "\n", encoding="utf-8"
+        _replace_bytes(
+            output,
+            (json.dumps(report, indent=2, allow_nan=False) + "\n").encode("utf-8"),
         )
 
 

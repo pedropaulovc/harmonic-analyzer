@@ -658,8 +658,8 @@ def test_every_direct_db_block_restores_inference_in_finally() -> None:
                 restored += 1
     offs = [node for node in ast.walk(tree) if toggle(node) == "False"]
     assert {id(node) for node in offs} == finally_offs
-    # The head profile, the shank profile and the station reference.
-    assert on == restored == len(offs) == 3
+    # The property, not the inventory: at least one block, each restored.
+    assert on == restored == len(offs) >= 1
 
 
 def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:

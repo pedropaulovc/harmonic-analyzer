@@ -250,7 +250,9 @@ def test_isolated_counter_provenance_identifies_the_whole_made_support(
     assert support["shoulder_length_mm"] == 3.9
     assert not any(key.startswith("relief_") for key in support)
     assert support["tip_chamfer_mm"] == 0.3
-    assert support["plug_length_mm"] == 8.0
+    assert support["plug_length_mm"] == 8.80
+    assert support["plug_counterbore_dia_mm"] == 4.70
+    assert support["plug_counterbore_depth_mm"] == 1.37
     counter_seat()
 
 
@@ -269,6 +271,8 @@ def test_isolated_counter_provenance_identifies_the_whole_made_support(
         "tip_chamfer_mm",
         "clamp_gap_mm",
         "plug_length_mm",
+        "plug_counterbore_dia_mm",
+        "plug_counterbore_depth_mm",
     ],
 )
 def test_changed_support_geometry_cannot_reuse_a_native_certificate(

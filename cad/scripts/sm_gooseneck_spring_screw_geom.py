@@ -94,8 +94,8 @@ FULL_THREAD_STATION = SHOULDER_LENGTH + STEP_LEAD + DIE_RUNOUT
 # Printed as the single limit "5.67 MAX" from the under-head face (machinist
 # FIX round 1, owner ruling 2026-10-26 (#1951, option B)): the longest
 # shoulder, the steepest-legged lead and the die's run-out, floored to the
-# print's two places so the printed limit never exceeds the budget
-# sm_gooseneck_spring_joint.MATED_ENGAGEMENT_MIN takes.
+# print's two places so the printed limit never exceeds the run-out budget the
+# plug's counterbore clears (sm_gooseneck_spring_joint.COUNTERBORE_DEPTH_MIN).
 FULL_THREAD_STATION_MAX = (
     math.floor((SHOULDER_LENGTH_MAX + STEP_LEAD_MAX + DIE_RUNOUT) * 100.0) / 100.0
 )

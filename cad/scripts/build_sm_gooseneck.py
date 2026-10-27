@@ -2,12 +2,15 @@ r"""Build the gooseneck post with its brazed, through-tapped end plug.
 
 The polished Ø16 x 2-wall tube anchors the stock counter spring above the
 summing lever. Its vertical leg, R51 quarter bend and horizontal arm form
-one hollow tube. A physical Ø12 x 8 AISI 1018 plug is silver-brazed flush
+one hollow tube. A physical Ø12 x 8.80 AISI 1018 plug is silver-brazed flush
 with the arm end, then drilled and tapped #8-32 UNC-2B through (owner ruling
-2026-10-26 (#1951, option B)). Both tap
-ends have a 0.25 x 45-degree break, leaving 7.50 mm nominal full thread
-(6.99 mm minimum at the printed plug-length band). The made MHA-SM-04
-slotted fillister screw is a separate component, not part of this weldment.
+2026-10-26 (#1951, option B)). An arm-end Ø4.70 x 1.37 counterbore clears
+MHA-SM-04's die run-out even with the spring loop clamped coil-bound
+(codjiflo P1 on #1997); its mouth, the tap edge at its floor and the inner
+tap end each carry a 0.25 x 45-degree break, leaving 6.93 mm nominal full
+thread (6.37 mm minimum, ``sm_gooseneck_spring_joint.ENGAGEMENT_MIN``). The
+made MHA-SM-04 slotted fillister screw is a separate component, not part of
+this weldment.
 
 The post slides through the east top-frame hub, whose square-head set screw
 sets its installed height. The stock counter spring's geometry owns that
@@ -17,11 +20,12 @@ puts the spring eye on its counter-anchor axis.
 Layout: origin at the vertical leg's reference mid-height; leg y -330..112.3,
 bend centre (-51, 112.3), arm centreline y 163.3. The straight arm runs
 52.359695 mm west from x -51 to -103.359695; the plug extends east from that
-end face to x -95.359695. The plug's modelling envelope is Ø14, overlapping
+end face to x -94.559695. The plug's modelling envelope is Ø14, overlapping
 the tube's mid-wall by 1 mm so the union adds only the Ø12 bore fill.
 That overlap is not the physical plug diameter on the print.
-``ThreadBore`` is the axial native Hole Wizard tap; ``SpringScrewAxis`` is
-its hidden, equation-driven assembly reference.
+``ThreadBore`` is the axial native Hole Wizard tap, ``Counterbore`` its
+coaxial arm-end run-out relief; ``SpringScrewAxis`` is
+their hidden, equation-driven assembly reference.
 
 Run on a SolidWorks worker::
 
@@ -82,6 +86,8 @@ from sm_gooseneck_geom import (  # noqa: E402
     WALL_T,
 )
 from sm_gooseneck_spring_joint import (
+    COUNTERBORE_DEPTH,
+    COUNTERBORE_DIA,
     EDGE_BREAK,
     PLUG_DIA,
     TAP_DRILL_DIA,
@@ -111,6 +117,7 @@ PLUG_OVERLAP_DIA = TUBE_DIA - WALL_T  # Ø14 modelling union, not the physical �
 # The 1 mm radial overlap merges into the tube wall; added volume is bore fill.
 PLUG_OVERLAP_R = PLUG_OVERLAP_DIA / 2.0
 TAP_DRILL_R = TAP_DRILL_DIA / 2.0
+COUNTERBORE_R = COUNTERBORE_DIA / 2.0
 _BREAK_OVERRUN = 0.5  # each revolved tap-end cutter closes in air
 
 
@@ -150,7 +157,13 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PlugOverlapDia", '"TubeDia" - "WallT"')
     await set_global(adapter, "TapDrillDia", f"{TAP_DRILL_DIA}mm")
     await set_global(adapter, "TapEdgeBreak", f"{EDGE_BREAK}mm")
-    await set_global(adapter, "FullThreadLength", '"PlugLength" - 2 * "TapEdgeBreak"')
+    await set_global(adapter, "CounterboreDia", f"{COUNTERBORE_DIA}mm")
+    await set_global(adapter, "CounterboreDepth", f"{COUNTERBORE_DEPTH}mm")
+    await set_global(
+        adapter,
+        "FullThreadLength",
+        '"PlugLength" - "CounterboreDepth" - 2 * "TapEdgeBreak"',
+    )
 
     # Per-sketch dim names + drive equations are declared inline at each define_*
     # / record call; their drive jobs collect here and apply in one deferred batch
@@ -221,79 +234,135 @@ async def build(adapter) -> dict[str, str]:
     v_tap = math.pi * TAP_DRILL_R**2 * PLUG_LENGTH
     vol = await volume_check(adapter, "plug through tap", vol - v_tap, 0.02 * v_tap)
 
-    # Both tap ends lose 0.25 mm of full thread. These 45-degree cutters run
-    # radially only inside the Ø12 bore, so their overruns remove no tube wall.
-    reach = TAP_DRILL_R + EDGE_BREAK + _BREAK_OVERRUN
-    mouth_apex = ARM_END_X + TAP_DRILL_R + EDGE_BREAK
-    inner_apex = x_plug_in - TAP_DRILL_R - EDGE_BREAK
-    breaks = SketchDims()
-    check("create_sketch tap edge breaks", await adapter.create_sketch("Front"))
+    # 1b. The arm-end counterbore, coaxial with ThreadBore and cut in its setup:
+    # its flat floor sits past the screw's clamped run-out, so the fat
+    # incomplete threads never reach the plug's full 2B thread. One revolved
+    # cutter carries the title-block 0.25 x 45-degree breaks on its mouth and
+    # on the tap edge at its floor; it closes in air outside the end face and
+    # inside the tap drill.
+    x_floor = ARM_END_X + COUNTERBORE_DEPTH
+    cbore_apex = x_floor + EDGE_BREAK
+    x_air = ARM_END_X - _BREAK_OVERRUN
+    cbore_profile = [
+        (cbore_apex, ARM_Y),
+        (cbore_apex, ARM_Y + TAP_DRILL_R),
+        (x_floor, ARM_Y + TAP_DRILL_R + EDGE_BREAK),
+        (x_floor, ARM_Y + COUNTERBORE_R),
+        (ARM_END_X + EDGE_BREAK, ARM_Y + COUNTERBORE_R),
+        (x_air, ARM_Y + COUNTERBORE_R + EDGE_BREAK + _BREAK_OVERRUN),
+        (x_air, ARM_Y),
+    ]
+    cbore = SketchDims()
+    check("create_sketch counterbore", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     check(
-        "tap edge break centerline",
-        await adapter.add_centerline(mouth_apex, ARM_Y, inner_apex, ARM_Y),
+        "counterbore centerline",
+        await adapter.add_centerline(x_air, ARM_Y, cbore_apex, ARM_Y),
     )
-    mouth_profile = [
-        (mouth_apex, ARM_Y),
-        (mouth_apex - reach, ARM_Y + reach),
-        (mouth_apex - reach, ARM_Y),
-    ]
+    cbore_lines = await add_line_chain(adapter, cbore_profile)
+    set_sketch_direct_db(adapter, False)
+    mouth_reach_drive = f'"TapEdgeBreak" + {_BREAK_OVERRUN}mm'
+    await define_polygon_chain(
+        adapter,
+        cbore_lines,
+        cbore_profile,
+        label="counterbore",
+        dims=cbore,
+        names=[
+            "CounterboreApexX",
+            "CounterboreAxisY",
+            "FloorBreakFoot",
+            "FloorBreakRun",
+            "FloorBreakRise",
+            "CounterboreFloor",
+            "CounterboreWall",
+            "MouthBreakRun",
+            "MouthBreakRise",
+            "CounterboreClosure",
+        ],
+        drives=[
+            '-"ArmEndX" - "CounterboreDepth" - "TapEdgeBreak"',
+            '"ArmY"',
+            '"TapDrillDia" / 2',
+            '"TapEdgeBreak"',
+            '"TapEdgeBreak"',
+            '"CounterboreDia" / 2 - "TapDrillDia" / 2 - "TapEdgeBreak"',
+            '"CounterboreDepth" - "TapEdgeBreak"',
+            mouth_reach_drive,
+            mouth_reach_drive,
+            f'"CounterboreDia" / 2 + {mouth_reach_drive}',
+        ],
+    )
+    await ensure_fully_defined(adapter, "counterbore")
+    check("exit_sketch counterbore", await adapter.exit_sketch())
+    name_last_feature(adapter, "CounterboreProfile")
+    drive_jobs += cbore.apply(adapter, "CounterboreProfile")
+    check(
+        "revolve counterbore",
+        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+    )
+    name_last_feature(adapter, "Counterbore")
+    v_cbore = math.pi * (
+        (COUNTERBORE_R**2 - TAP_DRILL_R**2) * COUNTERBORE_DEPTH
+        + EDGE_BREAK**2 * (COUNTERBORE_R + EDGE_BREAK / 3.0)
+        + EDGE_BREAK**2 * (TAP_DRILL_R + EDGE_BREAK / 3.0)
+    )
+    vol = await volume_check(
+        adapter, "arm-end counterbore", vol - v_cbore, 0.02 * v_cbore + 0.05
+    )
+
+    # 1c. The inner tap end keeps its 0.25 x 45-degree break. The cutter runs
+    # radially only inside the Ø12 bore, so its overrun removes no tube wall.
+    reach = TAP_DRILL_R + EDGE_BREAK + _BREAK_OVERRUN
+    inner_apex = x_plug_in - TAP_DRILL_R - EDGE_BREAK
+    inner_break = SketchDims()
+    check("create_sketch inner tap break", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    check(
+        "inner tap break centerline",
+        await adapter.add_centerline(inner_apex, ARM_Y, inner_apex + reach, ARM_Y),
+    )
     inner_profile = [
         (inner_apex, ARM_Y),
         (inner_apex + reach, ARM_Y + reach),
         (inner_apex + reach, ARM_Y),
     ]
-    mouth_lines = await add_line_chain(adapter, mouth_profile)
     inner_lines = await add_line_chain(adapter, inner_profile)
     set_sketch_direct_db(adapter, False)
     break_reach_drive = f'"TapDrillDia" / 2 + "TapEdgeBreak" + {_BREAK_OVERRUN}mm'
-    for prefix, lines, points, apex_drive in (
-        (
-            "Mouth",
-            mouth_lines,
-            mouth_profile,
-            '-"ArmEndX" - "TapDrillDia" / 2 - "TapEdgeBreak"',
-        ),
-        (
-            "Inner",
-            inner_lines,
-            inner_profile,
+    await define_polygon_chain(
+        adapter,
+        inner_lines,
+        inner_profile,
+        label="inner tap break",
+        dims=inner_break,
+        names=[
+            "InnerApexX",
+            "InnerAxisY",
+            "InnerConeRun",
+            "InnerConeRise",
+            "InnerClosure",
+        ],
+        drives=[
             '-"ArmEndX" - "PlugLength" + "TapDrillDia" / 2 + "TapEdgeBreak"',
-        ),
-    ):
-        await define_polygon_chain(
-            adapter,
-            lines,
-            points,
-            label=f"{prefix.lower()} tap break",
-            dims=breaks,
-            names=[
-                f"{prefix}ApexX",
-                f"{prefix}AxisY",
-                f"{prefix}ConeRun",
-                f"{prefix}ConeRise",
-                f"{prefix}Closure",
-            ],
-            drives=[
-                apex_drive,
-                '"ArmY"',
-                break_reach_drive,
-                break_reach_drive,
-                break_reach_drive,
-            ],
-        )
-    await ensure_fully_defined(adapter, "tap edge breaks")
-    check("exit_sketch tap edge breaks", await adapter.exit_sketch())
-    name_last_feature(adapter, "TapEdgeBreakProfile")
-    drive_jobs += breaks.apply(adapter, "TapEdgeBreakProfile")
+            '"ArmY"',
+            break_reach_drive,
+            break_reach_drive,
+            break_reach_drive,
+        ],
+    )
+    await ensure_fully_defined(adapter, "inner tap break")
+    check("exit_sketch inner tap break", await adapter.exit_sketch())
+    name_last_feature(adapter, "InnerTapBreakProfile")
+    drive_jobs += inner_break.apply(adapter, "InnerTapBreakProfile")
     check(
-        "revolve tap edge breaks",
+        "revolve inner tap break",
         await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
-    name_last_feature(adapter, "TapEdgeBreaks")
-    v_breaks = 2.0 * math.pi * EDGE_BREAK**2 * (TAP_DRILL_R + EDGE_BREAK / 3.0)
+    name_last_feature(adapter, "InnerTapBreak")
+    v_inner_break = math.pi * EDGE_BREAK**2 * (TAP_DRILL_R + EDGE_BREAK / 3.0)
     receiver_vol = await volume_check(
-        adapter, "both tap edge breaks", vol - v_breaks, 0.03 * v_breaks + 0.05
+        adapter, "inner tap break", vol - v_inner_break, 0.03 * v_inner_break + 0.05
     )
 
     await name_bore_axis(

@@ -14,6 +14,7 @@ import _config
 from spring_mount_geom import SpringPose
 import sm_gooseneck_geom
 import sm_gooseneck_spring_screw_geom as spring_screw
+import sm_gooseneck_spring_joint as spring_joint
 
 _UNIT_AXIS_ABS_TOL = 1e-12
 _CENTRE_ABS_TOL_MM = 1e-9
@@ -177,8 +178,10 @@ def counter_upper_support_geometry() -> dict[str, str | float]:
     Older integral-shank, purchased-screw and #6-32 die-relief screw
     certificates do not measure this made support: owner ruling 2026-10-26
     (#1951, option B) seats the loop on a plain Ø3.50 shoulder whose 45-degree
-    lead steps up to the #8-32 thread. Channel measurements are unchanged; the
-    analytic force and clearance model never depends on a native certificate.
+    lead steps up to the #8-32 thread, and the plug's arm-end counterbore
+    (codjiflo P1 on #1997) reshapes the face the loop is clamped to. Channel
+    measurements are unchanged; the analytic force and clearance model never
+    depends on a native certificate.
     """
     return {
         "component": "sm-gooseneck-spring-screw",
@@ -199,6 +202,8 @@ def counter_upper_support_geometry() -> dict[str, str | float]:
         "arm_end_x_mm": sm_gooseneck_geom.ARM_END_X,
         "spring_eye_x_mm": sm_gooseneck_geom.SPRING_EYE_X,
         "plug_length_mm": sm_gooseneck_geom.PLUG_LENGTH,
+        "plug_counterbore_dia_mm": spring_joint.COUNTERBORE_DIA,
+        "plug_counterbore_depth_mm": spring_joint.COUNTERBORE_DEPTH,
     }
 
 

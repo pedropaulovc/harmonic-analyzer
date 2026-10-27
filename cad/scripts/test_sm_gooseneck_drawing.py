@@ -22,7 +22,7 @@ def test_physical_plug_and_modelling_overlap_are_distinct() -> None:
     assert part.PLUG_DIA == tube_id == 12.0
     assert tube_id < part.PLUG_OVERLAP_DIA < geom.TUBE_DIA
     assert part.PLUG_OVERLAP_DIA == geom.TUBE_DIA - geom.WALL_T == 14.0
-    assert part.PLUG_LENGTH == 8.0
+    assert part.PLUG_LENGTH == 8.80
 
 
 def test_native_receiver_is_through_tapped_before_the_tube() -> None:
@@ -51,18 +51,46 @@ def test_native_receiver_is_through_tapped_before_the_tube() -> None:
     assert taps[0].lineno < min(node.lineno for node in sweeps)
 
 
-def test_both_tap_breaks_reduce_the_printed_full_thread_length() -> None:
+def test_counterbore_and_inner_break_follow_the_tap_before_the_tube() -> None:
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    tap = source.index('name="ThreadBore"')
+    cbore = source.index('name_last_feature(adapter, "Counterbore")')
+    inner = source.index('name_last_feature(adapter, "InnerTapBreak")')
+    sweep = source.index("create_sweep")
+    assert tap < cbore < inner < sweep
+    assert "TapEdgeBreaks" not in source and '"Mouth"' not in source
+    assert (part.COUNTERBORE_DIA, part.COUNTERBORE_DEPTH) == (
+        joint.COUNTERBORE_DIA,
+        joint.COUNTERBORE_DEPTH,
+    )
+
+
+def test_counterbore_and_breaks_reduce_the_printed_full_thread_length() -> None:
     notes = " ".join(spec.DRAWING_NOTES.split())
-    edge = re.search(r"BREAK BOTH TAP ENDS\s+([\d.]+)\s+X\s+45\s+DEG", notes)
+    cbore = re.search(
+        r"ARM END C'BORE <MOD-DIAM>([\d.]+) X ([\d.]+)-([\d.]+) DEEP,"
+        r" ON TAP AXIS WITHIN ([\d.]+)\.",
+        notes,
+    )
+    edge = re.search(r"BREAK INNER TAP END\s+([\d.]+)\s+X\s+45\s+DEG", notes)
     full = re.search(r"FULL THREAD\s+([\d.]+)\s+NOMINAL;\s+([\d.]+)\s+MIN", notes)
-    assert edge is not None and full is not None
+    assert cbore is not None and edge is not None and full is not None
+    dia, depth_min, depth_max, axis = map(float, cbore.groups())
+    assert (dia, depth_min, depth_max) == (4.70, 1.32, 1.42)
+    assert axis == joint.COUNTERBORE_AXIS_OFFSET_MAX == 0.10
+    assert "SETUP" not in notes  # a requirement, not a method
     edge_break = float(edge.group(1))
     nominal, minimum = map(float, full.groups())
     assert edge_break == 0.25
-    assert nominal == pytest.approx(part.PLUG_LENGTH - 2.0 * edge_break)
-    assert minimum == pytest.approx(nominal - joint.PLUG_LENGTH_BAND)
-    assert (nominal, minimum) == pytest.approx((7.50, 6.99))
+    # The title block's 0.25 break also takes the tap edge at the c'bore floor.
+    depth = (depth_min + depth_max) / 2.0
+    assert nominal == pytest.approx(part.PLUG_LENGTH - depth - 2.0 * edge_break)
+    assert minimum == pytest.approx(
+        part.PLUG_LENGTH - joint.PLUG_LENGTH_BAND - depth_max - 2.0 * edge_break
+    )
+    assert (nominal, minimum) == pytest.approx((6.93, 6.37))
     assert minimum >= 1.5 * (0.164 * 25.4)  # #8 basic major, not its tap drill
+    assert "BREAK BOTH TAP ENDS" not in notes
 
 
 def test_plug_print_uses_physical_size_and_shared_loose_bands() -> None:
@@ -73,7 +101,7 @@ def test_plug_print_uses_physical_size_and_shared_loose_bands() -> None:
         notes,
     )
     assert plug is not None
-    assert tuple(map(float, plug.groups())) == (12.00, 0.51, 8.00, 0.51)
+    assert tuple(map(float, plug.groups())) == (12.00, 0.51, 8.80, 0.51)
     assert re.search(
         r"THREAD AXIS TO TUBE AXIS\s+\+/-" + f"{joint.THREAD_AXIS_OFFSET_MAX:.2f}",
         notes,

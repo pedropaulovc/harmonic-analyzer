@@ -322,6 +322,56 @@ def test_output_onto_the_written_table_is_refused(tmp_path, monkeypatch, alias) 
         driver.main()
 
 
+def test_the_real_source_table_is_never_a_report_target() -> None:
+    from diagnostics import calibrate_spring_seats as driver
+
+    presets = sorted(_config.machine("springs", "presets"))
+    with pytest.raises(ValueError, match="source seat table"):
+        driver._refuse_unsafe_run(presets, driver.SPRINGS_YAML, None)
+
+
+@pytest.mark.parametrize("write", ["none", "elsewhere", "default"])
+@pytest.mark.parametrize("alias", ["same path", "dot-dot spelling", "hard link"])
+def test_output_onto_the_source_table_is_refused(
+    tmp_path, monkeypatch, write, alias
+) -> None:
+    """With no --write, or a --write elsewhere, the report would still replace
+    springs.yaml with JSON (written last, even on failure). Both entry points
+    refuse before native work and leave the table untouched."""
+    import asyncio
+
+    from diagnostics import calibrate_spring_seats as driver
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("a refused run reached native work")
+
+    monkeypatch.setattr(driver.dodo, "_com_seat", forbidden)
+    monkeypatch.setattr(driver, "run_build", forbidden)
+    output, springs = _aliased_report_and_table(tmp_path, alias)
+    springs.write_bytes(driver.SPRINGS_YAML.read_bytes())
+    table_bytes = springs.read_bytes()
+    monkeypatch.setattr(driver, "SPRINGS_YAML", springs)
+    presets = sorted(_config.machine("springs", "presets"))
+    target = {
+        "none": None,
+        "elsewhere": tmp_path / "out" / "x.yaml",
+        "default": springs,
+    }
+    with pytest.raises(ValueError, match="source seat table"):
+        asyncio.run(
+            driver.calibrate(None, presets, output, write=target[write], source="test")
+        )
+    argv = ["calibrate_spring_seats.py", "--presets", *presets, "--output", str(output)]
+    if write == "elsewhere":
+        argv += ["--write", str(target[write])]
+    elif write == "default":
+        argv += ["--write"]
+    monkeypatch.setattr(sys, "argv", argv)
+    with pytest.raises(ValueError, match="source seat table"):
+        driver.main()
+    assert springs.read_bytes() == table_bytes
+
+
 def test_calibrating_every_preset_passes_the_coverage_guard(
     tmp_path, monkeypatch
 ) -> None:
@@ -518,6 +568,99 @@ def test_counter_only_merge_keeps_channel_seats_and_writes_the_given_path(
         )
     header = [line for line in before.splitlines() if line.startswith("#")]
     assert after.splitlines()[: len(header)] == header
+
+
+def test_unchanged_merge_reproduces_the_committed_table_byte_for_byte(
+    tmp_path, monkeypatch
+) -> None:
+    """Merging the table's own counters and source back must emit its exact LF
+    bytes, so a farm leaf's output can be copied into cad/config verbatim. (The
+    checkout may carry CRLF; git stores and _merge_yaml writes LF.)"""
+    import yaml
+
+    from diagnostics import calibrate_spring_seats as driver
+
+    springs = tmp_path / "springs.yaml"
+    springs.write_bytes(driver.SPRINGS_YAML.read_bytes())
+    monkeypatch.setattr(driver, "SPRINGS_YAML", springs)
+    text = springs.read_text(encoding="utf-8")
+    original = yaml.safe_load(text)["springs"]
+    counters = {name: preset["counter"] for name, preset in original["presets"].items()}
+    target = tmp_path / "out" / "springs.yaml"
+
+    driver._merge_yaml(None, counters, original["source"], target)
+
+    assert b"\r" not in target.read_bytes()
+    assert target.read_bytes() == text.encode("utf-8")
+
+
+def _tear_writes(monkeypatch) -> None:
+    """Make the next binary write stop half way through with a disk error."""
+    real = os.fdopen
+
+    class _Torn:
+        def __init__(self, stream) -> None:
+            self.stream = stream
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_exc) -> bool:
+            self.stream.close()
+            return False
+
+        def write(self, data: bytes) -> int:
+            self.stream.write(data[: len(data) // 2])
+            self.stream.flush()
+            raise OSError("disk full")
+
+    monkeypatch.setattr(os, "fdopen", lambda handle, mode: _Torn(real(handle, mode)))
+
+
+def test_a_torn_table_write_leaves_the_previous_table_intact(
+    tmp_path, monkeypatch
+) -> None:
+    from diagnostics import calibrate_spring_seats as driver
+
+    springs = tmp_path / "springs.yaml"
+    springs.write_bytes(driver.SPRINGS_YAML.read_bytes())
+    monkeypatch.setattr(driver, "SPRINGS_YAML", springs)
+    target = tmp_path / "out" / "springs.calibrated.yaml"
+    target.parent.mkdir()
+    target.write_bytes(b"previous table\n")
+    _tear_writes(monkeypatch)
+
+    with pytest.raises(OSError, match="disk full"):
+        driver._merge_yaml(None, {}, "test source", target)
+
+    assert target.read_bytes() == b"previous table\n"
+    assert sorted(target.parent.iterdir()) == [target]
+
+
+def test_a_torn_report_write_leaves_the_previous_report_intact(
+    tmp_path, monkeypatch
+) -> None:
+    import asyncio
+
+    from diagnostics import calibrate_spring_seats as driver
+
+    report = tmp_path / "report.json"
+    report.write_bytes(b'{"status": "previous"}\n')
+    _tear_writes(monkeypatch)
+
+    with pytest.raises(OSError, match="disk full"):  # the failed run's report
+        asyncio.run(
+            driver.calibrate(
+                None,
+                sorted(_config.machine("springs", "presets")),
+                report,
+                write=None,
+                source="test",
+            )
+        )
+
+    assert report.read_bytes() == b'{"status": "previous"}\n'
+    assert sorted(tmp_path.iterdir()) == [report]
 
 
 class _ParallelFaceDistance(_FakeContact):
