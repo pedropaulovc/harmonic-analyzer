@@ -1923,8 +1923,8 @@ CAP_SEATING_STEPS = (
     "C3A.4 FLAT FACES MUST SEAT; REGISTERS MUST NOT BOTTOM. DO NOT PULL A GAP "
     "SHUT WITH THE SCREWS: RE-MACHINE OR REPLACE A FAILED PART.",
     "C3B. NO THREAD-ENGAGEMENT MEASUREMENT: WORST-CASE COMPLETE-THREAD "
-    f"ENGAGEMENT IS {retention.cap_screw_complete_engagement_min():.2f}, UNDER "
-    f"1.5D ({retention.CAP_MIN_COMPLETE_THREAD_ENGAGEMENT:.2f}); OWNER-ACCEPTED.",
+    f"ENGAGEMENT {retention.cap_screw_complete_engagement_min():.2f} MIN (UNDER "
+    f"1.5D, {retention.CAP_MIN_COMPLETE_THREAD_ENGAGEMENT:.2f}).",
     "C3C. LOCK EACH PAIR WITH NEW "
     f"{retention_hardware.WIRE_DIA / retention_hardware.INCH:.3f} STAINLESS WIRE "
     f"{_item(PIVOT_LOCK_WIRE)}:",

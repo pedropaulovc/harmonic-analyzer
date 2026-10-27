@@ -1576,7 +1576,8 @@ def test_c3b_states_the_owner_accepted_engagement_shortfall() -> None:
     assert 0.0 < engagement < minimum
     c3b = next(step for step in spec.CAP_SEATING_STEPS if step.startswith("C3B."))
     assert f"{engagement:.2f}" in c3b and f"{minimum:.2f}" in c3b
-    assert "MIN(" not in c3b and "MAX(" not in c3b
+    # Rule 20: a plain fact, no measurement algebra and no approval wording.
+    assert "MIN(" not in c3b and "MAX(" not in c3b and "ACCEPT" not in c3b
     exceptions = {
         e.id: e
         for e in load_exceptions(
