@@ -641,7 +641,8 @@ GEAR_DATA = gear_data_note(
 # teeth with a leader (rule 7; 2026-10-27 ENFORCE review, r2, r3: loose in
 # the notes block it reached no feature), so the notes block omits it.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
-# Pending exception ruling: MHA-PD-10 flat wall (#1378).
+# Emits approved declaration pd-transgear-feed-pinion RV-03 (owner ruling
+# 2026-10-27, #1378).
 # A shop note states the requirement, not the measuring method or the cutter
 # choice (Main ruling 2026-10-10): the run-out length is dimensioned.
 FLAT_WALL_NOTE = f"D-FLAT WALL TO BORE {FLAT_WALL_PRINTED:.2f} MIN."

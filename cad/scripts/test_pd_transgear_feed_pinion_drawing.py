@@ -390,7 +390,6 @@ def test_sheet_text_names_the_right_parts() -> None:
     assert drill.endswith(f"POSITION SET BY {spec.HUB_NUMBER}")
     assert "CENTRED ON HUB BODY" in hub.OIL_HOLE_CALLOUT_BELOW
     assert f"MATE PIN {spec.PIN_NUMBER}" in spec.BORE_FIT_CALLOUT
-    assert _config.parts("pd-transgear-rear-bushing")["number"] == callouts.REAR_BUSHING_NUMBER
     assert _config.parts("pd-transgear-front-bushing")["number"] == "MHA-PD-25"
 
 

@@ -25,10 +25,6 @@ from pd_transgear_feed_pinion_spec import (
 )
 from pd_transgear_pin_spec import FRONT_BUSHING_NUMBER
 
-# Hard-coded like the spec's part numbers; test_pd_transgear_feed_pinion_drawing
-# checks it against the registry offline.
-REAR_BUSHING_NUMBER = "MHA-PD-24"
-
 TEXT_PREFIX = 1  # swDimensionTextPrefix
 CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 

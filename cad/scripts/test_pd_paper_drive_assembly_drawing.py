@@ -382,7 +382,7 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     # bore.  References and relationship only, not the sentence (codjiflo P3
     # on 482fbdc).
     assert steps.step_number("pin-pressed") < steps.step_number("arm-plate-located")
-    jig = located[: located.index("PER THEIR DRAWINGS")]
+    jig, recheck = located.split("PER THE ARM AND PLATE DRAWINGS", 1)
     for stem in ("pd-transgear-knob-shaft", "pd-rack-pinion"):
         assert _number(stem) in jig
     assert "MESH" in jig
@@ -391,6 +391,12 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     assert f"{disc.CENTRE_DISTANCE:.3f}" in jig
     for reference in ("KNOB BORE", f"PRESSED {pin} PIN", "GAUGE PIN", "CLAMP"):
         assert reference in jig, reference
+    # The setting and the clamped re-check carry the mesh's window, the
+    # acceptance the arm and plate sheets cite for this step (codjiflo P2 on
+    # 1b09cec).
+    tol = f"\u00b1{disc.CENTRE_DISTANCE_SET_TOL:.3f}"
+    assert f"SET {disc.CENTRE_DISTANCE:.3f} {tol}" in jig
+    assert f"RE-CHECK CLAMPED: CENTRES STILL WITHIN {tol}." in recheck
     assert "MATCH-DRILL AND REAM THE LOCATING HOLES" in located
     assert (
         f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "
