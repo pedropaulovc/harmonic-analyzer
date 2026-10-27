@@ -51,6 +51,7 @@ from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_registry import DRAWINGS_BY_NAME
+from _named_views import octant_view_name
 from _machinist_review_mode import MachinistReviewMode
 from _ms_drawing_contract import assert_manufacturing_dimensions
 from solidworks_mcp.adapters.com_variant import double_array
@@ -358,8 +359,13 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to activate stick envelope sheet")
     front = place_view(adapter, str(SOURCE), "*Back", *FRONT_CENTER, scale=SHEET_SCALE)
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=SHEET_SCALE)
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1.0, 2.0))
+    # Built-in *Isometric showed only the plain back face (machinist review,
+    # run 20261027T054106110Z-752837f3): place the part's ruled-face octant
+    # and turn it like the RULED FACE view so ticks and numerals read.
+    iso = place_view(adapter, str(SOURCE), octant_view_name(*callouts.RULED_FACE_ISOMETRIC_OCTANT),
+                     *ISO_CENTER, scale=(1.0, 2.0))
     _rotate_ruled_face(adapter, front)
+    _rotate_ruled_face(adapter, iso)
     for view in (front, top, iso):
         set_hidden_lines_removed(adapter, view)
     annotations = []
