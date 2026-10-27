@@ -32,7 +32,9 @@ dependencies = [
     #            spine). Was only transitive; declared direct so a dep bump can't drop it.
     "filelock>=3.13",
     # Blind machinist review uses the SDK transport with explicit API credentials.
-    "claude-agent-sdk==0.1.76",
+    # The SDK bundles the Claude Code CLI; claude-opus-5-5 requires CLI >= 2.1.280
+    # (0.2.174 bundles 2.1.310; 0.1.76's 2.1.132 is refused with an API 400).
+    "claude-agent-sdk==0.2.174",
     "pyyaml>=6.0",
     "pillow>=10.0",
     "numpy>=1.26",
