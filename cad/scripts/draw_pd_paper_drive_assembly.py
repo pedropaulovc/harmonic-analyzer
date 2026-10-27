@@ -1305,11 +1305,15 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "ARM'S REAMED HOLE FROM THE REAR TILL ITS HEAD SEATS ON THE ARM."
         ),
         "arm-plate-located": (
+            # The package builds no jig: the step says how the distance is
+            # set and checked (2026-10-27 ENFORCE review, r1, r2).
             f"CLAMP {_N['pd-transgear-arm']} AND {_N['pd-transgear-arm-plate']} "
-            "TOGETHER IN A JIG HOLDING THE PLATE'S KNOB BORE "
+            "TOGETHER, THE PLATE'S KNOB BORE "
             f"{disc.CENTRE_DISTANCE:.3f} FROM THE ARM'S PIN BORE (THE "
             f"{_N['pd-transgear-knob-shaft']} {KNOB_TEETH}T / {_N['pd-rack-pinion']} "
-            f"{disc.TEETH}T MESH), PER THEIR DRAWINGS; "
+            f"{disc.TEETH}T MESH): A SNUG GAUGE PIN IN EACH BORE, SET "
+            f"{disc.CENTRE_DISTANCE:.3f} PLUS HALF EACH PIN'S DIAMETER OVER THE PINS; "
+            "RE-CHECK CLAMPED. PER THEIR DRAWINGS; "
             "MATCH-DRILL AND REAM THE LOCATING HOLES. "
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-locating-pin']} "
             f"{_N['pd-vn-transgear-arm-plate-locating-pin']} DOWELS INTO THE ARM "

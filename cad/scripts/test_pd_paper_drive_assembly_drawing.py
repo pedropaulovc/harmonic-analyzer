@@ -345,14 +345,20 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
         f"{_number('pd-vn-transgear-arm-plate-locating-pin')} DOWELS"
     ) in located
     assert (
-        "TOGETHER IN A JIG HOLDING THE PLATE'S KNOB BORE "
+        "TOGETHER, THE PLATE'S KNOB BORE "
         f"{disc.CENTRE_DISTANCE:.3f} FROM THE ARM'S PIN BORE"
     ) in located
-    # The step names the mesh that centre distance sets.
+    # The step names the mesh that centre distance sets, and how it is set
+    # and checked: the package builds no jig.
     jig = located[: located.index("PER THEIR DRAWINGS")]
     for stem in ("pd-transgear-knob-shaft", "pd-rack-pinion"):
         assert _number(stem) in jig
     assert "MESH" in jig
+    assert "JIG" not in jig
+    assert (
+        f"A SNUG GAUGE PIN IN EACH BORE, SET {disc.CENTRE_DISTANCE:.3f} PLUS HALF "
+        "EACH PIN'S DIAMETER OVER THE PINS; RE-CHECK CLAMPED."
+    ) in jig
     assert "MATCH-DRILL AND REAM THE LOCATING HOLES" in located
     assert (
         f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "

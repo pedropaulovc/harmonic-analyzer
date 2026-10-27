@@ -210,7 +210,9 @@ def _left_of(edge_x: float, width: float) -> float:
 _FACE_WIDTH_TEXT_WIDTH = 0.0627
 _FLAT_END_TEXT_WIDTH = 0.0601
 RIGHT_KEEP: dict[str, tuple[float, float]] = {
-    "OutsideDia": (_REAR_X - 0.040, RIGHT_CENTER[1]),
+    # 4 mm farther out than run 20261027T064211655Z, whose "RACK" touched
+    # the bore dimension's lower extension line (r1, r3).
+    "OutsideDia": (_REAR_X - 0.044, RIGHT_CENTER[1]),
     "BossDia": (_NOSE_X + 0.064, RIGHT_CENTER[1]),
     # Its dimension line stands just right of the nose; the text prints right
     # of the line, below the flat (run 20261027T032128736Z: 30 mm out, the
@@ -276,15 +278,18 @@ REAR_KEEP: dict[str, tuple[float, float]] = {
 
 # The oil hole lies in the section plane (+Y), so the cut shows it as a gap in
 # the upper boss wall; the note's leader lands mid-wall on its front edge.
-# The note stands above the section, right of the bore's shelf text and left
-# of the isometric.  It is match drilled with the hub seated, so the hub's
+# The note stands above the section, its first row ending just left of the
+# hole, so the leader leaves that row's right end and runs down clear of the
+# text (run 20261027T064211655Z: standing right of the hole, the leader left
+# the first row's left end and struck both rows, r1, r2).  It is match
+# drilled with the hub seated, so the hub's
 # sheet sets its position (CENTRED ON HUB BODY,
 # pd_transgear_disc_hub_spec.OIL_HOLE_CALLOUT_BELOW); the second row says so
 # (2026-10-27 ENFORCE review, r1-r3: the match drill named no locating part).
 OIL_HOLE_NOTE = "\n".join(
     (
         f"\u00d8{OIL_HOLE_DIA:.1f} OIL HOLE: DRILL AT ASSY WITH {HUB_NUMBER} THRU HUB AND BOSS",
-        # Short: it hangs left of the isometric's top.
+        # Shorter than the first row, so the leader passes right of it.
         f"POSITION SET BY {HUB_NUMBER}",
     )
 )
@@ -292,7 +297,8 @@ OIL_HOLE_EDGE = (
     _side_x(OIL_HOLE_SLEEVE_Z + OIL_HOLE_DIA / 2.0),
     RIGHT_CENTER[1] + (BORE_DIA + BOSS_DIA) / 4.0 * VIEW_SCALE[0] / 1000.0,
 )
-OIL_HOLE_CALLOUT = (_REAR_X + 0.035, _SIDE_TOP + 0.079)
+_OIL_HOLE_NOTE_WIDTH = 0.151  # its first row, as run 20261027T064211655Z drew it
+OIL_HOLE_CALLOUT = (OIL_HOLE_EDGE[0] - 0.008 - _OIL_HOLE_NOTE_WIDTH, _SIDE_TOP + 0.079)
 NOTE_HEIGHT = 0.0025
 
 _BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
