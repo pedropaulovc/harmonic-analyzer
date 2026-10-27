@@ -76,7 +76,9 @@ SPARE_SPROCKET_STEM = "pd-transgear-removable"
     for name, _teeth in removable.CONFIGS
     if name not in {removable.CRANK_CONFIG, removable.KNOB_CONFIG}
 )
-SPARE_SPROCKET_NUMBER = str(_config.parts(SPARE_SPROCKET_STEM)["number"])
+# A literal stem, so the recipe's config-dependency analysis reads exactly
+# this row (a variable stem reaches every parts/* row).
+SPARE_SPROCKET_NUMBER = str(_config.parts("pd-transgear-removable")["number"])
 PAPER_DRIVE_ITEM = str(BOM_ORDER.index(PAPER_DRIVE) + 1)
 # The label's leader tip: a point on the spare's upper plate face, part
 # millimetres (plate local z 0..PLATE), on the local x axis between the
