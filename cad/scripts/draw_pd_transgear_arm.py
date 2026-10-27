@@ -147,8 +147,10 @@ END_CENTER = (0.357, FRONT_CENTER[1])
 # caption over it: under section A-A the plate taps' projected-zone chain
 # lines run 13.5 mm below the rear face, and A-A's own caption, which hangs
 # below the view's extent, follows them down into the isometric's old place.
-ISO_CENTER = (0.105, 0.034)
-ISO_NOTE_XY = (0.075, 0.066)
+# Both stand right of the floor depth's text (FLOOR_TEXT_XY), its note 4 mm
+# off it and as far off A-A's caption.
+ISO_CENTER = (0.1325, 0.034)
+ISO_NOTE_XY = (0.103, 0.066)
 # Under the end view's pin callout and on its axis; its label clears the
 # title block and section A-A's 8.50.  The socket mouths face right, and the
 # column right of them holds the sockets' position frames inside the border.
@@ -239,11 +241,15 @@ OVERALL_PICKS = (
     (_front_x(-_FLANK), _front_y(_FLANK)),
     (_front_x(TIP_STATION), _front_y(3.0)),
 )
-# The floor depth's dimension line runs 2 mm off the section's pivot end,
+# The floor depth's dimension line runs 4 mm off the section's pivot end,
 # outside its witness lines. Its text, which names the spring it preloads,
 # is wider than the 31 mm between that line and the left border, so it
-# stands off the line on a leader (the stock text's idiom), centred in the
-# lower-left corner under the section and left of the isometric's note.
+# stands off the line on a leader (the stock text's idiom) under the
+# section, RIGHT of the line: the leader runs from the line to the near
+# (left) end of the text's underline, outside the text. Left of the line,
+# it ran to the underline's right end up through the text (run
+# 20261027T223014650Z, layout audit extension-through-own-text, 3.3 mm).
+# 4 mm, not 2: the leader then passes the pivot end's lower corner clear.
 # The spot face's callout stands right of its extension lines, above the
 # section (machinist review: between them, the lines struck its text; an
 # above-the-value callout prints one line only), clear of the overall
@@ -253,7 +259,7 @@ SECTION_KEEP = {
     # arrow ends on face A under its last line (run
     # 20261027T180656347Z: 1.9 mm, under the 2.0 arrow clearance).
     "SpotFaceDia": (0.1295, SECTION_CENTER[1] + 0.0196),
-    "FloorDepth": (_front_x(-PIVOT_END_R) - 0.002, SECTION_CENTER[1] - 0.022),
+    "FloorDepth": (_front_x(-PIVOT_END_R) - 0.004, SECTION_CENTER[1] - 0.022),
     # 4 mm higher than 0.020: its dimension line stood 1.8 mm over the
     # title block (review of 2ac1bdb28).
     "PinHoleDepth": (
@@ -261,7 +267,10 @@ SECTION_KEEP = {
         SECTION_CENTER[1] - 0.016,
     ),
 }
-FLOOR_TEXT_XY = (0.040, 0.058)
+# Its left edge stands 12 mm right of the line, so the leader keeps 2 mm
+# off "SETS PRELOAD OF", the widest line; its top 2.7 mm under the plate
+# tap's frame.
+FLOOR_TEXT_XY = (0.075, 0.055)
 # Section A-A's column right of the stud bore, where both its frames stand.
 _STUD_FRAME_X = _front_x(PIN_STATION) + 0.012
 END_KEEP = {

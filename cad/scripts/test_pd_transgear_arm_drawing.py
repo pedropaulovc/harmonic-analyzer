@@ -514,7 +514,9 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
     crossed it before. Review of 2ac1bdb28: the floor's text names its
     spring, wider than the room left of its line, so it stands off the line
     on a leader, under the section and clear of the isometric's note and the
-    plate tap's frame."""
+    plate tap's frame. Run 20261027T223014650Z: left of its line, the leader
+    ran to the underline's right end up through the text, so the text
+    stands right of its line."""
     lines = ["6.40 \u00b10.05", *spec.FLOOR_DEPTH_CALLOUT.splitlines()]
     width = max(map(len, lines)) * _CAPS_CHAR_WIDTH
     half_height = len(lines) * _LINE_PITCH / 2.0
@@ -530,6 +532,7 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
     # Too wide to hang left of its line inside the border: hence the leader.
     line_x = drawing.SECTION_KEEP["FloorDepth"][0]
     assert line_x - width < _BORDER
+    assert floor[0] > line_x + 0.005
     # The line stands off the pivot end it dimensions.
     pivot_end_x = drawing._front_x(-geometry.PIVOT_END_R)
     assert line_x < pivot_end_x
