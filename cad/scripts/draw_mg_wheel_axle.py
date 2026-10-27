@@ -64,6 +64,7 @@ from mg_wheel_axle_spec import (
     BACK_Y,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    LIMIT_PAIRS,
     PIN_DIA,
     RELIEF_DIA,
     RELIEF_ROOT_R,
@@ -75,6 +76,7 @@ from mg_wheel_axle_spec import (
     THREAD_END_Y,
     THREAD_MAJOR,
     TIP_Y,
+    TOL_TYPE_LIMIT,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -206,12 +208,12 @@ RELIEF_ROOT_CENTRES_MM = tuple(
 ROOT_TIP_TOL_M = 0.0002
 DETAIL_KEEP = {
     # Under the crop: its extension lines fall from the floor's two ends
-    # through the groove's air; its text block (~58 mm wide: the value over
-    # its two-line mate callout) stands wholly right of the flank's extension
-    # line (x 0.0855) with 4 mm air, and its top clears the crop circle (run
-    # 20261027T030250671Z: centred between the extension lines, both struck
-    # every line of it).
-    "ReliefWidth": (0.1185, _DETAIL_BOTTOM - 0.008),
+    # through the groove's air; its text block (~58 mm wide: the LIMIT pair
+    # over its two-line mate callout) stands wholly right of the crop circle
+    # (rightmost x ~0.100), so a taller pair cannot reach the circle, and
+    # right of the flank's extension line (run 20261027T030250671Z: centred
+    # between the extension lines, both struck every line of it).
+    "ReliefWidth": (0.1295, _DETAIL_BOTTOM - 0.010),
     # Over the crop: its line runs between the two floors 0.3 (3 mm) from the
     # step, inside the flat floor (the step's root ends 0.4 from it) and left
     # of the radius's arrow, then rises through the groove's open mouth.
@@ -548,14 +550,25 @@ def _plain_text(text: str) -> str:
     return " ".join(str(text).split())
 
 
+NOTE_POSITION_TOL_M = 1e-5
+
+
 def _add_view_note(
     adapter: Any, view: Any, text: str, xy: tuple[float, float], *, label: str
 ) -> None:
     """A free note in ``view`` at ``xy`` (its top-left corner); a note that
-    did not land in its view raises."""
+    did not land in its view, or did not keep its position (the adapter only
+    warns when SetPosition is refused), raises."""
     _activate_view(adapter, view, label=label)
-    if add_note(adapter, text, *xy) is None:
+    note = add_note(adapter, text, *xy)
+    if note is None:
         raise RuntimeError(f"failed to add the {label} note")
+    annotation = _early_bound(
+        _early_bound(note, "INote").GetAnnotation(), "IAnnotation"
+    )
+    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    if len(position) < 2 or math.dist(position[:2], xy) > NOTE_POSITION_TOL_M:
+        raise RuntimeError(f"{label} note sits at {position!r}, not {xy!r}")
     texts = [
         _plain_text(_early_bound(found, "INote").GetText() or "")
         for found in (_early_bound(view, "IView").GetNotes() or ())
@@ -582,29 +595,38 @@ def _label_detail(
         _add_view_note(adapter, view, text, xy, label=label)
 
 
-def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
-    matches = [a for a in annotations if dimension_name(adapter, a) == name]
-    if len(matches) != 1:
-        raise RuntimeError(f"expected one wheel-axle {name} dimension")
-    return matches[0]
+def _by_name(adapter: Any, annotations: list[Any]) -> dict[str, Any]:
+    """Each imported dimension by its model name, resolved once; a name
+    imported twice raises."""
+    found: dict[str, Any] = {}
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if not name:
+            continue
+        if name in found:
+            raise RuntimeError(f"wheel-axle {name} dimension imported twice")
+        found[name] = annotation
+    return found
 
 
-def _break_line_at_text(adapter: Any, annotations: list[Any], name: str) -> None:
-    """Put ``name``'s value in a break of its dimension line, read back
-    (draw_ch_channel_assembly._break_line_at_text)."""
-    display = _early_bound(
-        _early_bound(
-            _named(adapter, annotations, name), "IAnnotation"
-        ).GetSpecificAnnotation(),
+def _display(annotation: Any) -> Any:
+    return _early_bound(
+        _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
         "IDisplayDimension",
     )
+
+
+def _break_line_at_text(named: dict[str, Any], name: str) -> None:
+    """Put ``name``'s value in a break of its dimension line, read back
+    (draw_ch_channel_assembly._break_line_at_text)."""
+    display = _display(named[name])
     if display.SetBrokenLeader2(False, BROKEN_LINE_ALIGNED_TEXT) != 0:
         raise RuntimeError(f"wheel axle {name}: failed to break the dimension line")
     if int(display.GetBrokenLeader2()) != BROKEN_LINE_ALIGNED_TEXT:
         raise RuntimeError(f"wheel axle {name}: broken dimension line did not persist")
 
 
-def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
+def _assert_part_authored_text(named: dict[str, Any]) -> None:
     """Every imported dimension prints the text lanes its part authored
     (draw_pd_transgear_pin).
 
@@ -613,21 +635,12 @@ def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
     the sheet would write through to the source part (#1942).
     """
     wanted = callouts.authored_by_name()
-    displays: dict[str, list[Any]] = {name: [] for name in wanted}
-    for annotation in annotations:
-        name = dimension_name(adapter, annotation)
-        if name in displays:
-            displays[name].append(
-                _early_bound(
-                    _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
-                    "IDisplayDimension",
-                )
-            )
-    counts = {name: len(found) for name, found in displays.items() if len(found) != 1}
-    if counts:
-        raise RuntimeError(f"authored dimensions not printed exactly once: {counts!r}")
+    missing = sorted(set(wanted) - set(named))
+    if missing:
+        raise RuntimeError(f"authored dimensions not printed: {missing!r}")
+    displays = {name: _display(named[name]) for name in wanted}
     printed = {
-        (name, lane): str(displays[name][0].GetText(lane) or "")
+        (name, lane): str(displays[name].GetText(lane) or "")
         for name, lanes in wanted.items()
         for lane in lanes
     }
@@ -642,45 +655,57 @@ def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
         )
 
 
-def _assert_single_limits(adapter: Any, annotations: list[Any]) -> None:
-    """Each relief size imported with its part's native MAX type and value."""
+def _assert_relief_limits(named: dict[str, Any]) -> None:
+    """Each relief size imported with its part's native tolerance: the Ø
+    and root radius single limits, the width's LIMIT pair."""
     for (_feature, name), (limit, tol_type) in SINGLE_LIMITS.items():
-        display = _early_bound(
-            _early_bound(
-                _named(adapter, annotations, name), "IAnnotation"
-            ).GetSpecificAnnotation(),
-            "IDisplayDimension",
-        )
-        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        dimension = _early_bound(_display(named[name]).GetDimension2(0), "IDimension")
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         if int(tolerance.Type) != tol_type:
             raise RuntimeError(
-                f"{name} lost its native MAX type: {int(tolerance.Type)}"
+                f"{name} lost its native single-limit type: {int(tolerance.Type)}"
             )
         if not math.isclose(float(dimension.SystemValue), limit / 1000.0, abs_tol=1e-9):
             raise RuntimeError(f"{name} does not measure its part's limit {limit}")
+    for (_feature, name), (low, high) in LIMIT_PAIRS.items():
+        dimension = _early_bound(_display(named[name]).GetDimension2(0), "IDimension")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        value = float(dimension.SystemValue)
+        read = (
+            value + float(tolerance.GetMinValue()),
+            value + float(tolerance.GetMaxValue()),
+        )
+        if int(tolerance.Type) != TOL_TYPE_LIMIT or not all(
+            math.isclose(got, want / 1000.0, abs_tol=1e-9)
+            for got, want in zip(read, (low, high), strict=True)
+        ):
+            raise RuntimeError(
+                f"{name} lost its part's pair: type {int(tolerance.Type)}, {read!r} m"
+            )
 
 
-def _dress_relief_roots(adapter: Any, detail: Any, annotations: list[Any]) -> None:
-    """Land detail A's ReliefRootR leader on a root's circle, on its text's
-    side (draw_mg_magnifying_vertical_rod._dress_relief_roots).
-
-    Read back: radial. SolidWorks ends a radial leader at the circle point
-    facing its text and does not carry it through the centre, so
-    ``ArcExtensionLineOrOppositeSide`` True draws the arc's extension out to
-    that point. The rebuilt arrow tip must sit on one root's circle (either
-    root, either side of the axis), on its text's side of that root's centre.
-    """
-    annotation = _early_bound(
-        _named(adapter, annotations, "ReliefRootR"), "IAnnotation"
-    )
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+def _dress_relief_roots(adapter: Any, named: dict[str, Any]) -> None:
+    """Draw detail A's ReliefRootR leader out along its arc's extension
+    (draw_mg_magnifying_vertical_rod._dress_relief_roots): SolidWorks ends a
+    radial leader at the circle point facing its text and does not carry it
+    through the centre, so ``ArcExtensionLineOrOppositeSide`` True draws the
+    arc's extension out to that point."""
+    display = _display(named["ReliefRootR"])
     if bool(display.Diametric):
         raise RuntimeError("the imported relief root radius is not radial")
     display.ArcExtensionLineOrOppositeSide = True
     if display.ArcExtensionLineOrOppositeSide is not True:
         raise RuntimeError("ReliefRootR refused its arc extension line")
     rebuild_drawing(adapter, label="relief roots radius leader")
+
+
+def _assert_relief_root_landing(
+    adapter: Any, detail: Any, named: dict[str, Any]
+) -> None:
+    """The rebuilt ReliefRootR arrow tip sits on one root's circle (either
+    root, either side of the axis), on its text's side of that root's
+    centre."""
+    display = _display(named["ReliefRootR"])
     raw = display.GetDisplayData()
     if raw is None:
         raise RuntimeError("ReliefRootR has no rebuilt display data")
@@ -712,6 +737,18 @@ def _dress_relief_roots(adapter: Any, detail: Any, annotations: list[Any]) -> No
         f"ReliefRootR's arrow tip {tip} is on no relief root's circle on its "
         f"text's side (R {radius})"
     )
+
+
+def _assert_detail_settled(adapter: Any, detail: Any, named: dict[str, Any]) -> None:
+    """After finalize's last rebuild: detail A still holds its three
+    dimensions, their limits and authored text, and the radius still lands
+    on a root."""
+    lost = sorted(set(DETAIL_KEEP) - set(_view_dimension_names(adapter, detail)))
+    if lost:
+        raise RuntimeError(f"relief detail lost {lost} by the settling rebuild")
+    _assert_relief_limits(named)
+    _assert_part_authored_text(named)
+    _assert_relief_root_landing(adapter, detail, named)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -782,17 +819,19 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     annotations = [*side_annotations, *detail_annotations]
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    _assert_part_authored_text(adapter, annotations)
-    _assert_single_limits(adapter, annotations)
-    _dress_relief_roots(adapter, detail, annotations)
+    named = _by_name(adapter, annotations)
+    _assert_part_authored_text(named)
+    _assert_relief_limits(named)
+    _dress_relief_roots(adapter, named)
+    _assert_relief_root_landing(adapter, detail, named)
     for name in BROKEN_LINE_DIMENSIONS:
-        _break_line_at_text(adapter, annotations, name)
+        _break_line_at_text(named, name)
     rebuild_drawing(adapter, label="wheel axle broken dimension lines")
     # Both lengths read from the step: the origin circle on its extension line.
     for name in ORIGIN_DIMENSIONS:
         _set_dimension_origin(
             adapter,
-            _named(adapter, annotations, name),
+            named[name],
             origin_x=spt(STEP_X, 0.0)[0],
             label=f"wheel axle {name}",
         )
@@ -843,6 +882,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Wheel Axle Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(lambda: _assert_detail_settled(adapter, detail, named),),
     )
 
 

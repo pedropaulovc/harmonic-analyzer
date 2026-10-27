@@ -67,18 +67,28 @@ def test_thread_relief_is_cut_under_the_die_root() -> None:
     assert (spec.RELIEF_DIA, spec.RELIEF_WIDTH, spec.RELIEF_ROOT_R) == (1.85, 1.10, 0.2)
     assert spec.RELIEF_DIA <= spec.THREAD_ROOT_2A_MIN < spec.THREAD_BASIC_MINOR
     assert spec.RELIEF_WIDTH >= spec.THREAD_PITCH
-    assert 2.0 * spec.RELIEF_ROOT_R < spec.RELIEF_WIDTH
+    assert 2.0 * spec.RELIEF_ROOT_R < spec.RELIEF_WIDTH_MIN
     assert spec.FULL_THREAD_FROM_STEP_MAX == spec.RELIEF_WIDTH
-    # Every relief size prints as a single MAX limit at its model value.
+    # The Ø and root radius print as single MAX limits at their model values;
+    # the width as a LIMIT pair whose MIN holds rule 16's one pitch.
     assert spec.SINGLE_LIMITS == {
-        ("PinProfile", "ReliefWidth"): (1.10, spec.TOL_TYPE_MAX),
         ("PinProfile", "ReliefDia"): (1.85, spec.TOL_TYPE_MAX),
         ("ReliefRoots", "ReliefRootR"): (0.2, spec.TOL_TYPE_MAX),
     }
+    assert spec.LIMIT_PAIRS == {("PinProfile", "ReliefWidth"): (0.70, 1.10)}
+    assert spec.THREAD_PITCH <= spec.RELIEF_WIDTH_MIN
     assert spec.TOL_TYPE_MAX == 6  # swTolType_e.swTolMAX
+    assert spec.TOL_TYPE_LIMIT == 3  # swTolType_e.swTolLIMIT
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'name_last_feature(adapter, "ReliefRoots")' in source
     assert "_single_limits(adapter)" in source
+    assert "_limit_pairs(adapter)" in source
+
+
+def test_volume_gates_see_the_relief() -> None:
+    # codjiflo #1996: a whole-part 0.5% gate passed an unrelieved solid.
+    assert part.PIN_VOLUME_TOL < part.V_RELIEF_GROOVE
+    assert part.ROOTS_VOLUME_TOL < part.V_RELIEF_ROOTS
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
@@ -214,7 +224,8 @@ def test_callouts_are_part_authored_and_only_read_by_the_sheet() -> None:
     assert "SetText" not in drawing_source
     assert "set_dimension_callouts" not in drawing_source
     assert "set_reference_dimension" not in drawing_source
-    assert "_assert_part_authored_text(adapter, annotations)" in drawing_source
+    assert "_assert_part_authored_text(named)" in drawing_source
+    assert "settled_checks=" in drawing_source
     assert "author_dimension_callouts(adapter)" in Path(part.__file__).read_text(
         encoding="utf-8"
     )

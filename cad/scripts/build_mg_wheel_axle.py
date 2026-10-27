@@ -80,6 +80,7 @@ from mg_wheel_axle_spec import (
     PRESS_GAUGE,
     SHANK_LEN,
     STEP_Y,
+    LIMIT_PAIRS,
     SINGLE_LIMITS,
     SURFACE_FINISHES,
     THREAD,
@@ -90,6 +91,7 @@ from mg_wheel_axle_spec import (
     RELIEF_DIA,
     RELIEF_ROOT_R,
     RELIEF_WIDTH,
+    TOL_TYPE_LIMIT,
     TIP_Y,
 )
 
@@ -113,6 +115,13 @@ _ROOT_CENTROID_R = (
 )
 V_RELIEF_ROOTS = 2.0 * 2.0 * math.pi * _ROOT_CENTROID_R * _ROOT_SPANDREL
 V_TOTAL = V_PROFILE + V_RELIEF_ROOTS
+# The groove's cut, about 4.0 mm^3: under the whole-part 0.5% (4.4 mm^3) an
+# unrelieved solid would pass (codjiflo #1996), so the revolve's gate is a
+# quarter of the groove and the roots' fillet is read as its own delta.
+V_RELIEF_GROOVE = math.pi * (THREAD_R**2 - RELIEF_R**2) * RELIEF_WIDTH
+PIN_VOLUME_TOL = 0.25 * V_RELIEF_GROOVE
+ROOTS_VOLUME_TOL = 0.5 * V_RELIEF_ROOTS
+NEUTRAL_VOLUME_TOL = 0.01
 
 
 def _single_limits(adapter) -> None:
@@ -132,6 +141,35 @@ def _single_limits(adapter) -> None:
         if not tolerance.SetValues(0.0, 0.0) or int(tolerance.Type) != tol_type:
             raise RuntimeError(f"{label}: cannot retain the single limit {tol_type}")
         _telemetry.success(f"{label}: single limit (swTolType {tol_type})")
+
+
+def _limit_pairs(adapter) -> None:
+    """Each LIMIT_PAIRS dimension printed as its MIN/MAX pair, the model at
+    the MAX (build_mg_output_fixture's LIMIT form), at its own places, read
+    back."""
+    for (feature, name), (low, high) in LIMIT_PAIRS.items():
+        label = f"{name}@{feature}"
+        display, dimension = _named_dimension(adapter, feature, name)
+        value = float(dimension.SystemValue) * 1000.0
+        if not math.isclose(value, high, abs_tol=1e-6):
+            raise RuntimeError(f"{label}: nominal {value:.7f} is not its MAX {high}")
+        lower, upper = (low - high) / 1000.0, 0.0
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        tolerance.Type = TOL_TYPE_LIMIT
+        if tolerance.SetValues(lower, upper) is not True:
+            raise RuntimeError(f"{label}: LIMIT deviations were rejected")
+        if (
+            int(tolerance.Type) != TOL_TYPE_LIMIT
+            or not math.isclose(float(tolerance.GetMinValue()), lower, abs_tol=1e-12)
+            or not math.isclose(float(tolerance.GetMaxValue()), upper, abs_tol=1e-12)
+        ):
+            raise RuntimeError(f"{label}: LIMIT tolerance readback changed")
+        places = DRAWING_PRECISION[feature][name]
+        display = _early_bound(display, "IDisplayDimension")
+        display.SetPrecision3(-1, -1, places, -1)
+        if int(display.GetPrimaryTolPrecision2()) != places:
+            raise RuntimeError(f"{label}: LIMIT precision did not persist")
+        _telemetry.success(f"{label}: LIMIT {high:.{places}f}/{low:.{places}f}")
 
 
 def author_dimension_callouts(adapter) -> None:
@@ -292,7 +330,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += profile.apply(adapter, "PinProfile")
     check("revolve pin", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Pin")
-    await volume_check(adapter, "pin", V_PROFILE, 0.005 * V_PROFILE)
+    pin_volume = await volume_check(adapter, "pin", V_PROFILE, PIN_VOLUME_TOL)
 
     # The relief's two internal corners (drawing-guidelines.md rule 16), ONE fillet over both
     # circular edges, each picked on the floor's radius at its corner: the
@@ -310,7 +348,9 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs.append(
         (name_dimensions(adapter, "ReliefRoots", ["ReliefRootR"])[0], '"ReliefRootR"')
     )
-    await volume_check(adapter, "relief roots", V_TOTAL, 0.005 * V_TOTAL)
+    rooted = await volume_check(
+        adapter, "relief roots", pin_volume + V_RELIEF_ROOTS, ROOTS_VOLUME_TOL
+    )
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
@@ -319,7 +359,7 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     driven = await volume_check(
-        adapter, "driven pin (equations neutral)", V_TOTAL, 0.005 * V_TOTAL
+        adapter, "driven pin (equations neutral)", rooted, NEUTRAL_VOLUME_TOL
     )
 
     # Cosmetic #4-40 from the thread's dome-end edge back to the relief, so
@@ -350,6 +390,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "PinProfile", "ThreadLength", *deviations(THREAD_LEN_BAND)
     )
     _single_limits(adapter)
+    _limit_pairs(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

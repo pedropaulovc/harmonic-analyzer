@@ -51,16 +51,21 @@ THREAD_ROOT_2A_MIN = (0.0925 - 0.649519 / 40.0) * MM_PER_IN  # 1.937
 # that runs to a shoulder gets a relief of at least one pitch; the 2026-10-24
 # ENFORCE review's blocker). The die's lead runs out in the groove, so full
 # thread reaches the groove's far edge. Like the vertical rod's (MHA-MG-04),
-# the groove mates with nothing and every size is a single MAX limit
-# (swTolMAX prints the model value, so the model IS the limit): its Ø under
-# the die's root; its width, model 1.10 >= the die's 1.5-pitch lead, held
+# the groove mates with nothing: its Ø and root radius print as single MAX
+# limits (swTolMAX prints the model value, so the model IS the limit), its Ø
+# under the die's root, both internal corners the grooving tool's nose, R0.2
+# MAX (the title block's R1.0 would not fit the groove). Its width prints as
+# a LIMIT pair: the model 1.10 >= the die's 1.5-pitch lead is the MAX, held
 # under the first nut's worst-case station off the step (mg_wheel_group
 # NUT_RUNOUT_MARGIN; a narrower groove only moves the run-out back to the
-# die's 0.95); both internal corners the grooving tool's nose, R0.2 MAX
-# (the title block's R1.0 would not fit the groove).
+# die's 0.95), and rule 16's one pitch (0.635) the MIN, rounded up to 0.70
+# (codjiflo #1996: a MAX alone accepted a groove under one pitch). The
+# title block's .XX ±0.51 would put the nut on the run-out.
 RELIEF_DIA = 1.85
 RELIEF_WIDTH = 1.10
+RELIEF_WIDTH_MIN = 0.70
 RELIEF_ROOT_R = 0.2
+TOL_TYPE_LIMIT = 3  # swTolType_e.swTolLIMIT
 TOL_TYPE_MAX = 6  # swTolType_e.swTolMAX
 # Full thread starts this far past the step at the latest.
 FULL_THREAD_FROM_STEP_MAX = max(RELIEF_WIDTH, DIE_RUNOUT)  # 1.10
@@ -68,7 +73,9 @@ if not RELIEF_DIA <= THREAD_ROOT_2A_MIN < THREAD_BASIC_MINOR < THREAD_MAJOR:
     raise AssertionError("wheel-axle relief Ø leaves thread at the 2A root")
 if not THREAD_PITCH <= DIE_RUNOUT <= RELIEF_WIDTH:
     raise AssertionError("wheel-axle relief does not take the die's lead")
-if 2.0 * RELIEF_ROOT_R >= RELIEF_WIDTH:
+if not THREAD_PITCH <= RELIEF_WIDTH_MIN < RELIEF_WIDTH:
+    raise AssertionError("wheel-axle relief MIN is under one pitch")
+if 2.0 * RELIEF_ROOT_R >= RELIEF_WIDTH_MIN:
     raise AssertionError("wheel-axle relief roots meet across the groove")
 # Step to thread end. The step is the gauged face the nut stack hangs off,
 # so the thread reads from it (drawing-guidelines.md rule 10 (dimension from a real feature)'s functional datum) and the
@@ -128,11 +135,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
     ("PinProfile", "ThreadLength"): THREAD_LEN_BAND,
 }
-# The relief's three sizes print as single MAX limits (model value = limit).
+# The relief's Ø and root radius print as single MAX limits (model value =
+# limit); its width as a LIMIT pair, (MIN, MAX) mm, the model at the MAX.
 SINGLE_LIMITS: dict[tuple[str, str], tuple[float, int]] = {
-    ("PinProfile", "ReliefWidth"): (RELIEF_WIDTH, TOL_TYPE_MAX),
     ("PinProfile", "ReliefDia"): (RELIEF_DIA, TOL_TYPE_MAX),
     ("ReliefRoots", "ReliefRootR"): (RELIEF_ROOT_R, TOL_TYPE_MAX),
+}
+LIMIT_PAIRS: dict[tuple[str, str], tuple[float, float]] = {
+    ("PinProfile", "ReliefWidth"): (RELIEF_WIDTH_MIN, RELIEF_WIDTH),
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinProfile": {
@@ -149,6 +159,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 for (_feature, _name), (_limit, _type) in SINGLE_LIMITS.items():
     if round(_limit, DRAWING_PRECISION[_feature][_name]) != _limit:
         raise AssertionError(f"wheel-axle {_name} MAX does not print as its model")
+for (_feature, _name), (_low, _high) in LIMIT_PAIRS.items():
+    _places = DRAWING_PRECISION[_feature][_name]
+    if round(_low, _places) != _low or round(_high, _places) != _high:
+        raise AssertionError(f"wheel-axle {_name} limits do not print as authored")
 # The overall is the shank, the thread and the dome summed: a reference.
 REFERENCE_DIMENSIONS = frozenset({"PinLength"})
 
