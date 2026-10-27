@@ -199,7 +199,12 @@ PLATE_TAP_STATIONS = (
 )
 
 # Matched locating dowels, independent of the mounting screws' clearance.
-LOCATOR_PAIR_BASELINE_MM = 13.7
+# 13.1 (was 13.7; coordinator ruling W1 on #1379, pending owner
+# confirmation): at 13.7 the full worst-case wall to the arm's edge, with
+# the outline's edge break and the drill's run-off, fell to 1.76 (WALLS
+# below). 13.2 met 2.0 by 0.014, too thin for the reducer centre's ±0.5
+# source-mutation control; 13.1 keeps 2.06.
+LOCATOR_PAIR_BASELINE_MM = 13.1
 LOCATOR_SITES_MM = (
     (PLATE_SCREW_MID_STATION, LOCATOR_PAIR_BASELINE_MM / 2.0),
     (PLATE_SCREW_MID_STATION, -LOCATOR_PAIR_BASELINE_MM / 2.0),
@@ -264,6 +269,13 @@ LOCATOR_MOUTH_POSITION_RADIUS_MM = REDUCER_POSITION_RADIUS * (
     / LOCATOR_FULL_CYLINDER_SPAN_MIN_MM
 )
 WALL_TARGET = 2.0
+# The title block's R0.25 / C0.25 MAX edge break on the outline's face edges.
+OUTLINE_EDGE_BREAK_MAX_MM = 0.25
+# The locating holes are match-drilled through after the outline is milled,
+# in another setup: their walls to the outline pay 0.3 deg of drill run-off
+# over the full depth (the brief's run-off rule; #2000 holds the method).
+DRILL_RUN_OFF_DEG = 0.3
+LOCATOR_RUN_OFF_MM = THICKNESS * math.tan(math.radians(DRILL_RUN_OFF_DEG))
 # The tip station's printed band (R9-23; see TIP_STATION).
 TIP_STATION_BAND = BAND_XX
 
@@ -340,19 +352,23 @@ WALLS: dict[str, tuple[float, float]] = {
         - PIN_BORE_DIA_MAX / 2.0,
     ),
 }
+# Each locating hole's wall to the arm's edge is thinnest at a face, where
+# the hole's mouth break meets the outline's edge break; run-off is charged
+# at the exit face.
 for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
     _edge_air = PIVOT_END_R - _x * math.sin(EDGE_LEAN) - abs(_y) * math.cos(EDGE_LEAN)
     WALLS[f"locator {_index} to arm edge"] = (
         _edge_air - LOCATOR_HOLE_DIA_MM / 2.0,
         _edge_air - BAND_X - LOCATOR_MOUTH_POSITION_RADIUS_MM
-        - LOCATING_PIN.PRESS_HOLE_LIMITS_MM[1] / 2.0 - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM,
+        - LOCATING_PIN.PRESS_HOLE_LIMITS_MM[1] / 2.0 - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM
+        - OUTLINE_EDGE_BREAK_MAX_MM - LOCATOR_RUN_OFF_MM,
     )
     _tap_air = min(math.hypot(_x - station, _y) for station in PLATE_TAP_STATIONS)
     WALLS[f"locator {_index} to tap mouth"] = (
         _tap_air - (LOCATOR_HOLE_DIA_MM + PLATE_TAP_MOUTH_DIA_MAX_MM) / 2.0,
         _tap_air - LOCATOR_MOUTH_POSITION_RADIUS_MM - REDUCER_POSITION_RADIUS
         - (LOCATING_PIN.PRESS_HOLE_LIMITS_MM[1] + PLATE_TAP_MOUTH_DIA_MAX_MM) / 2.0
-        - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM,
+        - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM - LOCATOR_RUN_OFF_MM,
     )
 for _name, (_nominal, _worst) in WALLS.items():
     if _worst < WALL_TARGET:

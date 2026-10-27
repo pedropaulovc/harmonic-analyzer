@@ -113,8 +113,8 @@ def _receive(**changes) -> tuple[float, float]:
 
 
 def test_locator_sites_share_real_part_frames_and_paid_mouth_walls() -> None:
-    assert arm.LOCATOR_PAIR_BASELINE_MM == registration.LOCATOR_PAIR_BASELINE_MM == 13.7
-    assert math.dist(*arm.LOCATOR_SITES_MM) == pytest.approx(13.7)
+    assert arm.LOCATOR_PAIR_BASELINE_MM == registration.LOCATOR_PAIR_BASELINE_MM
+    assert math.dist(*arm.LOCATOR_SITES_MM) == pytest.approx(arm.LOCATOR_PAIR_BASELINE_MM)
     for arm_xy, plate_xy in zip(arm.LOCATOR_SITES_MM, plate.LOCATOR_SITES_MM, strict=True):
         assert plate_xy == pytest.approx((arm_xy[0] - plate.BORE_STATION, arm_xy[1] - plate.BORE_OFFSET))
     for geometry in (arm, plate):
@@ -122,9 +122,12 @@ def test_locator_sites_share_real_part_frames_and_paid_mouth_walls() -> None:
         assert len(locator_walls) >= 4
         assert all(worst >= geometry.WALL_TARGET for _nominal, worst in locator_walls.values())
     x, y = arm.LOCATOR_SITES_MM[0]
+    # Full worst case: the outline's title-block edge break and the match
+    # drill's run-off through the stock are paid too.
     expected = (arm.PIVOT_END_R - x * math.sin(arm.EDGE_LEAN) - abs(y) * math.cos(arm.EDGE_LEAN)
                 - arm.BAND_X - arm.LOCATOR_MOUTH_POSITION_RADIUS_MM - pin.PRESS_HOLE_LIMITS_MM[1] / 2.0
-                - pin.HOLE_MOUTH_BREAK_RADIAL_MAX_MM)
+                - pin.HOLE_MOUTH_BREAK_RADIAL_MAX_MM - 0.25
+                - arm.THICKNESS * math.tan(math.radians(0.3)))
     assert arm.WALLS["locator 1 to arm edge"][1] == pytest.approx(expected)
     assert "locator blind floor" not in arm.WALLS
 
