@@ -566,7 +566,13 @@ def _crop_outside_view(adapter: Any, view: Any) -> None:
         raise RuntimeError(f"outside view crop did not take: Crop2 status {status}")
     if not bool(native.CropViewNoOutline):
         raise RuntimeError("the outside view's crop prints an outline; expected none")
-    to_sheet = _early_bound(transform.Inverse(), "IMathTransform")
+    # The view's frame as it stands after the crop and rebuild, not the
+    # transform the fence was drawn with (codjiflo advisory on 09d0c82).
+    settled = _early_bound(native.GetSketch(), "ISketch")
+    to_sheet = _early_bound(
+        _early_bound(settled.ModelToSketchTransform, "IMathTransform").Inverse(),
+        "IMathTransform",
+    )
     ends = []
     for segment in segments:
         line = _early_bound(segment, "ISketchLine")
