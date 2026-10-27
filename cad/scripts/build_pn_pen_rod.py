@@ -315,16 +315,19 @@ async def _add_stud_tap_reference(adapter) -> list[tuple[str, str]]:
     Hole Wizard point sits.  Both track half the square."""
     dims = SketchDims()
     check("create sketch StudTapReference", await adapter.create_sketch("Top"))
+    # AddToDB is session-wide: restore it even when a witness fails.
     set_sketch_direct_db(adapter, True)
-    from_x = check(
-        "add tap station X witness",
-        await adapter.add_centerline(-STUD_TAP_STATION, 0.0, 0.0, 0.0),
-    )
-    from_z = check(
-        "add tap station Z witness",
-        await adapter.add_centerline(0.0, -STUD_TAP_STATION, 0.0, 0.0),
-    )
-    set_sketch_direct_db(adapter, False)
+    try:
+        from_x = check(
+            "add tap station X witness",
+            await adapter.add_centerline(-STUD_TAP_STATION, 0.0, 0.0, 0.0),
+        )
+        from_z = check(
+            "add tap station Z witness",
+            await adapter.add_centerline(0.0, -STUD_TAP_STATION, 0.0, 0.0),
+        )
+    finally:
+        set_sketch_direct_db(adapter, False)
     for line, relation, dim_name, kind in (
         (from_x, "horizontal", "TapStationX", "horizontal_distance"),
         (from_z, "vertical", "TapStationZ", "vertical_distance"),
