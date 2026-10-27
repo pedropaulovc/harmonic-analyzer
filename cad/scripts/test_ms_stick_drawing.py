@@ -23,6 +23,9 @@ import ms_stick_callouts as callouts
 import ms_stick_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import Box
+from _named_views import octant_axes, octant_view_name
+
+RULED_ISO = octant_view_name(*callouts.RULED_FACE_ISOMETRIC_OCTANT)
 
 
 def test_numeral_detail_ink_clears_border_and_placement_note() -> None:
@@ -506,7 +509,7 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
 
     def place_view(adapter, path, orientation, x, y, *, scale):
         assert path == str(source)
-        assert orientation in ("*Back", "*Top", "*Isometric")
+        assert orientation in ("*Back", "*Top", RULED_ISO)
         view = make_view((x, y), scale, 0.1, orientation)
         placements.append(view)
         return view
@@ -678,6 +681,28 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     assert all(view.Angle == pytest.approx(math.pi)
                for view in placements if view.Orientation == "*Back")
     assert placements[0].Position[0] == placements[1].Position[0]
+    # The pictorial shows the engraved face, turned like the RULED FACE view.
+    (iso,) = [view for view in placements if view.Orientation == RULED_ISO]
+    assert iso.Position == drawing.ISO_CENTER and iso.ScaleRatio == (1.0, 2.0)
+    assert iso.Angle == pytest.approx(math.pi)
+    assert any(view is iso for view in clean_views)
+
+
+def test_part_names_the_ruled_face_isometric_before_saving() -> None:
+    assert RULED_ISO == "ISO REAR-BOTTOM-RIGHT"
+    # The octant looks at the -Z ruled face; turned 180 deg on the sheet, model
+    # +X runs right and +Y down, as in the turned *Back RULED FACE view.
+    sheet_x, sheet_y, toward_viewer = octant_axes(*callouts.RULED_FACE_ISOMETRIC_OCTANT)
+    assert toward_viewer[2] < 0
+    assert -sheet_x[0] > 0 and -sheet_y[1] < 0
+    tree = ast.parse(Path(builder.__file__).read_text(encoding="utf-8"))
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    calls = sorted(
+        (node.lineno, node.func.id) for node in ast.walk(build)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        and node.func.id in {"name_octant_views", "save_part_and_images"}
+    )
+    assert [name for _line, name in calls] == ["name_octant_views", "save_part_and_images"]
 
 
 def test_graduation_location_chords_terminate_at_groove_centres() -> None:
