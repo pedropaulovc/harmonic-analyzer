@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 import pytest
 
+import _config
 import paper_drive_arm_registration as registration
 import pd_transgear_arm_geometry as arm
 import pd_transgear_arm_plate_geometry as plate
@@ -122,12 +123,15 @@ def test_locator_sites_share_real_part_frames_and_paid_mouth_walls() -> None:
         assert len(locator_walls) >= 4
         assert all(worst >= geometry.WALL_TARGET for _nominal, worst in locator_walls.values())
     x, y = arm.LOCATOR_SITES_MM[0]
-    # Full worst case: the outline's title-block edge break and the match
-    # drill's run-off through the stock are paid too.
+    # Full worst case: the outline's title-block edge break (either permitted
+    # form) and the match drill's run-off through the thickest stock are paid.
+    edge_break = _config.title_block("edge_break")
+    outline_break = max(edge_break["radius_mm"], edge_break["chamfer_max_mm"])
+    assert arm.OUTLINE_EDGE_BREAK_MAX_MM == outline_break
     expected = (arm.PIVOT_END_R - x * math.sin(arm.EDGE_LEAN) - abs(y) * math.cos(arm.EDGE_LEAN)
                 - arm.BAND_X - arm.LOCATOR_MOUTH_POSITION_RADIUS_MM - pin.PRESS_HOLE_LIMITS_MM[1] / 2.0
-                - pin.HOLE_MOUTH_BREAK_RADIAL_MAX_MM - 0.25
-                - arm.THICKNESS * math.tan(math.radians(0.3)))
+                - pin.HOLE_MOUTH_BREAK_RADIAL_MAX_MM - outline_break
+                - (arm.THICKNESS + arm.THICKNESS_BAND) * math.tan(math.radians(0.3)))
     assert arm.WALLS["locator 1 to arm edge"][1] == pytest.approx(expected)
     assert "locator blind floor" not in arm.WALLS
 

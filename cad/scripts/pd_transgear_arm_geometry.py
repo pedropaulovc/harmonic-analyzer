@@ -27,6 +27,7 @@ from __future__ import annotations
 import math
 from fractions import Fraction
 
+import _config
 import pd_rack_pinion_spec as DISC
 import pd_support_bar_spec as BAR
 import _mcmaster_90325a174 as PIVOT
@@ -269,13 +270,19 @@ LOCATOR_MOUTH_POSITION_RADIUS_MM = REDUCER_POSITION_RADIUS * (
     / LOCATOR_FULL_CYLINDER_SPAN_MIN_MM
 )
 WALL_TARGET = 2.0
-# The title block's R0.25 / C0.25 MAX edge break on the outline's face edges.
-OUTLINE_EDGE_BREAK_MAX_MM = 0.25
+# The title block's edge-break row (title_block.yaml ``edge_break``): either
+# permitted form, the round or the chamfer, takes its full size off a wall at
+# the outline's face edges.
+_EDGE_BREAK = _config.title_block("edge_break")
+OUTLINE_EDGE_BREAK_MAX_MM = max(
+    float(_EDGE_BREAK["radius_mm"]), float(_EDGE_BREAK["chamfer_max_mm"])
+)
 # The locating holes are match-drilled through after the outline is milled,
 # in another setup: their walls to the outline pay 0.3 deg of drill run-off
-# over the full depth (the brief's run-off rule; #2000 holds the method).
+# over the full depth, the thickest stock (the brief's run-off rule; #2000
+# holds the method).
 DRILL_RUN_OFF_DEG = 0.3
-LOCATOR_RUN_OFF_MM = THICKNESS * math.tan(math.radians(DRILL_RUN_OFF_DEG))
+LOCATOR_RUN_OFF_MM = (THICKNESS + THICKNESS_BAND) * math.tan(math.radians(DRILL_RUN_OFF_DEG))
 # The tip station's printed band (R9-23; see TIP_STATION).
 TIP_STATION_BAND = BAND_XX
 
