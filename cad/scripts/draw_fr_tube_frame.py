@@ -260,12 +260,14 @@ def _add_top_chamfer_dimension(
 
     In the length view the 45-degree break is the cone face's silhouette on
     the +X flank (sheet right), resolved from its model face and a projected
-    point on the line it draws. Its lead-in, the +X OD flank, is a model edge,
-    not a silhouette: farm leaf 20261027T073053Z found no Ø25.4 cylinder
-    silhouette anywhere in the view (4 silhouettes, none on that face), so
-    the flank is resolved as the exact visible line through its model point.
-    Both are selected as objects, so no seat hit-test is involved. Returns
-    the settled check that re-proves the dimension after the final rebuild.
+    point on the line it draws. Its lead-in is the top end face's outer rim,
+    the circular edge the chamfer leaves at the top, seen edge-on as the end
+    line. The OD flank cannot serve: farm leaves 20261027T073053Z and
+    20261027T075752Z read every one of the view's 4 silhouettes as the cone's
+    (two coincident per flank) and its 5 visible edges as 3 circles plus 2
+    cross-hole curves, so no selectable entity draws the OD flank. Both picks
+    are selected as objects, so no seat hit-test is involved. Returns the
+    settled check that re-proves the dimension after the final rebuild.
     """
     radius = OUTER_DIA / 2.0
     chamfer_mid = model_point_in_view(
@@ -285,9 +287,12 @@ def _add_top_chamfer_dimension(
         label="tube top chamfer",
     )["chamfer"]
     lead_in = (
-        scan_view_edges(view, label="tube OD flank")
-        .exact_line_through(
-            (radius, COLUMN_LENGTH / 2.0, 0.0), label="tube +X OD flank"
+        scan_view_edges(view, label="tube top end rim")
+        .circle_at(
+            (0.0, COLUMN_LENGTH, 0.0),
+            radius - TOP_END_CHAMFER,
+            axis=(0.0, 1.0, 0.0),
+            label="tube top end rim",
         )
         .edge
     )
@@ -305,7 +310,7 @@ def _add_top_chamfer_dimension(
     if not bool(chamfer.Select2(False, data)):
         raise RuntimeError("failed to select the tube top chamfer silhouette")
     if not bool(_early_bound(lead_in, "IEntity").Select4(True, data)):
-        raise RuntimeError("failed to select the tube +X OD flank edge")
+        raise RuntimeError("failed to select the tube top end rim edge")
     selected = int(manager.GetSelectedObjectCount2(-1))
     if selected != 2:
         raise RuntimeError(
