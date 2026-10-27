@@ -263,15 +263,29 @@ def test_flat_end_mill_reaches_the_end_wall_clear_of_the_hub() -> None:
     step, ahead of the wall at every printed limit."""
     import pd_transgear_disc_hub_spec as hub
 
-    # The flat cut to its printed MAX station on the longest sleeve.
-    assert spec.FLAT_LENGTH_MAX == pytest.approx(
+    # The end mill reaches the MAX station on the longest sleeve; a longer
+    # flat toward the MIN is the shop's choice of cutter.
+    assert spec.FLAT_REACH == pytest.approx(
         spec.OVERALL_LENGTH + spec.STATION_TOL - spec.FLAT_END_STATION
     )
-    assert spec.FLAT_END_TOL_TYPE == 6  # swTolType_e.swTolMAX
-    assert spec.FLAT_END_DEVIATIONS == (
-        pytest.approx(spec.CUTTER_RUNOUT_MAX - spec.FLAT_END_STATION), 0.0
+    assert spec.FLAT_CUTTER_FLUTE_MIN >= spec.FLAT_REACH + 0.5
+    # codjiflo P1 on 65a022125: the printed MIN keeps the wall off the step
+    # the spigot seats on (longest tooth length plus the title block's edge
+    # break) and off the cutter's run-out.
+    edge_break = float(_config.title_block("edge_break")["chamfer_max_mm"])
+    assert spec._TITLE_BLOCK_EDGE_BREAK == edge_break
+    assert spec.FLAT_END_MIN >= (
+        spec.FACE_WIDTH + printed_band_mm(spec.FACE_WIDTH_PLACES) + edge_break
     )
-    assert spec.FLAT_CUTTER_FLUTE_MIN >= spec.FLAT_LENGTH_MAX + 0.5
+    assert spec.FLAT_END_MIN >= spec.CUTTER_RUNOUT_MAX
+    assert spec.FLAT_END_TOL_TYPE == 3  # swTolType_e.swTolLIMIT
+    assert spec.FLAT_END_DEVIATIONS == (
+        pytest.approx(spec.FLAT_END_MIN - spec.FLAT_END_STATION), 0.0
+    )
+    # Looser than the title block's row at the limits' places.
+    assert spec.FLAT_END_STATION - spec.FLAT_END_MIN > 2.0 * printed_band_mm(
+        spec.FLAT_END_PLACES
+    )
     worst = (
         spec.FACE_WIDTH
         - printed_band_mm(spec.FACE_WIDTH_PLACES)
@@ -418,7 +432,7 @@ def _printed_text(name: str) -> str:
     elif name == "RootDia":
         rows = [f"{value} min."]
     elif name == "FlatEnd":
-        rows = [f"{value} max."]
+        rows = [value, f"{spec.FLAT_END_MIN:.{spec.FLAT_END_PLACES}f}"]
     elif name == "CutterRunout":
         rows = [f"{value} max."]
     elif name == "FullDepth":
@@ -510,6 +524,10 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
         "rear": _view_box(drawing.REAR_CENTER),
         "section": section,
         "outside": _view_box(drawing.LEFT_CENTER, spec.OVERALL_LENGTH),
+        # codjiflo P3 on 65a022125: the isometric's ink as run
+        # 20261027T032128736Z's sheet measured it, the BossDia's extension
+        # line excluded.
+        "isometric": Box(0.326, 0.185, 0.409, 0.247),
     }
     keeps = {
         **drawing.FRONT_KEEP,
@@ -898,3 +916,13 @@ def test_toothspace_callout_lands_on_the_rear_face_full_depth_flank() -> None:
     toward_note = math.atan2(note.ymin - landing[1], note.xmax - landing[0])
     assert contact_angle < toward_note < contact_angle + math.pi / 2.0
 
+
+
+def test_end_view_is_the_sections_third_angle_left_view() -> None:
+    """2026-10-27 ENFORCE review (r1, r3): a nose view stood left of the
+    section, whose rear face stands left.  The end view now sees the rear
+    face, and its cutting line runs top to bottom so the arrows point left,
+    model +X in that view: the section keeps its rear face left."""
+    assert drawing.END_VIEW_ORIENTATION == "*Back"
+    assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1]
+    assert drawing.FRONT_CENTER[0] < drawing._side_x(0.0) < drawing._side_x(spec.OVERALL_LENGTH)

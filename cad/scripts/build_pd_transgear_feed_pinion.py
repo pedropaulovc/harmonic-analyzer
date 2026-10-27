@@ -96,6 +96,7 @@ from pd_transgear_feed_pinion_spec import (
     FLAT_END_STATION,
     FLAT_TO_AXIS,
     FLAT_END_DEVIATIONS,
+    FLAT_END_MIN,
     FLAT_END_PLACES,
     FLAT_END_TOL_TYPE,
     FLAT_TO_AXIS_DEVIATIONS,
@@ -363,13 +364,16 @@ def _single_limit(
     limit_deviations: tuple[float, float],
     tol_type: int,
     printed: str,
+    *,
+    limit_places: int | None = None,
 ) -> None:
-    """A dimension as a single MIN or MAX limit: SolidWorks prints its
-    nominal then the limit word, so the nominal is the limit's value at the
-    sheet's places; the deviations stay on the native tolerance as the
-    model's record of the band."""
+    """A dimension as a MIN or MAX limit, or with ``limit_places`` a LIMIT
+    pair.  SolidWorks prints a MIN or MAX as its nominal then the limit word,
+    so the nominal is the limit's value at the sheet's places; the deviations
+    stay on the native tolerance as the model's record of the band.  A LIMIT
+    prints the nominal plus each deviation at the tolerance's places."""
     lower, upper = limit_deviations
-    _, dimension = _named_dimension(adapter, feature, name)
+    display, dimension = _named_dimension(adapter, feature, name)
     label = f"{name}@{feature}"
     # Source globals use the repository's 1e-9 m neutral-readback convention;
     # an inch-document round-trip must not be tested at exact bit equality.
@@ -395,7 +399,12 @@ def _single_limit(
         )
     ):
         raise RuntimeError(f"{label}: single-limit tolerance readback changed")
-    _telemetry.success(f"{label}: single limit {printed}")
+    if limit_places is not None:
+        display = _early_bound(display, "IDisplayDimension")
+        display.SetPrecision3(-1, -1, limit_places, -1)
+        if int(display.GetPrimaryTolPrecision2()) != limit_places:
+            raise RuntimeError(f"{label}: LIMIT precision did not persist")
+    _telemetry.success(f"{label}: limit {printed}")
 
 
 async def _root_profile(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -752,10 +761,10 @@ async def build(adapter) -> dict[str, str]:
     # Bands (pd_transgear_feed_pinion_spec): the overall length ±0.05 (R9-5),
     # the reamed bore, the boss's h6 under the disc's and hub's H7 bores, the
     # flat's (0, -0.015) under the hub's flat, the standard tip class, the
-    # root as a physical MIN floor, the flat's end wall as a MAX clear of the
-    # hub's flat; the cutter's full-depth station at its .XXX band and its
-    # run-out as a MAX limit (R9-67).  The tooth length, which only places
-    # the step, holds the title block's .XXX.
+    # root as a physical MIN floor, the flat's end wall as LIMITS between the
+    # step and the hub's flat; the cutter's full-depth station at its .XXX
+    # band and its run-out as a MAX limit (R9-67).  The tooth length, which
+    # only places the step, holds the title block's .XXX.
     _single_limit(
         adapter,
         "FlatProfile",
@@ -763,7 +772,8 @@ async def build(adapter) -> dict[str, str]:
         FLAT_END_STATION,
         FLAT_END_DEVIATIONS,
         FLAT_END_TOL_TYPE,
-        f"{FLAT_END_STATION:.{FLAT_END_PLACES}f} MAX",
+        f"{FLAT_END_STATION:.{FLAT_END_PLACES}f}/{FLAT_END_MIN:.{FLAT_END_PLACES}f}",
+        limit_places=FLAT_END_PLACES,
     )
     set_dimension_symmetric_tolerance(
         adapter, "SleeveProfile", "OverallLength", STATION_TOL

@@ -2,11 +2,14 @@ r"""Create the curated manufacturing drawing for the feed-pinion sleeve (MHA-PD-
 
 An end view, a longitudinal section B-B, a rear-face view, an outside view
 in the section's direction and an isometric at 3:1 (the section takes B: A
-names the bore datum). The end view carries the genuine native two-tooth
-span, bore fit note, finish and datum A; the rear-face view carries the
-toothspace inspection callout on a full-depth flank and the root's MIN
-across two gap floors; the outside view carries the cutter's full-depth
-station and run-out limit from the floor of the gap facing it; the section
+names the bore datum). The end view looks at the rear face (*Back), the
+third-angle left view of the section, whose rear face stands left (the
+2026-10-27 ENFORCE review: a nose view there broke the projection). It
+carries the genuine native two-tooth span, bore fit note, finish and datum
+A; the captioned rear-face view below carries the toothspace inspection
+callout on a full-depth flank and the root's MIN across two gap floors; the
+outside view carries the cutter's full-depth station and run-out limit from
+the floor of the gap facing it; the section
 carries diameters beside their axial extent, the D-flat from the axis, the
 lengths baselined from the rear face (drawing-guidelines.md rule 11 (turned
 parts read like the lathe)) and the step face (the disc hub's seat) square to
@@ -105,17 +108,22 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 # The end view's section line stands right of the bore fit note's leader.
+# It looks at the rear face (*Back): the section looks along model +X with
+# the rear face left, so its third-angle left view sees the rear face.
+END_VIEW_ORIENTATION = "*Back"
 FRONT_CENTER = (0.080, 0.160)
 RIGHT_CENTER = (0.230, 0.160)
 # The isometric (94 x 88 mm at 3:1) stands upper right, clear of the title
 # block and right of the oil-hole note.
 ISO_CENTER = (0.367, 0.214)
 # The toothspace pin seats on the straight pass's full-depth flank at the
-# REAR face (TOOTH_SPACE_INSPECTION_END_MM). The end view looks at the step
-# face, where the cutter's run-out leaves only partial-depth gaps: run 11's
-# pick there found a flank 0.23 mm off the contact. So the callout lands on
-# a rear-face view in the free lane below the section, left of the title
-# block (left edge 216 mm, top 66 mm) and under the section caption
+# REAR face (TOOTH_SPACE_INSPECTION_END_MM).  The nose view once used as the
+# end view looked at the step face, where the cutter's run-out leaves only
+# partial-depth gaps (run 11's pick there found a flank 0.23 mm off the
+# contact).  The end view now sees the rear face, but its lanes hold the
+# span, finish, datum and fit note, so the callout and the root's MIN land
+# on a second rear-face view in the free lane below the section, left of the
+# title block (left edge 216 mm, top 66 mm) and under the section caption
 # (bottom ~78 mm); a caption names it, hung centred below the view's
 # measured outline (run 12: at a fixed point it overlapped the outline by
 # 2.4 mm; the outline runs 6 mm past the tip circle).
@@ -192,11 +200,11 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
     # Its dimension line stands just right of the nose; the text prints right
     # of the line, below the flat (run 20261027T032128736Z: 30 mm out, the
     # outside view's outline struck its last row).
-    "FlatToAxis": (_NOSE_X + 0.008, _SIDE_BOTTOM - 0.0079),
+    "FlatToAxis": (_NOSE_X + 0.006, _SIDE_BOTTOM - 0.0079),
     "BoreDia": (_REAR_X - 0.010, _SIDE_TOP + 0.040),
     "FaceWidth": (_left_of(_REAR_X, _FACE_WIDTH_TEXT_WIDTH), _SIDE_BOTTOM - 0.0069),
-    "FlatEnd": (_left_of(_REAR_X, _FLAT_END_TEXT_WIDTH), _SIDE_BOTTOM - 0.0208),
-    "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0377),
+    "FlatEnd": (_left_of(_REAR_X, _FLAT_END_TEXT_WIDTH), _SIDE_BOTTOM - 0.0218),
+    "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0392),
 }
 
 # The outside view: the *Left view looks along +X, the section's direction of
@@ -204,9 +212,12 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
 # section plane's (Right plane's) dimensions.  It stands lower right, above
 # the title block and below the boss's callout; its two cutter rows hang
 # below it with their texts left of its rear face, and its caption stands
-# left of it above them.  Its tangent edges are hidden.
+# left of it above them.  Its tangent edges are hidden.  It is not projected
+# from any view, so its caption names its direction (codjiflo P2 on
+# 65a022125): it shows the side section B-B shows, uncut.
 LEFT_CENTER = (0.373, 0.112)
-LEFT_CAPTION = "OUTSIDE VIEW"
+LEFT_CAPTION = "OUTSIDE VIEW\nSAME SIDE AS B-B"
+_LEFT_CAPTION_WIDTH = 0.047  # its longer row, as the drawing test estimates
 TANGENT_EDGES_HIDDEN = 0  # swDisplayTangentEdges_e.swTangentEdgesHidden
 _LEFT_REAR_X = LEFT_CENTER[0] - OVERALL_LENGTH / 2.0 * VIEW_SCALE[0] / 1000.0
 _LEFT_BOTTOM = LEFT_CENTER[1] - HALF_OD
@@ -215,7 +226,9 @@ LEFT_KEEP: dict[str, tuple[float, float]] = {
     "FullDepth": (_left_of(_LEFT_REAR_X, _CUTTER_TEXT_WIDTH), _LEFT_BOTTOM - 0.0068),
     "CutterRunout": (_left_of(_LEFT_REAR_X, _CUTTER_TEXT_WIDTH), _LEFT_BOTTOM - 0.0206),
 }
-LEFT_CAPTION_XY = (_LEFT_REAR_X - _LEFT_OF_REAR_AIR - 0.032, LEFT_CENTER[1] + 0.001)
+LEFT_CAPTION_XY = (
+    _LEFT_REAR_X - _LEFT_OF_REAR_AIR - _LEFT_CAPTION_WIDTH, LEFT_CENTER[1] + 0.001
+)
 
 # The rear-face view's root diameter reads along a gap bisector (the *Back
 # view mirrors model x; model gaps at 15° + k·30° print at 165° - k·30°), so
@@ -245,11 +258,12 @@ NOTE_HEIGHT = 0.0025
 _BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
 # The finite-form data block uses the upper-left lane; the bore-fit note
 # remains within the air above the end view, preserving its leader.  It
-# stands 6 mm higher than at the 2026-10-24 review, whose crop showed its
-# last row's ")" struck by the 11 o'clock tooth.
+# stands 17 mm higher than at the 2026-10-24 review, whose crop showed its
+# last row's ")" struck by the 11 o'clock tooth, and clear above the section
+# line's upper "B", which the rear-face end view turns left, under the note.
 GEAR_DATA_XY = (0.016, 0.262)
 GEAR_DATA_CHAR_HEIGHT = 0.0025
-BORE_FIT_NOTE = (0.016, 0.199)
+BORE_FIT_NOTE = (0.016, 0.211)
 BORE_FIT_CHAR_HEIGHT = 0.0022
 # Separate radial-runout and relative-index controls share one source-linked
 # callout on the real finite tooth flank, not the OD. Its three rows use the
@@ -267,10 +281,12 @@ BORE_FIT_ATTACH = (
 )
 # The section's native caption, placed by its top centre, sits below the
 # stacked lengths, the overall's two-row callout the lowest.
-SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0500)
-# The finish stands lower LEFT of the end view: the section line's arrows and
-# their "B" labels point right, toward the section, and a lower-right leader
-# ran through the lower label (run 20261001T035353825Z layout audit).  It
+SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0515)
+# The finish stands lower LEFT of the end view: when the section line's
+# arrows and their "B" labels pointed right, toward the section, a
+# lower-right leader ran through the lower label (run 20261001T035353825Z
+# layout audit).  They now point left, the lower label below the finish's
+# leader, which lands level with the bore centre.  It
 # stands farther out and nearer level with the bore, so its leader climbs
 # shallowly and passes right of the symbol's own "Ra" text rather than through
 # it (run 20261001T110844152Z layout audit).  The symbol grows up and right
@@ -279,10 +295,10 @@ SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0500)
 # "Ra 1.6" printed 13.5-37.4 mm right of and 10.8-17.2 mm above the point,
 # over the teeth and across the bore fit leader's landing at 135 degrees.  At
 # 2.5 mm the symbol's ink tops out 9 mm below that landing and its text ends
-# 7 mm left of the tip circle.  The leader lands on the bore's 180° point,
-# not at -135°: the two-tooth span's extension lines run along that lower-left
-# diagonal, and its upper line passes 2.7 mm above-left of the bore centre
-# (machinist review, stack6: the finish leader crossed it).  The symbol
+# 7 mm left of the tip circle.  The leader lands on the bore's 180° point:
+# the nose view once ran the two-tooth span's extension lines along the
+# lower-left diagonal (machinist review, stack6: a -135° finish leader
+# crossed them); the rear-face view mirrors them lower right.  The symbol
 # stands 10 mm below the centre, so the shallower leader still passes right
 # of its own text.
 FINISH_ATTACH = (
@@ -500,12 +516,17 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
+    front = place_view(
+        adapter, str(SOURCE), END_VIEW_ORIENTATION, *FRONT_CENTER, scale=VIEW_SCALE
+    )
+    # Drawn top to bottom, the cutting line's arrows point left: in the
+    # rear-face view that is model +X, the section's direction of sight, so
+    # the section keeps its rear face left.
     right = create_section_view(
         adapter,
         front,
-        line_start=(FRONT_CENTER[0], FRONT_CENTER[1] - HALF_OD - 0.005),
-        line_end=(FRONT_CENTER[0], FRONT_CENTER[1] + HALF_OD + 0.005),
+        line_start=(FRONT_CENTER[0], FRONT_CENTER[1] + HALF_OD + 0.005),
+        line_end=(FRONT_CENTER[0], FRONT_CENTER[1] - HALF_OD - 0.005),
         view_xy=RIGHT_CENTER,
         section_label="B",
         scale=VIEW_SCALE,

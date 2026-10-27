@@ -34,18 +34,20 @@ CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 
 # The tip and the two-tooth span are set by the rack mesh.
 MESH_CALLOUT = f"MESHES {RACK_NUMBER} RACK"
-# The boss is the hub's locating fit, h6 under its H7 bore.
+# The boss is the hub's locating fit, h6 under its H7 bore.  The clearances
+# are literal text, so they carry their unit (codjiflo P2 on 65a022125: an
+# inch document converts the values but not the text).
 BOSS_CALLOUT = "\n".join(
     (
         f"LOCATES {HUB_NUMBER},",
-        f"{HUB.BOSS_CLEARANCE_LIMITS[0]:.3f}-{HUB.BOSS_CLEARANCE_LIMITS[1]:.3f} DIA CLR",
+        f"{HUB.BOSS_CLEARANCE_LIMITS[0]:.3f}-{HUB.BOSS_CLEARANCE_LIMITS[1]:.3f} mm DIA CLR",
     )
 )
 # The flat drives the hub's D-bore.
 FLAT_CALLOUT = "\n".join(
     (
         f"DRIVES {HUB_NUMBER},",
-        f"{HUB.FLAT_CLEARANCE[0]:.3f}-{HUB.FLAT_CLEARANCE[1]:.3f} CLR",
+        f"{HUB.FLAT_CLEARANCE[0]:.3f}-{HUB.FLAT_CLEARANCE[1]:.3f} mm CLR",
     )
 )
 # The step seats the hub's spigot: the tooth length places hub and disc.

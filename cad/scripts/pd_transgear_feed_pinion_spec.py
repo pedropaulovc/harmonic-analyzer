@@ -278,24 +278,30 @@ FLAT_DEPTH = BOSS_DIA / 2.0 - FLAT_TO_AXIS  # 1.0
 # cut by an end mill on an axis parallel to the sleeve's, plunged from the
 # nose.  The wall stops nothing: the hub's flat starts at its flange's rear
 # face, the spigot's length ahead of the step, so the wall stands clear
-# behind it (pd_transgear_disc_hub_spec.FLAT_END_CLEARANCE_WORST).  That
-# clearance is the station's only function, so it prints as a one-sided MAX
-# at one place (2026-10-27 ENFORCE review: ±0.05 was unneeded precision).
-# swTolMAX prints the nominal then "MAX"; the deviations record "anywhere
-# ahead of the cutter's run-out limit, up to the MAX".  The hub's check keeps
-# its conservative STATION_TOL allowance on top of the MAX.
+# behind it (pd_transgear_disc_hub_spec.FLAT_END_CLEARANCE_WORST), and it
+# stays clear of the step the hub's spigot seats on, so the flat never
+# notches that face.  Those are its only functions, so it prints as limits
+# at one place, looser than the title block's .X row (2026-10-27 ENFORCE
+# review: ±0.05 was unneeded precision; codjiflo P1 on 65a022125: a MAX
+# alone left the step unguarded).  The MAX is the modelled station.  The MIN
+# stands behind the longest tooth length plus the title block's 0.25 edge
+# break, and behind the cutter's run-out (asserted below).  The hub's check
+# keeps its conservative STATION_TOL allowance on top of the MAX.
 FLAT_END_STATION = 16.6
+FLAT_END_MIN = 14.0
 FLAT_END_PLACES = 1
-FLAT_END_TOL_TYPE = 6  # swTolType_e.swTolMAX
+FLAT_END_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
 FLAT_LENGTH = OVERALL_LENGTH - FLAT_END_STATION  # 10.75
-# The flat cut to its MAX station on the longest sleeve: the length the end
-# mill's flutes must cover (a longer flat is the shop's choice).
-FLAT_LENGTH_MAX = OVERALL_LENGTH + STATION_TOL - FLAT_END_STATION  # 10.80
+# The reach the end mill's flutes must cover: the flat cut to its MAX
+# station on the longest sleeve.  Stopping there is always accepted; a
+# longer flat, toward the MIN, is the shop's choice of a longer cutter.
+FLAT_REACH = OVERALL_LENGTH + STATION_TOL - FLAT_END_STATION  # 10.80
 FLAT_CUTTER_FLUTE_MIN = 12.0
-if FLAT_CUTTER_FLUTE_MIN < FLAT_LENGTH_MAX + 0.5:
+if FLAT_CUTTER_FLUTE_MIN < FLAT_REACH + 0.5:
     raise AssertionError("the flat's end mill cannot reach the end wall on its flutes")
-if round(FLAT_END_STATION, FLAT_END_PLACES) != FLAT_END_STATION:
-    raise AssertionError("the flat end's MAX does not print at its places")
+for _limit in (FLAT_END_MIN, FLAT_END_STATION):
+    if round(_limit, FLAT_END_PLACES) != _limit:
+        raise AssertionError("a flat end limit does not print at its places")
 
 # G7 bore on the preserved MHA-PD-23 h6 pin: +0.016/+0.004 over 0/-0.008
 # gives 0.004..0.024 diametral clearance. The true finite root at every
@@ -360,9 +366,12 @@ FULL_DEPTH_MAX = FULL_DEPTH + FULL_DEPTH_BAND
 # depth, up to the limit".
 CUTTER_RUNOUT_TOL_TYPE = 6  # swTolType_e.swTolMAX
 CUTTER_RUNOUT_DEVIATIONS = (FULL_DEPTH_MIN - CUTTER_RUNOUT_MAX, 0.0)
-FLAT_END_DEVIATIONS = (CUTTER_RUNOUT_MAX - FLAT_END_STATION, 0.0)
-if FLAT_END_DEVIATIONS[0] >= 0.0:
-    raise AssertionError("the flat's end wall reaches the cutter's run-out limit")
+FLAT_END_DEVIATIONS = (FLAT_END_MIN - FLAT_END_STATION, 0.0)
+_TITLE_BLOCK_EDGE_BREAK = 0.25  # the test reads it back from the title block
+if FLAT_END_MIN < max(
+    FACE_WIDTH + FACE_WIDTH_BAND + _TITLE_BLOCK_EDGE_BREAK, CUTTER_RUNOUT_MAX
+):
+    raise AssertionError("the flat's end wall may notch the step or the run-out")
 if round(CUTTER_RUNOUT_MAX, CUTTER_RUNOUT_PLACES) != CUTTER_RUNOUT_MAX:
     raise AssertionError("the run-out limit does not print at its places")
 # The outside view's cutter-station witnesses run along the floor of the
