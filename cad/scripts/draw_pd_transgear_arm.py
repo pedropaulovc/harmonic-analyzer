@@ -250,9 +250,11 @@ SECTION_KEEP = {
 _STUD_FRAME_X = _front_x(PIN_STATION) + 0.012
 # Each narrow depth's text stands right of its witness lines and outside
 # its view (run 20261010T001620278Z: inside them, the witness lines and the
-# view edges struck the text).
+# view edges struck the text); the sockets' depth centres far enough right
+# that its reason line clears the mouth's witness line too (run
+# 20261027T125629744Z's audit: centred 27 mm right, the line struck it).
 LOCATOR_SECTION_KEEP = {
-    "LocatorDepth": (LOCATOR_SECTION_CENTER[0] + 0.027, 0.0935),
+    "LocatorDepth": (LOCATOR_SECTION_CENTER[0] + 0.033, 0.0935),
 }
 END_KEEP = {
     "Depth": (END_CENTER[0], _end_y(PIVOT_END_R) + 0.017),

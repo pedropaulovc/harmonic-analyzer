@@ -172,7 +172,7 @@ LOCATOR_CALLOUT = "\n".join((
 # proud set (``pd_vn_transgear_arm_plate_locating_pin_spec.ARM_BOTTOM_AIR_MIN_MM``).
 if LOCATOR_PIN.ARM_BOTTOM_AIR_MIN_MM <= 0.0:
     raise AssertionError("the MHA-PD-VN-64 dowel bottoms in the MHA-PD-18 socket")
-LOCATOR_DEPTH_CALLOUT = "DOWEL CLEARS FLOOR"
+LOCATOR_DEPTH_CALLOUT = "DOWEL OFF FLOOR"
 
 # --- Printed text -------------------------------------------------------------
 # The thickness is the stock's: it prints "5/16 (7.94) GROUND STOCK", prefix

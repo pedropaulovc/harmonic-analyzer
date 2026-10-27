@@ -718,7 +718,15 @@ def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
     assert lines[1] == "MOUTH BREAK 0.05 MAX: DOWEL GRIP"
     assert drawing.DIMENSION_CALLOUTS["LocatorDia1"] == drawing.LOCATOR_CALLOUT_TEXT
     # The depth's ±0.05 says what it keeps.
-    assert drawing.DIMENSION_CALLOUTS["LocatorDepth"] == "DOWEL CLEARS FLOOR"
+    assert drawing.DIMENSION_CALLOUTS["LocatorDepth"] == "DOWEL OFF FLOOR"
+    # Its reason line clears the mouth's witness line and the right border.
+    caps = 0.00285  # run 20261027T125629744Z: 18 capitals set 51 mm wide
+    mouth = drawing.LOCATOR_SECTION_CENTER[0] + geometry.THICKNESS * drawing._S / 2000.0
+    centre = drawing.LOCATOR_SECTION_KEEP["LocatorDepth"][0]
+    half = len(spec.LOCATOR_DEPTH_CALLOUT) * caps / 2.0
+    assert centre - half > mouth + 0.002
+    sheet_right = DRAWING_TEMPLATES[drawing.SPEC.layout].width_m - _BORDER
+    assert centre + half < sheet_right - 0.003
 
 
 def test_the_only_note_is_the_projected_zones_and_it_carries_no_tolerance() -> None:
