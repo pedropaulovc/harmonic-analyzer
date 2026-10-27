@@ -207,11 +207,11 @@ def test_linked_notes_specify_the_spokes_and_ties() -> None:
     assert (
         drawing.DIMENSION_CALLOUTS["GrooveBottomDia"] == "PEN-WIRE SEAT\nMHA-SH-VN-56"
     )
-    assert drawing.CALLOUTS_ABOVE["GrooveR"] == "PEN-WIRE SEAT\nMHA-SH-VN-56"
+    assert drawing.CALLOUTS_ABOVE["GrooveR"] == "PEN-WIRE SEAT MHA-SH-VN-56"
     assert drawing.ROUND_CALLOUT.endswith("\nHOLDS TIE 2 WALL")
-    assert drawing.CALLOUTS_ABOVE["HubLength"] == (
-        "LOCKNUT ON FULL THREAD OF\nMG-WHEEL-AXLE MHA-MG-07"
-    )
+    assert drawing.CALLOUTS_ABOVE["HubLength"] == "MHA-MG-07 LOCKNUT STACK"
+    # An above-callout prints one line only.
+    assert not any("\n" in text for text in drawing.CALLOUTS_ABOVE.values())
     assert drawing.CALLOUTS_ABOVE["SpigotLength"] == "DRUM NOT PROUD"
     assert drawing.CALLOUTS_ABOVE["HubFrontZ"] == "WEB & RIM CENTER"
     assert drawing.DIMENSION_CALLOUTS["RimOuterDiaDim"].startswith("HOLDS PEN WIRE")
