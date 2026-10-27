@@ -213,7 +213,7 @@ FRONT_KEEP = {
     "LocatorY2": (_LOCATOR_OFFSET_X, _front_y(-PIVOT_END_R) - 0.0045),
     # Six callout lines under the value: the block centres low enough that
     # its top stays inside the upper border, right of the tap callout.
-    "LocatorDia1": (0.262, _front_y(PIVOT_END_R) + 0.0155),
+    "LocatorDia1": (0.262, _front_y(PIVOT_END_R) + 0.0177),
 }
 # The true overall (review of 19e33c6c2: the 128.90 from the bore axis read
 # as one), a reference under the stations: picked on the pivot round's upper
@@ -227,16 +227,20 @@ OVERALL_PICKS = (
 # The floor depth's text stands BELOW the section's pivot end, outside its
 # witness lines, where it hangs LEFT of the dimension line (away from the
 # part, right edge on the line): the line runs 2 mm off the pivot end.
-# The spot face's callout stands low enough that its two lines above the
-# value clear the overall reference; its value sits off the section's top.
+# The spot face's callout stands right of its extension lines, above the
+# section (machinist review: between them, the lines struck its text; an
+# above-the-value callout prints one line only), clear of the overall
+# reference above it.
 SECTION_KEEP = {
-    "SpotFaceDia": (_front_x(0.0), SECTION_CENTER[1] + 0.016),
+    "SpotFaceDia": (0.1295, SECTION_CENTER[1] + 0.019),
     "FloorDepth": (_front_x(-PIVOT_END_R) - 0.002, SECTION_CENTER[1] - 0.022),
     "PinHoleDepth": (
         _front_x(TIP_STATION - PIN_HOLE_DEPTH / 2.0),
         SECTION_CENTER[1] - 0.020,
     ),
 }
+# Section A-A's column right of the stud bore, where both its frames stand.
+_STUD_FRAME_X = _front_x(PIN_STATION) + 0.012
 # Each narrow depth's text stands right of its witness lines and outside
 # its view (run 20261010T001620278Z: inside them, the witness lines and the
 # view edges struck the text).
@@ -264,13 +268,11 @@ LOCATOR_CALLOUT_TEXT = "\n".join((
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": PIVOT_BORE_CALLOUT,
     "PinBoreDia": PIN_BORE_CALLOUT,
+    "SpotFaceDia": SPOT_FACE_CALLOUT,
     "FloorDepth": FLOOR_DEPTH_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
     "LocatorDia1": LOCATOR_CALLOUT_TEXT,
 }
-# Above the value: below it, the counterbore's extension lines struck the
-# callout (machinist review).
-DIMENSION_CALLOUTS_ABOVE = {"SpotFaceDia": SPOT_FACE_CALLOUT}
 
 # Native tap callout: arrow on the rear entry break's own edge, text above
 # the view with its top inside the upper border. It carries the ordinary
@@ -578,7 +580,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above")
     set_reference_dimensions(adapter, annotations, ("PivotBoreDia",))
     _set_stock_text(adapter, annotations)
     # Model-owned circular zones and actual feature datums. BASIC stations
@@ -589,12 +590,11 @@ async def build(adapter: Any) -> dict[str, str]:
     }
     pin_r = bore_dia["C"] / 2.0
     placements = {
-        # Right of the counterbore callout's lines, left of the stud's
-        # perpendicularity frame.
+        # Between the counterbore's callout and the stud's frames.
         "datum:A": PmiDrawingPlacement(
-            section, (_front_x(30.0), SECTION_CENTER[1] + 0.018),
+            section, (_front_x(56.0), SECTION_CENTER[1] + 0.018),
             attachment_xy=model_point_in_view(
-                adapter, section, (0.030, 0.0, 0.0), label="arm front datum",
+                adapter, section, (0.056, 0.0, 0.0), label="arm front datum",
             ),
         ),
         # Datum tags on a bore are picked by a SHEET POINT on the rim
@@ -616,14 +616,16 @@ async def build(adapter: Any) -> dict[str, str]:
                 bearing_deg=-27.0, label="datum C pin bore rim",
             ),
         ),
-        # Above the arm's upper edge near the square end, landing on the pin
-        # bore's upper right rim: the locating holes' six-line callout
-        # fills the band above the arm left of it.
+        # The stud's two frames stand stacked in section A-A right of its
+        # bore, the locating holes' callout filling the front view's band
+        # above the arm.  Both leaders enter the bore's mouth from the right
+        # and land on its far wall, the upper frame's higher, so they never
+        # cross.
         "feed_stud_position": PmiDrawingPlacement(
-            front, (0.300, FRONT_CENTER[1] + 0.025),
-            attachment_xy=_rim_point(
-                adapter, front, station_mm=PIN_STATION, radius_mm=pin_r,
-                bearing_deg=50.0, label="feed stud position pin bore rim",
+            section, (_STUD_FRAME_X, SECTION_CENTER[1] + 0.028),
+            attachment_xy=_wall_point(
+                adapter, section, x_mm=PIN_STATION - pin_r, z_mm=1.0,
+                label="feed stud position pin bore wall",
             ),
         ),
         # The projected-zone frames stand in section A-A on the side their
@@ -644,9 +646,9 @@ async def build(adapter: Any) -> dict[str, str]:
             ),
         ),
         "feed_stud_projected_axis": PmiDrawingPlacement(
-            section, (0.145, SECTION_CENTER[1] + 0.020),
+            section, (_STUD_FRAME_X, SECTION_CENTER[1] + 0.0195),
             attachment_xy=_wall_point(
-                adapter, section, x_mm=PIN_STATION + pin_r, z_mm=1.0,
+                adapter, section, x_mm=PIN_STATION - pin_r, z_mm=2.5,
                 label="feed stud projected axis pin bore wall",
             ),
         ),

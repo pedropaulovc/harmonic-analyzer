@@ -517,15 +517,23 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
     assert _hanging_left_box(lines, (old_line_x, 0.0))[0] == pytest.approx(
         0.0015, abs=0.001
     )
-    # The counterbore's lines stand above its value (machinist review: below
-    # it, the extension lines struck them).
-    assert drawing.DIMENSION_CALLOUTS_ABOVE == {"SpotFaceDia": spec.SPOT_FACE_CALLOUT}
-    assert "SpotFaceDia" not in drawing.DIMENSION_CALLOUTS
-    counterbore = _centred_box(
-        ["\u00d811.500 +0.1", *spec.SPOT_FACE_CALLOUT.splitlines()],
+    # The counterbore's text stands right of its extension lines, above the
+    # section (machinist review: between them, the lines struck it).
+    counterbore = _counterbore_box()
+    assert counterbore[0] > _BORDER + 0.003
+    right_extension = drawing._front_x(geometry.SPOT_FACE_DIA / 2.0)
+    assert counterbore[0] > right_extension + 0.002
+    section_top = drawing.SECTION_CENTER[1] + geometry.THICKNESS * drawing._S / 2000.0
+    assert counterbore[1] > section_top + 0.001
+    # Datum A's tag stands right of it.
+    assert counterbore[2] + 0.006 < drawing._front_x(56.0)
+
+
+def _counterbore_box() -> tuple[float, ...]:
+    return _centred_box(
+        ["+0.1", "\u00d811.500 0.0", *spec.SPOT_FACE_CALLOUT.splitlines()],
         drawing.SECTION_KEEP["SpotFaceDia"],
     )
-    assert counterbore[0] > _BORDER + 0.003
 
 
 def test_the_end_width_text_clears_the_section_arrow_and_the_end_view() -> None:
@@ -616,9 +624,7 @@ def test_the_overall_reference_spans_the_pivot_round_to_the_square_end() -> None
     assert abs(end_pick[1] - drawing.FRONT_CENTER[1]) < end_half
     lowest_station = min(xy[1] for xy in drawing.FRONT_KEEP.values())
     assert drawing.OVERALL_TEXT_XY[1] <= lowest_station - drawing.STATION_PITCH + 1e-9
-    above = len(spec.SPOT_FACE_CALLOUT.splitlines())
-    counterbore_top = drawing.SECTION_KEEP["SpotFaceDia"][1] + 0.003 + above * _LINE_PITCH
-    assert drawing.OVERALL_TEXT_XY[1] - _LINE_PITCH > counterbore_top
+    assert drawing.OVERALL_TEXT_XY[1] - _LINE_PITCH > _counterbore_box()[3]
 
 
 def test_registry_row_is_the_made_steel_mha_164() -> None:

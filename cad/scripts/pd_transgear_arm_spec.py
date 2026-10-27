@@ -194,9 +194,7 @@ PROJECTED_ZONE_NOTE = "\n".join((
 # The counterbore seats the MHA-PD-VN-63 spring's rim under the MHA-PD-VN-57
 # head, and its floor from the FRONT face sets the spring's room there
 # (transgear_hanger_joints.SPRING_ROOM_*): the callout names the spring, and
-# the floor's text says what its band sets (rule 4 (name the mate)). The
-# lines stand ABOVE the value, clear of the counterbore's extension lines
-# (machinist review: below it, the lines struck the text).
+# the floor's text says what its band sets (rule 4 (name the mate)).
 _SPRING = _config.parts("pd-vn-transgear-pivot-spring")
 _PIVOT_SCREW = _config.parts("pd-vn-transgear-pivot-screw")
 SPOT_FACE_CALLOUT = "\n".join((
