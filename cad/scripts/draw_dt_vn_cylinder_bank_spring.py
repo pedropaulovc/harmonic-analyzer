@@ -29,7 +29,8 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from enum import Enum
 from functools import partial
 import math
 from types import SimpleNamespace
@@ -48,7 +49,6 @@ from _drawing_leaders import (
     set_near_side_diameter,
 )
 from _layout_audit import (
-    _TEXT_ANCHORS,
     annotation_geometry,
     arrowhead_segments,
     calibrate_sheet_advance,
@@ -60,6 +60,7 @@ from _layout_geometry import (
     DEFAULT_ADVANCE_RATIO,
     segment_box_distance,
 )
+from _native_text_runs import lower_left_texts
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _supplier_disc_spring_drawing import (
@@ -117,31 +118,45 @@ FREE_TOP_CELL = next(
 )
 
 
+class PlanAnchor(Enum):
+    """The height a diameter's text is seated at beside the plan."""
+
+    # The text keeps the station height SolidWorks placed it at.
+    NATIVE_STATION = "native station"
+    # The shoulder sits on the plan's centre height, so the leader lands on
+    # the rim's 0 or 180 deg point and runs horizontal along the shoulder.
+    CENTER_HEIGHT = "center height"
+
+
 @dataclass(frozen=True)
 class PlanPlacement:
     """One presentation of the two plan diameters.
 
-    ``sides``: -1 text left of the plan, +1 right. ``level``: diameters whose
-    shoulder sits at the centre height, so the leader lands on the rim's 0 or
-    180 deg point and runs horizontal along the shoulder.
+    ``sides``: -1 text left of the plan, +1 right. ``anchors``: each
+    diameter's ``PlanAnchor``, ``NATIVE_STATION`` unless named.
     """
 
     label: str
     sides: Mapping[str, int]
-    level: frozenset[str] = frozenset()
+    anchors: Mapping[str, PlanAnchor] = field(default_factory=dict)
+
+    def anchor(self, name: str) -> PlanAnchor:
+        return self.anchors.get(name, PlanAnchor.NATIVE_STATION)
 
 
 # Tried in order; the first whose settled native ink passes every guard wins.
 PLAN_PLACEMENTS = (
     PlanPlacement("as placed", TEXT_SIDES["free_top"]),
     PlanPlacement(
-        "OD leader level at 0 deg", TEXT_SIDES["free_top"], frozenset({OD_NAME})
+        "OD leader level at 0 deg",
+        TEXT_SIDES["free_top"],
+        {OD_NAME: PlanAnchor.CENTER_HEIGHT},
     ),
     PlanPlacement("sides swapped", {ID_NAME: 1, OD_NAME: -1}),
     PlanPlacement(
         "sides swapped, OD leader level at 180 deg",
         {ID_NAME: 1, OD_NAME: -1},
-        frozenset({OD_NAME}),
+        {OD_NAME: PlanAnchor.CENTER_HEIGHT},
     ),
 )
 
@@ -264,46 +279,6 @@ def _text_record(adapter: Any, display: Any, *, label: str) -> dict[str, Any]:
     ):
         raise RuntimeError(f"{label}: no readable native text/position: {errors!r}")
     return lower_left_texts(record, label=label)
-
-
-def lower_left_texts(record: dict[str, Any], *, label: str) -> dict[str, Any]:
-    """``record`` with each text run's position moved to its lower-left corner.
-
-    ``_dump_annotation`` keeps each run's ``GetTextRefPositionAtIndex`` anchor
-    (``ref``), but ``display_box`` and the shared audit's row boxes read the
-    position as the lower-left. The audit's ``_TEXT_ANCHORS`` gives each
-    anchor as fractions of the run's width and cap height; this sheet's native
-    runs are all lower-left (``ref`` 1). A horizontal fraction needs the run's
-    width, so a run without one must be left-anchored; an unknown anchor is
-    refused rather than read as lower-left.
-    """
-    texts = record["display"]["texts"]
-    runs = []
-    for run in texts:
-        reference = int(run.get("ref", -1))
-        if reference not in _TEXT_ANCHORS:
-            raise RuntimeError(
-                f"{label}: text run {run.get('t')!r} has unknown anchor {reference}"
-            )
-        fx, fy = _TEXT_ANCHORS[reference]
-        width = float(run.get("w") or 0.0)
-        if fx and not width > 0.0:
-            raise RuntimeError(
-                f"{label}: text run {run.get('t')!r} is anchored {fx:g} along a "
-                "width SolidWorks did not report"
-            )
-        if not (fx or fy):
-            runs.append(run)
-            continue
-        along, up = fx * width, fy * float(run.get("h") or 0.0)
-        angle = float(run.get("ang") or 0.0)
-        cos_a, sin_a = math.cos(angle), math.sin(angle)
-        x, y, *rest = (float(value) for value in run["pos"])
-        corner = [x - along * cos_a + up * sin_a, y - along * sin_a - up * cos_a]
-        runs.append({**run, "pos": [*corner, *rest], "ref": 1})
-    if runs == list(texts):
-        return record
-    return {**record, "display": {**record["display"], "texts": runs}}
 
 
 def widths_measured(record: Mapping[str, Any]) -> bool:
@@ -439,12 +414,13 @@ def _is_shoulder(stroke: tuple, text: Any, tip_x: float, *, measured: bool) -> b
 def leader_chain(record: Mapping[str, Any]) -> tuple[list, list]:
     """A one-arrow diameter's lines as (arrow tip -> text shoulder, every other).
 
-    The chain is anchored at both ends: it starts at the arrow tip and its last
-    stroke is the shoulder under the text. A breadth-first search over joined
+    The chain is anchored at both ends: it starts at the arrow tip and ends in
+    the shoulder under the text. A breadth-first search over joined
     endpoints, each reached once, stops at the first stroke count at which a
     shoulder is reached, so the leader is the fewest-stroke such path and
-    duplicate or cyclic strokes cannot multiply the search. A stroke past the
-    shoulder or any detour is left over for ``stray_leader_lines``.
+    duplicate or cyclic strokes cannot multiply the search. The shoulder may
+    arrive as several joined collinear records (``shoulder_run``). A stroke
+    past the shoulder or any detour is left over for ``stray_leader_lines``.
     """
     arrows = record["display"].get("arrows") or ()
     if len(arrows) != 1:
@@ -464,6 +440,36 @@ def leader_chain(record: Mapping[str, Any]) -> tuple[list, list]:
             return a
         return None
 
+    def shoulder_run(
+        path: list[int], index: int, start: tuple[float, float]
+    ) -> list[int] | None:
+        """``index`` and the joined level strokes running on from it, the
+        fewest whose merged run from ``start`` is the shoulder, if any."""
+        run, end = [index], far_end(index, start)
+        while end is not None:
+            if abs(end[1] - start[1]) > 1e-7:
+                return None
+            if _is_shoulder((start, end), text, tip[0], measured=measured):
+                return run
+            onward = end[0] - start[0]
+            following = next(
+                (
+                    (piece, beyond)
+                    for piece in range(len(segments))
+                    if piece not in path
+                    and piece not in run
+                    and (beyond := far_end(piece, end)) is not None
+                    and abs(beyond[1] - start[1]) <= 1e-7
+                    and (beyond[0] - end[0]) * onward > 0.0
+                ),
+                None,
+            )
+            if following is None:
+                return None
+            run.append(following[0])
+            end = following[1]
+        return None
+
     reached = [tip]
     frontier: list[tuple[tuple[float, float], list[int]]] = [(tip, [])]
     best: list[int] | None = None
@@ -474,8 +480,9 @@ def leader_chain(record: Mapping[str, Any]) -> tuple[list, list]:
                 end = None if index in path else far_end(index, point)
                 if end is None:
                     continue
-                if _is_shoulder(segments[index], text, tip[0], measured=measured):
-                    best = [*path, index]
+                run = shoulder_run(path, index, point)
+                if run is not None:
+                    best = [*path, *run]
                     break
                 if all(math.dist(end, seen) > _JOIN_M for seen in reached):
                     reached.append(end)
@@ -545,13 +552,16 @@ def diameter_seat_move(
     plan: tuple[float, float, float, float],
     side: int,
     *,
-    level: bool,
+    anchor: PlanAnchor,
 ) -> tuple[float, float]:
-    """(dx, dy) seating a diameter's text a text height beside the plan, either
-    at its native station height or with its shoulder on the centre height."""
+    """(dx, dy) seating a diameter's text a text height beside the plan, at
+    the height its ``anchor`` names."""
     text = size_text_box(record)
     centre_y = (plan[1] + plan[3]) / 2.0
-    current = shoulder_y(record) if level else float(record["pos"][1])
+    if anchor is PlanAnchor.CENTER_HEIGHT:
+        current = shoulder_y(record)
+    else:
+        current = float(record["pos"][1])
     shift = diameter_text_shift(text, plan, side, arrow_reach=arrow_reach(record, side))
     return shift, centre_y - current
 
@@ -622,20 +632,23 @@ def _assert_diameters(
 
 def _seat_diameters(
     adapter: Any,
-    displays: Mapping[str, Any],
+    views: Mapping[str, Any],
     plan: tuple[float, float, float, float],
     placement: PlanPlacement,
 ) -> dict[str, Any]:
     """Move both texts to the placement; return the converged native snapshot.
 
     Every move is followed by a rebuild and a fresh read, the last one too, so
-    a placement that settles on its final permitted move is accepted.
+    a placement that settles on its final permitted move is accepted. Each
+    read and move goes through handles reacquired after the last rebuild
+    (``reacquire_supplier_dimensions``), never a cached display.
     """
     for moved in range(_SEAT_PASSES + 1):
+        displays = _size_displays(adapter, views)
         records = _size_records(adapter, displays)
         moves = {
             name: diameter_seat_move(
-                records[name], plan, side, level=name in placement.level
+                records[name], plan, side, anchor=placement.anchor(name)
             )
             for name, side in placement.sides.items()
         }
@@ -653,14 +666,14 @@ def _seat_diameters(
 
 def choose_plan_placement(
     adapter: Any,
-    displays: Mapping[str, Any],
+    views: Mapping[str, Any],
     plan: tuple[float, float, float, float],
 ) -> PlanPlacement:
     """The first ``PLAN_PLACEMENTS`` entry whose settled ink passes every guard."""
     rejected = []
     for placement in PLAN_PLACEMENTS:
         try:
-            records = _seat_diameters(adapter, displays, plan, placement)
+            records = _seat_diameters(adapter, views, plan, placement)
             _assert_diameters(records, plan, placement)
         except RuntimeError as error:
             rejected.append(f"{placement.label}: {error}")
@@ -709,6 +722,7 @@ def place_size_texts(
         if not annotation.SetPosition2(*anchor, 0.0):
             raise RuntimeError(f"{name}: dimension line station was rejected")
     rebuild_drawing(adapter, label="cylinder bank spring height stations")
+    displays = _size_displays(adapter, views)
     assert_height_stations(_size_records(adapter, displays), baseline)
     for name, anchor in anchors.items():
         display = displays[name]
@@ -717,6 +731,7 @@ def place_size_texts(
         if display.OffsetText is not True or not annotation.SetPosition2(*anchor, 0.0):
             raise RuntimeError(f"{name}: native offset text was rejected")
     rebuild_drawing(adapter, label="cylinder bank spring offset height text")
+    displays = _size_displays(adapter, views)
     records = _size_records(adapter, displays)
     shifts = {}
     for name, geometry in assert_height_stations(records, baseline).items():
@@ -727,9 +742,10 @@ def place_size_texts(
         f"{supplier_spec.SKU}: height texts moved "
         + ", ".join(f"{name} {dx * 1000:+.2f} mm" for name, dx in shifts.items())
     )
+    displays = _size_displays(adapter, views)
     _assert_heights(displays, _size_records(adapter, displays), baseline)
     plan = reference_bounds("free_top")
-    placement = choose_plan_placement(adapter, displays, plan)
+    placement = choose_plan_placement(adapter, views, plan)
 
     def settled() -> None:
         current = _size_displays(adapter, views)

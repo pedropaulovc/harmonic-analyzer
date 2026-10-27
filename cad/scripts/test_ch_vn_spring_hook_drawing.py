@@ -384,13 +384,18 @@ def test_settled_deburr_texts_clear_their_own_line_ink(monkeypatch, placement):
     reader = SimpleNamespace(take_errors=lambda: [])
     monkeypatch.setattr(drawing, "_Reader", lambda _adapter: reader)
     monkeypatch.setattr(
-        drawing, "_dump_annotation", lambda _reader, name: {"name": name}
+        drawing,
+        "_dump_annotation",
+        lambda _reader, name: {
+            "name": name,
+            "display": {
+                "texts": [{"t": name, "pos": [0.1, 0.1, 0.0], "h": 0.0035, "ref": 1}]
+            },
+        },
     )
     monkeypatch.setattr(drawing, "calibrate_sheet_advance", lambda _records: 0.6)
     monkeypatch.setattr(
-        drawing,
-        "annotation_geometry",
-        lambda record, *, owner, advance: ink[record["name"]],
+        drawing, "annotation_geometry", lambda record, **_kwargs: ink[record["name"]]
     )
 
     def check():
@@ -416,3 +421,214 @@ def test_angle_text_sits_inside_the_deburr_wedge_on_its_bisector():
     assert bearing == pytest.approx(spec.CHAMFER_ANGLE_DEG / 2, abs=0.5)
     assert math.hypot(x - vertex[0], y - vertex[1]) == pytest.approx(0.026, abs=2e-4)
     assert drawing.FRONT_KEEP["ChamferWidth"][1] < 0.100
+
+
+# The settled 45 deg as SolidWorks dumped it (layout audit of run fa43a1a5,
+# FRONT_KEEP's bisector placement): one lower-left run, native width 9.625.
+NATIVE_CHAMFER_ANGLE = {
+    "type": 4,
+    "name": "ChamferAngle",
+    "visible": 1,
+    "owner_type": 0,
+    "pos": [0.1305, 0.1132, 0.0005],
+    "display": {
+        "lines": [
+            [
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.1120414,
+                0.1032311,
+                0.0005,
+                0.1334869,
+                0.1032311,
+                0.0005,
+            ],
+            [
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.1094701,
+                0.1062166,
+                0.0005,
+                0.1255781,
+                0.1223246,
+                0.0005,
+            ],
+        ],
+        "arcs": [
+            [
+                0.0,
+                0.0,
+                -1.0,
+                -1.0,
+                0.1324869,
+                0.1032311,
+                0.0005,
+                0.1314728,
+                0.1104219,
+                0.0005,
+                0.1064846,
+                0.1032311,
+                0.0005,
+                0.0,
+                0.0,
+                1.0,
+                1.0,
+            ],
+            [
+                0.0,
+                0.0,
+                -1.0,
+                -1.0,
+                0.129148,
+                0.1159781,
+                0.0005,
+                0.124871,
+                0.1216174,
+                0.0005,
+                0.1064846,
+                0.1032311,
+                0.0005,
+                0.0,
+                0.0,
+                1.0,
+                1.0,
+            ],
+        ],
+        "arrows": [
+            [
+                0.1324869,
+                0.1032311,
+                0.0005,
+                -0.0679048,
+                0.9976918,
+                -0.0,
+                0.003556,
+                0.000762,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+            ],
+            [
+                0.124871,
+                0.1216174,
+                0.0005,
+                0.6574587,
+                -0.7534906,
+                -0.0,
+                0.003556,
+                0.000762,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+            ],
+        ],
+        "texts": [
+            {
+                "t": " 45\u00b0 ",
+                "pos": [0.1256875, 0.1104219, 0.0005],
+                "h": 0.0035,
+                "ref": 1,
+                "ang": 0.0,
+                "w": 0.009625,
+            },
+        ],
+    },
+    "dim": {"hole_callout": False},
+}
+
+
+def _run_native_ink_check(monkeypatch, records):
+    """``_verify_control_ink`` on dump-shaped records, through the real
+    normalization, advance calibration and ``annotation_geometry``."""
+    reader = SimpleNamespace(take_errors=lambda: [])
+    monkeypatch.setattr(drawing, "_Reader", lambda _adapter: reader)
+    monkeypatch.setattr(
+        drawing, "_dump_annotation", lambda _reader, index: records[index]
+    )
+    drawing._verify_control_ink(None, list(range(len(records))))
+
+
+def _probe(width_mm, line_x_mm):
+    """A one-run, arrowless dimension "1111" at (100, 100) mm, 3.5 tall, with
+    a vertical line of its own across the row at ``line_x_mm``. Its single run
+    gives no advance sample, so an estimate uses the 0.62 default: 8.68 mm."""
+    run = {"t": "1111", "pos": [0.100, 0.100, 0.0], "h": 0.0035, "ref": 1, "ang": 0.0}
+    if width_mm is not None:
+        run["w"] = width_mm / 1000
+    x = line_x_mm / 1000
+    return {
+        "type": 4,
+        "name": "Probe",
+        "visible": 1,
+        "display": {
+            "texts": [run],
+            "lines": [[0.0, 0.0, 0.0, 0.0, x, 0.0980, 0.0, x, 0.1055, 0.0]],
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    ("width_mm", "line_x_mm", "refused"),
+    [
+        (5.0, 107.0, False),  # native 5.0 wide: the line stands 2 mm clear
+        (None, 107.0, True),  # no native width: the 0.62 estimate is struck
+        (12.0, 110.0, True),  # native 12.0 wide: the estimate would hide it
+        (5.0, 103.0, True),  # a real strike through the measured run
+    ],
+)
+def test_native_run_widths_decide_the_ink_check(
+    monkeypatch, width_mm, line_x_mm, refused
+):
+    """Review 4385690681: a single-run dimension boxed at the 0.62 estimate is
+    falsely refused when its native run is narrower, and an under-estimate
+    hides a real strike. Measured widths decide; only a run SolidWorks gave
+    no width keeps the estimate."""
+    record = _probe(width_mm, line_x_mm)
+    if not refused:
+        _run_native_ink_check(monkeypatch, [record])
+        return
+    with pytest.raises(RuntimeError, match="struck by line ink"):
+        _run_native_ink_check(monkeypatch, [record])
+
+
+def test_the_settled_native_deburr_angle_passes(monkeypatch):
+    """The real fa43a1a5 record clears its own lines and arrowheads when read
+    at its native width."""
+    _run_native_ink_check(monkeypatch, [NATIVE_CHAMFER_ANGLE])
+
+
+@pytest.mark.parametrize(
+    ("reference", "line_x_mm", "refused"),
+    [
+        (2, 107.0, False),  # centred: read raw, the box shifts onto the line
+        (4, 107.0, False),  # lower-right: likewise
+        (4, 103.0, True),  # lower-right: read raw, the strike is hidden
+    ],
+)
+def test_anchored_text_runs_normalize_to_their_lower_left(
+    monkeypatch, reference, line_x_mm, refused
+):
+    """Review 4385690674: SolidWorks may report a run at a centred or right
+    anchor, but the audit's boxes read every position as lower-left. The
+    probe's 5 mm run truly spans x 100..105; it is reported at its anchor."""
+    from _layout_audit import _TEXT_ANCHORS
+    from _native_text_runs import lower_left_texts
+
+    record = _probe(5.0, line_x_mm)
+    (run,) = record["display"]["texts"]
+    fx, fy = _TEXT_ANCHORS[reference]
+    run["pos"] = [0.100 + fx * run["w"], 0.100 + fy * run["h"], 0.0]
+    run["ref"] = reference
+    (normal,) = lower_left_texts(record, label="Probe")["display"]["texts"]
+    assert (normal["ref"], normal["pos"]) == (1, pytest.approx([0.100, 0.100, 0.0]))
+    if not refused:
+        _run_native_ink_check(monkeypatch, [record])
+        return
+    with pytest.raises(RuntimeError, match="struck by line ink"):
+        _run_native_ink_check(monkeypatch, [record])

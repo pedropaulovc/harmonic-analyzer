@@ -44,7 +44,13 @@ from _layout_audit import (
     find_arrows_near_text,
     find_lines_through_own_text,
 )
-from _layout_geometry import ARROW_TEXT_CLEARANCE_M, SheetGeometry, segment_box_distance
+from _layout_geometry import (
+    ARROW_TEXT_CLEARANCE_M,
+    DEFAULT_ADVANCE_RATIO,
+    SheetGeometry,
+    segment_box_distance,
+)
+from _native_text_runs import lower_left_texts, measured_run_ink
 from _purchased_fastener_drawing import assert_supplier_view_fits
 from _rebuild import active_configuration_name
 from _supplier_dimensions import (
@@ -156,16 +162,31 @@ def _verify_control_ink(adapter: Any, annotations: list[Any]) -> None:
 
     The audit's own-line finders, plus the fleet's arrow-to-text clearance on
     each control's OWN arrowheads, which ``find_arrows_near_text`` exempts
-    (machinist b344192: the 45 deg sat on its own arc arrowhead).
+    (machinist b344192: the 45 deg sat on its own arc arrowhead). Text is
+    read as it prints: each run moved from its native anchor to its
+    lower-left, and boxed at the width SolidWorks reports. Only a run with no
+    reported width is estimated, at the calibrated advance floored at the
+    audit's default so the estimate never narrows the box (as the cylinder
+    spring's ``size_text_box``): a single-run dimension has no calibration
+    sample.
     """
     reader = _Reader(adapter)
     records = [_dump_annotation(reader, annotation) for annotation in annotations]
     errors = reader.take_errors()
-    if errors or any(record is None for record in records):
-        raise RuntimeError(f"unreadable settled cutting-control ink: {errors}")
-    advance = calibrate_sheet_advance(records)
+    if errors or any(
+        record is None or not (record.get("display") or {}).get("texts")
+        for record in records
+    ):
+        raise RuntimeError(f"unreadable settled cutting-control text/ink: {errors}")
+    records = [
+        lower_left_texts(record, label=str(record.get("name") or "cutting control"))
+        for record in records
+    ]
+    advance = max(calibrate_sheet_advance(records), DEFAULT_ADVANCE_RATIO)
     geometries = tuple(
-        annotation_geometry(record, owner="front", advance=advance)
+        annotation_geometry(
+            record, owner="front", advance=advance, ink=measured_run_ink(record)
+        )
         for record in records
     )
     if any(geometry is None or not geometry.text_boxes for geometry in geometries):
