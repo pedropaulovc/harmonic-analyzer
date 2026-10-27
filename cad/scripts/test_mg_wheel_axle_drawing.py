@@ -88,7 +88,8 @@ def test_thread_relief_is_cut_under_the_die_root() -> None:
 def test_volume_gates_see_the_relief() -> None:
     # codjiflo #1996: a whole-part 0.5% gate passed an unrelieved solid.
     assert part.PIN_VOLUME_TOL < part.V_RELIEF_GROOVE
-    assert part.ROOTS_VOLUME_TOL < part.V_RELIEF_ROOTS
+    # One root missing is half the roots' volume: the gate must reject it.
+    assert part.ROOTS_VOLUME_TOL < 0.5 * part.V_RELIEF_ROOTS
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
