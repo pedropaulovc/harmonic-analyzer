@@ -495,6 +495,10 @@ def _check_omp_provenance(
         "--model": "anthropic/" + review.model.removeprefix("anthropic/"),
         "--thinking": review.effort, "--session-dir": sessions,
     }
+    if "--resume" in invocation["command"]:
+        # Continuations reopen only this invocation's already home-bound session.
+        # A fresh descriptor must still reject any native --resume option.
+        values["--resume"] = session
     seen: set[str] = set()
     index = 1
     while index < len(command):

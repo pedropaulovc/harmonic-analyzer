@@ -2778,3 +2778,34 @@ def test_native_route_offsets_include_control_responses_without_provider_coverag
     # A route that got only an MCP status before failing has no provider record.
     early_failure = {"routes": [provenance["routes"][0]]}
     evaluation._check_native_events(None, early_failure, [status])
+
+
+@pytest.mark.parametrize("damage", [None, "missing_resume", "wrong_target", "fresh_descriptor", "duplicate"])
+def test_omp_continuation_command_is_bound_to_recorded_session(
+    tmp_path, case, provider, damage,
+):
+    identity = _identity(case, reviewer="claude")
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    review = evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    report = _omp_report(result)
+    evidence = report["extra"]["evidence"]
+    invocation = evidence["attempts"][0]
+    provenance = invocation["transport_provenance"]
+    if damage != "fresh_descriptor":
+        invocation["command"][invocation["command"].index("--session-id")] = "--resume"
+    command = deepcopy(provenance["omp_command"])
+    if damage != "missing_resume":
+        target = (str(Path(provenance["session_dir"]) / "other-session.jsonl")
+                  if damage == "wrong_target" else provenance["session_file"])
+        command.extend(["--resume", target])
+    if damage == "duplicate":
+        command.extend(["--resume", provenance["session_file"]])
+    provenance["omp_command"] = command
+    provenance["omp_effective_options"]["command"] = deepcopy(command)
+    if damage is None:
+        evaluation._check_omp_provenance(provenance, invocation, evidence, review)
+    else:
+        with pytest.raises(ValueError, match="OMP actual command"):
+            evaluation._check_omp_provenance(provenance, invocation, evidence, review)
