@@ -439,10 +439,7 @@ def _claude_provider_response(event: Any) -> bool:
     # The first assistant event's output count can still be partial. Readiness
     # is not completion/accounting: positive input or cache usage suffices.
     counts = [
-        usage.get(key, 0) for key in (
-            "input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens",
-            "output_tokens",
-        )
+        usage.get(key, 0) for key in _claude_transport.CLAUDE_TOKEN_COUNTERS
     ]
     return (
         all(type(count) is int and count >= 0 for count in counts)
@@ -1372,10 +1369,7 @@ def _usage(
             key: (first_turn_usage or {}).get(key, 0) for key in keys
         }
         return usage
-    keys = (
-        "input_tokens", "cache_creation_input_tokens",
-        "cache_read_input_tokens", "output_tokens",
-    )
+    keys = _claude_transport.CLAUDE_TOKEN_COUNTERS
     results = [row for row in rows if row.get("type") == "result"]
     usage = {
         key: sum((row.get("usage") or {}).get(key, 0) for row in results)

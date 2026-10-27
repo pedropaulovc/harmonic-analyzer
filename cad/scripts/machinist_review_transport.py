@@ -26,8 +26,13 @@ from machinist_review_credentials import CredentialPool, CredentialUnavailable, 
 
 TOOLS = {"mcp__sheets__view_sheet", "mcp__sheets__crop"}
 OMP_TOOLS = {"mcp__sheets_view_sheet", "mcp__sheets_crop"}
+CLAUDE_TOKEN_COUNTERS = (
+    "input_tokens", "cache_creation_input_tokens",
+    "cache_read_input_tokens", "output_tokens",
+)
 OMP_SYSTEM_PROMPT = "You are a blind drawing reviewer. Use only the supplied sheet tools. Return only the requested JSON verdict."
 _SESSION_STATES: ContextVar[set[Path] | None] = ContextVar("machinist_review_session_states", default=None)
+_ATTEMPT_DEADLINE: ContextVar[float | None] = ContextVar("machinist_review_attempt_deadline", default=None)
 # Sheet views/crops fit 1976x1280 RGB: even incompressible PNG+base64 can exceed
 # 10 MiB per image, and SDK tool-result records can contain duplicate images.
 # Match the existing OMP event bound, with room for batched results; this is a
@@ -48,6 +53,23 @@ OMP_PROJECT_CONTEXT_RE = re.compile(
     r"- Model: anthropic/[A-Za-z0-9._:/-]+\n"
     r"</workstation>\n</project-context>\n\n" + re.escape(_OMP_CRITICAL)
 )
+OMP_EFFECTIVE_CONFIG = {
+    "disabledProviders": ["native", "agents", "agents-md", "claude", "claude-md", "codex", "gemini", "github", "opencode"],
+    "mcp": {"startupTimeoutMs": 0, "enableProjectConfig": True},
+    "memory": {"backend": "off"}, "autolearn": {"enabled": False, "autoContinue": False},
+    "includeWorkspaceTree": False,
+}
+
+
+def validate_omp_system_prompt(parts):
+    """Validate the same fail-closed prompt boundary at runtime and in eval."""
+    if not isinstance(parts, list) or len(parts) != 2 or any(not isinstance(part, str) for part in parts):
+        raise ValueError("OMP lacks its actual isolated system prompt")
+    forbidden = ("<project>", "<repo-rules>", "<file path=", "<dir-context>", "<skills>", "<rules>", "<workspace-tree>", "<workspace-roots>")
+    first = re.sub(r"<redacted-content>.*?</redacted-content>", "", parts[0], flags=re.S).strip()
+    if (first != OMP_SYSTEM_PROMPT or any(marker in part for part in parts for marker in forbidden)
+            or OMP_PROJECT_CONTEXT_RE.fullmatch(parts[1].replace("\r\n", "\n").strip()) is None):
+        raise ValueError("OMP system prompt contains unauthorized context")
 
 
 def register_state(home: Path) -> None:
@@ -114,13 +136,21 @@ class CredentialLockTimeout(TimeoutError):
 
 @asynccontextmanager
 async def startup_timeout(phase, budget):
-    timer = asyncio.timeout(budget)
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + budget
+    attempt_deadline = _ATTEMPT_DEADLINE.get()
+    attempt_limited = attempt_deadline is not None and attempt_deadline <= deadline
+    timer = asyncio.timeout_at(attempt_deadline if attempt_limited else deadline)
     try:
         async with timer:
             yield
     except TimeoutError as exc:
-        if not timer.expired() or isinstance(exc, AttemptTimeout):
+        if not timer.expired():
             raise
+        # Equal deadlines belong to the overall attempt, irrespective of which
+        # nested timer delivers cancellation first.
+        if attempt_limited or isinstance(exc, AttemptTimeout):
+            raise AttemptTimeout from exc
         raise StartupTimeout(phase, budget) from exc
 
 
@@ -139,13 +169,13 @@ async def credential_operation(pool, operation, remaining, *args, **kwargs):
             await asyncio.sleep(min(0.05, budget))
 
 
-def environment(key=None, *, inherited=False):
+def environment(key=None, *, mode="sdk_overlay"):
     # SDK merges the parent environment itself and owns entrypoint/tracing
     # hygiene. Only credential removals and our explicit overrides belong there.
-    env = dict(os.environ) if inherited else {}
+    env = dict(os.environ) if mode == "subprocess" else {}
     for name in os.environ:
         if name.startswith("ANTHROPIC_") or re.match(r"CLAUDE_CODE_(OAUTH|USE_|API_KEY|SUBAGENT_MODEL|AWS|VERTEX|FOUNDRY)", name):
-            if inherited:
+            if mode == "subprocess":
                 env.pop(name, None)
             else:
                 env[name] = ""
@@ -171,16 +201,17 @@ def resume_inputs(previous):
     }
 
 
-def sdk_event(message):
+def sdk_event(message, value):
     """Convert SDK public dataclasses without losing image/result/error data."""
     from claude_agent_sdk import AssistantMessage, UserMessage, SystemMessage, ResultMessage
-    value = asdict(message)
+    # The caller's single dataclass conversion is also retained as native data.
     if isinstance(message, (AssistantMessage, UserMessage)):
         if isinstance(message.content, str):
             return {"type": "user", "message": {"content": message.content}}
         content = []
         for block, data in zip(message.content, value["content"]):
             if "type" not in data:
+                data = dict(data)
                 data["type"] = {"TextBlock": "text", "ThinkingBlock": "thinking", "ToolUseBlock": "tool_use", "ToolResultBlock": "tool_result"}.get(type(block).__name__, type(block).__name__)
             content.append(data)
         return {"type": "assistant" if isinstance(message, AssistantMessage) else "user",
@@ -223,7 +254,7 @@ def quota_event(event):
     return None
 
 
-async def _sdk(*, key, config, schema, model, effort, session_id, resume, cwd, remaining, startup, settings, emit, diagnostics, provenance):
+async def _sdk(*, key, config, schema, model, effort, session_id, continuation, cwd, remaining, startup, settings, emit, diagnostics, provenance):
     from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
     env = environment(key.api_key)
     home = Path(provenance["private_home"])
@@ -240,12 +271,13 @@ async def _sdk(*, key, config, schema, model, effort, session_id, resume, cwd, r
     env["CLAUDE_CONFIG_DIR"] = str(session_dir)
     env["MCP_TIMEOUT"] = str(max(1, int(min(startup, remaining()) * 1000)))
     options = ClaudeAgentOptions(
-        cwd=cwd, env=env, model=model, effort=effort, thinking={"type": "adaptive"},
+        cwd=cwd, env=env, model=model, effort=effort, thinking={"type": "adaptive", "display": "summarized"},
         tools=[], allowed_tools=sorted(TOOLS), mcp_servers=config["mcpServers"], strict_mcp_config=True,
         permission_mode="dontAsk", setting_sources=[], settings=json.dumps(settings),
         output_format={"type": "json_schema", "schema": schema},
         max_buffer_size=MAX_EVENT_BUFFER_BYTES,
-        resume=session_id if resume else None, session_id=None if resume else session_id,
+        resume=session_id if continuation == "sdk_resume" else None,
+        session_id=None if continuation == "sdk_resume" else session_id,
         extra_args={"bare": None, "disable-slash-commands": None, "no-chrome": None},
         stderr=lambda line: diagnostics.append(line + "\n"),
     )
@@ -276,8 +308,9 @@ async def _sdk(*, key, config, schema, model, effort, session_id, resume, cwd, r
         await client.query(config["prompt"])
         quota = None
         async for message in client.receive_response():
-            event = sdk_event(message)
-            emit(event, {"sdk_message_type": type(message).__name__, "message": asdict(message)})
+            value = asdict(message)
+            event = sdk_event(message, value)
+            emit(event, {"sdk_message_type": type(message).__name__, "message": value})
             actual_session = event.get("session_id")
             if actual_session:
                 if actual_session != session_id:
@@ -510,7 +543,7 @@ def omp_native_event(event):
     return retained
 
 
-async def _omp_session(*, executable, broker_env, config, schema, model, effort, cwd, remaining, startup, emit, diagnostics, provenance, resume):
+async def _omp_session(*, executable, broker_env, config, schema, model, effort, cwd, remaining, startup, emit, diagnostics, provenance, continuation):
     home = Path(provenance["private_home"])
     if not home.is_dir() or not Path(cwd).resolve().is_relative_to(home.resolve()):
         raise RuntimeError("OMP cwd must remain inside its lifecycle-owned private HOME")
@@ -523,19 +556,14 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
     agent = home / "agent"
     agent.mkdir(mode=0o700, exist_ok=True)
     overlay = home / "config.yml"
-    effective_config = {
-        "disabledProviders": ["native", "agents", "agents-md", "claude", "claude-md", "codex", "gemini", "github", "opencode"],
-        "mcp": {"startupTimeoutMs": 0, "enableProjectConfig": True},
-        "memory": {"backend": "off"}, "autolearn": {"enabled": False, "autoContinue": False},
-        "includeWorkspaceTree": False,
-    }
+    effective_config = deepcopy(OMP_EFFECTIVE_CONFIG)
     overlay.write_text(json.dumps(effective_config), encoding="utf-8")
     sessions = home / "sessions"
     sessions.mkdir(mode=0o700, exist_ok=True)
     provenance["session_dir"] = str(sessions)
-    if resume:
+    if continuation == "omp_resume":
         _omp_blobs(provenance)
-    env = environment(inherited=True)
+    env = environment(mode="subprocess")
     for name in tuple(env):
         if name.startswith(("PI_", "OMP_", "XDG_")):
             env.pop(name)
@@ -553,7 +581,7 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
                "--no-lsp", "--no-pty", "--no-prewalk", "--no-title", "--auto-approve",
                "--system-prompt", OMP_SYSTEM_PROMPT,
                "--model", "anthropic/" + model_id, "--thinking", effort, "--session-dir", str(sessions)]
-    if resume:
+    if continuation == "omp_resume":
         command += ["--resume", provenance["session_file"]]
     provenance["omp_command"] = command
     proc = await asyncio.create_subprocess_exec(*command, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, limit=MAX_EVENT_BUFFER_BYTES)
@@ -592,15 +620,12 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
             if tools != OMP_TOOLS:
                 raise RuntimeError("OMP sheets-only tool catalog mismatch")
             parts = state.get("systemPrompt")
-            if not isinstance(parts, list) or len(parts) != 2 or any(not isinstance(part, str) for part in parts):
-                raise RuntimeError("OMP lacks its actual isolated system prompt")
-            forbidden = ("<project>", "<repo-rules>", "<file path=", "<dir-context>", "<skills>", "<rules>", "<workspace-tree>", "<workspace-roots>")
-            first = re.sub(r"<redacted-content>.*?</redacted-content>", "", parts[0], flags=re.S).strip()
-            if (first != OMP_SYSTEM_PROMPT or any(marker in part for part in parts for marker in forbidden)
-                    or OMP_PROJECT_CONTEXT_RE.fullmatch(parts[1].replace("\r\n", "\n").strip()) is None):
-                raise RuntimeError("OMP system prompt contains unauthorized context")
+            try:
+                validate_omp_system_prompt(parts)
+            except ValueError as exc:
+                raise RuntimeError(str(exc)) from None
             actual = state.get("sessionId")
-            if not actual or resume and actual != provenance.get("session_id"):
+            if not actual or continuation == "omp_resume" and actual != provenance.get("session_id"):
                 raise RuntimeError("OMP continuation/session mismatch")
             if not isinstance(state.get("sessionFile"), str) or not state["sessionFile"]:
                 raise RuntimeError("OMP lacks its persisted session file")
@@ -671,19 +696,22 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
     provenance["operation_id"] = str(uuid.uuid4())
     provenance["routes"] = []
     common = {name: provenance.get(name) for name in ("operation_id", "package", "phase", "attempt")}
-    resume = "--resume" in command
-    pinned_omp = resume and provenance.get("transport") == "omp"
+    continuation = ("omp_resume" if provenance.get("transport") == "omp" else "sdk_resume") if "--resume" in command else "fresh"
+    resume = continuation != "fresh"
+    pinned_omp = continuation == "omp_resume"
     session_id = command[command.index("--resume" if resume else "--session-id") + 1]
     provenance["requested_session_id"] = session_id
     if not resume:
         provenance.update(transport="routing", session_id=None)
     try:
-        pool = CredentialPool(load=not pinned_omp)
+        pool = CredentialPool(load_mode="skip" if pinned_omp else "configured")
     except Exception:
         _telemetry.error("machinist_review.credentials", reason="invalid_configuration", configured_count=None, selected_id=None, **common)
         _telemetry.error("machinist_review.transport_failed", error_category="credential_configuration", timed_out=False, **common)
         raise
-    native, events, diagnostics = [], [], []
+    events, diagnostics = [], []
+    native_path = Path(cwd) / "native-events.jsonl"
+    native_path.write_text("", encoding="utf-8")
     notified = False
     route_index = 0
     def remaining():
@@ -706,7 +734,8 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
     def emit(event, raw):
         nonlocal notified
         if raw is not None:
-            native.append(pool.redact(json.dumps({"route_index": route_index, "native_event": raw}, default=str)))
+            with native_path.open("a", encoding="utf-8") as native:
+                native.write(pool.redact(json.dumps({"route_index": route_index, "native_event": raw}, default=str)) + "\n")
         if event is not None:
             safe = json.loads(pool.redact(json.dumps(event)))
             scope_tool_ids(safe)
@@ -729,8 +758,11 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
             if event.get("type") == "assistant":
                 turns += 1
                 cost += event.get("total_cost_usd", 0) or 0
-                for name, count in (event["message"].get("usage") or {}).items():
-                    usage[name] = usage.get(name, 0) + count
+                raw_usage = event["message"].get("usage") or {}
+                for name in CLAUDE_TOKEN_COUNTERS:
+                    count = raw_usage.get(name, 0)
+                    if type(count) is int and count >= 0:
+                        usage[name] = usage.get(name, 0) + count
         if results:
             results[-1].update(usage=usage, num_turns=turns, total_cost_usd=cost)
         else:
@@ -793,7 +825,7 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
             provenance.setdefault("routes", []).append(route)
             _telemetry.info("machinist_review.sdk_attempt", model=model, effort=effort, credential_id=credential.id, route_index=route_index, **common)
             async with operation("machinist_review.sdk", credential_id=credential.id, model=model, effort=effort):
-                quota = await _sdk(key=credential, config=config, schema=schema, model=model, effort=effort, session_id=session_id, resume=resume, cwd=cwd, remaining=remaining, startup=startup, settings=settings, emit=emit, diagnostics=diagnostics, provenance=provenance)
+                quota = await _sdk(key=credential, config=config, schema=schema, model=model, effort=effort, session_id=session_id, continuation=continuation, cwd=cwd, remaining=remaining, startup=startup, settings=settings, emit=emit, diagnostics=diagnostics, provenance=provenance)
             finish_usage()
             route["event_end"] = len(events)
             if quota is None:
@@ -829,13 +861,18 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
                         source_transport="omp" if pinned_omp else "claude_agent_sdk", destination_transport="omp",
                         reason="continuation" if pinned_omp else "no_configured_keys" if not pool.credentials else "no_eligible_keys", **common)
         async with operation("machinist_review.omp", model=model, effort=effort):
-            await _omp(config=config, schema=schema, model=model, effort=effort, cwd=cwd, remaining=remaining, startup=startup, emit=emit, diagnostics=diagnostics, provenance=provenance, resume=resume, register_secret=pool.secrets.add)
+            await _omp(config=config, schema=schema, model=model, effort=effort, cwd=cwd, remaining=remaining, startup=startup, emit=emit, diagnostics=diagnostics, provenance=provenance, continuation=continuation, register_secret=pool.secrets.add)
         finish_usage()
         route.update(outcome="succeeded", event_end=len(events), session_id=provenance.get("session_id"))
     try:
         async def bounded():
-            async with asyncio.timeout(remaining()):
-                await execute()
+            attempt_deadline = asyncio.get_running_loop().time() + remaining()
+            token = _ATTEMPT_DEADLINE.set(attempt_deadline)
+            try:
+                async with asyncio.timeout_at(attempt_deadline):
+                    await execute()
+            finally:
+                _ATTEMPT_DEADLINE.reset(token)
         asyncio.run(bounded())
         _telemetry.success("machinist_review.transport_completed", transport=provenance.get("transport"), duration_s=time.monotonic() - started, session_id=provenance.get("session_id"), **common)
         return subprocess.CompletedProcess(command, 0, "\n".join(json.dumps(event) for event in events), pool.redact("".join(diagnostics)))
@@ -863,5 +900,3 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
         if errors.strip():
             detail += "\nSanitized transport stderr:\n" + errors.strip()[-1600:]
         raise TransportError(detail, stdout=output, stderr=errors) from None
-    finally:
-        (Path(cwd) / "native-events.jsonl").write_text("\n".join(native), encoding="utf-8")

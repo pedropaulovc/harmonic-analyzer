@@ -281,6 +281,9 @@ both verdicts and the finding diff.
   `--permission-prompts` flags. Isolation instead uses supported `--bare`,
   explicit skill disabling, `tools=[]`, `permission_mode="dontAsk"`, empty
   setting sources and strict sheets-only MCP configuration.
+  SDK thinking uses adaptive mode with summarized display
+  (`thinking={"type": "adaptive", "display": "summarized"}`), preserving the
+  selected reasoning effort and retaining emitted summaries as evidence.
   The SDK receives only explicit environment overrides (including empty values
   to remove ambient authentication); its launcher owns parent-environment
   merging and entrypoint/tracing hygiene. OMP instead receives a sanitized full
@@ -349,16 +352,35 @@ both verdicts and the finding diff.
   startup phase and its budget rather than reporting a full-attempt timeout.
   An exhausted overall deadline remains an attempt timeout even when it expires
   inside a startup phase; the startup budget must not relabel that failure.
+  The timers share an absolute attempt deadline; equal startup/attempt
+  boundaries always belong to the overall attempt, regardless of timer order.
   Credential-lock contention has its own phase and budget (at most 30 seconds,
   also bounded by the attempt deadline), distinct from MCP startup and full
   attempt timeouts. A contended or stale lock fails closed, without bypassing
   shared routing state through OMP; recovery follows the operator procedure above.
   Failed or incomplete startup submits no review. Native redacted records and
   normalized image/tool evidence are retained separately.
+  SDK dataclasses are converted once; native records are redacted before being
+  streamed to disk rather than accumulating image-bearing JSON lines in memory.
   OMP streaming logs retain incremental deltas rather than repeated cumulative
   message snapshots. Terminal messages, including real tool images and usage,
   remain intact. Verdict extraction and successful inspection use only the final
   route; billed usage sums every route, including quota-rotated API attempts.
+  Interrupted routes without a terminal SDK result retain partial events and
+  observed input/output/cache-read/cache-creation integer token counters in a
+  synthesized error result. Nonnumeric usage metadata (service tiers and nested
+  cache/server-tool details) remains in raw evidence, not token arithmetic.
+  Partial accounting neither certifies complete billing nor makes a failed
+  attempt successful or cacheable; an existing SDK terminal result stays
+  authoritative. Runtime and eval share the same OMP prompt/config validator.
+  Routing-lock cleanup attempts each owned resource independently and closes
+  temporary output before deleting it. Cleanup failure never masks a primary
+  operation exception (including interruption); sanitized exception notes and
+  structured `credential_cleanup_failed` error logs report the cleanup category,
+  OS error codes and primary category, never raw exception or credential text.
+  Without a primary error, cleanup failure remains fatal.
+  No cleanup error authorizes a whole-operation retry, lock stealing or an
+  ambiguous Windows access-denied acquisition retry.
   RPC stdout is a strict machine channel: every nonempty line, including the
   shutdown drain, must be a JSON object. Malformed lines are retained as native
   `rpc_parse_error` evidence and fail closed, never discarded as diagnostic noise.

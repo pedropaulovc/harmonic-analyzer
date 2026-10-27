@@ -58,6 +58,7 @@ from typing import Any, Sequence
 
 import _telemetry as telemetry
 import machinist_review as mr
+from machinist_review_credentials import _LABEL
 
 DEFAULT_CASES = mr.CAD_ROOT / "comparisons" / "bench" / "machinist_review" / "manifest.json"
 VERSIONS = ("baseline", "candidate")
@@ -383,16 +384,7 @@ def _check_omp_provenance(
     if seen != flags | values.keys():
         raise ValueError("OMP actual command lacks isolation options")
     config = options["config"]
-    disabled = config.get("disabledProviders") if isinstance(config, dict) else None
-    if (
-        not isinstance(disabled, list) or any(not isinstance(item, str) for item in disabled)
-        or not {"native", "agents", "agents-md", "claude", "claude-md", "codex", "gemini", "github", "opencode"} <= set(disabled)
-        or set(config) != {"disabledProviders", "mcp", "memory", "autolearn", "includeWorkspaceTree"}
-        or config["mcp"] != {"startupTimeoutMs": 0, "enableProjectConfig": True}
-        or config["memory"] != {"backend": "off"}
-        or config["autolearn"] != {"enabled": False, "autoContinue": False}
-        or config["includeWorkspaceTree"] is not False
-    ):
+    if config != mr._claude_transport.OMP_EFFECTIVE_CONFIG:
         raise ValueError("OMP overlay lacks context/memory isolation")
     parts = options["system_prompt"]
     if (
@@ -401,14 +393,7 @@ def _check_omp_provenance(
         or any(not isinstance(part, str) for part in parts)
     ):
         raise ValueError("OMP runtime lacks sheets-only tools/system prompt")
-    first = re.sub(r"<redacted-content>.*?</redacted-content>", "", parts[0], flags=re.S).strip()
-    forbidden = ("<project>", "<repo-rules>", "<file path=", "<dir-context>", "<skills>", "<rules>", "<workspace-tree>", "<workspace-roots>")
-    if (
-        first != mr._claude_transport.OMP_SYSTEM_PROMPT
-        or any(marker in part for part in parts for marker in forbidden)
-        or mr._claude_transport.OMP_PROJECT_CONTEXT_RE.fullmatch(parts[1].replace("\r\n", "\n").strip()) is None
-    ):
-        raise ValueError("OMP runtime system prompt contains unauthorized context")
+    mr._claude_transport.validate_omp_system_prompt(parts)
     blobs = provenance.get("image_blobs")
     if not isinstance(blobs, list) or not blobs or any(
         not isinstance(digest, str) or re.fullmatch(r"[a-f0-9]{64}", digest) is None
@@ -531,7 +516,7 @@ def validate_evidence(
                 raise ValueError("transport session differs from invocation")
             if provenance.get("transport") == "claude_agent_sdk" and (
                 not isinstance(provenance.get("credential_id"), str)
-                or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,47}", provenance["credential_id"])
+                or not _LABEL.fullmatch(provenance["credential_id"])
                 or not re.fullmatch(r"[a-f0-9]{64}", provenance.get("credential_fingerprint", ""))
             ):
                 raise ValueError("invalid SDK credential provenance")

@@ -669,7 +669,7 @@ def sdk_transport(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         {"id": f"account-{n}", "apiKey": f"secret-canary-{n}"} for n in range(3)
     ]}))
     keys.chmod(0o600)
-    credentials._windows_acl(keys, secure=True)
+    credentials._windows_acl(keys, mode="restrict")
     monkeypatch.setenv("CODJIFLO_ANTHROPIC_KEYS_FILE", str(keys))
     monkeypatch.setenv("CODJIFLO_CLAUDE_STATE_FILE", str(tmp_path / "private" / "state.json"))
     state = SimpleNamespace(status="connected", queries=[], clients=[], quota=False, fail=False, delay=0)
@@ -781,7 +781,7 @@ def test_sdk_isolated_options_real_image_evidence_and_first_response(
     options = client.options
     assert options.tools == [] and set(options.allowed_tools) == SHEET_TOOLS
     assert options.setting_sources == [] and options.strict_mcp_config
-    assert options.thinking == {"type": "adaptive"}
+    assert options.thinking == {"type": "adaptive", "display": "summarized"}
     assert json.loads(options.settings)["disableAllHooks"]
     assert set(options.mcp_servers) == {"sheets"}
     assert client.disconnected
@@ -849,6 +849,211 @@ def test_sdk_api_retry_succeeds_without_rotation(
     state = json.loads(Path(os.environ["CODJIFLO_CLAUDE_STATE_FILE"]).read_text())
     assert all(entry["status"] == "ready" and entry["retryAt"] is None
                for entry in state["keys"].values())
+
+@pytest.mark.parametrize("termination", ["timeout", "eof", "crash"])
+def test_sdk_partial_raw_usage_preserves_failure_evidence_and_accounting(
+    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch, termination: str,
+) -> None:
+    import claude_agent_sdk as sdk
+
+    converted = []
+    original_asdict = sdk_transport.transport.asdict
+    def counted_asdict(message):
+        converted.append(type(message).__name__)
+        return original_asdict(message)
+    monkeypatch.setattr(sdk_transport.transport, "asdict", counted_asdict)
+    raw_usage = {
+        "input_tokens": 25, "output_tokens": 20,
+        "cache_creation_input_tokens": 7, "cache_read_input_tokens": 11,
+        "service_tier": "standard",
+        "cache_creation": {"ephemeral_5m_input_tokens": 7, "ephemeral_1h_input_tokens": 0},
+        "server_tool_use": {"web_search_requests": 0, "web_fetch_requests": 0},
+        "inference_geo": "not_available",
+    }
+    async def interrupted(self):
+        yield sdk.AssistantMessage(
+            content=[sdk.TextBlock(text="Partial provider response secret-canary-0")],
+            model="test", usage=raw_usage,
+        )
+        # Observe the consumer's on-disk native record while the SDK route is
+        # still active, before error cleanup or result synthesis can run.
+        native_text = (Path(self.options.cwd) / "native-events.jsonl").read_text()
+        assert "service_tier" in native_text and "secret-canary" not in native_text
+        assert converted == ["AssistantMessage"]
+        if termination == "timeout":
+            await asyncio.sleep(10)
+        elif termination == "crash":
+            raise RuntimeError("original SDK crash")
+
+    monkeypatch.setattr(sdk.ClaudeSDKClient, "receive_response", interrupted)
+    failures = []
+    monkeypatch.setattr(sdk_transport.transport._telemetry, "error",
+                        lambda name, **fields: failures.append((name, fields)))
+    responses = []
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0, timeout_s=0.5,
+        on_first_response=lambda: responses.append("response"),
+    )
+    assert not review.passed and responses == ["response"]
+    assert len(sdk_transport.clients) == 1 and sdk_transport.clients[0].disconnected
+    assert review.extra["usage"] == {
+        "input_tokens": 25, "output_tokens": 20,
+        "cache_creation_input_tokens": 7, "cache_read_input_tokens": 11,
+        "total_cost_usd": 0, "num_turns": 1,
+        "first_turn": {"cache_creation_input_tokens": 0, "cache_read_input_tokens": 0},
+    }
+    record, = review.extra["evidence"]["attempts"]
+    provenance = record["transport_provenance"]
+    route, = provenance["routes"]
+    assert route["outcome"] == "failed"
+    events = mr._parse_events(Path(record["stdout_file"]).read_text())
+    assistant, result = events
+    assert assistant["message"]["usage"] == raw_usage
+    assert result["type"] == "result" and result["is_error"]
+    assert route["event_end"] == len(events)
+    native = [json.loads(line)["native_event"]
+              for path in Path(review.events_file).parent.rglob("native-events.jsonl")
+              for line in path.read_text().splitlines() if line.strip()]
+    assert native[0]["message"]["usage"] == raw_usage
+    failure, = [fields for name, fields in failures if name == "machinist_review.transport_failed"]
+    assert failure["timed_out"] is (termination == "timeout")
+    assert failure["error_category"] == route["error_category"]
+    if termination == "timeout":
+        assert provenance["timeout_phase"] == "attempt"
+        assert provenance["timeout_budget_s"] == 0.5
+        assert route["error_category"] in {"TimeoutError", "AttemptTimeout"}
+    else:
+        assert route["error_category"] == "RuntimeError"
+        assert ("original SDK crash" if termination == "crash"
+                else "SDK ended without terminal result") in review.error
+
+
+@pytest.mark.parametrize(
+    "attempt_budget,startup_budget,expected",
+    [(2, 5, "attempt"), (5, 2, "startup"), (2, 2, "attempt")],
+)
+@pytest.mark.parametrize("outer_cancels_first", [False, True])
+def test_startup_deadline_classification_is_independent_of_timer_order(
+    monkeypatch: pytest.MonkeyPatch, attempt_budget, startup_budget, expected,
+    outer_cancels_first,
+):
+    import machinist_review_transport as transport
+
+    async def exercise():
+        clock = [100.0]
+        loop = asyncio.get_running_loop()
+        monkeypatch.setattr(loop, "time", lambda: clock[0])
+        attempt_deadline = clock[0] + attempt_budget
+        token = transport._ATTEMPT_DEADLINE.set(attempt_deadline)
+        outer = asyncio.timeout_at(attempt_deadline)
+        try:
+            with pytest.raises(TimeoutError) as caught:
+                async with outer:
+                    async with transport.startup_timeout("sheets connection", startup_budget):
+                        if not outer_cancels_first:
+                            # Re-register the actual outer timer after the inner
+                            # one, exercising both equal-deadline handle orders.
+                            outer.reschedule(attempt_deadline)
+                        clock[0] += min(attempt_budget, startup_budget)
+                        await asyncio.sleep(0)
+                        await asyncio.sleep(0)
+                        pytest.fail("a real deadline cancellation must arrive")
+            if expected == "startup":
+                assert isinstance(caught.value, transport.StartupTimeout)
+                assert caught.value.phase == "sheets connection"
+                assert caught.value.budget == startup_budget
+            else:
+                assert not isinstance(caught.value, transport.StartupTimeout)
+        finally:
+            transport._ATTEMPT_DEADLINE.reset(token)
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("cleanup_target", ["fd", "temporary", "shared"])
+@pytest.mark.parametrize("failure_phase", ["body", "serialize", "success"])
+@pytest.mark.parametrize("primary_type", [RuntimeError, KeyboardInterrupt])
+def test_credential_cleanup_preserves_primary_exception_and_releases_other_resources(
+    sdk_transport, monkeypatch: pytest.MonkeyPatch, cleanup_target, failure_phase, primary_type, caplog,
+):
+    import machinist_review_credentials as credentials
+    logger = credentials._telemetry.get_logger()
+    monkeypatch.setattr(logger, "handlers", [caplog.handler])
+    monkeypatch.setattr(logger, "propagate", False)
+
+    pool = credentials.CredentialPool()
+    shared = Path(str(pool.state_file) + ".lock")
+    original_open, original_close = os.open, os.close
+    original_unlink = Path.unlink
+    shared_fd = []
+    cleanup = []
+    output_handles = []
+    original_temporary = credentials.tempfile.NamedTemporaryFile
+    def temporary_output(*args, **kwargs):
+        output = original_temporary(*args, **kwargs)
+        output_handles.append(output)
+        return output
+    monkeypatch.setattr(credentials.tempfile, "NamedTemporaryFile", temporary_output)
+    primary = primary_type("original credential operation failure")
+    if failure_phase == "body" and cleanup_target == "temporary":
+        cleanup_target = "shared"  # No temporary exists before serialization.
+
+    def opened(path, *args, **kwargs):
+        fd = original_open(path, *args, **kwargs)
+        if Path(path) == shared:
+            shared_fd.append(fd)
+        return fd
+
+    def closed(fd):
+        original_close(fd)
+        if shared_fd and fd == shared_fd[0]:
+            cleanup.append("fd")
+            if cleanup_target == "fd":
+                raise PermissionError(13, "sensitive cleanup detail")
+
+    def unlinked(path, *args, **kwargs):
+        target = ("shared" if path == shared else "temporary"
+                  if path.parent == pool.state_file.parent and path.name.startswith("tmp") else None)
+        if target:
+            cleanup.append(target)
+        if target == "temporary":
+            assert output_handles and all(output.closed for output in output_handles)
+        result = original_unlink(path, *args, **kwargs)
+        if target == cleanup_target:
+            raise PermissionError(13, "sensitive cleanup detail")
+        return result
+
+    monkeypatch.setattr(os, "open", opened)
+    monkeypatch.setattr(os, "close", closed)
+    monkeypatch.setattr(Path, "unlink", unlinked)
+    if failure_phase == "serialize":
+        def fail_serialization(*args, **kwargs):
+            raise primary
+        monkeypatch.setattr(credentials.json, "dump", fail_serialization)
+    with pytest.raises(primary_type if failure_phase != "success" else PermissionError) as caught:
+        with pool._state():
+            if failure_phase == "body":
+                raise primary
+    if failure_phase != "success":
+        assert caught.value is primary
+    assert "fd" in cleanup and "shared" in cleanup
+    if failure_phase != "body":
+        assert "temporary" in cleanup
+    assert not shared.exists()
+    assert any("Claude credential cleanup failed: PermissionError" in note
+               for note in caught.value.__notes__)
+    assert "sensitive cleanup detail" not in "\n".join(caught.value.__notes__)
+    records = [record for record in caplog.records
+               if record.getMessage() == "machinist_review.credential_cleanup_failed"]
+    assert len(records) == 1
+    assert records[0].error_category == "PermissionError"
+    assert records[0].errno == 13
+    assert records[0].primary_error_category == (
+        primary_type.__name__ if failure_phase != "success" else "none"
+    )
+    assert "sensitive cleanup detail" not in caplog.text
+    assert "secret-canary" not in caplog.text
+
 
 
 def test_sdk_independent_native_state_is_removed_after_retaining_evidence(tmp_path, sdk_transport):
@@ -1023,7 +1228,7 @@ def test_omp_oauth_environment_never_inherits_the_api_proxy(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "inherited-canary")
     monkeypatch.setenv("ANTHROPIC_OAUTH_TOKEN", "inherited-oauth-canary")
     api = transport.environment("selected-canary")
-    oauth = transport.environment(inherited=True)
+    oauth = transport.environment(mode="subprocess")
     assert api["ANTHROPIC_BASE_URL"] == "https://api-only-proxy.invalid"
     assert api["ANTHROPIC_API_KEY"] == "selected-canary"
     assert all(name not in oauth for name in (
@@ -1113,10 +1318,10 @@ def test_credential_contention_polls_without_threads_and_respects_deadline(
 def test_credential_storage_secures_only_new_leaf(tmp_path, monkeypatch):
     import machinist_review_credentials as credentials
     calls = []
-    monkeypatch.setattr(credentials, "_windows_acl", lambda path, *, secure=False: calls.append((path, secure)))
+    monkeypatch.setattr(credentials, "_windows_acl", lambda path, *, mode="validate": calls.append((path, mode)))
     leaf = tmp_path / "shared" / "state" / "private"
     credentials._directory(leaf)
-    assert calls == [(leaf, True)]
+    assert calls == [(leaf, "restrict")]
     calls.clear()
     credentials._directory(leaf)
     assert calls == []
@@ -1243,16 +1448,16 @@ def test_sdk_redaction_skips_unchanged_files_but_scans_changed_and_new_files(
 
     monkeypatch.setattr(Path, "read_text", tracked_read)
 
-    async def invoke(resume):
+    async def invoke(continuation):
         await transport._sdk(
             key=key, config={"mcpServers": {}, "prompt": "Review"}, schema=mr.load_schema(),
             model="test", effort="high", session_id="00000000-0000-4000-8000-000000000001",
-            resume=resume, cwd=str(tmp_path), remaining=lambda: 5, startup=1,
+            continuation=continuation, cwd=str(tmp_path), remaining=lambda: 5, startup=1,
             settings=mr.CLAUDE_ISOLATION_SETTINGS, emit=lambda *args: None,
             diagnostics=[], provenance=provenance,
         )
 
-    asyncio.run(invoke(False))
+    asyncio.run(invoke("fresh"))
     assert set(reads) == {unchanged, changed, metadata}
     assert all(read_text(path) == "[REDACTED]" for path in reads)
     reads.clear()
@@ -1261,7 +1466,7 @@ def test_sdk_redaction_skips_unchanged_files_but_scans_changed_and_new_files(
     metadata.write_text(json.dumps({"secret": key.api_key, "next_secret": next_key.api_key}))
     new = session_dir / "new.log"
     new.write_text(key.api_key)
-    asyncio.run(invoke(True))
+    asyncio.run(invoke("sdk_resume"))
     assert set(reads) == {changed, metadata, new}
     assert all(key.api_key not in read_text(path) for path in (unchanged, changed, metadata, new))
     assert provenance["sdk_redacted_fingerprint"] == key.fingerprint
@@ -1269,12 +1474,12 @@ def test_sdk_redaction_skips_unchanged_files_but_scans_changed_and_new_files(
         str(path) for path in (unchanged, changed, metadata, new)
     }
     reads.clear()
-    asyncio.run(invoke(True))
+    asyncio.run(invoke("sdk_resume"))
     assert reads == []
     # Even unchanged files need a fresh scan after rebinding to another key.
     assert next_key.api_key in read_text(metadata)
     key = next_key
-    asyncio.run(invoke(True))
+    asyncio.run(invoke("sdk_resume"))
     assert set(reads) == {unchanged, changed, metadata, new}
     assert key.api_key not in read_text(metadata)
     assert provenance["sdk_redacted_fingerprint"] == key.fingerprint
@@ -1407,7 +1612,7 @@ if mode == "slow_shutdown": time.sleep(60)
             native.append(raw)
         if event is not None:
             normalized.append(event)
-    async def invoke(resume=False):
+    async def invoke(continuation="fresh"):
         async with asyncio.timeout(5):
             await transport._omp_session(
                 executable=sys.executable, broker_env={"OMP_AUTH_BROKER_URL": "http://127.0.0.1:1", "OMP_AUTH_BROKER_TOKEN": "fixture-token"},
@@ -1415,7 +1620,7 @@ if mode == "slow_shutdown": time.sleep(60)
                 schema={}, model="test", effort="medium", cwd=str(work),
                 remaining=lambda: 0.05 if catalog == "slow_shutdown" and (work / "completed").exists() else 5,
                 startup=1, emit=emit, diagnostics=[],
-                provenance=provenance, resume=resume,
+                provenance=provenance, continuation=continuation,
             )
     if catalog == "slow_shutdown":
         asyncio.run(invoke())
@@ -1437,7 +1642,7 @@ if mode == "slow_shutdown": time.sleep(60)
         assert effective["tools"] == sorted(transport.OMP_TOOLS)
         assert (home / "agent" / "blobs").is_dir()
         before_blobs = set(provenance["image_blobs"])
-        asyncio.run(invoke(resume=True))
+        asyncio.run(invoke("omp_resume"))
         assert before_blobs < set(provenance["image_blobs"])
         completed = provenance
         completed["resolved_model"] = {"provider": "anthropic", "id": "stale-precheck-model"}
@@ -1446,7 +1651,7 @@ if mode == "slow_shutdown": time.sleep(60)
             provenance = transport.resume_inputs(completed)
             catalog = failed_mode
             with pytest.raises(RuntimeError):
-                asyncio.run(invoke(resume=True))
+                asyncio.run(invoke("omp_resume"))
             assert "shutdown" not in provenance and "image_blobs" not in provenance
             assert provenance.get("resolved_model", {}).get("id") != "stale-precheck-model"
             if failed_mode == "extra":
@@ -1457,7 +1662,7 @@ if mode == "slow_shutdown": time.sleep(60)
         (home / "agent" / "blobs" / next(iter(before_blobs))).unlink()
         started = len(processes)
         with pytest.raises(RuntimeError, match="image blob is unavailable"):
-            asyncio.run(invoke(resume=True))
+            asyncio.run(invoke("omp_resume"))
         assert len(processes) == started  # Missing images fail before launching a new turn.
     else:
         with pytest.raises(TimeoutError if catalog == "silent" else RuntimeError):
@@ -1532,7 +1737,7 @@ def test_private_pool_rotation_groups_and_replaced_key_cannot_restore_old_block(
     def save():
         keys.write_text(json.dumps(value))
         keys.chmod(0o600)
-        credentials._windows_acl(keys, secure=True)
+        credentials._windows_acl(keys, mode="restrict")
     save()
     env = {"CODJIFLO_ANTHROPIC_KEYS_FILE": str(keys), "CODJIFLO_CLAUDE_STATE_FILE": str(state)}
     pool = credentials.CredentialPool(env)
@@ -1564,11 +1769,11 @@ def test_private_pool_invalid_configuration_fails_closed_without_secret_echo(
         value["keys"][1]["apiKey"] = value["keys"][0]["apiKey"]
     keys.write_text("canary-secret-broken{" if damage == "bad_json" else json.dumps(value))
     keys.chmod(0o600)
-    credentials._windows_acl(keys, secure=True)
+    credentials._windows_acl(keys, mode="restrict")
     if damage == "state":
         state.write_text('{"keys":"canary-secret-state"}')
         state.chmod(0o600)
-        credentials._windows_acl(state, secure=True)
+        credentials._windows_acl(state, mode="restrict")
     env = {"CODJIFLO_ANTHROPIC_KEYS_FILE": str(keys), "CODJIFLO_CLAUDE_STATE_FILE": str(state)}
     with pytest.raises(ValueError) as caught:
         credentials.CredentialPool(env).claim()
@@ -5215,7 +5420,7 @@ def test_sdk_environment_preserves_sdk_owned_entrypoint_and_tracing(
     assert overrides["ANTHROPIC_OAUTH_TOKEN"] == ""
     assert overrides["CLAUDE_CODE_USE_BEDROCK"] == ""
     assert all(os.environ[name] == value for name, value in inherited.items())
-    omp = sdk_transport.transport.environment(inherited=True)
+    omp = sdk_transport.transport.environment(mode="subprocess")
     assert all(omp[name] == value for name, value in inherited.items())
     assert "ANTHROPIC_OAUTH_TOKEN" not in omp and "CLAUDE_CODE_USE_BEDROCK" not in omp
 

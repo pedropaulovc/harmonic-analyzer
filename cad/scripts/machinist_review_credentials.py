@@ -13,6 +13,7 @@ import tempfile
 import time
 
 from filelock import FileLock
+import _telemetry
 
 _LABEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,47}\Z")
 
@@ -26,7 +27,7 @@ class Credential:
 
 
 
-def _windows_acl(path: Path, *, secure=False, fd=None) -> None:
+def _windows_acl(path: Path, *, mode="validate", fd=None) -> None:
     """Validate the opened NTFS inode's owner/DACL, not emulated mode bits."""
     if os.name != "nt":
         return
@@ -42,7 +43,7 @@ def _windows_acl(path: Path, *, secure=False, fd=None) -> None:
         finally:
             token.Close()
         flags = win32security.OWNER_SECURITY_INFORMATION | win32security.DACL_SECURITY_INFORMATION
-        if secure:
+        if mode == "restrict":
             acl = win32security.ACL()
             inheritance = win32con.OBJECT_INHERIT_ACE | win32con.CONTAINER_INHERIT_ACE if path.is_dir() else 0
             acl.AddAccessAllowedAceEx(win32security.ACL_REVISION, inheritance, ntsecuritycon.FILE_ALL_ACCESS, sid)
@@ -137,7 +138,7 @@ def _directory(path: Path) -> None:
             pass
         else:
             if directory == path:
-                _windows_acl(directory, secure=True)
+                _windows_acl(directory, mode="restrict")
         if directory.is_symlink() or not directory.is_dir():
             raise ValueError("Claude credentials: storage parent must be a directory")
 
@@ -147,12 +148,14 @@ class CredentialUnavailable(ValueError):
 
 
 class CredentialPool:
-    def __init__(self, env=None, *, load=True):
+    def __init__(self, env=None, *, load_mode="configured"):
         env = os.environ if env is None else env
         home = Path(env.get("HOME", str(Path.home())))
         self.keys_file = Path(env.get("CODJIFLO_ANTHROPIC_KEYS_FILE", home / ".config/codjiflo/anthropic-keys.json"))
         self.state_file = Path(env.get("CODJIFLO_CLAUDE_STATE_FILE", home / ".local/state/codjiflo/claude-routing.json"))
-        self.credentials = _credentials(_private_json(self.keys_file)) if load else []
+        if load_mode not in {"configured", "skip"}:
+            raise ValueError("unknown credential load mode")
+        self.credentials = _credentials(_private_json(self.keys_file)) if load_mode == "configured" else []
         self.secrets = {key.api_key for key in self.credentials}
 
     def redact(self, text: str) -> str:
@@ -179,6 +182,8 @@ class CredentialPool:
                 fd = os.open(shared, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o600)
             except FileExistsError:
                 raise BlockingIOError("Claude credential routing lock is busy") from None
+            primary = None
+            temporary = None
             try:
                 os.write(fd, f"pid={os.getpid()}\n".encode())
                 self.credentials = _credentials(_private_json(self.keys_file))
@@ -195,22 +200,48 @@ class CredentialPool:
                 self._validate_state(state)
                 with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=self.state_file.parent, delete=False) as output:
                     temporary = Path(output.name)
-                    try:
-                        os.chmod(temporary, 0o600)
-                        _windows_acl(temporary, secure=True)
-                        json.dump(state, output)
-                        output.flush()
-                        os.fsync(output.fileno())
-                    except BaseException:
-                        temporary.unlink(missing_ok=True)
-                        raise
-                try:
-                    temporary.replace(self.state_file)
-                finally:
-                    temporary.unlink(missing_ok=True)
+                    os.chmod(temporary, 0o600)
+                    _windows_acl(temporary, mode="restrict")
+                    json.dump(state, output)
+                    output.flush()
+                    os.fsync(output.fileno())
+                temporary.replace(self.state_file)
+            except BaseException as exc:
+                primary = exc
+                raise
             finally:
-                os.close(fd)
-                shared.unlink()
+                # Close the temporary output before deletion (required on
+                # Windows), and attempt each owned resource independently.
+                cleanup_errors = []
+                try:
+                    os.close(fd)
+                except OSError as exc:
+                    cleanup_errors.append(exc)
+                if temporary is not None:
+                    try:
+                        temporary.unlink(missing_ok=True)
+                    except OSError as exc:
+                        cleanup_errors.append(exc)
+                try:
+                    shared.unlink()
+                except OSError as exc:
+                    cleanup_errors.append(exc)
+                if cleanup_errors:
+                    failure = primary if primary is not None else cleanup_errors[0]
+                    for exc in cleanup_errors:
+                        _telemetry.error(
+                            "machinist_review.credential_cleanup_failed",
+                            error_category=type(exc).__name__,
+                            winerror=getattr(exc, "winerror", None), errno=exc.errno,
+                            primary_error_category=type(primary).__name__ if primary is not None else "none",
+                        )
+                        failure.add_note(
+                            f"Claude credential cleanup failed: {type(exc).__name__} "
+                            f"(winerror={getattr(exc, 'winerror', None)}, errno={exc.errno}); "
+                            "locks are never stolen; inspect the owned routing files"
+                        )
+                    if primary is None:
+                        raise failure
 
     @staticmethod
     def _validate_state(state):
