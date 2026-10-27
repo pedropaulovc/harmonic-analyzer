@@ -2,7 +2,7 @@ pd-transgear-arm:
   title: Transgear Arm
   number: MHA-PD-18
   material: AISI 1018 cold-finished steel
-  material_specification: AISI 1018 cold-finished steel bar, ASTM A108
+  material_specification: "AISI 1018 cold-finished steel bar, ASTM A108; 5/16 x 1 precision-ground flat, thickness ±0.001 in (McMaster-Carr 9517K466)"
   finish: bright machined; protect with ISO VG 32 machine-oil film
   quantity: 1
   tolerance_class: machined_block
@@ -18,3 +18,13 @@ pd-transgear-arm:
       where: "the locating-pattern and running-axis position controls"
       finding: "position controls over-specified (rule 5)"
       reason: "required by the whole-stack stock-form gate including the rigid two-hole registration yaw; stock dowels in reamed holes locate, the screws clamp (owner-accepted)"
+    - id: "RV-02"
+      kind: "accept"
+      where: "the 0.050 flatness frame on front face A"
+      finding: "flatness on ground-stock face over-specified (rule 5)"
+      reason: "owner ruling 2026-10-27 (#1379): datum A is established by the minimax fit, so face A's flatness plus the stock's ±0.001 in thickness band bounds the rear plate seat's tilt to A (0.1008); that tilt sets the MHA-PD-VN-56 worst engagement and the reducer-axis tilt (owner-accepted)"
+    - id: "RV-03"
+      kind: "accept"
+      where: "the MHA-PD-VN-58 latch pin's blind flat-bottom press hole"
+      finding: "pressed pin has no way out (rule 16)"
+      reason: "owner ruling 2026-10-27 (#1379): \"MHA-PD-18 latch pin should never come out.\" A permanent press; it is not removed in service, so rule 16's removal path does not apply (owner-accepted)"

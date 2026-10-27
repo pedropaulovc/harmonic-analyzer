@@ -128,8 +128,10 @@ def test_the_thickness_prints_as_the_ground_stock_reference() -> None:
     parentheses after the stock's own size, which is the modelled one."""
     prefix, suffix = spec.STOCK_TEXT_PREFIX, spec.STOCK_TEXT_SUFFIX
     assert prefix.endswith("(") and suffix.startswith(")")
-    stock_in = Fraction(prefix.rstrip("( "))
-    assert float(stock_in) * 25.4 == pytest.approx(geometry.THICKNESS)
+    stock, band = prefix.rstrip("( ").split()
+    assert float(Fraction(stock)) * 25.4 == pytest.approx(geometry.THICKNESS)
+    # The stock's thickness band, which the seat tilt is judged at, prints.
+    assert float(band.lstrip("±")) * 25.4 == pytest.approx(geometry.THICKNESS_BAND)
     assert "Depth" in drawing.END_KEEP
 
 
