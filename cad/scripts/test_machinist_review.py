@@ -1237,6 +1237,71 @@ def test_omp_oauth_environment_never_inherits_the_api_proxy(monkeypatch):
     assert transport.environment()["ANTHROPIC_OAUTH_TOKEN"] == ""
 
 
+@pytest.mark.parametrize("user_sid,initial_owner", [
+    ("S-1-5-21-1000", "S-1-5-32-544"),  # Elevated administrator default owner.
+    ("S-1-5-18", "S-1-5-18"),  # SYSTEM is already its own TokenUser.
+])
+def test_windows_acl_restrict_sets_current_owner_without_broadening_dacl(
+    tmp_path, monkeypatch, user_sid, initial_owner,
+):
+    import machinist_review_credentials as credentials
+    from types import SimpleNamespace
+    path = tmp_path / "private.json"
+    path.touch()
+    state = SimpleNamespace(owner=initial_owner, acl=None, flags=None)
+    class ACL:
+        def __init__(self):
+            self.aces = []
+        def AddAccessAllowedAceEx(self, revision, inheritance, mask, sid):
+            self.aces.append(((0, inheritance), mask, sid))
+        def GetAceCount(self):
+            return len(self.aces)
+        def GetAce(self, index):
+            return self.aces[index]
+    def set_security(path, kind, flags, owner, group, acl, sacl):
+        state.flags = flags
+        if flags & 1:
+            state.owner = owner
+        state.acl = acl
+    descriptor = SimpleNamespace(
+        GetSecurityDescriptorOwner=lambda: state.owner,
+        GetSecurityDescriptorDacl=lambda: state.acl,
+    )
+    security = SimpleNamespace(
+        TokenUser=1, OWNER_SECURITY_INFORMATION=1, DACL_SECURITY_INFORMATION=4,
+        PROTECTED_DACL_SECURITY_INFORMATION=0x80000000, SE_FILE_OBJECT=1,
+        ACL=ACL, ACL_REVISION=2, ACCESS_DENIED_ACE_TYPE=1,
+        ACCESS_DENIED_OBJECT_ACE_TYPE=6, ACCESS_ALLOWED_ACE_TYPE=0,
+        ACCESS_ALLOWED_OBJECT_ACE_TYPE=5,
+        OpenProcessToken=lambda *args: SimpleNamespace(Close=lambda: None),
+        GetTokenInformation=lambda *args: (user_sid, 0),
+        SetNamedSecurityInfo=set_security,
+        GetNamedSecurityInfo=lambda *args: descriptor,
+        ConvertSidToStringSid=lambda sid: sid,
+    )
+    monkeypatch.setitem(sys.modules, "msvcrt", SimpleNamespace())
+    monkeypatch.setitem(sys.modules, "ntsecuritycon", SimpleNamespace(FILE_ALL_ACCESS=0x1F01FF))
+    monkeypatch.setitem(sys.modules, "win32api", SimpleNamespace(GetCurrentProcess=lambda: 1))
+    monkeypatch.setitem(sys.modules, "win32con", SimpleNamespace(
+        TOKEN_QUERY=8, OBJECT_INHERIT_ACE=1, CONTAINER_INHERIT_ACE=2,
+    ))
+    monkeypatch.setitem(sys.modules, "win32security", security)
+    # Replace only this module's os reference, not pathlib's platform selection.
+    monkeypatch.setattr(credentials, "os", SimpleNamespace(name="nt"))
+    credentials._windows_acl(path, mode="restrict")
+    assert state.owner == user_sid
+    assert state.flags == 0x80000005
+    assert state.acl.aces == [((0, 0), 0x1F01FF, user_sid)]
+    credentials._windows_acl(path)
+    state.owner = "S-1-5-21-9999"
+    with pytest.raises(ValueError, match="owner-only DACL"):
+        credentials._windows_acl(path)
+    state.owner = user_sid
+    state.acl.aces.append(((0, 0), 0x1F01FF, "S-1-1-0"))
+    with pytest.raises(ValueError, match="owner-only DACL"):
+        credentials._windows_acl(path)
+
+
 @pytest.mark.parametrize("existing_state", [False, True])
 def test_private_pool_fractional_quota_rejected_without_state_write(
     tmp_path: Path, sdk_transport, existing_state: bool,

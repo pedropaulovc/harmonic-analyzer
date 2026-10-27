@@ -295,9 +295,10 @@ both verdicts and the finding diff.
   `~/.config/codjiflo/anthropic-keys.json`), containing exactly three unique
   `{"id": "label", "apiKey": "secret", "quotaGroup": "optional-group"}` entries
   under `keys`. Files must be regular, non-symlink, current-user-owned and mode
-  `0600` on POSIX; Windows requires a private current-user DACL (SYSTEM and
-  Administrators may also be allowed). Ambient Anthropic/OAuth keys are not a
-  second credential source. Routing state uses
+  `0600` on POSIX. Windows creation sets the owner to the current token user
+  and a private DACL; validation still requires that owner (SYSTEM and
+  Administrators may also be allowed by the DACL). Ambient Anthropic/OAuth
+  keys are not a second credential source. Routing state uses
   `CODJIFLO_CLAUDE_STATE_FILE`, default
   `~/.local/state/codjiflo/claude-routing.json`, with locked round-robin claims,
   fingerprint-aware rotation and quota-group cooldown/exhaustion. Invalid or

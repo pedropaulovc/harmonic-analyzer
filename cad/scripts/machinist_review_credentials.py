@@ -28,7 +28,7 @@ class Credential:
 
 
 def _windows_acl(path: Path, *, mode="validate", fd=None) -> None:
-    """Validate the opened NTFS inode's owner/DACL, not emulated mode bits."""
+    """Require TokenUser ownership; restrict newly created inodes to that owner/DACL."""
     if os.name != "nt":
         return
     try:
@@ -49,8 +49,8 @@ def _windows_acl(path: Path, *, mode="validate", fd=None) -> None:
             acl.AddAccessAllowedAceEx(win32security.ACL_REVISION, inheritance, ntsecuritycon.FILE_ALL_ACCESS, sid)
             win32security.SetNamedSecurityInfo(
                 str(path), win32security.SE_FILE_OBJECT,
-                win32security.DACL_SECURITY_INFORMATION | win32security.PROTECTED_DACL_SECURITY_INFORMATION,
-                None, None, acl, None,
+                flags | win32security.PROTECTED_DACL_SECURITY_INFORMATION,
+                sid, None, acl, None,
             )
         descriptor = (
             win32security.GetSecurityInfo(msvcrt.get_osfhandle(fd), win32security.SE_FILE_OBJECT, flags)
