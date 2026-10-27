@@ -3,7 +3,8 @@ r"""Native manufacturing sheet for the simple threaded L bracket.
 Model sizes import from the saved SLDPRT. The ordinary end view and associative
 1/4-20 UNC THRU callout define the simple tapped hole; no section is needed.
 Its fit class, inside corners and ordinary edge breaks follow the title block.
-The native neck prints 12.5; explicit 3.175 +/-0.13 retains the screw-grip stack.
+The native neck prints 12.5; explicit 3.175 +/-0.13 retains the screw-grip stack
+and is witnessed from the foot's free end, where its top and bottom are edges.
 """
 
 from __future__ import annotations
@@ -63,7 +64,7 @@ BOTTOM_CENTER = (0.079, 0.080)
 SIDE_CENTER = (0.228, 0.165)
 ISO_CENTER = (0.350, 0.130)
 ISO_SCALE = (1, 2)
-FRONT_KEEP = {"NeckThickness": (0.118, 0.185), "FlangeWidth": (0.079, 0.098), "FlangeDepth": (0.140, 0.123)}
+FRONT_KEEP = {"NeckThickness": (0.118, 0.185), "FlangeWidth": (0.079, 0.098), "FlangeDepth": (0.044, 0.123)}
 BOTTOM_KEEP = {"FlangeHeight": (0.132, 0.080)}
 SIDE_KEEP = {"NoseR": (0.266, 0.229), "SeatToAxis": (0.196, 0.165)}
 MOUNTING_KEEP = {"MountingX0": (0.045, 0.056), "MountingX1": (0.060, 0.046), "MountingY0": (0.030, 0.080)}
@@ -321,7 +322,7 @@ def _layout_linear_annotations(
     # handle too: its generated dimension name is not a stable model contract.
     by_name["LeverTapCallout"] = tap_callout
     annotations = [*annotations, overall_reference, tap_callout]
-    for name in (*names, "SeatToAxis"):
+    for name in names:
         if name in by_name:
             continue
         matches = [item for item in annotations if dimension_name(adapter, item) == name]
@@ -370,14 +371,27 @@ def _layout_linear_annotations(
 
     left_foot = min(line.x0 for line in verticals("MountingX0"))
     last_hole = max(line.x0 for line in verticals("MountingX1"))
-    seat_line = min(line.x0 for line in verticals("SeatToAxis"))
     front_outline = tuple(float(v) for v in _early_bound(front, "IView").GetOutline())
+    # The builder dimensions FlangeDepth on the free -X end: its witnesses
+    # leave the real foot top/bottom corners. Read the solid's projected
+    # foot and upright, so the offset text sits in the open L above the
+    # foot's free end without touching either outline.
+    foot_corners = [
+        model_point_in_view(adapter, front, (x / 1000.0, 0.0, z / 1000.0), label="front foot outline")
+        for x in SIDE_PLATE_X for z in SIDE_PLATE_Z
+    ]
+    arm_corners = [
+        model_point_in_view(adapter, front, (x / 1000.0, 0.0, z / 1000.0), label="front upright outline")
+        for x in (-NECK_HALF_X, NECK_HALF_X) for z in (-NOSE_R, SIDE_PLATE_Z[1])
+    ]
+    foot_end = model_point_in_view(adapter, front, (SIDE_PLATE_X[0] / 1000.0, 0.0, SIDE_PLATE_Z[0] / 1000.0), label="free foot end")[0]
+    front_solids = {
+        name: (min(p[0] for p in points), min(p[1] for p in points), max(p[0] for p in points), max(p[1] for p in points))
+        for name, points in (("front foot", foot_corners), ("front upright", arm_corners))
+    }
     targets = {
         "NeckThickness": (max(line.x0 for line in verticals("NeckThickness")) + 0.004, front_outline[3] + 0.004),
-        "FlangeDepth": (
-            min(seat_line, min(line.x0 for line in verticals("OverallHeight"))) - 0.004 - (before["FlangeDepth"].text[2] - before["FlangeDepth"].text[0]),
-            max(max(line.y0, line.y1) for line in before["FlangeDepth"].leader) + 0.004,
-        ),
+        "FlangeDepth": (foot_end, max(max(line.y0, line.y1) for line in before["FlangeDepth"].leader) + 0.004),
         "MountingX0": (left_foot - 0.004 - (before["MountingX0"].text[2] - before["MountingX0"].text[0]), before["MountingX0"].text[1]),
         "MountingX1": (last_hole + 0.004, before["MountingX1"].text[1]),
         "MountingY0": (
@@ -444,7 +458,7 @@ def _layout_linear_annotations(
             require_inside(name, (min(line.x0, line.x1), min(line.y0, line.y1), max(line.x0, line.x1), max(line.y0, line.y1)), region)
         _telemetry.info(f"{name} settled native text={ink.text}")
     require_clear("NeckThickness", next(ink.text for item, ink in settled if item is by_name["NeckThickness"]), {"front silhouette": front_outline})
-    require_clear("FlangeDepth", next(ink.text for item, ink in settled if item is by_name["FlangeDepth"]), {"front silhouette": front_outline})
+    require_clear("FlangeDepth", next(ink.text for item, ink in settled if item is by_name["FlangeDepth"]), front_solids)
     foot_points = [
         model_point_in_view(adapter, bottom, (x / 1000.0, y / 1000.0, SIDE_PLATE_Z[1] / 1000.0), label="mounting-face silhouette")
         for x in SIDE_PLATE_X for y in SIDE_PLATE_Y
