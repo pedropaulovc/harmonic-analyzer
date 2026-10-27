@@ -2651,8 +2651,8 @@ def capture_readings() -> tuple[CaptureReading, ...]:
     bolt_y = r.CAP_BOLT_Y_OFFSETS[0]
     # B-B's two C3A labels sit left of it, so both land on the bolt's outer
     # (-X) side and no leader crosses the section: the cap/block land at the
-    # clearance hole's bottom corner, the underhead footprint on the head's
-    # -X bearing ring.
+    # clearance hole's bottom corner, the underhead footprint at the head's
+    # -X bearing corner.
     # The native cap cuts its clearance holes at the nominal diameter
     # (pivot cap spec HOLE_DIA); its tolerance band is not modelled.
     hole_wall = r.CAP_BOLT_X_OFFSETS[0] - spec.pivot_cap.HOLE_DIA / 2.0
@@ -2716,13 +2716,18 @@ def capture_readings() -> tuple[CaptureReading, ...]:
                        callouts["cap_land"], (0.279, 0.2235),
                        pick_local_mm=(hole_wall, bolt_y,
                                       (spec.pivot_cap.HEIGHT - spec.pivot_cap.COUNTERBORE_DEPTH) / 2.0)),
-        # C3A's underhead arrow lands mid-annulus on the head's bearing face:
-        # outside the cap's largest clearance hole, inside the smallest head
-        # bearing diameter, so cap material lies beneath it.
+        # C3A's underhead arrow lands on the head's outer bearing corner, over
+        # the counterbore floor (cap material beneath it). Across the bearing
+        # face the head and that floor coincide, and run 15's pick there got
+        # the cap. So, as with the land, the pick acquires the head's own
+        # cylindrical side, mid-way below the safety-wire hole, which ends at
+        # that corner.
         CaptureReading(3, spec.PIVOT_CAP_SCREW,
-                       (-(r.CAP_BOLT_CLEARANCE_DIAMETER + r.CAP_BOLT_CLEARANCE_BAND[0]
-                          + r.CAP_BOLT_HEAD_BEARING_DIAMETER_MIN) / 4.0, 0.0, 0.0),
-                       callouts["underhead"], (0.282, 0.232)),
+                       (-spec.cap_screw.DIMS.head_dia / 2.0, 0.0, 0.0),
+                       callouts["underhead"], (0.282, 0.232),
+                       pick_local_mm=(-spec.cap_screw.DIMS.head_dia / 2.0, 0.0,
+                                      (spec.cap_screw.SCREW_WIRE_HEIGHT
+                                       - spec.cap_screw.SCREW_WIRE_HOLE_DIA / 2.0) / 2.0)),
     )
 
 

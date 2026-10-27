@@ -3185,6 +3185,18 @@ def native_property_package(monkeypatch, native_bom_bindings):
                 )
                 wall_x = bolt_x - cap.HOLE_DIA / 2.0
                 endpoints = ((wall_x, bolt_y, 0.0), (wall_x, bolt_y, cap.HEIGHT - cap.COUNTERBORE_DEPTH))
+            elif reading.stem == spec.PIVOT_CAP_SCREW and reading.text.startswith("C3A UNDERHEAD"):
+                # The revolved NAS head (diag_mcmaster_socket_head) is a plain
+                # cylinder: B-B cuts its -X side as one vertical line from the
+                # sharp bearing corner up to the safety-wire hole. Built from
+                # the screw spec alone. The corner is the criterion; the
+                # mid-side point is only where the pick acquires the head.
+                screw = spec.cap_screw
+                side_x = -screw.DIMS.head_dia / 2.0
+                endpoints = (
+                    (side_x, 0.0, 0.0),
+                    (side_x, 0.0, screw.SCREW_WIRE_HEIGHT - screw.SCREW_WIRE_HOLE_DIA / 2.0),
+                )
             else:
                 x, y, z = reading.local_mm
                 endpoints = ((x - 0.25, y, z), (x + 0.25, y, z))
@@ -4196,11 +4208,13 @@ def test_capture_c4_mouth_acquires_the_retainer_wall_inside_and_lands_on_its_top
     package.doc.raw_picks = raw_picks
     _scales, settled = drawing._place_package(package.adapter)
     readings = drawing.capture_readings()
-    # Only the two C4 MOUTH rows, the C4A UPPER CROSS-HOLE row and C3A's
-    # cap/block land (its arrow is on the coincident cap/block interface)
-    # separate acquisition from criterion.
+    # Only the two C4 MOUTH rows, the C4A UPPER CROSS-HOLE row and C3A's two
+    # rows (their arrows sit where cap and block, or head and counterbore
+    # floor, coincide) separate acquisition from criterion.
     assert [reading.pick_local_mm is not None for reading in readings] == [
-        reading.text.startswith(("C4 MOUTH", "C4A UPPER CROSS-HOLE", "C3A CAP / BLOCK LAND"))
+        reading.text.startswith(
+            ("C4 MOUTH", "C4A UPPER CROSS-HOLE", "C3A CAP / BLOCK LAND", "C3A UNDERHEAD")
+        )
         for reading in readings
     ]
     land = next(reading for reading in readings if reading.text.startswith("C3A CAP / BLOCK LAND"))
@@ -4212,6 +4226,17 @@ def test_capture_c4_mouth_acquires_the_retainer_wall_inside_and_lands_on_its_top
     assert land.pick_local_mm[0] == pytest.approx(wall_x, abs=1e-12)
     assert land.local_mm == pytest.approx((wall_x, land.pick_local_mm[1], 0.0), abs=1e-12)
     assert 0.0 < land.pick_local_mm[2] < cap.HEIGHT - cap.COUNTERBORE_DEPTH
+    underhead = next(reading for reading in readings if reading.text.startswith("C3A UNDERHEAD"))
+    screw = spec.cap_screw
+    # Acquired on the head's own cylindrical side, strictly between its bearing
+    # corner and the safety-wire hole; the criterion is that bearing corner,
+    # outside the cap's largest clearance hole so cap floor lies beneath it.
+    side_x = -screw.DIMS.head_dia / 2.0
+    assert underhead.local_mm == pytest.approx((side_x, 0.0, 0.0), abs=1e-12)
+    assert underhead.pick_local_mm[:2] == pytest.approx((side_x, 0.0), abs=1e-12)
+    assert 0.0 < underhead.pick_local_mm[2] < screw.SCREW_WIRE_HEIGHT - screw.SCREW_WIRE_HOLE_DIA / 2.0
+    r = spec.retention
+    assert -side_x > (r.CAP_BOLT_CLEARANCE_DIAMETER + r.CAP_BOLT_CLEARANCE_BAND[0]) / 2.0
     mouth = [(index, reading) for index, reading in enumerate(readings)
              if reading.text.startswith("C4 MOUTH")]
     bore = spec.pivot_retainer.BORE_DIA / 2.0
