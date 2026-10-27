@@ -8,6 +8,7 @@ chain. TL-32's nut face is VIEW D on its own 2:1 sheet, its arrow on the plan.
 """
 from __future__ import annotations
 import argparse
+import math
 import sys
 from typing import Any
 from _check import check
@@ -26,6 +27,7 @@ from _hole_callout_thread_class import omit_title_block_thread_class
 from _paths import CAD_ROOT
 import _telemetry
 from _session import run_build
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 import ch_rocker_arm_tl_oblique_pivot_block_spec as part
 
@@ -169,6 +171,7 @@ NUT_CALLOUT_XY = (.265,.084)
 NUT_ISO_XY = (.380,.215)
 _ARROWS_INSIDE = 0  # swDimArrowsInside
 _WITNESS_NONE = 3  # swWitnessLineVisibility_e.swWitnessLineNone
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 
 
 def _project(adapter,view,point,label):
@@ -237,16 +240,45 @@ def _section_letter_tops(dr_section) -> list[float]:
     return [info[1], info[4]]
 
 
-def _cut_face_only(adapter, view, letter: str) -> None:
+def _cut_face_only(adapter, view, letter: str, anchor: tuple[float, float, float],
+                   target: tuple[float, float]) -> None:
     """Print only the cut face (rule 9): on TL-32 a line run past the part
     also printed the lug or the block beyond the plane, 88 mm tall (farm run
     20261027T190843112Z). R2026x declares the setter void; only its bool
-    getter is truth-tested (draw_ch_rocker_arm_tl_vn_oblique_leadscrew)."""
-    cut = _early_bound(_early_bound(view, 'IView').GetSection(), 'IDrSection')
+    getter is truth-tested (draw_ch_rocker_arm_tl_vn_oblique_leadscrew).
+    The view keeps the place SolidWorks centred on the larger outline, and
+    the centre mark of a hole beyond the plane (farm run
+    20261027T192802646Z), so the marks go and the view moves until the model
+    point ``anchor`` (mm) lands on ``target`` (sheet m)."""
+    bound = _early_bound(view, 'IView')
+    cut = _early_bound(bound.GetSection(), 'IDrSection')
     cut.SetDisplayOnlySurfaceCut(True)
     rebuild_drawing(adapter, label=f'section {letter} cut face only')
     if not bool(cut.GetDisplayOnlySurfaceCut()):
         raise RuntimeError(f'section {letter} kept geometry beyond the cut')
+    marks = tuple(bound.GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ())
+    if marks:
+        draw = adapter.currentModel
+        draw.ClearSelection2(True)
+        for index, mark in enumerate(marks):
+            if not _early_bound(mark, 'IAnnotation').Select2(index > 0, 0):
+                raise RuntimeError(f'cannot select section {letter} centre mark')
+        draw.EditDelete()  # VT_VOID: the re-read below is the proof
+        draw.ClearSelection2(True)
+        rebuild_drawing(adapter, label=f'delete section {letter} centre marks')
+        if bound.GetAnnotationsByType(_CENTER_MARK_ANNOTATION):
+            raise RuntimeError(f'section {letter} centre marks survived deletion')
+    landed = _project(adapter, view, anchor, f'section {letter} anchor')
+    position = [float(v) for v in bound.Position]
+    move = [position[i] + target[i] - landed[i] for i in range(2)]
+    if bound.SetViewPosition(double_array(move), False) is not True:
+        raise RuntimeError(f'section {letter}: position {move!r} refused')
+    rebuild_drawing(adapter, label=f'section {letter} re-anchored')
+    landed = _project(adapter, view, anchor, f'section {letter} anchor after move')
+    _telemetry.info(f'section {letter}: {len(marks)} centre marks deleted; anchor at {landed!r}, '
+                    f'target {target!r}')
+    if math.dist(landed, target) > 5e-5:
+        raise RuntimeError(f'section {letter}: anchor landed at {landed!r}, not {target!r}')
 
 
 def _set_section_arrows(adapter) -> None:
@@ -349,7 +381,9 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
                                 section_label='B',scale=(1,1),partial=True,
                                 label='carriage counterbore floor')
     if is_feed:
-        _cut_face_only(adapter, floor, 'B')
+        # The top face's +Y corner lands where TL-22's full B-B puts it.
+        _cut_face_only(adapter, floor, 'B', (x, part.BLOCK_WIDTH/2, contract.BLOCK_HEIGHT),
+                       (FLOOR_XY[0]-contract.BLOCK_HEIGHT/2000, FLOOR_XY[1]+part.BLOCK_WIDTH/2000))
     row_4y = _project(adapter,plan,(part.BLOCK_X1,part.BOLT_Y,contract.BLOCK_HEIGHT),'row 4Y')
     _fit_section_letters(adapter, side, (floor,), below_y=row_4y[1])
     annotations += curate_view_dimensions(adapter,floor,keep=FLOOR_KEEP,view_label='B-B floor',
@@ -380,7 +414,9 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
             label='nut spigot recess')
         tap_row = _project(adapter,nut,(contract.NUT_FACE_X,max(y for y,_z in contract.NUT_HOLES_YZ),
                                         contract.NUT_AXIS_Z),'+Y nut tap row')
-        _cut_face_only(adapter, section_c, 'C')
+        _cut_face_only(adapter, section_c, 'C',
+                       ((contract.LUG_X0+contract.LUG_X1)/2, contract.NUT_AXIS_Y, contract.BLOCK_HEIGHT/2),
+                       NUT_SECTION_XY)
         _fit_section_letters(adapter, section_c, (), below_y=tap_row[1])
         # The callout picks the +Z column's lower tap, under section line C
         # at the nut axis, so its short leader from the lower right crosses
