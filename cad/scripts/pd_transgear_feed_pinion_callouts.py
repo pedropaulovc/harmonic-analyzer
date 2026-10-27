@@ -66,8 +66,11 @@ FLAT_END_CALLOUT = f"CLEARS {HUB_NUMBER} FLAT"
 FULL_DEPTH_CALLOUT = f"{TEETH}T FULL DEPTH"
 CUTTER_RUNOUT_CALLOUT = "CUTTER RUN-OUT"
 # The prefix lane replaces SolidWorks' own diameter symbol, so it carries it
-# (run 20261027T032128736Z printed a bare "ROOT 7.93 min.").
-ROOT_PREFIX = "ROOT <MOD-DIAM>"
+# (run 20261027T032128736Z printed a bare "ROOT 7.93 min.").  The translated
+# cutter's root arcs are not concentric: the MIN bounds every root point, not
+# the gap bisectors the arrows land on, so it names itself an envelope
+# (codjiflo P2 on ebde256dc).
+ROOT_PREFIX = "ROOT ENVELOPE <MOD-DIAM>"
 
 # lane -> (feature, dimension) -> text.
 CALLOUTS: dict[int, dict[tuple[str, str], str]] = {

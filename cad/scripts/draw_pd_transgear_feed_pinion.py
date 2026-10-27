@@ -27,6 +27,7 @@ import math
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
@@ -71,6 +72,7 @@ from pd_transgear_feed_pinion_spec import (
     BORE_DIA,
     BORE_FIT_CALLOUT,
     BOSS_DIA,
+    CUTTER_RUNOUT_MAX,
     DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -128,7 +130,9 @@ ISO_CENTER = (0.367, 0.214)
 # measured outline (run 12: at a fixed point it overlapped the outline by
 # 2.4 mm; the outline runs 6 mm past the tip circle).
 REAR_CENTER = (0.165, 0.046)
-REAR_CAPTION = "VIEW FROM REAR FACE"
+# The end view sees the rear face too; the caption names the end by its
+# feature (2026-10-27 ENFORCE review, r1, r3: "REAR FACE" named no end).
+REAR_CAPTION = "VIEW FROM GEAR END"
 REAR_CAPTION_XY = (REAR_CENTER[0] - 0.020, REAR_CENTER[1] - 0.0215)
 REAR_CAPTION_GAP_M = 0.002
 # INote.GetExtent reads ~0.3 mm apart between sessions; settle within twice.
@@ -142,6 +146,17 @@ SHEET_INNER_BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
 # Half the printed tooth-tip circle in sheet metres: the section's half-height,
 # which every dimension is placed clear of.
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
+# The cutting line through the end view's axis, drawn top to bottom so its
+# arrows point left: in the rear-face view that is model +X, the section's
+# direction of sight, so the section keeps its rear face left (drawn bottom
+# to top, the arrows point right and the section would lay the nose left).
+# It overshoots the tips 8 mm, so the lower "B" clears datum A's tag below
+# the bore (run 20261027T054041865Z layout audit: 5 mm left 1.35 mm).
+_SECTION_LINE_OVERSHOOT = 0.008
+SECTION_LINE = (
+    (FRONT_CENTER[0], FRONT_CENTER[1] + HALF_OD + _SECTION_LINE_OVERSHOOT),
+    (FRONT_CENTER[0], FRONT_CENTER[1] - HALF_OD - _SECTION_LINE_OVERSHOOT),
+)
 
 
 def _side_x(z_mm: float) -> float:
@@ -221,6 +236,19 @@ _LEFT_CAPTION_WIDTH = 0.047  # its longer row, as the drawing test estimates
 TANGENT_EDGES_HIDDEN = 0  # swDisplayTangentEdges_e.swTangentEdgesHidden
 _LEFT_REAR_X = LEFT_CENTER[0] - OVERALL_LENGTH / 2.0 * VIEW_SCALE[0] / 1000.0
 _LEFT_BOTTOM = LEFT_CENTER[1] - HALF_OD
+# The view is cropped just past the cutter's run-out limit: it exists for
+# the teeth, and the section shows the boss.  Uncropped, runs
+# 20261027T032128736Z..054041865Z drew one tooth-space line of the facing
+# gap on to the boss to ~15.3 mm, where the part has no edge (its STL holds
+# no vertex on the boss between 13.6 and 16.6 mm), and the review read it
+# as a run-out past the 13.80 MAX (r1, r2).
+OUTSIDE_CROP_Z = CUTTER_RUNOUT_MAX + 0.1
+OUTSIDE_CROP_FENCE = (
+    _LEFT_REAR_X - 0.004,
+    _LEFT_BOTTOM - 0.004,
+    _LEFT_REAR_X + OUTSIDE_CROP_Z * VIEW_SCALE[0] / 1000.0,
+    LEFT_CENTER[1] + HALF_OD + 0.004,
+)
 _CUTTER_TEXT_WIDTH = 0.0418
 LEFT_KEEP: dict[str, tuple[float, float]] = {
     "FullDepth": (_left_of(_LEFT_REAR_X, _CUTTER_TEXT_WIDTH), _LEFT_BOTTOM - 0.0068),
@@ -235,7 +263,7 @@ LEFT_CAPTION_XY = (
 # its arrows land on two gap floors; the text stands lower left, clear of the
 # view, under the notes and over its caption.
 _ROOT_TEXT_ANGLE = math.radians(195.0)
-_ROOT_TEXT_RADIUS = 0.050
+_ROOT_TEXT_RADIUS = 0.057
 REAR_KEEP: dict[str, tuple[float, float]] = {
     "RootDia": (
         REAR_CENTER[0] + _ROOT_TEXT_RADIUS * math.cos(_ROOT_TEXT_ANGLE),
@@ -246,13 +274,22 @@ REAR_KEEP: dict[str, tuple[float, float]] = {
 # The oil hole lies in the section plane (+Y), so the cut shows it as a gap in
 # the upper boss wall; the note's leader lands mid-wall on its front edge.
 # The note stands above the section, right of the bore's shelf text and left
-# of the isometric.
-OIL_HOLE_NOTE = f"\u00d8{OIL_HOLE_DIA:.1f} OIL HOLE: DRILL AT ASSY WITH {HUB_NUMBER} THRU HUB AND BOSS"
+# of the isometric.  It is match drilled with the hub seated, so the hub's
+# sheet sets its position (CENTRED ON HUB BODY,
+# pd_transgear_disc_hub_spec.OIL_HOLE_CALLOUT_BELOW); the second row says so
+# (2026-10-27 ENFORCE review, r1-r3: the match drill named no locating part).
+OIL_HOLE_NOTE = "\n".join(
+    (
+        f"\u00d8{OIL_HOLE_DIA:.1f} OIL HOLE: DRILL AT ASSY WITH {HUB_NUMBER} THRU HUB AND BOSS",
+        # Short: it hangs left of the isometric's top.
+        f"POSITION SET BY {HUB_NUMBER}",
+    )
+)
 OIL_HOLE_EDGE = (
     _side_x(OIL_HOLE_SLEEVE_Z + OIL_HOLE_DIA / 2.0),
     RIGHT_CENTER[1] + (BORE_DIA + BOSS_DIA) / 4.0 * VIEW_SCALE[0] / 1000.0,
 )
-OIL_HOLE_CALLOUT = (_REAR_X + 0.035, _SIDE_TOP + 0.077)
+OIL_HOLE_CALLOUT = (_REAR_X + 0.035, _SIDE_TOP + 0.079)
 NOTE_HEIGHT = 0.0025
 
 _BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
@@ -320,8 +357,11 @@ STEP_FRAME = (_side_x(FACE_WIDTH) - 0.020, _SIDE_TOP + 0.012)
 
 
 @_telemetry.traced("drawing.planar_centerline", label_param="label")
-def _create_section_axis_centerline(adapter: Any, view: Any, *, label: str) -> Any:
-    """Create the turning axis in the longitudinal-section sketch."""
+def _create_section_axis_centerline(
+    adapter: Any, view: Any, *, label: str, nose_mm: float = OVERALL_LENGTH
+) -> Any:
+    """Create the turning axis in a side view's sketch, 1 mm past the rear face
+    and past ``nose_mm`` (a cropped view's last station)."""
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
     name = view_name(adapter, view)
@@ -333,9 +373,10 @@ def _create_section_axis_centerline(adapter: Any, view: Any, *, label: str) -> A
     sketch_manager.AddToDB = True
     sketch_manager.DisplayWhenAdded = True
     half_length = OVERALL_LENGTH / 2000.0
+    nose = (nose_mm - OVERALL_LENGTH / 2.0) / 1000.0
     try:
         centerline = sketch_manager.CreateCenterLine(
-            -half_length - 0.001, 0.0, 0.0, half_length + 0.001, 0.0, 0.0
+            -half_length - 0.001, 0.0, 0.0, nose + 0.001, 0.0, 0.0
         )
     finally:
         sketch_manager.AddToDB = previous_add_to_db
@@ -434,6 +475,74 @@ def _hide_tangent_edges(view: Any) -> None:
     bound.UpdateViewDisplayGeometry()
 
 
+def _crop_outside_view(adapter: Any, view: Any) -> None:
+    """Crop the outside view to OUTSIDE_CROP_FENCE (sheet left, foot, right,
+    head) with no outline, read back.
+
+    The fence is sketched direct to the database in the view's own sketch
+    and handed to ``IView.Crop2`` (draw_dt_cone_swing_platform's section
+    crop).  The outline pads past a fence, so the proof is that it still
+    holds the fence and lost most of the boss past it.
+    """
+    left, foot, right, head = OUTSIDE_CROP_FENCE
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    native = _early_bound(view, "IView")
+    if not ddoc.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate the outside view for its crop")
+    draw.ClearSelection2(True)
+    before = tuple(float(value) for value in native.GetOutline())
+    sketch = _early_bound(native.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    corners = []
+    for x, y in ((left, head), (right, foot)):
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        corners.append(tuple(float(value) for value in projected.ArrayData))
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    try:
+        segments = tuple(
+            sketch_manager.CreateCornerRectangle(*corners[0], *corners[1]) or ()
+        )
+    finally:
+        sketch_manager.AddToDB = previous_add_to_db
+    if len(segments) != 4:
+        raise RuntimeError(f"outside view crop fence has {len(segments)} segments, not 4")
+    for segment in segments:
+        if not _early_bound(segment, "ISketchSegment").Select4(True, None):
+            raise RuntimeError("failed to select the outside view's crop fence")
+    # IView.Crop2(jagged, no outline, intensity) returns swCropViewErrors_e,
+    # where 1 is NoError.
+    status = int(native.Crop2(False, True, 0))
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    native.UpdateViewDisplayGeometry()
+    if status != 1 or not bool(native.IsCropped()):
+        raise RuntimeError(f"outside view crop did not take: Crop2 status {status}")
+    if not bool(native.CropViewNoOutline):
+        raise RuntimeError("the outside view's crop prints an outline; expected none")
+    after = tuple(float(value) for value in native.GetOutline())
+    _telemetry.info(f"outside view crop: outline {before} -> {after}")
+    removed = (OVERALL_LENGTH - OUTSIDE_CROP_Z) * VIEW_SCALE[0] / 1000.0
+    if (
+        len(after) != 4
+        or after[0] > left
+        or after[1] > foot
+        or after[2] < right
+        or after[3] < head
+        or before[2] - after[2] < 0.5 * removed
+    ):
+        raise RuntimeError(
+            f"outside view crop is not its fence {OUTSIDE_CROP_FENCE}: "
+            f"outline {before} -> {after}"
+        )
+
+
 def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
     """Every imported dimension prints the text lanes its part authored.
 
@@ -519,14 +628,11 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(
         adapter, str(SOURCE), END_VIEW_ORIENTATION, *FRONT_CENTER, scale=VIEW_SCALE
     )
-    # Drawn top to bottom, the cutting line's arrows point left: in the
-    # rear-face view that is model +X, the section's direction of sight, so
-    # the section keeps its rear face left.
     right = create_section_view(
         adapter,
         front,
-        line_start=(FRONT_CENTER[0], FRONT_CENTER[1] + HALF_OD + 0.005),
-        line_end=(FRONT_CENTER[0], FRONT_CENTER[1] - HALF_OD - 0.005),
+        line_start=SECTION_LINE[0],
+        line_end=SECTION_LINE[1],
         view_xy=RIGHT_CENTER,
         section_label="B",
         scale=VIEW_SCALE,
@@ -539,6 +645,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso, rear, outside):
         set_hidden_lines_removed(adapter, view)
     _hide_tangent_edges(outside)
+    _crop_outside_view(adapter, outside)
     _place_rear_caption(adapter, rear)
     if add_note(adapter, LEFT_CAPTION, *LEFT_CAPTION_XY) is None:
         raise RuntimeError("the outside view caption was not inserted")
@@ -564,7 +671,9 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the sleeve bore")
     _create_section_axis_centerline(adapter, right, label="pinion sleeve axis")
-    _create_section_axis_centerline(adapter, outside, label="outside view axis")
+    _create_section_axis_centerline(
+        adapter, outside, label="outside view axis", nose_mm=OUTSIDE_CROP_Z - 1.0
+    )
 
     oil_note = add_leader_note(
         adapter,

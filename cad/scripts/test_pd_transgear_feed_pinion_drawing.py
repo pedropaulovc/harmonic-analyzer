@@ -74,7 +74,7 @@ def test_part_authors_every_callout_on_a_marked_dimension() -> None:
     assert spec.PIN_NUMBER not in below["OverallLength"]
     assert "MHA-PD-25" in below["OverallLength"]
     assert callouts.CALLOUTS[callouts.TEXT_PREFIX] == {
-        ("RootProfile", "RootDia"): "ROOT <MOD-DIAM>"
+        ("RootProfile", "RootDia"): "ROOT ENVELOPE <MOD-DIAM>"
     }
 
 
@@ -357,9 +357,13 @@ def test_sheet_text_names_the_right_parts() -> None:
     for stem, number in numbers.items():
         assert _config.parts(stem)["number"] == number, stem
     note = drawing.OIL_HOLE_NOTE
-    assert "\n" not in note and len(note) <= 70
-    assert note.startswith(f"\u00d8{hub.OIL_HOLE_DIA:.1f} OIL HOLE")
-    assert f"WITH {spec.HUB_NUMBER}" in note
+    drill, position = note.split("\n")
+    assert len(drill) <= 70
+    assert drill.startswith(f"\u00d8{hub.OIL_HOLE_DIA:.1f} OIL HOLE")
+    assert f"WITH {spec.HUB_NUMBER}" in drill
+    # The hub's sheet locates the match-drilled hole (CENTRED ON HUB BODY).
+    assert position == f"POSITION SET BY {spec.HUB_NUMBER}"
+    assert "CENTRED ON HUB BODY" in hub.OIL_HOLE_CALLOUT_BELOW
     assert f"MATE PIN {spec.PIN_NUMBER}" in spec.BORE_FIT_CALLOUT
     assert _config.parts("pd-transgear-rear-bushing")["number"] == callouts.REAR_BUSHING_NUMBER
     assert _config.parts("pd-transgear-front-bushing")["number"] == "MHA-PD-25"
@@ -523,7 +527,13 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
         "end": _view_box(drawing.FRONT_CENTER),
         "rear": _view_box(drawing.REAR_CENTER),
         "section": section,
-        "outside": _view_box(drawing.LEFT_CENTER, spec.OVERALL_LENGTH),
+        # Cropped, without an outline: its geometry ends at the fence.
+        "outside": Box(
+            drawing._LEFT_REAR_X,
+            drawing.LEFT_CENTER[1] - drawing.HALF_OD,
+            drawing.OUTSIDE_CROP_FENCE[2],
+            drawing.LEFT_CENTER[1] + drawing.HALF_OD,
+        ),
         # codjiflo P3 on 65a022125: the isometric's ink as run
         # 20261027T032128736Z's sheet measured it, the BossDia's extension
         # line excluded.
@@ -680,7 +690,7 @@ def test_root_reads_across_two_gap_floors_on_the_rear_view() -> None:
     offset = (angle - pitch / 2.0) % pitch
     assert min(offset, pitch - offset) < 1e-9
     assert math.hypot(x - cx, y - cy) > drawing.HALF_OD + 0.015
-    assert _printed_text("RootDia").strip() == f"ROOT \u00d8{spec.ROOT_DIA_MIN:.2f} min."
+    assert _printed_text("RootDia").strip() == f"ROOT ENVELOPE \u00d8{spec.ROOT_DIA_MIN:.2f} min."
 
 
 # The finish symbol's ink from its insertion point, measured with 2.5 mm text
@@ -917,12 +927,57 @@ def test_toothspace_callout_lands_on_the_rear_face_full_depth_flank() -> None:
     assert contact_angle < toward_note < contact_angle + math.pi / 2.0
 
 
-
-def test_end_view_is_the_sections_third_angle_left_view() -> None:
+def test_end_view_is_the_sections_third_angle_left_view(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """2026-10-27 ENFORCE review (r1, r3): a nose view stood left of the
     section, whose rear face stands left.  The end view now sees the rear
     face, and its cutting line runs top to bottom so the arrows point left,
-    model +X in that view: the section keeps its rear face left."""
-    assert drawing.END_VIEW_ORIENTATION == "*Back"
+    model +X in that view: the section keeps its rear face left (codjiflo P3
+    on ebde256dc: the build's own call is checked, not just the constants)."""
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from _test_stubbed_build import offline_adapter, stub_seat
+
+    source = tmp_path / "source.SLDPRT"
+    source.write_bytes(b"")
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    seat = stub_seat(monkeypatch, drawing)
+    left, bottom, right, top = drawing.SHEET_INNER_BORDER
+    seat._early_bound.return_value.GetExtent.return_value = (
+        left + 0.01, bottom + 0.01, 0.0, right - 0.01, top - 0.01, 0.0
+    )
+    seat.new_project_drawing.return_value = (MagicMock(), MagicMock())
+    seat.place_view.side_effect = lambda _adapter, path, view, x, y, scale: SimpleNamespace(
+        orientation=view, centre=(x, y)
+    )
+    asyncio.run(drawing.build(offline_adapter()))
+
+    (section,) = seat.create_section_view.call_args_list
+    parent = section.args[1]
+    assert (parent.orientation, parent.centre) == ("*Back", drawing.FRONT_CENTER)
+    start, end = section.kwargs["line_start"], section.kwargs["line_end"]
+    assert start[0] == end[0] == drawing.FRONT_CENTER[0]
+    assert start[1] > drawing.FRONT_CENTER[1] + drawing.HALF_OD > drawing.FRONT_CENTER[1]
+    assert end[1] < drawing.FRONT_CENTER[1] - drawing.HALF_OD
+    assert section.kwargs["view_xy"] == drawing.RIGHT_CENTER
     assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1]
     assert drawing.FRONT_CENTER[0] < drawing._side_x(0.0) < drawing._side_x(spec.OVERALL_LENGTH)
+
+
+def test_outside_view_crops_past_the_run_out_limit() -> None:
+    """Runs 20261027T032128736Z..054041865Z (r1, r2): uncropped, the view drew
+    a tooth-space line on to the boss, past the 13.80 MAX.  It is cropped just
+    past the run-out limit, so both cutter stations' witnesses stay inside and
+    the boss, which the section shows, is cut away."""
+    left, foot, right, head = drawing.OUTSIDE_CROP_FENCE
+    s = drawing.VIEW_SCALE[0] / 1000.0
+    rear = drawing._LEFT_REAR_X
+    assert left < rear
+    for station in (spec.FULL_DEPTH, spec.CUTTER_RUNOUT_MAX):
+        assert rear + station * s < right
+    assert right < rear + (spec.FACE_WIDTH + 0.5) * s
+    assert foot < drawing.LEFT_CENTER[1] - drawing.HALF_OD
+    assert head > drawing.LEFT_CENTER[1] + drawing.HALF_OD
