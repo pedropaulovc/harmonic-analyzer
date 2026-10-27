@@ -118,7 +118,9 @@ ISO_CENTER = (0.385, 0.232)
 BEARING_ISO_CENTER = (ISO_CENTER[0], ISO_CENTER[1] - 0.008)
 ISO_NOTE_XY = (0.355, 0.200)
 BEARING_ISO_NOTE_XY = (ISO_NOTE_XY[0], ISO_NOTE_XY[1] - 0.008)
-CAPTION_A_XY = (0.155, 0.035)
+# Right of the Ø25's stack under the bore (SECTION_A_KEEP), clear of its
+# +X witness; the seat frame stands above it.
+CAPTION_A_XY = (0.161, 0.035)
 # View C no longer shares B-B's caption/dimension lanes.
 SIDE_CENTER = (0.210, 0.155)
 SIDE_VIEW_LETTER = "C"
@@ -222,8 +224,12 @@ SECTION_A_KEEP: dict[str, tuple[float, float, float]] = {
     # Hang each seat-depth block outside its span, beside the left end face.
     "TopBoreDepth": (BLOCK_X0 - 7.0, 0.0, _H + 8.25),
     "BottomBoreDepth": (BLOCK_X0 - 7.0, 0.0, -8.75),
-    # Folded web text occupies its own lane above the row's witnesses.
-    "ShoulderHoleDia": (BLOCK_X1 + 25.0, 0.0, -15.0),
+    # Below A-A, away from the plan (5bca52e review: above it, the line ran
+    # 8 px under the plan's 74.50 to text beside the 9.000 block). Text block
+    # centred on the bore between the witnesses, its top row ~2 model mm under
+    # A-A's lower edge (the counterbored top face); the line runs along the
+    # last row's baseline, ~11 model mm lower.
+    "ShoulderHoleDia": (BORE_X, 0.0, _H + 12.5),
     # Route the actual corner-radius leader right of A-A, below its dimension tiers.
     "SeatFilletR": (31.0, 0.0, 18.0),
 }
@@ -288,14 +294,12 @@ SCREW_HOLE_PROCESS = "DRILL"
 # sheet coordinates; the triangle lands across the unchanged 3 mm end wall.
 SEAT_DATUM_EDGE = (BORE_X - part_spec.BORE_DIA / 2.0, 0.0, 3.0)
 SEAT_DATUM_SYMBOL = (BLOCK_X0 - 1.5, 0.0, 5.0)
-# The frame stays below A-A's top face and above its native caption. Its
-# unchanged attachment lands 1.5 mm above the top seat floor on the +X wall.
-SEAT_FRAME_EDGE = (
-    BORE_X + part_spec.BORE_DIA / 2.0,
-    0.0,
-    part_spec.BORE_DEPTH + part_spec.SHOULDER + 1.5,
-)
-SEAT_FRAME_CORNER = (BORE_X + part_spec.SHOULDER_HOLE_DIA / 2.0 + 1.0, 0.0, _H + 2.0)
+# The frame stays below A-A's top face and above its native caption, right
+# of the Ø25's +X witness. Its attachment lands 1.5 mm inside the top face on
+# the top seat's +X wall, so its leader runs down-right off the mouth, never
+# across the Ø25 witness or its text under the bore.
+SEAT_FRAME_EDGE = (BORE_X + part_spec.BORE_DIA / 2.0, 0.0, _H - 1.5)
+SEAT_FRAME_CORNER = (BORE_X + 22.0, 0.0, _H + 2.0)
 _SEAT_GDT_SOURCE = ("draw_ch_rocker_arm_tl_oblique_pivot_block", "_seat_gdt")
 
 # The dedicated interface sheet keeps the full native hole callout above
@@ -1057,6 +1061,57 @@ def _plan_lower_row_witness(
         raise RuntimeError(f"7.000 upper witness does not clear A: {witnesses[0]}, {box}")
 
 
+_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
+
+
+def _web_diameter_under_section(
+    adapter: Any, annotations: list[Any], section_a: Any, on_a: Any, *, place: bool
+) -> None:
+    """The Ø25 web hole in A-A's own lane: both arrows inside its witnesses,
+    its line under the section, nothing past the hole's rims (5bca52e review:
+    a near-side line ran under the plan's 74.50 to text 37 mm right of A-A)."""
+    matches = [
+        a for a in annotations if dimension_name(adapter, a) == "ShoulderHoleDia"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError("section A-A needs exactly one native ShoulderHoleDia")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if place:
+        display.Diametric = True
+        display.ArrowSide = _ARROWS_INSIDE
+    if not bool(display.Diametric) or int(display.ArrowSide) != _ARROWS_INSIDE:
+        raise RuntimeError("Ø25 web hole lost its two-arrow diametric style")
+    if place:
+        return
+    outline = tuple(
+        float(value) for value in _early_bound(section_a, "IView").GetOutline()
+    )
+    rims = sorted(
+        on_a((BORE_X + side * part_spec.SHOULDER_HOLE_DIA / 2.0, 0.0, 0.0))[0]
+        for side in (-1.0, 1.0)
+    )
+    segments = dimension_segments(annotation)
+    lines = [
+        line
+        for line in segments
+        if abs(line[0][1] - line[1][1]) <= 1e-7 and abs(line[0][0] - line[1][0]) > 1e-4
+    ]
+    if (
+        not lines
+        or any(point[1] > outline[1] - 0.003 for line in lines for point in line)
+        or any(
+            not rims[0] - 0.0015 <= point[0] <= rims[1] + 0.0015
+            for line in segments
+            for point in line
+        )
+    ):
+        raise RuntimeError(
+            f"Ø25 web hole left its lane under A-A: segments={segments}, "
+            f"outline={outline}, rims={rims}"
+        )
+
+
 def _bore_axis_section(
     adapter: Any, source_model: Any, plan: Any
 ) -> tuple[Any, list[Any]]:
@@ -1674,11 +1729,11 @@ async def build(adapter: Any) -> dict[str, str]:
         {name: text for name, text in _hung_clear(CALLOUTS_BELOW).items() if name not in _OTHER_SHEET_DIMENSIONS},
     )
     offset_dimension_text(adapter, annotations, SECTION_A_TEXT_POSITIONS)
-    for name in ("BoreDia", "ShoulderHoleDia"):
-        diameters = [a for a in annotations if dimension_name(adapter, a) == name]
-        if len(diameters) != 1:
-            raise RuntimeError(f"expected one {name} dimension, found {len(diameters)}")
-        set_near_side_diameter(diameters[0], f"pivot block {name}")
+    diameters = [a for a in annotations if dimension_name(adapter, a) == "BoreDia"]
+    if len(diameters) != 1:
+        raise RuntimeError(f"expected one BoreDia dimension, found {len(diameters)}")
+    set_near_side_diameter(diameters[0], "pivot block BoreDia")
+    _web_diameter_under_section(adapter, annotations, section_a, on_a, place=True)
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(
@@ -1756,6 +1811,7 @@ async def build(adapter: Any) -> dict[str, str]:
         if not ddoc.ActivateSheet(SHEET_NAMES[0]):
             raise RuntimeError("cannot recheck the bearing/carriage witness")
         _plan_lower_row_witness(adapter, annotations, section_a, on_plan, place=False)
+        _web_diameter_under_section(adapter, annotations, section_a, on_a, place=False)
         if not ddoc.ActivateSheet(SHEET_NAMES[1]):
             raise RuntimeError("cannot recheck the capture-wing authorities")
         for name in ("WingAxisReach", "WingHalfWidth"):
