@@ -140,9 +140,14 @@ GEOMETRIC_CONTROLS += (
         ("A",), "diametral",
         projected_zone_height_mm=REGISTRATION.S_PROJECTED_HEIGHT_MM,
     ),
-    # No frame on the rear face (machinist review, rule 5): the 9517K466
-    # ground stock's thickness band carries its parallelism to A
-    # (paper_drive_arm_registration.ARM_OPPOSITE_FACE_PARALLELISM_MM).
+    # No frame on the rear face (machinist review, rule 5): the front face A's
+    # flatness plus the 9517K466 stock's thickness band carry its parallelism
+    # to A (paper_drive_arm_registration.ARM_OPPOSITE_FACE_PARALLELISM_MM).
+    GeometricControl(
+        "arm_front_flatness", "flatness",
+        f"{REGISTRATION.ARM_FRONT_FACE_FLATNESS_MM:.3f}",
+        PlanarFace((0.0, 0.0, -1.0), 0.0),
+    ),
     *(
         GeometricControl(
             f"arm_locator_{index}_position", "position", f"{REDUCER_POSITION_DIAMETER:.3f}",

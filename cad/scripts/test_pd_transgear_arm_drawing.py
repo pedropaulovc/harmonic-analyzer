@@ -758,15 +758,22 @@ def test_the_only_note_is_the_projected_zones_and_it_carries_no_tolerance() -> N
             assert f"{control.projected_zone_height_mm:.1f}" in flat
 
 
-def test_the_rear_face_has_no_frame_and_the_stock_carries_its_parallelism() -> None:
+def test_the_rear_face_parallelism_is_face_a_flatness_plus_the_stock_band() -> None:
     """Machinist review (over-specification): a // 0.050 A frame sat on the
-    rear face of 5/16 ground stock. The stock's thickness band carries it,
-    and the plate screw's worst engagement still meets 1.5D."""
+    rear face of 5/16 ground stock. Codjiflo (#2015): the thickness band
+    alone does not bound the rear face against datum A on bowed stock. Face
+    A's flatness frame bounds the bow; the rear face lies within that zone
+    plus the thickness spread, and the plate screw's worst engagement still
+    meets 1.5D at that tilt."""
     import paper_drive_arm_registration as registration
 
     assert all(control.characteristic != "parallelism" for control in spec.GEOMETRIC_CONTROLS)
+    flatness = [c for c in spec.GEOMETRIC_CONTROLS if c.characteristic == "flatness"]
+    assert [c.face for c in flatness] == [spec.PART_DATUMS[0].face]
+    assert flatness[0].datums == ()
+    assert float(flatness[0].tolerance) == pytest.approx(registration.ARM_FRONT_FACE_FLATNESS_MM)
     assert registration.ARM_OPPOSITE_FACE_PARALLELISM_MM == pytest.approx(
-        2.0 * geometry.THICKNESS_BAND
+        registration.ARM_FRONT_FACE_FLATNESS_MM + 2.0 * geometry.THICKNESS_BAND
     )
     assert joints.PLATE_SCREW_ENGAGEMENT_WORST_D >= joints.ENGAGEMENT_TARGET_D
 

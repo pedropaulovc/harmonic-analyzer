@@ -593,6 +593,14 @@ async def build(adapter: Any) -> dict[str, str]:
                 adapter, section, (0.056, 0.0, 0.0), label="arm front datum",
             ),
         ),
+        # Right of the stud's frames, under the overall (141.4), with a short
+        # leader down to face A.
+        "arm_front_flatness": PmiDrawingPlacement(
+            section, (0.285, SECTION_CENTER[1] + 0.0205),
+            attachment_xy=model_point_in_view(
+                adapter, section, (0.112, 0.0, 0.0), label="arm front face flatness",
+            ),
+        ),
         # Datum tags on a bore are picked by a SHEET POINT on the rim
         # (solidworks-drawing-layout-tuning.md section h): an edge-object
         # pick leaves the tag at its default drop beside the bore, and run 5
