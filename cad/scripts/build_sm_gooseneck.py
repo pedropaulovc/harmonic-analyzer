@@ -18,8 +18,8 @@ One weldment part, one body, built in this order:
    (the horizontal plane through the arm axis, so section A-A on the print
    carries its dimensions).
 2. ``Counterbore``: a revolved cut Ø COUNTERBORE_DIA x COUNTERBORE_DEPTH
-   from the end face, its floor corner sharp (printed R0.10 MAX); its depth
-   carries the native LIMIT band.  Then ``ThreadBore``: the native blind
+   from the end face, its floor corner round at its printed R0.10 MAX; its
+   depth carries the native LIMIT band.  Then ``ThreadBore``: the native blind
    bottoming tap from ``TAP_SPEC``, started on the counterbore floor, both
    depths from it.  ``SpringScrewAxis`` is their hidden, equation-driven
    assembly reference.
@@ -81,6 +81,7 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
+from _single_limit_tolerance import set_single_limit
 from _visibility import blank_reference_geometry
 from sm_gooseneck_spec import (
     DIMENSION_CALLOUTS,
@@ -119,6 +120,9 @@ from sm_gooseneck_spring_joint import (
     COUNTERBORE_DEPTH_MAX,
     COUNTERBORE_DEPTH_MIN,
     COUNTERBORE_DIA,
+    COUNTERBORE_FLOOR_CORNER_R_BAND,
+    COUNTERBORE_FLOOR_CORNER_R_MAX,
+    COUNTERBORE_FLOOR_CORNER_R_TOL_TYPE,
     PLUG_SHANK_DIA,
     TAP_DRILL_DEPTH_FROM_FLOOR,
     TAP_DRILL_DIA,
@@ -139,6 +143,15 @@ SHANK_R = PLUG_SHANK_DIA / 2.0
 SHANK_END_X = TUBE_END_X + PLUG_SHANK_LENGTH
 COUNTERBORE_R = COUNTERBORE_DIA / 2.0
 COUNTERBORE_FLOOR_X = ARM_END_X + COUNTERBORE_DEPTH
+# The floor corner's round (ArmAxisPlane sketch u along the arm, v radial):
+# its tangent points on the floor and on the wall, the quarter CCW between.
+_CB_CORNER_R = COUNTERBORE_FLOOR_CORNER_R_MAX
+COUNTERBORE_CORNER_CENTER = (
+    COUNTERBORE_FLOOR_X - _CB_CORNER_R,
+    COUNTERBORE_R - _CB_CORNER_R,
+)
+COUNTERBORE_CORNER_FLOOR_TANGENT = (COUNTERBORE_FLOOR_X, COUNTERBORE_R - _CB_CORNER_R)
+COUNTERBORE_CORNER_WALL_TANGENT = (COUNTERBORE_FLOOR_X - _CB_CORNER_R, COUNTERBORE_R)
 TAP_DRILL_R = TAP_DRILL_DIA / 2.0
 SLEEVE_R = SLEEVE_DIA / 2.0
 _SW_TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
@@ -156,7 +169,16 @@ if not math.isclose(TUBE_END_X - ARM_END_X, PLUG_HEAD_LENGTH, abs_tol=1e-9):
 
 # Analytic volumes, mm^3.
 V_END_PIECE = math.pi * (PLUG_R**2 * PLUG_HEAD_LENGTH + SHANK_R**2 * PLUG_SHANK_LENGTH)
-V_COUNTERBORE = math.pi * COUNTERBORE_R**2 * COUNTERBORE_DEPTH
+# The cut less the floor corner's round, the spandrel (1 - pi/4) r^2 revolved
+# about its centroid's radius (Pappus).
+_CB_CORNER_SPANDREL = (1.0 - math.pi / 4.0) * _CB_CORNER_R**2
+_CB_CORNER_CENTROID_R = (
+    COUNTERBORE_R - (10.0 - 3.0 * math.pi) / (12.0 - 3.0 * math.pi) * _CB_CORNER_R
+)
+V_COUNTERBORE = (
+    math.pi * COUNTERBORE_R**2 * COUNTERBORE_DEPTH
+    - 2.0 * math.pi * _CB_CORNER_CENTROID_R * _CB_CORNER_SPANDREL
+)
 V_TAP = blind_hole_volume_mm3(TAP_DRILL_DIA, TAP_DRILL_DEPTH_FROM_FLOOR)
 V_LEG = RING_AREA * (LEG_TOP - LEG_BOTTOM)
 # Quarter torus with an annular cross-section (Pappus): (pi/2) * BendR * ring.
@@ -269,6 +291,7 @@ async def build(adapter) -> dict[str, str]:
         ("PlugShankDia", PLUG_SHANK_DIA),
         ("CounterboreDia", COUNTERBORE_DIA),
         ("CounterboreDepth", COUNTERBORE_DEPTH),
+        ("CounterboreFloorCornerR", COUNTERBORE_FLOOR_CORNER_R_MAX),
         ("SleeveDia", SLEEVE_DIA),
         ("SleeveTop", SLEEVE_TOP),
     ):
@@ -373,15 +396,10 @@ async def build(adapter) -> dict[str, str]:
     # 2. The arm-end counterbore: its flat floor sits past the screw's clamped
     # run-out, so the fat incomplete threads never reach the end piece's full
     # 2B thread.  The cutter's mouth lies on the end face, so its depth
-    # dimension runs face to floor; the floor corner is sharp (the print's
-    # R0.10 MAX).  It is cut FIRST: its floor is the tap's start face.
+    # dimension runs face to floor; the floor corner is modelled at its
+    # printed limit, R0.10 MAX, a native radial dimension (codjiflo P2 on
+    # #1997).  It is cut FIRST: its floor is the tap's start face.
     counterbore = SketchDims()
-    counterbore_points = [
-        (COUNTERBORE_FLOOR_X, 0.0),
-        (COUNTERBORE_FLOOR_X, COUNTERBORE_R),
-        (ARM_END_X, COUNTERBORE_R),
-        (ARM_END_X, 0.0),
-    ]
     check("create_sketch counterbore", await adapter.create_sketch("ArmAxisPlane"))
     set_sketch_direct_db(adapter, True)
     try:
@@ -389,11 +407,32 @@ async def build(adapter) -> dict[str, str]:
             "counterbore axis centerline",
             await adapter.add_centerline(ARM_END_X, 0.0, COUNTERBORE_FLOOR_X, 0.0),
         )
-        counterbore_lines = await add_line_chain(adapter, counterbore_points)
+        (floor,) = await add_line_chain(
+            adapter,
+            [(COUNTERBORE_FLOOR_X, 0.0), COUNTERBORE_CORNER_FLOOR_TANGENT],
+            close=False,
+        )
+        floor_corner = check(
+            "counterbore floor corner arc",
+            await adapter.add_arc(
+                *COUNTERBORE_CORNER_CENTER,
+                *COUNTERBORE_CORNER_FLOOR_TANGENT,
+                *COUNTERBORE_CORNER_WALL_TANGENT,
+            ),
+        )
+        wall, mouth, counterbore_floor_axis = await add_line_chain(
+            adapter,
+            [
+                COUNTERBORE_CORNER_WALL_TANGENT,
+                (ARM_END_X, COUNTERBORE_R),
+                (ARM_END_X, 0.0),
+                (COUNTERBORE_FLOOR_X, 0.0),
+            ],
+            close=False,
+        )
     finally:
         # Session state on the seat (as the end piece above).
         set_sketch_direct_db(adapter, False)
-    floor, wall, mouth, counterbore_floor_axis = counterbore_lines
     for line, relation in (
         (floor, "vertical"),
         (wall, "horizontal"),
@@ -404,14 +443,20 @@ async def build(adapter) -> dict[str, str]:
             f"counterbore {relation} {line}",
             await adapter.add_sketch_constraint(line, None, relation),
         )
+    for first, second in ((floor, floor_corner), (floor_corner, wall)):
+        check(
+            f"counterbore floor corner tangent {first} {second}",
+            await adapter.add_sketch_constraint(first, second, "tangent"),
+        )
     await anchor_point_to_origin(
         adapter, f"{mouth}.end", ARM_END_X, 0.0, "counterbore mouth centre"
     )
     counterbore.record("CounterboreFaceStation", '-"ArmEndX"')
+    # Face to floor: from the mouth's rim to the floor's tangent point.
     await dimension_between(
         adapter,
-        f"{wall}.start",
-        f"{wall}.end",
+        f"{mouth}.start",
+        f"{floor}.end",
         "horizontal_distance",
         COUNTERBORE_DEPTH,
         "counterbore depth",
@@ -425,6 +470,13 @@ async def build(adapter) -> dict[str, str]:
         "CounterboreDia",
     )
     counterbore.record("CounterboreDia", '"CounterboreDia"')
+    check(
+        "counterbore floor corner radius",
+        await adapter.add_sketch_dimension(
+            floor_corner, None, "radial", COUNTERBORE_FLOOR_CORNER_R_MAX
+        ),
+    )
+    counterbore.record("CounterboreFloorCornerR", '"CounterboreFloorCornerR"')
     await ensure_fully_defined(adapter, "counterbore sketch")
     check("exit_sketch counterbore", await adapter.exit_sketch())
     name_last_feature(adapter, "CounterboreProfile")
@@ -859,6 +911,16 @@ async def build(adapter) -> dict[str, str]:
             COUNTERBORE_DEPTH_MIN - COUNTERBORE_DEPTH,
             COUNTERBORE_DEPTH_MAX - COUNTERBORE_DEPTH,
         ),
+    )
+    # The floor corner's R0.10 MAX (codjiflo P1 round 5, P2 on #1997): the
+    # modelled radius is the limit, the band runs from sharp up to it.
+    set_single_limit(
+        adapter,
+        "CounterboreProfile",
+        "CounterboreFloorCornerR",
+        limit=COUNTERBORE_FLOOR_CORNER_R_MAX,
+        band=COUNTERBORE_FLOOR_CORNER_R_BAND,
+        tol_type=COUNTERBORE_FLOOR_CORNER_R_TOL_TYPE,
     )
 
     await apply_material(adapter, MATERIAL)

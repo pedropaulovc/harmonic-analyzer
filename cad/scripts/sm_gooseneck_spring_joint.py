@@ -27,7 +27,6 @@ import sm_gooseneck_spring_screw_geom as screw
 import sm_vn_counter_spring_stock_geom as spring
 from _hole_spec import DRILL_POINT_H, HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
-from machinist_exceptions import load_exceptions
 
 EDGE_BREAK = float(_config.title_block("edge_break")["chamfer_max_mm"])
 PLUG_DIAMETER_BAND = printed_band_mm(2)
@@ -50,16 +49,23 @@ PLUG_SHANK_DIA = round(
 )
 
 
-def _owner_minor(package: str, exception_id: str) -> None:
-    """Refuse a shortfall the owner has not declared as a ``minor``."""
-    declared = {
-        entry.id: entry
-        for entry in load_exceptions(_config.CONFIG_DIR, package, "part")
-    }
-    entry = declared.get(exception_id)
-    if entry is None or entry.kind != "minor":
+def _owner_minor(row: dict, exception_id: str, part: str) -> None:
+    """Refuse a shortfall the owner has not declared as a ``minor``.
+
+    ``row`` is the part's registry row, read by its caller through a literal
+    ``_config.parts(<dashed-name>)`` so the build graph scopes this module's
+    config reads to the two rows (codjiflo P2 on #1997); the review itself
+    validates every declaration's form (machinist_exceptions.load_exceptions).
+    """
+    declared = row.get("machinist_exceptions") or ()
+    if not any(
+        isinstance(entry, dict)
+        and entry.get("id") == exception_id
+        and entry.get("kind") == "minor"
+        for entry in declared
+    ):
         raise AssertionError(
-            f"{package}: no owner minor {exception_id} declares this shortfall"
+            f"{part}: no owner minor {exception_id} declares this shortfall"
         )
 
 
@@ -166,8 +172,12 @@ RUNOUT_RADIAL_CLEARANCE_MIN = (
 )
 # The floor's corner to the wall is a stop in the run-out's path: the title
 # block's INSIDE CORNERS R1.0 MAX would reach it (codjiflo P1 round 5 on
-# #1997), so the MHA-SM-01 note prints FLOOR CORNER R0.10 MAX.
+# #1997), so MHA-SM-01 prints FLOOR CORNER R0.10 MAX, a native radial
+# dimension the model carries at its limit, banded from sharp up to it.
 COUNTERBORE_FLOOR_CORNER_R_MAX = 0.10
+# (upper, lower)
+COUNTERBORE_FLOOR_CORNER_R_BAND = (0.0, -COUNTERBORE_FLOOR_CORNER_R_MAX)
+COUNTERBORE_FLOOR_CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.10 MAX"
 
 # Tip budgets: the free gap leaves the screw shallowest (full-thread reach),
 # the least gap on its axis drives it deepest.
@@ -277,15 +287,19 @@ COUNTERBORE_WALL_MIN = (
     - 2.0 * EDGE_BREAK
 )
 COUNTERBORE_WALL_CALLOUT_MIN = math.floor(COUNTERBORE_WALL_MIN * 100.0) / 100.0
-# The drill's point past the head, inside the shank: at the head's end
-# (PLUG_HEAD_LENGTH) the deepest point's cone is narrowest there, against the
-# shank at its lower printed limit, the drill's location bands and its run-off.
+# The drill's point past the head, inside the shank: the deepest point's cone
+# is widest in the shank at the head's end, against the shank at its lower
+# printed limit, the drill's location bands and its run-off.  The head's end
+# stands PLUG_HEAD_LENGTH from the end face at its title-block .XX band, so
+# both drill envelopes take the SHORTEST head (codjiflo P1 on #1997): the
+# full-Ø drill stays inside it, and the point's cone meets the shank there.
+PLUG_HEAD_LENGTH_MIN = gooseneck.PLUG_HEAD_LENGTH - PLUG_LENGTH_BAND
 _POINT_TIP_MAX = TAP_DRILL_DEPTH_MAX + DRILL_POINT_H * TAP_DRILL_DIA_MAX / 2.0
 DRILL_POINT_RADIUS_AT_SHANK = max(
     0.0,
     TAP_DRILL_DIA_MAX
     / 2.0
-    * (_POINT_TIP_MAX - gooseneck.PLUG_HEAD_LENGTH)
+    * (_POINT_TIP_MAX - PLUG_HEAD_LENGTH_MIN)
     / (DRILL_POINT_H * TAP_DRILL_DIA_MAX / 2.0),
 )
 DRILL_POINT_SHANK_WALL_MIN = (
@@ -454,10 +468,7 @@ if TIP_THREAD_MARGIN_MIN <= 0.0:
     raise AssertionError("gooseneck screw tip reaches past the end piece's full thread")
 if TAP_LEAD_DRILL_MARGIN_MIN < 0.0:
     raise AssertionError("gooseneck end piece's tap lead runs past its drill")
-if (
-    _POINT_TIP_MAX - DRILL_POINT_H * TAP_DRILL_DIA_MAX / 2.0
-    > gooseneck.PLUG_HEAD_LENGTH
-):
+if TAP_DRILL_DEPTH_MAX > PLUG_HEAD_LENGTH_MIN:
     raise AssertionError("gooseneck end piece's full-Ø drill runs into its shank")
 if (
     min(PLUG_WALL_MIN, COUNTERBORE_WALL_MIN, DRILL_POINT_SHANK_WALL_MIN)
@@ -471,11 +482,13 @@ if min(PLUG_WALL_MIN, DRILL_POINT_SHANK_WALL_MIN) < PLUG_WALL_TARGET:
         "gooseneck end piece loses a drawing-guidelines.md rule 17 (walls and webs) wall"
     )
 if COUNTERBORE_WALL_MIN < PLUG_WALL_TARGET:
-    _owner_minor("sm_gooseneck", "RV-01")
+    _owner_minor(_config.parts("sm-gooseneck"), "RV-01", "sm_gooseneck")
 if HEAD_RETENTION_MIN <= 0.0:
     raise AssertionError("gooseneck screw head lets the spring eye pass")
 if HEAD_RETENTION_MIN < HEAD_RETENTION_TARGET:
-    _owner_minor("sm_gooseneck_spring_screw", "RV-01")
+    _owner_minor(
+        _config.parts("sm-gooseneck-spring-screw"), "RV-01", "sm_gooseneck_spring_screw"
+    )
 if HEAD_FLAT_BEARING_MARGIN_MIN <= 0.0:
     raise AssertionError("gooseneck screw's relief chamfer takes the loop off its flat")
 if min(LOOP_PLAIN_MARGIN_MIN, LOOP_CORNER_CLEARANCE_MIN) <= 0.0:

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import math
 import runpy
+from pathlib import Path
 
 import pytest
 
@@ -24,6 +25,7 @@ import sm_gooseneck_spring_joint as joint
 import sm_gooseneck_spring_screw_geom as screw
 import sm_gooseneck_spring_screw_spec as screw_spec
 import sm_vn_counter_spring_stock_geom as spring
+from _buildgraph import config_files_of
 
 ONE_POINT_FIVE_D = 1.5 * screw.MAJOR_DIA
 
@@ -120,10 +122,17 @@ def test_counterbore_floor_corner_round_clears_the_runout() -> None:
     assert exact == pytest.approx(0.033, abs=5e-4)
     # The title block's INSIDE CORNERS R1.0 MAX would stop the screw.
     assert joint._fillet_clearance(u, v, 1.0, 0.0) < 0.0
-    assert f"FLOOR CORNER R{rf:.2f} MAX" in gooseneck_spec.COUNTERBORE_FLOOR_CALLOUT
-    assert any(
-        gooseneck_spec.COUNTERBORE_FLOOR_CALLOUT in text
-        for text in gooseneck_spec.DIMENSION_CALLOUTS_BY_NAME.values()
+    # Printed by the model's own radial dimension, R0.10 MAX from sharp up.
+    assert joint.COUNTERBORE_FLOOR_CORNER_R_BAND == (0.0, -rf)
+    assert joint.COUNTERBORE_FLOOR_CORNER_R_TOL_TYPE == 6  # swTolMAX
+    assert (
+        "CounterboreFloorCornerR"
+        in gooseneck_spec.DRAWING_DIMENSIONS["CounterboreProfile"]
+    )
+    assert (
+        gooseneck_spec.DIMENSION_CALLOUTS_BY_NAME["CounterboreFloorCornerR"]
+        == gooseneck_spec.COUNTERBORE_FLOOR_CALLOUT
+        == "FLOOR CORNER"
     )
 
 
@@ -181,11 +190,15 @@ def test_bottoming_tap_lead_stays_inside_the_drill() -> None:
     assert joint.TAP_LEAD_DRILL_MARGIN_MIN == pytest.approx(shallowest_drill - lead_end)
     assert joint.TAP_LEAD_DRILL_MARGIN_MIN == pytest.approx(0.019, abs=5e-4)
     assert joint.TAP_LEAD_DRILL_MARGIN_MIN >= 0.0
+    # The full-Ø drill stays inside the SHORTEST head (.XX band).
+    assert joint.PLUG_HEAD_LENGTH_MIN == pytest.approx(
+        gooseneck.PLUG_HEAD_LENGTH - 0.51
+    )
     assert (
         joint.COUNTERBORE_DEPTH_MAX
         + joint.TAP_DRILL_DEPTH_FROM_FLOOR
         + joint.TAP_DEPTH_BAND
-        <= gooseneck.PLUG_HEAD_LENGTH
+        <= joint.PLUG_HEAD_LENGTH_MIN
     )
 
 
@@ -220,7 +233,8 @@ def test_tap_wall_is_2_0_at_the_full_worst_case() -> None:
 
 def test_drill_point_shank_wall_is_2_0_at_the_full_worst_case() -> None:
     # The deepest drill's 118-degree point crosses the head's end into the
-    # shank: its cone radius there, against the shank's lower printed limit.
+    # shank: its cone radius there, at the SHORTEST head (.XX band, codjiflo
+    # P1 on #1997), against the shank's lower printed limit.
     drill_r = (joint.TAP_DRILL_DIA + 0.10) / 2.0  # DRILLED HOLES +0.10
     point_h = drill_r / math.tan(math.radians(59.0))
     tip = (
@@ -229,7 +243,7 @@ def test_drill_point_shank_wall_is_2_0_at_the_full_worst_case() -> None:
         + joint.TAP_DEPTH_BAND
         + point_h
     )
-    cone_r = drill_r * (tip - gooseneck.PLUG_HEAD_LENGTH) / point_h
+    cone_r = drill_r * (tip - (gooseneck.PLUG_HEAD_LENGTH - 0.51)) / point_h
     assert 0.0 < cone_r < drill_r
     worst_wall = (
         (joint.PLUG_SHANK_DIA - joint.PLUG_DIAMETER_BAND) / 2.0
@@ -240,7 +254,7 @@ def test_drill_point_shank_wall_is_2_0_at_the_full_worst_case() -> None:
     )
     assert joint.DRILL_POINT_RADIUS_AT_SHANK == pytest.approx(cone_r, abs=1e-4)
     assert joint.DRILL_POINT_SHANK_WALL_MIN == pytest.approx(worst_wall, abs=1e-4)
-    assert worst_wall == pytest.approx(2.049, abs=5e-4)
+    assert worst_wall == pytest.approx(2.033, abs=5e-4)
     assert worst_wall >= joint.PLUG_WALL_TARGET
 
 
@@ -294,8 +308,8 @@ def _upper_transition_section(steps: int = 4000):
     from the eye's own axis line, as (s, dy, dz); the screw axis stands the
     eye's body-bearing offset above it.
     """
-    from diagnostics import diag_build_1330K524 as vendor
     import spring_mount_geom as mounts
+    from diagnostics import diag_build_1330K524 as vendor
 
     pose = mounts.COUNTER_REFERENCE_POSE
     ctrl = vendor._transition_ctrl(pose.length_mm, positive_x=True)
@@ -393,37 +407,52 @@ def _declared(package: str):
 def test_owner_minors_are_declared_and_required(monkeypatch) -> None:
     assert _declared("sm_gooseneck")["RV-01"] == "minor"
     assert _declared("sm_gooseneck_spring_screw")["RV-01"] == "minor"
-    joint._owner_minor("sm_gooseneck", "RV-01")
-    joint._owner_minor("sm_gooseneck_spring_screw", "RV-01")
-    real = machinist_exceptions.load_exceptions
+    rows = {
+        "sm_gooseneck": "sm-gooseneck",
+        "sm_gooseneck_spring_screw": "sm-gooseneck-spring-screw",
+    }
+    for package, dashed in rows.items():
+        joint._owner_minor(joint._config.parts(dashed), "RV-01", package)
+    real = joint._config.parts
 
     def without(hidden: str, accept: bool = False):
-        def load(config_root, name, kind):
-            entries = real(config_root, name, kind)
-            if name != hidden:
-                return entries
+        def parts(stem=None):
+            row = real(stem)
+            if stem != rows[hidden]:
+                return row
+            entries = [dict(entry) for entry in row["machinist_exceptions"]]
             if accept:
-                return tuple(
-                    machinist_exceptions.MachinistException(
-                        entry.id, entry.where, entry.finding, entry.reason, "accept"
-                    )
-                    for entry in entries
-                )
-            return tuple(entry for entry in entries if entry.id != "RV-01")
+                for entry in entries:
+                    entry["kind"] = "accept"
+            else:
+                entries = [entry for entry in entries if entry["id"] != "RV-01"]
+            return {**row, "machinist_exceptions": entries}
 
-        return load
+        return parts
 
     # An undeclared shortfall, or one declared only as accept, raises.
-    for hidden in ("sm_gooseneck", "sm_gooseneck_spring_screw"):
+    for hidden, dashed in rows.items():
         for accept in (False, True):
-            monkeypatch.setattr(joint, "load_exceptions", without(hidden, accept))
+            row = without(hidden, accept)(dashed)
             with pytest.raises(AssertionError, match=f"{hidden}: no owner minor RV-01"):
-                joint._owner_minor(hidden, "RV-01")
+                joint._owner_minor(row, "RV-01", hidden)
     # The module's own checks call it: run it afresh with each minor hidden.
-    for hidden in ("sm_gooseneck", "sm_gooseneck_spring_screw"):
-        monkeypatch.setattr(machinist_exceptions, "load_exceptions", without(hidden))
+    for hidden in rows:
+        monkeypatch.setattr(joint._config, "parts", without(hidden))
         with pytest.raises(AssertionError, match=f"{hidden}: no owner minor RV-01"):
             runpy.run_path(joint.__file__)
+
+
+def test_owner_minor_reads_stay_scoped_to_their_registry_rows() -> None:
+    # codjiflo P2 on #1997: the joint's config reads resolve to concrete
+    # files, never the whole-config fallback, so unrelated registry or
+    # calibration edits do not invalidate the recipes importing it.
+    tokens = config_files_of(Path(joint.__file__))
+    assert "**" not in tokens
+    assert {
+        "parts/sm-gooseneck.yaml",
+        "parts/sm-gooseneck-spring-screw.yaml",
+    } <= tokens
 
 
 def test_loop_passes_bear_on_the_plain_body_free_and_clamped() -> None:

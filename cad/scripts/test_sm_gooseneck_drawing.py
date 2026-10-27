@@ -58,9 +58,9 @@ def test_blind_tap_stays_inside_the_solid_end_piece() -> None:
     assert joint.TAP_SPEC.thread_class == "2B"
     assert part.TAP_DRILL_DIA == joint.TAP_DRILL_DIA
     assert joint.TAP_THREAD_DEPTH < joint.TAP_DRILL_DEPTH
-    # The full drill Ø stays in the head; the point stays in the end piece,
-    # so the tube's bore never sees the drill.
-    assert joint.TAP_DRILL_DEPTH_MAX <= geom.PLUG_HEAD_LENGTH
+    # The full drill Ø stays in the shortest head; the point stays in the end
+    # piece, so the tube's bore never sees the drill.
+    assert joint.TAP_DRILL_DEPTH_MAX <= joint.PLUG_HEAD_LENGTH_MIN
     tip = joint.TAP_DRILL_DEPTH_MAX + DRILL_POINT_H * joint.TAP_DRILL_DIA_MAX / 2.0
     assert tip < geom.PLUG_LENGTH
     taps = _calls(part, name="wizard_holes")
@@ -142,7 +142,10 @@ def test_counterbore_callouts_floor_the_wall_from_the_joint() -> None:
     assert floored <= joint.COUNTERBORE_WALL_MIN
     callouts = spec.DIMENSION_CALLOUTS_BY_NAME
     assert spec.COUNTERBORE_WALL_CALLOUT in callouts["CounterboreDia"].splitlines()
-    assert callouts["CounterboreDepth"] == spec.COUNTERBORE_FLOOR_CALLOUT
+    # The floor corner's limit is its own native radial dimension, not text
+    # under the depth (codjiflo P2 on #1997).
+    assert "CounterboreDepth" not in callouts
+    assert callouts["CounterboreFloorCornerR"] == spec.COUNTERBORE_FLOOR_CALLOUT
     marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
     assert set(callouts) <= marked
     for feature, by_name in spec.DIMENSION_CALLOUTS.items():

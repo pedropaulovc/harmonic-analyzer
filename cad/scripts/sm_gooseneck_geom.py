@@ -46,10 +46,13 @@ ARM_STRAIGHT = -ARM_END_X - BEND_R
 # The end piece: a solid head turned to the tube's Ø, flush with it, from the
 # clamp face to the tube end, and a shank turned to the measured tube bore,
 # brazed PLUG_SHANK_LENGTH deep.  The head holds the whole tapped hole
-# (sm_gooseneck_spring_joint); the shank sits in the straight tube.
+# (sm_gooseneck_spring_joint); the shank sits in the straight tube.  The head
+# is long enough that the deepest tap drill's point meets the shank at the
+# 2.0 wall even at the head's shortest .XX length (codjiflo P1 on #1997); the
+# shank gives up what the head gains, so the end piece's length is unchanged.
 PLUG_DIA = TUBE_DIA
-PLUG_HEAD_LENGTH = 21.00
-PLUG_SHANK_LENGTH = 5.00
+PLUG_HEAD_LENGTH = 21.50
+PLUG_SHANK_LENGTH = 4.50
 PLUG_LENGTH = PLUG_HEAD_LENGTH + PLUG_SHANK_LENGTH
 TUBE_END_X = ARM_END_X + PLUG_HEAD_LENGTH
 # The straight tube from the bend's exit tangent to the tube end.

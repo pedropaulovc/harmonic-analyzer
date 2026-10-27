@@ -190,9 +190,14 @@ def _section_x(model_x: float) -> float:
 
 
 # Section A-A's dimensions: the two lengths in one row over the part; the
-# counterbore depth's LIMIT pair and floor callout above them, left of the
-# face; the counterbore Ø (with its wall) left of the end face; the head and
-# shank Ø below the part, the shank's longer fit callout lower.
+# counterbore depth's LIMIT pair above them, left of the face; the
+# counterbore Ø (with its wall) left of the end face; the head and shank Ø
+# below the part, the shank's longer fit callout lower.  The floor corner's
+# "R0.10 MAX" / "FLOOR CORNER" stands up-left of the end face, between the
+# counterbore Ø and the depth: its arc lies on the sketch's +v side, model -Z,
+# the section's top (ArmAxisPlane is offset from the Top plane), so its leader
+# runs down-right through the counterbore's mouth to the corner, above the
+# Ø's upper extension line.
 SECTION_KEEP = {
     "PlugHeadLength": (
         _section_x(ARM_END_X + PLUG_HEAD_LENGTH / 2.0),
@@ -204,6 +209,7 @@ SECTION_KEEP = {
     ),
     "CounterboreDepth": (_SX0 - 0.012, _SY0 + _SECTION_HALF + 0.032),
     "CounterboreDia": (_SX0 - 0.030, _SY0),
+    "CounterboreFloorCornerR": (_SX0 - 0.030, _SY0 + _SECTION_HALF + 0.010),
     "PlugDia": (_section_x(ARM_END_X + 10.0), _SY0 - _SECTION_HALF - 0.016),
     "PlugShankDia": (
         _section_x(TUBE_END_X + PLUG_SHANK_LENGTH / 2.0),

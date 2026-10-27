@@ -19,12 +19,12 @@ takes.
 
 Every size is a native model dimension: the elevation's leg length, bend
 radius, arm straight and sleeve length; section A-A's end piece (head Ø and
-length, braze shank Ø and length) and counterbore (Ø, LIMIT depth); the end
-view's native blind-tap callout.  The notes state stock, process and intent
-only.  The counterbore's wall shortfall (owner minor sm-gooseneck RV-01) is
-stated on its Ø as ``C'BORE WALL n.nn MIN`` (drawing-guidelines.md rule 20),
-its floor-corner limit on its depth, the shank's braze fit on the shank Ø
-(rule 4, the matched fit names its mate and clearance) and the tap's location
+length, braze shank Ø and length) and counterbore (Ø, LIMIT depth, floor
+corner R0.10 MAX); the end view's native blind-tap callout.  The notes state
+stock, process and intent only.  The counterbore's wall shortfall (owner
+minor sm-gooseneck RV-01) is stated on its Ø as ``C'BORE WALL n.nn MIN``
+(drawing-guidelines.md rule 20), the shank's braze fit on the shank Ø (rule
+4, the matched fit names its mate and clearance) and the tap's location
 limits under its callout.
 """
 
@@ -38,7 +38,6 @@ from sm_gooseneck_spring_joint import (
     BRAZE_CLEARANCE_MAX,
     BRAZE_CLEARANCE_MIN,
     COUNTERBORE_AXIS_OFFSET_MAX,
-    COUNTERBORE_FLOOR_CORNER_R_MAX,
     COUNTERBORE_WALL_CALLOUT_MIN,
     DRILL_WANDER_MAX,
     THREAD_AXIS_OFFSET_MAX,
@@ -76,7 +75,8 @@ if not (
 # imports and reads them back; a drawing-side SetText can write through to
 # the part, #1942).
 COUNTERBORE_WALL_CALLOUT = f"C'BORE WALL {COUNTERBORE_WALL_CALLOUT_MIN:.2f} MIN"
-COUNTERBORE_FLOOR_CALLOUT = f"FLOOR CORNER R{COUNTERBORE_FLOOR_CORNER_R_MAX:.2f} MAX"
+# The floor corner's own native "R0.10 MAX" names the corner it limits.
+COUNTERBORE_FLOOR_CALLOUT = "FLOOR CORNER"
 COUNTERBORE_AXIS_CALLOUT = f"ON TAP AXIS WITHIN {COUNTERBORE_AXIS_OFFSET_MAX:.2f}"
 PLUG_DIA_CALLOUT = "FLUSH WITH TUBE OD,\nNO STEP"
 SHANK_FIT_CALLOUT = (
@@ -90,7 +90,7 @@ DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
     },
     "CounterboreProfile": {
         "CounterboreDia": f"{COUNTERBORE_AXIS_CALLOUT}\n{COUNTERBORE_WALL_CALLOUT}",
-        "CounterboreDepth": COUNTERBORE_FLOOR_CALLOUT,
+        "CounterboreFloorCornerR": COUNTERBORE_FLOOR_CALLOUT,
     },
 }
 DIMENSION_CALLOUTS_BY_NAME: dict[str, str] = {
@@ -123,7 +123,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BendPath": {"BendRadius"},
     "SleeveProfile": {"SleeveLength"},
     "EndPieceProfile": {"PlugDia", "PlugHeadLength", "PlugShankDia", "PlugShankLength"},
-    "CounterboreProfile": {"CounterboreDia", "CounterboreDepth"},
+    "CounterboreProfile": {
+        "CounterboreDia",
+        "CounterboreDepth",
+        "CounterboreFloorCornerR",
+    },
 }
 # The bent form's overall sizes are near enough at one place (the title
 # block's .X band, drawing-guidelines.md rule 3); the arm straight sets the
