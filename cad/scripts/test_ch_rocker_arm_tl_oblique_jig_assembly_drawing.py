@@ -734,6 +734,52 @@ def test_capture_measured_callout_rows_clear_cap_and_relocated_cotter():
         assert gap >= ROW_PITCH_HEIGHTS * min(text_height(after[0]), text_height(other))
 
 
+# Run 20261027T154139713Z-566cad5ab (69818ca95), sheet 4: the right column's
+# C5A (three rows) and C4 MOUTH blocks as printed (PDF glyph rows) and their
+# native leaders (layout-audit JSON DetailItem374/370), at the authored anchors.
+_NATIVE_RIGHT_COLUMN = {
+    "C5A FLAT PIN END": (
+        (0.365, 0.2025),
+        ((0.3651439, 0.2000337, 0.3878641, 0.2020710),
+         (0.3650640, 0.1970337, 0.3960759, 0.1990710),
+         (0.3652320, 0.1940337, 0.4043818, 0.1960710)),
+        (0.3640972, 0.2014001, 0.313, 0.178),
+    ),
+    "C4 MOUTH / FLAT LAND": (
+        (0.365, 0.1908),
+        ((0.3651439, 0.1881203, 0.3948891, 0.1903710),
+         (0.3652319, 0.1853337, 0.3966403, 0.1873710),
+         (0.3650800, 0.1821577, 0.3899821, 0.1843710)),
+        (0.3640903, 0.1899625, 0.3181, 0.1698391),
+    ),
+}
+
+
+def test_capture_native_three_row_c5a_clears_the_c4_mouth_block_below():
+    from _layout_audit import (
+        ROW_PITCH_HEIGHTS, find_leader_through_text, find_merged_blocks, text_height,
+    )
+    from _layout_geometry import AnnotationGeometry, Box, Segment
+
+    authored = {reading.text_xy: reading.text for reading in drawing.capture_readings()}
+    blocks = []
+    for label, (anchor, rows, leader) in _NATIVE_RIGHT_COLUMN.items():
+        # The snapshot stands where the recipe still authors the block, row for row.
+        assert authored[anchor].splitlines()[0] == label
+        assert len(authored[anchor].splitlines()) == len(rows)
+        blocks.append(AnnotationGeometry(
+            label=label, kind="note", owner="Section View A-A",
+            text_boxes=tuple(Box(*row) for row in rows),
+            segments=(Segment(*leader, "leader"),),
+        ))
+    sheet = _captured_capture_sheet(*blocks)
+    assert find_merged_blocks(sheet) == []
+    assert find_leader_through_text(sheet) == []
+    c5a, c4 = blocks
+    gap = min(box.ymin for box in c5a.text_boxes) - max(box.ymax for box in c4.text_boxes)
+    assert gap >= ROW_PITCH_HEIGHTS * min(text_height(c5a), text_height(c4))
+
+
 def test_capture_measured_cotter_leader_clears_both_native_cut_lines():
     from _layout_audit import find_leader_across_lines
     from _layout_geometry import AnnotationGeometry, Segment
@@ -1571,13 +1617,15 @@ def test_cap_seating_steps_cite_the_sourced_cap_screw_sku() -> None:
 def test_c3b_states_the_owner_accepted_engagement_shortfall() -> None:
     # Owner ruling 2026-10-27: the 3/4 screw stays; its worst-case complete
     # thread engagement is a minor exception (RV-04), C3B a plain statement.
-    engagement = spec.retention.cap_screw_complete_engagement_min()
+    engagement = spec.retention.cap_screw_complete_engagement_estimate()
     minimum = spec.retention.CAP_MIN_COMPLETE_THREAD_ENGAGEMENT
     assert 0.0 < engagement < minimum
     c3b = next(step for step in spec.CAP_SEATING_STEPS if step.startswith("C3B."))
     assert f"{engagement:.2f}" in c3b and f"{minimum:.2f}" in c3b
     # Rule 20: a plain fact, no measurement algebra and no approval wording.
     assert "MIN(" not in c3b and "MAX(" not in c3b and "ACCEPT" not in c3b
+    # No NAS or supplier limit backs the runouts: printed as an estimate, never a MIN.
+    assert "ESTIMATED" in c3b and f"{engagement:.2f} MIN" not in c3b
     exceptions = {
         e.id: e
         for e in load_exceptions(

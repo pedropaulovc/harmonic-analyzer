@@ -435,7 +435,8 @@ vendor CAD, replica-gate evidence or a load rating.
 Purchase TL-VN-73 as the listed **A286** NAS1352N5H12; the native AISI 304
 material-library surrogate is a rendering representation only, not a material
 substitution or purchasing authority. The retention hardware provider owns
-the catalogue limits. Worst-case complete full-form engagement in the THRU
+the catalogue limits. Estimated worst-case complete full-form engagement in
+the THRU (ASME B18.3 thread-runout conventions; no NAS or supplier limit)
 block threads is 9.81 mm, under 1.5D = 11.91 mm; owner minor exception RV-04
 (owner ruling 2026-10-27) accepts it without assembly measurement.
 For assembly, use clean, dry, free-running actual screws; seat cross-pattern

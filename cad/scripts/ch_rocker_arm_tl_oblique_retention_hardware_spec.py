@@ -56,11 +56,13 @@ SCREW_WIRE_FROM_TOP = (SCREW_WIRE_FROM_TOP_MIN + SCREW_WIRE_FROM_TOP_MAX) / 2
 SCREW_WIRE_HEIGHT = SCREW_HEAD_HEIGHT - SCREW_WIRE_FROM_TOP
 SCREW_WIRE_HEIGHT_MIN = SCREW_HEAD_HEIGHT_MIN - SCREW_WIRE_FROM_TOP_MAX
 SCREW_WIRE_HEIGHT_MAX = SCREW_HEAD_HEIGHT_MAX - SCREW_WIRE_FROM_TOP_MIN
-# A short screw is threaded as close to the head as practicable (NAS note c);
-# ASME B18.3-2012 Table 4 note (c), which NAS cites for body and grip, bounds
-# that for sizes through 5/8: complete threads to within two pitches of the
-# head. B18.3 Table 1 note (8)'s ~90-degree point, chamfered just below the
-# root, plus one partial thread leaves under two incomplete pitches there.
+# ESTIMATES, not procurement limits. A screw this short (3/4 < NAS1352's
+# 1.125 minimum basic thread length) is only "threaded as close to the head
+# as practicable" (NAS note c), and no supplier bound is published. These
+# adopt ASME B18.3-2012's conventions as the estimate: complete threads to
+# within two pitches of the head (Table 4 note (c), sizes through 5/8) and a
+# ~90-degree point chamfered just below the root (Table 1 note (8)), taken as
+# two incomplete pitches. They feed only the RV-04 estimate, never a guarantee.
 SCREW_COMPLETE_THREAD_FROM_HEAD_MAX = 2.0 * INCH / 18
 SCREW_POINT_INCOMPLETE_MAX = 2.0 * INCH / 18
 SCREW_WIRE_HOLE_ANGLES = (0.0, 60.0, 120.0, 180.0, 240.0, 300.0)

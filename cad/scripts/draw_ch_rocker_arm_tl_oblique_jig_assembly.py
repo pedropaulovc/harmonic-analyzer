@@ -2707,7 +2707,12 @@ def capture_readings() -> tuple[CaptureReading, ...]:
                        callouts["cotter"], (0.288, 0.205)),
         CaptureReading(3, spec.PIVOT_CAP, (cap_land_x, bolt_y, 0.0),
                        callouts["cap_land"], (0.279, 0.2235)),
-        CaptureReading(3, spec.PIVOT_CAP_SCREW, (-spec.cap_screw.DIMS.head_dia * 0.35, 0.0, 0.0),
+        # C3A's underhead arrow lands mid-annulus on the head's bearing face:
+        # outside the cap's largest clearance hole, inside the smallest head
+        # bearing diameter, so cap material lies beneath it.
+        CaptureReading(3, spec.PIVOT_CAP_SCREW,
+                       (-(r.CAP_BOLT_CLEARANCE_DIAMETER + r.CAP_BOLT_CLEARANCE_BAND[0]
+                          + r.CAP_BOLT_HEAD_BEARING_DIAMETER_MIN) / 4.0, 0.0, 0.0),
                        callouts["underhead"], (0.282, 0.232)),
     )
 

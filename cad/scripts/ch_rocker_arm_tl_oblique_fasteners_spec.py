@@ -244,8 +244,8 @@ CAP_TO_BLOCK = Fastener(
     pivot_block.BLOCK_HEIGHT,
     note=(
         f"{retention_hardware.SCREW_SUPPLIER} {retention_hardware.SCREW_SKU}; "
-        "worst-case complete full-form overlap in the THRU block threads is "
-        f"{retention.cap_screw_complete_engagement_min():.2f} mm, under 1.5D "
+        "estimated worst-case complete full-form overlap in the THRU block "
+        f"threads is {retention.cap_screw_complete_engagement_estimate():.2f} mm, under 1.5D "
         f"({retention.CAP_MIN_COMPLETE_THREAD_ENGAGEMENT:.2f} mm): owner minor "
         "exception RV-04 (owner ruling 2026-10-27), not measured at assembly. "
         "Seat clean, dry, free-running actual screws cross-pattern at "

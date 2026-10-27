@@ -266,7 +266,8 @@ and a loose stock edge do not replace these inspections.
 
 Use CBS Fasteners NAS1352N5H12, 5/16-18 × 3/4 in drilled-head A286 screws,
 as defined by the retention hardware provider. Block threads are THRU.
-Worst-case complete full-form screw/receiver overlap is 9.81 mm, under
+Estimated worst-case complete full-form screw/receiver overlap (ASME B18.3
+thread-runout conventions; no NAS or supplier limit) is 9.81 mm, under
 1.5D = 11.91 mm; owner minor exception RV-04 (owner ruling 2026-10-27)
 accepts it without assembly measurement. Seat clean, dry, free-running actual screws in a cross
 pattern at **0.50 ±0.05 N·m**. The cap must seat on all faces, with cap/block
