@@ -1,15 +1,18 @@
 r"""Create the manufacturing drawing for the transgear pivot spacer (MHA-PD-20).
 
-A turned brass ring: Ø8.600 O.D. over a reamed Ø4.727 +0.008/0 bore (a light
-press on the MHA-PD-VN-57 shoulder), 5.500 long under its explicit band.  The
+A turned brass ring: Ø11.0 O.D. over a reamed Ø4.727 +0.008/0 bore (a light
+press on the MHA-PD-VN-57 shoulder), 5.000 long under its explicit band.  The
 profile lies as it sits in the lathe (axis horizontal): the ``*Top`` view
 turned a quarter turn, so model +Z runs LEFT and the bar-side front face
 (z 0) is the profile's right end, the rear face (on the arm) its left end.
-Each end face carries its running finish and its perpendicularity to the
-bore, the length sits under the profile and the O.D. moves onto the profile
+Each end face carries its finish (the arm's bearing face and the bar seat)
+and its perpendicularity to the bore, the length sits under the profile and
+the O.D. moves onto the profile
 (drawing-guidelines.md rule 11 (turned parts read like the lathe): diameters on the side view).  The end view to its left (third
 angle, looking along -Z from the +Z end) keeps the bore, a solid circle only
-end-on, and its axis is datum A.
+end-on, and its axis is datum A.  Each banded size names what it serves
+(rule 4): the bore its press on the screw's shoulder, the length the spring
+room it sets.
 
 Run with SolidWorks open::
 
@@ -31,7 +34,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
     view_name,
 )
-
 from _check import check
 from _com import _early_bound
 from _drawing_centerline import add_view_centerline
@@ -44,26 +46,43 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import assert_imported_precision, offset_dimension_text
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
 from _drawing_finish import add_surface_finish
-from _drawing_gdt import add_feature_control_frame
+from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
+from _gtol_cylinder import CylinderFace
+from _gtol_face_resolve import resolve_faces
 from _gtol_face_read import face_geometry
 from _gtol_planar import PlanarFace
-from _layout_geometry import audit_sheet, format_findings
-from _native_axis_datum import add_native_axis_datum
+from _drawing_layout_audit import annotation_display
+from _layout_audit import (
+    display_box,
+    line_segment,
+    polygon_segments,
+    polyline_segments,
+)
+from _layout_geometry import (
+    Box,
+    Segment,
+    audit_sheet,
+    format_findings,
+    point_segment_distance,
+)
+from _machinist_review_mode import MachinistReviewMode
+from _native_axis_datum import _readback as read_native_datum
+from _native_axis_datum import _validate_source_edge as validate_source_axis_edge
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from diagnostics.drawing_layout_audit import collect_document
+import pd_transgear_pivot_spacer_callouts as callouts
 from pd_transgear_pivot_spacer_spec import (
-    BORE_CALLOUT,
     BORE_DATUM,
     BORE_DIA,
     DRAWING_DIMENSIONS,
@@ -75,6 +94,9 @@ from pd_transgear_pivot_spacer_spec import (
     SURFACE_FINISHES,
 )
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_pivot_spacer"]
 PART_STEM = SPEC.artifact_stem
@@ -88,7 +110,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø8.6 x 5.0 ring: 5:1 keeps the three sizes and both face finishes legible
+# A Ø11.0 x 5.0 ring: 5:1 keeps the three sizes and both face finishes legible
 # on the landscape sheet.
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
@@ -111,15 +133,26 @@ _PROFILE_BOTTOM = PROFILE_CENTER[1] - OD * _S / 2.0
 # profile is hidden-lines-removed (a dimension never lands on a hidden line).
 # The O.D. arrives there too and is moved onto the profile below.
 END_KEEP = {
-    "BoreDia": (0.045, 0.205),
+    "BoreDia": (0.050, 0.222),
     "RingOd": (0.045, 0.120),  # donor: moved onto the profile
 }
-DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
+# Rule 4: every tight band names its mate (pd_transgear_pivot_spacer_callouts).
+# The part authors both below-callouts on its source dimensions; the sheet
+# imports them and only reads them back (#1942).
+DIMENSION_CALLOUTS = {
+    name: lanes[callouts.CALLOUT_BELOW]
+    for name, lanes in callouts.authored_by_name().items()
+}
 # The length under the profile; the O.D. right of the part, its dimension line
 # far enough out that the front face's finish symbol sits between them.
 PROFILE_KEEP = {
     "RingLength": (PROFILE_CENTER[0], _PROFILE_BOTTOM - 0.022),
 }
+# The length's text and its callout are wider than the 25 between its
+# extension lines, so they stand offset right of the front face's extension
+# line, level with the dimension line and under the O.D.'s lower extension
+# line (clarity, review 2026-10-23: text struck by both extension lines).
+LENGTH_TEXT_XY = (_PROFILE_FRONT_X + 0.032, PROFILE_KEEP["RingLength"][1])
 OD_ON_PROFILE = (_PROFILE_FRONT_X + 0.040, PROFILE_CENTER[1])
 
 # Each face's pick lies on its edge line between the bore and O.D. radii.  The
@@ -138,8 +171,29 @@ FACE_FINISHES = {
         (_PROFILE_FRONT_X + 0.014, PROFILE_CENTER[1] - 0.008),
     ),
 }
-NOTES_XY = (0.020, 0.075)
 ISO_NOTE_XY = (0.315, 0.140)
+# Datum A's tag stands outside the O.D. on the end view's lower-left ray,
+# its leader crossing the annulus to the bore circle.  SolidWorks' native
+# drop landed it on the Ø11.0 outline (farm run 20261027T131303762Z-7567dd7c,
+# layout audit text-on-line), so the tag is placed: its centre this far off
+# the end view's centre.
+DATUM_A_ANGLE = math.radians(225.0)
+DATUM_A_REACH = OD / 2.0 * _S + 0.0125
+DATUM_A_SYMBOL = (
+    END_CENTER[0] + DATUM_A_REACH * math.cos(DATUM_A_ANGLE),
+    END_CENTER[1] + DATUM_A_REACH * math.sin(DATUM_A_ANGLE),
+)
+# The placed tag may not drift through the export's final rebuild by more
+# than the native helper's limit.
+DATUM_A_STABILITY_M = 0.0001
+# Settled: everything of datum A but its leader stands this far outside the
+# O.D., and the leader ends on the bore within this.
+DATUM_A_AIR = 0.002
+DATUM_A_LEADER_TOL = 0.0005
+# The datum triangle (as lines or filled) lies within this of its tip.
+DATUM_A_TRIANGLE_SPAN = 0.005
+# Two leader primitives join where their ends meet within this.
+_JOIN_TOL_M = 1e-5
 # Text on a line and text on text are defects; leader crossings stay logged.
 BLOCKING_LAYOUT_FINDINGS = frozenset({"text-on-line", "text-on-text"})
 
@@ -171,6 +225,15 @@ FRAME_HEIGHT = 0.00703
 FRAME_WIDTH = 0.02675
 # Sheet run from a frame to its face's line.
 FRAME_RUN = 0.008
+# The O.D.'s circular runout to A (coordinator ruling, #2014: it bounds the
+# offset the wall charges) lands on the profile's upper O.D. line at z 0.7 L,
+# its frame above the profile: right of the rear face's BEARING FACE symbol,
+# left of the O.D.'s dimension line, over its upper extension line.
+OD_RUNOUT_LANDING_Z_MM = 0.7 * LENGTH
+OD_RUNOUT_FRAME = (_PROFILE_REAR_X + 0.0125, _PROFILE_TOP + 0.020)
+OD_RUNOUT_LABEL = "spacer O.D. circular runout to bore"
+# A projected landing may sit this far from its laid-out point.
+_LANDING_TOL_M = 0.0005
 _SPACER_AXIS = (0.0, 0.0, 1.0)
 # A rim matches within this of its modelled centre and radius, its axis
 # along the spacer's.
@@ -345,6 +408,31 @@ def _face_attachment(
     return face, landing
 
 
+@_telemetry.traced("pivot_spacer.od_runout_landing")
+def _od_runout_landing(adapter: Any, view: Any) -> tuple[float, float]:
+    """The O.D.'s upper line on the profile at OD_RUNOUT_LANDING_Z_MM: of the
+    O.D.'s two silhouette points at that station (model -X and +X), the one
+    the view draws higher, proved to lie on the laid-out upper line."""
+    r_m, z_m = OD / 2000.0, OD_RUNOUT_LANDING_Z_MM / 1000.0
+    landing = max(
+        model_points_in_view(
+            adapter,
+            view,
+            ((-r_m, 0.0, z_m), (r_m, 0.0, z_m)),
+            label="spacer O.D. runout landing",
+            names=("-X line", "+X line"),
+        ),
+        key=lambda point: point[1],
+    )
+    expected = (_profile_x(OD_RUNOUT_LANDING_Z_MM), _PROFILE_TOP)
+    if math.dist(landing, expected) > _LANDING_TOL_M:
+        raise RuntimeError(
+            f"spacer O.D. runout landing {landing!r} is off the laid-out upper "
+            f"O.D. line at {expected!r}"
+        )
+    return landing
+
+
 def _move_dimension(
     adapter: Any,
     annotation: Any,
@@ -391,6 +479,217 @@ def _move_dimension(
     return matches[0]
 
 
+@_telemetry.traced("pivot_spacer.assert_part_authored_text")
+def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
+    """Every authored dimension prints exactly once, with the text lanes its
+    part wrote (draw_pd_transgear_pin).  Read-only: text set from the sheet
+    would write through to the source part (#1942)."""
+    wanted = callouts.authored_by_name()
+    displays: dict[str, list[Any]] = {name: [] for name in wanted}
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name in displays:
+            displays[name].append(
+                _early_bound(
+                    _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+                    "IDisplayDimension",
+                )
+            )
+    counts = {name: len(found) for name, found in displays.items() if len(found) != 1}
+    if counts:
+        raise RuntimeError(f"authored dimensions not printed exactly once: {counts!r}")
+    wrong = {
+        (name, lane): printed
+        for name, lanes in wanted.items()
+        for lane, text in lanes.items()
+        if callouts.callout_rows(printed := str(displays[name][0].GetText(lane) or ""))
+        != callouts.callout_rows(text)
+    }
+    if wrong:
+        raise RuntimeError(
+            f"imported dimension text differs from the part's: {wrong!r}"
+        )
+
+
+def _datum_a_ink(
+    adapter: Any, tag: Any
+) -> tuple[list[Segment], list[tuple[float, float]], Box]:
+    """Datum A's rendered ink from its own GetDisplayData, decoded by the
+    layout audit's own primitives (_layout_audit): its strokes (lines with
+    zero-length records dropped, polylines, polygons), the vertices of a
+    filled triangle or arrowhead, and its letter's box (display_box, which
+    estimates a run SolidWorks reports no width for)."""
+    annotation = _early_bound(tag.GetAnnotation(), "IAnnotation")
+    display, refused = annotation_display(adapter, annotation)
+    if refused or not display:
+        raise RuntimeError(f"datum A has no readable display data: {refused!r}")
+    strokes = [
+        segment
+        for raw in display.get("lines", ())
+        if (segment := line_segment(raw)) is not None
+    ]
+    for raw in display.get("polylines", ()):
+        strokes.extend(polyline_segments(raw))
+    for raw in display.get("polygons", ()):
+        strokes.extend(polygon_segments(raw))
+    vertices = [
+        (float(raw[i]), float(raw[i + 1]))
+        for raw in display.get("triangles", ())
+        if len(raw) >= 9
+        for i in (0, 3, 6)
+    ] + [
+        (float(raw[0]), float(raw[1]))
+        for raw in display.get("arrows", ())
+        if len(raw) >= 3
+    ]
+    texts = display.get("texts", ())
+    if not any(str(text.get("t", "")).strip() == BORE_DATUM for text in texts):
+        raise RuntimeError(
+            f"datum A renders no {BORE_DATUM!r} letter: "
+            f"{[text.get('t') for text in texts]!r}"
+        )
+    letter = display_box({"texts": texts})
+    if letter is None:
+        raise RuntimeError("datum A's letter has no box")
+    return strokes, vertices, letter
+
+
+def _ends(segment: Segment) -> tuple[tuple[float, float], tuple[float, float]]:
+    return (segment.x0, segment.y0), (segment.x1, segment.y1)
+
+
+def _leader_path(near: list[Segment], tip: tuple[float, float]) -> list[Segment]:
+    """The strokes of datum A's triangle and leader among ``near``: those
+    touching the tip (the triangle drawn as lines, the leader's first piece),
+    then every stroke joined end to end with the path and lying on the
+    leader's line, however SolidWorks splits it into primitives."""
+    path = [
+        s
+        for s in near
+        if min(math.dist(end, tip) for end in _ends(s)) <= DATUM_A_TRIANGLE_SPAN
+    ]
+    if not path:
+        return []
+    far = max(
+        (end for s in path for end in _ends(s)), key=lambda end: math.dist(end, tip)
+    )
+    length = math.dist(far, tip)
+    ux, uy = (far[0] - tip[0]) / length, (far[1] - tip[1]) / length
+
+    def on_leader(point: tuple[float, float]) -> bool:
+        return (
+            abs((point[0] - tip[0]) * uy - (point[1] - tip[1]) * ux)
+            <= DATUM_A_LEADER_TOL
+        )
+
+    grown = True
+    while grown:
+        grown = False
+        joints = [end for s in path for end in _ends(s)]
+        for s in near:
+            if s in path or not all(on_leader(end) for end in _ends(s)):
+                continue
+            if any(
+                math.dist(end, joint) <= _JOIN_TOL_M
+                for end in _ends(s)
+                for joint in joints
+            ):
+                path.append(s)
+                grown = True
+    return path
+
+
+@_telemetry.traced("pivot_spacer.datum_a_clear")
+def _assert_datum_a_clear(adapter: Any, tag: Any) -> None:
+    """Datum A's settled ink: its tip (the triangle's or leader's point
+    nearest the axis, in whichever primitives SolidWorks draws it) lies on
+    the bore; every stroke within DATUM_A_AIR of the O.D. belongs to the
+    triangle or the leader path from that tip (_leader_path), and the leader
+    leaves the O.D.; the frame, the shoulder and the rendered letter all
+    stand DATUM_A_AIR outside the O.D. (the clearance
+    test_datum_a_tag_stands_off_the_od_... sets on the requested point)."""
+    strokes, vertices, letter = _datum_a_ink(adapter, tag)
+    od_r = OD / 2.0 * _S
+    bore_r = BORE_DIA / 2.0 * _S
+    points = [end for s in strokes for end in _ends(s)] + vertices
+    if not points:
+        raise RuntimeError("datum A drew no ink")
+    tip = min(points, key=lambda point: math.dist(point, END_CENTER))
+    if abs(math.dist(tip, END_CENTER) - bore_r) > DATUM_A_LEADER_TOL:
+        raise RuntimeError(f"datum A's tip is at {tip!r}, not on the bore")
+    near = [
+        s for s in strokes if point_segment_distance(END_CENTER, s) < od_r + DATUM_A_AIR
+    ]
+    path = _leader_path(near, tip)
+    stray = [s for s in near if s not in path]
+    if stray:
+        raise RuntimeError(
+            f"datum A's ink stands on the O.D. off its leader: {stray!r}"
+        )
+    if not any(
+        math.dist(end, END_CENTER) >= od_r + DATUM_A_AIR
+        for s in path
+        for end in _ends(s)
+    ):
+        raise RuntimeError("datum A has no leader from outside the O.D. to the bore")
+    nearest = (
+        min(max(END_CENTER[0], letter.xmin), letter.xmax),
+        min(max(END_CENTER[1], letter.ymin), letter.ymax),
+    )
+    if math.dist(nearest, END_CENTER) < od_r + DATUM_A_AIR:
+        raise RuntimeError(f"datum A's letter {letter!r} stands on the O.D.")
+
+
+def _datum_a_live(
+    adapter: Any, view: Any, tag: Any, bore_edge: Any
+) -> tuple[float, float]:
+    """Datum A as the view holds it (the native helper's readback): the
+    view's one live datum tag is ``tag``, labelled A, shouldered, attached to
+    the bore edge alone and not dangling.  Returns its native position."""
+    xy, shoulder, _equality = read_native_datum(
+        adapter.swApp,
+        _early_bound(view, "IView"),
+        tag,
+        bore_edge,
+        datum=BORE_DATUM,
+        label="spacer bore axis",
+    )
+    if shoulder != "shouldered":
+        raise RuntimeError("datum A lost its shoulder")
+    return xy
+
+
+@_telemetry.traced("pivot_spacer.place_datum_a")
+def _place_datum_a(
+    adapter: Any, view: Any, bore_edge: Any
+) -> tuple[Any, tuple[float, float]]:
+    """Place datum A on the validated bore edge and prove the placement
+    survives a rebuild within the native helper's 0.1 mm.
+
+    ``add_datum_feature`` rebuilds before it returns, so the requested
+    position is applied again and read before a second rebuild: a tag that
+    re-solves on rebuild moves here and is refused."""
+    tag = add_datum_feature(
+        adapter,
+        view,
+        entity=bore_edge,
+        symbol_xy=DATUM_A_SYMBOL,
+        datum=BORE_DATUM,
+        label="spacer bore axis",
+        shoulder=True,
+    )
+    annotation = _early_bound(tag.GetAnnotation(), "IAnnotation")
+    if not annotation.SetPosition2(DATUM_A_SYMBOL[0], DATUM_A_SYMBOL[1], 0.0):
+        raise RuntimeError("failed to re-apply datum A's position")
+    placed = _datum_a_live(adapter, view, tag, bore_edge)
+    rebuild_drawing(adapter, label="datum A stability")
+    rebuilt = _datum_a_live(adapter, view, tag, bore_edge)
+    drift = math.dist(placed, rebuilt)
+    if drift > DATUM_A_STABILITY_M:
+        raise RuntimeError(f"datum A moved {drift * 1000.0:.3f} mm on rebuild")
+    return tag, rebuilt
+
+
 def _assert_layout_clean(findings: list[Any]) -> None:
     """Fail the sheet on text over ink; log every other audit finding."""
     blocking = [f for f in findings if f.kind in BLOCKING_LAYOUT_FINDINGS]
@@ -423,7 +722,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
         required=(
@@ -431,7 +729,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
@@ -502,7 +799,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # and the length's and bore's bands are authored on the part; the sheet
     # only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    set_dimension_callouts(adapter, end_annotations, DIMENSION_CALLOUTS)
+    _assert_part_authored_text(adapter, annotations)
+    offset_dimension_text(adapter, profile_annotations, {"RingLength": LENGTH_TEXT_XY})
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add center marks to the spacer end view")
     # The turning axis, picked on the O.D. face above it.
@@ -526,19 +824,19 @@ async def build(adapter: Any) -> dict[str, str]:
             label=label,
             char_height=0.0025,
         )
-    # Datum A, the bore, on the end view where it shows round; the view has
-    # no datum tag yet, as the native placement requires.
-    add_native_axis_datum(
-        adapter,
-        end,
-        entity=visible_circle_edge(adapter, end, BORE_DIA),
-        source_path=SOURCE,
+    # Datum A, the bore, on the end view where it shows round.  The edge is
+    # first proved to be the source part's one bore cylinder at the spec's
+    # radius (the native helper's validation), then the tag is placed.
+    bore_edge = visible_circle_edge(adapter, end, BORE_DIA)
+    validate_source_axis_edge(
+        adapter.swApp,
+        _early_bound(end, "IView"),
+        bore_edge,
+        SOURCE.resolve(strict=True),
         radius_m=BORE_DIA / 2000.0,
-        datum=BORE_DATUM,
         label="spacer bore axis",
-        shoulder=True,
-        stability_tolerance_m=0.0001,
     )
+    datum_a, datum_a_xy = _place_datum_a(adapter, end, bore_edge)
     # Both end faces square to A.
     profile_edges = scan_view_edges(profile, label="spacer profile rims")
     for mark, key in (
@@ -558,13 +856,29 @@ async def build(adapter: Any) -> dict[str, str]:
             datums=(BORE_DATUM,),
             label=mark.label,
         )
+    # The O.D. runs true to A.
+    od_face = resolve_faces(
+        _early_bound(_early_bound(profile, "IView").ReferencedDocument, "IModelDoc2"),
+        {"od": CylinderFace(OD, contains_z_mm=LENGTH / 2.0)},
+    )["od"]
+    add_feature_control_frame(
+        adapter,
+        profile,
+        entity=od_face,
+        entity_type="FACE",
+        leader_attach_xy=_od_runout_landing(adapter, profile),
+        frame_xy=OD_RUNOUT_FRAME,
+        characteristic="circular_runout",
+        tolerance=GEOMETRIC_TOLERANCES_MM["o.d. circular runout to bore"],
+        datums=(BORE_DATUM,),
+        label=OD_RUNOUT_LABEL,
+    )
     # Re-assert the display mode now the last annotation has landed: an
     # annotation attached after placement can leave a view's edge set
     # unregenerated, and only a real mode change rebuilds it.
     for view in (end, profile):
         set_hidden_lines_removed(adapter, view)
 
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     rebuild_drawing(adapter, label="pivot spacer layout audit")
     _assert_layout_clean(
@@ -575,12 +889,24 @@ async def build(adapter: Any) -> dict[str, str]:
         ]
     )
 
+    def datum_a_settled() -> None:
+        """After the export's last rebuild datum A is still the view's live,
+        attached tag, stands where it was placed (0.1 mm), and its settled
+        ink clears the O.D. (not only the requested point)."""
+        drift = math.dist(_datum_a_live(adapter, end, datum_a, bore_edge), datum_a_xy)
+        if drift > DATUM_A_STABILITY_M:
+            raise RuntimeError(
+                f"datum A moved {drift * 1000.0:.3f} mm after the final rebuild"
+            )
+        _assert_datum_a_clear(adapter, datum_a)
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Transgear Pivot Spacer Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(datum_a_settled,),
     )
 
 

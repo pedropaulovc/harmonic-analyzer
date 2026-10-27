@@ -13,3 +13,8 @@ pd-transgear-pivot-spacer:
       where: "the two faces squareness frames to the pressed bore (datum A)"
       finding: "squareness frames over-specified (rule 5)"
       reason: "the preloaded spring seats the hanger on these faces; their squareness is the hanger only tilt (owner-accepted)"
+    - id: "RV-02"
+      kind: "accept"
+      where: "the O.D.'s circular runout frame to the pressed bore (datum A)"
+      finding: "runout frame over-specified (rule 5)"
+      reason: "bounds the bore's offset in bar chucked as supplied, which the 2.0 wall target is charged against (owner ruling 2026-10-27, #1380)"
