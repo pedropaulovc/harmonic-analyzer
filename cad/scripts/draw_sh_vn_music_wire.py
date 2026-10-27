@@ -21,7 +21,10 @@ from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 import _telemetry
 import mg_magnifier_assembly_steps as magnifier_steps
-from _check import check
+from _purchased_fastener_drawing import (
+    _open_supplier_source_read_only,
+    _source_file_sha256,
+)
 from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
@@ -37,6 +40,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
+from _supplier_spring_drawing import _preserve_reference_source_file
 from _supplier_wire_stock_drawing import STOCK_FIELD, STOCK_SCALE, add_wire_section
 from sh_vn_music_wire_pen_geom import CONFIGURATION as ISO_CONFIGURATION
 
@@ -199,9 +203,15 @@ def _literal_note(adapter: Any, text: str, xy: tuple[float, float], label: str) 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
-    check("open shared music-wire source", await adapter.open_model(str(SOURCE)))
+    # As _supplier_spring_drawing: the native Ø presentation writes (SetText on
+    # the imported model dimension) may dirty the part in memory, so the shared
+    # part is opened read-only and its bytes are proven unchanged through export.
+    source_sha256 = _source_file_sha256(SOURCE)
+    model = _open_supplier_source_read_only(adapter, SOURCE, label=PART_STEM)
+    if model.GetSaveFlag() is not False:
+        raise RuntimeError(f"{PART_STEM}: supplier source must be clean before drawing")
     properties = read_required_properties(
-        adapter.currentModel,
+        model,
         (
             "Number",
             "Revision",
@@ -269,14 +279,15 @@ async def build(adapter: Any) -> dict[str, str]:
                 if _overlaps(box, other_box):
                     raise RuntimeError(f"{label} overlaps {other}")
 
-    return await finalize_drawing(
-        adapter,
-        OUTPUTS,
-        pdf_title="Shared Music Wire Purchase Drawing",
-        scale=STOCK_SCALE,
-        layout=SPEC.layout,
-        settled_checks=(settled,),
-    )
+    with _preserve_reference_source_file(SOURCE, source_sha256, label=PART_STEM):
+        return await finalize_drawing(
+            adapter,
+            OUTPUTS,
+            pdf_title="Shared Music Wire Purchase Drawing",
+            scale=STOCK_SCALE,
+            layout=SPEC.layout,
+            settled_checks=(settled,),
+        )
 
 
 def _parse_args() -> argparse.Namespace:

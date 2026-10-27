@@ -176,25 +176,37 @@ def _package(
     note_at=None,
     iso_fault=None,
     settled_fault=None,
+    dirty_source=False,
+    finalize_writes_source=False,
 ):
     source = tmp_path / f"{STEM}.SLDPRT"
     source.write_bytes(b"offline native-path fixture")
     monkeypatch.setattr(drawing, "SOURCE", source)
-    calls = SimpleNamespace(sections=[], settled=[], notes=[], views=[], finalize={})
+    calls = SimpleNamespace(
+        sections=[],
+        settled=[],
+        notes=[],
+        views=[],
+        finalize={},
+        opens=[],
+    )
     document = SimpleNamespace(
         ActivateView=lambda _name: True,
         GetEditSheet=lambda: True,
         ActiveDrawingView=None,
     )
     adapter = SimpleNamespace(currentModel=None)
+    source_model = SimpleNamespace(GetSaveFlag=lambda: dirty_source)
 
-    async def open_model(path):
-        assert path == str(source)
-        adapter.currentModel = "source"
-        return True
+    def open_read_only(target, model_source, *, label):
+        # The shared part is never opened writable through adapter.open_model.
+        assert target is adapter and model_source == source and label == STEM
+        calls.opens.append(model_source)
+        adapter.currentModel = source_model
+        return source_model
 
     def read_properties(model, names, *, required):
-        assert model == "source"
+        assert model is source_model
         assert "Manufacturing Notes" in required
         return {name: "native property" for name in names} | {
             "Manufacturing Notes": part.DRAWING_NOTES,
@@ -241,12 +253,13 @@ def _package(
             view.mode = 2
         elif settled_fault == "scale":
             view.ScaleRatio = (1, 1)
+        if finalize_writes_source:
+            source.write_bytes(b"part persisted by the drawing")
         for settled in kwargs["settled_checks"]:
             settled()
         return {"pdf": "offline-export"}
 
-    adapter.open_model = open_model
-    monkeypatch.setattr(drawing, "check", lambda _label, value: value)
+    monkeypatch.setattr(drawing, "_open_supplier_source_read_only", open_read_only)
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _kind: obj)
     monkeypatch.setattr(drawing, "double_array", tuple)
     monkeypatch.setattr(drawing, "read_required_properties", read_properties)
@@ -266,6 +279,7 @@ def _package(
 def test_one_sheet_carries_end_view_isometric_and_notes(monkeypatch, tmp_path):
     adapter, calls = _package(monkeypatch, tmp_path)
     assert asyncio.run(drawing.build(adapter)) == {"pdf": "offline-export"}
+    assert calls.opens == [drawing.SOURCE]
     assert calls.sections == [drawing.SOURCE]
     assert calls.settled == ["section"]
     [iso] = calls.views
@@ -316,3 +330,17 @@ def test_isometric_fails_closed_after_final_rebuild(monkeypatch, tmp_path, fault
     adapter, _calls = _package(monkeypatch, tmp_path, **fault)
     with pytest.raises(RuntimeError, match="wire isometric"):
         asyncio.run(drawing.build(adapter))
+
+
+def test_dirty_read_only_source_is_refused_before_drawing(monkeypatch, tmp_path):
+    adapter, calls = _package(monkeypatch, tmp_path, dirty_source=True)
+    with pytest.raises(RuntimeError, match="must be clean"):
+        asyncio.run(drawing.build(adapter))
+    assert calls.opens == [drawing.SOURCE] and not calls.sections
+
+
+def test_source_part_bytes_are_preserved_through_export(monkeypatch, tmp_path):
+    adapter, calls = _package(monkeypatch, tmp_path, finalize_writes_source=True)
+    with pytest.raises(RuntimeError, match="source part bytes changed"):
+        asyncio.run(drawing.build(adapter))
+    assert calls.settled == ["section"]
