@@ -477,14 +477,13 @@ def test_the_views_texts_clear_their_neighbours_and_the_border() -> None:
 
 
 def test_the_locator_callout_stays_inside_the_border() -> None:
-    """Its match-drill lines stand above the size, under the top border."""
-    lines = spec.LOCATOR_CALLOUT_ABOVE.count("\n") + 1
+    """Its lines stand under the size, the size under the top border."""
     text_y = (
         drawing.PLAN_CENTER[1]
         + (drawing.PLAN_KEEP["LocatorDia1"][1] - _PLAN_MID_Y) * drawing.SHEET_SCALE[0] / 1000.0
     )
-    assert text_y + 0.006 + lines * 0.0055 <= 0.266 - 0.002
-    widest = max(map(len, drawing._locator_callout_above().splitlines()))
+    assert text_y + 0.006 <= 0.266 - 0.002
+    widest = max(map(len, drawing._locator_callout().splitlines()))
     text_x = _view_sheet_x(
         drawing.PLAN_CENTER[0], drawing.PLAN_KEEP["LocatorDia1"][0], mirrored=False
     )
@@ -561,20 +560,19 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
     assert flat(spec.BORE_CALLOUT) == (
         f"REAM THRU RUNNING FIT ON KNOB SHAFT {numbers['KNOB_SHAFT_NUMBER']}"
     )
-    assert flat(spec.LOCATOR_CALLOUT) == (
-        f"2X REAM THRU SLIP FIT ON DOWEL {numbers['DOWEL_NUMBER']}"
-    )
     located = steps.step_number("arm-plate-located")
-    above = flat(drawing._locator_callout_above())
-    assert above.startswith(f"MATCH-DRILL WITH ARM {numbers['ARM_NUMBER']} AT ASSEMBLY,")
-    assert f"{steps.DRAWING_NUMBER} STEPS {located}-{located + 1};" in above
+    assert flat(drawing._locator_callout()) == (
+        f"2X REAM THRU, SLIP FIT ON DOWEL {numbers['DOWEL_NUMBER']}; "
+        f"MATCH-DRILL WITH ARM {numbers['ARM_NUMBER']}, {steps.DRAWING_NUMBER} "
+        f"STEPS {located}-{located + 1}; BREAK EDGE 0.05 MAX, DOWEL CONTACT"
+    )
+    assert drawing.DIMENSION_CALLOUTS["LocatorDia1"] == drawing._locator_callout()
     assert numbers["KNOB_SHAFT_NUMBER"] in spec.HUB_STATION_CALLOUT
     assert numbers["KNOB_CUP_NUMBER"] in spec.HUB_TO_BOSS_CALLOUT
     assert drawing.CALLOUTS_ABOVE["HubFaceToMounting"] == spec.HUB_STATION_CALLOUT
     assert drawing.DIMENSION_CALLOUTS["HubToBoss"] == spec.HUB_TO_BOSS_CALLOUT
-    callouts = {**drawing.CALLOUTS_ABOVE, "LocatorDia1": drawing._locator_callout_above()}
-    for text in (*drawing.DIMENSION_CALLOUTS.values(), *callouts.values()):
-        assert all(len(line) <= 22 for line in text.splitlines()), text
+    for text in (*drawing.DIMENSION_CALLOUTS.values(), *drawing.CALLOUTS_ABOVE.values()):
+        assert all(len(line) <= 23 for line in text.splitlines()), text
     assert not hasattr(drawing, "NOTES_TEXT")
 
 

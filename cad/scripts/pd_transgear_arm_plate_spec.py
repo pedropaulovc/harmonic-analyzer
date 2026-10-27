@@ -169,15 +169,14 @@ DOWEL_NUMBER = "MHA-PD-VN-64"
 # cylinder span in _transgear_arm_plate_locating_interface are judged at it).
 # The match-drill pointer cites the MHA-PD-00 steps that hold the pair's
 # setting and acceptance (rule 7: no method notes); the draw script fills the
-# step numbers, a module this part-build input must not import.  Three short
-# lines below the size: the drilled-hole callout sits under them.
-LOCATOR_CALLOUT_ABOVE = (
-    f"MATCH-DRILL WITH ARM\n{ARM_NUMBER} AT ASSEMBLY,\n"
-    "{assembly} STEPS {located}-{fitted};\n"
-    f"BREAK EDGE {LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX\n"
-    "KEEPS DOWEL CONTACT"
+# step numbers, a module this part-build input must not import.  All of it
+# below the size: the layout audit reads an above-callout as one line.
+LOCATOR_CALLOUT = (
+    f"2X REAM THRU, SLIP FIT\nON DOWEL {DOWEL_NUMBER};\n"
+    f"MATCH-DRILL WITH ARM\n{ARM_NUMBER}, {{assembly}}\n"
+    "STEPS {located}-{fitted}; BREAK EDGE\n"
+    f"{LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX, DOWEL CONTACT"
 )
-LOCATOR_CALLOUT = f"2X REAM THRU\nSLIP FIT ON DOWEL\n{DOWEL_NUMBER}"
 
 # The bore is the knob shaft's running surface (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): MACHINED, on
 # the exact native bore face the part build resolves. The hub face and the

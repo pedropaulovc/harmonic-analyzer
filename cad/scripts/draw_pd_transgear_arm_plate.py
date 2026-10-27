@@ -115,7 +115,6 @@ from pd_transgear_arm_plate_spec import (
     ISO_VIEW_SCALE,
     KNOB_ZONE_HEIGHT,
     LOCATOR_CALLOUT,
-    LOCATOR_CALLOUT_ABOVE,
     PART_DATUMS,
     REAR_VIEW_LABEL,
     SCREW_HOLE_CALLOUT,
@@ -203,10 +202,10 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     # its "2X" reached hole 2's position frame (FRAME_ROWS[2]) above it.
     "CskDia": (EDGE_PLUS_X + 8.0, _TOP + 5.5, _Z_PLAN),
     "LocatorX1": (LOCATOR_SITES_MM[0][0] / 2.0, PLAN_ROWS[2], _Z_PLAN),
-    # High enough that its three lines below clear the screw-hole callout;
-    # its match-drill lines stand above it, under the border.  Its leader
-    # runs down to locator 1 left of every location dimension line.
-    "LocatorDia1": (EDGE_MINUS_X - 4.5, _TOP + 23.75, _Z_PLAN),
+    # Under the border and high enough that its six lines clear the
+    # screw-hole callout; far enough left that its leader runs down to
+    # locator 1 left of every location dimension line.
+    "LocatorDia1": (EDGE_MINUS_X - 10.8, _TOP + 37.0, _Z_PLAN),
 }
 # Face-A view: the notch face's corner heights and the locator heights,
 # outboard, and both side edges from K below the end round.
@@ -232,11 +231,24 @@ SECTION_KEEP: dict[str, tuple[float, float, float]] = {
     "HubDia": (0.0, -11.0, HUB_FACE_Z - 25.5),
     "BossDia": (0.0, 0.0, BOSS_FACE_Z + 27.5),
 }
+
+
+def _locator_callout() -> str:
+    """The locating holes' callout, citing the MHA-PD-00 match-drill steps."""
+    located = assembly_steps.step_number("arm-plate-located")
+    fitted = assembly_steps.step_number("arm-plate-fitted")
+    if fitted != located + 1:
+        raise AssertionError("the match-drill pointer cites two consecutive steps")
+    return LOCATOR_CALLOUT.format(
+        assembly=assembly_steps.DRAWING_NUMBER, located=located, fitted=fitted
+    )
+
+
 PLAN_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "ScrewHoleDia": SCREW_HOLE_CALLOUT,
     "CskDia": CSK_CALLOUT,
-    "LocatorDia1": LOCATOR_CALLOUT,
+    "LocatorDia1": _locator_callout(),
 }
 PLAN_CALLOUTS_ABOVE = {
     "ScrewHoleDia": HOLE_COUNT_CALLOUT,
@@ -256,14 +268,16 @@ FINISH_CHAR_HEIGHT = 0.0025
 # a 6.3 mm shoulder (measured on run 20261009T214031408Z). The hole and
 # locator frames stand in three rows above the view, which mirrors X, so
 # its hole frames sit outboard of their own holes (no crossing) and the two
-# through-bore locator leaders drop between the hole leaders. The knob
+# through-bore locator leaders drop between the hole leaders; hole 2's
+# frame stands far enough left that its leader passes left of the A-A
+# cutting line's top letter (run 20261027T125555391Z). The knob
 # bore's frame stands left of the end round, its leader under the side
 # heights' witness lines; datum B's tag right of it.
 _BACK_K = (BACK_CENTER[0], 0.1286)
 FRAME_ROWS = (0.262, 0.250, 0.238)
 FRAME_XY = {
     "plate_hole_1_position": (_BACK_K[0] + 0.02875, FRAME_ROWS[2]),
-    "plate_hole_2_position": (_BACK_K[0] - 0.08185, FRAME_ROWS[2]),
+    "plate_hole_2_position": (_BACK_K[0] - 0.10185, FRAME_ROWS[2]),
     "plate_locator_1_position": (_BACK_K[0] + 0.01055, FRAME_ROWS[0]),
     "plate_locator_2_position": (_BACK_K[0] + 0.01905, FRAME_ROWS[1]),
     "knob_projected_axis": (_BACK_K[0] - 0.115, _BACK_K[1] - 0.008),
@@ -328,17 +342,6 @@ SCREW_ZONES = tuple(
     for x, _y in SCREW_HOLES
 )
 ZONE_LENGTH_TOL_M = 1e-7
-
-
-def _locator_callout_above() -> str:
-    """The locating holes' match-drill lines, citing the MHA-PD-00 steps."""
-    located = assembly_steps.step_number("arm-plate-located")
-    fitted = assembly_steps.step_number("arm-plate-fitted")
-    if fitted != located + 1:
-        raise AssertionError("the match-drill pointer cites two consecutive steps")
-    return LOCATOR_CALLOUT_ABOVE.format(
-        assembly=assembly_steps.DRAWING_NUMBER, located=located, fitted=fitted
-    )
 
 
 def _sheet_xy(
@@ -580,9 +583,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_callouts(adapter, plan_annotations, PLAN_CALLOUTS)
     set_dimension_callouts(
-        adapter, plan_annotations,
-        {**PLAN_CALLOUTS_ABOVE, "LocatorDia1": _locator_callout_above()},
-        location="above",
+        adapter, plan_annotations, PLAN_CALLOUTS_ABOVE, location="above"
     )
     if not auto_center_marks(adapter, plan, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME centre marks to the plan view")
