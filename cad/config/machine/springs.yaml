@@ -255,44 +255,43 @@ springs:
       - 0
       counter:
         pose:
-          length_mm: 349.69443255435453
+          length_mm: 349.6944335598102
           lower_eye_xy:
           - -91.19999999999999
-          - 1010.3428723439737
+          - 1010.3428723439919
           upper_eye_xy:
           - -91.2
-          - 1350.5377048983282
+          - 1350.5377059038021
           axis_xy:
-          - -4.075529156905491e-17
+          - -4.0755291451535194e-17
           - 1.0
           centre_xy:
           - -91.19999999999999
-          - 1180.440288621151
+          - 1180.440289123897
           clocking: half_turn
-        gooseneck_origin_y_mm: 1190.2303698792273
+        gooseneck_origin_y_mm: 1190.2325252254618
         upper_support:
           component: sm-gooseneck-spring-screw
           number: MHA-SM-04
-          thread: '#6-32 UNC'
+          thread: '#8-32 UNC'
           pitch_mm: 0.79375
           underhead_length_mm: 16.0
-          major_dia_mm: 3.5052000000000003
+          major_dia_mm: 4.1655999999999995
           head_dia_mm: 12.5
           head_height_mm: 7.0
           crown_rise_mm: 1.0
           slot_width_mm: 1.6
           slot_depth_mm: 3.0
-          relief_dia_mm: 2.2
-          relief_width_mm: 2.2
-          relief_lead_mm: 0.3
+          seat_dia_mm: 3.5
+          shoulder_length_mm: 3.9
           tip_chamfer_mm: 0.3
           clamp_gap_mm: 4.88061
           arm_end_x_mm: -103.359695
           spring_eye_x_mm: -105.8
           plug_length_mm: 8.0
         final_distance_mm:
-          lower: 3.7864976196478e-06
-          upper: 1.554322459339308e-12
+          lower: 3.7864983418976494e-06
+          upper: 3.5083300210182834e-11
     square:
       amplitudes_mm:
       - 0
@@ -317,41 +316,40 @@ springs:
       - 80
       counter:
         pose:
-          length_mm: 350.26532759098535
+          length_mm: 350.26533131534217
           lower_eye_xy:
           - -91.19999999999999
-          - 1010.3428723439896
+          - 1010.3428723439941
           upper_eye_xy:
           - -91.2
-          - 1351.108599934975
+          - 1351.1086036593363
           axis_xy:
-          - -4.068867326056483e-17
+          - -4.068867282667633e-17
           - 1.0
           centre_xy:
           - -91.19999999999999
-          - 1180.7257361394823
+          - 1180.7257380016651
           clocking: half_turn
-        gooseneck_origin_y_mm: 1190.801264915858
+        gooseneck_origin_y_mm: 1190.8034229809937
         upper_support:
           component: sm-gooseneck-spring-screw
           number: MHA-SM-04
-          thread: '#6-32 UNC'
+          thread: '#8-32 UNC'
           pitch_mm: 0.79375
           underhead_length_mm: 16.0
-          major_dia_mm: 3.5052000000000003
+          major_dia_mm: 4.1655999999999995
           head_dia_mm: 12.5
           head_height_mm: 7.0
           crown_rise_mm: 1.0
           slot_width_mm: 1.6
           slot_depth_mm: 3.0
-          relief_dia_mm: 2.2
-          relief_width_mm: 2.2
-          relief_lead_mm: 0.3
+          seat_dia_mm: 3.5
+          shoulder_length_mm: 3.9
           tip_chamfer_mm: 0.3
           clamp_gap_mm: 4.88061
           arm_end_x_mm: -103.359695
           spring_eye_x_mm: -105.8
           plug_length_mm: 8.0
         final_distance_mm:
-          lower: 3.786500720213977e-06
-          upper: 1.7763672155235496e-12
+          lower: 3.7864959429115734e-06
+          upper: 3.5083301858668596e-11
