@@ -53,7 +53,7 @@ EDGE_BREAK = float(_config.title_block("edge_break")["chamfer_max_mm"])
 # r 8.55 from the screw axis, outside the Ø16 tube face (r 8.0), and the
 # rigid helix can rock: the smallest footprints (head r <= (12.50 - 0.51)/2 -
 # 0.25; plug face from the 2.85 mouth reach out to 5.75 when the plug is
-# proud, or to 7.70 at the tube) leave it 3.88-4.13 untilted and 3.27 rocked
+# proud, or to 7.70 at the tube) leave it 3.88-4.13 untilted and 3.25 rocked
 # to minimum width (test_sm_gooseneck_spring_joint's numeric sweep).  The
 # floor holds anyway: the two stacked pull-side layers (helix angles 30 and
 # 390 degrees, centreline ~4.8 from the screw axis, wire r 4.0-5.6) bear on

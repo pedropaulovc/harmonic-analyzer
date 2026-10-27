@@ -275,7 +275,7 @@ springs:
           number: MHA-SM-04
           thread: '#8-32 UNC'
           pitch_mm: 0.79375
-          underhead_length_mm: 16.0
+          underhead_length_mm: 17.5
           major_dia_mm: 4.1655999999999995
           head_dia_mm: 12.5
           head_height_mm: 7.0
@@ -288,9 +288,9 @@ springs:
           clamp_gap_mm: 4.88061
           arm_end_x_mm: -103.359695
           spring_eye_x_mm: -105.8
-          plug_length_mm: 8.8
+          plug_length_mm: 9.9
           plug_counterbore_dia_mm: 4.7
-          plug_counterbore_depth_mm: 1.37
+          plug_counterbore_depth_mm: 2.57
         final_distance_mm:
           lower: 3.7864983418976494e-06
           upper: 3.5083300210182834e-11
@@ -338,7 +338,7 @@ springs:
           number: MHA-SM-04
           thread: '#8-32 UNC'
           pitch_mm: 0.79375
-          underhead_length_mm: 16.0
+          underhead_length_mm: 17.5
           major_dia_mm: 4.1655999999999995
           head_dia_mm: 12.5
           head_height_mm: 7.0
@@ -351,9 +351,9 @@ springs:
           clamp_gap_mm: 4.88061
           arm_end_x_mm: -103.359695
           spring_eye_x_mm: -105.8
-          plug_length_mm: 8.8
+          plug_length_mm: 9.9
           plug_counterbore_dia_mm: 4.7
-          plug_counterbore_depth_mm: 1.37
+          plug_counterbore_depth_mm: 2.57
         final_distance_mm:
           lower: 3.7864959429115734e-06
           upper: 3.486125887335281e-11
