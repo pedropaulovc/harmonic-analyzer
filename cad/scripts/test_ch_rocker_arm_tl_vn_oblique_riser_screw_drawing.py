@@ -234,3 +234,37 @@ def test_sheet_prints_only_the_replacement_sizes(monkeypatch) -> None:
     monkeypatch.setattr(drawing, "PRINTED_REFERENCES", ("SupplierLength", "SupplierMissing"))
     with pytest.raises(ValueError, match="SupplierMissing"):
         drawing._printed_rows()
+
+
+def test_reserved_lanes_keep_the_views_in_projection() -> None:
+    """Machinist review b344192: TOP and RIGHT sat 3 mm off FRONT's axis/row."""
+    import draw_ch_rocker_arm_tl_vn_oblique_riser_screw as drawing
+    from _purchased_fastener_drawing import fastener_view_cells, supplier_fit_cells
+    from _supplier_screw_layout import supplier_screw_margins
+
+    raw = supplier_screw_margins(
+        drawing._printed_rows(),
+        planes=drawing._printed(spec.SUPPLIER_REFERENCE_PLANES),
+        sides=drawing._printed(spec.SUPPLIER_REFERENCE_SIDES),
+    )
+    aligned = drawing._aligned_margins(raw)
+    # The same reserved views (the settled inventory guard), never a smaller lane.
+    assert set(aligned) == set(raw) == {"*Front", "*Top"}
+    for name, lanes in aligned.items():
+        assert all(new >= old for new, old in zip(lanes, raw[name], strict=True))
+    centres = {
+        name: center
+        for name, center, _cell in supplier_fit_cells(
+            fastener_view_cells(0.07, layout="supplier_top"), aligned, label="riser"
+        )
+    }
+    assert centres["*Top"][0] == pytest.approx(centres["*Front"][0], abs=1e-12)
+    assert centres["*Right"][1] == pytest.approx(centres["*Front"][1], abs=1e-12)
+    # The unbalanced reserve is what broke the projection.
+    raw_centres = {
+        name: center
+        for name, center, _cell in supplier_fit_cells(
+            fastener_view_cells(0.07, layout="supplier_top"), raw, label="riser"
+        )
+    }
+    assert raw_centres["*Top"][0] != pytest.approx(raw_centres["*Front"][0], abs=1e-4)

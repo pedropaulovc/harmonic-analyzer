@@ -297,3 +297,74 @@ def test_settled_sheet_keeps_only_the_thread_as_supplier_reference(monkeypatch, 
         return
     with pytest.raises(RuntimeError):
         check()
+
+
+def test_angle_text_sits_inside_the_deburr_wedge_on_its_bisector():
+    """An angle's text outside its 0..45 deg wedge measures another angle; on
+    the bisector at radius 26 it stands off both rays by more than its box."""
+    vertex = (0.1065, 0.1032)
+    x, y = drawing.FRONT_KEEP["ChamferAngle"]
+    bearing = math.degrees(math.atan2(y - vertex[1], x - vertex[0]))
+    assert bearing == pytest.approx(spec.CHAMFER_ANGLE_DEG / 2, abs=0.5)
+    assert math.hypot(x - vertex[0], y - vertex[1]) == pytest.approx(0.026, abs=2e-4)
+    assert drawing.FRONT_KEEP["ChamferWidth"][1] < 0.100
+
+
+def test_fixed_deburr_angle_text_clears_its_own_ink_by_two_millimetres():
+    """Arithmetic on the settled native 45 deg (layout audits of runs fa43a1a5
+    and ae121732, FRONT_KEEP's bisector placement), sheet metres: its run box
+    at SolidWorks' 9.625 width, both arrowheads (GetArrowHeadAtIndex2 rows)
+    and both extension lines stand at least the fleet's 2 mm arrow-to-text
+    clearance off its text, and its lower arrowhead off the width block's MIN
+    row (machinist b344192: the text sat on its own ray and arrowhead)."""
+    from _layout_audit import arrowhead_segments
+    from _layout_geometry import (
+        ARROW_TEXT_CLEARANCE_M,
+        Box,
+        Segment,
+        segment_box_distance,
+    )
+
+    assert drawing.FRONT_KEEP["ChamferAngle"] == pytest.approx((0.1305, 0.1132))
+    text = Box(0.1256875, 0.1104219, 0.1256875 + 0.009625, 0.1104219 + 0.0035)
+    min_row = Box(0.1232316, 0.0952219, 0.1232316 + 0.0895368, 0.0952219 + 0.0035)
+    arrowheads = [
+        arrowhead_segments(row)
+        for row in (
+            (
+                0.1324869,
+                0.1032311,
+                0.0005,
+                -0.0679048,
+                0.9976918,
+                0.0,
+                0.003556,
+                0.000762,
+            ),
+            (
+                0.124871,
+                0.1216174,
+                0.0005,
+                0.6574587,
+                -0.7534906,
+                0.0,
+                0.003556,
+                0.000762,
+            ),
+        )
+    ]
+    rays = (
+        Segment(0.1120414, 0.1032311, 0.1334869, 0.1032311, "ext-line"),
+        Segment(0.1094701, 0.1062166, 0.1255781, 0.1223246, "ext-line"),
+    )
+
+    def gap(segments, box):
+        return min(segment_box_distance(segment, box) for segment in segments)
+
+    clearances = [gap(head, text) for head in arrowheads] + [
+        gap([ray], text) for ray in rays
+    ]
+    assert clearances == pytest.approx([0.00362, 0.00477, 0.00719, 0.00602], abs=5e-5)
+    assert min(clearances) >= ARROW_TEXT_CLEARANCE_M
+    assert gap(arrowheads[0], min_row) == pytest.approx(0.00451, abs=5e-5)
+    assert gap(arrowheads[0], min_row) >= ARROW_TEXT_CLEARANCE_M

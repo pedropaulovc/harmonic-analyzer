@@ -83,17 +83,27 @@ ISO_CENTER = (0.310, 0.209)
 # y 0.1014..0.2711 at centre 0.18625), and it must stay inside the B sheet's
 # 12.7 mm top zone border (y 0.2667). Centred at 0.1805 its top is 0.2653 and
 # its bottom 0.0957, clear of the 0.0651 notes band; the eye crown stands at
-# 0.2593. The cut end (0.078 below the centre) drops 5.75 mm to 0.1023 while
-# the deburr texts keep their reviewed stations: still right of the shank,
-# clear of their own extension lines (review r8: centred under the 2.3 mm leg
-# they were struck) and above the notes.
+# 0.2593. The cut end (0.078 below the centre) drops 5.75 mm to 0.1023.
 # The settled isometric outline is 0.0543 half-height about its centre (run
 # 80ff6d1a read y 0.1587..0.2673 at centre 0.213, 0.6 mm past the border);
 # centred at 0.209 its top is 0.2633 and its bottom 0.1547.
+# Deburr texts. The 45 deg angle's vertex is where the chamfer meets the cut
+# end, (106.5, 103.2) mm; SolidWorks runs the angle's arc through its text and
+# breaks it at the text box. Parked at radius 22.3 next to the 45 deg ray it
+# sat on its own chamfer extension line and arc arrowhead (machinist b344192,
+# rule 14), so the text is centred on the bisector (22.5 deg) at radius 26.
+# Settled native ink (runs fa43a1a5, ae121732; run boxes at SolidWorks'
+# widths): the 45 deg's arrowheads stand 3.6 and 4.8 mm off its text, its
+# extension lines 6.0 and 7.2 mm, its lower arrowhead 4.5 mm off the width
+# block, and no own line runs inside any control's text. The width block
+# drops 2 mm (its MIN row stood 1.5 mm under that arrowhead) and still stands
+# right of the shank, clear of its own extension lines (review r8: centred
+# under the 2.3 mm leg they were struck) and ~6 mm above the notes. The
+# shared layout audit, not a sheet check, guards the settled ink.
 FRONT_KEEP = {
     "FinishedOverall": (0.042, FRONT_CENTER[1]),
-    "ChamferWidth": (0.168, 0.100),
-    "ChamferAngle": (0.124, 0.117),
+    "ChamferWidth": (0.168, 0.098),
+    "ChamferAngle": (0.1305, 0.1132),
 }
 # The deburr band is tighter than the title block on both sides (review r8
 # read it as a plain lead-in): its minimum leg brings the cut end under the
