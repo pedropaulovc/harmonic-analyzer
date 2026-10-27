@@ -1286,6 +1286,12 @@ def test_capture_operation_notes_and_finished_view_fit_their_sheet() -> None:
     assert _inside_sheet(finished)
     for note in _steps_sheet_boxes(layout):
         assert not _overlap(finished, note)
+    # The native 1:15 outline measured 77.3 x 56.8 mm (farm run
+    # 20261027T090456098Z, cad66b4d6), taller than the estimate above: the
+    # room must hold the measured extent too.
+    region = drawing.FINISHED_REGION
+    assert region[3] - region[1] >= 0.0568
+    assert region[2] - region[0] >= 0.0773
 
 
 @pytest.mark.parametrize("outside_room", (False, True))
