@@ -64,8 +64,6 @@ from dt_pinion_pivot_block_geometry import BLOCK_HEIGHT as _PINION_BLOCK_HEIGHT
 from dt_vn_slotted_screw_spec import SHANK_DIA as _BLOCK_SCREW_DIA
 from dt_vn_slotted_screw_spec import SHANK_LEN as _BLOCK_SCREW_LENGTH
 from dt_vn_slotted_screw_spec import THREAD as _BLOCK_SCREW_THREAD
-import ch_rocker_arm_tl_oblique_retention_hardware_spec as _JIG_CAP_HARDWARE
-import ch_rocker_arm_tl_oblique_retention_spec as _JIG_CAP_RETENTION
 
 
 def _smooth_annulus_limit_mm3(
@@ -895,51 +893,27 @@ _MS_MEASURING_STICK_ALLOWED_PAIRS = {
     ),
 }
 
-# The rocker's oblique-trammel jig (MHA-CH-06-TL-00, shop fixture). The
-# HUB locator pin's Ø10.20 x 12 p6 seat fills the carrier's HUB, which the
-# model carries only as a Ø3 centre-drill spot because it is reamed in place
-# on the running jig; the CL dowel's Ø6 m6 x 12 section in the carrier is the
-# same press, bounded by the full seat cylinder. Every screw, stud and nut is
-# a smooth major-diameter envelope in a tap-drill bore over its engagement
-# (major, tap drill, engagement); the bearings' 6200 rings press on the pivot
-# pins (the Ø10.001 k5 journal low limit in the Ø10 bore) and into the blocks
-# (Ø30 OD in the N6 seat's Ø29.976 low limit), each over the 9 mm ring width.
-# Everything else is contact: the pins coincident in the carrier holes, the
-# screw heads on their seats, the block screws' wedge-lock pairs between the
-# heads and TL-22's counterbore floor (Ø4.318 ID round the Ø4.166 major, Ø7.62
-# OD in the Ø7.94 bore), the lever screws' wedge-lock pairs between the heads
-# and the feed lever's top (Ø8.636 ID round the Ø7.938 major), the brackets,
-# nut, KP08 blocks and rails on their faces. Literals, like the rows above;
-# test_ch_rocker_arm_tl_oblique_jig_assembly pins them to the specs, and
-# verify's pass-sweep-interference-free holds them at every sweep pose.
+# Oblique shop fixture: only physical bonded-seat, dowel and smooth-thread
+# envelope overlap. Plain shoulder pivots, shims and spacers are running fits
+# or face contacts, never blanket interference exceptions.
 _JIG = "ch-rocker-arm-tl-oblique"
 _JIG_VENDOR = "ch-rocker-arm-tl-vn-oblique"
-JIG_HUB_PIN_SEAT = (10.20, 12.0)  # (diameter, length)
+JIG_HUB_PIN_SEAT = (10.20, 12.0)  # actual overlap: 20 cut length minus 6 riser minus 2 projection
 JIG_CL_DOWEL_PRESS = (6.0, 12.0)  # (diameter, carrier thickness)
 JIG_RAIL_SCREW_THREAD = (4.1656, 3.454, 9.35)  # #8-32 into each base bar
 JIG_BRACKET_SCREW_THREAD = (4.1656, 3.454, 7.975)  # #8-32 into a end bracket
-JIG_BLOCK_SCREW_THREAD = (4.1656, 3.454, 9.485)  # #8-32 into the nut bracket
 JIG_CARRIAGE_SCREW_THREAD = (4.0, 3.242, 4.4)  # M4 into each HGH15 carriage
 JIG_PILLOW_BLOCK_SCREW_THREAD = (3.5052, 2.705, 10.875)  # #6-32 into a end bracket
-JIG_NUT_SCREW_THREAD = (2.8448, 2.261, 9.2)  # #4-40 into the nut bracket
+JIG_NUT_SCREW_THREAD = (2.8448, 2.261, 9.2)  # #4-40 into feed block
 JIG_RISER_SCREW_THREAD = (2.8448, 2.261, 10.401409)  # #4-40 into the carrier
 JIG_CLAMP_SCREW_THREAD = (6.35, 5.105, 12.0)  # 1/4-20 through the carrier
 JIG_LEVER_SCREW_THREAD = (7.9375, 6.528, 10.414)  # 5/16-18 into the carrier
-JIG_PIVOT_CAP_SCREW_THREAD = (
-    _JIG_CAP_HARDWARE.SCREW_MAJOR_DIA,
-    TAP_DRILL_MM[_JIG_CAP_HARDWARE.SCREW_THREAD],
-    _JIG_CAP_HARDWARE.SCREW_LENGTH
-    - (_JIG_CAP_RETENTION.CAP_HEIGHT - _JIG_CAP_RETENTION.CAP_COUNTERBORE_DEPTH),
-)
-# Only the actual 5/16-18 major-envelope/tap-drill annulus is necessary
-# overlap; cap, screw heads and safety wire receive no blanket exception.
+JIG_PIVOT_SCREW_THREAD = (8.0, 6.8, 13.0)  # M8x1.25 below shoulder-end floor
 JIG_T_NUT_THREAD = (12.7, 10.716, 14.0)  # 1/2-13 stud in its T-nut
 JIG_FLANGE_NUT_THREAD = (12.7, 10.716, 13.0)  # 1/2-13 stud in its flange nut
 JIG_LEADSCREW_NUT_THREAD = (8.0, 6.0, 15.0)  # Tr8 screw in its flanged nut
-JIG_BEARING_ON_PIN = (10.001, 10.0, 9.0)  # (pin, bore, ring width)
-JIG_BEARING_IN_BLOCK = (30.0, 29.976, 9.0)  # (ring OD, block bore, ring width)
 _ROCKER_OBLIQUE_JIG_ALLOWED_PAIRS = {
-    frozenset((f"{_JIG}-hub-pin-1", f"{_JIG}-carrier-1")): (
+    frozenset((f"{_JIG_VENDOR}-hub-pin-1", f"{_JIG}-carrier-1")): (
         1.10 * math.pi * JIG_HUB_PIN_SEAT[0] ** 2 * JIG_HUB_PIN_SEAT[1] / 4.0
     ),
     frozenset((f"{_JIG_VENDOR}-cl-dowel-1", f"{_JIG}-carrier-1")): (
@@ -972,12 +946,6 @@ _ROCKER_OBLIQUE_JIG_ALLOWED_PAIRS = {
         second_number=2,
     ),
     **_numbered_pairs(
-        f"{_JIG_VENDOR}-block-screw",
-        range(1, 3),
-        f"{_JIG}-nut-bracket",
-        _smooth_annulus_limit_mm3(*JIG_BLOCK_SCREW_THREAD),
-    ),
-    **_numbered_pairs(
         f"{_JIG_VENDOR}-carriage-screw",
         range(1, 5),
         f"{_JIG_VENDOR}-carriage",
@@ -1006,7 +974,7 @@ _ROCKER_OBLIQUE_JIG_ALLOWED_PAIRS = {
     **_numbered_pairs(
         f"{_JIG_VENDOR}-nut-screw",
         range(1, 5),
-        f"{_JIG}-nut-bracket",
+        f"{_JIG}-feed-block",
         _smooth_annulus_limit_mm3(*JIG_NUT_SCREW_THREAD),
     ),
     **_numbered_pairs(
@@ -1048,47 +1016,16 @@ _ROCKER_OBLIQUE_JIG_ALLOWED_PAIRS = {
         _smooth_annulus_limit_mm3(*JIG_LEADSCREW_NUT_THREAD),
     ),
     **_numbered_pairs(
-        f"{_JIG_VENDOR}-bearing",
-        range(1, 3),
-        f"{_JIG}-pivot-pin",
-        _smooth_annulus_limit_mm3(*JIG_BEARING_ON_PIN),
+        f"{_JIG_VENDOR}-pivot-screw",
+        range(1, 2),
+        f"{_JIG}-feed-block",
+        _smooth_annulus_limit_mm3(*JIG_PIVOT_SCREW_THREAD),
     ),
     **_numbered_pairs(
-        f"{_JIG_VENDOR}-bearing",
-        range(3, 5),
-        f"{_JIG}-pivot-pin",
-        _smooth_annulus_limit_mm3(*JIG_BEARING_ON_PIN),
-        second_number=2,
-    ),
-    **_numbered_pairs(
-        f"{_JIG_VENDOR}-bearing",
-        range(1, 3),
+        f"{_JIG_VENDOR}-pivot-screw",
+        range(2, 3),
         f"{_JIG}-pivot-block",
-        _smooth_annulus_limit_mm3(*JIG_BEARING_IN_BLOCK),
-    ),
-    **_numbered_pairs(
-        f"{_JIG_VENDOR}-bearing",
-        range(3, 5),
-        f"{_JIG}-pivot-block",
-        _smooth_annulus_limit_mm3(*JIG_BEARING_IN_BLOCK),
-        second_number=2,
-    ),
-    # Eight NAS1352N5H12 cap screws, four per block. Only the smooth 5/16-18
-    # major envelope inside the tap-drill bore is material overlap. The
-    # flange/cap/floor, clevis/pin, retainer/clevis, cotter/hole and routed
-    # safety wire are clear or nominal tangencies, not blanket exceptions.
-    **_numbered_pairs(
-        f"{_JIG_VENDOR}-pivot-cap-screw",
-        range(1, 5),
-        f"{_JIG}-pivot-block",
-        _smooth_annulus_limit_mm3(*JIG_PIVOT_CAP_SCREW_THREAD),
-    ),
-    **_numbered_pairs(
-        f"{_JIG_VENDOR}-pivot-cap-screw",
-        range(5, 9),
-        f"{_JIG}-pivot-block",
-        _smooth_annulus_limit_mm3(*JIG_PIVOT_CAP_SCREW_THREAD),
-        second_number=2,
+        _smooth_annulus_limit_mm3(*JIG_PIVOT_SCREW_THREAD),
     ),
 }
 

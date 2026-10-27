@@ -1,6 +1,6 @@
 r"""Purchased MHA-CH-06-TL-VN-66 oblique-trammel leadscrew nut screw: Olander 4C50BHCA.
 
-The ``#4-40 X 1/2 BHCS`` (``ch_rocker_arm_tl_vn_oblique_nut_screw_spec``) that holds the Tr8 flanged leadscrew nut to the TL-29 nut bracket, into a blind tap.
+The ``#4-40 X 1/2 BHCS`` (``ch_rocker_arm_tl_vn_oblique_nut_screw_spec``) holds the Tr8 flanged leadscrew nut to the TL-32 integral feed-block lug, into a blind tap.
 The stock recipe ``diagnostics/diag_build_4C50BHCA.py`` builds the
 catalogue screw on the shared button-head recipe
 (``diag_mcmaster_button_head.build_button_head``) plus its nominal underhead

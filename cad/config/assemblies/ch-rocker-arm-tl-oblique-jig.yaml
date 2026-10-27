@@ -1,125 +1,60 @@
 number: MHA-CH-06-TL-00
-# ch-rocker-arm-tl-oblique-jig assembly contract (shop fixture; never in the
-# machine tree) -- per-assembly build data read through
-# cad/scripts/_assembly_contract.py. Editing this file re-keys ONLY the jig's
-# closure (its assembly leaf, its verify_soundness leaf, and whatever consumes
-# its saved .SLDASM), never a sibling assembly.
-#
-# flip_invert: _assembly._flip_sig signatures (+ " @<diag>" orientation suffix
-#   for a rotation/mirror twin) whose distance driver seats OPPOSITE the plain
-#   sign rule. The one distance driver is carriage 1's slide ("carriage 1 slide
-#   on rail 1"), recorded in the DOF manifest and authored only by verify's
-#   transient replays; a wrong side fails there with "flip-seed MISS ... toggle
-#   sig", naming this file. None inverted until a replay says otherwise.
-# allowed_free_stems: the exact component families allowed to read
-#   under-constrained (freed operational DOF + everything coupled to them).
-#   Shared by the incremental refresh and verify:soundness.
-# required_free_stems: one family per freed DOF that must itself read
-#   under-constrained (verify:soundness necessity).
-# free_dof (+ free_dof_per_active_channel x active channels): the operational
-#   DOF the saved model ships free (verify:soundness).
+# Shop fixture: one carriage-slide DOF. Rail 1 carries the integral feed block,
+# rail 2 the plain pivot block. Both purchased shoulder-screw stacks and every
+# carrier rider move with the linkage; the raised leadscrew/KP08s stay fixed.
 flip_invert: []
-# The sweep: the carriages slide on their rails, the carrier rides the two
-# pivot pins, and every part on a carriage, pivot block, nut bracket or the
-# carrier is lock-mated to it and moves with it (the jig spec's MOVING, BOM
-# order). The rails, bars, leadscrew feed and hold-downs are fixed.
-# TL-29's unused upper material is cut to height 33.3 mm (ordinary .X +/-0.8),
-# independent of the raised carrier: nominal bottom/top Z = 27.4/60.7 mm.
-# XY placement, nut axis Z = 40.4, side holes, 3/4 x 2 in stock and leadline
-# stay unchanged; the capture/workheight rise remains +12.5 mm, with no cap relief.
-# TL-00 cartridge-sheet F1/F2 own the fit-up sequence: actual TL-22 side-hole axes >=5.0 mm
-# below the actual TL-29 top BEFORE transfer punching; AFTER free-feed alignment
-# and final tightening, throughout travel, the ENTIRE actual top footprint/high
-# corners must remain >=2.35 mm below the actual TL-22 cap mounting plane.
-# Do not force nut/screw alignment to obtain that gap or invent HGH/KP08/
-# end-bracket STOCK height bands. These are fit-up checks, not exception waivers.
-# The retained native run/FIFO is immutable old-source API proof only, not
-# validation of this geometry; no interference allowance is added for the repair.
 allowed_free_stems:
   - ch-rocker-arm-tl-oblique-carrier
   - ch-rocker-arm-tl-oblique-pivot-block
-  - ch-rocker-arm-tl-oblique-pivot-pin
+  - ch-rocker-arm-tl-oblique-feed-block
+  - ch-rocker-arm-tl-vn-oblique-pivot-screw
+  - ch-rocker-arm-tl-vn-oblique-pivot-spacer
+  - ch-rocker-arm-tl-vn-oblique-pivot-shim
   - ch-rocker-arm-tl-oblique-riser
-  - ch-rocker-arm-tl-oblique-hub-pin
+  - ch-rocker-arm-tl-vn-oblique-hub-pin
   - ch-rocker-arm-tl-oblique-feed-lever
-  - ch-rocker-arm-tl-oblique-nut-bracket
-  - ch-rocker-arm-tl-oblique-pivot-cap
-  - ch-rocker-arm-tl-oblique-pivot-retainer
   - ch-rocker-arm-tl-vn-oblique-carriage
-  - ch-rocker-arm-tl-vn-oblique-bearing
   - ch-rocker-arm-tl-vn-oblique-cl-dowel
   - ch-rocker-arm-tl-vn-oblique-leadscrew-nut
-  - ch-rocker-arm-tl-vn-oblique-block-screw
   - ch-rocker-arm-tl-vn-oblique-carriage-screw
   - ch-rocker-arm-tl-vn-oblique-nut-screw
   - ch-rocker-arm-tl-vn-oblique-riser-screw
   - ch-rocker-arm-tl-vn-oblique-clamp-screw
   - ch-rocker-arm-tl-vn-oblique-lever-screw
-  - ch-rocker-arm-tl-vn-oblique-block-washer
   - ch-rocker-arm-tl-vn-oblique-lever-washer
-  - ch-rocker-arm-tl-vn-oblique-pivot-cap-screw
-  - ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin
-  - ch-rocker-arm-tl-vn-oblique-pivot-cotter
-  - ch-rocker-arm-tl-vn-oblique-pivot-lock-wire
-# One freed DOF (carriage 1's slide, DOF manifest key carriage_slide); every
-# moving family rides it, so each must read under-constrained: a rider whose
-# lock mate silently fixed it to the ground would otherwise pass.
 required_free_stems:
   - ch-rocker-arm-tl-oblique-carrier
   - ch-rocker-arm-tl-oblique-pivot-block
-  - ch-rocker-arm-tl-oblique-pivot-pin
+  - ch-rocker-arm-tl-oblique-feed-block
+  - ch-rocker-arm-tl-vn-oblique-pivot-screw
+  - ch-rocker-arm-tl-vn-oblique-pivot-spacer
+  - ch-rocker-arm-tl-vn-oblique-pivot-shim
   - ch-rocker-arm-tl-oblique-riser
-  - ch-rocker-arm-tl-oblique-hub-pin
+  - ch-rocker-arm-tl-vn-oblique-hub-pin
   - ch-rocker-arm-tl-oblique-feed-lever
-  - ch-rocker-arm-tl-oblique-nut-bracket
-  - ch-rocker-arm-tl-oblique-pivot-cap
-  - ch-rocker-arm-tl-oblique-pivot-retainer
   - ch-rocker-arm-tl-vn-oblique-carriage
-  - ch-rocker-arm-tl-vn-oblique-bearing
   - ch-rocker-arm-tl-vn-oblique-cl-dowel
   - ch-rocker-arm-tl-vn-oblique-leadscrew-nut
-  - ch-rocker-arm-tl-vn-oblique-block-screw
   - ch-rocker-arm-tl-vn-oblique-carriage-screw
   - ch-rocker-arm-tl-vn-oblique-nut-screw
   - ch-rocker-arm-tl-vn-oblique-riser-screw
   - ch-rocker-arm-tl-vn-oblique-clamp-screw
   - ch-rocker-arm-tl-vn-oblique-lever-screw
-  - ch-rocker-arm-tl-vn-oblique-block-washer
   - ch-rocker-arm-tl-vn-oblique-lever-washer
-  - ch-rocker-arm-tl-vn-oblique-pivot-cap-screw
-  - ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin
-  - ch-rocker-arm-tl-vn-oblique-pivot-cotter
-  - ch-rocker-arm-tl-vn-oblique-pivot-lock-wire
-# The sweep; verify's pass-sweep-interference-free gate replays the recorded
-# slide drive through both passes (the .<asm>.sweep.json sidecar).
 free_dof: 1
-# machinist_exceptions: the assembly drawing's owner-declared machinist-review
-#   exceptions (drawing-simplicity-policy.md "Named exceptions"); read by
-#   machinist_exceptions.load_exceptions for ch_rocker_arm_tl_oblique_jig_assembly,
-#   ignored by the build.
 machinist_exceptions:
-  # RV-01, re-accepted for issue #1630's #4-40 joint (owner ruling 2026-10-19,
-  # via coordinator: the bought nut, no lock, no receipt limits, 0.4 N·m;
-  # owner ruling 2026-10-20: #4-40 button heads directly on the flange, no
-  # washers, taps spotted from the nut's own flange holes). Jig spec numbers;
-  # the brass flange's hole and thickness carry no vendor band, taken at
-  # nominal. Superseded
-  # provenance, the owner-accepted M3 entry (2026-10-17), verbatim:
-  #   where: "steps 7A and 8 (sheet 6) and sheet 4 balloons 15 and 26: the TR8X2 flanged nut's 4 M3 X 10 SHCS into the nut bracket, tightened to 1.0 N·m"
-  #   finding: "no mechanical lock on the nut-flange screws under the reversing nut torque (rule 23)"
-  #   reason: "static clamp, rule 23's last bullet: the 4 M3 SHCS clamp the Tr8 nut's flange to TL-29 and no operating torque reaches them. The nut's worst-case torque is 0.87 N·m (1 kN hand-abuse thrust, oiled Tr8x2 thread); the flange's clamp slip torque is 8.0 to 10.7 N·m (4 x M3 at 1.67 kN preload from 1.0 N·m, mu 0.15 to 0.20, on the 16 bolt circle), a 9 to 12x margin, so the flange never slips (jig spec NUT_FLANGE_SLIP_MARGIN, self-checked >= 1.5). A wedge-lock pair cannot seat: an M3 pair's OD 7.0 on the 16 bolt circle overlaps the nut's 10.2 body by 0.6 (owner ruling 2026-10-17, via coordinator) (owner-accepted)"
   - id: "RV-01"
     kind: "accept"
-    where: "steps 7A and 8 (sheet 7) and sheet 5 balloons 17 and 28: the TR8X2 flanged nut's 4 #4-40 X 1/2 BHCS into the nut bracket, tightened to 0.4 N·m"
-    finding: "no mechanical lock on the nut-flange screws under the reversing nut torque (rule 23)"
-    reason: "static clamp, rule 23's last bullet: the 4 #4-40 BHCS clamp the Tr8 nut's flange to TL-29 and no operating torque reaches them. The nut's worst-case torque is 0.87 N·m (1 kN hand-abuse thrust, oiled Tr8x2 thread); the flange's clamp slip torque is 3.4 to 4.5 N·m (4 x #4-40 at 0.70 kN preload from 0.4 N·m, mu 0.15 to 0.20, on the 16 bolt circle), a 3.9 to 5.1x margin, so the flange never slips (jig spec NUT_FLANGE_SLIP_MARGIN, self-checked >= 1.5). Each button head bears directly on the brass flange at 79 MPa, under its 124 MPa yield (jig spec NUT_SCREW_FLANGE_BEARING_MPA). A lock washer seats only under OD 5.8: the 16 bolt circle less the nut's 10.2 body leaves 2.9 radially (owner ruling 2026-10-19, via coordinator; button heads, no washers, owner ruling 2026-10-20) (owner-accepted)"
-  - id: "RV-02"
-    kind: "accept"
-    where: "step 7C (sheet 7): CENTRE 54.500 FROM THE BLOCK'S SPINDLE END (SETS #8 TAP END WALLS), the nut bracket's set on pivot block 1 before its taps are spotted"
-    finding: "a three-place set given to hold the #8 taps' end walls (rules 4 and 17: walls fixed with geometry, not a tighter band)"
-    reason: "TL-29 cannot grow: a longer bracket puts the leadscrew feed gap under 2.5 and its 3/4 stock caps the length, so the set takes the title block's .XXX band (+/-0.13) with its reason, and each #8 tap's end wall is 1.544 min at the worst case of every band, over the 1.5 floor; MHA-CH-06-TL-29 states it on its #8 callout (nut bracket spec END_WALL_MIN, self-checked) (owner ruling 2026-10-17, via coordinator) (owner-accepted)"
+    where: "step 7 and F1: four #4-40 X 1/2 button heads directly on the Tr8 nut flange into the integral feed block, 0.4 N·m"
+    finding: "no mechanical lock on the nut-flange screws under reversing nut torque (rule 23)"
+    reason: "The unchanged four-screw flange is a static clamp: its calculated friction-slip margin exceeds 1.5 against the 1 kN hand-abuse nut torque. No operating torque reaches the screws. The owner accepted the #4-40 button-head joint without washers on 2026-10-19/20; the owner-approved 2026-10-23 simplification retains that joint in TL-32, with holes drilled to print rather than transfer spotted. Actual heads must seat flat and clear the nut body before tightening."
   - id: "RV-03"
     kind: "accept"
-    where: "step 8 (sheet 7): the handwheel's and the two KP08 pillow blocks' set screws on the leadscrew's flats, EACH LOCKED WITH LOW-STRENGTH (PURPLE) THREADLOCKER"
-    finding: "set screws on a hand-cranked, reversing shaft held only by threadlocker, no mechanical lock (rule 23)"
-    reason: "the lock means is the owner's choice: a bought low-strength (purple) threadlocker on each set screw, named in step 8, with no new hardware; each set screw seats on a flat on the screw, so the flat, not friction, carries the hand-crank torque (owner ruling 2026-10-18, via coordinator) (owner-accepted)"
+    where: "step 8: the handwheel and KP08 set screws on leadscrew flats, locked with low-strength purple threadlocker"
+    finding: "set screws on a hand-cranked reversing shaft use threadlocker without a mechanical lock (rule 23)"
+    reason: "Owner ruling 2026-10-18 retains bought low-strength threadlocker on each set screw; the shaft flats carry the hand-crank torque."
+  - id: "RV-04"
+    kind: "accept"
+    where: "P2: the two M8 shoulder screws seated in block counterbores, Loctite 222 and 4.0 N·m"
+    finding: "pivot shoulder screws use threadlocker without a separate mechanical thread lock (rule 23)"
+    reason: "The owner-approved 2026-10-23 plain-pivot contract explicitly chooses Loctite 222 and torque. Each screw shoulder bottoms in its counterbore, leaving measured 0.05–0.25 carrier running clearance; the head, thread, block and carriage form the positive lift-capture path. This is not whole-jig load certification."

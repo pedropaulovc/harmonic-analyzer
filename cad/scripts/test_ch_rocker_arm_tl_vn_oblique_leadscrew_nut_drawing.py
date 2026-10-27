@@ -12,6 +12,7 @@ import _config
 import build_ch_rocker_arm_tl_vn_oblique_leadscrew_nut as part
 import ch_rocker_arm_tl_vn_oblique_leadscrew_nut_spec as spec
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as feed
+import ch_rocker_arm_tl_oblique_feed_block_spec as feed_block
 import draw_ch_rocker_arm_tl_vn_oblique_leadscrew_nut as draw
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 
@@ -54,17 +55,17 @@ def test_c4_values_are_imported_not_retyped() -> None:
         assert re.search(rf"^{name} = feed\.", source, re.MULTILINE), name
 
 
-def test_frame_puts_the_flange_bracket_face_at_zero() -> None:
+def test_frame_puts_the_flange_feed_block_face_at_zero() -> None:
     ys = [y for _, y in spec.PROFILE]
     assert min(ys) == -spec.SPIGOT_LENGTH
     assert max(ys) == spec.FLANGE_THICK + spec.BODY_LONG
     assert max(ys) - min(ys) == spec.LENGTH
     flange = [y for r, y in spec.PROFILE if r == spec.FLANGE_DIA / 2.0]
     assert flange == [0.0, spec.FLANGE_THICK]
-    # C4 seats the flange's spigot face on TL-29 with the long body proud.
-    assert feed.NUT_FLANGE_X[1] - feed.NUT_FLANGE_X[0] == pytest.approx(
-        spec.FLANGE_THICK
-    )
+    # TL-32 seats the spigot in its -X face; the long body stays proud.
+    assert feed_block.NUT_FACE_X == feed_block.LUG_X0
+    assert feed_block.NUT_SPIGOT_DEPTH == spec.SPIGOT_LENGTH
+    assert feed_block.NUT_SEAT_DIA > spec.BODY_DIA
 
 
 def test_bore_is_the_contract_thread_minor_not_the_ooznest_crest() -> None:

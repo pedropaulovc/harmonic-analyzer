@@ -161,7 +161,7 @@ def test_riser_referenced_fitup_covers_the_finished_plate_stack(
     carrier_thickness = carrier.THICKNESS + carrier_sign * carrier.THICKNESS_BAND
     riser_thickness = spec.riser.THICKNESS + riser_sign * spec.riser.THICKNESS_BAND
     pin_bottom = carrier_thickness + riser_thickness + tip_height - dims.LENGTH
-    assert max(0.0, -pin_bottom) < jig.trammel.PIN_COLLAR_PROUD
+    assert max(0.0, -pin_bottom) < jig.trammel.PIVOT_SUPPORT_HEIGHT
     # Independent interval intersection: only the full-diameter pin cylinder
     # between the plate underside and its entry break provides press contact.
     cylinder_start = pin_bottom + dims.CROWN_H + dims.CHAMFER_LEN

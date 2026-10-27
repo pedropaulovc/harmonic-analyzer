@@ -45,6 +45,30 @@ const retiredTooling = [
   new_identities: [{ stem: `${parent}-tl-${tool}`, number: `MHA-${category}-TL-${sequence}` }],
   status: 'retired',
 })))
+retiredTooling.push(...[
+  ['nut-bracket', '29', '29', false],
+  ['pivot-cap', null, '30', false, '2026-10-20'],
+  ['pivot-retainer', null, '31', false, '2026-10-20'],
+  ['hub-pin', '25', '25', false],
+  ['pivot-cap-screw', null, '73', true, '2026-10-20'],
+  ['pivot-clevis-pin', null, '74', true, '2026-10-20'],
+  ['pivot-cotter', null, '75', true, '2026-10-20'],
+  ['pivot-lock-wire', null, '76', true, '2026-10-20'],
+  ['bearing', '32', '52', true],
+  ['block-screw', '43', '63', true],
+  ['block-washer', '50', '70', true],
+  ['pivot-pin', '23', '23', false],
+].map(([suffix, previousSequence, sequence, vendor, introduced]) => ({
+  old_stem: `ch-rocker-arm-tl-${vendor && previousSequence === null ? 'vn-' : ''}oblique-${suffix}`,
+  old_number: previousSequence === null ? null : `MHA-CH-006-TL-${previousSequence}`,
+  ...(introduced ? { introduced } : {}),
+  new_identities: [{
+    ...(vendor ? { parent: 'ch-rocker-arm-tl-oblique-jig' } : {}),
+    stem: `ch-rocker-arm-tl-${vendor ? 'vn-' : ''}oblique-${suffix}`,
+    number: `MHA-CH-06-TL-${vendor ? 'VN-' : ''}${sequence}`,
+  }],
+  status: 'retired',
+})))
 
 // Independent behavioral expectations, not values copied out of the projection table.
 const sharedCases = [
@@ -310,6 +334,8 @@ test('retired tooling keeps exactly its frozen old/current reservations without 
     const current = row.new_identities[0]
     assert.ok(!table.nativeIdentities.some(active => active.sourceStem === row.old_stem
       || active.identities.some(target => target.stem === current.stem || target.number === current.number)))
+    assert.ok(!table.toolingVendors.some(active => active.sourceStem === row.old_stem
+      || active.stem === current.stem || active.number === current.number))
     for (const number of [row.old_number, current.number]) {
       assert.throws(() => projectCurrentNativeNumber(number, current.stem), /unknown native identity/)
     }

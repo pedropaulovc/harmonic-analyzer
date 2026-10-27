@@ -1479,7 +1479,7 @@ def test_gallery_gate_rejects_a_mesh_whose_source_is_gone(
         export_models.assert_gallery_inputs_current(manifest)
 
 
-@pytest.mark.parametrize("stem", ["ch_pivot_shaft", "ch_rocker_arm_tl_oblique_pivot_pin"])
+@pytest.mark.parametrize("stem", ["ch_pivot_shaft", "ch_rocker_arm"])
 def test_features_cli_writes_only_one_requested_part_using_public_bundle_paths(
     tmp_path: Path, monkeypatch, stem: str,
 ) -> None:
@@ -1489,7 +1489,7 @@ def test_features_cli_writes_only_one_requested_part_using_public_bundle_paths(
     native = tmp_path / "sldprt" / f"{stem.replace('_', '-')}.SLDPRT"
     native.parent.mkdir()
     native.write_bytes(b"unchanged native part")
-    unrelated = tmp_path / "features" / "ch_rocker_arm" / "features.toml"
+    unrelated = tmp_path / "features" / "dt_crankshaft" / "features.toml"
     unrelated.parent.mkdir(parents=True)
     unrelated.write_bytes(b"another leaf's independent manifest")
     ledger = tmp_path / "stl" / "export-src.json"
@@ -1513,9 +1513,12 @@ def test_features_cli_writes_only_one_requested_part_using_public_bundle_paths(
 
     def save_step(_doc, selected, step):
         assert selected == stem
+        labels = [face_name(feature, 1) for feature in export_features.feature_selectors(selected)]
+        if selected == "ch_rocker_arm":
+            labels.append(face_name("pivot_bore", 1))  # Split cylindrical face in the raw STEP.
         rows = [
-            f"#{index} = ADVANCED_FACE ( '{face_name(feature, 1)}', ( #100 ), #101, .T. ) ;"
-            for index, feature in enumerate(export_features.feature_selectors(selected), 1)
+            f"#{index} = ADVANCED_FACE ( '{label}', ( #100 ), #101, .T. ) ;"
+            for index, label in enumerate(labels, 1)
         ]
         step.write_text(
             "ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\n"
@@ -1558,7 +1561,7 @@ def test_features_cli_exports_and_stages_one_step_per_declared_configuration(
     from dt_crank_handle_pivot_screw_spec import INSTALLED_CONFIG
 
     # Reuse real feature declarations; simulate configurations only in this test.
-    stem = "ch_rocker_arm_tl_oblique_pivot_pin"
+    stem = "ch_rocker_arm"
     original = export_features.step_configurations
     monkeypatch.setattr(
         export_features, "step_configurations",
@@ -1602,9 +1605,12 @@ def test_features_cli_exports_and_stages_one_step_per_declared_configuration(
     def save_step(doc, selected, step, *, reuse_names=False):
         assert selected == stem
         saves.append((step.name, doc.active, reuse_names))
+        labels = [face_name(feature, 1) for feature in export_features.feature_selectors(selected)]
+        if selected == "ch_rocker_arm":
+            labels.append(face_name("pivot_bore", 1))  # Split cylindrical face in the raw STEP.
         rows = [
-            f"#{index} = ADVANCED_FACE ( '{face_name(feature, 1)}', ( #100 ), #101, .T. ) ;"
-            for index, feature in enumerate(export_features.feature_selectors(selected), 1)
+            f"#{index} = ADVANCED_FACE ( '{label}', ( #100 ), #101, .T. ) ;"
+            for index, label in enumerate(labels, 1)
         ]
         step.write_text(
             f"ISO-10303-21;\nHEADER;\n/* {doc.active} */\nENDSEC;\nDATA;\n"
@@ -1656,7 +1662,7 @@ def test_configuration_steps_require_explicit_spec_opt_in(monkeypatch) -> None:
     import export_features
     from dt_crank_handle_pivot_screw_spec import INSTALLED_CONFIG
 
-    stem = "ch_rocker_arm_tl_oblique_pivot_pin"
+    stem = "ch_rocker_arm"
     # Surviving feature owners do not opt into extra configuration STEP exports.
     assert export_features.step_configurations(stem) == ()
     original = export_features.source_tree
@@ -1679,16 +1685,19 @@ def produced_feature_bundles(tmp_path: Path, monkeypatch):
     import export_features
     from _export_feature_faces import face_name
 
-    stems = ("ch_pivot_shaft", "ch_rocker_arm_tl_oblique_pivot_pin")
+    stems = ("ch_pivot_shaft", "ch_rocker_arm")
     monkeypatch.setattr(export_features, "SUPPORTED_PARTS", stems)
     colors = {}
     digests = {}
     for stem in stems:
         manifest, step = export_features.bundle_paths(stem, tmp_path)
         step.parent.mkdir(parents=True)
+        labels = [face_name(feature, 1) for feature in export_features.feature_selectors(stem)]
+        if stem == "ch_rocker_arm":
+            labels.append(face_name("pivot_bore", 1))  # Split cylindrical face in the raw STEP.
         rows = [
-            f"#{index} = ADVANCED_FACE ( '{face_name(feature, 1)}', ( #100 ), #101, .T. ) ;"
-            for index, feature in enumerate(export_features.feature_selectors(stem), 1)
+            f"#{index} = ADVANCED_FACE ( '{label}', ( #100 ), #101, .T. ) ;"
+            for index, label in enumerate(labels, 1)
         ]
         step.write_bytes(
             ("ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\n"

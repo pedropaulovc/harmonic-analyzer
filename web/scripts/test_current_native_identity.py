@@ -262,7 +262,27 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         cad_map = json.loads((ROOT / "cad/config/current-identity-map.json").read_text(encoding="utf-8"))
         identity = CurrentNativeIdentity()
         retired = cad_map["retired_identities"]
-        self.assertEqual(len(retired), 18)
+        self.assertEqual(len(retired), 30)
+        oblique_reservations = {
+            "ch-rocker-arm-tl-oblique-pivot-pin": "MHA-CH-06-TL-23",
+            "ch-rocker-arm-tl-oblique-hub-pin": "MHA-CH-06-TL-25",
+            "ch-rocker-arm-tl-oblique-nut-bracket": "MHA-CH-06-TL-29",
+            "ch-rocker-arm-tl-oblique-pivot-cap": "MHA-CH-06-TL-30",
+            "ch-rocker-arm-tl-oblique-pivot-retainer": "MHA-CH-06-TL-31",
+            "ch-rocker-arm-tl-vn-oblique-bearing": "MHA-CH-06-TL-VN-52",
+            "ch-rocker-arm-tl-vn-oblique-block-screw": "MHA-CH-06-TL-VN-63",
+            "ch-rocker-arm-tl-vn-oblique-block-washer": "MHA-CH-06-TL-VN-70",
+            "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw": "MHA-CH-06-TL-VN-73",
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin": "MHA-CH-06-TL-VN-74",
+            "ch-rocker-arm-tl-vn-oblique-pivot-cotter": "MHA-CH-06-TL-VN-75",
+            "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire": "MHA-CH-06-TL-VN-76",
+        }
+        actual_oblique = {
+            target["stem"]: target["number"]
+            for row in retired for target in row["new_identities"]
+            if "-tl-oblique-" in target["stem"] or "-tl-vn-oblique-" in target["stem"]
+        }
+        self.assertEqual(actual_oblique, oblique_reservations)
         active_numbers = {target["number"] for row in cad_map["parts_and_assemblies"]
                           for target in row["new_identities"]}
         for row in retired:

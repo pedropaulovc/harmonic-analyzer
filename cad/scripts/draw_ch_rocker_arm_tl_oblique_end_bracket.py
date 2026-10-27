@@ -1,6 +1,6 @@
 r"""Create the drawing for the oblique-trammel jig's end bracket (MHA-CH-06-TL-28).
 
-One part, two off (the title block's quantity). A 68.9 x 19.05 x 12.7 flat at
+One part, two off (the title block's quantity). A 68.9 x 12.7 x 25.4 flat at
 2:1: the plan (the *Front view, looking down on the top face) carries the
 six tap stations from the inner end and the length, all stacked below it,
 the row's station from the -Y side face (left), the stock width (right) and
@@ -84,25 +84,23 @@ OUTPUTS = DrawingOutputs(
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
 # The 68.9 bracket at 2:1 (ruling A′: flush with the 1/2 x 6 bar's column
-# edge, four bar taps): the plan outline spans sheet x 96.1..233.9,
-# y 161..199 mm; the end view projects right of it on its centreline (third
-# angle), outline x 262..288; the 1:1 iso (about 60 x 45) stands right of
-# the end view, its note under it, all above the title block (x 216 on, up
-# to y 70) and under the 267 border. Ruling A′'s six station lanes push the
-# length's line 25 lower, so the plan rises 16.5. The tap callouts stand in
+# edge, four bar taps): the plan outline spans sheet x 96.1..233.9; the end
+# view projects right of it on its centreline (third angle). The 1/2 x 1 bar
+# on edge makes the end view 50.8 wide (outline x 267.6..318.4), so the 1:1
+# iso stands 20 further right, its note under it, all above the title block
+# (x 216 on, up to y 70) and under the 267 border. The tap callouts stand in
 # three tiers a layout-audit row pitch apart (c4-r8: at 6 the audit merged
-# each side's three blocks); the end view moves 18 right (its outline x
-# 280..306, 20 short of the iso) so the right-hand callouts no longer stand
-# over it and take the same low tiers as the left.
+# each side's three blocks), high enough that the right-hand ones clear the
+# end view; the plan drops 4 to keep the top tier under the border.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 ISO_SCALE = (1, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
-PLAN_CENTER = (0.165, 0.1965)
+PLAN_CENTER = (0.165, 0.1925)
 END_CENTER = (0.293, PLAN_CENTER[1])
-ISO_CENTER = (0.358, 0.195)
-ISO_NOTE_XY = (0.330, 0.160)
-ISO_HALF = (0.030, 0.0225)  # the iso's half extents (sheet m)
+ISO_CENTER = (0.378, 0.195)
+ISO_NOTE_XY = (0.350, 0.155)
+ISO_HALF = (0.030, 0.025)  # the iso's half extents (sheet m)
 
 # Every text position is a MODEL point (mm) off the part, mapped onto its
 # view at run time (draw_ch_rocker_arm_tl_oblique_feed_lever). In the plan
@@ -223,8 +221,8 @@ TAP_DRILLS = {"bar": BAR_TAP_DRILL, "kp08": KP08_TAP_DRILL}
 CALLOUT_GLYPHS = {"bar": 17, "kp08": 17}
 _TIER_PITCH = 2.0 * text_half_high(2) + STACK_PITCH + 0.1  # 7.46
 TAP_TIERS = tuple(
-    _HW + 1.0 + text_half_high(2) + 0.2 + k * _TIER_PITCH for k in range(3)
-)  # 12.99, 20.45, 27.91
+    _HW + 5.0 + text_half_high(2) + 0.2 + k * _TIER_PITCH for k in range(3)
+)
 
 
 def _tap_callout(
