@@ -195,6 +195,7 @@ def counter_upper_support_geometry() -> dict[str, str | float]:
         "full_thread_station_max_mm": spring_screw.FULL_THREAD_STATION_MAX,
         "head_dia_mm": spring_screw.HEAD_DIA,
         "head_height_mm": spring_screw.HEAD_H,
+        "head_relief_chamfer_mm": spring_screw.HEAD_RELIEF_CHAMFER,
         "slot_width_mm": spring_screw.SLOT_WIDTH,
         "slot_depth_mm": spring_screw.SLOT_DEPTH,
         "tip_chamfer_mm": spring_screw.TIP_CHAMFER,

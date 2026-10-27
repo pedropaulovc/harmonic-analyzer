@@ -7,23 +7,27 @@ strength case that chose the thread.
 
 Design (owner rulings 2026-10-27, #1951, rederived from the ch19 reference
 close-up page001_img02).  MHA-SM-04 is a slotted cheese-head screw turned
-from hardened 4140: a Ø11.50 x 5.50 flat-topped head, and under it the plain
-Ø6.35 body the MHA-SM-VN-51 loop bears on, which is also the blank the die
-cuts the 1/4-28 UNF thread on, toward the tip.  The thread runs into the
-blind 1/4-28 UNF-2B tap in the solid end piece of MHA-SM-01's 1/2 in arm.  The
+from hardened 4140: a Ø11.50 x 6.60 flat-topped head, its under-face edge
+relieved for the spring's transition wire, and under it the plain Ø6.35
+body the MHA-SM-VN-51 loop bears on, which is also the blank the die cuts
+the 1/4-28 UNF thread on, toward the tip.  The thread runs into the blind
+1/4-28 UNF-2B tap in the solid end piece of MHA-SM-01's 1/2 in arm.  The
 2026-09-21 rulings stand unchanged: the head is tightened until the loop is
 clamped to the end face and cannot swivel, with no torque value and no
-threadlocker.  The Ø11.50 head keeps 0.745 retention under an owner minor
+threadlocker.  The Ø11.50 head keeps 0.95 retention under an owner minor
 (sm_gooseneck_spring_joint).
 
-Every size takes the title block's band for its places except four limits,
+Every size takes the title block's band for its places except six limits,
 each named on the sheet for what it serves (drawing-guidelines.md rule 4):
 the body Ø's LIMIT band 6.32/6.20 (the thread blank, inside the 2A major
 band, and the loop's seat), the plain length's single "3.60 MIN" (the loop
 bears on the plain body), the full-thread station's single "5.80 MAX" from
 the under-head face ("TO FULL THREAD"; the end piece's counterbore clears the
-run-out short of it), and the under-head corner's single "R0.5 MAX" under the
-title block's INSIDE CORNERS R1.0 MAX (codjiflo round 4 on #1997).
+run-out short of it), the under-head corner's single "R0.5 MAX" under the
+title block's INSIDE CORNERS R1.0 MAX (codjiflo round 4 on #1997), and the
+head Ø's LIMIT band 11.60/11.40 with its relief chamfer's 1.50/1.40 (the
+loop's transition wire clears the head, and the flat inside the relief
+still bears the loop).
 """
 
 from __future__ import annotations
@@ -37,9 +41,11 @@ from sm_gooseneck_spring_screw_geom import (
     BODY_DIA_MIN,
     FULL_THREAD_STATION_MAX,
     HEAD_DIA,
-    HEAD_DIA_LOWER,
+    HEAD_DIA_UPPER,
     HEAD_H,
     HEAD_H_LOWER,
+    HEAD_RELIEF_CHAMFER_MAX,
+    HEAD_RELIEF_CHAMFER_MIN,
     MAJOR_DIA,
     PITCH,
     PLAIN_LENGTH_MIN,
@@ -53,7 +59,7 @@ THREAD_CALLOUT = THREAD
 CHAMFER_CALLOUT = "X 45 DEG"
 # Callouts the PART authors on its dimensions (the drawing only reads them
 # back; a drawing-side SetText can write through to the part, #1942).  The
-# four limits are tighter than the title block, so each names what it serves
+# six limits are tighter than the title block, so each names what it serves
 # (drawing-guidelines.md rule 4).  Below the value (the corner radius's
 # two rows too: SolidWorks prints no line break in the above compartment,
 # pn_pen_v_block_spec; its value stands over them on the leader's shoulder,
@@ -61,6 +67,10 @@ CHAMFER_CALLOUT = "X 45 DEG"
 COUNTER_SPRING_NUMBER = str(_config.parts("sm-vn-counter-spring")["number"])
 PLUG_NUMBER = str(_config.parts("sm-gooseneck")["number"])
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
+    "HeadProfile": {
+        "HeadDia": f"{COUNTER_SPRING_NUMBER}\nWIRE CLEARS",
+        "HeadReliefChamfer": f"{CHAMFER_CALLOUT};\n{COUNTER_SPRING_NUMBER}\nWIRE CLEARS",
+    },
     "ShankProfile": {
         "BodyDia": f"THREAD BLANK;\n{COUNTER_SPRING_NUMBER}\nLOOP SEAT",
         "TipChamfer": CHAMFER_CALLOUT,
@@ -92,13 +102,13 @@ if set(DIMENSION_CALLOUTS_BY_NAME) & set(DIMENSION_CALLOUTS_ABOVE_BY_NAME):
     raise AssertionError("a dimension carries callouts both above and below")
 
 # drawing-guidelines.md rule 17 (walls and webs): the head left under the
-# slot floor, at the shortest head, the deepest slot and a full under-head
-# edge break, stays above the 2.0 wall target (5.50 - 0.51 - 2.51 - 0.25 =
-# 2.23).
-EDGE_BREAK_MAX = float(_config.title_block("edge_break")["chamfer_max_mm"])
+# slot floor is thinnest at the slot's ends, over the relief chamfer's widest
+# rise.  At the shortest head, the deepest slot and the largest chamfer it
+# stays above the 2.0 wall target (6.60 - 0.51 - 2.51 - 1.50 = 2.08).
 SLOT_WEB_TARGET = 2.0
 SLOT_WEB_MIN = round(
-    HEAD_H + HEAD_H_LOWER - (SLOT_DEPTH + SLOT_DEPTH_UPPER) - EDGE_BREAK_MAX, 6
+    HEAD_H + HEAD_H_LOWER - (SLOT_DEPTH + SLOT_DEPTH_UPPER) - HEAD_RELIEF_CHAMFER_MAX,
+    6,
 )
 if SLOT_WEB_MIN < SLOT_WEB_TARGET:
     raise AssertionError(
@@ -145,10 +155,11 @@ _SEC_FLANK = 1.0 / math.cos(math.radians(30.0))
 # The clamp couple (codjiflo eccentric-clamp P1s on #1997): the loop hangs
 # below the screw axis, so the clamp's reaction on the head face need not sit
 # on the axis, and the shank carries the preload times that offset in both
-# states.  Statics bounds the offset by the head face itself: the smallest
-# head, less its 0.25 edge break, is the farthest the loop can bear
-# (#1951 rederived-photo sketch: e = 0 / uniform pressure / this bound).
-CLAMP_ECCENTRICITY_MAX = (HEAD_DIA + HEAD_DIA_LOWER) / 2.0 - EDGE_BREAK_MAX
+# states.  Statics bounds the offset by the flat head face itself: the relief
+# chamfer ends it at the largest head less the smallest chamfer, and a wire
+# resting on the face's plane meets the 45-degree relief nowhere past that
+# edge (#1951 rederived-photo sketch: e = 0 / uniform pressure / this bound).
+CLAMP_ECCENTRICITY_MAX = (HEAD_DIA + HEAD_DIA_UPPER) / 2.0 - HEAD_RELIEF_CHAMFER_MIN
 
 
 def clamp_preload_n(mu_clamp: float) -> float:
@@ -307,7 +318,7 @@ TIGHTENING_SF = {pair: round(sf, 3) for pair, sf in _TIGHTENING_SF_EXACT.items()
 OVERTIGHTEN_MARGIN = min(_TIGHTENING_SF_EXACT.values())
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "HeadProfile": {"HeadDia", "HeadHeight"},
+    "HeadProfile": {"HeadDia", "HeadHeight", "HeadReliefChamfer"},
     "ShankProfile": {
         "UnderHeadLength",
         "BodyDia",
@@ -320,7 +331,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 # Chamfers never need extra places (drawing-guidelines.md rule 3): the tip
 # chamfer rides the title block's .X band, and the under-head corner's
-# single "R0.5 MAX" its one place.  Every other mark prints at two.
+# single "R0.5 MAX" its one place.  Every other mark prints at two, the
+# relief chamfer's functional LIMIT band 1.50/1.40 among them.
 ONE_PLACE_DIMENSIONS = frozenset({"TipChamfer", "UnderHeadCornerR"})
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     feature: {name: 1 if name in ONE_PLACE_DIMENSIONS else 2 for name in sorted(names)}

@@ -2,7 +2,7 @@ r"""Build MHA-SM-04, the gooseneck counter-spring clamp screw.
 
 A made slotted cheese-head screw turned from 1/2-in 4140 hardened to HRC 32,
 the grade its clamp strength needs (owner rulings 2026-10-27, #1951).  Under
-the flat-topped Ø11.50 x 5.50 head, a plain Ø6.35 body is the MHA-SM-VN-51
+the flat-topped Ø11.50 x 6.60 head, a plain Ø6.35 body is the MHA-SM-VN-51
 counter spring's loop seat.  It is also the 1/4-28 UNF thread's own blank,
 turned to its LIMIT band, and the die cuts the thread on it toward the tip.
 The thread runs into the blind 1/4-28 tap in the solid end piece of the
@@ -13,10 +13,11 @@ piece's flush face.  Sizes and bands live in
 
 Layout (``sm_gooseneck_spring_screw_geom`` frame): axis Z, the under-head face
 at z=0.  ``HeadProfile`` revolves the flat-topped cylinder head in +Z (top
-face at HEAD_H); ``ShankProfile`` revolves the body in -Z: one plain cylinder
-from the R0.5 MAX under-head corner to a 45-degree tip chamfer.  The body and
-the thread share the basic major cylinder; the thread callout defines the
-thread.  The driver slot is sketched on a plane at the top face and cut
+face at HEAD_H), its under-face edge relieved by a 45-degree chamfer for the
+loop's transition wire; ``ShankProfile`` revolves the body in -Z: one plain
+cylinder from the R0.5 MAX under-head corner to a 45-degree tip chamfer.  The
+body and the thread share the basic major cylinder; the thread callout defines
+the thread.  The driver slot is sketched on a plane at the top face and cut
 SLOT_DEPTH down into the head along local X.  One hidden reference sketch,
 ``StationReference``, carries three printed stations only: the overall length
 on the axis, and the plain length's MIN and the full-thread station's MAX,
@@ -78,7 +79,14 @@ from sm_gooseneck_spring_screw_geom import (
     FULL_THREAD_STATION_MAX_BAND,
     FULL_THREAD_STATION_MAX_TOL_TYPE,
     HEAD_DIA,
+    HEAD_DIA_LOWER,
+    HEAD_DIA_TOL_TYPE,
+    HEAD_DIA_UPPER,
     HEAD_H,
+    HEAD_RELIEF_CHAMFER,
+    HEAD_RELIEF_CHAMFER_LOWER,
+    HEAD_RELIEF_CHAMFER_TOL_TYPE,
+    HEAD_RELIEF_CHAMFER_UPPER,
     LENGTH,
     OVERALL_LENGTH,
     PLAIN_LENGTH_MIN,
@@ -156,8 +164,11 @@ if not (
 ):
     raise AssertionError("station witnesses overlap or leave the plain body")
 
-# Head: the flat-topped cylinder.
-V_HEAD = math.pi * HEAD_R**2 * HEAD_H
+# Head: the flat-topped cylinder less the relief chamfer's corner triangle
+# (centroid HEAD_R - HEAD_RELIEF_CHAMFER/3).
+V_HEAD = math.pi * HEAD_R**2 * HEAD_H - math.pi * HEAD_RELIEF_CHAMFER**2 * (
+    HEAD_R - HEAD_RELIEF_CHAMFER / 3.0
+)
 # Shank: the body cylinder less the tip chamfer's corner triangle (centroid
 # BODY_R - TIP_CHAMFER/3), plus the under-head corner round: its spandrel,
 # (1 - pi/4) R^2, swept about the axis at its centroid, (10 - 3 pi) /
@@ -255,6 +266,7 @@ async def build(adapter) -> dict[str, str]:
     for name, value in (
         ("HeadDia", HEAD_DIA),
         ("HeadHeight", HEAD_H),
+        ("HeadReliefChamfer", HEAD_RELIEF_CHAMFER),
         ("UnderHeadLength", LENGTH),
         ("BodyDia", BODY_DIA),
         ("UnderHeadCornerR", UNDERHEAD_CORNER_R),
@@ -269,9 +281,11 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     # Head revolve on the Right plane: sketch (u, v) maps to model (-Z, Y), so
-    # the head (+Z) lies at negative u, the flat top at u = -HEAD_H.
+    # the head (+Z) lies at negative u, the flat top at u = -HEAD_H.  The
+    # relief chamfer cuts the under-face's outer corner (u = 0, v = HEAD_R).
     head = SketchDims()
     u_top = -HEAD_H
+    relief = HEAD_RELIEF_CHAMFER
     check("create_sketch head profile", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     try:
@@ -279,9 +293,15 @@ async def build(adapter) -> dict[str, str]:
             "head axis centerline",
             await adapter.add_centerline(u_top, 0.0, 0.0, 0.0),
         )
-        head_seat, head_side, head_top, head_close = await add_line_chain(
+        head_seat, head_relief, head_side, head_top, head_close = await add_line_chain(
             adapter,
-            [(0.0, 0.0), (0.0, HEAD_R), (u_top, HEAD_R), (u_top, 0.0)],
+            [
+                (0.0, 0.0),
+                (0.0, HEAD_R - relief),
+                (-relief, HEAD_R),
+                (u_top, HEAD_R),
+                (u_top, 0.0),
+            ],
             close=True,
         )
     finally:
@@ -314,13 +334,35 @@ async def build(adapter) -> dict[str, str]:
         adapter, axis, head_side, (u_top / 2.0, HEAD_R + 4.0), "HeadDia"
     )
     head.record("HeadDia", '"HeadDia"')
+    # The relief's axial leg is the printed size; its radial leg equals it by
+    # equation: 45 degrees (the tip chamfer's recipe).
+    await dimension_between(
+        adapter,
+        f"{head_relief}.start",
+        f"{head_relief}.end",
+        "horizontal_distance",
+        relief,
+        "head relief chamfer",
+    )
+    head.record("HeadReliefChamfer", '"HeadReliefChamfer"')
+    await dimension_between(
+        adapter,
+        f"{head_relief}.start",
+        f"{head_relief}.end",
+        "vertical_distance",
+        relief,
+        "head relief chamfer rise",
+    )
+    head.record("HeadReliefChamferRise", '"HeadReliefChamfer"')
     await ensure_fully_defined(adapter, "head profile sketch")
     check("exit_sketch head profile", await adapter.exit_sketch())
     name_last_feature(adapter, "HeadProfile")
     drive_jobs += head.apply(adapter, "HeadProfile")
     check("revolve head", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Head")
-    await volume_check(adapter, "flat-topped cheese head", V_HEAD, 0.005 * V_HEAD)
+    await volume_check(
+        adapter, "flat-topped cheese head with relief chamfer", V_HEAD, 0.005 * V_HEAD
+    )
 
     # Shank revolve on the Right plane, toward +u (model -Z).  The body runs
     # flat from the under-head corner's round to the tip chamfer.  The round
@@ -597,14 +639,30 @@ async def build(adapter) -> dict[str, str]:
     # 1/4-28 UNF-2A major band; the plain length as the single "3.60 MIN"
     # from the under-head face, so the loop always bears on the plain body;
     # the full-thread station as the single "5.80 MAX", so the end piece's
-    # counterbore clears the run-out.  Every other mark takes the title
-    # block's band.
+    # counterbore clears the run-out; the head Ø and its relief chamfer as
+    # the LIMIT bands 11.60/11.40 and 1.50/1.40, so the loop's transition
+    # wire clears the head and the flat inside the relief still bears the
+    # loop.  Every other mark takes the title block's band.
     _limit_band(
         adapter,
         "ShankProfile",
         "BodyDia",
         (BODY_DIA_LOWER, BODY_DIA_UPPER),
         BODY_DIA_TOL_TYPE,
+    )
+    _limit_band(
+        adapter,
+        "HeadProfile",
+        "HeadDia",
+        (HEAD_DIA_LOWER, HEAD_DIA_UPPER),
+        HEAD_DIA_TOL_TYPE,
+    )
+    _limit_band(
+        adapter,
+        "HeadProfile",
+        "HeadReliefChamfer",
+        (HEAD_RELIEF_CHAMFER_LOWER, HEAD_RELIEF_CHAMFER_UPPER),
+        HEAD_RELIEF_CHAMFER_TOL_TYPE,
     )
     # The under-head corner's R0.5 MAX (codjiflo round 4 on #1997): the
     # modelled radius is the limit, the band runs from sharp up to it.

@@ -245,7 +245,8 @@ def test_isolated_counter_provenance_identifies_the_whole_made_support(
     assert support["full_thread_station_max_mm"] == 5.80
     assert support["underhead_length_mm"] == 19.5
     assert support["head_dia_mm"] == 11.5
-    assert support["head_height_mm"] == 5.5
+    assert support["head_height_mm"] == 6.6
+    assert support["head_relief_chamfer_mm"] == 1.45
     assert support["slot_width_mm"] == 1.6
     assert support["slot_depth_mm"] == 2.0
     assert not any(
@@ -272,6 +273,7 @@ def test_isolated_counter_provenance_identifies_the_whole_made_support(
         "underhead_length_mm",
         "head_dia_mm",
         "head_height_mm",
+        "head_relief_chamfer_mm",
         "slot_width_mm",
         "slot_depth_mm",
         "tip_chamfer_mm",

@@ -267,9 +267,108 @@ def test_head_retains_the_eye_under_its_declared_minor() -> None:
     smallest_head = screw.HEAD_DIA + screw.HEAD_DIA_LOWER
     retention = (smallest_head - spring.EYE_ID_MM) / 2.0
     assert joint.HEAD_RETENTION_MIN == pytest.approx(retention)
-    assert retention == pytest.approx(0.745, abs=5e-4)
+    assert retention == pytest.approx(0.95, abs=5e-4)
     assert 0.0 < retention < joint.HEAD_RETENTION_TARGET == 1.0
     assert screw.BODY_DIA_MAX < spring.EYE_ID_MM
+
+
+def _upper_transition_section(steps: int = 4000):
+    """The vendor's +X (upper) transition wire, in the head's axial section.
+
+    The four B-curve control points are the vendor model's
+    (diag_build_1330K524._transition_ctrl), placed by the reference pose's
+    rotation (half-turn clocking) about the upper eye, as
+    spring_mount_geom.counter_half_turn_clearances places the half-turn.
+    Returns, per centreline sample, the station along the screw axis from
+    the free-gap head face (positive into the head) and the radial offset
+    from the eye's own axis line, as (s, dy, dz); the screw axis stands the
+    eye's body-bearing offset above it.
+    """
+    from diagnostics import diag_build_1330K524 as vendor
+    import spring_mount_geom as mounts
+
+    pose = mounts.COUNTER_REFERENCE_POSE
+    ctrl = vendor._transition_ctrl(pose.length_mm, positive_x=True)
+    eye = spring.end_centers_mm(pose.length_mm)[1]
+    rows = pose.rotation_rows
+    head_x = mounts.GOOSENECK_END_X + gooseneck.SPRING_EYE_GAP
+    section = []
+    for index in range(steps + 1):
+        t = index / steps
+        weights = ((1 - t) ** 3, 3 * (1 - t) ** 2 * t, 3 * (1 - t) * t * t, t**3)
+        local = [
+            sum(w * point[k] for w, point in zip(weights, ctrl)) - eye[k]
+            for k in range(3)
+        ]
+        x, y, z = (
+            sum(local[k] * rows[k][j] for k in range(3))
+            + (pose.upper_eye_xy + (0.0,))[j]
+            for j in range(3)
+        )
+        section.append((x - head_x, y - pose.upper_eye_xy[1], z))
+    return section
+
+
+def _head_section_clearance(s, rho, head_r, relief, head_h=screw.HEAD_H):
+    """Signed distance from a section point to the relieved head's profile:
+    (0, 0)-(0, R - c)-(c, R)-(H, R)-(H, 0), negative inside."""
+    corners = ((0.0, 0.0), (0.0, head_r - relief), (relief, head_r), (head_h, head_r))
+    nearest = math.inf
+    for (s0, r0), (s1, r1) in zip(corners, corners[1:] + ((head_h, 0.0),)):
+        ds, dr = s1 - s0, r1 - r0
+        length2 = ds * ds + dr * dr
+        if length2 == 0.0:
+            continue  # an unrelieved head's zero-length relief
+        u = max(0.0, min(1.0, ((s - s0) * ds + (rho - r0) * dr) / length2))
+        nearest = min(nearest, math.hypot(s - s0 - u * ds, rho - r0 - u * dr))
+    inside = 0.0 <= s <= head_h and rho <= min(head_r, head_r - relief + s)
+    return -nearest if inside else nearest
+
+
+def test_head_relief_clears_the_vendor_transition_wire() -> None:
+    """Native probe 20261027T193324627Z: the unrelieved Ø11.50 edge cut
+    0.21 into the upper loop's transition wire.  The relief clears it at
+    every printed limit of the head Ø, the chamfer and the body (the eye's
+    offset), on the free-gap seat the head face holds the loop's head-side
+    end at (that end carries the transition, so clamping moves it with the
+    head)."""
+    section = _upper_transition_section()
+    # The distance is 1-Lipschitz along the wire: half the widest sample
+    # spacing bounds a closer point between two samples.
+    sampling = max(math.dist(a, b) for a, b in zip(section, section[1:])) / 2.0
+
+    def least(head_dia, relief, body_dia):
+        axis = (spring.EYE_ID_MM - body_dia) / 2.0
+        return min(
+            _head_section_clearance(
+                s, math.hypot(dy - axis, dz), head_dia / 2.0, relief
+            )
+            for s, dy, dz in section
+        ) - (joint.WIRE_R + sampling)
+
+    # The unrelieved nominal head reproduces the native interference.
+    assert least(screw.HEAD_DIA, 0.0, screw.BODY_DIA) == pytest.approx(-0.21, abs=0.01)
+    worst = min(
+        least(head, relief, body)
+        for head in (
+            screw.HEAD_DIA + screw.HEAD_DIA_LOWER,
+            screw.HEAD_DIA + screw.HEAD_DIA_UPPER,
+        )
+        for relief in (screw.HEAD_RELIEF_CHAMFER_MIN, screw.HEAD_RELIEF_CHAMFER_MAX)
+        for body in (screw.BODY_DIA_MIN, screw.BODY_DIA_MAX, screw.BODY_DIA)
+    )
+    assert worst > 0.0
+    # The CAD seat (the nominal head and relief) clears it too.
+    assert least(screw.HEAD_DIA, screw.HEAD_RELIEF_CHAMFER, screw.BODY_DIA) > worst
+
+
+def test_relieved_head_flat_still_bears_the_loop() -> None:
+    flat = (screw.HEAD_DIA + screw.HEAD_DIA_LOWER) / 2.0 - screw.HEAD_RELIEF_CHAMFER_MAX
+    pass_r = spring.COIL_MEAN_RADIUS_MM - (spring.EYE_ID_MM - screw.BODY_DIA_MAX) / 2.0
+    assert joint.HEAD_FLAT_RADIUS_MIN == pytest.approx(flat)
+    assert joint.LOOP_PASS_RADIUS_MAX == pytest.approx(pass_r)
+    assert joint.HEAD_FLAT_BEARING_MARGIN_MIN == pytest.approx(flat - pass_r)
+    assert joint.HEAD_FLAT_BEARING_MARGIN_MIN > 0.0
 
 
 def _declared(package: str):
@@ -588,11 +687,13 @@ def test_bending_span_reaches_the_receiver_first_full_thread() -> None:
     assert screw_spec._SECTIONS[-1][1] == screw_spec.STRENGTH_SPAN
 
 
-def test_clamp_couple_is_bounded_by_the_smallest_head_face() -> None:
+def test_clamp_couple_is_bounded_by_the_relieved_head_flat() -> None:
+    # The flat ends at the largest head less the smallest relief; a wire on
+    # the face's plane meets the 45-degree relief nowhere past it.
     spec = screw_spec
-    head = (screw.HEAD_DIA + screw.HEAD_DIA_LOWER) / 2.0 - joint.EDGE_BREAK
-    assert spec.CLAMP_ECCENTRICITY_MAX == pytest.approx(head)
-    assert head == pytest.approx(5.245)
+    flat = (screw.HEAD_DIA + screw.HEAD_DIA_UPPER) / 2.0 - screw.HEAD_RELIEF_CHAMFER_MIN
+    assert spec.CLAMP_ECCENTRICITY_MAX == pytest.approx(flat)
+    assert flat == pytest.approx(4.40)
     worst = (min(spec.CLAMP_FRICTIONS), max(spec.THREAD_FRICTIONS))
     # The couple is what governs: on the axis both SFs are several times it.
     assert spec.service_safety_factor(*worst, 0.0) > 2.0 * spec.service_safety_factor(

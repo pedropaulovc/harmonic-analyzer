@@ -78,8 +78,12 @@ def test_spec_is_the_single_source_of_marked_dimensions() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.SIDE_KEEP) | set(drawing.END_KEEP) == marked
     assert not set(drawing.SIDE_KEEP) & set(drawing.END_KEEP)
-    # The flat-topped head prints its Ø and height only.
-    assert spec.DRAWING_DIMENSIONS["HeadProfile"] == {"HeadDia", "HeadHeight"}
+    # The flat-topped head prints its Ø, height and relief chamfer only.
+    assert spec.DRAWING_DIMENSIONS["HeadProfile"] == {
+        "HeadDia",
+        "HeadHeight",
+        "HeadReliefChamfer",
+    }
     assert spec.DRAWING_DIMENSIONS["ShankProfile"] == {
         "UnderHeadLength",
         "BodyDia",
@@ -93,8 +97,9 @@ def test_spec_is_the_single_source_of_marked_dimensions() -> None:
     }
     # The slot width is only true-size in the head-end view.
     assert set(drawing.END_KEEP) == {"SlotWidth"}
-    # The chamfer's rise is held by equation, never printed a second time.
+    # Each chamfer's rise is held by equation, never printed a second time.
     assert "TipChamferRise" not in marked
+    assert "HeadReliefChamferRise" not in marked
     assert set(spec.DRAWING_DIMENSIONS) == {
         "HeadProfile",
         "ShankProfile",
@@ -116,10 +121,11 @@ def test_model_owns_places_and_bands() -> None:
     assert one_place == {"TipChamfer", "UnderHeadCornerR"}
     assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {1, 2}
     assert spec.REFERENCE_DIMENSIONS == {"OverallLength"}
-    # No mark carries a shared-helper band: the body Ø is a native LIMIT band
-    # and the plain length, the full-thread station and the under-head corner
-    # native single limits, all set by the part (owner rulings 2026-10-27,
-    # #1951); every other mark takes the title block's band.
+    # No mark carries a shared-helper band: the body Ø, the head Ø and the
+    # relief chamfer are native LIMIT bands and the plain length, the
+    # full-thread station and the under-head corner native single limits, all
+    # set by the part (owner rulings 2026-10-27, #1951); every other mark
+    # takes the title block's band.
     assert model_toleranced_dimensions(part) == {}
     tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
 
@@ -136,6 +142,18 @@ def test_model_owns_places_and_bands() -> None:
             "'BodyDia'",
             "(BODY_DIA_LOWER, BODY_DIA_UPPER)",
             "BODY_DIA_TOL_TYPE",
+        ),
+        (
+            "'HeadProfile'",
+            "'HeadDia'",
+            "(HEAD_DIA_LOWER, HEAD_DIA_UPPER)",
+            "HEAD_DIA_TOL_TYPE",
+        ),
+        (
+            "'HeadProfile'",
+            "'HeadReliefChamfer'",
+            "(HEAD_RELIEF_CHAMFER_LOWER, HEAD_RELIEF_CHAMFER_UPPER)",
+            "HEAD_RELIEF_CHAMFER_TOL_TYPE",
         ),
     }
     # "3.60 MIN", "5.80 MAX" and "R0.5 MAX": the model value IS the printed
@@ -169,6 +187,9 @@ def test_model_owns_places_and_bands() -> None:
     assert calls("_single_limit") == set()
     assert calls("set_dimension_prefix") == set()
     assert geom.BODY_DIA_TOL_TYPE == 3  # swTolLIMIT
+    assert geom.HEAD_RELIEF_CHAMFER_TOL_TYPE == 3  # swTolLIMIT
+    assert geom.HEAD_DIA_TOL_TYPE == 3  # swTolLIMIT
+    assert (geom.HEAD_DIA_LOWER, geom.HEAD_DIA_UPPER) == (-0.10, 0.10)
     assert geom.PLAIN_LENGTH_MIN_TOL_TYPE == 5  # swTolMIN
     assert geom.FULL_THREAD_STATION_MAX_TOL_TYPE == 6  # swTolMAX
     assert geom.UNDERHEAD_CORNER_R == 0.50
@@ -197,26 +218,51 @@ def test_policy_sheet_carries_no_gdt_or_render_time_precision() -> None:
 
 
 def test_geometry_matches_the_settled_design() -> None:
-    # Owner rulings 2026-10-27 (#1951): a flat-topped Ø11.50 x 5.50 cheese
-    # head over a plain Ø6.35 body, 1/4-28 UNF.
+    # Owner rulings 2026-10-27 (#1951): a flat-topped Ø11.50 cheese head over
+    # a plain Ø6.35 body, 1/4-28 UNF; the head 6.60 tall under its relief
+    # chamfer (ruling (A)).
     assert geom.HEAD_DIA == 11.50
-    assert geom.HEAD_H == 5.50
+    assert geom.HEAD_H == 6.60
     assert geom.SLOT_WIDTH == 1.60
     assert geom.SLOT_DEPTH == 2.00
-    assert geom.SLOT_FLOOR_Z == pytest.approx(3.50)
+    assert geom.SLOT_FLOOR_Z == pytest.approx(4.60)
     assert geom.LENGTH == 19.50
     assert geom.MAJOR_DIA == pytest.approx(0.25 * 25.4)
     assert geom.BODY_DIA == geom.MAJOR_DIA
     assert geom.PITCH == pytest.approx(25.4 / 28)
     assert geom.TIP_CHAMFER == 0.50
-    assert geom.OVERALL_LENGTH == pytest.approx(25.0)
+    assert geom.OVERALL_LENGTH == pytest.approx(26.10)
+    assert geom.HEAD_RELIEF_CHAMFER == 1.45
+    assert (geom.HEAD_RELIEF_CHAMFER_MIN, geom.HEAD_RELIEF_CHAMFER_MAX) == (
+        pytest.approx((1.40, 1.50))
+    )
 
 
 def test_slot_leaves_the_rule_17_head_web() -> None:
-    # Shortest head, deepest slot, full title-block edge break.
-    assert spec.EDGE_BREAK_MAX == 0.25
-    assert spec.SLOT_WEB_MIN == pytest.approx(5.50 - 0.51 - 2.51 - 0.25)
+    # Shortest head, deepest slot, largest relief chamfer: the slot's ends.
+    assert spec.SLOT_WEB_MIN == pytest.approx(6.60 - 0.51 - 2.51 - 1.50)
     assert spec.SLOT_WEB_MIN >= spec.SLOT_WEB_TARGET == 2.0
+
+
+def test_head_and_relief_bands_name_the_wire_they_clear() -> None:
+    # drawing-guidelines.md rule 4: each LIMIT band names what it serves.
+    assert spec.DIMENSION_CALLOUTS["HeadProfile"] == {
+        "HeadDia": f"{spec.COUNTER_SPRING_NUMBER}\nWIRE CLEARS",
+        "HeadReliefChamfer": f"X 45 DEG;\n{spec.COUNTER_SPRING_NUMBER}\nWIRE CLEARS",
+    }
+    assert spec.DRAWING_PRECISION_BY_NAME["HeadDia"] == 2
+    assert spec.DRAWING_PRECISION_BY_NAME["HeadReliefChamfer"] == 2
+    # The head Ø's block stands between the head-end view's slot width and
+    # the head's top face, centred on its own dimension line.
+    assert drawing.HEAD_DIA_TEXT_HEIGHT == drawing.block_height(2, 2)
+    x, y = drawing.SIDE_KEEP["HeadDia"]
+    assert y == drawing.SIDE_CENTER[1]
+    right = x + drawing.HEAD_DIA_TEXT_WIDTH / 2.0
+    left = x - drawing.HEAD_DIA_TEXT_WIDTH / 2.0
+    assert right <= drawing.TOP_X - 0.005
+    assert left >= drawing.END_KEEP["SlotWidth"][0] + 0.010
+    head_half = geom.HEAD_DIA * drawing._S / 2000.0
+    assert drawing.HEAD_DIA_TEXT_HEIGHT < 2.0 * head_half
 
 
 def test_body_limit_band_is_the_thread_blank_inside_the_2a_major() -> None:
@@ -404,18 +450,24 @@ def test_shank_profile_is_corner_plain_body_and_tip() -> None:
     assert build.count("blank_sketch(adapter, ") == 1
 
 
-def test_head_profile_is_a_flat_topped_cylinder() -> None:
+def test_head_profile_is_a_flat_topped_cylinder_with_its_relief() -> None:
     build = Path(part.__file__).read_text(encoding="utf-8")
     head = build[
         build.index("create_sketch head profile") : build.index(
             "exit_sketch head profile"
         )
     ]
-    assert "(0.0, 0.0), (0.0, HEAD_R), (u_top, HEAD_R), (u_top, 0.0)" in head
+    # The relief cuts the under-face's outer corner at 45 degrees: its axial
+    # leg is the printed size, its radial leg follows by equation.
+    assert "(0.0, HEAD_R - relief)," in head
+    assert "(-relief, HEAD_R)," in head
     assert "add_arc" not in head
     assert """head.record("HeadHeight", '"HeadHeight"')""" in head
     assert """head.record("HeadDia", '"HeadDia"')""" in head
-    assert head.count("head.record(") == 2
+    assert """head.record("HeadReliefChamfer", '"HeadReliefChamfer"')""" in head
+    assert """head.record("HeadReliefChamferRise", '"HeadReliefChamfer"')""" in head
+    assert head.count("head.record(") == 4
+    assert '("HeadReliefChamfer", HEAD_RELIEF_CHAMFER)' in build
 
 
 def test_thread_callout_names_the_size_but_not_the_title_block_class() -> None:
@@ -456,9 +508,11 @@ def test_part_sheet_carries_no_assembly_instruction() -> None:
 
 
 def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
-    r_head, h_head = 5.75, 5.5
+    r_head, h_head, relief = 5.75, 6.6, 1.45
     r_body, length, chamfer = 0.25 * 25.4 / 2.0, 19.5, 0.5
-    assert part.V_HEAD == pytest.approx(math.pi * r_head**2 * h_head)
+    # The relief's corner triangle (legs 1.45), by Pappus at its centroid.
+    relief_ring = 2.0 * math.pi * (r_head - relief / 3.0) * relief**2 / 2.0
+    assert part.V_HEAD == pytest.approx(math.pi * r_head**2 * h_head - relief_ring)
     # The body cylinder less, by Pappus, the tip chamfer's corner triangle
     # (legs 0.5, centroid r_body - 0.5/3), plus the under-head corner round's
     # spandrel ring, integrated on a midpoint grid over (axial u, radius r):
@@ -683,6 +737,35 @@ def test_underhead_corner_radius_reads_in_free_space() -> None:
     assert right <= drawing.THREAD_NOTE_XY[0] - 0.015
 
 
+def test_relief_chamfer_reads_over_the_head_clear_of_its_neighbours() -> None:
+    """The relief's '1.50/1.40' over its three callout rows stands left of
+    its 5.8-mm span, over the head: above the slot depth's text and left of
+    the full-thread block, so no line strikes its text."""
+    scale = drawing._S / 1000.0
+    assert drawing.UNDERHEAD_X - drawing.HEAD_RELIEF_X == pytest.approx(
+        geom.HEAD_RELIEF_CHAMFER * scale
+    )
+    assert drawing.TOP_X < drawing.SLOT_FLOOR_X < drawing.HEAD_RELIEF_X
+    assert drawing.HEAD_RELIEF_TEXT_HEIGHT == drawing.block_height(2, 3)
+    x, y = drawing.SIDE_KEEP["HeadReliefChamfer"]
+    assert (x, y) == drawing.HEAD_RELIEF_TEXT_XY
+    left = x - drawing.HEAD_RELIEF_TEXT_WIDTH / 2.0
+    right = x + drawing.HEAD_RELIEF_TEXT_WIDTH / 2.0
+    bottom = drawing.HEAD_RELIEF_LINE_Y
+    top = bottom + drawing.HEAD_RELIEF_TEXT_HEIGHT
+    assert y == pytest.approx((bottom + top) / 2.0)
+    assert right <= drawing.HEAD_RELIEF_X - 0.003 + 1e-12
+    # Over the slot depth's text (centred on its anchor, 4.5 mm of ink).
+    sd_x, sd_y = drawing.SIDE_KEEP["SlotDepth"]
+    assert bottom - (sd_y + 0.0045 / 2.0) >= 0.005
+    # Left of the full-thread block, whose height it shares.
+    ft_x, _ft_y = drawing.SIDE_KEEP["FullThread"]
+    assert ft_x - drawing.FULL_THREAD_TEXT_WIDTH / 2.0 - right >= 0.002
+    # Right of the head Ø's text and inside the border's top.
+    assert left > drawing.SIDE_KEEP["HeadDia"][0] + 0.002
+    assert top <= 0.2667 - 0.010
+
+
 def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
     build = Path(part.__file__).read_text(encoding="utf-8")
     blank = 'blank_sketch(adapter, "StationReference")'
@@ -697,11 +780,13 @@ def test_readback_contract_mirrors_every_printed_and_callout_control() -> None:
     printed = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
     assert set(drawing.PRINTED_DIMENSIONS) == printed
     limits = {name: row for name, row in drawing.PRINTED_DIMENSIONS.items() if row[1]}
-    # The builder's limits: the body Ø's LIMIT band, the plain length's
-    # single MIN, the full-thread station's and the under-head corner's
-    # single MAX.
+    # The builder's limits: the body Ø's, the head Ø's and the relief
+    # chamfer's LIMIT bands, the plain length's single MIN, the full-thread
+    # station's and the under-head corner's single MAX.
     assert limits == {
         "BodyDia": (geom.BODY_DIA, 3),
+        "HeadDia": (11.50, 3),
+        "HeadReliefChamfer": (1.45, 3),
         "PlainLength": (3.60, 5),
         "FullThread": (5.80, 6),
         "UnderHeadCornerR": (0.5, 6),
@@ -720,14 +805,20 @@ def test_readback_contract_mirrors_every_printed_and_callout_control() -> None:
     assert "for name in sorted(REFERENCE_DIMENSIONS):" in source
     assert drawing.LIMIT_DEVIATIONS == {
         "BodyDia": (geom.BODY_DIA_LOWER, geom.BODY_DIA_UPPER),
+        "HeadDia": (geom.HEAD_DIA_LOWER, geom.HEAD_DIA_UPPER),
+        "HeadReliefChamfer": (
+            geom.HEAD_RELIEF_CHAMFER_LOWER,
+            geom.HEAD_RELIEF_CHAMFER_UPPER,
+        ),
     }
     assert 'offset_dimension_text(adapter, side_annotations, {"BodyDia": ' in source
     assert drawing.PRINTED_DIMENSIONS["TipChamfer"] == (geom.TIP_CHAMFER, 0)
-    assert drawing.PRINTED_DIMENSIONS["OverallLength"][0] == pytest.approx(25.0)
-    # Unprinted control: the chamfer's rise, held to its axial leg so the
-    # "X 45 DEG" callout is true.
+    assert drawing.PRINTED_DIMENSIONS["OverallLength"][0] == pytest.approx(26.10)
+    # Unprinted controls: each chamfer's rise, held to its axial leg so the
+    # "X 45 DEG" callouts are true.
     assert drawing.SOURCE_ONLY_DIMENSIONS == {
         "TipChamferRise@ShankProfile": (geom.TIP_CHAMFER, 0),
+        "HeadReliefChamferRise@HeadProfile": (geom.HEAD_RELIEF_CHAMFER, 0),
     }
     # The part authors every callout on the dimension it marks; the drawing
     # writes none.  The full-thread limit alone carries its callout above
@@ -735,6 +826,8 @@ def test_readback_contract_mirrors_every_printed_and_callout_control() -> None:
     callouts = spec.DIMENSION_CALLOUTS_BY_NAME
     assert set(callouts) == {
         "BodyDia",
+        "HeadDia",
+        "HeadReliefChamfer",
         "TipChamfer",
         "UnderHeadCornerR",
         "PlainLength",

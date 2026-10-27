@@ -1,16 +1,17 @@
 r"""Create the MHA-SM-04 gooseneck spring screw manufacturing drawing.
 
 The SLDPRT remains authoritative.  MHA-SM-04 is a slotted cheese-head screw
-(owner rulings 2026-10-27, #1951): a flat-topped Ø11.50 x 5.50 head over a
-plain Ø6.35 body that is both the loop seat and the 1/4-28 UNF thread's
-blank.  A screw carries no datum and no geometric-control frame
-(drawing-guidelines.md rule 5 (avoid excessive GD&T)): the body Ø prints as
-the part's stacked LIMIT band, the plain length as the part's single
-"3.60 MIN" and the full-thread station as its single "5.80 MAX", both from
-the under-head face, the under-head corner as its single "R0.5 MAX" (codjiflo
-round 4 on #1997), and every other size is an ordinary model dimension at
-its part-authored places under the title block's band for those places (.X
-for the tip chamfer and the corner, .XX for the rest).
+(owner rulings 2026-10-27, #1951): a flat-topped Ø11.50 x 6.60 head, its
+under-face edge relieved for the spring's transition wire, over a plain
+Ø6.35 body that is both the loop seat and the 1/4-28 UNF thread's blank.  A
+screw carries no datum and no geometric-control frame (drawing-guidelines.md
+rule 5 (avoid excessive GD&T)): the body Ø, the head Ø and the head's relief
+chamfer print as the part's stacked LIMIT bands, the plain length as the part's
+single "3.60 MIN" and the full-thread station as its single "5.80 MAX", both
+from the under-head face, the under-head corner as its single "R0.5 MAX"
+(codjiflo round 4 on #1997), and every other size is an ordinary model
+dimension at its part-authored places under the title block's band for those
+places (.X for the tip chamfer and the corner, .XX for the rest).
 
 The screw axis is model +Z, so the ``*Right`` view already lays it horizontal
 as it sits in the lathe: model +Z runs to paper-LEFT, putting the head on the
@@ -73,7 +74,14 @@ from sm_gooseneck_spring_screw_geom import (
     FULL_THREAD_STATION_MAX,
     FULL_THREAD_STATION_MAX_TOL_TYPE,
     HEAD_DIA,
+    HEAD_DIA_LOWER,
+    HEAD_DIA_TOL_TYPE,
+    HEAD_DIA_UPPER,
     HEAD_H,
+    HEAD_RELIEF_CHAMFER,
+    HEAD_RELIEF_CHAMFER_LOWER,
+    HEAD_RELIEF_CHAMFER_TOL_TYPE,
+    HEAD_RELIEF_CHAMFER_UPPER,
     LENGTH,
     OVERALL_LENGTH,
     PLAIN_LENGTH_MIN,
@@ -110,21 +118,22 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 # Both orthographic views print at the sheet scale, so neither needs a caption.
-# 4:1 lays the 25.00 profile 100 mm long and the 1.6 slot 6.4 mm wide.
+# 4:1 lays the 26.10 profile 104.4 mm long and the 1.6 slot 6.4 mm wide.
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
 # The under-head face stays at sheet x 0.197, where the reviewed renders of
-# the earlier screw put it (farm run 20261027T053051351Z): the head and the
-# head-end view keep their places and the 19.50 body runs toward the tip, the
-# view's outline then 0.175-0.275 by 0.142-0.188.
-SIDE_CENTER = (0.225, 0.165)
+# the earlier screw put it (farm run 20261027T053051351Z): the 19.50 body
+# keeps its places toward the tip and the 6.60 head grows toward the
+# head-end view, the view's outline then 0.171-0.275 by 0.142-0.188.  The
+# view centre is the model bounding box's: top z=HEAD_H to tip z=-LENGTH.
+_BOX_MID_Z = (HEAD_H - LENGTH) / 2.0
+UNDERHEAD_SHEET_X = 0.197
+SIDE_CENTER = (UNDERHEAD_SHEET_X - _BOX_MID_Z * _S / 1000.0, 0.165)
 # Third-angle left view of the head end, on the profile's axis.
 END_CENTER = (0.085, SIDE_CENTER[1])
 ISO_CENTER = (0.360, 0.215)
 ISO_SCALE = (2, 1)
-# The view centre is the model bounding box's: top z=HEAD_H to tip z=-LENGTH.
-_BOX_MID_Z = (HEAD_H - LENGTH) / 2.0
 
 
 def _sheet_x(model_z_mm: float) -> float:
@@ -143,6 +152,8 @@ UNDERHEAD_X = _sheet_x(0.0)
 TIP_X = _sheet_x(-LENGTH)
 # Where the body meets the tip chamfer.
 THREAD_START_X = _sheet_x(-(LENGTH - TIP_CHAMFER))
+# Where the head's relief chamfer meets its OD.
+HEAD_RELIEF_X = _sheet_x(HEAD_RELIEF_CHAMFER)
 HEAD_TOP_Y = _sheet_y(HEAD_DIA / 2.0)
 BODY_TOP_Y = _sheet_y(BODY_DIA / 2.0)
 BODY_BOTTOM_Y = _sheet_y(-BODY_DIA / 2.0)
@@ -209,6 +220,13 @@ FULL_THREAD_TEXT_HEIGHT = block_height(1, _callout_lines("FullThread"))
 UNDERHEAD_CORNER_TEXT_WIDTH = _COUNTER_SPRING_WIDTH
 # ' 2.00 ', as ' 1.00 ' rendered (farm run 20261010T190631112Z).
 SLOT_DEPTH_TEXT_WIDTH = 0.0116
+# The relief chamfer: '1.50' over '1.40' (its LIMIT band) over 'X 45 DEG;' /
+# 'MHA-SM-VN-51' / 'WIRE CLEARS', the part number the widest row.
+HEAD_RELIEF_TEXT_WIDTH = _COUNTER_SPRING_WIDTH
+HEAD_RELIEF_TEXT_HEIGHT = block_height(2, _callout_lines("HeadReliefChamfer"))
+# The head Ø: its LIMIT band over 'MHA-SM-VN-51' / 'WIRE CLEARS'.
+HEAD_DIA_TEXT_WIDTH = _COUNTER_SPRING_WIDTH
+HEAD_DIA_TEXT_HEIGHT = block_height(2, _callout_lines("HeadDia"))
 
 # Rows below the profile, 15 mm apart (text sits ~3 mm above its requested
 # point, the dimension line ~5 mm below it), clear of the body Ø's text
@@ -284,14 +302,25 @@ FULL_THREAD_TEXT_XY = (
 PLAIN_LENGTH_TEXT_LEFT = (
     max(FULL_THREAD_TEXT_XY[0] + FULL_THREAD_TEXT_WIDTH / 2.0, FULL_THREAD_X) + 0.003
 )
+# The relief chamfer's axial leg: its 5.8-mm span is narrower than its
+# block, so the block stands left of the span over the head, its dimension
+# line 7 mm above the slot depth's and its right end 2.5 mm short of the
+# full-thread block, clear of the slot depth's text under it.
+HEAD_RELIEF_LINE_Y = HEAD_TOP_Y + 0.021
+HEAD_RELIEF_TEXT_XY = (
+    HEAD_RELIEF_X - 0.003 - HEAD_RELIEF_TEXT_WIDTH / 2.0,
+    HEAD_RELIEF_LINE_Y + HEAD_RELIEF_TEXT_HEIGHT / 2.0,
+)
 SIDE_KEEP = {
     "HeadHeight": ((TOP_X + UNDERHEAD_X) / 2.0, _ROW_Y[0]),
     "UnderHeadLength": ((UNDERHEAD_X + TIP_X) / 2.0, _ROW_Y[0]),
     "OverallLength": ((TOP_X + TIP_X) / 2.0, _ROW_Y[1]),
     # Diameters on the side view (drawing-guidelines.md rule 11 (turned parts
     # read like the lathe)): the head's stands between the profile and the
-    # head-end view.
-    "HeadDia": (TOP_X - 0.019, SIDE_CENTER[1]),
+    # head-end view, its block centred on its vertical dimension line and its
+    # right end 7 mm short of the head's top face.
+    "HeadDia": (TOP_X - 0.007 - HEAD_DIA_TEXT_WIDTH / 2.0, SIDE_CENTER[1]),
+    "HeadReliefChamfer": HEAD_RELIEF_TEXT_XY,
     # The slot depth reads from the top face, above the head.  Its 8-mm span
     # is narrower than its text, so the text stands outside, left of the top
     # face's extension line (the earlier crown rise's recipe, farm run
@@ -344,17 +373,20 @@ NOTES_XY = (0.016, 0.070)
 _TOL_NONE, _TOL_LIMIT, _TOL_MIN, _TOL_MAX = 0, 3, 5, 6
 if (
     BODY_DIA_TOL_TYPE != _TOL_LIMIT
+    or HEAD_DIA_TOL_TYPE != _TOL_LIMIT
+    or HEAD_RELIEF_CHAMFER_TOL_TYPE != _TOL_LIMIT
     or PLAIN_LENGTH_MIN_TOL_TYPE != _TOL_MIN
     or FULL_THREAD_STATION_MAX_TOL_TYPE != _TOL_MAX
     or UNDERHEAD_CORNER_R_TOL_TYPE != _TOL_MAX
 ):
     raise AssertionError(
-        "MHA-SM-04 body Ø is no longer LIMIT, plain length MIN, or full thread "
-        "and under-head corner MAX"
+        "MHA-SM-04 body Ø, head Ø or relief chamfer is no longer LIMIT, plain "
+        "length MIN, or full thread and under-head corner MAX"
     )
 PRINTED_DIMENSIONS: dict[str, tuple[float, int]] = {
-    "HeadDia": (HEAD_DIA, _TOL_NONE),
+    "HeadDia": (HEAD_DIA, _TOL_LIMIT),
     "HeadHeight": (HEAD_H, _TOL_NONE),
+    "HeadReliefChamfer": (HEAD_RELIEF_CHAMFER, _TOL_LIMIT),
     "UnderHeadLength": (LENGTH, _TOL_NONE),
     "BodyDia": (BODY_DIA, _TOL_LIMIT),
     "PlainLength": (PLAIN_LENGTH_MIN, _TOL_MIN),
@@ -369,15 +401,18 @@ PRINTED_DIMENSIONS: dict[str, tuple[float, int]] = {
 # band would skip the deviation readback, so the two must name the same rows.
 LIMIT_DEVIATIONS: dict[str, tuple[float, float]] = {
     "BodyDia": (BODY_DIA_LOWER, BODY_DIA_UPPER),
+    "HeadDia": (HEAD_DIA_LOWER, HEAD_DIA_UPPER),
+    "HeadReliefChamfer": (HEAD_RELIEF_CHAMFER_LOWER, HEAD_RELIEF_CHAMFER_UPPER),
 }
 if set(LIMIT_DEVIATIONS) != {
     name for name, (_, kind) in PRINTED_DIMENSIONS.items() if kind == _TOL_LIMIT
 }:
     raise AssertionError("MHA-SM-04 LIMIT rows and their deviations disagree")
-# Unprinted control: the tip chamfer's rise, held to its axial leg by
-# equation, so the "X 45 DEG" callout is true.
+# Unprinted controls: each chamfer's rise, held to its axial leg by
+# equation, so the "X 45 DEG" callouts are true.
 SOURCE_ONLY_DIMENSIONS: dict[str, tuple[float, int]] = {
     "TipChamferRise@ShankProfile": (TIP_CHAMFER, _TOL_NONE),
+    "HeadReliefChamferRise@HeadProfile": (HEAD_RELIEF_CHAMFER, _TOL_NONE),
 }
 
 

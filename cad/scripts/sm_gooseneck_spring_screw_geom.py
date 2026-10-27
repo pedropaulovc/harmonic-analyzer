@@ -35,9 +35,31 @@ PITCH = MM_PER_IN / THREADS_PER_IN
 LENGTH = 19.50
 LENGTH_LOWER, LENGTH_UPPER = printed_deviations(LENGTH, 2)
 # The cheese head: a flat-topped cylinder, as the reference close-up shows.
+# Its Ø prints as the LIMIT band 11.60/11.40, not the title block's .XX
+# +/-0.51: the relief chamfer below is measured from the OD, and at Ø12.01
+# the MHA-SM-VN-51 transition wire would meet the relief's outer end
+# (sm_gooseneck_spring_joint; owner ruling 2026-10-27, #1951).
 HEAD_DIA = 11.50
-HEAD_DIA_LOWER, HEAD_DIA_UPPER = printed_deviations(HEAD_DIA, 2)
-HEAD_H = 5.50
+HEAD_DIA_LOWER, HEAD_DIA_UPPER = -0.10, 0.10
+HEAD_DIA_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
+# The head's under-face OD edge is relieved by a 45-degree chamfer, printed
+# as the LIMIT band 1.50/1.40: the MHA-SM-VN-51 loop leaves its head-side end
+# for the coil through the vendor's transition wire, which crosses the head
+# face's plane just outside the head's OD.  Unrelieved, the Ø11.50 edge cuts
+# 0.21 into that wire (native verify:spring_seats probe, farm run
+# 20261027T193324627Z; the analytic replica in test_sm_gooseneck_spring_joint
+# agrees).  The joint holds the loop's clamp bearing on the flat inside it.
+HEAD_RELIEF_CHAMFER = 1.45
+HEAD_RELIEF_CHAMFER_LOWER, HEAD_RELIEF_CHAMFER_UPPER = -0.05, 0.05
+HEAD_RELIEF_CHAMFER_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
+HEAD_RELIEF_CHAMFER_MIN = round(HEAD_RELIEF_CHAMFER + HEAD_RELIEF_CHAMFER_LOWER, 6)
+HEAD_RELIEF_CHAMFER_MAX = round(HEAD_RELIEF_CHAMFER + HEAD_RELIEF_CHAMFER_UPPER, 6)
+# 6.60 tall, longer than the reference photo shows (head over the Ø12.70 arm
+# 0.52 against its 0.46): the relief chamfer rises from the under-head face
+# under the slot's ends, and the head left there must hold the rule-17 wall
+# (sm_gooseneck_spring_screw_spec SLOT_WEB_MIN; owner ruling 2026-10-27,
+# #1951, via coordinator Main).
+HEAD_H = 6.60
 HEAD_H_LOWER, HEAD_H_UPPER = printed_deviations(HEAD_H, 2)
 SLOT_WIDTH = 1.60
 SLOT_WIDTH_LOWER, SLOT_WIDTH_UPPER = printed_deviations(SLOT_WIDTH, 2)

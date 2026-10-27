@@ -282,10 +282,24 @@ DRILL_POINT_SHANK_WALL_MIN = (
 
 # Head retention: the head's worst-case overlap of the eye's ID.  The 1.0
 # check stands; the Ø11.50 head (the reference photo's proportion) keeps
-# 0.745 under owner minor sm-gooseneck-spring-screw RV-01 (2026-10-27, #1951).
+# 0.95 at its LIMIT band's 11.40 under owner minor sm-gooseneck-spring-screw
+# RV-01 (2026-10-27, #1951).
 HEAD_RETENTION_TARGET = 1.0
 HEAD_RETENTION = (screw.HEAD_DIA - spring.EYE_ID_MM) / 2.0
 HEAD_RETENTION_MIN = (screw.HEAD_DIA + screw.HEAD_DIA_LOWER - spring.EYE_ID_MM) / 2.0
+
+# The head's clamp flat.  The relief chamfer (sm_gooseneck_spring_screw_geom)
+# ends the flat under-head face at the smallest head less the largest
+# chamfer; the clamp's first pull pass, the loop's wire nearest the screw
+# axis, still bears on it.  Its centreline stands the coil radius less the
+# eye's offset from the screw axis, largest at the largest body.
+HEAD_FLAT_RADIUS_MIN = (
+    screw.HEAD_DIA + screw.HEAD_DIA_LOWER
+) / 2.0 - screw.HEAD_RELIEF_CHAMFER_MAX
+LOOP_PASS_RADIUS_MAX = (
+    spring.COIL_MEAN_RADIUS_MM - (spring.EYE_ID_MM - screw.BODY_DIA_MAX) / 2.0
+)
+HEAD_FLAT_BEARING_MARGIN_MIN = HEAD_FLAT_RADIUS_MIN - LOOP_PASS_RADIUS_MAX
 
 # The loop on its seat.  The clamp fixes the loop's two pull-side passes (the
 # wire that bears on the screw) at these stations from the head face: the
@@ -450,6 +464,8 @@ if HEAD_RETENTION_MIN <= 0.0:
     raise AssertionError("gooseneck screw head lets the spring eye pass")
 if HEAD_RETENTION_MIN < HEAD_RETENTION_TARGET:
     _owner_minor("sm_gooseneck_spring_screw", "RV-01")
+if HEAD_FLAT_BEARING_MARGIN_MIN <= 0.0:
+    raise AssertionError("gooseneck screw's relief chamfer takes the loop off its flat")
 if min(LOOP_PLAIN_MARGIN_MIN, LOOP_CORNER_CLEARANCE_MIN) <= 0.0:
     raise AssertionError("gooseneck spring loop bears off the screw's plain body")
 if not LOOP_PASS_X[0] < LOOP_PASS_X[1] < screw.PLAIN_LENGTH_MIN:

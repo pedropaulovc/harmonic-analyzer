@@ -11,6 +11,6 @@ sm-gooseneck-spring-screw:
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
-      where: "sheet 1, head Ø11.50: its worst-case overlap of the MHA-SM-VN-51 eye, 0.74"
-      finding: "head-to-eye retention 0.745 mm at the head's lower printed limit, under the project's 1.0 mm head retention check"
-      reason: "owner ruling 2026-10-27 (#1951, via coordinator Main): the Ø11.50 x 5.50 cheese head stands, the reference photo's proportion (0.89 x the arm). The 1.0 check is unchanged (sm_gooseneck_spring_joint.HEAD_RETENTION_TARGET); this declaration records the exception against it. The eye cannot pass the head: 0.745 of overlap would need about 13 % hoop strain in the 1.6 mm music wire."
+      where: "sheet 1, head Ø11.60/11.40: its worst-case overlap of the MHA-SM-VN-51 eye, 0.95"
+      finding: "head-to-eye retention 0.95 mm at the head's lower printed limit, under the project's 1.0 mm head retention check"
+      reason: "owner ruling 2026-10-27 (#1951, via coordinator Main): the Ø11.50 cheese head stands, the reference photo's proportion (0.89 x the arm); its LIMIT band 11.60/11.40 and 6.60 height clear the spring's transition wire (2026-10-27 rulings (A)/(A1)). The 1.0 check is unchanged (sm_gooseneck_spring_joint.HEAD_RETENTION_TARGET); this declaration records the exception against it. The eye cannot pass the head: 0.95 of overlap would need about 17 % hoop strain in the 1.6 mm music wire."
