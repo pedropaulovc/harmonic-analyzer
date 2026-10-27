@@ -10,7 +10,7 @@ over-specification or clarity cluster gates the aggregate verdict only when at
 least ``GATING_MIN_RUNS`` valid runs raised it (fewer when fewer runs are
 valid); single-run confirmations stay in the report as non-gating evidence.
 Raw per-run verdicts are retained as evidence.
-Every reviewer uses an isolated CLI in a neutral attempt directory. The judge
+Every reviewer uses an isolated transport in a neutral attempt directory. The judge
 resumes its own precheck session for adjudication, never another package's context.
 A private stdio MCP server supplies grayscale reviewer views and color-preserving
 judge overlays fitting 1976×1280 pixels, plus bounded vector-PDF/image crops.
@@ -37,8 +37,12 @@ parts. Authors and reviewers now share one standard, distilled from Harvey
 ch. 2-3): the title block is the general spec and over-specification is a
 defect as much as a missing dimension.
 
-Claude disables built-in tools and user/project customizations. Codex uses an
-isolated home with hardlinked (never copied) auth, a direct-tool model catalogue,
+Claude uses Agent SDK API keys from the private codjiflo pool, falling back to
+isolated OMP RPC only when no key is eligible, never to Claude CLI OAuth.
+Both transports disable built-in tools and user/project customizations. OMP
+accesses the existing credential vault through a scoped auth broker, never a
+copied credential database. Route decisions and outcomes have secret-safe logs.
+Codex uses an isolated home with hardlinked (never copied) auth, a direct-tool model catalogue,
 and a neutral attempt directory. The auth link is checked before and after
 every invocation and repaired if a CLI save split it (``relink_codex_auth``).
 Only the private ``sheets`` MCP server is configured. Attempt directories hold
@@ -50,11 +54,16 @@ SDK confirms this sole server exposes no resources or templates; their calls
 are recorded. Other tools and unexpected resource content remain fail-closed.
 Crop and token/cache usage are retained; first-turn usage belongs to that attempt.
 Fresh sessions never load prior review context; only the judge continues its own
-precheck. Transcripts and attempt files
-are retained even if Windows prevents moving the original cwd. The recorded
+precheck. Redacted transcripts and attempt files are retained even if Windows
+prevents moving the original cwd. Lifecycle-owned native SDK state and OMP image
+blobs survive only until their precheck's judge finishes (or is skipped), while
+independent runs and failed attempts release state after retaining evidence.
+Claude native session IDs are historical provenance, not CLI replay commands.
+The recorded
 ``retained_argv`` only adapts artifact paths for inspection, NOT a replay: it
-does not supply stdin or a fresh session id. ``command`` records actual argv;
-session ids and resume commands identify the completed CLI session.
+does not supply stdin or a fresh session id. ``command`` records actual Codex
+argv or the SDK invocation descriptor; ``transport_provenance`` distinguishes
+SDK from OMP and records the actual session, model and continuation details.
 
 Codex 0.159.1 uses a per-conversation ``prompt_cache_key`` and exposes no native
 override for fresh exec sessions. Within-review cache reuse is supported here;
@@ -112,6 +121,8 @@ import _telemetry  # noqa: E402
 from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME, CAD_ROOT  # noqa: E402
 from machinist_exceptions import load_exceptions as _load_exceptions  # noqa: E402
 import machinist_review_config as review_config  # noqa: E402
+import machinist_review_transport as _claude_transport  # noqa: E402
+from machinist_review_transport import TransportError as _ClaudeTransportError  # noqa: E402
 from machinist_review_sheets_mcp import (  # noqa: E402
     SheetStore,
     create_server as _create_sheet_server,
@@ -152,7 +163,6 @@ GATING_MIN_RUNS = 2
 SHEETS_SERVER = SCRIPTS_DIR / "machinist_review_sheets_mcp.py"
 # Startup is part of, not an extension to, the per-attempt timeout.
 MCP_STARTUP_TIMEOUT_S = 120.0
-_CLAUDE_MCP_POLL_INTERVAL_S = 0.25
 CLAUDE_ISOLATION_SETTINGS = {
     "disableAllHooks": True,
     "autoMemoryEnabled": False,
@@ -385,7 +395,7 @@ def _review_prompt(
     return prompt + response_instruction
 
 
-def build_claude_command(
+def build_claude_invocation(
     *,
     workdir: Path,
     mcp_config: Path,
@@ -393,72 +403,20 @@ def build_claude_command(
     model: str,
     effort: str,
     session_id: str,
-    claude: str = "claude",
-    schema_content: str | None = None,
     resume: bool = False,
 ) -> list[str]:
-    """Return the exact isolated ``claude -p`` argv for one package."""
+    """Return a secret-free SDK invocation descriptor, not executable CLI argv.
+
+    The common retained-invocation machinery stores this descriptor verbatim.
+    Actual routing, including OMP argv, is recorded in ``transport_provenance``.
+    """
     if schema.parent != workdir or mcp_config.parent != workdir:
         raise ValueError("review configuration must be inside the neutral workdir")
-    schema_json = json.dumps(
-        json.loads(
-            schema.read_text(encoding="utf-8")
-            if schema_content is None
-            else schema_content
-        ),
-        separators=(",", ":"),
-    )
     return [
-        claude,
-        "-p",
-        "--model",
-        model,
-        "--effort",
-        effort,
-        "--thinking",
-        "adaptive",
-        "--thinking-display",
-        "summarized",
-        "--input-format",
-        "stream-json",
-        "--output-format",
-        "stream-json",
-        "--verbose",
-        "--json-schema",
-        schema_json,
-        "--tools",
-        "",
-        "--allowedTools",
-        "mcp__sheets__view_sheet,mcp__sheets__crop",
-        "--restricted",
-        "--setting-sources",
-        "",
-        "--disable-slash-commands",
-        "--settings",
-        json.dumps(CLAUDE_ISOLATION_SETTINGS, separators=(",", ":")),
-        "--mcp-config",
-        str(mcp_config),
-        "--resume" if resume else "--session-id",
-        session_id,
-        "--permission-mode",
-        "dontAsk",
-        "--permission-prompts",
-        "none",
-        "--strict-mcp-config",
-        "--no-chrome",
+        "claude_agent_sdk", "--model", model, "--effort", effort,
+        "--resume" if resume else "--session-id", session_id,
+        "--mcp-config", str(mcp_config), "--schema", str(schema),
     ]
-
-
-class _ClaudeTransportError(RuntimeError):
-    """Retain partial CLI evidence when startup fails before any review."""
-
-    def __init__(
-        self, message: str, *, stdout: str, stderr: str, returncode: int | None
-    ) -> None:
-        super().__init__(message)
-        self.stdout = stdout
-        self.stderr = stderr
-        self.returncode = returncode
 
 
 def _claude_provider_response(event: Any) -> bool:
@@ -481,10 +439,7 @@ def _claude_provider_response(event: Any) -> bool:
     # The first assistant event's output count can still be partial. Readiness
     # is not completion/accounting: positive input or cache usage suffices.
     counts = [
-        usage.get(key, 0) for key in (
-            "input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens",
-            "output_tokens",
-        )
+        usage.get(key, 0) for key in _claude_transport.CLAUDE_TOKEN_COUNTERS
     ]
     return (
         all(type(count) is int and count >= 0 for count in counts)
@@ -492,200 +447,19 @@ def _claude_provider_response(event: Any) -> bool:
     )
 
 
-async def _run_claude(
-    command: list[str], *, input: str, timeout: float, cwd: str,
-    env: dict[str, str] | None,
-    on_first_response: Callable[[], None] | None = None,
-) -> subprocess.CompletedProcess[str]:
-    """Wait for this CLI's actual sheets connection before submitting a prompt.
-
-    Claude 2.1.303 starts MCP before input, but its system/init event waits for a
-    user turn. Use the SDK's initialize/mcp_status control protocol instead:
-    neither request invokes the model, and connected status includes tools/list.
-    Keep the same CLI and MCP process alive for the subsequent review or judge.
-    """
-    stdout: list[bytes] = []
-    stderr: list[bytes] = []
-    messages: asyncio.Queue[bytes | None] = asyncio.Queue()
-    startup_complete = False
-    response_notified = False
-    proc: asyncio.subprocess.Process | None = None
-    readers: list[asyncio.Task[None]] = []
-    failure: Exception | None = None
-    timed_out = False
-    startup_timeout = min(timeout, MCP_STARTUP_TIMEOUT_S)
-    spawn_env = dict(os.environ if env is None else env)
-    # The CLI's independent MCP startup deadline defaults to 30,000 ms. Align it
-    # with our readiness budget, overriding inherited settings in a fresh map;
-    # this does not extend the enclosing whole-attempt asyncio timeout.
-    spawn_env["MCP_TIMEOUT"] = str(max(1, int(startup_timeout * 1000)))
-
-    async def read_stdout() -> None:
-        assert proc is not None and proc.stdout is not None
-        pending: list[bytes] = []
-
-        def receive(line: bytes) -> None:
-            nonlocal response_notified
-            if not startup_complete:
-                messages.put_nowait(line)
-            elif on_first_response is not None and not response_notified:
-                try:
-                    event = json.loads(line)
-                except (ValueError, UnicodeDecodeError):
-                    return  # Preserve malformed/diagnostic lines in raw stdout.
-                if _claude_provider_response(event):
-                    response_notified = True
-                    on_first_response()
-
-        try:
-            while chunk := await proc.stdout.read(65536):
-                stdout.append(chunk)
-                # Frame only startup controls and the first provider response.
-                # Join fragments once per line: image events have no size limit
-                # and must not incur quadratic copying while awaiting readiness.
-                if startup_complete and (on_first_response is None or response_notified):
-                    pending.clear()
-                    continue
-                parts = chunk.split(b"\n")
-                pending.append(parts[0])
-                for fragment in parts[1:]:
-                    receive(b"".join(pending))
-                    pending = [fragment]
-                    if startup_complete and (on_first_response is None or response_notified):
-                        pending.clear()
-                        break
-            if pending:
-                receive(b"".join(pending))
-        finally:
-            messages.put_nowait(None)
-
-    async def read_stderr() -> None:
-        assert proc is not None and proc.stderr is not None
-        while chunk := await proc.stderr.read(65536):
-            stderr.append(chunk)
-
-    async def send(message: dict[str, Any]) -> None:
-        assert proc is not None and proc.stdin is not None
-        proc.stdin.write((json.dumps(message, ensure_ascii=False) + "\n").encode("utf-8"))
-        await proc.stdin.drain()
-
-    async def control(subtype: str) -> dict[str, Any]:
-        request_id = str(uuid.uuid4())
-        await send({
-            "type": "control_request", "request_id": request_id,
-            "request": {"subtype": subtype},
-        })
-        while True:
-            line = await messages.get()
-            if line is None:
-                raise RuntimeError("Claude exited before sheets MCP was ready")
-            try:
-                event = json.loads(line)
-            except (ValueError, UnicodeDecodeError):
-                continue  # Non-JSON diagnostics are still retained in stdout.
-            if not isinstance(event, dict) or event.get("type") != "control_response":
-                continue
-            response = event.get("response", {})
-            if not isinstance(response, dict) or response.get("request_id") != request_id:
-                continue
-            if response.get("subtype") != "success":
-                raise RuntimeError(f"Claude {subtype} failed: {response.get('error', response)}")
-            value = response.get("response")
-            if not isinstance(value, dict):
-                raise RuntimeError(f"Claude {subtype} returned no control response")
-            return value
-
-    try:
-        async with asyncio.timeout(timeout):
-            async with asyncio.timeout(startup_timeout):
-                proc = await asyncio.create_subprocess_exec(
-                    *command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE, cwd=cwd, env=spawn_env,
-                )
-                readers = [
-                    asyncio.create_task(read_stdout()),
-                    asyncio.create_task(read_stderr()),
-                ]
-                await control("initialize")
-                while True:
-                    status = await control("mcp_status")
-                    servers = status.get("mcpServers")
-                    if (
-                        not isinstance(servers, list) or len(servers) != 1
-                        or not isinstance(servers[0], dict)
-                        or servers[0].get("name") != "sheets"
-                    ):
-                        raise RuntimeError("Claude MCP status lacks the sole private sheets server")
-                    server = servers[0]
-                    state = server.get("status")
-                    if state == "connected":
-                        tools = server.get("tools")
-                        if not isinstance(tools, list) or {
-                            tool.get("name") for tool in tools if isinstance(tool, dict)
-                        } != {"view_sheet", "crop"}:
-                            raise RuntimeError("Claude sheets MCP connected without its sheet tools")
-                        break
-                    if state not in ("pending", "connecting"):
-                        raise RuntimeError(
-                            f"Claude sheets MCP startup {state!r}: {server.get('error', '')}"
-                        )
-                    await asyncio.sleep(_CLAUDE_MCP_POLL_INTERVAL_S)
-            startup_complete = True
-            await send({
-                "type": "user", "session_id": "",
-                "message": {"role": "user", "content": input},
-                "parent_tool_use_id": None,
-            })
-            assert proc.stdin is not None
-            proc.stdin.close()
-            await proc.wait()
-            await asyncio.gather(*readers)
-    except TimeoutError:
-        timed_out = True
-    except Exception as exc:
-        failure = exc
-    finally:
-        if proc is not None:
-            if proc.returncode is None:
-                try:
-                    proc.kill()
-                except ProcessLookupError:
-                    pass
-            if proc.stdin is not None:
-                proc.stdin.close()
-            await proc.wait()
-            # Reap before retaining/moving the Windows attempt directory, and
-            # drain both pipes even on timeout to preserve partial evidence.
-            await asyncio.gather(*readers, return_exceptions=True)
-    output = b"".join(stdout).decode("utf-8", errors="replace")
-    diagnostics = b"".join(stderr).decode("utf-8", errors="replace")
-    if timed_out:
-        exc = subprocess.TimeoutExpired(
-            command, timeout if startup_complete else startup_timeout,
-            output=output, stderr=diagnostics,
-        )
-        if not startup_complete:
-            exc.add_note("Timed out waiting for Claude's sheets MCP connection")
-        raise exc
-    if failure is not None:
-        raise _ClaudeTransportError(
-            f"{type(failure).__name__}: {failure}", stdout=output, stderr=diagnostics,
-            returncode=proc.returncode if proc is not None else None,
-        ) from failure
-    assert proc is not None and proc.returncode is not None
-    return subprocess.CompletedProcess(command, proc.returncode, output, diagnostics)
-
-
 def _run_reviewer(
     command: list[str], *, reviewer: str, input: str, timeout: float,
     cwd: str, env: dict[str, str] | None,
     on_first_response: Callable[[], None] | None = None,
+    transport_provenance: dict[str, Any] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     if reviewer == "claude":
-        return asyncio.run(_run_claude(
-            command, input=input, timeout=timeout, cwd=cwd, env=env,
-            on_first_response=on_first_response,
-        ))
+        return _claude_transport.run(
+            command=command, prompt=input, timeout=timeout, cwd=cwd,
+            startup=MCP_STARTUP_TIMEOUT_S, settings=CLAUDE_ISOLATION_SETTINGS,
+            provenance=transport_provenance if transport_provenance is not None else {},
+            on_first_response=on_first_response, provider_response=_claude_provider_response,
+        )
     return subprocess.run(
         command, input=input, capture_output=True, text=True,
         encoding="utf-8", errors="replace", timeout=timeout, cwd=cwd, env=env,
@@ -1595,10 +1369,7 @@ def _usage(
             key: (first_turn_usage or {}).get(key, 0) for key in keys
         }
         return usage
-    keys = (
-        "input_tokens", "cache_creation_input_tokens",
-        "cache_read_input_tokens", "output_tokens",
-    )
+    keys = _claude_transport.CLAUDE_TOKEN_COUNTERS
     results = [row for row in rows if row.get("type") == "result"]
     usage = {
         key: sum((row.get("usage") or {}).get(key, 0) for row in results)
@@ -1838,15 +1609,9 @@ def _codex_session_id(events: Sequence[dict[str, Any]]) -> str | None:
     return None
 
 
-def _resume_command(reviewer: str, session_id: str | None) -> str | None:
-    """Ready-to-run command that reopens one attempt's persisted CLI session."""
-    if session_id is None:
-        return None
-    resume = "claude --resume" if reviewer == "claude" else "codex resume"
-    return f"{resume} {session_id}"
-
-
-
+def _codex_resume_command(session_id: str | None) -> str | None:
+    """Reopen a persisted Codex CLI session."""
+    return f"codex resume {session_id}" if session_id is not None else None
 
 
 def _retain_attempt_dir(source: Path, destination: Path) -> str | None:
@@ -1903,7 +1668,6 @@ def _review_session(
     report_dir: Path = REPORT_DIR,
     retries: int = 1,
     timeout_s: float = 1800.0,
-    claude: str | None = None,
     codex: str | None = None,
     prompt_text: str | None = None,
     judge_findings: Sequence[dict[str, Any]] | None = None,
@@ -1944,9 +1708,9 @@ def _review_session(
     neutral_resources = reviewer == "codex" and _resource_neutrality_permitted(mcp_catalog)
     model = model or review_config.DEFAULT_MODELS[reviewer]
     effort = effort or review_config.DEFAULT_EFFORTS[reviewer]
-    executable = (claude if reviewer == "claude" else codex) or shutil.which(reviewer)
+    executable = "claude_agent_sdk" if reviewer == "claude" else codex or shutil.which("codex")
     if not executable:
-        raise RuntimeError(f"{reviewer} CLI not found on PATH")
+        raise RuntimeError("codex CLI not found on PATH")
     if precheck_diff is not None:
         prefix = (
             GUIDELINES_FILE.read_text(encoding="utf-8").rstrip()
@@ -2026,8 +1790,10 @@ def _review_session(
     # conversation. A fresh judge would lose the required precheck continuity.
     for attempt in range(1 if resume_id is not None else retries + 1):
         attempts = attempt + 1
+        attempt_started = time.monotonic()
         if resume_review is None:
-            attempt_dir = Path(tempfile.mkdtemp(prefix="machrev-"))
+            private_home = Path(tempfile.mkdtemp(prefix="machrev-home-")) if reviewer == "claude" else None
+            attempt_dir = Path(tempfile.mkdtemp(prefix="machrev-", dir=private_home))
         else:
             previous = next(
                 record for record in resume_review.extra["evidence"]["attempts"]
@@ -2036,8 +1802,11 @@ def _review_session(
             # Claude's project identity includes cwd. Recreate/reuse that exact
             # neutral path after its first-turn artifacts were safely retained.
             attempt_dir = Path(previous["cwd"])
+            private_home = Path(previous["transport_provenance"]["private_home"]) if reviewer == "claude" else None
             attempt_dir.mkdir(parents=True, exist_ok=True)
         cwd = attempt_dir
+        if private_home is not None:
+            _claude_transport.register_state(private_home)
         session_id: str | None = resume_id or (str(uuid.uuid4()) if reviewer == "claude" else None)
         attempt_events: list[dict[str, Any]] = []
         rollout_rows: list[dict[str, Any]] = []
@@ -2048,6 +1817,7 @@ def _review_session(
         attempt_context: list[str] = []
         stdout: str | bytes | None = None
         stderr: str | bytes | None = None
+        error_category: str | None = None
         attempt_record: dict[str, Any] = {
             "attempt": attempts,
             "reviewer": reviewer,
@@ -2068,7 +1838,17 @@ def _review_session(
             "stdout_file": None,
             "stderr_file": None,
             "artifacts": [],
+            "transport_provenance": (
+                _claude_transport.resume_inputs(previous.get("transport_provenance", {}))
+                if resume_review is not None else {}
+            ),
         }
+        attempt_record["transport_provenance"].update(
+            package=package.name, attempt=attempts,
+            phase="precheck" if precheck_diff is not None else "judge" if judge_findings is not None else "review",
+        )
+        if private_home is not None:
+            attempt_record["transport_provenance"]["private_home"] = str(private_home)
         attempt_records.append(attempt_record)
 
         def capture_rollout() -> None:
@@ -2127,9 +1907,9 @@ def _review_session(
                         },
                     },
                 }), encoding="utf-8")
-                cmd = build_claude_command(
+                cmd = build_claude_invocation(
                     workdir=attempt_dir, mcp_config=mcp_config, schema=schema,
-                    model=model, effort=effort, session_id=session_id, claude=executable,
+                    model=model, effort=effort, session_id=session_id,
                     resume=resume_id is not None,
                 )
             else:
@@ -2145,18 +1925,28 @@ def _review_session(
                     preserve_color=precheck_diff is not None or resume_id is not None,
                 )
             attempt_record["command"] = cmd
+            if reviewer == "claude":
+                provenance = attempt_record["transport_provenance"]
+                provenance.setdefault("transport", "routing")
+                provenance.setdefault("requested_session_id", session_id)
+                provenance.setdefault("session_id", resume_id)
             proc = _run_reviewer(
                 cmd, reviewer=reviewer, input=prompt, timeout=timeout_s,
                 cwd=str(cwd), env=env,
                 on_first_response=notify_first_response if on_first_response is not None else None,
+                **({"transport_provenance": attempt_record["transport_provenance"]} if reviewer == "claude" else {}),
             )
             attempt_record["exit_code"] = proc.returncode
             stdout, stderr = proc.stdout, proc.stderr
+            if reviewer == "claude":
+                session_id = attempt_record["transport_provenance"].get("session_id", session_id)
             attempt_events = _parse_events(proc.stdout)
+            final_route = max((event.get("route_index", 0) for event in attempt_events), default=0)
+            final_events = [event for event in attempt_events if event.get("route_index", 0) == final_route]
             capture_rollout()
             if reviewer == "claude" and any(
                 event.get("session_id") not in (None, "", session_id)
-                for event in attempt_events
+                for event in final_events
             ):
                 attempt_context.append("Claude continuation/session id disagrees with the requested judge session")
             if attempt_context:
@@ -2172,21 +1962,21 @@ def _review_session(
                     f"{(reported or proc.stderr.strip())[-800:]}"
                 )
             verdict = (
-                extract_claude_verdict(attempt_events, validator=validator)
+                extract_claude_verdict(final_events, validator=validator)
                 if reviewer == "claude"
                 else extract_codex_verdict(output, attempt_events, validator=validator)
             )
             if judge_findings is not None or precheck_diff is not None:
                 inspected = evaluate_sheet_evidence(
-                    attempt_events if reviewer == "claude" else rollout_details["events"],
+                    final_events if reviewer == "claude" else rollout_details["events"],
                     reviewer=reviewer, sheet_count=sheet_count,
                     neutral_resources=neutral_resources,
                 )
                 if inspected["tool_events"] or not inspected["inspection_proven"]:
                     raise RuntimeError("judge must inspect every sheet using only sheet tools")
-            success_events = list(attempt_events)
+            success_events = list(final_events)
             success_calls = (
-                list(attempt_events) if reviewer == "claude"
+                list(final_events) if reviewer == "claude"
                 else list(rollout_details["events"])
             )
             success_first_turn = dict(rollout_details["first_turn_usage"])
@@ -2194,6 +1984,7 @@ def _review_session(
             attempt_record["outcome"] = "succeeded"
             break
         except _ClaudeTransportError as exc:
+            error_category = exc.category
             stdout, stderr = exc.stdout, exc.stderr
             attempt_events = _parse_events(stdout)
             attempt_record["exit_code"] = exc.returncode
@@ -2201,6 +1992,7 @@ def _review_session(
             attempt_record["error"] = error
             verdict = None
         except subprocess.TimeoutExpired as exc:
+            error_category = "timeout"
             stdout, stderr = exc.stdout, exc.stderr
             partial_stdout = stdout or ""
             if isinstance(partial_stdout, bytes):
@@ -2211,10 +2003,13 @@ def _review_session(
             attempt_record["error"] = error
             verdict = None
         except Exception as exc:
+            error_category = type(exc).__name__
             error = f"{type(exc).__name__}: {exc}"
             attempt_record["error"] = error
             verdict = None
         finally:
+            if reviewer == "claude":
+                session_id = attempt_record["transport_provenance"].get("session_id", session_id)
             capture_rollout()
             if reviewer == "codex" and attempt_record["command"] is not None:
                 _warn_auth(relink_codex_auth(CODEX_HOME))
@@ -2222,7 +2017,18 @@ def _review_session(
                 # A planned Claude UUID is not a persisted, resumable session.
                 session_id = None
             attempt_record["session_id"] = session_id
-            attempt_record["resume_command"] = _resume_command(reviewer, session_id)
+            attempt_record["resume_command"] = (
+                None if reviewer == "claude" else _codex_resume_command(session_id)
+            )
+            log_attempt = _telemetry.success if attempt_record["outcome"] == "succeeded" else _telemetry.error
+            log_attempt(
+                "machinist_review.attempt_completed" if attempt_record["outcome"] == "succeeded" else "machinist_review.attempt_failed",
+                package=package.name, attempt=attempts, reviewer=reviewer,
+                transport=attempt_record["transport_provenance"].get("transport", reviewer),
+                session_id=session_id, outcome=attempt_record["outcome"],
+                duration_s=time.monotonic() - attempt_started,
+                error_category=error_category,
+            )
             events.extend(_tag_events(attempts, attempt_events))
             calls = attempt_events if reviewer == "claude" else rollout_details["events"]
             tool_history.extend(_tag_events(attempts, calls))
@@ -2248,6 +2054,23 @@ def _review_session(
                 str(artifact) for artifact in sorted(retained_dir.iterdir())
                 if artifact.name not in inputs
             ]
+            if reviewer == "claude":
+                native_path = retained_dir / "native-events.jsonl"
+                if native_path.is_file():
+                    with native_path.open("rb") as native:
+                        native_records = sum(1 for _ in native)
+                    attempt_record["transport_provenance"]["native_events"] = {
+                        "sha256": _sha256(native_path),
+                        "records": native_records,
+                    }
+                preserve = (
+                    precheck_diff is not None and attempt_record["outcome"] == "succeeded"
+                    and verdict is not None and verdict.get("decision") == "review"
+                )
+                if preserve:
+                    attempt_record["transport_provenance"]["state_cleanup"] = "preserved_for_judge"
+                if not preserve:
+                    _claude_transport.cleanup_state(attempt_record["transport_provenance"])
 
     _write_events(events_path, events)
     evidence = evaluate_sheet_evidence(
@@ -2307,7 +2130,19 @@ def _review_session(
         reviewed_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         error=error, events_file=str(events_path), attempts=attempts, extra=extra,
     )
+    if reviewer == "claude" and precheck_diff is not None and not review.passed:
+        for record in attempt_records:
+            _claude_transport.cleanup_state(record["transport_provenance"])
     write_review(review, report_dir)
+    log_result = _telemetry.info if error is None and blind and inspection_proven else _telemetry.error
+    log_result(
+        "machinist_review.completed", package=package.name, reviewer=reviewer,
+        passed=review.passed, blind=blind, inspection_proven=inspection_proven,
+        duration_s=review.duration_s, session_id=extra["session_id"],
+        input_tokens=extra["usage"].get("input_tokens", 0),
+        output_tokens=extra["usage"].get("output_tokens", 0),
+        error_category=error.split(":", 1)[0] if error else None,
+    )
     return review
 
 
@@ -2320,7 +2155,6 @@ def review_package(
     report_dir: Path = REPORT_DIR,
     retries: int = 1,
     timeout_s: float = 1800.0,
-    claude: str | None = None,
     codex: str | None = None,
     prompt_text: str | None = None,
     on_first_response: Callable[[], None] | None = None,
@@ -2329,8 +2163,7 @@ def review_package(
     return _review_session(
         package, reviewer=reviewer, model=model, effort=effort,
         report_dir=report_dir, retries=retries, timeout_s=timeout_s,
-        claude=claude, codex=codex, prompt_text=prompt_text,
-        on_first_response=on_first_response,
+        codex=codex, prompt_text=prompt_text, on_first_response=on_first_response,
     )
 
 
@@ -2362,7 +2195,6 @@ def aggregate_package(
     report_dir: Path = REPORT_DIR,
     retries: int = 1,
     timeout_s: float = 1800.0,
-    claude: str | None = None,
     codex: str | None = None,
     prompt_text: str | None = None,
     force: bool = False,
@@ -2377,7 +2209,7 @@ def aggregate_package(
     with _telemetry.span(
         "machinist_review.aggregate", name=package.name, kind=package.kind, run_count=runs,
         reviewer=reviewer, model=model, judge_reviewer=judge_reviewer, judge_model=judge_model,
-    ) as span:
+    ) as span, _claude_transport.session_lifecycle():
         started = time.monotonic()
         # Canonical ordinal names pair explicit PDFs even across renames.
         # A unique directory prevents stale sheets from an earlier invocation
@@ -2459,7 +2291,7 @@ def aggregate_package(
                     precheck = _review_session(
                         judge_package, reviewer=judge_reviewer, model=judge_model,
                         effort=judge_effort, report_dir=directory, retries=retries,
-                        timeout_s=timeout_s, claude=claude, codex=codex, precheck_diff=diff,
+                        timeout_s=timeout_s, codex=codex, precheck_diff=diff,
                     )
                     precheck_info["report"] = str(directory / f"{package.name}.json")
                     if not precheck.passed or not precheck.extra.get("session_id"):
@@ -2502,7 +2334,7 @@ def aggregate_package(
                     review = review_package(
                         snapshot, reviewer=reviewer, model=model, effort=effort,
                         report_dir=directory, retries=retries, timeout_s=timeout_s,
-                        claude=claude, codex=codex, prompt_text=prompt_text,
+                        codex=codex, prompt_text=prompt_text,
                         on_first_response=on_first_response,
                     )
                 except Exception as exc:
@@ -2613,7 +2445,7 @@ def aggregate_package(
                     judgment = _review_session(
                         judge_package, reviewer=judge_reviewer,
                         model=judge_model, effort=judge_effort, report_dir=directory,
-                        retries=retries, timeout_s=timeout_s, claude=claude, codex=codex,
+                        retries=retries, timeout_s=timeout_s, codex=codex,
                         judge_findings=findings, resume_review=precheck,
                     )
                 except Exception as exc:

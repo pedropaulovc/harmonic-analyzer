@@ -15,9 +15,10 @@ Only pass/fail are human outcomes. Invalid evidence is an infrastructure failure
 unassessed evidence and targeted failures remain usable experiment outcomes.
 
 Each invocation resumes matching valid results automatically. Inputs plus harness,
-evaluator, schema and sheet-server hashes, Pillow/pypdfium2/mcp and reviewer CLI
-versions (queried once per invocation), model, effort, timeout and retry settings
-define the run identity.
+evaluator, schema and sheet-server hashes, Pillow/pypdfium2/mcp and active reviewer
+runtime versions, model, effort, timeout and retry settings define the run identity.
+Optional OMP probes remain diagnostic for SDK-only runs; retained actual OMP
+executions require a matching successful current version probe before reuse.
 Use a separate report directory for an independent repeat of identical inputs.
 Concurrent invocations must not share a report directory. Each completed case is
 checkpointed atomically; interrupted/invalid cases rerun without overwriting old
@@ -48,6 +49,7 @@ import hashlib
 import importlib.metadata
 import json
 import math
+import os
 from pathlib import Path
 import re
 import shutil
@@ -58,6 +60,7 @@ from typing import Any, Sequence
 
 import _telemetry as telemetry
 import machinist_review as mr
+from machinist_review_credentials import CredentialPool, _LABEL
 
 DEFAULT_CASES = mr.CAD_ROOT / "comparisons" / "bench" / "machinist_review" / "manifest.json"
 VERSIONS = ("baseline", "candidate")
@@ -67,7 +70,7 @@ INVOCATION_FIELDS = frozenset({
     "attempt", "reviewer", "cwd", "attempt_dir", "codex_home", "sources", "command",
     "outcome", "error", "exit_code", "session_id", "resume_command", "stdout_file",
     "stderr_file", "artifacts", "retained_dir", "retained_argv", "rollout_file",
-    "retention_warning",
+    "retention_warning", "transport_provenance",
 })
 
 
@@ -151,25 +154,49 @@ def load_cases(manifest: Path) -> tuple[dict[str, Any], list[mr.ReviewPackage]]:
 
 @functools.cache
 def runtime_versions(reviewer: str) -> dict[str, str]:
-    """Installed renderer/MCP and reviewer CLI versions; queried once per process.
+    """Installed renderer/MCP and transport versions, queried once per process.
 
-    review_package resolves the reviewer the same way, through PATH.
+    Claude records the pinned SDK and optional OMP fallback, never Claude CLI.
+    Missing OMP does not prevent an API-pool SDK run; a selected fallback still
+    fails at execution if OMP is unavailable.
     """
     try:
         versions = {name: importlib.metadata.version(name) for name in RUNTIME_PACKAGES}
-        executable = shutil.which(reviewer)
-        if not executable:
-            raise RuntimeError(f"{reviewer} CLI not found on PATH")
+        if reviewer == "claude":
+            versions["claude-agent-sdk"] = importlib.metadata.version("claude-agent-sdk")
+            if not isinstance(versions["claude-agent-sdk"], str) or not versions["claude-agent-sdk"].strip():
+                raise RuntimeError("cannot determine review runtime versions: missing claude-agent-sdk version")
+    except importlib.metadata.PackageNotFoundError as exc:
+        raise RuntimeError(f"cannot determine review runtime versions: {exc}") from exc
+    transport = "omp" if reviewer == "claude" else reviewer
+    if reviewer == "claude":
+        versions["routing"] = "sdk-api-pool-then-omp-v1"
+    executable = shutil.which(transport)
+    if not executable:
+        if reviewer == "claude":
+            return {**versions, "reviewer_cli": "omp-unavailable", "omp_version_probe": "unavailable"}
+        raise RuntimeError(f"{transport} CLI not found on PATH")
+    try:
         process = subprocess.run(
             [executable, "--version"], capture_output=True, text=True,
             encoding="utf-8", errors="replace", timeout=60, check=False,
         )
-    except (OSError, subprocess.SubprocessError, importlib.metadata.PackageNotFoundError) as exc:
+    except (OSError, subprocess.SubprocessError) as exc:
+        if reviewer == "claude":
+            # Exceptions/output may contain credentials; retain only a safe category.
+            outcome = "timeout" if isinstance(exc, subprocess.TimeoutExpired) else type(exc).__name__
+            return {**versions, "reviewer_cli": "omp-unavailable", "omp_version_probe": outcome}
         raise RuntimeError(f"cannot determine review runtime versions: {exc}") from exc
     cli = process.stdout.strip()
     if process.returncode != 0 or not cli:
+        if reviewer == "claude":
+            return {
+                **versions, "reviewer_cli": "omp-unavailable",
+                "omp_version_probe": "nonzero_exit" if process.returncode else "empty_output",
+                "omp_version_probe_exit_code": str(process.returncode),
+            }
         raise RuntimeError(f"{reviewer} --version failed: {process.stderr.strip()[-400:]}")
-    return {**versions, "reviewer_cli": cli}
+    return {**versions, "reviewer_cli": cli, **({"omp_version_probe": "succeeded"} if reviewer == "claude" else {})}
 
 
 
@@ -185,9 +212,20 @@ def make_identity(
         "engine_sha256": mr._sha256(Path(mr.__file__)),
         "evaluator_sha256": mr._sha256(Path(__file__)),
         "sheets_server_sha256": mr._sha256(mr.SHEETS_SERVER),
+        "transport_sources_sha256": {
+            name: mr._sha256(mr.SCRIPTS_DIR / name) for name in (
+                "machinist_review_transport.py", "machinist_review_credentials.py",
+            )
+        },
         "schema_sha256": mr._sha256(mr.SCHEMA_FILE),
         "reviewer": reviewer, "model": model, "effort": effort,
-        "retries": retries, "timeout_s": timeout_s, "runtime": dict(runtime),
+        "retries": retries, "timeout_s": timeout_s,
+        "runtime": {
+            key: value for key, value in runtime.items()
+            if reviewer != "claude" or (
+                key != "reviewer_cli" and not key.startswith("omp_version_probe")
+            )
+        },
         "prompts": {
             version: {"raw_sha256": hashlib.sha256(raw).hexdigest(),
                       "effective_sha256": {
@@ -299,6 +337,210 @@ def _check_retained_argv(
         raise ValueError("retained argv must relocate exactly the attempt-dir file arguments")
 
 
+class _OMPProbeUnavailable(RuntimeError):
+    """A cached OMP execution cannot be checked without a current version."""
+
+
+def _check_native_events(
+    path: Path | None, provenance: dict[str, Any], events: list[dict[str, Any]],
+) -> None:
+    """Bind offline native bytes to the invocation and its started routes."""
+    if any(not isinstance(event, dict) for event in events):
+        raise ValueError("invalid normalized event object")
+    # Route offsets index the full transport stream, before _parse_events removes
+    # MCP control responses. Status alone is not proof of a provider response.
+    provider_events = [event for event in events if event.get("type") != "control_response"]
+    routes = provenance.get("routes", [])
+    if not isinstance(routes, list):
+        raise ValueError("invalid native event routes")
+    indexes: set[int] = set()
+    cursor = 0
+    for route in routes:
+        if (
+            not isinstance(route, dict)
+            or type(route.get("route_index")) is not int
+            or route["route_index"] != len(indexes) + 1
+            or route.get("transport") not in {"claude_agent_sdk", "omp"}
+            or route.get("outcome") not in {"succeeded", "failed", "quota"}
+            or type(route.get("event_start")) is not int or route["event_start"] != cursor
+            or type(route.get("event_end")) is not int
+            or not cursor <= route["event_end"] <= len(events)
+        ):
+            raise ValueError("invalid native event route boundaries")
+        index = route["route_index"]
+        indexes.add(index)
+        if any(type(event.get("route_index")) is not int or event["route_index"] != index
+               for event in events[cursor:route["event_end"]]):
+            raise ValueError("normalized events cross native routes")
+        cursor = route["event_end"]
+    if cursor != len(events):
+        raise ValueError("normalized events lack native routes")
+    if path is None:
+        if provider_events or provenance.get("native_events") is not None:
+            raise ValueError("missing retained native events")
+        return
+    content = path.read_bytes()
+    binding = provenance.get("native_events")
+    lines = content.splitlines()
+    if (
+        not isinstance(binding, dict) or set(binding) != {"sha256", "records"}
+        or binding["sha256"] != hashlib.sha256(content).hexdigest()
+        or type(binding["records"]) is not int or binding["records"] != len(lines)
+    ):
+        raise ValueError("retained native event digest/count mismatch")
+    # Offline validation cannot discover arbitrary credentials. Reuse the writer's
+    # literal/JSON-escaped redactor for known environment secrets; never open a vault.
+    redactor = CredentialPool(load_mode="skip")
+    redactor.secrets.update(
+        value for name, value in os.environ.items()
+        if value and name in {"ANTHROPIC_API_KEY", "ANTHROPIC_OAUTH_TOKEN", "CLAUDE_API_KEY"}
+    )
+    def contains_secret(value: Any) -> bool:
+        if isinstance(value, str):
+            return redactor.redact(value) != value
+        if isinstance(value, dict):
+            return any(contains_secret(key) or contains_secret(item) for key, item in value.items())
+        if isinstance(value, list):
+            return any(contains_secret(item) for item in value)
+        return False
+
+    seen: set[int] = set()
+    previous = 0
+    for line in lines:
+        try:
+            row = json.loads(line)
+        except (ValueError, UnicodeError) as exc:
+            raise ValueError("invalid retained native event JSON") from exc
+        if (
+            not isinstance(row, dict) or set(row) != {"route_index", "native_event"}
+            or type(row["route_index"]) is not int or row["route_index"] not in indexes
+            or row["route_index"] < previous or not isinstance(row["native_event"], dict)
+        ):
+            raise ValueError("invalid retained native event object/route")
+        if contains_secret(row):
+            raise ValueError("retained native events contain a known secret")
+        previous = row["route_index"]
+        seen.add(previous)
+    required = {event["route_index"] for event in provider_events}
+    required.update(route["route_index"] for route in routes if route["outcome"] == "succeeded")
+    if not required <= seen:
+        raise ValueError("retained native events lack provider route coverage")
+
+
+def _check_omp_version(provenance: dict[str, Any]) -> None:
+    if any(
+        route.get("transport") == "omp" and route.get("outcome") == "succeeded"
+        and not isinstance(route.get("omp_version"), str)
+        for route in provenance.get("routes", [])
+    ):
+        raise ValueError("retained OMP execution lacks version evidence")
+    versions = [
+        route.get("omp_version") for route in provenance.get("routes", [])
+        if route.get("transport") == "omp" and route.get("omp_version") is not None
+    ]
+    if provenance.get("transport") == "omp" and provenance.get("omp_version") is not None:
+        versions.append(provenance["omp_version"])
+    if not versions:
+        return
+    runtime = runtime_versions("claude")
+    if runtime.get("omp_version_probe") != "succeeded":
+        raise _OMPProbeUnavailable(
+            "cannot validate cached OMP execution: current OMP version probe unavailable; "
+            "retry when the probe succeeds (no provider request submitted)"
+        )
+    match = re.fullmatch(r"(?:omp(?:/|\s+))?v?(\d+\.\d+\.\d+)", runtime["reviewer_cli"])
+    if match is None:
+        raise _OMPProbeUnavailable("cannot validate cached OMP execution: unrecognized current OMP version")
+    current = match[1]
+    if any(value != current for value in versions):
+        raise ValueError("retained OMP execution version differs from current runtime")
+
+
+def _check_omp_provenance(
+    provenance: dict[str, Any], invocation: dict[str, Any], evidence: dict[str, Any],
+    review: mr.Review,
+) -> None:
+    """Check recorded runtime facts, not the SDK-shaped invocation descriptor."""
+    options = provenance.get("omp_effective_options")
+    if not isinstance(options, dict) or set(options) != {"command", "config", "system_prompt", "tools", "cwd"}:
+        raise ValueError("OMP lacks recorded effective options")
+    home = Path(provenance["private_home"]).resolve()
+    cwd = invocation["cwd"]
+    sessions = provenance.get("session_dir")
+    session = provenance.get("session_file")
+    if (
+        options["cwd"] != cwd or not Path(cwd).is_absolute()
+        or not Path(cwd).resolve().is_relative_to(home)
+        or not isinstance(sessions, str) or not Path(sessions).is_absolute()
+        or Path(sessions).resolve() != home / "sessions"
+        or not isinstance(session, str) or not Path(session).is_absolute()
+        or not Path(session).resolve().is_relative_to(Path(sessions).resolve())
+        or Path(session).resolve() == Path(sessions).resolve()
+    ):
+        raise ValueError("OMP session/cwd escapes its private HOME")
+    command = options["command"]
+    if (
+        not isinstance(command, list) or not command
+        or any(not isinstance(arg, str) or not arg for arg in command)
+        or command != provenance.get("omp_command")
+    ):
+        raise ValueError("OMP actual command provenance mismatch")
+    flags = {
+        "--no-ui", "--no-tools", "--no-extensions", "--no-skills", "--no-rules",
+        "--no-lsp", "--no-pty", "--no-prewalk", "--no-title", "--auto-approve",
+    }
+    values = {
+        "--mode": "rpc", "--cwd": cwd, "--config": str(home / "config.yml"),
+        "--system-prompt": mr._claude_transport.OMP_SYSTEM_PROMPT,
+        "--model": "anthropic/" + review.model.removeprefix("anthropic/"),
+        "--thinking": review.effort, "--session-dir": sessions,
+    }
+    if "--resume" in invocation["command"]:
+        # Continuations reopen only this invocation's already home-bound session.
+        # A fresh descriptor must still reject any native --resume option.
+        values["--resume"] = session
+    seen: set[str] = set()
+    index = 1
+    while index < len(command):
+        flag = command[index]
+        if flag in seen:
+            raise ValueError("OMP actual command repeats an option")
+        seen.add(flag)
+        if flag in flags:
+            index += 1
+        elif flag in values and index + 1 < len(command) and command[index + 1] == values[flag]:
+            index += 2
+        else:
+            raise ValueError("OMP actual command violates sheets-only isolation")
+    if seen != flags | values.keys():
+        raise ValueError("OMP actual command lacks isolation options")
+    config = options["config"]
+    if config != mr._claude_transport.OMP_EFFECTIVE_CONFIG:
+        raise ValueError("OMP overlay lacks context/memory isolation")
+    parts = options["system_prompt"]
+    if (
+        options["tools"] != sorted(mr._claude_transport.OMP_TOOLS)
+        or not isinstance(parts, list) or len(parts) != 2
+        or any(not isinstance(part, str) for part in parts)
+    ):
+        raise ValueError("OMP runtime lacks sheets-only tools/system prompt")
+    mr._claude_transport.validate_omp_system_prompt(parts)
+    blobs = provenance.get("image_blobs")
+    if not isinstance(blobs, list) or not blobs or any(
+        not isinstance(digest, str) or re.fullmatch(r"[a-f0-9]{64}", digest) is None
+        for digest in blobs
+    ) or len(blobs) != len(set(blobs)):
+        raise ValueError("OMP lacks valid persisted image digests")
+    prompt = evidence["effective_prompt"] + "\nReturn JSON matching this schema:\n" + json.dumps(json.loads(evidence["schema"]))
+    if (
+        provenance.get("omp_prompt") != prompt
+        or provenance.get("omp_prompt_sha256") != hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+    ):
+        raise ValueError("OMP exact prompt/schema provenance mismatch")
+    if provenance.get("shutdown") not in {"graceful", "forced_after_completion"}:
+        raise ValueError("OMP lacks completed process shutdown evidence")
+
+
 def validate_evidence(
     result: dict[str, Any], identity: dict[str, Any], version: str,
     package: mr.ReviewPackage, directory: Path,
@@ -393,10 +635,49 @@ def validate_evidence(
         ):
             raise ValueError("invalid invocation record")
         session_id = invocation["session_id"]
+        provenance = invocation["transport_provenance"]
+        if not isinstance(provenance, dict):
+            raise ValueError("missing transport provenance")
+        if review.reviewer == "claude" and invocation["command"] is not None:
+            if provenance.get("transport") not in {"claude_agent_sdk", "omp", "routing"} or (
+                invocation["outcome"] == "succeeded" and provenance.get("transport") == "routing"
+            ):
+                raise ValueError("unknown Claude execution transport")
+            if invocation["outcome"] == "succeeded" and provenance.get("session_id") != session_id:
+                raise ValueError("transport session differs from invocation")
+            if provenance.get("transport") == "claude_agent_sdk" and (
+                not isinstance(provenance.get("credential_id"), str)
+                or not _LABEL.fullmatch(provenance["credential_id"])
+                or not re.fullmatch(r"[a-f0-9]{64}", provenance.get("credential_fingerprint", ""))
+            ):
+                raise ValueError("invalid SDK credential provenance")
+            if provenance.get("transport") == "claude_agent_sdk" and invocation["outcome"] == "succeeded":
+                expected_isolation = {
+                    "tools": [], "allowed_tools": sorted(mr._claude_transport.TOOLS),
+                    "permission_mode": "dontAsk", "setting_sources": [],
+                    "strict_mcp_config": True, "settings": mr.CLAUDE_ISOLATION_SETTINGS,
+                }
+                if provenance.get("sdk_isolation") != expected_isolation:
+                    raise ValueError("SDK evidence lacks effective tool/permission isolation")
+            home = provenance.get("private_home")
+            if (not isinstance(home, str) or not Path(home).is_absolute()
+                    or not Path(home).name.startswith("machrev-home-")
+                    or not Path(invocation["cwd"]).resolve().is_relative_to(Path(home).resolve())):
+                raise ValueError("Claude invocation cwd is outside its private HOME")
+            if invocation["outcome"] == "succeeded":
+                resolved = provenance.get("resolved_model")
+                if (not isinstance(resolved, dict) or set(resolved) != {"provider", "id"}
+                        or resolved.get("provider") != "anthropic"
+                        or not isinstance(resolved.get("id"), str) or not resolved["id"]):
+                    raise ValueError("Claude evidence resolved an invalid Anthropic model")
+                if provenance.get("transport") == "omp":
+                    _check_omp_provenance(provenance, invocation, evidence, review)
         if (
             invocation["reviewer"] != review.reviewer
             or (session_id is not None and (not isinstance(session_id, str) or not session_id))
-            or invocation["resume_command"] != mr._resume_command(review.reviewer, session_id)
+            or invocation["resume_command"] != (
+                None if review.reviewer == "claude" else mr._codex_resume_command(session_id)
+            )
             or (session_id is not None and session_id in sessions)
         ):
             raise ValueError("invalid session provenance")
@@ -520,10 +801,20 @@ def validate_evidence(
         if len(set(artifact_paths)) != len(artifact_paths) or any(
             not path.is_absolute() or path.parent != retained
             or path.resolve().parent != retained.resolve() or not path.is_file()
-            or review.reviewer != "codex" or path.name not in ("codex-models.json", "verdict.json")
+            or (review.reviewer == "codex" and path.name not in ("codex-models.json", "verdict.json"))
+            or (review.reviewer == "claude" and path.name != "native-events.jsonl")
             for path in artifact_paths
         ):
             raise ValueError("missing or misplaced retained artifact")
+        if review.reviewer == "claude":
+            native = retained / "native-events.jsonl"
+            raw_events = (
+                [json.loads(line) for line in Path(invocation["stdout_file"]).read_text(encoding="utf-8").splitlines()
+                 if line.strip()]
+                if invocation["stdout_file"] is not None else []
+            )
+            _check_native_events(native if native in artifact_paths else None, provenance, raw_events)
+            _check_omp_version(provenance)
         catalog = retained / "codex-models.json"
         if catalog in artifact_paths:
             _check_codex_model_catalog(catalog, review.model)
@@ -544,14 +835,13 @@ def validate_evidence(
             continue
         if not isinstance(command, list) or not command or any(not isinstance(arg, str) for arg in command):
             raise ValueError("invalid invocation command")
-        if review.reviewer == "claude" and session_id is None:
+        if review.reviewer == "claude" and outcome == "succeeded" and session_id is None:
             raise ValueError("missing Claude invocation session")
         expected_command = (
-            mr.build_claude_command(
+            mr.build_claude_invocation(
                 workdir=attempt_dir, mcp_config=attempt_dir / "mcp.json",
                 schema=attempt_dir / "schema.json", model=review.model, effort=review.effort,
-                session_id=session_id or "", claude=command[0],
-                schema_content=evidence["schema"],
+                session_id=invocation["transport_provenance"].get("requested_session_id", session_id) or "",
             )
             if review.reviewer == "claude"
             else mr.build_codex_command(
@@ -578,6 +868,8 @@ def validate_evidence(
     if review.extra.get("context_errors") != []:
         raise ValueError("recorded reviewer context was not proven clean")
     successful = [row["event"] for row in events if row["attempt"] == review.attempts]
+    final_route = max((event.get("route_index", 0) for event in successful), default=0)
+    successful = [event for event in successful if event.get("route_index", 0) == final_route]
     if review.reviewer == "codex":
         # The --json stream is a projection that can omit calls (e.g. code-mode
         # cells); it may still never show one, but only the rollout proves views.
@@ -594,7 +886,8 @@ def validate_evidence(
         neutral_resources=neutral_resources,
     )
     final_inspection = mr.evaluate_sheet_evidence(
-        [row for row in authoritative if row["attempt"] == review.attempts],
+        [row for row in authoritative if row["attempt"] == review.attempts
+         and row["event"].get("route_index", 0) == final_route],
         reviewer=review.reviewer, sheet_count=review.sheet_count,
         neutral_resources=neutral_resources,
     )
@@ -637,6 +930,8 @@ def run_case(
             validate_evidence(cached, identity, version, package, directory)
             telemetry.info("Resuming review evaluation", case=package.name, version=version)
             return cached
+        except _OMPProbeUnavailable:
+            raise
         except (OSError, ValueError, TypeError, KeyError, AttributeError, RuntimeError) as exc:
             telemetry.warn("Discarding unusable checkpoint", case=package.name, reason=str(exc))
     directory.mkdir(parents=True, exist_ok=True)
@@ -740,9 +1035,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         manifest, packages = load_cases(args.cases)
         prompts = {v: getattr(args, v).read_bytes() for v in VERSIONS}
+        runtime = runtime_versions(args.reviewer)
         identity = make_identity(manifest, packages, prompts, reviewer=args.reviewer,
                                  model=args.model, effort=args.effort, retries=args.retries,
-                                 timeout_s=args.timeout, runtime=runtime_versions(args.reviewer))
+                                 timeout_s=args.timeout, runtime=runtime)
         frozen_baseline = manifest.get("baseline_prompt")
         if (
             frozen_baseline is not None
@@ -770,6 +1066,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 results.append(future.result())
         results.sort(key=lambda r: (r["version"], r["case"]))
         summary = aggregate(identity, results, assessments)
+        summary["runtime_probes"] = runtime
         _atomic_json(run_dir / "results.json", summary)
         print(json.dumps(summary, indent=2))
         return int(any(r["outcome"] == "invalid" for r in summary["results"]))

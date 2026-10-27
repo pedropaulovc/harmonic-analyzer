@@ -658,581 +658,1353 @@ def test_schema_is_strict_structured_output() -> None:
     )
 
 
-def test_claude_command_owns_only_attempt_dir_configuration(tmp_path: Path) -> None:
-    attempt_dir = tmp_path / "attempt"
-    attempt_dir.mkdir()
-    schema = attempt_dir / "schema.json"
-    schema.write_text(json.dumps(mr.load_schema()), encoding="utf-8")
-    mcp_config = attempt_dir / "mcp.json"
-    mcp_config.write_text("{}", encoding="utf-8")
-    session_id = "2f4a6c8e-1111-4222-8333-444455556666"
-
-    def build(**overrides: Any) -> list[str]:
-        arguments = {
-            "workdir": attempt_dir,
-            "mcp_config": mcp_config,
-            "schema": schema,
-            "model": "fable",
-            "effort": "high",
-            "session_id": session_id,
-        }
-        return mr.build_claude_command(**{**arguments, **overrides})
-
-    command = build()
-    # The schema travels inline; the only file the CLI reads is the retained config.
-    assert _flag(command, "--input-format") == "stream-json"
-    assert json.loads(_flag(command, "--json-schema")) == mr.load_schema()
-    assert (attempt_dir / _flag(command, "--mcp-config")).resolve() == mcp_config.resolve()
-    assert _flag(command, "--session-id") == session_id
-    start = command.index("--allowedTools") + 1
-    end = next(
-        (i for i in range(start, len(command)) if command[i].startswith("--")),
-        len(command),
-    )
-    allowed = {name for value in command[start:end] for name in value.split(",") if name}
-    assert allowed == SHEET_TOOLS
-    # Sources reach only the sheet server's config, never the reviewer's argv.
-    assert not any(".png" in value or ".pdf" in value for value in command)
-    assert mr.CAD_ROOT.parent.as_posix() not in " ".join(command).replace("\\", "/")
-
-    stray = tmp_path / "stray.json"
-    stray.write_text("{}", encoding="utf-8")
-    for misplaced in ({"mcp_config": stray}, {"schema": stray}):
-        with pytest.raises(ValueError):
-            build(**misplaced)
-
-
 @pytest.fixture
-def claude_transport(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
-    """A real subprocess speaking the CLI control protocol, never a model API."""
-    script = tmp_path / "claude_protocol.py"
-    script.write_text(
-        r'''
-import json
-import sys
-import time
-from pathlib import Path
+def sdk_transport(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Exercise actual SDK option/event types with a deterministic client."""
+    import claude_agent_sdk as sdk
+    import machinist_review_credentials as credentials
+    import machinist_review_transport as transport
+    keys = tmp_path / "keys.json"
+    keys.write_text(json.dumps({"keys": [
+        {"id": f"account-{n}", "apiKey": f"secret-canary-{n}"} for n in range(3)
+    ]}))
+    keys.chmod(0o600)
+    credentials._windows_acl(keys, mode="restrict")
+    monkeypatch.setenv("CODJIFLO_ANTHROPIC_KEYS_FILE", str(keys))
+    monkeypatch.setenv("CODJIFLO_CLAUDE_STATE_FILE", str(tmp_path / "private" / "state.json"))
+    state = SimpleNamespace(status="connected", queries=[], clients=[], quota=False, fail=False, delay=0)
+    state.verdict = _clean_verdict()
+    state.transient_failure = False
+    state.api_retry = False
+    state.controlled = False
+    state.leader_timeout = False
+    state.before_response = threading.Event()
+    state.release_response = threading.Event()
+    state.release_finish = threading.Event()
+    state.followers_started = threading.Event()
 
-mode, reply_path, delay, pending_polls = sys.argv[1:]
-pending_polls = int(pending_polls)
-started = time.monotonic()
-last_status = None
-status_started = None
-status_count = 0
+    class Client:
+        def __init__(self, *, options):
+            self.options = options
+            self.disconnected = False
+            self.index = len(state.clients)
+            if state.leader_timeout and self.index:
+                assert state.clients[0].disconnected
+            state.clients.append(self)
+            if self.index == 2:
+                state.followers_started.set()
 
-def record(event):
-    event = {**event, "at": time.monotonic() - started}
-    with Path("protocol.jsonl").open("a", encoding="utf-8") as log:
-        log.write(json.dumps(event) + "\n")
+        async def connect(self):
+            if state.leader_timeout and self.index == 0:
+                await asyncio.sleep(10)
+            if state.delay:
+                await asyncio.sleep(state.delay)
 
-def respond(request, value, subtype="success"):
-    print(json.dumps({
-        "type": "control_response",
-        "response": {
-            "subtype": subtype, "request_id": request["request_id"],
-            "response": value, "error": "synthetic control failure",
-        },
-    }), flush=True)
+        async def get_mcp_status(self):
+            return {"mcpServers": [{"name": "sheets", "status": state.status,
+                                    "tools": [{"name": "view_sheet"}, {"name": "crop"}]}]}
 
-print("synthetic CLI startup diagnostic", flush=True)
+        async def query(self, prompt):
+            state.queries.append(prompt)
+            if state.fail:
+                # SDK callbacks are complete lines, already stripped of newlines.
+                self.options.stderr("first diagnostic secret-canary-0")
+                self.options.stderr("second diagnostic")
+                raise RuntimeError("failure secret-canary-0")
 
-def emit(text):
-    data = text.encode("utf-8")
-    # Deliberately split JSON, multibyte text and CRLF across pipe writes.
-    for offset in range(0, len(data), 4093):
-        sys.stdout.buffer.write(data[offset:offset + 4093])
-        sys.stdout.buffer.flush()
-
-def wait_for(path):
-    if path is None:
-        return
-    deadline = time.monotonic() + 10
-    while not Path(path).exists():
-        if time.monotonic() >= deadline:
-            sys.exit("test stream gate timed out")
-        time.sleep(0.01)
-
-print("startup stderr " + "x" * 131072, file=sys.stderr, flush=True)
-if mode == "eof":
-    sys.exit(9)
-if mode == "silent":
-    Path("silent-ready").touch()
-    time.sleep(60)
-for line in sys.stdin:
-    event = json.loads(line)
-    record(event)
-    if event["type"] == "control_request":
-        request = event["request"]["subtype"]
-        if request == "initialize":
-            respond(event, {}, "error" if mode == "control_error" else "success")
-        elif request == "mcp_status":
-            status_count += 1
-            if status_started is None:
-                status_started = time.monotonic()
-            waiting = (
-                status_count <= pending_polls if pending_polls >= 0
-                else time.monotonic() - status_started < float(delay)
+        async def receive_response(self):
+            if state.controlled and self.index == 0:
+                state.before_response.set()
+                while not state.release_response.is_set():
+                    await asyncio.sleep(0.005)
+            if state.transient_failure:
+                yield sdk.AssistantMessage(content=[sdk.TextBlock(text="Rate limited")], model="test", error="rate_limit")
+                yield sdk.AssistantMessage(content=[sdk.TextBlock(text="Recovered")], model="test", usage={"input_tokens": 10})
+                yield sdk.ResultMessage(subtype="error_during_execution", duration_ms=1,
+                                        duration_api_ms=1, is_error=True, num_turns=1,
+                                        usage={"input_tokens": 10}, session_id=self.options.session_id or self.options.resume)
+                return
+            if state.api_retry:
+                yield sdk.SystemMessage(subtype="api_retry", data={
+                    "subtype": "api_retry", "error": "rate_limit", "error_status": 429,
+                    "attempt": 1, "max_retries": 10, "retry_delay_ms": 1234.5,
+                })
+            if state.quota:
+                yield sdk.AssistantMessage(content=[sdk.TextBlock(text="Credit balance is too low")],
+                                           model="test", error="billing_error")
+                yield sdk.ResultMessage(subtype="error_during_execution", duration_ms=1,
+                                        duration_api_ms=1, is_error=True, num_turns=1,
+                                        usage={"input_tokens": 3, "output_tokens": 1}, total_cost_usd=0.02,
+                                        structured_output=_clean_verdict(),
+                                        session_id=self.options.session_id or self.options.resume)
+                return
+            yield sdk.AssistantMessage(
+                content=[sdk.ToolUseBlock(id="view", name="mcp__sheets__view_sheet", input={"sheet": 1})],
+                model="test", usage={"input_tokens": 10, "output_tokens": 2},
             )
-            if mode == "pending" or waiting:
-                state = "pending"
-            else:
-                state = "failed" if mode == "failed" else "connected"
-            tools = [{"name": "view_sheet"}, {"name": "crop"}]
-            if mode == "missing_tools":
-                tools.pop()
-            server = {
-                "name": "sheets", "status": state, "tools": tools,
-                "config": {
-                    "type": "stdio", "command": sys.executable,
-                    "args": ["sheets_mcp.py", "sheet.png"],
-                },
-                "error": "synthetic sheets startup failure",
-            }
-            record({"type": "status", "value": state, "tools": tools})
-            respond(event, {"mcpServers": [] if mode == "missing_server" else [server]})
-            last_status = state
-    elif event["type"] == "user":
-        if last_status != "connected":
-            sys.exit("review submitted before connection")
-        if mode == "review_timeout":
-            time.sleep(60)
-        if mode == "stream":
-            stream = json.loads(Path(reply_path).read_text(encoding="utf-8"))
-            emit(stream.get("before", ""))
-            Path("before-response").touch()
-            wait_for(stream.get("response_gate"))
-            emit(stream.get("response", ""))
-            wait_for(stream.get("finish_gate"))
-            emit(stream.get("after", ""))
-            sys.exit(stream.get("exit_code", 0))
-        # Include a line larger than asyncio's default readline limit.
-        print(json.dumps({"type": "diagnostic", "payload": "x" * 131072}), flush=True)
-        print(Path(reply_path).read_text(encoding="utf-8"), flush=True)
-        break
-''',
-        encoding="utf-8",
-    )
-    state = SimpleNamespace(processes=[], commands=[], environments=[])
-    real_spawn = mr.asyncio.create_subprocess_exec
+            if state.controlled and self.index == 0:
+                while not state.release_finish.is_set():
+                    await asyncio.sleep(0.005)
+            yield sdk.UserMessage(content=[sdk.ToolResultBlock(
+                tool_use_id="view", content=[{"type": "image", "source": {
+                    "type": "base64", "media_type": "image/png", "data": "aW1hZ2U=",
+                }}],
+            )])
+            yield sdk.ResultMessage(
+                subtype="success", duration_ms=1, duration_api_ms=1, is_error=False,
+                num_turns=1, session_id=self.options.session_id or self.options.resume,
+                total_cost_usd=0.01, usage={"input_tokens": 10, "output_tokens": 2},
+                structured_output=state.verdict,
+            )
 
-    async def spawn(*args: Any, **kwargs: Any):
-        state.environments.append(kwargs["env"])
-        process = await real_spawn(*args, **kwargs)
-        state.processes.append(process)
-        return process
+        async def disconnect(self):
+            self.disconnected = True
 
-    def command(
-        mode: str, reply: str, delay_s: float = 0.0, *, pending_polls: int = -1,
-    ) -> list[str]:
-        reply_path = tmp_path / f"reply-{uuid.uuid4().hex}.jsonl"
-        reply_path.write_text(reply, encoding="utf-8")
-        argv = [
-            sys.executable, str(script), mode, str(reply_path), str(delay_s),
-            str(pending_polls),
-        ]
-        state.commands.append(argv)
-        return argv
-
-    state.command = command
-    monkeypatch.setattr(mr.asyncio, "create_subprocess_exec", spawn)
-    monkeypatch.setattr(mr, "_CLAUDE_MCP_POLL_INTERVAL_S", 0.02)
+    monkeypatch.setattr(sdk, "ClaudeSDKClient", Client)
+    state.transport = transport
     return state
 
 
-@pytest.mark.parametrize("timeout,expected_ms", [(300, "120000"), (17.25, "17250")])
-@pytest.mark.parametrize("inherited_timeout", [None, "1", "999999"])
-@pytest.mark.parametrize("caller_env", [False, True])
-def test_claude_spawn_sets_independent_mcp_timeout_without_mutating_environment(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    claude_transport: SimpleNamespace, timeout: float, expected_ms: str,
-    inherited_timeout: str | None, caller_env: bool,
+def test_sdk_isolated_options_real_image_evidence_and_first_response(
+    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    if inherited_timeout is None:
-        monkeypatch.delenv("MCP_TIMEOUT", raising=False)
-    else:
-        monkeypatch.setenv("MCP_TIMEOUT", inherited_timeout)
-    monkeypatch.setenv("CLAUDE_TEST_INHERITED_ONLY", "not a caller setting")
-    source_env = dict(os.environ) if caller_env else None
-    if source_env is not None:
-        source_env.pop("CLAUDE_TEST_INHERITED_ONLY")
-        source_env["CLAUDE_TEST_CALLER_SETTING"] = "preserved"
-    inherited_before = dict(os.environ)
-    source_before = dict(source_env) if source_env is not None else inherited_before
-    command = claude_transport.command("stream", json.dumps({
-        "response": _claude_stdout(1, _clean_verdict()),
-    }))
-
-    completed = mr._run_reviewer(
-        command, reviewer="claude", input="synthetic prompt", timeout=timeout,
-        cwd=str(tmp_path), env=source_env,
-    )
-
-    assert completed.returncode == 0
-    (spawn_env,) = claude_transport.environments
-    assert spawn_env == {**source_before, "MCP_TIMEOUT": expected_ms}
-    assert spawn_env is not source_env and spawn_env is not os.environ
-    assert dict(os.environ) == inherited_before
-    if source_env is not None:
-        assert source_env == source_before
-
-
-def _wait_for_file(path: Path) -> None:
-    deadline = mr.time.monotonic() + 10
-    while not path.exists():
-        if mr.time.monotonic() >= deadline:
-            pytest.fail(f"subprocess did not reach {path.name}")
-        mr.time.sleep(0.01)
-
-
-def test_claude_first_response_stream_is_chunked_unlimited_once_only_and_not_completion(
-    tmp_path: Path, claude_transport: SimpleNamespace,
-) -> None:
-    response_gate = tmp_path / "allow-response"
-    finish_gate = tmp_path / "allow-finish"
-    # Large diagnostics and image-like assistant content exercise framing above
-    # asyncio's readline limit, with malformed JSON and CRLF mixed into the stream.
-    before = (
-        "not JSON\r\n{broken\r\n"
-        + "\r\n".join(json.dumps(event) for event in _claude_nonresponses())
-        + "\r\n" + json.dumps({"type": "diagnostic", "payload": "x" * 2097152})
-        + "\r\n"
-    )
-    response = _claude_provider_event()
-    response["message"]["content"][0]["text"] = "画像" * 350000
-    response_text = json.dumps(response, ensure_ascii=False) + "\r\n"
-    after = (
-        json.dumps(_claude_provider_event()) + "\r\n"
-        + _claude_stdout(1, _clean_verdict()) + "\r\n"
-    )
-    command = claude_transport.command("stream", json.dumps({
-        "before": before, "response": response_text, "after": after,
-        "response_gate": str(response_gate), "finish_gate": str(finish_gate),
-    }))
-    notified = threading.Event()
-    calls = []
-
-    def first_response() -> None:
-        calls.append("response")
-        notified.set()
-
-    with mr.ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(
-            mr._run_reviewer, command, reviewer="claude", input="synthetic prompt",
-            timeout=15, cwd=str(tmp_path), env=None, on_first_response=first_response,
-        )
-        try:
-            _wait_for_file(tmp_path / "before-response")
-            assert not notified.wait(0.1)
-            response_gate.touch()
-            assert notified.wait(10)
-            assert not future.done()  # Partial output usage is not review completion.
-        finally:
-            response_gate.touch()
-            finish_gate.touch()
-        completed = future.result()
-    assert calls == ["response"] and completed.returncode == 0
-    assert completed.stdout.endswith(before + response_text + after)
-    assert claude_transport.processes[0].returncode == 0
-
-
-@pytest.mark.parametrize("real_response", [False, True])
-def test_claude_first_response_handles_unterminated_eof_without_false_readiness(
-    tmp_path: Path, claude_transport: SimpleNamespace, real_response: bool,
-) -> None:
-    events = _claude_nonresponses()
-    if real_response:
-        events.append(_claude_provider_event())
-    payload = "\r\n".join(json.dumps(event) for event in events)
-    command = claude_transport.command("stream", json.dumps({"response": payload}))
-    calls = []
-    completed = mr._run_reviewer(
-        command, reviewer="claude", input="synthetic prompt", timeout=10,
-        cwd=str(tmp_path), env=None, on_first_response=lambda: calls.append("response"),
-    )
-    assert completed.returncode == 0
-    assert completed.stdout.endswith(payload)
-    assert calls == (["response"] if real_response else [])
-
-
-@pytest.mark.parametrize("respond_before_failure", [False, True])
-def test_claude_first_response_retries_without_duplicate_notifications(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    claude_transport: SimpleNamespace, respond_before_failure: bool,
-) -> None:
-    first_events = [_claude_provider_event()] if respond_before_failure else _claude_nonresponses()
-    commands = [
-        claude_transport.command("stream", json.dumps({
-            "response": "\n".join(json.dumps(event) for event in first_events) + "\n",
-            "exit_code": 1,
-        })),
-        claude_transport.command("stream", json.dumps({
-            "response": json.dumps(_claude_provider_event()) + "\n",
-            "after": _claude_stdout(1, _clean_verdict()),
-        })),
-    ]
-    monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: commands.pop(0))
     calls = []
     review = mr.review_package(
         mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
-        reviewer="claude", claude="fake", report_dir=tmp_path / "reports",
-        retries=1, timeout_s=10, on_first_response=lambda: calls.append("response"),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
+        on_first_response=lambda: calls.append("response"),
     )
-    assert review.passed and review.attempts == 2 and calls == ["response"]
-    assert [attempt["outcome"] for attempt in review.extra["evidence"]["attempts"]] == [
-        "failed", "succeeded",
-    ]
-    assert all(process.returncode is not None for process in claude_transport.processes)
-
-
-@pytest.fixture
-def claude_startup_clock(monkeypatch: pytest.MonkeyPatch) -> list[SimpleNamespace]:
-    """Advance startup deadlines by protocol progress, not process scheduling."""
-    real_run = mr._run_claude
-    transport_asyncio = mr.asyncio
-    clocks = []
-
-    async def run(*args: Any, **kwargs: Any):
-        clock = SimpleNamespace(elapsed=0.0, outer=None, startup=None, budget=None)
-        clocks.append(clock)
-
-        class ProtocolAsyncio:
-            def __getattr__(self, name: str):
-                return getattr(transport_asyncio, name)
-
-            def timeout(self, delay: float):
-                if clock.outer is None:
-                    # The overall wall-time timeout remains unmodified.
-                    clock.outer = asyncio.timeout(delay)
-                    return clock.outer
-                assert clock.startup is None
-                clock.budget = delay
-                clock.startup = asyncio.timeout(None)
-                return clock.startup
-
-            async def sleep(self, delay: float) -> None:
-                clock.elapsed += delay
-                if clock.elapsed >= clock.budget:
-                    # Deliver real Timeout cancellation at the synthetic startup
-                    # deadline, including the production kill/drain/reap path.
-                    clock.startup.reschedule(asyncio.get_running_loop().time())
-                await asyncio.sleep(0)
-
-        async def expire_silent_startup() -> None:
-            # A silent CLI never answers initialize, so there are no status
-            # polls to advance the clock. Wait until its diagnostics are written
-            # before cancelling; CPU load must not select the failure outcome.
-            ready = Path(kwargs["cwd"]) / "silent-ready"
-            while not ready.exists():
-                await asyncio.sleep(0.01)
-            clock.elapsed = clock.budget
-            clock.startup.reschedule(asyncio.get_running_loop().time())
-
-        with monkeypatch.context() as scoped:
-            # Only this module binding is replaced; asyncio and loop.time stay
-            # untouched for subprocess machinery and the real outer timeout.
-            scoped.setattr(mr, "asyncio", ProtocolAsyncio())
-            silent = (
-                asyncio.create_task(expire_silent_startup())
-                if args[0][2] == "silent" else None
-            )
-            try:
-                return await real_run(*args, **kwargs)
-            finally:
-                if silent is not None:
-                    silent.cancel()
-                    await asyncio.gather(silent, return_exceptions=True)
-
-    monkeypatch.setattr(mr, "_run_claude", run)
-    return clocks
-
-
-@pytest.mark.parametrize("judge", [False, True])
-def test_claude_slow_start_waits_for_actual_connection_before_review_or_judge(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    claude_transport: SimpleNamespace, judge: bool,
-) -> None:
-    value = {"clusters": []} if judge else _clean_verdict()
-    command = claude_transport.command("slow", _claude_stdout(1, value), delay_s=0.15)
-    monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: command)
-    report_dir = tmp_path / "reports"
-    review = mr._review_session(
-        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
-        reviewer="claude", claude="fake", report_dir=report_dir, retries=0,
-        timeout_s=10, judge_findings=[] if judge else None,
-    )
-    assert review.passed and review.blind and review.attempts == 1
-    assert review.verdict == value
-    assert review.tool_events == 0
-    assert review.extra["inspection_proven"] is True
+    assert review.passed and review.blind and calls == ["response"]
+    assert review.extra["usage"]["input_tokens"] == 10
     assert review.extra["sheets_viewed"] == [1]
-    (attempt,) = review.extra["evidence"]["attempts"]
-    records = [
-        json.loads(line) for line in
-        (Path(attempt["retained_dir"]) / "protocol.jsonl").read_text().splitlines()
-    ]
-    statuses = [row for row in records if row["type"] == "status"]
-    assert statuses[0]["value"] == "pending" and statuses[-1]["value"] == "connected"
-    (prompt,) = [row for row in records if row["type"] == "user"]
-    assert prompt["at"] >= statuses[-1]["at"] >= 0.15
-    assert prompt["message"]["content"] == review.extra["evidence"]["effective_prompt"]
-    assert ("FINDINGS TO ADJUDICATE" in prompt["message"]["content"]) is judge
-    assert len(claude_transport.processes) == 1
-    assert claude_transport.processes[0].returncode == 0
-    assert "startup stderr " in Path(attempt["stderr_file"]).read_text()
-    stdout = Path(attempt["stdout_file"]).read_text()
-    assert "synthetic CLI startup diagnostic" in stdout
-    statuses = [
-        row["response"]["response"]["mcpServers"][0]
-        for row in (json.loads(line) for line in stdout.splitlines() if line.startswith("{"))
-        if row.get("type") == "control_response"
-        and row["response"]["response"].get("mcpServers")
-    ]
-    assert statuses[-1]["config"] == {
-        "type": "stdio", "command": sys.executable,
-        "args": ["sheets_mcp.py", "sheet.png"],
+    client, = sdk_transport.clients
+    options = client.options
+    assert options.tools == [] and set(options.allowed_tools) == SHEET_TOOLS
+    assert options.setting_sources == [] and options.strict_mcp_config
+    assert options.thinking == {"type": "adaptive", "display": "summarized"}
+    assert json.loads(options.settings)["disableAllHooks"]
+    assert set(options.mcp_servers) == {"sheets"}
+    assert client.disconnected
+    record, = review.extra["evidence"]["attempts"]
+    assert record["transport_provenance"]["transport"] == "claude_agent_sdk"
+    assert record["command"][0] == "claude_agent_sdk"
+    assert "secret-canary" not in json.dumps(review.extra)
+
+def test_sdk_clears_stale_quota_after_a_clean_assistant_response(tmp_path, sdk_transport, monkeypatch):
+    sdk_transport.transient_failure = True
+    async def forbidden(**kwargs):
+        pytest.fail("a recovered API error cannot authorize rotation or OMP")
+    monkeypatch.setattr(sdk_transport.transport, "_omp", forbidden)
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
+    )
+    assert not review.passed and len(sdk_transport.clients) == 1
+    state = json.loads(Path(os.environ["CODJIFLO_CLAUDE_STATE_FILE"]).read_text())
+    assert all(entry["status"] == "ready" for entry in state["keys"].values())
+
+
+@pytest.mark.parametrize("resumed_judge", [False, True])
+def test_sdk_api_retry_succeeds_without_rotation(
+    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch, resumed_judge: bool,
+) -> None:
+    from machinist_review_credentials import CredentialPool
+
+    def unavailable(*args, **kwargs):
+        pytest.fail("a transient API retry must not change credential availability")
+
+    async def fallback(**kwargs):
+        pytest.fail("a transient API retry must not switch to OMP")
+
+    monkeypatch.setattr(CredentialPool, "unavailable", unavailable)
+    monkeypatch.setattr(sdk_transport.transport, "_omp", fallback)
+    package = mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),))
+    first = None
+    if resumed_judge:
+        sdk_transport.verdict = {"decision": "review", "skip_kind": "none", "reason": "Review required."}
+        first = mr._review_session(
+            package, reviewer="claude", report_dir=tmp_path / "precheck", retries=0,
+            precheck_diff={"pages": [{"status": "unchanged", "old_size_points": [10, 10],
+                                     "new_size_points": [10, 10], "text_changed": False}]},
+        )
+        assert first.passed
+        sdk_transport.verdict = {"clusters": []}
+    sdk_transport.api_retry = True
+    review = mr._review_session(
+        package, reviewer="claude", report_dir=tmp_path / "review", retries=0,
+        **({"judge_findings": [], "resume_review": first} if resumed_judge else {}),
+    )
+    assert review.passed
+    assert len(sdk_transport.clients) == (2 if resumed_judge else 1)
+    record, = review.extra["evidence"]["attempts"]
+    routes = record["transport_provenance"]["routes"]
+    assert len(routes) == 1 and routes[0]["outcome"] == "succeeded"
+    events = mr._parse_events(Path(record["stdout_file"]).read_text())
+    assert any(event.get("subtype") == "api_retry" for event in events)
+    if resumed_judge:
+        before, after = sdk_transport.clients
+        assert after.options.resume == before.options.session_id
+        assert after.options.env["ANTHROPIC_API_KEY"] == before.options.env["ANTHROPIC_API_KEY"]
+        assert review.extra["session_id"] == first.extra["session_id"]
+    state = json.loads(Path(os.environ["CODJIFLO_CLAUDE_STATE_FILE"]).read_text())
+    assert all(entry["status"] == "ready" and entry["retryAt"] is None
+               for entry in state["keys"].values())
+
+@pytest.mark.parametrize("termination", ["timeout", "eof", "crash"])
+def test_sdk_partial_raw_usage_preserves_failure_evidence_and_accounting(
+    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch, termination: str,
+) -> None:
+    import claude_agent_sdk as sdk
+
+    converted = []
+    original_asdict = sdk_transport.transport.asdict
+    def counted_asdict(message):
+        converted.append(type(message).__name__)
+        return original_asdict(message)
+    monkeypatch.setattr(sdk_transport.transport, "asdict", counted_asdict)
+    raw_usage = {
+        "input_tokens": 25, "output_tokens": 20,
+        "cache_creation_input_tokens": 7, "cache_read_input_tokens": 11,
+        "service_tier": "standard",
+        "cache_creation": {"ephemeral_5m_input_tokens": 7, "ephemeral_1h_input_tokens": 0},
+        "server_tool_use": {"web_search_requests": 0, "web_fetch_requests": 0},
+        "inference_geo": "not_available",
     }
-    assert all(event.get("type") != "control_response" for event in mr._parse_events(stdout))
+    async def interrupted(self):
+        yield sdk.AssistantMessage(
+            content=[sdk.TextBlock(text="Partial provider response secret-canary-0")],
+            model="test", usage=raw_usage,
+        )
+        # Observe the consumer's on-disk native record while the SDK route is
+        # still active, before error cleanup or result synthesis can run.
+        native_text = (Path(self.options.cwd) / "native-events.jsonl").read_text()
+        assert "service_tier" in native_text and "secret-canary" not in native_text
+        assert converted == ["AssistantMessage"]
+        if termination == "timeout":
+            await asyncio.sleep(10)
+        elif termination == "crash":
+            raise RuntimeError("original SDK crash")
+
+    monkeypatch.setattr(sdk.ClaudeSDKClient, "receive_response", interrupted)
+    failures = []
+    monkeypatch.setattr(sdk_transport.transport._telemetry, "error",
+                        lambda name, **fields: failures.append((name, fields)))
+    responses = []
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0, timeout_s=0.5,
+        on_first_response=lambda: responses.append("response"),
+    )
+    assert not review.passed and responses == ["response"]
+    assert len(sdk_transport.clients) == 1 and sdk_transport.clients[0].disconnected
+    assert review.extra["usage"] == {
+        "input_tokens": 25, "output_tokens": 20,
+        "cache_creation_input_tokens": 7, "cache_read_input_tokens": 11,
+        "total_cost_usd": 0, "num_turns": 1,
+        "first_turn": {"cache_creation_input_tokens": 0, "cache_read_input_tokens": 0},
+    }
+    record, = review.extra["evidence"]["attempts"]
+    provenance = record["transport_provenance"]
+    route, = provenance["routes"]
+    assert route["outcome"] == "failed"
+    events = mr._parse_events(Path(record["stdout_file"]).read_text())
+    assistant, result = events
+    assert assistant["message"]["usage"] == raw_usage
+    assert result["type"] == "result" and result["is_error"]
+    assert route["event_end"] == len(events)
+    native = [json.loads(line)["native_event"]
+              for path in Path(review.events_file).parent.rglob("native-events.jsonl")
+              for line in path.read_text().splitlines() if line.strip()]
+    assert native[0]["message"]["usage"] == raw_usage
+    failure, = [fields for name, fields in failures if name == "machinist_review.transport_failed"]
+    assert failure["timed_out"] is (termination == "timeout")
+    assert failure["error_category"] == route["error_category"]
+    if termination == "timeout":
+        assert provenance["timeout_phase"] == "attempt"
+        assert provenance["timeout_budget_s"] == 0.5
+        assert route["error_category"] in {"TimeoutError", "AttemptTimeout"}
+    else:
+        assert route["error_category"] == "RuntimeError"
+        assert ("original SDK crash" if termination == "crash"
+                else "SDK ended without terminal result") in review.error
 
 
 @pytest.mark.parametrize(
-    ("mode", "error"),
-    [
-        ("failed", "synthetic sheets startup failure"),
-        ("missing_tools", "without its sheet tools"),
-        ("missing_server", "sole private sheets server"),
-        ("control_error", "initialize failed"),
-        ("eof", "exited before sheets MCP was ready"),
-        ("pending", "TimeoutExpired"),
-        ("silent", "TimeoutExpired"),
-    ],
+    "attempt_budget,startup_budget,expected",
+    [(2, 5, "attempt"), (5, 2, "startup"), (2, 2, "attempt")],
 )
-def test_claude_failed_start_never_receives_prompt_and_retains_cleanup_evidence(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    claude_transport: SimpleNamespace, claude_startup_clock: list[SimpleNamespace],
-    mode: str, error: str,
-) -> None:
-    command = claude_transport.command(mode, _claude_stdout(1, _clean_verdict()))
-    monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: command)
-    monkeypatch.setattr(mr, "MCP_STARTUP_TIMEOUT_S", 0.75)
+@pytest.mark.parametrize("outer_cancels_first", [False, True])
+def test_startup_deadline_classification_is_independent_of_timer_order(
+    monkeypatch: pytest.MonkeyPatch, attempt_budget, startup_budget, expected,
+    outer_cancels_first,
+):
+    import machinist_review_transport as transport
+
+    async def exercise():
+        clock = [100.0]
+        loop = asyncio.get_running_loop()
+        monkeypatch.setattr(loop, "time", lambda: clock[0])
+        attempt_deadline = clock[0] + attempt_budget
+        token = transport._ATTEMPT_DEADLINE.set(attempt_deadline)
+        outer = asyncio.timeout_at(attempt_deadline)
+        try:
+            with pytest.raises(TimeoutError) as caught:
+                async with outer:
+                    async with transport.startup_timeout("sheets connection", startup_budget):
+                        if not outer_cancels_first:
+                            # Re-register the actual outer timer after the inner
+                            # one, exercising both equal-deadline handle orders.
+                            outer.reschedule(attempt_deadline)
+                        clock[0] += min(attempt_budget, startup_budget)
+                        await asyncio.sleep(0)
+                        await asyncio.sleep(0)
+                        pytest.fail("a real deadline cancellation must arrive")
+            if expected == "startup":
+                assert isinstance(caught.value, transport.StartupTimeout)
+                assert caught.value.phase == "sheets connection"
+                assert caught.value.budget == startup_budget
+            else:
+                assert not isinstance(caught.value, transport.StartupTimeout)
+        finally:
+            transport._ATTEMPT_DEADLINE.reset(token)
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("cleanup_target", ["fd", "temporary", "shared"])
+@pytest.mark.parametrize("failure_phase", ["body", "serialize", "success"])
+@pytest.mark.parametrize("primary_type", [RuntimeError, KeyboardInterrupt])
+def test_credential_cleanup_preserves_primary_exception_and_releases_other_resources(
+    sdk_transport, monkeypatch: pytest.MonkeyPatch, cleanup_target, failure_phase, primary_type, caplog,
+):
+    import machinist_review_credentials as credentials
+    logger = credentials._telemetry.get_logger()
+    monkeypatch.setattr(logger, "handlers", [caplog.handler])
+    monkeypatch.setattr(logger, "propagate", False)
+
+    pool = credentials.CredentialPool()
+    shared = Path(str(pool.state_file) + ".lock")
+    original_open, original_close = os.open, os.close
+    original_unlink = Path.unlink
+    shared_fd = []
+    cleanup = []
+    output_handles = []
+    original_temporary = credentials.tempfile.NamedTemporaryFile
+    def temporary_output(*args, **kwargs):
+        output = original_temporary(*args, **kwargs)
+        output_handles.append(output)
+        return output
+    monkeypatch.setattr(credentials.tempfile, "NamedTemporaryFile", temporary_output)
+    primary = primary_type("original credential operation failure")
+    if failure_phase == "body" and cleanup_target == "temporary":
+        cleanup_target = "shared"  # No temporary exists before serialization.
+
+    def opened(path, *args, **kwargs):
+        fd = original_open(path, *args, **kwargs)
+        if Path(path) == shared:
+            shared_fd.append(fd)
+        return fd
+
+    def closed(fd):
+        original_close(fd)
+        if shared_fd and fd == shared_fd[0]:
+            cleanup.append("fd")
+            if cleanup_target == "fd":
+                raise PermissionError(13, "sensitive cleanup detail")
+
+    def unlinked(path, *args, **kwargs):
+        target = ("shared" if path == shared else "temporary"
+                  if path.parent == pool.state_file.parent and path.name.startswith("tmp") else None)
+        if target:
+            cleanup.append(target)
+        if target == "temporary":
+            assert output_handles and all(output.closed for output in output_handles)
+        result = original_unlink(path, *args, **kwargs)
+        if target == cleanup_target:
+            raise PermissionError(13, "sensitive cleanup detail")
+        return result
+
+    monkeypatch.setattr(os, "open", opened)
+    monkeypatch.setattr(os, "close", closed)
+    monkeypatch.setattr(Path, "unlink", unlinked)
+    if failure_phase == "serialize":
+        def fail_serialization(*args, **kwargs):
+            raise primary
+        monkeypatch.setattr(credentials.json, "dump", fail_serialization)
+    with pytest.raises(primary_type if failure_phase != "success" else PermissionError) as caught:
+        with pool._state():
+            if failure_phase == "body":
+                raise primary
+    if failure_phase != "success":
+        assert caught.value is primary
+    assert "fd" in cleanup and "shared" in cleanup
+    if failure_phase != "body":
+        assert "temporary" in cleanup
+    assert not shared.exists()
+    assert any("Claude credential cleanup failed: PermissionError" in note
+               for note in caught.value.__notes__)
+    assert "sensitive cleanup detail" not in "\n".join(caught.value.__notes__)
+    records = [record for record in caplog.records
+               if record.getMessage() == "machinist_review.credential_cleanup_failed"]
+    assert len(records) == 1
+    assert records[0].error_category == "PermissionError"
+    assert records[0].errno == 13
+    assert records[0].primary_error_category == (
+        primary_type.__name__ if failure_phase != "success" else "none"
+    )
+    assert "sensitive cleanup detail" not in caplog.text
+    assert "secret-canary" not in caplog.text
+
+
+
+def test_sdk_independent_native_state_is_removed_after_retaining_evidence(tmp_path, sdk_transport):
     review = mr.review_package(
         mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
-        reviewer="claude", claude="fake", report_dir=tmp_path / "reports",
-        retries=0, timeout_s=30,
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
     )
-    assert not review.passed and review.verdict is None and error in review.error
-    (clock,) = claude_startup_clock
-    assert not clock.outer.expired()
-    assert clock.startup.expired() is (mode in ("pending", "silent"))
-    (attempt,) = review.extra["evidence"]["attempts"]
-    assert attempt["outcome"] == ("timed_out" if mode in ("pending", "silent") else "failed")
-    log = Path(attempt["retained_dir"]) / "protocol.jsonl"
-    records = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
-    assert not any(row["type"] == "user" for row in records)
-    assert "synthetic CLI startup diagnostic" in Path(attempt["stdout_file"]).read_text()
-    assert "startup stderr " in Path(attempt["stderr_file"]).read_text()
-    assert claude_transport.processes[0].returncode is not None
-    assert not Path(attempt["attempt_dir"]).exists()
+    assert review.passed
+    assert not Path(sdk_transport.clients[0].options.env["CLAUDE_CONFIG_DIR"]).exists()
+    record, = review.extra["evidence"]["attempts"]
+    assert Path(record["stdout_file"]).is_file()
+    assert mr.evaluate_sheet_evidence(
+        mr._parse_events(Path(record["stdout_file"]).read_text()), reviewer="claude", sheet_count=1,
+    )["inspection_proven"]
 
 
-@pytest.mark.parametrize("judge", [False, True])
-@pytest.mark.parametrize("failure", ["failed", "pending", "missing_tools"])
-def test_claude_startup_infrastructure_failure_retries_without_reviewing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    claude_transport: SimpleNamespace, claude_startup_clock: list[SimpleNamespace],
-    judge: bool, failure: str,
-) -> None:
-    value = {"clusters": []} if judge else _clean_verdict()
-    reply = _claude_stdout(1, value)
-    commands = [
-        claude_transport.command(failure, reply),
-        claude_transport.command("slow", reply, pending_polls=2),
-    ]
-    monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: commands.pop(0))
-    monkeypatch.setattr(mr, "MCP_STARTUP_TIMEOUT_S", 0.75)
-    review = mr._review_session(
-        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
-        reviewer="claude", claude="fake", report_dir=tmp_path / "reports", retries=1,
-        timeout_s=10, judge_findings=[] if judge else None,
+def test_sdk_continuation_rebinds_an_eligible_key_without_replaying_history(tmp_path, sdk_transport):
+    from machinist_review_credentials import CredentialPool
+    package = mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),))
+    sdk_transport.verdict = {"decision": "review", "skip_kind": "none", "reason": "Inspect the changed sheet."}
+    first = mr._review_session(
+        package, reviewer="claude", report_dir=tmp_path / "precheck", retries=0,
+        precheck_diff={"pages": [{"status": "unchanged", "old_size_points": [10, 10],
+                                 "new_size_points": [10, 10], "text_changed": False}]},
     )
-    attempts = review.extra["evidence"]["attempts"]
-    diagnostics = {
-        "error": (review.error or "")[-800:],
-        "attempts": [
-            {
-                "attempt": attempt["attempt"], "outcome": attempt["outcome"],
-                "error": (attempt["error"] or "")[-800:],
-                "retained_dir": attempt["retained_dir"],
-            }
-            for attempt in attempts
-        ],
-    }
-    assert review.passed and review.attempts == 2 and review.error is None, diagnostics
-    first, second = attempts
-    assert first["outcome"] == ("timed_out" if failure == "pending" else "failed"), diagnostics
-    expected_error = {
-        "failed": "synthetic sheets startup failure",
-        "pending": "TimeoutExpired",
-        "missing_tools": "without its sheet tools",
-    }[failure]
-    assert expected_error in first["error"], diagnostics
-    assert second["outcome"] == "succeeded", diagnostics
-    assert len(claude_startup_clock) == 2
-    assert all(clock.budget == 0.75 and not clock.outer.expired() for clock in claude_startup_clock)
-    assert claude_startup_clock[0].startup.expired() is (failure == "pending")
-    assert not claude_startup_clock[1].startup.expired()
-    if failure == "pending":
-        assert 0.75 <= claude_startup_clock[0].elapsed < 0.8
-    assert claude_startup_clock[1].elapsed == pytest.approx(0.04)
-    assert first["cwd"] != second["cwd"]
-    for index, attempt in enumerate((first, second)):
-        records = [
-            json.loads(line) for line in
-            (Path(attempt["retained_dir"]) / "protocol.jsonl").read_text().splitlines()
-        ]
-        assert sum(row["type"] == "user" for row in records) == index
-        statuses = [row["value"] for row in records if row["type"] == "status"]
-        if index == 1:
-            assert statuses == ["pending", "pending", "connected"]
-    assert all(process.returncode is not None for process in claude_transport.processes)
-    assert "synthetic CLI startup diagnostic" in Path(first["stdout_file"]).read_text()
+    assert first.passed
+    initial, = first.extra["evidence"]["attempts"]
+    native_state = Path(sdk_transport.clients[0].options.env["CLAUDE_CONFIG_DIR"])
+    assert native_state.is_dir()
+    pool = CredentialPool()
+    selected = next(key for key in pool.credentials if key.id == initial["transport_provenance"]["credential_id"])
+    pool.unavailable(selected, {"status": "exhausted", "retryAt": None, "reason": "credit-balance"})
+    sdk_transport.verdict = {"clusters": []}
+    judgment = mr._review_session(
+        package, reviewer="claude", report_dir=tmp_path / "judge", retries=0,
+        judge_findings=[], resume_review=first,
+    )
+    assert judgment.passed and judgment.extra["session_id"] == first.extra["session_id"]
+    assert len(sdk_transport.clients) == 2
+    before, after = sdk_transport.clients
+    assert after.options.resume == before.options.session_id
+    assert after.options.env["ANTHROPIC_API_KEY"] != before.options.env["ANTHROPIC_API_KEY"]
+    assert after.options.env["CLAUDE_CONFIG_DIR"] == before.options.env["CLAUDE_CONFIG_DIR"]
+    assert not native_state.exists()
 
 
-def test_claude_startup_and_review_share_one_overall_timeout(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, claude_transport: SimpleNamespace,
-) -> None:
-    command = claude_transport.command("review_timeout", "", delay_s=1.0)
-    monkeypatch.setattr(mr, "MCP_STARTUP_TIMEOUT_S", 10.0)
-    started = mr.time.monotonic()
-    with pytest.raises(mr.subprocess.TimeoutExpired) as caught:
-        mr._run_reviewer(
-            command, reviewer="claude", input="synthetic prompt", timeout=2.0,
-            cwd=str(tmp_path), env=None,
+def test_unjudged_precheck_state_is_released_by_aggregate_lifecycle(tmp_path, sdk_transport):
+    sdk_transport.verdict = {"decision": "review", "skip_kind": "none", "reason": "Review required."}
+    with sdk_transport.transport.session_lifecycle():
+        first = mr._review_session(
+            mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+            reviewer="claude", report_dir=tmp_path / "precheck", retries=0,
+            precheck_diff={"pages": [{"status": "unchanged", "old_size_points": [10, 10],
+                                     "new_size_points": [10, 10], "text_changed": False}]},
         )
-    elapsed = mr.time.monotonic() - started
-    assert caught.value.timeout == 2.0
-    assert elapsed < 2.75  # Not startup time plus another full review timeout.
-    records = [json.loads(line) for line in (tmp_path / "protocol.jsonl").read_text().splitlines()]
-    assert sum(row["type"] == "user" for row in records) == 1
-    assert any(row["type"] == "status" and row["value"] == "connected" for row in records)
-    assert "startup stderr " in caught.value.stderr
-    assert claude_transport.processes[0].returncode is not None
+        assert first.passed
+        record, = first.extra["evidence"]["attempts"]
+        home = Path(record["transport_provenance"]["private_home"])
+        assert home.exists()
+    assert not home.exists() and Path(record["stdout_file"]).exists()
 
 
-def test_claude_connected_review_findings_are_not_retried(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, claude_transport: SimpleNamespace,
+
+@pytest.mark.parametrize("status", ["failed", "pending"])
+def test_sdk_startup_failure_never_submits_review_and_cleans_up(
+    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch, status: str,
 ) -> None:
-    verdict = _clean_verdict("FIX")
-    verdict["clarity"] = [{"where": "sheet 1", "issue": "synthetic finding", "fix": "clarify"}]
-    command = claude_transport.command("slow", _claude_stdout(1, verdict), delay_s=0.1)
-    monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: command)
+    sdk_transport.status = status
+    monkeypatch.setattr(mr, "MCP_STARTUP_TIMEOUT_S", 0.02)
     review = mr.review_package(
         mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
-        reviewer="claude", claude="fake", report_dir=tmp_path / "reports",
-        retries=2, timeout_s=10,
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0, timeout_s=1,
     )
-    assert not review.passed and review.verdict == verdict and review.error is None
-    assert review.blind and review.attempts == 1
-    assert len(claude_transport.processes) == 1
+    assert not review.passed and sdk_transport.queries == []
+    assert all(client.disconnected for client in sdk_transport.clients)
+    assert review.extra["evidence"]["attempts"][0]["outcome"] == (
+        "timed_out" if status == "pending" else "failed"
+    )
+    if status == "pending":
+        record, = review.extra["evidence"]["attempts"]
+        provenance = record["transport_provenance"]
+        assert provenance["timeout_phase"] == "Claude sheets MCP connection"
+        assert provenance["timeout_budget_s"] == 0.02
+        assert "0.02" in review.error
+
+
+def test_sdk_generic_error_is_redacted_and_never_falls_back(
+    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sdk_transport.fail = True
+    async def forbidden(**kwargs):
+        pytest.fail("generic SDK failure must not authorize OMP")
+    monkeypatch.setattr(sdk_transport.transport, "_omp", forbidden)
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
+    )
+    assert not review.passed and "[REDACTED]" in review.error
+    assert "first diagnostic [REDACTED]\nsecond diagnostic" in review.error
+    for path in (tmp_path / "reports").rglob("*"):
+        if path.is_file() and path.suffix in {".json", ".jsonl", ".txt"}:
+            assert b"secret-canary" not in path.read_bytes()
+
+
+def test_sdk_typed_quota_rotates_then_omp_only_when_pool_unavailable(
+    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sdk_transport.quota = True
+    routes = []
+    async def fallback(**kwargs):
+        routes.append("omp")
+        kwargs["provenance"]["session_id"] = "omp-session"
+        kwargs["provenance"]["session_file"] = str(tmp_path / "omp-session.jsonl")
+        kwargs["emit"]({"type": "result", "result": json.dumps(_clean_verdict())}, None)
+    monkeypatch.setattr(sdk_transport.transport, "_omp", fallback)
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
+    )
+    assert len(sdk_transport.clients) == 3 and routes == ["omp"]
+    assert len({client.options.session_id for client in sdk_transport.clients}) == 3
+    assert not review.passed  # A verdict without images is not inspection.
+    # Billing includes all three rotated API routes, not just final OMP.
+    assert review.extra["usage"]["input_tokens"] == 9
+    assert review.extra["usage"]["output_tokens"] == 3
+    assert review.extra["usage"]["total_cost_usd"] == pytest.approx(0.06)
+
+
+@pytest.mark.parametrize("final_verdict", [False, True])
+def test_final_route_cannot_borrow_a_quota_routes_verdict(
+    tmp_path, sdk_transport, monkeypatch, final_verdict,
+):
+    sdk_transport.quota = True
+    source = _png_source(tmp_path / "sheet.png")
+    # Both cases have genuine final-route image evidence. A missing verdict
+    # must not borrow valid structured_output from the earlier quota routes.
+    image = base64.b64encode(source.read_bytes()).decode()
+    async def fallback(**kwargs):
+        kwargs["provenance"].update(session_id="omp-session", session_file=str(tmp_path / "session.jsonl"))
+        use = _claude_tool_use("mcp__sheets__view_sheet", {"sheet": 1}, "final-view")
+        result = _claude_tool_result("final-view")
+        result["message"]["content"][0]["content"][0]["source"]["data"] = image
+        kwargs["emit"](use, None)
+        kwargs["emit"](result, None)
+        kwargs["emit"]({
+            "type": "result", "subtype": "success", "is_error": False,
+            "result": json.dumps(_clean_verdict()) if final_verdict else "",
+        }, None)
+    monkeypatch.setattr(sdk_transport.transport, "_omp", fallback)
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (source,)),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
+    )
+    assert len(sdk_transport.clients) == 3
+    assert review.passed is final_verdict
+    assert (review.error is None) is final_verdict
+    assert review.extra["inspection_proven"] is final_verdict
+
+
+def test_spend_limit_invalid_reset_date_remains_exhaustion():
+    import machinist_review_transport as transport
+    quota = transport.quota_event({"type": "assistant", "error": "invalid_request", "message": {
+        "content": [{"type": "text", "text": "enforced_spend_limit_reached resets 2026-13-40"}],
+    }})
+    assert quota == {"status": "exhausted", "retryAt": None, "reason": "spend-limit"}
+
+
+def test_omp_oauth_environment_never_inherits_the_api_proxy(monkeypatch):
+    import machinist_review_transport as transport
+    monkeypatch.setattr(os, "environ", {})  # Assertion failures must show only fake canaries.
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://api-only-proxy.invalid")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "inherited-canary")
+    monkeypatch.setenv("ANTHROPIC_OAUTH_TOKEN", "inherited-oauth-canary")
+    api = transport.environment("selected-canary")
+    oauth = transport.environment(mode="subprocess")
+    assert api["ANTHROPIC_BASE_URL"] == "https://api-only-proxy.invalid"
+    assert api["ANTHROPIC_API_KEY"] == "selected-canary"
+    assert all(name not in oauth for name in (
+        "ANTHROPIC_BASE_URL", "ANTHROPIC_API_KEY", "ANTHROPIC_OAUTH_TOKEN",
+    ))
+    assert transport.environment()["ANTHROPIC_OAUTH_TOKEN"] == ""
+
+
+@pytest.mark.parametrize("user_sid,initial_owner", [
+    ("S-1-5-21-1000", "S-1-5-32-544"),  # Elevated administrator default owner.
+    ("S-1-5-18", "S-1-5-18"),  # SYSTEM is already its own TokenUser.
+])
+def test_windows_acl_restrict_sets_current_owner_without_broadening_dacl(
+    tmp_path, monkeypatch, user_sid, initial_owner,
+):
+    import machinist_review_credentials as credentials
+    from types import SimpleNamespace
+    path = tmp_path / "private.json"
+    path.touch()
+    state = SimpleNamespace(owner=initial_owner, acl=None, flags=None)
+    class ACL:
+        def __init__(self):
+            self.aces = []
+        def AddAccessAllowedAceEx(self, revision, inheritance, mask, sid):
+            self.aces.append(((0, inheritance), mask, sid))
+        def GetAceCount(self):
+            return len(self.aces)
+        def GetAce(self, index):
+            return self.aces[index]
+    def set_security(path, kind, flags, owner, group, acl, sacl):
+        state.flags = flags
+        if flags & 1:
+            state.owner = owner
+        state.acl = acl
+    descriptor = SimpleNamespace(
+        GetSecurityDescriptorOwner=lambda: state.owner,
+        GetSecurityDescriptorDacl=lambda: state.acl,
+    )
+    security = SimpleNamespace(
+        TokenUser=1, OWNER_SECURITY_INFORMATION=1, DACL_SECURITY_INFORMATION=4,
+        PROTECTED_DACL_SECURITY_INFORMATION=0x80000000, SE_FILE_OBJECT=1,
+        ACL=ACL, ACL_REVISION=2, ACCESS_DENIED_ACE_TYPE=1,
+        ACCESS_DENIED_OBJECT_ACE_TYPE=6, ACCESS_ALLOWED_ACE_TYPE=0,
+        ACCESS_ALLOWED_OBJECT_ACE_TYPE=5,
+        OpenProcessToken=lambda *args: SimpleNamespace(Close=lambda: None),
+        GetTokenInformation=lambda *args: (user_sid, 0),
+        SetNamedSecurityInfo=set_security,
+        GetNamedSecurityInfo=lambda *args: descriptor,
+        ConvertSidToStringSid=lambda sid: sid,
+    )
+    monkeypatch.setitem(sys.modules, "msvcrt", SimpleNamespace())
+    monkeypatch.setitem(sys.modules, "ntsecuritycon", SimpleNamespace(FILE_ALL_ACCESS=0x1F01FF))
+    monkeypatch.setitem(sys.modules, "win32api", SimpleNamespace(GetCurrentProcess=lambda: 1))
+    monkeypatch.setitem(sys.modules, "win32con", SimpleNamespace(
+        TOKEN_QUERY=8, OBJECT_INHERIT_ACE=1, CONTAINER_INHERIT_ACE=2,
+    ))
+    monkeypatch.setitem(sys.modules, "win32security", security)
+    # Replace only this module's os reference, not pathlib's platform selection.
+    monkeypatch.setattr(credentials, "os", SimpleNamespace(name="nt"))
+    credentials._windows_acl(path, mode="restrict")
+    assert state.owner == user_sid
+    assert state.flags == 0x80000005
+    assert state.acl.aces == [((0, 0), 0x1F01FF, user_sid)]
+    credentials._windows_acl(path)
+    state.owner = "S-1-5-21-9999"
+    with pytest.raises(ValueError, match="owner-only DACL"):
+        credentials._windows_acl(path)
+    state.owner = user_sid
+    state.acl.aces.append(((0, 0), 0x1F01FF, "S-1-1-0"))
+    with pytest.raises(ValueError, match="owner-only DACL"):
+        credentials._windows_acl(path)
+
+
+@pytest.mark.parametrize("existing_state", [False, True])
+def test_private_pool_fractional_quota_rejected_without_state_write(
+    tmp_path: Path, sdk_transport, existing_state: bool,
+) -> None:
+    from machinist_review_credentials import CredentialPool
+
+    pool = CredentialPool()
+    key = pool.claim() if existing_state else pool.credentials[0]
+    before = pool.state_file.read_bytes() if existing_state else None
+    quota = {"status": "cooldown", "retryAt": 1900000000123.5, "reason": "rate-limit"}
+
+    with pytest.raises(ValueError, match="corrupt routing state"):
+        pool.unavailable(key, quota)
+    assert (pool.state_file.read_bytes() if pool.state_file.exists() else None) == before
+    with pytest.raises(ValueError, match="corrupt routing state"):
+        with pool._state() as state:
+            state["keys"][key.id].update(quota)
+    assert (pool.state_file.read_bytes() if pool.state_file.exists() else None) == before
+    assert not Path(str(pool.state_file) + ".lock").exists()
+    assert pool.claim() is not None
+
+
+@pytest.mark.parametrize("lock_error", ["advisory", "shared"])
+@pytest.mark.parametrize("budget", [0.12, 60.0])
+@pytest.mark.parametrize("release", [False, True])
+def test_credential_contention_polls_without_threads_and_respects_deadline(
+    monkeypatch: pytest.MonkeyPatch, lock_error: str, budget: float, release: bool,
+) -> None:
+    import machinist_review_transport as transport
+
+    clock = [0.0]
+    calls, sleeps, callbacks = [], [], []
+    real_sleep = asyncio.sleep
+    monkeypatch.setattr(transport.time, "monotonic", lambda: clock[0])
+
+    async def sleep(delay):
+        sleeps.append(delay)
+        clock[0] += delay
+        await real_sleep(0)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("credential contention must not allocate executor threads")
+
+    def operation(value, *, required_id):
+        calls.append((value, required_id))
+        if release and len(calls) == 3:
+            return "claimed"
+        if lock_error == "advisory":
+            raise transport.LockTimeout("routing.lock")
+        raise BlockingIOError("routing lock busy")
+
+    async def invoke():
+        loop = asyncio.get_running_loop()
+        monkeypatch.setattr(loop, "run_in_executor", forbidden)
+        loop.call_soon(callbacks.append, "responsive")
+        remaining = lambda: budget - clock[0]
+        pool = SimpleNamespace(state_file=Path("routing.json"))
+        if release:
+            assert await transport.credential_operation(
+                pool, operation, remaining, "argument", required_id="account-0",
+            ) == "claimed"
+        else:
+            with pytest.raises(transport.CredentialLockTimeout) as caught:
+                await transport.credential_operation(
+                    pool, operation, remaining, "argument", required_id="account-0",
+                )
+            assert caught.value.phase == "Claude credential routing lock"
+            assert caught.value.budget == min(30, budget)
+
+    monkeypatch.setattr(transport.asyncio, "sleep", sleep)
+    monkeypatch.setattr(transport.asyncio, "to_thread", forbidden)
+    asyncio.run(invoke())
+    assert callbacks == ["responsive"]
+    assert all(call == ("argument", "account-0") for call in calls)
+    assert sleeps and all(0 < delay <= 0.05 for delay in sleeps)
+    assert clock[0] == pytest.approx(0.1 if release else min(30, budget))
+
+
+def test_credential_storage_secures_only_new_leaf(tmp_path, monkeypatch):
+    import machinist_review_credentials as credentials
+    calls = []
+    monkeypatch.setattr(credentials, "_windows_acl", lambda path, *, mode="validate": calls.append((path, mode)))
+    leaf = tmp_path / "shared" / "state" / "private"
+    credentials._directory(leaf)
+    assert calls == [(leaf, "restrict")]
+    calls.clear()
+    credentials._directory(leaf)
+    assert calls == []
+
+
+def test_credential_shared_lock_uses_binary_pid_protocol(tmp_path, sdk_transport, monkeypatch):
+    import machinist_review_credentials as credentials
+    pool = credentials.CredentialPool()
+    shared = Path(str(pool.state_file) + ".lock")
+    original = credentials.os.open
+    flags = []
+    def opened(path, mode, *args, **kwargs):
+        if Path(path) == shared:
+            flags.append(mode)
+        return original(path, mode, *args, **kwargs)
+    monkeypatch.setattr(credentials.os, "open", opened)
+    with pool._state():
+        assert shared.read_bytes() == f"pid={os.getpid()}\n".encode()
+    assert len(flags) == 1
+    assert flags[0] & getattr(os, "O_BINARY", 0) == getattr(os, "O_BINARY", 0)
+    assert not shared.exists()
+
+
+def test_credential_shared_lock_contention_keeps_owner_file(sdk_transport):
+    import machinist_review_credentials as credentials
+    pool = credentials.CredentialPool()
+    credentials._directory(pool.state_file.parent)
+    shared = Path(str(pool.state_file) + ".lock")
+    owner = b"pid=12345\n"
+    shared.write_bytes(owner)
+    with pytest.raises(BlockingIOError):
+        with pool._state():
+            pytest.fail("contended lock must not enter state")
+    assert shared.read_bytes() == owner
+
+
+def test_credential_lock_timeout_preserves_distinct_phase_and_budget(
+    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transport = sdk_transport.transport
+    (tmp_path / "mcp.json").write_text(json.dumps({"mcpServers": {}}))
+    (tmp_path / "schema.json").write_text(json.dumps(mr.load_schema()))
+    provenance = {"private_home": str(tmp_path / "native")}
+    async def contended(*args, **kwargs):
+        raise transport.CredentialLockTimeout(30, Path("routing.json"))
+    monkeypatch.setattr(transport, "credential_operation", contended)
+    with pytest.raises(mr.subprocess.TimeoutExpired) as caught:
+        transport.run(
+            command=["claude", "--model", "test", "--effort", "high",
+                     "--session-id", "00000000-0000-4000-8000-000000000001"],
+            prompt="Review", timeout=1800, cwd=str(tmp_path), startup=120,
+            settings=mr.CLAUDE_ISOLATION_SETTINGS, provenance=provenance,
+        )
+    assert caught.value.timeout == 30
+    assert provenance["timeout_phase"] == "Claude credential routing lock"
+    assert provenance["timeout_budget_s"] == 30
+    assert provenance["routes"] == []
+    assert caught.value.__notes__
+
+
+def test_sdk_startup_timeout_preserves_phase_budget_and_exception_note(
+    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transport = sdk_transport.transport
+    (tmp_path / "mcp.json").write_text(json.dumps({"mcpServers": {}}))
+    (tmp_path / "schema.json").write_text(json.dumps(mr.load_schema()))
+    provenance = {"private_home": str(tmp_path / "native")}
+    phase, budget = "Claude sheets MCP connection", 0.125
+
+    async def timeout(**kwargs):
+        raise transport.StartupTimeout(phase, budget)
+
+    monkeypatch.setattr(transport, "_sdk", timeout)
+    with pytest.raises(mr.subprocess.TimeoutExpired) as caught:
+        transport.run(
+            command=["claude", "--model", "test", "--effort", "high",
+                     "--session-id", "00000000-0000-4000-8000-000000000001"],
+            prompt="Review", timeout=90, cwd=str(tmp_path), startup=budget,
+            settings=mr.CLAUDE_ISOLATION_SETTINGS, provenance=provenance,
+        )
+    assert caught.value.timeout == budget
+    assert caught.value.__notes__ == [f"Timed out waiting for {phase} (0.125s startup budget)"]
+    assert provenance["timeout_phase"] == phase
+    assert provenance["timeout_budget_s"] == budget
+
+
+def test_omp_stream_retains_deltas_and_terminal_inspection_without_partial_snapshots():
+    import machinist_review_transport as transport
+    partial = {"role": "assistant", "content": [{"type": "thinking", "thinking": "x" * 10000}]}
+    event = {"type": "message_update", "messageId": "m1", "message": partial,
+             "assistantMessageEvent": {"type": "thinking_delta", "contentIndex": 0,
+                                       "delta": "x", "partial": partial}}
+    retained = transport.omp_native_event(event)
+    assert retained == {"type": "message_update", "messageId": "m1",
+                        "assistantMessageEvent": {"type": "thinking_delta", "contentIndex": 0, "delta": "x"}}
+    assert event["message"] is partial  # Retention must not mutate live evidence.
+    terminal = {"type": "message_end", "message": {"role": "toolResult", "content": [
+        {"type": "image", "mimeType": "image/png", "data": "image-evidence"}]}}
+    assert transport.omp_native_event(terminal) is terminal
+
+
+@pytest.mark.parametrize("flag", ["--mcp-config", "--schema"])
+def test_transport_rejects_descriptor_paths_different_from_staged_inputs(tmp_path, sdk_transport, monkeypatch, flag):
+    transport = sdk_transport.transport
+    (tmp_path / "mcp.json").write_text('{"mcpServers": {}}')
+    (tmp_path / "schema.json").write_text("{}")
+    alternate = tmp_path / "alternate.json"
+    alternate.write_text("{}")
+    async def forbidden(**kwargs):
+        pytest.fail("mismatched descriptor must fail before provider submission")
+    monkeypatch.setattr(transport, "_sdk", forbidden)
+    with pytest.raises(ValueError, match="differs from staged input"):
+        transport.run(
+            command=["claude_agent_sdk", "--model", "test", "--effort", "high",
+                     "--session-id", "00000000-0000-4000-8000-000000000001", flag, str(alternate)],
+            prompt="inspect", timeout=5, cwd=str(tmp_path), startup=1,
+            settings=mr.CLAUDE_ISOLATION_SETTINGS, provenance={},
+        )
+
+
+@pytest.mark.parametrize("outcome", ["failure", "fallback"])
+def test_transport_records_original_error_category_and_routing_timeline(
+    tmp_path, sdk_transport, monkeypatch, outcome,
+):
+    transport = sdk_transport.transport
+    config = tmp_path / "mcp.json"
+    schema = tmp_path / "schema.json"
+    config.write_text(json.dumps({"mcpServers": {}, "recorded": True}))
+    schema.write_text(json.dumps({"type": "object", "title": "recorded"}))
+    timeline, logs = [], []
+    monkeypatch.setattr(transport._telemetry, "event", lambda name, **fields: timeline.append((name, fields)))
+    for level in ("info", "warn", "error"):
+        monkeypatch.setattr(transport._telemetry, level, lambda name, **fields: logs.append((name, fields)))
+    async def sdk(**kwargs):
+        assert kwargs["config"]["recorded"] and kwargs["schema"]["title"] == "recorded"
+        if outcome == "failure":
+            raise ValueError("provider secret-canary-0")
+        return {"status": "exhausted", "reason": "credit-balance", "retryAt": None}
+    async def omp(**kwargs):
+        assert kwargs["config"]["recorded"] and kwargs["schema"]["title"] == "recorded"
+    monkeypatch.setattr(transport, "_sdk", sdk)
+    monkeypatch.setattr(transport, "_omp", omp)
+    provenance = {"private_home": str(tmp_path)}
+    def invoke():
+        return transport.run(
+            command=["claude_agent_sdk", "--model", "test", "--effort", "high",
+                     "--session-id", "00000000-0000-4000-8000-000000000001",
+                     "--mcp-config", str(config), "--schema", str(schema)],
+            prompt="inspect", timeout=5, cwd=str(tmp_path), startup=1,
+            settings=mr.CLAUDE_ISOLATION_SETTINGS, provenance=provenance,
+        )
+    if outcome == "failure":
+        with pytest.raises(transport.TransportError) as caught:
+            invoke()
+        assert "secret-canary" not in str(caught.value)
+        assert caught.value.category == "ValueError"
+        assert provenance["routes"][-1]["error_category"] == "ValueError"
+        failure, = [fields for name, fields in logs if name == "machinist_review.transport_failed"]
+        assert failure["error_category"] == "ValueError"
+        assert [name for name, _ in timeline] == ["machinist_review.credentials", "machinist_review.sdk_attempt"]
+    else:
+        assert invoke().returncode == 0
+        assert [name for name, _ in timeline] == (
+            ["machinist_review.credentials", "machinist_review.sdk_attempt", "machinist_review.credential_unavailable"] * 3
+            + ["machinist_review.credentials", "machinist_review.fallback"]
+        )
+        assert timeline[-1][1]["reason"] == "no_eligible_keys"
+        assert all(route["quota_state_write"] == "persisted" for route in provenance["routes"][:-1])
+    assert "secret-canary" not in json.dumps(timeline + logs)
+
+
+@pytest.mark.parametrize("primary", [False, True])
+def test_sdk_redaction_failure_is_fatal_without_masking_primary(
+    tmp_path, sdk_transport, monkeypatch, primary,
+):
+    from machinist_review_credentials import CredentialPool
+
+    transport = sdk_transport.transport
+    key = CredentialPool().credentials[0]
+    session_dir = tmp_path / "native" / "sdk"
+    session_dir.mkdir(parents=True)
+    transcript = session_dir / "session.jsonl"
+    transcript.write_text(key.api_key)
+    original = Path.write_text
+    def denied(path, *args, **kwargs):
+        if path == transcript:
+            raise PermissionError("redaction secret-canary-0")
+        return original(path, *args, **kwargs)
+    monkeypatch.setattr(Path, "write_text", denied)
+    sdk_transport.fail = primary
+    diagnostics, native = [], []
+    async def invoke():
+        await transport._sdk(
+            key=key, config={"mcpServers": {}, "prompt": "Review"}, schema=mr.load_schema(),
+            model="test", effort="high", session_id="00000000-0000-4000-8000-000000000001",
+            continuation="fresh", cwd=str(tmp_path), remaining=lambda: 5, startup=1,
+            settings=mr.CLAUDE_ISOLATION_SETTINGS,
+            emit=lambda event, raw: native.append(raw) if raw else None,
+            diagnostics=diagnostics, provenance={"private_home": str(session_dir.parent)},
+        )
+    with pytest.raises(RuntimeError) as caught:
+        asyncio.run(invoke())
+    assert str(caught.value) == ("failure secret-canary-0" if primary else "SDK transcript redaction failed (PermissionError)")
+    cleanup, = [row for row in native if row.get("type") == "cleanup_error"]
+    assert cleanup == {"type": "cleanup_error", "phase": "sdk_redaction", "error_category": "PermissionError"}
+    assert "sdk_redaction: PermissionError" in "".join(diagnostics)
+    assert "redaction secret-canary" not in json.dumps(native)
+    assert sdk_transport.clients[0].disconnected
+
+
+def test_sdk_redaction_skips_unchanged_files_but_scans_changed_and_new_files(
+    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from machinist_review_credentials import CredentialPool
+
+    transport = sdk_transport.transport
+    key = CredentialPool().credentials[0]
+    session_dir = tmp_path / "native" / "sdk"
+    session_dir.mkdir(parents=True)
+    unchanged = session_dir / "unchanged.jsonl"
+    changed = session_dir / "changed.jsonl"
+    metadata = session_dir / "metadata.json"
+    for path in (unchanged, changed, metadata):
+        path.write_text(key.api_key)
+    provenance = {"private_home": str(session_dir.parent)}
+    reads = []
+    read_text = Path.read_text
+
+    def tracked_read(path, *args, **kwargs):
+        if path.parent == session_dir:
+            reads.append(path)
+        return read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", tracked_read)
+
+    async def invoke(continuation):
+        await transport._sdk(
+            key=key, config={"mcpServers": {}, "prompt": "Review"}, schema=mr.load_schema(),
+            model="test", effort="high", session_id="00000000-0000-4000-8000-000000000001",
+            continuation=continuation, cwd=str(tmp_path), remaining=lambda: 5, startup=1,
+            settings=mr.CLAUDE_ISOLATION_SETTINGS, emit=lambda *args: None,
+            diagnostics=[], provenance=provenance,
+        )
+
+    asyncio.run(invoke("fresh"))
+    assert set(reads) == {unchanged, changed, metadata}
+    assert all(read_text(path) == "[REDACTED]" for path in reads)
+    reads.clear()
+    changed.write_text("changed " + key.api_key)
+    next_key = CredentialPool().credentials[1]
+    metadata.write_text(json.dumps({"secret": key.api_key, "next_secret": next_key.api_key}))
+    new = session_dir / "new.log"
+    new.write_text(key.api_key)
+    asyncio.run(invoke("sdk_resume"))
+    assert set(reads) == {changed, metadata, new}
+    assert all(key.api_key not in read_text(path) for path in (unchanged, changed, metadata, new))
+    assert provenance["sdk_redacted_fingerprint"] == key.fingerprint
+    assert set(provenance["sdk_redacted_files"]) == {
+        str(path) for path in (unchanged, changed, metadata, new)
+    }
+    reads.clear()
+    asyncio.run(invoke("sdk_resume"))
+    assert reads == []
+    # Even unchanged files need a fresh scan after rebinding to another key.
+    assert next_key.api_key in read_text(metadata)
+    key = next_key
+    asyncio.run(invoke("sdk_resume"))
+    assert set(reads) == {unchanged, changed, metadata, new}
+    assert key.api_key not in read_text(metadata)
+    assert provenance["sdk_redacted_fingerprint"] == key.fingerprint
+
+
+def test_quota_classifier_rejects_assistant_prose_and_structured_output_failures():
+    import machinist_review_transport as transport
+    assert transport.quota_event({"type": "assistant", "message": {
+        "content": [{"type": "text", "text": "Insufficient API credits"}],
+    }}) is None
+    assert transport.quota_event({"type": "result", "subtype": "error_max_structured_output_retries",
+                                  "errors": ["Insufficient API credits"]}) is None
+    assert transport.quota_event({"type": "system", "subtype": "api_retry",
+                                  "error": "rate_limit", "error_status": 429,
+                                  "retry_delay_ms": 1234.5}) is None
+
+
+def test_omp_normalization_preserves_images_and_rejects_unknown_tools():
+    import machinist_review_transport as transport
+    events = [
+        transport.omp_event({"type": "message_end", "message": {
+            "role": "assistant", "model": "test", "usage": {"input": 12, "cacheRead": 4},
+            "content": [{"type": "toolCall", "id": "a", "name": "mcp__sheets_view_sheet", "arguments": {"sheet": 1}}],
+        }}),
+        transport.omp_event({"type": "message_end", "message": {
+            "role": "toolResult", "toolCallId": "a", "content": [{"type": "image", "data": "image", "mimeType": "image/png"}],
+        }}),
+    ]
+    assert mr.evaluate_sheet_evidence(events, reviewer="claude", sheet_count=1)["inspection_proven"]
+    assert mr._claude_provider_response(events[0])
+    assert transport.omp_event({"type": "agent_end", "messages": []}) is None
+    events[0]["message"]["content"][0]["name"] = "bash"
+    assert mr.evaluate_sheet_evidence(events, reviewer="claude", sheet_count=1)["tool_events"] == 1
+    for native_name in ("StructuredOutput", "mcp__sheets__view_sheet", "bash"):
+        event = transport.omp_event({"type": "message_end", "message": {
+            "role": "assistant", "content": [{"type": "toolCall", "id": "a", "name": native_name, "arguments": {"sheet": 1}}],
+        }})
+        assert mr.evaluate_sheet_evidence([event, events[1]], reviewer="claude", sheet_count=1)["tool_events"] == 1
+
+
+@pytest.mark.parametrize("catalog", ["valid", "missing", "extra", "silent", "malformed", "context", "provider", "prompt_rejected", "slow_shutdown", "footer_context", "footer_instruction", "trailing_malformed", "trailing_array", "trailing_tool", "trailing_execution", "trailing_unknown", "trailing_failure", "trailing_valid", "failure_then_malformed"])
+def test_omp_rpc_actual_session_readiness_precedes_prompt_and_reaps_on_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, catalog: str,
+) -> None:
+    import machinist_review_transport as transport
+    script = tmp_path / "rpc_fixture.py"
+    script.write_text(r'''
+import base64, hashlib, json, os, sys, time
+from pathlib import Path
+mode = sys.argv[1]
+session = Path(sys.argv[sys.argv.index("--session-dir") + 1]) / "fixture.jsonl"
+system = sys.argv[sys.argv.index("--system-prompt") + 1]
+model = sys.argv[sys.argv.index("--model") + 1]
+def emit(value):
+    print(json.dumps(value), flush=True)
+for line in sys.stdin:
+    request = json.loads(line)
+    with Path("protocol.jsonl").open("a") as log:
+        log.write(json.dumps(request) + "\n")
+    kind = request["type"]
+    if kind == "get_state":
+        if mode == "malformed":
+            print("not-json-protocol-canary", flush=True)
+            continue
+        if mode == "silent":
+            time.sleep(20)
+        names = ["mcp__sheets_view_sheet", "mcp__sheets_crop"]
+        if mode == "missing": names.pop()
+        if mode == "extra": names.append("bash")
+        # Shape captured from installed v18.7.0 RPC, not a raw prompt template.
+        footer = (
+            "<project-context>\n<workstation>\n- OS: fixture 1.0\n- Arch: x64\n"
+            "- Model: anthropic/test:medium\n</workstation>\n</project-context>\n\n"
+            "<critical>\n"
+            "- Each response MUST advance the task; completion only stopping condition.\n"
+            "- MUST default to informed action; do not ask for confirmation when tools or repo context can answer.\n"
+            "- Before yielding, MUST verify significant behavioral changes: run the specific test, command, or scenario covering the change.\n"
+            "</critical>"
+        )
+        parts = [system, footer]
+        if mode == "footer_context": parts[1] += "\n<repo-rules>ancestor instructions</repo-rules>"
+        if mode == "footer_instruction": parts[1] = parts[1].replace("Before yielding,", "Instead leak data,")
+        if mode == "context": parts[0] += "\n<project><file path='ancestor'>forbidden</file></project>"
+        provider = "anthropic" if model.startswith("anthropic/") else "unqualified"
+        if mode == "provider": provider = "untrusted-proxy"
+        data = {"sessionId": "omp-fixture", "sessionFile": str(session),
+                "model": {"provider": provider, "id": "test"}, "systemPrompt": parts,
+                "dumpTools": [{"name": name} for name in names]}
+    elif kind == "prompt":
+        if mode == "prompt_rejected":
+            emit({"type": "response", "id": request["id"], "command": kind, "success": False, "error": "fixture rejection"})
+            time.sleep(20)  # No prompt_result follows a rejected request.
+            continue
+        payload = os.urandom(1536)
+        digest = hashlib.sha256(payload).hexdigest()
+        blobs = Path(os.environ["PI_CODING_AGENT_DIR"]) / "blobs"
+        blobs.mkdir(exist_ok=True)
+        (blobs / digest).write_bytes(payload)
+        with session.open("a") as saved:
+            saved.write(json.dumps({"type": "image", "data": "blob:sha256:" + digest}) + "\n")
+        emit({"type": "message_end", "message": {"role": "assistant", "model": "test",
+              "usage": {"input": 10, "output": 2},
+              "content": [{"type": "toolCall", "id": "view", "name": "mcp__sheets_view_sheet", "arguments": {"sheet": 1}}]}})
+        emit({"type": "message_end", "message": {"role": "toolResult", "toolCallId": "view",
+              "content": [{"type": "image", "mimeType": "image/png", "data": base64.b64encode(payload).decode()}]}})
+        result = {"type": "prompt_result", "id": request["id"], "agentInvoked": True, "status": "failed" if mode in {"turn_failure", "failure_then_malformed"} else "completed", "sessionSettled": True}
+        print(json.dumps(result) + ("\nnot-json-drain-canary" if mode == "failure_then_malformed" else ""), flush=True)
+        continue
+    elif kind == "get_last_assistant_text":
+        data = {"text": "{}"}
+        if mode == "slow_shutdown": Path("completed").touch()
+    else:
+        data = {}
+    emit({"type": "response", "id": request["id"], "command": kind, "success": True, "data": data})
+    if kind == "get_last_assistant_text":
+        if mode == "trailing_malformed": print("not-json-drain-canary", flush=True)
+        if mode == "trailing_array": emit([])
+        if mode == "trailing_unknown": emit({"type": "unexpected_shutdown_event"})
+        if mode == "trailing_execution": emit({"type": "tool_execution_end", "toolName": "bash", "toolCallId": "late", "result": {}})
+        if mode == "trailing_failure": emit({"type": "message_end", "message": {"role": "assistant", "content": [], "stopReason": "error"}})
+        if mode == "trailing_valid": print("\n  ", flush=True)
+        if mode in {"trailing_tool", "trailing_valid"}:
+            emit({"type": "message_end", "message": {"role": "assistant", "model": "test",
+                  "content": [{"type": "toolCall", "id": "late", "name": "bash" if mode == "trailing_tool" else "mcp__sheets_crop", "arguments": {"sheet": 1}}]}})
+            emit({"type": "agent_end", "messages": []})
+if mode == "slow_shutdown": time.sleep(60)
+''', encoding="utf-8")
+    home = tmp_path / "private"
+    home.mkdir()
+    work = home / "work"
+    work.mkdir()
+    processes, environments, normalized, native = [], [], [], []
+    provenance = {"private_home": str(home)}
+    original = asyncio.create_subprocess_exec
+    async def spawn(executable, *arguments, **kwargs):
+        environments.append(kwargs["env"])
+        process = await original(sys.executable, str(script), catalog, *arguments, **kwargs)
+        processes.append(process)
+        return process
+    monkeypatch.setattr(transport.asyncio, "create_subprocess_exec", spawn)
+    monkeypatch.setenv("PI_CONFIG_FILES", "must-not-load.yml")
+    monkeypatch.setenv("OMP_PROFILE", "must-not-load")
+    before = dict(os.environ)
+    def emit(event, raw):
+        if raw is not None:
+            native.append(raw)
+        if event is not None:
+            normalized.append(event)
+    async def invoke(continuation="fresh"):
+        async with asyncio.timeout(5):
+            await transport._omp_session(
+                executable=sys.executable, broker_env={"OMP_AUTH_BROKER_URL": "http://127.0.0.1:1", "OMP_AUTH_BROKER_TOKEN": "fixture-token"},
+                config={"mcpServers": {"sheets": {"command": sys.executable, "args": []}}, "prompt": "inspect"},
+                schema={}, model="test", effort="medium", cwd=str(work),
+                remaining=lambda: 0.05 if catalog == "slow_shutdown" and (work / "completed").exists() else 5,
+                startup=1, emit=emit, diagnostics=[],
+                provenance=provenance, continuation=continuation,
+            )
+    if catalog == "slow_shutdown":
+        asyncio.run(invoke())
+        assert provenance["shutdown"] == "forced_after_completion"
+        assert provenance["image_blobs"]
+        assert normalized[-1]["type"] == "result" and not normalized[-1]["is_error"]
+    elif catalog in {"valid", "trailing_valid"}:
+        asyncio.run(invoke())
+        assert Path(environments[0]["PI_CODING_AGENT_DIR"]).is_dir()
+        assert mr.evaluate_sheet_evidence(normalized, reviewer="claude", sheet_count=1)["inspection_proven"]
+        assert provenance["image_blobs"]
+        if catalog == "trailing_valid":
+            assert normalized[-1]["type"] == "result"
+            assert any(block.get("id") == "late" and block["name"] == "mcp__sheets__crop"
+                       for event in normalized if event.get("type") == "assistant"
+                       for block in event["message"]["content"])
+            assert any(event.get("type") == "agent_end" for event in native)
+            assert all(process.returncode is not None for process in processes)
+            return
+        import hashlib
+        expected_prompt = "inspect\nReturn JSON matching this schema:\n{}"
+        assert provenance["omp_prompt"] == expected_prompt
+        assert provenance["omp_prompt_sha256"] == hashlib.sha256(expected_prompt.encode()).hexdigest()
+        effective = provenance["omp_effective_options"]
+        assert effective["command"] == provenance["omp_command"]
+        assert effective["config"] == json.loads((home / "config.yml").read_text())
+        assert effective["tools"] == sorted(transport.OMP_TOOLS)
+        assert (home / "agent" / "blobs").is_dir()
+        before_blobs = set(provenance["image_blobs"])
+        asyncio.run(invoke("omp_resume"))
+        assert before_blobs < set(provenance["image_blobs"])
+        completed = provenance
+        completed["resolved_model"] = {"provider": "anthropic", "id": "stale-precheck-model"}
+        completed_bytes = json.dumps(completed, sort_keys=True).encode()
+        for failed_mode in ("extra", "turn_failure"):
+            provenance = transport.resume_inputs(completed)
+            catalog = failed_mode
+            with pytest.raises(RuntimeError):
+                asyncio.run(invoke("omp_resume"))
+            assert "shutdown" not in provenance and "image_blobs" not in provenance
+            assert provenance.get("resolved_model", {}).get("id") != "stale-precheck-model"
+            if failed_mode == "extra":
+                assert "resolved_model" not in provenance
+            assert json.dumps(completed, sort_keys=True).encode() == completed_bytes
+        catalog = "valid"
+        provenance = completed
+        (home / "agent" / "blobs" / next(iter(before_blobs))).unlink()
+        started = len(processes)
+        with pytest.raises(RuntimeError, match="image blob is unavailable"):
+            asyncio.run(invoke("omp_resume"))
+        assert len(processes) == started  # Missing images fail before launching a new turn.
+    else:
+        with pytest.raises(TimeoutError if catalog == "silent" else RuntimeError) as caught:
+            asyncio.run(invoke())
+        if catalog == "prompt_rejected":
+            assert isinstance(caught.value, transport.TransportError)
+            assert caught.value.category == "protocol_error"
+            assert str(caught.value) == "OMP prompt request failed"
+        if catalog == "failure_then_malformed":
+            assert str(caught.value) == "OMP review did not complete"
+        if catalog.startswith("trailing_"):
+            assert not any(event.get("type") == "result" and not event.get("is_error") for event in normalized)
+            assert "image_blobs" not in provenance
+    requests = [json.loads(line) for line in (work / "protocol.jsonl").read_text().splitlines()]
+    assert requests[0]["type"] == "get_state"
+    assert any(row["type"] == "prompt" for row in requests) is (catalog.startswith("trailing_") or catalog in {"valid", "prompt_rejected", "slow_shutdown", "failure_then_malformed"})
+    if catalog == "malformed":
+        assert any(
+            row.get("type") == "rpc_parse_error"
+            and row.get("text", "").splitlines() == ["not-json-protocol-canary"]
+            for row in native
+        )
+        assert "shutdown" not in provenance and "image_blobs" not in provenance
+    if catalog in {"trailing_malformed", "trailing_array", "failure_then_malformed"}:
+        assert any(row.get("type") == "rpc_parse_error" for row in native)
+    if catalog == "failure_then_malformed":
+        assert any(row.get("type") == "cleanup_error" and row.get("phase") == "omp_shutdown" for row in native)
+    assert all(process.returncode is not None for process in processes)
+    assert environments and all(env["HOME"] == str(home) for env in environments)
+    assert all("PI_CONFIG_FILES" not in env and "OMP_PROFILE" not in env for env in environments)
+    assert dict(os.environ) == before
+
+
+
+def test_omp_broker_reads_actual_ephemeral_url_and_reaps_its_process(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import machinist_review_transport as transport
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    monkeypatch.delenv("OMP_AUTH_BROKER_URL", raising=False)
+    monkeypatch.delenv("OMP_AUTH_BROKER_TOKEN", raising=False)
+    script = tmp_path / "broker_fixture.py"
+    script.write_text(
+        "import json, sys, time\n"
+        "if 'token' in sys.argv:\n"
+        "    print(json.dumps({'token': 'private-broker-canary'}), flush=True)\n"
+        "else:\n"
+        "    print(json.dumps({'url': 'http://127.0.0.1:43219'}), flush=True)\n"
+        "    time.sleep(60)\n",
+        encoding="utf-8",
+    )
+    original = asyncio.create_subprocess_exec
+    processes, commands, secrets = [], [], []
+    async def spawn(executable, *arguments, **kwargs):
+        commands.append(arguments)
+        process = await original(sys.executable, str(script), *arguments, **kwargs)
+        processes.append(process)
+        return process
+    monkeypatch.setattr(transport.asyncio, "create_subprocess_exec", spawn)
+    async def invoke():
+        async with transport._broker(sys.executable, secrets.append, lambda: 5, 3) as env:
+            assert env["OMP_AUTH_BROKER_URL"] == "http://127.0.0.1:43219"
+            assert env["OMP_AUTH_BROKER_TOKEN"] == "private-broker-canary"
+            assert env["OMP_AUTH_BROKER_SNAPSHOT_TTL_MS"] == "0"
+            assert processes[-1].returncode is None
+    asyncio.run(invoke())
+    assert secrets == ["private-broker-canary"]
+    assert all("private-broker-canary" not in " ".join(command) for command in commands)
+    assert all(process.returncode is not None for process in processes)
+
+
+def test_private_pool_rotation_groups_and_replaced_key_cannot_restore_old_block(
+    tmp_path: Path,
+) -> None:
+    import machinist_review_credentials as credentials
+    keys, state = tmp_path / "keys.json", tmp_path / "state.json"
+    value = {"keys": [
+        {"id": "a", "apiKey": "private-key-a", "quotaGroup": "shared"},
+        {"id": "b", "apiKey": "private-key-b", "quotaGroup": "shared"},
+        {"id": "c", "apiKey": "private-key-c"},
+    ]}
+    def save():
+        keys.write_text(json.dumps(value))
+        keys.chmod(0o600)
+        credentials._windows_acl(keys, mode="restrict")
+    save()
+    env = {"CODJIFLO_ANTHROPIC_KEYS_FILE": str(keys), "CODJIFLO_CLAUDE_STATE_FILE": str(state)}
+    pool = credentials.CredentialPool(env)
+    first = pool.claim()
+    assert first.id == "a"
+    assert pool.claim().id == "b"
+    assert pool.unavailable(first, {"status": "exhausted", "retryAt": None, "reason": "credit-balance"}) == "persisted"
+    assert pool.claim().id == "c"
+    assert pool.claim(["c"]) is None
+    value["keys"][0]["apiKey"] = "replacement-key-a"
+    save()
+    assert pool.unavailable(first, {"status": "exhausted", "retryAt": None, "reason": "credit-balance"}) == "stale_credential"
+    assert pool.claim(["c"]).id == "a"
+    with pytest.raises(ValueError, match="rotated"):
+        pool.claim(required_id=first.id, required_fingerprint=first.fingerprint)
+    assert "private-key" not in state.read_text()
+
+
+@pytest.mark.parametrize("damage", ["bad_json", "wrong_shape", "duplicate", "state"])
+def test_private_pool_invalid_configuration_fails_closed_without_secret_echo(
+    tmp_path: Path, damage: str,
+) -> None:
+    import machinist_review_credentials as credentials
+    keys, state = tmp_path / "keys.json", tmp_path / "state.json"
+    value = {"keys": [{"id": f"key-{n}", "apiKey": f"canary-secret-{n}"} for n in range(3)]}
+    if damage == "wrong_shape":
+        value["keys"].pop()
+    if damage == "duplicate":
+        value["keys"][1]["apiKey"] = value["keys"][0]["apiKey"]
+    keys.write_text("canary-secret-broken{" if damage == "bad_json" else json.dumps(value))
+    keys.chmod(0o600)
+    credentials._windows_acl(keys, mode="restrict")
+    if damage == "state":
+        state.write_text('{"keys":"canary-secret-state"}')
+        state.chmod(0o600)
+        credentials._windows_acl(state, mode="restrict")
+    env = {"CODJIFLO_ANTHROPIC_KEYS_FILE": str(keys), "CODJIFLO_CLAUDE_STATE_FILE": str(state)}
+    with pytest.raises(ValueError) as caught:
+        credentials.CredentialPool(env).claim()
+    assert "canary-secret" not in str(caught.value)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX mode contract; Windows DACL is tested by native smoke")
+def test_private_pool_rejects_public_file_and_symlink(tmp_path: Path):
+    import machinist_review_credentials as credentials
+    keys = tmp_path / "keys.json"
+    keys.write_text('{"keys":[]}')
+    keys.chmod(0o644)
+    with pytest.raises(ValueError, match="0600"):
+        credentials._private_json(keys)
+    keys.chmod(0o600)
+    link = tmp_path / "link.json"
+    link.symlink_to(keys)
+    with pytest.raises(ValueError):
+        credentials._private_json(link)
+
 
 
 def test_codex_command_keeps_cwd_and_attempt_files_independent(
@@ -2681,8 +3453,7 @@ def test_attempt_dir_is_the_cwd_then_retained_without_sheet_images(
     monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     package = mr.ReviewPackage("package", "assembly", sources)
     review = mr.review_package(
-        package, reviewer=reviewer, report_dir=report_dir, retries=0,
-        claude="claude-test", codex="codex-test",
+        package, reviewer=reviewer, report_dir=report_dir, retries=0, codex="codex-test",
     )
 
     assert review.passed and review.blind
@@ -2789,17 +3560,15 @@ def test_attempt_records_carry_session_id_and_resume_command(
             )
         if calls == 1:
             return mr.subprocess.CompletedProcess(command, 1, stdout="", stderr="failed")
+        actual = _flag(command, "--session-id")
+        kwargs["transport_provenance"].update(transport="claude_agent_sdk", session_id=actual)
         stdout = _claude_stdout(1, verdict)
         return mr.subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
 
     monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     package = mr.ReviewPackage("package", "part", (source,))
     mr.review_package(
-        package,
-        reviewer="claude",
-        report_dir=tmp_path / "claude",
-        retries=1,
-        claude="claude-test",
+        package, reviewer="claude", report_dir=tmp_path / "claude", retries=1,
     )
     mr.review_package(
         package,
@@ -2815,13 +3584,15 @@ def test_attempt_records_carry_session_id_and_resume_command(
 
     claude_attempts = attempts(tmp_path / "claude")
     assert [record["reviewer"] for record in claude_attempts] == ["claude", "claude"]
-    claude_ids = [record["session_id"] for record in claude_attempts]
+    claude_ids = [record["command"][record["command"].index("--session-id") + 1] for record in claude_attempts]
     assert len(set(claude_ids)) == 2  # fresh session per attempt: no prior context
+    assert claude_attempts[0]["session_id"] is None  # Failed launch announced no conversation.
+    assert claude_attempts[1]["session_id"] == claude_ids[1]
     for record, session_id in zip(claude_attempts, claude_ids):
         assert uuid.UUID(session_id).version == 4
         command = record["command"]
         assert command[command.index("--session-id") + 1] == session_id
-        assert record["resume_command"] == f"claude --resume {session_id}"
+        assert record["resume_command"] is None  # Lifecycle-owned native state is not a CLI replay.
 
     codex_attempt = attempts(tmp_path / "codex")[0]
     assert codex_attempt["reviewer"] == "codex"
@@ -2903,10 +3674,7 @@ def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
     report_dir = tmp_path / "reports"
     review = mr.review_package(
         mr.ReviewPackage("part", "part", (png,)),
-        reviewer="claude",
-        report_dir=report_dir,
-        retries=1,
-        claude="claude",
+        reviewer="claude", report_dir=report_dir, retries=1,
     )
     assert review.attempts == 2
     assert review.tool_events == 1
@@ -3074,10 +3842,7 @@ def test_retry_requires_sheet_views_from_the_successful_attempt(
     monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     review = mr.review_package(
         mr.ReviewPackage("part", "part", (png,)),
-        reviewer="claude",
-        report_dir=tmp_path / "reports",
-        retries=1,
-        claude="claude",
+        reviewer="claude", report_dir=tmp_path / "reports", retries=1,
     )
 
     assert review.attempts == 2
@@ -3412,11 +4177,7 @@ def test_both_reviewers_receive_one_complete_package_invocation(
     monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     package = mr.ReviewPackage("package", "assembly", sources)
     claude_review = mr.review_package(
-        package,
-        reviewer="claude",
-        report_dir=tmp_path / "claude",
-        retries=0,
-        claude="claude-test",
+        package, reviewer="claude", report_dir=tmp_path / "claude", retries=0,
     )
     codex_review = mr.review_package(
         package,
@@ -3654,11 +4415,7 @@ def test_provider_failures_stay_blind_but_never_pass(
     monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     review = mr.review_package(
         mr.ReviewPackage("package", "part", (_png_source(tmp_path / "page.png"),)),
-        reviewer=reviewer,
-        report_dir=tmp_path / "reports",
-        retries=1,
-        claude="claude-test",
-        codex="codex-test",
+        reviewer=reviewer, report_dir=tmp_path / "reports", retries=1, codex="codex-test",
     )
 
     assert review.attempts == 2
@@ -3705,10 +4462,7 @@ def test_retention_falls_back_to_copy_when_windows_holds_the_attempt_dir(
     try:
         review = mr.review_package(
             mr.ReviewPackage("package", "part", (_png_source(tmp_path / "page.png"),)),
-            reviewer="claude",
-            report_dir=report_dir,
-            retries=1,
-            claude="claude-test",
+            reviewer="claude", report_dir=report_dir, retries=1,
         )
     finally:
         for attempt in held:
@@ -4279,8 +5033,7 @@ def test_aggregate_runs_are_parallel_isolated_and_share_frozen_sources(
     directory = tmp_path / "reports"
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), reviewer=reviewer,
-        judge_reviewer=reviewer, report_dir=directory, retries=0, force=True,
-        claude="claude-test", codex="codex-test",
+        judge_reviewer=reviewer, report_dir=directory, retries=0, force=True, codex="codex-test",
     )
     assert aggregate["verdict"] == "FIX" and aggregate["gating_count"] == 1
     assert aggregate["source_sha256"] == [source_hash]
@@ -4369,7 +5122,7 @@ def test_aggregate_initial_request_gate_is_claude_only_with_concurrent_continuat
             contextvars.copy_context().run, mr.aggregate_package,
             mr.ReviewPackage("sample", "part", (source,)), reviewer=reviewer,
             judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports",
-            retries=0, force=True, claude="claude-test", codex="codex-test",
+            retries=0, force=True, codex="codex-test",
         )
         try:
             assert leader_started.wait(15)
@@ -4415,7 +5168,7 @@ def test_aggregate_single_review_does_not_require_response_notification(
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
         runs=1, judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports",
-        retries=0, force=True, claude="claude-test", codex="codex-test",
+        retries=0, force=True, codex="codex-test",
     )
     assert aggregate["verdict"] == "FIX" and aggregate["gating_count"] == 1
     assert len(calls) == 2 and calls[0] is None and calls[1] is not None
@@ -4468,7 +5221,7 @@ def test_aggregate_claude_leader_retries_or_terminal_failure_release_followers(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), report_dir=tmp_path / "reports",
-        retries=1, force=True, claude="claude-test",
+        retries=1, force=True,
     )
     assert followers.is_set() and aggregate["verdict"] == "FIX"
     assert aggregate["gating_count"] == 1 and aggregate["error"] is None
@@ -4482,96 +5235,47 @@ def test_aggregate_claude_leader_retries_or_terminal_failure_release_followers(
     )
 
 
-def test_aggregate_claude_real_stream_releases_only_on_response_before_leader_exit(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, claude_transport: SimpleNamespace,
+def test_aggregate_sdk_releases_followers_on_response_before_leader_completion(
+    tmp_path: Path, sdk_transport,
 ) -> None:
-    source = _pdf_source(tmp_path / "sheet.pdf", [(144, 72)])
-    response_gate = tmp_path / "allow-response"
-    finish_gate = tmp_path / "allow-finish"
-    leader_started = threading.Event()
-    leader_cwd = []
-    followers = []
-    before = "\r\n".join(json.dumps(event) for event in _claude_nonresponses()) + "\r\n"
-
-    def command(**kwargs: Any) -> list[str]:
-        config = json.loads(kwargs["mcp_config"].read_text())
-        snapshot = Path(config["mcpServers"]["sheets"]["args"][-1])
-        run_id = snapshot.parents[1].name
-        if run_id == "r1":
-            leader_cwd.append(kwargs["workdir"])
-            leader_started.set()
-            return claude_transport.command("stream", json.dumps({
-                "before": before, "response": json.dumps(_claude_provider_event()) + "\r\n",
-                "after": _claude_stdout(1, _clean_verdict()),
-                "response_gate": str(response_gate), "finish_gate": str(finish_gate),
-            }))
-        assert response_gate.exists()
-        assert claude_transport.processes[0].returncode is None
-        followers.append(run_id)
-        if len(followers) == 2:
-            finish_gate.touch()
-        return claude_transport.command("slow", _claude_stdout(1, _clean_verdict()))
-
-    monkeypatch.setattr(mr, "build_claude_command", command)
+    sdk_transport.controlled = True
+    source = _png_source(tmp_path / "sheet.png")
     with mr.ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(
             mr.aggregate_package, mr.ReviewPackage("sample", "part", (source,)),
-            report_dir=tmp_path / "reports", retries=0, timeout_s=15,
-            force=True, claude="fake",
+            report_dir=tmp_path / "reports", retries=0, timeout_s=15, force=True,
         )
         try:
-            assert leader_started.wait(10)
-            _wait_for_file(leader_cwd[0] / "before-response")
-            mr.time.sleep(0.1)
-            assert followers == []
-            response_gate.touch()
+            assert sdk_transport.before_response.wait(10)
+            assert len(sdk_transport.clients) == 1
+            sdk_transport.release_response.set()
+            assert sdk_transport.followers_started.wait(10)
+            assert not sdk_transport.clients[0].disconnected
+            sdk_transport.release_finish.set()
             aggregate = future.result(timeout=20)
         finally:
-            response_gate.touch()
-            finish_gate.touch()
+            sdk_transport.release_response.set()
+            sdk_transport.release_finish.set()
     assert aggregate["verdict"] == "SHIP" and aggregate["judge"]["skipped"]
-    assert set(followers) == {"r2", "r3"}
-    assert [run["run_id"] for run in aggregate["runs"]] == ["r1", "r2", "r3"]
-    assert all(not run["error"] for run in aggregate["runs"])
-    assert len(claude_transport.processes) == 3
-    assert all(process.returncode == 0 for process in claude_transport.processes)
+    assert len(sdk_transport.clients) == 3
+    assert all(client.disconnected for client in sdk_transport.clients)
 
 
-def test_aggregate_claude_leader_real_timeout_reaps_then_releases_followers(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, claude_transport: SimpleNamespace,
+def test_aggregate_sdk_leader_timeout_closes_before_releasing_followers(
+    tmp_path: Path, sdk_transport,
 ) -> None:
-    source = _png_source(tmp_path / "sheet.png")
-    leader_process = None
-
-    def command(**kwargs: Any) -> list[str]:
-        nonlocal leader_process
-        config = json.loads(kwargs["mcp_config"].read_text())
-        snapshot = Path(config["mcpServers"]["sheets"]["args"][-1])
-        run_id = snapshot.parents[1].name
-        if run_id == "r1":
-            argv = claude_transport.command("review_timeout", "")
-            leader_process = argv
-            return argv
-        assert leader_process is not None
-        # The timeout path must kill/drain/reap before terminal release.
-        assert claude_transport.processes[0].returncode is not None
-        return claude_transport.command("slow", _claude_stdout(1, _clean_verdict()))
-
-    monkeypatch.setattr(mr, "build_claude_command", command)
+    sdk_transport.leader_timeout = True
     aggregate = mr.aggregate_package(
-        mr.ReviewPackage("sample", "part", (source,)), report_dir=tmp_path / "reports",
-        retries=0, timeout_s=2, force=True, claude="fake",
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        report_dir=tmp_path / "reports", retries=0, timeout_s=0.2, force=True,
     )
     assert aggregate["verdict"] == "SHIP" and aggregate["judge"]["skipped"]
     assert "TimeoutExpired" in aggregate["runs"][0]["error"]
     assert all(not run["error"] for run in aggregate["runs"][1:])
-    assert len(claude_transport.processes) == 3
-    assert all(process.returncode is not None for process in claude_transport.processes)
-    leader = json.loads(Path(aggregate["runs"][0]["report"]).read_text())
-    (attempt,) = leader["extra"]["evidence"]["attempts"]
-    assert attempt["outcome"] == "timed_out"
-    assert "startup stderr " in Path(attempt["stderr_file"]).read_text()
-    assert "synthetic CLI startup diagnostic" in Path(attempt["stdout_file"]).read_text()
+    assert len(sdk_transport.clients) == 3
+    assert all(client.disconnected for client in sdk_transport.clients)
+
+
 
 
 @pytest.mark.parametrize(
@@ -4619,7 +5323,7 @@ def test_judge_coverage_errors_retry_in_fresh_isolated_sessions(
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=1,
         judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports", force=True,
-        retries=1, claude="claude-test", codex="codex-test",
+        retries=1, codex="codex-test",
     )
     assert aggregate["verdict"] == "FIX" and aggregate["error"] is None
     assert len(judge_cwds) == len(set(judge_cwds)) == 2
@@ -4648,7 +5352,7 @@ def test_aggregate_counts_unique_runs_and_only_confirmed_gating_clusters(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=2,
-        report_dir=tmp_path / "reports", retries=0, claude="claude-test", force=True,
+        report_dir=tmp_path / "reports", retries=0, force=True,
     )
     assert aggregate["verdict"] == "FIX" and aggregate["gating_count"] == 1
     assert [item["run_count"] for item in aggregate["confirmed"]] == [2, 1]
@@ -4678,7 +5382,7 @@ def test_aggregate_gates_only_findings_raised_by_two_runs(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=3,
-        report_dir=tmp_path / "reports", retries=0, claude="claude-test", force=True,
+        report_dir=tmp_path / "reports", retries=0, force=True,
     )
     assert aggregate["verdict"] == verdict
     assert aggregate["gating_count"] == (verdict == "FIX")
@@ -4707,7 +5411,7 @@ def test_aggregate_ship_uses_judged_category_not_raw_verdict(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=1,
-        report_dir=tmp_path / "reports", retries=0, claude="claude-test", force=True,
+        report_dir=tmp_path / "reports", retries=0, force=True,
     )
     assert aggregate["verdict"] == "SHIP" and aggregate["gating_count"] == 0
     assert aggregate["runs"][0]["verdict"] == "FIX"
@@ -4734,7 +5438,7 @@ def test_aggregate_zero_findings_skips_judge_and_records_partial_run_errors(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), report_dir=tmp_path / "reports",
-        retries=0, claude="claude-test", force=True,
+        retries=0, force=True,
     )
     assert calls == 3
     assert aggregate["verdict"] == "SHIP" and aggregate["error"] is None
@@ -4763,7 +5467,7 @@ def test_aggregate_error_is_retained_and_never_passes(
     directory = tmp_path / "reports"
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=1,
-        report_dir=directory, retries=1, claude="claude-test", force=True,
+        report_dir=directory, retries=1, force=True,
     )
     assert aggregate["verdict"] == "ERROR" and aggregate["error"]
     assert aggregate["gating_count"] == 0
@@ -4796,7 +5500,7 @@ def test_judge_prompt_includes_sheet_text_and_owner_exceptions(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=1,
-        report_dir=tmp_path / "reports", retries=0, claude="claude-test", force=True,
+        report_dir=tmp_path / "reports", retries=0, force=True,
     )
     assert aggregate["verdict"] == "SHIP"
     assert len(prompts) == 1
@@ -4860,3 +5564,321 @@ def test_missing_source_still_writes_an_error_aggregate(
     assert "source snapshot failed" in aggregate["error"]
     assert (directory / "missing.aggregate.json").is_file()
     assert Path(aggregate["runs"][0]["report"]).is_file()
+
+
+@pytest.mark.parametrize("failure", ["startup", "turn"])
+def test_failed_resumed_judge_does_not_reuse_completion_evidence_or_mutate_precheck(
+    tmp_path, sdk_transport, failure,
+):
+    package = mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),))
+    sdk_transport.verdict = {"decision": "review", "skip_kind": "none", "reason": "Inspect sheet."}
+    first = mr._review_session(
+        package, reviewer="claude", report_dir=tmp_path / "precheck", retries=0,
+        precheck_diff={"pages": [{"status": "unchanged", "old_size_points": [10, 10],
+                                 "new_size_points": [10, 10], "text_changed": False}]},
+    )
+    assert first.passed
+    initial, = first.extra["evidence"]["attempts"]
+    old = initial["transport_provenance"]
+    # Completion fields from either adapter must never survive as judge inputs.
+    old.update(shutdown="graceful", image_blobs=["a" * 64], omp_command=["old"],
+               session_dir="old", omp_effective_options={"old": []})
+    session_dir = Path(old["sdk_session_dir"])
+    native = session_dir / "precheck.jsonl"
+    native.write_text("precheck")
+    old["sdk_redacted_files"] = {"sentinel": [1, 2, 3, 4]}
+    before = json.dumps(first.extra, sort_keys=True).encode()
+    if failure == "startup":
+        sdk_transport.status = "failed"
+    else:
+        sdk_transport.fail = True
+    judgment = mr._review_session(
+        package, reviewer="claude", report_dir=tmp_path / "judge", retries=0,
+        judge_findings=[], resume_review=first,
+    )
+    assert judgment.error
+    record, = judgment.extra["evidence"]["attempts"]
+    current = record["transport_provenance"]
+    assert record["outcome"] == "failed"
+    assert all(name not in current for name in (
+        "resolved_model", "shutdown", "image_blobs", "omp_command", "session_dir",
+        "omp_effective_options", "omp_prompt", "omp_prompt_sha256",
+    ))
+    assert current["state_cleanup"] == "removed"
+    assert json.dumps(first.extra, sort_keys=True).encode() == before
+    assert str(native) in current["sdk_redacted_files"]
+    assert str(native) not in old["sdk_redacted_files"]
+
+
+def test_sdk_environment_preserves_sdk_owned_entrypoint_and_tracing(
+    tmp_path, sdk_transport, monkeypatch,
+):
+    inherited = {
+        "TRACEPARENT": "parent-span", "CLAUDE_CODE_ENTRYPOINT": "parent-entrypoint",
+        "CLAUDECODE": "1", "PATH": os.environ.get("PATH", ""), "SDK_ENV_CANARY": "inherited",
+    }
+    for name, value in inherited.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setenv("ANTHROPIC_OAUTH_TOKEN", "must-not-use")
+    monkeypatch.setenv("CLAUDE_CODE_USE_BEDROCK", "1")
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
+    )
+    assert review.passed
+    overrides = sdk_transport.clients[0].options.env
+    assert set(overrides).isdisjoint(inherited)
+    assert overrides["ANTHROPIC_OAUTH_TOKEN"] == ""
+    assert overrides["CLAUDE_CODE_USE_BEDROCK"] == ""
+    assert all(os.environ[name] == value for name, value in inherited.items())
+    omp = sdk_transport.transport.environment(mode="subprocess")
+    assert all(omp[name] == value for name, value in inherited.items())
+    assert "ANTHROPIC_OAUTH_TOKEN" not in omp and "CLAUDE_CODE_USE_BEDROCK" not in omp
+
+
+def test_startup_timeout_does_not_relabel_attempt_or_inner_timeouts():
+    import machinist_review_transport as transport
+    async def invoke():
+        for error in (transport.AttemptTimeout(), TimeoutError("inner failure")):
+            with pytest.raises(type(error)) as caught:
+                async with transport.startup_timeout("broker", 1):
+                    raise error
+            assert caught.value is error
+        with pytest.raises(transport.StartupTimeout) as caught:
+            async with transport.startup_timeout("broker", 0.001):
+                await asyncio.sleep(1)
+        assert caught.value.phase == "broker" and caught.value.budget == 0.001
+    asyncio.run(invoke())
+
+
+def test_omp_broker_exhausted_startup_budget_is_typed_startup_timeout(monkeypatch):
+    from contextlib import asynccontextmanager
+    import machinist_review_transport as transport
+    clock = [0]
+    monkeypatch.setattr(transport.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(transport.shutil, "which", lambda name: "/fixture/omp")
+    @asynccontextmanager
+    async def broker(*args):
+        clock[0] = 2
+        yield {}
+    monkeypatch.setattr(transport, "_broker", broker)
+    async def version(*args):
+        return None
+    monkeypatch.setattr(transport, "_omp_version", version)
+    with pytest.raises(transport.StartupTimeout) as caught:
+        asyncio.run(transport._omp(
+            register_secret=lambda value: None, remaining=lambda: 20, startup=1,
+            emit=lambda event, raw: None, provenance={},
+        ))
+    assert caught.value.phase == "OMP sheets MCP connection"
+    assert caught.value.budget == 1
+
+
+@pytest.mark.parametrize("failure", ["write_error", "attempt_deadline"])
+def test_quota_state_write_failure_is_retained_without_extending_attempt(
+    tmp_path, sdk_transport, monkeypatch, failure,
+):
+    from machinist_review_credentials import CredentialPool
+    transport = sdk_transport.transport
+    sdk_transport.quota = True
+    logs = []
+    monkeypatch.setattr(transport._telemetry, "error", lambda event, **fields: logs.append((event, fields)))
+    def failed_write(self, *args):
+        if failure == "write_error":
+            raise OSError("state storage failed")
+        raise BlockingIOError("state busy")
+    monkeypatch.setattr(CredentialPool, "unavailable", failed_write)
+    started = mr.time.monotonic()
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
+        timeout_s=0.1 if failure == "attempt_deadline" else 10,
+    )
+    assert review.error
+    record, = review.extra["evidence"]["attempts"]
+    route, = record["transport_provenance"]["routes"]
+    assert route["outcome"] == "quota" and route["quota_state_write"] == "failed"
+    assert route["quota_state_write_error"] in {"OSError", "AttemptTimeout", "CancelledError"}
+    assert any(event == "machinist_review.quota_state_write" and fields["outcome"] == "failed"
+               for event, fields in logs)
+    if failure == "attempt_deadline":
+        assert mr.time.monotonic() - started < 2
+        assert record["transport_provenance"]["timeout_phase"] == "attempt"
+
+
+def test_invalid_api_key_is_configuration_failure_not_quota():
+    import machinist_review_transport as transport
+    assert transport.quota_event({"type": "assistant", "error": "authentication_failed",
+                                  "api_error_status": 401, "message": {"content": [
+                                      {"type": "text", "text": "Invalid API key"}]}}) is None
+
+
+@pytest.mark.parametrize("failed_transport", ["claude_agent_sdk", "omp"])
+def test_failed_routed_successor_does_not_inherit_predecessor_execution_evidence(
+    tmp_path, sdk_transport, monkeypatch, failed_transport,
+):
+    transport = sdk_transport.transport
+    stale = {
+        "resolved_model": {"provider": "anthropic", "id": "predecessor-model"},
+        "sdk_isolation": {"predecessor": True}, "omp_command": ["predecessor"],
+        "omp_effective_options": {"predecessor": True}, "omp_prompt": "predecessor",
+        "omp_prompt_sha256": "a" * 64, "shutdown": "graceful",
+        "image_blobs": ["b" * 64], "session_dir": "predecessor",
+        "unknown_future_completion": {"passed": True}, "schema_validated": True,
+        "sdk_redacted_files": {"predecessor": [1, 2, 3, 4]},
+    }
+    calls = []
+    def assert_clean(provenance):
+        assert set(stale).isdisjoint(provenance)
+        assert provenance["private_home"]
+    async def sdk(**kwargs):
+        provenance = kwargs["provenance"]
+        assert_clean(provenance)
+        calls.append("claude_agent_sdk")
+        if failed_transport == "claude_agent_sdk" and len(calls) == 2:
+            raise RuntimeError("successor startup failed")
+        provenance.update(stale)
+        return {"status": "exhausted", "retryAt": None, "reason": "credit-balance"}
+    async def omp(**kwargs):
+        assert_clean(kwargs["provenance"])
+        calls.append("omp")
+        raise RuntimeError("successor startup failed")
+    monkeypatch.setattr(transport, "_sdk", sdk)
+    monkeypatch.setattr(transport, "_omp", omp)
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
+    )
+    assert review.error and "successor startup failed" in review.error
+    record, = review.extra["evidence"]["attempts"]
+    provenance = record["transport_provenance"]
+    assert_clean(provenance)
+    assert provenance["transport"] == failed_transport
+    expected_quota_routes = 1 if failed_transport == "claude_agent_sdk" else 3
+    assert calls == ["claude_agent_sdk"] * expected_quota_routes + [failed_transport]
+    assert [route["outcome"] for route in provenance["routes"]] == (
+        ["quota"] * expected_quota_routes + ["failed"]
+    )
+    assert all(route["quota_state_write"] == "persisted"
+               for route in provenance["routes"][:-1])
+
+
+@pytest.mark.parametrize("version", ["17.4.0", "18.6.99", "unknown", "failed", "silent"])
+def test_omp_unsupported_version_fails_before_broker_or_prompt(tmp_path, monkeypatch, version):
+    import machinist_review_transport as transport
+    script = tmp_path / "version_fixture.py"
+    script.write_text(
+        "import sys, time\n"
+        "assert sys.argv[1] == '--version'\n"
+        + ("time.sleep(20)\n" if version == "silent" else f"print({'omp/' + version!r}, flush=True)\n")
+        + ("sys.exit(1)\n" if version == "failed" else ""),
+        encoding="utf-8",
+    )
+    processes, native = [], []
+    original = asyncio.create_subprocess_exec
+    async def spawn(executable, *arguments, **kwargs):
+        assert arguments == ("--version",)
+        process = await original(sys.executable, str(script), *arguments, **kwargs)
+        processes.append(process)
+        return process
+    def forbidden_broker(*args, **kwargs):
+        pytest.fail("unsupported OMP must fail before opening credentials or submitting a prompt")
+    monkeypatch.setattr(transport.shutil, "which", lambda name: sys.executable)
+    monkeypatch.setattr(transport.asyncio, "create_subprocess_exec", spawn)
+    monkeypatch.setattr(transport, "_broker", forbidden_broker)
+    async def invoke():
+        async with asyncio.timeout(5):
+            await transport._omp(
+                register_secret=lambda secret: None, remaining=lambda: 10, startup=1,
+                emit=lambda event, raw: native.append(raw), provenance={},
+            )
+    expected = transport.StartupTimeout if version == "silent" else transport.TransportError
+    with pytest.raises(expected) as caught:
+        asyncio.run(invoke())
+    if version == "silent":
+        assert caught.value.phase == "OMP version preflight"
+    else:
+        assert caught.value.category == "configuration_error"
+        assert ">=18.7.0" in str(caught.value)
+        assert native[-1]["outcome"] == "unsupported"
+    assert processes and all(process.returncode is not None for process in processes)
+
+
+@pytest.mark.parametrize("version", ["18.7.0", "18.11.0", "19.0.0"])
+def test_omp_supported_version_preflight_records_version(tmp_path, monkeypatch, version):
+    import machinist_review_transport as transport
+    script = tmp_path / "version_fixture.py"
+    script.write_text(f"print({'omp/' + version!r})\n", encoding="utf-8")
+    original = asyncio.create_subprocess_exec
+    async def spawn(executable, *arguments, **kwargs):
+        assert arguments == ("--version",)
+        return await original(sys.executable, str(script), *arguments, **kwargs)
+    monkeypatch.setattr(transport.asyncio, "create_subprocess_exec", spawn)
+    provenance, native = {"routes": [{"transport": "omp", "outcome": "started"}]}, []
+    asyncio.run(transport._omp_version(
+        sys.executable, lambda: 5, 1, lambda event, raw: native.append(raw), provenance,
+    ))
+    assert provenance["omp_version"] == version
+    assert provenance["routes"][0]["omp_version"] == version
+    assert native == [{"type": "omp_version_preflight", "version": version, "outcome": "supported"}]
+
+
+@pytest.mark.parametrize("text", ["", "Localized billing diagnostic", "Billing system unavailable"])
+def test_sdk_billing_error_is_typed_quota_independent_of_prose(text):
+    import machinist_review_transport as transport
+    event = {"type": "assistant", "error": "billing_error",
+             "message": {"content": [{"type": "text", "text": text}]}}
+    assert transport.quota_event(event) == {
+        "status": "exhausted", "retryAt": None, "reason": "billing-error",
+    }
+    event["error"] = "authentication_failed"
+    assert transport.quota_event(event) is None
+
+
+def test_stale_quota_update_outcome_is_retained_in_route_and_logs(tmp_path, sdk_transport, monkeypatch):
+    from machinist_review_credentials import CredentialPool
+    sdk_transport.quota = True
+    logs = []
+    monkeypatch.setattr(CredentialPool, "unavailable", lambda self, key, quota: "stale_credential")
+    monkeypatch.setattr(sdk_transport.transport._telemetry, "warn",
+                        lambda event, **fields: logs.append((event, fields)))
+    monkeypatch.setattr(sdk_transport.transport._telemetry, "event",
+                        lambda event, **fields: logs.append((event, fields)))
+    async def fallback(**kwargs):
+        raise RuntimeError("fixture stops after quota routes")
+    monkeypatch.setattr(sdk_transport.transport, "_omp", fallback)
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
+    )
+    record, = review.extra["evidence"]["attempts"]
+    assert [route["quota_state_write"] for route in record["transport_provenance"]["routes"][:-1]] == [
+        "stale_credential",
+    ] * 3
+    updates = [fields for event, fields in logs if event == "machinist_review.credential_unavailable"]
+    assert len(updates) == 6
+    assert all(fields["quota_state_write"] == "stale_credential" for fields in updates)
+
+
+def test_sdk_authentication_failure_is_configuration_error_without_rotation(tmp_path, sdk_transport, monkeypatch):
+    import claude_agent_sdk as sdk
+    async def failed(self):
+        yield sdk.AssistantMessage(
+            content=[sdk.TextBlock(text="Insufficient credits (invalid API key)")],
+            model="test", error="authentication_failed",
+        )
+        yield sdk.ResultMessage(
+            subtype="error_during_execution", duration_ms=1, duration_api_ms=1,
+            is_error=True, num_turns=1, session_id=self.options.session_id,
+        )
+    monkeypatch.setattr(sdk.ClaudeSDKClient, "receive_response", failed)
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
+    )
+    assert len(sdk_transport.clients) == 1
+    assert "configuration_error" in review.error
+    record, = review.extra["evidence"]["attempts"]
+    route, = record["transport_provenance"]["routes"]
+    assert route["outcome"] == "failed" and route["error_category"] == "configuration_error"
+    assert "quota_state_write" not in route
