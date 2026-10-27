@@ -707,9 +707,9 @@ def sdk_transport(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         async def query(self, prompt):
             state.queries.append(prompt)
             if state.fail:
-                # Chunk boundaries must not expose secrets in retained stderr.
-                self.options.stderr("secret-can")
-                self.options.stderr("ary-0")
+                # SDK callbacks are complete lines, already stripped of newlines.
+                self.options.stderr("first diagnostic secret-canary-0")
+                self.options.stderr("second diagnostic")
                 raise RuntimeError("failure secret-canary-0")
 
         async def receive_response(self):
@@ -733,7 +733,9 @@ def sdk_transport(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
                 yield sdk.AssistantMessage(content=[sdk.TextBlock(text="Credit balance is too low")],
                                            model="test", error="billing_error")
                 yield sdk.ResultMessage(subtype="error_during_execution", duration_ms=1,
-                                        duration_api_ms=1, is_error=True, num_turns=0,
+                                        duration_api_ms=1, is_error=True, num_turns=1,
+                                        usage={"input_tokens": 3, "output_tokens": 1}, total_cost_usd=0.02,
+                                        structured_output=_clean_verdict(),
                                         session_id=self.options.session_id or self.options.resume)
                 return
             yield sdk.AssistantMessage(
@@ -945,6 +947,7 @@ def test_sdk_generic_error_is_redacted_and_never_falls_back(
         reviewer="claude", report_dir=tmp_path / "reports", retries=0,
     )
     assert not review.passed and "[REDACTED]" in review.error
+    assert "first diagnostic [REDACTED]\nsecond diagnostic" in review.error
     for path in (tmp_path / "reports").rglob("*"):
         if path.is_file() and path.suffix in {".json", ".jsonl", ".txt"}:
             assert b"secret-canary" not in path.read_bytes()
@@ -968,6 +971,41 @@ def test_sdk_typed_quota_rotates_then_omp_only_when_pool_unavailable(
     assert len(sdk_transport.clients) == 3 and routes == ["omp"]
     assert len({client.options.session_id for client in sdk_transport.clients}) == 3
     assert not review.passed  # A verdict without images is not inspection.
+    # Billing includes all three rotated API routes, not just final OMP.
+    assert review.extra["usage"]["input_tokens"] == 9
+    assert review.extra["usage"]["output_tokens"] == 3
+    assert review.extra["usage"]["total_cost_usd"] == pytest.approx(0.06)
+
+
+@pytest.mark.parametrize("final_verdict", [False, True])
+def test_final_route_cannot_borrow_a_quota_routes_verdict(
+    tmp_path, sdk_transport, monkeypatch, final_verdict,
+):
+    sdk_transport.quota = True
+    source = _png_source(tmp_path / "sheet.png")
+    # Both cases have genuine final-route image evidence. A missing verdict
+    # must not borrow valid structured_output from the earlier quota routes.
+    image = base64.b64encode(source.read_bytes()).decode()
+    async def fallback(**kwargs):
+        kwargs["provenance"].update(session_id="omp-session", session_file=str(tmp_path / "session.jsonl"))
+        use = _claude_tool_use("mcp__sheets__view_sheet", {"sheet": 1}, "final-view")
+        result = _claude_tool_result("final-view")
+        result["message"]["content"][0]["content"][0]["source"]["data"] = image
+        kwargs["emit"](use, None)
+        kwargs["emit"](result, None)
+        kwargs["emit"]({
+            "type": "result", "subtype": "success", "is_error": False,
+            "result": json.dumps(_clean_verdict()) if final_verdict else "",
+        }, None)
+    monkeypatch.setattr(sdk_transport.transport, "_omp", fallback)
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (source,)),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
+    )
+    assert len(sdk_transport.clients) == 3
+    assert review.passed is final_verdict
+    assert (review.error is None) is final_verdict
+    assert review.extra["inspection_proven"] is final_verdict
 
 
 def test_spend_limit_invalid_reset_date_remains_exhaustion():
@@ -985,11 +1023,13 @@ def test_omp_oauth_environment_never_inherits_the_api_proxy(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "inherited-canary")
     monkeypatch.setenv("ANTHROPIC_OAUTH_TOKEN", "inherited-oauth-canary")
     api = transport.environment("selected-canary")
-    oauth = transport.environment()
+    oauth = transport.environment(overlay=False)
     assert api["ANTHROPIC_BASE_URL"] == "https://api-only-proxy.invalid"
     assert api["ANTHROPIC_API_KEY"] == "selected-canary"
-    assert not oauth.get("ANTHROPIC_BASE_URL") and not oauth.get("ANTHROPIC_API_KEY")
-    assert not oauth.get("ANTHROPIC_OAUTH_TOKEN")
+    assert all(name not in oauth for name in (
+        "ANTHROPIC_BASE_URL", "ANTHROPIC_API_KEY", "ANTHROPIC_OAUTH_TOKEN",
+    ))
+    assert transport.environment()["ANTHROPIC_OAUTH_TOKEN"] == ""
 
 
 @pytest.mark.parametrize("existing_state", [False, True])
@@ -1054,10 +1094,12 @@ def test_credential_contention_polls_without_threads_and_respects_deadline(
                 pool, operation, remaining, "argument", required_id="account-0",
             ) == "claimed"
         else:
-            with pytest.raises(TimeoutError, match="lock deadline"):
+            with pytest.raises(transport.CredentialLockTimeout) as caught:
                 await transport.credential_operation(
                     pool, operation, remaining, "argument", required_id="account-0",
                 )
+            assert caught.value.phase == "Claude credential routing lock"
+            assert caught.value.budget == min(30, budget)
 
     monkeypatch.setattr(transport.asyncio, "sleep", sleep)
     monkeypatch.setattr(transport.asyncio, "to_thread", forbidden)
@@ -1066,6 +1108,78 @@ def test_credential_contention_polls_without_threads_and_respects_deadline(
     assert all(call == ("argument", 0, "account-0") for call in calls)
     assert sleeps and all(0 < delay <= 0.05 for delay in sleeps)
     assert clock[0] == pytest.approx(0.1 if release else min(30, budget))
+
+
+def test_credential_storage_secures_only_new_leaf(tmp_path, monkeypatch):
+    import machinist_review_credentials as credentials
+    calls = []
+    monkeypatch.setattr(credentials, "_windows_acl", lambda path, *, secure=False: calls.append((path, secure)))
+    leaf = tmp_path / "shared" / "state" / "private"
+    credentials._directory(leaf)
+    assert calls == [(leaf, True)]
+    calls.clear()
+    credentials._directory(leaf)
+    assert calls == []
+
+
+def test_credential_shared_lock_uses_binary_pid_protocol(tmp_path, sdk_transport, monkeypatch):
+    import machinist_review_credentials as credentials
+    pool = credentials.CredentialPool()
+    shared = Path(str(pool.state_file) + ".lock")
+    original = credentials.os.open
+    flags = []
+    def opened(path, mode, *args, **kwargs):
+        if Path(path) == shared:
+            flags.append(mode)
+        return original(path, mode, *args, **kwargs)
+    monkeypatch.setattr(credentials.os, "open", opened)
+    with pool._state():
+        assert shared.read_bytes() == f"pid={os.getpid()}\n".encode()
+    assert len(flags) == 1
+    assert flags[0] & getattr(os, "O_BINARY", 0) == getattr(os, "O_BINARY", 0)
+    assert not shared.exists()
+
+
+@pytest.mark.parametrize("budget", [0, 60])
+def test_credential_shared_lock_contention_keeps_owner_file(sdk_transport, monkeypatch, budget):
+    import machinist_review_credentials as credentials
+    pool = credentials.CredentialPool()
+    credentials._directory(pool.state_file.parent)
+    shared = Path(str(pool.state_file) + ".lock")
+    owner = b"pid=12345\n"
+    shared.write_bytes(owner)
+    clock = [0.0]
+    monkeypatch.setattr(credentials.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(credentials.time, "sleep", lambda delay: clock.__setitem__(0, clock[0] + delay))
+    with pytest.raises(BlockingIOError if budget == 0 else TimeoutError):
+        with pool._state(timeout=budget):
+            pytest.fail("contended lock must not enter state")
+    assert shared.read_bytes() == owner
+    assert clock[0] == pytest.approx(0 if budget == 0 else 30)
+
+
+def test_credential_lock_timeout_preserves_distinct_phase_and_budget(
+    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transport = sdk_transport.transport
+    (tmp_path / "mcp.json").write_text(json.dumps({"mcpServers": {}}))
+    (tmp_path / "schema.json").write_text(json.dumps(mr.load_schema()))
+    provenance = {"private_home": str(tmp_path / "native")}
+    async def contended(*args, **kwargs):
+        raise transport.CredentialLockTimeout(30, Path("routing.json"))
+    monkeypatch.setattr(transport, "credential_operation", contended)
+    with pytest.raises(mr.subprocess.TimeoutExpired) as caught:
+        transport.run(
+            command=["claude", "--model", "test", "--effort", "high",
+                     "--session-id", "00000000-0000-4000-8000-000000000001"],
+            prompt="Review", timeout=1800, cwd=str(tmp_path), startup=120,
+            settings=mr.CLAUDE_ISOLATION_SETTINGS, provenance=provenance,
+        )
+    assert caught.value.timeout == 30
+    assert provenance["timeout_phase"] == "Claude credential routing lock"
+    assert provenance["timeout_budget_s"] == 30
+    assert provenance["routes"] == []
+    assert caught.value.__notes__
 
 
 def test_sdk_startup_timeout_preserves_phase_budget_and_exception_note(
@@ -1092,6 +1206,21 @@ def test_sdk_startup_timeout_preserves_phase_budget_and_exception_note(
     assert caught.value.__notes__ == [f"Timed out waiting for {phase} (0.125s startup budget)"]
     assert provenance["timeout_phase"] == phase
     assert provenance["timeout_budget_s"] == budget
+
+
+def test_omp_stream_retains_deltas_and_terminal_inspection_without_partial_snapshots():
+    import machinist_review_transport as transport
+    partial = {"role": "assistant", "content": [{"type": "thinking", "thinking": "x" * 10000}]}
+    event = {"type": "message_update", "messageId": "m1", "message": partial,
+             "assistantMessageEvent": {"type": "thinking_delta", "contentIndex": 0,
+                                       "delta": "x", "partial": partial}}
+    retained = transport.omp_native_event(event)
+    assert retained == {"type": "message_update", "messageId": "m1",
+                        "assistantMessageEvent": {"type": "thinking_delta", "contentIndex": 0, "delta": "x"}}
+    assert event["message"] is partial  # Retention must not mutate live evidence.
+    terminal = {"type": "message_end", "message": {"role": "toolResult", "content": [
+        {"type": "image", "mimeType": "image/png", "data": "image-evidence"}]}}
+    assert transport.omp_native_event(terminal) is terminal
 
 
 def test_sdk_redaction_skips_unchanged_files_but_scans_changed_and_new_files(

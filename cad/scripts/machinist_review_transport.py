@@ -96,6 +96,16 @@ class StartupTimeout(TimeoutError):
         self.phase, self.budget = phase, budget
 
 
+class CredentialLockTimeout(TimeoutError):
+    def __init__(self, budget, state_file):
+        super().__init__(
+            f"Claude credential routing lock deadline exceeded ({budget:g}s lock budget): "
+            f"{state_file}.lock (or its .machinist.lock advisory lock). "
+            "Locks are never stolen; confirm every holder has stopped before removing a leftover shared .lock."
+        )
+        self.phase, self.budget = "Claude credential routing lock", budget
+
+
 @asynccontextmanager
 async def startup_timeout(phase, budget):
     try:
@@ -107,7 +117,8 @@ async def startup_timeout(phase, budget):
 
 async def credential_operation(pool, operation, remaining, *args, **kwargs):
     """Poll contended locks without blocking the loop or creating worker threads."""
-    deadline = time.monotonic() + min(30, remaining())
+    lock_budget = min(30, remaining())
+    deadline = time.monotonic() + lock_budget
     while True:
         remaining()
         try:
@@ -115,19 +126,18 @@ async def credential_operation(pool, operation, remaining, *args, **kwargs):
         except (LockTimeout, BlockingIOError):
             budget = min(deadline - time.monotonic(), remaining())
             if budget <= 0:
-                raise TimeoutError(
-                    f"Claude credential routing lock deadline exceeded: {pool.state_file}.lock "
-                    "(or its .machinist.lock advisory lock). Locks are never stolen; "
-                    "confirm every holder has stopped before removing a leftover shared .lock."
-                ) from None
+                raise CredentialLockTimeout(lock_budget, pool.state_file) from None
             await asyncio.sleep(min(0.05, budget))
 
 
-def environment(key=None):
+def environment(key=None, *, overlay=True):
     env = dict(os.environ)
     for name in tuple(env):
         if name.startswith("ANTHROPIC_") or re.match(r"CLAUDE_CODE_(OAUTH|USE_|API_KEY|SUBAGENT_MODEL|AWS|VERTEX|FOUNDRY)", name):
-            env[name] = ""
+            if overlay:
+                env[name] = ""
+            else:
+                env.pop(name)
     if key:
         env["ANTHROPIC_API_KEY"] = key
         # API proxies receive only explicitly selected API credentials, never
@@ -213,7 +223,7 @@ async def _sdk(*, key, config, schema, model, effort, session_id, resume, cwd, r
         max_buffer_size=MAX_EVENT_BUFFER_BYTES,
         resume=session_id if resume else None, session_id=None if resume else session_id,
         extra_args={"bare": None, "disable-slash-commands": None, "no-chrome": None},
-        stderr=diagnostics.append,
+        stderr=lambda line: diagnostics.append(line + "\n"),
     )
     provenance["sdk_isolation"] = {
         "tools": options.tools, "allowed_tools": options.allowed_tools,
@@ -460,6 +470,23 @@ def _omp_blobs(provenance):
     return sorted(hashes)
 
 
+def omp_native_event(event):
+    """Retain deltas, not duplicate cumulative snapshots on every update.
+
+    Terminal message_end remains untouched, including images, usage and tool
+    evidence; interrupted text/tool streams retain their incremental deltas.
+    """
+    if event.get("type") != "message_update":
+        return event
+    update = event.get("assistantMessageEvent")
+    retained = {name: value for name, value in event.items() if name not in {"message", "assistantMessageEvent"}}
+    if isinstance(update, dict):
+        retained["assistantMessageEvent"] = {
+            name: value for name, value in update.items() if name not in {"partial", "message"}
+        }
+    return retained
+
+
 async def _omp_session(*, executable, broker_env, config, schema, model, effort, cwd, remaining, startup, emit, diagnostics, provenance, resume):
     home = Path(provenance["private_home"])
     if not home.is_dir() or not Path(cwd).resolve().is_relative_to(home.resolve()):
@@ -484,7 +511,7 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
     provenance["session_dir"] = str(sessions)
     if resume:
         _omp_blobs(provenance)
-    env = environment()
+    env = environment(overlay=False)
     for name in tuple(env):
         if name.startswith(("PI_", "OMP_", "XDG_")):
             env.pop(name)
@@ -518,7 +545,7 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
         if not line:
             raise RuntimeError("OMP exited before terminal response")
         event = json.loads(line)
-        emit(omp_event(event), event)
+        emit(omp_event(event), omp_native_event(event))
         return event
     async def control(kind, **fields):
         identity = str(uuid.uuid4())
@@ -765,11 +792,11 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
         output = "\n".join(json.dumps(event) for event in events)
         errors = pool.redact("".join(diagnostics))
         if isinstance(exc, TimeoutError):
-            budget = exc.budget if isinstance(exc, StartupTimeout) else timeout
+            budget = exc.budget if isinstance(exc, (StartupTimeout, CredentialLockTimeout)) else timeout
             expired = subprocess.TimeoutExpired(command, budget, output=output, stderr=errors)
             if str(exc):
                 expired.add_note(pool.redact(str(exc)))
-            if isinstance(exc, StartupTimeout):
+            if isinstance(exc, (StartupTimeout, CredentialLockTimeout)):
                 provenance["timeout_phase"] = exc.phase
                 provenance["timeout_budget_s"] = exc.budget
             raise expired from None

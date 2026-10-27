@@ -1415,7 +1415,7 @@ def test_source_allowlist_cannot_be_redefined_by_preserved_report(
     "argv_setting", "actual_replay", "cwd_moved", "codex_home", "attempt_in_repo",
 ])
 def test_actual_and_retained_paths_cannot_be_conflated_or_redirected(
-    tmp_path: Path, case, provider, reviewer: str, damage: str,
+    tmp_path: Path, case, provider, reviewer: str, damage: str, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     identity = _identity(case, reviewer=reviewer)
     directory = tmp_path / "run"
@@ -1457,13 +1457,25 @@ def test_actual_and_retained_paths_cannot_be_conflated_or_redirected(
         invocation["codex_home"] = None if reviewer == "codex" else str(tmp_path / "codex-home")
     else:
         # The reviewer's cwd must stay outside every repository.
-        repo = tmp_path / "repo"
+        repo = (
+            Path(invocation["transport_provenance"]["private_home"]) / "repo"
+            if reviewer == "claude" else tmp_path / "repo"
+        )
         (repo / ".git").mkdir(parents=True)
         inside = repo / Path(invocation["attempt_dir"]).name
         invocation["attempt_dir"] = invocation["cwd"] = str(inside)
+        checked = []
+        exists = Path.exists
+        def record_exists(path):
+            if path == repo / ".git":
+                checked.append(path)
+            return exists(path)
+        monkeypatch.setattr(Path, "exists", record_exists)
     _preserve_report(result, directory, report)
     with pytest.raises(ValueError):
         evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    if damage == "attempt_in_repo":
+        assert checked == [repo / ".git"]
 
 
 @pytest.mark.parametrize("reviewer", ["codex", "claude"])

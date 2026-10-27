@@ -1967,7 +1967,7 @@ def _review_session(
                     f"{(reported or proc.stderr.strip())[-800:]}"
                 )
             verdict = (
-                extract_claude_verdict(attempt_events, validator=validator)
+                extract_claude_verdict(final_events, validator=validator)
                 if reviewer == "claude"
                 else extract_codex_verdict(output, attempt_events, validator=validator)
             )

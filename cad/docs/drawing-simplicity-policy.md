@@ -277,6 +277,10 @@ both verdicts and the finding diff.
   codjiflo pool and uses the pinned Python Claude Agent SDK. Its bundled runtime
   runs in bare mode: OAuth/keychain auth and implicit hooks, memory, plugins and
   CLAUDE.md discovery are disabled, with skills additionally disabled explicitly.
+  The bundled Claude 2.1.132 parser rejects the former `--restricted` and
+  `--permission-prompts` flags. Isolation instead uses supported `--bare`,
+  explicit skill disabling, `tools=[]`, `permission_mode="dontAsk"`, empty
+  setting sources and strict sheets-only MCP configuration.
   The shared pool is
   `CODJIFLO_ANTHROPIC_KEYS_FILE` (default
   `~/.config/codjiflo/anthropic-keys.json`), containing exactly three unique
@@ -330,9 +334,17 @@ both verdicts and the finding diff.
   system-prompt isolation and resolved provider. Startup is bounded to 120
   seconds within the total attempt deadline; timeout diagnostics retain the
   startup phase and its budget rather than reporting a full-attempt timeout.
+  Credential-lock contention has its own phase and budget (at most 30 seconds,
+  also bounded by the attempt deadline), distinct from MCP startup and full
+  attempt timeouts. A contended or stale lock fails closed, without bypassing
+  shared routing state through OMP; recovery follows the operator procedure above.
   Failed or incomplete startup submits no review. Native redacted records and
-  normalized image/tool evidence are retained separately. Valid findings are
-  never retried. A successful precheck pins its actual transport and session for
+  normalized image/tool evidence are retained separately.
+  OMP streaming logs retain incremental deltas rather than repeated cumulative
+  message snapshots. Terminal messages, including real tool images and usage,
+  remain intact. Verdict extraction and successful inspection use only the final
+  route; billed usage sums every route, including quota-rotated API attempts.
+  Valid findings are never retried. A successful precheck pins its actual transport and session for
   judging. SDK continuation prefers the original credential, but may select
   another eligible key **before** submitting its single resumed turn: the local
   conversation and cwd remain unchanged. Once submitted, a failed resumed turn
@@ -352,6 +364,10 @@ both verdicts and the finding diff.
   (tools, permission mode, setting sources and strict MCP configuration).
   Both transports record `resolved_model` as a provider/id object; the SDK
   provider is `anthropic`.
+  The cache key identifies the SDK-first/OMP-fallback **routing policy**, not a
+  quota-dependent route selected in advance. The canonical cached result records
+  the route actually used and its per-attempt provenance, which adopters retain;
+  it does not claim SDK and OMP are identical inference harnesses.
 - Claude multi-run reviews use **initial-request staggering, then concurrent
   continuation**: `r1` starts alone; the other isolated runs start after its
   first real positive-usage provider assistant response, while `r1` continues.

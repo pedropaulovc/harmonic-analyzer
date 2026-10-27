@@ -120,15 +120,26 @@ def _credentials(value) -> list[Credential]:
 
 
 def _directory(path: Path) -> None:
-    if not path.exists():
-        _directory(path.parent)
+    """Create inherited-permission ancestors and secure only a new storage leaf."""
+    missing = []
+    ancestor = path
+    while not ancestor.exists():
+        if ancestor.is_symlink():
+            raise ValueError("Claude credentials: storage parent must be a directory")
+        missing.append(ancestor)
+        ancestor = ancestor.parent
+    if ancestor.is_symlink() or not ancestor.is_dir():
+        raise ValueError("Claude credentials: storage parent must be a directory")
+    for directory in reversed(missing):
         try:
-            path.mkdir(mode=0o700)
-            _windows_acl(path, secure=True)
+            directory.mkdir(mode=0o700 if directory == path else 0o777)
         except FileExistsError:
             pass
-    if path.is_symlink() or not path.is_dir():
-        raise ValueError("Claude credentials: storage parent must be a directory")
+        else:
+            if directory == path:
+                _windows_acl(directory, secure=True)
+        if directory.is_symlink() or not directory.is_dir():
+            raise ValueError("Claude credentials: storage parent must be a directory")
 
 
 class CredentialUnavailable(ValueError):
@@ -166,7 +177,7 @@ class CredentialPool:
             shared = Path(str(self.state_file) + ".lock")
             while True:
                 try:
-                    fd = os.open(shared, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                    fd = os.open(shared, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o600)
                     break
                 except FileExistsError:
                     if timeout == 0:
@@ -177,9 +188,7 @@ class CredentialPool:
                             "Locks are never stolen; confirm every holder has stopped "
                             "before removing a leftover shared lock."
                         )
-                        if timeout <= 30:
-                            raise TimeoutError(detail) from None
-                        raise ValueError(detail) from None
+                        raise TimeoutError(detail) from None
                     time.sleep(min(0.05, max(0, deadline - time.monotonic())))
             try:
                 os.write(fd, f"pid={os.getpid()}\n".encode())
