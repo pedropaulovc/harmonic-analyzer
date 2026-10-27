@@ -193,8 +193,8 @@ def _callout_lines(name: str) -> int:
 # 'MHA-SM-VN-51 LOOP', 48.41 mm as rendered.
 SEAT_DIA_TEXT_WIDTH = 0.0484
 SEAT_DIA_TEXT_HEIGHT = block_height(2, _callout_lines("SeatDia"))
-# 'TO 45 DEG LEAD; LOOP', 52.33 mm as rendered.
-SHOULDER_LENGTH_TEXT_WIDTH = 0.0524
+# 'MHA-SM-VN-51 LOOP', 48.41 mm as rendered (the seat Ø's widest line too).
+SHOULDER_LENGTH_TEXT_WIDTH = SEAT_DIA_TEXT_WIDTH
 SHOULDER_LENGTH_TEXT_HEIGHT = block_height(2, _callout_lines("ShoulderLength"))
 # 'TO FULL THREAD' 35.69 mm (font advance) over '5.67 max.', 21.44 mm as
 # rendered, on one line.

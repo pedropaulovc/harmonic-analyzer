@@ -80,7 +80,7 @@ PLUG_NUMBER = str(_config.parts("sm-gooseneck")["number"])
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
     "ShankProfile": {
         "SeatDia": f"{COUNTER_SPRING_NUMBER} LOOP\nSEAT, UNDER\nTHREAD MAJOR",
-        "ShoulderLength": "TO 45 DEG LEAD; LOOP\nCLEARS LEAD",
+        "ShoulderLength": f"TO 45 DEG LEAD;\n{COUNTER_SPRING_NUMBER} LOOP\nCLEARS LEAD",
         "TipChamfer": CHAMFER_CALLOUT,
     },
 }

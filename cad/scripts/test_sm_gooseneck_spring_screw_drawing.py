@@ -260,8 +260,11 @@ def test_seat_sits_under_the_thread_major() -> None:
         "SEAT, UNDER",
         "THREAD MAJOR",
     ]
+    # The band's mate is named at the band it serves (machinist FIX, farm run
+    # 20261027T071500743Z).
     assert callouts["ShoulderLength"].splitlines() == [
-        "TO 45 DEG LEAD; LOOP",
+        "TO 45 DEG LEAD;",
+        f"{spec.COUNTER_SPRING_NUMBER} LOOP",
         "CLEARS LEAD",
     ]
     assert spec.CHAMFER_CALLOUT == "X 45 DEG"
@@ -494,7 +497,7 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     # callout), 4.53 mm between stacked limits, 4.50 mm of first-line ink.
     assert drawing.block_height(2, 3) == pytest.approx(0.2388337 - 0.2131399, abs=2e-4)
     assert drawing.SEAT_DIA_TEXT_HEIGHT == drawing.block_height(2, 3)
-    assert drawing.SHOULDER_LENGTH_TEXT_HEIGHT == drawing.block_height(2, 2)
+    assert drawing.SHOULDER_LENGTH_TEXT_HEIGHT == drawing.block_height(2, 3)
     # The seat Ø stands on the seat, its line clear of the under-head
     # extension line, and its text hangs right of its own dimension line (its
     # leader meets the text's left end, so the leader runs beside the text,
