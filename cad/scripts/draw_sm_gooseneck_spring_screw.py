@@ -224,8 +224,10 @@ SLOT_DEPTH_TEXT_WIDTH = 0.0116
 # 'MHA-SM-VN-51' / 'WIRE CLEARS', the part number the widest row.
 HEAD_RELIEF_TEXT_WIDTH = _COUNTER_SPRING_WIDTH
 HEAD_RELIEF_TEXT_HEIGHT = block_height(2, _callout_lines("HeadReliefChamfer"))
-# The head Ø: its LIMIT band over 'MHA-SM-VN-51' / 'WIRE CLEARS'.
-HEAD_DIA_TEXT_WIDTH = _COUNTER_SPRING_WIDTH
+# The head Ø: its LIMIT band over 'MHA-SM-VN-51' / 'WIRE CLEARS;' / 'LOOP
+# OVERLAP' / '0.95 MIN'.  'LOOP OVERLAP' is about 34.3 mm at the 2.86 mm a
+# capital the rendered 'LOOP CLEARS' (31.38 mm) shows, the widest row.
+HEAD_DIA_TEXT_WIDTH = 0.0343
 HEAD_DIA_TEXT_HEIGHT = block_height(2, _callout_lines("HeadDia"))
 
 # Rows below the profile, 15 mm apart (text sits ~3 mm above its requested

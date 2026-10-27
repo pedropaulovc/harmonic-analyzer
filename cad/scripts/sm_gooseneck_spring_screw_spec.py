@@ -66,9 +66,16 @@ CHAMFER_CALLOUT = "X 45 DEG"
 # draw_pn_pen_rod's "R0.2 MAX / SEATS ON PEN V-BLOCK / MHA-PN-05"):
 COUNTER_SPRING_NUMBER = str(_config.parts("sm-vn-counter-spring")["number"])
 PLUG_NUMBER = str(_config.parts("sm-gooseneck")["number"])
+# The head's worst-case overlap of the loop's eye, under the 1.0 check (owner
+# minor RV-01), stated on the head Ø as a plain fact (drawing-guidelines.md
+# rule 20; codjiflo P2 on #1997), floored, never rounded up.  Two rows, so
+# neither is wider than the part number's.
+HEAD_RETENTION_CALLOUT = (
+    f"LOOP OVERLAP\n{math.floor(joint.HEAD_RETENTION_MIN * 100.0) / 100.0:.2f} MIN"
+)
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
     "HeadProfile": {
-        "HeadDia": f"{COUNTER_SPRING_NUMBER}\nWIRE CLEARS",
+        "HeadDia": f"{COUNTER_SPRING_NUMBER}\nWIRE CLEARS;\n{HEAD_RETENTION_CALLOUT}",
         "HeadReliefChamfer": f"{CHAMFER_CALLOUT};\n{COUNTER_SPRING_NUMBER}\nWIRE CLEARS",
     },
     "ShankProfile": {

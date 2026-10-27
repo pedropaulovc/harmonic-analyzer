@@ -12,6 +12,7 @@ import pytest
 import _config
 import build_sm_gooseneck_spring_screw as part
 import draw_sm_gooseneck_spring_screw as drawing
+import sm_gooseneck_spring_joint as joint
 import sm_gooseneck_spring_screw_geom as geom
 import sm_gooseneck_spring_screw_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
@@ -246,15 +247,21 @@ def test_slot_leaves_the_rule_17_head_web() -> None:
 
 def test_head_and_relief_bands_name_the_wire_they_clear() -> None:
     # drawing-guidelines.md rule 4: each LIMIT band names what it serves.
+    # The head's 0.95 retention under the 1.0 check (owner minor RV-01)
+    # prints on the head Ø as a plain fact, floored (rule 20).
+    assert spec.HEAD_RETENTION_CALLOUT == "LOOP OVERLAP\n0.95 MIN"
+    assert math.floor(joint.HEAD_RETENTION_MIN * 100.0) == 95
     assert spec.DIMENSION_CALLOUTS["HeadProfile"] == {
-        "HeadDia": f"{spec.COUNTER_SPRING_NUMBER}\nWIRE CLEARS",
+        "HeadDia": (
+            f"{spec.COUNTER_SPRING_NUMBER}\nWIRE CLEARS;\nLOOP OVERLAP\n0.95 MIN"
+        ),
         "HeadReliefChamfer": f"X 45 DEG;\n{spec.COUNTER_SPRING_NUMBER}\nWIRE CLEARS",
     }
     assert spec.DRAWING_PRECISION_BY_NAME["HeadDia"] == 2
     assert spec.DRAWING_PRECISION_BY_NAME["HeadReliefChamfer"] == 2
     # The head Ø's block stands between the head-end view's slot width and
     # the head's top face, centred on its own dimension line.
-    assert drawing.HEAD_DIA_TEXT_HEIGHT == drawing.block_height(2, 2)
+    assert drawing.HEAD_DIA_TEXT_HEIGHT == drawing.block_height(2, 4)
     x, y = drawing.SIDE_KEEP["HeadDia"]
     assert y == drawing.SIDE_CENTER[1]
     right = x + drawing.HEAD_DIA_TEXT_WIDTH / 2.0
