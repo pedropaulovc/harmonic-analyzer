@@ -26,10 +26,10 @@ from _gtol_planar import PlanarFace
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
-# Ø11.0 at .X (coordinator's provisional option D, 2026-10-27, pending owner
-# confirmation on #1380): no stack reads the O.D.'s band (the R9-61 0.142 lock
-# gap belonged to the retired 15.65 lock plates; the 9.8 plates leave 3.99 at
-# the largest O.D.), so the outside profile takes the loosest title-block row
+# Ø11.0 at .X (owner ruling 2026-10-27 on #1380, option D): no stack reads
+# the O.D.'s band (the R9-61 0.142 lock gap belonged to the retired 15.65
+# lock plates; the 9.8 plates leave 3.99 at the largest O.D.), so the
+# outside profile takes the loosest title-block row
 # (rule 4) and the wall reaches the 2.0 target at the full worst case below.
 # 7/16 in 360 brass rod lies inside the band as supplied: McMaster 8953K162
 # series, Ø7/16 in -0.003/+0.003 in (11.036..11.189), H02, ASTM B16 (read
