@@ -750,7 +750,8 @@ async def build(adapter: Any) -> dict[str, str]:
         raise AssertionError("the locating ream's band is no longer symmetric")
     for index in (1, 2):
         set_dimension_symmetric_tolerance(
-            adapter, "LocatorProfile", f"LocatorDia{index}", round(LOCATOR_HOLE_BAND_MM[0], 6)
+            adapter, "LocatorProfile", f"LocatorDia{index}",
+            round(deviations(LOCATOR_HOLE_BAND_MM)[1], 6),
         )
     for feature_name, dimension_name in BASIC_REDUCER_DIMENSIONS:
         set_dimension_basic_tolerance(adapter, feature_name, dimension_name)
