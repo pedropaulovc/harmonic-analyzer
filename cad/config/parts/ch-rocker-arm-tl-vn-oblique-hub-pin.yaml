@@ -10,7 +10,9 @@ ch-rocker-arm-tl-vn-oblique-hub-pin:
   quantity: 1
   tolerance_class: visual_noncritical
   process: purchased
-  manufacturing_notes: "Abrasive cut-off to 20.0 mm; deburr cut end. No other modification."
+  manufacturing_notes: "Cut to 20.0 mm. No other modification."
+  # The cut length is the sheet's one shop dimension, excepted in the drawing's
+  # general line. Orientation, bond and height live in the jig assembly's step
+  # 11, with the receiving hole.
   installation_notes: |
-    Cut end down; factory end up. Bond with Loctite 638.
-    Set height per jig assembly.
+    FIT IN THE MHA-CH-06-TL-21 CARRIER HUB HOLE PER MHA-CH-06-TL-00 STEP 11.

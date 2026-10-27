@@ -18,7 +18,6 @@ from _check import check
 from _com import _early_bound
 from _custom_properties import apply_custom_properties
 from _drawing_precision import _named_dimension
-from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fastener_catalog import fastener
 from _feature_tree import name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
@@ -26,6 +25,7 @@ from _part_save import save_part_and_images
 from _session import run_build
 from _sketch import ensure_fully_defined
 from _sketch_circle import define_circle
+from _supplier_limits import set_supplier_limits
 from _supplier_screw_reference import add_supplier_reference_sketch
 from _supplier_screw_reference_names import FEATURE_BY_PLANE
 from _visibility import blank_reference_geometry
@@ -69,7 +69,7 @@ async def _supplier_references(adapter):
     )
     for name, (lower, upper) in part.SUPPLIER_REFERENCE_TOLERANCES_MM.items():
         feature = FEATURE_BY_PLANE[part.SUPPLIER_REFERENCE_PLANES[name]]
-        set_dimension_bilateral_tolerance(adapter, feature, name, lower, upper)
+        set_supplier_limits(adapter, feature, name, lower, upper)
     for name, value, _orientation in part.SUPPLIER_REFERENCE_DIMENSIONS:
         feature = FEATURE_BY_PLANE[part.SUPPLIER_REFERENCE_PLANES[name]]
         display, native = _named_dimension(adapter, feature, name)

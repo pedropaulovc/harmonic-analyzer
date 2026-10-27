@@ -88,9 +88,15 @@ def test_native_supplier_witness_inventory():
         assert value > 0
         plane = spec.SUPPLIER_REFERENCE_PLANES[name]
         assert plane in FEATURE_BY_PLANE
-        assert orientation == ("horizontal" if plane == "Front" else "vertical")
+        # Diameters are horizontal chords; only the shoulder length is axial.
+        assert orientation == ("vertical" if name == "SupplierShoulderLength" else "horizontal")
         assert spec.SUPPLIER_REFERENCE_UNITS[name] == "mm"
     assert all(lower <= upper for lower, upper in spec.SUPPLIER_REFERENCE_TOLERANCES_MM.values())
+    # The head hides the shoulder in the head-end Front view: measure it in Top,
+    # at the shoulder's thread-end step, its Ø wider than the M8 thread it clears.
+    assert spec.SUPPLIER_REFERENCE_PLANES["SupplierShoulderDiameter"] == "Top"
+    assert spec.SUPPLIER_REFERENCE_STARTS["SupplierShoulderDiameter"] == (-spec.SHOULDER_DIA / 2.0, 0.0)
+    assert spec.SHOULDER_DIA > spec.THREAD_DIA
 
 
 def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):

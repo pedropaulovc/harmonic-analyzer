@@ -31,17 +31,19 @@ HEAD_HEIGHT = 4.5
 HEX = 5.0
 LENGTH = SHOULDER_LENGTH + HEAD_HEIGHT
 
-# At the sheet's 1:4 the head-height and thread-length chords stack their texts
-# on the shoulder length's; both sizes are stated in SUPPLIER_DATA instead.
+# The head-height and thread-length sizes are stated in SUPPLIER_DATA, not as
+# more chords on the small screw. Banded references print as stacked limits.
+# The shoulder Ø is hidden behind the head in the head-end Front view, so it is
+# measured in the Top profile at the shoulder's thread-end step (z = 0), its
+# witnesses rising clear past the narrower M8 thread to the top lane.
 SUPPLIER_REFERENCE_DIMENSIONS = (('SupplierShoulderDiameter', 10.0, 'horizontal'), ('SupplierShoulderLength', 35.0, 'vertical'), ('SupplierHeadDiameter', 16.0, 'horizontal'))
 SUPPLIER_REFERENCE_STARTS = {'SupplierShoulderDiameter': (-5.0, 0.0), 'SupplierShoulderLength': (0.0, -35.0), 'SupplierHeadDiameter': (-8.0, 0.0)}
-SUPPLIER_REFERENCE_PLANES = {'SupplierShoulderDiameter': 'Front', 'SupplierShoulderLength': 'Top', 'SupplierHeadDiameter': 'Front'}
-SUPPLIER_REFERENCE_FORMATS = {'SupplierShoulderDiameter': (3, 'diameter', None, 'NOMINAL SHOULDER DIAMETER'), 'SupplierShoulderLength': (2, 'length', None, 'NOMINAL SHOULDER LENGTH'), 'SupplierHeadDiameter': (0, 'diameter', None, 'NOMINAL HEAD DIAMETER')}
-# The two Front diameters take opposite lanes so their stacked texts never meet.
-SUPPLIER_REFERENCE_SIDES = {'SupplierShoulderDiameter': 'top', 'SupplierShoulderLength': 'left', 'SupplierHeadDiameter': 'bottom'}
+SUPPLIER_REFERENCE_PLANES = {'SupplierShoulderDiameter': 'Top', 'SupplierShoulderLength': 'Top', 'SupplierHeadDiameter': 'Front'}
+SUPPLIER_REFERENCE_FORMATS = {'SupplierShoulderDiameter': (3, 'diameter', None, 'SHOULDER'), 'SupplierShoulderLength': (2, 'length', None, 'SHOULDER LENGTH'), 'SupplierHeadDiameter': (0, 'diameter', None, 'HEAD')}
+SUPPLIER_REFERENCE_SIDES = {'SupplierShoulderDiameter': 'top', 'SupplierShoulderLength': 'right', 'SupplierHeadDiameter': 'bottom'}
 SUPPLIER_REFERENCE_UNITS = {'SupplierShoulderDiameter': 'mm', 'SupplierShoulderLength': 'mm', 'SupplierHeadDiameter': 'mm'}
 SUPPLIER_REFERENCE_TOLERANCES_MM = {
     'SupplierShoulderDiameter': deviations(SHOULDER_DIA_BAND),
     'SupplierShoulderLength': deviations(SHOULDER_LENGTH_BAND),
 }
-SUPPLIER_DATA = ('HEAD Ø16 X 4.5; THREAD M8 X 1.25 X 13 LONG; 5 mm HEX KEY.', 'NOMINAL MAJOR-DIAMETER THREAD ENVELOPE; HELIX NOT MODELLED.', 'SOCKET DEPTH AND EDGE FORMS NOT STATED; NOT MODELLED.')
+SUPPLIER_DATA = ('HEAD Ø16 X 4.5; THREAD M8 X 1.25 X 13 LONG; 5 mm HEX KEY.',)

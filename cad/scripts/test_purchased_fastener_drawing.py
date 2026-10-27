@@ -155,9 +155,13 @@ class _Note:
         return True
 
 
+_CUSTOM_GENERAL = "PURCHASED PART; TEST OVERRIDE LINE."
+
+
+@pytest.mark.parametrize("general_text", (None, _CUSTOM_GENERAL))
 @pytest.mark.parametrize("number_fit", (None, purchased.NumberFit.SHRINK_TO_CELL))
 def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
-    monkeypatch, tmp_path: Path, number_fit
+    monkeypatch, tmp_path: Path, number_fit, general_text
 ) -> None:
     source = tmp_path / "test-fastener.SLDPRT"
     source.touch()
@@ -320,6 +324,8 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
 
     monkeypatch.setattr(purchased, "finalize_drawing", finalize)
     options = {} if number_fit is None else {"number_fit": number_fit}
+    if general_text is not None:
+        options["general_text"] = general_text
     result = asyncio.run(
         purchased.build_purchased_fastener_drawing(
             _Adapter(source), spec, item="#4-40 x 1/4 TEST SCREW", **options
@@ -331,7 +337,10 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
     assert modes == dict.fromkeys(("*Front", "*Top", "*Right", "*Isometric"), "HLR")
     printed = [call[1] for call in calls if call[0] == "note"]
     assert "#4-40 x 1/4 TEST SCREW" in printed
-    assert purchased._GENERAL_TEXT[False] in printed
+    # The override replaces only the general line; omitted keeps the default.
+    # Both pass the build's native footer readback, which raises on a mismatch.
+    general = [text for text in printed if text in (_CUSTOM_GENERAL, *purchased._GENERAL_TEXT.values())]
+    assert general == [general_text or purchased._GENERAL_TEXT[False]]
     assert not any("STOCK" in text or "INSTALL PER NOTES" in text for text in printed)
     assert result == {"pdf": str(outputs["pdf"])}
     assert ("new", layout) in calls
