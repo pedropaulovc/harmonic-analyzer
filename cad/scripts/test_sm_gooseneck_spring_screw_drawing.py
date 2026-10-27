@@ -177,16 +177,35 @@ def test_crown_radius_prints_on_its_arc_as_a_spherical_reference() -> None:
     assert "CrownRadius" in spec.DRAWING_DIMENSIONS["HeadProfile"]
     assert spec.SPHERICAL_DIMENSIONS == {"CrownRadius"}
     assert spec.SPHERICAL_DIMENSIONS <= spec.REFERENCE_DIMENSIONS
-    assert f"{geom.CROWN_RADIUS:.{spec.DRAWING_PRECISION_BY_NAME['CrownRadius']}f}" == (
-        "20.0"
-    )
+    assert drawing._spherical_reference_text("CrownRadius") == "(SR20.0)"
     assert drawing.PRINTED_DIMENSIONS["CrownRadius"] == (geom.CROWN_RADIUS, 0)
     for word in ("CROWN", "SPHERICAL"):
         assert word not in spec.DRAWING_NOTES
-    # The builder records CrownRadius on the head profile, driven by the head
-    # Ø and the rise, so the printed reference cannot drift from them.
-    build = Path(part.__file__).read_text(encoding="utf-8")
-    assert 'head.record(\n        "CrownRadius",' in build
+    # The builder records CrownRadius on the head profile with an equation of
+    # the head Ø and the rise alone, so the printed reference cannot drift
+    # from them, and that equation is the geometry's radius.
+    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+    (expression,) = [
+        node.args[1].value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "record"
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "head"
+        and isinstance(node.args[0], ast.Constant)
+        and node.args[0].value == "CrownRadius"
+        and isinstance(node.args[1], ast.Constant)
+    ]
+    equation = ast.parse(expression.replace('"', ""), mode="eval")
+    names = {node.id for node in ast.walk(equation) if isinstance(node, ast.Name)}
+    assert names == {"HeadDia", "CrownRise"}
+    value = eval(  # the parsed equation holds only these names and arithmetic
+        compile(equation, "CrownRadius", "eval"),
+        {"__builtins__": {}},
+        {"HeadDia": geom.HEAD_DIA, "CrownRise": geom.CROWN_RISE},
+    )
+    assert value == pytest.approx(geom.CROWN_RADIUS)
 
 
 def test_crown_radius_leader_lands_on_the_lower_arc_clear_of_the_head_dia() -> None:

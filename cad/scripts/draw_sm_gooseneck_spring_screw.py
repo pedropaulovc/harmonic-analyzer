@@ -345,15 +345,8 @@ def _verify_printed_dimensions(adapter: Any, views: Sequence[Any]) -> None:
         ).endswith(")")
         if parenthesized != (name in REFERENCE_DIMENSIONS):
             raise RuntimeError(f"MHA-SM-04 {name}: reference state did not persist")
-        if name in SPHERICAL_DIMENSIONS and (
-            not str(display.GetText(1) or "").startswith("(S")
-            or int(display.ArrowSide) != _ARROWS_OUTSIDE
-            or bool(display.SolidLeader)
-        ):
-            raise RuntimeError(
-                f"MHA-SM-04 {name}: spherical reference or its outside leader "
-                "did not persist"
-            )
+        if name in SPHERICAL_DIMENSIONS:
+            _check_spherical_reference(found[name][0], display, label=name)
         if int(display.GetPrimaryPrecision2()) != DRAWING_PRECISION_BY_NAME[name]:
             raise RuntimeError(f"MHA-SM-04 {name}: display places did not persist")
         if (
@@ -371,20 +364,56 @@ def _verify_printed_dimensions(adapter: Any, views: Sequence[Any]) -> None:
             )
 
 
-def _set_spherical_reference(adapter: Any, annotation: Any, *, label: str) -> None:
+def _spherical_reference_text(name: str) -> str:
+    """The ink a spherical reference prints, e.g. ``(SR20.0)`` for CrownRadius."""
+    value = PRINTED_DIMENSIONS[name][0]
+    return f"(SR{value:.{DRAWING_PRECISION_BY_NAME[name]}f})"
+
+
+def _printed_text(annotation: Any) -> str:
+    """A dimension's printed text items joined (IDisplayData, the ink the
+    layout audit reads)."""
+    data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
+    return "".join(
+        str(data.GetTextAtIndex(index) or "").strip()
+        for index in range(int(data.GetTextCount() or 0))
+    )
+
+
+def _check_spherical_reference(annotation: Any, display: Any, *, label: str) -> None:
+    """Raise unless the reference prints its whole intended text with the
+    arrow outside the arc and no solid leader to the centre."""
+    expected = _spherical_reference_text(label)
+    printed = _printed_text(_early_bound(annotation, "IAnnotation"))
+    if printed != expected:
+        raise RuntimeError(f"MHA-SM-04 {label}: prints {printed!r}, not {expected!r}")
+    if int(display.ArrowSide) != _ARROWS_OUTSIDE or bool(display.SolidLeader):
+        raise RuntimeError(
+            f"MHA-SM-04 {label}: the outside leader did not persist "
+            f"(ArrowSide {int(display.ArrowSide)}, SolidLeader "
+            f"{bool(display.SolidLeader)})"
+        )
+
+
+def _set_spherical_reference(annotation: Any, *, name: str) -> None:
     """Print the crown's model radius as the ASME spherical reference ``(SR20.0)``.
 
     The radius is read-only: the head Ø and the controlling rise already fix
     the dome.  Whatever radius prefix the display carries stays behind the
-    ``(S`` (draw_dt_pinion_pivot_shaft prints its crown the same way).  The
-    arrow sits outside the arc with no solid leader on to the centre, which
-    lies inside the shank, so the leader runs from the text to the crown and
-    stops there (draw_dt_pinion_arbor's SR crown).  Each write is read back.
+    ``(S`` (draw_dt_pinion_pivot_shaft prints its crown the same way); a
+    ``(S`` already there is stripped first, so a second pass never prints
+    ``(S(SR``.  The arrow sits outside the arc with no solid leader on to the
+    centre, which lies inside the shank, so the leader runs from the text to
+    the crown and stops there (draw_dt_pinion_arbor's SR crown).  Prefix,
+    suffix and leader are read back here; the whole printed text after the
+    last rebuild, in the settled check (_verify_printed_dimensions).
     """
+    label = f"MHA-SM-04 {name}"
     annotation = _early_bound(annotation, "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
-    prefix = "(S" + existing
+    radius_prefix = existing.removeprefix("(S")
+    prefix = "(S" + radius_prefix
     display.SetText(1, prefix)
     display.SetText(2, ")")  # swDimensionTextSuffix
     applied = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
@@ -478,7 +507,7 @@ async def build(adapter: Any) -> dict[str, str]:
         if len(matches) != 1:
             raise RuntimeError(f"expected one MHA-SM-04 {name} reference dimension")
         if name in SPHERICAL_DIMENSIONS:
-            _set_spherical_reference(adapter, matches[0], label=f"MHA-SM-04 {name}")
+            _set_spherical_reference(matches[0], name=name)
             continue
         set_reference_dimension(adapter, matches[0], label=f"MHA-SM-04 {name}")
 
