@@ -415,10 +415,15 @@ _HUB_ROWS = tuple(
 )
 SPIGOT_LENGTH_CALLOUT = "DRUM NOT PROUD"
 WEB_CENTER_CALLOUT = "WEB & RIM CENTER"
-HUB_LENGTH_CALLOUT = f"LOCKNUT ON FULL THREAD OF\nMG-WHEEL-AXLE {AXLE_NUMBER}"
+# The overall sets the axle's locknut stack (mg_wheel_group): the callout
+# names the stack and the axle by number, one line no wider than run 14's
+# "LOCKNUT ON FULL THREAD", so its dimension line stops short of TIE 1's
+# DRILL THRU block.
+HUB_LENGTH_CALLOUT = f"{AXLE_NUMBER} LOCKNUT STACK"
 # The groove's two bands seat the pen wire (mg_magnifying_wheel_spec
 # GROOVE_WIDTH_MIN, GROOVE_DEPTH_MIN): each callout names it.
 GROOVE_CALLOUT = f"PEN-WIRE SEAT\n{PEN_WIRE_NUMBER}"
+GROOVE_R_CALLOUT = f"PEN-WIRE SEAT {PEN_WIRE_NUMBER}"
 # Capitals print wider than _TEXT_CHAR (run 13: "2X RIM BORE EDGES" measured
 # 2.6 mm a character), so a callout's span is estimated two characters wide.
 _CALLOUT_MARGIN_CHARS = 2
@@ -453,8 +458,7 @@ SECTION_KEEP = {
     "HubLength": _beside(
         _section_x(HUB_BACK_Z),
         -1,
-        max(len(line) for line in HUB_LENGTH_CALLOUT.splitlines())
-        + _CALLOUT_MARGIN_CHARS,
+        len(HUB_LENGTH_CALLOUT) + _CALLOUT_MARGIN_CHARS,
         _HUB_ROWS[2] + _STACK_UP + _ABOVE_UP,
     ),
     # The groove's R up right, its leader down-left onto the groove at run
@@ -526,8 +530,12 @@ CALLOUTS_ABOVE = {
     "SpigotLength": SPIGOT_LENGTH_CALLOUT,
     "HubFrontZ": WEB_CENTER_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
-    "GrooveR": GROOVE_CALLOUT,
+    "GrooveR": GROOVE_R_CALLOUT,
 }
+# SOLIDWORKS drops a multi-line callout above a value from the print
+# (draw_dt_cone_gear; this sheet's run 1 lost both two-line ones).
+if any("\n" in text for text in CALLOUTS_ABOVE.values()):
+    raise AssertionError("an above-callout with a line break does not print")
 # Three note lines, top-left anchored, under the two tie blocks and left of
 # the title block.
 NOTES_XY = (0.020, 0.062)
