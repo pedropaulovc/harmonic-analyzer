@@ -458,7 +458,7 @@ CAPTURE_READING_REGION = (
 # landings could not be told apart (machinist review, 2026-10-23/26).
 # B-B's native padded 1:1 extent measured 42.1 x 44.8 mm (49385), so its field
 # takes the top-right corner up to the border, with its caption directly
-# beneath, clear of A-A's right-hand callouts (C4 MOUTH tops out at 199 mm).
+# beneath (2 mm under its 220.1 mm outline), above A-A's right-hand column.
 # A-A's 1:1 crop is re-centred on its readings' span, C2 lower rim to C5A pin
 # end (23.15 to 63.0 above the pin origin), and its radius shrinks to 30 so
 # its field fits between the two callout columns; its caption sits beneath.
@@ -470,7 +470,7 @@ CAPTURE_VIEW_REGIONS = (
 )
 CAPTURE_LOCATOR_SCALE = (1, 4)
 CAPTURE_SECTION_SCALES = {"A": (1, 1), "B": (1, 1)}
-CAPTURE_SECTION_CAPTIONS = ((0.313, 0.104), (0.384, 0.2175))
+CAPTURE_SECTION_CAPTIONS = ((0.313, 0.104), (0.384, 0.2200))
 # Model crop of each section: (centre above the pin origin or at the first cap
 # screw, radius), in mm.
 CAPTURE_A_CROP_CENTRE_ABOVE_PIN_ORIGIN = 43.0
@@ -2665,16 +2665,19 @@ def capture_readings() -> tuple[CaptureReading, ...]:
         *(CaptureReading(2, spec.PIVOT_RETAINER, (side * mouth, 0.0, top),
                          callouts["mouth"], xy,
                          pick_local_mm=(side * mouth, 0.0, top / 2.0))
-          for side, xy in ((-1.0, (0.224, 0.2058)), (1.0, (0.365, 0.1895)))),
+          for side, xy in ((-1.0, (0.224, 0.2058)), (1.0, (0.365, 0.1908)))),
         *(CaptureReading(2, spec.CARRIER, carrier_face(side), callouts["carrier_backing"], xy)
           for side, xy in ((-1.0, (0.224, 0.184)), (1.0, (0.365, 0.179)))),
         # The running gap lands on the retainer's underside 0.7 inside its
         # rim, 2.6 mm out from C4 COMMON's carrier-face arrow at the land
-        # (they were 0.17 apart, one over the other).
+        # (they were 0.17 apart, one over the other). The right column's
+        # four blocks stand 3.6 mm apart (8df9bd30c's 2.3-2.5 merged under the
+        # 3.2-3.5 row pitch); the running-gap leader still starts about
+        # 0.4 above its landing.
         CaptureReading(2, spec.PIVOT_RETAINER, (washer.OUTER_DIA / 2.0 - 0.7, 0.0, 0.0),
-                       callouts["running_gap"], (0.365, 0.1683)),
+                       callouts["running_gap"], (0.365, 0.1672)),
         CaptureReading(2, spec.PIVOT_PIN, (0.0, 0.0, pin.OVERALL_LENGTH),
-                       callouts["pin_end"], (0.365, 0.200)),
+                       callouts["pin_end"], (0.365, 0.2025)),
         CaptureReading(2, spec.PIVOT_PIN, (-pin.FIT_DIA / 2.0, 0.0, hole_top),
                        callouts["cross_hole"], (0.224, 0.2145),
                        pick_local_mm=(-pin.FIT_DIA / 2.0, 0.0, (hole_top + pin.OVERALL_LENGTH - pin.LEAD_CHAMFER) / 2.0)),

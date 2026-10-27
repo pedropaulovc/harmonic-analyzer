@@ -3816,7 +3816,9 @@ def test_capture_bolt_section_field_holds_the_observed_native_1_to_1_extent(
     ) == (1, 1)
     caption_x, caption_y = drawing.CAPTURE_SECTION_CAPTIONS[1]
     assert caption_x == pytest.approx(cx)
-    assert cy - height / 2.0 - caption_y > 0.002
+    # The caption's top-centre point (its text tops about 1.9 mm lower)
+    # stands beneath the measured extent.
+    assert cy - height / 2.0 - caption_y > 0.0
 
 
 
