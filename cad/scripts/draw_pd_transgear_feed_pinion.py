@@ -552,6 +552,25 @@ def _crop_outside_view(adapter: Any, view: Any) -> None:
         )
 
 
+def _place_outside_caption(adapter: Any) -> None:
+    """Insert the outside view's caption at LEFT_CAPTION_XY, read back.
+
+    ``add_note`` returns the note even when SetPosition fails, leaving it at
+    SolidWorks' default spot (codjiflo P2 on 0772285), so its native position
+    and border containment are checked here."""
+    raw_note = add_note(adapter, LEFT_CAPTION, *LEFT_CAPTION_XY)
+    if raw_note is None:
+        raise RuntimeError("the outside view caption was not inserted")
+    note = _early_bound(raw_note, "INote")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    position = tuple(float(value) for value in annotation.GetPosition())
+    if math.dist(position[:2], LEFT_CAPTION_XY) > 1e-6:
+        raise RuntimeError(
+            f"outside view caption stands at {position[:2]}, not {LEFT_CAPTION_XY}"
+        )
+    _assert_note_inside_border(note, "outside view caption")
+
+
 def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
     """Every imported dimension prints the text lanes its part authored.
 
@@ -656,8 +675,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _hide_tangent_edges(outside)
     _crop_outside_view(adapter, outside)
     _place_rear_caption(adapter, rear)
-    if add_note(adapter, LEFT_CAPTION, *LEFT_CAPTION_XY) is None:
-        raise RuntimeError("the outside view caption was not inserted")
+    _place_outside_caption(adapter)
 
     annotations = []
     # The section first: the outside view then imports only the cutter

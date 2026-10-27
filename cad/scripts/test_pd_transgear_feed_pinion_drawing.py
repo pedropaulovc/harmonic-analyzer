@@ -538,8 +538,15 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
         ),
         # codjiflo P3 on 65a022125: the isometric's ink as run
         # 20261027T032128736Z's sheet measured it, the BossDia's extension
-        # line excluded.
-        "isometric": Box(0.326, 0.185, 0.409, 0.247),
+        # line excluded: (0.326, 0.185)-(0.409, 0.247) about ISO_CENTER
+        # (0.367, 0.214) at 3:1, so in model mm from its centre (codjiflo P3
+        # on 0772285: it follows the view's placement and scale).
+        "isometric": Box(
+            drawing.ISO_CENTER[0] - 41.0 / 3.0 * s,
+            drawing.ISO_CENTER[1] - 29.0 / 3.0 * s,
+            drawing.ISO_CENTER[0] + 42.0 / 3.0 * s,
+            drawing.ISO_CENTER[1] + 33.0 / 3.0 * s,
+        ),
     }
     keeps = {
         **drawing.FRONT_KEEP,
