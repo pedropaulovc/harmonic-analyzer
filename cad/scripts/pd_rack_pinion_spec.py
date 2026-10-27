@@ -217,11 +217,11 @@ TOOTH_SPACE_GAUGE_TIP_AIR_MIN_MM = min(contact.tip_air_mm for contact in _GAUGE_
 # fine pitch +0.002 in / -0). 35.101 stands 0.004 above 35.097, the
 # closest centre at which the largest disc tip clears the knob pinion's
 # interference point with both 0.05 TIR tooth-space runouts closing it
-# (paper_drive_mesh_check.reducer_mesh); the allowance is +0.025, the
-# radius of the drawn reducer position zone
-# (stock_form_quality.reducer_position_diameter_mm), inside the catalogue
-# +0.05 (owner ruling 2026-10-27, option A: standard gears take the
-# standard band; the far end is gated at CR 1.1 / 1.0 in
+# (paper_drive_mesh_check.reducer_mesh); the allowance is the catalogue
+# +0.05, the radius of K's drawn setting circle about S
+# (stock_form_quality.reducer_k_setting_diameter_mm; owner ruling
+# 2026-10-27, option A: standard gears take the standard band; the far
+# end is gated at CR 1.1 / 1.0 in
 # paper_drive_mesh_check.BAND_TOP_CONTACT_RATIO_FLOORS).
 MESH_PINION_TEETH = 12
 MESH_ANGLE_DEG = -168.0
@@ -229,7 +229,7 @@ CENTRE_DISTANCE = 35.101
 # The setting the arm and plate sheets print: the knob bore is held this
 # band from the pin bore when the pair is match-drilled, and must still be
 # there with the plate screwed down.
-CENTRE_DISTANCE_WINDOW = (CENTRE_DISTANCE, 35.126)
+CENTRE_DISTANCE_WINDOW = (CENTRE_DISTANCE, 35.151)
 # (upper, lower) deviations from CENTRE_DISTANCE, as every band here.
 CENTRE_DISTANCE_SET_BAND = (round(CENTRE_DISTANCE_WINDOW[1] - CENTRE_DISTANCE, 6), 0.0)
 CENTRE_DISTANCE_SET_TEXT = (

@@ -22,7 +22,7 @@ def test_both_meshes_pass_the_standard_gates() -> None:
 def test_reducer_centre_band_is_plus_only_from_the_interference_limit() -> None:
     # Fine-pitch practice: nominal +x/-0. The nominal sits just above the
     # interference point at the tight runout extreme; the allowance is the
-    # drawn position zone's radius, inside the catalogue +0.002 in.
+    # radius of K's drawn setting circle, inside the catalogue +0.002 in.
     import _gear_quality
 
     low, high = disc.CENTRE_DISTANCE_WINDOW
@@ -31,11 +31,11 @@ def test_reducer_centre_band_is_plus_only_from_the_interference_limit() -> None:
     )
     assert low == disc.CENTRE_DISTANCE
     assert disc.CENTRE_DISTANCE_SET_BAND == pytest.approx((high - low, 0.0))
-    assert high - low == pytest.approx(_gear_quality.reducer_position_diameter_mm() / 2.0)
+    assert high - low == pytest.approx(_gear_quality.reducer_k_setting_diameter_mm() / 2.0)
     assert high - low <= 0.002 * 25.4
     assert mesh.reducer_mesh(low).failures() == []
     assert mesh.reducer_mesh(low - 0.005).interference_margin_min_mm < 0.0
-    assert disc.CENTRE_DISTANCE_SET_TEXT == "35.101 +0.025/-0"
+    assert disc.CENTRE_DISTANCE_SET_TEXT == "35.101 +0.050/-0"
 
 
 def test_reducer_band_ends_pass_their_floors_and_the_far_end_is_reported() -> None:
@@ -48,8 +48,8 @@ def test_reducer_band_ends_pass_their_floors_and_the_far_end_is_reported() -> No
         mesh.BAND_TOP_CONTACT_RATIO_FLOORS
     )
     # The far end is short of the design floors, as the module states.
-    assert top.contact_ratio_min == pytest.approx(1.162, abs=5e-4)
-    assert top.runout_contact_ratio_min == pytest.approx(1.073, abs=5e-4)
+    assert top.contact_ratio_min == pytest.approx(1.118, abs=5e-4)
+    assert top.runout_contact_ratio_min == pytest.approx(1.029, abs=5e-4)
     assert top.contact_ratio_min < mesh.CONTACT_RATIO_FLOOR
     assert top.runout_contact_ratio_min < mesh.RUNOUT_CONTACT_RATIO_FLOOR
     assert top.backlash_mm[0] > nominal.backlash_mm[0] > 0.0

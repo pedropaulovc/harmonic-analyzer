@@ -167,12 +167,16 @@ def test_three_accessible_rear_indicator_sites_bound_every_tilt_direction() -> N
 
 
 def test_native_controls_reference_actual_bores_and_project_past_real_chain_plane() -> None:
-    for spec, geometry, prefix in ((arm_spec, arm, "arm"), (plate_spec, plate, "plate")):
+    # The arm's pattern is located from S (Ø0.050); the plate's from its own
+    # knob bore K, so it carries K's Ø0.100 setting circle about S.
+    for spec, geometry, prefix, zone in (
+        (arm_spec, arm, "arm", "0.050"), (plate_spec, plate, "plate", "0.100"),
+    ):
         controls = {control.key: control for control in spec.GEOMETRIC_CONTROLS}
         for index, xy in enumerate(geometry.LOCATOR_SITES_MM, 1):
             control = controls[f"{prefix}_locator_{index}_position"]
             assert control.datums == ("A", "B", "C") and control.tolerance_zone == "diametral"
-            assert control.tolerance == "0.050"
+            assert control.tolerance == zone
             assert (control.face.contains_x_mm, control.face.contains_y_mm) == xy
             assert control.face.diameter_mm == geometry.LOCATOR_HOLE_DIA_MM
         assert {(feature, name) for feature, name in spec.BASIC_REDUCER_DIMENSIONS if feature == "LocatorProfile"} == {
@@ -201,9 +205,9 @@ def test_clamp_axes_have_real_projected_zones_and_each_countersink_rides_its_hol
         assert hole.projected_zone_height_mm == plate.CLAMP_PLATE_PROJECTED_HEIGHT_MM
         assert isinstance(hole.face, CylinderFace)
         assert (hole.face.contains_x_mm, hole.face.contains_y_mm) == (x, y)
-        for control in (tap, hole):
+        for control, zone in ((tap, "0.050"), (hole, "0.100")):
             assert control.datums == ("A", "B", "C")
-            assert control.tolerance == "0.050" and control.tolerance_zone == "diametral"
+            assert control.tolerance == zone and control.tolerance_zone == "diametral"
 
 
 def test_measured_receiver_pays_full_two_pose_travel_and_uncertainty() -> None:
@@ -211,14 +215,14 @@ def test_measured_receiver_pays_full_two_pose_travel_and_uncertainty() -> None:
     assert widths == pytest.approx((0.062, 0.054))
     assert math.hypot(*widths) <= registration.LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM
     assert registration.LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM == 0.100
-    assert registration.REDUCER_AXIS_SETUP_RADIUS_MM == 0.025
+    assert registration.REDUCER_AXIS_SETUP_RADIUS_MM == 0.050
     assert registration.LOCATOR_COORDINATE_TRAVEL_MAX_MM <= 0.100 / math.sqrt(2.0)
 
 
 def test_setup_must_hold_the_drawn_centre_distance_band_along_s_k() -> None:
     import pd_rack_pinion_spec as disc
     high, low = disc.CENTRE_DISTANCE_SET_BAND
-    # +x/-0: never closer than nominal; the top is the position zone's radius.
+    # +x/-0: never closer than nominal; the top is K's setting circle radius.
     assert (high, low) == (registration.REDUCER_AXIS_SETUP_RADIUS_MM, 0.0)
     uncertainty = 0.001
     s_to_k = (arm.KNOB_BORE_STATION - arm.PIN_STATION, arm.KNOB_BORE_OFFSET)

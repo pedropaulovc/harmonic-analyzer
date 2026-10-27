@@ -19,7 +19,6 @@ live proof.
 
 from __future__ import annotations
 
-import math
 import textwrap
 
 import dt_drive_train_steps
@@ -33,28 +32,6 @@ import paper_drive_geom as paper_geometry
 import _paper_drive_placement as paper_placement
 
 DRAWING_NUMBER = "MHA-PD-00"
-
-# --- The reducer's S-K setting (step "arm-plate-located") -------------------
-# Jig-bored on the mill: the arm trammed with its pivot bore and the pressed
-# MHA-PD-23 pin (S) on one DRO axis, the DRO zeroed on S, the plate tapped
-# till its knob bore (K) indicates true at K's coordinates from S. Both
-# coordinates are set, so K's clocking about S is held as well as its
-# distance. K is aimed at the middle of the +x/-0 set band
-# (pd_rack_pinion_spec.CENTRE_DISTANCE_WINDOW); test_pd_paper_drive_assembly
-# _drawing checks the DRO/indicator error against the band and the drawn
-# position circle (paper_drive_arm_registration.REDUCER_AXIS_SETUP_RADIUS_MM).
-K_SET_CENTRE_DISTANCE_MM = sum(arm_geometry.DISC.CENTRE_DISTANCE_WINDOW) / 2.0
-_S_TO_K = (
-    arm_geometry.KNOB_BORE_STATION - arm_geometry.PIN_STATION,
-    arm_geometry.KNOB_BORE_OFFSET,
-)
-_S_TO_K_SCALE = K_SET_CENTRE_DISTANCE_MM / math.hypot(*_S_TO_K)
-# From S: toward the pivot along the arm, and across it to the plate's
-# notch side (both negative in the arm frame).
-K_FROM_S_ALONG_MM = -_S_TO_K[0] * _S_TO_K_SCALE  # 25.019
-K_FROM_S_ACROSS_MM = -_S_TO_K[1] * _S_TO_K_SCALE  # 24.637
-if K_FROM_S_ALONG_MM <= 0.0 or K_FROM_S_ACROSS_MM <= 0.0:
-    raise AssertionError("K is no longer toward the pivot and the notch side of S")
 
 # The chain fit-up starts from the crank side complete per its own fit-up
 # (CONTRACT-paper-drive.md §13.2 procedure (1)): the 16T set on its feeler and

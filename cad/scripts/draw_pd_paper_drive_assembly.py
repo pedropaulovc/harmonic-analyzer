@@ -8,7 +8,8 @@ the disc cluster and the knob stack apart along their axes on
 PAPER_DRIVE_EXPLODED, seen from above, and balloons every part it shows.
 Sheet 4 balloons the bar, its clamps and the platen group on
 PAPER_DRIVE_EXPLODED and prints their steps. Sheet 5 prints the transgear's
-assembly steps and sheet 6 continues them; sheet 7 prints the chain fit-up
+assembly steps and VIEW K, step 10's knob-bore setting from the pin as the
+assembly's own model dimensions; sheet 6 continues the steps; sheet 7 prints the chain fit-up
 (CONTRACT-paper-drive.md §13.2). Sheet 8 carries the complete native BOM,
 split horizontally into two pieces at measured row heights, and an assembly
 reference. The BOM identifies the current inch
@@ -40,6 +41,7 @@ from typing import Any, Callable, Iterable, Sequence
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
+    dimension_name,
     place_view,
     view_name,
 )
@@ -80,6 +82,9 @@ from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import assert_imported_precision
+from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import (
@@ -109,6 +114,7 @@ from _column_clamp_interface import BAR_DEPTH
 import pd_latch_hook_geometry as hook_geometry
 import paper_drive_rack_setup as rack_setup
 import pd_paper_drive_assembly_steps as steps
+import pd_paper_drive_knob_setting_spec as knob_setting
 import pd_paper_drive_explode_spec as explode
 import pd_platen_guide_spec as platen_guide
 import pd_platen_spec as platen
@@ -539,6 +545,54 @@ FITUP_CONTINUED_KEY = "collar-pins-pressed"
 FITUP_CONTINUED_SECOND_KEY = "latch-hook-fitted"
 FITUP_CHAIN_KEY = "loaded-rack-geometry-checked"
 CHAIN_SECOND_COLUMN_KEY = "collar-shoulder-seated"
+
+# Sheet 5's step-10 view: K's DRO setting from the pin S, the assembly's
+# hidden KnobSettingReference chain (pd_paper_drive_knob_setting_spec) on the
+# arm, plate and pin seen from the machine front at 1:1, cropped to a circle
+# on S-K's midpoint (S, Q and K all lie on it: Q is the chain's right angle).
+# It stands under the second column, over the title block; each setting's
+# text stands off its leg, away from the chain's third point, past the circle.
+KNOB_SETTING_VIEW_NAME = "VIEW K"
+KNOB_SETTING_SCALE = (1.0, 1.0)
+KNOB_SETTING_CENTER = (0.300, 0.096)
+KNOB_SETTING_RADIUS = 0.024
+KNOB_SETTING_TEXT_OFFSET = 0.016
+KNOB_SETTING_INSTANCES = frozenset(
+    {"pd-transgear-arm-1", "pd-transgear-arm-plate-1", "pd-transgear-pin-1"}
+)
+# The second column's steps end above this on sheet 5.
+KNOB_SETTING_FIELD_TOP = 0.132
+KNOB_SETTING_CAPTION = (
+    f"{KNOB_SETTING_VIEW_NAME}: KNOB BORE K\nFROM PIN S (STEP "
+    f"{steps.step_number('arm-plate-located')}), 1:1"
+)
+KNOB_SETTING_CAPTION_XY = (0.345, 0.112)
+if math.dist(knob_setting.S_XY, knob_setting.K_XY) / 2000.0 >= KNOB_SETTING_RADIUS:
+    raise AssertionError("the knob setting circle must frame S, Q and K")
+
+
+def knob_setting_keep(
+    s: tuple[float, float], q: tuple[float, float], k: tuple[float, float]
+) -> dict[str, tuple[float, float]]:
+    """Each setting's text, from the chain's projected S, Q and K (sheet
+    metres): off its leg's midpoint, square to the leg, away from the
+    chain's third point."""
+    def off(a, b, away):
+        mid = ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
+        length = math.dist(a, b)
+        normal = (-(b[1] - a[1]) / length, (b[0] - a[0]) / length)
+        if normal[0] * (mid[0] - away[0]) + normal[1] * (mid[1] - away[1]) < 0.0:
+            normal = (-normal[0], -normal[1])
+        return (
+            mid[0] + KNOB_SETTING_TEXT_OFFSET * normal[0],
+            mid[1] + KNOB_SETTING_TEXT_OFFSET * normal[1],
+        )
+
+    return {
+        knob_setting.ALONG_DIMENSION: off(s, q, k),
+        knob_setting.ACROSS_DIMENSION: off(q, k, s),
+    }
+
 
 SHEET_SCALES = {
     "ASSEMBLED VIEWS": ASSEMBLED_SCALE,
@@ -1327,9 +1381,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"{_N['pd-transgear-arm']} ARM'S REAR FACE WITH TOOLMAKER'S CLAMPS, "
             "SCREWS OUT; ARM ON PARALLELS ON THE MILL, PLATE UP. INDICATE THE "
             f"PIVOT BORE AND THE {_N['pd-transgear-pin']} PIN HEAD TRUE ON ONE DRO "
-            "AXIS; ZERO ON THE PIN. AT "
-            f"{steps.K_FROM_S_ALONG_MM:.3f} TOWARD THE PIVOT, "
-            f"{steps.K_FROM_S_ACROSS_MM:.3f} TO THE NOTCH SIDE, TAP THE PLATE TILL "
+            f"AXIS; ZERO ON THE PIN. AT THE {KNOB_SETTING_VIEW_NAME} SETTING FROM THE "
+            "PIN, TAP THE PLATE TILL "
             "ITS KNOB BORE INDICATES TRUE (THE "
             f"{_N['pd-transgear-knob-shaft']} {KNOB_TEETH}T / {_N['pd-rack-pinion']} "
             f"{disc.TEETH}T MESH); CLAMP; RE-INDICATE. "
@@ -3110,6 +3163,72 @@ def _place_exploded_sheet(
     return landings
 
 
+def _place_knob_setting_view(adapter: Any) -> None:
+    """Sheet 5's VIEW K: the arm, plate and pin from the machine front at
+    1:1, cropped on S-K's midpoint, carrying the assembly's two K setting
+    dimensions from S (pd_paper_drive_knob_setting_spec) that step 10 cites."""
+    label = "knob setting view"
+    _activate_sheet(adapter, SHEET_NAMES[4])
+    view = _early_bound(
+        place_view(
+            adapter, str(SOURCE), "*Front", *KNOB_SETTING_CENTER, scale=KNOB_SETTING_SCALE
+        ),
+        "IView",
+    )
+    apply_view_configuration(adapter, view, label=label)
+    _isolate_instances(adapter, view, KNOB_SETTING_INSTANCES, label=label)
+    model = tuple(
+        (x / 1000.0, y / 1000.0, 0.0)
+        for x, y in (
+            (
+                (knob_setting.S_XY[0] + knob_setting.K_XY[0]) / 2.0,
+                (knob_setting.S_XY[1] + knob_setting.K_XY[1]) / 2.0,
+            ),
+            knob_setting.S_XY,
+            knob_setting.Q_XY,
+            knob_setting.K_XY,
+        )
+    )
+    names = ("S-K midpoint", "pin S", "corner Q", "knob bore K")
+    centre = model_points_in_view(adapter, view, model[:1], label=label, names=names[:1])[0]
+    _shift_view(
+        adapter,
+        view,
+        (KNOB_SETTING_CENTER[0] - centre[0], KNOB_SETTING_CENTER[1] - centre[1]),
+        label=f"{label} centre",
+    )
+    centre, s, q, k = model_points_in_view(adapter, view, model, label=label, names=names)
+    if math.dist(centre, KNOB_SETTING_CENTER) > 1e-4:
+        raise RuntimeError(f"{label}: S-K midpoint sits at {centre!r}")
+    _crop_to_circle(adapter, view, KNOB_SETTING_CENTER, KNOB_SETTING_RADIUS, label=label)
+    set_hidden_lines_removed(adapter, view)
+    _show_base_view_sketches(adapter, view, (knob_setting.FEATURE,), label=label)
+    keep = knob_setting_keep(s, q, k)
+    annotations = curate_view_dimensions(
+        adapter,
+        view,
+        keep=keep,
+        view_label=label,
+        dimensions_by_feature=knob_setting.DRAWING_DIMENSIONS,
+    )
+    assert_imported_precision(
+        adapter, annotations, knob_setting.DRAWING_PRECISION[knob_setting.FEATURE]
+    )
+    imported = sorted(
+        dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
+        for annotation in annotations
+    )
+    if imported != sorted(keep):
+        raise RuntimeError(f"{label} imported {imported}, not {sorted(keep)}")
+    _place_sheet_note(
+        adapter,
+        SHEET_NAMES[4],
+        KNOB_SETTING_CAPTION,
+        KNOB_SETTING_CAPTION_XY,
+        label=f"{label} caption",
+    )
+
+
 def _place_fitup_sheets(adapter: Any, step_notes: StepNotes) -> None:
     for sheet_name, notes in (
         (SHEET_NAMES[4], step_notes.fitup_notes),
@@ -3176,6 +3295,7 @@ async def build(adapter: Any) -> dict[str, str]:
     landings += _place_transgear_exploded_sheet(adapter, table, items)
     landings += _place_exploded_sheet(adapter, table, items, notes)
     _place_fitup_sheets(adapter, notes)
+    _place_knob_setting_view(adapter)
     assert_full_detail_view(adapter, label="paper-drive assembly")
 
     return await finalize_drawing(

@@ -107,7 +107,19 @@ from sh_vn_chain_link_spec import INNER_LINK_CONFIGURATION, OUTER_LINK_CONFIGURA
 from _appearance import POLISHED_STEEL
 from _custom_properties import apply_custom_properties
 from _session import run_build
-from _drawing_marks import DRAWN_BY
+from _dimensions import drive_dimension, set_global
+from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
+from _drawing_precision import _named_dimension, apply_drawing_precision
+from _feature_tree import name_last_feature
+from _sketch import (
+    SketchDims,
+    anchor_point_to_origin,
+    blank_sketch,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
+import pd_paper_drive_knob_setting_spec as KNOB_SETTING
 from _assembly import (
     _rebuilt_component_name,
     activate_assembly_contract,
@@ -2197,6 +2209,109 @@ async def _place_chain_seed(
     )
 
 
+async def _author_knob_setting_reference(adapter) -> None:
+    """K's DRO setting from the pin S as model dimensions (MHA-PD-00 step 10):
+    one construction chain on the Front plane (sketch x, y = machine x, y),
+    P to S on the arm's axis, S to Q along it toward P, Q to K across it
+    (pd_paper_drive_knob_setting_spec). Dimensioned from globals, shown as
+    reference values with their one-line names, marked for the drawing and
+    blanked; no solid or pose changes."""
+    spec = KNOB_SETTING
+    for name, value in (
+        ("KnobSetAlong", spec.K_FROM_S_ALONG_MM),
+        ("KnobSetAcross", spec.K_FROM_S_ACROSS_MM),
+    ):
+        await set_global(adapter, name, f"{value}mm")
+    points = (spec.P_XY, spec.S_XY, spec.Q_XY, spec.K_XY)
+    dims = SketchDims()
+    check("create knob setting sketch", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    legs = [
+        check(f"knob setting leg {index}", await adapter.add_line(*p0, *p1))
+        for index, (p0, p1) in enumerate(zip(points, points[1:]))
+    ]
+    set_sketch_direct_db(adapter, False)
+    for index, leg in enumerate(legs):
+        segment = _early_bound(adapter._sketch_entities[leg], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(f"knob setting leg {index} is not construction")
+    for index, (leg, after) in enumerate(zip(legs, legs[1:])):
+        check(
+            f"knob setting legs {index} and {index + 1} chained",
+            await adapter.add_sketch_constraint(
+                f"{leg}.end", f"{after}.start", "coincident"
+            ),
+        )
+    check(
+        "knob setting: along the arm's axis",
+        await adapter.add_sketch_constraint(legs[1], legs[0], "collinear"),
+    )
+    check(
+        "knob setting: across the arm",
+        await adapter.add_sketch_constraint(legs[2], legs[1], "perpendicular"),
+    )
+    # P and S from the origin: S lies on machine x = 0, one dimension.
+    await anchor_point_to_origin(adapter, f"{legs[0]}.start", *spec.P_XY, "arm pivot P")
+    dims.record("KnobSetPivotX")
+    dims.record("KnobSetPivotY")
+    await anchor_point_to_origin(adapter, f"{legs[1]}.start", *spec.S_XY, "pin S")
+    if abs(spec.S_XY[0]) > 1e-9:
+        dims.record("KnobSetPinX")
+    dims.record("KnobSetPinY")
+    await dimension_between(
+        adapter, f"{legs[1]}.start", f"{legs[1]}.end", "distance",
+        spec.K_FROM_S_ALONG_MM, spec.ALONG_DIMENSION,
+    )
+    dims.record(spec.ALONG_DIMENSION, '"KnobSetAlong"')
+    await dimension_between(
+        adapter, f"{legs[2]}.start", f"{legs[2]}.end", "distance",
+        spec.K_FROM_S_ACROSS_MM, spec.ACROSS_DIMENSION,
+    )
+    dims.record(spec.ACROSS_DIMENSION, '"KnobSetAcross"')
+    await ensure_fully_defined(adapter, "knob setting")
+    check("exit knob setting sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, spec.FEATURE)
+    for name, expression in dims.apply(adapter, spec.FEATURE):
+        await drive_dimension(adapter, name, expression)
+    for name in sorted(spec.REFERENCE_DIMENSIONS):
+        # A reference value through the native prefix/suffix channel (the
+        # set band governs K, not the title block's .XXX row).
+        display, dimension = _named_dimension(adapter, spec.FEATURE, name)
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        tolerance.Type = 0  # swTolNONE
+        display.ShowParenthesis = False
+        display.SetText(1, "(")  # swDimensionTextPrefix
+        display.SetText(2, ")")  # swDimensionTextSuffix
+        if (
+            int(tolerance.Type) != 0
+            or bool(display.ShowParenthesis)
+            or str(display.GetText(1) or "") != "("
+            or str(display.GetText(2) or "") != ")"
+        ):
+            raise RuntimeError(f"{name}@{spec.FEATURE}: reference form did not persist")
+    apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
+    for name, (part, text) in spec.SETTING_CALLOUTS.items():
+        display, _dimension = _named_dimension(adapter, spec.FEATURE, name)
+        display.SetText(part, text)
+        actual = str(display.GetText(part) or "").replace("\r\n", "\n")
+        if actual != text:
+            raise RuntimeError(
+                f"{name}@{spec.FEATURE}: native setting callout reads {actual!r}, "
+                f"not {text!r}"
+            )
+    mark_dimensions_for_drawing(
+        adapter, spec.FEATURE, spec.DRAWING_DIMENSIONS[spec.FEATURE]
+    )
+    blank_sketch(adapter, spec.FEATURE)
+    feature = _early_bound(
+        _early_bound(adapter.currentModel, "IAssemblyDoc").FeatureByName(spec.FEATURE),
+        "IFeature",
+    )
+    if int(feature.Visible) != 1:  # swVisibilityStateHide
+        raise RuntimeError(f"{spec.FEATURE} still visible after BlankSketch")
+
+
 async def _insert_roller_chain(adapter) -> None:
     """The drive chain: a native CHAIN COMPONENT PATTERN (connected linkage) of
     alternating inner/outer links along the _chain.py loop, closed by the
@@ -3499,6 +3614,8 @@ async def build(adapter) -> dict[str, str]:
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
         chain_mounts=mounted_wheels(),
     )
+    # K's DRO setting from S, for MHA-PD-00's step-10 view (hidden sketch only).
+    await _author_knob_setting_reference(adapter)
     # Machine coords put the output/paper side at -Z, so SolidWorks' native Front
     # renders the machine BACK (chain and transgear cluster mirrored). Re-base the
     # standard views (same as the top assembly) so the saved doc and the _front

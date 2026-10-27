@@ -28,6 +28,9 @@ import fr_nameplate_spec as nameplate
 import paper_drive_geom as paper_geometry
 import paper_drive_rack_setup as rack_setup
 import pd_paper_drive_assembly_steps as steps
+import pd_paper_drive_knob_setting_spec as knob_setting
+import pd_transgear_arm_geometry as steps_arm
+import _paper_drive_placement as placement
 import pd_paper_drive_explode_spec as explode
 import pd_rack_pinion_spec as disc
 import pd_transgear_drive_collar_spec as collar
@@ -375,13 +378,12 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
         f"PRESS {plate_locating_pin.ASSEMBLY_QUANTITY} "
         f"{_number('pd-vn-transgear-arm-plate-locating-pin')} DOWELS"
     ) in located
-    # The setting's values and identities, in operation order: S (the
-    # MHA-PD-23 pin), K's two coordinates from S with the mesh they set,
-    # then each part reamed to its own drawing, then the dowels.
+    # The setting's identities, in operation order: S (the MHA-PD-23 pin),
+    # K set at VIEW K's model dimensions with the mesh they set, then each
+    # part reamed to its own drawing, then the dowels.
     order = [
         _number("pd-transgear-pin"),
-        f"{steps.K_FROM_S_ALONG_MM:.3f}",
-        f"{steps.K_FROM_S_ACROSS_MM:.3f}",
+        drawing.KNOB_SETTING_VIEW_NAME,
         _number("pd-transgear-knob-shaft"),
         _number("pd-rack-pinion"),
         _number("pd-transgear-arm"),
@@ -392,25 +394,90 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     cursor = located.index(_number("pd-transgear-arm")) + 1
     for token in order:
         cursor = located.index(token, cursor)
-    assert "JIG" not in located
+    # The step cites the view's model dimensions and types no value of its own.
+    for value in (knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM):
+        assert f"{value:.{knob_setting.PLACES}f}" not in located
 
 
-def test_the_jig_bored_k_lands_in_the_set_band_and_the_position_circle() -> None:
+def test_view_k_carries_the_set_coordinates_as_assembly_model_dimensions() -> None:
+    # The chain P-S-Q-K: Q along the arm's axis from S, K square to it.
+    s, q, k, p = (
+        knob_setting.S_XY, knob_setting.Q_XY, knob_setting.K_XY, knob_setting.P_XY,
+    )
+    assert math.dist(p, s) == pytest.approx(steps_arm.PIN_STATION)
+    assert math.dist(s, q) == pytest.approx(knob_setting.K_FROM_S_ALONG_MM)
+    assert math.dist(q, k) == pytest.approx(knob_setting.K_FROM_S_ACROSS_MM)
+    sq = (q[0] - s[0], q[1] - s[1])
+    qk = (k[0] - q[0], k[1] - q[1])
+    ps = (s[0] - p[0], s[1] - p[1])
+    assert sq[0] * qk[0] + sq[1] * qk[1] == pytest.approx(0.0, abs=1e-9)
+    assert sq[0] * ps[1] - sq[1] * ps[0] == pytest.approx(0.0, abs=1e-9)
+    # K is aimed at the middle of the set band, on the nominal S-K line.
+    low, high = disc.CENTRE_DISTANCE_WINDOW
+    assert math.dist(s, k) == pytest.approx((low + high) / 2.0)
+    nominal = (
+        placement.KNOB_SHAFT_XY[0] - s[0], placement.KNOB_SHAFT_XY[1] - s[1],
+    )
+    assert math.hypot(*nominal) == pytest.approx(low)
+    assert (k[0] - s[0]) * nominal[1] - (k[1] - s[1]) * nominal[0] == pytest.approx(
+        0.0, abs=1e-9
+    )
+    # The view marks exactly the two settings, at the places the model owns.
+    assert knob_setting.DRAWING_DIMENSIONS == {
+        knob_setting.FEATURE: {knob_setting.ALONG_DIMENSION, knob_setting.ACROSS_DIMENSION}
+    }
+    assert knob_setting.REFERENCE_DIMENSIONS == {
+        knob_setting.ALONG_DIMENSION, knob_setting.ACROSS_DIMENSION
+    }
+    for part, text in knob_setting.SETTING_CALLOUTS.values():
+        assert part == 3 and "\n" not in text
+
+
+def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
+    scale = drawing.KNOB_SETTING_SCALE[0] / drawing.KNOB_SETTING_SCALE[1]
+    centre = drawing.KNOB_SETTING_CENTER
+    mid = (
+        (knob_setting.S_XY[0] + knob_setting.K_XY[0]) / 2.0,
+        (knob_setting.S_XY[1] + knob_setting.K_XY[1]) / 2.0,
+    )
+    # Project as the machine front shows it (x mirrored); the layout holds
+    # either way, so check both.
+    for mirror in (1.0, -1.0):
+        def sheet(xy):
+            return (
+                centre[0] + mirror * (xy[0] - mid[0]) * scale / 1000.0,
+                centre[1] + (xy[1] - mid[1]) * scale / 1000.0,
+            )
+
+        s, q, k = (sheet(xy) for xy in (knob_setting.S_XY, knob_setting.Q_XY, knob_setting.K_XY))
+        for point in (s, q, k):
+            assert math.dist(point, centre) < drawing.KNOB_SETTING_RADIUS
+        keep = drawing.knob_setting_keep(s, q, k)
+        assert set(keep) == {knob_setting.ALONG_DIMENSION, knob_setting.ACROSS_DIMENSION}
+        for x, y in keep.values():
+            assert math.dist((x, y), centre) > drawing.KNOB_SETTING_RADIUS
+            assert drawing.FITUP_NOTE_XY[1][0] < x < drawing.FITUP_NOTE_LIMITS[1][0]
+            assert drawing.FITUP_NOTE_LIMITS[1][1] < y < drawing.KNOB_SETTING_FIELD_TOP
+    # Sheet 5's second column ends above the view's field.
+    notes = _unit_step_notes()
+    _, top = drawing.FITUP_NOTE_XY[1]
+    assert top - len(notes.fitup_notes[1].splitlines()) * NOTE_LINE_PITCH > (
+        drawing.KNOB_SETTING_FIELD_TOP
+    )
+    assert drawing.KNOB_SETTING_CENTER[1] - drawing.KNOB_SETTING_RADIUS > (
+        DRAWING_TEMPLATES[drawing.SPEC.layout].title_block_top_m
+    )
+    assert drawing.KNOB_SETTING_VIEW_NAME in drawing.KNOB_SETTING_CAPTION
+
+
+def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> None:
     import tomllib
 
     import paper_drive_arm_registration as registration
     from _process_plans import PROCESS_ROOT
 
-    # The printed coordinates are K at the middle of the set band, from S.
-    along, across = steps.K_FROM_S_ALONG_MM, steps.K_FROM_S_ACROSS_MM
     low, high = disc.CENTRE_DISTANCE_WINDOW
-    assert math.hypot(along, across) == pytest.approx((low + high) / 2.0)
     ux, uy = registration.S_TO_K_UNIT
-    assert (-along, -across) == pytest.approx(
-        (ux * (low + high) / 2.0, uy * (low + high) / 2.0)
-    )
-    # The nominal K, the centre of the drawn position circle, is the band bottom.
-    assert math.hypot(*registration._S_TO_K) == pytest.approx(low)
     inventory = tomllib.loads(
         (PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8")
     )
@@ -426,22 +493,28 @@ def test_the_jig_bored_k_lands_in_the_set_band_and_the_position_circle() -> None
     accuracy = stated * 25.4
     # The indicator's model is unknown: half a division of runout, centred.
     centring = inventory["gauges"]["dti"]["resolution_in"]["value"] * 25.4 / 4.0
-    # The DRO is zeroed on S, so its error enters once, on the S-to-K move:
-    # worst case both axes' errors add along any direction. The indicator
-    # centres S and K, and the pivot-and-pin tram turns K about S by its lever.
-    ux, uy = registration.S_TO_K_UNIT
+    # Signed worst case, every bound adding the same way: the DRO is zeroed
+    # on S, so its two axes' errors enter once, on the S-to-K move, both
+    # along any direction; the indicator centres S and K; the pivot-and-pin
+    # tram turns K about S by its lever.
     dro = accuracy * (abs(ux) + abs(uy))
-    lever = (low + high) / 2.0 / steps.arm_geometry.PIN_STATION
-    radial_err = math.hypot(dro, math.sqrt(2.0) * centring)
-    tangential_err = math.hypot(
-        dro, math.sqrt(2.0) * centring, math.sqrt(2.0) * centring * lever
-    )
-    # The operator dials the display's nearest count to each printed coordinate.
+    radial_err = dro + 2.0 * centring
+    lever = knob_setting.K_SET_CENTRE_DISTANCE_MM / steps_arm.PIN_STATION
+    tangential_err = dro + 2.0 * centring + 2.0 * centring * lever
+    assert radial_err == pytest.approx(0.0135, abs=1e-4)
+    # The operator dials the display's nearest count to each printed value.
     count = mill["resolution_mm"]["value"]
-    x, y = (round(value / count) * count for value in (along, across))
+    x, y = (
+        round(round(value, knob_setting.PLACES) / count) * count
+        for value in (knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM)
+    )
     radial = math.hypot(x, y) - low
     tangential = abs(x * uy - y * ux)
-    assert 0.0 <= radial - radial_err and radial + radial_err <= high - low
+    # Inside the +x/-0 band with margin at both ends.
+    bottom_margin = radial - radial_err
+    top_margin = (high - low) - (radial + radial_err)
+    assert bottom_margin > 0.010 and top_margin > 0.010
+    # And inside K's drawn setting circle about its nominal.
     radius = registration.REDUCER_AXIS_SETUP_RADIUS_MM
     assert math.hypot(radial + radial_err, tangential + tangential_err) < radius
 
@@ -460,7 +533,8 @@ def test_the_matched_plate_is_refitted_on_its_dowels_and_re_read() -> None:
     assert "PUSH AND ROCK THE PLATE BY HAND: NO SHAKE ON THE DOWELS" in fitted
     assert "RE-CHECK AFTER EVERY REMOVAL" in fitted
     # The setting step's own coordinates fix K; the refit only checks shake.
-    assert f"{steps.K_FROM_S_ALONG_MM:.3f}" not in fitted
+    assert f"{knob_setting.K_FROM_S_ALONG_MM:.3f}" not in fitted
+    assert drawing.KNOB_SETTING_VIEW_NAME not in fitted
     for method in ("RFS", "UNCERTAINTY", "QUALIFIED", "ACTUAL"):
         assert method not in fitted
     assert "COUNTERSINK" not in fitted
@@ -4842,7 +4916,8 @@ def test_pd_build_settled_checks_reject_native_item_drift_with_good_attachments(
     monkeypatch.setattr(drawing, "_source_family_counts", lambda _: {})
     for name in (
         "_validate_persisted_explode", "_create_sheets", "_place_assembled_sheet",
-        "_place_pivot_view", "_place_fitup_sheets", "assert_full_detail_view",
+        "_place_pivot_view", "_place_fitup_sheets", "_place_knob_setting_view",
+        "assert_full_detail_view",
     ):
         monkeypatch.setattr(drawing, name, lambda *_, **__: None)
     monkeypatch.setattr(drawing, "_place_bom_sheet", lambda *_: (

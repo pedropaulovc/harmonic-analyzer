@@ -32,6 +32,7 @@ import math
 
 import pd_transgear_arm_geometry as ARM
 import _transgear_arm_plate_locating_interface as LOCATING_PIN
+from _gear_quality import reducer_k_setting_diameter_mm
 from _printed_tolerance import angular_band_deg, printed_band_mm, printed_deviations
 
 # --- Where the bore sits on the arm (arm frame, mm) -------------------------
@@ -154,8 +155,12 @@ SCREW_HOLES = tuple(
 BAND_X = ARM.BAND_X
 BAND_XX = ARM.BAND_XX
 BAND_XXX = ARM.BAND_XXX
-REDUCER_POSITION_DIAMETER = ARM.REDUCER_POSITION_DIAMETER
-REDUCER_POSITION_RADIUS = ARM.REDUCER_POSITION_RADIUS
+# The plate's hole patterns are toleranced from its own knob bore B (= K),
+# and the matched pilots go through at the arm's pattern from the pin S:
+# K's setting circle about S (MHA-PD-00 step 10) carries into every
+# B-referenced frame here, so they take that circle, not the arm's zone.
+REDUCER_POSITION_DIAMETER = reducer_k_setting_diameter_mm()
+REDUCER_POSITION_RADIUS = REDUCER_POSITION_DIAMETER / 2.0
 LOCATOR_FULL_CYLINDER_SPAN_MIN_MM = (
     THICKNESS_OVER_ARM - THICKNESS_OVER_ARM_BAND
     - 2.0 * LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM

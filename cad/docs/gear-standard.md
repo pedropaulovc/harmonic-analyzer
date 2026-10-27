@@ -135,15 +135,20 @@ at the loose runout extreme (the centre opened by both tooth-space runouts).
 These are `paper_drive_mesh_check.CONTACT_RATIO_FLOOR` and
 `RUNOUT_CONTACT_RATIO_FLOOR` (user decision 2026-10-11); the centre comes from
 `pd_rack_pinion_spec.CENTRE_DISTANCE`. The arm and plate are match-drilled
-with that centre set to the ordinary fine-pitch band, nominal +0.025/-0
-(`CENTRE_DISTANCE_WINDOW`; catalogue practice is +0.002 in / -0, and +0.025
-is the radius of the drawn reducer position zone). At the band's far end
-the stock pair gives CR 1.162 and 1.073 at the runout extreme, gated at
+with that centre set to the standard fine-pitch band, nominal +0.050/-0
+(`CENTRE_DISTANCE_WINDOW`; catalogue practice is +0.002 in / -0). +0.050 is
+the radius of K's drawn setting circle about S
+(`stock_form_quality.reducer_k_setting_diameter_mm`, Ø0.10). The plate's
+B-referenced hole frames take that circle; S and the arm's patterns keep the
+Ø0.050 reducer position zone. At the band's far end the stock pair gives
+CR 1.118 and 1.029 at the runout extreme, gated at
 `BAND_TOP_CONTACT_RATIO_FLOORS` (1.1, 1.0): standard gears in a standard
 band (owner ruling 2026-10-27, option A). MHA-PD-00 step 10 jig-bores it on
 the mill DRO: the arm trammed on its pivot bore and the pressed MHA-PD-23
-pin, K set at mid-band coordinates from that pin and indicated true
-(`pd_paper_drive_assembly_steps.K_FROM_S_ALONG_MM` / `_ACROSS_MM`).
+pin, K set at mid-band coordinates from that pin and indicated true. The
+coordinates are the assembly's own model dimensions
+(`pd_paper_drive_knob_setting_spec`, the hidden `KnobSettingReference`
+sketch), printed in sheet 5's VIEW K.
 
 ### Setting the cone mesh
 
