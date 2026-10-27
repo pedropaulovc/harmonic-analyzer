@@ -7,7 +7,7 @@ sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
 The post is a polished chrome Ø16 x 2-wall tube with a tall vertical leg,
-an R51 quarter bend and a horizontal arm. Its flush brazed Ø12 x 8.80 end
+an R51 quarter bend and a horizontal arm. Its flush brazed Ø12 x 9.90 end
 plug has an axial native #8-32 UNC-2B through tap, counterbored at the arm
 end; the made MHA-SM-04 spring screw
 is NOT part of this weldment. The approximately 501 mm tall post keeps the

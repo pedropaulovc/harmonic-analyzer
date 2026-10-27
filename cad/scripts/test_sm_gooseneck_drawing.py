@@ -22,7 +22,7 @@ def test_physical_plug_and_modelling_overlap_are_distinct() -> None:
     assert part.PLUG_DIA == tube_id == 12.0
     assert tube_id < part.PLUG_OVERLAP_DIA < geom.TUBE_DIA
     assert part.PLUG_OVERLAP_DIA == geom.TUBE_DIA - geom.WALL_T == 14.0
-    assert part.PLUG_LENGTH == 8.80
+    assert part.PLUG_LENGTH == 9.90
 
 
 def test_native_receiver_is_through_tapped_before_the_tube() -> None:
@@ -65,18 +65,63 @@ def test_counterbore_and_inner_break_follow_the_tap_before_the_tube() -> None:
     )
 
 
+def test_every_direct_db_block_restores_inference_in_finally() -> None:
+    # Sketch inference is session state on the persistent seat: each block
+    # that turns it off must restore it even when a native segment is
+    # rejected, so every True is followed at once by a try whose finally
+    # restores it, and nothing restores it outside a finally.
+    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+
+    def toggle(node: ast.AST) -> str | None:
+        if (
+            isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Call)
+            and getattr(node.value.func, "id", "") == "set_sketch_direct_db"
+        ):
+            return ast.unparse(node.value.args[1])
+        return None
+
+    on = restored = 0
+    finally_offs: set[int] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Try):
+            finally_offs |= {
+                id(stmt) for stmt in node.finalbody if toggle(stmt) == "False"
+            }
+    for node in ast.walk(tree):
+        body = getattr(node, "body", None)
+        if not isinstance(body, list):
+            continue
+        for index, stmt in enumerate(body):
+            if toggle(stmt) == "True":
+                on += 1
+                following = body[index + 1]
+                assert isinstance(following, ast.Try), ast.unparse(stmt)
+                assert [toggle(s) for s in following.finalbody] == ["False"]
+                restored += 1
+    offs = [node for node in ast.walk(tree) if toggle(node) == "False"]
+    assert {id(node) for node in offs} == finally_offs
+    # The property, not the inventory: at least one block, each restored.
+    assert on == restored == len(offs) >= 1
+
+
 def test_counterbore_and_breaks_reduce_the_printed_full_thread_length() -> None:
     notes = " ".join(spec.DRAWING_NOTES.split())
     cbore = re.search(
-        r"ARM END C'BORE <MOD-DIAM>([\d.]+) X ([\d.]+)-([\d.]+) DEEP,"
+        r"ARM END C'BORE <MOD-DIAM>([\d.]+)-([\d.]+) X ([\d.]+)-([\d.]+) DEEP,"
         r" ON TAP AXIS WITHIN ([\d.]+)\.",
         notes,
     )
     edge = re.search(r"BREAK INNER TAP END\s+([\d.]+)\s+X\s+45\s+DEG", notes)
     full = re.search(r"FULL THREAD\s+([\d.]+)\s+NOMINAL;\s+([\d.]+)\s+MIN", notes)
     assert cbore is not None and edge is not None and full is not None
-    dia, depth_min, depth_max, axis = map(float, cbore.groups())
-    assert (dia, depth_min, depth_max) == (4.70, 1.32, 1.42)
+    dia_min, dia_max, depth_min, depth_max, axis = map(float, cbore.groups())
+    assert (dia_min, dia_max) == pytest.approx(
+        (joint.COUNTERBORE_DIA, joint.COUNTERBORE_DIA_MAX)
+    )
+    assert (dia_min, dia_max, depth_min, depth_max) == pytest.approx(
+        (4.70, 4.80, 2.52, 2.62)
+    )
     assert axis == joint.COUNTERBORE_AXIS_OFFSET_MAX == 0.10
     assert "SETUP" not in notes  # a requirement, not a method
     edge_break = float(edge.group(1))
@@ -88,7 +133,7 @@ def test_counterbore_and_breaks_reduce_the_printed_full_thread_length() -> None:
     assert minimum == pytest.approx(
         part.PLUG_LENGTH - joint.PLUG_LENGTH_BAND - depth_max - 2.0 * edge_break
     )
-    assert (nominal, minimum) == pytest.approx((6.93, 6.37))
+    assert (nominal, minimum) == pytest.approx((6.83, 6.27))
     assert minimum >= 1.5 * (0.164 * 25.4)  # #8 basic major, not its tap drill
     assert "BREAK BOTH TAP ENDS" not in notes
 
@@ -101,7 +146,7 @@ def test_plug_print_uses_physical_size_and_shared_loose_bands() -> None:
         notes,
     )
     assert plug is not None
-    assert tuple(map(float, plug.groups())) == (12.00, 0.51, 8.80, 0.51)
+    assert tuple(map(float, plug.groups())) == (12.00, 0.51, 9.90, 0.51)
     assert re.search(
         r"THREAD AXIS TO TUBE AXIS\s+\+/-" + f"{joint.THREAD_AXIS_OFFSET_MAX:.2f}",
         notes,

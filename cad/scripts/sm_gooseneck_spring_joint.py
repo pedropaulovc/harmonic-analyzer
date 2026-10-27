@@ -8,7 +8,7 @@ not left free to swivel (user ruling 2026-09-21).  Owner ruling 2026-10-26
 #8-32 thread past the shoulder's 45-degree lead runs through the MHA-SM-01
 plug, retapped #8-32 UNC-2B THRU.  An arm-end counterbore clears the screw's
 die run-out (codjiflo P1 on #1997): the run-out's incomplete threads never
-enter the plug's full 2B thread, even with the loop clamped coil-bound.
+enter the plug's full 2B thread, even with the loop clamped to its least gap.
 """
 
 from __future__ import annotations
@@ -46,7 +46,19 @@ EDGE_BREAK = float(_config.title_block("edge_break")["chamfer_max_mm"])
 # 10-9; music wire G 82.7 GPa max, Table 10-5; mean D 11.0998, n 1.75) is
 # LOOP_AXIAL_RATE ~ 28 N/mm, so it binds at LOOP_BIND_FORCE ~ 14 N, far under
 # the 231-693 N clamp preload sm_gooseneck_spring_screw_spec.clamp_preload_n
-# sweeps.  Bound, the loop rises one wire diameter per turn: CLAMPED_GAP.
+# sweeps.  Bound, the loop rises one wire diameter per turn: CLAMPED_GAP_MAX,
+# the most the gap can be under clamp.
+#
+# The finite faces let it sit deeper.  The plug-side helix tip stands at
+# r 8.55 from the screw axis, outside the Ø16 tube face (r 8.0), and the
+# rigid helix can rock: the smallest footprints (head r <= (12.50 - 0.51)/2 -
+# 0.25; plug face from the 2.85 mouth reach out to 5.75 when the plug is
+# proud, or to 7.70 at the tube) leave it 3.88-4.13 untilted and 3.27 rocked
+# to minimum width (test_sm_gooseneck_spring_joint's numeric sweep).  The
+# floor holds anyway: the two stacked pull-side layers (helix angles 30 and
+# 390 degrees, centreline ~4.8 from the screw axis, wire r 4.0-5.6) bear on
+# the seat inside BOTH faces, so the gap is never under two wire diameters:
+# CLAMPED_GAP_MIN, the least the gap can be, where the screw sits deepest.
 # Each check takes the gap worst for it.
 LOOP_SHEAR_MODULUS_MPA = 82_700.0
 LOOP_AXIAL_RATE = (
@@ -55,18 +67,19 @@ LOOP_AXIAL_RATE = (
     / (8.0 * (2.0 * spring.COIL_MEAN_RADIUS_MM) ** 3 * spring.LOOP_TURNS)
 )
 CLAMPED_LOOP_RISE = spring.LOOP_TURNS * spring.WIRE_DIA_MM
-CLAMPED_GAP = (spring.LOOP_TURNS + 1.0) * spring.WIRE_DIA_MM
-LOOP_BIND_FORCE = LOOP_AXIAL_RATE * (gooseneck.SPRING_EYE_GAP - CLAMPED_GAP)
+CLAMPED_GAP_MAX = (spring.LOOP_TURNS + 1.0) * spring.WIRE_DIA_MM
+CLAMPED_GAP_MIN = 2.0 * spring.WIRE_DIA_MM
+LOOP_BIND_FORCE = LOOP_AXIAL_RATE * (gooseneck.SPRING_EYE_GAP - CLAMPED_GAP_MAX)
 
 # The screw's own full thread starts behind its shoulder lead and the die's
 # run-out (sm_gooseneck_spring_screw_geom.FULL_THREAD_STATION, from the head),
 # no later than the "5.67 MAX" MHA-SM-04 prints (FULL_THREAD_STATION_MAX).
 # The run-out's incomplete threads are FAT (full crest, shallow root): in the
 # plug's full 2B thread they jam before the head clamps.  They reach deepest
-# past the plug face with the loop clamped coil-bound, so the arm-end
-# counterbore's depth clears that intrusion by COUNTERBORE_RUNOUT_MARGIN_MIN.
-SCREW_RUNOUT_INTRUSION = screw.FULL_THREAD_STATION - CLAMPED_GAP
-SCREW_RUNOUT_INTRUSION_MAX = screw.FULL_THREAD_STATION_MAX - CLAMPED_GAP
+# past the plug face at the least clamped gap, so the arm-end counterbore's
+# depth clears that intrusion by COUNTERBORE_RUNOUT_MARGIN_MIN.
+SCREW_RUNOUT_INTRUSION = screw.FULL_THREAD_STATION - CLAMPED_GAP_MIN
+SCREW_RUNOUT_INTRUSION_MAX = screw.FULL_THREAD_STATION_MAX - CLAMPED_GAP_MIN
 SCREW_RUNOUT_INTRUSION_FREE_MAX = (
     screw.FULL_THREAD_STATION_MAX - gooseneck.SPRING_EYE_GAP
 )
@@ -173,7 +186,7 @@ HEAD_RETENTION_MIN = (screw.HEAD_DIA + screw.HEAD_DIA_LOWER - spring.EYE_ID_MM) 
 # counter_pose, build_sm_summing_assembly).  Both passes must bear on the
 # plain seat alone, so the wire's section clears every other surface.
 # LOOP_PASS_X is the free (CAD, native-seat) state; the coil-bound loop rises
-# CLAMPED_LOOP_RISE in CLAMPED_GAP, and each clearance takes the worse state.
+# CLAMPED_LOOP_RISE in CLAMPED_GAP_MAX, and each clearance takes the worse state.
 _PASS_T = (1.0 / (4.0 * spring.LOOP_TURNS), 5.0 / (4.0 * spring.LOOP_TURNS))
 
 
@@ -186,7 +199,7 @@ LOOP_PASS_X = tuple(
     _loop_station(gooseneck.SPRING_EYE_GAP, spring.LOOP_RISE_MM, t) for t in _PASS_T
 )
 CLAMPED_LOOP_PASS_X = tuple(
-    _loop_station(CLAMPED_GAP, CLAMPED_LOOP_RISE, t) for t in _PASS_T
+    _loop_station(CLAMPED_GAP_MAX, CLAMPED_LOOP_RISE, t) for t in _PASS_T
 )
 WIRE_R = spring.WIRE_RADIUS_MM
 # Plug-side pass vs the 45-degree lead at the SHORTEST shoulder.  The wire
@@ -255,7 +268,7 @@ _FACE_CASES = tuple(
     _loop_face_clearance(gap, rise, seat)
     for gap, rise in (
         (gooseneck.SPRING_EYE_GAP, spring.LOOP_RISE_MM),
-        (CLAMPED_GAP, CLAMPED_LOOP_RISE),
+        (CLAMPED_GAP_MAX, CLAMPED_LOOP_RISE),
     )
     for seat in (screw.SEAT_DIA_MIN, screw.SEAT_DIA_MAX)
 )
@@ -263,11 +276,11 @@ LOOP_FACE_CONTACT_RADIUS_MIN = min(case[0] for case in _FACE_CASES)
 LOOP_MOUTH_STANDOFF_MIN = min(case[1] for case in _FACE_CASES)
 
 # Tip budgets: the free gap leaves the screw shallowest (protrusion, full-thread
-# reach), the clamped gap drives it deepest (tip to bend).
+# reach), the least clamped gap drives it deepest (tip to bend).
 SCREW_REACH = screw.LENGTH - gooseneck.SPRING_EYE_GAP
 SCREW_REACH_MIN = SCREW_REACH + screw.LENGTH_LOWER
 SCREW_REACH_MAX = SCREW_REACH + screw.LENGTH_UPPER
-CLAMPED_SCREW_REACH_MAX = screw.LENGTH + screw.LENGTH_UPPER - CLAMPED_GAP
+CLAMPED_SCREW_REACH_MAX = screw.LENGTH + screw.LENGTH_UPPER - CLAMPED_GAP_MIN
 SCREW_END_INCOMPLETE_MAX = 1.5 * screw.PITCH
 FULL_THREAD_REACH_MIN = SCREW_REACH_MIN - SCREW_END_INCOMPLETE_MAX
 PLUG_INNER_X = gooseneck.ARM_END_X + gooseneck.PLUG_LENGTH

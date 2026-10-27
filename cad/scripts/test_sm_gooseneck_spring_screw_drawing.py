@@ -38,10 +38,13 @@ def test_part_registry_row_is_the_made_screw() -> None:
     assert row["number"] == "MHA-SM-04"
     assert row["title"] == "Gooseneck Spring Screw"
     assert row["description"] == "GOOSENECK SPRING SCREW"
-    # Not a critical grade (rule 2): the field names the acceptable steels.
-    for grade in ("12L14", "1018", "1/2 in"):
+    # A critical grade (rule 2): the clamp's service SF needs 12L14's yield
+    # (sm_gooseneck_spring_screw_spec.YIELD_MPA); 1018 is not accepted.
+    for grade in ("12L14", "1/2 in"):
         assert grade in row["material"]
         assert grade in row["material_specification"]
+    assert "1018" not in row["material"] + row["material_specification"]
+    assert spec.YIELD_MPA == 415.0
     assert int(row["quantity"]) == 1
     # A static clamp, not a running fit.
     assert "fit_class" not in row
@@ -203,11 +206,12 @@ def test_geometry_matches_the_settled_design() -> None:
     assert geom.SLOT_WIDTH == 1.60
     assert geom.SLOT_DEPTH == 3.00
     assert geom.SLOT_FLOOR_Z == pytest.approx(4.00)
-    assert geom.LENGTH == 16.00
+    # 17.50 since codjiflo round 3 on #1997 (the plug's deeper counterbore).
+    assert geom.LENGTH == 17.50
     assert geom.MAJOR_DIA == pytest.approx(0.164 * 25.4)
     assert geom.SEAT_DIA == 3.50
     assert geom.SHOULDER_LENGTH == 3.90
-    assert geom.OVERALL_LENGTH == pytest.approx(23.0)
+    assert geom.OVERALL_LENGTH == pytest.approx(24.5)
     assert geom.CROWN_RADIUS == pytest.approx((6.25**2 + 1.0) / 2.0)
     assert geom.CROWN_CENTER_Z == pytest.approx(7.0 - geom.CROWN_RADIUS)
 
@@ -412,7 +416,7 @@ def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
     over_lead = 2.0 * math.pi * (r_seat + 2.0 * lead / 3.0) * lead**2 / 2.0
     tip = 2.0 * math.pi * (r_thread - 0.1) * 0.045
     assert part.V_SHANK == pytest.approx(
-        math.pi * r_thread**2 * 16.0 - over_seat - over_lead - tip
+        math.pi * r_thread**2 * 17.5 - over_seat - over_lead - tip
     )
     assert part.V_BODY == pytest.approx(part.V_HEAD + part.V_SHANK)
     # Independent slot volume: a 3-D midpoint grid over the strip.
@@ -709,7 +713,7 @@ def test_readback_contract_mirrors_every_printed_and_callout_control() -> None:
         "ShoulderLength": (geom.SHOULDER_LENGTH_LOWER, geom.SHOULDER_LENGTH_UPPER),
     }
     assert drawing.PRINTED_DIMENSIONS["TipChamfer"] == (geom.TIP_CHAMFER, 0)
-    assert drawing.PRINTED_DIMENSIONS["OverallLength"][0] == pytest.approx(23.0)
+    assert drawing.PRINTED_DIMENSIONS["OverallLength"][0] == pytest.approx(24.5)
     # Unprinted controls: the lead's axial leg (45 degrees by equation) and
     # the thread major the callout defines.
     assert drawing.SOURCE_ONLY_DIMENSIONS == {

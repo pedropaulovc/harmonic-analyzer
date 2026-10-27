@@ -382,7 +382,7 @@ _KNIFE_DOWEL_PRESS_LIMIT = _smooth_annulus_limit_mm3(
 # the hollow arm, not more engagement. A literal, test-pinned to its owners
 # like _KNIFE_HANGER_REACH, so a screw or gooseneck edit does not re-key every
 # assembly that imports this module.
-_GOOSENECK_THREAD_LENGTH = 7.43
+_GOOSENECK_THREAD_LENGTH = 7.33
 # Bearing seats are exact face contacts, NOT interference fits. Zero volume
 # permits a reported coincidence but no unmeasured kernel sliver allowance.
 _KNIFE_HANGER_SEAT_OVERLAP_LIMIT = 0.0

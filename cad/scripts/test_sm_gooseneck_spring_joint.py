@@ -24,8 +24,10 @@ ONE_POINT_FIVE_D = 1.5 * screw.MAJOR_DIA
 
 def test_clamp_preload_binds_the_loop_coil_bound() -> None:
     rise = spring.LOOP_TURNS * spring.WIRE_DIA_MM  # one wire per turn, bound
-    assert joint.CLAMPED_GAP == pytest.approx(rise + spring.WIRE_DIA_MM)
-    assert joint.CLAMPED_GAP == pytest.approx(4.40, abs=0.005)
+    assert joint.CLAMPED_GAP_MAX == pytest.approx(rise + spring.WIRE_DIA_MM)
+    assert joint.CLAMPED_GAP_MAX == pytest.approx(4.40, abs=0.005)
+    # Two stacked pull-side layers on the seat, inside both faces.
+    assert joint.CLAMPED_GAP_MIN == pytest.approx(2.0 * spring.WIRE_DIA_MM)
     rate = 82_700.0 * 1.6002**4 / (8.0 * 11.0998**3 * 1.75)
     assert joint.LOOP_AXIAL_RATE == pytest.approx(rate)
     assert joint.LOOP_BIND_FORCE == pytest.approx(rate * (4.88061 - 4.40055))
@@ -36,18 +38,18 @@ def test_clamp_preload_binds_the_loop_coil_bound() -> None:
     assert joint.LOOP_BIND_FORCE < 0.1 * least_preload
 
 
-def test_counterbore_depth_clears_the_clamped_runout_with_margin() -> None:
-    clamped = screw.FULL_THREAD_STATION_MAX - joint.CLAMPED_GAP
+def test_counterbore_depth_clears_the_deepest_runout_with_margin() -> None:
+    deepest = screw.FULL_THREAD_STATION_MAX - joint.CLAMPED_GAP_MIN
     free = screw.FULL_THREAD_STATION_MAX - gooseneck.SPRING_EYE_GAP
-    assert joint.SCREW_RUNOUT_INTRUSION_MAX == pytest.approx(clamped)
+    assert joint.SCREW_RUNOUT_INTRUSION_MAX == pytest.approx(deepest)
     assert joint.SCREW_RUNOUT_INTRUSION_FREE_MAX == pytest.approx(free)
-    assert (free, clamped) == pytest.approx((0.79, 1.27), abs=0.005)
-    assert joint.COUNTERBORE_DEPTH_MIN - clamped >= joint.COUNTERBORE_RUNOUT_MARGIN_MIN
+    assert (free, deepest) == pytest.approx((0.79, 2.47), abs=0.005)
+    assert joint.COUNTERBORE_DEPTH_MIN - deepest >= joint.COUNTERBORE_RUNOUT_MARGIN_MIN
     assert (
         joint.COUNTERBORE_DEPTH_MIN,
         joint.COUNTERBORE_DEPTH,
         joint.COUNTERBORE_DEPTH_MAX,
-    ) == pytest.approx((1.32, 1.37, 1.42))
+    ) == pytest.approx((2.52, 2.57, 2.62))
 
 
 def test_counterbore_clears_the_fat_runout_radially() -> None:
@@ -72,10 +74,10 @@ def test_receiver_full_thread_past_the_counterbore_is_1_5d() -> None:
         - 0.25  # title-block break on the tap edge at the counterbore floor
         - 0.25  # title-block break at the inner tap end
     )
-    assert gooseneck.PLUG_LENGTH == 8.80
+    assert gooseneck.PLUG_LENGTH == 9.90
     assert joint.ENGAGEMENT_MIN == pytest.approx(full_thread)
     assert (joint.ENGAGEMENT_NOMINAL, joint.ENGAGEMENT_MIN) == pytest.approx(
-        (6.93, 6.37)
+        (6.83, 6.27)
     )
     assert full_thread >= ONE_POINT_FIVE_D == pytest.approx(6.25, abs=0.005)
 
@@ -133,7 +135,7 @@ def test_counterbore_wall_is_2_0_at_the_full_worst_case() -> None:
     )
     assert joint.COUNTERBORE_DIA_MAX == pytest.approx(largest_cbore)
     assert joint.COUNTERBORE_WALL_MIN == pytest.approx(worst_wall)
-    assert worst_wall == pytest.approx(2.59, abs=0.005)
+    assert worst_wall == pytest.approx(2.58, abs=0.005)
     assert worst_wall >= joint.PLUG_WALL_TARGET
 
 
@@ -142,10 +144,10 @@ def test_screw_tip_exits_plug_without_reaching_tube_wall_or_bend() -> None:
     # Free gap: the screw sits shallowest.
     shortest_reach = screw.LENGTH + screw.LENGTH_LOWER - gooseneck.SPRING_EYE_GAP
     assert joint.TIP_PROTRUSION_MIN == pytest.approx(shortest_reach - longest_plug)
-    assert joint.TIP_PROTRUSION_MIN == pytest.approx(1.30, abs=0.005)
+    assert joint.TIP_PROTRUSION_MIN == pytest.approx(1.70, abs=0.005)
     assert joint.PLUG_INNER_X < joint.SCREW_TIP_X < -gooseneck.BEND_R
-    # Clamped gap: the screw sits deepest.
-    longest_reach = screw.LENGTH + screw.LENGTH_UPPER - joint.CLAMPED_GAP
+    # Least clamped gap: the screw sits deepest.
+    longest_reach = screw.LENGTH + screw.LENGTH_UPPER - joint.CLAMPED_GAP_MIN
     assert joint.TIP_TO_BEND_MIN == pytest.approx(gooseneck.ARM_RUN - longest_reach)
     assert joint.TIP_TO_BEND_MIN > 0.0
     smallest_bore = joint.PLUG_DIA - joint.PLUG_DIAMETER_BAND
@@ -213,6 +215,58 @@ def _helix_points(gap: float, rise: float, seat: float, n: int = 20_000):
         yield gap / 2.0 - rise / 2.0 + rise * t, math.hypot(x, y)
 
 
+def test_footprint_limited_rocked_loop_never_closes_below_the_gap_floor() -> None:
+    # The coil-bound helix, rigid, rocked about any horizontal axis: only wire
+    # whose contact point lands on a face's SMALLEST footprint can hold the
+    # faces apart.  Head: its Ø lower limit less the title-block break.  Plug
+    # face: from the counterbore mouth reach to the proud plug's Ø lower
+    # limit less its break.  Coarse grid; the floor must hold and be tight.
+    head_r = (screw.HEAD_DIA + screw.HEAD_DIA_LOWER) / 2.0 - joint.EDGE_BREAK
+    mouth_r = joint.COUNTERBORE_MOUTH_REACH
+    plug_r = (joint.PLUG_DIA - joint.PLUG_DIAMETER_BAND) / 2.0 - joint.EDGE_BREAK
+    tilts = [math.radians(step / 4.0) for step in range(33)]  # 0-8 degrees
+    axes = [math.radians(step) for step in range(0, 360, 10)]
+    widths = []
+    for seat in (screw.SEAT_DIA_MIN, screw.SEAT_DIA_MAX):
+        d = (spring.EYE_ID_MM - seat) / 2.0
+        points = []
+        for k in range(241):
+            t = k / 240.0
+            theta = math.pi / 2.0 + 2.0 * math.pi * spring.LOOP_TURNS * (
+                t - 1.0 / (4.0 * spring.LOOP_TURNS)
+            )
+            points.append(
+                (
+                    spring.COIL_MEAN_RADIUS_MM * math.cos(theta),
+                    -d + spring.COIL_MEAN_RADIUS_MM * math.sin(theta),
+                    joint.CLAMPED_LOOP_RISE * (t - 0.5),
+                )
+            )
+        least = math.inf
+        for tilt in tilts:
+            c, s = math.cos(tilt), math.sin(tilt)
+            for axis in axes:
+                ux, uy = math.cos(axis), math.sin(axis)
+                head_z, plug_z = [], []
+                for x, y, z in points:
+                    dot = (x * ux + y * uy) * (1.0 - c)
+                    xr = x * c + uy * z * s + ux * dot
+                    yr = y * c - ux * z * s + uy * dot
+                    zr = z * c + (ux * y - uy * x) * s
+                    radius = math.hypot(xr, yr)
+                    if radius < head_r:
+                        head_z.append(zr)
+                    if mouth_r < radius < plug_r:
+                        plug_z.append(zr)
+                if head_z and plug_z:
+                    gap = max(plug_z) - min(head_z) + 2.0 * joint.WIRE_R
+                    least = min(least, gap)
+        widths.append(least)
+    print(f"rocked footprint-limited loop width: {min(widths):.3f}")
+    assert all(width >= joint.CLAMPED_GAP_MIN for width in widths)
+    assert min(widths) <= joint.CLAMPED_GAP_MIN + 0.10
+
+
 def test_loop_wire_clears_the_counterbore_mouth_at_full_worst_case() -> None:
     reach = (
         joint.COUNTERBORE_DIA_MAX / 2.0  # largest counterbore
@@ -225,7 +279,7 @@ def test_loop_wire_clears_the_counterbore_mouth_at_full_worst_case() -> None:
     contact, standoff = [], []
     for gap, rise in (
         (gooseneck.SPRING_EYE_GAP, spring.LOOP_RISE_MM),
-        (joint.CLAMPED_GAP, joint.CLAMPED_LOOP_RISE),
+        (joint.CLAMPED_GAP_MAX, joint.CLAMPED_LOOP_RISE),
     ):
         for seat in (screw.SEAT_DIA_MIN, screw.SEAT_DIA_MAX):
             points = list(_helix_points(gap, rise, seat))

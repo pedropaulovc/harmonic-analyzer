@@ -28,7 +28,10 @@ THREAD = f"{THREAD_SIZE} UNC"
 THREADS_PER_IN = 32
 MAJOR_DIA = 0.164 * MM_PER_IN
 PITCH = MM_PER_IN / THREADS_PER_IN
-LENGTH = 16.00  # Under-head face to tip, including shoulder, lead and chamfer.
+# Under-head face to tip, including shoulder, lead and chamfer.  17.50 since
+# codjiflo round 3 on #1997: the plug's deeper counterbore and longer plug
+# (sm_gooseneck_geom) need the extra reach (sm_gooseneck_spring_joint).
+LENGTH = 17.50
 LENGTH_LOWER, LENGTH_UPPER = printed_deviations(LENGTH, 2)
 HEAD_DIA = 12.50
 HEAD_DIA_LOWER, HEAD_DIA_UPPER = printed_deviations(HEAD_DIA, 2)

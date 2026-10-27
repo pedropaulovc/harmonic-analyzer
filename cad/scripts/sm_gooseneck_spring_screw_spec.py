@@ -49,7 +49,6 @@ import math
 from enum import Enum
 
 import _config
-import sm_gooseneck_geom as gooseneck
 import sm_gooseneck_spring_joint as joint
 from sm_gooseneck_spring_screw_geom import (
     CROWN_RISE,
@@ -133,10 +132,12 @@ if CROWN_RISE_MIN <= 0.0 or SLOT_RIM_CUT_MIN <= 0.0 or HEAD_SIDE_MIN <= 0.0:
 
 # --- Strength case (#1941 / #1951 load model) ---------------------------------
 # Inputs: the catalogue maximum pull of MHA-SM-VN-51 (config), yield of AISI
-# 1018 cold-drawn, the weaker listed stock (370 MPa, azom.com ArticleID 6115;
-# 12L14 CD's 415 MPa adds 12 %), and the oiled black-oxide friction range.
+# 12L14 cold-drawn (415 MPa, azom.com ArticleID 6604), and the oiled
+# black-oxide friction range.  The grade is required (drawing-guidelines.md
+# rule 2): 1018 CD's 370 MPa (azom.com ArticleID 6115) leaves the service SF
+# at 1.91 over the beam past the plug's counterbore (codjiflo round 3, #1997).
 SPRING_PULL_MAX_N = float(_config.parts("sm-vn-counter-spring")["maximum_load_n"])
-YIELD_MPA = 370.0
+YIELD_MPA = 415.0
 # The clamp faces (the head and the plug face on the loop wire) and the thread
 # are different contact pairs, so each sweeps the range on its own: the lowest
 # clamp friction demands the most preload, and the highest thread friction
@@ -174,16 +175,22 @@ def thread_torque_n_mm(preload_n: float, mu_thread: float) -> float:
     )
 
 
-# Beam from the under-head face (x = 0) to the first FULL engaged thread, at
-# its farthest: the longest shoulder, the steepest-legged lead and the die's
-# run-out push it STRENGTH_SPAN past the clamp gap into the plug.  Sections:
-# the seat at its smallest diameter to the shortest shoulder, the estimated
-# deepest #8-32 root everywhere past it (the lead and run-out only add metal).
+# Beam from the under-head face (x = 0) to the first FULL thread the screw
+# and the plug share, at its farthest (codjiflo P1 round 3 on #1997): the
+# screw's own full thread starts by FULL_THREAD_STATION_MAX, the receiver's
+# past the plug's counterbore floor and its 0.25 break, from a plug face at
+# the widest clamped gap; inside the counterbore the screw is unsupported.
+# Sections: the seat at its smallest diameter to the shortest shoulder, the
+# estimated deepest #8-32 root everywhere past it (the lead and run-out only
+# add metal).
 # Path 1: half the pull enters at the head face by friction; the head is
 # bracketed guided (M = PL/2) to free (M = PL at the far support).  Path 2:
 # the pull bears at the loop's pull-side passes; supports at the head face and
 # the far support, bracketed fixed-fixed to simply supported; every split.
-STRENGTH_SPAN = max(gooseneck.SPRING_EYE_GAP, FULL_THREAD_STATION_MAX)
+RECEIVER_FULL_THREAD_STATION_MAX = (
+    joint.CLAMPED_GAP_MAX + joint.COUNTERBORE_DEPTH_MAX + joint.EDGE_BREAK
+)
+STRENGTH_SPAN = max(FULL_THREAD_STATION_MAX, RECEIVER_FULL_THREAD_STATION_MAX)
 _SECTIONS = (
     (0.0, SHOULDER_LENGTH_MIN, SEAT_DIA_MIN),
     (SHOULDER_LENGTH_MIN, STRENGTH_SPAN, THREAD_MINOR_2A_MIN_EST),

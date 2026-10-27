@@ -19,4 +19,4 @@ ARM_END_X = SPRING_EYE_X + SPRING_EYE_GAP / 2.0
 ARM_RUN = -ARM_END_X - BEND_R
 # Brazed end plug: 1.5D of #8-32 full thread past the arm-end run-out
 # counterbore (sm_gooseneck_spring_joint, codjiflo P1 on #1997).
-PLUG_LENGTH = 8.80
+PLUG_LENGTH = 9.90

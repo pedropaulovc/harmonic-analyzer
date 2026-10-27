@@ -116,11 +116,16 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 # Both orthographic views print at the sheet scale, so neither needs a caption.
-# 4:1 lays the 23.0 profile 92 mm long and the 1.6 slot 6.4 mm wide.
+# 4:1 lays the 24.5 profile 98 mm long and the 1.6 slot 6.4 mm wide.
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
-SIDE_CENTER = (0.215, 0.165)
+# The under-head face stays at sheet x 0.197, where farm run
+# 20261027T053051351Z rendered it (SHIP): the head, its stack and the two
+# rows over the shank keep their places, and the 17.50 under-head length
+# (16.00 there) grows the profile 6 mm toward the tip, the view's outline
+# then 0.1634-0.2726 by 0.1344-0.1956.
+SIDE_CENTER = (0.218, 0.165)
 # Third-angle left view of the crowned head end, on the profile's axis.
 END_CENTER = (0.085, SIDE_CENTER[1])
 ISO_CENTER = (0.360, 0.215)
@@ -219,7 +224,10 @@ SEAT_DIA_X = UNDERHEAD_X + 0.004
 # the tip chamfer, never on the lead.  The note stands up and right so the
 # leader slants down-left onto that edge.
 THREAD_PICK = (THREAD_START_X, SIDE_CENTER[1] + 0.004)
-THREAD_NOTE_XY = (THREAD_START_X + 0.013, SIDE_CENTER[1] + 0.035)
+# 11 mm right of the pick (13 at the 16.00 length): the leader keeps its
+# down-left slant and the note stays under the shoulder length's block, its
+# line 13 mm over the note, rather than walking toward the isometric.
+THREAD_NOTE_XY = (THREAD_START_X + 0.011, SIDE_CENTER[1] + 0.035)
 # Two rows over the shank, both from the under-head face, the longer
 # dimension outside.  The shoulder length's dimension line runs 13 mm
 # over the thread note's text row (where it rendered clear in farm run

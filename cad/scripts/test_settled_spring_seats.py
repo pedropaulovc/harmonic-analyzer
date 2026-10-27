@@ -240,7 +240,7 @@ def test_isolated_counter_provenance_identifies_the_whole_made_support(
     assert "sku" not in support
     assert support["thread"] == "#8-32 UNC"
     assert support["major_dia_mm"] == pytest.approx(4.1656)
-    assert support["underhead_length_mm"] == 16.0
+    assert support["underhead_length_mm"] == 17.5
     assert support["head_dia_mm"] == 12.5
     assert support["head_height_mm"] == 7.0
     assert support["crown_rise_mm"] == 1.0
@@ -250,9 +250,9 @@ def test_isolated_counter_provenance_identifies_the_whole_made_support(
     assert support["shoulder_length_mm"] == 3.9
     assert not any(key.startswith("relief_") for key in support)
     assert support["tip_chamfer_mm"] == 0.3
-    assert support["plug_length_mm"] == 8.80
+    assert support["plug_length_mm"] == 9.90
     assert support["plug_counterbore_dia_mm"] == 4.70
-    assert support["plug_counterbore_depth_mm"] == 1.37
+    assert support["plug_counterbore_depth_mm"] == 2.57
     counter_seat()
 
 

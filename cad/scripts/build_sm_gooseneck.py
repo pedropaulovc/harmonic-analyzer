@@ -2,13 +2,13 @@ r"""Build the gooseneck post with its brazed, through-tapped end plug.
 
 The polished Ø16 x 2-wall tube anchors the stock counter spring above the
 summing lever. Its vertical leg, R51 quarter bend and horizontal arm form
-one hollow tube. A physical Ø12 x 8.80 AISI 1018 plug is silver-brazed flush
+one hollow tube. A physical Ø12 x 9.90 AISI 1018 plug is silver-brazed flush
 with the arm end, then drilled and tapped #8-32 UNC-2B through (owner ruling
-2026-10-26 (#1951, option B)). An arm-end Ø4.70 x 1.37 counterbore clears
-MHA-SM-04's die run-out even with the spring loop clamped coil-bound
+2026-10-26 (#1951, option B)). An arm-end Ø4.70 x 2.57 counterbore clears
+MHA-SM-04's die run-out even with the spring loop clamped to its least gap
 (codjiflo P1 on #1997); its mouth, the tap edge at its floor and the inner
-tap end each carry a 0.25 x 45-degree break, leaving 6.93 mm nominal full
-thread (6.37 mm minimum, ``sm_gooseneck_spring_joint.ENGAGEMENT_MIN``). The
+tap end each carry a 0.25 x 45-degree break, leaving 6.83 mm nominal full
+thread (6.27 mm minimum, ``sm_gooseneck_spring_joint.ENGAGEMENT_MIN``). The
 made MHA-SM-04 slotted fillister screw is a separate component, not part of
 this weldment.
 
@@ -20,7 +20,7 @@ puts the spring eye on its counter-anchor axis.
 Layout: origin at the vertical leg's reference mid-height; leg y -330..112.3,
 bend centre (-51, 112.3), arm centreline y 163.3. The straight arm runs
 52.359695 mm west from x -51 to -103.359695; the plug extends east from that
-end face to x -94.559695. The plug's modelling envelope is Ø14, overlapping
+end face to x -93.459695. The plug's modelling envelope is Ø14, overlapping
 the tube's mid-wall by 1 mm so the union adds only the Ø12 bore fill.
 That overlap is not the physical plug diameter on the print.
 ``ThreadBore`` is the axial native Hole Wizard tap, ``Counterbore`` its
@@ -178,18 +178,22 @@ async def build(adapter) -> dict[str, str]:
     plug_dims = SketchDims()
     check("create_sketch end plug", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    check(
-        "end plug centerline",
-        await adapter.add_centerline(ARM_END_X, ARM_Y, x_plug_in, ARM_Y),
-    )
-    plug_profile = [
-        (x_plug_in, ARM_Y),
-        (x_plug_in, ARM_Y + PLUG_OVERLAP_R),
-        (ARM_END_X, ARM_Y + PLUG_OVERLAP_R),
-        (ARM_END_X, ARM_Y),
-    ]
-    profile = await add_line_chain(adapter, plug_profile)
-    set_sketch_direct_db(adapter, False)
+    try:
+        check(
+            "end plug centerline",
+            await adapter.add_centerline(ARM_END_X, ARM_Y, x_plug_in, ARM_Y),
+        )
+        plug_profile = [
+            (x_plug_in, ARM_Y),
+            (x_plug_in, ARM_Y + PLUG_OVERLAP_R),
+            (ARM_END_X, ARM_Y + PLUG_OVERLAP_R),
+            (ARM_END_X, ARM_Y),
+        ]
+        profile = await add_line_chain(adapter, plug_profile)
+    finally:
+        # Session state on the seat: a failed segment must not leave sketch
+        # inference off for the next leaf.
+        set_sketch_direct_db(adapter, False)
     await define_rectilinear_chain(
         adapter,
         profile,
@@ -255,12 +259,15 @@ async def build(adapter) -> dict[str, str]:
     cbore = SketchDims()
     check("create_sketch counterbore", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    check(
-        "counterbore centerline",
-        await adapter.add_centerline(x_air, ARM_Y, cbore_apex, ARM_Y),
-    )
-    cbore_lines = await add_line_chain(adapter, cbore_profile)
-    set_sketch_direct_db(adapter, False)
+    try:
+        check(
+            "counterbore centerline",
+            await adapter.add_centerline(x_air, ARM_Y, cbore_apex, ARM_Y),
+        )
+        cbore_lines = await add_line_chain(adapter, cbore_profile)
+    finally:
+        # Session state on the seat (as the end plug above).
+        set_sketch_direct_db(adapter, False)
     mouth_reach_drive = f'"TapEdgeBreak" + {_BREAK_OVERRUN}mm'
     await define_polygon_chain(
         adapter,
@@ -317,18 +324,21 @@ async def build(adapter) -> dict[str, str]:
     inner_apex = x_plug_in - TAP_DRILL_R - EDGE_BREAK
     inner_break = SketchDims()
     check("create_sketch inner tap break", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    check(
-        "inner tap break centerline",
-        await adapter.add_centerline(inner_apex, ARM_Y, inner_apex + reach, ARM_Y),
-    )
     inner_profile = [
         (inner_apex, ARM_Y),
         (inner_apex + reach, ARM_Y + reach),
         (inner_apex + reach, ARM_Y),
     ]
-    inner_lines = await add_line_chain(adapter, inner_profile)
-    set_sketch_direct_db(adapter, False)
+    set_sketch_direct_db(adapter, True)
+    try:
+        check(
+            "inner tap break centerline",
+            await adapter.add_centerline(inner_apex, ARM_Y, inner_apex + reach, ARM_Y),
+        )
+        inner_lines = await add_line_chain(adapter, inner_profile)
+    finally:
+        # Session state on the seat (as the end plug above).
+        set_sketch_direct_db(adapter, False)
     break_reach_drive = f'"TapDrillDia" / 2 + "TapEdgeBreak" + {_BREAK_OVERRUN}mm'
     await define_polygon_chain(
         adapter,
@@ -424,22 +434,25 @@ async def build(adapter) -> dict[str, str]:
     bend_path = SketchDims()
     check("create_sketch bend path", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    arc = check(
-        "bend arc",
-        await adapter.add_arc(
-            -BEND_R,
-            LEG_TOP,  # centre
-            0.0,
-            LEG_TOP,  # start (bend entry, top of the leg)
-            -BEND_R,
-            ARM_Y,  # end (bend exit into the arm)
-        ),
-    )
-    arm = check(
-        "arm run",
-        await adapter.add_line(-BEND_R, ARM_Y, ARM_END_X, ARM_Y),
-    )
-    set_sketch_direct_db(adapter, False)
+    try:
+        arc = check(
+            "bend arc",
+            await adapter.add_arc(
+                -BEND_R,
+                LEG_TOP,  # centre
+                0.0,
+                LEG_TOP,  # start (bend entry, top of the leg)
+                -BEND_R,
+                ARM_Y,  # end (bend exit into the arm)
+            ),
+        )
+        arm = check(
+            "arm run",
+            await adapter.add_line(-BEND_R, ARM_Y, ARM_END_X, ARM_Y),
+        )
+    finally:
+        # Session state on the seat (as the end plug above).
+        set_sketch_direct_db(adapter, False)
     # Manual-dim sketch (crank-pin pattern): record each display dim into the
     # SketchDims as it is created, in creation order. The centre anchor is at
     # (-BEND_R, LEG_TOP) -- both coords non-zero, so it emits TWO unsigned
