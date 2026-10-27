@@ -237,6 +237,18 @@ def _section_letter_tops(dr_section) -> list[float]:
     return [info[1], info[4]]
 
 
+def _cut_face_only(adapter, view, letter: str) -> None:
+    """Print only the cut face (rule 9): on TL-32 a line run past the part
+    also printed the lug or the block beyond the plane, 88 mm tall (farm run
+    20261027T190843112Z). R2026x declares the setter void; only its bool
+    getter is truth-tested (draw_ch_rocker_arm_tl_vn_oblique_leadscrew)."""
+    cut = _early_bound(_early_bound(view, 'IView').GetSection(), 'IDrSection')
+    cut.SetDisplayOnlySurfaceCut(True)
+    rebuild_drawing(adapter, label=f'section {letter} cut face only')
+    if not bool(cut.GetDisplayOnlySurfaceCut()):
+        raise RuntimeError(f'section {letter} kept geometry beyond the cut')
+
+
 def _set_section_arrows(adapter) -> None:
     """Set this document's cutting-line arrow sizes, read back, raise on
     mismatch (draw_dt_cone_gear_shaft._pin_witness_line_extension)."""
@@ -336,6 +348,8 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     floor = create_section_view(adapter,plan,line_start=start,line_end=end,view_xy=FLOOR_XY,
                                 section_label='B',scale=(1,1),partial=True,
                                 label='carriage counterbore floor')
+    if is_feed:
+        _cut_face_only(adapter, floor, 'B')
     row_4y = _project(adapter,plan,(part.BLOCK_X1,part.BOLT_Y,contract.BLOCK_HEIGHT),'row 4Y')
     _fit_section_letters(adapter, side, (floor,), below_y=row_4y[1])
     annotations += curate_view_dimensions(adapter,floor,keep=FLOOR_KEEP,view_label='B-B floor',
@@ -366,6 +380,7 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
             label='nut spigot recess')
         tap_row = _project(adapter,nut,(contract.NUT_FACE_X,max(y for y,_z in contract.NUT_HOLES_YZ),
                                         contract.NUT_AXIS_Z),'+Y nut tap row')
+        _cut_face_only(adapter, section_c, 'C')
         _fit_section_letters(adapter, section_c, (), below_y=tap_row[1])
         # The callout picks the +Z column's lower tap, under section line C
         # at the nut axis, so its short leader from the lower right crosses
