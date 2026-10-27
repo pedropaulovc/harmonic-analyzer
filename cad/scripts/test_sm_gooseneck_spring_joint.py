@@ -28,8 +28,10 @@ def test_receiver_full_thread_is_at_least_1_5d_at_both_broken_edges() -> None:
 
 
 def test_mated_full_thread_starts_past_the_screw_runout_and_is_1_5d() -> None:
-    # The screw's full thread starts FULL_THREAD_STATION(_MAX) from the head;
-    # past the clamp gap that station lies inside the plug mouth.
+    # The screw's full thread starts no later than the printed single limit
+    # FULL_THREAD_STATION_MAX ("5.67 MAX") from the head; past the clamp gap
+    # that station lies inside the plug mouth.
+    assert screw.FULL_THREAD_STATION_MAX == 5.67
     intrusion_max = screw.FULL_THREAD_STATION_MAX - gooseneck.SPRING_EYE_GAP
     assert intrusion_max > joint.EDGE_BREAK
     mated_min = (

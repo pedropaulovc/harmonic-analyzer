@@ -16,7 +16,9 @@ the seat shoulder to SHOULDER_LENGTH, the 45-degree lead up to the thread
 major, the thread, and a 45-degree tip chamfer.  The thread is modelled as
 its basic major cylinder.  The driver slot is sketched on a plane at the apex
 and cut SLOT_DEPTH down into the head along local X.  One hidden reference
-sketch, ``StationReference``, carries the printed overall length only.
+sketch, ``StationReference``, carries two printed stations only: the overall
+length on the axis, and the full-thread limit between two short witnesses
+that lie on the under-head face and on the thread's major silhouette.
 
 Run (SolidWorks already open)::
 
@@ -38,10 +40,12 @@ from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
+from _drawing_prefix import set_dimension_prefix
 from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
+    anchor_point_to_point,
     blank_sketch,
     dimension_between,
     ensure_fully_defined,
@@ -66,6 +70,8 @@ from sm_gooseneck_spring_screw_geom import (
     CROWN_CENTER_Z,
     CROWN_RADIUS,
     CROWN_RISE,
+    FULL_THREAD_STATION_MAX,
+    FULL_THREAD_STATION_MAX_TOL_TYPE,
     HEAD_CYL_H,
     HEAD_DIA,
     HEAD_H,
@@ -87,6 +93,7 @@ from sm_gooseneck_spring_screw_geom import (
     TIP_CHAMFER,
 )
 from sm_gooseneck_spring_screw_spec import (
+    CROWN_RADIUS_PREFIX,
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -111,6 +118,17 @@ THREAD_R = MAJOR_DIA / 2.0
 SEAT_R = SEAT_DIA / 2.0
 # Over-length of the slot rectangle along X: it only has to clear the head.
 SLOT_SPAN = HEAD_DIA + 2.0
+# StationReference's full-thread witnesses (Right-plane sketch u, v in mm):
+# each a short construction line lying ON a visible edge (the under-head face,
+# then the thread's major silhouette from the printed station toward the
+# tip), so the dimension's extension lines rise from the outline and no
+# reference line floats off it.
+FULL_THREAD_WITNESS = 0.5
+FACE_WITNESS_LINE = ((0.0, THREAD_R), (0.0, THREAD_R + FULL_THREAD_WITNESS))
+THREAD_WITNESS_LINE = (
+    (FULL_THREAD_STATION_MAX, THREAD_R),
+    (FULL_THREAD_STATION_MAX + FULL_THREAD_WITNESS, THREAD_R),
+)
 
 # Head: the cylinder plus the spherical cap of sagitta CROWN_RISE.
 V_HEAD = math.pi * HEAD_R**2 * HEAD_CYL_H + (
@@ -162,6 +180,44 @@ def slot_volume(steps: int = 4000) -> float:
 
 V_SLOT = slot_volume()
 V_FINAL = V_BODY - V_SLOT
+
+
+@_telemetry.traced("part.single_limit", label_param="name")
+def _single_limit(
+    adapter,
+    feature: str,
+    name: str,
+    limit: float,
+    tol_type: int,
+    lower: float,
+    upper: float,
+) -> None:
+    """``name@feature`` as a single limit: its nominal IS the printed limit
+    (swTolMAX / swTolMIN print the nominal plus MAX / MIN), carrying the
+    deviations ``lower`` / ``upper`` mm (build_ch_fulcrum_keeper._single_limit's
+    recipe)."""
+    _, dimension = _named_dimension(adapter, feature, name)
+    label = f"{name}@{feature}"
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, limit / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the limit {limit}"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = tol_type
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+    if (
+        int(tolerance.Type) != tol_type
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: single-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {limit:g} (type {tol_type})")
 
 
 @_telemetry.traced("part.limit_band", label_param="name")
@@ -232,6 +288,7 @@ async def build(adapter) -> dict[str, str]:
         ("SeatDia", SEAT_DIA),
         ("ShoulderLength", SHOULDER_LENGTH),
         ("TipChamfer", TIP_CHAMFER),
+        ("FullThread", FULL_THREAD_STATION_MAX),
         ("SlotWidth", SLOT_WIDTH),
         ("SlotDepth", SLOT_DEPTH),
     ):
@@ -440,26 +497,50 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "slotted shoulder screw", V_FINAL, 0.02 * V_SLOT)
     blank_reference_geometry(adapter, (("SlotPlane", "PLANE"),))
 
-    # Drawing-only station reference: the apex-to-tip overall, printed as a
-    # reference for stock cut-off.  One construction line on the axis of the
+    # Drawing-only station reference.  The apex-to-tip overall, printed as a
+    # reference for stock cut-off: one construction line on the axis of the
     # Right plane whose single length dimension IS the printed value (policy
     # drawing-simplicity-policy.md `How the repository implements the guidelines`), driven by the same globals so no geometry moves.
+    # The full-thread limit (machinist FIX round 1): the under-head face to
+    # the thread-silhouette point at FULL_THREAD_STATION_MAX, between the two
+    # witnesses' start points, its value the printed "5.67 MAX".
     stations = SketchDims()
     check("create_sketch station reference", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
-    overall_line = check(
-        "overall reference line",
-        await adapter.add_line(u_apex, 0.0, LENGTH, 0.0),
-    )
-    set_sketch_direct_db(adapter, False)
-    segment = _early_bound(adapter._sketch_entities[overall_line], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError("overall reference line did not take construction flag")
-    check(
-        "overall reference horizontal",
-        await adapter.add_sketch_constraint(overall_line, None, "horizontal"),
-    )
+    try:
+        overall_line = check(
+            "overall reference line",
+            await adapter.add_line(u_apex, 0.0, LENGTH, 0.0),
+        )
+        (fu0, fv0), (fu1, fv1) = FACE_WITNESS_LINE
+        face_witness = check(
+            "under-head face witness",
+            await adapter.add_line(fu0, fv0, fu1, fv1),
+        )
+        (tu0, tv0), (tu1, tv1) = THREAD_WITNESS_LINE
+        thread_witness = check(
+            "full-thread witness",
+            await adapter.add_line(tu0, tv0, tu1, tv1),
+        )
+    finally:
+        # Session state on the seat: a failed segment must not leave sketch
+        # inference off for the next leaf.
+        set_sketch_direct_db(adapter, False)
+    for line, relation in (
+        (overall_line, "horizontal"),
+        (face_witness, "vertical"),
+        (thread_witness, "horizontal"),
+    ):
+        segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(
+                f"station reference {line} did not take construction flag"
+            )
+        check(
+            f"station reference {relation} {line}",
+            await adapter.add_sketch_constraint(line, None, relation),
+        )
     await anchor_point_to_origin(
         adapter, f"{overall_line}.start", u_apex, 0.0, "overall reference apex"
     )
@@ -473,6 +554,37 @@ async def build(adapter) -> dict[str, str]:
         "overall length reference",
     )
     stations.record("OverallLength", '"HeadHeight" + "UnderHeadLength"')
+    await anchor_point_to_origin(
+        adapter, f"{face_witness}.start", fu0, fv0, "face witness on thread radius"
+    )
+    stations.record("FullThreadRadius", '"ThreadDia" / 2')
+    await dimension_between(
+        adapter,
+        f"{face_witness}.start",
+        f"{face_witness}.end",
+        "vertical_distance",
+        FULL_THREAD_WITNESS,
+        "face witness length",
+    )
+    stations.record("FaceWitness")
+    await anchor_point_to_point(
+        adapter,
+        f"{face_witness}.start",
+        f"{thread_witness}.start",
+        FULL_THREAD_STATION_MAX,
+        0.0,
+        "full-thread station",
+    )
+    stations.record("FullThread", '"FullThread"')
+    await dimension_between(
+        adapter,
+        f"{thread_witness}.start",
+        f"{thread_witness}.end",
+        "horizontal_distance",
+        FULL_THREAD_WITNESS,
+        "thread witness length",
+    )
+    stations.record("ThreadWitness")
     await ensure_fully_defined(adapter, "station reference sketch")
     check("exit_sketch station reference", await adapter.exit_sketch())
     name_last_feature(adapter, "StationReference")
@@ -503,8 +615,11 @@ async def build(adapter) -> dict[str, str]:
     # the seat diameter prints as the LIMIT band 3.60/3.40, its upper limit
     # under the #8-32 2A major minimum so the lead always steps up into the
     # thread blank; the shoulder length (to the lead's foot) as 4.10/3.70, so
-    # the loop clears the lead and full thread starts inside the MHA-SM-01
-    # engagement budget.  Every other mark takes the title block's band.
+    # the loop clears the lead; the full-thread station as the single limit
+    # "5.67 MAX" from the under-head face, so full thread starts inside the
+    # MHA-SM-01 engagement budget (any shorter run-out only adds engagement,
+    # so it carries no deviation).  Every other mark takes the title block's
+    # band.
     _limit_band(
         adapter,
         "ShankProfile",
@@ -519,6 +634,19 @@ async def build(adapter) -> dict[str, str]:
         (SHOULDER_LENGTH_LOWER, SHOULDER_LENGTH_UPPER),
         SHOULDER_LENGTH_TOL_TYPE,
     )
+    _single_limit(
+        adapter,
+        "StationReference",
+        "FullThread",
+        FULL_THREAD_STATION_MAX,
+        FULL_THREAD_STATION_MAX_TOL_TYPE,
+        0.0,
+        0.0,
+    )
+    # The crown's sphere prints on its arc (machinist FIX round 1): the
+    # equation-driven CrownRadius reads "SR"; the drawing parenthesizes it as
+    # a reference.
+    set_dimension_prefix(adapter, "HeadProfile", "CrownRadius", CROWN_RADIUS_PREFIX)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
@@ -528,9 +656,9 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _author_dimension_callouts(adapter)
-    # The station reference owns a printed dimension but no geometry: hide it
-    # so no assembly instance renders it (#880).  The drawing shows it per
-    # view through _drawing_hidden_sketches to import that dimension.
+    # The station reference owns printed dimensions and only reference lines:
+    # hide it so no assembly instance renders it (#880).  The drawing shows it
+    # per view through _drawing_hidden_sketches to import those dimensions.
     blank_sketch(adapter, "StationReference")
     apply_drawing_properties(
         adapter,

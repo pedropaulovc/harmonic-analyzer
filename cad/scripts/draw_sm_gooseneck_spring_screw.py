@@ -5,10 +5,12 @@ screw (owner ruling 2026-10-26 (#1951, option B)): a plain Ø3.50 loop seat
 under the head, a 45-degree lead, an #8-32 UNC thread.  A screw carries no
 datum and no geometric-control frame (drawing-guidelines.md rule 5 (avoid
 excessive GD&T)): the seat diameter and the shoulder length (to the lead's
-foot) print as the part's stacked LIMIT bands, and every other size is an
-ordinary model dimension at its part-authored places under the title
-block's band for those places (.X for the tip chamfer, .XX for the rest).
-The lead itself is unprinted: the two diameters fix it and its callout names
+foot) print as the part's stacked LIMIT bands, the full-thread station as
+the part's single "5.67 MAX" from the under-head face, the crown's sphere as
+the reference "(SR20.03)" on its arc, and every other size is an ordinary
+model dimension at its part-authored places under the title block's band for
+those places (.X for the tip chamfer, .XX for the rest).  The lead itself is
+unprinted: the two diameters fix it and the shoulder length's callout names
 it.
 
 The screw axis is model +Z, so the ``*Right`` view already lays it horizontal
@@ -63,7 +65,11 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from sm_gooseneck_spring_screw_geom import (
+    CROWN_CENTER_Z,
+    CROWN_RADIUS,
     CROWN_RISE,
+    FULL_THREAD_STATION_MAX,
+    FULL_THREAD_STATION_MAX_TOL_TYPE,
     HEAD_CYL_H,
     HEAD_DIA,
     HEAD_H,
@@ -85,6 +91,7 @@ from sm_gooseneck_spring_screw_geom import (
     TIP_CHAMFER,
 )
 from sm_gooseneck_spring_screw_spec import (
+    CROWN_RADIUS_PREFIX,
     DIMENSION_CALLOUTS_BY_NAME,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -145,30 +152,51 @@ SEAT_BOTTOM_Y = _sheet_y(-SEAT_DIA / 2.0)
 # The 45-degree lead: its foot ends the seat, its top meets the thread major.
 LEAD_FOOT_X = _sheet_x(-SHOULDER_LENGTH)
 LEAD_TOP_X = _sheet_x(-(SHOULDER_LENGTH + STEP_LEAD))
+# The printed full-thread station on the thread's major silhouette.
+FULL_THREAD_X = _sheet_x(-FULL_THREAD_STATION_MAX)
+# The crown sphere's centre on the axis, right of the apex by its radius.
+CROWN_CENTER_X = _sheet_x(CROWN_CENTER_Z)
 
-# Text-block estimates for the two LIMIT marks.  No farm run has rendered
-# them yet, so they are scaled from the measured ones at this text height
-# (the coordinator retunes from the rendered sheet): 'CLAMP TORQUE' measured
-# 35.8 mm, 3.0 mm a character; a stacked LIMIT's upper limit stood 9.8 mm
-# above the anchor and a two-line callout's underline 9.7 mm below it, at a
-# 5.5 mm line pitch (farm run 20261024T052013556Z, e71509a34).
-_CHAR_WIDTH = 0.0030
-_LINE_PITCH = 0.0055
-LIMIT_TEXT_TOP_ABOVE_ANCHOR = 0.010
+# Text blocks as rendered at this text height (layout audit of farm run
+# 20261027T034356887Z): a dimension's block centres on its anchor,
+# both ways; its last line sits on the dimension line (the underline); lines
+# above it step 5.56 mm (a callout line, or the value over its callout) and
+# 4.53 mm (a stacked LIMIT's upper over its lower); the first line's ink
+# tops out 4.50 mm above its baseline.  Widths are the widest line's: the
+# measured ones where that line rendered, else its Century Gothic advance at
+# the scale the measured lines fix (4.667 um per font unit at 1000 units,
+# ten rendered strings agreeing within 0.3 %).
+_CALLOUT_PITCH = 0.00556
+_LIMIT_PITCH = 0.00453
+_FIRST_LINE_INK = 0.0045
 
 
-def _callout_width(name: str) -> float:
-    """Estimated sheet width of a mark's block: its widest callout line."""
-    return _CHAR_WIDTH * max(
-        len(line) for line in DIMENSION_CALLOUTS_BY_NAME[name].splitlines()
+def block_height(value_lines: int, callout_lines: int) -> float:
+    """Sheet height of a dimension block from its underline to its top ink."""
+    return (
+        callout_lines * _CALLOUT_PITCH
+        + (value_lines - 1) * _LIMIT_PITCH
+        + _FIRST_LINE_INK
     )
 
 
-def _callout_bottom_drop(name: str) -> float:
-    """Estimated drop of a mark's last callout underline below its anchor."""
-    lines = len(DIMENSION_CALLOUTS_BY_NAME[name].splitlines())
-    return 0.0097 + (lines - 2) * _LINE_PITCH
+def _callout_lines(name: str) -> int:
+    return len(DIMENSION_CALLOUTS_BY_NAME[name].splitlines())
 
+
+# 'MHA-SM-VN-51 LOOP', 48.41 mm as rendered.
+SEAT_DIA_TEXT_WIDTH = 0.0484
+SEAT_DIA_TEXT_HEIGHT = block_height(2, _callout_lines("SeatDia"))
+# 'TO 45 DEG LEAD; LOOP', 52.33 mm as rendered.
+SHOULDER_LENGTH_TEXT_WIDTH = 0.0524
+SHOULDER_LENGTH_TEXT_HEIGHT = block_height(2, _callout_lines("ShoulderLength"))
+# 'FULL THREAD IN' 34.18 mm and its last line 'MHA-SM-01' 25.82 mm (font
+# advance); '5.67 max.' prints on one line (the old '0.3 max.' did).
+FULL_THREAD_TEXT_WIDTH = 0.0342
+FULL_THREAD_LAST_LINE_WIDTH = 0.0258
+FULL_THREAD_TEXT_HEIGHT = block_height(1, _callout_lines("FullThread"))
+# ' (SR20.03) ' 22.83 mm (font advance).
+CROWN_RADIUS_TEXT_WIDTH = 0.0228
 
 # Rows below the profile, 15 mm apart, the first 38 mm under the head
 # (text sits ~3 mm above its requested point, the dimension line ~5 mm
@@ -181,14 +209,55 @@ CROWN_RISE_TEXT_WIDTH = 0.0116
 # The seat Ø's dimension line stands on the seat near the under-head face,
 # leaving the seat's run toward the lead to its text.
 SEAT_DIA_X = UNDERHEAD_X + 0.004
-# The shoulder length's block: the stacked LIMIT over its three-line callout.
-SHOULDER_LENGTH_TEXT_WIDTH = _callout_width("ShoulderLength")
-SHOULDER_LENGTH_TEXT_BOTTOM_DROP = _callout_bottom_drop("ShoulderLength")
 # The thread callout's leader lands on the edge where the full thread meets
 # the tip chamfer, never on the lead.  The note stands up and right so the
 # leader slants down-left onto that edge.
 THREAD_PICK = (THREAD_START_X, SIDE_CENTER[1] + 0.004)
 THREAD_NOTE_XY = (THREAD_START_X + 0.013, SIDE_CENTER[1] + 0.035)
+# Two rows over the shank, both from the under-head face, the longer
+# dimension outside.  The shoulder length's dimension line runs 13 mm
+# over the thread note's text row (where it rendered clear in farm run
+# 20261027T034356887Z); the full-thread limit's 10 mm above it.
+SHOULDER_LENGTH_LINE_Y = THREAD_NOTE_XY[1] + 0.013
+FULL_THREAD_LINE_Y = SHOULDER_LENGTH_LINE_Y + 0.010
+# The full-thread block centres over its own 22.7-mm span, above its line.
+# Its extension lines rise 1.0 mm past the line, to the last line's
+# baseline, and 'MHA-SM-01' is wider than the span: centred, the 5.67
+# station's line would end 0.17 mm from the '1''s stem, so the block sits
+# 0.4 mm toward the tip, where both lines end >= 0.5 mm from glyph ink
+# (Century Gothic outlines at the measured scale).
+FULL_THREAD_TEXT_NUDGE = 0.0004
+FULL_THREAD_TEXT_XY = (
+    (UNDERHEAD_X + FULL_THREAD_X) / 2.0 + FULL_THREAD_TEXT_NUDGE,
+    FULL_THREAD_LINE_Y + FULL_THREAD_TEXT_HEIGHT / 2.0,
+)
+# The shoulder length's span (3.9 mm) is far narrower than its block, so the
+# block stands right of every line it would otherwise meet: 3 mm clear of
+# the full-thread block, which it shares a height with, and so of the 5.67
+# station's extension line too.
+SHOULDER_LENGTH_TEXT_LEFT = (
+    FULL_THREAD_TEXT_XY[0] + FULL_THREAD_TEXT_WIDTH / 2.0 + 0.003
+)
+# The crown radius reads lower-left of the crown.  A radial leader runs
+# along the radius, so it leaves the arc 17 degrees below the axis (the arc
+# spans +/-18.2 degrees, asin(6.25 / 20.03)) and runs down-left to its bend,
+# under the head Ø's lower end and over row 0, left of the apex extension
+# lines.  The bend stands 1.6 mm right of the text's box and 2.8 mm under its
+# anchor (radial SR dimensions as rendered: dt-pinion-arbor BackCapR and
+# dt-pinion-lift-rod CapR, farm run 20261027T025804097Z).
+CROWN_RADIUS_LEADER_DEG = 17.0
+CROWN_RADIUS_BEND_Y = SIDE_CENTER[1] - 0.033
+CROWN_RADIUS_BEND_X = CROWN_CENTER_X - (SIDE_CENTER[1] - CROWN_RADIUS_BEND_Y) / (
+    math.tan(math.radians(CROWN_RADIUS_LEADER_DEG))
+)
+RADIAL_BEND_GAP = 0.0016
+RADIAL_SHOULDER_DROP = 0.0028
+CROWN_RADIUS_ARC_XY = (
+    CROWN_CENTER_X
+    - CROWN_RADIUS * _S / 1000.0 * math.cos(math.radians(CROWN_RADIUS_LEADER_DEG)),
+    SIDE_CENTER[1]
+    - CROWN_RADIUS * _S / 1000.0 * math.sin(math.radians(CROWN_RADIUS_LEADER_DEG)),
+)
 SIDE_KEEP = {
     "HeadHeight": ((APEX_X + UNDERHEAD_X) / 2.0, _ROW_Y[0]),
     "UnderHeadLength": ((UNDERHEAD_X + TIP_X) / 2.0, _ROW_Y[0]),
@@ -206,15 +275,14 @@ SIDE_KEEP = {
         HEAD_TOP_Y + 0.012,
     ),
     "SlotDepth": ((APEX_X + SLOT_FLOOR_X) / 2.0, HEAD_TOP_Y + 0.024),
-    # The shoulder length reads above the profile from the under-head face
-    # to the lead's foot.  Its 3.9-mm span is far narrower than its block,
-    # and its callout hangs below the dimension line, toward the part, so
-    # the block stands wholly right of the lead-foot extension line (no
-    # extension line crosses the callout), right of the head/crown/slot-depth
-    # stack, and high enough that its callout clears the thread note.
+    "CrownRadius": (
+        CROWN_RADIUS_BEND_X - RADIAL_BEND_GAP - CROWN_RADIUS_TEXT_WIDTH / 2.0,
+        CROWN_RADIUS_BEND_Y + RADIAL_SHOULDER_DROP,
+    ),
+    "FullThread": FULL_THREAD_TEXT_XY,
     "ShoulderLength": (
-        LEAD_FOOT_X + 0.0035 + SHOULDER_LENGTH_TEXT_WIDTH / 2.0,
-        THREAD_NOTE_XY[1] + 0.026,
+        SHOULDER_LENGTH_TEXT_LEFT + SHOULDER_LENGTH_TEXT_WIDTH / 2.0,
+        SHOULDER_LENGTH_LINE_Y + SHOULDER_LENGTH_TEXT_HEIGHT / 2.0,
     ),
     # The seat Ø stands on the seat; its text is offset below (see below).
     "SeatDia": (SEAT_DIA_X, SIDE_CENTER[1] - 0.012),
@@ -227,10 +295,10 @@ SIDE_KEEP = {
 # the text stays clear of the under-head extension line (layout audit of farm
 # run 20261010T190631112Z, 6c56fd769).  Its right end stops short of the tip
 # chamfer's extension lines and its upper limit's top stays below the
-# thread silhouette.  The block is the stacked limits over the callout.
-SEAT_DIA_TEXT_WIDTH = _callout_width("SeatDia")
-SEAT_DIA_TEXT_BOTTOM_DROP = _callout_bottom_drop("SeatDia")
-SEAT_DIA_LEADER_GAP = 0.0008
+# thread silhouette.  The block is the stacked limits over the callout; as
+# rendered in farm run 20261027T034356887Z the leader's foot stood 2.1 mm
+# right of the Ø line, and the machinist review read it clear.
+SEAT_DIA_LEADER_GAP = 0.0021
 SEAT_DIA_TEXT_XY = (
     SEAT_DIA_X + SEAT_DIA_LEADER_GAP + SEAT_DIA_TEXT_WIDTH / 2.0,
     SIDE_CENTER[1] - 0.023,
@@ -250,23 +318,35 @@ NOTES_XY = (0.016, 0.070)
 
 # Policy: native generation verifies persisted values, tolerances and
 # reference state.  swTolType_e: NONE leaves the title block's band, LIMIT
-# prints the model value plus each deviation.  Each row is (nominal mm,
-# tolerance type).
-_TOL_NONE, _TOL_LIMIT = 0, 3
-if SEAT_DIA_TOL_TYPE != _TOL_LIMIT or SHOULDER_LENGTH_TOL_TYPE != _TOL_LIMIT:
-    raise AssertionError("MHA-SM-04 seat and shoulder bands are no longer LIMIT")
+# prints the model value plus each deviation, MAX prints the model value as
+# the part's single limit.  Each row is (nominal mm, tolerance type).
+_TOL_NONE, _TOL_LIMIT, _TOL_MAX = 0, 3, 6
+if (
+    SEAT_DIA_TOL_TYPE != _TOL_LIMIT
+    or SHOULDER_LENGTH_TOL_TYPE != _TOL_LIMIT
+    or FULL_THREAD_STATION_MAX_TOL_TYPE != _TOL_MAX
+):
+    raise AssertionError(
+        "MHA-SM-04 seat/shoulder bands are no longer LIMIT or full thread MAX"
+    )
 PRINTED_DIMENSIONS: dict[str, tuple[float, int]] = {
     "HeadDia": (HEAD_DIA, _TOL_NONE),
     "HeadHeight": (HEAD_H, _TOL_NONE),
     "CrownRise": (CROWN_RISE, _TOL_NONE),
+    "CrownRadius": (CROWN_RADIUS, _TOL_NONE),
     "UnderHeadLength": (LENGTH, _TOL_NONE),
     "SeatDia": (SEAT_DIA, _TOL_LIMIT),
     "ShoulderLength": (SHOULDER_LENGTH, _TOL_LIMIT),
+    "FullThread": (FULL_THREAD_STATION_MAX, _TOL_MAX),
     "TipChamfer": (TIP_CHAMFER, _TOL_NONE),
     "SlotWidth": (SLOT_WIDTH, _TOL_NONE),
     "SlotDepth": (SLOT_DEPTH, _TOL_NONE),
     "OverallLength": (OVERALL_LENGTH, _TOL_NONE),
 }
+# The crown radius prints "(SR20.03)": the part authors "SR", the drawing
+# wraps it as a reference.  Every other reference takes the plain parentheses.
+CROWN_RADIUS_PRINTED_PREFIX = "(" + CROWN_RADIUS_PREFIX
+_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 # Every LIMIT row's (lower, upper) deviations, mm: a LIMIT row without its
 # band would skip the deviation readback, so the two must name the same rows.
 LIMIT_DEVIATIONS: dict[str, tuple[float, float]] = {
@@ -318,6 +398,46 @@ def _check_dimension_state(
             )
 
 
+@_telemetry.traced("drawing.sm_gooseneck_spring_screw.crown_radius")
+def _dress_crown_radius(adapter: Any, annotations: Sequence[Any]) -> None:
+    """Print the crown's CrownRadius as the spherical reference "(SR20.03)"
+    and stop its leader at the arc (draw_ch_fulcrum_keeper._dress_crown_radius):
+    the head Ø and the crown rise fix the sphere, and with the arrow outside
+    and no solid leader the 80-mm radius draws no line through the head and
+    the shank to its centre."""
+    (annotation,) = [
+        item for item in annotations if dimension_name(adapter, item) == "CrownRadius"
+    ]
+    annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if bool(display.Diametric):
+        raise RuntimeError("MHA-SM-04 CrownRadius imported diametric, not radial")
+    existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
+    if existing != CROWN_RADIUS_PREFIX:
+        raise RuntimeError(
+            f"MHA-SM-04 CrownRadius prefix {existing!r} is not the part's "
+            f"{CROWN_RADIUS_PREFIX!r}; rebuild the source part"
+        )
+    display.SetText(1, CROWN_RADIUS_PRINTED_PREFIX)
+    display.SetText(2, ")")  # swDimensionTextSuffix
+    applied = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+    if applied != (CROWN_RADIUS_PRINTED_PREFIX, ")"):
+        raise RuntimeError(
+            f"failed to mark MHA-SM-04 CrownRadius a reference: {applied}"
+        )
+    display.ShortenedRadius = False
+    display.ArcExtensionLineOrOppositeSide = False
+    display.ArrowSide = _ARROWS_OUTSIDE
+    display.SolidLeader = False
+    if (
+        bool(display.ShortenedRadius)
+        or bool(display.ArcExtensionLineOrOppositeSide)
+        or int(display.ArrowSide) != _ARROWS_OUTSIDE
+        or bool(display.SolidLeader)
+    ):
+        raise RuntimeError("MHA-SM-04 crown radius kept its leader to the centre")
+
+
 def _verify_source_dimensions(model: Any) -> None:
     """The unprinted callout controls, read from the opened source part."""
     for full_name, expected in SOURCE_ONLY_DIMENSIONS.items():
@@ -350,6 +470,11 @@ def _verify_printed_dimensions(adapter: Any, views: Sequence[Any]) -> None:
         ).endswith(")")
         if parenthesized != (name in REFERENCE_DIMENSIONS):
             raise RuntimeError(f"MHA-SM-04 {name}: reference state did not persist")
+        if (
+            name == "CrownRadius"
+            and str(display.GetText(1) or "") != CROWN_RADIUS_PRINTED_PREFIX
+        ):
+            raise RuntimeError("MHA-SM-04 CrownRadius: SR prefix did not persist")
         if int(display.GetPrimaryPrecision2()) != DRAWING_PRECISION_BY_NAME[name]:
             raise RuntimeError(f"MHA-SM-04 {name}: display places did not persist")
         if (
@@ -435,7 +560,10 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*side_annotations, *end_annotations]
     offset_dimension_text(adapter, side_annotations, {"SeatDia": SEAT_DIA_TEXT_XY})
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    for name in sorted(REFERENCE_DIMENSIONS):
+    # The crown radius keeps its part-authored "SR" inside the parentheses;
+    # the plain references then rebuild the sheet.
+    _dress_crown_radius(adapter, side_annotations)
+    for name in sorted(REFERENCE_DIMENSIONS - {"CrownRadius"}):
         matches = [
             annotation
             for annotation in annotations

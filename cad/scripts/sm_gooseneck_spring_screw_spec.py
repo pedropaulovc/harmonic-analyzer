@@ -26,11 +26,20 @@ stops clamping the loop needs far less preload, but makes the loop a pivot
 (rule 23) and needs a stated seating torque, so it would reverse 2026-09-21.
 The #8-32 root carries the same clamp at the SF below.
 
-Every size takes the title block's band for its places except the two LIMIT
-bands, each named on the sheet for what it serves (drawing-guidelines.md rule
-4): the seat Ø (the loop seat, under the thread major) and the shoulder
-length (to the lead's foot: the loop clears the lead, and full thread starts
-inside the MHA-SM-01 engagement budget).
+Every size takes the title block's band for its places except three limits,
+each named on the sheet for what it serves (drawing-guidelines.md rule 4):
+the seat Ø's LIMIT band (the loop seat, under the thread major), the shoulder
+length's LIMIT band (to the lead's foot: the loop clears the lead) and the
+full-thread station's single "5.67 MAX" from the under-head face (full
+thread inside the MHA-SM-01 engagement budget).  The crown's sphere prints
+on its arc as the reference "(SR20.03)": the head Ø and the crown rise
+drive it (machinist FIX round 1: no note carries a feature's geometry).
+
+The counter seats in ``cad/config/machine/springs.yaml`` were re-measured
+natively on this seat by the one-off ``verify:spring_seats`` leaf, farm run
+20261027T034638856Z-1b1dff54e70d478cbab26d49c9bce78d; the committed file is
+that leaf's output byte for byte (sha256
+f32e260c67c6d7e2687eb6c37b10ee742d8e53dd0ccbe5b7c3d90ede2ee17d4a).
 """
 
 from __future__ import annotations
@@ -44,7 +53,6 @@ from sm_gooseneck_spring_screw_geom import (
     CROWN_RISE,
     CROWN_RISE_LOWER,
     CROWN_RISE_UPPER,
-    DIE_RUNOUT,
     FULL_THREAD_STATION_MAX,
     HEAD_H,
     HEAD_H_LOWER,
@@ -63,18 +71,17 @@ THREAD_CALLOUT = THREAD
 CHAMFER_CALLOUT = "X 45 DEG"
 # Below-value callouts the PART authors on its dimensions (the drawing only
 # reads them back; a drawing-side SetText can write through to the part,
-# #1942).  The two LIMIT bands are tighter than the title block, so each names
+# #1942).  The three limits are tighter than the title block, so each names
 # what it serves (drawing-guidelines.md rule 4).
 COUNTER_SPRING_NUMBER = str(_config.parts("sm-vn-counter-spring")["number"])
 PLUG_NUMBER = str(_config.parts("sm-gooseneck")["number"])
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
     "ShankProfile": {
         "SeatDia": f"{COUNTER_SPRING_NUMBER} LOOP\nSEAT, UNDER\nTHREAD MAJOR",
-        "ShoulderLength": (
-            f"TO 45 DEG LEAD; LOOP\nCLEARS LEAD, FULL\nTHREAD IN {PLUG_NUMBER}"
-        ),
+        "ShoulderLength": "TO 45 DEG LEAD; LOOP\nCLEARS LEAD",
         "TipChamfer": CHAMFER_CALLOUT,
     },
+    "StationReference": {"FullThread": f"FULL THREAD IN\n{PLUG_NUMBER}"},
 }
 DIMENSION_CALLOUTS_BY_NAME: dict[str, str] = {
     name: text
@@ -219,11 +226,11 @@ if min(COMBINED_SF.values()) < STRENGTH_SF_TARGET:
 # first-load yield at the low-friction preload sets the margin.
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "HeadProfile": {"HeadDia", "HeadHeight", "CrownRise"},
+    "HeadProfile": {"HeadDia", "HeadHeight", "CrownRise", "CrownRadius"},
     "ShankProfile": {"UnderHeadLength", "SeatDia", "ShoulderLength", "TipChamfer"},
     "SlotProfile": {"SlotWidth"},
     "DriverSlot": {"SlotDepth"},
-    "StationReference": {"OverallLength"},
+    "StationReference": {"OverallLength", "FullThread"},
 }
 # Chamfers never need extra places (drawing-guidelines.md rule 3): the tip
 # chamfer rides the title block's .X band.  Every other mark prints at two.
@@ -238,19 +245,18 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, places in dimensions.items()
 }
 # The overall length is the stock cut-off, a restatement of the head height
-# and under-head length; the crown rise is NOT a reference (see above).
-REFERENCE_DIMENSIONS = frozenset({"OverallLength"})
+# and under-head length; the crown radius prints the sphere on its arc as
+# "(SR20.03)", fixed by the head Ø and the crown rise.  The crown rise is NOT
+# a reference (see above).
+REFERENCE_DIMENSIONS = frozenset({"OverallLength", "CrownRadius"})
+# The crown radius's display prefix, authored on the part; the drawing adds
+# the reference parentheses around it.
+CROWN_RADIUS_PREFIX = "SR"
 
 # The fitter's clamp step (user ruling 2026-09-21: no torque value, no
 # threadlocker) prints on the summing assembly sheet as MHA-SM-00 step 8,
 # not here: a part sheet carries no assembly instruction (machinist review
-# 2026-10-23).  Note 3 bounds the die's run-out the engagement budget assumes
-# (sm_gooseneck_spring_joint.MATED_ENGAGEMENT_MIN).
-DRAWING_NOTES = "\n".join(
-    (
-        "1. CROWN SPHERICAL THROUGH RIM AND APEX.",
-        f"2. THREAD MATES THE TAPPED END PLUG OF {PLUG_NUMBER}.",
-        f"3. FULL THREAD FORM WITHIN {DIE_RUNOUT:.1f} OF THE LEAD.",
-    )
-)
+# 2026-10-23).  The crown's form and the full-thread limit print on their
+# features (machinist FIX round 1), so one note is left.
+DRAWING_NOTES = f"1. THREAD MATES THE TAPPED END PLUG OF {PLUG_NUMBER}."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 2:1"

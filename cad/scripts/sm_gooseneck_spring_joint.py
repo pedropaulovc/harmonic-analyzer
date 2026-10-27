@@ -42,7 +42,8 @@ ENGAGEMENT_NOMINAL = gooseneck.PLUG_LENGTH - 2.0 * EDGE_BREAK
 ENGAGEMENT_MIN = ENGAGEMENT_NOMINAL - PLUG_LENGTH_BAND
 ENGAGEMENT_MIN_D = 1.5
 # The screw's own full thread starts behind its shoulder lead and the die's
-# run-out (sm_gooseneck_spring_screw_geom.FULL_THREAD_STATION, from the head).
+# run-out (sm_gooseneck_spring_screw_geom.FULL_THREAD_STATION, from the head),
+# no later than the "5.67 MAX" MHA-SM-04 prints (FULL_THREAD_STATION_MAX).
 # Past the clamp gap that station lies inside the plug, so the MATED full
 # thread starts at the later of it and the plug mouth's edge break.
 SCREW_RUNOUT_INTRUSION = screw.FULL_THREAD_STATION - gooseneck.SPRING_EYE_GAP

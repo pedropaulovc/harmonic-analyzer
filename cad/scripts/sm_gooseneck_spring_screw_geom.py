@@ -17,6 +17,8 @@ case; ``sm_gooseneck_spring_joint`` the seat, engagement and wall budgets.
 
 from __future__ import annotations
 
+import math
+
 from _printed_tolerance import printed_deviations
 
 MM_PER_IN = 25.4
@@ -85,10 +87,22 @@ STEP_LEAD_MAX = (MAJOR_DIA - SEAT_DIA_MIN) / 2.0
 # The die runs up to the lead and leaves its chamfered start, 1.5 pitches of
 # incomplete thread (drawing-guidelines.md rule 18; the repo's tip allowance,
 # sm_gooseneck_spring_joint.SCREW_END_INCOMPLETE_MAX), on the thread blank
-# behind the lead.
+# behind the lead.  DIE_RUNOUT is the derivation input only; the sheet prints
+# the station it sets.
 DIE_RUNOUT = 1.5 * PITCH
 FULL_THREAD_STATION = SHOULDER_LENGTH + STEP_LEAD + DIE_RUNOUT
-FULL_THREAD_STATION_MAX = SHOULDER_LENGTH_MAX + STEP_LEAD_MAX + DIE_RUNOUT
+# Printed as the single limit "5.67 MAX" from the under-head face (machinist
+# FIX round 1, owner ruling 2026-10-26 (#1951, option B)): the longest
+# shoulder, the steepest-legged lead and the die's run-out, floored to the
+# print's two places so the printed limit never exceeds the budget
+# sm_gooseneck_spring_joint.MATED_ENGAGEMENT_MIN takes.
+FULL_THREAD_STATION_MAX = (
+    math.floor((SHOULDER_LENGTH_MAX + STEP_LEAD_MAX + DIE_RUNOUT) * 100.0) / 100.0
+)
+FULL_THREAD_STATION_MAX_TOL_TYPE = 6  # swTolType_e.swTolMAX
+# The longest shoulder must still leave a die one pitch of blank behind the
+# lead before the printed limit: anything tighter is not die-cuttable.
+FULL_THREAD_DIE_ROOM_MIN = SHOULDER_LENGTH_MAX + STEP_LEAD_MAX + 1.0 * PITCH
 # The thread-start chamfer rides the title block's one-place band.
 TIP_CHAMFER = 0.30
 OVERALL_LENGTH = LENGTH + HEAD_H
@@ -107,6 +121,10 @@ def require_shoulder_form(
         raise AssertionError("screw loop seat has no diameter")
     if full_thread_station_max + TIP_CHAMFER + 1.5 * PITCH >= LENGTH + LENGTH_LOWER:
         raise AssertionError("screw leaves no full thread between the lead and the tip")
+    if full_thread_station_max < FULL_THREAD_DIE_ROOM_MIN:
+        raise AssertionError(
+            "screw full-thread limit leaves a die no room behind the lead"
+        )
 
 
 require_shoulder_form()
