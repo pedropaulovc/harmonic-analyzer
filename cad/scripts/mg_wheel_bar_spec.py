@@ -11,11 +11,15 @@ test, which asserts the part marks and the drawing keeps EXACTLY
 
 from __future__ import annotations
 
+import math
+
+from _column_clamp_interface import BAR_DEPTH
 from _printed_tolerance import printed_band_mm
 from mg_wheel_bar_geom import (  # noqa: F401 (re-export)
     AXLE_BORE_BAND,
     AXLE_BORE_DIA,
     AXLE_BORE_X,
+    BAR_DEPTH_BAND,
     BAR_LENGTH,
     BAR_SIDE,
     BAR_TOP_ABOVE_ROW,
@@ -38,10 +42,9 @@ from mg_wheel_bar_geom import (  # noqa: F401 (re-export)
 # every hole station reads from that end.
 AXLE_BORE_STATION = AXLE_BORE_X - LEFT_END_X  # 61.0
 
-# Height 10 -> 11, grown downward, for 2.0 walls round the clamp holes at
-# the title-block bands (owner ruling 2026-10-24; mg_wheel_bar_geom): a 10
-# bar at .X leaves the clamp holes 1.48 under them even with the row at
-# +/-0.18. The height prints at .X under the title block: no mate bounds it.
+# Height 10 -> 11, grown downward (owner ruling 2026-10-24): at the full worst
+# case below, a 10 bar leaves the walls under the bores 0.77-0.93, under the
+# 1.5 floor. The height prints at .X under the title block: no mate bounds it.
 BAR_SIDE_PLACES = 1
 # The bore row reads from the TOP face, the face the pen-hanger strap's top is
 # flush with and the top assembly sets the bar by. It prints twice, from each
@@ -62,26 +65,65 @@ BORE_ROW_PLACES = 2
 CLAMP_POSITION_BAND = 0.18
 CLAMP_POSITION_PLACES = 2
 
-BORE_MIN_WALL = 2.0  # drawing-guidelines.md rule 17 (walls and webs) target, worst case
-# Worst wall above and below each bore: its row at its band from the top face,
-# the bar at its title-block least height, the bore at its largest.
+# drawing-guidelines.md rule 17 (walls and webs), at the FULL worst case:
+# - the locating bands: each row at its band from the top face, the stations
+#   at theirs from the left end, the bar at its title-block least height;
+# - each bore at its largest (DRILLED HOLES +0.10, the reamer's +0.01);
+# - 0.3 deg drill run-off over the deepest bar (9.50 +0.1): every hole is
+#   drilled or reamed on the mill into faces cut in an earlier setup;
+# - the title block's 0.25 edge break on both exposed edges of each wall, the
+#   hole's rim and the bar's edge at the face.
+# No tap on this bar, so no tap-major term.
+WALL_TARGET = 2.0
+WALL_FLOOR = 1.5
+DRILL_RUNOFF_DEG = 0.3  # the repo allowance (sh_column_clamp_fit.EAR_DRILL_WANDER_DEG)
+EDGE_BREAK = 0.25  # title block: BREAK SHARP EDGES R0.25 OR CHAMFER 0.25
+BAR_DEPTH_MAX = BAR_DEPTH + BAR_DEPTH_BAND[0]  # 9.6
+DRILL_RUNOFF = BAR_DEPTH_MAX * math.tan(math.radians(DRILL_RUNOFF_DEG))  # 0.050
+_WALL_LOSSES = DRILL_RUNOFF + 2.0 * EDGE_BREAK
 BAR_SIDE_MIN = BAR_SIDE - printed_band_mm(BAR_SIDE_PLACES)  # 10.2
 _ROW_BAND = printed_band_mm(BORE_ROW_PLACES)  # 0.51
 BORE_BANDS = {
     "axle bore": ((AXLE_BORE_DIA + AXLE_BORE_BAND[0]) / 2.0, _ROW_BAND),
-    "pen-hanger hole": ((PEN_HANGER_HOLE_DIA + DRILLED_HOLE_PLUS) / 2.0, _ROW_BAND),
+    "hanger hole": ((PEN_HANGER_HOLE_DIA + DRILLED_HOLE_PLUS) / 2.0, _ROW_BAND),
     "clamp holes": ((CLAMP_HOLE_DIA + DRILLED_HOLE_PLUS) / 2.0, CLAMP_POSITION_BAND),
 }  # bore -> (largest radius, row band)
 BORE_ROW_WALLS = {
-    bore: min(
-        BORE_ROW_FROM_TOP - band - radius,
-        BAR_SIDE_MIN - BORE_ROW_FROM_TOP - band - radius,
+    **{
+        f"{bore} top": BORE_ROW_FROM_TOP - band - radius - _WALL_LOSSES
+        for bore, (radius, band) in BORE_BANDS.items()
+    },
+    **{
+        f"{bore} bottom": BAR_SIDE_MIN
+        - BORE_ROW_FROM_TOP
+        - band
+        - radius
+        - _WALL_LOSSES
+        for bore, (radius, band) in BORE_BANDS.items()
+    },
+    "hanger hole end": HANGER_STATION
+    - PEN_HANGER_STATION_TOL
+    - BORE_BANDS["hanger hole"][0]
+    - _WALL_LOSSES,
+}  # top 1.566 / 1.604 / 1.731, bottom 1.766 / 1.804 / 1.931, hanger hole end 1.604
+for _wall, _value in BORE_ROW_WALLS.items():
+    if _value < WALL_FLOOR:
+        raise AssertionError(
+            f"wheel-bar {_wall} wall {_value:.3f} < {WALL_FLOOR} floor"
+        )
+# Every wall is under the 2.0 target: owner ruling 2026-10-26 (#1532) accepts
+# each as a minor (cad/config/parts/mg-wheel-bar.yaml machinist_exceptions,
+# one per wall). The top walls are bound by the interfaces (the strap's top
+# flush with the bar top, the row at the axle, wheel and taps' height); the
+# sheet states each hole's least wall, floored, on its callout.
+WALL_CALLOUT_MIN = {
+    bore: math.floor(
+        min(value for wall, value in BORE_ROW_WALLS.items() if wall.startswith(bore))
+        * 100
     )
-    for bore, (radius, band) in BORE_BANDS.items()
-}  # 2.116, 2.154, 2.281: every top wall governs
-for _bore, _wall in BORE_ROW_WALLS.items():
-    if _wall < BORE_MIN_WALL:
-        raise AssertionError(f"wheel-bar {_bore} wall {_wall:.3f} < {BORE_MIN_WALL}")
+    / 100
+    for bore in BORE_BANDS
+}  # axle bore 1.56, hanger hole 1.60, clamp holes 1.73
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  The bar depth is the extrude's named depth, banded because it

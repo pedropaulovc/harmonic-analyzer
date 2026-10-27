@@ -157,7 +157,8 @@ def test_part_authored_callouts_name_each_band_s_mate() -> None:
     axle = _config.parts("mg-wheel-axle")["number"]
     assert callouts.AXLE_BORE_CALLOUT == (
         f"REAM THRU\nPRESS FIT {axle} AXLE\n"
-        f"{BAR_PRESS[0]:.3f}-{BAR_PRESS[1]:.3f} DIAMETRAL\nINTERFERENCE"
+        f"{BAR_PRESS[0]:.3f}-{BAR_PRESS[1]:.3f} DIAMETRAL\nINTERFERENCE\n"
+        "WALL 1.56 MIN"
     )
     assert callouts.BAR_DEPTH_CALLOUT == (
         f"{axle} AXLE BACK END\n"
@@ -166,13 +167,12 @@ def test_part_authored_callouts_name_each_band_s_mate() -> None:
     assert callouts.CLAMP_ROW_CALLOUT.startswith("2X CLAMP HOLES")
     assert "MHA-SH-02" in callouts.CLAMP_ROW_CALLOUT
     assert "DIAMETRAL INTERFERENCE" in callouts.AXLE_BORE_CALLOUT.replace("\n", " ")
-    assert "MHA-SH-02" in callouts.CLAMP_HOLE_CALLOUT
+    assert callouts.CLAMP_HOLE_CALLOUT == "LOCATE TO MHA-SH-02 TAPS\nWALL 1.73 MIN"
+    assert callouts.HANGER_HOLE_CALLOUT == "WALL 1.60 MIN"
     texts = [*callouts.authored_by_name().values()]
     for lanes in texts:
         for text in lanes.values():
-            assert len(text.splitlines()) <= 4
-            # Walls are held by geometry, never named as a band's reason.
-            assert "WALL" not in text
+            assert len(text.splitlines()) <= 5
     # The part writes them; the sheet only reads them back (#1942).
     sheet = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_dimension_callouts" not in sheet
@@ -203,8 +203,11 @@ def test_clamp_position_band_is_the_mha_sh_02_tap_stack() -> None:
     assert round(band, 2) == band
 
 
-def test_every_bore_keeps_a_two_mm_wall_from_the_top_face_row() -> None:
+def test_every_wall_is_stated_at_the_full_worst_case() -> None:
+    import math
+
     import mg_wheel_bar_geom as geom
+    from _column_clamp_interface import BAR_DEPTH
 
     assert geom.AXLE_BORE_X == -56.0 == geom.WHEEL_X - geom.WHEEL_BAR_X0
     assert mg_wheel_bar_spec.AXLE_BORE_STATION == 61.0
@@ -213,13 +216,19 @@ def test_every_bore_keeps_a_two_mm_wall_from_the_top_face_row() -> None:
     )
     # The height has no band: the title block's .X (+/-0.8) governs it. The
     # hanger hole and the axle bore sit at the title block's .XX (+/-0.51)
-    # from the top face, the clamp pair at the taps' +/-0.18.
+    # from the top face, the clamp pair at the taps' +/-0.18. Each wall also
+    # loses 0.3 deg run-off over the 9.6 deepest bar (the holes are drilled on
+    # the mill into faces cut earlier) and a 0.25 break on each of its two
+    # exposed edges.
     side_min = geom.BAR_SIDE - 0.8
     drop = mg_wheel_bar_spec.BORE_ROW_FROM_TOP
     assert drop == geom.BAR_TOP_ABOVE_ROW
+    runoff = (BAR_DEPTH + 0.1) * math.tan(math.radians(0.3))
+    assert runoff == pytest.approx(0.0503, abs=1e-4)
+    losses = runoff + 2 * 0.25
     bores = {
         "axle bore": ((geom.AXLE_BORE_DIA + geom.AXLE_BORE_BAND[0]) / 2.0, 0.51),
-        "pen-hanger hole": (
+        "hanger hole": (
             (geom.PEN_HANGER_HOLE_DIA + geom.DRILLED_HOLE_PLUS) / 2.0,
             0.51,
         ),
@@ -228,22 +237,70 @@ def test_every_bore_keeps_a_two_mm_wall_from_the_top_face_row() -> None:
             mg_wheel_bar_spec.CLAMP_POSITION_BAND,
         ),
     }
-    top = {bore: drop - band - radius for bore, (radius, band) in bores.items()}
-    bottom = {
-        bore: side_min - drop - band - radius for bore, (radius, band) in bores.items()
+    walls = {
+        **{f"{b} top": drop - band - r - losses for b, (r, band) in bores.items()},
+        **{
+            f"{b} bottom": side_min - drop - band - r - losses
+            for b, (r, band) in bores.items()
+        },
+        "hanger hole end": geom.HANGER_STATION
+        - 0.51
+        - bores["hanger hole"][0]
+        - losses,
     }
-    walls = {bore: min(top[bore], bottom[bore]) for bore in bores}
     assert walls == pytest.approx(mg_wheel_bar_spec.BORE_ROW_WALLS)
+    # Owner ruling 2026-10-26 (#1532): these seven, each under the 2.0 target
+    # and over the 1.5 floor, are owner-accepted minors.
     assert walls == pytest.approx(
-        {"axle bore": 2.116, "pen-hanger hole": 2.154, "clamp holes": 2.281},
+        {
+            "axle bore top": 1.566,
+            "hanger hole top": 1.604,
+            "clamp holes top": 1.731,
+            "axle bore bottom": 1.766,
+            "hanger hole bottom": 1.804,
+            "clamp holes bottom": 1.931,
+            "hanger hole end": 1.604,
+        },
         abs=1e-3,
     )
-    assert bottom["clamp holes"] == pytest.approx(2.481)
-    assert min(walls.values()) >= 2.0
-    # The photographed 10 bar leaves the clamp holes 1.48 under them even at
-    # the taps' band: the height grew rather than a band tightening.
+    assert all(1.5 <= wall < 2.0 for wall in walls.values())
+    assert mg_wheel_bar_spec.WALL_CALLOUT_MIN == {
+        "axle bore": 1.56,
+        "hanger hole": 1.60,
+        "clamp holes": 1.73,
+    }
+    # The photographed 10 bar leaves the walls under the bores under the
+    # floor: the height grew rather than a band tightening.
+    for b, (r, band) in bores.items():
+        assert 10.0 - 0.8 - drop - band - r - losses < 1.5, b
     radius, band = bores["clamp holes"]
-    assert 10.0 - 0.8 - drop - band - radius == pytest.approx(1.481)
+    assert 10.0 - 0.8 - drop - band - radius - losses == pytest.approx(0.931, abs=1e-3)
+
+
+def test_every_wall_is_an_owner_declared_minor_stated_on_the_sheet() -> None:
+    import math
+
+    import _config
+    from machinist_exceptions import load_exceptions
+
+    declared = load_exceptions(_config.CONFIG_DIR, "mg_wheel_bar", "part")
+    assert len(declared) == len(mg_wheel_bar_spec.BORE_ROW_WALLS) == 7
+    texts = {
+        "axle bore": callouts.AXLE_BORE_CALLOUT,
+        "hanger hole": callouts.HANGER_HOLE_CALLOUT,
+        "clamp holes": callouts.CLAMP_HOLE_CALLOUT,
+    }
+    for entry, (wall, value) in zip(
+        declared, mg_wheel_bar_spec.BORE_ROW_WALLS.items(), strict=True
+    ):
+        bore = next(b for b in texts if wall.startswith(b))
+        row = callouts.callout_rows(texts[bore])[-1]
+        assert entry.kind == "minor"
+        assert row in entry.where
+        assert wall in entry.where
+        assert f"{math.floor(value * 100) / 100:.2f}" in entry.finding
+        assert "rule 17" in entry.finding
+        assert entry.reason.startswith("owner ruling 2026-10-26 (#1532)")
 
 
 def test_axle_bore_is_a_marked_reamed_cut() -> None:

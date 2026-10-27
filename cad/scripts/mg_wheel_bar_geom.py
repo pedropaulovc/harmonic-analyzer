@@ -17,9 +17,11 @@ from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 # --- bar section + length (DIMENSIONS.md ch21; M6.8 ch30 8-view pass) ----------
 # The top face stands BAR_TOP_ABOVE_ROW over the bore row: the pen-hanger
 # strap's top is flush with it and the top assembly sets the bar by it. Below
-# the row the bar runs to BAR_SIDE: the photographed 10 grew to 11, downward,
-# because at the title block's .X height band a 10 bar cannot hold the 2.0 mm
-# wall under the clamp holes (mg_wheel_bar_spec.BORE_ROW_WALLS).
+# the row the bar runs to BAR_SIDE: the photographed 10 grew to 11, downward
+# (owner ruling 2026-10-24), because at the full worst case a 10 bar leaves
+# the walls under the bores below the 1.5 mm floor
+# (mg_wheel_bar_spec.BORE_ROW_WALLS; the walls an 11 leaves are owner-ruled
+# minors, 2026-10-26, #1532).
 BAR_TOP_ABOVE_ROW = 5.0
 BAR_SIDE = 11.0  # tall (Y)
 # BAR_DEPTH (deep, Z) is the support-bar stock's (_column_clamp_interface);

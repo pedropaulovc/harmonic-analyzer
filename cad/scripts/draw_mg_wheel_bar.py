@@ -193,10 +193,10 @@ def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
         )
 
 
-@_telemetry.traced("drawing.mg_wheel_bar.clamp_tap_callout")
-def _name_clamp_taps(display: Any) -> None:
-    """Hang the back-arc taps the clamp holes locate to under their native
-    callout (a drawing annotation, not an imported model dimension).
+@_telemetry.traced("drawing.mg_wheel_bar.hole_callout_below", label_param="label")
+def _add_below_rows(display: Any, rows: str, *, label: str) -> None:
+    """Hang ``rows`` under a native hole callout (a drawing annotation, not an
+    imported model dimension), after any native below text.
 
     swDimensionTextCalloutBelowDefinition (8) pairs with the writable
     swDimensionTextCalloutBelow (4); the prefix, size and depth definitions
@@ -204,18 +204,19 @@ def _name_clamp_taps(display: Any) -> None:
     (draw_ch_channel_lever._name_hole_mate)."""
     display = _early_bound(display, "IDisplayDimension")
     definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7)}
-    display.SetText(callouts.CALLOUT_BELOW, callouts.CLAMP_HOLE_CALLOUT)
-    wanted = callouts.callout_rows(callouts.CLAMP_HOLE_CALLOUT)
+    below = str(display.GetText(8) or "").rstrip()
+    updated = f"{below}\n{rows}" if below else rows
+    display.SetText(callouts.CALLOUT_BELOW, updated)
+    wanted = callouts.callout_rows(updated)
     applied = {
         part: callouts.callout_rows(str(display.GetText(part) or ""))
         for part in (callouts.CALLOUT_BELOW, 8)
     }
-    if any(rows != wanted for rows in applied.values()) or any(
+    if any(found != wanted for found in applied.values()) or any(
         str(display.GetText(part) or "") != text for part, text in definitions.items()
     ):
         raise RuntimeError(
-            "clamp-hole callout's taps or native definitions did not persist: "
-            f"{applied!r}"
+            f"{label}: callout rows or native definitions did not persist: {applied!r}"
         )
 
 
@@ -311,24 +312,32 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center marks to wheel-bar bores")
 
     hanger_rim, clamp_rim = _hole_rims(front)
-    add_native_hole_callout(
-        adapter,
-        front,
-        edge=hanger_rim,
-        callout_xy=HANGER_CALLOUT_XY,
-        label="pen-hanger clearance hole",
-        process="DRILL",
-    )
-    _name_clamp_taps(
-        add_native_hole_callout(
-            adapter,
-            front,
-            edge=clamp_rim,
-            callout_xy=CLAMP_CALLOUT_XY,
-            label="column-clamp clearance holes",
-            process="DRILL",
+    for edge, callout_xy, label, rows in (
+        (
+            hanger_rim,
+            HANGER_CALLOUT_XY,
+            "pen-hanger clearance hole",
+            callouts.HANGER_HOLE_CALLOUT,
+        ),
+        (
+            clamp_rim,
+            CLAMP_CALLOUT_XY,
+            "column-clamp clearance holes",
+            callouts.CLAMP_HOLE_CALLOUT,
+        ),
+    ):
+        _add_below_rows(
+            add_native_hole_callout(
+                adapter,
+                front,
+                edge=edge,
+                callout_xy=callout_xy,
+                label=label,
+                process="DRILL",
+            ),
+            rows,
+            label=label,
         )
-    )
 
     # Beside the isometric, over its lower-right run (the view falls from
     # its upper-left end): clear of the title block below and of the depth's
