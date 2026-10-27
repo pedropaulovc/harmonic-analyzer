@@ -4,8 +4,9 @@
 > would receive it. Findings may already be fixed on `main`. Track the work on the
 > [Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
 >
-> **Revised 2026-10-27.** The cone-tip findings are corrected (VN-54, tip-gear material), and §7
-> adds cone-tip options with a to-scale sketch.
+> **Revised 2026-10-27.** The cone-tip findings are corrected (VN-54, tip-gear material, and the
+> rotating brass bushing and end screw from video 4), and §7 adds cone-tip options with a
+> to-scale sketch.
 
 ## Scope and method
 
@@ -15,7 +16,9 @@
 - **Original-machine evidence.** Hammack, Kranz and Carpenter (2014), chapters Crank, Cone
   Gear Set, Cylinder Gear Set, Pinion Gear and Translational Gearing (`references` submodule).
   Only facts are cited here. No image or text from the book is reproduced, because it is
-  licensed for non-commercial use only.
+  licensed for non-commercial use only. The engineerguy video stills in
+  `references/engineerguy-youtube/stills/full/` are cited by path and not reproduced either.
+  The main one is video 4, "The details of setting up the Harmonic Analyzer", at 6:36 and 6:39.
 - **3D inspection.** meshprobe 1.4.0 on Blender 5.2.0 (software GL) against
   `dt-drive-train.glb`: component census and world bounds, top/side orthographic views,
   close-ups of the cone tip, the crank mesh and the alignment-pinion rig, and a side-by-side
@@ -36,8 +39,8 @@
    reduction, the 13° oblique cone, the tip pivot and lock, the 120T cylinder gears with 3 mm
    notches, and the alignment-pinion rig all match the book. The departures are in small-part
    detail, and the cone tip is the clearest one: `MHA-DT-VN-54`, a Ø17.48 steel set-screw
-   collar, has no counterpart on the original, which has a small brass collar against a split
-   tip block. There is also one known accuracy defect: a 1.5° cam phase error that `READOUT.md`
+   collar, has no counterpart on the original. The original has a small brass bushing that
+   turns with the cone and runs against a long end screw in a split tip block. There is also one known accuracy defect: a 1.5° cam phase error that `READOUT.md`
    documents itself.
 2. **Drawings: rich in shop knowledge, weak on drafting discipline.** The sheets have gear data
    blocks, vendor SKUs, a complete BOM and a feeler-gauge assembly procedure. But they cite
@@ -85,24 +88,35 @@
   - **Material.** The book says "the four smallest gears at the tip of the cone are slightly
     more yellow in appearance and seem to be made of a different, perhaps harder metal"
     (p.17). That covers T006–T024. The p.21 close-up shows verdigris on the 6-leaf pinion,
-    which points to a copper alloy, not steel **[I from photo]**.
+    which points to a copper alloy, not steel **[I from photo]**. In the video 4 side view
+    (6:36) the four smallest gears are visibly lighter than the bronze-brown rest of the cone
+    **[I from video]**.
   - **Construction.** The photos don't show whether the tip gears are integral with the shaft
     or separate gears.
   - **v45.** All four are drawn in plain "Brass".
 - **No counterpart for `MHA-DT-VN-54`.**
   - **Model:** a Ø17.48 × 11.5 steel collar from 3/4″ bar with a radial 2-56 set screw on
     the wire flat, set "0.45 FEELER OFF T006 THRUST FACE" **[V]**.
-  - **Original:** the book's top-down photo (p.18; bundled overlay
-    `comparisons/*/harmonic_analyzer--ch12-p002-img09*`) and the p.21 close-up show only a
-    small brass collar. It sits directly against T006 and the black tip block, and is about
-    Ø5 × 4 mm (scaled from the gear pitch, ±25 %) **[I from photos]**.
+  - **Original:** the sources show only a small brass bushing, about Ø5 × 4 mm (scaled from
+    the gear pitch, ±25 %), right against T006 **[I from photos]**. The sources are the book's
+    top-down photo (p.18; bundled overlay `comparisons/*/harmonic_analyzer--ch12-p002-img09*`),
+    the p.21 close-up and the video 4 side view.
+  - **The bushing turns with the cone.** Between the video 4 frames at 6:36 and 6:39 the crank
+    turns. The bushing changes as much as the rotating 6-leaf pinion beside it (mean pixel
+    change 18.7 against 13–20). The end-screw thread, black block and side screw stay at the
+    compression floor (about 2–3) **[I from video]**. The bushing is therefore fixed to the
+    cone shaft. It is a rotating thrust collar, not a bush in the block.
   - **Verdict:** VN-54 is roughly 3× too large in diameter and length, the wrong metal, and
     has no set screw on the original.
-- **Tip block hardware.** On the original, a domed, slotted, blackened end screw sits on the
-  cone axis in the split black block, and a bright slotted pinch screw on the side locks the
-  slit (book pp.17–18) **[I from photos]**.
-  - v45 uses a headless #10-32 cup-point set screw (`VN-55`) for the end screw and a #4-40
-    fillister (`VN-56`) for the pinch **[V]**.
+- **Tip block hardware.**
+  - **Original** (book pp.17–18, video 4 at 6:36) **[I from photos/video]**:
+    - A long end screw is threaded through the black split block. Its domed, slotted,
+      blackened head is outboard, and its threaded end sticks out toward the cone.
+    - The rotating brass bushing runs against that inner end.
+    - A bright slotted pinch screw on the side crosses the slit and locks the end screw's
+      thread.
+  - **v45:** a short headless #10-32 cup-point set screw (`VN-55`) for the end screw and a
+    #4-40 fillister (`VN-56`) for the pinch **[V]**.
   - In the aligned overlay, the model's pinch-screw head is on the side facing the cylinder
     bank. On the original it is on the outboard side **[I]**.
 - **Helical crank drive gear.** `dt-crank-drive-gear` is "HELIX AT PITCH DIA: 13.0 ±1 DEG RIGHT
@@ -115,7 +129,7 @@
   says the original chain is lost, so its form is a guess **[V]**.
 - **Appearance (GLB only).** The crank arm renders black, where the original is nickel-bright.
   The post renders turquoise, where the original is dark green. These are cosmetic. The tip
-  collar is not cosmetic; see the VN-54 item above.
+  collar (VN-54) is not cosmetic; see the VN-54 item above.
 
 ## 2. Drawing quality
 
@@ -287,14 +301,19 @@ Severity: **BLOCKER** (can't be made or will not work as drawn), **MAJOR**, **MI
 - `dt-cone-tip-block` (DT-21)
   - **MAJOR [V]** The cone-axis height "38.10" is untoleranced (±0.51), while the post holds
     "38.10 ±0.25 AXIS MATCHES MHA-DT-21". At T006 that is about half a tooth **[I]**.
+  - **MINOR [I from photos/video]** The original's end screw is a long, headed screw. It goes
+    through the block, with its head outboard and its thread exposed toward the cone. It is not
+    a short headless cup set screw (VN-55), and the side pinch screw is on the opposite side
+    from the model's.
 - `dt-cone-swing-platform` (DT-20)
   - **MINOR [V]** "REAM Ø6.35 +0.02/0.00 … RUNNING FIT" against a Ø0.250 -0.001 shoulder allows
     zero clearance.
   - **MINOR [V]** "SWINGS FREE, NO AXIAL SHAKE" has no end-play number.
   - Good: a clear stock call.
 - `dt-vn-cone-tip-collar` (VN-54)
-  - **MAJOR [I from photos]** It has no counterpart on the original (§1 Departures). The real
-    tip has a small brass collar, about Ø5 × 4, against the tip block.
+  - **MAJOR [I from photos/video]** It has no counterpart on the original (§1 Departures). The
+    real tip has a small brass bushing, about Ø5 × 4, fixed on the shaft. It turns with the
+    cone and runs against the end screw.
   - **MAJOR [V]** A made part ("REAM THRU", "3/4 STEEL BAR STOCK OK") carries a VN number.
   - **MAJOR [I]** A 2-56 set screw clamping a 0.8 mm half-round wire will bend or mark it.
 - Vendor sheets (VN-51, -52, -55, -56, -60, -61)
@@ -369,7 +388,8 @@ Severity: **BLOCKER** (can't be made or will not work as drawn), **MAJOR**, **MI
 
 1. **Rework the cone tip (§7).**
    - Drop the Ø0.794 mm journal, the T006/T012 D-bores and VN-54.
-   - Replace VN-54 with the original's small brass collar.
+   - Replace VN-54 with the original's small brass bushing. Fix it on the shaft so it turns
+     with the cone and bears on a long end screw.
    - Pick one of the three period-accurate options: an integral 6-leaf pinion on a tip arbor,
      a one-piece planed arbor, or gears cut separately and sweated into a cluster.
    - Make T006–T024 in a yellow, harder copper alloy (phosphor bronze C544).
@@ -406,15 +426,22 @@ of it is in CAD.
 
 ### What the original tip looks like
 
-- **Brass collar.** A small brass collar, about Ø5 × 4 mm, sits against the T006 face and the
-  tip block (book p.18 top-down, p.21 close-up) **[I from photos]**.
-- **Tip block.** It is black and split. A domed, slotted, blackened end screw sits on the axis,
-  and a bright slotted pinch screw on the side locks the slit (pp.17–18) **[I from photos]**.
+- **Brass bushing.** A small brass bushing, about Ø5 × 4 mm, sits right against the T006 face
+  (book p.18 top-down, p.21 close-up, video 4 side view).
+  - It is fixed on the shaft and turns with the cone. Between the video 4 frames at 6:36 and
+    6:39 it changes like the rotating pinion, while the screw and block don't **[I from
+    video]**.
+  - Its outer face is a thrust face.
+- **End screw and block.** A long end screw is threaded through the black split block.
+  - Its domed, slotted, blackened head is outboard; its threaded end sticks out toward the cone
+    and faces the bushing.
+  - A bright slotted pinch screw on the side crosses the slit and locks the thread.
+  - End play is set by turning the end screw against the bushing, then tightening the pinch
+    screw (book pp.17–18, video 4) **[I from photos/video]**.
 - **What we don't know.**
   - The 1898 paper says only that the wheels "are all fastened together on the same axis and
     form the cone D" (Michelson & Stratton, p.4). How they are fixed is not stated.
-  - Whether the brass collar is fixed to the shaft or is the end of a bush in the block can't
-    be told from the photos.
+  - Whether the shaft's pivot point enters a centre in the end screw is hidden by the bushing.
 
 ### Constraints any option must meet
 
@@ -433,8 +460,12 @@ of it is in CAD.
 
 ### Options
 
-All three are period-accurate (c.1898). All three delete VN-54 and the Ø0.794 wire, add the
-original's small brass collar, and keep the original split block, end screw and pinch screw.
+All three are period-accurate (c.1898). All three:
+- delete VN-54 and the Ø0.794 wire;
+- add the original's brass bushing, soft-soldered or driven onto the pivot after the teeth are
+  cut, with its outer face square and smooth;
+- use the original's tip hardware: a split block with a long end screw that bears on the
+  bushing, and a side pinch screw.
 
 - **A · 6-leaf pinion cut on a tip arbor.**
   - **Arbor.** Phosphor bronze, carrying the integral T006, a Ø2.0 stem and a Ø1.5 pivot. It
@@ -444,7 +475,7 @@ original's small brass collar, and keep the original split block, end screw and 
     temporary tailstock boss beyond the pivot.
   - **T012 and T018.** Bore both Ø2.0 and soft-solder them onto the stem, setting the phase
     with a pin jig first.
-  - **Collar.** Fit the brass collar after cutting.
+  - **Bushing.** Fit the brass bushing on the pivot after cutting.
   - **Drive.** T006's torque reaches it through metal.
 - **B · One-piece T006–T018 with planed teeth.**
   - **Method.** Plane the teeth (shaper, or the lathe used as one) with three HSS form tools.
@@ -478,10 +509,15 @@ original's small brass collar, and keep the original split block, end screw and 
 ### Open questions for the CAD change
 
 - Confirm the 2.2–5.3 mm contact zone against the CAD source, not only the saved GLB pose.
-- Decide whether the brass collar is a thrust collar on the shaft or a bush in the block. Set
-  the end-play scheme to match.
-- Choose A, B or C. Each touches MHA-DT-03 (T006/T012 at least), MHA-DT-04, VN-54 (deleted),
-  VN-55 and VN-56 (end and pinch screws).
+- Resolved: the brass bushing is a thrust collar on the shaft (video 4 frame diff). End play
+  is set by the long end screw bearing on it.
+- Still open: whether the pivot runs in a centre in the end screw's tip. The photos and video
+  can't show it.
+- Choose A, B or C. Each touches:
+  - MHA-DT-03 (T006/T012 at least) and MHA-DT-04;
+  - VN-54, which is deleted;
+  - VN-55, replaced by a long headed end screw through the block;
+  - VN-56, the pinch screw, which moves to the outboard side.
 
 ## Reproducing the renders
 
@@ -517,3 +553,18 @@ and cylinder axes through the 20 gear centroids (skew 13.05°). Each cylinder ge
 surface-sampled at 400 000 points, keeping the points that fall inside each cone band's OD
 within that band's axial span. The committed sketch contains no book imagery; it is drawn from
 the drawings and those measurements.
+
+The rotating-bushing finding compares `engineerguy-youtube/stills/full/v4_t00396.png` and
+`v4_t00399.png`. The camera is locked off and the crank turns between the two frames. Mean
+absolute grey-level difference was taken in small windows:
+
+| Window | Mean change |
+|---|---|
+| 6-leaf pinion | 13.3 |
+| brass bushing | 18.7 |
+| exposed end-screw thread | 6.5 (edge bleed; ~4 a few px further on) |
+| black block | 2.1 |
+| end-screw head | 2.9 |
+| bright side screw | 3.0 |
+
+The video stills are not committed.
