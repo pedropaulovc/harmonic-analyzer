@@ -11,6 +11,7 @@ import pytest
 from _column_clamp_interface import BAR_DEPTH
 import build_mg_wheel_axle as part
 import draw_mg_wheel_axle as drawing
+import mg_wheel_axle_callouts as callouts
 import mg_magnifying_wheel_geom
 import mg_wheel_axle_spacer_spec
 import mg_wheel_axle_spec as spec
@@ -40,10 +41,14 @@ def test_spec_values_are_the_drill_rod_pin() -> None:
     assert spec.THREAD_MAJOR == pytest.approx(2.845, abs=1e-3)
     assert spec.THREAD_LEN == 8.20
     assert spec.PIN_LEN == pytest.approx(37.40 + spacer)
-    # Full thread only: 1.5 pitches of die run-out at the step, one pitch
-    # cut short by the dome.
+    # Full thread only: the die's lead runs out in the step's relief (wider
+    # than its 1.5 pitches), and the dome cuts one pitch short.
     assert spec.THREAD_PITCH == pytest.approx(0.635)
-    assert spec.FULL_THREAD_START_Y == pytest.approx(spec.PRESS_GAUGE + 1.5 * 0.635)
+    assert spec.DIE_RUNOUT == pytest.approx(1.5 * 0.635)
+    assert spec.RELIEF_WIDTH >= spec.DIE_RUNOUT >= spec.THREAD_PITCH
+    assert spec.FULL_THREAD_START_Y == pytest.approx(
+        spec.PRESS_GAUGE + spec.RELIEF_WIDTH
+    )
     assert spec.FULL_THREAD_END_Y == pytest.approx(spec.THREAD_END_Y - 0.635)
     assert spec.DOME_R == pytest.approx(1.665, abs=1e-3)
     # Pressed to the gauge from the bar's front face (the origin); the back
@@ -56,13 +61,60 @@ def test_spec_values_are_the_drill_rod_pin() -> None:
     )
 
 
+def test_thread_relief_is_cut_under_the_die_root() -> None:
+    """Rule 16 (2026-10-24 ENFORCE blocker): the thread running to the shank
+    step gets a relief of at least one pitch, the vertical rod's form."""
+    assert (spec.RELIEF_DIA, spec.RELIEF_WIDTH, spec.RELIEF_ROOT_R) == (1.85, 1.10, 0.2)
+    assert spec.RELIEF_DIA <= spec.THREAD_ROOT_2A_MIN < spec.THREAD_BASIC_MINOR
+    assert spec.RELIEF_WIDTH >= spec.THREAD_PITCH
+    assert 2.0 * spec.RELIEF_ROOT_R < spec.RELIEF_WIDTH
+    assert spec.FULL_THREAD_FROM_STEP_MAX == spec.RELIEF_WIDTH
+    # Every relief size prints as a single MAX limit at its model value.
+    assert spec.SINGLE_LIMITS == {
+        ("PinProfile", "ReliefWidth"): (1.10, spec.TOL_TYPE_MAX),
+        ("PinProfile", "ReliefDia"): (1.85, spec.TOL_TYPE_MAX),
+        ("ReliefRoots", "ReliefRootR"): (0.2, spec.TOL_TYPE_MAX),
+    }
+    assert spec.TOL_TYPE_MAX == 6  # swTolType_e.swTolMAX
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'name_last_feature(adapter, "ReliefRoots")' in source
+    assert "_single_limits(adapter)" in source
+
+
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.SIDE_KEEP) == marked
-    assert marked == {"PinDia", "ShankLength", "ThreadLength", "PinLength", "DomeR"}
+    assert set(drawing.SIDE_KEEP) | set(drawing.DETAIL_KEEP) == marked
+    assert not set(drawing.SIDE_KEEP) & set(drawing.DETAIL_KEEP)
+    assert set(drawing.DETAIL_KEEP) == {"ReliefWidth", "ReliefDia", "ReliefRootR"}
+    assert set(drawing.SIDE_KEEP) == {
+        "PinDia",
+        "ShankLength",
+        "ThreadLength",
+        "PinLength",
+        "DomeR",
+    }
     assert set(drawing.DRAWING_PRECISION_BY_NAME) == marked
-    assert drawing.DRAWING_PRECISION_BY_NAME == spec.DRAWING_PRECISION["PinProfile"]
+
+
+def test_detail_fence_holds_every_relief_reference() -> None:
+    focus = drawing.DETAIL_FOCUS_MM
+    radius = drawing.DETAIL_RADIUS_MM
+    floor = spec.RELIEF_DIA / 2.0
+    for x, y in (
+        (-floor, spec.STEP_Y),
+        (-floor, spec.STEP_Y + spec.RELIEF_WIDTH),
+        (floor, spec.STEP_Y),
+        (floor, spec.STEP_Y + spec.RELIEF_WIDTH),
+        *drawing.RELIEF_ROOT_CENTRES_MM,
+    ):
+        assert math.dist(focus, (x, y)) < radius, (x, y)
+    # The crop sits inside the border, left of the title block and under the
+    # side view's overall row.
+    cx, cy = drawing.DETAIL_CENTER
+    crop = drawing.DETAIL_CROP_RADIUS
+    assert cx - crop > 0.013 and cx + crop < 0.216
+    assert cy - crop > 0.013 and cy + crop < drawing._ROW_Y[2] - 0.010
 
 
 def test_pin_is_one_front_plane_revolve() -> None:
@@ -74,14 +126,20 @@ def test_pin_is_one_front_plane_revolve() -> None:
     assert "create_extrusion(" not in source
     # Axis1 on local Y and the Front Plane carry the assembly mates.
     assert 'name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0' in source
-    for name in ("PinDia", "ShankLength", "ThreadLength", "PinLength", "DomeR"):
+    for name in spec.DRAWING_DIMENSIONS["PinProfile"]:
         assert re.search(rf'profile\.record\(\s*"{name}"', source), name
+    floor_r = spec.RELIEF_DIA / 2.0
     v = (
         math.pi * (spec.PIN_DIA / 2.0) ** 2 * spec.SHANK_LEN
-        + math.pi * (spec.THREAD_MAJOR / 2.0) ** 2 * spec.THREAD_LEN
+        + math.pi * floor_r**2 * spec.RELIEF_WIDTH
+        + math.pi
+        * (spec.THREAD_MAJOR / 2.0) ** 2
+        * (spec.THREAD_LEN - spec.RELIEF_WIDTH)
         + math.pi * spec.DOME_H**2 * (3.0 * spec.DOME_R - spec.DOME_H) / 3.0
     )
-    assert part.V_TOTAL == pytest.approx(v)
+    assert part.V_PROFILE == pytest.approx(v)
+    assert 0.0 < part.V_RELIEF_ROOTS < 0.2
+    assert part.V_TOTAL == pytest.approx(v + part.V_RELIEF_ROOTS)
 
 
 def test_tolerances_are_native_on_the_model() -> None:
@@ -97,12 +155,16 @@ def test_tolerances_are_native_on_the_model() -> None:
     assert spec.THREAD_LEN_BAND == (0.25, -0.25)
     assert spec.REFERENCE_DIMENSIONS == {"PinLength"}
     assert spec.DRAWING_PRECISION["PinProfile"]["PinLength"] == 1
-    assert drawing.DIMENSION_CALLOUTS["ShankLength"] == "FROM SHANK STEP"
-    assert drawing.DIMENSION_CALLOUTS["ThreadLength"] == (
-        "FROM SHANK STEP;\nLOCKNUT ON FULL THREAD,\nEND 2.9 MAX PAST LOCKNUT"
+    assert callouts.SHANK_LENGTH_CALLOUT == "FROM SHANK STEP"
+    # Rule 4: the band names the stack it sets and the nut, and says where
+    # the 2.9 is read (the thread end, the dome's tangent), in MHA-MG-00's
+    # acceptance words.
+    assert callouts.THREAD_LENGTH_CALLOUT == (
+        "FROM SHANK STEP; SETS MHA-MG-00\nNUT STACK: LOCKNUT MHA-MG-VN-52\n"
+        "ON FULL THREAD, THREAD END\n(DOME TANGENT) 2.9 MAX PAST IT"
     )
     assert drawing.ORIGIN_DIMENSIONS == ("ShankLength", "ThreadLength")
-    assert group.THREAD_PAST_LOCKNUT_MAX <= group.THREAD_PAST_LOCKNUT_LIMIT == 2.9
+    assert group.THREAD_PAST_LOCKNUT_MAX <= spec.THREAD_PAST_LOCKNUT_LIMIT == 2.9
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
 
@@ -120,35 +182,67 @@ def test_journal_finish_and_no_gdt() -> None:
             assert token not in source, (module.__name__, token)
     for name in ("GEOMETRIC_CONTROLS", "PART_DATUMS"):
         assert not hasattr(spec, name)
-    # The wheel runs on the shank: a journal, machined grade (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
+    # The wheel runs on the shank: a journal, machined grade (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)), and
+    # the Ø callout says so beside the press fit.
     assert [(c.key, c.roughness_um) for c in spec.SURFACE_FINISHES] == [
         ("mg_axle_journal", MACHINED_UM)
     ]
+    assert "MG-MAGNIFYING-WHEEL RUNS ON IT" in callouts.PIN_DIA_CALLOUT
 
 
-def test_thread_callout_and_notes() -> None:
+def test_thread_callout_and_no_general_notes() -> None:
     assert spec.THREAD_CALLOUT == "#4-40 UNC"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_attached_note(") == 1
     assert "text=THREAD_CALLOUT" in source
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    notes = spec.DRAWING_NOTES
-    assert 1 <= len(notes.splitlines()) <= 4
-    flat = " ".join(notes.splitlines())
-    assert "TO THE GAUGE ON MHA-MG-00 (AXLE AS PRESSED)" in flat
-    assert not re.search(r"\d+\.\d|\+/-|±|Ø|MAX|MIN", notes)
-    assert all(len(line) <= 80 for line in notes.splitlines())
-    assert "REAMED BORE" not in notes
-    assert drawing.DIMENSION_CALLOUTS["PinDia"] == (
-        "PRESS FIT IN MG-WHEEL-BAR\n<MOD-DIAM>4.737-4.747 REAMED BORE"
+    # Rule 7: the press-to-gauge step is MHA-MG-00's, and the optional
+    # thread locker is gone; no general note remains.
+    assert "Manufacturing Notes" not in source
+    assert not hasattr(spec, "DRAWING_NOTES")
+    assert "Manufacturing Notes" not in Path(part.__file__).read_text(encoding="utf-8")
+    assert callouts.PIN_DIA_CALLOUT == (
+        "PRESS FIT IN MG-WHEEL-BAR\n<MOD-DIAM>4.737-4.747 REAMED BORE;\n"
+        "MG-MAGNIFYING-WHEEL RUNS ON IT"
     )
-    assert "DEBURR" not in notes
-    assert "X.XX" not in notes
+
+
+def test_callouts_are_part_authored_and_only_read_by_the_sheet() -> None:
+    """#1942: dimension text set from the sheet writes through to the part."""
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "SetText" not in drawing_source
+    assert "set_dimension_callouts" not in drawing_source
+    assert "set_reference_dimension" not in drawing_source
+    assert "_assert_part_authored_text(adapter, annotations)" in drawing_source
+    assert "author_dimension_callouts(adapter)" in Path(part.__file__).read_text(
+        encoding="utf-8"
+    )
+    authored = callouts.authored_by_name()
+    assert set(authored) == {
+        "PinDia",
+        "ShankLength",
+        "ThreadLength",
+        "ReliefWidth",
+        "ReliefRootR",
+        "PinLength",
+    }
+    assert authored["PinLength"] == {
+        callouts.TEXT_PREFIX: "(",
+        callouts.TEXT_SUFFIX: ")",
+    }
+    assert authored["ReliefRootR"] == {callouts.CALLOUT_ABOVE: "2X"}
+
+
+def test_detail_circles_are_authored_without_inference() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "manager.AddToDB = True" in source
+    assert "manager.AddToDB = previous_add_to_db" in source
+    assert "native_circle_geometry(circle" in source
 
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (3.0, 1.0)
     assert drawing.VIEW_SCALE == (3, 1)
+    assert drawing.DETAIL_SCALE == (10, 1)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("scale=VIEW_SCALE") == 2
     assert drawing.SIDE_VIEW_ANGLE == -math.pi / 2.0
@@ -172,11 +266,11 @@ def test_wheel_group_stack_fits_the_pin() -> None:
     assert group.STEP_INSIDE_HUB > 0.0
     assert group.STEP_INSIDE_HUB == pytest.approx(0.6566, abs=1e-3)
     # (b) on FULL thread: the dome's incomplete pitch is not counted, and the
-    # first nut stays clear of the die run-out at the step.
+    # first nut stays clear of the step's relief.
     assert group.LOCKNUT_THREAD_MARGIN >= 0.0
     assert group.LOCKNUT_THREAD_MARGIN == pytest.approx(0.0016, abs=1e-3)
-    assert group.NUT_RUNOUT_MARGIN == pytest.approx(0.2113, abs=1e-3)
-    assert group.THREAD_PAST_LOCKNUT_MAX <= group.THREAD_PAST_LOCKNUT_LIMIT == 2.9
+    assert group.NUT_RUNOUT_MARGIN == pytest.approx(0.0638, abs=1e-3)
+    assert group.THREAD_PAST_LOCKNUT_MAX <= spec.THREAD_PAST_LOCKNUT_LIMIT == 2.9
     assert group.THREAD_PAST_LOCKNUT_MAX == pytest.approx(2.8666, abs=1e-3)
     assert group.THREAD_PAST_LOCKNUT_NOMINAL == pytest.approx(1.6875, abs=1e-3)
     # Pressed to the gauge, the .X shank lands the back end near the back
