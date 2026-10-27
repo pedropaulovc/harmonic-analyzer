@@ -45,6 +45,7 @@ from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
+    dimension_name,
     place_view,
     view_name,
 )
@@ -152,7 +153,11 @@ VIEW_SCALE = (2, 1)
 PLAN_CENTER = (0.105, 0.132)
 ISO_CENTER = (0.320, 0.200)
 ISO_NOTE_XY = (0.285, 0.252)
-SCREW_SECTION_CENTER = (0.305, 0.110)
+# 30 mm higher than the outline alone needs: the view's caption keeps the
+# offset SOLIDWORKS gave it below the full section, before only the cut face
+# printed, which put it on the title block (machinist review, run
+# 20261027T180704579Z).
+SCREW_SECTION_CENTER = (0.305, 0.140)
 REAR_LABEL_XY = (0.093, 0.038)
 BACK_CENTER = (0.135, 0.153)
 KNOB_SECTION_CENTER = (0.298, BACK_CENTER[1])
@@ -247,16 +252,40 @@ BACK_KEEP: dict[str, tuple[float, float, float]] = {
 # 20261027T130144223Z; below the view, the hub-to-boss lines met the view's
 # caption).  The hub diameter stands beyond the knob zone's chain line, its
 # text above the axis: below it, datum B's tag (face-A view) sat on it and
-# read as naming the hub (machinist review, run 20261027T152452686Z); the
-# boss diameter stands beyond the boss face's caption.
+# read as naming the hub (machinist review, run 20261027T152452686Z); its
+# witness lines stop short of the hub face, not on through the hatched hub
+# to the profile line's far end at the rear face (run 20261027T180704579Z).
+# The boss diameter stands beyond the boss face's caption.
+HUB_DIA_TEXT_STANDOFF_MM = 25.5
+HUB_DIA_WITNESS_MAX_M = (HUB_DIA_TEXT_STANDOFF_MM * SHEET_SCALE[0] - 1.0) / 1000.0
 SECTION_KEEP: dict[str, tuple[float, float, float]] = {
     "ThicknessOverArm": (0.0, _SECTION_TOP + 5.0, REAR_FACE_Z / 2.0),
     "NotchDepth": (0.0, _SECTION_TOP + 10.0, FRONT_FACE_Z / 2.0),
     "HubFaceToMounting": (0.0, _SECTION_TOP + 19.0, HUB_FACE_Z / 2.0),
     "HubToBoss": (0.0, _SECTION_TOP + 28.0, (HUB_FACE_Z + BOSS_FACE_Z) / 2.0),
-    "HubDia": (0.0, 11.0, HUB_FACE_Z - 25.5),
+    "HubDia": (0.0, 11.0, HUB_FACE_Z - HUB_DIA_TEXT_STANDOFF_MM),
     "BossDia": (0.0, 0.0, BOSS_FACE_Z + 27.5),
 }
+
+
+def _cap_witness_lines(
+    adapter: Any, annotations: list[Any], name: str, length_m: float
+) -> None:
+    """Cap the named dimension's witness lines at ``length_m`` (sheet) from
+    its dimension line, read back."""
+    found = [
+        annotation for annotation in annotations
+        if dimension_name(adapter, annotation) == name
+    ]
+    if len(found) != 1:
+        raise RuntimeError(f"expected one {name} to cap its witness lines, found {len(found)}")
+    display = _early_bound(
+        _early_bound(found[0], "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension"
+    )
+    display.MaxWitnessLineLength = length_m
+    rebuild_drawing(adapter, label=f"{name} witness cap")
+    if abs(float(display.MaxWitnessLineLength) - length_m) > 1e-9:
+        raise RuntimeError(f"{name}: maximum witness-line length did not persist")
 
 
 def _locator_callout() -> str:
@@ -869,6 +898,7 @@ async def build(adapter: Any) -> dict[str, str]:
         {name: DRAWING_PRECISION_BY_NAME[name] for name in (*BACK_KEEP, *SECTION_KEEP)},
     )
     set_dimension_callouts(adapter, face_annotations, SECTION_CALLOUTS)
+    _cap_witness_lines(adapter, face_annotations, "HubDia", HUB_DIA_WITNESS_MAX_M)
     # These are the same native feature datums and circular zones authored
     # on the part, not +/- positions retyped on a drawing. The drill mouths,
     # the through locator bores' rims and the +X side face's edge on the
