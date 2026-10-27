@@ -100,10 +100,11 @@ PLAIN_LENGTH_MIN_TOL_TYPE = 5  # swTolType_e.swTolMIN
 # sm_gooseneck_spring_joint.SCREW_END_INCOMPLETE_MAX) behind the full thread.
 DIE_RUNOUT = 1.5 * PITCH
 # Under-head face to the first full thread, printed as the single limit
-# "5.80 MAX": the plug's counterbore clears every run-out short of it
-# (sm_gooseneck_spring_joint.COUNTERBORE_DEPTH_MIN).  Between the two limits
-# a die has 2.4 pitches for its chamfer.
-FULL_THREAD_STATION_MAX = 5.80
+# "5.71 MAX": the largest two-place limit whose run-out the end piece's
+# counterbore (sm_gooseneck_spring_joint.COUNTERBORE_DEPTH_MIN, 2.73) clears
+# by its margin at the least gap on the screw's axis.  Between the two limits
+# a die has 2.3 pitches for its chamfer.
+FULL_THREAD_STATION_MAX = 5.71
 FULL_THREAD_STATION_MAX_TOL_TYPE = 6  # swTolType_e.swTolMAX
 FULL_THREAD_DIE_ROOM_MIN = 2.0 * PITCH
 # The two limits bound each other, so each one's native band (upper, lower)

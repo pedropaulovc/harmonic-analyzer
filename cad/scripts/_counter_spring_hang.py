@@ -100,19 +100,18 @@ def assert_counter_spring_top_hang(
     )
     main_coil_gap = screw_y - sm_gooseneck_geom.TUBE_DIA / 2.0 - coil_top
     # The native seat certificate is taken at the free gap, but clamping
-    # shrinks the gap to CLAMPED_GAP_MIN..CLAMPED_GAP_MAX (sm_gooseneck_spring_joint;
-    # codjiflo P1 on #1997). The independent bound of the complete clamping
-    # envelope: the half-turn against the arm and the head at the free gap and
-    # at CLAMP_GAP_SAMPLES evenly spaced clamped gaps, both ends included,
-    # each the rigid shift counter_half_turn_clearances bounds.
+    # shrinks the gap to CLAMPED_GAP_MAX and below, to CLAMPED_AXIS_GAP_MIN on
+    # the screw's axis (sm_gooseneck_spring_joint; codjiflo P1 on #1997). The
+    # independent bound of the complete clamping envelope: the half-turn
+    # against the arm and the head at the free gap and at CLAMP_GAP_SAMPLES
+    # evenly spaced clamped gaps, both ends included, each the rigid shift
+    # counter_half_turn_clearances bounds.
     steps = CLAMP_GAP_SAMPLES - 1
+    least_gap = spring_joint.CLAMPED_AXIS_GAP_MIN
     clamp_gaps = (
         sm_gooseneck_geom.SPRING_EYE_GAP,
         *(
-            spring_joint.CLAMPED_GAP_MIN
-            + (spring_joint.CLAMPED_GAP_MAX - spring_joint.CLAMPED_GAP_MIN)
-            * index
-            / steps
+            least_gap + (spring_joint.CLAMPED_GAP_MAX - least_gap) * index / steps
             for index in range(steps + 1)
         ),
     )
@@ -133,7 +132,7 @@ def assert_counter_spring_top_hang(
             f"half-turn/tube {tube_gap:.3f} at clamp gap {tube_at:.4f}, "
             f"half-turn/head {head_gap:.3f} at clamp gap {head_at:.4f} mm "
             f"(free gap {sm_gooseneck_geom.SPRING_EYE_GAP:.4f}, clamped "
-            f"{spring_joint.CLAMPED_GAP_MIN:.4f}..{spring_joint.CLAMPED_GAP_MAX:.4f})"
+            f"{least_gap:.4f}..{spring_joint.CLAMPED_GAP_MAX:.4f})"
         )
     log(
         f"counter upper support: head retention {retention:.3f}, "

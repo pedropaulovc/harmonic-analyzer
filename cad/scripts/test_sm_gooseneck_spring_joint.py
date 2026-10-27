@@ -58,6 +58,16 @@ def test_screw_tilts_by_its_play_over_the_shortest_engagement() -> None:
     assert joint.SCREW_TILT_MAX == pytest.approx(tilt)
     assert math.degrees(tilt) == pytest.approx(1.296, abs=5e-4)
     assert joint.ENGAGEMENT_MIN >= ONE_POINT_FIVE_D
+    # On the screw's axis the tilted head face stands closer than the
+    # stacked passes allow where they bear, at most LOOP_PASS_RADIUS_MAX off
+    # the axis (test_rocked_loop_keeps_the_gap_floor_and_bears_on_the_body).
+    pass_radius = (
+        spring.COIL_MEAN_RADIUS_MM - (spring.EYE_ID_MM - screw.BODY_DIA_MAX) / 2.0
+    )
+    assert joint.LOOP_PASS_RADIUS_MAX == pytest.approx(pass_radius)
+    axis_gap = joint.CLAMPED_GAP_MIN - math.tan(tilt) * pass_radius
+    assert joint.CLAMPED_AXIS_GAP_MIN == pytest.approx(axis_gap)
+    assert axis_gap == pytest.approx(3.111, abs=5e-4)
     # At the end face: the deepest floor and its 0.25 break past the
     # receiver's first full thread.
     face = _screw_play() + (joint.COUNTERBORE_DEPTH_MAX + 0.25) * math.tan(tilt)
@@ -68,11 +78,11 @@ def test_screw_tilts_by_its_play_over_the_shortest_engagement() -> None:
 def test_counterbore_depth_clears_the_deepest_runout_with_margin() -> None:
     # The tilted full-thread circle's low side dips past its axis station.
     dip = screw.MAJOR_DIA / 2.0 * math.sin(joint.SCREW_TILT_MAX)
-    deepest = screw.FULL_THREAD_STATION_MAX - joint.CLAMPED_GAP_MIN + dip
+    deepest = screw.FULL_THREAD_STATION_MAX - joint.CLAMPED_AXIS_GAP_MIN + dip
     free = screw.FULL_THREAD_STATION_MAX - gooseneck.SPRING_EYE_GAP + dip
     assert joint.SCREW_RUNOUT_INTRUSION_MAX == pytest.approx(deepest)
     assert joint.SCREW_RUNOUT_INTRUSION_FREE_MAX == pytest.approx(free)
-    assert (free, deepest) == pytest.approx((0.99, 2.67), abs=0.005)
+    assert (free, deepest) == pytest.approx((0.90, 2.67), abs=0.005)
     assert joint.COUNTERBORE_DEPTH_MIN - deepest >= joint.COUNTERBORE_RUNOUT_MARGIN_MIN
     assert (
         joint.COUNTERBORE_DEPTH_MIN,
@@ -143,8 +153,8 @@ def test_receiver_full_thread_past_the_counterbore_is_1_5d() -> None:
 
 
 def test_deepest_tip_stays_inside_the_blind_full_thread() -> None:
-    # The longest screw at the least clamped gap sits deepest.
-    deepest_tip = screw.LENGTH + screw.LENGTH_UPPER - joint.CLAMPED_GAP_MIN
+    # The longest screw at the least gap on its axis sits deepest.
+    deepest_tip = screw.LENGTH + screw.LENGTH_UPPER - joint.CLAMPED_AXIS_GAP_MIN
     # The tap's depths run from the counterbore floor, its start face.
     shallowest_thread = (
         joint.COUNTERBORE_DEPTH_MIN
@@ -153,7 +163,7 @@ def test_deepest_tip_stays_inside_the_blind_full_thread() -> None:
     )
     assert joint.CLAMPED_SCREW_REACH_MAX == pytest.approx(deepest_tip)
     assert joint.TIP_THREAD_MARGIN_MIN == pytest.approx(shallowest_thread - deepest_tip)
-    assert joint.TIP_THREAD_MARGIN_MIN == pytest.approx(0.18, abs=0.005)
+    assert joint.TIP_THREAD_MARGIN_MIN == pytest.approx(0.09, abs=0.005)
     assert joint.TIP_THREAD_MARGIN_MIN > 0.0
     assert joint.TAP_SPEC.end == "blind"
     assert joint.TAP_SPEC.size == screw.THREAD_SIZE == "1/4-28"
@@ -486,6 +496,30 @@ def _rim_reach(radius, inner: float, outer: float):
     return reach
 
 
+def _relieved_head_reach(radius, inner: float, flat: float, outer: float):
+    """Axial reach of the wire's section onto MHA-SM-04's relieved head.
+
+    The flat annulus ``[inner, flat]`` has both rims (_rim_reach).  Past it
+    lies the 45-degree relief out to the head's Ø ``outer``, which stands
+    ``outer - flat`` back from the face at the OD, and then that OD corner.
+    A section bears on the relief where the foot of its normal lands on the
+    relief.
+    """
+    import numpy as np
+
+    r = joint.WIRE_R
+    reach = _rim_reach(radius, inner, flat)
+    root2 = math.sqrt(2.0)
+    cone = (radius >= flat + r / root2) & (radius <= outer + r / root2)
+    reach[cone] = np.maximum(reach[cone], r * root2 - (radius[cone] - flat))
+    off = radius - outer
+    corner = (off > 0.0) & (off < r)
+    reach[corner] = np.maximum(
+        reach[corner], -(outer - flat) + np.sqrt(r**2 - off[corner] ** 2)
+    )
+    return reach
+
+
 def test_rocked_loop_keeps_the_gap_floor_and_bears_on_the_body() -> None:
     # The loop, rigid (free helix and coil-bound), rocked by a tilt vector
     # over a grid, then pulled down the spring's line until it bears on the
@@ -493,12 +527,15 @@ def test_rocked_loop_keeps_the_gap_floor_and_bears_on_the_body() -> None:
     # state whose width fits the gap (the free gap, or CLAMPED_GAP_MAX bound)
     # counts.  Its section bears on a face wherever it meets the face's
     # footprint, rims included (_rim_reach).  Head: from the R0.5 corner's
-    # tangent out to its Ø lower limit less the title-block break.  End face:
-    # from the counterbore mouth's reach out to the flush end piece's Ø lower
-    # limit less its break, or its upper limit.
-    #  * every width holds the floor CLAMPED_GAP_MIN, which is tight, and so
-    #    does the gap on the screw axis with the head face tilted
-    #    SCREW_TILT_MAX against the end face in any direction;
+    # tangent out to the relieved flat's edge, then the 45-degree relief to
+    # the head's Ø (_relieved_head_reach), at the least flat (smallest head,
+    # largest relief) and the most.  End face: from the counterbore mouth's
+    # reach out to the flush end piece's Ø lower limit less its break, or its
+    # upper limit.
+    #  * every width holds the floor CLAMPED_GAP_MIN, which is tight, and the
+    #    gap on the screw axis with the head face tilted SCREW_TILT_MAX
+    #    against the end face in any direction holds CLAMPED_AXIS_GAP_MIN,
+    #    which is near-tight too (a finer grid reads it lower, toward it);
     #  * in every state that fits, the wire bears on the body at the body's
     #    own radius (no step: test_loop_passes_bear_on_the_plain_body_free_and_clamped),
     #    past the head face's wire radius (the R0.5 corner's floor,
@@ -509,8 +546,11 @@ def test_rocked_loop_keeps_the_gap_floor_and_bears_on_the_body() -> None:
 
     r = joint.WIRE_R
     step = 0.01
-    grid = np.round(np.arange(-0.31, 0.3101, step), 6)
+    grid = np.round(np.arange(-0.40, 0.4001, step), 6)
     tx, ty = (axis.ravel() for axis in np.meshgrid(grid, grid, indexing="ij"))
+    # Rocked about every horizontal axis alike: the disc the grid spans.
+    inside = np.hypot(tx, ty) <= grid[-1] + 1e-9
+    tx, ty = tx[inside], ty[inside]
     tilt = np.hypot(tx, ty)
     unit = np.zeros((tx.size, 2))
     np.divide(
@@ -529,7 +569,19 @@ def test_rocked_loop_keeps_the_gap_floor_and_bears_on_the_body() -> None:
     theta = math.pi / 2.0 + 2.0 * math.pi * spring.LOOP_TURNS * (
         t - 1.0 / (4.0 * spring.LOOP_TURNS)
     )
-    head_outer = (screw.HEAD_DIA + screw.HEAD_DIA_LOWER) / 2.0 - joint.EDGE_BREAK
+    heads = {
+        "least flat": (
+            (screw.HEAD_DIA + screw.HEAD_DIA_LOWER) / 2.0
+            - screw.HEAD_RELIEF_CHAMFER_MAX,
+            (screw.HEAD_DIA + screw.HEAD_DIA_LOWER) / 2.0,
+        ),
+        "most flat": (
+            (screw.HEAD_DIA + screw.HEAD_DIA_UPPER) / 2.0
+            - screw.HEAD_RELIEF_CHAMFER_MIN,
+            (screw.HEAD_DIA + screw.HEAD_DIA_UPPER) / 2.0,
+        ),
+    }
+    assert heads["least flat"][0] == pytest.approx(joint.HEAD_FLAT_RADIUS_MIN)
     mouth_r = joint.COUNTERBORE_MOUTH_REACH
     footprints = {
         "least": _smallest_end_piece_radius() - joint.EDGE_BREAK,
@@ -568,34 +620,35 @@ def test_rocked_loop_keeps_the_gap_floor_and_bears_on_the_body() -> None:
             assert radius.min(axis=1) == pytest.approx(bearing_r)
             bearing = radius <= bearing_r + 1e-9
             head_inner = body / 2.0 + screw.UNDERHEAD_CORNER_R
-            head_side = z - _rim_reach(radius, head_inner, head_outer)
-            head_face = head_side.min(axis=1)
-            station = z - head_face[:, None]
-            for name, outer in footprints.items():
-                end_side = z + _rim_reach(radius, mouth_r, outer)
-                width = end_side.max(axis=1) - head_face
-                axis_gap = min(
-                    float(((end_side - xy @ tilted).max(axis=1) - head_face).min())
-                    for tilted in face_tilts
-                )
-                fits = width <= gap_max
-                bearing_station = station[fits][bearing[fits]]
-                bearing_width = np.broadcast_to(
-                    width[fits][:, None], bearing[fits].shape
-                )[bearing[fits]]
-                cases.append(
-                    (
-                        state,
-                        body,
-                        name,
-                        float(width.min()),
-                        axis_gap,
-                        int(fits.sum()),
-                        float(tilt[fits].max()),
-                        float(bearing_station.min()),
-                        float((bearing_station - bearing_width).max()),
+            for head, (flat, head_r) in heads.items():
+                head_side = z - _relieved_head_reach(radius, head_inner, flat, head_r)
+                head_face = head_side.min(axis=1)
+                station = z - head_face[:, None]
+                for foot, outer in footprints.items():
+                    end_side = z + _rim_reach(radius, mouth_r, outer)
+                    width = end_side.max(axis=1) - head_face
+                    axis_gap = min(
+                        float(((end_side - xy @ tilted).max(axis=1) - head_face).min())
+                        for tilted in face_tilts
                     )
-                )
+                    fits = width <= gap_max
+                    bearing_station = station[fits][bearing[fits]]
+                    bearing_width = np.broadcast_to(
+                        width[fits][:, None], bearing[fits].shape
+                    )[bearing[fits]]
+                    cases.append(
+                        (
+                            state,
+                            body,
+                            f"{head}/{foot}",
+                            float(width.min()),
+                            axis_gap,
+                            int(fits.sum()),
+                            float(tilt[fits].max()),
+                            float(bearing_station.min()),
+                            float((bearing_station - bearing_width).max()),
+                        )
+                    )
     print(
         "rocked loop: "
         + ", ".join(
@@ -605,8 +658,11 @@ def test_rocked_loop_keeps_the_gap_floor_and_bears_on_the_body() -> None:
         )
     )
     assert min(case[3] for case in cases) >= joint.CLAMPED_GAP_MIN
-    assert min(case[4] for case in cases) >= joint.CLAMPED_GAP_MIN
-    tight = min(case[3] for case in cases if case[0] == "bound" and case[2] == "least")
+    axis_least = min(case[4] for case in cases)
+    assert joint.CLAMPED_AXIS_GAP_MIN <= axis_least <= joint.CLAMPED_AXIS_GAP_MIN + 0.05
+    tight = min(
+        case[3] for case in cases if case[0] == "bound" and case[2].endswith("/least")
+    )
     assert tight <= joint.CLAMPED_GAP_MIN + 0.10
     # A wire bearing on the body spans the counterbore's mouth rim (its section
     # reaches past it), so it rides that rim at most: its centre stands the

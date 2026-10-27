@@ -7,7 +7,7 @@ under-face edge relieved for the spring's transition wire, over a plain
 screw carries no datum and no geometric-control frame (drawing-guidelines.md
 rule 5 (avoid excessive GD&T)): the body Ø, the head Ø and the head's relief
 chamfer print as the part's stacked LIMIT bands, the plain length as the part's
-single "3.60 MIN" and the full-thread station as its single "5.80 MAX", both
+single "3.60 MIN" and the full-thread station as its single "5.71 MAX", both
 from the under-head face, the under-head corner as its single "R0.5 MAX"
 (codjiflo round 4 on #1997), and every other size is an ordinary model
 dimension at its part-authored places under the title block's band for those
@@ -210,7 +210,7 @@ BODY_DIA_TEXT_HEIGHT = block_height(2, _callout_lines("BodyDia"))
 # '3.60 min.' over 'PLAIN;' / 'MHA-SM-VN-51' / 'LOOP SEAT'.
 PLAIN_LENGTH_TEXT_WIDTH = _COUNTER_SPRING_WIDTH
 PLAIN_LENGTH_TEXT_HEIGHT = block_height(1, _callout_lines("PlainLength"))
-# 'TO FULL THREAD' 35.69 mm (font advance) over '5.80 max.', 21.44 mm as
+# 'TO FULL THREAD' 35.69 mm (font advance) over '5.71 max.', 21.44 mm as
 # '5.67 max.' rendered, on one line.
 FULL_THREAD_TEXT_WIDTH = 0.0357
 FULL_THREAD_VALUE_WIDTH = 0.0214
@@ -248,7 +248,7 @@ THREAD_NOTE_XY = (THREAD_START_X + 0.011, SIDE_CENTER[1] + 0.035)
 RADIAL_BEND_GAP = 0.0016
 RADIAL_BEND_DROP = 0.0028
 # The under-head corner's "R0.5 MAX" reads up-right of the upper corner,
-# right of the 5.80 station's extension line and under the two station rows,
+# right of the 5.71 station's extension line and under the two station rows,
 # "MHA-SM-VN-51" / "LOOP CLEARS" under it.  Its arc is the quarter down-left
 # of its centre; the text stands opposite, so SolidWorks lands the radial
 # arrow on the circle's point facing the text and the arc's extension carries
@@ -287,8 +287,8 @@ UNDERHEAD_CORNER_TIP_TOL_M = 0.0002
 # top ink, the full-thread limit's 10 mm above it.
 PLAIN_LENGTH_LINE_Y = UNDERHEAD_CORNER_BEND_Y + UNDERHEAD_CORNER_TEXT_HEIGHT + 0.0045
 FULL_THREAD_LINE_Y = PLAIN_LENGTH_LINE_Y + 0.010
-# The full-thread block centres over its own 23.2-mm span, above its line.
-# Its extension lines rise 1.0 mm past the line, so the value '5.80 max.'
+# The full-thread block centres over its own 22.8-mm span, above its line.
+# Its extension lines rise 1.0 mm past the line, so the value '5.71 max.'
 # (21.4 mm) takes the line between them and its callout stands above it
 # (farm run 20261027T053051351Z).
 FULL_THREAD_TEXT_XY = (
@@ -297,7 +297,7 @@ FULL_THREAD_TEXT_XY = (
 )
 # The plain length's span (14.4 mm) is narrower than its block, so the block
 # stands right of every line it would otherwise meet: 3 mm clear of the
-# full-thread block, which it shares a height with, and so of the 5.80
+# full-thread block, which it shares a height with, and so of the 5.71
 # station's extension line too.
 PLAIN_LENGTH_TEXT_LEFT = (
     max(FULL_THREAD_TEXT_XY[0] + FULL_THREAD_TEXT_WIDTH / 2.0, FULL_THREAD_X) + 0.003

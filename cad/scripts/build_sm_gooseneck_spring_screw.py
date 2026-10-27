@@ -638,7 +638,7 @@ async def build(adapter) -> dict[str, str]:
     # Ø prints as the LIMIT band 6.32/6.20, the thread blank inside the
     # 1/4-28 UNF-2A major band; the plain length as the single "3.60 MIN"
     # from the under-head face, so the loop always bears on the plain body;
-    # the full-thread station as the single "5.80 MAX", so the end piece's
+    # the full-thread station as the single "5.71 MAX", so the end piece's
     # counterbore clears the run-out; the head Ø and its relief chamfer as
     # the LIMIT bands 11.60/11.40 and 1.50/1.40, so the loop's transition
     # wire clears the head and the flat inside the relief still bears the

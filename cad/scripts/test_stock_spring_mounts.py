@@ -73,9 +73,9 @@ def test_counter_leading_half_turn_clears_tube_and_head() -> None:
     pose = spring_mount_geom.COUNTER_REFERENCE_POSE
     screw_y = spring_mount_geom.GOOSENECK_ORIGIN_Y + sm_gooseneck_geom.ARM_Y
     steps = 8
+    least = spring_joint.CLAMPED_AXIS_GAP_MIN
     gaps = [sm_gooseneck_geom.SPRING_EYE_GAP] + [
-        spring_joint.CLAMPED_GAP_MIN
-        + (spring_joint.CLAMPED_GAP_MAX - spring_joint.CLAMPED_GAP_MIN) * index / steps
+        least + (spring_joint.CLAMPED_GAP_MAX - least) * index / steps
         for index in range(steps + 1)
     ]
     for clamp_gap in gaps:
@@ -104,11 +104,13 @@ def test_counter_upper_loop_bears_on_the_plain_body_and_clears_the_tube() -> Non
     assert spring_mount_geom.COUNTER_UPPER_EYE_X == pytest.approx(
         spring_mount_geom.COLUMN_X - sm_gooseneck_geom.SPRING_EYE_X
     )
-    # The end piece's tap is blind: the longest screw at the least clamped gap
-    # stops short of the shallowest full thread, and the shortest screw at the
-    # free gap still engages 1.5D of full thread.
+    # The end piece's tap is blind: the longest screw at the least gap on its
+    # axis stops short of the shallowest full thread, and the shortest screw
+    # at the free gap still engages 1.5D of full thread.
     assert (
-        spring_screw.LENGTH + spring_screw.LENGTH_UPPER - spring_joint.CLAMPED_GAP_MIN
+        spring_screw.LENGTH
+        + spring_screw.LENGTH_UPPER
+        - spring_joint.CLAMPED_AXIS_GAP_MIN
         < spring_joint.TAP_THREAD_DEPTH_MIN
     )
     assert spring_joint.ENGAGEMENT_MIN >= 1.5 * spring_screw.MAJOR_DIA

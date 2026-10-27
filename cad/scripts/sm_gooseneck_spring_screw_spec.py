@@ -21,7 +21,7 @@ Every size takes the title block's band for its places except six limits,
 each named on the sheet for what it serves (drawing-guidelines.md rule 4):
 the body Ø's LIMIT band 6.32/6.20 (the thread blank, inside the 2A major
 band, and the loop's seat), the plain length's single "3.60 MIN" (the loop
-bears on the plain body), the full-thread station's single "5.80 MAX" from
+bears on the plain body), the full-thread station's single "5.71 MAX" from
 the under-head face ("TO FULL THREAD"; the end piece's counterbore clears the
 run-out short of it), the under-head corner's single "R0.5 MAX" under the
 title block's INSIDE CORNERS R1.0 MAX (codjiflo round 4 on #1997), and the
@@ -80,7 +80,7 @@ DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
         "PlainLength": f"PLAIN;\n{COUNTER_SPRING_NUMBER}\nLOOP SEAT",
     },
 }
-# Above the value: the full-thread limit's span is wider than its "5.80 max."
+# Above the value: the full-thread limit's span is wider than its "5.71 max."
 # but narrower than any callout, so the value takes the dimension line and
 # the callout stands over it (farm run 20261027T053051351Z).
 DIMENSION_CALLOUTS_ABOVE: dict[str, dict[str, str]] = {

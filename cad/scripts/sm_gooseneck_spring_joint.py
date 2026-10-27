@@ -74,9 +74,10 @@ def _owner_minor(package: str, exception_id: str) -> None:
 # the clamp preload sm_gooseneck_spring_screw_spec.clamp_preload_n sweeps.
 # Bound, the loop rises one wire diameter per turn: CLAMPED_GAP_MAX, the most
 # the gap can be under clamp.  The two stacked pull-side layers bear on the
-# body inside BOTH faces, so the gap is never under two wire diameters:
-# CLAMPED_GAP_MIN, the least the gap can be, where the screw sits deepest.
-# Each check takes the gap worst for it.
+# body inside BOTH faces, so where they bear the gap is never under two wire
+# diameters: CLAMPED_GAP_MIN (CLAMPED_AXIS_GAP_MIN, below, is the least on the
+# screw's axis, where the screw sits deepest).  Each check takes the gap worst
+# for it.
 LOOP_SHEAR_MODULUS_MPA = 82_700.0
 LOOP_AXIAL_RATE = (
     LOOP_SHEAR_MODULUS_MPA
@@ -103,17 +104,32 @@ ENGAGEMENT_MIN_D = 1.5
 SCREW_TILT_MAX = math.atan(
     2.0 * SCREW_RADIAL_PLAY_MAX / (ENGAGEMENT_MIN_D * screw.MAJOR_DIA)
 )
+# The two stacked pull passes hold the faces CLAMPED_GAP_MIN apart where they
+# bear on the body.  Their centreline stands the coil radius less the eye's
+# offset from the screw axis, at most LOOP_PASS_RADIUS_MAX (at the largest
+# body).  On the screw's own axis the head face, tilted SCREW_TILT_MAX against
+# the end face, can stand closer by the tilt over that radius.  A rocked loop
+# reaches toward this floor because the relieved head
+# (sm_gooseneck_spring_screw_geom) bears only inside its flat
+# (test_rocked_loop_keeps_the_gap_floor_and_bears_on_the_body).  Wherever the
+# screw's station along its axis matters (its run-out and its tip), this is
+# the least gap.
+LOOP_PASS_RADIUS_MAX = (
+    spring.COIL_MEAN_RADIUS_MM - (spring.EYE_ID_MM - screw.BODY_DIA_MAX) / 2.0
+)
+CLAMPED_AXIS_GAP_MIN = CLAMPED_GAP_MIN - math.tan(SCREW_TILT_MAX) * LOOP_PASS_RADIUS_MAX
 
-# The screw's own full thread starts no later than the "5.80 MAX" MHA-SM-04
+# The screw's own full thread starts no later than the "5.71 MAX" MHA-SM-04
 # prints (FULL_THREAD_STATION_MAX, from the head).  The run-out's incomplete
 # threads are FAT (full crest, shallow root): in the end piece's full 2B
 # thread they jam before the head clamps.  They reach deepest past the end
-# face at the least clamped gap, and the tilt dips the full-thread circle's
-# low side a further half major x sin(tilt), so the arm-end counterbore's
-# depth clears the intrusion by COUNTERBORE_RUNOUT_MARGIN_MIN.
+# face at the least gap on the screw's axis, and the tilt dips the
+# full-thread circle's low side a further half major x sin(tilt), so the
+# arm-end counterbore's depth clears the intrusion by
+# COUNTERBORE_RUNOUT_MARGIN_MIN.
 SCREW_RUNOUT_TILT_DIP = screw.MAJOR_DIA / 2.0 * math.sin(SCREW_TILT_MAX)
 SCREW_RUNOUT_INTRUSION_MAX = (
-    screw.FULL_THREAD_STATION_MAX - CLAMPED_GAP_MIN + SCREW_RUNOUT_TILT_DIP
+    screw.FULL_THREAD_STATION_MAX - CLAMPED_AXIS_GAP_MIN + SCREW_RUNOUT_TILT_DIP
 )
 SCREW_RUNOUT_INTRUSION_FREE_MAX = (
     screw.FULL_THREAD_STATION_MAX - gooseneck.SPRING_EYE_GAP + SCREW_RUNOUT_TILT_DIP
@@ -154,11 +170,11 @@ RUNOUT_RADIAL_CLEARANCE_MIN = (
 COUNTERBORE_FLOOR_CORNER_R_MAX = 0.10
 
 # Tip budgets: the free gap leaves the screw shallowest (full-thread reach),
-# the least clamped gap drives it deepest.
+# the least gap on its axis drives it deepest.
 SCREW_REACH = screw.LENGTH - gooseneck.SPRING_EYE_GAP
 SCREW_REACH_MIN = SCREW_REACH + screw.LENGTH_LOWER
 SCREW_REACH_MAX = SCREW_REACH + screw.LENGTH_UPPER
-CLAMPED_SCREW_REACH_MAX = screw.LENGTH + screw.LENGTH_UPPER - CLAMPED_GAP_MIN
+CLAMPED_SCREW_REACH_MAX = screw.LENGTH + screw.LENGTH_UPPER - CLAMPED_AXIS_GAP_MIN
 SCREW_END_INCOMPLETE_MAX = 1.5 * screw.PITCH
 FULL_THREAD_REACH_MIN = SCREW_REACH_MIN - SCREW_END_INCOMPLETE_MAX
 
@@ -291,14 +307,10 @@ HEAD_RETENTION_MIN = (screw.HEAD_DIA + screw.HEAD_DIA_LOWER - spring.EYE_ID_MM) 
 # The head's clamp flat.  The relief chamfer (sm_gooseneck_spring_screw_geom)
 # ends the flat under-head face at the smallest head less the largest
 # chamfer; the clamp's first pull pass, the loop's wire nearest the screw
-# axis, still bears on it.  Its centreline stands the coil radius less the
-# eye's offset from the screw axis, largest at the largest body.
+# axis (at most LOOP_PASS_RADIUS_MAX off it), still bears on it.
 HEAD_FLAT_RADIUS_MIN = (
     screw.HEAD_DIA + screw.HEAD_DIA_LOWER
 ) / 2.0 - screw.HEAD_RELIEF_CHAMFER_MAX
-LOOP_PASS_RADIUS_MAX = (
-    spring.COIL_MEAN_RADIUS_MM - (spring.EYE_ID_MM - screw.BODY_DIA_MAX) / 2.0
-)
 HEAD_FLAT_BEARING_MARGIN_MIN = HEAD_FLAT_RADIUS_MIN - LOOP_PASS_RADIUS_MAX
 
 # The loop on its seat.  The clamp fixes the loop's two pull-side passes (the

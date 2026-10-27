@@ -156,7 +156,7 @@ def test_model_owns_places_and_bands() -> None:
             "HEAD_RELIEF_CHAMFER_TOL_TYPE",
         ),
     }
-    # "3.60 MIN", "5.80 MAX" and "R0.5 MAX": the model value IS the printed
+    # "3.60 MIN", "5.71 MAX" and "R0.5 MAX": the model value IS the printed
     # limit (the shared _single_limit_tolerance setter), each band running
     # away from it.
     singles = {
@@ -286,11 +286,11 @@ def test_body_limit_band_is_the_thread_blank_inside_the_2a_major() -> None:
 
 
 def test_plain_length_and_full_thread_limits_print_on_the_part() -> None:
-    # "3.60 MIN" plain under the head (the loop's seat), "5.80 MAX" to the
+    # "3.60 MIN" plain under the head (the loop's seat), "5.71 MAX" to the
     # first full thread, both from the under-head face, with room between
     # them for the die's chamfered start.
     assert geom.PLAIN_LENGTH_MIN == 3.60
-    assert geom.FULL_THREAD_STATION_MAX == 5.80
+    assert geom.FULL_THREAD_STATION_MAX == 5.71
     assert geom.FULL_THREAD_STATION_MAX - geom.PLAIN_LENGTH_MIN >= (
         geom.FULL_THREAD_DIE_ROOM_MIN
     )
@@ -648,7 +648,7 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     # the full-thread block, which inks 0.9 mm over its line.
     assert ft_left < drawing.PLAIN_X < ft_right
     assert (ft_line + 0.0009) - (pl_line + 0.001) >= 0.002
-    # The plain length's block stands right of the 5.80 station's extension
+    # The plain length's block stands right of the 5.71 station's extension
     # line and of the full-thread block (it shares their height), 3 mm clear
     # of both, so no line strikes its text.
     pl_x, pl_y = drawing.SIDE_KEEP["PlainLength"]
@@ -706,7 +706,7 @@ def test_underhead_corner_radius_reads_in_free_space() -> None:
     # only the two stations' extension lines.
     assert leader_y(drawing.BODY_DIA_X) >= drawing.BODY_TOP_Y + 0.00635 + 0.0003
     assert tip_x < drawing.BODY_DIA_X < drawing.PLAIN_X < drawing.FULL_THREAD_X
-    # It bends 2 mm or more past the 5.80 station's extension line, under the
+    # It bends 2 mm or more past the 5.71 station's extension line, under the
     # plain length's dimension line.
     assert bend_x - drawing.FULL_THREAD_X >= 0.002
     assert bend_y <= drawing.PLAIN_LENGTH_LINE_Y - 0.010
@@ -727,7 +727,7 @@ def test_underhead_corner_radius_reads_in_free_space() -> None:
     ink_bottom = bend_y + 0.0009
     ink_top = bend_y + drawing.UNDERHEAD_CORNER_TEXT_HEIGHT
     assert drawing.UNDERHEAD_CORNER_TEXT_HEIGHT == pytest.approx(2 * 0.00556 + 0.0045)
-    # Clear of the 5.80 station's extension line, under the plain length's
+    # Clear of the 5.71 station's extension line, under the plain length's
     # dimension line, over the body, and short of the thread note and its
     # leader (whose lowest end is the pick).
     assert left >= drawing.FULL_THREAD_X + 0.003
@@ -788,7 +788,7 @@ def test_readback_contract_mirrors_every_printed_and_callout_control() -> None:
         "HeadDia": (11.50, 3),
         "HeadReliefChamfer": (1.45, 3),
         "PlainLength": (3.60, 5),
-        "FullThread": (5.80, 6),
+        "FullThread": (5.71, 6),
         "UnderHeadCornerR": (0.5, 6),
     }
     # The corner's radius lands on the side view's upper round, checked on

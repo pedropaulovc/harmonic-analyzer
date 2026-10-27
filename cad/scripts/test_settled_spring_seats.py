@@ -242,7 +242,7 @@ def test_isolated_counter_provenance_identifies_the_whole_made_support(
     assert support["major_dia_mm"] == pytest.approx(6.35)
     assert support["body_dia_mm"] == pytest.approx(6.35)
     assert support["plain_length_min_mm"] == 3.60
-    assert support["full_thread_station_max_mm"] == 5.80
+    assert support["full_thread_station_max_mm"] == 5.71
     assert support["underhead_length_mm"] == 19.5
     assert support["head_dia_mm"] == 11.5
     assert support["head_height_mm"] == 6.6
