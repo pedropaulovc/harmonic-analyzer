@@ -355,7 +355,23 @@ def test_settled_deburr_texts_clear_their_own_line_ink(monkeypatch, placement):
     """Machinist b344192 (rule 14): the 45 deg sat on its own chamfer
     extension line and arc arrowhead. The reviewed layout must fail the
     settled check and the moved one pass; an own arrowhead within the
-    arrow-to-text clearance fails even with every line clear."""
+    arrow-to-text clearance fails even with every line clear. The check is
+    one operation span, closed on success and on refusal alike."""
+    import contextlib
+
+    import _telemetry
+
+    spans = []
+
+    @contextlib.contextmanager
+    def span(name, **_attributes):
+        spans.append(name)
+        try:
+            yield None
+        finally:
+            spans.append(f"/{name}")
+
+    monkeypatch.setattr(_telemetry, "span", span)
     from dataclasses import replace
 
     ink = _deburr_ink("b344192" if placement == "b344192" else "moved")
@@ -382,9 +398,13 @@ def test_settled_deburr_texts_clear_their_own_line_ink(monkeypatch, placement):
 
     if placement == "moved":
         check()
-        return
-    with pytest.raises(RuntimeError, match="struck by line ink"):
-        check()
+    else:
+        with pytest.raises(RuntimeError, match="struck by line ink"):
+            check()
+    assert spans == [
+        "drawing.spring_hook.control_ink",
+        "/drawing.spring_hook.control_ink",
+    ]
 
 
 def test_angle_text_sits_inside_the_deburr_wedge_on_its_bisector():

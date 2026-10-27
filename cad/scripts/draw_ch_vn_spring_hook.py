@@ -149,6 +149,7 @@ def _verify_controls(annotations: list[Any]) -> None:
     )
 
 
+@_telemetry.traced("drawing.spring_hook.control_ink")
 def _verify_control_ink(adapter: Any, annotations: list[Any]) -> None:
     """Settled cutting-control ink: no dimension's own line or arrowhead
     strikes its own text, and no arrowhead crowds another control's text.

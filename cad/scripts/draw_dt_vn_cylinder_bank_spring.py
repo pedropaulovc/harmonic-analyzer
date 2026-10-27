@@ -48,6 +48,7 @@ from _drawing_leaders import (
     set_near_side_diameter,
 )
 from _layout_audit import (
+    _TEXT_ANCHORS,
     annotation_geometry,
     arrowhead_segments,
     calibrate_sheet_advance,
@@ -262,7 +263,47 @@ def _text_record(adapter: Any, display: Any, *, label: str) -> dict[str, Any]:
         or not texts
     ):
         raise RuntimeError(f"{label}: no readable native text/position: {errors!r}")
-    return record
+    return lower_left_texts(record, label=label)
+
+
+def lower_left_texts(record: dict[str, Any], *, label: str) -> dict[str, Any]:
+    """``record`` with each text run's position moved to its lower-left corner.
+
+    ``_dump_annotation`` keeps each run's ``GetTextRefPositionAtIndex`` anchor
+    (``ref``), but ``display_box`` and the shared audit's row boxes read the
+    position as the lower-left. The audit's ``_TEXT_ANCHORS`` gives each
+    anchor as fractions of the run's width and cap height; this sheet's native
+    runs are all lower-left (``ref`` 1). A horizontal fraction needs the run's
+    width, so a run without one must be left-anchored; an unknown anchor is
+    refused rather than read as lower-left.
+    """
+    texts = record["display"]["texts"]
+    runs = []
+    for run in texts:
+        reference = int(run.get("ref", -1))
+        if reference not in _TEXT_ANCHORS:
+            raise RuntimeError(
+                f"{label}: text run {run.get('t')!r} has unknown anchor {reference}"
+            )
+        fx, fy = _TEXT_ANCHORS[reference]
+        width = float(run.get("w") or 0.0)
+        if fx and not width > 0.0:
+            raise RuntimeError(
+                f"{label}: text run {run.get('t')!r} is anchored {fx:g} along a "
+                "width SolidWorks did not report"
+            )
+        if not (fx or fy):
+            runs.append(run)
+            continue
+        along, up = fx * width, fy * float(run.get("h") or 0.0)
+        angle = float(run.get("ang") or 0.0)
+        cos_a, sin_a = math.cos(angle), math.sin(angle)
+        x, y, *rest = (float(value) for value in run["pos"])
+        corner = [x - along * cos_a + up * sin_a, y - along * sin_a - up * cos_a]
+        runs.append({**run, "pos": [*corner, *rest], "ref": 1})
+    if runs == list(texts):
+        return record
+    return {**record, "display": {**record["display"], "texts": runs}}
 
 
 def widths_measured(record: Mapping[str, Any]) -> bool:
@@ -452,7 +493,9 @@ def leader_chain(record: Mapping[str, Any]) -> tuple[list, list]:
 
 
 def within_chain(segment: tuple, chain: list) -> bool:
-    """Collinear with chain strokes, and inside their extent: it prints as them."""
+    """Collinear with chain strokes and continuously covered by them: it
+    prints as them. The strokes' projections are merged where they touch; a
+    gap between separated collinear runs is not ink."""
     along = [
         stroke
         for stroke in chain
@@ -468,11 +511,16 @@ def within_chain(segment: tuple, chain: list) -> bool:
     def at(point: tuple[float, float]) -> float:
         return (point[0] - x0) * ux + (point[1] - y0) * uy
 
-    stations = [at(end) for stroke in along for end in stroke]
-    low, high = min(stations), max(stations)
-    return all(
-        low - COLLINEAR_TOLERANCE <= at(end) <= high + COLLINEAR_TOLERANCE
-        for end in segment
+    merged: list[list[float]] = []
+    for low, high in sorted(sorted((at(a), at(b))) for a, b in along):
+        if merged and low <= merged[-1][1] + COLLINEAR_TOLERANCE:
+            merged[-1][1] = max(merged[-1][1], high)
+        else:
+            merged.append([low, high])
+    start, end = sorted(at(point) for point in segment)
+    return any(
+        low - COLLINEAR_TOLERANCE <= start and end <= high + COLLINEAR_TOLERANCE
+        for low, high in merged
     )
 
 

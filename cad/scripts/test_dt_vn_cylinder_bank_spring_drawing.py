@@ -623,6 +623,41 @@ def _p4_seated():
     return {**P4, "SupplierOD": _seated(P4["SupplierOD"])}
 
 
+# Native size records of farm run 20261027T033117685Z-fa43a1a5 (head ec339f3d):
+# the arrowhead-aware OD seat, 1.84 mm out from pass 4. The heights and ID are
+# pass 4's. Every text run reported ``ref`` 1, lower-left.
+EC339 = {
+    **P4,
+    "SupplierOD": _native_record(
+        "SupplierOD",
+        (0.1715474, 0.227),
+        [
+            (0.1440247, 0.2248973, 0.1482068, 0.2241951),
+            (0.1482068, 0.2241951, 0.1933005, 0.2241951),
+        ],
+        _diameter_texts(0.1497943, "0.500 \u00b10.010 in) "),
+        [(0.1440247, 0.2248973, 0.9861979, -0.1655707)],
+    ),
+}
+
+
+def _anchored(record, reference, *, angle=0.0):
+    """``record`` with each run's position moved to the ``reference`` anchor
+    of its box (swTextPosition_e, the shared audit's ``_TEXT_ANCHORS``)."""
+    import copy
+
+    from _layout_audit import _TEXT_ANCHORS
+
+    fx, fy = _TEXT_ANCHORS[reference]
+    moved = copy.deepcopy(record)
+    for run in moved["display"]["texts"]:
+        along, up = fx * run.get("w", 0.0), fy * run["h"]
+        run["pos"][0] += along * math.cos(angle) - up * math.sin(angle)
+        run["pos"][1] += along * math.sin(angle) + up * math.cos(angle)
+        run["ang"], run["ref"] = angle, reference
+    return moved
+
+
 def test_86053_stray_od_line_is_refused_by_both_settled_guards() -> None:
     import draw_dt_vn_cylinder_bank_spring as drawing
 
@@ -887,6 +922,110 @@ def test_pass4_od_arrowhead_crowds_its_text_until_the_text_is_seated() -> None:
         drawing._assert_diameters(R86053, B344192_PLAN, as_placed)
     with pytest.raises(RuntimeError, match="offset text was lost"):
         drawing._assert_heights(_offset_displays(False), seated, baseline)
+
+
+def test_ec339f3d_native_records_are_lower_left_and_pass_unchanged() -> None:
+    """Review 4385263696: the anchor normalization is the identity on every
+    native record this sheet has printed, so the placement cannot change."""
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    for records in (EC339, P4, R86053, B344192):
+        for name, record in records.items():
+            assert {run["ref"] for run in record["display"]["texts"]} == {1}
+            assert drawing.lower_left_texts(record, label=name) is record
+    drawing._assert_heights(_offset_displays(), EC339, drawing.height_stations(B344192))
+    drawing._assert_diameters(EC339, B344192_PLAN, drawing.PLAN_PLACEMENTS[0])
+    # The OD seat is set by its own arrowhead, so the native read is converged.
+    # The ID's is set by the rim, and B344192_PLAN is rounded to 0.1 mm.
+    for name, side in drawing.TEXT_SIDES["free_top"].items():
+        dx, dy = drawing.diameter_seat_move(
+            EC339[name], B344192_PLAN, side, level=False
+        )
+        assert abs(dx) <= (drawing._SEATED_M if name == "SupplierOD" else 1e-4)
+        assert dy == 0.0
+
+
+@pytest.mark.parametrize(
+    ("reference", "angle"),
+    [(0, 0.0), (2, 0.0), (3, 0.0), (4, 0.0), (5, 0.0), (4, math.pi / 2)],
+    ids=["upper-left", "centred", "upper-right", "right", "upper-centre", "right-90"],
+)
+def test_text_anchors_normalize_to_lower_left(monkeypatch, reference, angle) -> None:
+    """Review 4385263696: a centred or right-anchored run reads as the same
+    box, so seating and the shoulder test do not shift by its width."""
+    from types import SimpleNamespace
+
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    lower_left = _anchored(EC339["SupplierOD"], 1, angle=angle)
+    anchored = _anchored(EC339["SupplierOD"], reference, angle=angle)
+    monkeypatch.setattr(
+        drawing, "_Reader", lambda _adapter: SimpleNamespace(take_errors=list)
+    )
+    monkeypatch.setattr(drawing, "_dump_annotation", lambda _reader, _note: anchored)
+    display = SimpleNamespace(GetAnnotation=lambda: None)
+    read = drawing._text_record(object(), display, label="SupplierOD")
+    for got, want in zip(read["display"]["texts"], lower_left["display"]["texts"]):
+        assert got["ref"] == 1
+        assert got["pos"] == pytest.approx(want["pos"], abs=1e-12)
+    # Read raw, the box is off by the anchor's share of the run.
+    assert drawing.size_text_box(anchored) != pytest.approx(drawing.size_text_box(read))
+    if angle == 0.0:
+        drawing._assert_diameters(
+            {**EC339, "SupplierOD": read}, B344192_PLAN, drawing.PLAN_PLACEMENTS[0]
+        )
+
+
+def test_text_anchors_that_cannot_be_normalized_are_refused() -> None:
+    import copy
+
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    unknown = copy.deepcopy(EC339["SupplierOD"])
+    unknown["display"]["texts"][0]["ref"] = 7
+    with pytest.raises(RuntimeError, match="unknown anchor 7"):
+        drawing.lower_left_texts(unknown, label="OD")
+    unmeasured = _anchored(EC339["SupplierOD"], 4)
+    del unmeasured["display"]["texts"][2]["w"]
+    with pytest.raises(RuntimeError, match="width SolidWorks did not report"):
+        drawing.lower_left_texts(unmeasured, label="OD")
+    # A left anchor needs no width: an unmeasured upper-left run normalizes.
+    upper_left = _anchored(EC339["SupplierOD"], 0)
+    del upper_left["display"]["texts"][2]["w"]
+    (*_, run) = drawing.lower_left_texts(upper_left, label="OD")["display"]["texts"]
+    assert run["pos"][1] == pytest.approx(0.2242486)
+
+
+def test_a_detached_stroke_in_a_gap_between_collinear_runs_is_stray() -> None:
+    """Review 4385263700: a dogleg splits the level leader into separated
+    collinear runs; the gap between them is not ink."""
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    def dogleg(*extra):
+        return _native_record(
+            "SupplierOD",
+            (0.1697066, 0.229805),
+            [
+                (0.1442, _LEVEL, 0.1446, _LEVEL),
+                (0.1446, _LEVEL, 0.1452, _LEVEL + 0.001),
+                (0.1452, _LEVEL + 0.001, 0.1458, _LEVEL),
+                (0.1458, _LEVEL, 0.146366, _LEVEL),
+                (0.146366, _LEVEL, 0.19146, _LEVEL),
+                *extra,
+            ],
+            _diameter_texts(0.1479535, "0.500 \u00b10.010 in) ", y=0.2270536),
+            [(0.1442, _LEVEL, 1.0, 0.0)],
+        )
+
+    assert drawing.stray_leader_lines(dogleg()) == []
+    gap = (0.1447, _LEVEL, 0.1457, _LEVEL)
+    bridging = (0.1444, _LEVEL, 0.1460, _LEVEL)
+    # Within the merged run of the leg's last piece and the shoulder.
+    covered = (0.1460, _LEVEL, 0.1600, _LEVEL)
+    assert drawing.stray_leader_lines(dogleg(gap, bridging, covered)) == [
+        pytest.approx(gap),
+        pytest.approx(bridging),
+    ]
 
 
 def test_unreported_text_widths_fall_back_to_the_calibrated_estimate(
