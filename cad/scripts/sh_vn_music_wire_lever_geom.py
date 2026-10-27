@@ -82,7 +82,7 @@ assert math.isclose(HOOK_Z, DRUM_END_Z, abs_tol=1e-9), (
 # XY tangent from the hook to the drum circle inflated by wire r + clearance.
 # +acos picks the tangent on the drum's right seen from the front (~2:25):
 # the wire wraps clockwise from there, down the drum's side to TIE 1 at
-# 6 o'clock (mg_magnifying_wheel_geom).
+# 8 o'clock (mg_magnifying_wheel_geom).
 _R_EFF = DRUM_DIA / 2.0 + WIRE_DIA / 2.0 + CLEARANCE  # 10.1
 
 

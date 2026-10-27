@@ -1,7 +1,7 @@
 r"""Reproduction script: magnifying wheel (book ch. 21, pp. 50-53).
 
 A gray cast-iron spider: a turned Ø100 rim on six tapered cast spokes and a
-turned Ø28.5 hub boss. The boss carries an integral Ø14.0 spigot on its front
+turned Ø30 hub boss. The boss carries an integral Ø14.0 spigot on its front
 (pen) side, on which the MHA-MG-10 brass drum is pressed. The lever wire wraps
 the drum, the pen wire runs in the rim's U-groove: the wire-centre radii
 49.2 / 9.85 give the wheel's 5x magnification. TIE 1 (lever wire) is an axial
@@ -89,8 +89,8 @@ from mg_magnifying_wheel_geom import (
     SPOKE_TIP_WIDTH,
     SPOKE_X0,
     SPOKE_X1,
-    TIE1_CLOCK_DEG,
-    TIE1_R,
+    TIE1_X,
+    TIE1_Y,
     TIE2_CLOCK_DEG,
     TIE_HOLE_DIA,
     clock_to_local_deg,
@@ -317,7 +317,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "GrooveR", f"{GROOVE_R}mm")
     await set_global(adapter, "GrooveBottomDia", f"{GROOVE_BOTTOM_DIA}mm")
     await set_global(adapter, "TieHoleDia", f"{TIE_HOLE_DIA}mm")
-    await set_global(adapter, "Tie1R", f"{TIE1_R}mm")
+    await set_global(adapter, "Tie1X", f"{TIE1_X}mm")
+    await set_global(adapter, "Tie1Y", f"{-TIE1_Y}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -684,20 +685,18 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(adapter, "groove", volume - V_GROOVE, 0.02 * V_GROOVE)
 
     # TIE 1: the lever-wire tie hole, axial through the boss just outboard of
-    # the drum's O.D. at TIE1_CLOCK_DEG (on the Y axis: one centre dim).
-    tie1_local = math.radians(clock_to_local_deg(TIE1_CLOCK_DEG))
-    tie1_x, tie1_y = TIE1_R * math.cos(tie1_local), TIE1_R * math.sin(tie1_local)
+    # the drum's O.D., located from the bore centre by two coordinates.
     tie1_sd = SketchDims()
     check("create_sketch tie 1", await adapter.create_sketch("Front"))
     await define_circle(
         adapter,
-        tie1_x,
-        tie1_y,
+        TIE1_X,
+        TIE1_Y,
         _TIE_R,
         "tie 1",
         dims=tie1_sd,
         names=("Tie1X", "Tie1Y", "Tie1HoleDia"),
-        drives=(None, '"Tie1R"', '"TieHoleDia"'),
+        drives=('"Tie1X"', '"Tie1Y"', '"TieHoleDia"'),
     )
     await ensure_fully_defined(adapter, "tie 1 sketch")
     check("exit_sketch tie 1", await adapter.exit_sketch())

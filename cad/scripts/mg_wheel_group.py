@@ -163,10 +163,34 @@ WRAP_MARGIN_DEG = 30.0  # wire left on its wheel at either end of the travel
 # TIE 2 at about 4:30. Turning clockwise unwinds it.
 PEN_WIRE_WRAP_DEG = 360.0 + _wheel.TIE2_CLOCK_DEG  # 317
 PEN_WIRE_WRAP_LEFT_DEG = PEN_WIRE_WRAP_DEG - CW_MAX_DEG  # 270.2
-# Lever wire: from its drum tangent clockwise down to TIE 1 at 6 o'clock.
-# Turning counter-clockwise (pen up: the lever pulls) unwinds it.
-LEVER_WIRE_WRAP_DEG = _lever.TANGENT_CLOCK_DEG - _wheel.TIE1_CLOCK_DEG  # 105.8
-LEVER_WIRE_WRAP_LEFT_DEG = LEVER_WIRE_WRAP_DEG - CCW_MAX_DEG  # 58.8
+# Lever wire: from its drum tangent clockwise down to TIE 1 at 8 o'clock.
+# Turning counter-clockwise (pen up: the lever pulls) unwinds it.  The wire's
+# contact arc is judged at the worst printed case: on the smallest drum (.X)
+# the tangent from the hook lands latest, and the wire leaves the drum
+# tangentially to reach TIE 1 standing outboard of it, at the hole's
+# farthest axis offset (the wire may lie anywhere in the smallest drilled
+# hole's slack), its clock angle shifted by that offset too.
+_HOOK_V = (_lever.HOOK_X - _lever.WHEEL_X, _lever.HOOK_Y - _lever.WHEEL_BAR_Y)
+_WIRE_R_MIN = _wheel.DRUM_WIRE_R_RANGE[0]  # 9.45
+_TANGENT_CLOCK_MIN = 180.0 - math.degrees(
+    math.atan2(_HOOK_V[1], _HOOK_V[0]) + math.acos(_WIRE_R_MIN / math.hypot(*_HOOK_V))
+)
+_TIE1_REACH_MAX = (
+    _wheel.TIE1_R
+    + _wheel.TIE1_OFFSET_MAX
+    - (_wheel.TIE_HOLE_DIA - _lever.WIRE_DIA) / 2.0
+)
+LEVER_WIRE_DEPARTURE_DEG = math.degrees(
+    math.acos(_WIRE_R_MIN / _TIE1_REACH_MAX)
+)  # 38.4
+_TIE1_CLOCK_SHIFT_DEG = math.degrees(math.asin(_wheel.TIE1_OFFSET_MAX / _wheel.TIE1_R))
+LEVER_WIRE_WRAP_DEG = (
+    _TANGENT_CLOCK_MIN
+    - _wheel.TIE1_CLOCK_DEG
+    - LEVER_WIRE_DEPARTURE_DEG
+    - _TIE1_CLOCK_SHIFT_DEG
+)  # 122.3
+LEVER_WIRE_WRAP_LEFT_DEG = LEVER_WIRE_WRAP_DEG - CCW_MAX_DEG  # 75.4
 for _label, _left in (
     ("pen wire", PEN_WIRE_WRAP_LEFT_DEG),
     ("lever wire", LEVER_WIRE_WRAP_LEFT_DEG),
@@ -180,9 +204,9 @@ for _label, _left in (
 # and the spacer behind it (the bar is a spacer's length further back). The
 # hole circles the axle as the wheel turns, so the tail must clear the larger
 # of the two at every angle: radially. The tail envelope is the wire plus one
-# twisted turn beside it (1.5 wire dia from the hole centre), about a hole at
-# its innermost printed station.
-TAIL_ENVELOPE_R = 1.5 * _lever.WIRE_DIA + _wheel.TIE1_POSITION_BAND
+# twisted turn beside it (1.5 wire dia from the hole centre), about the hole's
+# exit at its farthest axis offset (printed station, angle and drill wander).
+TAIL_ENVELOPE_R = 1.5 * _lever.WIRE_DIA + _wheel.TIE1_OFFSET_MAX
 _STACK_OD_MAX = max(
     _back.OD, _spacer.OD + printed_band_mm(_spacer.OD_PLACES)
 )  # 11.8, the spacer at its .X limit

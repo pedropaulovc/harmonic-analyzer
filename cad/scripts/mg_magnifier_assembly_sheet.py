@@ -22,6 +22,12 @@ from mg_magnifier_assembly_spec import (
     PRESS_GAUGE_DIMENSION,
 )
 from sh_vn_music_wire_lever_spec import BOM_DESCRIPTION as _WIRE_BOM_DESCRIPTION
+from mg_magnifying_wheel_geom import TIE1_CLOCK_DEG as _TIE1_CLOCK_DEG
+
+# TIE 1's rest clock position, seen from the front, as a clock-face hour.
+TIE1_REST_HOUR = round((90.0 - _TIE1_CLOCK_DEG) / 30.0) % 12 or 12
+if abs((90.0 - _TIE1_CLOCK_DEG) - 30.0 * TIE1_REST_HOUR) % 360.0 > 1.0:
+    raise AssertionError(f"TIE 1 at {_TIE1_CLOCK_DEG:.1f} deg is not on a clock hour")
 
 # The axle-stack dimensions the AXLE AS PRESSED and WHEEL ENDSHAKE details
 # import (the builder marks the banded ones, DIMENSION_TOLERANCES).
@@ -185,7 +191,7 @@ STEP_TEXT = {
     # method; the state is the rest pose the wire run is derived at
     # (sh_vn_music_wire_lever_geom), which MHA-HA-00 sets as every channel amplitude
     # at zero with the plate top level (its pen wire is tied in the same
-    # state), with TIE 1 at 6 o'clock (mg_wheel_group.LEVER_WIRE_WRAP_DEG).
+    # state), with TIE 1 at its rest hour (mg_wheel_group.LEVER_WIRE_WRAP_DEG).
     _steps.WIRE_HOOKED_KEY: (
         "AFTER MHA-HA-00 HAS CLAMPED THE BAR AND SCREWED THE BRACKET TO THE "
         "SUMMING LEVER: HOOK THE MHA-SH-VN-56 LEVER WIRE IN THE MHA-MG-06 "
@@ -196,7 +202,8 @@ STEP_TEXT = {
     _steps.WIRE_TIED_KEY: (
         "WITH EVERY CHANNEL AMPLITUDE AT ZERO AND THE MHA-SM-03 PLATE TOP "
         "LEVEL (MHA-HA-00), TURN THE WHEEL TO BRING TIE 1, THE AXIAL HOLE IN "
-        "THE WHEEL BOSS, TO 6 O'CLOCK SEEN FROM THE FRONT. LEAD THE WIRE DOWN "
+        f"THE WHEEL BOSS, TO {TIE1_REST_HOUR} O'CLOCK SEEN FROM THE FRONT. "
+        "LEAD THE WIRE DOWN "
         "TO THE DRUM'S RIGHT SIDE; WRAP IT CLOCKWISE DOWN THE MHA-MG-10 DRUM TO TIE 1; "
         "PASS IT THROUGH TAUT, TWIST THE TAIL BACK ON ITSELF AT LEAST THREE "
         "TURNS AND TRIM THE TAIL."

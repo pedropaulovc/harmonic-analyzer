@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the magnifying wheel.
 
-A Ø100 cast-iron spider: six tapered spokes, a grooved rim, a Ø28.5 boss with
+A Ø100 cast-iron spider: six tapered spokes, a grooved rim, a Ø30 boss with
 the Ø14.0 drum spigot, a reamed axle bore and two wire-tie holes.  The wheel
 axis is local +Z, so the FRONT view is the face (rim, spokes, fillets, bore,
 ties) and SECTION A-A, cut on the axis through the model's Right plane, is
@@ -120,8 +120,11 @@ FRONT_CENTER = (0.125, 0.150)
 # drive gear), and it needs the room between the hub's axial rows and the
 # title block.
 SECTION_CENTER = (0.255, 0.165)
-# The isometric stands right of the section's Ø14.0 text, ISO_CLEAR off it.
-ISO_CENTER = (0.367, 0.150)
+# The isometric stands right of the section's groove and Ø14.0 texts,
+# ISO_CLEAR off them, and above the spigot length's row, whose one-line
+# callout names the drum by number and runs right past the section.
+ISO_CENTER = (0.372, 0.200)
+ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, 0.150)
 ISO_CLEAR = 0.005
 
 _RIM_R = RIM_OUTER_DIA * SHEET_SCALE[0] / 2000.0
@@ -258,22 +261,23 @@ FRONT_KEEP = {
     # neither's extension lines reach the other's line.
     "SpokeRootWidth": _face(SPOKE_X0 + 4.5, 0.0),
     "SpokeTipWidth": _over((RIM_OUTER_DIA / 2.0 + 3.0, -22.0), 2),
-    # TIE 1's radius between its own extension lines, which run left from the
-    # bore's and the hole's centres past the OD: the text breaks its line
-    # 16 mm outside the rim, a quarter line under mid-span, so the block
-    # stays between the lines whether its point reads as the block's middle
-    # or (inside the lines) its bottom.
-    "Tie1Y": _face(
-        -(RIM_OUTER_DIA / 2.0 + 16.0), _TIE1[1] / 2.0 - _TEXT_LINE * 1000.0 / 4.0
-    ),
+    # TIE 1's two coordinates from the bore centre.  The Y between its own
+    # extension lines, which run left from the bore's and the hole's centres
+    # past the OD, its text off the lower one, 16 mm outside the rim (the
+    # lines stand only 5.6 apart); the X below the wheel, its extension lines
+    # down from the bore's centre (the A-A line) and the hole's, its text
+    # left of the A-A line under the lower "A" and right of TIE 2's block.
+    "Tie1Y": _face(-(RIM_OUTER_DIA / 2.0 + 16.0), _TIE1[1] - 5.4),
+    "Tie1X": _face(-9.0, -RIM_OUTER_DIA / 2.0 - 16.0),
     # The two tie Ø callouts hang off the face, the block's leader from its
     # shoulder's near end (the shoulder runs 7.3 mm under the point).  TIE
     # 1's block stands below the wheel, its top (DRILL THRU over the stacked
-    # Ø) 3.2 mm under the OD; its shoulder starts 20 mm right of the hole, so
-    # the leader slopes away from the A-A line that runs through the hole
-    # (run 11 dropped it down that line).
+    # Ø) 3.2 mm under the OD, its shoulder 20 mm right of the A-A line, so
+    # the leader runs down-right from the hole, away from the line and from
+    # the X's extension line, and the block stays left of the section's
+    # overall row.
     "Tie1HoleDia": _face(
-        _TIE1[0] + 20.0 + _CALLOUT_SHOULDER_LEFT,
+        20.0 + _CALLOUT_SHOULDER_LEFT,
         -RIM_OUTER_DIA / 2.0 - 3.2 - _CALLOUT_ABOVE - _TEXT_LINE * 1000.0,
     ),
     "Tie2Angle": _face(*_polar(_TIE2_INNER, sum(_TIE2_ANGLE_SECTOR) / 2.0, 35.0)),
@@ -282,9 +286,8 @@ FRONT_KEEP = {
     # the text's projection onto the axis.  Run 8 hung the block ON that foot,
     # so both lines ran through it: the block stands 25 mm off the axis on
     # the side away from the angle, its projection 75 mm out (the extension
-    # lines stop ~76, short of the angle's arc at 79), a one-line "TIE 2"
-    # under it (the hole's run is in the notes); it stays outside the OD and
-    # left of the A-A line's lower "A".
+    # lines stop ~76, short of the angle's arc at 79), "TIE 2" and "RADIAL"
+    # under it; it stays outside the OD and left of the A-A line's lower "A".
     "Tie2HoleDia": _face(
         *_polar(_polar((0.0, 0.0), _TIE2_OUTWARD, 75.0), _TIE2_OUTWARD + 90.0, 25.0)
     ),
@@ -308,10 +311,10 @@ NEAR_SIDE_DIAMETERS = {
     "RimInnerDiaDim": RIM_INNER_DIA,
     "BoreDiaDim": BORE_DIA,
 }
-# TIE 1 sits ON the A-A line, so its Ø takes one arrow on the rim nearest its
-# block, down-right of the hole, and no line through the centre (run 11's
-# default leader ran down the cutting line).  Every face leader near the line
-# is proven off it, each landing on its own feature's radius from the axis.
+# TIE 1's Ø takes one arrow on the rim nearest its block, down-right of the
+# hole, and no line through the centre (run 11's default leader, with the
+# hole on the A-A line, ran down it).  Every face leader near the line is
+# proven off it, each landing on its own feature's radius from the axis.
 TIE1_NEAR_SIDE = "Tie1HoleDia"
 _BORE_LANDING = (0.8 * BORE_DIA / 2000.0, 1.2 * BORE_DIA / 2000.0)
 FACE_LEADER_LANDINGS = {
@@ -413,7 +416,9 @@ _ABOVE_UP = _TEXT_LINE / 2.0
 _HUB_ROWS = tuple(
     SECTION_CENTER[1] - _RIM_R - drop for drop in (0.0050, 0.0184, 0.0238)
 )
-SPIGOT_LENGTH_CALLOUT = "DRUM NOT PROUD"
+# The spigot length's +0.1/0 band keeps the drum under the spigot face
+# (mg_magnifying_wheel_geom.DRUM_RECESS): its callout names the drum.
+SPIGOT_LENGTH_CALLOUT = f"MG-WHEEL-DRUM {DRUM_NUMBER} NOT PROUD"
 WEB_CENTER_CALLOUT = "WEB & RIM CENTER"
 # The overall sets the axle's locknut stack (mg_wheel_group): the callout
 # names the stack and the axle by number, one line no wider than run 14's
@@ -519,7 +524,7 @@ DIMENSION_CALLOUTS = {
     "HubFilletR": "12X",
     "RimFilletR": "12X",
     "Tie1HoleDia": "TIE 1",
-    "Tie2HoleDia": "TIE 2",
+    "Tie2HoleDia": "TIE 2\nRADIAL",
 }
 # The tie holes' operation stands over their Ø, keeping each block as narrow
 # as its stacked Ø; each axial band's need, the plane the 12.5 locates and
@@ -1065,9 +1070,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
-    add_property_linked_note(
-        adapter, "Isometric View Note", ISO_CENTER[0] - 0.030, 0.085
-    )
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
         adapter,
