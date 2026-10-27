@@ -370,6 +370,65 @@ def test_apex_tap_callout_fits_above_the_plan_between_the_lanes() -> None:
     assert box.xmax + 0.015 < set_screw_text_x
 
 
+def _hanging_block(text: str, column_xy: tuple[float, float]) -> tuple[float, ...]:
+    """A banded station's block as SolidWorks prints text placed outside its
+    witnesses: the shelf starts on the dimension's column and the block runs
+    east from it, centred on the placed height (5bca52e PDF: the 4.00 block
+    x 161.0..216.1 off its 0.161 column)."""
+    from _layout_geometry import estimate_text_box
+
+    box = estimate_text_box(
+        text,
+        anchor=(0.0, 0.0),
+        height=0.0035,
+        reference=2,  # swCENTER
+        advance_ratio=109.7 / (42 * 3.5),
+        line_spacing=16.8 * 25.4 / 72.0 / 3.5,
+    )
+    x, y = column_xy
+    return (x, y + box.ymin, x + box.width, y + box.ymax)
+
+
+def test_banded_plan_stations_each_print_at_their_own_arrows() -> None:
+    """5bca52e machinist review FIX: the 4.00 block stood over the 8.00
+    column's top arrow and the 8.00 text sat inside the 4.00 span. The tap
+    station's text hangs above its span, the ear thickness's below its span,
+    each off its own column, and no other column stands under either."""
+    from _drawing_annotation_extent import CLEAR_GAP_M
+
+    plan_top = drawing._top_y(spec.FOOT_Z0)
+    ear_face = drawing._top_y(spec.FOOT_Z0 + spec.EAR_T)
+    plan_bottom = drawing._top_y(FOOT_Z1)
+    tap_column = drawing.TOP_KEEP["SetScrewLocation"]
+    ear_column = drawing.TOP_KEEP["EarThick"]
+    foot_column = drawing.TOP_KEEP["FootLen"]
+    tap = _hanging_block(
+        f"4.00 ±0.1\n{drawing.DIMENSION_CALLOUTS['SetScrewLocation']}", tap_column
+    )
+    ear = _hanging_block(
+        f"8.00 ±0.1\n{drawing.DIMENSION_CALLOUTS['EarThick']}", ear_column
+    )
+    # Nested shortest first, each column clear of the plan and the one inside.
+    assert drawing._EAST_X + 0.008 <= tap_column[0] < ear_column[0] < foot_column[0]
+    # The tap station's block: wholly above the plan's top edge.
+    assert tap[1] > plan_top + CLEAR_GAP_M
+    # The ear thickness's column, and the outside arrow it raises over the
+    # top edge, stand clear east of the tap station's block.
+    assert ear_column[0] > tap[2] + 0.010
+    # Its block: under the ear's outboard-face line (its own lower witness),
+    # over the foot length's lower extension line, east of the hold-down
+    # hole's DRILL THRU block (~26 mm centred on its anchor), west of the
+    # foot length's column.
+    assert ear[3] < ear_face - CLEAR_GAP_M
+    assert ear[1] > plan_bottom + CLEAR_GAP_M
+    assert ear[0] > drawing.TOP_KEEP["HoleDia"][0] + 0.013 + 0.020
+    assert ear[2] + 0.005 < foot_column[0]
+    # The foot length's text sits in its span's upper half, above the ear
+    # thickness's block, and left of the isometric.
+    assert ear[3] + CLEAR_GAP_M < foot_column[1] - 0.003 < plan_top
+    assert foot_column[0] + 0.008 < drawing.ISO_CENTER[0] - 0.025
+
+
 def test_tap_note_solidworks_adds_is_removed() -> None:
     source = _drawing_source()
     assert 'redundant_note_substrings=("Tapped Hole",)' in source
