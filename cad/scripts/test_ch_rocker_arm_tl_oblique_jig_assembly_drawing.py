@@ -3674,7 +3674,7 @@ def test_capture_places_four_real_views_before_bom_with_one_exploded_balloon_own
     assert tuple(exploded.ScaleRatio) == scales[sheet.name] == (1.0, 4.0)
     assert tuple(locator.ScaleRatio) == (1, 4)
     assert tuple(main.ScaleRatio) == (1, 2)
-    assert tuple(bolt.ScaleRatio) == (1, 2)
+    assert tuple(bolt.ScaleRatio) == (1, 1)
     cluster = next(c for c in drawing.CLUSTERS if c.sheet == sheet.name)
     installed = drawing.capture_support_instances(cluster, 0) | {spec.instance_name(spec.CARRIER, 0)}
     for index, view in enumerate(sheet.views):
@@ -3750,18 +3750,18 @@ def test_capture_places_four_real_views_before_bom_with_one_exploded_balloon_own
     settled[-1]()
 
 
-@pytest.mark.parametrize("view_index,model_radius,paper_radius,region", (
-    (2, 0.039, 0.0195, (0.278, 0.119, 0.364, 0.211)),
-    (3, 0.014, 0.007, (0.360, 0.226, 0.403, 0.261)),
+@pytest.mark.parametrize("view_index,scale,model_radius,paper_radius,region", (
+    (2, (1, 2), 0.039, 0.0195, (0.278, 0.119, 0.364, 0.211)),
+    (3, (1, 1), 0.014, 0.014, (0.352, 0.219, 0.416, 0.266)),
 ))
-def test_capture_sections_half_scale_precedes_crop_without_shrinking_model_fence(
-    native_property_package, view_index, model_radius, paper_radius, region,
+def test_capture_sections_native_scale_precedes_crop_without_shrinking_model_fence(
+    native_property_package, view_index, scale, model_radius, paper_radius, region,
 ) -> None:
     package = native_property_package
     drawing._place_package(package.adapter)
     section = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[view_index]
     profile = package.doc.crop_circles[view_index - 1]
-    assert tuple(section.ScaleRatio) == section.crop_scale == (1, 2)
+    assert tuple(section.ScaleRatio) == section.crop_scale == scale
     assert section.post_crop_scale_writes == []
     assert profile.GetRadius() == pytest.approx(model_radius)
     assert section.crop[1] == pytest.approx(model_radius)
@@ -3773,32 +3773,51 @@ def test_capture_sections_half_scale_precedes_crop_without_shrinking_model_fence
     drawing._assert_capture_crop(package.adapter, section, view_index, profile)
 
 
-@pytest.mark.parametrize("view_index,native_outline,refusal", (
-    (2, (
+@pytest.mark.parametrize("view_index,scale,native_outline,refusal", (
+    (2, (1, 2), (
         0.27083100196371956, 0.24606200349283217,
         0.3737219227586998, 0.3340379981999397,
     ), "width 102[.]9 mm > 86[.]0 mm"),
-    (3, (
-        0.34833699958956615, 0.3351120025212765,
-        0.3904130000444241, 0.3798879901473522,
-    ), "height 44[.]8 mm > 35[.]0 mm"),
+    (3, (1, 1), (0.355, 0.215, 0.414, 0.265), "height 50[.]0 mm > 47[.]0 mm"),
 ))
-def test_capture_sections_still_refuse_the_observed_oversized_native_extents(
-    native_property_package, view_index, native_outline, refusal,
+def test_capture_sections_still_refuse_oversized_native_extents(
+    native_property_package, view_index, scale, native_outline, refusal,
 ) -> None:
     package = native_property_package
     drawing._place_package(package.adapter)
     section = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[view_index]
-    # The actual 4e7 A-A and 49385 B-B 1:1 extents remain refusals if native
-    # returns them at 1:2; the new scale never licenses a relaxed native box.
+    # The actual 4e7 A-A 1:1 extent remains a refusal if native returns it at
+    # 1:2, and B-B's 1:1 field never licenses a box taller than it.
     section.GetOutline = lambda: native_outline
     with pytest.raises(RuntimeError, match=refusal):
         drawing._fit_capture_view(
-            package.adapter, section, drawing.CAPTURE_VIEW_REGIONS[view_index], ((1, 2),),
+            package.adapter, section, drawing.CAPTURE_VIEW_REGIONS[view_index], (scale,),
             crop_profile=package.doc.crop_circles[view_index - 1], label="jig capture section",
         )
-    assert tuple(section.ScaleRatio) == (1, 2)
+    assert tuple(section.ScaleRatio) == scale
     assert section.post_crop_scale_writes == []
+
+
+def test_capture_bolt_section_field_holds_the_observed_native_1_to_1_extent(
+    native_property_package,
+) -> None:
+    package = native_property_package
+    drawing._place_package(package.adapter)
+    section = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[3]
+    region = drawing.CAPTURE_VIEW_REGIONS[3]
+    # 49385: B-B's native padded 1:1 extent was 42.076 x 44.776 mm; centred,
+    # it fits the top-right field that replaced the 43 x 35 mm 1:2 one.
+    width, height = 0.3904130000444241 - 0.34833699958956615, 0.3798879901473522 - 0.3351120025212765
+    cx, cy = (region[0] + region[2]) / 2.0, (region[1] + region[3]) / 2.0
+    section.GetOutline = lambda: (cx - width / 2.0, cy - height / 2.0, cx + width / 2.0, cy + height / 2.0)
+    assert drawing._fit_capture_view(
+        package.adapter, section, region, ((1, 1),),
+        crop_profile=package.doc.crop_circles[2], label="jig capture section",
+    ) == (1, 1)
+    caption_x, caption_y = drawing.CAPTURE_SECTION_CAPTIONS[1]
+    assert caption_x == pytest.approx(cx)
+    assert cy - height / 2.0 - caption_y > 0.002
+
 
 
 def test_capture_sections_use_actual_distinct_longitudinal_and_bolt_planes() -> None:
@@ -5914,7 +5933,7 @@ def test_capture_uncropped_fit_refreshes_native_geometry_at_each_candidate_scale
     (2, ((1, 1), (1, 2)), True, "cropped view requires one pre-authored scale"),
     (1, ((1, 5),), True, "cropped view scale differs from its pre-authored scale"),
     (2, ((1, 1),), True, "cropped view scale differs from its pre-authored scale"),
-    (3, ((1, 1),), True, "cropped view scale differs from its pre-authored scale"),
+    (3, ((1, 2),), True, "cropped view scale differs from its pre-authored scale"),
     (1, ((1, 4),), False, "cropped view lost its selected native profile"),
 ))
 def test_capture_cropped_fit_refuses_rescaling_or_a_lost_selected_profile(

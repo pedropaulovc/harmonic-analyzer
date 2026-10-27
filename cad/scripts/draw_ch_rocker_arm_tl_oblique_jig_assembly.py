@@ -453,14 +453,24 @@ CAPTURE_READING_REGION = (
     CLUSTER_RING_REGION[2] - BOM_SHEET_CLEARANCE,
     CLUSTER_RING_REGION[3] - BOM_SHEET_CLEARANCE,
 )
+# B-B is drawn at 1:1 (the 1:2 fragment was too small to read; machinist
+# review, 2026-10-23/26). Its native padded 1:1 extent measured 42.1 x 44.8 mm
+# (49385), so its field takes the top-right corner up to the border, and its
+# caption sits directly beneath that field, centred on it and clear of A-A's
+# right-hand callouts (C4 MOUTH tops out at 199 mm).
 CAPTURE_VIEW_REGIONS = (
     CAPTURE_EXPLODED_REGION,
     (0.224, 0.220, 0.278, 0.263),
     (0.278, 0.119, 0.364, 0.211),
-    (0.360, 0.226, 0.403, 0.261),
+    (0.352, 0.219, 0.416, 0.266),
 )
 CAPTURE_LOCATOR_SCALE = (1, 4)
-CAPTURE_SECTION_CAPTIONS = ((0.302, 0.115), (0.360, 0.222))
+CAPTURE_SECTION_SCALES = {"A": (1, 2), "B": (1, 1)}
+CAPTURE_SECTION_CAPTIONS = ((0.302, 0.115), (0.384, 0.2175))
+# Half-lengths of the cutting lines along their rows. B-B's is shorter, so its
+# arrows and letters stand 3.75 mm (at the plan's 1:4) inside A-A's instead of
+# on top of them; it still spans the whole 50 mm cap.
+CAPTURE_CUT_HALF_LENGTHS = {"A": 65.0, "B": 50.0}
 CAPTURE_NOTE_HEIGHT = 0.002
 
 
@@ -2613,6 +2623,12 @@ def capture_readings() -> tuple[CaptureReading, ...]:
     top = washer.THICKNESS
     hole_top = pin.CROSS_HOLE_STATION + pin.CROSS_HOLE_DIA / 2.0
     bolt_y = r.CAP_BOLT_Y_OFFSETS[0]
+    # B-B's two C3A labels sit left of it, so both land on the bolt's outer
+    # (-X) side and no leader crosses the section: the cap/block land midway
+    # between the cap's edge and the clearance hole, the underhead footprint
+    # on the head's -X bearing ring.
+    clearance_edge = r.CAP_BOLT_X_OFFSETS[0] - (r.CAP_BOLT_CLEARANCE_DIAMETER + r.CAP_BOLT_CLEARANCE_BAND[0]) / 2.0
+    cap_land_x = (-r.CAP_WIDTH / 2.0 + clearance_edge) / 2.0
     cap_origin = spec.PIVOT_CAP_PLACEMENTS[0][0]
     roof = _capture_local_point(spec.PIVOT_CAP, (
         spec.PIVOT_PIN_ORIGINS[0][0] + r.CAP_POCKET_DIAMETER / 2.0 * spec.PIN_ROWS[0][0],
@@ -2652,9 +2668,9 @@ def capture_readings() -> tuple[CaptureReading, ...]:
         CaptureReading(1, spec.PIVOT_COTTER,
                        (spec.pivot_cotter.EYE_OUTER_RADIUS, -spec.pivot_cotter.COTTER_WIDTH / 2.0, spec.pivot_cotter.EYE_CENTER),
                        callouts["cotter"], (0.288, 0.205)),
-        CaptureReading(3, spec.PIVOT_CAP, (0.0, bolt_y, 0.0),
+        CaptureReading(3, spec.PIVOT_CAP, (cap_land_x, bolt_y, 0.0),
                        callouts["cap_land"], (0.279, 0.2235)),
-        CaptureReading(3, spec.PIVOT_CAP_SCREW, (spec.cap_screw.DIMS.head_dia * 0.35, 0.0, 0.0),
+        CaptureReading(3, spec.PIVOT_CAP_SCREW, (-spec.cap_screw.DIMS.head_dia * 0.35, 0.0, 0.0),
                        callouts["underhead"], (0.282, 0.232)),
     )
 
@@ -2675,7 +2691,8 @@ def capture_cut_points(section_label: str) -> tuple[tuple[float, float, float], 
         origin, rows = spec.compose(spec.PIVOT_CAP_PLACEMENTS[0], (0.0, spec.retention.CAP_BOLT_Y_OFFSETS[0], 0.0))
     else:
         raise ValueError(f"unknown cartridge section {section_label!r}")
-    return tuple(tuple((origin[i] + distance * rows[0][i]) / 1000.0 for i in range(3)) for distance in (-65.0, 65.0))
+    half = CAPTURE_CUT_HALF_LENGTHS[section_label]
+    return tuple(tuple((origin[i] + distance * rows[0][i]) / 1000.0 for i in range(3)) for distance in (-half, half))
 
 
 def _crop_capture_view(adapter: Any, view: Any, centre: tuple[float, float], radius: float, *, label: str) -> Any:
@@ -3380,7 +3397,7 @@ def _place_capture_sheet(adapter: Any, cluster: Cluster) -> tuple[tuple[Any, ...
     scales = [scale, locator_scale]
     crop_profiles = [locator_profile]
     for index, letter in enumerate(("A", "B"), start=2):
-        section_scale = (1, 2)
+        section_scale = CAPTURE_SECTION_SCALES[letter]
         points = model_points_in_view(adapter, locator, capture_cut_points(letter), label=f"jig capture cut {letter}")
         view = _early_bound(create_section_view(adapter, locator, line_start=points[0], line_end=points[1],
                             view_xy=_region_center(CAPTURE_VIEW_REGIONS[index]), section_label=letter,
