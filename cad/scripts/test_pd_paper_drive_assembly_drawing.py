@@ -375,32 +375,17 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
         f"PRESS {plate_locating_pin.ASSEMBLY_QUANTITY} "
         f"{_number('pd-vn-transgear-arm-plate-locating-pin')} DOWELS"
     ) in located
-    pin = _number("pd-transgear-pin")
-    # The step names the mesh that centre distance sets, and how it is set
-    # and checked: the package builds no jig, and the pin is already pressed
-    # into its bore, so the gauge reads over it and a gauge pin in the knob
-    # bore.  References and relationship only, not the sentence (codjiflo P3
-    # on 482fbdc).
-    assert steps.step_number("pin-pressed") < steps.step_number("arm-plate-located")
-    jig, recheck = located.split("WITHIN THE WINDOW ON THE ARM AND PLATE DRAWINGS", 1)
+    # Set with the shop's micrometer over a ZZ gauge pin and the pressed pin:
+    # no jig, the catalogue +x/-0 band read directly.
+    assert "JIG" not in located
+    assert "ZZ GAUGE PIN THAT ENTERS IN THE PLATE'S KNOB BORE" in located
+    assert f"{_number('pd-transgear-pin')} PIN, THEN MIKE OVER BOTH" in located
+    assert f"THE CENTRES MUST READ {disc.CENTRE_DISTANCE_SET_TEXT}" in located
+    # The step names the mesh that centre distance sets.
+    setting = located[: located.index("TAP THE PLATE")]
     for stem in ("pd-transgear-knob-shaft", "pd-rack-pinion"):
-        assert _number(stem) in jig
-    assert "MESH" in jig
-    assert "JIG" not in jig
-    assert "EACH BORE" not in jig
-    assert f"{disc.CENTRE_DISTANCE:.3f}" in jig
-    for reference in ("KNOB BORE", f"PRESSED {pin} PIN", "GAUGE PIN", "CLAMP"):
-        assert reference in jig, reference
-    # The setting and the clamped re-check answer to the window the arm and
-    # plate sheets print and cite this step for (codjiflo P2 on 1b09cec); the
-    # step names it without restating the band (r1-r3 on f4f620a).
-    assert jig.endswith(f"OVER THE GAUGE PIN AND THE {pin} PIN, ")
-    assert recheck.startswith("; RE-CHECK CLAMPED: STILL WITHIN THAT WINDOW.")
-    tol = f"{disc.CENTRE_DISTANCE_SET_TOL:.3f}"
-    assert tol in steps.matched_locator_notes(
-        _number("pd-transgear-arm"), _number("pd-transgear-arm-plate"), on_arm=True, width=80
-    )
-    assert tol not in located
+        assert _number(stem) in setting
+    assert "MESH" in setting
     assert "MATCH-DRILL AND REAM THE LOCATING HOLES" in located
     assert (
         f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "
@@ -412,6 +397,7 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     assert "DOWELS LOCATE; SCREWS CLAMP ONLY" in fitted
     # One ordinary hand check; no gauge budget or load qualification text.
     assert "PUSH AND ROCK THE PLATE BY HAND: NO SHAKE ON THE DOWELS" in fitted
+    assert f"CENTRES STILL {disc.CENTRE_DISTANCE_SET_TEXT}" in fitted
     assert "RE-CHECK AFTER EVERY REMOVAL" in fitted
     for method in ("RFS", "UNCERTAINTY", "QUALIFIED", "ACTUAL"):
         assert method not in fitted

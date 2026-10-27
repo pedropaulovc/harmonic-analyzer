@@ -1843,9 +1843,12 @@ def _assert_gear_mesh() -> None:
     centre_distance = DISC_SPEC.CENTRE_DISTANCE
     c2c_nominal = DISC_SPEC.STANDARD_CENTRE_DISTANCE
     ext = centre_distance - c2c_nominal
-    # CR >= 1.2 at the minimum tips, positive backlash at the tight runout
-    # extreme, AGMA root clearance and the interference points.
-    reducer = mesh_check.reducer_mesh(centre_distance).require()
+    # CR at the minimum tips, positive backlash at the tight runout extreme,
+    # AGMA root clearance and the interference points, at both ends of the
+    # set band (the nominal end is the model's centre).
+    reducer, reducer_top = (check.require() for check in mesh_check.reducer_band_meshes())
+    if DISC_SPEC.CENTRE_DISTANCE_WINDOW[0] != centre_distance:
+        raise RuntimeError("the model's reducer centre is not the set band's nominal end")
     # The disc's teeth repeat every 3 deg, so a tooth must point along the S ->
     # K line at the mesh angle for the 12T's phased gap to receive it.
     disc_gamma = 360.0 / DISC_TEETH
@@ -1873,7 +1876,7 @@ def _assert_gear_mesh() -> None:
         raise RuntimeError(f"third gear/disc z overlap {z_overlap:.2f} < 2.5")
     log(
         f"gear mesh 12:120 {DISC_DP:g}DP PA{DISC_SPEC.PRESSURE_ANGLE_DEG:g}:"
-        f" c2c {centre_distance} (ext {ext:.3f}); {reducer.summary};"
+        f" c2c {centre_distance} (ext {ext:.3f}); {reducer.summary}; {reducer_top.summary};"
         f" 12T phased {THIRD_PHASE_DEG:+.1f} deg,"
         f" tip/floor margin {min(root_margin, reciprocal_margin):.3f}"
     )

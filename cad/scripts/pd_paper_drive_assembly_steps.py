@@ -152,17 +152,14 @@ def matched_locator_notes(
     mate = plate_number if on_arm else arm_number
     knob, pin = ("ITS KNOB BORE", "PIN BORE") if on_arm else ("KNOB BORE", "ITS PIN BORE")
     disc = arm_geometry.DISC
-    centres = (
-        f"{knob} CLAMPED {disc.CENTRE_DISTANCE:.3f} "
-        f"\u00b1{disc.CENTRE_DISTANCE_SET_TOL:.3f} FROM {pin}"
-    )
+    centres = f"{knob} CLAMPED {disc.CENTRE_DISTANCE_SET_TEXT} FROM {pin}"
     located, fitted = step_number("arm-plate-located"), step_number("arm-plate-fitted")
     if fitted != located + 1:
         raise AssertionError("the matched-pair notes cite two consecutive steps")
     notes = (
         f"1. LOCATING HOLES MATCH-DRILLED WITH {mate}, {centres}.",
         "2. PLATE ON THE DOWELS, SCREWS TIGHT: NO SHAKE, NO DAYLIGHT, "
-        f"CENTRES STILL WITHIN \u00b1{disc.CENTRE_DISTANCE_SET_TOL:.3f}. "
+        f"CENTRES STILL {disc.CENTRE_DISTANCE_SET_TEXT}. "
         f"{DRAWING_NUMBER} STEPS {located}-{fitted}.",
     )
     return "\n".join(

@@ -25,6 +25,13 @@ treats a contact ratio at or above about 1.1 as continuous action -- more
 than one tooth pair in contact at handover -- which is enough for this slow,
 hand-driven reducer; 1.2 remains the nominal design floor.
 
+The reducer's centre takes the ordinary fine-pitch set band, nominal
++0.025/-0 (pd_rack_pinion_spec.CENTRE_DISTANCE_WINDOW). The nominal end
+meets both tiers. The far end, a stock 12T:120T pair at the stock 0.05 TIR,
+gives CR 1.162 and 1.073 at the runout extreme, short of 1.2/1.1; it is
+gated at BAND_TOP_CONTACT_RATIO_FLOORS, 1.1 and 1.0 (owner ruling
+2026-10-27, option A: standard gears, standard band).
+
 Finite-profile bound (not a gate). These formulas take the ideal 120T
 involute. The disc is cut by the stock #2 (55T) cutter translated 17.20 to
 17.22 mm, whose flank against that ideal involute (same pitch thickness)
@@ -53,6 +60,9 @@ CONTACT_RATIO_FLOOR = 1.2
 # The reducer's loose runout extreme: continuous action for a slow,
 # hand-driven reducer (user decision 2026-10-11; see the module docstring).
 RUNOUT_CONTACT_RATIO_FLOOR = 1.1
+# (nominal tier, runout tier) at the far end of the reducer's set band
+# (owner ruling 2026-10-27, option A).
+BAND_TOP_CONTACT_RATIO_FLOORS = (1.1, 1.0)
 # The rack mesh's existing physical gate (pd_paper_drive_assembly_steps).
 RACK_ROOT_CLEARANCE_FLOOR_MM = 0.25
 # AGMA fine-pitch standard clearance, 0.200/P + 0.002 in, at the reducer's
@@ -79,6 +89,8 @@ class MeshCheck:
     # CR at the loose runout extreme; None where contact_ratio_min is
     # already taken there (the rack mesh).
     runout_contact_ratio_min: float | None = None
+    contact_ratio_floor: float = CONTACT_RATIO_FLOOR
+    runout_contact_ratio_floor: float = RUNOUT_CONTACT_RATIO_FLOOR
 
     def failures(self) -> list[str]:
         # Every gate below is an ordered comparison, which NaN passes; an
@@ -99,15 +111,15 @@ class MeshCheck:
         ]
         if problems:
             return problems
-        if self.contact_ratio_min < CONTACT_RATIO_FLOOR:
+        if self.contact_ratio_min < self.contact_ratio_floor:
             problems.append(
-                f"contact ratio {self.contact_ratio_min:.3f} < {CONTACT_RATIO_FLOOR}"
+                f"contact ratio {self.contact_ratio_min:.3f} < {self.contact_ratio_floor}"
             )
         if (self.runout_contact_ratio_min is not None
-                and self.runout_contact_ratio_min < RUNOUT_CONTACT_RATIO_FLOOR):
+                and self.runout_contact_ratio_min < self.runout_contact_ratio_floor):
             problems.append(
                 f"runout-extreme contact ratio {self.runout_contact_ratio_min:.3f} < "
-                f"{RUNOUT_CONTACT_RATIO_FLOOR}"
+                f"{self.runout_contact_ratio_floor}"
             )
         if self.backlash_mm[0] <= 0.0:
             problems.append(f"backlash {self.backlash_mm[0]:.4f} mm at the tight extreme")
@@ -314,4 +326,18 @@ def reducer_mesh(centre_distance_mm: float = disc.CENTRE_DISTANCE) -> MeshCheck:
         REDUCER_ROOT_CLEARANCE_FLOOR_MM,
         margin,
         reducer_contact_ratio(loose, pinion_tip_min, disc_tip_min),
+    )
+
+
+def reducer_band_meshes() -> tuple[MeshCheck, MeshCheck]:
+    """The reducer at both ends of its set band: the nominal end at the
+    design floors, the far end at BAND_TOP_CONTACT_RATIO_FLOORS."""
+    low, high = disc.CENTRE_DISTANCE_WINDOW
+    nominal_floor, runout_floor = BAND_TOP_CONTACT_RATIO_FLOORS
+    top = reducer_mesh(high)
+    return reducer_mesh(low), MeshCheck(
+        f"{top.label} at +{high - low:.3f}", top.contact_ratio_min, top.backlash_mm,
+        top.root_clearance_min_mm, top.root_clearance_floor_mm,
+        top.interference_margin_min_mm, top.runout_contact_ratio_min,
+        nominal_floor, runout_floor,
     )

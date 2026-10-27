@@ -19,22 +19,40 @@ def test_both_meshes_pass_the_standard_gates() -> None:
     assert mesh.reducer_mesh().failures() == []
 
 
-def test_reducer_centre_window_is_bounded_by_the_two_gates() -> None:
-    # The window's ends are where the gates bite (to the printed micron): the
-    # interference point at the tight extreme below, the contact-ratio floor
-    # above. The centre is the window's midpoint and passes every gate.
+def test_reducer_centre_band_is_plus_only_from_the_interference_limit() -> None:
+    # Fine-pitch practice: nominal +x/-0. The nominal sits just above the
+    # interference point at the tight runout extreme; the allowance is the
+    # drawn position zone's radius, inside the catalogue +0.002 in.
+    import _gear_quality
+
     low, high = disc.CENTRE_DISTANCE_WINDOW
-    step = 0.001
     assert mesh.reducer_runout_shift_mm() == pytest.approx(
         (knob.TOOTH_SPACE_RUNOUT_TIR_MM + disc.TOOTH_SPACE_RUNOUT_TIR_MM) / 2.0
     )
-    assert mesh.reducer_mesh(low).interference_margin_min_mm >= 0.0
-    assert mesh.reducer_mesh(low - step).interference_margin_min_mm < 0.0
-    assert mesh.reducer_mesh(high).contact_ratio_min >= mesh.CONTACT_RATIO_FLOOR
-    assert mesh.reducer_mesh(high + step).contact_ratio_min < mesh.CONTACT_RATIO_FLOOR
-    assert disc.CENTRE_DISTANCE == pytest.approx((low + high) / 2.0)
-    assert disc.CENTRE_DISTANCE_SET_TOL == pytest.approx((high - low) / 2.0)
-    assert mesh.reducer_mesh(disc.CENTRE_DISTANCE).failures() == []
+    assert low == disc.CENTRE_DISTANCE
+    assert disc.CENTRE_DISTANCE_SET_BAND == pytest.approx((high - low, 0.0))
+    assert high - low == pytest.approx(_gear_quality.reducer_position_diameter_mm() / 2.0)
+    assert high - low <= 0.002 * 25.4
+    assert mesh.reducer_mesh(low).failures() == []
+    assert mesh.reducer_mesh(low - 0.005).interference_margin_min_mm < 0.0
+    assert disc.CENTRE_DISTANCE_SET_TEXT == "35.101 +0.025/-0"
+
+
+def test_reducer_band_ends_pass_their_floors_and_the_far_end_is_reported() -> None:
+    nominal, top = mesh.reducer_band_meshes()
+    assert nominal.failures() == [] and top.failures() == []
+    assert (nominal.contact_ratio_floor, nominal.runout_contact_ratio_floor) == (
+        mesh.CONTACT_RATIO_FLOOR, mesh.RUNOUT_CONTACT_RATIO_FLOOR
+    )
+    assert (top.contact_ratio_floor, top.runout_contact_ratio_floor) == (
+        mesh.BAND_TOP_CONTACT_RATIO_FLOORS
+    )
+    # The far end is short of the design floors, as the module states.
+    assert top.contact_ratio_min == pytest.approx(1.162, abs=5e-4)
+    assert top.runout_contact_ratio_min == pytest.approx(1.073, abs=5e-4)
+    assert top.contact_ratio_min < mesh.CONTACT_RATIO_FLOOR
+    assert top.runout_contact_ratio_min < mesh.RUNOUT_CONTACT_RATIO_FLOOR
+    assert top.backlash_mm[0] > nominal.backlash_mm[0] > 0.0
 
 
 def _min_tips() -> tuple[float, float]:

@@ -134,7 +134,14 @@ printed tips: at least 1.2 at its nominal 35.101 mm centre, and at least 1.1
 at the loose runout extreme (the centre opened by both tooth-space runouts).
 These are `paper_drive_mesh_check.CONTACT_RATIO_FLOOR` and
 `RUNOUT_CONTACT_RATIO_FLOOR` (user decision 2026-10-11); the centre comes from
-`pd_rack_pinion_spec.CENTRE_DISTANCE`.
+`pd_rack_pinion_spec.CENTRE_DISTANCE`. The arm and plate are match-drilled
+with that centre set to the ordinary fine-pitch band, nominal +0.025/-0
+(`CENTRE_DISTANCE_WINDOW`; catalogue practice is +0.002 in / -0, and +0.025
+is the radius of the drawn reducer position zone). At the band's far end
+the stock pair gives CR 1.162 and 1.073 at the runout extreme, gated at
+`BAND_TOP_CONTACT_RATIO_FLOORS` (1.1, 1.0): standard gears in a standard
+band (owner ruling 2026-10-27, option A). MHA-PD-00 step 10 sets it with a micrometer
+over a ZZ gauge pin in the knob bore and the pressed MHA-PD-23 pin.
 
 ### Setting the cone mesh
 

@@ -1323,28 +1323,15 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "ARM'S REAMED HOLE FROM THE REAR TILL ITS HEAD SEATS ON THE ARM."
         ),
         "arm-plate-located": (
-            # The package builds no jig: the step says how the distance is
-            # set and checked (2026-10-27 ENFORCE review, r1, r2). The pin
-            # is already pressed (step "pin-pressed"), so the distance is
-            # gauged off it, not off an empty pin bore (codjiflo P2 on
-            # edb402b). The setting and the clamped re-check both answer to
-            # the window the arm and plate sheets print for these steps
-            # (pd_paper_drive_assembly_steps.matched_locator_notes), so the
-            # re-check has its acceptance (codjiflo P2 on 1b09cec). The step
-            # names that window rather than restating its band: printed here
-            # too, the ±0.004 repeated the part drawings' band and r1-r3 on
-            # f4f620a filed it as assembly over-specification.
-            f"CLAMP {_N['pd-transgear-arm']} AND {_N['pd-transgear-arm-plate']} "
-            "TOGETHER, THE PLATE'S KNOB BORE "
-            f"{disc.CENTRE_DISTANCE:.3f} FROM THE PRESSED {_N['pd-transgear-pin']} "
-            f"PIN'S AXIS (THE "
+            f"CLAMP THE {_N['pd-transgear-arm-plate']} PLATE ON THE "
+            f"{_N['pd-transgear-arm']} ARM'S REAR FACE WITH TOOLMAKER'S CLAMPS, "
+            f"SCREWS OUT. PUT THE LARGEST ZZ GAUGE PIN THAT ENTERS IN THE PLATE'S "
+            f"KNOB BORE; MIKE IT AND THE {_N['pd-transgear-pin']} PIN, THEN MIKE "
+            "OVER BOTH AHEAD OF THE HUB. LESS HALF THE TWO PIN \u00d8, THE CENTRES "
+            f"MUST READ {disc.CENTRE_DISTANCE_SET_TEXT}, MID-BAND AIMED (THE "
             f"{_N['pd-transgear-knob-shaft']} {KNOB_TEETH}T / {_N['pd-rack-pinion']} "
-            f"{disc.TEETH}T MESH): A SNUG GAUGE PIN IN THE KNOB BORE; SET "
-            f"{disc.CENTRE_DISTANCE:.3f} PLUS HALF OF EACH PIN'S MEASURED DIAMETER "
-            f"OVER THE GAUGE PIN AND THE {_N['pd-transgear-pin']} PIN, "
-            "WITHIN THE WINDOW ON THE ARM AND PLATE DRAWINGS; "
-            "RE-CHECK CLAMPED: STILL WITHIN THAT WINDOW. "
-            "MATCH-DRILL AND REAM THE LOCATING HOLES. "
+            f"{disc.TEETH}T MESH). TAP THE PLATE TO SET IT, TIGHTEN THE CLAMPS AND "
+            "RE-MIKE. MATCH-DRILL AND REAM THE LOCATING HOLES. "
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-locating-pin']} "
             f"{_N['pd-vn-transgear-arm-plate-locating-pin']} DOWELS INTO THE ARM "
             f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "
@@ -1357,7 +1344,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"{_N['pd-vn-transgear-arm-plate-screw']} SCREWS IN THE ARM'S THROUGH TAPS; "
             "SNUG BOTH, THEN TIGHTEN THEM IN TURN. DOWELS LOCATE; SCREWS CLAMP ONLY. "
             "PUSH AND ROCK THE PLATE BY HAND: NO SHAKE ON THE DOWELS, NO DAYLIGHT "
-            "UNDER IT. RE-CHECK AFTER EVERY REMOVAL."
+            f"UNDER IT. RE-MIKE AS STEP {steps.step_number('arm-plate-located')}: "
+            f"CENTRES STILL {disc.CENTRE_DISTANCE_SET_TEXT}. RE-CHECK AFTER EVERY REMOVAL."
         ),
         "arm-plate-screws-cut": (
             f"TAKE BOTH {_N['pd-vn-transgear-arm-plate-screw']} SCREWS OUT; CUT THEIR "

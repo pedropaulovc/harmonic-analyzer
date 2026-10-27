@@ -30,9 +30,10 @@ ARM_LOCATOR_SITES_MM = ARM.LOCATOR_SITES_MM
 PLATE_LOCATOR_SITES_MM = PLATE.LOCATOR_SITES_MM
 LOCATOR_PAIR_BASELINE_MM = ARM.LOCATOR_PAIR_BASELINE_MM
 REDUCER_AXIS_SETUP_RADIUS_MM = reducer_position_diameter_mm() / 2.0
-# The drawn matched setting: K held CENTRE_DISTANCE +/- this from S along
-# S-K (the reducer mesh's window, printed on the arm and plate sheets).
-REDUCER_CENTRE_DISTANCE_SET_TOL_MM = ARM.DISC.CENTRE_DISTANCE_SET_TOL
+# The drawn matched setting: K held this band (upper, lower) from
+# CENTRE_DISTANCE along S-K (the reducer's set band, printed on the arm
+# and plate sheets).
+REDUCER_CENTRE_DISTANCE_SET_BAND_MM = ARM.DISC.CENTRE_DISTANCE_SET_BAND
 # Unit vector S -> K in the arm frame (x along the arm, y across), the
 # frame of every K reading below.
 _S_TO_K = (ARM.KNOB_BORE_STATION - ARM.PIN_STATION, ARM.KNOB_BORE_OFFSET)
@@ -165,8 +166,13 @@ def require_matched_registration(
             or math.hypot(*setup_error_xy_mm) + measurement_uncertainty_mm > REDUCER_AXIS_SETUP_RADIUS_MM):
         raise ValueError("actual S-K gear-plane setup fails the drawn position circle")
     along = setup_error_xy_mm[0] * S_TO_K_UNIT[0] + setup_error_xy_mm[1] * S_TO_K_UNIT[1]
-    if abs(along) + measurement_uncertainty_mm > REDUCER_CENTRE_DISTANCE_SET_TOL_MM:
-        raise ValueError("actual S-K centre distance is outside the drawn setting window")
+    high, low = REDUCER_CENTRE_DISTANCE_SET_BAND_MM
+    # A reading exactly on a limit is accepted: allow the roundoff of
+    # rebuilding the reading from its two coordinates, nothing more.
+    roundoff = 1e-9
+    if (along - measurement_uncertainty_mm < low - roundoff
+            or along + measurement_uncertainty_mm > high + roundoff):
+        raise ValueError("actual S-K centre distance is outside the drawn setting band")
     if (not required_load_cases or len(set(required_load_cases)) != len(required_load_cases)
             or not math.isfinite(measurement_uncertainty_mm)
             or not 0.0 < measurement_uncertainty_mm <= ARM_SEAT_NORMAL_UNCERTAINTY_MAX_MM
