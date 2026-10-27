@@ -445,7 +445,7 @@ def test_procedure_pointers_name_the_sheet_and_zone_each_heading_prints_in() -> 
     ):
         text = next(line for line in spec.ASSEMBLY_STEPS if line.startswith(step))
         for label in pointers:
-            assert spec._at(label) in text, (step, label)
+            assert spec._sheet_zone(label) in text, (step, label)
 
 
 def test_procedures_print_as_short_sub_steps_under_their_headings() -> None:

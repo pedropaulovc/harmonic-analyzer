@@ -2378,6 +2378,8 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "ch_rocker_arm_tl_oblique_carrier_spec",
         # Edge-break row must stay within the pin flange's analysed capture limit.
         "ch_rocker_arm_tl_oblique_pivot_pin_spec",
+        # Edge-break row takes the pivot-block tap mouth off the cap screws' engagement estimate.
+        "ch_rocker_arm_tl_oblique_fasteners_spec",
         # Edge-break row supplies the fitted retainer's maximum mouth break.
         "ch_rocker_arm_tl_oblique_pivot_retainer_spec",
         # Edge-break row reduces the cap registers' straight capture engagement.
