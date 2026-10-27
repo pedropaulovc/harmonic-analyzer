@@ -114,7 +114,6 @@ from pd_transgear_arm_spec import (
     PART_DATUMS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    LATCH_PIN_HEIGHT_TOLERANCE,
     ISOMETRIC_VIEW_NOTE,
     PIVOT_BORE_CALLOUT,
     SPOT_FACE_DIA_BAND,
@@ -755,9 +754,8 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     for feature_name, dimension_name in BASIC_REDUCER_DIMENSIONS:
         set_dimension_basic_tolerance(adapter, feature_name, dimension_name)
-    set_dimension_symmetric_tolerance(
-        adapter, "PinHoleProfile", "PinHoleZ", LATCH_PIN_HEIGHT_TOLERANCE
-    )
+    # PinHoleZ carries no explicit band: its .XXX title-block row governs
+    # (coordinator ruling (a), #2019).
     set_dimension_bilateral_tolerance(
         adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_DIA_BAND)
     )

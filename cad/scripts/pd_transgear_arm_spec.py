@@ -65,7 +65,8 @@ BAND_BY_PLACES: dict[int, float] = {1: BAND_X, 2: BAND_XX, 3: BAND_XXX}
 # with acceptance matched to the measured shoulder; the latch-pin hole and
 # pin bore print .XXX under their explicit ream
 # bands; the reducer stations are BASIC under circular position controls;
-# only the end-face latch-hole height retains its ordinary ± height band.
+# the end-face latch-hole height is an ordinary .XXX row the title block
+# governs (coordinator ruling (a), #2019: no tightened band).
 # pin-hole depth is .XX, the band the pin's grip and proud range are judged
 # at (``PIN_HOLE_DEPTH_BAND``).
 OUTLINE_PLACES = 1
@@ -84,6 +85,7 @@ PIN_HOLE_DEPTH_PLACES = 2
 for _label, _places, _band in (
     ("tip station", TIP_STATION_PLACES, TIP_STATION_BAND),
     ("latch-pin hole depth", PIN_HOLE_DEPTH_PLACES, PIN_HOLE_DEPTH_BAND),
+    ("latch-pin hole height", STATION_PLACES, LATCH_PIN_HEIGHT_BAND),
 ):
     if abs(BAND_BY_PLACES[_places] - _band) > 1e-9:
         raise AssertionError(
@@ -96,8 +98,6 @@ for _label, _places, _band in (
 SPOT_FACE_DIA_BAND = (SPOT_FACE_DIA_GROWTH, 0.0)
 # Floor from the FRONT face: the MHA-PD-VN-63 spring's room under the head (R9-71).
 SPOT_FACE_FLOOR_TOLERANCE = SPOT_FACE_FLOOR_BAND
-# The blind end-face latch hole is not a reducer locating-hole control.
-LATCH_PIN_HEIGHT_TOLERANCE = LATCH_PIN_HEIGHT_BAND
 
 BASIC_REDUCER_DIMENSIONS = (
     ("StationReference", "PinStation"),
@@ -302,7 +302,7 @@ LATCH_PIN_PRESS_PRINTED = (
     math.ceil(LATCH_PIN_PRESS_INTERFERENCE[1] * 1e4 - 1e-6) / 1e4,
 )  # 0.0025, 0.0177
 # The pin bore's three lines (the operation, the mating pin, the press), plus
-# the ligament to the faces as a plain fact: 1.74 MIN at full budget is the
+# the ligament to the faces as a plain fact: 1.67 MIN at full budget is the
 # owner-accepted shortfall (machinist_exceptions RV-04; #2019 tracks the next
 # stock size up). Pressing it to the floor is MHA-PD-00's latch-pin-pressed
 # step (policy option (c)); the callout stands below the end view, inside the

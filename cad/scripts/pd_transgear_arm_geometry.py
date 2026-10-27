@@ -258,7 +258,9 @@ PIN_MACHINE_Z = FRONT_FACE_MACHINE_Z + PIN_HOLE_Z  # -120.43125
 BAND_X = 0.8
 BAND_XX = 0.51
 BAND_XXX = 0.13
-LATCH_PIN_HEIGHT_BAND = 0.065  # ordinary end-face latch-hole height, per side
+# The end-face latch hole's height is an ordinary .XXX row: the title block
+# governs it, with no tightened band (coordinator ruling (a), #2019).
+LATCH_PIN_HEIGHT_BAND = BAND_XXX
 REDUCER_POSITION_DIAMETER = reducer_position_diameter_mm()
 REDUCER_POSITION_RADIUS = REDUCER_POSITION_DIAMETER / 2.0
 # The dowel's full-diameter grip runs the through ream between its two
@@ -382,9 +384,10 @@ for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
         - (LOCATING_PIN.PRESS_HOLE_LIMITS_MM[1] + PLATE_TAP_MOUTH_DIA_MAX_MM) / 2.0
         - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM - LOCATOR_RUN_OFF_MM,
     )
-# The latch pin's hole-to-face ligament is 1.744 at full budget, under the
-# 2.0 target but over the 1.5 floor. #2019 tracks the owner's next stock
-# size up (owner ruling 2026-10-27, #1379); until then it is held at 1.5.
+# The latch pin's hole-to-face ligament is 1.679 at full budget (the .XXX
+# height band included), under the 2.0 target but over the 1.5 floor. #2019
+# tracks the owner's next stock size up (owner ruling 2026-10-27, #1379);
+# until then it is held at 1.5.
 LATCH_PIN_WALL_FLOOR = 1.5
 WALL_FLOORS = {"pin hole to faces": LATCH_PIN_WALL_FLOOR}
 for _name, (_nominal, _worst) in WALLS.items():

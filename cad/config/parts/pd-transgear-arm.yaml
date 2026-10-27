@@ -25,6 +25,6 @@ pd-transgear-arm:
       reason: "owner ruling 2026-10-27 (#1379): \"MHA-PD-18 latch pin should never come out.\" A permanent press; it is not removed in service, so rule 16's removal path does not apply (owner-accepted)"
     - id: "RV-04"
       kind: "minor"
-      where: "end view, the latch-pin hole callout: PIN HOLE TO FACES 1.74 MIN"
+      where: "end view, the latch-pin hole callout: PIN HOLE TO FACES 1.67 MIN"
       finding: "latch-pin hole ligament to the front and rear faces below the 2.0 mm target (rule 17)"
-      reason: "owner ruling 2026-10-27 (#1379): the Ø3.175 MHA-PD-VN-58 hole at mid-thickness of the 5/16 stock leaves 1.74 MIN at full budget (stock band, height band, 0.3 deg run-off over the deepest hole, both 0.25 breaks at the mouth), above the 1.5 floor; the next stock size up is tracked in #2019"
+      reason: "owner ruling 2026-10-27 (#1379): the Ø3.175 MHA-PD-VN-58 hole at mid-thickness of the 5/16 stock leaves 1.678 at full budget, printed 1.67 MIN (stock band ±0.0254, .XXX height band ±0.13 from the title block per coordinator ruling (a), 0.3 deg run-off over the deepest hole, both 0.25 breaks at the mouth), above the 1.5 floor; the next stock size up is tracked in #2019"

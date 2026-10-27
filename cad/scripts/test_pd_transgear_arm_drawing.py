@@ -161,8 +161,8 @@ def _printed_proud_range(pin_length: float, hole_depth: float) -> tuple[float, f
 
 
 # The worst far-face margin this test's restatement finds at the printed
-# rows, and the retired 3/4 pin's: with the latch hole's height at ±0.065
-# (LATCH_PIN_HEIGHT_BAND) it barely clears in a 6.10 hole; 0.05 deeper it
+# rows, and the retired 3/4 pin's: with the latch hole's height at its .XXX
+# row (LATCH_PIN_HEIGHT_BAND) it barely clears in a 6.10 hole; 0.05 deeper it
 # stops short of the face. Ruling B's 9.5 bar shortened the hook's ear
 # 16.0 -> 15.5, so the bend lever and its loss shrank 0.5.
 # The Ø11.0 .X pivot spacer (MHA-PD-20) widens the face squareness zone to
@@ -281,15 +281,20 @@ def test_the_latch_pin_full_diameter_passes_the_hook_at_the_printed_tip_band() -
     assert _worst_far_face_margin(printed, depth_only, bend_deg=0.0) > 0.0
 
 
-def test_the_explicit_bands_are_the_spot_face_pin_ream_and_hole_positions() -> None:
+def test_the_explicit_bands_are_the_spot_face_and_the_reams() -> None:
+    """The latch-pin hole's height has no explicit band: its .XXX title-block
+    row governs (coordinator ruling (a), #2019)."""
     assert model_toleranced_dimensions(part) == {
         ("SpotFaceProfile", "SpotFaceDia"): "*deviations(SPOT_FACE_DIA_BAND)",
         ("SpotFaceProfile", "FloorDepth"): "SPOT_FACE_FLOOR_TOLERANCE",
         ("LocatorProfile", "f'LocatorDia{index}'"): "round(deviations(LOCATOR_HOLE_BAND_MM)[1], 6)",
-        ("PinHoleProfile", "PinHoleZ"): "LATCH_PIN_HEIGHT_TOLERANCE",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
         ("PinBoreProfile", "PinBoreDia"): "*deviations(PIN_BORE_DIA_BAND)",
     }
+    assert geometry.LATCH_PIN_HEIGHT_BAND == spec.BAND_BY_PLACES[
+        spec.DRAWING_PRECISION_BY_NAME["PinHoleZ"]
+    ]
+    assert not hasattr(spec, "LATCH_PIN_HEIGHT_TOLERANCE")
     # The piloted counterbore only cuts oversize; the pin's press hole must
     # never end up larger than nominal.
     assert min(spec.SPOT_FACE_DIA_BAND) == 0.0 < max(spec.SPOT_FACE_DIA_BAND)
