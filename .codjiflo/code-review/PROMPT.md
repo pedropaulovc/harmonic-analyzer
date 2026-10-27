@@ -13,9 +13,20 @@ Use repository tools to read files at the PR head. Cite every tier 1 and tier 2
 finding by the guideline's rule number and title (for example "rule 5 (avoid
 excessive GD&T)") or by the quoted policy sentence.
 
-## Required reading
+## Applicability and required reading
 
-Read these at the PR head before reviewing:
+First decide from the diff whether the drawing tiers apply. They apply when
+the diff can change a printed sheet or the machinist-review gate: drawing
+scripts and their specs/notes/sheet modules, drawing helpers, part and
+assembly builders (`build_*.py`), geometry and spec modules a builder reads,
+`cad/config/`, and the review machinery (`machinist_review*.py`,
+`cad/scripts/prompts/`, the guidelines and the policy). The policy's gate
+covers "a sheet that changes only because CAD geometry, config or a helper it
+reads changed", so a geometry-only change reaches tiers 1 and 2 through the
+drawings that depend on it. A prose-only, `web/`-only or infrastructure-only
+diff with no such path skips tiers 1 and 2; say so in the summary.
+
+When the drawing tiers apply, read these at the PR head first:
 
 - `cad/docs/drawing-guidelines.md`: the numbered rules (1–25) every part and
   assembly package follows.
@@ -25,8 +36,9 @@ Read these at the PR head before reviewing:
   `cad/scripts/prompts/machinist_review_assembly.md` and their
   `machinist_review_<kind>_severity.md` contracts: what the blind machinist
   reviewer checks and how findings are classified.
-- The root `AGENTS.md` and the `AGENTS.md` of every area a changed file sits in
-  (`book/`, `logbook/`, `kickstarter/`, `web/`, `ai-story/`).
+
+Always read the root `AGENTS.md` and the `AGENTS.md` of every area a changed
+file sits in (`book/`, `logbook/`, `kickstarter/`, `web/`, `ai-story/`).
 
 Owner rulings are recorded as code comments beside the constant they govern,
 in a package's `machinist_exceptions` (`kind: accept` or `kind: minor`) in
@@ -37,10 +49,10 @@ owner's ruling.
 
 ## Tier 1: drawing simplicity policy
 
-Applies whenever the diff touches `draw_*.py`, `*_spec.py`, `*_notes.py`,
-`*_assembly_sheet.py`, `*_steps.py`, drawing helpers (`_drawing_*`,
-`_supplier_*`, `_surface_finish`, `_purchased_title_fit`), `cad/config/`, the
-guidelines, the policy or the machinist-review prompts. Check at least:
+Applies per the applicability section above. For a geometry-only change,
+judge the regenerated sheets of the affected parts and assemblies: walls,
+engagement, access and stack consequences (rules 16–21) and any printed value
+that moves. Check at least:
 
 - **Model owns tolerance and precision (rules 3, 4).** Bands are native model
   tolerances on the dimension. Precision is authored by the part build
@@ -61,10 +73,14 @@ guidelines, the policy or the machinist-review prompts. Check at least:
   never prescribe a machining method; dimensions, tolerances and assembly
   settings are associative native dimensions (hidden reference sketches when no
   feature carries the value), not free text.
-- **Bands only for function, naming the mate (rule 4).** Flag a bare tight
-  band with no stated mating part, an independently tightened band on a mating
-  pair instead of a matched-fit callout, or a tightened band where adjusting
-  the nominal would let the title-block band hold the governing assert.
+- **Bands only for function, naming the mate (rule 4).** Flag a tight band
+  whose mate appears nowhere in the package, or a band tightened where no
+  running, sliding, sealing, locating or press function needs it (for
+  example, where adjusting the nominal would let the title-block band hold the
+  governing assert). Controlled limits on both parts of a pair are valid when
+  they produce the required fit; interchangeable parts keep their essential
+  limits. A matched pair needs the mate's name and number plus the required
+  clearance or interference; "MATCH FIT" alone is incomplete.
 - **GD&T allowlist (rule 5).** A feature-control frame or datum appears only
   where the package's own `machinist_exceptions` `accept` entry allows it.
   New frames, datums or boxed basics without one are findings.
@@ -94,10 +110,11 @@ guidelines, the policy or the machinist-review prompts. Check at least:
 
 ## Tier 2: machinist review lens
 
-For every changed drawing script, spec, note, sheet or config value that
-reaches a printed sheet, predict the printed result and read it as the blind
-reviewer in `machinist_review_part.md` / `machinist_review_assembly.md` would:
-one package, no CAD, no context, no one to ask. Flag what that reviewer would
+For every changed drawing script, spec, note, sheet, builder geometry or
+config value that reaches a printed sheet, predict the printed result and
+read it as the blind reviewer in `machinist_review_part.md` /
+`machinist_review_assembly.md` would: one package, no CAD, no context, no one
+to ask. Flag what that reviewer would
 confirm under the severity contract:
 
 - **Blockers:** contradictions across views or sheets (rule 25), missing
