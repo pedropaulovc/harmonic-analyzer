@@ -62,7 +62,7 @@ SCREW_HOLE_SPEC = HoleSpec("counterbore_socket", "#8", overrides_mm={
 })
 DRAWING_VALUES = {
     "BlockLength": BLOCK_LENGTH, "BlockWidth": BLOCK_WIDTH,
-    "BlockHeight": BLOCK_HEIGHT, "BlockSideY": BLOCK_WIDTH / 2,
+    "SectionBlockHeight": BLOCK_HEIGHT, "BlockSideY": BLOCK_WIDTH / 2,
     "BoreDia": BORE_DIA, "TopBoreDepth": BORE_DEPTH,
     "TapDrillDia": PIVOT_TAP_DRILL,
     "CboreFloor": CBORE_FLOOR,
@@ -74,11 +74,10 @@ DRAWING_VALUES = {
 }
 DRAWING_DIMENSIONS = {
     "BlockProfile": ("BlockLength", "BlockWidth", "BlockSideY"),
-    "Block": ("BlockHeight",),
     "TopBoreProfile": ("BoreDia",),
     "TopBore": ("TopBoreDepth",),
     "PivotTapProfile": ("TapDrillDia",),
-    CBORE_FLOOR_REFERENCE: ("CboreFloor",),
+    CBORE_FLOOR_REFERENCE: ("CboreFloor", "SectionBlockHeight"),
     "CarriageDrillProfile": ("CarriageDrills3Y", "CarriageDrills4Y", "CarriageDrills1Dia"),
     "CarriageCboreProfile": ("CarriageCounterbores1Dia",),
     PLAN_DATUM_REFERENCE: ("PlanBoreX", "PlanHole1X", "PlanHole2X"),

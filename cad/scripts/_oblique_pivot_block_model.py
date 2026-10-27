@@ -174,6 +174,18 @@ async def _cbore_floor_reference(adapter) -> list[tuple[str, str]]:
         f"{feature} floor height",
     )
     dims.record("CboreFloor", '"CboreFloor"')
+    # The block height on the +Y face, where B-B prints it: the Block
+    # extrusion's own depth does not import into a removed section.
+    side_foot = to_sketch((spec.CBORE_SECTION_X, spec.BLOCK_WIDTH / 2.0, 0.0))
+    side_top = to_sketch((spec.CBORE_SECTION_X, spec.BLOCK_WIDTH / 2.0, spec.BLOCK_HEIGHT))
+    side = await _construction(adapter, adapter.add_line(side_foot[0], side_foot[1], side_top[0], side_top[1]),
+                               f"{feature} +Y face")
+    check(f"{feature} +Y face along Z", await adapter.add_sketch_constraint(side, None, "horizontal"))
+    await anchor_point_to_origin(adapter, f"{side}.start", *side_foot, f"{feature} +Y face foot")
+    dims.record("SectionSideY")
+    await dimension_between(adapter, f"{side}.start", f"{side}.end", "horizontal_distance",
+                            spec.BLOCK_HEIGHT, f"{feature} block height")
+    dims.record("SectionBlockHeight")
     await ensure_fully_defined(adapter, feature)
     check(f"exit_sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)

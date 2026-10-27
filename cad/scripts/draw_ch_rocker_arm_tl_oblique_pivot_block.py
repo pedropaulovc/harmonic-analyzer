@@ -85,7 +85,7 @@ SEAT_DEPTH_TEXT_XY = (.078,.104)
 # at x 347.15. The floor and its note stand above; the block height under,
 # clear of the SECTION B-B caption ~17 mm below the view.
 FLOOR_XY = (.335,.125)
-FLOOR_KEEP = {'CboreFloor':(.360,.143),'BlockHeight':(.335,.111)}
+FLOOR_KEEP = {'CboreFloor':(.360,.143),'SectionBlockHeight':(.335,.111)}
 ISO_XY, ISO_SCALE = (.355,.235), SHEET_SCALE
 # TL-32: the plan drops 24 mm so its block lands where TL-22's does; the lug
 # (x 171.75..190.25, y 137..185) takes the space below. Under it: LugWidth,
