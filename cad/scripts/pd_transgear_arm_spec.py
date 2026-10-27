@@ -192,10 +192,10 @@ PLATE_TAP_EDGE_BREAK_CALLOUT = (
     f"ENTRY / EXIT EDGE BREAK {ARM.PLATE_TAP_ENTRY_BREAK_MAX_MM:g} MAX BOTH SIDES"
 )
 # Where each projected zone starts and which way it runs, at the feature
-# (machinist review, rule 7; it was general note 1): section A-A draws each
-# zone as a heavy chain line from front face A (z = 0) and dimensions its
-# height MIN (ASME Y14.5-2018 10.5.1.4: the minimum extent and direction of
-# a projected zone, a dimensioned chain line beside the hole's axis). Model
+# (machinist review, rule 7; it was general note 1): the sheet draws each
+# zone as a heavy chain line from front face A (z = 0) along the hole's
+# axis and dimensions its height (ASME Y14.5-2018: the extent and direction
+# of a projected zone, a dimensioned chain line on the hole's axis). Model
 # +Z runs rearward. The plate taps' zones run rearward, through the arm into
 # the MHA-PD-19 plate past the seated screw-head contact
 # (transgear_hanger_joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM, from A);
@@ -218,9 +218,7 @@ if set(PROJECTED_ZONE_DIRECTION) != {
 }:
     raise AssertionError("every projected zone needs exactly one drawn direction")
 # The heights are sheet-derived (each measures its own chain line) and print
-# to DRAWING_REFERENCE_PRECISION, the frames' own place (Ⓟ 14.7, Ⓟ 32.6),
-# followed by MIN: a projected height is a minimum extent, not a .X band.
-PROJECTED_ZONE_HEIGHT_SUFFIX = " MIN"
+# to DRAWING_REFERENCE_PRECISION, as the frames print them (Ⓟ 14.7, Ⓟ 32.6).
 # The counterbore seats the MHA-PD-VN-63 spring's rim under the MHA-PD-VN-57
 # head, and its floor from the FRONT face sets the spring's room there
 # (transgear_hanger_joints.SPRING_ROOM_*): the callout names the spring, and

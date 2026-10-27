@@ -24,6 +24,7 @@ import argparse
 import math
 import re
 import sys
+from dataclasses import dataclass
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -45,6 +46,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_annotation_extent import move_annotation
 from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
@@ -59,7 +61,7 @@ from _drawing_gdt import PmiDrawingPlacement, project_part_pmi
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
-from _drawing_projection import model_point_in_view
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
@@ -72,7 +74,6 @@ import _telemetry
 from pd_transgear_arm_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
-    PIN_BORE_DIA,
     PIN_HOLE_DEPTH,
     PIN_STATION,
     PIVOT_END_R,
@@ -80,6 +81,7 @@ from pd_transgear_arm_geometry import (
     PLATE_TAP_STATIONS,
     THICKNESS,
     TIP_STATION,
+    edge_half_width,
 )
 from pd_transgear_arm_spec import (
     GEOMETRIC_CONTROLS,
@@ -96,7 +98,6 @@ from pd_transgear_arm_spec import (
     PIVOT_BORE_CALLOUT,
     PLATE_TAP_EDGE_BREAK_CALLOUT,
     PROJECTED_ZONE_DIRECTION,
-    PROJECTED_ZONE_HEIGHT_SUFFIX,
     SPOT_FACE_CALLOUT,
     STOCK_TEXT_PREFIX,
     STOCK_TEXT_SUFFIX,
@@ -211,9 +212,7 @@ FRONT_KEEP = {
     "LocatorX1": (_front_x(LOCATOR_SITES_MM[0][0] / 2.0), _station_row(1)),
     "PlateTapStation2": (_front_x(PLATE_TAP_STATIONS[1] / 2.0), _station_row(2)),
     "PinStation": (_front_x(PIN_STATION / 2.0), _station_row(3)),
-    # Right of the pin station, not mid-span: the pin bore's forward
-    # projected-zone chain line and its 32.6 rise through this row there.
-    "TipStation": (_front_x(0.75 * TIP_STATION), _station_row(4)),
+    "TipStation": (_front_x(TIP_STATION / 2.0), _station_row(4)),
     # The socket offsets' texts stand outside the arm: above its top edge,
     # under the tap callout's shelf, and below its bottom edge, left of
     # plate tap 1's witness line (machinist review: inside the silhouette
@@ -268,35 +267,58 @@ END_KEEP = {
 # offset 9 mm above its dimension line, under the top border, on a leader.
 STOCK_TEXT_XY = (END_CENTER[0], END_KEEP["Depth"][1] + 0.009)
 
-# Each projected zone's heavy chain line in section A-A, from front face A
-# (z = 0) through its height on the side ``PROJECTED_ZONE_DIRECTION`` names
-# (the taps' rearward, down the sheet; the pin bore's forward, up it), and
-# the sheet point of its vertical height dimension's value: model X of the
-# line (mm), text point. The taps' lines run on their axes, through the
-# holes' open cut; each tap frame's leader lands on the near wall at the
-# mouth, so none crosses its line. The two tap zones are the same height
-# the same way, so one dimension between their lines carries both ("2X";
-# run 20261027T180656347Z: two values crowded the 30 mm between the lines
-# and stood on the rear face); the other's text point is None. The pin
-# bore's runs beside its axis (Y14.5's "closely adjacent"), 1 mm out from
-# the wall its frames' leaders land on below face A: on the axis it ran on
-# the 68.815 station's witness line, and on the wall into its arrowhead.
-# Its height stands left of it, midway between the 68.815 row and its top.
-_PIN_CHAIN_X_MM = PIN_STATION - PIN_BORE_DIA / 2.0 - 1.0
-PROJECTED_ZONE_CHAINS: dict[str, tuple[float, tuple[float, float] | None]] = {
-    "plate_tap_1_position": (
-        PLATE_TAP_STATIONS[0],
+# Each projected zone's heavy chain line, from front face A (z = 0) through
+# its height on the side ``PROJECTED_ZONE_DIRECTION`` names, in the view
+# that shows its hole cut on the axis.
+#
+# The plate taps' zones run rearward, down section A-A, on their axes
+# through the holes' open cut; each tap frame's leader lands on the near
+# wall at the mouth, so none crosses its line. Both are one height the same
+# way, so one dimension carries both ("2X"). Its dimension line runs inside
+# tap 1's hole beside the chain line, so both of its arrows sit on the
+# zone's own ends, face A and the far end (review of d5d1298b0, r3: between
+# the taps the line started in the hatch and the zone read as starting at the
+# rear face); its value stands below the section, between the taps, on a
+# leader.
+#
+# The pin bore's zone runs forward 32.6 (65 mm at 2:1): up section A-A it
+# crossed the plan's 68.815, 128.90 and (141.4) dimension lines (review of
+# d5d1298b0, gating, r1/r2). Section D-D cuts the arm across the bore's
+# axis, cut faces only, at 1:1 in the lower-left corner (under the floor
+# depth's text, left of the isometric), where the line runs clear; it looks
+# toward the pivot, so forward reads to the right. D, not C: datum C is
+# this bore.
+@dataclass(frozen=True)
+class ZoneChain:
+    view: str  # "A-A" or "D-D"
+    x_mm: float  # model X of the line, on the hole's axis
+    # Sheet offset of the height's dimension line from the chain's midpoint;
+    # None: another zone's dimension carries this one ("2X").
+    dimension: tuple[float, float] | None
+    # Where the value stands off its dimension line on a leader, if it does.
+    text_xy: tuple[float, float] | None = None
+
+
+PROJECTED_ZONE_CHAINS: dict[str, ZoneChain] = {
+    "plate_tap_1_position": ZoneChain(
+        "A-A", PLATE_TAP_STATIONS[0], (0.0015, 0.0),
         (
             (_front_x(PLATE_TAP_STATIONS[0]) + _front_x(PLATE_TAP_STATIONS[1])) / 2.0,
             SECTION_CENTER[1] - 0.0145,
         ),
     ),
-    "plate_tap_2_position": (PLATE_TAP_STATIONS[1], None),
-    "feed_stud_projected_axis": (
-        _PIN_CHAIN_X_MM,
-        (_front_x(_PIN_CHAIN_X_MM) - 0.012, SECTION_CENTER[1] + 0.0617),
-    ),
+    "plate_tap_2_position": ZoneChain("A-A", PLATE_TAP_STATIONS[1], None),
+    "feed_stud_projected_axis": ZoneChain("D-D", PIN_STATION, (0.0, 0.006)),
 }
+PIN_SECTION_LABEL = "D"
+PIN_SECTION_SCALE = (1, 1)
+# The middle of section D-D's cut face and the pin bore's chain line
+# together, and the top centre of its caption, under them: the cut face's
+# top stands 2 mm under the floor depth's text, the caption's foot over the
+# lower border.
+PIN_SECTION_ZONE_CENTER = (0.040, 0.042)
+PIN_SECTION_CAPTION_TOP = (0.040, 0.0298)
+_CAPTION_SETTLE_M = 2e-4
 
 
 def projected_zone_count(key: str) -> int:
@@ -311,15 +333,14 @@ def projected_zone_count(key: str) -> int:
         )
 
     return 1 + sum(
-        1 for other, (_x, text) in PROJECTED_ZONE_CHAINS.items()
-        if text is None and same(other)
+        1 for other, chain in PROJECTED_ZONE_CHAINS.items()
+        if chain.dimension is None and same(other)
     )
 
 
 _SW_LINE_CHAIN = 3  # swLineStyles_e.swLineCHAIN
 _SW_LW_THICK = 2  # swLineWeights_e.swLW_THICK: Y14.5's heavy chain line
 _SW_TEXT_PREFIX = 1  # swDimensionTextPrefix
-_SW_TEXT_SUFFIX = 2  # swDimensionTextSuffix
 
 
 # The match-drill rides the locating holes' own callout, with the step that
@@ -565,48 +586,47 @@ def _line_ends(adapter: Any, line: Any) -> list[tuple[float, ...]]:
 
 def _add_projected_zone_chain(
     adapter: Any,
-    section: Any,
+    view: Any,
     *,
     key: str,
-    x_mm: float,
-    text_xy: tuple[float, float] | None,
+    chain: ZoneChain,
 ) -> None:
-    """One projected zone at its feature in section A-A: a heavy chain line
-    from front face A along ``key``'s direction for its height, and, when
-    ``text_xy`` is given, the height's vertical dimension on that line, "MIN"
-    after the value and the count of zones it carries before it.
+    """One projected zone at its feature: a heavy chain line from front face
+    A along ``key``'s direction for its height, and, when ``chain`` carries
+    one, the height's dimension on that line, prefixed with the count of
+    zones it carries ("2X") and printed as the frames print it.
 
-    The ends are model points projected through the section, so the line is
-    the zone's own extent at true length; it is authored in the section's
-    view sketch (draw_pn_pen_v_block's recipe: the sheet points mapped
-    through the sketch transform, straight to the database so no endpoint
-    snaps to nearby ink) and the dimension measures the line itself.
+    The ends are model points projected through the view, so the line is the
+    zone's own extent at true length and on its own side of face A; it is
+    authored in the view's sketch (draw_pn_pen_v_block's recipe: the sheet
+    points mapped through the sketch transform, straight to the database so
+    no endpoint snaps to nearby ink) and the dimension measures the line
+    itself.
     """
     (control,) = (c for c in GEOMETRIC_CONTROLS if c.key == key)
     height = control.projected_zone_height_mm
     direction = PROJECTED_ZONE_DIRECTION[key]
-    native = _early_bound(section, "IView")
+    native = _early_bound(view, "IView")
     native.UpdateViewDisplayGeometry()
+    ratio = tuple(float(value) for value in native.ScaleRatio)
     ends = [
         model_point_in_view(
-            adapter, section, (x_mm / 1000.0, 0.0, z / 1000.0),
+            adapter, view, (chain.x_mm / 1000.0, 0.0, z / 1000.0),
             label=f"{key} projected zone at z {z:g}",
         )
         for z in (0.0, direction * height)
     ]
-    rise = ends[1][1] - ends[0][1]
-    # Section A-A prints the front face up: forward (-Z) runs up the sheet.
-    if (
-        abs(ends[0][0] - ends[1][0]) > 1e-6
-        or abs(abs(rise) - height * _S / 1000.0) > 1e-6
-        or rise * direction >= 0.0
-    ):
-        raise RuntimeError(f"{key} projected zone projects as {ends!r}")
+    dx, dy = ends[1][0] - ends[0][0], ends[1][1] - ends[0][1]
+    vertical = abs(dx) <= 1e-6
+    if not (vertical or abs(dy) <= 1e-6) or abs(
+        math.hypot(dx, dy) - height * ratio[0] / ratio[1] / 1000.0
+    ) > 1e-6:
+        raise RuntimeError(f"{key} projected zone projects as {ends!r} at {ratio!r}")
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
-    name = view_name(adapter, section)
+    name = view_name(adapter, view)
     if not drawing.ActivateView(name):
-        raise RuntimeError(f"failed to activate section A-A for {key}'s chain line")
+        raise RuntimeError(f"failed to activate section {chain.view} for {key}'s chain line")
     draw.ClearSelection2(True)
     sketch = _early_bound(native.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
@@ -645,17 +665,22 @@ def _add_projected_zone_chain(
     drift = max(abs(a - b) for end, want in zip(placed, points) for a, b in zip(end, want))
     if drift > 1e-9:
         raise RuntimeError(f"{key} chain line moved from {points!r} to {placed!r}")
-    if text_xy is None:
+    if chain.dimension is None:
         _telemetry.info(f"{key} projected zone: chain {ends[0]!r} -> {ends[1]!r}")
         return
     if not drawing.ActivateView(name):
-        raise RuntimeError(f"failed to activate section A-A for {key}'s height")
+        raise RuntimeError(f"failed to activate section {chain.view} for {key}'s height")
     selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
     data = selection.CreateSelectData()
-    data.View = section
+    data.View = view
     if not segment.Select4(False, data):
         raise RuntimeError(f"failed to select {key}'s chain line")
-    display = draw.AddVerticalDimension2(text_xy[0], text_xy[1], 0.0)
+    at = (
+        (ends[0][0] + ends[1][0]) / 2.0 + chain.dimension[0],
+        (ends[0][1] + ends[1][1]) / 2.0 + chain.dimension[1],
+    )
+    add = draw.AddVerticalDimension2 if vertical else draw.AddHorizontalDimension2
+    display = add(at[0], at[1], 0.0)
     draw.ClearSelection2(True)
     if display is None:
         raise RuntimeError(f"failed to dimension {key}'s projected height")
@@ -669,17 +694,104 @@ def _add_projected_zone_chain(
     count = projected_zone_count(key)
     prefix = f"{count}X " if count > 1 else ""
     dimension.SetText(_SW_TEXT_PREFIX, prefix)
-    dimension.SetText(_SW_TEXT_SUFFIX, PROJECTED_ZONE_HEIGHT_SUFFIX)
-    readback = (
-        str(dimension.GetText(_SW_TEXT_PREFIX) or ""),
-        str(dimension.GetText(_SW_TEXT_SUFFIX) or ""),
-    )
-    if readback != (prefix, PROJECTED_ZONE_HEIGHT_SUFFIX):
-        raise RuntimeError(f"{key} height text did not persist: {readback!r}")
+    if str(dimension.GetText(_SW_TEXT_PREFIX) or "") != prefix:
+        raise RuntimeError(f"{key} height prefix did not persist")
+    if chain.text_xy is not None:
+        # The value stands off its dimension line on a leader; the line and
+        # its arrows stay on the zone's ends (the stock text's idiom).
+        annotation = _early_bound(dimension.GetAnnotation(), "IAnnotation")
+        dimension.OffsetText = True
+        if not annotation.SetPosition2(chain.text_xy[0], chain.text_xy[1], 0.0):
+            raise RuntimeError(f"failed to offset {key}'s height text")
+        rebuild_drawing(adapter, label=f"{key} projected height text")
+        position = tuple(float(value) for value in annotation.GetPosition())
+        if math.dist(position[:2], chain.text_xy) > 1e-6:
+            raise RuntimeError(f"{key} height text stayed at {position!r}")
     _telemetry.info(
         f"{key} projected zone: chain {ends[0]!r} -> {ends[1]!r}, "
-        f"height {prefix}{measured * 1000.0:.4f}{PROJECTED_ZONE_HEIGHT_SUFFIX} at {text_xy!r}"
+        f"height {prefix}{measured * 1000.0:.4f} on {at!r}, text {chain.text_xy!r}"
     )
+
+
+def _pin_zone_section(adapter: Any, front: Any) -> Any:
+    """Section D-D: the arm cut across the pin bore's axis, cut faces only,
+    at 1:1, looking toward the pivot; the cut face and the bore's forward
+    chain line together centre on ``PIN_SECTION_ZONE_CENTER``."""
+    pin_x = _front_x(PIN_STATION)
+    half = edge_half_width(PIN_STATION)
+    section = create_section_view(
+        adapter, front,
+        line_start=(pin_x, _front_y(half) + SECTION_LINE_OVERRUN),
+        line_end=(pin_x, _front_y(-half) - SECTION_LINE_OVERRUN),
+        view_xy=PIN_SECTION_ZONE_CENTER, section_label=PIN_SECTION_LABEL,
+        scale=PIN_SECTION_SCALE, label="pin bore projected-zone section",
+    )
+    native = _early_bound(section, "IView")
+    cut = _early_bound(native.GetSection(), "IDrSection")
+    # R2026x declares SetDisplayOnlySurfaceCut as a void setter; only its
+    # dedicated bool getter may be truth-tested.
+    cut.SetDisplayOnlySurfaceCut(True)
+    rebuild_drawing(adapter, label="section D-D cut face")
+    ratio = tuple(float(value) for value in native.ScaleRatio)
+    if not bool(cut.GetDisplayOnlySurfaceCut()) or ratio != tuple(
+        float(value) for value in PIN_SECTION_SCALE
+    ):
+        raise RuntimeError(f"section D-D is not a 1:1 cut-face section: {ratio!r}")
+    (control,) = (c for c in GEOMETRIC_CONTROLS if c.key == "feed_stud_projected_axis")
+    far_z = PROJECTED_ZONE_DIRECTION[control.key] * control.projected_zone_height_mm
+    for attempt in range(4):
+        native.UpdateViewDisplayGeometry()
+        rear, front_face, far = model_points_in_view(
+            adapter, section,
+            tuple((PIN_STATION / 1000.0, 0.0, z / 1000.0) for z in (THICKNESS, 0.0, far_z)),
+            label=f"section D-D zone extent, pass {attempt}",
+            names=("rear face", "face A", "zone end"),
+        )
+        xs = (rear[0], front_face[0], far[0])
+        centre = ((min(xs) + max(xs)) / 2.0, front_face[1])
+        miss = (PIN_SECTION_ZONE_CENTER[0] - centre[0], PIN_SECTION_ZONE_CENTER[1] - centre[1])
+        if math.hypot(*miss) <= 1e-4:
+            break
+        position = tuple(float(value) for value in native.Position)
+        if not native.SetViewPosition(
+            double_array([position[0] + miss[0], position[1] + miss[1]]), False
+        ):
+            raise RuntimeError("failed to re-centre section D-D")
+        rebuild_drawing(adapter, label="section D-D re-centred")
+    else:
+        raise RuntimeError(f"section D-D zone centred at {centre!r}, not {PIN_SECTION_ZONE_CENTER!r}")
+    # Looking toward the pivot, forward (-Z) reads to the right of face A.
+    if not rear[0] < front_face[0] < far[0]:
+        raise RuntimeError(f"section D-D does not read forward to the right: {xs!r}")
+    return section
+
+
+def _place_pin_section_caption(adapter: Any, section: Any) -> None:
+    """Hang section D-D's native caption, centred, under its cut face and
+    chain line (draw_pd_transgear_feed_pinion's measured placement), keeping
+    its linked view-label fields."""
+    view = _early_bound(section, "IView")
+    captions = []
+    for raw_note in view.GetNotes() or ():
+        note = _early_bound(raw_note, "INote")
+        linked_text = str(note.PropertyLinkedText or "")
+        if all(token in linked_text for token in ("<VLNAME>", "<VLLABEL>")):
+            captions.append((note, linked_text))
+    if len(captions) != 1:
+        raise RuntimeError(f"expected one native section D-D caption, found {len(captions)}")
+    note, linked_text = captions[0]
+    target = PIN_SECTION_CAPTION_TOP
+    for _attempt in range(4):
+        extent = tuple(float(value) for value in note.GetExtent())
+        error = (target[0] - (extent[0] + extent[3]) / 2.0, target[1] - extent[4])
+        if max(abs(error[0]), abs(error[1])) < _CAPTION_SETTLE_M:
+            break
+        move_annotation(adapter, note.GetAnnotation(), *error, label="section D-D caption")
+    else:
+        raise RuntimeError(f"section D-D caption stayed at {extent}, its top centre asked at {target}")
+    if str(note.PropertyLinkedText or "") != linked_text:
+        raise RuntimeError("section D-D caption lost its native view-label fields")
+    _telemetry.info(f"section D-D caption extent {extent}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -742,11 +854,12 @@ async def build(adapter: Any) -> dict[str, str]:
         view_xy=LOCATOR_SECTION_CENTER, section_label="B", scale=VIEW_SCALE,
         label="matched locating sockets transverse section",
     )
+    pin_section = _pin_zone_section(adapter, front)
     end = place_view(adapter, str(SOURCE), "*Right", *END_CENTER, scale=VIEW_SCALE)
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_VIEW_SCALE
     )
-    for view in (front, section, locator_section, end, iso):
+    for view in (front, section, locator_section, pin_section, end, iso):
         set_hidden_lines_removed(adapter, view)
 
     annotations = [
@@ -871,8 +984,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, placements=placements, datums=PART_DATUMS,
         controls=GEOMETRIC_CONTROLS, label="transgear arm locating frame",
     )
-    for key, (x_mm, text_xy) in PROJECTED_ZONE_CHAINS.items():
-        _add_projected_zone_chain(adapter, section, key=key, x_mm=x_mm, text_xy=text_xy)
+    chain_views = {"A-A": section, "D-D": pin_section}
+    for key, chain in PROJECTED_ZONE_CHAINS.items():
+        _add_projected_zone_chain(adapter, chain_views[chain.view], key=key, chain=chain)
+    _place_pin_section_caption(adapter, pin_section)
     _overall_reference(adapter, front)
     for view, label in ((front, "front"), (end, "end")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):

@@ -761,9 +761,11 @@ def test_each_projected_zone_is_a_dimensioned_chain_line_from_face_a_on_its_side
     """Machinist review of f4a5f03a1 (clarity, rule 7; all three runs): the
     frames gave each zone's height, but where it starts and which way it
     runs (from face A: taps rearward, pin bore forward) was printed only in
-    general note 1. Section A-A draws each zone at its feature as a chain
-    line from face A on its own side, dimensioned with its height MIN, and
-    the note is gone."""
+    general note 1. Each zone is drawn at its feature as a chain line from
+    face A on its own side, dimensioned with its height as the frame prints
+    it, and the note is gone. Review of d5d1298b0: the pin bore's 32.6 rose
+    through the plan's dimension lines (gating), so it is drawn in section
+    D-D; the taps' dimension line runs on their zone's own ends; no MIN."""
     import paper_drive_arm_registration as registration
 
     projected = {
@@ -796,48 +798,65 @@ def test_each_projected_zone_is_a_dimensioned_chain_line_from_face_a_on_its_side
         projected["feed_stud_projected_axis"].projected_zone_height_mm
         == registration.S_PROJECTED_HEIGHT_MM
     )
-    # Each line stands at its own hole: the taps' on their axes, the pin
-    # bore's beside its axis (which its station's witness line takes), just
-    # outside its wall.
+    # Each line stands on its own hole's axis, in a view that cuts the hole
+    # on that axis: the taps' in section A-A, the pin bore's in section D-D.
     stations = dict(zip(taps, geometry.PLATE_TAP_STATIONS))
-    for key, (x_mm, _text) in drawing.PROJECTED_ZONE_CHAINS.items():
-        face = projected[key].face
-        if key in stations:
-            assert x_mm == stations[key] == face.contains_x_mm
-        else:
-            outside = face.contains_x_mm - face.diameter_mm / 2.0 - x_mm
-            assert 0.0 < outside <= 1.0
+    for key, chain in drawing.PROJECTED_ZONE_CHAINS.items():
+        assert chain.x_mm == projected[key].face.contains_x_mm
+        assert chain.view == ("A-A" if key in stations else "D-D"), key
+        assert key not in stations or chain.x_mm == stations[key]
     # Every zone's height is printed: by its own dimension, or by one that
     # counts it ("2X") because it has the same height the same way.
     counts = {
         key: drawing.projected_zone_count(key)
-        for key, (_x, text) in drawing.PROJECTED_ZONE_CHAINS.items() if text is not None
+        for key, chain in drawing.PROJECTED_ZONE_CHAINS.items() if chain.dimension is not None
     }
     assert sum(counts.values()) == len(projected)
     assert counts == {"plate_tap_1_position": 2, "feed_stud_projected_axis": 1}
-    # On the sheet (front face up), each height's value stands between the
-    # line's ends, off the part, beside its line.
-    face_a_y = drawing.SECTION_CENTER[1] + geometry.THICKNESS * drawing._S / 2000.0
-    rear_y = drawing.SECTION_CENTER[1] - geometry.THICKNESS * drawing._S / 2000.0
-    for key, (x_mm, text) in drawing.PROJECTED_ZONE_CHAINS.items():
-        if text is None:
-            continue
-        text_x, text_y = text
-        direction = spec.PROJECTED_ZONE_DIRECTION[key]
-        end_y = face_a_y - direction * projected[key].projected_zone_height_mm * drawing._S / 1000.0
-        low, high = sorted((face_a_y, end_y))
-        assert low < text_y < high, key
-        assert not rear_y - 0.002 < text_y < face_a_y + 0.002, key
-        assert abs(text_x - drawing._front_x(x_mm)) >= 0.010, key
-    # The shared tap value stands midway between the two tap lines.
-    tap_x = [drawing._front_x(station) for station in geometry.PLATE_TAP_STATIONS]
-    text = drawing.PROJECTED_ZONE_CHAINS["plate_tap_1_position"][1]
-    assert text is not None and text[0] == pytest.approx(sum(tap_x) / 2.0)
     for control in projected.values():
         assert f"{control.projected_zone_height_mm:.{spec.DRAWING_REFERENCE_PRECISION}f}" == (
             f"{control.projected_zone_height_mm:g}"
         )
-    assert spec.PROJECTED_ZONE_HEIGHT_SUFFIX == " MIN"
+    assert not hasattr(spec, "PROJECTED_ZONE_HEIGHT_SUFFIX")
+    # Section A-A (2:1, face A up): the taps' dimension line runs inside tap
+    # 1's hole beside its chain line, so its arrows land on the zone's own
+    # ends; the "2X" value stands below the rear face, between the taps,
+    # above the zones' far ends.
+    tap = drawing.PROJECTED_ZONE_CHAINS["plate_tap_1_position"]
+    drill_r = drawing._PLATE_DRILL_R * drawing._S / 1000.0
+    assert tap.dimension is not None and tap.dimension[1] == 0.0
+    assert 0.001 <= abs(tap.dimension[0]) <= drill_r - 0.0015
+    face_a_y = drawing.SECTION_CENTER[1] + geometry.THICKNESS * drawing._S / 2000.0
+    rear_y = drawing.SECTION_CENTER[1] - geometry.THICKNESS * drawing._S / 2000.0
+    tap_end_y = face_a_y - projected["plate_tap_1_position"].projected_zone_height_mm * drawing._S / 1000.0
+    assert tap.text_xy is not None
+    assert tap_end_y < tap.text_xy[1] < rear_y - 0.004
+    tap_x = [drawing._front_x(station) for station in geometry.PLATE_TAP_STATIONS]
+    assert tap.text_xy[0] == pytest.approx(sum(tap_x) / 2.0)
+    # Section D-D (1:1, looking toward the pivot, forward to the right): the
+    # cut face and the 32.6 line inside the lower-left corner, under the
+    # floor depth's text and over the lower border, with its caption under
+    # them; D is not a datum letter.
+    assert drawing.PIN_SECTION_LABEL not in {datum.letter for datum in spec.PART_DATUMS}
+    assert drawing.PIN_SECTION_SCALE == (1, 1)
+    pin_height = projected["feed_stud_projected_axis"].projected_zone_height_mm / 1000.0
+    thickness = geometry.THICKNESS / 1000.0
+    centre_x, axis_y = drawing.PIN_SECTION_ZONE_CENTER
+    face_x = centre_x - (pin_height - thickness) / 2.0
+    left, right = face_x - thickness, face_x + pin_height
+    half = geometry.edge_half_width(geometry.PIN_STATION) / 1000.0
+    assert left > _BORDER + 0.005
+    assert right < drawing.ISO_NOTE_XY[0] - 0.010
+    floor_lines = ["6.40 \u00b10.05", *spec.FLOOR_DEPTH_CALLOUT.splitlines()]
+    floor = _hanging_left_box(floor_lines, drawing.SECTION_KEEP["FloorDepth"])
+    pin = drawing.PROJECTED_ZONE_CHAINS["feed_stud_projected_axis"]
+    assert pin.dimension is not None and pin.dimension[0] == 0.0
+    assert axis_y + half + 0.002 <= floor[1]
+    assert axis_y + pin.dimension[1] + _LINE_PITCH < floor[1]
+    caption_x, caption_top = drawing.PIN_SECTION_CAPTION_TOP
+    assert caption_x == pytest.approx(centre_x)
+    assert caption_top < axis_y - half - 0.002
+    assert caption_top - 0.016 > _BORDER
     # No general notes remain (rule 7).
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "add_note(" not in source
