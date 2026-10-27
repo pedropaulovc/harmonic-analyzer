@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import ast
+import asyncio
+import math
 from pathlib import Path
 import re
 from types import SimpleNamespace
@@ -249,3 +251,25 @@ def test_saved_receiver_requires_a_native_hole_feature(saved_tap, fault):
         feature.GetDefinition = lambda: None
     with pytest.raises(RuntimeError):
         drawing._require_saved_tap(model)
+
+
+def _mass_adapter(volume: float):
+    async def get_mass_properties():
+        return SimpleNamespace(
+            is_success=True, error=None, data=SimpleNamespace(volume=volume)
+        )
+
+    return SimpleNamespace(get_mass_properties=get_mass_properties)
+
+
+@pytest.mark.parametrize("volume", [math.nan, math.inf, -math.inf])
+def test_plug_build_stops_on_a_non_finite_volume_read(volume):
+    # NaN passes |vol - expected| > tol, the shared volume_check's included
+    # (codjiflo rounds 5 and 6 on #1997).
+    adapter = _mass_adapter(volume)
+    with pytest.raises(RuntimeError, match="non-finite volume"):
+        asyncio.run(part._volume(adapter))
+    # The shared check already rejects an infinite read; NaN needs the guard.
+    with pytest.raises(RuntimeError, match="non-finite volume|volume -?inf"):
+        asyncio.run(part._volume_check(adapter, "plug", 100.0, 1.0))
+    assert asyncio.run(part._volume(_mass_adapter(100.0))) == 100.0

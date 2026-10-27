@@ -123,13 +123,24 @@ COUNTERBORE_R = COUNTERBORE_DIA / 2.0
 _BREAK_OVERRUN = 0.5  # each revolved tap-end cutter closes in air
 
 
+def _finite(label: str, volume: float) -> float:
+    # NaN passes every |vol - expected| > tol comparison (the shared
+    # volume_check's included), so a non-finite read stops the build
+    # (codjiflo rounds 5 and 6 on #1997).
+    if not math.isfinite(volume):
+        raise RuntimeError(f"{label}: non-finite volume {volume!r}")
+    return volume
+
+
 async def _volume(adapter) -> float:
-    # A failed read must stop the build: NaN would pass every |vol - expected|
-    # comparison below (codjiflo round 5 on #1997).
     res = await adapter.get_mass_properties()
     if not res.is_success:
         raise RuntimeError(f"get_mass_properties failed: {res.error}")
-    return float(res.data.volume)
+    return _finite("volume", float(res.data.volume))
+
+
+async def _volume_check(adapter, label: str, expected: float, tol: float) -> float:
+    return _finite(label, await volume_check(adapter, label, expected, tol))
 
 
 async def build(adapter) -> dict[str, str]:
@@ -223,7 +234,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "EndPlug")
     v_plug_envelope = math.pi * PLUG_OVERLAP_R**2 * PLUG_LENGTH
-    vol = await volume_check(
+    vol = await _volume_check(
         adapter, "end plug envelope", v_plug_envelope, 0.02 * v_plug_envelope
     )
 
@@ -242,7 +253,7 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs += tap.placement_drive_jobs
     v_tap = math.pi * TAP_DRILL_R**2 * PLUG_LENGTH
-    vol = await volume_check(adapter, "plug through tap", vol - v_tap, 0.02 * v_tap)
+    vol = await _volume_check(adapter, "plug through tap", vol - v_tap, 0.02 * v_tap)
 
     # 1b. The arm-end counterbore, coaxial with ThreadBore and cut in its setup:
     # its flat floor sits past the screw's clamped run-out, so the fat
@@ -320,7 +331,7 @@ async def build(adapter) -> dict[str, str]:
         + EDGE_BREAK**2 * (COUNTERBORE_R + EDGE_BREAK / 3.0)
         + EDGE_BREAK**2 * (TAP_DRILL_R + EDGE_BREAK / 3.0)
     )
-    vol = await volume_check(
+    vol = await _volume_check(
         adapter, "arm-end counterbore", vol - v_cbore, 0.02 * v_cbore + 0.05
     )
 
@@ -377,7 +388,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "InnerTapBreak")
     v_inner_break = math.pi * EDGE_BREAK**2 * (TAP_DRILL_R + EDGE_BREAK / 3.0)
-    receiver_vol = await volume_check(
+    receiver_vol = await _volume_check(
         adapter, "inner tap break", vol - v_inner_break, 0.03 * v_inner_break + 0.05
     )
 
@@ -622,7 +633,7 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(
+    await _volume_check(
         adapter, "driven gooseneck (equations neutral)", final_vol, 0.001 * final_vol
     )
 
