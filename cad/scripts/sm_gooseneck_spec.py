@@ -3,6 +3,13 @@ r"""Pure-data dimensional contract shared by the gooseneck post and its drawing.
 PURE DATA, no SolidWorks/COM imports.  ``build_sm_gooseneck`` imports the marked-
 dimension NAME map + notes from here; ``draw_sm_gooseneck`` keeps exactly
 ``DRAWING_DIMENSIONS`` for its elevation-view import.
+
+The end plug is tapped #8-32 UNC-2B THRU per the
+owner ruling 2026-10-26 (#1951, option B), superseding the #6-32 the 2026-10-10
+option-B note named: the clamped MHA-SM-04 eye passes its full preload through
+the plug-face thread, which no #6-32 root carried at SF 2.  Its worst-case wall
+and engagement live in ``sm_gooseneck_spring_joint`` (``PLUG_WALL_MIN``,
+``ENGAGEMENT_MIN``).
 """
 
 from __future__ import annotations

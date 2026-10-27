@@ -5,7 +5,7 @@ owns every size and band; this module adds what the print states (the marked
 dimensions, their authored places, the callouts and the notes) and the
 strength case that chose the thread.
 
-Design (owner ruling 2026-10-26, #1951, option B).  MHA-SM-04 is a custom
+Design (owner ruling 2026-10-26 (#1951, option B)).  MHA-SM-04 is a custom
 shoulder screw: a plain turned Ø3.50 shoulder under the head is the
 MHA-SM-VN-51 loop seat, a 45-degree lead steps up to an #8-32 UNC thread, and
 the MHA-SM-01 plug is retapped #8-32 UNC-2B THRU.  The 2026-09-21 rulings
