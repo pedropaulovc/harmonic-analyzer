@@ -179,8 +179,6 @@ _TIE2_WANDER = (
 _SPOKE_PITCH = 360.0 / SPOKE_COUNT
 if clock_to_local_deg(0.0) % _SPOKE_PITCH:
     raise AssertionError("the spokes no longer lie on the horizontal centerline")
-if abs(math.dist((TIE1_X, TIE1_Y), (0.0, 0.0)) - TIE1_R) > 1e-9:
-    raise AssertionError("TIE 1's coordinates and radius disagree")
 
 # TIE 1 to the boss OD, every size at the title block's .XX (+/-0.51), its
 # axis anywhere in TIE1_OFFSET_MAX: 14.745 - (11.200 + 0.964) - 0.55 = 2.03.

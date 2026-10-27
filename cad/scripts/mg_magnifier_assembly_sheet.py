@@ -26,7 +26,8 @@ from mg_magnifying_wheel_geom import TIE1_CLOCK_DEG as _TIE1_CLOCK_DEG
 
 # TIE 1's rest clock position, seen from the front, as a clock-face hour.
 TIE1_REST_HOUR = round((90.0 - _TIE1_CLOCK_DEG) / 30.0) % 12 or 12
-if abs((90.0 - _TIE1_CLOCK_DEG) - 30.0 * TIE1_REST_HOUR) % 360.0 > 1.0:
+_TIE1_HOUR_OFF = ((90.0 - _TIE1_CLOCK_DEG) - 30.0 * TIE1_REST_HOUR + 180.0) % 360.0
+if abs(_TIE1_HOUR_OFF - 180.0) > 1.0:
     raise AssertionError(f"TIE 1 at {_TIE1_CLOCK_DEG:.1f} deg is not on a clock hour")
 
 # The axle-stack dimensions the AXLE AS PRESSED and WHEEL ENDSHAKE details
