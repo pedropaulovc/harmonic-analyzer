@@ -124,15 +124,18 @@ TIP_X = _sheet_x(TIP_Y)
 # baseline from the gauged step (the press gauge's face), each with the
 # dimension-origin circle on the step's extension line and named on its
 # callout, then the overall as a reference. The thread's block is the band's
-# two lines plus four callout lines, so its row and the overall's stand 4 mm
-# lower than with three, keeping the block clear of the shank's dimension
-# line.
-_ROW_Y = (SIDE_CENTER[1] - 0.032, SIDE_CENTER[1] - 0.0628, SIDE_CENTER[1] - 0.0840)
-# The thread length spans about 25 mm of sheet, its ~82 mm callout block
+# two lines plus three callout lines.
+_ROW_Y = (SIDE_CENTER[1] - 0.032, SIDE_CENTER[1] - 0.0588, SIDE_CENTER[1] - 0.0800)
+# The thread length spans about 25 mm of sheet, its ~78 mm callout block
 # wider: the block stands wholly left of the step's extension line (4 mm air,
 # room for the origin circle there), clear of the overall's extension line
 # dropping from the tip on the right.
 _THREAD_BLOCK_HALF = 0.041
+# The overall reference's value sits in a break of its dimension line: on
+# the unbroken line the parentheses' tails touched it (run
+# 20261027T030250671Z review; draw_ch_channel_assembly #1660 r8).
+BROKEN_LINE_DIMENSIONS = ("PinLength",)
+BROKEN_LINE_ALIGNED_TEXT = 3  # swDisplayDimensionLeaderText_e.swBrokenLeaderAlignedText
 SIDE_KEEP = {
     "ShankLength": ((BACK_X + STEP_X) / 2.0, _ROW_Y[0]),
     "ThreadLength": (STEP_X - 0.004 - _THREAD_BLOCK_HALF, _ROW_Y[1]),
@@ -202,10 +205,13 @@ RELIEF_ROOT_CENTRES_MM = tuple(
 )
 ROOT_TIP_TOL_M = 0.0002
 DETAIL_KEEP = {
-    # Under the crop, nearest the part: its extension lines fall from the
-    # floor's two ends through the groove's air, its two-line mate callout
-    # under the value.
-    "ReliefWidth": (DETAIL_CENTER[0], _DETAIL_BOTTOM - 0.005),
+    # Under the crop: its extension lines fall from the floor's two ends
+    # through the groove's air; its text block (~58 mm wide: the value over
+    # its two-line mate callout) stands wholly right of the flank's extension
+    # line (x 0.0855) with 4 mm air, and its top clears the crop circle (run
+    # 20261027T030250671Z: centred between the extension lines, both struck
+    # every line of it).
+    "ReliefWidth": (0.1185, _DETAIL_BOTTOM - 0.008),
     # Over the crop: its line runs between the two floors 0.3 (3 mm) from the
     # step, inside the flat floor (the step's root ends 0.4 from it) and left
     # of the radius's arrow, then rises through the groove's open mouth.
@@ -583,6 +589,21 @@ def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
     return matches[0]
 
 
+def _break_line_at_text(adapter: Any, annotations: list[Any], name: str) -> None:
+    """Put ``name``'s value in a break of its dimension line, read back
+    (draw_ch_channel_assembly._break_line_at_text)."""
+    display = _early_bound(
+        _early_bound(
+            _named(adapter, annotations, name), "IAnnotation"
+        ).GetSpecificAnnotation(),
+        "IDisplayDimension",
+    )
+    if display.SetBrokenLeader2(False, BROKEN_LINE_ALIGNED_TEXT) != 0:
+        raise RuntimeError(f"wheel axle {name}: failed to break the dimension line")
+    if int(display.GetBrokenLeader2()) != BROKEN_LINE_ALIGNED_TEXT:
+        raise RuntimeError(f"wheel axle {name}: broken dimension line did not persist")
+
+
 def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
     """Every imported dimension prints the text lanes its part authored
     (draw_pd_transgear_pin).
@@ -764,6 +785,9 @@ async def build(adapter: Any) -> dict[str, str]:
     _assert_part_authored_text(adapter, annotations)
     _assert_single_limits(adapter, annotations)
     _dress_relief_roots(adapter, detail, annotations)
+    for name in BROKEN_LINE_DIMENSIONS:
+        _break_line_at_text(adapter, annotations, name)
+    rebuild_drawing(adapter, label="wheel axle broken dimension lines")
     # Both lengths read from the step: the origin circle on its extension line.
     for name in ORIGIN_DIMENSIONS:
         _set_dimension_origin(

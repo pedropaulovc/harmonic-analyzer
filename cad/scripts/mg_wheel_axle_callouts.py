@@ -11,7 +11,7 @@ assembly import.
 
 from __future__ import annotations
 
-from mg_wheel_axle_spec import BAR_BORE_LIMITS, THREAD_PAST_LOCKNUT_LIMIT
+from mg_wheel_axle_spec import BAR_BORE_LIMITS
 
 TEXT_PREFIX = 1  # swDimensionTextPrefix
 TEXT_SUFFIX = 2  # swDimensionTextSuffix
@@ -35,16 +35,16 @@ PIN_DIA_CALLOUT = "\n".join(
 )
 SHANK_LENGTH_CALLOUT = "FROM SHANK STEP"
 # The thread length's band names the stack it sets and its mate (rule 4: a
-# width that sets a stack names the stack): the MHA-MG-00 nut stack, whose
-# locknut must sit on full thread, and the most thread that may stand past
-# it, read at the thread end (the dome's tangent, where the length ends), in
-# the words of MHA-MG-00's press-gauge acceptance (mg_magnifier_assembly_spec).
+# width that sets a stack names the stack): the MHA-MG-00 nut stack and its
+# MHA-MG-VN-52 locknut, and the feature the length ends on. The assembled
+# "2.9 MAX past the locknut" is checked on MHA-MG-00 (its press-gauge
+# acceptance, mg_magnifier_assembly_spec), not on this part (run
+# 20261027T030250671Z review).
 THREAD_LENGTH_CALLOUT = "\n".join(
     (
-        f"FROM SHANK STEP; SETS {ASSEMBLY}",
-        f"NUT STACK: LOCKNUT {NUT}",
-        "ON FULL THREAD, THREAD END",
-        f"(DOME TANGENT) {THREAD_PAST_LOCKNUT_LIMIT:.1f} MAX PAST IT",
+        "FROM SHANK STEP TO THREAD END;",
+        f"SETS {ASSEMBLY} NUT STACK,",
+        f"LOCKNUT {NUT}",
     )
 )
 # The relief's width limit keeps the first nut on full thread.

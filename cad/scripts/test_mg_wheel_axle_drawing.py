@@ -156,14 +156,16 @@ def test_tolerances_are_native_on_the_model() -> None:
     assert spec.REFERENCE_DIMENSIONS == {"PinLength"}
     assert spec.DRAWING_PRECISION["PinProfile"]["PinLength"] == 1
     assert callouts.SHANK_LENGTH_CALLOUT == "FROM SHANK STEP"
-    # Rule 4: the band names the stack it sets and the nut, and says where
-    # the 2.9 is read (the thread end, the dome's tangent), in MHA-MG-00's
-    # acceptance words.
+    # Rule 4: the band names the stack it sets, its locknut and the feature
+    # it ends on; the assembled 2.9 MAX past the locknut is MHA-MG-00's
+    # check, not this part's.
     assert callouts.THREAD_LENGTH_CALLOUT == (
-        "FROM SHANK STEP; SETS MHA-MG-00\nNUT STACK: LOCKNUT MHA-MG-VN-52\n"
-        "ON FULL THREAD, THREAD END\n(DOME TANGENT) 2.9 MAX PAST IT"
+        "FROM SHANK STEP TO THREAD END;\nSETS MHA-MG-00 NUT STACK,\n"
+        "LOCKNUT MHA-MG-VN-52"
     )
+    assert "2.9" not in callouts.THREAD_LENGTH_CALLOUT
     assert drawing.ORIGIN_DIMENSIONS == ("ShankLength", "ThreadLength")
+    assert drawing.BROKEN_LINE_DIMENSIONS == ("PinLength",)
     assert group.THREAD_PAST_LOCKNUT_MAX <= spec.THREAD_PAST_LOCKNUT_LIMIT == 2.9
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
