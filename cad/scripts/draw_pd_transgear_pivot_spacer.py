@@ -171,6 +171,10 @@ DATUM_A_SYMBOL = (
 # The placed tag may not drift through the export's final rebuild by more
 # than the native helper's limit.
 DATUM_A_STABILITY_M = 0.0001
+# Settled: everything of datum A but its leader stands this far outside the
+# O.D., and the leader ends on the bore within this.
+DATUM_A_AIR = 0.002
+DATUM_A_LEADER_TOL = 0.0005
 # Text on a line and text on text are defects; leader crossings stay logged.
 BLOCKING_LAYOUT_FINDINGS = frozenset({"text-on-line", "text-on-text"})
 
@@ -423,30 +427,89 @@ def _move_dimension(
 
 
 def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
-    """Every authored dimension prints the text lanes its part wrote
-    (draw_mg_wheel_axle).  Read-only: text set from the sheet would write
-    through to the source part (#1942)."""
+    """Every authored dimension prints exactly once, with the text lanes its
+    part wrote (draw_pd_transgear_pin).  Read-only: text set from the sheet
+    would write through to the source part (#1942)."""
     wanted = callouts.authored_by_name()
-    displays = {
-        dimension_name(adapter, annotation): annotation for annotation in annotations
+    displays: dict[str, list[Any]] = {name: [] for name in wanted}
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name in displays:
+            displays[name].append(
+                _early_bound(
+                    _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+                    "IDisplayDimension",
+                )
+            )
+    counts = {name: len(found) for name, found in displays.items() if len(found) != 1}
+    if counts:
+        raise RuntimeError(f"authored dimensions not printed exactly once: {counts!r}")
+    wrong = {
+        (name, lane): printed
+        for name, lanes in wanted.items()
+        for lane, text in lanes.items()
+        if callouts.callout_rows(printed := str(displays[name][0].GetText(lane) or ""))
+        != callouts.callout_rows(text)
     }
-    missing = sorted(set(wanted) - set(displays))
-    if missing:
-        raise RuntimeError(f"authored dimensions not printed: {missing!r}")
-    wrong = {}
-    for name, lanes in wanted.items():
-        display = _early_bound(
-            _early_bound(displays[name], "IAnnotation").GetSpecificAnnotation(),
-            "IDisplayDimension",
-        )
-        for lane, text in lanes.items():
-            printed = str(display.GetText(lane) or "")
-            if callouts.callout_rows(printed) != callouts.callout_rows(text):
-                wrong[(name, lane)] = printed
     if wrong:
         raise RuntimeError(
             f"imported dimension text differs from the part's: {wrong!r}"
         )
+
+
+def _centre_distance(segment: Any) -> float:
+    """Closest approach of one ink segment to the end view's centre."""
+    (cx, cy), (x0, y0), (x1, y1) = (
+        END_CENTER,
+        (segment.x0, segment.y0),
+        (segment.x1, segment.y1),
+    )
+    dx, dy = x1 - x0, y1 - y0
+    span = dx * dx + dy * dy
+    t = (
+        0.0
+        if span == 0.0
+        else min(1.0, max(0.0, ((cx - x0) * dx + (cy - y0) * dy) / span))
+    )
+    return math.dist((cx, cy), (x0 + t * dx, y0 + t * dy))
+
+
+def _assert_datum_a_clear(adapter: Any, tag: Any) -> None:
+    """Datum A's settled ink, as the layout audit collects it: one stroke,
+    its leader, enters the O.D. circle (plus air) and ends on the bore;
+    the frame, its letter and the shoulder all stand outside the O.D. with
+    DATUM_A_AIR (the clearance test_datum_a_tag_stands_off_the_od_... sets
+    on the requested point)."""
+    label = str(_early_bound(tag.GetAnnotation(), "IAnnotation").GetName())
+    inks = [
+        ink
+        for sheet in collect_document(adapter)
+        for ink in sheet.annotations
+        if ink.kind == "datum" and ink.label == label
+    ]
+    if len(inks) != 1:
+        raise RuntimeError(f"datum A {label!r}: {len(inks)} collected inks, expected 1")
+    od_r = OD / 2.0 * _S
+    bore_r = BORE_DIA / 2.0 * _S
+    near = [s for s in inks[0].segments if _centre_distance(s) < od_r + DATUM_A_AIR]
+    if len(near) != 1:
+        raise RuntimeError(
+            f"datum A: {len(near)} strokes within {DATUM_A_AIR * 1000.0:.1f} mm of the "
+            "O.D.; only its leader may cross it"
+        )
+    tip = min(
+        ((near[0].x0, near[0].y0), (near[0].x1, near[0].y1)),
+        key=lambda point: math.dist(point, END_CENTER),
+    )
+    if abs(math.dist(tip, END_CENTER) - bore_r) > DATUM_A_LEADER_TOL:
+        raise RuntimeError(f"datum A's leader ends at {tip!r}, not on the bore")
+    for box in inks[0].text_boxes:
+        nearest = (
+            min(max(END_CENTER[0], box.xmin), box.xmax),
+            min(max(END_CENTER[1], box.ymin), box.ymax),
+        )
+        if math.dist(nearest, END_CENTER) < od_r + DATUM_A_AIR:
+            raise RuntimeError(f"datum A's letter {box!r} stands on the O.D.")
 
 
 def _datum_a_live(
@@ -682,12 +745,14 @@ async def build(adapter: Any) -> dict[str, str]:
 
     def datum_a_settled() -> None:
         """After the export's last rebuild datum A is still the view's live,
-        attached tag and stands where it was placed (0.1 mm)."""
+        attached tag, stands where it was placed (0.1 mm), and its settled
+        ink clears the O.D. (not only the requested point)."""
         drift = math.dist(_datum_a_live(adapter, end, datum_a, bore_edge), datum_a_xy)
         if drift > DATUM_A_STABILITY_M:
             raise RuntimeError(
                 f"datum A moved {drift * 1000.0:.3f} mm after the final rebuild"
             )
+        _assert_datum_a_clear(adapter, datum_a)
 
     return await finalize_drawing(
         adapter,
