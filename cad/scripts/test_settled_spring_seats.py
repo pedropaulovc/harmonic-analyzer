@@ -251,9 +251,9 @@ def test_isolated_counter_provenance_identifies_the_whole_made_support(
     assert not any(key.startswith("relief_") for key in support)
     assert support["tip_chamfer_mm"] == 0.3
     assert support["underhead_corner_r_mm"] == 0.50
-    assert support["plug_length_mm"] == 9.90
-    assert support["plug_counterbore_dia_mm"] == 4.70
-    assert support["plug_counterbore_depth_mm"] == 2.57
+    assert support["plug_length_mm"] == 10.00
+    assert support["plug_counterbore_dia_mm"] == 4.90
+    assert support["plug_counterbore_depth_mm"] == 2.64
     assert support["plug_edge_break_mm"] == 0.25
     counter_seat()
 

@@ -142,7 +142,7 @@ if CROWN_RISE_MIN <= 0.0 or SLOT_RIM_CUT_MIN <= 0.0 or HEAD_SIDE_MIN <= 0.0:
 # 12L14 cold-drawn (415 MPa, azom.com ArticleID 6604), and the oiled
 # black-oxide friction range.  The grade is required (drawing-guidelines.md
 # rule 2): 1018 CD's 370 MPa (azom.com ArticleID 6115) leaves the service SF
-# at 1.91 over the beam past the plug's counterbore (codjiflo round 3, #1997).
+# at 1.90 over the beam past the plug's counterbore (codjiflo round 3, #1997).
 SPRING_PULL_MAX_N = float(_config.parts("sm-vn-counter-spring")["maximum_load_n"])
 YIELD_MPA = 415.0
 # The clamp faces (the head and the plug face on the loop wire) and the thread

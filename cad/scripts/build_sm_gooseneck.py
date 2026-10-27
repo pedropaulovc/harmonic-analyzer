@@ -2,13 +2,15 @@ r"""Build the gooseneck post with its brazed, through-tapped end plug.
 
 The polished Ø16 x 2-wall tube anchors the stock counter spring above the
 summing lever. Its vertical leg, R51 quarter bend and horizontal arm form
-one hollow tube. A physical Ø12 x 9.90 AISI 1018 plug is silver-brazed flush
+one hollow tube. A physical Ø12 x 10.00 AISI 1018 plug is silver-brazed flush
 with the arm end, then drilled and tapped #8-32 UNC-2B through (owner ruling
-2026-10-26 (#1951, option B)). An arm-end Ø4.70 x 2.57 counterbore clears
-MHA-SM-04's die run-out even with the spring loop clamped to its least gap
-(codjiflo P1 on #1997); its mouth, the tap edge at its floor and the inner
-tap end each carry a 0.25 x 45-degree break, leaving 6.83 mm nominal full
-thread (6.27 mm minimum, ``sm_gooseneck_spring_joint.ENGAGEMENT_MIN``). The
+2026-10-26 (#1951, option B)). An arm-end Ø4.90 x 2.64 counterbore clears
+MHA-SM-04's die run-out, the screw tilted in its thread, even with the spring
+loop clamped to its least gap (codjiflo P1 on #1997, round 5); its mouth, the
+tap edge at its floor and the inner tap end each carry a 0.25 x 45-degree
+break, its floor corner stays sharp (R0.10 MAX printed), leaving 6.86 mm
+nominal full thread (6.30 mm minimum,
+``sm_gooseneck_spring_joint.ENGAGEMENT_MIN``). The
 made MHA-SM-04 slotted fillister screw is a separate component, not part of
 this weldment.
 
@@ -122,8 +124,12 @@ _BREAK_OVERRUN = 0.5  # each revolved tap-end cutter closes in air
 
 
 async def _volume(adapter) -> float:
+    # A failed read must stop the build: NaN would pass every |vol - expected|
+    # comparison below (codjiflo round 5 on #1997).
     res = await adapter.get_mass_properties()
-    return res.data.volume if res.is_success else float("nan")
+    if not res.is_success:
+        raise RuntimeError(f"get_mass_properties failed: {res.error}")
+    return float(res.data.volume)
 
 
 async def build(adapter) -> dict[str, str]:

@@ -378,11 +378,11 @@ _KNIFE_DOWEL_PRESS_LIMIT = _smooth_annulus_limit_mm3(
 # MHA-SM-04 #8-32 through the #29 tap drill of MHA-SM-01's brazed end plug,
 # from the arm-end counterbore floor to the plug's inner end
 # (sm_gooseneck_geom.PLUG_LENGTH - sm_gooseneck_spring_joint.COUNTERBORE_DEPTH):
-# the screw's major clears the Ø4.70 counterbore, and the extra tip reach is in
+# the screw's major clears the Ø4.90 counterbore, and the extra tip reach is in
 # the hollow arm, not more engagement. A literal, test-pinned to its owners
 # like _KNIFE_HANGER_REACH, so a screw or gooseneck edit does not re-key every
 # assembly that imports this module.
-_GOOSENECK_THREAD_LENGTH = 7.33
+_GOOSENECK_THREAD_LENGTH = 7.36
 # Bearing seats are exact face contacts, NOT interference fits. Zero volume
 # permits a reported coincidence but no unmeasured kernel sliver allowance.
 _KNIFE_HANGER_SEAT_OVERLAP_LIMIT = 0.0

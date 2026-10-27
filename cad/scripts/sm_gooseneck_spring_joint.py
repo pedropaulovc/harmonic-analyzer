@@ -52,14 +52,16 @@ EDGE_BREAK = float(_config.title_block("edge_break")["chamfer_max_mm"])
 # The finite faces let it sit deeper.  The plug-side helix tip stands at
 # r 8.55 from the screw axis, outside the Ø16 tube face (r 8.0), and the
 # rigid helix can rock: the smallest footprints (head r <= (12.50 - 0.51)/2 -
-# 0.25; plug face from the 2.85 mouth reach out to 5.75 when the plug is
-# proud, or to 7.70 at the tube) leave it 3.88-4.13 untilted and 3.25 rocked
-# to minimum width (test_sm_gooseneck_spring_joint's numeric sweep).  The
-# floor holds anyway: the two stacked pull-side layers (helix angles 30 and
-# 390 degrees, centreline ~4.8 from the screw axis, wire r 4.0-5.6) bear on
-# the seat inside BOTH faces, so the gap is never under two wire diameters:
-# CLAMPED_GAP_MIN, the least the gap can be, where the screw sits deepest.
-# Each check takes the gap worst for it.
+# 0.25; plug face from the 3.04 mouth reach out to 5.75 when the plug is
+# proud, or to 7.70 at the tube; a wire section past a rim still bears on
+# it) leave it 3.88-4.13 untilted and 3.27 rocked to minimum width, 3.27 on
+# the screw axis with the head face tilted SCREW_TILT_MAX against the plug
+# face (test_sm_gooseneck_spring_joint's numeric sweep).  The floor holds
+# anyway: the two stacked pull-side layers (helix angles 30 and 390 degrees,
+# centreline ~4.8 from the screw axis, wire r 4.0-5.6) bear on the seat inside
+# BOTH faces, so the gap is never under two wire diameters: CLAMPED_GAP_MIN,
+# the least the gap can be, where the screw sits deepest.  Each check takes
+# the gap worst for it.
 LOOP_SHEAR_MODULUS_MPA = 82_700.0
 LOOP_AXIAL_RATE = (
     LOOP_SHEAR_MODULUS_MPA
@@ -71,17 +73,38 @@ CLAMPED_GAP_MAX = (spring.LOOP_TURNS + 1.0) * spring.WIRE_DIA_MM
 CLAMPED_GAP_MIN = 2.0 * spring.WIRE_DIA_MM
 LOOP_BIND_FORCE = LOOP_AXIAL_RATE * (gooseneck.SPRING_EYE_GAP - CLAMPED_GAP_MAX)
 
+# The screw is not square in the plug (codjiflo round 5 on #1997).  Its radial
+# play in the 2B thread, bounded crest-to-root by the tap's major +
+# TAP_ROOT_OVERSIZE against the 2A major minimum (the flank play is smaller),
+# can sit on opposite sides at the two ends of the engaged thread, so it tilts
+# by SCREW_TILT_MAX over the 1.5D the engagement keeps at least
+# (ENGAGEMENT_MIN, asserted below).  Past the engaged thread its offset from
+# the thread axis grows with that tilt.
+TAP_ROOT_OVERSIZE = 0.025
+SCREW_RADIAL_PLAY_MAX = (
+    screw.MAJOR_DIA + TAP_ROOT_OVERSIZE - screw.THREAD_MAJOR_2A_MIN
+) / 2.0
+ENGAGEMENT_MIN_D = 1.5
+SCREW_TILT_MAX = math.atan(
+    2.0 * SCREW_RADIAL_PLAY_MAX / (ENGAGEMENT_MIN_D * screw.MAJOR_DIA)
+)
+
 # The screw's own full thread starts behind its shoulder lead and the die's
 # run-out (sm_gooseneck_spring_screw_geom.FULL_THREAD_STATION, from the head),
 # no later than the "5.67 MAX" MHA-SM-04 prints (FULL_THREAD_STATION_MAX).
 # The run-out's incomplete threads are FAT (full crest, shallow root): in the
 # plug's full 2B thread they jam before the head clamps.  They reach deepest
-# past the plug face at the least clamped gap, so the arm-end counterbore's
-# depth clears that intrusion by COUNTERBORE_RUNOUT_MARGIN_MIN.
-SCREW_RUNOUT_INTRUSION = screw.FULL_THREAD_STATION - CLAMPED_GAP_MIN
-SCREW_RUNOUT_INTRUSION_MAX = screw.FULL_THREAD_STATION_MAX - CLAMPED_GAP_MIN
+# past the plug face at the least clamped gap, and the tilt dips the full-
+# thread circle's low side a further half major x sin(tilt).  The gap floor
+# holds on the screw axis with the head face tilted that much against the plug
+# face (test_sm_gooseneck_spring_joint), so the arm-end counterbore's depth
+# clears the intrusion by COUNTERBORE_RUNOUT_MARGIN_MIN.
+SCREW_RUNOUT_TILT_DIP = screw.MAJOR_DIA / 2.0 * math.sin(SCREW_TILT_MAX)
+SCREW_RUNOUT_INTRUSION_MAX = (
+    screw.FULL_THREAD_STATION_MAX - CLAMPED_GAP_MIN + SCREW_RUNOUT_TILT_DIP
+)
 SCREW_RUNOUT_INTRUSION_FREE_MAX = (
-    screw.FULL_THREAD_STATION_MAX - gooseneck.SPRING_EYE_GAP
+    screw.FULL_THREAD_STATION_MAX - gooseneck.SPRING_EYE_GAP + SCREW_RUNOUT_TILT_DIP
 )
 COUNTERBORE_RUNOUT_MARGIN_MIN = 0.05
 # Printed LIMIT depth from the plug face: its MIN rounded UP to the print's
@@ -93,26 +116,34 @@ COUNTERBORE_DEPTH_MIN = (
 )
 COUNTERBORE_DEPTH_MAX = round(COUNTERBORE_DEPTH_MIN + COUNTERBORE_DEPTH_BAND, 6)
 COUNTERBORE_DEPTH = round((COUNTERBORE_DEPTH_MIN + COUNTERBORE_DEPTH_MAX) / 2.0, 6)
+# The tilted screw's largest offset from the thread axis inside the
+# counterbore, at the plug face: the deepest floor plus the receiver's 0.25
+# floor break past its first full thread.
+SCREW_FACE_OFFSET_MAX = SCREW_RADIAL_PLAY_MAX + (
+    COUNTERBORE_DEPTH_MAX + EDGE_BREAK
+) * math.tan(SCREW_TILT_MAX)
 # Ø printed under the title block's DRILLED HOLES row (+0.10/0).  The fat
 # run-out (basic major, at or above the 2A major max) must clear the bore's
-# SMALLEST size with the screw and the bore each off the thread axis at the
-# mouth by their full bands: the counterbore's printed axis band to the tap
-# (COUNTERBORE_AXIS_OFFSET_MAX, MHA-SM-01 note 4) and the screw's radial play
-# in the 2B thread, bounded crest-to-root by the tap's major +
-# TAP_ROOT_OVERSIZE against the 2A major minimum (the flank play is smaller).
-# Ø4.50 left -0.03 of it, so the bore is Ø4.70.
-COUNTERBORE_DIA = 4.70
+# SMALLEST size with the screw and the bore each off the thread axis by their
+# full bands: the counterbore's printed axis band to the tap
+# (COUNTERBORE_AXIS_OFFSET_MAX, MHA-SM-01 note 4) and the tilted screw's
+# SCREW_FACE_OFFSET_MAX, its largest anywhere in the bore.  With the tilt,
+# Ø4.70 left -0.03 of it, so the bore is Ø4.90.
+COUNTERBORE_DIA = 4.90
 COUNTERBORE_DIA_MAX = COUNTERBORE_DIA + drilled_oversize_mm()
 COUNTERBORE_AXIS_OFFSET_MAX = 0.10
-TAP_ROOT_OVERSIZE = 0.025
-SCREW_RADIAL_PLAY_MAX = (
-    screw.MAJOR_DIA + TAP_ROOT_OVERSIZE - screw.THREAD_MAJOR_2A_MIN
-) / 2.0
 RUNOUT_RADIAL_CLEARANCE_MIN = (
     (COUNTERBORE_DIA - screw.MAJOR_DIA) / 2.0
     - COUNTERBORE_AXIS_OFFSET_MAX
-    - SCREW_RADIAL_PLAY_MAX
+    - SCREW_FACE_OFFSET_MAX
 )
+# The floor's corner to the wall is a stop in the run-out's path: the title
+# block's INSIDE CORNERS R1.0 MAX would reach it (codjiflo P1 round 5 on
+# #1997), so MHA-SM-01 note 4 prints FLOOR CORNER R0.10 MAX.  The run-out's
+# crest corner stands at least COUNTERBORE_RUNOUT_MARGIN_MIN above the floor
+# and RUNOUT_RADIAL_CLEARANCE_MIN off the wall; RUNOUT_FLOOR_CORNER_CLEARANCE_MIN
+# (below) is its clearance to the round's material.
+COUNTERBORE_FLOOR_CORNER_R_MAX = 0.10
 
 # The RECEIVER's full thread, the figure MHA-SM-01 prints: from the
 # counterbore floor to the inner end, less the title-block 0.25 edge break on
@@ -125,7 +156,6 @@ ENGAGEMENT_NOMINAL = gooseneck.PLUG_LENGTH - COUNTERBORE_DEPTH - 2.0 * EDGE_BREA
 ENGAGEMENT_MIN = (
     gooseneck.PLUG_LENGTH - PLUG_LENGTH_BAND - COUNTERBORE_DEPTH_MAX - 2.0 * EDGE_BREAK
 )
-ENGAGEMENT_MIN_D = 1.5
 
 # drawing-guidelines.md rule 17 wall between the tap and the plug's turned
 # OD, FULL worst case (brief 2026-10-26), every term cited:
@@ -189,16 +219,19 @@ HEAD_RETENTION_MIN = (screw.HEAD_DIA + screw.HEAD_DIA_LOWER - spring.EYE_ID_MM) 
 # CLAMPED_LOOP_RISE in CLAMPED_GAP_MAX.
 #
 # Rocked states.  Over every tilt whose width fits CLAMPED_GAP_MAX the passes
-# can reach the whole stacking envelope (head-side down to the head face,
-# plug-side out to ~3.64), but a rigid loop squeezed between two parallel
-# faces comes to rest only at a local MINIMUM of its width over tilt.  Each
-# seat limit and plug footprint has exactly one, near the untilted state (gap
-# 3.27-3.47, head-side pass 0.84-1.05, plug-side pass 2.44-2.65), so the
-# plug-side pass never stands farther out than the free state's: the lead
-# clearance below holds at the free and coil-bound untilted states
-# (test_sm_gooseneck_spring_joint finds the minima).  The head-side pass has
-# no such bound worth relying on, so the corner clearance holds for a wire
-# touching the head face itself, station WIRE_R, the floor in every state.
+# can reach the whole stacking envelope (plug-side out to ~3.73), but the
+# clamped loop holds only where friction can hold it: its head- and plug-face
+# contacts, on the face plane, within mu x gap of each other (the loop's
+# moment balance; MHA-SM-00 step 8 clamps it before the spring's lower loop
+# is hooked, so the preload is its only load).  At twice the clamp's highest
+# friction (sm_gooseneck_spring_screw_spec.CLAMP_FRICTIONS), which also covers
+# the head face's SCREW_TILT_MAX, with rim contacts counted, every such state
+# sits near the width minimum (codjiflo round 5 on #1997): gap 3.27-3.63,
+# head-side pass 0.80 and over, plug-side pass 2.79 at most, short of the free
+# state's.  So the lead clearance below holds at the free and coil-bound
+# untilted states (test_sm_gooseneck_spring_joint sweeps the held states), and
+# the corner clearance holds for a wire touching the head face itself,
+# station WIRE_R, the floor in every state.
 _PASS_T = (1.0 / (4.0 * spring.LOOP_TURNS), 5.0 / (4.0 * spring.LOOP_TURNS))
 
 
@@ -222,20 +255,19 @@ def _lead_clearance(plug_pass: float) -> float:
     return (screw.SHOULDER_LENGTH_MIN - plug_pass + WIRE_R) / math.sqrt(2.0) - WIRE_R
 
 
-def _corner_clearance(station: float, fillet_r: float) -> float:
-    """Clearance from a seat-bearing wire to the under-head fillet's material.
+def _fillet_clearance(u: float, v: float, fillet_r: float, body_r: float) -> float:
+    """Clearance from a round body (``body_r`` 0: a point) to a corner round.
 
-    In the axial section, from the corner: the wire's centre stands
-    ``station`` from the head face and WIRE_R above the seat; the fillet's
-    material is the corner square ``[0, fillet_r]^2`` outside the fillet
-    circle centred ``(fillet_r, fillet_r)``.  The head face and the seat are
-    the wire's own bearing faces, so only the quarter arc counts.  Valid on
-    either side of the fillet's tangent points; negative is overlap.
+    In the axial section, from the inside corner: the body's centre stands
+    ``u`` and ``v`` off the corner's two faces; the round's material is the
+    corner square ``[0, fillet_r]^2`` outside the circle centred ``(fillet_r,
+    fillet_r)``.  Each face is budgeted on its own, so only the quarter arc
+    counts.  Valid on either side of the round's tangent points; negative is
+    overlap.
     """
-    u, v = station, WIRE_R
     to_centre = math.hypot(u - fillet_r, v - fillet_r)
-    if 0.0 <= u <= fillet_r and 0.0 <= v <= fillet_r and to_centre >= fillet_r:
-        return -WIRE_R  # the wire's centre lies in the fillet's material
+    if 0.0 <= u <= fillet_r and 0.0 <= v <= fillet_r:
+        return fillet_r - to_centre - body_r  # negative in the round's material
     nearest = min(math.hypot(u - fillet_r, v), math.hypot(u, v - fillet_r))
     if to_centre > 0.0:
         # The arc point on the ray from the fillet centre, if on the quarter.
@@ -243,36 +275,47 @@ def _corner_clearance(station: float, fillet_r: float) -> float:
         arc_v = fillet_r + fillet_r * (v - fillet_r) / to_centre
         if arc_u <= fillet_r and arc_v <= fillet_r:
             nearest = min(nearest, abs(to_centre - fillet_r))
-    return nearest - WIRE_R
+    return nearest - body_r
 
 
 LOOP_LEAD_CLEARANCE_MIN = min(
     _lead_clearance(LOOP_PASS_X[1]), _lead_clearance(CLAMPED_LOOP_PASS_X[1])
 )
-# The under-head fillet MHA-SM-04 prints "R0.50 MAX"; the clearance grows with
-# the station past WIRE_R, so the head-face floor is the least of every state.
-LOOP_CORNER_CLEARANCE_MIN = _corner_clearance(WIRE_R, screw.UNDERHEAD_CORNER_R)
+# The under-head fillet MHA-SM-04 prints "R0.50 MAX", against a wire bearing on
+# the seat; the clearance grows with the station past WIRE_R, so the head-face
+# floor is the least of every state.
+LOOP_CORNER_CLEARANCE_MIN = _fillet_clearance(
+    WIRE_R, WIRE_R, screw.UNDERHEAD_CORNER_R, WIRE_R
+)
+# The counterbore floor's "R0.10 MAX" against the run-out's crest corner at
+# its least axial and radial clearances (both above).
+RUNOUT_FLOOR_CORNER_CLEARANCE_MIN = _fillet_clearance(
+    COUNTERBORE_DEPTH_MIN - SCREW_RUNOUT_INTRUSION_MAX,
+    RUNOUT_RADIAL_CLEARANCE_MIN,
+    COUNTERBORE_FLOOR_CORNER_R_MAX,
+    0.0,
+)
 
 # The loop against the counterbore mouth.  The eye's inner surface bears on
 # the seat on the pull side, so its axis stands EYE_ID/2 - SEAT/2 from the
 # screw axis.  The mouth's reach from the screw axis is the counterbore's
 # largest radius, its 0.25 edge break, and both axis offsets
-# (COUNTERBORE_AXIS_OFFSET_MAX and SCREW_RADIAL_PLAY_MAX, as for the run-out).
+# (COUNTERBORE_AXIS_OFFSET_MAX and SCREW_FACE_OFFSET_MAX, as for the run-out).
 # Two facts, each at the worse seat limit and the worse untilted gap:
 #  * LOOP_FACE_CONTACT_RADIUS_MIN: the wire that meets the plug face is the
 #    loop's plug-side tip (end of the helix), half a turn past the plug-side
 #    pull pass, on the far side of the eye: its distance from the screw axis;
 #  * LOOP_MOUTH_STANDOFF_MIN: every wire inside the mouth's reach is the
 #    seat-bearing pull pass, this far short of the plug face.
-# Rocked to its rest (a width minimum, above) the loop instead bears on the
-# plug face at the mouth's reach, so that standoff falls to zero there (within
-# the rest sweep's resolution in test_sm_gooseneck_spring_joint): the wire
-# reaches the face plane at the mouth and does not pass into the counterbore.
+# Rocked and held (above), the loop may instead bear on the mouth's rim, its
+# 0.25 break, which is plug material; the wire that dips inside the mouth is
+# then the seat-bearing plug-side pass, which the held-state sweep keeps short
+# of the free state's station, so it clears the lead.
 COUNTERBORE_MOUTH_REACH = (
     COUNTERBORE_DIA_MAX / 2.0
     + EDGE_BREAK
     + COUNTERBORE_AXIS_OFFSET_MAX
-    + SCREW_RADIAL_PLAY_MAX
+    + SCREW_FACE_OFFSET_MAX
 )
 _COIL_R = spring.COIL_MEAN_RADIUS_MM
 
@@ -338,7 +381,7 @@ if (
     or SCREW_RUNOUT_INTRUSION_FREE_MAX > SCREW_RUNOUT_INTRUSION_MAX
 ):
     raise AssertionError("gooseneck screw run-out reaches the plug's full thread")
-if RUNOUT_RADIAL_CLEARANCE_MIN <= 0.0:
+if min(RUNOUT_RADIAL_CLEARANCE_MIN, RUNOUT_FLOOR_CORNER_CLEARANCE_MIN) <= 0.0:
     raise AssertionError("gooseneck screw run-out rubs the plug counterbore")
 if FULL_THREAD_REACH_MIN <= gooseneck.PLUG_LENGTH + PLUG_LENGTH_BAND:
     raise AssertionError("gooseneck screw incomplete tip thread reaches the plug")
