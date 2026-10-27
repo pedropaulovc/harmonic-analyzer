@@ -37,20 +37,57 @@ THREAD = "#4-40"
 THREAD_CALLOUT = "#4-40 UNC"
 THREAD_MAJOR = THREAD_MAJOR_MM[THREAD]  # 2.845, modelled at the basic major
 THREAD_PITCH = MM_PER_IN / 40.0  # 0.635
-# Incomplete threads (drawing-guidelines.md rule 18 (thread engagement) counts full thread only): the
-# die cutting up to the step leaves 1.5 pitches of run-out there; the dome
-# cuts the last pitch short (the tip-chamfer allowance the filing stud takes).
+# Incomplete threads (drawing-guidelines.md rule 18 (thread engagement) counts full thread only): a
+# die leaves 1.5 pitches of run-out where it stops; the dome cuts the last
+# pitch short (the tip-chamfer allowance the filing stud takes).
 DIE_RUNOUT = 1.5 * THREAD_PITCH  # 0.9525
 TIP_INCOMPLETE = THREAD_PITCH  # 0.635
+# ASME B1.1 basic minor (D1 = D - 1.082532 P) and a conservative die root: a
+# full basic half-depth under the #4-40 UNC-2A minimum pitch diameter
+# (0.0925 in; mg_rod_clamp_joint, the vertical rod's #4-40 relief).
+THREAD_BASIC_MINOR = THREAD_MAJOR - 1.082532 * THREAD_PITCH  # 2.158
+THREAD_ROOT_2A_MIN = (0.0925 - 0.649519 / 40.0) * MM_PER_IN  # 1.937
+# Thread relief at the shank step (drawing-guidelines.md rule 16: a thread
+# that runs to a shoulder gets a relief of at least one pitch; the 2026-10-24
+# ENFORCE review's blocker). The die's lead runs out in the groove, so full
+# thread reaches the groove's far edge. Like the vertical rod's (MHA-MG-04),
+# the groove mates with nothing: its Ø and root radius print as single MAX
+# limits (swTolMAX prints the model value, so the model IS the limit), its Ø
+# under the die's root, both internal corners the grooving tool's nose, R0.2
+# MAX (the title block's R1.0 would not fit the groove). Its width prints as
+# a LIMIT pair: the model 1.10 >= the die's 1.5-pitch lead is the MAX, held
+# under the first nut's worst-case station off the step (mg_wheel_group
+# NUT_RUNOUT_MARGIN; a narrower groove only moves the run-out back to the
+# die's 0.95), and rule 16's one pitch (0.635) the MIN, rounded up to 0.70
+# (codjiflo #1996: a MAX alone accepted a groove under one pitch). The
+# title block's .XX ±0.51 would put the nut on the run-out.
+RELIEF_DIA = 1.85
+RELIEF_WIDTH = 1.10
+RELIEF_WIDTH_MIN = 0.70
+RELIEF_ROOT_R = 0.2
+TOL_TYPE_LIMIT = 3  # swTolType_e.swTolLIMIT
+TOL_TYPE_MAX = 6  # swTolType_e.swTolMAX
+# Full thread starts this far past the step at the latest.
+FULL_THREAD_FROM_STEP_MAX = max(RELIEF_WIDTH, DIE_RUNOUT)  # 1.10
+if not RELIEF_DIA <= THREAD_ROOT_2A_MIN < THREAD_BASIC_MINOR < THREAD_MAJOR:
+    raise AssertionError("wheel-axle relief Ø leaves thread at the 2A root")
+if not THREAD_PITCH <= DIE_RUNOUT <= RELIEF_WIDTH:
+    raise AssertionError("wheel-axle relief does not take the die's lead")
+if not THREAD_PITCH <= RELIEF_WIDTH_MIN < RELIEF_WIDTH:
+    raise AssertionError("wheel-axle relief MIN is under one pitch")
+if 2.0 * RELIEF_ROOT_R >= RELIEF_WIDTH_MIN:
+    raise AssertionError("wheel-axle relief roots meet across the groove")
 # Step to thread end. The step is the gauged face the nut stack hangs off,
 # so the thread reads from it (drawing-guidelines.md rule 10 (dimension from a real feature)'s functional datum) and the
 # shank's band stays out of the thread's stack. ±0.25 is the user's option
 # (c) of 2026-10-12: 8.20 is the shortest .XX length whose FULL thread still
 # clears the locknut's outer face at the worst corner with the spacer's
 # ±0.03 in the stack (8.17 without it), and its long corner leaves at most
-# 2.9 of thread past the locknut (mg_wheel_group).
+# 2.9 of thread past the locknut (mg_wheel_group), measured from the thread
+# end (the dome's tangent), not the dome's tip.
 THREAD_LEN = 8.20
 THREAD_LEN_BAND = (0.25, -0.25)
+THREAD_PAST_LOCKNUT_LIMIT = 2.9
 DOME_H = 0.8
 PIN_LEN = SHANK_LEN + THREAD_LEN + DOME_H  # a reference: the dome sets it
 # The spherical tip through the thread-major edge, DOME_H high.
@@ -79,16 +116,33 @@ STEP_Y = PRESS_GAUGE
 BACK_Y = STEP_Y - SHANK_LEN  # -8.9: 0.60 inside the 9.5 bar's back face
 THREAD_END_Y = STEP_Y + THREAD_LEN
 TIP_Y = THREAD_END_Y + DOME_H
-# Full thread runs from the die's runout at the step to one pitch short of
-# the dome.
-FULL_THREAD_START_Y = STEP_Y + DIE_RUNOUT
+# Full thread runs from the relief's far edge to one pitch short of the dome.
+FULL_THREAD_START_Y = STEP_Y + RELIEF_WIDTH
 FULL_THREAD_END_Y = THREAD_END_Y - TIP_INCOMPLETE
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "PinProfile": {"PinDia", "ShankLength", "ThreadLength", "PinLength", "DomeR"},
+    "PinProfile": {
+        "PinDia",
+        "ShankLength",
+        "ThreadLength",
+        "PinLength",
+        "DomeR",
+        "ReliefWidth",
+        "ReliefDia",
+    },
+    "ReliefRoots": {"ReliefRootR"},
 }
 DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
     ("PinProfile", "ThreadLength"): THREAD_LEN_BAND,
+}
+# The relief's Ø and root radius print as single MAX limits (model value =
+# limit); its width as a LIMIT pair, (MIN, MAX) mm, the model at the MAX.
+SINGLE_LIMITS: dict[tuple[str, str], tuple[float, int]] = {
+    ("PinProfile", "ReliefDia"): (RELIEF_DIA, TOL_TYPE_MAX),
+    ("ReliefRoots", "ReliefRootR"): (RELIEF_ROOT_R, TOL_TYPE_MAX),
+}
+LIMIT_PAIRS: dict[tuple[str, str], tuple[float, float]] = {
+    ("PinProfile", "ReliefWidth"): (RELIEF_WIDTH_MIN, RELIEF_WIDTH),
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinProfile": {
@@ -97,8 +151,18 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ThreadLength": 2,
         "PinLength": 1,
         "DomeR": 2,
+        "ReliefWidth": 2,
+        "ReliefDia": 2,
     },
+    "ReliefRoots": {"ReliefRootR": 1},
 }
+for (_feature, _name), (_limit, _type) in SINGLE_LIMITS.items():
+    if round(_limit, DRAWING_PRECISION[_feature][_name]) != _limit:
+        raise AssertionError(f"wheel-axle {_name} MAX does not print as its model")
+for (_feature, _name), (_low, _high) in LIMIT_PAIRS.items():
+    _places = DRAWING_PRECISION[_feature][_name]
+    if round(_low, _places) != _low or round(_high, _places) != _high:
+        raise AssertionError(f"wheel-axle {_name} limits do not print as authored")
 # The overall is the shank, the thread and the dome summed: a reference.
 REFERENCE_DIMENSIONS = frozenset({"PinLength"})
 
@@ -109,18 +173,11 @@ BAR_BORE_LIMITS = (
     _bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[1],
     _bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[0],
 )
-# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the note says only that the axle presses to the gauge and why. The
-# gauge itself is a model dimension of the mg-magnifier assembly, printed on
-# MHA-MG-00's AXLE AS PRESSED detail (mg_magnifier_assembly_spec): its 0.10
-# is spent inside the thread-end window (mg_wheel_group: full thread under the
-# locknut at the thick-stack corner).
-# The back end's window, now loose, rides the bar's depth callout.
-DRAWING_NOTES = "\n".join(
-    (
-        "PRESS INTO MG-WHEEL-BAR TO THE GAUGE ON MHA-MG-00 (AXLE AS PRESSED),",
-        "SO THE LOCKNUT SITS ON FULL THREAD; RED LOCTITE 271 OPTIONAL.",
-    )
-)
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): no general notes. The press to
+# the gauge is MHA-MG-00's step and AXLE AS PRESSED detail
+# (mg_magnifier_assembly_spec); every requirement here rides its own callout
+# (mg_wheel_axle_callouts), and the back end's window rides the bar's depth
+# callout.
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the magnifying wheel runs on the shank, a shaft-in-bushing journal,
 # so the one Ø3/16 face carries the machined grade (its pressed length in the
 # bar is the same face).

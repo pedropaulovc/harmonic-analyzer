@@ -88,18 +88,18 @@ _NUTS = (2.0 * _nut.THICKNESS_MIN, 2.0 * _nut.THICKNESS_MAX)
 STEP_INSIDE_HUB = (_SPACER[0] + _BACK[0] + _HUB[0]) - _GAUGE[1]  # 0.657
 # (b) The locknut sits on FULL thread (drawing-guidelines.md rule 18 (thread engagement) counts full threads only): the
 # thread less the incomplete pitch the dome cuts runs past its outer face,
-# and the first nut's inner face sits past the die's run-out at the step.
+# and the first nut's inner face sits past the step's thread relief (or the
+# die's run-out, were the relief cut narrower than the die's lead).
 LOCKNUT_THREAD_MARGIN = (_GAUGE[0] + _THREAD[0] - _pin.TIP_INCOMPLETE) - (
     _SPACER[1] + _BACK[1] + _HUB[1] + ENDSHAKE_MAX + _FRONT[1] + _NUTS[1]
 )  # 0.002
 NUT_RUNOUT_MARGIN = (_SPACER[0] + _BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0]) - (
-    _GAUGE[1] + _pin.DIE_RUNOUT
-)  # 0.211
+    _GAUGE[1] + _pin.FULL_THREAD_FROM_STEP_MAX
+)  # 0.064
 # (c) At most 2.9 of thread, incomplete pitch included, stands past the
 # locknut: the user's option (c) of 2026-10-12, superseding the rev-10
 # "dome + 1.3 at every corner" (the washers' and nuts' catalogue bands alone
 # put the floor at 2.305 with the thread length exact) and the ~1.46 nominal.
-THREAD_PAST_LOCKNUT_LIMIT = 2.9
 THREAD_PAST_LOCKNUT_MAX = (_GAUGE[1] + _THREAD[1]) - (
     _SPACER[0] + _BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0] + _NUTS[0]
 )  # 2.867
@@ -111,19 +111,12 @@ if LOCKNUT_THREAD_MARGIN < 0.0:
         f"locknut runs off the full thread: {LOCKNUT_THREAD_MARGIN:.4f}"
     )
 if NUT_RUNOUT_MARGIN < 0.0:
-    raise AssertionError(f"nut reaches the die run-out: {NUT_RUNOUT_MARGIN:.4f}")
-if THREAD_PAST_LOCKNUT_MAX > THREAD_PAST_LOCKNUT_LIMIT:
+    raise AssertionError(f"nut reaches the thread relief: {NUT_RUNOUT_MARGIN:.4f}")
+if THREAD_PAST_LOCKNUT_MAX > _pin.THREAD_PAST_LOCKNUT_LIMIT:
     raise AssertionError(
         f"{THREAD_PAST_LOCKNUT_MAX:.4f} of thread past the locknut "
-        f"> {THREAD_PAST_LOCKNUT_LIMIT}"
+        f"> {_pin.THREAD_PAST_LOCKNUT_LIMIT}"
     )
-# The thread length's band holds both: its callout on the axle's drawing
-# names the gauged step it reads from and states the lower and the upper
-# need (drawing-guidelines.md rule 4 (tighten only for function, and name the mate) and drawing-guidelines.md rule 10 (dimension from a real feature)).
-THREAD_LENGTH_CALLOUT = (
-    "FROM SHANK STEP;\nLOCKNUT ON FULL THREAD,\n"
-    f"END {THREAD_PAST_LOCKNUT_LIMIT:.1f} MAX PAST LOCKNUT"
-)
 
 # --- fits on the pin ------------------------------------------------------------------
 _PIN = (_pin.PIN_DIA - _pin.PIN_DIA_TOL, _pin.PIN_DIA + _pin.PIN_DIA_TOL)
