@@ -41,7 +41,6 @@ import sys
 from collections.abc import Callable
 from typing import Any
 
-from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
@@ -69,7 +68,7 @@ import _drawing_hidden_sketches as hidden_sketches
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_sections import _assert_section_line_placed, create_section_view
+from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
@@ -79,6 +78,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+import _transgear_zone_line as zone_lines
 import pd_paper_drive_assembly_steps as assembly_steps
 from pd_transgear_arm_plate_geometry import (
     LOCATOR_SITES_MM,
@@ -390,10 +390,6 @@ FACE_FINISHES: dict[str, tuple[_ModelPoint, _ModelPoint, _ModelPoint]] = {
 # mating part: ASME Y14.5 projected tolerance zone), clear of the hatching,
 # its height beside it beyond the zone's end.
 CHAIN_LINE_OFFSET_MM = 1.2
-CHAIN_LINE_STYLE = 3  # swLineStyles_e.swLineCHAIN
-CHAIN_LINE_WEIGHT = 2  # swLineWeights_e.swLW_THICK
-CENTER_LINE_STYLE = 4  # swLineStyles_e.swLineCENTER
-CENTER_LINE_WEIGHT = 0  # swLineWeights_e.swLW_THIN
 # Each screw hole's axis in section D-D, from face A (where its zone's chain
 # line continues it) past the rear face.
 SCREW_AXES = tuple(
@@ -572,69 +568,19 @@ def _add_linked_note(
     )
 
 
-def _project_to_sketch(
+def _sheet_points(
     adapter: Any,
     view: Any,
     points_mm: tuple[_ModelPoint, ...],
     *,
     label: str,
     names: tuple[str, ...],
-) -> tuple[list[tuple[float, float]], list[tuple[float, ...]]]:
-    """Model points (mm) on the sheet, and the first two in the view
-    sketch's space, each through one transform read."""
-    sheet = model_points_in_view(
+) -> list[tuple[float, float]]:
+    """Model points (mm) on the sheet (m), through one projection read."""
+    return model_points_in_view(
         adapter, view, [tuple(value / 1000.0 for value in point) for point in points_mm],
         label=label, names=names,
     )
-    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    ends = []
-    for x, y in sheet[:2]:
-        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        ends.append(tuple(float(value) for value in projected.ArrayData))
-    return sheet, ends
-
-
-def _sketch_line(
-    adapter: Any,
-    view: Any,
-    ends: list[tuple[float, ...]],
-    *,
-    style: int,
-    width: int,
-    label: str,
-) -> tuple[Any, Any]:
-    """A black line of ``style``/``width`` in ``view``'s sketch, straight to
-    the database (as the cutting lines are, _drawing_sections): an inferred
-    endpoint would snap onto a hole wall or a face.  Returns the segment
-    and the line, its ends read back."""
-    model = adapter.currentModel
-    drawing = _early_bound(model, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, view)):
-        raise RuntimeError(f"failed to activate the view for {label}")
-    model.ClearSelection2(True)
-    manager = _early_bound(model.SketchManager, "ISketchManager")
-    previous = bool(manager.AddToDB)
-    manager.AddToDB = True
-    try:
-        segment = manager.CreateLine(*ends[0], *ends[1])
-    finally:
-        manager.AddToDB = previous
-    if segment is None:
-        raise RuntimeError(f"failed to sketch the {label} line")
-    _assert_section_line_placed(adapter, segment, ends, label=f"{label} (as sketched)")
-    line = _early_bound(segment, "ISketchLine")
-    segment = _early_bound(segment, "ISketchSegment")
-    segment.Style = style
-    segment.Width = width
-    # COLORREF black: the default sketch colour prints grey, which read as
-    # a hidden line (machinist review, run 20261027T152452686Z).
-    segment.Color = 0
-    if (int(segment.Style), int(segment.Width), int(segment.Color)) != (style, width, 0):
-        raise RuntimeError(f"{label}: line style did not apply")
-    return segment, line
 
 
 @_telemetry.traced("drawing.axis_line", label_param="label")
@@ -642,12 +588,16 @@ def _add_axis_line(
     adapter: Any, view: Any, axis: tuple[_ModelPoint, _ModelPoint], *, label: str
 ) -> None:
     """A hole's axis as a thin black centre line in ``view``'s sketch."""
-    _sheet, ends = _project_to_sketch(
-        adapter, view, axis, label=label, names=("start", "end")
-    )
-    _sketch_line(
-        adapter, view, ends, style=CENTER_LINE_STYLE, width=CENTER_LINE_WEIGHT,
+    start, end = _sheet_points(adapter, view, axis, label=label, names=("start", "end"))
+    sketched = zone_lines.sketch_lines(
+        adapter, view, {"axis": (start, end)},
+        style=zone_lines.CENTER_LINE_STYLE, width=zone_lines.CENTER_LINE_WEIGHT,
         label=label,
+    )
+    zone_lines.require_placed(
+        adapter, sketched,
+        style=zone_lines.CENTER_LINE_STYLE, width=zone_lines.CENTER_LINE_WEIGHT,
+        label=label, stage="as sketched",
     )
 
 
@@ -667,37 +617,26 @@ def _add_zone_line(
     that both ends still sit on the freshly projected zone (face A and the
     zone's height) and the dimension's type, state, tolerance, text and length.
 
-    Direct-to-DB, as the cutting lines are (_drawing_sections): an inferred
-    endpoint would snap onto the hole wall or face A and change the length.
+    The line is created direct to the database (``_transgear_zone_line``,
+    shared with the arm): an inferred endpoint would snap onto the hole wall
+    or face A and change the length.
     """
     roles = ("start", "end", "height text")
-
-    def project() -> tuple[list[tuple[float, float]], list[tuple[float, ...]]]:
-        return _project_to_sketch(adapter, view, zone, label=label, names=roles)
-
-    def require_ends(line: Any, ends: list[tuple[float, ...]], stage: str) -> None:
-        _assert_section_line_placed(adapter, line, ends, label=f"{label} ({stage})")
-
-    (start, end, text), ends = project()
-    segment, line = _sketch_line(
-        adapter, view, ends, style=CHAIN_LINE_STYLE, width=CHAIN_LINE_WEIGHT,
-        label=label,
-    )
-    model = adapter.currentModel
-    selection_manager = _early_bound(model.SelectionManager, "ISelectionMgr")
-    selection = selection_manager.CreateSelectData()
-    selection.View = view
-    if not segment.Select4(False, selection):
-        raise RuntimeError(f"failed to select the {label} chain line")
+    chain = {
+        "style": zone_lines.CHAIN_LINE_STYLE, "width": zone_lines.CHAIN_LINE_WEIGHT,
+        "label": label,
+    }
+    start, end, text = _sheet_points(adapter, view, zone, label=label, names=roles)
+    sketched = zone_lines.sketch_lines(adapter, view, {"zone": (start, end)}, **chain)
+    zone_lines.require_placed(adapter, sketched, stage="as sketched", **chain)
+    segment = sketched["zone"].segment
     across = abs(end[0] - start[0]) >= abs(end[1] - start[1])
-    add = model.AddHorizontalDimension2 if across else model.AddVerticalDimension2
     # swDimensionType_e: swLinearDimension, or its horizontal/vertical form.
     linear_types = (2, 11) if across else (2, 12)
-    display = add(text[0], text[1], 0.0)
-    model.ClearSelection2(True)
-    if display is None:
-        raise RuntimeError(f"failed to dimension the {label} chain line")
-    display = _early_bound(display, "IDisplayDimension")
+    with zone_lines.dimension_input_suppressed(adapter):
+        display = zone_lines.dimension_line(
+            adapter, view, segment, vertical=not across, at=text, label=f"{label} chain",
+        )
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
     # A drawing-sketch dimension is created driving: editing it would move
     # the zone line. Driven, it only reports the line's length.
@@ -709,9 +648,6 @@ def _add_zone_line(
     display.SetText(1, "(")  # swDimensionTextPrefix
     display.SetText(2, ")")  # swDimensionTextSuffix
     wanted = (
-        CHAIN_LINE_STYLE,
-        CHAIN_LINE_WEIGHT,
-        0,  # black
         1,  # driven
         0,  # swTolNONE
         False,
@@ -722,9 +658,6 @@ def _add_zone_line(
 
     def applied() -> tuple[Any, ...]:
         return (
-            int(segment.Style),
-            int(segment.Width),
-            int(segment.Color),
             int(dimension.DrivenState),
             int(_early_bound(dimension.Tolerance, "IDimensionTolerance").Type),
             bool(display.ShowParenthesis),
@@ -745,7 +678,12 @@ def _add_zone_line(
         raise RuntimeError(f"{label}: reads {placed}, not {wanted}")
 
     def settled() -> None:
-        require_ends(line, project()[1], "settled")
+        fresh = _sheet_points(adapter, view, zone, label=label, names=roles)
+        zone_lines.require_placed(
+            adapter, sketched, stage="settled",
+            ends={"zone": tuple(zone_lines.sheet_to_sketch(adapter, view, fresh[:2]))},
+            **chain,
+        )
         require_linear("settled")
         state = applied()
         length = float(dimension.SystemValue)
