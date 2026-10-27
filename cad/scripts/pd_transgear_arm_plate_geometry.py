@@ -219,7 +219,8 @@ _HOLE_TO_EDGE = min(SCREW_HOLES[0][0] - EDGE_MINUS_X, EDGE_PLUS_X - SCREW_HOLES[
 # Each wall pays the edge breaks of the edges exposed at it: both rims at
 # the hub's and boss's end faces; the outline's or the notch's edge where a
 # hole stands inside it; the screw hole's exit mouth at face A over the bore
-# and under the countersink (the countersink's rim is obtuse, unbroken).
+# and under the countersink; and the countersink's rim at the rear face,
+# which the title block does not exempt, on the ligaments beside it.
 WALLS: dict[str, tuple[float, float]] = {
     "hub over the bore": (
         (HUB_DIA - BORE_DIA) / 2.0,
@@ -257,7 +258,7 @@ WALLS: dict[str, tuple[float, float]] = {
         - CSK_DIA_LIMITS_MM[1] / 2.0
         - BAND_X
         - REDUCER_POSITION_RADIUS
-        - OUTLINE_EDGE_BREAK_MAX_MM,
+        - 2.0 * OUTLINE_EDGE_BREAK_MAX_MM,  # the side edge and the cone's rim
     ),
 }
 for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
@@ -277,7 +278,8 @@ for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
         _csk_air - (LOCATOR_HOLE_DIA_MM + CSK_DIA) / 2.0,
         _csk_air - LOCATOR_MOUTH_POSITION_RADIUS_MM - REDUCER_POSITION_RADIUS
         - (LOCATING_PIN.SLIP_HOLE_LIMITS_MM[1] + CSK_DIA_LIMITS_MM[1]) / 2.0
-        - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM - 2.0 * HOLE_RUN_OFF_MM,
+        - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM - OUTLINE_EDGE_BREAK_MAX_MM
+        - 2.0 * HOLE_RUN_OFF_MM,
     )
     WALLS[f"locator {_index} to running bore"] = (
         math.hypot(_x, _y) - (LOCATOR_HOLE_DIA_MM + BORE_DIA) / 2.0,

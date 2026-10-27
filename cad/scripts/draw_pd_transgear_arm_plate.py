@@ -726,7 +726,11 @@ async def build(adapter: Any) -> dict[str, str]:
     # the through locator bores' rims and the +X side face's edge on the
     # Front sketch (z = 0) are visible in *Back.
     back_edges = scan_view_edges(back, label="plate mounting-face PMI")
-    bore_edge = visible_circle_edge(adapter, back, BORE_DIA)
+    # The bore's hub-face rim, from the scan just taken (no second sweep).
+    bore_edge = back_edges.circle_at(
+        (0.0, 0.0, HUB_FACE_Z), BORE_DIA / 2.0, axis=(0.0, 0.0, 1.0),
+        label="plate running bore rim",
+    ).edge
     placements = {
         "datum:A": PmiDrawingPlacement(
             knob_section,
