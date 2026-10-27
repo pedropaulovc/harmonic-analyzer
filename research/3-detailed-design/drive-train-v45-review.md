@@ -279,8 +279,10 @@ Severity: **BLOCKER** (can't be made or will not work as drawn), **MAJOR**, **MI
   - **MAJOR [V/I]** Edge contact from the 13° skew means one face edge of each gear does the
     work. The sheets never say which face is the contact face. "DO NOT BREAK OR CHAMFER EDGES ON
     TOOTH FLANKS" conflicts with the title block's "REMOVE BURRS AND BREAK SHARP EDGES".
-  - **MAJOR [V]** "MATERIAL Brass" names no alloy. The book says T006–T024 look yellower and
-    harder than the rest.
+  - **MAJOR [V]** "MATERIAL Brass" names no alloy, and v45 draws all 20 gears in it. The book
+    says T006–T024 look yellower and harder than the rest, and video 4 shows them lighter.
+    Specify bronze (phosphor bronze C544) for T006–T024 and an alloyed brass (e.g. C360) for
+    T030–T120.
   - **NICE [I]** On Brown & Sharpe-pattern plates (15–49 holes), 96T, 102T and 114T have no
     simple index (40/N = 5/12, 20/51, 20/57). Add an indexing table that flags them.
 - `dt-cone-gear-shaft` (DT-04)
@@ -392,7 +394,8 @@ Severity: **BLOCKER** (can't be made or will not work as drawn), **MAJOR**, **MI
      with the cone and bears on a long end screw.
    - Pick one of the three period-accurate options: an integral 6-leaf pinion on a tip arbor,
      a one-piece planed arbor, or gears cut separately and sweated into a cluster.
-   - Make T006–T024 in a yellow, harder copper alloy (phosphor bronze C544).
+   - Make T006–T024 and any new tip arbor in bronze (phosphor bronze C544), and T030–T120 in
+     brass, to match the real device.
    - A one-piece T006–T018 can't be cut with a rotating cutter.
 2. **Offer an easier crank drive gear.** Allow a spur 64T that meshes obliquely like the cone
    gears, or a purchased gear, alongside the 13° helical.
@@ -461,6 +464,8 @@ of it is in CAD.
 ### Options
 
 All three are period-accurate (c.1898). All three:
+- make T006–T024 and every new tip part (arbor, one-piece arbor, T006 part) in bronze
+  (phosphor bronze C544), and keep T030–T120 in brass, to match the real device;
 - delete VN-54 and the Ø0.794 wire;
 - add the original's brass bushing, soft-soldered or driven onto the pivot after the teeth are
   cut, with its outer face square and smooth;
@@ -473,11 +478,14 @@ All three are period-accurate (c.1898). All three:
   - **Cutting T006.** The stem is 0.07 mm and the pivot 0.32 mm below the T006 root (Ø2.14),
     so a fly cutter ground to the sheet-21 form runs off both sides. Support the work with a
     temporary tailstock boss beyond the pivot.
-  - **T012 and T018.** Bore both Ø2.0 and soft-solder them onto the stem, setting the phase
-    with a pin jig first.
+  - **T012 and T018.** Make them separate bronze gears. Bore both Ø2.0 and soft-solder them
+    onto the stem, setting the phase with a pin jig first. T024 stays a separate bronze gear
+    on DT-04.
   - **Bushing.** Fit the brass bushing on the pivot after cutting.
   - **Drive.** T006's torque reaches it through metal.
 - **B · One-piece T006–T018 with planed teeth.**
+  - **Material.** Bronze arbor carrying T006, T012 and T018. T024 stays a separate bronze
+    gear.
   - **Method.** Plane the teeth (shaper, or the lathe used as one) with three HSS form tools.
     Each stroke ends in a 1.5 mm relief groove inside the untouched 2.2 mm.
   - **Indexing.** One 72-hole spindle plate indexes 6, 12, 18 and 24; a 60T bull gear can't
@@ -485,8 +493,9 @@ All three are period-accurate (c.1898). All three:
   - **Effort.** Slow: 36 tooth spaces.
 - **C · Gears cut separately, then sweated into a cluster.**
   - **Cutting.** Each gear is cut alone with ordinary setups.
-  - **T006.** It becomes one small part with a Ø2.0 spigot, the 6 leaves and the Ø1.5 pivot,
-    and its leaves run off over its own spigot and pivot.
+  - **T006.** It becomes one small bronze part with a Ø2.0 spigot, the 6 leaves and the Ø1.5
+    pivot, and its leaves run off over its own spigot and pivot. T012, T018 and T024 are
+    separate bronze gears.
   - **Joining.** T018, T012 and T006 are soft-soldered face to face. The joints sit at the
     big-end faces, in the untouched zone. Phase all three with a pin jig through lined-up
     tooth spaces; reheat to take the cluster apart.
