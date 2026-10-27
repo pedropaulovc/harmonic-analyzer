@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import math
+import re
 from pathlib import Path
 from types import SimpleNamespace
 from contextlib import nullcontext
@@ -393,6 +394,93 @@ def test_instruction_groups_print_in_bench_feed_cap_carrier_order() -> None:
     assert [caps.index(label) for label in labels] == sorted(
         caps.index(label) for label in labels
     )
+
+
+_PROCEDURE_LAYOUTS = {
+    9: drawing.CARTRIDGE_LAYOUT,
+    10: drawing.TOP_CAPTURE_LAYOUT,
+    spec.OPERATION_SHEET_NUMBER: drawing.CAPTURE_LAYOUT,
+}
+
+
+def _sheet_zone(x: float, y: float) -> str:
+    """The template's zone (row D-A from the top, column 4-1 from the left)."""
+    width, height = drawing._TEMPLATE.width_m, drawing._TEMPLATE.height_m
+    return "DCBA"[int((height - y) / (height / 4.0))] + str(4 - int(x / (width / 4.0)))
+
+
+def _printed_blocks(layout):
+    """Each printed text block with its top-left corner."""
+    return (
+        (layout.steps, drawing.STEPS_XY),
+        (layout.continued, drawing.STEPS_CONTINUED_XY),
+        (layout.checks, layout.checks_xy),
+    )
+
+
+def test_procedure_pointers_name_the_sheet_and_zone_each_heading_prints_in() -> None:
+    assert [
+        drawing.SHEET_NAMES.index(sheet) + 1
+        for sheet in (drawing.CARTRIDGE_SHEET, drawing.TOP_CAPTURE_SHEET, drawing.CAPTURE_SHEET)
+    ] == list(_PROCEDURE_LAYOUTS)
+    for label, (sheet, zone) in spec.PROCEDURE_PLACES.items():
+        if label in ("A-A", "B-B"):
+            assert sheet == drawing.SHEET_NAMES.index(drawing.PIVOT_CAPTURE_SHEET) + 1
+            x0, y0, x1, y1 = drawing.CAPTURE_VIEW_REGIONS[2 if label == "A-A" else 3]
+            assert _sheet_zone((x0 + x1) / 2.0, (y0 + y1) / 2.0) == zone, label
+            continue
+        found = [
+            _sheet_zone(x, y - (index + 0.5) * drawing.NOTE_LINE_M)
+            for text, (x, y) in _printed_blocks(_PROCEDURE_LAYOUTS[sheet])
+            for index, line in enumerate(text.split("\n"))
+            if line.startswith(f"{label}. ")
+        ]
+        assert found == [zone], label
+    # The main sequence points at every procedure it sends the fitter to.
+    for step, pointers in (
+        ("2.", ("HD1",)), ("4.", ("C2A",)), ("7C.", ("F1",)), ("8.", ("F2",)),
+        ("9.", ("C4",)), ("13A.", ("C6", "HD1")), ("13B.", ("HD2",)),
+    ):
+        text = next(line for line in spec.ASSEMBLY_STEPS if line.startswith(step))
+        for label in pointers:
+            assert spec._at(label) in text, (step, label)
+
+
+def test_procedures_print_as_short_sub_steps_under_their_headings() -> None:
+    label = re.compile(r"[A-Z]+\d+[A-Z]?(?:\.\d+)? |[A-Z]+\d+[A-Z]?\. ")
+    for layout in _PROCEDURE_LAYOUTS.values():
+        for text, _xy in _printed_blocks(layout):
+            block = []
+            for line in [*text.split("\n"), ""]:
+                if line and not label.match(line) and line.startswith(" "):
+                    block.append(line)
+                    continue
+                # One action and its acceptance: three printed lines at most.
+                assert len(block) <= 3, block
+                if block and drawing._SUB_STEP.fullmatch(block[0].split(" ", 1)[0]):
+                    hang = " " * (len(block[0].split(" ", 1)[0]) + 1)
+                    assert all(row.startswith(hang) and row[len(hang)] != " " for row in block[1:])
+                block = [line] if line and not line.endswith(":") else []
+
+
+def test_sub_steps_hang_under_their_label_and_stay_in_their_group() -> None:
+    text = drawing._wrapped(
+        ("C4. GROUP HEADING:", "C4.1 " + "WORD " * 20, "C4A. NEXT:", "C4A.1 SHORT.",
+         "C5. OTHER.", "C5A.1 SEE C4 (SHEET 10, ZONE C4) AND ITEM 3."),
+        width=40, spaced=True,
+    )
+    assert text.split("\n") == [
+        "C4. GROUP HEADING:",
+        "C4.1 WORD WORD WORD WORD WORD WORD WORD",
+        "     WORD WORD WORD WORD WORD WORD WORD",
+        "     WORD WORD WORD WORD WORD WORD",
+        "C4A. NEXT:",
+        "C4A.1 SHORT.",
+        "",
+        "C5. OTHER.",
+        "C5A.1 SEE C4 (SHEET 10, ZONE C4) AND",
+        "      ITEM 3.",
+    ]
 
 
 def test_instruction_heading_moves_with_first_step_at_column_boundary(monkeypatch) -> None:

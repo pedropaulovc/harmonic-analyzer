@@ -669,18 +669,26 @@ if spec.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
     raise AssertionError("the jig explode is authored in Default")
 
 
-# Glues an item citation ("ITEM 22") and a value with its unit ("3.5 N·m",
-# "25 IN·LBF") into one word while wrapping, so the fitter never reads "ITEM"
-# or a number at a line end and what it belongs to on the next.
-_UNBROKEN = re.compile(r"\bITEM (?=\d)|(?<=\d) (?=N·m|IN·LBF)")
+# Glues an item citation ("ITEM 22"), a value with its unit ("3.5 N·m",
+# "25 IN·LBF") and a sheet or zone pointer ("SHEET 10", "ZONE B4") into one
+# word while wrapping, so the fitter never reads "ITEM", a number or "ZONE" at
+# a line end and what it belongs to on the next.
+_UNBROKEN = re.compile(r"\b(?:ITEM|SHEET) (?=\d)|\bZONE (?=[A-D]\d)|(?<=\d) (?=N·m|IN·LBF)")
 _GLUE = "\x00"
 # A step's label: its number, or a sub-step's ("7A").
 _STEP_LABEL = re.compile(r"\d+[A-Z]?")
 # Any labelled line's top-level step: "7" of 7A, "C3" of C3B, "HD1" itself.
 _STEP_GROUP = re.compile(r"([A-Z]*\d+)[A-Z]?")
+# A procedure's numbered sub-step label: "C2A.1", "HD3.6". It prints with a
+# hanging indent under its heading's group.
+_SUB_STEP = re.compile(r"([A-Z]+\d+[A-Z]?)\.\d+")
 
 
 def _step_group(line: str) -> str | None:
+    label, space, _text = line.partition(" ")
+    sub = _SUB_STEP.fullmatch(label) if space else None
+    if sub:
+        return _STEP_GROUP.fullmatch(sub[1])[1]
     number, sep, _rest = line.partition(". ")
     match = _STEP_GROUP.fullmatch(number) if sep else None
     return match[1] if match else None
@@ -711,7 +719,16 @@ def _wrapped(
         if opens or group is not None:
             previous = group
         number, sep, rest = line.partition(". ")
-        if sep and _STEP_LABEL.fullmatch(number):
+        label, space, text = line.partition(" ")
+        if space and _SUB_STEP.fullmatch(label):
+            out += textwrap.wrap(
+                text,
+                width=width,
+                initial_indent=f"{label} ",
+                subsequent_indent=" " * (len(label) + 1),
+                break_on_hyphens=False,
+            )
+        elif sep and _STEP_LABEL.fullmatch(number):
             out += textwrap.wrap(
                 rest,
                 width=width,
