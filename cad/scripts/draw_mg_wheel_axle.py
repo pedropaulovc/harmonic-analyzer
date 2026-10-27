@@ -741,11 +741,19 @@ def _assert_relief_root_landing(
 
 def _assert_detail_settled(adapter: Any, detail: Any, named: dict[str, Any]) -> None:
     """After finalize's last rebuild: detail A still holds its three
-    dimensions, their limits and authored text, and the radius still lands
-    on a root."""
+    dimensions; every imported dimension is visible and attached
+    (draw_ms_stick._assert_dimension_contract); their limits and authored
+    text hold; and the radius still lands on a root."""
     lost = sorted(set(DETAIL_KEEP) - set(_view_dimension_names(adapter, detail)))
     if lost:
         raise RuntimeError(f"relief detail lost {lost} by the settling rebuild")
+    annotations = {name: _early_bound(a, "IAnnotation") for name, a in named.items()}
+    hidden = sorted(name for name, a in annotations.items() if int(a.Visible) != 1)
+    dangling = sorted(name for name, a in annotations.items() if bool(a.IsDangling()))
+    if hidden or dangling:
+        raise RuntimeError(
+            f"settled wheel-axle dimensions hidden {hidden}, dangling {dangling}"
+        )
     _assert_relief_limits(named)
     _assert_part_authored_text(named)
     _assert_relief_root_landing(adapter, detail, named)

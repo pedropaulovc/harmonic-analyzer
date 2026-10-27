@@ -117,10 +117,11 @@ V_RELIEF_ROOTS = 2.0 * 2.0 * math.pi * _ROOT_CENTROID_R * _ROOT_SPANDREL
 V_TOTAL = V_PROFILE + V_RELIEF_ROOTS
 # The groove's cut, about 4.0 mm^3: under the whole-part 0.5% (4.4 mm^3) an
 # unrelieved solid would pass (codjiflo #1996), so the revolve's gate is a
-# quarter of the groove and the roots' fillet is read as its own delta.
+# quarter of the groove and the roots' fillet is read as its own delta, at a
+# quarter of both roots: one root missing (half) fails it.
 V_RELIEF_GROOVE = math.pi * (THREAD_R**2 - RELIEF_R**2) * RELIEF_WIDTH
 PIN_VOLUME_TOL = 0.25 * V_RELIEF_GROOVE
-ROOTS_VOLUME_TOL = 0.5 * V_RELIEF_ROOTS
+ROOTS_VOLUME_TOL = 0.25 * V_RELIEF_ROOTS
 NEUTRAL_VOLUME_TOL = 0.01
 
 
