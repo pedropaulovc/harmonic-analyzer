@@ -62,6 +62,7 @@ from _drawing_attachment import _assert_attached_to
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import scan_view_edges
 from _drawing_finish import add_surface_finish
+from _drawing_centerline import add_view_centerline
 from _drawing_gdt import PmiDrawingPlacement, project_part_pmi
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_notes import add_property_linked_note
@@ -178,11 +179,15 @@ SCREW_SECTION_LINE_MODEL = (
 )
 
 # Per-view survivors of the marked-dimension import, each at the MODEL point
-# (mm) its text stands on.  Plan: positions stack above the top edge,
-# nearest first; the heights from K stand outboard of each side, the hole
-# height's wide toleranced text wholly right of the edge.  Rows 4 apart (8
-# mm on the sheet: 4.4 mm air between 3.6 mm texts) keep the locator's
-# witness lines under the locator
+# (mm) its text stands on.  Plan: the locator and +X hole positions stack
+# above the top edge, nearest first; the -X hole's stands below the hole
+# row, between locator 2's centre mark and the boss, so the reamed-hole
+# leader runs from the upper left to locator 1 with no dimension line or
+# text in its way (machinist review, run 20261027T152452686Z: above the
+# plan, the leader struck the 10.875 text).  The heights from K stand
+# outboard of each side, the hole height's wide toleranced text wholly
+# right of the edge.  Rows 4 apart (8 mm on the sheet: 4.4 mm air between
+# 3.6 mm texts) keep the locator's witness lines under the locator
 # diameter's shoulder (at 5 apart a top row rose through it: farm run
 # 20261009T224545531Z, shoulder-crosses-line).  The width stands under the
 # face-A view instead: across the top it was the one dimension line the
@@ -190,7 +195,7 @@ SCREW_SECTION_LINE_MODEL = (
 PLAN_ROWS = tuple(_SECTION_TOP + 8.0 + 4.0 * row for row in range(3))
 PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "ScrewHoleX2": (SCREW_HOLES[1][0] / 2.0, PLAN_ROWS[0], _Z_PLAN),
-    "ScrewHoleX1": (SCREW_HOLES[0][0] / 2.0, PLAN_ROWS[1], _Z_PLAN),
+    "ScrewHoleX1": (SCREW_HOLES[0][0] / 2.0, 12.6, _Z_PLAN),
     "KinkY": (EDGE_MINUS_X - 5.0, KINK[1] / 2.0, _Z_PLAN),
     "TopLeftY": (EDGE_MINUS_X - 11.0, TOP_LEFT[1] / 2.0, _Z_PLAN),
     "KinkRightY": (EDGE_PLUS_X + 5.0, KINK_RIGHT[1] / 2.0, _Z_PLAN),
@@ -228,13 +233,15 @@ BACK_KEEP: dict[str, tuple[float, float, float]] = {
 # witness lines (SOLIDWORKS prints no callout above a linear dimension: run
 # 20261027T130144223Z; below the view, the hub-to-boss lines met the view's
 # caption).  The hub diameter stands beyond the knob zone's chain line, its
-# text below the axis; the boss diameter beyond the boss face's caption.
+# text above the axis: below it, datum B's tag (face-A view) sat on it and
+# read as naming the hub (machinist review, run 20261027T152452686Z); the
+# boss diameter stands beyond the boss face's caption.
 SECTION_KEEP: dict[str, tuple[float, float, float]] = {
     "ThicknessOverArm": (0.0, _SECTION_TOP + 5.0, REAR_FACE_Z / 2.0),
     "NotchDepth": (0.0, _SECTION_TOP + 10.0, FRONT_FACE_Z / 2.0),
     "HubFaceToMounting": (0.0, _SECTION_TOP + 19.0, HUB_FACE_Z / 2.0),
     "HubToBoss": (0.0, _SECTION_TOP + 28.0, (HUB_FACE_Z + BOSS_FACE_Z) / 2.0),
-    "HubDia": (0.0, -11.0, HUB_FACE_Z - 25.5),
+    "HubDia": (0.0, 11.0, HUB_FACE_Z - 25.5),
     "BossDia": (0.0, 0.0, BOSS_FACE_Z + 27.5),
 }
 
@@ -269,7 +276,9 @@ CALLOUTS_ABOVE = PLAN_CALLOUTS_ABOVE
 # The bore finish symbol stands below the end round, just right of the bore
 # axis: clear of the bore callout (lower left) and the end radius (lower
 # right); left of the axis its leader crossed the bore callout's (run
-# 20261027T130144223Z).
+# 20261027T130144223Z).  Its leader lands on the bore facing the symbol,
+# apart from the bore callout's landing: left to SOLIDWORKS, the two
+# landed together and crossed (machinist review, run 20261027T152452686Z).
 BORE_FINISH_MODEL = (3.0, _BOTTOM - 9.5, _Z_PLAN)
 FINISH_CHAR_HEIGHT = 0.0025
 # Position frames, sheet metres, offsets from the face-A view's K. A frame's
@@ -567,6 +576,9 @@ def _add_zone_line(
     segment = _early_bound(segment, "ISketchSegment")
     segment.Style = CHAIN_LINE_STYLE
     segment.Width = CHAIN_LINE_WEIGHT
+    # COLORREF black: the default sketch colour prints grey, which read as
+    # a hidden line (machinist review, run 20261027T152452686Z).
+    segment.Color = 0
     selection_manager = _early_bound(model.SelectionManager, "ISelectionMgr")
     selection = selection_manager.CreateSelectData()
     selection.View = view
@@ -594,6 +606,7 @@ def _add_zone_line(
     wanted = (
         CHAIN_LINE_STYLE,
         CHAIN_LINE_WEIGHT,
+        0,  # black
         1,  # driven
         0,  # swTolNONE
         False,
@@ -606,6 +619,7 @@ def _add_zone_line(
         return (
             int(segment.Style),
             int(segment.Width),
+            int(segment.Color),
             int(dimension.DrivenState),
             int(_early_bound(dimension.Tolerance, "IDimensionTolerance").Type),
             bool(display.ShowParenthesis),
@@ -713,15 +727,27 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if not auto_center_marks(adapter, plan, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME centre marks to the plan view")
+    bore_finish_xy = _sheet_xy(adapter, plan, BORE_FINISH_MODEL, "bore finish symbol")
     add_surface_finish(
         adapter,
         plan,
-        symbol_xy=_sheet_xy(adapter, plan, BORE_FINISH_MODEL, "bore finish symbol"),
+        symbol_xy=bore_finish_xy,
         control=surface_finish_by_key(SURFACE_FINISHES, "transgear_arm_plate_bore"),
         label="arm-plate bore finish",
         entity=visible_circle_edge(adapter, plan, BORE_DIA),
         char_height=FINISH_CHAR_HEIGHT,
+        leader_attach_xy=_bore_landing(adapter, plan, bore_finish_xy),
     )
+    # Each hole's axis in section D-D, so its zone's chain line reads as
+    # drawn beside the axis (ASME Y14.5-2018 6.4.7), not as a hidden line.
+    for index, (x, _y) in enumerate(SCREW_HOLES, 1):
+        add_view_centerline(
+            adapter, screw_section,
+            face_xy=_sheet_xy(
+                adapter, screw_section, (x - 0.8, _SCREW_Y, 1.5), f"screw hole {index} wall"
+            ),
+            label=f"screw hole {index} axis in section D-D",
+        )
     zone_checks = [
         _add_zone_line(
             adapter, screw_section, zone, height_mm=SCREW_ZONE_HEIGHT,
