@@ -179,9 +179,9 @@ SCREW_SECTION_LINE_MODEL = (
 # Per-view survivors of the marked-dimension import, each at the MODEL point
 # (mm) its text stands on.  Plan: positions stack above the top edge,
 # nearest first; the heights from K stand outboard of each side, the hole
-# height's wide toleranced text wholly between the edge and the top-corner
-# height's dimension line.  Rows 4 apart (8 mm on the sheet: 4.4 mm air
-# between 3.6 mm texts) keep the locator's witness lines under the locator
+# height's wide toleranced text wholly right of the edge.  Rows 4 apart (8
+# mm on the sheet: 4.4 mm air between 3.6 mm texts) keep the locator's
+# witness lines under the locator
 # diameter's shoulder (at 5 apart a top row rose through it: farm run
 # 20261009T224545531Z, shoulder-crosses-line).  The width stands under the
 # face-A view instead: across the top it was the one dimension line the
@@ -194,7 +194,6 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "TopLeftY": (EDGE_MINUS_X - 11.0, TOP_LEFT[1] / 2.0, _Z_PLAN),
     "KinkRightY": (EDGE_PLUS_X + 5.0, KINK_RIGHT[1] / 2.0, _Z_PLAN),
     "ScrewHoleY": (EDGE_PLUS_X + 9.5, _SCREW_Y / 2.0, _Z_PLAN),
-    "TopRightY": (EDGE_PLUS_X + 19.0, TOP_RIGHT[1] / 2.0, _Z_PLAN),
     "EndR": (0.7071 * END_R + 6.0, -0.7071 * END_R - 6.0, _Z_PLAN),
     "BoreDia": (EDGE_MINUS_X - 4.0, _BOTTOM - 6.0, _Z_PLAN),
     "ScrewHoleDia": (EDGE_MINUS_X - 6.0, _TOP + 8.0, _Z_PLAN),
@@ -205,11 +204,15 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     # Under the border and high enough that its six lines clear the
     # screw-hole callout; far enough left that its leader runs down to
     # locator 1 left of every location dimension line.
-    "LocatorDia1": (EDGE_MINUS_X - 10.8, _TOP + 37.0, _Z_PLAN),
+    "LocatorDia1": (EDGE_MINUS_X - 10.8, _TOP + 31.0, _Z_PLAN),
 }
 # Face-A view: the notch face's corner heights and the locator heights,
-# outboard, and both side edges from K below the end round.
+# outboard, the +X top corner's height outside them, and both side edges
+# from K below the end round.  The corner height stands here, not on the
+# plan: there its witness line ran through section D-D's letter (run
+# 20261027T130144223Z).
 BACK_KEEP: dict[str, tuple[float, float, float]] = {
+    "TopRightY": (EDGE_PLUS_X + 15.0, TOP_RIGHT[1] / 2.0, 0.0),
     "EdgeLeftX": (EDGE_MINUS_X / 2.0, _BOTTOM - 7.0, 0.0),
     "EdgeRightX": (EDGE_PLUS_X / 2.0, _BOTTOM - 7.0, 0.0),
     "NotchLeftY": (EDGE_MINUS_X - 4.0, NOTCH_LEFT[1] / 2.0, FRONT_FACE_Z),
@@ -219,15 +222,17 @@ BACK_KEEP: dict[str, tuple[float, float, float]] = {
 }
 # Section A-A (x = 0): the stations along Z are a baseline from face A,
 # stacked above the plate nearest first -- the rear face, the front face, the
-# hub face with what it sets above it.  The hub-to-boss length stands below
-# with its text beyond the boss face, so the lines under it clear the view's
-# caption.  The hub diameter stands beyond the knob zone's chain line, its
+# hub face -- and the hub-to-boss length stands above them all; the last two
+# carry what they set on two short lines under their values, between their
+# witness lines (SOLIDWORKS prints no callout above a linear dimension: run
+# 20261027T130144223Z; below the view, the hub-to-boss lines met the view's
+# caption).  The hub diameter stands beyond the knob zone's chain line, its
 # text below the axis; the boss diameter beyond the boss face's caption.
 SECTION_KEEP: dict[str, tuple[float, float, float]] = {
     "ThicknessOverArm": (0.0, _SECTION_TOP + 5.0, REAR_FACE_Z / 2.0),
-    "NotchDepth": (0.0, _SECTION_TOP + 11.0, FRONT_FACE_Z / 2.0),
-    "HubFaceToMounting": (0.0, _SECTION_TOP + 17.0, HUB_FACE_Z / 2.0),
-    "HubToBoss": (0.0, _BOTTOM - 5.0, BOSS_FACE_Z + 14.0),
+    "NotchDepth": (0.0, _SECTION_TOP + 10.0, FRONT_FACE_Z / 2.0),
+    "HubFaceToMounting": (0.0, _SECTION_TOP + 19.0, HUB_FACE_Z / 2.0),
+    "HubToBoss": (0.0, _SECTION_TOP + 28.0, (HUB_FACE_Z + BOSS_FACE_Z) / 2.0),
     "HubDia": (0.0, -11.0, HUB_FACE_Z - 25.5),
     "BossDia": (0.0, 0.0, BOSS_FACE_Z + 27.5),
 }
@@ -254,13 +259,17 @@ PLAN_CALLOUTS_ABOVE = {
     "ScrewHoleDia": HOLE_COUNT_CALLOUT,
     "CskDia": HOLE_COUNT_CALLOUT,
 }
-SECTION_CALLOUTS = {"HubToBoss": HUB_TO_BOSS_CALLOUT}
-SECTION_CALLOUTS_ABOVE = {"HubFaceToMounting": HUB_STATION_CALLOUT}
+SECTION_CALLOUTS = {
+    "HubFaceToMounting": HUB_STATION_CALLOUT,
+    "HubToBoss": HUB_TO_BOSS_CALLOUT,
+}
 DIMENSION_CALLOUTS = {**PLAN_CALLOUTS, **SECTION_CALLOUTS}
-CALLOUTS_ABOVE = {**PLAN_CALLOUTS_ABOVE, **SECTION_CALLOUTS_ABOVE}
-# The bore finish symbol stands below the end round, left of the bore axis:
-# clear of the bore callout (lower left) and the end radius (lower right).
-BORE_FINISH_MODEL = (-9.0, _BOTTOM - 9.0, _Z_PLAN)
+CALLOUTS_ABOVE = PLAN_CALLOUTS_ABOVE
+# The bore finish symbol stands below the end round, just right of the bore
+# axis: clear of the bore callout (lower left) and the end radius (lower
+# right); left of the axis its leader crossed the bore callout's (run
+# 20261027T130144223Z).
+BORE_FINISH_MODEL = (3.0, _BOTTOM - 9.5, _Z_PLAN)
 FINISH_CHAR_HEIGHT = 0.0025
 # Position frames, sheet metres, offsets from the face-A view's K. A frame's
 # xy is its top-left corner; it is about 59 mm wide with a projected zone
@@ -294,11 +303,12 @@ DATUM_C_XY = (_BACK_K[0] - 0.055, _BACK_K[1] + DATUM_C_MODEL_Y / 500.0)
 DATUM_A_MODEL = (0.0, _SCREW_Y, -14.0)
 # The thrust faces' finish symbols, on section A-A where each face is
 # edge-on: the pick lands on the face's own cut edge, midway across the
-# annulus between the bore and the face's diameter, below the axis.  The hub
-# face's symbol stands below the hub diameter's lower witness line, its
-# caption under it; the boss face's beside the face with its caption above
-# it, inside the boss diameter's witness lines.  Each caption's xy is its
-# top-left corner. Model points, mm.
+# annulus between the bore and the face's diameter, below the axis, and the
+# symbol stands level with it beyond the face, inside the diameter's witness
+# lines (under them, its leader crossed the hub's: run 20261027T130144223Z).
+# The hub face's caption stands under the hub diameter's lower witness line;
+# the boss face's above its symbol.  Each caption's xy is its top-left
+# corner. Model points, mm.
 _ModelPoint = tuple[float, float, float]
 
 
@@ -310,8 +320,8 @@ def _annulus_mid_y(face_dia: float) -> float:
 FACE_FINISHES: dict[str, tuple[_ModelPoint, _ModelPoint, _ModelPoint]] = {
     "hub_face": (
         (0.0, _annulus_mid_y(HUB_DIA), HUB_FACE_Z),
-        (0.0, -HUB_DIA / 2.0 - 3.0, HUB_FACE_Z - 10.0),
-        (0.0, -HUB_DIA / 2.0 - 6.0, HUB_FACE_Z - 17.5),
+        (0.0, _annulus_mid_y(HUB_DIA), HUB_FACE_Z - 9.5),
+        (0.0, -HUB_DIA / 2.0 - 1.5, HUB_FACE_Z - 17.5),
     ),
     "boss_face": (
         (0.0, _annulus_mid_y(BOSS_DIA), BOSS_FACE_Z),
@@ -322,22 +332,24 @@ FACE_FINISHES: dict[str, tuple[_ModelPoint, _ModelPoint, _ModelPoint]] = {
 # Each projected zone: a chain line from face A along its feature's axis,
 # just off it, for the zone's height, dimensioned as a reference (the frame
 # states the height).  (start, end, dimension text) model points, mm.  The
-# knob bore's runs out of A toward the hub in section A-A, its height under
-# it beyond the hub face; each screw hole's runs through the plate in
-# section D-D past the rear face, its height beside the hole beyond A.
+# knob bore's runs out of A toward the hub in section A-A, its height above
+# it beyond the hub face (the hub face's finish symbol stands below it);
+# each screw hole's runs through the plate in section D-D past the rear
+# face, its height beside the hole beyond the zone's end (beyond A it met
+# the view's caption: run 20261027T130144223Z).
 CHAIN_LINE_OFFSET_MM = 1.2
 CHAIN_LINE_STYLE = 3  # swLineStyles_e.swLineCHAIN
 CHAIN_LINE_WEIGHT = 2  # swLineWeights_e.swLW_THICK
 KNOB_ZONE = (
     (0.0, CHAIN_LINE_OFFSET_MM, 0.0),
     (0.0, CHAIN_LINE_OFFSET_MM, -KNOB_ZONE_HEIGHT),
-    (0.0, -1.5, -0.75 * KNOB_ZONE_HEIGHT),
+    (0.0, 4.0, -0.75 * KNOB_ZONE_HEIGHT),
 )
 SCREW_ZONES = tuple(
     (
         (x + CHAIN_LINE_OFFSET_MM, _SCREW_Y, 0.0),
         (x + CHAIN_LINE_OFFSET_MM, _SCREW_Y, SCREW_ZONE_HEIGHT),
-        (x - 1.5, _SCREW_Y, -3.5),
+        (x - 1.5, _SCREW_Y, SCREW_ZONE_HEIGHT + 3.5),
     )
     for x, _y in SCREW_HOLES
 )
@@ -625,9 +637,6 @@ async def build(adapter: Any) -> dict[str, str]:
         {name: DRAWING_PRECISION_BY_NAME[name] for name in (*BACK_KEEP, *SECTION_KEEP)},
     )
     set_dimension_callouts(adapter, face_annotations, SECTION_CALLOUTS)
-    set_dimension_callouts(
-        adapter, face_annotations, SECTION_CALLOUTS_ABOVE, location="above"
-    )
     # These are the same native feature datums and circular zones authored
     # on the part, not +/- positions retyped on a drawing. The drill mouths,
     # the through locator bores' rims and the +X side face's edge on the

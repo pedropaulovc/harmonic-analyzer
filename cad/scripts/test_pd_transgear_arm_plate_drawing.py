@@ -382,8 +382,9 @@ def test_the_thrust_face_finishes_and_captions_clear_their_face_and_the_diameter
         text_near = outward * (drawing.SECTION_KEEP[name][2] - face_z)
         text_near -= _half_width_model(text)
         assert text_near > caption_far, key
-    hub_symbol, hub_caption = drawing.FACE_FINISHES["hub_face"][1:]
-    assert max(hub_symbol[1], hub_caption[1]) < -geometry.HUB_DIA / 2.0
+    hub_pick, hub_symbol, hub_caption = drawing.FACE_FINISHES["hub_face"]
+    assert hub_symbol[1] == hub_pick[1]
+    assert hub_caption[1] < -geometry.HUB_DIA / 2.0
     boss_caption = drawing.FACE_FINISHES["boss_face"][2]
     lines = len(spec.FINISH_CAPTIONS["boss_face"].splitlines())
     assert boss_caption[1] < geometry.BOSS_DIA / 2.0
@@ -405,12 +406,11 @@ def test_each_thrust_face_finish_lands_on_its_own_face_annulus() -> None:
         assert caption.endswith(_config.parts(mate)["number"]), key
 
 
-def test_the_hole_height_text_stands_between_the_edge_and_the_corner_height() -> None:
+def test_the_hole_height_text_stands_right_of_the_edge() -> None:
     centre = drawing.PLAN_KEEP["ScrewHoleY"][0]
     text = f"[{_printed(geometry.SCREW_HOLES[0][1], 'ScrewHoleY')}]"
-    half = _half_width_model(text)
-    assert geometry.EDGE_PLUS_X < centre - half
-    assert centre + half < drawing.PLAN_KEEP["TopRightY"][0]
+    assert geometry.EDGE_PLUS_X < centre - _half_width_model(text)
+    assert "TopRightY" in drawing.BACK_KEEP
 
 
 def _section_sheet_x(z: float) -> float:
@@ -460,8 +460,8 @@ def test_the_views_texts_clear_their_neighbours_and_the_border() -> None:
     # Sheet 1: the plan's right-hand height, then section D-D and the
     # isometric, which stand clear of the title block and the border.
     plan_right = _view_sheet_x(
-        drawing.PLAN_CENTER[0], drawing.PLAN_KEEP["TopRightY"][0], mirrored=False
-    ) + _text_half_width_sheet(_printed(geometry.TOP_RIGHT[1], "TopRightY"))
+        drawing.PLAN_CENTER[0], drawing.PLAN_KEEP["ScrewHoleY"][0], mirrored=False
+    ) + _text_half_width_sheet(f"[{_printed(geometry.SCREW_HOLES[0][1], 'ScrewHoleY')}]")
     section_half = (geometry.EDGE_PLUS_X - geometry.EDGE_MINUS_X) / 1000.0
     assert drawing.SCREW_SECTION_CENTER[0] - section_half - plan_right >= _GAP
     assert drawing.SCREW_SECTION_CENTER[0] + section_half <= _INNER_BORDER_X - _GAP
@@ -519,7 +519,8 @@ def test_the_reamed_hole_leader_crosses_no_plan_dimension_line() -> None:
 def test_section_stations_are_a_baseline_from_the_mounting_face() -> None:
     """Every shoulder station stands above the plate measured from the
     mounting face (z = 0), shortest nearest so no extension line crosses a
-    dimension line; the overall alone stands below."""
+    dimension line; the hub-to-boss length stands above them all, and
+    nothing stands below the view, over its caption."""
     keep = drawing.SECTION_KEEP
     stations = {
         "ThicknessOverArm": geometry.REAR_FACE_Z,
@@ -531,9 +532,25 @@ def test_section_stations_are_a_baseline_from_the_mounting_face() -> None:
         assert keep[name][1] > geometry.arm_upper_edge_y(0.0), name
     rows = sorted(stations, key=lambda name: keep[name][1])
     assert rows == sorted(stations, key=lambda name: abs(stations[name]))
-    below = [name for name, point in keep.items() if point[1] < -geometry.END_R]
-    assert below == ["HubToBoss"]
-    assert -geometry.END_R - keep["HubToBoss"][1] < _CAPTION_CLEAR_MODEL
+    assert keep["HubToBoss"][1] > max(keep[name][1] for name in stations)
+    assert keep["HubToBoss"][2] == pytest.approx((geometry.HUB_FACE_Z + geometry.BOSS_FACE_Z) / 2.0)
+    assert not [name for name, point in keep.items() if point[1] < -geometry.END_R]
+
+
+def test_each_stacked_callout_fits_its_rows_and_witness_lines() -> None:
+    """A callout's lines stand under its value, above the next row's text,
+    and between the dimension's own witness lines."""
+    keep = drawing.SECTION_KEEP
+    for name, below, (left, right) in (
+        ("HubFaceToMounting", "NotchDepth", (geometry.HUB_FACE_Z, 0.0)),
+        ("HubToBoss", "HubFaceToMounting", (geometry.HUB_FACE_Z, geometry.BOSS_FACE_Z)),
+    ):
+        text = drawing.SECTION_CALLOUTS[name]
+        bottom = keep[name][1] - 1.0 - len(text.splitlines()) * _LINE_MODEL
+        assert bottom - (keep[below][1] + 0.9) >= 0.5, name
+        half = _half_width_model("X" * max(map(len, text.splitlines())))
+        assert left + 0.5 < keep[name][2] - half, name
+        assert keep[name][2] + half < right - 0.5, name
 
 
 def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
@@ -569,7 +586,7 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
     assert drawing.DIMENSION_CALLOUTS["LocatorDia1"] == drawing._locator_callout()
     assert numbers["KNOB_SHAFT_NUMBER"] in spec.HUB_STATION_CALLOUT
     assert numbers["KNOB_CUP_NUMBER"] in spec.HUB_TO_BOSS_CALLOUT
-    assert drawing.CALLOUTS_ABOVE["HubFaceToMounting"] == spec.HUB_STATION_CALLOUT
+    assert drawing.DIMENSION_CALLOUTS["HubFaceToMounting"] == spec.HUB_STATION_CALLOUT
     assert drawing.DIMENSION_CALLOUTS["HubToBoss"] == spec.HUB_TO_BOSS_CALLOUT
     for text in (*drawing.DIMENSION_CALLOUTS.values(), *drawing.CALLOUTS_ABOVE.values()):
         assert all(len(line) <= 23 for line in text.splitlines()), text
@@ -595,13 +612,13 @@ def test_each_projected_zone_is_a_chain_line_from_face_a() -> None:
     assert start == (0.0, drawing.CHAIN_LINE_OFFSET_MM, 0.0)
     assert end[:2] == start[:2] and end[2] == -spec.KNOB_ZONE_HEIGHT
     assert end[2] < text[2] < geometry.HUB_FACE_Z
-    assert abs(text[1]) < geometry.BORE_DIA / 2.0
+    assert drawing.CHAIN_LINE_OFFSET_MM < text[1] < geometry.HUB_DIA / 2.0 - 1.5
     assert drawing.CHAIN_LINE_OFFSET_MM < geometry.BORE_DIA / 2.0
     for (start, end, text), (x, y) in zip(drawing.SCREW_ZONES, geometry.SCREW_HOLES, strict=True):
         assert start == (x + drawing.CHAIN_LINE_OFFSET_MM, y, 0.0)
         assert end[:2] == start[:2] and end[2] == spec.SCREW_ZONE_HEIGHT
         assert spec.SCREW_ZONE_HEIGHT > geometry.REAR_FACE_Z
-        assert text[2] < 0.0 and abs(text[0] - x) < geometry.SCREW_HOLE_DIA / 2.0
+        assert text[2] > end[2] and abs(text[0] - x) < geometry.SCREW_HOLE_DIA / 2.0
     assert drawing.CHAIN_LINE_OFFSET_MM < geometry.SCREW_HOLE_DIA / 2.0
     assert spec.DRAWING_REFERENCE_PRECISION == {"KnobZone": 1, "ScrewZone": 1}
     assert f"{spec.KNOB_ZONE_HEIGHT:.1f}" == "40.6"

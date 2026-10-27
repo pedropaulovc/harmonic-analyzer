@@ -211,10 +211,9 @@ HOLE_COUNT_CALLOUT = f"{len(SCREW_HOLES)}X"
 # through the thrust ring (the chain plane and the disc-to-platen air,
 # contract §13); the hub-to-boss band sets the cup's station on the shaft and
 # so the cup pin's end wall (pd_transgear_knob_shaft_spec.CUP_FACE_STATION_BAND).
-HUB_STATION_CALLOUT = f"SETS 12T PLANE OF\nKNOB SHAFT {KNOB_SHAFT_NUMBER}"
-HUB_TO_BOSS_CALLOUT = (
-    f"SETS CUP {KNOB_CUP_NUMBER}\nSTATION ON KNOB\nSHAFT {KNOB_SHAFT_NUMBER}"
-)
+# Two short lines each, between the dimension's own witness lines.
+HUB_STATION_CALLOUT = f"SETS 12T PLANE\nOF {KNOB_SHAFT_NUMBER}"
+HUB_TO_BOSS_CALLOUT = f"SETS CUP {KNOB_CUP_NUMBER}\nON SHAFT {KNOB_SHAFT_NUMBER}"
 
 # Two sheets (drawing-guidelines.md rule 15): the rear face's plan with the
 # isometric and section D-D through the screw holes, then mounting face A's
