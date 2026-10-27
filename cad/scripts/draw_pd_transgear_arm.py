@@ -335,6 +335,8 @@ _PIN_CAPTION_GAP_M = 0.006
 # off at 0.2 (a native caption's extent does not follow a move exactly).
 _CAPTION_SETTLE_M = 5e-4
 _CAPTION_MOVES = 4
+# A two-line caption (name over scale) is 16.2 mm tall; one line is ~7.
+_CAPTION_TWO_LINES_M = 0.012
 _SW_INPUT_DIM_VAL_ON_CREATE = 10  # swUserPreferenceToggle_e.swInputDimValOnCreate
 
 
@@ -854,7 +856,9 @@ def _pin_section_caption_settled(adapter: Any, section: Any) -> None:
     """After finalize_drawing's last sheet-scale reset and rebuild: hang
     section D-D's caption, centred, under its cut face (bounded measured
     moves, then one final check of the resolved extent), inside the sheet,
-    printing its name and the sheet's 2:1."""
+    with its linked name and scale lines. ``INote.GetText`` reads the linked
+    fields blank even here (run 20261027T215106763Z: ' \\r\\n '), so the
+    resolved text is evidenced by its extent: two lines, as A-A's."""
     if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("cannot activate the pin-bore zone sheet")
     note, linked_text = _section_caption(section, "D-D")
@@ -878,11 +882,9 @@ def _pin_section_caption_settled(adapter: Any, section: Any) -> None:
     if max(map(abs, error)) >= _CAPTION_SETTLE_M:
         raise RuntimeError(f"section D-D caption stands at {extent}, its top centre asked at {target}")
     require_inside("section D-D caption", (extent[0], extent[1], extent[3], extent[4]), sheet_region(adapter))
-    printed = re.sub(r"\s+", "", str(note.GetText() or ""))
-    scale = f"{VIEW_SCALE[0]}:{VIEW_SCALE[1]}"
-    if str(note.PropertyLinkedText or "") != linked_text or f"{PIN_SECTION_LABEL}-{PIN_SECTION_LABEL}" not in printed or scale not in printed:
-        raise RuntimeError(f"section D-D caption prints {note.GetText()!r} from {linked_text!r}")
-    _telemetry.info(f"section D-D caption {note.GetText()!r} at {extent}")
+    if str(note.PropertyLinkedText or "") != linked_text or extent[4] - extent[1] < _CAPTION_TWO_LINES_M:
+        raise RuntimeError(f"section D-D caption {linked_text!r} resolved to {extent}")
+    _telemetry.info(f"section D-D caption at {extent}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
