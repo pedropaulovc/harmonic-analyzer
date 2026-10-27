@@ -44,6 +44,7 @@ from _holes import wizard_holes
 
 import _telemetry
 from _drawing_precision import apply_drawing_precision
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
@@ -62,6 +63,7 @@ from dt_crank_arm_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FIDUCIAL_MODEL_DEPTH,
+    FIDUCIAL_ORDINATE_TOL,
     FIDUCIAL_MODEL_DIA,
     FIDUCIAL_X,
     FIDUCIAL_Y,
@@ -256,9 +258,9 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "HandleSeat")
 
-    # Small visual punch witness.  Its restrained representation is driven so
-    # rebuilds remain stable, but it is deliberately absent from the drawing's
-    # manufacturing dimension set.
+    # Small visual punch witness.  The drawing prints its two ordinates from
+    # the hub-seat axis (FiducialX/FiducialY, marked below); its diameter and
+    # depth are only a restrained representation and never print.
     fiducial = SketchDims()
     check("create_sketch arm fiducial", await adapter.create_sketch("HandleSeat"))
     await define_circle(
@@ -540,6 +542,12 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    # The punch witness's ordinates carry their own band: the .X default would
+    # let its centre into the seat bore's edge break (dt_crank_arm_spec).
+    for name in ("FiducialX", "FiducialY"):
+        set_dimension_symmetric_tolerance(
+            adapter, "FiducialProfile", name, FIDUCIAL_ORDINATE_TOL
+        )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

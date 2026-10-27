@@ -15,7 +15,15 @@ from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 
 # --- bar section + length (DIMENSIONS.md ch21; M6.8 ch30 8-view pass) ----------
-BAR_SIDE = 10.0  # tall (Y)
+# The top face stands BAR_TOP_ABOVE_ROW over the bore row: the pen-hanger
+# strap's top is flush with it and the top assembly sets the bar by it. Below
+# the row the bar runs to BAR_SIDE: the photographed 10 grew to 11, downward
+# (owner ruling 2026-10-24), because at the full worst case a 10 bar leaves
+# the walls under the bores below the 1.5 mm floor
+# (mg_wheel_bar_spec.BORE_ROW_WALLS; the walls an 11 leaves are owner-ruled
+# minors, 2026-10-26, #1532).
+BAR_TOP_ABOVE_ROW = 5.0
+BAR_SIDE = 11.0  # tall (Y)
 # BAR_DEPTH (deep, Z) is the support-bar stock's (_column_clamp_interface);
 # the back face seats on the clamp arc.
 # The front face in the machine frame: the front clamp arc's front face
@@ -32,7 +40,6 @@ CLAMP_HOLE_X = (70.5, 105.5)  # clamp-screw holes flanking the column line at +8
 LEFT_END_X = -BAR_LENGTH / 2.0
 HANGER_STATION = SCREW_HOLE_X - LEFT_END_X  # 5.0
 CLAMP_STATIONS = tuple(x - LEFT_END_X for x in CLAMP_HOLE_X)  # (187.5, 222.5)
-CLAMP_STATION_PLACES = 1
 
 # Fixed photographic registration, shared by the bar placement and hanger tap
 # (build_pn_pen_hanger places its strap tap on this machine x).
@@ -47,26 +54,13 @@ WHEEL_X = 53.0  # magnifying-wheel centre, machine x
 AXLE_BORE_X = WHEEL_X - WHEEL_BAR_X0  # -56
 AXLE_BORE_DIA = round(0.1865 * 25.4, 6)  # 4.7371
 AXLE_BORE_BAND = (0.010, 0.0)  # (upper, lower) deviations, reamed
-# The height is bright square stock as supplied (cold-drawn h11 is 0/-0.09):
-# minus-only. Its bottom limit sets the walls over the bore row, which the
-# print reads from the bottom face, so the whole band lands on the top wall. At
-# -0.5 the clamp holes' top wall fell to 1.861; -0.3 holds 2.061.
-BAR_SIDE_BAND = (0.0, -0.3)
 # Printed depth band: with the axle's press gauge and .X shank it places the
 # axle's back end on the back face (mg_wheel_axle_spec.BACK_END_PROUD_MAX).
 BAR_DEPTH_BAND = (0.10, -0.10)
 
-# All four bores share one row at mid-height. No long face seats on a mating
-# part (the back face seats on the clamp arc), so the print reads the row from
-# the bottom face, with an explicit band.
-BORE_ROW_HEIGHT = BAR_SIDE / 2.0  # 5.0
-BORE_ROW_HEIGHT_TOL = 0.10
-BORE_ROW_HEIGHT_PLACES = 2
-# The bar's near face from the row at its worst sets the walls below.
-BORE_ROW_NEAR_FACE = (
-    min(BORE_ROW_HEIGHT, BAR_SIDE + BAR_SIDE_BAND[1] - BORE_ROW_HEIGHT)
-    - BORE_ROW_HEIGHT_TOL
-)  # 4.60
+# All four bores share one row, BAR_TOP_ABOVE_ROW under the top face; this is
+# the row's height over the bottom face (the bar's underside below the axle).
+BORE_ROW_HEIGHT = BAR_SIDE - BAR_TOP_ABOVE_ROW  # 6.0
 
 # Native Hole Wizard clearance contracts shared by build, drawing, and assemblies.
 PEN_HANGER_HOLE_SPEC = HoleSpec("clearance", "#8", fit="close")
@@ -74,19 +68,6 @@ PEN_HANGER_HOLE_DIA = blind_cut_dia_mm(PEN_HANGER_HOLE_SPEC)
 CLAMP_HOLE_SPEC = HoleSpec("clearance", "#8")
 CLAMP_HOLE_DIA = blind_cut_dia_mm(CLAMP_HOLE_SPEC)
 DRILLED_HOLE_PLUS = drilled_oversize_mm()
-
-BORE_MIN_WALL = 2.0  # drawing-guidelines.md rule 17 (walls and webs) target, worst case
-# Worst wall above or below each bore: the bar at its thinnest, the row at its
-# band, the bore at its largest.
-BORE_ROW_WALLS = {
-    "axle bore": BORE_ROW_NEAR_FACE - (AXLE_BORE_DIA + AXLE_BORE_BAND[0]) / 2.0,
-    "pen-hanger hole": BORE_ROW_NEAR_FACE
-    - (PEN_HANGER_HOLE_DIA + DRILLED_HOLE_PLUS) / 2.0,
-    "clamp holes": BORE_ROW_NEAR_FACE - (CLAMP_HOLE_DIA + DRILLED_HOLE_PLUS) / 2.0,
-}  # 2.226, 2.264, 2.061
-for _bore, _wall in BORE_ROW_WALLS.items():
-    if _wall < BORE_MIN_WALL:
-        raise AssertionError(f"wheel-bar {_bore} wall {_wall:.3f} < {BORE_MIN_WALL}")
 
 # Finished material remaining between the clearance bore and the free end.
 # This is a manufacturing ligament requirement, not a screw tear-out rating.

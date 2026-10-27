@@ -22,7 +22,7 @@ import _config
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from mg_wheel_bar_geom import WHEEL_BAR_Y
-from mg_wheel_bar_geom import BAR_FRONT_Z, BAR_SIDE, HANGER_SCREW_MACHINE_X
+from mg_wheel_bar_geom import BAR_FRONT_Z, BAR_TOP_ABOVE_ROW, HANGER_SCREW_MACHINE_X
 from _recording_geometry import PEN_ROD_X, PEN_Z_MID
 from _paper_drive_placement import PLATEN_BOTTOM_Y
 from pd_platen_spec import PLATE_HEIGHT as PLATEN_HEIGHT
@@ -36,7 +36,7 @@ PEN_ROD_NUMBER = _config.parts("pn-pen-rod")["number"]
 # --- Placement: the strap top is flush with the bar top, its back face seats
 # on the bar front face, its top-right corner sits on the rod line's x so the
 # slots centre on local x 0. ---
-HANGER_POS = (PEN_ROD_X, round(WHEEL_BAR_Y + BAR_SIDE / 2.0, 6), BAR_FRONT_Z)
+HANGER_POS = (PEN_ROD_X, round(WHEEL_BAR_Y + BAR_TOP_ABOVE_ROW, 6), BAR_FRONT_Z)
 ROD_AXIS_Z = round(PEN_Z_MID - BAR_FRONT_Z, 6)  # local z of the rod line
 
 # --- Strap (photo: tapers 16 -> 10, black, flat on the bar).  Its foot is as

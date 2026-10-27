@@ -1,8 +1,8 @@
 r"""Create the curated machinist drawing for the tube-frame column.
 
 The SLDPRT remains authoritative. This recipe supplies the regular open tube's
-orthographic views, diameter/cut-length/cross-hole dimensions, and their
-fit-up callouts;
+orthographic views, diameter/cut-length/cross-hole dimensions, the top-end
+chamfer dimension, and their fit-up callouts;
 sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
@@ -19,6 +19,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -46,11 +47,16 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
-from _drawing_edges import visible_view_entities
+from _drawing_edges import (
+    face_silhouettes_through,
+    scan_view_edges,
+    visible_view_entities,
+)
 from _drawing_notes import add_property_linked_note, property_link
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _gtol_cone import ConeFace
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
@@ -67,7 +73,6 @@ from fr_tube_frame_spec import (
     LOWER_CROSS_HOLE_Y,
     OUTER_DIA,
     TOP_END_CHAMFER,
-    TOP_END_CHAMFER_SUFFIX,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -111,8 +116,33 @@ LENGTH_KEEP = {
         LENGTH_CENTER[0] + 0.085,
         LENGTH_CENTER[1] - COLUMN_LENGTH / 10000.0 + LOWER_CROSS_HOLE_Y / 5000.0,
     ),
-    "TopChamfer": (LENGTH_CENTER[0] + 0.040, LENGTH_CENTER[1] + 0.120),
 }
+# The top-end break is a native chamfer dimension (``AddChamferDim``) whose
+# leader lands on the chamfer itself. The part's ``TopChamfer`` is a linear
+# distance: imported, it drew opposed arrows on the top face's extension well
+# right of the tube and named no edge (machinist review 5bca52e r2/r3).
+# ``AddChamferDim`` ignores its text point (run 20261027T080236834Z: asked
+# for x 200 mm, it centred the 103.6 mm block at x 141.6 over the end view,
+# four text-on-view/line audit findings), so the text is set after insertion
+# by ``SetPosition2``, which places the block's centre at x and the cap line
+# at y with the value line's shoulder 5.6 mm under it. Centred at x 198 mm
+# the block (146..250 mm) clears the end view's outline (x <= 141 mm); the
+# shoulder at 333 mm stays 4.8 mm over the isometric's outline (328.2 mm).
+CHAMFER_TEXT_XY = (0.198, 0.3386)
+_CHAMFER_POSITION_TOLERANCE_M = 0.001
+# The chamfer dimension prints the part-authored break places (one, .X) and
+# a whole-degree angle: "0.5 X 45°".
+CHAMFER_PLACES = DRAWING_PRECISION_BY_NAME["TopChamfer"]
+IMPORTED_PRECISION = {
+    name: places
+    for name, places in DRAWING_PRECISION_BY_NAME.items()
+    if name != "TopChamfer"
+}
+_CHAMFER_DIMENSION = 10  # swDimensionType_e.swChamferDimension
+# swDetailingChamferDimLeaderTextStyle_e.swDetailChamferDimDistAng
+_CHAMFER_TEXT_DIST_ANG = 2
+_CHAMFER_LENGTH = 0  # IDisplayDimension.ChamferPrecision index: length
+_CHAMFER_ANGLE = 1  # IDisplayDimension.ChamferPrecision index: angle
 # The cut length is set at assembly: the supply size rides above the (1018.8)
 # reference and the cut-to-fit stack below it (rule 19), so the requirement
 # is flagged on the length itself rather than in the note block.
@@ -224,6 +254,134 @@ def _add_outer_diameter_reference(
     return annotation
 
 
+@_telemetry.traced("drawing.top_chamfer")
+def _add_top_chamfer_dimension(
+    adapter: Any,
+    view: Any,
+    *,
+    text_xy: tuple[float, float],
+    callout_above: str,
+) -> Any:
+    """Dimension the top-end OD break with a native chamfer dimension.
+
+    In the length view the 45-degree break is the cone face's silhouette on
+    the +X flank (sheet right), resolved from its model face and a projected
+    point on the line it draws. Its lead-in is the top end face's outer rim,
+    the circular edge the chamfer leaves at the top, seen edge-on as the end
+    line. The OD flank cannot serve: farm leaves 20261027T073053Z and
+    20261027T075752Z read every one of the view's 4 silhouettes as the cone's
+    (two coincident per flank) and its 5 visible edges as 3 circles plus 2
+    cross-hole curves, so no selectable entity draws the OD flank. Both picks
+    are selected as objects, so no seat hit-test is involved. Returns the
+    settled check that re-proves the dimension after the final rebuild.
+    """
+    radius = OUTER_DIA / 2.0
+    chamfer_mid = model_point_in_view(
+        adapter,
+        view,
+        (
+            (radius - TOP_END_CHAMFER / 2.0) / 1000.0,
+            (COLUMN_LENGTH - TOP_END_CHAMFER / 2.0) / 1000.0,
+            0.0,
+        ),
+        label="tube top chamfer flank point",
+    )
+    chamfer = face_silhouettes_through(
+        adapter,
+        view,
+        {"chamfer": (ConeFace(45.0), chamfer_mid)},
+        label="tube top chamfer",
+    )["chamfer"]
+    lead_in = (
+        scan_view_edges(view, label="tube top end rim")
+        .circle_at(
+            (0.0, COLUMN_LENGTH, 0.0),
+            radius - TOP_END_CHAMFER,
+            axis=(0.0, 1.0, 0.0),
+            label="tube top end rim",
+        )
+        .edge
+    )
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    name = view_name(adapter, view)
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"failed to activate top chamfer view {name!r}")
+    draw.ClearSelection2(True)
+    manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    data = manager.CreateSelectData()
+    data.View = view
+    # Chamfered edge first, then its lead-in (SOLIDWORKS chamfer-dimension order).
+    chamfer = _sw_type_info.early_bound_or_flag(chamfer, "ISilhouetteEdge", "Select2")
+    if not bool(chamfer.Select2(False, data)):
+        raise RuntimeError("failed to select the tube top chamfer silhouette")
+    if not bool(_early_bound(lead_in, "IEntity").Select4(True, data)):
+        raise RuntimeError("failed to select the tube top end rim edge")
+    selected = int(manager.GetSelectedObjectCount2(-1))
+    if selected != 2:
+        raise RuntimeError(
+            f"tube top chamfer selection holds {selected} entities, not 2"
+        )
+    display = ddoc.AddChamferDim(text_xy[0], text_xy[1], 0.0)
+    draw.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError("failed to add the tube top chamfer dimension")
+    display = _early_bound(display, "IDisplayDimension")
+    display.ChamferTextStyle = _CHAMFER_TEXT_DIST_ANG
+    display.SetChamferPrecision(_CHAMFER_LENGTH, CHAMFER_PLACES)
+    display.SetChamferPrecision(_CHAMFER_ANGLE, 0)
+    display.ShowParenthesis = False
+    display.SetText(1, "")
+    display.SetText(2, "")
+    display.SetText(3, callout_above)
+    display.SetText(4, "")
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    if annotation is None:
+        raise RuntimeError("tube top chamfer dimension has no annotation")
+    if not annotation.SetPosition2(text_xy[0], text_xy[1], 0.0):
+        raise RuntimeError("failed to position the tube top chamfer text")
+
+    def settled() -> None:
+        if bool(annotation.IsDangling()):
+            raise RuntimeError("tube top chamfer dimension is dangling")
+        native = _early_bound(display.GetDimension2(0), "IDimension")
+        values = tuple(native.GetSystemChamferValues(0.0, 0.0) or ())
+        if len(values) != 3 or not bool(values[0]):
+            raise RuntimeError(f"tube top chamfer reads no chamfer values: {values!r}")
+        length_mm, angle_deg = float(values[1]) * 1000.0, math.degrees(float(values[2]))
+        if abs(length_mm - TOP_END_CHAMFER) > 1e-5 or abs(angle_deg - 45.0) > 1e-6:
+            raise RuntimeError(
+                f"tube top chamfer measures {length_mm:g} mm x {angle_deg:g} deg, "
+                f"expected {TOP_END_CHAMFER:g} mm x 45 deg"
+            )
+        lanes = {part: str(display.GetText(part) or "") for part in (1, 2, 3, 4)}
+        if (
+            int(display.Type2) != _CHAMFER_DIMENSION
+            or int(display.ChamferTextStyle) != _CHAMFER_TEXT_DIST_ANG
+            or int(display.ChamferPrecision(_CHAMFER_LENGTH)) != CHAMFER_PLACES
+            or int(display.ChamferPrecision(_CHAMFER_ANGLE)) != 0
+            or bool(display.ShowParenthesis)
+            or lanes != {1: "", 2: "", 3: callout_above, 4: ""}
+        ):
+            raise RuntimeError(
+                "tube top chamfer dimension style/lanes did not persist: "
+                f"type={display.Type2}, style={display.ChamferTextStyle}, "
+                f"places=({display.ChamferPrecision(_CHAMFER_LENGTH)}, "
+                f"{display.ChamferPrecision(_CHAMFER_ANGLE)}), lanes={lanes!r}"
+            )
+        placed = tuple(float(value) for value in (annotation.GetPosition() or ()))
+        if (
+            len(placed) < 2
+            or math.dist(placed[:2], text_xy) > _CHAMFER_POSITION_TOLERANCE_M
+        ):
+            raise RuntimeError(
+                f"tube top chamfer text moved: {placed!r}, requested {text_xy!r}"
+            )
+
+    settled()
+    return settled
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -274,6 +432,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_VIEW_SCALE
     )
     set_hidden_lines_removed(adapter, iso)
+    # The length view shows both stations as visible circles, so dashed bore
+    # lines there would say nothing (MR r2): hidden lines removed, BEFORE the
+    # chamfer dimension is attached to its silhouettes, so no later display
+    # change regenerates them under it.
+    set_hidden_lines_removed(adapter, length)
 
     curate_view_dimensions(
         adapter,
@@ -376,7 +539,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # sheet only proves they survived the import. A silent fallback to the
     # drawing document's two places would print the 1018.8 cut length as
     # 1018.77 and ask for a band the match-cut note explicitly refuses.
-    assert_imported_precision(adapter, dimensions, DRAWING_PRECISION_BY_NAME)
+    assert_imported_precision(adapter, dimensions, IMPORTED_PRECISION)
     for name in ("Length", "LowerHoleY", "UpperHoleY"):
         references = [
             annotation
@@ -404,36 +567,12 @@ async def build(adapter: Any) -> dict[str, str]:
                 _CALLOUT_BELOW: LENGTH_FIT_CALLOUT,
             }:
                 raise RuntimeError(f"length supply/cut-to-fit callouts did not persist: {lanes!r}")
-    chamfers = [
-        annotation
-        for annotation in dimensions
-        if dimension_name(adapter, annotation) == "TopChamfer"
-    ]
-    if len(chamfers) != 1:
-        raise RuntimeError(f"expected one native top chamfer, got {len(chamfers)}")
-    chamfer = _early_bound(chamfers[0].GetSpecificAnnotation(), "IDisplayDimension")
-    native_chamfer = _early_bound(chamfer.GetDimension2(0), "IDimension")
-    if abs(float(native_chamfer.SystemValue) * 1000.0 - TOP_END_CHAMFER) > 1e-5:
-        raise RuntimeError("native top chamfer differs from source size")
-    chamfer.ShowParenthesis = False
-    chamfer.SetText(1, "")
-    # Keep the native value/suffix on one line. Multiline suffix text on this
-    # imported model dimension rendered only its final line in the native PDF.
+    # Single line: the property is the cap's fit requirement (rule 4 names
+    # the mate) riding above the native chamfer value.
     cap_acceptance = " ".join(source_properties["Top End Callout"].splitlines())
-    chamfer.SetText(3, cap_acceptance)
-    chamfer.SetText(4, "")
-    chamfer_suffix = TOP_END_CHAMFER_SUFFIX
-    chamfer.SetText(2, chamfer_suffix)
-    chamfer.ShowDimensionValue = True
-    if (
-        bool(chamfer.ShowParenthesis)
-        or not bool(chamfer.ShowDimensionValue)
-        or str(chamfer.GetText(1) or "")
-        or str(chamfer.GetText(2) or "") != chamfer_suffix
-        or str(chamfer.GetText(3) or "") != cap_acceptance
-        or str(chamfer.GetText(4) or "")
-    ):
-        raise RuntimeError("native chamfer value/cap callout lanes did not persist")
+    chamfer_settled = _add_top_chamfer_dimension(
+        adapter, length, text_xy=CHAMFER_TEXT_XY, callout_above=cap_acceptance
+    )
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the annulus end view")
 
@@ -441,9 +580,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Isometric View Note", 0.175, 0.215)
     add_property_linked_note(adapter, "Length View Note", 0.075, 0.083)
     # The end view's hidden lines carry the cross-hole through both walls
-    # (rule 9); the length view shows both stations as visible circles, so
-    # dashed bore lines there would say nothing (MR r2): hidden lines removed.
-    set_hidden_lines_removed(adapter, length)
+    # (rule 9).
     set_hidden_lines_visible(adapter, end)
 
     return await finalize_drawing(
@@ -452,6 +589,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Tube Frame Column Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(chamfer_settled,),
     )
 
 

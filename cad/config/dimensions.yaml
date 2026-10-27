@@ -268,7 +268,7 @@ sections:
         - scaled
         - low
       - - Fiducial punch marks
-        - 'simple un-dimensioned punched witnesses on arm and shaft dome'
+        - 'simple punched witnesses on arm and shaft dome; neither prints a size, the arm''s prints .X ordinates from the hub-seat axis'
         - —
         - 'primary construction photo/annotation; these are alignment witnesses, not machined dimples. The CAD uses only a shallow visual representation and the drawings intentionally carry no diameter/depth callout.'
         - construction
@@ -1520,7 +1520,7 @@ sections:
         - scaled
         - low
       - - Wheel bar (M6.4/M6.8; clamp unified with the platen bar 2026-07)
-        - '10 tall × 9 deep steel HALF-width bar (`mg-wheel-bar`, x −226..+8, the clamped end 29 past the west column like the support-bar) at y 575.7, back face −129.9 on the front clamp arc, front face −138.9 (the shared platen-back plane) — the magnifying wheel''s own bar, same 9-deep stock as the ONE 28 × 9 × 452 `pd-support-bar` at y 303.734 (see ch. 22)'
+        - '11 tall × 9.5 deep steel HALF-width bar (`mg-wheel-bar`, x −226..+8, the clamped end 29 past the west column like the support-bar), its bore row at y 575.7, 5 under the top face (the photographed 10 grown 1 downward, owner ruling 2026-10-24, so the walls under the bores clear the 1.5 floor at the full worst case; the 1.56-1.93 walls under the 2.0 target are owner-ruled minors, 2026-10-26, #1532), back face −129.4 on the front clamp arc, front face −138.9 (the shared platen-back plane) — the magnifying wheel''s own bar, same 9.5-deep stock as the ONE 28 × 9.5 × 452 `pd-support-bar` at y 303.734 (see ch. 22)'
         - —
         - 'M6.4 layout; p3 90° view: bars run tangent IN FRONT of the columns (z −112)'
         - derived

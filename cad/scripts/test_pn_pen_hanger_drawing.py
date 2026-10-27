@@ -31,7 +31,7 @@ def test_hanger_screw_hole_lands_on_the_bar_screw_axis() -> None:
     # The strap seats on the bar front face, its top flush with the bar top.
     assert spec.HANGER_POS[2] + spec.STRAP_Z[1] == pytest.approx(magnifier.BAR_FRONT_Z)
     assert spec.HANGER_POS[1] == pytest.approx(
-        magnifier.WHEEL_BAR_Y + bar.BAR_SIDE / 2.0
+        magnifier.WHEEL_BAR_Y + bar.BAR_TOP_ABOVE_ROW
     )
     # The 3.0 strap carries no thread: the screw passes its #8 clearance hole
     # into the nut and jam nut, which leave at least two full pitches beyond.

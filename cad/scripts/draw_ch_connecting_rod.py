@@ -42,9 +42,12 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_detail_crop import native_circle_geometry
+from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
+    set_arc_endpoints_to_center,
     set_basic_dimension,
     set_dimension_callouts,
     set_reference_dimension,
@@ -59,6 +62,7 @@ from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_cylinder import CylinderFace
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -81,6 +85,10 @@ from ch_connecting_rod_spec import (
     SURFACE_FINISHES,
 )
 from ch_rod_pivot_pin_spec import BUDGET as PIN_JOINT_BUDGET
+
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["ch_connecting_rod"]
@@ -149,10 +157,6 @@ FRONT_KEEP = {
     # The reamed pin hole's value stands right of the fork, below the position
     # FCF's level leader, so the two leaders cannot cross.
     "PinHoleDia": (0.218, 0.196),
-    # The inside corners' radius off the shank's +X flank onto the ring
-    # (build_ch_connecting_rod's first fillet edge), up-right in the open
-    # field right of the shank, above the bore's finish symbol.
-    "InsideCornerR": (0.225, 0.106),
 }
 # One arrow on the rim nearest each text (set_near_side_diameter).
 NEAR_SIDE_DIAMETERS = ("RingOuterDia", "StrapBoreDia")
@@ -169,7 +173,6 @@ FRONT_CALLOUTS = {
         f" {_CLEARANCE_LEAST:.2f}-{_CLEARANCE_MOST:.2f}\nDIAMETRAL CLEARANCE"
     ),
     "ForkWidthDim": "FULL R",
-    "InsideCornerR": "ALL INSIDE CORNERS",
     "PinHoleDia": (
         f"THRU - REAM; PRESS\nFIT ON PIN {PIN_NUMBER},\n"
         f"{_PRESS_LEAST:.3f}-{_PRESS_MOST:.3f} INTERFERENCE"
@@ -206,11 +209,16 @@ OVERALL_TEXT_XY = (0.100, 0.175)
 # (baseline review). The fence centres on the rod axis midway between the
 # crown top and the ring-face references' lower ends and takes in both.
 DETAIL_SCALE = (3, 1)
-DETAIL_RADIUS_MM = 11.0
+# 12.5: the fence the passing layouts printed (an inferred draw had snapped
+# the authored 11.0 out to ~12.4), clear of the slot depth's text inside it.
+DETAIL_RADIUS_MM = 12.5
 DETAIL_FENCE_Y_MM = (FORK_TOP_Y + FORK_BASE_Y - 2.0) / 2.0
 # Right of the front view's pin-hole callout and FCF, below the isometric,
 # above the title block.
 DETAIL_CENTER = (0.325, 0.135)
+# How far the fence centre may print from DETAIL_CENTER once placed (the
+# 0.5 mm the section and detail settle reads allow, draw_dt_cone_swing_platform).
+DETAIL_PLACEMENT_TOL_M = 0.0005
 _DETAIL_MM = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
 _DETAIL_FENCE_R = DETAIL_RADIUS_MM * _DETAIL_MM
 if DETAIL_RADIUS_MM <= math.hypot(FORK_THICKNESS / 2.0, FORK_TOP_Y - DETAIL_FENCE_Y_MM):
@@ -252,8 +260,9 @@ DETAIL_KEEP = {
     "SlotDepth": (_FAR_X + 0.016, (_TINE_TOP_Y + _ROOT_Y) / 2.0 + 0.004),
     "ForkBossLength": (_FAR_X + 0.034, (_TINE_TOP_Y + _ROOT_Y) / 2.0),
     # Under the fork, from the datum face: the plate's near face (text left
-    # of the datum face).
-    "RingFaceNear": (_FACE_X - 0.030, _REF_END_Y - 0.010),
+    # of the datum face, its longest line 5 mm clear of the face's witness;
+    # at 30 mm the witness ran through MHA-DT-12, ENFORCE review).
+    "RingFaceNear": (_FACE_X - 0.036, _REF_END_Y - 0.010),
 }
 # The near tine's band locates the slot from the datum face (the channel's
 # axial budget) and, with the far tine's, holds the gap to the next channel's
@@ -290,13 +299,20 @@ DATUM_A_SYMBOL = _sheet_xy(
 # above the shank width's dimension line (its text stands right of the shank).
 DATUM_B_EDGE = _sheet_xy(-SHANK_WIDTH / 2.0, 100.0)
 DATUM_B_SYMBOL = (DATUM_B_EDGE[0] - 0.016, FRONT_KEEP["ShankWidthDim"][1] + 0.0045)
-# The 4.00 BASIC (datum B to the pin axis) runs on the shank below the fork
-# root, its text out to the left: over the pin its line lay on the position
-# FCF's level leader and under the ream leader (baseline review); inside the
-# head it crowded the hole and the ream callout's leader crossed it (#982
-# review r3). On the shank its arrow lands on the flank itself, datum B's
-# visible edge, left of the ream leader's run down-right from the hole.
-PIN_OFFSET_TEXT_XY = (0.150, _sheet_xy(0.0, FORK_BASE_Y - 6.0)[1])
+# The 4.00 BASIC (datum B to the pin axis) runs on the shank, its text out
+# to the left: over the pin its line lay on the position FCF's level leader
+# and under the ream leader (baseline review); inside the head it crowded
+# the hole and the ream callout's leader crossed it (#982 review r3); just
+# below the fork root the leader still crossed its right-hand arrow
+# (ENFORCE review). Below the ream callout's lowest line the leader, which
+# runs up-left from that line to the hole, cannot reach it; above datum B's
+# tag. On the shank its arrow lands on the flank itself, datum B's edge.
+PIN_OFFSET_TEXT_XY = (0.150, _sheet_xy(0.0, 111.0)[1])
+# The 4.00 BASIC from datum A (the bore axis) to datum B (the shank's left
+# flank) completes the frame (ENFORCE review: nothing placed B sideways from
+# A): its witness rises from the bore centre up the shank, its text out to
+# the left on the shank above the ring, clear over the Ø40.80 text.
+DATUM_B_FROM_A_TEXT_XY = (0.150, _sheet_xy(0.0, 55.0)[1])
 
 
 def _fork_detail(adapter: Any, left: Any) -> Any:
@@ -322,9 +338,28 @@ def _fork_detail(adapter: Any, left: Any) -> Any:
         point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
+    # ENFORCE farm runs: an inferred circle snapped in screen space (a 12.4
+    # and then a 9.7 mm fence, each off the rod axis), so the detail's fork
+    # wandered under its fixed texts and their lines struck them. The fence
+    # goes straight to the database and is read back before the detail
+    # selects it (draw_dt_pinion_lever._hub_detail's recipe).
     manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if manager.CreateCircle(*points[0], *points[1]) is None:
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        fence = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if fence is None:
         raise RuntimeError("failed to create the fork detail fence")
+    placed_centre, placed_radius = native_circle_geometry(fence, label="fork detail fence")
+    if math.dist(placed_centre[:2], points[0][:2]) > 1e-9 or not math.isclose(
+        placed_radius, math.dist(points[0][:2], points[1][:2]), abs_tol=1e-9
+    ):
+        raise RuntimeError("the fork detail fence moved from where it was placed")
+    draw.ClearSelection2(True)
+    if not _early_bound(fence, "ISketchSegment").Select4(False, None):
+        raise RuntimeError("failed to select the fork detail fence")
     detail = drawing.CreateDetailViewAt4(
         *DETAIL_CENTER,
         0.0,
@@ -343,6 +378,9 @@ def _fork_detail(adapter: Any, left: Any) -> Any:
     detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
     draw.ClearSelection2(True)
     draw.EditRebuild3()
+    # A fresh detail's display geometry can lag its creation
+    # (_drawing_detail_projection): refresh it before its outline places it.
+    detail.UpdateViewDisplayGeometry()
     outline = tuple(float(value) for value in detail.GetOutline())
     position = tuple(float(value) for value in detail.Position)
     if len(outline) != 4 or len(position) != 2:
@@ -354,6 +392,16 @@ def _fork_detail(adapter: Any, left: Any) -> Any:
     if not detail.SetViewPosition(double_array(target), False):
         raise RuntimeError("failed to position the fork detail")
     draw.EditRebuild3()
+    # DETAIL_KEEP assumes the fence centre (on the rod axis) prints at
+    # DETAIL_CENTER: read it back through the settled detail.
+    settle_detail_projection(
+        adapter,
+        detail,
+        (0.0, DETAIL_FENCE_Y_MM / 1000.0, 0.0),
+        ink_xy=DETAIL_CENTER,
+        tolerance_xy=(DETAIL_PLACEMENT_TOL_M, DETAIL_PLACEMENT_TOL_M),
+        label="fork detail fence centre",
+    )
     notes = tuple(_read_member(detail, "GetNotes") or ())
     if len(notes) != 1:
         raise RuntimeError(f"expected one native detail label, found {len(notes)}")
@@ -458,7 +506,7 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(
         adapter,
         front_annotations,
-        {**DRAWING_PRECISION["PinHoleProfile"], **DRAWING_PRECISION["InsideCorners"]},
+        DRAWING_PRECISION["PinHoleProfile"],
     )
     assert_imported_precision(adapter, left_annotations, DRAWING_PRECISION["Plate"])
     assert_imported_precision(
@@ -569,9 +617,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="strap bore axis",
     )
     # Datum B: the shank's left flank.  A alone leaves rotation about the bore
-    # axis unconstrained, so the pin-hole position (and the 147.67 direction)
-    # could not be inspected; B clocks the rod and the 4.00 BASIC below ties
-    # the pin to the shank centreline.
+    # axis unconstrained, so the pin-hole position (and the 158.37 direction)
+    # could not be inspected; B clocks the rod, the 4.00 BASIC from A places
+    # B, and the 4.00 BASIC from B places the pin on the shank centreline.
     add_datum_feature(
         adapter,
         front,
@@ -580,6 +628,26 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="B",
         label="shank left flank",
     )
+    # Both 4.00 BASICs run from the flank to a circle's CENTRE (datum A's bore,
+    # the pin's axis), set explicitly rather than left to the arc condition the
+    # pick resolves to. Value-only: both picks are coordinate hits.
+    datum_b_offset = add_edge_dimension(
+        adapter,
+        front,
+        p0=DATUM_B_EDGE,
+        p1=ring_rim,
+        text_xy=DATUM_B_FROM_A_TEXT_XY,
+        label="datum B from datum A",
+        orientation="horizontal",
+    )
+    set_arc_endpoints_to_center(adapter, datum_b_offset, label="datum B from datum A")
+    assert_dimension_measures(
+        adapter,
+        datum_b_offset,
+        expected_mm=SHANK_WIDTH / 2.0,
+        label="datum B from datum A",
+    )
+    set_basic_dimension(adapter, datum_b_offset, label="datum B from datum A")
     pin_offset = add_edge_dimension(
         adapter,
         front,
@@ -588,6 +656,13 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=PIN_OFFSET_TEXT_XY,
         label="pin C/L from shank flank",
         orientation="horizontal",
+    )
+    set_arc_endpoints_to_center(adapter, pin_offset, label="pin C/L from shank flank")
+    assert_dimension_measures(
+        adapter,
+        pin_offset,
+        expected_mm=SHANK_WIDTH / 2.0,
+        label="pin C/L from shank flank",
     )
     set_basic_dimension(adapter, pin_offset, label="pin C/L from shank flank")
     add_surface_finish(
