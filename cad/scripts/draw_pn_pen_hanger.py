@@ -12,10 +12,11 @@ hangs in both slots.  The front view (1:1, ``*Back``: looking at the strap's
 front face and the plates from the machine front, as note 1 names it) carries
 the strap outline, the screw-hole station, the upper plate's drop and the
 plates' sheet-stock thickness (a reference); section A-A (2:1) cuts the strap
-just above the upper plate and looks down onto its U, carrying the slot, its
-corner radius, the strap stock, the plate's overhang past the strap (a
-reference) and its in-line callout; the shaded isometric (1:1) fills the
-right of the sheet.
+just above the upper plate and looks down onto its U, carrying the slot (its
+depth and the plate's reach both from the plate's free end), its corner
+radius, the strap's sheet-stock thickness (a reference), the plate's overhang
+past the strap (a reference) and its in-line callout; the shaded isometric
+(1:1) fills the right of the sheet.
 
 Run with SolidWorks open::
 
@@ -254,11 +255,13 @@ FRONT_KEEP = {
 # OUTSIDE their spans, so no extension line crosses a dimension line.  The
 # slot width's 10 mm span cannot hold its banded value and fit callout, so
 # its text is offset onto a leader, right of the section beyond every
-# extension line (SLOT_WIDTH_TEXT_XY).  The plate reach and, outside it, the
-# slot bottom from the strap back face, on the left; the strap stock
-# thickness right of the strap end; the corner radius's text up-right of the
-# -x corner it is attached to, so its leader leaves the arc outward through
-# the arm and crosses no other ink.
+# extension line (SLOT_WIDTH_TEXT_XY).  On the left, the slot depth and,
+# outside it, the plate reach, both from the plate's free end (the plate is
+# cut as its own blank before brazing): shortest nearest, so the slot
+# bottom's extension line stops short of the reach's dimension line.  The
+# strap stock thickness right of the strap end; the corner radius's text
+# up-right of the -x corner it is attached to, so its leader leaves the arc
+# outward through the arm and crosses no other ink.
 _PLATE_FRONT_SHEET_Y = _az(PLATE_FRONT_Z)
 # Dimension-line rows below the plate front.  A single-line value prints
 # with its centre 2.7 mm above its line (native sheet run
@@ -281,13 +284,20 @@ SECTION_KEEP = {
         SECTION_ROW_Y["ArmWidth"] + _VALUE_ABOVE_LINE,
     ),
     "PlateWidth": (_ax(0.0), SECTION_ROW_Y["PlateWidth"] + _VALUE_ABOVE_LINE),
-    "PlateReach": (
+    "SlotDepth": (
         _ax(_HALF_PLATE) - 0.008,
         _az((PLATE_FRONT_Z + SLOT_BOTTOM_Z) / 2.0),
     ),
-    "SlotBottom": (_ax(_HALF_PLATE) - 0.020, _az(SLOT_BOTTOM_Z / 2.0)),
+    "PlateReach": (
+        _ax(_HALF_PLATE) - 0.020,
+        _az((PLATE_FRONT_Z + STRAP_Z[0]) / 2.0),
+    ),
     "StrapThick": (_ax(_SECTION_X[0]) + 0.008, _az((STRAP_Z[0] + STRAP_Z[1]) / 2.0)),
-    "SlotCornerR": (_ax(-_HALF_PLATE) + 0.015, _az(SLOT_BOTTOM_Z) + 0.012),
+    # "2X R2.0 MAX" (~30 mm) is wider than the 24.5 mm EACH SLOT row that set
+    # the block's width on the 20261024T091056564Z sheet, so the centre moves
+    # 4 mm right of the bare radius's and the left end keeps ~4 mm off the
+    # plate's -x edge.
+    "SlotCornerR": (_ax(-_HALF_PLATE) + 0.019, _az(SLOT_BOTTOM_Z) + 0.012),
 }
 # The slot width's offset text block (value, band and two callout rows,
 # about 49 x 15 mm, positioned by its centre): its left end 4 mm right of
@@ -299,16 +309,26 @@ SLOT_WIDTH_TEXT_XY = (
     _ax(_SECTION_X[0]) + 0.004 + _SLOT_TEXT_HALF_WIDTH,
     SECTION_ROW_Y["SlotWidth"] - 0.004,
 )
+# The strap stock's offset text block ("(3.0)" over SHEET STOCK, about
+# 30 x 8 mm, positioned by its centre): its two rows cannot sit in the 6 mm
+# span, so the block stands level with the strap, its left end 4 mm right of
+# the dimension line (8 mm right of the strap end), and the leader runs level
+# to that line, crossing nothing.
+_STRAP_THICK_TEXT_HALF_WIDTH = 0.015
+STRAP_THICK_TEXT_XY = (
+    SECTION_KEEP["StrapThick"][0] + 0.004 + _STRAP_THICK_TEXT_HALF_WIDTH,
+    SECTION_KEEP["StrapThick"][1],
+)
 # The native SECTION A-A / SCALE 2 : 1 caption's top centre, under the plate
 # width row.
 SECTION_CAPTION_XY = (SECTION_CENTER[0], SECTION_ROW_Y["PlateWidth"] - 0.012)
 # The overhang reference (rule 10): picked on the strap's cut edge at mid
 # thickness and on the plate's +x edge 7 mm ahead of its back, clear of the
-# plate-back and slot-bottom extension lines.  Its row 6 mm above the strap
-# back face; its value left of the plate edge's extension line (the 2.5 mm
-# span holds no text), as the arm width's sits.  The plate edge's extension
-# line rises past the strap foot and crosses only the slot bottom's
-# extension line (rule 14: conventional).
+# plate-back extension line.  Its row 6 mm above the strap back face; its
+# value left of the plate edge's extension line (the 2.5 mm span holds no
+# text), as the arm width's sits.  The plate edge's extension line rises past
+# the strap foot, where the plate reach's root extension line leaves the same
+# edge (rule 14: conventional).
 OVERHANG_PICK_Z = ((STRAP_Z[0] + STRAP_Z[1]) / 2.0, STRAP_Z[0] - 7.0)
 _OVERHANG_ROW_Y = _az(STRAP_Z[1]) + 0.006
 OVERHANG_TEXT_XY = (_ax(_HALF_PLATE) - 0.0085, _OVERHANG_ROW_Y + _VALUE_ABOVE_LINE)
@@ -566,22 +586,28 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
-    # Offset the slot width's text while it is still the bare banded value:
-    # its dimension line stays on its row, and the callout rows added next
-    # grow the parked block, not the span between the slot walls.
-    offset_dimension_text(adapter, annotations, {"SlotWidth": SLOT_WIDTH_TEXT_XY})
+    # Offset the slot width's and the strap stock's text while each is still
+    # the bare value: its dimension line stays put, and the callout rows added
+    # next grow the parked block, not the span between its extension lines.
+    offset_dimension_text(
+        adapter,
+        annotations,
+        {"SlotWidth": SLOT_WIDTH_TEXT_XY, "StrapThick": STRAP_THICK_TEXT_XY},
+    )
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    # The guide plates' thickness is the sheet stock's, printed as a reference
-    # (no band) over its SHEET STOCK callout row.
+    # The strap's and the guide plates' thickness is the sheet stock's, each
+    # printed as a reference (no band) over its SHEET STOCK callout row.
     references = [
-        item
+        (dimension_name(adapter, item), item)
         for item in annotations
         if dimension_name(adapter, item) in REFERENCE_DIMENSIONS
     ]
-    if len(references) != len(REFERENCE_DIMENSIONS):
-        raise RuntimeError("expected one native guide-plate stock thickness")
-    for item in references:
-        set_reference_dimension(adapter, item, label="guide-plate stock thickness")
+    if sorted(name for name, _ in references) != sorted(REFERENCE_DIMENSIONS):
+        raise RuntimeError(
+            f"expected one native stock thickness each: {sorted(REFERENCE_DIMENSIONS)}"
+        )
+    for name, item in references:
+        set_reference_dimension(adapter, item, label=f"{name} stock thickness")
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)

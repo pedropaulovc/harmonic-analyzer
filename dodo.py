@@ -3840,6 +3840,8 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # Supplier pose facts must stay independent of native replica recipes.
         SCRIPTS_DIR / "test_dt_vn_cone_pose_specs.py",
         SCRIPTS_DIR / "test_fit_bands.py",
+        # The shared single MAX/MIN limit setter's state and rejection paths.
+        SCRIPTS_DIR / "test_single_limit_tolerance.py",
         # Fixture pose, hook transform and conservative swept-wire clearance.
         SCRIPTS_DIR / "test_mg_fixture_installation.py",
         SCRIPTS_DIR / "test_printed_text_rulings.py",

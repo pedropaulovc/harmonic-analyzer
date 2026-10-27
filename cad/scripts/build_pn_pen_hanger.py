@@ -58,6 +58,7 @@ from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _holes import wizard_holes
+from _single_limit_tolerance import set_single_limit
 from pn_pen_hanger_spec import (
     DIMENSION_PREFIXES,
     DRAWING_BANDS,
@@ -78,6 +79,8 @@ from pn_pen_hanger_spec import (
     SLOT_BOTTOM,
     SLOT_BOTTOM_Z,
     SLOT_CORNER_R,
+    SLOT_CORNER_R_BAND,
+    SLOT_CORNER_R_TOL_TYPE,
     SLOT_DEPTH,
     SLOT_WIDTH,
     STRAP_BOT_X,
@@ -313,6 +316,15 @@ async def build(adapter) -> dict[str, str]:
             adapter, feature_name, dimension_name, *deviations(band)
         )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    # "2X R2.0 MAX": the modelled radius is the printed limit (rule 16).
+    set_single_limit(
+        adapter,
+        "UpperSlotCorner",
+        "SlotCornerR",
+        limit=SLOT_CORNER_R,
+        band=SLOT_CORNER_R_BAND,
+        tol_type=SLOT_CORNER_R_TOL_TYPE,
+    )
     for (feature_name, dimension_name), prefix in DIMENSION_PREFIXES.items():
         set_dimension_prefix(adapter, feature_name, dimension_name, prefix)
     clear_dimensions_for_drawing(adapter)
