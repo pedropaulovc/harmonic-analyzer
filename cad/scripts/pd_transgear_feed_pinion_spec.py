@@ -351,8 +351,10 @@ CUTTER_RUNOUT_TOL_TYPE = 6  # swTolType_e.swTolMAX
 CUTTER_RUNOUT_DEVIATIONS = (FULL_DEPTH_MIN - CUTTER_RUNOUT_MAX, 0.0)
 if round(CUTTER_RUNOUT_MAX, CUTTER_RUNOUT_PLACES) != CUTTER_RUNOUT_MAX:
     raise AssertionError("the run-out limit does not print at its places")
-FULL_DEPTH_PREFIX = "12T FULL DEPTH "
-CUTTER_RUNOUT_PREFIX = "CUTTER RUN-OUT "
+# The outside view's cutter-station witnesses run along the floor of the
+# gap that faces it (model 195°, a gap centre, seen from -X): the section
+# B-B plane passes through teeth, so neither station has an edge there.
+GAP_FLOOR_WITNESS_Y = -(ROOT_DIA_MIN / 2.0) * math.sin(math.pi / TEETH)
 # Numerical interval widths, not manufacturing tolerance or runout grades.
 ENDCUT_VOLUME_ERROR_MM3 = 0.02
 STEP_SEAT_AREA_ERROR_MM2 = 0.002
@@ -515,10 +517,15 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
 # --- Marked-dimension contract -------------------------------------------------
 # ``GearBlank`` is the tooth blank's extrude (its depth is the tooth length).
 # ``SleeveProfile`` is the Right-plane revolve of the boss, with
-# construction-only witnesses for the tooth tip, the root and the bore, so
-# every turned diameter prints beside its axial extent on the longitudinal
-# section (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 11 (turned parts read like the lathe)), and for the cutter's full-depth station, its
-# run-out limit (R9-67).  Lengths are baselined from the rear face.
+# construction-only witnesses for the tooth tip and the bore, so every turned
+# diameter prints beside its axial extent on the longitudinal section
+# (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 11 (turned parts read like the lathe)), and for the cutter's full-depth station and
+# its run-out limit (R9-67), which run along the facing gap's floor
+# (GAP_FLOOR_WITNESS_Y) and print on an outside view in the section's
+# direction.  Lengths are baselined from the rear face.
+# ``RootProfile`` is a construction circle on the Front plane (the rear face)
+# at the root's MIN: the root prints on the rear-face view, where the
+# full-depth gaps show their floors (the section cuts through teeth).
 # ``FlatProfile`` is the flat's cut sketch on the Right plane (the section
 # plane): the flat from the axis and its end wall from the rear face print on
 # the section, where the flat shows edge-on.
@@ -526,13 +533,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     "SleeveProfile": {
         "OutsideDia",
-        "RootDia",
         "BoreDia",
         "BossDia",
         "OverallLength",
         "FullDepth",
         "CutterRunout",
     },
+    "RootProfile": {"RootDia"},
     "FlatProfile": {"FlatToAxis", "FlatEnd"},
     "SpanProfile": {"ToothSpan"},
 }
@@ -541,13 +548,13 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": FACE_WIDTH_PLACES},
     "SleeveProfile": {
         "OutsideDia": 3,
-        "RootDia": ROOT_DIA_PLACES,
         "BoreDia": BORE_PLACES,
         "BossDia": BOSS_DIA_PLACES,
         "OverallLength": STATION_PLACES,
         "FullDepth": FULL_DEPTH_PLACES,
         "CutterRunout": CUTTER_RUNOUT_PLACES,
     },
+    "RootProfile": {"RootDia": ROOT_DIA_PLACES},
     "FlatProfile": {
         "FlatToAxis": FLAT_TO_AXIS_PLACES,
         "FlatEnd": STATION_PLACES,

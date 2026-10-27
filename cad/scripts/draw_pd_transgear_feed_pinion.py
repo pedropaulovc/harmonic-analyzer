@@ -1,16 +1,20 @@
 r"""Create the curated manufacturing drawing for the feed-pinion sleeve (MHA-PD-10).
 
-An end view, a longitudinal section B-B, a rear-face view and an isometric
-at 3:1 (the section takes B: A names the bore datum). The end view carries
-the genuine native two-tooth span, bore fit note, finish and datum A; the
-rear-face view carries the toothspace inspection callout on a full-depth
-flank; the section carries diameters beside their
-axial extent, the D-flat from the axis, the lengths baselined from the rear
-face (drawing-guidelines.md rule 11 (turned parts read like the lathe)) and the step face (the disc hub's seat) square to the bore, all
-imported natively from the part with the places and bands the part authored
-(``transgear_feed_pinion_spec``).  The oil hole is drilled through the seated
-hub at assembly, so the section carries only its one-line drill note; its
-station belongs to the hub's sheet.
+An end view, a longitudinal section B-B, a rear-face view, an outside view
+in the section's direction and an isometric at 3:1 (the section takes B: A
+names the bore datum). The end view carries the genuine native two-tooth
+span, bore fit note, finish and datum A; the rear-face view carries the
+toothspace inspection callout on a full-depth flank and the root's MIN
+across two gap floors; the outside view carries the cutter's full-depth
+station and run-out limit from the floor of the gap facing it; the section
+carries diameters beside their axial extent, the D-flat from the axis, the
+lengths baselined from the rear face (drawing-guidelines.md rule 11 (turned
+parts read like the lathe)) and the step face (the disc hub's seat) square to
+the bore, all imported natively from the part with the places, bands and
+callout text the part authored (``pd_transgear_feed_pinion_spec``,
+``pd_transgear_feed_pinion_callouts``).  The oil hole is drilled through the
+seated hub at assembly, so the section carries only its one-line drill note;
+its station belongs to the hub's sheet.
 """
 
 from __future__ import annotations
@@ -23,6 +27,7 @@ from typing import Any
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
+    dimension_name,
     place_view,
     view_name,
 )
@@ -39,7 +44,7 @@ from _drawing_common import (
 )
 from _drawing_annotation_extent import move_annotation
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import assert_imported_precision
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_feature_control_frame
 from _drawing_layout_collect import check_drawing_layout
@@ -50,24 +55,23 @@ from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _native_axis_datum import add_native_axis_datum
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+import pd_transgear_feed_pinion_callouts as callouts
 from paper_drive_stock_drawing import add_toothspace_callout, require_source_control
 from pd_transgear_disc_hub_spec import OIL_HOLE_DIA, OIL_HOLE_SLEEVE_Z
 from pd_transgear_feed_pinion_spec import (
     BORE_DATUM,
     BORE_DIA,
     BORE_FIT_CALLOUT,
-    BORE_PROCESS_CALLOUT,
     BOSS_DIA,
     DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
-    FLAT_END_STATION,
-    FLAT_TO_AXIS,
     GEOMETRIC_TOLERANCES_MM,
     HUB_NUMBER,
     OUTSIDE_DIA,
@@ -84,6 +88,7 @@ from pd_transgear_feed_pinion_spec import (
     TOOTH_SPACE_CALLOUT_PROPERTY,
 )
 
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_feed_pinion"]
 PART_STEM = SPEC.artifact_stem
@@ -140,56 +145,87 @@ def _side_x(z_mm: float) -> float:
     return RIGHT_CENTER[0] + (z_mm - OVERALL_LENGTH / 2.0) * VIEW_SCALE[0] / 1000.0
 
 
-# The end view is pictorial and carries its center mark, the bore fit note and
-# the bore finish.  On the section, the tip, root and boss diameters print
-# inline on the axis, between their own extension lines and off the part (the
-# crank hub's and the disc hub's layout): the tip and root left of the rear
-# face, where their witnesses start, the larger farther out so neither
-# extension line crosses the other's dimension line; the boss right of the
-# nose, beyond the flat.  The flat's distance from the axis prints between its
-# own extension lines just right of the nose, where its upper extension line
-# (the axis) stops short of the boss's text.  The bore keeps its shelf
-# above-left of the rear face, which holds its two-row band and process
-# callout clear of its own extension lines.  The lengths stay
-# baseline-stacked below from the rear face, shortest innermost, so no
-# extension line crosses an inner row.  The cutter's full-depth station and
-# run-out limit (R9-67) carry their names as model prefixes, too wide for
-# their spans, so their text stands left of the rear face, clear of every
-# station's extension line; the rows' 8 mm pitch keeps the section caption
-# over the title block.
-FRONT_KEEP: dict[str, tuple[float, float]] = {"ToothSpan": (FRONT_CENTER[0], 0.117)}
+# The end view is pictorial and carries its center mark, the bore fit note,
+# the bore finish and the two-tooth span (its rack mate under its limits).
+# On the section, the tip and boss diameters print inline on the axis,
+# between their own extension lines and off the part (the crank hub's and
+# the disc hub's layout): the tip left of the rear face, where its witness
+# starts; the boss right of the nose, beyond the flat.  Each prints its mate
+# under its value.  The flat's distance from the axis hangs below the
+# section right of the nose, its mate under it: the four rows are taller
+# than the flat's depth.  The bore keeps its shelf above-left of the rear
+# face, which holds its two-row band and process callout clear of its own
+# extension lines.  The lengths stay baseline-stacked below from the rear
+# face, shortest innermost, so no extension line crosses an inner row; the
+# tooth length's and the flat end's texts, wider than their spans with their
+# mates, stand left of the rear face, clear of every station's extension
+# line, and the overall's stands centred in its span.  The section plane
+# passes through teeth, where neither the root nor the cutter's stations
+# have an edge (2026-10-24 ENFORCE review): the root prints on the rear-face
+# view, where the full-depth gaps show their floors, and the cutter's
+# full-depth station and run-out limit (R9-67) on an outside view in the
+# section's direction, from the floor of the gap that faces it.
+FRONT_KEEP: dict[str, tuple[float, float]] = {"ToothSpan": (FRONT_CENTER[0], 0.112)}
 _SIDE_TOP = RIGHT_CENTER[1] + HALF_OD
 _SIDE_BOTTOM = RIGHT_CENTER[1] - HALF_OD
 _REAR_X = _side_x(0.0)
 _NOSE_X = _side_x(OVERALL_LENGTH)
-_ROW_PITCH = 0.008
-# The prefixed texts' centre left of the rear face: half the wider text's
-# printed width (test_transgear_feed_pinion_drawing) and an arrow's air.
-_CUTTER_TEXT_INSET = 0.040
-_FLAT_SHEET_DROP = FLAT_TO_AXIS * VIEW_SCALE[0] / 1000.0
+# Text left of the rear face ends this far short of its extension line.
+_LEFT_OF_REAR_AIR = 0.004
 
 
-def _row(index: int) -> float:
-    """Sheet y of the ``index``-th baseline row below the section."""
-    return _SIDE_BOTTOM - index * _ROW_PITCH - 0.002
+def _left_of(edge_x: float, width: float) -> float:
+    """Centre x of a text ``width`` wide that ends ``_LEFT_OF_REAR_AIR`` short
+    of ``edge_x``."""
+    return edge_x - _LEFT_OF_REAR_AIR - width / 2.0
 
 
+# Widths and heights of the stacked texts, as the drawing test estimates them
+# (3.5 mm caps, test_pd_transgear_feed_pinion_drawing): the rows are placed by
+# their text centres, each a 3 mm gap under the row above.
+_FACE_WIDTH_TEXT_WIDTH = 0.0575
+_FLAT_END_TEXT_WIDTH = 0.0549
 RIGHT_KEEP: dict[str, tuple[float, float]] = {
-    "RootDia": (_REAR_X - 0.030, RIGHT_CENTER[1]),
-    "OutsideDia": (_REAR_X - 0.0675, RIGHT_CENTER[1]),
+    "OutsideDia": (_REAR_X - 0.040, RIGHT_CENTER[1]),
     "BossDia": (_NOSE_X + 0.064, RIGHT_CENTER[1]),
-    "FlatToAxis": (_NOSE_X + 0.024, RIGHT_CENTER[1] - _FLAT_SHEET_DROP / 2.0),
+    "FlatToAxis": (_NOSE_X + 0.026, _SIDE_BOTTOM - 0.0079),
     "BoreDia": (_REAR_X - 0.010, _SIDE_TOP + 0.040),
-    "FullDepth": (_REAR_X - _CUTTER_TEXT_INSET, _row(1)),
-    # Nudged left of its span's centre, clear of the run-out's extension line.
-    "FaceWidth": ((_REAR_X + _side_x(FACE_WIDTH)) / 2.0 - 0.0015, _row(2)),
-    "CutterRunout": (_REAR_X - _CUTTER_TEXT_INSET, _row(3)),
-    "FlatEnd": ((_REAR_X + _side_x(FLAT_END_STATION)) / 2.0, _row(4)),
-    "OverallLength": (RIGHT_CENTER[0], _row(5)),
+    "FaceWidth": (_left_of(_REAR_X, _FACE_WIDTH_TEXT_WIDTH), _SIDE_BOTTOM - 0.0069),
+    "FlatEnd": (_left_of(_REAR_X, _FLAT_END_TEXT_WIDTH), _SIDE_BOTTOM - 0.0208),
+    "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0377),
 }
-DIMENSION_CALLOUTS = {
-    # The native value/limits define the bore; the callout adds the process.
-    "BoreDia": BORE_PROCESS_CALLOUT,
+
+# The outside view: the *Left view looks along +X, the section's direction of
+# sight, so it lays the rear face left like the section and imports the
+# section plane's (Right plane's) dimensions.  It stands lower right, above
+# the title block and below the boss's callout; its two cutter rows hang
+# below it with their texts left of its rear face, and its caption stands
+# left of it above them.  Tangent edges print in their phantom font, so the
+# straight pass's end, where the cutter's arc meets the floor tangentially,
+# shows on the floor the full-depth row rises from.
+LEFT_CENTER = (0.369, 0.112)
+LEFT_CAPTION = "OUTSIDE VIEW"
+TANGENT_EDGES_FONTED = 1  # swDisplayTangentEdges_e.swTangentEdgesVisibleAndFonted
+_LEFT_REAR_X = LEFT_CENTER[0] - OVERALL_LENGTH / 2.0 * VIEW_SCALE[0] / 1000.0
+_LEFT_BOTTOM = LEFT_CENTER[1] - HALF_OD
+_CUTTER_TEXT_WIDTH = 0.0366
+LEFT_KEEP: dict[str, tuple[float, float]] = {
+    "FullDepth": (_left_of(_LEFT_REAR_X, _CUTTER_TEXT_WIDTH), _LEFT_BOTTOM - 0.0067),
+    "CutterRunout": (_left_of(_LEFT_REAR_X, _CUTTER_TEXT_WIDTH), _LEFT_BOTTOM - 0.0206),
+}
+LEFT_CAPTION_XY = (_LEFT_REAR_X - _LEFT_OF_REAR_AIR - 0.032, LEFT_CENTER[1] + 0.001)
+
+# The rear-face view's root diameter reads along a gap bisector (the *Back
+# view mirrors model x; model gaps at 15° + k·30° print at 165° - k·30°), so
+# its arrows land on two gap floors; the text stands lower left, clear of the
+# view, under the notes and over its caption.
+_ROOT_TEXT_ANGLE = math.radians(195.0)
+_ROOT_TEXT_RADIUS = 0.040
+REAR_KEEP: dict[str, tuple[float, float]] = {
+    "RootDia": (
+        REAR_CENTER[0] + _ROOT_TEXT_RADIUS * math.cos(_ROOT_TEXT_ANGLE),
+        REAR_CENTER[1] + _ROOT_TEXT_RADIUS * math.sin(_ROOT_TEXT_ANGLE),
+    )
 }
 
 # The oil hole lies in the section plane (+Y), so the cut shows it as a gap in
@@ -206,10 +242,12 @@ NOTE_HEIGHT = 0.0025
 
 _BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
 # The finite-form data block uses the upper-left lane; the bore-fit note
-# remains within the air above the end view, preserving its leader.
+# remains within the air above the end view, preserving its leader.  It
+# stands 6 mm higher than at the 2026-10-24 review, whose crop showed its
+# last row's ")" struck by the 11 o'clock tooth.
 GEAR_DATA_XY = (0.016, 0.262)
 GEAR_DATA_CHAR_HEIGHT = 0.0025
-BORE_FIT_NOTE = (0.016, 0.193)
+BORE_FIT_NOTE = (0.016, 0.199)
 BORE_FIT_CHAR_HEIGHT = 0.0022
 # Separate radial-runout and relative-index controls share one source-linked
 # callout on the real finite tooth flank, not the OD. Its three rows use the
@@ -226,8 +264,8 @@ BORE_FIT_ATTACH = (
     FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(135.0)),
 )
 # The section's native caption, placed by its top centre, sits below the
-# stacked lengths.
-SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 6 * _ROW_PITCH)
+# stacked lengths, the overall's two-row callout the lowest.
+SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0500)
 # The finish stands lower LEFT of the end view: the section line's arrows and
 # their "B" labels point right, toward the section, and a lower-right leader
 # ran through the lower label (run 20261001T035353825Z layout audit).  It
@@ -365,6 +403,51 @@ def _place_rear_caption(adapter: Any, view: Any) -> None:
     _telemetry.info(f"rear view caption: outline {outline}, extent {extent}")
 
 
+def _show_tangent_edges_fonted(view: Any) -> None:
+    """Print the outside view's tangent edges in their phantom font, read back.
+
+    The straight pass ends where the cutter's arc meets the gap floor
+    tangentially: that edge is where the full-depth row's extension line
+    lands.
+    """
+    bound = _early_bound(view, "IView")
+    bound.SetDisplayTangentEdges2(TANGENT_EDGES_FONTED)
+    if int(bound.GetDisplayTangentEdges2()) != TANGENT_EDGES_FONTED:
+        raise RuntimeError("failed to show the outside view's tangent edges")
+    bound.UpdateViewDisplayGeometry()
+
+
+def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
+    """Every imported dimension prints the text lanes its part authored.
+
+    The mates, stacks and station names print nowhere else on the sheet, so
+    a lost lane must fail the drawing.  Read-only: text set from the sheet
+    would write through to the source part (#1942).
+    """
+    wanted = callouts.authored_by_name()
+    displays: dict[str, list[Any]] = {name: [] for name in wanted}
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name in displays:
+            displays[name].append(
+                _early_bound(
+                    _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+                    "IDisplayDimension",
+                )
+            )
+    counts = {name: len(found) for name, found in displays.items() if len(found) != 1}
+    if counts:
+        raise RuntimeError(f"authored dimensions not printed exactly once: {counts!r}")
+    wrong = {
+        (name, lane): text
+        for name, lanes in wanted.items()
+        for lane in lanes
+        if callouts.callout_rows(text := str(displays[name][0].GetText(lane) or ""))
+        != callouts.callout_rows(lanes[lane])
+    }
+    if wrong:
+        raise RuntimeError(f"imported dimension text differs from the part's: {wrong!r}")
+
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -430,33 +513,36 @@ async def build(adapter: Any) -> dict[str, str]:
     _position_section_caption(adapter, right, SECTION_CAPTION)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
     rear = place_view(adapter, str(SOURCE), "*Back", *REAR_CENTER, scale=VIEW_SCALE)
-    for view in (front, right, iso, rear):
+    outside = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=VIEW_SCALE)
+    for view in (front, right, iso, rear, outside):
         set_hidden_lines_removed(adapter, view)
+    _show_tangent_edges_fonted(outside)
     _place_rear_caption(adapter, rear)
+    if add_note(adapter, LEFT_CAPTION, *LEFT_CAPTION_XY) is None:
+        raise RuntimeError("the outside view caption was not inserted")
 
-    front_annotations = curate_view_dimensions(
-        adapter,
-        front,
-        keep=FRONT_KEEP,
-        view_label="front",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    right_annotations = curate_view_dimensions(
-        adapter,
-        right,
-        keep=RIGHT_KEEP,
-        view_label="longitudinal section",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    set_dimension_callouts(
-        adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
-    )
-    assert_imported_precision(
-        adapter, front_annotations + right_annotations, DRAWING_PRECISION_BY_NAME
-    )
+    annotations = []
+    # The section first: the outside view then imports only the cutter
+    # stations the section deleted (a model dimension prints in one view).
+    for view, keep, view_label in (
+        (front, FRONT_KEEP, "front"),
+        (right, RIGHT_KEEP, "longitudinal section"),
+        (outside, LEFT_KEEP, "outside"),
+        (rear, REAR_KEEP, "rear face"),
+    ):
+        annotations += curate_view_dimensions(
+            adapter,
+            view,
+            keep=keep,
+            view_label=view_label,
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        )
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    _assert_part_authored_text(adapter, annotations)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the sleeve bore")
     _create_section_axis_centerline(adapter, right, label="pinion sleeve axis")
+    _create_section_axis_centerline(adapter, outside, label="outside view axis")
 
     oil_note = add_leader_note(
         adapter,
