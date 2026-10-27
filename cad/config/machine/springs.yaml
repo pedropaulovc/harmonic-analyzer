@@ -289,9 +289,9 @@ springs:
           clamp_gap_mm: 4.88061
           arm_end_x_mm: -103.359695
           spring_eye_x_mm: -105.8
-          plug_length_mm: 9.9
-          plug_counterbore_dia_mm: 4.7
-          plug_counterbore_depth_mm: 2.57
+          plug_length_mm: 10.0
+          plug_counterbore_dia_mm: 4.9
+          plug_counterbore_depth_mm: 2.64
           plug_edge_break_mm: 0.25
         final_distance_mm:
           lower: 3.7864983418976494e-06
@@ -354,9 +354,9 @@ springs:
           clamp_gap_mm: 4.88061
           arm_end_x_mm: -103.359695
           spring_eye_x_mm: -105.8
-          plug_length_mm: 9.9
-          plug_counterbore_dia_mm: 4.7
-          plug_counterbore_depth_mm: 2.57
+          plug_length_mm: 10.0
+          plug_counterbore_dia_mm: 4.9
+          plug_counterbore_depth_mm: 2.64
           plug_edge_break_mm: 0.25
         final_distance_mm:
           lower: 3.7864959429115734e-06

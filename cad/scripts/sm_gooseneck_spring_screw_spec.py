@@ -40,10 +40,10 @@ geometry).
 
 The counter seats in ``cad/config/machine/springs.yaml`` were re-measured
 natively on this 17.50 screw (R0.5 under-head corner) and the counterbored
-9.90 plug by the one-off ``verify:spring_seats`` leaf, farm run
-20261027T090037071Z-f6fae47f673d41ddadbaee1c5f04e77a; the committed file is
+10.00 plug by the one-off ``verify:spring_seats`` leaf, farm run
+20261027T100720565Z-cb0857a90e9f487bb895a448958b24aa; the committed file is
 that leaf's output byte for byte (sha256
-3a718b80bac4c449299042edbf7e254573fd5128e430102a6b39358f57922d14).
+1f19b30783b86305ac4e687576b7bd349e2a57fa04a256121d753d6fba2cbdef).
 """
 
 from __future__ import annotations
