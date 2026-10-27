@@ -1377,7 +1377,12 @@ def test_steps_cite_every_screw_by_item_number() -> None:
 
 
 @pytest.fixture
-def native_bom_bindings(monkeypatch):
+def native_bom_bindings(monkeypatch, tmp_path):
+    # Fake COM owners must not resolve a live build's concurrently published
+    # source. Keep a saved, test-owned identity for the real occurrence proof.
+    source = tmp_path / drawing.SOURCE.name
+    source.touch()
+    monkeypatch.setattr(drawing, "SOURCE", source)
     monkeypatch.setattr(_com, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(
@@ -4369,6 +4374,48 @@ def _capture_leaf(reading, *, part_file, drawing_root="Draw54-SectionAssembly-1-
         component=_source_owner(wanted, part_file=part_file),
         identities=frozenset({wanted}), visible=True, path=wanted,
     )
+
+
+def test_capture_owner_proof_isolated_from_live_source_publication(
+    monkeypatch, tmp_path, request,
+) -> None:
+    live_source = tmp_path / "live-build" / drawing.SOURCE.name
+    live_source.parent.mkdir()
+    live_source.touch()
+    monkeypatch.setattr(drawing, "SOURCE", live_source)
+    package = request.getfixturevalue("native_property_package")
+    reading = next(r for r in drawing.capture_readings() if r.view_index == 2)
+    wanted = spec.instance_name(reading.stem, reading.index)
+    part_file = str(tmp_path / "stable-part.SLDPRT")
+    Path(part_file).touch()
+    leaf = _capture_leaf(reading, part_file=part_file)
+    owner = _source_owner(
+        f"{package.source_root.Name2}/{wanted}",
+        part_file=part_file, parent=package.source_root,
+    )
+    resolve = Path.resolve
+    live_reads = []
+
+    def publication_gap(path, *args, **kwargs):
+        resolved = resolve(path, *args, **kwargs)
+        if path == live_source:
+            live_reads.append(path)
+            if len(live_reads) == 1:
+                # Windows realpath retains this prefix if the source disappears
+                # between GetFinalPathName and its prefix-removal probe. The
+                # next resolve of the same (now missing) path has no prefix.
+                live_source.unlink()
+                return Path("//?/" + str(resolved).replace("\\", "/"))
+        return resolved
+
+    monkeypatch.setattr(Path, "resolve", publication_gap)
+    assert drawing._assert_capture_component_identity(
+        package.adapter, owner, leaf, view_index=2,
+        label="jig capture: hidden occurrence",
+    ) is owner
+    assert not live_reads
+    assert drawing.SOURCE != live_source
+    assert drawing.SOURCE.is_file()
 
 
 @pytest.mark.parametrize("view_index", (1, 2, 3))

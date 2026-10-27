@@ -266,6 +266,15 @@ bytes for private mutation fixtures. Keep each case's writable checkout, task
 state and invalidation checks isolated. Error-budget timings must retain the
 configured draws, seeds, reference cases and numerical acceptance checks.
 
+The oblique-jig drawing's fake native owners use a per-test, saved source path,
+not the real `cad/out/sldasm` source. Its occurrence proof deliberately retains
+real `Path.resolve()` comparisons. On Windows, a file disappearing between a
+resolver's native lookup and prefix-removal probe can leave `\\?\` on only one
+of two resolutions of the same input. A fixture reading live build outputs is
+therefore not isolated from concurrent artifact publication. The source-publication
+regression replays those two spellings and requires no access to the live source;
+the production occurrence-owner validation is unchanged.
+
 The startup-retry cases in `test_machinist_review.py` use a test-local MCP
 poll clock and a fixed number of pending responses. A proxy of only that test's
 `machinist_review.asyncio` binding arms a real startup `Timeout` when polling
