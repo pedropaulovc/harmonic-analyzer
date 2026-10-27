@@ -47,13 +47,16 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
-from _drawing_edges import face_silhouettes_through, visible_view_entities
+from _drawing_edges import (
+    face_silhouettes_through,
+    scan_view_edges,
+    visible_view_entities,
+)
 from _drawing_notes import add_property_linked_note, property_link
-from _drawing_projection import model_point_in_view, model_points_in_view
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _gtol_cone import ConeFace
-from _gtol_cylinder import CylinderFace
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
@@ -255,35 +258,38 @@ def _add_top_chamfer_dimension(
 ) -> Any:
     """Dimension the top-end OD break with a native chamfer dimension.
 
-    In the length view the 45-degree break is the cone face's silhouette and
-    its lead-in is the OD cylinder's silhouette, both on the +X flank (sheet
-    right). Each is resolved from its model face and a projected point on the
-    line it draws, then selected as an object, so no seat hit-test is involved.
-    Returns the settled check that re-proves the dimension after the final
-    rebuild.
+    In the length view the 45-degree break is the cone face's silhouette on
+    the +X flank (sheet right), resolved from its model face and a projected
+    point on the line it draws. Its lead-in, the +X OD flank, is a model edge,
+    not a silhouette: farm leaf 20261027T073053Z found no Ø25.4 cylinder
+    silhouette anywhere in the view (4 silhouettes, none on that face), so
+    the flank is resolved as the exact visible line through its model point.
+    Both are selected as objects, so no seat hit-test is involved. Returns
+    the settled check that re-proves the dimension after the final rebuild.
     """
     radius = OUTER_DIA / 2.0
-    chamfer_mid, od_mid = model_points_in_view(
+    chamfer_mid = model_point_in_view(
         adapter,
         view,
         (
-            (
-                (radius - TOP_END_CHAMFER / 2.0) / 1000.0,
-                (COLUMN_LENGTH - TOP_END_CHAMFER / 2.0) / 1000.0,
-                0.0,
-            ),
-            (radius / 1000.0, COLUMN_LENGTH / 2000.0, 0.0),
+            (radius - TOP_END_CHAMFER / 2.0) / 1000.0,
+            (COLUMN_LENGTH - TOP_END_CHAMFER / 2.0) / 1000.0,
+            0.0,
         ),
-        label="tube top chamfer and OD flank points",
+        label="tube top chamfer flank point",
     )
-    silhouettes = face_silhouettes_through(
+    chamfer = face_silhouettes_through(
         adapter,
         view,
-        {
-            "chamfer": (ConeFace(45.0), chamfer_mid),
-            "lead_in": (CylinderFace(OUTER_DIA), od_mid),
-        },
+        {"chamfer": (ConeFace(45.0), chamfer_mid)},
         label="tube top chamfer",
+    )["chamfer"]
+    lead_in = (
+        scan_view_edges(view, label="tube OD flank")
+        .exact_line_through(
+            (radius, COLUMN_LENGTH / 2.0, 0.0), label="tube +X OD flank"
+        )
+        .edge
     )
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
@@ -295,12 +301,11 @@ def _add_top_chamfer_dimension(
     data = manager.CreateSelectData()
     data.View = view
     # Chamfered edge first, then its lead-in (SOLIDWORKS chamfer-dimension order).
-    for append, key in ((False, "chamfer"), (True, "lead_in")):
-        silhouette = _sw_type_info.early_bound_or_flag(
-            silhouettes[key], "ISilhouetteEdge", "Select2"
-        )
-        if not bool(silhouette.Select2(append, data)):
-            raise RuntimeError(f"failed to select the tube top {key} silhouette")
+    chamfer = _sw_type_info.early_bound_or_flag(chamfer, "ISilhouetteEdge", "Select2")
+    if not bool(chamfer.Select2(False, data)):
+        raise RuntimeError("failed to select the tube top chamfer silhouette")
+    if not bool(_early_bound(lead_in, "IEntity").Select4(True, data)):
+        raise RuntimeError("failed to select the tube +X OD flank edge")
     selected = int(manager.GetSelectedObjectCount2(-1))
     if selected != 2:
         raise RuntimeError(
