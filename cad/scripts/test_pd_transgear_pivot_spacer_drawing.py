@@ -83,29 +83,30 @@ def test_the_bore_holds_a_light_press_on_the_shoulder_at_every_limit() -> None:
 
 def test_wall_holds_the_target_at_the_full_worst_case() -> None:
     """Rule 17 with every allowance the shop sees: the O.D. at its .X row's
-    low limit, the bore at its largest ream offset by the chucking's
-    eccentricity, and the title block's larger permitted break (radius or
-    chamfer) on both rims of an end face.  One chucking, so no run-off."""
+    low limit, the bore at its largest ream offset from the O.D. by half the
+    printed O.D. runout to A, and the title block's larger permitted break
+    (radius or chamfer) on both rims of an end face.  One chucking, so no
+    run-off."""
     row = _config.title_block("linear_1pl")["display"].lstrip("±")
     brk = _config.title_block("edge_break")
     setback = max(float(brk["radius_mm"]), float(brk["chamfer_max_mm"]))
     assert spec.OD_BAND == pytest.approx(float(row))
     assert spec.EDGE_BREAK == pytest.approx(setback)
-    # Four times the repo's per-setup 0.05 TIR, as a radial offset.
-    tir = float(_config.fit("crank_mesh", "tooth_cutting_runout_tir_mm"))
-    assert spec.BORE_ECCENTRICITY == pytest.approx(4.0 * tir / 2.0)
+    # Runout's full indicator movement is twice the axes' offset.
+    assert spec.OD_RUNOUT == pytest.approx(0.4)
+    assert spec.BORE_ECCENTRICITY == pytest.approx(spec.OD_RUNOUT / 2.0)
     worst = (
         (spec.OD - float(row) - spec.BORE_DIA_MAX) / 2.0
-        - spec.BORE_ECCENTRICITY
+        - spec.OD_RUNOUT / 2.0
         - 2.0 * setback
     )
-    assert spec.WALL_WORST == pytest.approx(worst)
+    assert spec.WALL_WORST == pytest.approx(worst) == pytest.approx(2.0325)
     assert spec.WALL_WORST >= spec.WALL_TARGET == 2.0
 
 
 def test_a_larger_permitted_radius_break_charges_the_wall(monkeypatch) -> None:
     """The wall charges whichever permitted break sets back further: an R0.4
-    break with the 0.25 chamfer kept leaves 2.132 - 2 x 0.15 < 2.0, so the
+    break with the 0.25 chamfer kept leaves 2.0325 - 2 x 0.15 < 2.0, so the
     spec refuses rather than missing the radius."""
     import importlib
 
@@ -117,7 +118,7 @@ def test_a_larger_permitted_radius_break_charges_the_wall(monkeypatch) -> None:
 
     monkeypatch.setattr(_config, "title_block", title_block)
     try:
-        with pytest.raises(AssertionError, match=r"MHA-PD-20 wall 1\.832 < the 2\.0"):
+        with pytest.raises(AssertionError, match=r"MHA-PD-20 wall 1\.732 < the 2\.0"):
             importlib.reload(spec)
     finally:
         monkeypatch.undo()
@@ -180,6 +181,7 @@ def test_both_end_faces_hold_square_to_the_bore_datum() -> None:
     assert spec.GEOMETRIC_TOLERANCES_MM == {
         "rear face perpendicularity to bore": "0.01",
         "front face perpendicularity to bore": "0.01",
+        "o.d. circular runout to bore": "0.4",
     }
     assert spec.REAR_FACE_PERPENDICULARITY == pytest.approx(0.01)
     assert spec.FRONT_FACE_PERPENDICULARITY == pytest.approx(0.01)
@@ -310,7 +312,7 @@ def _bore_text_box() -> Box:
 
 
 def test_both_frames_stand_inside_the_sheet_clear_of_every_annotation() -> None:
-    """Both frames and their leaders keep 2 mm of air from every other
+    """All three frames and their leaders keep 2 mm of air from every other
     annotation's box and line on the sheet (the dimensions' text and
     extension lines, both finishes, the notes, the axis centreline and both
     views) and from each other, and stand inside the inner border, off the
@@ -360,6 +362,16 @@ def test_both_frames_stand_inside_the_sheet_clear_of_every_annotation() -> None:
         symbols[f"{mark.key} frame leader"] = Box(
             min(near_x, landing_x), landing_y, max(near_x, landing_x), landing_y
         )
+    # The O.D.'s runout frame above the profile, its leader down to the upper
+    # O.D. line (the leader leaves the frame's left side at mid-height).
+    rx, ry = drawing.OD_RUNOUT_FRAME
+    runout = Box(rx, ry - drawing.FRAME_HEIGHT, rx + drawing.FRAME_WIDTH, ry)
+    landing_x = drawing._profile_x(drawing.OD_RUNOUT_LANDING_Z_MM)
+    assert rear_x < landing_x < front_x
+    symbols["runout frame"] = runout
+    symbols["runout frame leader"] = Box(
+        min(rx, landing_x), top, max(rx, landing_x), ry - drawing.FRAME_HEIGHT / 2.0
+    )
     for name, box in symbols.items():
         for other, obstacle in obstacles.items():
             if name.endswith("leader") and other == "profile":
@@ -379,11 +391,13 @@ def test_both_frames_stand_inside_the_sheet_clear_of_every_annotation() -> None:
         template.width_m,
         template.title_block_top_m,
     )
-    for mark in _FRAMES:
-        box = _frame_box(mark)
-        assert left <= box.xmin and box.xmax <= right, mark.key
-        assert bottom_edge <= box.ymin and box.ymax <= top_edge, mark.key
-        assert box.gap(title_block) >= _AIR, mark.key
+    for key, box in (
+        *((mark.key, _frame_box(mark)) for mark in _FRAMES),
+        ("runout", runout),
+    ):
+        assert left <= box.xmin and box.xmax <= right, key
+        assert bottom_edge <= box.ymin and box.ymax <= top_edge, key
+        assert box.gap(title_block) >= _AIR, key
 
 
 def _circle(radius: float, z: float, *, axis_z: float = 1.0):

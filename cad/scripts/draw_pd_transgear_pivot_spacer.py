@@ -55,6 +55,8 @@ from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
+from _gtol_cylinder import CylinderFace
+from _gtol_face_resolve import resolve_faces
 from _gtol_face_read import face_geometry
 from _gtol_planar import PlanarFace
 from _layout_geometry import audit_sheet, format_findings
@@ -206,6 +208,15 @@ FRAME_HEIGHT = 0.00703
 FRAME_WIDTH = 0.02675
 # Sheet run from a frame to its face's line.
 FRAME_RUN = 0.008
+# The O.D.'s circular runout to A (coordinator ruling, #2014: it bounds the
+# offset the wall charges) lands on the profile's upper O.D. line at z 0.7 L,
+# its frame above the profile: right of the rear face's BEARING FACE symbol,
+# left of the O.D.'s dimension line, over its upper extension line.
+OD_RUNOUT_LANDING_Z_MM = 0.7 * LENGTH
+OD_RUNOUT_FRAME = (_PROFILE_REAR_X + 0.0125, _PROFILE_TOP + 0.020)
+OD_RUNOUT_LABEL = "spacer O.D. circular runout to bore"
+# A projected landing may sit this far from its laid-out point.
+_LANDING_TOL_M = 0.0005
 _SPACER_AXIS = (0.0, 0.0, 1.0)
 # A rim matches within this of its modelled centre and radius, its axis
 # along the spacer's.
@@ -378,6 +389,30 @@ def _face_attachment(
         f"({expected[0]:.5f}, {expected[1]:.5f})"
     )
     return face, landing
+
+
+def _od_runout_landing(adapter: Any, view: Any) -> tuple[float, float]:
+    """The O.D.'s upper line on the profile at OD_RUNOUT_LANDING_Z_MM: of the
+    O.D.'s two silhouette points at that station (model -X and +X), the one
+    the view draws higher, proved to lie on the laid-out upper line."""
+    r_m, z_m = OD / 2000.0, OD_RUNOUT_LANDING_Z_MM / 1000.0
+    landing = max(
+        model_points_in_view(
+            adapter,
+            view,
+            ((-r_m, 0.0, z_m), (r_m, 0.0, z_m)),
+            label="spacer O.D. runout landing",
+            names=("-X line", "+X line"),
+        ),
+        key=lambda point: point[1],
+    )
+    expected = (_profile_x(OD_RUNOUT_LANDING_Z_MM), _PROFILE_TOP)
+    if math.dist(landing, expected) > _LANDING_TOL_M:
+        raise RuntimeError(
+            f"spacer O.D. runout landing {landing!r} is off the laid-out upper "
+            f"O.D. line at {expected!r}"
+        )
+    return landing
 
 
 def _move_dimension(
@@ -727,6 +762,23 @@ async def build(adapter: Any) -> dict[str, str]:
             datums=(BORE_DATUM,),
             label=mark.label,
         )
+    # The O.D. runs true to A.
+    od_face = resolve_faces(
+        _early_bound(_early_bound(profile, "IView").ReferencedDocument, "IModelDoc2"),
+        {"od": CylinderFace(OD, contains_z_mm=LENGTH / 2.0)},
+    )["od"]
+    add_feature_control_frame(
+        adapter,
+        profile,
+        entity=od_face,
+        entity_type="FACE",
+        leader_attach_xy=_od_runout_landing(adapter, profile),
+        frame_xy=OD_RUNOUT_FRAME,
+        characteristic="circular_runout",
+        tolerance=GEOMETRIC_TOLERANCES_MM["o.d. circular runout to bore"],
+        datums=(BORE_DATUM,),
+        label=OD_RUNOUT_LABEL,
+    )
     # Re-assert the display mode now the last annotation has landed: an
     # annotation attached after placement can leave a view's edge set
     # unregenerated, and only a real mode change rebuilds it.
