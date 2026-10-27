@@ -84,9 +84,7 @@ from ch_connecting_rod_spec import (
     FORK_THICKNESS,
     FORK_TOP_Y,
     FORK_WIDTH,
-    INSIDE_CORNER_BAND,
     INSIDE_CORNER_R,
-    INSIDE_CORNER_TOL_TYPE,
     PIN_HOLE_BAND,
     PIN_HOLE_DIA,
     RING_BORE_DIA,
@@ -210,35 +208,6 @@ def finished_volume() -> float:
         - strap_bore_volume()
         - pin_hole_volume()
     )
-
-
-def _inside_corner_max_limit(adapter) -> None:
-    """InsideCornerR as a MAX single limit carrying the band's deviations
-    (build_pn_pen_rod._shoulder_fillet_max_limit's recipe)."""
-    lower, upper = deviations(INSIDE_CORNER_BAND)
-    _, dimension = _named_dimension(adapter, "InsideCorners", "InsideCornerR")
-    label = "InsideCornerR@InsideCorners"
-    value = float(dimension.SystemValue)
-    if not math.isclose(value, INSIDE_CORNER_R / 1000.0, abs_tol=1e-9):
-        raise RuntimeError(
-            f"{label}: nominal {value * 1000.0:.7f} is not the band's max "
-            f"{INSIDE_CORNER_R}"
-        )
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = INSIDE_CORNER_TOL_TYPE
-    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
-        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
-    if (
-        int(tolerance.Type) != INSIDE_CORNER_TOL_TYPE
-        or not math.isclose(
-            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
-        )
-        or not math.isclose(
-            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
-        )
-    ):
-        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
-    _telemetry.success(f"{label}: single limit {INSIDE_CORNER_R:g} MAX")
 
 
 def tolerance_at_dimension_places(
@@ -599,13 +568,11 @@ async def build(adapter) -> dict[str, str]:
     v_expected -= slot_volume()
     await volume_check(adapter, "fork slot", v_expected, 0.01 * slot_volume() + 0.05)
 
-    # Every inside corner gets the one radius, printed R MAX
-    # (drawing-guidelines.md rule 16; ch_connecting_rod_spec). The FIRST edge
-    # is the shank's +X flank onto the ring: an imported fillet dimension
-    # attaches to its feature's first edge (build_pn_pen_hanger), and the
-    # front view carries the radius off that corner. Then the -X flank onto
-    # the ring, the root step's loop round the shank's end (the flanks'
-    # corners, then the plate faces'), and the slot floor's two corners.
+    # Every inside corner gets the one modelled radius, inside the title
+    # block's INSIDE CORNERS R1.0 MAX, which governs it on the print
+    # (ch_connecting_rod_spec): the shank's two flanks onto the ring, the
+    # root step's loop round the shank's end (the flanks' corners, then the
+    # plate faces'), and the slot floor's two corners.
     shank_x = SHANK_WIDTH / 2.0
     junction_y = math.sqrt(RING_OUTER_RADIUS**2 - shank_x**2)
     plate_z = SHANK_THICKNESS / 2.0
@@ -737,7 +704,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, "ForkSlotProfile", "RingFaceNear", face_upper
     )
     set_dimension_symmetric_tolerance(adapter, "Plate", "RingThick", thick_upper)
-    _inside_corner_max_limit(adapter)
     # The reamed press hole's band rides natively on its diameter, which the
     # front view imports at three places (DRAWING_PRECISION); its band prints
     # at the same three places (+0.010/0.000), not the fewest that hold it.
