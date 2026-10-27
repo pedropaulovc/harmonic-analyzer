@@ -1,22 +1,28 @@
 """Supplier nominal dimension diagrams beside the installed 9714K392 envelope.
 
-The sheet prints only replacement sizes: ID, OD, free height and thickness.
-The part keeps its catalogue load-point gauge sketch (compressed height and
-deflection at 1.5 lb), which is rating data rather than a replacement size;
-the 0.95 mm set gap governs the installed preload.
+The sheet prints only replacement sizes: ID, OD and free height. The strip
+thickness is not one: SKU 9714K392 defines it, and its 0.127 mm strip
+printed as a doubled hairline through the FRONT envelope (machinist review of
+4e46b502). The part keeps its strip and catalogue load-point gauge sketches
+(compressed height and deflection at 1.5 lb), which this sheet neither
+shows nor dimensions; the 0.95 mm set gap governs the installed preload.
 
-At 2:1 these diagrams are smaller than their text. The shared disc placement
-centres each value on its own line, so machinist review of b344192 found the
-thickness and free height struck by their witnesses and dimension lines, and
-the two plan diameters crossing at the centre with their text on the OD rim.
-``place_size_texts`` keeps every native dimension, value and station, and
+The shared disc diagram shows and dimensions all four sizes, so this sheet
+shows only the envelope and plan sketches (``SHEET_FEATURES``) and imports
+their three dimensions itself, under the same supplier-reference contract.
+The diagrams are construction geometry, drawn solid and thick for this
+SLDDRW (the music wire's ``_construction_curves_as_outline``): the default
+construction font printed them as grey dash-gap lines.
+
+At 2:1 the diagrams are smaller than their text, so ``place_size_texts``
 moves only presentation, each text by one native position write at a fixed
 place computed from the spec sizes, the view scale and the diagram centre
-(``size_text_positions``): the heights take native offset text shelved beyond
-their own lines (the R48 washer pattern), and the diameters take one
-near-side arrow with their text clear of the OD rim and 2 mm
-(``ARROW_TEXT_CLEARANCE_M``) beyond the outer reach of their own arrowhead.
-The shared finaliser's checks and the layout audit judge the settled sheet.
+(``size_text_positions``): the free height takes native offset text
+shelved beyond its own lines (the R48 washer pattern) at a station 10 mm off
+the envelope, and the diameters take one near-side arrow with their text
+clear of the OD rim and 2 mm (``ARROW_TEXT_CLEARANCE_M``) beyond the outer
+reach of their own arrowhead. The shared finaliser's checks and the layout
+audit judge the settled sheet.
 """
 
 from __future__ import annotations
@@ -24,6 +30,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Callable, Mapping
 from functools import partial
+import math
 from types import SimpleNamespace
 import sys
 from typing import Any
@@ -31,24 +38,28 @@ from typing import Any
 import _telemetry
 from _com import _early_bound
 from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
+from _drawing_hidden_sketches import _show_hidden_owners, curate_view_dimensions
 from _drawing_leaders import set_near_side_diameter
 from _layout_geometry import ARROW_TEXT_CLEARANCE_M
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
-from _supplier_disc_spring_drawing import (
-    prepare_supplier_disc_diagram,
-    supplier_disc_reference_features,
-    supplier_disc_spring_dimensions,
+from _supplier_dimensions import (
+    assert_supplier_reference_dimension,
+    supplier_reference_dimension,
 )
 from _supplier_spring_drawing import (
+    assert_supplier_configuration_value,
     build_supplier_spring_drawing,
     reacquire_supplier_dimensions,
 )
 from _supplier_spring_reference import SUPPLIER_DIAGRAM_CONFIGURATION
+from _supplier_wire_stock_drawing import _construction_curves_as_outline
 import dt_vn_cylinder_bank_spring_spec as supplier_spec
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from vn_disc_spring_supplier_stock import (
     SUPPLIER_DIMENSION_NAMES,
     SUPPLIER_DIMENSIONS_BY_FEATURE,
+    supplier_diagram_extents,
 )
 
 
@@ -61,24 +72,35 @@ SHEET_SPEC = SimpleNamespace(
 )
 ID_NAME = SUPPLIER_DIMENSION_NAMES["ID"]
 OD_NAME = SUPPLIER_DIMENSION_NAMES["OD"]
-THICKNESS_NAME = SUPPLIER_DIMENSION_NAMES["THICKNESS"]
 FREE_HEIGHT_NAME = SUPPLIER_DIMENSION_NAMES["FREE_HEIGHT"]
-# Each size keeps the side of its diagram the shared placement gave it:
-# -1 left, +1 right.
-TEXT_SIDES = {
-    "free_front": {THICKNESS_NAME: -1, FREE_HEIGHT_NAME: 1},
-    "free_top": {ID_NAME: -1, OD_NAME: 1},
+# The diagram sketches this sheet shows: the OD x free-height envelope and
+# the ID/OD plan. Not the strip (``DiscSupplierStrip``).
+SHEET_FEATURES = {
+    "free_front": ("DiscSupplierHeight",),
+    "free_top": ("DiscSupplierPlan",),
 }
+# The printed sizes, by view: (spec field, side of the diagram, -1 left).
+PRINTED = {
+    "free_front": {"FREE_HEIGHT": 1},
+    "free_top": {"ID": -1, "OD": 1},
+}
+TEXT_SIDES = {
+    key: {SUPPLIER_DIMENSION_NAMES[field]: side for field, side in sizes.items()}
+    for key, sizes in PRINTED.items()
+}
+# The free height's dimension line, this far off the envelope; the
+# diameters import this far off the plan, where the shared disc placement
+# imported them, before their style and text move.
+HEIGHT_STATION_M = 0.010
+DIAMETER_IMPORT_M = 0.018
 # Native geometry of this sheet's size dimensions, identical on runs
 # fa43a1a5 (ec339f3d) and ae121732 (d179e35b):
-# the shared disc placement's height station, 18 mm beyond the diagram;
-HEIGHT_STATION_M = 0.018
-# the witnesses run 1 mm past that station, away from the diagram;
+# the witnesses run 1 mm past the station, away from the diagram;
 WITNESS_OVERSHOOT_M = 0.001
 # every arrowhead is 3.556 mm long and 0.762 mm wide (GetArrowHeadAtIndex2);
 ARROW_LENGTH_M = 0.003556
 ARROW_WIDTH_M = 0.000762
-# cap height, and the printed width of "(0.005 in)" / "(0.050 in)" and of
+# cap height, and the printed width of "(0.050 in)" and of
 # "(Ø0.385 ±0.010 in)" / "(Ø0.500 ±0.010 in)" (their runs' native widths).
 TEXT_HEIGHT_M = 0.0035
 HEIGHT_TEXT_WIDTH_M = 0.0227354
@@ -115,6 +137,15 @@ def arrow_reach(rim: float) -> float:
     return rim + ARROW_LENGTH_M + ARROW_WIDTH_M / 2.0
 
 
+def height_station(
+    bounds: tuple[float, float, float, float], scale: float, side: int
+) -> tuple[float, float]:
+    """The free height's dimension-line station: ``HEIGHT_STATION_M`` off
+    the OD-wide envelope, at its centre height."""
+    cx, cy = _centre(bounds)
+    return cx + side * (supplier_spec.OD / 2000.0 * scale + HEIGHT_STATION_M), cy
+
+
 def size_text_positions(
     bounds: Mapping[str, tuple[float, float, float, float]],
     scales: Mapping[str, float],
@@ -122,10 +153,8 @@ def size_text_positions(
     """Each size text's native position (its centre), from the spec sizes,
     the view scale and each diagram's native centre (``bounds``)."""
     positions = {}
-    cx, cy = _centre(bounds["free_front"])
-    half_od = supplier_spec.OD / 2000.0 * scales["free_front"]
     for name, side in TEXT_SIDES["free_front"].items():
-        station = cx + side * (half_od + HEIGHT_STATION_M)
+        station, cy = height_station(bounds["free_front"], scales["free_front"], side)
         near = station + side * height_text_gap()
         positions[name] = (near + side * HEIGHT_TEXT_WIDTH_M / 2.0, cy)
     cx, cy = _centre(bounds["free_top"])
@@ -135,21 +164,63 @@ def size_text_positions(
     return positions
 
 
+def prepare_diagrams(
+    adapter: Any,
+    views: Mapping[str, Any],
+    *,
+    reference_bounds: Callable[[str], tuple[float, float, float, float]],
+) -> tuple[Callable[[], None], ...]:
+    """Solid construction curves; show only ``SHEET_FEATURES`` before the fit.
+
+    The shared disc preparation's contract for the sketches this sheet
+    shows: each saved hidden, and each view's ink exactly the nominal
+    diagram (the strip lies inside the envelope, so the extents are the
+    shared ones).
+    """
+    _construction_curves_as_outline(adapter)
+    for key, owners in SHEET_FEATURES.items():
+        shown = _show_hidden_owners(
+            adapter, views[key], owners, view_label=f"{supplier_spec.SKU} nominal {key}"
+        )
+        if set(shown) != set(owners):
+            raise RuntimeError(
+                f"{supplier_spec.SKU} {key}: diagram owners are not saved hidden"
+            )
+    expected_extents = supplier_diagram_extents(SHEET_SPEC)
+
+    def check_rebuilt_diagram_extents() -> None:
+        for key in SHEET_FEATURES:
+            x0, y0, x1, y1 = reference_bounds(key)
+            if not all(
+                math.isclose(actual, expected / 1000.0, rel_tol=0.0, abs_tol=1e-7)
+                for actual, expected in zip(
+                    (x1 - x0, y1 - y0), expected_extents[key], strict=True
+                )
+            ):
+                raise RuntimeError(
+                    f"{supplier_spec.SKU} {key}: native diagram ink differs from "
+                    f"nominal {expected_extents[key]} mm"
+                )
+
+    return (check_rebuilt_diagram_extents,)
+
+
+def _owners(names: Mapping[str, Any]) -> dict[str, str]:
+    return {
+        name: next(
+            feature
+            for feature, owned in SUPPLIER_DIMENSIONS_BY_FEATURE.items()
+            if name in owned
+        )
+        for name in names
+    }
+
+
 def _size_displays(adapter: Any, views: Mapping[str, Any]) -> dict[str, Any]:
     return reacquire_supplier_dimensions(
         adapter,
         {key: views[key] for key in TEXT_SIDES},
-        expected={
-            key: {
-                name: next(
-                    feature
-                    for feature, names in SUPPLIER_DIMENSIONS_BY_FEATURE.items()
-                    if name in names
-                )
-                for name in sides
-            }
-            for key, sides in TEXT_SIDES.items()
-        },
+        expected={key: _owners(sides) for key, sides in TEXT_SIDES.items()},
         configurations={key: SUPPLIER_DIAGRAM_CONFIGURATION for key in TEXT_SIDES},
     )
 
@@ -168,11 +239,11 @@ def place_size_texts(
     *,
     reference_bounds: Callable[[str], tuple[float, float, float, float]],
 ) -> None:
-    """Move the four size texts off their lines, one position write each.
+    """Move the three size texts off their lines, one position write each.
 
-    The heights' annotation still sits at its shared station, which offset
+    The free height's annotation still sits at its station, which offset
     mode keeps as the dimension line's; the write then moves only the text.
-    The shared finaliser's rebuild settles all four.
+    The shared finaliser's rebuild settles all three.
     """
     displays = _size_displays(adapter, views)
     positions = size_text_positions(
@@ -200,6 +271,76 @@ def place_size_texts(
     )
 
 
+def _import_sizes(
+    adapter: Any,
+    views: Mapping[str, Any],
+    stations: Mapping[str, tuple[float, float]],
+) -> list[tuple[str, str, dict[str, Any], str]]:
+    """The printed sizes as native supplier reference dimensions, each at
+    its station: (view key, name, reference contract, spec field)."""
+    references = []
+    for key, sizes in PRINTED.items():
+        fields = {SUPPLIER_DIMENSION_NAMES[field]: field for field in sizes}
+        imported = curate_view_dimensions(
+            adapter,
+            views[key],
+            keep={name: stations[name] for name in fields},
+            view_label=f"{supplier_spec.SKU} supplier {key}",
+            dimensions_by_feature=SUPPLIER_DIMENSIONS_BY_FEATURE,
+        )
+        configuration = str(views[key].ReferencedConfiguration)
+        if configuration != SUPPLIER_DIAGRAM_CONFIGURATION:
+            raise RuntimeError(
+                f"{supplier_spec.SKU} {key}: nominal diagram uses wrong configuration"
+            )
+        for annotation in imported:
+            name = dimension_name(adapter, annotation)
+            field = fields[name]
+            arguments = {
+                "label": f"{supplier_spec.SKU} supplier {field.lower()}",
+                "expected_mm": float(getattr(supplier_spec, field)),
+                "units": supplier_spec.SUPPLIER_DRAWING_UNITS,
+                "configuration": configuration,
+                "precision": supplier_spec.SUPPLIER_DRAWING_PRECISION[field],
+                "presentation": "diameter" if field in ("ID", "OD") else "length",
+            }
+            supplier_reference_dimension(
+                adapter,
+                _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension"),
+                **arguments,
+            )
+            references.append((key, name, arguments, field))
+    return references
+
+
+def _assert_source_band(display: Any, field: str) -> None:
+    """The source tolerance band the shared disc check reads: ID/OD carry
+    the catalogue's symmetric band at three places, free height none."""
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    band = getattr(supplier_spec, f"{field}_BAND", None)
+    if band is None:
+        if int(tolerance.Type) != 0:
+            raise RuntimeError(
+                f"{supplier_spec.SKU} {field}: unprovided source band appeared"
+            )
+        return
+    upper, lower = band
+    expected_type = 4 if math.isclose(upper, -lower, abs_tol=1e-12) else 2
+    if int(tolerance.Type) != expected_type or not all(
+        math.isclose(actual, value / 1000.0, rel_tol=0.0, abs_tol=1e-9)
+        for actual, value in (
+            (float(tolerance.GetMinValue()), lower),
+            (float(tolerance.GetMaxValue()), upper),
+        )
+    ):
+        raise RuntimeError(f"{supplier_spec.SKU} {field}: native source band changed")
+    if int(display.GetPrimaryTolPrecision2()) != 3:
+        raise RuntimeError(
+            f"{supplier_spec.SKU} {field}: source band needs three places"
+        )
+
+
 def supplier_dimensions(
     adapter: Any,
     views: Mapping[str, Any],
@@ -207,14 +348,42 @@ def supplier_dimensions(
     reference_bounds: Callable[[str], tuple[float, float, float, float]],
     settled_checks: list[Callable[[], None]],
 ) -> None:
-    supplier_disc_spring_dimensions(
-        adapter,
-        views,
-        spec=SHEET_SPEC,
-        reference_bounds=reference_bounds,
-        settled_checks=settled_checks,
-    )
+    """Import the printed sizes, place their texts, and register the shared
+    disc diagram's settled reference check for them, over the whole sheet:
+    the installed view carries no dimension."""
+    bounds = {key: reference_bounds(key) for key in PRINTED}
+    x0, y0, x1, y1 = bounds["free_top"]
+    cy = (y0 + y1) / 2.0
+    stations = {
+        FREE_HEIGHT_NAME: height_station(
+            bounds["free_front"], _view_scale(views["free_front"]), 1
+        ),
+        ID_NAME: (x0 - DIAMETER_IMPORT_M, cy),
+        OD_NAME: (x1 + DIAMETER_IMPORT_M, cy),
+    }
+    references = _import_sizes(adapter, views, stations)
+    configurations = {
+        key: str(view.ReferencedConfiguration) for key, view in views.items()
+    }
+    expected = {key: _owners(TEXT_SIDES.get(key, {})) for key in views}
     place_size_texts(adapter, views, reference_bounds=reference_bounds)
+
+    def check_settled_references() -> None:
+        displays = reacquire_supplier_dimensions(
+            adapter, views, expected=expected, configurations=configurations
+        )
+        for _key, name, arguments, field in references:
+            display = displays[name]
+            assert_supplier_reference_dimension(adapter, display, **arguments)
+            assert_supplier_configuration_value(
+                display,
+                arguments["configuration"],
+                arguments["expected_mm"],
+                label=name,
+            )
+            _assert_source_band(display, field)
+
+    settled_checks.append(check_settled_references)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -222,8 +391,8 @@ async def build(adapter: Any) -> dict[str, str]:
     return await build_supplier_spring_drawing(
         adapter, SPEC, item=ITEM,
         stock_configuration=SUPPLIER_DIAGRAM_CONFIGURATION,
-        prepare_views=partial(prepare_supplier_disc_diagram, spec=SHEET_SPEC),
-        supplier_reference_features=supplier_disc_reference_features(SHEET_SPEC),
+        prepare_views=prepare_diagrams,
+        supplier_reference_features=SHEET_FEATURES,
         include_right=False,
         stock_caption="SUPPLIER NOMINAL DIMENSION DIAGRAM — NOT PART SHAPE",
         supplier_margins={

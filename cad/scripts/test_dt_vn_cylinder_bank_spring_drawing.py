@@ -202,15 +202,25 @@ def test_purchased_sheet_documents_the_built_part() -> None:
 
 
 def test_sheet_prints_only_replacement_sizes_while_the_part_keeps_its_gauges() -> None:
+    """ID, OD and free height; not the strip thickness the SKU defines
+    (machinist 4e46b502), nor the load-point gauges the part keeps."""
     import draw_dt_vn_cylinder_bank_spring as drawing
-    from _supplier_disc_spring_drawing import supplier_disc_reference_features
+    from vn_disc_spring_supplier_stock import SUPPLIER_DIMENSIONS_BY_FEATURE
 
     assert spec.SUPPLIER_APPLICATION_DIMENSIONS == ("WORKING_HEIGHT", "WORKING_DEFLECTION")
     assert drawing.SHEET_SPEC.SUPPLIER_APPLICATION_DIMENSIONS == ()
-    assert supplier_disc_reference_features(drawing.SHEET_SPEC) == {
-        "free_front": ("DiscSupplierHeight", "DiscSupplierStrip"),
+    assert drawing.SHEET_FEATURES == {
+        "free_front": ("DiscSupplierHeight",),
         "free_top": ("DiscSupplierPlan",),
     }
+    assert {field for sizes in drawing.PRINTED.values() for field in sizes} == {
+        "ID",
+        "OD",
+        "FREE_HEIGHT",
+    }
+    # The part keeps its strip; the sheet neither shows nor dimensions it.
+    assert SUPPLIER_DIMENSIONS_BY_FEATURE["DiscSupplierStrip"] == ("SupplierThickness",)
+    assert spec.THICKNESS == pytest.approx(0.005 * IN)
     assert drawing.SHEET_SPEC.ID_BAND == spec.ID_BAND
     assert drawing.SHEET_SPEC.OD_BAND == spec.OD_BAND
 
@@ -219,17 +229,15 @@ def test_sheet_prints_only_replacement_sizes_while_the_part_keeps_its_gauges() -
 # ae121732 (d179e35b), identical on both, at 2:1. Metres.
 FRONT_BOUNDS = (0.1188, 0.13223, 0.1442, 0.13477)
 PLAN_BOUNDS = (0.1188, 0.2143, 0.1442, 0.2397)
-NATIVE_POSITIONS = {
-    "SupplierThickness": (0.0862323, 0.1335),
-    "SupplierFreeHeight": (0.1767677, 0.1335),
-    "SupplierID": (0.0932934, 0.227),
-    "SupplierOD": (0.1715474, 0.227),
-}
+# Those runs' free-height station, 18 mm off the envelope; it is now 10 mm.
+_OLD_STATION_X, _STATION_X = 0.1622, 0.1442 + 0.010
 # GetArrowHeadAtIndex2 tips and directions (toward the base); every head is
-# 3.556 mm long and 0.762 mm wide.
+# 3.556 mm long and 0.762 mm wide. The free height's ride its station.
 NATIVE_ARROWS = {
-    "SupplierThickness": [(0.1008, 0.133373, 0, -1), (0.1008, 0.133627, 0, 1)],
-    "SupplierFreeHeight": [(0.1622, 0.13223, 0, -1), (0.1622, 0.13477, 0, 1)],
+    "SupplierFreeHeight": [
+        (0.1622 - _OLD_STATION_X + _STATION_X, 0.13223, 0, -1),
+        (0.1622 - _OLD_STATION_X + _STATION_X, 0.13477, 0, 1),
+    ],
     "SupplierID": [(0.1218905, 0.2251869, -0.9826622, -0.1854051)],
     "SupplierOD": [(0.1440247, 0.2248973, 0.9861979, -0.1655707)],
 }
@@ -257,9 +265,7 @@ def _text_box(drawing, name, position):
     return Box(x - width / 2.0, y - half_height, x + width / 2.0, y + half_height)
 
 
-def test_build_places_the_size_texts_after_the_shared_disc_dimensions(
-    monkeypatch,
-) -> None:
+def test_build_shows_and_dimensions_only_the_sheet_diagrams(monkeypatch) -> None:
     import draw_dt_vn_cylinder_bank_spring as drawing
 
     seen = {}
@@ -270,44 +276,155 @@ def test_build_places_the_size_texts_after_the_shared_disc_dimensions(
 
     monkeypatch.setattr(drawing, "build_supplier_spring_drawing", fake_build)
     asyncio.run(drawing.build(object()))
+    assert seen["prepare_views"] is drawing.prepare_diagrams
+    assert seen["supplier_reference_features"] is drawing.SHEET_FEATURES
     supplier_dimensions = seen["supplier_dimensions"]
     assert supplier_dimensions.func is drawing.supplier_dimensions
     assert supplier_dimensions.keywords["settled_checks"] is seen["settled_checks"]
 
+
+def test_diagrams_show_only_the_sheet_sketches_in_solid_construction_font(
+    monkeypatch,
+) -> None:
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
     calls = []
+    monkeypatch.setattr(
+        drawing, "_construction_curves_as_outline", lambda _a: calls.append("font")
+    )
 
-    def shared(adapter, views, *, spec, reference_bounds, settled_checks):
-        assert spec is drawing.SHEET_SPEC
-        calls.append("shared")
-        settled_checks.append("shared check")
+    def show(_adapter, view, owners, *, view_label):
+        calls.append((view, tuple(owners)))
+        return list(owners)
 
-    def place(adapter, views, *, reference_bounds):
-        calls.append("place")
+    monkeypatch.setattr(drawing, "_show_hidden_owners", show)
+    # The check runs before the fit, with every view at 1:1: the envelope
+    # alone has the shared diagram's nominal extents, as the strip lies
+    # inside it.
+    unit = {
+        "free_front": (0.0, 0.0, spec.OD / 1000.0, spec.FREE_HEIGHT / 1000.0),
+        "free_top": (0.0, 0.0, spec.OD / 1000.0, spec.OD / 1000.0),
+    }
+    (check,) = drawing.prepare_diagrams(
+        object(), {key: key for key in unit}, reference_bounds=unit.__getitem__
+    )
+    assert calls == [
+        "font",
+        ("free_front", ("DiscSupplierHeight",)),
+        ("free_top", ("DiscSupplierPlan",)),
+    ]
+    check()
+    with pytest.raises(RuntimeError, match="differs from nominal"):
+        drawing.prepare_diagrams(
+            object(),
+            {key: key for key in unit},
+            reference_bounds=lambda key: (0.0, 0.0, 1.0, 1.0),
+        )[0]()
 
-    monkeypatch.setattr(drawing, "supplier_disc_spring_dimensions", shared)
-    monkeypatch.setattr(drawing, "place_size_texts", place)
-    supplier_dimensions(object(), {}, reference_bounds=lambda key: (0, 0, 1, 1))
-    assert calls == ["shared", "place"]
-    # The shared settled checks are the only ones: no sheet-local guard.
-    assert seen["settled_checks"] == ["shared check"]
+
+def test_sizes_import_at_their_stations_and_settle_under_the_shared_contract(
+    monkeypatch,
+) -> None:
+    """Free height at its 10 mm station, the diameters where the shared
+    disc placement imported them; one settled check, over the whole sheet."""
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    calls = []
+    references = [
+        (
+            "free_front",
+            "SupplierFreeHeight",
+            {"configuration": "C", "expected_mm": 1.27},
+            "FREE_HEIGHT",
+        ),
+        (
+            "free_top",
+            "SupplierID",
+            {"configuration": "C", "expected_mm": spec.ID},
+            "ID",
+        ),
+        (
+            "free_top",
+            "SupplierOD",
+            {"configuration": "C", "expected_mm": spec.OD},
+            "OD",
+        ),
+    ]
+
+    def import_sizes(_adapter, _views, stations):
+        calls.append(("import", dict(stations)))
+        return references
+
+    def reacquire(_adapter, views, *, expected, configurations):
+        calls.append(("reacquire", expected, configurations))
+        return {name: name for _key, name, _args, _field in references}
+
+    monkeypatch.setattr(drawing, "_import_sizes", import_sizes)
+    monkeypatch.setattr(
+        drawing, "place_size_texts", lambda *_a, **_k: calls.append(("place",))
+    )
+    monkeypatch.setattr(drawing, "_view_scale", lambda _view: 2.0)
+    monkeypatch.setattr(drawing, "reacquire_supplier_dimensions", reacquire)
+    for name in (
+        "assert_supplier_reference_dimension",
+        "assert_supplier_configuration_value",
+        "_assert_source_band",
+    ):
+        monkeypatch.setattr(
+            drawing, name, lambda *_a, name=name, **_k: calls.append(name)
+        )
+    views = {
+        key: SimpleNamespace(ReferencedConfiguration=configuration)
+        for key, configuration in (
+            ("free_front", "SUPPLIER_REFERENCE"),
+            ("free_top", "SUPPLIER_REFERENCE"),
+            ("installed_iso", "Default"),
+        )
+    }
+    bounds = {"free_front": FRONT_BOUNDS, "free_top": PLAN_BOUNDS}
+    settled = []
+    drawing.supplier_dimensions(
+        object(), views, reference_bounds=bounds.__getitem__, settled_checks=settled
+    )
+    assert calls[0][0] == "import" and calls[1] == ("place",)
+    stations = calls[0][1]
+    for name, station in {
+        "SupplierFreeHeight": (_STATION_X, 0.1335),
+        "SupplierID": (0.1188 - 0.018, 0.227),
+        "SupplierOD": (0.1442 + 0.018, 0.227),
+    }.items():
+        assert stations.pop(name) == pytest.approx(station)
+    assert stations == {}
+    (check,) = settled
+    calls.clear()
+    check()
+    (_, expected, configurations), *asserted = calls
+    assert expected == {
+        "free_front": {"SupplierFreeHeight": "DiscSupplierHeight"},
+        "free_top": {
+            "SupplierID": "DiscSupplierPlan",
+            "SupplierOD": "DiscSupplierPlan",
+        },
+        "installed_iso": {},
+    }
+    assert configurations["installed_iso"] == "Default"
+    assert len(asserted) == 3 * len(references)
 
 
 def test_size_text_positions_come_from_the_spec_sizes_and_view_scale() -> None:
-    """Heights: the shared station (18 mm beyond the OD-wide diagram), 1 mm
-    of witness and the shelf gap. Diameters: the farther of a text height
-    off the OD rim and 2 mm past the arrowhead's outer reach. A position is
-    its text's centre, as SolidWorks reports it."""
-    import draw_dt_vn_cylinder_bank_spring as drawing
+    """Free height: its station 10 mm off the OD-wide envelope, 1 mm of
+    witness and the shelf gap. Diameters: the farther of a text height off
+    the OD rim and 2 mm past the arrowhead's outer reach. A position is its
+    text's centre, as SolidWorks reports it."""
 
     positions = _positions()
+    assert set(positions) == {"SupplierFreeHeight", "SupplierID", "SupplierOD"}
     od_rim, id_rim = spec.OD / 1000.0, spec.ID / 1000.0  # radii at 2:1
     shelf = 0.001 + 0.002 + 0.0002
-    assert positions["SupplierThickness"] == pytest.approx(
-        (0.1315 - od_rim - 0.018 - shelf - 0.0227354 / 2.0, 0.1335)
-    )
     assert positions["SupplierFreeHeight"] == pytest.approx(
-        (0.1315 + od_rim + 0.018 + shelf + 0.0227354 / 2.0, 0.1335)
+        (0.1315 + od_rim + 0.010 + shelf + 0.0227354 / 2.0, 0.1335)
     )
+    assert positions["SupplierFreeHeight"][0] == pytest.approx(0.1687677)
     od_gap = od_rim + 0.003556 + 0.000381 + 0.002 + 0.0002
     id_gap = max(od_rim + 0.0035 + 0.0002, id_rim + 0.003556 + 0.000381 + 0.0022)
     assert od_gap == pytest.approx(0.018837) and id_gap == pytest.approx(0.0164)
@@ -317,18 +434,11 @@ def test_size_text_positions_come_from_the_spec_sizes_and_view_scale() -> None:
     assert positions["SupplierID"] == pytest.approx(
         (0.1315 - id_gap - 0.0435062 / 2.0, 0.227)
     )
-    # The heights land exactly on the native shelves, the ID within 0.06 mm,
-    # the OD 0.54 mm farther out than the ec339f3d/d179e35b seat.
-    for name in ("SupplierThickness", "SupplierFreeHeight"):
-        assert positions[name] == pytest.approx(NATIVE_POSITIONS[name], abs=1e-7)
-    assert positions["SupplierID"][0] == pytest.approx(0.0932934, abs=6e-5)
-    assert positions["SupplierOD"][0] - 0.1715474 == pytest.approx(0.000543, abs=1e-5)
-    # Scale, not constants: at 1:1 the stations close in by half the OD.
+    # Scale, not constants: at 1:1 the station closes in by half the OD.
     unit = _positions(scale=1.0)
-    for name, side in drawing.TEXT_SIDES["free_front"].items():
-        assert unit[name][0] == pytest.approx(
-            positions[name][0] - side * spec.OD / 2000.0
-        )
+    assert unit["SupplierFreeHeight"][0] == pytest.approx(
+        positions["SupplierFreeHeight"][0] - spec.OD / 2000.0
+    )
 
 
 @pytest.mark.parametrize("name", list(NATIVE_ARROWS))
@@ -358,24 +468,25 @@ def test_each_text_clears_its_own_native_arrowheads_by_two_mm(name) -> None:
         assert drawing.height_text_gap() - 0.000762 / 2.0 >= ARROW_TEXT_CLEARANCE_M
 
 
-def test_fixed_texts_fit_the_top_cell() -> None:
+def test_fixed_texts_fit_their_cells() -> None:
     import draw_dt_vn_cylinder_bank_spring as drawing
     from _supplier_spring_drawing import supplier_state_cells
 
     cells = {key: cell for key, _, cell in supplier_state_cells(0.0, maximum=False)}
-    x0, _y0, x1, _y1 = cells["free_top"]
-    for name in drawing.TEXT_SIDES["free_top"]:
-        text = _text_box(drawing, name, _positions()[name])
-        assert x0 < text.xmin and text.xmax < x1
+    for key, sides in drawing.TEXT_SIDES.items():
+        x0, _y0, x1, _y1 = cells[key]
+        for name in sides:
+            text = _text_box(drawing, name, _positions()[name])
+            assert x0 < text.xmin and text.xmax < x1
 
 
 @pytest.mark.parametrize("refused", [False, True], ids=["placed", "refused"])
 def test_each_size_text_is_one_position_write_inside_one_span(
     monkeypatch, refused
 ) -> None:
-    """Heights enter offset mode and diameters take the near-side style
-    before any write; each text then gets exactly one SetPosition2, at its
-    fixed position, with no rebuild or readback of its own."""
+    """The free height enters offset mode and the diameters take the
+    near-side style before any write; each text then gets exactly one
+    SetPosition2, at its fixed position, with no rebuild or readback."""
     import _telemetry
     import draw_dt_vn_cylinder_bank_spring as drawing
 
@@ -405,7 +516,10 @@ def test_each_size_text_is_one_position_write_inside_one_span(
 
         return SimpleNamespace(SetPosition2=set_position)
 
-    displays = {name: Display(name=name) for name in NATIVE_POSITIONS}
+    displays = {
+        name: Display(name=name)
+        for name in ("SupplierFreeHeight", "SupplierID", "SupplierOD")
+    }
     monkeypatch.setattr(_telemetry, "span", span)
     monkeypatch.setattr(drawing, "_size_displays", lambda _a, _v: displays)
     monkeypatch.setattr(drawing, "_view_scale", lambda _view: 2.0)
@@ -436,13 +550,12 @@ def test_each_size_text_is_one_position_write_inside_one_span(
         calls[: len(styles)]
         == styles
         == [
-            ("offset", "SupplierThickness", True),
             ("offset", "SupplierFreeHeight", True),
             ("near side", "SupplierID"),
             ("near side", "SupplierOD"),
         ]
     )
-    assert len(writes) == 4 and all(inside == [name] for *_, inside in writes)
+    assert len(writes) == 3 and all(inside == [name] for *_, inside in writes)
     expected = _positions()
     for _, label, xy, _ in writes:
         assert xy == pytest.approx(expected[label])
