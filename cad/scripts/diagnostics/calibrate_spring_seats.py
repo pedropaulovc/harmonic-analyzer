@@ -38,6 +38,10 @@ summing assembly is needed to replace a stale seat::
     uv run cad/scripts/diagnostics/calibrate_spring_seats.py --presets neutral square --write
 
 Without ``--write`` the measurements only go to the JSON report.
+``--counter-only`` re-measures only the counter seats of every listed preset and
+keeps ``channel_seats``; ``--write PATH`` writes the merged table to PATH
+instead of springs.yaml; and ``--worker`` runs under a caller (a
+``_cached_com_action`` farm leaf) that already holds the COM seat.
 """
 
 from __future__ import annotations
@@ -45,6 +49,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import sys
 import traceback
 from dataclasses import asdict, replace
@@ -61,6 +66,12 @@ import ch_vn_channel_spring_stock_geom as channel_stock  # noqa: E402
 import sm_gooseneck_geom  # noqa: E402
 import spring_mount_geom as spring_mounts  # noqa: E402
 import settled_spring_seats  # noqa: E402
+
+# This driver exists to replace a stale counter record, and the summing spec
+# reads counter_seat() at import: accept that record (with a warning) BEFORE
+# importing build_sm_summing_assembly. Nothing here consumes it -- every seed
+# is analytic (spring_mount_geom) and every written number is measured.
+settled_spring_seats.accept_stale_counter_record_for_recalibration()
 from _interference_contracts import allowed_interference_pairs  # noqa: E402
 from build_sm_summing_assembly import _assert_counter_spring_top_hang  # noqa: E402
 from _assembly import (  # noqa: E402
@@ -84,13 +95,13 @@ from _session import run_build  # noqa: E402
 from _cwm import put_component_pose  # noqa: E402
 from _spring import build_spring  # noqa: E402
 from _stock_fastener import _blank_recipe_references  # noqa: E402
-from _transforms import (
+from _transforms import (  # noqa: E402
     ROT_Y_180,
     ROT_Y_POS90,
     compose_rows,
     euler_from_rows,
     rot_z_rows,
-)  # noqa: E402
+)
 from build_ch_channel_assembly import ARM_MID_DZ, FULCRUM, IDENTITY, z_station  # noqa: E402
 from _cone_axis_constants import SUMMING_Z  # noqa: E402
 from diagnostics._seat_search import ContactSolution, solve_component_contact  # noqa: E402
@@ -528,27 +539,39 @@ async def _calibrate_counter(
 
 
 def _merge_yaml(
-    channel_rows: list[dict], counters: dict[str, dict], source: str
+    channel_rows: list[dict] | None,
+    counters: dict[str, dict],
+    source: str,
+    path: Path,
 ) -> None:
+    """Merge the measurements into springs.yaml's document and write it to ``path``.
+
+    ``channel_rows=None`` keeps the existing ``springs.channel_seats``.
+    """
     import yaml
 
-    document = yaml.safe_load(SPRINGS_YAML.read_text(encoding="utf-8"))
+    original = SPRINGS_YAML.read_text(encoding="utf-8")
+    document = yaml.safe_load(original)
     springs = document["springs"]
     springs["source"] = source
-    springs["channel_seats"] = channel_rows
+    if channel_rows is not None:
+        springs["channel_seats"] = channel_rows
     for preset, counter in counters.items():
         springs["presets"][preset]["counter"] = counter
     text = yaml.safe_dump(document, sort_keys=False, allow_unicode=False, width=88)
-    header = "\n".join(
-        line
-        for line in SPRINGS_YAML.read_text(encoding="utf-8").splitlines()
-        if line.startswith("#")
-    )
-    SPRINGS_YAML.write_text(header + "\n" + text, encoding="utf-8", newline="\n")
+    header = "\n".join(line for line in original.splitlines() if line.startswith("#"))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(header + "\n" + text, encoding="utf-8", newline="\n")
 
 
 async def calibrate(
-    adapter, presets: list[str], output: Path, write: bool, source: str
+    adapter,
+    presets: list[str],
+    output: Path,
+    write: Path | None,
+    source: str,
+    *,
+    counter_only: bool = False,
 ) -> dict[str, str]:
     table = _config.machine("springs", "presets")
     unknown = [name for name in presets if name not in table]
@@ -563,7 +586,17 @@ async def calibrate(
         raise ValueError(
             f"preset amplitudes must be finite and nonnegative: {amplitudes}"
         )
-    if write:
+    if write is not None and counter_only:
+        # A counter-only write keeps every channel row, so the only way it can
+        # leave the table stale is a preset whose counter it did not re-measure.
+        omitted = sorted(set(table) - set(presets))
+        if omitted:
+            raise ValueError(
+                "--counter-only --write must recalibrate every configured preset's "
+                f"counter, so none keeps a stale seat; missing {omitted}. Calibrate "
+                f"{sorted(table)} together, or drop --write."
+            )
+    elif write is not None:
         # _merge_yaml REPLACES springs.channel_seats, and channel_seat() matches an
         # amplitude exactly (no fit, no interpolation), so a write that calibrated
         # only some presets would delete the rows the omitted ones need. Refuse it
@@ -583,26 +616,28 @@ async def calibrate(
     report: dict = {
         "status": "started",
         "presets": presets,
+        "counter_only": counter_only,
         "channel": [],
         "counter": [],
     }
     channel_rows: list[dict] = []
     counters: dict[str, dict] = {}
     try:
-        for index, amplitude in enumerate(amplitudes):
-            channel_rows.append(
-                await _calibrate_channel(adapter, amplitude, index, report)
-            )
+        if not counter_only:
+            for index, amplitude in enumerate(amplitudes):
+                channel_rows.append(
+                    await _calibrate_channel(adapter, amplitude, index, report)
+                )
+            report["channel_seats"] = channel_rows
         for name in presets:
             counters[name] = await _calibrate_counter(
                 adapter, name, [float(a) for a in table[name]["amplitudes_mm"]], report
             )
-        report["channel_seats"] = channel_rows
         report["counters"] = counters
         report["status"] = "completed"
-        if write:
-            _merge_yaml(channel_rows, counters, source)
-            report["written"] = str(SPRINGS_YAML)
+        if write is not None:
+            _merge_yaml(None if counter_only else channel_rows, counters, source, write)
+            report["written"] = str(write)
         return {"report": str(output)}
     except BaseException:
         report["status"] = "failed"
@@ -627,8 +662,23 @@ def main() -> int:
     )
     parser.add_argument(
         "--write",
+        nargs="?",
+        type=Path,
+        const=SPRINGS_YAML,
+        default=None,
+        metavar="PATH",
+        help="merge the measurements into springs.yaml and write it to PATH "
+        "(default: springs.yaml itself)",
+    )
+    parser.add_argument(
+        "--counter-only",
         action="store_true",
-        help="rewrite springs.yaml with the measurements",
+        help="re-measure only the presets' counter seats; keep springs.channel_seats",
+    )
+    parser.add_argument(
+        "--worker",
+        action="store_true",
+        help="the caller (a _cached_com_action leaf) already holds the COM seat",
     )
     parser.add_argument(
         "--source",
@@ -636,12 +686,30 @@ def main() -> int:
         "full saved-assembly acceptance is required by the build gates.",
     )
     args = parser.parse_args()
-    with dodo._com_seat("calibrate-spring-seats"):
+    write = None if args.write is None else args.write.resolve()
+
+    def run() -> int:
         return run_build(
             lambda adapter: calibrate(
-                adapter, args.presets, args.output.resolve(), args.write, args.source
+                adapter,
+                args.presets,
+                args.output.resolve(),
+                write,
+                args.source,
+                counter_only=args.counter_only,
             )
         )
+
+    if args.worker:
+        # Taking dodo._com_seat here would deadlock on the parent's own lock.
+        if not os.environ.get("HARMONIC_COM_SEAT"):
+            raise RuntimeError(
+                "--worker requires the caller to hold the coordinated COM seat "
+                "(HARMONIC_COM_SEAT unset)"
+            )
+        return run()
+    with dodo._com_seat("calibrate-spring-seats"):
+        return run()
 
 
 if __name__ == "__main__":

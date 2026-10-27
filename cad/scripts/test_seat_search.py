@@ -1,5 +1,6 @@
 """Offline contract for the native seat SEARCH behind spring recalibration, and
-for the driver's refusal to write a partial seat table.
+for the driver: its refusal to write a partial seat table, its import against
+the stale counter record it replaces, and its --worker/--counter-only modes.
 
 The search may use ``ClosestDistance`` only to choose where the next trial
 lands. A distance the modeller over-reports, under-reports, or returns as zero
@@ -9,13 +10,29 @@ the clear endpoint never inside the interfering region.
 
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
+import textwrap
+from pathlib import Path
 
 import pytest
 
 import _config
+import settled_spring_seats
 from diagnostics import _seat_search as search
 
 _CONTACT_OFFSET_MM = 0.0731234567
+
+
+@pytest.fixture(autouse=True)
+def strict_stale_counter_after_the_test(monkeypatch):
+    # The first import of the driver sets the stale-counter recalibration
+    # bypass for its process; undo it after each test so later tests in this
+    # worker keep the stale-record ValueError.
+    monkeypatch.setattr(
+        settled_spring_seats, "_ACCEPT_STALE_COUNTER_FOR_RECALIBRATION", False
+    )
 
 
 class _FakeContact:
@@ -236,7 +253,7 @@ def test_write_refuses_presets_that_do_not_cover_every_channel_amplitude(
                 None,
                 [partial],
                 tmp_path / "report.json",
-                write=True,
+                write=tmp_path / "springs.yaml",
                 source="test",
             )
         )
@@ -255,7 +272,7 @@ def test_calibrating_every_preset_passes_the_coverage_guard(tmp_path) -> None:
                 None,
                 presets,
                 tmp_path / "report.json",
-                write=True,
+                write=tmp_path / "springs.yaml",
                 source="test",
             )
         )
@@ -288,6 +305,171 @@ def test_counter_support_certificate_refuses_stale_or_unproven_parts(
     ledger.write_text("{}")
     driver._require_current_support_parts()
     assert seen[-1] == ["part:sm_gooseneck", "part:sm_gooseneck_spring_screw"]
+
+
+def test_driver_imports_against_the_stale_counter_record_it_replaces() -> None:
+    """The summing spec reads ``counter_seat()`` at import, so without its
+    recalibration bypass the driver could not even load in the stale state it
+    exists to fix. A fresh interpreter keeps the bypass out of this process."""
+    scripts = Path(__file__).resolve().parent
+    probe = textwrap.dedent(
+        f"""
+        import copy
+        import sys
+
+        sys.path[:0] = [{str(scripts)!r}, {str(scripts.parents[1])!r}]
+        import _config
+
+        machine = _config.machine
+
+        def stale_machine(*keys):
+            value = machine(*keys)
+            if keys == ("springs", "presets"):
+                value = copy.deepcopy(value)
+                for preset in value.values():
+                    preset["counter"]["upper_support"] = {{"thread": "#6-32 UNC"}}
+            return value
+
+        _config.machine = stale_machine
+        import settled_spring_seats
+
+        try:
+            settled_spring_seats.counter_seat()
+        except ValueError as error:
+            assert "Stale counter native calibration" in str(error), error
+        else:
+            raise SystemExit("the injected counter record is not stale")
+        from diagnostics import calibrate_spring_seats
+
+        assert "build_sm_summing_assembly" in sys.modules
+        print("imported", calibrate_spring_seats.__name__)
+        """
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=scripts,
+        capture_output=True,
+        text=True,
+        timeout=240,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "imported diagnostics.calibrate_spring_seats" in result.stdout
+
+
+def test_worker_runs_only_under_the_callers_com_seat(monkeypatch) -> None:
+    """A ``_cached_com_action`` leaf already holds the seat: ``--worker`` must not
+    take ``dodo._com_seat`` again (it would deadlock), and must refuse to run at
+    all when no caller holds it."""
+    from diagnostics import calibrate_spring_seats as driver
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("--worker took the COM seat lock")
+
+    builds: list[object] = []
+    monkeypatch.setattr(driver.dodo, "_com_seat", forbidden)
+    monkeypatch.setattr(driver, "run_build", lambda build: builds.append(build) or 0)
+    monkeypatch.setattr(sys, "argv", ["calibrate_spring_seats.py", "--worker"])
+
+    monkeypatch.delenv("HARMONIC_COM_SEAT", raising=False)
+    with pytest.raises(RuntimeError, match="HARMONIC_COM_SEAT unset"):
+        driver.main()
+    assert builds == []
+
+    monkeypatch.setenv("HARMONIC_COM_SEAT", "calibrate-spring-seats leaf")
+    assert driver.main() == 0
+    assert len(builds) == 1
+
+
+def test_counter_only_write_refuses_a_partial_preset_list(tmp_path) -> None:
+    """A counter-only write keeps every channel row; an omitted preset would keep
+    its stale counter, so the driver refuses before it takes the COM seat."""
+    import asyncio
+
+    from diagnostics import calibrate_spring_seats as driver
+
+    table = _config.machine("springs", "presets")
+    assert len(table) > 1, "fixture needs more than one configured preset"
+    report = tmp_path / "report.json"
+    with pytest.raises(ValueError, match="must recalibrate every configured preset"):
+        asyncio.run(
+            driver.calibrate(
+                None,
+                sorted(table)[:1],
+                report,
+                write=tmp_path / "springs.yaml",
+                source="test",
+                counter_only=True,
+            )
+        )
+    assert not report.exists()
+
+
+def test_counter_only_measures_no_channel_seat_and_reports_it(
+    tmp_path, monkeypatch
+) -> None:
+    import asyncio
+
+    from diagnostics import calibrate_spring_seats as driver
+
+    async def no_channel(*_args):
+        raise AssertionError("--counter-only calibrated a channel seat")
+
+    monkeypatch.setattr(driver, "_calibrate_channel", no_channel)
+    monkeypatch.setattr(driver, "_require_current_support_parts", lambda: None)
+    report = tmp_path / "report.json"
+    with pytest.raises(AttributeError):  # reached the counter build: no adapter
+        asyncio.run(
+            driver.calibrate(
+                None,
+                sorted(_config.machine("springs", "presets")),
+                report,
+                write=tmp_path / "springs.yaml",
+                source="test",
+                counter_only=True,
+            )
+        )
+    recorded = json.loads(report.read_text(encoding="utf-8"))
+    assert recorded["counter_only"] is True
+    assert recorded["status"] == "failed"
+    assert recorded["channel"] == []
+    assert "channel_seats" not in recorded
+
+
+def test_counter_only_merge_keeps_channel_seats_and_writes_the_given_path(
+    tmp_path, monkeypatch
+) -> None:
+    import yaml
+
+    from diagnostics import calibrate_spring_seats as driver
+
+    springs = tmp_path / "springs.yaml"
+    springs.write_bytes(driver.SPRINGS_YAML.read_bytes())
+    monkeypatch.setattr(driver, "SPRINGS_YAML", springs)
+    before = springs.read_text(encoding="utf-8")
+    original = yaml.safe_load(before)["springs"]
+    counters = {name: {"marker": name} for name in original["presets"]}
+    target = tmp_path / "out" / "springs.calibrated.yaml"
+
+    driver._merge_yaml(None, counters, "test source", target)
+
+    assert springs.read_text(encoding="utf-8") == before
+    after = target.read_text(encoding="utf-8")
+
+    def channel_block(text: str) -> str:
+        return text[text.index("\n  channel_seats:\n") : text.index("\n  presets:\n")]
+
+    assert channel_block(after) == channel_block(before)
+    merged = yaml.safe_load(after)["springs"]
+    assert merged["channel_seats"] == original["channel_seats"]
+    assert merged["source"] == "test source"
+    for name, counter in counters.items():
+        assert merged["presets"][name]["counter"] == counter
+        assert (
+            merged["presets"][name]["amplitudes_mm"]
+            == original["presets"][name]["amplitudes_mm"]
+        )
+    header = [line for line in before.splitlines() if line.startswith("#")]
+    assert after.splitlines()[: len(header)] == header
 
 
 class _ParallelFaceDistance(_FakeContact):

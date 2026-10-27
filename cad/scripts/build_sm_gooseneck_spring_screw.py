@@ -1,20 +1,22 @@
 r"""Build MHA-SM-04, the gooseneck counter-spring clamp screw.
 
-A made slotted fillister screw turned from 1/2-in 12L14 or 1018 round.  Its #6-32
-shank threads into the gooseneck MHA-SM-01's tapped end plug and the
-under-head face clamps the counter spring's upper eye against the plug face.
-Sizes and bands live in ``sm_gooseneck_spring_screw_geom``; the print's
-marks, places and notes in ``sm_gooseneck_spring_screw_spec``.
+A made slotted fillister shoulder screw turned from 1/2-in 12L14 or 1018
+round (owner ruling 2026-10-26 (#1951, option B)).  A plain turned Ø3.50
+shoulder under the head is the MHA-SM-VN-51 counter spring's loop seat; a
+45-degree lead steps up to the #8-32 UNC thread, which runs into the
+gooseneck MHA-SM-01's tapped end plug, and the under-head face clamps the
+loop against the plug face.  Sizes and bands live in
+``sm_gooseneck_spring_screw_geom``; the print's marks, places and notes in
+``sm_gooseneck_spring_screw_spec``.
 
 Layout (``sm_gooseneck_spring_screw_geom`` frame): axis Z, the under-head face
 at z=0.  ``HeadProfile`` revolves the cylindrical head and its spherical
-crown in +Z (apex at HEAD_H); ``ShankProfile`` revolves the shank in -Z,
-opening with the die relief (a 45-degree lead from its floor into the
-under-head face) and closing with a 45-degree tip chamfer.  The thread is
-modelled as its basic major cylinder.  The driver slot is sketched on a plane
-at the apex and cut SLOT_DEPTH down into the head along local X.  Two hidden
-reference sketches carry printed dimensions only: ``StationReference`` the
-overall length, ``LeadReference`` the lead on the profile's lower silhouette.
+crown in +Z (apex at HEAD_H); ``ShankProfile`` revolves the shank in -Z:
+the seat shoulder to SHOULDER_LENGTH, the 45-degree lead up to the thread
+major, the thread, and a 45-degree tip chamfer.  The thread is modelled as
+its basic major cylinder.  The driver slot is sketched on a plane at the apex
+and cut SLOT_DEPTH down into the head along local X.  One hidden reference
+sketch, ``StationReference``, carries the printed overall length only.
 
 Run (SolidWorks already open)::
 
@@ -70,16 +72,18 @@ from sm_gooseneck_spring_screw_geom import (
     LENGTH,
     MAJOR_DIA,
     OVERALL_LENGTH,
-    RELIEF_DIA,
-    RELIEF_DIA_LOWER,
-    RELIEF_DIA_TOL_TYPE,
-    RELIEF_DIA_UPPER,
-    RELIEF_LEAD,
-    RELIEF_LEAD_TOL_TYPE,
-    RELIEF_WIDTH,
+    SEAT_DIA,
+    SEAT_DIA_LOWER,
+    SEAT_DIA_TOL_TYPE,
+    SEAT_DIA_UPPER,
+    SHOULDER_LENGTH,
+    SHOULDER_LENGTH_LOWER,
+    SHOULDER_LENGTH_TOL_TYPE,
+    SHOULDER_LENGTH_UPPER,
     SLOT_DEPTH,
     SLOT_FLOOR_Z,
     SLOT_WIDTH,
+    STEP_LEAD,
     TIP_CHAMFER,
 )
 from sm_gooseneck_spring_screw_spec import (
@@ -104,27 +108,22 @@ _SAVED_DRAWING_PROPERTIES = (
 
 HEAD_R = HEAD_DIA / 2.0
 THREAD_R = MAJOR_DIA / 2.0
-RELIEF_R = RELIEF_DIA / 2.0
+SEAT_R = SEAT_DIA / 2.0
 # Over-length of the slot rectangle along X: it only has to clear the head.
 SLOT_SPAN = HEAD_DIA + 2.0
-# LeadReference's construction line (Right-plane sketch u, v in mm): the lead
-# as it shows on the profile's LOWER silhouette, from the under-head face down
-# to the relief floor.  The profile's own lead points sit on the upper
-# silhouette, where the relief width's extension lines leave no room for a
-# second baseline dimension's text.
-LEAD_REFERENCE_LINE = ((0.0, -(RELIEF_R + RELIEF_LEAD)), (RELIEF_LEAD, -RELIEF_R))
 
 # Head: the cylinder plus the spherical cap of sagitta CROWN_RISE.
 V_HEAD = math.pi * HEAD_R**2 * HEAD_CYL_H + (
     math.pi * CROWN_RISE**2 * (3.0 * CROWN_RADIUS - CROWN_RISE) / 3.0
 )
-# Shank: the major cylinder less the relief annulus (the lead's corner
-# triangle, legs RELIEF_LEAD, centroid RELIEF_R + RELIEF_LEAD/3 out, stays)
-# and the tip chamfer's corner triangle (centroid THREAD_R - TIP_CHAMFER/3).
-V_LEAD = math.pi * RELIEF_LEAD**2 * (RELIEF_R + RELIEF_LEAD / 3.0)
-V_RELIEF = math.pi * (THREAD_R**2 - RELIEF_R**2) * RELIEF_WIDTH - V_LEAD
+# Shank: the seat cylinder, the 45-degree lead's frustum (axial length
+# STEP_LEAD, seat radius to thread radius) and the thread major cylinder,
+# less the tip chamfer's corner triangle (centroid THREAD_R - TIP_CHAMFER/3).
+V_SEAT = math.pi * SEAT_R**2 * SHOULDER_LENGTH
+V_LEAD = math.pi * STEP_LEAD / 3.0 * (SEAT_R**2 + SEAT_R * THREAD_R + THREAD_R**2)
+V_THREAD = math.pi * THREAD_R**2 * (LENGTH - SHOULDER_LENGTH - STEP_LEAD)
 V_TIP = math.pi * TIP_CHAMFER**2 * (THREAD_R - TIP_CHAMFER / 3.0)
-V_SHANK = math.pi * THREAD_R**2 * LENGTH - V_RELIEF - V_TIP
+V_SHANK = V_SEAT + V_LEAD + V_THREAD - V_TIP
 V_BODY = V_HEAD + V_SHANK
 
 
@@ -163,27 +162,6 @@ def slot_volume(steps: int = 4000) -> float:
 
 V_SLOT = slot_volume()
 V_FINAL = V_BODY - V_SLOT
-
-
-@_telemetry.traced("part.single_limit", label_param="name")
-def _single_limit(
-    adapter, feature: str, name: str, nominal: float, tol_type: int
-) -> None:
-    """A dimension printed as a single MIN or MAX limit: SOLIDWORKS prints the
-    nominal then the limit word, so the model value is the limit itself
-    (build_pd_support_bar._single_limit)."""
-    label = f"{name}@{feature}"
-    _, dimension = _named_dimension(adapter, feature, name)
-    if not math.isclose(float(dimension.SystemValue), nominal / 1000.0, abs_tol=1e-9):
-        raise RuntimeError(
-            f"{label}: nominal {float(dimension.SystemValue) * 1000.0:.7f} is not "
-            f"the limit {nominal:.7f}"
-        )
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = tol_type
-    if not tolerance.SetValues(0.0, 0.0) or int(tolerance.Type) != tol_type:
-        raise RuntimeError(f"{label}: cannot retain the single limit {tol_type}")
-    _telemetry.success(f"{label}: single limit (swTolType {tol_type})")
 
 
 @_telemetry.traced("part.limit_band", label_param="name")
@@ -251,9 +229,8 @@ async def build(adapter) -> dict[str, str]:
         ("CrownRise", CROWN_RISE),
         ("UnderHeadLength", LENGTH),
         ("ThreadDia", MAJOR_DIA),
-        ("ReliefDia", RELIEF_DIA),
-        ("ReliefWidth", RELIEF_WIDTH),
-        ("ReliefLead", RELIEF_LEAD),
+        ("SeatDia", SEAT_DIA),
+        ("ShoulderLength", SHOULDER_LENGTH),
         ("TipChamfer", TIP_CHAMFER),
         ("SlotWidth", SLOT_WIDTH),
         ("SlotDepth", SLOT_DEPTH),
@@ -331,9 +308,9 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Head")
     await volume_check(adapter, "crowned fillister head", V_HEAD, 0.005 * V_HEAD)
 
-    # Shank revolve on the Right plane, toward +u (model -Z).  The under-head
-    # face steps down a 45-degree lead onto the relief floor, which runs to
-    # RELIEF_WIDTH before the flank rises to the thread major.
+    # Shank revolve on the Right plane, toward +u (model -Z).  The seat runs
+    # flat from the under-head face to SHOULDER_LENGTH, the foot of the
+    # 45-degree lead that steps up to the thread major.
     shank = SketchDims()
     check("create_sketch shank profile", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
@@ -342,10 +319,9 @@ async def build(adapter) -> dict[str, str]:
     )
     points = [
         (0.0, 0.0),
-        (0.0, RELIEF_R + RELIEF_LEAD),
-        (RELIEF_LEAD, RELIEF_R),
-        (RELIEF_WIDTH, RELIEF_R),
-        (RELIEF_WIDTH, THREAD_R),
+        (0.0, SEAT_R),
+        (SHOULDER_LENGTH, SEAT_R),
+        (SHOULDER_LENGTH + STEP_LEAD, THREAD_R),
         (LENGTH - TIP_CHAMFER, THREAD_R),
         (LENGTH, THREAD_R - TIP_CHAMFER),
         (LENGTH, 0.0),
@@ -355,45 +331,51 @@ async def build(adapter) -> dict[str, str]:
     for index, line in enumerate(lines):
         (u0, v0), (u1, v1) = points[index], points[(index + 1) % len(lines)]
         if u0 != u1 and v0 != v1:
-            continue  # a 45-degree lead or chamfer; its two legs define it
+            continue  # the 45-degree lead or tip chamfer: dimensioned below
         relation = "horizontal" if v0 == v1 else "vertical"
         check(
             f"shank profile {relation} {line}",
             await adapter.add_sketch_constraint(line, None, relation),
         )
-    relief_lead, relief_floor, thread_outline = lines[1], lines[2], lines[4]
-    tip_chamfer = lines[5]
+    seat, step_lead, thread_outline = lines[1], lines[2], lines[3]
+    tip_chamfer = lines[4]
     # Every axial size reads from the under-head face, the clamp face.
     for name, start, end, value in (
-        ("UnderHeadLength", f"{relief_lead}.start", f"{tip_chamfer}.end", LENGTH),
-        ("ReliefWidth", f"{relief_lead}.start", f"{relief_floor}.end", RELIEF_WIDTH),
-        ("ReliefLead", f"{relief_lead}.start", f"{relief_lead}.end", RELIEF_LEAD),
+        ("UnderHeadLength", f"{seat}.start", f"{tip_chamfer}.end", LENGTH),
+        ("ShoulderLength", f"{seat}.start", f"{seat}.end", SHOULDER_LENGTH),
         ("TipChamfer", f"{tip_chamfer}.start", f"{tip_chamfer}.end", TIP_CHAMFER),
     ):
         await dimension_between(
             adapter, start, end, "horizontal_distance", value, f"shank {name}"
         )
         shank.record(name, f'"{name}"')
-    # The radial legs equal the axial legs by equation: 45 degrees.
-    for name, line, value in (
-        ("ReliefLead", relief_lead, RELIEF_LEAD),
-        ("TipChamfer", tip_chamfer, TIP_CHAMFER),
-    ):
-        await dimension_between(
-            adapter,
-            f"{line}.start",
-            f"{line}.end",
-            "vertical_distance",
-            value,
-            f"shank {name} rise",
-        )
-        shank.record(f"{name}Rise", f'"{name}"')
+    # The lead's radial leg is the two diameters' half-difference; its axial
+    # leg equals it by equation, so the lead is 45 degrees.  The tip chamfer's
+    # rise equals its axial leg the same way.
+    await dimension_between(
+        adapter,
+        f"{step_lead}.start",
+        f"{step_lead}.end",
+        "horizontal_distance",
+        STEP_LEAD,
+        "shank StepLead",
+    )
+    shank.record("StepLead", '("ThreadDia" - "SeatDia") / 2')
+    await dimension_between(
+        adapter,
+        f"{tip_chamfer}.start",
+        f"{tip_chamfer}.end",
+        "vertical_distance",
+        TIP_CHAMFER,
+        "shank TipChamfer rise",
+    )
+    shank.record("TipChamferRise", '"TipChamfer"')
     for name, line, u_mid, radius in (
-        ("ReliefDia", relief_floor, (RELIEF_LEAD + RELIEF_WIDTH) / 2.0, RELIEF_R),
+        ("SeatDia", seat, SHOULDER_LENGTH / 2.0, SEAT_R),
         (
             "ThreadDia",
             thread_outline,
-            (RELIEF_WIDTH + LENGTH - TIP_CHAMFER) / 2.0,
+            (SHOULDER_LENGTH + STEP_LEAD + LENGTH - TIP_CHAMFER) / 2.0,
             THREAD_R,
         ),
     ):
@@ -412,7 +394,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Shank")
     await volume_check(
         adapter,
-        "turned fillister screw with relief and tip chamfer",
+        "turned shoulder screw with lead and tip chamfer",
         V_BODY,
         0.005 * V_BODY,
     )
@@ -455,7 +437,7 @@ async def build(adapter) -> dict[str, str]:
         (name_dimensions(adapter, "DriverSlot", ["SlotDepth"])[0], '"SlotDepth"')
     )
     # A cut the wrong way removes nothing: the volume is the direction check.
-    await volume_check(adapter, "slotted fillister screw", V_FINAL, 0.02 * V_SLOT)
+    await volume_check(adapter, "slotted shoulder screw", V_FINAL, 0.02 * V_SLOT)
     blank_reference_geometry(adapter, (("SlotPlane", "PLANE"),))
 
     # Drawing-only station reference: the apex-to-tip overall, printed as a
@@ -496,45 +478,6 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "StationReference")
     drive_jobs += stations.apply(adapter, "StationReference")
 
-    # Drawing-only lead reference: one construction line over the lead's
-    # lower silhouette, so the printed lead's extension lines drop into the
-    # open air under the relief, beside the relief diameter, instead of
-    # crowding the relief width above it.  Its length IS the printed
-    # "0.30 MAX", driven by the profile's lead global so no geometry moves.
-    lead_dims = SketchDims()
-    (lead_u0, lead_v0), (lead_u1, lead_v1) = LEAD_REFERENCE_LINE
-    check("create_sketch lead reference", await adapter.create_sketch("Right"))
-    set_sketch_direct_db(adapter, True)
-    try:
-        lead_line = check(
-            "lead reference line",
-            await adapter.add_line(lead_u0, lead_v0, lead_u1, lead_v1),
-        )
-    finally:
-        # Session state on the seat: a failed segment must not leave sketch
-        # inference off for the next leaf.
-        set_sketch_direct_db(adapter, False)
-    lead_segment = _early_bound(adapter._sketch_entities[lead_line], "ISketchSegment")
-    lead_segment.ConstructionGeometry = True
-    if not bool(lead_segment.ConstructionGeometry):
-        raise RuntimeError("lead reference line did not take construction flag")
-    await anchor_point_to_origin(
-        adapter, f"{lead_line}.start", lead_u0, lead_v0, "lead reference seat edge"
-    )
-    lead_dims.record("LeadStation", '"ReliefDia" / 2 + "ReliefLead"')
-    for name, kind, label in (
-        ("HeadLead", "horizontal_distance", "lead reference axial leg"),
-        ("HeadLeadRise", "vertical_distance", "lead reference radial leg"),
-    ):
-        await dimension_between(
-            adapter, f"{lead_line}.start", f"{lead_line}.end", kind, RELIEF_LEAD, label
-        )
-        lead_dims.record(name, '"ReliefLead"')
-    await ensure_fully_defined(adapter, "lead reference sketch")
-    check("exit_sketch lead reference", await adapter.exit_sketch())
-    name_last_feature(adapter, "LeadReference")
-    drive_jobs += lead_dims.apply(adapter, "LeadReference")
-
     # Apply the deferred drive equations once the whole model exists, then
     # re-check neutrality: every equation evaluates to its as-built value.
     await force_rebuild(adapter)
@@ -542,7 +485,10 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dimension, expression)
     await force_rebuild(adapter)
     await volume_check(
-        adapter, "driven slotted screw (equations neutral)", V_FINAL, 0.02 * V_SLOT
+        adapter,
+        "driven slotted shoulder screw (equations neutral)",
+        V_FINAL,
+        0.02 * V_SLOT,
     )
     bodies = tuple(
         _early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or ()
@@ -553,20 +499,25 @@ async def build(adapter) -> dict[str, str]:
         )
 
     # Model-owned limits (drawing-simplicity-policy.md `How the repository
-    # implements the guidelines`): the relief diameter prints as the LIMIT
-    # band 2.35/2.15, capped under the die root and floored at the neck's
-    # pre-existing minimum; its lead as a single MAX limit, short enough to
-    # keep the clamp seat flat inside the thread major.  Every other mark
-    # takes the title block's two-place band.
+    # implements the guidelines`), owner ruling 2026-10-26 (#1951, option B):
+    # the seat diameter prints as the LIMIT band 3.60/3.40, its upper limit
+    # under the #8-32 2A major minimum so the lead always steps up into the
+    # thread blank; the shoulder length (to the lead's foot) as 4.10/3.70, so
+    # the loop clears the lead and full thread starts inside the MHA-SM-01
+    # engagement budget.  Every other mark takes the title block's band.
     _limit_band(
         adapter,
         "ShankProfile",
-        "ReliefDia",
-        (RELIEF_DIA_LOWER, RELIEF_DIA_UPPER),
-        RELIEF_DIA_TOL_TYPE,
+        "SeatDia",
+        (SEAT_DIA_LOWER, SEAT_DIA_UPPER),
+        SEAT_DIA_TOL_TYPE,
     )
-    _single_limit(
-        adapter, "LeadReference", "HeadLead", RELIEF_LEAD, RELIEF_LEAD_TOL_TYPE
+    _limit_band(
+        adapter,
+        "ShankProfile",
+        "ShoulderLength",
+        (SHOULDER_LENGTH_LOWER, SHOULDER_LENGTH_UPPER),
+        SHOULDER_LENGTH_TOL_TYPE,
     )
 
     await apply_material(adapter, MATERIAL)
@@ -577,11 +528,10 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _author_dimension_callouts(adapter)
-    # The reference sketches own printed dimensions but no geometry: hide them
-    # so no assembly instance renders them (#880).  The drawing shows them per
-    # view through _drawing_hidden_sketches to import those dimensions.
+    # The station reference owns a printed dimension but no geometry: hide it
+    # so no assembly instance renders it (#880).  The drawing shows it per
+    # view through _drawing_hidden_sketches to import that dimension.
     blank_sketch(adapter, "StationReference")
-    blank_sketch(adapter, "LeadReference")
     apply_drawing_properties(
         adapter,
         PART_NAME,

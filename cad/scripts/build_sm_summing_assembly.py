@@ -32,9 +32,12 @@ boss-hook / counter-spring / gooseneck chain.
   boss top face + counter-spring + gooseneck -- the counter-balance hung from
   the east column; the post is gripped by the top-frame rail hub's set screw
   (no separate clamp part).
-* sm-gooseneck-spring-screw -- made MHA-SM-04 fillister, head outboard, clamps the
-  supplier upper-eye band to the gooseneck plug face; locked to the fixed
-  gooseneck with no additional operational DOF.
+* sm-gooseneck-spring-screw -- made MHA-SM-04 fillister shoulder screw, head
+  outboard: the supplier upper loop sits on its plain O3.50 seat and the head
+  clamps it to the gooseneck plug face, while the #8-32 thread past the seat's
+  45-degree lead runs through the plug's through tap (owner ruling 2026-10-26
+  (#1951, option B)); locked to the fixed gooseneck with no additional
+  operational DOF.
 
 Cross-subassembly fits (checked at the top level): the channel springs
 (ch-channel.SLDASM) thread the summing-lever plate's O4.5 holes -- gated
@@ -562,15 +565,37 @@ def _assert_counter_spring_top_hang(
         raise RuntimeError(
             f"double-loop band does not fit clamped gap: {axial_gap:.9f} mm"
         )
-    # ROT_Y_POS90 sends the shank toward -X. The die relief occupies only the
-    # outboard part of the supplier eye band; the rest MUST bear on the full
-    # thread major used by counter_upper_support_offset.
+    # Owner ruling 2026-10-26 (#1951, option B): the loop bears on MHA-SM-04's
+    # plain seat. ROT_Y_POS90 sends the shank toward -X, so a station from the
+    # under-head face is head_x - x. The band reaches the plug face, past the
+    # seat's end at the 45-degree lead's foot (SHOULDER_LENGTH_MIN at the
+    # shortest shoulder), so only the loop's two pull-side wire passes may
+    # touch the screw: sm_gooseneck_spring_joint fixes them (LOOP_PASS_X) for
+    # the plumb loop centred in the gap and bounds their clearance to the lead
+    # and to the largest under-head corner. The band check above already holds
+    # the loop plumb; hold it to that centre too, so those budgets are this
+    # pose's, and require both passes on the seat.
     head_x = spring_mounts.GOOSENECK_END_X + sm_gooseneck_geom.SPRING_EYE_GAP
-    full_thread_overlap = min(
-        pose.upper_eye_xy[0] + band, head_x - spring_screw.RELIEF_WIDTH
-    ) - max(pose.upper_eye_xy[0] - band, head_x - spring_screw.LENGTH)
-    if min(full_thread_overlap, spring_joint.EYE_FULL_THREAD_OVERLAP_MIN) <= 0.0:
-        raise RuntimeError("counter upper eye bears only on the screw die relief")
+    seat_shift = (
+        head_x - pose.upper_eye_xy[0] - sm_gooseneck_geom.SPRING_EYE_GAP / 2.0
+    )
+    passes = tuple(station + seat_shift for station in spring_joint.LOOP_PASS_X)
+    seat_overhang = (
+        head_x - (pose.upper_eye_xy[0] - band) - spring_screw.SHOULDER_LENGTH_MIN
+    )
+    lead_clearance = spring_joint.LOOP_LEAD_CLEARANCE_MIN
+    corner_clearance = spring_joint.LOOP_CORNER_CLEARANCE_MIN
+    if (
+        abs(seat_shift) > 1e-9
+        or not 0.0 < passes[0] < passes[1] < spring_screw.SHOULDER_LENGTH_MIN
+        or min(lead_clearance, corner_clearance) <= 0.0
+    ):
+        raise RuntimeError(
+            "counter upper loop does not bear on the screw's plain seat: loop "
+            f"{seat_shift:.9f} off the gap centre, passes at {passes[0]:.4f}/"
+            f"{passes[1]:.4f} vs seat end {spring_screw.SHOULDER_LENGTH_MIN:.2f}, "
+            f"lead/corner clearance {lead_clearance:.4f}/{corner_clearance:.4f} mm"
+        )
     coil_top = (
         pose.centre_xy[1]
         + uy * counter_stock.coil_end_x_mm(pose.length_mm)
@@ -586,8 +611,11 @@ def _assert_counter_spring_top_hang(
         )
     log(
         f"counter upper support: head retention {retention:.3f}, "
-        f"eye clamp side clearance {axial_gap:.9f}, full-thread eye overlap "
-        f"{full_thread_overlap:.5f}, main coil {main_coil_gap:.3f}, "
+        f"eye clamp side clearance {axial_gap:.9f}, seat passes "
+        f"{passes[0]:.4f}/{passes[1]:.4f} before the O{spring_screw.SEAT_DIA:.2f} "
+        f"seat's end {spring_screw.SHOULDER_LENGTH_MIN:.2f} (band {seat_overhang:.4f} "
+        f"past it to the plug face), lead/corner clearance {lead_clearance:.4f}/"
+        f"{corner_clearance:.4f}, main coil {main_coil_gap:.3f}, "
         f"half-turn tube/head {tube_gap:.3f}/{head_gap:.3f} mm"
     )
 

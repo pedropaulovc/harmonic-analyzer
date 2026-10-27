@@ -3,7 +3,8 @@ r"""Build the gooseneck post with its brazed, through-tapped end plug.
 The polished Ø16 x 2-wall tube anchors the stock counter spring above the
 summing lever. Its vertical leg, R51 quarter bend and horizontal arm form
 one hollow tube. A physical Ø12 x 8 AISI 1018 plug is silver-brazed flush
-with the arm end, then drilled and tapped #6-32 UNC-2B through. Both tap
+with the arm end, then drilled and tapped #8-32 UNC-2B through (owner ruling
+2026-10-26 (#1951, option B)). Both tap
 ends have a 0.25 x 45-degree break, leaving 7.50 mm nominal full thread
 (6.99 mm minimum at the printed plug-length band). The made MHA-SM-04
 slotted fillister screw is a separate component, not part of this weldment.

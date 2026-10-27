@@ -608,8 +608,8 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "ch_vn_frame_side_screw",  # #2-56 fillister (McMaster 91794A080, MHA-CH-VN-52); member, x2 into top_frame KeeperTaps (top-level row)
         "ch_fulcrum_keeper",  # #1-72 UNF crown tap through to the shaft bore (receiver of MHA-CH-VN-55); its #2 foot hole is clearance only
         "ch_vn_fulcrum_set_screw",  # #1-72 UNF x 5/32 cup-point set screw (McMaster 91375A942, MHA-CH-VN-55), member: x2, one into each fulcrum_keeper crown tap
-        "sm_gooseneck",  # receiver: through-tapped brazed end plug; also the post gripped by the frame's set screw
-        "sm_gooseneck_spring_screw",  # made MHA-SM-04 fillister: clamps the counter-spring upper eye to the plug
+        "sm_gooseneck",  # receiver: #8-32 through-tapped brazed end plug; also the post gripped by the frame's set screw
+        "sm_gooseneck_spring_screw",  # made MHA-SM-04 #8-32 shoulder screw: clamps the counter-spring upper eye on its Ø3.50 seat to the plug
         "fr_vn_gooseneck_set_screw",  # 1/4-20 UNC x 3/4 square-head cup point (91410A540), member: into top_frame hub boss tap, grips summing gooseneck
         "pd_vn_guide_lock_screw",  # #4-40 slotted pan head (McMaster 91792A108, MHA-PD-VN-60, R9-31), member: 8 into the platen_guide rear through taps
         "pn_vn_hanger_screw",  # #8-32 UNC x 1 hex head (McMaster 93075A199), member through the pen-hanger strap's clearance hole into the hanger nut and jam nut
@@ -1568,15 +1568,19 @@ JOINTS: tuple[Joint, ...] = (
             "swivelling on the thread. No operating rubbing torque reaches the screw axis."
         ),
         axial_capture=(
-            "made MHA-SM-04 fillister head clamps the double-loop band to the brazed "
-            "plug end face; full thread engagement is limited by the through-tapped "
-            "plug. The screw tip continues into the hollow arm, not into a blind bottom."
+            "made MHA-SM-04 fillister head clamps the double-loop band, seated on the "
+            "screw's plain Ø3.50 shoulder, to the brazed plug end face; full thread "
+            "engagement is limited by the #8-32 through-tapped plug. The screw tip "
+            "continues into the hollow arm, not into a blind bottom."
         ),
         lock=Lock.NONE,
         evidence=(
             "user, 2026-09-21, binding upper-eye clamp ruling: static nonrotating "
-            "eye, no threadlocker; sm_gooseneck_spring_joint.py "
-            "ENGAGEMENT_MIN/HEAD_RETENTION_MIN/EYE_FULL_THREAD_OVERLAP_MIN/"
+            "eye, no threadlocker; owner ruling 2026-10-26 (#1951, option B): "
+            "Ø3.50 shoulder seat, #8-32 thread and retapped plug; "
+            "sm_gooseneck_spring_joint.py "
+            "ENGAGEMENT_MIN/MATED_ENGAGEMENT_MIN/PLUG_WALL_MIN/HEAD_RETENTION_MIN/"
+            "LOOP_LEAD_CLEARANCE_MIN/LOOP_CORNER_CLEARANCE_MIN/"
             "SCREW_REACH/TIP_PROTRUSION_MIN; "
             "build_sm_summing_assembly.py gooseneck spring screw lock_mate "
             "(CAD restraint, not mechanical locking hardware); the installation "

@@ -364,14 +364,15 @@ def export_snapshot(
     mount = modules["spring_mount_geom"]
     settled = modules["settled_spring_seats"]
     goose = modules["sm_gooseneck_geom"]
-    # Releases before MHA-SM-04 model the counter eye on the gooseneck's
-    # integral screw shank; later trees seat it on the separate made screw's
-    # #6-32 major diameter.
-    counter_screw_dia = (
-        goose.SCREW_SHANK_DIA
-        if hasattr(goose, "SCREW_SHANK_DIA")
-        else identity_map.import_module(cad, "sm_gooseneck_spring_screw_geom").MAJOR_DIA
-    )
+    # screwRadiusMm is the shank the counter eye hangs on.  Releases before
+    # MHA-SM-04 model it as the gooseneck's integral screw shank; #6-32 trees
+    # seat the eye on the separate made screw's thread major; shoulder-screw
+    # trees (owner ruling 2026-10-26 (#1951, option B)) on its plain SEAT_DIA.
+    if hasattr(goose, "SCREW_SHANK_DIA"):
+        counter_screw_dia = goose.SCREW_SHANK_DIA
+    else:
+        made_screw = identity_map.import_module(cad, "sm_gooseneck_spring_screw_geom")
+        counter_screw_dia = getattr(made_screw, "SEAT_DIA", made_screw.MAJOR_DIA)
     mag = modules["mg_magnifying_lever_geom"]
     lw = modules["mg_lever_wire_geom"]
     pw = modules["pn_pen_wire_geom"]

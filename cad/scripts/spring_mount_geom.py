@@ -226,10 +226,16 @@ _COUNTER_LOWER_OFFSET = _counter_lower_offset()
 
 
 def counter_upper_support_offset(axis: tuple[float, float]) -> float:
-    """Seat the eye on full-thread major diameter, not the partial die relief."""
+    """Seat the loop's pull-side passes on MHA-SM-04's plain Ø3.50 shoulder.
+
+    Owner ruling 2026-10-26 (#1951, option B): the loop bears on the plain
+    turned seat under the head, never on the #8-32 thread past its 45-degree
+    lead (sm_gooseneck_spring_joint bounds the passes clear of the lead and the
+    under-head corner), so the bearing surface is the seat diameter.
+    """
     ux, uy = axis
     radius = counter_stock.COIL_MEAN_RADIUS_MM
-    tube = counter_stock.WIRE_RADIUS_MM + spring_screw.MAJOR_DIA / 2.0
+    tube = counter_stock.WIRE_RADIUS_MM + spring_screw.SEAT_DIA / 2.0
     omega = 2.0 * math.pi * counter_stock.LOOP_TURNS
     half_interval = math.asin(tube / radius) / omega
 

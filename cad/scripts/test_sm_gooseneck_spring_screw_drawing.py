@@ -45,7 +45,10 @@ def test_part_registry_row_is_the_made_screw() -> None:
     # A static clamp, not a running fit.
     assert "fit_class" not in row
     assert row["process"] != "purchased"
-    assert row["process"] == "turned slotted fillister screw; die-cut #6-32 thread"
+    assert row["process"] == (
+        "turned slotted fillister shoulder screw: plain Ø3.50 loop seat, "
+        "45-degree lead, die-cut #8-32 thread"
+    )
     assert part.MATERIAL == "Plain Carbon Steel"
 
 
@@ -66,16 +69,28 @@ def test_spec_is_the_single_source_of_marked_dimensions() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.SIDE_KEEP) | set(drawing.END_KEEP) == marked
     assert not set(drawing.SIDE_KEEP) & set(drawing.END_KEEP)
-    # The thread is defined by its callout, not a Ø3.51 dimension, and the
+    # The thread is defined by its callout, not a Ø4.17 dimension, and the
     # crown by its rise and the note, not a radius.
     assert "ThreadDia" not in marked
     assert "CrownRadius" not in marked
     # The slot width is only true-size in the head-end view.
     assert set(drawing.END_KEEP) == {"SlotWidth"}
-    # The profile's lead stays unprinted; the lead prints from the lower
-    # silhouette's reference line.
-    assert "ReliefLead" not in marked
-    assert spec.DRAWING_DIMENSIONS["LeadReference"] == {"HeadLead"}
+    # The lead stays unprinted: the two diameters fix it, the shoulder
+    # length's callout names it, and no reference sketch restates it.
+    assert "StepLead" not in marked
+    assert set(spec.DRAWING_DIMENSIONS) == {
+        "HeadProfile",
+        "ShankProfile",
+        "SlotProfile",
+        "DriverSlot",
+        "StationReference",
+    }
+    assert spec.DRAWING_DIMENSIONS["ShankProfile"] == {
+        "UnderHeadLength",
+        "SeatDia",
+        "ShoulderLength",
+        "TipChamfer",
+    }
 
 
 def test_model_owns_places_and_bands() -> None:
@@ -86,13 +101,12 @@ def test_model_owns_places_and_bands() -> None:
         name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 1
     }
     # Chamfers never need extra places (rule 3); every other mark is .XX.
-    assert one_place == {"TipChamfer", "HeadLead"}
+    assert one_place == {"TipChamfer"}
     assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {1, 2}
     assert spec.REFERENCE_DIMENSIONS == {"OverallLength"}
-    # No mark carries a shared-helper band: the relief Ø is a native LIMIT
-    # band and the lead a single MAX, both set by the part with the model
-    # value as the upper limit; every other mark takes the title block's
-    # .XX band.
+    # No mark carries a shared-helper band: the seat Ø and the shoulder
+    # length are native LIMIT bands set by the part (owner ruling 2026-10-26
+    # (#1951, option B)); every other mark takes the title block's band.
     assert model_toleranced_dimensions(part) == {}
     tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
 
@@ -103,19 +117,23 @@ def test_model_owns_places_and_bands() -> None:
             if isinstance(node, ast.Call) and getattr(node.func, "id", "") == helper
         }
 
-    assert calls("_single_limit") == {
-        ("'LeadReference'", "'HeadLead'", "RELIEF_LEAD", "RELIEF_LEAD_TOL_TYPE"),
-    }
     assert calls("_limit_band") == {
         (
             "'ShankProfile'",
-            "'ReliefDia'",
-            "(RELIEF_DIA_LOWER, RELIEF_DIA_UPPER)",
-            "RELIEF_DIA_TOL_TYPE",
+            "'SeatDia'",
+            "(SEAT_DIA_LOWER, SEAT_DIA_UPPER)",
+            "SEAT_DIA_TOL_TYPE",
+        ),
+        (
+            "'ShankProfile'",
+            "'ShoulderLength'",
+            "(SHOULDER_LENGTH_LOWER, SHOULDER_LENGTH_UPPER)",
+            "SHOULDER_LENGTH_TOL_TYPE",
         ),
     }
-    assert geom.RELIEF_DIA_TOL_TYPE == 3  # swTolLIMIT
-    assert geom.RELIEF_LEAD_TOL_TYPE == 6  # swTolMAX
+    assert not hasattr(part, "_single_limit")
+    assert geom.SEAT_DIA_TOL_TYPE == 3  # swTolLIMIT
+    assert geom.SHOULDER_LENGTH_TOL_TYPE == 3  # swTolLIMIT
 
 
 def test_policy_sheet_carries_no_gdt_or_render_time_precision() -> None:
@@ -142,7 +160,9 @@ def test_geometry_matches_the_settled_design() -> None:
     assert geom.SLOT_DEPTH == 3.00
     assert geom.SLOT_FLOOR_Z == pytest.approx(4.00)
     assert geom.LENGTH == 16.00
-    assert geom.MAJOR_DIA == pytest.approx(3.5052)
+    assert geom.MAJOR_DIA == pytest.approx(0.164 * 25.4)
+    assert geom.SEAT_DIA == 3.50
+    assert geom.SHOULDER_LENGTH == 3.90
     assert geom.OVERALL_LENGTH == pytest.approx(23.0)
     assert geom.CROWN_RADIUS == pytest.approx((6.25**2 + 1.0) / 2.0)
     assert geom.CROWN_CENTER_Z == pytest.approx(7.0 - geom.CROWN_RADIUS)
@@ -171,49 +191,83 @@ def test_controlling_crown_rise_keeps_a_fillister_head_across_its_band() -> None
     assert 0.0 < spec.CROWN_RISE_MIN < spec.CROWN_RISE_MAX < geom.HEAD_DIA / 2.0
 
 
-def test_relief_sits_below_the_die_root_with_a_flat_seat() -> None:
-    # The relief's LIMIT band: its upper limit is the largest 0.05 step under
-    # the estimated deepest die root, about the unchanged model value 2.20;
-    # the lead's single MAX is the model value.
-    assert geom.RELIEF_DIA == pytest.approx(2.20)
-    assert geom.THREAD_MINOR_2A_MIN_EST == pytest.approx(2.3826, abs=1e-4)
-    assert geom.RELIEF_DIA_MAX == pytest.approx(2.35)
+def test_seat_sits_under_the_thread_major() -> None:
+    # Owner ruling 2026-10-26 (#1951, option B): the Ø3.50 seat keeps the old
+    # #6-32 crest height (0.1380 in = 3.5052) within 0.003 radial.
+    assert abs(geom.SEAT_DIA - 0.138 * 25.4) / 2.0 < 0.003
+    # Its LIMIT band 3.60/3.40: the upper limit stays under the #8-32 2A
+    # major minimum, so the lead always steps UP into the thread blank.
+    assert (geom.SEAT_DIA_LOWER, geom.SEAT_DIA_UPPER) == pytest.approx((-0.10, 0.10))
+    assert (geom.SEAT_DIA_MIN, geom.SEAT_DIA_MAX) == pytest.approx((3.40, 3.60))
+    assert geom.THREAD_MAJOR_2A_MIN == pytest.approx(3.990, abs=1e-3)
+    assert geom.SEAT_DIA_MAX < geom.THREAD_MAJOR_2A_MIN
+    # The shoulder length's LIMIT band 4.10/3.70, to the lead's foot.
     assert (
-        geom.RELIEF_DIA_MAX < geom.THREAD_MINOR_2A_MIN_EST < geom.RELIEF_DIA_MAX + 0.05
+        geom.SHOULDER_LENGTH_LOWER,
+        geom.SHOULDER_LENGTH_UPPER,
+    ) == pytest.approx((-0.20, 0.20))
+    assert (geom.SHOULDER_LENGTH_MIN, geom.SHOULDER_LENGTH_MAX) == pytest.approx(
+        (3.70, 4.10)
     )
-    # The design's pre-existing floor (the former 2.20 +/-0.05), #1951.
-    assert geom.RELIEF_DIA_MIN == pytest.approx(2.15)
-    assert (geom.RELIEF_DIA_LOWER, geom.RELIEF_DIA_UPPER) == pytest.approx(
-        (-0.05, 0.15)
-    )
-    assert geom.RELIEF_LEAD_MAX == geom.RELIEF_LEAD == pytest.approx(0.30)
-    assert geom.RELIEF_FLOOR_MIN >= 1.5 * geom.PITCH
-    # The largest relief under the longest lead still leaves a flat seat.
-    assert geom.SEAT_FLAT_INNER_DIA_MAX == pytest.approx(2.95)
-    assert geom.SEAT_FLAT_INNER_DIA_MAX < geom.MAJOR_DIA
-    assert spec.DIMENSION_CALLOUTS_BY_NAME["ReliefDia"].splitlines() == [
-        "UNDER DIE ROOT,",
-        "MIN FOR",
-        "CLAMP TORQUE",
+    # Each LIMIT band names what it serves (drawing-guidelines.md rule 4).
+    callouts = spec.DIMENSION_CALLOUTS_BY_NAME
+    assert callouts["SeatDia"].splitlines() == [
+        "MHA-SM-VN-51 LOOP",
+        "SEAT, UNDER",
+        "THREAD MAJOR",
+    ]
+    assert callouts["ShoulderLength"].splitlines() == [
+        "TO 45 DEG LEAD; LOOP",
+        "CLEARS LEAD, FULL",
+        "THREAD IN MHA-SM-01",
     ]
     assert spec.CHAMFER_CALLOUT == "X 45 DEG"
 
 
-def test_lead_reference_line_is_the_lead_on_the_lower_silhouette() -> None:
-    (u0, v0), (u1, v1) = part.LEAD_REFERENCE_LINE
-    r = geom.RELIEF_DIA / 2.0
-    assert (u0, v0) == pytest.approx((0.0, -(r + geom.RELIEF_LEAD)))
-    assert (u1, v1) == pytest.approx((geom.RELIEF_LEAD, -r))
-    # 45 degrees: equal legs, both the profile's lead.
-    assert u1 - u0 == pytest.approx(v1 - v0) == pytest.approx(geom.RELIEF_LEAD)
+def _shank_profile_points() -> list[tuple[float, float]]:
+    """The builder's ShankProfile chain, evaluated in the builder's names."""
+    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+    (node,) = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and [ast.unparse(target) for target in node.targets] == ["points"]
+    ]
+    return eval(compile(ast.Expression(node.value), "<points>", "eval"), vars(part))
+
+
+def test_shank_profile_is_seat_lead_thread_and_tip() -> None:
+    seat_r, thread_r = geom.SEAT_DIA / 2.0, geom.MAJOR_DIA / 2.0
+    expected = [
+        (0.0, 0.0),
+        (0.0, seat_r),
+        (geom.SHOULDER_LENGTH, seat_r),
+        (geom.SHOULDER_LENGTH + geom.STEP_LEAD, thread_r),
+        (geom.LENGTH - geom.TIP_CHAMFER, thread_r),
+        (geom.LENGTH, thread_r - geom.TIP_CHAMFER),
+        (geom.LENGTH, 0.0),
+    ]
+    points = _shank_profile_points()
+    assert len(points) == len(expected)
+    for got, want in zip(points, expected):
+        assert got == pytest.approx(want)
+    # The lead is 45 degrees: its axial leg equals its radial leg, the two
+    # diameters' half-difference.
+    (u0, v0), (u1, v1) = points[2], points[3]
+    assert u1 - u0 == pytest.approx(v1 - v0) == pytest.approx(geom.STEP_LEAD)
+    assert geom.STEP_LEAD == pytest.approx((geom.MAJOR_DIA - geom.SEAT_DIA) / 2.0)
+    # The model holds it by equation from the two diameter globals, so the
+    # radial leg (set by the diameters) is never dimensioned a second time.
     build = Path(part.__file__).read_text(encoding="utf-8")
-    blank = 'blank_sketch(adapter, "LeadReference")'
-    assert blank in build
-    assert build.index(blank) < build.rindex("save_part_and_images(adapter, PART_NAME)")
+    assert """shank.record("StepLead", '("ThreadDia" - "SeatDia") / 2')""" in build
+    # The only vertical leg dimensioned anywhere is the tip chamfer's rise.
+    assert build.count('"vertical_distance"') == 1
+    # No hidden reference sketch restates the lead: only StationReference.
+    assert build.count("blank_sketch(adapter, ") == 1
 
 
 def test_thread_callout_names_the_size_but_not_the_title_block_class() -> None:
-    assert spec.THREAD_CALLOUT == "#6-32 UNC"
+    assert spec.THREAD_CALLOUT == "#8-32 UNC"
     assert "2A" not in spec.THREAD_CALLOUT
     assert drawing.THREAD_CALLOUT is spec.THREAD_CALLOUT
 
@@ -222,9 +276,11 @@ def test_notes_are_short_and_carry_no_dimension_or_method() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
     assert 1 <= len(lines) <= 4
     for line in lines:
-        # Only the mating parts' numbers are quoted.
+        # Only the mating parts' numbers are quoted, and note 3's die
+        # run-out bound (sm_gooseneck_spring_joint.MATED_ENGAGEMENT_MIN
+        # assumes it), which no view can show.
         text = line.split(". ", 1)[-1]
-        for number in ("MHA-SM-01", "MHA-SM-VN-51"):
+        for number in ("MHA-SM-01", "MHA-SM-VN-51", f"{geom.DIE_RUNOUT:.1f}"):
             text = text.replace(number, "")
         assert not any(ch.isdigit() for ch in text), line
         for word in ("TORQUE", "LOCTITE", "N-M", "IN-LB"):
@@ -251,15 +307,20 @@ def test_part_sheet_carries_no_assembly_instruction() -> None:
 
 
 def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
-    r_head, r_thread, r_relief = 6.25, 3.5052 / 2.0, 1.1
+    r_head, r_thread, r_seat = 6.25, 0.164 * 25.4 / 2.0, 1.75
+    shoulder, lead = 3.9, r_thread - r_seat
     rc = geom.CROWN_RADIUS
     cap = math.pi * 1.0**2 * (3.0 * rc - 1.0) / 3.0
     assert part.V_HEAD == pytest.approx(math.pi * r_head**2 * 6.0 + cap)
-    # Pappus: the lead's 0.3 x 0.3 triangle stays, the tip chamfer's goes.
-    lead = 2.0 * math.pi * (r_relief + 0.1) * 0.045
+    # The major cylinder less the annulus over the seat and, by Pappus, the
+    # lead's corner triangle (legs `lead`, centroid r_seat + 2 lead/3) and
+    # the tip chamfer's (legs 0.3, centroid r_thread - 0.1).
+    over_seat = math.pi * (r_thread**2 - r_seat**2) * shoulder
+    over_lead = 2.0 * math.pi * (r_seat + 2.0 * lead / 3.0) * lead**2 / 2.0
     tip = 2.0 * math.pi * (r_thread - 0.1) * 0.045
-    relief = math.pi * (r_thread**2 - r_relief**2) * 2.2 - lead
-    assert part.V_SHANK == pytest.approx(math.pi * r_thread**2 * 16.0 - relief - tip)
+    assert part.V_SHANK == pytest.approx(
+        math.pi * r_thread**2 * 16.0 - over_seat - over_lead - tip
+    )
     assert part.V_BODY == pytest.approx(part.V_HEAD + part.V_SHANK)
     # Independent slot volume: a 3-D midpoint grid over the strip.
     steps_z, steps_y = 600, 200
@@ -281,8 +342,11 @@ def test_side_view_stations_follow_the_model() -> None:
     scale = drawing.SHEET_SCALE[0] / 1000.0
     assert drawing.TIP_X - drawing.APEX_X == pytest.approx(geom.OVERALL_LENGTH * scale)
     assert drawing.UNDERHEAD_X - drawing.APEX_X == pytest.approx(geom.HEAD_H * scale)
-    assert drawing.RELIEF_END_X - drawing.UNDERHEAD_X == pytest.approx(
-        geom.RELIEF_WIDTH * scale
+    assert drawing.LEAD_FOOT_X - drawing.UNDERHEAD_X == pytest.approx(
+        geom.SHOULDER_LENGTH * scale
+    )
+    assert drawing.LEAD_TOP_X - drawing.LEAD_FOOT_X == pytest.approx(
+        geom.STEP_LEAD * scale
     )
     # Model +Z runs paper-left in *Right: head left, tip right.
     assert (
@@ -290,7 +354,8 @@ def test_side_view_stations_follow_the_model() -> None:
         < drawing.RIM_X
         < drawing.SLOT_FLOOR_X
         < drawing.UNDERHEAD_X
-        < drawing.RELIEF_END_X
+        < drawing.LEAD_FOOT_X
+        < drawing.LEAD_TOP_X
         < drawing.THREAD_START_X
         < drawing.TIP_X
     )
@@ -320,7 +385,7 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         drawing.THREAD_NOTE_XY,
         drawing.ISO_NOTE_XY,
         drawing.NOTES_XY,
-        drawing.RELIEF_DIA_TEXT_XY,
+        drawing.SEAT_DIA_TEXT_XY,
         (drawing.TIP_X, drawing.SIDE_CENTER[1]),
         *drawing.SIDE_KEEP.values(),
         *drawing.END_KEEP.values(),
@@ -328,44 +393,62 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     for x, y in points:
         assert inner[0] < x < inner[2] and inner[1] < y < inner[3]
         assert not (x >= title_block[0] and y <= title_block[1])
-    # The thread callout's leader lands on the full thread, never the relief.
+    # The thread callout's leader lands on the full thread, never the lead.
     assert drawing.THREAD_PICK[0] == drawing.THREAD_START_X
-    assert drawing.THREAD_START_X - drawing.RELIEF_END_X > 0.0
+    assert drawing.THREAD_START_X - drawing.LEAD_TOP_X > 0.0
     thread_half = geom.MAJOR_DIA * drawing.SHEET_SCALE[0] / 2000.0
     assert abs(drawing.THREAD_PICK[1] - drawing.SIDE_CENTER[1]) < thread_half
     assert drawing.THREAD_NOTE_XY[0] - drawing.THREAD_PICK[0] > 0.010
-    # The relief marks sit on the groove.  The Ø stands on the floor beside
-    # the flank and its text hangs right of its own dimension line (its
+    # The two LIMIT blocks are estimated at 3.0 mm a character of their widest
+    # callout line and a 5.5 mm line pitch (no farm run has rendered them).
+    callouts = spec.DIMENSION_CALLOUTS_BY_NAME
+    for name, width, drop in (
+        ("SeatDia", drawing.SEAT_DIA_TEXT_WIDTH, drawing.SEAT_DIA_TEXT_BOTTOM_DROP),
+        (
+            "ShoulderLength",
+            drawing.SHOULDER_LENGTH_TEXT_WIDTH,
+            drawing.SHOULDER_LENGTH_TEXT_BOTTOM_DROP,
+        ),
+    ):
+        lines = callouts[name].splitlines()
+        assert width == pytest.approx(0.003 * max(map(len, lines)))
+        assert drop == pytest.approx(0.0097 + 0.0055 * (len(lines) - 2))
+    # The seat Ø stands on the seat, its line clear of the under-head
+    # extension line, and its text hangs right of its own dimension line (its
     # leader meets the text's left end, so the leader runs beside the text,
-    # not through it), below the thread silhouette and clear of the
+    # not through it), below the thread silhouette and short of the
     # tip-chamfer extension lines (layout audit, farm run 20261010T190631112Z).
-    for name in ("ReliefDia", "ReliefWidth"):
-        assert drawing.UNDERHEAD_X < drawing.SIDE_KEEP[name][0] < drawing.RELIEF_END_X
-    assert drawing.SIDE_KEEP["ReliefDia"][0] == drawing.RELIEF_DIA_X
-    assert drawing.LEAD_FOOT_X + 0.003 < drawing.RELIEF_DIA_X < drawing.RELIEF_END_X
-    text_x, text_y = drawing.RELIEF_DIA_TEXT_XY
-    left = text_x - drawing.RELIEF_DIA_TEXT_WIDTH / 2.0
-    right = text_x + drawing.RELIEF_DIA_TEXT_WIDTH / 2.0
-    assert left > drawing.RELIEF_DIA_X
+    assert drawing.SIDE_KEEP["SeatDia"][0] == drawing.SEAT_DIA_X
+    assert drawing.UNDERHEAD_X + 0.003 <= drawing.SEAT_DIA_X < drawing.LEAD_FOOT_X
+    text_x, text_y = drawing.SEAT_DIA_TEXT_XY
+    left = text_x - drawing.SEAT_DIA_TEXT_WIDTH / 2.0
+    right = text_x + drawing.SEAT_DIA_TEXT_WIDTH / 2.0
+    assert left > drawing.SEAT_DIA_X
     assert right <= drawing.THREAD_START_X - 0.002
     # The stacked upper limit's top stays clear of the shank's lower outline
     # (farm run 20261024T052013556Z struck it at 9.8 mm above the anchor).
-    thread_bottom = drawing.SIDE_CENTER[1] - thread_half
-    assert text_y + drawing.RELIEF_DIA_TEXT_TOP_ABOVE_ANCHOR <= thread_bottom - 0.002
-    block_bottom = text_y - drawing.RELIEF_DIA_TEXT_BOTTOM_DROP
-    # The lead's extension line drops from the lead's foot on the lower
-    # silhouette, left of the Ø's leader; its text block stands right of
-    # that line with room to spare (the layout audit of farm run
-    # 20261024T031009457Z found the line through the block's left edge),
-    # under the Ø's LIMIT block and above row 0.
-    lead_x, lead_y = drawing.SIDE_KEEP["HeadLead"]
-    lead_left = lead_x - drawing.LEAD_TEXT_WIDTH / 2.0
-    assert drawing.UNDERHEAD_X < drawing.LEAD_FOOT_X <= lead_left - 0.003
-    assert drawing.LEAD_FOOT_X < drawing.RELIEF_DIA_X - 0.003
-    assert lead_y + drawing.LEAD_TEXT_TOP_ABOVE_ANCHOR <= block_bottom - 0.002
-    assert lead_y - drawing.SIDE_KEEP["UnderHeadLength"][1] >= 0.015
-    assert lead_x + drawing.LEAD_TEXT_WIDTH / 2.0 < drawing.THREAD_START_X - 0.005
-    assert drawing.NECK_BOTTOM_Y > text_y
+    assert drawing.THREAD_BOTTOM_Y < drawing.SEAT_BOTTOM_Y
+    assert (
+        text_y + drawing.LIMIT_TEXT_TOP_ABOVE_ANCHOR <= drawing.THREAD_BOTTOM_Y - 0.002
+    )
+    # Its callout ends well above row 0.
+    block_bottom = text_y - drawing.SEAT_DIA_TEXT_BOTTOM_DROP
+    assert block_bottom - drawing.SIDE_KEEP["UnderHeadLength"][1] >= 0.015
+    # The shoulder length reads above the profile.  Its callout hangs below
+    # the dimension line, so the block stands wholly right of the lead-foot
+    # extension line (none crosses the callout), right of the head, crown
+    # and slot-depth stack, above the thread and clear over the thread note.
+    shoulder_x, shoulder_y = drawing.SIDE_KEEP["ShoulderLength"]
+    shoulder_left = shoulder_x - drawing.SHOULDER_LENGTH_TEXT_WIDTH / 2.0
+    shoulder_right = shoulder_x + drawing.SHOULDER_LENGTH_TEXT_WIDTH / 2.0
+    shoulder_bottom = shoulder_y - drawing.SHOULDER_LENGTH_TEXT_BOTTOM_DROP
+    assert drawing.LEAD_FOOT_X + 0.003 <= shoulder_left
+    assert shoulder_left > drawing.UNDERHEAD_X > drawing.SIDE_KEEP["SlotDepth"][0]
+    assert shoulder_bottom >= drawing.THREAD_TOP_Y + 0.004
+    assert shoulder_bottom >= drawing.THREAD_NOTE_XY[1] + 0.008
+    assert shoulder_y > drawing.SIDE_KEEP["SlotDepth"][1]
+    assert shoulder_y + drawing.LIMIT_TEXT_TOP_ABOVE_ANCHOR <= inner[3] - 0.010
+    assert drawing.ISO_CENTER[0] - shoulder_right > 0.040
     # The crown rise's text stands outside, left of the apex extension line
     # it shares with the slot depth.
     crown_x = drawing.SIDE_KEEP["CrownRise"][0]
@@ -373,15 +456,16 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     assert (
         crown_x - drawing.CROWN_RISE_TEXT_WIDTH / 2.0 > drawing.SIDE_KEEP["HeadDia"][0]
     )
-    # The relief width stands above the head so its text clears the head face.
-    assert drawing.SIDE_KEEP["ReliefWidth"][1] > drawing.HEAD_TOP_Y
+    # Nothing over the shank shares the head's column.
+    assert drawing.SIDE_KEEP["SlotDepth"][0] < drawing.UNDERHEAD_X
     # The two apex dimensions stack above the head, 12 mm apart.
     crown_y = drawing.SIDE_KEEP["CrownRise"][1]
     slot_y = drawing.SIDE_KEEP["SlotDepth"][1]
     assert drawing.HEAD_TOP_Y < crown_y < slot_y
     assert slot_y - crown_y >= 0.010
-    # The centreline pick lands on the thread, clear of the relief.
-    assert drawing.RELIEF_END_X < drawing.CENTERLINE_PICK[0] < drawing.THREAD_START_X
+    # The centreline pick lands on the thread's face, past the lead.
+    assert drawing.LEAD_TOP_X < drawing.CENTERLINE_PICK[0] < drawing.THREAD_START_X
+    assert abs(drawing.CENTERLINE_PICK[1] - drawing.SIDE_CENTER[1]) < thread_half
     # The isometric stands clear of the thread note.
     assert drawing.ISO_CENTER[0] - drawing.THREAD_NOTE_XY[0] > 0.040
 
@@ -400,27 +484,28 @@ def test_readback_contract_mirrors_every_printed_and_callout_control() -> None:
     printed = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
     assert set(drawing.PRINTED_DIMENSIONS) == printed
     limits = {name: row for name, row in drawing.PRINTED_DIMENSIONS.items() if row[1]}
-    # The builder's limits: the relief's LIMIT band and the lead's single
-    # MAX, the model value being the upper limit of each.
+    # The builder's limits: the seat Ø's and the shoulder length's LIMIT
+    # bands (owner ruling 2026-10-26 (#1951, option B)).
     assert limits == {
-        "ReliefDia": (geom.RELIEF_DIA, 3),
-        "HeadLead": (geom.RELIEF_LEAD, 6),
+        "SeatDia": (geom.SEAT_DIA, 3),
+        "ShoulderLength": (geom.SHOULDER_LENGTH, 3),
     }
     assert drawing.LIMIT_DEVIATIONS == {
-        "ReliefDia": (geom.RELIEF_DIA_LOWER, geom.RELIEF_DIA_UPPER)
+        "SeatDia": (geom.SEAT_DIA_LOWER, geom.SEAT_DIA_UPPER),
+        "ShoulderLength": (geom.SHOULDER_LENGTH_LOWER, geom.SHOULDER_LENGTH_UPPER),
     }
     assert drawing.PRINTED_DIMENSIONS["TipChamfer"] == (geom.TIP_CHAMFER, 0)
     assert drawing.PRINTED_DIMENSIONS["OverallLength"][0] == pytest.approx(23.0)
-    # The profile's own lead stays unbanded; the printed one follows it.
+    # Unprinted controls: the lead's axial leg (45 degrees by equation) and
+    # the thread major the callout defines.
     assert drawing.SOURCE_ONLY_DIMENSIONS == {
-        "ReliefLead@ShankProfile": (geom.RELIEF_LEAD, 0),
+        "StepLead@ShankProfile": (geom.STEP_LEAD, 0),
         "ThreadDia@ShankProfile": (geom.MAJOR_DIA, 0),
     }
-    # The lead's MAX names the part whose loop the flat seat clamps.  The part
-    # authors every callout on the dimension it marks; the drawing writes none.
+    # The part authors every callout on the dimension it marks; the drawing
+    # writes none.
     callouts = spec.DIMENSION_CALLOUTS_BY_NAME
-    lead_callout = callouts["HeadLead"].splitlines()
-    assert lead_callout == ["X 45 DEG", "FLAT SEAT FOR", "MHA-SM-VN-51 LOOP"]
+    assert set(callouts) == {"SeatDia", "ShoulderLength", "TipChamfer"}
     assert callouts["TipChamfer"] == spec.CHAMFER_CALLOUT
     for feature, names in spec.DIMENSION_CALLOUTS.items():
         assert set(names) <= spec.DRAWING_DIMENSIONS[feature]

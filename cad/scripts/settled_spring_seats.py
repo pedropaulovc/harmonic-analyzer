@@ -174,9 +174,11 @@ def channel_seat(amplitude_mm: float) -> SettledSpring:
 def counter_upper_support_geometry() -> dict[str, str | float]:
     """Identify the actual upper support measured by the native fixture.
 
-    Older integral-shank and purchased-screw certificates do not measure this
-    made support. Channel measurements are unchanged; the analytic force and
-    clearance model never depends on a native certificate.
+    Older integral-shank, purchased-screw and #6-32 die-relief screw
+    certificates do not measure this made support: owner ruling 2026-10-26
+    (#1951, option B) seats the loop on a plain Ø3.50 shoulder whose 45-degree
+    lead steps up to the #8-32 thread. Channel measurements are unchanged; the
+    analytic force and clearance model never depends on a native certificate.
     """
     return {
         "component": "sm-gooseneck-spring-screw",
@@ -190,9 +192,8 @@ def counter_upper_support_geometry() -> dict[str, str | float]:
         "crown_rise_mm": spring_screw.CROWN_RISE,
         "slot_width_mm": spring_screw.SLOT_WIDTH,
         "slot_depth_mm": spring_screw.SLOT_DEPTH,
-        "relief_dia_mm": spring_screw.RELIEF_DIA,
-        "relief_width_mm": spring_screw.RELIEF_WIDTH,
-        "relief_lead_mm": spring_screw.RELIEF_LEAD,
+        "seat_dia_mm": spring_screw.SEAT_DIA,
+        "shoulder_length_mm": spring_screw.SHOULDER_LENGTH,
         "tip_chamfer_mm": spring_screw.TIP_CHAMFER,
         "clamp_gap_mm": sm_gooseneck_geom.SPRING_EYE_GAP,
         "arm_end_x_mm": sm_gooseneck_geom.ARM_END_X,
@@ -201,17 +202,45 @@ def counter_upper_support_geometry() -> dict[str, str | float]:
     }
 
 
+# diagnostics/calibrate_spring_seats.py exists to replace a stale counter
+# record, yet it imports build_sm_summing_assembly, whose spec module reads
+# counter_seat() at import.  Only that entry point may set this (a repo scan in
+# test_settled_spring_seats.py holds every other caller out).
+_ACCEPT_STALE_COUNTER_FOR_RECALIBRATION = False
+
+
+def accept_stale_counter_record_for_recalibration() -> None:
+    """Let ``counter_seat()`` return a stale counter record so it can be re-measured.
+
+    Callable ONLY by ``diagnostics/calibrate_spring_seats.py``, at module top,
+    before it imports the summing modules. That driver seeds every
+    measurement from ``spring_mount_geom`` and writes only what its native
+    fixture reads back, so the stale numbers this lets through are never what
+    it records. Every other process keeps the stale-record ``ValueError``.
+    """
+    global _ACCEPT_STALE_COUNTER_FOR_RECALIBRATION
+    _ACCEPT_STALE_COUNTER_FOR_RECALIBRATION = True
+
+
 def counter_seat() -> tuple[SettledSpring, float]:
     """Return the fixed counter placement and gooseneck height for this bank."""
     record = _active_preset()["counter"]
     if record.get("upper_support") != counter_upper_support_geometry():
-        raise ValueError(
+        message = (
             "Stale counter native calibration: upper support must be the "
-            "made MHA-SM-04 screw in its clamped gap. Rebuild "
-            "sm-gooseneck-spring-screw and sm-gooseneck, then run "
-            "diagnostics/calibrate_spring_seats.py --presets neutral square --write "
-            "on a licensed farm/native seat; older support measurements cannot "
-            "certify this joint."
+            "made MHA-SM-04 shoulder screw (plain seat, #8-32 thread) in its "
+            "clamped gap. Rebuild sm-gooseneck-spring-screw and sm-gooseneck, "
+            "then run diagnostics/calibrate_spring_seats.py --presets neutral "
+            "square --write on a licensed farm/native seat; older support "
+            "measurements cannot certify this joint."
+        )
+        if not _ACCEPT_STALE_COUNTER_FOR_RECALIBRATION:
+            raise ValueError(message)
+        import _telemetry
+
+        _telemetry.warn(
+            f"{message} Returning the stale record only so "
+            "diagnostics/calibrate_spring_seats.py can import and re-measure it."
         )
     return (
         _spring(record, expected_clocking="half_turn"),

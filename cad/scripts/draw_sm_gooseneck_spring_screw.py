@@ -1,11 +1,15 @@
 r"""Create the MHA-SM-04 gooseneck spring screw manufacturing drawing.
 
-The SLDPRT remains authoritative.  A screw carries no datum and no
-geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the relief diameter
-prints as the part's stacked LIMIT band, its 45-degree lead as the part's
-single MAX limit, and every other size is an ordinary model dimension at its
-part-authored places under the title block's band for those places (.X for
-the tip chamfer, .XX for the rest).
+The SLDPRT remains authoritative.  MHA-SM-04 is a slotted fillister shoulder
+screw (owner ruling 2026-10-26 (#1951, option B)): a plain Ø3.50 loop seat
+under the head, a 45-degree lead, an #8-32 UNC thread.  A screw carries no
+datum and no geometric-control frame (drawing-guidelines.md rule 5 (avoid
+excessive GD&T)): the seat diameter and the shoulder length (to the lead's
+foot) print as the part's stacked LIMIT bands, and every other size is an
+ordinary model dimension at its part-authored places under the title
+block's band for those places (.X for the tip chamfer, .XX for the rest).
+The lead itself is unprinted: the two diameters fix it and its callout names
+it.
 
 The screw axis is model +Z, so the ``*Right`` view already lays it horizontal
 as it sits in the lathe: model +Z runs to paper-LEFT, putting the crowned head
@@ -66,16 +70,18 @@ from sm_gooseneck_spring_screw_geom import (
     LENGTH,
     MAJOR_DIA,
     OVERALL_LENGTH,
-    RELIEF_DIA,
-    RELIEF_DIA_LOWER,
-    RELIEF_DIA_TOL_TYPE,
-    RELIEF_DIA_UPPER,
-    RELIEF_LEAD,
-    RELIEF_LEAD_TOL_TYPE,
-    RELIEF_WIDTH,
+    SEAT_DIA,
+    SEAT_DIA_LOWER,
+    SEAT_DIA_TOL_TYPE,
+    SEAT_DIA_UPPER,
+    SHOULDER_LENGTH,
+    SHOULDER_LENGTH_LOWER,
+    SHOULDER_LENGTH_TOL_TYPE,
+    SHOULDER_LENGTH_UPPER,
     SLOT_DEPTH,
     SLOT_FLOOR_Z,
     SLOT_WIDTH,
+    STEP_LEAD,
     TIP_CHAMFER,
 )
 from sm_gooseneck_spring_screw_spec import (
@@ -129,35 +135,60 @@ APEX_X = _sheet_x(HEAD_H)
 RIM_X = _sheet_x(HEAD_CYL_H)
 SLOT_FLOOR_X = _sheet_x(SLOT_FLOOR_Z)
 UNDERHEAD_X = _sheet_x(0.0)
-RELIEF_END_X = _sheet_x(-RELIEF_WIDTH)
 TIP_X = _sheet_x(-LENGTH)
 # Where the full thread meets the tip chamfer.
 THREAD_START_X = _sheet_x(-(LENGTH - TIP_CHAMFER))
 HEAD_TOP_Y = _sheet_y(HEAD_DIA / 2.0)
 THREAD_TOP_Y = _sheet_y(MAJOR_DIA / 2.0)
-RELIEF_TOP_Y = _sheet_y(RELIEF_DIA / 2.0)
-RELIEF_MID_X = (UNDERHEAD_X + RELIEF_END_X) / 2.0
-# The 45-degree lead's foot on the relief floor.
-LEAD_FOOT_X = _sheet_x(-RELIEF_LEAD)
-NECK_BOTTOM_Y = _sheet_y(-RELIEF_DIA / 2.0)
-# The relief Ø's dimension line stands on the floor next to the flank,
-# leaving the air under the floor's head end to the lead's extension line.
-RELIEF_DIA_X = RELIEF_END_X - 0.0015
+THREAD_BOTTOM_Y = _sheet_y(-MAJOR_DIA / 2.0)
+SEAT_BOTTOM_Y = _sheet_y(-SEAT_DIA / 2.0)
+# The 45-degree lead: its foot ends the seat, its top meets the thread major.
+LEAD_FOOT_X = _sheet_x(-SHOULDER_LENGTH)
+LEAD_TOP_X = _sheet_x(-(SHOULDER_LENGTH + STEP_LEAD))
+
+# Text-block estimates for the two LIMIT marks.  No farm run has rendered
+# them yet, so they are scaled from the measured ones at this text height
+# (the coordinator retunes from the rendered sheet): 'CLAMP TORQUE' measured
+# 35.8 mm, 3.0 mm a character; a stacked LIMIT's upper limit stood 9.8 mm
+# above the anchor and a two-line callout's underline 9.7 mm below it, at a
+# 5.5 mm line pitch (farm run 20261024T052013556Z, e71509a34).
+_CHAR_WIDTH = 0.0030
+_LINE_PITCH = 0.0055
+LIMIT_TEXT_TOP_ABOVE_ANCHOR = 0.010
+
+
+def _callout_width(name: str) -> float:
+    """Estimated sheet width of a mark's block: its widest callout line."""
+    return _CHAR_WIDTH * max(
+        len(line) for line in DIMENSION_CALLOUTS_BY_NAME[name].splitlines()
+    )
+
+
+def _callout_bottom_drop(name: str) -> float:
+    """Estimated drop of a mark's last callout underline below its anchor."""
+    lines = len(DIMENSION_CALLOUTS_BY_NAME[name].splitlines())
+    return 0.0097 + (lines - 2) * _LINE_PITCH
+
 
 # Rows below the profile, 15 mm apart, the first 38 mm under the head
 # (text sits ~3 mm above its requested point, the dimension line ~5 mm
-# below it), clear of the lead's text block above them.  Row 0 chains the
+# below it), clear of the seat Ø's text block above them.  Row 0 chains the
 # head height and the under-head length from the under-head face; row 1
 # carries the reference overall.
 _ROW_Y = (HEAD_TOP_Y - 0.093, HEAD_TOP_Y - 0.108)
 # ' 1.00 ' as rendered (farm run 20261010T190631112Z).
 CROWN_RISE_TEXT_WIDTH = 0.0116
-# The lead's text block: '0.3 max.' over its three-line callout, the widest
-# line (the spring's number) 48.2 mm as rendered (farm run
-# 20261024T031009457Z, 9d8923584).
-LEAD_TEXT_WIDTH = 0.049
-# Its top line stood 10.7 mm above the anchor in that run.
-LEAD_TEXT_TOP_ABOVE_ANCHOR = 0.011
+# The seat Ø's dimension line stands on the seat near the under-head face,
+# leaving the seat's run toward the lead to its text.
+SEAT_DIA_X = UNDERHEAD_X + 0.004
+# The shoulder length's block: the stacked LIMIT over its three-line callout.
+SHOULDER_LENGTH_TEXT_WIDTH = _callout_width("ShoulderLength")
+SHOULDER_LENGTH_TEXT_BOTTOM_DROP = _callout_bottom_drop("ShoulderLength")
+# The thread callout's leader lands on the edge where the full thread meets
+# the tip chamfer, never on the lead.  The note stands up and right so the
+# leader slants down-left onto that edge.
+THREAD_PICK = (THREAD_START_X, SIDE_CENTER[1] + 0.004)
+THREAD_NOTE_XY = (THREAD_START_X + 0.013, SIDE_CENTER[1] + 0.035)
 SIDE_KEEP = {
     "HeadHeight": ((APEX_X + UNDERHEAD_X) / 2.0, _ROW_Y[0]),
     "UnderHeadLength": ((UNDERHEAD_X + TIP_X) / 2.0, _ROW_Y[0]),
@@ -175,39 +206,34 @@ SIDE_KEEP = {
         HEAD_TOP_Y + 0.012,
     ),
     "SlotDepth": ((APEX_X + SLOT_FLOOR_X) / 2.0, HEAD_TOP_Y + 0.024),
-    # The die relief against the under-head face.  Its width reads above it,
-    # clear of the head; its Ø below it, the dimension line standing on the
-    # floor.
-    "ReliefWidth": (RELIEF_MID_X, HEAD_TOP_Y + 0.005),
-    "ReliefDia": (RELIEF_DIA_X, SIDE_CENTER[1] - 0.012),
-    # The lead reads under the relief from the lower silhouette's reference
-    # line: its text stands right of its 1.2 mm span, under the relief Ø's
-    # LIMIT block and above row 0, its left end clear of the lead's extension
-    # line.
-    "HeadLead": (LEAD_FOOT_X + 0.0035 + LEAD_TEXT_WIDTH / 2.0, HEAD_TOP_Y - 0.076),
+    # The shoulder length reads above the profile from the under-head face
+    # to the lead's foot.  Its 3.9-mm span is far narrower than its block,
+    # and its callout hangs below the dimension line, toward the part, so
+    # the block stands wholly right of the lead-foot extension line (no
+    # extension line crosses the callout), right of the head/crown/slot-depth
+    # stack, and high enough that its callout clears the thread note.
+    "ShoulderLength": (
+        LEAD_FOOT_X + 0.0035 + SHOULDER_LENGTH_TEXT_WIDTH / 2.0,
+        THREAD_NOTE_XY[1] + 0.026,
+    ),
+    # The seat Ø stands on the seat; its text is offset below (see below).
+    "SeatDia": (SEAT_DIA_X, SIDE_CENTER[1] - 0.012),
     # The tip chamfer's axial leg reads below-right of the tip.
     "TipChamfer": (TIP_X + 0.012, SIDE_CENTER[1] - 0.016),
 }
-# The relief Ø's text goes on an OffsetText leader, hung right of its own
+# The seat Ø's text goes on an OffsetText leader, hung right of its own
 # dimension line: the leader meets the text's LEFT end, so with that end
 # right of the line the leader descends beside the text, not through it, and
-# the text stays clear of the under-head and lead extension lines (layout
-# audit of farm run 20261010T190631112Z, 6c56fd769).  Its right end stops
-# short of the tip chamfer's extension lines and the Ø line stays below the
-# thread silhouette.  The block is the stacked limits over the callout.  As
-# rendered in farm run 20261024T052013556Z (e71509a34), its upper limit's top
-# stood 9.8 mm above the anchor, where the shank's lower outline struck it;
-# 'CLAMP TORQUE' measured 35.8 mm (3.0 mm a character), and the underline of
-# the two-line callout sat 9.7 mm below the anchor at a 5.5 mm line pitch.
-# The three-line callout's widest line, 'UNDER DIE ROOT,', is scaled from
-# those, and its underline one more pitch down.
-RELIEF_DIA_TEXT_WIDTH = 0.046
-RELIEF_DIA_TEXT_TOP_ABOVE_ANCHOR = 0.010
-RELIEF_DIA_TEXT_BOTTOM_DROP = 0.0155
-RELIEF_DIA_LEADER_GAP = 0.0008
-RELIEF_DIA_TEXT_XY = (
-    RELIEF_DIA_X + RELIEF_DIA_LEADER_GAP + RELIEF_DIA_TEXT_WIDTH / 2.0,
-    SIDE_CENTER[1] - 0.0205,
+# the text stays clear of the under-head extension line (layout audit of farm
+# run 20261010T190631112Z, 6c56fd769).  Its right end stops short of the tip
+# chamfer's extension lines and its upper limit's top stays below the
+# thread silhouette.  The block is the stacked limits over the callout.
+SEAT_DIA_TEXT_WIDTH = _callout_width("SeatDia")
+SEAT_DIA_TEXT_BOTTOM_DROP = _callout_bottom_drop("SeatDia")
+SEAT_DIA_LEADER_GAP = 0.0008
+SEAT_DIA_TEXT_XY = (
+    SEAT_DIA_X + SEAT_DIA_LEADER_GAP + SEAT_DIA_TEXT_WIDTH / 2.0,
+    SIDE_CENTER[1] - 0.023,
 )
 # The slot width reads right of the head-end view, left of the head Ø.
 END_KEEP = {
@@ -216,32 +242,26 @@ END_KEEP = {
         END_CENTER[1] + 0.010,
     ),
 }
-# The thread callout's leader lands on the edge where the full thread meets
-# the tip chamfer, never on the relief groove.  The note stands up and
-# right so the leader slants down-left onto that edge.
-THREAD_PICK = (THREAD_START_X, SIDE_CENTER[1] + 0.004)
-THREAD_NOTE_XY = (THREAD_START_X + 0.013, SIDE_CENTER[1] + 0.035)
 # A point on the thread's cylindrical face, clear of every dimension line.
-CENTERLINE_PICK = ((RELIEF_END_X + THREAD_START_X) / 2.0, SIDE_CENTER[1] + 0.003)
+CENTERLINE_PICK = ((LEAD_TOP_X + THREAD_START_X) / 2.0, SIDE_CENTER[1] + 0.003)
 ISO_NOTE_XY = (0.340, 0.180)
 # Bottom-left, above the title-block line, like the other screw sheets.
 NOTES_XY = (0.016, 0.070)
 
 # Policy: native generation verifies persisted values, tolerances and
-# reference state.  swTolType_e: NONE leaves the title block's .XX band, MAX
-# prints the model value as the part's single limit, LIMIT prints the model
-# value plus each deviation.  Each row is (nominal mm, tolerance type).
-_TOL_NONE, _TOL_LIMIT, _TOL_MAX = 0, 3, 6
-if RELIEF_DIA_TOL_TYPE != _TOL_LIMIT or RELIEF_LEAD_TOL_TYPE != _TOL_MAX:
-    raise AssertionError("MHA-SM-04 relief limits are no longer LIMIT / MAX")
+# reference state.  swTolType_e: NONE leaves the title block's band, LIMIT
+# prints the model value plus each deviation.  Each row is (nominal mm,
+# tolerance type).
+_TOL_NONE, _TOL_LIMIT = 0, 3
+if SEAT_DIA_TOL_TYPE != _TOL_LIMIT or SHOULDER_LENGTH_TOL_TYPE != _TOL_LIMIT:
+    raise AssertionError("MHA-SM-04 seat and shoulder bands are no longer LIMIT")
 PRINTED_DIMENSIONS: dict[str, tuple[float, int]] = {
     "HeadDia": (HEAD_DIA, _TOL_NONE),
     "HeadHeight": (HEAD_H, _TOL_NONE),
     "CrownRise": (CROWN_RISE, _TOL_NONE),
     "UnderHeadLength": (LENGTH, _TOL_NONE),
-    "ReliefDia": (RELIEF_DIA, _TOL_LIMIT),
-    "ReliefWidth": (RELIEF_WIDTH, _TOL_NONE),
-    "HeadLead": (RELIEF_LEAD, _TOL_MAX),
+    "SeatDia": (SEAT_DIA, _TOL_LIMIT),
+    "ShoulderLength": (SHOULDER_LENGTH, _TOL_LIMIT),
     "TipChamfer": (TIP_CHAMFER, _TOL_NONE),
     "SlotWidth": (SLOT_WIDTH, _TOL_NONE),
     "SlotDepth": (SLOT_DEPTH, _TOL_NONE),
@@ -250,16 +270,17 @@ PRINTED_DIMENSIONS: dict[str, tuple[float, int]] = {
 # Every LIMIT row's (lower, upper) deviations, mm: a LIMIT row without its
 # band would skip the deviation readback, so the two must name the same rows.
 LIMIT_DEVIATIONS: dict[str, tuple[float, float]] = {
-    "ReliefDia": (RELIEF_DIA_LOWER, RELIEF_DIA_UPPER),
+    "SeatDia": (SEAT_DIA_LOWER, SEAT_DIA_UPPER),
+    "ShoulderLength": (SHOULDER_LENGTH_LOWER, SHOULDER_LENGTH_UPPER),
 }
 if set(LIMIT_DEVIATIONS) != {
     name for name, (_, kind) in PRINTED_DIMENSIONS.items() if kind == _TOL_LIMIT
 }:
     raise AssertionError("MHA-SM-04 LIMIT rows and their deviations disagree")
-# Unprinted controls: the profile's lead (the printed lead's reference line
-# follows it by equation) and the thread major the callout defines.
+# Unprinted controls: the lead's axial leg (held at 45 degrees by equation
+# from the two diameters) and the thread major the callout defines.
 SOURCE_ONLY_DIMENSIONS: dict[str, tuple[float, int]] = {
-    "ReliefLead@ShankProfile": (RELIEF_LEAD, _TOL_NONE),
+    "StepLead@ShankProfile": (STEP_LEAD, _TOL_NONE),
     "ThreadDia@ShankProfile": (MAJOR_DIA, _TOL_NONE),
 }
 
@@ -383,7 +404,10 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Gooseneck Spring Screw Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: f"gooseneck spring clamp; slotted fillister screw; {THREAD_CALLOUT}; steel",
+            3: (
+                "gooseneck spring clamp; slotted fillister shoulder screw; "
+                f"{THREAD_CALLOUT}; steel"
+            ),
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -409,7 +433,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations = [*side_annotations, *end_annotations]
-    offset_dimension_text(adapter, side_annotations, {"ReliefDia": RELIEF_DIA_TEXT_XY})
+    offset_dimension_text(adapter, side_annotations, {"SeatDia": SEAT_DIA_TEXT_XY})
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     for name in sorted(REFERENCE_DIMENSIONS):
         matches = [

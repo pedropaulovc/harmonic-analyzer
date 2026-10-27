@@ -36,7 +36,7 @@ The screws, and the small parts that do not belong anywhere else.
 | `mg-vn-wheel-axle-nut` | 2 | brass | McMaster 92671A005, #4-40 hex (nut + jam nut) |
 | `mg-vn-wheel-axle-back-washer` | 1 | brass | McMaster 92916A480, #10 |
 | `mg-vn-wheel-axle-front-washer` | 1 | brass | McMaster 92916A250, #4 |
-| `sm-gooseneck-spring-screw` (MHA-SM-04) | 1 | AISI 12L14 cold-finished steel | Ø12.7 mm (1/2") round; shop-turned slotted fillister with die-cut #6-32 thread; dimensions: `sm_gooseneck_spring_screw_geom.py` |
+| `sm-gooseneck-spring-screw` (MHA-SM-04) | 1 | AISI 12L14 cold-finished steel | Ø12.7 mm (1/2") round; shop-turned slotted fillister shoulder screw: plain Ø3.50 loop seat, 45° lead, die-cut #8-32 thread (owner ruling 2026-10-26 (#1951, option B)); dimensions: `sm_gooseneck_spring_screw_geom.py` |
 | `pd-guide-lock` | TODO | TODO | TODO |
 | `sh-column-clamp-front` | TODO | TODO | TODO |
 | `sh-column-clamp-back` | TODO | TODO | TODO |

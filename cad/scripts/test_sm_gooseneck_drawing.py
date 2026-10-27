@@ -27,10 +27,10 @@ def test_physical_plug_and_modelling_overlap_are_distinct() -> None:
 
 def test_native_receiver_is_through_tapped_before_the_tube() -> None:
     assert joint.TAP_SPEC.kind == "tapped"
-    assert joint.TAP_SPEC.size == "#6-32"
+    assert joint.TAP_SPEC.size == "#8-32"
     assert joint.TAP_SPEC.end == "through_all"
     assert joint.TAP_SPEC.thread_class == "2B"
-    assert part.TAP_DRILL_DIA == 2.705
+    assert part.TAP_DRILL_DIA == 3.454
     tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
     taps = [
         node
@@ -62,7 +62,7 @@ def test_both_tap_breaks_reduce_the_printed_full_thread_length() -> None:
     assert nominal == pytest.approx(part.PLUG_LENGTH - 2.0 * edge_break)
     assert minimum == pytest.approx(nominal - joint.PLUG_LENGTH_BAND)
     assert (nominal, minimum) == pytest.approx((7.50, 6.99))
-    assert minimum >= 1.5 * (0.138 * 25.4)  # #6 basic major, not its tap drill
+    assert minimum >= 1.5 * (0.164 * 25.4)  # #8 basic major, not its tap drill
 
 
 def test_plug_print_uses_physical_size_and_shared_loose_bands() -> None:
@@ -81,7 +81,7 @@ def test_plug_print_uses_physical_size_and_shared_loose_bands() -> None:
     assert re.search(
         r"DRILL WANDER\s+" + f"{joint.DRILL_WANDER_MAX:.2f}" + r"\s+MAX", notes
     )
-    assert "#6-32 UNC-2B THRU PLUG" in notes
+    assert "#8-32 UNC-2B THRU PLUG" in notes
     assert "SILVER-BRAZE" in notes
     # drawing-guidelines.md rule 4 (tighten only for function, and name the mate): a matched fit names its mate and states the clearance.
     fit = re.search(
@@ -114,11 +114,11 @@ def saved_tap(monkeypatch):
     """Read-only saved feature with independently specified native tap metadata."""
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     definition = SimpleNamespace(
-        FastenerSize="#6-32",
+        FastenerSize="#8-32",
         ThreadClass="2B",
         ThreadEndCondition=1,  # through all, not blind or through next
         EndCondition=1,
-        ThruTapDrillDiameter=0.002705,  # native model length units are metres
+        ThruTapDrillDiameter=0.003454,  # native model length units are metres
     )
     feature = SimpleNamespace(
         GetTypeName2=lambda: "HoleWzd",
@@ -140,7 +140,7 @@ def test_saved_native_receiver_accepts_the_through_tap(saved_tap, offset_mm):
 @pytest.mark.parametrize(
     ("field", "value", "diagnostic"),
     [
-        ("FastenerSize", "#8-32", "thread size"),
+        ("FastenerSize", "#6-32", "thread size"),
         ("ThreadClass", "", "ThreadClass"),
         ("ThreadClass", "3B", "ThreadClass"),
         ("ThreadEndCondition", 0, "ThreadEndCondition"),
@@ -148,8 +148,8 @@ def test_saved_native_receiver_accepts_the_through_tap(saved_tap, offset_mm):
         ("EndCondition", 0, "EndCondition"),
         ("EndCondition", 2, "EndCondition"),
         ("ThruTapDrillDiameter", 0.0, "tap drill"),
-        ("ThruTapDrillDiameter", 0.002699, "tap drill"),
-        ("ThruTapDrillDiameter", 0.002711, "tap drill"),
+        ("ThruTapDrillDiameter", 0.003448, "tap drill"),
+        ("ThruTapDrillDiameter", 0.003460, "tap drill"),
     ],
 )
 def test_saved_native_receiver_rejects_lost_thread_metadata(

@@ -429,9 +429,9 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
             frozenset(("sm-vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
             ),
-            # MHA-SM-04 #6-32 major in the #36 drill through the 8.0 end plug.
+            # MHA-SM-04 #8-32 major in the #29 drill through the 8.0 end plug.
             frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1")): _annulus_limit(
-                3.505, 2.705, 8.0
+                4.166, 3.454, 8.0
             ),
         }
     )
@@ -602,9 +602,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("sm-vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
             ),
-            # MHA-SM-04 #6-32 major, #36 drill, 8.0 through-tapped end plug.
+            # MHA-SM-04 #8-32 major, #29 drill, 8.0 through-tapped end plug.
             frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1")): _annulus_limit(
-                3.505, 2.705, 8.0
+                4.166, 3.454, 8.0
             ),
         },
         "pn-pen": {

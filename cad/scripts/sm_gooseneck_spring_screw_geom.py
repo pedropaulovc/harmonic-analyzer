@@ -4,20 +4,29 @@ Native frame: axis Z, under-head face Z=0, head +Z, shank -Z. The
 thread is represented by its basic major cylinder, not a die blank with a
 made-up general diameter tolerance. The external UNC-2A callout defines it.
 No drawing, prose, builder or COM dependencies belong in this module.
+
+Owner ruling 2026-10-26 (#1951, option B): a custom shoulder screw.  Under the
+head a plain turned Ø3.50 shoulder is the counter spring's loop seat, at the
+height the #6-32 thread crests gave it before; a 45-degree lead steps up to an
+#8-32 UNC thread that runs through the MHA-SM-01 plug, retapped #8-32.  The
+2026-09-21 rulings stand: the head clamps the loop to the plug face (no torque
+value, no threadlocker).  The ruling supersedes the #6-32 the 2026-10-10
+option-B note named.  ``sm_gooseneck_spring_screw_spec`` carries the strength
+case; ``sm_gooseneck_spring_joint`` the seat, engagement and wall budgets.
 """
 
 from __future__ import annotations
-
-import math
 
 from _printed_tolerance import printed_deviations
 
 MM_PER_IN = 25.4
 STOCK_DIA = 0.5 * MM_PER_IN
-THREAD = "#6-32 UNC"
-MAJOR_DIA = 0.138 * MM_PER_IN
-PITCH = MM_PER_IN / 32.0
-LENGTH = 16.00  # Under-head face to tip, including relief and chamfer.
+THREAD_SIZE = "#8-32"
+THREAD = f"{THREAD_SIZE} UNC"
+THREADS_PER_IN = 32
+MAJOR_DIA = 0.164 * MM_PER_IN
+PITCH = MM_PER_IN / THREADS_PER_IN
+LENGTH = 16.00  # Under-head face to tip, including shoulder, lead and chamfer.
 LENGTH_LOWER, LENGTH_UPPER = printed_deviations(LENGTH, 2)
 HEAD_DIA = 12.50
 HEAD_DIA_LOWER, HEAD_DIA_UPPER = printed_deviations(HEAD_DIA, 2)
@@ -32,62 +41,72 @@ SLOT_WIDTH = 1.60
 SLOT_WIDTH_LOWER, SLOT_WIDTH_UPPER = printed_deviations(SLOT_WIDTH, 2)
 SLOT_DEPTH = 3.00  # From the uncut crown apex, not its cylindrical rim.
 SLOT_DEPTH_LOWER, SLOT_DEPTH_UPPER = printed_deviations(SLOT_DEPTH, 2)
-# The die relief under the head mates with nothing (machinist review
-# 2026-10-23).  It prints as the native LIMIT band 2.35/2.15 about the
-# unchanged model value 2.20.  The upper limit is derived, not picked: the
-# largest 0.05 step under the estimated deepest #6-32 die root
-# (THREAD_MINOR_2A_MIN_EST, 2.38), so the die still cuts full thread up to
-# the flank.  The neck carries the clamp torque and preload, so it keeps the
-# design's pre-existing floor, 2.15 (the former 2.20 +/-0.05), unchanged here;
-# its strength adequacy is tracked in #1951.
-RELIEF_DIA = 2.20
-RELIEF_DIA_MIN = 2.15
-RELIEF_DIA_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
-RELIEF_WIDTH = 2.20  # Under-head face to the full-thread flank.
-RELIEF_WIDTH_LOWER, RELIEF_WIDTH_UPPER = printed_deviations(RELIEF_WIDTH, 2)
-# The 45-degree lead from the under-head face down onto the relief floor
-# prints as the single limit "0.30 MAX" (any shorter lead down to a sharp
-# corner is accepted).  It is tighter than the title block because the
-# under-head face is the clamp seat: at the largest relief and lead the flat
-# still reaches inside the thread major, where the inner edge of the spring's
-# clamped upper loop can bear when the loop is shoved against the thread.
-RELIEF_LEAD = 0.30  # Axial and radial legs of the 45-degree lead.
-RELIEF_LEAD_TOL_TYPE = 6  # swTolType_e.swTolMAX
-# The thread-start chamfer rides the title block's one-place band.
-TIP_CHAMFER = 0.30
 
-# #6-32 UNC-2A pitch-diameter minimum, ASME B1.1 as tabled by Engineers Edge
-# (read 2026-10-10, https://www.engineersedge.com/screw_threads_chart.htm).
-THREAD_PD_2A_MIN_IN = 0.1141
+# #8-32 UNC-2A limits, ASME B1.1 as tabled by Engineers Edge (read 2026-10-26,
+# https://www.engineersedge.com/screw_threads_chart.htm): major 0.1631/0.1571
+# in, pitch diameter 0.1428/0.1399 in.
+THREAD_MAJOR_2A_MIN_IN = 0.1571
+THREAD_PD_2A_MIN_IN = 0.1399
+THREAD_MAJOR_2A_MIN = THREAD_MAJOR_2A_MIN_IN * MM_PER_IN
 # DERIVED ESTIMATE, not a standard minimum minor-diameter limit: the repo's
 # deepest die-root construction takes a full basic half-depth (0.649519 P)
-# below the minimum 2A pitch diameter. The table publishes a minor MAXIMUM,
-# not this minimum. The largest relief must clear the estimated deeper root.
-THREAD_MINOR_2A_MIN_EST = (THREAD_PD_2A_MIN_IN - 0.649519 / 32.0) * MM_PER_IN
-RELIEF_DIA_MAX = math.floor(THREAD_MINOR_2A_MIN_EST * 20.0) / 20.0
-RELIEF_DIA_LOWER = round(RELIEF_DIA_MIN - RELIEF_DIA, 6)
-RELIEF_DIA_UPPER = round(RELIEF_DIA_MAX - RELIEF_DIA, 6)
-RELIEF_LEAD_MAX = RELIEF_LEAD
-RELIEF_FLOOR_MIN = RELIEF_WIDTH + RELIEF_WIDTH_LOWER - RELIEF_LEAD_MAX
-SEAT_FLAT_INNER_DIA_MAX = RELIEF_DIA_MAX + 2.0 * RELIEF_LEAD_MAX
+# below the minimum 2A pitch diameter (pd_vn_transgear_pivot_screw_spec uses
+# the same construction for its #8-32): 3.038.
+THREAD_MINOR_2A_MIN_EST = (THREAD_PD_2A_MIN_IN - 0.649519 / THREADS_PER_IN) * MM_PER_IN
+
+# The loop seat: a plain turned shoulder from the under-head face, at the
+# owner's Ø3.50 (today's #6-32 crest height, 3.5052, within 0.003 radial), so
+# the loop, the spring's line of action and the coil/tube gap stay where the
+# native calibration left them.  It prints as the LIMIT band 3.60/3.40: the
+# upper limit keeps the seat under the #8-32 2A major minimum, 3.990, so the
+# lead always steps UP into the thread blank and the die's run-out stays on
+# that blank; the title block's 4.01 would cross it.
+SEAT_DIA = 3.50
+SEAT_DIA_LOWER, SEAT_DIA_UPPER = -0.10, 0.10
+SEAT_DIA_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
+SEAT_DIA_MIN = round(SEAT_DIA + SEAT_DIA_LOWER, 6)
+SEAT_DIA_MAX = round(SEAT_DIA + SEAT_DIA_UPPER, 6)
+# Under-head face to the FOOT of the 45-degree lead (the end of the seat).  It
+# prints as the LIMIT band 4.10/3.70: the shortest shoulder still keeps the
+# loop's plug-side pass clear of the lead, and the longest still starts full
+# thread within the 1.5D engagement budget inside the plug
+# (sm_gooseneck_spring_joint owns both checks).  The title block's +/-0.51
+# fits neither end.
+SHOULDER_LENGTH = 3.90
+SHOULDER_LENGTH_LOWER, SHOULDER_LENGTH_UPPER = -0.20, 0.20
+SHOULDER_LENGTH_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
+SHOULDER_LENGTH_MIN = round(SHOULDER_LENGTH + SHOULDER_LENGTH_LOWER, 6)
+SHOULDER_LENGTH_MAX = round(SHOULDER_LENGTH + SHOULDER_LENGTH_UPPER, 6)
+# The lead rises at 45 degrees from the seat to the thread major: its legs are
+# set by the two diameters, not printed separately (the model holds the 45 by
+# equation; the shoulder length's callout names the lead's foot and angle).
+STEP_LEAD = (MAJOR_DIA - SEAT_DIA) / 2.0
+STEP_LEAD_MAX = (MAJOR_DIA - SEAT_DIA_MIN) / 2.0
+# The die runs up to the lead and leaves its chamfered start, 1.5 pitches of
+# incomplete thread (drawing-guidelines.md rule 18; the repo's tip allowance,
+# sm_gooseneck_spring_joint.SCREW_END_INCOMPLETE_MAX), on the thread blank
+# behind the lead.
+DIE_RUNOUT = 1.5 * PITCH
+FULL_THREAD_STATION = SHOULDER_LENGTH + STEP_LEAD + DIE_RUNOUT
+FULL_THREAD_STATION_MAX = SHOULDER_LENGTH_MAX + STEP_LEAD_MAX + DIE_RUNOUT
+# The thread-start chamfer rides the title block's one-place band.
+TIP_CHAMFER = 0.30
 OVERALL_LENGTH = LENGTH + HEAD_H
 SLOT_FLOOR_Z = HEAD_H - SLOT_DEPTH
 
 
-def require_relief_clearance(
-    diameter_max: float = RELIEF_DIA_MAX,
-    floor_min: float = RELIEF_FLOOR_MIN,
-    lead_outer_dia_max: float = SEAT_FLAT_INNER_DIA_MAX,
+def require_shoulder_form(
+    seat_dia_max: float = SEAT_DIA_MAX,
+    seat_dia_min: float = SEAT_DIA_MIN,
+    full_thread_station_max: float = FULL_THREAD_STATION_MAX,
 ) -> None:
-    """Refuse a relief that cannot clear the die or leaves no flat head seat."""
-    if diameter_max > THREAD_MINOR_2A_MIN_EST:
-        raise AssertionError("screw relief stands above the estimated deepest die root")
-    if floor_min < 1.5 * PITCH:
-        raise AssertionError(
-            "screw relief needs at least 1.5 pitches of straight floor"
-        )
-    if lead_outer_dia_max >= MAJOR_DIA:
-        raise AssertionError("screw relief lead consumes the flat under-head seat")
+    """Refuse a seat that is not a step DOWN from the thread, or a thread too short."""
+    if seat_dia_max >= THREAD_MAJOR_2A_MIN:
+        raise AssertionError("screw loop seat reaches the #8-32 thread major")
+    if seat_dia_min <= 0.0:
+        raise AssertionError("screw loop seat has no diameter")
+    if full_thread_station_max + TIP_CHAMFER + 1.5 * PITCH >= LENGTH + LENGTH_LOWER:
+        raise AssertionError("screw leaves no full thread between the lead and the tip")
 
 
-require_relief_clearance()
+require_shoulder_form()

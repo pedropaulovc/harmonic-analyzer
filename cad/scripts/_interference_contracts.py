@@ -375,7 +375,7 @@ _KNIFE_DOWEL_PRESS_DEPTH = 9.5
 _KNIFE_DOWEL_PRESS_LIMIT = _smooth_annulus_limit_mm3(
     _KNIFE_DOWEL_DIA_MAX, _KNIFE_DOWEL_HOLE_MIN, _KNIFE_DOWEL_PRESS_DEPTH
 )
-# MHA-SM-04 #6-32 through the #36 tap drill of MHA-SM-01's brazed end plug,
+# MHA-SM-04 #8-32 through the #29 tap drill of MHA-SM-01's brazed end plug,
 # over the whole plug length (sm_gooseneck_geom.PLUG_LENGTH): the extra tip
 # reach is in the hollow arm, not more engagement. A literal, test-pinned to
 # its owner like _KNIFE_HANGER_REACH, so a screw or gooseneck edit does not
@@ -415,7 +415,7 @@ _SUMMING_ALLOWED_PAIRS = {
     # Spring/support contact has no allowance and remains independently gated.
     frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1")): (
         _smooth_annulus_limit_mm3(
-            THREAD_MAJOR_MM["#6-32"], TAP_DRILL_MM["#6-32"], _GOOSENECK_PLUG_LENGTH
+            THREAD_MAJOR_MM["#8-32"], TAP_DRILL_MM["#8-32"], _GOOSENECK_PLUG_LENGTH
         )
     ),
 }

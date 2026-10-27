@@ -74,16 +74,18 @@ def test_counter_leading_half_turn_clears_tube_and_head() -> None:
     assert head_gap >= spring_mount_geom.MIN_CLEARANCE_MM
 
 
-def test_counter_upper_eye_bears_on_full_thread_and_clears_the_tube() -> None:
-    """The MHA-SM-04 shank supports the plumb eye on its full-thread major."""
+def test_counter_upper_loop_bears_on_the_plain_seat_and_clears_the_tube() -> None:
+    """The MHA-SM-04 shank supports the plumb loop on its plain Ø3.50 seat."""
     import build_sm_summing_assembly as summing
     import sm_gooseneck_spring_screw_geom as spring_screw
 
     pose = spring_mount_geom.COUNTER_REFERENCE_POSE
     assert pose.axis_xy[1] == pytest.approx(1.0, abs=1e-6)
+    # Coil mean radius 5.5499 less wire radius 0.8001 less seat radius 1.75.
+    assert spring_screw.SEAT_DIA == 3.50
     assert spring_mount_geom.counter_upper_support_offset(
         pose.axis_xy
-    ) == pytest.approx(2.9972, abs=1e-4)
+    ) == pytest.approx(2.9998, abs=1e-4)
     assert sm_gooseneck_geom.SPRING_EYE_GAP == pytest.approx(4.88061)
     assert spring_mount_geom.COUNTER_UPPER_EYE_X == pytest.approx(
         spring_mount_geom.COLUMN_X - sm_gooseneck_geom.SPRING_EYE_X
