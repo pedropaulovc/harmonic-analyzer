@@ -32,6 +32,7 @@ def _windows_acl(path: Path, *, secure=False, fd=None) -> None:
         return
     try:
         import msvcrt
+        import ntsecuritycon
         import win32api
         import win32con
         import win32security
@@ -44,7 +45,7 @@ def _windows_acl(path: Path, *, secure=False, fd=None) -> None:
         if secure:
             acl = win32security.ACL()
             inheritance = win32con.OBJECT_INHERIT_ACE | win32con.CONTAINER_INHERIT_ACE if path.is_dir() else 0
-            acl.AddAccessAllowedAceEx(win32security.ACL_REVISION, inheritance, win32con.FILE_ALL_ACCESS, sid)
+            acl.AddAccessAllowedAceEx(win32security.ACL_REVISION, inheritance, ntsecuritycon.FILE_ALL_ACCESS, sid)
             win32security.SetNamedSecurityInfo(
                 str(path), win32security.SE_FILE_OBJECT,
                 win32security.DACL_SECURITY_INFORMATION | win32security.PROTECTED_DACL_SECURITY_INFORMATION,
@@ -128,6 +129,10 @@ def _directory(path: Path) -> None:
             pass
     if path.is_symlink() or not path.is_dir():
         raise ValueError("Claude credentials: storage parent must be a directory")
+
+
+class CredentialUnavailable(ValueError):
+    """A requested key cannot currently serve a locally persisted conversation."""
 
 
 class CredentialPool:
@@ -237,7 +242,7 @@ class CredentialPool:
                     state["cursor"] = (index + 1) % len(self.credentials)
                     return key
         if required_id is not None:
-            raise ValueError("Claude continuation credential is unavailable or rotated")
+            raise CredentialUnavailable("Claude continuation credential is unavailable or rotated")
         return None
 
     def unavailable(self, key: Credential, quota: dict, *, timeout=30):

@@ -421,12 +421,20 @@ def validate_evidence(
                 or not re.fullmatch(r"[a-f0-9]{64}", provenance.get("credential_fingerprint", ""))
             ):
                 raise ValueError("invalid SDK credential provenance")
+            home = provenance.get("private_home")
+            if (not isinstance(home, str) or not Path(home).is_absolute()
+                    or not Path(home).name.startswith("machrev-home-")
+                    or not Path(invocation["cwd"]).resolve().is_relative_to(Path(home).resolve())):
+                raise ValueError("Claude invocation cwd is outside its private HOME")
+            if provenance.get("transport") == "omp" and invocation["outcome"] == "succeeded":
+                resolved = provenance.get("resolved_model")
+                if not isinstance(resolved, dict) or resolved.get("provider") != "anthropic":
+                    raise ValueError("OMP evidence resolved a non-Anthropic provider")
         if (
             invocation["reviewer"] != review.reviewer
             or (session_id is not None and (not isinstance(session_id, str) or not session_id))
             or invocation["resume_command"] != (
-                mr._transport_resume(invocation["transport_provenance"], session_id)
-                if review.reviewer == "claude" else mr._codex_resume_command(session_id)
+                None if review.reviewer == "claude" else mr._codex_resume_command(session_id)
             )
             or (session_id is not None and session_id in sessions)
         ):

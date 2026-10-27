@@ -274,7 +274,10 @@ both verdicts and the finding diff.
   PDF text coordinates use PDFium's page-to-device mapping with `ctypes.c_int`
   outputs, matching its `int*` binding contract on Linux and Windows.
 - Claude execution first selects an eligible API credential from the private
-  codjiflo pool and uses the pinned Python Claude Agent SDK. The shared pool is
+  codjiflo pool and uses the pinned Python Claude Agent SDK. Its bundled runtime
+  runs in bare mode: OAuth/keychain auth and implicit hooks, memory, plugins and
+  CLAUDE.md discovery are disabled, with skills additionally disabled explicitly.
+  The shared pool is
   `CODJIFLO_ANTHROPIC_KEYS_FILE` (default
   `~/.config/codjiflo/anthropic-keys.json`), containing exactly three unique
   `{"id": "label", "apiKey": "secret", "quotaGroup": "optional-group"}` entries
@@ -288,23 +291,40 @@ both verdicts and the finding diff.
   insecure configuration fails closed. Only typed API quota errors authorize
   rotation, not ordinary prose, schema errors, startup failures or SDK exceptions.
 - When no configured API credential is eligible, execution uses **OMP**, never
-  Claude CLI OAuth. OMP runs in RPC mode with a private HOME/config/cache,
-  disabled built-in tools, extensions, rules, skills, LSP, memory and autolearn,
-  and only the sheets MCP server. Existing OMP credentials remain in the original
+  Claude CLI OAuth. OMP runs in RPC mode with cwd beneath a private HOME, an inert
+  local `.omp` discovery boundary, and disabled ancestor context-file providers,
+  built-in tools, extensions, rules, skills, LSP, memory and autolearn. Only the
+  cwd-local sheets MCP server is discovered. The model is qualified as
+  `anthropic/<model>` and its resolved provider must be Anthropic.
+  OMP's fixed workstation metadata and built-in critical directives remain;
+  the startup guard accepts their rendered structure but rejects additional
+  project instructions, rules, skills or appended context.
+  Existing OMP credentials remain in the original
   vault, accessed through the supported auth broker: an explicitly configured
   `OMP_AUTH_BROKER_URL`/`OMP_AUTH_BROKER_TOKEN` pair is reused, otherwise a scoped
   loopback broker opens the existing store and is reaped after the invocation.
   No privileged Windows links or credential copies are required. Broker tokens
   are passed only in environment, with snapshot disk caching disabled.
+  API-key proxy overrides are stripped from the OAuth environment, so a proxy
+  configured for SDK API keys never receives the broker's OAuth bearer.
 - Before submitting review content, SDK `get_mcp_status` must prove that the
   actual session has the sole connected sheets server and both tools; OMP waits
-  for synchronous MCP startup and validates the actual RPC `get_state.dumpTools`
-  catalog. Startup is bounded to 120 seconds within the total attempt deadline.
+  for synchronous MCP startup and validates actual RPC `get_state.dumpTools`,
+  system-prompt isolation and resolved provider. Startup is bounded to 120
+  seconds within the total attempt deadline.
   Failed or incomplete startup submits no review. Native redacted records and
   normalized image/tool evidence are retained separately. Valid findings are
   never retried. A successful precheck pins its actual transport and session for
-  judging; SDK continuation also pins credential ID/fingerprint. Unavailable or
-  rotated continuation credentials fail rather than silently replacing history.
+  judging. SDK continuation prefers the original credential, but may select
+  another eligible key **before** submitting its single resumed turn: the local
+  conversation and cwd remain unchanged. Once submitted, a failed resumed turn
+  is never retried or switched to another transport.
+  Private SDK transcripts and OMP agent/blob state survive the precheck so
+  persisted images hydrate correctly in the judge's history. Independent runs,
+  failed attempts and completed judges delete native state after retaining
+  redacted event/image evidence. The aggregate also cleans an unused precheck
+  when judging is skipped or an error returns early. Native session IDs remain
+  historical provenance, not standalone CLI resume recipes after cleanup.
 - Structured operation logs record credential decisions (safe IDs/counts),
   SDK attempts, OMP fallback reasons, broker readiness and terminal outcome or
   failure category. Keys/tokens, environment maps and unredacted exceptions are

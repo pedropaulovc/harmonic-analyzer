@@ -1272,7 +1272,7 @@ def test_surviving_original_attempt_dir_requires_warning_and_complete_retention(
     invocation = report["extra"]["evidence"]["attempts"][0]
     original = Path(invocation["attempt_dir"])
     # Windows can refuse to remove a directory a lingering MCP server still holds.
-    original.mkdir()
+    original.mkdir(parents=True)
     (original / "stdout.txt").write_text("locked", encoding="utf-8")
     try:
         if state != "unwarned":
@@ -1394,8 +1394,7 @@ def test_actual_and_retained_paths_cannot_be_conflated_or_redirected(
         inside = repo / Path(invocation["attempt_dir"]).name
         invocation["attempt_dir"] = invocation["cwd"] = str(inside)
     _preserve_report(result, directory, report)
-    match = "git repository" if damage == "attempt_in_repo" else None
-    with pytest.raises(ValueError, match=match):
+    with pytest.raises(ValueError):
         evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
 
 
@@ -1898,7 +1897,7 @@ def test_pre_invocation_failure_has_no_fabricated_command_or_streams(
 ) -> None:
     identity = _identity(case, reviewer=reviewer)
     identity["retries"] = 1
-    builder_name = f"build_{reviewer}_command"
+    builder_name = "build_claude_invocation" if reviewer == "claude" else "build_codex_command"
     builder = getattr(mr, builder_name)
     calls = 0
 
@@ -2016,8 +2015,7 @@ def test_retry_invocations_cannot_reuse_or_relabel_provenance(
         original_session = succeeded["session_id"]
         succeeded["session_id"] = failed["session_id"]
         succeeded["resume_command"] = (
-            mr._transport_resume(succeeded["transport_provenance"], failed["session_id"])
-            if reviewer == "claude" else mr._codex_resume_command(failed["session_id"])
+            None if reviewer == "claude" else mr._codex_resume_command(failed["session_id"])
         )
         if reviewer == "claude":
             for field in ("command", "retained_argv"):

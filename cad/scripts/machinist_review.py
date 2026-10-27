@@ -54,8 +54,12 @@ SDK confirms this sole server exposes no resources or templates; their calls
 are recorded. Other tools and unexpected resource content remain fail-closed.
 Crop and token/cache usage are retained; first-turn usage belongs to that attempt.
 Fresh sessions never load prior review context; only the judge continues its own
-precheck. Transcripts and attempt files
-are retained even if Windows prevents moving the original cwd. The recorded
+precheck. Redacted transcripts and attempt files are retained even if Windows
+prevents moving the original cwd. Lifecycle-owned native SDK state and OMP image
+blobs survive only until their precheck's judge finishes (or is skipped), while
+independent runs and failed attempts release state after retaining evidence.
+Claude native session IDs are historical provenance, not CLI replay commands.
+The recorded
 ``retained_argv`` only adapts artifact paths for inspection, NOT a replay: it
 does not supply stdin or a fresh session id. ``command`` records actual Codex
 argv or the SDK invocation descriptor; ``transport_provenance`` distinguishes
@@ -1620,15 +1624,6 @@ def _codex_resume_command(session_id: str | None) -> str | None:
     return f"codex resume {session_id}" if session_id is not None else None
 
 
-def _transport_resume(provenance: dict[str, Any], session_id: str | None) -> str | None:
-    """OMP has a CLI recipe; SDK continuation uses recorded provenance only."""
-    if session_id is None:
-        return None
-    if provenance.get("transport") == "omp":
-        import shlex
-        command = ["omp", "--resume", provenance["session_file"]]
-        return subprocess.list2cmdline(command) if os.name == "nt" else shlex.join(command)
-    return None
 
 
 
@@ -1812,7 +1807,8 @@ def _review_session(
         attempts = attempt + 1
         attempt_started = time.monotonic()
         if resume_review is None:
-            attempt_dir = Path(tempfile.mkdtemp(prefix="machrev-"))
+            private_home = Path(tempfile.mkdtemp(prefix="machrev-home-")) if reviewer == "claude" else None
+            attempt_dir = Path(tempfile.mkdtemp(prefix="machrev-", dir=private_home))
         else:
             previous = next(
                 record for record in resume_review.extra["evidence"]["attempts"]
@@ -1821,8 +1817,11 @@ def _review_session(
             # Claude's project identity includes cwd. Recreate/reuse that exact
             # neutral path after its first-turn artifacts were safely retained.
             attempt_dir = Path(previous["cwd"])
+            private_home = Path(previous["transport_provenance"]["private_home"]) if reviewer == "claude" else None
             attempt_dir.mkdir(parents=True, exist_ok=True)
         cwd = attempt_dir
+        if private_home is not None:
+            _claude_transport.register_state(private_home)
         session_id: str | None = resume_id or (str(uuid.uuid4()) if reviewer == "claude" else None)
         attempt_events: list[dict[str, Any]] = []
         rollout_rows: list[dict[str, Any]] = []
@@ -1862,6 +1861,8 @@ def _review_session(
             package=package.name, attempt=attempts,
             phase="precheck" if precheck_diff is not None else "judge" if judge_findings is not None else "review",
         )
+        if private_home is not None:
+            attempt_record["transport_provenance"]["private_home"] = str(private_home)
         attempt_records.append(attempt_record)
 
         def capture_rollout() -> None:
@@ -1938,6 +1939,11 @@ def _review_session(
                     preserve_color=precheck_diff is not None or resume_id is not None,
                 )
             attempt_record["command"] = cmd
+            if reviewer == "claude":
+                provenance = attempt_record["transport_provenance"]
+                provenance.setdefault("transport", "routing")
+                provenance.setdefault("requested_session_id", session_id)
+                provenance.setdefault("session_id", resume_id)
             proc = _run_reviewer(
                 cmd, reviewer=reviewer, input=prompt, timeout=timeout_s,
                 cwd=str(cwd), env=env,
@@ -2023,8 +2029,7 @@ def _review_session(
                 session_id = None
             attempt_record["session_id"] = session_id
             attempt_record["resume_command"] = (
-                _transport_resume(attempt_record["transport_provenance"], session_id)
-                if reviewer == "claude" else _codex_resume_command(session_id)
+                None if reviewer == "claude" else _codex_resume_command(session_id)
             )
             log_attempt = _telemetry.success if attempt_record["outcome"] == "succeeded" else _telemetry.error
             log_attempt(
@@ -2061,6 +2066,15 @@ def _review_session(
                 str(artifact) for artifact in sorted(retained_dir.iterdir())
                 if artifact.name not in inputs
             ]
+            if reviewer == "claude":
+                preserve = (
+                    precheck_diff is not None and attempt_record["outcome"] == "succeeded"
+                    and verdict is not None and verdict.get("decision") == "review"
+                )
+                if preserve:
+                    attempt_record["transport_provenance"]["state_cleanup"] = "preserved_for_judge"
+                else:
+                    _claude_transport.cleanup_state(attempt_record["transport_provenance"])
 
     _write_events(events_path, events)
     evidence = evaluate_sheet_evidence(
@@ -2120,6 +2134,9 @@ def _review_session(
         reviewed_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         error=error, events_file=str(events_path), attempts=attempts, extra=extra,
     )
+    if reviewer == "claude" and precheck_diff is not None and not review.passed:
+        for record in attempt_records:
+            _claude_transport.cleanup_state(record["transport_provenance"])
     write_review(review, report_dir)
     log_result = _telemetry.info if error is None and blind and inspection_proven else _telemetry.error
     log_result(
@@ -2194,7 +2211,7 @@ def aggregate_package(
     with _telemetry.span(
         "machinist_review.aggregate", name=package.name, kind=package.kind, run_count=runs,
         reviewer=reviewer, model=model, judge_reviewer=judge_reviewer, judge_model=judge_model,
-    ) as span:
+    ) as span, _claude_transport.session_lifecycle():
         started = time.monotonic()
         # Canonical ordinal names pair explicit PDFs even across renames.
         # A unique directory prevents stale sheets from an earlier invocation
