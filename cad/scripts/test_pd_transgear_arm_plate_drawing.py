@@ -159,11 +159,14 @@ def test_the_plate_screws_engage_the_arm_one_and_a_half_diameters() -> None:
     assert joints.PLATE_SCREW_ENGAGEMENT_WORST_D >= joints.ENGAGEMENT_TARGET_D
 
 
-def test_the_section_cuts_the_whole_plate_on_the_bore_axis() -> None:
-    (x0, y0, _), (x1, y1, _) = drawing.SECTION_LINE_MODEL
+def test_the_sections_cut_the_whole_plate_on_the_bore_and_hole_axes() -> None:
+    (x0, y0, _), (x1, y1, _) = drawing.KNOB_SECTION_LINE_MODEL
     assert x0 == x1 == 0.0
     assert min(y0, y1) < -geometry.END_R
     assert max(y0, y1) > geometry.arm_upper_edge_y(0.0)
+    (x0, y0, _), (x1, y1, _) = drawing.SCREW_SECTION_LINE_MODEL
+    assert y0 == y1 == geometry.SCREW_HOLES[0][1] == geometry.SCREW_HOLES[1][1]
+    assert min(x0, x1) < geometry.EDGE_MINUS_X and max(x0, x1) > geometry.EDGE_PLUS_X
 
 
 def test_registry_row_is_the_made_steel_mha_165() -> None:
@@ -329,18 +332,13 @@ def test_the_drill_and_countersink_leaders_lead_to_different_holes() -> None:
 
 
 # Measured on the run 20261001T110844152Z render (2:1 sheet): about 2.65 mm
-# of sheet per character of dimension or note text (an upper bound); a
-# horizontal dimension's text reaches 1.6 model mm under its text point; the
-# cutting line's arrow and letter reach 2.1 model mm past the line's end; the
+# of sheet per character of dimension or note text (an upper bound); the
 # section caption sits more than 6 model mm under the view (the 7.94 row at
 # 5 cleared it, the 29.037 row at 11 did not).
 _CHAR_MM = 2.65
-_TEXT_BELOW_KEEP_MODEL = 1.6
-_SECTION_LABEL_MODEL = 2.1
+_LINE_MODEL = 2.75  # a note line's pitch, model mm at 2:1 (5.5 mm on the sheet)
 _CAPTION_CLEAR_MODEL = 6.0
 _INNER_BORDER_X = 0.4191  # ASME B landscape inner border, right
-_TITLE_BLOCK_LEFT_X = 0.216  # the title block's left edge, below y 0.066
-_NOTE_CHAR_MM = 2.5  # a sheet note's character pitch (measured on the r3 sheet)
 _CAPTION_HEIGHT = 0.0035
 # The 1:1 isometric's half extents, sheet m: 44 x 52 measured on the r3
 # sheet for the 31.75 bar, plus its widening to 38.1 foreshortened (cos 30
@@ -364,38 +362,47 @@ def _printed(value: float, name: str) -> str:
     return f"{value:.{spec.DRAWING_PRECISION_BY_NAME[name]}f}"
 
 
-def test_the_thrust_face_finishes_clear_their_face_and_the_diameters() -> None:
-    """Face, then the finish symbol, then the Ø text, outward on each side."""
-    left, right = drawing.FINISH_SYMBOL_REACH
+def test_the_thrust_face_finishes_and_captions_clear_their_face_and_the_diameters() -> None:
+    """Outward from each face: its symbol and caption, then its diameter's
+    text; the hub's stand outside the hub diameter's witness lines, the
+    boss's inside the boss diameter's."""
     for key, face_z, name, value, outward in (
         ("hub_face", geometry.HUB_FACE_Z, "HubDia", geometry.HUB_DIA, -1.0),
         ("boss_face", geometry.BOSS_FACE_Z, "BossDia", geometry.BOSS_DIA, 1.0),
     ):
-        _pick, symbol = drawing.FACE_FINISHES[key]
-        near, far = sorted(
-            (
-                outward * (symbol[2] - left - face_z),
-                outward * (symbol[2] + right - face_z),
-            )
-        )
+        _pick, symbol, caption = drawing.FACE_FINISHES[key]
+        width = max(map(len, spec.FINISH_CAPTIONS[key].splitlines()))
+        caption_near = outward * (caption[2] - face_z)
+        if outward < 0.0:
+            caption_near -= 2.0 * _half_width_model("X" * width)
+        caption_far = caption_near + 2.0 * _half_width_model("X" * width)
+        assert outward * (symbol[2] - face_z) > 1.0, key
+        assert caption_near > 0.5, key
         text = "\u00d8" + _printed(value, name)
         text_near = outward * (drawing.SECTION_KEEP[name][2] - face_z)
         text_near -= _half_width_model(text)
-        assert near > 0.0, key
-        assert text_near > far, key
+        assert text_near > caption_far, key
+    hub_symbol, hub_caption = drawing.FACE_FINISHES["hub_face"][1:]
+    assert max(hub_symbol[1], hub_caption[1]) < -geometry.HUB_DIA / 2.0
+    boss_caption = drawing.FACE_FINISHES["boss_face"][2]
+    lines = len(spec.FINISH_CAPTIONS["boss_face"].splitlines())
+    assert boss_caption[1] < geometry.BOSS_DIA / 2.0
+    assert boss_caption[1] - lines * _LINE_MODEL > drawing.FACE_FINISHES["boss_face"][1][1]
 
 
 def test_each_thrust_face_finish_lands_on_its_own_face_annulus() -> None:
     """Each leader meets its face between the bore and the face's diameter,
-    with the symbol level with that point, so it reads as the face's."""
-    for key, face_z, face_dia in (
-        ("hub_face", geometry.HUB_FACE_Z, geometry.HUB_DIA),
-        ("boss_face", geometry.BOSS_FACE_Z, geometry.BOSS_DIA),
+    so it reads as the face's; each caption names what runs on the face."""
+    for key, face_z, face_dia, mate in (
+        ("hub_face", geometry.HUB_FACE_Z, geometry.HUB_DIA, "pd-transgear-knob-thrust-ring"),
+        ("boss_face", geometry.BOSS_FACE_Z, geometry.BOSS_DIA, "pd-transgear-knob-cup"),
     ):
-        pick, symbol = drawing.FACE_FINISHES[key]
+        pick = drawing.FACE_FINISHES[key][0]
         assert pick[2] == face_z, key
         assert geometry.BORE_DIA / 2.0 + 0.5 < abs(pick[1]) < face_dia / 2.0 - 0.5, key
-        assert symbol[1] == pick[1], key
+        caption = spec.FINISH_CAPTIONS[key]
+        assert caption.startswith("THRUST FACE"), key
+        assert caption.endswith(_config.parts(mate)["number"]), key
 
 
 def test_the_hole_height_text_stands_between_the_edge_and_the_corner_height() -> None:
@@ -409,7 +416,7 @@ def test_the_hole_height_text_stands_between_the_edge_and_the_corner_height() ->
 def _section_sheet_x(z: float) -> float:
     """Sheet x of section A-A's model z (the view centred on its z extent)."""
     mid = (geometry.HUB_FACE_Z + geometry.BOSS_FACE_Z) / 2.0
-    return drawing.SECTION_CENTER[0] + (z - mid) * drawing.SHEET_SCALE[0] / 1000.0
+    return drawing.KNOB_SECTION_CENTER[0] + (z - mid) * drawing.SHEET_SCALE[0] / 1000.0
 
 
 def _view_sheet_x(centre_x: float, model_x: float, mirrored: bool) -> float:
@@ -425,63 +432,63 @@ def _text_half_width_sheet(text: str) -> float:
 
 
 def test_the_views_texts_clear_their_neighbours_and_the_border() -> None:
+    # Sheet 2: the face-A view's -X-side heights, then section A-A's hub Ø.
     back = drawing.BACK_CENTER[0]
-    # Plan's right-hand height, then the back view's -X-side notch height.
-    top_right = drawing.PLAN_KEEP["TopRightY"][0]
-    plan_right = _view_sheet_x(
-        drawing.PLAN_CENTER[0], top_right, mirrored=False
-    ) + _text_half_width_sheet(_printed(geometry.TOP_RIGHT[1], "TopRightY"))
-    notch_right = drawing.BACK_KEEP["NotchRightY"][0]
-    back_left = _view_sheet_x(back, notch_right, mirrored=True) - (
-        _text_half_width_sheet(_printed(geometry.NOTCH_RIGHT[1], "NotchRightY"))
-    )
-    assert back_left - plan_right >= _GAP
-    # The back view's other notch height, then the section's hub Ø.
-    notch_left = drawing.BACK_KEEP["NotchLeftY"][0]
-    back_right = _view_sheet_x(back, notch_left, mirrored=True) + (
-        _text_half_width_sheet(_printed(geometry.NOTCH_LEFT[1], "NotchLeftY"))
+    back_right = max(
+        _view_sheet_x(back, drawing.BACK_KEEP[name][0], mirrored=True)
+        + _text_half_width_sheet(_printed(value, name))
+        for name, value in (
+            ("NotchLeftY", geometry.NOTCH_LEFT[1]),
+            ("LocatorY1", geometry.LOCATOR_SITES_MM[0][1]),
+        )
     )
     hub_text = "\u00d8" + _printed(geometry.HUB_DIA, "HubDia")
     hub_left = _section_sheet_x(
         drawing.SECTION_KEEP["HubDia"][2] - _half_width_model(hub_text)
     )
     assert hub_left - back_right >= _GAP
+    # The knob zone's chain line ends short of the hub Ø's dimension line.
+    assert drawing.KNOB_ZONE[1][2] - drawing.SECTION_KEEP["HubDia"][2] >= 2.0
     # The section's boss Ø ends inside the border.
     boss_text = "\u00d8" + _printed(geometry.BOSS_DIA, "BossDia")
     boss_right = _section_sheet_x(
         drawing.SECTION_KEEP["BossDia"][2] + _half_width_model(boss_text)
     )
     assert _INNER_BORDER_X - boss_right >= 0.002
-    # The isometric stands between the notes and the title block, its
-    # caption above it and below the back view's edge dimensions.
-    notes_right = drawing.NOTES_XY[0] + drawing.NOTES_WIDTH * _NOTE_CHAR_MM / 1000.0
+    # The face-A view's frames: the knob bore's stays inside the border.
+    assert drawing.FRAME_XY["knob_projected_axis"][0] > 0.0125 + 0.004
+    # Sheet 1: the plan's right-hand height, then section D-D and the
+    # isometric, which stand clear of the title block and the border.
+    plan_right = _view_sheet_x(
+        drawing.PLAN_CENTER[0], drawing.PLAN_KEEP["TopRightY"][0], mirrored=False
+    ) + _text_half_width_sheet(_printed(geometry.TOP_RIGHT[1], "TopRightY"))
+    section_half = (geometry.EDGE_PLUS_X - geometry.EDGE_MINUS_X) / 1000.0
+    assert drawing.SCREW_SECTION_CENTER[0] - section_half - plan_right >= _GAP
+    assert drawing.SCREW_SECTION_CENTER[0] + section_half <= _INNER_BORDER_X - _GAP
+    assert drawing.SCREW_SECTION_CENTER[1] - 0.03 > 0.066
     iso_left = drawing.ISO_CENTER[0] - _ISO_HALF_WIDTH_SHEET
-    assert iso_left - notes_right >= _GAP
-    assert _TITLE_BLOCK_LEFT_X - (drawing.ISO_CENTER[0] + _ISO_HALF_WIDTH_SHEET) >= _GAP
-    assert all(
-        len(line) <= drawing.NOTES_WIDTH for line in drawing.NOTES_TEXT.splitlines()
-    )
-    edge_text_bottom = (
-        drawing.PLAN_CENTER[1]
-        + (drawing.BACK_KEEP["EdgeLeftX"][1] - _PLAN_MID_Y) * drawing.SHEET_SCALE[0] / 1000.0
-        - _TEXT_BELOW_KEEP_MODEL * drawing.SHEET_SCALE[0] / 1000.0
-    )
+    assert iso_left - plan_right >= _GAP
+    assert drawing.ISO_CENTER[0] + _ISO_HALF_WIDTH_SHEET <= _INNER_BORDER_X - _GAP
+    iso_bottom = drawing.ISO_CENTER[1] - _ISO_HALF_HEIGHT_SHEET
+    assert iso_bottom - drawing.SCREW_SECTION_CENTER[1] >= 0.03
     caption_y = drawing.ISO_NOTE_XY[1]
-    assert edge_text_bottom - caption_y >= 0.002
     assert caption_y - _CAPTION_HEIGHT - (drawing.ISO_CENTER[1] + _ISO_HALF_HEIGHT_SHEET) >= 0.0
+    assert caption_y <= 0.266 - 0.004
 
 
-def test_the_first_plan_row_clears_the_cutting_line_arrow() -> None:
-    arrow_top = (
-        geometry.arm_upper_edge_y(0.0)
-        + drawing.SECTION_LINE_OVERRUN_MM
-        + _SECTION_LABEL_MODEL
+def test_the_locator_callout_stays_inside_the_border() -> None:
+    """Its match-drill lines stand above the size, under the top border."""
+    lines = spec.LOCATOR_CALLOUT_ABOVE.count("\n") + 1
+    text_y = (
+        drawing.PLAN_CENTER[1]
+        + (drawing.PLAN_KEEP["LocatorDia1"][1] - _PLAN_MID_Y) * drawing.SHEET_SCALE[0] / 1000.0
     )
-    nearest_row = min(
-        drawing.PLAN_KEEP[name][1]
-        for name in ("ScrewHoleX1", "ScrewHoleX2", "LocatorX1")
+    assert text_y + 0.006 + lines * 0.0055 <= 0.266 - 0.002
+    widest = max(map(len, drawing._locator_callout_above().splitlines()))
+    text_x = _view_sheet_x(
+        drawing.PLAN_CENTER[0], drawing.PLAN_KEEP["LocatorDia1"][0], mirrored=False
     )
-    assert nearest_row - _TEXT_BELOW_KEEP_MODEL - arrow_top >= 1.0
+    assert text_x - _text_half_width_sheet("X" * widest) >= 0.0125 + 0.002
 
 
 def test_the_reamed_hole_leader_crosses_no_plan_dimension_line() -> None:
@@ -530,40 +537,84 @@ def test_section_stations_are_a_baseline_from_the_mounting_face() -> None:
     assert -geometry.END_R - keep["HubToBoss"][1] < _CAPTION_CLEAR_MODEL
 
 
-def test_matched_pair_and_projected_zone_notes_state_their_values() -> None:
-    """The plate sheet states the setting and acceptance, and every zone's origin."""
-    import pd_rack_pinion_spec as disc
+def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
+    """The tight bands name their mates; the locating holes cite the
+    MHA-PD-00 steps that set and accept the matched pair (no sheet notes)."""
+    import pd_paper_drive_assembly_steps as steps
 
     numbers = {
-        key: _config.parts(key)["number"]
-        for key in ("pd-transgear-arm", "pd-transgear-arm-plate")
+        name: _config.parts(key)["number"]
+        for name, key in (
+            ("KNOB_SHAFT_NUMBER", "pd-transgear-knob-shaft"),
+            ("THRUST_RING_NUMBER", "pd-transgear-knob-thrust-ring"),
+            ("KNOB_CUP_NUMBER", "pd-transgear-knob-cup"),
+            ("ARM_NUMBER", "pd-transgear-arm"),
+            ("DOWEL_NUMBER", "pd-vn-transgear-arm-plate-locating-pin"),
+        )
     }
-    for text, mate in (
-        (drawing.NOTES_TEXT, numbers["pd-transgear-arm"]),
-    ):
-        flat = " ".join(line.strip() for line in text.splitlines())
-        assert f"MATCH-DRILLED WITH {mate}," in flat
-        band = disc.CENTRE_DISTANCE_SET_TEXT
-        assert f"KNOB BORE CLAMPED {band} FROM" in flat
-        assert f"CENTRES STILL {band}" in flat
-        assert "NO SHAKE, NO DAYLIGHT" in flat
-        assert "ACCEPTANCE" not in flat
-        assert "PROJECTED ZONES START AT" in flat
-    plate_notes = " ".join(line.strip() for line in drawing.NOTES_TEXT.splitlines())
-    projected = [
-        control for control in drawing.GEOMETRIC_CONTROLS
+    for name, number in numbers.items():
+        assert getattr(spec, name) == number, name
+
+    def flat(text: str) -> str:
+        return " ".join(text.split())
+
+    assert flat(spec.BORE_CALLOUT) == (
+        f"REAM THRU RUNNING FIT ON KNOB SHAFT {numbers['KNOB_SHAFT_NUMBER']}"
+    )
+    assert flat(spec.LOCATOR_CALLOUT) == (
+        f"2X REAM THRU SLIP FIT ON DOWEL {numbers['DOWEL_NUMBER']}"
+    )
+    located = steps.step_number("arm-plate-located")
+    above = flat(drawing._locator_callout_above())
+    assert above.startswith(f"MATCH-DRILL WITH ARM {numbers['ARM_NUMBER']} AT ASSEMBLY,")
+    assert f"{steps.DRAWING_NUMBER} STEPS {located}-{located + 1};" in above
+    assert numbers["KNOB_SHAFT_NUMBER"] in spec.HUB_STATION_CALLOUT
+    assert numbers["KNOB_CUP_NUMBER"] in spec.HUB_TO_BOSS_CALLOUT
+    assert drawing.CALLOUTS_ABOVE["HubFaceToMounting"] == spec.HUB_STATION_CALLOUT
+    assert drawing.DIMENSION_CALLOUTS["HubToBoss"] == spec.HUB_TO_BOSS_CALLOUT
+    callouts = {**drawing.CALLOUTS_ABOVE, "LocatorDia1": drawing._locator_callout_above()}
+    for text in (*drawing.DIMENSION_CALLOUTS.values(), *callouts.values()):
+        assert all(len(line) <= 22 for line in text.splitlines()), text
+    assert not hasattr(drawing, "NOTES_TEXT")
+
+
+def test_each_projected_zone_is_a_chain_line_from_face_a() -> None:
+    """ASME Y14.5-2018 §6.4.7: each zone drawn from face A, along its
+    feature's axis and just off it, for its frame's height, away from the
+    feature's own body (the knob bore's toward the hub, -Z; the holes'
+    through the plate past the rear face, +Z)."""
+    heights = {
+        control.key: control.projected_zone_height_mm
+        for control in spec.GEOMETRIC_CONTROLS
         if control.projected_zone_height_mm is not None
-    ]
-    assert projected
-    for control in projected:
-        assert f"{control.projected_zone_height_mm:.1f}" in plate_notes
-    assert "LEFT VIEW: REAR FACE;" in plate_notes
-    assert f"CSK COAXIAL WITH ITS \u00d8{geometry.SCREW_HOLE_DIA:.1f} HOLE." in plate_notes
-    assert "CENTRE VIEW: MOUNTING FACE A." in plate_notes
-    for feature in ("HOLE BORES (CENTRE VIEW)", "KNOB BORE"):
-        assert feature in plate_notes
-    assert "CSK CONES" not in plate_notes
-    # The countersinks are cut from the rear face, which *Front (the left
-    # view) looks at; *Back (the centre view) looks at face A.
+    }
+    assert heights == {
+        "plate_hole_1_position": spec.SCREW_ZONE_HEIGHT,
+        "plate_hole_2_position": spec.SCREW_ZONE_HEIGHT,
+        "knob_projected_axis": spec.KNOB_ZONE_HEIGHT,
+    }
+    start, end, text = drawing.KNOB_ZONE
+    assert start == (0.0, drawing.CHAIN_LINE_OFFSET_MM, 0.0)
+    assert end[:2] == start[:2] and end[2] == -spec.KNOB_ZONE_HEIGHT
+    assert end[2] < text[2] < geometry.HUB_FACE_Z
+    assert abs(text[1]) < geometry.BORE_DIA / 2.0
+    assert drawing.CHAIN_LINE_OFFSET_MM < geometry.BORE_DIA / 2.0
+    for (start, end, text), (x, y) in zip(drawing.SCREW_ZONES, geometry.SCREW_HOLES, strict=True):
+        assert start == (x + drawing.CHAIN_LINE_OFFSET_MM, y, 0.0)
+        assert end[:2] == start[:2] and end[2] == spec.SCREW_ZONE_HEIGHT
+        assert spec.SCREW_ZONE_HEIGHT > geometry.REAR_FACE_Z
+        assert text[2] < 0.0 and abs(text[0] - x) < geometry.SCREW_HOLE_DIA / 2.0
+    assert drawing.CHAIN_LINE_OFFSET_MM < geometry.SCREW_HOLE_DIA / 2.0
+    assert spec.DRAWING_REFERENCE_PRECISION == {"KnobZone": 1, "ScrewZone": 1}
+    assert f"{spec.KNOB_ZONE_HEIGHT:.1f}" == "40.6"
+    assert f"{spec.SCREW_ZONE_HEIGHT:.1f}" == "7.0"
+
+
+def test_two_sheets_label_each_face_view() -> None:
+    assert spec.SHEET_NAMES == ("REAR FACE", "FACE A")
+    assert spec.REAR_VIEW_LABEL == "REAR VIEW"
+    assert "FACE A" in spec.FRONT_VIEW_LABEL
+    # The countersinks are cut from the rear face, which *Front looks at;
+    # *Back looks at face A.
     assert geometry.REAR_FACE_Z > 0.0
-    assert drawing.PLAN_CENTER[0] < drawing.BACK_CENTER[0] < drawing.SECTION_CENTER[0]
+    assert drawing.BACK_CENTER[0] < drawing.KNOB_SECTION_CENTER[0]
