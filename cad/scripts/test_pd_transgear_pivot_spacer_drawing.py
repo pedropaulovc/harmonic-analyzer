@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+import re
 from types import SimpleNamespace
 
 import pytest
@@ -225,21 +226,51 @@ def _text_box(text: str, anchor: tuple[float, float], reference: int) -> Box:
     return box
 
 
+# A dimension's text block with its callout rows, as farm run
+# 20261027T121009040Z-eda67c82 printed them (layout-audit text runs): the
+# block centres near the annotation position SetPosition2 takes (the
+# length's rows on 0.2445, 0.1205 against its 0.2445, 0.1215; the bore's on
+# 0.0500, 0.2215 against 0.050, 0.222), so each box grows by 1.5 of anchor
+# slip; its rows stand 5.55 apart at 3.5 text, and the widest row's advance
+# reaches 0.80 of the cap height ("MHA-PD-VN-57 SHOULDER" ran 58.6 wide).
+# The bore's stacked +0.008 is one more row on top.
+_ROW_PITCH = 0.00555 / _CAP_M
+_CALLOUT_ADVANCE = 0.80
+_ANCHOR_SLIP = 0.0015
+
+
+def _callout_block(text: str, anchor: tuple[float, float]) -> Box:
+    box = estimate_text_box(
+        text,
+        anchor=anchor,
+        height=_CAP_M,
+        reference=2,
+        advance_ratio=_CALLOUT_ADVANCE,
+        line_spacing=_ROW_PITCH,
+    )
+    assert box is not None
+    return Box(
+        box.xmin - _ANCHOR_SLIP,
+        box.ymin - _ANCHOR_SLIP,
+        box.xmax + _ANCHOR_SLIP,
+        box.ymax + _ANCHOR_SLIP,
+    )
+
+
 def _length_text_box() -> Box:
-    return _text_box(
+    return _callout_block(
         f"{spec.LENGTH:.3f} ±{spec.LENGTH_BAND:.2f}\n"
         f"{drawing.DIMENSION_CALLOUTS['RingLength']}",
         drawing.LENGTH_TEXT_XY,
-        2,
     )
 
 
 def _bore_text_box() -> Box:
-    return _text_box(
-        f"\u00d8{spec.BORE_DIA:.3f} +{max(spec.BORE_DIA_BAND):.3f}\n"
+    return _callout_block(
+        f"+{max(spec.BORE_DIA_BAND):.3f}\n"
+        f"\u00d8{spec.BORE_DIA:.3f} {min(spec.BORE_DIA_BAND):.3f}\n"
         f"{drawing.DIMENSION_CALLOUTS['BoreDia']}",
         drawing.END_KEEP["BoreDia"],
-        2,
     )
 
 
@@ -267,12 +298,7 @@ def test_both_frames_stand_inside_the_sheet_clear_of_every_annotation() -> None:
         "length text": _length_text_box(),
         "length dimension line": Box(rear_x, length_y, drawing.LENGTH_TEXT_XY[0], length_y),
         "O.D. text": _text_box(f"\u00d8{spec.OD:.3f}", drawing.OD_ON_PROFILE, 2),
-        "bore text": _text_box(
-            f"\u00d8{spec.BORE_DIA:.3f} +{max(spec.BORE_DIA_BAND):.3f}\n"
-            f"{drawing.DIMENSION_CALLOUTS['BoreDia']}",
-            drawing.END_KEEP["BoreDia"],
-            2,
-        ),
+        "bore text": _bore_text_box(),
         "notes": _text_box(spec.DRAWING_NOTES, drawing.NOTES_XY, 0),
         "isometric note": _text_box(spec.ISOMETRIC_VIEW_NOTE, drawing.ISO_NOTE_XY, 0),
         # Lines: the axis centreline, the length's extension lines down from
@@ -462,24 +488,37 @@ def test_the_bore_callout_names_ream_for_the_shoulder_press() -> None:
     assert 0.0 < max(spec.BORE_DIA_BAND) < drilled_growth
     assert set(drawing.DIMENSION_CALLOUTS) == {"BoreDia", "RingLength"}
     assert "BoreDia" in drawing.END_KEEP and "RingLength" in drawing.PROFILE_KEEP
-    bore = drawing.DIMENSION_CALLOUTS["BoreDia"].splitlines()
-    assert bore == [
-        "REAM THRU",
-        "0.002-0.036 DIAMETRAL",
-        "INTERFERENCE ON",
-        f"{_config.parts('pd-vn-transgear-pivot-screw')['number']} SHOULDER",
-    ]
+    bore = " ".join(drawing.DIMENSION_CALLOUTS["BoreDia"].split())
+    # Process, fit and mate (rule 4), not their wording or wrapping.
+    assert bore.startswith("REAM THRU")
+    assert "DIAMETRAL INTERFERENCE" in bore
+    assert _config.parts("pd-vn-transgear-pivot-screw")["number"] in bore
     # The printed window encloses the spec's press at both limits.
-    low, high = (float(v) for v in bore[1].split()[0].split("-"))
-    assert low <= spec.PRESS_INTERFERENCE[0] < spec.PRESS_INTERFERENCE[1] <= high
-    assert low > 0.0
+    (window,) = re.findall(r"(\d+\.\d+)-(\d+\.\d+)", bore)
+    low, high = (float(v) for v in window)
+    assert 0.0 < low <= spec.PRESS_INTERFERENCE[0] < spec.PRESS_INTERFERENCE[1] <= high
+    assert high - spec.PRESS_INTERFERENCE[1] < 0.001
+    assert spec.PRESS_INTERFERENCE[0] - low < 0.001
 
 
 def test_the_length_band_names_the_spring_room_it_sets() -> None:
     """Rule 4: a width that sets a stack names the stack.  The ±0.05 length
     sets the MHA-PD-VN-63 spring's room (transgear_hanger_joints)."""
-    spring = _config.parts("pd-vn-transgear-pivot-spring")["number"]
-    assert drawing.DIMENSION_CALLOUTS["RingLength"] == f"SETS {spring}\nSPRING ROOM"
+    callout = " ".join(drawing.DIMENSION_CALLOUTS["RingLength"].split())
+    assert _config.parts("pd-vn-transgear-pivot-spring")["number"] in callout
+    assert "SPRING ROOM" in callout
+
+
+def test_callout_boxes_enclose_the_native_rows_the_farm_printed() -> None:
+    """The calibration behind _length_text_box and _bore_text_box: each
+    encloses the native rows' extents from run 20261027T121009040Z-eda67c82
+    (layout audit, lower-left anchored runs plus their width and 3.5 cap)."""
+    for box, (xmin, ymin, xmax, ymax) in (
+        (_length_text_box(), (0.2224, 0.1132, 0.2665, 0.1278)),
+        (_bore_text_box(), (0.0207, 0.2064, 0.0793, 0.2366)),
+    ):
+        assert box.xmin <= xmin and xmax <= box.xmax
+        assert box.ymin <= ymin and ymax <= box.ymax
 
 
 def test_offset_length_text_clears_every_extension_line() -> None:
