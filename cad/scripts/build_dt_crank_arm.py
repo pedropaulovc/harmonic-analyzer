@@ -256,9 +256,9 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "HandleSeat")
 
-    # Small visual punch witness.  Its restrained representation is driven so
-    # rebuilds remain stable, but it is deliberately absent from the drawing's
-    # manufacturing dimension set.
+    # Small visual punch witness.  The drawing prints its two ordinates from
+    # the hub-seat axis (FiducialX/FiducialY, marked below); its diameter and
+    # depth are only a restrained representation and never print.
     fiducial = SketchDims()
     check("create_sketch arm fiducial", await adapter.create_sketch("HandleSeat"))
     await define_circle(

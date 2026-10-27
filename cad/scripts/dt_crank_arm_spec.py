@@ -39,6 +39,7 @@ from dt_crank_hub_geometry import (
     AXIAL_PIN_DIA,
     AXIAL_PIN_LENGTH,
     AXIAL_PIN_RADIUS_FROM_AXIS,
+    EDGE_BREAK_MAX_MM,
     FIDUCIAL_MODEL_DEPTH,
     FIDUCIAL_MODEL_DIA,
     GENERAL_1PL_TOL_MM,
@@ -79,12 +80,33 @@ if PIVOT_END_WEB_WORST < WALL_TARGET_MM:
 AXIAL_PIN_X = AXIAL_PIN_RADIUS_FROM_AXIS
 AXIAL_PIN_Y = 0.0
 
-# Restrained visual representation of the two alignment witnesses.  The arm
-# owns one shallow punched mark; the matching mark is on the crankshaft dome.
-# Neither diameter nor depth is a manufacturing dimension on the print.
-_FIDUCIAL_AXIS = ARM_FIDUCIAL_RADIUS / math.sqrt(2.0)
+# The arm owns one shallow punched alignment witness; the matching mark is on
+# the crankshaft (MHA-DT-11) dome, and the drive-train assembly lines the two up
+# before the taper ream.  It stands at 135 degrees on the boss ring's
+# mid-radius, its ordinates from the hub-seat axis rounded to their printed .X
+# place.  Its diameter and depth are a visual representation, never printed.
+_FIDUCIAL_AXIS = round(ARM_FIDUCIAL_RADIUS / math.sqrt(2.0), 1)
 FIDUCIAL_X = -_FIDUCIAL_AXIS
 FIDUCIAL_Y = _FIDUCIAL_AXIS
+# Machinist review 2026-10-27 (no location in words): the ordinates print from
+# the hub-seat axis at the title block's loose .X band, enough for a scribed,
+# hand-punched mark.  Anywhere in that square the punch centre stays on the flat
+# outboard face, outside the edge breaks of the nominal seat bore and boss end;
+# a .X band any looser would let it reach the boss end's break.
+FIDUCIAL_RADIAL_LIMITS = (
+    math.sqrt(2.0) * (_FIDUCIAL_AXIS - GENERAL_1PL_TOL_MM),
+    math.sqrt(2.0) * (_FIDUCIAL_AXIS + GENERAL_1PL_TOL_MM),
+)
+if not (
+    HUB_SEAT_DIA / 2.0 + EDGE_BREAK_MAX_MM
+    < FIDUCIAL_RADIAL_LIMITS[0]
+    < FIDUCIAL_RADIAL_LIMITS[1]
+    < ARM_WIDTH / 2.0 - EDGE_BREAK_MAX_MM
+):
+    raise AssertionError(
+        f"punch witness band reaches {FIDUCIAL_RADIAL_LIMITS} from the hub-seat axis, "
+        "off the flat face between the seat bore and boss end breaks"
+    )
 
 # Keeper-ring anchor (ch11 p.14): a small slotted screw in the arm's outboard
 # face clamps the brass eyelet that once tethered removable pin MHA-DT-09.
@@ -108,14 +130,16 @@ HALF_WIDTH = ARM_WIDTH / 2.0
 # #892; the U41 platform precedent).
 REFERENCE_DIMENSIONS = {"Depth"}
 
-# Marked dimensions imported by the drawing.  The punch and axial seam groove
-# are assembly-match features, so their representation geometry carries no
-# independent size or location dimension.
+# Marked dimensions imported by the drawing.  The axial seam groove is an
+# assembly-match feature, so its representation geometry carries no
+# independent size or location dimension; the punch witness prints only its
+# location from the hub-seat axis.
 # The two end radii are concentric with the hub seat and the handle pivot, so
 # they locate both on the arm's mid-width axis; the former common-axis offset
 # restated that and is gone with the square end.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ArmOutline": {"BossRadius", "EndRadius"},
+    "FiducialProfile": {"FiducialX", "FiducialY"},
     "Arm": {"Depth"},
     "HubSeatProfile": {"HubSeatDia"},
     "StationReference": {
@@ -130,6 +154,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # .X size: it is bored first, and MHA-DT-31 is turned to suit it.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ArmOutline": {"BossRadius": 1, "EndRadius": 1},
+    "FiducialProfile": {"FiducialX": 1, "FiducialY": 1},
     "Arm": {"Depth": 1},
     "HubSeatProfile": {"HubSeatDia": 1},
     "StationReference": {

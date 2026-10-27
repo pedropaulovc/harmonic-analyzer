@@ -228,7 +228,13 @@ FRONT_KEEP = {
     "AnchorStation": (_sheet_x(ANCHOR_SCREW_X / 2.0), 0.104),
     "AnchorOffset": (0.108, FRONT_CENTER[1] + HALF_WIDTH * SHEET_SCALE[0] / 1000.0 + 0.008),
     "Width": (0.279, FRONT_CENTER[1]),
-    "BossRadius": (0.030, FRONT_CENTER[1]),
+    # The punch witness's ordinates from the hub-seat axis: the X above the
+    # boss end, under the witness's callout; the Y left of the boss.
+    "FiducialX": (_sheet_x(FIDUCIAL_X / 2.0), 0.178),
+    "FiducialY": (0.034, FRONT_CENTER[1] + FIDUCIAL_Y / 2.0 * SHEET_SCALE[0] / 1000.0),
+    # Below the boss end, inboard of the overall's extension line: on the axis
+    # its leader would run along the witness Y's extension line from the centre.
+    "BossRadius": (0.057, 0.106),
     # Below and right of the handle end, clear of the Width row and the
     # 75.0 station row; its leader lands on the lower-right quarter of the arc.
     "EndRadius": (0.268, 0.100),
