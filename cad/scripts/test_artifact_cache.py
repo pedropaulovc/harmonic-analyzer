@@ -9,6 +9,7 @@ on-disk sinks (cache.jsonl, the per-label key sidecar) are redirected to a tmp d
 from __future__ import annotations
 
 import concurrent.futures
+import contextlib
 import hashlib
 import io
 import json
@@ -21,6 +22,7 @@ import threading
 import time
 import types
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -39,6 +41,10 @@ class _FakeBackend:
 
     def __init__(self):
         self.blobs: dict[str, bytes] = {}
+        self.credential_retries_enabled = False
+
+    def enable_credential_retries(self):
+        self.credential_retries_enabled = True
 
     def get(self, key):
         payload = self.blobs.get(key)
@@ -897,9 +903,11 @@ def _gated_backend():
     backend = _FakeBackend()
     order: list[str] = []
     release = threading.Event()
+    backend.entered = threading.Event()
 
     def head(key):
         order.append(f"head {key}")
+        backend.entered.set()
         release.wait(5)
         order.append("head done")
         return False
@@ -912,44 +920,92 @@ def test_prewarm_opens_the_connection_once_and_the_probe_reuses_it(leaf, monkeyp
     """A probe that arrives while the prewarm's HEAD is still in flight waits for
     that request, so it reuses the connection it opens -- rather than racing it
     with a second cold TLS handshake -- and the client is built exactly once."""
-    import threading
+    waits = []
 
     backend, order, release = _gated_backend()
     built: list[int] = []
-    monkeypatch.setattr(cache, "_make_backend", lambda: built.append(1) or backend)
+    monkeypatch.setattr(cache, "_make_backend", lambda **kwargs: built.append(1) or backend)
     warm = cache.prewarm()
     assert warm is not None
-    while "head prewarm" not in order:  # client built, HEAD in flight
-        threading.Event().wait(0.01)
+    assert backend.entered.wait(5)
 
-    threading.Timer(0.2, release.set).start()
+    def finish_prewarm(timeout):
+        waits.append(timeout)
+        release.set()
+        warm.join(5)
+        assert not warm.is_alive()
+        return True
+
+    monkeypatch.setattr(
+        cache, "_PREWARMED", types.SimpleNamespace(wait=finish_prewarm),
+    )
     assert cache._backend() is backend
     order.append("probe")
     warm.join(5)
     assert order == ["head prewarm", "head done", "probe"]
     assert built == [1]
     assert [args[0] for args in leaf] == [cache._join_prewarm]
+    assert backend.credential_retries_enabled
+    assert waits == [3.0]
 
 
-def test_a_stalled_prewarm_delays_the_probe_only_by_its_bound(leaf, monkeypatch):
-    """The cache verdict never depends on the prewarm: a HEAD that hangs costs the
-    first real call at most ``_PREWARM_WAIT_S``, after which it proceeds."""
-    import time
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_a_stalled_prewarm_delays_the_probe_only_by_its_bound(
+    leaf, credential_runtime, monkeypatch, method,
+):
+    """After the bounded wait, a real request has its own client AND credential."""
+    entered, release = threading.Event(), threading.Event()
+    speculative = _FakeTokenCredential()
+    original = getattr(speculative, method)
 
-    backend, order, release = _gated_backend()
-    monkeypatch.setattr(cache, "_make_backend", lambda: backend)
-    monkeypatch.setattr(cache, "_PREWARM_WAIT_S", 0.2)
+    def blocked(*args, **kwargs):
+        entered.set()
+        assert release.wait(5)
+        return original(*args, **kwargs)
+
+    setattr(speculative, method, blocked)
+    credentials = [
+        cache._SharedTokenInfoCredential(speculative),
+        cache._SharedTokenInfoCredential(_FakeTokenCredential()),
+    ]
+    built = []
+    closed = []
+
+    def make_backend(**kwargs):
+        credential = credentials[len(built)]
+        backend = types.SimpleNamespace(
+            exists=lambda key: getattr(credential, method)("scope"),
+            close=lambda: closed.append(credential),
+            enable_credential_retries=credential.enable_retries,
+        )
+        built.append(backend)
+        return backend
+
+    monkeypatch.setattr(cache, "_make_backend", make_backend)
     warm = cache.prewarm()
+    waits = []
     try:
-        while "head prewarm" not in order:
-            time.sleep(0.01)
-        started = time.monotonic()
-        assert cache._backend() is backend
-        assert time.monotonic() - started < 2
-        assert "head done" not in order
+        assert entered.wait(5)
+        assert isinstance(cache._BACKEND, cache._Unset)
+        monkeypatch.setattr(
+            cache, "_PREWARMED",
+            types.SimpleNamespace(wait=lambda timeout: waits.append(timeout) or False),
+        )
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            def probe():
+                backend = cache._backend()
+                return backend, backend.exists("actual")
+
+            backend, token = pool.submit(probe).result(timeout=5)
+        assert backend is built[1]
+        assert token is not None
+        assert waits == [3.0]
+        assert warm.is_alive()
     finally:
         release.set()
         warm.join(5)
+    assert cache._BACKEND is built[1]
+    assert closed == [credentials[0]]
 
 
 def test_a_stalled_prewarm_holds_interpreter_exit_only_by_its_bound(leaf, monkeypatch):
@@ -958,7 +1014,7 @@ def test_a_stalled_prewarm_holds_interpreter_exit_only_by_its_bound(leaf, monkey
     import time
 
     backend, order, release = _gated_backend()
-    monkeypatch.setattr(cache, "_make_backend", lambda: backend)
+    monkeypatch.setattr(cache, "_make_backend", lambda **kwargs: backend)
     monkeypatch.setattr(cache, "_PREWARM_JOIN_S", 0.2)
     warm = cache.prewarm()
     try:
@@ -978,7 +1034,7 @@ def test_a_failed_prewarm_never_turns_the_cache_off(leaf, monkeypatch, failure):
     be built leaves the backend unset, so the probe builds (and reports) its own."""
     attempts: list[str] = []
 
-    def speculative_failure():
+    def speculative_failure(**kwargs):
         attempts.append("prewarm")
         if failure == "raises":
             raise RuntimeError("constructor failed")
@@ -989,7 +1045,9 @@ def test_a_failed_prewarm_never_turns_the_cache_off(leaf, monkeypatch, failure):
     assert isinstance(cache._BACKEND, cache._Unset)
 
     backend = _FakeBackend()
-    monkeypatch.setattr(cache, "_make_backend", lambda: attempts.append("probe") or backend)
+    monkeypatch.setattr(
+        cache, "_make_backend", lambda **kwargs: attempts.append("probe") or backend,
+    )
     assert cache._backend() is backend
     assert attempts == ["prewarm", "probe"]
 
@@ -1010,7 +1068,7 @@ def test_prewarm_runs_only_in_a_publishing_farm_leaf(leaf, monkeypatch, mode, re
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", mode)
     monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", resource)
     monkeypatch.setattr(
-        cache, "_make_backend", lambda: pytest.fail("a non-leaf process connected")
+        cache, "_make_backend", lambda **kwargs: pytest.fail("a non-leaf process connected")
     )
     assert cache.prewarm() is None
     assert cache._PREWARMED is None
@@ -1030,6 +1088,1129 @@ def test_a_thread_that_cannot_start_is_no_prewarm(leaf, monkeypatch):
     assert cache.prewarm() is None
     assert cache._PREWARMED.is_set()
     assert leaf == []
+
+
+class _FakeTokenCredential:
+    """Token endpoints with deterministic outcomes, never a subprocess or network."""
+
+    def __init__(self, outcomes=()):
+        self.outcomes = list(outcomes)
+        self.calls = []
+
+    def _fetch(self, method, scopes, kwargs):
+        from azure.core.credentials import AccessToken, AccessTokenInfo
+
+        self.calls.append((method, scopes, kwargs))
+        if self.outcomes:
+            outcome = self.outcomes.pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+        token = f"secret-token-{len(self.calls)}"
+        if method == "get_token_info":
+            return AccessTokenInfo(
+                token, int(cache.time.time()) + 4000,
+                refresh_on=int(cache.time.time()) + 3000,
+            )
+        return AccessToken(token, int(cache.time.time()) + 4000)
+
+    def get_token(self, *scopes, **kwargs):
+        return self._fetch("get_token", scopes, kwargs)
+
+    def get_token_info(self, *scopes, **kwargs):
+        return self._fetch("get_token_info", scopes, kwargs)
+
+
+def _transient_unavailable(message="offline", cause=None):
+    from azure.identity import CredentialUnavailableError
+
+    error = CredentialUnavailableError(message)
+    error.__cause__ = cause if cause is not None else TimeoutError("token endpoint timed out")
+    return error
+
+
+
+@pytest.fixture
+def credential_runtime(monkeypatch):
+    now = [1000]
+    delays, warnings, events = [], [], []
+    monkeypatch.setattr(
+        cache, "time", types.SimpleNamespace(
+            time=lambda: now[0], monotonic=lambda: now[0], sleep=delays.append,
+        ),
+    )
+    monkeypatch.setattr(
+        _telemetry, "warn", warnings.append,
+    )
+    monkeypatch.setattr(
+        _telemetry, "event",
+        lambda name, **attrs: events.append((name, attrs)),
+    )
+    return types.SimpleNamespace(
+        now=now, delays=delays, warnings=warnings, events=events,
+    )
+
+
+def test_credential_reuses_tokens_across_independent_callers(credential_runtime):
+    inner = _FakeTokenCredential()
+    proxy = cache._SharedTokenCredential(inner)
+    first = proxy.get_token("scope", tenant_id="tenant")
+    for _ in range(5):
+        assert proxy.get_token("scope", tenant_id="tenant") is first
+    assert len(inner.calls) == 1
+    assert credential_runtime.delays == []
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+@pytest.mark.parametrize(
+    ("expires_on", "refresh_on", "refresh_at"),
+    [
+        (2000, None, 1700),  # refresh at the five-minute expiry boundary
+        (2000, 1500, 1500),  # refresh_on can bring refresh forward
+        (2000, 1900, 1700),  # refresh_on cannot bypass expiry skew
+        (1200, None, 1000),  # a newly fetched near-expiry token is not reusable
+    ],
+)
+def test_credential_refresh_deadlines(
+    credential_runtime, method, expires_on, refresh_on, refresh_at,
+):
+    from azure.core.credentials import AccessToken, AccessTokenInfo
+
+    first = (
+        AccessTokenInfo("secret", expires_on, refresh_on=refresh_on)
+        if method == "get_token_info" else AccessToken("secret", expires_on)
+    )
+    # AccessToken has no refresh_on; use the info interface for those cases.
+    if method == "get_token" and refresh_on is not None:
+        refresh_at = expires_on - 300
+    inner = _FakeTokenCredential([first])
+    proxy = cache._SharedTokenInfoCredential(inner)
+    fetch = getattr(proxy, method)
+    assert fetch("scope") is first
+    if refresh_at > credential_runtime.now[0]:
+        credential_runtime.now[0] = refresh_at - 1
+        assert fetch("scope") is first
+    credential_runtime.now[0] = refresh_at
+    assert fetch("scope") is not first
+    assert len(inner.calls) == 2
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_credential_keys_complete_request_semantics(credential_runtime, method):
+    inner = _FakeTokenCredential()
+    proxy = cache._SharedTokenInfoCredential(inner)
+    fetch = getattr(proxy, method)
+    requests = [
+        (("scope",), {}),
+        (("other-scope",), {}),
+        (("scope", "other-scope"), {}),
+        (("other-scope", "scope"), {}),
+        (("scope",), {"tenant_id": "tenant-a"}),
+        (("scope",), {"tenant_id": "tenant-b"}),
+        (("scope",), {"claims": "secret-claims-a"}),
+        (("scope",), {"claims": "secret-claims-b"}),
+        (("scope",), {"enable_cae": False}),
+        (("scope",), {"enable_cae": True}),
+        (("scope",), {"options": {"tenant_id": "a", "claims": "secret-a"}}),
+        (("scope",), {"options": {"tenant_id": "b", "claims": "secret-a"}}),
+        (("scope",), {"options": {"tenant_id": "a", "claims": "secret-b"}}),
+        (("scope",), {"options": {"enable_cae": True}}),
+        (("scope",), {"options": {"extra": {"items": [1, 2]}}}),
+        (("scope",), {"options": {"extra": {"items": [2, 1]}}}),
+    ]
+    tokens = [fetch(*scopes, **kwargs) for scopes, kwargs in requests]
+    assert len(inner.calls) == len(requests)
+    for (scopes, kwargs), token in zip(requests, tokens):
+        assert fetch(*scopes, **kwargs) is token
+    assert len(inner.calls) == len(requests)
+    assert credential_runtime.events == []
+
+
+def test_credential_snapshots_mutable_options(credential_runtime):
+    inner = _FakeTokenCredential()
+    proxy = cache._SharedTokenInfoCredential(inner)
+    options = {"tenant_id": "a", "claims": "secret-a"}
+    first = proxy.get_token_info("scope", options=options)
+    options["claims"] = "secret-b"
+    second = proxy.get_token_info("scope", options=options)
+    assert second is not first
+    assert proxy.get_token_info(
+        "scope", options={"claims": "secret-a", "tenant_id": "a"},
+    ) is first
+    assert len(inner.calls) == 2
+
+
+def test_credential_keeps_token_and_info_interfaces_separate(credential_runtime):
+    from azure.core.credentials import AccessToken, AccessTokenInfo
+
+    inner = _FakeTokenCredential()
+    proxy = cache._SharedTokenInfoCredential(inner)
+    token = proxy.get_token("scope")
+    info = proxy.get_token_info("scope")
+    assert isinstance(token, AccessToken)
+    assert isinstance(info, AccessTokenInfo)
+    assert proxy.get_token("scope") is token
+    assert proxy.get_token_info("scope") is info
+    assert len(inner.calls) == 2
+    bare = cache._SharedTokenCredential(types.SimpleNamespace(get_token=inner.get_token))
+    assert not hasattr(bare, "get_token_info")
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_credential_concurrent_refresh_is_singleflight(credential_runtime, method):
+    inner = _FakeTokenCredential()
+    proxy = cache._SharedTokenInfoCredential(inner)
+    entered, release = threading.Event(), threading.Event()
+    original = getattr(inner, method)
+
+    def blocked(*scopes, **kwargs):
+        entered.set()
+        assert release.wait(5), "test did not release fake acquisition"
+        return original(*scopes, **kwargs)
+
+    setattr(inner, method, blocked)
+    fetch = getattr(proxy, method)
+    for now in (1000, 4700):
+        credential_runtime.now[0] = now
+        entered.clear()
+        release.clear()
+        start = threading.Barrier(8)
+
+        def request():
+            start.wait(5)
+            return fetch("scope")
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            futures = [pool.submit(request) for _ in range(8)]
+            try:
+                assert entered.wait(5), "fake acquisition did not start"
+            finally:
+                release.set()
+            tokens = [future.result(timeout=5) for future in futures]
+        assert all(token is tokens[0] for token in tokens)
+    assert len(inner.calls) == 2
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_credential_retries_unavailability_then_reuses_success(credential_runtime, method):
+    from azure.identity import CredentialUnavailableError
+
+    timeout = subprocess.TimeoutExpired("secret-command", 10)
+    unavailable = CredentialUnavailableError("secret-claims must not reach retry telemetry")
+    unavailable.__cause__ = timeout
+    invocation = CredentialUnavailableError("secret-invocation")
+    invocation.__context__ = TimeoutError("secret-path")
+    inner = _FakeTokenCredential([unavailable, invocation])
+    proxy = cache._SharedTokenInfoCredential(inner)
+    fetch = getattr(proxy, method)
+    token = fetch("scope", claims="secret-request-claims")
+    assert fetch("scope", claims="secret-request-claims") is token
+    assert len(inner.calls) == 3
+    assert credential_runtime.delays == [1, 2]
+    assert len(credential_runtime.warnings) == 2
+    assert [name for name, attrs in credential_runtime.events] == [
+        "cache.credential.retry", "cache.credential.retry",
+    ]
+    attrs = [attrs for name, attrs in credential_runtime.events]
+    assert [item["attempt"] for item in attrs] == [1, 2]
+    assert [item["delay_s"] for item in attrs] == [1, 2]
+    assert [item["cause_type"] for item in attrs] == ["TimeoutExpired", "TimeoutError"]
+    assert all(item["error_type"] == "CredentialUnavailableError" for item in attrs)
+    assert "secret" not in repr(credential_runtime.warnings)
+    assert "secret" not in repr(credential_runtime.events)
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_credential_retry_exhaustion_preserves_exception_and_cause(credential_runtime, method):
+    from azure.identity import CredentialUnavailableError
+
+    errors = [_transient_unavailable(f"unavailable-{i}") for i in range(3)]
+    cause = subprocess.TimeoutExpired("az", 10)
+    errors[-1].__cause__ = cause
+    inner = _FakeTokenCredential(errors)
+    proxy = cache._SharedTokenInfoCredential(inner)
+    fetch = getattr(proxy, method)
+    with pytest.raises(CredentialUnavailableError) as caught:
+        fetch("scope")
+    assert caught.value is errors[-1]
+    assert caught.value.__cause__ is cause
+    assert len(inner.calls) == 3
+    assert credential_runtime.delays == [1, 2]
+    assert len(credential_runtime.events) == 2
+    # Exhaustion stores only a retry deadline, never an exception/traceback.
+    assert list(proxy._retry_after.values()) == [1030]
+    assert not hasattr(proxy, "_failures")
+    assert fetch("scope") is not None  # immediate recovery, still inside 30 seconds
+    assert len(inner.calls) == 4
+    assert credential_runtime.delays == [1, 2]
+    assert proxy._retry_after == {}
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+@pytest.mark.parametrize("transient_cause", [False, True])
+def test_credential_never_retries_authentication_errors(
+    credential_runtime, method, transient_cause,
+):
+    from azure.core.exceptions import ClientAuthenticationError
+
+    failure = ClientAuthenticationError("permission denied")
+    if transient_cause:
+        failure.__cause__ = TimeoutError("endpoint timeout does not make auth retryable")
+    inner = _FakeTokenCredential([failure])
+    proxy = cache._SharedTokenInfoCredential(inner)
+    with pytest.raises(ClientAuthenticationError) as caught:
+        getattr(proxy, method)("scope")
+    assert caught.value is failure
+    assert len(inner.calls) == 1
+    assert credential_runtime.delays == []
+    assert credential_runtime.events == []
+    assert credential_runtime.warnings == []
+    assert getattr(proxy, method)("scope") is not None
+    assert len(inner.calls) == 2
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_real_chain_suppression_always_traverses_and_recovers(
+    credential_runtime, monkeypatch, method,
+):
+    from azure.core.exceptions import ClientAuthenticationError
+    from azure.identity import ChainedTokenCredential
+
+    links = [
+        _FakeTokenCredential([_transient_unavailable() for _ in range(12)])
+        for _ in range(2)
+    ]
+    proxy = cache._SharedTokenInfoCredential(ChainedTokenCredential(*links))
+    fetch = getattr(proxy, method)
+    request_kwargs = (
+        {"claims": "private"} if method == "get_token"
+        else {"options": {"claims": "private"}}
+    )
+    with pytest.raises(ClientAuthenticationError) as original:
+        fetch("scope", **request_kwargs)
+    traceback = original.value.__traceback__
+    assert [len(link.calls) for link in links] == [3, 3]
+    assert credential_runtime.delays == [1, 2]
+    deadline = next(iter(proxy._retry_after.values()))
+    credential_runtime.now[0] += 29
+    # Wall-clock jumps must not end monotonic retry suppression.
+    monkeypatch.setattr(cache.time, "time", lambda: 1)
+    for traversal in range(1, 4):
+        with pytest.raises(ClientAuthenticationError) as repeated:
+            fetch("scope", **request_kwargs)
+        assert repeated.value is not original.value
+        assert original.value.__traceback__ is traceback
+        assert [len(link.calls) for link in links] == [3 + traversal, 3 + traversal]
+        assert credential_runtime.delays == [1, 2]
+        assert list(proxy._retry_after.values()) == [deadline]
+    # A different identity retains its full retry budget.
+    with pytest.raises(ClientAuthenticationError):
+        fetch("other-scope", **request_kwargs)
+    assert [len(link.calls) for link in links] == [9, 9]
+    assert credential_runtime.delays == [1, 2, 1, 2]
+    credential_runtime.now[0] += 1
+    with pytest.raises(ClientAuthenticationError):
+        fetch("scope", **request_kwargs)
+    assert [len(link.calls) for link in links] == [12, 12]
+    assert credential_runtime.delays == [1, 2, 1, 2, 1, 2]
+    # Recovery is visible immediately, not after another cooldown.
+    assert fetch("scope", **request_kwargs) is not None
+    assert len(links[0].calls) == 13
+    assert len(links[1].calls) == 12
+    assert len(proxy._retry_after) == 1  # only the other identity remains suppressed
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_real_chain_missing_configuration_never_retries(credential_runtime, method):
+    from azure.core.exceptions import ClientAuthenticationError
+    from azure.identity import ChainedTokenCredential, CredentialUnavailableError
+
+    links = [
+        _FakeTokenCredential([
+            CredentialUnavailableError("not configured") for _ in range(4)
+        ])
+        for _ in range(3)
+    ]
+    proxy = cache._SharedTokenInfoCredential(ChainedTokenCredential(*links))
+    fetch = getattr(proxy, method)
+    errors = []
+    for traversal in range(1, 5):
+        with pytest.raises(ClientAuthenticationError) as caught:
+            fetch("scope")
+        errors.append(caught.value)
+        assert [len(link.calls) for link in links] == [traversal] * 3
+        assert credential_runtime.delays == []
+        assert proxy._retry_after == {}
+    assert len({id(error) for error in errors}) == 4
+    assert credential_runtime.events == []
+    assert credential_runtime.warnings == []
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_real_sdk_missing_imds_endpoint_never_retries(credential_runtime, method):
+    from azure.core.exceptions import ClientAuthenticationError, ServiceRequestError
+    from azure.core.pipeline.transport import HttpTransport
+    from azure.identity import (
+        ChainedTokenCredential, EnvironmentCredential, ManagedIdentityCredential,
+    )
+
+    class NoEndpointHttpTransport(HttpTransport):
+        calls = 0
+
+        def open(self):
+            pass
+
+        def close(self):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            self.close()
+
+        def send(self, request, **kwargs):
+            self.calls += 1
+            raise ServiceRequestError("offline IMDS endpoint unavailable")
+
+    transport = NoEndpointHttpTransport()
+    with patch.dict(os.environ, {}, clear=True):
+        with ChainedTokenCredential(
+            EnvironmentCredential(), ManagedIdentityCredential(transport=transport),
+        ) as chain:
+            proxy = cache._SharedTokenInfoCredential(chain)
+            with pytest.raises(ClientAuthenticationError):
+                getattr(proxy, method)("https://storage.azure.com/.default")
+    assert transport.calls == 1
+    assert credential_runtime.delays == []
+    assert credential_runtime.events == []
+    assert credential_runtime.warnings == []
+    assert proxy._retry_after == {}
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+@pytest.mark.parametrize("chain_kind", ["direct", "chained", "default"])
+def test_managed_identity_transport_retries_require_that_links_prior_success(
+    credential_runtime, method, chain_kind,
+):
+    from azure.core.exceptions import ClientAuthenticationError, ServiceRequestError
+    from azure.identity import (
+        ChainedTokenCredential, DefaultAzureCredential, ManagedIdentityCredential,
+    )
+
+    class StubManagedIdentityCredential(_FakeTokenCredential, ManagedIdentityCredential):
+        """Public SDK identity type with deterministic endpoint responses."""
+
+    def unavailable():
+        return _transient_unavailable(cause=ServiceRequestError("offline"))
+
+    mi = StubManagedIdentityCredential([unavailable()])
+    if chain_kind == "direct":
+        inner = mi
+    elif chain_kind == "chained":
+        inner = ChainedTokenCredential(mi)
+    else:
+        inner = DefaultAzureCredential.__new__(DefaultAzureCredential)
+        ChainedTokenCredential.__init__(inner, mi)
+    proxy = cache._SharedTokenInfoCredential(inner)
+    fetch = getattr(proxy, method)
+    # No endpoint has ever worked: one fresh discovery, no retry or suppression.
+    with pytest.raises(ClientAuthenticationError):
+        fetch("first-scope")
+    assert len(mi.calls) == 1
+    assert credential_runtime.delays == []
+    assert proxy._retry_after == {}
+    # The same link now proves availability, even through DAC's sticky dispatch.
+    assert fetch("first-scope") is not None
+    mi.outcomes = [unavailable() for _ in range(3)]
+    with pytest.raises(ClientAuthenticationError):
+        fetch("refresh-scope")
+    assert len(mi.calls) == 5
+    assert credential_runtime.delays == [1, 2]
+    assert list(proxy._retry_after.values()) == [1030]
+    # Suppression never replays an error or prevents immediate recovery.
+    assert fetch("refresh-scope") is not None
+    assert len(mi.calls) == 6
+    assert credential_runtime.delays == [1, 2]
+    assert proxy._retry_after == {}
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_other_links_success_does_not_establish_managed_identity(
+    credential_runtime, method,
+):
+    from azure.core.exceptions import ClientAuthenticationError, ServiceRequestError
+    from azure.identity import (
+        ChainedTokenCredential, CredentialUnavailableError, ManagedIdentityCredential,
+    )
+
+    class StubManagedIdentityCredential(_FakeTokenCredential, ManagedIdentityCredential):
+        pass
+
+    first = _FakeTokenCredential()
+    mi = StubManagedIdentityCredential([
+        _transient_unavailable(cause=ServiceRequestError("no endpoint")),
+    ])
+    proxy = cache._SharedTokenInfoCredential(ChainedTokenCredential(first, mi))
+    fetch = getattr(proxy, method)
+    assert fetch("first-scope") is not None
+    first.outcomes = [CredentialUnavailableError("not configured")]
+    with pytest.raises(ClientAuthenticationError):
+        fetch("second-scope")
+    assert len(mi.calls) == 1
+    assert credential_runtime.delays == []
+    assert proxy._retry_after == {}
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+@pytest.mark.parametrize(
+    "cause_kind", ["none", "os_error", "name_only", "timeout", "request", "response", "nested"],
+)
+def test_unavailability_requires_a_typed_transient_cause(
+    credential_runtime, method, cause_kind,
+):
+    from azure.core.exceptions import ServiceRequestError, ServiceResponseError
+    from azure.identity import CredentialUnavailableError
+
+    # Neither an error's text nor an unrelated class with a familiar name counts.
+    named_error = type("ServiceRequestError", (Exception,), {})
+    nested = RuntimeError("wrapper")
+    nested.__cause__ = TimeoutError("timeout")
+    causes = {
+        "none": None,
+        "os_error": OSError("offline"),
+        "name_only": named_error("offline"),
+        "timeout": TimeoutError("timeout"),
+        "request": ServiceRequestError("offline"),
+        "response": ServiceResponseError("offline"),
+        "nested": nested,
+    }
+    failure = CredentialUnavailableError("ServiceRequestError TimeoutExpired timeout")
+    failure.__cause__ = causes[cause_kind]
+    inner = _FakeTokenCredential([failure])
+    proxy = cache._SharedTokenInfoCredential(inner)
+    fetch = getattr(proxy, method)
+    if cause_kind in ("none", "os_error", "name_only"):
+        with pytest.raises(CredentialUnavailableError) as caught:
+            fetch("scope")
+        assert caught.value is failure
+        assert len(inner.calls) == 1
+        assert credential_runtime.delays == []
+        assert credential_runtime.events == []
+        assert proxy._retry_after == {}
+    else:
+        assert fetch("scope") is not None
+        assert len(inner.calls) == 2
+        assert credential_runtime.delays == [1]
+        expected_cause = {
+            "timeout": "TimeoutError", "request": "ServiceRequestError",
+            "response": "ServiceResponseError", "nested": "TimeoutError",
+        }[cause_kind]
+        assert credential_runtime.events[0][1]["cause_type"] == expected_cause
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_missing_chain_sources_do_not_hide_a_transient_source(credential_runtime, method):
+    from azure.identity import ChainedTokenCredential, CredentialUnavailableError
+
+    unconfigured = _FakeTokenCredential([
+        CredentialUnavailableError("no configuration") for _ in range(2)
+    ])
+    transient = _FakeTokenCredential([_transient_unavailable()])
+    proxy = cache._SharedTokenInfoCredential(ChainedTokenCredential(unconfigured, transient))
+    assert getattr(proxy, method)("scope") is not None
+    assert [len(link.calls) for link in (unconfigured, transient)] == [2, 2]
+    assert credential_runtime.delays == [1]
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_post_farm_success_restore_acquires_during_retry_suppression(
+    archive_tree, credential_runtime, monkeypatch, method,
+):
+    from azure.identity import ChainedTokenCredential
+
+    links = [
+        _FakeTokenCredential([_transient_unavailable() for _ in range(3)])
+        for _ in range(2)
+    ]
+    proxy = cache._SharedTokenInfoCredential(ChainedTokenCredential(*links))
+    service = _BlockBlobService()
+
+    class AuthenticatedContainer:
+        def get_blob_client(self, name):
+            getattr(proxy, method)("https://storage.azure.com/.default")
+            return service.get_blob_client(name)
+
+    backend = cache._BlobBackend(AuthenticatedContainer(), proxy)
+    monkeypatch.setattr(cache, "_BACKEND", backend)
+    monkeypatch.setattr(cache, "_PREWARMED", None)
+    monkeypatch.setenv("HARMONIC_EXECUTOR", "farm")
+    key = "c" * 64
+    output = archive_tree / "farm-result.SLDPRT"
+    # Submitter's initial cache check exhausts transient acquisition.
+    assert cache.probe(key) is None
+    assert [len(link.calls) for link in links] == [3, 3]
+    assert credential_runtime.delays == [1, 2]
+    assert list(proxy._retry_after.values()) == [1030]
+    # An independent farm writer publishes the real packed output.
+    output.write_bytes(b"canonical farm result")
+    _put_bytes(cache._BlobBackend(service), key, _packed([output]))
+    output.unlink()
+    # Farm completion precedes the deadline; the submitter must still hydrate.
+    credential_runtime.now[0] += 1
+    assert cache.restore(key, [output], "part:farm-result")
+    assert output.read_bytes() == b"canonical farm result"
+    assert [len(link.calls) for link in links] == [4, 3]
+    assert credential_runtime.delays == [1, 2]
+    assert proxy._retry_after == {}
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+@pytest.mark.parametrize("recover", [True, False])
+def test_real_chain_retry_telemetry_keeps_sanitized_link_types_and_attempts(
+    credential_runtime, monkeypatch, method, recover,
+):
+    from azure.core.exceptions import ClientAuthenticationError, ServiceRequestError
+    from azure.identity import ChainedTokenCredential, CredentialUnavailableError
+
+    spans = []
+
+    @contextlib.contextmanager
+    def phase(name, **attrs):
+        spans.append((name, attrs))
+        yield types.SimpleNamespace(set_attribute=lambda key, value: attrs.update({key: value}))
+
+    monkeypatch.setattr(cache, "_phase", phase)
+
+    class FakeImdsCredential(_FakeTokenCredential):
+        pass
+
+    class FakeCliCredential(_FakeTokenCredential):
+        pass
+
+    def unavailable(cause):
+        error = CredentialUnavailableError("secret claims and endpoint")
+        error.__cause__ = cause
+        return error
+
+    imds = FakeImdsCredential([
+        unavailable(ServiceRequestError("secret IMDS address")) for _ in range(3)
+    ])
+    cli = FakeCliCredential([
+        unavailable(subprocess.TimeoutExpired("secret CLI command", 10))
+        for _ in range(1 if recover else 3)
+    ])
+    proxy = cache._SharedTokenInfoCredential(ChainedTokenCredential(imds, cli))
+    fetch = getattr(proxy, method)
+    request_kwargs = (
+        {"claims": "secret-request"} if method == "get_token"
+        else {"options": {"claims": "secret-request"}}
+    )
+    if recover:
+        assert fetch("scope", **request_kwargs) is not None
+    else:
+        with pytest.raises(ClientAuthenticationError):
+            fetch("scope", **request_kwargs)
+    assert spans[-1][1]["attempts"] == (2 if recover else 3)
+    events = credential_runtime.events
+    assert len(events) == (2 if recover else 4)
+    for offset in range(0, len(events), 2):
+        imds_attrs, cli_attrs = events[offset][1], events[offset + 1][1]
+        assert imds_attrs["link_credential"] == "FakeImdsCredential"
+        assert imds_attrs["cause_type"] == "ServiceRequestError"
+        assert cli_attrs["link_credential"] == "FakeCliCredential"
+        assert cli_attrs["cause_type"] == "TimeoutExpired"
+        for attrs in (imds_attrs, cli_attrs):
+            assert attrs["error_type"] == "CredentialUnavailableError"
+            assert attrs["outcome"] == "transient"
+            assert all(isinstance(value, (str, int)) for value in attrs.values())
+    assert "FakeCliCredential" in credential_runtime.warnings[0]
+    assert "TimeoutExpired" in credential_runtime.warnings[0]
+    assert "secret" not in repr(events)
+    assert "secret" not in repr(credential_runtime.warnings)
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_credential_span_reports_retry_suppression_and_remaining_time(
+    credential_runtime, monkeypatch, method,
+):
+    from azure.identity import CredentialUnavailableError
+
+    spans = []
+
+    @contextlib.contextmanager
+    def phase(name, **attrs):
+        spans.append((name, attrs))
+        yield types.SimpleNamespace(set_attribute=lambda key, value: attrs.update({key: value}))
+
+    monkeypatch.setattr(cache, "_phase", phase)
+    inner = _FakeTokenCredential([_transient_unavailable() for _ in range(5)])
+    proxy = cache._SharedTokenInfoCredential(inner)
+    fetch = getattr(proxy, method)
+    with pytest.raises(CredentialUnavailableError):
+        fetch("scope")
+    assert spans[-1][1]["retry_suppressed"] is False
+    assert spans[-1][1]["retry_suppression_remaining_s"] == 0
+    credential_runtime.now[0] += 7
+    with pytest.raises(CredentialUnavailableError):
+        fetch("scope")
+    assert spans[-1][1]["attempts"] == 1
+    assert spans[-1][1]["retry_suppressed"] is True
+    assert spans[-1][1]["retry_suppression_remaining_s"] == 23
+    credential_runtime.now[0] += 23
+    assert fetch("scope") is not None
+    assert spans[-1][1]["attempts"] == 2
+    assert spans[-1][1]["retry_suppressed"] is False
+    assert spans[-1][1]["retry_suppression_remaining_s"] == 0
+    assert credential_runtime.delays == [1, 2, 1]
+
+
+@pytest.mark.parametrize("failure", ["head", "constructor"])
+def test_prewarm_acquires_once_and_closes_private_resources(
+    leaf, credential_runtime, monkeypatch, failure,
+):
+    import azure.identity
+    import azure.storage.blob
+
+    closed = []
+    inner = _FakeTokenCredential([_transient_unavailable()])
+    inner.close = lambda: closed.append("credential")
+    monkeypatch.setattr(azure.identity, "DefaultAzureCredential", lambda: inner)
+    monkeypatch.delenv("HARMONIC_CACHE_SAS", raising=False)
+
+    class FakeContainer:
+        def __init__(self, *args, credential, **kwargs):
+            self.credential = credential
+            if failure == "constructor":
+                raise RuntimeError("constructor failed")
+
+        def get_blob_client(self, name):
+            return self
+
+        def exists(self):
+            return self.credential.get_token("scope")
+
+        def close(self):
+            closed.append("client")
+
+    monkeypatch.setattr(azure.storage.blob, "ContainerClient", FakeContainer)
+    cache.prewarm().join(5)
+    assert isinstance(cache._BACKEND, cache._Unset)
+    assert len(inner.calls) == (1 if failure == "head" else 0)
+    assert credential_runtime.delays == []
+    assert closed == (["client", "credential"] if failure == "head" else ["credential"])
+
+
+def test_container_construction_failure_survives_credential_close_failure(
+    credential_runtime, monkeypatch,
+):
+    import azure.identity
+    import azure.storage.blob
+
+    original = RuntimeError("container construction failed")
+    cause = ValueError("original constructor cause")
+    closed = []
+    inner = _FakeTokenCredential()
+
+    def close():
+        closed.append(True)
+        raise RuntimeError("credential close failed")
+
+    def construct(*args, **kwargs):
+        raise original from cause
+
+    inner.close = close
+    monkeypatch.delenv("HARMONIC_CACHE_SAS", raising=False)
+    monkeypatch.setattr(azure.identity, "DefaultAzureCredential", lambda: inner)
+    monkeypatch.setattr(azure.storage.blob, "ContainerClient", construct)
+    with pytest.raises(RuntimeError) as caught:
+        cache._make_backend()
+    assert caught.value is original
+    assert caught.value.__cause__ is cause
+    assert closed == [True]
+    assert inner.calls == []
+
+
+
+@pytest.mark.parametrize("loses", [False, True])
+def test_prewarm_closes_only_losing_backend_resources(
+    leaf, credential_runtime, monkeypatch, loses,
+):
+    import azure.identity
+    import azure.storage.blob
+
+    closed, clients, credentials = [], [], []
+    monkeypatch.delenv("HARMONIC_CACHE_SAS", raising=False)
+
+    def credential():
+        inner = _FakeTokenCredential()
+        index = len(credentials)
+        inner.close = lambda: closed.append(("credential", index))
+        credentials.append(inner)
+        return inner
+
+    monkeypatch.setattr(azure.identity, "DefaultAzureCredential", credential)
+
+    class FakeContainer:
+        def __init__(self, *args, credential, **kwargs):
+            self.credential = credential
+            self.index = len(clients)
+            clients.append(self)
+
+        def get_blob_client(self, name):
+            return self
+
+        def exists(self):
+            token = self.credential.get_token("scope")
+            assert self.credential._attempts == 1
+            if loses:
+                # Publish the real backend while this speculative HEAD is in flight.
+                cache._BACKEND = cache._make_backend()
+            return token
+
+        def close(self):
+            closed.append(("client", self.index))
+
+    monkeypatch.setattr(azure.storage.blob, "ContainerClient", FakeContainer)
+    cache.prewarm().join(5)
+    assert cache._BACKEND._cc is clients[1 if loses else 0]
+    assert closed == ([("client", 0), ("credential", 0)] if loses else [])
+    # Promotion is observable through behavior, not a private-field assignment.
+    inner = credentials[1 if loses else 0]
+    inner.outcomes = [_transient_unavailable() for _ in range(2)]
+    token = cache._BACKEND._credential.get_token("fresh-scope")
+    assert token is not None
+    assert len(inner.calls) == (3 if loses else 4)
+    assert credential_runtime.delays == [1, 2]
+    assert cache._BACKEND._credential._attempts == cache._CREDENTIAL_ATTEMPTS
+
+
+@pytest.mark.parametrize("status_code", [403, 404])
+@pytest.mark.parametrize("authenticated", [False, True])
+@pytest.mark.parametrize("loses", [False, True])
+@pytest.mark.parametrize("auth_error", [False, True])
+def test_prewarm_storage_head_error_preserves_only_authenticated_owned_client(
+    leaf, credential_runtime, monkeypatch, status_code, authenticated, loses, auth_error,
+):
+    import azure.identity
+    import azure.storage.blob
+    from azure.core.exceptions import ClientAuthenticationError, HttpResponseError
+
+    closed, clients, credentials = [], [], []
+    monkeypatch.delenv("HARMONIC_CACHE_SAS", raising=False)
+
+    def credential():
+        inner = _FakeTokenCredential()
+        index = len(credentials)
+        inner.close = lambda: closed.append(("credential", index))
+        credentials.append(inner)
+        return inner
+
+    monkeypatch.setattr(azure.identity, "DefaultAzureCredential", credential)
+
+    class FakeContainer:
+        def __init__(self, *args, credential, **kwargs):
+            self.credential = credential
+            self.index = len(clients)
+            clients.append(self)
+
+        def get_blob_client(self, name):
+            return self
+
+        def exists(self):
+            if authenticated:
+                self.credential.get_token("scope")
+            if loses:
+                cache._BACKEND = cache._make_backend()
+            error_type = ClientAuthenticationError if auth_error else HttpResponseError
+            error = error_type("storage-side HEAD response")
+            error.status_code = status_code
+            raise error
+
+        def close(self):
+            closed.append(("client", self.index))
+
+    monkeypatch.setattr(azure.storage.blob, "ContainerClient", FakeContainer)
+    cache.prewarm().join(5)
+    if loses:
+        assert cache._BACKEND._cc is clients[1]
+    elif authenticated and not auth_error:
+        assert cache._BACKEND._cc is clients[0]
+        assert cache._BACKEND._credential._attempts == cache._CREDENTIAL_ATTEMPTS
+        assert cache._BACKEND._credential.get_token("scope") is not None
+        assert len(credentials[0].calls) == 1
+    else:
+        assert isinstance(cache._BACKEND, cache._Unset)
+    assert closed == (
+        [("client", 0), ("credential", 0)]
+        if loses or not authenticated or auth_error else []
+    )
+    assert credential_runtime.delays == []
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_concurrent_transient_failure_is_singleflight_without_later_replay(
+    credential_runtime, method,
+):
+    from azure.identity import CredentialUnavailableError
+
+    errors = [_transient_unavailable() for _ in range(3)]
+    inner = _FakeTokenCredential(errors)
+    proxy = cache._SharedTokenInfoCredential(inner)
+    entered, release, waiting = threading.Event(), threading.Event(), threading.Event()
+    original = getattr(inner, method)
+
+    class PendingRequests(dict):
+        waiters = 0
+
+        def get(self, key, default=None):
+            pending = super().get(key, default)
+            if pending is not None:
+                # Called under the proxy's lock, before the waiter joins its future.
+                self.waiters += 1
+                if self.waiters == 7:
+                    waiting.set()
+            return pending
+
+    proxy._inflight = PendingRequests()
+
+    def blocked(*args, **kwargs):
+        entered.set()
+        assert release.wait(5), "test did not release fake acquisition"
+        return original(*args, **kwargs)
+
+    setattr(inner, method, blocked)
+    fetch = getattr(proxy, method)
+    start = threading.Barrier(8)
+
+    def request():
+        start.wait(5)
+        return fetch("scope")
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        futures = [pool.submit(request) for _ in range(8)]
+        try:
+            assert entered.wait(5)
+            assert waiting.wait(5), "all callers must join the same acquisition"
+        finally:
+            release.set()
+        for future in futures:
+            with pytest.raises(CredentialUnavailableError) as caught:
+                future.result(timeout=5)
+            assert caught.value is errors[-1]
+    assert len(inner.calls) == 3
+    assert credential_runtime.delays == [1, 2]
+    assert list(proxy._retry_after.values()) == [1030]
+    assert fetch("scope") is not None
+    assert len(inner.calls) == 4
+    assert credential_runtime.delays == [1, 2]
+    assert proxy._retry_after == {}
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_credential_failed_refresh_never_returns_stale_token(credential_runtime, method):
+    from azure.identity import CredentialUnavailableError
+
+    inner = _FakeTokenCredential()
+    proxy = cache._SharedTokenInfoCredential(inner)
+    fetch = getattr(proxy, method)
+    stale = fetch("scope")
+    credential_runtime.now[0] = stale.expires_on
+    failures = [_transient_unavailable() for _ in range(3)]
+    inner.outcomes.extend(failures)
+    with pytest.raises(CredentialUnavailableError) as caught:
+        fetch("scope")
+    assert caught.value is failures[-1]
+    assert len(inner.calls) == 4
+    assert credential_runtime.delays == [1, 2]
+
+
+def test_credential_clock_is_module_local(credential_runtime):
+    assert cache.time is not time
+    assert cache.time.time() == 1000
+    assert time.time() != 1000
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+@pytest.mark.parametrize("failure", ["recover", "exhaust", 0, 1, 2])
+@pytest.mark.parametrize("chain_kind", ["chained", "default"])
+def test_real_chain_retry_classifies_link_types(
+    credential_runtime, method, failure, chain_kind,
+):
+    from azure.core.exceptions import ClientAuthenticationError
+    from azure.identity import ChainedTokenCredential, DefaultAzureCredential
+
+    base = ChainedTokenCredential if chain_kind == "chained" else DefaultAzureCredential
+
+    class RecordingChain(base):
+        def __init__(self, *links):
+            # Real dispatch, but never instantiate environment/network credentials.
+            ChainedTokenCredential.__init__(self, *links)
+            self.errors = []
+
+        def get_token(self, *args, **kwargs):
+            try:
+                return super().get_token(*args, **kwargs)
+            except ClientAuthenticationError as exc:
+                self.errors.append(exc)
+                raise
+
+        def get_token_info(self, *args, **kwargs):
+            try:
+                return super().get_token_info(*args, **kwargs)
+            except ClientAuthenticationError as exc:
+                self.errors.append(exc)
+                raise
+
+    links = [
+        _FakeTokenCredential([_transient_unavailable() for _ in range(3)])
+        for _ in range(3)
+    ]
+    if failure == "recover":
+        links[-1].outcomes = [_transient_unavailable()]
+    elif isinstance(failure, int):
+        links[failure].outcomes = [ClientAuthenticationError("real auth failure")]
+    chain = RecordingChain(*links)
+    proxy = cache._SharedTokenInfoCredential(chain)
+    fetch = getattr(proxy, method)
+    if failure == "recover":
+        token = fetch("scope")
+        assert fetch("scope") is token
+        assert [len(link.calls) for link in links] == [2, 2, 2]
+        assert credential_runtime.delays == [1]
+    else:
+        with pytest.raises(ClientAuthenticationError) as caught:
+            fetch("scope")
+        assert caught.value is chain.errors[-1]
+        assert caught.value.__cause__ is None
+        assert "_FakeTokenCredential" in str(caught.value)
+        assert "_ObservedCredentialLink" not in str(caught.value)
+        if failure == "exhaust":
+            assert [len(link.calls) for link in links] == [3, 3, 3]
+            assert credential_runtime.delays == [1, 2]
+        else:
+            assert [len(link.calls) for link in links] == [
+                int(index <= failure) for index in range(3)
+            ]
+            assert credential_runtime.delays == []
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_default_chain_retains_sticky_success(credential_runtime, method):
+    from azure.identity import DefaultAzureCredential, CredentialUnavailableError
+
+    # Use actual DAC dispatch without constructing environment/network credentials.
+    chain = DefaultAzureCredential.__new__(DefaultAzureCredential)
+    first = _FakeTokenCredential([CredentialUnavailableError("offline")])
+    winner = _FakeTokenCredential()
+    chain.credentials = (first, winner)
+    chain._successful_credential = None
+    proxy = cache._SharedTokenInfoCredential(chain)
+    fetch = getattr(proxy, method)
+    fetch("first-scope")
+    fetch("second-scope")
+    assert len(first.calls) == 1
+    assert len(winner.calls) == 2
+    assert chain._successful_credential._inner is winner
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_opaque_unhashable_option_is_uncached_passthrough(credential_runtime, method):
+    class Opaque:
+        __hash__ = None
+
+    option = Opaque()
+    inner = _FakeTokenCredential()
+    fetch = getattr(cache._SharedTokenInfoCredential(inner), method)
+    assert fetch("scope", custom=option) is not fetch("scope", custom=option)
+    assert [call[2]["custom"] for call in inner.calls] == [option, option]
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_retry_backoff_does_not_lock_other_request_identities(
+    credential_runtime, monkeypatch, method,
+):
+    inner = _FakeTokenCredential()
+    proxy = cache._SharedTokenInfoCredential(inner)
+    fetch = getattr(proxy, method)
+    cached = fetch("cached")
+    inner.outcomes = [_transient_unavailable()]
+    entered, release = threading.Event(), threading.Event()
+
+    def backoff(delay):
+        assert proxy._token_lock.acquire(blocking=False)
+        proxy._token_lock.release()
+        entered.set()
+        assert release.wait(5)
+
+    monkeypatch.setattr(cache.time, "sleep", backoff)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+        retrying = pool.submit(fetch, "retrying")
+        try:
+            assert entered.wait(5)
+            assert pool.submit(fetch, "cached").result(timeout=5) is cached
+            assert pool.submit(fetch, "independent").result(timeout=5) is not cached
+        finally:
+            release.set()
+        assert retrying.result(timeout=5) is not None
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_chain_observations_are_isolated_between_request_threads(
+    credential_runtime, monkeypatch, method,
+):
+    from azure.core.exceptions import ClientAuthenticationError
+    from azure.identity import ChainedTokenCredential
+
+    entered, release = threading.Event(), threading.Event()
+
+    class ScopedLink(_FakeTokenCredential):
+        def _fetch(self, called_method, scopes, kwargs):
+            if scopes == ("terminal",):
+                raise ClientAuthenticationError("same diagnostic")
+            if not self.calls:
+                self.calls.append((called_method, scopes, kwargs))
+                raise _transient_unavailable("same diagnostic")
+            return super()._fetch(called_method, scopes, kwargs)
+
+    def backoff(delay):
+        credential_runtime.delays.append(delay)
+        entered.set()
+        assert release.wait(5)
+
+    monkeypatch.setattr(cache.time, "sleep", backoff)
+    fetch = getattr(
+        cache._SharedTokenInfoCredential(ChainedTokenCredential(ScopedLink())), method,
+    )
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        transient = pool.submit(fetch, "transient")
+        try:
+            assert entered.wait(5)
+            terminal = pool.submit(fetch, "terminal")
+            with pytest.raises(ClientAuthenticationError):
+                terminal.result(timeout=5)
+            assert credential_runtime.delays == [1]
+        finally:
+            release.set()
+        assert transient.result(timeout=5) is not None
+
+
+def test_bare_probe_retry_does_not_import_telemetry(credential_runtime, monkeypatch):
+    import builtins
+
+    original_import = builtins.__import__
+
+    def guarded_import(name, *args, **kwargs):
+        assert name != "_telemetry", "bare probe must not configure telemetry"
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.delitem(sys.modules, "_telemetry")
+    monkeypatch.setattr(builtins, "__import__", guarded_import)
+    inner = _FakeTokenCredential([_transient_unavailable()])
+    assert cache._SharedTokenCredential(inner).get_token("scope") is not None
+    assert credential_runtime.delays == [1]
+    assert credential_runtime.events == []
+    assert credential_runtime.warnings == []
 
 
 @pytest.fixture

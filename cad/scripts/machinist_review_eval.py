@@ -558,6 +558,7 @@ def validate_evidence(
                 workdir=cwd, attempt_dir=attempt_dir, sources=snapshot_sources,
                 schema=attempt_dir / "schema.json", output=attempt_dir / "verdict.json",
                 model=review.model, effort=review.effort, codex=command[0],
+                timeout_s=identity["timeout_s"],
             )
         )
         if command != expected_command:

@@ -151,7 +151,7 @@ GATING_MIN_RUNS = 2
 # source paths nor sheet counts disturb the model's cached tool/prompt prefix.
 SHEETS_SERVER = SCRIPTS_DIR / "machinist_review_sheets_mcp.py"
 # Startup is part of, not an extension to, the per-attempt timeout.
-CLAUDE_MCP_STARTUP_TIMEOUT_S = 120.0
+MCP_STARTUP_TIMEOUT_S = 120.0
 _CLAUDE_MCP_POLL_INTERVAL_S = 0.25
 CLAUDE_ISOLATION_SETTINGS = {
     "disableAllHooks": True,
@@ -513,7 +513,12 @@ async def _run_claude(
     readers: list[asyncio.Task[None]] = []
     failure: Exception | None = None
     timed_out = False
-    startup_timeout = min(timeout, CLAUDE_MCP_STARTUP_TIMEOUT_S)
+    startup_timeout = min(timeout, MCP_STARTUP_TIMEOUT_S)
+    spawn_env = dict(os.environ if env is None else env)
+    # The CLI's independent MCP startup deadline defaults to 30,000 ms. Align it
+    # with our readiness budget, overriding inherited settings in a fresh map;
+    # this does not extend the enclosing whole-attempt asyncio timeout.
+    spawn_env["MCP_TIMEOUT"] = str(max(1, int(startup_timeout * 1000)))
 
     async def read_stdout() -> None:
         assert proc is not None and proc.stdout is not None
@@ -595,7 +600,7 @@ async def _run_claude(
             async with asyncio.timeout(startup_timeout):
                 proc = await asyncio.create_subprocess_exec(
                     *command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE, cwd=cwd, env=env,
+                    stderr=subprocess.PIPE, cwd=cwd, env=spawn_env,
                 )
                 readers = [
                     asyncio.create_task(read_stdout()),
@@ -699,12 +704,15 @@ def build_codex_command(
     attempt_dir: Path | None = None,
     session_id: str | None = None,
     preserve_color: bool = False,
+    timeout_s: float | None = None,
 ) -> list[str]:
     """Build argv using a neutral cwd and separately identified attempt files.
 
     ``prepare_codex_environment`` must create the direct-tool model catalog and
     supply the isolated CODEX_HOME environment before this command is invoked.
     The default attempt_dir is useful for standalone toy probes, not the harness.
+    MCP startup shares the attempt deadline, capped by MCP_STARTUP_TIMEOUT_S.
+    Standalone probes without an attempt timeout use that shared cap.
     """
     attempt_dir = workdir if attempt_dir is None else attempt_dir
     if (
@@ -781,6 +789,9 @@ def build_codex_command(
         # model was sampled before tools/list returned and judged with no tools.
         # Required servers are awaited, and exec fails if one cannot start.
         "mcp_servers.sheets.required": True,
+        "mcp_servers.sheets.startup_timeout_sec": (
+            MCP_STARTUP_TIMEOUT_S if timeout_s is None else min(timeout_s, MCP_STARTUP_TIMEOUT_S)
+        ),
     }
     for key, value in overrides.items():
         command.extend(("-c", f"{key}={json.dumps(value)}"))
@@ -2130,6 +2141,7 @@ def _review_session(
                     workdir=cwd, attempt_dir=attempt_dir, sources=snapshot.sources,
                     schema=schema, output=output, model=model, effort=effort,
                     codex=executable, session_id=resume_id,
+                    timeout_s=timeout_s,
                     preserve_color=precheck_diff is not None or resume_id is not None,
                 )
             attempt_record["command"] = cmd
