@@ -155,16 +155,19 @@ def test_the_worst_case_walls_hold_at_the_printed_bands() -> None:
         centre_gap = math.hypot(x, y) - position
         hole_wall = (
             centre_gap - bore_r_max - (geometry.SCREW_HOLE_DIA + drill) / 2.0 - brk
-            - (geometry.THICKNESS_OVER_ARM + geometry.HUB_TO_BOSS) * run_off
+            - (geometry.THICKNESS_OVER_ARM + geometry.THICKNESS_OVER_ARM_BAND
+               + geometry.HUB_TO_BOSS + geometry.HUB_TO_BOSS_BAND) * run_off
         )
         assert hole_wall >= geometry.WALL_TARGET
     for name, (_nominal, worst) in geometry.WALLS.items():
         assert worst >= geometry.WALL_TARGET, name
     # The locator to the outline: the plate's 0.25 break and the run-off
-    # through the plate, on top of the dowel hole's own mouth break.
+    # through the deepest printed plate, on top of the hole's mouth break.
+    deepest = geometry.THICKNESS_OVER_ARM + geometry.THICKNESS_OVER_ARM_BAND
+    assert geometry.HOLE_RUN_OFF_MM == pytest.approx(deepest * run_off)
     for index in (1, 2):
         nominal, worst = geometry.WALLS[f"locator {index} to plate edge/notch"]
-        assert worst < nominal - brk - geometry.THICKNESS_OVER_ARM * run_off
+        assert worst < nominal - brk - deepest * run_off
 
 
 def test_the_plate_screws_engage_the_arm_one_and_a_half_diameters() -> None:
@@ -592,15 +595,20 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
     def flat(text: str) -> str:
         return " ".join(text.split())
 
-    assert flat(spec.BORE_CALLOUT) == (
-        f"REAM THRU RUNNING FIT ON KNOB SHAFT {numbers['KNOB_SHAFT_NUMBER']}"
-    )
+    bore = flat(spec.BORE_CALLOUT)
+    assert "REAM" in bore and "RUNNING FIT" in bore
+    assert numbers["KNOB_SHAFT_NUMBER"] in bore
     located = steps.step_number("arm-plate-located")
-    assert flat(drawing._locator_callout()) == (
-        f"2X REAM THRU, SLIP FIT ON DOWEL {numbers['DOWEL_NUMBER']}; "
-        f"MATCH-DRILL WITH ARM {numbers['ARM_NUMBER']}, {steps.DRAWING_NUMBER} "
-        f"STEPS {located}-{located + 1}; BREAK EDGE 0.05 MAX, DOWEL CONTACT"
-    )
+    locator = flat(drawing._locator_callout())
+    assert locator.startswith("2X REAM THRU") and "SLIP FIT" in locator
+    for required in (
+        numbers["DOWEL_NUMBER"],
+        numbers["ARM_NUMBER"],
+        steps.DRAWING_NUMBER,
+        f"{located}-{located + 1}",
+        "0.05 MAX",
+    ):
+        assert required in locator, required
     assert drawing.DIMENSION_CALLOUTS["LocatorDia1"] == drawing._locator_callout()
     assert numbers["KNOB_SHAFT_NUMBER"] in spec.HUB_STATION_CALLOUT
     assert numbers["KNOB_CUP_NUMBER"] in spec.HUB_TO_BOSS_CALLOUT

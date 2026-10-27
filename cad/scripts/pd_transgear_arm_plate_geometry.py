@@ -201,8 +201,10 @@ _CSK_DEPTH_MAX = (
 # pay no run-off.
 OUTLINE_EDGE_BREAK_MAX_MM = ARM.OUTLINE_EDGE_BREAK_MAX_MM
 _RUN_OFF = math.tan(math.radians(ARM.DRILL_RUN_OFF_DEG))
-HOLE_RUN_OFF_MM = THICKNESS_OVER_ARM * _RUN_OFF
-BORE_RUN_OFF_MM = HUB_TO_BOSS * _RUN_OFF
+# Over the deepest stock the print allows: the .XX thickness and the
+# hub-to-boss length at their upper limits.
+HOLE_RUN_OFF_MM = (THICKNESS_OVER_ARM + THICKNESS_OVER_ARM_BAND) * _RUN_OFF
+BORE_RUN_OFF_MM = (HUB_TO_BOSS + HUB_TO_BOSS_BAND) * _RUN_OFF
 
 _BORE_R_MAX = (BORE_DIA + BORE_DIA_LIMITS[1]) / 2.0
 _NOTCH_DISTANCE = (

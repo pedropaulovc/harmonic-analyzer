@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from collections.abc import Callable
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -55,9 +56,9 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_attachment import _assert_attached_to
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import scan_view_edges
 from _drawing_finish import add_surface_finish
@@ -354,6 +355,9 @@ SCREW_ZONES = tuple(
     for x, _y in SCREW_HOLES
 )
 ZONE_LENGTH_TOL_M = 1e-7
+# A placed note reads back its own SetPosition point; a refused move leaves
+# it at the default drop, centimetres away.
+NOTE_POSITION_TOL_M = 1e-5
 
 
 def _sheet_xy(
@@ -389,6 +393,19 @@ def _bore_landing(
     dx, dy = toward[0] - centre[0], toward[1] - centre[1]
     scale = BORE_DIA / 2.0 * SHEET_SCALE[0] / 1000.0 / math.hypot(dx, dy)
     return centre[0] + dx * scale, centre[1] + dy * scale
+
+
+def _assert_datum_b_on_bore(
+    adapter: Any, projected: dict[str, Any], bore_edge: Any
+) -> None:
+    """Datum B is picked at its landing point (``_bore_landing``), so the
+    helper's own check only proves the tag sits on what that hit-test
+    returned; prove that entity IS the bore's edge, not the concentric hub
+    outline within the pick aperture."""
+    _assert_attached_to(
+        adapter, projected["datum:B"], bore_edge, entity_type="EDGE",
+        what="datum B", label="plate running bore", expected_leaders=0,
+    )
 
 
 def _activate_sheet(adapter: Any, name: str) -> None:
@@ -436,8 +453,18 @@ def _cut(
 
 
 def _add_note(adapter: Any, text: str, xy: tuple[float, float], label: str) -> None:
-    if add_note(adapter, text, *xy) is None:
+    note = add_note(adapter, text, *xy)
+    if note is None:
         raise RuntimeError(f"failed to add the plate's {label}")
+    # The wrapper only warns when it cannot place the note; read it back.
+    annotation = _early_bound(note, "INote").GetAnnotation()
+    position = (
+        _early_bound(annotation, "IAnnotation").GetPosition() if annotation else None
+    )
+    if not position or math.hypot(
+        float(position[0]) - xy[0], float(position[1]) - xy[1]
+    ) > NOTE_POSITION_TOL_M:
+        raise RuntimeError(f"the plate's {label} is not at {xy}: reads {position}")
 
 
 @_telemetry.traced("drawing.projected_zone_line", label_param="label")
@@ -449,9 +476,11 @@ def _add_zone_line(
     height_mm: float,
     precision_key: str,
     label: str,
-) -> None:
+) -> Callable[[], None]:
     """A thick chain line in ``view``'s sketch along a projected zone, and its
-    height as a reference dimension; endpoints, style and length read back.
+    height as a driven reference dimension; endpoints read back here, and
+    the returned check proves style, driven state, no tolerance, text and
+    length after the finalizer's settling rebuild (``settled_checks``).
 
     Direct-to-DB, as the cutting lines are (_drawing_sections): an inferred
     endpoint would snap onto the hole wall or face A and change the length.
@@ -503,33 +532,57 @@ def _add_zone_line(
     if display is None:
         raise RuntimeError(f"failed to dimension the {label} chain line")
     display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    # A drawing-sketch dimension is created driving: editing it would move
+    # the zone line. Driven, it only reports the line's length.
+    dimension.DrivenState = 1  # swDimensionDrivenState_e.swDimensionDriven
     display.SetPrecision3(DRAWING_REFERENCE_PRECISION[precision_key], -1, -1, -1)
-    display.SetText(1, "(")  # swDimensionTextPrefix: a reference height
+    # The repository's reference form (set_reference_dimension): bracketing
+    # text, never the native parentheses as well.
+    display.ShowParenthesis = False
+    display.SetText(1, "(")  # swDimensionTextPrefix
     display.SetText(2, ")")  # swDimensionTextSuffix
-    rebuild_drawing(adapter, label=label)
-    length = float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue)
-    applied = (
-        int(segment.Style),
-        int(segment.Width),
-        int(display.GetPrimaryPrecision2()),
-        str(display.GetText(1) or ""),
-        str(display.GetText(2) or ""),
-    )
     wanted = (
         CHAIN_LINE_STYLE,
         CHAIN_LINE_WEIGHT,
+        1,  # driven
+        0,  # swTolNONE
+        False,
         DRAWING_REFERENCE_PRECISION[precision_key],
         "(",
         ")",
     )
-    if applied != wanted or not math.isclose(
-        length, height_mm / 1000.0, abs_tol=ZONE_LENGTH_TOL_M
-    ):
-        raise RuntimeError(
-            f"{label}: reads {applied} over {length * 1000.0:.4f} mm, "
-            f"not {wanted} over {height_mm:.4f} mm"
+
+    def applied() -> tuple[Any, ...]:
+        return (
+            int(segment.Style),
+            int(segment.Width),
+            int(dimension.DrivenState),
+            int(_early_bound(dimension.Tolerance, "IDimensionTolerance").Type),
+            bool(display.ShowParenthesis),
+            int(display.GetPrimaryPrecision2()),
+            str(display.GetText(1) or ""),
+            str(display.GetText(2) or ""),
         )
+
+    placed = applied()
+    if placed != wanted:
+        raise RuntimeError(f"{label}: reads {placed}, not {wanted}")
+
+    def settled() -> None:
+        state = applied()
+        length = float(dimension.SystemValue)
+        if state != wanted or not math.isclose(
+            length, height_mm / 1000.0, abs_tol=ZONE_LENGTH_TOL_M
+        ):
+            raise RuntimeError(
+                f"{label}: settled at {state} over {length * 1000.0:.4f} mm, "
+                f"not {wanted} over {height_mm:.4f} mm"
+            )
+        _telemetry.info(f"{label}: settled {length * 1000.0:.4f} mm, driven, no tolerance")
+
     _telemetry.info(f"{label}: chain {start!r} -> {end!r}, height text at {text!r}")
+    return settled
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -608,11 +661,13 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=visible_circle_edge(adapter, plan, BORE_DIA),
         char_height=FINISH_CHAR_HEIGHT,
     )
-    for index, zone in enumerate(SCREW_ZONES, 1):
+    zone_checks = [
         _add_zone_line(
             adapter, screw_section, zone, height_mm=SCREW_ZONE_HEIGHT,
             precision_key="ScrewZone", label=f"screw hole {index} projected zone",
         )
+        for index, zone in enumerate(SCREW_ZONES, 1)
+    ]
     _add_note(adapter, REAR_VIEW_LABEL, REAR_LABEL_XY, "rear view label")
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
@@ -683,10 +738,11 @@ async def build(adapter: Any) -> dict[str, str]:
             ) for index, (x, y) in enumerate(LOCATOR_SITES_MM, 1)
         },
     }
-    project_part_pmi(
+    projected = project_part_pmi(
         adapter, placements=placements, datums=PART_DATUMS,
         controls=GEOMETRIC_CONTROLS, label="plate actual-bore locating frame",
     )
+    _assert_datum_b_on_bore(adapter, projected, bore_edge)
     if not auto_center_marks(adapter, back, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME centre marks to the face A view")
     for key, label in (
@@ -708,10 +764,10 @@ async def build(adapter: Any) -> dict[str, str]:
             _sheet_xy(adapter, knob_section, caption, f"{label} caption"),
             f"{label} caption",
         )
-    _add_zone_line(
+    zone_checks.append(_add_zone_line(
         adapter, knob_section, KNOB_ZONE, height_mm=KNOB_ZONE_HEIGHT,
         precision_key="KnobZone", label="knob bore projected zone",
-    )
+    ))
     _add_note(adapter, FRONT_VIEW_LABEL, FRONT_LABEL_XY, "front view label")
 
     artefacts = await finalize_drawing(
@@ -722,6 +778,7 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         expected_sheet_names=SHEET_NAMES,
         sheet_scales={name: SHEET_SCALE for name in SHEET_NAMES},
+        settled_checks=tuple(zone_checks),
     )
     require_saved_projected_gtols(
         adapter, artefacts["drawing"], GEOMETRIC_CONTROLS,
