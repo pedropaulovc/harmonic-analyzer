@@ -12,7 +12,8 @@ the two plan diameters crossing at the centre with their text on the OD rim.
 ``place_size_texts`` keeps every native dimension, value and station, and
 moves only presentation: the heights take native offset text shelved beyond
 their own lines (the R48 washer pattern), and the diameters take one
-near-side arrow with their text a text height clear of the OD rim.
+near-side arrow with their text a text height clear of the OD rim and the
+fleet's 2 mm arrow-to-text clearance beyond their own arrowhead.
 
 Native run 86053b8e then printed a stray SupplierOD line: from the OD rim's
 0 deg point (centre height), parallel to its leader and through its own "(".
@@ -48,9 +49,15 @@ from _drawing_leaders import (
 )
 from _layout_audit import (
     annotation_geometry,
+    arrowhead_segments,
     calibrate_sheet_advance,
     display_box,
     find_lines_through_own_text,
+)
+from _layout_geometry import (
+    ARROW_TEXT_CLEARANCE_M,
+    DEFAULT_ADVANCE_RATIO,
+    segment_box_distance,
 )
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -165,13 +172,20 @@ def diameter_air(text: Any) -> float:
 
 
 def diameter_text_shift(
-    text: Any, plan: tuple[float, float, float, float], side: int
+    text: Any,
+    plan: tuple[float, float, float, float],
+    side: int,
+    *,
+    arrow_reach: float,
 ) -> float:
-    """Sheet x move that leaves ``diameter_air`` between text and plan ink."""
+    """Sheet x move that leaves ``diameter_air`` between text and plan ink and
+    the arrow-to-text clearance between text and the outer extent of its own
+    arrowhead (``arrow_reach``), whichever is farther out."""
     air = diameter_air(text) + PLACE_SETTLE_M
+    arrow_air = ARROW_TEXT_CLEARANCE_M + PLACE_SETTLE_M
     if side < 0:
-        return plan[0] - air - text.xmax
-    return plan[2] + air - text.xmin
+        return min(plan[0] - air, arrow_reach - arrow_air) - text.xmax
+    return max(plan[2] + air, arrow_reach + arrow_air) - text.xmin
 
 
 def assert_diameter_text_clear(
@@ -181,6 +195,37 @@ def assert_diameter_text_clear(
     if not gap >= diameter_air(text):
         raise RuntimeError(
             f"{label}: text is {gap * 1000:.2f} mm from the OD rim, under a text height"
+        )
+
+
+def own_arrowheads(record: Mapping[str, Any]) -> list[Any]:
+    """A dimension's arrowhead outlines, as the layout audit draws them."""
+    heads = [
+        segment
+        for arrow in record["display"].get("arrows") or ()
+        for segment in arrowhead_segments(arrow)
+    ]
+    if not heads:
+        raise RuntimeError(f"{record.get('name')}: no readable native arrowhead")
+    return heads
+
+
+def arrow_reach(record: Mapping[str, Any], side: int) -> float:
+    """The sheet x of a diameter's own arrowheads nearest its text's side."""
+    xs = [x for segment in own_arrowheads(record) for x in (segment.x0, segment.x1)]
+    return max(xs) if side > 0 else min(xs)
+
+
+def assert_own_arrows_clear(
+    record: Mapping[str, Any], text: Any, *, label: str
+) -> None:
+    """The fleet's arrow-to-text clearance on the dimension's OWN arrowheads,
+    which ``find_arrows_near_text`` exempts (``_verify_control_ink`` rule)."""
+    gap = min(segment_box_distance(head, text) for head in own_arrowheads(record))
+    if not gap >= ARROW_TEXT_CLEARANCE_M:
+        raise RuntimeError(
+            f"{label}: own arrowhead {gap * 1000:.2f} mm from its text, under the "
+            f"{ARROW_TEXT_CLEARANCE_M * 1000:g} mm arrow-to-text clearance"
         )
 
 
@@ -215,10 +260,27 @@ def _text_record(adapter: Any, display: Any, *, label: str) -> dict[str, Any]:
         or len(position) != 3
         or not all(math.isfinite(float(value)) for value in position)
         or not texts
-        or not all(float(row.get("w") or 0.0) > 0.0 for row in texts)
     ):
-        raise RuntimeError(f"{label}: no measured native text/position: {errors!r}")
+        raise RuntimeError(f"{label}: no readable native text/position: {errors!r}")
     return record
+
+
+def widths_measured(record: Mapping[str, Any]) -> bool:
+    """SolidWorks reported a width for every text run of the record."""
+    return all(float(run.get("w") or 0.0) > 0.0 for run in record["display"]["texts"])
+
+
+def size_text_box(record: Mapping[str, Any]) -> Any:
+    """A size text's box: SolidWorks' width for each run that reports one.
+
+    A run with no width (``_dump_display`` omits ``w`` when the seat returns
+    none) is estimated at the record's calibrated glyph advance, the sheet
+    audit's estimate, floored at its 0.62 default so it never narrows the box.
+    The heights' shared station geometry estimates the same way: their single
+    run has no calibration sample, so it gets the default.
+    """
+    advance = max(calibrate_sheet_advance((record,)), DEFAULT_ADVANCE_RATIO)
+    return display_box({"texts": record["display"]["texts"]}, advance=advance)
 
 
 def _size_displays(adapter: Any, views: Mapping[str, Any]) -> dict[str, Any]:
@@ -308,18 +370,28 @@ def _segments(record: Mapping[str, Any]) -> list[tuple[tuple[float, float], ...]
     ]
 
 
-def _is_shoulder(stroke: tuple, text: Any, tip_x: float) -> bool:
+def _is_shoulder(stroke: tuple, text: Any, tip_x: float, *, measured: bool) -> bool:
     """A level stroke on the text's baseline under all of the text, ending at
-    the text's far edge (away from the arrow), as SolidWorks draws it."""
+    the text's far edge (away from the arrow), as SolidWorks draws it.
+
+    Text left of its arrow ends at its first glyph, which the run position
+    fixes. Text right of it ends at its last glyph, known only from measured
+    widths; with an estimated width the shoulder need only run under the text.
+    """
     (ax, ay), (bx, by) = stroke
     low, high = min(ax, bx), max(ax, bx)
-    far_end = abs(high - text.xmax) if tip_x < text.xmin else abs(low - text.xmin)
-    return (
+    if not (
         abs(ay - by) <= 1e-7
         and abs(ay - text.ymin) <= _SHOULDER_REACH_M
         and low <= text.xmin + COLLINEAR_TOLERANCE
-        and high >= text.xmax - COLLINEAR_TOLERANCE
-        and far_end <= COLLINEAR_TOLERANCE
+    ):
+        return False
+    if tip_x < text.xmin:
+        if measured:
+            return abs(high - text.xmax) <= COLLINEAR_TOLERANCE
+        return high > text.xmin + COLLINEAR_TOLERANCE
+    return abs(low - text.xmin) <= COLLINEAR_TOLERANCE and (
+        not measured or high >= text.xmax - COLLINEAR_TOLERANCE
     )
 
 
@@ -327,9 +399,11 @@ def leader_chain(record: Mapping[str, Any]) -> tuple[list, list]:
     """A one-arrow diameter's lines as (arrow tip -> text shoulder, every other).
 
     The chain is anchored at both ends: it starts at the arrow tip and its last
-    stroke is the shoulder under the text. Of several such paths the one with
-    fewest strokes is the leader; a stroke past the shoulder or any detour is
-    left over for ``stray_leader_lines``.
+    stroke is the shoulder under the text. A breadth-first search over joined
+    endpoints, each reached once, stops at the first stroke count at which a
+    shoulder is reached, so the leader is the fewest-stroke such path and
+    duplicate or cyclic strokes cannot multiply the search. A stroke past the
+    shoulder or any detour is left over for ``stray_leader_lines``.
     """
     arrows = record["display"].get("arrows") or ()
     if len(arrows) != 1:
@@ -337,25 +411,37 @@ def leader_chain(record: Mapping[str, Any]) -> tuple[list, list]:
             f"{record.get('name')}: near-side diameter has {len(arrows)} arrows"
         )
     segments = _segments(record)
-    text = display_box({"texts": record["display"]["texts"]})
+    text = size_text_box(record)
+    measured = widths_measured(record)
     tip = (float(arrows[0][0]), float(arrows[0][1]))
+
+    def far_end(index: int, point: tuple[float, float]) -> tuple[float, float] | None:
+        a, b = segments[index]
+        if math.dist(a, point) <= _JOIN_M:
+            return b
+        if math.dist(b, point) <= _JOIN_M:
+            return a
+        return None
+
+    reached = [tip]
+    frontier: list[tuple[tuple[float, float], list[int]]] = [(tip, [])]
     best: list[int] | None = None
-
-    def walk(point: tuple[float, float], used: list[int]) -> None:
-        nonlocal best
-        if used and _is_shoulder(segments[used[-1]], text, tip[0]):
-            if best is None or len(used) < len(best):
-                best = list(used)
-            return
-        for index, (a, b) in enumerate(segments):
-            if index in used:
-                continue
-            if math.dist(a, point) <= _JOIN_M:
-                walk(b, [*used, index])
-            elif math.dist(b, point) <= _JOIN_M:
-                walk(a, [*used, index])
-
-    walk(tip, [])
+    while frontier and best is None:
+        following = []
+        for point, path in frontier:
+            for index in range(len(segments)):
+                end = None if index in path else far_end(index, point)
+                if end is None:
+                    continue
+                if _is_shoulder(segments[index], text, tip[0], measured=measured):
+                    best = [*path, index]
+                    break
+                if all(math.dist(end, seen) > _JOIN_M for seen in reached):
+                    reached.append(end)
+                    following.append((end, [*path, index]))
+            if best is not None:
+                break
+        frontier = following
     if best is None:
         raise RuntimeError(
             f"{record.get('name')}: leader does not reach its text shoulder"
@@ -415,10 +501,11 @@ def diameter_seat_move(
 ) -> tuple[float, float]:
     """(dx, dy) seating a diameter's text a text height beside the plan, either
     at its native station height or with its shoulder on the centre height."""
-    text = display_box({"texts": record["display"]["texts"]})
+    text = size_text_box(record)
     centre_y = (plan[1] + plan[3]) / 2.0
     current = shoulder_y(record) if level else float(record["pos"][1])
-    return diameter_text_shift(text, plan, side), centre_y - current
+    shift = diameter_text_shift(text, plan, side, arrow_reach=arrow_reach(record, side))
+    return shift, centre_y - current
 
 
 def assert_diameter_ink(
@@ -428,12 +515,14 @@ def assert_diameter_ink(
     *,
     label: str,
 ) -> None:
-    """Text clear of the rim, every line on the leader, leader to text, in cell."""
-    text = display_box({"texts": record["display"]["texts"]})
+    """Text clear of the rim, every line on the leader, own arrowheads clear of
+    the text, leader to text, in cell."""
+    text = size_text_box(record)
     assert_diameter_text_clear(text, plan, side, label=label)
     stray = stray_leader_lines(record)
     if stray:
         raise RuntimeError(f"{label}: lines off its leader chain {stray!r}")
+    assert_own_arrows_clear(record, text, label=label)
     ink = display_box(record["display"])
     x0, y0, x1, y1 = FREE_TOP_CELL
     if not (x0 <= ink.xmin and ink.xmax <= x1 and y0 <= ink.ymin and ink.ymax <= y1):
@@ -541,6 +630,7 @@ def choose_plan_placement(
     )
 
 
+@_telemetry.traced("drawing.cylinder_bank_spring.size_texts")
 def place_size_texts(
     adapter: Any,
     views: Mapping[str, Any],
