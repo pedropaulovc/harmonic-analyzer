@@ -342,6 +342,11 @@ def test_fiducial_callout_attaches_on_the_punched_mark_rim() -> None:
     # The note stands above the arm's top edge, left of the hub-seat leader.
     assert drawing.FIDUCIAL_CALLOUT_XY[1] > drawing.ARM_SILHOUETTE[3]
     assert drawing.FIDUCIAL_CALLOUT_XY[0] < cx
+    # Its right end stays left of the mark (iter 1 of the 2026-10-27 fix: a
+    # wider block sent the leader down-left through the FiducialX 7.9).
+    char_w = 0.0027  # measured on the 5bca52e13 render
+    width = max(map(len, notes.FIDUCIAL_CALLOUT.splitlines())) * char_w
+    assert drawing.FIDUCIAL_CALLOUT_XY[0] + width + 0.005 < cx
 
 
 def test_fiducial_is_located_from_the_seat_axis_not_by_eye() -> None:

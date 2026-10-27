@@ -277,7 +277,10 @@ FIDUCIAL_EDGE_PICK = (
     * SHEET_SCALE[0]
     / 1000.0,
 )
-FIDUCIAL_CALLOUT_XY = (0.016, 0.196)
+# Under the hub-seat block, its right end left of the mark: the leader runs
+# down and right to the rim, outside the FiducialX ordinate's lines and text
+# (iter 1 of the 2026-10-27 fix: from right of the mark it ran through 7.9).
+FIDUCIAL_CALLOUT_XY = (0.016, 0.205)
 # The overall's pick on the handle-end arc: 2 mm below the axis, on the arc.
 _END_PICK_DY_SHEET = 0.004
 _END_PICK_DX = math.sqrt(HALF_WIDTH**2 - (_END_PICK_DY_SHEET * 1000.0 / SHEET_SCALE[0]) ** 2)
