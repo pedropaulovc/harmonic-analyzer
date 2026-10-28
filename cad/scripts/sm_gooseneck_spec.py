@@ -40,7 +40,6 @@ from sm_gooseneck_spring_joint import (
     COUNTERBORE_AXIS_OFFSET_MAX,
     COUNTERBORE_WALL_CALLOUT_MIN,
     COUNTERBORE_WALL_MIN,
-    DRILL_WANDER_MAX,
     PLUG_WALL_TARGET,
     THREAD_AXIS_OFFSET_MAX,
     owner_minor,
@@ -105,8 +104,18 @@ SHANK_FIT_CALLOUT = (
     f"{BRAZE_CLEARANCE_MIN:.2f}-{BRAZE_CLEARANCE_MAX:.2f} DIAMETRAL\n"
     "CLEARANCE"
 )
+# The sleeve's select-fit window rides its own Ø on the elevation (rule 7: a
+# matched fit goes on the feature, not in a note; codjiflo P2 on #1997), with
+# the stock it is cut from (owner ruling 2026-10-27: select-fit from stock,
+# no hone).
+SLEEVE_FIT_CALLOUT = (
+    "STOCK; FIT ON TUBE,\n"
+    f"{BRAZE_CLEARANCE_MIN:.2f}-{BRAZE_CLEARANCE_MAX:.2f} DIAMETRAL\n"
+    "CLEARANCE"
+)
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
     "BendPath": {"BendRadius": BEND_RADIUS_CALLOUT},
+    "SleeveProfile": {"SleeveDia": SLEEVE_FIT_CALLOUT},
     "EndPieceProfile": {
         "PlugDia": PLUG_DIA_CALLOUT,
         "PlugShankDia": SHANK_FIT_CALLOUT,
@@ -130,18 +139,14 @@ DIMENSION_CALLOUTS_BY_NAME: dict[str, str] = {
 # two depths print at the places their band is read at
 # (sm_gooseneck_spring_joint.TAP_DEPTH_BAND), measured from the counterbore
 # floor (the Hole Wizard start face; codjiflo P2 on #1997 asked the datum be
-# stated), and its location limits print under it as finished geometry,
-# with the mate they serve: the thread axis, and the tap drill's point, which
-# the wall budgets take off that axis by DRILL_WANDER_MAX
-# (DRILL_POINT_SHANK_WALL_MIN).  "DRILL WANDER" and "TAP AFTER BRAZE" read as
-# method (machinist review of e487a1bb4).  Four rows in all (the layout
+# stated), and the thread axis's location limit prints under it with the
+# mate it serves.  The drill's wander is a budget term, not a print row
+# (sm_gooseneck_spring_joint.DRILL_WANDER_MAX).  Four rows in all (the layout
 # audit's tall-block limit: a fifth row gated, farm run 20261028T005208028Z).
 TAP_CALLOUT_PRECISION = {"hw-threaddepth": 2, "hw-tapdrldepth": 2}
-DRILL_POINT_OFFSET_MAX = round(THREAD_AXIS_OFFSET_MAX + DRILL_WANDER_MAX, 6)
 TAP_CALLOUT_BELOW = (
     f"FOR {SCREW_NUMBER}; DEPTHS FROM C'BORE FLOOR\n"
-    f"AXIS TO TUBE AXIS +/-{THREAD_AXIS_OFFSET_MAX:.2f}, "
-    f"DRILL POINT +/-{DRILL_POINT_OFFSET_MAX:.2f}"
+    f"THREAD AXIS TO TUBE AXIS +/-{THREAD_AXIS_OFFSET_MAX:.2f}"
 )
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
@@ -149,13 +154,14 @@ TAP_CALLOUT_BELOW = (
 # Front plane carrying the elevation's leg length (foot to the bend tangent)
 # and arm straight (bend tangent to the end face) on the tube's axes;
 # BendPath the bend's centreline radius; SleeveProfile the sleeve length from
-# the leg's foot (its top station).  EndPieceProfile and CounterboreProfile
+# the leg's foot (its top station) and its stock Ø, which carries the
+# select-fit window.  EndPieceProfile and CounterboreProfile
 # lie on the arm-axis plane, so section A-A (cut along the arm axis) carries
 # them. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StationReference": {"LegLength", "ArmStraight"},
     "BendPath": {"BendRadius"},
-    "SleeveProfile": {"SleeveLength"},
+    "SleeveProfile": {"SleeveLength", "SleeveDia"},
     "EndPieceProfile": {"PlugDia", "PlugHeadLength", "PlugShankDia", "PlugShankLength"},
     "CounterboreProfile": {
         "CounterboreDia",
@@ -181,19 +187,18 @@ if set(DIMENSION_CALLOUTS_BY_NAME) - set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("a gooseneck callout names an unmarked dimension")
 
 # Four lines (drawing-guidelines.md rule 7; codjiflo on #1997): the stock,
-# the sleeve's select-fit acceptance on the tube (its bore is stock, so no
-# feature carries it) and its braze, the joints, then the order the owner
-# ruled (2026-10-27, #1997: join the end piece before bending, cooled or
-# fully cured) with the bend's acceptance.  Sizes are on the features and the
-# bend radius is native, so no line names a tool; the tap's sequence rides
-# its callout (rule 7, flag it where it applies), and section A-A shows the
-# end piece solid.  Each line ends left of the title block.
+# both members as stock and the sleeve's braze (its select-fit window rides
+# the sleeve's Ø), the joints, then the order the owner ruled (2026-10-27,
+# #1997: join the end piece before bending, cooled or fully cured; recorded
+# as RV-02 in sm-gooseneck.yaml) with the bend's acceptance.  Sizes are on
+# the features and the bend radius is native, so no line names a tool, and
+# section A-A shows the end piece solid.  Each line ends left of the title
+# block.
 DRAWING_NOTES = "\n".join(
     (
         f"1. TUBE {TUBE_STOCK_SIZE}, {STOCK_SUPPLIER} {TUBE_STOCK_SKU}; "
         f"SLEEVE {SLEEVE_STOCK_SIZE}, {SLEEVE_STOCK_SKU}",
-        f"2. AS STOCK. SLEEVE {BRAZE_CLEARANCE_MIN:.2f}-{BRAZE_CLEARANCE_MAX:.2f} "
-        "DIAMETRAL ON TUBE, SILVER-BRAZED BOTH ENDS.",
+        "2. TUBE AND SLEEVE AS STOCK; SLEEVE SILVER-BRAZED TO TUBE AT BOTH ENDS.",
         "3. BRAZE BAg-7 (AWS A5.8), FULL PENETRATION; END PIECE: BRAZE OR LOCTITE 638.",
         "4. JOIN END PIECE, COOL OR FULLY CURE, THEN BEND: OVALITY 5% MAX, NO KINKS.",
     )

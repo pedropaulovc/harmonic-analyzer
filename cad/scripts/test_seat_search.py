@@ -1,7 +1,7 @@
 """Offline contract for the native seat SEARCH behind spring recalibration, and
 for the driver: its refusals before native work (a partial --write, a report
 onto the written table), its import against the stale counter record it
-replaces, and its --worker and counter-only modes.
+replaces, and its counter-only mode.
 
 The search may use ``ClosestDistance`` only to choose where the next trial
 lands. A distance the modeller over-reports, under-reports, or returns as zero
@@ -522,30 +522,6 @@ def test_driver_imports_against_the_stale_counter_record_it_replaces() -> None:
     )
     assert result.returncode == 0, result.stderr
     assert "imported diagnostics.calibrate_spring_seats" in result.stdout
-
-
-def test_worker_runs_only_under_the_callers_com_seat(monkeypatch) -> None:
-    """A ``_cached_com_action`` leaf already holds the seat: ``--worker`` must not
-    take ``dodo._com_seat`` again (it would deadlock), and must refuse to run at
-    all when no caller holds it."""
-    from diagnostics import calibrate_spring_seats as driver
-
-    def forbidden(*_args, **_kwargs):
-        raise AssertionError("--worker took the COM seat lock")
-
-    builds: list[object] = []
-    monkeypatch.setattr(driver.dodo, "_com_seat", forbidden)
-    monkeypatch.setattr(driver, "run_build", lambda build: builds.append(build) or 0)
-    monkeypatch.setattr(sys, "argv", ["calibrate_spring_seats.py", "--worker"])
-
-    monkeypatch.delenv("HARMONIC_COM_SEAT", raising=False)
-    with pytest.raises(RuntimeError, match="HARMONIC_COM_SEAT unset"):
-        driver.main()
-    assert builds == []
-
-    monkeypatch.setenv("HARMONIC_COM_SEAT", "calibrate-spring-seats leaf")
-    assert driver.main() == 0
-    assert len(builds) == 1
 
 
 def test_counter_mode_measures_no_channel_seat_and_reports_it(

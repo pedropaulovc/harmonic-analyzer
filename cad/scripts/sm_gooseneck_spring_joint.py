@@ -32,6 +32,11 @@ EDGE_BREAK = float(_config.title_block("edge_break")["chamfer_max_mm"])
 PLUG_DIAMETER_BAND = printed_band_mm(2)
 PLUG_LENGTH_BAND = printed_band_mm(2)
 THREAD_AXIS_OFFSET_MAX = 0.15
+# The tap drill's wander off its axis at the point: a shop-capability term
+# the wall budgets charge and the print does not carry (as the fleet's other
+# drill-wander budgets, e.g. fr_top_frame_spec.KEEPER_TAP_DRILL_WANDER_DEG).
+# A print row for it read as method and could not be inspected after tapping
+# (machinist review of e487a1bb4; codjiflo P2 on #1997).
 DRILL_WANDER_MAX = 0.10
 # The end piece's shank is turned to the measured tube bore (the stock bore
 # spans 9.02-9.91, sm_gooseneck_geom), and the diametral clearance is the

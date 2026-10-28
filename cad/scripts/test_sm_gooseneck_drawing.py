@@ -165,8 +165,8 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
     for phrase in (
         "TUBE 1/2 OD X 0.065 WALL, ONLINEMETALS 7322",
         "SLEEVE 5/8 OD X 0.058 WALL, 7324",
-        "AS STOCK",
-        f"{window} DIAMETRAL ON TUBE, SILVER-BRAZED BOTH ENDS",
+        "TUBE AND SLEEVE AS STOCK",
+        "SLEEVE SILVER-BRAZED TO TUBE AT BOTH ENDS",
         "BAg-7 (AWS A5.8), FULL PENETRATION",
         "END PIECE: BRAZE OR LOCTITE 638",
         # Owner ruling 2026-10-27 (#1997): join before bending.
@@ -174,14 +174,19 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
         "OVALITY 5% MAX",
     ):
         assert phrase in notes, phrase
-    # The shank callout states the joint's window and names no method.
+    # The shank and sleeve callouts state the joint's window on their own
+    # features and name no method (rule 7: a matched fit goes on the feature).
     assert spec.SHANK_FIT_CALLOUT == f"FIT TO TUBE BORE,\n{window} DIAMETRAL\nCLEARANCE"
+    assert (
+        spec.SLEEVE_FIT_CALLOUT == f"STOCK; FIT ON TUBE,\n{window} DIAMETRAL\nCLEARANCE"
+    )
+    assert spec.DIMENSION_CALLOUTS["SleeveProfile"] == {
+        "SleeveDia": spec.SLEEVE_FIT_CALLOUT
+    }
     # A note names no tool (rule 7): R76.2 is the native bend radius.
     assert "DIE" not in notes
-    # Sizes and tolerances are native model dimensions, never note text; the
-    # stock sleeve's select-fit window has no feature to ride, so it is the
-    # one figure the notes carry (rule 7's matched fit with its acceptance).
-    assert re.search(r"\b\d+\.\d{1,2}\b", notes.replace(window, "")) is None, notes
+    # Sizes and tolerances are native model dimensions, never note text.
+    assert re.search(r"\b\d+\.\d{1,2}\b", notes) is None, notes
     assert "<MOD-DIAM>" not in notes and "Ø" not in notes
     assert "THRU" not in notes.upper()
 
@@ -192,9 +197,8 @@ def test_tap_callout_states_geometry_and_its_mate_within_four_rows() -> None:
     rows = spec.TAP_CALLOUT_BELOW.splitlines()
     assert len(rows) == 2
     assert rows[0] == f"FOR {spec.SCREW_NUMBER}; DEPTHS FROM C'BORE FLOOR"
-    assert spec.DRILL_POINT_OFFSET_MAX == pytest.approx(
-        joint.THREAD_AXIS_OFFSET_MAX + joint.DRILL_WANDER_MAX
-    )
+    assert rows[1] == f"THREAD AXIS TO TUBE AXIS +/-{joint.THREAD_AXIS_OFFSET_MAX:.2f}"
+    assert "DRILL" not in spec.TAP_CALLOUT_BELOW
     assert "WANDER" not in spec.TAP_CALLOUT_BELOW
     assert "BRAZE" not in spec.TAP_CALLOUT_BELOW
     assert spec.SCREW_NUMBER in spec.DIMENSION_CALLOUTS_BY_NAME["CounterboreDia"]

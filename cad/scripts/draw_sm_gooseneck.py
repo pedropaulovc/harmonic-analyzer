@@ -13,14 +13,17 @@ sheet carries, at 1:3:
 * the ELEVATION (``*Front``): the leg length (foot to the bend tangent) and
   the arm straight (bend tangent to the end face) on the tube's axes, from
   the part's hidden ``StationReference``; the bend's centreline radius; the
-  sleeve length from the foot;
+  sleeve length from the foot and the sleeve's stock Ø with its fit on the
+  tube;
 * the END VIEW (``*Left``, third-angle left of the elevation): the end face,
-  carrying the native blind-tap callout with the tap's location limits;
+  carrying the native blind-tap callout with its depth datum and the thread
+  axis's location limit;
 
-and at 3:1 SECTION A-A, a removed section cut along the arm axis through the
-end piece only (cut faces only): the head Ø (flush) and length, the braze
-shank Ø (its fit) and length, and the counterbore Ø (with the stated wall)
-and LIMIT depth (with its floor-corner limit).  The isometric is at 1:4.
+and at 3:1 SECTION A-A, a full section on the arm axis (cut faces only)
+cropped to the end piece, with the tube end's joint line drawn across each
+cut wall: the head Ø (flush) and length, the braze shank Ø (its fit) and
+length, and the counterbore Ø (with its mate and the stated wall) and LIMIT
+depth (with its floor-corner limit).  The isometric is at 1:4.
 
 Run with SolidWorks open::
 
@@ -147,13 +150,16 @@ BEND_TANGENT_Y = _front_y(LEG_TOP)
 SLEEVE_TOP_Y = _front_y(SLEEVE_TOP)
 
 # The elevation's dimensions: both vertical runs on the leg's right, the
-# sleeve's inside the leg's; the arm straight over the arm; the bend radius
+# sleeve's inside the leg's; the sleeve's Ø with its fit callout on the leg's
+# left, between the end view's leg and the elevation's, above the title block
+# (top y 0.066); the arm straight over the arm; the bend radius
 # right of the bend, its line 10 degrees above the leg's tangent so it passes
 # under section line A's right arrow and label (at about 40 degrees it ran
 # through the label, farm run 20261027T224212504Z) and over the leg length's
 # upper extension line.
 FRONT_KEEP = {
     "SleeveLength": (LEG_AXIS_X + 0.018, (FOOT_Y + SLEEVE_TOP_Y) / 2.0),
+    "SleeveDia": (LEG_AXIS_X - 0.034, FOOT_Y + 0.040),
     "LegLength": (LEG_AXIS_X + 0.034, (SLEEVE_TOP_Y + BEND_TANGENT_Y) / 2.0),
     "ArmStraight": ((END_FACE_X + _front_x(-BEND_R)) / 2.0, ARM_AXIS_Y + 0.014),
     "BendRadius": (LEG_AXIS_X + 0.019, ARM_AXIS_Y - 0.0176),
@@ -610,7 +616,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     annotations = [*front_annotations, *section_annotations]
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    _assert_part_callouts(adapter, section_annotations)
+    _assert_part_callouts(adapter, annotations)
 
     # The end piece's blind tap, natively called out on the end face: the
     # title block's THREADS row owns the 2B class (drawing-guidelines.md
