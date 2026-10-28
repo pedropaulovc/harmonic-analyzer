@@ -565,6 +565,7 @@ KNOB_SETTING_SCALE = (1.0, 1.0)
 KNOB_SETTING_CENTER = (0.320, 0.097)
 KNOB_SETTING_RADIUS = 0.024
 KNOB_SETTING_TEXT_OFFSET = 0.030
+KNOB_SETTING_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 KNOB_SETTING_INSTANCES = frozenset({"pd-transgear-arm-1", "pd-transgear-arm-plate-1"})
 # The located step's acceptance for "true": a null reading on the indicator, so the
 # setting's centring bound comes from this stated sweep, not from the
@@ -3300,6 +3301,18 @@ def _place_knob_setting_view(adapter: Any) -> None:
     )
     if imported != sorted(keep):
         raise RuntimeError(f"{label} imported {imported}, not {sorted(keep)}")
+    # Arrows outside the extension lines: each value spans most of its short
+    # leg, so arrows inside struck its parentheses (run
+    # 20261028T030354738Z-98518b6344ca4a139d0dac48e7162995, r1 and r3).
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ArrowSide = KNOB_SETTING_ARROWS_OUTSIDE
+        if int(display.ArrowSide) != KNOB_SETTING_ARROWS_OUTSIDE:
+            raise RuntimeError(
+                f"{label}: {dimension_name(adapter, annotation)} kept its arrows inside"
+            )
+    rebuild_drawing(adapter, label=f"{label} arrows")
     for letter, (text_xy, tip) in knob_setting_letters(s, q, k, t).items():
         add_leader_note(
             adapter,
