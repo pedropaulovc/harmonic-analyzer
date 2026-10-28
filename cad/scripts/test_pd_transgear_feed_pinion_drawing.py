@@ -11,6 +11,7 @@ import pytest
 import _config
 import build_pd_transgear_feed_pinion as part
 import draw_pd_transgear_feed_pinion as drawing
+import pd_transgear_feed_pinion_callouts as callouts
 import pd_transgear_feed_pinion_spec as spec
 import paper_drive_stock_native as stock_native
 import paper_drive_stock_drawing as stock_drawing
@@ -46,8 +47,35 @@ def test_required_drawing_paths() -> None:
 def test_every_marked_dimension_is_placed_and_has_places() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) == marked
+    keeps = (drawing.FRONT_KEEP, drawing.RIGHT_KEEP, drawing.LEFT_KEEP, drawing.REAR_KEEP)
+    assert sum(len(keep) for keep in keeps) == len(marked)
+    assert set().union(*keeps) == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
+
+
+def test_part_authors_every_callout_on_a_marked_dimension() -> None:
+    """#1942: the sheet only reads text lanes back; the part writes them on
+    the dimensions it marks, and every band tighter than its row names its
+    mate or stack at its own callout (2026-10-24 ENFORCE review)."""
+    assert part.callouts is callouts
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_dimension_callouts" not in source and ".SetText(" not in source
+    for feature, by_name in callouts.authored_text().items():
+        assert set(by_name) <= spec.DRAWING_DIMENSIONS[feature], feature
+    below = {
+        name: text
+        for (_feature, name), text in callouts.CALLOUTS[callouts.CALLOUT_BELOW].items()
+    }
+    assert below["BoreDia"] == spec.BORE_PROCESS_CALLOUT
+    for name in ("BossDia", "FlatToAxis", "FaceWidth", "FlatEnd", "OverallLength"):
+        assert spec.HUB_NUMBER in below[name], name
+    for name in ("OutsideDia", "ToothSpan"):
+        assert spec.RACK_NUMBER in below[name], name
+    assert spec.PIN_NUMBER not in below["OverallLength"]
+    assert "MHA-PD-25" in below["OverallLength"]
+    assert callouts.CALLOUTS[callouts.TEXT_PREFIX] == {
+        ("RootProfile", "RootDia"): "ROOT ENVELOPE <MOD-DIAM>"
+    }
 
 
 def test_sheet_authors_no_manufacturing_value() -> None:
@@ -59,9 +87,7 @@ def test_sheet_authors_no_manufacturing_value() -> None:
 
 def test_bands_come_from_named_spec_constants() -> None:
     assert model_toleranced_dimensions(part) == {
-        ("FlatProfile", "FlatEnd"): "STATION_TOL",
         ("SleeveProfile", "OverallLength"): "STATION_TOL",
-        ("SleeveProfile", "FullDepth"): "FULL_DEPTH_BAND",
         ("SleeveProfile", "BoreDia"): "*BORE_DEVIATIONS",
         ("SleeveProfile", "BossDia"): "*BOSS_DIA_DEVIATIONS",
         ("FlatProfile", "FlatToAxis"): "*FLAT_TO_AXIS_DEVIATIONS",
@@ -154,7 +180,7 @@ def test_full_depth_covers_the_racks_worst_reach() -> None:
 
     reach = assembly.RACK_FRONT_FROM_SLEEVE_REAR_WORST
     assert spec.FULL_DEPTH_MIN >= reach
-    assert spec.FULL_DEPTH_MAX < spec.FACE_WIDTH - printed_band_mm(
+    assert spec.FULL_DEPTH_MIN < spec.FACE_WIDTH - printed_band_mm(
         spec.FACE_WIDTH_PLACES
     )
     # The platen stands between the rack's front face and the disc's rear
@@ -184,15 +210,17 @@ def test_cutter_run_out_ends_inside_its_limit_clear_of_the_disc() -> None:
     assert spec.RUNOUT_RISE_WORST == pytest.approx(
         (spec.BOSS_DIA + spec.BOSS_DIA_BAND[0]) / 2.0 - spec.ROOT_DEPTH_X_MIN
     )
+    # The largest cutter at the full-depth MIN still runs out inside the MAX.
+    rise = spec.RUNOUT_RISE_WORST
+    assert (
+        spec.FULL_DEPTH_MIN + spec.cutter_runout(spec.CUTTER_DIA_MAX, rise)
+        <= spec.CUTTER_RUNOUT_MAX
+    )
     # Negative control derives an oversized cutter from the actual station
     # limit instead of pinning a formerly acceptable catalog diameter.
-    length = spec.CUTTER_RUNOUT_MAX - spec.FULL_DEPTH_MAX
-    rise = spec.RUNOUT_RISE_WORST
+    length = spec.CUTTER_RUNOUT_MAX - spec.FULL_DEPTH_MIN
     big = 1.01 * (length * length + rise * rise) / rise
-    assert (
-        spec.FULL_DEPTH_MAX + spec.cutter_runout(big, spec.RUNOUT_RISE_WORST)
-        > spec.CUTTER_RUNOUT_MAX
-    )
+    assert spec.FULL_DEPTH_MIN + spec.cutter_runout(big, rise) > spec.CUTTER_RUNOUT_MAX
 
 
 def test_cutter_stations_are_native_banded_model_dimensions() -> None:
@@ -201,25 +229,47 @@ def test_cutter_stations_are_native_banded_model_dimensions() -> None:
     frozen into note text (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 12 (hole and slot callouts say what to do))."""
     assert {"FullDepth", "CutterRunout"} <= spec.DRAWING_DIMENSIONS["SleeveProfile"]
     places = spec.DRAWING_PRECISION_BY_NAME
-    assert places["FullDepth"] == spec.FULL_DEPTH_PLACES == 3
+    assert places["FullDepth"] == spec.FULL_DEPTH_PLACES == 2
     assert places["CutterRunout"] == spec.CUTTER_RUNOUT_PLACES == 2
-    # The window is the .XXX row's band; the run-out a MAX limit
-    # (swTolType_e.swTolMAX) whose nominal is the limit it prints.
-    assert spec.FULL_DEPTH_BAND == printed_band_mm(spec.FULL_DEPTH_PLACES)
+    # The full depth covers the rack, a one-sided need, so it prints as a
+    # MIN at the modelled station (2026-10-27 review, r1, r3); the run-out
+    # MAX (swTolType_e.swTolMAX) caps it.  Each nominal is the limit it
+    # prints.
+    assert spec.FULL_DEPTH_TOL_TYPE == 5  # swTolType_e.swTolMIN
+    assert spec.FULL_DEPTH_MIN == spec.FULL_DEPTH
+    assert round(spec.FULL_DEPTH, spec.FULL_DEPTH_PLACES) == spec.FULL_DEPTH
+    # codjiflo P2 (0247213): a smaller cutter or shallower profile runs out
+    # sooner, so over every accepted part only the run-out MAX bounds the
+    # full depth and the cutter's end.
+    assert spec.FULL_DEPTH_MAX == spec.CUTTER_RUNOUT_MAX
+    assert spec.CUTTER_RUNOUT_END_WORST == spec.CUTTER_RUNOUT_MAX
     assert spec.CUTTER_RUNOUT_TOL_TYPE == 6
     lower, upper = spec.CUTTER_RUNOUT_DEVIATIONS
     assert upper == 0.0
     assert spec.CUTTER_RUNOUT_MAX + lower == pytest.approx(spec.FULL_DEPTH_MIN)
     # No number the model owns is retyped into the notes.
     lines = spec.DRAWING_NOTES.splitlines()
-    for value in (f"{spec.FULL_DEPTH:.3f}", f"{spec.CUTTER_RUNOUT_MAX:.2f}"):
+    for value in (f"{spec.FULL_DEPTH:.2f}", f"{spec.CUTTER_RUNOUT_MAX:.2f}"):
         assert value not in spec.DRAWING_NOTES, value
-    # A shop note states requirements only: the cutter is method.
-    assert lines == [spec.TOOTH_EDGE_NOTE, spec.FLAT_WALL_NOTE]
+    # A shop note states requirements only: the cutter is method.  The
+    # tooth-edge exception is flagged at the teeth by a leader (rule 7), so
+    # the loose block keeps only the wall.
+    assert lines == [spec.FLAT_WALL_NOTE]
     assert max(len(line) for line in lines) <= 70
-    # One-line names, printed before the value on its own row.
-    for prefix in (spec.FULL_DEPTH_PREFIX, spec.CUTTER_RUNOUT_PREFIX):
-        assert "\n" not in prefix and prefix.endswith(" ")
+    # Short names, printed under the value, so the narrow text stands left
+    # of the outside view's rear face.  The full depth names its function:
+    # its teeth cover the rack's reach.
+    assert callouts.FULL_DEPTH_CALLOUT.split("\n") == [
+        f"{spec.TEETH}T FULL DEPTH",
+        f"COVERS {callouts.RACK_NUMBER} RACK",
+    ]
+    assert "\n" not in callouts.CUTTER_RUNOUT_CALLOUT
+    # Their witnesses run along the floor of the gap facing the outside
+    # view: model 195°, a gap centre (gap centres at 15° + k·30°).
+    assert spec.GAP_FLOOR_WITNESS_Y == pytest.approx(
+        spec.ROOT_DIA_MIN / 2.0 * math.sin(math.radians(195.0))
+    )
+    assert (195.0 - 180.0 / spec.TEETH) % (360.0 / spec.TEETH) == pytest.approx(0.0)
 
 
 def test_flat_end_mill_reaches_the_end_wall_clear_of_the_hub() -> None:
@@ -229,10 +279,29 @@ def test_flat_end_mill_reaches_the_end_wall_clear_of_the_hub() -> None:
     step, ahead of the wall at every printed limit."""
     import pd_transgear_disc_hub_spec as hub
 
-    assert spec.FLAT_LENGTH_MAX == pytest.approx(
-        spec.FLAT_LENGTH + 2.0 * spec.STATION_TOL
+    # The end mill reaches the MAX station on the longest sleeve; a longer
+    # flat toward the MIN is the shop's choice of cutter.
+    assert spec.FLAT_REACH == pytest.approx(
+        spec.OVERALL_LENGTH + spec.STATION_TOL - spec.FLAT_END_STATION
     )
-    assert spec.FLAT_CUTTER_FLUTE_MIN >= spec.FLAT_LENGTH_MAX + 0.5
+    assert spec.FLAT_CUTTER_FLUTE_MIN >= spec.FLAT_REACH + 0.5
+    # codjiflo P1 on 65a022125: the printed MIN keeps the wall off the step
+    # the spigot seats on (longest tooth length plus the title block's edge
+    # break) and off the cutter's run-out.
+    edge_break = float(_config.title_block("edge_break")["chamfer_max_mm"])
+    assert spec._TITLE_BLOCK_EDGE_BREAK == edge_break
+    assert spec.FLAT_END_MIN >= (
+        spec.FACE_WIDTH + printed_band_mm(spec.FACE_WIDTH_PLACES) + edge_break
+    )
+    assert spec.FLAT_END_MIN >= spec.CUTTER_RUNOUT_MAX
+    assert spec.FLAT_END_TOL_TYPE == 3  # swTolType_e.swTolLIMIT
+    assert spec.FLAT_END_DEVIATIONS == (
+        pytest.approx(spec.FLAT_END_MIN - spec.FLAT_END_STATION), 0.0
+    )
+    # Looser than the title block's row at the limits' places.
+    assert spec.FLAT_END_STATION - spec.FLAT_END_MIN > 2.0 * printed_band_mm(
+        spec.FLAT_END_PLACES
+    )
     worst = (
         spec.FACE_WIDTH
         - printed_band_mm(spec.FACE_WIDTH_PLACES)
@@ -241,6 +310,14 @@ def test_flat_end_mill_reaches_the_end_wall_clear_of_the_hub() -> None:
     )
     assert hub.FLAT_END_CLEARANCE_WORST == pytest.approx(worst)
     assert hub.FLAT_END_CLEARANCE_WORST > 0.0
+    # codjiflo P2 on edb402b/482fbdc (#2006): the title block lets the
+    # flat's floor meet the wall in an inside corner up to its ceiling.  Where
+    # the hub's flat starts, that corner's blend must stay under the flats'
+    # minimum clearance, or the hub cannot seat.
+    corner = float(_config.title_block("inside_corner")["radius_mm"])
+    gap = hub.FLAT_END_CLEARANCE_WORST
+    rise = corner - math.sqrt(corner**2 - (corner - gap) ** 2) if gap < corner else 0.0
+    assert rise < hub.FLAT_CLEARANCE[0], (gap, rise)
 
 
 def test_flat_volume_is_the_boss_segment() -> None:
@@ -304,11 +381,16 @@ def test_sheet_text_names_the_right_parts() -> None:
     for stem, number in numbers.items():
         assert _config.parts(stem)["number"] == number, stem
     note = drawing.OIL_HOLE_NOTE
-    assert "\n" not in note and len(note) <= 70
-    assert note.startswith(f"\u00d8{hub.OIL_HOLE_DIA:.1f} OIL HOLE")
-    assert f"WITH {spec.HUB_NUMBER}" in note
+    hole, drill = note.split("\n")
+    assert hole.startswith(f"\u00d8{hub.OIL_HOLE_DIA:.1f} OIL HOLE")
+    # The leader leaves the last row's end, so that row is the longer.
+    assert len(hole) < len(drill) <= 70
+    assert f"WITH {spec.HUB_NUMBER}" in drill
+    # The hub's sheet locates the match-drilled hole (CENTRED ON HUB BODY).
+    assert drill.endswith(f"POSITION SET BY {spec.HUB_NUMBER}")
+    assert "CENTRED ON HUB BODY" in hub.OIL_HOLE_CALLOUT_BELOW
     assert f"MATE PIN {spec.PIN_NUMBER}" in spec.BORE_FIT_CALLOUT
-    assert drawing.DIMENSION_CALLOUTS == {"BoreDia": spec.BORE_PROCESS_CALLOUT}
+    assert _config.parts("pd-transgear-front-bushing")["number"] == "MHA-PD-25"
 
 
 def test_part_record_and_finish() -> None:
@@ -354,15 +436,20 @@ _DEVIATION_PLACES = {
 }
 # The stations the R9-5 ±0.05 band governs; the other lengths print bare
 # under the title block's .XXX row.
-_STATIONS = {"FlatEnd", "OverallLength"}
+_STATIONS = {"OverallLength"}
 
 
 def _printed_text(name: str) -> str:
-    """A kept dimension's whole text as the section prints it, padded with
-    the space SolidWorks prints either side: its value, then the root's MIN,
-    a station's band, or a stacked band, then any callout below."""
+    """A kept dimension's whole text as the sheet prints it, padded with the
+    space SolidWorks prints either side: its part-authored prefix and value,
+    then the root's MIN, a station's band, or a stacked band, then the
+    part-authored callout below."""
     value = f"{_NOMINAL[name]:.{spec.DRAWING_PRECISION_BY_NAME[name]}f}"
-    if name.endswith("Dia"):
+    lanes = callouts.authored_by_name().get(name, {})
+    if callouts.TEXT_PREFIX in lanes:
+        # An authored prefix replaces SolidWorks' own diameter symbol.
+        value = lanes[callouts.TEXT_PREFIX].replace("<MOD-DIAM>", "\u00d8") + value
+    elif name.endswith("Dia"):
         value = f"\u00d8{value}"
     if name == "ToothSpan":
         lower, upper = spec.SPAN_LIMITS
@@ -370,12 +457,12 @@ def _printed_text(name: str) -> str:
             f"{spec.SPAN_PREFIX}{upper:.{spec.SPAN_PLACES}f}",
             f"{lower:.{spec.SPAN_PLACES}f}",
         ]
-    elif name == "RootDia":
+    elif name in ("RootDia", "FullDepth"):
         rows = [f"{value} min."]
+    elif name == "FlatEnd":
+        rows = [value, f"{spec.FLAT_END_MIN:.{spec.FLAT_END_PLACES}f}"]
     elif name == "CutterRunout":
-        rows = [f"{spec.CUTTER_RUNOUT_PREFIX}{value} max."]
-    elif name == "FullDepth":
-        rows = [f"{spec.FULL_DEPTH_PREFIX}{value} \u00b1{spec.FULL_DEPTH_BAND:.2f}"]
+        rows = [f"{value} max."]
     elif name in _DEVIATIONS:
         lower, upper = _DEVIATIONS[name]
         places = _DEVIATION_PLACES[name]
@@ -384,8 +471,8 @@ def _printed_text(name: str) -> str:
         rows = [f"{value} \u00b1{spec.STATION_TOL:.{spec.STATION_PLACES}f}"]
     else:
         rows = [value]
-    if name in drawing.DIMENSION_CALLOUTS:
-        rows.append(drawing.DIMENSION_CALLOUTS[name])
+    if callouts.CALLOUT_BELOW in lanes:
+        rows += lanes[callouts.CALLOUT_BELOW].split("\n")
     return "\n".join(f" {row} " for row in rows)
 
 
@@ -397,9 +484,10 @@ def _printed_box(name: str, anchor: tuple[float, float]) -> Box:
     """The estimated box of a kept dimension's whole text.
 
     Text placed on the axis prints centred on its point, the dimension line
-    breaking round it (the crank hub's sheet).  A shelf diameter's text hangs
-    off one side of its dimension line, and SolidWorks picks the side (the
-    20261001T110844152Z shelf printed both), so its box covers both."""
+    breaking round it (the crank hub's sheet).  A section shelf diameter's
+    text hangs off one side of its dimension line, and SolidWorks picks the
+    side (the 20261001T110844152Z shelf printed both), so its box covers
+    both."""
     box = estimate_text_box(
         _printed_text(name),
         anchor=anchor,
@@ -409,7 +497,12 @@ def _printed_box(name: str, anchor: tuple[float, float]) -> Box:
         line_spacing=_LINE_SPACING,
     )
     assert box is not None
-    if name.endswith("Dia") and not _inline(anchor):
+    if name == "FlatToAxis":
+        # Its text prints right of its own dimension line (run
+        # 20261027T032128736Z), the line at the anchor.
+        width = box.xmax - box.xmin
+        return Box(anchor[0], box.ymin, anchor[0] + width, box.ymax)
+    if name.endswith("Dia") and name in drawing.RIGHT_KEEP and not _inline(anchor):
         width = box.xmax - box.xmin
         return Box(anchor[0] - width, box.ymin, anchor[0] + width, box.ymax)
     return box
@@ -428,29 +521,60 @@ def _note_box(text: str, anchor: tuple[float, float], *, height: float = _CAP_M)
     return box
 
 
+def _view_box(centre: tuple[float, float], length_mm: float | None = None) -> Box:
+    """A view's tip-circle box; ``length_mm`` gives a side view's length."""
+    half_x = drawing.HALF_OD if length_mm is None else length_mm * drawing.VIEW_SCALE[0] / 2000.0
+    return Box(
+        centre[0] - half_x,
+        centre[1] - drawing.HALF_OD,
+        centre[0] + half_x,
+        centre[1] + drawing.HALF_OD,
+    )
+
+
 def test_section_values_and_bands_print_clear_of_each_other() -> None:
     """Machinist review of run 20261001T110844152Z: the tip, spigot and shank
     stood on one shelf above the section and their stacked bands printed over
     each other.  Every value with its band and callout keeps the layout
-    audit's text air from every other text, clears both views, and stays
+    audit's text air from every other text, clears every view, and stays
     inside the border; the inline diameters print between their own
-    extension lines and off the part, and the flat's value between the axis
-    and the flat, right of the nose."""
+    extension lines and off the part, and the flat's value hangs below the
+    section right of the nose, under the boss's lower extension line."""
     s = drawing.VIEW_SCALE[0] / 1000.0
     axis_y = drawing.RIGHT_CENTER[1]
     rear_x = drawing._side_x(0.0)
     nose_x = drawing._side_x(spec.OVERALL_LENGTH)
     section = Box(rear_x, axis_y - drawing.HALF_OD, nose_x, axis_y + drawing.HALF_OD)
-    end_view = Box(
-        drawing.FRONT_CENTER[0] - drawing.HALF_OD,
-        drawing.FRONT_CENTER[1] - drawing.HALF_OD,
-        drawing.FRONT_CENTER[0] + drawing.HALF_OD,
-        drawing.FRONT_CENTER[1] + drawing.HALF_OD,
-    )
-    boxes = {
-        name: _printed_box(name, xy)
-        for name, xy in {**drawing.FRONT_KEEP, **drawing.RIGHT_KEEP}.items()
+    views = {
+        "end": _view_box(drawing.FRONT_CENTER),
+        "rear": _view_box(drawing.REAR_CENTER),
+        "section": section,
+        # Cropped, without an outline: its geometry ends at the fence.
+        "outside": Box(
+            drawing._LEFT_REAR_X,
+            drawing.LEFT_CENTER[1] - drawing.HALF_OD,
+            drawing.OUTSIDE_CROP_FENCE[2],
+            drawing.LEFT_CENTER[1] + drawing.HALF_OD,
+        ),
+        # codjiflo P3 on 65a022125: the isometric's ink as run
+        # 20261027T032128736Z's sheet measured it, the BossDia's extension
+        # line excluded: (0.326, 0.185)-(0.409, 0.247) about ISO_CENTER
+        # (0.367, 0.214) at 3:1, so in model mm from its centre (codjiflo P3
+        # on 0772285: it follows the view's placement and scale).
+        "isometric": Box(
+            drawing.ISO_CENTER[0] - 41.0 / 3.0 * s,
+            drawing.ISO_CENTER[1] - 29.0 / 3.0 * s,
+            drawing.ISO_CENTER[0] + 42.0 / 3.0 * s,
+            drawing.ISO_CENTER[1] + 33.0 / 3.0 * s,
+        ),
     }
+    keeps = {
+        **drawing.FRONT_KEEP,
+        **drawing.RIGHT_KEEP,
+        **drawing.LEFT_KEEP,
+        **drawing.REAR_KEEP,
+    }
+    boxes = {name: _printed_box(name, xy) for name, xy in keeps.items()}
     boxes["oil hole note"] = _note_box(
         drawing.OIL_HOLE_NOTE, drawing.OIL_HOLE_CALLOUT, height=drawing.NOTE_HEIGHT
     )
@@ -460,6 +584,13 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
     boxes["toothspace callout"] = _note_box(
         spec.TOOTH_SPACE_CALLOUT, drawing.TOOTH_SPACE_CALLOUT_XY,
         height=drawing.TOOTH_SPACE_CALLOUT_CHAR_HEIGHT,
+    )
+    boxes["outside caption"] = _note_box(drawing.LEFT_CAPTION, drawing.LEFT_CAPTION_XY)
+    boxes["tooth edge note"] = _note_box(
+        drawing.TOOTH_EDGE_LEADER_NOTE, drawing.TOOTH_EDGE_NOTE_XY, height=0.0025
+    )
+    boxes["manufacturing notes"] = _note_box(
+        spec.DRAWING_NOTES, drawing.NOTES_XY, height=0.0025
     )
     data_box = estimate_text_box(
         spec.GEAR_DATA,
@@ -481,30 +612,27 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
     for name, box in boxes.items():
         assert x0 <= box.xmin and box.xmax <= x1, name
         assert y0 <= box.ymin and box.ymax <= y1, name
-        assert box.gap(end_view) >= ARROW_TEXT_CLEARANCE_M, name
+        for view, outline in views.items():
+            assert box.gap(outline) >= ARROW_TEXT_CLEARANCE_M, (name, view)
+    for (a, box_a), (b, box_b) in itertools.combinations(views.items(), 2):
+        assert box_a.gap(box_b) >= 0.010, (a, b)
     inline = {
         name: anchor for name, anchor in drawing.RIGHT_KEEP.items() if _inline(anchor)
     }
-    assert set(inline) == {"OutsideDia", "RootDia", "BossDia"}
+    assert set(inline) == {"OutsideDia", "BossDia"}
     for name in inline:
         half = _NOMINAL[name] / 2.0 * s
         assert axis_y - half < boxes[name].ymin, name
         assert boxes[name].ymax < axis_y + half, name
-        assert boxes[name].gap(section) >= ARROW_TEXT_CLEARANCE_M, name
-    # Beside one face the larger diameter stands farther out, so neither's
-    # extension lines cross the other's dimension line.
-    left = sorted(
-        (n for n in inline if inline[n][0] < rear_x), key=lambda n: -inline[n][0]
-    )
-    assert [_NOMINAL[n] for n in left] == sorted(_NOMINAL[n] for n in left)
+    assert inline["OutsideDia"][0] < rear_x
     assert inline["BossDia"][0] > nose_x
-    # The flat's value sits between its extension lines (the axis and the
-    # flat) right of the nose, and its axis extension line, which runs to its
-    # dimension line, stops short of the boss's inline text.
+    # The flat's value and mate hang below the section right of the nose,
+    # under the boss's lower extension line and left of its text; its
+    # extension lines stop short of the boss's text.
     flat = boxes["FlatToAxis"]
     flat_x = drawing.RIGHT_KEEP["FlatToAxis"][0]
-    assert axis_y - spec.FLAT_TO_AXIS * s < flat.ymin and flat.ymax < axis_y
-    assert flat.gap(section) >= ARROW_TEXT_CLEARANCE_M
+    assert flat.ymax + ARROW_TEXT_CLEARANCE_M < axis_y - spec.BOSS_DIA / 2.0 * s
+    assert flat.xmin > nose_x + ARROW_TEXT_CLEARANCE_M
     assert flat_x + 2.0 * ARROW_TEXT_CLEARANCE_M < boxes["BossDia"].xmin
 
 
@@ -515,42 +643,89 @@ _CAPTION_HEIGHT = 0.0165
 _TITLE_BLOCK_TOP = 0.0649
 
 
+def _assert_rows_stack(
+    rows: dict[str, tuple[float, float]], station_x, rear_x: float, left_of_rear: set[str]
+) -> list[str]:
+    """Each row stands farther out than every shorter one, its text crosses
+    no outer row's extension line and stands clear under the row above, and
+    the named texts stand left of the rear face."""
+    by_row = sorted(rows, key=lambda n: -rows[n][1])
+    assert [_NOMINAL[n] for n in by_row] == sorted(_NOMINAL[n] for n in by_row)
+    boxes = [_printed_box(name, rows[name]) for name in by_row]
+    for i, name in enumerate(by_row):
+        for outer in by_row[i + 1 :]:
+            for x in (rear_x, station_x(_NOMINAL[outer])):
+                clear = (
+                    x <= boxes[i].xmin - ARROW_TEXT_CLEARANCE_M
+                    or x >= boxes[i].xmax + ARROW_TEXT_CLEARANCE_M
+                )
+                assert clear, (name, outer)
+        if name not in left_of_rear:
+            own = (rear_x, station_x(_NOMINAL[name]))
+            assert own[0] + ARROW_TEXT_CLEARANCE_M < boxes[i].xmin, name
+            assert boxes[i].xmax + ARROW_TEXT_CLEARANCE_M < own[1], name
+    for upper, lower in zip(boxes, boxes[1:]):
+        assert lower.ymax + TEXT_CLEARANCE_HEIGHTS * _CAP_M < upper.ymin
+    for name in left_of_rear:
+        assert _printed_box(name, rows[name]).xmax + ARROW_TEXT_CLEARANCE_M < rear_x
+    return by_row
+
+
 def test_baseline_lengths_stack_without_crossing_extension_lines() -> None:
-    """Each length's row stands farther out than every shorter one, and its
-    text crosses no outer row's extension line (the prefixed cutter texts
-    stand left of the rear face); the caption hangs below them, clear of the
-    title block."""
+    """The section's lengths stack below it (the tooth length's and the flat
+    end's texts, with their mates, left of the rear face); the caption hangs
+    below them, clear of the title block."""
     rear_x = drawing._side_x(0.0)
     bottom = drawing.RIGHT_CENTER[1] - drawing.HALF_OD
     rows = {
         name: xy
         for name, xy in drawing.RIGHT_KEEP.items()
-        if xy[1] < bottom and not name.endswith("Dia")
+        if xy[1] < bottom and not name.endswith("Dia") and name != "FlatToAxis"
     }
-    assert set(rows) == {
-        "FullDepth",
-        "FaceWidth",
-        "CutterRunout",
-        "FlatEnd",
-        "OverallLength",
-    }
-    by_row = sorted(rows, key=lambda n: -rows[n][1])
-    assert [_NOMINAL[n] for n in by_row] == sorted(_NOMINAL[n] for n in by_row)
-    for i, name in enumerate(by_row):
-        box = _printed_box(name, rows[name])
-        for outer in by_row[i + 1 :]:
-            x = drawing._side_x(_NOMINAL[outer])
-            clear = (
-                x <= box.xmin - ARROW_TEXT_CLEARANCE_M
-                or x >= box.xmax + ARROW_TEXT_CLEARANCE_M
-            )
-            assert clear, (name, outer)
-    for name in ("FullDepth", "CutterRunout"):
-        assert _printed_box(name, rows[name]).xmax + ARROW_TEXT_CLEARANCE_M < rear_x
+    assert set(rows) == {"FaceWidth", "FlatEnd", "OverallLength"}
+    by_row = _assert_rows_stack(rows, drawing._side_x, rear_x, {"FaceWidth", "FlatEnd"})
+    assert _printed_box(by_row[0], rows[by_row[0]]).ymax < bottom - 0.002
     _, cap_top = drawing.SECTION_CAPTION
     lowest = _printed_box(by_row[-1], rows[by_row[-1]])
     assert cap_top < lowest.ymin - TEXT_CLEARANCE_HEIGHTS * _CAP_M
     assert cap_top - _CAPTION_HEIGHT > _TITLE_BLOCK_TOP + 0.002
+
+
+def test_cutter_rows_stack_below_the_outside_view() -> None:
+    """2026-10-24 ENFORCE review: the section plane passes through teeth, so
+    the full-depth station and the run-out limit had no edge there.  They
+    print on the outside view, which looks along the section's direction
+    (*Left: rear face left), their texts left of its rear face, the lower row
+    clear of the title block."""
+    scale = drawing.VIEW_SCALE[0] / 1000.0
+    rear_x = drawing.LEFT_CENTER[0] - spec.OVERALL_LENGTH / 2.0 * scale
+    rows = dict(drawing.LEFT_KEEP)
+    assert set(rows) == {"FullDepth", "CutterRunout"}
+    by_row = _assert_rows_stack(
+        rows, lambda z: rear_x + z * scale, rear_x, {"FullDepth", "CutterRunout"}
+    )
+    bottom = drawing.LEFT_CENTER[1] - drawing.HALF_OD
+    assert _printed_box(by_row[0], rows[by_row[0]]).ymax < bottom - 0.002
+    # The lowest row's dimension line runs just under its text.
+    lowest = _printed_box(by_row[-1], rows[by_row[-1]])
+    assert lowest.ymin - 0.002 > _TITLE_BLOCK_TOP
+    title_left = DRAWING_TEMPLATES[DRAWINGS_BY_NAME["pd_transgear_feed_pinion"].layout].title_block_left_m
+    assert rear_x > title_left
+    assert drawing.TANGENT_EDGES_HIDDEN == 0  # swTangentEdgesHidden
+
+
+def test_root_reads_across_two_gap_floors_on_the_rear_view() -> None:
+    """The rear-face view shows the full-depth gaps; the root's text stands
+    on a gap bisector, so its diameter's arrows land on two gap floors."""
+    cx, cy = drawing.REAR_CENTER
+    x, y = drawing.REAR_KEEP["RootDia"]
+    angle = math.degrees(math.atan2(y - cy, x - cx)) % 360.0
+    # *Back mirrors model x: model gaps at 15° + k·30° print at 165° - k·30°.
+    pitch = 360.0 / spec.TEETH
+    offset = (angle - pitch / 2.0) % pitch
+    assert min(offset, pitch - offset) < 1e-9
+    assert math.hypot(x - cx, y - cy) > drawing.HALF_OD + 0.015
+    assert _printed_text("RootDia").strip() == f"ROOT ENVELOPE \u00d8{spec.ROOT_DIA_MIN:.2f} min."
 
 
 # The finish symbol's ink from its insertion point, measured with 2.5 mm text
@@ -786,3 +961,84 @@ def test_toothspace_callout_lands_on_the_rear_face_full_depth_flank() -> None:
     toward_note = math.atan2(note.ymin - landing[1], note.xmax - landing[0])
     assert contact_angle < toward_note < contact_angle + math.pi / 2.0
 
+
+def test_end_view_is_the_sections_third_angle_left_view(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """2026-10-27 ENFORCE review (r1, r3): a nose view stood left of the
+    section, whose rear face stands left.  The end view now sees the rear
+    face, and its cutting line runs top to bottom so the arrows point left,
+    model +X in that view: the section keeps its rear face left (codjiflo P3
+    on ebde256dc: the build's own call is checked, not just the constants)."""
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from _test_stubbed_build import offline_adapter, stub_seat
+
+    source = tmp_path / "source.SLDPRT"
+    source.write_bytes(b"")
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    seat = stub_seat(monkeypatch, drawing)
+    left, bottom, right, top = drawing.SHEET_INNER_BORDER
+    seat._early_bound.return_value.GetExtent.return_value = (
+        left + 0.01, bottom + 0.01, 0.0, right - 0.01, top - 0.01, 0.0
+    )
+    seat.new_project_drawing.return_value = (MagicMock(), MagicMock())
+    seat.place_view.side_effect = lambda _adapter, path, view, x, y, scale: SimpleNamespace(
+        orientation=view, centre=(x, y)
+    )
+    asyncio.run(drawing.build(offline_adapter()))
+
+    (section,) = seat.create_section_view.call_args_list
+    parent = section.args[1]
+    assert (parent.orientation, parent.centre) == ("*Back", drawing.FRONT_CENTER)
+    start, end = section.kwargs["line_start"], section.kwargs["line_end"]
+    assert start[0] == end[0] == drawing.FRONT_CENTER[0]
+    assert start[1] > drawing.FRONT_CENTER[1] + drawing.HALF_OD > drawing.FRONT_CENTER[1]
+    assert end[1] < drawing.FRONT_CENTER[1] - drawing.HALF_OD
+    assert section.kwargs["view_xy"] == drawing.RIGHT_CENTER
+    assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1]
+    assert drawing.FRONT_CENTER[0] < drawing._side_x(0.0) < drawing._side_x(spec.OVERALL_LENGTH)
+
+
+def test_outside_view_crops_past_the_run_out_limit() -> None:
+    """Runs 20261027T032128736Z..054041865Z (r1, r2): uncropped, the view drew
+    a tooth-space line on to the boss, past the 13.80 MAX.  It is cropped just
+    past the run-out limit, so both cutter stations' witnesses stay inside and
+    the boss, which the section shows, is cut away."""
+    left, foot, right, head = drawing.OUTSIDE_CROP_FENCE
+    s = drawing.VIEW_SCALE[0] / 1000.0
+    rear = drawing._LEFT_REAR_X
+    assert left < rear
+    for station in (spec.FULL_DEPTH, spec.CUTTER_RUNOUT_MAX):
+        assert rear + station * s < right
+    assert right < rear + (spec.FACE_WIDTH + 0.5) * s
+    assert foot < drawing.LEFT_CENTER[1] - drawing.HALF_OD
+    assert head > drawing.LEFT_CENTER[1] + drawing.HALF_OD
+
+
+def test_tooth_edge_exception_is_flagged_at_the_teeth() -> None:
+    """2026-10-27 ENFORCE review (r2, r3), rule 7: the 'do not break' exception
+    to the title block's edge break reaches the teeth on a leader, not as a
+    loose note.  The leader leaves its longer last row and lands on the tip
+    land of the gear-end view's upper-left tooth, a tooth in the mirrored
+    *Back view (model 30°), outside the root's dimension."""
+    rows = drawing.TOOTH_EDGE_LEADER_NOTE.split("\n")
+    assert " ".join(rows) == spec.TOOTH_EDGE_NOTE
+    assert len(rows) == 2 and len(rows[0]) < len(rows[1])
+    assert spec.TOOTH_EDGE_NOTE not in spec.DRAWING_NOTES
+    scale = drawing.VIEW_SCALE[0] / 1000.0
+    dx = drawing.TOOTH_EDGE_ATTACH[0] - drawing.REAR_CENTER[0]
+    dy = drawing.TOOTH_EDGE_ATTACH[1] - drawing.REAR_CENTER[1]
+    radius = math.hypot(dx, dy) / scale
+    assert spec.ROOT_DIA_MIN / 2.0 < spec.OUTSIDE_DIA / 2.0 - 0.1 < radius
+    assert radius < spec.OUTSIDE_DIA / 2.0
+    model_angle = (180.0 - math.degrees(math.atan2(dy, dx))) % 360.0
+    assert model_angle % (360.0 / spec.TEETH) == pytest.approx(0.0, abs=1e-9)
+    # The notes block hangs below the leader's note; the leader runs right,
+    # to a tip beyond the note's end.
+    note = _note_box(drawing.TOOTH_EDGE_LEADER_NOTE, drawing.TOOTH_EDGE_NOTE_XY, height=0.0025)
+    assert note.xmax < drawing.TOOTH_EDGE_ATTACH[0]
+    notes = _note_box(spec.DRAWING_NOTES, drawing.NOTES_XY, height=0.0025)
+    assert notes.ymax < note.ymin

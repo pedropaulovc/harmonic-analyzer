@@ -323,6 +323,37 @@ def test_bom_numbers_and_purchased_skus_come_from_the_registry() -> None:
     assert drawing.BOM_COMPONENT_IDENTITIES[inner] != drawing.BOM_COMPONENT_IDENTITIES[outer]
 
 
+def test_bom_sheet_says_what_the_shared_chain_number_orders() -> None:
+    """2026-10-27 ENFORCE review (r1-r3): the inner and outer link rows share
+    one Number, so the BOM sheet states that Number is one supplier chain,
+    the length to cut and how it splits, and what closes the loop."""
+    inner, outer = "sh-vn-chain-link--InnerLink", "sh-vn-chain-link--OuterLink"
+    note = drawing.BOM_CHAIN_ORDER_NOTE
+    sku = _config.parts("sh-vn-chain-link")["supplier_skus"][0]
+    pitches = drawing.CHAIN_QUANTITIES[inner] + drawing.CHAIN_QUANTITIES[outer]
+    assert pitches + drawing.CHAIN_QUANTITIES["pd-vn-chain-connecting-link"] == (
+        drawing.chain.LINK_COUNT
+    )
+    for text in (
+        f"{drawing.BOM_PART_NUMBERS[inner]} IS ONE CHAIN",
+        f"MCMASTER {sku}",
+        f"CUT {pitches} PITCHES",
+        f"{drawing.CHAIN_QUANTITIES[inner]} INNER",
+        f"{drawing.CHAIN_QUANTITIES[outer]} OUTER",
+        drawing.BOM_PART_NUMBERS["pd-vn-chain-connecting-link"],
+    ):
+        assert text in note.replace("\n", " "), text
+    assert drawing.BOM_SHEET_CAPTION.endswith(note)
+    assert drawing.BOM_SHEET_CAPTION.startswith(drawing.BOM_REFERENCE_CAPTION)
+    # The caption hangs right of the reference view, above the border and
+    # left of the title block (rows of at most 36 characters).
+    rows = drawing.BOM_SHEET_CAPTION.split("\n")
+    assert max(len(row) for row in rows) <= 36
+    x, y = drawing.BOM_REFERENCE_CAPTION_XY
+    assert x > drawing.BOM_REFERENCE_LIMITS[2]
+    assert y - len(rows) * NOTE_LINE_PITCH > drawing.SHEET_INNER_BORDER_BOTTOM
+
+
 def test_the_two_locating_dowels_are_not_the_two_knob_wheel_drive_dowels() -> None:
     locating = "pd-vn-transgear-arm-plate-locating-pin"
     driving = "pd-vn-transgear-knob-drive-pin"
@@ -344,15 +375,32 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
         f"PRESS {plate_locating_pin.ASSEMBLY_QUANTITY} "
         f"{_number('pd-vn-transgear-arm-plate-locating-pin')} DOWELS"
     ) in located
-    assert (
-        "TOGETHER IN A JIG HOLDING THE PLATE'S KNOB BORE "
-        f"{disc.CENTRE_DISTANCE:.3f} FROM THE ARM'S PIN BORE"
-    ) in located
-    # The step names the mesh that centre distance sets.
-    jig = located[: located.index("PER THEIR DRAWINGS")]
+    pin = _number("pd-transgear-pin")
+    # The step names the mesh that centre distance sets, and how it is set
+    # and checked: the package builds no jig, and the pin is already pressed
+    # into its bore, so the gauge reads over it and a gauge pin in the knob
+    # bore.  References and relationship only, not the sentence (codjiflo P3
+    # on 482fbdc).
+    assert steps.step_number("pin-pressed") < steps.step_number("arm-plate-located")
+    jig, recheck = located.split("WITHIN THE WINDOW ON THE ARM AND PLATE DRAWINGS", 1)
     for stem in ("pd-transgear-knob-shaft", "pd-rack-pinion"):
         assert _number(stem) in jig
     assert "MESH" in jig
+    assert "JIG" not in jig
+    assert "EACH BORE" not in jig
+    assert f"{disc.CENTRE_DISTANCE:.3f}" in jig
+    for reference in ("KNOB BORE", f"PRESSED {pin} PIN", "GAUGE PIN", "CLAMP"):
+        assert reference in jig, reference
+    # The setting and the clamped re-check answer to the window the arm and
+    # plate sheets print and cite this step for (codjiflo P2 on 1b09cec); the
+    # step names it without restating the band (r1-r3 on f4f620a).
+    assert jig.endswith(f"OVER THE GAUGE PIN AND THE {pin} PIN, ")
+    assert recheck.startswith("; RE-CHECK CLAMPED: STILL WITHIN THAT WINDOW.")
+    tol = f"{disc.CENTRE_DISTANCE_SET_TOL:.3f}"
+    assert tol in steps.matched_locator_notes(
+        _number("pd-transgear-arm"), _number("pd-transgear-arm-plate"), on_arm=True, width=80
+    )
+    assert tol not in located
     assert "MATCH-DRILL AND REAM THE LOCATING HOLES" in located
     assert (
         f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "

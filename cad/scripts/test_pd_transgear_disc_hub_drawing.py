@@ -1124,3 +1124,27 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
     _drawing_marks.apply_drawing_properties(None, part.PART_NAME, extra)
     carried.update(stamped)
     assert [name for name in required if not str(carried.get(name) or "").strip()] == []
+
+
+def test_seat_bound_takes_full_depth_to_the_step() -> None:
+    """codjiflo P2 (0247213): the sleeve prints only the full depth's MIN and
+    the run-out's MAX, so a smaller cutter may cut full depth to the step.
+    The seat's lower bound is then the whole form gap at every step corner."""
+    sleeve = spec.SLEEVE
+    assert sleeve.FULL_DEPTH_MAX >= sleeve.FACE_WIDTH + sleeve.FACE_WIDTH_BAND
+    full_gap = [
+        sleeve.step_seat_area_bounds_mm2(
+            spec.SEAT_INNER_R,
+            spec.SEAT_CONTACT_R,
+            profile=profile,
+            station_mm=station,
+            full_depth_mm=station,
+        )[0]
+        for profile in sleeve.manufactured_profiles()
+        for station in (
+            sleeve.FACE_WIDTH - sleeve.FACE_WIDTH_BAND,
+            sleeve.FACE_WIDTH + sleeve.FACE_WIDTH_BAND,
+        )
+    ]
+    assert spec.SEAT_CONTACT_AREA == min(full_gap)
+    assert spec.SEAT_CONTACT_AREA > 0.0

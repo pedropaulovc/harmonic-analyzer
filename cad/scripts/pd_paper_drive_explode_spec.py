@@ -105,12 +105,16 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
     ),
     ExplodeStep("cup pin out of the cup", ("pd-vn-transgear-knob-cup-pin",), "x", 22.0),
     # The plate off the arm's rear face, its screws behind it and the two
-    # locating dowels drawn out of the arm between them.
+    # locating dowels drawn out of the arm between them.  At 16 mm the
+    # isometric drew the plate on the arm's top edge with the dowels hidden
+    # under it (2026-10-27 ENFORCE review, r1, r2: balloon 20 landed on a
+    # barely visible tip).  The 6 mm dowels, 1.7 proud, now stand about
+    # 16 mm clear of the arm and 18 mm short of the plate.
     ExplodeStep(
         "arm plate rearward",
         ("pd-transgear-arm-plate", "pd-vn-transgear-arm-plate-screw"),
         "z",
-        16.0,
+        40.0,
     ),
     ExplodeStep(
         "plate screws rearward", ("pd-vn-transgear-arm-plate-screw",), "z", 24.0
@@ -119,7 +123,7 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
         "plate dowels rearward",
         ("pd-vn-transgear-arm-plate-locating-pin",),
         "z",
-        10.0,
+        20.0,
     ),
     # The disc cluster forward along its pin, in the order it comes off.
     ExplodeStep(

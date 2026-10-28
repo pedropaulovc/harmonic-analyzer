@@ -225,7 +225,7 @@ RACK_MESH_EXTENSION = (
 RACK_AXIS_DISTANCE = PITCH_DIA / 2.0 + RACK_MESH_EXTENSION
 
 # --- axial stations from the rear face (z 0) -----------------------------------
-# OVERALL_LENGTH and FLAT_END_STATION print ±0.05 (R9-5; the knob chain and
+# OVERALL_LENGTH prints ±0.05 (R9-5; the knob chain and
 # the fitted bands read the overall: transgear_cluster_fit).  The tooth length
 # prints .XXX: its end is the step face the hub's spigot seats on, so it
 # places hub and disc with the spigot's own .XXX length (the bushings and the
@@ -278,13 +278,35 @@ FLAT_DEPTH = BOSS_DIA / 2.0 - FLAT_TO_AXIS  # 1.0
 # cut by an end mill on an axis parallel to the sleeve's, plunged from the
 # nose.  The wall stops nothing: the hub's flat starts at its flange's rear
 # face, the spigot's length ahead of the step, so the wall stands clear
-# behind it (pd_transgear_disc_hub_spec.FLAT_END_CLEARANCE_WORST).
-FLAT_END_STATION = 16.60
-FLAT_LENGTH = OVERALL_LENGTH - FLAT_END_STATION  # 10.75
-FLAT_LENGTH_MAX = FLAT_LENGTH + 2.0 * STATION_TOL  # 10.85
+# behind it (pd_transgear_disc_hub_spec.FLAT_END_CLEARANCE_WORST), and it
+# stays clear of the step the hub's spigot seats on, so the flat never
+# notches that face.  Those are its only functions, so it prints as limits
+# at one place, looser than the title block's .X row (2026-10-27 ENFORCE
+# review: ±0.05 was unneeded precision; codjiflo P1 on 65a022125: a MAX
+# alone left the step unguarded).  The MAX is the modelled station.  The MIN
+# stands behind the longest tooth length plus the title block's 0.25 edge
+# break, and behind the cutter's run-out (asserted below).  The hub's check
+# keeps its conservative STATION_TOL allowance on top of the MAX.  The MAX
+# stands far enough behind the hub's flat that the title block's R1.0 inside
+# corner, where the flat's floor meets the wall, stays under the flats'
+# 0.020 minimum clearance where the hub's flat starts (codjiflo P2 on
+# edb402b/482fbdc: at 16.6 an R1.0 corner rose 0.21 there; #2006).  The
+# drawing test holds that envelope.
+FLAT_END_STATION = 16.0
+FLAT_END_MIN = 14.0
+FLAT_END_PLACES = 1
+FLAT_END_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
+FLAT_LENGTH = OVERALL_LENGTH - FLAT_END_STATION  # 11.35
+# The reach the end mill's flutes must cover: the flat cut to its MAX
+# station on the longest sleeve.  Stopping there is always accepted; a
+# longer flat, toward the MIN, is the shop's choice of a longer cutter.
+FLAT_REACH = OVERALL_LENGTH + STATION_TOL - FLAT_END_STATION  # 11.40
 FLAT_CUTTER_FLUTE_MIN = 12.0
-if FLAT_CUTTER_FLUTE_MIN < FLAT_LENGTH_MAX + 0.5:
+if FLAT_CUTTER_FLUTE_MIN < FLAT_REACH + 0.5:
     raise AssertionError("the flat's end mill cannot reach the end wall on its flutes")
+for _limit in (FLAT_END_MIN, FLAT_END_STATION):
+    if round(_limit, FLAT_END_PLACES) != _limit:
+        raise AssertionError("a flat end limit does not print at its places")
 
 # G7 bore on the preserved MHA-PD-23 h6 pin: +0.016/+0.004 over 0/-0.008
 # gives 0.004..0.024 diametral clearance. The true finite root at every
@@ -334,25 +356,39 @@ if pd_rack_pinion_spec.BORE_DIA_MIN <= OUTSIDE_DIA + OUTSIDE_DIA_BAND[0]:
 # remaining face has partial-depth gaps, not full-depth analytic teeth.
 # CUTTER_RUNOUT_MAX is the retained native maximum station; the geometric
 # endpoint over the boss uses the deepest template X, never a root norm.
+# The full depth has one function, covering the rack (the assembly's
+# RACK_FRONT_FROM_SLEEVE_REAR_WORST), so it prints as a MIN at the modelled
+# station; the run-out MAX caps how deep the cutter may go (2026-10-27
+# ENFORCE review, r1, r3: a three-place hold served nothing).  Any cutter's
+# full depth stands behind its own run-out, so the print bounds it only by
+# that MAX (FULL_DEPTH_MAX, below).
 FULL_DEPTH = 10.15
-FULL_DEPTH_PLACES = 3
+FULL_DEPTH_PLACES = 2
+FULL_DEPTH_TOL_TYPE = 5  # swTolType_e.swTolMIN
+FULL_DEPTH_DEVIATIONS = (0.0, 0.0)
+FULL_DEPTH_MIN = FULL_DEPTH
 CUTTER_RUNOUT_MAX = 13.80  # from the rear face, a limit
 CUTTER_RUNOUT_PLACES = 2
 CUTTER_DIA_MAX_IN = 2.25
 CUTTER_DIA_MAX = CUTTER_DIA_MAX_IN * MM_PER_IN
 CUTTER_SKU = "10-289-328"
-FULL_DEPTH_BAND = printed_band_mm(FULL_DEPTH_PLACES)
-FULL_DEPTH_MIN = FULL_DEPTH - FULL_DEPTH_BAND
-FULL_DEPTH_MAX = FULL_DEPTH + FULL_DEPTH_BAND
 # swTolMAX prints the dimension's NOMINAL followed by "MAX", so the witness
 # sits at the limit; its deviations record "anywhere behind the shortest full
 # depth, up to the limit".
 CUTTER_RUNOUT_TOL_TYPE = 6  # swTolType_e.swTolMAX
 CUTTER_RUNOUT_DEVIATIONS = (FULL_DEPTH_MIN - CUTTER_RUNOUT_MAX, 0.0)
+FLAT_END_DEVIATIONS = (FLAT_END_MIN - FLAT_END_STATION, 0.0)
+_TITLE_BLOCK_EDGE_BREAK = 0.25  # the test reads it back from the title block
+if FLAT_END_MIN < max(
+    FACE_WIDTH + FACE_WIDTH_BAND + _TITLE_BLOCK_EDGE_BREAK, CUTTER_RUNOUT_MAX
+):
+    raise AssertionError("the flat's end wall may notch the step or the run-out")
 if round(CUTTER_RUNOUT_MAX, CUTTER_RUNOUT_PLACES) != CUTTER_RUNOUT_MAX:
     raise AssertionError("the run-out limit does not print at its places")
-FULL_DEPTH_PREFIX = "12T FULL DEPTH "
-CUTTER_RUNOUT_PREFIX = "CUTTER RUN-OUT "
+# The outside view's cutter-station witnesses run along the floor of the
+# gap that faces it (model 195°, a gap centre, seen from -X): the section
+# B-B plane passes through teeth, so neither station has an edge there.
+GAP_FLOOR_WITNESS_Y = -(ROOT_DIA_MIN / 2.0) * math.sin(math.pi / TEETH)
 # Numerical interval widths, not manufacturing tolerance or runout grades.
 ENDCUT_VOLUME_ERROR_MM3 = 0.02
 STEP_SEAT_AREA_ERROR_MM2 = 0.002
@@ -443,22 +479,18 @@ def step_seat_area_bounds_mm2(
 # station. The retained limit keeps the cutting envelope behind the disc
 # and under the hub spigot; no particular boss slot is presumed.
 RUNOUT_RISE_WORST = (BOSS_DIA + BOSS_DIA_BAND[0]) / 2.0 - ROOT_DEPTH_X_MIN
-CUTTER_RUNOUT_END_WORST = FULL_DEPTH_MAX + cutter_runout(
-    CUTTER_DIA_MAX, RUNOUT_RISE_WORST
-)
+# With only the MIN printed, any cutter of the form may be used: a smaller
+# one, or a shallower accepted profile, runs out sooner and so cuts full
+# depth further forward.  Over every accepted part the full depth and the
+# cutter's end are bounded only by the run-out MAX (codjiflo P2, 0247213),
+# and the hub's round engagement and seat take them there.
+FULL_DEPTH_MAX = CUTTER_RUNOUT_MAX
+CUTTER_RUNOUT_END_WORST = CUTTER_RUNOUT_MAX
 RUNOUT_DISC_CLEARANCE = 0.05
-if FULL_DEPTH_MAX >= FACE_WIDTH - _BAND[FACE_WIDTH_PLACES]:
-    raise AssertionError("the 12T full-depth window reaches the step")
-if CUTTER_RUNOUT_END_WORST > CUTTER_RUNOUT_MAX + 1e-9:
-    raise AssertionError(
-        f"a Ø{CUTTER_DIA_MAX_IN:.2f} in cutter runs out to "
-        f"{CUTTER_RUNOUT_END_WORST:.3f}, past the {CUTTER_RUNOUT_MAX} limit"
-    )
-if CUTTER_RUNOUT_END_WORST > DISC_REAR_MIN - RUNOUT_DISC_CLEARANCE + 1e-9:
-    raise AssertionError(
-        f"the cutter runs out to {CUTTER_RUNOUT_END_WORST:.3f}, within "
-        f"{RUNOUT_DISC_CLEARANCE} of the disc's rear face {DISC_REAR_MIN:.3f}"
-    )
+if FULL_DEPTH_MIN + cutter_runout(CUTTER_DIA_MAX, RUNOUT_RISE_WORST) > CUTTER_RUNOUT_MAX:
+    raise AssertionError("the largest cutter at the full-depth MIN overruns the run-out MAX")
+if FULL_DEPTH_MIN >= FACE_WIDTH - _BAND[FACE_WIDTH_PLACES]:
+    raise AssertionError("the 12T full-depth MIN reaches the step")
 if CUTTER_RUNOUT_MAX > DISC_REAR_MIN - RUNOUT_DISC_CLEARANCE + 1e-9:
     raise AssertionError("the run-out limit reaches the disc's rear face")
 
@@ -515,10 +547,15 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
 # --- Marked-dimension contract -------------------------------------------------
 # ``GearBlank`` is the tooth blank's extrude (its depth is the tooth length).
 # ``SleeveProfile`` is the Right-plane revolve of the boss, with
-# construction-only witnesses for the tooth tip, the root and the bore, so
-# every turned diameter prints beside its axial extent on the longitudinal
-# section (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 11 (turned parts read like the lathe)), and for the cutter's full-depth station, its
-# run-out limit (R9-67).  Lengths are baselined from the rear face.
+# construction-only witnesses for the tooth tip and the bore, so every turned
+# diameter prints beside its axial extent on the longitudinal section
+# (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 11 (turned parts read like the lathe)), and for the cutter's full-depth station and
+# its run-out limit (R9-67), which run along the facing gap's floor
+# (GAP_FLOOR_WITNESS_Y) and print on an outside view in the section's
+# direction.  Lengths are baselined from the rear face.
+# ``RootProfile`` is a construction circle on the Front plane (the rear face)
+# at the root's MIN: the root prints on the rear-face view, where the
+# full-depth gaps show their floors (the section cuts through teeth).
 # ``FlatProfile`` is the flat's cut sketch on the Right plane (the section
 # plane): the flat from the axis and its end wall from the rear face print on
 # the section, where the flat shows edge-on.
@@ -526,13 +563,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     "SleeveProfile": {
         "OutsideDia",
-        "RootDia",
         "BoreDia",
         "BossDia",
         "OverallLength",
         "FullDepth",
         "CutterRunout",
     },
+    "RootProfile": {"RootDia"},
     "FlatProfile": {"FlatToAxis", "FlatEnd"},
     "SpanProfile": {"ToothSpan"},
 }
@@ -541,16 +578,16 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": FACE_WIDTH_PLACES},
     "SleeveProfile": {
         "OutsideDia": 3,
-        "RootDia": ROOT_DIA_PLACES,
         "BoreDia": BORE_PLACES,
         "BossDia": BOSS_DIA_PLACES,
         "OverallLength": STATION_PLACES,
         "FullDepth": FULL_DEPTH_PLACES,
         "CutterRunout": CUTTER_RUNOUT_PLACES,
     },
+    "RootProfile": {"RootDia": ROOT_DIA_PLACES},
     "FlatProfile": {
         "FlatToAxis": FLAT_TO_AXIS_PLACES,
-        "FlatEnd": STATION_PLACES,
+        "FlatEnd": FLAT_END_PLACES,
     },
     "SpanProfile": {"ToothSpan": SPAN_PLACES},
 }
@@ -600,10 +637,13 @@ GEAR_DATA = gear_data_note(
 )
 
 # The title block's 0.25 edge break is 14% of this fine tooth's whole depth,
-# and the tooth ends seat the hub's spigot.
+# and the tooth ends seat the hub's spigot.  The drawing flags it at the
+# teeth with a leader (rule 7; 2026-10-27 ENFORCE review, r2, r3: loose in
+# the notes block it reached no feature), so the notes block omits it.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
-# Pending exception ruling: MHA-PD-10 flat wall (#1378).
+# Emits approved declaration pd-transgear-feed-pinion RV-03 (owner ruling
+# 2026-10-27, #1378).
 # A shop note states the requirement, not the measuring method or the cutter
 # choice (Main ruling 2026-10-10): the run-out length is dimensioned.
 FLAT_WALL_NOTE = f"D-FLAT WALL TO BORE {FLAT_WALL_PRINTED:.2f} MIN."
-DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, FLAT_WALL_NOTE))
+DRAWING_NOTES = FLAT_WALL_NOTE

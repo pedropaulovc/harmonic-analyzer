@@ -788,6 +788,24 @@ CHAIN_QUANTITIES = {
     "sh-vn-chain-link--OuterLink": chain.LINK_COUNT // 2 - 1,
     "pd-vn-chain-connecting-link": 1,
 }
+# The inner and outer link rows print one purchase Number, one supplier
+# chain's two link kinds, so the BOM sheet says what that Number is and what
+# to order (2026-10-27 ENFORCE review, r1-r3: one Number with two
+# descriptions and quantities left the order unknown).  It joins the BOM
+# reference's caption, in the air right of that view.
+_CHAIN_CUT_PITCHES = (
+    CHAIN_QUANTITIES["sh-vn-chain-link--InnerLink"]
+    + CHAIN_QUANTITIES["sh-vn-chain-link--OuterLink"]
+)
+BOM_CHAIN_ORDER_NOTE = (
+    f"{BOM_PART_NUMBERS['sh-vn-chain-link--InnerLink']} IS ONE CHAIN,\n"
+    f"MCMASTER {_config.parts('sh-vn-chain-link')['supplier_skus'][0]}: "
+    f"CUT {_CHAIN_CUT_PITCHES} PITCHES,\n"
+    f"{CHAIN_QUANTITIES['sh-vn-chain-link--InnerLink']} INNER AND "
+    f"{CHAIN_QUANTITIES['sh-vn-chain-link--OuterLink']} OUTER LINKS;\n"
+    f"{BOM_PART_NUMBERS['pd-vn-chain-connecting-link']} CLOSES THE LOOP."
+)
+BOM_SHEET_CAPTION = f"{BOM_REFERENCE_CAPTION}\n{BOM_CHAIN_ORDER_NOTE}"
 if not set(TRANSGEAR_QUANTITIES) <= set(BOM_PART_NUMBERS):
     raise AssertionError("every transgear family is a BOM row")
 TRANSGEAR_INSTANCES = frozenset(
@@ -1305,11 +1323,27 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "ARM'S REAMED HOLE FROM THE REAR TILL ITS HEAD SEATS ON THE ARM."
         ),
         "arm-plate-located": (
+            # The package builds no jig: the step says how the distance is
+            # set and checked (2026-10-27 ENFORCE review, r1, r2). The pin
+            # is already pressed (step "pin-pressed"), so the distance is
+            # gauged off it, not off an empty pin bore (codjiflo P2 on
+            # edb402b). The setting and the clamped re-check both answer to
+            # the window the arm and plate sheets print for these steps
+            # (pd_paper_drive_assembly_steps.matched_locator_notes), so the
+            # re-check has its acceptance (codjiflo P2 on 1b09cec). The step
+            # names that window rather than restating its band: printed here
+            # too, the ±0.004 repeated the part drawings' band and r1-r3 on
+            # f4f620a filed it as assembly over-specification.
             f"CLAMP {_N['pd-transgear-arm']} AND {_N['pd-transgear-arm-plate']} "
-            "TOGETHER IN A JIG HOLDING THE PLATE'S KNOB BORE "
-            f"{disc.CENTRE_DISTANCE:.3f} FROM THE ARM'S PIN BORE (THE "
+            "TOGETHER, THE PLATE'S KNOB BORE "
+            f"{disc.CENTRE_DISTANCE:.3f} FROM THE PRESSED {_N['pd-transgear-pin']} "
+            f"PIN'S AXIS (THE "
             f"{_N['pd-transgear-knob-shaft']} {KNOB_TEETH}T / {_N['pd-rack-pinion']} "
-            f"{disc.TEETH}T MESH), PER THEIR DRAWINGS; "
+            f"{disc.TEETH}T MESH): A SNUG GAUGE PIN IN THE KNOB BORE; SET "
+            f"{disc.CENTRE_DISTANCE:.3f} PLUS HALF OF EACH PIN'S MEASURED DIAMETER "
+            f"OVER THE GAUGE PIN AND THE {_N['pd-transgear-pin']} PIN, "
+            "WITHIN THE WINDOW ON THE ARM AND PLATE DRAWINGS; "
+            "RE-CHECK CLAMPED: STILL WITHIN THAT WINDOW. "
             "MATCH-DRILL AND REAM THE LOCATING HOLES. "
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-locating-pin']} "
             f"{_N['pd-vn-transgear-arm-plate-locating-pin']} DOWELS INTO THE ARM "
@@ -2543,7 +2577,7 @@ def _place_bom_sheet(
     ):
         raise RuntimeError(f"paper-drive BOM reference leaves its field: {outline!r}")
     _place_sheet_note(
-        adapter, SHEET_NAMES[7], BOM_REFERENCE_CAPTION, BOM_REFERENCE_CAPTION_XY,
+        adapter, SHEET_NAMES[7], BOM_SHEET_CAPTION, BOM_REFERENCE_CAPTION_XY,
         label="BOM reference caption",
     )
     # Insert the complete model's BOM on its own sheet; view-only isolation
