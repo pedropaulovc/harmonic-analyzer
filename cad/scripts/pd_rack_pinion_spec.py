@@ -209,33 +209,32 @@ TOOTH_SPACE_GAUGE_ROOT_AIR_MIN_MM = min(contact.root_air_mm for contact in _GAUG
 TOOTH_SPACE_GAUGE_TIP_AIR_MIN_MM = min(contact.tip_air_mm for contact in _GAUGE_CORNERS)
 
 
-# The physical reducer's assembled axis datum, set from the closed-form
-# checks in paper_drive_mesh_check.reducer_mesh over the printed bands:
-# knob-pinion and disc tooth thickness at the pitch circle (the
-# manufactured_profiles corners) and both tooth-space runouts of 0.05 TIR,
-# which together move the working centre by (0.05 + 0.05)/2 = 0.05.
-# Bisecting those two gates gives the usable window 35.097..35.105 mm:
-#   - below 35.097 the largest disc tip reaches past the knob pinion's
-#     interference point (its base-circle tangency) at the tight extreme
-#     (35.097 - 0.05);
-#   - above 35.105 the contact ratio at the minimum tips (7.38 and 64.44 OD)
-#     falls below 1.2.
-# 35.101 is the window's midpoint (Main ruling 2026-10-10: the design takes
-# an ordinary 0.05 TIR; 35.080 admitted only 0.005). It gives CR 1.207,
-# backlash 0.069 at the tight extreme and 0.170 at the loose one, root
-# clearance 0.240 (AGMA fine-pitch floor 0.157) and an interference margin
-# of 0.012 mm.
+# The physical reducer's assembled axis datum. Both gears are shop-cut
+# 48DP PA20 standard forms (the knob's 12T by a #8 cutter, this disc by a
+# #2 cutter), so the centre takes ordinary fine-pitch practice: nominal
+# plus a positive allowance, never minus, since a close centre binds
+# (MISUMI Mech Lab, "Center to Center Spacing for Shafts with Spur Gears":
+# fine pitch +0.002 in / -0). 35.101 stands 0.004 above 35.097, the
+# closest centre at which the largest disc tip clears the knob pinion's
+# interference point with both 0.05 TIR tooth-space runouts closing it
+# (paper_drive_mesh_check.reducer_mesh); the allowance is the catalogue
+# +0.05, the radius of K's drawn setting circle about S
+# (stock_form_quality.reducer_k_setting_diameter_mm; owner ruling
+# 2026-10-27, option A: standard gears take the standard band; the far
+# end is gated at CR 1.1 / 1.0 in
+# paper_drive_mesh_check.BAND_TOP_CONTACT_RATIO_FLOORS).
 MESH_PINION_TEETH = 12
 MESH_ANGLE_DEG = -168.0
 CENTRE_DISTANCE = 35.101
-# The window above, as the setting the arm and plate sheets print: the knob
-# bore is held CENTRE_DISTANCE +/- this from the pin bore when the pair is
-# match-drilled, and must still be there with the plate screwed down.
-CENTRE_DISTANCE_WINDOW = (35.097, 35.105)
-# Rounded to the micron so a reading of exactly the tolerance compares equal.
-CENTRE_DISTANCE_SET_TOL = round((CENTRE_DISTANCE_WINDOW[1] - CENTRE_DISTANCE_WINDOW[0]) / 2.0, 6)
-if abs(sum(CENTRE_DISTANCE_WINDOW) / 2.0 - CENTRE_DISTANCE) > 1e-9:
-    raise AssertionError("CENTRE_DISTANCE is the midpoint of its window")
+# The setting the arm and plate sheets print: the knob bore is held this
+# band from the pin bore when the pair is match-drilled, and must still be
+# there with the plate screwed down.
+CENTRE_DISTANCE_WINDOW = (CENTRE_DISTANCE, 35.151)
+# (upper, lower) deviations from CENTRE_DISTANCE, as every band here.
+CENTRE_DISTANCE_SET_BAND = (round(CENTRE_DISTANCE_WINDOW[1] - CENTRE_DISTANCE, 6), 0.0)
+CENTRE_DISTANCE_SET_TEXT = (
+    f"{CENTRE_DISTANCE:.3f} +{CENTRE_DISTANCE_SET_BAND[0]:.3f}/-0"
+)
 STANDARD_CENTRE_DISTANCE = (TEETH + MESH_PINION_TEETH) * MODULE_MM / 2.0
 CENTRE_EXTENSION = CENTRE_DISTANCE - STANDARD_CENTRE_DISTANCE
 

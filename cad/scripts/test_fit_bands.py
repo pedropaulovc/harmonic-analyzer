@@ -310,6 +310,12 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the pressed dowel's catalogue diameter: read by min/max for the press "
         "interference against the arm's blind hole"
     ),
+    ("pd_rack_pinion_spec", "CENTRE_DISTANCE_SET_BAND"): (
+        "the reducer's S-K set band at assembly (+0.025/-0 fine-pitch centre "
+        "allowance), printed as setting text on MHA-PD-00 step 10 and the arm "
+        "and plate notes, read by paper_drive_arm_registration; no fit or "
+        "model dimension"
+    ),
     ("sm_vn_knife_mount_dowel_spec", "DIA_BAND"): (
         "the pressed dowel's catalogue diameter: read by min/max for the press "
         "interference against the knife mount's reamed blind hole"

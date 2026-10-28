@@ -60,15 +60,19 @@ SEQUENCE: tuple[str, ...] = (
     "lock-seats-faced",
     # Hanger, on the bench, then hung (R9-6: the spacer is fitted as made).
     "latch-pin-pressed",
-    # R9-68: the plain pin pressed into the arm's reamed hole, head on the
-    # arm's rear face (pd_transgear_pin_spec).
-    "pin-pressed",
-    # The plate's knob bore is held at its drawn place from the arm's pin
-    # bore in the matched jig before the
-    # two locating holes receive their separate final press/slip reams.
+    # The plate's knob bore K is set on the mill DRO from the arm's empty
+    # reamed pin bore S, the pin's running axis once pressed (one turned
+    # shank Ø, pd_transgear_pin_spec), at MHA-PD-00 VIEW K's model
+    # dimensions, before the two locating holes receive their separate final
+    # press/slip reams. The arm lies flat on parallels, plate up, with no
+    # pin yet: its head is not concentric to the shank by any drawing
+    # control, so it is no reference (codjiflo P2 on 8e8d5d5).
     "arm-plate-located",
     "arm-plate-fitted",
     "arm-plate-screws-cut",
+    # R9-68: the plain pin pressed into the arm's reamed hole, head on the
+    # arm's rear face (pd_transgear_pin_spec).
+    "pin-pressed",
     "hanger-pivoted",
     # Disc cluster, on the bench (R9-68: the disc on the sleeve's seat
     # shoulder, the hub's D-bore on its D-flat; R9-8, R9-9). The hub is then
@@ -152,17 +156,14 @@ def matched_locator_notes(
     mate = plate_number if on_arm else arm_number
     knob, pin = ("ITS KNOB BORE", "PIN BORE") if on_arm else ("KNOB BORE", "ITS PIN BORE")
     disc = arm_geometry.DISC
-    centres = (
-        f"{knob} CLAMPED {disc.CENTRE_DISTANCE:.3f} "
-        f"\u00b1{disc.CENTRE_DISTANCE_SET_TOL:.3f} FROM {pin}"
-    )
+    centres = f"{knob} CLAMPED {disc.CENTRE_DISTANCE_SET_TEXT} FROM {pin}"
     located, fitted = step_number("arm-plate-located"), step_number("arm-plate-fitted")
     if fitted != located + 1:
         raise AssertionError("the matched-pair notes cite two consecutive steps")
     notes = (
         f"1. LOCATING HOLES MATCH-DRILLED WITH {mate}, {centres}.",
         "2. PLATE ON THE DOWELS, SCREWS TIGHT: NO SHAKE, NO DAYLIGHT, "
-        f"CENTRES STILL WITHIN \u00b1{disc.CENTRE_DISTANCE_SET_TOL:.3f}. "
+        f"CENTRES STILL {disc.CENTRE_DISTANCE_SET_TEXT}. "
         f"{DRAWING_NUMBER} STEPS {located}-{fitted}.",
     )
     return "\n".join(

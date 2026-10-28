@@ -8,7 +8,8 @@ the disc cluster and the knob stack apart along their axes on
 PAPER_DRIVE_EXPLODED, seen from above, and balloons every part it shows.
 Sheet 4 balloons the bar, its clamps and the platen group on
 PAPER_DRIVE_EXPLODED and prints their steps. Sheet 5 prints the transgear's
-assembly steps and sheet 6 continues them; sheet 7 prints the chain fit-up
+assembly steps and VIEW K, the plate's knob-bore setting from the arm's pin bore as the
+assembly's own model dimensions; sheet 6 continues the steps; sheet 7 prints the chain fit-up
 (CONTRACT-paper-drive.md §13.2). Sheet 8 carries the complete native BOM,
 split horizontally into two pieces at measured row heights, and an assembly
 reference. The BOM identifies the current inch
@@ -40,6 +41,7 @@ from typing import Any, Callable, Iterable, Sequence
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
+    dimension_name,
     place_view,
     view_name,
 )
@@ -80,6 +82,9 @@ from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import assert_imported_precision
+from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import (
@@ -109,6 +114,7 @@ from _column_clamp_interface import BAR_DEPTH
 import pd_latch_hook_geometry as hook_geometry
 import paper_drive_rack_setup as rack_setup
 import pd_paper_drive_assembly_steps as steps
+import pd_paper_drive_knob_setting_spec as knob_setting
 import pd_paper_drive_explode_spec as explode
 import pd_platen_guide_spec as platen_guide
 import pd_platen_spec as platen
@@ -539,6 +545,134 @@ FITUP_CONTINUED_KEY = "collar-pins-pressed"
 FITUP_CONTINUED_SECOND_KEY = "latch-hook-fitted"
 FITUP_CHAIN_KEY = "loaded-rack-geometry-checked"
 CHAIN_SECOND_COLUMN_KEY = "collar-shoulder-seated"
+
+# Sheet 5's VIEW K: K's DRO setting from the arm's pin bore S, the
+# assembly's hidden KnobSettingReference chain
+# (pd_paper_drive_knob_setting_spec) on the arm and plate seen from the
+# machine front at 1:1 as the arm-plate-located step sets them, before the pin is pressed;
+# cropped to a circle on S-K's midpoint (S, Q and K all lie on it: Q is the
+# chain's right angle).
+# It stands under the second column, over the title block; each setting's
+# text stands well off its leg, away from the chain's third point, clear of
+# the circle (run 20261027T230707102Z put them 4 mm past it, over the arm's
+# edge). Its one-word callout keeps the text block between its leg's
+# extension lines (run 20261028T000650671Z: "ALONG ARM" was struck by one).
+# The three circles in the crop are lettered on short leaders and named in the
+# legend left of the circle (same run): S the pin bore, K the knob bore, and T
+# the arm's plate-screw tap that lies between them.
+KNOB_SETTING_VIEW_NAME = "VIEW K"
+KNOB_SETTING_SCALE = (1.0, 1.0)
+KNOB_SETTING_CENTER = (0.320, 0.097)
+KNOB_SETTING_RADIUS = 0.024
+KNOB_SETTING_TEXT_OFFSET = 0.030
+KNOB_SETTING_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+KNOB_SETTING_INSTANCES = frozenset({"pd-transgear-arm-1", "pd-transgear-arm-plate-1"})
+# The located step's acceptance for "true": a null reading on the indicator, so the
+# setting's centring bound comes from this stated sweep, not from the
+# indicator's unknown accuracy over its range (codjiflo P2 on 8e8d5d5): under
+# half a division of sweep puts each centre within a quarter division.
+KNOB_SETTING_TRUE = "TRUE: UNDER HALF A DIVISION OF SWEEP"
+KNOB_SETTING_TRUE_SWEEP_DIVISIONS = 0.5
+# The second column's steps end above this on sheet 5.
+KNOB_SETTING_FIELD_TOP = 0.144
+# The plate-screw tap inside the crop, in the machine frame (mm): the arm's
+# tap station nearer S, on the plate's centreline.
+KNOB_SETTING_TAP_STATION = max(arm_geometry.PLATE_TAP_STATIONS)
+KNOB_SETTING_TAP_XY = (
+    knob_setting.P_XY[0]
+    + arm_geometry.ARM_U[0] * KNOB_SETTING_TAP_STATION
+    + arm_geometry.ARM_N[0] * arm_geometry.PLATE_CENTRELINE_OFFSET,
+    knob_setting.P_XY[1]
+    + arm_geometry.ARM_U[1] * KNOB_SETTING_TAP_STATION
+    + arm_geometry.ARM_N[1] * arm_geometry.PLATE_CENTRELINE_OFFSET,
+)
+KNOB_SETTING_LEGEND = {
+    "S": f"{_config.parts('pd-transgear-arm')['number']} PIN BORE",
+    "K": f"{_config.parts('pd-transgear-arm-plate')['number']} KNOB BORE",
+    "T": f"{_config.parts('pd-vn-transgear-arm-plate-screw')['number']} TAP",
+}
+KNOB_SETTING_CAPTION = "\n".join(
+    (
+        f"{KNOB_SETTING_VIEW_NAME}, 1:1 (STEP {steps.step_number('arm-plate-located')})",
+        *(f"{letter}: {name}" for letter, name in KNOB_SETTING_LEGEND.items()),
+    )
+)
+KNOB_SETTING_CAPTION_XY = (0.218, 0.113)
+# Each letter's centre stands this far off its circle's centre (sheet m): S
+# along the arm past the pin, T diagonally away from both chain legs, K
+# radially out past the plate's boss, just outside the crop.
+KNOB_SETTING_LETTER_GAPS = {"S": 0.004, "T": 0.005, "K": 0.0095}
+# Half a default-height capital letter (sheet m): note positions are the
+# text's upper-left corner.
+KNOB_SETTING_LETTER_HALF = (0.0013, 0.0018)
+for _point in (knob_setting.S_XY, knob_setting.K_XY, KNOB_SETTING_TAP_XY):
+    if math.dist(
+        _point,
+        (
+            (knob_setting.S_XY[0] + knob_setting.K_XY[0]) / 2.0,
+            (knob_setting.S_XY[1] + knob_setting.K_XY[1]) / 2.0,
+        ),
+    ) / 1000.0 >= KNOB_SETTING_RADIUS:
+        raise AssertionError("the knob setting circle must frame S, T and K")
+
+
+def knob_setting_letters(
+    s: tuple[float, float],
+    q: tuple[float, float],
+    k: tuple[float, float],
+    t: tuple[float, float],
+) -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
+    """Each circle's letter: (note upper-left corner, leader tip on the
+    circle's centre), from the projected S, Q, K and tap T (sheet metres)."""
+    def unit(vector):
+        length = math.hypot(*vector)
+        return (vector[0] / length, vector[1] / length)
+
+    along = unit((s[0] - q[0], s[1] - q[1]))
+    across = unit((k[0] - q[0], k[1] - q[1]))
+    centre = ((s[0] + k[0]) / 2.0, (s[1] + k[1]) / 2.0)
+    directions = {
+        "S": along,
+        "T": unit((along[0] + across[0], along[1] + across[1])),
+        "K": unit((k[0] - centre[0], k[1] - centre[1])),
+    }
+    tips = {"S": s, "T": t, "K": k}
+    letters = {}
+    for letter, tip in tips.items():
+        gap = KNOB_SETTING_LETTER_GAPS[letter]
+        dx, dy = directions[letter]
+        letters[letter] = (
+            (
+                tip[0] + gap * dx - KNOB_SETTING_LETTER_HALF[0],
+                tip[1] + gap * dy + KNOB_SETTING_LETTER_HALF[1],
+            ),
+            tip,
+        )
+    return letters
+
+
+def knob_setting_keep(
+    s: tuple[float, float], q: tuple[float, float], k: tuple[float, float]
+) -> dict[str, tuple[float, float]]:
+    """Each setting's text, from the chain's projected S, Q and K (sheet
+    metres): off its leg's midpoint, square to the leg, away from the
+    chain's third point."""
+    def off(a, b, away):
+        mid = ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
+        length = math.dist(a, b)
+        normal = (-(b[1] - a[1]) / length, (b[0] - a[0]) / length)
+        if normal[0] * (mid[0] - away[0]) + normal[1] * (mid[1] - away[1]) < 0.0:
+            normal = (-normal[0], -normal[1])
+        return (
+            mid[0] + KNOB_SETTING_TEXT_OFFSET * normal[0],
+            mid[1] + KNOB_SETTING_TEXT_OFFSET * normal[1],
+        )
+
+    return {
+        knob_setting.ALONG_DIMENSION: off(s, q, k),
+        knob_setting.ACROSS_DIMENSION: off(q, k, s),
+    }
+
 
 SHEET_SCALES = {
     "ASSEMBLED VIEWS": ASSEMBLED_SCALE,
@@ -1323,28 +1457,18 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "ARM'S REAMED HOLE FROM THE REAR TILL ITS HEAD SEATS ON THE ARM."
         ),
         "arm-plate-located": (
-            # The package builds no jig: the step says how the distance is
-            # set and checked (2026-10-27 ENFORCE review, r1, r2). The pin
-            # is already pressed (step "pin-pressed"), so the distance is
-            # gauged off it, not off an empty pin bore (codjiflo P2 on
-            # edb402b). The setting and the clamped re-check both answer to
-            # the window the arm and plate sheets print for these steps
-            # (pd_paper_drive_assembly_steps.matched_locator_notes), so the
-            # re-check has its acceptance (codjiflo P2 on 1b09cec). The step
-            # names that window rather than restating its band: printed here
-            # too, the ±0.004 repeated the part drawings' band and r1-r3 on
-            # f4f620a filed it as assembly over-specification.
-            f"CLAMP {_N['pd-transgear-arm']} AND {_N['pd-transgear-arm-plate']} "
-            "TOGETHER, THE PLATE'S KNOB BORE "
-            f"{disc.CENTRE_DISTANCE:.3f} FROM THE PRESSED {_N['pd-transgear-pin']} "
-            f"PIN'S AXIS (THE "
+            f"CLAMP THE {_N['pd-transgear-arm-plate']} PLATE ON THE "
+            f"{_N['pd-transgear-arm']} ARM'S REAR FACE WITH TOOLMAKER'S CLAMPS, "
+            "SCREWS OUT; ARM ON PARALLELS ON THE MILL, PLATE UP, NO PIN YET. "
+            "INDICATE THE PIVOT BORE AND THE ARM'S PIN BORE S TRUE ON ONE DRO "
+            f"AXIS ({KNOB_SETTING_TRUE}); ZERO ON S. AT THE "
+            f"{KNOB_SETTING_VIEW_NAME} SETTING FROM S, TAP THE PLATE TILL "
+            "ITS KNOB BORE INDICATES TRUE (THE "
             f"{_N['pd-transgear-knob-shaft']} {KNOB_TEETH}T / {_N['pd-rack-pinion']} "
-            f"{disc.TEETH}T MESH): A SNUG GAUGE PIN IN THE KNOB BORE; SET "
-            f"{disc.CENTRE_DISTANCE:.3f} PLUS HALF OF EACH PIN'S MEASURED DIAMETER "
-            f"OVER THE GAUGE PIN AND THE {_N['pd-transgear-pin']} PIN, "
-            "WITHIN THE WINDOW ON THE ARM AND PLATE DRAWINGS; "
-            "RE-CHECK CLAMPED: STILL WITHIN THAT WINDOW. "
-            "MATCH-DRILL AND REAM THE LOCATING HOLES. "
+            f"{disc.TEETH}T MESH); CLAMP; RE-INDICATE. "
+            "MATCH-DRILL 2 PILOTS THROUGH THE PLATE, BLIND IN THE ARM. "
+            "PART THEM; REAM EACH PART'S HOLES TO ITS DRAWING "
+            f"({_N['pd-transgear-arm']} PRESS, {_N['pd-transgear-arm-plate']} SLIP). "
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-locating-pin']} "
             f"{_N['pd-vn-transgear-arm-plate-locating-pin']} DOWELS INTO THE ARM "
             f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "
@@ -3119,6 +3243,95 @@ def _place_exploded_sheet(
     return landings
 
 
+def _place_knob_setting_view(adapter: Any) -> None:
+    """Sheet 5's VIEW K: the arm and plate from the machine front at
+    1:1, cropped on S-K's midpoint, carrying the assembly's two K setting
+    dimensions from S (pd_paper_drive_knob_setting_spec) that the arm-plate-located step cites."""
+    label = "knob setting view"
+    _activate_sheet(adapter, SHEET_NAMES[4])
+    view = _early_bound(
+        place_view(
+            adapter, str(SOURCE), "*Front", *KNOB_SETTING_CENTER, scale=KNOB_SETTING_SCALE
+        ),
+        "IView",
+    )
+    apply_view_configuration(adapter, view, label=label)
+    _isolate_instances(adapter, view, KNOB_SETTING_INSTANCES, label=label)
+    model = tuple(
+        (x / 1000.0, y / 1000.0, 0.0)
+        for x, y in (
+            (
+                (knob_setting.S_XY[0] + knob_setting.K_XY[0]) / 2.0,
+                (knob_setting.S_XY[1] + knob_setting.K_XY[1]) / 2.0,
+            ),
+            knob_setting.S_XY,
+            knob_setting.Q_XY,
+            knob_setting.K_XY,
+            KNOB_SETTING_TAP_XY,
+        )
+    )
+    names = ("S-K midpoint", "pin S", "corner Q", "knob bore K", "plate-screw tap T")
+    centre = model_points_in_view(adapter, view, model[:1], label=label, names=names[:1])[0]
+    _shift_view(
+        adapter,
+        view,
+        (KNOB_SETTING_CENTER[0] - centre[0], KNOB_SETTING_CENTER[1] - centre[1]),
+        label=f"{label} centre",
+    )
+    centre, s, q, k, t = model_points_in_view(adapter, view, model, label=label, names=names)
+    if math.dist(centre, KNOB_SETTING_CENTER) > 1e-4:
+        raise RuntimeError(f"{label}: S-K midpoint sits at {centre!r}")
+    _crop_to_circle(adapter, view, KNOB_SETTING_CENTER, KNOB_SETTING_RADIUS, label=label)
+    set_hidden_lines_removed(adapter, view)
+    _show_base_view_sketches(adapter, view, (knob_setting.FEATURE,), label=label)
+    keep = knob_setting_keep(s, q, k)
+    annotations = curate_view_dimensions(
+        adapter,
+        view,
+        keep=keep,
+        view_label=label,
+        dimensions_by_feature=knob_setting.DRAWING_DIMENSIONS,
+    )
+    assert_imported_precision(
+        adapter, annotations, knob_setting.DRAWING_PRECISION[knob_setting.FEATURE]
+    )
+    imported = sorted(
+        dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
+        for annotation in annotations
+    )
+    if imported != sorted(keep):
+        raise RuntimeError(f"{label} imported {imported}, not {sorted(keep)}")
+    # Arrows outside the extension lines: each value spans most of its short
+    # leg, so arrows inside struck its parentheses (run
+    # 20261028T030354738Z-98518b6344ca4a139d0dac48e7162995, r1 and r3).
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ArrowSide = KNOB_SETTING_ARROWS_OUTSIDE
+        if int(display.ArrowSide) != KNOB_SETTING_ARROWS_OUTSIDE:
+            raise RuntimeError(
+                f"{label}: {dimension_name(adapter, annotation)} kept its arrows inside"
+            )
+    rebuild_drawing(adapter, label=f"{label} arrows")
+    for letter, (text_xy, tip) in knob_setting_letters(s, q, k, t).items():
+        add_leader_note(
+            adapter,
+            letter,
+            text_xy=text_xy,
+            attach_xy=tip,
+            label=f"{label} letter {letter}",
+            view=view,
+        )
+    rebuild_drawing(adapter, label=f"{label} letters")
+    _place_sheet_note(
+        adapter,
+        SHEET_NAMES[4],
+        KNOB_SETTING_CAPTION,
+        KNOB_SETTING_CAPTION_XY,
+        label=f"{label} caption",
+    )
+
+
 def _place_fitup_sheets(adapter: Any, step_notes: StepNotes) -> None:
     for sheet_name, notes in (
         (SHEET_NAMES[4], step_notes.fitup_notes),
@@ -3185,6 +3398,7 @@ async def build(adapter: Any) -> dict[str, str]:
     landings += _place_transgear_exploded_sheet(adapter, table, items)
     landings += _place_exploded_sheet(adapter, table, items, notes)
     _place_fitup_sheets(adapter, notes)
+    _place_knob_setting_view(adapter)
     assert_full_detail_view(adapter, label="paper-drive assembly")
 
     return await finalize_drawing(

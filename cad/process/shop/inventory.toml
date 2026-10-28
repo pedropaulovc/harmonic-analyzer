@@ -52,16 +52,20 @@
 kind = "mill"
 make = "Precision Matthews"
 source = "https://www.precisionmatthews.com/products/pm-30mv"
-control = "manual handwheels on all three axes, read on a three-axis EL400-class glass-scale DRO"
+control = "manual handwheels on all three axes, read on the installed Precision Matthews MagXact MX-100M three-axis magnetic-scale DRO (SKU DRO-MAG-M-3ax-18x36x20, EL403 display; owner-confirmed 2026-10-27)"
 operation_mode = "manual_with_digital_positioning"
 headstock_tilt_deg = 90
 # The DRO grid the sheet prints and the kernel checks (docs/rules-coordinates.md).
-# Basis: machines.PM-30MV.resolution_mm: authored EL400-class glass-scale DRO nominal display increment 0.005 mm, offset +0 mm = 0.005 mm; source b757b5a76 cad/process/shop/inventory.toml:30 original 5 um scale/readout instrument. Resolution is not accuracy or a calibration certificate.
-resolution_mm = { value = 0.005, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "DRO display and handwheel jog, smallest displayed increment" } }
+# Basis: machines.PM-30MV.resolution_mm: the installed MagXact MX-100M (owner-confirmed 2026-10-27). Its manual (V1 9-1-2021) states "The standard MagXact package for the mill has 5 micron (0.005 mm = 0.0002") resolution scales" with display resolution DP defaulting to the same 5 microns. The vendor's accuracy statement is in cite below; prechips has no accuracy field.
+resolution_mm = { value = 0.005, measured = { status = "measured", by = "Pedro Paulo Vezza Campos", date = "2026-10-27", instrument = "installed MagXact MX-100M identified by the owner; vendor-stated 5 um scale and display resolution" } }
 # A manual mill moves one handwheel at a time: arcs are cut by the manual-arc methods
 # (stairs or chain drill then filing, chords, rotary table; docs/plan.md "Manual arcs").
 note = "Manual mill with DRO; envelope and travel below are illustrative example values (vendor numbers relabelled)."
-cite = ["PM-30MV manual v3 2020-10 p.5 (https://macclab.com/wp-content/uploads/2022/01/PM-30MV-v3-2020-10.pdf): 2 HP (1.5 kW) brushless DC motor, spindle 50-1500 rpm low range and 1400-3000 rpm high range, R8"]
+cite = [
+  "PM-30MV manual v3 2020-10 p.5 (https://macclab.com/wp-content/uploads/2022/01/PM-30MV-v3-2020-10.pdf): 2 HP (1.5 kW) brushless DC motor, spindle 50-1500 rpm low range and 1400-3000 rpm high range, R8",
+  "DRO accuracy, vendor-stated: MagXact MX-100M product page (https://www.precisionmatthews.com/products/dro-mag-m-3ax-18x36x20), read 2026-10-27: \"Magnetic Scales and encoders, .0002” Accuracy\"; the X, Y and Z scales are each listed at .0002 in. Installed DRO and 0.0002 in precision confirmed by the owner 2026-10-27.",
+  "DRO resolution, vendor-stated: MagXact MX-100M Mill DRO manual V1 9-1-2021 (https://cdn.shopify.com/s/files/1/0576/0984/6859/files/MagXact-MX-100M-Mill-DRO-V1-9-1-2021.pdf): \"The standard MagXact package for the mill has 5 micron (0.005 mm = 0.0002\") resolution scales\"",
+]
 
 [machines.PM-30MV.envelope]
 # PM-30MV manual v3 2020-10, specifications table, read 2026-10-16:
@@ -3845,6 +3849,9 @@ kind = "dial_test_indicator"
 make = "LittleMachineShop"
 # Basis: gauges.dti.resolution_in: original declared comparison/display increment nominal 0.0005 in, offset +0 in = 0.0005 in. Source b757b5a76 cad/process/shop/inventory.toml:1275 (gauges.dti.resolution_in). Unchanged increment, not accuracy or a calibration certificate.
 resolution_in = { value = 0.0005, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "gauge dial or digital display, smallest marked increment" } }
+# Accuracy: unknown. The installed indicator's model is unidentified, so no vendor accuracy
+# can be cited; setting budgets charge a half-division centring allowance on this placeholder
+# resolution instead (MHA-PD-00 step 10: test_pd_paper_drive_assembly_drawing).
 # Basis: gauges.dti.range_in: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1276 (gauges.dti.range_in) authored dial_test_indicator geometry baseline 0.03 in, offset +0 in = 0.03 in. Range endpoints are not extended beyond the declared source span; lower endpoint is a minimum, upper endpoint a maximum.
 # Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "marked gauge range and comparison against size or roughness reference"; scalar/vector-only schema.
 range_in = 0.03

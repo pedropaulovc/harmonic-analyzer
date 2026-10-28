@@ -545,9 +545,9 @@ def test_matched_pair_and_projected_zone_notes_state_their_values() -> None:
     ):
         flat = " ".join(line.strip() for line in text.splitlines())
         assert f"MATCH-DRILLED WITH {mate}," in flat
-        tol = f"\u00b1{disc.CENTRE_DISTANCE_SET_TOL:.3f}"
-        assert f"KNOB BORE CLAMPED {disc.CENTRE_DISTANCE:.3f} {tol} FROM" in flat
-        assert f"CENTRES STILL WITHIN {tol}" in flat
+        band = disc.CENTRE_DISTANCE_SET_TEXT
+        assert f"KNOB BORE CLAMPED {band} FROM" in flat
+        assert f"CENTRES STILL {band}" in flat
         assert "NO SHAKE, NO DAYLIGHT" in flat
         assert "ACCEPTANCE" not in flat
         assert "PROJECTED ZONES START AT" in flat

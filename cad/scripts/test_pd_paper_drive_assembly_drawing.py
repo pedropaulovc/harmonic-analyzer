@@ -28,6 +28,9 @@ import fr_nameplate_spec as nameplate
 import paper_drive_geom as paper_geometry
 import paper_drive_rack_setup as rack_setup
 import pd_paper_drive_assembly_steps as steps
+import pd_paper_drive_knob_setting_spec as knob_setting
+import pd_transgear_arm_geometry as steps_arm
+import _paper_drive_placement as placement
 import pd_paper_drive_explode_spec as explode
 import pd_rack_pinion_spec as disc
 import pd_transgear_drive_collar_spec as collar
@@ -54,6 +57,21 @@ STEP_HEAD = re.compile(r"^(\d+)\. ", re.MULTILINE)
 # #945 moves these into _drawing_common.
 NOTE_CHAR_WIDTH = 0.00276
 NOTE_LINE_PITCH = 0.0045
+# Dimension text runs larger: VIEW K's "ALONG ARM" callout spanned 27.9 mm and
+# its two rows 9.2 mm on run 20261028T000650671Z's sheet 5.
+DIM_CHAR_WIDTH = 0.0031
+DIM_LINE_PITCH = 0.0047
+
+
+def _segment_distance(
+    point: tuple[float, float], a: tuple[float, float], b: tuple[float, float]
+) -> float:
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    t = ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) / (dx * dx + dy * dy)
+    t = min(1.0, max(0.0, t))
+    return math.dist(point, (a[0] + t * dx, a[1] + t * dy))
+
+
 # Words no sheet of the package may print (drawing-simplicity policy).
 FORBIDDEN_SHEET_WORDS = ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "BOOK FIDELITY")
 
@@ -375,33 +393,244 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
         f"PRESS {plate_locating_pin.ASSEMBLY_QUANTITY} "
         f"{_number('pd-vn-transgear-arm-plate-locating-pin')} DOWELS"
     ) in located
-    pin = _number("pd-transgear-pin")
-    # The step names the mesh that centre distance sets, and how it is set
-    # and checked: the package builds no jig, and the pin is already pressed
-    # into its bore, so the gauge reads over it and a gauge pin in the knob
-    # bore.  References and relationship only, not the sentence (codjiflo P3
-    # on 482fbdc).
-    assert steps.step_number("pin-pressed") < steps.step_number("arm-plate-located")
-    jig, recheck = located.split("WITHIN THE WINDOW ON THE ARM AND PLATE DRAWINGS", 1)
-    for stem in ("pd-transgear-knob-shaft", "pd-rack-pinion"):
-        assert _number(stem) in jig
-    assert "MESH" in jig
-    assert "JIG" not in jig
-    assert "EACH BORE" not in jig
-    assert f"{disc.CENTRE_DISTANCE:.3f}" in jig
-    for reference in ("KNOB BORE", f"PRESSED {pin} PIN", "GAUGE PIN", "CLAMP"):
-        assert reference in jig, reference
-    # The setting and the clamped re-check answer to the window the arm and
-    # plate sheets print and cite this step for (codjiflo P2 on 1b09cec); the
-    # step names it without restating the band (r1-r3 on f4f620a).
-    assert jig.endswith(f"OVER THE GAUGE PIN AND THE {pin} PIN, ")
-    assert recheck.startswith("; RE-CHECK CLAMPED: STILL WITHIN THAT WINDOW.")
-    tol = f"{disc.CENTRE_DISTANCE_SET_TOL:.3f}"
-    assert tol in steps.matched_locator_notes(
-        _number("pd-transgear-arm"), _number("pd-transgear-arm-plate"), on_arm=True, width=80
+    # The setting's identities, in operation order: S (the arm's empty pin
+    # bore, the pressed pin's running axis), K set at VIEW K's model
+    # dimensions with the mesh they set, then each part reamed to its own
+    # drawing, then the dowels.
+    order = [
+        "PIN BORE S",
+        drawing.KNOB_SETTING_VIEW_NAME,
+        _number("pd-transgear-knob-shaft"),
+        _number("pd-rack-pinion"),
+        _number("pd-transgear-arm"),
+        _number("pd-transgear-arm-plate"),
+        _number("pd-vn-transgear-arm-plate-locating-pin"),
+    ]
+    # The parts named in the opening clamp are skipped by searching after it.
+    cursor = located.index(_number("pd-transgear-arm")) + 1
+    for token in order:
+        cursor = located.index(token, cursor)
+    # The step cites the view's model dimensions and types no value of its own.
+    for value in (knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM):
+        assert f"{value:.{knob_setting.PLACES}f}" not in located
+    # S is the arm's reamed bore, not the pin's head (no drawing control
+    # holds the head to the shank): the pin goes in after the plate is set.
+    assert "NO PIN YET" in located
+    assert steps.step_number("arm-plate-fitted") < steps.step_number("pin-pressed")
+    assert steps.step_number("pin-pressed") < steps.step_number("hanger-pivoted")
+    # "True" is a stated null-reading acceptance, the budget's centring bound.
+    assert drawing.KNOB_SETTING_TRUE in located
+
+
+def test_view_k_carries_the_set_coordinates_as_assembly_model_dimensions() -> None:
+    # The chain P-S-Q-K: Q along the arm's axis from S, K square to it.
+    s, q, k, p = (
+        knob_setting.S_XY, knob_setting.Q_XY, knob_setting.K_XY, knob_setting.P_XY,
     )
-    assert tol not in located
-    assert "MATCH-DRILL AND REAM THE LOCATING HOLES" in located
+    assert math.dist(p, s) == pytest.approx(steps_arm.PIN_STATION)
+    assert math.dist(s, q) == pytest.approx(knob_setting.K_FROM_S_ALONG_MM)
+    assert math.dist(q, k) == pytest.approx(knob_setting.K_FROM_S_ACROSS_MM)
+    sq = (q[0] - s[0], q[1] - s[1])
+    qk = (k[0] - q[0], k[1] - q[1])
+    ps = (s[0] - p[0], s[1] - p[1])
+    assert sq[0] * qk[0] + sq[1] * qk[1] == pytest.approx(0.0, abs=1e-9)
+    assert sq[0] * ps[1] - sq[1] * ps[0] == pytest.approx(0.0, abs=1e-9)
+    # K is aimed at the middle of the set band, on the nominal S-K line.
+    low, high = disc.CENTRE_DISTANCE_WINDOW
+    assert math.dist(s, k) == pytest.approx((low + high) / 2.0)
+    nominal = (
+        placement.KNOB_SHAFT_XY[0] - s[0], placement.KNOB_SHAFT_XY[1] - s[1],
+    )
+    assert math.hypot(*nominal) == pytest.approx(low)
+    assert (k[0] - s[0]) * nominal[1] - (k[1] - s[1]) * nominal[0] == pytest.approx(
+        0.0, abs=1e-9
+    )
+    # The view marks exactly the two settings, at the places the model owns.
+    assert knob_setting.DRAWING_DIMENSIONS == {
+        knob_setting.FEATURE: {knob_setting.ALONG_DIMENSION, knob_setting.ACROSS_DIMENSION}
+    }
+    assert knob_setting.REFERENCE_DIMENSIONS == {
+        knob_setting.ALONG_DIMENSION, knob_setting.ACROSS_DIMENSION
+    }
+    for part, text in knob_setting.SETTING_CALLOUTS.values():
+        assert part == 3 and "\n" not in text
+
+
+def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
+    scale = drawing.KNOB_SETTING_SCALE[0] / drawing.KNOB_SETTING_SCALE[1]
+    centre = drawing.KNOB_SETTING_CENTER
+    mid = (
+        (knob_setting.S_XY[0] + knob_setting.K_XY[0]) / 2.0,
+        (knob_setting.S_XY[1] + knob_setting.K_XY[1]) / 2.0,
+    )
+    # Project as the machine front shows it (x mirrored); the layout holds
+    # either way, so check both.
+    for mirror in (1.0, -1.0):
+        def sheet(xy):
+            return (
+                centre[0] + mirror * (xy[0] - mid[0]) * scale / 1000.0,
+                centre[1] + (xy[1] - mid[1]) * scale / 1000.0,
+            )
+
+        s, q, k, t = (
+            sheet(xy)
+            for xy in (
+                knob_setting.S_XY, knob_setting.Q_XY, knob_setting.K_XY,
+                drawing.KNOB_SETTING_TAP_XY,
+            )
+        )
+        for point in (s, q, k, t):
+            assert math.dist(point, centre) < drawing.KNOB_SETTING_RADIUS
+        keep = drawing.knob_setting_keep(s, q, k)
+        assert set(keep) == {knob_setting.ALONG_DIMENSION, knob_setting.ACROSS_DIMENSION}
+        legs = {
+            knob_setting.ALONG_DIMENSION: (s, q),
+            knob_setting.ACROSS_DIMENSION: (q, k),
+        }
+        boxes = []
+        for name, (x, y) in keep.items():
+            # The value row centred on the text point, its callout row above;
+            # the dimension line runs through the text, parallel to its leg.
+            _, callout = knob_setting.SETTING_CALLOUTS[name]
+            a, b = legs[name]
+            leg = math.dist(a, b)
+            unit = ((b[0] - a[0]) / leg, (b[1] - a[1]) / leg)
+            rows = (
+                ("(00.000)", -DIM_LINE_PITCH / 2.0, DIM_LINE_PITCH / 2.0),
+                (callout, DIM_LINE_PITCH / 2.0, 1.5 * DIM_LINE_PITCH),
+            )
+            for text, low, high in rows:
+                half = len(text) * DIM_CHAR_WIDTH / 2.0
+                # Every corner stays between the leg's two extension lines.
+                for dx in (-half, half):
+                    for dy in (low, high):
+                        assert abs(dx * unit[0] + dy * unit[1]) < leg / 2.0 - 0.0005
+            half = max(len(text) for text, _, _ in rows) * DIM_CHAR_WIDTH / 2.0
+            box = (x - half, y - DIM_LINE_PITCH / 2.0, x + half, y + 1.5 * DIM_LINE_PITCH)
+            nearest = (
+                min(max(centre[0], box[0]), box[2]),
+                min(max(centre[1], box[1]), box[3]),
+            )
+            assert math.dist(nearest, centre) > drawing.KNOB_SETTING_RADIUS
+            assert drawing.FITUP_NOTE_XY[1][0] < box[0] and box[2] < drawing.FITUP_NOTE_LIMITS[1][0]
+            assert drawing.FITUP_NOTE_LIMITS[1][1] < box[1] and box[3] < drawing.KNOB_SETTING_FIELD_TOP
+            shift = (x - (a[0] + b[0]) / 2.0, y - (a[1] + b[1]) / 2.0)
+            for end in (a, b):
+                assert end[1] + shift[1] < drawing.KNOB_SETTING_FIELD_TOP
+            boxes.append(box)
+        # Each circle lettered on a leader to its centre: S and T inside the
+        # crop, K just outside it past the boss, each clear of the chain.
+        letters = drawing.knob_setting_letters(s, q, k, t)
+        assert letters.keys() == drawing.KNOB_SETTING_LEGEND.keys() == {"S", "K", "T"}
+        half_w, half_h = drawing.KNOB_SETTING_LETTER_HALF
+        diagonal = math.hypot(half_w, half_h)
+        for letter, ((left, top), tip) in letters.items():
+            assert tip == {"S": s, "K": k, "T": t}[letter]
+            middle = (left + half_w, top - half_h)
+            reach = math.dist(middle, centre)
+            if letter == "K":
+                assert reach - diagonal > drawing.KNOB_SETTING_RADIUS
+            else:
+                assert reach + diagonal < drawing.KNOB_SETTING_RADIUS
+            for a, b in ((s, q), (q, k)):
+                assert _segment_distance(middle, a, b) > diagonal + 0.0005
+            for other in (s, q, k, t):
+                if other != tip:
+                    assert math.dist(middle, other) > diagonal + 0.002
+            boxes.append((left, top - 2 * half_h, left + 2 * half_w, top))
+        caption_lines = drawing.KNOB_SETTING_CAPTION.splitlines()
+        left, top = drawing.KNOB_SETTING_CAPTION_XY
+        caption = (
+            left,
+            top - len(caption_lines) * NOTE_LINE_PITCH,
+            left + max(map(len, caption_lines)) * NOTE_CHAR_WIDTH,
+            top,
+        )
+        assert caption[2] < centre[0] - drawing.KNOB_SETTING_RADIUS
+        assert caption[0] > drawing.FITUP_NOTE_LIMITS[0][0]
+        assert caption[1] > DRAWING_TEMPLATES[drawing.SPEC.layout].title_block_top_m
+        boxes.append(caption)
+        for index, one in enumerate(boxes):
+            for other in boxes[index + 1:]:
+                assert (
+                    one[2] < other[0] or other[2] < one[0]
+                    or one[3] < other[1] or other[3] < one[1]
+                )
+    # The legend names each lettered circle by its part number.
+    for letter, stem in (
+        ("S", "pd-transgear-arm"),
+        ("K", "pd-transgear-arm-plate"),
+        ("T", "pd-vn-transgear-arm-plate-screw"),
+    ):
+        assert f"{letter}: {_number(stem)} " in drawing.KNOB_SETTING_CAPTION
+    # Sheet 5's second column ends above the view's field.
+    notes = _unit_step_notes()
+    _, top = drawing.FITUP_NOTE_XY[1]
+    assert top - len(notes.fitup_notes[1].splitlines()) * NOTE_LINE_PITCH > (
+        drawing.KNOB_SETTING_FIELD_TOP
+    )
+    assert drawing.KNOB_SETTING_CENTER[1] - drawing.KNOB_SETTING_RADIUS > (
+        DRAWING_TEMPLATES[drawing.SPEC.layout].title_block_top_m
+    )
+    assert drawing.KNOB_SETTING_VIEW_NAME in drawing.KNOB_SETTING_CAPTION
+
+
+def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> None:
+    import tomllib
+
+    import paper_drive_arm_registration as registration
+    from _process_plans import PROCESS_ROOT
+
+    low, high = disc.CENTRE_DISTANCE_WINDOW
+    ux, uy = registration.S_TO_K_UNIT
+    inventory = tomllib.loads(
+        (PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8")
+    )
+    mill = inventory["machines"]["PM-30MV"]
+    # The installed DRO's vendor-stated accuracy, per axis (inventory cite).
+    (stated,) = [
+        float(match.group(1))
+        for cite in mill["cite"]
+        if cite.startswith("DRO accuracy")
+        for match in [re.search(r"(\.\d+)” Accuracy", cite)]
+        if match
+    ]
+    accuracy = stated * 25.4
+    # Centring is a null reading against the step's stated acceptance, not a
+    # measured size: under half a division of sweep (the TIR) puts each centre
+    # within a quarter division of the spindle. The indicator's unknown
+    # accuracy over its range scales that sub-division reading only; the
+    # bound holds while the indicator repeats to its stated sweep at null.
+    division = inventory["gauges"]["dti"]["resolution_in"]["value"] * 25.4
+    centring = drawing.KNOB_SETTING_TRUE_SWEEP_DIVISIONS * division / 2.0
+    # Signed worst case, every bound adding the same way: the DRO is zeroed
+    # on S, so its two axes' errors enter once, on the S-to-K move, both
+    # along any direction; the indicator centres S and K; the pivot-and-pin
+    # tram turns K about S by its lever.
+    dro = accuracy * (abs(ux) + abs(uy))
+    radial_err = dro + 2.0 * centring
+    lever = knob_setting.K_SET_CENTRE_DISTANCE_MM / steps_arm.PIN_STATION
+    tangential_err = dro + 2.0 * centring + 2.0 * centring * lever
+    assert radial_err == pytest.approx(0.0135, abs=1e-4)
+    # The operator dials the display's nearest count to each printed value.
+    count = mill["resolution_mm"]["value"]
+    x, y = (
+        round(round(value, knob_setting.PLACES) / count) * count
+        for value in (knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM)
+    )
+    radial = math.hypot(x, y) - low
+    tangential = abs(x * uy - y * ux)
+    # Inside the +x/-0 band with margin at both ends.
+    bottom_margin = radial - radial_err
+    top_margin = (high - low) - (radial + radial_err)
+    assert bottom_margin > 0.010 and top_margin > 0.010
+    # And inside K's drawn setting circle about its nominal.
+    radius = registration.REDUCER_AXIS_SETUP_RADIUS_MM
+    assert math.hypot(radial + radial_err, tangential + tangential_err) < radius
+
+
+def test_the_matched_plate_is_refitted_on_its_dowels_and_re_read() -> None:
+    located = _step_body("arm-plate-located")
     assert (
         f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "
         f"{plate_locating_interface.PROUD_LIMITS_MM[1]:.2f} PROUD, NOT TO THE BLIND FLOOR"
@@ -413,6 +642,9 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     # One ordinary hand check; no gauge budget or load qualification text.
     assert "PUSH AND ROCK THE PLATE BY HAND: NO SHAKE ON THE DOWELS" in fitted
     assert "RE-CHECK AFTER EVERY REMOVAL" in fitted
+    # The setting step's own coordinates fix K; the refit only checks shake.
+    assert f"{knob_setting.K_FROM_S_ALONG_MM:.3f}" not in fitted
+    assert drawing.KNOB_SETTING_VIEW_NAME not in fitted
     for method in ("RFS", "UNCERTAINTY", "QUALIFIED", "ACTUAL"):
         assert method not in fitted
     assert "COUNTERSINK" not in fitted
@@ -1360,8 +1592,11 @@ def test_the_plate_screws_are_cut_to_the_limit_the_lock_sweep_clears() -> None:
     """R9-44: cut off the mechanism, then refit the same screws before the
     hanger is pivoted."""
     order = ["arm-plate-fitted", "arm-plate-screws-cut", "hanger-pivoted"]
-    numbers = [steps.step_number(key) for key in order]
-    assert numbers == list(range(numbers[0], numbers[0] + 3))
+    fitted, cut, pivoted = (steps.step_number(key) for key in order)
+    assert cut == fitted + 1 and cut < pivoted
+    # Only the pin, pressed once the plate is set from its bore, goes in
+    # between; the screws are back in before the hanger is pivoted.
+    assert steps.SEQUENCE[cut:pivoted - 1] == ("pin-pressed",)
     body = _step_body("arm-plate-screws-cut")
     assert body.startswith(
         f"TAKE BOTH {_number('pd-vn-transgear-arm-plate-screw')} SCREWS OUT"
@@ -4794,7 +5029,8 @@ def test_pd_build_settled_checks_reject_native_item_drift_with_good_attachments(
     monkeypatch.setattr(drawing, "_source_family_counts", lambda _: {})
     for name in (
         "_validate_persisted_explode", "_create_sheets", "_place_assembled_sheet",
-        "_place_pivot_view", "_place_fitup_sheets", "assert_full_detail_view",
+        "_place_pivot_view", "_place_fitup_sheets", "_place_knob_setting_view",
+        "assert_full_detail_view",
     ):
         monkeypatch.setattr(drawing, name, lambda *_, **__: None)
     monkeypatch.setattr(drawing, "_place_bom_sheet", lambda *_: (

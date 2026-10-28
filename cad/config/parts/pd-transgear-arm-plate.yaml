@@ -9,15 +9,16 @@ pd-transgear-arm-plate:
   process: >-
     Mill the outline from 1-1/2 in bar and step the notch; turn the front hub
     and rear boss on the bore axis; ream the bore; drill and countersink the
-    two clamp screw holes. Hold plate and MHA-PD-18 on independent retained
-    datum-A fixture carriers at the specified critical S-K gear-plane setting
-    and projected-axis limits. Drill the two common 1.80 locating pilots
-    through the plate and blind into the arm. Retain each carrier while
-    finishing plate holes 2.010–2.020 through and arm holes 1.990–2.000
+    two clamp screw holes. Clamp the plate on the rear face of MHA-PD-18
+    (before its MHA-PD-23 pin is pressed) and, on the mill DRO, set the
+    knob bore at the MHA-PD-00 VIEW K coordinates from the arm's pin bore,
+    indicated true. Drill the two common 1.80 locating pilots
+    through the plate and blind into the arm in that setting.
+    Finish plate holes 2.010–2.020 through and arm holes 1.990–2.000
     separately; never pass the larger plate reamer into an arm press seat.
     Mouth breaks 0.05 MAX. Reassemble the original matched pair and inspect
-    the actual hole positions, S-K setup and complete loaded free-motion
-    envelope; do not accept an arbitrary as-made bolted pose.
+    the actual hole positions, S-K setting and complete loaded
+    free-motion envelope; do not accept an arbitrary as-made bolted pose.
   installation_notes: |-
     INSTALLATION - MATCHED ARM / ARM PLATE
     SET THE SPECIFIED CRITICAL S-K POSE BEFORE MATCH-REAMING.
