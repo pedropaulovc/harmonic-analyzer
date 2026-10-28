@@ -109,6 +109,11 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         " blank_dia_band(12), tooth_thickness_band(12))",
         "each",
     ),
+    # for dim_name, band in (("PinHoleDia", PIN_HOLE_DIA_BAND), ("SlotWidth",
+    # SLOT_WIDTH_BAND)): deviations(band), then the symmetric setter -- the
+    # knife mount's datum-B hole and datum-C slot slip bands (owner ruling
+    # 2026-10-24, T+H3), both the dowel spec's SLIP_HOLE_DIA_BAND.
+    ("build_sm_knife_mount", "band"): ("(PIN_HOLE_DIA_BAND, SLOT_WIDTH_BAND)", "each"),
 }
 
 # Consumer modules that cannot be imported without SolidWorks, with the reason.
@@ -312,7 +317,8 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ),
     ("sm_vn_knife_mount_dowel_spec", "DIA_BAND"): (
         "the pressed dowel's catalogue diameter: read by min/max for the press "
-        "interference against the knife mount's reamed blind hole"
+        "interference against the crossbar's blind ream and the slip clearance "
+        "in the knife mount's round hole and slot"
     ),
     ("fr_top_frame_spec", "HANGER_CLEARANCE_DIA_BAND"): (
         "the native +0.13/0 float-hole diameter: indexed into its printed "

@@ -119,13 +119,18 @@ class GtolFrameSignature:
     outside_disposition: str | None = None
 
 
-def gtol_frame_signature(xml: str) -> GtolFrameSignature:
+def gtol_frame_signature(xml: str, *, shared_symbol: str | None = None) -> GtolFrameSignature:
     """Parse the load-bearing subset of a SOLIDWORKS frame XML payload.
 
     SOLIDWORKS may add default elements when it serializes a frame, so raw XML
     string equality is too strict.  Conversely, substring matching is unsafe:
     it misses datum order and diametral-zone state.  This normalized signature
     compares every production field this repository authors.
+
+    ``shared_symbol`` reads a composite frame's lower segment: it shares the
+    upper segment's symbol cell, and SOLIDWORKS read its XML back with one
+    empty ``<ToleranceSymbol>`` (farm run 20261009T200747541Z).  That one
+    empty symbol stands for ``shared_symbol``; without it, it is refused.
     """
     root = _frame_root(xml)
     if root.tag.rsplit("}", 1)[-1] != "GtolFrame":
@@ -139,6 +144,8 @@ def gtol_frame_signature(xml: str) -> GtolFrameSignature:
         ]
 
     symbols = texts("ToleranceSymbol")
+    if shared_symbol and symbols == [""]:
+        symbols = [shared_symbol]
     tolerances = texts("PrimaryToleranceValue")
     if len(symbols) != 1 or not symbols[0]:
         raise ValueError(f"frame XML has {len(symbols)} tolerance symbols")

@@ -61,15 +61,21 @@ class PmiDrawingPlacement:
             raise ValueError("projected PMI position tolerance must be positive")
 
 
-def _gtol_frame_persisted(applied: str, authored: str) -> bool:
+def _gtol_frame_persisted(
+    applied: str, authored: str, *, shared_symbol: str | None = None
+) -> bool:
     """Whether a frame's read-back XML states every semantic ``authored`` does.
 
     The parsed signature, not substrings: a dropped datum or a 0.05 inside
     another value passed a substring test (CodeRabbit PRRT_kwDOPHDy386rADCQ).
     The _part_pmi readback precedent; an unparsable readback did not persist.
+    ``shared_symbol`` reads a composite lower segment's empty symbol cell
+    (``gtol_frame_signature``).
     """
     try:
-        return _gtol_frame_signature(applied) == _gtol_frame_signature(authored)
+        return _gtol_frame_signature(
+            applied, shared_symbol=shared_symbol
+        ) == _gtol_frame_signature(authored)
     except ValueError:
         return False
 
@@ -311,6 +317,7 @@ def add_feature_control_frame(
     translated: Sequence[str] = (),
     outside_disposition: str | None = None,
     lower_frame: tuple[str, str, Sequence[str]] | None = None,
+    composite: bool = False,
 ) -> Any:
     """Attach a native feature-control frame to a drawing-view edge.
 
@@ -319,6 +326,11 @@ def add_feature_control_frame(
     stacked frame ``(characteristic, tolerance, datums)`` on the same leader
     (``IGtol.AddFrame``), printed with its own symbol -- not composite
     (``GetCompositeFrame2(1)`` must read False) -- its XML read back.
+    ``composite=True`` joins it to the first instead
+    (``IGtol.SetCompositeFrame2(True, 1)``; both frames must share the
+    characteristic, which prints once across the two segments):
+    ``GetCompositeFrame2(1)`` must read True, and each segment's XML is read
+    back, the lower's empty shared symbol cell standing for the upper's.
 
     ``outside_disposition`` applies the native circled-U profile modifier to
     the upper frame (None: symmetric; "0": wholly inside; total: wholly outside).
@@ -341,6 +353,10 @@ def add_feature_control_frame(
     if entity_type.upper() not in _ATTACHMENT_SELECT_TYPES:
         raise ValueError(
             f"feature-control frame cannot attach to a {entity_type} ({label})"
+        )
+    if composite and (lower_frame is None or lower_frame[0] != characteristic):
+        raise ValueError(
+            f"a composite frame needs a lower segment of the same characteristic ({label})"
         )
     xml = _gtol_frame_xml(
         characteristic,
@@ -387,6 +403,7 @@ def add_feature_control_frame(
         "IsAttached",
         "GetLeaderCount",
         "GetCompositeFrame2",
+        "SetCompositeFrame2",
     )
     frame_count = int(gtol.GetFrameCount() or 0)
     if frame_count == 0:
@@ -463,9 +480,10 @@ def add_feature_control_frame(
     if int(gtol.GetFormat()) != 2:  # swGtolFormatType_e.GTOL_SW2022 (current)
         raise RuntimeError(f"feature-control frame remained in old format ({label})")
     if lower_frame is not None:
+        kind = "composite lower segment" if composite else "stacked lower frame"
         lower_characteristic, lower_tolerance, lower_datums = lower_frame
         if not gtol.AddFrame() or int(gtol.GetFrameCount() or 0) != 2:
-            raise RuntimeError(f"failed to add the stacked lower frame ({label})")
+            raise RuntimeError(f"failed to add the {kind} ({label})")
         lower = _sw_type_info.early_bound_or_flag(
             gtol.GetFrame(2), "IGtolFrame", "SetSymbolXml", "GetSymbolXml"
         )
@@ -476,16 +494,24 @@ def add_feature_control_frame(
             diameter=diameter,
         )
         if not lower.SetSymbolXml(lower_xml):
-            raise RuntimeError(
-                f"SOLIDWORKS rejected the stacked lower-frame XML ({label})"
-            )
-        if gtol.GetCompositeFrame2(1):
+            raise RuntimeError(f"SOLIDWORKS rejected the {kind} XML ({label})")
+        if composite:
+            gtol.SetCompositeFrame2(True, 1)
+            if gtol.GetCompositeFrame2(1) is not True:
+                raise RuntimeError(f"feature-control frame is not composite ({label})")
+            # Joining the segments rewrites the shared symbol cell: the upper
+            # segment must still read back whole.
+            upper_applied = str(frame.GetSymbolXml() or "")
+            if not _gtol_frame_persisted(upper_applied, xml):
+                raise RuntimeError(
+                    f"composite upper segment did not persist ({label}): {upper_applied!r}"
+                )
+        elif gtol.GetCompositeFrame2(1):
             raise RuntimeError(f"stacked frames read back composite ({label})")
         lower_applied = str(lower.GetSymbolXml() or "")
-        if not _gtol_frame_persisted(lower_applied, lower_xml):
-            raise RuntimeError(
-                f"stacked lower frame did not persist ({label}): {lower_applied!r}"
-            )
+        shared = _GTOL_SYMBOLS[characteristic] if composite else None
+        if not _gtol_frame_persisted(lower_applied, lower_xml, shared_symbol=shared):
+            raise RuntimeError(f"{kind} did not persist ({label}): {lower_applied!r}")
     if quantity:
         if not gtol.InsertBelowFrameTextAt(1, quantity):
             raise RuntimeError(f"failed to add feature quantity {quantity!r} ({label})")

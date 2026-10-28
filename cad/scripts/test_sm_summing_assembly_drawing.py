@@ -117,6 +117,25 @@ def test_station_slide_clears_the_hex_trunnion() -> None:
         assert abs(distance) > builder.HEX_Z_OUTER - mount_inner_face
 
 
+def test_dowels_leave_the_mounts_with_the_crossbar_not_with_the_mounts() -> None:
+    # Owner ruling 2026-10-24 (T+H3): the dowels press into the crossbar, so
+    # the explode lifts them out of the mounts' round hole and slot before any
+    # station slides, and no station slide carries them.
+    labels = [label for label, *_ in explode.EXPLODE_STEPS]
+    dowel_steps = [
+        (index, step)
+        for index, step in enumerate(explode.EXPLODE_STEPS)
+        if spec.DOWEL in step[1]
+    ]
+    assert len(dowel_steps) == 1
+    index, (_label, stems, station, axis, distance) = dowel_steps[0]
+    assert stems == (spec.DOWEL,) and station is None and axis == "y"
+    assert index < labels.index("front station slides off")
+    assert distance == explode.DOWEL_LIFT > builder.knife_dowel.PROUD_MAX
+    dowel_top = builder.KNIFE_DOWEL_Y + explode.DOWEL_LIFT
+    assert dowel_top < builder.HANGER_WASHER_Y
+
+
 def test_jam_nut_explodes_threaded_on_the_eyebolt_shank() -> None:
     # Fitted, the nut's underside is on the boss top face, ANCHOR_H above the
     # eyebolt's cut end (flush with the boss underside).
@@ -246,6 +265,17 @@ def test_retention_rows_cite_the_package_steps() -> None:
     assert hook.lock_step == "MHA-SM-00 STEP 2"
     nut = rows["sm-summing/boss-hook-jam-nut-on-hook"]
     assert nut.installed_at == "MHA-SM-00 STEP 2"
+
+
+def test_step_six_runs_each_hanger_bolt_home_by_hand_before_drawing_up() -> None:
+    # Owner ruling 2026-10-27 (#2018 option C): accepted as is.  Each cut
+    # bolt is run in by hand to its washer before it draws the mount's top
+    # seat flat to the crossbar underside.
+    step = notes.ASSEMBLY_STEPS[5]
+    assert step.startswith("6. ")
+    assert "MHA-SM-VN-52" in step
+    assert "WASHER" in step
+    assert step.index("BY HAND") < step.index("TIGHTEN")
 
 
 def test_hanger_fit_up_reach_matches_the_builder_band() -> None:

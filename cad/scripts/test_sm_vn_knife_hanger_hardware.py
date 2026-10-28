@@ -1391,7 +1391,7 @@ def test_hanger_direct_adapter_calls_bind_to_the_vendored_sdk(recipe: str) -> No
     if any(
         isinstance(argument, ast.Starred) for call in calls for argument in call.args
     ):
-        from build_fr_top_frame import slot_stadium_points
+        from build_sm_knife_mount import slot_stadium_points
 
         producers = [
             node
@@ -1449,6 +1449,54 @@ def test_hanger_direct_adapter_calls_bind_to_the_vendored_sdk(recipe: str) -> No
                 f"{recipe}:{call.lineno}: {call.func.attr} cannot bind "
                 f"{source}:{method.lineno}: {error}"
             )
+
+
+@pytest.mark.parametrize("along_u", [True, False])
+def test_dowel_slot_stadium_closes_counter_clockwise(along_u: bool) -> None:
+    """The knife mount's datum-C slot (moved from build_fr_top_frame, owner
+    ruling 2026-10-24, T+H3) sketches as one closed CCW stadium."""
+    import build_sm_knife_mount as part
+    import sm_knife_mount_spec as knife_mount
+
+    centre = (5.0, -7.0)
+    half_flat, half_w = part.SLOT_FLAT / 2, knife_mount.SLOT_WIDTH / 2
+    p1, p2, p3, p4, c_b, c_a = part.slot_stadium_points(
+        centre, along_u=along_u, half_flat=half_flat, half_w=half_w
+    )
+    # Straight sides of the flat run, each end a half round about its centre.
+    assert math.dist(p1, p2) == pytest.approx(2 * half_flat)
+    assert math.dist(p3, p4) == pytest.approx(2 * half_flat)
+    assert math.dist(c_a, c_b) == pytest.approx(2 * half_flat)
+    for c, a, b in ((c_b, p2, p3), (c_a, p4, p1)):
+        assert math.dist(c, a) == pytest.approx(half_w)
+        assert math.dist(c, b) == pytest.approx(half_w)
+        # add_arc sweeps counter-clockwise from a to b: the half round
+        # bulges away from the slot's centre.
+        sweep_mid = (c[0] + (b[1] - a[1]) / 2, c[1] - (b[0] - a[0]) / 2)
+        assert math.dist(sweep_mid, centre) == pytest.approx(half_flat + half_w)
+    # The sides run along the slot (u when along_u), counter-clockwise.
+    axis = 0 if along_u else 1
+    assert p1[1 - axis] == pytest.approx(p2[1 - axis])
+    area2 = sum(
+        x0 * y1 - x1 * y0
+        for (x0, y0), (x1, y1) in zip((p1, p2, p3, p4), (p2, p3, p4, p1))
+    )
+    assert area2 > 0
+    # On the dowel line (model x along u), end b is the slot's inner end and
+    # end a its outer end, whose whole half round stands in air past the
+    # widest printed block's -X face.
+    _, _, _, _, inner, outer = (
+        point[0]
+        for point in part.slot_stadium_points(
+            ((part.SLOT_INNER_X + part.SLOT_OUTER_X) / 2.0, 0.0),
+            along_u=True,
+            half_flat=half_flat,
+            half_w=half_w,
+        )
+    )
+    assert inner == pytest.approx(part.SLOT_INNER_X)
+    assert outer == pytest.approx(part.SLOT_OUTER_X)
+    assert outer + half_w < -(knife_mount.BLK_HALF_X + knife_mount._X / 2.0)
 
 
 def _stud_height_case(monkeypatch):

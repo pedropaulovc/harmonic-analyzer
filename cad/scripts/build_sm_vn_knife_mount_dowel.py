@@ -1,12 +1,13 @@
 r"""Purchased MHA-SM-VN-53 knife-mount dowel: McMaster 98381A473.
 
 A 1/8 x 3/4 alloy-steel dowel (``sm_vn_knife_mount_dowel_spec``), pressed chamfer
-end first to the floor of the blind reamed hole in the MHA-SM-02 knife
-mount's top seat; its proud length slips into the blind hole in the MHA-FR-02
-crossbar underside and keys the mount against turning about its MHA-SM-VN-52
-screw.  The stock recipe ``diagnostics/diag_build_98381A473.py`` models the
-vendor model's chamfered and rounded ends; its standalone run is the replica
-gate against the user-supplied vendor model.
+end first up to the floor of a blind ream in the MHA-FR-02 crossbar's faced
+underside (owner ruling 2026-10-24, T+H3); its proud length slips into the
+MHA-SM-02 knife mount's round hole or open slot and keys the mount against
+turning about its MHA-SM-VN-52 screw.  The stock recipe
+``diagnostics/diag_build_98381A473.py`` models the vendor model's chamfered
+and rounded ends; its standalone run is the replica gate against the
+user-supplied vendor model.
 
 Frame: pin axis +Y, pressed end face at y = 0 (the Top Plane), lead end at
 y = LENGTH.  The axis is published as ``ScrewAxis`` (Front ∩ Right), the
