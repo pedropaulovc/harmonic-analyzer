@@ -236,11 +236,12 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
 # It stands 4 mm higher than the uncropped view did, so the full depth's
 # extra row (the rack it covers) stays above the title block.
 LEFT_CENTER = (0.373, 0.116)
-LEFT_CAPTION = "PARTIAL OUTSIDE VIEW\nSAME SIDE AS B-B"
-# Its longer row, as the drawing test estimates (0.0522), plus 1 mm: it
-# stands clear right of the section's nose extension line, which run
-# 20261028T113212039Z's wider anchor struck through (r1-r3).
-_LEFT_CAPTION_WIDTH = 0.053
+# Its rows are no longer than they were before it was partial: run
+# 20261028T113212039Z's PARTIAL OUTSIDE VIEW row ran left into the section's
+# nose extension line (r1-r3), and 50.9 mm of air separates that line from
+# the cropped view's outline (run 20261028T115354649Z's layout audit).
+LEFT_CAPTION = "PARTIAL VIEW\nSAME SIDE AS B-B"
+_LEFT_CAPTION_WIDTH = 0.047  # its longer row, as the drawing test estimates
 TANGENT_EDGES_HIDDEN = 0  # swDisplayTangentEdges_e.swTangentEdgesHidden
 _LEFT_REAR_X = LEFT_CENTER[0] - OVERALL_LENGTH / 2.0 * VIEW_SCALE[0] / 1000.0
 _LEFT_BOTTOM = LEFT_CENTER[1] - HALF_OD
