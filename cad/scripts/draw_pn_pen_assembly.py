@@ -56,6 +56,7 @@ from _drawing_common import (
     read_required_properties,
     set_high_quality_shaded_with_edges,
 )
+from _drawing_detail_crop import _transform_point, native_circle_geometry
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
@@ -152,10 +153,9 @@ SETTINGS_NOTE_WIDTH = 70  # characters
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 DETAIL_POSITION_TOL_M = 1e-4
 DETAIL_LETTER_GAP = 0.001
-# One default-format glyph's width and line height (the measured 2.55 mm per
-# character and 4.53 mm per line above).
+# One default-format glyph's width (the measured 2.55 mm per character
+# above): where C's arrow letter starts left of its tip before it is squared.
 DETAIL_LETTER_WIDTH = 0.00255
-DETAIL_LETTER_HEIGHT = 0.00453
 BOUNDARY_COLOR = 0  # COLORREF black, the outline's colour.
 # Each circled detail's parent view, by the orientation the detail shares with
 # it. A and B are bounded on RIGHT, where the stud and the hanger screw both
@@ -698,15 +698,39 @@ def _activate_view(adapter: Any, view: Any, *, label: str) -> str:
     return name
 
 
-def _label_view(
+def _view_note(
     adapter: Any, view: Any, text: str, xy: tuple[float, float], *, label: str
-) -> Box:
-    """A view-owned label note at ``xy``, proved on the drawable sheet."""
+) -> tuple[Any, Box]:
+    """A view-owned note at ``xy`` and its measured box, proved on the
+    drawable sheet."""
     _activate_view(adapter, view, label=label)
     note = add_note(adapter, text, *xy)
     if note is None:
         raise RuntimeError(f"failed to label the {label}")
-    box = _note_box(_early_bound(note, "INote"), label=label)
+    note = _early_bound(note, "INote")
+    box = _note_box(note, label=label)
+    _assert_on_sheet(box, label=f"{label} label")
+    return note, box
+
+
+def _label_view(
+    adapter: Any, view: Any, text: str, xy: tuple[float, float], *, label: str
+) -> Box:
+    """A view-owned label note at ``xy``, proved on the drawable sheet."""
+    return _view_note(adapter, view, text, xy, label=label)[1]
+
+
+def _move_note(
+    adapter: Any, note: Any, delta: tuple[float, float], *, label: str
+) -> Box:
+    """Translate ``note`` by ``delta`` (sheet metres) and return its re-read
+    box, proved on the drawable sheet."""
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    x, y, z = (float(value) for value in annotation.GetPosition())
+    if not annotation.SetPosition2(x + delta[0], y + delta[1], z):
+        raise RuntimeError(f"failed to move the {label}")
+    adapter.currentModel.EditRebuild3()
+    box = _note_box(note, label=label)
     _assert_on_sheet(box, label=f"{label} label")
     return box
 
@@ -887,15 +911,34 @@ def _sketch_view_circle(
     radius: float,
     *,
     label: str,
-) -> None:
-    """A circle (sheet metres) in ``view``'s own sketch, left selected."""
-    _sketch_in_view(
+) -> Any:
+    """A circle (sheet metres) in ``view``'s own sketch, left selected; the
+    sketch segment."""
+    return _sketch_in_view(
         adapter,
         view,
         (centre, (centre[0] + radius, centre[1])),
         "circle",
         label=label,
     )
+
+
+def _view_circle_on_sheet(
+    adapter: Any, circle: Any, *, label: str
+) -> tuple[tuple[float, float], float]:
+    """A view-sketch circle as SolidWorks holds it: its sheet centre and
+    radius, read back through the sketch's inverse transform (the
+    _drawing_detail_crop sketch -> parent sheet hop)."""
+    centre, radius = native_circle_geometry(circle, label=label)
+    sketch = _early_bound(_early_bound(circle, "ISketchSegment").GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    inverse = _early_bound(transform.Inverse(), "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    sheet_centre, rim = (
+        _transform_point(utility, xyz, inverse, label=label)[:2]
+        for xyz in (centre, (centre[0] + radius, centre[1], centre[2]))
+    )
+    return sheet_centre, math.dist(sheet_centre, rim)
 
 
 def _add_explode_trail(
@@ -933,11 +976,11 @@ def _mark_detail_boundary(
     the detail shows, lettered at its upper right, or its upper left for
     ``LETTERED_LEFT`` (machinist review, farm run 20261016T082735510Z: the
     fitter could not tell where A and B come from; run 20261024T091056564Z:
-    nor D). Returns the circle's sheet centre and radius."""
+    nor D). Returns the circle's sheet centre and radius as read back."""
     label = f"{detail.label} boundary"
-    centre = model_point_in_view(adapter, parent, detail.model_centre_m, label=label)
+    requested = model_point_in_view(adapter, parent, detail.model_centre_m, label=label)
     radius = detail.radius_mm * SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
-    _sketch_view_circle(adapter, parent, centre, radius, label=label)
+    circle = _sketch_view_circle(adapter, parent, requested, radius, label=label)
     # A view-sketch circle prints in the sketch's grey (farm run
     # 20261016T092607223Z); colour the still-selected circle as the outline.
     selection = _early_bound(adapter.currentModel.SelectionManager, "ISelectionMgr")
@@ -946,28 +989,37 @@ def _mark_detail_boundary(
     _early_bound(adapter.currentModel, "IDrawingDoc").SetLineColor(BOUNDARY_COLOR)
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
-    reach = radius * math.sqrt(0.5) + DETAIL_LETTER_GAP
-    left = detail.key in LETTERED_LEFT
-    # Upper left, the letter stands up and left of the circle's 45 degree
-    # point, its lower-right corner there, so the arc, which swings out left
-    # below that point, passes under it (farm run 20261024T122758180Z: a
-    # letter hung DOWN from that point straddled the arc).
-    xy = (
-        (
-            centre[0] - reach - DETAIL_LETTER_WIDTH,
-            centre[1] + reach + DETAIL_LETTER_HEIGHT,
-        )
-        if left
-        else (centre[0] + reach, centre[1] + reach)
-    )
-    box = _label_view(
-        adapter, parent, notes.DETAIL_LETTERS[detail.key], xy, label=label
-    )
-    if left and (
-        box[2] > centre[0] - radius * math.sqrt(0.5)
-        or math.dist((box[2], box[1]), centre) < radius + DETAIL_LETTER_GAP
+    centre, drawn = _view_circle_on_sheet(adapter, circle, label=label)
+    if (
+        math.dist(centre, requested) > DETAIL_POSITION_TOL_M
+        or abs(drawn - radius) > DETAIL_POSITION_TOL_M
     ):
-        raise RuntimeError(f"{label}: letter {box!r} runs into its circle")
+        raise RuntimeError(
+            f"{label}: circle reads centre {centre!r} radius {drawn!r}, "
+            f"requested {requested!r} radius {radius!r}"
+        )
+    radius = drawn
+    letter = notes.DETAIL_LETTERS[detail.key]
+    if detail.key not in LETTERED_LEFT:
+        reach = radius * math.sqrt(0.5) + DETAIL_LETTER_GAP
+        _label_view(
+            adapter, parent, letter, (centre[0] + reach, centre[1] + reach), label=label
+        )
+        return centre, radius
+    # Upper left, the letter's measured box is moved so its lower-right corner
+    # sits on the circle's upper-left 45 degree ray, DETAIL_LETTER_GAP outside
+    # the rim; the whole box then lies up and left of that corner, clear of the
+    # circle. Placing it by an assumed glyph size left the corner 0.4 mm inside
+    # the gap once the glyph read 3.4 x 4.7 mm (rolling main 6d7f35476).
+    clear = (radius + DETAIL_LETTER_GAP) * math.sqrt(0.5)
+    corner = (centre[0] - clear, centre[1] + clear)
+    note, box = _view_note(adapter, parent, letter, corner, label=label)
+    box = _move_note(
+        adapter, note, (corner[0] - box[2], corner[1] - box[1]), label=label
+    )
+    if math.dist((box[2], box[1]), corner) > DETAIL_POSITION_TOL_M:
+        raise RuntimeError(f"{label}: letter {box!r} did not land at {corner!r}")
+    _telemetry.info(f"{label}: circle {centre!r} r {radius!r}, letter {box!r}")
     return centre, radius
 
 
