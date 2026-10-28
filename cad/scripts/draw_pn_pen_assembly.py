@@ -876,9 +876,16 @@ def _sketch_in_view(
     kind: str,
     *,
     label: str,
+    exact: bool = False,
 ) -> Any:
     """A ``kind`` ("circle": centre, rim point; "line": ends) at two sheet
-    points (metres) in ``view``'s own sketch, left selected."""
+    points (metres) in ``view``'s own sketch, left selected.
+
+    ``exact`` authors straight to the sketch database (``AddToDB``), so no
+    screen-space inference snaps a point onto the view's edges, and selects
+    the segment explicitly (draw_ms_stick's exact fence): with inference the
+    stud boundary's centre snapped 0.43 mm off its request, the rim point
+    kept (farm run 20261028T061224266Z)."""
     view = _early_bound(view, "IView")
     _activate_view(adapter, view, label=label)
     sketch = _early_bound(view.GetSketch(), "ISketch")
@@ -894,13 +901,20 @@ def _sketch_in_view(
     manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
     create = {"circle": manager.CreateCircle, "line": manager.CreateLine}[kind]
     previous = bool(manager.AddToDB)
-    manager.AddToDB = False
+    manager.AddToDB = exact
     try:
         segment = create(*points[0], *points[1])
     finally:
         manager.AddToDB = previous
     if segment is None:
         raise RuntimeError(f"failed to sketch the {label} {kind}")
+    if exact:
+        adapter.currentModel.ClearSelection2(True)
+        selection = _early_bound(adapter.currentModel.SelectionManager, "ISelectionMgr")
+        data = _early_bound(selection.CreateSelectData(), "ISelectData")
+        data.View = view
+        if _early_bound(segment, "ISketchSegment").Select4(False, data) is not True:
+            raise RuntimeError(f"failed to select the {label} {kind}")
     return segment
 
 
@@ -911,6 +925,7 @@ def _sketch_view_circle(
     radius: float,
     *,
     label: str,
+    exact: bool = False,
 ) -> Any:
     """A circle (sheet metres) in ``view``'s own sketch, left selected; the
     sketch segment."""
@@ -920,6 +935,7 @@ def _sketch_view_circle(
         (centre, (centre[0] + radius, centre[1])),
         "circle",
         label=label,
+        exact=exact,
     )
 
 
@@ -980,9 +996,11 @@ def _mark_detail_boundary(
     label = f"{detail.label} boundary"
     requested = model_point_in_view(adapter, parent, detail.model_centre_m, label=label)
     radius = detail.radius_mm * SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
-    circle = _sketch_view_circle(adapter, parent, requested, radius, label=label)
+    circle = _sketch_view_circle(
+        adapter, parent, requested, radius, label=label, exact=True
+    )
     # A view-sketch circle prints in the sketch's grey (farm run
-    # 20261016T092607223Z); colour the still-selected circle as the outline.
+    # 20261016T092607223Z); colour the selected circle as the outline.
     selection = _early_bound(adapter.currentModel.SelectionManager, "ISelectionMgr")
     if int(selection.GetSelectedObjectCount2(-1)) != 1:
         raise RuntimeError(f"{label}: the sketched circle is not the one selection")
