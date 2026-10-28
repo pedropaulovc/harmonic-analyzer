@@ -1034,7 +1034,7 @@ def test_the_cropped_outside_view_reads_as_partial_with_a_break_on_the_boss() ->
     drawn end.  The caption names the view PARTIAL; a long-break line on the
     crop crosses the Ø8.2 boss past both outlines, so the MAX lands on the
     boss stub between the step and the break, clear of the break's Z."""
-    assert drawing.LEFT_CAPTION.splitlines()[0].startswith("PARTIAL ")
+    assert drawing.LEFT_CAPTION.splitlines()[0] == "PARTIAL"
     caption = _note_box(drawing.LEFT_CAPTION, (0.0, 0.0))
     assert caption.xmax - caption.xmin <= drawing._LEFT_CAPTION_WIDTH
     s = drawing.VIEW_SCALE[0] / 1000.0

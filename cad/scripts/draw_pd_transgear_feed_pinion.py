@@ -245,11 +245,12 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
 # It stands 4 mm higher than the uncropped view did, so the full depth's
 # extra row (the rack it covers) stays above the title block.
 LEFT_CENTER = (0.373, 0.116)
-LEFT_CAPTION = "PARTIAL OUTSIDE VIEW\nSAME SIDE AS B-B"
-# Its longer row, a little over the drawing test's estimate: farm run
-# 20261028T064402620Z printed it 49.4 mm wide, and at 59 mm its left end
-# reached the 27.35 overall's extension line (sheet x 271.0).
-_LEFT_CAPTION_WIDTH = 0.053
+LEFT_CAPTION = "PARTIAL\nOUTSIDE VIEW\nSAME SIDE AS B-B"
+# Its longest row.  Only 48 mm stand between the 27.35 overall's extension
+# line (sheet x 271.0) and the view's box (x 322.2): one row "PARTIAL
+# OUTSIDE VIEW" printed 49.4 mm wide (farm runs 20261028T064402620Z and
+# 070655020Z struck or overlapped one of them), so PARTIAL takes its own row.
+_LEFT_CAPTION_WIDTH = 0.047
 TANGENT_EDGES_HIDDEN = 0  # swDisplayTangentEdges_e.swTangentEdgesHidden
 _LEFT_REAR_X = LEFT_CENTER[0] - OVERALL_LENGTH / 2.0 * VIEW_SCALE[0] / 1000.0
 _LEFT_BOTTOM = LEFT_CENTER[1] - HALF_OD
