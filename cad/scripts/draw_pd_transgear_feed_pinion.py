@@ -236,23 +236,44 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
 # It stands 4 mm higher than the uncropped view did, so the full depth's
 # extra row (the rack it covers) stays above the title block.
 LEFT_CENTER = (0.373, 0.116)
-LEFT_CAPTION = "OUTSIDE VIEW\nSAME SIDE AS B-B"
-_LEFT_CAPTION_WIDTH = 0.047  # its longer row, as the drawing test estimates
+LEFT_CAPTION = "PARTIAL OUTSIDE VIEW\nSAME SIDE AS B-B"
+_LEFT_CAPTION_WIDTH = 0.059  # its longer row, as the drawing test estimates
 TANGENT_EDGES_HIDDEN = 0  # swDisplayTangentEdges_e.swTangentEdgesHidden
 _LEFT_REAR_X = LEFT_CENTER[0] - OVERALL_LENGTH / 2.0 * VIEW_SCALE[0] / 1000.0
 _LEFT_BOTTOM = LEFT_CENTER[1] - HALF_OD
-# The view is cropped just past the cutter's run-out limit: it exists for
-# the teeth, and the section shows the boss.  Uncropped, runs
+# The view is a partial view: it shows the gear body, the step and the
+# start of the Ø8.200 boss, so the run-out limit's extension line lands on
+# the boss (1e2b7b5 ENFORCE review, r1, r3: cropped at the step it stood in
+# air), and stops short of the flat.  Uncropped, runs
 # 20261027T032128736Z..054041865Z drew one tooth-space line of the facing
-# gap on to the boss to ~15.3 mm, where the part has no edge (its STL holds
-# no vertex on the boss between 13.6 and 16.6 mm), and the review read it
-# as a run-out past the 13.80 MAX (r1, r2).
-OUTSIDE_CROP_Z = CUTTER_RUNOUT_MAX + 0.1
+# gap on to the boss to ~15.2 mm, model Y -0.72..-0.80, where the part has
+# no edge (its STL holds no vertex on the boss between 13.6 and 16.6 mm; the
+# deepest root clears the boss at 13.12), and the review read it as a
+# run-out past the 13.80 MAX (r1, r2).  The fence's notch, open to its
+# right edge, leaves that band of the boss out from just past the step.
+OUTSIDE_CROP_Z = CUTTER_RUNOUT_MAX + 1.0
+_OUTSIDE_NOTCH_Z = FACE_WIDTH + 0.03
+_OUTSIDE_NOTCH_Y = (-1.5, -0.25)  # model Y, mm
 OUTSIDE_CROP_FENCE = (
     _LEFT_REAR_X - 0.004,
     _LEFT_BOTTOM - 0.004,
     _LEFT_REAR_X + OUTSIDE_CROP_Z * VIEW_SCALE[0] / 1000.0,
     LEFT_CENTER[1] + HALF_OD + 0.004,
+)
+_NOTCH_X = _LEFT_REAR_X + _OUTSIDE_NOTCH_Z * VIEW_SCALE[0] / 1000.0
+_NOTCH_FOOT, _NOTCH_HEAD = (
+    LEFT_CENTER[1] + y * VIEW_SCALE[0] / 1000.0 for y in _OUTSIDE_NOTCH_Y
+)
+# The fence's corners in order (sheet m): OUTSIDE_CROP_FENCE less the notch.
+OUTSIDE_CROP_PROFILE = (
+    (OUTSIDE_CROP_FENCE[0], OUTSIDE_CROP_FENCE[1]),
+    (OUTSIDE_CROP_FENCE[2], OUTSIDE_CROP_FENCE[1]),
+    (OUTSIDE_CROP_FENCE[2], _NOTCH_FOOT),
+    (_NOTCH_X, _NOTCH_FOOT),
+    (_NOTCH_X, _NOTCH_HEAD),
+    (OUTSIDE_CROP_FENCE[2], _NOTCH_HEAD),
+    (OUTSIDE_CROP_FENCE[2], OUTSIDE_CROP_FENCE[3]),
+    (OUTSIDE_CROP_FENCE[0], OUTSIDE_CROP_FENCE[3]),
 )
 _FULL_DEPTH_TEXT_WIDTH = 0.0601
 _CUTTER_TEXT_WIDTH = 0.0418
@@ -528,15 +549,17 @@ def _hide_tangent_edges(view: Any) -> None:
 
 @_telemetry.traced("drawing.outside_view_crop")
 def _crop_outside_view(adapter: Any, view: Any) -> None:
-    """Crop the outside view to OUTSIDE_CROP_FENCE (sheet left, foot, right,
-    head) with no outline, read back.
+    """Crop the outside view to OUTSIDE_CROP_PROFILE (OUTSIDE_CROP_FENCE, sheet
+    left, foot, right, head, less the boss notch) with no outline, read back.
 
-    The fence is sketched direct to the database in the view's own sketch
-    and handed to ``IView.Crop2`` (draw_dt_cone_swing_platform's section
-    crop).  The proof is the fence's own endpoints, read back in sheet
-    coordinates (codjiflo P2 on edb402b); the outline, which pads past the
-    fence (5.8-9.8 mm on run 20261027T072743812Z), is only a sanity check
-    that the view shrank to about the fence.
+    The fence is sketched direct to the database in the view's own sketch,
+    one line per side through exact shared corners, so the loop closes
+    (``_sketch.add_line_chain``), and handed to ``IView.Crop2``
+    (draw_dt_cone_swing_platform's section crop).  The proof is the fence's
+    own endpoints, read back in sheet coordinates (codjiflo P2 on edb402b);
+    the outline, which pads past the fence (5.8-9.8 mm on run
+    20261027T072743812Z), is only a sanity check that the view shrank to
+    about the fence.
     """
     left, foot, right, head = OUTSIDE_CROP_FENCE
     draw = adapter.currentModel
@@ -550,7 +573,7 @@ def _crop_outside_view(adapter: Any, view: Any) -> None:
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     corners = []
-    for x, y in ((left, head), (right, foot)):
+    for x, y in OUTSIDE_CROP_PROFILE:
         point = _early_bound(
             math_utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
         )
@@ -561,12 +584,13 @@ def _crop_outside_view(adapter: Any, view: Any) -> None:
     sketch_manager.AddToDB = True
     try:
         segments = tuple(
-            sketch_manager.CreateCornerRectangle(*corners[0], *corners[1]) or ()
+            sketch_manager.CreateLine(*start, *end)
+            for start, end in zip(corners, corners[1:] + corners[:1])
         )
     finally:
         sketch_manager.AddToDB = previous_add_to_db
-    if len(segments) != 4:
-        raise RuntimeError(f"outside view crop fence has {len(segments)} segments, not 4")
+    if not all(segments):
+        raise RuntimeError("failed to sketch the outside view's crop fence")
     for segment in segments:
         if not _early_bound(segment, "ISketchSegment").Select4(True, None):
             raise RuntimeError("failed to select the outside view's crop fence")
@@ -600,17 +624,18 @@ def _crop_outside_view(adapter: Any, view: Any) -> None:
                 "IMathPoint",
             )
             ends.append(tuple(float(value) for value in sheet_point.ArrayData)[:2])
-    fence = (
-        min(x for x, _ in ends),
-        min(y for _, y in ends),
-        max(x for x, _ in ends),
-        max(y for _, y in ends),
-    )
     after = tuple(float(value) for value in native.GetOutline())
-    _telemetry.info(f"outside view crop: fence {fence}, outline {before} -> {after}")
-    if max(abs(a - b) for a, b in zip(fence, OUTSIDE_CROP_FENCE)) > 1e-6:
+    _telemetry.info(f"outside view crop: fence {ends}, outline {before} -> {after}")
+    expected = [
+        corner
+        for start, end in zip(
+            OUTSIDE_CROP_PROFILE, OUTSIDE_CROP_PROFILE[1:] + OUTSIDE_CROP_PROFILE[:1]
+        )
+        for corner in (start, end)
+    ]
+    if max(math.dist(end, corner) for end, corner in zip(ends, expected)) > 1e-6:
         raise RuntimeError(
-            f"outside view crop fence reads back {fence}, not {OUTSIDE_CROP_FENCE}"
+            f"outside view crop fence reads back {ends}, not {OUTSIDE_CROP_PROFILE}"
         )
     pad = 0.015
     removed = (OVERALL_LENGTH - OUTSIDE_CROP_Z) * VIEW_SCALE[0] / 1000.0

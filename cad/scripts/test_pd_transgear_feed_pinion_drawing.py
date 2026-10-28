@@ -1002,20 +1002,34 @@ def test_end_view_is_the_sections_third_angle_left_view(
     assert drawing.FRONT_CENTER[0] < drawing._side_x(0.0) < drawing._side_x(spec.OVERALL_LENGTH)
 
 
-def test_outside_view_crops_past_the_run_out_limit() -> None:
-    """Runs 20261027T032128736Z..054041865Z (r1, r2): uncropped, the view drew
-    a tooth-space line on to the boss, past the 13.80 MAX.  It is cropped just
-    past the run-out limit, so both cutter stations' witnesses stay inside and
-    the boss, which the section shows, is cut away."""
+def test_outside_view_is_partial_and_shows_the_boss_past_the_run_out_limit() -> None:
+    """1e2b7b5 ENFORCE review (r1, r3): cropped at the step, the run-out
+    limit's extension line stood in air.  The partial view shows the step and
+    the boss past both cutter stations, short of the flat, and is labelled
+    partial.  Runs 20261027T032128736Z..054041865Z (r1, r2): uncropped, it
+    drew a tooth-space line on to the boss past the 13.80 MAX, at model Y
+    -0.72..-0.80; the fence's notch leaves that band out from past the step."""
     left, foot, right, head = drawing.OUTSIDE_CROP_FENCE
     s = drawing.VIEW_SCALE[0] / 1000.0
     rear = drawing._LEFT_REAR_X
     assert left < rear
     for station in (spec.FULL_DEPTH, spec.CUTTER_RUNOUT_MAX):
         assert rear + station * s < right
-    assert right < rear + (spec.FACE_WIDTH + 0.5) * s
+    assert rear + (spec.CUTTER_RUNOUT_MAX + 0.5) * s <= right
+    assert right < rear + spec.FLAT_END_STATION * s
     assert foot < drawing.LEFT_CENTER[1] - drawing.HALF_OD
     assert head > drawing.LEFT_CENTER[1] + drawing.HALF_OD
+    assert drawing.LEFT_CAPTION.startswith("PARTIAL ")
+    profile = drawing.OUTSIDE_CROP_PROFILE
+    assert len(profile) == 8
+    xs, ys = zip(*profile)
+    assert (min(xs), min(ys), max(xs), max(ys)) == (left, foot, right, head)
+    notch_x = min(x for x in xs if x > left)
+    assert rear + spec.FACE_WIDTH * s < notch_x < rear + (spec.FACE_WIDTH + 0.05) * s
+    notch_ys = sorted(y for x, y in profile if x == notch_x)
+    centre = drawing.LEFT_CENTER[1]
+    assert centre - 0.80 * s > notch_ys[0] and notch_ys[1] > centre - 0.72 * s
+    assert notch_ys[1] < centre
 
 
 def test_tooth_edge_exception_is_flagged_at_the_teeth() -> None:
