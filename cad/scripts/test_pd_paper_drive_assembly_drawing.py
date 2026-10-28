@@ -1559,7 +1559,12 @@ def test_the_collar_is_faced_and_shoulder_seated_before_stud_cut_and_acceptance(
 
 def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
     accepted = _step_body("fitup-accepted")
-    assert f"DISC END FLOAT {cluster_fit.END_FLOAT_TEXT}" in accepted
+    assert f"DISC END FLOAT {drawing.DISC_END_FLOAT_TEXT}" in accepted
+    # Rounded outward: every cluster inside its printed bands passes.
+    low, high = drawing.DISC_END_FLOAT_ACCEPT
+    assert low <= cluster_fit.END_FLOAT_RANGE[0] < low + 0.01
+    assert high - 0.01 < cluster_fit.END_FLOAT_RANGE[1] <= high
+    assert low >= cluster_fit.END_FLOAT_MIN
     assert "DISC TURNS FREE" in accepted
     for key, bounds in (
         ("collar-pins-pressed", drive_pin.PROUD_RANGE),

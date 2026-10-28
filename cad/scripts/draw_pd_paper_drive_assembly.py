@@ -1423,6 +1423,15 @@ KNOB_END_FLOAT_RANGE = (
     knob_shaft.END_FLOAT - knob_shaft.END_FLOAT_SET_TOL,
     knob_shaft.END_FLOAT + knob_shaft.END_FLOAT_SET_TOL,
 )
+# The disc's end float as the fitter accepts it: the printed stack's worst
+# case (transgear_cluster_fit.END_FLOAT_RANGE, 0.2013-0.5537) rounded outward
+# to the hundredth, so every cluster made inside its printed bands passes
+# (CodeRabbit on cdf418a1c: printed 0.55, it refused a good one).
+DISC_END_FLOAT_ACCEPT = (
+    math.floor(cluster_fit.END_FLOAT_RANGE[0] * 100.0 + 1e-9) / 100.0,
+    math.ceil(cluster_fit.END_FLOAT_RANGE[1] * 100.0 - 1e-9) / 100.0,
+)
+DISC_END_FLOAT_TEXT = f"{DISC_END_FLOAT_ACCEPT[0]:.2f}-{DISC_END_FLOAT_ACCEPT[1]:.2f}"
 # The platen's screw stations (platen_spec): its front counterbores take the
 # guide screws, its through-taps the clip screws.
 GUIDE_SCREWS = len(platen.GUIDE_HOLE_X) * len(platen.GUIDE_HOLE_Y)
@@ -1712,7 +1721,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"PASSES); KNOB END FLOAT {knob_lo:.2f} TO {knob_hi:.2f}; "
             f"{sprocket.KNOB_CONFIG} FREE "
             "UNDER THE NUT; THE HANGER FREE; DISC END FLOAT "
-            f"{cluster_fit.END_FLOAT_TEXT} AND THE DISC TURNS FREE; COLLAR TO DISC "
+            f"{DISC_END_FLOAT_TEXT} AND THE DISC TURNS FREE; COLLAR TO DISC "
             f"AIR PER STEP {steps.step_number('collar-disc-air-inspected')}, "
             f"{steps.COLLAR_DISC_AIR_TEXT} AT OVERLAP AFTER REFITTING AND LATCHING. "
             "ELSE REPORT: NO FACING OR FITTING."
