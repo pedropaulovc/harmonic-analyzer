@@ -32,7 +32,7 @@ def assert_counter_spring_top_hang(
     ux, uy = pose.axis_xy
     screw_y = gooseneck_y + sm_gooseneck_geom.ARM_Y
     retention = spring_joint.HEAD_RETENTION
-    # The Ø11.50 cheese head keeps HEAD_RETENTION_MIN (0.745) under the 1.0
+    # The cheese head keeps HEAD_RETENTION_MIN (0.95) under the 1.0
     # retention check: owner minor sm-gooseneck-spring-screw RV-01 (2026-10-27,
     # #1951), which sm_gooseneck_spring_joint enforces at import
     # (_owner_minor).  The head must still overlap the eye at its smallest.

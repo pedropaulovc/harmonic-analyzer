@@ -1583,7 +1583,7 @@ JOINTS: tuple[Joint, ...] = (
             "screw with a plain Ø6.35 body and slotted cheese head, blind 1/4-28 "
             "tap in the solid end piece; owner minors sm-gooseneck.yaml RV-01 "
             "(counterbore wall 1.78 MIN under the 2.0 target) and "
-            "sm-gooseneck-spring-screw.yaml RV-01 (head retention 0.745 under the "
+            "sm-gooseneck-spring-screw.yaml RV-01 (head retention 0.95 under the "
             "1.0 check); sm_gooseneck_spring_joint.py "
             "ENGAGEMENT_MIN/COUNTERBORE_DEPTH_MIN/SCREW_RUNOUT_INTRUSION_MAX/"
             "PLUG_WALL_MIN/COUNTERBORE_WALL_MIN/DRILL_POINT_SHANK_WALL_MIN/"
