@@ -74,13 +74,23 @@ def test_the_chamfered_end_is_the_pressed_end() -> None:
 
 
 def test_the_installation_note_names_both_holes_and_fits_the_sheet() -> None:
-    lines = _config.parts(STEM)["installation_notes"].splitlines()
-    assert len(lines) <= 4
+    from _purchased_fastener_drawing import note_lines
+
+    lines = note_lines(_config.parts(STEM)["installation_notes"], label=STEM)
     assert all(len(line) <= 70 for line in lines), lines
     flat = " ".join(lines)
     assert "MHA-SM-02" in flat and "MHA-FR-02" in flat
-    assert "CHAMFER END IN THE SEAT" in flat
-    assert "DIAMETRAL CLEARANCE" in flat
+    assert "UNDERSIDE REAM, CHAMFER END FIRST." in flat
+    # The band the knife mount's B-hole callout prints (rule 25: one value
+    # on both sheets).
+    from sm_knife_mount_spec import PIN_SLIP_PRINTED
+
+    low, high = PIN_SLIP_PRINTED
+    assert f"{low:.3f}-{high:.3f} DIAMETRAL CLEARANCE" in flat
+    # Owner ruling 2026-10-24 (T+H3): the crossbar holds the press, the knife
+    # mount the slip.
+    assert "PRESS FIT IN THE MHA-FR-02 CROSSBAR" in flat
+    assert "INTO THE MHA-SM-02 KNIFE MOUNT" in flat
 
 
 def test_purchased_sheet_documents_the_built_part() -> None:

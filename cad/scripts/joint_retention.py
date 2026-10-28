@@ -616,7 +616,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "fr_harmonic_base",  # receiver: #10-32 cross taps, 1/4-20 hold-down seats, #4-40 nameplate seats, and the drive_train screws' seats (top-level rows)
         "sm_vn_boss_hook_jam_nut",  # McMaster 90760A140 thin #10-24 hex nut (MHA-SM-VN-55), member: jammed on the summing-lever boss top face, locking the boss hook
         "sm_vn_knife_hanger_stud",  # #10-24 UNC cut plain hex bolt (McMaster 92314A253 x 2), member into the knife-mount top tap
-        "sm_knife_mount",  # #10-24 UNC-2B bottoming tap (9.65 full thread, 11.24 drill) in the top seat, receiver of the knife-hanger bolt; two plain reamed dowel holes
+        "sm_knife_mount",  # #10-24 UNC-2B bottoming tap (9.65 full thread, 11.24 drill) in the top seat, receiver of the knife-hanger bolt; a plain reamed dowel slip hole and an open dowel slot
         "fr_vn_lag_screw",  # 1/4-20 UNC-2A x 3/4 hex head (92240A540), member: through rocker_arm_support foot into harmonic_base
         "mg_vn_magnifying_bracket_screw",  # #2-56 fillister, member: two in bracket counterbores into summing_lever (top-level row)
         "pd_vn_platen_clip_screw",  # #2-56 brass slotted pan head (92446A077, MHA-PD-VN-65), member: 4 into the platen's through taps, clamping the paper clips
@@ -697,7 +697,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_guide_lock",  # 1/8 drill holes (R9-49) only; clamped by guide_lock_screw
         "dt_vn_keeper_chain",  # bead chain
         "dt_vn_keeper_chain_link",  # snap loop link
-        "sm_vn_knife_mount_dowel",  # MHA-SM-VN-53 1/8 dowels, two pressed into each knife mount's reamed top-seat holes, slip in the crossbar hole and slot
+        "sm_vn_knife_mount_dowel",  # MHA-SM-VN-53 1/8 dowels, two pressed into the crossbar's blind underside reams per knife mount, slip in the knife mount's round hole and slot
         "sm_vn_knife_hanger_washer",  # new 18-8 SAE washer (McMaster 96659A104), hex-head bearing on the faced crossbar top; no thread
         "pd_latch_hook",  # MHA-PD-14 formed spring-steel hook: screw holes drilled thru, latch-pin hole match-drilled at assembly; no thread
         "sh_vn_music_wire",  # LeverWire and PenWire members, wrapped/tied, no thread
@@ -765,7 +765,7 @@ UNTHREADED_STOCK: dict[str, str] = {
     "dt_vn_keeper_chain": "chain; its end links hang on screws and eyes, carrying no thread",
     "dt_vn_crank_seat_drive_pin": "dowel pin pressed into a plain hole",
     "dt_vn_keeper_chain_link": "plain chain link",
-    "sm_vn_knife_mount_dowel": "dowel pin pressed into a reamed hole",
+    "sm_vn_knife_mount_dowel": "dowel pin pressed into a blind reamed hole",
     "sm_vn_knife_hanger_washer": "plain SAE washer under the knife-hanger hex head; no thread",
     "dt_vn_pinion_strap_pin": "slotted spring pin pressed into a plain hole",
     "pd_vn_transgear_knob_drive_pin": "dowel pin pressed into a plain hole",
@@ -1460,8 +1460,9 @@ JOINTS: tuple[Joint, ...] = (
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "clamps the knife-edge bearing block's top seat to the stationary crossbar underside (MOUNT_GAP 0); "
-            "block and casting never move relative to each other. The two pressed MHA-SM-VN-53 dowels, slipped into "
-            "the crossbar's round hole and slot, react any torque about the screw axis, and the lever rock (freed lever_rock DOF) "
+            "block and casting never move relative to each other. The two pressed MHA-SM-VN-53 dowels, held in "
+            "the crossbar's underside reams and slipped into the block's round hole and slot (owner ruling "
+            "2026-10-24, T+H3), react any torque about the screw axis, and the lever rock (freed lever_rock DOF) "
             "acts about machine Z, perpendicular to the vertical (Y) screw, so it reaches the thread only as "
             "cyclic tension and shear, never as torque about its own axis"
         ),

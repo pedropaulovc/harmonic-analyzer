@@ -18,6 +18,15 @@ hex), so only the trunnion's TOP VERTEX LINE nears the bore's upper inner wall
 bore's upper inner wall, the knife SEAT: it carries ``MACHINED_UM`` (1.6, policy
 drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates) -- ``GROUND_UM`` 0.8 is reserved for knife edges and pivot-screw
 shoulders).
+
+Owner ruling 2026-10-24 (T+H3), from this sheet's machinist ENFORCE review
+(rule 16: a dowel pressed into a blind hole needs a way out; rule 4/16: the
+press reams could not be cut before through-hardening): the two
+MHA-SM-VN-53 dowels press into the MHA-FR-02 crossbar, knocked out from its
+faced top, and slip into this block's round hole (datum B) and its slot
+(datum C, open to the -X face).  The block's finish states that its sizes
+apply after heat treatment; O1's growth (<= 0.012 on the Ø12 bore, <= 0.003
+on the slip sizes) stays inside the remaining bands.
 """
 
 from __future__ import annotations
@@ -36,8 +45,9 @@ from sm_summing_lever_spec import HEX_H, HEX_W
 # --- fixed geometry for the drawing's view math (mirrors build_sm_knife_mount) ----
 R_BORE = 6.0  # Ø12 knife-bearing bore (2026-09-02 ch18 p.42 re-read: close bore)
 # Block half-width, owned here (the build reads it): 25.4 across, the .X
-# width that keeps the -X dowel's far-side web at 2.0 round the 15.264 span
-# (PIN_HOLE_FAR_SIDE_WEB below; 25.319 is the least).
+# width set for the former pressed -X dowel's far-side web; with the slot
+# open to that face (owner ruling 2026-10-24, T+H3) it keeps the slot's pin
+# inside the mouth and the half-round end inboard of it (SLOT_* below).
 BLK_HALF_X = 12.7
 SUPPORT_Z_THICK = 14.0  # axial depth straddling the trunnion mid
 BLK_TOP = 14.87  # local block top (clamped to the top-frame casting underside)
@@ -70,36 +80,66 @@ BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.015
 BLOCK_SIZE_PLACES = 1
 BLOCK_SIZE_TOL = _X  # 0.8
 BLOCK_HEIGHT_PRINTED = round(BLK_TOP - BLK_BOT, BLOCK_SIZE_PLACES)  # 29.6
-# Manufacturing GD&T limits consumed by the part's drawing projection.
+# Manufacturing GD&T limits consumed by the part's drawing projection.  Owner
+# ruling 2026-10-24 (T+H3): the datum reference frame is A (the top seat), B
+# (the MHA-SM-VN-53 round slip hole, +X) and C (the dowel slot open to the -X
+# face, its width positioned to A|B, the crossbar's former slot frame).
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "knife-bore position": "0.20",
-    "knife-bore perpendicularity": "0.05",
-    "knife-hanger tap position": "0.15",
-    "dowel hole pattern position": "0.13",
+    "knife-bore orientation": "0.05",
+    "knife-hanger tap position": "0.14",
+    "dowel slot position": "0.05",
+    "dowel hole perpendicularity": "0.015",
+    "dowel slot perpendicularity": "0.015",
 }
-# The bore (drawing-guidelines.md rule 5 (avoid excessive GD&T), knife-edge system): ⌖Ø0.20 locates it to the top
-# seat (datum A) and the dowel pattern (datum B); a stacked ⊥Ø0.05|B holds
-# its axis square to the plane of the dowel axes.  That one Ø zone bounds
-# both the yaw off the dowel line (the rock budget's far-end offset) and the
-# tilt; a ∥ to A would bound the tilt only, in a two-plane zone, leaving the
-# yaw free.
+# The bore (drawing-guidelines.md rule 5 (avoid excessive GD&T), knife-edge
+# system), owner ruling 2026-10-27 (#2016): a composite ⌖ to A|B|C, Ø0.20
+# over Ø0.05.  The block's ⊥0.015 hole and slot let B's and C's simulators
+# stand t/2 off their mouths' centres, so the dowel pair's shift grows by
+# 0.015 and the bore's whole Ø0.19 zone, charged as the far end's offset,
+# left 4.94 deg of rock.  The lower segment (ASME Y14.5-2018: a composite
+# frame's lower datums only orient) holds the bore's axis within Ø0.05
+# parallel to A and clocked to the B-C line, so the far end's offset is the
+# 0.05 refinement, not the location zone; the upper Ø0.20 still locates the
+# bore for the webs and the tap's crown, and the ridge's yaw between the two
+# mounts' bores (codjiflo, PR #1978) charges it.  A stacked ⊥|B no longer
+# bounds the yaw: B is one hole, not the dowel pattern, and ⊥|C would take
+# the yaw from the slot's short walls.
 KNIFE_BORE_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-bore position"])
-KNIFE_BORE_ORIENTATION_TOL = float(
-    GEOMETRIC_TOLERANCES_MM["knife-bore perpendicularity"]
-)
-# The #10-24 tap's position to the top seat and the dowel pattern (A|B): the
-# bolt axis the crossbar's #10 clearance hole must float round
-# (``build_sm_summing_assembly``'s knife-hanger stack).  Its 0.075 zone radius
-# is one term of HANGER_SCREW_MISMATCH (hypot(0.316, 0.264) = 0.412) inside
+KNIFE_BORE_ORIENTATION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-bore orientation"])
+# The #10-24 tap's position to A|B|C: the bolt axis the crossbar's #10
+# clearance hole must float round (``build_sm_summing_assembly``'s knife-hanger
+# stack).  Its 0.07 zone radius is one term of HANGER_SCREW_MISMATCH inside
 # the hole's 0.6095 radial float with the drill drift's 0.194 over the
-# printed grip's thickest 37.01, 0.0039 spare.
-# A screw through a clearance hole needs no tighter zone than that float
-# admits (drawing-guidelines.md rule 5), and Ø0.15 is the largest two-place
-# zone it admits: the float closes at Ø0.1556; Ø0.16 leaves -0.0031 and
-# Ø0.25 -0.067.  Plain face dimensions instead, even at .XXX (+/-0.13 each
-# way, not 0.075), give hypot(0.371, 0.319) = 0.489 and -0.074: the frame is
-# functional.
+# printed grip's thickest 37.01.  Ø0.14 is the largest two-place zone that
+# float admits (spare 0.0043; the stack closes at Ø0.1461, and Ø0.15
+# overruns by 0.0028, now that B's simulator may stand t/2 = 0.0075 off the
+# pin root under ⊥0.015|A).  A screw through a clearance hole needs no
+# tighter zone than that float admits (drawing-guidelines.md rule 5); plain
+# face dimensions instead, even at .XXX (+/-0.13 each way, not 0.07), spend
+# the float: the frame is functional.
+# The zone is unprojected (owner ruling 2026-10-27, #2018: accepted as is).
+# It bounds the tap's axis only over its 9.52 thread, so the axis may lean
+# atan(0.14 / 9.52) = 0.84 deg and run 0.07 + 37.01 * 0.14 / 9.52 = 0.614
+# off nominal at the crossbar's faced top.  Charged in the zone radius's
+# place, that is 0.46 past the float.  The dowels
+# locate the mount, not the bolt, so the knife's place and its rock are
+# unaffected.  The #10-24 bolt (minor Ø3.68 over the 37.01 grip) flexes the
+# 0.46 at about 49 N (cantilever estimate, E 200 GPa), and MHA-SM-00 has it
+# turned in by hand to its washer before it is tightened.
 STUD_TAP_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-hanger tap position"])
+# Owner ruling 2026-10-27 (#2016, option A): datum B's round slip hole and
+# datum C's slot stand square to the datum-A top seat, so the MHA-SM-VN-53
+# dowels, pressed square into the crossbar, enter them without binding.  The
+# hole takes ⊥Ø0.015|A (a cylindrical zone round its axis); the slot, a
+# width feature, takes ⊥0.015|A (a planar zone, no Ø) on its centre plane:
+# two controls, each its own key, both set to 0.015 by the ruling.
+DOWEL_HOLE_PERPENDICULARITY_TOL = float(
+    GEOMETRIC_TOLERANCES_MM["dowel hole perpendicularity"]
+)
+DOWEL_SLOT_PERPENDICULARITY_TOL = float(
+    GEOMETRIC_TOLERANCES_MM["dowel slot perpendicularity"]
+)
 
 
 def free_rock_deg(
@@ -143,18 +183,21 @@ def free_rock_deg(
     return math.degrees(low - phi0)
 
 
-# Why Ø0.05 (2026-10-09 ruling): a yawed bore steals rock.  Free rock of the
-# nominal 8.080 x 10.268 trunnion in the nominal Ø12 against the far-end
-# offset t across the 14 deep bore: t 0 -> 8.92 deg, 0.05 -> 8.44, 0.10 ->
-# 7.96, 0.18 -> 7.17.  The drawing-guidelines.md rule 17 (walls and webs) budget -- the trunnion's ridge-to-side and flank-to-side limits and
-# the bore's .XX size at its band limit, t the ⊥Ø0.05 zone plus the dowel
-# yaw across the deepest .X block -- is
-# ``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG`` (>= 5.0, 6.64 in
-# the reamed bore), which owns the
-# crossbar's slip terms.  The top seat clamps to the frame's faced Ra 3.2
-# underside plane (MHA-FR-02, user ruling 2026-10-12), so no bedding term
-# enters: seat form tilts the block, it cannot yaw the bore off the dowel
-# line.
+# Why the bore's orientation is budgeted (2026-10-09 ruling): a yawed bore
+# steals rock.  Free rock of the nominal 8.080 x 10.268 trunnion in the
+# nominal Ø12 against the far-end offset t across the 14 deep bore: t 0 ->
+# 8.92 deg, 0.05 -> 8.44, 0.10 -> 7.96, 0.18 -> 7.17.  The drawing-guidelines.md
+# rule 17 (walls and webs) budget -- the trunnion's ridge-to-side and
+# flank-to-side limits and the bore's .XX size at its band limit, t the
+# bore's Ø0.05 orientation refinement to A|B|C (owner ruling 2026-10-27,
+# #2016: the composite frame's lower segment) plus the dowel yaw across the
+# deepest .X block and the ridge's yaw between the two bores, the latter on
+# the Ø0.20 location zone -- is
+# ``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG`` (>= 5.0, 6.32 in
+# the reamed bore), which owns the slip terms.  The top seat clamps to the
+# frame's faced Ra 3.2 underside plane (MHA-FR-02, user ruling 2026-10-12),
+# so no bedding term enters: seat form tilts the block, it cannot yaw the
+# bore off the dowel line.
 KNIFE_FREE_ROCK_DEG = free_rock_deg(0.0)
 # The bore crown (its upper inner wall) below the top seat: 14.62.
 BORE_CROWN_DEPTH = BLK_TOP - (BORE_CY + R_BORE)
@@ -346,67 +389,68 @@ BOLT_NUMBER = "MHA-SM-VN-52"
 TAP_DRILL_CALLOUT = f"{STUD_TAP_DRILL} DRILL"
 TAP_CALLOUT_REASON = f"SETS {BOLT_NUMBER} TIP CLEARANCE"
 
-# MHA-SM-VN-53 dowels: two blind flat-bottom reamed holes in the top seat at
-# DOWEL.HANGER_OFFSET either side of the tap axis along local X, at mid-depth.
-# The pair is the sheet's datum B (the orientation that keys the block against
-# turning about its screw); the crossbar takes one in a round slip hole, the
-# other in a slot along the dowel line, so the pattern never overconstrains.
-# The reamed holes hold the press of the stock dowel, as the MHA-PD-18
-# latch-pin hole holds the same 1/8 series' (``pd_transgear_arm_geometry``).
-PIN_HOLE_X = DOWEL.HANGER_OFFSET  # 7.632
-PIN_HOLE_XS = (-PIN_HOLE_X, PIN_HOLE_X)
-PIN_HOLE_COUNT = len(PIN_HOLE_XS)
-if PIN_HOLE_COUNT != DOWEL.PER_MOUNT:
-    raise AssertionError("the knife mount reams one hole per MHA-SM-VN-53 dowel")
-# The pair's 2X ream carries ⌖Ø0.13 to the top seat (datum A) and names the
-# pattern datum B (the datum feature symbol on that frame; drawing-guidelines.md rule 5 (avoid excessive GD&T)); the
-# frame itself prints 2X under it too, so B is plainly the two-hole pattern,
-# not one hole.  The sheet
-# prints its span BASIC between the two hole axes, centred on the block, and
-# positions the tap and the bore to A|B.  Each hole's station from the
-# pattern centre varies by the zone's radius, and from the tap axis by that
-# plus the tap's zone radius.
-PIN_HOLE_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["dowel hole pattern position"])
-PIN_HOLE_SPAN = DOWEL.SPAN  # 15.264 BASIC
-PIN_HOLE_SPAN_PLACES = DOWEL.SPAN_PLACES
-PIN_HOLE_SPAN_TOL = PIN_HOLE_POSITION_TOL  # 0.13: the span's worst variation
-PIN_HOLE_HALF_SPAN_TOL = PIN_HOLE_SPAN_TOL / 2.0  # 0.065
-PIN_HOLE_X_TOL = PIN_HOLE_HALF_SPAN_TOL + STUD_TAP_POSITION_TOL / 2.0  # 0.14
-PIN_HOLE_DIA = DOWEL.DIA  # 3.175
-PIN_HOLE_DIA_BAND = (0.0, -0.010)
-PIN_HOLE_DIA_PLACES = 3
-PIN_HOLE_DEPTH = DOWEL.PRESS_DEPTH  # 9.5
-PIN_HOLE_DEPTH_PLACES = DOWEL.PRESS_DEPTH_PLACES
+# MHA-SM-VN-53 dowels (owner ruling 2026-10-24, T+H3; machinist ENFORCE
+# review of this sheet, rules 16 and 4): the pins press into the MHA-FR-02
+# crossbar, which carries their knockouts, and SLIP into this hardened block,
+# which so carries no press band to hold through heat treatment.  The +X pin
+# enters a blind round slip hole, datum B; the -X pin a slot along the dowel
+# line, datum C, open to the block's -X face (a closed 3.95 slot left a 1.59
+# worst web to that face of the 25.4 block; open, it leaves none), its width
+# positioned to A|B.  Both are cut from the top seat to one flat floor.
+PIN_HOLE_X = DOWEL.HANGER_OFFSET  # 7.632, datum B's station from the tap axis
+SLOT_X = -PIN_HOLE_X  # the -X pin's station: datum C, the slot
+if DOWEL.PER_MOUNT != 2:
+    raise AssertionError("the knife mount keys on one hole and one slot")
+PIN_HOLE_DIA = DOWEL.SLIP_HOLE_DIA  # 3.25
+PIN_HOLE_DIA_BAND = DOWEL.SLIP_HOLE_DIA_BAND
+PIN_HOLE_DIA_PLACES = DOWEL.SLIP_HOLE_DIA_PLACES
+PIN_HOLE_DEPTH = DOWEL.SLIP_DEPTH  # 9.5, the hole's and the slot's floor
+PIN_HOLE_DEPTH_PLACES = DOWEL.SLIP_DEPTH_PLACES
+SLOT_WIDTH = DOWEL.SLIP_HOLE_DIA
+SLOT_WIDTH_BAND = DOWEL.SLIP_HOLE_DIA_BAND
+SLOT_WIDTH_PLACES = DOWEL.SLIP_HOLE_DIA_PLACES
 DOWEL_NUMBER = "MHA-SM-VN-53"
-if PIN_HOLE_SPAN_TOL != DOWEL.SPAN_TOL or PIN_HOLE_SPAN_PLACES != 3:
+# The slot's width: ⌖0.05 to A|B, at an implied basic zero across the line
+# from B (the crossbar's former slot frame, moved with the slot).
+SLOT_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["dowel slot position"])
+# The slot's inner end: its half-round end's centre stands SLOT_END_FROM_B
+# from B's axis along the line, printed .XX.  Its shortest limit keeps the
+# end clear of the tap's thread (below); its longest still puts the slot's
+# pin, at the crossbar's shortest span (BASIC 15.264 within its Ø0.05 zone)
+# and B's slip, wholly between the slot's straight walls, so the walls bound
+# the pin across the line (clocking) at every limit.  The slot runs straight
+# out through the -X face.  The block may go on either way round: the pins
+# are one pair, the same either way.
+SLOT_END_FROM_B = 14.40
+SLOT_END_PLACES = 2
+SLOT_END_TOL = _XX  # 0.51
+_SLIP_HALF = DOWEL.SLIP_CLEARANCE_MAX / 2.0  # B's float on its pin, 0.046
+# The slot's pin's axis from B's axis along the line, (nearest, farthest).
+SLOT_PIN_FROM_B = (
+    DOWEL.SPAN - DOWEL.SPAN_TOL - _SLIP_HALF,
+    DOWEL.SPAN + DOWEL.SPAN_TOL + _SLIP_HALF,
+)  # (15.193, 15.335)
+# Clocking: the pin's centre stands past the end's centre at the end's
+# longest limit, so the pin's full diameter bears on the straight walls:
+# 15.193 - 14.91 = 0.283.
+SLOT_PIN_LOCATION_MARGIN = SLOT_PIN_FROM_B[0] - (SLOT_END_FROM_B + SLOT_END_TOL)
+if SLOT_PIN_LOCATION_MARGIN <= 0.0:
     raise AssertionError(
-        "the dowel pattern's zone must be the span variation the stacks take"
+        f"the -X dowel can reach the slot's half-round end "
+        f"({SLOT_PIN_LOCATION_MARGIN:.3f}): its walls no longer clock the block"
     )
-# (loosest, tightest) press from the ream band and the catalogue band:
-# 0.00254..0.01762, printed rounded outward to four places.
-PIN_PRESS_INTERFERENCE = (
-    round(DOWEL.DIA_MIN - (PIN_HOLE_DIA + max(PIN_HOLE_DIA_BAND)), 6),
-    round(DOWEL.DIA_MAX - (PIN_HOLE_DIA + min(PIN_HOLE_DIA_BAND)), 6),
-)
-if PIN_PRESS_INTERFERENCE[0] <= 0.0:
-    raise AssertionError("the knife-mount dowel ream loses MHA-SM-VN-53's press")
-# The press the sheet prints, rounded outward to four places (the MHA-PD-18
-# latch-pin precedent, ``pd_transgear_arm_spec.LATCH_PIN_PRESS_PRINTED``).
-PIN_PRESS_PRINTED = (
-    math.floor(PIN_PRESS_INTERFERENCE[0] * 1e4 + 1e-6) / 1e4,
-    math.ceil(PIN_PRESS_INTERFERENCE[1] * 1e4 - 1e-6) / 1e4,
-)
-if PIN_PRESS_PRINTED != (0.0025, 0.0177):
-    raise AssertionError(f"knife-mount dowel press prints {PIN_PRESS_PRINTED}")
-# Worst-case webs round each dowel hole (largest ream, station off by its
-# band).
-_PIN_R_MAX = (PIN_HOLE_DIA + max(PIN_HOLE_DIA_BAND)) / 2.0
-# The pattern is located on the block's outside faces at general tolerance
-# (blind machinist review, 2026-10-09: nothing tied the dowel/tap/bore family
-# to the faces), both in the top view: the +X dowel hole's axis from the +X
-# side face (.XX, the BASIC span chains on to the -X hole) and the -X hole's
-# axis from the front face (.X).  The row's square to the front face is the
-# title block's angular tolerance.
+# The -X face from B's axis at its nearest: the narrowest .X block less B's
+# farthest .XX station from the +X face, 24.6 - 5.578 = 19.022.
+# (PIN_HOLE_SIDE_* below.)
+
+# --- Locations and worst-case webs ------------------------------------------
+_PIN_R_MAX = (PIN_HOLE_DIA + max(PIN_HOLE_DIA_BAND)) / 2.0  # 1.635
+_SLOT_HALF_W_MAX = (SLOT_WIDTH + max(SLOT_WIDTH_BAND)) / 2.0  # 1.635
+# B is located on the block's outside faces at general tolerance (blind
+# machinist review, 2026-10-09: nothing tied the dowel/tap/bore family to the
+# faces), both in the top view: its axis from the +X side face (.XX) and
+# from the front/back face (.X, the block's mid-plane).  The line's square to
+# the front face is the title block's angular tolerance.
 PIN_HOLE_SIDE_DISTANCE = BLK_HALF_X - PIN_HOLE_X  # 5.068, prints 5.07
 PIN_HOLE_SIDE_PLACES = 2
 PIN_HOLE_SIDE_TOL = _XX  # 0.51
@@ -414,44 +458,80 @@ HOLE_ROW_FACE_DISTANCE = SUPPORT_Z_THICK / 2.0  # 7.0
 HOLE_ROW_FACE_PLACES = 1
 HOLE_ROW_FACE_TOL = _X  # 0.8
 _ANGULAR_TOL_DEG = float(_config.title_block("angular")["value_deg"])  # 1.0
-# To the +X side face: 5.068 - 0.51 - 1.5875 = 2.97.
-PIN_HOLE_SIDE_WEB = PIN_HOLE_SIDE_DISTANCE - PIN_HOLE_SIDE_TOL - _PIN_R_MAX
-# The -X hole to the -X face, the narrowest .X block and the hole a full span
-# variation out: 24.6 - (5.578 + 15.394) - 1.5875 = 2.04.
-PIN_HOLE_FAR_SIDE_WEB = (
-    (2.0 * BLK_HALF_X - BLOCK_SIZE_TOL)
-    - (PIN_HOLE_SIDE_DISTANCE + PIN_HOLE_SIDE_TOL + PIN_HOLE_SPAN + PIN_HOLE_SPAN_TOL)
-    - _PIN_R_MAX
+_TAN_ANGULAR = math.tan(math.radians(_ANGULAR_TOL_DEG))
+_FACE_FROM_B_MIN = (2.0 * BLK_HALF_X - BLOCK_SIZE_TOL) - (
+    PIN_HOLE_SIDE_DISTANCE + PIN_HOLE_SIDE_TOL
+)  # 19.022
+_FACE_FROM_B_MAX = (2.0 * BLK_HALF_X + BLOCK_SIZE_TOL) - (
+    PIN_HOLE_SIDE_DISTANCE - PIN_HOLE_SIDE_TOL
+)  # 21.642
+# The mouth: the slot's pin bears wholly inside the block, its far side short
+# of the -X face: 19.022 - 15.335 - 1.591 = 2.10.
+SLOT_MOUTH_PIN_MARGIN = _FACE_FROM_B_MIN - SLOT_PIN_FROM_B[1] - DOWEL.DIA_MAX / 2.0
+if SLOT_MOUTH_PIN_MARGIN <= 0.0:
+    raise AssertionError(
+        f"the -X dowel overhangs the slot's open mouth ({SLOT_MOUTH_PIN_MARGIN:.3f})"
+    )
+# The slot's half-round end stands well inboard of the mouth, so its straight
+# walls run square out through the -X face (no part-round lip or feather edge
+# to trap a burr there): 19.022 - 14.91 - 1.635 = 2.48.
+SLOT_END_TO_MOUTH = (
+    _FACE_FROM_B_MIN - (SLOT_END_FROM_B + SLOT_END_TOL) - _SLOT_HALF_W_MAX
 )
-# Front and back faces: the -X hole off its .X band, the block at its
-# thinnest .X depth, the row skewed by the angular tolerance.  The +X hole
-# stands a full pattern variation and the longest span's skew off it, 0.13 +
-# 15.394 tan 1 deg = 0.399; the tap the half-span band, its zone radius and
-# half that skew, 0.274.  Back (the binding side) 13.2 - 7.8 = 5.4 from the
-# -X axis: dowel 5.4 - 0.399 - 1.5875 = 3.41, tap thread 5.4 - 0.274 -
-# 2.413 = 2.71.
+if SLOT_END_TO_MOUTH < STUD_TAP_WEB_MIN:
+    raise AssertionError(
+        f"the dowel slot's half-round end stands {SLOT_END_TO_MOUTH:.3f} inside"
+        " its mouth: its walls do not run straight out through the -X face"
+    )
+# The B row's nearer front/back face at its worst: the face location's .X
+# band, or the thinnest .X block measured from the far face.
 _ROW_Z_MIN = min(
     HOLE_ROW_FACE_DISTANCE - HOLE_ROW_FACE_TOL,
     (2.0 * HOLE_ROW_FACE_DISTANCE - BLOCK_SIZE_TOL)
     - (HOLE_ROW_FACE_DISTANCE + HOLE_ROW_FACE_TOL),
+)  # 5.4
+# B to the +X side face: 5.068 - 0.51 - 1.635 = 2.92.
+PIN_HOLE_SIDE_WEB = PIN_HOLE_SIDE_DISTANCE - PIN_HOLE_SIDE_TOL - _PIN_R_MAX
+# B to the front/back face: 5.4 - 1.635 = 3.77.
+PIN_HOLE_Z_WEB = _ROW_Z_MIN - _PIN_R_MAX
+# The slot's two cheeks (no thin finger at the mouth): its centre plane off
+# B's line by half its zone, the line skewed by the angular tolerance out to
+# the -X face at its farthest, 5.4 - 0.025 - 0.378 - 1.635 = 3.36.
+SLOT_CHEEK_WEB = (
+    _ROW_Z_MIN
+    - SLOT_POSITION_TOL / 2.0
+    - _FACE_FROM_B_MAX * _TAN_ANGULAR
+    - _SLOT_HALF_W_MAX
 )
-_ROW_SKEW = (PIN_HOLE_SPAN + PIN_HOLE_SPAN_TOL) * math.tan(
-    math.radians(_ANGULAR_TOL_DEG)
+# The tap axis stands BASIC PIN_HOLE_X from B, within its zone radius.
+_TAP_FROM_B_MIN = PIN_HOLE_X - STUD_TAP_POSITION_TOL / 2.0
+# B to the tap's thread major: 7.557 - 1.635 - 2.413 = 3.51.
+PIN_HOLE_TAP_WEB = _TAP_FROM_B_MIN - _PIN_R_MAX - STUD_THREAD_MAJOR / 2.0
+# The slot's half-round end to the tap's thread major, the end at its
+# nearest: 13.89 - 1.635 - 7.707 - 2.413 = 2.135.
+_SLOT_TIP_FROM_B_MIN = SLOT_END_FROM_B - SLOT_END_TOL - _SLOT_HALF_W_MAX
+SLOT_TAP_WEB = (
+    _SLOT_TIP_FROM_B_MIN
+    - (PIN_HOLE_X + STUD_TAP_POSITION_TOL / 2.0)
+    - STUD_THREAD_MAJOR / 2.0
 )
-PIN_HOLE_Z_WEB = _ROW_Z_MIN - (PIN_HOLE_SPAN_TOL + _ROW_SKEW) - _PIN_R_MAX
+# The tap's thread to the front/back face: its zone radius and the line's
+# skew over its BASIC station from B, 5.4 - 0.07 - 0.133 - 2.413 = 2.78.
 STUD_TAP_Z_WALL = (
-    _ROW_Z_MIN - (PIN_HOLE_X_TOL + _ROW_SKEW / 2.0) - STUD_THREAD_MAJOR / 2.0
+    _ROW_Z_MIN
+    - STUD_TAP_POSITION_TOL / 2.0
+    - PIN_HOLE_X * _TAN_ANGULAR
+    - STUD_THREAD_MAJOR / 2.0
 )
-# The bore's flanks, its axis off the pattern centre by its zone radius and
-# the pattern centre off the side face by the +X hole's band and the span's
-# half variation: near 12.7 - 0.575 - 0.10 - 6.015 = 6.01, far 24.6 - 13.275
-# - 0.10 - 6.015 = 5.21.
-_PATTERN_X_MAX = BLK_HALF_X + PIN_HOLE_SIDE_TOL + PIN_HOLE_HALF_SPAN_TOL
-BORE_SIDE_WEB = (
-    (2.0 * BLK_HALF_X - BLOCK_SIZE_TOL)
-    - _PATTERN_X_MAX
-    - KNIFE_BORE_POSITION_TOL / 2.0
-    - BORE_R_MAX
+# The bore's flanks: its axis BASIC PIN_HOLE_X from B within its zone
+# radius, B off the +X face by its .XX band: near 12.7 - 0.51 - 0.10 -
+# 6.015 = 6.075, far 24.6 - 13.31 - 6.015 = 5.275.
+_BORE_FROM_PLUS_X_FACE_MAX = (
+    BLK_HALF_X + PIN_HOLE_SIDE_TOL + KNIFE_BORE_POSITION_TOL / 2.0
+)
+BORE_SIDE_WEB = min(
+    BLK_HALF_X - PIN_HOLE_SIDE_TOL - KNIFE_BORE_POSITION_TOL / 2.0 - BORE_R_MAX,
+    (2.0 * BLK_HALF_X - BLOCK_SIZE_TOL) - _BORE_FROM_PLUS_X_FACE_MAX - BORE_R_MAX,
 )
 # Under the bore: the shortest .X block below the BASIC bore centre, the bore
 # at the bottom of its zone and at its largest: 28.8 - 20.62 - 0.10 - 6.015
@@ -462,23 +542,27 @@ BORE_BOTTOM_WALL = (
     - KNIFE_BORE_POSITION_TOL / 2.0
     - BORE_R_MAX
 )
-# To the tap's thread major: 7.492 - 1.5875 - 2.413 = 3.4915.
-PIN_HOLE_TAP_WEB = (PIN_HOLE_X - PIN_HOLE_X_TOL) - _PIN_R_MAX - STUD_THREAD_MAJOR / 2.0
-# The hole floor's inner corner to the bore, the floor at its deepest and the
-# bore at its largest, highest position, its axis also off the pattern
-# centre toward the hole by its zone radius: 5.78.
-_PIN_FLOOR_Y_MIN = BLK_TOP - (PIN_HOLE_DEPTH + DOWEL.PRESS_DEPTH_TOL)
+# The floors at their deepest over the bore at its largest and highest.
+_PIN_FLOOR_Y_MIN = BLK_TOP - (PIN_HOLE_DEPTH + DOWEL.SLIP_DEPTH_TOL)
+_BORE_CY_MAX = BORE_CY + KNIFE_BORE_POSITION_TOL / 2.0
+# B's floor corner, B toward the bore by the bore's zone radius: 5.78.
 PIN_HOLE_BORE_WEB = (
-    (PIN_HOLE_X - PIN_HOLE_HALF_SPAN_TOL - KNIFE_BORE_POSITION_TOL / 2.0 - _PIN_R_MAX)
-    ** 2
-    + (_PIN_FLOOR_Y_MIN - (BORE_CY + KNIFE_BORE_POSITION_TOL / 2.0)) ** 2
+    (PIN_HOLE_X - KNIFE_BORE_POSITION_TOL / 2.0 - _PIN_R_MAX) ** 2
+    + (_PIN_FLOOR_Y_MIN - _BORE_CY_MAX) ** 2
+) ** 0.5 - BORE_R_MAX
+# The slot floor's nearest corner, its half-round end at its nearest: 5.16.
+SLOT_BORE_WEB = (
+    (_SLOT_TIP_FROM_B_MIN - PIN_HOLE_X - KNIFE_BORE_POSITION_TOL / 2.0) ** 2
+    + (_PIN_FLOOR_Y_MIN - _BORE_CY_MAX) ** 2
 ) ** 0.5 - BORE_R_MAX
 for _label, _web in (
-    ("dowel to the +X side face", PIN_HOLE_SIDE_WEB),
-    ("dowel to the -X side face", PIN_HOLE_FAR_SIDE_WEB),
-    ("dowel to the tap thread", PIN_HOLE_TAP_WEB),
-    ("dowel to the bore", PIN_HOLE_BORE_WEB),
-    ("dowel to the front/back face", PIN_HOLE_Z_WEB),
+    ("dowel hole B to the +X side face", PIN_HOLE_SIDE_WEB),
+    ("dowel hole B to the front/back face", PIN_HOLE_Z_WEB),
+    ("dowel slot cheek to the front/back face", SLOT_CHEEK_WEB),
+    ("dowel hole B to the tap thread", PIN_HOLE_TAP_WEB),
+    ("dowel slot end to the tap thread", SLOT_TAP_WEB),
+    ("dowel hole B to the bore", PIN_HOLE_BORE_WEB),
+    ("dowel slot to the bore", SLOT_BORE_WEB),
     ("tap thread to the front/back face", STUD_TAP_Z_WALL),
     ("bore to the side face", BORE_SIDE_WEB),
     ("bore to the bottom face", BORE_BOTTOM_WALL),
@@ -499,10 +583,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # the sheet it read as a (wrong) 12.45 bore radius (blind review round 2).
     # The centre height is a sheet-added BASIC from the datum-A top seat.
     "BoreProfile": {"BoreDia"},
-    # The dowel holes: their reamed Ø and flat-floor depth.  Their span is a
-    # sheet-added dimension between the two hole axes (the model locates
-    # each from the tap axis, which the sheet positions to the pair).
-    "PinHoleProfile": {"PinHoleDia"},
+    # Datum B, the round slip hole: its Ø and the floor depth it shares with
+    # the slot (one cut).  Datum C, the slot: its width and its half-round
+    # end's centre from B's axis, both in the hole sketch.
+    "PinHoleProfile": {"PinHoleDia", "SlotWidth", "SlotEndFromB"},
     "PinHole": {"PinHoleDepth"},
 }
 # Places the part authors on the marked dimensions (drawing-simplicity
@@ -510,7 +594,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {"BlockWidth": BLOCK_SIZE_PLACES, "BlockHeight": BLOCK_SIZE_PLACES},
     "BoreProfile": {"BoreDia": BORE_DIA_PLACES},
-    "PinHoleProfile": {"PinHoleDia": PIN_HOLE_DIA_PLACES},
+    "PinHoleProfile": {
+        "PinHoleDia": PIN_HOLE_DIA_PLACES,
+        "SlotWidth": SLOT_WIDTH_PLACES,
+        "SlotEndFromB": SLOT_END_PLACES,
+    },
     "PinHole": {"PinHoleDepth": PIN_HOLE_DEPTH_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -519,33 +607,63 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, places in names.items()
 }
 # Places of the dimensions the sheet adds between two model features (no
-# model dimension carries them; the fr_top_frame_spec precedent): the dowel
-# pair's BASIC span, the tap axis's BASIC station from a dowel axis (the tap
-# and bore frames reference B), the bore centre's BASIC height under the
-# datum-A top seat, the block's depth, and the pattern's two face
-# locations.  A BASIC
-# states the model's exact value, so its places must print it unrounded: the
-# height is the build's 14.866 + 5.75 = 20.616
-# (``build_sm_knife_mount.BORE_CENTRE_DEPTH``), not this module's 14.87
-# mirror.
+# model dimension carries them; the fr_top_frame_spec precedent): the tap
+# axis's BASIC station from B (the tap and bore frames reference A|B|C),
+# the bore centre's BASIC height under the datum-A top seat, the block's
+# depth, and B's two face locations.  A BASIC states the model's exact
+# value, so its places must print it unrounded: the height is the build's
+# 14.866 + 5.75 = 20.616 (``build_sm_knife_mount.BORE_CENTRE_DEPTH``), not
+# this module's 14.87 mirror.
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {
-    "dowel hole span": PIN_HOLE_SPAN_PLACES,
-    "dowel hole from tap axis": PIN_HOLE_SPAN_PLACES,
+    "dowel hole from tap axis": DOWEL.HANGER_OFFSET_PLACES,
     "knife-bore centre from top seat": 3,
     "block-depth overall": BLOCK_SIZE_PLACES,
     "dowel hole from side face": PIN_HOLE_SIDE_PLACES,
     "hole row from front face": HOLE_ROW_FACE_PLACES,
 }
-# The pair's count above the dowel holes' Ø and three short lines under it
-# (the MHA-PD-18 PIN_HOLE_CALLOUT precedent): the operation, the mating
-# dowel, the press.  The pair is datum B.
-PIN_HOLE_PAIR_CALLOUT = f"{PIN_HOLE_COUNT}X"
-PIN_HOLE_CALLOUT = "\n".join(
-    (
-        "BLIND FLAT-BOTTOM REAM",
-        f"PRESS {DOWEL_NUMBER} DOWEL TO FLOOR",
-        f"{PIN_PRESS_PRINTED[0]:.4f}/{PIN_PRESS_PRINTED[1]:.4f} INTERFERENCE",
-    )
+# Rule 4: each slip band names its mate and the clearance it sets, printed
+# outward to three places.
+PIN_SLIP_PRINTED = (
+    math.floor(DOWEL.SLIP_CLEARANCE_MIN * 1e3 + 1e-6) / 1e3,
+    math.ceil(DOWEL.SLIP_CLEARANCE_MAX * 1e3 - 1e-6) / 1e3,
+)  # (0.047, 0.093)
+_SLIP_MATE = (
+    f"{PIN_SLIP_PRINTED[0]:.3f}-{PIN_SLIP_PRINTED[1]:.3f} DIAMETRAL CLEARANCE",
+    f"ON {DOWEL_NUMBER} DOWEL",
 )
+PIN_HOLE_CALLOUT = "\n".join(("BLIND FLAT-BOTTOM REAM", *_SLIP_MATE))
+SLOT_WIDTH_CALLOUT = "\n".join(("OPEN-END SLOT", f"SLIP FIT ON {DOWEL_NUMBER}"))
+# One depth for the hole and the slot (one cut to one floor), the
+# fr_top_frame HANGER_PIN_DEPTH_CALLOUT precedent.  Nothing seats on the
+# floor (the longest proud pin stands SLIP_DEPTH_CLEARANCE_MIN off the
+# shallowest), so its corner takes the title block's INSIDE CORNERS R1.0
+# MAX and the row prints no limit of its own (machinist review, farm run
+# 20261027T233328148Z: a local CORNER R0.1 MAX named no function, rule 1).
+# The angular-fit proof (build_sm_summing_assembly) charges the hole's
+# straight wall short of that corner, 9.5 - 0.8 - 1.0 - 0.5 = 7.2.
+DOWEL_HOLE_FLOOR_CORNER_R_MAX = float(_config.title_block("inside_corner")["radius_mm"])
+PIN_DEPTH_CALLOUT = "2X FLAT BOTTOM"
+# The longest proud pin's crowned end reaches 0.007 below the shallowest
+# straight wall, into that corner: pushed against the wall there, the crown
+# meets the corner's arc DOWEL_HOLE_CORNER_RECESS (0.00004) in from the
+# wall, inside half the tightest slip, so the corner neither bottoms nor
+# binds the pin.
+_CROWN_CENTRE_DEPTH = DOWEL.PROUD_MAX - DOWEL.FREE_END_LEN
+_CORNER_CENTRE_DEPTH = (
+    DOWEL.SLIP_DEPTH - DOWEL.SLIP_DEPTH_TOL - DOWEL_HOLE_FLOOR_CORNER_R_MAX
+)
+DOWEL_HOLE_CORNER_RECESS = (
+    math.hypot(
+        DOWEL_HOLE_FLOOR_CORNER_R_MAX - DOWEL.FREE_END_LEN,
+        max(_CROWN_CENTRE_DEPTH - _CORNER_CENTRE_DEPTH, 0.0),
+    )
+    + DOWEL.FREE_END_LEN
+    - DOWEL_HOLE_FLOOR_CORNER_R_MAX
+)
+if DOWEL_HOLE_CORNER_RECESS >= DOWEL.SLIP_CLEARANCE_MIN / 2.0:
+    raise AssertionError(
+        f"the slip hole's floor corner reaches the proud pin's crown "
+        f"({DOWEL_HOLE_CORNER_RECESS:.4f} >= half the tightest slip)"
+    )
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

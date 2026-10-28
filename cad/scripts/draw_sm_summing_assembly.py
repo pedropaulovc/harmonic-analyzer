@@ -38,6 +38,7 @@ import _telemetry
 import sm_summing_assembly_sheet as notes
 import sm_summing_assembly_spec as spec
 import sm_summing_explode_spec as explode
+import sm_vn_boss_hook_jam_nut_spec as jam_nut
 from _check import check
 from _com import _early_bound
 from _drawing_balloons import (
@@ -236,8 +237,21 @@ EYEBOLT_BALLOON_POINT_MM = (
     ANCHOR_9490T1.eye_open_tip_mm[1],
     ANCHOR_9490T1.wire_radius_mm,
 )
+# The jam nut's walked anchor landed at its underside, so leader 7 read as
+# ending on the eyebolt shank below the nut (machinist review on 6d7f35476).
+# It is pinned to the hex instead: the vertical corner edge at half height
+# between the two flats facing the +X+Y+Z isometric viewer. The builder
+# places the nut with ROT_X_NEG90, part (x, y, z) -> machine (x, z, -y), so
+# the part corner at 120 deg from +Y, (r sin 120, r cos 120), lands at
+# machine (+X, +Z).
+JAM_NUT_BALLOON_POINT_MM = (
+    jam_nut.ACROSS_CORNERS / 2.0 * math.sin(math.radians(120.0)),
+    jam_nut.ACROSS_CORNERS / 2.0 * math.cos(math.radians(120.0)),
+    jam_nut.THICKNESS / 2.0,
+)
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
-    spec.BOSS_HOOK: BalloonAnchor(point_mm=EYEBOLT_BALLOON_POINT_MM)
+    spec.BOSS_HOOK: BalloonAnchor(point_mm=EYEBOLT_BALLOON_POINT_MM),
+    spec.BOSS_JAM_NUT: BalloonAnchor(point_mm=JAM_NUT_BALLOON_POINT_MM),
 }
 
 EXPLODED_VIEW_NAMES = {

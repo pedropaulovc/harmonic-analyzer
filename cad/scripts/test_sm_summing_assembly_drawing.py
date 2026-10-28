@@ -117,6 +117,25 @@ def test_station_slide_clears_the_hex_trunnion() -> None:
         assert abs(distance) > builder.HEX_Z_OUTER - mount_inner_face
 
 
+def test_dowels_leave_the_mounts_with_the_crossbar_not_with_the_mounts() -> None:
+    # Owner ruling 2026-10-24 (T+H3): the dowels press into the crossbar, so
+    # the explode lifts them out of the mounts' round hole and slot before any
+    # station slides, and no station slide carries them.
+    labels = [label for label, *_ in explode.EXPLODE_STEPS]
+    dowel_steps = [
+        (index, step)
+        for index, step in enumerate(explode.EXPLODE_STEPS)
+        if spec.DOWEL in step[1]
+    ]
+    assert len(dowel_steps) == 1
+    index, (_label, stems, station, axis, distance) = dowel_steps[0]
+    assert stems == (spec.DOWEL,) and station is None and axis == "y"
+    assert index < labels.index("front station slides off")
+    assert distance == explode.DOWEL_LIFT > builder.knife_dowel.PROUD_MAX
+    dowel_top = builder.KNIFE_DOWEL_Y + explode.DOWEL_LIFT
+    assert dowel_top < builder.HANGER_WASHER_Y
+
+
 def test_jam_nut_explodes_threaded_on_the_eyebolt_shank() -> None:
     # Fitted, the nut's underside is on the boss top face, ANCHOR_H above the
     # eyebolt's cut end (flush with the boss underside).
@@ -141,6 +160,35 @@ def test_eyebolt_balloon_lands_on_the_eye_facing_the_viewer() -> None:
     # Its outward normal faces the +X+Y+Z isometric viewer.
     assert sum(offset) > 0.0
     assert drawing.BALLOON_ANCHORS[spec.BOSS_HOOK].point_mm == point
+
+
+def test_jam_nut_balloon_lands_on_the_hex_corner_facing_the_viewer() -> None:
+    x, y, z = drawing.JAM_NUT_BALLOON_POINT_MM
+    # A hex corner (corners at 0, 60, ... deg from part +Y), at half height.
+    assert math.hypot(x, y) == pytest.approx(jam_nut.ACROSS_CORNERS / 2.0)
+    sixths = math.degrees(math.atan2(x, y)) / 60.0
+    assert sixths == pytest.approx(round(sixths), abs=1e-9)
+    assert z == pytest.approx(jam_nut.THICKNESS / 2.0)
+
+    def toward_viewer(px: float, py: float) -> float:
+        # Row-vector placement (the builder's JAM_NUT_ROWS), dotted with the
+        # +X+Y+Z isometric view direction in the horizontal plane.
+        rows = builder.JAM_NUT_ROWS
+        machine = [px * rows[0][i] + py * rows[1][i] for i in range(3)]
+        return machine[0] + machine[2]
+
+    corners = [
+        (
+            jam_nut.ACROSS_CORNERS / 2.0 * math.sin(math.radians(60.0 * k)),
+            jam_nut.ACROSS_CORNERS / 2.0 * math.cos(math.radians(60.0 * k)),
+        )
+        for k in range(6)
+    ]
+    assert toward_viewer(x, y) == pytest.approx(
+        max(toward_viewer(*corner) for corner in corners)
+    )
+    assert drawing.BALLOON_ANCHORS[spec.BOSS_JAM_NUT].point_mm == (x, y, z)
+    assert drawing.BALLOON_ANCHORS[spec.BOSS_JAM_NUT].instance is None
 
 
 def test_settings_are_derived_from_the_placed_geometry() -> None:
@@ -246,6 +294,17 @@ def test_retention_rows_cite_the_package_steps() -> None:
     assert hook.lock_step == "MHA-SM-00 STEP 2"
     nut = rows["sm-summing/boss-hook-jam-nut-on-hook"]
     assert nut.installed_at == "MHA-SM-00 STEP 2"
+
+
+def test_step_six_runs_each_hanger_bolt_home_by_hand_before_drawing_up() -> None:
+    # Owner ruling 2026-10-27 (#2018 option C): accepted as is.  Each cut
+    # bolt is run in by hand to its washer before it draws the mount's top
+    # seat flat to the crossbar underside.
+    step = notes.ASSEMBLY_STEPS[5]
+    assert step.startswith("6. ")
+    assert "MHA-SM-VN-52" in step
+    assert "WASHER" in step
+    assert step.index("BY HAND") < step.index("TIGHTEN")
 
 
 def test_hanger_fit_up_reach_matches_the_builder_band() -> None:

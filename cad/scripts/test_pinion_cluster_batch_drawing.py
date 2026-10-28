@@ -410,21 +410,6 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
             # Exact head-to-washer bearing contacts: no solid overlap allowed.
             frozenset(("sm-vn-knife-hanger-stud-1", "sm-vn-knife-hanger-washer-1")): 0.0,
             frozenset(("sm-vn-knife-hanger-stud-2", "sm-vn-knife-hanger-washer-2")): 0.0,
-            # 98381A473 at its largest (3.18262) in the smallest Ø3.165 ream,
-            # pressed 9.5 deep (the models are line to line); two per mount,
-            # the front mount's pair first.
-            frozenset(("sm-vn-knife-mount-dowel-1", "sm-knife-mount-1")): _annulus_limit(
-                3.18262, 3.165, 9.5
-            ),
-            frozenset(("sm-vn-knife-mount-dowel-2", "sm-knife-mount-1")): _annulus_limit(
-                3.18262, 3.165, 9.5
-            ),
-            frozenset(("sm-vn-knife-mount-dowel-3", "sm-knife-mount-2")): _annulus_limit(
-                3.18262, 3.165, 9.5
-            ),
-            frozenset(("sm-vn-knife-mount-dowel-4", "sm-knife-mount-2")): _annulus_limit(
-                3.18262, 3.165, 9.5
-            ),
             # 9490T1 #10-24 through the 0.75-in boss; #25 tap drill.
             frozenset(("sm-vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
@@ -435,6 +420,22 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
                 6.35, 5.41, 11.84
             ),
         }
+    )
+    # Owner ruling 2026-10-24 (T+H3): the four knife-mount dowels press into
+    # the one MHA-FR-02 crossbar, so the back mount's pair (dowels 3-4) pairs
+    # with fr-top-frame-1, not a second crossbar, and no dowel pairs with a
+    # knife mount (each slips in its round hole or slot).
+    top = _interference_contracts.allowed_interference_pairs("ha-harmonic-analyzer")
+    for dowel_number in range(1, 5):
+        pair = frozenset(
+            (
+                f"sm-summing-1/sm-vn-knife-mount-dowel-{dowel_number}",
+                "fr-frame-1/fr-top-frame-1",
+            )
+        )
+        assert top[pair] == pytest.approx(_annulus_limit(3.18262, 3.165, 12.0))
+    assert not any(
+        "sm-vn-knife-mount-dowel" in name for pair in summing for name in pair
     )
 
 
@@ -580,25 +581,6 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
             frozenset(("sm-vn-knife-hanger-stud-1", "sm-vn-knife-hanger-washer-1")): 0.0,
             frozenset(("sm-vn-knife-hanger-stud-2", "sm-vn-knife-hanger-washer-2")): 0.0,
-            # Stock 98381A473 pressed 9.5 into the Ø3.175 +0/-0.010 ream,
-            # two per knife mount.
-            **_expected_numbered_pairs(
-                "sm-vn-knife-mount-dowel",
-                range(1, 3),
-                "sm-knife-mount",
-                3.18262,
-                3.165,
-                9.5,
-            ),
-            **_expected_numbered_pairs(
-                "sm-vn-knife-mount-dowel",
-                range(3, 5),
-                "sm-knife-mount",
-                3.18262,
-                3.165,
-                9.5,
-                second_number=2,
-            ),
             # Stock 9490T1: #10-24 major, #25 drill, 0.75-in boss engagement.
             frozenset(("sm-vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
@@ -776,6 +758,18 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 )): 0.0
                 for number in (1, 2)
             },
+            # Owner ruling 2026-10-24 (T+H3): 98381A473 at its largest
+            # (3.18262) pressed 12.0 up into the smallest Ø3.165 crossbar
+            # ream (the models are line to line); four in the one crossbar.
+            # In sm-summing each pin slips in its knife mount: no pair there.
+            **_expected_numbered_pairs(
+                "sm-summing-1/sm-vn-knife-mount-dowel",
+                range(1, 5),
+                "fr-frame-1/fr-top-frame",
+                3.18262,
+                3.165,
+                12.0,
+            ),
             **_expected_numbered_pairs(
                 "mg-magnifier-1/mg-vn-magnifying-bracket-screw",
                 range(1, 3),

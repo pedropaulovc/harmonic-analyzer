@@ -95,6 +95,7 @@ NUMBER_DRILL_MM = {  # number drills cut diameter exactly
     "#37": 2.642,
     "#43": 2.261,
     "#47": 1.994,
+    "#51": 1.702,  # 0.0670 in: MHA-FR-02 dowel-ream knockouts
     "#54": 1.397,
     "#5": 5.220,  # 0.2055in: #10 screw clearance (pivot-bracket ledge)
 }

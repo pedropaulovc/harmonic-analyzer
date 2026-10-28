@@ -93,6 +93,9 @@ def test_reach_extrema_are_the_fit_up_cut_band_alone() -> None:
         ("HANGER_THREAD_SPARE", -0.01, "useful full-form tail"),
         ("HANGER_REACH", 9.08, "outside the fit-up cut"),
         ("HANGER_CUT_LENGTH_MAX", 49.8, "without removing its factory end"),
+        # Owner ruling 2026-10-24 (T+H3): the dowel's free end, hanging from
+        # the crossbar ream, on the knife mount's slip-hole floor.
+        ("KNIFE_DOWEL_END_Y", 999.7 - 9.5, "bottoms the knife mount's slip hole"),
     ],
 )
 def test_stack_rejects_unseated_bearing_faces_or_insufficient_inspected_tail(
@@ -254,6 +257,43 @@ def test_hanger_axis_validation_rejects_transverse_or_reversed_axis(
 ) -> None:
     with pytest.raises(RuntimeError, match=r"local \+Y fastener axis.*assembly \+Y"):
         _assert_hanger_axis_positive_y(
-            "sm-vn-knife-mount-dowel-1",
+            "sm-vn-knife-hanger-stud-1",
             _transform(rotation_rows),
         )
+
+
+def test_knife_dowels_hang_pressed_end_up_from_the_crossbar_reams() -> None:
+    # Owner ruling 2026-10-24 (T+H3): each dowel is pressed chamfer end
+    # first up into its crossbar ream, so the model's pressed end (local
+    # y = 0) sits on the ream floor and its axis points down (Rx180).
+    assert asm.KNIFE_DOWEL_ROWS == [[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]]
+    _assert_hanger_axis_positive_y(
+        "sm-vn-knife-mount-dowel-1", _transform(asm.KNIFE_DOWEL_ROWS), sense=-1.0
+    )
+    for rotation_rows in (
+        [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+        [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0]],
+    ):
+        with pytest.raises(RuntimeError, match=r"local \+Y fastener axis.*assembly -Y"):
+            _assert_hanger_axis_positive_y(
+                "sm-vn-knife-mount-dowel-1", _transform(rotation_rows), sense=-1.0
+            )
+    assert asm.KNIFE_DOWEL_Y == pytest.approx(
+        CASTING_UNDERSIDE_Y + top_frame.HANGER_PIN_HOLE_DEPTH
+    )
+    assert asm.KNIFE_DOWEL_Y == pytest.approx(1011.7)
+    assert asm.KNIFE_DOWEL_END_Y == pytest.approx(992.65)
+
+
+def test_crossbar_hanger_stations_are_the_assemblys_knife_mount_stations() -> None:
+    # The crossbar's holes and its worst-case proofs read fr_top_frame_spec's
+    # stations; the assembly places the mounts and dowels at its own derived
+    # trunnion mid (87.0585).  The crossbar's 87.06 is that mid at the
+    # print's .XX resolution (the literal main's build_fr_top_frame carried),
+    # so a trunnion-station edit past that rounding must move both.
+    assert round(asm.HEX_Z_MID, 2) == top_frame.HEX_Z_MID
+    for crossbar, assembly in (
+        (top_frame.STUD_Z_FRONT, asm.SUMMING_Z - asm.HEX_Z_MID),
+        (top_frame.STUD_Z_REAR, asm.SUMMING_Z + asm.HEX_Z_MID),
+    ):
+        assert abs(crossbar - assembly) < 0.005

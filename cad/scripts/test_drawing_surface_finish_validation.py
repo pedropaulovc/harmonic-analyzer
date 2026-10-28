@@ -810,13 +810,18 @@ def _stacked_frame(
     monkeypatch: pytest.MonkeyPatch,
     lower_reads_back: Any,
     upper_reads_back: Any = lambda xml: xml,
+    *,
+    composite: bool = False,
+    joins: bool = True,
 ) -> list[str]:
     """add_feature_control_frame on a fake seat for the knife bore's
-    ⌖Ø0.20|A|B over a stacked ⊥Ø0.05|B; ``upper_reads_back(xml)`` and
-    ``lower_reads_back(xml)`` are what each frame's GetSymbolXml returns.
-    Returns the frames' handed XML.
+    ⌖Ø0.20|A|B over a stacked ⊥Ø0.05|B, or with ``composite`` its composite
+    ⌖Ø0.20|A|B|C over Ø0.05|A|B|C (``joins``: whether SetCompositeFrame2
+    takes); ``upper_reads_back(xml)`` and ``lower_reads_back(xml)`` are what
+    each frame's GetSymbolXml returns.  Returns the frames' handed XML.
     """
     handed: list[str] = []
+    joined: list[bool] = []
 
     class _XmlFrame:
         def __init__(self, reads_back: Any) -> None:
@@ -856,7 +861,12 @@ def _stacked_frame(
             return self.frames[index - 1]
 
         def GetCompositeFrame2(self, _index: int) -> bool:
-            return False
+            return bool(joined)
+
+        def SetCompositeFrame2(self, value: bool, index: int) -> None:
+            assert (value, index) == (True, 1)
+            if joins:
+                joined.append(True)
 
         def GetFormat(self) -> int:
             return 2
@@ -886,9 +896,14 @@ def _stacked_frame(
         frame_xy=(0.15, 0.19),
         characteristic="position",
         tolerance="0.20",
-        datums=("A", "B"),
+        datums=("A", "B", "C") if composite else ("A", "B"),
         diameter=True,
-        lower_frame=("perpendicularity", "0.05", ("B",)),
+        lower_frame=(
+            ("position", "0.05", ("A", "B", "C"))
+            if composite
+            else ("perpendicularity", "0.05", ("B",))
+        ),
+        composite=composite,
         label="knife-bore position",
     )
     return handed
@@ -899,6 +914,69 @@ def test_stacked_lower_frame_reads_back_its_exact_signature(monkeypatch) -> None
     assert handed[1] == gtol_frame_xml(
         "perpendicularity", "0.05", datums=("B",), diameter=True
     )
+
+
+def _shared_symbol_cell(xml: str) -> str:
+    # Farm run 20261009T200747541Z: a composite frame's lower segment read
+    # back one empty <ToleranceSymbol>; the segments share the symbol cell.
+    return re.sub(
+        r"<ToleranceSymbol>[^<]*</ToleranceSymbol>", "<ToleranceSymbol />", _unescaped(xml)
+    )
+
+
+def test_composite_frame_joins_and_reads_back_each_segment(monkeypatch) -> None:
+    # Owner ruling 2026-10-27 (#2016): the knife bore's composite position.
+    handed = _stacked_frame(monkeypatch, _shared_symbol_cell, composite=True)
+    assert handed[1] == gtol_frame_xml(
+        "position", "0.05", datums=("A", "B", "C"), diameter=True
+    )
+
+
+def test_composite_frame_must_read_back_composite(monkeypatch) -> None:
+    with pytest.raises(RuntimeError, match=r"feature-control frame is not composite"):
+        _stacked_frame(monkeypatch, _shared_symbol_cell, composite=True, joins=False)
+
+
+@pytest.mark.parametrize("frame", ("upper", "lower"))
+def test_composite_segments_fail_unless_their_signature_persists(
+    monkeypatch, frame: str
+) -> None:
+    lost = _FRAME_CORRUPTIONS["lost-last-datum"]
+    reads = []
+
+    def upper_lost_once_joined(xml: str) -> str:
+        # The upper segment reads back whole before the join, then loses C.
+        reads.append(xml)
+        return lost(xml) if len(reads) > 1 else xml
+
+    with pytest.raises(RuntimeError, match=rf"composite {frame} segment did not persist"):
+        if frame == "upper":
+            _stacked_frame(
+                monkeypatch,
+                _shared_symbol_cell,
+                upper_reads_back=upper_lost_once_joined,
+                composite=True,
+            )
+        else:
+            _stacked_frame(
+                monkeypatch, lambda xml: _shared_symbol_cell(lost(xml)), composite=True
+            )
+
+
+def test_stacked_frames_still_refuse_an_empty_symbol_cell(monkeypatch) -> None:
+    # The default (not composite) keeps the full signature: an empty cell is
+    # a lost symbol.
+    with pytest.raises(RuntimeError, match=r"stacked lower frame did not persist"):
+        _stacked_frame(monkeypatch, _shared_symbol_cell)
+
+
+def test_composite_needs_a_lower_segment_of_its_characteristic() -> None:
+    with pytest.raises(ValueError, match=r"same characteristic"):
+        _drawing_gdt.add_feature_control_frame(
+            None, None, frame_xy=(0.1, 0.2), characteristic="position",
+            tolerance="0.20", lower_frame=("perpendicularity", "0.05", ("A",)),
+            composite=True, label="composite",
+        )
 
 
 _FRAME_CORRUPTIONS = {
