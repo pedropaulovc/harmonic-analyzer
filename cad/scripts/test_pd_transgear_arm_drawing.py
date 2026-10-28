@@ -513,10 +513,11 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
     crossed the left border (rendered at x 1.5 mm), and the counterbore text
     crossed it before. Review of 2ac1bdb28: the floor's text names its
     spring, wider than the room left of its line, so it stands off the line
-    on a leader, under the section and clear of the isometric's note and the
-    plate tap's frame. Run 20261027T223014650Z: left of its line, the leader
-    ran to the underline's right end up through the text, so the text
-    stands right of its line."""
+    on a leader, under the section and clear of the plate tap's frame. Run
+    20261027T223014650Z: left of its line, the leader ran to the underline's
+    right end up through the text, so the text stands right of its line,
+    clear of section A-A's caption (centred under the section, about 46 mm
+    wide); the isometric moved to sheet 2 (review of 67d749fb4)."""
     lines = ["6.40 \u00b10.05", *spec.FLOOR_DEPTH_CALLOUT.splitlines()]
     width = max(map(len, lines)) * _CAPS_CHAR_WIDTH
     half_height = len(lines) * _LINE_PITCH / 2.0
@@ -528,7 +529,7 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
     assert floor[0] > _BORDER + 0.0015
     assert floor[1] > _BORDER + 0.0015
     assert floor[3] < section_bottom - 0.008
-    assert floor[2] < drawing.ISO_NOTE_XY[0] - 0.005
+    assert floor[2] < drawing.SECTION_CENTER[0] - 0.023 - 0.005
     # Too wide to hang left of its line inside the border: hence the leader.
     line_x = drawing.SECTION_KEEP["FloorDepth"][0]
     assert line_x - width < _BORDER

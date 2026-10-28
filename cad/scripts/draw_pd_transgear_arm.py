@@ -143,14 +143,12 @@ FRONT_CENTER = (0.189, 0.205)
 # the overall-length reference under the station stack.
 SECTION_CENTER = (FRONT_CENTER[0], 0.090)
 END_CENTER = (0.357, FRONT_CENTER[1])
-# Bottom left, where the general notes stood (the sheet has none now), its
-# caption over it: under section A-A the plate taps' projected-zone chain
-# lines run 13.5 mm below the rear face, and A-A's own caption, which hangs
-# below the view's extent, follows them down into the isometric's old place.
-# Both stand right of the floor depth's text (FLOOR_TEXT_XY), its note 4 mm
-# off it and as far off A-A's caption.
-ISO_CENTER = (0.1325, 0.034)
-ISO_NOTE_XY = (0.103, 0.066)
+# On sheet 2, right of section D-D in its open field, its label over it.
+# On sheet 1 under section A-A it crowded A-A's zone frames, the floor
+# depth's text and A-A's caption (machinist review of 67d749fb4, run
+# 20261028T000748086Z, gating clarity).
+ISO_CENTER = (0.330, 0.125)
+ISO_NOTE_XY = (0.300, 0.157)
 # Under the end view's pin callout and on its axis; its label clears the
 # title block and section A-A's 8.50.  The socket mouths face right, and the
 # column right of them holds the sockets' position frames inside the border.
@@ -981,10 +979,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="matched locating sockets transverse section",
     )
     end = place_view(adapter, str(SOURCE), "*Right", *END_CENTER, scale=VIEW_SCALE)
-    iso = place_view(
-        adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_VIEW_SCALE
-    )
-    for view in (front, section, locator_section, end, iso):
+    for view in (front, section, locator_section, end):
         set_hidden_lines_removed(adapter, view)
 
     annotations = [
@@ -1127,7 +1122,6 @@ async def build(adapter: Any) -> dict[str, str]:
             label=label,
         )
         _set_tap_callout_text(callout, qualifier, label=label)
-    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     # Sheet 2: the pin bore's projected zone in section D-D, cut from a plan
     # on sheet 1's plan centre (rule 15: its own sheet, not a shrunk view).
@@ -1141,6 +1135,11 @@ async def build(adapter: Any) -> dict[str, str]:
     _match_pin_section_caption(adapter, pin_section, section)
     if not auto_center_marks(adapter, pin_plan, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME centre marks to the pin-bore zone plan")
+    iso = place_view(
+        adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_VIEW_SCALE
+    )
+    set_hidden_lines_removed(adapter, iso)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     if not ddoc.ActivateSheet(SHEET_NAMES[0]):
         raise RuntimeError("cannot return to the arm sheet")
 
