@@ -481,7 +481,11 @@ def provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
             stderr="quota exhausted" if state["mode"] == "provider_error" else "",
         )
 
-    monkeypatch.setattr(mr.shutil, "which", lambda executable: executable)
+    real_which = mr.shutil.which
+    monkeypatch.setattr(
+        mr.shutil, "which",
+        lambda name, *args, **kwargs: real_which(name, *args, **kwargs) if args or kwargs else name,
+    )
     monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     monkeypatch.setattr(mr, "prepare_codex_environment", prepare_codex_environment)
     monkeypatch.setattr(mr, "relink_codex_auth", lambda home: None)
