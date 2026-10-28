@@ -32,7 +32,6 @@ from __future__ import annotations
 
 import math
 
-import _config
 import sm_gooseneck_geom as geom
 from sm_gooseneck_spring_joint import (
     BRAZE_CLEARANCE_MAX,
@@ -42,8 +41,6 @@ from sm_gooseneck_spring_joint import (
     DRILL_WANDER_MAX,
     THREAD_AXIS_OFFSET_MAX,
 )
-
-SCREW_NUMBER = str(_config.parts("sm-gooseneck-spring-screw")["number"])
 
 # Stock designations as the supplier lists them.  The print states them in
 # inches; each one is checked against the millimetre geometry it names.
@@ -105,13 +102,14 @@ DIMENSION_CALLOUTS_BY_NAME: dict[str, str] = {
 # The end piece's native blind-tap callout (end view): the title block's
 # THREADS row owns the 2B class (drawing-guidelines.md rule 2), the tap's
 # two depths print at the places their band is read at
-# (sm_gooseneck_spring_joint.TAP_DEPTH_BAND), and its location limits print
-# under it.
+# (sm_gooseneck_spring_joint.TAP_DEPTH_BAND), and its location limits and
+# the braze order print under it.  Four rows in all (the layout audit's
+# tall-block limit: a fifth row gated, farm run 20261028T005208028Z), so the
+# braze order shares the wander row.
 TAP_CALLOUT_PRECISION = {"hw-threaddepth": 2, "hw-tapdrldepth": 2}
 TAP_CALLOUT_BELOW = (
     f"THREAD AXIS TO TUBE AXIS +/-{THREAD_AXIS_OFFSET_MAX:.2f}\n"
-    f"DRILL WANDER {DRILL_WANDER_MAX:.2f} MAX\n"
-    f"TAP AFTER BRAZE; MATES {SCREW_NUMBER}"
+    f"DRILL WANDER {DRILL_WANDER_MAX:.2f} MAX; TAP AFTER BRAZE"
 )
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the

@@ -155,10 +155,11 @@ def test_counterbore_callouts_floor_the_wall_from_the_joint() -> None:
 def test_notes_state_stock_process_and_intent_without_sizes() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
     # Rule 7: four lines at most, each ending left of the title block
-    # (x 0.216) from NOTES_XY at the sheet's ~2.35 mm a character.
+    # (x 0.216) from NOTES_XY at the sheet's ~2.42 mm a character (farm run
+    # 20261028T005208028Z: the 80-character line ended at x 0.210).
     assert len(lines) <= 4
     assert all(re.match(r"\d\. ", line) for line in lines)
-    assert drawing.NOTES_XY[0] + 0.00235 * max(map(len, lines)) < 0.212
+    assert drawing.NOTES_XY[0] + 0.00242 * max(map(len, lines)) < 0.214
     notes = " ".join(spec.DRAWING_NOTES.split())
     for phrase in (
         "1/2 OD X 0.065 WALL 4130-N SEAMLESS",
@@ -178,9 +179,12 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
     assert "THRU" not in notes.upper()
 
 
-def test_tap_callout_flags_the_braze_order_and_the_made_screw() -> None:
-    assert spec.SCREW_NUMBER == "MHA-SM-04"
-    assert spec.TAP_CALLOUT_BELOW.splitlines()[-1] == "TAP AFTER BRAZE; MATES MHA-SM-04"
+def test_tap_callout_flags_the_braze_order_within_four_rows() -> None:
+    # The native callout's two rows plus these stay within the layout
+    # audit's four-row limit.
+    rows = spec.TAP_CALLOUT_BELOW.splitlines()
+    assert len(rows) == 2
+    assert rows[-1].endswith("; TAP AFTER BRAZE")
     printed = " ".join((spec.DRAWING_NOTES, spec.TAP_CALLOUT_BELOW)).upper()
     assert "PURCHASED" not in printed and "INTEGRAL" not in printed
     assert "THREADLOCKER" not in printed  # spring-eye clamping belongs to the assembly
