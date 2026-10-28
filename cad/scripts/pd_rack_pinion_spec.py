@@ -1,7 +1,8 @@
-r"""MHA-PD-06 rack-pinion: the 120T brass reducer disc of the translational gearing.
+r"""MHA-PD-06 rack-pinion: the 150T brass reducer disc of the translational gearing.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` import.  The disc is
-driven 12:120 by the knob shaft's finite #8/reference-12 PA20 48DP form and
+driven 15:150 by the knob shaft's finite #7/reference-14 PA20 48DP form (#2034:
+15:150 replaced 12:120 at the same 1:10 feed) and
 screwed to the brass hub's flange (MHA-PD-17, ``pd_transgear_disc_hub_spec``) by three #0-80 fillister
 screws (MHA-PD-VN-55, McMaster 91794A055; the joint is
 ``pd_transgear_disc_hub_geometry``'s).  Its Ø13.1 H7 bore pilots on the hub's
@@ -55,10 +56,10 @@ from stock_form_cutter import (
 MM_PER_IN = 25.4
 
 # --- gear ----------------------------------------------------------------------
-TEETH = 120
+TEETH = 150
 DIAMETRAL_PITCH = 48.0
 PRESSURE_ANGLE_DEG = 20.0
-CUTTER_REFERENCE_TEETH = 55
+CUTTER_REFERENCE_TEETH = 135
 CUTTER_TEMPLATE = CutterTemplate(
     CUTTER_REFERENCE_TEETH, DIAMETRAL_PITCH, PRESSURE_ANGLE_DEG
 )
@@ -71,9 +72,9 @@ PITCH_DIA = TEETH * MODULE_MM
 ADDENDUM_FACTOR = 1.0
 DEDENDUM_FACTOR = 1.25
 GROUND_WHOLE_DEPTH_PREMISE_MM = 2.25 * MODULE_MM
-RADIAL_SETTING = 17.210  # axis-total rigid tool translation, NOT profile shift x
+RADIAL_SETTING = 3.969  # axis-total rigid tool translation, NOT profile shift x
 _SPAN_DESIGN_SETTING_BAND = (0.010, -0.010)
-SPAN_TEETH = 13  # physical indexed teeth, never the cutter's reference count
+SPAN_TEETH = 17  # physical indexed teeth, never the cutter's reference count
 SPAN_PLACES = 4
 OUTSIDE_DIA_BAND = (0.0, -0.10)  # (upper, lower), finite-supported blank
 _SUPPORT_PROFILE = StockFormProfile(
@@ -187,7 +188,7 @@ for _profile in _PROFILE_CORNERS:
         _profile.support_radius_max_mm - _profile.blank_radius_mm
         <= _profile.geometry_error_bound_mm
     ):
-        raise AssertionError("finite #2 ground tip/closure reaches the accepted blank")
+        raise AssertionError(f"finite #{CUTTER_NUMBER} ground tip/closure reaches the accepted blank")
 
 
 # One certified pin, re-seated in every physical space, measures pattern
@@ -210,26 +211,32 @@ TOOTH_SPACE_GAUGE_TIP_AIR_MIN_MM = min(contact.tip_air_mm for contact in _GAUGE_
 
 
 # The physical reducer's assembled axis datum. Both gears are shop-cut
-# 48DP PA20 standard forms (the knob's 12T by a #8 cutter, this disc by a
-# #2 cutter), so the centre takes ordinary fine-pitch practice: nominal
+# 48DP PA20 standard forms (the knob's 15T by a #7 cutter, this disc by a
+# #1 cutter), so the centre takes ordinary fine-pitch practice: nominal
 # plus a positive allowance, never minus, since a close centre binds
 # (MISUMI Mech Lab, "Center to Center Spacing for Shafts with Spur Gears":
-# fine pitch +0.002 in / -0). 35.101 stands 0.004 above 35.097, the
-# closest centre at which the largest disc tip clears the knob pinion's
-# interference point with both 0.05 TIR tooth-space runouts closing it
-# (paper_drive_mesh_check.reducer_mesh); the allowance is the catalogue
-# +0.05, the radius of K's drawn setting circle about S
+# fine pitch +0.002 in / -0); the allowance is the catalogue +0.05, the
+# radius of K's drawn setting circle about S
 # (stock_form_quality.reducer_k_setting_diameter_mm; owner ruling
-# 2026-10-27, option A: standard gears take the standard band; the far
-# end is gated at CR 1.1 / 1.0 in
-# paper_drive_mesh_check.BAND_TOP_CONTACT_RATIO_FLOORS).
-MESH_PINION_TEETH = 12
+# 2026-10-27, option A: standard gears take the standard band).
+# paper_drive_mesh_check.reducer_mesh over the printed bands (tooth
+# thickness at the manufactured_profiles corners, both 0.05 TIR tooth-space
+# runouts) bounds the usable centres to 43.737..43.851 (standard centre
+# 43.656): below, the largest disc tip reaches past the knob pinion's
+# interference point at the tight extreme; above, the contact ratio at the
+# minimum tips falls below 1.2. 43.794 is that window's midpoint (owner
+# ruling #2034: 15:150 opens it from the 12:120's 0.008 to 0.114), and the
+# whole set band 43.794..43.844 meets the full design floors (owner ruling
+# on #2034 x #2011: 43.794 +0.050/-0, aim mid-band): CR 1.305 / 1.214 and
+# an interference margin of 0.166 at the nominal end, CR 1.214 / 1.123 at
+# the far end.
+MESH_PINION_TEETH = 15
 MESH_ANGLE_DEG = -168.0
-CENTRE_DISTANCE = 35.101
+CENTRE_DISTANCE = 43.794
 # The setting the arm and plate sheets print: the knob bore is held this
 # band from the pin bore when the pair is match-drilled, and must still be
 # there with the plate screwed down.
-CENTRE_DISTANCE_WINDOW = (CENTRE_DISTANCE, 35.151)
+CENTRE_DISTANCE_WINDOW = (CENTRE_DISTANCE, 43.844)
 # (upper, lower) deviations from CENTRE_DISTANCE, as every band here.
 CENTRE_DISTANCE_SET_BAND = (round(CENTRE_DISTANCE_WINDOW[1] - CENTRE_DISTANCE, 6), 0.0)
 CENTRE_DISTANCE_SET_TEXT = (
@@ -401,7 +408,13 @@ GEAR_DATA = gear_data_note(
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
         ("WHOLE DEPTH (mm, REF)", f"{WHOLE_DEPTH:.3f}"),
-        ("CUTTER", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
+        (
+            "CUTTER",
+            # #1 is open-ended (135T to rack): print the catalogue's range.
+            f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}T-RACK"
+            if CUTTER_TOOTH_RANGE[1] is None
+            else f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T",
+        ),
         (
             f"SPAN OVER {SPAN_TEETH} TEETH",
             f"{min(SPAN_LIMITS):.{SPAN_PLACES}f}-{max(SPAN_LIMITS):.{SPAN_PLACES}f}",

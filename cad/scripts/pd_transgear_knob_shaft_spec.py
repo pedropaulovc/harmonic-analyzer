@@ -1,12 +1,13 @@
-r"""MHA-PD-08 transgear-knob-shaft: the steel knob shaft with its integral 12T.
+r"""MHA-PD-08 transgear-knob-shaft: the steel knob shaft with its integral pinion.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  ``build_pd_transgear_knob_shaft`` marks and tolerances exactly
 ``DRAWING_DIMENSIONS`` / ``DRAWING_PRECISION`` on the model and
 ``draw_pd_transgear_knob_shaft`` keeps exactly the same names.
 
-One turned SAE1018 shaft carries a standard-depth 12T48DP PA20 integral
-pinion cut by the finite TTC #8 stock form (10-289-488, Ø44.45 cutter).
+One turned SAE1018 shaft carries a standard-depth ``TEETH``-tooth 48DP PA20
+integral pinion cut by the finite TTC stock form ``CUTTER_NUMBER``
+(``CUTTER_SKU``, Ø44.45 cutter).
 The gear front F and every chain/cup station remain unchanged.  Its front
 Ø4.850 h6 solid D-core drives the matching brass D-collar without a cross
 hole.  The collar's fitted rear face bears directly on F; the #8-32 stud
@@ -16,21 +17,23 @@ The thread relief carries clamp, not torque.
 
 The Ø6 g6 rear journal runs in the plate's Ø6 H7 bore.  The loose Ø6.05-bore
 thrust ring retains its 5.2 length and bears on the actual rear tooth ends.
-True finite disk endcuts run out within that ring, not in the active plate
-bearing.  The rear cup is still set on the existing end-float feeler and
-match-pinned by MHA-PD-VN-62.  No front spring pin or collar slot remains.
+Every gap is cut straight at full depth through the whole face (#2034); the
+form root stands above the journal, so the cutter runs out in air over the
+journal at the rear and over the neck and D-core at the front.  The rear
+cup is still set on the existing end-float feeler and match-pinned by
+MHA-PD-VN-62.  No front spring pin or collar slot remains.
 
 Part frame: the axis is local +Z through the origin (``Axis1``); +Z is
 machine +Z (rearward), so the assembly places the part without rotation.  The
-origin is F, the 12T's front face (machine z -148.1 at the stack pose, R9-17):
-the teeth run z = 0..FACE_WIDTH, the journal FACE_WIDTH..REAR_END_Z,
+origin is F, the pinion's front face (machine z -148.1 at the stack pose,
+R9-17): the teeth run z = 0..FACE_WIDTH, the journal FACE_WIDTH..REAR_END_Z,
 the D-core CORE_FRONT_Z..CORE_REAR_Z, the front neck CORE_REAR_Z..0,
 the thread relief THREAD_END_Z..CORE_FRONT_Z, and thread TIP_Z..THREAD_END_Z.
 The indexed finite gap is centred on
 GAP_AZIMUTH_DEG from local +X, CCW about +Z.
 
 Named datums: ``Axis1`` (the shaft axis); ``Front Plane`` (F); planes
-``PinionRear`` (the 12T's rear face, the thrust ring's seat), ``RearFace``
+``PinionRear`` (the pinion's rear face, the thrust ring's seat), ``RearFace``
 (the journal's rear end face), ``ThreadEnd`` (full thread ends) and
 ``StudTip`` (the tip face).
 """
@@ -61,19 +64,22 @@ from pd_transgear_knob_thrust_ring_spec import LENGTH as RING_LENGTH
 from pd_transgear_knob_thrust_ring_spec import LENGTH_TOL as RING_LENGTH_TOL
 from pd_transgear_knob_thrust_ring_spec import ID as RING_ID
 from pd_transgear_knob_thrust_ring_spec import ID_BAND as RING_ID_BAND
-from paper_drive_stock_envelope import cutter_end_volume_bounds_mm3
-from stock_form_cutter import CutterTemplate, StockFormProfile, translation_for_tangent_span
+from stock_form_cutter import (
+    StockFormProfile,
+    template_for_teeth,
+    translation_for_tangent_span,
+)
 
 MM_PER_IN = 25.4
 WALL_FLOOR = 2.0
 EDGE_BREAK_MAX = float(_config.title_block("edge_break")["chamfer_max_mm"])
 ENGAGEMENT_FLOOR_D = 1.5
 
-# --- Actual finite stock #8 master, not an analytic generated shift --------
+# --- Actual finite stock-form master, not an analytic generated shift -------
 TEETH = DISC.MESH_PINION_TEETH
 DIAMETRAL_PITCH = DISC.DIAMETRAL_PITCH
 PRESSURE_ANGLE_DEG = DISC.PRESSURE_ANGLE_DEG
-CUTTER_TEMPLATE = CutterTemplate(12, DIAMETRAL_PITCH, PRESSURE_ANGLE_DEG)
+CUTTER_TEMPLATE = template_for_teeth(TEETH, DIAMETRAL_PITCH, PRESSURE_ANGLE_DEG)
 CUTTER_NUMBER = CUTTER_TEMPLATE.cutter_number
 CUTTER_TOOTH_RANGE = CUTTER_TEMPLATE.teeth_range
 MODULE_MM = CUTTER_TEMPLATE.module_mm
@@ -84,9 +90,9 @@ DEDENDUM_FACTOR = (
     CUTTER_TEMPLATE.pitch_radius_mm - CUTTER_TEMPLATE.root_radius_mm
 ) / MODULE_MM
 PITCH_DIA = TEETH * MODULE_MM
-RADIAL_SETTING = 0.005
+RADIAL_SETTING = 0.266
 _SPAN_DESIGN_SETTING_BAND = (0.005, -0.005)
-OUTSIDE_DIA = 7.40
+OUTSIDE_DIA = 8.98
 OUTSIDE_DIA_BAND = gear_tip_band_mm("contact_critical")
 OUTSIDE_DIA_PLACES = 2
 STOCK_PROFILE = StockFormProfile(
@@ -172,7 +178,7 @@ FACE_WIDTH = 5.9
 FACE_WIDTH_PLACES = 3
 GAP_AZIMUTH_DEG = 180.0 / TEETH
 # The assembly spins the shaft and its whole mounted front stack (collar,
-# drive pins, wheel) about K so a 12T gap faces the reducer disc's tooth on
+# drive pins, wheel) about K so a pinion gap faces the reducer disc's tooth on
 # the K -> S line (azimuth 180 + MESH_ANGLE_DEG from K): the nearest
 # representative modulo one tooth pitch. The assembly drawing reads it to
 # find the collar's rim seen edge-on.
@@ -222,9 +228,9 @@ TIP_STATION = 23.9
 TIP_STATION_PLACES = 2
 
 # --- Solid D-core; no gear bore and no transverse torque hole ---------------
-# 4.850, not 4.900: the 0.05 tooth-space TIR (Main ruling 2026-10-10) costs
-# the finite cutter 0.0225 of radial air over the core; 4.850 restores
-# FRONT_CORE_AIR_MIN above its 0.035 floor (0.0385).
+# 4.850, not 4.900: the 0.05 tooth-space TIR (Main ruling 2026-10-10) cost
+# the earlier, smaller pinion's cutter its core air.  The core is kept; the
+# current form root lifts FRONT_CORE_AIR_MIN to 0.828 over its 0.035 floor.
 CORE_DIA = 4.850
 CORE_DIA_BAND = (0.0, -0.008)  # ISO h6, over 3 THROUGH 6 mm
 CORE_DIA_PLACES = 3
@@ -279,8 +285,9 @@ CORE_FRONT_FROM_F = 5.25
 CORE_FRONT_FROM_F_PLACES = 3
 
 # Ordinary turned undercut at F: no tiny-radius grade or front disk cut.
-# 3.950, not 4.000: pays the 0.05 tooth-space TIR's extra 0.0225 radius and
-# keeps FRONT_NECK_AIR_MIN above its 0.320 floor (0.3235).
+# 3.950, not 4.000: paid the 0.05 tooth-space TIR under the earlier, smaller
+# pinion.  The neck is kept; FRONT_NECK_AIR_MIN is now 1.113 over its 0.320
+# floor.
 FRONT_RELIEF_DIA = 3.950
 FRONT_RELIEF_DIA_PLACES = 3
 FRONT_RELIEF_WIDTH = 0.400
@@ -326,7 +333,7 @@ CORE_FLAT_REACH_PAST_SHOULDER_MIN = (
 # allowed tool end is CORE_FLAT_REACH_PAST_SHOULDER_MIN, asserted below.
 CORE_FLAT_TOOL_REACH_NOTE = (
     f"D-CORE FLAT TOOL END {min(CORE_FLAT_CUT_END_LIMITS):.2f}-"
-    f"{max(CORE_FLAT_CUT_END_LIMITS):.2f} FROM 12T FRONT FACE; "
+    f"{max(CORE_FLAT_CUT_END_LIMITS):.2f} FROM {TEETH}T FRONT FACE; "
     f"END RADIUS R{CORE_FLAT_TOOL_END_RADIUS_MAX:.3f} MAX."
 )
 FRONT_RELIEF_AREA_MIN = math.pi * FRONT_RELIEF_DIA_MIN**2 / 4.0
@@ -382,7 +389,7 @@ RELIEF_AREA_RATIO_MIN = RELIEF_AREA_MIN / THREAD_STRESS_AREA
 JOURNAL_DIA = 6.0
 JOURNAL_DIA_BAND = SHAFT_G6_3_TO_6_MM
 JOURNAL_DIA_PLACES = 3
-# The cup's front face, from the 12T's rear face (R9-25): the thrust ring +
+# The cup's front face, from the pinion's rear face (R9-25): the thrust ring +
 # the plate's hub-to-boss + the 0.2 end float, the cup running that far
 # behind the rear boss at the stack pose.  K-1 (R9-70): the float is set at
 # assembly, the cup slid on the journal against a 0.2 feeler at the boss and
@@ -400,7 +407,7 @@ if abs(CUP_FACE_STATION - 34.4375) > 1e-9:
 # boss's own bands, and the feeler setting.
 CUP_FACE_STATION_BAND = RING_LENGTH_TOL + PLATE_HUB_TO_BOSS_BAND + END_FLOAT_SET_TOL
 # The journal runs on behind the cup's front face to carry the cup's pin
-# (K-1); 12T rear face to the rear end face, at the title block's .XXX.
+# (K-1); pinion rear face to the rear end face, at the title block's .XXX.
 JOURNAL_REAR_EXTENSION = 6.5
 JOURNAL_LENGTH = CUP_FACE_STATION + JOURNAL_REAR_EXTENSION  # 40.9375
 JOURNAL_LENGTH_PLACES = 3
@@ -442,62 +449,35 @@ if FRONT_CORE_AIR_MIN <= 0.0:
     raise AssertionError("the finite stock cutter enters the solid D-core envelope")
 if not CORE_DIA < JOURNAL_DIA < OUTSIDE_DIA:
     raise AssertionError(
-        "the journal must step up from the core and stay under the 12T"
+        f"the journal must step up from the core and stay under the {TEETH}T"
     )
 
-# --- Actual finite Ø44.45 stock disk, both axial terminal positions ---------
-FULL_DEPTH = 4.65
-FULL_DEPTH_PLACES = 3
-# 10.6, not 10.5: the 0.05 tooth-space TIR raises the worst rear disk chord
-# end to F + 9.589; the printed limit keeps its 1.0 margin over that end and
-# stays 0.32 short of the plate hub bore (F + 10.92 worst).
-CUTTER_RUNOUT_MAX = 10.6
-CUTTER_RUNOUT_PLACES = 2
+# --- Straight full-depth gaps through the face; actual Ø44.45 stock disk ---
+# Owner ruling 2026-10-23 (#2034): every gap is one straight full-depth pass
+# through FACE_WIDTH, the easiest set-up to machine; there is no rear endcut.
+# The disk runs out in air at both ends: in front of F over the neck and the
+# D-core (FRONT_NECK_AIR_MIN, FRONT_CORE_AIR_MIN above) and behind the rear
+# face over the running journal, gated here.  The swept form's lowest point
+# is the formed root, so the worst-case air over the largest g6 journal,
+# charged with the tooth-space TIR to A (the journal itself) and the profile
+# geometry error, is 0.280 over FRONT_CORE_AIR_MIN's 0.035 floor.
+# TTC 10-289-487, 48DP PA20 #7 (14 to 16 T), the same Ø1-3/4 x 7/8-bore body
+# as the #8 10-289-488; in stock at Travers, observed 2026-10-27:
+# https://www.travers.com/product/ttc-10-289-487-involute-style-gear-cutter-10-289-487
 CUTTER_DIA = 44.45
 CUTTER_ARBOR_BORE = 22.225
-CUTTER_SKU = "10-289-488"
-FULL_DEPTH_BAND = printed_band_mm(FULL_DEPTH_PLACES)
-FULL_DEPTH_MIN = FULL_DEPTH - FULL_DEPTH_BAND  # 4.52
-FULL_DEPTH_MAX = FULL_DEPTH + FULL_DEPTH_BAND  # 4.78
-# swTolMAX prints the dimension's NOMINAL followed by "MAX", so the witness
-# sits at the limit; its deviations record "anywhere behind the shortest full
-# depth, up to the limit".
-CUTTER_RUNOUT_TOL_TYPE = 6  # swTolType_e.swTolMAX
-CUTTER_RUNOUT_DEVIATIONS = (FULL_DEPTH_MIN - CUTTER_RUNOUT_MAX, 0.0)
-if round(CUTTER_RUNOUT_MAX, CUTTER_RUNOUT_PLACES) != CUTTER_RUNOUT_MAX:
-    raise AssertionError("the run-out limit does not print at its places")
-FULL_DEPTH_PREFIX = "12T FULL DEPTH "
-CUTTER_RUNOUT_PREFIX = "CUTTER RUN-OUT "
-
-
-def cutter_runout(cutter_dia: float, rise: float) -> float:
-    """Axial length behind the full-depth station over which a form cutter of
-    ``cutter_dia`` still cuts a surface ``rise`` above the gap floor: the
-    chord half-length of its circle at that height, √(Rc² − (Rc − rise)²)."""
-    radius = cutter_dia / 2.0
-    if not 0.0 <= rise <= radius:
-        raise ValueError(f"rise {rise} is off a Ø{cutter_dia} cutter")
-    return (radius**2 - (radius - rise) ** 2) ** 0.5
-
-
-# Window (i): full depth covers the disc's worst-corner rear face.  That face
-# is the assembly stack's (contract §13.2): nominal 3.70 from F + arm 0.0254
-# + plate 0.13 + ring 0.05 + 12T face 0.13 + stud 0.05 + disc seat 0.05 +
-# the knob float forward 0.35.
-DISC_REAR_FROM_F_WORST = 4.4854
-# Window (ii): the run-out ends in front of the plate hub's running bore.  At
-# the stack pose (12T rear tooth ends -> ring -> hub) the hub face lies the
-# face width plus the ring behind F, nearest at their short limits.
-HUB_BORE_FROM_F_WORST = (FACE_WIDTH - printed_band_mm(FACE_WIDTH_PLACES)) + (
-    RING_LENGTH - RING_LENGTH_TOL
-)  # 10.92
-# Use deepest ground X for the rear disk chord, not the polar root radius.
-# Internal toothspace TIR is the only profile/journal axis term here.
-_JOURNAL_R_MAX = (JOURNAL_DIA + max(JOURNAL_DIA_BAND)) / 2.0
-RUNOUT_RISE_WORST = _JOURNAL_R_MAX + TOOTH_SPACE_RUNOUT_TIR_MM / 2.0 - ROOT_DEPTH_X_MIN
-CUTTER_RUNOUT_END_WORST = FULL_DEPTH_MAX + cutter_runout(
-    CUTTER_DIA, RUNOUT_RISE_WORST
-)
+CUTTER_SKU = "10-289-487"
+JOURNAL_CUTTER_AIR_FLOOR = 0.035  # FRONT_CORE_AIR_MIN's floor
+JOURNAL_CUTTER_AIR_MIN = (
+    ROOT_DIA_EXACT_MIN - (JOURNAL_DIA + max(JOURNAL_DIA_BAND))
+    - TOOTH_SPACE_RUNOUT_TIR_MM
+) / 2.0 - max(p.geometry_error_bound_mm for p in _PROFILE_CORNERS)
+if JOURNAL_CUTTER_AIR_MIN <= JOURNAL_CUTTER_AIR_FLOOR:
+    raise AssertionError(
+        f"the finite stock cutter running out behind the {TEETH}T leaves "
+        f"{JOURNAL_CUTTER_AIR_MIN:.4f} over the journal, under the "
+        f"{JOURNAL_CUTTER_AIR_FLOOR:.3f} floor"
+    )
 # Actual tooling fixture envelope, not a claimed purchased arbor SKU.
 CUTTER_MOUNT_OD_MAX = 31.75
 CUTTER_MOUNT_AIR_MIN = (
@@ -506,46 +486,52 @@ CUTTER_MOUNT_AIR_MIN = (
 )
 if CUTTER_MOUNT_AIR_MIN <= 0.0:
     raise AssertionError("the actual arbor mounting envelope reaches shaft stock")
-if FULL_DEPTH_MIN < DISC_REAR_FROM_F_WORST - 1e-9:
-    raise AssertionError(
-        f"12T full depth may stop at F + {FULL_DEPTH_MIN:.3f}, in front of the "
-        f"disc's worst rear face F + {DISC_REAR_FROM_F_WORST:.4f}"
-    )
-if CUTTER_RUNOUT_END_WORST > CUTTER_RUNOUT_MAX + 1e-9:
-    raise AssertionError(
-        f"a Ø{CUTTER_DIA:.2f} cutter's run-out reaches F + "
-        f"{CUTTER_RUNOUT_END_WORST:.3f}, past the printed {CUTTER_RUNOUT_MAX:.2f}"
-    )
-if CUTTER_RUNOUT_MAX >= HUB_BORE_FROM_F_WORST:
-    raise AssertionError(
-        f"the printed run-out limit F + {CUTTER_RUNOUT_MAX:.2f} reaches the plate "
-        f"hub bore (F + {HUB_BORE_FROM_F_WORST:.2f} worst)"
-    )
 
 # The real tool master extends to its finite tip. Close the native tool only
 # beyond the accepted blank; do not extend the working flank to fake support.
+# The disc's convention: the finite translated tip VECTOR at the lowest
+# accepted setting, less its numerical error, caps the blank (the master's
+# reference tooth count is not this gear's, so its own tip radius is no bound).
+_MIN_SETTING_SUPPORT = StockFormProfile(
+    TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, RADIAL_SETTING_LIMITS[0]
+)
 CUTTER_SUPPORT_MARGIN_MIN = (
-    CUTTER_TEMPLATE.tip_radius_mm + min(0.0, RADIAL_SETTING_LIMITS[0])
+    _MIN_SETTING_SUPPORT.support_radius_max_mm
+    - _MIN_SETTING_SUPPORT.geometry_error_bound_mm
     - (OUTSIDE_DIA + max(OUTSIDE_DIA_BAND)) / 2.0
 )
 if CUTTER_SUPPORT_MARGIN_MIN <= 0.0:
     raise AssertionError("the accepted blank leaves the finite ground cutter support")
-CUTTER_AXIS_R = STOCK_PROFILE.root_point(STOCK_PROFILE.root_half_angle_rad)[0] + CUTTER_DIA / 2.0
-CUTTER_AXIS_Z = FULL_DEPTH
-CUTTER_RUNOUT_END_Z = FULL_DEPTH + cutter_runout(
-    CUTTER_DIA,
-    JOURNAL_DIA / 2.0 - STOCK_PROFILE.root_point(STOCK_PROFILE.root_half_angle_rad)[0],
-)
-if not PINION_REAR_Z < CUTTER_RUNOUT_END_Z < HUB_BORE_FROM_F_WORST:
-    raise AssertionError("the actual finite endcuts leave the thrust ring's span")
+# OUTSIDE_DIA is the disc's floor rule (pd_rack_pinion_spec.OUTSIDE_DIA):
+# the support diameter at the lowest accepted setting, less the numerical
+# error and the + tip band, floored to the printed 0.01. Its margin is that
+# floor's remainder by construction (here 0.13 um radial, the disc's 1.35);
+# the gate claims containment, not clearance. The model support is the
+# reference count's own tip circle, which the stock master must form to cut
+# that standard gear, so the real ground form reaches at least this far.
+# Inlined: the span limits that fix the lowest setting are built from
+# OUTSIDE_DIA, so deriving it upstream would be circular.
+_FLOOR_RULE_OUTSIDE_DIA = math.floor(
+    (
+        2.0 * _MIN_SETTING_SUPPORT.support_radius_max_mm
+        - 2.0 * _MIN_SETTING_SUPPORT.geometry_error_bound_mm
+        - OUTSIDE_DIA_BAND[0]
+    )
+    * 10.0**OUTSIDE_DIA_PLACES
+) / 10.0**OUTSIDE_DIA_PLACES
+if OUTSIDE_DIA != _FLOOR_RULE_OUTSIDE_DIA:
+    raise AssertionError(
+        f"the {TEETH}T blank Ø{OUTSIDE_DIA} is not the floored cutter support "
+        f"Ø{_FLOOR_RULE_OUTSIDE_DIA} (the disc's tip rule)"
+    )
 
 
 def gear_bearing_area_lower(profile: StockFormProfile, inner_radius: float) -> float:
     """Phase-independent tooth-end area outside an enclosing removed disk.
 
     The caller MUST include its edge break, relative-axis error and transverse
-    fit float in ``inner_radius``. Rear finite terminal gaps are subsets of
-    straight gaps, so this is also a conservative rear tooth-end lower bound.
+    fit float in ``inner_radius``. Every gap runs straight at full depth
+    through the face, so the bound holds at the rear tooth ends as at F.
     Area evaluation error is charged in the refusing direction twice.
     """
     if not math.isfinite(inner_radius) or inner_radius < 0.0:
@@ -566,10 +552,12 @@ def gear_bearing_area_lower(profile: StockFormProfile, inner_radius: float) -> f
     return outer - inner
 
 
-# The ring overlaps the slotted runout, not a full circular journal. Twelve
-# retained tooth-centre caps still limit its offset: the nearest cap is at
-# most half an index pitch from any offset direction. Charge pattern runout
-# against the support radius before solving the exact chord enclosure.
+# The ring's bore runs over the full round journal: the straight-through
+# cutter clears it (JOURNAL_CUTTER_AIR_MIN), so its true float is (ring ID
+# max - journal min) / 2.  The bound kept here is wider, hence conservative:
+# only TEETH tooth-centre caps at the journal's smallest radius less the
+# pattern runout limit its offset, the nearest at most half an index pitch
+# from any offset direction, solved as an exact chord enclosure.
 _RING_CAP_R_MIN = JOURNAL_DIA_MIN / 2.0 - TOOTH_SPACE_RUNOUT_TIR_MM / 2.0
 _RING_CAP_ANGLE = math.pi / TEETH
 if not all(
@@ -584,6 +572,8 @@ RING_TRANSVERSE_FLOAT_MAX = math.sqrt(
     ((RING_ID + max(RING_ID_BAND)) / 2.0)**2
     - (_RING_CAP_R_MIN * math.sin(_RING_CAP_ANGLE))**2
 ) - _RING_CAP_R_MIN * math.cos(_RING_CAP_ANGLE)
+if RING_TRANSVERSE_FLOAT_MAX < ((RING_ID + max(RING_ID_BAND)) - JOURNAL_DIA_MIN) / 2.0:
+    raise AssertionError("the ring float bound is under its round-journal float")
 REAR_BEARING_INNER_RADIUS_MAX = (
     (RING_ID + max(RING_ID_BAND)) / 2.0 + EDGE_BREAK_MAX
     + RING_TRANSVERSE_FLOAT_MAX + TOOTH_SPACE_RUNOUT_TIR_MM / 2.0
@@ -596,50 +586,16 @@ if REAR_BEARING_AREA_MIN <= 0.0:
     raise AssertionError("the loose rear ring has no actual tooth-end support")
 
 
-def endcut_volume_bounds_mm3(
-    *,
-    profile: StockFormProfile = STOCK_PROFILE,
-    face_width_mm: float = FACE_WIDTH,
-    full_depth_mm: float = FULL_DEPTH,
-    journal_radius_mm: float = JOURNAL_DIA / 2.0,
-    rear_end_z_mm: float = REAR_END_Z,
-    absolute_error_mm3: float = 0.02,
-) -> tuple[float, float]:
-    """ONE gap's extra rear endcut, excluding the straight0..FD pass.
-
-    The front terminal cannot touch core, undercut or either allowed corner.
-    The two rear stock intervals are disjoint at the actual gear rear.
-    """
-    if (
-        profile.teeth != TEETH or profile.helix_angle_deg != 0.0
-        or profile.template != CUTTER_TEMPLATE
-    ):
-        raise ValueError("knob endcut requires the declared straight stock master")
-    if not 0.0 < full_depth_mm < face_width_mm < rear_end_z_mm:
-        raise ValueError("invalid knob full-depth/gear/journal stations")
-    bounds = tuple(
-        cutter_end_volume_bounds_mm3(
-            profile, CUTTER_DIA, outer_radius_mm=radius, inner_radius_mm=0.0,
-            start_offset_mm=start, end_offset_mm=end,
-            absolute_error_mm3=absolute_error_mm3 / 2.0,
-        )
-        for radius, start, end in (
-            (profile.blank_radius_mm, 0.0, face_width_mm - full_depth_mm),
-            (journal_radius_mm, face_width_mm - full_depth_mm, rear_end_z_mm - full_depth_mm),
-        )
-    )
-    return (
-        max(0.0, math.nextafter(math.fsum(row[0] for row in bounds), -math.inf)),
-        math.nextafter(math.fsum(row[1] for row in bounds), math.inf),
-    )
-
-
-def expected_volume_bounds_mm3(*, absolute_error_mm3: float = 0.05) -> tuple[float, float]:
-    """Complete NOMINAL shaft: true D, two neck fillets, actual rear endcuts.
+def expected_volume_bounds_mm3() -> tuple[float, float]:
+    """Complete NOMINAL shaft: true D, two neck fillets, straight full-face gaps.
 
     Thread uses the existing cosmetic-thread turned-blank convention.
     Nominal round fillets lie wholly inside the D-flat plane; the flat tool
-    ends in neck air. Unsupported geometry refuses rather than fake volume.
+    ends in neck air.  Every gap runs straight through FACE_WIDTH and its
+    cutter run-out removes no neck, core or journal (FRONT_NECK_AIR_MIN,
+    FRONT_CORE_AIR_MIN, JOURNAL_CUTTER_AIR_MIN), so the exact 2D gap area
+    times the face width is the whole removal.  Unsupported geometry refuses
+    rather than fake volume.
     """
     r_core = CORE_DIA / 2.0
     flat = CORE_FLAT_FROM_AXIS
@@ -671,16 +627,14 @@ def expected_volume_bounds_mm3(*, absolute_error_mm3: float = 0.05) -> tuple[flo
         math.pi * STOCK_PROFILE.blank_radius_mm**2 * FACE_WIDTH,
         math.pi * (JOURNAL_DIA / 2.0)**2 * JOURNAL_LENGTH,
     ))
-    end_lo, end_hi = endcut_volume_bounds_mm3(
-        absolute_error_mm3=absolute_error_mm3 / TEETH
-    )
-    straight = TEETH * STOCK_PROFILE.gap_area_mm2 * FULL_DEPTH
-    area_error = TEETH * STOCK_PROFILE.gap_area_error_bound_mm2 * FULL_DEPTH
+    straight = TEETH * STOCK_PROFILE.gap_area_mm2 * FACE_WIDTH
+    area_error = TEETH * STOCK_PROFILE.gap_area_error_bound_mm2 * FACE_WIDTH
     arithmetic_error = 512.0 * math.ulp(turned)
     return (
-        math.nextafter(turned - straight - TEETH * end_hi - area_error - arithmetic_error, -math.inf),
-        math.nextafter(turned - straight - TEETH * end_lo + area_error + arithmetic_error, math.inf),
+        math.nextafter(turned - straight - area_error - arithmetic_error, -math.inf),
+        math.nextafter(turned - straight + area_error + arithmetic_error, math.inf),
     )
+
 
 # The tip chamfer at its printed worst never grows past the one pitch the
 # thumbnut's engagement budget already takes off for it (contract §7).
@@ -718,14 +672,14 @@ GEAR_DATA = gear_data_note(
     ]
 )
 
-# The title block's 0.25 edge break is a sixth of this fine tooth's whole
+# The title block's 0.25 edge break is a fifth of this fine tooth's whole
 # depth, so the sheet carries the one part-specific exception it needs. A
 # shop note states the requirement, not the cutter or method (Main ruling
 # 2026-10-10); the cutter lives in the gear data block.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
 DRAWING_NOTES = "\n".join((
     TOOTH_EDGE_NOTE,
-    "FRONT D-CORE SOLID; COLLAR REAR FACE BEARS ON 12T FRONT FACE.",
+    f"FRONT D-CORE SOLID; COLLAR REAR FACE BEARS ON {TEETH}T FRONT FACE.",
     "NO FRONT CROSS HOLE.",
 ))
 
@@ -760,12 +714,12 @@ GEOMETRIC_CONTROLS = (
 
 # --- Marked-dimension contract ------------------------------------------------
 # ``StudProfile`` is the Right-plane revolve in front of F (the core, the
-# thread relief, the thread blank and the tip chamfer); it also carries
-# construction-only witnesses, the tooth-tip blank across the face (OutsideDia,
-# drawing-simplicity-policy.md `How the repository implements the guidelines`'s reference-sketch allowance) and the cutter's full-depth station and
-# run-out limit from F (R9-21), so every turned size imports natively beside
+# thread relief, the thread blank and the tip chamfer); it also carries a
+# construction-only witness, the tooth-tip blank across the face (OutsideDia,
+# drawing-simplicity-policy.md `How the repository implements the guidelines`'s
+# reference-sketch allowance), so every turned size imports natively beside
 # its axial extent.  ``JournalProfile`` is the revolve behind the teeth.
-# ``GearBlank`` owns the face width.
+# ``GearBlank`` owns the face width, which is also the straight gaps' depth.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     "CoreFlatProfile": {"FlatToAxis"},
@@ -783,8 +737,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "TipStation",
         "TipChamfer",
         "OutsideDia",
-        "FullDepth",
-        "CutterRunout",
     },
     "JournalProfile": {"JournalDia", "JournalLength"},
 }
@@ -805,8 +757,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "TipStation": TIP_STATION_PLACES,
         "TipChamfer": TIP_CHAMFER_PLACES,
         "OutsideDia": OUTSIDE_DIA_PLACES,
-        "FullDepth": FULL_DEPTH_PLACES,
-        "CutterRunout": CUTTER_RUNOUT_PLACES,
     },
     "JournalProfile": {
         "JournalDia": JOURNAL_DIA_PLACES,

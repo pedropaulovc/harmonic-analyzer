@@ -129,7 +129,7 @@ def test_fitted_rear_face_reacts_on_actual_f_at_every_printed_corner(
     assert collar.BODY_BLANK_LENGTH_MIN >= (
         collar.LENGTH_FITTED_MAX + collar.FACING_ALLOWANCE
     )
-    assert "REAR FACE TO FIT, SEATED ON MHA-PD-08 12T FRONT FACE" in collar.BODY_LENGTH_CALLOUT
+    assert "REAR FACE TO FIT, SEATED ON MHA-PD-08 15T FRONT FACE" in collar.BODY_LENGTH_CALLOUT
     # A larger relative axis envelope consumes all real tooth-end support.
     with pytest.raises(
         AssertionError, match="collar rear face has no actual gear support"

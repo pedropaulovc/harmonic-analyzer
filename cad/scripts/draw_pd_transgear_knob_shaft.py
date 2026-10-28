@@ -59,6 +59,7 @@ from pd_transgear_knob_shaft_spec import (
     CORE_DIA,
     CORE_FRONT_Z,
     CORE_REAR_Z,
+    CUTTER_NUMBER,
     FRONT_CORNER_RADIUS,
     FRONT_RELIEF_DIA,
     FRONT_RELIEF_WIDTH,
@@ -137,14 +138,11 @@ CHAMFER_START_X = _sheet_x(-(TIP_STATION - TIP_CHAMFER))
 HALF_OD = OUTSIDE_DIA * _S / 2000.0
 
 # Turned sizes stay beside their own axial regions. Baseline lengths nest
-# below F, with the cutter limits on separate rows. The D-flat's native
-# plane-to-axis dimension is visible edge-on in the side view.
+# below F. The D-flat's native plane-to-axis dimension is visible edge-on in
+# the side view.
 _ABOVE_Y = SIDE_CENTER[1] + HALF_OD + 0.016
 _ROW_PITCH = 0.010
 _ROW_Y = tuple(SIDE_CENTER[1] - HALF_OD - 0.016 - i * _ROW_PITCH for i in range(6))
-# The prefixed texts' centre right of F: half the wider text's printed width
-# (test_transgear_knob_shaft_drawing) and an arrow's air.
-_CUTTER_TEXT_INSET = 0.040
 SIDE_KEEP: dict[str, tuple[float, float]] = {
     "OutsideDia": ((F_X + PINION_REAR_X) / 2.0, _ABOVE_Y),
     "CoreDia": ((F_X + CORE_END_X) / 2.0, _ABOVE_Y + 0.010),
@@ -153,7 +151,7 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     # fifths along the relief it starts right of F, above that frame.
     "ReliefDia": ((CORE_END_X + 4.0 * THREAD_END_X) / 5.0, _ABOVE_Y + 0.0265),
     # A Ø's line stands at its point; right of the view's centre the text
-    # hangs LEFT of it (the 12T's and core's, run 20261001T085006647Z), and
+    # hangs LEFT of it (the pinion's and core's, run 20261001T085006647Z), and
     # the blank's banded text and shoulder run 27.5 mm (19e33c6c2: from the
     # blank's mid the shoulder crossed the relief's line).  9 mm in from the
     # chamfer the line stands clear of the core runout frame below the text
@@ -165,8 +163,6 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     "PlainCore": ((F_X + THREAD_END_X) / 2.0, _ROW_Y[1]),
     "JournalLength": ((PINION_REAR_X + REAR_X) / 2.0, _ROW_Y[0]),
     "TipStation": ((F_X + TIP_X) / 2.0, _ROW_Y[2]),
-    "FullDepth": (F_X + _CUTTER_TEXT_INSET, _ROW_Y[3]),
-    "CutterRunout": (F_X + _CUTTER_TEXT_INSET, _ROW_Y[5]),
     "FlatToAxis": (CORE_END_X + 0.018, SIDE_CENTER[1] - HALF_OD - 0.004),
     "TipChamfer": (TIP_X + 0.012, SIDE_CENTER[1] - HALF_OD),
 }
@@ -182,7 +178,7 @@ END_KEEP: dict[str, tuple[float, float]] = {
 DIMENSION_CALLOUTS_BELOW = {"TipChamfer": CHAMFER_CALLOUT}
 
 # The thread callout lands on the edge where the thread blank meets the tip
-# chamfer and stands up and left, clear of the tooth-tip Ø over the 12T.
+# chamfer and stands up and left, clear of the tooth-tip Ø over the pinion.
 THREAD_PICK = (CHAMFER_START_X, SIDE_CENTER[1] + 0.002)
 THREAD_NOTE_XY = ((THREAD_END_X + CHAMFER_START_X) / 2.0, _ABOVE_Y + 0.020)
 # The actual active core (not the new neck) and running journal own finishes.
@@ -229,7 +225,7 @@ DETAIL_LABEL_TEXT = f"DETAIL {DETAIL_LETTER}\nSCALE {DETAIL_SCALE[0]} : {DETAIL_
 # The fence, model mm (z, y): mid-neck, 0.1 under the axis.  Radius 2.7
 # holds both neck floors (the Ø's two arrows land on drawn floor), the
 # core's top step corner (2.53 out), the Ø's lower arrow tail (2.6 under
-# the axis; 2.52 out), the 12T root, and the axis and F origin that
+# the axis; 2.52 out), and the axis and F origin that
 # FrontReliefDia and FrontReliefWidth reference: a crop drops a dimension
 # whose reference it cuts away.
 DETAIL_FOCUS_MM = (-FRONT_RELIEF_WIDTH / 2.0, -0.1)
@@ -290,14 +286,14 @@ DETAIL_KEEP: dict[str, tuple[float, float]] = {
     # the 4 mm span it would sit on both witness lines.
     "FrontReliefWidth": (_STEP_X + 0.0078, _DETAIL_BOTTOM - 0.007),
     # Left of the crop: the leader runs from the corner 12-24 deg below
-    # level, inside the corner's own quadrant, through the 12T's blank
-    # interior under its root (2.52) and over the axis.
+    # level, inside the corner's own quadrant, through the pinion's blank
+    # interior under its root and over the axis.
     "FrontCornerRadius": (_CORNER_CENTER[0] - 0.0325, _CORNER_CENTER[1] - 0.006),
 }
 # Top-left anchors.  The label stands left of the crop, 3 mm under the
 # corner R's text (its limits print to 5 mm under its point).
 DETAIL_LABEL_XY = (0.042, _CORNER_CENTER[1] - 0.014)
-# The mark's "B" stands under the 12T, between the tooth-tip Ø's lower arrow
+# The mark's "B" stands under the pinion, between the tooth-tip Ø's lower arrow
 # (x 0.2056) and F's witness lines (x 0.2144), clear of the mark circle.
 PARENT_LETTER_XY = (F_X - 0.0057, SIDE_CENTER[1] - HALF_OD - 0.0025)
 
@@ -577,7 +573,7 @@ async def build(adapter: Any) -> dict[str, str]:
             2: "Harmonic Analyzer Project",
             3: (
                 f"transgear knob shaft; steel; {TEETH}T {DIAMETRAL_PITCH:g}DP "
-                f"PA{PRESSURE_ANGLE_DEG:g}; finite stock #8; #8-32 stud; D-core"
+                f"PA{PRESSURE_ANGLE_DEG:g}; finite stock #{CUTTER_NUMBER}; #8-32 stud; D-core"
             ),
             4: "Generated from the project-owned ASME B drawing standard",
         },

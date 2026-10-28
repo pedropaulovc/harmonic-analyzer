@@ -149,7 +149,10 @@ CRANK_TEETH = configuration_teeth(CRANK_CONFIG)
 KNOB_TEETH = configuration_teeth(KNOB_CONFIG)
 
 # Installed physical chain; changing a mounted wheel does not resize it.
-CHAIN_LINK_COUNT = 68
+# 66, not 68 (#2034): the 15:150 reducer moves the knob axis 6.64 nearer the
+# crank (centres 154.853 -> 148.211); 68 no longer closes a pinned cycle and
+# 64 is too short, while 66 hangs a 33.0 sag against the 68-link's 31.1.
+CHAIN_LINK_COUNT = 66
 if type(CHAIN_LINK_COUNT) is not int or CHAIN_LINK_COUNT <= 0 or CHAIN_LINK_COUNT % 2:
     raise ValueError("the selected ANSI #25 chain count must be a positive even integer")
 

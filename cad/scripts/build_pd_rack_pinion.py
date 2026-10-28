@@ -1,8 +1,9 @@
 r"""Reproduction script: translational-gearing reducer disc MHA-PD-06 (book ch. 23).
 
-The large thin brass reducer disc retains the narrated 120 physical teeth,
-cut by the finite PA20 48DP stock #2/reference-55 master. It does not
-touch the rack: the finite stock #8/reference-12 knob pinion drives it 12:120.
+The large thin brass reducer disc carries 150 physical teeth (#2034: 15:150
+replaced the narrated 12:120 at the same 1:10 feed), cut by the finite PA20
+48DP stock #1/reference-135 master. It does not touch the rack: the finite
+stock #7/reference-14 knob pinion drives it 15:150.
 Its bore pilots on the brass hub's Ø13.1 spigot, and three #0-80 fillister
 screws (MHA-PD-VN-55) clamp it to that hub's flange (MHA-PD-17).
 

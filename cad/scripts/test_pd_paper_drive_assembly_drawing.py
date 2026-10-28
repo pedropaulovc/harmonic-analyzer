@@ -435,23 +435,48 @@ def test_view_k_carries_the_set_coordinates_as_assembly_model_dimensions() -> No
     ps = (s[0] - p[0], s[1] - p[1])
     assert sq[0] * qk[0] + sq[1] * qk[1] == pytest.approx(0.0, abs=1e-9)
     assert sq[0] * ps[1] - sq[1] * ps[0] == pytest.approx(0.0, abs=1e-9)
-    # K is aimed at the middle of the set band, on the nominal S-K line.
+    # K is the DRO count nearest the middle of the set band, about the
+    # mid-band point on the nominal S-K line: each coordinate a whole count
+    # within a count of that point, so K is within a count's diagonal of it.
     low, high = disc.CENTRE_DISTANCE_WINDOW
-    assert math.dist(s, k) == pytest.approx((low + high) / 2.0)
+    count = knob_setting.DRO_COUNT_MM
     nominal = (
         placement.KNOB_SHAFT_XY[0] - s[0], placement.KNOB_SHAFT_XY[1] - s[1],
     )
     assert math.hypot(*nominal) == pytest.approx(low)
-    assert (k[0] - s[0]) * nominal[1] - (k[1] - s[1]) * nominal[0] == pytest.approx(
-        0.0, abs=1e-9
+    setting = (knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM)
+    for value, aim in zip(setting, knob_setting.K_AIM_FROM_S_MM):
+        assert value / count == pytest.approx(round(value / count), abs=1e-9)
+        assert abs(value - aim) < count
+    diagonal = count * math.sqrt(2.0)
+    off_line = abs((k[0] - s[0]) * nominal[1] - (k[1] - s[1]) * nominal[0]) / low
+    assert off_line < diagonal
+    assert abs(math.dist(s, k) - (low + high) / 2.0) < diagonal
+    # N, the nominal centre, is on S-K at the band's low end, beside the
+    # model's knob axis by K's count off the nominal line; S to N carries the
+    # set band itself, +x/-0.
+    assert math.dist(knob_setting.N_XY, placement.KNOB_SHAFT_XY) < diagonal
+    assert math.dist(s, knob_setting.N_XY) == pytest.approx(disc.CENTRE_DISTANCE)
+    assert (k[0] - s[0]) * (knob_setting.N_XY[1] - s[1]) - (k[1] - s[1]) * (
+        knob_setting.N_XY[0] - s[0]
+    ) == pytest.approx(0.0, abs=1e-9)
+    assert knob_setting.CENTRE_TOLERANCE_MM == pytest.approx((0.0, high - low))
+    assert disc.CENTRE_DISTANCE_SET_TEXT == (
+        f"{disc.CENTRE_DISTANCE:.{knob_setting.PLACES}f} "
+        f"+{knob_setting.CENTRE_TOLERANCE_MM[1]:.{knob_setting.PLACES}f}/-0"
     )
-    # The view marks exactly the two settings, at the places the model owns.
+    # The view marks the band and the two settings, at the places the model
+    # owns; only the settings are references.
     assert knob_setting.DRAWING_DIMENSIONS == {
-        knob_setting.FEATURE: {knob_setting.ALONG_DIMENSION, knob_setting.ACROSS_DIMENSION}
+        knob_setting.FEATURE: {
+            knob_setting.ALONG_DIMENSION, knob_setting.ACROSS_DIMENSION,
+            knob_setting.CENTRE_DIMENSION,
+        }
     }
     assert knob_setting.REFERENCE_DIMENSIONS == {
         knob_setting.ALONG_DIMENSION, knob_setting.ACROSS_DIMENSION
     }
+    assert knob_setting.CENTRE_DIMENSION not in knob_setting.SETTING_CALLOUTS
     for part, text in knob_setting.SETTING_CALLOUTS.values():
         assert part == 3 and "\n" not in text
 
@@ -472,22 +497,47 @@ def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
                 centre[1] + (xy[1] - mid[1]) * scale / 1000.0,
             )
 
-        s, q, k, t = (
+        s, q, k, t, n = (
             sheet(xy)
             for xy in (
                 knob_setting.S_XY, knob_setting.Q_XY, knob_setting.K_XY,
-                drawing.KNOB_SETTING_TAP_XY,
+                drawing.KNOB_SETTING_TAP_XY, knob_setting.N_XY,
             )
         )
-        for point in (s, q, k, t):
+        for point in (s, q, k, t, n):
             assert math.dist(point, centre) < drawing.KNOB_SETTING_RADIUS
-        keep = drawing.knob_setting_keep(s, q, k)
-        assert set(keep) == {knob_setting.ALONG_DIMENSION, knob_setting.ACROSS_DIMENSION}
+        keep = drawing.knob_setting_keep(s, q, k, n)
+        assert set(keep) == {
+            knob_setting.ALONG_DIMENSION, knob_setting.ACROSS_DIMENSION,
+            knob_setting.CENTRE_DIMENSION,
+        }
+        # S to N: the value and its stacked +x/-0 on one text row pair, past
+        # S along the line (outside its extension lines), clear of the crop.
+        x, y = keep.pop(knob_setting.CENTRE_DIMENSION)
+        half = len("43.794+0.050") * DIM_CHAR_WIDTH / 2.0
+        box = (x - half, y - DIM_LINE_PITCH, x + half, y + DIM_LINE_PITCH)
+        nearest = (min(max(centre[0], box[0]), box[2]), min(max(centre[1], box[1]), box[3]))
+        assert math.dist(nearest, centre) > drawing.KNOB_SETTING_RADIUS
+        assert drawing.FITUP_NOTE_XY[1][0] < box[0] and box[2] < drawing.FITUP_NOTE_LIMITS[1][0]
+        assert drawing.FITUP_NOTE_LIMITS[1][1] < box[1] and box[3] < drawing.KNOB_SETTING_FIELD_TOP
+        line = math.dist(s, n)
+        along = ((x - n[0]) * (s[0] - n[0]) + (y - n[1]) * (s[1] - n[1])) / line
+        assert along - half > line
+        # The dimension line runs through the text, so each extension line
+        # ends where S and N are carried square to the line to the text's
+        # offset: inside the view's field, clear of the title block (run
+        # 20261028T050655383Z: N's ran onto its top border).
+        unit = ((s[0] - n[0]) / line, (s[1] - n[1]) / line)
+        offset = -(x - n[0]) * unit[1] + (y - n[1]) * unit[0]
+        for end in (s, n):
+            tip = (end[0] - offset * unit[1], end[1] + offset * unit[0])
+            assert drawing.FITUP_NOTE_LIMITS[1][1] < tip[1] < drawing.KNOB_SETTING_FIELD_TOP
+            assert tip[1] - DRAWING_TEMPLATES[drawing.SPEC.layout].title_block_top_m > 0.005
+        boxes = [box]
         legs = {
             knob_setting.ALONG_DIMENSION: (s, q),
             knob_setting.ACROSS_DIMENSION: (q, k),
         }
-        boxes = []
         for name, (x, y) in keep.items():
             # The value row centred on the text point, its callout row above;
             # the dimension line runs through the text, parallel to its leg.
@@ -514,9 +564,13 @@ def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
             assert math.dist(nearest, centre) > drawing.KNOB_SETTING_RADIUS
             assert drawing.FITUP_NOTE_XY[1][0] < box[0] and box[2] < drawing.FITUP_NOTE_LIMITS[1][0]
             assert drawing.FITUP_NOTE_LIMITS[1][1] < box[1] and box[3] < drawing.KNOB_SETTING_FIELD_TOP
+            # Each extension line runs past its dimension line by about
+            # 1.6 mm (ANSI 1/16 in); the step text above must stay clear of
+            # that overshoot (run 20261028T063820031Z: ALONG's struck the
+            # continuation line's "ON").
             shift = (x - (a[0] + b[0]) / 2.0, y - (a[1] + b[1]) / 2.0)
             for end in (a, b):
-                assert end[1] + shift[1] < drawing.KNOB_SETTING_FIELD_TOP
+                assert end[1] + shift[1] + 0.003 < drawing.KNOB_SETTING_FIELD_TOP
             boxes.append(box)
         # Each circle lettered on a leader to its centre: S and T inside the
         # crop, K just outside it past the boss, each clear of the chain.
@@ -612,18 +666,32 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     lever = knob_setting.K_SET_CENTRE_DISTANCE_MM / steps_arm.PIN_STATION
     tangential_err = dro + 2.0 * centring + 2.0 * centring * lever
     assert radial_err == pytest.approx(0.0135, abs=1e-4)
-    # The operator dials the display's nearest count to each printed value.
+    # The printed values are the display's own counts: the operator dials
+    # exactly what VIEW K prints.
     count = mill["resolution_mm"]["value"]
-    x, y = (
-        round(round(value, knob_setting.PLACES) / count) * count
-        for value in (knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM)
-    )
+    assert knob_setting.DRO_COUNT_MM == count
+    x, y = knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM
+    assert round(round(x, knob_setting.PLACES) / count) * count == pytest.approx(x)
+    assert round(round(y, knob_setting.PLACES) / count) * count == pytest.approx(y)
+
+    def margins(point):
+        radial = math.hypot(*point) - low
+        return radial - radial_err, (high - low) - (radial + radial_err)
+
     radial = math.hypot(x, y) - low
     tangential = abs(x * uy - y * ux)
-    # Inside the +x/-0 band with margin at both ends.
-    bottom_margin = radial - radial_err
-    top_margin = (high - low) - (radial + radial_err)
-    assert bottom_margin > 0.010 and top_margin > 0.010
+    bottom_margin, top_margin = margins((x, y))
+    # 1. Physically: the worst-case K lies inside the set band at both ends.
+    assert low < low + radial - radial_err and low + radial + radial_err < high
+    assert bottom_margin > 0.0 and top_margin > 0.0
+    # 2. No count about the aim leaves a larger minimum margin.
+    best = max(min(margins(point)) for point in knob_setting.dro_count_candidates())
+    assert min(bottom_margin, top_margin) == pytest.approx(best, abs=1e-12)
+    # 3. At least what the mid-band aim leaves after the error budget and the
+    # count lattice: the nearest count is within half a count per axis.
+    floor = (high - low) / 2.0 - radial_err - count / 2.0 * (abs(ux) + abs(uy))
+    assert floor > 0.0
+    assert min(bottom_margin, top_margin) > floor
     # And inside K's drawn setting circle about its nominal.
     radius = registration.REDUCER_AXIS_SETUP_RADIUS_MM
     assert math.hypot(radial + radial_err, tangential + tangential_err) < radius
@@ -1080,7 +1148,7 @@ def test_no_retired_part_is_named_on_the_sheet() -> None:
 
 
 def test_the_knob_stack_prints_front_to_rear() -> None:
-    """Contract §1: thumbnut | knob wheel | collar | 12T | ring | plate hub | plate |
+    """Contract §1: thumbnut | knob wheel | collar | pinion | ring | plate hub | plate |
     rear boss | cup | screw."""
     body = _step_body("knob-stack-fitted")
     order = [
@@ -1430,7 +1498,7 @@ def test_the_fitted_collar_rear_face_reacts_on_the_actual_gear_shoulder() -> Non
     ) in faced
     seated = _step_body("collar-shoulder-seated")
     assert "D-BORE ON THE SHAFT D-FLAT" in seated
-    assert "REAR FACE BEARING ON THE MHA-PD-08 12T FRONT FACE" in seated
+    assert "REAR FACE BEARING ON THE MHA-PD-08 15T FRONT FACE" in seated
     assert "ON THE DRIVE DOWELS" in seated
     assert collar.BODY_REAR_FACE_FROM_F == 0.0
     assert collar.LENGTH_FITTED_MIN <= collar.LENGTH <= collar.LENGTH_FITTED_MAX
@@ -2447,11 +2515,11 @@ def test_chain_roles_follow_validated_loop_stations_not_native_indices(monkeypat
     adapter, components = _native_chain_fixture(monkeypatch)
     model = adapter.currentModel
     names = assembly._assign_chain_references(adapter)
-    assert len(names) == 67
+    assert len(names) == 65
     assert names["@InnerLink:1"] == components[0].Name2
-    assert names["@InnerLink:34"] == components[66].Name2
-    assert names["@OuterLink:33"] == components[65].Name2
-    assert len({component.ComponentReference for component in components[:-1]}) == 67
+    assert names["@InnerLink:33"] == components[64].Name2
+    assert names["@OuterLink:32"] == components[63].Name2
+    assert len({component.ComponentReference for component in components[:-1]}) == 65
     model.ForceRebuild3.assert_called_once_with(False)
     # Drawing simplification may change only the derived suffix.
     for component in components:
@@ -2515,7 +2583,7 @@ def test_chain_reference_assignment_refuses_failed_native_rebuild(monkeypatch):
     assert [component.ComponentReference for component in components[:-1]] == (
         expected_references
     )
-    assert len(set(expected_references)) == 67
+    assert len(set(expected_references)) == 65
     assert components[-1].ComponentReference == connecting_reference
     assert [component.Name2 for component in components] == names_before
     assert [
@@ -2557,7 +2625,7 @@ def test_chain_pattern_rebuild_rebinds_existing_pose_witnesses(monkeypatch):
     assert len(names) == chain.LINK_COUNT - 1
     assert names["@InnerLink:1"] == components[0].Name2
     assert names["@OuterLink:1"] == components[1].Name2
-    assert names["@InnerLink:34"] == components[-2].Name2
+    assert names["@InnerLink:33"] == components[-2].Name2
     assert not {
         before[station] for station in placed_stations
     }.intersection(_assembly._POSE_LEDGER), (
@@ -3074,8 +3142,8 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False):
 def test_source_census_distinguishes_chain_members_and_preserves_transgear_aggregation(monkeypatch):
     model, _components, table, adapter, _cells, keys = _pd_bom_fixture(monkeypatch)
     counts = drawing._source_family_counts(model)
-    assert counts["sh-vn-chain-link--InnerLink"] == 34
-    assert counts["sh-vn-chain-link--OuterLink"] == 33
+    assert counts["sh-vn-chain-link--InnerLink"] == 33
+    assert counts["sh-vn-chain-link--OuterLink"] == 32
     assert counts["pd-vn-chain-connecting-link"] == 1
     assert counts["pd-transgear-removable"] == 3
     items = dict(
@@ -3402,8 +3470,8 @@ def test_pd_all_visible_authoring_preserves_visible_quantities_and_native_snapsh
     proof_by_row = {row[0]: row for row in snapshot}
     for key, count, configurations in (
         ("pd-transgear-removable", 3, {"T12 Simplified", "T18 Simplified", "T24 Simplified"}),
-        ("sh-vn-chain-link--InnerLink", 34, {"InnerLink Simplified"}),
-        ("sh-vn-chain-link--OuterLink", 33, {"OuterLink Simplified"}),
+        ("sh-vn-chain-link--InnerLink", 33, {"InnerLink Simplified"}),
+        ("sh-vn-chain-link--OuterLink", 32, {"OuterLink Simplified"}),
     ):
         row = scene.keys.index(key) + 1
         members = table.GetComponents2(row, configuration)
@@ -3782,8 +3850,8 @@ def test_bom_insertion_retains_grouped_native_members_through_pd_consumer(
             f"T12{suffix}", f"T18{suffix}", f"T24{suffix}"
         }
         for key, quantity, member in (
-            ("sh-vn-chain-link--InnerLink", "34", f"InnerLink{suffix}"),
-            ("sh-vn-chain-link--OuterLink", "33", f"OuterLink{suffix}"),
+            ("sh-vn-chain-link--InnerLink", "33", f"InnerLink{suffix}"),
+            ("sh-vn-chain-link--OuterLink", "32", f"OuterLink{suffix}"),
         ):
             row = scene.keys.index(key) + 1
             assert table.DisplayedText2(row, 1, True) == drawing.BOM_PART_NUMBERS[key]
@@ -4060,8 +4128,8 @@ def test_pd_consumer_refuses_wrong_visible_projection_despite_unchanged_physical
         (scene.keys.index(key) + 1, quantity)
         for key, quantity in (
             ("pd-transgear-removable", 3),
-            ("sh-vn-chain-link--InnerLink", 34),
-            ("sh-vn-chain-link--OuterLink", 33),
+            ("sh-vn-chain-link--InnerLink", 33),
+            ("sh-vn-chain-link--OuterLink", 32),
         )
     )
     for row, quantity in retained_quantities:
@@ -4258,8 +4326,8 @@ def test_place_bom_sheet_preserves_native_grouped_quantities_with_visible_number
         assert table.DisplayedText2(row, 1, True) == drawing.BOM_PART_NUMBERS[key]
     for key, quantity, configurations in (
         ("pd-transgear-removable", 3, {"T12", "T18", "T24"}),
-        ("sh-vn-chain-link--InnerLink", 34, {"InnerLink"}),
-        ("sh-vn-chain-link--OuterLink", 33, {"OuterLink"}),
+        ("sh-vn-chain-link--InnerLink", 33, {"InnerLink"}),
+        ("sh-vn-chain-link--OuterLink", 32, {"OuterLink"}),
     ):
         row = scene.keys.index(key) + 1
         assert table.Text2(row, 3, True) == table.DisplayedText2(row, 3, True) == str(quantity)
@@ -5410,11 +5478,11 @@ def test_split_bom_snapshot_refuses_membership_or_quantity_changes(monkeypatch, 
                 component.ReferencedConfiguration = "OuterLink Simplified"
             for component in native_rows[outer_row - 1]:
                 component.ReferencedConfiguration = "InnerLink Simplified"
-            assert len(native_rows[inner_row - 1]) == 34
-            assert len(native_rows[outer_row - 1]) == 33
+            assert len(native_rows[inner_row - 1]) == 33
+            assert len(native_rows[outer_row - 1]) == 32
             cells = piece._pd_state.cells
             assert cells[inner_row][1] == cells[outer_row][1]
-            assert (cells[inner_row][3], cells[outer_row][3]) == ("34", "33")
+            assert (cells[inner_row][3], cells[outer_row][3]) == ("33", "32")
         message = "membership or quantities changed"
     else:
         for piece in pieces:

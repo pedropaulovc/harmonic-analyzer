@@ -1047,13 +1047,16 @@ setup allowance, not a gear accuracy grade.
 
 | part | teeth | pitch | cutter | index per tooth (40:1) |
 |---|--:|---|:--:|---|
-| `pd-rack-pinion` (reducer disc) | 120 | 48DP PA20 | #2, Precise/Penn 10-289-482 | 5 on 15 |
-| `pd-transgear-knob-shaft` integral pinion | 12 | 48DP PA20 | #8, TTC 10-289-488 | 3 turns + 5 on 15 |
+| `pd-rack-pinion` (reducer disc) | 150 | 48DP PA20 | #1, TTC 10-289-481 | 4 on 15 |
+| `pd-transgear-knob-shaft` integral pinion | 15 | 48DP PA20 | #7, TTC 10-289-487 | 2 turns + 10 on 15 |
 | `pd-transgear-feed-pinion` | 12 | 32DP PA20 | #8, Precise/Penn 10-289-328 | 3 turns + 5 on 15 |
 | `pd-platen-rack` | rack, pitch 2.4936 mm | 32DP PA20 | none: bought as stock rack | none |
 
-The reducer is 12:120 at 48DP, and the two 48DP cutters are the same #2 and #8 sizes the cones
-use. Both 12T pinions carry the stock #8 form, and each hub is shaped so the cutter runs out clear.
+The reducer is 15:150 at 48DP (#2034 replaced 12:120; the ratio stays 1:10). Its two 48DP
+cutters, #1 and #7, are sizes the cones do not use, so the 48DP set needs both. The knob's 15T is
+cut straight through its face: its form root stands above the journal, so the cutter runs out in
+air with no endcut. The feed 12T carries the stock #8 form, and its hub is shaped so the cutter
+runs out clear.
 The rack is bought, not cut: SDP/SI A1B12-Y324, a 48 in brass 32DP 20° rack, 3/16 × 3/16 in
 (4.7625 mm) square ([product page](https://shop.sdp-si.com/a-1b12-y324.html),
 [D820 catalogue](https://sdp-si.com/D820/PDFS/Gears.pdf)), cut to the printed 269.6 mm callout
@@ -1062,6 +1065,7 @@ CAD nominal is not the shop cut length; `pd_platen_rack_spec.DRAWING_PRECISION` 
 to one decimal place under the ordinary .X band. Check it against the feed pinion before fitting; the pitch-index limit the model
 allows for it is in `cad/config/tolerances/stock_form_quality.yaml` (`rack_pitch_index_deviation_mm`).
 
-The chain is 68 links of ANSI #25, 12:24 from the crank sprocket to the knob sprocket. The
+The chain is 66 links of ANSI #25, 12:24 from the crank sprocket to the knob sprocket (#2034
+moved the knob 6.64 mm nearer the crank; the former 68 links no longer close). The
 sprockets are made from McMaster 6793K blanks. The transgear arm and its plate are located by two
 MHA-PD-VN-64 dowels (McMaster 93600A189, 2 × 6 mm); the screws only clamp.

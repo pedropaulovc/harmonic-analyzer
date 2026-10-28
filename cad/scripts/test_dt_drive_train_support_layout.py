@@ -773,7 +773,7 @@ def test_chain_shift_moves_the_crank_seat_hub_and_knob_seat_together(
 
     crank_seat = drive.CRANKSHAFT_Z0 + cs.SEAT_COLLAR
     # The knob side's seat is the MHA-PD-22 drive collar's front face, set
-    # SET_NOMINAL in front of the knob shaft's 12T front face.
+    # SET_NOMINAL in front of the knob shaft's pinion front face.
     knob_seat = paper.KNOB_COLLAR_Z0
     assert crank_seat == pytest.approx(-154.3)
     assert knob_seat == pytest.approx(crank_seat)

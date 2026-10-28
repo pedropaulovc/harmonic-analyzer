@@ -19,7 +19,7 @@ order:
    hub's front face is faced until it stands ``HUB_NOSE_WINDOW`` behind the
    sleeve's nose, so the front bushing bears on the steel nose (the hub never
    thrusts, R9-5) and traps hub and disc against the step.
-1. m, the air from F (the MHA-PD-08 knob shaft's 12T front face) to the
+1. m, the air from F (the MHA-PD-08 knob shaft's pinion front face) to the
    MHA-PD-06 disc's front face with the knob shaft rearward and the cluster,
    hub and disc pushed FORWARD, is set to ``FIT_WINDOW`` by facing the FRONT
    bushing.  Pushed forward, the cluster bears through the front bushing on
@@ -42,7 +42,7 @@ MHA-PD-19 plate both seat, so the arm's thickness drops out of m:
     rear bushing  = F - tooth length - spigot length - arm thickness - m
                     - disc end float
 
-with F (from the arm's rear face) = plate hub face + thrust ring + 12T face.
+with F (from the arm's rear face) = plate hub face + thrust ring + pinion face.
 Each term is taken at its owning module's printed band.
 
 Pure data: no SolidWorks.  The hub's and the bushings' specs and the
@@ -99,7 +99,7 @@ F_TERMS: tuple[tuple[str, float, float], ...] = (
     ),
     ("MHA-PD-VN-60 thrust ring length", KNOB_RING.LENGTH, KNOB_RING.LENGTH_TOL),
     (
-        "MHA-PD-08 12T face width",
+        "MHA-PD-08 pinion face width",
         KNOB_SHAFT.FACE_WIDTH,
         printed_band_mm(KNOB_SHAFT.FACE_WIDTH_PLACES),
     ),
@@ -212,7 +212,7 @@ MODEL_M = round(
 
 # The sleeve's rear face, cluster, hub and disc forward, from the arm's front
 # face: the rear bushing's fitted gap plus the sleeve's float (the rear
-# bushing can follow the sleeve forward), 6.25 .. 6.87 (the 12T over the
+# bushing can follow the sleeve forward), 6.25 .. 6.87 (the pinion over the
 # rack, the bushing to the rack's back face: build_pd_paper_drive_assembly).
 SLEEVE_REAR_FORWARD_FROM_ARM = (
     round(REAR_CHAIN_NOMINAL - REAR_CHAIN_BAND - FIT_WINDOW[1] - HUB_NOSE_WINDOW[1], 6),

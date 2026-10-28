@@ -168,10 +168,10 @@ _MOVING_CHANNEL_STEMS = (
 _INSTANCE_SUFFIX = re.compile(r"-\d+$")
 # Crank-drive gear mate: either side carries one of these in its component name.
 _CRANK_GEAR_TOKENS = ("dt-crank-pinion", "dt-crank-drive-gear")
-# Paper-feed reduction gear mate (paper-drive): the 12T third gear driving the
-# 120T reducer disc (the disc part is named rack-pinion for historical reasons).
+# Paper-feed reduction gear mate (paper-drive): the 15T third gear driving the
+# 150T reducer disc (the disc part is named rack-pinion for historical reasons).
 _FEED_GEAR_TOKENS = ("pd-rack-pinion",)
-_FEED_GEAR_RATIO = (1, 10)  # 12T third gear : 120T reducer disc
+_FEED_GEAR_RATIO = (1, 10)  # 15T third gear : 150T reducer disc
 # Expected TOP-LEVEL component-count band per assembly. REFERENCE DATA ONLY -- the
 # live component-count gate was removed (every failure it ever raised was a stale
 # band or a gate bug, never a real regression). Kept because the counts document
@@ -428,7 +428,7 @@ def assert_gear_ratios(adapter: Any, name: str) -> None:
                     f"{GEAR_OWNER} has no gear mates -- the drive train is broken"
                 )
             if name == "pd-paper-drive":
-                # A missing/suppressed 12T:120T feed mesh must fail loud, not
+                # A missing/suppressed 15T:150T feed mesh must fail loud, not
                 # take the harmless no-gears path below (codex #196).
                 raise RuntimeError(
                     "paper-drive has no gear mates -- the paper-feed train is broken"
@@ -459,7 +459,7 @@ def assert_gear_ratios(adapter: Any, name: str) -> None:
         )
         crank_expected = _canon_ratio(crank_num, crank_den)
         if name == "pd-paper-drive":
-            # The single paper-feed reduction mesh (12T third gear : 120T disc);
+            # The single paper-feed reduction mesh (15T third gear : 150T disc);
             # paper-drive carries no crank/channel gear mates.
             if feed_links != [_FEED_GEAR_RATIO]:
                 problems.append(
@@ -1591,7 +1591,7 @@ async def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
     the hand-run ``build_kinematic_probe.py``, so a paper-feed regression could ship
     with the standard gates green. This wires that proof into ``verify:kinematics``:
     open paper-drive, drive the crank, and assert T24 / drive collar / knob
-    shaft (integral 12T) / the 120T disc / the feed pinion all turn and the
+    shaft (integral 15T) / the 150T disc / the feed pinion all turn and the
     platen feeds (the probe's own assertions). The driven (dirty) model is
     discarded without saving. The belt
     mate ratio is build-time-checked but the rack coefficient and the

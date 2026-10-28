@@ -564,7 +564,20 @@ KNOB_SETTING_VIEW_NAME = "VIEW K"
 KNOB_SETTING_SCALE = (1.0, 1.0)
 KNOB_SETTING_CENTER = (0.320, 0.097)
 KNOB_SETTING_RADIUS = 0.024
-KNOB_SETTING_TEXT_OFFSET = 0.030
+# At 15:150 Q sits higher in the crop, so at 0.030 ALONG's extension line from
+# Q struck the second column's continuation line (run 20261028T063820031Z,
+# machinist review r1-r3, rule 14); 0.024 keeps the texts clear of the
+# circle and the extension lines 4 mm under the column.
+KNOB_SETTING_TEXT_OFFSET = 0.024
+# S to N, the set band (43.794 +0.050/-0 at 15:150), spans the crop's
+# diameter, so its text stands past S along the line, off it away from Q,
+# clear of the circle and under the second column. Its dimension line runs
+# through the text, so the offset also sets its extension lines: at 0.028
+# N's ran down onto the title block's top border (run
+# 20261028T050655383Z, machinist review r1/r3, rule 13); at 0.018 they end
+# in the view's field, above the title block.
+KNOB_SETTING_CENTRE_TEXT_PAST = 0.045
+KNOB_SETTING_CENTRE_TEXT_OFFSET = 0.018
 KNOB_SETTING_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 KNOB_SETTING_INSTANCES = frozenset({"pd-transgear-arm-1", "pd-transgear-arm-plate-1"})
 # The located step's acceptance for "true": a null reading on the indicator, so the
@@ -599,9 +612,10 @@ KNOB_SETTING_CAPTION = "\n".join(
 )
 KNOB_SETTING_CAPTION_XY = (0.218, 0.113)
 # Each letter's centre stands this far off its circle's centre (sheet m): S
-# along the arm past the pin, T diagonally away from both chain legs, K
-# radially out past the plate's boss, just outside the crop.
-KNOB_SETTING_LETTER_GAPS = {"S": 0.004, "T": 0.005, "K": 0.0095}
+# inward and away from Q (at 15:150 S-K spans most of the crop, so S's
+# letter past the pin would leave it), T diagonally away from both chain
+# legs, K radially out past the plate's boss, just outside the crop.
+KNOB_SETTING_LETTER_GAPS = {"S": 0.005, "T": 0.005, "K": 0.0095}
 # Half a default-height capital letter (sheet m): note positions are the
 # text's upper-left corner.
 KNOB_SETTING_LETTER_HALF = (0.0013, 0.0018)
@@ -631,8 +645,10 @@ def knob_setting_letters(
     along = unit((s[0] - q[0], s[1] - q[1]))
     across = unit((k[0] - q[0], k[1] - q[1]))
     centre = ((s[0] + k[0]) / 2.0, (s[1] + k[1]) / 2.0)
+    inward = unit((centre[0] - s[0], centre[1] - s[1]))
+    away = unit((centre[0] - q[0], centre[1] - q[1]))
     directions = {
-        "S": along,
+        "S": unit((inward[0] + away[0], inward[1] + away[1])),
         "T": unit((along[0] + across[0], along[1] + across[1])),
         "K": unit((k[0] - centre[0], k[1] - centre[1])),
     }
@@ -652,25 +668,42 @@ def knob_setting_letters(
 
 
 def knob_setting_keep(
-    s: tuple[float, float], q: tuple[float, float], k: tuple[float, float]
+    s: tuple[float, float],
+    q: tuple[float, float],
+    k: tuple[float, float],
+    n: tuple[float, float],
 ) -> dict[str, tuple[float, float]]:
-    """Each setting's text, from the chain's projected S, Q and K (sheet
-    metres): off its leg's midpoint, square to the leg, away from the
-    chain's third point."""
-    def off(a, b, away):
+    """Each setting's text, from the chain's projected S, Q, K and the
+    nominal centre N (sheet metres): each coordinate off its leg's midpoint,
+    square to the leg, away from the chain's third point; S to N past S
+    along its line, off it away from Q."""
+    def normal_away(a, b, away):
         mid = ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
         length = math.dist(a, b)
         normal = (-(b[1] - a[1]) / length, (b[0] - a[0]) / length)
         if normal[0] * (mid[0] - away[0]) + normal[1] * (mid[1] - away[1]) < 0.0:
             normal = (-normal[0], -normal[1])
+        return mid, normal
+
+    def off(a, b, away):
+        mid, normal = normal_away(a, b, away)
         return (
             mid[0] + KNOB_SETTING_TEXT_OFFSET * normal[0],
             mid[1] + KNOB_SETTING_TEXT_OFFSET * normal[1],
         )
 
+    mid, normal = normal_away(s, n, q)
+    length = math.dist(s, n)
+    past = ((s[0] - n[0]) / length, (s[1] - n[1]) / length)
     return {
         knob_setting.ALONG_DIMENSION: off(s, q, k),
         knob_setting.ACROSS_DIMENSION: off(q, k, s),
+        knob_setting.CENTRE_DIMENSION: (
+            mid[0] + KNOB_SETTING_CENTRE_TEXT_PAST * past[0]
+            + KNOB_SETTING_CENTRE_TEXT_OFFSET * normal[0],
+            mid[1] + KNOB_SETTING_CENTRE_TEXT_PAST * past[1]
+            + KNOB_SETTING_CENTRE_TEXT_OFFSET * normal[1],
+        ),
     }
 
 
@@ -1648,7 +1681,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "collar-shoulder-seated": (
             f"SEAT THE {_N['pd-transgear-drive-collar']} D-BORE ON THE SHAFT D-FLAT, "
-            f"ITS REAR FACE BEARING ON THE {_N['pd-transgear-knob-shaft']} 12T FRONT FACE. "
+            f"ITS REAR FACE BEARING ON THE {_N['pd-transgear-knob-shaft']} {KNOB_TEETH}T FRONT FACE. "
             f"{sprocket.KNOB_CONFIG} ON THE DRIVE DOWELS, NUT TIGHT ON THE PILOT. "
             "THUMBNUT IS A CLAMP ONLY; NEVER TURNED TO DRIVE."
         ),
@@ -3245,8 +3278,9 @@ def _place_exploded_sheet(
 
 def _place_knob_setting_view(adapter: Any) -> None:
     """Sheet 5's VIEW K: the arm and plate from the machine front at
-    1:1, cropped on S-K's midpoint, carrying the assembly's two K setting
-    dimensions from S (pd_paper_drive_knob_setting_spec) that the arm-plate-located step cites."""
+    1:1, cropped on S-K's midpoint, carrying the assembly's set band S to N
+    and its two K setting dimensions from S (pd_paper_drive_knob_setting_spec)
+    that the arm-plate-located step cites."""
     label = "knob setting view"
     _activate_sheet(adapter, SHEET_NAMES[4])
     view = _early_bound(
@@ -3268,9 +3302,13 @@ def _place_knob_setting_view(adapter: Any) -> None:
             knob_setting.Q_XY,
             knob_setting.K_XY,
             KNOB_SETTING_TAP_XY,
+            knob_setting.N_XY,
         )
     )
-    names = ("S-K midpoint", "pin S", "corner Q", "knob bore K", "plate-screw tap T")
+    names = (
+        "S-K midpoint", "pin S", "corner Q", "knob bore K", "plate-screw tap T",
+        "nominal centre N",
+    )
     centre = model_points_in_view(adapter, view, model[:1], label=label, names=names[:1])[0]
     _shift_view(
         adapter,
@@ -3278,13 +3316,15 @@ def _place_knob_setting_view(adapter: Any) -> None:
         (KNOB_SETTING_CENTER[0] - centre[0], KNOB_SETTING_CENTER[1] - centre[1]),
         label=f"{label} centre",
     )
-    centre, s, q, k, t = model_points_in_view(adapter, view, model, label=label, names=names)
+    centre, s, q, k, t, n = model_points_in_view(
+        adapter, view, model, label=label, names=names
+    )
     if math.dist(centre, KNOB_SETTING_CENTER) > 1e-4:
         raise RuntimeError(f"{label}: S-K midpoint sits at {centre!r}")
     _crop_to_circle(adapter, view, KNOB_SETTING_CENTER, KNOB_SETTING_RADIUS, label=label)
     set_hidden_lines_removed(adapter, view)
     _show_base_view_sketches(adapter, view, (knob_setting.FEATURE,), label=label)
-    keep = knob_setting_keep(s, q, k)
+    keep = knob_setting_keep(s, q, k, n)
     annotations = curate_view_dimensions(
         adapter,
         view,
