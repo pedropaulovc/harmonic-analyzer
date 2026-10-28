@@ -615,6 +615,14 @@ def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
         ("T", "pd-vn-transgear-arm-plate-screw"),
     ):
         assert f"{letter}: {_number(stem)} " in drawing.KNOB_SETTING_CAPTION
+    # ALONG is the DRO frame's P-S axis, and the legend and the step name P.
+    s, q = knob_setting.S_XY, knob_setting.Q_XY
+    toward_p = (knob_setting.P_XY[0] - s[0], knob_setting.P_XY[1] - s[1])
+    along = (q[0] - s[0], q[1] - s[1])
+    assert abs(toward_p[0] * along[1] - toward_p[1] * along[0]) < 1e-9
+    assert toward_p[0] * along[0] + toward_p[1] * along[1] > 0.0
+    assert "ALONG: S TOWARD P" in drawing.KNOB_SETTING_CAPTION
+    assert "P: ARM'S PIVOT BORE" in drawing.KNOB_SETTING_CAPTION
     # Sheet 5's second column ends above the view's field.
     notes = _unit_step_notes()
     _, top = drawing.FITUP_NOTE_XY[1]
@@ -784,11 +792,20 @@ def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
     assert drawing.TRANSGEAR_BALLOON_ANCHORS["pd-transgear-removable"].instance == (
         "pd-transgear-removable-1"
     )
-    # Every other family walks its own body on the instance the view shows.
+    # The hub lands on its flange's front rim, on the far side from the
+    # knob stack; every other family walks its own body on the instance the
+    # view shows.
+    hub_point = drawing.TRANSGEAR_BALLOON_ANCHORS["pd-transgear-disc-hub"].point_mm
+    assert hub_point is not None
+    assert math.hypot(hub_point[0], hub_point[1]) == pytest.approx(
+        drawing.hub.FLANGE_DIA / 2.0, abs=1e-3
+    )
+    assert hub_point[2] == pytest.approx(-drawing.hub.FLANGE_THICK)
+    assert hub_point[0] > 0.0 and hub_point[1] > 0.0
     assert all(
         anchor == drawing.BalloonAnchor()
         for stem, anchor in drawing.TRANSGEAR_BALLOON_ANCHORS.items()
-        if stem != "pd-transgear-removable"
+        if stem not in {"pd-transgear-removable", "pd-transgear-disc-hub"}
     )
 
 

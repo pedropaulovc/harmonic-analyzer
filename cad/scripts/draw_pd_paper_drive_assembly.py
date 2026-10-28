@@ -604,13 +604,23 @@ KNOB_SETTING_LEGEND = {
     "K": f"{_config.parts('pd-transgear-arm-plate')['number']} KNOB BORE",
     "T": f"{_config.parts('pd-vn-transgear-arm-plate-screw')['number']} TAP",
 }
+# The DRO frame is the arm's P-S axis: ALONG runs from S toward the pivot bore
+# P, off the crop (pd_paper_drive_knob_setting_spec.py:59-66, 92-103, on
+# pd_transgear_arm_geometry.ARM_U), the axis the located step trams. Named in
+# the legend, as the step names it (machinist review of run
+# 20261028T090156127Z, r1/r3: the view showed no pivot bore).
+KNOB_SETTING_PIVOT_LINES = (
+    "ALONG: S TOWARD P",
+    "P: ARM'S PIVOT BORE",
+)
 KNOB_SETTING_CAPTION = "\n".join(
     (
         f"{KNOB_SETTING_VIEW_NAME}, 1:1 (STEP {steps.step_number('arm-plate-located')})",
         *(f"{letter}: {name}" for letter, name in KNOB_SETTING_LEGEND.items()),
+        *KNOB_SETTING_PIVOT_LINES,
     )
 )
-KNOB_SETTING_CAPTION_XY = (0.218, 0.113)
+KNOB_SETTING_CAPTION_XY = (0.213, 0.122)
 # Each letter's centre stands this far off its circle's centre (sheet m): S
 # inward and away from Q (at 15:150 S-K spans most of the crop, so S's
 # letter past the pin would leave it), T diagonally away from both chain
@@ -1029,10 +1039,24 @@ TRANSGEAR_EXPLODED_INSTANCES = frozenset(
 if explode.KNOB_WHEEL_INSTANCE not in TRANSGEAR_EXPLODED_INSTANCES:
     raise AssertionError("the explode moves the mounted knob wheel it shows")
 # The knob wheel is the mounted removable; the crank wheel and spare T18 are
-# sheet 1's.
+# sheet 1's.  The hub's walk took its flange's rear rim on the far side from
+# the knob stack (part (-10.676, -6.598, 0)), so on sheet 2 balloon 29's
+# leader crossed the T24 and thumbnut and its arrow was lost on the dark disc
+# (machinist review of run 20261028T090156127Z, r1/r3).  The diametrically
+# opposite point of the flange's front rim (part z = -FLANGE_THICK, wholly
+# drawn) faces away from the knob stack on both isometrics, clear of the
+# three screw heads.
+HUB_BALLOON_ANGLE = math.atan2(6.598, 10.676)
+HUB_BALLOON_POINT_MM = (
+    round(hub.FLANGE_DIA / 2.0 * math.cos(HUB_BALLOON_ANGLE), 3),
+    round(hub.FLANGE_DIA / 2.0 * math.sin(HUB_BALLOON_ANGLE), 3),
+    -hub.FLANGE_THICK,
+)
 TRANSGEAR_BALLOON_ANCHORS = {
     stem: BalloonAnchor(instance=explode.KNOB_WHEEL_INSTANCE)
     if stem == "pd-transgear-removable"
+    else BalloonAnchor(point_mm=HUB_BALLOON_POINT_MM)
+    if stem == "pd-transgear-disc-hub"
     else BalloonAnchor()
     for stem in TRANSGEAR_QUANTITIES
 }
@@ -1493,7 +1517,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"CLAMP THE {_N['pd-transgear-arm-plate']} PLATE ON THE "
             f"{_N['pd-transgear-arm']} ARM'S REAR FACE WITH TOOLMAKER'S CLAMPS, "
             "SCREWS OUT; ARM ON PARALLELS ON THE MILL, PLATE UP, NO PIN YET. "
-            "INDICATE THE PIVOT BORE AND THE ARM'S PIN BORE S TRUE ON ONE DRO "
+            "INDICATE THE PIVOT BORE P AND THE ARM'S PIN BORE S TRUE ON ONE DRO "
             f"AXIS ({KNOB_SETTING_TRUE}); ZERO ON S. AT THE "
             f"{KNOB_SETTING_VIEW_NAME} SETTING FROM S, TAP THE PLATE TILL "
             "ITS KNOB BORE INDICATES TRUE (THE "
