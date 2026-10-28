@@ -186,12 +186,15 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
     assert "THRU" not in notes.upper()
 
 
-def test_tap_callout_flags_the_braze_order_within_four_rows() -> None:
+def test_tap_callout_states_geometry_and_its_mate_within_four_rows() -> None:
     # The native callout's two rows plus these stay within the layout
-    # audit's four-row limit.
+    # audit's four-row limit; each row is finished geometry, not method.
     rows = spec.TAP_CALLOUT_BELOW.splitlines()
     assert len(rows) == 2
-    assert rows[-1].endswith("; TAP AFTER BRAZE")
+    assert rows[0].endswith(f"FOR {spec.SCREW_NUMBER}")
+    assert "WANDER" not in spec.TAP_CALLOUT_BELOW
+    assert "BRAZE" not in spec.TAP_CALLOUT_BELOW
+    assert spec.SCREW_NUMBER in spec.DIMENSION_CALLOUTS_BY_NAME["CounterboreDia"]
     printed = " ".join((spec.DRAWING_NOTES, spec.TAP_CALLOUT_BELOW)).upper()
     assert "PURCHASED" not in printed and "INTEGRAL" not in printed
     assert "THREADLOCKER" not in printed  # spring-eye clamping belongs to the assembly

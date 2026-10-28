@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import math
 
+import _config
 import sm_gooseneck_geom as geom
 from sm_gooseneck_spring_joint import (
     BRAZE_CLEARANCE_MAX,
@@ -73,12 +74,20 @@ if not (
 
 # Callouts the PART authors on its dimensions, below the value (the drawing
 # imports and reads them back; a drawing-side SetText can write through to
-# the part, #1942).
+# the part, #1942).  The counterbore's tight limits (depth band, axis, floor
+# corner) all serve one function, clearing MHA-SM-04's thread run-out
+# (sm_gooseneck_spring_joint), so its Ø names the mate (rule 4; machinist
+# review of e487a1bb4).
+SCREW_NUMBER = str(_config.parts("sm-gooseneck-spring-screw")["number"])
 COUNTERBORE_WALL_CALLOUT = f"C'BORE WALL {COUNTERBORE_WALL_CALLOUT_MIN:.2f} MIN"
+COUNTERBORE_MATE_CALLOUT = f"CLEARS {SCREW_NUMBER} RUN-OUT"
 # The floor corner's own native "R0.10 MAX" names the corner it limits.
 COUNTERBORE_FLOOR_CALLOUT = "FLOOR CORNER"
 COUNTERBORE_AXIS_CALLOUT = f"ON TAP AXIS WITHIN {COUNTERBORE_AXIS_OFFSET_MAX:.2f}"
 PLUG_DIA_CALLOUT = "FLUSH WITH TUBE OD,\nNO STEP"
+# The bend radius is the tube's centreline radius; the arrowhead lands on the
+# outer arc, so the value says which (machinist review of e487a1bb4).
+BEND_RADIUS_CALLOUT = "CLR"
 # Three short rows, so the block ends left of the end view (sheet layout,
 # draw_sm_gooseneck).  The window is the joint's, braze or retaining compound
 # (owner ruling 2026-10-27 on #1997, sm_gooseneck_spring_joint), so the
@@ -89,12 +98,16 @@ SHANK_FIT_CALLOUT = (
     "CLEARANCE"
 )
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
+    "BendPath": {"BendRadius": BEND_RADIUS_CALLOUT},
     "EndPieceProfile": {
         "PlugDia": PLUG_DIA_CALLOUT,
         "PlugShankDia": SHANK_FIT_CALLOUT,
     },
     "CounterboreProfile": {
-        "CounterboreDia": f"{COUNTERBORE_AXIS_CALLOUT}\n{COUNTERBORE_WALL_CALLOUT}",
+        "CounterboreDia": (
+            f"{COUNTERBORE_MATE_CALLOUT}\n{COUNTERBORE_AXIS_CALLOUT}\n"
+            f"{COUNTERBORE_WALL_CALLOUT}"
+        ),
         "CounterboreFloorCornerR": COUNTERBORE_FLOOR_CALLOUT,
     },
 }
@@ -107,14 +120,16 @@ DIMENSION_CALLOUTS_BY_NAME: dict[str, str] = {
 # The end piece's native blind-tap callout (end view): the title block's
 # THREADS row owns the 2B class (drawing-guidelines.md rule 2), the tap's
 # two depths print at the places their band is read at
-# (sm_gooseneck_spring_joint.TAP_DEPTH_BAND), and its location limits and
-# the braze order print under it.  Four rows in all (the layout audit's
-# tall-block limit: a fifth row gated, farm run 20261028T005208028Z), so the
-# braze order shares the wander row.
+# (sm_gooseneck_spring_joint.TAP_DEPTH_BAND), and its location limits print
+# under it as finished geometry: the thread axis, with the mate it serves,
+# and the tap drill's point on that axis (the wall budgets' DRILL_WANDER_MAX;
+# "DRILL WANDER" and "TAP AFTER BRAZE" read as method, machinist review of
+# e487a1bb4).  Four rows in all (the layout audit's tall-block limit: a fifth
+# row gated, farm run 20261028T005208028Z).
 TAP_CALLOUT_PRECISION = {"hw-threaddepth": 2, "hw-tapdrldepth": 2}
 TAP_CALLOUT_BELOW = (
-    f"THREAD AXIS TO TUBE AXIS +/-{THREAD_AXIS_OFFSET_MAX:.2f}\n"
-    f"DRILL WANDER {DRILL_WANDER_MAX:.2f} MAX; TAP AFTER BRAZE"
+    f"AXIS TO TUBE AXIS +/-{THREAD_AXIS_OFFSET_MAX:.2f} FOR {SCREW_NUMBER}\n"
+    f"DRILL POINT ON THREAD AXIS WITHIN {DRILL_WANDER_MAX:.2f}"
 )
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the

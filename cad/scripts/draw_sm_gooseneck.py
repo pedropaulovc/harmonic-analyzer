@@ -77,6 +77,7 @@ from sm_gooseneck_geom import (
     PLUG_SHANK_LENGTH,
     SLEEVE_DIA,
     SLEEVE_TOP,
+    TUBE_BORE_DIA,
     TUBE_DIA,
     TUBE_END_X,
 )
@@ -413,6 +414,49 @@ def _crop_section(adapter: Any, section: Any) -> None:
         )
 
 
+def _sketch_end_piece_joint(adapter: Any, section: Any) -> None:
+    """Draw the tube end's joint line across each cut wall of section A-A.
+
+    The weldment is one body, so the head's shoulder and the tube end merge
+    into one hatched face and the end piece did not read as a separate part
+    (machinist review of e487a1bb4).  The joint is the tube end, x
+    TUBE_END_X, from the bore to the OD on both walls: thin lines in the
+    view's own sketch, direct to the database (as ``_crop_section``)."""
+    x = _section_x(TUBE_END_X)
+    inner, outer = (TUBE_BORE_DIA / 2.0 * _SECTION_S, _TUBE_R * _SECTION_S)
+    segments = [
+        ((x, _SY0 + side * inner), (x, _SY0 + side * outer)) for side in (1.0, -1.0)
+    ]
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    native = _early_bound(section, "IView")
+    if not ddoc.ActivateView(view_name(adapter, section)):
+        raise RuntimeError("failed to activate section A-A for its joint lines")
+    draw.ClearSelection2(True)
+    sketch = _early_bound(native.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+
+    def to_sketch(xy: tuple[float, float]) -> tuple[float, ...]:
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([xy[0], xy[1], 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        return tuple(float(value) for value in projected.ArrayData)
+
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    try:
+        for index, (start, end) in enumerate(segments):
+            if sketch_manager.CreateLine(*to_sketch(start), *to_sketch(end)) is None:
+                raise RuntimeError(f"section A-A joint line {index} failed")
+    finally:
+        sketch_manager.AddToDB = previous_add_to_db
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="section A-A joint lines")
+
+
 def _end_piece_section(adapter: Any, front: Any) -> Any:
     """Section A-A along the arm axis, cropped to the end piece."""
     line = model_points_in_view(
@@ -451,6 +495,7 @@ def _end_piece_section(adapter: Any, front: Any) -> Any:
     _crop_section(adapter, section)
     # The crop must not move the placed ink.
     _place_section(adapter, native)
+    _sketch_end_piece_joint(adapter, section)
     position_section_caption(
         adapter, section, SECTION_CAPTION_XY, label="gooseneck end piece"
     )
