@@ -186,7 +186,9 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "EndR": (0.7071 * END_R + 6.0, -0.7071 * END_R - 6.0, _Z_PLAN),
     "BoreDia": (EDGE_MINUS_X - 4.0, _BOTTOM - 6.0, _Z_PLAN),
     "ScrewHoleDia": (EDGE_MINUS_X - 6.0, _TOP + 8.0, _Z_PLAN),
-    "CskDia": (EDGE_PLUS_X + 8.0, _TOP + 8.0, _Z_PLAN),
+    # 2.5 under the drill callout's height since #2034: with the taller plate
+    # its "2X" reached hole 2's position frame (FRAME_ROWS[2]) above it.
+    "CskDia": (EDGE_PLUS_X + 8.0, _TOP + 5.5, _Z_PLAN),
     "LocatorX1": (LOCATOR_SITES_MM[0][0] / 2.0, PLAN_ROWS[2], _Z_PLAN),
     # High enough that its callout lines clear the screw-hole callout; three
     # short lines keep its left edge inside the border. Its leader runs down
