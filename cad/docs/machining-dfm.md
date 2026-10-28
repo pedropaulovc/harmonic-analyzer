@@ -643,7 +643,10 @@ text/witness strike, and confirm clearance to the 4.5 boss-height leader.
 The top-frame's live view identifiers are **H-H** (front/rear rail section),
 **DETAIL J** (underside hub enlargement) and **K-K** (set-screw boss
 section); DETAIL L retired with the crossbar's dowel slot.
-Datums B/C/D and A-A/E-E/F-F/VIEW G are unchanged. Section stations, endpoints,
+Datum A is new: the faced underside on F-F, to which the four press reams
+carry **⊥Ø0.02** (RV-05). Datums B and C now name the +X press reams (front,
+rear) in place of the retired round slip holes. Datum D and A-A/E-E/F-F/VIEW G
+are unchanged. Section stations, endpoints,
 profiles, orientations and scales retain the historical B/E/D placement
 calibration; old B/D glyph bounds do not establish H/K glyph clearance.
 

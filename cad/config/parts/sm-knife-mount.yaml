@@ -9,9 +9,9 @@ sm-knife-mount:
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "the datum-C dowel slot's position frame and the #10-24 hanger-tap and knife-bore position frames to A|B|C"
-      finding: "position frames over-specified (rule 5)"
-      reason: "keep the knife bore square to the dowel line and let the crossbar clearance hole float round the bolt (owner-accepted knife-edge-system control; the slot frame moved here from MHA-FR-02 with the slot, owner ruling 2026-10-24 T+H3)"
+      where: "the datum-C dowel slot's position frame (⌖ 0.05 | A | B on the slot width) and the #10-24 hanger-tap and knife-bore position frames to A|B|C"
+      finding: "position frames over-specified (rule 5); and the slot frame reads as incomplete or missing its basics because no boxed basic dimension locates the slot (rule 5)"
+      reason: "keep the knife bore square to the dowel line and let the crossbar clearance hole float round the bolt (owner-accepted knife-edge-system control). The slot frame moved here from MHA-FR-02 with the slot (owner ruling 2026-10-24 T+H3) and keeps that frame's owner ruling of 2026-10-24 under ASME Y14.5-2018: it controls only the slot WIDTH, its median plane centred on datum B's axis at an implied basic 0 across the dowel line and an implied basic 0 deg along it, which need no printed basic; the toleranced 14.40 (.XX) to the slot's half-round end sets the slot's position ALONG the slot and is the band the slot-pin margin and slot-to-tap web stacks charge, so a basic along-slot dimension is not required and the frame is complete as drawn"
     - id: "RV-02"
       kind: "accept"
       where: "the knife-bore position frame's composite lower segment, Ø0.05 to A|B|C under the Ø0.20 to A|B|C"

@@ -623,9 +623,11 @@ LAND_END_CALLOUT = "4X LAND END FROM\nCROSSBAR FACE, EACH SIDE"
 # beside the hub boss and gussets it excludes.  Native inspection must
 # establish the renamed caption's clearance.
 UNDERSIDE_FACING_NOTE_XY = (0.330, 0.098)
-# The -X reams' stations along the dowel line are F-F's plain .XXX 7.632
-# from the screw axis ("2X"), and the frames' implied basic zero and 90 deg
-# need no words (machinist review r1: no basic or tolerance in note text).
+# Each -X ream stands BASIC 15.264 from the +X ream beside it under its
+# ⌖Ø0.05 frame (fr_top_frame_spec: machinist review, farm run 4), the zero
+# across the dowel line implied; the +X reams' stations are F-F's plain
+# .XXX 7.632 from the screw axis (machinist review r1: no basic or
+# tolerance in note text).
 # Sheet 6, removed section F-F through the REAR knife-hanger station: the
 # #10 plain clearance hole, with the native finished top-to-underside grip,
 # and both dowel reams, each with its knockout up to the faced top, cut along
@@ -2266,7 +2268,7 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
     it) and the depth all four reams share, in one targeted import, and
     only reads the grip back; no sheet-side grip exists.  This section also
     adds the +X ream's station from the screw axis and the -X ream's
-    ordinary station from the +X ream.  The reams' size is across this cut;
+    BASIC span from the +X ream.  The reams' size is across this cut;
     the underside locator carries it and the knockouts' callout.
     Returns the view and its imported dimensions.
     """

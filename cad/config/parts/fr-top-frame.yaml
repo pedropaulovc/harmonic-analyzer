@@ -35,7 +35,7 @@ fr-top-frame:
       kind: "minor"
       where: "the MHA-SM-VN-53 knockout floor land: the 4X #51 knockouts (Ø1.70 THRU ALL FROM REAM FLOOR) on the dowel ream axes, coaxial by the drawing alone"
       finding: "the pressed dowel's end flat bears on a 0.313 minimum land, below the 0.4 floor-land target, at the drawn coaxiality's implied-zero ±0.13 per axis (rules 16, 17)"
-      reason: "owner ruling 2026-10-27: accept the 0.313 land at the drawn coaxiality's title-block worst case rather than a method note (REAM SETUP) or a position frame; the dowel still bottoms on a continuous land (fr_top_frame_spec.HANGER_PIN_FLOOR_BEARING_LAND_MIN). The land is computed with the knockout originating at the ream floor, as its callout's FROM REAM FLOOR row states, so the drawn coaxiality is held at the floor; drilled from the faced top, its drift at the floor would also be charged and the land would not stand"
+      reason: "owner ruling 2026-10-27 (knockout option c): accept the 0.313 land at the drawn coaxiality's title-block worst case rather than a method note (REAM SETUP) or a position frame, the knockout called out '#51 DRILL / 4X Ø1.70 THRU ALL FROM REAM FLOOR'; the dowel still bottoms on a continuous land (fr_top_frame_spec.HANGER_PIN_FLOOR_BEARING_LAND_MIN). The 0.313 is computed with the knockout originating at the ream floor, as that callout's FROM REAM FLOOR row states, so the drawn coaxiality is held at the floor; drilled from the faced top, the #51's own drift at the floor (0.3 deg over the 25.8 run, 0.135) would also be charged and the land would fall to about 0.18"
     - id: "RV-07"
       kind: "accept"
       where: "the faced underside's knife-mount seat patches carry no flatness control"
