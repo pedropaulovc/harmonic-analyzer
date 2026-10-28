@@ -107,7 +107,7 @@ def test_purchased_stock_skus_suppliers_numbers_and_installed_quantities() -> No
 _SHARED_MEMBERS = {
     "sh-vn-chain-link": (
         "McMaster-Carr", "6261K171", "MHA-SH-VN-50",
-        {"InnerLink": 34, "OuterLink": 33},
+        {"InnerLink": 33, "OuterLink": 32},
     ),
     "sh-vn-music-wire": (
         "McMaster-Carr", "9666K56", "MHA-SH-VN-56",

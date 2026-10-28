@@ -50,7 +50,7 @@ def native_bindings(monkeypatch):
 def _inventory(name):
     # Installed acceptance quantities, independent of the production census.
     counts = {
-        "pd-paper-drive": {"InnerLink": 34, "OuterLink": 33},
+        "pd-paper-drive": {"InnerLink": 33, "OuterLink": 32},
         "ch-rocker-arm-tl-oblique-jig": {"HoldDownStud": 4, "TNut": 4, "FlangeNut": 4},
         "dt-drive-train": {"FootScrew": 1, "SwingStopScrew": 1},
         "mg-magnifier": {"LeverWire": 1},
@@ -135,8 +135,8 @@ def test_reopened_member_census_rejects_identity_or_quantity_drift(
 @pytest.mark.parametrize(
     ("name", "role", "quantity"),
     [
-        ("pd-paper-drive", "InnerLink", 34),
-        ("pd-paper-drive", "OuterLink", 33),
+        ("pd-paper-drive", "InnerLink", 33),
+        ("pd-paper-drive", "OuterLink", 32),
         ("ch-rocker-arm-tl-oblique-jig", "HoldDownStud", 4),
         ("ch-rocker-arm-tl-oblique-jig", "TNut", 4),
         ("ch-rocker-arm-tl-oblique-jig", "FlangeNut", 4),

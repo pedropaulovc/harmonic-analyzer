@@ -385,8 +385,8 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
             "dt-drive-train-1", "SwingStopScrew",
             "sh-vn-fillister-screw-90280a108", "Default", 1,
         ),
-        ("pd-paper-drive-1", "InnerLink", "sh-vn-chain-link", "InnerLink", 34),
-        ("pd-paper-drive-1", "OuterLink", "sh-vn-chain-link", "OuterLink", 33),
+        ("pd-paper-drive-1", "InnerLink", "sh-vn-chain-link", "InnerLink", 33),
+        ("pd-paper-drive-1", "OuterLink", "sh-vn-chain-link", "OuterLink", 32),
         ("mg-magnifier-1", "LeverWire", "sh-vn-music-wire", "LeverWire", 1),
         ("pn-pen-1", "PenWire", "sh-vn-music-wire", "PenWire", 1),
     )
