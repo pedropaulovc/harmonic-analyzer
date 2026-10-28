@@ -560,7 +560,7 @@ CHAIN_SECOND_COLUMN_KEY = "collar-shoulder-seated"
 # The three circles in the crop are lettered on short leaders and named in the
 # legend left of the circle (same run): S the pin bore, K the knob bore, and T
 # the arm's plate-screw tap that lies between them.
-KNOB_SETTING_VIEW_NAME = "VIEW K"
+KNOB_SETTING_VIEW_NAME = steps.KNOB_SETTING_VIEW_NAME
 KNOB_SETTING_SCALE = (1.0, 1.0)
 KNOB_SETTING_CENTER = (0.320, 0.097)
 KNOB_SETTING_RADIUS = 0.024
@@ -1499,14 +1499,15 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "ITS KNOB BORE INDICATES TRUE (THE "
             f"{_N['pd-transgear-knob-shaft']} {KNOB_TEETH}T / {_N['pd-rack-pinion']} "
             f"{disc.TEETH}T MESH); CLAMP; RE-INDICATE. "
-            "MATCH-DRILL 2 PILOTS THROUGH THE PLATE, BLIND IN THE ARM. "
+            "MATCH-DRILL 2 PILOTS THROUGH THE PLATE AND THE ARM. "
             "PART THEM; REAM EACH PART'S HOLES TO ITS DRAWING "
             f"({_N['pd-transgear-arm']} PRESS, {_N['pd-transgear-arm-plate']} SLIP). "
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-locating-pin']} "
             f"{_N['pd-vn-transgear-arm-plate-locating-pin']} DOWELS INTO THE ARM "
+            "FROM THE REAR, "
             f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "
-            f"{plate_locating_interface.PROUD_LIMITS_MM[1]:.2f} PROUD, NOT TO THE "
-            "BLIND FLOOR; MATCH-MARK ARM AND PLATE."
+            f"{plate_locating_interface.PROUD_LIMITS_MM[1]:.2f} PROUD; "
+            "MATCH-MARK ARM AND PLATE."
         ),
         "arm-plate-fitted": (
             f"FIT THE {_N['pd-transgear-arm-plate']} PLATE ON THE LOCATING DOWELS. "

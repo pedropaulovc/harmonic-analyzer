@@ -85,8 +85,6 @@ from pd_transgear_arm_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
     LOCATOR_HOLE_BAND_MM,
-    LOCATOR_BLIND_DEPTH_MM,
-    LOCATOR_BLIND_DEPTH_BAND_MM,
     EDGE_LEAN,
     END_HALF_WIDTH,
     PIN_BORE_DIA,
@@ -116,7 +114,6 @@ from pd_transgear_arm_spec import (
     PART_DATUMS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    LATCH_PIN_HEIGHT_TOLERANCE,
     ISOMETRIC_VIEW_NOTE,
     PIVOT_BORE_CALLOUT,
     SPOT_FACE_DIA_BAND,
@@ -292,7 +289,6 @@ async def build(adapter: Any) -> dict[str, str]:
         ("LocatorY1", abs(LOCATOR_SITES_MM[0][1])),
         ("LocatorY2", abs(LOCATOR_SITES_MM[1][1])),
         ("LocatorDia", LOCATOR_HOLE_DIA_MM),
-        ("LocatorDepth", LOCATOR_BLIND_DEPTH_MM),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -686,9 +682,10 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
 
-    # Matched blind press sockets from the actual rear mounting face.
+    # Matched through press holes from the actual rear mounting face: the
+    # dowel presses in from the rear and punches out from the front.
     locators = SketchDims()
-    check("create_sketch locating sockets", await adapter.create_sketch("RearFace"))
+    check("create_sketch locating holes", await adapter.create_sketch("RearFace"))
     for index, (x, y) in enumerate(LOCATOR_SITES_MM, 1):
         await define_circle(
             adapter, x, y, LOCATOR_HOLE_DIA_MM / 2.0, f"locator {index}",
@@ -696,20 +693,28 @@ async def build(adapter: Any) -> dict[str, str]:
             names=(f"LocatorX{index}", f"LocatorY{index}", f"LocatorDia{index}"),
             drives=('"LocatorX"', f'"LocatorY{index}"', '"LocatorDia"'),
         )
-    await ensure_fully_defined(adapter, "matched locating socket sketch")
-    check("exit_sketch locating sockets", await adapter.exit_sketch())
+    await ensure_fully_defined(adapter, "matched locating hole sketch")
+    check("exit_sketch locating holes", await adapter.exit_sketch())
     name_last_feature(adapter, "LocatorProfile")
     drive_jobs += locators.apply(adapter, "LocatorProfile")
+    before = await volume_check(
+        adapter, "arm before the locating holes", expected, 0.001 * expected
+    )
     check(
-        "cut blind locating sockets",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=LOCATOR_BLIND_DEPTH_MM)),
+        "cut through locating holes",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+        ),
     )
     name_last_feature(adapter, "LocatorHoles")
-    drive_jobs.append(
-        (name_dimensions(adapter, "LocatorHoles", ["LocatorDepth"])[0], '"LocatorDepth"')
+    # Judged on the cut's own volume: blind 4.80 sockets would remove 19.6
+    # mm^3 less than the through holes, far outside this 2% band, so the
+    # check proves the punch-out path reaches the front face.
+    v_locators = len(LOCATOR_SITES_MM) * math.pi * (LOCATOR_HOLE_DIA_MM / 2.0)**2 * THICKNESS
+    await volume_check(
+        adapter, "matched through locating holes", before - v_locators, 0.02 * v_locators
     )
-    expected -= len(LOCATOR_SITES_MM) * math.pi * (LOCATOR_HOLE_DIA_MM / 2.0)**2 * LOCATOR_BLIND_DEPTH_MM
-    await volume_check(adapter, "matched blind locating sockets", expected, 0.001 * expected)
+    expected -= v_locators
     for index, (x, y) in enumerate(LOCATOR_SITES_MM, 1):
         axis = await name_bore_axis(
             adapter, "Top Plane", y, "Right Plane", x, f"locator {index}",
@@ -738,18 +743,19 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "SpotFaceProfile", "FloorDepth", SPOT_FACE_FLOOR_TOLERANCE
     )
-    set_dimension_symmetric_tolerance(
-        adapter, "LocatorHoles", "LocatorDepth", LOCATOR_BLIND_DEPTH_BAND_MM
-    )
+    # The locating ream's band is symmetric, so it prints ± on one line and
+    # the six-line callout under it stays inside the sheet's upper border.
+    if abs(sum(LOCATOR_HOLE_BAND_MM)) > 1e-9:
+        raise AssertionError("the locating ream's band is no longer symmetric")
     for index in (1, 2):
-        set_dimension_bilateral_tolerance(
-            adapter, "LocatorProfile", f"LocatorDia{index}", *deviations(LOCATOR_HOLE_BAND_MM)
+        set_dimension_symmetric_tolerance(
+            adapter, "LocatorProfile", f"LocatorDia{index}",
+            round(deviations(LOCATOR_HOLE_BAND_MM)[1], 6),
         )
     for feature_name, dimension_name in BASIC_REDUCER_DIMENSIONS:
         set_dimension_basic_tolerance(adapter, feature_name, dimension_name)
-    set_dimension_symmetric_tolerance(
-        adapter, "PinHoleProfile", "PinHoleZ", LATCH_PIN_HEIGHT_TOLERANCE
-    )
+    # PinHoleZ carries no explicit band: its .XXX title-block row governs
+    # (coordinator ruling (a), #2019).
     set_dimension_bilateral_tolerance(
         adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_DIA_BAND)
     )

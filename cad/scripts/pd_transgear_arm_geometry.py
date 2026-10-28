@@ -27,6 +27,7 @@ from __future__ import annotations
 import math
 from fractions import Fraction
 
+import _config
 import pd_rack_pinion_spec as DISC
 import pd_support_bar_spec as BAR
 import _mcmaster_90325a174 as PIVOT
@@ -199,7 +200,13 @@ PLATE_TAP_STATIONS = (
 )
 
 # Matched locating dowels, independent of the mounting screws' clearance.
-LOCATOR_PAIR_BASELINE_MM = 13.7
+# 13.1 (was 13.7): owner ruling 2026-10-27 (#1379) confirmed option W1 under
+# the full-budget wall rule (sketch and per-term arithmetic in
+# issuecomment-6443060097). At 13.7 the full
+# worst-case wall to the arm's edge, with the outline's edge break and the
+# drill's run-off, fell to 1.76 (WALLS below). 13.2 met 2.0 by 0.014, too
+# thin for the reducer centre's ±0.5 source-mutation control; 13.1 keeps 2.06.
+LOCATOR_PAIR_BASELINE_MM = 13.1
 LOCATOR_SITES_MM = (
     (PLATE_SCREW_MID_STATION, LOCATOR_PAIR_BASELINE_MM / 2.0),
     (PLATE_SCREW_MID_STATION, -LOCATOR_PAIR_BASELINE_MM / 2.0),
@@ -208,8 +215,6 @@ LOCATOR_HOLE_DIA_MM = sum(LOCATING_PIN.PRESS_HOLE_LIMITS_MM) / 2.0
 LOCATOR_HOLE_BAND_MM = tuple(
     limit - LOCATOR_HOLE_DIA_MM for limit in reversed(LOCATING_PIN.PRESS_HOLE_LIMITS_MM)
 )
-LOCATOR_BLIND_DEPTH_MM = LOCATING_PIN.ARM_BLIND_DEPTH_MM
-LOCATOR_BLIND_DEPTH_BAND_MM = LOCATING_PIN.ARM_BLIND_DEPTH_TOLERANCE_MM
 LOCATOR_PROUD_MM = LOCATING_PIN.PROUD_MM
 LOCATOR_PROUD_BAND_MM = LOCATING_PIN.PROUD_TOLERANCE_MM
 PLATE_TAP_SPEC = HoleSpec("tapped", "#8-32")
@@ -253,18 +258,34 @@ PIN_MACHINE_Z = FRONT_FACE_MACHINE_Z + PIN_HOLE_Z  # -120.43125
 BAND_X = 0.8
 BAND_XX = 0.51
 BAND_XXX = 0.13
-LATCH_PIN_HEIGHT_BAND = 0.065  # ordinary end-face latch-hole height, per side
+# The end-face latch hole's height is an ordinary .XXX row: the title block
+# governs it, with no tightened band (coordinator ruling (a), #2019).
+LATCH_PIN_HEIGHT_BAND = BAND_XXX
 REDUCER_POSITION_DIAMETER = reducer_position_diameter_mm()
 REDUCER_POSITION_RADIUS = REDUCER_POSITION_DIAMETER / 2.0
+# The dowel's full-diameter grip runs the through ream between its two
+# mouth breaks, on the thinnest stock (as the plate's slip holes).
 LOCATOR_FULL_CYLINDER_SPAN_MIN_MM = (
-    LOCATOR_BLIND_DEPTH_MM - LOCATOR_BLIND_DEPTH_BAND_MM
-    - LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
+    THICKNESS - THICKNESS_BAND - 2.0 * LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
 )
 LOCATOR_MOUTH_POSITION_RADIUS_MM = REDUCER_POSITION_RADIUS * (
     1.0 + 2.0 * LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
     / LOCATOR_FULL_CYLINDER_SPAN_MIN_MM
 )
 WALL_TARGET = 2.0
+# The title block's edge-break row (title_block.yaml ``edge_break``): either
+# permitted form, the round or the chamfer, takes its full size off a wall at
+# the outline's face edges.
+_EDGE_BREAK = _config.title_block("edge_break")
+OUTLINE_EDGE_BREAK_MAX_MM = max(
+    float(_EDGE_BREAK["radius_mm"]), float(_EDGE_BREAK["chamfer_max_mm"])
+)
+# The locating holes are match-drilled through after the outline is milled,
+# in another setup: their walls to the outline pay 0.3 deg of drill run-off
+# over the full depth, the thickest stock (the brief's run-off rule; #2000
+# holds the method).
+DRILL_RUN_OFF_DEG = 0.3
+LOCATOR_RUN_OFF_MM = (THICKNESS + THICKNESS_BAND) * math.tan(math.radians(DRILL_RUN_OFF_DEG))
 # The tip station's printed band (R9-23; see TIP_STATION).
 TIP_STATION_BAND = BAND_XX
 
@@ -314,12 +335,16 @@ WALLS: dict[str, tuple[float, float]] = {
         - _TAP_OVERSIZE_R,
     ),
     # The hole's height is dimensioned from the FRONT face, so thin stock
-    # takes its whole band off the rear ligament.
+    # takes its whole band off the rear ligament. Full budget: the drill's
+    # run-off over the deepest hole, and both title-block breaks at the mouth
+    # (the face edge's and the hole's).
     "pin hole to faces": (
         (THICKNESS - PIN_HOLE_DIA) / 2.0,
         (THICKNESS - PIN_HOLE_DIA - PIN_HOLE_DIA_BAND[0]) / 2.0
         - THICKNESS_BAND
-        - LATCH_PIN_HEIGHT_BAND,
+        - LATCH_PIN_HEIGHT_BAND
+        - (PIN_HOLE_DEPTH + PIN_HOLE_DEPTH_BAND) * math.tan(math.radians(DRILL_RUN_OFF_DEG))
+        - 2.0 * OUTLINE_EDGE_BREAK_MAX_MM,
     ),
     "pin hole to end-face edges": (
         TIP_END_R - PIN_HOLE_DIA / 2.0,
@@ -341,27 +366,34 @@ WALLS: dict[str, tuple[float, float]] = {
         - PIN_BORE_DIA_MAX / 2.0,
     ),
 }
+# Each locating hole's wall to the arm's edge is thinnest at a face, where
+# the hole's mouth break meets the outline's edge break; run-off is charged
+# at the exit face.
 for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
     _edge_air = PIVOT_END_R - _x * math.sin(EDGE_LEAN) - abs(_y) * math.cos(EDGE_LEAN)
     WALLS[f"locator {_index} to arm edge"] = (
         _edge_air - LOCATOR_HOLE_DIA_MM / 2.0,
         _edge_air - BAND_X - LOCATOR_MOUTH_POSITION_RADIUS_MM
-        - LOCATING_PIN.PRESS_HOLE_LIMITS_MM[1] / 2.0 - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM,
+        - LOCATING_PIN.PRESS_HOLE_LIMITS_MM[1] / 2.0 - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM
+        - OUTLINE_EDGE_BREAK_MAX_MM - LOCATOR_RUN_OFF_MM,
     )
     _tap_air = min(math.hypot(_x - station, _y) for station in PLATE_TAP_STATIONS)
     WALLS[f"locator {_index} to tap mouth"] = (
         _tap_air - (LOCATOR_HOLE_DIA_MM + PLATE_TAP_MOUTH_DIA_MAX_MM) / 2.0,
         _tap_air - LOCATOR_MOUTH_POSITION_RADIUS_MM - REDUCER_POSITION_RADIUS
         - (LOCATING_PIN.PRESS_HOLE_LIMITS_MM[1] + PLATE_TAP_MOUTH_DIA_MAX_MM) / 2.0
-        - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM,
+        - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM - LOCATOR_RUN_OFF_MM,
     )
-WALLS["locator blind floor"] = (
-    THICKNESS - LOCATOR_BLIND_DEPTH_MM,
-    THICKNESS - THICKNESS_BAND - LOCATOR_BLIND_DEPTH_MM - LOCATOR_BLIND_DEPTH_BAND_MM,
-)
+# The latch pin's hole-to-face ligament is 1.679 at full budget (the .XXX
+# height band included), under the 2.0 target but over the 1.5 floor. #2019
+# tracks the owner's next stock size up (owner ruling 2026-10-27, #1379);
+# until then it is held at 1.5.
+LATCH_PIN_WALL_FLOOR = 1.5
+WALL_FLOORS = {"pin hole to faces": LATCH_PIN_WALL_FLOOR}
 for _name, (_nominal, _worst) in WALLS.items():
-    if _worst < WALL_TARGET:
-        raise AssertionError(f"arm {_name} wall {_worst:.3f} < {WALL_TARGET}")
+    _floor = WALL_FLOORS.get(_name, WALL_TARGET)
+    if _worst < _floor:
+        raise AssertionError(f"arm {_name} wall {_worst:.3f} < {_floor}")
 
 def polygon_area_moments(points: tuple[tuple[float, float], ...]) -> tuple[float, float, float]:
     """Exact signed-polygon area and first moments, returned with positive area."""
@@ -443,8 +475,8 @@ def material_properties(pivot_bore_mm: float, *, density_kg_m3: float = 7870.0) 
     )
     for x, y in LOCATOR_SITES_MM:
         remove(
-            math.pi * (LOCATOR_HOLE_DIA_MM / 2.0)**2 * LOCATOR_BLIND_DEPTH_MM,
-            x, y, THICKNESS - LOCATOR_BLIND_DEPTH_MM / 2.0,
+            math.pi * (LOCATOR_HOLE_DIA_MM / 2.0)**2 * THICKNESS,
+            x, y, THICKNESS / 2.0,
         )
     return {
         "volume_mm3": volume,

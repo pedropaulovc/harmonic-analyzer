@@ -51,11 +51,6 @@ def reducer_axis_projected_zone_diameter_mm() -> float:
     return _positive_limit_mm("reducer_axis_projected_zone_diameter_mm")
 
 
-def arm_opposite_face_parallelism_mm() -> float:
-    """Arm rear mounting face parallelism to its front, over the drawn seat."""
-    return _positive_limit_mm("arm_opposite_face_parallelism_mm")
-
-
 def arm_plate_loaded_normal_change_mm() -> float:
     """Assembled arm-plate seat: loaded-minus-snug indicator change limit."""
     return _positive_limit_mm("arm_plate_loaded_normal_change_mm")

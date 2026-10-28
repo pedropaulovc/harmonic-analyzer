@@ -164,7 +164,12 @@ def test_reference_entry_pays_published_fillet_and_independent_critical_axes() -
     angle = (math.atan(arm.REDUCER_POSITION_DIAMETER / arm.CLAMP_TAP_PROJECTED_HEIGHT_MM)
              + registration.ARM_PLATE_TILT_MAX_RAD)
     required = (screw.THREAD_MAJOR / 2.0 + screw.UNDER_HEAD_FILLET_RADIUS_MAX_MM) / math.cos(angle)
-    expected = plate.SCREW_HOLE_DIA / 2.0 - required - arm.REDUCER_POSITION_RADIUS - plate.REDUCER_POSITION_RADIUS
+    # The plate hole's zone runs into the arm: inside the plate its axis is
+    # extrapolated to the deepest stock's rear face.
+    in_plate = plate.REDUCER_POSITION_RADIUS + (
+        plate.THICKNESS_OVER_ARM + plate.THICKNESS_OVER_ARM_BAND
+    ) * plate.REDUCER_POSITION_DIAMETER / plate.CLAMP_PLATE_PROJECTED_HEIGHT_MM
+    expected = plate.SCREW_HOLE_DIA / 2.0 - required - arm.REDUCER_POSITION_RADIUS - in_plate
     assert joints.PLATE_SCREW_REFERENCE_ENTRY_MARGIN_MM == pytest.approx(expected)
     assert expected > 0.0
 
@@ -199,7 +204,6 @@ def test_published_standard_stock_and_entire_head_bounds_do_not_use_receiving_ca
     )
     assert joints.PLATE_SCREW_STOCK_LEAD_MARGIN_MM > 0.0
     assert joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM <= arm.CLAMP_TAP_PROJECTED_HEIGHT_MM
-    assert joints.PLATE_SCREW_CONTACT_PLATE_LOCAL_Z_MAX_MM <= plate.CLAMP_PLATE_PROJECTED_HEIGHT_MM
     assert joints.PLATE_SCREW_WHOLE_HEAD_ARM_LOCAL_Z_MAX_MM > joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM
     assert joints.PLATE_SCREW_WHOLE_HEAD_RADIAL_SUPPORT_MAX_MM > screw.HEAD_RADIUS_FROM_THREAD_AXIS_MAX_MM
     monkeypatch.setattr(screw, "STOCK_OVERALL_LENGTH_MIN_MM", 0.5 * 25.4)
@@ -325,7 +329,18 @@ def test_the_reamed_hole_keeps_the_press_at_both_limits(monkeypatch) -> None:
 def test_every_wall_holds_the_target_at_the_printed_worst_case(module) -> None:
     for name, (nominal, worst) in module.WALLS.items():
         assert worst <= nominal, name
-        assert worst >= module.WALL_TARGET, name
+        assert worst >= getattr(module, "WALL_FLOORS", {}).get(name, module.WALL_TARGET), name
+
+
+def test_the_latch_pin_ligament_is_the_arm_s_one_tracked_shortfall() -> None:
+    # Owner ruling 2026-10-27 (#1379, tracked in #2019): the full-budget
+    # ligament, at the .XXX height band (coordinator ruling (a)), stays under
+    # the 2.0 target until the next stock size up.
+    assert arm.WALL_FLOORS == {"pin hole to faces": arm.LATCH_PIN_WALL_FLOOR}
+    worst = arm.WALLS["pin hole to faces"][1]
+    assert arm.LATCH_PIN_WALL_FLOOR == 1.5 <= worst < arm.WALL_TARGET
+    assert arm.LATCH_PIN_HEIGHT_BAND == arm.BAND_XXX
+    assert worst == pytest.approx(1.6787, abs=1e-4)
 
 
 def test_spacer_wall_holds_the_target_with_both_rim_breaks() -> None:

@@ -1072,9 +1072,10 @@ physically mating clamp-screw clearance budget.
 The transgear arm and pivot spacer read the pivot screw's catalogue shoulder
 dimensions directly from `_mcmaster_90325a174`; fitted-thread and chamfer checks
 remain in `pd_vn_transgear_pivot_screw_spec`. `_transgear_arm_plate_locating_interface`
-owns the arm/plate dowel-hole limits, proud set, blind depth and mouth breaks;
-`pd_vn_transgear_arm_plate_locating_pin_spec` retains purchased-pin data and the
-stock-to-interface fit, insertion and bottom-air calculations. Mating geometry
+owns the arm/plate dowel-hole limits (both reamed through), proud set and mouth
+breaks; `pd_vn_transgear_arm_plate_locating_pin_spec` retains purchased-pin data
+and the stock-to-interface fit and insertion calculations, and the arm spec
+asserts the front punch-out air (`LOCATOR_PUNCH_AIR_MIN_MM`). Mating geometry
 imports the narrow providers directly, not either full hardware spec.
 `_rocker_interface` owns the shared rocker profile dimensions and rod-pin
 coordinates. Rod specs, rocker builders and geometry consumers import it

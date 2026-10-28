@@ -254,14 +254,15 @@ PLATE_SCREW_THREAD_TILT_MAX_RAD = math.asin(
     2.0 * PLATE_SCREW_THREAD_RADIAL_PLAY_MAX_MM / PLATE_SCREW_ENGAGEMENT_WORST
 )
 PLATE_SCREW_AXIS_TILT_MAX_RAD = PLATE_SCREW_THREAD_TILT_MAX_RAD + _TAP_AXIS_TILT_MAX
-# Only a seated BEARING contact must be below these projected-axis caps;
-# neither XML serialization nor P14.7 asserts that every crown point is there.
+# Only a seated BEARING contact must be below the arm tap's projected-axis
+# cap; neither XML serialization nor P14.7 asserts that every crown point is
+# there. The plate hole's zone runs from face A into the arm, so inside the
+# plate its axis is extrapolated
+# (pd_transgear_arm_plate_geometry.SCREW_AXIS_RADIUS_IN_PLATE_MM).
 PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM = (
     ARM.THICKNESS + ARM.THICKNESS_BAND + _PLATE_MAX + PLATE_SCREW_SEAT_HEIGHT_DEBIT_MM
 )
-PLATE_SCREW_CONTACT_PLATE_LOCAL_Z_MAX_MM = _PLATE_MAX + PLATE_SCREW_SEAT_HEIGHT_DEBIT_MM
-if (PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM > ARM.CLAMP_TAP_PROJECTED_HEIGHT_MM
-        or PLATE_SCREW_CONTACT_PLATE_LOCAL_Z_MAX_MM > PLATE.CLAMP_PLATE_PROJECTED_HEIGHT_MM):
+if PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM > ARM.CLAMP_TAP_PROJECTED_HEIGHT_MM:
     raise AssertionError("seated clamp contact exceeds an actually drawn projected-axis height")
 # Lo is OVERALL. Correlating it with TOTAL head height removes the unknown
 # crown/bevel split without turning .100 REF or .312 nominal into maxima.
@@ -299,7 +300,7 @@ PLATE_SCREW_REFERENCE_ENTRY_MARGIN_MM = (
     PLATE.SCREW_HOLE_DIA / 2.0
     - (PLATE_SCREW.THREAD_MAJOR / 2.0 + PLATE_SCREW.UNDER_HEAD_FILLET_RADIUS_MAX_MM)
     / math.cos(_TAP_AXIS_TILT_MAX + REGISTRATION.ARM_PLATE_TILT_MAX_RAD)
-    - ARM.REDUCER_POSITION_RADIUS - PLATE.REDUCER_POSITION_RADIUS
+    - ARM.REDUCER_POSITION_RADIUS - PLATE.SCREW_AXIS_RADIUS_IN_PLATE_MM
 )
 PLATE_SCREW_ENGAGEMENT_NOMINAL = min(
     PLATE_SCREW.LENGTH - PLATE.THICKNESS_OVER_ARM, ARM.THICKNESS

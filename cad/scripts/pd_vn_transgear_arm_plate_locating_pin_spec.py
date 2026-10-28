@@ -7,7 +7,8 @@ a reference, NOT a maximum or a full-cylinder guarantee. The purchased
 native reference remains a nominal cylinder, with no invented end form.
 
 Reference frame: axis +Y, first end y=0, other end y=LENGTH. Installed
-pins are pressed in the arm, not to the blind floor; screws clamp only.
+pins are pressed into the arm's through holes from the rear, to the proud
+set, and punched out from the front; screws clamp only.
 """
 
 from __future__ import annotations
@@ -45,14 +46,11 @@ INSERTION_LIMITS_MM = (
     LENGTH_LIMITS_MM[0] - INTERFACE.PROUD_LIMITS_MM[1],
     LENGTH_LIMITS_MM[1] - INTERFACE.PROUD_LIMITS_MM[0],
 )
-ARM_BOTTOM_AIR_MIN_MM = (
-    INTERFACE.ARM_BLIND_DEPTH_MM - INTERFACE.ARM_BLIND_DEPTH_TOLERANCE_MM - INSERTION_LIMITS_MM[1]
-)
 
 PURCHASED_STOCK_NOTE = "\n".join((
-    "INSTALLATION - TWO PER MHA-PD-18 ARM: PRESS INTO THE ARM, NOT TO THE",
-    "BLIND FLOOR. THE MHA-PD-19 PLATE SLIPS ON; ITS SCREWS CLAMP ONLY,",
-    "THE PINS LOCATE IT (MHA-PD-00).",
+    "INSTALLATION - TWO PER MHA-PD-18 ARM: PRESS INTO THE ARM FROM THE REAR",
+    "TO THE PROUD SET; PUNCH OUT FROM THE FRONT. THE MHA-PD-19 PLATE SLIPS",
+    "ON; ITS SCREWS CLAMP ONLY, THE PINS LOCATE IT (MHA-PD-00).",
 ))
 
 

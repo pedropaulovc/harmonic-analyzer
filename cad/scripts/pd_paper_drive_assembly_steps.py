@@ -19,11 +19,8 @@ live proof.
 
 from __future__ import annotations
 
-import textwrap
-
 import dt_drive_train_steps
 import pd_transgear_drive_collar_spec as collar
-import pd_transgear_arm_geometry as arm_geometry
 import paper_drive_mesh_check as mesh_check
 import paper_drive_rack_setup as rack_setup
 import pd_transgear_removable_spec as removable
@@ -143,33 +140,14 @@ def step_ref(key: str) -> str:
     return f"{DRAWING_NUMBER} STEP {step_number(key)}"
 
 
-def matched_locator_notes(
-    arm_number: str, plate_number: str, *, on_arm: bool, width: int
-) -> str:
-    """The arm's and the plate's two sheet notes: each requirement with its value.
+# The assembly sheet's view of the reducer's S-K setting: the arm and plate
+# are match-drilled at it (pd_paper_drive_knob_setting_spec).
+KNOB_SETTING_VIEW_NAME = "VIEW K"
 
-    The sheet states the setting and the acceptance the pair must meet; the
-    procedure stays at the cited steps (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). The
-    centre distance and its setting window are the reducer mesh's
-    (pd_rack_pinion_spec.CENTRE_DISTANCE_WINDOW).
-    """
-    mate = plate_number if on_arm else arm_number
-    knob, pin = ("ITS KNOB BORE", "PIN BORE") if on_arm else ("KNOB BORE", "ITS PIN BORE")
-    disc = arm_geometry.DISC
-    centres = f"{knob} CLAMPED {disc.CENTRE_DISTANCE_SET_TEXT} FROM {pin}"
-    located, fitted = step_number("arm-plate-located"), step_number("arm-plate-fitted")
-    if fitted != located + 1:
-        raise AssertionError("the matched-pair notes cite two consecutive steps")
-    notes = (
-        f"1. LOCATING HOLES MATCH-DRILLED WITH {mate}, {centres}.",
-        "2. PLATE ON THE DOWELS, SCREWS TIGHT: NO SHAKE, NO DAYLIGHT, "
-        f"CENTRES STILL {disc.CENTRE_DISTANCE_SET_TEXT}. "
-        f"{DRAWING_NUMBER} STEPS {located}-{fitted}.",
-    )
-    return "\n".join(
-        "\n".join(textwrap.wrap(note, width, subsequent_indent="   ", break_on_hyphens=False))
-        for note in notes
-    )
+
+def knob_setting_ref() -> str:
+    """The pointer the arm and plate sheets print: ``MHA-PD-00 VIEW K``."""
+    return f"{DRAWING_NUMBER} {KNOB_SETTING_VIEW_NAME}"
 
 
 # --- Values the procedure owns (CONTRACT-paper-drive.md §13.2) --------------

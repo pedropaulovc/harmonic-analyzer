@@ -42,10 +42,46 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert part.DRAWING_DIMENSIONS is mg_magnifying_wheel_spec.DRAWING_DIMENSIONS
     marked = set().union(*mg_magnifying_wheel_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.SECTION_KEEP)
+    kept = (
+        set(drawing.FRONT_KEEP)
+        | set(drawing.SECTION_KEEP)
+        | set(drawing.SECTION_DIAMETER_KEEP)
+    )
     assert kept == marked
     assert not set(drawing.FRONT_KEEP) & set(drawing.SECTION_KEEP)
+    # The rim's Ø print on A-A from the hidden reference sketch alone.
+    assert set(drawing.SECTION_DIAMETER_KEEP) == set(
+        mg_magnifying_wheel_spec.DRAWING_DIMENSIONS[
+            mg_magnifying_wheel_spec.DIAMETER_REFERENCE
+        ]
+    )
+    assert not set(drawing.SECTION_DIAMETER_KEEP) & (
+        set(drawing.FRONT_KEEP) | set(drawing.SECTION_KEEP)
+    )
     assert set(drawing.DIMENSION_CALLOUTS) | set(drawing.CALLOUTS_ABOVE) <= kept
+
+
+def test_rim_diameters_ride_the_hidden_section_reference() -> None:
+    build = Path(part.__file__).read_text(encoding="utf-8")
+    blank = "blank_reference_sketches(adapter, REFERENCE_SKETCHES)"
+    assert build.count(blank) == 1
+    assert build.index(blank) < build.rindex("save_part_and_images(adapter, PART_NAME)")
+    # A diametric linear dimension prints no Ø unless the prefix carries it.
+    assert (
+        'set_dimension_prefix(adapter, DIAMETER_REFERENCE, name, "<MOD-DIAM>")' in build
+    )
+    # A-A is cut and curated while the part shows the reference, through the
+    # face it is cut from; the isometric is placed after the re-blank.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    block = source.index("with _drawing_hidden_sketches.part_sketches_shown(")
+    header = source[block : source.index("):", block)]
+    assert "REFERENCE_SKETCHES" in header and "base_view=front" in header
+    assert (
+        block
+        < source.index("section = create_section_view(")
+        < source.index("_drawing_hidden_sketches.curate_view_dimensions(")
+        < source.index('iso = place_view(adapter, str(SOURCE), "*Isometric"')
+    )
 
 
 def test_every_marked_dimension_has_model_places() -> None:
@@ -203,7 +239,7 @@ def test_linked_notes_specify_the_spokes_and_ties() -> None:
     # Each fit prints on its own diameter: the mate and the stated fit.
     assert "PRESS FIT" not in notes and "RUNS ON" not in notes
     assert drawing.DIMENSION_CALLOUTS["BoreDiaDim"] == (
-        "REAM THRU\n0.033-0.053 DIAMETRAL\nCLEARANCE ON\nMG-WHEEL-AXLE MHA-MG-07"
+        "REAM THRU\n0.033-0.053\nDIAMETRAL\nCLEARANCE ON\nMG-WHEEL-AXLE\nMHA-MG-07"
     )
     assert drawing.DIMENSION_CALLOUTS["SpigotDia"] == (
         "0.005-0.034\nDIAMETRAL\nINTERFERENCE IN\nMG-WHEEL-DRUM\nMHA-MG-10"
@@ -219,7 +255,7 @@ def test_linked_notes_specify_the_spokes_and_ties() -> None:
     assert not any("\n" in text for text in drawing.CALLOUTS_ABOVE.values())
     assert drawing.CALLOUTS_ABOVE["SpigotLength"] == "MG-WHEEL-DRUM MHA-MG-10 NOT PROUD"
     assert drawing.DIMENSION_CALLOUTS["Tie2HoleDia"].endswith("\nRADIAL")
-    assert drawing.CALLOUTS_ABOVE["HubFrontZ"] == "WEB & RIM CENTER"
+    assert drawing.CALLOUTS_ABOVE["HubFrontZ"] == "GROOVE, WEB & RIM CENTER"
     assert drawing.DIMENSION_CALLOUTS["RimOuterDiaDim"].startswith("HOLDS PEN WIRE")
     # TIE 1 stands off the drum; the note says so without a number.
     assert "CLEAR OF MG-WHEEL-DRUM" in notes and "BAND" not in notes

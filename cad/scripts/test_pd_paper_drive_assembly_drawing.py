@@ -700,8 +700,9 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
 def test_the_matched_plate_is_refitted_on_its_dowels_and_re_read() -> None:
     located = _step_body("arm-plate-located")
     assert (
+        "DOWELS INTO THE ARM FROM THE REAR, "
         f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "
-        f"{plate_locating_interface.PROUD_LIMITS_MM[1]:.2f} PROUD, NOT TO THE BLIND FLOOR"
+        f"{plate_locating_interface.PROUD_LIMITS_MM[1]:.2f} PROUD;"
     ) in located
     assert "MATCH-MARK ARM AND PLATE" in located
     fitted = _step_body("arm-plate-fitted")
