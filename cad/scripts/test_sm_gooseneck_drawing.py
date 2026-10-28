@@ -201,7 +201,9 @@ def test_tap_callout_states_geometry_and_its_mate_within_four_rows() -> None:
     assert "DRILL" not in spec.TAP_CALLOUT_BELOW
     assert "WANDER" not in spec.TAP_CALLOUT_BELOW
     assert "BRAZE" not in spec.TAP_CALLOUT_BELOW
-    assert spec.SCREW_NUMBER in spec.DIMENSION_CALLOUTS_BY_NAME["CounterboreDia"]
+    assert (
+        spec.SCREW_NUMBER in spec.DIMENSION_CALLOUTS_BY_NAME["CounterboreFloorCornerR"]
+    )
     printed = " ".join((spec.DRAWING_NOTES, spec.TAP_CALLOUT_BELOW)).upper()
     assert "PURCHASED" not in printed and "INTEGRAL" not in printed
     assert "THREADLOCKER" not in printed  # spring-eye clamping belongs to the assembly

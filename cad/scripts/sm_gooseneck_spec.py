@@ -83,20 +83,22 @@ if not (
 # imports and reads them back; a drawing-side SetText can write through to
 # the part, #1942).  The counterbore's tight limits (depth band, axis, floor
 # corner) all serve one function, clearing MHA-SM-04's thread run-out
-# (sm_gooseneck_spring_joint), so its Ø names the mate (rule 4; machinist
-# review of e487a1bb4).
+# (sm_gooseneck_spring_joint), so the floor corner's callout, beside the depth
+# and the Ø, names the mate (rule 4; machinist review of e487a1bb4).  The Ø
+# keeps two rows: its block stands between its own extension lines (a third
+# row was struck by the lower one, machinist review of cca02b34c; set below
+# them, its text ran off the sheet's left edge, farm run 20261028T072132691Z).
 SCREW_NUMBER = str(_config.parts("sm-gooseneck-spring-screw")["number"])
 COUNTERBORE_WALL_CALLOUT = f"C'BORE WALL {COUNTERBORE_WALL_CALLOUT_MIN:.2f} MIN"
-# The floor corner's own native "R0.10 MAX" names the corner it limits.
-COUNTERBORE_FLOOR_CALLOUT = "FLOOR CORNER"
 COUNTERBORE_AXIS_CALLOUT = f"ON TAP AXIS WITHIN {COUNTERBORE_AXIS_OFFSET_MAX:.2f}"
-# No row wider than the axis row: the block stands between the sheet's left
+# The floor corner's own native "R0.10 MAX" names the corner it limits.
+COUNTERBORE_FLOOR_CALLOUT = f"FLOOR CORNER,\nFOR {SCREW_NUMBER} RUN-OUT"
+# No row wider than the axis row: each block stands between the sheet's left
 # border and the end face (farm run 20261028T062539287Z: "CLEARS MHA-SM-04
 # RUN-OUT" crossed the border).
-COUNTERBORE_MATE_CALLOUT = f"FOR {SCREW_NUMBER} RUN-OUT"
-if max(map(len, (COUNTERBORE_MATE_CALLOUT, COUNTERBORE_WALL_CALLOUT))) > len(
-    COUNTERBORE_AXIS_CALLOUT
-):
+if max(
+    map(len, (*COUNTERBORE_FLOOR_CALLOUT.splitlines(), COUNTERBORE_WALL_CALLOUT))
+) > len(COUNTERBORE_AXIS_CALLOUT):
     raise AssertionError("a counterbore callout row is wider than its axis row")
 PLUG_DIA_CALLOUT = "FLUSH WITH TUBE OD,\nNO STEP"
 # The bend radius is the tube's centreline radius; the arrowhead lands on the
@@ -128,10 +130,7 @@ DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
         "PlugShankDia": SHANK_FIT_CALLOUT,
     },
     "CounterboreProfile": {
-        "CounterboreDia": (
-            f"{COUNTERBORE_MATE_CALLOUT}\n{COUNTERBORE_AXIS_CALLOUT}\n"
-            f"{COUNTERBORE_WALL_CALLOUT}"
-        ),
+        "CounterboreDia": f"{COUNTERBORE_AXIS_CALLOUT}\n{COUNTERBORE_WALL_CALLOUT}",
         "CounterboreFloorCornerR": COUNTERBORE_FLOOR_CALLOUT,
     },
 }
