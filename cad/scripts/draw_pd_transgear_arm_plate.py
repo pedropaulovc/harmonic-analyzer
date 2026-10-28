@@ -126,7 +126,6 @@ from pd_transgear_arm_plate_spec import (
     SHEET_NAMES,
     SURFACE_FINISHES,
 )
-from pd_cluster_stack_band import STACK_NAME
 
 # Machinist review gates this sheet: the build fails on a FIX verdict.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -280,20 +279,16 @@ BACK_KEEP: dict[str, tuple[float, float, float]] = {
 # witness lines stop short of the hub face, not on through the hatched hub
 # to the profile line's far end at the rear face (run 20261027T180704579Z).
 # The boss diameter stands beyond the boss face's caption.
-# The hub station's callout line ("DISC CLUSTER STACK", 45.7 mm at 2:1) is
-# wider than its 41 mm span, so its text block shifts 5.5 sheet mm toward the
-# hub face (sheet x grows with z at 2:1): centred it ran 3.6 mm through datum
-# A's line on the mounting face (sheet x = 355); shifted it ends 3 mm short of
-# it and stays 6 mm right of datum A's tag.
-_HUB_TEXT_SHIFT = -2.75
+# The hub station's callout takes three lines (it also sets the disc
+# cluster's collar air, #2038), so it and the front face's row stand 1.5 mm
+# lower than the two-line pitch: its lines clear the front face's value and
+# its value clears the hub-to-boss lines.
 HUB_DIA_TEXT_STANDOFF_MM = 25.5
 HUB_DIA_WITNESS_MAX_M = (HUB_DIA_TEXT_STANDOFF_MM * SHEET_SCALE[0] - 1.0) / 1000.0
 SECTION_KEEP: dict[str, tuple[float, float, float]] = {
     "ThicknessOverArm": (0.0, _SECTION_TOP + 5.0, REAR_FACE_Z / 2.0),
-    "NotchDepth": (0.0, _SECTION_TOP + 10.0, FRONT_FACE_Z / 2.0),
-    "HubFaceToMounting": (
-        0.0, _SECTION_TOP + 19.0, HUB_FACE_Z / 2.0 + _HUB_TEXT_SHIFT
-    ),
+    "NotchDepth": (0.0, _SECTION_TOP + 8.5, FRONT_FACE_Z / 2.0),
+    "HubFaceToMounting": (0.0, _SECTION_TOP + 19.5, HUB_FACE_Z / 2.0),
     "HubToBoss": (0.0, _SECTION_TOP + 28.0, (HUB_FACE_Z + BOSS_FACE_Z) / 2.0),
     "HubDia": (0.0, 11.0, HUB_FACE_Z - HUB_DIA_TEXT_STANDOFF_MM),
     "BossDia": (0.0, 0.0, BOSS_FACE_Z + 27.5),
@@ -369,17 +364,12 @@ PLAN_CALLOUTS_ABOVE = {
     "ScrewHoleDia": HOLE_COUNT_CALLOUT,
     "CskDia": HOLE_COUNT_CALLOUT,
 }
-# The hub station, the outermost row above the section, names the stack its
-# ±band serves (rule 4) above its text, away from the inner rows.
-SECTION_CALLOUTS_ABOVE = {
-    "HubFaceToMounting": STACK_NAME,
-}
 SECTION_CALLOUTS = {
     "HubFaceToMounting": HUB_STATION_CALLOUT,
     "HubToBoss": HUB_TO_BOSS_CALLOUT,
 }
 DIMENSION_CALLOUTS = {**PLAN_CALLOUTS, **SECTION_CALLOUTS}
-CALLOUTS_ABOVE = {**PLAN_CALLOUTS_ABOVE, **SECTION_CALLOUTS_ABOVE}
+CALLOUTS_ABOVE = PLAN_CALLOUTS_ABOVE
 # The bore finish symbol stands below the end round, just right of the bore
 # axis: clear of the bore callout (lower left) and the end radius (lower
 # right); left of the axis its leader crossed the bore callout's (run
@@ -897,9 +887,6 @@ async def build(adapter: Any) -> dict[str, str]:
         {name: DRAWING_PRECISION_BY_NAME[name] for name in (*BACK_KEEP, *SECTION_KEEP)},
     )
     set_dimension_callouts(adapter, face_annotations, SECTION_CALLOUTS)
-    set_dimension_callouts(
-        adapter, face_annotations, SECTION_CALLOUTS_ABOVE, location="above"
-    )
     _cap_witness_lines(adapter, face_annotations, "HubDia", HUB_DIA_WITNESS_MAX_M)
     _set_arrow_sides(adapter, face_annotations, BACK_ARROW_SIDES)
     # These are the same native feature datums and circular zones authored

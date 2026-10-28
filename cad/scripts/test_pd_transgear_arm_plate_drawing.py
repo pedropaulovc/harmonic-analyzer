@@ -24,7 +24,7 @@ from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dime
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fit_deviations import deviations
 from _printed_tolerance import printed_deviations
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND, STACK_NAME
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND
 
 
 def _band(places: int) -> float:
@@ -117,9 +117,9 @@ def test_the_explicit_bands_are_the_bore_the_knob_float_and_the_hole_positions()
         ("BoreProfile", "BoreDia"): "*deviations(BORE_BAND)",
     }
     # The hub station is a disc-cluster stack term: it prints the cluster's
-    # band and names the stack (rule 4).
+    # band and names the collar air it sets (rule 4).
     assert geometry.HUB_FACE_TO_MOUNTING_BAND == PRINTED_LENGTH_BAND
-    assert STACK_NAME in drawing.CALLOUTS_ABOVE["HubFaceToMounting"]
+    assert "COLLAR AIR" in " ".join(drawing.SECTION_CALLOUTS["HubFaceToMounting"].split())
     assert spec.DRAWING_PRECISION_BY_NAME["HubFaceToMounting"] == 3
     # The H7 bore prints its sourced limits; zero lower deviation is intentional.
     lower, upper = deviations(spec.BORE_BAND)
@@ -607,8 +607,7 @@ def test_section_stations_are_a_baseline_from_the_mounting_face() -> None:
         "HubFaceToMounting": geometry.HUB_FACE_Z,
     }
     for name, station in stations.items():
-        shift = drawing._HUB_TEXT_SHIFT if name == "HubFaceToMounting" else 0.0
-        assert keep[name][2] == pytest.approx(station / 2.0 + shift), name
+        assert keep[name][2] == pytest.approx(station / 2.0), name
         assert keep[name][1] > geometry.arm_upper_edge_y(0.0), name
     rows = sorted(stations, key=lambda name: keep[name][1])
     assert rows == sorted(stations, key=lambda name: abs(stations[name]))
@@ -713,7 +712,9 @@ def test_each_projected_zone_is_a_chain_line_from_face_a() -> None:
     first, last = drawing.SCREW_SECTION_LINE_MODEL
     assert first[0] < geometry.EDGE_MINUS_X < geometry.EDGE_PLUS_X < last[0]
     assert spec.DRAWING_REFERENCE_PRECISION == {"KnobZone": 1, "ScrewZone": 1}
-    assert f"{spec.KNOB_ZONE_HEIGHT:.1f}" == "40.6"
+    # The chain plane's lower limit narrows with the disc cluster's ±0.02
+    # stack terms (#2038), so K's projected height is 40.3, not 40.6.
+    assert f"{spec.KNOB_ZONE_HEIGHT:.1f}" == "40.3"
     assert f"{spec.SCREW_ZONE_HEIGHT:.1f}" == "7.0"
 
 

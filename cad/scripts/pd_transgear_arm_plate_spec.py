@@ -216,10 +216,12 @@ CSK_CALLOUT = f"{CSK_ANGLE_DEG:.0f}\u00b0 CSK\nCOAXIAL WITH\nDRILLED HOLE"
 HOLE_COUNT_CALLOUT = f"{len(SCREW_HOLES)}X"
 # The hub face's station from mounting face A sets the knob shaft's 12T plane
 # through the thrust ring (the chain plane and the disc-to-platen air,
-# contract §13); the hub-to-boss band sets the cup's station on the shaft and
-# so the cup pin's end wall (pd_transgear_knob_shaft_spec.CUP_FACE_STATION_BAND).
-# Two short lines each, between the dimension's own witness lines.
-HUB_STATION_CALLOUT = f"SETS 12T PLANE\nOF {KNOB_SHAFT_NUMBER}"
+# contract §13) and, as the disc cluster's printed stack's first term, the
+# collar's air to the disc (#2038: its ±0.02 is that stack's band); the
+# hub-to-boss band sets the cup's station on the shaft and so the cup pin's
+# end wall (pd_transgear_knob_shaft_spec.CUP_FACE_STATION_BAND).  Short
+# lines, between the dimension's own witness lines.
+HUB_STATION_CALLOUT = f"SETS 12T PLANE\nAND COLLAR AIR\nOF {KNOB_SHAFT_NUMBER}"
 HUB_TO_BOSS_CALLOUT = f"SETS CUP {KNOB_CUP_NUMBER}\nON SHAFT {KNOB_SHAFT_NUMBER}"
 
 # Two sheets (drawing-guidelines.md rule 15): the rear face's plan with the
