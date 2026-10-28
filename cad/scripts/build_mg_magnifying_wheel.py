@@ -107,10 +107,17 @@ from mg_magnifying_wheel_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
+    HUB_FILLET_PRINTED,
     ISOMETRIC_VIEW_NOTE,
     REFERENCE_SKETCHES,
     REFERENCE_WITNESS_LEN,
+    RIM_FILLET_PRINTED,
     SECTION_PLANE,
+    SPOKE_PITCH_DEG,
+    SPOKE_PITCH_PREFIX,
+    SPOKE_PITCH_SPOKES,
+    SPOKE_REFERENCE,
+    SPOKE_STUB_R,
     SURFACE_FINISHES,
 )
 from mg_wheel_bar_geom import WHEEL_BAR_Y as _YOKE_WHEEL_Y
@@ -276,8 +283,10 @@ async def _fillet(adapter, radius: float, picks, name: str, dim: str) -> None:
     name_dimensions(adapter, name, [dim])
 
 
-def _spoke_edge_picks(circle_r: float) -> list[list[float]]:
-    """Mid-height points on each spoke side's junction edge with the circle."""
+def _spoke_edge_picks(circle_r: float, printed: tuple[int, int]) -> list[list[float]]:
+    """Mid-height points on each spoke side's junction edge with the circle,
+    the ``printed`` (spoke, side) edge first: the drawing's imported radius
+    lands on the first pick's edge (mg_magnifying_wheel_spec.HUB_FILLET_PRINTED)."""
     x, y = side_meets_circle(circle_r)
     picks = []
     for k in range(SPOKE_COUNT):
@@ -290,7 +299,9 @@ def _spoke_edge_picks(circle_r: float) -> list[list[float]]:
                     0.0,
                 ]
             )
-    return picks
+    spoke, side = printed
+    first = 2 * spoke + (0 if side > 0 else 1)
+    return [picks[first], *picks[:first], *picks[first + 1 :]]
 
 
 def _section_plane(adapter) -> None:
@@ -467,6 +478,52 @@ async def _diameter_reference(adapter) -> list[tuple[str, str]]:
     check(f"exit_sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
     _require_on_section_plane(adapter, feature)
+    return dims.apply(adapter, feature)
+
+
+async def _spoke_reference(adapter) -> list[tuple[str, str]]:
+    """The spoke pattern's pitch (mg_magnifying_wheel_spec.SPOKE_REFERENCE).
+
+    A hidden Front-plane sketch: the centrelines of SPOKE_PITCH_SPOKES as
+    construction stubs through the rim, each end anchored on its spoke's
+    radial, and the DRIVEN angle between them (the Tie2Angle precedent), so
+    it restates the pattern without driving it.  It adds no volume.
+    """
+    feature = SPOKE_REFERENCE
+    check(f"create_sketch {feature}", await adapter.create_sketch("Front"))
+    bearings = [k * SPOKE_PITCH_DEG for k in SPOKE_PITCH_SPOKES]
+    stubs = []
+    set_sketch_direct_db(adapter, True)
+    for bearing in bearings:
+        a = math.radians(bearing)
+        ends = [(r * math.cos(a), r * math.sin(a)) for r in SPOKE_STUB_R]
+        line = check(
+            f"{feature} {bearing:g} deg centreline",
+            await adapter.add_centerline(*ends[0], *ends[1]),
+        )
+        stubs.append((line, ends))
+    set_sketch_direct_db(adapter, False)
+    dims = SketchDims()
+    for line, ends in stubs:
+        for end_ref, point in zip((f"{line}.start", f"{line}.end"), ends, strict=True):
+            await anchor_point_to_origin(
+                adapter, end_ref, *point, f"{feature} {end_ref}"
+            )
+            dims.record(None)
+            dims.record(None)
+    between = math.radians(sum(bearings) / 2.0)
+    await add_angular_reference_dimension(
+        adapter,
+        stubs[0][0],
+        stubs[1][0],
+        (SPOKE_STUB_R[0] * math.cos(between), SPOKE_STUB_R[0] * math.sin(between)),
+        "spoke pitch",
+        expected_degrees=SPOKE_PITCH_DEG,
+    )
+    dims.record("SpokePitch")
+    await ensure_fully_defined(adapter, feature)
+    check(f"exit_sketch {feature}", await adapter.exit_sketch())
+    name_last_feature(adapter, feature)
     return dims.apply(adapter, feature)
 
 
@@ -725,20 +782,31 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Bore")
     volume = await volume_check(adapter, "bore", volume - V_BORE, 0.02 * V_BORE)
 
-    # Section A-A's rim diameters, restated on a hidden sketch in its cut.
+    # Section A-A's rim diameters, restated on a hidden sketch in its cut, and
+    # the spoke pattern's pitch on a hidden Front-plane sketch.
     drive_jobs += await _diameter_reference(adapter)
+    drive_jobs += await _spoke_reference(adapter)
 
     # Cast fillets where each spoke side meets the boss (R3) and the rim (R4),
-    # picked mid-height on every junction edge; then the R0.80 rounds on the
-    # rim bore's two edges, picked between the 0 and 60 deg spokes.
+    # picked mid-height on every junction edge, the edge the face view prints
+    # first; then the R0.80 rounds on the rim bore's two edges, picked between
+    # the 0 and 60 deg spokes.
     await _fillet(
-        adapter, HUB_FILLET_R, _spoke_edge_picks(_HUB_R), "HubFillets", "HubFilletR"
+        adapter,
+        HUB_FILLET_R,
+        _spoke_edge_picks(_HUB_R, HUB_FILLET_PRINTED),
+        "HubFillets",
+        "HubFilletR",
     )
     volume = await volume_check(
         adapter, "hub fillets", volume + V_HUB_FILLETS, 0.02 * V_HUB_FILLETS
     )
     await _fillet(
-        adapter, RIM_FILLET_R, _spoke_edge_picks(_RIM_IN_R), "RimFillets", "RimFilletR"
+        adapter,
+        RIM_FILLET_R,
+        _spoke_edge_picks(_RIM_IN_R, RIM_FILLET_PRINTED),
+        "RimFillets",
+        "RimFilletR",
     )
     volume = await volume_check(
         adapter, "rim fillets", volume + V_RIM_FILLETS, 0.02 * V_RIM_FILLETS
@@ -1055,6 +1123,7 @@ async def build(adapter) -> dict[str, str]:
     # (build_dt_pinion_arbor's journal references).
     for name in sorted(DRAWING_DIMENSIONS[DIAMETER_REFERENCE]):
         set_dimension_prefix(adapter, DIAMETER_REFERENCE, name, "<MOD-DIAM>")
+    set_dimension_prefix(adapter, SPOKE_REFERENCE, "SpokePitch", SPOKE_PITCH_PREFIX)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -1067,8 +1136,9 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    # The diameter reference stays in the part for A-A to import, hidden so
-    # it prints in no assembly (_drawing_hidden_sketches shows it in A-A).
+    # The reference sketches stay in the part for the drawing's views to
+    # import, hidden so they print in no assembly (_drawing_hidden_sketches
+    # shows the diameter reference in A-A, the spoke reference on the face).
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     return await save_part_and_images(adapter, PART_NAME)
 

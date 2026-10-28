@@ -70,12 +70,13 @@ def test_rim_diameters_ride_the_hidden_section_reference() -> None:
     assert (
         'set_dimension_prefix(adapter, DIAMETER_REFERENCE, name, "<MOD-DIAM>")' in build
     )
-    # A-A is cut and curated while the part shows the reference, through the
-    # face it is cut from; the isometric is placed after the re-blank.
+    # A-A is cut and curated while the part shows the diameter reference
+    # alone (the spoke reference would print in the cut), through the face it
+    # is cut from; the isometric is placed after the re-blank.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     block = source.index("with _drawing_hidden_sketches.part_sketches_shown(")
     header = source[block : source.index("):", block)]
-    assert "REFERENCE_SKETCHES" in header and "base_view=front" in header
+    assert "(DIAMETER_REFERENCE,)" in header and "base_view=front" in header
     assert (
         block
         < source.index("section = create_section_view(")
@@ -224,15 +225,41 @@ def test_tie2_profile_runs_radially_and_ends_in_air() -> None:
     assert low < bearing % 360.0 < high
 
 
-def test_linked_notes_specify_the_spokes_and_ties() -> None:
-    notes = mg_magnifying_wheel_spec.DRAWING_NOTES
+@pytest.mark.parametrize(
+    ("circle_r", "printed", "fillet_name"),
+    [
+        ("_HUB_R", "HUB_FILLET_PRINTED", "_HUB_FILLET"),
+        ("_RIM_IN_R", "RIM_FILLET_PRINTED", "_RIM_FILLET"),
+    ],
+)
+def test_each_fillet_r_prints_on_the_builders_first_pick(
+    circle_r: str, printed: str, fillet_name: str
+) -> None:
+    # The imported R lands on the first pick's edge, so the drawing's landing
+    # proof must target the fillet the builder picks first.
+    picks = part._spoke_edge_picks(
+        getattr(part, circle_r), getattr(mg_magnifying_wheel_spec, printed)
+    )
+    centre = getattr(drawing, fillet_name)[0]
+    gaps = [math.dist(pick[:2], centre) for pick in picks]
+    assert len(picks) == 12 and min(gaps) == gaps[0]
+
+
+def test_linked_notes_specify_the_ties_and_the_angle_the_spokes() -> None:
+    spec = mg_magnifying_wheel_spec
+    notes = spec.DRAWING_NOTES
     lines = notes.splitlines()
     assert len(lines) <= 4
     assert all(len(line) <= 80 for line in lines)
-    assert "6 TAPERED SPOKES" in notes and "CAST" not in notes
-    # The spokes' clocking to the ties: two on the centerline TIE 2's angle
-    # is measured from (the model's seed spoke on local +X).
-    assert "TWO ON THE HORIZONTAL CENTERLINE" in notes.splitlines()[0]
+    assert "SPOKES" not in notes and "CAST" not in notes
+    # The spokes' count, pitch and clocking print on their own angle between
+    # two spoke centrelines: two on the centerline TIE 2's angle is measured
+    # from (the model's seed spoke on local +X).
+    assert spec.SPOKE_PITCH_PREFIX == "6X " and spec.SPOKE_PITCH_DEG == 60.0
+    assert spec.DRAWING_PRECISION[spec.SPOKE_REFERENCE] == {"SpokePitch": 0}
+    assert "SpokePitch" in drawing.FRONT_KEEP
+    assert drawing.CALLOUTS_ABOVE["SpokePitch"] == "TWO ON THE HORIZONTAL CENTERLINE"
+    assert spec.SPOKE_REFERENCE in spec.REFERENCE_SKETCHES
     assert "TIE 1" in notes and "TIE 2" in notes
     # The bore's REAM THRU callout carries the process; the notes do not.
     assert "REAMED" not in notes

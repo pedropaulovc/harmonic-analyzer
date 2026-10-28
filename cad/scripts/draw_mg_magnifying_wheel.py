@@ -38,7 +38,6 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
@@ -51,6 +50,7 @@ from _drawing_finish import add_surface_finish
 from _drawing_leaders import (
     assert_leaders_clear,
     dimension_segments,
+    leader_crossings,
     leader_segments,
     section_line_segments,
     set_near_side_diameter,
@@ -73,21 +73,27 @@ from mg_magnifying_wheel_geom import (
     DRUM_PRESS,
     HUB_BACK_Z,
     HUB_FRONT_Z,
+    SPOKE_ROOT_WIDTH,
+    SPOKE_TIP_WIDTH,
     SPOKE_X0,
 )
 from mg_magnifying_wheel_spec import (
     BORE_DIA,
     CAST_ROUND_R,
+    DIAMETER_REFERENCE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     DRAWING_REFERENCE_PRECISION,
     HUB_DIA,
+    HUB_FILLET_PRINTED,
     HUB_FILLET_R,
     REFERENCE_DIMENSIONS,
-    REFERENCE_SKETCHES,
+    RIM_FILLET_PRINTED,
     RIM_FILLET_R,
     ROUND_TEXT_SUFFIX,
     SPIGOT_DIA,
+    SPOKE_PITCH_CALLOUT,
+    SPOKE_PITCH_DEG,
     SURFACE_FINISHES,
     TIE1_CLOCK_DEG,
     TIE1_R,
@@ -198,8 +204,35 @@ def _over(attach_mm: tuple[float, float], lines: int) -> tuple[float, float]:
     return (x, y + lines * _TEXT_LINE / 2.0)
 
 
-_HUB_FILLET_CENTRE = fillet(HUB_DIA / 2.0, HUB_FILLET_R, outside=True)["centre"]
-_RIM_FILLET_CENTRE = fillet(RIM_INNER_DIA / 2.0, RIM_FILLET_R, outside=False)["centre"]
+def _printed_fillet(
+    circle_r: float, fillet_r: float, outside: bool, printed: tuple[int, int]
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """The centre (model mm) of the fillet whose R the face view prints (the
+    builder's first pick, mg_magnifying_wheel_spec.HUB_FILLET_PRINTED), and its
+    arc's two end bearings (deg) from that centre."""
+    seed = fillet(circle_r, fillet_r, outside)
+    spoke, side = printed
+    turn = math.radians(spoke * SPOKE_PITCH_DEG)
+
+    def place(point: tuple[float, float]) -> tuple[float, float]:
+        x, y = point[0], side * point[1]
+        return (
+            x * math.cos(turn) - y * math.sin(turn),
+            x * math.sin(turn) + y * math.cos(turn),
+        )
+
+    centre = place(seed["centre"])
+    ends = tuple(
+        math.degrees(math.atan2(end[1] - centre[1], end[0] - centre[0]))
+        for end in (place(seed["on_side"]), place(seed["on_circle"]))
+    )
+    return centre, ends
+
+
+_HUB_FILLET = _printed_fillet(HUB_DIA / 2.0, HUB_FILLET_R, True, HUB_FILLET_PRINTED)
+_RIM_FILLET = _printed_fillet(
+    RIM_INNER_DIA / 2.0, RIM_FILLET_R, False, RIM_FILLET_PRINTED
+)
 _TIE1 = _polar((0.0, 0.0), clock_to_local_deg(TIE1_CLOCK_DEG), TIE1_R)
 # TIE 2's angle is driven between its radial axis (outward at 223 deg) and the
 # horizontal inner end, where the axis enters the rim bore: the sketch's own
@@ -211,10 +244,22 @@ _TIE1 = _polar((0.0, 0.0), clock_to_local_deg(TIE1_CLOCK_DEG), TIE1_R)
 _TIE2_OUTWARD = clock_to_local_deg(TIE2_CLOCK_DEG) % 360.0
 _TIE2_INNER = _polar((0.0, 0.0), _TIE2_OUTWARD, RIM_INNER_DIA / 2.0)
 _TIE2_ANGLE_SECTOR = (180.0, _TIE2_OUTWARD)
-# A leader-borne radius's shoulder starts this far (mm) left of its point
-# (run 11 readback: the R3.0's at 142.9 for a point at 149.1).
+# A leader-borne radius's shoulder starts this far (mm) from its text's
+# centre, on the leader's side (run 11 readback: the R3.0's at 142.9 for a
+# point at 149.1).  SolidWorks draws the leader on the ray from the arc's
+# centre through that shoulder end, and lands its arrow where the ray meets
+# the arc: each shoulder stands on a ray through its own fillet's arc.
 _RADIUS_SHOULDER_LEFT = 6.2
-_HUB_FILLET_SHOULDER = _polar((0.0, 0.0), 30.0, RIM_OUTER_DIA / 2.0 + 10.0)
+# The R3.0's arc faces the hub-spoke corner, so its leader reaches it from
+# the material side: up from the seed spoke's -Y fillet through the spoke
+# (crossing only the spoke widths' extension lines and TIE 1's, which
+# drawing-guidelines.md rule 14 allows), left of the root width's line and
+# its text leader, and up the 0-60 window to a shoulder past the OD.
+_HUB_FILLET_SHOULDER = _polar(_HUB_FILLET[0], 95.0, 58.0)
+# The R4.0 leaves the 180 deg spoke's sheet-+Y rim fillet out through the rim
+# to a shoulder left of the OD, its text left of the shoulder, above TIE 1's
+# Y extension line and right of its dimension line.
+_RIM_FILLET_SHOULDER = _polar(_RIM_FILLET[0], 190.0, 12.2)
 # The mates the matched fits and the tight bands name (drawing-guidelines.md
 # rule 4 (tighten only for function, and name the mate)), by drawing number.
 AXLE_NUMBER = str(_config.parts("mg-wheel-axle")["number"])
@@ -241,14 +286,18 @@ FRONT_KEEP = {
     # Near-side, one arrow: the bore up-left through the 120-180 window to
     # its block's shoulder (stacked Ø plus six callout lines).
     "BoreDiaDim": _over((_BORE_BLOCK_X, _BORE_SHOULDER_Y), 8),
-    # The R3 (concave, inside the 0-60 window) leadered out along the window
-    # to a shoulder past the OD at 30 deg; the R4 (convex, from outside the
-    # rim) on its centre's -3 deg ray, past the OD and above the tip width's
-    # extension lines.
+    # Each fillet R on its own fillet (_HUB_FILLET_SHOULDER,
+    # _RIM_FILLET_SHOULDER), the R3's text right of its shoulder, the R4's
+    # left.
     "HubFilletR": _over(
         (_HUB_FILLET_SHOULDER[0] + _RADIUS_SHOULDER_LEFT, _HUB_FILLET_SHOULDER[1]), 2
     ),
-    "RimFilletR": _over(_polar(_RIM_FILLET_CENTRE, -3.0, 26.0), 2),
+    "RimFilletR": _over(
+        (_RIM_FILLET_SHOULDER[0] - _RADIUS_SHOULDER_LEFT, _RIM_FILLET_SHOULDER[1]), 2
+    ),
+    # The spoke pattern's 6X 60° between the 60 and 120 deg spokes'
+    # centrelines, above the wheel, its clocking callout over it.
+    "SpokePitch": _face(0.0, RIM_OUTER_DIA / 2.0 + 30.0),
     # Each spoke width's line beside its own end: the root's inside the hub
     # fillets' feet, its text off on a leader (SPOKE_ROOT_TEXT_XY); the
     # tip's outside the rim, its text below the line beside the OD, so
@@ -546,7 +595,8 @@ DIMENSION_CALLOUTS = {
 }
 # The tie holes' operation stands over their Ø, keeping each block as narrow
 # as its stacked Ø; each axial band's need, the plane the 15.5 locates and
-# the groove R's seat stand over their values.
+# the groove R's seat stand over their values; the spokes' clocking over
+# their pitch.
 CALLOUTS_ABOVE = {
     "Tie1HoleDia": "DRILL THRU",
     "Tie2HoleDia": "DRILL THRU",
@@ -554,12 +604,13 @@ CALLOUTS_ABOVE = {
     "HubFrontZ": WEB_CENTER_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
     "GrooveR": GROOVE_R_CALLOUT,
+    "SpokePitch": SPOKE_PITCH_CALLOUT,
 }
 # SOLIDWORKS drops a multi-line callout above a value from the print
 # (draw_dt_cone_gear; this sheet's run 1 lost both two-line ones).
 if any("\n" in text for text in CALLOUTS_ABOVE.values()):
     raise AssertionError("an above-callout with a line break does not print")
-# Three note lines, top-left anchored, under the two tie blocks and left of
+# The two tie notes, top-left anchored, under the two tie blocks and left of
 # the title block.
 NOTES_XY = (0.020, 0.062)
 
@@ -577,15 +628,26 @@ _RIM_SIDE_POINTS = tuple(
 )
 # A failed section pick names every scanned edge passing this near its point.
 _PICK_INVENTORY_MM = 6.0
-# The bore's finish symbol stands outside the OD up the 0-60 window, 45 deg,
-# above the R3's shoulder; its leader lands on the bore on that bearing,
-# right of the A-A line.
-_BORE_FINISH_BEARING = 45.0
+# The bore's finish symbol stands outside the OD left of the wheel, between
+# the bore's block and the R4.0's text; its leader lands on the bore on that
+# bearing, clear below the bore's Ø leader and above the R4.0's text.
+_BORE_FINISH_BEARING = 161.6
 BORE_FINISH_SYMBOL = _face(
-    *_polar((0.0, 0.0), _BORE_FINISH_BEARING, RIM_OUTER_DIA / 2.0 + 16.0)
+    *_polar((0.0, 0.0), _BORE_FINISH_BEARING, RIM_OUTER_DIA / 2.0 + 21.2)
 )
 _BORE_FINISH_POINT = (*_polar((0.0, 0.0), _BORE_FINISH_BEARING, BORE_DIA / 2.0), 0.0)
 FINISH_CHAR_HEIGHT = 0.0025
+# The two fillet R's print one arrow outside their arc, the leader stopping
+# there (draw_dt_arbor_pedestal's crown): no arc extension, no line on to
+# the centre.  Each rebuilt arrow tip must lie on its fillet's arc within
+# FILLET_TIP_TOL (m) of its radius and FILLET_SPAN_TOL (deg) of its span.
+_ARROWS_OUTSIDE = 1  # swDimArrowsOutside
+FILLET_TIP_TOL = 0.0002
+FILLET_SPAN_TOL = 1.0
+PRINTED_FILLETS = {
+    "HubFilletR": (_HUB_FILLET, HUB_FILLET_R),
+    "RimFilletR": (_RIM_FILLET, RIM_FILLET_R),
+}
 
 
 def _near_side_diameters(
@@ -788,6 +850,126 @@ def _set_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"no dimension to set arrows inside: {sorted(remaining)}")
 
 
+def _dress_fillet_radii(adapter: Any, annotations: list[Any]) -> None:
+    """Print each PRINTED_FILLETS R with one arrow outside its arc and the
+    leader stopping on it (_ARROWS_OUTSIDE), read back."""
+    remaining = set(PRINTED_FILLETS)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        remaining.discard(name)
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ArcExtensionLineOrOppositeSide = False
+        display.ArrowSide = _ARROWS_OUTSIDE
+        display.SolidLeader = False
+        if (
+            bool(display.Diametric)
+            or bool(display.ArcExtensionLineOrOppositeSide)
+            or int(display.ArrowSide) != _ARROWS_OUTSIDE
+            or bool(display.SolidLeader)
+        ):
+            raise RuntimeError(f"{name} did not keep its radial leader style")
+    if remaining:
+        raise RuntimeError(f"no fillet radius to dress: {sorted(remaining)}")
+
+
+def _width_dimension_lines(
+    annotation: Any, axis_y: float, half_widths: tuple[float, ...]
+) -> list[Any]:
+    """A vertical width's ink less its extension lines: the horizontal strokes
+    at the measured levels (``half_widths`` mm off ``axis_y``), which a leader
+    may cross (drawing-guidelines.md rule 14)."""
+    levels = [axis_y + half / 1000.0 for half in half_widths]
+    return [
+        segment
+        for segment in dimension_segments(annotation)
+        if not (
+            abs(segment[0][1] - segment[1][1]) < 1e-6
+            and any(abs(segment[0][1] - level) < 0.0003 for level in levels)
+        )
+    ]
+
+
+def _assert_fillet_radii(
+    adapter: Any,
+    front: Any,
+    annotations: list[Any],
+    bore_finish: Any,
+    *,
+    axis: tuple[float, float],
+) -> None:
+    """Fail unless each printed fillet R's arrow tip lies on its own fillet's
+    arc (eecbf88 review: the R3.0 ended in open air) and its leader crosses no
+    other leader, dimension line or the A-A line (it crossed the spoke
+    widths' lines)."""
+    named = {
+        dimension_name(adapter, annotation): annotation for annotation in annotations
+    }
+    centres = model_points_in_view(
+        adapter,
+        front,
+        tuple(
+            (centre[0] / 1000.0, centre[1] / 1000.0, 0.0)
+            for (centre, _ends), _r in PRINTED_FILLETS.values()
+        ),
+        label="printed fillet centres",
+        names=tuple(PRINTED_FILLETS),
+    )
+    for (name, ((_c, ends), radius)), centre in zip(
+        PRINTED_FILLETS.items(), centres, strict=True
+    ):
+        display = _early_bound(
+            _early_bound(named[name], "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        )
+        raw = display.GetDisplayData()
+        if raw is None:
+            raise RuntimeError(f"{name} has no rebuilt display data")
+        data = _early_bound(raw, "IDisplayData")
+        if int(data.GetArrowHeadCount()) != 1:
+            raise RuntimeError(f"{name} must draw exactly one radial arrow")
+        arrow = tuple(float(v) for v in data.GetArrowHeadAtIndex2(0))
+        if len(arrow) != 12 or not all(math.isfinite(v) for v in arrow):
+            raise RuntimeError(f"{name} has incomplete arrow-head coordinates")
+        tip = (arrow[0], arrow[1])
+        off = (tip[0] - centre[0], tip[1] - centre[1])
+        bearing = math.degrees(math.atan2(off[1], off[0]))
+        half = abs((ends[1] - ends[0] + 180.0) % 360.0 - 180.0) / 2.0
+        mid = ends[0] + ((ends[1] - ends[0] + 180.0) % 360.0 - 180.0) / 2.0
+        swing = abs((bearing - mid + 180.0) % 360.0 - 180.0)
+        if (
+            abs(math.hypot(*off) - radius / 1000.0) > FILLET_TIP_TOL
+            or swing > half + FILLET_SPAN_TOL
+        ):
+            raise RuntimeError(
+                f"{name}'s arrow tip {tip} is not on its fillet's arc (centre "
+                f"{centre}, R {radius}, arc {ends[0]:.1f}..{ends[1]:.1f} deg, tip "
+                f"at {bearing:.1f} deg)"
+            )
+        _telemetry.info(f"{name}: arrow tip {tip} on its fillet at {bearing:.1f} deg")
+    groups = {name: dimension_segments(named[name]) for name in PRINTED_FILLETS}
+    groups["SpokeRootWidth"] = _width_dimension_lines(
+        named["SpokeRootWidth"],
+        axis[1],
+        (SPOKE_ROOT_WIDTH / 2.0, -SPOKE_ROOT_WIDTH / 2.0),
+    )
+    groups["SpokeTipWidth"] = _width_dimension_lines(
+        named["SpokeTipWidth"], axis[1], (SPOKE_TIP_WIDTH / 2.0, -SPOKE_TIP_WIDTH / 2.0)
+    )
+    groups["Tie1Y"] = _width_dimension_lines(named["Tie1Y"], axis[1], (0.0, _TIE1[1]))
+    for name in (*NEAR_SIDE_DIAMETERS, TIE1_NEAR_SIDE):
+        groups[name] = dimension_segments(named[name])
+    groups["BoreFinish"] = leader_segments(bore_finish.GetAnnotation())
+    groups["SectionLine"] = section_line_segments(adapter, front)
+    crossed = [
+        pair for pair in leader_crossings(groups) if set(pair) & set(PRINTED_FILLETS)
+    ]
+    if crossed:
+        raise RuntimeError(f"wheel fillet R leaders cross: {crossed}")
+
+
 def _assert_face_leaders_clear(
     adapter: Any,
     front: Any,
@@ -966,11 +1148,12 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
     # A-A is cut, and curated, while the part shows the rim's diameter
     # reference (draw_pd_platen's floor section): a section takes a hidden
-    # sketch as the part stands when it is cut.
+    # sketch as the part stands when it is cut.  The spoke reference stays
+    # hidden there: the face view's curate shows it in that view alone.
     with _drawing_hidden_sketches.part_sketches_shown(
         adapter,
         source_model,
-        REFERENCE_SKETCHES,
+        (DIAMETER_REFERENCE,),
         label="section A-A diameter reference",
         base_view=front,
     ):
@@ -1008,7 +1191,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     annotations = [
-        *curate_view_dimensions(
+        *_drawing_hidden_sketches.curate_view_dimensions(
             adapter,
             front,
             keep=FRONT_KEEP,
@@ -1026,6 +1209,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     offset_dimension_text(adapter, annotations, {"SpokeRootWidth": SPOKE_ROOT_TEXT_XY})
     _set_arrows_inside(adapter, annotations)
+    _dress_fillet_radii(adapter, annotations)
     axis, tie1, bore_landing = model_points_in_view(
         adapter,
         front,
@@ -1055,6 +1239,7 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=FINISH_CHAR_HEIGHT,
     )
     _assert_face_leaders_clear(adapter, front, annotations, bore_finish, axis=axis)
+    _assert_fillet_radii(adapter, front, annotations, bore_finish, axis=axis)
 
     # The rim's axial width across the section between its side faces' cut
     # lines (_RIM_SIDE_POINTS), its text left of the rim's back face on its
