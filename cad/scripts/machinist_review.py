@@ -1557,15 +1557,8 @@ def extract_claude_verdict(
             if text.strip():
                 break
     if verdict is None:
-        if not text.strip():
-            raise RuntimeError("claude produced no final message")
-        start, end = text.find("{"), text.rfind("}")
-        if start < 0 or end < 0:
-            raise RuntimeError(f"final message is not JSON: {text[:200]!r}")
-        parsed = json.loads(text[start : end + 1])
-        if not isinstance(parsed, dict):
-            raise RuntimeError("structured verdict is not an object")
-        verdict = parsed
+        # The OMP route repairs its final text against this same parser.
+        verdict = _claude_transport.verdict_object(text)
     return validator(verdict)
 
 

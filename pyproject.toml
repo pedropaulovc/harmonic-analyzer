@@ -31,6 +31,10 @@ dependencies = [
     #            the single SolidWorks STA seat at runtime (replaces the old task_dep
     #            spine). Was only transitive; declared direct so a dep bump can't drop it.
     "filelock>=3.13",
+    # jsonschema - checks OMP-route machinist verdicts against the review schema
+    #              (machinist_review_transport.py). Was only transitive via mcp;
+    #              declared direct because the transport imports it.
+    "jsonschema>=4.0",
     # Blind machinist review uses the SDK transport with explicit API credentials.
     # The SDK bundles the Claude Code CLI; claude-opus-5-5 requires CLI >= 2.1.280
     # (0.2.174 bundles 2.1.310; 0.1.76's 2.1.132 is refused with an API 400).
