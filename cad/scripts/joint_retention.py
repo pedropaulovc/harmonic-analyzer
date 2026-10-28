@@ -771,7 +771,7 @@ UNTHREADED_STOCK: dict[str, str] = {
     "pd_vn_transgear_knob_drive_pin": "dowel pin pressed into a plain hole",
     "pd_vn_transgear_knob_cup_pin": "slotted spring pin in a hole match-drilled at assembly",
     "pd_vn_transgear_latch_pin": "dowel pin pressed into a reamed hole",
-    "pd_vn_transgear_arm_plate_locating_pin": "dowel pin pressed into the arm's blind socket",
+    "pd_vn_transgear_arm_plate_locating_pin": "dowel pin pressed into the arm's through ream",
     "pd_vn_transgear_retaining_ring": "external retaining ring fitted sideways in a groove",
     "pd_vn_transgear_pivot_spring": "disc spring on the pivot shoulder; no thread",
     "pd_vn_transgear_pivot_shim": "shim ring on the pivot shoulder under the head; no thread",
