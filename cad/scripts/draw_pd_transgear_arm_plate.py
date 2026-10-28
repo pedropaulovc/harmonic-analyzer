@@ -77,6 +77,7 @@ from _native_projected_zone import require_saved_projected_gtols
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
+from _section_axis import position_section_caption
 import _telemetry
 import _transgear_zone_line as zone_lines
 import pd_paper_drive_assembly_steps as assembly_steps
@@ -147,10 +148,13 @@ PNG = OUTPUTS.png
 # section D-D under it.  Sheet 2: the face-A view on the left under its three
 # rows of frames, section A-A to its right with its hub-side zone line and
 # hub diameter clear of the view's right-hand heights.  A view's centre is
-# its outline's; K stands 24.4 mm below it in both face views.
+# its outline's; K stands (_TOP + _BOTTOM) / 2 below it in both face views.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
-PLAN_CENTER = (0.105, 0.132)
+# 6 mm lower since #2034 (the plate 6.4 longer, 12.8 on the sheet): on the
+# old centre the locating-hole callout's top line crossed the upper border
+# (preview run 20261028T064655627Z).
+PLAN_CENTER = (0.105, 0.126)
 ISO_CENTER = (0.320, 0.200)
 ISO_NOTE_XY = (0.285, 0.252)
 # 30 mm higher than the outline alone needs: the view's caption keeps the
@@ -158,10 +162,18 @@ ISO_NOTE_XY = (0.285, 0.252)
 # printed, which put it on the title block (machinist review, run
 # 20261027T180704579Z).
 SCREW_SECTION_CENTER = (0.305, 0.140)
-REAR_LABEL_XY = (0.093, 0.038)
+REAR_LABEL_XY = (0.093, 0.032)
 BACK_CENTER = (0.135, 0.153)
-KNOB_SECTION_CENTER = (0.298, BACK_CENTER[1])
-FRONT_LABEL_XY = (0.110, 0.081)
+# 3 mm under the face-A view's line since #2034: on it the hub-to-boss
+# text crossed the upper border (preview run 20261028T064655627Z).
+KNOB_SECTION_CENTER = (0.298, BACK_CENTER[1] - 0.003)
+# Section A-A's native caption, top centre: SOLIDWORKS hangs it 17 mm under
+# the section, on the title block since #2034 (same run); here it stands
+# 8 mm under the thrust-face captions and 3 mm over the title block.
+KNOB_SECTION_CAPTION_XY = (0.279, 0.0835)
+# 4 mm under the side widths' extension-line ends since #2034, whose taller
+# face put them through this label (same run).
+FRONT_LABEL_XY = (0.110, 0.077)
 
 _TOP = TOP_LEFT[1]  # the plate's highest point (the top edge's -X corner)
 _SECTION_TOP = arm_upper_edge_y(0.0)
@@ -268,7 +280,9 @@ SECTION_KEEP: dict[str, tuple[float, float, float]] = {
     "ThicknessOverArm": (0.0, _SECTION_TOP + 5.0, REAR_FACE_Z / 2.0),
     "NotchDepth": (0.0, _SECTION_TOP + 10.0, FRONT_FACE_Z / 2.0),
     "HubFaceToMounting": (0.0, _SECTION_TOP + 19.0, HUB_FACE_Z / 2.0),
-    "HubToBoss": (0.0, _SECTION_TOP + 28.0, (HUB_FACE_Z + BOSS_FACE_Z) / 2.0),
+    # 27, not 28: under the upper border since #2034 (same run); the lowest
+    # row whose callout lines clear the hub-face station's value.
+    "HubToBoss": (0.0, _SECTION_TOP + 27.0, (HUB_FACE_Z + BOSS_FACE_Z) / 2.0),
     "HubDia": (0.0, 11.0, HUB_FACE_Z - HUB_DIA_TEXT_STANDOFF_MM),
     "BossDia": (0.0, 0.0, BOSS_FACE_Z + 27.5),
 }
@@ -368,7 +382,12 @@ FINISH_CHAR_HEIGHT = 0.0025
 # cutting line's top letter (run 20261027T125555391Z). The knob
 # bore's frame stands left of the end round, its leader under the side
 # heights' witness lines; datum B's tag right of it.
-_BACK_K = (BACK_CENTER[0], 0.1286)
+# K on the sheet: the view centres the outline, which spans _BOTTOM.._TOP
+# about K (a fixed 0.1286 put K 6 mm off once #2034 lengthened the plate).
+_BACK_K = (
+    BACK_CENTER[0],
+    BACK_CENTER[1] - (_TOP + _BOTTOM) / 2.0 * SHEET_SCALE[0] / 1000.0,
+)
 FRAME_ROWS = (0.262, 0.250, 0.238)
 FRAME_XY = {
     "plate_hole_1_position": (_BACK_K[0] + 0.02875, FRAME_ROWS[2]),
@@ -846,6 +865,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     for view in (back, knob_section):
         set_hidden_lines_removed(adapter, view)
+    position_section_caption(
+        adapter, knob_section, KNOB_SECTION_CAPTION_XY, label="plate section A-A"
+    )
     face_annotations = _curated(
         adapter,
         (
