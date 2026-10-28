@@ -450,10 +450,6 @@ def omp_event(event):
             arguments = block.get("arguments")
             if name in OMP_TOOLS:
                 name = name.replace("mcp__sheets_", "mcp__sheets__", 1)
-                # OMP adds its harness intent string "i" to every tool call;
-                # it is not a tool argument, so sheet evidence must not see it.
-                if isinstance(arguments, dict) and isinstance(arguments.get("i"), str):
-                    arguments = {key: value for key, value in arguments.items() if key != "i"}
             else:
                 # Never let an unregistered native name collide with the SDK's
                 # allowed sheets/StructuredOutput evidence namespace.

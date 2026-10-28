@@ -33,6 +33,8 @@ PDFIUM_LOCK = threading.RLock()
 VIEW_BOX = (1976, 1280)
 MAX_SCALE = 8
 CROP_BUDGET = 40
+# OMP injects this harness intent string into tool arguments, not the tool schema.
+HARNESS_INTENT_KEY = "i"
 
 # --- text layer (exact sheet strings, organized by view) --------------------
 VIEW_LABEL_RE = re.compile(
@@ -807,6 +809,13 @@ class SheetStore:
             return spans
 
 
+def sheet_tool_arguments(arguments: Any) -> Any:
+    """Ignore only string OMP intent metadata, preserving the recorded arguments."""
+    if isinstance(arguments, dict) and isinstance(arguments.get(HARNESS_INTENT_KEY), str):
+        return {key: value for key, value in arguments.items() if key != HARNESS_INTENT_KEY}
+    return arguments
+
+
 def create_server(store: SheetStore) -> FastMCP:
     """Register only static-schema view_sheet/crop tools; SDK reports tool errors."""
 
@@ -816,6 +825,8 @@ def create_server(store: SheetStore) -> FastMCP:
                 "view_sheet": {"sheet"},
                 "crop": {"sheet", "x1", "y1", "x2", "y2"},
             }.get(name)
+            if expected is not None:
+                arguments = sheet_tool_arguments(arguments)
             if expected is not None and (
                 not isinstance(arguments, dict)
                 or set(arguments) != expected
