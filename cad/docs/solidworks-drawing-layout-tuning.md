@@ -975,7 +975,7 @@ is not route acceptance. At request (51, 81) mm, the native connector from
 `MHA-SM-02 SEAT` below `4X 122.4° ±0.5°`. The native/PDF evidence is
 `D:/farm-runs/summing-plate-taps-20261022/r3-sm-visual-evidence/`
 (`sm-native-layout-audit.json`, `sm-flank-angle-small-defect.png` and
-`sm-detail-d-complete.png`). Keep the exterior arc seed **(58, 184) mm**
+`sm-detail-d-complete.png`). Seed the exterior arc at its original 18.57 mm radius
 and use the same native angular shelf at **(51, 211) mm**, a text-only
 **130 mm upward** move. Its entire lower row starts at native Y205.4437 mm,
 4.1036 mm above the height's upper witness; its right edge X69.6861 mm is
@@ -991,6 +991,19 @@ one, a line/line crossing, not text. These are placement projections: fresh
 native/PDF inspection must prove the actual re-solved route and full-sheet ink.
 The model-owned angle, one-place precision, symmetric band, attachments, all six
 views, and the separate `3X 5.00` / `2.59` placements remain unchanged.
+
+That shelf alone still failed machinist review on 41bbeec. With the seed at
+153.6° about the shoulder, (58, 184) mm, the offset connector landed on the arc
+by the lower arrow at (58.3221, 166.7272) mm. That position did not depend on
+the text's position: R3's shelf below and the later shelf above both used it.
+From the shelf above, the leader crossed the angle's own arc. In both seeds
+tried here, the native landing was the arc end nearest the false-offset seed. Moving the seed to 120°,
+(65.3, 191.8) mm, at the same radius made the connector land at the upper
+arrow, (73.42, 194.25) mm, outside the arc. Run
+`20261028T232328323Z-b403fbd514844805a4b0c59c40b49f8f` read the leader back from
+(69.69, 205.44) mm to that point, and machinist review returned SHIP. To change
+the end an offset angular leader lands on, seed the arc nearer that end and
+keep the measured wedge.
 
 The rocker's abandoned angular-offset attempt is not a reusable placement
 contract. R26's false-offset 109-degree seed did not determine its final

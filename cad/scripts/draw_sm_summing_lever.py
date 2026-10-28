@@ -1649,10 +1649,15 @@ DETAIL_KEEP = {
     "HexHeight": (0.0342, DETAIL_CENTER[1]),
     "RidgeFromLeft": (0.201, 0.2483),
     "RidgeFromRight": (0.044, 0.25105),
-    "FlankToSide": (0.058, 0.184),
+    # 120 deg about the shoulder (74.5999, 175.6701) mm at the same 18.57 mm
+    # radius. At 153.6 deg (58, 184) the offset connector landed by the lower
+    # arrow (58.3, 166.7) and crossed its own arc up to the shelf above
+    # (machinist review 41bbeec): seeded nearer the upper end, it lands on
+    # the arc's upper part, below and right of the shelf, outside the arc.
+    "FlankToSide": (0.0653, 0.1918),
     "KnifeRidgeRadius": (0.181, 0.219),
 }
-# Keep the native arc seed. R3's low shelf routed through the final SEAT T.
+# Keep the native arc radius. R3's low shelf routed through the final SEAT T.
 # Above the height's Y201.3401 witness, the whole two-row block clears it by
 # 4.1036 mm and the X74.5999 ridge witness by 4.9138 mm. Any connector from
 # the unchanged arc stays below the text; verify regenerated native/PDF ink.
