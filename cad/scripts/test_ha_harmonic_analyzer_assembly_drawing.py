@@ -187,6 +187,54 @@ def test_the_loose_spare_sprocket_is_named_with_its_row_and_its_place() -> None:
     assert drawing.PAPER_DRIVE_EXPLODE_M == pytest.approx((0.0, 0.0, -0.450))
 
 
+def test_the_spare_label_moves_off_a_balloon_that_lands_on_it() -> None:
+    """Run 20261028T091118034Z (1e2b7b540): item 7's balloon moved into the
+    label's first place and its leader ran 4.56 mm through the text. The
+    label read back from run 20261028T041950158Z (its three lines, leader
+    start and tip) keeps its first place beside that run's balloons and
+    moves clear of the moved one."""
+    from _layout_geometry import Box, Segment
+
+    mm = 0.001
+    tip = (93.28 * mm, 140.31 * mm)
+    placed = (35.28 * mm, 136.31 * mm)
+    boxes = [
+        Box(35.28 * mm, y * mm, (35.28 + width) * mm, (y + 3.5) * mm)
+        for y, width in ((131.79, 33.89), (127.26, 38.18), (122.74, 33.20))
+    ]
+    leader_start = (73.58 * mm, 125.94 * mm)
+    balloon_6 = (
+        (40.62 * mm, 151.03 * mm, 5.23 * mm),
+        Segment(44.58 * mm, 152.93 * mm, 99.19 * mm, 188.84 * mm),
+    )
+    balloon_8 = (
+        (93.0 * mm, 89.5 * mm, 5.23 * mm),
+        Segment(93.24 * mm, 93.03 * mm, 96.54 * mm, 119.42 * mm),
+    )
+    old_7 = (
+        (80.5 * mm, 95.8 * mm, 5.23 * mm),
+        Segment(82.41 * mm, 100.65 * mm, 100.23 * mm, 146.64 * mm),
+    )
+    moved_7 = (
+        (52.4 * mm, 124.8 * mm, 5.23 * mm),
+        Segment(55.7 * mm, 128.9 * mm, 84.6 * mm, 165.1 * mm),
+    )
+
+    def place(*balloons):
+        circles = [circle for circle, _leader in balloons]
+        leaders = [leader for _circle, leader in balloons]
+        return drawing.spare_label_offset(
+            tip, placed, boxes, leader_start, circles, leaders
+        )
+
+    offset, airs = place(balloon_6, old_7, balloon_8)
+    assert offset == drawing.SPARE_LABEL_OFFSETS[0]
+    offset, airs = place(balloon_6, moved_7, balloon_8)
+    assert airs[0] == 0.0
+    assert offset is not None and offset != drawing.SPARE_LABEL_OFFSETS[0]
+    assert airs[-1] >= drawing.SPARE_LABEL_CLEARANCE
+
+
 def test_the_parked_nib_is_set_on_the_paper_before_the_line_check() -> None:
     """Code review C08: the model and the feeler step park the nib
     PEN_PAPER_CLEARANCE_MM off the paper, and nothing on the plumb, guided
