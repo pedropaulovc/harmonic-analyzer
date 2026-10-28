@@ -127,7 +127,10 @@ VIEW_SCALE = (2, 1)
 # title block (it reached y 0.085).
 PLAN_CENTER = (0.080, 0.153)
 BACK_CENTER = (0.218, PLAN_CENTER[1])
-SECTION_CENTER = (0.343, PLAN_CENTER[1])
+# 5 mm above the plan's line since #2034: the 15:150 plate is 12.7 taller on
+# the sheet, and on the plan's line the section's caption reached the title
+# block (run 20261028T024319752Z). Sections here are not projection-locked.
+SECTION_CENTER = (0.343, PLAN_CENTER[1] + 0.005)
 # 3 mm lower than before #2034: the 15:150 plate stands 6.4 taller, so the
 # back view's edge dimensions reach 3 mm nearer the isometric's caption.
 ISO_CENTER = (0.180, 0.042)
@@ -187,8 +190,9 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "LocatorX1": (LOCATOR_SITES_MM[0][0] / 2.0, PLAN_ROWS[2], _Z_PLAN),
     # High enough that its callout lines clear the screw-hole callout; three
     # short lines keep its left edge inside the border. Its leader runs down
-    # to locator 1 left of every location dimension line.
-    "LocatorDia1": (EDGE_MINUS_X - 4.5, _TOP + 23.75, _Z_PLAN),
+    # to locator 1 left of every location dimension line. 1.75 lower than
+    # before #2034, whose taller plate put its top line on the border.
+    "LocatorDia1": (EDGE_MINUS_X - 4.5, _TOP + 22.0, _Z_PLAN),
 }
 # Back view (the mounting face): the notch face's corner heights, outboard,
 # and both side edges from K below the end round, clear of every leader.
