@@ -14,6 +14,7 @@ It never edits the source assembly or its explodes.
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 import textwrap
 from pathlib import Path
@@ -25,12 +26,14 @@ import ha_harmonic_analyzer_assembly_spec as spec
 from _assembly_contract import assembly_contract
 from _check import check
 from _com import _early_bound
+from _drawing_balloon_display import rendered_balloon_circle
 from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_high_quality_shaded_with_edges,
 )
 from _drawing_balloons import (
@@ -43,6 +46,7 @@ from _drawing_balloons import (
 from _drawing_centerline import add_view_centerline
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_leader_notes import add_leader_note
+from _drawing_leaders import segments_cross
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_tables import insert_bom_table
 from _drawing_view_configuration import (
@@ -59,6 +63,14 @@ from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _simplified_names import SIMPLIFIED_SUFFIX, simplified_name
 from fr_frame_attachment_spec import TOP_SCREW_Y
+from _layout_geometry import (
+    Box,
+    Segment,
+    point_segment_distance,
+    segment_box_distance,
+    segment_circle_distance,
+)
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
@@ -191,12 +203,21 @@ EXPLODED_CENTER = (
     _PORTRAIT.width_m / 2.0,
     (_PORTRAIT.title_block_top_m + _BOM_BOTTOM_Y) / 2.0,
 )
-# The spare sprocket's label (notes.SPARE_SPROCKET_LABEL): its top-left
-# corner this far from the leader tip, sheet metres. The spare lies ~4 mm
-# west of item 7's leader (5bca52e13 sheet 3), so the three short lines stand
-# below-left of it, in the open sheet between the item 6 and item 7 balloons
-# and clear of that leader.
-SPARE_LABEL_OFFSET = (-0.058, -0.004)
+# The spare sprocket's label (notes.SPARE_SPROCKET_LABEL): candidate places
+# for its top-left corner, sheet metres from its leader tip, tried in order.
+# The balloons ring the view by their own rule and move whenever an anchor or
+# explode re-keys: run 20261028T091118034Z (1e2b7b540) put item 7's balloon
+# inside the first place, its leader 4.56 mm through the text. So the label
+# takes the first place whose read-back text and leader clear every balloon
+# circle and leader by SPARE_LABEL_CLEARANCE. All lie in the open sheet west
+# of the paper drive, the tip to their right.
+SPARE_LABEL_OFFSETS = (
+    (-0.058, -0.004),  # below-left of the tip, beside it (#2010)
+    (-0.058, -0.024),  # one label lower
+    (-0.075, -0.024),  # lower and further west
+    (-0.075, 0.000),  # further west, level with the tip
+)
+SPARE_LABEL_CLEARANCE = 0.002
 _AXIS_INDEX = {"x": 0, "y": 1, "z": 2}
 # The paper drive's authored explode (model metres): the spare rides it.
 PAPER_DRIVE_EXPLODE_M = tuple(
@@ -464,6 +485,184 @@ def _spare_sprocket_tip(adapter: Any, view: Any) -> tuple[float, float]:
     )
     _telemetry.event("drawing.spare_sprocket_tip", instance=path, model_m=list(point))
     return model_point_in_view(adapter, view, point, label=label)
+
+
+def _annotation(note: Any) -> Any:
+    return _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
+
+
+def _leader_segments(annotation: Any) -> list[Segment]:
+    """Every straight run of ``annotation``'s leaders, sheet metres, each
+    from its text or balloon end towards its tip."""
+    segments = []
+    for index in range(int(annotation.GetLeaderCount())):
+        values = [float(v) for v in (annotation.GetLeaderPointsAtIndex(index) or ())]
+        points = [(values[i], values[i + 1]) for i in range(0, len(values) - 2, 3)]
+        segments.extend(Segment(*a, *b) for a, b in zip(points, points[1:]))
+    return segments
+
+
+def _note_text_boxes(annotation: Any, *, label: str) -> list[Box]:
+    """Each printed line's box from the note's display data: its lower-left
+    anchor (swTextPosition_e 1), cap height and rendered width. INote's
+    GetExtent would include the leader."""
+    display = annotation.GetDisplayData()
+    if display is None:
+        raise RuntimeError(f"{label}: the note has no display data")
+    data = _sw_type_info.early_bound_or_flag(
+        display,
+        "IDisplayData",
+        "GetTextCount",
+        "GetTextPositionAtIndex",
+        "GetTextHeightAtIndex",
+        "GetTextInBoxWidthAtIndex",
+        "GetTextRefPositionAtIndex",
+    )
+    boxes = []
+    for index in range(int(data.GetTextCount())):
+        x, y = (float(v) for v in tuple(data.GetTextPositionAtIndex(index))[:2])
+        height = float(data.GetTextHeightAtIndex(index))
+        width = float(data.GetTextInBoxWidthAtIndex(index))
+        if int(data.GetTextRefPositionAtIndex(index)) != 1 or min(height, width) <= 0:
+            raise RuntimeError(f"{label}: text line {index} has no lower-left box")
+        boxes.append(Box(x, y, x + width, y + height))
+    if not boxes:
+        raise RuntimeError(f"{label}: the note prints no text")
+    return boxes
+
+
+def _segment_air(first: Segment, second: Segment) -> float:
+    ends = (((first.x0, first.y0), (first.x1, first.y1)),)
+    ends += (((second.x0, second.y0), (second.x1, second.y1)),)
+    if segments_cross(*ends):
+        return 0.0
+    return min(
+        *(point_segment_distance(point, second) for point in ends[0]),
+        *(point_segment_distance(point, first) for point in ends[1]),
+    )
+
+
+def spare_label_air(
+    text_boxes: list[Box],
+    leader: Segment,
+    circles: list[tuple[float, float, float]],
+    leaders: list[Segment],
+) -> float:
+    """Least air, metres, from the label's text and leader to any balloon's
+    circle ``(x, y, radius)`` or leader; 0 where they touch or cross."""
+    airs = [math.inf]
+    for box in text_boxes:
+        airs += [
+            max(
+                0.0,
+                math.hypot(
+                    max(box.xmin - x, 0.0, x - box.xmax),
+                    max(box.ymin - y, 0.0, y - box.ymax),
+                )
+                - radius,
+            )
+            for x, y, radius in circles
+        ]
+        airs += [segment_box_distance(segment, box) for segment in leaders]
+    airs += [segment_circle_distance(leader, circle) for circle in circles]
+    airs += [_segment_air(leader, segment) for segment in leaders]
+    return min(airs)
+
+
+def spare_label_offset(
+    tip: tuple[float, float],
+    placed: tuple[float, float],
+    text_boxes: list[Box],
+    leader_start: tuple[float, float],
+    circles: list[tuple[float, float, float]],
+    leaders: list[Segment],
+) -> tuple[tuple[float, float] | None, list[float]]:
+    """The first SPARE_LABEL_OFFSETS place that clears every balloon by
+    SPARE_LABEL_CLEARANCE (None if none does), and each tried place's air.
+    The label read back at ``placed`` moves rigidly, its leader still ending
+    on ``tip``."""
+    airs = []
+    for offset in SPARE_LABEL_OFFSETS:
+        dx = tip[0] + offset[0] - placed[0]
+        dy = tip[1] + offset[1] - placed[1]
+        air = spare_label_air(
+            [
+                Box(b.xmin + dx, b.ymin + dy, b.xmax + dx, b.ymax + dy)
+                for b in text_boxes
+            ],
+            Segment(leader_start[0] + dx, leader_start[1] + dy, *tip),
+            circles,
+            leaders,
+        )
+        airs.append(air)
+        if air >= SPARE_LABEL_CLEARANCE:
+            return offset, airs
+    return None, airs
+
+
+def _add_spare_label(
+    adapter: Any, view: Any, tip: tuple[float, float], landings: list[Any]
+) -> None:
+    """Label the spare sprocket at the first place clear of every balloon,
+    measured from the inserted label and the balloons' rendered geometry, and
+    prove the clearance again where it lands."""
+    label = "spare sprocket label"
+    first = SPARE_LABEL_OFFSETS[0]
+    annotation = _annotation(
+        add_leader_note(
+            adapter,
+            notes.SPARE_SPROCKET_LABEL,
+            text_xy=(tip[0] + first[0], tip[1] + first[1]),
+            attach_xy=tip,
+            label=label,
+            view=view,
+        )
+    )
+    circles = [
+        rendered_balloon_circle(landing.note, label=landing.label)
+        for landing in landings
+    ]
+    leaders = [
+        segment
+        for landing in landings
+        for segment in _leader_segments(_annotation(landing.note))
+    ]
+
+    def read_back() -> tuple[list[Box], Segment]:
+        runs = _leader_segments(annotation)
+        if len(runs) != 1:
+            raise RuntimeError(f"{label}: {len(runs)} leader runs, expected one")
+        return _note_text_boxes(annotation, label=label), runs[0]
+
+    boxes, leader = read_back()
+    placed = tuple(float(v) for v in tuple(annotation.GetPosition())[:2])
+    offset, airs = spare_label_offset(
+        tip, placed, boxes, (leader.x0, leader.y0), circles, leaders
+    )
+    tried = ", ".join(f"{air * 1000.0:.1f}" for air in airs)
+    if offset is None:
+        raise RuntimeError(
+            f"{label}: no place clears every balloon by "
+            f"{SPARE_LABEL_CLEARANCE * 1000.0:g} mm (air per place {tried} mm)"
+        )
+    if offset != first:
+        if not annotation.SetPosition2(tip[0] + offset[0], tip[1] + offset[1], 0.0):
+            raise RuntimeError(f"{label}: failed to move the note to {offset}")
+        rebuild_drawing(adapter, label=label)
+        boxes, leader = read_back()
+        if math.dist((leader.x1, leader.y1), tip) > 0.001:
+            raise RuntimeError(f"{label}: the leader left its tip after the move")
+    air = spare_label_air(boxes, leader, circles, leaders)
+    if air < SPARE_LABEL_CLEARANCE:
+        raise RuntimeError(
+            f"{label}: landed {air * 1000.0:.2f} mm from a balloon, under "
+            f"{SPARE_LABEL_CLEARANCE * 1000.0:g} mm"
+        )
+    _telemetry.info(
+        f"{label}: top-left {offset[0] * 1000.0:+.0f},{offset[1] * 1000.0:+.0f} mm "
+        f"from its tip, {air * 1000.0:.1f} mm clear of every balloon "
+        f"(air per place tried {tried} mm)"
+    )
 
 
 def _validate_source(source_model: Any) -> None:
@@ -835,17 +1034,7 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
             f"complete-machine exploded view carries {len(landings)} balloons, "
             f"expected one per BOM row ({len(BOM_COMPONENTS)})"
         )
-    add_leader_note(
-        adapter,
-        notes.SPARE_SPROCKET_LABEL,
-        text_xy=(
-            spare_tip[0] + SPARE_LABEL_OFFSET[0],
-            spare_tip[1] + SPARE_LABEL_OFFSET[1],
-        ),
-        attach_xy=spare_tip,
-        label="spare sprocket label",
-        view=exploded,
-    )
+    _add_spare_label(adapter, exploded, spare_tip, landings)
     _add_note_block(
         adapter,
         name,
