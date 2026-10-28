@@ -1724,13 +1724,7 @@ def test_omp_harness_intent_argument_does_not_void_sheet_inspection():
     assert not mr.evaluate_sheet_evidence([view, result], reviewer="claude", sheet_count=1)["inspection_proven"]
 
 
-@pytest.mark.parametrize("catalog", ["valid", "missing", "extra", "silent", "malformed", "context", "provider", "prompt_rejected", "slow_shutdown", "footer_context", "footer_instruction", "trailing_malformed", "trailing_array", "trailing_tool", "trailing_execution", "trailing_unknown", "trailing_failure", "trailing_valid", "failure_then_malformed"])
-def test_omp_rpc_actual_session_readiness_precedes_prompt_and_reaps_on_failure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, catalog: str,
-) -> None:
-    import machinist_review_transport as transport
-    script = tmp_path / "rpc_fixture.py"
-    script.write_text(r'''
+_OMP_RPC_FIXTURE = r'''
 import base64, hashlib, json, os, sys, time
 from pathlib import Path
 mode = sys.argv[1]
@@ -1739,6 +1733,9 @@ system = sys.argv[sys.argv.index("--system-prompt") + 1]
 model = sys.argv[sys.argv.index("--model") + 1]
 def emit(value):
     print(json.dumps(value), flush=True)
+# Optional scripted final texts, one per prompt; the last one repeats.
+replies = json.loads(Path("replies.json").read_text()) if Path("replies.json").exists() else None
+prompts, last = 0, "{}"
 for line in sys.stdin:
     request = json.loads(line)
     with Path("protocol.jsonl").open("a") as log:
@@ -1777,23 +1774,29 @@ for line in sys.stdin:
             emit({"type": "response", "id": request["id"], "command": kind, "success": False, "error": "fixture rejection"})
             time.sleep(20)  # No prompt_result follows a rejected request.
             continue
-        payload = os.urandom(1536)
-        digest = hashlib.sha256(payload).hexdigest()
-        blobs = Path(os.environ["PI_CODING_AGENT_DIR"]) / "blobs"
-        blobs.mkdir(exist_ok=True)
-        (blobs / digest).write_bytes(payload)
-        with session.open("a") as saved:
-            saved.write(json.dumps({"type": "image", "data": "blob:sha256:" + digest}) + "\n")
-        emit({"type": "message_end", "message": {"role": "assistant", "model": "test",
-              "usage": {"input": 10, "output": 2},
-              "content": [{"type": "toolCall", "id": "view", "name": "mcp__sheets_view_sheet", "arguments": {"sheet": 1}}]}})
-        emit({"type": "message_end", "message": {"role": "toolResult", "toolCallId": "view",
-              "content": [{"type": "image", "mimeType": "image/png", "data": base64.b64encode(payload).decode()}]}})
+        prompts += 1
+        if prompts == 1 or mode == "repair_tool":
+            payload = os.urandom(1536)
+            digest = hashlib.sha256(payload).hexdigest()
+            blobs = Path(os.environ["PI_CODING_AGENT_DIR"]) / "blobs"
+            blobs.mkdir(exist_ok=True)
+            (blobs / digest).write_bytes(payload)
+            with session.open("a") as saved:
+                saved.write(json.dumps({"type": "image", "data": "blob:sha256:" + digest}) + "\n")
+            emit({"type": "message_end", "message": {"role": "assistant", "model": "test",
+                  "usage": {"input": 10, "output": 2},
+                  "content": [{"type": "toolCall", "id": "view", "name": "mcp__sheets_view_sheet", "arguments": {"sheet": 1}}]}})
+            emit({"type": "message_end", "message": {"role": "toolResult", "toolCallId": "view",
+                  "content": [{"type": "image", "mimeType": "image/png", "data": base64.b64encode(payload).decode()}]}})
+        if replies is not None:
+            last = replies[min(prompts, len(replies)) - 1]
+            emit({"type": "message_end", "message": {"role": "assistant", "model": "test",
+                  "usage": {"input": 5, "output": 1}, "content": [{"type": "text", "text": last}]}})
         result = {"type": "prompt_result", "id": request["id"], "agentInvoked": True, "status": "failed" if mode in {"turn_failure", "failure_then_malformed"} else "completed", "sessionSettled": True}
         print(json.dumps(result) + ("\nnot-json-drain-canary" if mode == "failure_then_malformed" else ""), flush=True)
         continue
     elif kind == "get_last_assistant_text":
-        data = {"text": "{}"}
+        data = {"text": last}
         if mode == "slow_shutdown": Path("completed").touch()
     else:
         data = {}
@@ -1805,12 +1808,23 @@ for line in sys.stdin:
         if mode == "trailing_execution": emit({"type": "tool_execution_end", "toolName": "bash", "toolCallId": "late", "result": {}})
         if mode == "trailing_failure": emit({"type": "message_end", "message": {"role": "assistant", "content": [], "stopReason": "error"}})
         if mode == "trailing_valid": print("\n  ", flush=True)
-        if mode in {"trailing_tool", "trailing_valid"}:
+        if mode in {"trailing_tool", "trailing_valid"} or mode == "repair_trailing_tool" and prompts > 1:
             emit({"type": "message_end", "message": {"role": "assistant", "model": "test",
                   "content": [{"type": "toolCall", "id": "late", "name": "bash" if mode == "trailing_tool" else "mcp__sheets_crop", "arguments": {"sheet": 1}}]}})
             emit({"type": "agent_end", "messages": []})
+        if mode == "repair_trailing_execution" and prompts > 1:
+            emit({"type": "tool_execution_end", "toolName": "mcp__sheets_crop", "toolCallId": "late", "result": {}})
 if mode == "slow_shutdown": time.sleep(60)
-''', encoding="utf-8")
+'''
+
+
+@pytest.mark.parametrize("catalog", ["valid", "missing", "extra", "silent", "malformed", "context", "provider", "prompt_rejected", "slow_shutdown", "footer_context", "footer_instruction", "trailing_malformed", "trailing_array", "trailing_tool", "trailing_execution", "trailing_unknown", "trailing_failure", "trailing_valid", "failure_then_malformed"])
+def test_omp_rpc_actual_session_readiness_precedes_prompt_and_reaps_on_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, catalog: str,
+) -> None:
+    import machinist_review_transport as transport
+    script = tmp_path / "rpc_fixture.py"
+    script.write_text(_OMP_RPC_FIXTURE, encoding="utf-8")
     home = tmp_path / "private"
     home.mkdir()
     work = home / "work"
@@ -1923,6 +1937,116 @@ if mode == "slow_shutdown": time.sleep(60)
     assert all("PI_CONFIG_FILES" not in env and "OMP_PROFILE" not in env for env in environments)
     assert dict(os.environ) == before
 
+
+# Observed on farm run 20261028T113956431Z (judge, sm_gooseneck_spring_screw):
+# OMP closed the cluster object before "reason", twice in a row.
+_OMP_MALFORMED_JUDGMENT = (
+    '```json\n{"clusters":[{"member_ids":["r1.minor.1"],"decision":"not_gating","category":"minor",'
+    '"where":"Sheet 1, head callout","issue":"Loop overlap 0.95 MIN is below the 1.0 mm retention check.",'
+    '"fix":"No change needed."},"reason":"Owner exception RV-01 accepts this departure."}]}\n```'
+)
+_OMP_REPAIRED_JUDGMENT = _OMP_MALFORMED_JUDGMENT.replace('needed."},"reason"', 'needed.","reason"')
+
+
+@pytest.mark.parametrize("mode", ["repaired", "schema_repaired", "unrepaired", "repair_tool", "repair_trailing_tool", "repair_trailing_execution"])
+def test_omp_repairs_malformed_verdict_in_session_without_tools(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str,
+) -> None:
+    import machinist_review_transport as transport
+    repaired = json.loads(_OMP_REPAIRED_JUDGMENT.removeprefix("```json\n").removesuffix("\n```"))
+    missing_reason = json.loads(json.dumps(repaired))
+    del missing_reason["clusters"][0]["reason"]
+    first = json.dumps(missing_reason) if mode == "schema_repaired" else _OMP_MALFORMED_JUDGMENT
+    replies = [first] if mode == "unrepaired" else [first, _OMP_REPAIRED_JUDGMENT]
+    script = tmp_path / "rpc_fixture.py"
+    script.write_text(_OMP_RPC_FIXTURE, encoding="utf-8")
+    home = tmp_path / "private"
+    work = home / "work"
+    work.mkdir(parents=True)
+    (work / "replies.json").write_text(json.dumps(replies), encoding="utf-8")
+    processes, normalized, spans = [], [], []
+    original = asyncio.create_subprocess_exec
+    async def spawn(executable, *arguments, **kwargs):
+        process = await original(sys.executable, str(script), mode if mode.startswith("repair_") else "valid", *arguments, **kwargs)
+        processes.append(process)
+        return process
+    monkeypatch.setattr(transport.asyncio, "create_subprocess_exec", spawn)
+    monkeypatch.setattr(transport._telemetry, "event", lambda name, **attributes: spans.append((name, attributes)))
+    provenance = {"private_home": str(home)}
+    schema = json.loads(mr.JUDGE_SCHEMA_FILE.read_text(encoding="utf-8"))
+    async def invoke():
+        async with asyncio.timeout(10):
+            await transport._omp_session(
+                executable=sys.executable, broker_env={},
+                config={"mcpServers": {}, "prompt": "inspect"}, schema=schema, model="test",
+                effort="medium", cwd=str(work), remaining=lambda: 10, startup=5,
+                emit=lambda event, raw: event is not None and normalized.append(event),
+                diagnostics=[], provenance=provenance, continuation="fresh",
+            )
+    def judge(events):
+        return mr.extract_claude_verdict(events, validator=lambda value: mr.validate_judgment(value, [{"id": "r1.minor.1"}]))
+    def prompts():
+        return [json.loads(line) for line in (work / "protocol.jsonl").read_text().splitlines() if '"prompt"' in line]
+    if mode.startswith("repair_"):
+        # A correction turn must never add (or launder) sheet evidence, even
+        # through trailing events read by a control request or the drain.
+        with pytest.raises(RuntimeError, match="repair turn called a tool"):
+            asyncio.run(invoke())
+        assert not any(event.get("type") == "result" for event in normalized)
+        assert "image_blobs" not in provenance
+        assert len(provenance["omp_repair_turns"]) == 1
+        assert all(process.returncode is not None for process in processes)
+        return
+    asyncio.run(invoke())
+    result = normalized[-1]
+    assert result["type"] == "result" and not result["is_error"]
+    if mode != "unrepaired":
+        # Downstream reads the repaired final text (main returned the first,
+        # rejected one), matching the final assistant message in the session.
+        assert result["result"] == _OMP_REPAIRED_JUDGMENT
+        assert normalized[-2]["message"]["content"] == [{"type": "text", "text": _OMP_REPAIRED_JUDGMENT}]
+        assert judge(normalized) == repaired
+        with pytest.raises((ValueError, RuntimeError)):
+            judge([{"type": "result", "result": first}])
+    sent = prompts()
+    repairs = provenance["omp_repair_turns"]
+    assert [span for span, _ in spans] == ["machinist_review.omp_repair_turn"] * len(repairs)
+    assert [attributes for _, attributes in spans] == [{"turn": index + 1, "error": repair["error"]} for index, repair in enumerate(repairs)]
+    assert len(sent) == 1 + len(repairs)
+    for repair, prompt in zip(repairs, sent[1:]):
+        assert repair["error"] in prompt["message"] and "no tool calls" in prompt["message"]
+    # Only the review turn's single view is sheet evidence; corrections add none.
+    evidence = mr.evaluate_sheet_evidence(normalized, reviewer="claude", sheet_count=1)
+    assert evidence["inspection_proven"] and evidence["tool_events"] == 0
+    assert sum(block.get("type") == "tool_use" for event in normalized if event.get("type") == "assistant"
+               for block in event["message"]["content"]) == 1
+    if mode == "unrepaired":
+        # Exhausted repairs leave today's downstream failure unchanged.
+        assert len(repairs) == transport.OMP_REPAIR_TURNS == 2
+        assert result["result"] == _OMP_MALFORMED_JUDGMENT
+        with pytest.raises(json.JSONDecodeError, match="Expecting ',' delimiter") as caught:
+            judge(normalized)
+        with pytest.raises(json.JSONDecodeError) as baseline:
+            judge([{"type": "result", "result": _OMP_MALFORMED_JUDGMENT}])
+        assert str(caught.value) == str(baseline.value)
+        return
+    assert len(repairs) == 1
+    if mode == "schema_repaired":
+        assert repairs[0]["error"] == "schema violation at verdict['clusters'][0]: 'reason' is a required property"
+    else:
+        assert repairs[0]["error"].startswith("JSONDecodeError: Expecting ',' delimiter")
+
+
+def test_omp_verdict_error_uses_the_extractor_parser_and_schema():
+    import machinist_review_transport as transport
+    schema = json.loads(mr.JUDGE_SCHEMA_FILE.read_text(encoding="utf-8"))
+    assert transport.omp_verdict_error(_OMP_REPAIRED_JUDGMENT, schema) is None
+    assert transport.omp_verdict_error(_OMP_MALFORMED_JUDGMENT, schema).startswith("JSONDecodeError: Expecting ',' delimiter")
+    assert transport.omp_verdict_error("no verdict", schema).startswith("RuntimeError: final message is not JSON")
+    assert transport.omp_verdict_error("", schema) == "RuntimeError: claude produced no final message"
+    assert transport.omp_verdict_error('{"clusters": [], "extra": 1}', schema).startswith("schema violation at verdict: Additional properties")
+    long_text = json.dumps({"clusters": "x" * 2000})
+    assert len(transport.omp_verdict_error(long_text, schema)) == 503
 
 
 def test_omp_broker_reads_actual_ephemeral_url_and_reaps_its_process(
