@@ -67,7 +67,7 @@ def test_outline_prints_at_two_places_for_the_counterbore_walls_it_sets():
     loosen=printed_band_mm(1)-printed_band_mm(2)
     assert spec.CBORE_END_WALL_MIN-loosen<2.0
     assert spec.CBORE_SIDE_WALL_MIN-loosen<1.5
-    assert spec.CALLOUTS_BELOW['BlockLength']=='SETS COUNTERBORE\nEND WALL'
+    assert spec.CALLOUTS_BELOW['BlockLength']=='SETS COUNTERBORE END WALL'
     assert spec.CALLOUTS_BELOW['BlockWidth']=='SETS COUNTERBORE\nSIDE WALL 1.59 MIN'
 
 

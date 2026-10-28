@@ -130,7 +130,7 @@ CALLOUTS_BELOW = {
     # the note, farm run 20261027T175531766Z): the block height's extension
     # lines pass left of it.
     "CboreFloor": "M4x20 IN HGH15CA:\n3.85 MIN ENGAGEMENT",
-    "BlockLength": "SETS COUNTERBORE\nEND WALL",
+    "BlockLength": "SETS COUNTERBORE END WALL",
     "BlockWidth": f"SETS COUNTERBORE\n{CBORE_SIDE_WALL_TEXT}",
 }
 REFERENCE_SKETCHES = (CBORE_FLOOR_REFERENCE, PLAN_DATUM_REFERENCE)
