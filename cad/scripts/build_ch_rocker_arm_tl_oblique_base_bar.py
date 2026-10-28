@@ -88,7 +88,7 @@ import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 
 PART_NAME = "ch-rocker-arm-tl-oblique-base-bar"
-MATERIAL = "6061 Alloy"  # the registry row names the 6061-T6511 flat bar
+MATERIAL = "6061 Alloy"  # the registry row's example aluminium flat bar
 _SAVED_DRAWING_PROPERTIES = (
     "Number",
     "Material Specification",
