@@ -87,10 +87,17 @@ if not (
 # review of e487a1bb4).
 SCREW_NUMBER = str(_config.parts("sm-gooseneck-spring-screw")["number"])
 COUNTERBORE_WALL_CALLOUT = f"C'BORE WALL {COUNTERBORE_WALL_CALLOUT_MIN:.2f} MIN"
-COUNTERBORE_MATE_CALLOUT = f"CLEARS {SCREW_NUMBER} RUN-OUT"
 # The floor corner's own native "R0.10 MAX" names the corner it limits.
 COUNTERBORE_FLOOR_CALLOUT = "FLOOR CORNER"
 COUNTERBORE_AXIS_CALLOUT = f"ON TAP AXIS WITHIN {COUNTERBORE_AXIS_OFFSET_MAX:.2f}"
+# No row wider than the axis row: the block stands between the sheet's left
+# border and the end face (farm run 20261028T062539287Z: "CLEARS MHA-SM-04
+# RUN-OUT" crossed the border).
+COUNTERBORE_MATE_CALLOUT = f"FOR {SCREW_NUMBER} RUN-OUT"
+if max(map(len, (COUNTERBORE_MATE_CALLOUT, COUNTERBORE_WALL_CALLOUT))) > len(
+    COUNTERBORE_AXIS_CALLOUT
+):
+    raise AssertionError("a counterbore callout row is wider than its axis row")
 PLUG_DIA_CALLOUT = "FLUSH WITH TUBE OD,\nNO STEP"
 # The bend radius is the tube's centreline radius; the arrowhead lands on the
 # outer arc, so the value says which (machinist review of e487a1bb4).
