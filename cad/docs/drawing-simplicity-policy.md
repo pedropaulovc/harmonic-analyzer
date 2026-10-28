@@ -376,6 +376,11 @@ both verdicts and the finding diff.
   shared routing state through OMP; recovery follows the operator procedure above.
   Failed or incomplete startup submits no review. Native redacted records and
   normalized image/tool evidence are retained separately.
+  Tool arguments retain OMP's harness intent metadata in those records. The sheet
+  server and shared reviewer/judge evidence validator ignore only the `i` key
+  when its value is a string, before checking the exact integer tool arguments.
+  Unknown keys and non-string intent values remain invalid; successful image
+  results and an in-range view of every sheet are still required for inspection.
   SDK dataclasses are converted once; native records are redacted before being
   streamed to disk. Normalized image/tool events still accumulate in memory for
   the existing stdout/evaluation interface; only native records are streamed.

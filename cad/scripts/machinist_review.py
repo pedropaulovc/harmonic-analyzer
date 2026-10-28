@@ -126,6 +126,7 @@ from machinist_review_transport import TransportError as _ClaudeTransportError  
 from machinist_review_sheets_mcp import (  # noqa: E402
     SheetStore,
     create_server as _create_sheet_server,
+    sheet_tool_arguments,
 )
 
 PROMPTS_DIR = SCRIPTS_DIR / "prompts"
@@ -1306,6 +1307,7 @@ def evaluate_sheet_evidence(
                         for part in (result.get("content") or [])
                     )
                 )
+            arguments = sheet_tool_arguments(arguments)
             keys = {"sheet"} if tool == "view_sheet" else {"sheet", "x1", "y1", "x2", "y2"}
             valid = (
                 tool is not None

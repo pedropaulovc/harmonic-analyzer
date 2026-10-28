@@ -1368,7 +1368,10 @@ def test_credential_contention_polls_without_threads_and_respects_deadline(
         loop = asyncio.get_running_loop()
         monkeypatch.setattr(loop, "run_in_executor", forbidden)
         loop.call_soon(callbacks.append, "responsive")
-        remaining = lambda: budget - clock[0]
+
+        def remaining():
+            return budget - clock[0]
+
         pool = SimpleNamespace(state_file=Path("routing.json"))
         if release:
             assert await transport.credential_operation(
@@ -1706,8 +1709,7 @@ def test_omp_normalization_preserves_images_and_rejects_unknown_tools():
 
 
 def test_omp_harness_intent_argument_does_not_void_sheet_inspection():
-    # Real OMP tool calls carry the harness intent "i" beside the tool's own
-    # arguments (seen 2026-10-28); without stripping it no view ever proved.
+    # Transport preserves the harness intent; the shared validator ignores it.
     import machinist_review_transport as transport
     view, result = (
         transport.omp_event({"type": "message_end", "message": {
@@ -1718,7 +1720,7 @@ def test_omp_harness_intent_argument_does_not_void_sheet_inspection():
             "role": "toolResult", "toolCallId": "a", "content": [{"type": "image", "data": "image", "mimeType": "image/png"}],
         }}),
     )
-    assert view["message"]["content"][0]["input"] == {"sheet": 1}
+    assert view["message"]["content"][0]["input"] == {"sheet": 1, "i": "view sheet"}
     assert mr.evaluate_sheet_evidence([view, result], reviewer="claude", sheet_count=1)["inspection_proven"]
     view["message"]["content"][0]["input"] = {"sheet": 1, "page": 2}
     assert not mr.evaluate_sheet_evidence([view, result], reviewer="claude", sheet_count=1)["inspection_proven"]
@@ -2730,6 +2732,45 @@ def test_evidence_accepts_in_range_views_and_crops(reviewer: str) -> None:
         "neutral_calls": [],
         "inspection_proven": True,
     }
+
+
+@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+@pytest.mark.parametrize(
+    ("arguments", "accepted"),
+    [
+        ({"sheet": 1, "i": "view sheet 1"}, True),
+        ({"sheet": 1, "i": "view sheet 1", "page": 2}, False),
+        ({"sheet": 1, "i": 1}, False),
+        ({"sheet": 1, "i": None}, False),
+        ({"sheet": 1, "i": False}, False),
+        ({"sheet": True, "i": "view sheet 1"}, False),
+        ({"sheet": "1", "i": "view sheet 1"}, False),
+        ({"sheet": 0, "i": "view sheet 1"}, False),
+        ({"sheet": 2, "i": "view sheet 1"}, False),
+    ],
+)
+def test_recorded_omp_intent_keeps_sheet_arguments_exact(
+    reviewer: str, arguments: dict[str, Any], accepted: bool,
+) -> None:
+    # mg_magnifying_lever, 20261028T112052819Z, runs/r1/events: real OMP node.
+    node = {
+        "type": "tool_use",
+        "id": "route-1:toolu_01SiAYhhHNna5KkNefp99gtw",
+        "name": "mcp__sheets__view_sheet",
+        "input": {"sheet": 1, "i": "view sheet 1"},
+    }
+    events = _call_events(reviewer, "view_sheet", arguments, node["id"])
+    if reviewer == "claude":
+        node["input"] = arguments
+        events[0]["message"]["content"][0] = node
+    original = json.dumps(events, sort_keys=True)
+
+    evidence = mr.evaluate_sheet_evidence(events, reviewer=reviewer, sheet_count=1)
+
+    assert evidence["inspection_proven"] is accepted
+    assert evidence["sheets_viewed"] == ([1] if accepted else [])
+    assert evidence["tool_events"] == 0
+    assert json.dumps(events, sort_keys=True) == original
 
 
 _REJECTED_CALLS: dict[str, dict[str, list[dict[str, Any]]]] = {
@@ -4859,6 +4900,34 @@ def test_crop_rejects_degenerate_and_out_of_frame_rects(tmp_path: Path) -> None:
         # Tool errors leave the server usable.
         png, text = _image_and_text(_call(server, "view_sheet", {"sheet": 1}))
         assert (png, text) == store.view_sheet(1)
+
+
+@pytest.mark.parametrize("tool", ["view_sheet", "crop"])
+def test_sheet_server_ignores_only_string_harness_intent(
+    tmp_path: Path, tool: str,
+) -> None:
+    source = _png_source(tmp_path / "sheet.png", (300, 200))
+    arguments = {"sheet": 1}
+    if tool == "crop":
+        arguments.update(x1=10, y1=10, x2=100, y2=100)
+    with sheets.SheetStore([source]) as store:
+        server = sheets.create_server(store)
+        expected = _image_and_text(_call(server, tool, arguments))
+        tagged = {**arguments, "i": "view sheet 1" if tool == "view_sheet" else "detail A"}
+        assert _image_and_text(_call(server, tool, tagged)) == expected
+        assert "i" in tagged
+        for invalid in (
+            {**tagged, "page": 2},
+            {**arguments, "i": 1},
+            {**arguments, "i": None},
+            {**arguments, "i": False},
+            {**tagged, "sheet": True},
+            {**tagged, "sheet": "1"},
+            {**tagged, "sheet": 0},
+            {**tagged, "sheet": 2},
+        ):
+            with pytest.raises(ToolError):
+                _call(server, tool, invalid)
 
 
 def test_renders_are_memoized_and_byte_identical(
