@@ -1028,6 +1028,35 @@ def test_outside_view_crops_past_the_run_out_limit() -> None:
     assert head > drawing.LEFT_CENTER[1] + drawing.HALF_OD
 
 
+def test_the_cropped_outside_view_reads_as_partial_with_a_break_on_the_boss() -> None:
+    """2026-10-28 ENFORCE review (r1, r2): the cropped view had no break line
+    and no PARTIAL label, and the 13.80 MAX's extension line landed past the
+    drawn end.  The caption names the view PARTIAL; a long-break line on the
+    crop crosses the Ø8.2 boss past both outlines, so the MAX lands on the
+    boss stub between the step and the break, clear of the break's Z."""
+    assert drawing.LEFT_CAPTION.splitlines()[0].startswith("PARTIAL ")
+    caption = _note_box(drawing.LEFT_CAPTION, (0.0, 0.0))
+    assert caption.xmax - caption.xmin <= drawing._LEFT_CAPTION_WIDTH
+    s = drawing.VIEW_SCALE[0] / 1000.0
+    ys = [y for y, _z in drawing.OUTSIDE_BREAK]
+    zs = [z for _y, z in drawing.OUTSIDE_BREAK]
+    # Straight ends on the crop, past both boss outlines.
+    for y, z in (drawing.OUTSIDE_BREAK[0], drawing.OUTSIDE_BREAK[-1]):
+        assert z == drawing.OUTSIDE_CROP_Z
+        assert abs(y) > spec.BOSS_DIA / 2.0
+    assert drawing._outside_sheet_xy(0.0, drawing.OUTSIDE_CROP_Z)[0] == pytest.approx(
+        drawing.OUTSIDE_CROP_FENCE[2]
+    )
+    # The Z stays ahead of the step and the MAX, on the side of the axis away
+    # from the facing gap's floor, from which the MAX's extension line drops.
+    assert min(zs) > spec.CUTTER_RUNOUT_MAX > spec.FACE_WIDTH
+    z_ys = [y for y, z in drawing.OUTSIDE_BREAK if z != drawing.OUTSIDE_CROP_Z]
+    assert spec.GAP_FLOOR_WITNESS_Y < 0.0 < min(z_ys) and max(z_ys) < spec.BOSS_DIA / 2.0
+    assert sorted(ys) == ys
+    # The break stands clear of the MAX's extension line on the sheet.
+    assert (drawing.OUTSIDE_CROP_Z - spec.CUTTER_RUNOUT_MAX) * s >= 0.0005
+
+
 def test_tooth_edge_exception_is_flagged_at_the_teeth() -> None:
     """2026-10-27 ENFORCE review (r2, r3), rule 7: the 'do not break' exception
     to the title block's edge break reaches the teeth on a leader, not as a
