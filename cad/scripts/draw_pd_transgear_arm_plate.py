@@ -164,13 +164,18 @@ ISO_NOTE_XY = (0.285, 0.252)
 SCREW_SECTION_CENTER = (0.305, 0.140)
 REAR_LABEL_XY = (0.093, 0.032)
 BACK_CENTER = (0.135, 0.153)
-# 3 mm under the face-A view's line since #2034: on it the hub-to-boss
-# text crossed the upper border (preview run 20261028T064655627Z).
-KNOB_SECTION_CENTER = (0.298, BACK_CENTER[1] - 0.003)
-# Section A-A's native caption, top centre: SOLIDWORKS hangs it 17 mm under
-# the section, on the title block since #2034 (same run); here it stands
-# 8 mm under the thrust-face captions and 3 mm over the title block.
-KNOB_SECTION_CAPTION_XY = (0.279, 0.0835)
+# 5 mm under the face-A view's line since #2034: on it the hub-to-boss
+# text crossed the upper border by 3.7 (preview run 20261028T064655627Z);
+# its row cannot drop, its callout lines would meet the hub-face station's
+# value (run 20261028T070651235Z at a 1 mm lower row: 1.3 mm air).
+KNOB_SECTION_CENTER = (0.298, BACK_CENTER[1] - 0.005)
+# Section A-A's native caption, its annotation position: SOLIDWORKS hangs
+# it 17 mm under the section, on the title block since #2034 (same run);
+# here it stands 6 mm under the thrust-face captions, 3 mm over the title
+# block, its box centred near the section's middle and clear of the ring's
+# thrust-face caption (at x 0.279 the box centred at 0.260, under that
+# caption: run 20261028T070651235Z).
+KNOB_SECTION_CAPTION_XY = (0.309, 0.0835)
 # 4 mm under the side widths' extension-line ends since #2034, whose taller
 # face put them through this label (same run).
 FRONT_LABEL_XY = (0.110, 0.077)
@@ -280,9 +285,7 @@ SECTION_KEEP: dict[str, tuple[float, float, float]] = {
     "ThicknessOverArm": (0.0, _SECTION_TOP + 5.0, REAR_FACE_Z / 2.0),
     "NotchDepth": (0.0, _SECTION_TOP + 10.0, FRONT_FACE_Z / 2.0),
     "HubFaceToMounting": (0.0, _SECTION_TOP + 19.0, HUB_FACE_Z / 2.0),
-    # 27, not 28: under the upper border since #2034 (same run); the lowest
-    # row whose callout lines clear the hub-face station's value.
-    "HubToBoss": (0.0, _SECTION_TOP + 27.0, (HUB_FACE_Z + BOSS_FACE_Z) / 2.0),
+    "HubToBoss": (0.0, _SECTION_TOP + 28.0, (HUB_FACE_Z + BOSS_FACE_Z) / 2.0),
     "HubDia": (0.0, 11.0, HUB_FACE_Z - HUB_DIA_TEXT_STANDOFF_MM),
     "BossDia": (0.0, 0.0, BOSS_FACE_Z + 27.5),
 }
