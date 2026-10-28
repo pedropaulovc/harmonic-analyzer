@@ -518,6 +518,16 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     assert re.fullmatch(re.escape(parent) + r"-TL-\d{2}", number)
 
 
+def test_material_names_the_aluminium_flat_bar_family() -> None:
+    # Machinist review ENFORCE (rule 2): only the holes and slots need the
+    # metal, so the title block names the family; the spec row keeps the owned
+    # 6061-T6511 bar as the example source.
+    row = _config.parts("ch-rocker-arm-tl-oblique-base-bar")
+    assert row["material"].startswith("ALUMINUM FLAT BAR")
+    assert "6061" not in row["material"]
+    assert "6061-T6511" in row["material_specification"]
+
+
 def test_places_are_model_authored_and_the_sheet_is_pure() -> None:
     script = Path(drawing.__file__)
     assert script.name in _drawing_contract.PRECISION_MIGRATED_DRAWINGS
