@@ -143,6 +143,16 @@ def step_ref(key: str) -> str:
     return f"{DRAWING_NUMBER} STEP {step_number(key)}"
 
 
+# The assembly sheet's view of the reducer's S-K setting: the arm and plate
+# are match-drilled at it (pd_paper_drive_knob_setting_spec).
+KNOB_SETTING_VIEW_NAME = "VIEW K"
+
+
+def knob_setting_ref() -> str:
+    """The pointer the arm and plate sheets print: ``MHA-PD-00 VIEW K``."""
+    return f"{DRAWING_NUMBER} {KNOB_SETTING_VIEW_NAME}"
+
+
 def matched_locator_notes(
     arm_number: str, plate_number: str, *, on_arm: bool, width: int
 ) -> str:

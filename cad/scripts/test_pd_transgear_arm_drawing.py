@@ -717,10 +717,13 @@ def test_the_counterbore_and_its_floor_name_the_pivot_spring() -> None:
 def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
     """Machinist review (blocker and clarity): the reamed sockets named no
     dowel or fit, the mouth break no reason, and the match-drill sat in a
-    general note with the pair's setting."""
+    general note with the pair's setting. The setting is MHA-PD-00 VIEW K's
+    native S-K dimension; the callout points at it and prints no centre
+    distance of its own (#1388 policy)."""
     import pd_vn_transgear_arm_plate_locating_pin_spec as dowel
     import _transgear_arm_plate_locating_interface as interface
-    from pd_paper_drive_assembly_steps import step_ref
+    import pd_rack_pinion_spec as disc
+    from pd_paper_drive_assembly_steps import knob_setting_ref
 
     loosest = min(dowel.DIA_LIMITS) - max(interface.PRESS_HOLE_LIMITS_MM)
     tightest = max(dowel.DIA_LIMITS) - min(interface.PRESS_HOLE_LIMITS_MM)
@@ -731,16 +734,17 @@ def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
     flat = " ".join(drawing.LOCATOR_CALLOUT_TEXT.split())
     # The contract, not the wording: the through ream, the mouth break's
     # limit, the dowel and its interference, and the match-drill partner and
-    # its assembly step.
+    # the assembly view that sets it.
     for fact in (
         "THRU",
         f"{interface.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX",
         dowel.PART_NUMBER,
         f"{spec.LOCATOR_PRESS_INTERFERENCE[0]:.3f}/{spec.LOCATOR_PRESS_INTERFERENCE[1]:.3f}",
         plate,
-        step_ref("arm-plate-located"),
+        knob_setting_ref(),
     ):
         assert fact in flat, fact
+    assert f"{disc.CENTRE_DISTANCE:.3f}" not in flat
     assert drawing.DIMENSION_CALLOUTS["LocatorDia1"] == drawing.LOCATOR_CALLOUT_TEXT
 
 

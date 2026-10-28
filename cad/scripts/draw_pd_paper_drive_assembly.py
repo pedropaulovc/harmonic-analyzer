@@ -560,7 +560,7 @@ CHAIN_SECOND_COLUMN_KEY = "collar-shoulder-seated"
 # The three circles in the crop are lettered on short leaders and named in the
 # legend left of the circle (same run): S the pin bore, K the knob bore, and T
 # the arm's plate-screw tap that lies between them.
-KNOB_SETTING_VIEW_NAME = "VIEW K"
+KNOB_SETTING_VIEW_NAME = steps.KNOB_SETTING_VIEW_NAME
 KNOB_SETTING_SCALE = (1.0, 1.0)
 KNOB_SETTING_CENTER = (0.320, 0.097)
 KNOB_SETTING_RADIUS = 0.024

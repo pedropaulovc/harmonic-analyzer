@@ -110,7 +110,7 @@ from pd_transgear_arm_spec import (
     engagement_line,
 )
 import transgear_hanger_joints as joints
-from pd_paper_drive_assembly_steps import step_ref
+from pd_paper_drive_assembly_steps import knob_setting_ref
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -371,13 +371,14 @@ _SW_TEXT_SUFFIX = 2  # swDimensionTextSuffix
 _SW_DIMENSION_DRIVEN = 1  # swDimensionDrivenState_e.swDimensionDriven
 
 
-# The match-drill rides the locating holes' own callout, with the step that
-# sets the pair's centres and checks its fit (machinist review, rule 7).
+# The match-drill rides the locating holes' own callout, pointing at the
+# assembly view whose native S-K dimension sets the pair's centres; the
+# callout carries no value of its own (rule 7; #1388 policy).
 _PLATE = _config.parts("pd-transgear-arm-plate")
 LOCATOR_CALLOUT_TEXT = "\n".join((
     LOCATOR_CALLOUT,
     f"MATCH-DRILL WITH ARM PLATE {_PLATE['number']}",
-    f"AT {step_ref('arm-plate-located')}",
+    f"AT ASSEMBLY, {knob_setting_ref()}",
 ))
 
 DIMENSION_CALLOUTS = {
