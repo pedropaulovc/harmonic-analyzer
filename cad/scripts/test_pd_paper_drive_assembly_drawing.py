@@ -382,7 +382,7 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     # bore.  References and relationship only, not the sentence (codjiflo P3
     # on 482fbdc).
     assert steps.step_number("pin-pressed") < steps.step_number("arm-plate-located")
-    jig, recheck = located.split("PER THE ARM AND PLATE DRAWINGS", 1)
+    jig, recheck = located.split("WITHIN THE WINDOW ON THE ARM AND PLATE DRAWINGS", 1)
     for stem in ("pd-transgear-knob-shaft", "pd-rack-pinion"):
         assert _number(stem) in jig
     assert "MESH" in jig
@@ -391,12 +391,16 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     assert f"{disc.CENTRE_DISTANCE:.3f}" in jig
     for reference in ("KNOB BORE", f"PRESSED {pin} PIN", "GAUGE PIN", "CLAMP"):
         assert reference in jig, reference
-    # The setting and the clamped re-check carry the mesh's window, the
-    # acceptance the arm and plate sheets cite for this step (codjiflo P2 on
-    # 1b09cec).
-    tol = f"\u00b1{disc.CENTRE_DISTANCE_SET_TOL:.3f}"
-    assert f"SET {disc.CENTRE_DISTANCE:.3f} {tol}" in jig
-    assert f"RE-CHECK CLAMPED: CENTRES STILL WITHIN {tol}." in recheck
+    # The setting and the clamped re-check answer to the window the arm and
+    # plate sheets print and cite this step for (codjiflo P2 on 1b09cec); the
+    # step names it without restating the band (r1-r3 on f4f620a).
+    assert jig.endswith(f"OVER THE GAUGE PIN AND THE {pin} PIN, ")
+    assert recheck.startswith("; RE-CHECK CLAMPED: STILL WITHIN THAT WINDOW.")
+    tol = f"{disc.CENTRE_DISTANCE_SET_TOL:.3f}"
+    assert tol in steps.matched_locator_notes(
+        _number("pd-transgear-arm"), _number("pd-transgear-arm-plate"), on_arm=True, width=80
+    )
+    assert tol not in located
     assert "MATCH-DRILL AND REAM THE LOCATING HOLES" in located
     assert (
         f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "

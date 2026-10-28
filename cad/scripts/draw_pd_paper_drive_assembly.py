@@ -1327,22 +1327,23 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             # set and checked (2026-10-27 ENFORCE review, r1, r2). The pin
             # is already pressed (step "pin-pressed"), so the distance is
             # gauged off it, not off an empty pin bore (codjiflo P2 on
-            # edb402b). The setting and the clamped re-check carry the mesh's
-            # window, the ±tol the arm and plate sheets cite for these steps
-            # (pd_paper_drive_assembly_steps.matched_locator_notes; codjiflo
-            # P2 on 1b09cec).
+            # edb402b). The setting and the clamped re-check both answer to
+            # the window the arm and plate sheets print for these steps
+            # (pd_paper_drive_assembly_steps.matched_locator_notes), so the
+            # re-check has its acceptance (codjiflo P2 on 1b09cec). The step
+            # names that window rather than restating its band: printed here
+            # too, the ±0.004 repeated the part drawings' band and r1-r3 on
+            # f4f620a filed it as assembly over-specification.
             f"CLAMP {_N['pd-transgear-arm']} AND {_N['pd-transgear-arm-plate']} "
             "TOGETHER, THE PLATE'S KNOB BORE "
             f"{disc.CENTRE_DISTANCE:.3f} FROM THE PRESSED {_N['pd-transgear-pin']} "
             f"PIN'S AXIS (THE "
             f"{_N['pd-transgear-knob-shaft']} {KNOB_TEETH}T / {_N['pd-rack-pinion']} "
             f"{disc.TEETH}T MESH): A SNUG GAUGE PIN IN THE KNOB BORE; SET "
-            f"{disc.CENTRE_DISTANCE:.3f} \u00b1{disc.CENTRE_DISTANCE_SET_TOL:.3f} "
-            "PLUS HALF OF EACH PIN'S MEASURED DIAMETER "
+            f"{disc.CENTRE_DISTANCE:.3f} PLUS HALF OF EACH PIN'S MEASURED DIAMETER "
             f"OVER THE GAUGE PIN AND THE {_N['pd-transgear-pin']} PIN, "
-            "PER THE ARM AND PLATE DRAWINGS; "
-            "RE-CHECK CLAMPED: CENTRES STILL WITHIN "
-            f"\u00b1{disc.CENTRE_DISTANCE_SET_TOL:.3f}. "
+            "WITHIN THE WINDOW ON THE ARM AND PLATE DRAWINGS; "
+            "RE-CHECK CLAMPED: STILL WITHIN THAT WINDOW. "
             "MATCH-DRILL AND REAM THE LOCATING HOLES. "
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-locating-pin']} "
             f"{_N['pd-vn-transgear-arm-plate-locating-pin']} DOWELS INTO THE ARM "
