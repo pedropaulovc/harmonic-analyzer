@@ -4131,17 +4131,17 @@ def test_cap_recess_bands_preserve_the_counterbore_ligament() -> None:
     assert part.COUNTERBORE_PRINTED_CAP_LIGAMENT == pytest.approx(2.0402450833172)
 
 
-def test_slip_hole_size_parks_above_the_plan_right_of_datum_c() -> None:
+def test_slip_hole_size_parks_above_the_plan() -> None:
     # The rear round hole's size, its +/- band on one row and its two
     # slip-fit rows print face-on in the underside locator.  The historical
     # v43 crop calibrated the former 67 x 17 mm block; the recipe now grows
     # its width for the full number without moving the lower-left corner.
     # That same crop lands the leader on the underline's end facing the hole, at
     # the block's foot.  The block parks over the plan, inside the sheet
-    # frame and right of datum C's tag; it and its leader keep ink clear of
-    # every locator line, box, circle and slot and of both slot frames, and
-    # the leader, leaving the rim between F-F's cutting line and datum C's
-    # leader, crosses neither.  Estimated boxes: the render measures the
+    # frame; it and its leader keep ink clear of every locator line, box,
+    # circle and slot, of both slot frames and of both datum tags, and the
+    # leader, leaving the rim above F-F's cutting line, crosses neither it
+    # nor datum C's leader.  Estimated boxes: the render measures the
     # regenerated sheet.
     from _layout_geometry import Box, Segment, segment_box_distance, segment_circle_distance
 
@@ -4204,6 +4204,35 @@ def test_slip_hole_size_parks_above_the_plan_right_of_datum_c() -> None:
             assert _segments_apart(leader, line), name
         else:
             assert _segment_gap(leader, line) >= ink, name
+
+
+def test_datum_c_and_the_slip_hole_size_meet_the_rear_hole_apart() -> None:
+    # Machinist review of 3de09b959 (sheet 6): with datum C's tag above the
+    # plan, the size's open arrowhead ended inside datum C's filled triangle
+    # on the 1.08 mm hole.  The triangle's 2.9 mm base overhangs the rim on
+    # both sides, so the two must leave the rim at least a right angle apart:
+    # datum C drops to the lower rim, under F-F's cutting line, into the
+    # window clear of F-F's right arrow and letter; the size leaves the upper.
+    from _layout_geometry import segment_box_distance
+
+    ink = drawing.INK_CLEARANCE
+    lines, boxes, picks, cut_y = _underside_locator_ink()
+    hole_x, hole_y, _hole_r = _locator_circles()["round hole C"]
+    x, y = drawing.HANGER_PIN_DIA_TEXT_XY
+    foot = (x - drawing.HANGER_PIN_DIA_TEXT_WIDTH / 2.0, y - drawing.HANGER_PIN_DIA_TEXT_HALF_HEIGHT)
+    datum = (picks["C"][0] - hole_x, picks["C"][1] - hole_y)
+    size = (foot[0] - hole_x, foot[1] - hole_y)
+    assert datum[0] * size[0] + datum[1] * size[1] <= 0.0
+    assert picks["C"][1] < cut_y < foot[1]
+    leader, tag = lines["datum C leader"], boxes["datum C tag"]
+    arrow, letter = lines["F-F right arrow"], boxes["F-F right letter"]
+    assert _segment_gap(leader, arrow) >= ink
+    assert segment_box_distance(arrow, tag) >= ink
+    assert segment_box_distance(leader, letter) >= ink
+    assert _box_box_gap(
+        (tag.xmin, tag.ymin, tag.xmax, tag.ymax),
+        (letter.xmin, letter.ymin, letter.xmax, letter.ymax),
+    ) >= ink
 
 
 def test_build_places_the_hanger_section_on_the_underside_sheet() -> None:
