@@ -143,9 +143,11 @@ B-referenced hole frames take that circle; S and the arm's patterns keep the
 Ø0.050 reducer position zone. At the band's far end the stock pair gives
 CR 1.118 and 1.029 at the runout extreme, gated at
 `BAND_TOP_CONTACT_RATIO_FLOORS` (1.1, 1.0): standard gears in a standard
-band (owner ruling 2026-10-27, option A). MHA-PD-00 step 10 jig-bores it on
-the mill DRO: the arm trammed on its pivot bore and the pressed MHA-PD-23
-pin, K set at mid-band coordinates from that pin and indicated true. The
+band (owner ruling 2026-10-27, option A). MHA-PD-00's arm-plate-located step
+jig-bores it on the mill DRO before the MHA-PD-23 pin is pressed: the arm
+trammed on its pivot bore and its reamed pin bore S (the pressed pin's running
+axis), K set at mid-band coordinates from S, each indicated true to under
+half a division of sweep. The
 coordinates are the assembly's own model dimensions
 (`pd_paper_drive_knob_setting_spec`, the hidden `KnobSettingReference`
 sketch), printed in sheet 5's VIEW K.

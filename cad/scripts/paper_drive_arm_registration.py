@@ -30,7 +30,7 @@ from _printed_tolerance import printed_band_mm
 ARM_LOCATOR_SITES_MM = ARM.LOCATOR_SITES_MM
 PLATE_LOCATOR_SITES_MM = PLATE.LOCATOR_SITES_MM
 LOCATOR_PAIR_BASELINE_MM = ARM.LOCATOR_PAIR_BASELINE_MM
-# K's drawn setting circle about S (MHA-PD-00 step 10); its radius is the
+# K's drawn setting circle about S (MHA-PD-00 VIEW K); its radius is the
 # set band, the band's far end at its edge.
 REDUCER_AXIS_SETUP_RADIUS_MM = reducer_k_setting_diameter_mm() / 2.0
 # The drawn matched setting: K held this band (upper, lower) from

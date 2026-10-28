@@ -8,7 +8,7 @@ the disc cluster and the knob stack apart along their axes on
 PAPER_DRIVE_EXPLODED, seen from above, and balloons every part it shows.
 Sheet 4 balloons the bar, its clamps and the platen group on
 PAPER_DRIVE_EXPLODED and prints their steps. Sheet 5 prints the transgear's
-assembly steps and VIEW K, step 10's knob-bore setting from the pin as the
+assembly steps and VIEW K, the plate's knob-bore setting from the arm's pin bore as the
 assembly's own model dimensions; sheet 6 continues the steps; sheet 7 prints the chain fit-up
 (CONTRACT-paper-drive.md §13.2). Sheet 8 carries the complete native BOM,
 split horizontally into two pieces at measured row heights, and an assembly
@@ -546,26 +546,32 @@ FITUP_CONTINUED_SECOND_KEY = "latch-hook-fitted"
 FITUP_CHAIN_KEY = "loaded-rack-geometry-checked"
 CHAIN_SECOND_COLUMN_KEY = "collar-shoulder-seated"
 
-# Sheet 5's step-10 view: K's DRO setting from the pin S, the assembly's
-# hidden KnobSettingReference chain (pd_paper_drive_knob_setting_spec) on the
-# arm, plate and pin seen from the machine front at 1:1, cropped to a circle
-# on S-K's midpoint (S, Q and K all lie on it: Q is the chain's right angle).
+# Sheet 5's VIEW K: K's DRO setting from the arm's pin bore S, the
+# assembly's hidden KnobSettingReference chain
+# (pd_paper_drive_knob_setting_spec) on the arm and plate seen from the
+# machine front at 1:1 as the arm-plate-located step sets them, before the pin is pressed;
+# cropped to a circle on S-K's midpoint (S, Q and K all lie on it: Q is the
+# chain's right angle).
 # It stands under the second column, over the title block; each setting's
 # text stands well off its leg, away from the chain's third point, clear of
 # the circle (run 20261027T230707102Z put them 4 mm past it, over the arm's
 # edge). Its one-word callout keeps the text block between its leg's
 # extension lines (run 20261028T000650671Z: "ALONG ARM" was struck by one).
 # The three circles in the crop are lettered on short leaders and named in the
-# legend left of the circle (same run): S the pin, K the knob bore, and T the
-# arm's plate-screw tap that lies between them.
+# legend left of the circle (same run): S the pin bore, K the knob bore, and T
+# the arm's plate-screw tap that lies between them.
 KNOB_SETTING_VIEW_NAME = "VIEW K"
 KNOB_SETTING_SCALE = (1.0, 1.0)
 KNOB_SETTING_CENTER = (0.320, 0.097)
 KNOB_SETTING_RADIUS = 0.024
 KNOB_SETTING_TEXT_OFFSET = 0.030
-KNOB_SETTING_INSTANCES = frozenset(
-    {"pd-transgear-arm-1", "pd-transgear-arm-plate-1", "pd-transgear-pin-1"}
-)
+KNOB_SETTING_INSTANCES = frozenset({"pd-transgear-arm-1", "pd-transgear-arm-plate-1"})
+# The located step's acceptance for "true": a null reading on the indicator, so the
+# setting's centring bound comes from this stated sweep, not from the
+# indicator's unknown accuracy over its range (codjiflo P2 on 8e8d5d5): under
+# half a division of sweep puts each centre within a quarter division.
+KNOB_SETTING_TRUE = "TRUE: UNDER HALF A DIVISION OF SWEEP"
+KNOB_SETTING_TRUE_SWEEP_DIVISIONS = 0.5
 # The second column's steps end above this on sheet 5.
 KNOB_SETTING_FIELD_TOP = 0.144
 # The plate-screw tap inside the crop, in the machine frame (mm): the arm's
@@ -580,7 +586,7 @@ KNOB_SETTING_TAP_XY = (
     + arm_geometry.ARM_N[1] * arm_geometry.PLATE_CENTRELINE_OFFSET,
 )
 KNOB_SETTING_LEGEND = {
-    "S": f"{_config.parts('pd-transgear-pin')['number']} PIN",
+    "S": f"{_config.parts('pd-transgear-arm')['number']} PIN BORE",
     "K": f"{_config.parts('pd-transgear-arm-plate')['number']} KNOB BORE",
     "T": f"{_config.parts('pd-vn-transgear-arm-plate-screw')['number']} TAP",
 }
@@ -1452,10 +1458,10 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         "arm-plate-located": (
             f"CLAMP THE {_N['pd-transgear-arm-plate']} PLATE ON THE "
             f"{_N['pd-transgear-arm']} ARM'S REAR FACE WITH TOOLMAKER'S CLAMPS, "
-            "SCREWS OUT; ARM ON PARALLELS ON THE MILL, PLATE UP. INDICATE THE "
-            f"PIVOT BORE AND THE {_N['pd-transgear-pin']} PIN HEAD TRUE ON ONE DRO "
-            f"AXIS; ZERO ON THE PIN. AT THE {KNOB_SETTING_VIEW_NAME} SETTING FROM THE "
-            "PIN, TAP THE PLATE TILL "
+            "SCREWS OUT; ARM ON PARALLELS ON THE MILL, PLATE UP, NO PIN YET. "
+            "INDICATE THE PIVOT BORE AND THE ARM'S PIN BORE S TRUE ON ONE DRO "
+            f"AXIS ({KNOB_SETTING_TRUE}); ZERO ON S. AT THE "
+            f"{KNOB_SETTING_VIEW_NAME} SETTING FROM S, TAP THE PLATE TILL "
             "ITS KNOB BORE INDICATES TRUE (THE "
             f"{_N['pd-transgear-knob-shaft']} {KNOB_TEETH}T / {_N['pd-rack-pinion']} "
             f"{disc.TEETH}T MESH); CLAMP; RE-INDICATE. "
@@ -3237,9 +3243,9 @@ def _place_exploded_sheet(
 
 
 def _place_knob_setting_view(adapter: Any) -> None:
-    """Sheet 5's VIEW K: the arm, plate and pin from the machine front at
+    """Sheet 5's VIEW K: the arm and plate from the machine front at
     1:1, cropped on S-K's midpoint, carrying the assembly's two K setting
-    dimensions from S (pd_paper_drive_knob_setting_spec) that step 10 cites."""
+    dimensions from S (pd_paper_drive_knob_setting_spec) that the arm-plate-located step cites."""
     label = "knob setting view"
     _activate_sheet(adapter, SHEET_NAMES[4])
     view = _early_bound(

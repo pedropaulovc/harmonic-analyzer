@@ -1,10 +1,11 @@
-"""The reducer's S-K setting as model dimensions (MHA-PD-00 step 10).
+"""The reducer's S-K setting as model dimensions (MHA-PD-00 VIEW K).
 
-The matched knob bore K is jig-bored on the mill DRO from the pressed
-MHA-PD-23 pin S: the arm trammed on its pivot bore P and S, the DRO zeroed on
-S, the plate tapped till its knob bore indicates true at K's two coordinates
-from S, along the arm toward P and across it to the plate's notch side. K is
-aimed at the middle of the +x/-0 set band
+The matched knob bore K is jig-bored on the mill DRO from the arm's reamed
+pin bore S, before the MHA-PD-23 pin is pressed into it (its one turned shank
+is the pressed pin's running axis): the arm trammed on its pivot bore P and
+S, the DRO zeroed on S, the plate tapped till its knob bore indicates true at
+K's two coordinates from S, along the arm toward P and across it to the
+plate's notch side. K is aimed at the middle of the +x/-0 set band
 (``pd_rack_pinion_spec.CENTRE_DISTANCE_WINDOW``) so the DRO and indicator
 setting error, worst case, stays inside it at both ends
 (test_pd_paper_drive_assembly_drawing).
@@ -12,8 +13,9 @@ setting error, worst case, stays inside it at both ends
 ``build_pd_paper_drive_assembly`` authors these as one hidden construction
 chain in the assembly, on its Front plane (sketch x, y = machine x, y): P to
 S along the arm, S to Q along it toward P, Q to K across it. Its two setting
-dimensions are marked for MHA-PD-00, whose sheet 5 view prints them and step
-10 cites; the step prints no value of its own. No solid or pose changes.
+dimensions are marked for MHA-PD-00, whose sheet 5 VIEW K prints them and
+whose arm-plate-located step cites it; the step prints no value of its own.
+No solid or pose changes.
 """
 
 from __future__ import annotations

@@ -393,11 +393,12 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
         f"PRESS {plate_locating_pin.ASSEMBLY_QUANTITY} "
         f"{_number('pd-vn-transgear-arm-plate-locating-pin')} DOWELS"
     ) in located
-    # The setting's identities, in operation order: S (the MHA-PD-23 pin),
-    # K set at VIEW K's model dimensions with the mesh they set, then each
-    # part reamed to its own drawing, then the dowels.
+    # The setting's identities, in operation order: S (the arm's empty pin
+    # bore, the pressed pin's running axis), K set at VIEW K's model
+    # dimensions with the mesh they set, then each part reamed to its own
+    # drawing, then the dowels.
     order = [
-        _number("pd-transgear-pin"),
+        "PIN BORE S",
         drawing.KNOB_SETTING_VIEW_NAME,
         _number("pd-transgear-knob-shaft"),
         _number("pd-rack-pinion"),
@@ -412,6 +413,13 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     # The step cites the view's model dimensions and types no value of its own.
     for value in (knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM):
         assert f"{value:.{knob_setting.PLACES}f}" not in located
+    # S is the arm's reamed bore, not the pin's head (no drawing control
+    # holds the head to the shank): the pin goes in after the plate is set.
+    assert "NO PIN YET" in located
+    assert steps.step_number("arm-plate-fitted") < steps.step_number("pin-pressed")
+    assert steps.step_number("pin-pressed") < steps.step_number("hanger-pivoted")
+    # "True" is a stated null-reading acceptance, the budget's centring bound.
+    assert drawing.KNOB_SETTING_TRUE in located
 
 
 def test_view_k_carries_the_set_coordinates_as_assembly_model_dimensions() -> None:
@@ -550,7 +558,7 @@ def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
                 )
     # The legend names each lettered circle by its part number.
     for letter, stem in (
-        ("S", "pd-transgear-pin"),
+        ("S", "pd-transgear-arm"),
         ("K", "pd-transgear-arm-plate"),
         ("T", "pd-vn-transgear-arm-plate-screw"),
     ):
@@ -588,8 +596,13 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
         if match
     ]
     accuracy = stated * 25.4
-    # The indicator's model is unknown: half a division of runout, centred.
-    centring = inventory["gauges"]["dti"]["resolution_in"]["value"] * 25.4 / 4.0
+    # Centring is a null reading against the step's stated acceptance, not a
+    # measured size: under half a division of sweep (the TIR) puts each centre
+    # within a quarter division of the spindle. The indicator's unknown
+    # accuracy over its range scales that sub-division reading only; the
+    # bound holds while the indicator repeats to its stated sweep at null.
+    division = inventory["gauges"]["dti"]["resolution_in"]["value"] * 25.4
+    centring = drawing.KNOB_SETTING_TRUE_SWEEP_DIVISIONS * division / 2.0
     # Signed worst case, every bound adding the same way: the DRO is zeroed
     # on S, so its two axes' errors enter once, on the S-to-K move, both
     # along any direction; the indicator centres S and K; the pivot-and-pin
@@ -1579,8 +1592,11 @@ def test_the_plate_screws_are_cut_to_the_limit_the_lock_sweep_clears() -> None:
     """R9-44: cut off the mechanism, then refit the same screws before the
     hanger is pivoted."""
     order = ["arm-plate-fitted", "arm-plate-screws-cut", "hanger-pivoted"]
-    numbers = [steps.step_number(key) for key in order]
-    assert numbers == list(range(numbers[0], numbers[0] + 3))
+    fitted, cut, pivoted = (steps.step_number(key) for key in order)
+    assert cut == fitted + 1 and cut < pivoted
+    # Only the pin, pressed once the plate is set from its bore, goes in
+    # between; the screws are back in before the hanger is pivoted.
+    assert steps.SEQUENCE[cut:pivoted - 1] == ("pin-pressed",)
     body = _step_body("arm-plate-screws-cut")
     assert body.startswith(
         f"TAKE BOTH {_number('pd-vn-transgear-arm-plate-screw')} SCREWS OUT"

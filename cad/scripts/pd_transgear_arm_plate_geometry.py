@@ -157,7 +157,7 @@ BAND_XX = ARM.BAND_XX
 BAND_XXX = ARM.BAND_XXX
 # The plate's hole patterns are toleranced from its own knob bore B (= K),
 # and the matched pilots go through at the arm's pattern from the pin S:
-# K's setting circle about S (MHA-PD-00 step 10) carries into every
+# K's setting circle about S (MHA-PD-00 VIEW K) carries into every
 # B-referenced frame here, so they take that circle, not the arm's zone.
 REDUCER_POSITION_DIAMETER = reducer_k_setting_diameter_mm()
 REDUCER_POSITION_RADIUS = REDUCER_POSITION_DIAMETER / 2.0

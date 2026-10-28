@@ -2210,7 +2210,7 @@ async def _place_chain_seed(
 
 
 async def _author_knob_setting_reference(adapter) -> None:
-    """K's DRO setting from the pin S as model dimensions (MHA-PD-00 step 10):
+    """K's DRO setting from the arm's pin bore S as model dimensions (MHA-PD-00 VIEW K):
     one construction chain on the Front plane (sketch x, y = machine x, y),
     P to S on the arm's axis, S to Q along it toward P, Q to K across it
     (pd_paper_drive_knob_setting_spec). Dimensioned from globals, shown as
@@ -3614,7 +3614,7 @@ async def build(adapter) -> dict[str, str]:
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
         chain_mounts=mounted_wheels(),
     )
-    # K's DRO setting from S, for MHA-PD-00's step-10 view (hidden sketch only).
+    # K's DRO setting from S, for MHA-PD-00's VIEW K (hidden sketch only).
     await _author_knob_setting_reference(adapter)
     # Machine coords put the output/paper side at -Z, so SolidWorks' native Front
     # renders the machine BACK (chain and transgear cluster mirrored). Re-base the

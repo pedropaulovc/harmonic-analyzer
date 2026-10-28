@@ -8,8 +8,8 @@ stock_form_quality:
   # internal method constants and are never printed.
   toothspace_runout_tir_mm: 0.050
   reducer_position_diameter_mm: 0.050
-  # The matched knob bore K's setting circle about the pin S (MHA-PD-00
-  # step 10): its radius is the reducer centre's standard +0.05/-0 set band
+  # The matched knob bore K's setting circle about the arm's pin bore S
+  # (MHA-PD-00 VIEW K): its radius is the reducer centre's standard +0.05/-0 set band
   # (owner ruling 2026-10-27, option A). S and the arm/plate hole patterns
   # keep reducer_position_diameter_mm.
   reducer_k_setting_diameter_mm: 0.100
