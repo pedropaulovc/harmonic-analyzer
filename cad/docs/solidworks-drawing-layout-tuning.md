@@ -1758,8 +1758,10 @@ with another unasked thread-major limit or local inspection note.
 
 The lever no longer imports or prints its local numeric `TipChamfer` size,
 band or `LIMIT RETAINS FULL ENGAGEMENT` text. One native thread-feature
-callout is printed in the enlarged detail: designation, `45° ENTRY CHAMFER`,
-`MATES MHA-MG-01`, then `BRACKET` on its own fourth row. Its native
+callout is printed in the enlarged detail: designation, `MATES MHA-MG-01`,
+then `BRACKET` on its own third row. The modeled0.20 tip chamfer is the
+title-block edge break, so the callout no longer names an unsized
+`45° ENTRY CHAMFER` (machinist FIX, 1e2b7b5). Its native
 attachment and source text are retained; there is no detached manual copy.
 Hide drawing-local duplicates
 in the front and isometric without changing the source model's callout.

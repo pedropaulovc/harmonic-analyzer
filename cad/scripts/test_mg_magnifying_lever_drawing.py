@@ -966,19 +966,13 @@ def _assert_detail_thread_ink_routes(annotations, native_note, project, detail):
     tip = project(None, detail, (values["OverallLength"], values["RodDia"] / 2.0, 0.0))
     x, y, _z = native_note.GetAnnotation().GetPosition()
     text = native_note.GetText()
-    assert text.splitlines() == [
-        f"{joint.THREAD} UNC", "45° ENTRY CHAMFER", "MATES MHA-MG-01", "BRACKET",
-    ]
+    assert text.splitlines() == [f"{joint.THREAD} UNC", "MATES MHA-MG-01", "BRACKET"]
     dx, dy = x - 0.273, y - 0.213
     rows = (
         Box(0.2736628 + dx, 0.2090349 + dy, 0.2982645 + dx, 0.2129736 + dy),
-        # R10 same-font advances: shape45.4869mm; conservative46mm envelope.
-        Box(x, 0.2048825 + dy, x + 0.046, 0.2088479 + dy),
-        Box(x + 0.0002567, 0.2048825 + dy - 0.0045257,
-            x + 0.0423395, 0.2084479 + dy - 0.0045257),
+        Box(x + 0.0002567, 0.2048825 + dy, x + 0.0423395, 0.2084479 + dy),
         # BRACKET measured19.5154mm; conservative20.5mm envelope.
-        Box(x, 0.2048825 + dy - 2 * 0.0045257,
-            x + 0.0205, 0.2084479 + dy - 2 * 0.0045257),
+        Box(x, 0.2048825 + dy - 0.0045257, x + 0.0205, 0.2084479 + dy - 0.0045257),
     )
     lx, ly, _z = annotations["ThreadLength"].GetPosition()
     length = AnnotationGeometry(
@@ -994,7 +988,7 @@ def _assert_detail_thread_ink_routes(annotations, native_note, project, detail):
     # source-derived tip witness at this recipe station; do not lose this control.
     unwrapped = AnnotationGeometry(
         label="native detail thread", kind="note", owner="detail",
-        text_boxes=(Box(x + 0.0002567, rows[2].ymin, x + 0.0646268, rows[2].ymax),),
+        text_boxes=(Box(x + 0.0002567, rows[1].ymin, x + 0.0646268, rows[1].ymax),),
     )
     before = SheetGeometry("Sheet1", template.width_m, template.height_m, region, annotations=(length, unwrapped))
     assert any(item.a == unwrapped.label for item in find_text_on_line(before))
@@ -1343,7 +1337,7 @@ def test_missing_native_thread_callout_is_created_only_on_the_verified_thread(mo
         assert annotation is state.note.GetAnnotation()
         assert state.thread is state.original_thread and state.thread.ThreadCallout is state.note
         assert state.writes == [spec.PRINT_THREAD_CALLOUT.replace("\n", "\r\n")]
-        assert len(state.writes[0].splitlines()) == 4
+        assert len(state.writes[0].splitlines()) == 3
         assert state.entities == state.note.GetAnnotation().GetAttachedEntities3()
         assert state.model_thread.ThreadCallout == spec.THREAD_CALLOUT
         assert state.model_thread.thread_class == "2A"
