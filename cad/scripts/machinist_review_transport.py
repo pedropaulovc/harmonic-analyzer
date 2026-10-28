@@ -237,7 +237,10 @@ def quota_event(event):
     if error == "billing_error":
         return {"status": "exhausted", "retryAt": None, "reason": "billing-error"}
     text = "\n".join(block.get("text", "") for block in event.get("message", {}).get("content", []) if block.get("type") == "text")
-    if error in {"rate_limit", "invalid_request"}:
+    # SDK 0.2.x types a 400 spend-limit/credit refusal as "unknown"; accept it
+    # only as the CLI's own synthetic "API Error:" text, never model prose.
+    api_refusal = error == "unknown" and text.startswith("API Error: ")
+    if error in {"rate_limit", "invalid_request"} or api_refusal:
         if re.search(r"Your credit balance is too low to access the Anthropic API|Insufficient (?:API )?credits", text, re.I):
             return {"status": "exhausted", "retryAt": None, "reason": "credit-balance"}
         if "enforced_spend_limit_reached" in text or re.search(r"You have reached your specified (?:workspace )?API usage limits", text):
@@ -407,13 +410,18 @@ def omp_event(event):
     for block in message.get("content", []):
         if block.get("type") == "toolCall":
             name = str(block.get("name", ""))
+            arguments = block.get("arguments")
             if name in OMP_TOOLS:
                 name = name.replace("mcp__sheets_", "mcp__sheets__", 1)
+                # OMP adds its harness intent string "i" to every tool call;
+                # it is not a tool argument, so sheet evidence must not see it.
+                if isinstance(arguments, dict) and isinstance(arguments.get("i"), str):
+                    arguments = {key: value for key, value in arguments.items() if key != "i"}
             else:
                 # Never let an unregistered native name collide with the SDK's
                 # allowed sheets/StructuredOutput evidence namespace.
                 name = "omp_unrecognized__" + name
-            content.append({"type": "tool_use", "id": block.get("id"), "name": name, "input": block.get("arguments")})
+            content.append({"type": "tool_use", "id": block.get("id"), "name": name, "input": arguments})
         else:
             content.append(block)
     usage = message.get("usage", {})

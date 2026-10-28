@@ -28,6 +28,17 @@ import machinist_review_config as review_config
 import machinist_review_sheets_mcp as sheets
 
 SHEET_TOOLS = {"mcp__sheets__view_sheet", "mcp__sheets__crop"}
+_REAL_WHICH = shutil.which
+
+
+def _reviewer_which(name: str, *args: Any, **kwargs: Any) -> str | None:
+    """Fake reviewer executables only. mr.shutil IS the stdlib module, so the
+    patch is process-wide: trimesh's first import probes which("blender",
+    path=...) inside precheck, and must still reach the real lookup."""
+    if name in mr.REVIEWERS and not args and not kwargs:
+        return f"{name}-test"
+    return _REAL_WHICH(name, *args, **kwargs)
+
 
 
 def _clean_verdict(verdict: str = "SHIP") -> dict[str, Any]:
@@ -1692,6 +1703,25 @@ def test_omp_normalization_preserves_images_and_rejects_unknown_tools():
             "role": "assistant", "content": [{"type": "toolCall", "id": "a", "name": native_name, "arguments": {"sheet": 1}}],
         }})
         assert mr.evaluate_sheet_evidence([event, events[1]], reviewer="claude", sheet_count=1)["tool_events"] == 1
+
+
+def test_omp_harness_intent_argument_does_not_void_sheet_inspection():
+    # Real OMP tool calls carry the harness intent "i" beside the tool's own
+    # arguments (seen 2026-10-28); without stripping it no view ever proved.
+    import machinist_review_transport as transport
+    view, result = (
+        transport.omp_event({"type": "message_end", "message": {
+            "role": "assistant", "content": [{"type": "toolCall", "id": "a", "name": "mcp__sheets_view_sheet",
+                                              "arguments": {"sheet": 1, "i": "view sheet"}}],
+        }}),
+        transport.omp_event({"type": "message_end", "message": {
+            "role": "toolResult", "toolCallId": "a", "content": [{"type": "image", "data": "image", "mimeType": "image/png"}],
+        }}),
+    )
+    assert view["message"]["content"][0]["input"] == {"sheet": 1}
+    assert mr.evaluate_sheet_evidence([view, result], reviewer="claude", sheet_count=1)["inspection_proven"]
+    view["message"]["content"][0]["input"] = {"sheet": 1, "page": 2}
+    assert not mr.evaluate_sheet_evidence([view, result], reviewer="claude", sheet_count=1)["inspection_proven"]
 
 
 @pytest.mark.parametrize("catalog", ["valid", "missing", "extra", "silent", "malformed", "context", "provider", "prompt_rejected", "slow_shutdown", "footer_context", "footer_instruction", "trailing_malformed", "trailing_array", "trailing_tool", "trailing_execution", "trailing_unknown", "trailing_failure", "trailing_valid", "failure_then_malformed"])
@@ -5528,7 +5558,7 @@ def test_main_uses_aggregate_contract_for_each_input_mode(
         return _session_reply(command, kwargs, _clean_verdict())
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
-    monkeypatch.setattr(mr.shutil, "which", lambda reviewer: f"{reviewer}-test")
+    monkeypatch.setattr(mr.shutil, "which", _reviewer_which)
     directory = tmp_path / "reports"
     assert mr.main([*args, "--force", "--report-dir", str(directory)]) == 0
     data = json.loads((directory / f"{name}.aggregate.json").read_text(encoding="utf-8"))
@@ -5832,6 +5862,23 @@ def test_sdk_billing_error_is_typed_quota_independent_of_prose(text):
         "status": "exhausted", "retryAt": None, "reason": "billing-error",
     }
     event["error"] = "authentication_failed"
+    assert transport.quota_event(event) is None
+
+
+def test_sdk_unknown_typed_spend_limit_rotates_but_prose_does_not():
+    # SDK 0.2.174 (CLI 2.1.310) reports a workspace spend-limit 400 with
+    # error "unknown" on a synthetic assistant message; seen 2026-10-28.
+    import machinist_review_transport as transport
+    text = ("API Error: 400 You have reached your specified API usage limits. "
+            "You will regain access on 2999-11-01 at 00:00 UTC.")
+    event = {"type": "assistant", "error": "unknown",
+             "message": {"content": [{"type": "text", "text": text}], "model": "<synthetic>"}}
+    quota = transport.quota_event(event)
+    assert quota["status"] == "exhausted" and quota["reason"] == "spend-limit"
+    assert quota["retryAt"] == 32498409600000
+    event["message"]["content"][0]["text"] = "Credit: " + text
+    assert transport.quota_event(event) is None
+    event["message"]["content"][0]["text"] = "API Error: 500 Internal server error"
     assert transport.quota_event(event) is None
 
 

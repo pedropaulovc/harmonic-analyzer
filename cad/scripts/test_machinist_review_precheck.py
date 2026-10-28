@@ -28,6 +28,7 @@ from test_machinist_review import (
     _pdf_source,
     _png_source,
     _rollout_message,
+    _reviewer_which,
     _rollout_row,
     _text_pdf,
     _write_rollout,
@@ -586,7 +587,7 @@ def test_cli_rejects_missing_baseline_mismatched_pairs_and_non_pdf_inputs(
         args = ["--png", str(_png_source(tmp_path / "sheet.png")), "--force"]
     harness = _Reviewer()
     monkeypatch.setattr(mr, "_run_reviewer", harness)
-    monkeypatch.setattr(mr.shutil, "which", lambda reviewer: f"{reviewer}-test")
+    monkeypatch.setattr(mr.shutil, "which", _reviewer_which)
     assert _main_status([*args, "--report-dir", str(tmp_path / "reports")]) == 2
     assert not harness.calls
 
@@ -610,7 +611,7 @@ def test_cli_baseline_inputs_reach_real_precheck_harness(
         args = [name, "--pdf-dir", str(after_dir), "--before-pdf-dir", str(before_dir)]
     harness = _Reviewer(_decision("skip", "rendering_noise"))
     monkeypatch.setattr(mr, "_run_reviewer", harness)
-    monkeypatch.setattr(mr.shutil, "which", lambda reviewer: f"{reviewer}-test")
+    monkeypatch.setattr(mr.shutil, "which", _reviewer_which)
     directory = tmp_path / "reports"
     assert mr.main([*args, "--report-dir", str(directory)]) == 0
     aggregate = json.loads((directory / f"{name}.aggregate.json").read_text(encoding="utf-8"))
@@ -643,7 +644,7 @@ def test_cli_missing_ok_filters_required_pdfs_only(
     (before if missing == "before" else after).unlink()
     harness = _Reviewer()
     monkeypatch.setattr(mr, "_run_reviewer", harness)
-    monkeypatch.setattr(mr.shutil, "which", lambda reviewer: f"{reviewer}-test")
+    monkeypatch.setattr(mr.shutil, "which", _reviewer_which)
     directory = tmp_path / "reports"
     if force:
         args.append("--force")
@@ -675,7 +676,7 @@ def test_cli_pairs_repeated_pdfs_by_position_not_by_basename(
     after_b.write_bytes(before_b.read_bytes())
     harness = _Reviewer(_decision("skip", "rendering_noise"))
     monkeypatch.setattr(mr, "_run_reviewer", harness)
-    monkeypatch.setattr(mr.shutil, "which", lambda reviewer: f"{reviewer}-test")
+    monkeypatch.setattr(mr.shutil, "which", _reviewer_which)
     directory = tmp_path / "reports"
     assert mr.main([
         "--pdf", str(after_a), "--pdf", str(after_b),
