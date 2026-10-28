@@ -551,22 +551,25 @@ CHAIN_SECOND_COLUMN_KEY = "collar-shoulder-seated"
 # arm, plate and pin seen from the machine front at 1:1, cropped to a circle
 # on S-K's midpoint (S, Q and K all lie on it: Q is the chain's right angle).
 # It stands under the second column, over the title block; each setting's
-# text stands off its leg, away from the chain's third point, past the circle.
+# text stands well off its leg, away from the chain's third point, clear of
+# the circle and its own callout clear of the other dimension (run
+# 20261027T230707102Z put them 4 mm past the circle, over the arm's edge and
+# each other's lines). The caption stands left of the circle.
 KNOB_SETTING_VIEW_NAME = "VIEW K"
 KNOB_SETTING_SCALE = (1.0, 1.0)
-KNOB_SETTING_CENTER = (0.300, 0.096)
+KNOB_SETTING_CENTER = (0.320, 0.097)
 KNOB_SETTING_RADIUS = 0.024
-KNOB_SETTING_TEXT_OFFSET = 0.016
+KNOB_SETTING_TEXT_OFFSET = 0.030
 KNOB_SETTING_INSTANCES = frozenset(
     {"pd-transgear-arm-1", "pd-transgear-arm-plate-1", "pd-transgear-pin-1"}
 )
 # The second column's steps end above this on sheet 5.
-KNOB_SETTING_FIELD_TOP = 0.132
+KNOB_SETTING_FIELD_TOP = 0.144
 KNOB_SETTING_CAPTION = (
-    f"{KNOB_SETTING_VIEW_NAME}: KNOB BORE K\nFROM PIN S (STEP "
-    f"{steps.step_number('arm-plate-located')}), 1:1"
+    f"{KNOB_SETTING_VIEW_NAME}, 1:1\nKNOB BORE K FROM PIN S\n(STEP "
+    f"{steps.step_number('arm-plate-located')})"
 )
-KNOB_SETTING_CAPTION_XY = (0.345, 0.112)
+KNOB_SETTING_CAPTION_XY = (0.218, 0.112)
 if math.dist(knob_setting.S_XY, knob_setting.K_XY) / 2000.0 >= KNOB_SETTING_RADIUS:
     raise AssertionError("the knob setting circle must frame S, Q and K")
 

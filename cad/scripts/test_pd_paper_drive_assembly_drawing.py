@@ -454,10 +454,48 @@ def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
             assert math.dist(point, centre) < drawing.KNOB_SETTING_RADIUS
         keep = drawing.knob_setting_keep(s, q, k)
         assert set(keep) == {knob_setting.ALONG_DIMENSION, knob_setting.ACROSS_DIMENSION}
-        for x, y in keep.values():
-            assert math.dist((x, y), centre) > drawing.KNOB_SETTING_RADIUS
-            assert drawing.FITUP_NOTE_XY[1][0] < x < drawing.FITUP_NOTE_LIMITS[1][0]
-            assert drawing.FITUP_NOTE_LIMITS[1][1] < y < drawing.KNOB_SETTING_FIELD_TOP
+        legs = {
+            knob_setting.ALONG_DIMENSION: (s, q),
+            knob_setting.ACROSS_DIMENSION: (q, k),
+        }
+        boxes = []
+        for name, (x, y) in keep.items():
+            # Value text, its callout one line above; the dimension line
+            # runs through the text, parallel to its leg.
+            _, callout = knob_setting.SETTING_CALLOUTS[name]
+            half = max(len(callout), len("(00.000)")) * NOTE_CHAR_WIDTH / 2.0
+            box = (x - half, y - NOTE_LINE_PITCH / 2.0, x + half, y + 1.5 * NOTE_LINE_PITCH)
+            nearest = (
+                min(max(centre[0], box[0]), box[2]),
+                min(max(centre[1], box[1]), box[3]),
+            )
+            assert math.dist(nearest, centre) > drawing.KNOB_SETTING_RADIUS
+            assert drawing.FITUP_NOTE_XY[1][0] < box[0] and box[2] < drawing.FITUP_NOTE_LIMITS[1][0]
+            assert drawing.FITUP_NOTE_LIMITS[1][1] < box[1] and box[3] < drawing.KNOB_SETTING_FIELD_TOP
+            a, b = legs[name]
+            shift = (x - (a[0] + b[0]) / 2.0, y - (a[1] + b[1]) / 2.0)
+            for end in (a, b):
+                assert end[1] + shift[1] < drawing.KNOB_SETTING_FIELD_TOP
+            boxes.append(box)
+        caption_lines = drawing.KNOB_SETTING_CAPTION.splitlines()
+        left, top = drawing.KNOB_SETTING_CAPTION_XY
+        boxes.append(
+            (
+                left,
+                top - len(caption_lines) * NOTE_LINE_PITCH,
+                left + max(map(len, caption_lines)) * NOTE_CHAR_WIDTH,
+                top,
+            )
+        )
+        assert boxes[-1][2] < centre[0] - drawing.KNOB_SETTING_RADIUS
+        assert boxes[-1][0] > drawing.FITUP_NOTE_LIMITS[0][0]
+        assert boxes[-1][1] > DRAWING_TEMPLATES[drawing.SPEC.layout].title_block_top_m
+        for index, one in enumerate(boxes):
+            for other in boxes[index + 1:]:
+                assert (
+                    one[2] < other[0] or other[2] < one[0]
+                    or one[3] < other[1] or other[3] < one[1]
+                )
     # Sheet 5's second column ends above the view's field.
     notes = _unit_step_notes()
     _, top = drawing.FITUP_NOTE_XY[1]
