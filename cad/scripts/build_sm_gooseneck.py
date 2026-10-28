@@ -85,6 +85,7 @@ from _single_limit_tolerance import set_single_limit
 from _visibility import blank_reference_geometry
 from sm_gooseneck_spec import (
     DIMENSION_CALLOUTS,
+    DIMENSION_CALLOUTS_ABOVE,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -251,16 +252,18 @@ def _limit_band(
 
 @_telemetry.traced("part.dimension_callouts")
 def _author_dimension_callouts(adapter) -> None:
-    """Persist each printed callout below its source dimension's value
-    (build_sm_gooseneck_spring_screw._author_dimension_callouts): the drawing
-    imports and reads them back, never writing them itself."""
-    for feature, callouts in DIMENSION_CALLOUTS.items():
-        resolved = _named_dimensions(adapter, feature, set(callouts))
-        for name, text in callouts.items():
-            display, _dimension = resolved[name]
-            display.SetText(4, text)  # swDimensionTextCalloutBelow
-            if str(display.GetText(4) or "").replace("\r\n", "\n") != text:
-                raise RuntimeError(f"{name}@{feature}: callout did not persist")
+    """Persist each printed callout on its source dimension, below or above
+    the value (build_sm_gooseneck_spring_screw._author_dimension_callouts):
+    the drawing imports and reads them back, never writing them itself."""
+    # swDimensionTextCalloutBelow = 4, swDimensionTextCalloutAbove = 3.
+    for slot, by_feature in ((4, DIMENSION_CALLOUTS), (3, DIMENSION_CALLOUTS_ABOVE)):
+        for feature, callouts in by_feature.items():
+            resolved = _named_dimensions(adapter, feature, set(callouts))
+            for name, text in callouts.items():
+                display, _dimension = resolved[name]
+                display.SetText(slot, text)
+                if str(display.GetText(slot) or "").replace("\r\n", "\n") != text:
+                    raise RuntimeError(f"{name}@{feature}: callout did not persist")
 
 
 async def build(adapter) -> dict[str, str]:

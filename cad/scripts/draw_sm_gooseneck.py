@@ -85,6 +85,7 @@ from sm_gooseneck_geom import (
     TUBE_END_X,
 )
 from sm_gooseneck_spec import (
+    DIMENSION_CALLOUTS_ABOVE_BY_NAME,
     DIMENSION_CALLOUTS_BY_NAME,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -513,20 +514,26 @@ def _end_piece_section(adapter: Any, front: Any) -> Any:
 
 
 def _assert_part_callouts(adapter: Any, annotations: list[Any]) -> None:
-    """The part authors every callout below its dimension's value; the import
-    must carry each one unchanged (the drawing never writes them, #1942)."""
-    found: dict[str, str] = {}
+    """The part authors every callout below or above its dimension's value;
+    the import must carry each one unchanged (the drawing never writes them,
+    #1942)."""
+    # swDimensionTextCalloutBelow = 4, swDimensionTextCalloutAbove = 3.
+    expected = {
+        (4, name): text for name, text in DIMENSION_CALLOUTS_BY_NAME.items()
+    } | {(3, name): text for name, text in DIMENSION_CALLOUTS_ABOVE_BY_NAME.items()}
+    found: dict[tuple[int, str], str] = {}
     for raw in annotations:
         annotation = _early_bound(raw, "IAnnotation")
         name = dimension_name(adapter, annotation)
-        if name not in DIMENSION_CALLOUTS_BY_NAME:
+        slots = [slot for slot, expected_name in expected if expected_name == name]
+        if not slots:
             continue
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        found[name] = str(display.GetText(4) or "").replace("\r\n", "\n")
-    if found != DIMENSION_CALLOUTS_BY_NAME:
+        for slot in slots:
+            found[(slot, name)] = str(display.GetText(slot) or "").replace("\r\n", "\n")
+    if found != expected:
         raise RuntimeError(
-            f"gooseneck dimension callouts did not import: {found!r} != "
-            f"{DIMENSION_CALLOUTS_BY_NAME!r}"
+            f"gooseneck dimension callouts did not import: {found!r} != {expected!r}"
         )
 
 

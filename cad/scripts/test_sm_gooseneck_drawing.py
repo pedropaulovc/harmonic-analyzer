@@ -143,13 +143,19 @@ def test_counterbore_callouts_floor_the_wall_from_the_joint() -> None:
     callouts = spec.DIMENSION_CALLOUTS_BY_NAME
     assert spec.COUNTERBORE_WALL_CALLOUT in callouts["CounterboreDia"].splitlines()
     # The floor corner's limit is its own native radial dimension, not text
-    # under the depth (codjiflo P2 on #1997).
+    # under the depth (codjiflo P2 on #1997); the depth names its mate in one
+    # row above its stacked pair (rule 4).
     assert "CounterboreDepth" not in callouts
+    assert spec.DIMENSION_CALLOUTS_ABOVE_BY_NAME == {
+        "CounterboreDepth": f"CLEARS {spec.SCREW_NUMBER} RUN-OUT"
+    }
+    assert "\n" not in spec.COUNTERBORE_DEPTH_CALLOUT
     assert callouts["CounterboreFloorCornerR"] == spec.COUNTERBORE_FLOOR_CALLOUT
     marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
-    assert set(callouts) <= marked
-    for feature, by_name in spec.DIMENSION_CALLOUTS.items():
-        assert set(by_name) <= set(spec.DRAWING_DIMENSIONS[feature])
+    assert set(callouts) | set(spec.DIMENSION_CALLOUTS_ABOVE_BY_NAME) <= marked
+    for by_feature in (spec.DIMENSION_CALLOUTS, spec.DIMENSION_CALLOUTS_ABOVE):
+        for feature, by_name in by_feature.items():
+            assert set(by_name) <= set(spec.DRAWING_DIMENSIONS[feature])
 
 
 def test_notes_state_stock_process_and_intent_without_sizes() -> None:
@@ -166,9 +172,9 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
         "TUBE 1/2 OD X 0.065 WALL, ONLINEMETALS 7322",
         "SLEEVE 5/8 OD X 0.058 WALL, 7324",
         "TUBE AND SLEEVE AS STOCK",
-        "SLEEVE SILVER-BRAZED TO TUBE AT BOTH ENDS",
-        "BAg-7 (AWS A5.8), FULL PENETRATION",
-        "END PIECE: BRAZE OR LOCTITE 638",
+        "SLEEVE TO TUBE: CONTINUOUS BRAZE FILLET EACH END",
+        "BRAZE BAg-7 (AWS A5.8)",
+        "END PIECE: FULL-PENETRATION BRAZE OR LOCTITE 638",
         # Owner ruling 2026-10-27 (#1997): join before bending.
         "JOIN END PIECE, COOL OR FULLY CURE, THEN BEND",
         "OVALITY 5% MAX",

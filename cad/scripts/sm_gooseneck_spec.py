@@ -139,6 +139,19 @@ DIMENSION_CALLOUTS_BY_NAME: dict[str, str] = {
     for callouts in DIMENSION_CALLOUTS.values()
     for name, text in callouts.items()
 }
+# Above the value, one row (SolidWorks prints no line break in the above
+# compartment, pn_pen_v_block_spec): the counterbore depth's 0.10 LIMIT band
+# names its mate at its own callout (rule 4; machinist review of 3a807442b).
+# Below its stacked pair it would cross the end face's extension lines.
+COUNTERBORE_DEPTH_CALLOUT = f"CLEARS {SCREW_NUMBER} RUN-OUT"
+DIMENSION_CALLOUTS_ABOVE: dict[str, dict[str, str]] = {
+    "CounterboreProfile": {"CounterboreDepth": COUNTERBORE_DEPTH_CALLOUT},
+}
+DIMENSION_CALLOUTS_ABOVE_BY_NAME: dict[str, str] = {
+    name: text
+    for callouts in DIMENSION_CALLOUTS_ABOVE.values()
+    for name, text in callouts.items()
+}
 
 # The end piece's native blind-tap callout (end view): the title block's
 # THREADS row owns the 2B class (drawing-guidelines.md rule 2), the tap's
@@ -189,23 +202,28 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for dimensions in DRAWING_PRECISION.values()
     for name, places in dimensions.items()
 }
-if set(DIMENSION_CALLOUTS_BY_NAME) - set(DRAWING_PRECISION_BY_NAME):
+if (set(DIMENSION_CALLOUTS_BY_NAME) | set(DIMENSION_CALLOUTS_ABOVE_BY_NAME)) - set(
+    DRAWING_PRECISION_BY_NAME
+):
     raise AssertionError("a gooseneck callout names an unmarked dimension")
 
 # Four lines (drawing-guidelines.md rule 7; codjiflo on #1997): the stock,
-# both members as stock and the sleeve's braze (its select-fit window rides
-# the sleeve's Ø), the joints, then the order the owner ruled (2026-10-27,
-# #1997: join the end piece before bending, cooled or fully cured; recorded
-# as RV-02 in sm-gooseneck.yaml) with the bend's acceptance.  Sizes are on
-# the features and the bend radius is native, so no line names a tool, and
-# section A-A shows the end piece solid.  Each line ends left of the title
-# block.
+# both members as stock and the sleeve's braze with its extent (its
+# select-fit window rides the sleeve's Ø), the end piece's joint, then the
+# order the owner ruled (2026-10-27, #1997: join the end piece before
+# bending, cooled or fully cured; recorded as RV-02 in sm-gooseneck.yaml)
+# with the bend's acceptance.  The sleeve's braze is a fillet at each end of
+# its lap and the end piece's a full-penetration joint (machinist review of
+# 3a807442b: "full penetration" read as covering the sleeve's 218.0 lap too).
+# Sizes are on the features and the bend radius is native, so no line names
+# a tool, and section A-A shows the end piece solid.  Each line ends left of
+# the title block.
 DRAWING_NOTES = "\n".join(
     (
         f"1. TUBE {TUBE_STOCK_SIZE}, {STOCK_SUPPLIER} {TUBE_STOCK_SKU}; "
         f"SLEEVE {SLEEVE_STOCK_SIZE}, {SLEEVE_STOCK_SKU}",
-        "2. TUBE AND SLEEVE AS STOCK; SLEEVE SILVER-BRAZED TO TUBE AT BOTH ENDS.",
-        "3. BRAZE BAg-7 (AWS A5.8), FULL PENETRATION; END PIECE: BRAZE OR LOCTITE 638.",
+        "2. TUBE AND SLEEVE AS STOCK; SLEEVE TO TUBE: CONTINUOUS BRAZE FILLET EACH END.",
+        "3. BRAZE BAg-7 (AWS A5.8); END PIECE: FULL-PENETRATION BRAZE OR LOCTITE 638.",
         "4. JOIN END PIECE, COOL OR FULLY CURE, THEN BEND: OVALITY 5% MAX, NO KINKS.",
     )
 )
