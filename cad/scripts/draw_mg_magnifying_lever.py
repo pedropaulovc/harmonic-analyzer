@@ -57,7 +57,7 @@ DETAIL_CENTER = (0.310, 0.190)
 DETAIL_SCALE = (3, 1)
 DETAIL_FOCUS = (0.156, 0.0, 0.0)
 DETAIL_RADIUS_MM = 12.5
-# Four native callout rows wrap BRACKET below its mate ID between the length
+# Three native callout rows wrap BRACKET below its mate ID between the length
 # witnesses. Their actual font, leader and clearance still require native audit.
 DETAIL_KEEP = {"ThreadLength": (0.323, 0.255), "IncompleteLength": (0.377, 0.165)}
 # R24: end the diameter witnesses left of the unchanged finish symbol/leader;
