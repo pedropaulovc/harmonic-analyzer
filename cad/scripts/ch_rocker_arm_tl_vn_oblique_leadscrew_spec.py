@@ -9,8 +9,8 @@ sibling part spec, never retyped.
 What it is: a Tr8x2 screw parallel to rail 1, on the rail's column side
 (+lateral), turning in two KP08 pillow blocks. Each block stands on an
 end bracket (TL-28, two off) bolted on base bar 1's top. A flanged brass
-nut, screwed to the nut bracket (TL-29), drives carriage 1: the nut bracket
-bolts to pivot block 1's column-side face. The handwheel
+nut, screwed directly to the integral lug of feed block TL-32, drives
+carriage 1. The handwheel
 (``fixtures.trammel-handwheel``) sits on the screw's outboard end, past the
 base bar's far end, so the wheel overhangs it.
 
@@ -21,14 +21,14 @@ envelope below. In base bar 1's part frame, x = s - RAIL_NEAR_S ⚙ and
 y = -lateral; the turned-over bar under rail 2 carries the same holes, unused.
 
 Why the column side: the far hold-down stud stands on the rail's front side
-(lateral -37.5 ⚙ at s 405 ⚙, up to STUD_TOP_Z), inside the moving nut
-bracket's travel. The near stud (column side, s 35.9 ⚙) lies short of the near
+(lateral -37.5 ⚙ at s 405 ⚙, up to STUD_TOP_Z), away from the feed
+block's travel. The near stud (column side, s 35.9 ⚙) lies short of the near
 KP08 bracket, so the screw never passes a stud.
 
 Why lateral 55: the KP08 envelope (55 across the axis, ``KP08_MARGIN`` all
 round) must stay outside pivot block 1's side (lateral 20 ⚙), which runs
-between the two blocks; the 12.7 bracket plate lifts the axis to 40.4, so the
-Ø40 wheel's rim stays above the bar and the nut bracket clears the bar top.
+between the two blocks; the 25.4-high bracket lifts the axis to 53.1.
+The handwheel grip sweeps to Z74.6, below the carrier underside at Z80.2.
 Each bracket stands wholly on bar 1 (the user's 2026-10-17 ruling A′: the
 bar widened to 1/2 x 6, its column-side edge at lateral 88.9 ⚙), its outer
 end flush with that edge, on 4 x #8 screws in one row: two pairs symmetric
@@ -36,7 +36,7 @@ about the screw axis, the inner at ±11, the outer at ±27.5, the round
 half-span inside the rule-17 window (below) between the #8 tap's wall to the
 KP08's outer #6-32 tap in TL-28 and TL-20's counterbore wall to the bar's edge.
 
-Travel. The KP08 blocks sit at least FEED_GAP outside the nut bracket's reach
+Travel. The KP08 blocks sit at least FEED_GAP outside the feed lug's reach
 over the carriage travel ``trammel.CARRIAGE_TRAVEL`` ⚙ (107.2 .. 421.4, both
 passes); the screw runs NEAR_STUB past the near KP08 and on into the
 handwheel's bore past its grub and its set-screw flat
@@ -44,22 +44,24 @@ handwheel's bore past its grub and its set-screw flat
 HUB_GAP past the far block: SCREW_LENGTH 410. The stations
 and the screw length are fixed (the drilled parts carry them); self-checks
 guard them against the bought block, so a vendor swap changes the bought
-numbers and TL-29's nut interface only, or trips a check.
+numbers and TL-32's nut interface only, or trips a check.
 
-Feed modes. The Tr8x2 nut does not back-drive: with the nut bracket's two
-block screws in, the handwheel feeds carriage 1 (the finish pass); with them
-out, the bracket rides on the screw and the TL-26 lever feeds (roughing).
+The nut remains attached to the feed block during either feed mode. Align
+the KP08 blocks to the nut at both travel ends before tightening their
+floating mounting screws; no transfer spotting is required.
 
 Thrust is taken on the KP08 inner-ring set screws gripping the plain thread
 (no journals; the AMPEC block has no axial or end-play rating): a hand-fed
 finish pass only.
 
 LOAD_CASES (ruling A′): 1 kN hand-abuse thrust along the screw at its axis
-(lateral 55, 27.7 above the bar top), on each TL-28's 4 x #8-32 torqued to
+(lateral 55, 40.4 above the bar top), on each TL-28's 4 x #8-32 torqued to
 2.8 N·m (25 in·lbf; head bearing on TL-20's counterbore floor limits it):
 preload T/(0.2 d) 3.36 kN a screw; the row's centroid is on the screw axis
-(e = 0), so the bracket slips at 2.69 kN (μ 0.2, margin 2.69) and starts to
-open (F·h = n·P·w/6, w 19.05) at 1.54 kN (margin 1.54).
+(e = 0), so the bracket slips at 2.69 kN (μ 0.2, margin 2.69). It starts to
+open (F·h = n·P·w/6, w 12.7) at 704 N, below TL-00's 1161 N feed thrust at
+a 70 N hand pull. Owner ruling 2026-10-27: the heel may lift elastically;
+slip governs, held at 1.5 x both the 1 kN abuse and the feed thrust.
 
 Bought dimensions live in one block below (``# --- Bought items``). Items
 marked UNVERIFIED are assumed until verified on receipt.
@@ -72,7 +74,6 @@ from fractions import Fraction
 
 import _config
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
-import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec
 from _printed_tolerance import printed_band_mm
@@ -83,9 +84,6 @@ INCH = trammel.INCH
 END_BRACKET = "ch-rocker-arm-tl-oblique-end-bracket"
 END_BRACKET_NUMBER = "MHA-CH-06-TL-28"
 END_BRACKET_QUANTITY = 2
-NUT_BRACKET = "ch-rocker-arm-tl-oblique-nut-bracket"
-NUT_BRACKET_NUMBER = "MHA-CH-06-TL-29"
-NUT_BRACKET_QUANTITY = 1
 RAIL = 1  # the screw runs beside rail 1 and drives carriage 1
 
 # Shop-inventory ids (cad/process/shop/inventory.toml); the inventory owns
@@ -111,7 +109,7 @@ NUT_HOLE_PCD = 16.0
 NUT_HOLE_ANGLES_DEG = (45.0, 135.0, 225.0, 315.0)
 NUT_BODY_DIA = 10.2
 NUT_LENGTH = 15.0
-NUT_BODY_SHORT = 1.5  # the spigot, in TL-29's -X counterbore
+NUT_BODY_SHORT = 1.5  # the spigot, in TL-32's -X counterbore
 NUT_BODY_LONG = NUT_LENGTH - NUT_FLANGE_THICK - NUT_BODY_SHORT  # 10, proud on -X
 # US-customary UNC (fastener policy): the flange's Ø3.5 plain holes float a
 # #4-40 (major 2.845) 0.33 a side. Each button head (MHA-CH-06-TL-VN-66)
@@ -168,8 +166,8 @@ NUT_SCREW_FULL_THREAD_MIN = full_thread_min(
     NUT_SCREW_LENGTH, NUT_SCREW_GRIP, NUT_SCREW
 )  # 7.236, 2.54 D
 # The longest screw (B18.3: never long) on the flange's nominal stops 0.8
-# inside TL-29's full thread.
-NUT_SCREW_TAP_DEPTH = NUT_SCREW_ENGAGEMENT + 0.8  # TL-29's full thread: 10.0
+# inside TL-32's full thread.
+NUT_SCREW_TAP_DEPTH = NUT_SCREW_ENGAGEMENT + 0.8  # full thread: 10.0
 # KP08 pillow block. Verified: axis height, bolt spacing, length, height, bore.
 KP08_AXIS_HEIGHT = 15.0
 KP08_BOLT_SPACING = 42.0
@@ -184,7 +182,7 @@ KP08_HOLE_DIA = 4.5  # UNVERIFIED: the smaller of the 4.5 / 4.8 M4 holes
 KP08_FOOT_THICK = 5.0  # UNVERIFIED: base (foot) thickness
 # Rule 18 through the foot at its unverified nominal (a thicker foot takes
 # engagement off one for one: ENGAGEMENT_TARGET_D's half diameter). The 5/8
-# tip stops 1.825 inside TL-28's 12.7 THRU tap.
+# tip stops inside TL-28's 25.4 THRU tap.
 KP08_SCREW_LENGTH = _shortest_length(KP08_FOOT_THICK, KP08_SCREW)  # 5/8
 KP08_SCREW_FULL_THREAD_MIN = full_thread_min(
     KP08_SCREW_LENGTH, KP08_FOOT_THICK, KP08_SCREW
@@ -217,14 +215,14 @@ HANDWHEEL_SWEEP_R = max(
 
 # --- Layout (rail-1 stations s, lateral; machine Z) -------------------------------
 SCREW_LATERAL = 55.0
-BRACKET_THICK = 0.5 * INCH  # TL-28 plate: lifts the KP08 base off the bar top
-KP08_BASE_Z = trammel.BASE_BAR_THICK + BRACKET_THICK  # 25.4
-SCREW_AXIS_Z = KP08_BASE_Z + KP08_AXIS_HEIGHT  # 40.4
+BRACKET_THICK = 1.0 * INCH  # OnlineMetals 1165 half-by-one bar, on edge
+KP08_BASE_Z = trammel.BASE_BAR_THICK + BRACKET_THICK  # 38.1
+SCREW_AXIS_Z = KP08_BASE_Z + KP08_AXIS_HEIGHT  # 53.1
 HUB_GAP = 6.0  # far KP08 outer face to the handwheel's hub end
 # The drilled parts fix the KP08 stations and the screw length; a vendor swap
 # must not move them. The self-checks below guard them against the bought
 # block: a swap that trips one is a redesign decision.
-FEED_GAP = 2.5  # nut bracket to a KP08 envelope at a travel stop, at least
+FEED_GAP = 2.5  # feed lug/nut to KP08 envelope at a travel stop (TL-32 checks)
 NEAR_STUB = 2.0  # screw past the near KP08's outer face, as fitted (step 7)
 NEAR_STUB_MIN = 1.0  # at least
 # The screw's set-screw flat, centred on the handwheel's grub (TL-VN-54).
@@ -239,12 +237,12 @@ HANDWHEEL_ENGAGEMENT_MIN = max(
 )
 
 # --- TL-28 end bracket (2 off, identical) -------------------------------
-# 6061-T6 flat 1/2 x 3/4 in. Frame: origin on the bottom face at the inner end
-# (toward the rail), mid-width; +X outward (machine +lateral), +Y along the
-# screw away from the spindle, +Z up. Envelope X 0 .. 68.9, Y ±9.525, Z 0 ..
-# 12.7. Placed with X = 0 at lateral BRACKET_INNER_LATERAL, Y = 0 on KP08_S.
-BRACKET_STOCK = "6061-T6 flat 1/2 x 3/4 in"
-BRACKET_WIDTH = 0.75 * INCH  # 19.05 along the screw
+# 6061-T6511 flat 1/2 x 1 in, OnlineMetals 1165, on edge. Frame: origin on
+# the bottom face at the inner end (toward the rail), mid-width; +X outward
+# (machine +lateral), +Y along the screw away from the spindle, +Z up.
+# Envelope X 0 .. 68.9, Y ±6.35, Z 0 .. 25.4.
+BRACKET_STOCK = "6061-T6511 flat 1/2 x 1 in (OnlineMetals 1165), on edge"
+BRACKET_WIDTH = 0.5 * INCH  # 12.7 along the screw
 BRACKET_INNER_LATERAL = 20.0  # 3 clear of the carriage's side (lateral 17 ⚙)
 # Ruling A′ (2026-10-17): the outer end flush with bar 1's column-side edge,
 # so the bracket stands wholly on the bar (it cantilevered past the 1/2 x 4).
@@ -307,52 +305,6 @@ BAR_SCREW_ENGAGEMENT = BAR_SCREW_LENGTH_MM - BAR_SCREW_GRIP  # 7.975 nominal
 # Worst case at TL-20's printed bands (6.955 .. 8.995).
 BAR_SCREW_ENGAGEMENT_RANGE = base_bar.bracket_screw_under_head(BAR_SCREW_LENGTH_MM)
 
-# --- TL-29 nut bracket (1 off) ------------------------------------------------
-# 6061-T6 flat 3/4 x 2 in. Frame: pivot block 1's own axes (X along the rail, +
-# away from the spindle, origin X at the carriage centre; +Y the block's +Y,
-# which is rail 1's -lateral; +Z up), the origin on the block's -Y face (the
-# column side) at the bracket's bottom face. The bracket lies at -Y.
-# Envelope X NUT_BRACKET_X, Y -48 .. 0, Z 0 .. NUT_BRACKET_HEIGHT.
-NUT_BRACKET_STOCK = "6061-T6 flat 3/4 x 2 in"
-NUT_BRACKET_STOCK_THICK = 0.75 * INCH
-NUT_BRACKET_LENGTH = 18.5  # +X end milled to length (TL-29 #8 end wall)
-# The stock's 3/4 in runs along the rail, its +X end milled to the length.
-# The bracket centres on pivot block 1's two side screws (TL-22's
-# SIDE_SCREW_X), so each #8 tap leaves the same nominal wall to its end face
-# (c4-r3: at the old -9.525 .. 8.975 the far wall was 0.55 thinner).
-# The nut's 10 body stands on -X: 1 in stock puts it on the near KP08 at the
-# near travel stop, the nut on the +X face puts the bracket on the far.
-_NUT_BRACKET_MID_X = sum(pivot_block.SIDE_SCREW_X) / 2.0  # 0
-NUT_BRACKET_X = (
-    _NUT_BRACKET_MID_X - NUT_BRACKET_LENGTH / 2.0,
-    _NUT_BRACKET_MID_X + NUT_BRACKET_LENGTH / 2.0,
-)
-BLOCK_SIDE_LATERAL = pivot_block.BLOCK_WIDTH / 2.0  # ⚙ 20
-NUT_FLANGE_MARGIN = 2.0  # bracket edge past the nut flange's rim
-# Fixed finished height: raising the carrier must not grow unused material
-# into the cartridge cap or its lock-wire tail. Nut seat/bottom stay fixed.
-NUT_BRACKET_HEIGHT = 33.3
-NUT_BRACKET_BOTTOM_Z = SCREW_AXIS_Z - NUT_FLANGE_DIA / 2.0 - NUT_FLANGE_MARGIN
-NUT_BRACKET_TOP_Z = NUT_BRACKET_BOTTOM_Z + NUT_BRACKET_HEIGHT
-NUT_BRACKET_DEPTH = (
-    SCREW_LATERAL + NUT_FLANGE_DIA / 2.0 + NUT_FLANGE_MARGIN - BLOCK_SIDE_LATERAL
-)  # 48
-# The nut is flipped (the tap-to-bore wall): its spigot sits in a NUT_BORE_DIA
-# counterbore in the -X face and the screw passes TL-29 THRU; the flange
-# screws to the -X face with 4 x #4-40 tapped on the nut's NUT_HOLE_PCD and the
-# long body stands proud on -X.
-# 0.3 over the spigot (owner ruling 2026-10-20), so the spigot's float, which
-# the spotted #4-40 taps stack, holds their wall to this counterbore.
-NUT_BORE_DIA = NUT_BODY_DIA + 0.3  # the spigot's counterbore: 10.5
-NUT_BORE_YZ = (
-    -(SCREW_LATERAL - BLOCK_SIDE_LATERAL),
-    SCREW_AXIS_Z - NUT_BRACKET_BOTTOM_Z,
-)  # (-35, 13)
-NUT_FLANGE_X = (NUT_BRACKET_X[0] - NUT_FLANGE_THICK, NUT_BRACKET_X[0])
-NUT_X = (NUT_FLANGE_X[0] - NUT_BODY_LONG, NUT_BRACKET_X[0] + NUT_BODY_SHORT)
-
-# --- Feed stations (rail-1 s): fixed, guarded by the self-checks --------------------
-NUT_REACH_X = (min(NUT_X[0], NUT_BRACKET_X[0]), max(NUT_X[1], NUT_BRACKET_X[1]))
 KP08_S = (72.0, 443.0)  # near, far: KP08 axial centre stations
 SCREW_LENGTH = 410.0
 KP08_FACE_S = (
@@ -369,27 +321,6 @@ WHEEL_S = (
     HUB_END_S + HANDWHEEL_HUB_LENGTH,
     HUB_END_S + HANDWHEEL_HUB_LENGTH + HANDWHEEL_WHEEL_LENGTH,
 )
-# Block screws: 2 x #8-32 SHCS through pivot block 1 from its +Y face into
-# #8-32 tapped holes in the bracket's Y = 0 face, each head on a wedge-lock
-# washer pair (MHA-CH-06-TL-VN-70) on the floor of TL-22's counterbore: the
-# screws carry the reversing feed thrust.
-BLOCK_SCREW = "#8-32"
-BLOCK_SCREW_LENGTH = "1-7/8"
-# TL-22 owns the hole positions (pivot_block.SIDE_SCREW_*); aliased here.
-BLOCK_SCREW_X = pivot_block.SIDE_SCREW_X  # pivot-block frame X
-BLOCK_SCREW_BLOCK_Z = pivot_block.SIDE_SCREW_Z  # pivot-block frame Z
-NUT_BRACKET_BLOCK_HOLES_Z = (
-    trammel.CARRIAGE_TOP_Z + BLOCK_SCREW_BLOCK_Z - NUT_BRACKET_BOTTOM_Z
-)
-NUT_BRACKET_TAP_DEPTH = 12.0  # minimum full thread in the bracket
-BLOCK_SCREW_GRIP = pivot_block.SIDE_UNDER_HEAD  # TL-22 under the head: 35.6
-# The TL-VN-70 pair's stack under each head: McMaster 91812A215's 0.080-0.100 in
-# band at its maximum (the worst case for engagement). A literal, so this
-# calculator imports no bought-part module; the TL-VN-70 spec pins it.
-BLOCK_SCREW_LOCK_STACK = 0.100 * INCH  # 2.54
-# 1-7/8 in less TL-22 and the pair: 9.49 in TL-29, over the 1.5 D 6.249 and
-# inside the 12 thread; the TL-VN-70 spec holds it at the worst-case bands.
-BLOCK_SCREW_ENGAGEMENT = 1.875 * INCH - BLOCK_SCREW_GRIP - BLOCK_SCREW_LOCK_STACK
 
 # --- Additions to sibling parts -------------------------------------------------
 # TL-20 base bar (both bars, single configuration): 8 x #8 SHCS clearance
@@ -402,10 +333,6 @@ BASE_BAR_HOLES: tuple[tuple[float, float], ...] = tuple(
     for lateral in BAR_SCREW_LATERALS
 )
 BASE_BAR_HOLE_SPEC = HoleSpec("counterbore_socket", "#8")  # normal fit
-# TL-22 pivot block (both blocks): 2 x #8 SHCS clearance THRU along Y at
-# block (X, Z), counterbored from the +Y face; TL-22 owns the holes.
-PIVOT_BLOCK_HOLES: tuple[tuple[float, float], ...] = pivot_block.SIDE_SCREW_HOLES
-PIVOT_BLOCK_HOLE_SPEC = pivot_block.SIDE_SCREW_HOLE_SPEC
 
 
 # --- Machine-frame helpers ------------------------------------------------------
@@ -458,31 +385,30 @@ HANDWHEEL_BOX = (
 )
 HANDWHEEL_Z = (SCREW_AXIS_Z - HANDWHEEL_SWEEP_R, SCREW_AXIS_Z + HANDWHEEL_SWEEP_R)
 
+# Vertical envelopes remain below the unchanged carrier at every pose.
+if not max(KP08_Z[1], HANDWHEEL_Z[1], SCREW_Z[1]) < trammel.CARRIER_UNDERSIDE_Z:
+    raise AssertionError("the raised leadscrew system reaches the carrier underside")
 
-def nut_bracket_box(carriage_s: float) -> tuple[float, float, float, float]:
-    """The nut bracket with its nut, as a rail-1 box at a carriage station."""
-    return (
-        carriage_s + NUT_REACH_X[0],
-        carriage_s + NUT_REACH_X[1],
-        BLOCK_SIDE_LATERAL,
-        BLOCK_SIDE_LATERAL + NUT_BRACKET_DEPTH,
-    )
+# TL-26 sits flat on the carrier's top face; its full swept plan is clear
+# in Z without a pose-dependent XY exemption.
+FEED_LEVER_CLEARANCE = trammel.CARRIER_TOP_Z - max(
+    KP08_Z[1], HANDWHEEL_Z[1], SCREW_Z[1], BRACKET_Z[1]
+)
+if not FEED_LEVER_CLEARANCE > 0.0:
+    raise AssertionError("the raised leadscrew system reaches the feed lever")
+
+# Hold-downs are disjoint in rail coordinates regardless of their fitted Z.
+for _stud_s, _stud_lat in trammel.HOLD_DOWN_STUDS:
+    for _box in (*KP08_BOXES.values(), *BRACKET_BOXES.values(), SCREW_BOX, HANDWHEEL_BOX):
+        if (
+            _box[0] - 14.0 <= _stud_s <= _box[1] + 14.0
+            and _box[2] - 14.0 <= _stud_lat <= _box[3] + 14.0
+        ):
+            raise AssertionError("the raised feed system reaches a hold-down envelope")
+
+# --- Self-checks ---------------------------------------------------------------
 
 
-NUT_BRACKET_Z = (NUT_BRACKET_BOTTOM_Z, NUT_BRACKET_TOP_Z)
-
-# --- Self-checks --------------------------------------------------------------------
-_travel_lo, _travel_hi = trammel.CARRIAGE_TRAVEL
-_reach = (nut_bracket_box(_travel_lo)[0], nut_bracket_box(_travel_hi)[1])
-# The nut bracket (its nut included) stays FEED_GAP off either KP08 envelope
-# over the full travel.
-if not _reach[0] - KP08_BOXES["KP08 near"][1] >= FEED_GAP:
-    raise AssertionError("the nut bracket reaches the near KP08")
-if not KP08_BOXES["KP08 far"][0] - _reach[1] >= FEED_GAP:
-    raise AssertionError("the nut bracket reaches the far KP08")
-# The KP08 envelopes clear pivot block 1's sides where it passes over them.
-if not KP08_BOXES["KP08 near"][2] > BLOCK_SIDE_LATERAL:
-    raise AssertionError("the KP08 envelope reaches pivot block 1")
 # Every bracket and the near KP08 stand clear of the near hold-down.
 _near_stud_s = trammel.HOLD_DOWN_STUDS[0][0]
 if not BRACKET_BOXES["end bracket near"][0] > _near_stud_s + 14.0:
@@ -514,12 +440,6 @@ if not HANDWHEEL_ENGAGEMENT >= HANDWHEEL_ENGAGEMENT_MIN:
     raise AssertionError("the screw stops short of the handwheel's grub or its flat")
 if not HANDWHEEL_ENGAGEMENT < HANDWHEEL_BORE_LENGTH:
     raise AssertionError("the screw stands proud of the wheel's outer face")
-# The nut flange fits the nut bracket; the bracket clears the bar top and
-# stays under the carrier.
-if not NUT_BRACKET_BOTTOM_Z > trammel.BASE_BAR_THICK:
-    raise AssertionError("the nut bracket reaches the bar top")
-if not NUT_BRACKET_TOP_Z < trammel.CARRIER_UNDERSIDE_Z:
-    raise AssertionError("the nut bracket reaches the carrier")
 # The bracket's screws land in the bar between the rail and the bar edge,
 # clear of the hold-down slots, rail holes and bar ends.
 for _x, _y in BASE_BAR_HOLES:
@@ -542,15 +462,13 @@ if not (
     < BRACKET_THICK
 ):
     raise AssertionError("the bar screws' engagement in the bracket")
-if not 1.5 * SHCS_8_MAJOR <= BLOCK_SCREW_ENGAGEMENT <= NUT_BRACKET_TAP_DEPTH:
-    raise AssertionError("the block screws' engagement in the nut bracket")
 if not (
     1.5 * NUT_SCREW_MAJOR
     <= NUT_SCREW_FULL_THREAD_MIN
     < NUT_SCREW_ENGAGEMENT
     < NUT_SCREW_TAP_DEPTH
 ):
-    raise AssertionError("the nut flange screws' engagement in the nut bracket")
+    raise AssertionError("the nut flange screws' engagement in the feed block")
 if not 1.5 * THREAD_MAJOR_MM[KP08_SCREW] <= KP08_SCREW_FULL_THREAD_MIN:
     raise AssertionError("the KP08 screws' engagement in the end bracket")
 
@@ -585,10 +503,13 @@ _worst_shear = 1.0 / _n + abs(BAR_SCREW_THRUST_ECCENTRICITY) * max(_r) / sum(
 BRACKET_SLIP_THRUST = FRICTION_MIN * BAR_SCREW_PRELOAD / _worst_shear  # 2.69 kN
 # Opening onset: the thrust's moment about the bracket's heel, at the screw
 # axis above the bar top, against the row's preload over the bracket width.
-_thrust_height = SCREW_AXIS_Z - trammel.BASE_BAR_THICK  # 27.7
+# Owner ruling 2026-10-27 (#1943 review): slip governs. A firm hand pull can
+# reach the onset (TL-00's 1161 N feed thrust), lifting the heel elastically;
+# the joint must not slip, so the onset is reported, not required.
+_thrust_height = SCREW_AXIS_Z - trammel.BASE_BAR_THICK  # 40.4
 BRACKET_OPENING_THRUST = (
     _n * BAR_SCREW_PRELOAD * BRACKET_WIDTH / (6.0 * _thrust_height)
-)  # 1.54 kN
+)  # 704 N
 if BRACKET_SLIP_THRUST < SLIP_MARGIN_MIN * HAND_ABUSE_THRUST:
     raise AssertionError(
         f"TL-28 slips at {BRACKET_SLIP_THRUST:.0f} N, under "

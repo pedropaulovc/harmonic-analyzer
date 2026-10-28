@@ -2,7 +2,7 @@
 
 Each explicitly configured member retains its four-view reference content.
 REWORK additionally owns the existing HoldDownStud-only native manufacturing
-controls; installed acceptance remains in the assembly's HD1-HD3 steps.
+controls; installed acceptance remains in the assembly's HD1-HD4 steps.
 The twelve installed members are not twelve procurement units.
 """
 
@@ -63,6 +63,9 @@ from ch_rocker_arm_tl_oblique_jig_assembly_spec import HOLD_DOWN_REFERENCE
 from _layout_audit import display_box, estimated_text_runs
 from _drawing_layout_audit import annotation_display
 from _layout_geometry import Box, Segment, segment_box_distance
+from _machinist_review_mode import MachinistReviewMode
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["sh_vn_clamping_kit_hardware"]
@@ -359,6 +362,45 @@ def fit_stud_title_block(
     return settled
 
 
+def link_rework_material(
+    adapter: Any, *, sheet_name: str, material: str
+) -> Callable[[], None]:
+    """Print the stud's Material Specification in REWORK's MATERIAL cell.
+
+    Sheet 1 (_purchased_variant_drawing) prints the kit's Material
+    Specification; this sheet's template cell linked the SOLIDWORKS library
+    stand-in ("Plain Carbon Steel"), so the two sheets named two materials
+    for the stud being cut (machinist review, 3/3 runs). Only this drawing's
+    note link changes; the source model and saved template stay untouched.
+    """
+    document = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet_view = _early_bound(document.GetFirstView(), "IView")
+    stand_in, specification = property_link("Material"), property_link("Material Specification")
+    found = []
+    note = sheet_view.GetFirstNote2()
+    while note is not None:
+        note = _early_bound(note, "INote")
+        if source_property_expression(str(note.PropertyLinkedText)) == stand_in:
+            found.append(note)
+        note = note.GetNext()
+    if len(found) != 1:
+        raise RuntimeError(f"stud REWORK title block needs one MATERIAL link, found {len(found)}")
+    (note,) = found
+    note.PropertyLinkedText = str(note.PropertyLinkedText).replace(stand_in, specification)
+    rebuild_drawing(adapter, label="stud REWORK material link")
+
+    def settled() -> None:
+        if not document.ActivateSheet(sheet_name):
+            raise RuntimeError(f"failed to activate stud material-check sheet {sheet_name!r}")
+        assert_linked_value(
+            specification, material, str(note.PropertyLinkedText), str(note.GetText()),
+            label=f"{sheet_name} MATERIAL",
+        )
+
+    settled()
+    return settled
+
+
 def read_saved_cut_end_angle(model: Any) -> float:
     """Read the saved HoldDownStud feature, without retargeting the drawing.
 
@@ -554,7 +596,7 @@ def _assert_stud_rework_properties(model: Any) -> dict[str, str]:
 
 
 def append_stud_rework_sheets(adapter: Any) -> tuple[Callable[[], None], ...]:
-    """Append final branch part-only REWORK; assembly HD1-HD3 owns installed fit."""
+    """Append final branch part-only REWORK; assembly HD1-HD4 owns installed fit."""
     document = _early_bound(adapter.currentModel, "IDrawingDoc")
     if not document.ActivateSheet(SHEET_NAMES[0]):
         raise RuntimeError("failed to activate stud REWORK sheet")
@@ -610,6 +652,10 @@ def append_stud_rework_sheets(adapter: Any) -> tuple[Callable[[], None], ...]:
         settled,
         fit_stud_title_block(
             adapter, sheet_name=SHEET_NAMES[0], number=source_properties["Number"],
+        ),
+        link_rework_material(
+            adapter, sheet_name=SHEET_NAMES[0],
+            material=source_properties["Material Specification"],
         ),
     )
 

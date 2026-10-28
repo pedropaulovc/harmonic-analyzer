@@ -151,7 +151,7 @@ if PIVOT_BLOCK_PLAN_CLEARANCE <= 0.0:
     raise AssertionError(f"{SKU}: a riser screw tip lies over a pivot block")
 if STAND_OUT_MAX_NOMINAL_SEAT >= trammel.CARRIER_TO_RAIL_GAP:
     raise AssertionError(f"{SKU}: a riser screw tip reaches the rails")
-if STAND_OUT_MAX_NOMINAL_SEAT >= trammel.PIN_COLLAR_PROUD:
+if STAND_OUT_MAX_NOMINAL_SEAT >= trammel.PIVOT_SUPPORT_HEIGHT:
     raise AssertionError(f"{SKU}: a riser screw tip reaches the pivot block tops")
 
 # Exact-current product table and engineering drawing read 2026-10-21.

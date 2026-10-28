@@ -37,9 +37,9 @@ PINNED = {
     "PART_SAGITTA.inner": (trammel.PART_SAGITTA[0], 14.188),
     "PART_SAGITTA.outer": (trammel.PART_SAGITTA[1], 13.905),
     "RISER_HUB_CHECK": (trammel.RISER_HUB_CHECK, 5.869),
-    # The jig stack: BEARING_SHOULDER 4 (r4) makes the pivot block 24 high.
-    "PIVOT_BLOCK_HEIGHT": (trammel.PIVOT_BLOCK_HEIGHT, 24.0),
-    "PIVOT_BLOCK_TOP_Z": (trammel.PIVOT_BLOCK_TOP_Z, 64.7),
+    "PIVOT_BLOCK_TOP_Z": (trammel.PIVOT_BLOCK_TOP_Z, 65.0),
+    "PIVOT_SUPPORT_HEIGHT": (trammel.PIVOT_SUPPORT_HEIGHT, 16.0),
+    "CARRIER_UNDERSIDE_Z": (trammel.CARRIER_UNDERSIDE_Z, 81.0),
 }
 
 
@@ -57,10 +57,20 @@ def test_outputs_are_derived_not_typed() -> None:
         for node in ast.walk(tree)
         if isinstance(node, ast.Constant) and isinstance(node.value, float)
     }
+    # RISER_BLANK_ORIGIN's unrelated 16.0 coincides with PIVOT_SUPPORT_HEIGHT;
+    # that output is instead checked to be assigned from an expression.
+    coincident = {"PIVOT_SUPPORT_HEIGHT"}
     typed = {
-        name for name, (_v, expected) in PINNED.items() if abs(expected) in literals
+        name
+        for name, (_v, expected) in PINNED.items()
+        if name not in coincident and abs(expected) in literals
     }
     assert not typed, f"calculator outputs typed as literals: {sorted(typed)}"
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and any(
+            isinstance(t, ast.Name) and t.id in coincident for t in node.targets
+        ):
+            assert not isinstance(node.value, ast.Constant)
 
 
 def test_inputs_come_from_the_rocker_spec() -> None:
@@ -89,12 +99,15 @@ def test_jig_stock_requirements_preserve_finished_geometry_without_claiming_owne
         (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_bytes().decode()
     )
     (carrier,) = [
-        row for row in inventory["stock"] if "MHA-CH-06-TL-21" in row.get("note", "")
+        row for row in inventory["stock"]
+        if "OnlineMetals 1173" in row.get("note", "")
+        and "TL-21 carrier" in row.get("note", "")
     ]
     (riser,) = [
         row for row in inventory["stock"] if "MHA-CH-06-TL-24" in row.get("note", "")
     ]
-    assert "on_hand" not in carrier and "on_hand" not in riser
+    assert carrier["on_hand"] is True
+    assert "on_hand" not in riser
     import ch_rocker_arm_tl_oblique_carrier_spec as carrier_spec
 
     assert carrier["section_mm"][0] >= carrier_spec.PLATE_WIDTH
@@ -195,8 +208,22 @@ def test_sensitivities_match_the_brief() -> None:
     assert f"{trammel.RADIUS_PER_TENTH_DEG:.1f}" == "4.7"
     # A spacing error of 0.1 changes R by about 0.18.
     assert f"{0.1 * trammel.RADIUS_PER_SPACING:.2f}" == "0.18"
-    # C3 radial play, unmounted worst case, on the cut radius.
-    assert f"{trammel.RADIUS_FROM_BEARING_PLAY:.3f}" == "0.041"
+    assert trammel.SHOULDER_CARRIER_CLEARANCE == (0.0, 0.040)
+    assert f"{trammel.RADIUS_FROM_SHOULDER_CLEARANCE:.3f}" == "0.071"
+
+
+def test_plain_pivot_stack_sets_the_carrier_height() -> None:
+    assert trammel.PIVOT_BLOCK_HEIGHT == 24.3
+    # Owner ruling 2026-10-27: a nominal five 0.2 shims a support.
+    assert trammel.PIVOT_SHIM_PACK == 1.0
+    assert trammel.PIVOT_SPACER_LENGTH == 15.0
+    assert trammel.CARRIER_UNDERSIDE_Z == pytest.approx(81.0)
+    for retired in (
+        "BEARING_RADIAL_PLAY", "RADIUS_FROM_BEARING_PLAY", "BEARING_BORE",
+        "BEARING_OD", "BEARING_WIDTH", "BEARINGS_PER_PIN", "BEARING_RECESS",
+        "BEARING_SHOULDER", "PIN_COLLAR_PROUD", "PIN_COLLAR_HEIGHT",
+    ):
+        assert not hasattr(trammel, retired)
 
 
 def test_hold_down_studs_land_on_t_slots_inside_the_table() -> None:
