@@ -1217,27 +1217,35 @@ def _register_recess_sheet(adapter: Any) -> Any:
     return plan
 
 
-def _fit_register_section(adapter: Any, section: Any) -> tuple[float, ...]:
-    """Fit the native outline without changing its orientation or scale."""
+def _fit_register_section(adapter: Any, section: Any, level_y: float) -> tuple[float, ...]:
+    """Fit the native outline without changing its orientation or scale, level
+    with the plan (rule 15): the bearing axis (model Y = 0) projects to
+    ``level_y``, its sheet height in the plan, through a model point."""
     native = _early_bound(section, "IView")
     x0, y0, x1, y1 = REGISTER_SECTION_REGION
-    target = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
+    anchor = (_REGISTER_CUT[0], 0.0, _H)
     for attempt in range(4):
         native.UpdateViewDisplayGeometry()
         outline = tuple(float(value) for value in native.GetOutline())
         if outline[2] - outline[0] > x1 - x0 or outline[3] - outline[1] > y1 - y0:
             raise RuntimeError(f"register-depth section exceeds its reserved region: {outline}")
-        center = ((outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0)
-        if x0 <= outline[0] < outline[2] <= x1 and y0 <= outline[1] < outline[3] <= y1:
+        projected = _view_mapper(adapter, native)(anchor)
+        x_inside = x0 <= outline[0] < outline[2] <= x1
+        y_inside = y0 <= outline[1] < outline[3] <= y1
+        if x_inside and y_inside and abs(projected[1] - level_y) <= 1e-4:
             return outline
         position = tuple(float(value) for value in native.Position)
-        moved = [position[axis] + target[axis] - center[axis] for axis in (0, 1)]
+        dx = 0.0 if x_inside else (x0 + x1) / 2.0 - (outline[0] + outline[2]) / 2.0
+        moved = [position[0] + dx, position[1] + level_y - projected[1]]
         # Respect whatever native movement constraints exist. The shared
         # section creator requests NotAligned; no alignment is inferred here.
         if not native.SetViewPosition(double_array(moved), False):
             raise RuntimeError("failed to centre register-depth section")
-        rebuild_drawing(adapter, label=f"register-depth section centred {attempt}")
-    raise RuntimeError("native register-depth section cannot fit its reserved region")
+        rebuild_drawing(adapter, label=f"register-depth section levelled {attempt}")
+    raise RuntimeError(
+        f"register-depth section {outline} cannot sit level with the plan at "
+        f"y={level_y} inside its reserved region"
+    )
 
 
 def _register_section_layout(
@@ -1532,7 +1540,10 @@ def _register_section_sheet(adapter: Any) -> tuple[Any, Callable[[], None]]:
         label="flat-bottom register recess section",
     )
     set_hidden_lines_removed(adapter, section)
-    outline = _fit_register_section(adapter, section)
+    # ENFORCE review (3de09b9 fix run): D-D sat 2.4 mm below the plan beside
+    # it; level the bearing axis across both views.
+    level_y = on_plan((_REGISTER_CUT[0], 0.0, _H))[1]
+    outline = _fit_register_section(adapter, section, level_y)
     on_section = _view_mapper(adapter, section)
     register_xy = on_section(
         (*_REGISTER_CUT, _H - part_spec.CAP_REGISTER_DEPTH / 2.0)

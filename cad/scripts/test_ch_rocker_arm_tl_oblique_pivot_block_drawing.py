@@ -1531,17 +1531,24 @@ def test_register_section_fits_native_outline_without_rotation(monkeypatch, fail
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "double_array", tuple)
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    # Model Y = 0 projects 3 mm above the view position.
+    monkeypatch.setattr(
+        drawing, "_view_mapper",
+        lambda _adapter, _view: lambda _xyz: (position[0], position[1] + 0.003),
+    )
+    level_y = 0.170
     if failure is None:
-        fitted = drawing._fit_register_section(object(), native)
+        fitted = drawing._fit_register_section(object(), native, level_y)
         x0, y0, x1, y1 = drawing.REGISTER_SECTION_REGION
         outline = native.GetOutline()
         assert x0 <= outline[0] < outline[2] <= x1
         assert y0 <= outline[1] < outline[3] <= y1
+        assert position[1] + 0.003 == pytest.approx(level_y)
         assert len(moves) == 1
         assert fitted == outline
     else:
         with pytest.raises(RuntimeError):
-            drawing._fit_register_section(object(), native)
+            drawing._fit_register_section(object(), native, level_y)
         assert len(moves) == (0 if failure == "oversized" else 1 if failure == "rejected" else 4)
     assert native.Angle == 0.19 and native.ScaleDecimal == 2.0
 
