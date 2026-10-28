@@ -13,7 +13,9 @@ def test_identity_stock_and_common_pivot_interface():
     metadata=_config.parts(spec.PART_NAME)
     assert metadata['number']=='MHA-CH-06-TL-32'
     assert metadata['quantity']==spec.QUANTITY==1
-    assert not metadata.get('machinist_exceptions')
+    (exception,)=metadata['machinist_exceptions']
+    assert (exception['id'],exception['kind'])==('RV-01','minor')
+    assert pivot.CBORE_SIDE_WALL_TEXT in exception['where']
     assert spec.BLOCK_HEIGHT==pivot.BLOCK_HEIGHT==24.3
     assert (spec.BLOCK_X0,spec.BLOCK_X1,spec.BLOCK_WIDTH)==(-42,20,40)
     assert (spec.LUG_X0,spec.LUG_X1,spec.LUG_Y0,spec.LUG_Y1)==(-9.25,9.25,-68,-20)

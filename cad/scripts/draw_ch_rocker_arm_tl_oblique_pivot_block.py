@@ -62,19 +62,26 @@ TAPPED_HOLE_NOTE = '#4-40 Tapped Hole'
 # converged on hole 1).
 # X ordinates stand above the plan in 9 mm lanes from the -X edge (x 139):
 # the 10.00 to the seat, its text right of its 10 mm span, then the two hole
-# columns and the 62.00 overall, 8 mm under the border. Rows are dimensioned
-# once each from the seat axis: 3Y/4Y on the +X side at x .222, clear of A's
-# right letter, arrows inside so neither's outside tail strikes the other's
-# text (review r1-r3); BlockSideY at x .231 and BlockWidth past its
-# shouldered text.
+# columns and the 62.00 overall, 8 mm under the border. The 62.00's text and
+# the counterbore end wall it sets stand off right of the +X edge, leadered,
+# one row under the value, the block centred on its point: inline, the
+# callout row pushed the line onto the 55.000's text, and centred at y .2615
+# the value crossed the border (farm run 20261028T152045278Z). Rows are
+# dimensioned once each from the seat axis: 3Y/4Y on the +X side at x .222,
+# clear of A's right letter, arrows inside so neither's outside tail strikes
+# the other's text (review r1-r3); BlockSideY at x .231 and BlockWidth past
+# its shouldered text, its three rows centred on the point over the bottom
+# edge's extension line, 4 mm right of BlockSideY's arrow tail (at x .255
+# 1.6 mm, same run) and left of TL-32's 88.00 (x .285).
 PLAN_XY = (.170,.205)
 PLAN_KEEP = {
     'BlockLength':(.170,.259),'PlanHole2X':(.1665,.250),'PlanHole1X':(.1535,.241),
     'PlanBoreX':(.157,.232),
-    'BlockWidth':(.249,.195),'BlockSideY':(.231,.220),
+    'BlockWidth':(.2595,.203),'BlockSideY':(.231,.220),
     'CarriageDrills3Y':(.222,.1985),'CarriageDrills4Y':(.222,.2115),
     'BoreDia':(.078,.196),'CarriageDrills1Dia':(.085,.168),'CarriageCounterbores3Dia':(.245,.150),
 }
+BLOCK_LENGTH_TEXT_XY = (.240,.2585)
 ROW_DIMENSIONS = ('CarriageDrills3Y','CarriageDrills4Y')
 # Section A-A looks up the sheet (third-angle: placed below the plan, its
 # arrows point away from it, review of farm run 20261024T133158704Z), so the
@@ -419,6 +426,7 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         _hide_witness_lines(adapter, side_annotations, 'TapDrillDia')
     _arrows_inside(adapter, side_annotations, ('TopBoreDepth',))
     offset_dimension_text(adapter, side_annotations, {'TopBoreDepth': seat_text_xy})
+    offset_dimension_text(adapter, plan_annotations, {'BlockLength': BLOCK_LENGTH_TEXT_XY})
     annotations = plan_annotations + side_annotations
     x = part.CBORE_SECTION_X
     start = _project(adapter,plan,(x,part.BLOCK_WIDTH/2+4,contract.BLOCK_HEIGHT),'floor cut start')

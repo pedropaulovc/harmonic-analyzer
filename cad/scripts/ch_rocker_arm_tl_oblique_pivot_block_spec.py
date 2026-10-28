@@ -100,6 +100,20 @@ DRAWING_PRECISION = {
     for feature, names in DRAWING_DIMENSIONS.items()
 }
 DRAWING_PRECISION_BY_NAME = {name: places for names in DRAWING_PRECISION.values() for name, places in names.items()}
+# The outline sets the counterbore walls (rule 17, worst case at the printed
+# bands): the +X end wall through BlockLength less the hole column, the -Y side
+# wall through BlockWidth less BlockSideY and the row. At .X (±0.8) the end
+# wall would fall under the 2.0 target and the side wall under the 1.5 floor,
+# so both print at two places and their callouts name the wall they set. At
+# two places the side wall still falls short of 2.0; it prints as a fact.
+_CBORE_R_MAX = (CBORE_DIA + printed_band_mm(DRAWING_PRECISION_BY_NAME["CarriageCounterbores3Dia"])) / 2
+_ROW_BAND = max(printed_band_mm(DRAWING_PRECISION_BY_NAME[name]) for name in ("CarriageDrills3Y", "CarriageDrills4Y"))
+CBORE_END_WALL_MIN = (BLOCK_X1 - BOLT_X - _CBORE_R_MAX - printed_band_mm(DRAWING_PRECISION_BY_NAME["BlockLength"])
+                      - printed_band_mm(DRAWING_PRECISION_BY_NAME["PlanHole2X"]))
+CBORE_SIDE_WALL_MIN = (BLOCK_WIDTH / 2 - BOLT_Y - _CBORE_R_MAX - _ROW_BAND
+                       - printed_band_mm(DRAWING_PRECISION_BY_NAME["BlockWidth"])
+                       - printed_band_mm(DRAWING_PRECISION_BY_NAME["BlockSideY"]))
+CBORE_SIDE_WALL_TEXT = f"SIDE WALL {math.floor(CBORE_SIDE_WALL_MIN * 100.0) / 100.0:.2f} MIN"
 CALLOUTS_SUFFIX: dict[str, str] = {}
 CALLOUTS_ABOVE = {
     "BoreDia": "REAM H7", "TapDrillDia": "DRILL THRU",
@@ -116,6 +130,8 @@ CALLOUTS_BELOW = {
     # the note, farm run 20261027T175531766Z): the block height's extension
     # lines pass left of it.
     "CboreFloor": "M4x20 IN HGH15CA:\n3.85 MIN ENGAGEMENT",
+    "BlockLength": "SETS COUNTERBORE END WALL",
+    "BlockWidth": f"SETS COUNTERBORE\n{CBORE_SIDE_WALL_TEXT}",
 }
 REFERENCE_SKETCHES = (CBORE_FLOOR_REFERENCE, PLAN_DATUM_REFERENCE)
 WALLS_MM = {
@@ -125,6 +141,8 @@ WALLS_MM = {
     "pivot seat to carriage counterbore": math.hypot(BORE_X + BOLT_X, BOLT_Y) - BORE_DIA / 2 - CBORE_DIA / 2,
 }
 assert min(WALLS_MM.values()) >= 2.0
+assert CBORE_END_WALL_MIN >= 2.0
+assert 1.5 <= CBORE_SIDE_WALL_MIN < 2.0
 assert 3.8 <= round(ENGAGEMENT_MIN, 6) <= round(ENGAGEMENT_MAX, 6) <= 4.95
 assert round(PIVOT_THREAD_ENGAGEMENT / pivot_screw.THREAD_DIA, 2) >= PIVOT_THREAD_ENGAGEMENT_MIN_D
 assert PIVOT_THREAD_LENGTH > pivot_screw.THREAD_LENGTH
