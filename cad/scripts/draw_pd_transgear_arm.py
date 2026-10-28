@@ -215,7 +215,13 @@ FRONT_KEEP = {
     # callouts.
     "PinBoreDia": (_front_x(PIN_STATION) + 0.056, _UNDER_FRONT - 0.024),
     "EndWidth": (_front_x(TIP_STATION) + 0.012, FRONT_CENTER[1]),
-    "PlateTapStation1": (_front_x(PLATE_TAP_STATIONS[0] / 2.0), _station_row(0)),
+    # Mid-line, or further left: it keeps 12 mm between its centre and the
+    # lower 6.850's box, which hangs left of tap 1 (since #2034 moved K, tap 1
+    # stands 6.2 nearer the pivot and mid-line came within 7 mm of it).
+    "PlateTapStation1": (
+        min(_front_x(PLATE_TAP_STATIONS[0] / 2.0), _LOWER_OFFSET_X - 0.0145 - 0.012),
+        _station_row(0),
+    ),
     "LocatorX1": (_front_x(LOCATOR_SITES_MM[0][0] / 2.0), _station_row(1)),
     "PlateTapStation2": (_front_x(PLATE_TAP_STATIONS[1] / 2.0), _station_row(2)),
     "PinStation": (_front_x(PIN_STATION / 2.0), _station_row(3)),

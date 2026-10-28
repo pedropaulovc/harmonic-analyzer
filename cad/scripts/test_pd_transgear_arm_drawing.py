@@ -85,9 +85,15 @@ def test_plate_tap_stations_follow_the_current_reducer_bore() -> None:
     for index, station in enumerate(stations, start=1):
         name = f"PlateTapStation{index}"
         assert name in spec.DRAWING_DIMENSIONS["StationReference"]
-        assert drawing.FRONT_KEEP[name][0] == pytest.approx(
-            drawing._front_x(station / 2.0)
-        )
+        text_x = drawing.FRONT_KEEP[name][0]
+        middle = drawing._front_x(station / 2.0)
+        if index == 1:
+            # Mid-line unless the lower 6.850's box needs it further left
+            # (test_the_socket_offsets_and_frames_stand_outside_the_arm); it
+            # stays on its own line, well inside the pivot's extension line.
+            assert drawing._front_x(0.0) + 0.007 < text_x <= middle + 1e-12
+        else:
+            assert text_x == pytest.approx(middle)
     assert drawing.TAP_CALLOUTS[0][1] == pytest.approx(stations[0])
 
 
