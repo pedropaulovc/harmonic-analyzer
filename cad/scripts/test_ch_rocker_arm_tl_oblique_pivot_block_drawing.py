@@ -19,15 +19,19 @@ def test_rectangular_rail_two_block_and_new_stock():
     assert not metadata.get('machinist_exceptions')
 
 
-def test_pivot_shoulder_bottoms_with_thirteen_mm_thread_engagement():
+def test_pivot_shoulder_bottoms_with_full_form_thread_engagement():
     assert (spec.BORE_X,spec.BORE_Y)==(-32,0)
     assert (spec.BORE_DIA,spec.BORE_BAND,spec.BORE_DEPTH)==(10,(.015,0),7.65)
     assert spec.PIVOT_TAP=='M8x1.25'
     assert spec.PIVOT_TAP_DRILL==6.8
     assert spec.PIVOT_THREAD_LENGTH==spec.BLOCK_HEIGHT-spec.BORE_DEPTH
-    assert spec.PIVOT_THREAD_ENGAGEMENT==13
-    assert spec.PIVOT_THREAD_ENGAGEMENT>=1.5*8
-    assert spec.PIVOT_THREAD_LENGTH-spec.PIVOT_THREAD_ENGAGEMENT>0
+    # Full-form thread: the screw's 13 less 1.5 pitches, held to RV-05's floor.
+    assert spec.PIVOT_THREAD_ENGAGEMENT==13-1.5*1.25
+    assert round(spec.PIVOT_THREAD_ENGAGEMENT/8,2)>=spec.PIVOT_THREAD_ENGAGEMENT_MIN_D
+    assert spec.PIVOT_THREAD_ENGAGEMENT<1.5*8
+    assert spec.PIVOT_THREAD_LENGTH>13
+    min_text=spec.CALLOUTS_BELOW['TapDrillDia'].splitlines()[-1]
+    assert float(min_text.split()[0])<=spec.PIVOT_THREAD_ENGAGEMENT
     assert spec.BORE_X==trammel.PIN_OFFSET
     assert spec.BORE_LIMITS == (10.0, 10.015)
     assert math.isclose(spec.PIVOT_LOCATING_CLEARANCE_MIN, 0.0, abs_tol=1e-9)

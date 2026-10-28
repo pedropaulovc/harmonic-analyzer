@@ -58,3 +58,8 @@ machinist_exceptions:
     where: "P2: the two M8 shoulder screws seated in block counterbores, Loctite 222 and 4.0 N·m"
     finding: "pivot shoulder screws use threadlocker without a separate mechanical thread lock (rule 23)"
     reason: "The owner-approved 2026-10-23 plain-pivot contract explicitly chooses Loctite 222 and torque. Each screw shoulder bottoms in its counterbore, leaving measured 0.05–0.25 carrier running clearance; the head, thread, block and carriage form the positive lift-capture path. This is not whole-jig load certification."
+  - id: "RV-05"
+    kind: "accept"
+    where: "TL-22 and TL-32 sheets, the M8x1.25 TAP THRU BELOW SHOULDER SEAT callout's 11.12 MIN ENGAGEMENT, and P2: the two TL-VN-77 shoulder screws threaded into those taps"
+    finding: "M8 full-form thread engagement 11.12 (1.39D) is under 1.5D (rule 18)"
+    reason: "Owner ruling 2026-10-27: the bought 90323A492 shoulder screw has 13 of thread; less 1.5 incomplete pitches that leaves 11.125 full-form thread (about 1.39D) in the 6061 blocks' through taps. The screw is static: its shoulder seats on the counterbore floor and the thread carries only the 4.0 N·m seating preload (about 2.5 kN at K 0.20), against an estimated 43.4 kN 6061 thread-strip load on the full-form length (17.4x; 5.8x on the one-third-of-ultimate basis). More thread needs a different bought screw. This is not whole-jig load certification."

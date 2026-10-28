@@ -596,14 +596,17 @@ LEVER_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
 PIVOT_RUNNING_GAP = (0.05, 0.25)
 PIVOT_SCREW_TORQUE_NM = 4.0
 PIVOT_NOMINAL_RUNNING_GAP = PIVOT_HEAD_UNDERSIDE_Z - trammel.CARRIER_TOP_Z
-PIVOT_THREAD_ENGAGEMENT = pivot_screw.THREAD_LENGTH
+PIVOT_THREAD_ENGAGEMENT = pivot_block.PIVOT_THREAD_ENGAGEMENT  # full form, 11.125
 PIVOT_THREAD_TIP_Z = PIVOT_SCREW_BOTTOM_Z - pivot_screw.THREAD_LENGTH
 if not PIVOT_RUNNING_GAP[0] <= PIVOT_NOMINAL_RUNNING_GAP <= PIVOT_RUNNING_GAP[1]:
     raise AssertionError("the nominal shoulder head must clear the carrier")
 if PIVOT_THREAD_TIP_Z <= trammel.CARRIAGE_TOP_Z:
     raise AssertionError("the shoulder-screw tip must stay inside the block")
-if PIVOT_THREAD_ENGAGEMENT < 1.5 * pivot_screw.THREAD_DIA:
-    raise AssertionError("the M8 receiver needs at least 1.5D engagement")
+# Under 1.5D (1.39D): owner exception RV-05 (2026-10-27) in the jig config.
+if round(PIVOT_THREAD_ENGAGEMENT / pivot_screw.THREAD_DIA, 2) < pivot_block.PIVOT_THREAD_ENGAGEMENT_MIN_D:
+    raise AssertionError("the M8 receiver's full-form engagement is under RV-05's stated floor")
+if PIVOT_THREAD_ENGAGEMENT != fasteners.PIVOT_SCREW_TO_BLOCK.engagement_mm:
+    raise AssertionError("the fastener table's M8 engagement is not the block's")
 
 # Every instance of every logical family, in insertion order. Ordinary families
 # keep native <stem>-N names; kit instances use persisted role-local references.
@@ -1152,8 +1155,9 @@ _AL_SHEAR_ULTIMATE_MPA = 207.0
 _STRIP_SAFETY = 3.0
 _NUT_FACTOR = 0.20
 # A 4 N·m seating torque gives nominal 2.5 kN preload at K=.20 on M8.
-# The 6061 internal-thread shear estimate is deliberately limited to one third
-# of ultimate; this is a seating choice, not a whole-jig load certification.
+# The 6061 internal-thread shear estimate on the 11.125 full-form engagement
+# (43.4 kN, 17.4x the preload; RV-05 cites it) is deliberately limited to one
+# third of ultimate; this is a seating choice, not a whole-jig load certification.
 PIVOT_SCREW_PRELOAD_N = PIVOT_SCREW_TORQUE_NM / (_NUT_FACTOR * pivot_screw.THREAD_DIA / 1000.0)
 PIVOT_THREAD_STRIP_N = 0.75 * math.pi * pivot_screw.THREAD_DIA * PIVOT_THREAD_ENGAGEMENT * _AL_SHEAR_ULTIMATE_MPA
 if PIVOT_SCREW_PRELOAD_N > PIVOT_THREAD_STRIP_N / _STRIP_SAFETY:

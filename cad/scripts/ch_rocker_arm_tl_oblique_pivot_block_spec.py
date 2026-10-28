@@ -36,7 +36,13 @@ if PIVOT_LOCATING_CLEARANCE_MIN < 0.0:
 PIVOT_TAP = "M8x1.25"
 PIVOT_TAP_DRILL = 6.8
 PIVOT_THREAD_LENGTH = BLOCK_HEIGHT - BORE_DEPTH
-PIVOT_THREAD_ENGAGEMENT = 13.0
+# Rule 18 counts full-form thread only: the TL-VN-77's 13 of thread less 1.5
+# incomplete pitches, 11.125 (1.39D). That falls short of 1.5D; the owner's
+# 2026-10-27 ruling accepts it (jig assembly config RV-05) and the tap callout
+# states it as a plain fact.
+PIVOT_THREAD_ENGAGEMENT = pivot_screw.THREAD_LENGTH - 1.5 * pivot_screw.THREAD_PITCH
+PIVOT_THREAD_ENGAGEMENT_MIN_D = 1.39  # RV-05's stated floor
+PIVOT_ENGAGEMENT_TEXT = f"{math.floor(PIVOT_THREAD_ENGAGEMENT * 100.0) / 100.0:.2f} MIN ENGAGEMENT"
 PIVOT_AXIS_NAME = "PivotAxis"
 BOLT_X = BOLT_Y = 13.0
 BOLT_POINTS = tuple((x, y) for x in (-BOLT_X, BOLT_X) for y in (-BOLT_Y, BOLT_Y))
@@ -100,7 +106,7 @@ CALLOUTS_ABOVE = {
 }
 CALLOUTS_BELOW = {
     "BoreDia": "LOCATING FIT ON MHA-CH-06-TL-VN-77 SHOULDER",
-    "TapDrillDia": "M8x1.25 TAP THRU BELOW SHOULDER SEAT",
+    "TapDrillDia": f"M8x1.25 TAP THRU BELOW SHOULDER SEAT\n{PIVOT_ENGAGEMENT_TEXT}",
     "TopBoreDepth": "SETS TL-VN-77 SHOULDER HEIGHT",
     "CarriageDrills1Dia": "MATCHES HGH15CA CARRIAGE M4 PATTERN",
     "CarriageCounterbores3Dia": "FLOOR: SECTION B-B",
@@ -118,5 +124,5 @@ WALLS_MM = {
 }
 assert min(WALLS_MM.values()) >= 2.0
 assert 3.8 <= round(ENGAGEMENT_MIN, 6) <= round(ENGAGEMENT_MAX, 6) <= 4.95
-assert PIVOT_THREAD_ENGAGEMENT >= 1.5 * 8.0
-assert PIVOT_THREAD_LENGTH > PIVOT_THREAD_ENGAGEMENT
+assert round(PIVOT_THREAD_ENGAGEMENT / pivot_screw.THREAD_DIA, 2) >= PIVOT_THREAD_ENGAGEMENT_MIN_D
+assert PIVOT_THREAD_LENGTH > pivot_screw.THREAD_LENGTH

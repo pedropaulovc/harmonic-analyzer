@@ -808,7 +808,9 @@ def test_interference_contracts_are_physical_seats_and_threads() -> None:
         ),
         (
             contracts.JIG_PIVOT_SCREW_THREAD,
-            (8.0, 6.8, fasteners.PIVOT_SCREW_TO_BLOCK.engagement_mm),
+            # The modeled thread envelope overlaps the tap drill over its whole
+            # 13, not just the full-form engagement.
+            (8.0, 6.8, pivot_screw.THREAD_LENGTH),
         ),
         (
             contracts.JIG_T_NUT_THREAD,
@@ -1375,8 +1377,10 @@ def test_handwheel_set_screw_meets_the_leadscrew_flat() -> None:
 
 def test_shoulder_pivot_axial_stack_and_thread_engagement() -> None:
     row = fasteners.PIVOT_SCREW_TO_BLOCK
-    assert row.engagement_mm == pivot_screw.THREAD_LENGTH == 13.0
-    assert row.engagement_mm >= 1.5 * pivot_screw.THREAD_DIA
+    assert row.engagement_mm == pivot_block.PIVOT_THREAD_ENGAGEMENT
+    assert row.engagement_mm == pytest.approx(pivot_screw.THREAD_LENGTH - 1.5 * pivot_screw.THREAD_PITCH)
+    assert row.engagement_mm < 1.5 * pivot_screw.THREAD_DIA  # RV-05's accepted shortfall
+    assert spec.PIVOT_SCREW_PRELOAD_N * 3.0 < spec.PIVOT_THREAD_STRIP_N
     assert row.torque_nm == 4.0
     assert row.threadlocker == "Loctite 222"
     for index, ((block, _rows), (screw, screw_rows)) in enumerate(zip(

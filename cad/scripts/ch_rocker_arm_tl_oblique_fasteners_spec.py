@@ -249,7 +249,9 @@ class ShoulderScrew:
 
     @property
     def engagement_mm(self) -> float:
-        return min(self.thread_length_mm, pivot_block.BLOCK_HEIGHT - self.counterbore_depth_mm)
+        # Full-form thread only (rule 18): less 1.5 incomplete pitches.
+        full_thread = self.thread_length_mm - 1.5 * pivot_screw.THREAD_PITCH
+        return min(full_thread, pivot_block.BLOCK_HEIGHT - self.counterbore_depth_mm)
 
 
 PIVOT_SCREW_TO_BLOCK = ShoulderScrew()
