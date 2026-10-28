@@ -160,8 +160,8 @@ BOUNDARY_COLOR = 0  # COLORREF black, the outline's colour.
 # Each circled detail's parent view, by the orientation the detail shares with
 # it. A and B are bounded on RIGHT, where the stud and the hanger screw both
 # show (on FRONT the strap hides the stud); D on FRONT, which it enlarges.
-# D's letter stands at its circle's upper left: the marker's grip block fills
-# the upper right on FRONT.
+# A and B are lettered at their circles' upper right, D at its upper left:
+# the marker's grip block fills the upper right on FRONT.
 BOUNDED_ON = {"stud": "*Right", "hanger": "*Right", "stirrup": "*Front"}
 LETTERED_LEFT = frozenset(("stirrup",))
 # C, the turned plan, is named by a viewing arrow on FRONT instead
@@ -989,10 +989,11 @@ def _mark_detail_boundary(
     adapter: Any, parent: Any, detail: Detail
 ) -> tuple[tuple[float, float], float]:
     """The detail's boundary on its parent view: a black circle round what
-    the detail shows, lettered at its upper right, or its upper left for
-    ``LETTERED_LEFT`` (machinist review, farm run 20261016T082735510Z: the
-    fitter could not tell where A and B come from; run 20261024T091056564Z:
-    nor D). Returns the circle's sheet centre and radius as read back."""
+    the detail shows, lettered clear of it at its upper right, or its upper
+    left for ``LETTERED_LEFT`` (machinist review, farm run
+    20261016T082735510Z: the fitter could not tell where A and B come from;
+    run 20261024T091056564Z: nor D). Returns the circle's sheet centre and
+    radius as read back."""
     label = f"{detail.label} boundary"
     requested = model_point_in_view(adapter, parent, detail.model_centre_m, label=label)
     radius = detail.radius_mm * SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
@@ -1017,25 +1018,25 @@ def _mark_detail_boundary(
             f"requested {requested!r} radius {radius!r}"
         )
     radius = drawn
-    letter = notes.DETAIL_LETTERS[detail.key]
-    if detail.key not in LETTERED_LEFT:
-        reach = radius * math.sqrt(0.5) + DETAIL_LETTER_GAP
-        _label_view(
-            adapter, parent, letter, (centre[0] + reach, centre[1] + reach), label=label
-        )
-        return centre, radius
-    # Upper left, the letter's measured box is moved so its lower-right corner
-    # sits on the circle's upper-left 45 degree ray, DETAIL_LETTER_GAP outside
-    # the rim; the whole box then lies up and left of that corner, clear of the
-    # circle. Placing it by an assumed glyph size left the corner 0.4 mm inside
-    # the gap once the glyph read 3.4 x 4.7 mm (rolling main 6d7f35476).
+    # The letter's measured box is moved so its lower corner nearer the circle
+    # sits on the circle's upper 45 degree ray on that side, DETAIL_LETTER_GAP
+    # outside the rim; the whole box then lies above and outside that corner,
+    # clear of the circle, whatever the glyph measures. An assumed glyph size
+    # left D's corner inside the gap (rolling main 6d7f35476), and A and B,
+    # hung down from the 45 degree point, sat on their own arcs (machinist
+    # review, farm run 20261028T064301322Z).
+    side = -1.0 if detail.key in LETTERED_LEFT else 1.0
     clear = (radius + DETAIL_LETTER_GAP) * math.sqrt(0.5)
-    corner = (centre[0] - clear, centre[1] + clear)
-    note, box = _view_note(adapter, parent, letter, corner, label=label)
-    box = _move_note(
-        adapter, note, (corner[0] - box[2], corner[1] - box[1]), label=label
+    corner = (centre[0] + side * clear, centre[1] + clear)
+    note, box = _view_note(
+        adapter, parent, notes.DETAIL_LETTERS[detail.key], corner, label=label
     )
-    if math.dist((box[2], box[1]), corner) > DETAIL_POSITION_TOL_M:
+    near_x = box[2] if side < 0 else box[0]
+    box = _move_note(
+        adapter, note, (corner[0] - near_x, corner[1] - box[1]), label=label
+    )
+    near_x = box[2] if side < 0 else box[0]
+    if math.dist((near_x, box[1]), corner) > DETAIL_POSITION_TOL_M:
         raise RuntimeError(f"{label}: letter {box!r} did not land at {corner!r}")
     _telemetry.info(f"{label}: circle {centre!r} r {radius!r}, letter {box!r}")
     return centre, radius
