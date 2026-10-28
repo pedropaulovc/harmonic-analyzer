@@ -13,7 +13,8 @@ import sys
 from typing import Any
 from _check import check
 from _com import _early_bound
-from _drawing_common import DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, rebuild_drawing
+from _drawing_common import (DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, rebuild_drawing,
+                             remove_notes_matching)
 from _drawing_dimensions import assert_imported_precision, dimension_name, offset_dimension_text
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
@@ -39,6 +40,9 @@ PART_STEM = SPEC.artifact_stem
 SOURCE = CAD_ROOT / 'out' / 'sldprt' / f'{PART_STEM}.SLDPRT'
 OUTPUTS = DrawingOutputs(slddrw=SPEC.outputs['slddrw'],pdf=SPEC.outputs['pdf'],png=SPEC.outputs['png'])
 SHEET_SCALE = (1.0,1.0)
+# SolidWorks' own descriptive note for TL-32's Hole Wizard nut taps; the native
+# tap callout already states the thread.
+TAPPED_HOLE_NOTE = '#4-40 Tapped Hole'
 # Sheet metres. The plan sits at x .170 so the 112 mm REAM text, the tap
 # callout and the 4X callouts fit left of it inside the border, with short
 # leaders. Plan geometry on the sheet: block x 139..201, y 185..225; frame
@@ -484,16 +488,23 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     precision = {name:places for dims in contract.DRAWING_PRECISION.values()
                  for name,places in dims.items() if name in kept}
     assert_imported_precision(adapter,annotations,precision)
+    if is_feed:
+        # SolidWorks pins its own TAPPED_HOLE_NOTE once per view that picks up
+        # the one NutTaps feature, and which views do is its choice: the same
+        # recipe and model printed 1 on main 6d7f35476 and 2 on 1e2b7b540
+        # (draw_fr_top_frame._auto_tapped_hole_notes). So the count is logged
+        # by sheet, not gated, and finalize's sweep proves none reaches the print.
+        removed = {}
+        for sheet_name in sheets:
+            drawing.ActivateSheet(sheet_name)
+            removed[sheet_name] = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)
+        _telemetry.info(f'removed automatic {TAPPED_HOLE_NOTE!r} notes by sheet: {removed}')
     drawing.ActivateSheet(sheets[0])
     outputs = DrawingOutputs(slddrw=spec.outputs['slddrw'],pdf=spec.outputs['pdf'],png=spec.outputs['png'])
     return await finalize_drawing(adapter,outputs,pdf_title='Rocker Oblique Trammel Block Manufacturing Drawing',
                                   scale=SHEET_SCALE,layout=spec.layout,sheet_scales=sheet_scales,
-                                  # SolidWorks pins its own "#4-40 Tapped Hole" notes by the nut
-                                  # taps, whose Hole Wizard callout already states the thread.
-                                  # Finalize's all-sheet sweep: farm run 20261024T115707908Z (1:1
-                                  # C-C) found 1.
-                                  redundant_note_substrings=('#4-40 Tapped Hole',) if is_feed else (),
-                                  expected_redundant_notes=1 if is_feed else 0)
+                                  redundant_note_substrings=(TAPPED_HOLE_NOTE,) if is_feed else (),
+                                  expected_redundant_notes=0)
 
 
 async def build(adapter):
