@@ -2,7 +2,7 @@ r"""MHA-PD-15 transgear-knob-thrust-ring: the loose brass ring in front of the p
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  The ring rides the knob shaft's (MHA-PD-08) Ø6 g6 journal between the
-12T's rear face and the arm plate's front hub face (contract §1.7, round 6
+pinion's rear face and the arm plate's front hub face (contract §1.7, round 6
 K5: the journal runs straight in the steel plate, no bushing).  It is loose:
 located by the journal, it rotates with the shaft or not.  Its length is the
 FORWARD stop of the knob's end-float pair (the cup behind the rear boss is
@@ -12,7 +12,7 @@ The O.D. stands a little proud of the plate's front hub radially (book p.59:
 a brass ring slightly larger than the silver hub).
 
 Part frame: axis local +Y through the origin (``Axis1``); the front face
-(on the 12T) is the Top Plane, y = 0; the rear face (on the plate hub's front
+(on the pinion) is the Top Plane, y = 0; the rear face (on the plate hub's front
 face) is y = LENGTH.
 """
 
@@ -35,7 +35,7 @@ ID = 6.05
 ID_BAND = (drilled_oversize_mm(), 0.0)  # (upper, lower) deviations
 LENGTH = 5.2
 # The forward stop of the knob's end float (contract §12): explicit ± band.
-# It spaces the knob shaft's 12T (MHA-PD-08) from the arm plate's front hub
+# It spaces the knob shaft's pinion (MHA-PD-08) from the arm plate's front hub
 # (MHA-PD-19), so the knob's F datum, chain plane and disc/platen gap stacks
 # (paper_drive_arm_registration, the paper-drive assembly) consume it; the
 # sheet names that stack at the callout (drawing-guidelines rule 4).
@@ -69,9 +69,9 @@ if WALL_WORST < WALL_FLOOR - 1e-9:
 # The sheet: the bore's process under its size.
 BORE_CALLOUT = "DRILL THRU"
 # drawing-guidelines.md rule 4: the length's ± band names the stack it
-# serves -- the ring spaces the knob shaft's 12T from the arm plate's hub.
+# serves -- the ring spaces the knob shaft's pinion from the arm plate's hub.
 LENGTH_CALLOUT = (
-    f"SPACES {_config.parts('pd-transgear-knob-shaft')['number']} 12T\n"
+    f"SPACES {_config.parts('pd-transgear-knob-shaft')['number']} PINION\n"
     f"FROM {_config.parts('pd-transgear-arm-plate')['number']} HUB"
 )
 # Below-text the part build authors on its source dimensions; the drawing
@@ -82,7 +82,7 @@ DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
     "Ring": {"RingLength": LENGTH_CALLOUT},
 }
 
-# Both faces are thrust faces (12T in front, plate hub behind): MACHINED, on
+# Both faces are thrust faces (pinion in front, plate hub behind): MACHINED, on
 # the exact native faces the part build resolves.
 SURFACE_FINISHES = (
     SurfaceFinishControl("front_face", MACHINED_UM, PlanarFace((0.0, -1.0, 0.0), 0.0)),

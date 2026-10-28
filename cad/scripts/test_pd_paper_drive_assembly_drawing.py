@@ -1134,7 +1134,7 @@ def test_no_retired_part_is_named_on_the_sheet() -> None:
 
 
 def test_the_knob_stack_prints_front_to_rear() -> None:
-    """Contract §1: thumbnut | knob wheel | collar | 12T | ring | plate hub | plate |
+    """Contract §1: thumbnut | knob wheel | collar | pinion | ring | plate hub | plate |
     rear boss | cup | screw."""
     body = _step_body("knob-stack-fitted")
     order = [
