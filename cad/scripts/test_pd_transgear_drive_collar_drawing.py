@@ -431,7 +431,7 @@ def test_body_rear_face_reacts_at_f_over_the_whole_fitted_domain() -> None:
     note = _note(drawing.BODY_NOTE)
     assert spec.BODY_LENGTH_CALLOUT.replace("\n", ", ") in note
     assert note.endswith(f"PER {steps.step_ref(drawing.BODY_FIT_STEP_KEY)}.")
-    assert "SEATED ON MHA-PD-08 12T FRONT FACE" in note
+    assert "SEATED ON MHA-PD-08 15T FRONT FACE" in note
     assert f"{spec.BODY_BLANK_LENGTH_MIN:.3f} MIN" in note
     assert spec.THUMBNUT_ENGAGEMENT_WORST >= shaft.ENGAGEMENT_FLOOR_D * shaft.THREAD_MAJOR
     assert spec.FRONT_BEARING_AREA_MIN > 0.0

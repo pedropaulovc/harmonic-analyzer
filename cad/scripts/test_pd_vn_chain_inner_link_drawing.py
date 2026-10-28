@@ -25,7 +25,7 @@ def test_registry_row_is_the_bought_chain_not_a_machined_part() -> None:
 
 def test_quantity_is_half_the_loop_and_matches_the_bom() -> None:
     quantity = int(ROW["configuration_quantities"][CONFIGURATION])
-    assert quantity * 2 == _chain.LINK_COUNT == 68
+    assert quantity * 2 == _chain.LINK_COUNT == 66
     assert int(ROW["quantity"]) == sum(ROW["configuration_quantities"].values())
     assert assembly_drawing.CHAIN_QUANTITIES[BOM_KEY] == quantity
     assert assembly_drawing.CHAIN_QUANTITIES["pd-vn-chain-connecting-link"] == 1

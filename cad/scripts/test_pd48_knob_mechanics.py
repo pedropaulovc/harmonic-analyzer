@@ -1,4 +1,4 @@
-"""Pure mechanical corner contracts for the actual 12T48DP integral knob.
+"""Pure mechanical corner contracts for the actual 48DP integral knob pinion.
 
 No native part/build/drawing imports. Parent integration owns executing these
 alongside the migrated stack tests and the native/farm gates.
@@ -6,6 +6,7 @@ alongside the migrated stack tests and the native/farm gates.
 
 from __future__ import annotations
 
+import importlib.util
 import math
 
 import pytest
@@ -24,12 +25,12 @@ from paper_drive_stock_envelope import (
 
 
 def test_actual_stock_master_and_real_printed_span_family():
-    assert shaft.TEETH == 12
+    assert shaft.TEETH == 15
     assert shaft.DIAMETRAL_PITCH == 48.0
     assert shaft.PRESSURE_ANGLE_DEG == 20.0
-    assert shaft.CUTTER_TEMPLATE.reference_teeth == 12
-    assert shaft.CUTTER_NUMBER == 8
-    assert shaft.CUTTER_TOOTH_RANGE == (12, 13)
+    assert shaft.CUTTER_TEMPLATE.reference_teeth == 14
+    assert shaft.CUTTER_NUMBER == 7
+    assert shaft.CUTTER_TOOTH_RANGE == (14, 16)
     assert not hasattr(shaft, "PROFILE_SHIFT")
     profiles = shaft.manufactured_profiles()
     assert len(profiles) == 4
@@ -37,18 +38,47 @@ def test_actual_stock_master_and_real_printed_span_family():
     assert {p.blank_radius_mm for p in profiles} == {
         (shaft.OUTSIDE_DIA + d) / 2.0 for d in shaft.OUTSIDE_DIA_BAND
     }
-    # OUTWARD printing admits a slightly negative T; ignoring it is unsafe.
-    assert shaft.RADIAL_SETTING_LIMITS[0] < 0.0
-    assert shaft.RADIAL_SETTING_LIMITS[1] > 0.010
+    # OUTWARD printing widens the ±0.005 design band on both sides; holding
+    # the shop to the design band alone would reject accepted spans.
+    high, low = shaft._SPAN_DESIGN_SETTING_BAND
+    assert shaft.RADIAL_SETTING_LIMITS[0] < shaft.RADIAL_SETTING + low
+    assert shaft.RADIAL_SETTING_LIMITS[1] > shaft.RADIAL_SETTING + high
+    assert shaft.RADIAL_SETTING_LIMITS == pytest.approx(
+        (0.2609517064666221, 0.27103193914373097)
+    )
     for profile in profiles:
         error = 2.0 * profile.geometry_error_bound_mm + 8.0 * math.ulp(shaft.SPAN_NOMINAL)
         assert shaft.SPAN_LIMITS[0] - error <= (
             profile.tangent_span_mm(shaft.SPAN_TEETH)
         ) <= shaft.SPAN_LIMITS[1] + error
         profile.require_tip_land(0.25 * shaft.MODULE_MM)
-    assert shaft.ROOT_DIA_EXACT_MIN < 5.027083333333334
+    # Deeper than the standard 1.25-module dedendum root at the deepest corner.
+    assert shaft.ROOT_DIA_EXACT_MIN < shaft.PITCH_DIA - 2.5 * shaft.MODULE_MM
+    assert shaft.ROOT_DIA_EXACT_MIN == pytest.approx(6.6050463363483365)
     assert shaft.ROOT_DIA_MIN <= shaft.ROOT_DIA_EXACT_MIN
-    assert shaft.CUTTER_SUPPORT_MARGIN_MIN > 0.004
+    assert shaft.ROOT_DIA_MIN == 6.60
+    # The disc's convention: the finite tip vector at the lowest accepted
+    # setting caps the blank; the margin is the 0.01 floor's remainder.
+    assert shaft.CUTTER_SUPPORT_MARGIN_MIN > 0.0
+    assert shaft.CUTTER_SUPPORT_MARGIN_MIN == pytest.approx(1.32789629217811e-4, abs=1e-9)
+    # Negative control: a blank 0.001 over the printed tip limit is unsupported.
+    support = shaft._MIN_SETTING_SUPPORT
+    assert (
+        support.support_radius_max_mm - support.geometry_error_bound_mm
+        - (shaft.OUTSIDE_DIA + max(shaft.OUTSIDE_DIA_BAND) + 0.001) / 2.0
+    ) < 0.0
+    # Same construction as the disc: both blanks are the floored support.
+    for spec in (shaft, shaft.DISC):
+        lowest = spec._MIN_SETTING_SUPPORT
+        floored = math.floor(
+            (
+                2.0 * lowest.support_radius_max_mm
+                - 2.0 * lowest.geometry_error_bound_mm
+                - spec.OUTSIDE_DIA_BAND[0]
+            )
+            * 100.0
+        ) / 100.0
+        assert spec.OUTSIDE_DIA == floored
 
 
 def test_actual_pin_is_supported_at_every_manufactured_corner():
@@ -85,8 +115,12 @@ def test_true_front_disk_clears_active_core_and_both_neck_corners():
     assert neck_air == pytest.approx(shaft.FRONT_NECK_AIR_MIN)
     assert core_air > 0.035
     assert neck_air > 0.320
-    # The old unstepped front core is a concrete physical counterexample.
-    assert root_min - 6.345 / 2.0 < 0.0
+    # Negative control: a core grown to the printed root limit has no air
+    # once its runout and the tooth-space TIR are charged.
+    assert root_min - (
+        shaft.ROOT_DIA_MIN / 2.0 + shaft.CORE_TOTAL_RUNOUT / 2.0
+        + shaft.TOOTH_SPACE_RUNOUT_TIR_MM / 2.0
+    ) - error < 0.0
     for profile in profiles:
         lo, hi = cutter_end_volume_bounds_mm3(
             profile, shaft.CUTTER_DIA,
@@ -115,7 +149,8 @@ def test_physical_flat_terminal_has_two_actual_end_limits():
     # The tool end lies in air: its limits print once, in the notes, from
     # these constants, not as dimensions on invisible geometry.
     assert not {"FlatEnd", "FlatToolRadius"} & shaft.DRAWING_DIMENSIONS["CoreFlatProfile"]
-    assert "TOOL END 0.05-0.17 FROM 12T FRONT FACE" in shaft.CORE_FLAT_TOOL_REACH_NOTE
+    assert shaft.TEETH == 15
+    assert "TOOL END 0.05-0.17 FROM 15T FRONT FACE" in shaft.CORE_FLAT_TOOL_REACH_NOTE
     assert "R0.100 MAX" in shaft.CORE_FLAT_TOOL_REACH_NOTE
     assert shaft.FRONT_RELIEF_WIDTH_MIN > 2.0 * shaft.FRONT_CORNER_RADIUS_MAX
 
@@ -155,25 +190,62 @@ def test_shortened_drive_face_is_real_not_old_full_core_length():
     assert collar.BODY_REAR_FACE_FROM_F == 0.0
 
 
-def test_rear_disk_chord_uses_deep_ground_x_not_polar_root():
+def _journal_envelope_removal(profile, journal_dia: float) -> tuple[float, float]:
+    """The disk end's removal over a journal of ``journal_dia`` with the TIR."""
+    return cutter_end_volume_bounds_mm3(
+        profile, shaft.CUTTER_DIA,
+        outer_radius_mm=(journal_dia + shaft.TOOTH_SPACE_RUNOUT_TIR_MM) / 2.0,
+        inner_radius_mm=0.0, start_offset_mm=0.0, end_offset_mm=shaft.JOURNAL_LENGTH,
+        absolute_error_mm3=0.001,
+    )
+
+
+def _spec_with_journal_band(monkeypatch, band: tuple[float, float]):
+    """A fresh execution of the shaft spec with the g6 journal band patched."""
+    monkeypatch.setattr(fits, "SHAFT_G6_3_TO_6_MM", band)
+    fresh_spec = importlib.util.spec_from_file_location(
+        "_knob_shaft_perturbed", shaft.__file__
+    )
+    fresh = importlib.util.module_from_spec(fresh_spec)
+    fresh_spec.loader.exec_module(fresh)
+    return fresh
+
+
+def test_straight_through_cutter_clears_the_journal_at_worst_case(monkeypatch):
+    # #2034: every gap is cut straight through the face; the cutter runs out
+    # over the journal, whose largest g6 size stays under the formed root.
     assert shaft.CUTTER_DIA == 44.45
     assert shaft.CUTTER_ARBOR_BORE == 22.225
-    deep_x = min(p.root_point(p.root_half_angle_rad)[0] for p in shaft.manufactured_profiles())
-    assert deep_x == shaft.ROOT_DEPTH_X_MIN
-    assert deep_x < shaft.ROOT_DIA_EXACT_MIN / 2.0
-    rise = (
-        (shaft.JOURNAL_DIA + max(shaft.JOURNAL_DIA_BAND)) / 2.0
-        + shaft.TOOTH_SPACE_RUNOUT_TIR_MM / 2.0 - deep_x
-    )
-    end = shaft.FULL_DEPTH_MAX + math.sqrt(shaft.CUTTER_DIA * rise - rise**2)
-    assert end == pytest.approx(shaft.CUTTER_RUNOUT_END_WORST)
-    assert end < 9.59  # 10.6 printed limit less its 1.0 margin (0.05 TIR)
-    assert shaft.CUTTER_RUNOUT_MAX - end > 1.0
-    assert shaft.HUB_BORE_FROM_F_WORST == pytest.approx(10.92)
-    assert shaft.CUTTER_RUNOUT_MAX < shaft.HUB_BORE_FROM_F_WORST
-    old_rise = (8.5 - 0.005) / 2.0 + shaft.TOOTH_SPACE_RUNOUT_TIR_MM / 2.0 - deep_x
-    old_end = shaft.FULL_DEPTH_MAX + math.sqrt(shaft.CUTTER_DIA * old_rise - old_rise**2)
-    assert old_end > shaft.CUTTER_RUNOUT_MAX
+    assert shaft.CUTTER_SKU == "10-289-487"
+    profiles = shaft.manufactured_profiles()
+    journal_max = shaft.JOURNAL_DIA + max(shaft.JOURNAL_DIA_BAND)
+    assert journal_max == pytest.approx(5.996)
+    air = (
+        2.0 * min(p.root_radius_min_mm for p in profiles)
+        - journal_max - shaft.TOOTH_SPACE_RUNOUT_TIR_MM
+    ) / 2.0 - max(p.geometry_error_bound_mm for p in profiles)
+    assert air == pytest.approx(shaft.JOURNAL_CUTTER_AIR_MIN)
+    assert shaft.JOURNAL_CUTTER_AIR_FLOOR == 0.035
+    assert shaft.JOURNAL_CUTTER_AIR_MIN > shaft.JOURNAL_CUTTER_AIR_FLOOR
+    assert shaft.JOURNAL_CUTTER_AIR_MIN == pytest.approx(0.27952316817391276)
+    # The independent disk-envelope oracle removes nothing from the journal.
+    for profile in profiles:
+        lo, hi = _journal_envelope_removal(profile, journal_max)
+        assert lo == 0.0
+        assert hi < 1e-6
+    # Negative control: a Ø6.7 journal stands in the cutter's path; the
+    # envelope removes real stock from it and the spec refuses to load.
+    assert (
+        shaft.ROOT_DIA_EXACT_MIN - 6.7 - shaft.TOOTH_SPACE_RUNOUT_TIR_MM
+    ) / 2.0 < 0.0
+    lo, _hi = _journal_envelope_removal(shaft.STOCK_PROFILE, 6.7)
+    assert lo > 0.0
+    real_band = fits.SHAFT_G6_3_TO_6_MM
+    with pytest.raises(AssertionError, match="over the journal"):
+        _spec_with_journal_band(monkeypatch, (0.700, 0.690))
+    # Positive control: the same fresh execution with the real band loads.
+    fresh = _spec_with_journal_band(monkeypatch, real_band)
+    assert fresh.JOURNAL_CUTTER_AIR_MIN == pytest.approx(shaft.JOURNAL_CUTTER_AIR_MIN)
 
 
 def test_bearing_material_charges_breaks_axis_error_and_loose_float():
@@ -181,14 +253,19 @@ def test_bearing_material_charges_breaks_axis_error_and_loose_float():
     # Regression value, not a load floor: the spec's physical gate is a
     # positive face. It charges bore, entry break, D-axis error at F and
     # half the 0.05 tooth-space TIR, so it sits below the uncharged ring.
-    assert collar.FRONT_BEARING_AREA_MIN == pytest.approx(7.9219, abs=1e-3)
+    assert collar.FRONT_BEARING_AREA_MIN == pytest.approx(23.2357, abs=1e-3)
     assert shaft.RING_TRANSVERSE_FLOAT_MAX >= (ring.ID + max(ring.ID_BAND) - shaft.JOURNAL_DIA_MIN) / 2.0
-    assert shaft.RING_TRANSVERSE_FLOAT_MAX == pytest.approx(0.10960380794239155)
+    assert shaft.RING_TRANSVERSE_FLOAT_MAX == pytest.approx(0.10828384499329324)
     assert collar.D_SUPPORT_LENGTH_MIN == pytest.approx(4.072234843105)
     assert collar.D_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.058542058772)
-    assert shaft.REAR_BEARING_INNER_RADIUS_MAX >= 3.4585
+    assert shaft.REAR_BEARING_INNER_RADIUS_MAX == pytest.approx(3.458283844993293)
+    assert shaft.REAR_BEARING_INNER_RADIUS_MAX > shaft.ROOT_DIA_EXACT_MIN / 2.0
     assert shaft.REAR_BEARING_AREA_MIN > 1.0
-    assert shaft.REAR_BEARING_AREA_MIN < 2.0  # not the uncharged centred claim
+    assert shaft.REAR_BEARING_AREA_MIN == pytest.approx(11.326745529792383)
+    # Not the uncharged centred claim on the bare ring bore.
+    centred = shaft.gear_bearing_area_lower(shaft.STOCK_PROFILE, ring.ID / 2.0)
+    assert centred == pytest.approx(18.906670346162162)
+    assert shaft.REAR_BEARING_AREA_MIN < centred
     assert shaft.gear_bearing_area_lower(shaft.STOCK_PROFILE, shaft.OUTSIDE_DIA) == 0.0
     with pytest.raises(ValueError):
         shaft.gear_bearing_area_lower(shaft.STOCK_PROFILE, -1.0)
@@ -215,20 +292,24 @@ def test_retained_walls_and_axial_stations_need_no_new_waiver():
 def test_actual_arbor_mount_has_room_and_a_manufacturable_spacer_wall():
     assert shaft.CUTTER_MOUNT_OD_MAX == 31.75
     assert (shaft.CUTTER_MOUNT_OD_MAX - shaft.CUTTER_ARBOR_BORE) / 2.0 >= 2.0
+    # The arbor stands on the deepest ground X, not the polar root radius.
+    deep_x = min(p.root_point(p.root_half_angle_rad)[0] for p in shaft.manufactured_profiles())
+    assert deep_x == shaft.ROOT_DEPTH_X_MIN
+    assert deep_x < shaft.ROOT_DIA_EXACT_MIN / 2.0
     assert shaft.CUTTER_MOUNT_AIR_MIN > 5.0
+    assert shaft.CUTTER_MOUNT_AIR_MIN == pytest.approx(5.124269671663278)
 
 
-def test_complete_nominal_volume_includes_d_neck_and_true_endcut_interval():
-    lo, hi = shaft.expected_volume_bounds_mm3(absolute_error_mm3=0.05)
+def test_complete_nominal_volume_is_straight_full_face_gaps():
+    lo, hi = shaft.expected_volume_bounds_mm3()
     assert 0.0 < lo <= hi
-    assert hi - lo <= 0.05 + 1e-7
-    far_lo, far_hi = cutter_end_section_area_bounds_mm2(
-        shaft.STOCK_PROFILE, shaft.CUTTER_DIA,
-        outer_radius_mm=shaft.JOURNAL_DIA / 2.0,
-        inner_radius_mm=0.0, offset_mm=30.0, absolute_error_mm2=0.001,
-    )
-    assert far_lo == 0.0
-    assert far_hi < 1e-6
+    assert hi - lo <= 1e-6
+    gaps = shaft.TEETH * shaft.STOCK_PROFILE.gap_area_mm2 * shaft.FACE_WIDTH
+    assert gaps > 0.0
+    # Negative control: the retired straight pass to 4.65 of the 5.9 face,
+    # without its endcut, leaves stock the full-face oracle refuses.
+    left = shaft.TEETH * shaft.STOCK_PROFILE.gap_area_mm2 * (shaft.FACE_WIDTH - 4.65)
+    assert lo + left > hi + 1.0
     with pytest.raises(ValueError, match="finite ground tip/closure"):
         cutter_end_volume_bounds_mm3(
             shaft.STOCK_PROFILE, shaft.CUTTER_DIA,
@@ -284,13 +365,14 @@ def test_production_recipe_contains_real_profile_cap_and_grade_sources(builder):
     modules = {Path(path).stem for path in graph.module_deps_of(script)}
     assert {
         "pd_transgear_knob_shaft_spec",
-        "paper_drive_stock_envelope",
         "paper_drive_stock_inspection",
         "stock_form_cutter",
         "_fit_deviations",
         "_gear_quality",
         "_config",
     } <= modules
+    # The retired rear endcut model no longer reaches the recipe's cache key.
+    assert "paper_drive_stock_envelope" not in modules
     tokens = graph.config_files_of(script)
     assert "tolerances/stock_form_quality.yaml" in tokens
     assert "test_pd48_knob_mechanics" not in modules

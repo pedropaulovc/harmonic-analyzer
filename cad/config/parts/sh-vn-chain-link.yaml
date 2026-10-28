@@ -8,10 +8,10 @@ sh-vn-chain-link:
   material_specification: Steel, McMaster-Carr 6261K171
   finish: as supplied; supplier states no coating
   # Installed members, not purchased chains; stock is sold by the foot.
-  quantity: 67
+  quantity: 65
   default_configuration: InnerLink
   configuration_quantities:
-    InnerLink: 34
-    OuterLink: 33
+    InnerLink: 33
+    OuterLink: 32
   tolerance_class: machined_block
   process: purchased

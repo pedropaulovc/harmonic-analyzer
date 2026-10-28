@@ -2,7 +2,7 @@
 
 Net platen feed per CRANK revolution with the selected crank / knob removables
 mounted: chain (tooth ratio, ``pd_transgear_removable_spec``) x
-knob-shaft 12T/disc reduction x
+knob-shaft pinion/disc reduction x
 feed-pinion reference pitch circumference on the 32DP rack. Every stage is a real mate in
 ``build_paper_drive_assembly``. This pure module also owns the canonical
 paper/pen anchors, accepted-source loaded geometry enclosures and quantitative
@@ -48,7 +48,7 @@ MM_PER_IN = 25.4
 CHAIN_RATIO = (
     pd_transgear_removable_spec.CRANK_TEETH / pd_transgear_removable_spec.KNOB_TEETH
 )  # knob turns per crank turn
-GEAR_RATIO = pd_transgear_knob_shaft_spec.TEETH / pd_rack_pinion_spec.TEETH  # 12:120
+GEAR_RATIO = pd_transgear_knob_shaft_spec.TEETH / pd_rack_pinion_spec.TEETH  # 15:150
 FEED_PITCH_DIA = pd_transgear_feed_pinion_spec.PITCH_DIA
 # Profile shift changes mounting distance, not the reference rolling pitch.
 NET_RACK_TRAVEL_PER_CRANK_REV = CHAIN_RATIO * GEAR_RATIO * math.pi * FEED_PITCH_DIA

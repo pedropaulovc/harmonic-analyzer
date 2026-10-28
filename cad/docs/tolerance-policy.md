@@ -90,9 +90,12 @@ Gear tips take `fits.gear_tip` in `tolerances/gear_tip.yaml` (read through
 `_gear_fit_limits.gear_tip_band_mm`), not the routine title-block band: an oversize
 tip eats root air and an undersize tip shortens the path of contact.
 `standard` (+0.00/−0.10 mm) is the default. `contact_critical` (+0.00/−0.02 mm)
-is kept only where a mesh gate needs it: the 12T knob-shaft pinion, whose
-12T:120T reducer contact ratio at the nominal centre is 1.207 at Ø7.38 (floor
-1.2) and would fall to 1.191 at −0.05. The 32T alignment and 120T cylinder
+is kept only where a mesh gate needs it: the knob-shaft pinion. It was set for
+the 12T:120T reducer, whose contact ratio at the nominal centre was 1.207 at
+Ø7.38 (floor 1.2). The 15T:150T reducer (#2034) reaches 1.305 at its nominal
+centre, but the far end of its set band, 43.844, holds 1.214 against that
+floor. A −0.10 tip costs about 0.05 of contact ratio and would take that end
+to 1.167, below it. The 32T alignment and 120T cylinder
 tips were contact-critical until the stack6 machinist review. At −0.10 every
 drive-train check still passes: alignment backlash, root air and interference,
 and cone root air, backlash and interference. Only the reported contact

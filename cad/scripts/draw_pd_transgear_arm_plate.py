@@ -113,7 +113,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# The plate is 56 x 38 in plan and 29 deep: at 2:1 the plan, the back view
+# The plate is 62 x 38 in plan and 29 deep: at 2:1 the plan, the back view
 # and section A-A stand side by side above the title block (x > 0.216 below
 # y 0.066). The section stands far enough right that its hub diameter clears
 # the back view's notch height and its boss diameter ends inside the border
@@ -127,9 +127,14 @@ VIEW_SCALE = (2, 1)
 # title block (it reached y 0.085).
 PLAN_CENTER = (0.080, 0.153)
 BACK_CENTER = (0.218, PLAN_CENTER[1])
-SECTION_CENTER = (0.343, PLAN_CENTER[1])
-ISO_CENTER = (0.180, 0.045)
-ISO_NOTE_XY = (0.150, 0.081)
+# 5 mm above the plan's line since #2034: the 15:150 plate is 12.7 taller on
+# the sheet, and on the plan's line the section's caption reached the title
+# block (run 20261028T024319752Z). Sections here are not projection-locked.
+SECTION_CENTER = (0.343, PLAN_CENTER[1] + 0.005)
+# 3 mm lower than before #2034: the 15:150 plate stands 6.4 taller, so the
+# back view's edge dimensions reach 3 mm nearer the isometric's caption.
+ISO_CENTER = (0.180, 0.042)
+ISO_NOTE_XY = (0.150, 0.078)
 # Bottom left, under the plan view's bore frame (its bottom y 0.081), left
 # of the isometric.
 NOTES_XY = (0.014, 0.075)
@@ -181,12 +186,15 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "EndR": (0.7071 * END_R + 6.0, -0.7071 * END_R - 6.0, _Z_PLAN),
     "BoreDia": (EDGE_MINUS_X - 4.0, _BOTTOM - 6.0, _Z_PLAN),
     "ScrewHoleDia": (EDGE_MINUS_X - 6.0, _TOP + 8.0, _Z_PLAN),
-    "CskDia": (EDGE_PLUS_X + 8.0, _TOP + 8.0, _Z_PLAN),
+    # 2.5 under the drill callout's height since #2034: with the taller plate
+    # its "2X" reached hole 2's position frame (FRAME_ROWS[2]) above it.
+    "CskDia": (EDGE_PLUS_X + 8.0, _TOP + 5.5, _Z_PLAN),
     "LocatorX1": (LOCATOR_SITES_MM[0][0] / 2.0, PLAN_ROWS[2], _Z_PLAN),
     # High enough that its callout lines clear the screw-hole callout; three
     # short lines keep its left edge inside the border. Its leader runs down
-    # to locator 1 left of every location dimension line.
-    "LocatorDia1": (EDGE_MINUS_X - 4.5, _TOP + 23.75, _Z_PLAN),
+    # to locator 1 left of every location dimension line. 1.75 lower than
+    # before #2034, whose taller plate put its top line on the border.
+    "LocatorDia1": (EDGE_MINUS_X - 4.5, _TOP + 22.0, _Z_PLAN),
 }
 # Back view (the mounting face): the notch face's corner heights, outboard,
 # and both side edges from K below the end round, clear of every leader.
@@ -389,11 +397,12 @@ async def build(adapter: Any) -> dict[str, str]:
     plan_edges = scan_view_edges(plan, label="plate rear-face locating PMI")
     back_edges = scan_view_edges(back, label="plate mounting-face drill PMI")
     placements = {
-        # Above section A-A's station stack (its top text reaches y 0.2365),
-        # so the tag's horizontal leader to the mounting face's extension
-        # runs clear of the HubFaceToMounting text.
+        # Above section A-A's station stack (its top text reaches y 0.2485
+        # since #2034 raised the section: run 20261028T032002538Z), so the
+        # tag's horizontal leader to the mounting face's extension runs
+        # clear of the HubFaceToMounting text.
         "datum:A": PmiDrawingPlacement(
-            section, (0.300, 0.244),
+            section, (0.300, 0.253),
             attachment_xy=_sheet_xy(
                 adapter, section, (0.0, SCREW_HOLES[0][1], 0.0),
                 "plate mounting datum",

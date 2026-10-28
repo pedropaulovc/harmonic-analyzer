@@ -19,10 +19,11 @@ def test_both_meshes_pass_the_standard_gates() -> None:
     assert mesh.reducer_mesh().failures() == []
 
 
-def test_reducer_centre_band_is_plus_only_from_the_interference_limit() -> None:
-    # Fine-pitch practice: nominal +x/-0. The nominal sits just above the
-    # interference point at the tight runout extreme; the allowance is the
-    # radius of K's drawn setting circle, inside the catalogue +0.002 in.
+def test_reducer_centre_band_is_plus_only_inside_the_gate_window() -> None:
+    # Fine-pitch practice: nominal +x/-0. The nominal is the midpoint of the
+    # centres the gates allow (interference below, CR 1.2 above); the
+    # allowance is the radius of K's drawn setting circle, the catalogue
+    # +0.002 in.
     import _gear_quality
 
     low, high = disc.CENTRE_DISTANCE_WINDOW
@@ -34,25 +35,28 @@ def test_reducer_centre_band_is_plus_only_from_the_interference_limit() -> None:
     assert high - low == pytest.approx(_gear_quality.reducer_k_setting_diameter_mm() / 2.0)
     assert high - low <= 0.002 * 25.4
     assert mesh.reducer_mesh(low).failures() == []
-    assert mesh.reducer_mesh(low - 0.005).interference_margin_min_mm < 0.0
-    assert disc.CENTRE_DISTANCE_SET_TEXT == "35.101 +0.050/-0"
+    # The gate window the nominal bisects, each edge where its gate bites.
+    usable_low, usable_high = 43.737, 43.851
+    assert (usable_low + usable_high) / 2.0 == pytest.approx(low, abs=1e-9)
+    assert mesh.reducer_mesh(usable_low).failures() == []
+    assert mesh.reducer_mesh(usable_low - 0.001).interference_margin_min_mm < 0.0
+    assert mesh.reducer_mesh(usable_high).failures() == []
+    assert mesh.reducer_mesh(usable_high + 0.001).contact_ratio_min < mesh.CONTACT_RATIO_FLOOR
+    assert usable_low < low < high < usable_high
+    assert disc.CENTRE_DISTANCE_SET_TEXT == "43.794 +0.050/-0"
 
 
-def test_reducer_band_ends_pass_their_floors_and_the_far_end_is_reported() -> None:
+def test_reducer_band_ends_both_pass_the_design_floors() -> None:
     nominal, top = mesh.reducer_band_meshes()
     assert nominal.failures() == [] and top.failures() == []
-    assert (nominal.contact_ratio_floor, nominal.runout_contact_ratio_floor) == (
-        mesh.CONTACT_RATIO_FLOOR, mesh.RUNOUT_CONTACT_RATIO_FLOOR
-    )
-    assert (top.contact_ratio_floor, top.runout_contact_ratio_floor) == (
-        mesh.BAND_TOP_CONTACT_RATIO_FLOORS
-    )
-    # The far end is short of the design floors, as the module states.
-    assert top.contact_ratio_min == pytest.approx(1.118, abs=5e-4)
-    assert top.runout_contact_ratio_min == pytest.approx(1.029, abs=5e-4)
-    assert top.contact_ratio_min < mesh.CONTACT_RATIO_FLOOR
-    assert top.runout_contact_ratio_min < mesh.RUNOUT_CONTACT_RATIO_FLOOR
+    assert nominal.contact_ratio_min == pytest.approx(1.305, abs=5e-4)
+    assert nominal.runout_contact_ratio_min == pytest.approx(1.214, abs=5e-4)
+    assert top.contact_ratio_min == pytest.approx(1.214, abs=5e-4)
+    assert top.runout_contact_ratio_min == pytest.approx(1.1235, abs=5e-4)
+    assert top.contact_ratio_min >= mesh.CONTACT_RATIO_FLOOR
+    assert top.runout_contact_ratio_min >= mesh.RUNOUT_CONTACT_RATIO_FLOOR
     assert top.backlash_mm[0] > nominal.backlash_mm[0] > 0.0
+    assert top.label.endswith("at +0.050")
 
 
 def _min_tips() -> tuple[float, float]:
@@ -102,7 +106,6 @@ def test_runout_tier_fails_on_its_own() -> None:
 @pytest.mark.parametrize("field", [
     "contact_ratio_min", "runout_contact_ratio_min", "backlash_low", "backlash_high",
     "root_clearance_min_mm", "root_clearance_floor_mm", "interference_margin_min_mm",
-    "contact_ratio_floor", "runout_contact_ratio_floor",
 ])
 def test_an_undefined_mesh_number_fails_closed(field: str) -> None:
     good = mesh.reducer_mesh()
@@ -114,8 +117,6 @@ def test_an_undefined_mesh_number_fails_closed(field: str) -> None:
         "root_clearance_floor_mm": good.root_clearance_floor_mm,
         "interference_margin_min_mm": good.interference_margin_min_mm,
         "runout_contact_ratio_min": good.runout_contact_ratio_min,
-        "contact_ratio_floor": good.contact_ratio_floor,
-        "runout_contact_ratio_floor": good.runout_contact_ratio_floor,
     }
     if field.startswith("backlash"):
         low, high = good.backlash_mm

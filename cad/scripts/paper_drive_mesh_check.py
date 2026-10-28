@@ -1,6 +1,6 @@
 """Closed-form AGMA-style checks for the paper drive's two gear meshes.
 
-Geometry comes only from the part specs: the 12T:120T 48DP PA20 reducer
+Geometry comes only from the part specs: the 15T:150T 48DP PA20 reducer
 (MHA-PD knob shaft on the MHA-PD-06 disc) and the 12T 32DP PA20 feed pinion
 (MHA-PD-10) on the purchased 32DP PA20 rack (MHA-PD-05). Each mesh is
 checked at its assembled (datum) state over every manufactured profile
@@ -10,13 +10,13 @@ clearance, and the interference (undercut) limit. Loaded service
 displacement is not part of these gates (user decision 2026-10-09, as on
 main); the native assembly's interference check covers the built pose.
 
-Both pinions are stock #8 form cuts. The feed pinion's form is translated
+The feed pinion is a stock #8 form cut; its form is translated
 rigidly outward by ``s`` along each gap bisector (the spec's RADIAL_SETTING);
 translation keeps every flank normal, so against a straight rack it acts as
 the untranslated involute with the rack and the tip both moved inward by the
-radial part of that translation, s*cos(pi/N). The reducer pinion and the
-disc are cut at standard depth, so they take the ordinary external-gear
-formulas at the operating pressure angle.
+radial part of that translation, s*cos(pi/N). The reducer pinion (stock #7)
+and the disc (stock #1) are cut at standard depth, so they take the ordinary
+external-gear formulas at the operating pressure angle.
 
 The reducer's contact ratio has two tiers (user decision 2026-10-11): CR at
 least 1.2 at the nominal centre, and at least 1.1 at the loose runout
@@ -26,23 +26,22 @@ than one tooth pair in contact at handover -- which is enough for this slow,
 hand-driven reducer; 1.2 remains the nominal design floor.
 
 The reducer's centre takes the ordinary fine-pitch set band, nominal
-+0.050/-0 (pd_rack_pinion_spec.CENTRE_DISTANCE_WINDOW). The nominal end
-meets both tiers. The far end, 35.151, a stock 12T:120T pair at the stock
-0.05 TIR, gives CR 1.118 at the set centre and 1.029 at the runout extreme,
-short of 1.2/1.1; it is
-gated at BAND_TOP_CONTACT_RATIO_FLOORS, 1.1 and 1.0 (owner ruling
-2026-10-27, option A: standard gears, standard band).
++0.050/-0 (pd_rack_pinion_spec.CENTRE_DISTANCE_WINDOW). Both ends meet
+both tiers: the far end, 43.844, a stock 15T:150T pair at the stock 0.05
+TIR, gives CR 1.214 at the set centre and 1.123 at the runout extreme
+(owner ruling on #2034 x #2011: 43.794 +0.050/-0 at the full floors).
 
-Finite-profile bound (not a gate). These formulas take the ideal 120T
-involute. The disc is cut by the stock #2 (55T) cutter translated 17.20 to
-17.22 mm, whose flank against that ideal involute (same pitch thickness)
-over the active profile is at most 1.05 um fuller just below the pitch
-circle and relieved toward the tip, by 18.8 to 24.3 um at the tip over the
-printed corners; the 12T pinion deviates by at most -2.9..+3.4 um. Hence:
-backlash loses at most about 4 um (normal) to the extra material; the ideal
+Finite-profile bound (not a gate). These formulas take the ideal involutes.
+Over the active profile at the printed corners, the disc cut by the stock
+#1 (135T) cutter translated 3.959 to 3.979 mm is at most 0.23 um fuller than
+the ideal 150T involute (same pitch thickness) and relieved toward the tip,
+by 1.2 to 2.2 um at the tip. The 15T pinion, cut by the stock #7 (14T)
+cutter translated 0.261 to 0.271 mm, is at most 1.05 um fuller just below
+the pitch circle and relieved by 8.6 to 11.7 um at the tip. Hence: backlash
+loses at most about 1.3 um (normal) to the extra material; the ideal
 interference check is conservative, since relief only removes metal at
 unchanged tip radii; and the contact ratios are computed on the ideal
-involute, so the relieved disc tip carries little load at handover.
+involute, so the relieved pinion tip carries little load at handover.
 """
 
 from __future__ import annotations
@@ -61,9 +60,6 @@ CONTACT_RATIO_FLOOR = 1.2
 # The reducer's loose runout extreme: continuous action for a slow,
 # hand-driven reducer (user decision 2026-10-11; see the module docstring).
 RUNOUT_CONTACT_RATIO_FLOOR = 1.1
-# (nominal tier, runout tier) at the far end of the reducer's set band
-# (owner ruling 2026-10-27, option A).
-BAND_TOP_CONTACT_RATIO_FLOORS = (1.1, 1.0)
 # The rack mesh's existing physical gate (pd_paper_drive_assembly_steps).
 RACK_ROOT_CLEARANCE_FLOOR_MM = 0.25
 # AGMA fine-pitch standard clearance, 0.200/P + 0.002 in, at the reducer's
@@ -90,8 +86,6 @@ class MeshCheck:
     # CR at the loose runout extreme; None where contact_ratio_min is
     # already taken there (the rack mesh).
     runout_contact_ratio_min: float | None = None
-    contact_ratio_floor: float = CONTACT_RATIO_FLOOR
-    runout_contact_ratio_floor: float = RUNOUT_CONTACT_RATIO_FLOOR
 
     def failures(self) -> list[str]:
         # Every gate below is an ordered comparison, which NaN passes; an
@@ -103,8 +97,6 @@ class MeshCheck:
             "root clearance": self.root_clearance_min_mm,
             "root clearance floor": self.root_clearance_floor_mm,
             "interference margin": self.interference_margin_min_mm,
-            "contact ratio floor": self.contact_ratio_floor,
-            "runout contact ratio floor": self.runout_contact_ratio_floor,
         }
         if self.runout_contact_ratio_min is not None:
             values["runout contact ratio"] = self.runout_contact_ratio_min
@@ -114,15 +106,15 @@ class MeshCheck:
         ]
         if problems:
             return problems
-        if self.contact_ratio_min < self.contact_ratio_floor:
+        if self.contact_ratio_min < CONTACT_RATIO_FLOOR:
             problems.append(
-                f"contact ratio {self.contact_ratio_min:.3f} < {self.contact_ratio_floor}"
+                f"contact ratio {self.contact_ratio_min:.3f} < {CONTACT_RATIO_FLOOR}"
             )
         if (self.runout_contact_ratio_min is not None
-                and self.runout_contact_ratio_min < self.runout_contact_ratio_floor):
+                and self.runout_contact_ratio_min < RUNOUT_CONTACT_RATIO_FLOOR):
             problems.append(
                 f"runout-extreme contact ratio {self.runout_contact_ratio_min:.3f} < "
-                f"{self.runout_contact_ratio_floor}"
+                f"{RUNOUT_CONTACT_RATIO_FLOOR}"
             )
         if self.backlash_mm[0] <= 0.0:
             problems.append(f"backlash {self.backlash_mm[0]:.4f} mm at the tight extreme")
@@ -242,7 +234,7 @@ def feed_rack_contact_half_width_mm(
     return reach
 
 
-# --- 12T:120T reducer -------------------------------------------------------------
+# --- Knob pinion : disc reducer -------------------------------------------------
 _REDUCER_PA = math.radians(disc.PRESSURE_ANGLE_DEG)
 
 
@@ -322,7 +314,7 @@ def reducer_mesh(centre_distance_mm: float = disc.CENTRE_DISTANCE) -> MeshCheck:
         line - math.sqrt(pinion_tip_max**2 - pinion_base**2),
     )
     return MeshCheck(
-        "12T:120T reducer",
+        f"{knob.TEETH}T:{disc.TEETH}T reducer",
         reducer_contact_ratio(centre_distance_mm, pinion_tip_min, disc_tip_min),
         backlash,
         clearance,
@@ -333,12 +325,7 @@ def reducer_mesh(centre_distance_mm: float = disc.CENTRE_DISTANCE) -> MeshCheck:
 
 
 def reducer_band_meshes() -> tuple[MeshCheck, MeshCheck]:
-    """The reducer at both ends of its set band: the nominal end at the
-    design floors, the far end at BAND_TOP_CONTACT_RATIO_FLOORS."""
+    """The reducer at both ends of its set band, each at the design floors."""
     low, high = disc.CENTRE_DISTANCE_WINDOW
-    nominal_floor, runout_floor = BAND_TOP_CONTACT_RATIO_FLOORS
     top = reducer_mesh(high)
-    return reducer_mesh(low), replace(
-        top, label=f"{top.label} at +{high - low:.3f}",
-        contact_ratio_floor=nominal_floor, runout_contact_ratio_floor=runout_floor,
-    )
+    return reducer_mesh(low), replace(top, label=f"{top.label} at +{high - low:.3f}")

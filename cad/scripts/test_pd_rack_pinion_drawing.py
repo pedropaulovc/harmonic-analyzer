@@ -196,25 +196,22 @@ def test_gear_data_block_is_what_the_machinist_needs() -> None:
     data = spec.GEAR_DATA
     lower, upper = sorted(spec.SPAN_LIMITS)
     for label, value in (
-        ("NUMBER OF TEETH", "120"),
+        ("NUMBER OF TEETH", "150"),
         ("DIAMETRAL PITCH", "48.00"),
         ("PRESSURE ANGLE", "20.0 DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{spec.PITCH_DIA:.2f}"),
         ("WHOLE DEPTH (mm, REF)", f"{spec.WHOLE_DEPTH:.3f}"),
-        (
-            "CUTTER",
-            f"#{spec.CUTTER_NUMBER}, "
-            f"{spec.CUTTER_TOOTH_RANGE[0]}-{spec.CUTTER_TOOTH_RANGE[1]}T",
-        ),
+        ("CUTTER", "#1, 135T-RACK"),
         (f"SPAN OVER {spec.SPAN_TEETH} TEETH", f"{lower:.4f}-{upper:.4f}"),
         ("MATES WITH", f"KNOB SHAFT MHA-PD-08, {spec.MESH_PINION_TEETH}T"),
     ):
         assert f"{label}:  {value}" in data
     assert len(data.splitlines()) == 9
     assert "CIRCULAR THICKNESS" not in data
-    assert spec.CUTTER_NUMBER == 2
-    assert spec.CUTTER_REFERENCE_TEETH == 55 != spec.TEETH == 120
-    assert spec.CUTTER_TOOTH_RANGE == (55, 134)
+    assert "None" not in data
+    assert spec.CUTTER_NUMBER == 1
+    assert spec.CUTTER_REFERENCE_TEETH == 135 != spec.TEETH == 150
+    assert spec.CUTTER_TOOTH_RANGE == (135, None)
     assert part.GEAR_DATA == data
     # A shop note states the requirement, not the method or design history.
     assert spec.DRAWING_NOTES == spec.BORE_FRONT_CHAMFER_NOTE
@@ -227,10 +224,10 @@ def test_gear_data_block_is_what_the_machinist_needs() -> None:
 def test_printed_span_limits_define_every_accepted_translation_corner() -> None:
     from stock_form_cutter import translation_for_tangent_span
 
-    assert spec.SPAN_TEETH == 13
-    assert spec.SPAN_LIMITS == (20.4174, 20.4308)
-    assert spec.RADIAL_SETTING_LIMITS[0] < 17.200
-    assert spec.RADIAL_SETTING_LIMITS[1] > 17.220
+    assert spec.SPAN_TEETH == 17
+    assert spec.SPAN_LIMITS == (26.8806, 26.8946)
+    assert spec.RADIAL_SETTING_LIMITS[0] < 3.959
+    assert spec.RADIAL_SETTING_LIMITS[1] > 3.979
     for limit, setting, sign in zip(
         spec.SPAN_LIMITS, spec.RADIAL_SETTING_LIMITS, (-1.0, 1.0), strict=True
     ):
@@ -259,24 +256,24 @@ def test_finite_blank_cap_uses_the_lowest_printed_span_inverted_translation() ->
     from stock_form_cutter import StockFormProfile
 
     lowest = StockFormProfile(
-        120, spec.CUTTER_TEMPLATE, spec.PITCH_DIA / 2.0,
+        150, spec.CUTTER_TEMPLATE, spec.PITCH_DIA / 2.0,
         spec.RADIAL_SETTING_LIMITS[0],
     )
     cap = 2.0 * lowest.support_radius_max_mm
     assert spec.SUPPORT_OUTSIDE_DIA_MM == pytest.approx(cap)
-    assert spec.OUTSIDE_DIA == 64.54
+    assert spec.OUTSIDE_DIA == 80.41
     assert spec.OUTSIDE_DIA + spec.OUTSIDE_DIA_BAND[0] < cap
     # Standard actual-N OD would require unsupported upper-tip continuation.
     standard_od = (spec.TEETH + 2.0) * spec.MODULE_MM
     assert standard_od > cap
     with pytest.raises(ValueError, match="FINITE"):
-        StockFormProfile(120, spec.CUTTER_TEMPLATE, standard_od / 2.0,
+        StockFormProfile(150, spec.CUTTER_TEMPLATE, standard_od / 2.0,
                          spec.RADIAL_SETTING_LIMITS[0])
 
 
 def test_real_finite_corners_preserve_root_web_volume_and_material_land() -> None:
     for profile in spec.manufactured_profiles():
-        assert profile.teeth == 120 and profile.template.reference_teeth == 55
+        assert profile.teeth == 150 and profile.template.reference_teeth == 135
         assert profile.root_radius_min_mm < profile.root_radius_max_mm
         assert 2.0 * profile.root_radius_min_mm >= spec.ROOT_DIA_MIN
         assert profile.root_radius_min_mm > hub_geometry.BOLT_CIRCLE_DIA / 2.0

@@ -2,7 +2,7 @@ r"""Create the manufacturing drawing for the transgear knob thrust ring (MHA-PD-
 
 The edge view is the ``*Right`` orientation rotated a quarter turn in the
 sheet so the ring's axis lies horizontal, as it sits in the lathe: the front
-face (on the 12T) on the left, the rear face (on the plate hub) on the
+face (on the pinion) on the left, the rear face (on the plate hub) on the
 right, each with its running finish, the length between them under its
 explicit band and the O.D. beside it; the length's callout names the stack
 its band serves.  The face view is the ``*Bottom`` orientation -- exactly the
@@ -313,7 +313,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="knob thrust ring axis centerline",
     )
     for key, label in (
-        ("front_face", "ring front (12T) face finish"),
+        ("front_face", "ring front (pinion) face finish"),
         ("rear_face", "ring rear (plate hub) face finish"),
     ):
         pick, symbol = FACE_FINISHES[key]
