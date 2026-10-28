@@ -471,10 +471,12 @@ both verdicts and the finding diff.
   most two correction prompts in the same session. Each quotes the error and
   asks for only the corrected JSON object: same content, no new findings, no
   tool calls. `omp_repair_turns` records each error and a
-  `machinist_review.omp_repair_turn` span event marks it. Any tool call during
-  a correction fails the attempt, so corrections never add sheet evidence. The
-  result event and verdict are the final text; validators are unchanged, so
-  text still invalid after two corrections fails exactly as before.
+  `machinist_review.omp_repair_turn` span event marks it. Once a correction is
+  requested, any tool call event fails the attempt, including trailing events
+  read by later control requests or the shutdown drain, so corrections never
+  add sheet evidence. The result event and verdict are the final text;
+  validators are unchanged, so text still invalid after two corrections fails
+  exactly as before.
   The pinned SDK package/version is mandatory. OMP is an optional fallback for
   SDK runs: a missing executable or failed, empty, timed-out or OS-error
   `omp --version` probe does not prevent SDK execution. Runtime identity records

@@ -756,6 +756,10 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
         validate_tools(event)
         if event.get("type") in {"tool_execution_start", "tool_execution_update", "tool_execution_end"} and event.get("toolName") not in OMP_TOOLS:
             raise RuntimeError("OMP emitted an unauthorized tool")
+        # Once a correction is requested nothing may touch the sheet again,
+        # including trailing events read by control requests or the drain.
+        if repairing and omp_calls_tool(event):
+            raise RuntimeError("OMP verdict repair turn called a tool")
         if postcompletion and event.get("type") not in {"message_end", "tool_execution_end", "turn_end", "agent_end"}:
             raise RuntimeError("OMP emitted an unexpected postcompletion event")
         return event
@@ -775,7 +779,7 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
                 if not event.get("success"):
                     raise RuntimeError("OMP control request failed")
                 return event.get("data", {})
-    completed = False
+    completed = repairing = False
     try:
         async with startup_timeout("OMP sheets MCP connection", min(startup, remaining())):
             state = await control("get_state")
@@ -802,15 +806,11 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
                 "system_prompt": parts, "tools": sorted(tools), "cwd": cwd,
             }
         await control("set_auto_compaction", enabled=False)
-        async def turn(message, *, repair=False):
+        async def turn(message):
             identity = str(uuid.uuid4())
             await send({"id": identity, "type": "prompt", "message": message})
             while True:
                 event = await receive()
-                # A correction must not inspect (or re-inspect) the sheet:
-                # fail at the first streamed, completed or executed tool call.
-                if repair and omp_calls_tool(event):
-                    raise RuntimeError("OMP verdict repair turn called a tool")
                 if event.get("type") == "response" and event.get("id") == identity and event.get("success") is False:
                     raise TransportError("OMP prompt request failed", category="protocol_error")
                 if event.get("type") == "prompt_result" and event.get("id") == identity:
@@ -826,7 +826,8 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
         while len(repairs) < OMP_REPAIR_TURNS and (error := omp_verdict_error(str(text.get("text") or ""), schema)):
             repairs.append({"error": error})
             _telemetry.event("machinist_review.omp_repair_turn", turn=len(repairs), error=error)
-            await turn(OMP_REPAIR_PROMPT.format(error=error), repair=True)
+            repairing = True
+            await turn(OMP_REPAIR_PROMPT.format(error=error))
             # The downstream verdict and its result event are this final text.
             text = await control("get_last_assistant_text")
         # Publish success only after shutdown output and persisted blobs pass

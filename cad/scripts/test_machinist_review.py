@@ -1808,10 +1808,12 @@ for line in sys.stdin:
         if mode == "trailing_execution": emit({"type": "tool_execution_end", "toolName": "bash", "toolCallId": "late", "result": {}})
         if mode == "trailing_failure": emit({"type": "message_end", "message": {"role": "assistant", "content": [], "stopReason": "error"}})
         if mode == "trailing_valid": print("\n  ", flush=True)
-        if mode in {"trailing_tool", "trailing_valid"}:
+        if mode in {"trailing_tool", "trailing_valid"} or mode == "repair_trailing_tool" and prompts > 1:
             emit({"type": "message_end", "message": {"role": "assistant", "model": "test",
                   "content": [{"type": "toolCall", "id": "late", "name": "bash" if mode == "trailing_tool" else "mcp__sheets_crop", "arguments": {"sheet": 1}}]}})
             emit({"type": "agent_end", "messages": []})
+        if mode == "repair_trailing_execution" and prompts > 1:
+            emit({"type": "tool_execution_end", "toolName": "mcp__sheets_crop", "toolCallId": "late", "result": {}})
 if mode == "slow_shutdown": time.sleep(60)
 '''
 
@@ -1946,7 +1948,7 @@ _OMP_MALFORMED_JUDGMENT = (
 _OMP_REPAIRED_JUDGMENT = _OMP_MALFORMED_JUDGMENT.replace('needed."},"reason"', 'needed.","reason"')
 
 
-@pytest.mark.parametrize("mode", ["repaired", "schema_repaired", "unrepaired", "repair_tool"])
+@pytest.mark.parametrize("mode", ["repaired", "schema_repaired", "unrepaired", "repair_tool", "repair_trailing_tool", "repair_trailing_execution"])
 def test_omp_repairs_malformed_verdict_in_session_without_tools(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str,
 ) -> None:
@@ -1965,7 +1967,7 @@ def test_omp_repairs_malformed_verdict_in_session_without_tools(
     processes, normalized, spans = [], [], []
     original = asyncio.create_subprocess_exec
     async def spawn(executable, *arguments, **kwargs):
-        process = await original(sys.executable, str(script), "repair_tool" if mode == "repair_tool" else "valid", *arguments, **kwargs)
+        process = await original(sys.executable, str(script), mode if mode.startswith("repair_") else "valid", *arguments, **kwargs)
         processes.append(process)
         return process
     monkeypatch.setattr(transport.asyncio, "create_subprocess_exec", spawn)
@@ -1985,12 +1987,13 @@ def test_omp_repairs_malformed_verdict_in_session_without_tools(
         return mr.extract_claude_verdict(events, validator=lambda value: mr.validate_judgment(value, [{"id": "r1.minor.1"}]))
     def prompts():
         return [json.loads(line) for line in (work / "protocol.jsonl").read_text().splitlines() if '"prompt"' in line]
-    if mode == "repair_tool":
-        # A correction turn must never add (or launder) sheet evidence.
+    if mode.startswith("repair_"):
+        # A correction turn must never add (or launder) sheet evidence, even
+        # through trailing events read by a control request or the drain.
         with pytest.raises(RuntimeError, match="repair turn called a tool"):
             asyncio.run(invoke())
         assert not any(event.get("type") == "result" for event in normalized)
-        assert "image_blobs" not in provenance and "shutdown" not in provenance
+        assert "image_blobs" not in provenance
         assert len(provenance["omp_repair_turns"]) == 1
         assert all(process.returncode is not None for process in processes)
         return
