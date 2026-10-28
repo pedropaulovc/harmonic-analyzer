@@ -649,10 +649,32 @@ if not _WIN_LO <= round(PIVOT_NOMINAL_RUNNING_GAP * 100) <= _WIN_HI:
 # making it (5: four 0.5 and one 0.1; greedy is exact for 0.5/0.2/0.1).
 _PACK_MAX_TENTHS = math.ceil((_GAP_HI - _WIN_HI) / 10)
 PIVOT_FIT_PACK_MAX = _PACK_MAX_TENTHS / 10
-PIVOT_FIT_SHIMS_MAX = 0
+_WORST_PACK: dict[int, int] = {}  # tenths -> shims
+_rest = _PACK_MAX_TENTHS
 for _tenths in reversed(_FIT_TENTHS):
-    PIVOT_FIT_SHIMS_MAX += _PACK_MAX_TENTHS // _tenths
-    _PACK_MAX_TENTHS %= _tenths
+    _WORST_PACK[_tenths], _rest = divmod(_rest, _tenths)
+PIVOT_FIT_SHIMS_MAX = sum(_WORST_PACK.values())
+# Owner ruling 2026-10-27: TL-VN-79 stays one BOM identity, QTY its modeled
+# nominal pack (5 x 0.2 a support); the fitting stock bought with it is that
+# pack plus the worst-case pack at both supports. Each support's share of the
+# buy builds every pack up to the worst case, so both fit at once.
+_SUPPORTS = pivot_shim.QUANTITY // pivot_shim.PER_SUPPORT  # 2
+_BUY_TENTHS = {tenths: _SUPPORTS * count for tenths, count in _WORST_PACK.items()}
+_BUY_TENTHS[round(pivot_shim.THICKNESS * 10)] += pivot_shim.QUANTITY
+_SKU_BY_TENTHS = {round(t * 10): sku for t, sku in pivot_shim.FIT_SKUS.items()}
+# SKU -> (thickness, count), thinnest first: 0.1 x2, 0.2 x10, 0.5 x8.
+PIVOT_SHIM_BUY = {
+    _SKU_BY_TENTHS[tenths]: (tenths / 10, _BUY_TENTHS[tenths]) for tenths in _FIT_TENTHS
+}
+if any(count % _SUPPORTS for count in _BUY_TENTHS.values()):
+    raise AssertionError("the shim buy list does not split evenly between the supports")
+_BUILDABLE = {0}
+for _tenths, _count in _BUY_TENTHS.items():
+    _BUILDABLE = {
+        built + k * _tenths for built in _BUILDABLE for k in range(_count // _SUPPORTS + 1)
+    }
+if not set(range(_PACK_MAX_TENTHS + 1)) <= _BUILDABLE:
+    raise AssertionError("the shim buy list cannot build every fitting pack at both supports")
 
 # Every instance of every logical family, in insertion order. Ordinary families
 # keep native <stem>-N names; kit instances use persisted role-local references.
@@ -785,7 +807,7 @@ BOM_DESCRIPTIONS = {
     FEED_BLOCK: "FEED BLOCK",
     PIVOT_SCREW: "M8X1.25 SHOULDER SCREW, 10 X 35",
     PIVOT_SPACER: "SPACER, 10 ID X 16 OD X 15",
-    PIVOT_SHIM: "DIN 988 SHIM, 10 X 16 X 0.2",
+    PIVOT_SHIM: "DIN 988 SHIM 10X16, FITTING STOCK",
     CARRIER: "CARRIER PLATE",
     RISER: "ACETAL RISER",
     HUB_PIN: "HUB LOCATOR PIN",
@@ -1409,11 +1431,11 @@ ASSEMBLY_STEPS = (
     f"THROUGH THE KP08S AND NUT, {leadscrew.NEAR_STUB:.0f} PAST THE NEAR BLOCK. "
     "COMPLETE F1 (SHEET 8). PUSH THE HANDWHEEL "
     f"{_item(HANDWHEEL)} ON, HUB {leadscrew.HUB_GAP:.0f} OFF THE FAR BLOCK; "
-    "TIGHTEN ITS AND THE KP08 SET SCREWS ON THE FLATS WITH LOW-STRENGTH "
-    "(PURPLE) THREADLOCKER. THEN COMPLETE F2.",
-    "9. REMOVE THE TEMPORARY SHOULDER SCREWS. FIT THE SHIMS, SPACERS AND "
-    "CARRIER ON A1/B1; COMPLETE P1-P3 (SHEET 8). RECORD HD1 H THROUGH THE "
-    "COMPLETE INNER-PASS HAND SWEEP USING THE HANDWHEEL.",
+    "TIGHTEN ITS AND THE KP08 SET SCREWS ON THE FLATS WITH LOCTITE 222 "
+    "THREADLOCKER. THEN COMPLETE F2.",
+    "9. REMOVE THE TEMPORARY SHOULDER SCREWS. FIT THE SPACERS AND CARRIER "
+    "ON A1/B1; SELECT SHIMS PER P1 AND COMPLETE P1-P3 (SHEET 8). RECORD HD1 "
+    "H THROUGH THE COMPLETE INNER-PASS HAND SWEEP USING THE HANDWHEEL.",
     # The carrier stays on its A1/B1 seats from step 9 to 13A: HUB and CL are
     # finished in place on the running jig (carrier spec) and nothing removes
     # it before 13A.
@@ -1454,11 +1476,12 @@ PIVOT_FIT_STEPS = (
     f"P1. AT EACH SUPPORT SET A LOOSE SPACER {_item(PIVOT_SPACER)} ON THE "
     "BLOCK, NO SHIMS. LOWER THE CARRIER ON THE CHOSEN HOLE PAIR, SEAT BOTH "
     "SHOULDER SCREWS AND MEASURE EACH HEAD-TO-CARRIER GAP. LIFT THE CARRIER; "
-    f"UNDER EACH SPACER STACK DIN 988 SHIMS {_item(PIVOT_SHIM)} THAT CLOSE "
-    f"ITS GAP TO {PIVOT_RUNNING_GAP[0]:.2f}-{PIVOT_RUNNING_GAP[1]:.2f} "
-    "THROUGH FREE SWING, SELECTED FROM FITTING STOCK "
-    + ", ".join(f"{sku} ({t:.1f})" for t, sku in sorted(pivot_shim.FIT_SKUS.items()))
-    + f": NOMINAL {pivot_shim.PER_SUPPORT} X {pivot_shim.THICKNESS:.1f}, "
+    f"UNDER EACH SPACER STACK SHIMS {_item(PIVOT_SHIM)}, DIN 988 FITTING "
+    "STOCK PER THE BUY LIST UNDER THE BOM ("
+    + ", ".join(f"{sku} {t:.1f}" for t, sku in sorted(pivot_shim.FIT_SKUS.items()))
+    + f"), THAT CLOSE ITS GAP TO {PIVOT_RUNNING_GAP[0]:.2f}-"
+    f"{PIVOT_RUNNING_GAP[1]:.2f} THROUGH FREE SWING: NOMINAL "
+    f"{pivot_shim.PER_SUPPORT} X {pivot_shim.THICKNESS:.1f}, "
     f"WORST CASE UP TO {PIVOT_FIT_PACK_MAX:.1f} ({PIVOT_FIT_SHIMS_MAX} SHIMS). "
     "REMEASURE. THE SAME SHIM SET MUST SERVE BOTH HOLE PAIRS; NO SHIM "
     "BETWEEN SPACER AND CARRIER.",
@@ -1471,6 +1494,17 @@ PIVOT_FIT_STEPS = (
     "SUPPORTS, FREE ROTATION AND POSITIVE LIFT CAPTURE UNDER BOTH HEADS. "
     "REFIT A FAILED STACK; DO NOT LOOSEN A SEATED SCREW TO MAKE CLEARANCE.",
 )
+# Sheet 2, under the BOM: what item 7's QTY counts and the fitting stock to buy.
+PIVOT_SHIM_STOCK_NOTE = "\n".join((
+    f"ITEM {ITEM_NUMBERS[PIVOT_SHIM]}: DIN 988 SHIM FITTING STOCK, SELECTED PER P1.",
+    f"BOM QTY. {pivot_shim.QUANTITY} IS THE NOMINAL PACK, {pivot_shim.PER_SUPPORT} X "
+    f"{pivot_shim.THICKNESS:.1f} A SUPPORT.",
+    "BUY, COVERING THE WORST CASE AT BOTH SUPPORTS:",
+    ", ".join(
+        f"{sku} ({thickness:.1f}) X{count}"
+        for sku, (thickness, count) in PIVOT_SHIM_BUY.items()
+    ) + ".",
+))
 KP08_ALIGNMENT_STEPS = (
     f"F1. BEFORE TIGHTENING, CHECK ALL FOUR NUT BUTTON HEADS SEAT FLAT "
     f"AND CLEAR THE NUT BODY; TIGHTEN TO {_NUT_TORQUE}. THE KP08S FLOAT "

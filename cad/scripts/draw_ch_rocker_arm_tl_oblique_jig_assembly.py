@@ -362,12 +362,14 @@ EXPLODED_CAPTION_XY = (0.018, 0.030)
 EXPLODED_CAPTION_WIDTH = 68  # characters; stops left of the title block
 # Each cluster view's ring room: inside the border, over the caption. The
 # ring is centred in it, then slid left until its low arc clears the title
-# block (TITLE_BLOCK_KEEP_OUT).
+# block (TITLE_BLOCK_KEEP_OUT). Its top keeps visible air under the border
+# (rule 13; farm 20261028T005007348Z: a top balloon ring-fitted to the border
+# itself read as touching it).
 CLUSTER_RING_REGION = (
     SHEET_INNER_BORDER[0],
     EXPLODED_CAPTION_XY[1] + 0.003,
     SHEET_INNER_BORDER[2],
-    SHEET_INNER_BORDER[3],
+    SHEET_INNER_BORDER[3] - BOM_SHEET_CLEARANCE,
 )
 CLUSTER_CENTER = (
     (CLUSTER_RING_REGION[0] + CLUSTER_RING_REGION[2]) / 2.0,
@@ -1124,13 +1126,15 @@ def kit_bom_note_region(
     )
 
 
-def _kit_bom_note_extent(note: Any) -> tuple[float, float, float, float]:
+def _kit_bom_note_extent(
+    note: Any, *, label: str = "jig kit key"
+) -> tuple[float, float, float, float]:
     values = tuple(float(value) for value in (note.GetExtent() or ()))
     if len(values) != 6 or not all(map(math.isfinite, values)):
-        raise RuntimeError(f"jig kit key has unreadable native note extent: {values!r}")
+        raise RuntimeError(f"{label} has unreadable native note extent: {values!r}")
     box = values[0], values[1], values[3], values[4]
     if box[0] >= box[2] or box[1] >= box[3]:
-        raise RuntimeError(f"jig kit key has empty native note extent: {values!r}")
+        raise RuntimeError(f"{label} has empty native note extent: {values!r}")
     return box
 
 
@@ -1190,6 +1194,68 @@ def _place_kit_bom_note(adapter: Any, table: Any, reference: Any) -> Callable[[]
             f"field_m={field!r}; BOM air_mm={(extent[0] - bom[2]) * 1000:.3f}; "
             f"reference air_mm={(outline[1] - extent[3]) * 1000:.3f}"
         )
+
+    settled()
+    return settled
+
+
+def shim_stock_note_region(
+    bom: tuple[float, float, float, float],
+) -> tuple[float, float, float, float]:
+    """Room under the BOM, flush with its left edge, left of the title block."""
+    return (
+        bom[0],
+        SHEET_INNER_BORDER[1] + REGION_GAP,
+        TITLE_BLOCK_KEEP_OUT[0] - REGION_GAP,
+        bom[1] - REGION_GAP,
+    )
+
+
+def _place_shim_stock_note(adapter: Any, table: Any) -> Callable[[], None]:
+    """Seat item 7's fitting-stock buy list under the BOM (owner ruling
+    2026-10-27), then recheck its text and clearance."""
+    label = "jig shim fitting-stock note"
+    text = spec.PIVOT_SHIM_STOCK_NOTE
+    region = shim_stock_note_region(_bom_bounds(table))
+    if region[0] >= region[2] or region[1] >= region[3]:
+        raise RuntimeError(f"{label} has no clear note field: {region!r}")
+    note = _add_note_block(adapter, BOM_SHEET, text, (region[0], region[3]), label=label)
+    rebuild_drawing(adapter, label=f"measure {label}")
+    adapter.currentModel.GraphicsRedraw2()
+    box = _kit_bom_note_extent(note, label=label)
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    if len(position) != 3 or not all(map(math.isfinite, position)):
+        raise RuntimeError(f"{label} has unreadable native note position")
+    # Measured ink, not the insertion point: left on the BOM's edge, top
+    # REGION_GAP under its last row.
+    if not annotation.SetPosition2(
+        position[0] + region[0] - box[0],
+        position[1] + region[3] - box[3],
+        position[2],
+    ):
+        raise RuntimeError(f"{label} native note placement failed")
+    rebuild_drawing(adapter, label=f"seat {label}")
+
+    def settled() -> None:
+        _activate_sheet(adapter, BOM_SHEET)
+        adapter.currentModel.GraphicsRedraw2()
+        printed = str(note.GetText() or "").replace("\r\n", "\n").replace("\r", "\n")
+        if printed != text:
+            raise RuntimeError(f"{label} text changed: {printed!r}")
+        if int(annotation.OwnerType) != 1 or int(annotation.Visible) != 1:
+            raise RuntimeError(f"{label} is not a visible sheet-owned note")
+        if int(annotation.GetLeaderCount()) != 0:
+            raise RuntimeError(f"{label} unexpectedly has a leader")
+        field = shim_stock_note_region(_bom_bounds(table))
+        extent = _kit_bom_note_extent(note, label=label)
+        tolerance = 1e-6  # the note's position read-back, not a paper allowance
+        if not (
+            field[0] - tolerance <= extent[0] < extent[2] <= field[2]
+            and field[1] <= extent[1] < extent[3] <= field[3] + tolerance
+        ):
+            raise RuntimeError(f"{label} extent {extent!r} leaves its clear field {field!r}")
+        _telemetry.info(f"{label}: extent_m={extent!r}; field_m={field!r}")
 
     settled()
     return settled
@@ -2039,17 +2105,91 @@ def ring_right_slack(
     return max(0.0, min(cap, -keep_out_overshoot(circles, outline, keep_out=keep_out)))
 
 
+def ring_floor_clearance(
+    circles: Sequence[tuple[float, float, float]],
+    outline: tuple[float, float, float, float],
+    *,
+    keep_out: tuple[float, float, float, float],
+    floor: float,
+) -> float:
+    """How far a ringed cluster view may move down: the least height of any
+    balloon circle (centre x, y, radius) or the outline over the higher of
+    ``keep_out``'s top and ``floor``; negative when one already sits below it.
+    Not only what overlaps the block across: a leader from a balloon beside
+    it to a landing above it could cut its corner."""
+    level = max(keep_out[3], floor)
+    return min([y - radius for _x, y, radius in circles] + [outline[1]]) - level
+
+
+def ring_down_slack(
+    circles: Sequence[tuple[float, float, float]],
+    outline: tuple[float, float, float, float],
+    *,
+    keep_out: tuple[float, float, float, float],
+    floor: float,
+    cap: float,
+) -> float:
+    """How far down a ringed cluster view may move back, up to ``cap``.
+
+    ``cluster_ring_fit`` raises a ring until its whole low arc clears
+    ``keep_out``; the balloons actually placed usually sit well above it.
+    Farm 20261028T005007348Z sheet 6: the raised carrier ring left its top
+    balloon on the border and the sheet's lower half empty (rule 15).
+    """
+    clearance = ring_floor_clearance(circles, outline, keep_out=keep_out, floor=floor)
+    return max(0.0, min(cap, clearance))
+
+
+def _move_ring(
+    adapter: Any,
+    view: Any,
+    landings: Sequence[BalloonLanding],
+    circles: Sequence[tuple[float, float, float]],
+    centre: tuple[float, float],
+    move: tuple[float, float],
+    *,
+    label: str,
+) -> tuple[list[tuple[float, float, float]], tuple[float, float, float, float]]:
+    """Move the view by ``move``; every balloon must ride with it. Returns
+    the balloons' rendered circles and the view outline after the move."""
+    _center_view_outline(
+        adapter, view, (centre[0] + move[0], centre[1] + move[1]), label=label
+    )
+    moved = [rendered_balloon_circle(item.note, label=label) for item in landings]
+    follow = max(5e-4, 0.05 * math.hypot(*move))
+    for item, before, after in zip(landings, circles, moved, strict=True):
+        if (
+            abs(after[0] - before[0] - move[0]) > follow
+            or abs(after[1] - before[1] - move[1]) > follow
+        ):
+            raise RuntimeError(
+                f"{label}: {item.instance} balloon did not move with its view "
+                f"({before[:2]!r} -> {after[:2]!r}, view moved {move!r})"
+            )
+    _telemetry.info(
+        f"{label}: ring moved {move[0] * 1000.0:.1f} mm right, "
+        f"{move[1] * 1000.0:.1f} mm up; balloons "
+        + ", ".join(
+            f"({(after[0] - before[0]) * 1000.0:.2f}, {(after[1] - before[1]) * 1000.0:.2f})"
+            for before, after in zip(circles, moved, strict=True)
+        )
+    )
+    return moved, _view_outline(view, label=label)
+
+
 def _relax_cluster_slide(
     adapter: Any, view: Any, landings: Sequence[BalloonLanding], *, label: str
 ) -> list[BalloonLanding]:
     """Move a ringed cluster view, its balloons with it, back right by its
     placed balloons' slack (:func:`ring_right_slack`) less ``_RELAX_MARGIN``,
-    never past the ring's centred position; then every balloon must clear the
-    title block and sit inside the border.
+    never past the ring's centred position; then back down by their slack
+    over the title block's top (:func:`ring_down_slack`), again no lower than
+    centred. Every balloon must then clear the title block and sit inside
+    the border and over the caption.
 
     The balloons do not ride with the view exactly (farm r9: 9.54 to 10.02 for
-    a 9.70 move), so a balloon the move still left in the keep-out sends the
-    view back left by its overshoot, at most ``_RELAX_PASSES`` times.
+    a 9.70 move), so a balloon a move still left in the keep-out sends the
+    view back by its overshoot, at most ``_RELAX_PASSES`` times per axis.
 
     Returns ``landings`` with each proven leader landing carried by the
     view's move (the leaders end on model edges, which move with it; farm
@@ -2071,30 +2211,36 @@ def _relax_cluster_slide(
     for _pass in range(_RELAX_PASSES):
         if abs(move) <= 1e-4:
             break
-        _center_view_outline(adapter, view, (centre[0] + move, centre[1]), label=label)
-        moved = [rendered_balloon_circle(item.note, label=label) for item in landings]
-        follow = max(5e-4, 0.05 * abs(move))
-        for item, before, after in zip(landings, circles, moved, strict=True):
-            if (
-                abs(after[0] - before[0] - move) > follow
-                or abs(after[1] - before[1]) > follow
-            ):
-                raise RuntimeError(
-                    f"{label}: {item.instance} balloon did not move with its view "
-                    f"({before[:2]!r} -> {after[:2]!r}, view moved {move:.6f})"
-                )
-        _telemetry.info(
-            f"{label}: ring moved {move * 1000.0:.1f} mm right, balloons "
-            + ", ".join(
-                f"{(after[0] - before[0]) * 1000.0:.2f}"
-                for before, after in zip(circles, moved, strict=True)
-            )
+        circles, outline = _move_ring(
+            adapter, view, landings, circles, centre, (move, 0.0), label=label
         )
-        circles = moved
-        outline = _view_outline(view, label=label)
         centre = _region_center(outline)
         overshoot = keep_out_overshoot(circles, outline, keep_out=TITLE_BLOCK_KEEP_OUT)
         move = -(overshoot + _RELAX_MARGIN) if overshoot > 0.0 else 0.0
+    floor = CLUSTER_RING_REGION[1]
+    drop = max(
+        0.0,
+        ring_down_slack(
+            circles,
+            outline,
+            keep_out=TITLE_BLOCK_KEEP_OUT,
+            floor=floor,
+            cap=centre[1] - CLUSTER_CENTER[1],
+        )
+        - _RELAX_MARGIN,
+    )
+    move = -drop
+    for _pass in range(_RELAX_PASSES):
+        if abs(move) <= 1e-4:
+            break
+        circles, outline = _move_ring(
+            adapter, view, landings, circles, centre, (0.0, move), label=label
+        )
+        centre = _region_center(outline)
+        clearance = ring_floor_clearance(
+            circles, outline, keep_out=TITLE_BLOCK_KEEP_OUT, floor=floor
+        )
+        move = -clearance + _RELAX_MARGIN if clearance < 0.0 else 0.0
     shift = (centre[0] - start[0], centre[1] - start[1])
     landings = [
         item
@@ -2105,18 +2251,20 @@ def _relax_cluster_slide(
         )
         for item in landings
     ]
-    # The relax moves the ring sideways only, so it answers for the side
-    # borders, held to the ring's contract (each centre BALLOON_RADIUS
-    # inside), and the title block it moves toward, held to the rendered ink.
-    # The ring's own heights stand (farm r10/r13: the carrier's top CL-dowel
-    # balloon, its 5.20 ink 0.2 over the ring's 5.00, unmoved by the relax).
-    left, _bottom, right, _top = SHEET_INNER_BORDER
+    # The relax moves the ring right and down only, so it answers for the
+    # side borders, held to the ring's contract (each centre BALLOON_RADIUS
+    # inside), and the title block and caption it moves toward, held to the
+    # rendered ink. The ring's top only drops (farm r10/r13: the carrier's top
+    # CL-dowel balloon, its 5.20 ink 0.2 over the ring's 5.00).
+    left, _bottom, right, top = SHEET_INNER_BORDER
     k0, k1, k2, k3 = TITLE_BLOCK_KEEP_OUT
     for item, (x, y, radius) in zip(landings, circles, strict=True):
         reach = min(radius, BALLOON_RADIUS)
         if (
             x - reach < left
             or x + reach > right
+            or y + radius > top
+            or y - reach < floor
             or (
                 x + radius > k0
                 and x - radius < k2
@@ -2126,7 +2274,8 @@ def _relax_cluster_slide(
         ):
             raise RuntimeError(
                 f"{label}: {item.instance} balloon at {(x, y)!r}, radius "
-                f"{radius:.5f}, leaves the side borders or enters the title block"
+                f"{radius:.5f}, leaves the border, the caption's room or "
+                "enters the title block"
             )
     return landings
 
@@ -2353,6 +2502,7 @@ def _place_package(
         occurrence_quantities=True,
     )
     kit_note_settled = _place_kit_bom_note(adapter, table, reference)
+    shim_note_settled = _place_shim_stock_note(adapter, table)
     bom_name = _bom_feature_name(table)
     landings: list[BalloonLanding] = []
     for cluster, view, scale in placed:
@@ -2391,6 +2541,7 @@ def _place_package(
         lambda: assert_balloon_landings(adapter, landings),
         cl_tip_settled,
         kit_note_settled,
+        shim_note_settled,
     )
 
 

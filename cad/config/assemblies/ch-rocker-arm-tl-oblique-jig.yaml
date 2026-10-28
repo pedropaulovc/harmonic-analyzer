@@ -50,7 +50,7 @@ machinist_exceptions:
     reason: "The unchanged four-screw flange is a static clamp: its calculated friction-slip margin exceeds 1.5 against the 1 kN hand-abuse nut torque. No operating torque reaches the screws. The owner accepted the #4-40 button-head joint without washers on 2026-10-19/20; the owner-approved 2026-10-23 simplification retains that joint in TL-32, with holes drilled to print rather than transfer spotted. Actual heads must seat flat and clear the nut body before tightening."
   - id: "RV-03"
     kind: "accept"
-    where: "step 8: the handwheel and KP08 set screws on leadscrew flats, locked with low-strength purple threadlocker"
+    where: "step 8: the handwheel and KP08 set screws on leadscrew flats, locked with Loctite 222 (low-strength purple) threadlocker"
     finding: "set screws on a hand-cranked reversing shaft use threadlocker without a mechanical lock (rule 23)"
     reason: "Owner ruling 2026-10-18 retains bought low-strength threadlocker on each set screw; the shaft flats carry the hand-crank torque."
   - id: "RV-04"

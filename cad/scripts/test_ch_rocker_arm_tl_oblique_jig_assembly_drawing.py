@@ -1154,6 +1154,7 @@ def test_package_settled_checks_reread_native_bom_without_mutating_layout(
     )
     seat._place_assembled_sheet.return_value = lambda: None
     seat._place_kit_bom_note.return_value = lambda: None
+    seat._place_shim_stock_note.return_value = lambda: None
     seat._place_notes_reference_views.return_value = {
         name: drawing.NOTES_REFERENCE_SCALE for name in drawing.NOTES_REFERENCE_REGIONS
     }
@@ -1491,6 +1492,89 @@ def test_kit_bom_key_refuses_a_native_note_that_does_not_fit(kit_bom_note_state,
         state.move = fault
     with pytest.raises(RuntimeError):
         drawing._place_kit_bom_note(_ADAPTER, state.table, state.reference)
+
+
+def test_shim_stock_note_sits_under_the_bom_left_of_the_title(kit_bom_note_state):
+    state = kit_bom_note_state
+    settled = drawing._place_shim_stock_note(_ADAPTER, state.table)
+    [note] = state.notes
+    assert note.text == spec.PIVOT_SHIM_STOCK_NOTE
+    extent = drawing._kit_bom_note_extent(note)
+    bom = drawing._bom_bounds(state.table)
+    assert extent[0] == pytest.approx(bom[0])  # flush with the table, by its ink
+    assert bom[1] - extent[3] == pytest.approx(drawing.REGION_GAP)
+    assert extent[2] < drawing.TITLE_BLOCK_KEEP_OUT[0] and _inside_sheet(extent)
+    settled()
+    state.notes[0].text = "ITEM 7: SOMETHING ELSE"
+    with pytest.raises(RuntimeError, match="text changed"):
+        settled()
+
+
+@pytest.mark.parametrize("fault", ("oversized", "ignored", "refused"))
+def test_shim_stock_note_refuses_a_note_that_does_not_fit(kit_bom_note_state, fault):
+    state = kit_bom_note_state
+    if fault == "oversized":
+        state.width = 0.250
+    else:
+        state.move = fault
+    with pytest.raises(RuntimeError):
+        drawing._place_shim_stock_note(_ADAPTER, state.table)
+
+
+def test_shim_stock_note_buys_the_worst_case_at_both_supports() -> None:
+    # Owner ruling 2026-10-27: the nominal 0.2 pack plus four 0.5 and one 0.1
+    # a support (the 2.1 worst case), at both supports.
+    assert spec.PIVOT_SHIM_BUY == {
+        "98055A117": (0.1, 2), "98055A118": (0.2, 10), "98055A121": (0.5, 8),
+    }
+    note = spec.PIVOT_SHIM_STOCK_NOTE
+    assert note.startswith(f"ITEM {spec.ITEM_NUMBERS[spec.PIVOT_SHIM]}:")
+    for sku, (_thickness, count) in spec.PIVOT_SHIM_BUY.items():
+        assert f"{sku} " in note and f"X{count}" in note
+    assert "SELECTED PER P1" in note
+    item = f"(ITEM {spec.ITEM_NUMBERS[spec.PIVOT_SHIM]})"
+    assert item in spec.PIVOT_FIT_STEPS[0] and "BUY LIST UNDER THE BOM" in spec.PIVOT_FIT_STEPS[0]
+    description = spec.BOM_DESCRIPTIONS[spec.PIVOT_SHIM]
+    assert "FITTING STOCK" in description
+    assert len(description) <= drawing.BOM_DESCRIPTION_MAX_CHARS
+
+
+def test_ring_down_slack_follows_what_lies_under_each_balloon() -> None:
+    keep_out = (0.200, 0.0, 0.400, 0.070)
+    floor = 0.033
+    outline = (0.050, 0.120, 0.150, 0.200)
+    # The room ends at the title block's top, above the floor, for every
+    # balloon: one beside the block could lead across its corner.
+    over = [(0.300, 0.110, 0.005)]
+    assert drawing.ring_floor_clearance(
+        over, outline, keep_out=keep_out, floor=floor
+    ) == pytest.approx(0.035)
+    beside = [(0.100, 0.060, 0.005)]
+    assert drawing.ring_floor_clearance(
+        beside, outline, keep_out=keep_out, floor=floor
+    ) == pytest.approx(-0.015)
+    assert drawing.ring_floor_clearance(
+        over, outline, keep_out=keep_out, floor=0.100
+    ) == pytest.approx(0.005)
+    # The outline binds too, and the cap (the centred position) limits it.
+    wide = (0.050, 0.090, 0.250, 0.200)
+    assert drawing.ring_down_slack(
+        over, wide, keep_out=keep_out, floor=floor, cap=0.040
+    ) == pytest.approx(0.020)
+    assert drawing.ring_down_slack(
+        over, outline, keep_out=keep_out, floor=floor, cap=0.010
+    ) == pytest.approx(0.010)
+    # A balloon already in the keep-out allows nothing.
+    inside = [(0.300, 0.070, 0.005)]
+    assert drawing.ring_down_slack(
+        inside, outline, keep_out=keep_out, floor=floor, cap=0.040
+    ) == 0.0
+
+
+def test_cluster_rings_keep_air_under_the_top_border() -> None:
+    assert drawing.CLUSTER_RING_REGION[3] == pytest.approx(
+        drawing.SHEET_INNER_BORDER[3] - drawing.BOM_SHEET_CLEARANCE
+    )
 
 
 @pytest.mark.parametrize(
