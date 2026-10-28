@@ -98,9 +98,15 @@ NIB_CLEARANCE_TEXT = f"{PEN_PAPER_CLEARANCE_MM:.2f}"
 # Both callouts stay short: the bar-height text stands wholly west of the
 # front view, the stud-drop text in the narrow strip between the east column
 # and the crank-side view, so it names only its step (the extension lines
-# show it runs from the bar top to the stud head).
+# show it runs from the bar top to the stud head). The bar height runs from
+# the raised deck top (ha_harmonic_analyzer_assembly_spec.DECK_TOP_Y), whose
+# extension line ends at the west column short of that deck, so its callout
+# and step name the surface (#2060), in short lines.
 SETTING_CALLOUTS = {
-    BAR_HEIGHT_DIMENSION: f"BAR TOP (STEP {steps.step_number('magnifier-bar-clamped')})",
+    BAR_HEIGHT_DIMENSION: (
+        "BAR TOP ABOVE\nRAISED DECK TOP\n"
+        f"(STEP {steps.step_number('magnifier-bar-clamped')})"
+    ),
     STUD_DROP_DIMENSION: f"STEP {steps.step_number('pen-wire-tied')}",
 }
 
@@ -157,8 +163,8 @@ _STEP_TEXT: dict[str, str] = {
         "MAGNIFIER BAR: MHA-MG-00 SUPPLIES THE MHA-SH-01/MHA-SH-02 CLAMP ARCS "
         "AND BOTH MHA-SH-VN-53 CLAMP SCREWS. CLOSE THE LOOSE ARCS ROUND THE "
         "WEST FRONT COLUMN, WHEEL TOWARD THE PEN ROD. SET THE MHA-MG-08 BAR "
-        "TOP TO ITS HEIGHT ABOVE THE DECK (SHEET 1) AND LEVEL ALONG ITS "
-        "LENGTH, THEN TIGHTEN BOTH SCREWS EVENLY."
+        "TOP TO ITS HEIGHT ABOVE THE RAISED DECK TOP (SHEET 1) AND LEVEL "
+        "ALONG ITS LENGTH, THEN TIGHTEN BOTH SCREWS EVENLY."
     ),
     "magnifier-bracket-screwed": (
         "MAGNIFIER BRACKET: SEAT THE MHA-MG-01 BRACKET FLANGE ON ITS SEATS ON "
