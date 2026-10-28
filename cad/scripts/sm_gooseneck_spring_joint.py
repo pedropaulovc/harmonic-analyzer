@@ -68,13 +68,15 @@ PLUG_SHANK_DIA = round(
 )
 
 
-def _owner_minor(row: dict, exception_id: str, part: str) -> None:
+def owner_minor(row: dict, exception_id: str, part: str) -> None:
     """Refuse a shortfall the owner has not declared as a ``minor``.
 
-    ``row`` is the part's registry row, read by its caller through a literal
-    ``_config.parts(<dashed-name>)`` so the build graph scopes this module's
-    config reads to the two rows (codjiflo P2 on #1997); the review itself
-    validates every declaration's form (machinist_exceptions.load_exceptions).
+    ``row`` is the part's registry row, read by the part's own spec through a
+    literal ``_config.parts(<dashed-name>)``: this module reads no registry
+    row, so the channel-seat consumers of settled_spring_seats (which reads
+    the counterbore from here) do not re-key on these parts' rows (codjiflo
+    P3 on #1997).  The review itself validates every declaration's form
+    (machinist_exceptions.load_exceptions).
     """
     declared = row.get("machinist_exceptions") or ()
     if not any(
@@ -500,14 +502,9 @@ if min(PLUG_WALL_MIN, DRILL_POINT_SHANK_WALL_MIN) < PLUG_WALL_TARGET:
     raise AssertionError(
         "gooseneck end piece loses a drawing-guidelines.md rule 17 (walls and webs) wall"
     )
-if COUNTERBORE_WALL_MIN < PLUG_WALL_TARGET:
-    _owner_minor(_config.parts("sm-gooseneck"), "RV-01", "sm_gooseneck")
-if HEAD_RETENTION_MIN <= 0.0:
-    raise AssertionError("gooseneck screw head lets the spring eye pass")
-if HEAD_RETENTION_MIN < HEAD_RETENTION_TARGET:
-    _owner_minor(
-        _config.parts("sm-gooseneck-spring-screw"), "RV-01", "sm_gooseneck_spring_screw"
-    )
+# COUNTERBORE_WALL_MIN < PLUG_WALL_TARGET and HEAD_RETENTION_MIN <
+# HEAD_RETENTION_TARGET each stand only on an owner minor; the part specs
+# (sm_gooseneck_spec, sm_gooseneck_spring_screw_spec) check the declarations.
 if HEAD_FLAT_BEARING_MARGIN_MIN <= 0.0:
     raise AssertionError("gooseneck screw's relief chamfer takes the loop off its flat")
 if min(LOOP_PLAIN_MARGIN_MIN, LOOP_CORNER_CLEARANCE_MIN) <= 0.0:

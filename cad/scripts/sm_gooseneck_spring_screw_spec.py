@@ -66,6 +66,12 @@ CHAMFER_CALLOUT = "X 45 DEG"
 # draw_pn_pen_rod's "R0.2 MAX / SEATS ON PEN V-BLOCK / MHA-PN-05"):
 COUNTER_SPRING_NUMBER = str(_config.parts("sm-vn-counter-spring")["number"])
 PLUG_NUMBER = str(_config.parts("sm-gooseneck")["number"])
+# The head's retention under its 1.0 target stands only on owner minor RV-01
+# (sm_gooseneck_spring_joint.owner_minor).
+if joint.HEAD_RETENTION_MIN < joint.HEAD_RETENTION_TARGET:
+    joint.owner_minor(
+        _config.parts("sm-gooseneck-spring-screw"), "RV-01", "sm_gooseneck_spring_screw"
+    )
 # The head's worst-case overlap of the loop's eye, under the 1.0 check (owner
 # minor RV-01), stated on the head Ø as a plain fact (drawing-guidelines.md
 # rule 20; codjiflo P2 on #1997), floored, never rounded up.  Two rows, so

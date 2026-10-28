@@ -39,9 +39,8 @@ summing assembly is needed to replace a stale seat::
 
 Without ``--write`` the measurements only go to the JSON report.
 ``--counter-only`` re-measures only the counter seats of every listed preset and
-keeps ``channel_seats``; ``--write PATH`` writes the merged table to PATH
-instead of springs.yaml; and ``--worker`` runs under a caller (a
-``_cached_com_action`` farm leaf) that already holds the COM seat.
+keeps ``channel_seats``; and ``--write PATH`` writes the merged table to PATH
+instead of springs.yaml.
 """
 
 from __future__ import annotations
@@ -742,11 +741,6 @@ def main() -> int:
         help="re-measure only the presets' counter seats; keep springs.channel_seats",
     )
     parser.add_argument(
-        "--worker",
-        action="store_true",
-        help="the caller (a _cached_com_action leaf) already holds the COM seat",
-    )
-    parser.add_argument(
         "--source",
         default="Native fixture calibration (diagnostics/calibrate_spring_seats.py); "
         "full saved-assembly acceptance is required by the build gates.",
@@ -758,23 +752,12 @@ def main() -> int:
     # Refuse here too, before the COM seat and run_build's connect.
     _refuse_unsafe_run(args.presets, output, write)
 
-    def run() -> int:
+    with dodo._com_seat("calibrate-spring-seats"):
         return run_build(
             lambda adapter: calibrate(
                 adapter, args.presets, output, write, args.source, mode=mode
             )
         )
-
-    if args.worker:
-        # Taking dodo._com_seat here would deadlock on the parent's own lock.
-        if not os.environ.get("HARMONIC_COM_SEAT"):
-            raise RuntimeError(
-                "--worker requires the caller to hold the coordinated COM seat "
-                "(HARMONIC_COM_SEAT unset)"
-            )
-        return run()
-    with dodo._com_seat("calibrate-spring-seats"):
-        return run()
 
 
 if __name__ == "__main__":

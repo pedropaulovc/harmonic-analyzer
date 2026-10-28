@@ -412,7 +412,7 @@ def test_owner_minors_are_declared_and_required(monkeypatch) -> None:
         "sm_gooseneck_spring_screw": "sm-gooseneck-spring-screw",
     }
     for package, dashed in rows.items():
-        joint._owner_minor(joint._config.parts(dashed), "RV-01", package)
+        joint.owner_minor(joint._config.parts(dashed), "RV-01", package)
     real = joint._config.parts
 
     def without(hidden: str, accept: bool = False):
@@ -435,24 +435,34 @@ def test_owner_minors_are_declared_and_required(monkeypatch) -> None:
         for accept in (False, True):
             row = without(hidden, accept)(dashed)
             with pytest.raises(AssertionError, match=f"{hidden}: no owner minor RV-01"):
-                joint._owner_minor(row, "RV-01", hidden)
-    # The module's own checks call it: run it afresh with each minor hidden.
-    for hidden in rows:
+                joint.owner_minor(row, "RV-01", hidden)
+    # Each part's spec checks its own declaration: run it afresh with the
+    # minor hidden.
+    specs = {
+        "sm_gooseneck": gooseneck_spec,
+        "sm_gooseneck_spring_screw": screw_spec,
+    }
+    for hidden, spec_module in specs.items():
         monkeypatch.setattr(joint._config, "parts", without(hidden))
         with pytest.raises(AssertionError, match=f"{hidden}: no owner minor RV-01"):
-            runpy.run_path(joint.__file__)
+            runpy.run_path(spec_module.__file__)
 
 
 def test_owner_minor_reads_stay_scoped_to_their_registry_rows() -> None:
-    # codjiflo P2 on #1997: the joint's config reads resolve to concrete
-    # files, never the whole-config fallback, so unrelated registry or
-    # calibration edits do not invalidate the recipes importing it.
-    tokens = config_files_of(Path(joint.__file__))
-    assert "**" not in tokens
-    assert {
-        "parts/sm-gooseneck.yaml",
-        "parts/sm-gooseneck-spring-screw.yaml",
-    } <= tokens
+    # codjiflo P2/P3 on #1997: the joint reads no registry row, so the
+    # channel seats importing it through settled_spring_seats do not re-key
+    # on these parts' rows; each part's spec reads its own row, a concrete
+    # file, never the whole-config fallback.
+    joint_tokens = config_files_of(Path(joint.__file__))
+    assert "**" not in joint_tokens
+    assert not {token for token in joint_tokens if token.startswith("parts/")}
+    for spec_module, row in (
+        (gooseneck_spec, "parts/sm-gooseneck.yaml"),
+        (screw_spec, "parts/sm-gooseneck-spring-screw.yaml"),
+    ):
+        tokens = config_files_of(Path(spec_module.__file__))
+        assert "**" not in tokens
+        assert row in tokens
 
 
 def test_loop_passes_bear_on_the_plain_body_free_and_clamped() -> None:

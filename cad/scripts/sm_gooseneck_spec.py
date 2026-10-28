@@ -39,9 +39,17 @@ from sm_gooseneck_spring_joint import (
     BRAZE_CLEARANCE_MIN,
     COUNTERBORE_AXIS_OFFSET_MAX,
     COUNTERBORE_WALL_CALLOUT_MIN,
+    COUNTERBORE_WALL_MIN,
     DRILL_WANDER_MAX,
+    PLUG_WALL_TARGET,
     THREAD_AXIS_OFFSET_MAX,
+    owner_minor,
 )
+
+# The counterbore wall under the rule 17 target stands only on owner minor
+# RV-01 (sm_gooseneck_spring_joint.owner_minor).
+if COUNTERBORE_WALL_MIN < PLUG_WALL_TARGET:
+    owner_minor(_config.parts("sm-gooseneck"), "RV-01", "sm_gooseneck")
 
 # Stock designations as the supplier lists them.  The print states them in
 # inches; each one is checked against the millimetre geometry it names.
@@ -120,16 +128,20 @@ DIMENSION_CALLOUTS_BY_NAME: dict[str, str] = {
 # The end piece's native blind-tap callout (end view): the title block's
 # THREADS row owns the 2B class (drawing-guidelines.md rule 2), the tap's
 # two depths print at the places their band is read at
-# (sm_gooseneck_spring_joint.TAP_DEPTH_BAND), and its location limits print
-# under it as finished geometry: the thread axis, with the mate it serves,
-# and the tap drill's point on that axis (the wall budgets' DRILL_WANDER_MAX;
-# "DRILL WANDER" and "TAP AFTER BRAZE" read as method, machinist review of
-# e487a1bb4).  Four rows in all (the layout audit's tall-block limit: a fifth
-# row gated, farm run 20261028T005208028Z).
+# (sm_gooseneck_spring_joint.TAP_DEPTH_BAND), measured from the counterbore
+# floor (the Hole Wizard start face; codjiflo P2 on #1997 asked the datum be
+# stated), and its location limits print under it as finished geometry,
+# with the mate they serve: the thread axis, and the tap drill's point, which
+# the wall budgets take off that axis by DRILL_WANDER_MAX
+# (DRILL_POINT_SHANK_WALL_MIN).  "DRILL WANDER" and "TAP AFTER BRAZE" read as
+# method (machinist review of e487a1bb4).  Four rows in all (the layout
+# audit's tall-block limit: a fifth row gated, farm run 20261028T005208028Z).
 TAP_CALLOUT_PRECISION = {"hw-threaddepth": 2, "hw-tapdrldepth": 2}
+DRILL_POINT_OFFSET_MAX = round(THREAD_AXIS_OFFSET_MAX + DRILL_WANDER_MAX, 6)
 TAP_CALLOUT_BELOW = (
-    f"AXIS TO TUBE AXIS +/-{THREAD_AXIS_OFFSET_MAX:.2f} FOR {SCREW_NUMBER}\n"
-    f"DRILL POINT ON THREAD AXIS WITHIN {DRILL_WANDER_MAX:.2f}"
+    f"FOR {SCREW_NUMBER}; DEPTHS FROM C'BORE FLOOR\n"
+    f"AXIS TO TUBE AXIS +/-{THREAD_AXIS_OFFSET_MAX:.2f}, "
+    f"DRILL POINT +/-{DRILL_POINT_OFFSET_MAX:.2f}"
 )
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the

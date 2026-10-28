@@ -191,7 +191,10 @@ def test_tap_callout_states_geometry_and_its_mate_within_four_rows() -> None:
     # audit's four-row limit; each row is finished geometry, not method.
     rows = spec.TAP_CALLOUT_BELOW.splitlines()
     assert len(rows) == 2
-    assert rows[0].endswith(f"FOR {spec.SCREW_NUMBER}")
+    assert rows[0] == f"FOR {spec.SCREW_NUMBER}; DEPTHS FROM C'BORE FLOOR"
+    assert spec.DRILL_POINT_OFFSET_MAX == pytest.approx(
+        joint.THREAD_AXIS_OFFSET_MAX + joint.DRILL_WANDER_MAX
+    )
     assert "WANDER" not in spec.TAP_CALLOUT_BELOW
     assert "BRAZE" not in spec.TAP_CALLOUT_BELOW
     assert spec.SCREW_NUMBER in spec.DIMENSION_CALLOUTS_BY_NAME["CounterboreDia"]

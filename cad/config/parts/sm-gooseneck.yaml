@@ -1,7 +1,7 @@
 sm-gooseneck:
   number: MHA-SM-01
   material: AISI 4130-N tube; 1018 end piece
-  material_specification: "4130-N seamless steel tube, 1/2 in OD x 0.065 in wall (OnlineMetals 7322), bent on a 1/2 in x 3 in CLR die; sleeve 4130-N seamless 5/8 in OD x 0.058 in wall (OnlineMetals 7324); end piece AISI 1018 cold-drawn round, 5/8 in"
+  material_specification: "4130-N seamless steel tube, 1/2 in OD x 0.065 in wall (OnlineMetals 7322); sleeve 4130-N seamless 5/8 in OD x 0.058 in wall (OnlineMetals 7324); end piece AISI 1018 cold-drawn round, 5/8 in"
   finish: ASTM B456 SC2 Ni-Cr plate after joining; mask tap; oil tap and bore; dims pre-plate
   quantity: 1
   tolerance_class: machined_block
