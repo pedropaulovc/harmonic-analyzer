@@ -1020,6 +1020,11 @@ def test_outside_view_is_partial_and_shows_the_boss_past_the_run_out_limit() -> 
     assert foot < drawing.LEFT_CENTER[1] - drawing.HALF_OD
     assert head > drawing.LEFT_CENTER[1] + drawing.HALF_OD
     assert drawing.LEFT_CAPTION.startswith("PARTIAL ")
+    # Run 20261028T113212039Z (r1-r3): the section's nose extension line
+    # struck the wider caption; it stands right of that line now.
+    caption = _note_box(drawing.LEFT_CAPTION, drawing.LEFT_CAPTION_XY)
+    assert drawing._NOSE_X + 0.003 < caption.xmin
+    assert caption.xmax < rear
     profile = drawing.OUTSIDE_CROP_PROFILE
     assert len(profile) == 8
     xs, ys = zip(*profile)
