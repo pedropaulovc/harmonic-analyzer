@@ -134,16 +134,18 @@ def test_the_drill_callout_names_the_mate_its_location_bands_serve() -> None:
     assert max(len(row) for row in rows) <= len("2X DRILL Ø3.18 THRU ALL")
 
 
-def test_the_edge_located_hole_coordinates_name_the_taps_they_match() -> None:
+def test_the_hole_coordinates_name_the_taps_they_match() -> None:
     """Machinist review ENFORCE at 2056e3344 (blocker): the 4.000 and 2X
-    3.700 ±0.035 edge locations gave no function. The coordinates baseline
-    the pattern from the corner, and the set window spends each band
-    (±0.065 is refused), so each names the guide whose taps it matches."""
+    3.700 ±0.035 edge locations gave no function; at eecbf880d the 18.000
+    still lacked it. The coordinates baseline the pattern from the corner,
+    and the set window spends each band (±0.065 is refused), so each names
+    the guide whose taps it matches."""
     import _config
 
     guide = _config.parts("pd-platen-guide")["number"]
     assert drawing.DIMENSION_CALLOUTS_BELOW == {
         "Hole1X": f"MATCHES\n{guide}",
+        "Hole2X": f"MATCHES\n{guide}",
         "Hole1Y": f"MATCHES\n{guide}",
     }
     # Each block stays inside its value's width, the 4.000's left of the
@@ -152,6 +154,7 @@ def test_the_edge_located_hole_coordinates_name_the_taps_they_match() -> None:
     x_x, _ = drawing.FRONT_KEEP["Hole1X"]
     assert width <= len("2X 3.700 ±0.035") * _CHAR_WIDTH
     assert width <= len("4.000 ±0.035") * _CHAR_WIDTH
+    assert width <= len("18.000 ±0.035") * _CHAR_WIDTH
     assert x_x + width / 2.0 < drawing.LEFT_EDGE_X - 0.002
 
 
@@ -171,11 +174,24 @@ def test_the_edge_coordinate_blocks_clear_each_other_and_the_18_000() -> None:
     # The hole Y's line (at its text x) passes left of the whole 4.000 block.
     assert x_x - len("4.000 ±0.035") * _CHAR_WIDTH / 2.0 > y_x
     # The 4.000's shelf, its dimension line, stands clear above the 18.000's
-    # text; the 18.000's own line runs below that text.
-    assert x_y - _BLOCK_SHELF > drawing.FRONT_KEEP["Hole2X"][1] + 0.002
-    # Both blocks stay under the Height's bottom arrow and extension line.
-    for y in (y_y, x_y):
+    # (the smaller dimension nearer the part); both three-row blocks hang
+    # their shelves the same _BLOCK_SHELF below their text positions.
+    assert x_y > drawing.FRONT_KEEP["Hole2X"][1] + 0.004
+    # All three blocks stay under the Height's bottom arrow and the plate.
+    for y in (y_y, x_y, drawing.FRONT_KEEP["Hole2X"][1]):
         assert y + _BLOCK_TOP < drawing.BOTTOM_EDGE_Y - 0.002
+
+
+def test_the_18_000_block_stands_between_the_hole_extension_lines() -> None:
+    """Machinist review at eecbf880d: the 18.000 now carries the mate block.
+    Its shelf keeps the one-row line's place above the 22.5's text, and the
+    block stands between hole 1's extension line (where the 4.000's line
+    ends) and hole 2's."""
+    x, y = drawing.FRONT_KEEP["Hole2X"]
+    half = len("18.000 ±0.035") * _CHAR_WIDTH / 2.0
+    assert x - half > drawing._sheet_x(pd_guide_lock_spec.HOLE_XY[0][0]) + 0.002
+    assert x + half < drawing.HOLE_2_X_SHEET - 0.002
+    assert y - _BLOCK_SHELF > drawing.FRONT_KEEP["Width"][1] + 0.003
 
 
 def test_the_thickness_value_stands_outboard_of_its_extension_lines() -> None:
