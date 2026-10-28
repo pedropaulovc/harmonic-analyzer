@@ -564,7 +564,11 @@ KNOB_SETTING_VIEW_NAME = "VIEW K"
 KNOB_SETTING_SCALE = (1.0, 1.0)
 KNOB_SETTING_CENTER = (0.320, 0.097)
 KNOB_SETTING_RADIUS = 0.024
-KNOB_SETTING_TEXT_OFFSET = 0.030
+# At 15:150 Q sits higher in the crop, so at 0.030 ALONG's extension line from
+# Q struck the second column's continuation line (run 20261028T063820031Z,
+# machinist review r1-r3, rule 14); 0.024 keeps the texts clear of the
+# circle and the extension lines 4 mm under the column.
+KNOB_SETTING_TEXT_OFFSET = 0.024
 # S to N, the set band (43.794 +0.050/-0 at 15:150), spans the crop's
 # diameter, so its text stands past S along the line, off it away from Q,
 # clear of the circle and under the second column. Its dimension line runs

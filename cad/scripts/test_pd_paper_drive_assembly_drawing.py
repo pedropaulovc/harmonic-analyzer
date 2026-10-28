@@ -564,9 +564,13 @@ def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
             assert math.dist(nearest, centre) > drawing.KNOB_SETTING_RADIUS
             assert drawing.FITUP_NOTE_XY[1][0] < box[0] and box[2] < drawing.FITUP_NOTE_LIMITS[1][0]
             assert drawing.FITUP_NOTE_LIMITS[1][1] < box[1] and box[3] < drawing.KNOB_SETTING_FIELD_TOP
+            # Each extension line runs past its dimension line by about
+            # 1.6 mm (ANSI 1/16 in); the step text above must stay clear of
+            # that overshoot (run 20261028T063820031Z: ALONG's struck the
+            # continuation line's "ON").
             shift = (x - (a[0] + b[0]) / 2.0, y - (a[1] + b[1]) / 2.0)
             for end in (a, b):
-                assert end[1] + shift[1] < drawing.KNOB_SETTING_FIELD_TOP
+                assert end[1] + shift[1] + 0.003 < drawing.KNOB_SETTING_FIELD_TOP
             boxes.append(box)
         # Each circle lettered on a leader to its centre: S and T inside the
         # crop, K just outside it past the boss, each clear of the chain.
