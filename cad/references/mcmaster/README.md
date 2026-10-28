@@ -435,9 +435,10 @@ vendor CAD, replica-gate evidence or a load rating.
 Purchase TL-VN-73 as the listed **A286** NAS1352N5H12; the native AISI 304
 material-library surrogate is a rendering representation only, not a material
 substitution or purchasing authority. The retention hardware provider owns
-the catalogue limits. The native fully threaded solid and the overall
-3/4 in length do not certify complete full-form engagement: inspect actual
-screws and THRU receiving threads for ≥1.5D = 11.90625 mm physical overlap.
+the catalogue limits. Estimated worst-case complete full-form engagement in
+the THRU (ASME B18.3 thread-runout conventions; no NAS or supplier limit)
+block threads is 9.81 mm, under 1.5D = 11.91 mm; owner minor exception RV-04
+(owner ruling 2026-10-27) accepts it without assembly measurement.
 For assembly, use clean, dry, free-running actual screws; seat cross-pattern
 at 0.50 ±0.05 N·m with the cap seated on all faces, cap/block base gap
 ≤0.05 mm over the whole mounting footprint, and independently underhead gap

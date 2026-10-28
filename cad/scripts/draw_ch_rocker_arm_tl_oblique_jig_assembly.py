@@ -113,10 +113,13 @@ from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _simplified_names import simplified_name
 from _layout_audit import display_box
+from _machinist_review_mode import MachinistReviewMode
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_oblique_jig_assembly"]
 ARTIFACT_STEM = SPEC.artifact_stem
@@ -450,14 +453,33 @@ CAPTURE_READING_REGION = (
     CLUSTER_RING_REGION[2] - BOM_SHEET_CLEARANCE,
     CLUSTER_RING_REGION[3] - BOM_SHEET_CLEARANCE,
 )
+# Both sections are drawn at 1:1. At 1:2 the retainer (4.16 thick) printed
+# smaller than one arrowhead, so the B-B fragment and A-A's C4/C4A/C5A/C5B
+# landings could not be told apart (machinist review, 2026-10-23/26).
+# B-B's native padded 1:1 extent measured 42.1 x 44.8 mm (49385), so its field
+# takes the top-right corner up to the border, with its caption directly
+# beneath (2 mm under its 220.1 mm outline), above A-A's right-hand column.
+# A-A's 1:1 crop is re-centred on its readings' span, C2 lower rim to C5A pin
+# end (23.15 to 63.0 above the pin origin), and its radius shrinks to 30 so
+# its field fits between the two callout columns; its caption sits beneath.
 CAPTURE_VIEW_REGIONS = (
     CAPTURE_EXPLODED_REGION,
     (0.224, 0.220, 0.278, 0.263),
-    (0.278, 0.119, 0.364, 0.211),
-    (0.360, 0.226, 0.403, 0.261),
+    (0.264, 0.106, 0.362, 0.200),
+    (0.352, 0.219, 0.416, 0.266),
 )
 CAPTURE_LOCATOR_SCALE = (1, 4)
-CAPTURE_SECTION_CAPTIONS = ((0.302, 0.115), (0.360, 0.222))
+CAPTURE_SECTION_SCALES = {"A": (1, 1), "B": (1, 1)}
+CAPTURE_SECTION_CAPTIONS = ((0.313, 0.104), (0.384, 0.2200))
+# Model crop of each section: (centre above the pin origin or at the first cap
+# screw, radius), in mm.
+CAPTURE_A_CROP_CENTRE_ABOVE_PIN_ORIGIN = 43.0
+CAPTURE_SECTION_CROP_RADII = {"A": 30.0, "B": 14.0}
+# Half-lengths of the cutting lines along their rows. B-B's is longer, so its
+# arrows and letters stand 3.75 mm (at the plan's 1:4) outside A-A's instead of
+# on top of them. Shorter, its right letter sat 0.48 mm in the C5B cotter
+# leader (00fa5c46c); longer, it moves away from that leader.
+CAPTURE_CUT_HALF_LENGTHS = {"A": 65.0, "B": 80.0}
 CAPTURE_NOTE_HEIGHT = 0.002
 
 
@@ -647,18 +669,26 @@ if spec.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
     raise AssertionError("the jig explode is authored in Default")
 
 
-# Glues an item citation ("ITEM 22") and a value with its unit ("3.5 N·m",
-# "25 IN·LBF") into one word while wrapping, so the fitter never reads "ITEM"
-# or a number at a line end and what it belongs to on the next.
-_UNBROKEN = re.compile(r"\bITEM (?=\d)|(?<=\d) (?=N·m|IN·LBF)")
+# Glues an item citation ("ITEM 22"), a value with its unit ("3.5 N·m",
+# "25 IN·LBF") and a sheet or zone pointer ("SHEET 10", "ZONE B4") into one
+# word while wrapping, so the fitter never reads "ITEM", a number or "ZONE" at
+# a line end and what it belongs to on the next.
+_UNBROKEN = re.compile(r"\b(?:ITEM|SHEET) (?=\d)|\bZONE (?=[A-D]\d)|(?<=\d) (?=N·m|IN·LBF)")
 _GLUE = "\x00"
 # A step's label: its number, or a sub-step's ("7A").
 _STEP_LABEL = re.compile(r"\d+[A-Z]?")
 # Any labelled line's top-level step: "7" of 7A, "C3" of C3B, "HD1" itself.
 _STEP_GROUP = re.compile(r"([A-Z]*\d+)[A-Z]?")
+# A procedure's numbered sub-step label: "C2A.1", "HD3.6". It prints with a
+# hanging indent under its heading's group.
+_SUB_STEP = re.compile(r"([A-Z]+\d+[A-Z]?)\.\d+")
 
 
 def _step_group(line: str) -> str | None:
+    label, space, _text = line.partition(" ")
+    sub = _SUB_STEP.fullmatch(label) if space else None
+    if sub:
+        return _STEP_GROUP.fullmatch(sub[1])[1]
     number, sep, _rest = line.partition(". ")
     match = _STEP_GROUP.fullmatch(number) if sep else None
     return match[1] if match else None
@@ -689,7 +719,16 @@ def _wrapped(
         if opens or group is not None:
             previous = group
         number, sep, rest = line.partition(". ")
-        if sep and _STEP_LABEL.fullmatch(number):
+        label, space, text = line.partition(" ")
+        if space and _SUB_STEP.fullmatch(label):
+            out += textwrap.wrap(
+                text,
+                width=width,
+                initial_indent=f"{label} ",
+                subsequent_indent=" " * (len(label) + 1),
+                break_on_hyphens=False,
+            )
+        elif sep and _STEP_LABEL.fullmatch(number):
             out += textwrap.wrap(
                 rest,
                 width=width,
@@ -2610,6 +2649,13 @@ def capture_readings() -> tuple[CaptureReading, ...]:
     top = washer.THICKNESS
     hole_top = pin.CROSS_HOLE_STATION + pin.CROSS_HOLE_DIA / 2.0
     bolt_y = r.CAP_BOLT_Y_OFFSETS[0]
+    # B-B's two C3A labels sit left of it, so both land on the bolt's outer
+    # (-X) side and no leader crosses the section: the cap/block land at the
+    # clearance hole's bottom corner, the underhead footprint at the head's
+    # -X bearing corner.
+    # The native cap cuts its clearance holes at the nominal diameter
+    # (pivot cap spec HOLE_DIA); its tolerance band is not modelled.
+    hole_wall = r.CAP_BOLT_X_OFFSETS[0] - spec.pivot_cap.HOLE_DIA / 2.0
     cap_origin = spec.PIVOT_CAP_PLACEMENTS[0][0]
     roof = _capture_local_point(spec.PIVOT_CAP, (
         spec.PIVOT_PIN_ORIGINS[0][0] + r.CAP_POCKET_DIAMETER / 2.0 * spec.PIN_ROWS[0][0],
@@ -2627,18 +2673,29 @@ def capture_readings() -> tuple[CaptureReading, ...]:
         # C5B HEAD and C4 COMMON at least one row pitch apart. Each leader
         # leaves its bottom row's right end, so the mouth leader passes 2.7 mm
         # above C5B's longer first row (struck by 0.78 mm at 2056e3344).
+        # The right column, top to bottom under the B-B caption: C5A, C4
+        # MOUTH, C4 COMMON, C4A running gap, each leader leaving its first row
+        # above the next one's so none cross. C5A sits here because from the
+        # top centre its leader ran through the C5B cotter label (5d622b853).
+        # The common and running-gap leaders start above the carrier top
+        # (their targets lie on and just over it) and the running gap's
+        # passes under the cotter eye.
         *(CaptureReading(2, spec.PIVOT_RETAINER, (side * mouth, 0.0, top),
                          callouts["mouth"], xy,
                          pick_local_mm=(side * mouth, 0.0, top / 2.0))
-          for side, xy in ((-1.0, (0.224, 0.2058)), (1.0, (0.365, 0.199)))),
-        *(CaptureReading(2, spec.CARRIER, carrier_face(side),
-                         callouts["carrier_backing_pin_end" if side > 0.0 else "carrier_backing"],
-                         (x, 0.184))
-          for side, x in ((-1.0, 0.224), (1.0, 0.365))),
-        CaptureReading(2, spec.PIVOT_RETAINER, (land, 0.0, 0.0),
-                       callouts["running_gap"], (0.365, 0.157)),
+          for side, xy in ((-1.0, (0.224, 0.2058)), (1.0, (0.365, 0.1908)))),
+        *(CaptureReading(2, spec.CARRIER, carrier_face(side), callouts["carrier_backing"], xy)
+          for side, xy in ((-1.0, (0.224, 0.184)), (1.0, (0.365, 0.179)))),
+        # The running gap lands on the retainer's underside 0.7 inside its
+        # rim, 2.6 mm out from C4 COMMON's carrier-face arrow at the land
+        # (they were 0.17 apart, one over the other). The right column's
+        # four blocks stand 3.6 mm apart (8df9bd30c's 2.3-2.5 merged under the
+        # 3.2-3.5 row pitch); the running-gap leader still starts about
+        # 0.4 above its landing.
+        CaptureReading(2, spec.PIVOT_RETAINER, (washer.OUTER_DIA / 2.0 - 0.7, 0.0, 0.0),
+                       callouts["running_gap"], (0.365, 0.1672)),
         CaptureReading(2, spec.PIVOT_PIN, (0.0, 0.0, pin.OVERALL_LENGTH),
-                       callouts["pin_end"], (0.305, 0.214)),
+                       callouts["pin_end"], (0.365, 0.2025)),
         CaptureReading(2, spec.PIVOT_PIN, (-pin.FIT_DIA / 2.0, 0.0, hole_top),
                        callouts["cross_hole"], (0.224, 0.2145),
                        pick_local_mm=(-pin.FIT_DIA / 2.0, 0.0, (hole_top + pin.OVERALL_LENGTH - pin.LEAD_CHAMFER) / 2.0)),
@@ -2649,10 +2706,28 @@ def capture_readings() -> tuple[CaptureReading, ...]:
         CaptureReading(1, spec.PIVOT_COTTER,
                        (spec.pivot_cotter.EYE_OUTER_RADIUS, -spec.pivot_cotter.COTTER_WIDTH / 2.0, spec.pivot_cotter.EYE_CENTER),
                        callouts["cotter"], (0.288, 0.205)),
-        CaptureReading(3, spec.PIVOT_CAP, (0.0, bolt_y, 0.0),
-                       callouts["cap_land"], (0.279, 0.2235)),
-        CaptureReading(3, spec.PIVOT_CAP_SCREW, (spec.cap_screw.DIMS.head_dia * 0.35, 0.0, 0.0),
-                       callouts["underhead"], (0.282, 0.232)),
+        # Along the land itself the cap's bottom edge and the block's top edge
+        # coincide, so a coordinate pick may return either (run 13 got the
+        # block). As with C4 MOUTH, the criterion is a corner, here the
+        # clearance hole's bottom corner on the land. The pick acquires the
+        # cap's own hole wall at mid-height below the counterbore, which no
+        # block edge shares and which ends at that corner.
+        CaptureReading(3, spec.PIVOT_CAP, (hole_wall, bolt_y, 0.0),
+                       callouts["cap_land"], (0.279, 0.2235),
+                       pick_local_mm=(hole_wall, bolt_y,
+                                      (spec.pivot_cap.HEIGHT - spec.pivot_cap.COUNTERBORE_DEPTH) / 2.0)),
+        # C3A's underhead arrow lands on the head's outer bearing corner, over
+        # the counterbore floor (cap material beneath it). Across the bearing
+        # face the head and that floor coincide, and run 15's pick there got
+        # the cap. So, as with the land, the pick acquires the head's own
+        # cylindrical side, mid-way below the safety-wire hole, which ends at
+        # that corner.
+        CaptureReading(3, spec.PIVOT_CAP_SCREW,
+                       (-spec.cap_screw.DIMS.head_dia / 2.0, 0.0, 0.0),
+                       callouts["underhead"], (0.282, 0.232),
+                       pick_local_mm=(-spec.cap_screw.DIMS.head_dia / 2.0, 0.0,
+                                      (spec.cap_screw.SCREW_WIRE_HEIGHT
+                                       - spec.cap_screw.SCREW_WIRE_HOLE_DIA / 2.0) / 2.0)),
     )
 
 
@@ -2672,7 +2747,20 @@ def capture_cut_points(section_label: str) -> tuple[tuple[float, float, float], 
         origin, rows = spec.compose(spec.PIVOT_CAP_PLACEMENTS[0], (0.0, spec.retention.CAP_BOLT_Y_OFFSETS[0], 0.0))
     else:
         raise ValueError(f"unknown cartridge section {section_label!r}")
-    return tuple(tuple((origin[i] + distance * rows[0][i]) / 1000.0 for i in range(3)) for distance in (-65.0, 65.0))
+    half = CAPTURE_CUT_HALF_LENGTHS[section_label]
+    return tuple(tuple((origin[i] + distance * rows[0][i]) / 1000.0 for i in range(3)) for distance in (-half, half))
+
+
+def capture_section_crop(section_label: str) -> tuple[tuple[float, float, float], float]:
+    """One section's model crop centre (m) and radius (m)."""
+    if section_label == "A":
+        origin = spec.PIVOT_PIN_ORIGINS[0]
+        centre = (origin[0], origin[1], origin[2] + CAPTURE_A_CROP_CENTRE_ABOVE_PIN_ORIGIN)
+    elif section_label == "B":
+        centre = spec.PIVOT_CAP_SCREW_PLACEMENTS[0][0]
+    else:
+        raise ValueError(f"unknown cartridge section {section_label!r}")
+    return tuple(value / 1000.0 for value in centre), CAPTURE_SECTION_CROP_RADII[section_label] / 1000.0
 
 
 def _crop_capture_view(adapter: Any, view: Any, centre: tuple[float, float], radius: float, *, label: str) -> Any:
@@ -2721,12 +2809,8 @@ def _assert_capture_crop(adapter: Any, view: Any, index: int, profile: Any) -> N
     origin = tuple(value / 1000.0 for value in spec.PIVOT_PIN_ORIGINS[0])
     if index == 1:
         anchor, radius = origin, 0.055
-    elif index == 2:
-        anchor = tuple(origin[i] + (spec.pivot_pin.OVERALL_LENGTH / 2000.0 if i == 2 else 0.0) for i in range(3))
-        radius = 0.039
-    elif index == 3:
-        anchor = tuple(value / 1000.0 for value in spec.PIVOT_CAP_SCREW_PLACEMENTS[0][0])
-        radius = 0.014
+    elif index in (2, 3):
+        anchor, radius = capture_section_crop("A" if index == 2 else "B")
     else:
         raise ValueError(f"{label}: not an assembled crop view")
     bound = _early_bound(view, "IView")
@@ -3377,7 +3461,7 @@ def _place_capture_sheet(adapter: Any, cluster: Cluster) -> tuple[tuple[Any, ...
     scales = [scale, locator_scale]
     crop_profiles = [locator_profile]
     for index, letter in enumerate(("A", "B"), start=2):
-        section_scale = (1, 2)
+        section_scale = CAPTURE_SECTION_SCALES[letter]
         points = model_points_in_view(adapter, locator, capture_cut_points(letter), label=f"jig capture cut {letter}")
         view = _early_bound(create_section_view(adapter, locator, line_start=points[0], line_end=points[1],
                             view_xy=_region_center(CAPTURE_VIEW_REGIONS[index]), section_label=letter,
@@ -3389,12 +3473,7 @@ def _place_capture_sheet(adapter: Any, cluster: Cluster) -> tuple[tuple[Any, ...
         section = _early_bound(view.GetSection(), "IDrSection")
         section.SetDisplayOnlySurfaceCut(False)
         _orient_capture_section(adapter, view, spec.PIN_ROWS[0] if letter == "A" else spec.PIVOT_CAP_PLACEMENTS[0][1][0])
-        if letter == "A":
-            anchor = tuple(origin[i] + (spec.pivot_pin.OVERALL_LENGTH / 2000.0 if i == 2 else 0.0) for i in range(3))
-            radius = 0.039
-        else:
-            anchor = tuple(v / 1000.0 for v in spec.PIVOT_CAP_SCREW_PLACEMENTS[0][0])
-            radius = 0.014
+        anchor, radius = capture_section_crop(letter)
         centre = model_point_in_view(adapter, view, anchor, label=f"jig capture crop {letter}")
         profile = _crop_capture_view(adapter, view, centre, radius * section_scale[0] / section_scale[1], label=f"jig capture section {letter}")
         set_hidden_lines_removed(adapter, view)

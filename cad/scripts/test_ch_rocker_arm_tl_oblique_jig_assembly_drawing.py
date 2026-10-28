@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import math
+import re
 from pathlib import Path
 from types import SimpleNamespace
 from contextlib import nullcontext
@@ -36,6 +37,8 @@ import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
 import ch_rocker_arm_tl_oblique_retention_hardware_spec as hardware
 import draw_ch_rocker_arm_tl_oblique_jig_assembly as drawing
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
+from _paths import CAD_ROOT
+from machinist_exceptions import load_exceptions
 
 
 # Default-format note text: about 2.8 mm a character and 4.5 mm a line on the
@@ -395,6 +398,93 @@ def test_instruction_groups_print_in_bench_feed_cap_carrier_order() -> None:
     )
 
 
+_PROCEDURE_LAYOUTS = {
+    9: drawing.CARTRIDGE_LAYOUT,
+    10: drawing.TOP_CAPTURE_LAYOUT,
+    spec.OPERATION_SHEET_NUMBER: drawing.CAPTURE_LAYOUT,
+}
+
+
+def _sheet_zone(x: float, y: float) -> str:
+    """The template's zone (row D-A from the top, column 4-1 from the left)."""
+    width, height = drawing._TEMPLATE.width_m, drawing._TEMPLATE.height_m
+    return "DCBA"[int((height - y) / (height / 4.0))] + str(4 - int(x / (width / 4.0)))
+
+
+def _printed_blocks(layout):
+    """Each printed text block with its top-left corner."""
+    return (
+        (layout.steps, drawing.STEPS_XY),
+        (layout.continued, drawing.STEPS_CONTINUED_XY),
+        (layout.checks, layout.checks_xy),
+    )
+
+
+def test_procedure_pointers_name_the_sheet_and_zone_each_heading_prints_in() -> None:
+    assert [
+        drawing.SHEET_NAMES.index(sheet) + 1
+        for sheet in (drawing.CARTRIDGE_SHEET, drawing.TOP_CAPTURE_SHEET, drawing.CAPTURE_SHEET)
+    ] == list(_PROCEDURE_LAYOUTS)
+    for label, (sheet, zone) in spec.PROCEDURE_PLACES.items():
+        if label in ("A-A", "B-B"):
+            assert sheet == drawing.SHEET_NAMES.index(drawing.PIVOT_CAPTURE_SHEET) + 1
+            x0, y0, x1, y1 = drawing.CAPTURE_VIEW_REGIONS[2 if label == "A-A" else 3]
+            assert _sheet_zone((x0 + x1) / 2.0, (y0 + y1) / 2.0) == zone, label
+            continue
+        found = [
+            _sheet_zone(x, y - (index + 0.5) * drawing.NOTE_LINE_M)
+            for text, (x, y) in _printed_blocks(_PROCEDURE_LAYOUTS[sheet])
+            for index, line in enumerate(text.split("\n"))
+            if line.startswith(f"{label}. ")
+        ]
+        assert found == [zone], label
+    # The main sequence points at every procedure it sends the fitter to.
+    for step, pointers in (
+        ("2.", ("HD1",)), ("4.", ("C2A",)), ("7C.", ("F1",)), ("8.", ("F2",)),
+        ("9.", ("C4",)), ("13A.", ("C6", "HD1")), ("13B.", ("HD2",)),
+    ):
+        text = next(line for line in spec.ASSEMBLY_STEPS if line.startswith(step))
+        for label in pointers:
+            assert spec._sheet_zone(label) in text, (step, label)
+
+
+def test_procedures_print_as_short_sub_steps_under_their_headings() -> None:
+    label = re.compile(r"[A-Z]+\d+[A-Z]?(?:\.\d+)? |[A-Z]+\d+[A-Z]?\. ")
+    for layout in _PROCEDURE_LAYOUTS.values():
+        for text, _xy in _printed_blocks(layout):
+            block = []
+            for line in [*text.split("\n"), ""]:
+                if line and not label.match(line) and line.startswith(" "):
+                    block.append(line)
+                    continue
+                # One action and its acceptance: three printed lines at most.
+                assert len(block) <= 3, block
+                if block and drawing._SUB_STEP.fullmatch(block[0].split(" ", 1)[0]):
+                    hang = " " * (len(block[0].split(" ", 1)[0]) + 1)
+                    assert all(row.startswith(hang) and row[len(hang)] != " " for row in block[1:])
+                block = [line] if line and not line.endswith(":") else []
+
+
+def test_sub_steps_hang_under_their_label_and_stay_in_their_group() -> None:
+    text = drawing._wrapped(
+        ("C4. GROUP HEADING:", "C4.1 " + "WORD " * 20, "C4A. NEXT:", "C4A.1 SHORT.",
+         "C5. OTHER.", "C5A.1 SEE C4 (SHEET 10, ZONE C4) AND ITEM 3."),
+        width=40, spaced=True,
+    )
+    assert text.split("\n") == [
+        "C4. GROUP HEADING:",
+        "C4.1 WORD WORD WORD WORD WORD WORD WORD",
+        "     WORD WORD WORD WORD WORD WORD WORD",
+        "     WORD WORD WORD WORD WORD WORD",
+        "C4A. NEXT:",
+        "C4A.1 SHORT.",
+        "",
+        "C5. OTHER.",
+        "C5A.1 SEE C4 (SHEET 10, ZONE C4) AND",
+        "      ITEM 3.",
+    ]
+
+
 def test_instruction_heading_moves_with_first_step_at_column_boundary(monkeypatch) -> None:
     # Three lines fit on the left, but the four-line group does not. Without
     # heading co-location, FEED CHECKS would be left behind its first step.
@@ -639,8 +729,55 @@ def test_capture_measured_callout_rows_clear_cap_and_relocated_cotter():
             a = a.union(box)
         for box in other.text_boxes[1:]:
             b = b.union(box)
-        gap = max(a.ymin - b.ymax, b.ymin - a.ymax)
+        # C5A now stands in the right column, beside rather than above them.
+        gap = max(a.ymin - b.ymax, b.ymin - a.ymax, a.xmin - b.xmax, b.xmin - a.xmax)
         assert gap >= ROW_PITCH_HEIGHTS * min(text_height(after[0]), text_height(other))
+
+
+# Run 20261027T154139713Z-566cad5ab (69818ca95), sheet 4: the right column's
+# C5A (three rows) and C4 MOUTH blocks as printed (PDF glyph rows) and their
+# native leaders (layout-audit JSON DetailItem374/370), at the authored anchors.
+_NATIVE_RIGHT_COLUMN = {
+    "C5A FLAT PIN END": (
+        (0.365, 0.2025),
+        ((0.3651439, 0.2000337, 0.3878641, 0.2020710),
+         (0.3650640, 0.1970337, 0.3960759, 0.1990710),
+         (0.3652320, 0.1940337, 0.4043818, 0.1960710)),
+        (0.3640972, 0.2014001, 0.313, 0.178),
+    ),
+    "C4 MOUTH / FLAT LAND": (
+        (0.365, 0.1908),
+        ((0.3651439, 0.1881203, 0.3948891, 0.1903710),
+         (0.3652319, 0.1853337, 0.3966403, 0.1873710),
+         (0.3650800, 0.1821577, 0.3899821, 0.1843710)),
+        (0.3640903, 0.1899625, 0.3181, 0.1698391),
+    ),
+}
+
+
+def test_capture_native_three_row_c5a_clears_the_c4_mouth_block_below():
+    from _layout_audit import (
+        ROW_PITCH_HEIGHTS, find_leader_through_text, find_merged_blocks, text_height,
+    )
+    from _layout_geometry import AnnotationGeometry, Box, Segment
+
+    authored = {reading.text_xy: reading.text for reading in drawing.capture_readings()}
+    blocks = []
+    for label, (anchor, rows, leader) in _NATIVE_RIGHT_COLUMN.items():
+        # The snapshot stands where the recipe still authors the block, row for row.
+        assert authored[anchor].splitlines()[0] == label
+        assert len(authored[anchor].splitlines()) == len(rows)
+        blocks.append(AnnotationGeometry(
+            label=label, kind="note", owner="Section View A-A",
+            text_boxes=tuple(Box(*row) for row in rows),
+            segments=(Segment(*leader, "leader"),),
+        ))
+    sheet = _captured_capture_sheet(*blocks)
+    assert find_merged_blocks(sheet) == []
+    assert find_leader_through_text(sheet) == []
+    c5a, c4 = blocks
+    gap = min(box.ymin for box in c5a.text_boxes) - max(box.ymax for box in c4.text_boxes)
+    assert gap >= ROW_PITCH_HEIGHTS * min(text_height(c5a), text_height(c4))
 
 
 def test_capture_measured_cotter_leader_clears_both_native_cut_lines():
@@ -673,28 +810,43 @@ def test_capture_measured_cotter_air_rejects_neighboring_leaders_caption_and_mod
     from _layout_geometry import Box, Segment, segment_box_distance
 
     authored = {reading.text.splitlines()[0]: reading.text_xy for reading in drawing.capture_readings()}
-    cotter = _captured_capture_callout("C5B COTTER EYE / PRONGS", authored["C5B COTTER EYE / PRONGS"])
-    flat = _captured_capture_callout("C5A FLAT PIN END", authored["C5A FLAT PIN END"])
+    # Retired routes (old C5A at (0.305, 0.216), old C4A junction) are only the
+    # negative controls; the current-layout checks use run 11's native leaders
+    # (layout-audit JSON DetailItem374 C5A, DetailItem375 C4A, DetailItem377 C5B).
+    flat = _captured_capture_callout("C5A FLAT PIN END")
     cross_hole = Segment(0.2545473, 0.2122206, 0.3184239, 0.17925, "leader")
+    flat_now = Segment(*_NATIVE_RIGHT_COLUMN["C5A FLAT PIN END"][2], "leader")
+    cross_hole_now = Segment(0.2545473, 0.2103143, 0.308, 0.1745, "leader")
+    cotter_now = Segment(0.287412, 0.2037175, 0.25535, 0.2402265, "leader")
+    # The native C5B leader was measured at its note's (0.288, 0.205) anchor:
+    # a later move must refresh this snapshot rather than silently keep it.
+    assert authored["C5B COTTER EYE / PRONGS"] == (0.288, 0.205)
     locator_caption = (0.224, 0.2154743, 0.2705646, 0.2189743)
+    # The former 1:2 A-A field is the negative control's obstacle only; the
+    # current checks use run 11's native 1:1 A-A outline (radius-30 crop),
+    # bound to the recipe that still places it so.
     section_a = (0.2924833, 0.1402120, 0.3495167, 0.1897880)
+    section_a_now = (0.271412, 0.117412, 0.354588, 0.188588)
+    assert drawing.CAPTURE_SECTION_SCALES["A"] == (1, 1)
+    assert drawing.CAPTURE_SECTION_CROP_RADII["A"] == 30.0
+    assert drawing._capture_inside(section_a_now, drawing.CAPTURE_VIEW_REGIONS[2])
     assert drawing._segment_crosses_box(cross_hole, _captured_cotter_glyph((0.280, 0.205)), inset=0.0)
     assert drawing._segment_crosses_box(flat.segments[0], _captured_cotter_glyph((0.291, 0.205)), inset=0.0)
     assert drawing._capture_overlap(_captured_cotter_glyph((0.250, 0.219)), locator_caption)
     assert drawing._capture_overlap(_captured_cotter_glyph((0.288, 0.198)), section_a)
     glyph = _captured_cotter_glyph(authored["C5B COTTER EYE / PRONGS"])
     assert drawing._capture_inside(glyph, drawing.CAPTURE_READING_REGION)
-    for neighbor in (cross_hole, flat.segments[0]):
+    for neighbor in (cross_hole_now, flat_now):
         assert not drawing._segment_crosses_box(neighbor, glyph, inset=0.0)
         assert segment_box_distance(neighbor, Box(*glyph)) > 0.0
-    for obstacle in (locator_caption, section_a):
+    for obstacle in (locator_caption, section_a_now):
         assert not drawing._capture_overlap(glyph, obstacle)
-        assert not drawing._segment_crosses_box(cotter.segments[0], obstacle, inset=0.0)
+        assert not drawing._segment_crosses_box(cotter_now, obstacle, inset=0.0)
     leaders = [
         LeaderSegment(label=label, kind="note", x0=segment.x0, y0=segment.y0,
                       x1=segment.x1, y1=segment.y1)
         for label, segment in (
-            ("cotter", cotter.segments[0]), ("flat pin", flat.segments[0]), ("cross-hole", cross_hole),
+            ("cotter", cotter_now), ("flat pin", flat_now), ("cross-hole", cross_hole_now),
         )
     ]
     assert find_leader_leader_crossings(leaders) == []
@@ -1197,6 +1349,12 @@ def test_capture_operation_notes_and_finished_view_fit_their_sheet() -> None:
     assert _inside_sheet(finished)
     for note in _steps_sheet_boxes(layout):
         assert not _overlap(finished, note)
+    # The native 1:15 outline measured 77.3 x 56.8 mm (farm run
+    # 20261027T090456098Z, cad66b4d6), taller than the estimate above: the
+    # room must hold the measured extent too.
+    region = drawing.FINISHED_REGION
+    assert region[3] - region[1] >= 0.0568
+    assert region[2] - region[0] >= 0.0773
 
 
 @pytest.mark.parametrize("outside_room", (False, True))
@@ -1471,6 +1629,32 @@ def test_cap_seating_steps_cite_the_sourced_cap_screw_sku() -> None:
     assert hardware.SCREW_SKU in steps
 
 
+def test_c3b_states_the_owner_accepted_engagement_shortfall() -> None:
+    # Owner ruling 2026-10-27: the 3/4 screw stays; its worst-case complete
+    # thread engagement is a minor exception (RV-04), C3B a plain statement.
+    engagement = spec.fasteners.cap_screw_complete_engagement_estimate()
+    minimum = spec.retention.CAP_MIN_COMPLETE_THREAD_ENGAGEMENT
+    assert 0.0 < engagement < minimum
+    c3b = next(step for step in spec.CAP_SEATING_STEPS if step.startswith("C3B."))
+    assert f"{engagement:.2f}" in c3b and f"{minimum:.2f}" in c3b
+    # Rule 20: a plain fact, no measurement algebra and no approval wording.
+    assert "MIN(" not in c3b and "MAX(" not in c3b and "ACCEPT" not in c3b
+    # No NAS or supplier limit backs the runouts: printed as an estimate, never a MIN.
+    assert "ESTIMATED" in c3b and f"{engagement:.2f} MIN" not in c3b
+    exceptions = {
+        e.id: e
+        for e in load_exceptions(
+            CAD_ROOT / "config", "ch_rocker_arm_tl_oblique_jig_assembly", "assembly"
+        )
+    }
+    shortfall = exceptions["RV-04"]
+    assert shortfall.kind == "minor"
+    assert f"{engagement:.2f}" in shortfall.finding
+    assert f"{minimum:.2f}" in shortfall.finding
+    assert "owner ruling 2026-10-27" in shortfall.reason
+    assert hardware.SCREW_SKU in shortfall.where
+
+
 class _Table:
     """A BOM in SolidWorks' order, with the edits and measures the recipe uses."""
 
@@ -1694,7 +1878,7 @@ def test_package_settled_checks_reread_native_bom_without_mutating_layout(
         name: drawing.NOTES_REFERENCE_SCALE for name in drawing.NOTES_REFERENCE_REGIONS
     }
     capture_views = tuple(object() for _ in range(4))
-    capture_scales = ((1, 4), (1, 4), (1, 2), (1, 1))
+    capture_scales = ((1, 4), (1, 4), (1, 1), (1, 1))
     capture_profiles = tuple(object() for _ in range(3))
     seat._place_capture_sheet.return_value = (
         capture_views, capture_scales, (), capture_profiles,
@@ -2852,14 +3036,13 @@ def native_property_package(monkeypatch, native_bom_bindings):
             point = (point[0]+note.landing_shift[0], point[1]+note.landing_shift[1], 0.0)
             bounds = extent()
             label = text.splitlines()[0]
-            if label in (
-                "C5A FLAT PIN END", "C3A CAP / BLOCK LAND", "C5B COTTER EYE / PRONGS",
-            ):
+            if label in ("C3A CAP / BLOCK LAND", "C5B COTTER EYE / PRONGS"):
                 # The 2f1b2c01 native capture registers the actual text-side
-                # junction, including C5A's right-side attachment. A landing
-                # inside the text's X span does not imply a left-side junction.
-                # Keep the physical transformed landing (and defect shift)
-                # live: only the measured junction offset is replayed.
+                # junction. Keep the physical transformed landing (and defect
+                # shift) live: only the measured junction offset is replayed.
+                # C5A now sits in the right column with its landing to the
+                # left, where native attaches at the nearest (left) end
+                # (5d622b853), the generic rule below.
                 captured = _captured_capture_callout(label, note.position[:2])
                 junction = captured.segments[0]
                 return (junction.x0, junction.y0, 0.0, *point)
@@ -2987,6 +3170,33 @@ def native_property_package(monkeypatch, native_bom_bindings):
                     # acquisition point but starts above the corner: the
                     # unchanged strict criterion must refuse it.
                     endpoints = ((x, y, hole_top + 0.25 * (chamfer - hole_top)), (x, y, chamfer))
+            elif reading.stem == spec.PIVOT_CAP and reading.text.startswith("C3A CAP / BLOCK LAND"):
+                # B-B cuts the cap's clearance hole as one vertical wall from
+                # the cap/block land up to the counterbore floor, at the
+                # NOMINAL modelled hole (the native builder cuts HOLE_DIA; its
+                # band is not geometry). Built from the cap spec alone, never
+                # from the reading, so a wrong production coordinate misses it.
+                # Its bottom corner is the C3A criterion; the mid-wall point is
+                # only where the coordinate pick acquires the cap's own edge.
+                cap = spec.pivot_cap
+                bolt_x, bolt_y = next(
+                    point for point in cap.BOLT_POINTS
+                    if point[0] < 0.0 and point[1] == reading.local_mm[1]
+                )
+                wall_x = bolt_x - cap.HOLE_DIA / 2.0
+                endpoints = ((wall_x, bolt_y, 0.0), (wall_x, bolt_y, cap.HEIGHT - cap.COUNTERBORE_DEPTH))
+            elif reading.stem == spec.PIVOT_CAP_SCREW and reading.text.startswith("C3A UNDERHEAD"):
+                # The revolved NAS head (diag_mcmaster_socket_head) is a plain
+                # cylinder: B-B cuts its -X side as one vertical line from the
+                # sharp bearing corner up to the safety-wire hole. Built from
+                # the screw spec alone. The corner is the criterion; the
+                # mid-side point is only where the pick acquires the head.
+                screw = spec.cap_screw
+                side_x = -screw.DIMS.head_dia / 2.0
+                endpoints = (
+                    (side_x, 0.0, 0.0),
+                    (side_x, 0.0, screw.SCREW_WIRE_HEIGHT - screw.SCREW_WIRE_HOLE_DIA / 2.0),
+                )
             else:
                 x, y, z = reading.local_mm
                 endpoints = ((x - 0.25, y, z), (x + 0.25, y, z))
@@ -3673,8 +3883,8 @@ def test_capture_places_four_real_views_before_bom_with_one_exploded_balloon_own
     ]
     assert tuple(exploded.ScaleRatio) == scales[sheet.name] == (1.0, 4.0)
     assert tuple(locator.ScaleRatio) == (1, 4)
-    assert tuple(main.ScaleRatio) == (1, 2)
-    assert tuple(bolt.ScaleRatio) == (1, 2)
+    assert tuple(main.ScaleRatio) == (1, 1)
+    assert tuple(bolt.ScaleRatio) == (1, 1)
     cluster = next(c for c in drawing.CLUSTERS if c.sheet == sheet.name)
     installed = drawing.capture_support_instances(cluster, 0) | {spec.instance_name(spec.CARRIER, 0)}
     for index, view in enumerate(sheet.views):
@@ -3685,7 +3895,7 @@ def test_capture_places_four_real_views_before_bom_with_one_exploded_balloon_own
     assert all(view.IsCropped() for view in (locator, main, bolt))
     assert len(package.doc.section_segments) == 2
     assert len(package.doc.crop_circles) == len(package.doc.crop_calls) == 3
-    for index, model_radius in ((1, 0.055), (2, 0.039), (3, 0.014)):
+    for index, model_radius in ((1, 0.055), (2, 0.030), (3, 0.014)):
         view = sheet.views[index]
         circle = package.doc.crop_circles[index - 1]
         assert package.doc.crop_calls[index - 1] == (view, circle)
@@ -3750,18 +3960,18 @@ def test_capture_places_four_real_views_before_bom_with_one_exploded_balloon_own
     settled[-1]()
 
 
-@pytest.mark.parametrize("view_index,model_radius,paper_radius,region", (
-    (2, 0.039, 0.0195, (0.278, 0.119, 0.364, 0.211)),
-    (3, 0.014, 0.007, (0.360, 0.226, 0.403, 0.261)),
+@pytest.mark.parametrize("view_index,scale,model_radius,paper_radius,region", (
+    (2, (1, 1), 0.030, 0.030, (0.264, 0.106, 0.362, 0.200)),
+    (3, (1, 1), 0.014, 0.014, (0.352, 0.219, 0.416, 0.266)),
 ))
-def test_capture_sections_half_scale_precedes_crop_without_shrinking_model_fence(
-    native_property_package, view_index, model_radius, paper_radius, region,
+def test_capture_sections_native_scale_precedes_crop_without_shrinking_model_fence(
+    native_property_package, view_index, scale, model_radius, paper_radius, region,
 ) -> None:
     package = native_property_package
     drawing._place_package(package.adapter)
     section = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[view_index]
     profile = package.doc.crop_circles[view_index - 1]
-    assert tuple(section.ScaleRatio) == section.crop_scale == (1, 2)
+    assert tuple(section.ScaleRatio) == section.crop_scale == scale
     assert section.post_crop_scale_writes == []
     assert profile.GetRadius() == pytest.approx(model_radius)
     assert section.crop[1] == pytest.approx(model_radius)
@@ -3773,32 +3983,53 @@ def test_capture_sections_half_scale_precedes_crop_without_shrinking_model_fence
     drawing._assert_capture_crop(package.adapter, section, view_index, profile)
 
 
-@pytest.mark.parametrize("view_index,native_outline,refusal", (
-    (2, (
+@pytest.mark.parametrize("view_index,scale,native_outline,refusal", (
+    (2, (1, 1), (
         0.27083100196371956, 0.24606200349283217,
         0.3737219227586998, 0.3340379981999397,
-    ), "width 102[.]9 mm > 86[.]0 mm"),
-    (3, (
-        0.34833699958956615, 0.3351120025212765,
-        0.3904130000444241, 0.3798879901473522,
-    ), "height 44[.]8 mm > 35[.]0 mm"),
+    ), "width 102[.]9 mm > 98[.]0 mm"),
+    (3, (1, 1), (0.355, 0.215, 0.414, 0.265), "height 50[.]0 mm > 47[.]0 mm"),
 ))
-def test_capture_sections_still_refuse_the_observed_oversized_native_extents(
-    native_property_package, view_index, native_outline, refusal,
+def test_capture_sections_still_refuse_oversized_native_extents(
+    native_property_package, view_index, scale, native_outline, refusal,
 ) -> None:
     package = native_property_package
     drawing._place_package(package.adapter)
     section = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[view_index]
-    # The actual 4e7 A-A and 49385 B-B 1:1 extents remain refusals if native
-    # returns them at 1:2; the new scale never licenses a relaxed native box.
+    # The actual 4e7 A-A extent at its former 39 mm crop stays a refusal in
+    # the 1:1 field, and B-B's 1:1 field never licenses a box taller than it.
     section.GetOutline = lambda: native_outline
     with pytest.raises(RuntimeError, match=refusal):
         drawing._fit_capture_view(
-            package.adapter, section, drawing.CAPTURE_VIEW_REGIONS[view_index], ((1, 2),),
+            package.adapter, section, drawing.CAPTURE_VIEW_REGIONS[view_index], (scale,),
             crop_profile=package.doc.crop_circles[view_index - 1], label="jig capture section",
         )
-    assert tuple(section.ScaleRatio) == (1, 2)
+    assert tuple(section.ScaleRatio) == scale
     assert section.post_crop_scale_writes == []
+
+
+def test_capture_bolt_section_field_holds_the_observed_native_1_to_1_extent(
+    native_property_package,
+) -> None:
+    package = native_property_package
+    drawing._place_package(package.adapter)
+    section = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[3]
+    region = drawing.CAPTURE_VIEW_REGIONS[3]
+    # 49385: B-B's native padded 1:1 extent was 42.076 x 44.776 mm; centred,
+    # it fits the top-right field that replaced the 43 x 35 mm 1:2 one.
+    width, height = 0.3904130000444241 - 0.34833699958956615, 0.3798879901473522 - 0.3351120025212765
+    cx, cy = (region[0] + region[2]) / 2.0, (region[1] + region[3]) / 2.0
+    section.GetOutline = lambda: (cx - width / 2.0, cy - height / 2.0, cx + width / 2.0, cy + height / 2.0)
+    assert drawing._fit_capture_view(
+        package.adapter, section, region, ((1, 1),),
+        crop_profile=package.doc.crop_circles[2], label="jig capture section",
+    ) == (1, 1)
+    caption_x, caption_y = drawing.CAPTURE_SECTION_CAPTIONS[1]
+    assert caption_x == pytest.approx(cx)
+    # The caption's top-centre point (its text tops about 1.9 mm lower)
+    # stands beneath the measured extent.
+    assert cy - height / 2.0 - caption_y > 0.0
+
 
 
 def test_capture_sections_use_actual_distinct_longitudinal_and_bolt_planes() -> None:
@@ -3842,7 +4073,7 @@ def test_capture_exploded_fit_does_not_shrink_assembled_reading_scales(native_pr
     exploded, locator, main, _bolt = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views
     assert tuple(exploded.ScaleRatio) == scales[drawing.PIVOT_CAPTURE_SHEET] == (1.0, 8.0)
     assert tuple(locator.ScaleRatio) == (1, 4)
-    assert tuple(main.ScaleRatio) == (1, 2)
+    assert tuple(main.ScaleRatio) == (1, 1)
     settled[-1]()
 
 
@@ -3977,11 +4208,35 @@ def test_capture_c4_mouth_acquires_the_retainer_wall_inside_and_lands_on_its_top
     package.doc.raw_picks = raw_picks
     _scales, settled = drawing._place_package(package.adapter)
     readings = drawing.capture_readings()
-    # Only the two C4 MOUTH rows and the C4A UPPER CROSS-HOLE row separate
-    # acquisition from criterion.
+    # Only the two C4 MOUTH rows, the C4A UPPER CROSS-HOLE row and C3A's two
+    # rows (their arrows sit where cap and block, or head and counterbore
+    # floor, coincide) separate acquisition from criterion.
     assert [reading.pick_local_mm is not None for reading in readings] == [
-        reading.text.startswith(("C4 MOUTH", "C4A UPPER CROSS-HOLE")) for reading in readings
+        reading.text.startswith(
+            ("C4 MOUTH", "C4A UPPER CROSS-HOLE", "C3A CAP / BLOCK LAND", "C3A UNDERHEAD")
+        )
+        for reading in readings
     ]
+    land = next(reading for reading in readings if reading.text.startswith("C3A CAP / BLOCK LAND"))
+    cap = spec.pivot_cap
+    # Acquired on the cap's own modelled (nominal HOLE_DIA) clearance-hole
+    # wall, strictly between the cap/block interface and the counterbore
+    # floor: no block edge there. The criterion is that wall's bottom corner.
+    wall_x = next(x for x, y in cap.BOLT_POINTS if x < 0.0 and y == land.local_mm[1]) - cap.HOLE_DIA / 2.0
+    assert land.pick_local_mm[0] == pytest.approx(wall_x, abs=1e-12)
+    assert land.local_mm == pytest.approx((wall_x, land.pick_local_mm[1], 0.0), abs=1e-12)
+    assert 0.0 < land.pick_local_mm[2] < cap.HEIGHT - cap.COUNTERBORE_DEPTH
+    underhead = next(reading for reading in readings if reading.text.startswith("C3A UNDERHEAD"))
+    screw = spec.cap_screw
+    # Acquired on the head's own cylindrical side, strictly between its bearing
+    # corner and the safety-wire hole; the criterion is that bearing corner,
+    # outside the cap's largest clearance hole so cap floor lies beneath it.
+    side_x = -screw.DIMS.head_dia / 2.0
+    assert underhead.local_mm == pytest.approx((side_x, 0.0, 0.0), abs=1e-12)
+    assert underhead.pick_local_mm[:2] == pytest.approx((side_x, 0.0), abs=1e-12)
+    assert 0.0 < underhead.pick_local_mm[2] < screw.SCREW_WIRE_HEIGHT - screw.SCREW_WIRE_HOLE_DIA / 2.0
+    r = spec.retention
+    assert -side_x > (r.CAP_BOLT_CLEARANCE_DIAMETER + r.CAP_BOLT_CLEARANCE_BAND[0]) / 2.0
     mouth = [(index, reading) for index, reading in enumerate(readings)
              if reading.text.startswith("C4 MOUTH")]
     bore = spec.pivot_retainer.BORE_DIA / 2.0
@@ -5238,43 +5493,6 @@ def test_capture_native_glyph_bounds_union_all_measured_runs(native_bom_bindings
     assert drawing._capture_note_bounds(note) == pytest.approx((0.1, 0.19, 0.128, 0.204))
 
 
-def test_capture_settled_rejects_wrong_left_flat_pin_junction(
-    native_property_package, monkeypatch,
-) -> None:
-    """The old fake's left-side C5A junction crosses the cotter ink.
-
-    Native 2f1b2c01 registers a right-side junction; preserve that clear
-    baseline, then prove the real settled guard still rejects the bad route.
-    """
-    import ast
-
-    package = native_property_package
-    _scales, settled = drawing._place_package(package.adapter)
-    note = next(
-        note for note in package.doc.attached_notes
-        if note.text.startswith("C5A FLAT PIN END")
-    )
-    annotation = note.GetAnnotation()
-    original = annotation.GetLeaderPointsAtIndex(0)
-    extent = note.GetExtent()
-    height = annotation.GetTextFormat(0).CharHeight
-    wrong = (
-        extent[0] - 0.001, note.position[1] - height * 0.6, 0.0,
-        *original[3:],
-    )
-    monkeypatch.setattr(annotation, "GetLeaderPointsAtIndex", lambda _index: wrong)
-    with pytest.raises(
-        RuntimeError, match="native reading leader crosses another label/caption",
-    ) as refusal:
-        settled[-1]()
-    layout = ast.literal_eval(str(refusal.value).split("; layout=", 1)[1])
-    assert any(
-        layout["leaders"][leader][0].startswith("jig capture C5A FLAT PIN END")
-        and layout["rectangles"][label]["label"].startswith("jig capture C5B COTTER EYE")
-        for leader, label in layout["leader_label_crossings"]
-    )
-
-
 @pytest.mark.parametrize("whole_outside", (False, True))
 def test_capture_settled_glyph_and_whole_extents_keep_distinct_authority(
     native_property_package, monkeypatch, whole_outside,
@@ -5913,8 +6131,8 @@ def test_capture_uncropped_fit_refreshes_native_geometry_at_each_candidate_scale
     (1, ((1, 4), (1, 5), (1, 6)), True, "cropped view requires one pre-authored scale"),
     (2, ((1, 1), (1, 2)), True, "cropped view requires one pre-authored scale"),
     (1, ((1, 5),), True, "cropped view scale differs from its pre-authored scale"),
-    (2, ((1, 1),), True, "cropped view scale differs from its pre-authored scale"),
-    (3, ((1, 1),), True, "cropped view scale differs from its pre-authored scale"),
+    (2, ((1, 2),), True, "cropped view scale differs from its pre-authored scale"),
+    (3, ((1, 2),), True, "cropped view scale differs from its pre-authored scale"),
     (1, ((1, 4),), False, "cropped view lost its selected native profile"),
 ))
 def test_capture_cropped_fit_refuses_rescaling_or_a_lost_selected_profile(
