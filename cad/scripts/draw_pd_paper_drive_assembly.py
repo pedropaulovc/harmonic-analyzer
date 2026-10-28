@@ -566,10 +566,14 @@ KNOB_SETTING_CENTER = (0.320, 0.097)
 KNOB_SETTING_RADIUS = 0.024
 KNOB_SETTING_TEXT_OFFSET = 0.030
 # S to N, the set band (43.794 +0.050/-0 at 15:150), spans the crop's
-# diameter, so its text stands past S along the line, off it away from Q:
-# clear of the circle, over the title block, under the second column.
+# diameter, so its text stands past S along the line, off it away from Q,
+# clear of the circle and under the second column. Its dimension line runs
+# through the text, so the offset also sets its extension lines: at 0.028
+# N's ran down onto the title block's top border (run
+# 20261028T050655383Z, machinist review r1/r3, rule 13); at 0.018 they end
+# in the view's field, above the title block.
 KNOB_SETTING_CENTRE_TEXT_PAST = 0.045
-KNOB_SETTING_CENTRE_TEXT_OFFSET = 0.028
+KNOB_SETTING_CENTRE_TEXT_OFFSET = 0.018
 KNOB_SETTING_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 KNOB_SETTING_INSTANCES = frozenset({"pd-transgear-arm-1", "pd-transgear-arm-plate-1"})
 # The located step's acceptance for "true": a null reading on the indicator, so the

@@ -523,6 +523,16 @@ def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
         line = math.dist(s, n)
         along = ((x - n[0]) * (s[0] - n[0]) + (y - n[1]) * (s[1] - n[1])) / line
         assert along - half > line
+        # The dimension line runs through the text, so each extension line
+        # ends where S and N are carried square to the line to the text's
+        # offset: inside the view's field, clear of the title block (run
+        # 20261028T050655383Z: N's ran onto its top border).
+        unit = ((s[0] - n[0]) / line, (s[1] - n[1]) / line)
+        offset = -(x - n[0]) * unit[1] + (y - n[1]) * unit[0]
+        for end in (s, n):
+            tip = (end[0] - offset * unit[1], end[1] + offset * unit[0])
+            assert drawing.FITUP_NOTE_LIMITS[1][1] < tip[1] < drawing.KNOB_SETTING_FIELD_TOP
+            assert tip[1] - DRAWING_TEMPLATES[drawing.SPEC.layout].title_block_top_m > 0.005
         boxes = [box]
         legs = {
             knob_setting.ALONG_DIMENSION: (s, q),
