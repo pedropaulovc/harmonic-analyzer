@@ -994,14 +994,21 @@ def test_v_dimension_text_stays_off_the_part_in_the_end_view() -> None:
     # "2X 45°" ~13.6 x 3.8 mm (final8), offset right of the body's back face
     # and under the bottom face's line (which the flat height's lower
     # extension line carries on to its line), left of section A-A's front
-    # face and its extension lines; its leader from the arc runs under the
-    # body's back corner.
+    # face and its extension lines, no lower than its caption; its leader
+    # from the arc runs under the body's back corner.  Release review
+    # 41bbeec: level with the near wall's "3.1" line, its shelf ended 1 mm
+    # short of that line's outside arrow and read as one line; the shelf
+    # (~2.7 mm under the text's centre) stands >= 4 mm off both of section
+    # A-A's under-face lines (~3.3 mm under their keeps).
     text_x, text_y = drawing.FLANK_ANGLE_TEXT_XY
     half_w, half_h = 0.007, 0.0019
     assert text_x - half_w > drawing._rz(spec.BODY_Z1) + 0.005
     assert text_y + half_h < corner[1] - 0.005
     assert text_x + half_w < drawing._sz(spec.BODY_Z0) - 0.008
-    assert text_y - half_h > drawing.SECTION_CAPTION_XY[1] + 0.005
+    assert text_y - half_h > drawing.SECTION_CAPTION_XY[1]
+    shelf = text_y - 0.0027
+    for name in ("ReliefZ0", "ReliefZ1"):
+        assert abs(shelf - (drawing.SECTION_KEEP[name][1] - 0.0033)) >= 0.004
     left = (text_x - half_w, text_y)
     slope = (left[1] - arc_y) / (left[0] - arc_x)
     at_back = arc_y + slope * (drawing._rz(spec.BODY_Z1) - arc_x)
