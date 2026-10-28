@@ -65,19 +65,25 @@ def test_blind_tap_stays_inside_the_solid_end_piece() -> None:
     assert tip < geom.PLUG_LENGTH
     taps = _calls(part, name="wizard_holes")
     assert len(taps) == 1
-    # The end piece and its tap come first; the tube is swept onto them.
+    # The tube is swept first; the end piece and its tap follow as their own
+    # body, so the tap never reaches the tube's.
     sweeps = _calls(part, attr="create_sweep")
     assert sweeps
-    assert taps[0].lineno < min(node.lineno for node in sweeps)
+    assert taps[0].lineno > max(node.lineno for node in sweeps)
 
 
-def test_tap_starts_on_the_counterbore_floor_before_the_tube() -> None:
+def test_tap_starts_on_the_counterbore_floor_of_the_unmerged_end_piece() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
+    sweep = source.index("create_sweep")
     end_piece = source.index('name_last_feature(adapter, "EndPiece")')
     counterbore = source.index('name_last_feature(adapter, "Counterbore")')
     tap = source.index('name="ThreadBore"')
-    sweep = source.index("create_sweep")
-    assert end_piece < counterbore < tap < sweep
+    assert sweep < end_piece < counterbore < tap
+    # The end piece is its own body, so section A-A hatches it apart from the
+    # tube (machinist review of 3c0b5d87c).
+    revolve = source.rindex("create_revolve", 0, end_piece)
+    assert "merge_result=False" in source[revolve:end_piece]
+    assert "len(bodies) != 2" in source
     assert "[[COUNTERBORE_FLOOR_X, ARM_Y, 0.0]]" in source
     assert joint.TAP_SPEC.depth_mm == joint.TAP_DRILL_DEPTH_FROM_FLOOR
     assert joint.TAP_SPEC.overrides_mm == {

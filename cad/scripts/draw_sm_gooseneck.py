@@ -20,10 +20,11 @@ sheet carries, at 1:3:
   axis's location limit;
 
 and at 3:1 SECTION A-A, a full section on the arm axis (cut faces only)
-cropped to the end piece, with the tube end's joint line drawn across each
-cut wall: the head Ø (flush) and length, the braze shank Ø (its fit) and
-length, and the counterbore's LIMIT Ø (with the stated wall) and depth (with
-its floor-corner limit, which names the mate).  The isometric is at 1:4.
+cropped to the end piece, the tube's cut walls hatched across the end
+piece's and ended in a freehand break: the head Ø (flush) and length, the
+braze shank Ø (its fit) and length, and the counterbore's LIMIT Ø (with the
+stated wall) and depth (with its floor-corner limit, which names the mate).
+The isometric is at 1:4.
 
 Run with SolidWorks open::
 
@@ -426,47 +427,124 @@ def _crop_section(adapter: Any, section: Any) -> None:
         )
 
 
-def _sketch_end_piece_joint(adapter: Any, section: Any) -> None:
-    """Draw the tube end's joint line across each cut wall of section A-A.
+# The tube's cut walls hatch at a right angle to the end piece's, so the two
+# bodies of the weldment (build_sm_gooseneck) read as two parts (drafting
+# practice for adjacent parts; machinist review of 3c0b5d87c).
+TUBE_HATCH_TURN = math.pi / 2.0
+# A section face whose model box starts on the end face's side of this
+# station is the end piece's: the tube's walls start at TUBE_END_X.
+_END_PIECE_SPLIT_X_M = (ARM_END_X + TUBE_END_X) / 2.0 / 1000.0
 
-    The weldment is one body, so the head's shoulder and the tube end merge
-    into one hatched face and the end piece did not read as a separate part
-    (machinist review of e487a1bb4).  The joint is the tube end, x
-    TUBE_END_X, from the bore to the OD on both walls: thin lines in the
-    view's own sketch, direct to the database (as ``_crop_section``)."""
-    x = _section_x(TUBE_END_X)
-    inner, outer = (TUBE_BORE_DIA / 2.0 * _SECTION_S, _TUBE_R * _SECTION_S)
-    segments = [
-        ((x, _SY0 + side * inner), (x, _SY0 + side * outer)) for side in (1.0, -1.0)
-    ]
+
+def _section_face_hatches(adapter: Any, section: Any) -> list[Any]:
+    """Section A-A's IFaceHatch objects, null slots dropped; a fresh section
+    can return only null slots (draw_mg_magnifying_clamp._face_hatches), so
+    one rebuild is allowed before giving up."""
+    view = _early_bound(section, "IView")
+    for attempt in range(2):
+        hatches = [
+            _early_bound(raw, "IFaceHatch")
+            for raw in (view.GetFaceHatches() or ())
+            if raw is not None
+        ]
+        if hatches:
+            return hatches
+        if attempt == 0:
+            rebuild_drawing(adapter, label="section A-A face hatches")
+            view.UpdateViewDisplayGeometry()
+    raise RuntimeError("section A-A returned no face hatches")
+
+
+def _split_hatches(hatches: list[Any]) -> tuple[list[Any], list[Any]]:
+    """``(end_piece, tube)`` hatches, by where each cut face starts."""
+    end_piece, tube = [], []
+    for hatch in hatches:
+        face = hatch.Face
+        if face is None:
+            raise RuntimeError("a section A-A face hatch has no face")
+        box = tuple(float(value) for value in _early_bound(face, "IFace2").GetBox())
+        (end_piece if min(box[0], box[3]) < _END_PIECE_SPLIT_X_M else tube).append(
+            hatch
+        )
+    if not end_piece or not tube:
+        raise RuntimeError(
+            f"section A-A hatches {len(end_piece)} end-piece and {len(tube)} tube "
+            "faces; the weldment must cut as two bodies"
+        )
+    return end_piece, tube
+
+
+def _hatch_tube_apart(adapter: Any, section: Any) -> None:
+    """Turn the tube's crosshatch a right angle from the end piece's and read
+    it back (the end piece keeps the material crosshatch)."""
+    end_piece, tube = _split_hatches(_section_face_hatches(adapter, section))
+    base = float(end_piece[0].Angle)
+    for hatch in tube:
+        hatch.UseMaterialHatch = False
+        hatch.Angle = base + TUBE_HATCH_TURN
+    rebuild_drawing(adapter, label="section A-A tube hatch turned")
+    end_piece, tube = _split_hatches(_section_face_hatches(adapter, section))
+    turns = [abs(math.remainder(float(hatch.Angle) - base, math.pi)) for hatch in tube]
+    if any(not math.isclose(turn, TUBE_HATCH_TURN, abs_tol=1e-6) for turn in turns):
+        raise RuntimeError(f"section A-A tube hatch did not turn: {turns!r}")
+    if any(not bool(hatch.UseMaterialHatch) for hatch in end_piece):
+        raise RuntimeError("section A-A end piece lost its material crosshatch")
+    _telemetry.success(
+        f"section A-A: {len(tube)} tube hatch(es) turned 90 deg from "
+        f"{len(end_piece)} end-piece hatch(es)"
+    )
+
+
+# The tube runs on past the crop, so each cut wall ends in a freehand break
+# (machinist review of 3c0b5d87c), short of the crop's edge so the whole
+# curve shows: an S across the wall about TUBE_BREAK_X, model mm.
+TUBE_BREAK_X = SECTION_CROP_X_MM[1] - 0.4
+_TUBE_BREAK_WAVE = 0.25
+if not TUBE_END_X + PLUG_SHANK_LENGTH < TUBE_BREAK_X - _TUBE_BREAK_WAVE:
+    raise AssertionError("section A-A's tube break reaches the shank end")
+
+
+def _sketch_tube_break(adapter: Any, section: Any) -> None:
+    """Draw the freehand break across each of the tube's cut walls, in the
+    view's own sketch (as ``_crop_section``)."""
+    inner, outer = TUBE_BORE_DIA / 2.0, _TUBE_R
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     native = _early_bound(section, "IView")
     if not ddoc.ActivateView(view_name(adapter, section)):
-        raise RuntimeError("failed to activate section A-A for its joint lines")
+        raise RuntimeError("failed to activate section A-A for its tube break")
     draw.ClearSelection2(True)
     sketch = _early_bound(native.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
 
-    def to_sketch(xy: tuple[float, float]) -> tuple[float, ...]:
+    def to_sketch(xy: tuple[float, float]) -> list[float]:
         point = _early_bound(
             math_utility.CreatePoint(double_array([xy[0], xy[1], 0.0])), "IMathPoint"
         )
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        return tuple(float(value) for value in projected.ArrayData)
+        return [float(value) for value in projected.ArrayData]
 
     sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    previous_add_to_db = bool(sketch_manager.AddToDB)
-    sketch_manager.AddToDB = True
-    try:
-        for index, (start, end) in enumerate(segments):
-            if sketch_manager.CreateLine(*to_sketch(start), *to_sketch(end)) is None:
-                raise RuntimeError(f"section A-A joint line {index} failed")
-    finally:
-        sketch_manager.AddToDB = previous_add_to_db
+    for side in (1.0, -1.0):
+        wave = ((0.0, 0.0), (1.0 / 3.0, 1.0), (2.0 / 3.0, -1.0), (1.0, 0.0))
+        points = [
+            to_sketch(
+                (
+                    _section_x(TUBE_BREAK_X + sway * _TUBE_BREAK_WAVE),
+                    _SY0 + side * (inner + (outer - inner) * share) * _SECTION_S,
+                )
+            )
+            for share, sway in wave
+        ]
+        # CreateSpline2 always adds straight to the database.
+        spline = sketch_manager.CreateSpline2(
+            double_array([value for point in points for value in point]), False
+        )
+        if spline is None:
+            raise RuntimeError(f"section A-A tube break ({side:+.0f}) failed")
     draw.ClearSelection2(True)
-    rebuild_drawing(adapter, label="section A-A joint lines")
+    rebuild_drawing(adapter, label="section A-A tube break")
 
 
 _SECTION_THREAD_LAYER = "SECTION-COSMETIC-THREADS-HIDDEN"
@@ -546,10 +624,12 @@ def _end_piece_section(adapter: Any, front: Any) -> Any:
     # before placing so the display change cannot shift the placed ink.
     set_hidden_lines_removed(adapter, section)
     _place_section(adapter, native)
+    # Hatched before the crop: a cropped view's hatch reads are not relied on.
+    _hatch_tube_apart(adapter, section)
     _crop_section(adapter, section)
     # The crop must not move the placed ink.
     _place_section(adapter, native)
-    _sketch_end_piece_joint(adapter, section)
+    _sketch_tube_break(adapter, section)
     position_section_caption(
         adapter, section, SECTION_CAPTION_XY, label="gooseneck end piece"
     )

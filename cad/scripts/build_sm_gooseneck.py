@@ -10,23 +10,25 @@ select-fitted from stock and brazed, covers the leg from its foot: the post
 the east top-frame hub's Ø17 bore and set screw take.  The made MHA-SM-04
 screw is a separate component, not part of this weldment.
 
-One weldment part, one body, built in this order:
+One weldment part of two solid bodies, the tube (its sleeve merged on) and
+the end piece, so a section hatches each as its own part and every view
+draws their joint (machinist review of 3c0b5d87c), built in this order:
 
-1. ``EndPiece``: the solid head Ø PLUG_DIA from the end face ARM_END_X to the
+1. ``Leg``: the tube from its foot LEG_BOTTOM up to the bend tangent LEG_TOP.
+2. ``BendArmSweep``: the 90-degree bend R BEND_R and the TUBE_STRAIGHT arm to
+   TUBE_END_X along ``BendPath``, hollow, merged onto the leg.
+3. ``EndPiece``: the solid head Ø PLUG_DIA from the end face ARM_END_X to the
    tube end TUBE_END_X, then the braze shank Ø PLUG_SHANK_DIA x
    PLUG_SHANK_LENGTH into the tube bore -- one revolve on ``ArmAxisPlane``
    (the horizontal plane through the arm axis, so section A-A on the print
-   carries its dimensions).
-2. ``Counterbore``: a revolved cut Ø COUNTERBORE_DIA x COUNTERBORE_DEPTH
+   carries its dimensions), NOT merged: its head bears on the tube end and
+   its shank stands in the bore at the joint's nominal braze clearance.
+4. ``Counterbore``: a revolved cut Ø COUNTERBORE_DIA x COUNTERBORE_DEPTH
    from the end face, its floor corner round at its printed R0.10 MAX; its
    Ø and depth carry native LIMIT bands.  Then ``ThreadBore``: the native blind
    bottoming tap from ``TAP_SPEC``, started on the counterbore floor, both
    depths from it.  ``SpringScrewAxis`` is their hidden, equation-driven
    assembly reference.
-3. ``Leg``: the tube from its foot LEG_BOTTOM up to the bend tangent LEG_TOP.
-4. ``BendArmSweep``: the 90-degree bend R BEND_R and the TUBE_STRAIGHT arm to
-   TUBE_END_X along ``BendPath``, hollow, ending on the end piece's head
-   around its shank (the joint's nominal braze clearance is modelled).
 5. ``Sleeve``: Ø SLEEVE_DIA from LEG_BOTTOM to SLEEVE_TOP, its bore the tube
    OD, revolved onto the leg.
 6. ``StationReference``: a hidden construction sketch on the Front plane
@@ -311,225 +313,7 @@ async def build(adapter) -> dict[str, str]:
     # must resolve).
     drive_jobs: list[tuple[str, str]] = []
 
-    # 1. The end piece first, on the horizontal plane through the arm axis.
-    # Sketch (u, v) is model (x, -z) about the arm axis at v = 0.
-    check(
-        "create_plane ArmAxisPlane",
-        await adapter.create_plane(
-            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=ARM_Y)
-        ),
-    )
-    name_last_feature(adapter, "ArmAxisPlane")
-    drive_jobs.append(
-        (name_dimensions(adapter, "ArmAxisPlane", ["ArmAxisStation"])[0], '"ArmY"')
-    )
-    end_piece = SketchDims()
-    end_piece_points = [
-        (SHANK_END_X, 0.0),
-        (SHANK_END_X, SHANK_R),
-        (TUBE_END_X, SHANK_R),
-        (TUBE_END_X, PLUG_R),
-        (ARM_END_X, PLUG_R),
-        (ARM_END_X, 0.0),
-    ]
-    check("create_sketch end piece", await adapter.create_sketch("ArmAxisPlane"))
-    set_sketch_direct_db(adapter, True)
-    try:
-        end_piece_axis = check(
-            "end piece axis centerline",
-            await adapter.add_centerline(ARM_END_X, 0.0, SHANK_END_X, 0.0),
-        )
-        end_piece_lines = await add_line_chain(adapter, end_piece_points)
-    finally:
-        # Session state on the seat: a failed segment must not leave sketch
-        # inference off for the next leaf.
-        set_sketch_direct_db(adapter, False)
-    shank_end, shank_side, head_step, head_side, end_face, end_piece_floor = (
-        end_piece_lines
-    )
-    for line, relation in (
-        (shank_end, "vertical"),
-        (shank_side, "horizontal"),
-        (head_step, "vertical"),
-        (head_side, "horizontal"),
-        (end_face, "vertical"),
-        (end_piece_floor, "horizontal"),
-    ):
-        check(
-            f"end piece {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
-        )
-    await anchor_point_to_origin(
-        adapter, f"{end_face}.end", ARM_END_X, 0.0, "end face centre"
-    )
-    end_piece.record("EndFaceStation", '-"ArmEndX"')
-    for name, line, length in (
-        ("PlugHeadLength", head_side, PLUG_HEAD_LENGTH),
-        ("PlugShankLength", shank_side, PLUG_SHANK_LENGTH),
-    ):
-        await dimension_between(
-            adapter,
-            f"{line}.start",
-            f"{line}.end",
-            "horizontal_distance",
-            length,
-            f"end piece {name}",
-        )
-        end_piece.record(name, f'"{name}"')
-    for name, line, u_mid, radius in (
-        ("PlugDia", head_side, ARM_END_X + PLUG_HEAD_LENGTH / 2.0, PLUG_R),
-        ("PlugShankDia", shank_side, TUBE_END_X + PLUG_SHANK_LENGTH / 2.0, SHANK_R),
-    ):
-        await add_diametric_linear_dimension(
-            adapter, end_piece_axis, line, (u_mid, radius + 4.0), name
-        )
-        end_piece.record(name, f'"{name}"')
-    await ensure_fully_defined(adapter, "end piece sketch")
-    check("exit_sketch end piece", await adapter.exit_sketch())
-    name_last_feature(adapter, "EndPieceProfile")
-    drive_jobs += end_piece.apply(adapter, "EndPieceProfile")
-    check(
-        "revolve end piece",
-        await adapter.create_revolve(RevolveParameters(angle=360.0)),
-    )
-    name_last_feature(adapter, "EndPiece")
-    vol = await _volume_check(
-        adapter, "solid end piece", V_END_PIECE, 0.005 * V_END_PIECE
-    )
-
-    # 2. The arm-end counterbore: its flat floor sits past the screw's clamped
-    # run-out, so the fat incomplete threads never reach the end piece's full
-    # 2B thread.  The cutter's mouth lies on the end face, so its depth
-    # dimension runs face to floor; the floor corner is modelled at its
-    # printed limit, R0.10 MAX, a native radial dimension (codjiflo P2 on
-    # #1997).  It is cut FIRST: its floor is the tap's start face.
-    counterbore = SketchDims()
-    check("create_sketch counterbore", await adapter.create_sketch("ArmAxisPlane"))
-    set_sketch_direct_db(adapter, True)
-    try:
-        counterbore_axis = check(
-            "counterbore axis centerline",
-            await adapter.add_centerline(ARM_END_X, 0.0, COUNTERBORE_FLOOR_X, 0.0),
-        )
-        (floor,) = await add_line_chain(
-            adapter,
-            [(COUNTERBORE_FLOOR_X, 0.0), COUNTERBORE_CORNER_FLOOR_TANGENT],
-            close=False,
-        )
-        floor_corner = check(
-            "counterbore floor corner arc",
-            await adapter.add_arc(
-                *COUNTERBORE_CORNER_CENTER,
-                *COUNTERBORE_CORNER_FLOOR_TANGENT,
-                *COUNTERBORE_CORNER_WALL_TANGENT,
-            ),
-        )
-        wall, mouth, counterbore_floor_axis = await add_line_chain(
-            adapter,
-            [
-                COUNTERBORE_CORNER_WALL_TANGENT,
-                (ARM_END_X, COUNTERBORE_R),
-                (ARM_END_X, 0.0),
-                (COUNTERBORE_FLOOR_X, 0.0),
-            ],
-            close=False,
-        )
-    finally:
-        # Session state on the seat (as the end piece above).
-        set_sketch_direct_db(adapter, False)
-    for line, relation in (
-        (floor, "vertical"),
-        (wall, "horizontal"),
-        (mouth, "vertical"),
-        (counterbore_floor_axis, "horizontal"),
-    ):
-        check(
-            f"counterbore {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
-        )
-    for first, second in ((floor, floor_corner), (floor_corner, wall)):
-        check(
-            f"counterbore floor corner tangent {first} {second}",
-            await adapter.add_sketch_constraint(first, second, "tangent"),
-        )
-    await anchor_point_to_origin(
-        adapter, f"{mouth}.end", ARM_END_X, 0.0, "counterbore mouth centre"
-    )
-    counterbore.record("CounterboreFaceStation", '-"ArmEndX"')
-    # Face to floor: from the mouth's rim to the floor's tangent point.
-    await dimension_between(
-        adapter,
-        f"{mouth}.start",
-        f"{floor}.end",
-        "horizontal_distance",
-        COUNTERBORE_DEPTH,
-        "counterbore depth",
-    )
-    counterbore.record("CounterboreDepth", '"CounterboreDepth"')
-    await add_diametric_linear_dimension(
-        adapter,
-        counterbore_axis,
-        wall,
-        (ARM_END_X + COUNTERBORE_DEPTH / 2.0, COUNTERBORE_R + 4.0),
-        "CounterboreDia",
-    )
-    counterbore.record("CounterboreDia", '"CounterboreDia"')
-    check(
-        "counterbore floor corner radius",
-        await adapter.add_sketch_dimension(
-            floor_corner, None, "radial", COUNTERBORE_FLOOR_CORNER_R_MAX
-        ),
-    )
-    counterbore.record("CounterboreFloorCornerR", '"CounterboreFloorCornerR"')
-    await ensure_fully_defined(adapter, "counterbore sketch")
-    check("exit_sketch counterbore", await adapter.exit_sketch())
-    name_last_feature(adapter, "CounterboreProfile")
-    drive_jobs += counterbore.apply(adapter, "CounterboreProfile")
-    check(
-        "revolve counterbore",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
-    )
-    name_last_feature(adapter, "Counterbore")
-    vol = await _volume_check(
-        adapter, "arm-end counterbore", vol - V_COUNTERBORE, 0.02 * V_COUNTERBORE
-    )
-
-    # 2b. The native blind bottoming tap, started on the counterbore floor
-    # (west-facing), both depths from that floor (sm_gooseneck_spring_joint).
-    # If the wizard's table drill differs from TAP_DRILL_DIA, wizard_holes
-    # fails loud (the joint's walls are budgeted on that drill).
-    tap = wizard_holes(
-        adapter,
-        TAP_SPEC,
-        [[COUNTERBORE_FLOOR_X, ARM_Y, 0.0]],
-        (-1.0, 0.0, 0.0),
-        f"gooseneck end piece ({TAP_SPEC.size} blind)",
-        name="ThreadBore",
-        expect_dia_mm=TAP_DRILL_DIA,
-        placement_dims=[((None, None), ("TapAxisY", '"ArmY"'))],
-    )
-    if abs(tap.depth_mm - TAP_DRILL_DEPTH_FROM_FLOOR) > 0.005:
-        raise RuntimeError(
-            f"gooseneck tap drill depth {tap.depth_mm:.3f} != "
-            f"{TAP_DRILL_DEPTH_FROM_FLOOR:.3f} mm"
-        )
-    drive_jobs += tap.placement_drive_jobs
-    vol = await _volume_check(adapter, "end piece blind tap", vol - V_TAP, 0.02 * V_TAP)
-    blank_reference_geometry(adapter, (("ArmAxisPlane", "PLANE"),))
-
-    await name_bore_axis(
-        adapter,
-        "Front Plane",
-        0.0,
-        "Top Plane",
-        ARM_Y,
-        "spring screw",
-        drive_b='"ArmY"',
-        drive_jobs=drive_jobs,
-    )
-    name_last_feature(adapter, "SpringScrewAxis")
-
-    # 3. Vertical leg (start-offset extrude from the Top plane: the leg is
+    # 1. Vertical leg (start-offset extrude from the Top plane: the leg is
     # asymmetric -- foot at LEG_BOTTOM, top at LEG_TOP into the bend). TWO
     # concentric on-axis circles -- the OD and the tube bore -- extrude as the
     # annular wall. Only the diameters are dims; the centre slots are ignored.
@@ -561,13 +345,13 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += leg.apply(adapter, "LegProfile")
     extrude_at_offset(adapter, LEG_TOP - LEG_BOTTOM, LEG_BOTTOM, merge_result=False)
     name_last_feature(adapter, "Leg")
-    expected = vol + V_LEG
+    expected = V_LEG
     vol = await _volume(adapter)
     _telemetry.info(f"volume after leg: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.005 * expected:
         raise RuntimeError(f"leg volume {vol:.1f} != {expected:.1f}")
 
-    # 4. Quarter bend + straight arm to the tube end: ONE sweep along an arc +
+    # 2. Quarter bend + straight arm to the tube end: ONE sweep along an arc +
     # line chain. Direct DB keeps inference relations off; exact-coordinate
     # joints still merge. add_arc draws CCW: bend entry (angle 0 from the
     # centre) to bend exit (angle 90).
@@ -591,7 +375,8 @@ async def build(adapter) -> dict[str, str]:
             await adapter.add_line(-BEND_R, ARM_Y, TUBE_END_X, ARM_Y),
         )
     finally:
-        # Session state on the seat (as the end piece above).
+        # Session state on the seat: a failed segment must not leave sketch
+        # inference off for the next leaf.
         set_sketch_direct_db(adapter, False)
     # Manual-dim sketch: record each display dim as it is created, in
     # creation order. The centre anchor at (-BEND_R, LEG_TOP) emits TWO
@@ -731,8 +516,8 @@ async def build(adapter) -> dict[str, str]:
     check("sweep bend + arm", res)
     name_last_feature(adapter, "BendArmSweep")
     blank_reference_geometry(adapter, tuple((name, "PLANE") for name in profile_planes))
-    # The sweep merges the leg and, at the tube end's annulus on the head,
-    # the end piece; the shank stands clear of the bore by the braze gap.
+    # The sweep merges onto the leg; the end piece comes after, as its own
+    # body.
     expected = expected + V_BEND + V_ARM
     vol = await _volume(adapter)
     _telemetry.info(
@@ -742,6 +527,227 @@ async def build(adapter) -> dict[str, str]:
     # absolute B-rep slack is larger relative to the expectation.
     if abs(vol - expected) > 0.02 * expected:
         raise RuntimeError(f"bend volume {vol:.1f} != {expected:.1f}")
+
+    # 3. The end piece, on the horizontal plane through the arm axis, as its
+    # own body (see the module docstring).
+    # Sketch (u, v) is model (x, -z) about the arm axis at v = 0.
+    check(
+        "create_plane ArmAxisPlane",
+        await adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=ARM_Y)
+        ),
+    )
+    name_last_feature(adapter, "ArmAxisPlane")
+    drive_jobs.append(
+        (name_dimensions(adapter, "ArmAxisPlane", ["ArmAxisStation"])[0], '"ArmY"')
+    )
+    end_piece = SketchDims()
+    end_piece_points = [
+        (SHANK_END_X, 0.0),
+        (SHANK_END_X, SHANK_R),
+        (TUBE_END_X, SHANK_R),
+        (TUBE_END_X, PLUG_R),
+        (ARM_END_X, PLUG_R),
+        (ARM_END_X, 0.0),
+    ]
+    check("create_sketch end piece", await adapter.create_sketch("ArmAxisPlane"))
+    set_sketch_direct_db(adapter, True)
+    try:
+        end_piece_axis = check(
+            "end piece axis centerline",
+            await adapter.add_centerline(ARM_END_X, 0.0, SHANK_END_X, 0.0),
+        )
+        end_piece_lines = await add_line_chain(adapter, end_piece_points)
+    finally:
+        # Session state on the seat: a failed segment must not leave sketch
+        # inference off for the next leaf.
+        set_sketch_direct_db(adapter, False)
+    shank_end, shank_side, head_step, head_side, end_face, end_piece_floor = (
+        end_piece_lines
+    )
+    for line, relation in (
+        (shank_end, "vertical"),
+        (shank_side, "horizontal"),
+        (head_step, "vertical"),
+        (head_side, "horizontal"),
+        (end_face, "vertical"),
+        (end_piece_floor, "horizontal"),
+    ):
+        check(
+            f"end piece {relation} {line}",
+            await adapter.add_sketch_constraint(line, None, relation),
+        )
+    await anchor_point_to_origin(
+        adapter, f"{end_face}.end", ARM_END_X, 0.0, "end face centre"
+    )
+    end_piece.record("EndFaceStation", '-"ArmEndX"')
+    for name, line, length in (
+        ("PlugHeadLength", head_side, PLUG_HEAD_LENGTH),
+        ("PlugShankLength", shank_side, PLUG_SHANK_LENGTH),
+    ):
+        await dimension_between(
+            adapter,
+            f"{line}.start",
+            f"{line}.end",
+            "horizontal_distance",
+            length,
+            f"end piece {name}",
+        )
+        end_piece.record(name, f'"{name}"')
+    for name, line, u_mid, radius in (
+        ("PlugDia", head_side, ARM_END_X + PLUG_HEAD_LENGTH / 2.0, PLUG_R),
+        ("PlugShankDia", shank_side, TUBE_END_X + PLUG_SHANK_LENGTH / 2.0, SHANK_R),
+    ):
+        await add_diametric_linear_dimension(
+            adapter, end_piece_axis, line, (u_mid, radius + 4.0), name
+        )
+        end_piece.record(name, f'"{name}"')
+    await ensure_fully_defined(adapter, "end piece sketch")
+    check("exit_sketch end piece", await adapter.exit_sketch())
+    name_last_feature(adapter, "EndPieceProfile")
+    drive_jobs += end_piece.apply(adapter, "EndPieceProfile")
+    check(
+        "revolve end piece",
+        await adapter.create_revolve(
+            RevolveParameters(angle=360.0, merge_result=False)
+        ),
+    )
+    name_last_feature(adapter, "EndPiece")
+    vol = await _volume_check(
+        adapter, "solid end piece", vol + V_END_PIECE, 0.005 * V_END_PIECE
+    )
+
+    # 4. The arm-end counterbore: its flat floor sits past the screw's clamped
+    # run-out, so the fat incomplete threads never reach the end piece's full
+    # 2B thread.  The cutter's mouth lies on the end face, so its depth
+    # dimension runs face to floor; the floor corner is modelled at its
+    # printed limit, R0.10 MAX, a native radial dimension (codjiflo P2 on
+    # #1997).  It is cut FIRST: its floor is the tap's start face.
+    counterbore = SketchDims()
+    check("create_sketch counterbore", await adapter.create_sketch("ArmAxisPlane"))
+    set_sketch_direct_db(adapter, True)
+    try:
+        counterbore_axis = check(
+            "counterbore axis centerline",
+            await adapter.add_centerline(ARM_END_X, 0.0, COUNTERBORE_FLOOR_X, 0.0),
+        )
+        (floor,) = await add_line_chain(
+            adapter,
+            [(COUNTERBORE_FLOOR_X, 0.0), COUNTERBORE_CORNER_FLOOR_TANGENT],
+            close=False,
+        )
+        floor_corner = check(
+            "counterbore floor corner arc",
+            await adapter.add_arc(
+                *COUNTERBORE_CORNER_CENTER,
+                *COUNTERBORE_CORNER_FLOOR_TANGENT,
+                *COUNTERBORE_CORNER_WALL_TANGENT,
+            ),
+        )
+        wall, mouth, counterbore_floor_axis = await add_line_chain(
+            adapter,
+            [
+                COUNTERBORE_CORNER_WALL_TANGENT,
+                (ARM_END_X, COUNTERBORE_R),
+                (ARM_END_X, 0.0),
+                (COUNTERBORE_FLOOR_X, 0.0),
+            ],
+            close=False,
+        )
+    finally:
+        # Session state on the seat (as the end piece above).
+        set_sketch_direct_db(adapter, False)
+    for line, relation in (
+        (floor, "vertical"),
+        (wall, "horizontal"),
+        (mouth, "vertical"),
+        (counterbore_floor_axis, "horizontal"),
+    ):
+        check(
+            f"counterbore {relation} {line}",
+            await adapter.add_sketch_constraint(line, None, relation),
+        )
+    for first, second in ((floor, floor_corner), (floor_corner, wall)):
+        check(
+            f"counterbore floor corner tangent {first} {second}",
+            await adapter.add_sketch_constraint(first, second, "tangent"),
+        )
+    await anchor_point_to_origin(
+        adapter, f"{mouth}.end", ARM_END_X, 0.0, "counterbore mouth centre"
+    )
+    counterbore.record("CounterboreFaceStation", '-"ArmEndX"')
+    # Face to floor: from the mouth's rim to the floor's tangent point.
+    await dimension_between(
+        adapter,
+        f"{mouth}.start",
+        f"{floor}.end",
+        "horizontal_distance",
+        COUNTERBORE_DEPTH,
+        "counterbore depth",
+    )
+    counterbore.record("CounterboreDepth", '"CounterboreDepth"')
+    await add_diametric_linear_dimension(
+        adapter,
+        counterbore_axis,
+        wall,
+        (ARM_END_X + COUNTERBORE_DEPTH / 2.0, COUNTERBORE_R + 4.0),
+        "CounterboreDia",
+    )
+    counterbore.record("CounterboreDia", '"CounterboreDia"')
+    check(
+        "counterbore floor corner radius",
+        await adapter.add_sketch_dimension(
+            floor_corner, None, "radial", COUNTERBORE_FLOOR_CORNER_R_MAX
+        ),
+    )
+    counterbore.record("CounterboreFloorCornerR", '"CounterboreFloorCornerR"')
+    await ensure_fully_defined(adapter, "counterbore sketch")
+    check("exit_sketch counterbore", await adapter.exit_sketch())
+    name_last_feature(adapter, "CounterboreProfile")
+    drive_jobs += counterbore.apply(adapter, "CounterboreProfile")
+    check(
+        "revolve counterbore",
+        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+    )
+    name_last_feature(adapter, "Counterbore")
+    vol = await _volume_check(
+        adapter, "arm-end counterbore", vol - V_COUNTERBORE, 0.02 * V_COUNTERBORE
+    )
+
+    # 4b. The native blind bottoming tap, started on the counterbore floor
+    # (west-facing), both depths from that floor (sm_gooseneck_spring_joint).
+    # If the wizard's table drill differs from TAP_DRILL_DIA, wizard_holes
+    # fails loud (the joint's walls are budgeted on that drill).
+    tap = wizard_holes(
+        adapter,
+        TAP_SPEC,
+        [[COUNTERBORE_FLOOR_X, ARM_Y, 0.0]],
+        (-1.0, 0.0, 0.0),
+        f"gooseneck end piece ({TAP_SPEC.size} blind)",
+        name="ThreadBore",
+        expect_dia_mm=TAP_DRILL_DIA,
+        placement_dims=[((None, None), ("TapAxisY", '"ArmY"'))],
+    )
+    if abs(tap.depth_mm - TAP_DRILL_DEPTH_FROM_FLOOR) > 0.005:
+        raise RuntimeError(
+            f"gooseneck tap drill depth {tap.depth_mm:.3f} != "
+            f"{TAP_DRILL_DEPTH_FROM_FLOOR:.3f} mm"
+        )
+    drive_jobs += tap.placement_drive_jobs
+    vol = await _volume_check(adapter, "end piece blind tap", vol - V_TAP, 0.02 * V_TAP)
+    blank_reference_geometry(adapter, (("ArmAxisPlane", "PLANE"),))
+
+    await name_bore_axis(
+        adapter,
+        "Front Plane",
+        0.0,
+        "Top Plane",
+        ARM_Y,
+        "spring screw",
+        drive_b='"ArmY"',
+        drive_jobs=drive_jobs,
+    )
+    name_last_feature(adapter, "SpringScrewAxis")
 
     # 5. The sleeve over the leg from its foot, revolved about the leg axis
     # on the Front plane; its bore is the tube OD, so it merges onto the leg.
@@ -897,13 +903,13 @@ async def build(adapter) -> dict[str, str]:
     await _volume_check(
         adapter, "driven gooseneck (equations neutral)", final_vol, 0.001 * final_vol
     )
-    # One weldment body: the tube end's annulus joins the end piece's head and
-    # the sleeve's bore the leg's OD.
+    # Two bodies (module docstring): the tube with its sleeve merged on the
+    # leg's OD, and the end piece, its head on the tube end's annulus.
     bodies = tuple(
         _early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or ()
     )
-    if len(bodies) != 1:
-        raise RuntimeError(f"gooseneck: expected one solid body, found {len(bodies)}")
+    if len(bodies) != 2:
+        raise RuntimeError(f"gooseneck: expected two solid bodies, found {len(bodies)}")
 
     # Model-owned limits: the counterbore depth prints as its LIMIT band from
     # the end face (sm_gooseneck_spring_joint), the model at mid-band; its Ø
