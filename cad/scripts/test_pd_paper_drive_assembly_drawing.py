@@ -1430,7 +1430,7 @@ def test_the_fitted_collar_rear_face_reacts_on_the_actual_gear_shoulder() -> Non
     ) in faced
     seated = _step_body("collar-shoulder-seated")
     assert "D-BORE ON THE SHAFT D-FLAT" in seated
-    assert "REAR FACE BEARING ON THE MHA-PD-08 12T FRONT FACE" in seated
+    assert "REAR FACE BEARING ON THE MHA-PD-08 15T FRONT FACE" in seated
     assert "ON THE DRIVE DOWELS" in seated
     assert collar.BODY_REAR_FACE_FROM_F == 0.0
     assert collar.LENGTH_FITTED_MIN <= collar.LENGTH <= collar.LENGTH_FITTED_MAX
@@ -2447,11 +2447,11 @@ def test_chain_roles_follow_validated_loop_stations_not_native_indices(monkeypat
     adapter, components = _native_chain_fixture(monkeypatch)
     model = adapter.currentModel
     names = assembly._assign_chain_references(adapter)
-    assert len(names) == 67
+    assert len(names) == 65
     assert names["@InnerLink:1"] == components[0].Name2
-    assert names["@InnerLink:34"] == components[66].Name2
-    assert names["@OuterLink:33"] == components[65].Name2
-    assert len({component.ComponentReference for component in components[:-1]}) == 67
+    assert names["@InnerLink:33"] == components[64].Name2
+    assert names["@OuterLink:32"] == components[63].Name2
+    assert len({component.ComponentReference for component in components[:-1]}) == 65
     model.ForceRebuild3.assert_called_once_with(False)
     # Drawing simplification may change only the derived suffix.
     for component in components:
@@ -2515,7 +2515,7 @@ def test_chain_reference_assignment_refuses_failed_native_rebuild(monkeypatch):
     assert [component.ComponentReference for component in components[:-1]] == (
         expected_references
     )
-    assert len(set(expected_references)) == 67
+    assert len(set(expected_references)) == 65
     assert components[-1].ComponentReference == connecting_reference
     assert [component.Name2 for component in components] == names_before
     assert [
@@ -2557,7 +2557,7 @@ def test_chain_pattern_rebuild_rebinds_existing_pose_witnesses(monkeypatch):
     assert len(names) == chain.LINK_COUNT - 1
     assert names["@InnerLink:1"] == components[0].Name2
     assert names["@OuterLink:1"] == components[1].Name2
-    assert names["@InnerLink:34"] == components[-2].Name2
+    assert names["@InnerLink:33"] == components[-2].Name2
     assert not {
         before[station] for station in placed_stations
     }.intersection(_assembly._POSE_LEDGER), (
@@ -3074,8 +3074,8 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False):
 def test_source_census_distinguishes_chain_members_and_preserves_transgear_aggregation(monkeypatch):
     model, _components, table, adapter, _cells, keys = _pd_bom_fixture(monkeypatch)
     counts = drawing._source_family_counts(model)
-    assert counts["sh-vn-chain-link--InnerLink"] == 34
-    assert counts["sh-vn-chain-link--OuterLink"] == 33
+    assert counts["sh-vn-chain-link--InnerLink"] == 33
+    assert counts["sh-vn-chain-link--OuterLink"] == 32
     assert counts["pd-vn-chain-connecting-link"] == 1
     assert counts["pd-transgear-removable"] == 3
     items = dict(
@@ -3402,8 +3402,8 @@ def test_pd_all_visible_authoring_preserves_visible_quantities_and_native_snapsh
     proof_by_row = {row[0]: row for row in snapshot}
     for key, count, configurations in (
         ("pd-transgear-removable", 3, {"T12 Simplified", "T18 Simplified", "T24 Simplified"}),
-        ("sh-vn-chain-link--InnerLink", 34, {"InnerLink Simplified"}),
-        ("sh-vn-chain-link--OuterLink", 33, {"OuterLink Simplified"}),
+        ("sh-vn-chain-link--InnerLink", 33, {"InnerLink Simplified"}),
+        ("sh-vn-chain-link--OuterLink", 32, {"OuterLink Simplified"}),
     ):
         row = scene.keys.index(key) + 1
         members = table.GetComponents2(row, configuration)
@@ -3782,8 +3782,8 @@ def test_bom_insertion_retains_grouped_native_members_through_pd_consumer(
             f"T12{suffix}", f"T18{suffix}", f"T24{suffix}"
         }
         for key, quantity, member in (
-            ("sh-vn-chain-link--InnerLink", "34", f"InnerLink{suffix}"),
-            ("sh-vn-chain-link--OuterLink", "33", f"OuterLink{suffix}"),
+            ("sh-vn-chain-link--InnerLink", "33", f"InnerLink{suffix}"),
+            ("sh-vn-chain-link--OuterLink", "32", f"OuterLink{suffix}"),
         ):
             row = scene.keys.index(key) + 1
             assert table.DisplayedText2(row, 1, True) == drawing.BOM_PART_NUMBERS[key]
@@ -4060,8 +4060,8 @@ def test_pd_consumer_refuses_wrong_visible_projection_despite_unchanged_physical
         (scene.keys.index(key) + 1, quantity)
         for key, quantity in (
             ("pd-transgear-removable", 3),
-            ("sh-vn-chain-link--InnerLink", 34),
-            ("sh-vn-chain-link--OuterLink", 33),
+            ("sh-vn-chain-link--InnerLink", 33),
+            ("sh-vn-chain-link--OuterLink", 32),
         )
     )
     for row, quantity in retained_quantities:
@@ -4258,8 +4258,8 @@ def test_place_bom_sheet_preserves_native_grouped_quantities_with_visible_number
         assert table.DisplayedText2(row, 1, True) == drawing.BOM_PART_NUMBERS[key]
     for key, quantity, configurations in (
         ("pd-transgear-removable", 3, {"T12", "T18", "T24"}),
-        ("sh-vn-chain-link--InnerLink", 34, {"InnerLink"}),
-        ("sh-vn-chain-link--OuterLink", 33, {"OuterLink"}),
+        ("sh-vn-chain-link--InnerLink", 33, {"InnerLink"}),
+        ("sh-vn-chain-link--OuterLink", 32, {"OuterLink"}),
     ):
         row = scene.keys.index(key) + 1
         assert table.Text2(row, 3, True) == table.DisplayedText2(row, 3, True) == str(quantity)
@@ -5410,11 +5410,11 @@ def test_split_bom_snapshot_refuses_membership_or_quantity_changes(monkeypatch, 
                 component.ReferencedConfiguration = "OuterLink Simplified"
             for component in native_rows[outer_row - 1]:
                 component.ReferencedConfiguration = "InnerLink Simplified"
-            assert len(native_rows[inner_row - 1]) == 34
-            assert len(native_rows[outer_row - 1]) == 33
+            assert len(native_rows[inner_row - 1]) == 33
+            assert len(native_rows[outer_row - 1]) == 32
             cells = piece._pd_state.cells
             assert cells[inner_row][1] == cells[outer_row][1]
-            assert (cells[inner_row][3], cells[outer_row][3]) == ("34", "33")
+            assert (cells[inner_row][3], cells[outer_row][3]) == ("33", "32")
         message = "membership or quantities changed"
     else:
         for piece in pieces:

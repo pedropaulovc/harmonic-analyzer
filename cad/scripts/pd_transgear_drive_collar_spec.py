@@ -79,6 +79,7 @@ from pd_transgear_knob_shaft_spec import (
     RELIEF_DIA_MAX,
     THREAD_MAJOR,
     THREAD_PITCH,
+    TEETH as SHAFT_TEETH,
     TIP_STATION,
     TIP_STATION_PLACES,
 )
@@ -413,7 +414,7 @@ PIN_REAR_INSET_WORST = pin_rear_inset(
 
 # The mating shaft, named on the sheet so the fit and the seat face are found.
 SHAFT_NUMBER = "MHA-PD-08"
-SHAFT_SEAT_FACE = f"{SHAFT_NUMBER} 12T FRONT FACE"
+SHAFT_SEAT_FACE = f"{SHAFT_NUMBER} {SHAFT_TEETH}T FRONT FACE"
 
 # --- Fitted axial reaction -------------------------------------------------
 # With the rear face seated on the actual gear shoulder, body length IS the
@@ -466,7 +467,7 @@ for _ok, _what in (
         "a blind drive-pin hole leaves a floor under the wall floor",
     ),
     (PIN_REAR_INSET_WORST >= 0.0, "a pressed drive pin stands out of the rear face"),
-    (BODY_REAR_FACE_FROM_F == 0.0, "the collar has no axial reaction at the 12T front face"),
+    (BODY_REAR_FACE_FROM_F == 0.0, "the collar has no axial reaction at the pinion front face"),
 ):
     if not _ok:
         raise AssertionError(f"MHA-PD-22: {_what}")

@@ -10,8 +10,8 @@ swinging transgear hanger behind the bar, and the REAL power train:
 
     selected crank wheel --(belt/chain, tooth ratio)--> selected knob wheel
       --(drive collar: two pressed drive pins + D-flat, LOCK)--> knob shaft
-      with its source-selected stock-form 12T 48DP PA20 reducer pinion
-      --(GEAR mate 12:120)--> 120T 48DP PA20 disc
+      with its source-selected stock-form 15T 48DP PA20 reducer pinion
+      --(GEAR mate 15:150)--> 150T 48DP PA20 disc
       --(LOCK: brass hub + feed sleeve)--> stock-form 12T 32DP PA20 feed pinion
       --(RACK-PINION mate, reference pitch circumference)--> rack --(LOCK)--> platen
 
@@ -19,7 +19,7 @@ Operational kinematics: the crank-end sprocket spin is the ONE free
 operational DOF -- drag it and the whole feed train follows the feed law in
 ``paper_drive_geom``, using the mounted selections in ``pd_transgear_removable_spec``.
 Every stage is a real SolidWorks mate on geometrically meshed gears. The hanger arm
-pivots on the bar and carries the stud, so the 12T:120T mesh is permanent. The drive spec
+pivots on the bar and carries the stud, so the 15T:150T mesh is permanent. The drive spec
 is recorded into the DOF manifest for the transient verify:kinematics replay,
 never authored.
 The source-bound frozen rack qualifier is conditional on the entire PRINTED
@@ -40,9 +40,9 @@ real receiving and loaded-inspection data remain separately required.
   lock-mated to the platen so the whole group feeds together.
 * Transgear hanger (behind the bar): the arm stands on the pivot spacer and
   swings on the shoulder pivot screw in the bar's tap; the stepped stud in the
-  arm carries the feed sleeve (12T 32DP PA20), the 120T disc and its brass hub,
+  arm carries the feed sleeve (12T 32DP PA20), the 150T disc and its brass hub,
   closed by the hub cap. The arm plate, screwed to the arm, bores the knob
-  shaft, whose integral 12T meshes the disc; the thrust ring and the knob cup
+  shaft, whose integral 15T meshes the disc; the thrust ring and the knob cup
   (set on a feeler, cross-pinned to the journal) set its end float. On the
   shaft's front D-core the drive collar (pressed drive pins, matching D-bore) carries
   selected knob removable CHAIN-WRAPPED at the z -155.7 chain plane, and the
@@ -553,7 +553,7 @@ from pd_transgear_thumbnut_spec import (  # noqa: E402
     THREAD as THUMBNUT_THREAD,
 )
 
-# The knob shaft's integral stock-form 12T 48DP PA20 is the third gear.
+# The knob shaft's integral stock-form 15T 48DP PA20 is the third gear.
 THIRD_TEETH = KNOB_SPEC.TEETH
 THIRD_DP = KNOB_SPEC.DIAMETRAL_PITCH
 THIRD_FACE = KNOB_SPEC.FACE_WIDTH
@@ -578,7 +578,7 @@ if seat_geometry.PIN_HOLE_ANGLES_DEG != (90.0, 270.0):
     raise AssertionError("identity-placed removables expect pin holes on +/-Y")
 
 # Knob stack on K (front -> back): thumbnut | knob wheel | drive collar | the
-# shaft's 12T | thrust ring | arm-plate hub | plate | boss | knob cup.
+# shaft's 15T | thrust ring | arm-plate hub | plate | boss | knob cup.
 # The front collar seat stays on the wheel rear; its actual rear face is on
 # gear front F. Its fitted body length is a saved native REF, not a front pin.
 KNOB_COLLAR_Z0 = seat_geometry.SEAT_FACE_Z  # -154.3
@@ -593,7 +593,7 @@ if abs(KNOB_PIN.DIA - seat_geometry.DRIVE_PIN_DIA) > 1e-12:
     raise AssertionError("transgear-knob-drive-pin is not the removable's drive pin")
 if COLLAR.PIN_CIRCLE_RADIUS != seat_geometry.PIN_CIRCLE_RADIUS:
     raise AssertionError("the collar's pin circle is not the removable's")
-# Behind the 12T: the thrust ring to the plate hub's face, the knob cup on the
+# Behind the 15T: the thrust ring to the plate hub's face, the knob cup on the
 # journal's rear end END_FLOAT behind the plate's boss (all Rx+90), and the
 # MHA-PD-VN-62 spring pin through cup and journal (identity: along machine X,
 # R9-70 K-1).
@@ -621,11 +621,11 @@ if abs(_F_FROM_ARM_Z - KNOB_SHAFT_Z0) > 1e-9 or abs(CLUSTER.F_Z - KNOB_SHAFT_Z0)
     raise AssertionError("F is off the arm, plate hub and thrust ring chain")
 if abs(DISC_Z0 - CLUSTER.FLOAT_WINDOW_CENTRE - KNOB_SHAFT_Z0 - CLUSTER.MODEL_M) > 1e-9:
     raise AssertionError("the model's disc is off the knob chain's fitted station")
-# The 120T disc's rear face (the MHA-PD-VN-55 tips sit inside it) to the platen's
+# The 150T disc's rear face (the MHA-PD-VN-55 tips sit inside it) to the platen's
 # front face at the printed worst case: the platen forward by its fitted
 # float, magnified by its yaw about the bar's end at the near lock; F
 # rearward by the arm (held on the longest spacer by the MHA-PD-VN-63 spring), the
-# arm, hub face, ring and 12T bands; the platen forward by the bar and its
+# arm, hub face, ring and 15T bands; the platen forward by the bar and its
 # own bands; then m's max, the cluster's rearward float, its tilt on the bore
 # clearance (pivot on the rear bushing's smallest Ø9, over the shortest
 # sleeve) at the disc rim, the hanger's tilt on the spacer (Codex P1 on
@@ -764,14 +764,14 @@ if BUSHING_RACK_AIR_WORST < 0.0:
 
 # Stack D: a bought #25 chain floated REARMOST on the thinnest knob-wheel plate
 # reaches chain_reach_rear() behind the seat face; it must keep air to the
-# 120T disc's front face.
+# reducer disc's front face.
 CHAIN_REACH_REAR_WORST = seat_geometry.CHAIN_REACH_REAR_WORST  # 3.587
 CHAIN_DISC_AXIAL_AIR_WORST = DISC_Z0 - (
     seat_geometry.SEAT_FACE_Z + CHAIN_REACH_REAR_WORST
 )  # 3.0635 = 6.65 - 3.5865
 if CHAIN_DISC_AXIAL_AIR_WORST <= 0.0:
     raise AssertionError(
-        f"bought #25 chain reaches the 120T disc: air {CHAIN_DISC_AXIAL_AIR_WORST:.4f}"
+        f"bought #25 chain reaches the reducer disc: air {CHAIN_DISC_AXIAL_AIR_WORST:.4f}"
     )
 # Radially, the only knob-stack feature between the seat face and the disc is
 # the drive collar (the pins sit inside it); at its print-worst (largest)
@@ -868,13 +868,13 @@ for _screw, _tap_x, _hole_x in zip(
         raise AssertionError("a latch-hook screw hole is off its tap in the bar")
 
 # Mesh phasing. build_fixed_gear seeds the disc with a TOOTH centred on local
-# +X, and its teeth repeat every 3 deg: MESH_ANGLE is a multiple of that, so
+# +X, and its teeth repeat every 2.4 deg: MESH_ANGLE is a multiple of that, so
 # the disc keeps identity spin with a tooth along the S -> K line. The knob
-# shaft's integral 12T has a GAP at GAP_AZIMUTH_DEG (a tooth on local +X); the
+# shaft's integral 15T has a GAP at GAP_AZIMUTH_DEG (a tooth on local +X); the
 # spec's FRONT_STACK_PHASE_DEG spins it so a gap faces back along that line.
-THIRD_GAMMA = 360.0 / THIRD_TEETH  # 30
+THIRD_GAMMA = 360.0 / THIRD_TEETH  # 24
 _MESH_AZ = 180.0 + MESH_ANGLE_DEG  # 12: from the knob axis toward the stud
-THIRD_PHASE_DEG = KNOB_SPEC.FRONT_STACK_PHASE_DEG  # -3: nearest representative
+THIRD_PHASE_DEG = KNOB_SPEC.FRONT_STACK_PHASE_DEG  # 0: nearest representative
 # Rigidly clock the complete mounted front stack to the actual integral
 # shaft. Spare inventory and the intentionally visual native chain are separate.
 KNOB_FRONT_STACK_ROT = rot_z_rows(THIRD_PHASE_DEG)
@@ -1043,7 +1043,7 @@ CHAIN_PLANE_ENVELOPES = (
         )
         for xy in DISC_SCREW_XY
     ),
-    ("120T disc", STUD_XY, DISC_SPEC.OUTSIDE_DIA / 2.0, DISC_Z0, DISC_Z0 + DISC_FACE),
+    ("reducer disc", STUD_XY, DISC_SPEC.OUTSIDE_DIA / 2.0, DISC_Z0, DISC_Z0 + DISC_FACE),
     ("feed sleeve", STUD_XY, FEED.OUTSIDE_DIA / 2.0, FEED_Z0 - FEED_FACE, FEED_Z0),
     (
         "drive collar",
@@ -1861,8 +1861,8 @@ def _assert_gear_mesh() -> None:
     reducer, reducer_top = (check.require() for check in mesh_check.reducer_band_meshes())
     if DISC_SPEC.CENTRE_DISTANCE_WINDOW[0] != centre_distance:
         raise RuntimeError("the model's reducer centre is not the set band's nominal end")
-    # The disc's teeth repeat every 3 deg, so a tooth must point along the S ->
-    # K line at the mesh angle for the 12T's phased gap to receive it.
+    # The disc's teeth repeat every 360/DISC_TEETH deg, so a tooth must point
+    # along the S -> K line at the mesh angle for the knob pinion's phased gap.
     disc_gamma = 360.0 / DISC_TEETH
     if abs(math.remainder(MESH_ANGLE_DEG, disc_gamma)) > 1e-9:
         raise RuntimeError(
@@ -1871,7 +1871,7 @@ def _assert_gear_mesh() -> None:
         )
     gap_az = THIRD_PHASE_DEG + KNOB_SPEC.GAP_AZIMUTH_DEG - _MESH_AZ
     if abs(math.remainder(gap_az, THIRD_GAMMA)) > 1e-9:
-        raise RuntimeError("the knob 12T's phased gap does not face the disc")
+        raise RuntimeError(f"the knob {THIRD_TEETH}T's phased gap does not face the disc")
     # Shifted full-depth pinion relief is below the base circle. Check both
     # true root arcs; the spec also rejects contact beyond a base circle.
     tip_reach = centre_distance - DISC_SPEC.OUTSIDE_DIA / 2.0
@@ -1887,9 +1887,9 @@ def _assert_gear_mesh() -> None:
     if z_overlap < 2.5:
         raise RuntimeError(f"third gear/disc z overlap {z_overlap:.2f} < 2.5")
     log(
-        f"gear mesh 12:120 {DISC_DP:g}DP PA{DISC_SPEC.PRESSURE_ANGLE_DEG:g}:"
+        f"gear mesh {THIRD_TEETH}:{DISC_TEETH} {DISC_DP:g}DP PA{DISC_SPEC.PRESSURE_ANGLE_DEG:g}:"
         f" c2c {centre_distance} (ext {ext:.3f}); {reducer.summary}; {reducer_top.summary};"
-        f" 12T phased {THIRD_PHASE_DEG:+.1f} deg,"
+        f" {THIRD_TEETH}T phased {THIRD_PHASE_DEG:+.1f} deg,"
         f" tip/floor margin {min(root_margin, reciprocal_margin):.3f}"
     )
 
@@ -1897,7 +1897,7 @@ def _assert_gear_mesh() -> None:
 def _assert_knob_shaft_clearance() -> None:
     """The knob cluster must ride the disc's exact centre distance with its
     air gaps and floats."""
-    # R9-68: the collar's rearmost stop is the 12T's front face F, and the
+    # R9-68: the collar's rearmost stop is the knob pinion's front face F, and the
     # front bushing is faced until F to the disc's front face reads
     # FIT_WINDOW with the cluster forward, so the window's minimum is the
     # collar's worst air to the disc.  The model sits at the window's centre.
@@ -3219,9 +3219,9 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 180.0, 0.0],
         ROT_Y_180,
     )
-    # 120T 48DP PA20 reducer disc on the feed sleeve's seat, FREE (revolute below) --
-    # gear-mated to the knob shaft's 12T. Identity spin: a tooth points along
-    # the S -> K line (MESH_ANGLE is a multiple of its 3-deg pitch).
+    # 150T 48DP PA20 reducer disc on the feed sleeve's seat, FREE (revolute below) --
+    # gear-mated to the knob shaft's 15T. Identity spin: a tooth points along
+    # the S -> K line (MESH_ANGLE is a multiple of its 2.4-deg pitch).
     disc = await place_component(
         adapter,
         "pd-rack-pinion",
@@ -3229,7 +3229,7 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 0.0, 0.0],
         IDENTITY,
         ground=False,
-        label="rack-pinion (120T reducer disc)",
+        label=f"rack-pinion ({DISC_TEETH}T reducer disc)",
     )
     await _sprocket_revolute(adapter, disc, "reducer disc")
     # The shifted 12T 32DP PA20 feed sleeve runs on the pin, rear face on the rear
@@ -3378,8 +3378,8 @@ async def build(adapter) -> dict[str, str]:
             label=f"MHA-PD-VN-54 knob drive pin #{k} (y{y:.1f})",
         )
         await _lock_to_collar(knob_pin, f"drive pin #{k}")
-    # Knob shaft MHA-PD-08 on its datum F (the 12T's front face), spun so a gap
-    # of its 12T faces the disc's tooth on the S -> K line.
+    # Knob shaft MHA-PD-08 on its datum F (the 15T's front face), spun so a gap
+    # of its 15T faces the disc's tooth on the S -> K line.
     knob_shaft = await place_component(
         adapter,
         "pd-transgear-knob-shaft",
@@ -3440,7 +3440,7 @@ async def build(adapter) -> dict[str, str]:
         f" {CHAIN_MID_Z - CHAIN_PIN_HALF_LEN:.2f} (radial gap to the head"
         f" {_chain_inner_wrap_r - THUMBNUT_HEAD_DIA / 2.0:.1f})"
     )
-    # Behind the 12T (Rx+90): the thrust ring to the plate hub, the knob cup on
+    # Behind the 15T (Rx+90): the thrust ring to the plate hub, the knob cup on
     # the journal's rear end, and the MHA-PD-VN-62 spring pin through both (R9-70).
     ring = await place_component(
         adapter,
@@ -3537,13 +3537,13 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     hide_generated_planes(adapter, shown, "belt/chain coupling")
-    # (2) GEAR mate: the integral shifted 12T drives the unshifted 120T disc.
+    # (2) GEAR mate: the integral knob pinion drives the reducer disc.
     await gear_mate(
         adapter,
         named_ref(f"Axis1@{knob_shaft}", "AXIS"),
         named_ref(f"Axis1@{disc}", "AXIS"),
         [THIRD_TEETH, DISC_TEETH],
-        label=f"knob shaft 12T : disc 120T ({DISC_DP:g}DP)",
+        label=f"knob shaft {THIRD_TEETH}T : disc {DISC_TEETH}T ({DISC_DP:g}DP)",
     )
     # (3) RACK-PINION mate: the feed pinion (locked to the disc) feeds the
     # platen at its reference pitch circumference (profile shift does not alter it).

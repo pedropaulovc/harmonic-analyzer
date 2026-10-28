@@ -113,7 +113,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# The plate is 56 x 38 in plan and 29 deep: at 2:1 the plan, the back view
+# The plate is 62 x 38 in plan and 29 deep: at 2:1 the plan, the back view
 # and section A-A stand side by side above the title block (x > 0.216 below
 # y 0.066). The section stands far enough right that its hub diameter clears
 # the back view's notch height and its boss diameter ends inside the border
@@ -128,8 +128,10 @@ VIEW_SCALE = (2, 1)
 PLAN_CENTER = (0.080, 0.153)
 BACK_CENTER = (0.218, PLAN_CENTER[1])
 SECTION_CENTER = (0.343, PLAN_CENTER[1])
-ISO_CENTER = (0.180, 0.045)
-ISO_NOTE_XY = (0.150, 0.081)
+# 3 mm lower than before #2034: the 15:150 plate stands 6.4 taller, so the
+# back view's edge dimensions reach 3 mm nearer the isometric's caption.
+ISO_CENTER = (0.180, 0.042)
+ISO_NOTE_XY = (0.150, 0.078)
 # Bottom left, under the plan view's bore frame (its bottom y 0.081), left
 # of the isometric.
 NOTES_XY = (0.014, 0.075)

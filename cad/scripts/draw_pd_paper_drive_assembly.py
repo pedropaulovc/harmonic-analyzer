@@ -1648,7 +1648,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "collar-shoulder-seated": (
             f"SEAT THE {_N['pd-transgear-drive-collar']} D-BORE ON THE SHAFT D-FLAT, "
-            f"ITS REAR FACE BEARING ON THE {_N['pd-transgear-knob-shaft']} 12T FRONT FACE. "
+            f"ITS REAR FACE BEARING ON THE {_N['pd-transgear-knob-shaft']} {KNOB_TEETH}T FRONT FACE. "
             f"{sprocket.KNOB_CONFIG} ON THE DRIVE DOWELS, NUT TIGHT ON THE PILOT. "
             "THUMBNUT IS A CLAMP ONLY; NEVER TURNED TO DRIVE."
         ),

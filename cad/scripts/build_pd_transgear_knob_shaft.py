@@ -1,12 +1,12 @@
-r"""Build the integral finite-stock 12T48DP knob shaft MHA-PD-08.
+r"""Build the integral finite-stock 48DP pinion knob shaft MHA-PD-08.
 
-The pure source owns the actual #8/12T master, printed-span-inverted tool
-setting, contact-critical blank, D-core, conventional front neck, #8-32
-stud and 6g6 running journal. F and all retained cup/chain stations are
-unchanged. Exact finite gaps run straight only to FULL_DEPTH. A genuine
-stock-disc cutter revolution removes the partial-depth rear tooth gaps
-and journal cavity; no generated-profile shift or flat end-mill slot is
-used. The front terminal intersects no material in the paid source family.
+The pure source owns the actual stock-form master (``CUTTER_NUMBER``,
+``TEETH`` teeth), printed-span-inverted tool setting, contact-critical
+blank, D-core, conventional front neck, #8-32 stud and 6g6 running
+journal. F and all retained cup/chain stations are unchanged. Exact finite
+gaps run straight at full depth through the whole face width; the stock
+disk runs out in air over the neck, D-core and journal, so no generated-
+profile shift, endcut or flat end-mill slot is modelled.
 
 Root REF and driven tangent-span carriers use the same physical finite
 contact curves. The running-journal datum and source-approved core controls
@@ -28,7 +28,6 @@ import math
 import sys
 from typing import Any
 
-import _telemetry
 from _appearance import apply_material
 from _check import check
 from _com import _early_bound
@@ -48,7 +47,7 @@ from _sketch import (
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
+from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _drawing_prefix import set_dimension_prefix
 from _simplified_part import save_simplified_part
 from _sketch_circle import define_circle
@@ -58,7 +57,6 @@ from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from paper_drive_stock_native import (
     apply_span_limits,
-    author_cutter_endcut,
     author_root_envelope,
     author_span,
     measure_one_solid_body_volume,
@@ -80,24 +78,15 @@ from pd_transgear_knob_shaft_spec import (
     CORE_FLAT_CUT_END_BAND,
     CORE_FLAT_CUT_END_TOL_TYPE,
     CORE_FLAT_TOOL_REACH_NOTE,
-    CUTTER_DIA,
-    CUTTER_RUNOUT_DEVIATIONS,
-    CUTTER_RUNOUT_MAX,
-    CUTTER_RUNOUT_PLACES,
-    CUTTER_RUNOUT_PREFIX,
-    CUTTER_RUNOUT_TOL_TYPE,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
     FACE_WIDTH,
-    FULL_DEPTH,
-    FULL_DEPTH_BAND,
     FRONT_RELIEF_DIA,
     FRONT_RELIEF_WIDTH,
     FRONT_CORNER_RADIUS,
     FRONT_CORNER_RADIUS_BAND,
     FRONT_CORNER_RADIUS_TOL_TYPE,
-    FULL_DEPTH_PREFIX,
     GEAR_DATA,
     GEOMETRIC_CONTROLS,
     JOURNAL_DIA,
@@ -127,7 +116,6 @@ from pd_transgear_knob_shaft_spec import (
     TIP_Z,
     TOOTH_SPACE_CALLOUT,
     TOOTH_SPACE_CALLOUT_PROPERTY,
-    endcut_volume_bounds_mm3,
     expected_volume_bounds_mm3,
 )
 
@@ -187,7 +175,7 @@ async def _native_volume_check(
 async def _straight_stock_gaps(
     adapter: Any, drive_jobs: list[tuple[str, str]]
 ) -> ToothedDisc:
-    """The actual blank and exact straight finite pass only from F to full depth."""
+    """The actual blank and exact straight finite pass through the whole face."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     radius = STOCK_PROFILE.blank_radius_mm
@@ -233,14 +221,14 @@ async def _straight_stock_gaps(
     name_last_feature(adapter, "StraightToothProfile")
     check(
         "cut actual finite stock gap",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=FULL_DEPTH)),
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH)),
     )
     name_last_feature(adapter, "StraightToothGap")
     drive_jobs.append(
-        (name_dimensions(adapter, "StraightToothGap", ["StraightCutDepth"])[0], '"FullDepth"')
+        (name_dimensions(adapter, "StraightToothGap", ["StraightCutDepth"])[0], '"FaceWidth"')
     )
-    one_gap = STOCK_PROFILE.gap_area_mm2 * FULL_DEPTH
-    area_error = STOCK_PROFILE.gap_area_error_bound_mm2 * FULL_DEPTH
+    one_gap = STOCK_PROFILE.gap_area_mm2 * FACE_WIDTH
+    area_error = STOCK_PROFILE.gap_area_error_bound_mm2 * FACE_WIDTH
     await _native_volume_check(
         adapter, "finite stock gap seed",
         blank_volume - one_gap - area_error,
@@ -250,34 +238,10 @@ async def _straight_stock_gaps(
     pattern = await pattern_stock_feature(adapter, "StraightToothGap", TEETH, "StraightToothPattern")
     expected = blank_volume - TEETH * one_gap
     volume = await _native_volume_check(
-        adapter, "finite twelve-gap straight pattern",
+        adapter, f"finite {TEETH}-gap straight pattern",
         expected - TEETH * area_error, expected + TEETH * area_error, 0.01 * expected,
     )
     return ToothedDisc(volume, ("StraightToothGap", pattern))
-
-
-async def _stock_cutter_endcut(
-    adapter: Any, volume: float, drive_jobs: list[tuple[str, str]]
-) -> tuple[float, tuple[str, str]]:
-    """The real rear disk cavity, including the actual journal stock domain."""
-    lower, upper = endcut_volume_bounds_mm3()
-    if not 0.0 < lower <= upper:
-        raise ValueError("rear finite cutter has no resolved positive removal")
-    features = await author_cutter_endcut(adapter, STOCK_PROFILE, CUTTER_DIA, FULL_DEPTH)
-    drive_jobs.append(
-        (name_dimensions(adapter, features.plane, ["ToolEndStation"])[0], '"FullDepth"')
-    )
-    removed = (lower + upper) / 2.0
-    await _native_volume_check(
-        adapter, "rear finite stock-disk terminal seed",
-        volume - upper, volume - lower, 0.01 * removed,
-    )
-    pattern = await pattern_stock_feature(adapter, features.cut, TEETH, "ToolEndPattern")
-    actual = await _native_volume_check(
-        adapter, "twelve rear finite stock-disk terminals",
-        volume - TEETH * upper, volume - TEETH * lower, 0.01 * TEETH * removed,
-    )
-    return actual, (features.cut, pattern)
 
 
 def _native_arc(adapter: Any, label: str, *points: float) -> str:
@@ -358,20 +322,8 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
         "tooth-tip blank witness",
         await adapter.add_line(0.0, OUTSIDE_DIA / 2.0, -FACE_WIDTH, OUTSIDE_DIA / 2.0),
     )
-    # R9-21: the cutter's full-depth station and run-out limit, from F along
-    # the tooth tips' lower line, so each baseline dimension below the side
-    # view rises from the part's edge.
-    tip_v = -OUTSIDE_DIA / 2.0
-    runout_ref = check(
-        "run-out-limit witness",
-        await adapter.add_line(0.0, tip_v, -CUTTER_RUNOUT_MAX, tip_v),
-    )
-    full_depth_ref = check(
-        "full-depth witness", await adapter.add_line(0.0, tip_v, -FULL_DEPTH, tip_v)
-    )
     set_sketch_direct_db(adapter, False)
-    for line in (outside, runout_ref, full_depth_ref):
-        _as_construction(adapter, line)
+    _as_construction(adapter, outside)
     for line, relation in (
         (front_face, "vertical"),
         (neck_floor, "horizontal"),
@@ -384,8 +336,6 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
         (tip_face, "vertical"),
         (axis_edge, "horizontal"),
         (outside, "horizontal"),
-        (runout_ref, "horizontal"),
-        (full_depth_ref, "horizontal"),
     ):
         check(
             f"stud profile {relation} {line}",
@@ -484,24 +434,6 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
     ):
         await add_diametric_linear_dimension(adapter, axis, target, xy, name)
         profile.record(name, f'"{name}"')
-    check(
-        "full-depth witness starts on the run-out witness",
-        await adapter.add_sketch_constraint(
-            f"{full_depth_ref}.start", f"{runout_ref}.start", "coincident"
-        ),
-    )
-    await anchor_point_to_origin(
-        adapter, f"{runout_ref}.start", 0.0, tip_v, "witnesses on the tip line"
-    )
-    profile.record("WitnessDrop", '"OutsideDia" / 2')
-    for name, line, value, drive in (
-        ("FullDepth", full_depth_ref, FULL_DEPTH, '"FullDepth"'),
-        ("CutterRunout", runout_ref, CUTTER_RUNOUT_MAX, '"CutterRunoutMax"'),
-    ):
-        await dimension_between(
-            adapter, f"{line}.end", "origin", "horizontal_distance", value, name
-        )
-        profile.record(name, drive)
     await ensure_fully_defined(adapter, "stud sketch")
     check("exit_sketch stud", await adapter.exit_sketch())
     name_last_feature(adapter, "StudProfile")
@@ -519,40 +451,6 @@ async def _revolve_profile(adapter: Any, label: str, feature: str) -> None:
         await adapter.create_revolve(RevolveParameters(angle=360.0)),
     )
     name_last_feature(adapter, feature)
-
-
-def _runout_max_limit(adapter: Any) -> None:
-    """CutterRunout as the single limit "10.60 MAX" (swTolMAX): SolidWorks
-    prints the nominal then the limit word, so the nominal is the limit; the
-    deviations stay on the native tolerance as the model's record of the
-    band."""
-    lower, upper = CUTTER_RUNOUT_DEVIATIONS
-    _, dimension = _named_dimension(adapter, "StudProfile", "CutterRunout")
-    label = "CutterRunout@StudProfile"
-    if not math.isclose(
-        float(dimension.SystemValue), CUTTER_RUNOUT_MAX / 1000.0, abs_tol=1e-9
-    ):
-        raise RuntimeError(f"{label}: nominal is not the run-out limit")
-    raw_tolerance = dimension.Tolerance
-    if raw_tolerance is None:
-        raise RuntimeError(f"{label}: native dimension has no tolerance")
-    tolerance = _early_bound(raw_tolerance, "IDimensionTolerance")
-    tolerance.Type = CUTTER_RUNOUT_TOL_TYPE
-    if tolerance.SetValues(lower / 1000.0, upper / 1000.0) is not True:
-        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
-    if (
-        int(tolerance.Type) != CUTTER_RUNOUT_TOL_TYPE
-        or not math.isclose(
-            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
-        )
-        or not math.isclose(
-            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
-        )
-    ):
-        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
-    _telemetry.success(
-        f"{label}: single limit {CUTTER_RUNOUT_MAX:.{CUTTER_RUNOUT_PLACES}f} MAX"
-    )
 
 
 async def _cut_core_flat(
@@ -755,8 +653,6 @@ async def build(adapter: Any) -> dict[str, str]:
         ("TipChamfer", TIP_CHAMFER),
         ("JournalDia", JOURNAL_DIA),
         ("JournalLength", JOURNAL_LENGTH),
-        ("FullDepth", FULL_DEPTH),
-        ("CutterRunoutMax", CUTTER_RUNOUT_MAX),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -778,9 +674,8 @@ async def build(adapter: Any) -> dict[str, str]:
         0.005 * V_JOURNAL,
     )
 
-    # The F terminal is genuinely empty by the pure front-envelope proof.
-    # The rear terminal must cut both partial-depth teeth and real journal.
-    volume, end_features = await _stock_cutter_endcut(adapter, volume, drive_jobs)
+    # Both cutter terminals are genuinely empty by the pure envelope proofs:
+    # the run-out clears the neck and D-core at F and the journal at the rear.
     await author_root_envelope(adapter, STOCK_PROFILE)
     await author_span(adapter, STOCK_PROFILE, SPAN_TEETH, places=SPAN_PLACES)
 
@@ -829,11 +724,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "CoreFlatProfile", "FlatToAxis", *deviations(CORE_FLAT_BAND)
     )
-    set_dimension_symmetric_tolerance(adapter, "StudProfile", "FullDepth", FULL_DEPTH_BAND)
-    _runout_max_limit(adapter)
     _apply_neck_and_flat_limits(adapter)
-    set_dimension_prefix(adapter, "StudProfile", "FullDepth", FULL_DEPTH_PREFIX)
-    set_dimension_prefix(adapter, "StudProfile", "CutterRunout", CUTTER_RUNOUT_PREFIX)
     set_dimension_prefix(adapter, "RootInspectionProfile", "RootEnvelope", "REFERENCE ROOT ")
     apply_span_limits(
         adapter, nominal_mm=SPAN_NOMINAL, deviations=SPAN_DEVIATIONS,
@@ -860,7 +751,7 @@ async def build(adapter: Any) -> dict[str, str]:
             TOOTH_SPACE_CALLOUT_PROPERTY: TOOTH_SPACE_CALLOUT,
         },
     )
-    return await save_simplified_part(adapter, PART_NAME, disc.tooth_features + end_features)
+    return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 
 
 if __name__ == "__main__":

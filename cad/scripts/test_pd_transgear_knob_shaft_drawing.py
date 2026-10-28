@@ -27,7 +27,12 @@ from _drawing_contract import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_notes import property_link
 from paper_drive_stock_inspection import span_contact_points_mm, toothspace_gauge_contact_mm
-from stock_form_cutter import CutterTemplate, StockFormProfile, translation_for_tangent_span
+from stock_form_cutter import (
+    CutterTemplate,
+    StockFormProfile,
+    template_for_teeth,
+    translation_for_tangent_span,
+)
 from _test_stubbed_build import offline_adapter, stub_seat
 
 
@@ -41,34 +46,35 @@ def test_required_drawing_paths_and_registry() -> None:
     assert DRAWINGS_BY_NAME["pd_transgear_knob_shaft"].script == Path(drawing.__file__).resolve()
 
 
-def test_native_stock_source_is_the_selected_12t_48dp_master() -> None:
+def test_native_stock_source_is_the_selected_15t_48dp_master() -> None:
     import pd_rack_pinion_spec as disc
 
     profile = spec.STOCK_PROFILE
-    assert spec.TEETH == profile.teeth == disc.MESH_PINION_TEETH == 12
+    assert spec.TEETH == profile.teeth == disc.MESH_PINION_TEETH == 15
     assert spec.DIAMETRAL_PITCH == disc.DIAMETRAL_PITCH == 48
-    assert profile.template == spec.CUTTER_TEMPLATE == CutterTemplate(12, 48, 20)
-    assert profile.template.cutter_number == 8
-    assert profile.template.reference_teeth == 12
-    assert profile.radial_translation_mm == spec.RADIAL_SETTING
+    assert profile.template == spec.CUTTER_TEMPLATE == template_for_teeth(15, 48, 20)
+    assert spec.CUTTER_TEMPLATE == CutterTemplate(14, 48, 20)
+    assert profile.template.cutter_number == spec.CUTTER_NUMBER == 7
+    assert profile.template.reference_teeth == 14
+    assert profile.radial_translation_mm == spec.RADIAL_SETTING == 0.266
     assert profile.blank_radius_mm == spec.OUTSIDE_DIA / 2
-    assert spec.OUTSIDE_DIA == 7.40
+    assert spec.OUTSIDE_DIA == 8.98
     assert spec.OUTSIDE_DIA_BAND == (0.0, -0.02)
     assert spec.CUTTER_DIA == 44.45
     assert spec.CUTTER_ARBOR_BORE == 22.225
-    assert spec.CUTTER_SKU == "10-289-488"
+    assert spec.CUTTER_SKU == "10-289-487"
     assert part.STOCK_PROFILE is profile
     assert "PROFILE SHIFT" not in spec.GEAR_DATA
     lower, upper = sorted(spec.SPAN_LIMITS)
     assert spec.GEAR_DATA.splitlines()[1:] == [
-        "NUMBER OF TEETH:  12",
+        "NUMBER OF TEETH:  15",
         "DIAMETRAL PITCH:  48.00",
         "PRESSURE ANGLE:  20.0 DEG",
         f"PITCH DIAMETER (mm, REF):  {spec.PITCH_DIA:.2f}",
         f"WHOLE DEPTH (mm, REF):  {spec.WHOLE_DEPTH:.3f}",
-        "CUTTER:  #8, 12-13T",
+        "CUTTER:  #7, 14-16T",
         f"SPAN OVER 2 TEETH:  {lower:.4f}-{upper:.4f}",
-        "MATES WITH:  DISC MHA-PD-06, 120T",
+        "MATES WITH:  DISC MHA-PD-06, 150T",
     ]
 
 
@@ -80,10 +86,12 @@ def test_span_is_actual_finite_contact_and_printed_limits_are_inverted() -> None
         (spec.SPAN_LIMITS[0] - spec.SPAN_NOMINAL, spec.SPAN_LIMITS[1] - spec.SPAN_NOMINAL)
     )
     for setting, tip in ((p.radial_translation_mm, p.blank_radius_mm) for p in spec.manufactured_profiles()):
-        profile = StockFormProfile(12, spec.CUTTER_TEMPLATE, tip, setting)
+        profile = StockFormProfile(spec.TEETH, spec.CUTTER_TEMPLATE, tip, setting)
         assert spec.RADIAL_SETTING_LIMITS[0] <= setting <= spec.RADIAL_SETTING_LIMITS[1]
         actual = profile.tangent_span_mm(2)
-        error = 2 * profile.geometry_error_bound_mm
+        # The mechanics test's convention: the inverted setting limits land
+        # on the printed span within the evaluator error plus a few ulps.
+        error = 2 * profile.geometry_error_bound_mm + 8.0 * math.ulp(spec.SPAN_NOMINAL)
         assert spec.SPAN_LIMITS[0] - error <= actual <= spec.SPAN_LIMITS[1] + error
         a, b = span_contact_points_mm(profile, 2)
         assert math.dist(a, b) == pytest.approx(actual, abs=1e-10)
@@ -93,11 +101,14 @@ def test_span_is_actual_finite_contact_and_printed_limits_are_inverted() -> None
     lo, hi = spec.RADIAL_SETTING_LIMITS
     assert lo < spec.RADIAL_SETTING < hi
     outside = hi + 0.001
-    rejected_span = StockFormProfile(12, spec.CUTTER_TEMPLATE, 3.69, outside).tangent_span_mm(2)
+    tip_min = (spec.OUTSIDE_DIA + min(spec.OUTSIDE_DIA_BAND)) / 2
+    rejected_span = StockFormProfile(
+        spec.TEETH, spec.CUTTER_TEMPLATE, tip_min, outside
+    ).tangent_span_mm(2)
     assert rejected_span > spec.SPAN_LIMITS[1]
     with pytest.raises(ValueError):
         translation_for_tangent_span(
-            12, spec.CUTTER_TEMPLATE, rejected_span, 2,
+            spec.TEETH, spec.CUTTER_TEMPLATE, rejected_span, 2,
             translation_bounds_mm=spec.RADIAL_SETTING_LIMITS,
         )
 
@@ -108,22 +119,34 @@ def test_all_accepted_corners_keep_genuine_finite_ground_tip_in_air() -> None:
         assert math.hypot(*tip) - profile.blank_radius_mm > profile.geometry_error_bound_mm
         assert 2 * profile.root_radius_min_mm >= spec.ROOT_DIA_MIN
         assert profile.root_point(profile.root_half_angle_rad)[0] >= spec.ROOT_DEPTH_X_MIN
-    with pytest.raises(ValueError):
-        replace(spec.STOCK_PROFILE, blank_radius_mm=spec.CUTTER_TEMPLATE.tip_radius_mm + 0.02)
+    # The finite tip is the translated master's support, not the 14T
+    # reference's own tip radius (which this 15T blank already exceeds).
+    support = spec.STOCK_PROFILE.support_radius_max_mm
+    assert spec.CUTTER_TEMPLATE.tip_radius_mm < spec.STOCK_PROFILE.blank_radius_mm < support
+    with pytest.raises(ValueError, match="FINITE cutter support"):
+        replace(spec.STOCK_PROFILE, blank_radius_mm=support + 0.001)
 
 
-def test_front_core_and_actual_rear_terminal_window() -> None:
+def test_front_core_and_journal_clear_the_straight_through_cutter() -> None:
+    # #2034: straight full-depth gaps through the face, no rear endcut; the
+    # cutter runs out over the D-core at F and over the journal at the rear.
     assert spec.FRONT_CORE_AIR_MIN > 0.0
-    assert spec.FULL_DEPTH_MIN >= spec.DISC_REAR_FROM_F_WORST
-    assert spec.CUTTER_RUNOUT_END_WORST < spec.CUTTER_RUNOUT_MAX < spec.HUB_BORE_FROM_F_WORST
-    assert spec.PINION_REAR_Z < spec.CUTTER_RUNOUT_END_Z < spec.HUB_BORE_FROM_F_WORST
-    assert spec.CUTTER_AXIS_R == pytest.approx(
-        spec.CUTTER_DIA / 2 + spec.STOCK_PROFILE.root_point(spec.STOCK_PROFILE.root_half_angle_rad)[0]
+    journal_max = spec.JOURNAL_DIA + max(spec.JOURNAL_DIA_BAND)
+    assert spec.ROOT_DIA_EXACT_MIN > journal_max + spec.TOOTH_SPACE_RUNOUT_TIR_MM
+    assert spec.JOURNAL_CUTTER_AIR_MIN == pytest.approx(
+        (spec.ROOT_DIA_EXACT_MIN - journal_max - spec.TOOTH_SPACE_RUNOUT_TIR_MM) / 2
     )
-    assert spec.CUTTER_AXIS_R != pytest.approx(spec.CUTTER_DIA / 2 + spec.ROOT_DIA / 2)
-    # Negative controls: a larger catalogue disk and an enlarged core are not equivalent.
-    assert spec.FULL_DEPTH_MAX + spec.cutter_runout(2.75 * 25.4, spec.RUNOUT_RISE_WORST) > spec.CUTTER_RUNOUT_MAX
-    assert spec.ROOT_DIA_EXACT_MIN - 5.1 - spec.CORE_TOTAL_RUNOUT - spec.TOOTH_SPACE_RUNOUT_TIR_MM < 0.0
+    assert spec.JOURNAL_CUTTER_AIR_MIN > spec.JOURNAL_CUTTER_AIR_FLOOR
+    for retired in (
+        "FULL_DEPTH", "CUTTER_RUNOUT_MAX", "CUTTER_RUNOUT_END_WORST", "CUTTER_RUNOUT_END_Z",
+        "RUNOUT_RISE_WORST", "CUTTER_AXIS_R", "CUTTER_AXIS_Z", "DISC_REAR_FROM_F_WORST",
+        "HUB_BORE_FROM_F_WORST", "cutter_runout", "endcut_volume_bounds_mm3",
+    ):
+        assert not hasattr(spec, retired), retired
+    # Negative controls: a core enlarged to Ø6.6 and a Ø6.7 journal both
+    # stand in the cutter's path.
+    assert spec.ROOT_DIA_EXACT_MIN - 6.6 - spec.CORE_TOTAL_RUNOUT - spec.TOOTH_SPACE_RUNOUT_TIR_MM < 0.0
+    assert spec.ROOT_DIA_EXACT_MIN - 6.7 - spec.TOOTH_SPACE_RUNOUT_TIR_MM < 0.0
 
 
 def test_real_d_core_thread_and_six_mm_g6_source() -> None:
@@ -176,25 +199,22 @@ def test_neck_corner_radius_band_runs_from_sharp_to_the_maximum() -> None:
     assert spec.FRONT_CORNER_RADIUS + hi == pytest.approx(0.1)
 
 
-def test_complete_nominal_native_volume_uses_bounded_rear_disk_and_true_d() -> None:
-    end_lo, end_hi = spec.endcut_volume_bounds_mm3(absolute_error_mm3=0.05 / spec.TEETH)
-    assert 0.0 < end_lo <= end_hi
+def test_complete_nominal_native_volume_uses_full_face_gaps_and_true_d() -> None:
     lower, upper = spec.expected_volume_bounds_mm3()
     r = spec.CORE_DIA / 2
     h = spec.CORE_FLAT_FROM_AXIS
     flat_removed = (r*r*math.acos(h/r) - h*math.sqrt(r*r-h*h)) * spec.CORE_ACTIVE_LENGTH
-    straight = spec.TEETH * spec.STOCK_PROFILE.gap_area_mm2 * spec.FULL_DEPTH
-    before_end = (
+    turned = (
         math.pi * spec.STOCK_PROFILE.blank_radius_mm**2 * spec.FACE_WIDTH
-        + part.V_STUD + part.V_JOURNAL - flat_removed - straight
+        + part.V_STUD + part.V_JOURNAL - flat_removed
     )
-    assert lower <= before_end - spec.TEETH * (end_lo + end_hi) / 2 <= upper
-    assert upper - lower <= 0.051
-    assert before_end > upper  # omitting the true terminal cannot meet the oracle
-    with pytest.raises(ValueError):
-        spec.endcut_volume_bounds_mm3(full_depth_mm=spec.FACE_WIDTH + 0.1)
-    with pytest.raises(ValueError):
-        spec.endcut_volume_bounds_mm3(profile=replace(spec.STOCK_PROFILE, teeth=13))
+    straight = spec.TEETH * spec.STOCK_PROFILE.gap_area_mm2 * spec.FACE_WIDTH
+    assert lower <= turned - straight <= upper
+    assert upper - lower <= 1e-6
+    # Negative control: the retired straight pass to 4.65, its endcut
+    # omitted, cannot meet the oracle.
+    partial = spec.TEETH * spec.STOCK_PROFILE.gap_area_mm2 * 4.65
+    assert turned - partial > upper
 
 
 def test_every_native_dimension_is_placed_once_with_model_places() -> None:
@@ -206,7 +226,8 @@ def test_every_native_dimension_is_placed_once_with_model_places() -> None:
     assert spec.DRAWING_DIMENSIONS["CoreFlatProfile"] == {"FlatToAxis"}
     assert spec.DRAWING_DIMENSIONS["SpanProfile"] == {"ToothSpan"}
     assert spec.DRAWING_DIMENSIONS["RootInspectionProfile"] == {"RootEnvelope"}
-    assert {"FullDepth", "CutterRunout"} <= spec.DRAWING_DIMENSIONS["StudProfile"]
+    assert not {"FullDepth", "CutterRunout"} & marked
+    assert not {"FullDepth", "CutterRunout"} & set(drawing.SIDE_KEEP)
     assert "RootEnvelope" in drawing.END_KEEP and "ToothSpan" in drawing.END_KEEP
     assert "FlatToAxis" in drawing.SIDE_KEEP
     assert set(drawing.DETAIL_KEEP) == {
@@ -219,7 +240,8 @@ def test_tool_end_limits_print_once_in_the_notes_from_the_spec() -> None:
     # dimension, so note 4 is the one printed owner of both limits.
     lo, hi = spec.CORE_FLAT_CUT_END_LIMITS
     note = spec.CORE_FLAT_TOOL_REACH_NOTE
-    assert f"TOOL END {lo:.2f}-{hi:.2f} FROM 12T FRONT FACE" in note
+    assert f"TOOL END {lo:.2f}-{hi:.2f} FROM {spec.TEETH}T FRONT FACE" in note
+    assert "FROM 15T FRONT FACE" in note
     assert f"R{spec.CORE_FLAT_TOOL_END_RADIUS_MAX:.3f} MAX" in note
     assert "\n" not in note
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
@@ -907,14 +929,21 @@ def test_neck_detail_fails_loud_when_the_crop_takes_a_dimension(monkeypatch) -> 
 
 
 @pytest.mark.parametrize(
-    ("module_name", "volume_check", "pattern"),
+    ("module_name", "volume_check", "pattern", "cut_depth", "cut_drive"),
     [
-        ("build_pd_transgear_knob_shaft", "_native_volume_check", "pattern_stock_feature"),
-        ("build_pd_transgear_feed_pinion", "check_one_solid_body_volume", "pattern_about_z"),
+        (
+            "build_pd_transgear_knob_shaft", "_native_volume_check", "pattern_stock_feature",
+            "FACE_WIDTH", '"FaceWidth"',
+        ),
+        (
+            "build_pd_transgear_feed_pinion", "check_one_solid_body_volume", "pattern_about_z",
+            "FULL_DEPTH", '"FullDepth"',
+        ),
     ],
 )
 def test_straight_stock_pass_bosses_the_blank_then_cuts_one_patterned_gap(
-    monkeypatch: pytest.MonkeyPatch, module_name: str, volume_check: str, pattern: str
+    monkeypatch: pytest.MonkeyPatch, module_name: str, volume_check: str, pattern: str,
+    cut_depth: str, cut_drive: str,
 ) -> None:
     module = importlib.import_module(module_name)
     seat = stub_seat(monkeypatch, module, keep=("_straight_stock_gaps",))
@@ -924,7 +953,8 @@ def test_straight_stock_pass_bosses_the_blank_then_cuts_one_patterned_gap(
     seat.name_last_feature.side_effect = lambda _adapter, name: name
     adapter = offline_adapter()
     seat.attach_mock(adapter, "adapter")
-    asyncio.run(module._straight_stock_gaps(adapter, []))
+    jobs: list[tuple[object, str]] = []
+    asyncio.run(module._straight_stock_gaps(adapter, jobs))
 
     watched = {
         "ensure_fully_defined", "adapter.exit_sketch", "adapter.create_extrusion",
@@ -948,12 +978,13 @@ def test_straight_stock_pass_bosses_the_blank_then_cuts_one_patterned_gap(
     )
     curves = [f"Curve{k}" for k in range(1, len(segments) + 1)]
     assert seat.ensure_fully_defined.call_args_list[1].kwargs["fix_entities"] == curves
-    # A blind boss of the face width, then a blind cut of the full depth,
-    # both from the sketch plane (F): one direction, solid, merged, each
-    # result checked.
+    # A blind boss of the face width, then a blind cut (the knob's through
+    # the whole face, #2034; the feed pinion's to its full depth), both from
+    # the sketch plane (F): one direction, solid, merged, each result checked.
     boss = adapter.create_extrusion.await_args.args[0]
     cut = adapter.create_cut_extrude.await_args.args[0]
-    assert (boss.depth, cut.depth) == (module.FACE_WIDTH, module.FULL_DEPTH)
+    assert (boss.depth, cut.depth) == (module.FACE_WIDTH, getattr(module, cut_depth))
+    assert jobs[-1][1] == cut_drive
     for feature in (boss, cut):
         assert feature.end_condition == "Blind"
         assert feature.start_offset == 0.0
@@ -1004,12 +1035,16 @@ def test_neck_corners_are_equal_tangent_quarter_arcs_with_a_radial_size(
     assert (front, None, "radial", radius) in dimensions
 
 
-def test_cutter_end_is_authored_after_the_turned_profiles_within_its_volume_bounds(
+def test_build_cuts_no_endcut_and_checks_the_full_face_oracle(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # #2034: the straight full-face pass is the only tooth cut; no rear
+    # stock-disk endcut, its witnesses, globals or limits remain.
+    for retired in ("_stock_cutter_endcut", "author_cutter_endcut", "_runout_max_limit"):
+        assert not hasattr(part, retired), retired
     seat = stub_seat(
         monkeypatch, part,
-        spy=("_stud_profile", "_journal_profile", "_revolve_profile", "_stock_cutter_endcut"),
+        spy=("_stud_profile", "_journal_profile", "_revolve_profile"),
     )
     seat._straight_stock_gaps.return_value = part.ToothedDisc(
         1000.0, ("StraightToothGap", "StraightToothPattern")
@@ -1019,36 +1054,26 @@ def test_cutter_end_is_authored_after_the_turned_profiles_within_its_volume_boun
         lambda _adapter, _label, lower, upper, _allowance: (lower + upper) / 2.0
     )
     seat._native_arc.side_effect = lambda _adapter, label, *_points: label
-    endcut = SimpleNamespace(plane="ToolEndPlane", cut="ToolEndCut")
-    seat.author_cutter_endcut.return_value = endcut
     adapter = offline_adapter()
     seat.attach_mock(adapter, "adapter")
     asyncio.run(part.build(adapter))
 
     names = [name for name, _args, _kwargs in seat.mock_calls]
-    authored = names.index("author_cutter_endcut")
-    assert names.index("_stud_profile") < authored
-    assert names.index("_journal_profile") < authored
-    assert seat.author_cutter_endcut.await_args.args[1:] == (
-        part.STOCK_PROFILE, part.CUTTER_DIA, part.FULL_DEPTH
-    )
-    # The seed removes one tooth's end and the pattern TEETH of them, each
-    # within the spec's resolved removal bounds of the volume before it.
-    lower, upper = spec.endcut_volume_bounds_mm3()
-    before = seat._stock_cutter_endcut.call_args.args[1]
-    checks = [
-        args[2:4] for name, args, _kwargs in seat.mock_calls[authored:]
-        if name == "_native_volume_check"
+    assert names.index("_straight_stock_gaps") < names.index("_stud_profile")
+    assert names.index("_stud_profile") < names.index("_journal_profile")
+    assert "pattern_stock_feature" not in names
+    globals_set = [args[1] for name, args, _kwargs in seat.mock_calls if name == "set_global"]
+    assert "FaceWidth" in globals_set
+    assert not {"FullDepth", "CutterRunoutMax"} & set(globals_set)
+    prefixed = [args[2] for name, args, _kwargs in seat.mock_calls if name == "set_dimension_prefix"]
+    assert not {"FullDepth", "CutterRunout"} & set(prefixed)
+    (saved,) = [args for name, args, _kwargs in seat.mock_calls if name == "save_simplified_part"]
+    assert saved[2] == ("StraightToothGap", "StraightToothPattern")
+    # The stud sketch keeps one construction witness, the tooth-tip blank.
+    witnesses = [call.args for call in adapter.add_line.await_args_list]
+    assert witnesses == [
+        (0.0, part.OUTSIDE_DIA / 2.0, -part.FACE_WIDTH, part.OUTSIDE_DIA / 2.0)
     ]
-    assert checks[0] == pytest.approx((before - upper, before - lower))
-    assert checks[1] == pytest.approx(
-        (before - part.TEETH * upper, before - part.TEETH * lower)
-    )
-    (patterned,) = [
-        args for name, args, _kwargs in seat.mock_calls[authored:]
-        if name == "pattern_stock_feature"
-    ]
-    assert patterned[1:3] == (endcut.cut, part.TEETH)
     # Each turned profile is revolved a full turn as its sketch closes, the
     # body named for the profile handed over.
     revolves = []

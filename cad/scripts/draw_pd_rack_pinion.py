@@ -1,9 +1,9 @@
 r"""Create the curated manufacturing drawing for the rack-pinion reduction disc (MHA-PD-06).
 
 Follows the batch gear-drawing pattern (see ``draw_cylinder_gear``). Drawn 1:1;
-the 120 physical teeth use the finite 48DP stock #2/reference-55 master.
+the 150 physical teeth use the finite 48DP stock #1/reference-135 master.
 The face view (``*Front``, the rear face) prints the controlling native
-13-tooth actual-flank span, supported blank and bore with its reamed limits.
+17-tooth actual-flank span, supported blank and bore with its reamed limits.
 The fit note names the MHA-PD-17 hub's spigot, and the native #0-80 tap
 callout carries its unchanged mouth-break and assembly-transfer lines (no
 bolt-circle position). The edge view prints the disc thickness, the front

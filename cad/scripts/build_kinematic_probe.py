@@ -4,8 +4,8 @@ Turning the selected crank sprocket must propagate through the WHOLE feed
 train (paper-drive rework E8 -- every stage a real mate):
 
     selected crank wheel --Belt/Chain tooth ratio--> selected knob wheel
-      --mated--> drive collar --Lock--> knob shaft (its integral 12T gear)
-      --GEAR 12:120--> 120T reducer disc --Lock--> 12T feed pinion
+      --mated--> drive collar --Lock--> knob shaft (its integral 15T gear)
+      --GEAR 15:150--> 150T reducer disc --Lock--> 12T feed pinion
       --rack-pinion (pi * 10.16 / rev)--> platen (the paper feed)
 
 and the roller chain rides both sprockets. This probe opens the saved default-`free`
@@ -21,10 +21,10 @@ about the global Z axis, so their SIGNED Z rotations are compared -- ratio AND s
   * the knob wheel turns the SAME direction as the crank (signed Z angles) --
     a chain couples both
     sprockets the same way; an external gear mate would REVERSE,
-  * the drive collar and the knob shaft (with its integral 12T) turn by the SAME
+  * the drive collar and the knob shaft (with its integral 15T) turn by the SAME
     signed Z angle as the knob wheel (collar mated to wheel, shaft Lock-mated to
     collar -- the whole feed train follows; codex #189 :592),
-  * the GEAR mate turns the disc at 12:120 of the knob shaft spin, reversed (external
+  * the GEAR mate turns the disc at 15:150 of the knob shaft spin, reversed (external
     mesh; ``GEAR_SENSE`` pins the authored alignment),
   * the feed pinion turns WITH the disc (Lock, same axis -- signed compare),
   * the platen translates by ``pi * FEED_PD * (dTheta_feed / 360)``, checked
@@ -89,7 +89,7 @@ CRANK_TOL = 2.0     # deg: the temporary driver must hit DRIVE_DEG on BOTH sides
 # ratio tightly and the same-sense rotation a chain enforces.
 from paper_drive_geom import CHAIN_RATIO  # noqa: E402
 
-GEAR_RATIO = THIRD_TEETH / DISC_TEETH  # 12:120 = 0.1 (the reduction gear mate)
+GEAR_RATIO = THIRD_TEETH / DISC_TEETH  # 15:150 = 0.1 (the reduction gear mate)
 # Chain-stage ratio tolerance, derived from what the probe measures. The ratio
 # is d_knob / d_crank, two axis-angle magnitudes from Transform2 after ONE solve
 # of a LINEAR belt coupling. Live T12/T24 read +30.00 -> +15.00 deg
@@ -110,7 +110,7 @@ LIN_TOL = 0.05      # mm: the 30-deg drive feeds only ~0.133 mm through the 1:20
 # is deterministic per build script; these constants pin it (precedent:
 # 29f1282). They live HERE (not in the build script) so a calibration flip
 # re-runs only verify:kinematics, not the assembly build.
-GEAR_SENSE = -1.0  # sign of (disc Z) / (knob shaft Z): external 12:120 mesh
+GEAR_SENSE = -1.0  # sign of (disc Z) / (knob shaft Z): external 15:150 mesh
 # FEED_SIGN is PINNED by the physical tooth contact observed in live SW
 # (2026-07-07 drag test: the original platen-axis-referenced mate fed the
 # paper BACKWARD at this constant's old -1 value, every magnitude passing).
@@ -282,7 +282,7 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
     # SENSE of the coupling, invisible to the magnitude compares.
     z_crank = _rel_z_angle_deg(_rot(adapter, crank_wheel), base_R[crank_wheel])
     z_knob = _rel_z_angle_deg(_rot(adapter, knob_wheel), base_R[knob_wheel])
-    # The collar, the knob shaft (integral 12T), the disc and the feed pinion
+    # The collar, the knob shaft (integral 15T), the disc and the feed pinion
     # also spin about global Z -> their SIGNED rotations are meaningful (the
     # senses the collar, gear and rack-pinion mates enforce), like the sprockets'.
     z_collar = _rel_z_angle_deg(_rot(adapter, collar), base_R[collar])
@@ -326,7 +326,7 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
                 f"{nm} turned Z {zv:+.2f} deg, expected {z_knob:+.2f} (knob wheel) "
                 "-- the knob stack did not follow the feed (codex #189 :592)"
             )
-    # (3) The GEAR mate reduces the cluster spin 12:120 into the disc, SIGNED
+    # (3) The GEAR mate reduces the cluster spin 15:150 into the disc, SIGNED
     # (an external mesh reverses; GEAR_SENSE pins the authored alignment). The
     # expected disc angle is small (1.5 deg for a 30-deg crank), so the
     # tolerance is proportionally tight -- a dropped/mis-ratioed mate fails.
@@ -355,7 +355,7 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
             f"{z_feed:+.2f}/360) -- rack broken or feed direction REVERSED")
     # (6) End-to-end cross-check: the whole train must feed at the documented
     # NET law from the selected mounted train, SIGNED through the
-    # full chain (same-sense chain -> reversing 12:120 mesh -> pinned rack
+    # full chain (same-sense chain -> reversing 15:150 mesh -> pinned rack
     # sense): d_platen = FEED_SIGN * GEAR_SENSE * NET * z_crank / 360. Any
     # single reversal anywhere in the train flips the sign and fails HERE even
     # if a pairwise constant above were miscalibrated to match it (2026-07-07
@@ -383,8 +383,8 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
         f"  knob  {removable.KNOB_CONFIG} {d_knob:6.2f} deg  (belt/chain, ratio "
         f"{chain_ratio:.3f} = {removable.CRANK_TEETH}:{removable.KNOB_TEETH}, same-sense)\n"
         f"  collar      {z_collar:+6.2f} deg  (mated to knob wheel, signed)\n"
-        f"  knob shaft  {z_shaft:+6.2f} deg  (Lock to collar, integral 12T, signed)\n"
-        f"  120T disc   {z_disc:+6.2f} deg  (gear mate 12:120, signed)\n"
+        f"  knob shaft  {z_shaft:+6.2f} deg  (Lock to collar, integral {THIRD_TEETH}T, signed)\n"
+        f"  {DISC_TEETH}T disc   {z_disc:+6.2f} deg  (gear mate {THIRD_TEETH}:{DISC_TEETH}, signed)\n"
         f"  feed pinion {z_feed:+6.2f} deg  (Lock to disc, signed)\n"
         f"  platen      {d_platen:+7.3f} mm  (rack-pinion, pi*{FEED_PD:.2f}/rev;"
         f" NET {NET_RACK_TRAVEL_PER_CRANK_REV:.3f}/crank-rev)\n"

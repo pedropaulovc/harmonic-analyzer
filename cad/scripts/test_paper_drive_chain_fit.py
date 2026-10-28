@@ -20,7 +20,7 @@ def _selected(side: int = 1) -> physical.ChainFit:
 
 
 def test_selected_count_is_the_same_single_source_as_the_visual() -> None:
-    assert sprocket.CHAIN_LINK_COUNT == 68
+    assert sprocket.CHAIN_LINK_COUNT == 66
     assert visual.LINK_COUNT == sprocket.CHAIN_LINK_COUNT
     assert visual.LINK_PITCH == sprocket.CHAIN_PITCH
     knob, crank = physical.source_nominal_chain_centres_mm()

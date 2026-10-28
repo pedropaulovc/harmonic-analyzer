@@ -387,6 +387,8 @@ def solve_chain_fit(knob_centre: Point, crank_centre: Point, *,
 
     # Sample one tooth either side of the tangent and neighbouring allocations.
     # This finite search reports its scope rather than claiming all phases.
+    # Wraps reach two teeth either way, nearest first: at the 15:150 knob axis
+    # (#2034) the reverse-taut 66-link cycle lies outside a one-tooth window.
     phase_offsets = [0.0]
     phase_offsets.extend(sign * step_a * j / 48.0 for j in range(1, 49) for sign in (-1.0, 1.0))
     best_air = -math.inf
@@ -412,8 +414,8 @@ def solve_chain_fit(knob_centre: Point, crank_centre: Point, *,
                     continue
                 phase_a = frame_angle + alpha - math.pi / na
                 phase_b = frame_angle + beta - math.pi / nb
-                for seated_a in (nominal_a, nominal_a - 1, nominal_a + 1):
-                    for seated_b in (nominal_b, nominal_b - 1, nominal_b + 1):
+                for seated_a in (nominal_a, nominal_a - 1, nominal_a + 1, nominal_a - 2, nominal_a + 2):
+                    for seated_b in (nominal_b, nominal_b - 1, nominal_b + 1, nominal_b - 2, nominal_b + 2):
                         slack_count = count - tight - seated_a - seated_b
                         if min(seated_a, seated_b, slack_count) < 2:
                             continue
@@ -487,7 +489,7 @@ def solve_chain_fit(knob_centre: Point, crank_centre: Point, *,
                                          max(point[1] for point in pins) + half_height))
     raise ChainSearchUnqualified(f"UNQUALIFIED: no {count}-link pinned cycle found on 97 phase samples "
                      "(alpha +/-1 knob pitch, step=knob pitch/48; beta +/-1 crank pitch; "
-                     "tangent tight/wrap counts +/-1) "
+                     "tangent tight count +/-1, wrap counts +/-2) "
                      f"for centres {knob_centre}, {crank_centre}; "
                      f"necessary taut-length lower bound {bound:.6f} mm, available {count * pitch:.6f} mm, "
                      f"best examined root-to-tip roller air {best_air:.6f} mm, "

@@ -1,8 +1,8 @@
-r"""MHA-PD-17 transgear-disc-hub: the brass hub and flange in front of the 120T disc.
+r"""MHA-PD-17 transgear-disc-hub: the brass hub and flange in front of the reducer disc.
 
 The retained Ø13.2 turned hub has an H7 bore matching the pinion sleeve's
 (MHA-PD-10) h6 boss and drives through its D-flat, with a Ø25.1 × 2.4 flange
-and a Ø13.1 h6 rear spigot.  The spigot passes the 120T disc's (MHA-PD-06)
+and a Ø13.1 h6 rear spigot.  The spigot passes the reducer disc's (MHA-PD-06)
 bore, which pilots on it, and its end seats on the sleeve's step face (the
 12T's tooth ends); the flange's rear face clamps the disc's front face, the
 spigot's length ahead of the step.  Three #0-80 fillister screws (MHA-PD-VN-55)

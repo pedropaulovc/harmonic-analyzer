@@ -2,7 +2,7 @@ r"""Purchased transgear disc screw: McMaster 91794A055, 18-8 stainless (x3).
 
 #0-80 x 1/4 slotted fillister, fully threaded (contract §2.6, ruling 4).
 Each screw passes the brass hub's flange clearance hole (MHA-PD-17) and
-threads into a #0-80 through tap in the 120T disc (MHA-PD-06).  CUT TO FIT
+threads into a #0-80 through tap in the reducer disc (MHA-PD-06).  CUT TO FIT
 at assembly (R9-47): each tip is cut TIP_BELOW_REAR_FACE under the disc's
 rear face and the cut end broken, so the part is modelled as installed:
 CUT_LENGTH long with a CUT_END_BREAK_MAX 45 deg break.

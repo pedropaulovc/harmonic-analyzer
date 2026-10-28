@@ -1,10 +1,10 @@
-r"""The hub-flange ↔ 120T disc joint: three #0-80 disc screws on one circle,
+r"""The hub-flange ↔ reducer-disc joint: three #0-80 disc screws on one circle,
 and the hub's spigot the disc pilots on.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` import.  The one
 authority for what two parts cut and must agree on: the brass hub's flange
 (MHA-PD-17, ``transgear_disc_hub_spec``) carries the Ø1.7 clearance holes and
-the 120T disc (MHA-PD-06, ``rack_pinion_spec``) the #0-80 taps; the three
+the reducer disc (MHA-PD-06, ``rack_pinion_spec``) the #0-80 taps; the three
 91794A055 fillister screws (MHA-PD-VN-55) join them on a Ø19 circle, the
 smallest that keeps the disc's taps 2.0 clear of its Ø13.1 bore at the worst
 case (``rack_pinion_spec`` checks it; the heads stand 1.5 clear of the
