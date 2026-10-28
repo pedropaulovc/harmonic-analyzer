@@ -5,10 +5,11 @@ pin, pressed through a Ø1.6 hole match-drilled through cup and journal at
 assembly (not modelled); its front face runs behind the arm plate's rear
 boss, the rear stop of the knob's end float (``pd_transgear_knob_cup_spec``).
 
-Layout: one turned half-profile on the Front plane, revolved about local +Y:
-the O.D. and the length are its driving dimensions.  The front face is the
-Top Plane (y = 0), the rear face y = LENGTH. The reamed Ø6 H7 bore is cut
-through the full length from a Top-plane circle.  ``Axis1`` is the cup axis
+Layout: one turned half-section on the Front plane, revolved about local +Y:
+the ring from the reamed Ø6 H7 bore out to the O.D., so the O.D., the bore
+and the length are its driving dimensions and all three print on the
+drawing's axial section.  The front face is the Top Plane (y = 0), the rear
+face y = LENGTH.  ``Axis1`` is the cup axis
 (Front Plane ∩ Right Plane).  The paper-drive assembly mates ``Axis1`` to the
 knob shaft's axis and the Top Plane to the shaft's cup-face station.
 
@@ -38,7 +39,6 @@ from _sketch import (
     ensure_fully_defined,
     set_sketch_direct_db,
 )
-from _sketch_circle import define_circle
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import (
@@ -69,10 +69,7 @@ V_BORE = math.pi * BORE_R**2 * LENGTH
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import (
-        ExtrusionParameters,
-        RevolveParameters,
-    )
+    from solidworks_mcp.adapters.base import RevolveParameters
 
     check("create_part", await adapter.create_part())
 
@@ -88,17 +85,18 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Turned half-profile about local +Y: front face, O.D., rear face, back
-    # down the axis.
+    # Turned half-section about local +Y: front face, O.D., rear face, then
+    # back along the reamed bore, so the bore's Ø is a profile dimension that
+    # prints on the axial section beside the O.D. (rule 11).
     profile = SketchDims()
     check("create_sketch cup profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     axis = check("cup axis", await adapter.add_centerline(0.0, 0.0, 0.0, LENGTH))
     points = [
-        (0.0, 0.0),
+        (BORE_R, 0.0),
         (CUP_R, 0.0),
         (CUP_R, LENGTH),
-        (0.0, LENGTH),
+        (BORE_R, LENGTH),
     ]
     lines = await add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
@@ -113,7 +111,13 @@ async def build(adapter) -> dict[str, str]:
     check(
         "cup axis vertical", await adapter.add_sketch_constraint(axis, None, "vertical")
     )
-    await anchor_point_to_origin(adapter, f"{lines[0]}.start", 0.0, 0.0, "cup origin")
+    await anchor_point_to_origin(adapter, f"{axis}.start", 0.0, 0.0, "cup axis origin")
+    check(
+        "cup front face on the Top plane",
+        await adapter.add_sketch_constraint(
+            f"{lines[0]}.start", "origin", "horizontal_points"
+        ),
+    )
     await add_diametric_linear_dimension(
         adapter, axis, lines[1], (CUP_R + 4.0, LENGTH / 2.0), "CupDia"
     )
@@ -123,41 +127,24 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_dimension(lines[1], None, "linear", LENGTH),
     )
     profile.record("CupLength", '"CupLength"')
+    check(
+        "cup axis length",
+        await adapter.add_sketch_dimension(axis, None, "linear", LENGTH),
+    )
+    profile.record("AxisLength", '"CupLength"')
+    await add_diametric_linear_dimension(
+        adapter, axis, lines[3], (BORE_R - 1.5, LENGTH / 2.0), "BoreDia"
+    )
+    profile.record("BoreDia", '"BoreDia"')
     await ensure_fully_defined(adapter, "cup profile")
     check("exit_sketch cup profile", await adapter.exit_sketch())
     name_last_feature(adapter, "CupProfile")
     drive_jobs += profile.apply(adapter, "CupProfile")
     check("revolve cup", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "CupBody")
-    await volume_check(adapter, "turned cup body", V_BODY, 0.005 * V_BODY)
+    await volume_check(adapter, "turned cup ring", V_BODY - V_BORE, 0.01 * V_BORE)
     await bbox_extent_check(adapter, "cup length", "y", LENGTH)
     await bbox_extent_check(adapter, "cup O.D.", "x", OD)
-
-    # Reamed through bore on the cup axis: the slide on the journal.
-    bore = SketchDims()
-    check("create_sketch cup bore", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter,
-        0.0,
-        0.0,
-        BORE_R,
-        "cup reamed bore",
-        dims=bore,
-        names=("BoreCx", "BoreCz", "BoreDia"),
-        drives=(None, None, '"BoreDia"'),
-    )
-    await ensure_fully_defined(adapter, "cup bore sketch")
-    check("exit_sketch cup bore", await adapter.exit_sketch())
-    name_last_feature(adapter, "BoreProfile")
-    drive_jobs += bore.apply(adapter, "BoreProfile")
-    check(
-        "cut cup bore",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=LENGTH, reverse_direction=True)
-        ),
-    )
-    name_last_feature(adapter, "ThroughBore")
-    await volume_check(adapter, "cup through bore", V_BODY - V_BORE, 0.01 * V_BORE)
 
     # The mate axis: the first reference axis, so it is Axis1.
     cup_axis = await name_bore_axis(
@@ -178,7 +165,7 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreDia", *deviations(BORE_BAND)
+        adapter, "CupProfile", "BoreDia", *deviations(BORE_BAND)
     )
     # Every other printed dimension is governed by its places (the spec's
     # DRAWING_PRECISION): no model band.

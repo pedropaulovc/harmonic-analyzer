@@ -136,15 +136,17 @@ SURFACE_FINISHES = (
 )
 
 # Marked model dimensions and the places the model authors on them
-# (drawing-simplicity-policy.md `How the repository implements the guidelines`).  The turned profile carries the O.D.
-# and the length; the bore is its own feature.
+# (drawing-simplicity-policy.md `How the repository implements the guidelines`).  The turned profile carries the O.D.,
+# the bore and the length, so all three print on the axial section (rule 11).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "CupProfile": {"CupDia", "CupLength"},
-    "BoreProfile": {"BoreDia"},
+    "CupProfile": {"CupDia", "CupLength", "BoreDia"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "CupProfile": {"CupDia": OD_PLACES, "CupLength": LENGTH_PLACES},
-    "BoreProfile": {"BoreDia": BORE_PLACES},
+    "CupProfile": {
+        "CupDia": OD_PLACES,
+        "CupLength": LENGTH_PLACES,
+        "BoreDia": BORE_PLACES,
+    },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
