@@ -58,7 +58,7 @@ def test_actual_stock_master_and_real_printed_span_family():
     assert shaft.ROOT_DIA_MIN <= shaft.ROOT_DIA_EXACT_MIN
     assert shaft.ROOT_DIA_MIN == 6.60
     # The disc's convention: the finite tip vector at the lowest accepted
-    # setting caps the blank, by a thin positive margin.
+    # setting caps the blank; the margin is the 0.01 floor's remainder.
     assert shaft.CUTTER_SUPPORT_MARGIN_MIN > 0.0
     assert shaft.CUTTER_SUPPORT_MARGIN_MIN == pytest.approx(1.32789629217811e-4, abs=1e-9)
     # Negative control: a blank 0.001 over the printed tip limit is unsupported.
@@ -67,6 +67,18 @@ def test_actual_stock_master_and_real_printed_span_family():
         support.support_radius_max_mm - support.geometry_error_bound_mm
         - (shaft.OUTSIDE_DIA + max(shaft.OUTSIDE_DIA_BAND) + 0.001) / 2.0
     ) < 0.0
+    # Same construction as the disc: both blanks are the floored support.
+    for spec in (shaft, shaft.DISC):
+        lowest = spec._MIN_SETTING_SUPPORT
+        floored = math.floor(
+            (
+                2.0 * lowest.support_radius_max_mm
+                - 2.0 * lowest.geometry_error_bound_mm
+                - spec.OUTSIDE_DIA_BAND[0]
+            )
+            * 100.0
+        ) / 100.0
+        assert spec.OUTSIDE_DIA == floored
 
 
 def test_actual_pin_is_supported_at_every_manufactured_corner():

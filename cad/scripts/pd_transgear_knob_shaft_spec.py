@@ -502,6 +502,28 @@ CUTTER_SUPPORT_MARGIN_MIN = (
 )
 if CUTTER_SUPPORT_MARGIN_MIN <= 0.0:
     raise AssertionError("the accepted blank leaves the finite ground cutter support")
+# OUTSIDE_DIA is the disc's floor rule (pd_rack_pinion_spec.OUTSIDE_DIA):
+# the support diameter at the lowest accepted setting, less the numerical
+# error and the + tip band, floored to the printed 0.01. Its margin is that
+# floor's remainder by construction (here 0.13 um radial, the disc's 1.35);
+# the gate claims containment, not clearance. The model support is the
+# reference count's own tip circle, which the stock master must form to cut
+# that standard gear, so the real ground form reaches at least this far.
+# Inlined: the span limits that fix the lowest setting are built from
+# OUTSIDE_DIA, so deriving it upstream would be circular.
+_FLOOR_RULE_OUTSIDE_DIA = math.floor(
+    (
+        2.0 * _MIN_SETTING_SUPPORT.support_radius_max_mm
+        - 2.0 * _MIN_SETTING_SUPPORT.geometry_error_bound_mm
+        - OUTSIDE_DIA_BAND[0]
+    )
+    * 10.0**OUTSIDE_DIA_PLACES
+) / 10.0**OUTSIDE_DIA_PLACES
+if OUTSIDE_DIA != _FLOOR_RULE_OUTSIDE_DIA:
+    raise AssertionError(
+        f"the {TEETH}T blank Ø{OUTSIDE_DIA} is not the floored cutter support "
+        f"Ø{_FLOOR_RULE_OUTSIDE_DIA} (the disc's tip rule)"
+    )
 
 
 def gear_bearing_area_lower(profile: StockFormProfile, inner_radius: float) -> float:
