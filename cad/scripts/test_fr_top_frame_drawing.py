@@ -5339,6 +5339,36 @@ def test_build_places_the_hanger_section_on_the_underside_sheet() -> None:
     assert "imported_annotations += hanger_dimensions" in underside
 
 
+def test_datum_c_and_the_ream_size_meet_the_rear_ream_apart() -> None:
+    # Machinist review of 3de09b959 (sheet 6, #2045) and farm run
+    # 20261027T030041319Z: with datum C's tag above the plan, the size's open
+    # arrowhead ended inside datum C's filled triangle on the ~1.1 mm rear
+    # circle.  The triangle's 2.9 mm base overhangs the rim on both sides, so
+    # the two must leave the rim at least a right angle apart: datum C drops
+    # to the lower rim, under F-F's cutting line, into the window clear of
+    # F-F's right arrow and letter; the size leaves the upper.
+    from _layout_geometry import segment_box_distance
+
+    ink = drawing.INK_CLEARANCE
+    lines, boxes, picks, cut_y = _underside_locator_ink()
+    hole_x, hole_y, _hole_r = _locator_circles()["+X ream C"]
+    x, y = drawing.HANGER_PIN_DIA_TEXT_XY
+    foot = (x - drawing.HANGER_PIN_DIA_TEXT_WIDTH / 2.0, y - drawing.HANGER_PIN_DIA_TEXT_HALF_HEIGHT)
+    datum = (picks["C"][0] - hole_x, picks["C"][1] - hole_y)
+    size = (foot[0] - hole_x, foot[1] - hole_y)
+    assert datum[0] * size[0] + datum[1] * size[1] <= 0.0
+    assert picks["C"][1] < cut_y < foot[1]
+    leader, tag = lines["datum C leader"], boxes["datum C tag"]
+    arrow, letter = lines["F-F right arrow"], boxes["F-F right letter"]
+    assert _segment_gap(leader, arrow) >= ink
+    assert segment_box_distance(arrow, tag) >= ink
+    assert segment_box_distance(leader, letter) >= ink
+    assert _box_box_gap(
+        (tag.xmin, tag.ymin, tag.xmax, tag.ymax),
+        (letter.xmin, letter.ymin, letter.xmax, letter.ymax),
+    ) >= ink
+
+
 def test_hanger_callout_states_drill_thru_on_the_native_rows(monkeypatch) -> None:
     """The plain wizard's native callout keeps its variable-driven diameter
     and states DRILL THRU in place of its one extent token (user ruling

@@ -768,9 +768,11 @@ HANGER_SECTION_CAPTION_XY = (0.120, 0.031)
 # the plan either crosses datum C's leader or shares the rear frame's
 # landing from above.  So datum C's leader leaves the rear +X ream DOWNWARD,
 # opposite the size's, as the front -X ream's frame and knockout leaders do.
-# Its tag box stands 5.3 mm under F-F's right letter and 2.3 mm right of it; the
-# leader passes 3.6 mm left of that letter and 8 mm left of the cutting-plane
-# arrow, and the front frame's leader passes 4.3 mm under the tag's box.
+# Its tag box stands 6.3 mm under F-F's right letter and 2.4 mm right of it
+# (2.8 mm even on the locator-ink model's conservative box, which reserves
+# 7 mm above the point: #2045's test); the leader passes 3.9 mm left of that
+# letter and 7.5 mm left of the cutting-plane arrow, and the front frame's
+# leader passes 3.4 mm under the tag's box.
 # Datum B's leader leaves the front +X ream DOWNWARD too, to its tag under
 # the plan: any leader from that ream to the right crosses the land-end
 # dimension's bar-face extension line (x 109.17 mm, y 144..174), which runs
@@ -779,7 +781,7 @@ HANGER_SECTION_CAPTION_XY = (0.120, 0.031)
 # land-end dimension line, and its tag box stands 6.5 mm under that line's
 # extension lines and 2 mm under the land-end text's jog.
 _HUB_BOTTOM_M_PER_MM = HUB_BOTTOM_SCALE[0] / HUB_BOTTOM_SCALE[1] / 1000.0
-HANGER_DATUM_SYMBOL_XY = {"B": (0.103, 0.134), "C": (0.117, 0.201)}
+HANGER_DATUM_SYMBOL_XY = {"B": (0.103, 0.134), "C": (0.117, 0.200)}
 # Each +X ream is 1.06 mm across at 1:3, its rim 1.1 mm (sheet) inside
 # the crossbar's +X edge, so the rim is hit-tested zoomed onto a 5 mm square
 # (draw_ch_rocker_arm's pivot-bore datum precedent), where the pick aperture
