@@ -294,6 +294,30 @@ def _cap_witness_lines(
         raise RuntimeError(f"{name}: maximum witness-line length did not persist")
 
 
+_DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
+# Outside, the -X hole's arrows ran 1.2 mm from the locator callout's line
+# ends (run 20261028T000816580Z, layout audit arrow-near-text); its 21.8 mm
+# span holds both arrows under its value.
+PLAN_ARROWS_INSIDE = ("ScrewHoleX1",)
+
+
+def _arrows_inside(adapter: Any, annotations: list[Any], names: tuple[str, ...]) -> None:
+    """Draw each named dimension's arrows inside its witness lines, read back."""
+    for name in names:
+        found = [
+            annotation for annotation in annotations
+            if dimension_name(adapter, annotation) == name
+        ]
+        if len(found) != 1:
+            raise RuntimeError(f"expected one {name} to draw arrows inside, found {len(found)}")
+        display = _early_bound(
+            _early_bound(found[0], "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension"
+        )
+        display.ArrowSide = _DIM_ARROWS_INSIDE
+        if int(display.ArrowSide) != _DIM_ARROWS_INSIDE:
+            raise RuntimeError(f"{name} did not keep its arrows inside its witness lines")
+
+
 def _locator_callout() -> str:
     """The locating holes' callout, citing the MHA-PD-00 match-drill steps."""
     located = assembly_steps.step_number("arm-plate-located")
@@ -775,6 +799,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, plan_annotations, PLAN_CALLOUTS_ABOVE, location="above"
     )
+    _arrows_inside(adapter, plan_annotations, PLAN_ARROWS_INSIDE)
     if not auto_center_marks(adapter, plan, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME centre marks to the plan view")
     bore_finish_xy = _sheet_xy(adapter, plan, BORE_FINISH_MODEL, "bore finish symbol")
