@@ -16,6 +16,7 @@ import draw_pd_transgear_knob_thrust_ring as drawing
 import pd_transgear_knob_thrust_ring_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND, STACK_NAME
 
 
 def test_required_drawing_paths() -> None:
@@ -73,6 +74,7 @@ def test_the_banded_length_names_the_stack_it_serves() -> None:
     assert spec.LENGTH_TOL < _printed_tolerance.printed_band_mm(spec.LENGTH_PLACES)
     assert spec.DIMENSION_CALLOUTS["Ring"] == {"RingLength": spec.LENGTH_CALLOUT}
     assert shaft in spec.LENGTH_CALLOUT and plate in spec.LENGTH_CALLOUT
+    assert STACK_NAME in spec.LENGTH_CALLOUT
 
 
 def test_the_drawing_reads_the_callouts_back_and_never_writes_them() -> None:
@@ -99,7 +101,7 @@ def test_ring_bore_and_opposed_axial_faces_consume_the_new_interface() -> None:
     assert spec.ID == pytest.approx(6.05)
     assert spec.ID_BAND == pytest.approx((0.10, 0.0))
     assert spec.LENGTH == pytest.approx(5.2)
-    assert spec.LENGTH_TOL == pytest.approx(0.05)
+    assert spec.LENGTH_TOL == pytest.approx(PRINTED_LENGTH_BAND) == pytest.approx(0.02)
     assert part.V_RING == pytest.approx(
         math.pi * ((spec.OD / 2.0) ** 2 - (spec.ID / 2.0) ** 2) * spec.LENGTH
     )

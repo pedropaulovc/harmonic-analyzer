@@ -47,7 +47,7 @@ from _sketch import (
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
 from _drawing_prefix import set_dimension_prefix
 from _simplified_part import save_simplified_part
 from _sketch_circle import define_circle
@@ -82,6 +82,7 @@ from pd_transgear_knob_shaft_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     FACE_WIDTH,
+    FACE_WIDTH_BAND,
     FRONT_RELIEF_DIA,
     FRONT_RELIEF_WIDTH,
     FRONT_CORNER_RADIUS,
@@ -709,6 +710,8 @@ async def build(adapter: Any) -> dict[str, str]:
         lower_volume, upper_volume, 0.005 * V_JOURNAL,
     )
 
+    # The 15T's face width: a disc-cluster stack term at the cluster's band.
+    set_dimension_symmetric_tolerance(adapter, "GearBlank", "FaceWidth", FACE_WIDTH_BAND)
     set_dimension_bilateral_tolerance(
         adapter, "StudProfile", "CoreDia", *deviations(CORE_DIA_BAND)
     )

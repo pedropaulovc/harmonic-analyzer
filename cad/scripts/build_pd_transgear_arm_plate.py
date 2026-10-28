@@ -94,6 +94,7 @@ from pd_transgear_arm_plate_geometry import (
     END_R,
     HUB_DIA,
     HUB_FACE_TO_MOUNTING,
+    HUB_FACE_TO_MOUNTING_BAND,
     HUB_FACE_Z,
     HUB_LENGTH,
     HUB_TO_BOSS,
@@ -911,6 +912,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_symmetric_tolerance(
         adapter, "BearingProfile", "HubToBoss", HUB_TO_BOSS_TOLERANCE
+    )
+    # The hub face station: a disc-cluster stack term at the cluster's band.
+    set_dimension_symmetric_tolerance(
+        adapter, "BearingProfile", "HubFaceToMounting", HUB_FACE_TO_MOUNTING_BAND
     )
     for index in (1, 2):
         set_dimension_bilateral_tolerance(

@@ -72,20 +72,18 @@ SEQUENCE: tuple[str, ...] = (
     "pin-pressed",
     "hanger-pivoted",
     # Disc cluster, on the bench (R9-68: the disc on the sleeve's seat
-    # shoulder, the hub's D-bore on its D-flat; R9-8, R9-9). The hub is then
-    # faced to stand inside transgear_cluster_fit.HUB_NOSE_WINDOW behind the
-    # sleeve nose, so the front bushing bears on the steel nose and traps the
-    # hub and disc against the shoulder.
+    # shoulder, the hub's D-bore on its D-flat; R9-8, R9-9). Hub and bushings
+    # are printed lengths (#2038 owner ruling 2026-10-28; transgear_cluster_fit):
+    # nothing in the cluster is faced at assembly.
     # Centre and seat the disc to the sleeve's actual running-bore datum
     # before transfer-spotting; lock, re-indicate every space, then match-mark.
     "disc-cluster-assembled",
-    "hub-faced-to-nose",
     "disc-taps-transferred",
     # R9-47: tips flush to 0.20 below the disc's rear face, cut ends broken
     # (pd_vn_transgear_disc_screw_spec.TIP_BELOW_REAR_FACE, CUT_END_BREAK_MAX).
     "disc-screws-cut",
     "oil-hole-drilled",
-    # R9-68: on the pin between the two bushing blanks, the ring last.
+    # R9-68: on the pin between the two bushings, as made, the ring last.
     "disc-cluster-hung",
     # Knob stack, front to rear (contract §1). R9-70 (N-A): the collar's pilot
     # faced on the bench to stand proud of every removable wheel, the
@@ -106,11 +104,6 @@ SEQUENCE: tuple[str, ...] = (
     "loaded-rack-geometry-checked",
     # Chain fit-up (contract §13.2 procedure (2)-(8)).
     "fitup-pose-set",
-    # R9-68: in that pose, the MHA-PD-25 front bushing faced to m (the F-to-disc
-    # window, cluster forward), then the MHA-PD-24 rear bushing faced to the
-    # cluster's float (transgear_cluster_fit).
-    "front-bushing-faced-to-fit",
-    "rear-bushing-faced-to-fit",
     # The D-collar's rear face is fitted on the actual gear front F; the
     # thumbnut reacts through pilot, collar and F.
     "collar-rear-faced-to-fit",

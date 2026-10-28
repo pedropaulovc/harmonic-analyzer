@@ -1,8 +1,7 @@
 r"""Create the manufacturing drawing for the transgear rear bushing (MHA-PD-24).
 
-A turned brass ring: Ø9.0 O.D. over a reamed Ø3.900 bore, faced to fit at
-assembly, so its modelled 6.0 length prints as a REFERENCE under the
-fit-at-assembly callout and the MHA-PD-00 step that sets it.  The profile lies
+A turned brass ring: Ø9.0 O.D. over a reamed Ø3.900 bore, its length printed
+to the disc cluster stack's band under the stack callout.  The profile lies
 as it sits in the lathe (axis horizontal): the ``*Top`` view turned a quarter
 turn, so model +Z runs LEFT and the arm face (z 0) is the profile's right
 end, the sleeve face its left end.  Each end face carries its running
@@ -42,11 +41,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import (
-    assert_imported_precision,
-    set_dimension_callouts,
-    set_reference_dimension,
-)
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -58,7 +53,6 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from diagnostics.drawing_layout_audit import collect_document
-from pd_paper_drive_assembly_steps import step_ref
 from pd_transgear_rear_bushing_spec import (
     BORE_CALLOUT,
     BORE_DIA,
@@ -87,7 +81,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø9 x 6 ring: 5:1 keeps the three sizes, the fit callout and both face
+# A Ø9 x 6 ring: 5:1 keeps the three sizes, the stack callout and both face
 # finishes legible on the landscape sheet.
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
@@ -105,10 +99,6 @@ _PROFILE_SLEEVE_X = PROFILE_CENTER[0] - LENGTH * _S / 2.0  # z LENGTH, left end
 _PROFILE_TOP = PROFILE_CENTER[1] + OD * _S / 2.0
 _PROFILE_BOTTOM = PROFILE_CENTER[1] - OD * _S / 2.0
 
-# Faced to fit at MHA-PD-00's rear-bushing step (the float); the pointer comes
-# from the step registry.
-FIT_STEP_KEY = "rear-bushing-faced-to-fit"
-
 # The bore stays on the end view, where it is a circle: a reamed through
 # hole, fully defined by its callout (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)), it needs no section, and the
 # profile is hidden-lines-removed (a dimension never lands on a hidden line).
@@ -119,9 +109,9 @@ END_KEEP = {
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
-    "RingLength": f"{LENGTH_CALLOUT},\nPER {step_ref(FIT_STEP_KEY)}",
+    "RingLength": LENGTH_CALLOUT,
 }
-# The length under the profile.  Its four-line reference block is wider
+# The length under the profile.  Its three-line block is wider
 # than the 6.0 between its extension lines, so it stands off to the right,
 # under the O.D. dimension, where no extension line runs through it.  The
 # O.D. sits right of the part, its dimension line far enough out that the arm
@@ -147,7 +137,6 @@ FACE_FINISHES = {
         (_PROFILE_ARM_X + 0.014, PROFILE_CENTER[1] - 0.008),
     ),
 }
-NOTES_XY = (0.020, 0.075)
 ISO_NOTE_XY = (0.315, 0.145)
 # Text over ink, an extension line through its own text and a mark printed
 # twice are defects; leader crossings stay logged.
@@ -269,7 +258,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
         required=(
@@ -277,7 +265,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
@@ -291,7 +278,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Transgear Rear Bushing Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "transgear cluster rear bushing; turned brass, faced to fit",
+            3: "transgear cluster rear bushing; turned brass",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -348,17 +335,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # and the bore's band are authored on the part; the sheet only proves the
     # import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    # Faced to fit at assembly: the modelled length prints as a REFERENCE
-    # value and the callout under it is the requirement; the blank it is
-    # faced from is the Manufacturing Notes' make-to size.
-    length_annotations = [
-        annotation
-        for annotation in profile_annotations
-        if dimension_name(adapter, annotation) == "RingLength"
-    ]
-    if len(length_annotations) != 1:
-        raise RuntimeError("profile does not carry exactly one bushing length")
-    set_reference_dimension(adapter, length_annotations[0], label="bushing length")
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     _mark_bore_axis(adapter, end)
     # The turning axis, picked on the O.D. face above it.
@@ -383,7 +359,6 @@ async def build(adapter: Any) -> dict[str, str]:
             char_height=0.0025,
         )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     rebuild_drawing(adapter, label="rear bushing layout audit")
     _assert_layout_clean(

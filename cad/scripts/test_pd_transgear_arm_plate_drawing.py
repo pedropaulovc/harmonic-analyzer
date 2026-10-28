@@ -24,6 +24,7 @@ from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dime
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fit_deviations import deviations
 from _printed_tolerance import printed_deviations
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND
 
 
 def _band(places: int) -> float:
@@ -112,8 +113,14 @@ def test_the_explicit_bands_are_the_bore_the_knob_float_and_the_hole_positions()
     assert model_toleranced_dimensions(part) == {
         ("LocatorProfile", "f'LocatorDia{index}'"): "*deviations(LOCATOR_HOLE_BAND_MM)",
         ("BearingProfile", "HubToBoss"): "HUB_TO_BOSS_TOLERANCE",
+        ("BearingProfile", "HubFaceToMounting"): "HUB_FACE_TO_MOUNTING_BAND",
         ("BoreProfile", "BoreDia"): "*deviations(BORE_BAND)",
     }
+    # The hub station is a disc-cluster stack term: it prints the cluster's
+    # band and names the collar air it sets (rule 4).
+    assert geometry.HUB_FACE_TO_MOUNTING_BAND == PRINTED_LENGTH_BAND
+    assert "COLLAR AIR" in " ".join(drawing.SECTION_CALLOUTS["HubFaceToMounting"].split())
+    assert spec.DRAWING_PRECISION_BY_NAME["HubFaceToMounting"] == 3
     # The H7 bore prints its sourced limits; zero lower deviation is intentional.
     lower, upper = deviations(spec.BORE_BAND)
     assert (lower, upper) == geometry.BORE_DIA_LIMITS
@@ -611,15 +618,22 @@ def test_section_stations_are_a_baseline_from_the_mounting_face() -> None:
 
 def test_each_stacked_callout_fits_its_rows_and_witness_lines() -> None:
     """A callout's lines stand under its value, above the next row's text,
-    and between the dimension's own witness lines."""
+    and between the dimension's own witness lines.  SOLIDWORKS centres the
+    value-and-callout block on its position (run 20261028T111221004Z: a third
+    callout line raised the hub station's value into the hub-to-boss line)."""
     keep = drawing.SECTION_KEEP
+
+    def half_height(name: str) -> float:
+        lines = len(drawing.SECTION_CALLOUTS.get(name, "").splitlines())
+        return 0.9 + lines * _LINE_MODEL / 2.0
+
     for name, below, (left, right) in (
         ("HubFaceToMounting", "NotchDepth", (geometry.HUB_FACE_Z, 0.0)),
         ("HubToBoss", "HubFaceToMounting", (geometry.HUB_FACE_Z, geometry.BOSS_FACE_Z)),
     ):
         text = drawing.SECTION_CALLOUTS[name]
-        bottom = keep[name][1] - 1.0 - len(text.splitlines()) * _LINE_MODEL
-        assert bottom - (keep[below][1] + 0.9) >= 0.5, name
+        bottom = keep[name][1] - half_height(name)
+        assert bottom - (keep[below][1] + half_height(below)) >= 0.5, name
         half = _half_width_model("X" * max(map(len, text.splitlines())))
         assert left + 0.5 < keep[name][2] - half, name
         assert keep[name][2] + half < right - 0.5, name
@@ -705,7 +719,9 @@ def test_each_projected_zone_is_a_chain_line_from_face_a() -> None:
     first, last = drawing.SCREW_SECTION_LINE_MODEL
     assert first[0] < geometry.EDGE_MINUS_X < geometry.EDGE_PLUS_X < last[0]
     assert spec.DRAWING_REFERENCE_PRECISION == {"KnobZone": 1, "ScrewZone": 1}
-    assert f"{spec.KNOB_ZONE_HEIGHT:.1f}" == "40.6"
+    # The chain plane's lower limit narrows with the disc cluster's ±0.02
+    # stack terms (#2038), so K's projected height is 40.3, not 40.6.
+    assert f"{spec.KNOB_ZONE_HEIGHT:.1f}" == "40.3"
     assert f"{spec.SCREW_ZONE_HEIGHT:.1f}" == "7.0"
 
 

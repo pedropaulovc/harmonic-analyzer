@@ -12,8 +12,8 @@ import pytest
 import _config
 import build_pd_transgear_front_bushing as part
 import draw_pd_transgear_front_bushing as drawing
-import pd_paper_drive_assembly_steps as steps
 import transgear_cluster_fit as fit
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND, STACK_NAME
 import pd_transgear_disc_hub_spec as hub
 import pd_transgear_front_bushing_spec as spec
 import pd_transgear_pin_spec as pin
@@ -38,7 +38,8 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.END_KEEP) | set(drawing.PROFILE_KEEP) == marked
     assert not set(drawing.END_KEEP) & set(drawing.PROFILE_KEEP)
-    assert spec.REFERENCE_DIMENSIONS == {"RingLength"} < set(drawing.PROFILE_KEEP)
+    assert spec.REFERENCE_DIMENSIONS == frozenset()
+    assert "RingLength" in drawing.PROFILE_KEEP
 
 
 def test_the_chamfer_prints_a_max_the_ring_never_reaches() -> None:
@@ -52,16 +53,13 @@ def test_the_chamfer_prints_a_max_the_ring_never_reaches() -> None:
     assert drawing.DIMENSION_CALLOUTS["FrontChamferSize"].strip() == "X 45 DEG"
 
 
-def test_only_the_bore_carries_a_model_band() -> None:
+def test_the_bore_and_the_printed_length_carry_model_bands() -> None:
     """The bore runs on the pin, so its reamed band lives on the model
-    dimension.  The length is faced to fit at assembly: the model's is the
-    nominal fit, never a toleranced make-to size."""
+    dimension; the length is a printed term of the disc cluster stack."""
     assert model_toleranced_dimensions(part) == {
         ("RingProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)",
+        ("Ring", "RingLength"): "LENGTH_BAND",
     }
-    fitted = f"{spec.LENGTH:.2f}"
-    assert fitted not in spec.DRAWING_NOTES
-    assert fitted not in drawing.DIMENSION_CALLOUTS["RingLength"]
 
 
 def test_the_bore_runs_on_the_pin_and_names_it() -> None:
@@ -127,36 +125,29 @@ def test_the_unchanged_bushing_bears_on_the_smaller_d_flat_sleeve_nose() -> None
     )
     bearing_area = math.pi * (nose_r**2 - inner_r**2) - removed_cap
     assert bearing_area > 0.0
-    assert fit.HUB_NOSE_WINDOW[0] >= 0.0
+    assert fit.RECESS_RANGE[0] >= 0.0
 
 
-def test_every_accepted_part_set_is_faced_from_the_blank() -> None:
-    """The bushing is faced to the m it sets; the blank is long enough to
-    face to the longest fit with one finishing cut left."""
-    assert spec.GAP_MIN == fit.FRONT_BUSHING_FITTED_MIN
-    assert spec.GAP_MAX == fit.FRONT_BUSHING_FITTED_MAX
-    assert spec.GAP_MIN <= spec.LENGTH <= spec.GAP_MAX
-    assert spec.BLANK_LENGTH_MIN >= spec.GAP_MAX + spec.FACING_ALLOWANCE - 1e-9
-    # R9-68: the spigot on the step moves the window to 4.18-5.88 (the
-    # step-to-nose chain); m read with hub and disc forward on the bushing
-    # adds the hub's recess behind the nose, 5.98, so the blank is 6.10.
-    assert (spec.GAP_MIN, spec.GAP_MAX) == pytest.approx((4.1767, 5.9783), abs=1e-4)
-    assert spec.BLANK_LENGTH_MIN == pytest.approx(6.10)
-    assert f"{spec.BLANK_LENGTH_MIN:.2f} MIN" in spec.DRAWING_NOTES
+def test_the_length_is_a_printed_term_of_the_disc_cluster_stack() -> None:
+    """#2038: printed 2 places, +/-0.02, named on the stack; nothing is faced
+    to fit, set at assembly or supplied as a blank."""
+    assert spec.LENGTH == fit.FRONT_BUSHING_LENGTH
+    assert spec.LENGTH_BAND == fit.LENGTH_BAND == PRINTED_LENGTH_BAND
+    assert spec.LENGTH_PLACES == fit.LENGTH_PLACES == 2
+    assert spec.DRAWING_PRECISION_BY_NAME["RingLength"] == 2
+    assert "RingLength" not in spec.REFERENCE_DIMENSIONS
     callout = drawing.DIMENSION_CALLOUTS["RingLength"]
-    assert f"{spec.GAP_MIN:.2f}-{spec.GAP_MAX:.2f}" in callout
-    assert "FACED TO FIT" in callout
-
-
-def test_the_length_callout_points_at_the_front_bushing_step() -> None:
-    """m is set first, cluster forward, so the front bushing's step precedes
-    the rear bushing's, and the sheet's pointer follows any renumbering."""
-    assert drawing.FIT_STEP_KEY == "front-bushing-faced-to-fit"
-    assert steps.step_number(drawing.FIT_STEP_KEY) < steps.step_number(
-        "rear-bushing-faced-to-fit"
+    assert callout == spec.LENGTH_CALLOUT
+    assert STACK_NAME in callout
+    sources = (
+        Path(drawing.__file__).read_text(encoding="utf-8"),
+        Path(part.__file__).read_text(encoding="utf-8"),
     )
-    callout = drawing.DIMENSION_CALLOUTS["RingLength"]
-    assert callout.endswith(f"PER {steps.step_ref(drawing.FIT_STEP_KEY)}")
+    for text in (*drawing.DIMENSION_CALLOUTS.values(), *sources):
+        for banned in ("FACED TO FIT", "SET AT ASSEMBLY", "SUPPLY", "step_ref"):
+            assert banned not in text
+    assert not hasattr(drawing, "FIT_STEP_KEY")
+    assert not hasattr(spec, "DRAWING_NOTES")
 
 
 def test_the_bore_and_both_end_faces_run_machined() -> None:
@@ -179,11 +170,9 @@ def test_the_bore_and_both_end_faces_run_machined() -> None:
     ) == ((0.0, 0.0, 1.0), spec.LENGTH)
 
 
-def test_each_face_symbol_names_its_thrust_mate_and_the_faced_end() -> None:
+def test_each_face_symbol_names_its_thrust_mate() -> None:
     """Machinist review: an end-face Ra 1.6 with no stated function reads as
-    over-specification, and FACED TO FIT must say which end.  Each face's
-    symbol names the part it thrusts on; the faced end is named both at its
-    symbol and on the fitted-length callout."""
+    over-specification.  Each face's symbol names the part it thrusts on."""
     targets = {
         control.key: control.production_method for control in spec.SURFACE_FINISHES
     }
@@ -194,16 +183,6 @@ def test_each_face_symbol_names_its_thrust_mate_and_the_faced_end() -> None:
     assert names(targets["nose_face"], hub.SLEEVE_NUMBER)
     assert names(targets["ring_face"], pin.RING_NUMBER)
     assert pin.RING_NUMBER == _config.parts("pd-vn-transgear-retaining-ring")["number"]
-    assert "REAR" in targets["nose_face"]
-    assert "REAR" not in targets["ring_face"]
-    # The facing instruction itself names the rear end, never the front.
-    facing = [
-        line
-        for line in drawing.DIMENSION_CALLOUTS["RingLength"].splitlines()
-        if "FACED TO FIT" in line
-    ]
-    assert len(facing) == 1
-    assert "REAR" in facing[0] and "FRONT" not in facing[0]
 
 
 def test_face_symbols_attach_to_their_own_end_of_the_lathe_profile() -> None:
@@ -243,7 +222,7 @@ def test_the_bore_finish_lands_on_the_bore_circle_clear_of_the_od() -> None:
 
 
 def test_sheet_text_stays_short() -> None:
-    for text in (spec.DRAWING_NOTES, *drawing.DIMENSION_CALLOUTS.values()):
+    for text in drawing.DIMENSION_CALLOUTS.values():
         lines = text.splitlines()
         assert len(lines) <= 4
         assert all(len(line) <= 70 for line in lines)
@@ -297,6 +276,5 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
     _drawing_marks.apply_drawing_properties(None, part.PART_NAME, extra)
     carried.update(stamped)
     assert [name for name in required if not str(carried.get(name) or "").strip()] == []
-    assert carried["Manufacturing Notes"] == spec.DRAWING_NOTES
     assert carried["Isometric View Note"] == spec.ISOMETRIC_VIEW_NOTE
     assert set(part._SAVED_DRAWING_PROPERTIES) <= set(required)

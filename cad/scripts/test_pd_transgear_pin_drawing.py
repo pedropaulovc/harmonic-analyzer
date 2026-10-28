@@ -18,6 +18,7 @@ from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dime
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND, STACK_NAME
 
 
 def test_required_drawing_paths() -> None:
@@ -44,16 +45,18 @@ def test_every_marked_dimension_prints_once_with_model_places() -> None:
     }
 
 
-def test_only_the_shank_and_the_ring_groove_carry_model_bands() -> None:
-    """The turned shank (running fit and arm press) and the groove's
-    catalogue Ø and width carry native bands; the groove station prints .XXX,
-    the head land and the tip apex's station .XX, and every other size its
-    places under the title block."""
+def test_only_the_shank_the_ring_groove_and_its_station_carry_model_bands() -> None:
+    """The turned shank (running fit and arm press), the groove's catalogue
+    Ø and width, and the groove station (a disc-cluster stack term) carry
+    native bands; the head land and the tip apex's station print .XX, and
+    every other size its places under the title block."""
     assert model_toleranced_dimensions(part) == {
         ("PinProfile", "ShankDia"): "*deviations(DIA_BAND)",
         ("PinProfile", "GrooveDia"): "*deviations(GROOVE_DIA_BAND)",
         ("PinProfile", "GrooveWidth"): "*deviations(GROOVE_WIDTH_BAND)",
+        ("PinProfile", "GrooveStation"): "GROOVE_STATION_BAND",
     }
+    assert spec.GROOVE_STATION_BAND == PRINTED_LENGTH_BAND
     assert spec.DRAWING_PRECISION_BY_NAME["ShankDia"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["GrooveStation"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["TipDomeZ"] == 2
@@ -66,10 +69,9 @@ def test_the_front_land_holds_the_wall_floor_at_the_worst_case() -> None:
     bound).  ENFORCE run 20261024T034648173Z: the land's end at the tip
     dome's junction cannot be picked up, so the tip apex prints from the
     head seat and the land is a reference.  Its worst case is then the apex
-    at its printed lower limit, the load wall at its upper, and the deepest
+    at its printed lower limit, the load wall at its ±band's upper, and the deepest
     dome the R2.0's .X band allows on the shank: a hemisphere."""
     tip_places = spec.DRAWING_PRECISION_BY_NAME["TipDomeZ"]
-    wall_places = spec.DRAWING_PRECISION_BY_NAME["GrooveStation"]
     dome_r_places = spec.DRAWING_PRECISION_BY_NAME["TipDomeR"]
     # At R2.0 -0.8 the sphere is smaller than the rim: the deepest real dome
     # on the largest shank is the hemisphere.
@@ -79,7 +81,7 @@ def test_the_front_land_holds_the_wall_floor_at_the_worst_case() -> None:
     lower = (
         round(spec.TIP_STATION, tip_places)
         - printed_band_mm(tip_places)
-        - (spec.GROOVE_STATION + printed_band_mm(wall_places))
+        - (spec.GROOVE_STATION + spec.GROOVE_STATION_BAND)
         - spec.DIA_MAX / 2.0
     )
     assert spec.FRONT_LAND_MIN == pytest.approx(lower)
@@ -196,20 +198,14 @@ def test_the_functional_station_runs_from_the_head_seat_to_the_load_wall() -> No
 
 
 def test_the_three_place_station_names_the_stack_it_sets() -> None:
-    """Rule 4: a .XXX size with a function names it.  The front bushing is
-    faced to fit over the station's band."""
+    """Rule 4: the station's ±band names the disc cluster stack it serves."""
     import transgear_cluster_fit as fit
 
     callout = _below("GrooveStation")
     assert callout == callouts.GROOVE_STATION_CALLOUT
-    assert "LOAD WALL" in callout and spec.FRONT_BUSHING_NUMBER in callout
+    assert "LOAD WALL" in callout and STACK_NAME in callout
     assert spec.DRAWING_PRECISION_BY_NAME["GrooveStation"] == 3
-    assert (
-        "MHA-PD-23 groove station",
-        spec.GROOVE_STATION,
-        spec.GROOVE_STATION_BAND,
-        1,
-    ) in fit.FRONT_CHAIN_TERMS
+    assert fit.GS[1:] == (spec.GROOVE_STATION, spec.GROOVE_STATION_BAND)
 
 
 def test_the_dome_heights_and_the_overall_print_as_references() -> None:

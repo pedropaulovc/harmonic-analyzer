@@ -3,10 +3,10 @@ r"""MHA-PD-25 transgear-front-bushing: the brass thrust ring in front of the clu
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  A turned brass ring on the MHA-PD-23 pin between the MHA-PD-10
 sleeve's nose (steel: the hub never thrusts, R9-5) and the MHA-PD-VN-61 retaining
-ring.  It is faced to fit at assembly, after the MHA-PD-17 hub's front face is
-faced to stand ``transgear_cluster_fit.HUB_NOSE_WINDOW`` behind the nose,
-until m reads ``transgear_cluster_fit.FIT_WINDOW`` with the cluster, hub and
-disc pushed forward (step 1 of the fit-up there).  It runs free on the pin;
+ring.  Its length is printed (#2038 owner ruling 2026-10-28: nothing in the
+disc cluster is faced to fit): ``transgear_cluster_fit.FRONT_BUSHING_LENGTH``
+sets, with the cluster forward, the collar-to-disc air (``pd_cluster_air``).
+It runs free on the pin;
 both faces bear.  Its Ø12 rear face reaches over the hub's front face, so the
 bushing, held by the ring, traps hub and disc against the sleeve's step
 face (the hub's spigot seats on it).  The ring's Ø7.16 O.D. bears inside
@@ -20,6 +20,7 @@ retaining ring); the chamfer is on the z = LENGTH edge.
 from __future__ import annotations
 
 import transgear_cluster_fit as FIT
+from pd_cluster_stack_band import STACK_NAME
 import pd_transgear_disc_hub_spec as HUB
 import pd_transgear_pin_spec as PIN
 import pd_vn_transgear_retaining_ring_spec as RING
@@ -70,30 +71,21 @@ if HUB_FACE_OVERLAP_WORST < HUB_FACE_OVERLAP_MIN:
         f"past its bore, under {HUB_FACE_OVERLAP_MIN}"
     )
 
-# --- Fitted length ---------------------------------------------------------------
-GAP_MIN = FIT.FRONT_BUSHING_FITTED_MIN
-GAP_MAX = FIT.FRONT_BUSHING_FITTED_MAX
-LENGTH = FIT.FRONT_BUSHING_MODEL
-
-FACING_ALLOWANCE = 0.10
-BLANK_LENGTH_MIN = 6.10
-if BLANK_LENGTH_MIN < GAP_MAX + FACING_ALLOWANCE - 1e-9:
-    raise AssertionError(
-        f"MHA-PD-25 blank {BLANK_LENGTH_MIN:.2f} MIN leaves no {FACING_ALLOWANCE} "
-        f"facing allowance over the {GAP_MAX:.3f} longest fit"
-    )
-
-# The rear face (z 0, the unchamfered end) is the one faced, so the chamfer
-# survives the fit; the callout and the rear face's finish symbol both name it.
-LENGTH_CALLOUT = f"SET AT ASSEMBLY {GAP_MIN:.2f}-{GAP_MAX:.2f}\nREAR FACE FACED TO FIT"
-DRAWING_NOTES = f"SUPPLY {BLANK_LENGTH_MIN:.2f} MIN LONG."
+# --- Length: printed (#2038 owner ruling 2026-10-28, option A) --------------------
+# With the cluster forward it sets F to the disc's front face (m), so the
+# drive collar's air to the disc: a term of the disc cluster's printed stack.
+LENGTH = FIT.FRONT_BUSHING_LENGTH  # 5.32
+LENGTH_BAND = FIT.LENGTH_BAND
+LENGTH_PLACES = FIT.LENGTH_PLACES
+# Rule 4: the band names the stack it serves and what it sets.
+LENGTH_CALLOUT = f"{STACK_NAME},\nSETS COLLAR TO DISC AIR"
 
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the bore runs on the pin and both faces bear, so all three carry
 # the machined grade, the bore as the sleeve's bore on the same pin does.
 # The bushing runs free between the turning MHA-PD-10 sleeve's nose and the
 # MHA-PD-VN-61 ring on the pin, so either face may slip under the cluster's
 # thrust: each face's symbol names its mate (rule 7, say why).
-REAR_FACE_TARGET = f"REAR FACE, THRUST ON {HUB.SLEEVE_NUMBER}"
+REAR_FACE_TARGET = f"THRUST ON {HUB.SLEEVE_NUMBER}"
 FRONT_FACE_TARGET = f"THRUST ON {PIN.RING_NUMBER}"
 SURFACE_FINISHES = (
     SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),
@@ -120,7 +112,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "RingProfile": {"RingOd": OD_PLACES, "BoreDia": BORE_PLACES},
-    "Ring": {"RingLength": 1},
+    "Ring": {"RingLength": LENGTH_PLACES},
     "FrontChamfer": {"FrontChamferSize": FRONT_CHAMFER_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -130,7 +122,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked MHA-PD-25 dimension needs authored places")
-REFERENCE_DIMENSIONS = frozenset({"RingLength"})
+REFERENCE_DIMENSIONS: frozenset[str] = frozenset()
 
 ISOMETRIC_VIEW_SCALE = (4, 1)
 ISOMETRIC_VIEW_NOTE = (

@@ -732,7 +732,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_transgear_disc_hub",  # MHA-PD-17 brass hub: D-bore on the sleeve's D-flat, plain flange clearance holes for the disc screws; trapped between the seat shoulder and the front bushing, no thread
         "pd_transgear_drive_collar",  # MHA-PD-22: matching D-bore on the knob shaft, reamed drive-pin holes; no thread
         "pd_transgear_feed_pinion",  # MHA-PD-10 shifted 12T 32DP PA20 sleeve: plain bore on the pin, D-flat keying the hub's D-bore; no thread
-        "pd_transgear_front_bushing",  # MHA-PD-25 brass bushing faced to fit, reamed bore on the pin; no thread
+        "pd_transgear_front_bushing",  # MHA-PD-25 brass bushing, printed length, reamed bore on the pin; no thread
         "pd_transgear_knob_cup",  # MHA-PD-16: reamed through bore, cross-pinned to the journal at assembly; no thread
         "pd_transgear_knob_thrust_ring",  # MHA-PD-15 loose brass ring, drilled bore; no thread
         "pd_vn_transgear_latch_pin",  # MHA-PD-VN-58 1/8 dowel pressed into the arm's reamed end-face hole
@@ -743,7 +743,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_vn_cylinder_bank_spring",  # MHA-DT-VN-68 wave spring loose on the MHA-DT-13 arbor; no thread
         "ch_vn_rocker_bank_spring",  # MHA-CH-VN-54 wave spring loose on the MHA-CH-05 shaft; no thread
         "pd_transgear_pin",  # MHA-PD-23 plain steel pin pressed into the arm's reamed hole, ring groove at the front; no thread
-        "pd_transgear_rear_bushing",  # MHA-PD-24 brass bushing faced to fit, reamed bore on the pin; no thread
+        "pd_transgear_rear_bushing",  # MHA-PD-24 brass bushing, printed length, reamed bore on the pin; no thread
         "pd_transgear_removable",  # O12 plain bore + 2 drive-pin holes, no thread (build_pd_transgear_removable)
         "pd_vn_transgear_retaining_ring",  # MHA-PD-VN-61 external retaining ring (McMaster 97431A260) in the pin's groove
         "pd_vn_transgear_knob_drive_pin",  # MHA-PD-VN-54 dowel pressed into plain holes, no thread

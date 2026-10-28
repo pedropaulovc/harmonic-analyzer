@@ -12,9 +12,9 @@ fit, the bushings and the paper-drive assembly import.
 from __future__ import annotations
 
 import pd_vn_transgear_retaining_ring_spec as RING
+from pd_cluster_stack_band import STACK_NAME
 from pd_transgear_pin_spec import (
     ARM_NUMBER,
-    FRONT_BUSHING_NUMBER,
     PRESS_INTERFERENCE,
     RING_NUMBER,
     RUNNING_MATES,
@@ -42,9 +42,9 @@ SHANK_CALLOUT = "\n".join(
         f"RUNS IN {', '.join(RUNNING_MATES)}",
     )
 )
-# The .XXX station names the stack it sets: the front bushing is faced to
-# fit over its band (``transgear_cluster_fit``).
-GROOVE_STATION_CALLOUT = f"TO RING LOAD WALL;\nSETS {FRONT_BUSHING_NUMBER} FACED LENGTH"
+# The .XXX ±band station names the stack it serves (rule 4): a term of the
+# disc cluster's printed stack (``transgear_cluster_fit.GS``).
+GROOVE_STATION_CALLOUT = f"TO RING LOAD WALL;\n{STACK_NAME}"
 
 # lane -> (feature, dimension) -> text.
 CALLOUTS: dict[int, dict[tuple[str, str], str]] = {

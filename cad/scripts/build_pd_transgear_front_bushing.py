@@ -1,9 +1,8 @@
 r"""Reproduction script: transgear front bushing (MHA-PD-25; R9-68; 1 used).
 
 The turned brass ring on the MHA-PD-23 pin between the MHA-PD-10 sleeve's nose
-and the MHA-PD-VN-61 retaining ring (``pd_transgear_front_bushing_spec``).  It is
-faced to fit at assembly for m, and the model is the bushing as fitted to
-parts at their nominals.
+and the MHA-PD-VN-61 retaining ring (``pd_transgear_front_bushing_spec``).  Its
+length is printed (+/-LENGTH_BAND, a term of the disc cluster stack, #2038).
 
 Layout: Front-plane annulus at the origin (O.D., bore) extruded +Z by the
 length, so the nose face is the Front Plane (z = 0) and the ring face is the
@@ -40,7 +39,10 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _drawing_tolerances import (
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
@@ -49,13 +51,13 @@ from pd_transgear_front_bushing_spec import (
     BORE_DIA,
     BORE_DIA_BAND,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     FRONT_CHAMFER,
     FRONT_CHAMFER_BAND,
     FRONT_CHAMFER_TOL_TYPE,
     ISOMETRIC_VIEW_NOTE,
     LENGTH,
+    LENGTH_BAND,
     OD,
     SURFACE_FINISHES,
 )
@@ -67,7 +69,6 @@ _SAVED_DRAWING_PROPERTIES = (
     "Material Specification",
     "Finish",
     "Quantity",
-    "Manufacturing Notes",
     "Isometric View Note",
 )
 
@@ -206,11 +207,12 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     # The bore runs on the pin: its reamed band lives on the model dimension.
-    # The length is faced to fit at assembly: no band on the model; the sheet
-    # prints it as a reference under its callout.  The chamfer prints its MAX.
+    # The length is printed to the disc cluster stack's band.  The chamfer
+    # prints its MAX.
     set_dimension_bilateral_tolerance(
         adapter, "RingProfile", "BoreDia", *deviations(BORE_DIA_BAND)
     )
+    set_dimension_symmetric_tolerance(adapter, "Ring", "RingLength", LENGTH_BAND)
     _chamfer_max_limit(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
@@ -220,12 +222,7 @@ async def build(adapter) -> dict[str, str]:
     # extruded -Z would have no +Z face at z = LENGTH and refuse here.
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
+        adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)

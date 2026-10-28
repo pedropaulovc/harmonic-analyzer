@@ -26,6 +26,7 @@ from __future__ import annotations
 import math
 
 from _printed_tolerance import printed_band_mm
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND
 
 SCREW_THREAD = "#0-80"
 # MHA-PD-VN-55, McMaster 91794A055 (_mcmaster_91794a055 sizes it).
@@ -46,13 +47,14 @@ if len(SCREW_ANGLES_DEG) != SCREW_COUNT:
 # H7 bore, preserving the disc pilot and screw-to-bore wall envelope. The
 # sleeve-matched hub bore may be smaller without changing this outer pilot.
 # Its length runs from the flange's rear face to its end on the sleeve's
-# step, printed .XXX.
+# step: a term of the disc cluster's printed stack (transgear_cluster_fit),
+# printed .XXX at the cluster's band (#2038 owner ruling 2026-10-28).
 SPIGOT_DIA = 13.1
 SPIGOT_DIA_BAND = (0.0, -0.011)  # (upper, lower) deviations, h6
 SPIGOT_DIA_PLACES = 3
 SPIGOT_LENGTH = 3.65
 SPIGOT_LENGTH_PLACES = 3
-SPIGOT_LENGTH_BAND = printed_band_mm(SPIGOT_LENGTH_PLACES)
+SPIGOT_LENGTH_BAND = PRINTED_LENGTH_BAND
 
 
 def screw_centres() -> tuple[tuple[float, float], ...]:

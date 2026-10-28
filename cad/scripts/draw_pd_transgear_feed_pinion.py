@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from collections.abc import Sequence
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -130,7 +131,8 @@ ISO_CENTER = (0.367, 0.214)
 # (bottom ~78 mm); a caption names it, hung centred below the view's
 # measured outline (run 12: at a fixed point it overlapped the outline by
 # 2.4 mm; the outline runs 6 mm past the tip circle).
-REAR_CENTER = (0.165, 0.046)
+# 2 mm lower than run 12 left room for the tooth length's stack row above.
+REAR_CENTER = (0.165, 0.044)
 # The end view sees the rear face too; the caption names the end by its
 # feature (2026-10-27 ENFORCE review, r1, r3: "REAR FACE" named no end).
 REAR_CAPTION = "VIEW FROM GEAR END"
@@ -220,9 +222,12 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
     # outside view's outline struck its last row).
     "FlatToAxis": (_NOSE_X + 0.006, _SIDE_BOTTOM - 0.0079),
     "BoreDia": (_REAR_X - 0.010, _SIDE_TOP + 0.040),
-    "FaceWidth": (_left_of(_REAR_X, _FACE_WIDTH_TEXT_WIDTH), _SIDE_BOTTOM - 0.0069),
-    "FlatEnd": (_left_of(_REAR_X, _FLAT_END_TEXT_WIDTH), _SIDE_BOTTOM - 0.0218),
-    "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0392),
+    # The tooth length's band and its second callout row (the disc cluster
+    # stack) make it a three-row text, centred on its point: every row stands
+    # 3 mm lower than with the bare tooth length.
+    "FaceWidth": (_left_of(_REAR_X, _FACE_WIDTH_TEXT_WIDTH), _SIDE_BOTTOM - 0.0099),
+    "FlatEnd": (_left_of(_REAR_X, _FLAT_END_TEXT_WIDTH), _SIDE_BOTTOM - 0.0278),
+    "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0452),
 }
 
 # The outside view: the *Left view looks along +X, the section's direction of
@@ -232,12 +237,20 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
 # below it with their texts left of its rear face, and its caption stands
 # left of it above them.  Its tangent edges are hidden.  It is not projected
 # from any view, so its caption names its direction (codjiflo P2 on
-# 65a022125): it shows the side section B-B shows, uncut.
+# 65a022125): it shows the side section B-B shows, uncut.  It is cropped
+# (below), so its caption names it PARTIAL and a break line closes the boss
+# stub at the crop (2026-10-28 ENFORCE review, r1, r2: with neither, the
+# 13.80 MAX's extension line landed past the drawn end and the view read as
+# the whole part).
 # It stands 4 mm higher than the uncropped view did, so the full depth's
 # extra row (the rack it covers) stays above the title block.
 LEFT_CENTER = (0.373, 0.116)
-LEFT_CAPTION = "OUTSIDE VIEW\nSAME SIDE AS B-B"
-_LEFT_CAPTION_WIDTH = 0.047  # its longer row, as the drawing test estimates
+LEFT_CAPTION = "PARTIAL\nOUTSIDE VIEW\nSAME SIDE AS B-B"
+# Its longest row.  Only 48 mm stand between the 27.35 overall's extension
+# line (sheet x 271.0) and the view's box (x 322.2): one row "PARTIAL
+# OUTSIDE VIEW" printed 49.4 mm wide (farm runs 20261028T064402620Z and
+# 070655020Z struck or overlapped one of them), so PARTIAL takes its own row.
+_LEFT_CAPTION_WIDTH = 0.047
 TANGENT_EDGES_HIDDEN = 0  # swDisplayTangentEdges_e.swTangentEdgesHidden
 _LEFT_REAR_X = LEFT_CENTER[0] - OVERALL_LENGTH / 2.0 * VIEW_SCALE[0] / 1000.0
 _LEFT_BOTTOM = LEFT_CENTER[1] - HALF_OD
@@ -246,14 +259,42 @@ _LEFT_BOTTOM = LEFT_CENTER[1] - HALF_OD
 # 20261027T032128736Z..054041865Z drew one tooth-space line of the facing
 # gap on to the boss to ~15.3 mm, where the part has no edge (its STL holds
 # no vertex on the boss between 13.6 and 16.6 mm), and the review read it
-# as a run-out past the 13.80 MAX (r1, r2).
-OUTSIDE_CROP_Z = CUTTER_RUNOUT_MAX + 0.1
+# as a run-out past the 13.80 MAX (r1, r2).  The crop stands 0.2 mm past
+# the MAX (0.6 mm on the sheet), so the break line drawn on it stays
+# distinct from the MAX's extension line, which lands on the boss stub
+# between the step and the break.
+OUTSIDE_CROP_Z = CUTTER_RUNOUT_MAX + 0.2
 OUTSIDE_CROP_FENCE = (
     _LEFT_REAR_X - 0.004,
     _LEFT_BOTTOM - 0.004,
     _LEFT_REAR_X + OUTSIDE_CROP_Z * VIEW_SCALE[0] / 1000.0,
     LEFT_CENTER[1] + HALF_OD + 0.004,
 )
+# The long-break line on the crop (draw_fr_nameplate's SECTION_BREAK): thin,
+# across the Ø8.2 boss and past both its outlines, with its Z on the side of
+# the axis away from the facing gap's floor, so the 13.80 MAX's extension
+# line, which drops from that floor to its row below the view, never meets
+# it.  Model (radial y, axial z) in mm; the view prints model +Y up.
+_BREAK_OVERRUN = 0.35
+_BREAK_Z_MID_Y = 2.0
+_BREAK_Z_HALF_HEIGHT = 0.3
+_BREAK_Z_TIP = 0.15
+OUTSIDE_BREAK = (
+    (-(BOSS_DIA / 2.0 + _BREAK_OVERRUN), OUTSIDE_CROP_Z),
+    (_BREAK_Z_MID_Y - _BREAK_Z_HALF_HEIGHT, OUTSIDE_CROP_Z),
+    (_BREAK_Z_MID_Y - _BREAK_Z_HALF_HEIGHT / 2.0, OUTSIDE_CROP_Z - _BREAK_Z_TIP),
+    (_BREAK_Z_MID_Y + _BREAK_Z_HALF_HEIGHT / 2.0, OUTSIDE_CROP_Z + _BREAK_Z_TIP),
+    (_BREAK_Z_MID_Y + _BREAK_Z_HALF_HEIGHT, OUTSIDE_CROP_Z),
+    (BOSS_DIA / 2.0 + _BREAK_OVERRUN, OUTSIDE_CROP_Z),
+)
+
+
+def _outside_sheet_xy(radial_y: float, axial_z: float) -> tuple[float, float]:
+    """A model (y, z) point of the outside view on the sheet."""
+    s = VIEW_SCALE[0] / 1000.0
+    return (_LEFT_REAR_X + axial_z * s, LEFT_CENTER[1] + radial_y * s)
+
+
 _FULL_DEPTH_TEXT_WIDTH = 0.0601
 _CUTTER_TEXT_WIDTH = 0.0418
 LEFT_KEEP: dict[str, tuple[float, float]] = {
@@ -343,7 +384,7 @@ BORE_FIT_ATTACH = (
 )
 # The section's native caption, placed by its top centre, sits below the
 # stacked lengths, the overall's two-row callout the lowest.
-SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0515)
+SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0548)
 # The finish stands lower LEFT of the end view: when the section line's
 # arrows and their "B" labels pointed right, toward the section, a
 # lower-right leader ran through the lower label (run 20261001T035353825Z
@@ -526,6 +567,51 @@ def _hide_tangent_edges(view: Any) -> None:
     bound.UpdateViewDisplayGeometry()
 
 
+def _sheet_points_in_view_sketch(
+    adapter: Any, native: Any, points: Sequence[tuple[float, float]]
+) -> list[tuple[float, float, float]]:
+    """Sheet points (m) in ``native``'s own sketch space, through the sketch's
+    ModelToSketchTransform (the drawing's model space is the sheet)."""
+    sketch = _early_bound(native.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    projected_points = []
+    for x, y in points:
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        projected_points.append(tuple(float(value) for value in projected.ArrayData))
+    return projected_points
+
+
+def _sketch_line_ends_on_sheet(
+    adapter: Any, native: Any, segments: Sequence[Any]
+) -> list[tuple[float, float]]:
+    """Every end of ``segments`` (view-sketch lines) read back on the sheet,
+    through the view's frame as it stands now."""
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    settled = _early_bound(native.GetSketch(), "ISketch")
+    to_sheet = _early_bound(
+        _early_bound(settled.ModelToSketchTransform, "IMathTransform").Inverse(),
+        "IMathTransform",
+    )
+    ends = []
+    for segment in segments:
+        line = _early_bound(segment, "ISketchLine")
+        for raw in (line.GetStartPoint2(), line.GetEndPoint2()):
+            point = _early_bound(raw, "ISketchPoint")
+            sheet_point = _early_bound(
+                _early_bound(
+                    math_utility.CreatePoint(double_array([point.X, point.Y, point.Z])),
+                    "IMathPoint",
+                ).MultiplyTransform(to_sheet),
+                "IMathPoint",
+            )
+            ends.append(tuple(float(value) for value in sheet_point.ArrayData)[:2])
+    return ends
+
+
 @_telemetry.traced("drawing.outside_view_crop")
 def _crop_outside_view(adapter: Any, view: Any) -> None:
     """Crop the outside view to OUTSIDE_CROP_FENCE (sheet left, foot, right,
@@ -546,16 +632,7 @@ def _crop_outside_view(adapter: Any, view: Any) -> None:
         raise RuntimeError("failed to activate the outside view for its crop")
     draw.ClearSelection2(True)
     before = tuple(float(value) for value in native.GetOutline())
-    sketch = _early_bound(native.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    corners = []
-    for x, y in ((left, head), (right, foot)):
-        point = _early_bound(
-            math_utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
-        )
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        corners.append(tuple(float(value) for value in projected.ArrayData))
+    corners = _sheet_points_in_view_sketch(adapter, native, ((left, head), (right, foot)))
     sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
     previous_add_to_db = bool(sketch_manager.AddToDB)
     sketch_manager.AddToDB = True
@@ -582,24 +659,7 @@ def _crop_outside_view(adapter: Any, view: Any) -> None:
         raise RuntimeError("the outside view's crop prints an outline; expected none")
     # The view's frame as it stands after the crop and rebuild, not the
     # transform the fence was drawn with (codjiflo advisory on 09d0c82).
-    settled = _early_bound(native.GetSketch(), "ISketch")
-    to_sheet = _early_bound(
-        _early_bound(settled.ModelToSketchTransform, "IMathTransform").Inverse(),
-        "IMathTransform",
-    )
-    ends = []
-    for segment in segments:
-        line = _early_bound(segment, "ISketchLine")
-        for raw in (line.GetStartPoint2(), line.GetEndPoint2()):
-            point = _early_bound(raw, "ISketchPoint")
-            sheet_point = _early_bound(
-                _early_bound(
-                    math_utility.CreatePoint(double_array([point.X, point.Y, point.Z])),
-                    "IMathPoint",
-                ).MultiplyTransform(to_sheet),
-                "IMathPoint",
-            )
-            ends.append(tuple(float(value) for value in sheet_point.ArrayData)[:2])
+    ends = _sketch_line_ends_on_sheet(adapter, native, segments)
     fence = (
         min(x for x, _ in ends),
         min(y for _, y in ends),
@@ -626,6 +686,44 @@ def _crop_outside_view(adapter: Any, view: Any) -> None:
             f"outside view outline {before} -> {after} is not about its fence "
             f"{OUTSIDE_CROP_FENCE}"
         )
+
+
+@_telemetry.traced("drawing.outside_view_break")
+def _sketch_outside_break(adapter: Any, view: Any) -> None:
+    """Draw OUTSIDE_BREAK into the cropped outside view's own sketch as thin
+    lines (draw_fr_nameplate's section break), read back on the sheet.
+
+    AddToDB keeps sketch inference from snapping the short Z segments onto
+    the step's or the boss's edges."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    native = _early_bound(view, "IView")
+    if not ddoc.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate the outside view for its break line")
+    draw.ClearSelection2(True)
+    sheet_points = [_outside_sheet_xy(y, z) for y, z in OUTSIDE_BREAK]
+    points = _sheet_points_in_view_sketch(adapter, native, sheet_points)
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    segments = []
+    try:
+        for index, (start, end) in enumerate(zip(points, points[1:])):
+            segment = sketch_manager.CreateLine(*start, *end)
+            if segment is None:
+                raise RuntimeError(f"outside view break line segment {index} failed")
+            segments.append(segment)
+    finally:
+        sketch_manager.AddToDB = previous_add_to_db
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    ends = _sketch_line_ends_on_sheet(adapter, native, segments)
+    expected = [xy for pair in zip(sheet_points, sheet_points[1:]) for xy in pair]
+    _telemetry.info(f"outside view break line: {ends}")
+    if len(ends) != len(expected) or any(
+        math.dist(got, want) > 1e-6 for got, want in zip(ends, expected)
+    ):
+        raise RuntimeError(f"outside view break line reads back {ends}, not {expected}")
 
 
 def _place_outside_caption(adapter: Any, view: Any) -> None:
@@ -776,6 +874,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _create_section_axis_centerline(
         adapter, outside, label="outside view axis", nose_mm=OUTSIDE_CROP_Z - 1.0
     )
+    _sketch_outside_break(adapter, outside)
 
     oil_note = add_leader_note(
         adapter,

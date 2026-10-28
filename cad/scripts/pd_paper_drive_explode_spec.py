@@ -96,14 +96,19 @@ KNOB_WHEEL_INSTANCE = "pd-transgear-removable-1"
 # disc, the hub flange, the T24) never sits over the other axis's parts.
 TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
     # Knob shaft's rear: the cup off the journal, its cross pin out along
-    # its own (machine X) axis.
+    # its own (machine X) axis toward -X, the side sheet 3's isometric sees.
+    # Along +X the pin stood behind the plate's lower block: its balloon
+    # anchor fell back to a listed edge and the leader landed on the block
+    # (run 20261028T074113068Z, ENFORCE review r1-r3 gating on balloon 40).
     ExplodeStep(
         "knob cup rearward",
         ("pd-transgear-knob-cup", "pd-vn-transgear-knob-cup-pin"),
         "z",
         46.0,
     ),
-    ExplodeStep("cup pin out of the cup", ("pd-vn-transgear-knob-cup-pin",), "x", 22.0),
+    ExplodeStep(
+        "cup pin out of the cup", ("pd-vn-transgear-knob-cup-pin",), "x", -22.0
+    ),
     # The plate off the arm's rear face, its screws behind it and the two
     # locating dowels drawn out of the arm between them.  At 16 mm the
     # isometric drew the plate on the arm's top edge with the dowels hidden

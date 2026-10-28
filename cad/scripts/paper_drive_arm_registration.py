@@ -24,7 +24,6 @@ from _gear_quality import (
     reducer_k_setting_diameter_mm,
     reducer_position_diameter_mm,
 )
-from _printed_tolerance import printed_band_mm
 
 ARM_LOCATOR_SITES_MM = ARM.LOCATOR_SITES_MM
 PLATE_LOCATOR_SITES_MM = PLATE.LOCATOR_SITES_MM
@@ -106,7 +105,7 @@ KNOB_F_MACHINE_Z_MM = ARM_REAR_MACHINE_Z_MM - (
 )
 KNOB_F_AXIAL_BAND_MM = (
     ARM.THICKNESS_BAND + PLATE.HUB_FACE_TO_MOUNTING_BAND
-    + RING.LENGTH_TOL + printed_band_mm(SHAFT.FACE_WIDTH_PLACES)
+    + RING.LENGTH_TOL + SHAFT.FACE_WIDTH_BAND
     + SHAFT.END_FLOAT + SHAFT.END_FLOAT_SET_TOL
 )
 # The fitted collar is NOT nominal +/- a printed band. Its actual accepted

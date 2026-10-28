@@ -16,8 +16,8 @@ drawing-guidelines.md rule 11 (turned parts read like the lathe)).  The spigot r
 z = -FLANGE_THICK..0 and the hub body forward to the hub front face, so
 ``Front Plane`` (z = 0) is the flange's rear face, the one that clamps the
 disc, and the spigot's and flange's printed lengths run from it.  The
-overall, spigot end to hub front face, is the cluster fit's model length
-(the hub front face is faced to the sleeve's nose at assembly).  The bore
+overall, spigot end to hub front face, is printed, as is the spigot length,
+both terms of the disc cluster stack (#2038).  The bore
 is two Front-plane cuts: the D-bore (its flat on local -Y) forward through
 flange and body, and the round bore back through the spigot.  The three
 screw holes lie on a construction bolt circle whose driving diameter is the
@@ -63,7 +63,10 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _drawing_tolerances import (
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
 from pd_transgear_disc_hub_geometry import (
     BOLT_CIRCLE_DIA,
     BOLT_CIRCLE_X_FACTOR,
@@ -84,12 +87,14 @@ from pd_transgear_disc_hub_spec import (
     HUB_DIA,
     HUB_FRONT_Z,
     HUB_LENGTH,
+    HUB_LENGTH_BAND,
     OIL_HOLE_DIA,
     OIL_HOLE_STATION,
     SCREW_HOLE_DIA,
     SPIGOT_DIA,
     SPIGOT_DIA_DEVIATIONS,
     SPIGOT_LENGTH,
+    SPIGOT_LENGTH_BAND,
 )
 
 PART_NAME = "pd-transgear-disc-hub"
@@ -559,8 +564,9 @@ async def build(adapter) -> dict[str, str]:
     await report_mass_properties(adapter)
     # The bore carries both its bands on the model: the round's H7 and the
     # flat's band, which together set the fit on the sleeve's boss and flat;
-    # the spigot carries its h6, the disc's pilot.  Every other size is
-    # governed by its places, the holes by the title block's DRILLED HOLES
+    # the spigot carries its h6, the disc's pilot.  The overall and spigot
+    # lengths carry the disc cluster stack's printed band.  Every other size
+    # is governed by its places, the holes by the title block's DRILLED HOLES
     # row (the spec's DRAWING_PRECISION).
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreDia", *BORE_DEVIATIONS
@@ -570,6 +576,12 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter, "HubProfile", "SpigotDia", *SPIGOT_DIA_DEVIATIONS
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "HubProfile", "HubLength", HUB_LENGTH_BAND
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "HubProfile", "SpigotLength", SPIGOT_LENGTH_BAND
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

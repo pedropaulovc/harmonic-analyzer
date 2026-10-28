@@ -335,7 +335,6 @@ def reducer_working_z_band_mm() -> tuple[float, float]:
     from the three critical witnesses; K is outside their triangle.
     """
     import paper_drive_arm_registration as registration
-    from _printed_tolerance import printed_band_mm
 
     front = registration.KNOB_F_MACHINE_Z_MM
     band = registration.KNOB_F_AXIAL_BAND_MM
@@ -346,7 +345,7 @@ def reducer_working_z_band_mm() -> tuple[float, float]:
         math.nextafter(front - band - seat_height, -math.inf),
         math.nextafter(
             front + band + seat_height + pd_transgear_knob_shaft_spec.FACE_WIDTH
-            + printed_band_mm(pd_transgear_knob_shaft_spec.FACE_WIDTH_PLACES),
+            + pd_transgear_knob_shaft_spec.FACE_WIDTH_BAND,
             math.inf,
         ),
     )

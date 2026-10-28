@@ -22,6 +22,7 @@ import _config
 from _gtol_planar import PlanarFace
 from _printed_tolerance import drilled_oversize_mm, printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND, STACK_NAME
 
 OD = 13.6
 # 6.05 (a stock metric drill), not 6.1: the knob pinion's 0.05 tooth-space
@@ -38,8 +39,10 @@ LENGTH = 5.2
 # It spaces the knob shaft's pinion (MHA-PD-08) from the arm plate's front hub
 # (MHA-PD-19), so the knob's F datum, chain plane and disc/platen gap stacks
 # (paper_drive_arm_registration, the paper-drive assembly) consume it; the
-# sheet names that stack at the callout (drawing-guidelines rule 4).
-LENGTH_TOL = 0.05
+# sheet names that stack at the callout (drawing-guidelines rule 4).  F is
+# the disc cluster's printed stack's reference too (transgear_cluster_fit),
+# so the band is the cluster's (#2038 owner ruling 2026-10-28, option A).
+LENGTH_TOL = PRINTED_LENGTH_BAND
 
 # Places each printed dimension carries (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the O.D. is routine
 # at .X (the wall below holds at that row, and nothing fits on the O.D.); the
@@ -69,10 +72,12 @@ if WALL_WORST < WALL_FLOOR - 1e-9:
 # The sheet: the bore's process under its size.
 BORE_CALLOUT = "DRILL THRU"
 # drawing-guidelines.md rule 4: the length's ± band names the stack it
-# serves -- the ring spaces the knob shaft's pinion from the arm plate's hub.
+# serves -- the ring spaces the knob shaft's pinion from the arm plate's hub,
+# a term of the disc cluster's printed stack.
 LENGTH_CALLOUT = (
     f"SPACES {_config.parts('pd-transgear-knob-shaft')['number']} PINION\n"
-    f"FROM {_config.parts('pd-transgear-arm-plate')['number']} HUB"
+    f"FROM {_config.parts('pd-transgear-arm-plate')['number']} HUB\n"
+    f"{STACK_NAME}"
 )
 # Below-text the part build authors on its source dimensions; the drawing
 # imports and reads it back (text set from the drawing writes through to the
