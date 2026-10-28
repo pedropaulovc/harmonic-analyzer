@@ -210,7 +210,7 @@ def test_smaller_bosses_leave_real_plan_corners_and_the_outward_foot_seat() -> N
     assert part.KEEPER_FOOT_TIP_Z_REAR == pytest.approx(86.996, abs=0.0005)
     assert part.KEEPER_FOOT_BOSS_MARGINS == pytest.approx((1.496, 2.504), abs=0.0005)
     assert min(part.KEEPER_FOOT_BOSS_MARGINS) >= 1.0
-    assert part.KEEPER_FOOT_PRINTED_BOSS_MARGINS == pytest.approx((0.060, 0.550))
+    assert part.KEEPER_FOOT_PRINTED_BOSS_MARGINS == pytest.approx((0.570, 1.060))
     assert min(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS) > 0.0
     assert part.KEEPER_FOOT_RAIL_MARGINS == pytest.approx((4.996, 6.004), abs=0.0005)
     stock_major = FILLISTER_SIZE[0]
@@ -230,30 +230,25 @@ def test_smaller_bosses_leave_real_plan_corners_and_the_outward_foot_seat() -> N
 @pytest.mark.parametrize("front_station_direction", (-1, 1))
 @pytest.mark.parametrize("rear_station_direction", (-1, 1))
 @pytest.mark.parametrize("pitch_direction", (-1, 1))
-@pytest.mark.parametrize("lug_direction", (-1, 1))
-@pytest.mark.parametrize("foot_direction", (-1, 1))
+@pytest.mark.parametrize("overall_direction", (-1, 1))
 @pytest.mark.parametrize("boss_direction", (-1, 1))
 def test_complete_keeper_foot_clears_boss_at_every_printed_fitup_corner(
     front_station_direction: int,
     rear_station_direction: int,
     pitch_direction: int,
-    lug_direction: int,
-    foot_direction: int,
+    overall_direction: int,
     boss_direction: int,
 ) -> None:
     # Actual fit-up locates the lug INNER faces before transferring the
     # frame taps. This is not a stack of model-nominal tap/hole positions.
-    lug_places = keeper.DRAWING_PRECISION["LugBody"]["LugThickness"]
-    foot_places = keeper.DRAWING_PRECISION["FootProfile"]["FootLength"]
+    # The keeper prints its overall length off the inner lug face (owner
+    # ruling 2026-10-28), so that one band reaches the foot tip.
+    overall_places = keeper.DRAWING_PRECISION["OverallLengthReference"]["OverallLength"]
     boss_places = spec.DRAWING_PRECISION["BossUpProfile"]["C0Dia"]
     pitch_places = spec.DRAWING_REFERENCE_PRECISION["socket vertical pitch"]
-    lug_thickness = (
-        round(2.0 * keeper.LUG_HALF_T, lug_places)
-        + lug_direction * spec.PRINTED_LINEAR_BAND_MM[lug_places]
-    )
-    foot_length = (
-        round(keeper.FOOT_L, foot_places)
-        + foot_direction * spec.PRINTED_LINEAR_BAND_MM[foot_places]
+    overall_length = (
+        round(keeper.OVERALL_LENGTH, overall_places)
+        + overall_direction * spec.PRINTED_LINEAR_BAND_MM[overall_places]
     )
     boss_radius = (
         round(part.BOSS_DIA, boss_places)
@@ -278,18 +273,17 @@ def test_complete_keeper_foot_clears_boss_at_every_printed_fitup_corner(
         + rear_station_direction * keeper.KEEPER_FITUP_LOCATION_BAND_MM
     )
     margins = (
-        front_inner - lug_thickness - foot_length - boss_radius,
-        socket_pitch - rear_inner - lug_thickness - foot_length - boss_radius,
+        front_inner - overall_length - boss_radius,
+        socket_pitch - rear_inner - overall_length - boss_radius,
     )
     assert min(margins) > 0.0
     if (
         front_station_direction,
         rear_station_direction,
         pitch_direction,
-        lug_direction,
-        foot_direction,
+        overall_direction,
         boss_direction,
-    ) == (-1, 1, -1, 1, 1, 1):
+    ) == (-1, 1, -1, 1, 1):
         assert margins == pytest.approx(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS)
 
 
@@ -5960,7 +5954,7 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     assert part.KEEPER_FOOT_BOSS_MARGINS == pytest.approx((1.496, 2.504), abs=0.0005)
     # Along the rail the faced top runs boss to boss, so the fitted foot
     # stays on it exactly when it clears the bosses at the printed bands.
-    assert part.KEEPER_FOOT_PRINTED_BOSS_MARGINS == pytest.approx((0.060, 0.550))
+    assert part.KEEPER_FOOT_PRINTED_BOSS_MARGINS == pytest.approx((0.570, 1.060))
     assert part.KEEPER_FOOT_RAIL_MARGINS == pytest.approx((4.996, 6.004), abs=0.0005)
     # Across it the widest printed foot, at the farthest printed fit-up
     # offset from the web, stays inside the narrowest printed flange less

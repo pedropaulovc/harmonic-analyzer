@@ -254,7 +254,6 @@ from _mcmaster_90280a837 import (
 )
 from ch_fulcrum_keeper_spec import (
     DRAWING_PRECISION as KEEPER_DRAWING_PRECISION,
-    FOOT_L,
     FOOT_COUNTERBORE_DEPTH_PLACES,
     FOOT_H,
     FOOT_SCREW_LENGTH_MM,
@@ -266,7 +265,7 @@ from ch_fulcrum_keeper_spec import (
     KEEPER_FITUP_X_BAND_MM,
     KEEPER_FITUP_PLACES,
     KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM,
-    LUG_HALF_T,
+    OVERALL_LENGTH as KEEPER_OVERALL_LENGTH,
     FOOT_TIP_X,
     FULCRUM_KEEPER_CENTRE_Z,
     KEEPER_SCREW_Z_OFF,
@@ -1191,18 +1190,17 @@ KEEPER_FOOT_BOSS_MARGINS = tuple(
 # socket at fit-up, then the frame taps are transferred through their feet.
 # Neither the foot-hole position nor a separate frame-tap station band
 # reaches the foot tip. The real stack is the printed INNER-face station
-# plus its DRO band, full lug thickness, foot length and boss OD; the rear
-# also loses the printed socket-pitch band. Taking zero nearest-X distance
-# is conservative for the complete foot, whatever its X position.
-KEEPER_FOOT_LENGTH_BAND_MM = PRINTED_LINEAR_BAND_MM[
-    KEEPER_DRAWING_PRECISION["FootProfile"]["FootLength"]
+# plus its DRO band, the keeper's printed overall length (inner lug face to
+# foot tip) and boss OD; the rear also loses the printed socket-pitch band.
+# Taking zero nearest-X distance is conservative for the complete foot,
+# whatever its X position.
+KEEPER_OVERALL_LENGTH_PLACES = KEEPER_DRAWING_PRECISION["OverallLengthReference"][
+    "OverallLength"
 ]
 BOSS_DIA_BAND_MM = PRINTED_LINEAR_BAND_MM[DRAWING_PRECISION["BossUpProfile"]["C0Dia"]]
 KEEPER_PRINTED_MAX_OUTBOARD_REACH = (
-    round(2.0 * LUG_HALF_T, KEEPER_DRAWING_PRECISION["LugBody"]["LugThickness"])
-    + PRINTED_LINEAR_BAND_MM[KEEPER_DRAWING_PRECISION["LugBody"]["LugThickness"]]
-    + round(FOOT_L, KEEPER_DRAWING_PRECISION["FootProfile"]["FootLength"])
-    + KEEPER_FOOT_LENGTH_BAND_MM
+    round(KEEPER_OVERALL_LENGTH, KEEPER_OVERALL_LENGTH_PLACES)
+    + PRINTED_LINEAR_BAND_MM[KEEPER_OVERALL_LENGTH_PLACES]
 )
 KEEPER_PRINTED_MAX_BOSS_RADIUS = (
     round(BOSS_DIA, DRAWING_PRECISION["BossUpProfile"]["C0Dia"]) + BOSS_DIA_BAND_MM

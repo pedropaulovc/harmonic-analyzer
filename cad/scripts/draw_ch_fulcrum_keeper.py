@@ -189,31 +189,32 @@ TOP_CALLOUTS = {
 }
 
 # Per-view survivors of the marked-dimension import: parametric name ->
-# sheet position.  The front view carries the lug thickness chained left of
-# the foot length below the seat, its text out to the left of the inner lug
-# face (its own extension line is the overall length's too),
-# and under both the overall length (a reference, MR-fleet r3: the chain
-# printed no overall), ~8 mm under the chain's dimension line (r4: 3.6 mm
-# under it, its own line sat on the chain's arrows) and above
-# the notes; the finished height (a reference) left of the lug and the
-# supplied height (single limit MIN) outside it, the larger size outermost
-# (r4: the supply size alone left its extension line in empty space above
-# the drawn top); the foot height right of the foot tip. The foot-to-lug
-# corner prints no radius: the title block's INSIDE CORNERS R1.0 MAX governs
-# it (ENFORCE review 2026-10-24: a local "R1.0 max." restated that row,
-# rule 2).
+# sheet position.  The front view baselines its lengths off the inner lug
+# face (owner ruling 2026-10-28, ENFORCE review eecbf88: the 8.00 + 8.50
+# chain printed the overall only as a reference): the lug thickness below
+# the seat, its text out to the left of the inner lug face (its own
+# extension line is the overall length's too), and under it the overall
+# length, a real .XX size, ~8 mm under the lug's dimension line (r4: 3.6 mm
+# under it, its own line sat on the lug's arrows) and above the notes; the
+# foot length prints nowhere. The finished height (a reference) stands left
+# of the lug and the supplied height (single limit MIN) outside it, the
+# larger size outermost (r4: the supply size alone left its extension line
+# in empty space above the drawn top); the foot height right of the foot
+# tip. The foot-to-lug corner prints no radius: the title block's INSIDE
+# CORNERS R1.0 MAX governs it (ENFORCE review 2026-10-24: a local "R1.0
+# max." restated that row, rule 2).
 # The plan carries the crown tap's station off the inner lug face above the
 # plan, its text out to the left of the inner face's extension line
 # (MR-fleet r1: in the front view its extension line off the tap axis ended
 # in mid-air; the plan sees the tap end-on), the foot screw's station off the
-# foot tip (above the plan) and off the -Z side face, the latter's text and
-# function under its extension lines right of the foot tip, clear of the
-# foot-hole callout.  The end view carries the width plus the shaft-axis /
-# crown stack, the reamed bore and the bore's reference place off a side face
-# with its centre-plane band above it.
+# foot tip (above the plan; it holds the counterbore's tip wall, owner ruling
+# 2026-10-28, review exception RV-03) and off the -Z side face, the latter's
+# text and function under its extension lines right of the foot tip, clear
+# of the foot-hole callout.  The end view carries the width plus the
+# shaft-axis / crown stack, the reamed bore and the bore's reference place
+# off a side face with its centre-plane band above it.
 FRONT_KEEP = {
     "LugThickness": (0.080, 0.086),
-    "FootLength": (_front_x((LUG_HALF_T + FOOT_TIP_X) / 2.0), 0.086),
     "OverallLength": (FRONT_CENTER[0], 0.068),
     "FootRise": (0.140, 0.106),
     "OverallHeight": (0.080, FRONT_CENTER[1]),

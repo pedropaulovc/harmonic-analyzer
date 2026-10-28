@@ -99,16 +99,20 @@ def test_rule_12_worst_case_walls_and_thread() -> None:
     assert round(spec.BORE_SIDE_WALL_MM, 3) == 3.1
     assert round(spec.SET_SCREW_WEB_MM, 3) == 2.053
     assert round(spec.FOOT_TIP_WALL_MM, 3) == 2.04
-    assert round(spec.FOOT_CBORE_LUG_CLEARANCE_MM, 3) == 1.03
+    # Owner ruling 2026-10-28: the outer lug face now sits 16.50 - 8.00 off
+    # the tip, both bands, so the counterbore keeps 0.52 off it.
+    assert round(spec.FOOT_CBORE_LUG_CLEARANCE_MM, 3) == 0.52
     assert round(spec.FOOT_SCREW_ENGAGEMENT_D, 2) == 1.79
     # The native counterbore callout prints the template's .XX; the engagement
     # and bottoming stacks take that printed depth (2.11), not 2.1082.
     assert spec.FOOT_COUNTERBORE_DEPTH_PLACES == 2
     # Owner ruling Q11-B: the 8.0 lug holds the web at the title block's .XX
-    # lug and tap station; Q11-B': the foot length prints .XX too.
+    # lug and tap station; Q11-B' and 2026-10-28: the overall length (the
+    # foot tip off the inner lug face) prints .XX, the foot length nowhere.
     assert spec.DRAWING_PRECISION["LugBody"]["LugThickness"] == 2
     assert spec.DRAWING_PRECISION["SetScrewReference"]["SetScrewLocation"] == 2
-    assert spec.DRAWING_PRECISION["FootProfile"]["FootLength"] == 2
+    assert spec.DRAWING_PRECISION["OverallLengthReference"]["OverallLength"] == 2
+    assert spec.DRAWING_PRECISION["FootProfile"] == {"FootRise": 1}
     # Off the foot tip the hole's station holds the tip wall at .XX; the
     # frame's transferred tap takes the .XXX side-station band.
     assert spec.DRAWING_PRECISION["FootScrewReference"]["ScrewFromTip"] == 2
@@ -142,16 +146,14 @@ def test_corner_round_sits_under_the_title_block_inside_corner_ceiling() -> None
     # MR-fleet r1: the foot-to-lug inside corner was sharp and unstated. The
     # title block's INSIDE CORNERS R1.0 MAX states it, so the sheet prints no
     # local radius (ENFORCE review 2026-10-24: a local "R1.0 max." restated
-    # that row, rule 2). The part models the round at that ceiling, which
-    # keeps the round's tangent line off the counterbore.
+    # that row, rule 2). The part models the round at that ceiling. At the
+    # worst case the counterbore can nick a round at the ceiling (0.52 < 1.0,
+    # cosmetic, owner ruling 2026-10-28) but never reaches the lug face.
     spec = ch_fulcrum_keeper_spec
     ceiling = _config.title_block("inside_corner")["radius_mm"]
     assert spec.CORNER_R == 1.0
     assert spec.CORNER_R <= ceiling
-    # The title block now permits the corner up to its ceiling, so the
-    # ceiling itself must keep the round's tangent line off the counterbore.
-    assert 0.0 < spec.CORNER_R
-    assert ceiling < spec.FOOT_CBORE_LUG_CLEARANCE_MM
+    assert 0.0 < spec.FOOT_CBORE_LUG_CLEARANCE_MM < ceiling
     assert "CornerFillet" not in spec.DRAWING_DIMENSIONS
     assert "CornerFillet" not in spec.DRAWING_PRECISION
     assert "CornerRadius" not in drawing.FRONT_KEEP
@@ -167,18 +169,19 @@ def test_drawing_enforces_machinist_review() -> None:
     assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
 
 
-def test_overall_sizes_print_as_references_and_the_bore_centred_on_the_width() -> None:
+def test_overall_length_is_real_and_the_bore_centred_on_the_width() -> None:
     # MR-fleet r5: "(7.0)" across the width left the builder no lateral
     # error for the pair-ream layout. Owner ruling Q10-B: the full round
     # follows the width, so the bore's place is held to the width's centre
     # plane, stated on the (7.0) reference with its function, not as a
     # station off a side face (which would carry the width's own band too).
+    # Owner ruling 2026-10-28 (ENFORCE review eecbf88, rule 10): the front
+    # view baselines the 8.00 lug and a real 16.50 overall off the inner lug
+    # face; the 8.50 foot length no longer chains off the lug.
     spec = ch_fulcrum_keeper_spec
-    assert spec.REFERENCE_DIMENSIONS == (
-        "OverallHeight",
-        "OverallLength",
-        "BoreFromSide",
-    )
+    assert spec.REFERENCE_DIMENSIONS == ("OverallHeight", "BoreFromSide")
+    assert "FootLength" not in drawing.FRONT_KEEP
+    assert "FootLength" not in set().union(*spec.DRAWING_DIMENSIONS.values())
     assert spec.DRAWING_PRECISION["BoreSideReference"] == {"BoreFromSide": 1}
     assert spec.BORE_FROM_SIDE == spec.KEEPER_WIDTH / 2.0
     assert spec.BORE_CENTRE_BAND_MM == 0.3
@@ -189,7 +192,7 @@ def test_overall_sizes_print_as_references_and_the_bore_centred_on_the_width() -
     )
     assert drawing.DIMENSION_CALLOUTS["BoreFromSide"] is spec.BORE_CENTRE_CALLOUT
     assert spec.DRAWING_PRECISION["OverallHeightReference"] == {"OverallHeight": 1}
-    assert spec.DRAWING_PRECISION["OverallLengthReference"] == {"OverallLength": 1}
+    assert spec.DRAWING_PRECISION["OverallLengthReference"] == {"OverallLength": 2}
     assert spec.OVERALL_LENGTH == 2.0 * spec.LUG_HALF_T + spec.FOOT_L == 16.5
     assert "BoreFromSide" in drawing.RIGHT_KEEP
     assert "OverallLength" in drawing.FRONT_KEEP
@@ -678,7 +681,7 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
     )
     notes_top = drawing.NOTES_TOP
     notes = Box(0.020, notes_top - 5 * _PITCH, 0.182, notes_top)
-    overall_length = _text_block(drawing.FRONT_KEEP["OverallLength"], ["(16.5)"])
+    overall_length = _text_block(drawing.FRONT_KEEP["OverallLength"], ["16.50"])
     foot_hole = Box(0.1035, 0.1945, 0.1469, 0.2095)  # r13 printed + DRILL row
     tap = _text_block(drawing.SET_SCREW_CALLOUT_XY, _tap_rows())
     keeps = {**drawing.FRONT_KEEP, **drawing.TOP_KEEP}
@@ -708,7 +711,6 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
         "tap callout": tap,
         "overall length": overall_length,
         "overall height": _text_block(drawing.FRONT_KEEP["OverallHeight"], ["(32.2)"]),
-        "foot length": _text_block(drawing.FRONT_KEEP["FootLength"], ["8.50"]),
         "screw from tip": _text_block(drawing.TOP_KEEP["ScrewFromTip"], ["4.50"]),
     }
     for name, block in blocks.items():
@@ -747,7 +749,7 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
     for name, box in {**neighbours, **blocks}.items():
         if name != "lug":
             assert segment_box_distance(square_top, box) >= 0.003, name
-    # r4: SolidWorks drew the (16.5)'s line ~2.7 mm off its text, onto the
+    # r4: SolidWorks drew the overall length's line ~2.7 mm off its text, onto the
     # lug thickness's arrows under that block's last row; either side, it
     # stays clear of the 8.00's line and of the notes.
     assert blocks["LugThickness"].ymin - (overall_length.ymax + 0.003) >= _AIR
