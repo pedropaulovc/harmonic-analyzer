@@ -66,6 +66,10 @@ def test_rim_diameters_ride_the_hidden_section_reference() -> None:
     blank = "blank_reference_sketches(adapter, REFERENCE_SKETCHES)"
     assert build.count(blank) == 1
     assert build.index(blank) < build.rindex("save_part_and_images(adapter, PART_NAME)")
+    # A diametric linear dimension prints no Ø unless the prefix carries it.
+    assert (
+        'set_dimension_prefix(adapter, DIAMETER_REFERENCE, name, "<MOD-DIAM>")' in build
+    )
     # A-A is cut and curated while the part shows the reference, through the
     # face it is cut from; the isometric is placed after the re-blank.
     source = Path(drawing.__file__).read_text(encoding="utf-8")

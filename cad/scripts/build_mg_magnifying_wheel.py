@@ -56,6 +56,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
+from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
@@ -1049,6 +1050,11 @@ async def build(adapter) -> dict[str, str]:
     # The tie holes are drilled: the title block's DRILLED HOLES row governs
     # their size, and TIE 1's radius rides the title block's .XX.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    # A diametric linear dimension prints no Ø of its own (farm run f4472703
+    # printed "100.00" and "88.0"): the native symbol token supplies it
+    # (build_dt_pinion_arbor's journal references).
+    for name in sorted(DRAWING_DIMENSIONS[DIAMETER_REFERENCE]):
+        set_dimension_prefix(adapter, DIAMETER_REFERENCE, name, "<MOD-DIAM>")
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
