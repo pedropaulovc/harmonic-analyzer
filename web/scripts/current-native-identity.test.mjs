@@ -373,6 +373,17 @@ test('retired stems and Numbers cannot reappear through active rows, aliases or 
   assert.throws(() => validateCurrentNativeIdentityProjection(table, duplicate), /colliding retired identity/)
 })
 
+test('a retired post-migration identity with no historical Number still reserves its current Number', () => {
+  const reservation = cadMap.retired_identities.find(row => row.old_number === null)
+  assert.ok(reservation, 'the current map retires at least one post-migration identity')
+  const reused = structuredClone(cadMap)
+  reused.parts_and_assemblies[0].new_identities[0].number = reservation.new_identities[0].number
+  assert.throws(() => validateCurrentNativeIdentityProjection(table, reused), /active identity collides with retired/)
+  const missing = structuredClone(cadMap)
+  delete missing.retired_identities.find(row => row.old_number === null).old_number
+  assert.throws(() => validateCurrentNativeIdentityProjection(table, missing), /invalid retired identity reservation/)
+})
+
 test('shared targets permit consistent many-to-one rows but reject duplicate source contexts and undeclared semantics', async t => {
   for (const sourceStem of ['vn-boss-hook', 'vn-chain-inner-link']) {
     const duplicate = structuredClone(table)
