@@ -864,7 +864,7 @@ def _add_setting_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
             raise RuntimeError(f"{name}: precision did not persist")
         callout = notes.SETTING_CALLOUTS[name]
         display.SetText(_CALLOUT_BELOW, callout)
-        if str(display.GetText(_CALLOUT_BELOW) or "") != callout:
+        if str(display.GetText(_CALLOUT_BELOW) or "").replace("\r", "") != callout:
             raise RuntimeError(f"{name}: callout did not persist")
         authored.append((name, display))
 
@@ -875,7 +875,7 @@ def _add_setting_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
             if abs(measured - expected[name]) > 1e-4:
                 raise RuntimeError(f"{name}: settled value {measured:g} mm changed")
             if (
-                str(display.GetText(_CALLOUT_BELOW) or "")
+                str(display.GetText(_CALLOUT_BELOW) or "").replace("\r", "")
                 != notes.SETTING_CALLOUTS[name]
             ):
                 raise RuntimeError(f"{name}: settled callout changed")

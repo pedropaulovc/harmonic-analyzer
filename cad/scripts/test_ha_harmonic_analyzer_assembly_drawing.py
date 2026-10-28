@@ -158,6 +158,19 @@ def test_shared_vendor_instructions_print_current_numbers_and_roles() -> None:
     assert assembly_contract("pn-pen").number in pen_wire
 
 
+def test_bar_height_names_the_raised_deck_it_runs_from() -> None:
+    """#2060: the 529.9's extension line ends at the west column, short of the
+    raised deck it is measured from (spec.DECK_TOP_Y is the base stack top),
+    so the callout and step 8 name that surface."""
+    import fr_harmonic_base_spec as base
+
+    assert spec.DECK_TOP_Y == base.STACK_HEIGHT
+    step = steps.step_number("magnifier-bar-clamped")
+    callout = notes.SETTING_CALLOUTS[spec.BAR_HEIGHT_DIMENSION]
+    assert callout.split("\n") == ["BAR TOP ABOVE", "RAISED DECK TOP", f"(STEP {step})"]
+    assert "ABOVE THE RAISED DECK TOP (SHEET 1)" in notes.ASSEMBLY_STEPS[step - 1]
+
+
 def test_the_loose_spare_sprocket_is_named_with_its_row_and_its_place() -> None:
     """Machinist review r1/r2 on 5bca52e13: the paper drive's spare sprocket
     lies loose on the deck (sheet 2) and beside item 7 (sheet 3) with no
