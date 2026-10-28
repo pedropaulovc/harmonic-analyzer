@@ -330,7 +330,11 @@ PROJECTED_ZONE_CHAINS: dict[str, ZoneChain] = {
         "A-A", PLATE_TAP_STATIONS[0], (0.0015, 0.0),
         (
             (_front_x(PLATE_TAP_STATIONS[0]) + _front_x(PLATE_TAP_STATIONS[1])) / 2.0,
-            SECTION_CENTER[1] - 0.0145,
+            # 2 mm under tap 1's frame shoulder (y SECTION_CENTER - 0.0129):
+            # since #2034 moved the taps 12 mm left on the sheet, the shoulder
+            # reached over the text's left end, 0.2 mm into its top (run
+            # 20261028T064655627Z, leader-through-text).
+            SECTION_CENTER[1] - 0.0165,
         ),
     ),
     "plate_tap_2_position": ZoneChain("A-A", PLATE_TAP_STATIONS[1], None),
