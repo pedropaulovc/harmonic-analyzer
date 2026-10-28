@@ -48,16 +48,18 @@ TUBE_STOCK = "1/2 OD X 0.065 WALL 4130-N SEAMLESS"
 TUBE_STOCK_SKU = "ONLINEMETALS 7322"
 SLEEVE_STOCK_SIZE = "5/8 OD X 0.058 WALL"
 SLEEVE_STOCK_SKU = "ONLINEMETALS 7324"
-BEND_DIE = "1/2 X 3 CLR DIE"
 for _name, _mm, _inches in (
     ("tube OD", geom.TUBE_DIA, 0.500),
     ("tube wall", geom.WALL_T, 0.065),
     ("sleeve OD", geom.SLEEVE_DIA, 0.625),
     ("sleeve wall", geom.SLEEVE_WALL_T, 0.058),
-    ("bend centreline radius", geom.BEND_R, 3.000),
 ):
     if not math.isclose(_mm, _inches * geom.MM_PER_IN, abs_tol=1e-9):
         raise AssertionError(f"gooseneck {_name} no longer matches its stated stock")
+# R76.2 is the 1/2 in x 3 in CLR die's (owner ruling 2026-10-27); the print
+# states the radius, not the tool (rule 7, codjiflo on #1997).
+if not math.isclose(geom.BEND_R, 3.000 * geom.MM_PER_IN, abs_tol=1e-9):
+    raise AssertionError("gooseneck bend radius is no longer the 3 in CLR die's")
 # The sleeve's select-fit window is the end piece's cited braze window
 # (sm_gooseneck_spring_joint.BRAZE_CLEARANCE_MIN/MAX), since the sleeve's
 # stock bore is not machined (owner ruling 2026-10-27, "select-fit from
@@ -148,15 +150,19 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DIMENSION_CALLOUTS_BY_NAME) - set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("a gooseneck callout names an unmarked dimension")
 
-# Four lines (drawing-guidelines.md rule 7; codjiflo on #1997): stock,
-# bend, braze.  Sizes are on the features; the tap's sequence and its mate
-# ride the tap callout (rule 7, flag it where it applies), and section A-A
-# shows the end piece solid.  Each line ends left of the title block.
+# Four lines (drawing-guidelines.md rule 7; codjiflo on #1997): tube stock,
+# sleeve stock with its select-fit acceptance on the tube (the sleeve bore is
+# stock, so no feature carries it), the bend's acceptance, the braze.  Sizes
+# are on the features and the bend radius is native, so no line names a
+# tool; the tap's sequence rides its callout (rule 7, flag it where it
+# applies), and section A-A shows the end piece solid.  Each line ends left
+# of the title block.
 DRAWING_NOTES = "\n".join(
     (
         f"1. TUBE {TUBE_STOCK}, {TUBE_STOCK_SKU}, AS STOCK.",
-        f"2. SLEEVE {SLEEVE_STOCK_SIZE}, {SLEEVE_STOCK_SKU}: SELECT-FIT AT SHANK CLEARANCE.",
-        f"3. BEND ON {BEND_DIE}; OVALITY 5% MAX; NO FLATS, KINKS OR CRACKS.",
+        f"2. SLEEVE {SLEEVE_STOCK_SIZE}, {SLEEVE_STOCK_SKU}: "
+        f"{BRAZE_CLEARANCE_MIN:.2f}-{BRAZE_CLEARANCE_MAX:.2f} DIAMETRAL ON TUBE.",
+        "3. BEND: OVALITY 5% MAX; NO FLATS, KINKS OR CRACKS.",
         "4. SILVER-BRAZE BAg-7 PER AWS A5.8, FULL PENETRATION: SHANK, BOTH SLEEVE ENDS.",
     )
 )

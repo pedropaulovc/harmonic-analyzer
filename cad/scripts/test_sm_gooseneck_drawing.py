@@ -161,20 +161,25 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
     assert all(re.match(r"\d\. ", line) for line in lines)
     assert drawing.NOTES_XY[0] + 0.00242 * max(map(len, lines)) < 0.214
     notes = " ".join(spec.DRAWING_NOTES.split())
+    window = f"{joint.BRAZE_CLEARANCE_MIN:.2f}-{joint.BRAZE_CLEARANCE_MAX:.2f}"
     for phrase in (
         "1/2 OD X 0.065 WALL 4130-N SEAMLESS",
         "ONLINEMETALS 7322",
         "AS STOCK",
-        "1/2 X 3 CLR DIE",
         "5/8 OD X 0.058 WALL",
         "ONLINEMETALS 7324",
-        "SELECT-FIT AT SHANK CLEARANCE",
+        f"{window} DIAMETRAL ON TUBE",
+        "OVALITY 5% MAX",
         "BOTH SLEEVE ENDS",
         "BAg-7",
     ):
         assert phrase in notes, phrase
-    # Sizes and tolerances are native model dimensions, never note text.
-    assert re.search(r"\b\d+\.\d{1,2}\b", notes) is None, notes
+    # A note names no tool (rule 7): R76.2 is the native bend radius.
+    assert "DIE" not in notes
+    # Sizes and tolerances are native model dimensions, never note text; the
+    # stock sleeve's select-fit window has no feature to ride, so it is the
+    # one figure the notes carry (rule 7's matched fit with its acceptance).
+    assert re.search(r"\b\d+\.\d{1,2}\b", notes.replace(window, "")) is None, notes
     assert "<MOD-DIAM>" not in notes and "Ø" not in notes
     assert "THRU" not in notes.upper()
 
