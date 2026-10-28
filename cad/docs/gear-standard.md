@@ -11,9 +11,9 @@ involute cutter instead of making cutters for an odd pitch.
 |---|---|---|
 | Cone and cylinder train | `dt-cone-gear` T006–T120, `dt-cylinder-gear` ×20 (120T), `dt-alignment-pinion` (32T) | 48DP, PA20, spur |
 | Crossed crank pair | `dt-crank-pinion` (16T, straight), `dt-crank-drive-gear` (64T, right-hand helix 13.0011°) | normal 24DP, normal PA20 |
-| Paper-drive reducer | `pd-rack-pinion` (120T disc), `pd-transgear-knob-shaft` (integral 12T) | 48DP, PA20 (same cutter set as the cones) |
+| Paper-drive reducer | `pd-rack-pinion` (150T disc), `pd-transgear-knob-shaft` (integral 15T) | 48DP, PA20 (#1 and #7, added to the cone set) |
 | Paper feed | `pd-transgear-feed-pinion` (12T), `pd-platen-rack` | 32DP, PA20 |
-| Chain | crank and knob sprockets, 68 links | ANSI #25 |
+| Chain | crank and knob sprockets, 66 links | ANSI #25 |
 
 The configured values live in [`../config/machine/gear_train.yaml`](../config/machine/gear_train.yaml)
 and the part specs (`dt_cone_gear_spec.py`, `dt_crank_drive_gear_spec.py`,
@@ -75,17 +75,20 @@ shop. At 48DP PA20 the ordinary eight-cutter ranges cover every cone from 12T to
 ### Cutter-native teeth
 
 A range cutter is ground to the tooth of the lowest count in its range: #8 for
-12–13 teeth, #7 14–16, #6 17–20, #5 21–25, #4 26–34, #3 35–54, #2 55–134. The
-model draws every form-cut gear as the gap its stock cutter makes, not as an
-ideal involute for its own tooth count. The 120T cylinder gears carry the #2
-form (55T reference), the 32T alignment drum the #4 form (26T), the 16T crank
+12–13 teeth, #7 14–16, #6 17–20, #5 21–25, #4 26–34, #3 35–54, #2 55–134, #1
+135 to a rack. The model draws every form-cut gear as the gap its stock cutter
+makes, not as an ideal involute for its own tooth count. The 120T cylinder
+gears carry the #2
+form (55T reference), the 150T reducer disc the #1 form (135T), the 15T knob
+pinion the #7 form (14T), the 32T alignment drum the #4 form (26T), the 16T crank
 pinion the #7 form (14T), and the 64T crank gear the #2 form in its normal
 section. Each cone is cut by the cutter for its own range at standard depth, so
 the cutter's pitch line sits on the cone's pitch circle. Its blank is the AGMA
 standard outside diameter, (N + 2)/DP, floored to 0.01 mm and cut down only
 where the cutter's form would stop supporting the tip. The 6T cone is cut by
-DT6-FORM1, a custom ground tool with its own sheet. The two 12T paper pinions
-carry the #8 form, and their hubs are shaped so the cutter runs out clear.
+DT6-FORM1, a custom ground tool with its own sheet. The 12T feed pinion carries
+the #8 form, and its hub is shaped so the cutter runs out clear; the 15T knob
+pinion is cut straight through its face, its root above the journal.
 
 ### How the meshes are accepted
 
@@ -130,9 +133,10 @@ The alignment pinion only meshes while the readout is zeroed, with the notches
 set by eye. It must not bind; its contact ratio is reported, not gated.
 
 The paper reducer has two mandatory contact-ratio gates, both at the minimum
-printed tips: at least 1.2 at its nominal 35.101 mm centre, and at least 1.1
-at the loose runout extreme (the centre opened by both tooth-space runouts).
-These are `paper_drive_mesh_check.CONTACT_RATIO_FLOOR` and
+printed tips: at least 1.2 at its nominal 43.794 mm centre (set within
+±0.057, window 43.737–43.851; the standard centre is 43.656 mm), and at least
+1.1 at the loose runout extreme (the centre opened by both tooth-space
+runouts). These are `paper_drive_mesh_check.CONTACT_RATIO_FLOOR` and
 `RUNOUT_CONTACT_RATIO_FLOOR` (user decision 2026-10-11); the centre comes from
 `pd_rack_pinion_spec.CENTRE_DISTANCE`. The arm and plate are match-drilled
 with that centre set to the standard fine-pitch band, nominal +0.050/-0
@@ -207,9 +211,9 @@ These are comparison values only; the built teeth are accepted as described in
 
 As ideal teeth, both 12T paper pinions needed positive profile shift to avoid
 undercut: x = +0.298 with a 0.437-module tip land at 20°, against x = +0.624
-with only 0.272 module of land at 14.5°. The built pinions are cut instead with
-the stock #8 form, the feed pinion with the 32DP cutter and the knob pinion with
-the 48DP cutter from the cone set.
+with only 0.272 module of land at 14.5°. The built feed pinion is cut instead
+with the stock 32DP #8 form. The knob pinion was a 48DP #8 12T until #2034
+made it a 15T cut with the #7 form; this study no longer describes it.
 
 ## Why not 14.5° at 48DP
 
@@ -260,14 +264,19 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
   mounting screw becomes a 4 in 1/4-20 (MSC 40923906), with a 94.9 mm REF cut
   length. Cut each screw to its own matched hole: end flush to 0.3 mm short of
   the platform underside, never proud, with 0.90D minimum engagement.
-- Paper drive: the reducer keeps its 12:120 counts, which fit the photographed
-  1898 disc best, but is cut at 48DP with the cone cutters. The disc shrinks from
-  OD 81.55 mm to 64.54 mm, about 21% smaller. The change is deliberate: one
-  48DP cutter set then serves the cones, the cylinder gears and the reducer.
-  The 12T 32DP feed pinion runs on a purchased SDP/SI A1B12-Y324 32DP rack,
-  which shortens the paper advance from 1.596 to 1.496 mm per crank turn
-  (−6.25%). The chain stays ANSI #25, 68 links, on the 12T crank and 24T knob
-  sprockets.
+- Paper drive: the reducer was first modelled 12:120 at 48DP with the cone
+  cutters, which shrank the disc from the earlier DP38 model's OD 81.55 mm
+  (the photographed 1898 disc reads about 82 ± 2.5 mm) to 64.54 mm. The
+  owner's ruling in #2034 changed it to 15:150, which keeps the 1:10 ratio
+  and brings the disc back to OD 80.41 mm. The
+  150T disc takes a #1 cutter (TTC 10-289-481) and the 15T knob pinion a #7
+  (TTC 10-289-487), cut straight through its face; neither size is in the
+  cone set. The 12T 32DP feed pinion runs on a purchased SDP/SI A1B12-Y324
+  32DP rack, which shortens the paper advance from 1.596 to 1.496 mm per crank
+  turn (−6.25%). The chain stays ANSI #25 on the 12T crank and 24T knob
+  sprockets, now 66 links: the larger reducer moves the knob 6.64 mm nearer
+  the crank (centres 154.853 → 148.211 mm), and the former 68 links no longer
+  close.
 - Tooth form: a 20° tooth has a smaller base circle (0.940 of pitch diameter,
   against 0.968 at 14.5°), so its flanks are more curved and its tip narrower.
   At 48DP the whole tooth is about 1.2 mm deep, so the difference shows under a

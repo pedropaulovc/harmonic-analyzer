@@ -165,8 +165,9 @@ tolerance.**
      20-pair train and the 32T alignment pinion share it by construction);
    - **crossed crank pair — normal 24DP / 20° PA** (`gear_train.yaml crank_drive_normal_module_mm`),
      a straight 16T pinion driving a right-hand 13.0011° helical 64T;
-   - **paper-drive reducer — 48DP / 20°** (`pd_rack_pinion_spec.py`, 120T disc and the 12T knob
-     pinion; same pitch and cutters as the cone train, but a separate meshing pair);
+   - **paper-drive reducer — 48DP / 20°** (`pd_rack_pinion_spec.py`, 150T disc and the 15T knob
+     pinion since #2034; same pitch as the cone train, cut with the #1 and #7 cutters the cones
+     do not use, and a separate meshing pair);
    - **paper feed — 32DP / 20°** (`pd_transgear_feed_pinion_spec.py`, 12T pinion and the
      purchased platen rack, which must *not* couple to the train DP or the rack silently interferes).
 

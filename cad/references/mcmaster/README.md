@@ -1215,7 +1215,7 @@ Catalog specifications checked on September 10, 2026:
   complete shoulder-length text, witnesses and arrows as well as neighbouring
   ink, views and border, including a fresh exact-name cold readback.
 - [91794A055](https://www.mcmaster.com/91794A055/) (`pd-vn-transgear-disc-screw`,
-  MHA-PD-VN-55, three) joins the brass disc hub's flange to the 120T disc: each
+  MHA-PD-VN-55, three) joins the brass disc hub's flange to the 150T disc: each
   head sits on the flange and the thread enters one of the disc's through
   taps. The product page was read on September 30, 2026: 18-8 stainless
   steel slotted fillister head, #0-80 UNF class 2A, 1/4 in under the head,
@@ -1543,8 +1543,9 @@ Catalog specifications checked on September 10, 2026:
   product pages were read on October 14, 2026. Each states steel, single
   strand, ANSI 25, 1/4 in pitch, 0.130 in roller diameter, 1/8 in roller width
   and 140 lb working load; neither states a grade, plate size or coating.
-  6261K171 is sold by the foot. The selected 68-pitch loop (17 in) is cut from
-  2 ft with an inner link at each end. This gives 34 inner and 33 outer links,
+  6261K171 is sold by the foot. The selected 66-pitch loop (16.5 in; #2034
+  replaced the former 68-pitch, 17 in loop) is cut from 2 ft with an inner link
+  at each end. This gives 33 inner and 32 outer links,
   the `InnerLink` and `OuterLink` configuration quantities of one purchased chain;
   6261K108, the connecting link, closes the loop as its last outer link. The
   cut is the only modification, so both identities stay vendor (`-vn-`) parts
