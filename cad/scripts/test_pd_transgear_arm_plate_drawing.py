@@ -607,7 +607,8 @@ def test_section_stations_are_a_baseline_from_the_mounting_face() -> None:
         "HubFaceToMounting": geometry.HUB_FACE_Z,
     }
     for name, station in stations.items():
-        assert keep[name][2] == pytest.approx(station / 2.0), name
+        shift = drawing._HUB_TEXT_SHIFT if name == "HubFaceToMounting" else 0.0
+        assert keep[name][2] == pytest.approx(station / 2.0 + shift), name
         assert keep[name][1] > geometry.arm_upper_edge_y(0.0), name
     rows = sorted(stations, key=lambda name: keep[name][1])
     assert rows == sorted(stations, key=lambda name: abs(stations[name]))

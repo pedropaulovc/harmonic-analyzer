@@ -159,7 +159,10 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     # and stays 9 mm off the thread callout's leader to the chamfer.
     "ThreadBlankDia": (CHAMFER_START_X - 0.009, _ABOVE_Y),
     "JournalDia": ((PINION_REAR_X + REAR_X) / 2.0, _ABOVE_Y),
-    "FaceWidth": ((F_X + PINION_REAR_X) / 2.0, _ROW_Y[4]),
+    # Its two-line text (24.2 mm wide with "DISC CLUSTER STACK") is wider
+    # than the 17.7 mm between its witness lines, so it stands outside right
+    # of F's (214.4): text 217.3..241.5 mm, under the empty rows past F.
+    "FaceWidth": (F_X + 0.015, _ROW_Y[4]),
     "CoreFront": ((F_X + CORE_END_X) / 2.0, _ROW_Y[0]),
     "PlainCore": ((F_X + THREAD_END_X) / 2.0, _ROW_Y[1]),
     "JournalLength": ((PINION_REAR_X + REAR_X) / 2.0, _ROW_Y[0]),

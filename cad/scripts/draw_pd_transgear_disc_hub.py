@@ -102,9 +102,10 @@ END_VIEW_ANGLE = -math.pi / 2.0
 AXIS_Y = 0.165
 SIDE_CENTER = (0.225, AXIS_Y)
 END_CENTER = (0.090, AXIS_Y)
-# Above the flange's diameter, the edge view's outermost dimension, and
-# right of its extension lines.
-ISO_CENTER = (0.374, 0.216)
+# Right of the flange's diameter, below the overall's stack callout: the
+# view's top-left arc (run 20261028T041908587Z) sat under the callout's
+# widest line, so the view drops below that row and steps right of its end.
+ISO_CENTER = (0.379, 0.188)
 NOTES_XY = (0.020, 0.062)
 
 
@@ -153,7 +154,9 @@ FLAT_CALLOUT = "\n".join(
 #   little low between its extension lines to leave the spigot end's frame
 #   room above it.  The two lengths from the flange's rear face on one row
 #   above: the flange's text left of the flange, the spigot's right of the
-#   spigot.  The overall, printed to the disc cluster stack's band, on the
+#   spigot, its whole callout block right of the spigot end's extension line
+#   (the overall's rises through that row) and so clear of the flange's
+#   dimension line.  The overall, printed to the disc cluster stack's band, on the
 #   next row up, outermost, its text and stack callout right of the spigot end's
 #   extension line.  Its ends are the spigot's and the hub's +X corners, so
 #   from a row above its extension lines rise off the part; from below they
@@ -178,7 +181,7 @@ SIDE_KEEP = {
     # Clear the spigot's whole fit-callout box, not just its dimension line.
     "FlangeDia": (SPIGOT_END_X + 0.083, AXIS_Y),
     "FlangeThick": (_side_x(-FLANGE_THICK) - 0.014, AXIS_Y + _FLANGE_R + 0.009),
-    "SpigotLength": (SPIGOT_END_X + 0.012, AXIS_Y + _FLANGE_R + 0.009),
+    "SpigotLength": (SPIGOT_END_X + 0.026, AXIS_Y + _FLANGE_R + 0.009),
     "HubLength": (SPIGOT_END_X + 0.056, AXIS_Y + _FLANGE_R + 0.026),
     "OilHoleDia": (HUB_FRONT_X - 0.052, AXIS_Y + _FLANGE_R + 0.040),
 }

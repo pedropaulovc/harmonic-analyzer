@@ -280,12 +280,20 @@ BACK_KEEP: dict[str, tuple[float, float, float]] = {
 # witness lines stop short of the hub face, not on through the hatched hub
 # to the profile line's far end at the rear face (run 20261027T180704579Z).
 # The boss diameter stands beyond the boss face's caption.
+# The hub station's callout line ("DISC CLUSTER STACK", 45.7 mm at 2:1) is
+# wider than its 41 mm span, so its text block shifts 5.5 sheet mm toward the
+# hub face: centred it ran 3.6 mm through datum A's line on the mounting face
+# (sheet x = 355); shifted it ends 3.1 mm short of it and stays 6 mm right of
+# datum A's tag.
+_HUB_TEXT_SHIFT = 2.75
 HUB_DIA_TEXT_STANDOFF_MM = 25.5
 HUB_DIA_WITNESS_MAX_M = (HUB_DIA_TEXT_STANDOFF_MM * SHEET_SCALE[0] - 1.0) / 1000.0
 SECTION_KEEP: dict[str, tuple[float, float, float]] = {
     "ThicknessOverArm": (0.0, _SECTION_TOP + 5.0, REAR_FACE_Z / 2.0),
     "NotchDepth": (0.0, _SECTION_TOP + 10.0, FRONT_FACE_Z / 2.0),
-    "HubFaceToMounting": (0.0, _SECTION_TOP + 19.0, HUB_FACE_Z / 2.0),
+    "HubFaceToMounting": (
+        0.0, _SECTION_TOP + 19.0, HUB_FACE_Z / 2.0 + _HUB_TEXT_SHIFT
+    ),
     "HubToBoss": (0.0, _SECTION_TOP + 28.0, (HUB_FACE_Z + BOSS_FACE_Z) / 2.0),
     "HubDia": (0.0, 11.0, HUB_FACE_Z - HUB_DIA_TEXT_STANDOFF_MM),
     "BossDia": (0.0, 0.0, BOSS_FACE_Z + 27.5),
