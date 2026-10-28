@@ -49,7 +49,7 @@ SCREW_NUMBER = str(_config.parts("sm-gooseneck-spring-screw")["number"])
 # inches; each one is checked against the millimetre geometry it names.
 TUBE_STOCK = "1/2 OD X 0.065 WALL 4130-N SEAMLESS"
 TUBE_STOCK_SKU = "ONLINEMETALS 7322"
-SLEEVE_STOCK = "5/8 OD X 0.058 WALL 4130-N SEAMLESS"
+SLEEVE_STOCK_SIZE = "5/8 OD X 0.058 WALL"
 SLEEVE_STOCK_SKU = "ONLINEMETALS 7324"
 BEND_DIE = "1/2 X 3 CLR DIE"
 for _name, _mm, _inches in (
@@ -110,7 +110,8 @@ DIMENSION_CALLOUTS_BY_NAME: dict[str, str] = {
 TAP_CALLOUT_PRECISION = {"hw-threaddepth": 2, "hw-tapdrldepth": 2}
 TAP_CALLOUT_BELOW = (
     f"THREAD AXIS TO TUBE AXIS +/-{THREAD_AXIS_OFFSET_MAX:.2f}\n"
-    f"DRILL WANDER {DRILL_WANDER_MAX:.2f} MAX"
+    f"DRILL WANDER {DRILL_WANDER_MAX:.2f} MAX\n"
+    f"TAP AFTER BRAZE; MATES {SCREW_NUMBER}"
 )
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
@@ -149,25 +150,16 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DIMENSION_CALLOUTS_BY_NAME) - set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("a gooseneck callout names an unmarked dimension")
 
-# Lines kept short so the left-anchored block clears the views; it grows
-# DOWNWARD.  Stock, process and intent only: every size is on a feature.
+# Four lines (drawing-guidelines.md rule 7; codjiflo on #1997): stock,
+# bend, braze.  Sizes are on the features; the tap's sequence and its mate
+# ride the tap callout (rule 7, flag it where it applies), and section A-A
+# shows the end piece solid.  Each line ends left of the title block.
 DRAWING_NOTES = "\n".join(
     (
-        f"1. TUBE: {TUBE_STOCK},",
-        f"   {TUBE_STOCK_SKU}; STOCK OD AND WALL, NOT",
-        f"   MACHINED. BEND ON {BEND_DIE}; OVALITY 5%",
-        "   MAX; NO FLATS, KINKS OR CRACKS.",
-        "2. END PIECE: SOLID. SILVER-BRAZE ON ITS SHANK,",
-        "   BAg-7 PER AWS A5.8, FULL FAYING-SURFACE",
-        "   PENETRATION; NO OPEN GAP AT THE TUBE END.",
-        "   TAP AFTER BRAZE.",
-        f"3. SLEEVE: {SLEEVE_STOCK},",
-        f"   {SLEEVE_STOCK_SKU}; STOCK WALL (NO HONE).",
-        "   SELECT-FIT FROM STOCK TO THE TUBE AT THE",
-        "   END-PIECE SHANK'S BRAZE CLEARANCE.",
-        "   SILVER-BRAZE BOTH ENDS.",
-        f"4. {SCREW_NUMBER} SPRING SCREW: MADE SEPARATELY;",
-        "   NOT INCLUDED IN THIS WELDMENT.",
+        f"1. TUBE {TUBE_STOCK}, {TUBE_STOCK_SKU}, AS STOCK.",
+        f"2. SLEEVE {SLEEVE_STOCK_SIZE}, {SLEEVE_STOCK_SKU}: SELECT-FIT AT SHANK CLEARANCE.",
+        f"3. BEND ON {BEND_DIE}; OVALITY 5% MAX; NO FLATS, KINKS OR CRACKS.",
+        "4. SILVER-BRAZE BAg-7 PER AWS A5.8, FULL PENETRATION: SHANK, BOTH SLEEVE ENDS.",
     )
 )
 ELEVATION_VIEW_NOTE = "ELEVATION SCALE 1:3"

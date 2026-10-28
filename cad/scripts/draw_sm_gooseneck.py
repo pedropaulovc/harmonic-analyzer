@@ -231,13 +231,14 @@ if set(FRONT_KEEP) | set(SECTION_KEEP) != {
 }:
     raise AssertionError("the gooseneck sheet does not place every marked dimension")
 
-# Notes fill the lower left under section A-A; the isometric's note sits
-# under it.  The elevation's foot stands on the title block's top and its
-# bounding box spans the end face to the leg, so its note stands over the
-# view's upper right, right of the arm straight and clear of the border (left
-# of the foot it printed inside the view's box, farm run
+# The four note lines run long, so they sit in the bottom left, under the
+# end view's foot (y ~0.067) and left of the title block (x 0.216); the
+# isometric's note sits under it.  The elevation's foot stands on the title
+# block's top and its bounding box spans the end face to the leg, so its note
+# stands over the view's upper right, right of the arm straight and clear of
+# the border (left of the foot it printed inside the view's box, farm run
 # 20261027T233507330Z).
-NOTES_XY = (0.016, 0.098)
+NOTES_XY = (0.016, 0.062)
 ELEVATION_NOTE_XY = (0.262, 0.262)
 ISO_NOTE_XY = (0.345, 0.085)
 TAPPED_HOLE_NOTE = "Tapped Hole"

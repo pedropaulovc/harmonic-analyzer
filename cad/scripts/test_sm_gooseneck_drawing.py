@@ -154,20 +154,22 @@ def test_counterbore_callouts_floor_the_wall_from_the_joint() -> None:
 
 def test_notes_state_stock_process_and_intent_without_sizes() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
-    assert len([line for line in lines if re.match(r"\d+\. ", line)]) <= 4
+    # Rule 7: four lines at most, each ending left of the title block
+    # (x 0.216) from NOTES_XY at the sheet's ~2.35 mm a character.
+    assert len(lines) <= 4
+    assert all(re.match(r"\d\. ", line) for line in lines)
+    assert drawing.NOTES_XY[0] + 0.00235 * max(map(len, lines)) < 0.212
     notes = " ".join(spec.DRAWING_NOTES.split())
     for phrase in (
         "1/2 OD X 0.065 WALL 4130-N SEAMLESS",
         "ONLINEMETALS 7322",
-        "NOT MACHINED",
+        "AS STOCK",
         "1/2 X 3 CLR DIE",
-        "5/8 OD X 0.058 WALL 4130-N SEAMLESS",
+        "5/8 OD X 0.058 WALL",
         "ONLINEMETALS 7324",
-        "SELECT-FIT FROM STOCK",
-        "NO HONE",
-        "SILVER-BRAZE BOTH ENDS",
+        "SELECT-FIT AT SHANK CLEARANCE",
+        "BOTH SLEEVE ENDS",
         "BAg-7",
-        "TAP AFTER BRAZE",
     ):
         assert phrase in notes, phrase
     # Sizes and tolerances are native model dimensions, never note text.
@@ -176,13 +178,12 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
     assert "THRU" not in notes.upper()
 
 
-def test_weldment_keeps_the_made_screw_in_the_assembly() -> None:
-    notes = " ".join(spec.DRAWING_NOTES.split()).upper()
+def test_tap_callout_flags_the_braze_order_and_the_made_screw() -> None:
     assert spec.SCREW_NUMBER == "MHA-SM-04"
-    assert spec.SCREW_NUMBER in notes and "MADE SEPARATELY" in notes
-    assert "NOT INCLUDED IN THIS WELDMENT" in notes
-    assert "PURCHASED" not in notes and "INTEGRAL" not in notes
-    assert "THREADLOCKER" not in notes  # spring-eye clamping belongs to the assembly
+    assert spec.TAP_CALLOUT_BELOW.splitlines()[-1] == "TAP AFTER BRAZE; MATES MHA-SM-04"
+    printed = " ".join((spec.DRAWING_NOTES, spec.TAP_CALLOUT_BELOW)).upper()
+    assert "PURCHASED" not in printed and "INTEGRAL" not in printed
+    assert "THREADLOCKER" not in printed  # spring-eye clamping belongs to the assembly
 
 
 def test_sheet_places_every_marked_dimension_at_its_places() -> None:
