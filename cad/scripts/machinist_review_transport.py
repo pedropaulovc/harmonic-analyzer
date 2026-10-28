@@ -32,6 +32,14 @@ CLAUDE_TOKEN_COUNTERS = (
     "cache_read_input_tokens", "output_tokens",
 )
 OMP_SYSTEM_PROMPT = "You are a blind drawing reviewer. Use only the supplied sheet tools. Return only the requested JSON verdict."
+# OMP has no constrained decoding: a final message that fails the verdict
+# parser or schema gets at most this many same-session, tool-free corrections.
+OMP_REPAIR_TURNS = 2
+OMP_REPAIR_PROMPT = (
+    "Your previous reply is not a valid JSON verdict: {error}\n"
+    "Reply with only the corrected JSON object matching the schema: the same content, "
+    "no new findings, and no tool calls."
+)
 _SESSION_STATES: ContextVar[set[Path] | None] = ContextVar("machinist_review_session_states", default=None)
 _ATTEMPT_DEADLINE: ContextVar[float | None] = ContextVar("machinist_review_attempt_deadline", default=None)
 # Sheet views/crops fit 1976x1280 RGB: even incompressible PNG+base64 can exceed
@@ -71,6 +79,35 @@ def validate_omp_system_prompt(parts):
     if (first != OMP_SYSTEM_PROMPT or any(marker in part for part in parts for marker in forbidden)
             or OMP_PROJECT_CONTEXT_RE.fullmatch(parts[1].replace("\r\n", "\n").strip()) is None):
         raise ValueError("OMP system prompt contains unauthorized context")
+
+
+def verdict_object(text: str) -> dict:
+    """Parse a final reviewer message, tolerating prose or a code fence around it."""
+    if not text.strip():
+        raise RuntimeError("claude produced no final message")
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end < 0:
+        raise RuntimeError(f"final message is not JSON: {text[:200]!r}")
+    parsed = json.loads(text[start : end + 1])
+    if not isinstance(parsed, dict):
+        raise RuntimeError("structured verdict is not an object")
+    return parsed
+
+
+def omp_verdict_error(text: str, schema: dict) -> str | None:
+    """Return why OMP's final text fails the verdict parser or schema, if it does."""
+    import jsonschema
+
+    try:
+        jsonschema.validate(verdict_object(text), schema)
+    except jsonschema.ValidationError as exc:
+        where = "".join(f"[{part!r}]" for part in exc.absolute_path)
+        error = f"schema violation at verdict{where}: {exc.message}"
+    except (RuntimeError, ValueError) as exc:
+        error = f"{type(exc).__name__}: {exc}"
+    else:
+        return None
+    return error if len(error) <= 500 else error[:500] + "..."
 
 
 def register_state(home: Path) -> None:
@@ -432,6 +469,22 @@ def omp_event(event):
             "usage": {"input_tokens": usage.get("input", 0), "output_tokens": usage.get("output", 0), "cache_read_input_tokens": usage.get("cacheRead", 0), "cache_creation_input_tokens": usage.get("cacheWrite", 0)}}}
 
 
+def omp_calls_tool(event):
+    """Detect any native trace of a tool call: streamed, completed or executed."""
+    if str(event.get("type", "")).startswith("tool_execution_"):
+        return True
+    update = event.get("assistantMessageEvent")
+    if isinstance(update, dict) and str(update.get("type", "")).startswith("toolcall"):
+        return True
+    def walk(node):
+        if isinstance(node, dict):
+            return node.get("type") == "toolCall" or any(walk(child) for child in node.values())
+        return isinstance(node, list) and any(walk(child) for child in node)
+    # agent_end may replay history beyond this turn; every new call in it was
+    # already streamed and completed through the message events checked here.
+    return event.get("type") != "agent_end" and walk(event)
+
+
 @asynccontextmanager
 async def _broker(executable, register_secret, remaining, startup):
     """Use the supported vault boundary, never copy or relink refresh tokens."""
@@ -749,20 +802,33 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
                 "system_prompt": parts, "tools": sorted(tools), "cwd": cwd,
             }
         await control("set_auto_compaction", enabled=False)
-        prompt_id = str(uuid.uuid4())
+        async def turn(message, *, repair=False):
+            identity = str(uuid.uuid4())
+            await send({"id": identity, "type": "prompt", "message": message})
+            while True:
+                event = await receive()
+                # A correction must not inspect (or re-inspect) the sheet:
+                # fail at the first streamed, completed or executed tool call.
+                if repair and omp_calls_tool(event):
+                    raise RuntimeError("OMP verdict repair turn called a tool")
+                if event.get("type") == "response" and event.get("id") == identity and event.get("success") is False:
+                    raise TransportError("OMP prompt request failed", category="protocol_error")
+                if event.get("type") == "prompt_result" and event.get("id") == identity:
+                    if event.get("status") != "completed":
+                        raise RuntimeError("OMP review did not complete")
+                    return
         omp_prompt = config["prompt"] + "\nReturn JSON matching this schema:\n" + json.dumps(schema)
         provenance["omp_prompt"] = omp_prompt
         provenance["omp_prompt_sha256"] = hashlib.sha256(omp_prompt.encode("utf-8")).hexdigest()
-        await send({"id": prompt_id, "type": "prompt", "message": omp_prompt})
-        while True:
-            event = await receive()
-            if event.get("type") == "response" and event.get("id") == prompt_id and event.get("success") is False:
-                raise TransportError("OMP prompt request failed", category="protocol_error")
-            if event.get("type") == "prompt_result" and event.get("id") == prompt_id:
-                if event.get("status") != "completed":
-                    raise RuntimeError("OMP review did not complete")
-                break
+        await turn(omp_prompt)
         text = await control("get_last_assistant_text")
+        repairs = provenance["omp_repair_turns"] = []
+        while len(repairs) < OMP_REPAIR_TURNS and (error := omp_verdict_error(str(text.get("text") or ""), schema)):
+            repairs.append({"error": error})
+            _telemetry.event("machinist_review.omp_repair_turn", turn=len(repairs), error=error)
+            await turn(OMP_REPAIR_PROMPT.format(error=error), repair=True)
+            # The downstream verdict and its result event are this final text.
+            text = await control("get_last_assistant_text")
         # Publish success only after shutdown output and persisted blobs pass
         # the same validation as the active receive loop.
         completed = True
