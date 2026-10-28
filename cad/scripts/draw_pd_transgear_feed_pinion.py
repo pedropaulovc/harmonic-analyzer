@@ -246,7 +246,10 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
 # extra row (the rack it covers) stays above the title block.
 LEFT_CENTER = (0.373, 0.116)
 LEFT_CAPTION = "PARTIAL OUTSIDE VIEW\nSAME SIDE AS B-B"
-_LEFT_CAPTION_WIDTH = 0.059  # its longer row, as the drawing test estimates
+# Its longer row, a little over the drawing test's estimate: farm run
+# 20261028T064402620Z printed it 49.4 mm wide, and at 59 mm its left end
+# reached the 27.35 overall's extension line (sheet x 271.0).
+_LEFT_CAPTION_WIDTH = 0.053
 TANGENT_EDGES_HIDDEN = 0  # swDisplayTangentEdges_e.swTangentEdgesHidden
 _LEFT_REAR_X = LEFT_CENTER[0] - OVERALL_LENGTH / 2.0 * VIEW_SCALE[0] / 1000.0
 _LEFT_BOTTOM = LEFT_CENTER[1] - HALF_OD
