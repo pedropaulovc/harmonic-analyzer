@@ -163,7 +163,7 @@ _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0  # sheet metres per model mm
 # 0.097), its ink centred 1.8 mm under it as measured, it fills x
 # 0.289..0.341, y 0.069..0.121: 78 mm right of the reamed diameter's callout
 # (to x ~0.213), 4 mm over the title block (top 0.0651), under the flank
-# angle's text (x ~0.283..0.297, from y ~0.146).
+# angle's text (x ~0.2815..0.2955, from y ~0.134).
 # Its scale note (top-left anchor, ~58 mm wide) beside it at mid-height, from
 # x 0.350 (9 mm right of the ink) to ~0.408, 11 mm inside the border (0.4188),
 # under the caption and over the title block.
@@ -259,12 +259,16 @@ FRONT_KEEP = {
 #   view (x ~0.264..0.268, y ~0.148..0.156), right of the back edge's
 #   extension line (x 0.256, straight down from the corner); its text,
 #   offset off the arc on a leader (draw_pd_transgear_thumbnut's countersink
-#   angle), stands right of the view under the bottom face's line: ~14 mm at
-#   x ~0.283..0.297, y ~0.146..0.150, 6 mm under the flat height's lower
-#   extension line (y 0.156) and 9 mm left of section A-A (x 0.306).  Blind
-#   review final9: in the groove's wedge the arc, through the text, ran into
-#   its "4"; final8: placed outside the wedge it measures, SOLIDWORKS swept
-#   the arc 40 mm about the corner through the depth row's text.
+#   angle), stands right of the view under section A-A's dimension rows:
+#   ~14 mm at x ~0.2815..0.2955, y ~0.1335..0.1375, its shelf (~0.133) 5 mm
+#   under the far wall's line (~0.1377), 12 mm from the near wall's outside
+#   arrow (tail x ~0.299, y ~0.1445) and 10 mm left of section A-A (x
+#   0.306).  Release review 41bbeec: at y ~0.148 its shelf (~0.1453) ended
+#   1 mm short of that arrow's tail at its height and read as one line.
+#   Blind review final9: in the groove's wedge the arc, through the text,
+#   ran into its "4"; final8: placed outside the wedge it measures,
+#   SOLIDWORKS swept the arc 40 mm about the corner through the depth row's
+#   text.
 # * the apex flat's width over the view (its line ~6 mm over the top face,
 #   y ~0.234; text ~0.2355..0.239), its extension lines rising from the
 #   flat's ends (x 0.228 / 0.236) across the end face: 8 mm under the tap's
@@ -292,7 +296,7 @@ _ROUND_TEXT_RUN = 0.070
 # angle under the bottom face's line; the arc stands on the bisector between.
 _FLANK_ARC_BEARING = -math.radians(90.0 - V_ANGLE_DEG / 2.0) / 2.0
 _FLANK_ARC_RUN = 0.012
-FLANK_ANGLE_TEXT_XY = (_rz(BODY_Z1) + 0.0135, _ry(0.0) - 0.008)
+FLANK_ANGLE_TEXT_XY = (_rz(BODY_Z1) + 0.0125, _ry(0.0) - 0.0205)
 RIGHT_KEEP = {
     "VMouthZ0": ((_rz(BODY_Z0) + _rz(V_MOUTH_Z0)) / 2.0, _ry(0.0) - 0.006),
     "VMouthZ1": (_rz(_CZ), _ry(0.0) - 0.006 - _END_ROW),
