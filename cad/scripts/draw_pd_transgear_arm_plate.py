@@ -395,11 +395,12 @@ async def build(adapter: Any) -> dict[str, str]:
     plan_edges = scan_view_edges(plan, label="plate rear-face locating PMI")
     back_edges = scan_view_edges(back, label="plate mounting-face drill PMI")
     placements = {
-        # Above section A-A's station stack (its top text reaches y 0.2365),
-        # so the tag's horizontal leader to the mounting face's extension
-        # runs clear of the HubFaceToMounting text.
+        # Above section A-A's station stack (its top text reaches y 0.2485
+        # since #2034 raised the section: run 20261028T032002538Z), so the
+        # tag's horizontal leader to the mounting face's extension runs
+        # clear of the HubFaceToMounting text.
         "datum:A": PmiDrawingPlacement(
-            section, (0.300, 0.244),
+            section, (0.300, 0.253),
             attachment_xy=_sheet_xy(
                 adapter, section, (0.0, SCREW_HOLES[0][1], 0.0),
                 "plate mounting datum",
