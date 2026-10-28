@@ -182,14 +182,18 @@ COUNTERBORE_DEPTH = round((COUNTERBORE_DEPTH_MIN + COUNTERBORE_DEPTH_MAX) / 2.0,
 SCREW_FACE_OFFSET_MAX = SCREW_RADIAL_PLAY_MAX + (
     COUNTERBORE_DEPTH_MAX + EDGE_BREAK
 ) * math.tan(SCREW_TILT_MAX)
-# Ø printed under the title block's DRILLED HOLES row (+0.10/0).  The fat
-# run-out (basic major, at or above the body's upper limit) must clear the
-# bore's SMALLEST size with the screw and the bore each off the thread axis by
+# Ø printed as its own LIMIT band from the model's 7.00 up 0.10 (codjiflo
+# P1 on #1997: a flat-floored counterbore is milled, not drilled, so the
+# title block's DRILLED HOLES row cannot be assumed to govern it, and the
+# .XX row's -0.51 would let the run-out reach the wall).  The fat run-out
+# (basic major, at or above the body's upper limit) must clear the bore's
+# SMALLEST size with the screw and the bore each off the thread axis by
 # their full bands: the counterbore's printed axis band to the tap
 # (COUNTERBORE_AXIS_OFFSET_MAX, MHA-SM-01 note) and the tilted screw's
 # SCREW_FACE_OFFSET_MAX, its largest anywhere in the bore.
 COUNTERBORE_DIA = 7.00
-COUNTERBORE_DIA_MAX = COUNTERBORE_DIA + drilled_oversize_mm()
+COUNTERBORE_DIA_BAND = 0.10
+COUNTERBORE_DIA_MAX = round(COUNTERBORE_DIA + COUNTERBORE_DIA_BAND, 6)
 COUNTERBORE_AXIS_OFFSET_MAX = 0.10
 RUNOUT_RADIAL_CLEARANCE_MIN = (
     (COUNTERBORE_DIA - screw.MAJOR_DIA) / 2.0

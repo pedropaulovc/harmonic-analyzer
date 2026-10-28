@@ -175,9 +175,9 @@ def channel_seat(amplitude_mm: float) -> SettledSpring:
 def counter_upper_support_geometry() -> dict[str, str | float]:
     """Identify the actual upper support measured by the native fixture.
 
-    Older integral-shank, purchased-screw, #6-32 die-relief and #8-32
-    shoulder-screw certificates do not measure this made support: owner
-    ruling 2026-10-27 (#1951) seats the loop on the plain Ø6.35 body of a
+    Older integral-shank, purchased-screw and #6-32 die-relief certificates
+    do not measure this made support: owner ruling 2026-10-27 (#1951) seats
+    the loop on the plain Ø6.35 body of a
     1/4-28 slotted cheese-head screw, clamped to the flush end piece of the
     Ø12.70 tube arm, whose arm-end counterbore (codjiflo P1 on #1997) shapes
     the face the loop is clamped to. Channel measurements are unchanged; the

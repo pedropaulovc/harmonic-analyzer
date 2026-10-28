@@ -155,9 +155,6 @@ class CounterScrewDiameterTests(unittest.TestCase):
             "six_thirty_two_thread_major": (
                 types.SimpleNamespace(MAJOR_DIA=3.5052), 3.5052
             ),
-            "shoulder_seat": (
-                types.SimpleNamespace(MAJOR_DIA=4.1656, SEAT_DIA=3.50), 3.50
-            ),
             # A body distinct from the major proves BODY_DIA, not MAJOR_DIA.
             "cheese_head_plain_body": (
                 types.SimpleNamespace(MAJOR_DIA=6.35, BODY_DIA=6.30), 6.30

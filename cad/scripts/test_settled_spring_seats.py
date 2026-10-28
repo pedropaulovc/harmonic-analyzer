@@ -299,15 +299,13 @@ def test_changed_support_geometry_cannot_reuse_a_native_certificate(
         counter_seat()
 
 
-@pytest.mark.parametrize("thread", ["#6-32 UNC", "#8-32 UNC"])
 def test_counter_record_measured_on_an_earlier_screw_is_rejected(
     isolated_calibration,
-    thread,
 ):
     _, record = isolated_calibration
     record["upper_support"] = {
         **counter_upper_support_geometry(),
-        "thread": thread,
+        "thread": "#6-32 UNC",
     }
     with pytest.raises(ValueError, match="Stale counter native calibration"):
         counter_seat()

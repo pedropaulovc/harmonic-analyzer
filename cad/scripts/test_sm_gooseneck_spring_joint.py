@@ -260,7 +260,7 @@ def test_drill_point_shank_wall_is_2_0_at_the_full_worst_case() -> None:
 
 
 def test_counterbore_wall_holds_the_floor_and_declares_its_minor() -> None:
-    largest_cbore = joint.COUNTERBORE_DIA + 0.10  # DRILLED HOLES +0.10
+    largest_cbore = 7.10  # its printed LIMIT 7.10/7.00
     # Counterbore cut after braze, head OD turned before: different setups.
     runoff = joint.COUNTERBORE_DEPTH_MAX * math.tan(math.radians(0.3))
     worst_wall = (

@@ -275,8 +275,8 @@ _FRAME_ALLOWED_PAIRS = {
     ),
     # MHA-FR-VN-52 / 91410A540 1/4-20 (major 6.35, #7 drill 5.105): thread from
     # the hub's spot face, 21.0 from the bore axis (fr_top_frame_spec
-    # HUB_SET_SPOT_FROM_AXIS), to the cup tip 8.15 from the axis (0.15 clear of
-    # the O16 post): 12.5 to the O17 bore wall plus the tip's 0.35 into the bore.
+    # HUB_SET_SPOT_FROM_AXIS), to the cup tip 8.15 from the axis (0.21 clear of
+    # the gooseneck's O15.875 sleeve): 12.5 to the O17 bore wall plus the tip's 0.35 into the bore.
     frozenset(("fr-vn-gooseneck-set-screw-1", "fr-top-frame-1")): _smooth_annulus_limit_mm3(
         6.35, 5.105, 12.85
     ),

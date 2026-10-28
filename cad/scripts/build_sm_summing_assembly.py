@@ -555,7 +555,6 @@ import spring_mount_geom as spring_mounts  # noqa: E402
 import sm_summing_lever_spec  # noqa: E402
 from stock_anchor_geom import ANCHOR_9490T1  # noqa: E402
 import sm_vn_boss_hook_jam_nut_spec as jam_nut  # noqa: E402
-from fr_frame_attachment_spec import TOP_SCREW_Y as TOP_FRAME_MID_Y  # noqa: E402
 
 BOSS_HOOK_POS = (*spring_mounts.COUNTER_ANCHOR_XY, SUMMING_Z)
 # MHA-SM-VN-55 on the anchor axis, its z = 0 face on the boss top face:
@@ -568,10 +567,6 @@ JAM_NUT_POS = (
 JAM_NUT_ROWS = ROT_X_NEG90
 # The counter spring and gooseneck use complete calibrated placements loaded by
 # ``counter_seat`` before assembly creation.
-# The top frame's rail band about its mid-plane: the gooseneck hub bore's rail
-# span (999.7..1036.2), where the set screw grips the gooseneck's sleeve.
-TOP_FRAME_RAIL_BOTTOM_Y = TOP_FRAME_MID_Y - top_frame.HALF_H
-TOP_FRAME_RAIL_TOP_Y = TOP_FRAME_MID_Y + top_frame.HALF_H
 
 UPPER_EYE_CLAMP_NOTES = (
     "MHA-SM-04: CLAMP COUNTER-SPRING UPPER EYE TO END PIECE.\n"
@@ -588,25 +583,22 @@ def _assert_gooseneck_sleeve_covers_hub_bore(
     The Ø12.70 tube alone would rattle in the unchanged Ø17 rail-hub bore;
     the 5/8 in sleeve (sm_gooseneck_geom.SLEEVE_*) is the post the hub's set
     screw grips, so at this setting it must run from below the rail underside
-    to above its top face.
+    (CASTING_UNDERSIDE_Y) to above its faced top (CROSSBAR_TOP_Y).
     """
     sleeve_bottom = gooseneck_origin_y + sm_gooseneck_geom.LEG_BOTTOM
     sleeve_top = gooseneck_origin_y + sm_gooseneck_geom.SLEEVE_TOP
-    if not (
-        sleeve_bottom <= TOP_FRAME_RAIL_BOTTOM_Y
-        and TOP_FRAME_RAIL_TOP_Y <= sleeve_top
-    ):
+    if not (sleeve_bottom <= CASTING_UNDERSIDE_Y and CROSSBAR_TOP_Y <= sleeve_top):
         raise RuntimeError(
             f"gooseneck sleeve y {sleeve_bottom:.3f}..{sleeve_top:.3f} at the "
             f"{label} setting does not cover the top-frame hub bore's rail span "
-            f"{TOP_FRAME_RAIL_BOTTOM_Y:.3f}..{TOP_FRAME_RAIL_TOP_Y:.3f}"
+            f"{CASTING_UNDERSIDE_Y:.3f}..{CROSSBAR_TOP_Y:.3f}"
         )
     log(
         f"gooseneck sleeve ({label}): y {sleeve_bottom:.3f}..{sleeve_top:.3f} "
-        f"covers the hub bore rail span {TOP_FRAME_RAIL_BOTTOM_Y:.3f}.."
-        f"{TOP_FRAME_RAIL_TOP_Y:.3f} "
-        f"({TOP_FRAME_RAIL_BOTTOM_Y - sleeve_bottom:.3f} "
-        f"below, {sleeve_top - TOP_FRAME_RAIL_TOP_Y:.3f} above)"
+        f"covers the hub bore rail span {CASTING_UNDERSIDE_Y:.3f}.."
+        f"{CROSSBAR_TOP_Y:.3f} "
+        f"({CASTING_UNDERSIDE_Y - sleeve_bottom:.3f} "
+        f"below, {sleeve_top - CROSSBAR_TOP_Y:.3f} above)"
     )
 
 

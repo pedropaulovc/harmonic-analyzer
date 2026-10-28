@@ -148,16 +148,13 @@ def counter_screw_diameter(goose, import_made_screw) -> float:
 
     Releases before MHA-SM-04 model it as the gooseneck's integral screw shank;
     #6-32 trees seat the eye on the separate made screw's thread major;
-    shoulder-screw trees (owner ruling 2026-10-26 (#1951, option B)) on its
-    plain SEAT_DIA; cheese-head trees (owner ruling 2026-10-27 (#1951)) on its
-    plain BODY_DIA.  ``import_made_screw`` loads that release's screw module.
+    cheese-head trees (owner ruling 2026-10-27 (#1951)) on its plain BODY_DIA.
+    ``import_made_screw`` loads that release's screw module.
     """
     if hasattr(goose, "SCREW_SHANK_DIA"):
         return goose.SCREW_SHANK_DIA
     made_screw = import_made_screw()
-    return getattr(
-        made_screw, "BODY_DIA", getattr(made_screw, "SEAT_DIA", made_screw.MAJOR_DIA)
-    )
+    return getattr(made_screw, "BODY_DIA", made_screw.MAJOR_DIA)
 
 
 def main() -> None:

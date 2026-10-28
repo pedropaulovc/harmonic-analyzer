@@ -22,7 +22,7 @@ sheet carries, at 1:3:
 and at 3:1 SECTION A-A, a full section on the arm axis (cut faces only)
 cropped to the end piece, with the tube end's joint line drawn across each
 cut wall: the head Ø (flush) and length, the braze shank Ø (its fit) and
-length, and the counterbore Ø (with the stated wall) and LIMIT depth (with
+length, and the counterbore's LIMIT Ø (with the stated wall) and depth (with
 its floor-corner limit, which names the mate).  The isometric is at 1:4.
 
 Run with SolidWorks open::
@@ -205,9 +205,10 @@ def _section_x(model_x: float) -> float:
 
 # Section A-A's dimensions: the two lengths in one row over the part; the
 # counterbore depth's LIMIT pair above them, left of the face; the
-# counterbore Ø (with its wall) left of the end face, between its extension
-# lines; the head and shank Ø
-# below the part, the shank's longer fit callout lower.  Each Ø's text
+# counterbore Ø's LIMIT pair (with its axis row) left of the end face,
+# between its extension lines; the head and shank Ø below the part, the
+# head's block carrying the counterbore wall a row lower, the shank's longer
+# fit callout lower.  Each Ø's text
 # starts at its dimension line and runs right, so the head's line stands
 # near the end face and its text ends short of the shank's line (at
 # ARM_END_X + 10 the shank's line ran through it, farm run
@@ -232,7 +233,7 @@ SECTION_KEEP = {
     "CounterboreDepth": (_SX0 - 0.012, _SY0 + _SECTION_HALF + 0.032),
     "CounterboreDia": (_SX0 - 0.030, _SY0),
     "CounterboreFloorCornerR": (_SX0 - 0.032, _SY0 + _SECTION_HALF + 0.013),
-    "PlugDia": (_section_x(ARM_END_X + 4.0), _SY0 - _SECTION_HALF - 0.016),
+    "PlugDia": (_section_x(ARM_END_X + 4.0), _SY0 - _SECTION_HALF - 0.019),
     "PlugShankDia": (
         _section_x(TUBE_END_X + PLUG_SHANK_LENGTH / 2.0),
         _SY0 - _SECTION_HALF - 0.044,

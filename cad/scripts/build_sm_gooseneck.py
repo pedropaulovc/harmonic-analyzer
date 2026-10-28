@@ -19,7 +19,7 @@ One weldment part, one body, built in this order:
    carries its dimensions).
 2. ``Counterbore``: a revolved cut Ø COUNTERBORE_DIA x COUNTERBORE_DEPTH
    from the end face, its floor corner round at its printed R0.10 MAX; its
-   depth carries the native LIMIT band.  Then ``ThreadBore``: the native blind
+   Ø and depth carry native LIMIT bands.  Then ``ThreadBore``: the native blind
    bottoming tap from ``TAP_SPEC``, started on the counterbore floor, both
    depths from it.  ``SpringScrewAxis`` is their hidden, equation-driven
    assembly reference.
@@ -121,6 +121,7 @@ from sm_gooseneck_spring_joint import (
     COUNTERBORE_DEPTH_MAX,
     COUNTERBORE_DEPTH_MIN,
     COUNTERBORE_DIA,
+    COUNTERBORE_DIA_MAX,
     COUNTERBORE_FLOOR_CORNER_R_BAND,
     COUNTERBORE_FLOOR_CORNER_R_MAX,
     COUNTERBORE_FLOOR_CORNER_R_TOL_TYPE,
@@ -904,8 +905,10 @@ async def build(adapter) -> dict[str, str]:
     if len(bodies) != 1:
         raise RuntimeError(f"gooseneck: expected one solid body, found {len(bodies)}")
 
-    # Model-owned limit: the counterbore depth prints as its LIMIT band from
-    # the end face (sm_gooseneck_spring_joint), the model at mid-band.
+    # Model-owned limits: the counterbore depth prints as its LIMIT band from
+    # the end face (sm_gooseneck_spring_joint), the model at mid-band; its Ø
+    # as LIMIT 7.10/7.00, the model at the lower limit the run-out clearance
+    # is budgeted on (codjiflo P1 on #1997).
     _limit_band(
         adapter,
         "CounterboreProfile",
@@ -914,6 +917,12 @@ async def build(adapter) -> dict[str, str]:
             COUNTERBORE_DEPTH_MIN - COUNTERBORE_DEPTH,
             COUNTERBORE_DEPTH_MAX - COUNTERBORE_DEPTH,
         ),
+    )
+    _limit_band(
+        adapter,
+        "CounterboreProfile",
+        "CounterboreDia",
+        (0.0, COUNTERBORE_DIA_MAX - COUNTERBORE_DIA),
     )
     # The floor corner's R0.10 MAX (codjiflo P1 round 5, P2 on #1997): the
     # modelled radius is the limit, the band runs from sharp up to it.

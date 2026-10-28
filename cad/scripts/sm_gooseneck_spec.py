@@ -19,13 +19,13 @@ takes.
 
 Every size is a native model dimension: the elevation's leg length, bend
 radius, arm straight and sleeve length; section A-A's end piece (head Ø and
-length, braze shank Ø and length) and counterbore (Ø, LIMIT depth, floor
+length, braze shank Ø and length) and counterbore (LIMIT Ø and depth, floor
 corner R0.10 MAX); the end view's native blind-tap callout.  The notes state
 stock, process and intent only.  The counterbore's wall shortfall (owner
-minor sm-gooseneck RV-01) is stated on its Ø as ``C'BORE WALL n.nn MIN``
-(drawing-guidelines.md rule 20), the shank's braze fit on the shank Ø (rule
-4, the matched fit names its mate and clearance) and the tap's location
-limits under its callout.
+minor sm-gooseneck RV-01) is stated as ``C'BORE WALL n.nn MIN`` under the
+head Ø, the wall's outer bound (drawing-guidelines.md rule 20), the shank's
+braze fit on the shank Ø (rule 4, the matched fit names its mate and
+clearance) and the tap's location limits under its callout.
 """
 
 from __future__ import annotations
@@ -81,13 +81,15 @@ if not (
 
 # Callouts the PART authors on its dimensions, below the value (the drawing
 # imports and reads them back; a drawing-side SetText can write through to
-# the part, #1942).  The counterbore's tight limits (depth band, axis, floor
-# corner) all serve one function, clearing MHA-SM-04's thread run-out
+# the part, #1942).  The counterbore's tight limits (Ø and depth bands, axis,
+# floor corner) all serve one function, clearing MHA-SM-04's thread run-out
 # (sm_gooseneck_spring_joint), so the floor corner's callout, beside the depth
-# and the Ø, names the mate (rule 4; machinist review of e487a1bb4).  The Ø
-# keeps two rows: its block stands between its own extension lines (a third
-# row was struck by the lower one, machinist review of cca02b34c; set below
-# them, its text ran off the sheet's left edge, farm run 20261028T072132691Z).
+# and the Ø, names the mate (rule 4; machinist review of e487a1bb4).  The Ø's
+# block stands between its own extension lines: its stacked LIMIT pair and
+# one row (a fourth row was struck by the lower line, machinist review of
+# cca02b34c; set below them, its text ran off the sheet's left edge, farm run
+# 20261028T072132691Z), so the wall it leaves rides under the head Ø, its
+# outer bound, in the open space below the section.
 SCREW_NUMBER = str(_config.parts("sm-gooseneck-spring-screw")["number"])
 COUNTERBORE_WALL_CALLOUT = f"C'BORE WALL {COUNTERBORE_WALL_CALLOUT_MIN:.2f} MIN"
 COUNTERBORE_AXIS_CALLOUT = f"ON TAP AXIS WITHIN {COUNTERBORE_AXIS_OFFSET_MAX:.2f}"
@@ -96,11 +98,11 @@ COUNTERBORE_FLOOR_CALLOUT = f"FLOOR CORNER, CLEARS\n{SCREW_NUMBER} RUN-OUT"
 # No row wider than the axis row: each block stands between the sheet's left
 # border and the end face (farm run 20261028T062539287Z: "CLEARS MHA-SM-04
 # RUN-OUT" crossed the border).
-if max(
-    map(len, (*COUNTERBORE_FLOOR_CALLOUT.splitlines(), COUNTERBORE_WALL_CALLOUT))
-) > len(COUNTERBORE_AXIS_CALLOUT):
+if max(map(len, COUNTERBORE_FLOOR_CALLOUT.splitlines())) > len(
+    COUNTERBORE_AXIS_CALLOUT
+):
     raise AssertionError("a counterbore callout row is wider than its axis row")
-PLUG_DIA_CALLOUT = "FLUSH WITH TUBE OD,\nNO STEP"
+PLUG_DIA_CALLOUT = f"FLUSH WITH TUBE OD,\nNO STEP\n{COUNTERBORE_WALL_CALLOUT}"
 # The bend radius is the tube's centreline radius; the arrowhead lands on the
 # outer arc, so the value says which (machinist review of e487a1bb4).
 BEND_RADIUS_CALLOUT = "CLR"
@@ -130,7 +132,7 @@ DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
         "PlugShankDia": SHANK_FIT_CALLOUT,
     },
     "CounterboreProfile": {
-        "CounterboreDia": f"{COUNTERBORE_AXIS_CALLOUT}\n{COUNTERBORE_WALL_CALLOUT}",
+        "CounterboreDia": COUNTERBORE_AXIS_CALLOUT,
         "CounterboreFloorCornerR": COUNTERBORE_FLOOR_CALLOUT,
     },
 }

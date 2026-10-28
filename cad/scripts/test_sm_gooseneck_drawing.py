@@ -141,7 +141,10 @@ def test_counterbore_callouts_floor_the_wall_from_the_joint() -> None:
     assert spec.COUNTERBORE_WALL_CALLOUT == f"C'BORE WALL {floored:.2f} MIN"
     assert floored <= joint.COUNTERBORE_WALL_MIN
     callouts = spec.DIMENSION_CALLOUTS_BY_NAME
-    assert spec.COUNTERBORE_WALL_CALLOUT in callouts["CounterboreDia"].splitlines()
+    # The wall rides under the head Ø, its outer bound; the counterbore Ø's
+    # stacked LIMIT pair keeps one row between its extension lines.
+    assert spec.COUNTERBORE_WALL_CALLOUT in callouts["PlugDia"].splitlines()
+    assert callouts["CounterboreDia"] == spec.COUNTERBORE_AXIS_CALLOUT
     # The floor corner's limit is its own native radial dimension, not text
     # under the depth (codjiflo P2 on #1997); the depth names its mate in one
     # row above its stacked pair (rule 4).

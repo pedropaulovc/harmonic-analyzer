@@ -26,7 +26,9 @@ TAP_DRILL_MM = {  # taps cut the tap-drill diameter (TAP_DRILL column)
     "#10-24": 3.797,
     "#10-32": 4.0386,
     "1/4-20": 5.105,
-    "1/4-28": 5.410,  # #3 drill (0.2130 in); not yet re-proved by a live wizard probe
+    # #3 drill (0.2130 in); MHA-SM-01's blind wizard tap read it back and
+    # printed Ø5.41 (farm run 20261028T114400957Z).
+    "1/4-28": 5.410,
     "5/16-18": 6.528,
     "3/8-16": 7.938,  # 5/16 drill
     "1/2-13": 10.716,
