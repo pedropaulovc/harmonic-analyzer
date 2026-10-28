@@ -1547,11 +1547,6 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"HUB'S SPIGOT, THEN THE HUB'S D-BORE ON THE {_N['pd-transgear-feed-pinion']} "
             "D-FLAT, SPIGOT TO THE STEP."
         ),
-        "hub-faced-to-nose": (
-            "AS FITTED, MEASURE THE HUB FRONT FACE BEHIND THE SLEEVE NOSE. HUB "
-            f"OFF; FACE ITS FRONT TILL {cluster_fit.HUB_NOSE_WINDOW_TEXT} BEHIND; "
-            "REFIT."
-        ),
         "disc-taps-transferred": (
             "MOUNT THE CLUSTER ON A MANDREL IN THE "
             f"{_N['pd-transgear-feed-pinion']} BORE. WITH A "
@@ -1576,10 +1571,11 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "DEBURR THE BORE."
         ),
         "disc-cluster-hung": (
-            "OIL THE PIN (LIGHT MACHINE OIL); CLUSTER ON, PINION REARWARD; A "
-            f"{_N['pd-transgear-front-bushing']} BUSHING BLANK ON THE NOSE TRAPS HUB "
-            f"AND DISC; {_N['pd-vn-transgear-retaining-ring']} RING SIDEWAYS IN THE PIN "
-            "GROOVE. NO REAR BUSHING YET: CLUSTER FORWARD ON THE RING."
+            "OIL THE PIN (LIGHT MACHINE OIL); BUSHINGS AS MADE: "
+            f"{_N['pd-transgear-rear-bushing']} BUSHING ON THE PIN, CLUSTER ON, "
+            f"PINION REARWARD; {_N['pd-transgear-front-bushing']} BUSHING ON THE NOSE "
+            f"TRAPS HUB AND DISC; {_N['pd-vn-transgear-retaining-ring']} RING SIDEWAYS "
+            "IN THE PIN GROOVE."
         ),
         "collar-pins-pressed": (
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-knob-drive-pin']} "
@@ -1652,22 +1648,6 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"{quality.reducer_setup_clock_deviation_mm():.2f} AT THE PITCH CIRCLE. "
             "TURN THE KNOB: NO TIGHT SPOT, SHAKE AT EVERY TOOTH."
         ),
-        "front-bushing-faced-to-fit": (
-            "CLUSTER, HUB AND DISC FORWARD, FEEL m, THE AXIAL GAP FROM THE "
-            f"{_N['pd-transgear-knob-shaft']} {teeth} TO THE {_N['pd-rack-pinion']} "
-            "DISC. FACE THE "
-            f"{_N['pd-transgear-front-bushing']} BUSHING'S REAR TILL m IS "
-            f"{cluster_fit.FIT_WINDOW_TEXT}; ELSE REPORT."
-        ),
-        # The blank (MHA-PD-24 BLANK_LENGTH_MIN) is longer than the nominal gap
-        # it fills, so it is faced to the gap gauged before it goes on.
-        "rear-bushing-faced-to-fit": (
-            "CLUSTER FORWARD, DEPTH-GAUGE THE SLEEVE REAR FACE FROM THE ARM; "
-            f"FACE THE {_N['pd-transgear-rear-bushing']} BLANK TO THAT LESS "
-            f"{cluster_fit.SLEEVE_FLOAT_WINDOW_TEXT}. STRIP TO THE PIN, BLANK ON, "
-            f"REFIT. DISC END FLOAT {cluster_fit.FLOAT_WINDOW_TEXT} AND FREE; ELSE "
-            "REPORT."
-        ),
         "collar-rear-faced-to-fit": (
             f"IN STEP {steps.step_number('fitup-pose-set')}'S POSE, "
             f"{steps.KNOB_HELD_BACK_TEXT}. {collar.BODY_FACE_PHRASE}: SET THE "
@@ -1707,9 +1687,11 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"{steps.OFFSET_ACCEPT_TOL - collar.FIT_UP_OFFSET_TARGET:.2f} BEHIND "
             f"PASSES); KNOB END FLOAT {knob_lo:.2f} TO {knob_hi:.2f}; "
             f"{sprocket.KNOB_CONFIG} FREE "
-            "UNDER THE NUT; THE HANGER FREE; RE-CHECK ACTUAL COLLAR TO DISC AIR "
+            "UNDER THE NUT; THE HANGER FREE; DISC END FLOAT "
+            f"{cluster_fit.END_FLOAT_TEXT} AND THE DISC TURNS FREE; COLLAR TO DISC "
+            f"AIR PER STEP {steps.step_number('collar-disc-air-inspected')}, "
             f"{steps.COLLAR_DISC_AIR_TEXT} AT OVERLAP AFTER REFITTING AND LATCHING. "
-            "ELSE REPORT."
+            "ELSE REPORT: NO FACING OR FITTING."
         ),
         "chain-closed": (
             f"LOOP {chain.LINK_COUNT} PITCHES OF ANSI #25 CHAIN, "

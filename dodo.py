@@ -3739,6 +3739,9 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # Closed-form AGMA-style gates for the 12T:120T reducer and the feed
         # pinion on the rack, plus one numeric flank-stepping cross-check.
         SCRIPTS_DIR / "test_paper_drive_mesh_check.py",
+        # The disc cluster's printed stack (#2038): end float, recess, and the
+        # collar and platen air stacks in the statistical style.
+        SCRIPTS_DIR / "test_transgear_cluster_air.py",
         # The integral pinion's finite cutter, running fits and retained bearings.
         SCRIPTS_DIR / "test_pd48_knob_mechanics.py",
         # Source-only adapter member/signature census; no SDK or native import.

@@ -26,6 +26,8 @@ from _drawing_contract import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_notes import property_link
+from _printed_tolerance import printed_band_mm
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND, STACK_NAME
 from paper_drive_stock_inspection import span_contact_points_mm, toothspace_gauge_contact_mm
 from stock_form_cutter import (
     CutterTemplate,
@@ -274,6 +276,9 @@ def test_model_bands_and_source_linked_properties() -> None:
     assert bands[("JournalProfile", "JournalDia")] == "*deviations(JOURNAL_DIA_BAND)"
     assert bands[("CoreFlatProfile", "FlatToAxis")] == "*deviations(CORE_FLAT_BAND)"
     assert bands[("StudProfile", "OutsideDia")] == "*deviations(OUTSIDE_DIA_BAND)"
+    assert bands[("GearBlank", "FaceWidth")] == "FACE_WIDTH_BAND"
+    assert spec.FACE_WIDTH_BAND == PRINTED_LENGTH_BAND
+    assert spec.FACE_WIDTH_BAND < printed_band_mm(spec.FACE_WIDTH_PLACES)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
     assert not drawing_specification_violations(source, filename=drawing.__file__)
@@ -531,7 +536,8 @@ def test_part_record_and_running_finishes() -> None:
     assert faces["journal"].diameter_mm == spec.JOURNAL_DIA
     assert faces["core"].diameter_mm == spec.CORE_DIA
     assert spec.CORE_FRONT_Z < faces["core"].contains_z_mm < spec.CORE_REAR_Z
-    assert drawing.DIMENSION_CALLOUTS_BELOW == {"TipChamfer": spec.CHAMFER_CALLOUT}
+    assert drawing.DIMENSION_CALLOUTS_BELOW["TipChamfer"] == spec.CHAMFER_CALLOUT
+    assert STACK_NAME in drawing.DIMENSION_CALLOUTS_BELOW["FaceWidth"]
 
 
 def _inside(point_mm, focus_mm, radius_mm) -> bool:

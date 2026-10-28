@@ -126,6 +126,7 @@ from pd_transgear_arm_plate_spec import (
     SHEET_NAMES,
     SURFACE_FINISHES,
 )
+from pd_cluster_stack_band import STACK_NAME
 
 # Machinist review gates this sheet: the build fails on a FIX verdict.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -360,12 +361,17 @@ PLAN_CALLOUTS_ABOVE = {
     "ScrewHoleDia": HOLE_COUNT_CALLOUT,
     "CskDia": HOLE_COUNT_CALLOUT,
 }
+# The hub station, the outermost row above the section, names the stack its
+# ±band serves (rule 4) above its text, away from the inner rows.
+SECTION_CALLOUTS_ABOVE = {
+    "HubFaceToMounting": STACK_NAME,
+}
 SECTION_CALLOUTS = {
     "HubFaceToMounting": HUB_STATION_CALLOUT,
     "HubToBoss": HUB_TO_BOSS_CALLOUT,
 }
 DIMENSION_CALLOUTS = {**PLAN_CALLOUTS, **SECTION_CALLOUTS}
-CALLOUTS_ABOVE = PLAN_CALLOUTS_ABOVE
+CALLOUTS_ABOVE = {**PLAN_CALLOUTS_ABOVE, **SECTION_CALLOUTS_ABOVE}
 # The bore finish symbol stands below the end round, just right of the bore
 # axis: clear of the bore callout (lower left) and the end radius (lower
 # right); left of the axis its leader crossed the bore callout's (run
@@ -883,6 +889,9 @@ async def build(adapter: Any) -> dict[str, str]:
         {name: DRAWING_PRECISION_BY_NAME[name] for name in (*BACK_KEEP, *SECTION_KEEP)},
     )
     set_dimension_callouts(adapter, face_annotations, SECTION_CALLOUTS)
+    set_dimension_callouts(
+        adapter, face_annotations, SECTION_CALLOUTS_ABOVE, location="above"
+    )
     _cap_witness_lines(adapter, face_annotations, "HubDia", HUB_DIA_WITNESS_MAX_M)
     _set_arrow_sides(adapter, face_annotations, BACK_ARROW_SIDES)
     # These are the same native feature datums and circular zones authored

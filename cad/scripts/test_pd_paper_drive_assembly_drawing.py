@@ -34,7 +34,6 @@ import _paper_drive_placement as placement
 import pd_paper_drive_explode_spec as explode
 import pd_rack_pinion_spec as disc
 import pd_transgear_drive_collar_spec as collar
-import pd_transgear_front_bushing_spec as front_bushing
 import pd_transgear_feed_pinion_spec as feed_pinion
 import pd_transgear_knob_cup_spec as cup
 import pd_transgear_knob_shaft_spec as knob_shaft
@@ -42,7 +41,6 @@ import pd_vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
 import _transgear_arm_plate_locating_interface as plate_locating_interface
 import pd_vn_transgear_arm_plate_screw_spec as plate_screw
 import pd_vn_transgear_knob_drive_pin_spec as drive_pin
-import pd_transgear_rear_bushing_spec as rear_bushing
 from _test_stubbed_build import stub_seat
 import pd_transgear_removable_spec as sprocket
 import _sprocket_seat_geometry as seat_geometry
@@ -1543,9 +1541,9 @@ def test_the_collar_is_faced_and_shoulder_seated_before_stud_cut_and_acceptance(
 
 
 def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
-    rear = _step_body("rear-bushing-faced-to-fit")
-    assert f"DISC END FLOAT {cluster_fit.FLOAT_WINDOW_TEXT}" in rear
-    assert cluster_fit.FIT_WINDOW_TEXT in _step_body("front-bushing-faced-to-fit")
+    accepted = _step_body("fitup-accepted")
+    assert f"DISC END FLOAT {cluster_fit.END_FLOAT_TEXT}" in accepted
+    assert "DISC TURNS FREE" in accepted
     for key, bounds in (
         ("collar-pins-pressed", drive_pin.PROUD_RANGE),
         ("latch-pin-pressed", joints.LATCH_PIN_PROUD_RANGE),
@@ -1553,80 +1551,39 @@ def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
         assert f"{bounds[0]:.2f} TO {bounds[1]:.2f} PROUD" in _step_body(key)
 
 
-def test_the_hub_recess_is_in_m_and_in_the_disc_end_float() -> None:
-    """Codex P2 (6c385465d): the hub stands up to HUB_NOSE_WINDOW behind the
-    nose, so hub and disc reach the front bushing that much ahead of the
-    step. m is read with them forward, so the recess cannot close it below
-    FIT_WINDOW's minimum, and the front bushing's longest fit carries it; the
-    rear bushing leaves the sleeve the float less the recess, so the disc's
-    end float stays FLOAT_WINDOW (the disc-to-platen stack's term)."""
-    recess = cluster_fit.HUB_NOSE_WINDOW
-    longest = (
-        cluster_fit.FRONT_CHAIN_NOMINAL
-        + cluster_fit.FRONT_CHAIN_BAND
-        + cluster_fit.FIT_WINDOW[1]
-        + recess[1]
+def test_nothing_in_the_disc_cluster_is_faced_at_assembly() -> None:
+    for key in (
+        "hub-faced-to-nose",
+        "front-bushing-faced-to-fit",
+        "rear-bushing-faced-to-fit",
+    ):
+        assert key not in steps.SEQUENCE
+    assert "pilot-faced-to-fit" in steps.SEQUENCE
+    assert "collar-rear-faced-to-fit" in steps.SEQUENCE
+    assert "collar-disc-air-inspected" in steps.SEQUENCE
+    hub = drawing._N["pd-transgear-disc-hub"]
+    bushings = (
+        drawing._N["pd-transgear-front-bushing"],
+        drawing._N["pd-transgear-rear-bushing"],
     )
-    assert cluster_fit.FRONT_BUSHING_FITTED_MAX == pytest.approx(longest)
-    assert front_bushing.BLANK_LENGTH_MIN >= longest + front_bushing.FACING_ALLOWANCE
-    sleeve = cluster_fit.SLEEVE_FLOAT_WINDOW
-    for r in recess:
-        assert cluster_fit.FLOAT_WINDOW[0] <= sleeve[0] + r
-        assert sleeve[1] + r <= cluster_fit.FLOAT_WINDOW[1] + 1e-9
-    # The model, cluster rearward with the hub on the step, reads m forward.
-    forward = (
-        cluster_fit.SLEEVE_FLOAT_WINDOW_CENTRE + cluster_fit.HUB_NOSE_WINDOW_CENTRE
+    for key in steps.SEQUENCE:
+        body = _step_body(key)
+        assert "BLANK" not in body or not any(n in body for n in bushings), key
+        if "FACE" not in body:
+            continue
+        for number in (hub, *bushings):
+            assert f"FACE THE {number}" not in body, key
+    hung = _step_body("disc-cluster-hung")
+    assert "BUSHINGS AS MADE" in hung
+    for number in bushings:
+        assert number in hung
+    assert "ON THE NOSE TRAPS HUB AND DISC" in hung
+    accepted = _step_body("fitup-accepted")
+    assert f"STEP {steps.step_number('collar-disc-air-inspected')}" in accepted
+    assert "ELSE REPORT" in accepted
+    assert steps.step_number("disc-cluster-assembled") + 1 == steps.step_number(
+        "disc-taps-transferred"
     )
-    assert cluster_fit.DISC_FRONT_Z - forward - cluster_fit.F_Z == pytest.approx(
-        cluster_fit.FIT_WINDOW_CENTRE
-    )
-    assert "CLUSTER, HUB AND DISC FORWARD, FEEL m" in _step_body(
-        "front-bushing-faced-to-fit"
-    )
-
-
-def test_the_rear_bushing_blank_is_faced_to_the_gauged_gap_before_it_goes_on() -> None:
-    """Codex P2 (724f78f26): the MHA-PD-24 blank is longer than the gap it
-    fills (6.85 MIN against 6.30 nominal, cluster forward), so refitted
-    unfaced it keeps the ring out of its groove. The step gauges that gap,
-    sleeve rear face from the arm's front face, with the front bushing and
-    ring on, faces the blank to it less the float, and only then puts it on
-    the pin."""
-    gap_nominal = (
-        cluster_fit.REAR_CHAIN_NOMINAL
-        - cluster_fit.FIT_WINDOW_CENTRE
-        - cluster_fit.HUB_NOSE_WINDOW_CENTRE
-    )
-    assert rear_bushing.BLANK_LENGTH_MIN > gap_nominal
-    lo, hi = cluster_fit.SLEEVE_REAR_FORWARD_FROM_ARM
-    assert lo <= gap_nominal <= hi
-    # The gap less the sleeve's float band is the length band the bushing's
-    # sheet sets.
-    sleeve = cluster_fit.SLEEVE_FLOAT_WINDOW
-    assert lo - sleeve[1] == pytest.approx(rear_bushing.GAP_MIN)
-    assert hi - sleeve[0] == pytest.approx(rear_bushing.GAP_MAX)
-    rear = _step_body("rear-bushing-faced-to-fit")
-    gauged = rear.index("DEPTH-GAUGE THE SLEEVE REAR FACE FROM THE ARM")
-    faced = rear.index(f"BLANK TO THAT LESS {cluster_fit.SLEEVE_FLOAT_WINDOW_TEXT}")
-    fitted = rear.index("BLANK ON")
-    assert gauged < faced < fitted
-    # The hung cluster carries no rear bushing until then.
-    assert "NO REAR BUSHING YET" in _step_body("disc-cluster-hung")
-    assert steps.step_number("disc-cluster-hung") < steps.step_number(
-        "rear-bushing-faced-to-fit"
-    )
-
-
-def test_the_hub_is_faced_to_the_nose_before_the_disc_is_tapped() -> None:
-    """R9-68: the hub's front face is faced to stand just behind the sleeve
-    nose on the bench, disc seated and hub on the flat, before the flange
-    holes are transferred; the front bushing then bears on the nose."""
-    order = ["disc-cluster-assembled", "hub-faced-to-nose", "disc-taps-transferred"]
-    numbers = [steps.step_number(key) for key in order]
-    assert numbers == list(range(numbers[0], numbers[0] + 3))
-    faced = _step_body("hub-faced-to-nose")
-    assert f"TILL {cluster_fit.HUB_NOSE_WINDOW_TEXT} BEHIND" in faced
-    assert "ON THE NOSE TRAPS HUB AND DISC" in _step_body("disc-cluster-hung")
 
 
 def test_the_disc_is_centred_to_its_running_bore_before_transfer_and_match_mark() -> None:

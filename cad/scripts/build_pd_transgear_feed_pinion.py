@@ -94,6 +94,7 @@ from pd_transgear_feed_pinion_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     FACE_WIDTH,
+    FACE_WIDTH_BAND,
     FLAT_END_STATION,
     FLAT_TO_AXIS,
     FLAT_END_DEVIATIONS,
@@ -110,6 +111,7 @@ from pd_transgear_feed_pinion_spec import (
     OUTSIDE_DIA,
     OUTSIDE_DIA_DEVIATIONS,
     OVERALL_LENGTH,
+    OVERALL_LENGTH_BAND,
     PRESSURE_ANGLE_DEG,  # noqa: F401 - the drawing test reads it off the part
     SPAN_DEVIATIONS,
     SPAN_NOMINAL,
@@ -121,7 +123,6 @@ from pd_transgear_feed_pinion_spec import (
     ROOT_DIA_MIN,
     ROOT_DIA_PLACES,
     ROOT_DIA_TOL_TYPE,
-    STATION_TOL,
     SURFACE_FINISHES,
     TEETH,
     TOOTH_SPACE_CALLOUT,
@@ -766,8 +767,8 @@ async def build(adapter) -> dict[str, str]:
     # flat's (0, -0.015) under the hub's flat, the standard tip class, the
     # root as a physical MIN floor, the flat's end wall as LIMITS between the
     # step and the hub's flat; the cutter's full depth as a MIN (it covers
-    # the rack) and its run-out as a MAX limit (R9-67).  The tooth length,
-    # which only places the step, holds the title block's .XXX.
+    # the rack) and its run-out as a MAX limit (R9-67).  The tooth length and
+    # the overall are disc-cluster stack terms at the cluster's band.
     _single_limit(
         adapter,
         "FlatProfile",
@@ -779,8 +780,9 @@ async def build(adapter) -> dict[str, str]:
         limit_places=FLAT_END_PLACES,
     )
     set_dimension_symmetric_tolerance(
-        adapter, "SleeveProfile", "OverallLength", STATION_TOL
+        adapter, "SleeveProfile", "OverallLength", OVERALL_LENGTH_BAND
     )
+    set_dimension_symmetric_tolerance(adapter, "GearBlank", "FaceWidth", FACE_WIDTH_BAND)
     set_dimension_bilateral_tolerance(
         adapter, "SleeveProfile", "BoreDia", *BORE_DEVIATIONS
     )

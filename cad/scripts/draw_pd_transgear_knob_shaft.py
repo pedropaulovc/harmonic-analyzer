@@ -67,6 +67,7 @@ from pd_transgear_knob_shaft_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
+    FACE_WIDTH_CALLOUT,
     JOURNAL_DIA,
     OUTSIDE_DIA,
     PLAIN_CORE,
@@ -175,7 +176,12 @@ END_KEEP: dict[str, tuple[float, float]] = {
     "RootEnvelope": (FRONT_CENTER[0] + 0.0494, FRONT_CENTER[1] - 0.0021),
     "ToothSpan": (FRONT_CENTER[0] + 0.029, FRONT_CENTER[1] + HALF_OD + 0.021),
 }
-DIMENSION_CALLOUTS_BELOW = {"TipChamfer": CHAMFER_CALLOUT}
+# The face width's ±band names the disc cluster stack (rule 4); its one
+# line hangs into the empty sixth baseline row below it.
+DIMENSION_CALLOUTS_BELOW = {
+    "TipChamfer": CHAMFER_CALLOUT,
+    "FaceWidth": FACE_WIDTH_CALLOUT,
+}
 
 # The thread callout lands on the edge where the thread blank meets the tip
 # chamfer and stands up and left, clear of the tooth-tip Ø over the pinion.

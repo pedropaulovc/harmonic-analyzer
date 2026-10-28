@@ -130,7 +130,8 @@ ISO_CENTER = (0.367, 0.214)
 # (bottom ~78 mm); a caption names it, hung centred below the view's
 # measured outline (run 12: at a fixed point it overlapped the outline by
 # 2.4 mm; the outline runs 6 mm past the tip circle).
-REAR_CENTER = (0.165, 0.046)
+# 2 mm lower than run 12 left room for the tooth length's stack row above.
+REAR_CENTER = (0.165, 0.044)
 # The end view sees the rear face too; the caption names the end by its
 # feature (2026-10-27 ENFORCE review, r1, r3: "REAR FACE" named no end).
 REAR_CAPTION = "VIEW FROM GEAR END"
@@ -220,9 +221,12 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
     # outside view's outline struck its last row).
     "FlatToAxis": (_NOSE_X + 0.006, _SIDE_BOTTOM - 0.0079),
     "BoreDia": (_REAR_X - 0.010, _SIDE_TOP + 0.040),
-    "FaceWidth": (_left_of(_REAR_X, _FACE_WIDTH_TEXT_WIDTH), _SIDE_BOTTOM - 0.0069),
-    "FlatEnd": (_left_of(_REAR_X, _FLAT_END_TEXT_WIDTH), _SIDE_BOTTOM - 0.0218),
-    "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0392),
+    # The tooth length's band and its second callout row (the disc cluster
+    # stack) make it a three-row text, centred on its point: every row stands
+    # 3 mm lower than with the bare tooth length.
+    "FaceWidth": (_left_of(_REAR_X, _FACE_WIDTH_TEXT_WIDTH), _SIDE_BOTTOM - 0.0099),
+    "FlatEnd": (_left_of(_REAR_X, _FLAT_END_TEXT_WIDTH), _SIDE_BOTTOM - 0.0278),
+    "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0452),
 }
 
 # The outside view: the *Left view looks along +X, the section's direction of
@@ -343,7 +347,7 @@ BORE_FIT_ATTACH = (
 )
 # The section's native caption, placed by its top centre, sits below the
 # stacked lengths, the overall's two-row callout the lowest.
-SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0515)
+SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0548)
 # The finish stands lower LEFT of the end view: when the section line's
 # arrows and their "B" labels pointed right, toward the section, a
 # lower-right leader ran through the lower label (run 20261001T035353825Z

@@ -24,6 +24,7 @@ from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dime
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fit_deviations import deviations
 from _printed_tolerance import printed_deviations
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND, STACK_NAME
 
 
 def _band(places: int) -> float:
@@ -112,8 +113,14 @@ def test_the_explicit_bands_are_the_bore_the_knob_float_and_the_hole_positions()
     assert model_toleranced_dimensions(part) == {
         ("LocatorProfile", "f'LocatorDia{index}'"): "*deviations(LOCATOR_HOLE_BAND_MM)",
         ("BearingProfile", "HubToBoss"): "HUB_TO_BOSS_TOLERANCE",
+        ("BearingProfile", "HubFaceToMounting"): "HUB_FACE_TO_MOUNTING_BAND",
         ("BoreProfile", "BoreDia"): "*deviations(BORE_BAND)",
     }
+    # The hub station is a disc-cluster stack term: it prints the cluster's
+    # band and names the stack (rule 4).
+    assert geometry.HUB_FACE_TO_MOUNTING_BAND == PRINTED_LENGTH_BAND
+    assert STACK_NAME in drawing.CALLOUTS_ABOVE["HubFaceToMounting"]
+    assert spec.DRAWING_PRECISION_BY_NAME["HubFaceToMounting"] == 3
     # The H7 bore prints its sourced limits; zero lower deviation is intentional.
     lower, upper = deviations(spec.BORE_BAND)
     assert (lower, upper) == geometry.BORE_DIA_LIMITS

@@ -46,7 +46,10 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _drawing_tolerances import (
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
@@ -62,6 +65,7 @@ from pd_transgear_pin_spec import (
     GROOVE_DIA_BAND,
     GROOVE_REAR_STATION,
     GROOVE_STATION,
+    GROOVE_STATION_BAND,
     GROOVE_WIDTH,
     GROOVE_WIDTH_BAND,
     HEAD_DIA,
@@ -434,9 +438,9 @@ async def build(adapter) -> dict[str, str]:
     await bbox_extent_check(adapter, "head Ø (y)", "y", HEAD_DIA, 0.01)
 
     # Model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the turned shank (the running fit and
-    # the press in the arm) and the ring groove's catalogue Ø and width.  The
-    # groove station and the front land print .XXX and the title block governs
-    # them.
+    # the press in the arm), the ring groove's catalogue Ø and width, and the
+    # groove station, a disc-cluster stack term at the cluster's band.  The
+    # front land prints .XX and the title block governs it.
     set_dimension_bilateral_tolerance(
         adapter, "PinProfile", "ShankDia", *deviations(DIA_BAND)
     )
@@ -445,6 +449,9 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter, "PinProfile", "GrooveWidth", *deviations(GROOVE_WIDTH_BAND)
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "PinProfile", "GrooveStation", GROOVE_STATION_BAND
     )
 
     await apply_material(adapter, MATERIAL)
