@@ -61,7 +61,10 @@ CLAMP_HOLE_CALLOUT_PLACES = 2
 # the proven 8.37 mm minimum for the head's full-float envelope, while allowing
 # the ordinary .XX upper deviation. A symmetric .XX band would let the width
 # fall to 7.99 mm and foul the head; .XXX on both sides needlessly limits the
-# maximum. Geometry and the runs remain unchanged.
+# maximum. Geometry and the runs remain unchanged. The round counterbores take
+# 7.99: their head stays coaxial, while a slid head adds the slot run's .XXX
+# overrun (build_pd_support_bar.clamp_slot_head_clearance), so the callout
+# says the minimum is for the slid head (3de09b9 machinist review).
 CLAMP_SLOT_WIDTH_PLACES = 2
 CLAMP_SLOT_PLACES = 3
 CLAMP_SLOT_CBORE_WIDTH_PLACES = 2
@@ -150,13 +153,14 @@ DIMENSION_CALLOUTS = {
     # head bears on less floor than over a round hole (CLAMP_HEAD_BEARING_MIN)
     # and nears the counterbore's wall (clamp_slot_head_clearance); the
     # 2026-10-23 review read the take-up reason alone as no reason for the
-    # width's band. The counterbore's width and run hold the MHA-SH-VN-53
-    # head. Short lines: detail C is 2:1 in a corner.
+    # width's band. The counterbore's minimum clears the slid MHA-SH-VN-53
+    # head. Short lines: detail C is 2:1 in a corner, and two lines keep the
+    # block between section B-B and the 440.50 line.
     "ClampSlotWidth": (
         "THRU, MAX SEATS\nMHA-SH-VN-53 HEADS;\nTRAVEL AND STATIONS\n"
         "KEEP THE FULL TAKE-UP\nOF MHA-SH-02 PITCH"
     ),
-    "ClampSlotCboreWidth": "C'BORE FOR\nMHA-SH-VN-53",
+    "ClampSlotCboreWidth": "MIN CLEARS SLID\nMHA-SH-VN-53",
     "ClampSlotCboreDepth": "MHA-SH-VN-53\nHEADS BELOW\nSLIDE FACE",
 }
 # The slot widths' count: both west slots share one detail.
