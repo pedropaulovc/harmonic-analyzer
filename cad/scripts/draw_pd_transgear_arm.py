@@ -272,8 +272,14 @@ SECTION_KEEP = {
 }
 # Its left edge stands 12 mm right of the line, so the leader keeps 2 mm
 # off "SETS PRELOAD OF", the widest line; its top 2.7 mm under the plate
-# tap's frame.
-FLOOR_TEXT_XY = (0.075, 0.055)
+# tap's frame (both 3 mm lower than before run 20261028T134941938Z).
+FLOOR_TEXT_XY = (0.075, 0.052)
+# The top of both plate-tap frames in section A-A, 4.4 mm under its rear
+# face: the counterbore's extension lines run to its revolved profile's end,
+# 2 mm past that face, and at 1.5 mm under it they ran into tap 1's frame
+# (machinist review of eecbf880d, r1/r2 gating clarity: one struck its
+# "Ø0.050 (P)" cell). Now 2.5 mm under their ends.
+_TAP_FRAME_TOP_Y = SECTION_CENTER[1] - 0.0124
 # Section A-A's column right of the stud bore, where both its frames stand.
 _STUD_FRAME_X = _front_x(PIN_STATION) + 0.012
 END_KEEP = {
@@ -329,10 +335,11 @@ PROJECTED_ZONE_CHAINS: dict[str, ZoneChain] = {
         "A-A", PLATE_TAP_STATIONS[0], (0.0015, 0.0),
         (
             (_front_x(PLATE_TAP_STATIONS[0]) + _front_x(PLATE_TAP_STATIONS[1])) / 2.0,
-            # 2 mm under tap 1's frame shoulder (y SECTION_CENTER - 0.0129):
-            # since #2034 moved the taps 12 mm left on the sheet, the shoulder
-            # reached over the text's left end, 0.2 mm into its top (run
-            # 20261028T064655627Z, leader-through-text).
+            # Beside tap 1's frame shoulder (y SECTION_CENTER - 0.0159),
+            # which ends left of the tap's hole, 9 mm short of the text's
+            # left end; the text stands right of the hole (since #2034 moved
+            # the taps 12 mm left on the sheet, the old shoulder reached over
+            # the text's left end: run 20261028T064655627Z, leader-through-text).
             SECTION_CENTER[1] - 0.0165,
         ),
     ),
@@ -996,14 +1003,14 @@ async def build(adapter: Any) -> dict[str, str]:
         # sheet x put tap 1's frame on its chain line once #2034 moved the
         # taps 12 mm left (preview run 20261028T070651235Z).
         "plate_tap_1_position": PmiDrawingPlacement(
-            section, (_front_x(PLATE_TAP_STATIONS[0]) - 0.07196, SECTION_CENTER[1] - 0.0094),
+            section, (_front_x(PLATE_TAP_STATIONS[0]) - 0.07196, _TAP_FRAME_TOP_Y),
             attachment_xy=_wall_point(
                 adapter, section, x_mm=PLATE_TAP_STATIONS[0] - _PLATE_DRILL_R,
                 z_mm=THICKNESS - 0.5, label="plate tap 1 wall",
             ),
         ),
         "plate_tap_2_position": PmiDrawingPlacement(
-            section, (_front_x(PLATE_TAP_STATIONS[1]) + 0.01104, SECTION_CENTER[1] - 0.0094),
+            section, (_front_x(PLATE_TAP_STATIONS[1]) + 0.01104, _TAP_FRAME_TOP_Y),
             attachment_xy=_wall_point(
                 adapter, section, x_mm=PLATE_TAP_STATIONS[1] + _PLATE_DRILL_R,
                 z_mm=THICKNESS - 0.5, label="plate tap 2 wall",
