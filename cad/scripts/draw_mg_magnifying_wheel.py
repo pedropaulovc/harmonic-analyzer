@@ -78,7 +78,6 @@ from mg_magnifying_wheel_geom import (
 from mg_magnifying_wheel_spec import (
     BORE_DIA,
     CAST_ROUND_R,
-    DIAMETER_REFERENCE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     DRAWING_REFERENCE_PRECISION,
@@ -86,7 +85,6 @@ from mg_magnifying_wheel_spec import (
     HUB_FILLET_R,
     REFERENCE_DIMENSIONS,
     REFERENCE_SKETCHES,
-    REFERENCE_WITNESS_LEN,
     RIM_FILLET_R,
     ROUND_TEXT_SUFFIX,
     SPIGOT_DIA,
@@ -100,11 +98,7 @@ from mg_magnifying_wheel_spec import (
 )
 from mg_wheel_group import HUB_RUNNING
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import (
-    dimension_name,
-    place_view,
-    view_name,
-)
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -927,68 +921,6 @@ def _add_round_radius(adapter: Any, section: Any, edges: ViewEdges) -> Any:
     return annotation
 
 
-SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
-REFERENCE_WITNESS_COLOR = 0  # COLORREF black, the outline's colour.
-REFERENCE_WITNESS_COUNT = len(SECTION_DIAMETER_KEEP)
-
-
-def _blacken_diameter_witnesses(adapter: Any, section: Any) -> None:
-    """Draw the diameter reference's witnesses in the outline's black.
-
-    Each lies on its rim surface's A-A outline, where its construction grey
-    would break the black edge (draw_dt_pinion_arbor's flank witnesses).
-    Chosen on the model -- the sketch's construction segments of the witness
-    length, one per diameter -- then mapped into A-A and read back.
-    """
-    native = _early_bound(section, "IView")
-    model = native.ReferencedDocument
-    if model is None:
-        raise RuntimeError("section A-A references no model")
-    feature = _early_bound(model, "IPartDoc").FeatureByName(DIAMETER_REFERENCE)
-    if feature is None:
-        raise RuntimeError(f"{DIAMETER_REFERENCE}: no such feature in the wheel")
-    sketch = _early_bound(
-        _early_bound(feature, "IFeature").GetSpecificFeature2(), "ISketch"
-    )
-    witnesses = []
-    for raw in sketch.GetSketchSegments() or ():
-        segment = _early_bound(raw, "ISketchSegment")
-        length = float(segment.GetLength()) * 1000.0
-        if segment.ConstructionGeometry and abs(length - REFERENCE_WITNESS_LEN) < 0.01:
-            witnesses.append(segment)
-    if len(witnesses) != REFERENCE_WITNESS_COUNT:
-        raise RuntimeError(
-            f"{DIAMETER_REFERENCE}: {len(witnesses)} construction witnesses, "
-            f"want {REFERENCE_WITNESS_COUNT}"
-        )
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, section)):
-        raise RuntimeError("failed to activate section A-A for its witnesses")
-    selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    for index, witness in enumerate(witnesses):
-        in_view = native.GetCorresponding(witness)
-        if in_view is None:
-            raise RuntimeError(f"{DIAMETER_REFERENCE} witness {index}: not in A-A")
-        draw.ClearSelection2(True)
-        selection_data = selection.CreateSelectData()
-        selection_data.View = section
-        if not _early_bound(in_view, "ISketchSegment").Select4(False, selection_data):
-            raise RuntimeError(f"failed to select {DIAMETER_REFERENCE} witness {index}")
-        kind = int(selection.GetSelectedObjectType3(1, -1))
-        if kind != SW_SEL_EXT_SKETCH_SEGS:
-            raise RuntimeError(
-                f"{DIAMETER_REFERENCE} witness {index} pick resolved to type {kind}"
-            )
-        drawing.SetLineColor(REFERENCE_WITNESS_COLOR)
-        draw.ClearSelection2(True)
-    draw.EditRebuild3()
-    _telemetry.info(
-        f"magnifying-wheel: {len(witnesses)} {DIAMETER_REFERENCE} witnesses "
-        "drawn black in A-A"
-    )
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -1070,7 +1002,6 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
     position_section_caption(adapter, section, SECTION_CAPTION_XY, label="wheel")
-    _blacken_diameter_witnesses(adapter, section)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     # The face view needs no hidden lines once the section carries the hub.
     for view in (front, iso):
