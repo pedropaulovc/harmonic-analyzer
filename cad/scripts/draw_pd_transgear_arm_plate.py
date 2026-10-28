@@ -295,27 +295,34 @@ def _cap_witness_lines(
 
 
 _DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
+_DIM_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 # Outside, the -X hole's arrows ran 1.2 mm from the locator callout's line
 # ends (run 20261028T000816580Z, layout audit arrow-near-text); its 21.8 mm
 # span holds both arrows under its value.
-PLAN_ARROWS_INSIDE = ("ScrewHoleX1",)
+PLAN_ARROW_SIDES = {"ScrewHoleX1": _DIM_ARROWS_INSIDE}
+# Inside, the 18.078's upper arrowhead struck its boxed text, which stands
+# between locator 2 and the notch corner's height (machinist review of
+# 848ba5637, run 20261028T003904510Z, gating clarity); outside, the arrows
+# point in at both witness lines and none crosses the box.
+BACK_ARROW_SIDES = {"LocatorY2": _DIM_ARROWS_OUTSIDE}
 
 
-def _arrows_inside(adapter: Any, annotations: list[Any], names: tuple[str, ...]) -> None:
-    """Draw each named dimension's arrows inside its witness lines, read back."""
-    for name in names:
+def _set_arrow_sides(adapter: Any, annotations: list[Any], sides: dict[str, int]) -> None:
+    """Draw each named dimension's arrows on its side of its witness lines
+    (swDimensionArrowsSide_e), read back."""
+    for name, side in sides.items():
         found = [
             annotation for annotation in annotations
             if dimension_name(adapter, annotation) == name
         ]
         if len(found) != 1:
-            raise RuntimeError(f"expected one {name} to draw arrows inside, found {len(found)}")
+            raise RuntimeError(f"expected one {name} to set its arrow side, found {len(found)}")
         display = _early_bound(
             _early_bound(found[0], "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension"
         )
-        display.ArrowSide = _DIM_ARROWS_INSIDE
-        if int(display.ArrowSide) != _DIM_ARROWS_INSIDE:
-            raise RuntimeError(f"{name} did not keep its arrows inside its witness lines")
+        display.ArrowSide = side
+        if int(display.ArrowSide) != side:
+            raise RuntimeError(f"{name} did not keep its arrows on side {side}")
 
 
 def _locator_callout() -> str:
@@ -799,7 +806,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, plan_annotations, PLAN_CALLOUTS_ABOVE, location="above"
     )
-    _arrows_inside(adapter, plan_annotations, PLAN_ARROWS_INSIDE)
+    _set_arrow_sides(adapter, plan_annotations, PLAN_ARROW_SIDES)
     if not auto_center_marks(adapter, plan, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME centre marks to the plan view")
     bore_finish_xy = _sheet_xy(adapter, plan, BORE_FINISH_MODEL, "bore finish symbol")
@@ -855,6 +862,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_callouts(adapter, face_annotations, SECTION_CALLOUTS)
     _cap_witness_lines(adapter, face_annotations, "HubDia", HUB_DIA_WITNESS_MAX_M)
+    _set_arrow_sides(adapter, face_annotations, BACK_ARROW_SIDES)
     # These are the same native feature datums and circular zones authored
     # on the part, not +/- positions retyped on a drawing. The drill mouths,
     # the through locator bores' rims and the +X side face's edge on the
