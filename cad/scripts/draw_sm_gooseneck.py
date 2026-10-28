@@ -476,7 +476,7 @@ def _split_hatches(hatches: list[Any]) -> tuple[list[Any], list[Any]]:
 
 def _hatch_tube_apart(adapter: Any, section: Any) -> None:
     """Turn the tube's crosshatch a right angle from the end piece's and read
-    it back (the end piece keeps the material crosshatch)."""
+    it back; the end piece's hatch is left as the section drew it."""
     end_piece, tube = _split_hatches(_section_face_hatches(adapter, section))
     base = float(end_piece[0].Angle)
     for hatch in tube:
@@ -487,8 +487,10 @@ def _hatch_tube_apart(adapter: Any, section: Any) -> None:
     turns = [abs(math.remainder(float(hatch.Angle) - base, math.pi)) for hatch in tube]
     if any(not math.isclose(turn, TUBE_HATCH_TURN, abs_tol=1e-6) for turn in turns):
         raise RuntimeError(f"section A-A tube hatch did not turn: {turns!r}")
-    if any(not bool(hatch.UseMaterialHatch) for hatch in end_piece):
-        raise RuntimeError("section A-A end piece lost its material crosshatch")
+    if any(
+        not math.isclose(float(hatch.Angle), base, abs_tol=1e-6) for hatch in end_piece
+    ):
+        raise RuntimeError("section A-A end piece hatch moved with the tube's")
     _telemetry.success(
         f"section A-A: {len(tube)} tube hatch(es) turned 90 deg from "
         f"{len(end_piece)} end-piece hatch(es)"
