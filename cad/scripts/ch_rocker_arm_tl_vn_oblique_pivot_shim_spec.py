@@ -13,7 +13,8 @@ from __future__ import annotations
 from _fit_deviations import deviations
 
 SKU = "98055A118"
-QUANTITY = 2
+PER_SUPPORT = 5  # the nominal 1.0 pack under each of the two spacers
+QUANTITY = 2 * PER_SUPPORT
 ID = 10.0
 ID_BAND = (0.4, 0.03)  # upper, lower deviations, mm
 OD = 16.0
@@ -38,4 +39,4 @@ SUPPLIER_REFERENCE_TOLERANCES_MM = {
     'SupplierOuterDiameter': deviations(OD_BAND),
     'SupplierThickness': deviations(THICKNESS_BAND),
 }
-SUPPLIER_DATA = ('MODEL: ONE 0.2 mm SHIM PER PIVOT.', 'FITTING STOCK: 98055A117 (0.1 mm), 98055A121 (0.5 mm).', 'SELECT AT ASSEMBLY TO THE JIG RUNNING-GAP REQUIREMENT.')
+SUPPLIER_DATA = ('MODEL: FIVE 0.2 mm SHIMS PER PIVOT, NOMINAL.', 'FITTING STOCK: 98055A117 (0.1 mm), 98055A121 (0.5 mm).', 'SELECT AT ASSEMBLY TO THE JIG RUNNING-GAP REQUIREMENT.')

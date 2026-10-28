@@ -21,7 +21,7 @@ def test_rectangular_rail_two_block_and_new_stock():
 
 def test_pivot_shoulder_bottoms_with_full_form_thread_engagement():
     assert (spec.BORE_X,spec.BORE_Y)==(-32,0)
-    assert (spec.BORE_DIA,spec.BORE_BAND,spec.BORE_DEPTH)==(10,(.015,0),7.65)
+    assert (spec.BORE_DIA,spec.BORE_BAND,spec.BORE_DEPTH)==(10,(.015,0),6.85)
     assert spec.PIVOT_TAP=='M8x1.25'
     assert spec.PIVOT_TAP_DRILL==6.8
     assert spec.PIVOT_THREAD_LENGTH==spec.BLOCK_HEIGHT-spec.BORE_DEPTH

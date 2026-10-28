@@ -6,4 +6,4 @@ ch-rocker-arm-tl-oblique-pivot-block:
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
-  process: "Rectangular rail-2 block; shoulder-screw seat and four carriage counterbores. Keep carriage counterbore floors 15.600 above the bottom; pivot seat diameter 10 H7, 7.65 deep from top with M8x1.25 tapped through hole below."
+  process: "Rectangular rail-2 block; shoulder-screw seat and four carriage counterbores. Keep carriage counterbore floors 15.600 above the bottom; pivot seat diameter 10 H7, 6.85 deep from top with M8x1.25 tapped through hole below."

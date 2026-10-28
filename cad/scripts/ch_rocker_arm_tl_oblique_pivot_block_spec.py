@@ -23,8 +23,10 @@ STOCK_THICKNESS, STOCK_WIDTH = 25.4, 88.9
 BORE_X, BORE_Y = -32.0, 0.0
 # The TL-VN-77 shoulder bottoms on the seat floor, so the 3-place depth sets
 # how high the screw stands, hence the head-to-carrier gap the assembly's
-# shim selection then trims (jig assembly ``PIVOT_RUNNING_GAP``).
-BORE_DIA, BORE_DEPTH = 10.0, 7.65
+# shim selection then trims (jig assembly ``PIVOT_RUNNING_GAP``). Owner ruling
+# 2026-10-27 (B): shallow enough that the unshimmed gap is open at every loose
+# band (+0.09..+2.26); shims, which only close it, are the fitting adjustment.
+BORE_DIA, BORE_DEPTH = 10.0, 6.85
 BORE_BAND = (0.015, 0.0)  # H7; locating seat for TL-VN-77 shoulder
 _bore_lower, _bore_upper = deviations(BORE_BAND)
 _shoulder_lower, _shoulder_upper = deviations(pivot_screw.SHOULDER_DIA_BAND)

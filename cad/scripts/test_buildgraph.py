@@ -258,7 +258,7 @@ def test_plain_pivot_components_are_first_class_jig_only_targets() -> None:
         "ch_rocker_arm_tl_oblique_feed_block": ("MHA-CH-06-TL-32", 1),
         "ch_rocker_arm_tl_vn_oblique_pivot_screw": ("MHA-CH-06-TL-VN-77", 2),
         "ch_rocker_arm_tl_vn_oblique_pivot_spacer": ("MHA-CH-06-TL-VN-78", 2),
-        "ch_rocker_arm_tl_vn_oblique_pivot_shim": ("MHA-CH-06-TL-VN-79", 2),
+        "ch_rocker_arm_tl_vn_oblique_pivot_shim": ("MHA-CH-06-TL-VN-79", 10),
         "ch_rocker_arm_tl_vn_oblique_hub_pin": ("MHA-CH-06-TL-VN-80", 1),
     }
     jig = "ch_rocker_arm_tl_oblique_jig"

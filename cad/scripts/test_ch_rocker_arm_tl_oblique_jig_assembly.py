@@ -56,7 +56,7 @@ PART_STEMS = {
     physical.replace("-", "_")
     for physical, _configuration in spec.COMPONENT_IDENTITIES.values()
 }
-PIVOT_FAMILIES = {spec.PIVOT_SCREW: 2, spec.PIVOT_SPACER: 2, spec.PIVOT_SHIM: 2}
+PIVOT_FAMILIES = {spec.PIVOT_SCREW: 2, spec.PIVOT_SPACER: 2, spec.PIVOT_SHIM: 10}
 # Each screw family and its fastener-table row (count, callout, engagement).
 SCREW_ROWS = {
     spec.RAIL_SCREW: fasteners.RAIL_TO_BAR,
@@ -180,9 +180,9 @@ def test_pivot_blocks_and_screws_sit_on_the_pin_stations() -> None:
         bore = _image(rows, origin, (pivot_block.BORE_X, 0.0, 0.0))
         assert bore[:2] == pytest.approx(trammel.rail_point(rail, spec.PIN_STATION))
         assert screw[:2] == pytest.approx(bore[:2])
-        assert screw[2] == pytest.approx(57.35)
-    assert trammel.CARRIER_UNDERSIDE_Z == pytest.approx(80.2)
-    assert trammel.CARRIER_TOP_Z == pytest.approx(92.2)
+        assert screw[2] == pytest.approx(58.15)
+    assert trammel.CARRIER_UNDERSIDE_Z == pytest.approx(81.0)
+    assert trammel.CARRIER_TOP_Z == pytest.approx(93.0)
 
 
 def test_carrier_riser_hub_pin_and_lever_close_on_the_carrier_frame() -> None:
@@ -527,7 +527,7 @@ def test_builder_places_exactly_the_inventory() -> None:
         spec.LEVER_SCREW: 2,
         spec.LEVER_LOCK_WASHER: 2,
     }
-    assert sum(spec.QUANTITIES.values()) == 85
+    assert sum(spec.QUANTITIES.values()) == 93
     assert spec.QUANTITIES[spec.END_BRACKET] == (leadscrew.END_BRACKET_QUANTITY)
     assert spec.QUANTITIES[spec.BASE_BAR] == base_bar.QUANTITY
     assert spec.QUANTITIES[spec.HOLD_DOWN_STUD] == fasteners.HOLD_DOWN_STUD_COUNT
@@ -1390,19 +1390,45 @@ def test_shoulder_pivot_axial_stack_and_thread_engagement() -> None:
         assert screw[2] == pytest.approx(floor)
         assert screw[2] - pivot_screw.THREAD_LENGTH > block[2]
         assert screw_rows[2] == pytest.approx((0.0, 0.0, 1.0))
-        shim = spec.PIVOT_SHIM_PLACEMENTS[index][0]
+        shims = spec.PIVOT_SHIM_PLACEMENTS[
+            index * pivot_shim.PER_SUPPORT:(index + 1) * pivot_shim.PER_SUPPORT
+        ]
         spacer = spec.PIVOT_SPACER_PLACEMENTS[index][0]
-        assert shim[:2] == pytest.approx(screw[:2])
+        assert len(shims) == pivot_shim.PER_SUPPORT == 5
+        # The pack stacks face to face from the block top up to the spacer.
+        for k, (shim, _shim_rows) in enumerate(shims):
+            assert shim[:2] == pytest.approx(screw[:2])
+            assert shim[2] == pytest.approx(65.0 + k * pivot_shim.THICKNESS)
         assert spacer[:2] == pytest.approx(screw[:2])
-        assert shim[2] == pytest.approx(65.0)
-        assert spacer[2] == pytest.approx(shim[2] + pivot_shim.THICKNESS)
+        assert spacer[2] == pytest.approx(shims[-1][0][2] + pivot_shim.THICKNESS)
         assert spacer[2] + pivot_spacer.LENGTH == pytest.approx(trammel.CARRIER_UNDERSIDE_Z)
         head_bottom = screw[2] + pivot_screw.SHOULDER_LENGTH
         assert head_bottom - trammel.CARRIER_TOP_Z == pytest.approx(0.15)
-        assert head_bottom + pivot_screw.HEAD_HEIGHT == pytest.approx(96.85)
+        assert head_bottom + pivot_screw.HEAD_HEIGHT == pytest.approx(97.65)
         assert pivot_screw.HEAD_DIA > carrier.PIN_HOLE_DIA
     assert spec.lock_parent(spec.FEED_BLOCK, 0) == spec.instance_name(spec.CARRIAGE, 0)
     assert spec.lock_parent(spec.PIVOT_BLOCK, 0) == spec.instance_name(spec.CARRIAGE, 1)
+
+
+def test_unshimmed_gap_opens_at_every_band_and_stock_shims_fit_it() -> None:
+    from itertools import combinations_with_replacement
+
+    assert pivot_block.BORE_DEPTH == 6.85
+    low, high = spec.PIVOT_UNSHIMMED_GAP_RANGE
+    assert (low, high) == pytest.approx((0.09, 2.26))
+    assert low >= spec.PIVOT_RUNNING_GAP[0]  # no head clamps before shimming
+    # Brute force over the stock, independent of the spec's 0.1-step argument.
+    stock = [round(t * 100) for t in pivot_shim.FIT_SKUS]
+    packs = {
+        sum(combo)
+        for count in range(spec.PIVOT_FIT_SHIMS_MAX + 1)
+        for combo in combinations_with_replacement(stock, count)
+    }
+    window = [round(g * 100) for g in spec.PIVOT_RUNNING_GAP]
+    for gap in range(round(low * 100), round(high * 100) + 1):
+        assert any(window[0] <= gap - pack <= window[1] for pack in packs), gap
+    assert (spec.PIVOT_FIT_PACK_MAX, spec.PIVOT_FIT_SHIMS_MAX) == (2.1, 5)
+    assert trammel.PIVOT_SHIM_PACK == pivot_shim.PER_SUPPORT * pivot_shim.THICKNESS
 
 
 def test_plain_pivot_radial_fits_are_not_interference_allowances() -> None:
@@ -1417,7 +1443,7 @@ def test_plain_pivot_radial_fits_are_not_interference_allowances() -> None:
     assert pivot_shim.ID + pivot_shim.ID_BAND[1] > shaft_high
     allowed = contracts.allowed_interference_pairs(spec.ASM_NAME)
     for family in PIVOT_FAMILIES:
-        for index in range(2):
+        for index in range(PIVOT_FAMILIES[family]):
             name = spec.instance_name(family, index)
             actual = {pair for pair in allowed if name in pair}
             if family == spec.PIVOT_SCREW:

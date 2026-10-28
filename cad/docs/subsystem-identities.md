@@ -85,7 +85,9 @@ retain their complete mate identifiers.
 
 The owner-approved 2026-10-23 simplification replaces the captured bearing
 cartridges with purchased shoulder screws, spacers and selected DIN 988 shims.
-The carrier remains at nominal underside Z80.2. Positive lift capture runs
+The carrier sits at nominal underside Z81.0 (owner ruling 2026-10-27: the
+6.85 shoulder seat leaves the unshimmed gap open at every loose band, and a
+nominal five 0.2 shims a support close it). Positive lift capture runs
 carrier → shoulder-screw head → M8 thread → block → carriage, not through a
 bearing or press fit. Fit the measured head-to-carrier running gap to
 0.05–0.25 mm using the purchased shim stock. The assembly owns the full
@@ -647,5 +649,5 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | added | `ch-rocker-arm-tl-oblique-feed-block` | MHA-CH-06-TL-32 | 2026-10-23 integral rail-1 block and nut lug from 6061 1 × 3-1/2 in bar |
 | added | `ch-rocker-arm-tl-vn-oblique-pivot-screw` | MHA-CH-06-TL-VN-77 | McMaster 90323A492 shoulder screw x2, Ø10 × 35, M8 × 1.25 thread |
 | added | `ch-rocker-arm-tl-vn-oblique-pivot-spacer` | MHA-CH-06-TL-VN-78 | McMaster 92871A359 18-8 spacer x2, 10 ID × 16 OD × 15 |
-| added | `ch-rocker-arm-tl-vn-oblique-pivot-shim` | MHA-CH-06-TL-VN-79 | McMaster 98055A118 DIN 988 shim x2 nominal, 10 × 16 × 0.2; select fitting stock 98055A117/98055A121 for measured running gap |
+| added | `ch-rocker-arm-tl-vn-oblique-pivot-shim` | MHA-CH-06-TL-VN-79 | McMaster 98055A118 DIN 988 shim x10 nominal (five a support), 10 × 16 × 0.2; select fitting stock 98055A117/98055A118/98055A121 for measured running gap |
 | added | `ch-rocker-arm-tl-vn-oblique-hub-pin` | MHA-CH-06-TL-VN-80 | McMaster 2281A11-6410N695 Class Z minus Ø10.2000 gauge pin x1, abrasive-cut to 20.0 and bonded |

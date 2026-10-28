@@ -15,7 +15,8 @@ Rows give the machine image of each part's local axis.
 
 Rail 1 carries the integral feed block; rail 2 carries the plain pivot block.
 Both blocks stand on the carriage tops at 40.7 and finish at 65.0. Selected
-DIN 988 shims and loose 15 mm spacers support the carrier at nominal Z80.2.
+DIN 988 shims (nominal five 0.2 a support) and loose 15 mm spacers support the
+carrier at nominal Z81.0.
 The carrier turns directly on purchased shoulder screws. Their shoulders
 bottom in the blocks' counterbores, not on the carrier, and their heads
 positively capture it without clamping its running faces.
@@ -59,6 +60,8 @@ from __future__ import annotations
 import math
 from collections.abc import Iterator
 from dataclasses import dataclass
+
+from _printed_tolerance import printed_band_mm
 
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as pivot_screw
@@ -462,12 +465,15 @@ CARRIAGE_PLACEMENTS: tuple[Placement, ...] = tuple(
 PIVOT_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     (origin, PIN_ROWS) for origin in PIVOT_SCREW_ORIGINS
 )
+# Each support's nominal pack: PER_SUPPORT shims stacked on the block top,
+# support-major (the order of LOCKED_TO's parents).
 PIVOT_SHIM_PLACEMENTS: tuple[Placement, ...] = tuple(
-    (_at(pin, trammel.PIVOT_BLOCK_TOP_Z), PIN_ROWS)
+    (_at(pin, trammel.PIVOT_BLOCK_TOP_Z + k * pivot_shim.THICKNESS), PIN_ROWS)
     for pin in trammel.pin_pair(PASS)
+    for k in range(pivot_shim.PER_SUPPORT)
 )
 PIVOT_SPACER_PLACEMENTS: tuple[Placement, ...] = tuple(
-    (_at(pin, trammel.PIVOT_BLOCK_TOP_Z + pivot_shim.THICKNESS), PIN_ROWS)
+    (_at(pin, trammel.PIVOT_BLOCK_TOP_Z + trammel.PIVOT_SHIM_PACK), PIN_ROWS)
     for pin in trammel.pin_pair(PASS)
 )
 # The CL dowel, pressed chamfered end first from the top, its round tip set
@@ -608,6 +614,46 @@ if round(PIVOT_THREAD_ENGAGEMENT / pivot_screw.THREAD_DIA, 2) < pivot_block.PIVO
 if PIVOT_THREAD_ENGAGEMENT != fasteners.PIVOT_SCREW_TO_BLOCK.engagement_mm:
     raise AssertionError("the fastener table's M8 engagement is not the block's")
 
+# Owner ruling 2026-10-27 (B), Codex P2: with every stack member at its loose
+# band (shoulder +0.05/0, seat at its printed places, spacer ±0.13, carrier at
+# .X) the unshimmed head gap stays open; shims, which only close it, are the
+# fitting adjustment that brings the measured gap into PIVOT_RUNNING_GAP.
+_SEAT_BAND = printed_band_mm(pivot_block.DRAWING_PRECISION_BY_NAME["TopBoreDepth"])
+_UNSHIMMED_NOMINAL = (
+    pivot_screw.SHOULDER_LENGTH - pivot_block.BORE_DEPTH - pivot_spacer.LENGTH - trammel.CARRIER_THICK
+)
+# Bands are (upper, lower) deviations.
+PIVOT_UNSHIMMED_GAP_RANGE = (
+    _UNSHIMMED_NOMINAL + pivot_screw.SHOULDER_LENGTH_BAND[1] - _SEAT_BAND
+    - pivot_spacer.LENGTH_BAND[0] - trammel.CARRIER_THICK_BAND,
+    _UNSHIMMED_NOMINAL + pivot_screw.SHOULDER_LENGTH_BAND[0] + _SEAT_BAND
+    - pivot_spacer.LENGTH_BAND[1] + trammel.CARRIER_THICK_BAND,
+)  # +0.09 .. +2.26
+if abs(trammel.PIVOT_SHIM_PACK - pivot_shim.PER_SUPPORT * pivot_shim.THICKNESS) > 1e-9:
+    raise AssertionError("the modeled shim pack is not PER_SUPPORT TL-VN-79 shims")
+# Every unshimmed gap in the range reaches the window with a pack in 0.1 steps
+# (the thinnest fitting shim), checked at 0.01 across the whole range.
+_FIT_TENTHS = sorted(round(t * 10) for t in pivot_shim.FIT_SKUS)  # 0.1, 0.2, 0.5
+_GAP_LO, _GAP_HI = (round(g * 100) for g in PIVOT_UNSHIMMED_GAP_RANGE)
+_WIN_LO, _WIN_HI = (round(g * 100) for g in PIVOT_RUNNING_GAP)
+if _FIT_TENTHS[0] != 1:
+    raise AssertionError("the fitting stock no longer steps the pack by 0.1")
+if _GAP_LO < _WIN_LO:
+    raise AssertionError("an unshimmed head can clamp the carrier at the worst case")
+for _gap in range(_GAP_LO, _GAP_HI + 1):
+    if not any(_WIN_LO <= _gap - 10 * n <= _WIN_HI for n in range(_gap // 10 + 1)):
+        raise AssertionError(f"no shim pack fits a {_gap / 100:.2f} unshimmed gap")
+if not _WIN_LO <= round(PIVOT_NOMINAL_RUNNING_GAP * 100) <= _WIN_HI:
+    raise AssertionError("the nominal pack does not fit the nominal stack")
+# The thickest pack the worst case needs (2.1), and the fewest stock shims
+# making it (5: four 0.5 and one 0.1; greedy is exact for 0.5/0.2/0.1).
+_PACK_MAX_TENTHS = math.ceil((_GAP_HI - _WIN_HI) / 10)
+PIVOT_FIT_PACK_MAX = _PACK_MAX_TENTHS / 10
+PIVOT_FIT_SHIMS_MAX = 0
+for _tenths in reversed(_FIT_TENTHS):
+    PIVOT_FIT_SHIMS_MAX += _PACK_MAX_TENTHS // _tenths
+    _PACK_MAX_TENTHS %= _tenths
+
 # Every instance of every logical family, in insertion order. Ordinary families
 # keep native <stem>-N names; kit instances use persisted role-local references.
 PLACEMENTS: dict[str, tuple[Placement, ...]] = {
@@ -675,7 +721,7 @@ LOCKED_TO: dict[str, tuple[tuple[str, int], ...]] = {
     PIVOT_BLOCK: ((CARRIAGE, 1),),
     PIVOT_SCREW: _SUPPORT_PARENTS,
     PIVOT_SPACER: _SUPPORT_PARENTS,
-    PIVOT_SHIM: _SUPPORT_PARENTS,
+    PIVOT_SHIM: tuple(parent for parent in _SUPPORT_PARENTS for _ in range(pivot_shim.PER_SUPPORT)),
     CARRIAGE_SCREW: tuple(parent for parent in _SUPPORT_PARENTS for _ in pivot_block.BOLT_POINTS),
     LEADSCREW_NUT: ((FEED_BLOCK, 0),),
     NUT_SCREW: tuple((FEED_BLOCK, 0) for _ in leadscrew_nut.HOLE_ANGLES_DEG),
@@ -1405,13 +1451,17 @@ ASSEMBLY_CHECKS = (
     "HAS THE P1 RUNNING GAP WITHOUT CLAMPING THE CARRIER.",
 )
 PIVOT_FIT_STEPS = (
-    f"P1. AT EACH SUPPORT FIT A DIN 988 SHIM {_item(PIVOT_SHIM)} ON THE "
-    f"BLOCK AND A LOOSE SPACER {_item(PIVOT_SPACER)} ON THE SHIM. LOWER THE "
-    "CARRIER ON THE CHOSEN HOLE PAIR AND SEAT BOTH SHOULDER SCREWS. MEASURE "
-    f"HEAD-TO-CARRIER GAP; SELECT SHIMS FOR {PIVOT_RUNNING_GAP[0]:.2f}-"
-    f"{PIVOT_RUNNING_GAP[1]:.2f} THROUGH FREE SWING. FITTING STOCK: 98055A117 "
-    "(0.1), 98055A118 (0.2), 98055A121 (0.5). THE SAME SHIM SET MUST SERVE "
-    "BOTH HOLE PAIRS; NO SHIM BETWEEN SPACER AND CARRIER.",
+    f"P1. AT EACH SUPPORT SET A LOOSE SPACER {_item(PIVOT_SPACER)} ON THE "
+    "BLOCK, NO SHIMS. LOWER THE CARRIER ON THE CHOSEN HOLE PAIR, SEAT BOTH "
+    "SHOULDER SCREWS AND MEASURE EACH HEAD-TO-CARRIER GAP. LIFT THE CARRIER; "
+    f"UNDER EACH SPACER STACK DIN 988 SHIMS {_item(PIVOT_SHIM)} THAT CLOSE "
+    f"ITS GAP TO {PIVOT_RUNNING_GAP[0]:.2f}-{PIVOT_RUNNING_GAP[1]:.2f} "
+    "THROUGH FREE SWING, SELECTED FROM FITTING STOCK "
+    + ", ".join(f"{sku} ({t:.1f})" for t, sku in sorted(pivot_shim.FIT_SKUS.items()))
+    + f": NOMINAL {pivot_shim.PER_SUPPORT} X {pivot_shim.THICKNESS:.1f}, "
+    f"WORST CASE UP TO {PIVOT_FIT_PACK_MAX:.1f} ({PIVOT_FIT_SHIMS_MAX} SHIMS). "
+    "REMEASURE. THE SAME SHIM SET MUST SERVE BOTH HOLE PAIRS; NO SHIM "
+    "BETWEEN SPACER AND CARRIER.",
     "P2. CLEAN THE M8 THREADS; APPLY LOCTITE 222. LIGHTLY GREASE THE "
     "SHOULDERS AND SPACER FACES WITH NLGI 2 LITHIUM GREASE, KEEPING THREADS "
     "CLEAN OF GREASE. "
@@ -1952,7 +2002,7 @@ for (_origin, _rows), _pin in zip(BLOCK_PLACEMENTS, PIVOT_SCREW_ORIGINS):
     _bore = tuple(_origin[i] + pivot_block.BORE_X * _rows[0][i] for i in range(2))
     if math.dist(_bore, _pin[:2]) > 1e-9:
         raise AssertionError("pivot counterbore is not on its screw axis")
-if abs(trammel.PIVOT_BLOCK_TOP_Z + pivot_shim.THICKNESS + pivot_spacer.LENGTH - trammel.CARRIER_UNDERSIDE_Z) > 1e-9:
+if abs(trammel.PIVOT_BLOCK_TOP_Z + trammel.PIVOT_SHIM_PACK + pivot_spacer.LENGTH - trammel.CARRIER_UNDERSIDE_Z) > 1e-9:
     raise AssertionError("shim and spacer do not support the nominal carrier seat")
 if not HUB_PIN_TOP_Z < PART_TOP_Z:
     raise AssertionError("the HUB pin stands above the strap")

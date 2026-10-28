@@ -1792,11 +1792,14 @@ def test_plain_pivot_geometry_sets_the_carrier_and_positive_head_capture() -> No
     for index in range(2):
         screw_origin, screw_rows = spec.PLACEMENTS[spec.PIVOT_SCREW][index]
         spacer_origin, spacer_rows = spec.PLACEMENTS[spec.PIVOT_SPACER][index]
-        shim_origin, shim_rows = spec.PLACEMENTS[spec.PIVOT_SHIM][index]
+        shims = spec.PLACEMENTS[spec.PIVOT_SHIM][
+            index * shim.PER_SUPPORT:(index + 1) * shim.PER_SUPPORT
+        ]
+        shim_origin, shim_rows = shims[0]
         assert screw_rows[2] == spacer_rows[2] == shim_rows[2] == (0.0, 0.0, 1.0)
         assert screw_origin[:2] == spacer_origin[:2] == shim_origin[:2]
         assert shim_origin[2] == pytest.approx(spec.trammel.PIVOT_BLOCK_TOP_Z)
-        assert spacer_origin[2] == pytest.approx(shim_origin[2] + shim.THICKNESS)
+        assert spacer_origin[2] == pytest.approx(shims[-1][0][2] + shim.THICKNESS)
         assert spacer_origin[2] + spacer.LENGTH == pytest.approx(spec.trammel.CARRIER_UNDERSIDE_Z)
         assert screw_origin[2] == pytest.approx(shim_origin[2] - block.BORE_DEPTH)
         assert screw_origin[2] - screw.THREAD_LENGTH > spec.trammel.CARRIAGE_TOP_Z

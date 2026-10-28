@@ -366,9 +366,12 @@ END_STOPS = {
 # --- Height stack (machine Z, table top = 0) ---------------------------------
 BASE_BAR_THICK = round(0.5 * INCH, 9)  # 1/2 in 6061 flat bar
 PIVOT_BLOCK_HEIGHT = 24.3  # finished from 1 in stock
-PIVOT_SHIM_THICK = 0.2  # nominal selected DIN 988 shim (98055A118)
+# Nominal fitted pack: five 0.2 DIN 988 shims (98055A118, TL-VN-79) per
+# support; the 6.85 shoulder seat (owner ruling 2026-10-27) leaves 1.15
+# unshimmed, so the pack closes the nominal head gap to 0.15.
+PIVOT_SHIM_PACK = 1.0
 PIVOT_SPACER_LENGTH = 15.0  # loose purchased spacer (92871A359)
-PIVOT_SUPPORT_HEIGHT = PIVOT_SHIM_THICK + PIVOT_SPACER_LENGTH
+PIVOT_SUPPORT_HEIGHT = PIVOT_SHIM_PACK + PIVOT_SPACER_LENGTH
 # Finished dimensions, not purchased stock: face 1/2 in 6061-T651 plate to
 # CARRIER_THICK and 1/4 in acetal to RISER_THICK (#1619). Both native drawing
 # dimensions print at .X and take that title-block band, not a supplier-stock

@@ -79,7 +79,7 @@ _STOCK_REQUIREMENTS = {
     "ch-rocker-arm-tl-vn-oblique-pivot-screw": (("90323A492",), "MHA-CH-06-TL-VN-77", 2),
     "ch-rocker-arm-tl-vn-oblique-pivot-spacer": (("92871A359",), "MHA-CH-06-TL-VN-78", 2),
     "ch-rocker-arm-tl-vn-oblique-pivot-shim": (
-        ("98055A118", "98055A117", "98055A121"), "MHA-CH-06-TL-VN-79", 2,
+        ("98055A118", "98055A117", "98055A121"), "MHA-CH-06-TL-VN-79", 10,
     ),
     "ch-rocker-arm-tl-vn-oblique-hub-pin": (("2281A11-6410N695",), "MHA-CH-06-TL-VN-80", 1),
 }

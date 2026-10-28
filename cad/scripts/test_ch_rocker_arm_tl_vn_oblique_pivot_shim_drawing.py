@@ -49,7 +49,7 @@ def test_catalogue_and_current_identity():
     assert tuple(row["supplier_skus"]) == stock.skus == ('98055A118', '98055A117', '98055A121')
     assert row["stock_name"] == stock.stock_name
     assert row["material"] == stock.material == part.MATERIAL
-    assert row["quantity"] == spec.QUANTITY == 2
+    assert row["quantity"] == spec.QUANTITY == 2 * spec.PER_SUPPORT == 10
 
 
 def test_supplier_dimensions_and_physical_contract():
