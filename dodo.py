@@ -3725,6 +3725,9 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_transgear_hanger_joints.py",
         # Matched stock-dowel registration and paid loaded plate motion.
         SCRIPTS_DIR / "test_paper_drive_arm_registration.py",
+        # The arm and plate's shared projected-zone line core: Modify-dialog
+        # suppression restored, font and endpoint read-back.
+        SCRIPTS_DIR / "test_transgear_zone_line.py",
         # The cut #10-24 hex hanger's tap web, washer/spotface reach and dowel
         # stack at the printed bands, and the retired 1/2-13 tap's failed web.
         SCRIPTS_DIR / "test_knife_hanger_worst_case.py",

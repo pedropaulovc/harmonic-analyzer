@@ -24,16 +24,14 @@ import argparse
 import math
 import re
 import sys
-from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Iterator
+from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
-    view_name,
 )
 
 import _config
@@ -77,6 +75,7 @@ from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+import _transgear_zone_line as zone_lines
 from pd_transgear_arm_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
@@ -354,7 +353,6 @@ _CAPTION_SETTLE_M = 5e-4
 _CAPTION_MOVES = 4
 # A two-line caption (name over scale) is 16.2 mm tall; one line is ~7.
 _CAPTION_TWO_LINES_M = 0.012
-_SW_INPUT_DIM_VAL_ON_CREATE = 10  # swUserPreferenceToggle_e.swInputDimValOnCreate
 
 
 def projected_zone_count(key: str) -> int:
@@ -374,8 +372,6 @@ def projected_zone_count(key: str) -> int:
     )
 
 
-_SW_LINE_CHAIN = 3  # swLineStyles_e.swLineCHAIN
-_SW_LW_THICK = 2  # swLineWeights_e.swLW_THICK: Y14.5's heavy chain line
 _SW_TEXT_PREFIX = 1  # swDimensionTextPrefix
 _SW_TEXT_SUFFIX = 2  # swDimensionTextSuffix
 _SW_DIMENSION_DRIVEN = 1  # swDimensionDrivenState_e.swDimensionDriven
@@ -610,36 +606,6 @@ def _set_stock_text(adapter: Any, annotations: list[Any]) -> None:
     raise RuntimeError("arm end view has no Depth dimension to label")
 
 
-def _line_ends(adapter: Any, line: Any) -> list[tuple[float, ...]]:
-    bound = _early_bound(line, "ISketchLine")
-    return [
-        tuple(
-            float(adapter._get_attr_or_call(point, axis)) for axis in ("X", "Y", "Z")
-        )
-        for point in (
-            _early_bound(adapter._get_attr_or_call(bound, accessor), "ISketchPoint")
-            for accessor in ("GetStartPoint2", "GetEndPoint2")
-        )
-    ]
-
-
-@contextmanager
-def _dimension_input_suppressed(adapter: Any) -> Iterator[None]:
-    """No Modify dialog while a driving dimension lands on a fresh sketch
-    line: SolidWorks resets swInputDimValOnCreate on entering a sketch, so
-    the adapter's connect-time suppression does not cover it (codjiflo on
-    #2015). The seat's own setting comes back afterwards."""
-    app = adapter.swApp
-    previous = bool(app.GetUserPreferenceToggle(_SW_INPUT_DIM_VAL_ON_CREATE))
-    app.SetUserPreferenceToggle(_SW_INPUT_DIM_VAL_ON_CREATE, False)
-    try:
-        if bool(app.GetUserPreferenceToggle(_SW_INPUT_DIM_VAL_ON_CREATE)):
-            raise RuntimeError("swInputDimValOnCreate stayed on")
-        yield
-    finally:
-        app.SetUserPreferenceToggle(_SW_INPUT_DIM_VAL_ON_CREATE, previous)
-
-
 @_telemetry.traced("drawing.transgear_arm.projected_zone_chains", label_param="label")
 def _add_projected_zone_chains(adapter: Any, view: Any, label: str) -> None:
     """Every projected zone drawn in ``view`` (section ``label``) at its
@@ -650,10 +616,9 @@ def _add_projected_zone_chains(adapter: Any, view: Any, label: str) -> None:
 
     The ends are model points projected through the view in one frame, so
     each line is its zone's own extent at true length and on its own side of
-    face A. The lines are authored together in the view's sketch
-    (draw_pn_pen_v_block's recipe: sheet points mapped through the sketch
-    transform, straight to the database so no endpoint snaps to nearby ink),
-    the drawing rebuilds once, and their fonts and endpoints are read back
+    face A. The lines are authored together in the view's sketch, straight
+    to the database (``_transgear_zone_line``, shared with the plate), the
+    drawing rebuilds once, and their fonts and endpoints are read back
     settled; each dimension measures its line itself.
     """
     chains = [(key, chain) for key, chain in PROJECTED_ZONE_CHAINS.items() if chain.view == label]
@@ -679,81 +644,33 @@ def _add_projected_zone_chains(adapter: Any, view: Any, label: str) -> None:
             math.hypot(dx, dy) - heights[key] * ratio[0] / ratio[1] / 1000.0
         ) > 1e-6:
             raise RuntimeError(f"{key} projected zone projects as {(start, end)!r} at {ratio!r}")
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    name = view_name(adapter, view)
-    if not drawing.ActivateView(name):
-        raise RuntimeError(f"failed to activate section {label} for its chain lines")
-    draw.ClearSelection2(True)
-    sketch = _early_bound(native.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    points = {
-        key: [
-            tuple(
-                _early_bound(
-                    _early_bound(
-                        utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
-                    ).MultiplyTransform(transform),
-                    "IMathPoint",
-                ).ArrayData
-            )
-            for x, y in pair
-        ]
-        for key, pair in ends.items()
-    }
-    manager = _early_bound(draw.SketchManager, "ISketchManager")
-    previous_add_to_db = bool(manager.AddToDB)
-    manager.AddToDB = True
-    lines = {}
-    try:
-        for key, pair in points.items():
-            lines[key] = manager.CreateLine(*pair[0], *pair[1])
-            if lines[key] is None:
-                raise RuntimeError(f"failed to create {key}'s projected-zone chain line")
-    finally:
-        manager.AddToDB = previous_add_to_db
-    segments = {key: _early_bound(line, "ISketchSegment") for key, line in lines.items()}
-    for segment in segments.values():
-        # A view sketch line otherwise prints in the under-defined sketch blue.
-        segment.Color = 0  # COLORREF black
-        segment.Style = _SW_LINE_CHAIN
-        segment.Width = _SW_LW_THICK
-    draw.ClearSelection2(True)
+    sketched = zone_lines.sketch_lines(
+        adapter, view, {key: (start, end) for key, (start, end) in ends.items()},
+        style=zone_lines.CHAIN_LINE_STYLE, width=zone_lines.CHAIN_LINE_WEIGHT,
+        label=f"section {label} projected-zone chain",
+    )
     rebuild_drawing(adapter, label=f"section {label} projected-zone chain lines")
-    for key, segment in segments.items():
-        font = (int(segment.Color), int(segment.Style), int(segment.Width))
-        if font != (0, _SW_LINE_CHAIN, _SW_LW_THICK):
-            raise RuntimeError(f"{key} chain line font did not persist: {font!r}")
-        placed = _line_ends(adapter, lines[key])
-        drift = max(abs(a - b) for end, want in zip(placed, points[key]) for a, b in zip(end, want))
-        if drift > 1e-9:
-            raise RuntimeError(f"{key} chain line moved from {points[key]!r} to {placed!r}")
+    zone_lines.require_placed(
+        adapter, sketched,
+        style=zone_lines.CHAIN_LINE_STYLE, width=zone_lines.CHAIN_LINE_WEIGHT,
+        label=f"section {label} projected-zone chain", stage="settled",
+    )
     offsets = []
-    with _dimension_input_suppressed(adapter):
+    with zone_lines.dimension_input_suppressed(adapter):
         for key, chain in chains:
             if chain.dimension is None:
                 _telemetry.info(f"{key} projected zone: chain {ends[key]!r}")
                 continue
-            if not drawing.ActivateView(name):
-                raise RuntimeError(f"failed to activate section {label} for {key}'s height")
-            selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
-            data = selection.CreateSelectData()
-            data.View = view
-            if not segments[key].Select4(False, data):
-                raise RuntimeError(f"failed to select {key}'s chain line")
             start, end = ends[key]
             at = (
                 (start[0] + end[0]) / 2.0 + chain.dimension[0],
                 (start[1] + end[1]) / 2.0 + chain.dimension[1],
             )
-            vertical = abs(end[0] - start[0]) <= 1e-6
-            add = draw.AddVerticalDimension2 if vertical else draw.AddHorizontalDimension2
-            display = add(at[0], at[1], 0.0)
-            draw.ClearSelection2(True)
-            if display is None:
-                raise RuntimeError(f"failed to dimension {key}'s projected height")
-            dimension = _early_bound(display, "IDisplayDimension")
+            dimension = zone_lines.dimension_line(
+                adapter, view, sketched[key].segment,
+                vertical=abs(end[0] - start[0]) <= 1e-6, at=at,
+                label=f"{key} projected height",
+            )
             measured = abs(float(_early_bound(dimension.GetDimension2(0), "IDimension").SystemValue))
             if abs(measured * 1000.0 - heights[key]) > 1e-6:
                 raise RuntimeError(

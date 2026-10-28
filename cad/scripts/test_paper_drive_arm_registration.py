@@ -203,7 +203,7 @@ def test_clamp_axes_have_real_projected_zones_and_each_countersink_rides_its_hol
     from _gtol_cylinder import CylinderFace
     arm_controls = {control.key: control for control in arm_spec.GEOMETRIC_CONTROLS}
     plate_controls = {control.key: control for control in plate_spec.GEOMETRIC_CONTROLS}
-    # The cones are coaxial with their holes (sheet note 3): no frame of their own.
+    # The cones are coaxial with their holes (the plan's 2X CSK callout): no frame of their own.
     assert not any("countersink" in key for key in plate_controls)
     for index, (x, y) in enumerate(plate.SCREW_HOLES, 1):
         tap = arm_controls[f"plate_tap_{index}_position"]

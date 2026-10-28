@@ -143,7 +143,10 @@ CSK_HALF_ANGLE_LIMITS_RAD = tuple(
     math.radians((CSK_ANGLE_DEG + sign * CSK_ANGLE_BAND_DEG) / 2.0)
     for sign in (-1.0, 1.0)
 )
-CLAMP_PLATE_PROJECTED_HEIGHT_MM = 7.0  # seated bearing-contact cap; SOURCE mm, not whole crown/native unit proof
+# Each screw hole's projected zone (P 7.0) starts at face A and runs into the
+# arm MHA-PD-18, the mate's side (ASME Y14.5 projected tolerance zone;
+# coordinator ruling 2026-10-27, #2017). SOURCE mm.
+CLAMP_PLATE_PROJECTED_HEIGHT_MM = 7.0
 CSK_DIA_DEVIATIONS_MM = printed_deviations(CSK_DIA, CSK_DIA_PLACES)
 CSK_DIA_LIMITS_MM = tuple(CSK_DIA + deviation for deviation in CSK_DIA_DEVIATIONS_MM)
 CSK_DEPTH = (
@@ -179,16 +182,48 @@ CSK_DIA_BAND = printed_band_mm(CSK_DIA_PLACES)
 # The notch face's corner heights print .X: the face only clears the arm's
 # lower edge (transgear_hanger_joints.NOTCH_REFERENCE_AIR_WORST_MM).
 NOTCH_BAND = BAND_X
-# Each cone is coaxial with its hole (sheet note 3), so its axis lies in the
-# hole's projected zone. The floor still pays two independent zone radii at
-# EVERY height, which bounds that with no coaxial credit.
+# Each cone is coaxial with its hole (the plan's 2X CSK callout). The zone
+# lies outside the plate, so inside it each axis is the zone's straight
+# extension: tilted at most D/H, and off true position by at most the zone
+# radius plus that tilt over the height above face A. The floor pays two
+# independent such radii (cone and hole) at the deepest stock's rear face,
+# with no coaxial credit.
 # Pay the cone rim's vertical lever and its shallowest global generatrix.
 _CSK_AXIS_TILT_MAX_RAD = math.atan(REDUCER_POSITION_DIAMETER / CLAMP_PLATE_PROJECTED_HEIGHT_MM)
+
+
+def screw_axis_radius_mm(height_mm: float) -> float:
+    """Bound on a screw hole's (or its cone's) axis offset from true position
+    at ``height_mm`` above face A, inside the plate."""
+    if height_mm < 0.0:
+        raise ValueError("inside the plate is above face A")
+    return REDUCER_POSITION_RADIUS + height_mm * math.tan(_CSK_AXIS_TILT_MAX_RAD)
+
+
+SCREW_AXIS_RADIUS_IN_PLATE_MM = screw_axis_radius_mm(
+    THICKNESS_OVER_ARM + THICKNESS_OVER_ARM_BAND
+)
 _CSK_DEPTH_MAX = (
-    ((CSK_DIA_LIMITS_MM[1] - SCREW_HOLE_DIA) / 2.0 + REDUCER_POSITION_DIAMETER)
+    ((CSK_DIA_LIMITS_MM[1] - SCREW_HOLE_DIA) / 2.0 + 2.0 * SCREW_AXIS_RADIUS_IN_PLATE_MM)
     / math.tan(CSK_HALF_ANGLE_LIMITS_RAD[0] - _CSK_AXIS_TILT_MAX_RAD)
     + CSK_DIA_LIMITS_MM[1] / 2.0 * math.sin(_CSK_AXIS_TILT_MAX_RAD)
 )
+# Full worst-case wall terms (enforce brief 2026-10-26). The title block's
+# R0.25 / C0.25 MAX edge break, on each exposed edge at a wall (the arm's
+# constant). Drill run-off of 0.3 deg (#2000 holds the method) wherever a
+# hole and the wall's other boundary are made in different setups, over the
+# depth from the entry face to the wall: the locating holes and the screw
+# holes are drilled through the plate after the outline is milled; the bore
+# is reamed on the lathe after the outline and the notch are milled, over its
+# whole hub-to-boss length. The hub and boss are turned on the bore axis in
+# the bore's own setup (the part's process), so their walls over the bore
+# pay no run-off.
+OUTLINE_EDGE_BREAK_MAX_MM = ARM.OUTLINE_EDGE_BREAK_MAX_MM
+_RUN_OFF = math.tan(math.radians(ARM.DRILL_RUN_OFF_DEG))
+# Over the deepest stock the print allows: the .XX thickness and the
+# hub-to-boss length at their upper limits.
+HOLE_RUN_OFF_MM = (THICKNESS_OVER_ARM + THICKNESS_OVER_ARM_BAND) * _RUN_OFF
+BORE_RUN_OFF_MM = (HUB_TO_BOSS + HUB_TO_BOSS_BAND) * _RUN_OFF
 
 _BORE_R_MAX = (BORE_DIA + BORE_DIA_LIMITS[1]) / 2.0
 _NOTCH_DISTANCE = (
@@ -200,37 +235,53 @@ _NOTCH_DISTANCE = (
 _NEAR_HOLE = min(SCREW_HOLES, key=lambda xy: math.hypot(*xy))
 # The nearer side edge to either hole's axis (the -X hole sits nearer its edge).
 _HOLE_TO_EDGE = min(SCREW_HOLES[0][0] - EDGE_MINUS_X, EDGE_PLUS_X - SCREW_HOLES[-1][0])
+# Each wall pays the edge breaks of the edges exposed at it: both rims at
+# the hub's and boss's end faces; the outline's or the notch's edge where a
+# hole stands inside it; the screw hole's exit mouth at face A over the bore
+# and under the countersink; and the countersink's rim at the rear face,
+# which the title block does not exempt, on the ligaments beside it.
 WALLS: dict[str, tuple[float, float]] = {
     "hub over the bore": (
         (HUB_DIA - BORE_DIA) / 2.0,
-        (HUB_DIA - BAND_XX) / 2.0 - _BORE_R_MAX,
+        (HUB_DIA - BAND_XX) / 2.0 - _BORE_R_MAX - 2.0 * OUTLINE_EDGE_BREAK_MAX_MM,
     ),
     "boss over the bore": (
         (BOSS_DIA - BORE_DIA) / 2.0,
-        (BOSS_DIA - BAND_X) / 2.0 - _BORE_R_MAX,
+        (BOSS_DIA - BAND_X) / 2.0 - _BORE_R_MAX - 2.0 * OUTLINE_EDGE_BREAK_MAX_MM,
     ),
-    "bore to end round": (END_R - BORE_DIA / 2.0, END_R - BAND_X - _BORE_R_MAX),
+    "bore to end round": (
+        END_R - BORE_DIA / 2.0,
+        END_R - BAND_X - _BORE_R_MAX - OUTLINE_EDGE_BREAK_MAX_MM - BORE_RUN_OFF_MM,
+    ),
     "bore to notch": (
         _NOTCH_DISTANCE - BORE_DIA / 2.0,
-        _NOTCH_DISTANCE - NOTCH_BAND - _BORE_R_MAX,
+        _NOTCH_DISTANCE - NOTCH_BAND - _BORE_R_MAX
+        - OUTLINE_EDGE_BREAK_MAX_MM - BORE_RUN_OFF_MM,
     ),
     "bore to screw holes": (
         math.hypot(*_NEAR_HOLE) - BORE_DIA / 2.0 - SCREW_HOLE_DIA / 2.0,
         math.hypot(*_NEAR_HOLE)
-        - REDUCER_POSITION_RADIUS
+        - SCREW_AXIS_RADIUS_IN_PLATE_MM
         - _BORE_R_MAX
-        - (SCREW_HOLE_DIA + DRILL_GROWTH) / 2.0,
+        - (SCREW_HOLE_DIA + DRILL_GROWTH) / 2.0
+        - OUTLINE_EDGE_BREAK_MAX_MM - HOLE_RUN_OFF_MM - BORE_RUN_OFF_MM,
     ),
     "under the countersinks": (
         THICKNESS_OVER_ARM - CSK_DEPTH,
-        THICKNESS_OVER_ARM - THICKNESS_OVER_ARM_BAND - _CSK_DEPTH_MAX,
+        THICKNESS_OVER_ARM - THICKNESS_OVER_ARM_BAND - _CSK_DEPTH_MAX
+        - OUTLINE_EDGE_BREAK_MAX_MM,
     ),
     "countersinks to the side edges": (
         _HOLE_TO_EDGE - CSK_DIA / 2.0,
         _HOLE_TO_EDGE
         - CSK_DIA_LIMITS_MM[1] / 2.0
         - BAND_X
-        - REDUCER_POSITION_RADIUS,
+        - SCREW_AXIS_RADIUS_IN_PLATE_MM
+        # The countersink follows the drilled hole's exit at the rear face,
+        # which has run off over the plate since entry at face A; the side
+        # edge was milled in an earlier setup.
+        - HOLE_RUN_OFF_MM
+        - 2.0 * OUTLINE_EDGE_BREAK_MAX_MM,  # the side edge and the cone's rim
     ),
 }
 for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
@@ -242,20 +293,22 @@ for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
     WALLS[f"locator {_index} to plate edge/notch"] = (
         _edge_air - LOCATOR_HOLE_DIA_MM / 2.0,
         _edge_air - BAND_X - LOCATOR_MOUTH_POSITION_RADIUS_MM
-        - LOCATING_PIN.SLIP_HOLE_LIMITS_MM[1] / 2.0 - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM,
+        - LOCATING_PIN.SLIP_HOLE_LIMITS_MM[1] / 2.0 - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM
+        - OUTLINE_EDGE_BREAK_MAX_MM - HOLE_RUN_OFF_MM,
     )
     _csk_air = min(math.hypot(_x - x, _y - y) for x, y in SCREW_HOLES)
     WALLS[f"locator {_index} to countersink"] = (
         _csk_air - (LOCATOR_HOLE_DIA_MM + CSK_DIA) / 2.0,
-        _csk_air - LOCATOR_MOUTH_POSITION_RADIUS_MM - REDUCER_POSITION_RADIUS
+        _csk_air - LOCATOR_MOUTH_POSITION_RADIUS_MM - SCREW_AXIS_RADIUS_IN_PLATE_MM
         - (LOCATING_PIN.SLIP_HOLE_LIMITS_MM[1] + CSK_DIA_LIMITS_MM[1]) / 2.0
-        - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM,
+        - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM - OUTLINE_EDGE_BREAK_MAX_MM
+        - 2.0 * HOLE_RUN_OFF_MM,
     )
     WALLS[f"locator {_index} to running bore"] = (
         math.hypot(_x, _y) - (LOCATOR_HOLE_DIA_MM + BORE_DIA) / 2.0,
         math.hypot(_x, _y) - LOCATOR_MOUTH_POSITION_RADIUS_MM
         - LOCATING_PIN.SLIP_HOLE_LIMITS_MM[1] / 2.0 - _BORE_R_MAX
-        - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM,
+        - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM - HOLE_RUN_OFF_MM - BORE_RUN_OFF_MM,
     )
 for _name, (_nominal, _worst) in WALLS.items():
     if _worst < WALL_TARGET:
