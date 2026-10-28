@@ -488,7 +488,10 @@ _CALLOUT_MARGIN_CHARS = 2
 # spigot face's shared extension line, so its span is estimated at that
 # pitch.
 _DRUM_CALLOUT_CHAR = 0.00302
-ARROWS_INSIDE = ("SpigotLength", "HubFrontZ")
+# The spoke pitch's arc spans its two extension lines: outside, its 60 deg
+# arrow's tail stood 1.9 mm from the Ø100.00's text (run
+# 20261028T155719459Z, layout audit arrow-near-text).
+ARROWS_INSIDE = ("SpigotLength", "HubFrontZ", "SpokePitch")
 _DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
 SECTION_KEEP = {
     "HubDia": (_HUB_DIA_X, SECTION_CENTER[1]),
