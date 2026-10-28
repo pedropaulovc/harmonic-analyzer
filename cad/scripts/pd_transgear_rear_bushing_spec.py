@@ -46,7 +46,7 @@ if WALL_WORST < WALL_TARGET:
 # It sets the disc's end float (worst case) and, cluster rearward, where the
 # disc's rear face stands to the platen: a term of the disc cluster's
 # printed stack.
-LENGTH = FIT.REAR_BUSHING_LENGTH  # 5.71
+LENGTH = FIT.REAR_BUSHING_LENGTH  # 5.69
 LENGTH_BAND = FIT.LENGTH_BAND
 LENGTH_PLACES = FIT.LENGTH_PLACES
 # Rule 4: the band names the stack it serves and what it sets.

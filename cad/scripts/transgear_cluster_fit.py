@@ -59,8 +59,8 @@ from pd_cluster_stack_band import PRINTED_LENGTH_BAND
 LENGTH_BAND = PRINTED_LENGTH_BAND
 LENGTH_PLACES = 2
 HUB_LENGTH = 13.69
-FRONT_BUSHING_LENGTH = 5.30
-REAR_BUSHING_LENGTH = 5.71
+FRONT_BUSHING_LENGTH = 5.32
+REAR_BUSHING_LENGTH = 5.69
 
 # --- the stack's terms: (label, nominal, band) ------------------------------------
 PH = (
@@ -104,7 +104,7 @@ M_FWD_CHAIN = (
     (LHUB, 1),
     (SP, -1),
 )
-M_FWD_NOMINAL = _nominal(M_FWD_CHAIN)  # 0.3625
+M_FWD_NOMINAL = _nominal(M_FWD_CHAIN)  # 0.3825
 M_FWD_BAND = _spread(M_FWD_CHAIN)
 # The disc's end float: hub and disc from the step (sleeve on the rear
 # bushing) to the front bushing (bushing on the ring).
@@ -149,12 +149,12 @@ SLEEVE_REAR_FORWARD_FROM_ARM = (
 ARM_REAR_Z = PIN.HEAD_SEAT_MACHINE_Z  # -116.4625
 ARM_FRONT_Z = ARM.FRONT_FACE_MACHINE_Z  # -124.4
 REAR_BUSHING_REAR_Z = ARM_FRONT_Z
-SLEEVE_REAR_Z = round(ARM_FRONT_Z - REAR_BUSHING_LENGTH, 6)  # -130.11
-STEP_Z = round(SLEEVE_REAR_Z - SLEEVE.FACE_WIDTH, 6)  # -143.71, the spigot's seat
-DISC_FRONT_Z = round(SLEEVE_REAR_Z - SLEEVE.DISC_FRONT_STATION, 6)  # -147.36
+SLEEVE_REAR_Z = round(ARM_FRONT_Z - REAR_BUSHING_LENGTH, 6)  # -130.09
+STEP_Z = round(SLEEVE_REAR_Z - SLEEVE.FACE_WIDTH, 6)  # -143.69, the spigot's seat
+DISC_FRONT_Z = round(SLEEVE_REAR_Z - SLEEVE.DISC_FRONT_STATION, 6)  # -147.34
 DISC_REAR_Z = round(DISC_FRONT_Z + DISC.FACE_WIDTH, 6)  # -144.39
-NOSE_Z = round(SLEEVE_REAR_Z - SLEEVE.OVERALL_LENGTH, 6)  # -157.46
-HUB_FRONT_Z = round(STEP_Z - HUB_LENGTH, 6)  # -157.40
+NOSE_Z = round(SLEEVE_REAR_Z - SLEEVE.OVERALL_LENGTH, 6)  # -157.44
+HUB_FRONT_Z = round(STEP_Z - HUB_LENGTH, 6)  # -157.38
 FRONT_BUSHING_REAR_Z = NOSE_Z
 FRONT_BUSHING_FRONT_Z = round(NOSE_Z - FRONT_BUSHING_LENGTH, 6)  # -162.76
 RING_FRONT_Z = PIN.GROOVE_LOAD_WALL_MACHINE_Z  # -163.7125
@@ -164,7 +164,7 @@ SLEEVE_FLOAT_MODEL = round(FRONT_BUSHING_FRONT_Z - RING_REAR_Z, 6)  # 0.3175
 F_Z = round(ARM_REAR_Z - F_FROM_ARM_REAR, 6)  # -148.1
 # F to the model disc's front face: the cluster rearward, so m_fwd plus the
 # end float.
-MODEL_M = round(DISC_FRONT_Z - F_Z, 6)  # 0.74
+MODEL_M = round(DISC_FRONT_Z - F_Z, 6)  # 0.76
 
 # Running fits on the pin (sleeve and both bushings share the bore band).
 BORE_DIA_BAND = SLEEVE.BORE_DIA_BAND

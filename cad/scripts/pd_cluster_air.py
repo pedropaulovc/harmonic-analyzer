@@ -42,6 +42,7 @@ import pd_transgear_feed_pinion_spec as SLEEVE
 import pd_transgear_front_bushing_spec as FRONT_BUSHING
 import pd_transgear_knob_shaft_spec as KNOB_SHAFT
 import pd_transgear_knob_thrust_ring_spec as KNOB_RING
+import pd_transgear_pin_spec as PIN
 import transgear_cluster_fit as FIT
 from _printed_tolerance import printed_band_mm
 
@@ -57,6 +58,7 @@ IN_SERVICE_CLEARANCES = frozenset(
     {
         "hub rock on the sleeve boss",
         "sleeve cocking on the pin",
+        "front bushing and ring cocking on the pin",
         "knob journal tilt in the plate bore",
         "platen float at the near lock",
         "arm plate loaded-seat change",
@@ -153,21 +155,38 @@ DISC_TIP_R = DISC.OUTSIDE_DIA / 2.0
 COLLAR_RIM_R = (COLLAR.OD + max(COLLAR.OD_BAND)) / 2.0  # 8.75
 # Q: the disc's tip under the collar's rim (the rim reaches past the tips).
 Q_FROM_DISC_AXIS = min(DISC_TIP_R, DISC.CENTRE_DISTANCE + COLLAR_RIM_R)
-# The disc's axial stop's least outer radius: the spigot's end on the
-# sleeve's step (the sleeve's smallest tips) or the hub's front face on the
-# front bushing (the smaller of the two smallest diameters).
-DISC_STOP_R = min(
-    HUB.SEAT_CONTACT_R,
+# The disc's forward stop, cluster forward: the hub's front face on the front
+# bushing (recess 0) or the sleeve's nose on it with the spigot's end on the
+# sleeve's step (recess > 0); every contact edge less the title block's
+# break, the step's tooth tips excepted (never broken, HUB.SEAT_CONTACT_R).
+# The disc's tilts pivot on the least of these edges.
+HUB_FACE_STOP_R = (
     min(
         HUB.HUB_DIA - printed_band_mm(HUB.HUB_DIA_PLACES),
         FRONT_BUSHING.OD - printed_band_mm(FRONT_BUSHING.OD_PLACES),
     )
-    / 2.0,
-)
-# The knob's axial stop: the 15T's rear tooth ends on the thrust ring.
-KNOB_STOP_R = (
-    min(KNOB_SHAFT.OUTSIDE_DIA, KNOB_RING.OD - printed_band_mm(KNOB_RING.OD_PLACES))
     / 2.0
+    - EDGE_BREAK_MAX
+)
+NOSE_STOP_R = (SLEEVE.BOSS_DIA + min(SLEEVE.BOSS_DIA_BAND)) / 2.0 - EDGE_BREAK_MAX
+DISC_STOP_R = min(HUB.SEAT_CONTACT_R, HUB_FACE_STOP_R, NOSE_STOP_R)
+# The bushing is loose on the pin and held by the MHA-PD-VN-61 ring, which
+# bears only on the groove's load wall (codjiflo P2 on 69223db92): bushing
+# and ring cock together on the pin, as far as the bushing's bore lets them,
+# about the load wall's broken outer edge, the one fixed support.  That moves
+# the disc's contact on the bushing forward by the cock times its reach
+# beyond that edge; the disc's own tilts then pivot on its contact.
+PIN_LOAD_WALL_R = PIN.DIA_MIN / 2.0 - EDGE_BREAK_MAX
+FRONT_BUSHING_COCK = math.atan(
+    FIT.BORE_DIAMETRAL_CLEARANCE[1]
+    / (FRONT_BUSHING.LENGTH - FRONT_BUSHING.LENGTH_BAND - 2.0 * EDGE_BREAK_MAX)
+)
+FRONT_BUSHING_COCK_REACH = max(HUB_FACE_STOP_R, NOSE_STOP_R) - PIN_LOAD_WALL_R
+# The knob's axial stop: the 15T's rear tooth ends (never broken) on the
+# thrust ring (its O.D. edge broken), the ring on the plate's hub face.
+KNOB_STOP_R = min(
+    KNOB_SHAFT.OUTSIDE_DIA / 2.0,
+    (KNOB_RING.OD - printed_band_mm(KNOB_RING.OD_PLACES)) / 2.0 - EDGE_BREAK_MAX,
 )
 DISC_TILT_LEVER = Q_FROM_DISC_AXIS - DISC_STOP_R
 KNOB_TILT_LEVER = max(0.0, COLLAR_RIM_R - KNOB_STOP_R)
@@ -209,6 +228,8 @@ def collar_terms() -> dict[str, float]:
         {
             "hub rock on the sleeve boss": HUB_ROCK * DISC_TILT_LEVER,
             "sleeve cocking on the pin": SLEEVE_COCK * DISC_TILT_LEVER,
+            "front bushing and ring cocking on the pin": FRONT_BUSHING_COCK
+            * FRONT_BUSHING_COCK_REACH,
             "knob journal tilt in the plate bore": KNOB_JOURNAL_TILT * KNOB_TILT_LEVER,
             "sleeve step face perpendicularity": STEP_SLOPE * Q_FROM_DISC_AXIS,
             "hub spigot end perpendicularity": SPIGOT_SLOPE * Q_FROM_DISC_AXIS,

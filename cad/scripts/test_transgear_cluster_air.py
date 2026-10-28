@@ -28,8 +28,8 @@ def test_ruled_lengths_print_at_the_cluster_band():
     assert PRINTED_LENGTH_BAND == pytest.approx(0.02)
     assert (FIT.HUB_LENGTH, FIT.FRONT_BUSHING_LENGTH, FIT.REAR_BUSHING_LENGTH) == (
         pytest.approx(13.69),
-        pytest.approx(5.30),
-        pytest.approx(5.71),
+        pytest.approx(5.32),
+        pytest.approx(5.69),
     )
     for label, _, band in (*TIGHTENED, *PRINTED_LENGTHS):
         assert band == pytest.approx(PRINTED_LENGTH_BAND), label
@@ -83,6 +83,25 @@ def test_collar_air_is_the_statistical_stack():
         assert stack.terms[label] == band
     # Service motions add arithmetically; only made sizes are RSS'd.
     assert "arm plate loaded-seat change" in AIR.IN_SERVICE_CLEARANCES
+
+
+def test_forward_stop_chain_pivots_on_the_pin_load_wall():
+    # The loose front bushing and its retaining ring cock together about the
+    # load wall's broken edge; the disc pivots on its least broken contact.
+    brk = 0.25
+    hub_face = min(HUB.HUB_DIA - 0.8, FRONT_BUSHING.OD - 0.8) / 2.0 - brk
+    nose = (FIT.SLEEVE.BOSS_DIA + min(FIT.SLEEVE.BOSS_DIA_BAND)) / 2.0 - brk
+    assert AIR.HUB_FACE_STOP_R == pytest.approx(hub_face)
+    assert AIR.NOSE_STOP_R == pytest.approx(nose)
+    assert AIR.DISC_STOP_R == pytest.approx(min(HUB.SEAT_CONTACT_R, hub_face, nose))
+    cock = math.atan(
+        FIT.BORE_DIAMETRAL_CLEARANCE[1]
+        / (FRONT_BUSHING.LENGTH - PRINTED_LENGTH_BAND - 2.0 * brk)
+    )
+    wall = FRONT_BUSHING.PIN.DIA_MIN / 2.0 - brk
+    term = AIR.COLLAR_AIR.terms["front bushing and ring cocking on the pin"]
+    assert term == pytest.approx(cock * (max(hub_face, nose) - wall))
+    assert "front bushing and ring cocking on the pin" in AIR.IN_SERVICE_CLEARANCES
 
 
 def test_platen_air_budgets_the_pin_zone_and_governs():
