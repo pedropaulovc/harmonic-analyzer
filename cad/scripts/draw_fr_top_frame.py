@@ -678,24 +678,29 @@ HANGER_SECTION_CALLOUTS = {
 HANGER_SECTION_CAPTION_XY = (0.120, 0.031)
 # Sheet 6, UNDERSIDE locator (1:3, model x right and z up from the view
 # centre): datum B is the front round dowel hole, its tag low in the window
-# right of the crossbar; datum C the rear one, its tag above the rear rail so
-# its leader climbs away from F-F's right arrow.  Each slot's position
+# right of the crossbar; datum C the rear one, its tag in the same window
+# under F-F's right letter, its leader dropping from the hole's lower rim
+# across the junction gusset, left of F-F's right arrow and letter.  The rear
+# hole's size reaches its upper rim, so the two meet the hole from opposite
+# sides of F-F's cutting line, as datum B and the front frame do (machinist
+# review of 3de09b959: with both above, the size's arrowhead ended inside
+# datum C's triangle).  Each slot's position
 # frame, B|C> in front and C|B> at the rear (the translation modifier frees
 # the slot along the line to the other station's round hole), stands outside
 # the plan silhouette, as the machinist review asked: the rear one above the
-# plan left of datum C's tag, its leader dropping from its right end to the
-# rear slot's outer end arc, above F-F's cutting line and left of datum C's
-# rim pick; the front one right of the plan under the rear-right boss, its
-# leader dropping from its left end, below the rear round hole and right of
+# plan, its leader dropping from its right end to the
+# rear slot's outer end arc, above F-F's cutting line and left of the size's
+# leader; the front one right of the plan under the rear-right boss, its
+# leader dropping from its left end, under datum C's tag and right of
 # datum B's tag, to the front slot's inner end arc, left of datum B's rim
 # pick and right of the pocket length's extension lines.  The FRONT slot's
 # width (the rear slot lies on F-F's cutting line) runs left of the front
 # gusset, its text on a leader into the band under the front rail that
 # passes left of the land's dimension line.  The REAR round hole's size,
-# face-on here, climbs between the rear frame's leader and datum C's to its
-# block over the plan, right of datum C's tag.
+# face-on here, climbs right of the rear frame's leader to its block over
+# the plan.
 _HUB_BOTTOM_M_PER_MM = HUB_BOTTOM_SCALE[0] / HUB_BOTTOM_SCALE[1] / 1000.0
-HANGER_DATUM_SYMBOL_XY = {"B": (0.136, 0.176), "C": (0.130, 0.257)}
+HANGER_DATUM_SYMBOL_XY = {"B": (0.136, 0.176), "C": (0.119, 0.200)}
 # Each round hole is 1.08 mm across at 1:3, its rim 1.1 mm (sheet) inside
 # the crossbar's +X edge, so the rim is hit-tested zoomed onto a 5 mm square
 # (draw_ch_rocker_arm's pivot-bore datum precedent), where the pick aperture
@@ -801,7 +806,7 @@ HANGER_SLOT_WIDTH_OFFSET_XY = (0.050, 0.137)
 # 25-character process row to the current widest row, at the same font.
 # Keep the block's lower-left corner fixed: the native leader leaves that
 # underline end toward the hole.  Extra width grows into the empty band to
-# the right, not toward datum C's tag or its leader.
+# the right, not toward the rear slot frame or its leader.
 # Right of the hole, the cutting line, F-F's right arrow and the rear-right
 # boss leave no leader route to a block beside the plan.  Left of it, the
 # rear frame's leader, F-F's left arrow and detail J's label leave a window
