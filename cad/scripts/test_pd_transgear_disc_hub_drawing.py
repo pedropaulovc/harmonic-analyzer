@@ -213,13 +213,15 @@ def test_boss_round_engagement_and_available_flat_face_follow_the_live_sleeve() 
     hub_min = spec.HUB_LENGTH - PRINTED_LENGTH_BAND
     spigot_max = spec.SPIGOT_LENGTH + PRINTED_LENGTH_BAND
     # Seated: hub front face to the boss's first full round; slid forward:
-    # the nose to the first full round behind the slid spigot.
+    # the nose to the first full round behind the slid spigot.  Each exposed
+    # end of the contact loses the title block's edge break.
+    brk = 0.25
     engagement = min(
         *(
-            tooth + hub_min - max(tooth, sleeve.CUTTER_RUNOUT_END_WORST)
+            tooth + hub_min - brk - max(tooth + brk, sleeve.CUTTER_RUNOUT_END_WORST)
             for tooth in teeth
         ),
-        sleeve_min - max(teeth[1] + slide, sleeve.CUTTER_RUNOUT_END_WORST),
+        sleeve_min - brk - max(teeth[1] + slide + brk, sleeve.CUTTER_RUNOUT_END_WORST),
     )
     assert spec.ROUND_ENGAGEMENT_MIN == pytest.approx(engagement)
     assert engagement > 0.0

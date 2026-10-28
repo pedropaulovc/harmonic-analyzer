@@ -49,14 +49,17 @@ COLLAR_AIR_MIN = COLLAR.COLLAR_DISC_AIR_MIN  # 0.10
 PLATEN_AIR_MIN = 0.03  # R9-68
 
 # --- classification ------------------------------------------------------------
-# In-service clearances: running fits and floats the parts can all take up
-# together; they add arithmetically.
+# In-service clearances and motions: running fits, floats and the arm
+# plate's accepted loaded-minus-snug seat movement (a service motion, not a
+# made size: codjiflo P2 on 6228b6ead) can all be taken up together; they
+# add arithmetically.
 IN_SERVICE_CLEARANCES = frozenset(
     {
         "hub rock on the sleeve boss",
         "sleeve cocking on the pin",
         "knob journal tilt in the plate bore",
         "platen float at the near lock",
+        "arm plate loaded-seat change",
     }
 )
 _LENGTHS = (
@@ -83,7 +86,6 @@ INDEPENDENT_TOLERANCES = frozenset(
         "pin S projected axis zone",
         "knob K projected axis zone",
         "arm opposite-face parallelism",
-        "arm plate loaded-seat change",
         "MHA-PD-20 spacer length",
         "MHA-PD-07 support bar depth",
         "MHA-PD-02 platen thickness",

@@ -213,17 +213,27 @@ FLAT_DRIVE_LENGTH_MIN = min(
 FLAT_DRIVE_FACE_AREA_MIN = FLAT_DRIVE_WIDTH_MIN * FLAT_DRIVE_LENGTH_MIN
 
 
-# Round engagement on the boss: from the boss's first full round (the step,
-# or behind it the form cutter's run-out slots at their deepest) to the hub
-# front face or the nose, whichever is nearer, over the hub's slide.  The
-# title block's edge breaks at both ends are not subtracted.
+# Round engagement on the boss: from the boss's first full round (the hub
+# bore's rear edge break, or ahead of it the form cutter's run-out slots at
+# their deepest) to the hub bore's front edge break or the nose's, whichever
+# is nearer, over the hub's slide.  The title block's edge break comes off
+# every exposed end of the contact (codjiflo P2 on 6228b6ead), as the
+# sleeve's own bearing span does (pd_cluster_air.SLEEVE_COCK).
+_ENGAGEMENT_EDGE_BREAK = float(_config.title_block("edge_break")["chamfer_max_mm"])
 ROUND_ENGAGEMENT_MIN = min(
     *(
-        tooth + HUB_LENGTH_MIN - max(tooth, SLEEVE.CUTTER_RUNOUT_END_WORST)
+        tooth
+        + HUB_LENGTH_MIN
+        - _ENGAGEMENT_EDGE_BREAK
+        - max(tooth + _ENGAGEMENT_EDGE_BREAK, SLEEVE.CUTTER_RUNOUT_END_WORST)
         for tooth in _TOOTH_LENGTHS
     ),
     _SLEEVE_LENGTH_MIN
-    - max(_TOOTH_LENGTHS[1] + _HUB_SLIDE_MAX, SLEEVE.CUTTER_RUNOUT_END_WORST),
+    - _ENGAGEMENT_EDGE_BREAK
+    - max(
+        _TOOTH_LENGTHS[1] + _HUB_SLIDE_MAX + _ENGAGEMENT_EDGE_BREAK,
+        SLEEVE.CUTTER_RUNOUT_END_WORST,
+    ),
 )
 
 # --- the seat: the spigot's end on the sleeve's step ---------------------------

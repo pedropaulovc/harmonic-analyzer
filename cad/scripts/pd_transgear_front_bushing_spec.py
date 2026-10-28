@@ -74,7 +74,7 @@ if HUB_FACE_OVERLAP_WORST < HUB_FACE_OVERLAP_MIN:
 # --- Length: printed (#2038 owner ruling 2026-10-28, option A) --------------------
 # With the cluster forward it sets F to the disc's front face (m), so the
 # drive collar's air to the disc: a term of the disc cluster's printed stack.
-LENGTH = FIT.FRONT_BUSHING_LENGTH  # 5.27
+LENGTH = FIT.FRONT_BUSHING_LENGTH  # 5.30
 LENGTH_BAND = FIT.LENGTH_BAND
 LENGTH_PLACES = FIT.LENGTH_PLACES
 # Rule 4: the band names the stack it serves and what it sets.

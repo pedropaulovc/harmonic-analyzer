@@ -510,11 +510,11 @@ if abs(_pin_hole_n - _pin_hole_offset) > 1e-9 or (
 PIN_Z0 = PIN.HEAD_SEAT_MACHINE_Z  # -116.4625: the head's underside (Ry180)
 if abs(PIN_Z0 - (ARM_Z0 + ARM.THICKNESS)) > 1e-9:
     raise AssertionError("the pin's head is off the arm's rear face")
-REAR_BUSHING_Z0 = CLUSTER.REAR_BUSHING_REAR_Z  # -124.4 (Ry180, to -130.14)
+REAR_BUSHING_Z0 = CLUSTER.REAR_BUSHING_REAR_Z  # -124.4 (Ry180, to -130.11)
 if abs(REAR_BUSHING_Z0 - ARM_Z0) > 1e-9:
     raise AssertionError("the rear bushing is off the arm's front face")
-FEED_Z0 = REAR_BUSHING_Z0 - REAR_BUSHING.LENGTH  # -130.14 (Ry180, teeth to -143.74)
-DISC_Z0 = FEED_Z0 - FEED.DISC_FRONT_STATION  # -147.39: on the hub spigot's flange
+FEED_Z0 = REAR_BUSHING_Z0 - REAR_BUSHING.LENGTH  # -130.11 (Ry180, teeth to -143.71)
+DISC_Z0 = FEED_Z0 - FEED.DISC_FRONT_STATION  # -147.36: on the hub spigot's flange
 if abs(DISC_Z0 - CLUSTER.DISC_FRONT_Z) > 1e-9:
     raise AssertionError("the disc is off the cluster stack's station")
 _DISC_SCREW_R = DISC_HUB_GEOM.BOLT_CIRCLE_DIA / 2.0
@@ -525,8 +525,8 @@ DISC_SCREW_XY = tuple(
     )
     for angle in DISC_HUB_GEOM.SCREW_ANGLES_DEG
 )
-DISC_SCREW_Z0 = DISC_Z0 - DISC_HUB.FLANGE_THICK  # -149.79: heads on the flange
-FRONT_BUSHING_Z0 = FEED_Z0 - FEED.OVERALL_LENGTH  # -157.49 (Ry180, to -162.76)
+DISC_SCREW_Z0 = DISC_Z0 - DISC_HUB.FLANGE_THICK  # -149.76: heads on the flange
+FRONT_BUSHING_Z0 = FEED_Z0 - FEED.OVERALL_LENGTH  # -157.46 (Ry180, to -162.76)
 if abs(FRONT_BUSHING_Z0 - CLUSTER.FRONT_BUSHING_REAR_Z) > 1e-9:
     raise AssertionError("the front bushing is off the sleeve's nose")
 # The hub's front face, its printed overall leaving it RECESS behind the
@@ -642,7 +642,7 @@ PLATEN_YAW_LEVER = (BAR_LENGTH / 2.0) / (BAR_LENGTH / 2.0 - LOCK_STATION_X[0])
 # bar (6.0) carries no drawing band: .XXX assumed.
 _PLATEN_THICKNESS_BAND = printed_band_mm(PLATEN_PRECISION["Depth"])
 _RACK_THICKNESS_BAND = printed_band_mm(3)
-DISC_PLATEN_NOMINAL = PLATE_FRONT_Z - (DISC_Z0 + DISC_SPEC.FACE_WIDTH)  # 1.64
+DISC_PLATEN_NOMINAL = PLATE_FRONT_Z - (DISC_Z0 + DISC_SPEC.FACE_WIDTH)  # 1.61
 CLUSTER_TILT_AT_DISC_RIM = (
     (
         DISC_SPEC.OUTSIDE_DIA
@@ -785,7 +785,7 @@ BUSHING_RACK_AIR_WORST = (
     - (CLUSTER.SLEEVE_REAR_FORWARD_FROM_ARM[1] - REAR_BUSHING.LENGTH)
     - HANGER.HANGER_TILT
     * (_P_TO_S + (REAR_BUSHING.OD + printed_band_mm(REAR_BUSHING.OD_PLACES)) / 2.0)
-)  # 1.07
+)  # 1.87
 if BUSHING_RACK_AIR_WORST < 0.0:
     raise AssertionError(
         "MHA-PD-24 rear bushing enters the MHA-PD-05 rack at the printed worst case: "

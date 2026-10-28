@@ -28,8 +28,8 @@ def test_ruled_lengths_print_at_the_cluster_band():
     assert PRINTED_LENGTH_BAND == pytest.approx(0.02)
     assert (FIT.HUB_LENGTH, FIT.FRONT_BUSHING_LENGTH, FIT.REAR_BUSHING_LENGTH) == (
         pytest.approx(13.69),
-        pytest.approx(5.27),
-        pytest.approx(5.74),
+        pytest.approx(5.30),
+        pytest.approx(5.71),
     )
     for label, _, band in (*TIGHTENED, *PRINTED_LENGTHS):
         assert band == pytest.approx(PRINTED_LENGTH_BAND), label
@@ -81,6 +81,8 @@ def test_collar_air_is_the_statistical_stack():
         assert stack.terms[source] > 0.0, source
     for label, _, band in (term for term, _ in FIT.M_FWD_CHAIN):
         assert stack.terms[label] == band
+    # Service motions add arithmetically; only made sizes are RSS'd.
+    assert "arm plate loaded-seat change" in AIR.IN_SERVICE_CLEARANCES
 
 
 def test_platen_air_budgets_the_pin_zone_and_governs():
