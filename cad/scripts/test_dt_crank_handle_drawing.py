@@ -30,7 +30,8 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert handle.DRAWING_DIMENSIONS is dt_crank_handle_spec.DRAWING_DIMENSIONS
     marked = set().union(*dt_crank_handle_spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.FRONT_KEEP) == marked
+    assert set(drawing.FRONT_KEEP) | set(drawing.DETAIL_KEEP) == marked
+    assert not set(drawing.FRONT_KEEP) & set(drawing.DETAIL_KEEP)
     assert set(drawing.DIMENSION_CALLOUTS) <= marked
     assert set(dt_crank_handle_spec.DRAWING_PRECISION_BY_NAME) == marked
     assert "draw_dt_crank_handle.py" in PRECISION_MIGRATED_DRAWINGS
@@ -277,9 +278,47 @@ def test_inside_corners_print_a_max_radius_their_mates_clear() -> None:
     assert "_inside_corner_max_limit(adapter, name)" in build_source
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert (
-        "_dress_inside_corner(adapter, front_by_name[name], name=name)"
+        "_dress_inside_corner(adapter, by_name[name], name=name)"
         in drawing_source
     )
+
+
+def test_root_relief_prints_in_an_enlarged_detail_with_separate_leaders() -> None:
+    # MHA-DT-08 machinist review of 3de09b959: at 4:1 the relief's leg, its
+    # R0.3 MAX root and their blocks crowded one tiny corner.  Detail B, a
+    # native detail of section A-A, carries both, each on its own leader.
+    assert set(drawing.DETAIL_KEEP) == {"TenonRootRelief", "TenonRootRadius"}
+    assert drawing.DETAIL_SCALE[0] / drawing.DETAIL_SCALE[1] >= 2.0 * drawing.SHEET_SCALE[0]
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "CreateDetailViewAt4(" in source
+    # The leg's dimension runs from the tenon end's corner: the fence must
+    # show it, the relief and its whole root round, or the import drops it.
+    reach = drawing.DETAIL_RADIUS_MM - drawing._FENCE_MARGIN_MM
+    for point in (
+        (dt_crank_handle_spec.TENON_X0, dt_crank_handle_spec.TENON_R),
+        handle.RELIEF_TOP,
+        (handle.ROOT_CENTER[0] + 0.3, handle.ROOT_CENTER[1]),
+    ):
+        assert math.dist(drawing.DETAIL_FOCUS_MM, point) <= reach
+    assert drawing._ROOT_CENTER == pytest.approx(handle.ROOT_CENTER)
+    # Both blocks stand outside the circle, inside the border (x 0.0127 ..
+    # 0.4191, y .. 0.2667): the leg's 23 x 27.4 mm block hangs left of its
+    # keep, the R0.3 block's 22.0 x 14.6 mm centres on its keep.
+    cx, cy = drawing.DETAIL_CENTER
+    r = drawing.DETAIL_CROP_RADIUS
+    leg_x, leg_y = drawing.DETAIL_KEEP["TenonRootRelief"]
+    assert cx - r - leg_x >= 0.005
+    assert leg_y + 0.0137 <= 0.2667 - 0.004
+    root_x, root_y = drawing.DETAIL_KEEP["TenonRootRadius"]
+    assert root_x - 0.011 - (cx + r) >= 0.008
+    assert root_x + 0.011 <= 0.4191 - 0.010
+    assert cy + r <= 0.2667 - 0.010
+    # The R0.3 text stands inside the round's span (-90 to 45 degrees about
+    # its centre), so its leader lands on the arc without an extension.
+    centre = drawing._detail_xy(*handle.ROOT_CENTER)
+    angle = math.degrees(math.atan2(root_y - centre[1], root_x - centre[0]))
+    assert -90.0 < angle < 45.0
+    assert drawing.INSIDE_CORNER_ARC_EXTENSION["TenonRootRadius"] is False
 
 
 def test_tenon_root_relief_clears_the_ferrule_seat_and_keeps_the_tenon() -> None:
