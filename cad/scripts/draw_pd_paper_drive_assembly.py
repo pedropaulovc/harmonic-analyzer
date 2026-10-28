@@ -552,9 +552,12 @@ CHAIN_SECOND_COLUMN_KEY = "collar-shoulder-seated"
 # on S-K's midpoint (S, Q and K all lie on it: Q is the chain's right angle).
 # It stands under the second column, over the title block; each setting's
 # text stands well off its leg, away from the chain's third point, clear of
-# the circle and its own callout clear of the other dimension (run
-# 20261027T230707102Z put them 4 mm past the circle, over the arm's edge and
-# each other's lines). The caption stands left of the circle.
+# the circle (run 20261027T230707102Z put them 4 mm past it, over the arm's
+# edge). Its one-word callout keeps the text block between its leg's
+# extension lines (run 20261028T000650671Z: "ALONG ARM" was struck by one).
+# The three circles in the crop are lettered on short leaders and named in the
+# legend left of the circle (same run): S the pin, K the knob bore, and T the
+# arm's plate-screw tap that lies between them.
 KNOB_SETTING_VIEW_NAME = "VIEW K"
 KNOB_SETTING_SCALE = (1.0, 1.0)
 KNOB_SETTING_CENTER = (0.320, 0.097)
@@ -565,13 +568,80 @@ KNOB_SETTING_INSTANCES = frozenset(
 )
 # The second column's steps end above this on sheet 5.
 KNOB_SETTING_FIELD_TOP = 0.144
-KNOB_SETTING_CAPTION = (
-    f"{KNOB_SETTING_VIEW_NAME}, 1:1\nKNOB BORE K FROM PIN S\n(STEP "
-    f"{steps.step_number('arm-plate-located')})"
+# The plate-screw tap inside the crop, in the machine frame (mm): the arm's
+# tap station nearer S, on the plate's centreline.
+KNOB_SETTING_TAP_STATION = max(arm_geometry.PLATE_TAP_STATIONS)
+KNOB_SETTING_TAP_XY = (
+    knob_setting.P_XY[0]
+    + arm_geometry.ARM_U[0] * KNOB_SETTING_TAP_STATION
+    + arm_geometry.ARM_N[0] * arm_geometry.PLATE_CENTRELINE_OFFSET,
+    knob_setting.P_XY[1]
+    + arm_geometry.ARM_U[1] * KNOB_SETTING_TAP_STATION
+    + arm_geometry.ARM_N[1] * arm_geometry.PLATE_CENTRELINE_OFFSET,
 )
-KNOB_SETTING_CAPTION_XY = (0.218, 0.112)
-if math.dist(knob_setting.S_XY, knob_setting.K_XY) / 2000.0 >= KNOB_SETTING_RADIUS:
-    raise AssertionError("the knob setting circle must frame S, Q and K")
+KNOB_SETTING_LEGEND = {
+    "S": f"{_config.parts('pd-transgear-pin')['number']} PIN",
+    "K": f"{_config.parts('pd-transgear-arm-plate')['number']} KNOB BORE",
+    "T": f"{_config.parts('pd-vn-transgear-arm-plate-screw')['number']} TAP",
+}
+KNOB_SETTING_CAPTION = "\n".join(
+    (
+        f"{KNOB_SETTING_VIEW_NAME}, 1:1 (STEP {steps.step_number('arm-plate-located')})",
+        *(f"{letter}: {name}" for letter, name in KNOB_SETTING_LEGEND.items()),
+    )
+)
+KNOB_SETTING_CAPTION_XY = (0.218, 0.113)
+# Each letter's centre stands this far off its circle's centre (sheet m): S
+# along the arm past the pin, T diagonally away from both chain legs, K
+# radially out past the plate's boss, just outside the crop.
+KNOB_SETTING_LETTER_GAPS = {"S": 0.004, "T": 0.005, "K": 0.0095}
+# Half a default-height capital letter (sheet m): note positions are the
+# text's upper-left corner.
+KNOB_SETTING_LETTER_HALF = (0.0013, 0.0018)
+for _point in (knob_setting.S_XY, knob_setting.K_XY, KNOB_SETTING_TAP_XY):
+    if math.dist(
+        _point,
+        (
+            (knob_setting.S_XY[0] + knob_setting.K_XY[0]) / 2.0,
+            (knob_setting.S_XY[1] + knob_setting.K_XY[1]) / 2.0,
+        ),
+    ) / 1000.0 >= KNOB_SETTING_RADIUS:
+        raise AssertionError("the knob setting circle must frame S, T and K")
+
+
+def knob_setting_letters(
+    s: tuple[float, float],
+    q: tuple[float, float],
+    k: tuple[float, float],
+    t: tuple[float, float],
+) -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
+    """Each circle's letter: (note upper-left corner, leader tip on the
+    circle's centre), from the projected S, Q, K and tap T (sheet metres)."""
+    def unit(vector):
+        length = math.hypot(*vector)
+        return (vector[0] / length, vector[1] / length)
+
+    along = unit((s[0] - q[0], s[1] - q[1]))
+    across = unit((k[0] - q[0], k[1] - q[1]))
+    centre = ((s[0] + k[0]) / 2.0, (s[1] + k[1]) / 2.0)
+    directions = {
+        "S": along,
+        "T": unit((along[0] + across[0], along[1] + across[1])),
+        "K": unit((k[0] - centre[0], k[1] - centre[1])),
+    }
+    tips = {"S": s, "T": t, "K": k}
+    letters = {}
+    for letter, tip in tips.items():
+        gap = KNOB_SETTING_LETTER_GAPS[letter]
+        dx, dy = directions[letter]
+        letters[letter] = (
+            (
+                tip[0] + gap * dx - KNOB_SETTING_LETTER_HALF[0],
+                tip[1] + gap * dy + KNOB_SETTING_LETTER_HALF[1],
+            ),
+            tip,
+        )
+    return letters
 
 
 def knob_setting_keep(
@@ -3190,9 +3260,10 @@ def _place_knob_setting_view(adapter: Any) -> None:
             knob_setting.S_XY,
             knob_setting.Q_XY,
             knob_setting.K_XY,
+            KNOB_SETTING_TAP_XY,
         )
     )
-    names = ("S-K midpoint", "pin S", "corner Q", "knob bore K")
+    names = ("S-K midpoint", "pin S", "corner Q", "knob bore K", "plate-screw tap T")
     centre = model_points_in_view(adapter, view, model[:1], label=label, names=names[:1])[0]
     _shift_view(
         adapter,
@@ -3200,7 +3271,7 @@ def _place_knob_setting_view(adapter: Any) -> None:
         (KNOB_SETTING_CENTER[0] - centre[0], KNOB_SETTING_CENTER[1] - centre[1]),
         label=f"{label} centre",
     )
-    centre, s, q, k = model_points_in_view(adapter, view, model, label=label, names=names)
+    centre, s, q, k, t = model_points_in_view(adapter, view, model, label=label, names=names)
     if math.dist(centre, KNOB_SETTING_CENTER) > 1e-4:
         raise RuntimeError(f"{label}: S-K midpoint sits at {centre!r}")
     _crop_to_circle(adapter, view, KNOB_SETTING_CENTER, KNOB_SETTING_RADIUS, label=label)
@@ -3223,6 +3294,16 @@ def _place_knob_setting_view(adapter: Any) -> None:
     )
     if imported != sorted(keep):
         raise RuntimeError(f"{label} imported {imported}, not {sorted(keep)}")
+    for letter, (text_xy, tip) in knob_setting_letters(s, q, k, t).items():
+        add_leader_note(
+            adapter,
+            letter,
+            text_xy=text_xy,
+            attach_xy=tip,
+            label=f"{label} letter {letter}",
+            view=view,
+        )
+    rebuild_drawing(adapter, label=f"{label} letters")
     _place_sheet_note(
         adapter,
         SHEET_NAMES[4],

@@ -57,6 +57,21 @@ STEP_HEAD = re.compile(r"^(\d+)\. ", re.MULTILINE)
 # #945 moves these into _drawing_common.
 NOTE_CHAR_WIDTH = 0.00276
 NOTE_LINE_PITCH = 0.0045
+# Dimension text runs larger: VIEW K's "ALONG ARM" callout spanned 27.9 mm and
+# its two rows 9.2 mm on run 20261028T000650671Z's sheet 5.
+DIM_CHAR_WIDTH = 0.0031
+DIM_LINE_PITCH = 0.0047
+
+
+def _segment_distance(
+    point: tuple[float, float], a: tuple[float, float], b: tuple[float, float]
+) -> float:
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    t = ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) / (dx * dx + dy * dy)
+    t = min(1.0, max(0.0, t))
+    return math.dist(point, (a[0] + t * dx, a[1] + t * dy))
+
+
 # Words no sheet of the package may print (drawing-simplicity policy).
 FORBIDDEN_SHEET_WORDS = ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "BOOK FIDELITY")
 
@@ -449,8 +464,14 @@ def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
                 centre[1] + (xy[1] - mid[1]) * scale / 1000.0,
             )
 
-        s, q, k = (sheet(xy) for xy in (knob_setting.S_XY, knob_setting.Q_XY, knob_setting.K_XY))
-        for point in (s, q, k):
+        s, q, k, t = (
+            sheet(xy)
+            for xy in (
+                knob_setting.S_XY, knob_setting.Q_XY, knob_setting.K_XY,
+                drawing.KNOB_SETTING_TAP_XY,
+            )
+        )
+        for point in (s, q, k, t):
             assert math.dist(point, centre) < drawing.KNOB_SETTING_RADIUS
         keep = drawing.knob_setting_keep(s, q, k)
         assert set(keep) == {knob_setting.ALONG_DIMENSION, knob_setting.ACROSS_DIMENSION}
@@ -460,11 +481,24 @@ def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
         }
         boxes = []
         for name, (x, y) in keep.items():
-            # Value text, its callout one line above; the dimension line
-            # runs through the text, parallel to its leg.
+            # The value row centred on the text point, its callout row above;
+            # the dimension line runs through the text, parallel to its leg.
             _, callout = knob_setting.SETTING_CALLOUTS[name]
-            half = max(len(callout), len("(00.000)")) * NOTE_CHAR_WIDTH / 2.0
-            box = (x - half, y - NOTE_LINE_PITCH / 2.0, x + half, y + 1.5 * NOTE_LINE_PITCH)
+            a, b = legs[name]
+            leg = math.dist(a, b)
+            unit = ((b[0] - a[0]) / leg, (b[1] - a[1]) / leg)
+            rows = (
+                ("(00.000)", -DIM_LINE_PITCH / 2.0, DIM_LINE_PITCH / 2.0),
+                (callout, DIM_LINE_PITCH / 2.0, 1.5 * DIM_LINE_PITCH),
+            )
+            for text, low, high in rows:
+                half = len(text) * DIM_CHAR_WIDTH / 2.0
+                # Every corner stays between the leg's two extension lines.
+                for dx in (-half, half):
+                    for dy in (low, high):
+                        assert abs(dx * unit[0] + dy * unit[1]) < leg / 2.0 - 0.0005
+            half = max(len(text) for text, _, _ in rows) * DIM_CHAR_WIDTH / 2.0
+            box = (x - half, y - DIM_LINE_PITCH / 2.0, x + half, y + 1.5 * DIM_LINE_PITCH)
             nearest = (
                 min(max(centre[0], box[0]), box[2]),
                 min(max(centre[1], box[1]), box[3]),
@@ -472,30 +506,55 @@ def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
             assert math.dist(nearest, centre) > drawing.KNOB_SETTING_RADIUS
             assert drawing.FITUP_NOTE_XY[1][0] < box[0] and box[2] < drawing.FITUP_NOTE_LIMITS[1][0]
             assert drawing.FITUP_NOTE_LIMITS[1][1] < box[1] and box[3] < drawing.KNOB_SETTING_FIELD_TOP
-            a, b = legs[name]
             shift = (x - (a[0] + b[0]) / 2.0, y - (a[1] + b[1]) / 2.0)
             for end in (a, b):
                 assert end[1] + shift[1] < drawing.KNOB_SETTING_FIELD_TOP
             boxes.append(box)
+        # Each circle lettered on a leader to its centre: S and T inside the
+        # crop, K just outside it past the boss, each clear of the chain.
+        letters = drawing.knob_setting_letters(s, q, k, t)
+        assert letters.keys() == drawing.KNOB_SETTING_LEGEND.keys() == {"S", "K", "T"}
+        half_w, half_h = drawing.KNOB_SETTING_LETTER_HALF
+        diagonal = math.hypot(half_w, half_h)
+        for letter, ((left, top), tip) in letters.items():
+            assert tip == {"S": s, "K": k, "T": t}[letter]
+            middle = (left + half_w, top - half_h)
+            reach = math.dist(middle, centre)
+            if letter == "K":
+                assert reach - diagonal > drawing.KNOB_SETTING_RADIUS
+            else:
+                assert reach + diagonal < drawing.KNOB_SETTING_RADIUS
+            for a, b in ((s, q), (q, k)):
+                assert _segment_distance(middle, a, b) > diagonal + 0.0005
+            for other in (s, q, k, t):
+                if other != tip:
+                    assert math.dist(middle, other) > diagonal + 0.002
+            boxes.append((left, top - 2 * half_h, left + 2 * half_w, top))
         caption_lines = drawing.KNOB_SETTING_CAPTION.splitlines()
         left, top = drawing.KNOB_SETTING_CAPTION_XY
-        boxes.append(
-            (
-                left,
-                top - len(caption_lines) * NOTE_LINE_PITCH,
-                left + max(map(len, caption_lines)) * NOTE_CHAR_WIDTH,
-                top,
-            )
+        caption = (
+            left,
+            top - len(caption_lines) * NOTE_LINE_PITCH,
+            left + max(map(len, caption_lines)) * NOTE_CHAR_WIDTH,
+            top,
         )
-        assert boxes[-1][2] < centre[0] - drawing.KNOB_SETTING_RADIUS
-        assert boxes[-1][0] > drawing.FITUP_NOTE_LIMITS[0][0]
-        assert boxes[-1][1] > DRAWING_TEMPLATES[drawing.SPEC.layout].title_block_top_m
+        assert caption[2] < centre[0] - drawing.KNOB_SETTING_RADIUS
+        assert caption[0] > drawing.FITUP_NOTE_LIMITS[0][0]
+        assert caption[1] > DRAWING_TEMPLATES[drawing.SPEC.layout].title_block_top_m
+        boxes.append(caption)
         for index, one in enumerate(boxes):
             for other in boxes[index + 1:]:
                 assert (
                     one[2] < other[0] or other[2] < one[0]
                     or one[3] < other[1] or other[3] < one[1]
                 )
+    # The legend names each lettered circle by its part number.
+    for letter, stem in (
+        ("S", "pd-transgear-pin"),
+        ("K", "pd-transgear-arm-plate"),
+        ("T", "pd-vn-transgear-arm-plate-screw"),
+    ):
+        assert f"{letter}: {_number(stem)} " in drawing.KNOB_SETTING_CAPTION
     # Sheet 5's second column ends above the view's field.
     notes = _unit_step_notes()
     _, top = drawing.FITUP_NOTE_XY[1]
