@@ -1111,17 +1111,18 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     # The bands' functions (Main's ruling, 2026-10-16): together they hold the
     # shaft's flat-station window (ch_fulcrum_shaft_spec); the slide (r11
     # review) moves both flats at once, the band is what leaves it a seat. The
-    # south face's band alone is also what keeps its foot off the front socket
-    # boss at the printed worst case (build_fr_top_frame), which the step names
-    # so the absolute setting has a stated reason (#1660 r1, rules 4 and 19).
+    # south face's band also keeps its foot off the front socket boss at the
+    # printed worst case (build_fr_top_frame), which the step names so the
+    # absolute setting has a stated reason (#1660 r1, rules 4 and 19). Since
+    # the keeper prints its overall length off the inner lug face (owner
+    # ruling 2026-10-28) the boss would clear even at the title block's band.
     import build_fr_top_frame as top
 
     south_margin, north_margin = top.KEEPER_FOOT_PRINTED_BOSS_MARGINS
-    # At the title block's band for these places the south foot would reach
-    # the boss; the north foot keeps a wide margin either way.
     band = keeper.KEEPER_FITUP_LOCATION_BAND_MM
     title_block_band = top.PRINTED_LINEAR_BAND_MM[places]
-    assert 0.0 < south_margin < title_block_band - band
+    assert 0.0 < south_margin
+    assert south_margin + band - title_block_band > 0.0
     assert north_margin > 10 * band
     # #1660 r6 (rule 4): the lug centre's ±0.10 (owner ruling X-A) is what
     # keeps the transferred foot tap walled in the rail web (rule 17's 1.5):

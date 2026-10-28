@@ -65,11 +65,15 @@ CROWN_R = 7.0  # full-round lug top about the shaft axis: KEEPER_WIDTH / 2
 FOOT_H = 8.0  # foot height; the bracket seats on y=0
 # Owner ruling Q11-B' (2026-10-16): the foot shortens 10.5 -> 8.5 so the
 # thicker lug leaves its tip where it was, clear of MHA-FR-02's corner
-# bosses (build_fr_top_frame KEEPER_FOOT_PRINTED_BOSS_MARGINS); it prints
-# .XX (FOOT_LENGTH_PLACES), as the .X band no longer clears the boss.
+# bosses (build_fr_top_frame KEEPER_FOOT_PRINTED_BOSS_MARGINS). Owner ruling
+# 2026-10-28 (option D, ENFORCE review eecbf88: the 8.00 + 8.50 chain left
+# the overall a reference): the front view baselines the 8.00 lug and the
+# overall length off the inner lug face, the overall a real size at .XX
+# (OVERALL_LENGTH_PLACES), so the foot length prints nowhere.
 FOOT_L = 8.5  # foot length outboard of the lug's outer face
-FOOT_LENGTH_PLACES = 2
+OVERALL_LENGTH_PLACES = 2
 FOOT_TIP_X = LUG_HALF_T + FOOT_L  # 12.5: outboard end of the foot
+OVERALL_LENGTH = 2.0 * LUG_HALF_T + FOOT_L  # 16.5: inner lug face to foot tip
 CROWN_TOP_Y = SHAFT_AXIS_H + CROWN_R  # 32.2: the set-screw tap's entry
 # Plain reamed bore for the plain Ø6.35 (1/4 in ground, SHAFT_H) fulcrum
 # shaft: the shaft slides through both lugs at assembly and the set screw
@@ -362,19 +366,28 @@ if SET_SCREW_WEB_MM < 2.0:
 # Counterbore walls. The hole prints 4.50 off the foot tip at .XX and 7.000
 # off a side face at .XXX (FootScrewReference / FootScrewSideReference: the
 # side station is the frame tap's transverse place, transferred at fit-up);
-# the foot length prints .XX, the width .X, and the counterbore is a drilled
-# diameter. Located off the tip, the tip wall takes only the station's band.
+# the lug thickness and the overall length print .XX off the inner lug face,
+# the width .X, and the counterbore is a drilled diameter. Located off the
+# tip, the tip wall takes only the station's band: 2.04 here, 1.53 at the
+# full worst case (less two 0.25 title-block edge breaks, the counterbore
+# rim and the tip's top edge, and 0.3 deg run-off over its 2.11 depth),
+# above the 1.5 floor. Off the inner lug face (12.00) the 16.50's band would
+# join the station's and leave 1.02 at the full worst case, so the plan
+# keeps the hole off the tip: owner ruling 2026-10-28 (option D), review
+# exception RV-03 (cad/config/parts/ch-fulcrum-keeper.yaml).
 # The lug side is no wall: the foot runs on under the lug to x = -4, so
-# there the counterbore need only stay off the lug's outer face.
+# there the counterbore need only stay off the lug's outer face, which sits
+# 16.50 - 8.00 off the tip (both bands).
 _CBORE_MAX_RADIUS = (CBORE_DIA_MM + _DRILLED_PLUS) / 2.0
 FOOT_TIP_WALL_MM = SCREW_FROM_TIP - _BAND_BY_PLACES[2] - _CBORE_MAX_RADIUS
 if FOOT_TIP_WALL_MM < 2.0:
     raise AssertionError(f"keeper counterbore tip wall {FOOT_TIP_WALL_MM:.2f} < 2.0")
 FOOT_CBORE_LUG_CLEARANCE_MM = (
-    (FOOT_L - _BAND_BY_PLACES[FOOT_LENGTH_PLACES])
+    (OVERALL_LENGTH - _BAND_BY_PLACES[OVERALL_LENGTH_PLACES])
+    - (2.0 * LUG_HALF_T + _LUG_T_BAND)
     - (SCREW_FROM_TIP + _BAND_BY_PLACES[2])
     - _CBORE_MAX_RADIUS
-)
+)  # 0.52
 if FOOT_CBORE_LUG_CLEARANCE_MM <= 0.0:
     raise AssertionError("the keeper counterbore runs into the lug's outer face")
 # The foot-to-lug inside corner (drawing-guidelines.md rule 16; machinist
@@ -382,12 +395,14 @@ if FOOT_CBORE_LUG_CLEARANCE_MM <= 0.0:
 # block's INSIDE CORNERS R1.0 MAX governs it, so the sheet prints no local
 # limit (ENFORCE review 2026-10-24: a local "R1.0 MAX" restated that row,
 # rule 2). The part models the round at that ceiling. The counterbore's
-# nearest worst-case edge stands FOOT_CBORE_LUG_CLEARANCE_MM off the lug's
-# outer face, so the round's tangent line on the foot top must stop short of
-# it.
+# nearest worst-case edge stands FOOT_CBORE_LUG_CLEARANCE_MM (0.52) off the
+# lug's outer face, inside a round at that ceiling's 1.0, so at the worst
+# case the counterbore rim can nick the round: cosmetic (owner ruling
+# 2026-10-28; the eecbf88 judge read the same strip as no wall). It never
+# reaches the lug face (the assert above).
 CORNER_R = 1.0
-if not 0.0 < CORNER_R < FOOT_CBORE_LUG_CLEARANCE_MM:
-    raise AssertionError("the foot-to-lug corner round reaches the counterbore")
+if not 0.0 < CORNER_R:
+    raise AssertionError("the foot-to-lug corner round has no radius")
 FOOT_SIDE_WALL_MM = min(
     SCREW_FROM_SIDE - _BAND_BY_PLACES[3] - _CBORE_MAX_RADIUS,
     (KEEPER_WIDTH - _BAND_BY_PLACES[1])
@@ -429,13 +444,14 @@ if KEEPER_TAP_SPEC.depth_mm - _BAND_BY_PLACES[1] < (
 # width (BORE_FROM_SIDE, a reference carrying the centre-plane band
 # BORE_CENTRE_CALLOUT: MR-fleet r5 asked what lateral error the pair-ream
 # layout may take; owner ruling Q10-B), the finished height seat to crown top
-# and the overall length lug face to foot tip (references: the bore height
-# and crown, and the lug thickness and foot length, chain them) and the
-# supplied blank's height (SUPPLY_HEIGHT_MIN), printed beside the finished
-# one (MR-fleet r4: the supply size alone left its extension line in empty
-# space above the top). The part saves them blanked; the drawing shows the
-# tap's and the foot screw's stations in the plan, the heights and length in
-# the front view and the bore's place in the end view.
+# (a reference: the bore height and crown chain it), the overall length lug
+# face to foot tip (a real size, the front view's baseline beside the lug
+# thickness; owner ruling 2026-10-28) and the supplied blank's height
+# (SUPPLY_HEIGHT_MIN), printed beside the finished one (MR-fleet r4: the
+# supply size alone left its extension line in empty space above the top).
+# The part saves them blanked; the drawing shows the tap's and the foot
+# screw's stations in the plan, the heights and length in the front view and
+# the bore's place in the end view.
 REFERENCE_SKETCHES = (
     "SetScrewReference",
     "FootScrewReference",
@@ -445,7 +461,7 @@ REFERENCE_SKETCHES = (
     "SupplyHeightReference",
     "OverallLengthReference",
 )
-REFERENCE_DIMENSIONS = ("OverallHeight", "OverallLength", "BoreFromSide")
+REFERENCE_DIMENSIONS = ("OverallHeight", "BoreFromSide")
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. The wizard screw hole and the crown tap ship as native hole
@@ -453,7 +469,7 @@ REFERENCE_DIMENSIONS = ("OverallHeight", "OverallLength", "BoreFromSide")
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "LugProfile": {"LugRise"},
     "LugBody": {"LugThickness"},
-    "FootProfile": {"FootLength", "FootRise"},
+    "FootProfile": {"FootRise"},
     "Foot": {"Depth"},
     "LugCrownProfile": {"CrownRadius"},
     "ShaftBoreProfile": {"BoreDia"},
@@ -476,9 +492,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # off the inner face and the lug thickness: the 8.0 lug holds the crown tap's
 # web at both title-block .XX bands (SET_SCREW_WEB_MM, owner ruling Q11-B)
 # and the shaft's flat window takes them (ch_fulcrum_shaft_spec
-# FLAT_STATION_WINDOW_MM). The foot length takes two (FOOT_LENGTH_PLACES:
-# the frame's foot-to-boss stack, owner ruling Q11-B'). Three places carry a
-# stated function (rule 4): the
+# FLAT_STATION_WINDOW_MM). The overall length takes two (OVERALL_LENGTH_PLACES:
+# the frame's foot-to-boss stack, owner rulings Q11-B' and 2026-10-28). Three
+# places carry a stated function (rule 4): the
 # side station centres the transferred MHA-FR-02 tap in its rail web
 # (KEEPER_SCREW_TRANSVERSE_BAND_MM, build_fr_top_frame). The references print
 # one place; the crown's radial reference the width's CROWN_R_PLACES and the
@@ -486,7 +502,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LugProfile": {"LugRise": 2},
     "LugBody": {"LugThickness": 2},
-    "FootProfile": {"FootLength": FOOT_LENGTH_PLACES, "FootRise": 1},
+    "FootProfile": {"FootRise": 1},
     "Foot": {"Depth": KEEPER_WIDTH_PLACES},
     "LugCrownProfile": {"CrownRadius": CROWN_R_PLACES},
     "ShaftBoreProfile": {"BoreDia": 3},
@@ -496,7 +512,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BoreSideReference": {"BoreFromSide": 1},
     "OverallHeightReference": {"OverallHeight": 1},
     "SupplyHeightReference": {"SupplyHeight": 1},
-    "OverallLengthReference": {"OverallLength": 1},
+    "OverallLengthReference": {"OverallLength": OVERALL_LENGTH_PLACES},
 }
 # The function the three-place size serves, printed under it.
 FOOT_SCREW_SIDE_CALLOUT = "CENTERS MHA-FR-02\nTAP IN RAIL WEB"
@@ -556,17 +572,15 @@ SUPPLY_HEIGHT_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints "33.2 MIN"
 SUPPLY_HEIGHT_CALLOUT = "SUPPLY HEIGHT,\nSQUARE TOP"
 if not CROWN_TOP_Y < SUPPLY_HEIGHT_MIN:
     raise AssertionError("the supplied blank does not reach the crown apex")
-# Overall length, inner lug face to foot tip (MR-fleet r3: only the chained
-# lug thickness and foot length printed it).
-OVERALL_LENGTH = 2.0 * LUG_HALF_T + FOOT_L  # 16.5
 
 # True free-text instructions only (native dims and callouts carry the rest;
 # the bore's pair reaming is its callout, BORE_PAIR_CALLOUT). The material
 # and finish are the title block's. Brackets carry no frames and no datums
 # (policy). The plan's foot hole stays located off the foot tip: from the
-# inner lug face (12.00 at .XX) the tip wall would fall to 1.02 mm with the
-# 8.00 and 8.50 in the stack (FOOT_TIP_WALL_MM). A note saying so
-# (MR-fleet r7, cc1a81a) drew three findings of its own, so none is printed.
+# inner lug face (12.00 at .XX) the 16.50's band would join the tip wall's
+# stack (FOOT_TIP_WALL_MM; owner ruling 2026-10-28, review exception RV-03).
+# A note saying so (MR-fleet r7, cc1a81a) drew three findings of its own, so
+# none is printed.
 DRAWING_NOTES = "\n".join(
     (
         "1. CROWN TAP FOR THE MHA-CH-VN-55 CUP-POINT SET SCREW; FOOT HOLE",

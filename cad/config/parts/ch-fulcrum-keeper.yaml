@@ -17,3 +17,8 @@ ch-fulcrum-keeper:
       where: "foot-hole side station '7.000 \u00b10.13, CENTERS MHA-FR-02 TAP IN RAIL WEB'"
       finding: "foot-hole lateral station held at .XXX instead of title-block .XX (rule 4)"
       reason: "the MHA-FR-02 rail tap is transferred through this hole; at .XX the rail-web thread ligament drops from 1.62 to about 1.24, below the 1.5 floor (owner ruling 2026-10-16)"
+    - id: "RV-03"
+      kind: "accept"
+      where: "top view, foot-hole station '4.50' off the foot tip (foot end face), beside the crown tap's '4.00' off the inner lug face"
+      finding: "the top view uses two origins: the foot hole is located 4.50 off the foot tip while the crown tap and the front view's 8.00 and 16.50 baseline from the inner lug face (rule 10)"
+      reason: "owner ruling 2026-10-28 (option D): the hole is located off the foot tip because that protects the counterbore tip wall, 1.53 at the full worst case (4.50 at .XX, the \u00d83.80 counterbore at DRILLED HOLES +0.10, two 0.25 edge breaks, 0.3 deg run-off over its 2.11 depth) vs the 1.5 floor; located off the inner lug face (12.00) the 16.50's band joins the stack and leaves 1.02, below the floor"
