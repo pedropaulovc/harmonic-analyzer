@@ -435,23 +435,48 @@ def test_view_k_carries_the_set_coordinates_as_assembly_model_dimensions() -> No
     ps = (s[0] - p[0], s[1] - p[1])
     assert sq[0] * qk[0] + sq[1] * qk[1] == pytest.approx(0.0, abs=1e-9)
     assert sq[0] * ps[1] - sq[1] * ps[0] == pytest.approx(0.0, abs=1e-9)
-    # K is aimed at the middle of the set band, on the nominal S-K line.
+    # K is the DRO count nearest the middle of the set band, about the
+    # mid-band point on the nominal S-K line: each coordinate a whole count
+    # within a count of that point, so K is within a count's diagonal of it.
     low, high = disc.CENTRE_DISTANCE_WINDOW
-    assert math.dist(s, k) == pytest.approx((low + high) / 2.0)
+    count = knob_setting.DRO_COUNT_MM
     nominal = (
         placement.KNOB_SHAFT_XY[0] - s[0], placement.KNOB_SHAFT_XY[1] - s[1],
     )
     assert math.hypot(*nominal) == pytest.approx(low)
-    assert (k[0] - s[0]) * nominal[1] - (k[1] - s[1]) * nominal[0] == pytest.approx(
-        0.0, abs=1e-9
+    setting = (knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM)
+    for value, aim in zip(setting, knob_setting.K_AIM_FROM_S_MM):
+        assert value / count == pytest.approx(round(value / count), abs=1e-9)
+        assert abs(value - aim) < count
+    diagonal = count * math.sqrt(2.0)
+    off_line = abs((k[0] - s[0]) * nominal[1] - (k[1] - s[1]) * nominal[0]) / low
+    assert off_line < diagonal
+    assert abs(math.dist(s, k) - (low + high) / 2.0) < diagonal
+    # N, the nominal centre, is on S-K at the band's low end, beside the
+    # model's knob axis by K's count off the nominal line; S to N carries the
+    # set band itself, +x/-0.
+    assert math.dist(knob_setting.N_XY, placement.KNOB_SHAFT_XY) < diagonal
+    assert math.dist(s, knob_setting.N_XY) == pytest.approx(disc.CENTRE_DISTANCE)
+    assert (k[0] - s[0]) * (knob_setting.N_XY[1] - s[1]) - (k[1] - s[1]) * (
+        knob_setting.N_XY[0] - s[0]
+    ) == pytest.approx(0.0, abs=1e-9)
+    assert knob_setting.CENTRE_TOLERANCE_MM == pytest.approx((0.0, high - low))
+    assert disc.CENTRE_DISTANCE_SET_TEXT == (
+        f"{disc.CENTRE_DISTANCE:.{knob_setting.PLACES}f} "
+        f"+{knob_setting.CENTRE_TOLERANCE_MM[1]:.{knob_setting.PLACES}f}/-0"
     )
-    # The view marks exactly the two settings, at the places the model owns.
+    # The view marks the band and the two settings, at the places the model
+    # owns; only the settings are references.
     assert knob_setting.DRAWING_DIMENSIONS == {
-        knob_setting.FEATURE: {knob_setting.ALONG_DIMENSION, knob_setting.ACROSS_DIMENSION}
+        knob_setting.FEATURE: {
+            knob_setting.ALONG_DIMENSION, knob_setting.ACROSS_DIMENSION,
+            knob_setting.CENTRE_DIMENSION,
+        }
     }
     assert knob_setting.REFERENCE_DIMENSIONS == {
         knob_setting.ALONG_DIMENSION, knob_setting.ACROSS_DIMENSION
     }
+    assert knob_setting.CENTRE_DIMENSION not in knob_setting.SETTING_CALLOUTS
     for part, text in knob_setting.SETTING_CALLOUTS.values():
         assert part == 3 and "\n" not in text
 
@@ -472,22 +497,37 @@ def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
                 centre[1] + (xy[1] - mid[1]) * scale / 1000.0,
             )
 
-        s, q, k, t = (
+        s, q, k, t, n = (
             sheet(xy)
             for xy in (
                 knob_setting.S_XY, knob_setting.Q_XY, knob_setting.K_XY,
-                drawing.KNOB_SETTING_TAP_XY,
+                drawing.KNOB_SETTING_TAP_XY, knob_setting.N_XY,
             )
         )
-        for point in (s, q, k, t):
+        for point in (s, q, k, t, n):
             assert math.dist(point, centre) < drawing.KNOB_SETTING_RADIUS
-        keep = drawing.knob_setting_keep(s, q, k)
-        assert set(keep) == {knob_setting.ALONG_DIMENSION, knob_setting.ACROSS_DIMENSION}
+        keep = drawing.knob_setting_keep(s, q, k, n)
+        assert set(keep) == {
+            knob_setting.ALONG_DIMENSION, knob_setting.ACROSS_DIMENSION,
+            knob_setting.CENTRE_DIMENSION,
+        }
+        # S to N: the value and its stacked +x/-0 on one text row pair, past
+        # S along the line (outside its extension lines), clear of the crop.
+        x, y = keep.pop(knob_setting.CENTRE_DIMENSION)
+        half = len("43.794+0.050") * DIM_CHAR_WIDTH / 2.0
+        box = (x - half, y - DIM_LINE_PITCH, x + half, y + DIM_LINE_PITCH)
+        nearest = (min(max(centre[0], box[0]), box[2]), min(max(centre[1], box[1]), box[3]))
+        assert math.dist(nearest, centre) > drawing.KNOB_SETTING_RADIUS
+        assert drawing.FITUP_NOTE_XY[1][0] < box[0] and box[2] < drawing.FITUP_NOTE_LIMITS[1][0]
+        assert drawing.FITUP_NOTE_LIMITS[1][1] < box[1] and box[3] < drawing.KNOB_SETTING_FIELD_TOP
+        line = math.dist(s, n)
+        along = ((x - n[0]) * (s[0] - n[0]) + (y - n[1]) * (s[1] - n[1])) / line
+        assert along - half > line
+        boxes = [box]
         legs = {
             knob_setting.ALONG_DIMENSION: (s, q),
             knob_setting.ACROSS_DIMENSION: (q, k),
         }
-        boxes = []
         for name, (x, y) in keep.items():
             # The value row centred on the text point, its callout row above;
             # the dimension line runs through the text, parallel to its leg.
@@ -612,18 +652,32 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     lever = knob_setting.K_SET_CENTRE_DISTANCE_MM / steps_arm.PIN_STATION
     tangential_err = dro + 2.0 * centring + 2.0 * centring * lever
     assert radial_err == pytest.approx(0.0135, abs=1e-4)
-    # The operator dials the display's nearest count to each printed value.
+    # The printed values are the display's own counts: the operator dials
+    # exactly what VIEW K prints.
     count = mill["resolution_mm"]["value"]
-    x, y = (
-        round(round(value, knob_setting.PLACES) / count) * count
-        for value in (knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM)
-    )
+    assert knob_setting.DRO_COUNT_MM == count
+    x, y = knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM
+    assert round(round(x, knob_setting.PLACES) / count) * count == pytest.approx(x)
+    assert round(round(y, knob_setting.PLACES) / count) * count == pytest.approx(y)
+
+    def margins(point):
+        radial = math.hypot(*point) - low
+        return radial - radial_err, (high - low) - (radial + radial_err)
+
     radial = math.hypot(x, y) - low
     tangential = abs(x * uy - y * ux)
-    # Inside the +x/-0 band with margin at both ends.
-    bottom_margin = radial - radial_err
-    top_margin = (high - low) - (radial + radial_err)
-    assert bottom_margin > 0.010 and top_margin > 0.010
+    bottom_margin, top_margin = margins((x, y))
+    # 1. Physically: the worst-case K lies inside the set band at both ends.
+    assert low < low + radial - radial_err and low + radial + radial_err < high
+    assert bottom_margin > 0.0 and top_margin > 0.0
+    # 2. No count about the aim leaves a larger minimum margin.
+    best = max(min(margins(point)) for point in knob_setting.dro_count_candidates())
+    assert min(bottom_margin, top_margin) == pytest.approx(best, abs=1e-12)
+    # 3. At least what the mid-band aim leaves after the error budget and the
+    # count lattice: the nearest count is within half a count per axis.
+    floor = (high - low) / 2.0 - radial_err - count / 2.0 * (abs(ux) + abs(uy))
+    assert floor > 0.0
+    assert min(bottom_margin, top_margin) > floor
     # And inside K's drawn setting circle about its nominal.
     radius = registration.REDUCER_AXIS_SETUP_RADIUS_MM
     assert math.hypot(radial + radial_err, tangential + tangential_err) < radius

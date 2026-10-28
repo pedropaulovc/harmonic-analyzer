@@ -133,28 +133,30 @@ The alignment pinion only meshes while the readout is zeroed, with the notches
 set by eye. It must not bind; its contact ratio is reported, not gated.
 
 The paper reducer has two mandatory contact-ratio gates, both at the minimum
-printed tips: at least 1.2 at its nominal 43.794 mm centre (set within
-±0.057, window 43.737–43.851; the standard centre is 43.656 mm), and at least
-1.1 at the loose runout extreme (the centre opened by both tooth-space
-runouts). These are `paper_drive_mesh_check.CONTACT_RATIO_FLOOR` and
-`RUNOUT_CONTACT_RATIO_FLOOR` (user decision 2026-10-11); the centre comes from
-`pd_rack_pinion_spec.CENTRE_DISTANCE`. The arm and plate are match-drilled
-with that centre set to the standard fine-pitch band, nominal +0.050/-0
-(`CENTRE_DISTANCE_WINDOW`; catalogue practice is +0.002 in / -0). +0.050 is
-the radius of K's drawn setting circle about S
+printed tips: at least 1.2 at its nominal 43.794 mm centre (the standard
+centre is 43.656 mm), and at least 1.1 at the loose runout extreme (the centre
+opened by both tooth-space runouts). These are
+`paper_drive_mesh_check.CONTACT_RATIO_FLOOR` and `RUNOUT_CONTACT_RATIO_FLOOR`
+(user decision 2026-10-11); the centre comes from
+`pd_rack_pinion_spec.CENTRE_DISTANCE`. The gates alone would allow
+43.737–43.851, and 43.794 is that window's midpoint. The arm and plate are
+match-drilled with that centre set to the standard fine-pitch band, nominal
++0.050/-0 (`CENTRE_DISTANCE_WINDOW`; catalogue practice is +0.002 in / -0).
++0.050 is the radius of K's drawn setting circle about S
 (`stock_form_quality.reducer_k_setting_diameter_mm`, Ø0.10). The plate's
 B-referenced hole frames take that circle; S and the arm's patterns keep the
-Ø0.050 reducer position zone. At the band's far end the stock pair gives
-CR 1.118 and 1.029 at the runout extreme, gated at
-`BAND_TOP_CONTACT_RATIO_FLOORS` (1.1, 1.0): standard gears in a standard
-band (owner ruling 2026-10-27, option A). MHA-PD-00's arm-plate-located step
-jig-bores it on the mill DRO before the MHA-PD-23 pin is pressed: the arm
-trammed on its pivot bore and its reamed pin bore S (the pressed pin's running
-axis), K set at mid-band coordinates from S, each indicated true to under
-half a division of sweep. The
+Ø0.050 reducer position zone. Both ends of the band meet the full design
+floors (`paper_drive_mesh_check.reducer_band_meshes`): CR 1.305 and 1.214 at
+the runout extreme at the nominal end, 1.214 and 1.123 at the far end, 43.844
+(owner ruling on #2034 and #2011: 43.794 +0.050/-0, aim mid-band).
+MHA-PD-00's arm-plate-located step jig-bores it on the mill DRO before the
+MHA-PD-23 pin is pressed: the arm trammed on its pivot bore and its reamed pin
+bore S (the pressed pin's running axis), K set at mid-band coordinates from S,
+each indicated true to under half a division of sweep. The band and the
 coordinates are the assembly's own model dimensions
 (`pd_paper_drive_knob_setting_spec`, the hidden `KnobSettingReference`
-sketch), printed in sheet 5's VIEW K.
+sketch), printed in sheet 5's VIEW K: the S-K centre distance toleranced
+43.794 +0.050/-0, the two DRO coordinates as references.
 
 ### Setting the cone mesh
 

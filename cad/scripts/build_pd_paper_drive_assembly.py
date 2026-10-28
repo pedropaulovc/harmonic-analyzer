@@ -110,6 +110,7 @@ from _session import run_build
 from _dimensions import drive_dimension, set_global
 from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
 from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _feature_tree import name_last_feature
 from _sketch import (
     SketchDims,
@@ -2212,14 +2213,17 @@ async def _place_chain_seed(
 async def _author_knob_setting_reference(adapter) -> None:
     """K's DRO setting from the arm's pin bore S as model dimensions (MHA-PD-00 VIEW K):
     one construction chain on the Front plane (sketch x, y = machine x, y),
-    P to S on the arm's axis, S to Q along it toward P, Q to K across it
-    (pd_paper_drive_knob_setting_spec). Dimensioned from globals, shown as
-    reference values with their one-line names, marked for the drawing and
+    P to S on the arm's axis, S to Q along it toward P, Q to K across it,
+    and S to the nominal centre N on the S-K line
+    (pd_paper_drive_knob_setting_spec). Dimensioned from globals: S to N
+    toleranced with the set band, the two DRO coordinates shown as
+    reference values with their one-line names; marked for the drawing and
     blanked; no solid or pose changes."""
     spec = KNOB_SETTING
     for name, value in (
         ("KnobSetAlong", spec.K_FROM_S_ALONG_MM),
         ("KnobSetAcross", spec.K_FROM_S_ACROSS_MM),
+        ("KnobSetCentre", DISC_SPEC.CENTRE_DISTANCE),
     ):
         await set_global(adapter, name, f"{value}mm")
     points = (spec.P_XY, spec.S_XY, spec.Q_XY, spec.K_XY)
@@ -2230,8 +2234,10 @@ async def _author_knob_setting_reference(adapter) -> None:
         check(f"knob setting leg {index}", await adapter.add_line(*p0, *p1))
         for index, (p0, p1) in enumerate(zip(points, points[1:]))
     ]
+    line = check("knob setting S-K line", await adapter.add_line(*spec.S_XY, *spec.K_XY))
+    nominal = check("knob setting S-N", await adapter.add_line(*spec.S_XY, *spec.N_XY))
     set_sketch_direct_db(adapter, False)
-    for index, leg in enumerate(legs):
+    for index, leg in enumerate((*legs, line, nominal)):
         segment = _early_bound(adapter._sketch_entities[leg], "ISketchSegment")
         segment.ConstructionGeometry = True
         if not bool(segment.ConstructionGeometry):
@@ -2251,6 +2257,20 @@ async def _author_knob_setting_reference(adapter) -> None:
         "knob setting: across the arm",
         await adapter.add_sketch_constraint(legs[2], legs[1], "perpendicular"),
     )
+    # S-K joins the chain's ends; N stands on it, CENTRE_DISTANCE from S.
+    for first, second, what in (
+        (f"{line}.start", f"{legs[1]}.start", "S-K line from S"),
+        (f"{line}.end", f"{legs[2]}.end", "S-K line to K"),
+        (f"{nominal}.start", f"{legs[1]}.start", "S-N from S"),
+    ):
+        check(
+            f"knob setting: {what}",
+            await adapter.add_sketch_constraint(first, second, "coincident"),
+        )
+    check(
+        "knob setting: N on the S-K line",
+        await adapter.add_sketch_constraint(nominal, line, "collinear"),
+    )
     # P and S from the origin: S lies on machine x = 0, one dimension.
     await anchor_point_to_origin(adapter, f"{legs[0]}.start", *spec.P_XY, "arm pivot P")
     dims.record("KnobSetPivotX")
@@ -2269,11 +2289,22 @@ async def _author_knob_setting_reference(adapter) -> None:
         spec.K_FROM_S_ACROSS_MM, spec.ACROSS_DIMENSION,
     )
     dims.record(spec.ACROSS_DIMENSION, '"KnobSetAcross"')
+    await dimension_between(
+        adapter, f"{nominal}.start", f"{nominal}.end", "distance",
+        DISC_SPEC.CENTRE_DISTANCE, spec.CENTRE_DIMENSION,
+    )
+    dims.record(spec.CENTRE_DIMENSION, '"KnobSetCentre"')
     await ensure_fully_defined(adapter, "knob setting")
     check("exit knob setting sketch", await adapter.exit_sketch())
     name_last_feature(adapter, spec.FEATURE)
     for name, expression in dims.apply(adapter, spec.FEATURE):
         await drive_dimension(adapter, name, expression)
+    # The set band itself, +x/-0, on S to N: an assembly setting is an
+    # associative model dimension, never a note (#1388).
+    set_dimension_bilateral_tolerance(
+        adapter, spec.FEATURE, spec.CENTRE_DIMENSION, *KNOB_SETTING.CENTRE_TOLERANCE_MM,
+        places=spec.PLACES,
+    )
     for name in sorted(spec.REFERENCE_DIMENSIONS):
         # A reference value through the native prefix/suffix channel (the
         # set band governs K, not the title block's .XXX row).
