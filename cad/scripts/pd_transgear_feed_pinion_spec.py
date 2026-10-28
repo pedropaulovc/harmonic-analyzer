@@ -8,11 +8,12 @@ slides on the boss; its rear spigot passes through
 the 120T disc's (MHA-PD-06) bore, which pilots on it, and seats its end on the
 step face, so the step is the rear stop of hub and disc; the hub drives
 through the boss's D-flat, which is drive only (its end wall stands behind
-the hub's own flat and never touches it).  The hub's front face is faced to
-stand just behind the nose, so the MHA-PD-25 front bushing bears on the nose
-and traps hub and disc against the step.  The rear face runs on the MHA-PD-24
-rear bushing; both bushings and the hub are faced to fit
-(``transgear_cluster_fit``, which reads this module).
+the hub's own flat and never touches it).  The hub's printed overall leaves
+its front face never proud of the nose (``transgear_cluster_fit.RECESS_RANGE``),
+so the MHA-PD-25 front bushing bears on the nose and traps hub and disc
+against the step.  The rear face runs on the MHA-PD-24 rear bushing; both
+bushings and the hub are printed lengths of the disc cluster's printed stack
+(#2038; ``transgear_cluster_fit``, which reads this module).
 
 Local frame: origin on the axis at the sleeve's REAR face, +Z toward the
 machine FRONT.  The teeth occupy z 0..FACE_WIDTH, the boss
@@ -43,6 +44,7 @@ from _gtol_cylinder import CylinderFace
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pd_transgear_disc_hub_geometry import SPIGOT_LENGTH, SPIGOT_LENGTH_BAND
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND
 from paper_drive_stock_envelope import (
     cutter_end_section_area_bounds_mm2,
     cutter_end_volume_bounds_mm3,
@@ -225,17 +227,20 @@ RACK_MESH_EXTENSION = (
 RACK_AXIS_DISTANCE = PITCH_DIA / 2.0 + RACK_MESH_EXTENSION
 
 # --- axial stations from the rear face (z 0) -----------------------------------
-# OVERALL_LENGTH prints ±0.05 (R9-5; the knob chain and
-# the fitted bands read the overall: transgear_cluster_fit).  The tooth length
-# prints .XXX: its end is the step face the hub's spigot seats on, so it
-# places hub and disc with the spigot's own .XXX length (the bushings and the
-# hub are faced to fit over both bands).
+# The overall and the tooth length are terms of the disc cluster's printed
+# stack (transgear_cluster_fit): the overall sets the hub's recess behind the
+# nose, the tooth length's end is the step face the hub's spigot seats on.
+# Both print at the cluster's band (#2038 owner ruling 2026-10-28, option A:
+# nothing in the cluster is faced to fit).  STATION_TOL is the allowance the
+# flat's reach and the hub's flat-end check keep on the sleeve's other
+# stations (R9-5's former overall band).
 STATION_TOL = 0.05
 STATION_PLACES = 2
 FACE_WIDTH = 13.60  # the tooth length: rear face to the step onto the boss
 FACE_WIDTH_PLACES = 3
-FACE_WIDTH_BAND = printed_band_mm(FACE_WIDTH_PLACES)
+FACE_WIDTH_BAND = PRINTED_LENGTH_BAND
 OVERALL_LENGTH = 27.35
+OVERALL_LENGTH_BAND = PRINTED_LENGTH_BAND
 
 # --- diameters -----------------------------------------------------------------
 # The boss is the hub's locating fit: turned h6 under the matching H7 bore

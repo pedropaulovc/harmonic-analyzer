@@ -17,6 +17,7 @@ review of the sheet).
 from __future__ import annotations
 
 import pd_transgear_disc_hub_spec as HUB
+from pd_cluster_stack_band import STACK_NAME
 from pd_transgear_feed_pinion_spec import (
     BORE_PROCESS_CALLOUT,
     HUB_NUMBER,
@@ -46,13 +47,13 @@ FLAT_CALLOUT = "\n".join(
         f"{HUB.FLAT_CLEARANCE[0]:.3f}-{HUB.FLAT_CLEARANCE[1]:.3f} mm CLR",
     )
 )
-# The step seats the hub's spigot: the tooth length places hub and disc.
-FACE_WIDTH_CALLOUT = f"SEATS {HUB_NUMBER} SPIGOT"
-# The overall is a term of the hub's and the front bushing's faced-to-fit
-# chains (transgear_cluster_fit.HUB_CHAIN_TERMS, FRONT_CHAIN_TERMS).
-OVERALL_CALLOUT = "\n".join(
-    (f"SETS {HUB_NUMBER}, {FRONT_BUSHING_NUMBER}", "FACED LENGTHS")
-)
+# The step seats the hub's spigot: the tooth length places hub and disc.  Its
+# ±band is a term of the disc cluster's printed stack (transgear_cluster_fit.TL).
+FACE_WIDTH_CALLOUT = "\n".join((f"SEATS {HUB_NUMBER} SPIGOT", STACK_NAME))
+# The overall sets the hub's recess behind the nose and carries the front
+# bushing's thrust: a term of the disc cluster's printed stack
+# (transgear_cluster_fit.OL).
+OVERALL_CALLOUT = "\n".join((f"SETS {HUB_NUMBER}, {FRONT_BUSHING_NUMBER}", STACK_NAME))
 # The flat's end wall stands clear behind the hub's flat
 # (pd_transgear_disc_hub_spec.FLAT_END_CLEARANCE_WORST).
 FLAT_END_CALLOUT = f"CLEARS {HUB_NUMBER} FLAT"

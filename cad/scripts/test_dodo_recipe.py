@@ -3841,10 +3841,12 @@ def test_fit_guard_uses_task_recipe_config_dependencies():
     # fit() calls; an empty guard here would refuse a real build. The inch
     # cone and drum tips read gear_tip; the crank gears sit on cone_line's
     # stations, so the pinion also reads the cone mesh's edge slack. The
-    # train's stock-form transgear specs read stock_form_quality.
+    # train's stock-form transgear specs read stock_form_quality, and the
+    # transgear knob shaft's 15T face width reads the disc cluster's printed
+    # band (pd_cluster_stack, #2038).
     assert dodo._fit_groups_env("assembly:dt_drive_train") == (
-        "cone_drum_oblique_mesh,crank_mesh,gear_tip,shaft_in_bushing,"
-        "stock_form_quality"
+        "cone_drum_oblique_mesh,crank_mesh,gear_tip,pd_cluster_stack,"
+        "shaft_in_bushing,stock_form_quality"
     )
     assert dodo._fit_groups_env("part:dt_crank_pinion") == (
         "cone_drum_oblique_mesh,crank_mesh,gear_mesh,shaft_in_bushing"

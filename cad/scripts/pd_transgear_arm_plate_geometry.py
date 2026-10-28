@@ -34,6 +34,7 @@ import pd_transgear_arm_geometry as ARM
 import _transgear_arm_plate_locating_interface as LOCATING_PIN
 from _gear_quality import reducer_k_setting_diameter_mm
 from _printed_tolerance import angular_band_deg, printed_band_mm, printed_deviations
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND
 
 # --- Where the bore sits on the arm (arm frame, mm) -------------------------
 # K follows the reducer's physical mounting centre, transformed into the arm
@@ -105,11 +106,11 @@ HUB_DIA = 13.2  # .XX
 # chain-plane station (contract §13).
 HUB_LENGTH = 12.6
 HUB_FACE_TO_MOUNTING = NOTCH_DEPTH + HUB_LENGTH  # 20.5375
-# The chain-plane station prints .XXX (contract §13). Keep its existing
-# title-block config reader here, not in the richer drawing/annotation spec:
-# ARM.BAND_XXX is a hard-coded wall band, not this station's printed grade.
+# The chain-plane station (contract §13) and the first term of the disc
+# cluster's printed stack (F, transgear_cluster_fit): .XXX at the cluster's
+# printed band (#2038 owner ruling 2026-10-28, option A).
 HUB_STATION_PLACES = 3
-HUB_FACE_TO_MOUNTING_BAND = printed_band_mm(HUB_STATION_PLACES)
+HUB_FACE_TO_MOUNTING_BAND = PRINTED_LENGTH_BAND
 BOSS_DIA = 20.0  # .X
 # The boss face's station is authoritative: the knob stack (HUB_TO_BOSS) runs
 # to it, so the boss takes whatever the over-arm section leaves.

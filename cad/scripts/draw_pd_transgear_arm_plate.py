@@ -279,12 +279,18 @@ BACK_KEEP: dict[str, tuple[float, float, float]] = {
 # witness lines stop short of the hub face, not on through the hatched hub
 # to the profile line's far end at the rear face (run 20261027T180704579Z).
 # The boss diameter stands beyond the boss face's caption.
+# The hub station's callout takes three lines (it also sets the disc
+# cluster's collar air, #2038).  SOLIDWORKS centres the value-and-callout
+# block on its position, so the third line raised the value half a line: at
+# +19.5 the hub-to-boss dimension line ran through it (run
+# 20261028T111221004Z, layout audit text-on-line).  At +17.9 the value
+# clears that line and the block's foot clears the front face's value.
 HUB_DIA_TEXT_STANDOFF_MM = 25.5
 HUB_DIA_WITNESS_MAX_M = (HUB_DIA_TEXT_STANDOFF_MM * SHEET_SCALE[0] - 1.0) / 1000.0
 SECTION_KEEP: dict[str, tuple[float, float, float]] = {
     "ThicknessOverArm": (0.0, _SECTION_TOP + 5.0, REAR_FACE_Z / 2.0),
     "NotchDepth": (0.0, _SECTION_TOP + 10.0, FRONT_FACE_Z / 2.0),
-    "HubFaceToMounting": (0.0, _SECTION_TOP + 19.0, HUB_FACE_Z / 2.0),
+    "HubFaceToMounting": (0.0, _SECTION_TOP + 17.9, HUB_FACE_Z / 2.0),
     "HubToBoss": (0.0, _SECTION_TOP + 28.0, (HUB_FACE_Z + BOSS_FACE_Z) / 2.0),
     "HubDia": (0.0, 11.0, HUB_FACE_Z - HUB_DIA_TEXT_STANDOFF_MM),
     "BossDia": (0.0, 0.0, BOSS_FACE_Z + 27.5),

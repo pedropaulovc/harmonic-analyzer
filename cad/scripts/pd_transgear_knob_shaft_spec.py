@@ -57,6 +57,7 @@ from _gtol_controls import GeometricControl, PartDatum
 from _gtol_cylinder import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm, printed_deviations
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND, STACK_NAME
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pd_transgear_arm_plate_geometry import HUB_TO_BOSS as PLATE_HUB_TO_BOSS
 from pd_transgear_arm_plate_geometry import HUB_TO_BOSS_BAND as PLATE_HUB_TO_BOSS_BAND
@@ -174,8 +175,15 @@ ROOT_DEPTH_X_MIN = min(
     p.root_point(p.root_half_angle_rad)[0] for p in _PROFILE_CORNERS
 )
 WHOLE_DEPTH = (OUTSIDE_DIA - ROOT_DIA) / 2.0
+# The pinion's face width spaces F (its front face, the drive collar's seat)
+# from the thrust ring: a term of the disc cluster's printed stack
+# (transgear_cluster_fit), so it prints .XXX at the cluster's band (#2038
+# owner ruling 2026-10-28, option A).
 FACE_WIDTH = 5.9
 FACE_WIDTH_PLACES = 3
+FACE_WIDTH_BAND = PRINTED_LENGTH_BAND
+# drawing-guidelines rule 4: the band names the stack it serves.
+FACE_WIDTH_CALLOUT = STACK_NAME
 GAP_AZIMUTH_DEG = 180.0 / TEETH
 # The assembly spins the shaft and its whole mounted front stack (collar,
 # drive pins, wheel) about K so a pinion gap faces the reducer disc's tooth on

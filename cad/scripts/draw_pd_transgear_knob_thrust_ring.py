@@ -92,12 +92,13 @@ END_KEEP = {
 }
 MOVED_TO_SIDE = frozenset({"RingOd"})
 # The length's text and its callout stand outside the right extension line:
-# the 20.8 mm span between the faces is narrower than "5.200 ±0.05", so text
+# the 20.8 mm span between the faces is narrower than "5.200 ±0.02", so text
 # centred between them is struck by both extension lines.  Far enough right
 # that the callout's left edge clears the right extension line, and high
-# enough that its second line clears the O.D.'s upper extension line.
+# enough that its three callout lines (the third names the disc cluster
+# stack) clear the O.D.'s upper extension line.
 SIDE_KEEP = {
-    "RingLength": (SIDE_CENTER[0] + LENGTH / 2.0 * _S / 1000.0 + 0.032, 0.224),
+    "RingLength": (SIDE_CENTER[0] + LENGTH / 2.0 * _S / 1000.0 + 0.032, 0.229),
 }
 
 

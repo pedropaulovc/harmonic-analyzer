@@ -24,6 +24,7 @@ import pd_transgear_arm_geometry as ARM
 import pd_vn_transgear_retaining_ring_spec as RING
 from _gtol_cylinder import CylinderFace
 from _printed_tolerance import printed_band_mm
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 PIN_NUMBER = "MHA-PD-23"
@@ -71,11 +72,12 @@ HEAD_DOME_R = ((HEAD_DIA / 2.0) ** 2 + HEAD_DOME_SAG**2) / (2.0 * HEAD_DOME_SAG)
 # --- Ring groove -------------------------------------------------------------
 # The groove's FRONT wall is the load wall: the cluster pushed forward bears
 # the front bushing on the ring and the ring on this wall.  Its station from
-# the head's underside is the pin's one functional length; it prints .XXX
-# and the front bushing is faced to fit over its band (transgear_cluster_fit).
+# the head's underside is the pin's one functional length: a term of the
+# disc cluster's printed stack (transgear_cluster_fit), so it prints .XXX at
+# the cluster's band (#2038 owner ruling 2026-10-28, option A).
 GROOVE_STATION = 47.25  # head underside to the groove's front (load) wall
 GROOVE_STATION_PLACES = 3
-GROOVE_STATION_BAND = printed_band_mm(GROOVE_STATION_PLACES)
+GROOVE_STATION_BAND = PRINTED_LENGTH_BAND
 GROOVE_DIA = RING.GROOVE_DIA
 GROOVE_DIA_BAND = RING.GROOVE_DIA_BAND
 GROOVE_WIDTH = RING.GROOVE_WIDTH

@@ -67,6 +67,7 @@ from pd_transgear_knob_shaft_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
+    FACE_WIDTH_CALLOUT,
     JOURNAL_DIA,
     OUTSIDE_DIA,
     PLAIN_CORE,
@@ -158,7 +159,10 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     # and stays 9 mm off the thread callout's leader to the chamfer.
     "ThreadBlankDia": (CHAMFER_START_X - 0.009, _ABOVE_Y),
     "JournalDia": ((PINION_REAR_X + REAR_X) / 2.0, _ABOVE_Y),
-    "FaceWidth": ((F_X + PINION_REAR_X) / 2.0, _ROW_Y[4]),
+    # Its two-line text (45.7 mm wide with "DISC CLUSTER STACK") is wider
+    # than the 17.7 mm between its witness lines, so it stands outside right
+    # of F's (214.4): text ~218.6..264.3 mm, under the empty rows past F.
+    "FaceWidth": (F_X + 0.027, _ROW_Y[4]),
     "CoreFront": ((F_X + CORE_END_X) / 2.0, _ROW_Y[0]),
     "PlainCore": ((F_X + THREAD_END_X) / 2.0, _ROW_Y[1]),
     "JournalLength": ((PINION_REAR_X + REAR_X) / 2.0, _ROW_Y[0]),
@@ -175,7 +179,12 @@ END_KEEP: dict[str, tuple[float, float]] = {
     "RootEnvelope": (FRONT_CENTER[0] + 0.0494, FRONT_CENTER[1] - 0.0021),
     "ToothSpan": (FRONT_CENTER[0] + 0.029, FRONT_CENTER[1] + HALF_OD + 0.021),
 }
-DIMENSION_CALLOUTS_BELOW = {"TipChamfer": CHAMFER_CALLOUT}
+# The face width's ±band names the disc cluster stack (rule 4); its one
+# line hangs into the empty sixth baseline row below it.
+DIMENSION_CALLOUTS_BELOW = {
+    "TipChamfer": CHAMFER_CALLOUT,
+    "FaceWidth": FACE_WIDTH_CALLOUT,
+}
 
 # The thread callout lands on the edge where the thread blank meets the tip
 # chamfer and stands up and left, clear of the tooth-tip Ø over the pinion.

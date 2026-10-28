@@ -604,13 +604,23 @@ KNOB_SETTING_LEGEND = {
     "K": f"{_config.parts('pd-transgear-arm-plate')['number']} KNOB BORE",
     "T": f"{_config.parts('pd-vn-transgear-arm-plate-screw')['number']} TAP",
 }
+# The DRO frame is the arm's P-S axis: ALONG runs from S toward the pivot bore
+# P, off the crop (pd_paper_drive_knob_setting_spec.py:59-66, 92-103, on
+# pd_transgear_arm_geometry.ARM_U), the axis the located step trams. Named in
+# the legend, as the step names it (machinist review of run
+# 20261028T090156127Z, r1/r3: the view showed no pivot bore).
+KNOB_SETTING_PIVOT_LINES = (
+    "ALONG: S TOWARD P",
+    "P: ARM'S PIVOT BORE",
+)
 KNOB_SETTING_CAPTION = "\n".join(
     (
         f"{KNOB_SETTING_VIEW_NAME}, 1:1 (STEP {steps.step_number('arm-plate-located')})",
         *(f"{letter}: {name}" for letter, name in KNOB_SETTING_LEGEND.items()),
+        *KNOB_SETTING_PIVOT_LINES,
     )
 )
-KNOB_SETTING_CAPTION_XY = (0.218, 0.113)
+KNOB_SETTING_CAPTION_XY = (0.213, 0.122)
 # Each letter's centre stands this far off its circle's centre (sheet m): S
 # inward and away from Q (at 15:150 S-K spans most of the crop, so S's
 # letter past the pin would leave it), T diagonally away from both chain
@@ -1029,10 +1039,24 @@ TRANSGEAR_EXPLODED_INSTANCES = frozenset(
 if explode.KNOB_WHEEL_INSTANCE not in TRANSGEAR_EXPLODED_INSTANCES:
     raise AssertionError("the explode moves the mounted knob wheel it shows")
 # The knob wheel is the mounted removable; the crank wheel and spare T18 are
-# sheet 1's.
+# sheet 1's.  The hub's walk took its flange's rear rim on the far side from
+# the knob stack (part (-10.676, -6.598, 0)), so on sheet 2 balloon 29's
+# leader crossed the T24 and thumbnut and its arrow was lost on the dark disc
+# (machinist review of run 20261028T090156127Z, r1/r3).  The diametrically
+# opposite point of the flange's front rim (part z = -FLANGE_THICK, wholly
+# drawn) faces away from the knob stack on both isometrics, clear of the
+# three screw heads.
+HUB_BALLOON_ANGLE = math.atan2(6.598, 10.676)
+HUB_BALLOON_POINT_MM = (
+    round(hub.FLANGE_DIA / 2.0 * math.cos(HUB_BALLOON_ANGLE), 3),
+    round(hub.FLANGE_DIA / 2.0 * math.sin(HUB_BALLOON_ANGLE), 3),
+    -hub.FLANGE_THICK,
+)
 TRANSGEAR_BALLOON_ANCHORS = {
     stem: BalloonAnchor(instance=explode.KNOB_WHEEL_INSTANCE)
     if stem == "pd-transgear-removable"
+    else BalloonAnchor(point_mm=HUB_BALLOON_POINT_MM)
+    if stem == "pd-transgear-disc-hub"
     else BalloonAnchor()
     for stem in TRANSGEAR_QUANTITIES
 }
@@ -1399,6 +1423,15 @@ KNOB_END_FLOAT_RANGE = (
     knob_shaft.END_FLOAT - knob_shaft.END_FLOAT_SET_TOL,
     knob_shaft.END_FLOAT + knob_shaft.END_FLOAT_SET_TOL,
 )
+# The disc's end float as the fitter accepts it: the printed stack's worst
+# case (transgear_cluster_fit.END_FLOAT_RANGE, 0.2013-0.5537) rounded outward
+# to the hundredth, so every cluster made inside its printed bands passes
+# (CodeRabbit on cdf418a1c: printed 0.55, it refused a good one).
+DISC_END_FLOAT_ACCEPT = (
+    math.floor(cluster_fit.END_FLOAT_RANGE[0] * 100.0 + 1e-9) / 100.0,
+    math.ceil(cluster_fit.END_FLOAT_RANGE[1] * 100.0 - 1e-9) / 100.0,
+)
+DISC_END_FLOAT_TEXT = f"{DISC_END_FLOAT_ACCEPT[0]:.2f}-{DISC_END_FLOAT_ACCEPT[1]:.2f}"
 # The platen's screw stations (platen_spec): its front counterbores take the
 # guide screws, its through-taps the clip screws.
 GUIDE_SCREWS = len(platen.GUIDE_HOLE_X) * len(platen.GUIDE_HOLE_Y)
@@ -1493,7 +1526,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"CLAMP THE {_N['pd-transgear-arm-plate']} PLATE ON THE "
             f"{_N['pd-transgear-arm']} ARM'S REAR FACE WITH TOOLMAKER'S CLAMPS, "
             "SCREWS OUT; ARM ON PARALLELS ON THE MILL, PLATE UP, NO PIN YET. "
-            "INDICATE THE PIVOT BORE AND THE ARM'S PIN BORE S TRUE ON ONE DRO "
+            "INDICATE THE PIVOT BORE P AND THE ARM'S PIN BORE S TRUE ON ONE DRO "
             f"AXIS ({KNOB_SETTING_TRUE}); ZERO ON S. AT THE "
             f"{KNOB_SETTING_VIEW_NAME} SETTING FROM S, TAP THE PLATE TILL "
             "ITS KNOB BORE INDICATES TRUE (THE "
@@ -1547,11 +1580,6 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"HUB'S SPIGOT, THEN THE HUB'S D-BORE ON THE {_N['pd-transgear-feed-pinion']} "
             "D-FLAT, SPIGOT TO THE STEP."
         ),
-        "hub-faced-to-nose": (
-            "AS FITTED, MEASURE THE HUB FRONT FACE BEHIND THE SLEEVE NOSE. HUB "
-            f"OFF; FACE ITS FRONT TILL {cluster_fit.HUB_NOSE_WINDOW_TEXT} BEHIND; "
-            "REFIT."
-        ),
         "disc-taps-transferred": (
             "MOUNT THE CLUSTER ON A MANDREL IN THE "
             f"{_N['pd-transgear-feed-pinion']} BORE. WITH A "
@@ -1576,10 +1604,11 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "DEBURR THE BORE."
         ),
         "disc-cluster-hung": (
-            "OIL THE PIN (LIGHT MACHINE OIL); CLUSTER ON, PINION REARWARD; A "
-            f"{_N['pd-transgear-front-bushing']} BUSHING BLANK ON THE NOSE TRAPS HUB "
-            f"AND DISC; {_N['pd-vn-transgear-retaining-ring']} RING SIDEWAYS IN THE PIN "
-            "GROOVE. NO REAR BUSHING YET: CLUSTER FORWARD ON THE RING."
+            "OIL THE PIN (LIGHT MACHINE OIL); BUSHINGS AS MADE: "
+            f"{_N['pd-transgear-rear-bushing']} BUSHING ON THE PIN, CLUSTER ON, "
+            f"PINION REARWARD; {_N['pd-transgear-front-bushing']} BUSHING ON THE NOSE "
+            f"TRAPS HUB AND DISC; {_N['pd-vn-transgear-retaining-ring']} RING SIDEWAYS "
+            "IN THE PIN GROOVE."
         ),
         "collar-pins-pressed": (
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-knob-drive-pin']} "
@@ -1652,22 +1681,6 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"{quality.reducer_setup_clock_deviation_mm():.2f} AT THE PITCH CIRCLE. "
             "TURN THE KNOB: NO TIGHT SPOT, SHAKE AT EVERY TOOTH."
         ),
-        "front-bushing-faced-to-fit": (
-            "CLUSTER, HUB AND DISC FORWARD, FEEL m, THE AXIAL GAP FROM THE "
-            f"{_N['pd-transgear-knob-shaft']} {teeth} TO THE {_N['pd-rack-pinion']} "
-            "DISC. FACE THE "
-            f"{_N['pd-transgear-front-bushing']} BUSHING'S REAR TILL m IS "
-            f"{cluster_fit.FIT_WINDOW_TEXT}; ELSE REPORT."
-        ),
-        # The blank (MHA-PD-24 BLANK_LENGTH_MIN) is longer than the nominal gap
-        # it fills, so it is faced to the gap gauged before it goes on.
-        "rear-bushing-faced-to-fit": (
-            "CLUSTER FORWARD, DEPTH-GAUGE THE SLEEVE REAR FACE FROM THE ARM; "
-            f"FACE THE {_N['pd-transgear-rear-bushing']} BLANK TO THAT LESS "
-            f"{cluster_fit.SLEEVE_FLOAT_WINDOW_TEXT}. STRIP TO THE PIN, BLANK ON, "
-            f"REFIT. DISC END FLOAT {cluster_fit.FLOAT_WINDOW_TEXT} AND FREE; ELSE "
-            "REPORT."
-        ),
         "collar-rear-faced-to-fit": (
             f"IN STEP {steps.step_number('fitup-pose-set')}'S POSE, "
             f"{steps.KNOB_HELD_BACK_TEXT}. {collar.BODY_FACE_PHRASE}: SET THE "
@@ -1707,9 +1720,11 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"{steps.OFFSET_ACCEPT_TOL - collar.FIT_UP_OFFSET_TARGET:.2f} BEHIND "
             f"PASSES); KNOB END FLOAT {knob_lo:.2f} TO {knob_hi:.2f}; "
             f"{sprocket.KNOB_CONFIG} FREE "
-            "UNDER THE NUT; THE HANGER FREE; RE-CHECK ACTUAL COLLAR TO DISC AIR "
+            "UNDER THE NUT; THE HANGER FREE; DISC END FLOAT "
+            f"{DISC_END_FLOAT_TEXT} AND THE DISC TURNS FREE; COLLAR TO DISC "
+            f"AIR PER STEP {steps.step_number('collar-disc-air-inspected')}, "
             f"{steps.COLLAR_DISC_AIR_TEXT} AT OVERLAP AFTER REFITTING AND LATCHING. "
-            "ELSE REPORT."
+            "ELSE REPORT: NO FACING OR FITTING."
         ),
         "chain-closed": (
             f"LOOP {chain.LINK_COUNT} PITCHES OF ANSI #25 CHAIN, "

@@ -2403,6 +2403,8 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "paper_drive_geom",
         "paper_drive_rack_travel",
         "pd_transgear_knob_shaft_spec",
+        # Edge-break row shortens the sleeve's bore span in the collar air stack.
+        "pd_cluster_air",
         # Edge-break row sizes the pivot spacer's wall and its seat flat.
         "pd_transgear_pivot_spacer_spec",
         # Edge-break row comes off the locating holes' walls to the arm's edge.

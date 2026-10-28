@@ -144,7 +144,6 @@ def test_fit_up_adjustments_are_complete_and_ordered_before_installation() -> No
     assert seq.index("lock-seats-faced") == seq.index("guide-locks-set") + 1
     assert (
         seq.index("disc-cluster-assembled")
-        < seq.index("hub-faced-to-nose")
         < seq.index("disc-taps-transferred")
         < seq.index("disc-screws-cut")
         < seq.index("disc-cluster-hung")

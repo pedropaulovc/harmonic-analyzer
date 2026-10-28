@@ -5,8 +5,8 @@ axis lies horizontal, as it sits in the lathe (drawing-guidelines.md rule 11 (tu
 face on the left, the flange and the spigot on the right.  It carries the
 turned profile: the three diameters beside their steps, the spigot's and
 flange's lengths from the flange's rear face, the overall (spigot end to hub
-front) as a reference under its faced-to-fit callout (set at the
-paper-drive assembly's hub-facing step), and the flange's rear face and the
+front), both lengths printed to the disc cluster stack's band, and the
+flange's rear face and the
 spigot's end square to the bore, datum A.  Looking down on +Y it sees the
 radial oil hole end-on, so it also carries the hole's size and its
 match-drill callout.  The face view is the ``*Back`` orientation (looking at
@@ -27,11 +27,7 @@ import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    dimension_name,
-    place_view,
-)
+from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
 
 from _check import check
 from _com import _early_bound
@@ -43,11 +39,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import (
-    assert_imported_precision,
-    set_dimension_callouts,
-    set_reference_dimension,
-)
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
 from _drawing_gdt import add_feature_control_frame
 from _drawing_notes import add_property_linked_note
@@ -61,7 +53,6 @@ from _native_axis_datum import add_native_axis_datum
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
-from pd_paper_drive_assembly_steps import step_ref
 from pd_transgear_disc_hub_spec import (
     BORE_DATUM,
     BORE_DIA,
@@ -82,6 +73,7 @@ from pd_transgear_disc_hub_spec import (
     SPIGOT_CALLOUT_BELOW,
     SPIGOT_DIA,
     SPIGOT_LENGTH,
+    SPIGOT_LENGTH_CALLOUT,
 )
 
 
@@ -110,9 +102,10 @@ END_VIEW_ANGLE = -math.pi / 2.0
 AXIS_Y = 0.165
 SIDE_CENTER = (0.225, AXIS_Y)
 END_CENTER = (0.090, AXIS_Y)
-# Above the flange's diameter, the edge view's outermost dimension, and
-# right of its extension lines.
-ISO_CENTER = (0.374, 0.216)
+# Right of the flange's diameter, below the overall's stack callout: the
+# view's top-left arc (run 20261028T041908587Z) sat under the callout's
+# widest line, so the view drops below that row and steps right of its end.
+ISO_CENTER = (0.379, 0.188)
 NOTES_XY = (0.020, 0.062)
 
 
@@ -126,10 +119,6 @@ HUB_FRONT_X = _side_x(HUB_FRONT_Z)
 SPIGOT_END_X = _side_x(SPIGOT_LENGTH)
 _FLANGE_R = FLANGE_DIA / 2.0 * _S
 _SPIGOT_R = SPIGOT_DIA / 2.0 * _S
-
-# Faced to fit at MHA-PD-00's hub step; the pointer comes from the step
-# registry.
-FIT_STEP_KEY = "hub-faced-to-nose"
 
 # The D-bore's two native bands set its fits; each callout adds extent and
 # the mating feature by name and number with the clearance the pair gives
@@ -165,8 +154,10 @@ FLAT_CALLOUT = "\n".join(
 #   little low between its extension lines to leave the spigot end's frame
 #   room above it.  The two lengths from the flange's rear face on one row
 #   above: the flange's text left of the flange, the spigot's right of the
-#   spigot.  The overall, a reference faced at assembly, on the next row up,
-#   outermost, its text and fit-up callout right of the spigot end's
+#   spigot, its whole callout block right of the spigot end's extension line
+#   (the overall's rises through that row) and so clear of the flange's
+#   dimension line.  The overall, printed to the disc cluster stack's band, on the
+#   next row up, outermost, its text and stack callout right of the spigot end's
 #   extension line.  Its ends are the spigot's and the hub's +X corners, so
 #   from a row above its extension lines rise off the part; from below they
 #   ran down across the hub front and the spigot end.  The oil hole's size
@@ -189,9 +180,9 @@ SIDE_KEEP = {
     "SpigotDia": (SPIGOT_END_X + 0.040, AXIS_Y - 0.003),
     # Clear the spigot's whole fit-callout box, not just its dimension line.
     "FlangeDia": (SPIGOT_END_X + 0.083, AXIS_Y),
-    "FlangeThick": (_side_x(-FLANGE_THICK) - 0.014, AXIS_Y + _FLANGE_R + 0.008),
-    "SpigotLength": (SPIGOT_END_X + 0.012, AXIS_Y + _FLANGE_R + 0.008),
-    "HubLength": (SPIGOT_END_X + 0.040, AXIS_Y + _FLANGE_R + 0.024),
+    "FlangeThick": (_side_x(-FLANGE_THICK) - 0.014, AXIS_Y + _FLANGE_R + 0.009),
+    "SpigotLength": (SPIGOT_END_X + 0.026, AXIS_Y + _FLANGE_R + 0.009),
+    "HubLength": (SPIGOT_END_X + 0.056, AXIS_Y + _FLANGE_R + 0.026),
     "OilHoleDia": (HUB_FRONT_X - 0.052, AXIS_Y + _FLANGE_R + 0.040),
 }
 DIMENSION_CALLOUTS_BELOW = {
@@ -200,7 +191,8 @@ DIMENSION_CALLOUTS_BELOW = {
     "ScrewHoleDia": SCREW_HOLE_CALLOUT_BELOW,
     "OilHoleDia": OIL_HOLE_CALLOUT_BELOW,
     "SpigotDia": SPIGOT_CALLOUT_BELOW,
-    "HubLength": f"{HUB_LENGTH_CALLOUT},\nPER {step_ref(FIT_STEP_KEY)}",
+    "SpigotLength": SPIGOT_LENGTH_CALLOUT,
+    "HubLength": HUB_LENGTH_CALLOUT,
 }
 DIMENSION_CALLOUTS_ABOVE = {"ScrewHoleDia": SCREW_HOLE_CALLOUT_ABOVE}
 
@@ -467,17 +459,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # Decimal places (and so the general-tolerance row each dimension claims)
     # are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    # Faced to fit at assembly: the modelled overall prints as a REFERENCE
-    # value and the callout under it is the requirement; the blank it is
-    # faced from is the Manufacturing Notes' make-to size.
-    length_annotations = [
-        annotation
-        for annotation in side_annotations
-        if dimension_name(adapter, annotation) == "HubLength"
-    ]
-    if len(length_annotations) != 1:
-        raise RuntimeError("edge view does not carry exactly one hub overall")
-    set_reference_dimension(adapter, length_annotations[0], label="hub overall")
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS_BELOW)
     set_dimension_callouts(
         adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"

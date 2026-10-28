@@ -28,6 +28,7 @@ from _gear_quality import (
 )
 from _printed_tolerance import printed_band_mm
 from _drawing_tolerances import _tolerance_places
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND, STACK_NAME
 from paper_drive_stock_inspection import (
     span_contact_points_mm,
     toothspace_gauge_contact_mm,
@@ -73,6 +74,9 @@ def test_part_authors_every_callout_on_a_marked_dimension() -> None:
         assert spec.RACK_NUMBER in below[name], name
     assert spec.PIN_NUMBER not in below["OverallLength"]
     assert "MHA-PD-25" in below["OverallLength"]
+    for name in ("FaceWidth", "OverallLength"):
+        assert STACK_NAME in below[name], name
+        assert "FACED" not in below[name], name
     assert callouts.CALLOUTS[callouts.TEXT_PREFIX] == {
         ("RootProfile", "RootDia"): "ROOT ENVELOPE <MOD-DIAM>"
     }
@@ -87,16 +91,19 @@ def test_sheet_authors_no_manufacturing_value() -> None:
 
 def test_bands_come_from_named_spec_constants() -> None:
     assert model_toleranced_dimensions(part) == {
-        ("SleeveProfile", "OverallLength"): "STATION_TOL",
+        ("SleeveProfile", "OverallLength"): "OVERALL_LENGTH_BAND",
+        ("GearBlank", "FaceWidth"): "FACE_WIDTH_BAND",
         ("SleeveProfile", "BoreDia"): "*BORE_DEVIATIONS",
         ("SleeveProfile", "BossDia"): "*BOSS_DIA_DEVIATIONS",
         ("FlatProfile", "FlatToAxis"): "*FLAT_TO_AXIS_DEVIATIONS",
         ("SleeveProfile", "OutsideDia"): "*OUTSIDE_DIA_DEVIATIONS",
     }
     # A band tighter than its printed row needs a functional reason (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)):
-    # stations' ±0.05, the tip class, boss h6 and flat
+    # the disc cluster stack's ±0.02, the tip class, boss h6 and flat
     # 0/-0.015 bands have functional reasons tighter than their printed rows.
-    assert spec.STATION_TOL < printed_band_mm(spec.STATION_PLACES)
+    assert spec.OVERALL_LENGTH_BAND == spec.FACE_WIDTH_BAND == PRINTED_LENGTH_BAND
+    assert spec.OVERALL_LENGTH_BAND < printed_band_mm(spec.STATION_PLACES)
+    assert spec.FACE_WIDTH_BAND < printed_band_mm(spec.FACE_WIDTH_PLACES)
     by_name = spec.DRAWING_PRECISION_BY_NAME
     for name, band in (
         ("OutsideDia", spec.OUTSIDE_DIA_BAND),
@@ -134,7 +141,7 @@ def test_disc_front_stands_a_spigot_length_ahead_of_the_step() -> None:
     assert spec.DISC_FRONT_STATION == pytest.approx(spec.FACE_WIDTH + hub.SPIGOT_LENGTH)
     assert spec.DISC_FRONT_STATION == pytest.approx(17.25)
     assert spec.DISC_FRONT_STATION_BAND == pytest.approx(
-        printed_band_mm(spec.FACE_WIDTH_PLACES) + hub.SPIGOT_LENGTH_BAND
+        spec.FACE_WIDTH_BAND + hub.SPIGOT_LENGTH_BAND
     )
     assert disc.BORE_DIA_MIN > spec.OUTSIDE_DIA + spec.OUTSIDE_DIA_BAND[0]
     assert hub.DISC_STEP_GAP_WORST > 0.0
@@ -291,7 +298,7 @@ def test_flat_end_mill_reaches_the_end_wall_clear_of_the_hub() -> None:
     edge_break = float(_config.title_block("edge_break")["chamfer_max_mm"])
     assert spec._TITLE_BLOCK_EDGE_BREAK == edge_break
     assert spec.FLAT_END_MIN >= (
-        spec.FACE_WIDTH + printed_band_mm(spec.FACE_WIDTH_PLACES) + edge_break
+        spec.FACE_WIDTH + spec.FACE_WIDTH_BAND + edge_break
     )
     assert spec.FLAT_END_MIN >= spec.CUTTER_RUNOUT_MAX
     assert spec.FLAT_END_TOL_TYPE == 3  # swTolType_e.swTolLIMIT
@@ -304,7 +311,7 @@ def test_flat_end_mill_reaches_the_end_wall_clear_of_the_hub() -> None:
     )
     worst = (
         spec.FACE_WIDTH
-        - printed_band_mm(spec.FACE_WIDTH_PLACES)
+        - spec.FACE_WIDTH_BAND
         + hub.SPIGOT_LENGTH_MIN
         - (spec.FLAT_END_STATION + spec.STATION_TOL)
     )
@@ -434,9 +441,12 @@ _DEVIATION_PLACES = {
     "FlatToAxis": spec.FLAT_TO_AXIS_PLACES,
     "OutsideDia": _tolerance_places(*spec.OUTSIDE_DIA_DEVIATIONS),
 }
-# The stations the R9-5 ±0.05 band governs; the other lengths print bare
-# under the title block's .XXX row.
-_STATIONS = {"OverallLength"}
+# The disc-cluster stack terms' symmetric bands; the other lengths print bare
+# under the title block's rows.
+_STATIONS = {
+    "OverallLength": spec.OVERALL_LENGTH_BAND,
+    "FaceWidth": spec.FACE_WIDTH_BAND,
+}
 
 
 def _printed_text(name: str) -> str:
@@ -468,7 +478,7 @@ def _printed_text(name: str) -> str:
         places = _DEVIATION_PLACES[name]
         rows = [f"{upper:+.{places}f}", f"{value} {lower:+.{places}f}"]
     elif name in _STATIONS:
-        rows = [f"{value} \u00b1{spec.STATION_TOL:.{spec.STATION_PLACES}f}"]
+        rows = [f"{value} \u00b1{_STATIONS[name]:.2f}"]
     else:
         rows = [value]
     if callouts.CALLOUT_BELOW in lanes:
@@ -1016,6 +1026,35 @@ def test_outside_view_crops_past_the_run_out_limit() -> None:
     assert right < rear + (spec.FACE_WIDTH + 0.5) * s
     assert foot < drawing.LEFT_CENTER[1] - drawing.HALF_OD
     assert head > drawing.LEFT_CENTER[1] + drawing.HALF_OD
+
+
+def test_the_cropped_outside_view_reads_as_partial_with_a_break_on_the_boss() -> None:
+    """2026-10-28 ENFORCE review (r1, r2): the cropped view had no break line
+    and no PARTIAL label, and the 13.80 MAX's extension line landed past the
+    drawn end.  The caption names the view PARTIAL; a long-break line on the
+    crop crosses the Ø8.2 boss past both outlines, so the MAX lands on the
+    boss stub between the step and the break, clear of the break's Z."""
+    assert drawing.LEFT_CAPTION.splitlines()[0] == "PARTIAL"
+    caption = _note_box(drawing.LEFT_CAPTION, (0.0, 0.0))
+    assert caption.xmax - caption.xmin <= drawing._LEFT_CAPTION_WIDTH
+    s = drawing.VIEW_SCALE[0] / 1000.0
+    ys = [y for y, _z in drawing.OUTSIDE_BREAK]
+    zs = [z for _y, z in drawing.OUTSIDE_BREAK]
+    # Straight ends on the crop, past both boss outlines.
+    for y, z in (drawing.OUTSIDE_BREAK[0], drawing.OUTSIDE_BREAK[-1]):
+        assert z == drawing.OUTSIDE_CROP_Z
+        assert abs(y) > spec.BOSS_DIA / 2.0
+    assert drawing._outside_sheet_xy(0.0, drawing.OUTSIDE_CROP_Z)[0] == pytest.approx(
+        drawing.OUTSIDE_CROP_FENCE[2]
+    )
+    # The Z stays ahead of the step and the MAX, on the side of the axis away
+    # from the facing gap's floor, from which the MAX's extension line drops.
+    assert min(zs) > spec.CUTTER_RUNOUT_MAX > spec.FACE_WIDTH
+    z_ys = [y for y, z in drawing.OUTSIDE_BREAK if z != drawing.OUTSIDE_CROP_Z]
+    assert spec.GAP_FLOOR_WITNESS_Y < 0.0 < min(z_ys) and max(z_ys) < spec.BOSS_DIA / 2.0
+    assert sorted(ys) == ys
+    # The break stands clear of the MAX's extension line on the sheet.
+    assert (drawing.OUTSIDE_CROP_Z - spec.CUTTER_RUNOUT_MAX) * s >= 0.0005
 
 
 def test_tooth_edge_exception_is_flagged_at_the_teeth() -> None:

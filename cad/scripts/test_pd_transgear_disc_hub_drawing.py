@@ -14,7 +14,6 @@ from types import SimpleNamespace
 import pytest
 
 import _appearance
-from _assembly_contract import assembly_contract
 import _bore_axis
 import _check
 import _config
@@ -33,7 +32,7 @@ import _sketch_circle
 import _sketch_rectangle
 import build_pd_transgear_disc_hub as part
 import draw_pd_transgear_disc_hub as drawing
-import pd_paper_drive_assembly_steps as steps
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND, STACK_NAME
 import pd_transgear_disc_hub_geometry as joint
 import pd_transgear_disc_hub_spec as spec
 import transgear_cluster_fit as cluster_fit
@@ -73,10 +72,10 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert set(drawing.DIMENSION_CALLOUTS_ABOVE) <= marked
 
 
-def test_the_sheet_prints_the_faced_overall_and_the_flange_never_the_hub_body() -> None:
-    """R9-5 / R9-68: the overall (spigot end to hub front) is faced to fit,
-    so it prints as a reference at the model's 13.70; the flange 2.400 and
-    the spigot 3.650 are functional .XXX lengths; the hub body is their
+def test_the_sheet_prints_the_overall_and_the_flange_never_the_hub_body() -> None:
+    """R9-5 / #2038: the overall (spigot end to hub front) is a printed term
+    of the disc cluster stack, 13.69 at 2 places; the flange 2.400 and the
+    spigot 3.650 are functional .XXX lengths; the hub body is their
     remainder and is not printed.  No oil-hole station prints either: the
     hole is centred on the hub body when it is match-drilled (R9-60)."""
     diameters = {
@@ -91,8 +90,10 @@ def test_the_sheet_prints_the_faced_overall_and_the_flange_never_the_hub_body() 
         set(spec.DRAWING_PRECISION_BY_NAME) - diameters - {"OilHoleDia", "FlatToAxis"}
     )
     assert lengths == {"HubLength", "FlangeThick", "SpigotLength"}
-    assert spec.REFERENCE_DIMENSIONS == {"HubLength"} < set(drawing.SIDE_KEEP)
-    assert spec.HUB_LENGTH == cluster_fit.HUB_LENGTH_MODEL == pytest.approx(13.70)
+    assert spec.REFERENCE_DIMENSIONS == frozenset()
+    assert {"HubLength", "SpigotLength"} < set(drawing.SIDE_KEEP)
+    assert spec.HUB_LENGTH == cluster_fit.HUB_LENGTH == pytest.approx(13.69)
+    assert _places("HubLength") == cluster_fit.LENGTH_PLACES == 2
     assert spec.FLANGE_THICK == pytest.approx(2.4) and _places("FlangeThick") == 3
     assert spec.SPIGOT_LENGTH == pytest.approx(3.65) and _places("SpigotLength") == 3
     assert spec.BORE_DIA == spec.SLEEVE.BOSS_DIA and _places("BoreDia") == 3
@@ -102,65 +103,48 @@ def test_the_sheet_prints_the_faced_overall_and_the_flange_never_the_hub_body() 
     assert spec.SPIGOT_DIA == pytest.approx(13.1) and _places("SpigotDia") == 3
     assert spec.FLANGE_DIA == pytest.approx(25.1) and _places("FlangeDia") == 3
     assert joint.BOLT_CIRCLE_DIA == pytest.approx(19.0)
-    assert spec.HUB_BODY_LENGTH == pytest.approx(7.65)
+    assert spec.HUB_BODY_LENGTH == pytest.approx(7.64)
 
 
-def test_the_hub_front_is_faced_into_the_nose_window_at_its_own_step() -> None:
-    """R9-68: no print stack holds the hub front face 0.00-0.10 behind the
-    sleeve's nose, so it is faced at fit-up, right after the cluster is put
-    together and before the disc's taps are spotted through the flange.  The
-    sheet prints the fitted band and the step; the blank leaves a finishing
-    cut over the longest fit."""
-    sleeve = cluster_fit.SLEEVE
-    # The hub's room runs from the 12T's step, the spigot's seat, to the nose.
-    room = (
-        (sleeve.OVERALL_LENGTH - sleeve.STATION_TOL)
-        - (sleeve.FACE_WIDTH + sleeve.FACE_WIDTH_BAND),
-        (sleeve.OVERALL_LENGTH + sleeve.STATION_TOL)
-        - (sleeve.FACE_WIDTH - sleeve.FACE_WIDTH_BAND),
+def test_the_overall_and_the_spigot_are_printed_terms_of_the_disc_cluster_stack() -> None:
+    """#2038: nothing in the cluster is faced or set at assembly; the overall
+    and the spigot print +/-0.02 natively, named on the stack."""
+    assert spec.HUB_LENGTH_BAND == cluster_fit.LENGTH_BAND == PRINTED_LENGTH_BAND
+    assert joint.SPIGOT_LENGTH_BAND == spec.SPIGOT_LENGTH_BAND == PRINTED_LENGTH_BAND
+    assert (spec.HUB_LENGTH_MIN, spec.HUB_LENGTH_MAX) == pytest.approx(
+        (spec.HUB_LENGTH - PRINTED_LENGTH_BAND, spec.HUB_LENGTH + PRINTED_LENGTH_BAND)
     )
-    window = cluster_fit.HUB_NOSE_WINDOW
-    assert window == (0.0, 0.10)
-    assert cluster_fit.HUB_NOSE_WINDOW_TEXT == "0.00-0.10"
-    assert (spec.HUB_LENGTH_FITTED_MIN, spec.HUB_LENGTH_FITTED_MAX) == pytest.approx(
-        (room[0] - window[1], room[1] - window[0])
+    assert (spec.SPIGOT_LENGTH_MIN, spec.SPIGOT_LENGTH_MAX) == pytest.approx(
+        (
+            spec.SPIGOT_LENGTH - PRINTED_LENGTH_BAND,
+            spec.SPIGOT_LENGTH + PRINTED_LENGTH_BAND,
+        )
     )
-    assert (spec.HUB_LENGTH_FITTED_MIN, spec.HUB_LENGTH_FITTED_MAX) == pytest.approx(
-        (13.47, 13.93)
+    assert "HubLength" not in spec.REFERENCE_DIMENSIONS
+    callouts = drawing.DIMENSION_CALLOUTS_BELOW
+    assert callouts["HubLength"] == spec.HUB_LENGTH_CALLOUT
+    assert callouts["SpigotLength"] == spec.SPIGOT_LENGTH_CALLOUT
+    assert STACK_NAME in callouts["HubLength"]
+    assert STACK_NAME in callouts["SpigotLength"]
+    sources = (
+        Path(drawing.__file__).read_text(encoding="utf-8"),
+        Path(part.__file__).read_text(encoding="utf-8"),
     )
-    assert cluster_fit.STEP_Z - cluster_fit.HUB_FRONT_Z == pytest.approx(
-        spec.HUB_LENGTH
-    )
-    assert spec.BLANK_LENGTH_MIN == pytest.approx(14.05)
-    # The model: hub front face at the window's centre behind the nose.
-    assert cluster_fit.HUB_FRONT_Z - cluster_fit.NOSE_Z == pytest.approx(
-        sum(window) / 2.0
-    )
-    assert spec.BLANK_LENGTH_MIN >= spec.HUB_LENGTH_FITTED_MAX + spec.FACING_ALLOWANCE
-    assert f"SUPPLY {spec.BLANK_LENGTH_MIN:.2f} MIN" in spec.DRAWING_NOTES
-    sequence = list(steps.SEQUENCE)
-    at = sequence.index(drawing.FIT_STEP_KEY)
-    assert drawing.FIT_STEP_KEY == "hub-faced-to-nose"
-    assert sequence[at - 1 : at + 2] == [
-        "disc-cluster-assembled",
-        "hub-faced-to-nose",
-        "disc-taps-transferred",
-    ]
-    callout = drawing.DIMENSION_CALLOUTS_BELOW["HubLength"]
-    assert callout.startswith(
-        f"SET AT ASSEMBLY {spec.HUB_LENGTH_FITTED_MIN:.2f}-"
-        f"{spec.HUB_LENGTH_FITTED_MAX:.2f}\nFACED TO FIT"
-    )
-    assert callout.endswith(f"PER {steps.step_ref(drawing.FIT_STEP_KEY)}")
+    for text in (*callouts.values(), spec.DRAWING_NOTES, *sources):
+        for banned in ("FACED TO FIT", "SET AT ASSEMBLY", "SUPPLY", "step_ref"):
+            assert banned not in text
+    assert not hasattr(drawing, "FIT_STEP_KEY")
 
 
-def test_only_the_bore_and_the_spigot_carry_model_bands() -> None:
+def test_the_bore_the_spigot_and_the_stack_lengths_carry_model_bands() -> None:
     """Every other size is governed by its printed places and the holes by
     the title block's DRILLED HOLES row."""
     assert model_toleranced_dimensions(part) == {
         ("BoreProfile", "BoreDia"): "*BORE_DEVIATIONS",
         ("BoreProfile", "FlatToAxis"): "*FLAT_TO_AXIS_DEVIATIONS",
         ("HubProfile", "SpigotDia"): "*SPIGOT_DIA_DEVIATIONS",
+        ("HubProfile", "HubLength"): "HUB_LENGTH_BAND",
+        ("HubProfile", "SpigotLength"): "SPIGOT_LENGTH_BAND",
     }
 
 
@@ -215,17 +199,29 @@ def test_the_d_bore_slides_on_the_sleeve_boss_and_flat_at_every_printed_limit() 
 
 def test_boss_round_engagement_and_available_flat_face_follow_the_live_sleeve() -> None:
     """The retained axial stack keeps the finite cutter end behind the
-    locating round and the sleeve flat's end behind the hub flat. The
-    available D-flat face is geometry, not a certified torque capacity."""
+    locating round and the sleeve flat's end behind the hub flat. The hub
+    slides forward off the step by up to the whole end float, its front face
+    then past the nose. The available D-flat face is geometry, not a
+    certified torque capacity."""
     sleeve = spec.SLEEVE
-    engagement = (
-        sleeve.OVERALL_LENGTH
-        - sleeve.STATION_TOL
-        - cluster_fit.HUB_NOSE_WINDOW[1]
-        - max(
-            sleeve.FACE_WIDTH + sleeve.FACE_WIDTH_BAND,
-            sleeve.CUTTER_RUNOUT_END_WORST,
-        )
+    slide = cluster_fit.END_FLOAT_RANGE[1]
+    teeth = (
+        sleeve.FACE_WIDTH - sleeve.FACE_WIDTH_BAND,
+        sleeve.FACE_WIDTH + sleeve.FACE_WIDTH_BAND,
+    )
+    sleeve_min = sleeve.OVERALL_LENGTH - sleeve.OVERALL_LENGTH_BAND
+    hub_min = spec.HUB_LENGTH - PRINTED_LENGTH_BAND
+    spigot_max = spec.SPIGOT_LENGTH + PRINTED_LENGTH_BAND
+    # Seated: hub front face to the boss's first full round; slid forward:
+    # the nose to the first full round behind the slid spigot.  Each exposed
+    # end of the contact loses the title block's edge break.
+    brk = 0.25
+    engagement = min(
+        *(
+            tooth + hub_min - brk - max(tooth + brk, sleeve.CUTTER_RUNOUT_END_WORST)
+            for tooth in teeth
+        ),
+        sleeve_min - brk - max(teeth[1] + slide + brk, sleeve.CUTTER_RUNOUT_END_WORST),
     )
     assert spec.ROUND_ENGAGEMENT_MIN == pytest.approx(engagement)
     assert engagement > 0.0
@@ -237,12 +233,11 @@ def test_boss_round_engagement_and_available_flat_face_follow_the_live_sleeve() 
         ((sleeve.BOSS_DIA + sleeve.BOSS_DIA_BAND[1]) / 2.0) ** 2
         - (sleeve.FLAT_TO_AXIS + sleeve.FLAT_TO_AXIS_BAND[0]) ** 2
     )
-    length_min = (
-        sleeve.OVERALL_LENGTH
-        - sleeve.STATION_TOL
-        - cluster_fit.HUB_NOSE_WINDOW[1]
-        - (sleeve.FACE_WIDTH + sleeve.FACE_WIDTH_BAND + spec.SPIGOT_LENGTH_MAX)
+    length_min = min(
+        hub_min - spigot_max,
+        sleeve_min - teeth[1] - slide - spigot_max,
     )
+    assert length_min > 0.0
     assert spec.FLAT_DRIVE_WIDTH == pytest.approx(width)
     assert spec.FLAT_DRIVE_WIDTH_MIN == pytest.approx(width_min)
     assert spec.FLAT_DRIVE_LENGTH_MIN == pytest.approx(length_min)
@@ -568,9 +563,7 @@ def test_every_mate_the_sheet_cites_is_named_with_its_own_number() -> None:
         name_by_number[_config.parts(stem)["number"]] = name
     printed = " ".join(_sheet_text().split())
     cited = re.findall(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", printed)
-    assert set(cited) == set(name_by_number) | {
-        assembly_contract("pd-paper-drive").number
-    }
+    assert set(cited) == set(name_by_number)
     for number, name in name_by_number.items():
         assert printed.count(f"{name} {number}") == printed.count(number), number
 
@@ -581,13 +574,14 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
         (spec.HUB_DIA - _row(_places("HubDia"))) - (spec.BORE_DIA + spec.BORE_BAND[0])
     ) / 2.0
     oil_r = (spec.OIL_HOLE_DIA + DRILL_PLUS) / 2.0
-    # The oil hole is centred on the shortest hub body the fitted overall,
+    # The oil hole is centred on the shortest hub body the printed overall,
     # the printed spigot and the printed flange leave, give or take the
     # centring at fit-up: the same ligament to the hub front face and to the
     # flange face.
     body_min = (
-        spec.HUB_LENGTH_FITTED_MIN
-        - (spec.SPIGOT_LENGTH + _row(_places("SpigotLength")))
+        spec.HUB_LENGTH
+        - PRINTED_LENGTH_BAND
+        - (spec.SPIGOT_LENGTH + PRINTED_LENGTH_BAND)
         - (spec.FLANGE_THICK + _row(_places("FlangeThick")))
     )
     oil_ligament = body_min / 2.0 - spec.OIL_HOLE_CENTRING_TOL - oil_r
@@ -606,7 +600,7 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
         spec.FLAT_TO_AXIS + spec.FLAT_TO_AXIS_BAND[0]
     )
 
-    assert oil_ligament == pytest.approx(2.68, abs=0.005)
+    assert oil_ligament == pytest.approx(2.835, abs=0.005)
     assert hole_to_rim == pytest.approx(2.02, abs=0.005)
     assert not any("RIM" in line for line in spec.DRAWING_NOTES.splitlines())
     for wall in (
@@ -691,18 +685,20 @@ def test_the_wall_gate_refuses_a_coarser_printed_row(monkeypatch) -> None:
 
 def test_the_oil_hole_is_centred_on_the_hub_body_the_lengths_leave() -> None:
     """R9-8 / R9-60: Ø1.2 on the drilled row, match-drilled through hub and
-    sleeve with the hub seated and faced, centred on the hub body, so its
-    station behind the hub front face follows the fitted overall and the
-    printed flange, not a band of its own."""
+    sleeve with the hub seated, centred on the hub body, so its station
+    behind the hub front face follows the printed overall, spigot and
+    flange, not a band of its own."""
     assert spec.OIL_HOLE_DIA == pytest.approx(1.2)
-    assert spec.OIL_HOLE_STATION == pytest.approx(3.825)
-    assert spec.OIL_HOLE_Z == pytest.approx(-6.225)
+    assert spec.OIL_HOLE_STATION == pytest.approx(3.82)
+    assert spec.OIL_HOLE_Z == pytest.approx(-6.22)
     body = (
-        spec.HUB_LENGTH_FITTED_MIN
-        - (spec.SPIGOT_LENGTH + _row(_places("SpigotLength")))
+        spec.HUB_LENGTH
+        - PRINTED_LENGTH_BAND
+        - (spec.SPIGOT_LENGTH + PRINTED_LENGTH_BAND)
         - (spec.FLANGE_THICK + _row(_places("FlangeThick"))),
-        spec.HUB_LENGTH_FITTED_MAX
-        - (spec.SPIGOT_LENGTH - _row(_places("SpigotLength")))
+        spec.HUB_LENGTH
+        + PRINTED_LENGTH_BAND
+        - (spec.SPIGOT_LENGTH - PRINTED_LENGTH_BAND)
         - (spec.FLANGE_THICK - _row(_places("FlangeThick"))),
     )
     assert spec.HUB_BODY_LENGTH_RANGE == pytest.approx(body)
@@ -720,9 +716,9 @@ def test_the_oil_hole_is_centred_on_the_hub_body_the_lengths_leave() -> None:
     )
     assert sleeve.FLAT_END_STATION < spec.OIL_HOLE_SLEEVE_Z < sleeve.OVERALL_LENGTH
     # Its ligament to the nose holds the sleeve's 2.0 target with the hub
-    # front face at the window's nearest.
+    # front face at its least recess behind the nose.
     nose_worst = (
-        cluster_fit.HUB_NOSE_WINDOW[0]
+        cluster_fit.RECESS_RANGE[0]
         + spec.OIL_HOLE_STATION_RANGE[0]
         - (spec.OIL_HOLE_DIA + DRILL_PLUS) / 2.0
     )
@@ -762,6 +758,11 @@ _BANDS = {
     "FlatToAxis": spec.FLAT_TO_AXIS_BAND,
     "SpigotDia": spec.SPIGOT_DIA_BAND,
 }
+# The disc cluster stack's printed lengths carry their symmetric band.
+_SYMMETRIC = {
+    "HubLength": spec.HUB_LENGTH_BAND,
+    "SpigotLength": spec.SPIGOT_LENGTH_BAND,
+}
 
 
 def _printed_box(name: str, anchor: tuple[float, float]) -> Box:
@@ -772,8 +773,8 @@ def _printed_box(name: str, anchor: tuple[float, float]) -> Box:
         value = f"\u00d8{value}"
     if name in _BANDS:
         value += f" +{_BANDS[name][0]:.3f}"
-    if name in spec.REFERENCE_DIMENSIONS:
-        value = f"({value})"
+    if name in _SYMMETRIC:
+        value += f"\u00b1{_SYMMETRIC[name]:.{_places(name)}f}"
     lines = [
         drawing.DIMENSION_CALLOUTS_ABOVE.get(name),
         value,
@@ -988,6 +989,7 @@ def test_every_drive_equation_reproduces_the_modelled_geometry(monkeypatch) -> N
         "_as_construction",
         "_check_z_span",
         "set_dimension_bilateral_tolerance",
+        "set_dimension_symmetric_tolerance",
         "apply_drawing_precision",
         "clear_dimensions_for_drawing",
         "mark_dimensions_for_drawing",
