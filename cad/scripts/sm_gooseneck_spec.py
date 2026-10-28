@@ -44,10 +44,11 @@ from sm_gooseneck_spring_joint import (
 
 # Stock designations as the supplier lists them.  The print states them in
 # inches; each one is checked against the millimetre geometry it names.
-TUBE_STOCK = "1/2 OD X 0.065 WALL 4130-N SEAMLESS"
-TUBE_STOCK_SKU = "ONLINEMETALS 7322"
+STOCK_SUPPLIER = "ONLINEMETALS"
+TUBE_STOCK_SIZE = "1/2 OD X 0.065 WALL"
+TUBE_STOCK_SKU = "7322"
 SLEEVE_STOCK_SIZE = "5/8 OD X 0.058 WALL"
-SLEEVE_STOCK_SKU = "ONLINEMETALS 7324"
+SLEEVE_STOCK_SKU = "7324"
 for _name, _mm, _inches in (
     ("tube OD", geom.TUBE_DIA, 0.500),
     ("tube wall", geom.WALL_T, 0.065),
@@ -79,11 +80,13 @@ COUNTERBORE_FLOOR_CALLOUT = "FLOOR CORNER"
 COUNTERBORE_AXIS_CALLOUT = f"ON TAP AXIS WITHIN {COUNTERBORE_AXIS_OFFSET_MAX:.2f}"
 PLUG_DIA_CALLOUT = "FLUSH WITH TUBE OD,\nNO STEP"
 # Three short rows, so the block ends left of the end view (sheet layout,
-# draw_sm_gooseneck).
+# draw_sm_gooseneck).  The window is the joint's, braze or retaining compound
+# (owner ruling 2026-10-27 on #1997, sm_gooseneck_spring_joint), so the
+# callout names no method; note 3 does.
 SHANK_FIT_CALLOUT = (
-    "BRAZE FIT TO\n"
-    f"TUBE BORE, {BRAZE_CLEARANCE_MIN:.2f}-{BRAZE_CLEARANCE_MAX:.2f}\n"
-    "DIAMETRAL CLEARANCE"
+    "FIT TO TUBE BORE,\n"
+    f"{BRAZE_CLEARANCE_MIN:.2f}-{BRAZE_CLEARANCE_MAX:.2f} DIAMETRAL\n"
+    "CLEARANCE"
 )
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
     "EndPieceProfile": {
@@ -150,20 +153,22 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DIMENSION_CALLOUTS_BY_NAME) - set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("a gooseneck callout names an unmarked dimension")
 
-# Four lines (drawing-guidelines.md rule 7; codjiflo on #1997): tube stock,
-# sleeve stock with its select-fit acceptance on the tube (the sleeve bore is
-# stock, so no feature carries it), the bend's acceptance, the braze.  Sizes
-# are on the features and the bend radius is native, so no line names a
-# tool; the tap's sequence rides its callout (rule 7, flag it where it
-# applies), and section A-A shows the end piece solid.  Each line ends left
-# of the title block.
+# Four lines (drawing-guidelines.md rule 7; codjiflo on #1997): the stock,
+# the sleeve's select-fit acceptance on the tube (its bore is stock, so no
+# feature carries it) and its braze, the joints, then the order the owner
+# ruled (2026-10-27, #1997: join the end piece before bending, cooled or
+# fully cured) with the bend's acceptance.  Sizes are on the features and the
+# bend radius is native, so no line names a tool; the tap's sequence rides
+# its callout (rule 7, flag it where it applies), and section A-A shows the
+# end piece solid.  Each line ends left of the title block.
 DRAWING_NOTES = "\n".join(
     (
-        f"1. TUBE {TUBE_STOCK}, {TUBE_STOCK_SKU}, AS STOCK.",
-        f"2. SLEEVE {SLEEVE_STOCK_SIZE}, {SLEEVE_STOCK_SKU}: "
-        f"{BRAZE_CLEARANCE_MIN:.2f}-{BRAZE_CLEARANCE_MAX:.2f} DIAMETRAL ON TUBE.",
-        "3. BEND: OVALITY 5% MAX; NO FLATS, KINKS OR CRACKS.",
-        "4. SILVER-BRAZE BAg-7 PER AWS A5.8, FULL PENETRATION: SHANK, BOTH SLEEVE ENDS.",
+        f"1. TUBE {TUBE_STOCK_SIZE}, {STOCK_SUPPLIER} {TUBE_STOCK_SKU}; "
+        f"SLEEVE {SLEEVE_STOCK_SIZE}, {SLEEVE_STOCK_SKU}",
+        f"2. AS STOCK. SLEEVE {BRAZE_CLEARANCE_MIN:.2f}-{BRAZE_CLEARANCE_MAX:.2f} "
+        "DIAMETRAL ON TUBE, SILVER-BRAZED BOTH ENDS.",
+        "3. BRAZE BAg-7 (AWS A5.8), FULL PENETRATION; END PIECE: BRAZE OR LOCTITE 638.",
+        "4. JOIN END PIECE, COOL OR FULLY CURE, THEN BEND: OVALITY 5% MAX, NO KINKS.",
     )
 )
 ELEVATION_VIEW_NOTE = "ELEVATION SCALE 1:3"

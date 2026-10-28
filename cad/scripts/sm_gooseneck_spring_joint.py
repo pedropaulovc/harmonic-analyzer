@@ -33,17 +33,36 @@ PLUG_DIAMETER_BAND = printed_band_mm(2)
 PLUG_LENGTH_BAND = printed_band_mm(2)
 THREAD_AXIS_OFFSET_MAX = 0.15
 DRILL_WANDER_MAX = 0.10
-# The end piece's shank is turned to the measured tube bore for a
-# silver-braze (BAg-7) joint: the diametral faying clearance is the mating
-# requirement.  The retained Ø band still limits the shank, and the wall
-# budget below uses its lower limit.  The window is the filler maker's for
-# flux-brazed BAg, 0.002-0.005 in (0.051-0.127 mm) PER SIDE (Lucas-Milhaupt,
-# "The Effect of Joint Clearance on Braze Joint Strength", Table 1; per side
-# as in its "Designing Braze Joints at Temperature"), so 0.102-0.254
-# diametral, printed rounded inward at two places.  The leg sleeve's stock
-# select-fit takes the same window (sm_gooseneck_spec).
+# The end piece's shank is turned to the measured tube bore (the stock bore
+# spans 9.02-9.91, sm_gooseneck_geom), and the diametral clearance is the
+# mating requirement.  The retained Ø band still limits the shank, and the
+# wall budget below uses its lower limit.  Owner ruling 2026-10-27 (#1997):
+# the end piece is joined BEFORE the bend, cooled or fully cured first, so the
+# solid shank, 1.16 short of the bend's exit tangent, supports the tube through
+# the bend.  Three joints were weighed (#1997 joint-options note):
+# - Press fit: rejected.  Shigley 10e eq. 3-57/3-58 (same steel, solid shaft)
+#   caps the diametral interference at about 0.021 before the thinnest
+#   tube's bore yields (0.014 at SF 1.5), and holding the clamp torque at
+#   the screw's yield (DIN 7190 steel-steel friction 0.12) needs about
+#   0.008: a 0.006 window on a stock bore measured in the shop.
+# - Silver braze, BAg-7: the filler maker's flux-brazed window, 0.002-0.005 in
+#   (0.051-0.127 mm) PER SIDE (Lucas-Milhaupt, "The Effect of Joint
+#   Clearance on Braze Joint Strength", Table 1; per side as in its
+#   "Designing Braze Joints at Temperature"), so 0.102-0.254 diametral,
+#   printed rounded inward at two places.
+# - LOCTITE 638 retaining compound, the alternative: the same window, inside
+#   the TDS's 0.25 mm gap fill (TDS, August 2016).  ISO 10123 shear 25
+#   N/mm^2 minimum at 24 h, derated by the Henkel Retaining Compound Design
+#   Guide's factors (alloy steel 0.9, clearance 0.3 at the window's wide
+#   end, L/D 0.5 on a 9 mm shaft 0.6) holds about 2.2 N m: 3.7 times the
+#   clamp's worst tightening torque at its needed preload.
+# The leg sleeve's stock select-fit takes the same window (sm_gooseneck_spec).
 BRAZE_CLEARANCE_MIN = 0.11
 BRAZE_CLEARANCE_MAX = 0.25
+# LOCTITE 638 TDS (August 2016): bond gaps up to 0.25 mm.
+LOCTITE_638_GAP_MAX = 0.25
+if BRAZE_CLEARANCE_MAX > LOCTITE_638_GAP_MAX:
+    raise AssertionError("the end piece's joint window passes LOCTITE 638's gap fill")
 PLUG_SHANK_DIA = round(
     gooseneck.TUBE_BORE_DIA - (BRAZE_CLEARANCE_MIN + BRAZE_CLEARANCE_MAX) / 2.0, 2
 )

@@ -163,17 +163,19 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
     notes = " ".join(spec.DRAWING_NOTES.split())
     window = f"{joint.BRAZE_CLEARANCE_MIN:.2f}-{joint.BRAZE_CLEARANCE_MAX:.2f}"
     for phrase in (
-        "1/2 OD X 0.065 WALL 4130-N SEAMLESS",
-        "ONLINEMETALS 7322",
+        "TUBE 1/2 OD X 0.065 WALL, ONLINEMETALS 7322",
+        "SLEEVE 5/8 OD X 0.058 WALL, 7324",
         "AS STOCK",
-        "5/8 OD X 0.058 WALL",
-        "ONLINEMETALS 7324",
-        f"{window} DIAMETRAL ON TUBE",
+        f"{window} DIAMETRAL ON TUBE, SILVER-BRAZED BOTH ENDS",
+        "BAg-7 (AWS A5.8), FULL PENETRATION",
+        "END PIECE: BRAZE OR LOCTITE 638",
+        # Owner ruling 2026-10-27 (#1997): join before bending.
+        "JOIN END PIECE, COOL OR FULLY CURE, THEN BEND",
         "OVALITY 5% MAX",
-        "BOTH SLEEVE ENDS",
-        "BAg-7",
     ):
         assert phrase in notes, phrase
+    # The shank callout states the joint's window and names no method.
+    assert spec.SHANK_FIT_CALLOUT == f"FIT TO TUBE BORE,\n{window} DIAMETRAL\nCLEARANCE"
     # A note names no tool (rule 7): R76.2 is the native bend radius.
     assert "DIE" not in notes
     # Sizes and tolerances are native model dimensions, never note text; the

@@ -852,3 +852,56 @@ def test_tightening_sf_is_the_overtightening_margin() -> None:
     assert sf == pytest.approx(1.0)
     assert spec.OVERTIGHTEN_MARGIN == pytest.approx(margin)
     assert spec.OVERTIGHTEN_MARGIN >= spec.STRENGTH_SF_TARGET
+
+
+def _end_piece_torque_n_mm(mu_clamp: float, mu_thread: float) -> float:
+    # Tightening MHA-SM-04 turns the end piece through its thread and its
+    # under-head face; the shank joint reacts both.
+    preload = screw_spec.clamp_preload_n(mu_clamp)
+    head = preload * mu_clamp * screw_spec.CLAMP_ECCENTRICITY_MAX
+    return screw_spec.thread_torque_n_mm(preload, mu_thread) + head
+
+
+def test_loctite_638_alternative_holds_the_clamp_torque() -> None:
+    # Owner ruling 2026-10-27 (#1997): LOCTITE 638 in the braze window.
+    # Henkel Retaining Compound Design Guide: T = pi d^2 L tau f / 2000 (N m)
+    # with f = alloy steel 0.9 x clearance 0.3 x L/D 0.6 (static, slip fit,
+    # room-temperature cure: 1.0); tau = 25 N/mm^2 (TDS ISO 10123, 24 h).
+    assert joint.BRAZE_CLEARANCE_MAX <= joint.LOCTITE_638_GAP_MAX
+    shank = gooseneck.TUBE_BORE_DIA_MIN - joint.BRAZE_CLEARANCE_MAX
+    capacity = math.pi * shank**2 * gooseneck.PLUG_SHANK_LENGTH * 25.0 * 0.162 / 2.0
+    needed = max(_end_piece_torque_n_mm(*pair) for pair in screw_spec.FRICTION_PAIRS)
+    assert capacity / needed == pytest.approx(3.66, abs=0.01)
+    assert capacity >= 2.0 * needed
+
+
+def test_press_fit_window_is_too_narrow_to_fit_by_hand() -> None:
+    # Shigley 10e eq. 3-57/3-58, same steel, solid shaft: the interference
+    # the thinnest tube's bore takes to yield (4130-N, 60 ksi) against the
+    # interference that holds the torque at the screw's own yield (DIN 7190
+    # steel-steel friction 0.12).
+    e_mpa, sy_mpa = 205_000.0, 60_000 * 0.00689475729
+    od = gooseneck.TUBE_DIA_MIN
+    bore = od - 2.0 * gooseneck.WALL_T_MIN
+
+    def pressure(delta: float, d: float, do: float) -> float:
+        return e_mpa * delta / (2.0 * d) * (1.0 - (d / do) ** 2)
+
+    def von_mises(delta: float, d: float, do: float) -> float:
+        p = pressure(delta, d, do)
+        hoop = p * (do**2 + d**2) / (do**2 - d**2)
+        return math.sqrt(hoop**2 + hoop * p + p**2)
+
+    cap = sy_mpa / von_mises(1.0, bore, od)
+    at_yield = max(
+        _end_piece_torque_n_mm(*pair) * screw_spec._TIGHTENING_SF_EXACT[pair]
+        for pair in screw_spec.FRICTION_PAIRS
+    )
+    d, do = gooseneck.TUBE_BORE_DIA, gooseneck.TUBE_DIA
+    hold_per_mm = (
+        0.12 * pressure(1.0, d, do) * math.pi * d**2 * gooseneck.PLUG_SHANK_LENGTH / 2
+    )
+    need = at_yield / hold_per_mm
+    assert cap == pytest.approx(0.0214, abs=5e-4)
+    assert need == pytest.approx(0.0080, abs=5e-4)
+    assert cap / 1.5 - need < 0.0065
