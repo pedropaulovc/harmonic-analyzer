@@ -1499,7 +1499,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "ITS KNOB BORE INDICATES TRUE (THE "
             f"{_N['pd-transgear-knob-shaft']} {KNOB_TEETH}T / {_N['pd-rack-pinion']} "
             f"{disc.TEETH}T MESH); CLAMP; RE-INDICATE. "
-            "MATCH-DRILL 2 PILOTS THROUGH THE PLATE, BLIND IN THE ARM. "
+            "MATCH-DRILL 2 PILOTS THROUGH THE PLATE AND THE ARM. "
             "PART THEM; REAM EACH PART'S HOLES TO ITS DRAWING "
             f"({_N['pd-transgear-arm']} PRESS, {_N['pd-transgear-arm-plate']} SLIP). "
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-locating-pin']} "
