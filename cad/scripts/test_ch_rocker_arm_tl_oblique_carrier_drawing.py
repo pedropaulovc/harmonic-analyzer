@@ -419,6 +419,12 @@ def test_every_x_station_is_a_baseline_from_a1() -> None:
     for name, (x, _y) in spec.STATIONS.items():
         ends = sorted((a1_sheet, _on_sheet(x, 0.0)[0]))
         assert ends[0] < _top_text(name)[0] < ends[1], name
+    # Machinist review 07a6786: the 34.9's arrows went outside its short span
+    # and its line ran on into the REAM leader; they are held inside.
+    assert '_arrows_inside(adapter, annotations, "EdgeX")' in inspect.getsource(
+        drawing.build
+    )
+    assert drawing._ARROWS_INSIDE == 0  # swDimArrowsInside
 
 
 def test_section_line_prints_its_ends_only() -> None:

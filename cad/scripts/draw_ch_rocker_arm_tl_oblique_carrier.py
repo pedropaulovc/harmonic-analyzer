@@ -136,7 +136,8 @@ _A1 = part_spec.PIN_HOLES["A1"]
 # clear over the 450.135's text (to y 96.1). Above, the longer the lower,
 # each text in the column just short of its own end, both lanes over A2DX's
 # text (to 236.6): R1 238.5, R2 250, 7.6 under the border. The left end's
-# 34.9 stands between the end and A1, under the REAM leader's reach.
+# 34.9 stands between the end and A1, under the REAM leader's reach, its
+# arrows held inside so its line stops at the end (_arrows_inside).
 TOP_KEEP: dict[str, tuple[float, float, float]] = {
     # Outline: the length outermost below, the left end from A1 between the
     # two, the width innermost right, the pin line from the -Y edge
@@ -692,6 +693,28 @@ def _set_callout_texts(
         raise RuntimeError(f"dimension texts not applied: {sorted(remaining)}")
 
 
+_ARROWS_INSIDE = 0  # swDimArrowsInside
+
+
+def _arrows_inside(adapter: Any, annotations: list[Any], name: str) -> None:
+    """Hold one short dimension's arrows inside its extension lines, read
+    back (draw_ch_rocker_arm_tl_oblique_pivot_block). Machinist review of
+    07a678696 (r1-r3 clarity): SolidWorks put the 34.9's arrows outside its
+    17.5 sheet mm span, and its dimension line ran on past the left end into
+    the REAM leader."""
+    (annotation,) = [
+        item for item in annotations if dimension_name(adapter, item) == name
+    ]
+    display = _early_bound(
+        _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+        "IDisplayDimension",
+    )
+    display.ArrowSide = _ARROWS_INSIDE
+    rebuild_drawing(adapter, label=f"{name} arrows inside")
+    if int(display.ArrowSide) != _ARROWS_INSIDE:
+        raise RuntimeError(f"{name}: arrows did not move inside")
+
+
 def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
     return tuple(value / 1000.0 for value in point_mm)
 
@@ -1012,6 +1035,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _set_callout_texts(adapter, annotations, CALLOUT_PREFIXES, part=1)
     _set_callout_texts(adapter, annotations, CALLOUT_SUFFIXES, part=2)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    _arrows_inside(adapter, annotations, "EdgeX")
     ream = [
         item for item in annotations if dimension_name(adapter, item) == "PinHoleDia"
     ]
