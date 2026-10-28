@@ -26,9 +26,10 @@ than one tooth pair in contact at handover -- which is enough for this slow,
 hand-driven reducer; 1.2 remains the nominal design floor.
 
 The reducer's centre takes the ordinary fine-pitch set band, nominal
-+0.025/-0 (pd_rack_pinion_spec.CENTRE_DISTANCE_WINDOW). The nominal end
-meets both tiers. The far end, a stock 12T:120T pair at the stock 0.05 TIR,
-gives CR 1.162 and 1.073 at the runout extreme, short of 1.2/1.1; it is
++0.050/-0 (pd_rack_pinion_spec.CENTRE_DISTANCE_WINDOW). The nominal end
+meets both tiers. The far end, 35.151, a stock 12T:120T pair at the stock
+0.05 TIR, gives CR 1.118 at the set centre and 1.029 at the runout extreme,
+short of 1.2/1.1; it is
 gated at BAND_TOP_CONTACT_RATIO_FLOORS, 1.1 and 1.0 (owner ruling
 2026-10-27, option A: standard gears, standard band).
 
