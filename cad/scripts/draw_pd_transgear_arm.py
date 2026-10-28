@@ -1075,16 +1075,18 @@ async def build(adapter: Any) -> dict[str, str]:
         # mouth, so it never crosses the tap's chain line on its axis; each
         # frame stands far enough out that its 6 mm shoulder ends short of
         # the hole (run 20261027T180656347Z: the shoulders ran across the
-        # chain lines).
+        # chain lines). Each keeps its offset from its tap's axis: a fixed
+        # sheet x put tap 1's frame on its chain line once #2034 moved the
+        # taps 12 mm left (preview run 20261028T070651235Z).
         "plate_tap_1_position": PmiDrawingPlacement(
-            section, (0.0665, SECTION_CENTER[1] - 0.0094),
+            section, (_front_x(PLATE_TAP_STATIONS[0]) - 0.07196, SECTION_CENTER[1] - 0.0094),
             attachment_xy=_wall_point(
                 adapter, section, x_mm=PLATE_TAP_STATIONS[0] - _PLATE_DRILL_R,
                 z_mm=THICKNESS - 0.5, label="plate tap 1 wall",
             ),
         ),
         "plate_tap_2_position": PmiDrawingPlacement(
-            section, (0.1795, SECTION_CENTER[1] - 0.0094),
+            section, (_front_x(PLATE_TAP_STATIONS[1]) + 0.01104, SECTION_CENTER[1] - 0.0094),
             attachment_xy=_wall_point(
                 adapter, section, x_mm=PLATE_TAP_STATIONS[1] + _PLATE_DRILL_R,
                 z_mm=THICKNESS - 0.5, label="plate tap 2 wall",
