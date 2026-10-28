@@ -690,7 +690,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("pd-transgear-pin-1", "pd-transgear-arm-1")): _annulus_limit(
                 3.9, 3.874, 7.9375
             ),
-            # MHA-PD-VN-64 Ø2.0 dowels pressed into the arm's Ø1.995 blind reams,
+            # MHA-PD-VN-64 Ø2.0 dowels pressed into the arm's Ø1.995 through reams,
             # 6.0 long less 1.70 proud.
             **_expected_numbered_pairs(
                 "pd-vn-transgear-arm-plate-locating-pin",

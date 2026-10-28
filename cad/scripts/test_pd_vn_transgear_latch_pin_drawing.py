@@ -91,6 +91,15 @@ def test_the_installation_note_states_the_proud_length() -> None:
     assert f"({spec.PROUD:.1f}) PROUD" in notes and "REF" in notes
 
 
+def test_the_installation_note_says_permanent_and_fits_the_sheet() -> None:
+    from _purchased_fastener_drawing import note_lines
+
+    notes = _config.parts(STEM)["installation_notes"]
+    # Owner ruling 2026-10-27 (#1379): the latch pin never comes out.
+    assert "PERMANENT" in notes
+    note_lines(notes, label=STEM)  # raises past the sheet's line budget
+
+
 def test_purchased_sheet_documents_the_built_part() -> None:
     import draw_pd_vn_transgear_latch_pin as drawing
 

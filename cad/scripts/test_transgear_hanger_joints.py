@@ -325,7 +325,18 @@ def test_the_reamed_hole_keeps_the_press_at_both_limits(monkeypatch) -> None:
 def test_every_wall_holds_the_target_at_the_printed_worst_case(module) -> None:
     for name, (nominal, worst) in module.WALLS.items():
         assert worst <= nominal, name
-        assert worst >= module.WALL_TARGET, name
+        assert worst >= getattr(module, "WALL_FLOORS", {}).get(name, module.WALL_TARGET), name
+
+
+def test_the_latch_pin_ligament_is_the_arm_s_one_tracked_shortfall() -> None:
+    # Owner ruling 2026-10-27 (#1379, tracked in #2019): the full-budget
+    # ligament, at the .XXX height band (coordinator ruling (a)), stays under
+    # the 2.0 target until the next stock size up.
+    assert arm.WALL_FLOORS == {"pin hole to faces": arm.LATCH_PIN_WALL_FLOOR}
+    worst = arm.WALLS["pin hole to faces"][1]
+    assert arm.LATCH_PIN_WALL_FLOOR == 1.5 <= worst < arm.WALL_TARGET
+    assert arm.LATCH_PIN_HEIGHT_BAND == arm.BAND_XXX
+    assert worst == pytest.approx(1.6787, abs=1e-4)
 
 
 def test_spacer_wall_holds_the_target_with_both_rim_breaks() -> None:

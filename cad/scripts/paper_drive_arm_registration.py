@@ -19,7 +19,6 @@ import pd_transgear_knob_shaft_spec as SHAFT
 import pd_transgear_knob_thrust_ring_spec as RING
 import _sprocket_seat_geometry as WHEEL
 from _gear_quality import (
-    arm_opposite_face_parallelism_mm,
     arm_plate_loaded_normal_change_mm,
     reducer_axis_projected_zone_diameter_mm,
     reducer_k_setting_diameter_mm,
@@ -67,7 +66,16 @@ ARM_SEAT_WITNESS_MIN_WIDTH_MM = 26.0 * 14.5 / max(
 ) - 2.0 * ARM_SEAT_WITNESS_POSITION_RADIUS_MM
 if ARM_SEAT_WITNESS_MIN_WIDTH_MM < ARM_SEAT_SPAN_MIN_MM:
     raise AssertionError("actual three-indicator support width is below the charged tilt span")
-ARM_OPPOSITE_FACE_PARALLELISM_MM = arm_opposite_face_parallelism_mm()
+# The arm's rear face carries no frame (machinist review, rule 5): it is the
+# 9517K466 ground stock's as-supplied face (thickness 5/16 ±0.001", the
+# only face tolerance McMaster lists, page read 2026-10-27). What this bounds
+# is the plate seat's tilt relative to the arm's own surface under it, not to
+# a remote datum: any bow bends both faces together and cancels, so over the
+# seat span the relative wedge is the local thickness difference, and the
+# band holds the thickness at every point: <= 2 x 0.0254. The owner ruling
+# 2026-10-27 (#1379) charges no frame. The governing gate is the
+# MHA-PD-VN-56 plate screw's worst full-thread engagement, >= 1.5D.
+ARM_OPPOSITE_FACE_PARALLELISM_MM = 2.0 * ARM.THICKNESS_BAND
 AXIS_PROJECTED_ZONE_DIAMETER_MM = reducer_axis_projected_zone_diameter_mm()
 ARM_PLATE_TILT_MAX_RAD = (
     math.atan(ARM_OPPOSITE_FACE_PARALLELISM_MM / ARM_SEAT_SPAN_MIN_MM)

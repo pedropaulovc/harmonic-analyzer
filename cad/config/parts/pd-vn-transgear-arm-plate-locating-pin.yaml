@@ -12,9 +12,9 @@ pd-vn-transgear-arm-plate-locating-pin:
   # Published ISO 2338:1997 length limits for nominal 6 mm are 5.75..6.25.
   # Its end c≈0.35 is reference only, not a supplier maximum.
   installation_notes: |-
-    INSTALLATION - TWO PER MHA-PD-18 ARM: PRESS INTO THE ARM, NOT TO THE
-    BLIND FLOOR. THE MHA-PD-19 PLATE SLIPS ON; ITS SCREWS CLAMP ONLY,
-    THE PINS LOCATE IT (MHA-PD-00).
+    INSTALLATION - TWO PER MHA-PD-18 ARM: PRESS INTO THE ARM FROM THE REAR
+    TO THE PROUD SET; PUNCH OUT FROM THE FRONT. THE MHA-PD-19 PLATE SLIPS
+    ON; ITS SCREWS CLAMP ONLY, THE PINS LOCATE IT (MHA-PD-00).
   quantity: 2
   tolerance_class: machined_block
   process: purchased

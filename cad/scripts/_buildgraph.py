@@ -2405,6 +2405,8 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "pd_transgear_knob_shaft_spec",
         # Edge-break row sizes the pivot spacer's wall and its seat flat.
         "pd_transgear_pivot_spacer_spec",
+        # Edge-break row comes off the locating holes' walls to the arm's edge.
+        "pd_transgear_arm_geometry",
     }
 )
 
