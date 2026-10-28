@@ -618,15 +618,22 @@ def test_section_stations_are_a_baseline_from_the_mounting_face() -> None:
 
 def test_each_stacked_callout_fits_its_rows_and_witness_lines() -> None:
     """A callout's lines stand under its value, above the next row's text,
-    and between the dimension's own witness lines."""
+    and between the dimension's own witness lines.  SOLIDWORKS centres the
+    value-and-callout block on its position (run 20261028T111221004Z: a third
+    callout line raised the hub station's value into the hub-to-boss line)."""
     keep = drawing.SECTION_KEEP
+
+    def half_height(name: str) -> float:
+        lines = len(drawing.SECTION_CALLOUTS.get(name, "").splitlines())
+        return 0.9 + lines * _LINE_MODEL / 2.0
+
     for name, below, (left, right) in (
         ("HubFaceToMounting", "NotchDepth", (geometry.HUB_FACE_Z, 0.0)),
         ("HubToBoss", "HubFaceToMounting", (geometry.HUB_FACE_Z, geometry.BOSS_FACE_Z)),
     ):
         text = drawing.SECTION_CALLOUTS[name]
-        bottom = keep[name][1] - 1.0 - len(text.splitlines()) * _LINE_MODEL
-        assert bottom - (keep[below][1] + 0.9) >= 0.5, name
+        bottom = keep[name][1] - half_height(name)
+        assert bottom - (keep[below][1] + half_height(below)) >= 0.5, name
         half = _half_width_model("X" * max(map(len, text.splitlines())))
         assert left + 0.5 < keep[name][2] - half, name
         assert keep[name][2] + half < right - 0.5, name
