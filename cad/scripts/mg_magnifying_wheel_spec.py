@@ -62,12 +62,26 @@ from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
 from mg_wheel_group import WHEEL_BORE_MAX
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  The face view carries the rim, bore, spoke, fillet and tie
-# dimensions; SECTION A-A carries the hub profile, the groove and the spoke
-# thickness.  The rim's axial width and the rim-bore round's R are added on
+# print shows.  The face view carries the bore, spoke, fillet and tie
+# dimensions; SECTION A-A carries the hub profile, the groove, the spoke
+# thickness and the rim's two diameters (DIAMETER_REFERENCE: turned sizes on
+# the side view, drawing-guidelines.md rule 11 (turned parts read like the
+# lathe)).  The rim's axial width and the rim-bore round's R are added on
 # the sheet (A-A cannot import a fillet radius whose arc is the cut). ---
+#
+# The rim's Ø are Front-plane circles, which no side view can import, so
+# they are restated as diametric dimensions on a hidden reference sketch in
+# A-A's cutting plane (SECTION_PLANE, coincident with the Right plane), each
+# driven from the same global as its circle.  Each one's witness is a short
+# construction line REFERENCE_WITNESS_LEN long on its surface, starting at
+# the rim's back face (the OD) or at the back rim-bore round's tangent (the
+# rim bore), so its extension lines leave the part there.
+SECTION_PLANE = "SectionAPlane"
+DIAMETER_REFERENCE = "DiameterReference"
+REFERENCE_SKETCHES = (DIAMETER_REFERENCE,)
+REFERENCE_WITNESS_LEN = 1.0
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "RimProfile": {"RimOuterDiaDim", "RimInnerDiaDim"},
+    DIAMETER_REFERENCE: {"RimOuterDiaDim", "RimInnerDiaDim"},
     "SpokeProfile": {"SpokeRootWidth", "SpokeTipWidth"},
     "Spoke": {"SpokeAxial"},
     "HubProfile": {"HubDia", "SpigotDia", "HubLength", "SpigotLength", "HubFrontZ"},
@@ -86,7 +100,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # the web moved the whole row (LEVER_WIRE_WEB_GAP below).  The spigot and the
 # bore are matched fits, their two places a reference nominal.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "RimProfile": {"RimOuterDiaDim": 2, "RimInnerDiaDim": 1},
+    DIAMETER_REFERENCE: {"RimOuterDiaDim": 2, "RimInnerDiaDim": 1},
     "SpokeProfile": {"SpokeRootWidth": 1, "SpokeTipWidth": 1},
     "Spoke": {"SpokeAxial": 1},
     "HubProfile": {

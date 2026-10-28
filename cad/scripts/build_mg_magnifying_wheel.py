@@ -21,13 +21,14 @@ from __future__ import annotations
 
 import math
 import sys
+from collections.abc import Callable
 
 from _appearance import PANEL_BLACK, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
-from _com import _read_member
+from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
-from _feature_tree import name_last_feature
+from _feature_tree import _feature_by_name, name_last_feature
 from _part_checks import measure_check, report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
@@ -36,6 +37,7 @@ from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
+    blank_reference_sketches,
     blank_sketch,
     dimension_between,
     ensure_fully_defined,
@@ -100,10 +102,14 @@ from mg_magnifying_wheel_geom import (
     spoke_half_width,
 )
 from mg_magnifying_wheel_spec import (
+    DIAMETER_REFERENCE,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
+    REFERENCE_SKETCHES,
+    REFERENCE_WITNESS_LEN,
+    SECTION_PLANE,
     SURFACE_FINISHES,
 )
 from mg_wheel_bar_geom import WHEEL_BAR_Y as _YOKE_WHEEL_Y
@@ -286,6 +292,183 @@ def _spoke_edge_picks(circle_r: float) -> list[list[float]]:
     return picks
 
 
+def _section_plane(adapter) -> None:
+    """Section A-A's cutting plane, named and hidden: coincident with the Right
+    plane (model X = 0, through the wheel axis), the plane A-A cuts.  A hidden
+    sketch on a bare standard plane imports nothing into a section, and an
+    offset plane cannot sit at zero offset, so it is InsertRefPlane's
+    Coincident constraint on the selected Right plane
+    (build_ch_rocker_arm_tl_oblique_carrier's section plane)."""
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        "Right Plane", "PLANE", 0, 0, 0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError(f"plane {SECTION_PLANE}: cannot select the Right plane")
+    feature_manager = _early_bound(model.FeatureManager, "IFeatureManager")
+    # swRefPlaneReferenceConstraint_Coincident = 4
+    if feature_manager.InsertRefPlane(4, 0.0, 0, 0.0, 0, 0.0) is None:
+        raise RuntimeError(f"plane {SECTION_PLANE}: InsertRefPlane failed")
+    model.ClearSelection2(True)
+    name_last_feature(adapter, SECTION_PLANE)
+    blank_reference_geometry(adapter, ((SECTION_PLANE, "PLANE"),))
+
+
+def _require_on_section_plane(adapter, sketch: str) -> None:
+    """create_sketch falls back to a standard plane when a named one fails to
+    select; the sketch's parents must name SECTION_PLANE."""
+    feature = _early_bound(_feature_by_name(adapter, sketch), "IFeature")
+    parents = [
+        str(_early_bound(parent, "IFeature").Name)
+        for parent in (feature.GetParents() or ())
+    ]
+    if SECTION_PLANE not in parents:
+        raise RuntimeError(f"{sketch} is not on {SECTION_PLANE}: parents {parents}")
+
+
+def _sketch_mapper(
+    adapter, *, u_axis: int, v_axis: int, label: str
+) -> Callable[[tuple[float, float, float]], tuple[float, float]]:
+    """Map model points (mm) into the ACTIVE sketch, requiring model axis
+    ``u_axis`` along the sketch's u and ``v_axis`` along its v (either sign)
+    (build_ch_rocker_arm_tl_oblique_carrier's mapper): a plane coincident with
+    the Right plane need not keep its sketch axes' senses."""
+    import pythoncom
+    from win32com.client import VARIANT
+
+    active = adapter.currentModel.GetActiveSketch2()
+    if active is None:
+        raise RuntimeError(f"{label}: no active sketch")
+    sketch = _early_bound(active, "ISketch")
+    math_util = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    xform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+
+    def raw(model_mm: tuple[float, float, float]) -> tuple[float, ...]:
+        point = math_util.CreatePoint(
+            VARIANT(
+                pythoncom.VT_ARRAY | pythoncom.VT_R8, [c / 1000.0 for c in model_mm]
+            )
+        )
+        mapped = _early_bound(
+            _early_bound(point, "IMathPoint").MultiplyTransform(xform), "IMathPoint"
+        )
+        return tuple(c * 1000.0 for c in mapped.ArrayData)
+
+    base = raw((0.0, 0.0, 0.0))
+    for axis, want in ((u_axis, 0), (v_axis, 1)):
+        unit = [0.0, 0.0, 0.0]
+        unit[axis] = 1.0
+        delta = [m - b for m, b in zip(raw(tuple(unit)), base, strict=True)]
+        if abs(abs(delta[want]) - 1.0) > 1e-6:
+            raise RuntimeError(
+                f"{label}: model axis {axis} maps to sketch {delta!r}, not along "
+                f"sketch {'uv'[want]}"
+            )
+
+    def to_sketch(model_mm: tuple[float, float, float]) -> tuple[float, float]:
+        u, v, w = raw(model_mm)
+        if abs(w) > 1e-4:
+            raise RuntimeError(f"{label}: {model_mm} is {w:g} mm off the sketch")
+        u, v = round(u, 9), round(v, 9)
+        return (0.0 if abs(u) < 1e-9 else u, 0.0 if abs(v) < 1e-9 else v)
+
+    return to_sketch
+
+
+# The reference sketch's axis is the bore's centreline in A-A: it runs the
+# hub's length and this far past each end face, clear of the Ø30's text.
+_CENTRELINE_OVERRUN = 2.0
+
+
+async def _diameter_reference(adapter) -> list[tuple[str, str]]:
+    """Section A-A's rim diameters (mg_magnifying_wheel_spec.DIAMETER_REFERENCE).
+
+    A hidden sketch on SECTION_PLANE: the wheel axis as a centreline, and on
+    each rim surface a construction witness REFERENCE_WITNESS_LEN long, the
+    OD's from the rim's back face, the rim bore's from the back rim-bore
+    round's tangent.  Each Ø is a diametric dimension from the axis to its
+    witness's start, driven from the global its Front-plane circle is driven
+    from, so the sketch restates the geometry and moves with it.  It adds no
+    volume.
+    """
+    feature = DIAMETER_REFERENCE
+    _section_plane(adapter)
+    check(f"create_sketch {feature}", await adapter.create_sketch(SECTION_PLANE))
+    to_sketch = _sketch_mapper(adapter, u_axis=2, v_axis=1, label=feature)
+    axis_start = to_sketch((0.0, 0.0, HUB_BACK_Z + _CENTRELINE_OVERRUN))
+    axis_end = to_sketch((0.0, 0.0, HUB_FRONT_Z - _CENTRELINE_OVERRUN))
+    back = RIM_AXIAL / 2.0
+    witnesses = (
+        # (dimension, global, radius, model z of the witness start)
+        ("RimOuterDiaDim", '"RimOuterDia"', _RIM_R, back),
+        ("RimInnerDiaDim", '"RimInnerDia"', _RIM_IN_R, back - CAST_ROUND_R),
+    )
+    set_sketch_direct_db(adapter, True)
+    axis = check(
+        f"{feature} axis", await adapter.add_centerline(*axis_start, *axis_end)
+    )
+    lines = []
+    for name, _drive, radius, z in witnesses:
+        start = to_sketch((0.0, radius, z))
+        end = to_sketch((0.0, radius, z - REFERENCE_WITNESS_LEN))
+        lines.append(
+            check(f"{feature} {name} witness", await adapter.add_line(*start, *end))
+        )
+    set_sketch_direct_db(adapter, False)
+    for line in lines:
+        segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(f"{feature} {line}: construction flag rejected")
+    for line in (axis, *lines):
+        check(
+            f"{feature} {line} horizontal",
+            await adapter.add_sketch_constraint(line, None, "horizontal"),
+        )
+    dims = SketchDims()
+    await anchor_point_to_origin(
+        adapter, f"{axis}.start", *axis_start, f"{feature} axis start"
+    )
+    dims.record(None)
+    check(
+        f"{feature} axis length",
+        await adapter.add_sketch_dimension(
+            axis, None, "linear", HUB_LEN + 2.0 * _CENTRELINE_OVERRUN
+        ),
+    )
+    dims.record(None)
+    for line, (name, _drive, _radius, z) in zip(lines, witnesses, strict=True):
+        await dimension_between(
+            adapter,
+            f"{line}.start",
+            "origin",
+            "horizontal_distance",
+            abs(z),
+            f"{feature} {name} witness station",
+        )
+        dims.record(None)
+        check(
+            f"{feature} {name} witness length",
+            await adapter.add_sketch_dimension(
+                line, None, "linear", REFERENCE_WITNESS_LEN
+            ),
+        )
+        dims.record(None)
+    for line, (name, drive, radius, _z) in zip(lines, witnesses, strict=True):
+        start = to_sketch((0.0, radius, back))
+        await add_diametric_linear_dimension(
+            adapter, axis, f"{line}.start", (start[0], start[1] + 4.0), name
+        )
+        dims.record(name, drive)
+    await ensure_fully_defined(adapter, feature)
+    check(f"exit_sketch {feature}", await adapter.exit_sketch())
+    name_last_feature(adapter, feature)
+    _require_on_section_plane(adapter, feature)
+    return dims.apply(adapter, feature)
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CircularPatternParameters,
@@ -333,7 +516,7 @@ async def build(adapter) -> dict[str, str]:
         _RIM_R,
         "rim OD",
         dims=rim_sd,
-        names=("RimOdCx", "RimOdCz", "RimOuterDiaDim"),
+        names=("RimOdCx", "RimOdCz", "RimOdCircleDia"),
         drives=(None, None, '"RimOuterDia"'),
     )
     await define_circle(
@@ -343,7 +526,7 @@ async def build(adapter) -> dict[str, str]:
         _RIM_IN_R,
         "rim ID",
         dims=rim_sd,
-        names=("RimIdCx", "RimIdCz", "RimInnerDiaDim"),
+        names=("RimIdCx", "RimIdCz", "RimIdCircleDia"),
         drives=(None, None, '"RimInnerDia"'),
     )
     await ensure_fully_defined(adapter, "rim sketch")
@@ -540,6 +723,9 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Bore")
     volume = await volume_check(adapter, "bore", volume - V_BORE, 0.02 * V_BORE)
+
+    # Section A-A's rim diameters, restated on a hidden sketch in its cut.
+    drive_jobs += await _diameter_reference(adapter)
 
     # Cast fillets where each spoke side meets the boss (R3) and the rim (R4),
     # picked mid-height on every junction edge; then the R0.80 rounds on the
@@ -875,6 +1061,9 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
+    # The diameter reference stays in the part for A-A to import, hidden so
+    # it prints in no assembly (_drawing_hidden_sketches shows it in A-A).
+    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     return await save_part_and_images(adapter, PART_NAME)
 
 
