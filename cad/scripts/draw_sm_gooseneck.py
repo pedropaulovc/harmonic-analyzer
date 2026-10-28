@@ -474,26 +474,48 @@ def _split_hatches(hatches: list[Any]) -> tuple[list[Any], list[Any]]:
     return end_piece, tube
 
 
+# swAreaHatchingScope_e: a face hatch's edit applies to its Body (3) or only
+# its Region (0); the section's default reached the end piece's hatch too
+# (farm run 20261028T135841794Z), so the tube's edit is scoped first.
+_HATCH_SCOPES = (("body", 3), ("region", 0))
+
+
 def _hatch_tube_apart(adapter: Any, section: Any) -> None:
     """Turn the tube's crosshatch a right angle from the end piece's and read
-    it back; the end piece's hatch is left as the section drew it."""
+    it back, scoped to the tube's body (else to each of its regions, the end
+    piece's own regions pinned at their angle); the end piece keeps its
+    angle."""
     end_piece, tube = _split_hatches(_section_face_hatches(adapter, section))
     base = float(end_piece[0].Angle)
-    for hatch in tube:
-        hatch.UseMaterialHatch = False
-        hatch.Angle = base + TUBE_HATCH_TURN
-    rebuild_drawing(adapter, label="section A-A tube hatch turned")
-    end_piece, tube = _split_hatches(_section_face_hatches(adapter, section))
-    turns = [abs(math.remainder(float(hatch.Angle) - base, math.pi)) for hatch in tube]
-    if any(not math.isclose(turn, TUBE_HATCH_TURN, abs_tol=1e-6) for turn in turns):
-        raise RuntimeError(f"section A-A tube hatch did not turn: {turns!r}")
-    if any(
-        not math.isclose(float(hatch.Angle), base, abs_tol=1e-6) for hatch in end_piece
-    ):
-        raise RuntimeError("section A-A end piece hatch moved with the tube's")
-    _telemetry.success(
-        f"section A-A: {len(tube)} tube hatch(es) turned 90 deg from "
-        f"{len(end_piece)} end-piece hatch(es)"
+    readings: list[str] = []
+    for scope_name, scope in _HATCH_SCOPES:
+        if scope == 0:
+            for hatch in end_piece:
+                hatch.HatchScope = scope
+                hatch.Angle = base
+        for hatch in tube:
+            hatch.HatchScope = scope
+            hatch.UseMaterialHatch = False
+            hatch.Angle = base + TUBE_HATCH_TURN
+        rebuild_drawing(adapter, label=f"section A-A tube hatch turned ({scope_name})")
+        end_piece, tube = _split_hatches(_section_face_hatches(adapter, section))
+        turns = [
+            abs(math.remainder(float(hatch.Angle) - base, math.pi)) for hatch in tube
+        ]
+        kept = [float(hatch.Angle) for hatch in end_piece]
+        readings.append(
+            f"{scope_name}: tube turns {turns!r}, end piece {kept!r} (base {base!r})"
+        )
+        if all(
+            math.isclose(turn, TUBE_HATCH_TURN, abs_tol=1e-6) for turn in turns
+        ) and all(math.isclose(angle, base, abs_tol=1e-6) for angle in kept):
+            _telemetry.success(
+                f"section A-A: {len(tube)} tube hatch(es) turned 90 deg from "
+                f"{len(end_piece)} end-piece hatch(es), {scope_name} scope"
+            )
+            return
+    raise RuntimeError(
+        "section A-A tube hatch did not turn apart: " + "; ".join(readings)
     )
 
 
