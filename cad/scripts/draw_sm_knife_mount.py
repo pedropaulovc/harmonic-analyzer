@@ -211,22 +211,23 @@ FRONT_KEEP = {
 }
 # The hole and slot floor depth stands right of the section, its witness
 # lines off the cut top seat and that floor; "2X FLAT BOTTOM" with it
-# states that the slot's floor, cut in the same pass, is the same, and its
-# second row limits that floor's corner (sm_knife_mount_spec.PIN_DEPTH_CALLOUT,
-# codjiflo round 5).  The dimension line stands at BLK_HALF_X + 12.0, x
+# states that the slot's floor, cut in the same pass, is the same; its
+# corner is the title block's (sm_knife_mount_spec.PIN_DEPTH_CALLOUT).  The
+# dimension line stands at BLK_HALF_X + 12.0, x
 # 349.4 mm (farm run 20261027T175429300Z), 14.9 mm right of the 7.632
 # BASIC's shoulder end (x 334.5 mm, farm run 20261027T133857303Z); its
-# witness lines run to x 350.4.  Left in line, the value and its two rows
+# witness lines run to x 350.4.  Left in line, the value and its rows
 # printed the value across the top seat's witness and the dimension line's
 # outer tail (y 152.9..156.4 mm, run 20261027T175429300Z:
 # extension-through-own-text, dim-line-through-own-text), so the text
 # parks on a jog right of the witness lines' ends, draw_fr_top_frame's
-# HANGER_PIN_DEPTH_OFFSET_XY form.  That same three-row callout (value,
+# HANGER_PIN_DEPTH_OFFSET_XY form.  That form's three-row callout (value,
 # "4X FLAT BOTTOM,", "CORNER R0.1 MAX") printed in run 20261027T175429300Z
 # with every row centred on the offset x, the value's baseline 2.78 mm over
 # the offset y and the rows' 5.56 mm under each other, 3.5 mm tall, the
 # widest 41.94 mm; the leader left the dimension line's midpoint for the
-# underline's left end, the underline under the last row.
+# underline's left end, the underline under the last row.  This block's
+# two rows keep that 42 mm slot centred on the same x.
 DEPTH_VALUE_RISE = 0.00278
 DEPTH_ROW_PITCH = 0.00556
 DEPTH_TEXT_HEIGHT = 0.0035

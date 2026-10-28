@@ -145,9 +145,10 @@ def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> N
     assert sm_knife_mount_spec.SLOT_X == -sm_knife_mount_spec.PIN_HOLE_X
     assert start[0] < sm_knife_mount_spec.SLOT_X < 0.0 < sm_knife_mount_spec.PIN_HOLE_X < end[0]
     # One cut, one floor: the depth states, under the value, that the floor
-    # is flat and holds for both seats (the hole and the slot), and limits
-    # the floor's corner (codjiflo round 5: the title block's R1.0 inside
-    # corner would shorten the straight wall the angular-fit proof takes).
+    # is flat and holds for both seats (the hole and the slot).  Nothing
+    # seats on it, so its corner is the title block's (machinist review, farm
+    # run 20261027T233328148Z: a local CORNER R0.1 MAX named no function).
+    import _config
     from _layout_audit import TEXT_ROW_LIMIT
     from _layout_geometry import ARROW_TEXT_CLEARANCE_M
 
@@ -155,10 +156,10 @@ def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> N
     depth_rows = callout.splitlines()
     assert "FLAT BOTTOM" in depth_rows[0]
     assert "2X" in depth_rows[0].split()
+    assert "CORNER" not in callout
     corner = sm_knife_mount_spec.DOWEL_HOLE_FLOOR_CORNER_R_MAX
-    assert corner == 0.1
-    assert callout.count(f"R{corner:.1f}") == 1
-    assert "CORNER" in callout and "MAX" in callout.split()
+    assert corner == float(_config.title_block("inside_corner")["radius_mm"])
+    assert 0.0 < sm_knife_mount_spec.DOWEL_HOLE_CORNER_RECESS < 0.001
     assert 1 + len(depth_rows) <= TEXT_ROW_LIMIT
     assert drawing.DEPTH_TEXT_ROWS == 1 + len(depth_rows)
     assert drawing.DIMENSION_CALLOUTS["PinHoleDepth"] is callout

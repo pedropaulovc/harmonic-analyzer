@@ -348,17 +348,19 @@ def test_the_slip_fit_takes_the_perpendicularity_tilt() -> None:
     # Owner ruling 2026-10-27 (#2016 option A): the crossbar reams ⊥Ø0.02 to
     # the faced underside and the block's hole and slot ⊥Ø0.015 to A.  Each
     # zone tilts its axis by atan(zone / length) over the hole's straight,
-    # full-size wall: the shortest printed depth less the floor's R0.1 MAX
-    # corner and the reamer's 0.5 bevel lead (10.6 ream, 8.1 hole; codjiflo
-    # round 6).  An assumed 0.01 seat conformity across the block's
-    # shortest 13.2 seat depth adds its tilt.  Together they stay inside the
-    # tilt the tightest slip takes over the longest proud pin (its floor lift
-    # included) short of its rounded free end, 8.113 - 0.406.
+    # full-size wall: the shortest printed depth less the floor's corner
+    # (the crossbar ream's CORNER R0.1 MAX; the block's title-block R1.0 MAX,
+    # machinist review, farm run 20261027T233328148Z) and the reamer's 0.5
+    # bevel lead (10.6 ream, 7.2 hole; codjiflo round 6).  An assumed 0.01
+    # seat conformity across the block's shortest 13.2 seat depth adds its
+    # tilt.  Together they stay inside the tilt the tightest slip takes over
+    # the longest proud pin (its floor lift included) short of its rounded
+    # free end, 8.113 - 0.406.
     assert top_frame.HANGER_PRESS_HOLE_PERPENDICULARITY_TOL == 0.02
     assert knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL == 0.015
     assert knife_mount.DOWEL_SLOT_PERPENDICULARITY_TOL == 0.015
-    assert dowel.PRESS_FLOOR_CORNER_R_MAX == knife_mount.DOWEL_HOLE_FLOOR_CORNER_R_MAX
     assert dowel.PRESS_FLOOR_CORNER_R_MAX == pytest.approx(0.1)
+    assert knife_mount.DOWEL_HOLE_FLOOR_CORNER_R_MAX == pytest.approx(1.0)
     assert asm.KNIFE_REAM_LEAD_ALLOWANCE == 0.5
     assert asm.KNIFE_SEAT_CONFORMITY == 0.01
     lead = asm.KNIFE_REAM_LEAD_ALLOWANCE
@@ -374,7 +376,7 @@ def test_the_slip_fit_takes_the_perpendicularity_tilt() -> None:
         - knife_mount.DOWEL_HOLE_FLOOR_CORNER_R_MAX
         - lead
     )
-    assert (ream_wall, hole_wall) == pytest.approx((10.6, 8.1))
+    assert (ream_wall, hole_wall) == pytest.approx((10.6, 7.2))
     seat_depth = knife_mount.SUPPORT_Z_THICK - knife_mount.BLOCK_SIZE_TOL
     assert seat_depth == pytest.approx(13.2)
     assert dowel.FREE_END_LEN == pytest.approx(dowel.ENDS.crown_r)
@@ -408,16 +410,16 @@ def test_the_slip_fit_takes_the_perpendicularity_tilt() -> None:
             ),
         )
     )
-    assert asm.KNIFE_DOWEL_TILT_CHARGED_DEG == pytest.approx(0.2576142, abs=5e-7)
-    assert asm.KNIFE_DOWEL_TILT_ALLOWED_DEG - asm.KNIFE_DOWEL_TILT_CHARGED_DEG > 0.09
+    assert asm.KNIFE_DOWEL_TILT_CHARGED_DEG == pytest.approx(0.2708770, abs=5e-7)
+    assert asm.KNIFE_DOWEL_TILT_ALLOWED_DEG - asm.KNIFE_DOWEL_TILT_CHARGED_DEG > 0.08
     # Negative controls: ⊥Ø0.04 on the ream, ⊥Ø0.03 on the block's hole, or
-    # a 0.04 seat conformity binds the tightest slip; the next step down
-    # (Ø0.03, Ø0.02, 0.03) still passes.
-    assert tilt(0.04, 0.015) == pytest.approx(0.3657185, abs=5e-7)
-    assert tilt(0.02, 0.03) == pytest.approx(0.3637166, abs=5e-7)
-    assert tilt(0.02, 0.015, 0.04) == pytest.approx(0.3878313, abs=5e-7)
-    assert min(tilt(0.04, 0.015), tilt(0.02, 0.03), tilt(0.02, 0.015, 0.04)) > allowed
-    assert max(tilt(0.03, 0.015), tilt(0.02, 0.02), tilt(0.02, 0.015, 0.03)) < allowed
+    # a 0.03 seat conformity binds the tightest slip; the next step down
+    # (Ø0.03, Ø0.02, 0.02) still passes.
+    assert tilt(0.04, 0.015) == pytest.approx(0.3789814, abs=5e-7)
+    assert tilt(0.02, 0.03) == pytest.approx(0.3902420, abs=5e-7)
+    assert tilt(0.02, 0.015, 0.03) == pytest.approx(0.3576886, abs=5e-7)
+    assert min(tilt(0.04, 0.015), tilt(0.02, 0.03), tilt(0.02, 0.015, 0.03)) > allowed
+    assert max(tilt(0.03, 0.015), tilt(0.02, 0.02), tilt(0.02, 0.015, 0.02)) < allowed
     # The old Ø3.24 +/-0.03 band's tightest slip (0.02738) takes only
     # 0.2036 deg: the full charge binds it.
     old_allowed = math.degrees(math.atan(0.02738 / entry))
@@ -428,8 +430,8 @@ def test_the_slip_fit_takes_the_perpendicularity_tilt() -> None:
     no_lead_no_seat = tilt(
         0.02, 0.015, 0.0, ream=ream_wall + lead, hole=hole_wall + lead
     )
-    assert no_lead == pytest.approx(0.2465758, abs=5e-7)
-    assert no_lead_no_seat == pytest.approx(0.2031699, abs=5e-7)
+    assert no_lead == pytest.approx(0.2582564, abs=5e-7)
+    assert no_lead_no_seat == pytest.approx(0.2148505, abs=5e-7)
     assert no_lead_no_seat < no_lead < asm.KNIFE_DOWEL_TILT_CHARGED_DEG
     # Counting the bearing length to the chamfer, not the rounded free end,
     # would overstate the slip's allowance.

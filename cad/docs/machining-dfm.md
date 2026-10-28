@@ -721,24 +721,25 @@ frame: datums B and C are its round hole and its slot.
 Owner ruling 2026-10-27 (#2016 option A) bounds the pin-to-hole tilt the
 slip fit must take: the crossbar reams carry **⊥Ø0.02** to the faced
 underside and the block's round hole and slot **⊥Ø0.015** to A. At the
-shortest printed depths less the floors' R0.1 MAX corners and less a 0.5
-lead allowance (10.6 ream wall, 8.1 hole wall), they tilt the pin against
-its hole by 0.1081° + 0.1061°. The lead allowance is conservatism beyond
-the print, not an undersize tail: each hole's size band applies over its
-full depth, so a conforming ream is full size to its floor corner, the pin
-bottoms and the proud length holds.
+shortest printed depths less the floors' corners (the ream's CORNER R0.1
+MAX; the block's title-block R1.0 MAX, since nothing seats on its floor)
+and less a 0.5 lead allowance (10.6 ream wall, 7.2 hole wall), they tilt
+the pin against its hole by 0.1081° + 0.1194°. The lead allowance is
+conservatism beyond the print, not an undersize tail: each hole's size band
+applies over its full depth, so a conforming ream is full size to its floor
+corner, the pin bottoms and the proud length holds.
 An assumed 0.01 conformity of the clamped seats across the block's
 shortest 13.2 seat depth adds 0.0434°; this is an assumption about
 ordinary face-milled seats drawn flat by the bolt, not a drawing control.
-The charge totals **0.2576°**, inside the **0.3522°** the tightest slip
+The charge totals **0.2709°**, inside the **0.3522°** the tightest slip
 takes over the longest proud pin (its 0.009 floor-fillet lift included)
-short of its rounded free end (8.113 − 0.406), a margin of 0.0946°. That
+short of its rounded free end (8.113 − 0.406), a margin of 0.0814°. That
 margin comes from the slip band: Ø3.25 ±0.02 (a stock metric reamer; the
 slot milled to the same band) keeps the 3.270 maximum, so the loosest slip
 and every stack it feeds are unchanged, and opens the tightest slip from
 0.027 to 0.047 (codjiflo round 6); the old Ø3.24 ±0.03 band took only
-0.2036°. ⊥Ø0.04 on the ream (0.3657°), ⊥Ø0.03 on the block (0.3637°) or a
-0.04 seat conformity (0.3878°) would bind.
+0.2036°. ⊥Ø0.04 on the ream (0.3790°), ⊥Ø0.03 on the block (0.3902°) or a
+0.03 seat conformity (0.3577°) would bind; the seats bind past 0.029.
 
 The earlier 2.020267 mm crown-web proof was undercharged: it used the
 nominal Ø3.797 pilot and an exact 118° point, omitting physical drill

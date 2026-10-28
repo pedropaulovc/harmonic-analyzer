@@ -634,12 +634,36 @@ _SLIP_MATE = (
 PIN_HOLE_CALLOUT = "\n".join(("BLIND FLAT-BOTTOM REAM", *_SLIP_MATE))
 SLOT_WIDTH_CALLOUT = "\n".join(("OPEN-END SLOT", f"SLIP FIT ON {DOWEL_NUMBER}"))
 # One depth for the hole and the slot (one cut to one floor), the
-# fr_top_frame HANGER_PIN_DEPTH_CALLOUT precedent.  The floor's corner
-# (codjiflo round 5 on owner ruling #2016): the title block's R1.0 inside
-# corner would leave the hole's and the slot's straight walls 1.0 short of
-# the 8.7 shallowest depth the angular-fit proof takes them at
-# (build_sm_summing_assembly), so the depth's row limits it.
-DOWEL_HOLE_FLOOR_CORNER_R_MAX = 0.1
-PIN_DEPTH_CALLOUT = f"2X FLAT BOTTOM,\nCORNER R{DOWEL_HOLE_FLOOR_CORNER_R_MAX:.1f} MAX"
+# fr_top_frame HANGER_PIN_DEPTH_CALLOUT precedent.  Nothing seats on the
+# floor (the longest proud pin stands SLIP_DEPTH_CLEARANCE_MIN off the
+# shallowest), so its corner takes the title block's INSIDE CORNERS R1.0
+# MAX and the row prints no limit of its own (machinist review, farm run
+# 20261027T233328148Z: a local CORNER R0.1 MAX named no function, rule 1).
+# The angular-fit proof (build_sm_summing_assembly) charges the hole's
+# straight wall short of that corner, 9.5 - 0.8 - 1.0 - 0.5 = 7.2.
+DOWEL_HOLE_FLOOR_CORNER_R_MAX = float(_config.title_block("inside_corner")["radius_mm"])
+PIN_DEPTH_CALLOUT = "2X FLAT BOTTOM"
+# The longest proud pin's crowned end reaches 0.007 below the shallowest
+# straight wall, into that corner: pushed against the wall there, the crown
+# meets the corner's arc DOWEL_HOLE_CORNER_RECESS (0.00004) in from the
+# wall, inside half the tightest slip, so the corner neither bottoms nor
+# binds the pin.
+_CROWN_CENTRE_DEPTH = DOWEL.PROUD_MAX - DOWEL.FREE_END_LEN
+_CORNER_CENTRE_DEPTH = (
+    DOWEL.SLIP_DEPTH - DOWEL.SLIP_DEPTH_TOL - DOWEL_HOLE_FLOOR_CORNER_R_MAX
+)
+DOWEL_HOLE_CORNER_RECESS = (
+    math.hypot(
+        DOWEL_HOLE_FLOOR_CORNER_R_MAX - DOWEL.FREE_END_LEN,
+        max(_CROWN_CENTRE_DEPTH - _CORNER_CENTRE_DEPTH, 0.0),
+    )
+    + DOWEL.FREE_END_LEN
+    - DOWEL_HOLE_FLOOR_CORNER_R_MAX
+)
+if DOWEL_HOLE_CORNER_RECESS >= DOWEL.SLIP_CLEARANCE_MIN / 2.0:
+    raise AssertionError(
+        f"the slip hole's floor corner reaches the proud pin's crown "
+        f"({DOWEL_HOLE_CORNER_RECESS:.4f} >= half the tightest slip)"
+    )
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

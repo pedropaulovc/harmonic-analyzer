@@ -309,10 +309,11 @@ KNIFE_FREE_ROCK_FLOOR_DEG = spec.KNIFE_FREE_ROCK_FLOOR_DEG
 # perpendicularity controls: the crossbar ream ⊥Ø0.02 to the faced underside
 # and the block's hole and slot ⊥Ø0.015 to A.  Each zone tilts its axis by
 # at most atan(zone / length) over the hole's straight wall: its shortest
-# printed depth less the floor's R0.1 MAX corner and less
-# KNIFE_REAM_LEAD_ALLOWANCE (ream 12.0 - 0.8 - 0.1 - 0.5, hole 9.5 - 0.8 -
-# 0.1 - 0.5).  The proud pin (PROUD_MAX, which carries the ream floor's
-# corner lift) bears in the hole over its full-diameter length short of its
+# printed depth less the floor's corner (the ream's CORNER R0.1 MAX, the
+# block's title-block R1.0 MAX) and less KNIFE_REAM_LEAD_ALLOWANCE (ream
+# 12.0 - 0.8 - 0.1 - 0.5, hole 9.5 - 0.8 - 1.0 - 0.5).  The proud pin
+# (PROUD_MAX, which carries the ream floor's corner lift) bears in the hole
+# over its full-diameter length short of its
 # rounded free end, and the tightest slip takes a relative tilt of at most
 # atan(SLIP_CLEARANCE_MIN / that length) before the pin binds.
 #

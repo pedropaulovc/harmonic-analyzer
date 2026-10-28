@@ -40,4 +40,4 @@ fr-top-frame:
       kind: "accept"
       where: "the faced underside's knife-mount seat patches carry no flatness control"
       finding: "seat flatness unspecified for the knife-mount dowel slip-tilt fit (rules 1, 5)"
-      reason: "owner preference 2026-10-27 (no FCF on face-milled seats): the knife-mount slip-tilt proof (build_sm_summing_assembly, #2016) charges an assumed 0.01 seat conformity over the 13.2 minimum seat, which a face-milled seat drawn flat by the bolt holds; the fit binds only past about 0.03"
+      reason: "owner preference 2026-10-27 (no FCF on face-milled seats): the knife-mount slip-tilt proof (build_sm_summing_assembly, #2016) charges an assumed 0.01 seat conformity over the 13.2 minimum seat, which a face-milled seat drawn flat by the bolt holds; the fit binds only past about 0.029"
