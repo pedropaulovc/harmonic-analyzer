@@ -1,9 +1,11 @@
 r"""Create the drawing for the oblique-trammel jig's carrier plate (MHA-CH-06-TL-21).
 
 The top view at 1:2 carries the outline, the reamed pin holes, the two
-centre-drill spots and every tap station. Position chains: X from the HUB
-spot's axis (the plate's centreline, 260.0 from the left end), A1 by 225.07
-from it and B1 from A1 by the spacing; Y from the A1-B1 pin line (the reamed
+centre-drill spots and every tap station. Position chains (rule 10, one
+datum per view): X from A1's axis, the left lower ream that carries the
+±0.02 pair: the left end 34.9 from it, the tap axis (lever taps and HUB)
+225.07, B1 by the spacing and every spot and tap by its own baseline
+(the part's hidden StationReference); Y from the A1-B1 pin line (the reamed
 pair's own axes), 45.00 above the -Y edge. Every location dimension stands
 outside the outline in its own lane: X stations above and below, Y stations
 left and right, so no extension line crosses a text.
@@ -107,32 +109,48 @@ def _xy(x: float, y: float) -> tuple[float, float, float]:
 # Dimension lanes, carrier mm (1:2: sheet x = 222 + X/2, y = 175 + Y/2). Y
 # stations stand left (-X half) and right (+X half), ~17-19 apart (8.5-9.5 on
 # the sheet: a multi-row text beside its lane and its clearance), the
-# 3-row riser and pin-chain texts on the outward side. X stations stand above
-# and below, each text in a gap of the other lanes' extension lines. Carrier
-# r11: the 45.53 HUB and 44.287 riser extension lines ran 0.62 apart on the
-# left and the 130.0 width's line ran through the B2DY text, so HUB moved to
-# the right lanes, the width innermost and B2DY beside it, and the riser
-# stations name the riser (RISER_STATION_CALLOUT). Carrier r13: the CL 29.35
-# text (centred on its lane, 12.9 wide) touched the outline at x 92, so its
-# lane stands at x 83 and A2DY's at 74.5, the text 2 clear of both.
+# 2-row riser and 3-row pin-chain texts on the outward side. X stations are
+# baselines from A1 (rule 10, one datum per view), below and above (the
+# A1-baseline note at TOP_KEEP). Carrier r11: the 45.53 HUB and 44.287 riser
+# extension lines ran 0.62 apart on the left and the 130.0 width's line ran
+# through the B2DY text, so HUB moved to the right lanes, the width innermost
+# and B2DY beside it, and the riser stations name the riser
+# (RISER_STATION_CALLOUT). Carrier r13: the CL 29.35 text (centred on its
+# lane, 12.9 wide) touched the outline at x 92, so its lane stands at x 83 and
+# A2DY's at 74.5, the text 2 clear of both.
 _LEFT = (-278.0, -295.0, -312.0, -329.0, -350.0)  # sheet x 83 .. 47
 _RIGHT = (279.0, 298.0, 317.0, 336.0, 355.0, 374.0)  # sheet x 361.5 .. 409
 _A1 = part_spec.PIN_HOLES["A1"]
 # Every text position is a MODEL point (mm), mapped onto its view at run time.
 # A horizontal dimension's last row stands on its lane, its rows stacking up
 # 5.56 sheet mm apart, so a keep Y below is the lane plus its rows.
+#
+# A1-baseline lanes (sheet x: A1 109.5, CL 141.6, R2 162.2, R1 202.0, the tap
+# axis 222, R1R 242.0, R2R 281.8, CR 302.5, B1 334.5). Every X dimension shares
+# A1's extension line; each text stands in a column no other extension line
+# crosses at its height. Below, the shorter the higher (the lever callout,
+# ~144..214 x 134.6..149.3, takes the band under the plate between CL and the
+# axis, so R2 and R1 go above): CL 145 and the tap axis 132 left of the lever
+# callout; R1R 117 under it, its text in the free column between CL and the
+# axis; R2R 108 and CR 102 each in the column just short of its own end,
+# clear over the 450.135's text (to y 96.1). Above, the longer the lower,
+# each text in the column just short of its own end, both lanes over A2DX's
+# text (to 236.6): R1 238.5, R2 250, 7.6 under the border. The left end's
+# 34.9 stands between the end and A1, under the REAM leader's reach.
 TOP_KEEP: dict[str, tuple[float, float, float]] = {
-    # Outline: the length outermost below, the HUB axis from the left end
-    # below the pin chain, the width innermost right, the pin line from the
-    # -Y edge outermost left.
+    # Outline: the length outermost below, the left end from A1 between the
+    # two, the width innermost right, the pin line from the -Y edge
+    # outermost left.
     "PlateLength": _xy(56.0, -194.4),  # lane y 75
-    "PlateHalfLength": _xy(-164.0, -149.4),  # lane y 97.5
     "PlateWidth": _xy(_RIGHT[0], -8.0),
     "PlateNearY": _xy(_LEFT[4], -24.0),
-    # The pin chain: A1 from the HUB axis, B1 from A1, A2/B2 from A1/B1.
-    "A1X": _xy(-112.0, -136.4),  # lane y 104
+    "EdgeX": _xy(-242.5, -120.4),  # lane y 112
+    # The pin chain: the tap axis and B1 from A1, A2/B2 from A1/B1.
+    "A1X": _xy(-191.0, -80.4),  # lane y 132
     "PinSpacing": _xy(172.0, -170.3),  # lane y 81.5
-    "A2DX": _xy(-193.0, 110.7),  # lane y 222
+    # Its text 4 sheet mm right of A1's extension line, which now rises past
+    # it to the R2 lane.
+    "A2DX": _xy(-187.0, 110.7),  # lane y 222
     # Review 88c6d (r1/r2/r3.clarity.1): centred on its 3.6 mm span, B2DX's
     # three rows were struck by both B1/B2 extension lines. Its rows stand
     # wholly outboard of them and of the 520.0's +X extension line (sheet x
@@ -153,26 +171,27 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
     # The diameter approach may cross genuine witness extensions (rule 14),
     # but never a dimension line, another text row or the shoulder's text.
     "PinHoleDia": _xy(-339.0, -106.3),
-    # The spots: each its own diameter callout; HUB by Y right, CL by X
-    # below and Y left.
+    # The spots: each its own diameter callout; HUB's right of its axis
+    # above, CL's in the plate's free band under the pin line (above the
+    # plate the A1 baselines cross CL's old leader), each by Y right/left.
     "SpotDia": _xy(50.0, 98.0),
-    "SpotDiaCl": _xy(-190.0, 142.0),
+    "SpotDiaCl": _xy(-102.0, -20.8),
     # Carrier r13: a single-row text within its span stands clear of both
     # arrows (3.56 long): at y 192 the 45.53's top arrow ran into it and at
     # 161.5 the 38.00's bottom arrow struck it. HUB's text is at y 189, 3.7
     # over CR's (181.5); the 38.00's at 163.5, 2.5 under the 22.00's (169.5).
     "HubY": _xy(_RIGHT[3], 28.0),
-    "ClX": _xy(-204.0, -87.4),  # lane y 128.5, its text left of CL
+    "ClX": _xy(-193.0, -54.4),  # lane y 145
     "ClY": _xy(_LEFT[0], 14.0),
-    # The taps: the riser stations above and below in the gaps of the pin
-    # chain's lines, their Y stations left; CR and the levers right.
-    "CrX": _xy(80.0, -54.4),  # lane y 145
+    # The taps: the riser stations above and below (A1-baseline note), their
+    # Y stations left; CR's X below, CR's Y and the levers right.
+    "CrX": _xy(141.0, -140.4),  # lane y 102
     "CrY": _xy(_RIGHT[2], 13.0),
-    "RiserX1": _xy(46.0, 129.0),  # lane y 231.2
-    "RiserX1R": _xy(-45.0, -111.3),  # lane y 111
+    "RiserX1": _xy(-80.0, 138.2),  # lane y 238.5
+    "RiserX1R": _xy(-104.0, -104.8),  # lane y 117
     "RiserY1": _xy(_LEFT[3], 65.8),
-    "RiserX2": _xy(-60.0, 160.7),  # lane y 247
-    "RiserX2R": _xy(165.0, -91.3),  # lane y 121
+    "RiserX2": _xy(-172.0, 161.2),  # lane y 250
+    "RiserX2R": _xy(80.0, -122.8),  # lane y 108
     "RiserY2": _xy(_LEFT[2], 102.4),
     "LeverY1": _xy(_RIGHT[4], -11.0),
     "LeverY2": _xy(_RIGHT[5], -23.0),
@@ -300,8 +319,16 @@ _BAND = (part_spec.POSITION_BAND, -part_spec.POSITION_BAND)
 _D1 = round(part_spec.D1, 3)
 _DX = round(abs(part_spec.A2_DX), 3)
 _DY = round(part_spec.A2_DY, 3)
-# A1 from the HUB axis (the X datum) at the title block's .XX band.
+# A1, the X datum, from the tap axis (the model origin's X) at the title
+# block's .XX band: the print's 225.07 runs from A1 to the lever taps and HUB.
 _A1X = round(abs(_A1[0]), 2)
+
+
+def _from_a1(x: float, places: int) -> float:
+    """A spot's or tap's printed X station: its baseline from A1's axis."""
+    return round(x - _A1[0], places)
+
+
 _CHAIN: dict[str, dict[str, tuple[Any, tuple[Any, ...]]]] = {
     "A1": {
         "station": (limits(_A1X, 2), ("PIN_HOLES",)),
@@ -374,7 +401,9 @@ for _prefix, (_x, _y) in part_spec.SPOTS.items():
             "dia": (limits(part_spec.SPOT_DIA, 2), ("SPOT_DIA",)),
             "dia_nominal": (part_spec.SPOT_DIA, ("SPOT_DIA",)),
             "angle_deg": (part_spec.SPOT_ANGLE, ("SPOT_ANGLE", "CALLOUT_SUFFIXES")),
-            "station": (limits(round(_x, 2), 2), ("SPOTS",)),
+            "station": (limits(_from_a1(_x, 2), 2), ("SPOTS", "PIN_HOLES")),
+            "station_nominal": (_from_a1(_x, 2), ("SPOTS", "PIN_HOLES")),
+            "parent": ("pin_hole_a1", ("PIN_HOLES",)),
             "height": (limits(round(_y, 2), 2), ("SPOTS",)),
         },
         precision={"dia": 2, "angle_deg": 0, "station": 2, "height": 2},
@@ -425,8 +454,12 @@ for _stem, _points, _thread, _drill, _spec_name, _places in _TAPS:
                 ),
                 "dia_nominal": (round(_drill, 2), (_spec_name,)),
                 "thru": (True, (_spec_name,)),
-                "station": (limits(round(_x, _places), _places), (_spec_name,)),
-                "station_nominal": (round(_x, _places), (_spec_name,)),
+                "station": (
+                    limits(_from_a1(_x, _places), _places),
+                    (_spec_name, "PIN_HOLES"),
+                ),
+                "station_nominal": (_from_a1(_x, _places), (_spec_name, "PIN_HOLES")),
+                "parent": ("pin_hole_a1", ("PIN_HOLES",)),
                 "height": (limits(round(_y, _places), _places), (_spec_name,)),
                 "height_nominal": (round(_y, _places), (_spec_name,)),
             },
@@ -963,8 +996,9 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     on_top = _view_mapper(adapter, top)
-    # The spot stations and Ø3 live on SpotReference, a sketch the part saves
-    # hidden: _drawing_hidden_sketches shows it in the view that imports it.
+    # The spot heights and Ø3 live on SpotReference and every X station from
+    # A1 on StationReference, sketches the part saves hidden:
+    # _drawing_hidden_sketches shows them in the view that imports them.
     annotations = hidden_sketches.curate_view_dimensions(
         adapter,
         top,

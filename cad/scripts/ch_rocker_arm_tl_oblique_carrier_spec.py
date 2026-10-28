@@ -58,10 +58,12 @@ pair sets R800 or R816 on the MHA-CH-13 strap); the sensitivities stay here:
 * Rail angle (not on this sheet): 0.1° of rail angle is about 4.7 mm of R
   (``trammel.RADIUS_PER_TENTH_DEG``); the rails are set by indicating.
 
-Position chains. X runs from the HUB spot's axis, which the 260.0 places from
-the left end (A1 by an ordinary 225.07, B1 from A1 by the spacing); Y runs from
-the A1-B1 pin line, the reamed pair's own axes, placed 45.00 from the -Y edge.
-A2/B2 chain from A1/B1, never from an edge.
+Position chains (rule 10: one datum per view). X runs from A1's axis, the
+left lower ream that carries the ±0.02 pair: the left end 34.9 from it, B1 by
+the spacing, and every spot and tap by a baseline of its own
+(``STATION_REFERENCE``), the tap axis (lever taps and HUB) by the 225.07. Y
+runs from the A1-B1 pin line, the reamed pair's own axes, placed 45.00 from
+the -Y edge. A2/B2 chain from A1/B1, never from an edge.
 
 Pin-hole chamfer (``PIN_CHAMFER``): retain the existing 0.3 MIN x 45°
 underside edge breaks on all four holes. Each active pair slides on the
@@ -206,7 +208,10 @@ SPOTS = {"Hub": HUB, "Cl": CL}
 # reference plane's offset cannot be imported into a drawing (farm jig-r1),
 # so the spot planes and cones are driven from this sketch instead.
 SPOT_REFERENCE = "SpotReference"
-REFERENCE_SKETCHES = (SECTION_REFERENCE, SPOT_REFERENCE)
+# The hidden sketch of points carrying every printed X station from A1
+# (``STATIONS``).
+STATION_REFERENCE = "StationReference"
+REFERENCE_SKETCHES = (SECTION_REFERENCE, SPOT_REFERENCE, STATION_REFERENCE)
 # The CL dowel is press-set from the actual riser once CL is finished in place:
 # a bought Ø6 m6 dowel in an N7 hole (ISO 286, 3-6 mm row).
 CL_DOWEL_DIA = 6.0
@@ -242,13 +247,41 @@ RISER_TAP_DRILL = TAP_DRILL_MM[RISER_THREAD]
 RISER_STATION_PLACES = trammel.RISER_TAP_STATION_PLACES
 RISER_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-riser")["number"]
 RISER_TAP_CALLOUT = f"HOLDS {RISER_NUMBER} SCREWS\nCLEAR OF ITS CUT EDGES"
-# Rule 4: each 3-place station names what it locates (carrier r11 review).
-RISER_STATION_CALLOUT = f"LOCATES\n{RISER_NUMBER}"
+# Rule 4: each 3-place station names what it locates (carrier r11 review), on
+# one row by the riser's tool number (the A1 baselines leave no room for the
+# full number's 39 mm; RISER_TAP_CALLOUT spells it out).
+RISER_TOOL_ID = "-".join(RISER_NUMBER.split("-")[-2:])
+RISER_STATION_CALLOUT = f"LOCATES {RISER_TOOL_ID}"
 RISER_STATIONS = ("RiserX1", "RiserX1R", "RiserY1", "RiserX2", "RiserX2R", "RiserY2")
 
 LEVER_THREAD = "5/16-18"
 LEVER_SPEC = HoleSpec("tapped", LEVER_THREAD)
 LEVER_TAP_DRILL = TAP_DRILL_MM[LEVER_THREAD]
+
+# --- X stations: baselines from A1 (rule 10, one datum per view) ---------------
+# A Hole Wizard placement sketch cannot carry a datum point, so the taps'
+# and SpotReference's placements stay origin-based, driven from
+# STATION_REFERENCE: one point on A1's axis and one on each station's feature
+# (the left end's on the -X/-Y corner), each printed dimension the baseline
+# from A1. The tap axis (lever taps and HUB, X = 0) is A1X itself.
+STATIONS = {
+    "EdgeX": (OUTLINE_X[0], OUTLINE_Y[0]),
+    "ClX": CL,
+    "RiserX1": RISER_SCREWS[0],
+    "RiserX1R": RISER_SCREWS[1],
+    "RiserX2": RISER_SCREWS[2],
+    "RiserX2R": RISER_SCREWS[3],
+    "CrX": CR,
+}
+# Rule 17 (riser walls): C, the cut's centre (trammel.ARC_CENTRE), stands D1/2
+# from A1, so each riser station's error about C adds half the spacing band to
+# the station band trammel.RISER_SCREW_WALLS assumes, radially x |x|/R.
+_RISER_X_MAX = max(abs(x) for x, _y in RISER_SCREWS)
+RISER_WALLS_FROM_A1 = min(trammel.RISER_SCREW_WALLS) - (
+    POSITION_BAND / 2.0 * _RISER_X_MAX / trammel.RISER_SCREW_RADIUS
+)
+if trammel.ARC_CENTRE[0] != 0.0 or RISER_WALLS_FROM_A1 < 2.0:
+    raise AssertionError("a riser countersink breaks rule 17's 2.0 wall from A1")
 
 # --- Rule 18: full thread at the worst case ------------------------------------
 # Every tap runs THRU the faced plate: its finished .X low limit, less the
@@ -302,7 +335,7 @@ SAG_CUTTING_LOAD = CUTTING_LOAD_N * D1**3 / (48.0 * E_6061 * _I)
 
 # --- Drawing --------------------------------------------------------------------
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "PlateProfile": {"PlateLength", "PlateWidth", "PlateHalfLength", "PlateNearY"},
+    "PlateProfile": {"PlateLength", "PlateWidth", "PlateNearY"},
     "PinHoleProfile": {
         "A1X",
         "PinSpacing",
@@ -313,16 +346,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "B2DY",
     },
     SECTION_REFERENCE: {"PinChamferSize", "StockThick"},
-    SPOT_REFERENCE: {"SpotDia", "SpotDiaCl", "HubY", "ClX", "ClY"},
-    "CrTap": {"CrX", "CrY"},
-    "RiserTaps": set(RISER_STATIONS),
+    SPOT_REFERENCE: {"SpotDia", "SpotDiaCl", "HubY", "ClY"},
+    STATION_REFERENCE: set(STATIONS),
+    "CrTap": {"CrY"},
+    "RiserTaps": {"RiserY1", "RiserY2"},
     "LeverTaps": {"LeverY1", "LeverY2"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateProfile": {
         "PlateLength": 1,
         "PlateWidth": 1,
-        "PlateHalfLength": 1,
         "PlateNearY": 2,
     },
     "PinHoleProfile": {
@@ -338,9 +371,16 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PinChamferSize": PIN_CHAMFER_PLACES,
         "StockThick": THICKNESS_PLACES,
     },
-    SPOT_REFERENCE: {"SpotDia": 2, "SpotDiaCl": 2, "HubY": 2, "ClX": 2, "ClY": 2},
-    "CrTap": {"CrX": 2, "CrY": 2},
-    "RiserTaps": {name: RISER_STATION_PLACES for name in RISER_STATIONS},
+    SPOT_REFERENCE: {"SpotDia": 2, "SpotDiaCl": 2, "HubY": 2, "ClY": 2},
+    # The left end at the outline's .X; the TL-24 stations at the walls' places.
+    STATION_REFERENCE: {
+        "EdgeX": 1,
+        "ClX": 2,
+        "CrX": 2,
+        **{name: RISER_STATION_PLACES for name in STATIONS if name.startswith("Riser")},
+    },
+    "CrTap": {"CrY": 2},
+    "RiserTaps": {"RiserY1": RISER_STATION_PLACES, "RiserY2": RISER_STATION_PLACES},
     "LeverTaps": {"LeverY1": 2, "LeverY2": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -372,7 +412,7 @@ CALLOUTS_BELOW = {
 _SPOT_SUFFIX = f" X {SPOT_ANGLE:.0f}\u00b0"
 CALLOUT_SUFFIXES = {"SpotDia": _SPOT_SUFFIX, "SpotDiaCl": _SPOT_SUFFIX}
 # Each riser row's +X screw shares its -X twin's height (the tap sketch's
-# shared coordinate) and has its own X station from HUB, so each printed
+# shared coordinate) and has its own X station from A1, so each printed
 # height covers both holes of its row (carrier-r1 review: the +X pair read as
 # unlocated in Y).
 CALLOUT_PREFIXES = {"RiserY1": "2X ", "RiserY2": "2X "}
