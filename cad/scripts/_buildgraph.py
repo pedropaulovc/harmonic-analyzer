@@ -2388,7 +2388,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         # Edge-break row takes both exposed edges off each wheel-bar wall.
         "mg_wheel_bar_spec",
         "sm_gooseneck_spring_joint",
-        "sm_gooseneck_spring_screw_spec",
         "sm_knife_mount_spec",
         # Angular row sets the lever-level acceptance the summing sheet prints,
         # held inside the knife edge's free-rock floor.

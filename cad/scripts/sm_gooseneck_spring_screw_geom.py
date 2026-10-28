@@ -2,92 +2,150 @@
 
 Native frame: axis Z, under-head face Z=0, head +Z, shank -Z. The
 thread is represented by its basic major cylinder, not a die blank with a
-made-up general diameter tolerance. The external UNC-2A callout defines it.
+made-up general diameter tolerance. The external UNF-2A callout defines it.
 No drawing, prose, builder or COM dependencies belong in this module.
+
+Owner rulings 2026-10-27 (#1951): rederived from the ch19 reference close-up
+(page001_img02): a plain slotted cheese head on the arm axis, the spring's
+double loop clamped on the screw's plain body between the head and the
+MHA-SM-01 end piece's flush face.  The body is the 1/4-28 UNF thread's own
+blank, turned to the 2A major band and left plain under the head for the
+loop; the die runs up to it and leaves its run-out inside the end piece's
+counterbore.  The Ø11.50 head stands under an owner minor exception to the
+1.0 head retention check (sm_gooseneck_spring_joint).  The 2026-09-21 rulings
+stand: the head clamps the loop to the end face (no torque value, no
+threadlocker).  ``sm_gooseneck_spring_screw_spec`` carries the strength case;
+``sm_gooseneck_spring_joint`` the body, engagement and wall budgets.
 """
 
 from __future__ import annotations
-
-import math
 
 from _printed_tolerance import printed_deviations
 
 MM_PER_IN = 25.4
 STOCK_DIA = 0.5 * MM_PER_IN
-THREAD = "#6-32 UNC"
-MAJOR_DIA = 0.138 * MM_PER_IN
-PITCH = MM_PER_IN / 32.0
-LENGTH = 16.00  # Under-head face to tip, including relief and chamfer.
+THREAD_SIZE = "1/4-28"
+THREAD = f"{THREAD_SIZE} UNF"
+THREADS_PER_IN = 28
+MAJOR_DIA = 0.25 * MM_PER_IN
+PITCH = MM_PER_IN / THREADS_PER_IN
+# Under-head face to tip, including the plain body, the thread and the tip
+# chamfer: the free-gap reach leaves 1.5D of mated full thread past the plug's
+# counterbore floor at the shortest screw (sm_gooseneck_spring_joint).
+LENGTH = 19.50
 LENGTH_LOWER, LENGTH_UPPER = printed_deviations(LENGTH, 2)
-HEAD_DIA = 12.50
-HEAD_DIA_LOWER, HEAD_DIA_UPPER = printed_deviations(HEAD_DIA, 2)
-HEAD_H = 7.00  # Overall head height, NOT the cylindrical side alone.
+# The cheese head: a flat-topped cylinder, as the reference close-up shows.
+# Its Ø prints as the LIMIT band 11.60/11.40, not the title block's .XX
+# +/-0.51: the relief chamfer below is measured from the OD, and at Ø12.01
+# the MHA-SM-VN-51 transition wire would meet the relief's outer end
+# (sm_gooseneck_spring_joint; owner ruling 2026-10-27, #1951).
+HEAD_DIA = 11.50
+HEAD_DIA_LOWER, HEAD_DIA_UPPER = -0.10, 0.10
+HEAD_DIA_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
+# The head's under-face OD edge is relieved by a 45-degree chamfer, printed
+# as the LIMIT band 1.50/1.40: the MHA-SM-VN-51 loop leaves its head-side end
+# for the coil through the vendor's transition wire, which crosses the head
+# face's plane just outside the head's OD.  Unrelieved, the Ø11.50 edge cuts
+# 0.21 into that wire (native verify:spring_seats probe, farm run
+# 20261027T193324627Z; the analytic replica in test_sm_gooseneck_spring_joint
+# agrees).  The joint holds the loop's clamp bearing on the flat inside it.
+HEAD_RELIEF_CHAMFER = 1.45
+HEAD_RELIEF_CHAMFER_LOWER, HEAD_RELIEF_CHAMFER_UPPER = -0.05, 0.05
+HEAD_RELIEF_CHAMFER_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
+HEAD_RELIEF_CHAMFER_MIN = round(HEAD_RELIEF_CHAMFER + HEAD_RELIEF_CHAMFER_LOWER, 6)
+HEAD_RELIEF_CHAMFER_MAX = round(HEAD_RELIEF_CHAMFER + HEAD_RELIEF_CHAMFER_UPPER, 6)
+# 6.60 tall, longer than the reference photo shows (head over the Ø12.70 arm
+# 0.52 against its 0.46): the relief chamfer rises from the under-head face
+# under the slot's ends, and the head left there must hold the rule-17 wall
+# (sm_gooseneck_spring_screw_spec SLOT_WEB_MIN; owner ruling 2026-10-27,
+# #1951, via coordinator Main).
+HEAD_H = 6.60
 HEAD_H_LOWER, HEAD_H_UPPER = printed_deviations(HEAD_H, 2)
-CROWN_RISE = 1.00  # Controlling sagitta; the cylindrical side is derived.
-CROWN_RISE_LOWER, CROWN_RISE_UPPER = printed_deviations(CROWN_RISE, 2)
-HEAD_CYL_H = HEAD_H - CROWN_RISE
-CROWN_RADIUS = ((HEAD_DIA / 2.0) ** 2 + CROWN_RISE**2) / (2.0 * CROWN_RISE)
-CROWN_CENTER_Z = HEAD_H - CROWN_RADIUS
 SLOT_WIDTH = 1.60
 SLOT_WIDTH_LOWER, SLOT_WIDTH_UPPER = printed_deviations(SLOT_WIDTH, 2)
-SLOT_DEPTH = 3.00  # From the uncut crown apex, not its cylindrical rim.
+SLOT_DEPTH = 2.00  # From the flat top face.
 SLOT_DEPTH_LOWER, SLOT_DEPTH_UPPER = printed_deviations(SLOT_DEPTH, 2)
-# The die relief under the head mates with nothing (machinist review
-# 2026-10-23).  It prints as the native LIMIT band 2.35/2.15 about the
-# unchanged model value 2.20.  The upper limit is derived, not picked: the
-# largest 0.05 step under the estimated deepest #6-32 die root
-# (THREAD_MINOR_2A_MIN_EST, 2.38), so the die still cuts full thread up to
-# the flank.  The neck carries the clamp torque and preload, so it keeps the
-# design's pre-existing floor, 2.15 (the former 2.20 +/-0.05), unchanged here;
-# its strength adequacy is tracked in #1951.
-RELIEF_DIA = 2.20
-RELIEF_DIA_MIN = 2.15
-RELIEF_DIA_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
-RELIEF_WIDTH = 2.20  # Under-head face to the full-thread flank.
-RELIEF_WIDTH_LOWER, RELIEF_WIDTH_UPPER = printed_deviations(RELIEF_WIDTH, 2)
-# The 45-degree lead from the under-head face down onto the relief floor
-# prints as the single limit "0.30 MAX" (any shorter lead down to a sharp
-# corner is accepted).  It is tighter than the title block because the
-# under-head face is the clamp seat: at the largest relief and lead the flat
-# still reaches inside the thread major, where the inner edge of the spring's
-# clamped upper loop can bear when the loop is shoved against the thread.
-RELIEF_LEAD = 0.30  # Axial and radial legs of the 45-degree lead.
-RELIEF_LEAD_TOL_TYPE = 6  # swTolType_e.swTolMAX
-# The thread-start chamfer rides the title block's one-place band.
-TIP_CHAMFER = 0.30
 
-# #6-32 UNC-2A pitch-diameter minimum, ASME B1.1 as tabled by Engineers Edge
-# (read 2026-10-10, https://www.engineersedge.com/screw_threads_chart.htm).
-THREAD_PD_2A_MIN_IN = 0.1141
+# 1/4-28 UNF-2A limits, ASME B1.1 as tabled by Engineers Edge (read
+# 2026-10-27, https://www.engineersedge.com/screw_threads_chart.htm): major
+# 0.2490/0.2425 in, pitch diameter 0.2258/0.2225 in.
+THREAD_MAJOR_2A_MAX_IN = 0.2490
+THREAD_MAJOR_2A_MIN_IN = 0.2425
+THREAD_PD_2A_MIN_IN = 0.2225
+THREAD_MAJOR_2A_MAX = THREAD_MAJOR_2A_MAX_IN * MM_PER_IN
+THREAD_MAJOR_2A_MIN = THREAD_MAJOR_2A_MIN_IN * MM_PER_IN
 # DERIVED ESTIMATE, not a standard minimum minor-diameter limit: the repo's
 # deepest die-root construction takes a full basic half-depth (0.649519 P)
-# below the minimum 2A pitch diameter. The table publishes a minor MAXIMUM,
-# not this minimum. The largest relief must clear the estimated deeper root.
-THREAD_MINOR_2A_MIN_EST = (THREAD_PD_2A_MIN_IN - 0.649519 / 32.0) * MM_PER_IN
-RELIEF_DIA_MAX = math.floor(THREAD_MINOR_2A_MIN_EST * 20.0) / 20.0
-RELIEF_DIA_LOWER = round(RELIEF_DIA_MIN - RELIEF_DIA, 6)
-RELIEF_DIA_UPPER = round(RELIEF_DIA_MAX - RELIEF_DIA, 6)
-RELIEF_LEAD_MAX = RELIEF_LEAD
-RELIEF_FLOOR_MIN = RELIEF_WIDTH + RELIEF_WIDTH_LOWER - RELIEF_LEAD_MAX
-SEAT_FLAT_INNER_DIA_MAX = RELIEF_DIA_MAX + 2.0 * RELIEF_LEAD_MAX
+# below the minimum 2A pitch diameter (pd_vn_transgear_pivot_screw_spec uses
+# the same construction for its #8-32): 5.062.
+THREAD_MINOR_2A_MIN_EST = (THREAD_PD_2A_MIN_IN - 0.649519 / THREADS_PER_IN) * MM_PER_IN
+
+# The plain body is the thread blank: modelled at the basic major with the
+# thread, printed as the LIMIT band 6.32/6.20 inside the 2A major band, so the
+# die cuts a 2A crest and the loop bears on one turned diameter.  The title
+# block's +/-0.51 would leave the blank outside the thread class.
+BODY_DIA = MAJOR_DIA
+BODY_DIA_LOWER, BODY_DIA_UPPER = -0.15, -0.03
+BODY_DIA_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
+BODY_DIA_MIN = round(BODY_DIA + BODY_DIA_LOWER, 6)
+BODY_DIA_MAX = round(BODY_DIA + BODY_DIA_UPPER, 6)
+# Under-head face to the die's first incomplete thread, printed as the single
+# limit "3.60 MIN": the loop's plug-side pass (sm_gooseneck_spring_joint.LOOP_PASS_X,
+# 3.14 at the free gap) always bears on the plain body.  Any longer plain body
+# only shortens the run-out window below, which the full-thread MAX bounds.
+PLAIN_LENGTH_MIN = 3.60
+PLAIN_LENGTH_MIN_TOL_TYPE = 5  # swTolType_e.swTolMIN
+# The die's chamfered start leaves 1.5 pitches of incomplete thread
+# (drawing-guidelines.md rule 18; the repo's tip allowance,
+# sm_gooseneck_spring_joint.SCREW_END_INCOMPLETE_MAX) behind the full thread.
+DIE_RUNOUT = 1.5 * PITCH
+# Under-head face to the first full thread, printed as the single limit
+# "5.71 MAX": the largest two-place limit whose run-out the end piece's
+# counterbore (sm_gooseneck_spring_joint.COUNTERBORE_DEPTH_MIN, 2.73) clears
+# by its margin at the least gap on the screw's axis.  Between the two limits
+# a die has 2.3 pitches for its chamfer.
+FULL_THREAD_STATION_MAX = 5.71
+FULL_THREAD_STATION_MAX_TOL_TYPE = 6  # swTolType_e.swTolMAX
+FULL_THREAD_DIE_ROOM_MIN = 2.0 * PITCH
+# The two limits bound each other, so each one's native band (upper, lower)
+# about its modelled limit runs to the other: the plain body at most reaches
+# the full thread (zero run-out), and the full thread starts no earlier than
+# the plain body's end.
+PLAIN_LENGTH_MIN_BAND = (round(FULL_THREAD_STATION_MAX - PLAIN_LENGTH_MIN, 6), 0.0)
+FULL_THREAD_STATION_MAX_BAND = (0.0, -PLAIN_LENGTH_MIN_BAND[0])
+# The under-head inside corner (head face to body) is turned R0.5 MAX, not the
+# title block's INSIDE CORNERS R1.0 MAX (codjiflo round 4 on #1997): a loop
+# wire touching both the face and the body clears a concave round only up to
+# R0.8 (sm_gooseneck_spring_joint owns the check).  swTolMAX prints the
+# nominal and "MAX", so the modelled radius IS the limit; the band runs from
+# sharp up to it.
+UNDERHEAD_CORNER_R = 0.50
+UNDERHEAD_CORNER_R_BAND = (0.0, -UNDERHEAD_CORNER_R)  # (upper, lower)
+UNDERHEAD_CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.5 MAX"
+# The thread-start chamfer, about one thread depth, rides the title block's
+# one-place band.
+TIP_CHAMFER = 0.50
 OVERALL_LENGTH = LENGTH + HEAD_H
 SLOT_FLOOR_Z = HEAD_H - SLOT_DEPTH
 
 
-def require_relief_clearance(
-    diameter_max: float = RELIEF_DIA_MAX,
-    floor_min: float = RELIEF_FLOOR_MIN,
-    lead_outer_dia_max: float = SEAT_FLAT_INNER_DIA_MAX,
+def require_body_form(
+    body_dia_max: float = BODY_DIA_MAX,
+    body_dia_min: float = BODY_DIA_MIN,
+    plain_length_min: float = PLAIN_LENGTH_MIN,
+    full_thread_station_max: float = FULL_THREAD_STATION_MAX,
 ) -> None:
-    """Refuse a relief that cannot clear the die or leaves no flat head seat."""
-    if diameter_max > THREAD_MINOR_2A_MIN_EST:
-        raise AssertionError("screw relief stands above the estimated deepest die root")
-    if floor_min < 1.5 * PITCH:
+    """Refuse a body outside the 2A major band, or no room for the die and thread."""
+    if not THREAD_MAJOR_2A_MIN <= body_dia_min <= body_dia_max <= THREAD_MAJOR_2A_MAX:
+        raise AssertionError("screw body leaves the 1/4-28 UNF-2A major band")
+    if full_thread_station_max - plain_length_min < FULL_THREAD_DIE_ROOM_MIN:
         raise AssertionError(
-            "screw relief needs at least 1.5 pitches of straight floor"
+            "screw full-thread limit leaves a die no room for its chamfer"
         )
-    if lead_outer_dia_max >= MAJOR_DIA:
-        raise AssertionError("screw relief lead consumes the flat under-head seat")
+    if full_thread_station_max + TIP_CHAMFER + 1.5 * PITCH >= LENGTH + LENGTH_LOWER:
+        raise AssertionError(
+            "screw leaves no full thread between the run-out and the tip"
+        )
 
 
-require_relief_clearance()
+require_body_form()

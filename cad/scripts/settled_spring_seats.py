@@ -14,6 +14,7 @@ import _config
 from spring_mount_geom import SpringPose
 import sm_gooseneck_geom
 import sm_gooseneck_spring_screw_geom as spring_screw
+import sm_gooseneck_spring_joint as spring_joint
 
 _UNIT_AXIS_ABS_TOL = 1e-12
 _CENTRE_ABS_TOL_MM = 1e-9
@@ -174,9 +175,13 @@ def channel_seat(amplitude_mm: float) -> SettledSpring:
 def counter_upper_support_geometry() -> dict[str, str | float]:
     """Identify the actual upper support measured by the native fixture.
 
-    Older integral-shank and purchased-screw certificates do not measure this
-    made support. Channel measurements are unchanged; the analytic force and
-    clearance model never depends on a native certificate.
+    Older integral-shank, purchased-screw and #6-32 die-relief certificates
+    do not measure this made support: owner ruling 2026-10-27 (#1951) seats
+    the loop on the plain Ø6.35 body of a
+    1/4-28 slotted cheese-head screw, clamped to the flush end piece of the
+    Ø12.70 tube arm, whose arm-end counterbore (codjiflo P1 on #1997) shapes
+    the face the loop is clamped to. Channel measurements are unchanged; the
+    analytic force and clearance model never depends on a native certificate.
     """
     return {
         "component": "sm-gooseneck-spring-screw",
@@ -185,19 +190,25 @@ def counter_upper_support_geometry() -> dict[str, str | float]:
         "pitch_mm": spring_screw.PITCH,
         "underhead_length_mm": spring_screw.LENGTH,
         "major_dia_mm": spring_screw.MAJOR_DIA,
+        "body_dia_mm": spring_screw.BODY_DIA,
+        "plain_length_min_mm": spring_screw.PLAIN_LENGTH_MIN,
+        "full_thread_station_max_mm": spring_screw.FULL_THREAD_STATION_MAX,
         "head_dia_mm": spring_screw.HEAD_DIA,
         "head_height_mm": spring_screw.HEAD_H,
-        "crown_rise_mm": spring_screw.CROWN_RISE,
+        "head_relief_chamfer_mm": spring_screw.HEAD_RELIEF_CHAMFER,
         "slot_width_mm": spring_screw.SLOT_WIDTH,
         "slot_depth_mm": spring_screw.SLOT_DEPTH,
-        "relief_dia_mm": spring_screw.RELIEF_DIA,
-        "relief_width_mm": spring_screw.RELIEF_WIDTH,
-        "relief_lead_mm": spring_screw.RELIEF_LEAD,
         "tip_chamfer_mm": spring_screw.TIP_CHAMFER,
+        "underhead_corner_r_mm": spring_screw.UNDERHEAD_CORNER_R,
         "clamp_gap_mm": sm_gooseneck_geom.SPRING_EYE_GAP,
         "arm_end_x_mm": sm_gooseneck_geom.ARM_END_X,
         "spring_eye_x_mm": sm_gooseneck_geom.SPRING_EYE_X,
+        "tube_dia_mm": sm_gooseneck_geom.TUBE_DIA,
+        "plug_head_length_mm": sm_gooseneck_geom.PLUG_HEAD_LENGTH,
         "plug_length_mm": sm_gooseneck_geom.PLUG_LENGTH,
+        "plug_counterbore_dia_mm": spring_joint.COUNTERBORE_DIA,
+        "plug_counterbore_depth_mm": spring_joint.COUNTERBORE_DEPTH,
+        "plug_edge_break_mm": spring_joint.EDGE_BREAK,
     }
 
 
@@ -207,11 +218,12 @@ def counter_seat() -> tuple[SettledSpring, float]:
     if record.get("upper_support") != counter_upper_support_geometry():
         raise ValueError(
             "Stale counter native calibration: upper support must be the "
-            "made MHA-SM-04 screw in its clamped gap. Rebuild "
-            "sm-gooseneck-spring-screw and sm-gooseneck, then run "
-            "diagnostics/calibrate_spring_seats.py --presets neutral square --write "
-            "on a licensed farm/native seat; older support measurements cannot "
-            "certify this joint."
+            "made MHA-SM-04 cheese-head screw (plain Ø6.35 body, 1/4-28 "
+            "thread) in its clamped gap. Rebuild sm-gooseneck-spring-screw and "
+            "sm-gooseneck, "
+            "then run diagnostics/calibrate_spring_seats.py --presets neutral "
+            "square --write on a licensed farm/native seat; older support "
+            "measurements cannot certify this joint."
         )
     return (
         _spring(record, expected_clocking="half_turn"),

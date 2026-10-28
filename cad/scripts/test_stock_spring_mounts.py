@@ -66,35 +66,57 @@ def test_uniform_plate_preserves_anchor_and_nut_installation_coordinates() -> No
 
 
 def test_counter_leading_half_turn_clears_tube_and_head() -> None:
-    """The extra half-turn must face the open side, not penetrate the tube."""
+    """The extra half-turn must face the open side, not penetrate the tube,
+    at the free gap and across the whole clamped-gap envelope."""
+    import sm_gooseneck_spring_joint as spring_joint
+
     pose = spring_mount_geom.COUNTER_REFERENCE_POSE
     screw_y = spring_mount_geom.GOOSENECK_ORIGIN_Y + sm_gooseneck_geom.ARM_Y
-    tube_gap, head_gap = spring_mount_geom.counter_half_turn_clearances(pose, screw_y)
-    assert tube_gap >= spring_mount_geom.MIN_CLEARANCE_MM
-    assert head_gap >= spring_mount_geom.MIN_CLEARANCE_MM
+    steps = 8
+    least = spring_joint.CLAMPED_AXIS_GAP_MIN
+    gaps = [sm_gooseneck_geom.SPRING_EYE_GAP] + [
+        least + (spring_joint.CLAMPED_GAP_MAX - least) * index / steps
+        for index in range(steps + 1)
+    ]
+    for clamp_gap in gaps:
+        tube_gap, head_gap = spring_mount_geom.counter_half_turn_clearances(
+            pose, screw_y, clamp_gap=clamp_gap
+        )
+        assert tube_gap >= spring_mount_geom.MIN_CLEARANCE_MM, clamp_gap
+        assert head_gap >= spring_mount_geom.MIN_CLEARANCE_MM, clamp_gap
 
 
-def test_counter_upper_eye_bears_on_full_thread_and_clears_the_tube() -> None:
-    """The MHA-SM-04 shank supports the plumb eye on its full-thread major."""
+def test_counter_upper_loop_bears_on_the_plain_body_and_clears_the_tube() -> None:
+    """The MHA-SM-04 shank supports the plumb loop on its plain Ø6.35 body."""
     import build_sm_summing_assembly as summing
+    import sm_gooseneck_spring_joint as spring_joint
     import sm_gooseneck_spring_screw_geom as spring_screw
+    from _counter_spring_hang import assert_counter_spring_top_hang
 
     pose = spring_mount_geom.COUNTER_REFERENCE_POSE
     assert pose.axis_xy[1] == pytest.approx(1.0, abs=1e-6)
+    # Coil mean radius 5.5499 less wire radius 0.8001 less body radius 3.175.
+    assert spring_screw.BODY_DIA == pytest.approx(6.35)
     assert spring_mount_geom.counter_upper_support_offset(
         pose.axis_xy
-    ) == pytest.approx(2.9972, abs=1e-4)
+    ) == pytest.approx(1.5748, abs=1e-4)
     assert sm_gooseneck_geom.SPRING_EYE_GAP == pytest.approx(4.88061)
     assert spring_mount_geom.COUNTER_UPPER_EYE_X == pytest.approx(
         spring_mount_geom.COLUMN_X - sm_gooseneck_geom.SPRING_EYE_X
     )
+    # The end piece's tap is blind: the longest screw at the least gap on its
+    # axis stops short of the shallowest full thread, and the shortest screw
+    # at the free gap still engages 1.5D of full thread.
     assert (
         spring_screw.LENGTH
-        > sm_gooseneck_geom.SPRING_EYE_GAP + sm_gooseneck_geom.PLUG_LENGTH
+        + spring_screw.LENGTH_UPPER
+        - spring_joint.CLAMPED_AXIS_GAP_MIN
+        < spring_joint.TAP_THREAD_DEPTH_MIN
     )
-    summing._assert_counter_spring_top_hang(pose, spring_mount_geom.GOOSENECK_ORIGIN_Y)
+    assert spring_joint.ENGAGEMENT_MIN >= 1.5 * spring_screw.MAJOR_DIA
+    assert_counter_spring_top_hang(pose, spring_mount_geom.GOOSENECK_ORIGIN_Y)
     # The screw frame's head (+Z) points outboard (machine +X), so its shank
-    # runs into the plug.
+    # runs into the end piece.
     assert summing.ROT_Y_POS90[2] == [1.0, 0.0, 0.0]
 
 

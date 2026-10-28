@@ -323,12 +323,12 @@ if not math.isclose(CAP_MOUTH_Y + CAP_TOTAL_HEIGHT, CAP_TOP_Y, abs_tol=1e-9):
 # axis along X at (y TOP_FRAME_MID_Y, z 3.088 -- the hub/post centreline).
 # Entered through the boss's spot face x -218.0 (21.0 from the bore axis):
 # local +Y -> -X (rot_z_rows(90), euler [0,0,90]) points the exact stock shank
-# inboard while retaining its cup tip at x -205.15, 0.15 clear (outboard) of
-# the Ø16 post surface at x -205. The under-head face is the tip less the
+# inboard while retaining its cup tip at x -205.15, 0.21 clear (outboard) of
+# the gooseneck's Ø15.875 sleeve surface at x -204.94. The under-head face is the tip less the
 # shank, x -224.20: the head stands 6.2 proud of the spot face, so the cup
 # point reaches the post before the head could bottom.
 GOOSENECK_HUB_Z = 3.088  # gooseneck bore centreline (unchanged position)
-SET_SCREW_TIP_X = -205.15  # 0.15 clear (outboard) of the Ø16 post surface -205
+SET_SCREW_TIP_X = -205.15  # 0.21 clear (outboard) of the Ø15.875 sleeve, -204.94
 SET_SCREW_UNDER_HEAD_X = SET_SCREW_TIP_X - GOOSENECK_SHANK_LEN
 if not SET_SCREW_UNDER_HEAD_X < TOP_SET_SPOT_FACE_X < SET_SCREW_TIP_X:
     raise AssertionError(
@@ -935,7 +935,7 @@ async def build(adapter) -> dict[str, str]:
             assert_component_placed(adapter, cross_screw, cross_target, s_rows)
 
     # Gooseneck set screw: 1/4-20 x 3/4 square head through the hub boss's tap
-    # hole along +X at the hub centreline; tip 0.15 clear of the Ø16 post
+    # hole along +X at the hub centreline; tip 0.21 clear of the Ø15.875 sleeve
     # (see SET_SCREW_* constants). Same fix-all treatment.
     set_target = [SET_SCREW_UNDER_HEAD_X, TOP_FRAME_MID_Y, GOOSENECK_HUB_Z]
     set_rows = rot_z_rows(90.0)

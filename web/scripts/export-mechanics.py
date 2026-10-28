@@ -143,6 +143,20 @@ def spring_deformation_contract(cad: Path, stock, counter) -> tuple[dict, dict]:
     return tuple(contracts)
 
 
+def counter_screw_diameter(goose, import_made_screw) -> float:
+    """The shank the counter eye hangs on, for every archived support layout.
+
+    Releases before MHA-SM-04 model it as the gooseneck's integral screw shank;
+    #6-32 trees seat the eye on the separate made screw's thread major;
+    cheese-head trees (owner ruling 2026-10-27 (#1951)) on its plain BODY_DIA.
+    ``import_made_screw`` loads that release's screw module.
+    """
+    if hasattr(goose, "SCREW_SHANK_DIA"):
+        return goose.SCREW_SHANK_DIA
+    made_screw = import_made_screw()
+    return getattr(made_screw, "BODY_DIA", made_screw.MAJOR_DIA)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -364,13 +378,9 @@ def export_snapshot(
     mount = modules["spring_mount_geom"]
     settled = modules["settled_spring_seats"]
     goose = modules["sm_gooseneck_geom"]
-    # Releases before MHA-SM-04 model the counter eye on the gooseneck's
-    # integral screw shank; later trees seat it on the separate made screw's
-    # #6-32 major diameter.
-    counter_screw_dia = (
-        goose.SCREW_SHANK_DIA
-        if hasattr(goose, "SCREW_SHANK_DIA")
-        else identity_map.import_module(cad, "sm_gooseneck_spring_screw_geom").MAJOR_DIA
+    counter_screw_dia = counter_screw_diameter(
+        goose,
+        lambda: identity_map.import_module(cad, "sm_gooseneck_spring_screw_geom"),
     )
     mag = modules["mg_magnifying_lever_geom"]
     lw = modules["mg_lever_wire_geom"]

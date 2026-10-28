@@ -275,8 +275,8 @@ _FRAME_ALLOWED_PAIRS = {
     ),
     # MHA-FR-VN-52 / 91410A540 1/4-20 (major 6.35, #7 drill 5.105): thread from
     # the hub's spot face, 21.0 from the bore axis (fr_top_frame_spec
-    # HUB_SET_SPOT_FROM_AXIS), to the cup tip 8.15 from the axis (0.15 clear of
-    # the O16 post): 12.5 to the O17 bore wall plus the tip's 0.35 into the bore.
+    # HUB_SET_SPOT_FROM_AXIS), to the cup tip 8.15 from the axis (0.21 clear of
+    # the gooseneck's O15.875 sleeve): 12.5 to the O17 bore wall plus the tip's 0.35 into the bore.
     frozenset(("fr-vn-gooseneck-set-screw-1", "fr-top-frame-1")): _smooth_annulus_limit_mm3(
         6.35, 5.105, 12.85
     ),
@@ -375,12 +375,14 @@ _KNIFE_DOWEL_PRESS_DEPTH = 12.0
 _KNIFE_DOWEL_PRESS_LIMIT = _smooth_annulus_limit_mm3(
     _KNIFE_DOWEL_DIA_MAX, _KNIFE_DOWEL_HOLE_MIN, _KNIFE_DOWEL_PRESS_DEPTH
 )
-# MHA-SM-04 #6-32 through the #36 tap drill of MHA-SM-01's brazed end plug,
-# over the whole plug length (sm_gooseneck_geom.PLUG_LENGTH): the extra tip
-# reach is in the hollow arm, not more engagement. A literal, test-pinned to
-# its owner like _KNIFE_HANGER_REACH, so a screw or gooseneck edit does not
-# re-key every assembly that imports this module.
-_GOOSENECK_PLUG_LENGTH = 8.0
+# MHA-SM-04 1/4-28 in the #3 drill of the blind 1/4-28 tap in MHA-SM-01's
+# solid end piece, from the arm-end counterbore floor to the screw's tip,
+# which the model seats at the free gap short of the tap's full thread
+# (round(min(sm_gooseneck_spring_joint.SCREW_REACH, TAP_THREAD_DEPTH) -
+# COUNTERBORE_DEPTH, 2)): the screw's major clears the Ø7.00 counterbore. A
+# literal, test-pinned to its owners like _KNIFE_HANGER_REACH, so a screw or
+# gooseneck edit does not re-key every assembly that imports this module.
+_GOOSENECK_THREAD_LENGTH = 11.84
 # Bearing seats are exact face contacts, NOT interference fits. Zero volume
 # permits a reported coincidence but no unmeasured kernel sliver allowance.
 _KNIFE_HANGER_SEAT_OVERLAP_LIMIT = 0.0
@@ -405,7 +407,7 @@ _SUMMING_ALLOWED_PAIRS = {
     # Spring/support contact has no allowance and remains independently gated.
     frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1")): (
         _smooth_annulus_limit_mm3(
-            THREAD_MAJOR_MM["#6-32"], TAP_DRILL_MM["#6-32"], _GOOSENECK_PLUG_LENGTH
+            THREAD_MAJOR_MM["1/4-28"], TAP_DRILL_MM["1/4-28"], _GOOSENECK_THREAD_LENGTH
         )
     ),
 }

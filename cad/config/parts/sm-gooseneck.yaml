@@ -1,8 +1,19 @@
 sm-gooseneck:
   number: MHA-SM-01
-  material: AISI 1010 seamless steel tube
-  material_specification: AISI 1010 seamless steel tube
-  finish: ASTM B456 SC2 Ni-Cr plate after braze; Ra 0.8 max; dims pre-plate
+  material: AISI 4130-N tubes; 1018 end piece
+  material_specification: "4130-N seamless steel tube, 1/2 in OD x 0.065 in wall (OnlineMetals 7322); sleeve 4130-N seamless 5/8 in OD x 0.058 in wall (OnlineMetals 7324); end piece AISI 1018 cold-drawn round, 5/8 in"
+  finish: ASTM B456 SC2 Ni-Cr plate after joining; mask and oil c'bore and tap; oil bore; dims pre-plate
   quantity: 1
   tolerance_class: machined_block
-  process: "machined (steel)"
+  process: "1/2 in tube; end piece silver-brazed (or LOCTITE 638) and cooled or cured before bending; leg sleeve silver-brazed; end piece tapped 1/4-28 UNF-2B blind"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "sheet 1, arm-end counterbore: C'BORE WALL 1.78 MIN"
+      finding: "counterbore-to-OD wall 1.78 mm minimum, below the 2.0 mm target but above the 1.5 mm floor (rule 17)"
+      reason: "owner ruling 2026-10-27 (#1951, via coordinator Main): the whole gooseneck is 1/2 in tube ending flush, with no step, in the solid Ø12.70 end piece, so the Ø7.00 counterbore that clears MHA-SM-04's die run-out leaves 1.78 at the worst printed limits (sm_gooseneck_spring_joint.COUNTERBORE_WALL_MIN, floored, never rounded up). No tighter band is allowed; the sheet states the wall."
+    - id: "RV-02"
+      kind: "accept"
+      where: "sheet 1, note 4: JOIN END PIECE, COOL OR FULLY CURE, THEN BEND"
+      finding: "process sequence stated in a note (rule 7, geometry not method)"
+      reason: "owner ruling 2026-10-27 (#1997, via coordinator Main, on codjiflo's shank-to-bend-tangent finding): the end piece is joined before the tube is bent, and the braze cools or the retaining compound fully cures first, so the solid shank, 1.16 short of the bend's exit tangent, supports the tube through the bend. The owner asked for this order and cool-down on the sheet, briefly, and nothing more."

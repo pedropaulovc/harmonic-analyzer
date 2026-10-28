@@ -38,6 +38,9 @@ summing assembly is needed to replace a stale seat::
     uv run cad/scripts/diagnostics/calibrate_spring_seats.py --presets neutral square --write
 
 Without ``--write`` the measurements only go to the JSON report.
+``--counter-only`` re-measures only the counter seats of every listed preset and
+keeps ``channel_seats``; and ``--write PATH`` writes the merged table to PATH
+instead of springs.yaml.
 """
 
 from __future__ import annotations
@@ -45,9 +48,12 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import sys
+import tempfile
 import traceback
 from dataclasses import asdict, replace
+from enum import Enum
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -61,8 +67,8 @@ import ch_vn_channel_spring_stock_geom as channel_stock  # noqa: E402
 import sm_gooseneck_geom  # noqa: E402
 import spring_mount_geom as spring_mounts  # noqa: E402
 import settled_spring_seats  # noqa: E402
+from _counter_spring_hang import assert_counter_spring_top_hang  # noqa: E402
 from _interference_contracts import allowed_interference_pairs  # noqa: E402
-from build_sm_summing_assembly import _assert_counter_spring_top_hang  # noqa: E402
 from _assembly import (  # noqa: E402
     assert_pose_ledger,
     check_no_interference,
@@ -84,13 +90,13 @@ from _session import run_build  # noqa: E402
 from _cwm import put_component_pose  # noqa: E402
 from _spring import build_spring  # noqa: E402
 from _stock_fastener import _blank_recipe_references  # noqa: E402
-from _transforms import (
+from _transforms import (  # noqa: E402
     ROT_Y_180,
     ROT_Y_POS90,
     compose_rows,
     euler_from_rows,
     rot_z_rows,
-)  # noqa: E402
+)
 from build_ch_channel_assembly import ARM_MID_DZ, FULCRUM, IDENTITY, z_station  # noqa: E402
 from _cone_axis_constants import SUMMING_Z  # noqa: E402
 from diagnostics._seat_search import ContactSolution, solve_component_contact  # noqa: E402
@@ -452,6 +458,15 @@ async def _calibrate_counter(
         upper_correction = _correction_mm(upper, allowance)
         _land(adapter, screw, upper_direction, upper_correction)
         _land(adapter, gooseneck, upper_direction, upper_correction)
+        # Landing put each boundary at -allowance, so the re-measure straddles
+        # that, as a channel refit's does.  Unhinted, ClosestDistance (which
+        # over-reports the Boolean's boundary by ~2.8e-5 mm) steers the first
+        # trial past it, and inside the modeller's ~1e-5 mm precision the
+        # native verdict need not be monotonic: the loop on the plain Ø6.35
+        # body read CLEAR 10-12e-6 mm inside its outer boundary in a 2e-6 mm
+        # sweep, identically before and after landing (farm run
+        # 20261027T205137862Z), and the unhinted bisection closed on that
+        # island, 1.08e-5 mm deep.
         lower_check = solve_component_contact(
             adapter,
             counter,
@@ -460,6 +475,7 @@ async def _calibrate_counter(
             bracket,
             label=f"{preset} counter lower verify",
             locate_only=True,
+            hint_offset_mm=-allowance,
         )
         upper_check = solve_component_contact(
             adapter,
@@ -469,6 +485,7 @@ async def _calibrate_counter(
             bracket,
             label=f"{preset} counter upper verify",
             locate_only=True,
+            hint_offset_mm=-allowance,
         )
         for label, contact in (("lower", lower_check), ("upper", upper_check)):
             if not _seated(f"{preset} counter {label}", contact, allowance):
@@ -476,7 +493,7 @@ async def _calibrate_counter(
                     f"{preset} counter {label}: landed pose is not seated ({contact!r})"
                 )
         # The fixture variant has the same made-screw receiver joint as production;
-        # allow only that exact thread/plug overlap, never spring/support masks.
+        # allow only that exact thread/end-piece overlap, never spring/support masks.
         screw_pair = frozenset((screw, gooseneck))
         production_pair = frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1"))
         check_no_interference(
@@ -496,7 +513,7 @@ async def _calibrate_counter(
         lower_eye_xy=(seed.lower_eye_xy[0] + dx, seed.lower_eye_xy[1] + dy),
         upper_eye_xy=(seed.upper_eye_xy[0] + dx, seed.upper_eye_xy[1] + dy),
     )
-    _assert_counter_spring_top_hang(pose, actual_gooseneck_y)
+    assert_counter_spring_top_hang(pose, actual_gooseneck_y)
     report["counter"].append(
         {
             "preset": preset,
@@ -527,33 +544,126 @@ async def _calibrate_counter(
 # ---------------------------------------------------------------- driver
 
 
-def _merge_yaml(
-    channel_rows: list[dict], counters: dict[str, dict], source: str
-) -> None:
-    import yaml
+class CalibrationMode(Enum):
+    """What one run re-measures."""
 
-    document = yaml.safe_load(SPRINGS_YAML.read_text(encoding="utf-8"))
-    springs = document["springs"]
-    springs["source"] = source
-    springs["channel_seats"] = channel_rows
-    for preset, counter in counters.items():
-        springs["presets"][preset]["counter"] = counter
-    text = yaml.safe_dump(document, sort_keys=False, allow_unicode=False, width=88)
-    header = "\n".join(
-        line
-        for line in SPRINGS_YAML.read_text(encoding="utf-8").splitlines()
-        if line.startswith("#")
+    ALL = "all"  # every channel seat, then the listed presets' counters
+    COUNTER = "counter"  # the listed presets' counters only; channel seats kept
+
+
+def _same_file(first: Path, second: Path) -> bool:
+    """True when the two paths name one file: the same resolved path, or (when
+    both exist) the same file by another name, e.g. a hard link."""
+    first, second = first.resolve(), second.resolve()
+    return first == second or (
+        first.exists() and second.exists() and os.path.samefile(first, second)
     )
-    SPRINGS_YAML.write_text(header + "\n" + text, encoding="utf-8", newline="\n")
 
 
-async def calibrate(
-    adapter, presets: list[str], output: Path, write: bool, source: str
-) -> dict[str, str]:
+def _refuse_unsafe_run(presets: list[str], output: Path, write: Path | None) -> None:
+    """Refuse, before any native work, a run whose write would leave a stale
+    seat or whose report would overwrite a seat table."""
     table = _config.machine("springs", "presets")
     unknown = [name for name in presets if name not in table]
     if unknown:
         raise ValueError(f"unknown presets {unknown}; have {sorted(table)}")
+    # The report is written last, even when calibration fails, so aimed at the
+    # source table it would replace springs.yaml with JSON whatever --write is.
+    if _same_file(output, SPRINGS_YAML):
+        raise ValueError(
+            f"--output {output.resolve()} is the source seat table "
+            f"{SPRINGS_YAML}; the report would overwrite it"
+        )
+    if write is None:
+        return
+    # A written table keeps the counter of any preset this run did not measure,
+    # and counter_seat() would reject that stale record at build. In ALL mode
+    # the same coverage also holds every channel amplitude _merge_yaml's
+    # replaced channel_seats must carry (channel_seat() matches exactly).
+    omitted = sorted(set(table) - set(presets))
+    if omitted:
+        raise ValueError(
+            "--write must re-measure every configured preset's counter, so none "
+            f"keeps a stale seat; missing {omitted}. Calibrate {sorted(table)} "
+            "together, or drop --write."
+        )
+    if _same_file(output, write):
+        raise ValueError(
+            f"--output {output.resolve()} is the --write table {write.resolve()}; "
+            "the report would overwrite it"
+        )
+
+
+def _replace_bytes(path: Path, data: bytes) -> None:
+    """Write ``data`` to ``path`` whole or not at all: into a temporary sibling,
+    then renamed over it, so a failed write leaves the previous file intact.
+
+    Binary, not _layout_audit.replace_text: its text-mode stream would turn
+    LF into CRLF on Windows, and the merged table must stay byte-for-byte what
+    springs.yaml holds."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle, temporary = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    try:
+        with os.fdopen(handle, "wb") as stream:
+            stream.write(data)
+        os.replace(temporary, path)
+    except BaseException:
+        Path(temporary).unlink(missing_ok=True)
+        raise
+
+
+def _merge_yaml(
+    channel_rows: list[dict] | None,
+    counters: dict[str, dict],
+    source: str,
+    path: Path,
+) -> None:
+    """Merge the measurements into springs.yaml's document and write it to ``path``.
+
+    ``channel_rows=None`` keeps the existing ``springs.channel_seats`` and their
+    ``source``: the refreshed counters then carry this run's attribution as
+    ``counter_source`` (absent when it equals ``source``), so a retained
+    channel table is never credited to a run that did not measure it.
+    """
+    import yaml
+
+    original = SPRINGS_YAML.read_text(encoding="utf-8")
+    document = yaml.safe_load(original)
+    springs = document["springs"]
+    if channel_rows is None:
+        counter_source = source if source != springs["source"] else None
+    else:
+        springs["source"] = source
+        springs["channel_seats"] = channel_rows
+        counter_source = None
+    attributed: dict = {}
+    for key, value in springs.items():
+        if key == "counter_source":
+            continue
+        attributed[key] = value
+        if key == "source" and counter_source is not None:
+            attributed["counter_source"] = counter_source
+    document["springs"] = springs = attributed
+    for preset, counter in counters.items():
+        springs["presets"][preset]["counter"] = counter
+    text = yaml.safe_dump(document, sort_keys=False, allow_unicode=False, width=88)
+    header = "\n".join(line for line in original.splitlines() if line.startswith("#"))
+    _replace_bytes(path, (header + "\n" + text).encode("utf-8"))
+
+
+async def calibrate(
+    adapter,
+    presets: list[str],
+    output: Path,
+    write: Path | None,
+    source: str,
+    *,
+    mode: CalibrationMode = CalibrationMode.ALL,
+) -> dict[str, str]:
+    _refuse_unsafe_run(presets, output, write)
+    table = _config.machine("springs", "presets")
     amplitudes = list(
         dict.fromkeys(
             float(a) for name in presets for a in table[name]["amplitudes_mm"]
@@ -563,55 +673,45 @@ async def calibrate(
         raise ValueError(
             f"preset amplitudes must be finite and nonnegative: {amplitudes}"
         )
-    if write:
-        # _merge_yaml REPLACES springs.channel_seats, and channel_seat() matches an
-        # amplitude exactly (no fit, no interpolation), so a write that calibrated
-        # only some presets would delete the rows the omitted ones need. Refuse it
-        # here, before the COM run, rather than leave a table that fails at build.
-        missing = [
-            (name, a)
-            for name in sorted(table)
-            for a in (float(x) for x in table[name]["amplitudes_mm"])
-            if a not in amplitudes
-        ]
-        if missing:
-            raise ValueError(
-                "--write rewrites every channel seat, so the calibrated presets must "
-                f"cover all configured amplitudes; missing {missing}. Calibrate "
-                f"{sorted(table)} together, or drop --write."
-            )
     report: dict = {
         "status": "started",
         "presets": presets,
+        "mode": mode.value,
         "channel": [],
         "counter": [],
     }
     channel_rows: list[dict] = []
     counters: dict[str, dict] = {}
     try:
-        for index, amplitude in enumerate(amplitudes):
-            channel_rows.append(
-                await _calibrate_channel(adapter, amplitude, index, report)
-            )
+        if mode is CalibrationMode.ALL:
+            for index, amplitude in enumerate(amplitudes):
+                channel_rows.append(
+                    await _calibrate_channel(adapter, amplitude, index, report)
+                )
+            report["channel_seats"] = channel_rows
         for name in presets:
             counters[name] = await _calibrate_counter(
                 adapter, name, [float(a) for a in table[name]["amplitudes_mm"]], report
             )
-        report["channel_seats"] = channel_rows
         report["counters"] = counters
         report["status"] = "completed"
-        if write:
-            _merge_yaml(channel_rows, counters, source)
-            report["written"] = str(SPRINGS_YAML)
+        if write is not None:
+            _merge_yaml(
+                channel_rows if mode is CalibrationMode.ALL else None,
+                counters,
+                source,
+                write,
+            )
+            report["written"] = str(write)
         return {"report": str(output)}
     except BaseException:
         report["status"] = "failed"
         report["error"] = traceback.format_exc()
         raise
     finally:
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(
-            json.dumps(report, indent=2, allow_nan=False) + "\n", encoding="utf-8"
+        _replace_bytes(
+            output,
+            (json.dumps(report, indent=2, allow_nan=False) + "\n").encode("utf-8"),
         )
 
 
@@ -627,8 +727,18 @@ def main() -> int:
     )
     parser.add_argument(
         "--write",
+        nargs="?",
+        type=Path,
+        const=SPRINGS_YAML,
+        default=None,
+        metavar="PATH",
+        help="merge the measurements into springs.yaml and write it to PATH "
+        "(default: springs.yaml itself)",
+    )
+    parser.add_argument(
+        "--counter-only",
         action="store_true",
-        help="rewrite springs.yaml with the measurements",
+        help="re-measure only the presets' counter seats; keep springs.channel_seats",
     )
     parser.add_argument(
         "--source",
@@ -636,10 +746,16 @@ def main() -> int:
         "full saved-assembly acceptance is required by the build gates.",
     )
     args = parser.parse_args()
+    output = args.output.resolve()
+    write = None if args.write is None else args.write.resolve()
+    mode = CalibrationMode.COUNTER if args.counter_only else CalibrationMode.ALL
+    # Refuse here too, before the COM seat and run_build's connect.
+    _refuse_unsafe_run(args.presets, output, write)
+
     with dodo._com_seat("calibrate-spring-seats"):
         return run_build(
             lambda adapter: calibrate(
-                adapter, args.presets, args.output.resolve(), args.write, args.source
+                adapter, args.presets, output, write, args.source, mode=mode
             )
         )
 

@@ -1,5 +1,7 @@
 """Offline contract for the native seat SEARCH behind spring recalibration, and
-for the driver's refusal to write a partial seat table.
+for the driver: its refusals before native work (a partial --write, a report
+onto the written table), its import against the stale counter record it
+replaces, and its counter-only mode.
 
 The search may use ``ClosestDistance`` only to choose where the next trial
 lands. A distance the modeller over-reports, under-reports, or returns as zero
@@ -9,6 +11,12 @@ the clear endpoint never inside the interfering region.
 
 from __future__ import annotations
 
+import json
+import os
+import subprocess
+import sys
+import textwrap
+from pathlib import Path
 
 import pytest
 
@@ -210,55 +218,230 @@ def test_wrong_hint_still_ends_in_a_native_bracket(fake, gain, hint) -> None:
     assert solution.clear_offset_mm - solution.interfering_offset_mm <= 1e-6
 
 
-def test_write_refuses_presets_that_do_not_cover_every_channel_amplitude(
-    tmp_path,
-) -> None:
-    """A partial --write would DELETE the omitted presets' channel-seat rows.
+class _PrecisionBand(_FakeContact):
+    """The counter upper loop on MHA-SM-04's plain Ø6.35 body (farm run
+    20261027T205137862Z): a 2e-6 mm sweep read the native verdict CLEAR again
+    10-12e-6 mm inside its outer boundary, inside the modeller's ~1e-5 mm
+    precision, and ClosestDistance over-reported by ~2.8e-5 mm."""
 
-    ``settled_spring_seats.channel_seat`` matches an amplitude exactly, so those
-    stations would fail at build time instead. The driver must refuse before it
-    takes the COM seat -- with no adapter to call, reaching a build is the bug.
-    """
+    contact = -6e-6
+    island = (-12e-6, -10e-6)
+    over_report = 2.8e-5
+
+    def evaluate(self, offset_mm: float):
+        self.trials += 1
+        self.offsets.append(offset_mm)
+        depth = offset_mm - self.contact
+        if depth >= 0.0:
+            return "clear", depth + self.over_report
+        if self.island[0] <= depth <= self.island[1]:
+            return "clear", self.over_report
+        return "interfering", None
+
+
+def test_landed_re_measure_hinted_at_its_allowance_closes_on_the_outer_boundary(
+    monkeypatch,
+) -> None:
+    """A pose landed boolean_stability_mm past the boundary re-measures with
+    the hint at -allowance (calibrate_spring_seats' counter verify); the
+    bracket must close on the OUTER boundary, not an island inside it."""
+    monkeypatch.setattr(search, "_ActualContact", _PrecisionBand)
+    allowance = float(_config.machine("springs", "boolean_stability_mm"))
+    solution = search.solve_component_contact(
+        object(),
+        "screw",
+        "counter",
+        (0.0, -1.0, 0.0),
+        0.125,
+        label="fake",
+        locate_only=True,
+        hint_offset_mm=-allowance,
+    )
+
+    assert solution.interfering_offset_mm < _PrecisionBand.contact
+    assert _PrecisionBand.contact <= solution.clear_offset_mm
+    assert solution.clear_offset_mm - solution.interfering_offset_mm <= 1e-6
+    assert abs(solution.clear_offset_mm + allowance) <= allowance / 2.0
+
+
+@pytest.mark.parametrize("mode", ["ALL", "COUNTER"])
+def test_write_refuses_presets_that_leave_any_counter_unmeasured(
+    tmp_path, mode
+) -> None:
+    """A partial --write keeps the omitted presets' counter records, which
+    counter_seat() rejects as stale at build; in ALL mode it would also DELETE
+    the channel-seat rows only they need (channel_seat() matches exactly). The
+    driver must refuse before native work -- with no adapter, reaching a build
+    is the bug -- and leave no report behind."""
     import asyncio
 
     from diagnostics import calibrate_spring_seats as driver
 
     table = _config.machine("springs", "presets")
-    partial = min(table, key=lambda name: len(set(table[name]["amplitudes_mm"])))
-    complete = max(table, key=lambda name: len(set(table[name]["amplitudes_mm"])))
-    assert set(table[complete]["amplitudes_mm"]) - set(
-        table[partial]["amplitudes_mm"]
-    ), "fixture needs one preset whose amplitudes are not a subset"
-
-    with pytest.raises(ValueError, match="cover all configured amplitudes"):
-        asyncio.run(
-            driver.calibrate(
-                None,
-                [partial],
-                tmp_path / "report.json",
-                write=True,
-                source="test",
+    assert len(table) > 1, "fixture needs more than one configured preset"
+    report = tmp_path / "report.json"
+    for partial in sorted(table):
+        with pytest.raises(ValueError, match="re-measure every configured preset"):
+            asyncio.run(
+                driver.calibrate(
+                    None,
+                    [partial],
+                    report,
+                    write=tmp_path / "springs.yaml",
+                    source="test",
+                    mode=driver.CalibrationMode[mode],
+                )
             )
+    assert not report.exists()
+
+
+def test_partial_write_is_refused_before_the_com_seat(tmp_path, monkeypatch) -> None:
+    from diagnostics import calibrate_spring_seats as driver
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("a refused run reached the COM seat")
+
+    monkeypatch.setattr(driver.dodo, "_com_seat", forbidden)
+    monkeypatch.setattr(driver, "run_build", forbidden)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "calibrate_spring_seats.py",
+            "--presets",
+            sorted(_config.machine("springs", "presets"))[-1],
+            "--counter-only",
+            "--write",
+            str(tmp_path / "springs.yaml"),
+        ],
+    )
+    with pytest.raises(ValueError, match="re-measure every configured preset"):
+        driver.main()
+
+
+def _aliased_report_and_table(tmp_path: Path, alias: str) -> tuple[Path, Path]:
+    table = tmp_path / "springs.yaml"
+    if alias == "same path":
+        return table, table
+    (tmp_path / "sub").mkdir()
+    if alias == "dot-dot spelling":
+        return tmp_path / "sub" / ".." / "springs.yaml", table
+    table.write_text("springs: {}\n", encoding="utf-8")
+    link = tmp_path / "sub" / "hardlink.yaml"
+    os.link(table, link)  # resolves elsewhere; only samefile sees the alias
+    assert link.resolve() != table.resolve()
+    return link, table
+
+
+@pytest.mark.parametrize("alias", ["same path", "dot-dot spelling", "hard link"])
+def test_output_onto_the_written_table_is_refused(tmp_path, monkeypatch, alias) -> None:
+    """The report is written last, even on failure: aimed at the --write PATH
+    (by any alias) it would replace the merged table with JSON. Both entry
+    points refuse before native work."""
+    import asyncio
+
+    from diagnostics import calibrate_spring_seats as driver
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("a refused run reached native work")
+
+    monkeypatch.setattr(driver.dodo, "_com_seat", forbidden)
+    monkeypatch.setattr(driver, "run_build", forbidden)
+    presets = sorted(_config.machine("springs", "presets"))
+    output, write = _aliased_report_and_table(tmp_path, alias)
+    with pytest.raises(ValueError, match="report would overwrite it"):
+        asyncio.run(driver.calibrate(None, presets, output, write=write, source="test"))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "calibrate_spring_seats.py",
+            "--presets",
+            *presets,
+            "--output",
+            str(output),
+            "--write",
+            str(write),
+        ],
+    )
+    with pytest.raises(ValueError, match="report would overwrite it"):
+        driver.main()
+
+
+def test_the_real_source_table_is_never_a_report_target() -> None:
+    from diagnostics import calibrate_spring_seats as driver
+
+    presets = sorted(_config.machine("springs", "presets"))
+    with pytest.raises(ValueError, match="source seat table"):
+        driver._refuse_unsafe_run(presets, driver.SPRINGS_YAML, None)
+
+
+@pytest.mark.parametrize("write", ["none", "elsewhere", "default"])
+@pytest.mark.parametrize("alias", ["same path", "dot-dot spelling", "hard link"])
+def test_output_onto_the_source_table_is_refused(
+    tmp_path, monkeypatch, write, alias
+) -> None:
+    """With no --write, or a --write elsewhere, the report would still replace
+    springs.yaml with JSON (written last, even on failure). Both entry points
+    refuse before native work and leave the table untouched."""
+    import asyncio
+
+    from diagnostics import calibrate_spring_seats as driver
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("a refused run reached native work")
+
+    monkeypatch.setattr(driver.dodo, "_com_seat", forbidden)
+    monkeypatch.setattr(driver, "run_build", forbidden)
+    output, springs = _aliased_report_and_table(tmp_path, alias)
+    springs.write_bytes(driver.SPRINGS_YAML.read_bytes())
+    table_bytes = springs.read_bytes()
+    monkeypatch.setattr(driver, "SPRINGS_YAML", springs)
+    presets = sorted(_config.machine("springs", "presets"))
+    target = {
+        "none": None,
+        "elsewhere": tmp_path / "out" / "x.yaml",
+        "default": springs,
+    }
+    with pytest.raises(ValueError, match="source seat table"):
+        asyncio.run(
+            driver.calibrate(None, presets, output, write=target[write], source="test")
         )
+    argv = ["calibrate_spring_seats.py", "--presets", *presets, "--output", str(output)]
+    if write == "elsewhere":
+        argv += ["--write", str(target[write])]
+    elif write == "default":
+        argv += ["--write"]
+    monkeypatch.setattr(sys, "argv", argv)
+    with pytest.raises(ValueError, match="source seat table"):
+        driver.main()
+    assert springs.read_bytes() == table_bytes
 
 
-def test_calibrating_every_preset_passes_the_coverage_guard(tmp_path) -> None:
+def test_calibrating_every_preset_passes_the_coverage_guard(
+    tmp_path, monkeypatch
+) -> None:
     """The complete set must NOT be refused; it is how the table is regenerated."""
     import asyncio
 
     from diagnostics import calibrate_spring_seats as driver
 
+    # COUNTER mode goes straight to the counter, whose doit-ledger freshness
+    # check is covered below; past it, the missing adapter is the proof.
+    monkeypatch.setattr(driver, "_require_current_support_parts", lambda: None)
     presets = sorted(_config.machine("springs", "presets"))
-    with pytest.raises(AttributeError):  # reached the build: no adapter to drive
-        asyncio.run(
-            driver.calibrate(
-                None,
-                presets,
-                tmp_path / "report.json",
-                write=True,
-                source="test",
+    for mode in driver.CalibrationMode:
+        with pytest.raises(AttributeError):  # reached the build: no adapter to drive
+            asyncio.run(
+                driver.calibrate(
+                    None,
+                    presets,
+                    tmp_path / "report.json",
+                    write=tmp_path / "springs.yaml",
+                    source="test",
+                    mode=mode,
+                )
             )
-        )
 
 
 def test_counter_support_certificate_refuses_stale_or_unproven_parts(
@@ -288,6 +471,244 @@ def test_counter_support_certificate_refuses_stale_or_unproven_parts(
     ledger.write_text("{}")
     driver._require_current_support_parts()
     assert seen[-1] == ["part:sm_gooseneck", "part:sm_gooseneck_spring_screw"]
+
+
+def test_driver_imports_against_the_stale_counter_record_it_replaces() -> None:
+    """The calibrator must load in the stale state it exists to fix, with no
+    bypass: none of its imports may read counter_seat(), so neither the summing
+    builder nor the summing spec (which reads it at import) may load. A fresh
+    interpreter keeps the injected stale table out of this process."""
+    scripts = Path(__file__).resolve().parent
+    probe = textwrap.dedent(
+        f"""
+        import copy
+        import sys
+
+        sys.path[:0] = [{str(scripts)!r}, {str(scripts.parents[1])!r}]
+        import _config
+
+        machine = _config.machine
+
+        def stale_machine(*keys):
+            value = machine(*keys)
+            if keys == ("springs", "presets"):
+                value = copy.deepcopy(value)
+                for preset in value.values():
+                    preset["counter"]["upper_support"] = {{"thread": "#6-32 UNC"}}
+            return value
+
+        _config.machine = stale_machine
+        import settled_spring_seats
+
+        try:
+            settled_spring_seats.counter_seat()
+        except ValueError as error:
+            assert "Stale counter native calibration" in str(error), error
+        else:
+            raise SystemExit("the injected counter record is not stale")
+        from diagnostics import calibrate_spring_seats
+
+        loaded = {{"build_sm_summing_assembly", "sm_summing_assembly_spec"}}
+        assert not loaded & set(sys.modules), loaded & set(sys.modules)
+        print("imported", calibrate_spring_seats.__name__)
+        """
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=scripts,
+        capture_output=True,
+        text=True,
+        timeout=240,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "imported diagnostics.calibrate_spring_seats" in result.stdout
+
+
+def test_counter_mode_measures_no_channel_seat_and_reports_it(
+    tmp_path, monkeypatch
+) -> None:
+    import asyncio
+
+    from diagnostics import calibrate_spring_seats as driver
+
+    async def no_channel(*_args):
+        raise AssertionError("counter mode calibrated a channel seat")
+
+    monkeypatch.setattr(driver, "_calibrate_channel", no_channel)
+    monkeypatch.setattr(driver, "_require_current_support_parts", lambda: None)
+    report = tmp_path / "report.json"
+    with pytest.raises(AttributeError):  # reached the counter build: no adapter
+        asyncio.run(
+            driver.calibrate(
+                None,
+                sorted(_config.machine("springs", "presets")),
+                report,
+                write=tmp_path / "springs.yaml",
+                source="test",
+                mode=driver.CalibrationMode.COUNTER,
+            )
+        )
+    recorded = json.loads(report.read_text(encoding="utf-8"))
+    assert recorded["mode"] == "counter"
+    assert recorded["status"] == "failed"
+    assert recorded["channel"] == []
+    assert "channel_seats" not in recorded
+
+
+def test_counter_only_merge_keeps_channel_seats_and_writes_the_given_path(
+    tmp_path, monkeypatch
+) -> None:
+    import yaml
+
+    from diagnostics import calibrate_spring_seats as driver
+
+    springs = tmp_path / "springs.yaml"
+    springs.write_bytes(driver.SPRINGS_YAML.read_bytes())
+    monkeypatch.setattr(driver, "SPRINGS_YAML", springs)
+    before = springs.read_text(encoding="utf-8")
+    original = yaml.safe_load(before)["springs"]
+    counters = {name: {"marker": name} for name in original["presets"]}
+    target = tmp_path / "out" / "springs.calibrated.yaml"
+
+    driver._merge_yaml(None, counters, "test source", target)
+
+    assert springs.read_text(encoding="utf-8") == before
+    after = target.read_text(encoding="utf-8")
+
+    def channel_block(text: str) -> str:
+        return text[text.index("\n  channel_seats:\n") : text.index("\n  presets:\n")]
+
+    assert channel_block(after) == channel_block(before)
+    merged = yaml.safe_load(after)["springs"]
+    assert merged["channel_seats"] == original["channel_seats"]
+    # The retained channel seats keep their own attribution; only the refreshed
+    # counters are credited to this run.
+    assert merged["source"] == original["source"] != "test source"
+    assert merged["counter_source"] == "test source"
+    assert list(merged).index("counter_source") == list(merged).index("source") + 1
+    for name, counter in counters.items():
+        assert merged["presets"][name]["counter"] == counter
+        assert (
+            merged["presets"][name]["amplitudes_mm"]
+            == original["presets"][name]["amplitudes_mm"]
+        )
+    header = [line for line in before.splitlines() if line.startswith("#")]
+    assert after.splitlines()[: len(header)] == header
+
+
+def test_unchanged_merge_reproduces_the_committed_table_byte_for_byte(
+    tmp_path, monkeypatch
+) -> None:
+    """Merging the table's own counters and source back must emit its exact LF
+    bytes, so a farm leaf's output can be copied into cad/config verbatim. (The
+    checkout may carry CRLF; git stores and _merge_yaml writes LF.)"""
+    import yaml
+
+    from diagnostics import calibrate_spring_seats as driver
+
+    springs = tmp_path / "springs.yaml"
+    springs.write_bytes(driver.SPRINGS_YAML.read_bytes())
+    monkeypatch.setattr(driver, "SPRINGS_YAML", springs)
+    text = springs.read_text(encoding="utf-8")
+    original = yaml.safe_load(text)["springs"]
+    counters = {name: preset["counter"] for name, preset in original["presets"].items()}
+    target = tmp_path / "out" / "springs.yaml"
+
+    driver._merge_yaml(None, counters, original["source"], target)
+
+    assert b"\r" not in target.read_bytes()
+    assert target.read_bytes() == text.encode("utf-8")
+
+
+def test_full_merge_credits_both_tables_to_the_run(tmp_path, monkeypatch) -> None:
+    import yaml
+
+    from diagnostics import calibrate_spring_seats as driver
+
+    springs = tmp_path / "springs.yaml"
+    document = yaml.safe_load(driver.SPRINGS_YAML.read_text(encoding="utf-8"))
+    document["springs"]["counter_source"] = "an earlier counter-only run"
+    springs.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+    monkeypatch.setattr(driver, "SPRINGS_YAML", springs)
+    original = document["springs"]
+    counters = {name: {"marker": name} for name in original["presets"]}
+    target = tmp_path / "out" / "springs.yaml"
+
+    driver._merge_yaml([{"row": 0}], counters, "run B", target)
+
+    merged = yaml.safe_load(target.read_text(encoding="utf-8"))["springs"]
+    assert merged["source"] == "run B"
+    assert "counter_source" not in merged
+    assert merged["channel_seats"] == [{"row": 0}]
+
+
+def _tear_writes(monkeypatch) -> None:
+    """Make the next binary write stop half way through with a disk error."""
+    real = os.fdopen
+
+    class _Torn:
+        def __init__(self, stream) -> None:
+            self.stream = stream
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_exc) -> bool:
+            self.stream.close()
+            return False
+
+        def write(self, data: bytes) -> int:
+            self.stream.write(data[: len(data) // 2])
+            self.stream.flush()
+            raise OSError("disk full")
+
+    monkeypatch.setattr(os, "fdopen", lambda handle, mode: _Torn(real(handle, mode)))
+
+
+def test_a_torn_table_write_leaves_the_previous_table_intact(
+    tmp_path, monkeypatch
+) -> None:
+    from diagnostics import calibrate_spring_seats as driver
+
+    springs = tmp_path / "springs.yaml"
+    springs.write_bytes(driver.SPRINGS_YAML.read_bytes())
+    monkeypatch.setattr(driver, "SPRINGS_YAML", springs)
+    target = tmp_path / "out" / "springs.calibrated.yaml"
+    target.parent.mkdir()
+    target.write_bytes(b"previous table\n")
+    _tear_writes(monkeypatch)
+
+    with pytest.raises(OSError, match="disk full"):
+        driver._merge_yaml(None, {}, "test source", target)
+
+    assert target.read_bytes() == b"previous table\n"
+    assert sorted(target.parent.iterdir()) == [target]
+
+
+def test_a_torn_report_write_leaves_the_previous_report_intact(
+    tmp_path, monkeypatch
+) -> None:
+    import asyncio
+
+    from diagnostics import calibrate_spring_seats as driver
+
+    report = tmp_path / "report.json"
+    report.write_bytes(b'{"status": "previous"}\n')
+    _tear_writes(monkeypatch)
+
+    with pytest.raises(OSError, match="disk full"):  # the failed run's report
+        asyncio.run(
+            driver.calibrate(
+                None,
+                sorted(_config.machine("springs", "presets")),
+                report,
+                write=None,
+                source="test",
+            )
+        )
+
+    assert report.read_bytes() == b'{"status": "previous"}\n'
+    assert sorted(tmp_path.iterdir()) == [report]
 
 
 class _ParallelFaceDistance(_FakeContact):

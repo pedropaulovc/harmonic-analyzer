@@ -64,12 +64,12 @@ BORE_DIA = COLUMN_SOCKET_DIAMETER
 WEB_T = 13.0  # user ruling: retain loose bands plus realistic deep-drill wander
 CAP_RECESS_FLOOR_Y = HALF_H + BOSS_ABOVE - CAP_RECESS_DEPTH  # 6.45
 GOOSENECK_X = -COLUMN_X  # east rail, -X crank side (summing's post station)
-GOOSENECK_BORE_DIA = 17.0  # O16 post slides through
+GOOSENECK_BORE_DIA = 17.0  # the gooseneck's O15.875 sleeve slides through
 
 # --- Gooseneck set-screw boss (east-rail hub) ---------------------------------
 #
 # User ruling 2026-10-12 (option (a), no jam nut): the MHA-FR-VN-52 square-head
-# cup-point set screw that pinches the O16 post enters the hub through a cast
+# cup-point set screw that pinches the gooseneck's O15.875 sleeve enters the hub through a cast
 # boss on the hub pad's outer face -- square-sided and blended into the rail
 # under the top flange, as the ch19 img04 hub shows it -- spot-faced square
 # to the tap. The spot face starts the thread square on a machined face (the
