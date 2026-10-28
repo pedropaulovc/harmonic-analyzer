@@ -92,7 +92,7 @@ SCREW_NUMBER = str(_config.parts("sm-gooseneck-spring-screw")["number"])
 COUNTERBORE_WALL_CALLOUT = f"C'BORE WALL {COUNTERBORE_WALL_CALLOUT_MIN:.2f} MIN"
 COUNTERBORE_AXIS_CALLOUT = f"ON TAP AXIS WITHIN {COUNTERBORE_AXIS_OFFSET_MAX:.2f}"
 # The floor corner's own native "R0.10 MAX" names the corner it limits.
-COUNTERBORE_FLOOR_CALLOUT = f"FLOOR CORNER,\nFOR {SCREW_NUMBER} RUN-OUT"
+COUNTERBORE_FLOOR_CALLOUT = f"FLOOR CORNER, CLEARS\n{SCREW_NUMBER} RUN-OUT"
 # No row wider than the axis row: each block stands between the sheet's left
 # border and the end face (farm run 20261028T062539287Z: "CLEARS MHA-SM-04
 # RUN-OUT" crossed the border).

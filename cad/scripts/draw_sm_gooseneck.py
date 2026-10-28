@@ -211,11 +211,14 @@ def _section_x(model_x: float) -> float:
 # near the end face and its text ends short of the shank's line (at
 # ARM_END_X + 10 the shank's line ran through it, farm run
 # 20261027T224212504Z).  The floor corner's
-# "R0.10 MAX" / "FLOOR CORNER" stands up-left of the end face, between the
+# "R0.10 MAX" block stands up-left of the end face, between the
 # counterbore Ø and the depth: its arc lies on the sketch's +v side, model -Z,
 # the section's top (ArmAxisPlane is offset from the Top plane), so its leader
 # runs down-right through the counterbore's mouth to the corner, above the
-# Ø's upper extension line.
+# Ø's upper extension line.  Its leader's shoulder underlines the whole
+# block, so the block ends short of the end face's extension lines (x 0.075;
+# a 21-character row reached 0.0754 and crossed them, farm run
+# 20261028T083207316Z).
 SECTION_KEEP = {
     "PlugHeadLength": (
         _section_x(ARM_END_X + PLUG_HEAD_LENGTH / 2.0),
@@ -227,7 +230,7 @@ SECTION_KEEP = {
     ),
     "CounterboreDepth": (_SX0 - 0.012, _SY0 + _SECTION_HALF + 0.032),
     "CounterboreDia": (_SX0 - 0.030, _SY0),
-    "CounterboreFloorCornerR": (_SX0 - 0.030, _SY0 + _SECTION_HALF + 0.010),
+    "CounterboreFloorCornerR": (_SX0 - 0.032, _SY0 + _SECTION_HALF + 0.013),
     "PlugDia": (_section_x(ARM_END_X + 4.0), _SY0 - _SECTION_HALF - 0.016),
     "PlugShankDia": (
         _section_x(TUBE_END_X + PLUG_SHANK_LENGTH / 2.0),
