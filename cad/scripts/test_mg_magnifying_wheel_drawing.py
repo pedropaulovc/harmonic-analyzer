@@ -219,7 +219,7 @@ def test_linked_notes_specify_the_spokes_and_ties() -> None:
     assert not any("\n" in text for text in drawing.CALLOUTS_ABOVE.values())
     assert drawing.CALLOUTS_ABOVE["SpigotLength"] == "MG-WHEEL-DRUM MHA-MG-10 NOT PROUD"
     assert drawing.DIMENSION_CALLOUTS["Tie2HoleDia"].endswith("\nRADIAL")
-    assert drawing.CALLOUTS_ABOVE["HubFrontZ"] == "WEB & RIM CENTER"
+    assert drawing.CALLOUTS_ABOVE["HubFrontZ"] == "GROOVE, WEB & RIM CENTER"
     assert drawing.DIMENSION_CALLOUTS["RimOuterDiaDim"].startswith("HOLDS PEN WIRE")
     # TIE 1 stands off the drum; the note says so without a number.
     assert "CLEAR OF MG-WHEEL-DRUM" in notes and "BAND" not in notes

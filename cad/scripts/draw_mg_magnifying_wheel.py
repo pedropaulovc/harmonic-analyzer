@@ -395,7 +395,7 @@ _RIM_WIDTH_ROW = _SPOKE_ROW + 0.010
 # through a text (run 7: four extension-through-own-text findings).
 # Nearest the part the spigot length ("9.00 +0.10/0"), whose band keeps the
 # drum from standing proud (DRUM_RECESS); then the web's centre plane
-# ("12.5"), which the rim and its groove share, its extension line rising
+# ("15.5"), which the rim and its groove share, its extension line rising
 # from the axis left of the spigot step's, so the row above stops short of
 # it; last the overall ("19.60 ±0.10"), which holds the axle's nut stack,
 # left of the back face above the A-A caption.  Each band's need, and the
@@ -419,7 +419,10 @@ _HUB_ROWS = tuple(
 # The spigot length's +0.1/0 band keeps the drum under the spigot face
 # (mg_magnifying_wheel_geom.DRUM_RECESS): its callout names the drum.
 SPIGOT_LENGTH_CALLOUT = f"MG-WHEEL-DRUM {DRUM_NUMBER} NOT PROUD"
-WEB_CENTER_CALLOUT = "WEB & RIM CENTER"
+# The groove's centre sits on that plane (build_mg_magnifying_wheel: "groove
+# centre on the mid-plane"), so the callout names it: the 15.5 locates the
+# groove, and TIE 2 drilled from its bottom, axially.
+WEB_CENTER_CALLOUT = "GROOVE, WEB & RIM CENTER"
 # The overall sets the axle's locknut stack (mg_wheel_group): the callout
 # names the stack and the axle by number, one line no wider than run 14's
 # "LOCKNUT ON FULL THREAD", so its dimension line stops short of TIE 1's
@@ -535,7 +538,7 @@ DIMENSION_CALLOUTS = {
     "Tie2HoleDia": "TIE 2\nRADIAL",
 }
 # The tie holes' operation stands over their Ø, keeping each block as narrow
-# as its stacked Ø; each axial band's need, the plane the 12.5 locates and
+# as its stacked Ø; each axial band's need, the plane the 15.5 locates and
 # the groove R's seat stand over their values.
 CALLOUTS_ABOVE = {
     "Tie1HoleDia": "DRILL THRU",
