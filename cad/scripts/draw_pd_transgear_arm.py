@@ -369,6 +369,8 @@ def projected_zone_count(key: str) -> int:
 _SW_LINE_CHAIN = 3  # swLineStyles_e.swLineCHAIN
 _SW_LW_THICK = 2  # swLineWeights_e.swLW_THICK: Y14.5's heavy chain line
 _SW_TEXT_PREFIX = 1  # swDimensionTextPrefix
+_SW_TEXT_SUFFIX = 2  # swDimensionTextSuffix
+_SW_DIMENSION_DRIVEN = 1  # swDimensionDrivenState_e.swDimensionDriven
 
 
 # The match-drill rides the locating holes' own callout, with the step that
@@ -748,14 +750,28 @@ def _add_projected_zone_chains(adapter: Any, view: Any, label: str) -> None:
                 raise RuntimeError(
                     f"{key} height measures {measured * 1000.0:g}, not {heights[key]:g} mm"
                 )
+            # The frame's Ⓟ height is the control; the chain line's
+            # dimension repeats it, so it prints as a reference (codjiflo on
+            # 40288f27f, rule 3): driven, bracketed as the plate's zone
+            # heights are (set_reference_dimension's form), the count first.
+            model_dimension = _early_bound(dimension.GetDimension2(0), "IDimension")
+            model_dimension.DrivenState = _SW_DIMENSION_DRIVEN
             dimension.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
-            if int(dimension.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
-                raise RuntimeError(f"{key} height precision did not persist")
             count = projected_zone_count(key)
-            prefix = f"{count}X " if count > 1 else ""
+            prefix = f"{count}X (" if count > 1 else "("
+            dimension.ShowParenthesis = False
             dimension.SetText(_SW_TEXT_PREFIX, prefix)
-            if str(dimension.GetText(_SW_TEXT_PREFIX) or "") != prefix:
-                raise RuntimeError(f"{key} height prefix did not persist")
+            dimension.SetText(_SW_TEXT_SUFFIX, ")")
+            applied = (
+                int(model_dimension.DrivenState),
+                int(dimension.GetPrimaryPrecision2()),
+                bool(dimension.ShowParenthesis),
+                str(dimension.GetText(_SW_TEXT_PREFIX) or ""),
+                str(dimension.GetText(_SW_TEXT_SUFFIX) or ""),
+            )
+            wanted = (_SW_DIMENSION_DRIVEN, DRAWING_REFERENCE_PRECISION, False, prefix, ")")
+            if applied != wanted:
+                raise RuntimeError(f"{key} reference height reads {applied}, not {wanted}")
             if chain.text_xy is not None:
                 # The value stands off its dimension line on a leader; the
                 # line and its arrows stay on the zone's ends (the stock
