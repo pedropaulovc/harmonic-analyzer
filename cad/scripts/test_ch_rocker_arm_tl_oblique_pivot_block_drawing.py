@@ -58,6 +58,19 @@ def test_no_bearing_web_wing_cap_or_side_features_survive():
     assert set(spec.CALLOUTS_BELOW)<=set(spec.DRAWING_PRECISION_BY_NAME)
 
 
+def test_outline_prints_at_two_places_for_the_counterbore_walls_it_sets():
+    places=spec.DRAWING_PRECISION_BY_NAME
+    assert places['BlockLength']==places['BlockWidth']==2
+    assert math.isclose(spec.CBORE_END_WALL_MIN,2.105)
+    assert math.isclose(spec.CBORE_SIDE_WALL_MIN,1.595)
+    # At .X either outline wall falls short: the end under 2.0, the side under 1.5.
+    loosen=printed_band_mm(1)-printed_band_mm(2)
+    assert spec.CBORE_END_WALL_MIN-loosen<2.0
+    assert spec.CBORE_SIDE_WALL_MIN-loosen<1.5
+    assert spec.CALLOUTS_BELOW['BlockLength']=='SETS COUNTERBORE\nEND WALL'
+    assert spec.CALLOUTS_BELOW['BlockWidth']=='SETS COUNTERBORE\nSIDE WALL 1.59 MIN'
+
+
 def test_native_builder_owns_real_solids_dimensions_and_final_volume():
     source=Path(__file__).with_name('_oblique_pivot_block_model.py').read_text()
     tree=ast.parse(source)
