@@ -468,6 +468,48 @@ def _sketch_end_piece_joint(adapter: Any, section: Any) -> None:
     rebuild_drawing(adapter, label="section A-A joint lines")
 
 
+_SECTION_THREAD_LAYER = "SECTION-COSMETIC-THREADS-HIDDEN"
+
+
+def _hide_section_cosmetic_threads(adapter: Any, section: Any) -> None:
+    """Put section A-A's cosmetic threads on a hidden, non-printing layer.
+
+    Drawn in the cut, the tap's major-diameter lines printed dashed, and a
+    section never carries hidden lines (drawing-guidelines.md rule 9; machinist
+    review of 1d60c6832).  The tap stays fully defined by its native callout
+    on the end view (rule 9: a standard hole needs neither hidden lines nor a
+    section), and the section still shows the drilled bore solid.  As
+    draw_dt_cone_swing_platform._hide_profile_cosmetic_threads."""
+    draw = adapter.currentModel
+    manager = _early_bound(draw.GetLayerManager(), "ILayerMgr")
+    if manager.GetLayer(_SECTION_THREAD_LAYER) is None and (
+        int(
+            manager.AddLayer(
+                _SECTION_THREAD_LAYER, "section A-A cosmetic threads", 0, 0, 0
+            )
+        )
+        != 1
+    ):
+        raise RuntimeError("failed to add the hidden section-thread layer")
+    layer = _early_bound(manager.GetLayer(_SECTION_THREAD_LAYER), "ILayer")
+    layer.Visible = False
+    layer.Printable = False
+    if bool(layer.Visible) or bool(layer.Printable):
+        raise RuntimeError("section-thread layer did not stay hidden")
+    hidden = 0
+    for raw in _early_bound(section, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw, "IAnnotation")
+        if int(annotation.GetType()) != 1:  # swCosmeticThread
+            continue
+        annotation.Layer = _SECTION_THREAD_LAYER
+        if str(annotation.Layer or "") != _SECTION_THREAD_LAYER:
+            raise RuntimeError("section A-A cosmetic thread refused the hidden layer")
+        hidden += 1
+    if not hidden:
+        raise RuntimeError("section A-A has no cosmetic thread to hide")
+    rebuild_drawing(adapter, label="section A-A cosmetic threads hidden")
+
+
 def _end_piece_section(adapter: Any, front: Any) -> Any:
     """Section A-A along the arm axis, cropped to the end piece."""
     line = model_points_in_view(
@@ -628,6 +670,7 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*front_annotations, *section_annotations]
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _assert_part_callouts(adapter, annotations)
+    _hide_section_cosmetic_threads(adapter, section)
 
     # The end piece's blind tap, natively called out on the end face: the
     # title block's THREADS row owns the 2B class (drawing-guidelines.md
