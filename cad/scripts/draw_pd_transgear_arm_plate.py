@@ -326,13 +326,10 @@ def _set_arrow_sides(adapter: Any, annotations: list[Any], sides: dict[str, int]
 
 
 def _locator_callout() -> str:
-    """The locating holes' callout, citing the MHA-PD-00 match-drill steps."""
-    located = assembly_steps.step_number("arm-plate-located")
-    fitted = assembly_steps.step_number("arm-plate-fitted")
-    if fitted != located + 1:
-        raise AssertionError("the match-drill pointer cites two consecutive steps")
+    """The locating holes' callout, naming MHA-PD-00 VIEW K's setting."""
     return LOCATOR_CALLOUT.format(
-        assembly=assembly_steps.DRAWING_NUMBER, located=located, fitted=fitted
+        assembly=assembly_steps.DRAWING_NUMBER,
+        view=assembly_steps.KNOB_SETTING_VIEW_NAME,
     )
 
 

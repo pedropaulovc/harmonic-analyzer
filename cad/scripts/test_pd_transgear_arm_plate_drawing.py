@@ -626,8 +626,9 @@ def test_each_stacked_callout_fits_its_rows_and_witness_lines() -> None:
 
 
 def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
-    """The tight bands name their mates; the locating holes cite the
-    MHA-PD-00 steps that set and accept the matched pair (no sheet notes)."""
+    """The tight bands name their mates; the locating holes point at the
+    MHA-PD-00 view whose native S-K dimension sets the matched pair (no
+    sheet notes, no centre distance on this sheet)."""
     import pd_paper_drive_assembly_steps as steps
 
     numbers = {
@@ -649,17 +650,17 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
     bore = flat(spec.BORE_CALLOUT)
     assert "REAM" in bore and "RUNNING FIT" in bore
     assert numbers["KNOB_SHAFT_NUMBER"] in bore
-    located = steps.step_number("arm-plate-located")
     locator = flat(drawing._locator_callout())
     assert locator.startswith("2X REAM THRU") and "SLIP FIT" in locator
     for required in (
         numbers["DOWEL_NUMBER"],
         numbers["ARM_NUMBER"],
-        steps.DRAWING_NUMBER,
-        f"{located}-{located + 1}",
+        steps.knob_setting_ref(),
         "0.05 MAX",
     ):
         assert required in locator, required
+    # The S-K setting's value is VIEW K's native dimension, not callout text.
+    assert f"{disc.CENTRE_DISTANCE:.3f}" not in locator
     assert drawing.DIMENSION_CALLOUTS["LocatorDia1"] == drawing._locator_callout()
     assert numbers["KNOB_SHAFT_NUMBER"] in spec.HUB_STATION_CALLOUT
     assert numbers["KNOB_CUP_NUMBER"] in spec.HUB_TO_BOSS_CALLOUT

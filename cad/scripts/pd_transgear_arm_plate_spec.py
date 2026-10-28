@@ -167,14 +167,15 @@ DOWEL_NUMBER = "MHA-PD-VN-64"
 # mouth break. The dowel engagement pays the arm's mouth break, which is
 # tighter than the title block's edge break (the wall budgets and the full-
 # cylinder span in _transgear_arm_plate_locating_interface are judged at it).
-# The match-drill pointer cites the MHA-PD-00 steps that hold the pair's
-# setting and acceptance (rule 7: no method notes); the draw script fills the
-# step numbers, a module this part-build input must not import.  All of it
+# The match-drill pointer names the MHA-PD-00 view whose native S-K dimension
+# sets the pair (rule 7: no method notes; #1388 policy: the setting's value
+# lives on the assembly sheet, not here); the draw script fills the sheet
+# and view, from a module this part-build input must not import.  All of it
 # below the size: the layout audit reads an above-callout as one line.
 LOCATOR_CALLOUT = (
     f"2X REAM THRU, SLIP FIT\nON DOWEL {DOWEL_NUMBER};\n"
     f"MATCH-DRILL WITH ARM\n{ARM_NUMBER}, {{assembly}}\n"
-    "STEPS {located}-{fitted}; BREAK EDGE\n"
+    "{view}; BREAK EDGE\n"
     f"{LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX, DOWEL CONTACT"
 )
 
