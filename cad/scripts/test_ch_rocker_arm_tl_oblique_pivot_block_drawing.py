@@ -79,6 +79,9 @@ def test_bearing_seat_is_n6_with_its_matched_fit_callout() -> None:
         assert bands[("CAP_REGISTER_PROFILE", f"CapRegister{index}Dia")] == (
             "*deviations(CAP_REGISTER_DIA_BAND)"
         )
+    assert bands[("CAP_REGISTER_FEATURE", "CapRegisterDepth")] == (
+        "*deviations(CAP_REGISTER_DEPTH_BAND)"
+    )
 
 
 def test_web_hole_keeps_the_abutment_and_clears_a_puller() -> None:
@@ -799,6 +802,7 @@ def test_register_receivers_use_the_shared_bearing_relative_contract() -> None:
     assert spec.REGISTER_DIA == retention.BLOCK_REGISTER_DIAMETER
     assert spec.REGISTER_DIA_BAND == retention.BLOCK_REGISTER_DIAMETER_BAND
     assert spec.REGISTER_DEPTH == retention.BLOCK_REGISTER_DEPTH
+    assert spec.REGISTER_DEPTH_BAND == retention.BLOCK_REGISTER_DEPTH_BAND == (0.30, 0.0)
     assert spec.REGISTER_DEPTH_PLACES == retention.BLOCK_REGISTER_DEPTH_PLACES
     assert spec.REGISTER_LOCATION_PLACES == retention.CAP_REGISTER_LOCATION_PLACES
     assert set(spec.DRAWING_PRECISION[spec.CAP_REGISTER_PROFILE]) == set(
@@ -826,7 +830,7 @@ def test_register_recesses_bind_cylinders_and_actual_flat_floors() -> None:
         assert recess["station"] == pytest.approx([dx - band, dx + band])
         assert recess["width"] == pytest.approx([23.87, 24.13])
         assert recess["dia"] == pytest.approx([7.20, 7.30])
-        assert recess["depth"] == pytest.approx([1.87, 2.13])
+        assert recess["depth"] == pytest.approx([2.0, 2.3])
         assert recess["thru"] is False
         assert set(recess["requirements"]) == {"station", "width", "dia", "depth", "note"}
         assert recess["precision"] == {
@@ -913,7 +917,7 @@ def test_register_material_gaps_charge_source_bands_without_tightening_body() ->
     assert shallow["register 1 to wing side"] > margins["register 1 to wing side"]
     location = printed_band_mm(spec.REGISTER_LOCATION_PLACES)
     radius = (spec.REGISTER_DIA + spec.REGISTER_DIA_BAND[0]) / 2.0
-    deepest = spec.REGISTER_DEPTH + printed_band_mm(spec.REGISTER_DEPTH_PLACES)
+    deepest = spec.REGISTER_DEPTH + spec.REGISTER_DEPTH_BAND[0]
     drift = deepest * math.tan(math.radians(spec.GENERAL_ANGULAR_BAND_DEGREES))
     for index, (dx, _dy) in enumerate(spec.CAP_REGISTER_CENTERS, start=1):
         assert margins[f"register {index} to wing step"] == pytest.approx(

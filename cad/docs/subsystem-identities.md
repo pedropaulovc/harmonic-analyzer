@@ -141,14 +141,14 @@ not a competing wing-length/end chain. The source retains the 2 mm
 thread-wall target and 0.50 mm wing/bracket-clearance contract without
 changing the two-rectangle topology, anchors, rails, leadline or bracket pose.
 
-Both flat-bottom register receivers retain **2.000 ±0.13 mm depth**.
-For this unchanged 2 mm nominal, the ordinary two-place band would allow
-1.49 mm, below the source's 1.649708 mm positive-clearance threshold through
-full cap rock. The present band gives source lower bounds of **0.220259 mm
-register-bottom clearance** and **0.124936 mm assembly clearance**.
+Both flat-bottom register receivers print **2.0 +0.3/0 mm depth**: the
+modelled 2.0 is the clearance minimum, above the source's 1.649708 mm
+positive-clearance threshold through full cap rock. The upper limit is not
+for floor thickness: the receiver's angular drift over its deepest 2.3 mm
+still leaves register assembly clearance, which an unbounded MIN would not.
+The band gives source lower bounds of **0.350239 mm register-bottom
+clearance** and **0.001969 mm assembly clearance**.
 These are analytical bounds from `capture_bounds`, not installed readings.
-The tight upper limit is not claimed to be necessary for floor thickness,
-and an unbounded MIN depth is not the receiver's material contract.
 
 TL-29's height is **33.3 mm**, with the existing ordinary .X ±0.8 mm
 band, independent of the raised carrier. This cuts unused upper bracket

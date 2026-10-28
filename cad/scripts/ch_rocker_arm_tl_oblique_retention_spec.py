@@ -109,8 +109,12 @@ CAP_REGISTER_END_CHAMFER_MAX = float(_config.title_block("edge_break")["chamfer_
 CAP_REGISTER_ROOT_RADIUS_MAX = 0.12
 BLOCK_REGISTER_DIAMETER = 7.20
 BLOCK_REGISTER_DIAMETER_BAND = (0.10, 0.0)
+# The modelled depth is its lower limit: register bottom clearance through
+# full cap rock needs it. The receiver's angular drift over its depth bounds
+# register assembly from above, so the band is one-sided, not a MIN.
 BLOCK_REGISTER_DEPTH = 2.000
-BLOCK_REGISTER_DEPTH_PLACES = 3
+BLOCK_REGISTER_DEPTH_BAND = (0.30, 0.0)
+BLOCK_REGISTER_DEPTH_PLACES = 1
 GENERAL_ANGULAR_BAND_DEGREES = 1.0
 CAP_BOLT_SKU = hardware.SCREW_SKU
 CAP_BOLT_LENGTH = hardware.SCREW_LENGTH
@@ -394,7 +398,7 @@ def _cap_motion(
             for point in receiver_pattern
         ) - math.sqrt(2.0) * receiver_band
         - receiver_radius_max
-        - (BLOCK_REGISTER_DEPTH + printed_band_mm(BLOCK_REGISTER_DEPTH_PLACES)) * math.tan(gamma),
+        - (BLOCK_REGISTER_DEPTH + BLOCK_REGISTER_DEPTH_BAND[0]) * math.tan(gamma),
         CAP_WIDTH / 2.0 - edge_band - max(fx, fy * math.sin(yaw)) - shift,
         CAP_LENGTH / 2.0 - edge_band - max(fy, fx * math.sin(yaw)) - shift,
         min(
@@ -589,11 +593,10 @@ def capture_bounds(
         + CAP_VERTICAL_MOTION_ENCLOSURE * math.tan(gamma + rock_limit)
     )
     projection_band = printed_band_mm(CAP_REGISTER_PROJECTION_PLACES)
-    depth_band = printed_band_mm(BLOCK_REGISTER_DEPTH_PLACES)
     projection_min = CAP_REGISTER_PROJECTION - projection_band
     projection_max = CAP_REGISTER_PROJECTION + projection_band
-    depth_min = BLOCK_REGISTER_DEPTH - depth_band
-    depth_max = BLOCK_REGISTER_DEPTH + depth_band
+    depth_min = BLOCK_REGISTER_DEPTH + BLOCK_REGISTER_DEPTH_BAND[1]
+    depth_max = BLOCK_REGISTER_DEPTH + BLOCK_REGISTER_DEPTH_BAND[0]
     boss_radius_max = register_boss_diameter_max / 2.0
     receiver_radius_max = register_bore_diameter_max / 2.0
     register_axis_allowance = (

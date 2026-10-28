@@ -106,6 +106,7 @@ from ch_rocker_arm_tl_oblique_pivot_block_spec import (
     CAP_TAP_POINTS,
     CAP_TAP_REFERENCE,
     CAP_REGISTER_DEPTH,
+    CAP_REGISTER_DEPTH_BAND,
     CAP_REGISTER_DIA,
     CAP_REGISTER_DIA_BAND,
     CAP_REGISTER_FEATURE,
@@ -979,6 +980,10 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter, CAP_REGISTER_PROFILE, "CapRegister2Dia", *deviations(CAP_REGISTER_DIA_BAND)
+    )
+    # The register depth's one-sided band: 2.0 is its clearance minimum.
+    set_dimension_bilateral_tolerance(
+        adapter, CAP_REGISTER_FEATURE, "CapRegisterDepth", *deviations(CAP_REGISTER_DEPTH_BAND)
     )
     _max_limit(adapter, "SeatFillets", "SeatFilletR")
     apply_drawing_precision(adapter, DRAWING_PRECISION)

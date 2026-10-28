@@ -193,9 +193,11 @@ CAP_REGISTER_LOCATION_PLACES = retention.CAP_REGISTER_LOCATION_PLACES
 CAP_REGISTER_DIA = retention.BLOCK_REGISTER_DIAMETER
 CAP_REGISTER_DIA_BAND = retention.BLOCK_REGISTER_DIAMETER_BAND
 CAP_REGISTER_DEPTH = retention.BLOCK_REGISTER_DEPTH
-# At the unchanged 2 mm nominal, .XXX is the loosest decimal class whose
-# lower limit clears the cap through rock: .XX permits 1.49 mm, below the
-# 1.649708 mm required depth. This does not make the 2.13 mm upper limit critical.
+# The modelled 2.0 is the depth's lower limit, one-sided +0.3/0: the TL-30
+# register needs 1.649708 mm for bottom clearance through cap rock, and the
+# receiver's tilt over the deepest 2.3 still leaves register assembly
+# clearance (retention capture_bounds). An unbounded MIN would lose that.
+CAP_REGISTER_DEPTH_BAND = retention.BLOCK_REGISTER_DEPTH_BAND
 CAP_REGISTER_DEPTH_PLACES = retention.BLOCK_REGISTER_DEPTH_PLACES
 CAP_REGISTER_CALLOUT = "LOCATING RECESS FOR TL-30\nXY FROM BEARING AXIS"
 CAP_REGISTER_DEPTH_CALLOUT = (
@@ -212,6 +214,7 @@ REGISTER_POINTS = CAP_REGISTER_POINTS
 REGISTER_DIA = CAP_REGISTER_DIA
 REGISTER_DIA_BAND = CAP_REGISTER_DIA_BAND
 REGISTER_DEPTH = CAP_REGISTER_DEPTH
+REGISTER_DEPTH_BAND = CAP_REGISTER_DEPTH_BAND
 REGISTER_DEPTH_PLACES = CAP_REGISTER_DEPTH_PLACES
 REGISTER_LOCATION_PLACES = CAP_REGISTER_LOCATION_PLACES
 
@@ -766,7 +769,7 @@ def cap_register_margins(
 
     Direct receiver XY uses .XXX and wing-step reach .XX from the same
     bearing axis. The bearing axis to the original edges stays .XX.
-    Receiver diameter carries its explicit +.10/0 band; depth is .XXX.
+    Receiver diameter carries its explicit +.10/0 band, depth its +.3/0.
     Tap walls use the thread major envelope, carriage counterbores their .XX
     band, and side counterbores their existing .XXX band. Independent source
     locations add, never RSS.
@@ -777,7 +780,7 @@ def cap_register_margins(
     axis_x = _band("BoreStationX")
     axis_y = _band("BoreStationY")
     radius = (diameter + CAP_REGISTER_DIA_BAND[0]) / 2.0
-    deepest = depth + printed_band_mm(CAP_REGISTER_DEPTH_PLACES)
+    deepest = depth + CAP_REGISTER_DEPTH_BAND[0]
     tangent = math.tan(math.radians(GENERAL_ANGULAR_BAND_DEGREES))
     drift = deepest * tangent
     bearing_drift = (BLOCK_HEIGHT + _band("BlockHeight")) * tangent

@@ -745,8 +745,12 @@ for _index, ((_x, _y), (_dx, _dy)) in enumerate(
             ),
             "dia_nominal": (part_spec.CAP_REGISTER_DIA, ("CAP_REGISTER_DIA",)),
             "depth": (
-                limits(part_spec.CAP_REGISTER_DEPTH, part_spec.CAP_REGISTER_DEPTH_PLACES),
-                ("CAP_REGISTER_DEPTH", "CAP_REGISTER_DEPTH_PLACES"),
+                limits(
+                    part_spec.CAP_REGISTER_DEPTH,
+                    part_spec.CAP_REGISTER_DEPTH_PLACES,
+                    part_spec.CAP_REGISTER_DEPTH_BAND,
+                ),
+                ("CAP_REGISTER_DEPTH", "CAP_REGISTER_DEPTH_BAND"),
             ),
             "depth_ref": (part_spec.CAP_REGISTER_DEPTH, ("CAP_REGISTER_DEPTH",)),
             "thru": (False, ("CAP_REGISTER_DEPTH",)),
