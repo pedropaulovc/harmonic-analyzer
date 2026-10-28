@@ -187,11 +187,14 @@ SCREW_SECTION_LINE_MODEL = (
 
 # Per-view survivors of the marked-dimension import, each at the MODEL point
 # (mm) its text stands on.  Plan: the locator and +X hole positions stack
-# above the top edge, nearest first; the -X hole's stands below the hole
-# row, between locator 2's centre mark and the boss, so the reamed-hole
-# leader runs from the upper left to locator 1 with no dimension line or
-# text in its way (machinist review, run 20261027T152452686Z: above the
-# plan, the leader struck the 10.875 text).  The heights from K stand
+# above the top edge, nearest first; the -X hole's stands above them all,
+# over the reamed-hole callout's leader start, so that leader runs from the
+# upper left to locator 1 with no dimension line or text in its way
+# (machinist review, run 20261027T152452686Z: in the rows the leader passes,
+# it struck the 10.875 text).  Rule 14 keeps it off the plate (codjiflo on
+# 9704957a3: inside, between locator 2 and the boss, it read on the part);
+# the leader then crosses only hole 1's witness line, which rule 14 calls
+# conventional.  The heights from K stand
 # outboard of each side, the hole height's wide toleranced text wholly
 # right of the edge.  Rows 4 apart (8 mm on the sheet: 4.4 mm air between
 # 3.6 mm texts) keep the locator's witness lines under the locator
@@ -200,12 +203,15 @@ SCREW_SECTION_LINE_MODEL = (
 # face-A view instead: across the top it was the one dimension line the
 # reamed-hole leader had to cross (machinist review of the r3 sheets).
 PLAN_ROWS = tuple(_SECTION_TOP + 8.0 + 4.0 * row for row in range(3))
+# Three rows over the top one: 7 mm over the leader's start (r18 sheet, run
+# 20261027T192628995Z: its shelf ends 20.8 over the section top).
+_OVER_LEADER_ROW = _SECTION_TOP + 8.0 + 4.0 * 5
 PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     # Text outboard of hole 2's witness line: between it and K, the bore
     # axis's witness line struck the 4.125 (machinist review, run
     # 20261027T165127867Z).
     "ScrewHoleX2": (SCREW_HOLES[1][0] + 5.5, PLAN_ROWS[0], _Z_PLAN),
-    "ScrewHoleX1": (SCREW_HOLES[0][0] / 2.0, 12.6, _Z_PLAN),
+    "ScrewHoleX1": (SCREW_HOLES[0][0] / 2.0, _OVER_LEADER_ROW, _Z_PLAN),
     "KinkY": (EDGE_MINUS_X - 5.0, KINK[1] / 2.0, _Z_PLAN),
     "TopLeftY": (EDGE_MINUS_X - 11.0, TOP_LEFT[1] / 2.0, _Z_PLAN),
     "KinkRightY": (EDGE_PLUS_X + 5.0, KINK_RIGHT[1] / 2.0, _Z_PLAN),

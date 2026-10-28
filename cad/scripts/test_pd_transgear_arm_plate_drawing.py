@@ -413,8 +413,9 @@ _ISO_HALF_HEIGHT_SHEET = (52.0 + 6.35 * 0.5) / 2.0 / 1000.0
 _PLAN_MID_Y = (geometry.TOP_LEFT[1] - geometry.END_R) / 2.0
 _GAP = 0.004  # sheet m between neighbouring texts
 # The locator callout's leader leaves its text block's lower right, this far
-# (model mm) from the kept text point (measured on the r3 sheet).
-_LOCATOR_LEADER_START_MODEL = (7.0, -5.5)
+# (model mm) from the kept text point (measured on the r18 sheet, run
+# 20261027T192628995Z: the shelf's right end).
+_LOCATOR_LEADER_START_MODEL = (16.8, -11.0)
 
 
 def _half_width_model(text: str) -> float:
@@ -557,7 +558,8 @@ def test_the_locator_callout_stays_inside_the_border() -> None:
 def test_the_reamed_hole_leader_crosses_no_plan_dimension_line() -> None:
     """The locator callout's leader runs from its text to locator 1 without
     crossing a location or size dimension line standing above the plan; the
-    -X hole's position stands below the hole row, out of its way."""
+    -X hole's position stands above the leader's start, out of its way and
+    off the plate (rule 14)."""
     spans = {
         "ScrewHoleX1": (geometry.SCREW_HOLES[0][0], 0.0),
         "ScrewHoleX2": (geometry.SCREW_HOLES[1][0], 0.0),
@@ -569,16 +571,17 @@ def test_the_reamed_hole_leader_crosses_no_plan_dimension_line() -> None:
     start_x = text_x + _LOCATOR_LEADER_START_MODEL[0]
     start_y = text_y + _LOCATOR_LEADER_START_MODEL[1]
     site_x, site_y = geometry.LOCATOR_SITES_MM[0]
-    hole_y = geometry.SCREW_HOLES[0][1]
-    assert drawing.PLAN_KEEP["ScrewHoleX1"][1] < geometry.LOCATOR_SITES_MM[1][1] < hole_y
+    # Its text (1.8 mm half height) clears the leader's start by a row.
+    assert drawing.PLAN_KEEP["ScrewHoleX1"][1] > start_y + 4.0
     checked = 0
     for name, (x0, x1) in spans.items():
         if name not in drawing.PLAN_KEEP:
             continue
         row = drawing.PLAN_KEEP[name][1]
-        if row < hole_y:
+        assert row > geometry.TOP_LEFT[1], name
+        assert site_y < row, name
+        if row >= start_y:
             continue
-        assert site_y < row < start_y, name
         leader_x = start_x + (site_x - start_x) * (start_y - row) / (start_y - site_y)
         assert not min(x0, x1) <= leader_x <= max(x0, x1), name
         checked += 1
