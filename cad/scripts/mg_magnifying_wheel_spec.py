@@ -76,12 +76,27 @@ from mg_wheel_group import WHEEL_BORE_MAX
 # construction line REFERENCE_WITNESS_LEN long on its surface, starting at
 # the rim's back face (the OD) or at the back rim-bore round's tangent (the
 # rim bore), so its extension lines leave the part there.
+#
+# The spoke pattern's pitch prints on the face view between two spoke
+# centrelines, the 60 and 120 deg spokes', on a hidden Front-plane sketch
+# (SPOKE_REFERENCE): each centreline is a construction stub through the rim
+# (SPOKE_STUB_R), and the angle between them is a DRIVEN reference (the
+# Tie2Angle precedent) printed "6X 60°".  The seed spoke lies on local +X,
+# so two spokes lie on the face view's horizontal centerline, which the
+# angle's callout states.
 SECTION_PLANE = "SectionAPlane"
 DIAMETER_REFERENCE = "DiameterReference"
-REFERENCE_SKETCHES = (DIAMETER_REFERENCE,)
+SPOKE_REFERENCE = "SpokeReference"
+REFERENCE_SKETCHES = (DIAMETER_REFERENCE, SPOKE_REFERENCE)
 REFERENCE_WITNESS_LEN = 1.0
+SPOKE_PITCH_DEG = 360.0 / SPOKE_COUNT
+SPOKE_PITCH_SPOKES = (1, 2)
+SPOKE_STUB_R = (RIM_INNER_DIA / 2.0 - 4.0, RIM_OUTER_DIA / 2.0 + 3.0)
+SPOKE_PITCH_PREFIX = f"{SPOKE_COUNT}X "
+SPOKE_PITCH_CALLOUT = "TWO ON THE HORIZONTAL CENTERLINE"
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     DIAMETER_REFERENCE: {"RimOuterDiaDim", "RimInnerDiaDim"},
+    SPOKE_REFERENCE: {"SpokePitch"},
     "SpokeProfile": {"SpokeRootWidth", "SpokeTipWidth"},
     "Spoke": {"SpokeAxial"},
     "HubProfile": {"HubDia", "SpigotDia", "HubLength", "SpigotLength", "HubFrontZ"},
@@ -92,6 +107,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Tie1Profile": {"Tie1X", "Tie1Y", "Tie1HoleDia"},
     "Tie2Profile": {"Tie2HoleDia", "Tie2Angle"},
 }
+# Each fillet feature's R imports onto its FIRST picked edge
+# (build_mg_wheel_axle: the drawing's inserted radius lands on the first
+# pick's edge), so the builder picks the edge the face view prints first:
+# (spoke index from the seed on +X, side of that spoke in its own frame).
+# The R3.0's leader rises from the seed spoke's -Y hub fillet through the
+# spoke and the 0-60 window; the R4.0's leaves the 180 deg spoke's -Y (sheet
+# +Y) rim fillet out through the rim to the left.  Neither crosses the
+# spoke widths' dimension lines on the seed spoke.
+HUB_FILLET_PRINTED = (0, -1)
+RIM_FILLET_PRINTED = (3, -1)
 # Decimal places per marked dimension (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the cast
 # shapes at one place, the turned and drilled sizes at two.  The rim's OD
 # keeps two: at .X its Ø99.2 floor leaves the groove 0.75 deep under the 0.8
@@ -101,6 +126,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # bore are matched fits, their two places a reference nominal.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     DIAMETER_REFERENCE: {"RimOuterDiaDim": 2, "RimInnerDiaDim": 1},
+    SPOKE_REFERENCE: {"SpokePitch": 0},
     "SpokeProfile": {"SpokeRootWidth": 1, "SpokeTipWidth": 1},
     "Spoke": {"SpokeAxial": 1},
     "HubProfile": {
@@ -134,17 +160,15 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
 ROUND_TEXT_SUFFIX = " MAX"
 
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the notes say only what no callout can.  The spigot's press fit and
-# the bore's running fit print on their own diameter callouts.  The spokes'
-# clocking is a 0 deg relation no dimension can show: the seed spoke lies on
-# local +X, so two spokes lie on the face view's horizontal centerline, the
-# one TIE 2's angle is measured from.  TIE 1's two coordinates ride the title
+# the bore's running fit print on their own diameter callouts, and the
+# spokes' count, pitch and clocking on their own angle (SPOKE_REFERENCE).
+# TIE 1's two coordinates ride the title
 # block: the boss is sized so its wall holds at .XX (TIE1_HUB_WALL), and its
 # note says why the hole stands off the drum (mg_magnifying_wheel_geom
 # TIE1_DRUM_OPENING) without a number.
 MIN_WALL = 2.0  # drawing-guidelines.md rule 17 (walls and webs) target
 DRAWING_NOTES = "\n".join(
     (
-        f"{SPOKE_COUNT} TAPERED SPOKES EQUALLY SPACED, TWO ON THE HORIZONTAL CENTERLINE.",
         "TIE 1: LEVER-WIRE TIE HOLE THRU BOSS, CLEAR OF MG-WHEEL-DRUM.",
         "TIE 2: PEN-WIRE TIE HOLE, GROOVE BOTTOM TO RIM BORE.",
     )
@@ -190,7 +214,7 @@ _TIE_R_MAX = (TIE_HOLE_DIA + drilled_oversize_mm()) / 2.0
 _TIE2_WANDER = (
     (GROOVE_BOTTOM_DIA + GROOVE_BOTTOM_BAND[0] - _RIM_ID[0]) / 2.0
 ) * math.tan(math.radians(DRILL_WANDER_DEG))
-_SPOKE_PITCH = 360.0 / SPOKE_COUNT
+_SPOKE_PITCH = SPOKE_PITCH_DEG
 if clock_to_local_deg(0.0) % _SPOKE_PITCH:
     raise AssertionError("the spokes no longer lie on the horizontal centerline")
 
