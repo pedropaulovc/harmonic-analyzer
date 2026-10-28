@@ -568,29 +568,25 @@ def test_source_part_stamps_every_required_property(drawing) -> None:
     assert not blank, f"{stem}: apply_drawing_properties reads blank registry fields {blank}"
 
 
-@pytest.mark.parametrize("name", ("sh_vn_clamping_kit_hardware",))
-def test_configured_notes_must_reach_the_stamping_call(name, monkeypatch) -> None:
-    drawing = next(drawing for drawing in PART_DRAWINGS if drawing.name == name)
-    build = SCRIPTS / f"build_{drawing.part}.py"
-    tree = _tree(build)
-    calls = [
-        node for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "apply_drawing_properties"
-    ]
-    assert len(calls) == 1 and len(calls[0].args) == 3
-    # Leave the complete metadata and saved-state guards in place, but stop
-    # passing their note mapping to the actual document-property producer.
-    calls[0].args[2] = ast.Dict(keys=[], values=[])
-    required = _required(SCRIPTS / drawing.script_name)
-    tree.body.extend(ast.Expr(value=ast.Constant(value=key)) for key in required)
-    read_tree = _tree
-    monkeypatch.setitem(
-        globals(), "_tree", lambda path: tree if path == build else read_tree(path)
+@pytest.mark.parametrize("stamp_notes", (False, True))
+def test_configured_notes_must_reach_the_stamping_call(
+    tmp_path, monkeypatch, stamp_notes
+) -> None:
+    # Purchased reference sheets no longer consume per-member notes. Exercise
+    # the producer contract independently of which sheets currently need them.
+    build = tmp_path / "build_configured.py"
+    build.write_text(
+        "from _purchased_part_variants import save_member_part\n"
+        'CONFIGURATIONS = ("First", "Second")\n'
+        'notes = {f"{name} Notes": "note" for name in CONFIGURATIONS}\n'
+        'SAVED_PROPERTIES = ("First Notes", "Second Notes")\n'
+        f"apply_drawing_properties(adapter, stem, {'notes' if stamp_notes else '{}'})\n",
+        encoding="utf-8",
     )
-    with pytest.raises(AssertionError, match="never stamps"):
-        test_source_part_stamps_every_required_property(drawing)
+    monkeypatch.setitem(globals(), "part_properties", lambda stem: {})
+    stamped, _ = _stamped("configured", build)
+    configured_notes = {"First Notes", "Second Notes"}
+    assert stamped & configured_notes == (configured_notes if stamp_notes else set())
 
 
 def test_unsupported_configured_property_comprehension_fails_closed() -> None:
