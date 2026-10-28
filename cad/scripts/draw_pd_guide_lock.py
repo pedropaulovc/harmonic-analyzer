@@ -121,7 +121,7 @@ HOLE_2_X_SHEET = _sheet_x(HOLE_XY[1][0])
 # right of the view's extension lines (centred between them, the lines struck
 # its digits, machinist review ENFORCE r1-r3) and its one-line as-supplied
 # stock callout in the clear field above the value.
-# The two edge hole coordinates carry three-row blocks (value plus the mate
+# The three hole coordinates carry three-row blocks (value plus the mate
 # callout below it). SolidWorks centres a block on its text position and
 # hangs the dimension's shelf from its last row, about 8.3 mm below that
 # position, its first row's top about 7.3 mm above (layout audit of farm run
@@ -131,11 +131,14 @@ HOLE_2_X_SHEET = _sheet_x(HOLE_XY[1][0])
 # 68 mm, its block left of it and below the Height's bottom arrow; the 4.000's
 # block stands right of that line, its shelf (the 4.000's dimension line)
 # 6 mm above the 18.000's and its top clear of the Height's extension line.
+# The 18.000's text rises by the block's extra rows so its shelf keeps the
+# one-row line's place; the block stands under the plate between hole 1's and
+# hole 2's extension lines, right of where the 4.000's line ends.
 FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], 0.125),
     "Height": (0.057, FRONT_CENTER[1]),
     "Hole1X": (0.086, 0.1448),
-    "Hole2X": (0.142, 0.133),
+    "Hole2X": (0.142, 0.1388),
     "Hole1Y": (0.068, 0.141),
     "CornerR": (0.215, 0.211),
 }
@@ -166,17 +169,18 @@ HOLE_CALLOUT_BELOW = "\n".join(
         f"{SCREW_NUMBER} SCREWS",
     )
 )
-# The coordinates baseline both holes from the plate's corner, so the 4.000
-# and the shared 2X Y are as much the pattern as the 18.000: hole 1's X and
-# the holes' common line are what land on the guide's tap row (the R9-49 set
+# The coordinates baseline both holes from the plate's corner, so the 4.000,
+# the 18.000 and the shared 2X Y are each the pattern: the holes' X's and
+# their common line are what land on the guide's tap row (the R9-49 set
 # window spends each coordinate's band, pd_vn_guide_lock_screw_spec
 # .POSITION_RADIAL; ±0.065 is refused). Each carries the mate at its own
 # value (machinist review ENFORCE at 2056e3344: the hole callout alone left
-# the edge locations without one). Two short rows keep each block inside its
-# value's width, the hole Y's left of the 4.000 and the 4.000's left of the
-# plate's left-edge extension line.
+# the edge locations without one; at eecbf880d the 18.000 still lacked it).
+# Two short rows keep each block inside its value's width, the hole Y's left
+# of the 4.000 and the 4.000's left of the plate's left-edge extension line.
 DIMENSION_CALLOUTS_BELOW = {
     "Hole1X": f"MATCHES\n{GUIDE_NUMBER}",
+    "Hole2X": f"MATCHES\n{GUIDE_NUMBER}",
     "Hole1Y": f"MATCHES\n{GUIDE_NUMBER}",
 }
 
