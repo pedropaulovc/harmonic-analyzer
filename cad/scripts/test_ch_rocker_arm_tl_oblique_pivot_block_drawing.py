@@ -16,7 +16,11 @@ def test_rectangular_rail_two_block_and_new_stock():
     metadata=_config.parts(spec.PART_NAME)
     assert metadata['number']=='MHA-CH-06-TL-22'
     assert metadata['quantity']==spec.QUANTITY==1
-    assert not metadata.get('machinist_exceptions')
+    # Owner ruling 2026-10-28: the stated side-wall shortfall, accepted minor.
+    (exception,)=metadata['machinist_exceptions']
+    assert (exception['id'],exception['kind'])==('RV-01','minor')
+    assert spec.CBORE_SIDE_WALL_TEXT in exception['where']
+    assert f'{spec.CBORE_SIDE_WALL_TEXT[len("SIDE WALL "):-len(" MIN")]} min' in exception['finding']
 
 
 def test_pivot_shoulder_bottoms_with_full_form_thread_engagement():
