@@ -2338,7 +2338,7 @@ def test_vendor_warning_capture_restores_jsonl_sink(tmp_path, monkeypatch, faile
         pytest.param("pn_pen_rod", "local", (False, False), False, False, id="ordinary-part"),
         pytest.param("dt_vn_bearing", "drawing", (False, False), False, False, id="vendor-drawing"),
         pytest.param(
-            "ch_rocker_arm_tl_vn_oblique_bearing", "local", (False, False),
+            "ch_rocker_arm_tl_vn_oblique_cl_dowel", "local", (False, False),
             False, True, id="tooling-vendor-build",
         ),
         pytest.param(
@@ -4300,7 +4300,7 @@ def test_produced_bundle_edits_rekey_full_export_without_invalidating_native_led
 
 
 @pytest.mark.parametrize("source", [
-    "draw_ch_rocker_arm.py", "draw_ch_rocker_arm_tl_oblique_pivot_pin.py",
+    "draw_ch_rocker_arm.py", "draw_ch_rocker_arm_tl_oblique_carrier.py",
     "_drawing_layout_audit.py", "_pdf_ink.py",
 ])
 def test_draw_source_edits_do_not_rekey_full_export_before_producing_bundles(
@@ -4361,11 +4361,11 @@ def synthetic_prechips_task(tmp_path, monkeypatch):
     for name in _process_plans.SHOP_FILES:
         (shop / name).write_text("version = 1\n")
     (shop / "inventory.toml").write_text(
-        '[fixtures.test]\ncad = "ch_rocker_arm_tl_oblique_pivot_pin"\n'
+        '[fixtures.test]\ncad = "ch_rocker_arm_tl_oblique_carrier"\n'
     )
     monkeypatch.setattr(_process_plans, "PROCESS_ROOT", root)
     monkeypatch.setattr(_process_plans, "TRAVELER_STEMS", (stem,))
-    spec = dodo.SCRIPTS_DIR / "ch_rocker_arm_tl_oblique_pivot_pin_spec.py"
+    spec = dodo.SCRIPTS_DIR / "ch_rocker_arm_tl_oblique_carrier_spec.py"
     helper = dodo.SCRIPTS_DIR / "_synthetic_fixture_dimensions.py"
     original = dodo._executed_closure
 

@@ -16,9 +16,8 @@ from _layout_audit import (
     annotation_geometry,
     calibrate_sheet_advance,
     find_lines_through_own_text,
-    find_text_clearance,
 )
-from _supplier_screw_layout import supplier_screw_lane_plan, supplier_top_text_geometry
+from _supplier_screw_layout import supplier_top_text_geometry
 
 _RECORDED = json.loads(
     (Path(__file__).parent / "testdata" / "supplier_top_r44.json").read_text(encoding="utf-8")
@@ -212,29 +211,6 @@ def test_settled_shelf_guard_refuses_return_of_r44_text_collision(native_replay)
         screws._assert_supplier_top_shelves(None, displays)
 
 
-def test_block_thread_length_uses_left_lane_and_recorded_texts_no_longer_overlap(native_replay):
-    import ch_rocker_arm_tl_vn_oblique_block_screw_spec as supplier
-
-    displays = _displays("block")
-    lengths = {name: displays[name] for name in ("SupplierLength", "SupplierThreadLength")}
-    assert find_text_clearance(_sheet(lengths))
-    plan = supplier_screw_lane_plan(
-        supplier.SUPPLIER_REFERENCE_DIMENSIONS,
-        planes=supplier.SUPPLIER_REFERENCE_PLANES,
-        sides=supplier.SUPPLIER_REFERENCE_SIDES,
-    )
-    outline = _RECORDED["block"]["*Front"]["outline"]
-    for name, display in lengths.items():
-        side, offset = plan[name]
-        x = outline[0] - offset if side == "left" else outline[2] + offset
-        _, y, z = display.GetPosition()
-        assert display.SetPosition2(x, y, z)
-    screws._shelf_supplier_top_text(None, displays)
-    assert not find_text_clearance(_sheet(lengths))
-    assert plan["SupplierLength"][0] == "right"
-    assert plan["SupplierThreadLength"][0] == "left"
-
-
 @pytest.mark.parametrize("layout", ("standard", "tall_top"))
 def test_unaffected_layouts_do_not_read_or_change_offset_text(monkeypatch, layout):
     from test_purchased_fastener_drawing import _supplier_native
@@ -272,7 +248,7 @@ def test_unaffected_layouts_do_not_read_or_change_offset_text(monkeypatch, layou
 
 def _settled_block_replay(monkeypatch):
     """Keep real placement/final callbacks; isolate unrelated source COM readers."""
-    import draw_ch_rocker_arm_tl_vn_oblique_block_screw as block
+    import draw_ch_rocker_arm_tl_vn_oblique_bracket_screw as block
 
     displays = _displays("block")
     views = {}
@@ -289,7 +265,7 @@ def _settled_block_replay(monkeypatch):
             native = SimpleNamespace(
                 FullName=f"{name}@{feature}@stock.SLDPRT",
                 Tolerance=SimpleNamespace(
-                    Type=5 if name in supplier.SUPPLIER_REFERENCE_MINIMUMS else 0,
+                    Type=0,
                     GetMinValue=lambda: 0.0, GetMaxValue=lambda: 0.0,
                 ),
             )
@@ -305,7 +281,6 @@ def _settled_block_replay(monkeypatch):
             UpdateViewDisplayGeometry=lambda: None,
             GetAnnotations=lambda rows=rows: rows,
         )
-    monkeypatch.setattr(block, "_early_bound", lambda obj, _interface: obj)
     monkeypatch.setattr(screws, "_binding", lambda _adapter, view: (view.name, "stock.SLDPRT", "Default"))
     monkeypatch.setattr(screws, "_assert_source", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(screws, "supplier_reference_dimension", lambda _adapter, display, **_kwargs: display)

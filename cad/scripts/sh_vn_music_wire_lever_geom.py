@@ -82,7 +82,7 @@ assert math.isclose(HOOK_Z, DRUM_END_Z, abs_tol=1e-9), (
 # XY tangent from the hook to the drum circle inflated by wire r + clearance.
 # +acos picks the tangent on the drum's right seen from the front (~2:25):
 # the wire wraps clockwise from there, down the drum's side to TIE 1 at
-# 6 o'clock (mg_magnifying_wheel_geom).
+# 8 o'clock (mg_magnifying_wheel_geom).
 _R_EFF = DRUM_DIA / 2.0 + WIRE_DIA / 2.0 + CLEARANCE  # 10.1
 
 
@@ -117,7 +117,7 @@ def run_gaps(
     start: tuple[float, float, float], end: tuple[float, float, float], n: int = 4001
 ) -> dict[str, float]:
     """Surface gaps from a straight run to the wheel's pen-side faces it passes:
-    the rim ring, the spokes and the Ø25 boss (each where the run is radially
+    the rim ring, the spokes and the hub boss (each where the run is radially
     over it, wire r + clearance widened), and the drum lane's two ends at the
     drum end. Positive = clear."""
     face = {

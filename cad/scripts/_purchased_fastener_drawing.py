@@ -1432,6 +1432,7 @@ async def build_purchased_fastener_drawing(
     *,
     item: str | None = None,
     cut_to_suit: bool = False,
+    general_text: str | None = None,
     number_fit: NumberFit = NumberFit.TEMPLATE,
     view_layout: Literal["standard", "supplier_top", "tall_top"] = "standard",
     supplier_dimensions: SupplierDimensions | None = None,
@@ -1449,6 +1450,9 @@ async def build_purchased_fastener_drawing(
     ``cut_to_suit`` marks a fastener its registry installation note cuts at
     assembly.  ``number_fit`` opts a sheet whose registry number overruns the
     DWG. NO. cell into the measured fit (:func:`_fit_number`).
+    ``general_text`` overrides only the footer's general line (the same
+    reserved line and native text/extent readbacks); None keeps the
+    ``cut_to_suit``-selected default.
     ``title_block_setup`` formats existing linked title notes and returns their
     mandatory final-rebuild check, as for purchased-part reference sheets.
     ``view_layout="supplier_top"`` reserves the supplier screw family's Top
@@ -1507,6 +1511,7 @@ async def build_purchased_fastener_drawing(
             item=item if item is not None else stock.stock_name.upper(),
             notes=str(registry.get("installation_notes", "")),
             cut_to_suit=cut_to_suit,
+            general_text=general_text,
             document_title=str(registry["title"]),
             number_fit=number_fit,
             view_layout=view_layout,
@@ -1640,6 +1645,7 @@ async def _build_reference_sheet(
     material_property: str = "Material",
     notes: str = "",
     cut_to_suit: bool = False,
+    general_text: str | None = None,
     document_title: str | None = None,
     spring: bool = False,
     view_layout: Literal["standard", "supplier_top", "tall_top"] = "standard",
@@ -1857,6 +1863,7 @@ async def _build_reference_sheet(
                 item=item,
                 notes=notes,
                 cut_to_suit=cut_to_suit,
+                general_text=general_text,
                 label=label,
                 supplier_data=supplier_data,
             )

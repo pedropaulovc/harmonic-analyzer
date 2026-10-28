@@ -373,15 +373,6 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Metal Round Cap",
         "9275K141",
     ),
-    # MHA-CH-06-TL-VN-52: the oblique trammel jig's pivot bearings, a pair
-    # pressed into each pivot block (shop fixture hardware, modelled so the
-    # jig assembly can mate them and run native interference).
-    "ch-rocker-arm-tl-vn-oblique-bearing": _stock(
-        "ch-rocker-arm-tl-vn-oblique-bearing",
-        "Steel Ball Bearing, Sealed, Trade No. 6200-2RS",
-        "5972K41",
-        material="Alloy Steel",
-    ),
     # MHA-CH-06-TL-VN-53: the oblique trammel jig's CL locator, press-set above
     # the actual riser in the carrier's in-place-finished CL hole (shop
     # fixture hardware modelled for native mates and interference).
@@ -409,15 +400,6 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91251A196",
         material="Alloy Steel",
     ),
-    # MHA-CH-06-TL-VN-63: the oblique trammel jig's #8-32 X 1-7/8 SHCS (the
-    # fastener table's NUT_BRACKET_TO_BLOCK row); shop fixture hardware,
-    # modelled so the jig assembly can mate it and run native interference.
-    "ch-rocker-arm-tl-vn-oblique-block-screw": _stock(
-        "ch-rocker-arm-tl-vn-oblique-block-screw",
-        "Black-Oxide Alloy Steel Socket Head Screw",
-        "91251A188",
-        material="Alloy Steel",
-    ),
     # MHA-CH-06-TL-VN-64: the oblique trammel jig's M4 X 20 SHCS (the
     # fastener table's BLOCK_TO_CARRIAGE row); shop fixture hardware,
     # modelled so the jig assembly can mate it and run native interference.
@@ -437,7 +419,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         material="Alloy Steel",
     ),
     # MHA-CH-06-TL-VN-66: the oblique trammel jig's #4-40 X 1/2 BHCS (the
-    # fastener table's NUT_TO_NUT_BRACKET row), Olander 4C50BHCA; shop fixture
+    # fastener table's NUT_TO_FEED_BLOCK row), Olander 4C50BHCA; shop fixture
     # hardware, modelled so the jig assembly can mate it and run native
     # interference.
     "ch-rocker-arm-tl-vn-oblique-nut-screw": _stock(
@@ -476,16 +458,6 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91251A583",
         material="Alloy Steel",
     ),
-    # MHA-CH-06-TL-VN-70: the oblique trammel jig's #8 wedge-lock washer pairs
-    # under the TL-VN-63 block screws' heads (the fastener table's
-    # BLOCK_LOCK_WASHER row); shop fixture hardware, modelled so the jig
-    # assembly can mate it and run native interference.
-    "ch-rocker-arm-tl-vn-oblique-block-washer": _stock(
-        "ch-rocker-arm-tl-vn-oblique-block-washer",
-        "Extreme-Vibration-Resistant Wedge Lock Washer",
-        "91812A215",
-        material="AISI 304",  # native library stand-in; purchased grade is 316
-    ),
     # MHA-CH-06-TL-VN-71: the oblique trammel jig's 5/16 wedge-lock washer pairs
     # under the TL-VN-69 feed lever screws' heads (the fastener table's
     # LEVER_LOCK_WASHER row); shop fixture hardware, modelled so the jig
@@ -496,34 +468,36 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91812A230",
         material="AISI 304",  # native library stand-in; purchased grade is 316
     ),
-    # VN-72 is retired. The captured-pivot cartridge uses actual non-McMaster
-    # supplier identities; source dimensions live in retention_hardware_spec.
-    "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw": _stock(
-        "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw",
-        "Predrilled Socket Head Cap Screw",
-        "NAS1352N5H12",
-        material="AISI 304",  # native rendering surrogate; purchased alloy is A286
-        supplier="CBS Fasteners",
-    ),
-    "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin": _stock(
-        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
-        "Headed Clevis Pin",
-        "CLPS6-0187-1250D",
-        material="AISI 316 Annealed Stainless Steel Bar (SS)",  # native entry; purchased condition remains supplier authority
-        supplier="Huyett",
-    ),
-    "ch-rocker-arm-tl-vn-oblique-pivot-cotter": _stock(
-        "ch-rocker-arm-tl-vn-oblique-pivot-cotter",
-        "Split Cotter Pin",
-        "CP-062-0500",
-        supplier="Huyett",
-    ),
-    "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire": _stock(
-        "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire",
-        "Stainless Safety Wire",
-        "05-02685",
+    # AISI 304 below is a native-library surrogate for appearance/approximate
+    # mass only. Supplier authority for both purchases is 18-8 stainless,
+    # not a certified 304 grade; each YAML material_specification owns it.
+    "ch-rocker-arm-tl-vn-oblique-pivot-screw": _stock(
+        "ch-rocker-arm-tl-vn-oblique-pivot-screw",
+        "18-8 Stainless Steel Precision Shoulder Screw, 10 mm x 35 mm, M8 x 1.25",
+        "90323A492",
         material="AISI 304",
-        supplier="Aircraft Spruce",
+    ),
+    "ch-rocker-arm-tl-vn-oblique-pivot-spacer": _stock(
+        "ch-rocker-arm-tl-vn-oblique-pivot-spacer",
+        "18-8 Stainless Steel Round Spacer, 10 mm ID x 16 mm OD x 15 mm",
+        "92871A359",
+        material="AISI 304",
+    ),
+    # DIN 988 spring-steel shims: the library's plain carbon steel (default),
+    # as pd-vn-transgear-pivot-shim.
+    "ch-rocker-arm-tl-vn-oblique-pivot-shim": _stock(
+        "ch-rocker-arm-tl-vn-oblique-pivot-shim",
+        "DIN 988 Spring Steel Shim, 10 mm ID x 16 mm OD x 0.2 mm",
+        "98055A118",
+        "98055A117",
+        "98055A121",
+    ),
+    # Hardened tool-steel gauge pin: the library's Alloy Steel stand-in.
+    "ch-rocker-arm-tl-vn-oblique-hub-pin": _stock(
+        "ch-rocker-arm-tl-vn-oblique-hub-pin",
+        "Class Z Minus Gauge Pin, size 10.2000 mm, 2 in supply, cut to 20.0 mm",
+        "2281A11-6410N695",
+        material="Alloy Steel",
     ),
 }
 

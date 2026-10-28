@@ -666,6 +666,48 @@ def test_local_title_fit_preserves_full_name_number_and_never_touches_material(m
             check_title()
 
 
+@pytest.mark.parametrize("failure", [None, "missing", "duplicate", "value", "sheet"])
+def test_rework_material_prints_the_kits_material_specification(monkeypatch, failure):
+    """Machinist review: sheet 1 said 'Hardened steel', REWORK the library
+    stand-in 'Plain Carbon Steel', for the same stud."""
+    material = ROW["material_specification"]
+    stand_in = draw.property_link("Material")
+    specification = draw.property_link("Material Specification")
+
+    class Note(SimpleNamespace):
+        def GetText(self):
+            if failure == "value":
+                return ROW["material"]
+            return material if self.PropertyLinkedText == specification else ROW["material"]
+
+    cell = Note(PropertyLinkedText=stand_in)
+    number = Note(PropertyLinkedText=draw.property_link("Number"))
+    notes = [number, cell] + ([Note(PropertyLinkedText=stand_in)] if failure == "duplicate" else [])
+    if failure == "missing":
+        notes.remove(cell)
+    for index, item in enumerate(notes):
+        next_note = notes[index + 1] if index + 1 < len(notes) else None
+        item.GetNext = lambda next_note=next_note: next_note
+    active = []
+    document = SimpleNamespace(
+        GetFirstView=lambda: SimpleNamespace(GetFirstNote2=lambda: notes[0]),
+        ActivateSheet=lambda value: active.append(value) or failure != "sheet",
+    )
+    adapter = SimpleNamespace(currentModel=document)
+    rebuilt = []
+    monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(draw, "rebuild_drawing", lambda _adapter, *, label: rebuilt.append(label))
+    if failure:
+        with pytest.raises(RuntimeError):
+            draw.link_rework_material(adapter, sheet_name="REWORK", material=material)
+        return
+    check = draw.link_rework_material(adapter, sheet_name="REWORK", material=material)
+    assert cell.PropertyLinkedText == specification and cell.GetText() == material == "Hardened steel"
+    assert number.PropertyLinkedText == draw.property_link("Number") and rebuilt
+    check()
+    assert active == ["REWORK", "REWORK"]
+
+
 def _saved_cut_model(monkeypatch, *, failure=None):
     """Saved part controls remain authoritative without a printed chamfer dimension."""
     nominal = spec.CUT_END_CHAMFER_MAX / 1000.0
@@ -1083,7 +1125,7 @@ def test_drawing_keeps_source_only_chamfer_and_part_only_rework_sheet(monkeypatc
 
     def properties(model):
         property_reads.append(model)
-        return {"Number": ROW["number"]}
+        return {"Number": ROW["number"], "Material Specification": ROW["material_specification"]}
 
     monkeypatch.setattr(draw, "_assert_stud_rework_properties", properties)
     monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
@@ -1115,6 +1157,13 @@ def test_drawing_keeps_source_only_chamfer_and_part_only_rework_sheet(monkeypatc
         return lambda: title_settled.append(sheet_name)
 
     monkeypatch.setattr(draw, "fit_stud_title_block", fit_title)
+    material_calls, material_settled = [], []
+
+    def link_material(_adapter, *, sheet_name, material):
+        material_calls.append((active[-1], sheet_name, material))
+        return lambda: material_settled.append(sheet_name)
+
+    monkeypatch.setattr(draw, "link_rework_material", link_material)
 
     monkeypatch.setattr(draw, "add_property_linked_note", lambda _adapter, name, *position, **kwargs: notes.append((active[-1], name, kwargs.get("char_height"))))
     captions = []
@@ -1135,6 +1184,7 @@ def test_drawing_keeps_source_only_chamfer_and_part_only_rework_sheet(monkeypatc
     assert adapter.currentModel is document
     assert rework_note_views == [views[0]]
     assert title_calls == [("REWORK", "REWORK", ROW["number"])]
+    assert material_calls == [("REWORK", "REWORK", ROW["material_specification"])]
     assert notes == [
         ("REWORK", f"{CONFIGURATION} Rework Lower End Note", None),
         ("REWORK", "Existing Thread", None),
@@ -1162,6 +1212,7 @@ def test_drawing_keeps_source_only_chamfer_and_part_only_rework_sheet(monkeypatc
         assert owner_checks == [(views[0], views[1])] * 2
         assert notes_settled == [views[0]]
         assert title_settled == ["REWORK"]
+        assert material_settled == ["REWORK"]
 
 
 def test_shared_drawing_uses_one_configured_supplier_sheet_and_appended_stud_sheets(monkeypatch) -> None:

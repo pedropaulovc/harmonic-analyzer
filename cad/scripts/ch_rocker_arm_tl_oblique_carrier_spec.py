@@ -3,10 +3,10 @@ r"""Pure-data contract for the oblique-trammel jig's carrier plate (MHA-CH-06-TL
 Shop fixture, not a machine part (cad/docs/subsystem-identities.md). The
 carrier is the moving plate of the rocker arm's oblique-trammel mill jig
 (``ch_rocker_arm_tl_oblique_trammel_spec``, imported as ``trammel``). It rides
-on two pivot pins (MHA-CH-06-TL-23), one in each pivot block on the two
-rails; for the inner pass the pins sit in A1/B1, for the outer pass in A2/B2.
+on two purchased shoulder screws (MHA-CH-06-TL-VN-77), supported by loose
+spacers; for the inner pass they sit in A1/B1, for the outer pass in A2/B2.
 The rocker blank, on its riser (MHA-CH-06-TL-24), is located on the HUB pin
-(MHA-CH-06-TL-25) and the CL dowel and clamped by the CR screw; the feed
+(MHA-CH-06-TL-VN-80) and the CL dowel and clamped by the CR screw; the feed
 lever (MHA-CH-06-TL-26) bolts to the -Y edge.
 
 Material and stock: 1/2 in 6061-T651 aluminium plate, OnlineMetals #1250
@@ -26,7 +26,7 @@ Values marked (calc) are read from ``trammel``, never retyped:
   dY = 24.481. Never from a plate edge.
 * (calc) HUB (0, 45.526) and CL (-160.895, 29.350): Ø3 x 90° centre-drill
   spots only. Both are finished in place on the running jig: HUB to Ø10.20 H7
-  for the TL-25 pin, and CL to Ø6 N7 (5.984/5.996) for the bought Ø6 x 20 m6
+  for the bonded TL-VN-80 gauge pin, and CL to Ø6 N7 (5.984/5.996) for the bought Ø6 x 20 m6
   dowel (6.004/6.012, inventory ``fixtures.trammel-cl-dowel``), a
   0.008-0.028 diametral press (``CL_DOWEL_INTERFERENCE``). The traveler
   carries these sizes, not this sheet, so the spots locate at title-block
@@ -47,8 +47,8 @@ Tight bands (drawing-guidelines.md rule 4). The print names each band's
 function and mate (``SPACING_CALLOUT``, ``DX_CALLOUT``, ``DY_CALLOUT``: the
 pair sets R800 or R816 on the MHA-CH-13 strap); the sensitivities stay here:
 
-* Pin holes Ø10.000 +0.015/0 (H7), REAM THRU. Mate: MHA-CH-06-TL-23 PIVOT
-  PIN, upper section Ø10 h6, so 0.000-0.024 diametral clearance. That
+* Pin holes Ø10.000 +0.015/0 (H7), REAM THRU. Mate: MHA-CH-06-TL-VN-77
+  shoulder, Ø10 -0.025/0, so 0.000-0.040 diametral clearance. That
   clearance is edge error 1:1.
 * D1 450.135 ±0.02: a spacing error x 1.77 (``trammel.RADIUS_PER_SPACING``)
   is the cut radius error on R800.
@@ -57,24 +57,16 @@ pair sets R800 or R816 on the MHA-CH-13 strap); the sensitivities stay here:
 * dY 24.481 ±0.02: 1:1 on the 16.00 strap depth (R816 - R800).
 * Rail angle (not on this sheet): 0.1° of rail angle is about 4.7 mm of R
   (``trammel.RADIUS_PER_TENTH_DEG``); the rails are set by indicating.
-* Bearing radial play (not on this sheet): the C3 6200-2RS play,
-  0.008-0.023 unmounted, can open or close the pin spacing by up to 0.023, so
-  up to 0.041 on R (``trammel.RADIUS_FROM_BEARING_PLAY``).
 
 Position chains. X runs from the HUB spot's axis, which the 260.0 places from
 the left end (A1 by an ordinary 225.07, B1 from A1 by the spacing); Y runs from
 the A1-B1 pin line, the reamed pair's own axes, placed 45.00 from the -Y edge.
 A2/B2 chain from A1/B1, never from an edge.
 
-Pin-hole chamfer (``PIN_CHAMFER``, jig-r3 interference). Each pivot pin's
-collar seats on the underside, and its R0.2 MAX collar fillet
-(``ch_rocker_arm_tl_oblique_pivot_pin_spec.SHOULDER_FILLET_RADIUS``) met the
-sharp edge of the Ø10 hole: 0.27 mm³ of overlap per pin. All four holes
-carry a 0.3 MIN x 45° chamfer on that edge (every pair rides the pins on
-some pass). The HUB does not: it is only a Ø3 spot here and is reamed to
-Ø10.20 H7 in place on the running jig, so its break belongs to that in-place
-step (the hub pin's R0.2 head fillet is cleared by the title block's edge
-break, ``ch_rocker_arm_tl_oblique_hub_pin_spec``).
+Pin-hole chamfer (``PIN_CHAMFER``): retain the existing 0.3 MIN x 45°
+underside edge breaks on all four holes. Each active pair slides on the
+purchased TL-VN-78 spacer's top face, rather than a pin collar. The HUB
+is still finished in place to Ø10.20 H7 for the bonded gauge pin.
 
 No skid (user ruling, option (b), 2026-10-16). The plate is carried on the two
 pins only. Its centre sag between pins 450 apart, simply supported, E = 69 GPa,
@@ -82,15 +74,6 @@ I = 130·12³/12: 0.02 mm under its own weight and 0.015 mm under 10 N of
 cutting load at mid-span (``SAG_SELF_WEIGHT``, ``SAG_CUTTING_LOAD``) - far
 inside the cut's own tolerance, so nothing need bear under the plate.
 
-Each pin-hole axis is inspected against the underside before assembly.
-PIN_AXIS_CALLOUT belongs to the native 4X REAM dimension: its 0.05 MAX lean
-in 10.50 of land, in any direction, bounds the actual axis vector's angle by
-atan(0.05/10.50), not each projected component independently.
-Section A-A measures the actual straight land as a native reference (11.7
-nominal); PIN_LAND_CALLOUT separately requires 10.50 MIN of straight land.
-The process row gives the surface-plate, fitted-arbor and indicator setup.
-No geometric frame (no ``machinist_exceptions`` accept entry), reamed fit or
-chamfer geometry changes.
 
 Rule 17 (walls) at worst case: the lever tap's thread major to the -45 edge
 is 3.03 nominal, 2.01 at the stations' and the edge's .XX bands
@@ -108,8 +91,9 @@ from __future__ import annotations
 import math
 
 import _config
-import ch_rocker_arm_tl_oblique_pivot_pin_spec as pivot_pin
-import ch_rocker_arm_tl_oblique_retention_spec as retention
+import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as pivot_screw
+import ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec as pivot_spacer
+import ch_rocker_arm_tl_vn_oblique_hub_pin_spec as hub_pin
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 from _fit_deviations import deviations
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
@@ -135,8 +119,7 @@ PLATE_HALF_LENGTH = OUTLINE_X[1]  # 260: the centreline to either end
 
 # --- Pivot-pin holes (calc) -------------------------------------------------
 PIN_HOLES = trammel.PIN_HOLES
-# Each pin hole's hidden named axis, which the jig assembly mates on the
-# pivot pin's (pivot_pin_spec.AXIS_NAME).
+# Each unchanged pivot bore has a named axis for the shoulder-screw mate.
 PIN_HOLE_AXES = {hole: f"PinAxis{hole}" for hole in PIN_HOLES}
 D1 = trammel.D1
 A2_DX = trammel.A2[0] - trammel.A1[0]  # -7.224 (outward)
@@ -145,22 +128,30 @@ if abs(abs(A2_DX) - (trammel.D2 - trammel.D1) / 2.0) > 1e-9:
     raise AssertionError("A2 is not chained (D2 - D1)/2 outboard of A1")
 PIN_HOLE_DIA = 10.0
 PIN_HOLE_BAND = (0.015, 0.0)  # H7 on Ø10
-PIN_MATE_BAND = (0.0, -0.009)  # h6 on the TL-23 pin's Ø10 upper section
+PIN_MATE_BAND = pivot_screw.SHOULDER_DIA_BAND
 _hole_low, _hole_high = deviations(PIN_HOLE_BAND)
 _mate_low, _mate_high = deviations(PIN_MATE_BAND)
 PIN_CLEARANCE_MIN = _hole_low - _mate_high
 PIN_CLEARANCE_MAX = _hole_high - _mate_low
 POSITION_BAND = 0.02  # symmetric, on D1, dX and dY
-PIN_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-pivot-pin")["number"]
-PIN_MATE = f"{PIN_NUMBER} PIVOT PIN"
+PIN_NUMBER = "MHA-CH-06-TL-VN-77"
+HUB_HOLE_DIA = 10.20
+HUB_HOLE_BAND = (0.018, 0.0)  # unchanged in-place H7 bore for bonded gauge pin
+_hub_hole_low, _hub_hole_high = deviations(HUB_HOLE_BAND)
+_hub_pin_low, _hub_pin_high = deviations(hub_pin.DIA_BAND)
+HUB_HOLE_LIMITS = (HUB_HOLE_DIA + _hub_hole_low, HUB_HOLE_DIA + _hub_hole_high)
+HUB_PIN_LIMITS = (hub_pin.DIA + _hub_pin_low, hub_pin.DIA + _hub_pin_high)
+HUB_BOND_CLEARANCE_MIN = HUB_HOLE_LIMITS[0] - HUB_PIN_LIMITS[1]
+HUB_BOND_CLEARANCE_MAX = HUB_HOLE_LIMITS[1] - HUB_PIN_LIMITS[0]
+if HUB_BOND_CLEARANCE_MIN < 0.0:
+    raise AssertionError("bonded gauge pin interferes with the unchanged carrier H7 bore")
+# The mate's number and name print on rows of their own: on one row they
+# made the block 91 mm wide, past the inner border and across the plate
+# end's extension line.
 PIN_HOLE_CALLOUT = (
     f"4X REAM THRU ({PIN_CLEARANCE_MIN:.3f}-{PIN_CLEARANCE_MAX:.3f}\n"
-    f"DIAMETRAL CLEARANCE ON\n{PIN_MATE})"
+    f"DIAMETRAL CLEARANCE ON\n{PIN_NUMBER}\nSHOULDER SCREW)"
 )
-# Source-visible aliases of the shared retention proof's actual inspection
-# limits, not independent tolerances or extra bore geometry.
-PIN_AXIS_DEVIATION_MAX = retention.CARRIER_AXIS_DEVIATION_MAX
-PIN_AXIS_MEASUREMENT_SPAN = retention.CARRIER_AXIS_MEASUREMENT_SPAN
 # Rule 4: each pin band names what it sets and on which part (jig-r3 review);
 # the error sensitivities stay in the docstring.
 STRAP_NUMBER = "MHA-CH-13"
@@ -169,29 +160,16 @@ DX_CALLOUT = f"SETS R{trammel.R_OUTER:.0f} ON\n{STRAP_NUMBER}"
 DY_CALLOUT = DX_CALLOUT
 STRAP_DEPTH = trammel.R_OUTER - trammel.R_INNER
 
-# 45° chamfer on each pin hole's underside (collar-side) edge: it clears the
-# pivot pin's collar fillet.  Printed as a native single MIN limit: the title
-# block's .X band would let it shrink to nothing.  (upper, lower): the
-# nominal IS the MIN limit; the upper, which a MIN print does not show, is
-# the native record of what still leaves the collar a seat (guard below).
+# Existing underside chamfer: clears the entry and leaves a spacer thrust seat.
 PIN_CHAMFER = 0.3
 PIN_CHAMFER_BAND = (0.1, 0.0)
 PIN_CHAMFER_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints "0.3 MIN"
 PIN_CHAMFER_PLACES = 1
-# The modeled straight wall ends at the underside chamfer, not at an invented
-# 10.50 station. Section A-A displays this derived length as reference only.
-PIN_STRAIGHT_LAND = THICKNESS - PIN_CHAMFER
-DRAWING_REFERENCE_PRECISION = {"PinStraightLand": 1}
-# Against the hole edge the fillet's arc stands R (2 - sqrt 2) proud of a 45°
-# chamfer's leg, so the MIN leg reaches it with 0.1 to spare; the chamfered
-# mouth at its largest stays inside the collar.
-if PIN_CHAMFER < pivot_pin.SHOULDER_FILLET_RADIUS * (2.0 - math.sqrt(2.0)) + 0.1:
-    raise AssertionError("pin-hole chamfer does not clear the pivot pin's fillet")
 _PIN_CHAMFER_MOUTH_MAX = (
     (PIN_HOLE_DIA + PIN_HOLE_BAND[0]) / 2.0 + PIN_CHAMFER + PIN_CHAMFER_BAND[0]
 )
-if _PIN_CHAMFER_MOUTH_MAX >= pivot_pin.COLLAR_DIA / 2.0:
-    raise AssertionError("pin-hole chamfer eats the pivot pin collar's seat")
+if _PIN_CHAMFER_MOUTH_MAX >= (pivot_spacer.OD + pivot_spacer.OD_BAND[1]) / 2.0:
+    raise AssertionError("pin-hole chamfer consumes the spacer's thrust seat")
 if round(PIN_CHAMFER, PIN_CHAMFER_PLACES) != PIN_CHAMFER:
     raise AssertionError("the pin-hole chamfer must print exactly at its places")
 # The hidden reference sketch section A-A imports (fr_nameplate's
@@ -207,7 +185,7 @@ if round(PIN_CHAMFER, PIN_CHAMFER_PLACES) != PIN_CHAMFER:
 # jig-r6's import came back empty.
 SECTION_PLANE = "SectionAPlane"
 SECTION_REFERENCE = "SectionReference"
-PIN_CHAMFER_CALLOUT = f"X 45\u00b0, 4X UNDERSIDE\nCLEARS {PIN_NUMBER}\nCOLLAR FILLET"
+PIN_CHAMFER_CALLOUT = "X 45\u00b0, 4X UNDERSIDE\nSEATS ON TL-VN-78 SPACER"
 # Section A-A cuts SECTION_HALF_SPAN either side of A1's axis; the stock line
 # stands STOCK_REFERENCE_INSET inside the cut's +X end, so the thickness's
 # extension lines leave the slab at its end.
@@ -379,21 +357,8 @@ POSITION_BANDED = ("PinSpacing", "A2DX", "A2DY", "B2DX", "B2DY")
 # Each spot has its own leader and callout (jig-r3: a "2X" with one leader
 # read as one spot).
 SPOT_CALLOUT = "CENTRE DRILL SPOT"
-# The full orientation acceptance is on the actual reamed diameter, never on
-# a separate leader note. The lean is the axis's lateral change over the
-# measurement span in its own direction, so its bound is exactly
-# atan(deviation/span) in any azimuth, not a per-direction allowance.
-CAP_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-pivot-cap")["number"]
-PIN_AXIS_CALLOUT = (
-    "AXES SQUARE TO UNDERSIDE:\n"
-    f"{PIN_AXIS_DEVIATION_MAX:.2f} MAX LEAN IN {PIN_AXIS_MEASUREMENT_SPAN:.2f} OF\n"
-    "LAND, ANY DIRECTION, SO PIN\n"
-    f"CLEARS {CAP_NUMBER} CAP"
-)
-PIN_LAND_CALLOUT = f"4X STRAIGHT\nLAND\n{PIN_AXIS_MEASUREMENT_SPAN:.2f} MIN"
-PIN_STRAIGHT_LAND_MIN_CALLOUT = f"{PIN_AXIS_MEASUREMENT_SPAN:.2f} MIN"
 CALLOUTS_BELOW = {
-    "PinHoleDia": f"{PIN_HOLE_CALLOUT}\n{PIN_AXIS_CALLOUT}",
+    "PinHoleDia": PIN_HOLE_CALLOUT,
     "PinSpacing": SPACING_CALLOUT,
     "A2DX": DX_CALLOUT,
     "B2DX": DX_CALLOUT,

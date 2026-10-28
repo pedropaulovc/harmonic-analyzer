@@ -314,6 +314,12 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the pressed dowel's catalogue diameter: read by min/max for the press "
         "interference against the arm's blind hole"
     ),
+    ("pd_rack_pinion_spec", "CENTRE_DISTANCE_SET_BAND"): (
+        "the reducer's S-K set band at assembly (+0.025/-0 fine-pitch centre "
+        "allowance), printed as setting text on MHA-PD-00 step 10 and the arm "
+        "and plate notes, read by paper_drive_arm_registration; no fit or "
+        "model dimension"
+    ),
     ("sm_vn_knife_mount_dowel_spec", "DIA_BAND"): (
         "the pressed dowel's catalogue diameter: read by min/max for the press "
         "interference against the knife mount's reamed blind hole"
@@ -325,26 +331,6 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("sm_knife_mount_spec", "STUD_TAP_DIA_BAND"): (
         "the title-block DRILLED HOLES +0.10/0 tap-pilot diameter: indexed into "
         "accepted limits, without a redundant explicit callout band"
-    ),
-    ("ch_rocker_arm_tl_oblique_retention_spec", "PIN_FLANGE_DIA_BAND"): (
-        "indexed for the captive flange's minimum stop overlap and maximum "
-        "pocket envelope; also authored on the native pivot pin"
-    ),
-    ("ch_rocker_arm_tl_oblique_retention_spec", "PIN_CROSS_HOLE_BAND"): (
-        "the clevis cross-hole's drilled band, indexed by the actual loaded "
-        "top-retainer stack; the pivot pin spec ties it to the title block's "
-        "DRILLED HOLES row, which its plain drilled callout prints"
-    ),
-    ("ch_rocker_arm_tl_oblique_retention_spec", "CAP_POCKET_DIAMETER_BAND"): (
-        "indexed for the worst flange-to-pocket shift and contact margin; "
-        "also authored on the native cap's PocketDia"
-    ),
-    ("ch_rocker_arm_tl_oblique_retention_spec", "CAP_APERTURE_BAND"): (
-        "indexed for minimum pin running clearance and maximum positive-stop aperture"
-    ),
-    ("ch_rocker_arm_tl_oblique_retention_spec", "CAP_BOLT_CLEARANCE_BAND"): (
-        "indexed for guaranteed head-floor coverage and exclusion of through "
-        "holes from the fixed-world floor witnesses"
     ),
 }
 
@@ -485,10 +471,6 @@ def test_band_uses_are_found() -> None:
     assert "build_dt_cone_gear_shaft:band" in ids, (
         "missing band consumer anchor: build_dt_cone_gear_shaft:band"
     )
-    # Per-source anchor: an exported limit consumer may not disappear behind a
-    # rich unrelated source's count.
-    anchor = "draw_ch_rocker_arm_tl_oblique_pivot_pin:part_spec.BEARING_PRINT_BAND"
-    assert anchor in ids, f"missing band consumer anchor: {anchor}"
 
 
 def test_known_bad_ids_are_live() -> None:
@@ -578,8 +560,6 @@ def test_classification_lists_are_current() -> None:
     assert ("dt_cylinder_gear_spec", "OVERALL_THICKNESS_BAND") in inventory, (
         "missing band inventory anchor: dt_cylinder_gear_spec:OVERALL_THICKNESS_BAND"
     )
-    anchor = ("ch_rocker_arm_tl_oblique_pivot_pin_spec", "BEARING_PRINT_BAND")
-    assert anchor in inventory, f"missing band inventory anchor: {anchor[0]}:{anchor[1]}"
     for listing in (NOT_FIT_BANDS, INDEXED_FIT_BANDS):
         stale = set(listing) - inventory
         assert not stale, f"listed constants that are gone: {sorted(stale)}"
@@ -592,7 +572,6 @@ def band_use_source_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Pat
     anchors = {
         "build_dt_crank_drive_gear": "BORE_DIA_BAND",
         "build_dt_cone_gear_shaft": "band",
-        "draw_ch_rocker_arm_tl_oblique_pivot_pin": "part_spec.BEARING_PRINT_BAND",
     }
     for module, expression in anchors.items():
         (tmp_path / f"{module}.py").write_text(
@@ -623,7 +602,6 @@ def test_band_uses_anchor_rejects_no_match(
     [
         ("build_dt_crank_drive_gear", "BORE_DIA_BAND"),
         ("build_dt_cone_gear_shaft", "band"),
-        ("draw_ch_rocker_arm_tl_oblique_pivot_pin", "part_spec.BEARING_PRINT_BAND"),
     ],
 )
 def test_band_uses_anchor_rejects_one_directory_deep_source(
@@ -652,7 +630,6 @@ def band_inventory_source_tree(
     """AST-only assignments satisfy real lists without importing their owners."""
     names = set(NOT_FIT_BANDS) | set(INDEXED_FIT_BANDS) | {
         ("dt_cylinder_gear_spec", "OVERALL_THICKNESS_BAND"),
-        ("ch_rocker_arm_tl_oblique_pivot_pin_spec", "BEARING_PRINT_BAND"),
     }
     by_module: dict[str, list[str]] = {}
     for module, name in sorted(names):
@@ -685,7 +662,6 @@ def test_inventory_anchor_rejects_no_match(
     ("module", "name"),
     [
         ("dt_cylinder_gear_spec", "OVERALL_THICKNESS_BAND"),
-        ("ch_rocker_arm_tl_oblique_pivot_pin_spec", "BEARING_PRINT_BAND"),
     ],
 )
 def test_inventory_anchor_rejects_one_directory_deep_source(

@@ -513,6 +513,21 @@ def test_the_wire_wrap_has_the_required_geometric_margin() -> None:
     assert mg_wheel_group.LEVER_WIRE_WRAP_LEFT_DEG >= mg_wheel_group.WRAP_MARGIN_DEG
 
 
+def test_the_wire_tie_step_brings_tie_1_to_its_modelled_rest_clock() -> None:
+    import mg_magnifying_wheel_geom as wheel
+
+    # The step's clock-face hour is where the wheel model puts TIE 1 at rest
+    # (seen from the front), so the wire is tied in the state its wrap is
+    # proved in.
+    step = notes.STEP_TEXT[steps.WIRE_TIED_KEY]
+    hours = [int(hour) for hour in re.findall(r"\b(\d{1,2}) O'CLOCK\b", step)]
+    assert len(hours) == 1
+    hour_clock_deg = 90.0 - 30.0 * hours[0]
+    assert (hour_clock_deg - wheel.TIE1_CLOCK_DEG + 180.0) % 360.0 - 180.0 == (
+        pytest.approx(0.0, abs=1.0)
+    )
+
+
 def test_the_assembled_views_name_their_direction_clear_of_their_neighbours() -> None:
     # r8's printed outlines (sheet metres): Front, Right, Isometric.
     front = (0.041, 0.091, 0.099, 0.204)

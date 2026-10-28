@@ -60,11 +60,9 @@ _STOCK_REQUIREMENTS = {
     "mg-vn-wheel-axle-front-washer": (("92916A250",), "MHA-MG-VN-55", 1),
     "ch-vn-spring-hook": (("9489T111",), "MHA-CH-VN-51", 20),
     "fr-vn-tube-frame-cap": (("9275K141",), "MHA-FR-VN-54", 4),
-    "ch-rocker-arm-tl-vn-oblique-bearing": (("5972K41",), "MHA-CH-06-TL-VN-52", 4),
     "ch-rocker-arm-tl-vn-oblique-cl-dowel": (("91595A452",), "MHA-CH-06-TL-VN-53", 1),
     "ch-rocker-arm-tl-vn-oblique-rail-screw": (("91251A197",), "MHA-CH-06-TL-VN-61", 14),
     "ch-rocker-arm-tl-vn-oblique-bracket-screw": (("91251A196",), "MHA-CH-06-TL-VN-62", 8),
-    "ch-rocker-arm-tl-vn-oblique-block-screw": (("91251A188",), "MHA-CH-06-TL-VN-63", 2),
     "ch-rocker-arm-tl-vn-oblique-carriage-screw": (("91290A168",), "MHA-CH-06-TL-VN-64", 8),
     "ch-rocker-arm-tl-vn-oblique-kp08-screw": (
         ("91251A150",),
@@ -75,42 +73,21 @@ _STOCK_REQUIREMENTS = {
     "ch-rocker-arm-tl-vn-oblique-riser-screw": (("91771A112",), "MHA-CH-06-TL-VN-67", 4),
     "ch-rocker-arm-tl-vn-oblique-clamp-screw": (("91251A541",), "MHA-CH-06-TL-VN-68", 1),
     "ch-rocker-arm-tl-vn-oblique-lever-screw": (("91251A583",), "MHA-CH-06-TL-VN-69", 2),
-    "ch-rocker-arm-tl-vn-oblique-block-washer": (
-        ("91812A215",), "MHA-CH-06-TL-VN-70", 2,
-    ),
     "ch-rocker-arm-tl-vn-oblique-lever-washer": (
         ("91812A230",), "MHA-CH-06-TL-VN-71", 2,
     ),
-    "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw": (
-        ("NAS1352N5H12",),
-        "MHA-CH-06-TL-VN-73",
-        8,
+    "ch-rocker-arm-tl-vn-oblique-pivot-screw": (("90323A492",), "MHA-CH-06-TL-VN-77", 2),
+    "ch-rocker-arm-tl-vn-oblique-pivot-spacer": (("92871A359",), "MHA-CH-06-TL-VN-78", 2),
+    "ch-rocker-arm-tl-vn-oblique-pivot-shim": (
+        ("98055A118", "98055A117", "98055A121"), "MHA-CH-06-TL-VN-79", 10,
     ),
-    "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin": (
-        ("CLPS6-0187-1250D",),
-        "MHA-CH-06-TL-VN-74",
-        2,
-    ),
-    "ch-rocker-arm-tl-vn-oblique-pivot-cotter": (
-        ("CP-062-0500",),
-        "MHA-CH-06-TL-VN-75",
-        2,
-    ),
-    "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire": (
-        ("05-02685",),
-        "MHA-CH-06-TL-VN-76",
-        4,
-    ),
+    "ch-rocker-arm-tl-vn-oblique-hub-pin": (("2281A11-6410N695",), "MHA-CH-06-TL-VN-80", 1),
 }
 # The post-mount screw's 1/4-20 x 4 in stock is sourced from MSC; the jig's nut
 # screws are Olander button heads (owner ruling 2026-10-20).
 _SUPPLIERS = {
     "dt-vn-post-mount-screw": "MSC Industrial Supply",
     "ch-rocker-arm-tl-vn-oblique-nut-screw": "Olander",
-    "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw": "CBS Fasteners",
-    "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin": "Huyett",
-    "ch-rocker-arm-tl-vn-oblique-pivot-cotter": "Huyett",
-    "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire": "Aircraft Spruce",
 }
 
 

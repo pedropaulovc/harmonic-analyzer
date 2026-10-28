@@ -125,9 +125,9 @@ def test_factory_tip_stays_clear_below_the_carrier_at_the_plate_bands() -> None:
     )
     assert spec.STAND_OUT_MAX_NOMINAL_SEAT == pytest.approx(stand_out)
     assert trammel.CARRIER_UNDERSIDE_Z - trammel.PIVOT_BLOCK_TOP_Z == pytest.approx(
-        trammel.PIN_COLLAR_PROUD
+        trammel.PIVOT_SUPPORT_HEIGHT
     )
-    assert stand_out < trammel.PIN_COLLAR_PROUD
+    assert stand_out < trammel.PIVOT_SUPPORT_HEIGHT
     assert stand_out < trammel.CARRIER_TO_RAIL_GAP
     radius = max(
         math.dist((x, y), (pivot_block.BORE_X, 0.0))

@@ -112,9 +112,9 @@ cannot ask for what the authors were told to leave out.
   gate 3 in the root `AGENTS.md`).
   Purchased drawings may opt into a recipe-local title-block setup after the
   source links resolve, returning final-rebuild checks through the existing
-  `settled_checks` contract. The TL-VN-73/74/75/76 captured-pivot purchases
-  and the TL-VN-55 leadscrew nut opt into `_purchased_title_fit` (as do the
-  catalogued supplier screws): it fits their existing linked Name, Material
+  `settled_checks` contract. The TL-VN-55 leadscrew nut opts into
+  `_purchased_title_fit` (as do the catalogued supplier screws): it fits their
+  existing linked Name, Material
   and DWG. NO. notes inside their actual native ruled cells on one row.
   Readable native-height floors are 3 mm for Name/Number and 2 mm for Material;
   an unfit complete value refuses export, never truncates it.
@@ -123,11 +123,7 @@ cannot ask for what the authors were told to leave out.
   exact `$PRPSHEET` expression and still requires the full resolved value.
   Font, anchor and whole-cell bounds remain independently checked after the
   final rebuild. No saved template, purchase identity, grade or reference-view
-  scale changes. These four registry Material Specifications contain the
-  physical material/condition and applicable standard, not duplicated catalogue
-  prose. PASSIVATED and ZINC CLEAR remain in Finish; the complete CBS screw
-  description is in ITEM. Supplier, SKU, clevis 3/16 x 1-1/4 and wire .032 stay
-  in the existing procurement rows. The fixture's Material `LineLength` write
+  scale changes. The fixture's Material `LineLength` write
   was observed to persist without widening its wrapped text, so that ineffective
   write is removed for Material only; actual native bounds still decide fit.
 - **Fit-up at assembly (rule 19) is a last resort.** Slots, shims, cut-to-fit

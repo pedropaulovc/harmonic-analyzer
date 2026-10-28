@@ -35,6 +35,12 @@ def reducer_position_diameter_mm() -> float:
     return _positive_limit_mm("reducer_position_diameter_mm")
 
 
+def reducer_k_setting_diameter_mm() -> float:
+    """Diametral circle the matched knob bore K is set in about the pin S;
+    its radius is the reducer centre's set band."""
+    return _positive_limit_mm("reducer_k_setting_diameter_mm")
+
+
 def shaft_turned_runout_mm() -> float:
     """Ordinary turned-core total runout to the shaft's running datum."""
     return _positive_limit_mm("shaft_turned_runout_mm")

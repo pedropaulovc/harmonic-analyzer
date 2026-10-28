@@ -155,9 +155,13 @@ class _Note:
         return True
 
 
+_CUSTOM_GENERAL = "PURCHASED PART; TEST OVERRIDE LINE."
+
+
+@pytest.mark.parametrize("general_text", (None, _CUSTOM_GENERAL))
 @pytest.mark.parametrize("number_fit", (None, purchased.NumberFit.SHRINK_TO_CELL))
 def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
-    monkeypatch, tmp_path: Path, number_fit
+    monkeypatch, tmp_path: Path, number_fit, general_text
 ) -> None:
     source = tmp_path / "test-fastener.SLDPRT"
     source.touch()
@@ -320,6 +324,8 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
 
     monkeypatch.setattr(purchased, "finalize_drawing", finalize)
     options = {} if number_fit is None else {"number_fit": number_fit}
+    if general_text is not None:
+        options["general_text"] = general_text
     result = asyncio.run(
         purchased.build_purchased_fastener_drawing(
             _Adapter(source), spec, item="#4-40 x 1/4 TEST SCREW", **options
@@ -331,7 +337,10 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
     assert modes == dict.fromkeys(("*Front", "*Top", "*Right", "*Isometric"), "HLR")
     printed = [call[1] for call in calls if call[0] == "note"]
     assert "#4-40 x 1/4 TEST SCREW" in printed
-    assert purchased._GENERAL_TEXT[False] in printed
+    # The override replaces only the general line; omitted keeps the default.
+    # Both pass the build's native footer readback, which raises on a mismatch.
+    general = [text for text in printed if text in (_CUSTOM_GENERAL, *purchased._GENERAL_TEXT.values())]
+    assert general == [general_text or purchased._GENERAL_TEXT[False]]
     assert not any("STOCK" in text or "INSTALL PER NOTES" in text for text in printed)
     assert result == {"pdf": str(outputs["pdf"])}
     assert ("new", layout) in calls
@@ -9094,7 +9103,7 @@ def test_source_property_expression_accepts_only_the_optional_font_wrapper(
     "raw",
     [
         "",
-        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+        "ch-rocker-arm-tl-vn-oblique-pivot-screw",
         '$PRP:"SW-Title(Title)"',
         'NAME $PRPSHEET:"SW-Title(Title)"',
         '$PRPSHEET:"SW-Title(Title)" suffix',
@@ -9137,9 +9146,9 @@ def test_linked_value_preserves_captured_name_when_native_format_strips_font() -
     # source property and resolved Name remain intact. This is not a COM echo.
     assert_linked_value(
         '<FONT size=15PTS>$PRPSHEET:"SW-Title(Title)"',
-        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+        "ch-rocker-arm-tl-vn-oblique-pivot-screw",
         '$PRPSHEET:"SW-Title(Title)"',
-        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+        "ch-rocker-arm-tl-vn-oblique-pivot-screw",
         label="Name",
     )
 
@@ -9162,42 +9171,42 @@ def test_linked_value_accepts_exact_wrapped_material_without_normalizing_text() 
     [
         pytest.param(
             '$PRPSHEET:"Title"',
-            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            "ch-rocker-arm-tl-vn-oblique-pivot-screw",
             id="different-property-even-with-identical-resolved-text",
         ),
         pytest.param(
             '$PRP:"SW-Title(Title)"',
-            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            "ch-rocker-arm-tl-vn-oblique-pivot-screw",
             id="different-property-owner",
         ),
         pytest.param(
-            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
-            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            "ch-rocker-arm-tl-vn-oblique-pivot-screw",
+            "ch-rocker-arm-tl-vn-oblique-pivot-screw",
             id="literal-replacement",
         ),
         pytest.param(
             'NAME $PRPSHEET:"SW-Title(Title)"',
-            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            "ch-rocker-arm-tl-vn-oblique-pivot-screw",
             id="extra-prefix",
         ),
         pytest.param(
             '$PRPSHEET:"SW-Title(Title)" suffix',
-            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            "ch-rocker-arm-tl-vn-oblique-pivot-screw",
             id="extra-suffix",
         ),
         pytest.param(
             '$PRPSHEET:"SW-Title(Title)"$PRPSHEET:"Material"',
-            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            "ch-rocker-arm-tl-vn-oblique-pivot-screw",
             id="second-link",
         ),
         pytest.param(
             '<B>$PRPSHEET:"SW-Title(Title)"',
-            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            "ch-rocker-arm-tl-vn-oblique-pivot-screw",
             id="unsupported-markup",
         ),
         pytest.param(
             '<FONT size=15PTS$PRPSHEET:"SW-Title(Title)"',
-            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            "ch-rocker-arm-tl-vn-oblique-pivot-screw",
             id="malformed-font",
         ),
         pytest.param(
@@ -9207,12 +9216,12 @@ def test_linked_value_accepts_exact_wrapped_material_without_normalizing_text() 
         ),
         pytest.param(
             '$PRPSHEET:"SW-Title(Title)"',
-            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin ",
+            "ch-rocker-arm-tl-vn-oblique-pivot-screw ",
             id="value-whitespace-is-not-normalized",
         ),
         pytest.param(
             '$PRPSHEET:"SW-Title(Title)"',
-            "CH-ROCKER-ARM-TL-VN-OBLIQUE-PIVOT-CLEVIS-PIN",
+            "CH-ROCKER-ARM-TL-VN-OBLIQUE-PIVOT-SCREW",
             id="value-case-is-not-normalized",
         ),
     ],
@@ -9223,7 +9232,7 @@ def test_linked_value_refuses_true_identity_or_full_value_changes(
     from _purchased_title_fit import assert_linked_value
 
     expected_link = '<FONT size=15PTS>$PRPSHEET:"SW-Title(Title)"'
-    expected_text = "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin"
+    expected_text = "ch-rocker-arm-tl-vn-oblique-pivot-screw"
     with pytest.raises(RuntimeError) as caught:
         assert_linked_value(
             expected_link, expected_text, actual_link, actual_text, label="Name"
@@ -9247,7 +9256,7 @@ def test_linked_value_refuses_invalid_expected_link_even_when_unchanged(
 ) -> None:
     from _purchased_title_fit import assert_linked_value
 
-    text = "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin"
+    text = "ch-rocker-arm-tl-vn-oblique-pivot-screw"
     with pytest.raises(RuntimeError) as caught:
         assert_linked_value(invalid_link, text, invalid_link, text, label="Name")
     assert repr(invalid_link) in str(caught.value)

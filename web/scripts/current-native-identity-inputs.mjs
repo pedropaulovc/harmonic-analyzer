@@ -27,17 +27,22 @@ export function validateCurrentNativeIdentityProjection(table, cadMap, archivedM
   if (cadMap.schema_version !== 1 || !Array.isArray(cadMap.parts_and_assemblies)
     || !Array.isArray(cadMap.retired_identities)) fail('invalid current CAD map')
   const reservedStems = new Set(), reservedNumbers = new Set()
+  // A post-migration identity retires with no historical Number (old_number
+  // null); its current Numbers are still reserved.
+  const numbersOf = (historical, targets) =>
+    [...(historical === null ? [] : [historical]), ...targets.map(target => target.number)]
   for (const row of cadMap.retired_identities) {
     if (row.status !== 'retired' || !Array.isArray(row.new_identities) || !row.new_identities.length
       || [row.old_stem, ...row.new_identities.map(target => target.stem)]
         .some(stem => typeof stem !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(stem))
-      || [row.old_number, ...row.new_identities.map(target => target.number)]
+      || row.old_number === undefined
+      || numbersOf(row.old_number, row.new_identities)
         .some(number => typeof number !== 'string' || !number.startsWith('MHA-'))) fail('invalid retired identity reservation')
     for (const stem of new Set([row.old_stem, ...row.new_identities.map(target => target.stem)])) {
       if (reservedStems.has(stem)) fail(`colliding retired identity stem ${stem}`)
       reservedStems.add(stem)
     }
-    for (const number of new Set([row.old_number, ...row.new_identities.map(target => target.number)])) {
+    for (const number of new Set(numbersOf(row.old_number, row.new_identities))) {
       if (reservedNumbers.has(number)) fail(`colliding retired identity Number ${number}`)
       reservedNumbers.add(number)
     }
@@ -45,7 +50,7 @@ export function validateCurrentNativeIdentityProjection(table, cadMap, archivedM
   for (const row of cadMap.parts_and_assemblies) {
     if (row.status === 'retired'
       || [row.old_stem, ...row.new_identities.map(target => target.stem)].some(stem => reservedStems.has(stem))
-      || [row.old_number, ...row.new_identities.map(target => target.number)].some(number => reservedNumbers.has(number))) {
+      || numbersOf(row.old_number, row.new_identities).some(number => reservedNumbers.has(number))) {
       fail(`active identity collides with retired reservation ${row.old_stem}`)
     }
   }

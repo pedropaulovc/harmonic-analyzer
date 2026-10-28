@@ -170,7 +170,7 @@ _PIN_PLAN_CLEARANCE = (
     - _PIVOT_BLOCK_PLAN_RADIUS
     - DIA_MAX / 2.0
 )
-if BOTTOM_PROJECTION_MAX >= trammel.PIN_COLLAR_PROUD:
+if BOTTOM_PROJECTION_MAX >= trammel.PIVOT_SUPPORT_HEIGHT:
     raise AssertionError("the CL lower end reaches the below-carrier top envelope")
 if _PIN_PLAN_CLEARANCE <= 0.0:
     raise AssertionError("the CL lower end can meet a pivot pin or block in plan")

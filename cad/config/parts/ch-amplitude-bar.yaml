@@ -1,7 +1,9 @@
 ch-amplitude-bar:
   number: MHA-CH-01
-  material: "AISI 1018 cold-finished, 1/4 in sq"
-  material_specification: AISI 1018 cold-rolled steel, 6.35 sq
+  # Any cold-finished low-carbon 1/4 in square bar (1018, 1020, 12L14): no
+  # fit, plating or load needs one grade (machinist review, rule 2).
+  material: "LOW-CARBON STEEL CF, 1/4 in sq"
+  material_specification: low-carbon cold-finished steel, 6.35 sq
   finish: "bright chrome, dims plated; pin hole bare, oiled"
   quantity: 20
   tolerance_class: machined_block

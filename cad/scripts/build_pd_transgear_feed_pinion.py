@@ -42,12 +42,17 @@ from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
+    blank_reference_sketches,
     dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
-from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_precision import (
+    _named_dimension,
+    _named_dimensions,
+    apply_drawing_precision,
+)
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_marks import (
     apply_drawing_properties,
@@ -55,10 +60,10 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_tolerances import (
+    _set_tolerance_precision,
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
-from _drawing_prefix import set_dimension_prefix
 from _simplified_part import save_simplified_part
 from _gear import ToothedDisc, pattern_about_z
 from _holes import cross_hole_volume_mm3
@@ -83,7 +88,6 @@ from pd_transgear_feed_pinion_spec import (
     CUTTER_RUNOUT_DEVIATIONS,
     CUTTER_RUNOUT_MAX,
     CUTTER_RUNOUT_PLACES,
-    CUTTER_RUNOUT_PREFIX,
     CUTTER_RUNOUT_TOL_TYPE,
     DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
@@ -92,10 +96,16 @@ from pd_transgear_feed_pinion_spec import (
     FACE_WIDTH,
     FLAT_END_STATION,
     FLAT_TO_AXIS,
+    FLAT_END_DEVIATIONS,
+    FLAT_END_MIN,
+    FLAT_END_PLACES,
+    FLAT_END_TOL_TYPE,
     FLAT_TO_AXIS_DEVIATIONS,
     FULL_DEPTH,
-    FULL_DEPTH_BAND,
-    FULL_DEPTH_PREFIX,
+    FULL_DEPTH_DEVIATIONS,
+    FULL_DEPTH_PLACES,
+    FULL_DEPTH_TOL_TYPE,
+    GAP_FLOOR_WITNESS_Y,
     GEAR_DATA,
     OUTSIDE_DIA,
     OUTSIDE_DIA_DEVIATIONS,
@@ -109,6 +119,7 @@ from pd_transgear_feed_pinion_spec import (
     STOCK_PROFILE,
     ROOT_DIA_DEVIATIONS,
     ROOT_DIA_MIN,
+    ROOT_DIA_PLACES,
     ROOT_DIA_TOL_TYPE,
     STATION_TOL,
     SURFACE_FINISHES,
@@ -118,6 +129,7 @@ from pd_transgear_feed_pinion_spec import (
     TOOTH_SPACE_INSPECTION_PHASE_RAD,
     endcut_volume_bounds_mm3,
 )
+import pd_transgear_feed_pinion_callouts as callouts
 from pd_transgear_disc_hub_spec import OIL_HOLE_DIA, OIL_HOLE_SLEEVE_Z
 
 PART_NAME = "pd-transgear-feed-pinion"
@@ -349,19 +361,23 @@ def _as_construction(adapter, line: str) -> None:
 
 def _single_limit(
     adapter,
+    feature: str,
     name: str,
     nominal: float,
     limit_deviations: tuple[float, float],
     tol_type: int,
     printed: str,
+    *,
+    limit_places: int | None = None,
 ) -> None:
-    """A SleeveProfile dimension as a single MIN or MAX limit: SolidWorks
-    prints its nominal then the limit word, so the nominal is the limit's
-    value at the sheet's places; the deviations stay on the native tolerance
-    as the model's record of the band."""
+    """A dimension as a MIN or MAX limit, or with ``limit_places`` a LIMIT
+    pair.  SolidWorks prints a MIN or MAX as its nominal then the limit word,
+    so the nominal is the limit's value at the sheet's places; the deviations
+    stay on the native tolerance as the model's record of the band.  A LIMIT
+    prints the nominal plus each deviation at the tolerance's places."""
     lower, upper = limit_deviations
-    _, dimension = _named_dimension(adapter, "SleeveProfile", name)
-    label = f"{name}@SleeveProfile"
+    display, dimension = _named_dimension(adapter, feature, name)
+    label = f"{name}@{feature}"
     # Source globals use the repository's 1e-9 m neutral-readback convention;
     # an inch-document round-trip must not be tested at exact bit equality.
     if not math.isclose(float(dimension.SystemValue), nominal / 1000.0, abs_tol=1e-9):
@@ -386,7 +402,63 @@ def _single_limit(
         )
     ):
         raise RuntimeError(f"{label}: single-limit tolerance readback changed")
-    _telemetry.success(f"{label}: single limit {printed}")
+    if limit_places is not None:
+        _set_tolerance_precision(
+            display, limit_deviations, label=label, places=limit_places
+        )
+    _telemetry.success(f"{label}: limit {printed}")
+
+
+async def _root_profile(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+    """The root's MIN as a construction circle on the rear face (Front plane).
+
+    The section B-B plane passes through teeth, so it shows no root; the
+    rear-face view shows the full-depth gaps' floors, and a Front-plane
+    diameter imports there.  Construction only: the volume is unchanged.
+    """
+    dims = SketchDims()
+    check("create_sketch root", await adapter.create_sketch("Front"))
+    suppress_dimension_input(adapter)
+    circle = await define_circle(
+        adapter,
+        0.0,
+        0.0,
+        ROOT_DIA_MIN / 2.0,
+        "root minimum",
+        dims=dims,
+        names=(None, None, "RootDia"),
+        drives=(None, None, '"RootDia"'),
+    )
+    _as_construction(adapter, circle)
+    await ensure_fully_defined(adapter, "root sketch")
+    check("exit_sketch root", await adapter.exit_sketch())
+    name_last_feature(adapter, "RootProfile")
+    drive_jobs += dims.apply(adapter, "RootProfile")
+    # A standalone sketch saves shown and renders in every assembly; the
+    # drawing still imports its dimension from the hidden sketch.
+    blank_reference_sketches(adapter, ("RootProfile",))
+
+
+@_telemetry.traced("part.dimension_text")
+def _author_dimension_text(adapter) -> None:
+    """Write every authored text lane on its source dimension, read it back.
+
+    The drawing only reads these lanes: set from the sheet they would write
+    through to this part outside its recipe (#1942).
+    """
+    for feature, by_name in callouts.authored_text().items():
+        displays = _named_dimensions(adapter, feature, set(by_name))
+        for name, lanes in by_name.items():
+            display = _early_bound(displays[name][0], "IDisplayDimension")
+            for lane, text in lanes.items():
+                # SetText is void in the native API; the read-back is the result.
+                display.SetText(lane, text)
+                printed = str(display.GetText(lane) or "")
+                if callouts.callout_rows(printed) != callouts.callout_rows(text):
+                    raise RuntimeError(
+                        f"{name}@{feature}: text lane {lane} did not persist: "
+                        f"{printed!r}"
+                    )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -445,7 +517,7 @@ async def build(adapter) -> dict[str, str]:
     # model -Z, local y -> model Y), so its diameter prints beside its length
     # on the section (drawing-guidelines.md rule 11 (turned parts read like the lathe)). The profile starts AT the tooth face, clear of
     # the relieved gap floors (crank pinion #906): the one step.
-    # Construction witnesses carry the tip, root and bore diameters.
+    # Construction witnesses carry the tip and bore diameters.
     profile = SketchDims()
     check("create_sketch sleeve", await adapter.create_sketch("Right"))
     suppress_dimension_input(adapter)
@@ -465,27 +537,25 @@ async def build(adapter) -> dict[str, str]:
         "outside-diameter witness",
         await adapter.add_line(0.0, OUTSIDE_DIA / 2.0, -FACE_WIDTH, OUTSIDE_DIA / 2.0),
     )
-    root_ref = check(
-        "root-diameter witness",
-        await adapter.add_line(0.0, ROOT_DIA_MIN / 2.0, -FACE_WIDTH, ROOT_DIA_MIN / 2.0),
-    )
     bore_ref = check(
         "bore-diameter witness",
         await adapter.add_line(0.0, BORE_DIA / 2.0, -OVERALL_LENGTH, BORE_DIA / 2.0),
     )
     # R9-67: the cutter's full-depth station and run-out limit, from the rear
-    # face along the tooth tips' lower line, so each baseline dimension below
-    # the section rises from the part's edge.
-    tip_v = -OUTSIDE_DIA / 2.0
+    # face along the floor of the gap that faces an outside view in the
+    # section's direction (GAP_FLOOR_WITNESS_Y), so each baseline dimension
+    # rises from the floor whose straight pass and run-out it bounds.
+    floor_v = GAP_FLOOR_WITNESS_Y
     runout_ref = check(
         "run-out-limit witness",
-        await adapter.add_line(0.0, tip_v, -CUTTER_RUNOUT_MAX, tip_v),
+        await adapter.add_line(0.0, floor_v, -CUTTER_RUNOUT_MAX, floor_v),
     )
     full_depth_ref = check(
-        "full-depth witness", await adapter.add_line(0.0, tip_v, -FULL_DEPTH, tip_v)
+        "full-depth witness",
+        await adapter.add_line(0.0, floor_v, -FULL_DEPTH, floor_v),
     )
     set_sketch_direct_db(adapter, False)
-    for line in (outside_ref, root_ref, bore_ref, runout_ref, full_depth_ref):
+    for line in (outside_ref, bore_ref, runout_ref, full_depth_ref):
         _as_construction(adapter, line)
     for i, line in enumerate(lines):
         (_, y1), (_, y2) = points[i], points[(i + 1) % len(lines)]
@@ -496,7 +566,6 @@ async def build(adapter) -> dict[str, str]:
         )
     for label, line, end_point in (
         ("outside-diameter witness", outside_ref, f"{lines[0]}.start"),
-        ("root-diameter witness", root_ref, f"{lines[0]}.start"),
         ("bore-diameter witness", bore_ref, f"{lines[2]}.end"),
     ):
         check(
@@ -539,7 +608,6 @@ async def build(adapter) -> dict[str, str]:
             f"{outside_ref}.start",
             (-FACE_WIDTH / 2.0, OUTSIDE_DIA / 2.0 + 5.0),
         ),
-        ("RootDia", f"{root_ref}.start", (-FACE_WIDTH / 2.0, -(ROOT_DIA_MIN / 2.0 + 5.0))),
         ("BoreDia", f"{bore_ref}.start", (-OVERALL_LENGTH / 2.0, BORE_DIA / 2.0 + 3.0)),
     ):
         await add_diametric_linear_dimension(adapter, axis, target, xy, name)
@@ -559,9 +627,11 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     await anchor_point_to_origin(
-        adapter, f"{runout_ref}.start", 0.0, tip_v, "witnesses on the tip line"
+        adapter, f"{runout_ref}.start", 0.0, floor_v, "witnesses on the gap floor"
     )
-    profile.record("WitnessDrop", '"OutsideDia" / 2')
+    profile.record(
+        "WitnessDrop", f'"RootDia" * {-GAP_FLOOR_WITNESS_Y / ROOT_DIA_MIN:.12f}'
+    )
     await dimension_between(
         adapter,
         f"{full_depth_ref}.end",
@@ -593,6 +663,7 @@ async def build(adapter) -> dict[str, str]:
 
     volume, end_features = await _stock_cutter_endcut(adapter, drive_jobs)
     await author_span(adapter, STOCK_PROFILE, SPAN_TEETH, places=SPAN_PLACES)
+    await _root_profile(adapter, drive_jobs)
 
     # Bore through (centre 0,0): define_circle emits only the diameter dim.
     bore = SketchDims()
@@ -690,18 +761,25 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven feed-pinion sleeve (equations neutral)", volume, 0.01 * V_BORE
     )
 
-    # Bands (pd_transgear_feed_pinion_spec): the flat's end wall and the overall
-    # length ±0.05 (R9-5), the reamed bore, the boss's h6 under the disc's
-    # and hub's H7 bores, the flat's (0, -0.015) under the hub's flat, the
-    # standard tip class, the root as a physical MIN floor; the cutter's full-depth station
-    # at its .XXX band and its run-out as a MAX limit (R9-67).  The tooth
-    # length, which only places the step, holds the title block's .XXX.
-    set_dimension_symmetric_tolerance(adapter, "FlatProfile", "FlatEnd", STATION_TOL)
-    set_dimension_symmetric_tolerance(
-        adapter, "SleeveProfile", "OverallLength", STATION_TOL
+    # Bands (pd_transgear_feed_pinion_spec): the overall length ±0.05 (R9-5),
+    # the reamed bore, the boss's h6 under the disc's and hub's H7 bores, the
+    # flat's (0, -0.015) under the hub's flat, the standard tip class, the
+    # root as a physical MIN floor, the flat's end wall as LIMITS between the
+    # step and the hub's flat; the cutter's full depth as a MIN (it covers
+    # the rack) and its run-out as a MAX limit (R9-67).  The tooth length,
+    # which only places the step, holds the title block's .XXX.
+    _single_limit(
+        adapter,
+        "FlatProfile",
+        "FlatEnd",
+        FLAT_END_STATION,
+        FLAT_END_DEVIATIONS,
+        FLAT_END_TOL_TYPE,
+        f"{FLAT_END_STATION:.{FLAT_END_PLACES}f}/{FLAT_END_MIN:.{FLAT_END_PLACES}f}",
+        limit_places=FLAT_END_PLACES,
     )
     set_dimension_symmetric_tolerance(
-        adapter, "SleeveProfile", "FullDepth", FULL_DEPTH_BAND
+        adapter, "SleeveProfile", "OverallLength", STATION_TOL
     )
     set_dimension_bilateral_tolerance(
         adapter, "SleeveProfile", "BoreDia", *BORE_DEVIATIONS
@@ -717,27 +795,38 @@ async def build(adapter) -> dict[str, str]:
     )
     _single_limit(
         adapter,
+        "RootProfile",
         "RootDia",
         ROOT_DIA_MIN,
         ROOT_DIA_DEVIATIONS,
         ROOT_DIA_TOL_TYPE,
-        f"{ROOT_DIA_MIN:.2f} MIN",
+        f"{ROOT_DIA_MIN:.{ROOT_DIA_PLACES}f} MIN",
     )
     _single_limit(
         adapter,
+        "SleeveProfile",
         "CutterRunout",
         CUTTER_RUNOUT_MAX,
         CUTTER_RUNOUT_DEVIATIONS,
         CUTTER_RUNOUT_TOL_TYPE,
         f"{CUTTER_RUNOUT_MAX:.{CUTTER_RUNOUT_PLACES}f} MAX",
     )
-    # Each cutter station names itself: neither ends at a drawn edge.
-    set_dimension_prefix(adapter, "SleeveProfile", "FullDepth", FULL_DEPTH_PREFIX)
-    set_dimension_prefix(adapter, "SleeveProfile", "CutterRunout", CUTTER_RUNOUT_PREFIX)
+    _single_limit(
+        adapter,
+        "SleeveProfile",
+        "FullDepth",
+        FULL_DEPTH,
+        FULL_DEPTH_DEVIATIONS,
+        FULL_DEPTH_TOL_TYPE,
+        f"{FULL_DEPTH:.{FULL_DEPTH_PLACES}f} MIN",
+    )
     apply_span_limits(
         adapter, nominal_mm=SPAN_NOMINAL, deviations=SPAN_DEVIATIONS,
         places=SPAN_PLACES, prefix=SPAN_PREFIX,
     )
+    # Every mate, stack and station name prints at its own callout, authored
+    # here (pd_transgear_feed_pinion_callouts).
+    _author_dimension_text(adapter)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

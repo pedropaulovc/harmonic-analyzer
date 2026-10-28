@@ -663,7 +663,7 @@ def _retained_washer_layout(monkeypatch, scope):
 
 
 @pytest.mark.parametrize("scope", (
-    "ch-block", "ch-lever", "ch-thrust", "pd-shim", "sm-hanger", "mg-back", "mg-front",
+    "ch-lever", "ch-thrust", "pd-shim", "sm-hanger", "mg-back", "mg-front",
 ))
 def test_washer_consumer_clears_retained_native_od_blocks_and_preserves_neighbors(monkeypatch, scope):
     from _layout_audit import display_box
@@ -750,7 +750,6 @@ def test_washer_already_clear_od_is_unchanged_without_repositioning(monkeypatch)
     "family,head_half,head_one,front_half,front_one",
     (
         ("carriage", 14.676, 18.176, 23.332567791611, 35.489135583221),
-        ("block", 14.605, 18.034, 37.248070506164, 63.320141012327),
         ("bracket", 14.605, 18.034, 21.353286632314, 31.530573264629),
         ("rail", 14.605, 18.034, 22.950425184312, 34.724850368624),
         ("clamp", 15.9385, 20.701, 25.705462650093, 40.234925300185),

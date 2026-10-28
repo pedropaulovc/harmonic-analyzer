@@ -12,16 +12,18 @@ or basic dimensions, and no general notes (MHA-DT-08 machinist review of
 2026-10-18).  The longitudinal section A-A, taken on the end view's vertical
 centre line, is the handle's length view (drawing-guidelines.md rule 11
 (turned parts read like the lathe)): the profile, the reamed bore and the
-counterbore all sketch on the Front plane the section lies in, so every size
-prints there.  The stations stack above it in a baseline from the tenon end
-face, with the tangency-fixed radii as references beneath them; the diameters
-are dimensioned across their own cut, their text on shelves clear of the
-section; the fitted tenon and counterbore carry their mates and clearances as
-callouts, the tenon root's 45-degree relief its band with the ferrule it
-serves (owner ruling 2026-10-24, #1900), and the tenon root and the
-counterbore's floor corner their R0.3 MAX single limits with the part that
-seats on each.  The end view stands on the section's axis and carries the
-cutting plane.
+counterbore all sketch on the Front plane the section lies in, so nearly every
+size prints there.  The stations stack above it in a baseline from the tenon
+end face, with the tangency-fixed radii as references beneath them; the
+diameters are dimensioned across their own cut, their text on shelves clear of
+the section; the fitted tenon and counterbore carry their mates and clearances
+as callouts, and the counterbore's floor corner its R0.3 MAX single limit with
+the cup that seats on it.  The tenon root's relief cut into the ferrule
+shoulder (owner ruling 2026-10-24, #1900) prints in detail B, an 8:1 native
+detail of the section: the 45-degree relief's band with the ferrule it serves
+and the root's R0.3 MAX, each on its own leader (MHA-DT-08 machinist review of
+3de09b959: at 4:1 the two crowded one tiny corner).  The end view stands on
+the section's axis and carries the cutting plane.
 
 Run with SolidWorks open::
 
@@ -35,14 +37,16 @@ import math
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
 from _check import check
-from _com import _early_bound
+from _com import _early_bound, _read_member
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -58,6 +62,7 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
@@ -87,11 +92,15 @@ from dt_crank_handle_spec import (
     S_CONCAVE_CENTER,
     S_CONVEX_CENTER,
     S_CONVEX_R,
+    SHOULDER_R,
     SHOULDER_X,
     TANGENT_POINT_DIAMETERS,
     TENON_FIT_NOTE,
+    TENON_R,
     TENON_ROOT_CALLOUT,
+    TENON_ROOT_RELIEF,
     TENON_ROOT_RELIEF_CALLOUT,
+    TENON_ROOT_ROUND_REACH,
     TENON_X0,
     WAIST_X,
 )
@@ -126,9 +135,15 @@ _S = SHEET_SCALE[0] / 1000.0
 FRONT_BBOX_CX = (TENON_X0 + OAK_END_X) / 2.0
 FRONT_CENTER = (0.162, 0.130)
 RIGHT_CENTER = (0.362, FRONT_CENTER[1])
-ISO_CENTER = (0.380, 0.235)
-ISO_NOTE_POS = (0.285, 0.244)
-CAPTION_XY = (0.085, 0.052)
+# Detail B took the upper right, so the isometric, its note and the section's
+# caption share the lower left, under the fitted tenon's callout (bottom y
+# ~0.069, x 0.056..0.116) and left of the reamed bore's (x >= 0.152 down to y
+# ~0.055).  The 1:1 isometric reads about 53 x 39 mm: x ~0.087..0.140, y
+# ~0.020..0.059; the caption (top-centre anchored, ~44 x 16 mm) and the note
+# (top-left anchored, ~59 x 5 mm) stand left of it.
+ISO_CENTER = (0.112, 0.040)
+ISO_NOTE_POS = (0.016, 0.034)
+CAPTION_XY = (0.045, 0.061)
 
 END_R = HANDLE_MAX_DIA * _S / 2.0
 
@@ -213,29 +228,10 @@ FRONT_KEEP = {
     # 4 mm clear of that text, with another 4 mm from its own text to the
     # end view's x 0.320 outline.
     "CrestDia": (_front_x(OAK_END_X) + 0.025, 0.165),
-    # The inside corners' three-row blocks (R0.3 MAX / mate / SEAT), 8 x 2.75 =
-    # 22.0 mm wide and 2 x 5.55 + 3.5 = 14.6 mm tall, centred on the keep (were
-    # the rows to hang from the keep instead, each box drops ~7 mm and stays
-    # clear):
-    #   Tenon root, left of the tenon end above the root relief's block: box x
-    #   0.018..0.040, y 0.1832..0.1978 -- 3.6 mm left of the 5.0's outside
-    #   tail (x 0.0436 at y 0.1922), 10.4 clear of the tenon end's extension
-    #   line (x 0.050), 5.6 inside the border and 3.2 over the relief's block.
-    #   Its leader runs down-right through the air over the tenon, right of
-    #   the relief's narrower top rows, into the relief's mouth to the round.
-    "TenonRootRadius": (_front_x(TENON_X0) - 0.021, 0.1905),
-    # The root relief's leg (owner ruling 2026-10-24, #1900): a vertical
-    # linear dimension, so its dimension line sits on the keep and its
-    # "0.9 ±0.1" plus four callout rows of 10 characters at most (23 mm wide
-    # on farm r3 of 8abe1a641) stand left of it, centred on the keep's y.
-    # That r3 keep (tenon end - 0.018) put the block at x 0.009..0.032, across
-    # the inner border (x 0.0127); at tenon end - 0.010 it spans x
-    # 0.017..0.040, 4.5 inside the border and 9.8 clear of the tenon end's
-    # extension line, under the R0.3 block (x 0.018..0.040).  y 0.1522..0.1800
-    # keeps it wholly above the relief's upper extension line (y 0.1492), so
-    # no extension line strikes it (farm r1 of 1727eecbe).  The R0.3 leader
-    # runs down-right 9 mm or more clear of its right edge.
-    "TenonRootRelief": (_front_x(TENON_X0) - 0.010, 0.1661),
+    # The counterbore floor corner's three-row block (R0.3 MAX / mate / SEAT),
+    # 8 x 2.75 = 22.0 mm wide and 2 x 5.55 + 3.5 = 14.6 mm tall, centred on
+    # the keep (were the rows to hang from the keep instead, the box drops
+    # ~7 mm and stays clear):
     #   Counterbore floor, above the section between the swell diameter's
     #   dimension line (x 0.213) and the 8.1's floor extension line (x
     #   0.2416): box x 0.2163..0.2383 (3.3 mm clear of each), y 0.1877..0.2023
@@ -245,6 +241,83 @@ FRONT_KEEP = {
     #   top edge) and crosses the 8.1's floor extension line at y ~0.157,
     #   31 mm from either text.
     "CounterboreFloorRadius": (_front_x(COUNTERBORE_FLOOR_X) - 0.0143, 0.195),
+}
+
+# DETAIL B (MHA-DT-08 machinist review of 3de09b959): at 4:1 the root relief
+# is a few millimetres of sheet, and its leg, its R0.3 MAX root and their two
+# blocks all met one tiny corner, so a reader could not tell the 45-degree
+# wall runs back into the shoulder.  An 8:1 native detail of section A-A
+# carries both, each on its own leader, cut and hatched like its parent.  The
+# leg's model dimension runs from the tenon end's corner (the dimension leaves
+# the part's left end), and a detail imports only a dimension whose
+# references it shows, so the fence takes in that corner as well as the
+# relief, its root round, the shoulder face up to the ferrule's OD corner and
+# the reamed bore under the tenon.
+DETAIL_LETTER = "B"
+DETAIL_SCALE = (8, 1)
+_DS = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
+DETAIL_FOCUS_MM = (4.9, 4.5)
+DETAIL_RADIUS_MM = 3.4
+_TENON_END_CORNER = (TENON_X0, TENON_R)
+_RELIEF_TOP = (SHOULDER_X, TENON_R + TENON_ROOT_RELIEF)
+_ROOT_CENTER = (
+    SHOULDER_X + TENON_ROOT_RELIEF - TENON_ROOT_ROUND_REACH,
+    TENON_R + INSIDE_CORNER_R_MAX,
+)
+_ROOT_EXTENT = (_ROOT_CENTER[0] + INSIDE_CORNER_R_MAX, _ROOT_CENTER[1])
+_FENCE_MARGIN_MM = 0.3
+if any(
+    math.dist(DETAIL_FOCUS_MM, point) > DETAIL_RADIUS_MM - _FENCE_MARGIN_MM
+    for point in (
+        _TENON_END_CORNER,
+        _RELIEF_TOP,
+        _ROOT_EXTENT,
+        (SHOULDER_X, SHOULDER_R),
+    )
+):
+    raise AssertionError(
+        "detail B's fence must take in the tenon end's corner, the relief, its "
+        "root round and the ferrule shoulder's OD corner"
+    )
+# Upper right, where the isometric stood: the circle spans x 0.318..0.372, y
+# 0.201..0.255, 11.7 mm under the top border, 15 mm right of the 56.0 row's
+# end (x 0.274) and 13 mm over the end view's cutting-plane arrow (y ~0.182).
+DETAIL_CENTER = (0.345, 0.228)
+DETAIL_CROP_RADIUS = DETAIL_RADIUS_MM * _DS
+# The label hangs from its top centre under the circle's lower left, left of
+# the end view's "A" arrow (x >= 0.363) and right of the 15.2's text (x
+# <= 0.315 at y ~0.165).
+DETAIL_LABEL_XY = (0.333, 0.197)
+# The fence on section A-A spans x 0.048..0.075, y 0.134..0.162; its letter
+# stands up-left of it in the gutter the two blocks used to fill.
+DETAIL_LETTER_XY = (0.036, 0.166)
+
+
+def _detail_xy(model_x_mm: float, model_y_mm: float) -> tuple[float, float]:
+    """Sheet point of a model point in detail B (as the section: +X right)."""
+    return (
+        DETAIL_CENTER[0] + (model_x_mm - DETAIL_FOCUS_MM[0]) * _DS,
+        DETAIL_CENTER[1] + (model_y_mm - DETAIL_FOCUS_MM[1]) * _DS,
+    )
+
+
+DETAIL_KEEP = {
+    # The relief's leg (owner ruling 2026-10-24, #1900): a vertical linear
+    # dimension, so its dimension line sits on the keep and its "0.9 ±0.1"
+    # plus four callout rows (23 mm wide on farm r3 of 8abe1a641) stand left
+    # of it on a shelf, centred on the keep's y, as they did on the section.
+    # The line stands 10 mm left of the tenon end's corner (x 0.3218), outside
+    # the circle; the block spans x 0.289..0.312, y 0.233..0.261 -- above the
+    # relief's upper extension line (y 0.2296), 6 mm under the top border and
+    # 15 mm right of the 56.0 row's end.
+    "TenonRootRelief": (
+        _detail_xy(*_TENON_END_CORNER)[0] - 0.010,
+        _detail_xy(*_RELIEF_TOP)[1] + 0.0173,
+    ),
+    # The root's R0.3 MAX block (22.0 x 14.6 mm, centred on the keep) right of
+    # the circle, x 0.383..0.405: its leader runs left, inside the round's
+    # span, onto the arc (x 0.3656), 14 mm inside the right border.
+    "TenonRootRadius": (0.394, _detail_xy(*_ROOT_CENTER)[1]),
 }
 # Every band renders from its model dimension; the callouts carry the reamed
 # bore's mate, the fitted tenon's and counterbore's mates and clearances, and
@@ -257,11 +330,12 @@ DIMENSION_CALLOUTS = {
     "TenonRootRelief": TENON_ROOT_RELIEF_CALLOUT,
     "CounterboreFloorRadius": COUNTERBORE_FLOOR_CALLOUT,
 }
-# Each inside corner's text stands up-left of its arc's centre: the tenon
-# root's (the arc's lower-right quarter) off the arc's span, the counterbore
-# floor's (its upper-left quarter) inside it.
+# Each inside corner's text stands inside its arc's span, so its leader lands
+# on the arc itself: the tenon root's right of its centre in detail B (the
+# round turns from the tenon OD at -90 degrees to the relief at 45), the
+# counterbore floor's up-left of its centre (its upper-left quarter).
 INSIDE_CORNER_ARC_EXTENSION = {
-    "TenonRootRadius": True,
+    "TenonRootRadius": False,
     "CounterboreFloorRadius": False,
 }
 RADII = (*sorted(REFERENCE_RADII), "EndRoundR")
@@ -338,6 +412,121 @@ def _dress_inside_corner(adapter: Any, annotation: Any, *, name: str) -> None:
     )
 
 
+def _ferrule_seat_detail(adapter: Any, section: Any) -> Any:
+    """Native 8:1 detail B of the tenon root's relief in section A-A
+    (draw_dt_pinion_lever._hub_detail): fence, scale, outline, label and
+    letter each read back."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(section, "IView")
+    if not drawing.ActivateView(view_name(adapter, section)):
+        raise RuntimeError("failed to activate detail B's parent section")
+    draw.ClearSelection2(True)
+    center = model_point_in_view(
+        adapter,
+        section,
+        (DETAIL_FOCUS_MM[0] / 1000.0, DETAIL_FOCUS_MM[1] / 1000.0, 0.0),
+        label="detail B fence centre",
+    )
+    sheet_xy = [center[:2], (center[0] + DETAIL_RADIUS_MM * _S, center[1])]
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in sheet_xy:
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    # Straight to the database: an inferred circle snaps onto nearby section
+    # edges (draw_dt_pinion_lever r2), so the fence is read back before use.
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        fence = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if fence is None:
+        raise RuntimeError("failed to create detail B's fence")
+    arc = _early_bound(fence, "ISketchArc")
+    placed = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+    placed_centre = [float(adapter._get_attr_or_call(placed, axis)) for axis in "XY"]
+    if math.dist(placed_centre, points[0][:2]) > 1e-9 or not math.isclose(
+        float(arc.GetRadius()), math.dist(points[0][:2], points[1][:2]), abs_tol=1e-9
+    ):
+        raise RuntimeError("detail B's fence moved from where it was placed")
+    draw.ClearSelection2(True)
+    if not _early_bound(fence, "ISketchSegment").Select4(False, None):
+        raise RuntimeError("failed to select detail B's fence")
+    detail = drawing.CreateDetailViewAt4(
+        *DETAIL_CENTER,
+        0.0,
+        0,  # swDetViewSTANDARD
+        *DETAIL_SCALE,
+        DETAIL_LETTER,
+        1,  # swDetCircleCIRCLE
+        True,
+        False,
+        False,
+        5,
+    )
+    if detail is None:
+        raise RuntimeError("CreateDetailViewAt4 returned no detail B")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    ratio = tuple(float(value) for value in detail.ScaleRatio)
+    if len(ratio) != 2 or not math.isclose(
+        ratio[0] / ratio[1], DETAIL_SCALE[0] / DETAIL_SCALE[1]
+    ):
+        raise RuntimeError(f"detail B scale {ratio!r}, expected {DETAIL_SCALE!r}")
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("detail B has invalid bounds")
+    span = 2.0 * DETAIL_CROP_RADIUS
+    _telemetry.info(
+        f"detail B outline {outline[2] - outline[0]:.5f} x "
+        f"{outline[3] - outline[1]:.5f} m (fence {span:.5f})"
+    )
+    if min(outline[2] - outline[0], outline[3] - outline[1]) < 0.95 * span:
+        raise RuntimeError(f"detail B is smaller than its fence: {outline}")
+    target = [
+        position[axis] + DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
+        for axis in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position detail B")
+    draw.EditRebuild3()
+    notes = tuple(_read_member(detail, "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native detail B label, found {len(notes)}")
+    note = _early_bound(notes[0], "INote")
+    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+    label_xyz = (*DETAIL_LABEL_XY, 0.0)
+    if not annotation.SetPosition2(*label_xyz):
+        raise RuntimeError("failed to position detail B's label")
+    draw.EditRebuild3()
+    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
+    if math.dist(actual, label_xyz) > 1e-8:
+        raise RuntimeError(f"detail B's label position did not persist: {actual}")
+    circles = tuple(_read_member(parent, "GetDetailCircles") or ())
+    if len(circles) != 1:
+        raise RuntimeError(
+            f"expected one detail circle on section A-A, found {len(circles)}"
+        )
+    circle = _early_bound(circles[0], "IDetailCircle")
+    circle.SetLabelPosition(*DETAIL_LETTER_XY)
+    draw.EditRebuild3()
+    letter = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(letter) != 2 or math.dist(letter, DETAIL_LETTER_XY) > 1e-8:
+        raise RuntimeError(f"detail B's letter did not persist: {letter}")
+    return detail
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -391,11 +580,27 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
-    front.SetDisplayTangentEdges2(0)
-    if int(front.GetDisplayTangentEdges2()) != 0:
-        raise RuntimeError("failed to hide crank-handle tangent edges")
-    front.UpdateViewDisplayGeometry()
+    detail = _ferrule_seat_detail(adapter, front)
+    set_hidden_lines_removed(adapter, detail)
+    for view, label in ((front, "section A-A"), (detail, "detail B")):
+        view.SetDisplayTangentEdges2(0)
+        if int(view.GetDisplayTangentEdges2()) != 0:
+            raise RuntimeError(f"failed to hide crank-handle {label} tangent edges")
+        view.UpdateViewDisplayGeometry()
 
+    # Detail B is dimensioned FIRST: its two dimensions live in HandleProfile
+    # with the section's, a dimension already on the sheet is never imported
+    # again while a deleted one is, and a native detail imported nothing after
+    # its parent's import and deletions (draw_ch_amplitude_bar r743-6).  The
+    # detail keeps its two and deletes the rest; the section's import then
+    # takes those back and skips the two the detail holds.
+    detail_annotations = curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="ferrule seat detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
     front_annotations = curate_view_dimensions(
         adapter,
         front,
@@ -403,25 +608,26 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="longitudinal section",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    assert_imported_precision(adapter, front_annotations, DRAWING_PRECISION_BY_NAME)
-    front_by_name = {dimension_name(adapter, a): a for a in front_annotations}
+    annotations = [*front_annotations, *detail_annotations]
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    by_name = {dimension_name(adapter, a): a for a in annotations}
     # The tenon and the counterbore are fitted to the ferrule and cup (their
     # to-suit callouts), and the S-curve's tangent point is fixed by its
     # arcs, so their sizes print as references.
     for name in sorted(REFERENCE_DIMENSIONS | TANGENT_POINT_DIAMETERS):
         set_reference_dimension(
             adapter,
-            front_by_name[name],
+            by_name[name],
             label=f"MHA-DT-08 {name}",
             diameter=name.endswith("Dia"),
         )
     for name in RADII:
         _style_radius(
-            adapter, front_by_name[name], name=name, reference=name in REFERENCE_RADII
+            adapter, by_name[name], name=name, reference=name in REFERENCE_RADII
         )
     for name in sorted(INSIDE_CORNER_ARC_EXTENSION):
-        _dress_inside_corner(adapter, front_by_name[name], name=name)
+        _dress_inside_corner(adapter, by_name[name], name=name)
     rebuild_drawing(adapter, label="crank-handle radii")
     create_section_axis_centerline(
         adapter, front, length_mm=OAK_END_X - TENON_X0, label="crank handle axis"

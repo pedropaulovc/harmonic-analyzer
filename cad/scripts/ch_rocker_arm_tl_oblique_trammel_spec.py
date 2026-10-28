@@ -8,9 +8,9 @@ A carrier plate (MHA-CH-06-TL-21) rides one pivot pin on each rail. The angle
 the spindle subtends between the two pins is constant, so by the
 inscribed-angle theorem the spindle traces a circle of radius
 ``R = D / (2 sin ALPHA)`` in the carrier's frame. The outer edge reuses the
-same rails: with the spindle isolated, both top retainers are removed and the
-carrier is deliberately re-seated on A2/B2, then both retainers are reinstalled
-with two fresh split cotters before either support is used again.
+same rails: with the spindle isolated, both shoulder screws are removed and
+the carrier lifted, the carriages moved to the other stations, and the carrier
+re-seated on A2/B2 before both screws are refitted.
 
 This module is the one pure calculator: it derives every value marked ⚙ on
 the jig sheets (MHA-CH-06-TL-20 to TL-26 and the TL-00 jig assembly) from:
@@ -26,15 +26,14 @@ the jig sheets (MHA-CH-06-TL-20 to TL-26 and the TL-00 jig assembly) from:
 * ``ALPHA_DEG``, kept at the brief's 16.4405 degrees;
 * the 350 mm blank (strap stock 1018 3 x 40 mm, OnlineMetals #22381);
 * the bought hardware the jig is built round (HIWIN HGR15 rail cut to 440,
-  HGH15CA Z0 carriage, 6200-2RS bearing) and the PM-30MV table (maker manual,
+  HGH15CA Z0 carriage, shoulder screws and loose spacers) and the PM-30MV table (maker manual,
   macclab.com PM-30MV-v3-2020-10: table 33 x 8-1/4 in, three 14 mm T-slots at
   63.5 mm, spindle centreline 7-1/2 in from the pleated column cover).
 
-Captured pivots retain both supports during both passes. The integral flange
-is trapped between the unchanged block top and a safety-wired cap; a removable
-washer, headed clevis pin and fresh split cotter capture the carrier above.
-The original k5/N6 bearing fits support rotation, not axial safety. The raised
-carrier seat adds 12.5 mm to the former work height, with no skid or rail change.
+Plain shoulder-screw pivots positively capture both supports during both
+passes. Each M8 screw bottoms its shoulder on the block counterbore floor;
+its head captures the carrier, which turns on the shoulder and slides on a
+loose spacer over a selected shim. The carrier seat remains at Z80.2.
 Heights alone do not prove spindle/toolholder clearance: installed-machine
 acceptance needs the actual stepped tooling envelope over both complete sweeps.
 
@@ -59,19 +58,13 @@ Error sensitivity (printed next to the bands that carry it):
   dimensioned from A1/B1, never from a plate edge.
 * pin spacing: a D error changes R by ``RADIUS_PER_SPACING`` (1.77) per unit
   of spacing error. The spacing is held by one DRO setting.
-* pin and bearing clearance: any clearance appears 1:1 as edge position
-  error.
-* bearing radial play: the 6200-2RS bought (inventory
-  ``fixtures.trammel-6200-2rs``) is C3, 0.008-0.023 radial internal
-  clearance unmounted. Each pin axis can float up to that play against its
-  block, so the pin spacing can open or close by up to the play, and R moves
-  by ``RADIUS_FROM_BEARING_PLAY`` = 1.77 x 0.023 = 0.041 at worst, the
-  unmounted bound. Mounted, the pivot pin's k5 press (MHA-CH-06-TL-23) and
-  the pivot block's N6 seat (MHA-CH-06-TL-22) only shrink the play: at their
-  loosest limits the seat takes 0.0012 off (0.039 on R), at their tightest
-  the bearings run at a 0.012 preload with no play. The feed load takes the
-  remainder up to one side, so the real error is smaller and repeats from
-  pass to pass.
+* shoulder/carrier clearance: the purchased Ø10 shoulder (-0.025/0) in the
+  carrier Ø10 H7 (0/+0.015) gives 0–0.040 diametral clearance. This can move
+  the edge 1:1; it is not a bearing-internal-play budget. The two supports'
+  opposite radial take-up can change spacing by one diametral clearance,
+  so the radius contribution is ``RADIUS_FROM_SHOULDER_CLEARANCE`` (0.071).
+  The block's H7 locating counterbore has its own shoulder-clearance budget;
+  there are no rolling bearings, press fits or mounted C3-play assumptions.
 
 Sweep (Main, 2026-10-16). The brief swept the cutter over the whole 350
 blank, +/-13 degrees about C. Here each pass covers the part only. The
@@ -86,16 +79,11 @@ rail: 75.2 to 389.4 over both passes. The riser's 9/16 in cutter rides the
 same circle as the part cutter with a larger radius. The same stops
 therefore cut the riser clear of every position the part cutter reaches.
 
-Pivot pin offset, rule 17 (Main, 2026-10-16). The HGH15CA's four M4 holes
-sit on a 26 x 26 square, 18.38 from the carriage centre. A 6200 bore
-coaxial with the carriage (Ø30) would leave 18.38 - 15 - 2.25 = 1.13 of wall
-to a Ø4.5 clearance hole, under the 1.5 floor. A Ø8 counterbore would break
-into the bore. ``PIN_OFFSET`` moves the bore 32 toward the spindle along the
-rail. The nearest hole centre is then sqrt(19^2 + 13^2) = 23.02 from the
-bore axis: a 4.02 wall to the Ø8 counterbore and 5.77 to the Ø4.5 hole. The
-offset is what limits the sweep: with it, the carriage centre runs 107.2 to
-421.4 against the rail's 45.7 to 424.3 (half the 61.4 carriage from each end
-of the 440 rail).
+Pivot pin offset (owner-approved 2026-10-23). Keep ``PIN_OFFSET`` 32 toward
+the spindle along the rail, preserving both pass stations and the carrier
+hole layout. The plain Ø10 H7 counterbore replaces the former bearing
+cartridge. The carriage centre still runs 107.2 to 421.4 against the rail's
+45.7 to 424.3 (half the 61.4 carriage from each end of the 440 rail).
 """
 
 from __future__ import annotations
@@ -328,8 +316,10 @@ RADIUS_PER_TENTH_DEG = (
     D1 * math.cos(ALPHA) / (2.0 * math.sin(ALPHA) ** 2) * math.radians(0.1)
 )
 RADIUS_PER_SPACING = 1.0 / (2.0 * math.sin(ALPHA))  # dR/dD
-BEARING_RADIAL_PLAY = (0.008, 0.023)  # C3, unmounted: (min, max)
-RADIUS_FROM_BEARING_PLAY = RADIUS_PER_SPACING * BEARING_RADIAL_PLAY[1]
+SHOULDER_CARRIER_CLEARANCE = (0.0, 0.040)  # diametral, Ø10 H7 / bought shoulder
+RADIUS_FROM_SHOULDER_CLEARANCE = (
+    RADIUS_PER_SPACING * SHOULDER_CARRIER_CLEARANCE[1]
+)
 
 # --- Bought hardware (catalogue values; not modelled in detail) --------------
 # HIWIN HGR15R rail, cut to 440 (inventory, Main 2026-10-16). The cut is a
@@ -354,21 +344,6 @@ CARRIAGE_WIDTH = 34.0
 CARRIAGE_LENGTH = 61.4  # over the end seals
 CARRIAGE_BOLT_SPAN = (26.0, 26.0)  # (along, across), four M4 tapped
 CARRIAGE_BOLT = "M4"
-# 6200-2RS deep-groove ball bearing (inventory fixtures.trammel-6200-2rs):
-# bore 10 0/-0.008, OD 30 0/-0.009, width 9 0/-0.12. The pivot pin's k5
-# press reads the bore band and the pivot block's N6 seat reads the OD band.
-# The lower boss is fitted from the measured upper-race face and block floor;
-# bearing-width variation must not be mistaken for a fitted stop clearance.
-BEARING_BORE = 10.0
-BEARING_OD = 30.0
-BEARING_WIDTH = 9.0
-BEARINGS_PER_PIN = 2
-# Pivot-block bore stack: a 1 mm recess at each face, the two bearings, and
-# the 4 mm shoulder between them. At 4 the web between the two seats holds
-# the 2.0 wall target at two-place bands (24 - 0.51 - 2 x 10.51 = 2.47;
-# drawing-guidelines.md rule 17), so no band is tightened to protect it.
-BEARING_RECESS = 1.0
-BEARING_SHOULDER = 4.0
 
 # --- Rails on the bars --------------------------------------------------------
 # Each rail's near end stops RAIL_NEAR_S from the spindle axis (brief); rail
@@ -380,10 +355,8 @@ CARRIAGE_S_RANGE = (
     RAIL_NEAR_S + CARRIAGE_LENGTH / 2.0,
     RAIL_FAR_S - CARRIAGE_LENGTH / 2.0,
 )
-# The pivot pin cannot be coaxial with the carriage: the HGH15CA's 26 x 26 M4
-# pattern sits 18.4 from its centre, inside the 6200's 30 OD plus a wall. The
-# pin bore is set toward the spindle along the rail by PIN_OFFSET; the pass
-# sweeps above still keep every carriage on its rail.
+# The unchanged pivot station preserves the carrier's four holes and both
+# sweeps; the simplified block locates a shoulder screw at that same station.
 PIN_OFFSET = -32.0  # pin s minus carriage-centre s
 CARRIAGE_TRAVEL = (PIN_S_MIN - PIN_OFFSET, PIN_S_MAX - PIN_OFFSET)
 END_STOPS = {
@@ -392,15 +365,13 @@ END_STOPS = {
 
 # --- Height stack (machine Z, table top = 0) ---------------------------------
 BASE_BAR_THICK = round(0.5 * INCH, 9)  # 1/2 in 6061 flat bar
-PIVOT_BLOCK_HEIGHT = (
-    2.0 * BEARING_RECESS + BEARINGS_PER_PIN * BEARING_WIDTH + BEARING_SHOULDER
-)
-# The raised Ø12.7 seat remains on the upper inner race through its narrow
-# lower boss. The broad Ø36 flange is relieved clear of the seal and its rim
-# is fitted above the block floor, independently of the bearing press fits.
-# The raised cartridge leaves block height and the carriage unchanged.
-PIN_COLLAR_PROUD = 15.5
-PIN_COLLAR_HEIGHT = BEARING_RECESS + PIN_COLLAR_PROUD
+PIVOT_BLOCK_HEIGHT = 24.3  # finished from 1 in stock
+# Nominal fitted pack: five 0.2 DIN 988 shims (98055A118, TL-VN-79) per
+# support; the 6.85 shoulder seat (owner ruling 2026-10-27) leaves 1.15
+# unshimmed, so the pack closes the nominal head gap to 0.15.
+PIVOT_SHIM_PACK = 1.0
+PIVOT_SPACER_LENGTH = 15.0  # loose purchased spacer (92871A359)
+PIVOT_SUPPORT_HEIGHT = PIVOT_SHIM_PACK + PIVOT_SPACER_LENGTH
 # Finished dimensions, not purchased stock: face 1/2 in 6061-T651 plate to
 # CARRIER_THICK and 1/4 in acetal to RISER_THICK (#1619). Both native drawing
 # dimensions print at .X and take that title-block band, not a supplier-stock
@@ -416,7 +387,7 @@ STRAP_THICK = rocker.ARM_THICKNESS
 RAIL_SEAT_Z = BASE_BAR_THICK
 CARRIAGE_TOP_Z = RAIL_SEAT_Z + CARRIAGE_HEIGHT
 PIVOT_BLOCK_TOP_Z = CARRIAGE_TOP_Z + PIVOT_BLOCK_HEIGHT
-CARRIER_UNDERSIDE_Z = PIVOT_BLOCK_TOP_Z + PIN_COLLAR_PROUD
+CARRIER_UNDERSIDE_Z = PIVOT_BLOCK_TOP_Z + PIVOT_SUPPORT_HEIGHT
 CARRIER_TOP_Z = CARRIER_UNDERSIDE_Z + CARRIER_THICK
 # Vertical rail clearance for through-screw tips that are also clear of the
 # pivot blocks in plan; their individual specs check that separate envelope.

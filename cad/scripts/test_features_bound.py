@@ -95,7 +95,7 @@ def configured_feature_part(monkeypatch) -> str:
     from dt_crank_handle_pivot_screw_spec import INSTALLED_CONFIG
 
     # Reuse real feature declarations with test-only configuration names.
-    stem = "ch_rocker_arm_tl_oblique_pivot_pin"
+    stem = "ch_rocker_arm"
     original = export_features.step_configurations
     monkeypatch.setattr(
         export_features, "step_configurations",

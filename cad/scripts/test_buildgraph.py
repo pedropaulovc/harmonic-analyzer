@@ -139,22 +139,20 @@ _INSERTED_SOURCES = {
     "pd_transgear_thumbnut",
     "ms_measuring_stick": "ms_stick ms_stop_block ms_stop_plate ms_vn_stop_plate_screw sh_vn_thumb_screw",
     "ch_rocker_arm_tl_oblique_jig": "ch_rocker_arm_tl_oblique_base_bar ch_rocker_arm_tl_oblique_carrier "
-    "ch_rocker_arm_tl_oblique_feed_lever ch_rocker_arm_tl_oblique_hub_pin "
-    "ch_rocker_arm_tl_oblique_end_bracket ch_rocker_arm_tl_oblique_nut_bracket "
-    "ch_rocker_arm_tl_oblique_pivot_block ch_rocker_arm_tl_oblique_pivot_pin ch_rocker_arm_tl_oblique_riser "
-    "ch_rocker_arm_tl_oblique_pivot_cap ch_rocker_arm_tl_oblique_pivot_retainer "
-    "ch_rocker_arm_tl_vn_oblique_rail ch_rocker_arm_tl_vn_oblique_carriage ch_rocker_arm_tl_vn_oblique_bearing "
+    "ch_rocker_arm_tl_oblique_feed_lever ch_rocker_arm_tl_oblique_feed_block "
+    "ch_rocker_arm_tl_oblique_end_bracket "
+    "ch_rocker_arm_tl_oblique_pivot_block ch_rocker_arm_tl_oblique_riser "
+    "ch_rocker_arm_tl_vn_oblique_rail ch_rocker_arm_tl_vn_oblique_carriage "
     "ch_rocker_arm_tl_vn_oblique_cl_dowel ch_rocker_arm_tl_vn_oblique_leadscrew "
     "ch_rocker_arm_tl_vn_oblique_leadscrew_nut ch_rocker_arm_tl_vn_oblique_pillow_block "
     "ch_rocker_arm_tl_vn_oblique_handwheel sh_vn_clamping_kit_hardware "
     "ch_rocker_arm_tl_vn_oblique_rail_screw ch_rocker_arm_tl_vn_oblique_bracket_screw "
-    "ch_rocker_arm_tl_vn_oblique_block_screw ch_rocker_arm_tl_vn_oblique_carriage_screw "
+    "ch_rocker_arm_tl_vn_oblique_carriage_screw "
     "ch_rocker_arm_tl_vn_oblique_kp08_screw ch_rocker_arm_tl_vn_oblique_nut_screw "
     "ch_rocker_arm_tl_vn_oblique_riser_screw ch_rocker_arm_tl_vn_oblique_clamp_screw "
-    "ch_rocker_arm_tl_vn_oblique_lever_screw ch_rocker_arm_tl_vn_oblique_block_washer "
-    "ch_rocker_arm_tl_vn_oblique_lever_washer ch_rocker_arm_tl_vn_oblique_pivot_cap_screw "
-    "ch_rocker_arm_tl_vn_oblique_pivot_clevis_pin ch_rocker_arm_tl_vn_oblique_pivot_cotter "
-    "ch_rocker_arm_tl_vn_oblique_pivot_lock_wire",
+    "ch_rocker_arm_tl_vn_oblique_lever_screw ch_rocker_arm_tl_vn_oblique_lever_washer "
+    "ch_rocker_arm_tl_vn_oblique_pivot_screw ch_rocker_arm_tl_vn_oblique_pivot_spacer "
+    "ch_rocker_arm_tl_vn_oblique_pivot_shim ch_rocker_arm_tl_vn_oblique_hub_pin",
     "ha_harmonic_analyzer": "fr_frame dt_drive_train ch_channel sm_summing mg_magnifier pn_pen "
     "pd_paper_drive ms_measuring_stick",
 }
@@ -248,7 +246,7 @@ def test_arm_plate_locating_pin_has_real_assembly_dependents() -> None:
     assert set(dependents_of(stem)) == {"pd_paper_drive", "ha_harmonic_analyzer"}
 
 
-def test_positive_pivot_components_are_first_class_jig_only_targets() -> None:
+def test_plain_pivot_components_are_first_class_jig_only_targets() -> None:
     import json
 
     import _config
@@ -257,12 +255,11 @@ def test_positive_pivot_components_are_first_class_jig_only_targets() -> None:
     from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 
     identities = {
-        "ch_rocker_arm_tl_oblique_pivot_cap": ("MHA-CH-06-TL-30", 2),
-        "ch_rocker_arm_tl_oblique_pivot_retainer": ("MHA-CH-06-TL-31", 2),
-        "ch_rocker_arm_tl_vn_oblique_pivot_cap_screw": ("MHA-CH-06-TL-VN-73", 8),
-        "ch_rocker_arm_tl_vn_oblique_pivot_clevis_pin": ("MHA-CH-06-TL-VN-74", 2),
-        "ch_rocker_arm_tl_vn_oblique_pivot_cotter": ("MHA-CH-06-TL-VN-75", 2),
-        "ch_rocker_arm_tl_vn_oblique_pivot_lock_wire": ("MHA-CH-06-TL-VN-76", 4),
+        "ch_rocker_arm_tl_oblique_feed_block": ("MHA-CH-06-TL-32", 1),
+        "ch_rocker_arm_tl_vn_oblique_pivot_screw": ("MHA-CH-06-TL-VN-77", 2),
+        "ch_rocker_arm_tl_vn_oblique_pivot_spacer": ("MHA-CH-06-TL-VN-78", 2),
+        "ch_rocker_arm_tl_vn_oblique_pivot_shim": ("MHA-CH-06-TL-VN-79", 10),
+        "ch_rocker_arm_tl_vn_oblique_hub_pin": ("MHA-CH-06-TL-VN-80", 1),
     }
     jig = "ch_rocker_arm_tl_oblique_jig"
     contract = assembly_contract(jig.replace("_", "-"))
@@ -296,52 +293,10 @@ def test_positive_pivot_components_are_first_class_jig_only_targets() -> None:
         source, identity = mapped[0]
         assert identity["number"] == number
         assert source["old_stem"] == dashed and source["old_number"] is None
-        assert source["introduced"] == "2026-10-20"
+        assert source["introduced"] == "2026-10-23"
         if "_vn_" in stem:
             assert identity["parent"] == jig.replace("_", "-")
         assert drawing.script_name in PRECISION_MIGRATED_DRAWINGS
-
-
-def test_positive_capture_interference_contract_has_only_exact_thread_pairs() -> None:
-    import math
-
-    import _interference_contracts as interference
-    import ch_rocker_arm_tl_oblique_retention_hardware_spec as hardware
-    import ch_rocker_arm_tl_oblique_retention_spec as retention
-    from _hole_spec import TAP_DRILL_MM
-
-    jig = "ch-rocker-arm-tl-oblique"
-    vendor = "ch-rocker-arm-tl-vn-oblique"
-    major, tap, engagement = interference.JIG_PIVOT_CAP_SCREW_THREAD
-    assert major == hardware.SCREW_MAJOR_DIA
-    assert tap == TAP_DRILL_MM[hardware.SCREW_THREAD]
-    assert engagement == pytest.approx(
-        hardware.SCREW_LENGTH - (retention.CAP_HEIGHT - retention.CAP_COUNTERBORE_DEPTH)
-    )
-    expected_limit = 1.10 * math.pi * (major**2 - tap**2) * engagement / 4.0
-    expected = {
-        frozenset(
-            (f"{vendor}-pivot-cap-screw-{index}", f"{jig}-pivot-block-{block}")
-        ): pytest.approx(expected_limit)
-        for index in range(1, 9)
-        for block in ((index - 1) // 4 + 1,)
-    }
-    new_stems = (
-        f"{jig}-pivot-cap",
-        f"{jig}-pivot-retainer",
-        f"{vendor}-pivot-cap-screw",
-        f"{vendor}-pivot-clevis-pin",
-        f"{vendor}-pivot-cotter",
-        f"{vendor}-pivot-lock-wire",
-    )
-    actual = {
-        pair: limit
-        for pair, limit in interference.allowed_interference_pairs(f"{jig}-jig").items()
-        if any(name.rsplit("-", 1)[0] in new_stems for name in pair)
-    }
-    # Nominal contact and tangency are not reasons to mask a cap, wire, pin,
-    # retainer or cotter collision.
-    assert actual == expected
 
 
 @pytest.mark.parametrize(
@@ -349,6 +304,18 @@ def test_positive_capture_interference_contract_has_only_exact_thread_pairs() ->
     [
         ("pd_chain_sprocket", "MHA-PD-01"),
         ("ch_rocker_arm_tl_vn_oblique_nut_washer", "MHA-CH-06-TL-VN-72"),
+        ("ch_rocker_arm_tl_oblique_pivot_pin", "MHA-CH-06-TL-23"),
+        ("ch_rocker_arm_tl_oblique_hub_pin", "MHA-CH-06-TL-25"),
+        ("ch_rocker_arm_tl_oblique_nut_bracket", "MHA-CH-06-TL-29"),
+        ("ch_rocker_arm_tl_oblique_pivot_cap", "MHA-CH-06-TL-30"),
+        ("ch_rocker_arm_tl_oblique_pivot_retainer", "MHA-CH-06-TL-31"),
+        ("ch_rocker_arm_tl_vn_oblique_bearing", "MHA-CH-06-TL-VN-52"),
+        ("ch_rocker_arm_tl_vn_oblique_block_screw", "MHA-CH-06-TL-VN-63"),
+        ("ch_rocker_arm_tl_vn_oblique_block_washer", "MHA-CH-06-TL-VN-70"),
+        ("ch_rocker_arm_tl_vn_oblique_pivot_cap_screw", "MHA-CH-06-TL-VN-73"),
+        ("ch_rocker_arm_tl_vn_oblique_pivot_clevis_pin", "MHA-CH-06-TL-VN-74"),
+        ("ch_rocker_arm_tl_vn_oblique_pivot_cotter", "MHA-CH-06-TL-VN-75"),
+        ("ch_rocker_arm_tl_vn_oblique_pivot_lock_wire", "MHA-CH-06-TL-VN-76"),
     ],
 )
 def test_retired_orphan_families_are_not_allocated(stem, number) -> None:

@@ -1,6 +1,6 @@
 r"""Build the oblique-trammel jig's end bracket (MHA-CH-06-TL-28; shop fixture).
 
-A 6061-T6 1/2 x 3/4 in flat, 68.9 long, two off: each carries one of the
+A 6061-T6511 1/2 x 1 in flat on edge, 68.9 long, two off: each carries one of the
 leadscrew feed's KP08 pillow blocks on base bar 1's top
 (``ch_rocker_arm_tl_oblique_end_bracket_spec``).
 
@@ -8,7 +8,7 @@ Layout (the spec's model frame, +Z up): ONE Front-plane rectangle from the
 inner end face (model x 0) about the mid-width line, extruded +Z by the stock
 thickness; the four #8-32 UNC base-bar taps and the two #6-32 UNC KP08 taps are
 two native Hole Wizard features tapped THRU from the top face on the row y 0.
-The row's printed station (9.525 from the -Y side face) lives on a hidden
+The row's printed station (6.35 from the -Y side face) lives on a hidden
 reference sketch, ``HoleRowReference`` (build_ch_rocker_arm_tl_oblique_base_bar's
 ``RailRowReference``).
 
@@ -78,7 +78,7 @@ _SAVED_DRAWING_PROPERTIES = (
 V_BRACKET = BRACKET_LENGTH * BRACKET_WIDTH * BRACKET_THICK
 V_BAR_TAPS = len(BAR_TAP_X) * math.pi * (BAR_TAP_DRILL / 2.0) ** 2 * BRACKET_THICK
 V_KP08_TAPS = len(KP08_TAP_X) * math.pi * (KP08_TAP_DRILL / 2.0) ** 2 * BRACKET_THICK
-# Tight enough that a missing tap (about 109 mm^3 the smaller) fails.
+# Tight enough that a missing tap (about 146 mm^3 the smaller) fails.
 _V_TOL = 20.0
 
 

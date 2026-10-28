@@ -122,6 +122,9 @@ def test_square_section_prints_as_stock_reference() -> None:
     config = parts("ch-amplitude-bar")
     assert "1/4 in sq" in config["material"]
     assert len(str(config["material"])) <= 36
+    # Rule 2: nothing on the bar needs one grade, so the field names the
+    # stock family (machinist review, 3de09b9).
+    assert "1018" not in config["material"]
 
 
 def test_views_are_the_full_length_and_enlarged_cropped_ends() -> None:
@@ -560,7 +563,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     spec = _config.parts("ch-amplitude-bar")
-    assert spec["material_specification"] == "AISI 1018 cold-rolled steel, 6.35 sq"
+    assert spec["material_specification"] == "low-carbon cold-finished steel, 6.35 sq"
     # One line in the FINISH field (r1 wrapped at 50 characters). Round 2:
     # the unplated press bore states its protection.
     assert spec["finish"] == "bright chrome, dims plated; pin hole bare, oiled"
