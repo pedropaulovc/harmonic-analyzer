@@ -202,6 +202,16 @@ V_SLOT = slot_strip_area(HEAD_R, SLOT_WIDTH) * SLOT_DEPTH
 V_FINAL = V_TURNED - V_SLOT
 
 
+async def _volume_check(adapter, label: str, expected: float, tol: float) -> float:
+    # NaN passes every |vol - expected| > tol comparison (the shared
+    # volume_check's included, #2013), so a non-finite read stops the build
+    # (codjiflo on #1997, as build_sm_gooseneck).
+    volume = await volume_check(adapter, label, expected, tol)
+    if not math.isfinite(volume):
+        raise RuntimeError(f"{label}: non-finite volume {volume!r}")
+    return volume
+
+
 @_telemetry.traced("part.limit_band", label_param="name")
 def _limit_band(
     adapter, feature: str, name: str, deviations: tuple[float, float], tol_type: int
@@ -360,7 +370,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += head.apply(adapter, "HeadProfile")
     check("revolve head", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Head")
-    await volume_check(
+    await _volume_check(
         adapter, "flat-topped cheese head with relief chamfer", V_HEAD, 0.005 * V_HEAD
     )
 
@@ -458,7 +468,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += shank.apply(adapter, "ShankProfile")
     check("revolve shank", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Shank")
-    await volume_check(
+    await _volume_check(
         adapter,
         "turned cheese-head screw with corner round and tip chamfer",
         V_TURNED,
@@ -503,7 +513,7 @@ async def build(adapter) -> dict[str, str]:
         (name_dimensions(adapter, "DriverSlot", ["SlotDepth"])[0], '"SlotDepth"')
     )
     # A cut the wrong way removes nothing: the volume is the direction check.
-    await volume_check(adapter, "slotted cheese-head screw", V_FINAL, 0.02 * V_SLOT)
+    await _volume_check(adapter, "slotted cheese-head screw", V_FINAL, 0.02 * V_SLOT)
     blank_reference_geometry(adapter, (("SlotPlane", "PLANE"),))
 
     # Drawing-only station reference.  The top-to-tip overall, printed as a
@@ -619,7 +629,7 @@ async def build(adapter) -> dict[str, str]:
     for dimension, expression in drive_jobs:
         await drive_dimension(adapter, dimension, expression)
     await force_rebuild(adapter)
-    await volume_check(
+    await _volume_check(
         adapter,
         "driven slotted cheese-head screw (equations neutral)",
         V_FINAL,
