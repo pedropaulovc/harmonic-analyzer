@@ -30,7 +30,6 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_notes import property_link
 from _drawing_registry import DRAWING_TEMPLATES, DrawingSpec
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_sheets import create_blank_drawing_sheets
@@ -98,8 +97,8 @@ async def build_purchased_variant_drawing(
     """Draw purchased-member references, with separately scoped rework sheets.
 
     ``variants`` pairs exact native configuration names with short member labels.
-    The source stamps ``<configuration> Manufacturing Notes`` at document scope,
-    because every $PRPSHEET link on this single sheet follows its first view.
+    The reference sheet prints only sourcing facts (member, quantity, purchase
+    unit, supplier and SKU); installation belongs to the assembly's steps.
 
     Member headers are centered by their measured native text extents inside
     their reserved band; an insertion point alone is not proof of containment.
@@ -136,8 +135,7 @@ async def build_purchased_variant_drawing(
         raise ValueError(
             "configured installed quantities do not sum to the family quantity"
         )
-    note_properties = tuple(f"{name} Manufacturing Notes" for name in configurations)
-    names = (*_PROPERTIES, "Material Specification", "Finish", *note_properties)
+    names = (*_PROPERTIES, "Material Specification", "Finish")
     check(f"open {spec.artifact_stem} source", await adapter.open_model(str(source)))
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     if Path(model.GetPathName()).resolve() != source.resolve():
@@ -287,19 +285,6 @@ async def build_purchased_variant_drawing(
                 )
             )
             configured_views.append((view, configuration, scale, cell))
-        property_name = f"{configuration} Manufacturing Notes"
-        linked = f"{label}: {property_link(property_name)}"
-        resolved = f"{label}: {properties[property_name]}"
-        note_y = 0.106 - index * 0.007
-        note = _literal_note(adapter, linked, 0.018, note_y)
-        placed.append(
-            (
-                note,
-                linked,
-                resolved,
-                (0.015, note_y - 0.006, 0.415, note_y + 0.001),
-            )
-        )
     purchase_note = f"QTY {total} INSTALLED MEMBERS; PURCHASE UNIT: {purchase_unit}."
     note = _literal_note(adapter, purchase_note, 0.018, 0.113)
     placed.append((note, purchase_note, purchase_note, (0.015, 0.107, 0.415, 0.114)))
