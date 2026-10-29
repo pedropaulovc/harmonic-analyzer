@@ -83,7 +83,8 @@ def test_pin_chain_runs_from_a1_b1_with_banded_mates() -> None:
     assert spec.DX_CALLOUT == spec.DY_CALLOUT == "SETS R816 ON\nMHA-CH-13"
     for text in spec.CALLOUTS_BELOW.values():
         assert "ERROR" not in text and "1:1" not in text
-    # A1 is located from the HUB axis (the X datum) at the .XX band.
+    # The tap axis (lever taps and HUB) is located from A1, the X datum, at
+    # the .XX band.
     a1 = features["pin_hole_a1"]
     assert a1["station_nominal"] == round(abs(trammel.A1[0]), 2) == 225.07
     assert a1["precision"]["station"] == 2
@@ -199,7 +200,6 @@ def test_spot_stations_print_from_the_hidden_reference_sketch() -> None:
         "SpotDia",
         "SpotDiaCl",
         "HubY",
-        "ClX",
         "ClY",
     }
     # jig-r3: each spot has its own leader and callout, no "2X".
@@ -331,16 +331,21 @@ def test_riser_tap_stations_print_their_walls_band_and_name_the_riser() -> None:
     for index, (x, y) in enumerate(spec.RISER_SCREWS, start=1):
         tap = features[f"riser_tap_{index}"]
         assert tap["precision"]["station"] == tap["precision"]["height"] == places
-        assert tap["station_nominal"] == round(x, places)
+        assert tap["station_nominal"] == round(x - spec.PIN_HOLES["A1"][0], places)
         assert tap["height_nominal"] == round(y, places)
     riser = _config.parts("ch-rocker-arm-tl-oblique-riser")["number"]
     assert riser == "MHA-CH-06-TL-24"
     assert spec.RISER_TAP_CALLOUT == (f"HOLDS {riser} SCREWS\nCLEAR OF ITS CUT EDGES")
-    # Rule 4 (carrier r11): each 3-place station names what it locates.
-    assert set(spec.RISER_STATIONS) == spec.DRAWING_DIMENSIONS["RiserTaps"]
+    # Rule 4 (carrier r11): each 3-place station names what it locates, by
+    # the tool number the hole callout spells out in full.
+    assert spec.DRAWING_DIMENSIONS["RiserTaps"] == {"RiserY1", "RiserY2"}
+    assert set(spec.RISER_STATIONS) - {"RiserY1", "RiserY2"} <= set(spec.STATIONS)
+    assert riser.endswith(spec.RISER_TOOL_ID) and spec.RISER_TOOL_ID == "TL-24"
     for name in spec.RISER_STATIONS:
-        assert spec.CALLOUTS_BELOW[name] == f"LOCATES\n{riser}", name
+        assert spec.CALLOUTS_BELOW[name] == "LOCATES TL-24", name
     assert min(trammel.RISER_SCREW_WALLS) >= 2.0
+    # From A1 the station error about the cut's centre adds half the D1 band.
+    assert 2.0 <= spec.RISER_WALLS_FROM_A1 < min(trammel.RISER_SCREW_WALLS)
     # Four rows (the native two and these two), ~4.5 mm each, centred on the
     # anchor: under the border, over the HUB spot's callout.
     rows = 2 + len(spec.RISER_TAP_CALLOUT.splitlines())
@@ -360,11 +365,66 @@ def test_riser_heights_cover_both_holes_of_their_row() -> None:
     assert screws[1][1] == screws[0][1] and screws[3][1] == screws[2][1]
     assert screws[1][0] == -screws[0][0] and screws[3][0] == -screws[2][0]
     source = inspect.getsource(part)
-    assert '(("RiserX1R", None), SharedCoordinate(0))' in source
-    assert '(("RiserX2R", None), SharedCoordinate(2))' in source
+    assert '(("RiserX1ROrigin", _origin_x("RiserX1R")), SharedCoordinate(0))' in source
+    assert '(("RiserX2ROrigin", _origin_x("RiserX2R")), SharedCoordinate(2))' in source
     assert spec.CALLOUT_PREFIXES == {"RiserY1": "2X ", "RiserY2": "2X "}
     build = inspect.getsource(drawing.build)
     assert "_set_callout_texts(adapter, annotations, CALLOUT_PREFIXES, part=1)" in build
+
+
+def test_every_x_station_is_a_baseline_from_a1() -> None:
+    """Machinist review 41bbeec (r1/r2 clarity.1): X ran from three origins
+    (the left end, A1 and the tap axis). One X datum, A1's axis: every X
+    station prints from it (rule 10)."""
+    a1x = spec.PIN_HOLES["A1"][0]
+    assert spec.DRAWING_DIMENSIONS[spec.STATION_REFERENCE] == set(spec.STATIONS)
+    other_x = {
+        name
+        for feature, names in spec.DRAWING_DIMENSIONS.items()
+        if feature != spec.STATION_REFERENCE
+        for name in names
+        if "X" in name
+    }
+    # The tap axis and the pin chain stay on the pin-hole sketch, A1 its root.
+    assert other_x == {"A1X", "A2DX", "B2DX"}
+    assert "PlateHalfLength" not in spec.DRAWING_DIMENSIONS["PlateProfile"]
+    assert spec.DRAWING_DIMENSIONS["CrTap"] == {"CrY"}
+    assert spec.STATION_REFERENCE in spec.REFERENCE_SKETCHES
+    assert spec.STATIONS["EdgeX"] == (spec.OUTLINE_X[0], spec.OUTLINE_Y[0])
+    assert spec.STATIONS["ClX"] == spec.CL and spec.STATIONS["CrX"] == spec.CR
+    features = _features()
+    located = ("hub_spot", "cl_spot", "cr_tap_1", "lever_tap_1", "lever_tap_2")
+    for name in located + tuple(f"riser_tap_{i}" for i in range(1, 5)):
+        feature = features[name]
+        places = feature["precision"]["station"]
+        assert feature["parent"] == "pin_hole_a1", name
+        assert feature["station_nominal"] == round(_at(feature)[0] - a1x, places), name
+    # The tap axis prints once, as A1X.
+    assert features["lever_tap_1"]["station_nominal"] == 225.07
+    # Each origin-based placement evaluates to the feature's |X| from its
+    # printed station less A1X.
+    values = {"A1X@PinHoleProfile": abs(a1x)} | {
+        f"{name}@{spec.STATION_REFERENCE}": abs(x - a1x)
+        for name, (x, _y) in spec.STATIONS.items()
+    }
+    for name, (x, _y) in spec.STATIONS.items():
+        if name == "EdgeX":
+            continue
+        expression = part._origin_x(name)
+        for key, value in values.items():
+            expression = expression.replace(f'"{key}"', repr(value))
+        assert math.isclose(eval(expression), abs(x), abs_tol=1e-9), name
+    # Each X text stands within its own span, between A1 and its feature.
+    a1_sheet = _on_sheet(a1x, 0.0)[0]
+    for name, (x, _y) in spec.STATIONS.items():
+        ends = sorted((a1_sheet, _on_sheet(x, 0.0)[0]))
+        assert ends[0] < _top_text(name)[0] < ends[1], name
+    # Machinist review 07a6786: the 34.9's arrows went outside its short span
+    # and its line ran on into the REAM leader; they are held inside.
+    assert '_arrows_inside(adapter, annotations, "EdgeX")' in inspect.getsource(
+        drawing.build
+    )
+    assert drawing._ARROWS_INSIDE == 0  # swDimArrowsInside
 
 
 def test_section_line_prints_its_ends_only() -> None:
@@ -430,12 +490,16 @@ def _boxes_overlap(a, b) -> bool:
 def test_every_location_text_stands_outside_the_outline() -> None:
     """jig-r3: hole-location dimensions sat inside the outline, crossing
     holes and each other. Every top-view text but the diameters stands
-    outside it, in its lane."""
+    outside it, in its lane (CL's spot callout stands in the plate's free
+    band under the pin line)."""
+    diameters = {"PinHoleDia", "SpotDia", "SpotDiaCl"}
     x0, y0 = _on_sheet(spec.OUTLINE_X[0], spec.OUTLINE_Y[0])
     x1, y1 = _on_sheet(spec.OUTLINE_X[1], spec.OUTLINE_Y[1])
-    for name in drawing.TOP_KEEP:
+    for name in set(drawing.TOP_KEEP) - diameters:
         tx, ty = _top_text(name)
         assert not (x0 - 3.0 < tx < x1 + 3.0 and y0 - 3.0 < ty < y1 + 3.0), name
+    for name in drawing.TOP_KEEP:
+        tx, ty = _top_text(name)
         assert _BORDER[0] + 6.0 <= tx <= _BORDER[2] - 6.0, name
         assert _BORDER[1] <= ty <= _BORDER[3], name
     # One sheet: the left lanes fit between the outline and the border.

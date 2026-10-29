@@ -18,6 +18,9 @@ Z, model Z = -carrier Y, so a Top-plane sketch reads carrier (X, Y)):
   plane, coincident with the Front plane: the A1-B1 pin line), which drives
   the feature's distance and carries the finished thickness section A-A prints,
   driven from Plate's depth;
+* ``StationReference``, a hidden Top-plane sketch of points, carries every
+  printed X station as a baseline from A1's axis (rule 10); the spot and tap
+  placements below stay origin-based, driven from it;
 * the HUB and CL centre-drill spots are 90 degree cones, each revolved on a
   plane through its axis parallel to the Front plane (the plane's offset is
   the spot's Y station) as the pivot plate's seat cone;
@@ -107,6 +110,8 @@ from ch_rocker_arm_tl_oblique_carrier_spec import (
     SPOT_FLANK_ANGLE,
     SPOT_REFERENCE,
     SPOTS,
+    STATION_REFERENCE,
+    STATIONS,
     THICKNESS,
     PIN_CHAMFER,
     PIN_CHAMFER_BAND,
@@ -277,7 +282,7 @@ async def _spot(
         adapter, f"{face}.start", profile[0][0], profile[0][1], f"{label} station"
     )
     if profile[0][0] != 0.0:
-        dims.record(f"{prefix}SpotX", f'"{prefix}X@{SPOT_REFERENCE}"')
+        dims.record(f"{prefix}SpotX", f'"{prefix}XOrigin@{SPOT_REFERENCE}"')
     await add_diametric_linear_dimension(
         adapter,
         axis,
@@ -333,11 +338,12 @@ async def _spot(
 
 
 async def _spot_reference(adapter) -> list[tuple[str, str]]:
-    """The hidden reference sketch that carries the spots' printed stations
+    """The hidden reference sketch that carries the spots' printed heights
     and their one Ø3 (drawing-simplicity-policy: a value the sheet prints but
     no importable feature dimension carries). A Top-plane sketch reads carrier
     (X, Y): HUB on the centreline (one Y), CL by X and Y, each a Ø3 circle on
-    the spot's mouth; CL's diameter is driven equal to HUB's."""
+    the spot's mouth; CL's diameter is driven equal to HUB's and its X from
+    its printed station from A1 (``STATION_REFERENCE``)."""
     ref = SketchDims()
     check("create_sketch spot reference", await adapter.create_sketch("Top"))
     await define_circle(
@@ -354,13 +360,83 @@ async def _spot_reference(adapter) -> list[tuple[str, str]]:
         _R_SPOT,
         "CL spot reference",
         dims=ref,
-        names=("ClX", "ClY", "SpotDiaCl"),
-        drives=(None, None, f'"SpotDia@{SPOT_REFERENCE}"'),
+        names=("ClXOrigin", "ClY", "SpotDiaCl"),
+        drives=(_origin_x("ClX"), None, f'"SpotDia@{SPOT_REFERENCE}"'),
     )
     await ensure_fully_defined(adapter, "spot reference sketch")
     check("exit_sketch spot reference", await adapter.exit_sketch())
     name_last_feature(adapter, SPOT_REFERENCE)
     return ref.apply(adapter, SPOT_REFERENCE)
+
+
+def _add_point(adapter, point: tuple[float, float], label: str) -> str:
+    """One sketch point straight into the sketch DB (no inference snap),
+    registered for the adapter's dimension refs (build_dt_pinion_lever)."""
+    sketch_manager = _early_bound(adapter.currentSketchManager, "ISketchManager")
+    previous = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    try:
+        created = sketch_manager.CreatePoint(point[0] / 1000.0, point[1] / 1000.0, 0.0)
+    finally:
+        sketch_manager.AddToDB = previous
+    if created is None:
+        raise RuntimeError(f"cannot create the {label} point")
+    return adapter._register_sketch_entity("Point", created)
+
+
+def _origin_x(station: str) -> str:
+    """A feature's origin-based |X| placement as its printed station from A1
+    (``STATIONS``) less A1's own |X| (A1X; A1 is at -A1X)."""
+    a1x = _pin_dim("A1X")
+    printed = f'"{station}@{STATION_REFERENCE}"'
+    if STATIONS[station][0] < 0.0:
+        return f"{a1x} - {printed}"
+    return f"{printed} - {a1x}"
+
+
+async def _station_reference(adapter) -> list[tuple[str, str]]:
+    """The hidden Top-plane sketch of points carrying every printed X station
+    from A1 (rule 10: one datum per view; drawing-simplicity-policy: a Hole
+    Wizard placement sketch cannot carry a datum point). Points, not
+    construction lines: the drawing shows the sketch in the view it
+    dimensions (build_dt_pinion_lever's points-only idiom).
+
+    The A1 point stands on the pin line, its X driven from A1X. Each station
+    point stands on its feature's centre (the left end's on the -X/-Y corner),
+    so its extension line leaves the feature: X from the A1 point (printed,
+    the owner the feature placements are driven from), Y from it too (not
+    printed; driven where a printed Y has a name, else the spec's)."""
+    stations = SketchDims()
+    check("create_sketch station reference", await adapter.create_sketch("Top"))
+    a1 = PIN_HOLES["A1"]
+    origin = _add_point(adapter, a1, "A1 station")
+    await anchor_point_to_origin(adapter, origin, *a1, "A1 station")
+    stations.record("StationA1X", _pin_dim("A1X"))
+    y_drives = {
+        "EdgeX": '"PlateNearY@PlateProfile"',
+        "ClX": f'"ClY@{SPOT_REFERENCE}"',
+    }
+    for name, point in STATIONS.items():
+        target = _add_point(adapter, point, f"{name} station")
+        await anchor_point_to_point(
+            adapter,
+            origin,
+            target,
+            point[0] - a1[0],
+            point[1] - a1[1],
+            f"{name} from A1",
+        )
+        stations.record(
+            name,
+            '"PlateHalfLength@PlateProfile" - ' + _pin_dim("A1X")
+            if name == "EdgeX"
+            else None,
+        )
+        stations.record(f"{name}Rise", y_drives.get(name))
+    await ensure_fully_defined(adapter, "station reference sketch")
+    check("exit_sketch station reference", await adapter.exit_sketch())
+    name_last_feature(adapter, STATION_REFERENCE)
+    return stations.apply(adapter, STATION_REFERENCE)
 
 
 def _pin_dim(name: str) -> str:
@@ -673,9 +749,12 @@ async def build(adapter) -> dict[str, str]:
         adapter, "pin chamfers", volume - V_PIN_CHAMFER, 0.05 * V_PIN_CHAMFER + 0.05
     )
 
-    # --- HUB and CL centre-drill spots ---------------------------------------
-    # Their printed stations and Ø3 first: the hidden reference sketch that
-    # drives each spot plane and cone, ahead of them in the tree.
+    # --- X stations from A1, then the HUB and CL centre-drill spots ----------
+    # The printed baselines first: the hidden sketch of points that drives
+    # every spot and tap X placement, ahead of them in the tree. Then the
+    # spots' printed heights and Ø3: the hidden reference sketch that drives
+    # each spot plane and cone, ahead of them in the tree.
+    drive_jobs += await _station_reference(adapter)
     drive_jobs += await _spot_reference(adapter)
     for prefix, point in SPOTS.items():
         drive_jobs += await _spot(adapter, prefix, point)
@@ -692,8 +771,9 @@ async def build(adapter) -> dict[str, str]:
         f"CR clamp tap ({CR_SPEC.size})",
         name="CrTap",
         expect_dia_mm=CR_TAP_DRILL,
-        placement_dims=[(("CrX", None), ("CrY", None))],
+        placement_dims=[(("CrXOrigin", _origin_x("CrX")), ("CrY", None))],
     )
+    drive_jobs += cr.placement_drive_jobs
     v_cr = math.pi * (cr.hole_dia_mm / 2.0) ** 2 * THICKNESS
     volume = await volume_check(adapter, "CR tap", volume - v_cr, 0.03 * v_cr)
 
@@ -706,10 +786,10 @@ async def build(adapter) -> dict[str, str]:
         name="RiserTaps",
         expect_dia_mm=RISER_TAP_DRILL,
         placement_dims=[
-            (("RiserX1", None), ("RiserY1", None)),
-            (("RiserX1R", None), SharedCoordinate(0)),
-            (("RiserX2", None), ("RiserY2", None)),
-            (("RiserX2R", None), SharedCoordinate(2)),
+            (("RiserX1Origin", _origin_x("RiserX1")), ("RiserY1", None)),
+            (("RiserX1ROrigin", _origin_x("RiserX1R")), SharedCoordinate(0)),
+            (("RiserX2Origin", _origin_x("RiserX2")), ("RiserY2", None)),
+            (("RiserX2ROrigin", _origin_x("RiserX2R")), SharedCoordinate(2)),
         ],
     )
     drive_jobs += riser.placement_drive_jobs
