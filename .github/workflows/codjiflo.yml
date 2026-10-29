@@ -10,10 +10,10 @@ permissions:
 jobs:
   review:
     if: github.event.issue.pull_request
-    uses: vezzadev/codjiflo-reviewer/.github/workflows/review.yml@4c98f65ab0f6addffd63bd996dd44193603c9ad9
+    uses: vezzadev/codjiflo-reviewer/.github/workflows/review.yml@aa8e93499215ebb34dad75e63dcaa468b309f073
     with:
       approved-users: ${{ vars.CODJIFLO_APPROVED_USERS }}
-      bot-ref: 4c98f65ab0f6addffd63bd996dd44193603c9ad9
+      bot-ref: aa8e93499215ebb34dad75e63dcaa468b309f073
       runner-label: codjiflo-reviewer
       source-submodules: '["SolidworksMCP-python"]'
       app-id: ${{ vars.CODJIFLO_APP_ID }}

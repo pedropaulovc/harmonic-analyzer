@@ -34,8 +34,11 @@ context; do not require unrelated area instructions for files outside that area.
 
 Trace drawing-affecting changes through their source dependencies: drawing
 scripts and specs/notes/sheet modules, drawing helpers, part and assembly
-builders (`build_*.py`), their geometry/spec/config inputs, and machinist-review
-machinery. For these changes read the relevant rules in
+builders (`build_*.py`), their geometry/spec/config inputs, `cad/config/`,
+machinist-review machinery, and edits to the drawing guidelines or simplicity
+policy themselves. Governance-document changes require the source-level
+governance and owner-ruling checks even when they change only prose.
+For these changes read the relevant rules in
 `cad/docs/drawing-guidelines.md` and their implementation in
 `cad/docs/drawing-simplicity-policy.md` at the PR head. Read
 `cad/scripts/prompts/machinist_review_<kind>.md` and its severity contract when
