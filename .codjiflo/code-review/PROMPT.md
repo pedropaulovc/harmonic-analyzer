@@ -118,8 +118,13 @@ claim the saved model or final sheet was inspected. Check at least:
 
 For changed adapter calls, check method existence, signatures, inherited mixins
 and delegated helpers against the vendored `PyWin32Adapter` source where
-available. For changed SolidWorks API calls, consult prepared local SDK
-documentation where available. Use source inspection and read-only static/AST
+available. For changed SolidWorks API calls, inspect any prepared local reference
+under `$CODEX_HOME/plugins/cache/*/developing-solidworks/*/skills/developing-solidworks/`
+(use `$HOME/.codex` when `CODEX_HOME` is unset). Read its `docs/`, `index/`,
+`types/`, `enums/` and `examples/` directories directly; OMP disables skill and
+rule discovery. These optional caches are provisioned separately by the runner
+operator, not as a prerequisite to every review. If absent, continue with the
+vendored source and repository documentation. Use read-only source/static/AST
 analysis without importing recipes, constructing adapters or running test suites.
 Do not invent an adapter method from the operation's name. If an API contract
 cannot be resolved from available source/docs, identify the specific uncertainty
