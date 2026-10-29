@@ -10,10 +10,10 @@ permissions:
 jobs:
   review:
     if: github.event.issue.pull_request
-    uses: vezzadev/codjiflo-reviewer/.github/workflows/review.yml@cb9a1b98c05d554e02e342072bc078380f91a283
+    uses: vezzadev/codjiflo-reviewer/.github/workflows/review.yml@3a30108c98f96089c510c4e2467f23207e9c7103
     with:
       approved-users: ${{ vars.CODJIFLO_APPROVED_USERS }}
-      bot-ref: cb9a1b98c05d554e02e342072bc078380f91a283
+      bot-ref: 3a30108c98f96089c510c4e2467f23207e9c7103
       runner-label: codjiflo-reviewer
       prepare-command: node scripts/prepare-solidworks-docs.mjs
       app-id: ${{ vars.CODJIFLO_APP_ID }}
