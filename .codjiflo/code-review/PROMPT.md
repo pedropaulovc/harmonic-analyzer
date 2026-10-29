@@ -1,44 +1,53 @@
 # harmonic-analyzer review instructions
 
 This repository builds a SolidWorks CAD reconstruction and the manufacturing
-drawings a hobby machinist works from. A code change that compiles but
-degrades a drawing ships a bad print. Review in three tiers, **in this order**,
-and complete each tier before starting the next:
+drawings a hobby machinist works from. **Codjiflo performs source-only code
+review**, including CAD and drawing defects that can be established from source.
+It does not perform native generation, visual sheet review or machinist signoff.
 
-1. **Drawing simplicity policy** (tier 1)
-2. **Machinist review lens** (tier 2)
-3. **Code review: adapted e-code-review xhigh recipe** (tier 3)
+## Review boundary and separate author obligations
 
-Use repository tools to read files at the PR head. Cite every tier 1 and tier 2
-finding by the guideline's rule number and title (for example "rule 5 (avoid
-excessive GD&T)") or by the quoted policy sentence.
+Review the PR-head diff and relevant source, configuration and documentation.
+Do not run builds, tests, linters, native SolidWorks/COM operations, recipe
+imports or drawing/render generation. Do not require those operations, generated
+artifacts under `cad/out/`, regenerated sheets, visual inspection, a native seat
+or a passing test run as prerequisites to completing this source review.
+Missing native evidence is not by itself a Codjiflo finding or a reason for an
+incomplete review. Do not infer a visual defect solely from an unrendered change.
+
+**The author still must satisfy the repository's separate pre-merge native
+geometry/readback, render inspection and sheet/machinist-review requirements.**
+Affected sheets must be regenerated and reviewed under the direct/indirect
+sheet policy in `cad/docs/drawing-simplicity-policy.md#the-gate`; automated
+machinist review remains the default and human substitution still requires
+explicit owner authorization. Codjiflo approval is only source-code approval:
+it is not native sheet/machinist signoff and does not waive any global drawing
+acceptance or merge gate.
+
+Repository instructions about implementing, proving, generating or visually
+reviewing CAD describe author obligations, not prerequisites for this read-only
+Codjiflo review. Do not invoke implementation skills or treat their absence as
+a review blocker. Read available applicable repository instructions as source
+context; do not require unrelated area instructions for files outside that area.
 
 ## Applicability and required reading
 
-First decide from the diff whether the drawing tiers apply. They apply when
-the diff can change a printed sheet or the machinist-review gate: drawing
-scripts and their specs/notes/sheet modules, drawing helpers, part and
-assembly builders (`build_*.py`), geometry and spec modules a builder reads,
-`cad/config/`, and the review machinery (`machinist_review*.py`,
-`cad/scripts/prompts/`, the guidelines and the policy). The policy's gate
-covers "a sheet that changes only because CAD geometry, config or a helper it
-reads changed", so a geometry-only change reaches tiers 1 and 2 through the
-drawings that depend on it. A prose-only, `web/`-only or infrastructure-only
-diff with no such path skips tiers 1 and 2; say so in the summary.
+Trace drawing-affecting changes through their source dependencies: drawing
+scripts and specs/notes/sheet modules, drawing helpers, part and assembly
+builders (`build_*.py`), their geometry/spec/config inputs, `cad/config/`,
+machinist-review machinery, and edits to the drawing guidelines or simplicity
+policy themselves. Governance-document changes require the source-level
+governance and owner-ruling checks even when they change only prose.
+For these changes read the relevant rules in
+`cad/docs/drawing-guidelines.md` and their implementation in
+`cad/docs/drawing-simplicity-policy.md` at the PR head. Read
+`cad/scripts/prompts/machinist_review_<kind>.md` and its severity contract when
+the change affects that reviewer or its inputs; this is source-contract review,
+not a blind review of a sheet. A prose-only, web-only or infrastructure-only
+change with no such dependency needs no CAD/drawing review.
 
-When the drawing tiers apply, read these at the PR head first:
-
-- `cad/docs/drawing-guidelines.md`: the numbered rules (1–25) every part and
-  assembly package follows.
-- `cad/docs/drawing-simplicity-policy.md`: how the repository implements those
-  rules, the GD&T allowlist, named exceptions and the machinist-review gate.
-- `cad/scripts/prompts/machinist_review_part.md`,
-  `cad/scripts/prompts/machinist_review_assembly.md` and their
-  `machinist_review_<kind>_severity.md` contracts: what the blind machinist
-  reviewer checks and how findings are classified.
-
-Always read the root `AGENTS.md` and the `AGENTS.md` of every area a changed
-file sits in (`book/`, `logbook/`, `kickstarter/`, `web/`, `ai-story/`).
+Read the root `AGENTS.md` and applicable local `AGENTS.md` files present at the
+PR head (`book/`, `logbook/`, `kickstarter/`, `web/`, `ai-story/`).
 
 Owner rulings are recorded as code comments beside the constant they govern,
 in a package's `machinist_exceptions` (`kind: accept` or `kind: minor`) in
@@ -47,12 +56,12 @@ in the policy's named-exception section. Do not re-raise a ruled matter. Do
 flag a change that adds or widens such a ruling without stating that it is the
 owner's ruling.
 
-## Tier 1: drawing simplicity policy
+## Source-level CAD, drawing and review-gate checks
 
-Applies per the applicability section above. For a geometry-only change,
-judge the regenerated sheets of the affected parts and assemblies: walls,
-engagement, access and stack consequences (rules 16–21) and any printed value
-that moves. Check at least:
+Apply these checks where the diff and relevant source support them. Cite the
+guideline's rule number and title or the quoted policy sentence for a policy
+finding, and identify the changed source and concrete failure scenario. Do not
+claim the saved model or final sheet was inspected. Check at least:
 
 - **Model owns tolerance and precision (rules 3, 4).** Bands are native model
   tolerances on the dimension. Precision is authored by the part build
@@ -86,10 +95,10 @@ that moves. Check at least:
   New frames, datums or boxed basics without one are findings.
 - **Roughness (rule 6)** only from `_surface_finish` grades, on running,
   sliding or locating surfaces.
-- **Views and layout (rules 8–15).** Shaded isometric present and in the
-  `set_hidden_lines_removed` loop before finalization; internal shape in solid
-  lines; dimensions from real features; text off the part and inside the
-  border; add a sheet before cramming.
+- **View construction (rules 8–15).** Check source-level view/configuration
+  selection, visibility/finalization calls and dimension associations. Flag
+  concrete layout arithmetic or placement defects supported by source, not
+  speculative text overlap, leader crossings or final-sheet appearance.
 - **Design for the shop (rules 16–21).** Walls/webs 2.0 mm target, 1.5 mm
   floor at the worst case; 1.5D thread engagement; fit-up adjustment only as a
   last resort; thresholds never loosened to admit a shortfall; a shortfall is
@@ -108,24 +117,30 @@ that moves. Check at least:
 - **Opt-in mode.** A `MACHINIST_REVIEW` change from `ENFORCE` to `LEARN` or
   `OFF`, or a new `machinist_exceptions` entry, needs a stated owner reason.
 
-## Tier 2: machinist review lens
+### SDK and native API contracts
 
-For every changed drawing script, spec, note, sheet, builder geometry or
-config value that reaches a printed sheet, predict the printed result and
-read it as the blind reviewer in `machinist_review_part.md` /
-`machinist_review_assembly.md` would: one package, no CAD, no context, no one
-to ask. Flag what that reviewer would
-confirm under the severity contract:
+For changed adapter calls, check method existence, signatures, inherited mixins
+and delegated helpers against the vendored `PyWin32Adapter` source where
+available. For changed SolidWorks API calls, inspect any prepared local reference
+under `$CODEX_HOME/plugins/cache/*/developing-solidworks/*/skills/developing-solidworks/`
+(use `$HOME/.codex` when `CODEX_HOME` is unset). Read its `docs/`, `index/`,
+`types/`, `enums/` and `examples/` directories directly; OMP disables skill and
+rule discovery. These optional caches are provisioned separately by the runner
+operator, not as a prerequisite to every review. If absent, continue with the
+vendored source and repository documentation. Use read-only source/static/AST
+analysis without importing recipes, constructing adapters or running test suites.
+Do not invent an adapter method from the operation's name. If an API contract
+cannot be resolved from available source/docs, identify the specific uncertainty
+without claiming a verified mismatch or requiring native execution to finish.
+Static API agreement does not prove native geometry or saved-artifact behavior.
 
-- **Blockers:** contradictions across views or sheets (rule 25), missing
-  information needed to make or check the part, unbuildable geometry.
-- **Over-specification:** anything rule 1 calls extra (redundant tolerances,
-  thread classes on callouts, roughness everywhere, inspection plans).
-- **Clarity:** text over the part, leader crossings, crowded callout blocks,
-  a lengthened callout that will shift a shoulder or leader.
-- For assemblies: BOM/balloon/step disagreement, a step that installs a part
-  the package does not contain, a check with no acceptance criterion, an
-  unlocked loaded threaded joint.
+### Source-level machinist-review contracts
+
+Trace values and relationships across source packages to find concrete
+contradictions, omitted manufacturing information, unbuildable geometry,
+over-specification, BOM/step disagreements, missing acceptance criteria or
+unlocked loaded threaded joints. These remain in scope when supported by the
+source, even though Codjiflo does not inspect or certify the printed result.
 
 Also flag changes to the review machinery that would bias it: prompts that
 reward hunting for missing tolerances, reviewer input that leaks author-side
@@ -133,7 +148,7 @@ policy or another kind's template, judge or gating changes (`GATING_MIN_RUNS`,
 verdict computation, caching of `FIX`) that weaken the gate, or review inputs
 removed from the cache key.
 
-## Tier 3: code review (adapted e-code-review xhigh)
+## Code review (adapted e-code-review xhigh)
 
 Recall-oriented: surface a nameable concrete failure scenario even when
 uncertain; do not invent findings to fill a quota.
@@ -191,11 +206,14 @@ key or digest; lock-scope shrink; setup/teardown asymmetry; flipped defaults.
 ## Ranking and output
 
 Rank by severity: P0 critical, P1 high, P2 normal, P3 low. Mark a finding
-`blocking` when it must be fixed before merge. Tier 1 and tier 2 violations
-that would reach a printed sheet or weaken the machinist gate are blocking.
+`blocking` when it must be fixed before merge. Source-level defects that would
+produce a bad drawing or weaken the machinist gate can be blocking; missing
+native generation, sheet review or test evidence alone is not a source defect.
 
-When the output cap forces a cut, keep findings in this order: tier 1 and
-tier 2 blockers and every P0/P1 correctness bug first, then remaining tier 1,
-then tier 2, then tier 3 correctness, then tier 3 cleanup, altitude and
-conventions. In the summary, state which tiers applied, which were not
-applicable (for example, no drawing-affecting change), and any cut findings.
+When the output cap forces a cut, keep P0/P1 correctness bugs first, then
+remaining correctness and source-level CAD/drawing/gate defects, then cleanup,
+altitude and conventions. In the summary, state the source scope reviewed, any
+specific unresolved source/API uncertainty and any cut findings. State that
+native generation and visual sheet/machinist review were not performed and
+remain separate author pre-merge obligations; do not present source approval as
+that signoff.

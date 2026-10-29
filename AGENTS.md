@@ -202,6 +202,16 @@ individual PR or stack does not need a successful full `build` before merging.
    Automated machinist review is the default; substituting human machinist
    review requires explicit owner authorization.
 
+**Codjiflo is source-only code review.** Its scope is defined in
+[`.codjiflo/code-review/PROMPT.md`](.codjiflo/code-review/PROMPT.md), including
+source-level CAD/drawing defects and available SDK/API contracts. It does not
+run native generation, tests or visual sheet review, and those author-side
+activities are not prerequisites for completing its review. Codjiflo approval
+does not certify the native artifacts or provide sheet/machinist signoff.
+Authors must still supply the focused proof, render inspection and exact-sheet
+machinist review required above before merge; the direct/indirect sheet policy
+and owner-authorization requirement for human substitution are unchanged.
+
 **Stacked PRs may share focused native proof and render inspection** when the
 tested top commit contains every covered change and the evidence identifies the
 covered commits and artifacts. A stack does not require a full build to merge.
