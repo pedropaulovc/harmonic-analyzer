@@ -37,9 +37,9 @@ PINNED = {
     "PART_SAGITTA.inner": (trammel.PART_SAGITTA[0], 14.188),
     "PART_SAGITTA.outer": (trammel.PART_SAGITTA[1], 13.905),
     "RISER_HUB_CHECK": (trammel.RISER_HUB_CHECK, 5.869),
-    "PIVOT_BLOCK_TOP_Z": (trammel.PIVOT_BLOCK_TOP_Z, 65.0),
+    "PIVOT_BLOCK_TOP_Z": (trammel.PIVOT_BLOCK_TOP_Z, 64.3),
     "PIVOT_SUPPORT_HEIGHT": (trammel.PIVOT_SUPPORT_HEIGHT, 16.0),
-    "CARRIER_UNDERSIDE_Z": (trammel.CARRIER_UNDERSIDE_Z, 81.0),
+    "CARRIER_UNDERSIDE_Z": (trammel.CARRIER_UNDERSIDE_Z, 80.3),
 }
 
 
@@ -217,7 +217,9 @@ def test_plain_pivot_stack_sets_the_carrier_height() -> None:
     # Owner ruling 2026-10-27: a nominal five 0.2 shims a support.
     assert trammel.PIVOT_SHIM_PACK == 1.0
     assert trammel.PIVOT_SPACER_LENGTH == 15.0
-    assert trammel.CARRIER_UNDERSIDE_Z == pytest.approx(81.0)
+    # The stack stands on the faced 12.0 base bar (owner ruling 2026-10-30).
+    assert trammel.RAIL_SEAT_Z == trammel.BASE_BAR_THICK == 12.0
+    assert trammel.CARRIER_UNDERSIDE_Z == pytest.approx(80.3)
     for retired in (
         "BEARING_RADIAL_PLAY", "RADIUS_FROM_BEARING_PLAY", "BEARING_BORE",
         "BEARING_OD", "BEARING_WIDTH", "BEARINGS_PER_PIN", "BEARING_RECESS",
@@ -238,9 +240,11 @@ def test_base_bar_stock_fits_the_vise_with_its_column_edge_three_and_a_half_out(
     None
 ):
     """The 2026-10-30 ruling: the bar's stock width (left as supplied) fits the
-    6 in vise's stock hard jaws, and the ordered stock row supplies it. The
-    column-side edge stays at lateral +88.9 (2026-10-17 ruling a) so the TL-28
-    brackets stand on bar 1; both hold-down studs stay on the bar."""
+    6 in vise's stock hard jaws, and the ordered stock row supplies it; its
+    1/2 in thickness is faced to BASE_BAR_THICK (owner ruling 2026-10-30,
+    option A). The column-side edge stays at lateral +88.9 (2026-10-17 ruling
+    a) so the TL-28 brackets stand on bar 1; both hold-down studs stay on the
+    bar."""
     inventory = tomllib.loads(
         (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_bytes().decode()
     )
@@ -250,8 +254,10 @@ def test_base_bar_stock_fits_the_vise_with_its_column_edge_three_and_a_half_out(
         row for row in inventory["stock"] if "OnlineMetals 17666" in row.get("note", "")
     ]
     assert stock["section_mm"] == pytest.approx(
-        [trammel.BASE_BAR_WIDTH, trammel.BASE_BAR_THICK]
+        [trammel.BASE_BAR_WIDTH, trammel.BASE_BAR_STOCK_THICK]
     )
+    assert trammel.BASE_BAR_THICK < trammel.BASE_BAR_STOCK_THICK
+    assert f"Face both large faces to {trammel.BASE_BAR_THICK:.1f} mm" in stock["note"]
     assert stock["length_mm"] >= 2 * trammel.BASE_BAR_LENGTH
     assert trammel.BASE_BAR_COLUMN_EDGE == pytest.approx(88.9)
     assert (

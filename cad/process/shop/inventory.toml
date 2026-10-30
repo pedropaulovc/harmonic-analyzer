@@ -6448,7 +6448,7 @@ cite = ["Owner-reported purchased stock and allocation, oblique jig simplificati
 [[stock]]
 form = "flat_bar"
 material = "6061-T6511 aluminium"
-note = "TL-20 base bars x2: OnlineMetals 17666, 1/2 x 5-1/2 in, the widest listed 6061 rectangle bar that fits the 6 in vise's 5 3/4 in stock-hard-jaw capacity (1/2 x 6 does not). Order 36 in: two 440 mm bars plus saw kerf and facing. Not yet owned."
+note = "TL-20 base bars x2: OnlineMetals 17666, 1/2 x 5-1/2 in, the widest listed 6061 rectangle bar that fits the 6 in vise's 5 3/4 in stock-hard-jaw capacity (1/2 x 6 does not). Order 36 in: two 440 mm bars plus saw kerf and facing. Face both large faces to 12.0 mm (owner ruling 2026-10-30); the width stays as supplied. Not yet owned."
 section_mm = [139.7, 12.7]
 length_mm = 914.4
 on_hand = false

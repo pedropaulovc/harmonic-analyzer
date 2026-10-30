@@ -8,9 +8,9 @@ under one native tap callout, the end brackets' eight counterbored
 holes (stations from the end face, four rows from the -Y edge, one native
 callout naming the far-side counterbores and the TL-28 mate), and both slots'
 stations, rises, width and centre-to-centre run (slot centre marks); the end
-view, projected right of the plan on its centreline, carries the stock
-thickness; the shaded isometric rides bottom left under the plan's stack,
-left of the title block.
+view, projected right of the plan on its centreline, carries the faced
+thickness and both faced seats' Ra 3.2 under their one reason; the shaded
+isometric rides bottom left under the plan's stack, left of the title block.
 
 Run with SolidWorks open::
 
@@ -24,6 +24,7 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -40,10 +41,13 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_edges import visible_view_entities
+from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _machinist_review_mode import MachinistReviewMode
@@ -54,10 +58,12 @@ import ch_rocker_arm_tl_oblique_base_bar_spec as part_spec
 from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
+from _surface_finish import SEAT_UM, surface_finish_by_key
 from _printed_limits import limits
 from _printed_tolerance import drilled_oversize_mm
 from ch_rocker_arm_tl_oblique_base_bar_spec import (
     BAR_LENGTH,
+    BAR_THICK,
     BAR_WIDTH,
     BRACKET_CALLOUT_PRECISION,
     BRACKET_CALLOUT_PROCESS,
@@ -74,8 +80,10 @@ from ch_rocker_arm_tl_oblique_base_bar_spec import (
     RAIL_HOLE_X,
     RAIL_MATE_CALLOUT,
     RAIL_ROW_CALLOUT,
+    SEAT_FINISH_REASON,
     SLOT_RUN,
     STOCK_DIMENSIONS,
+    SURFACE_FINISHES,
     TAP_DRILL,
     TAP_SPEC,
 )
@@ -92,7 +100,7 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A 440 x 139.7 x 12.7 bar: 1:2 puts the 220-wide plan on the B sheet, its end
+# A 440 x 139.7 x 12.0 bar: 1:2 puts the 220-wide plan on the B sheet, its end
 # view projected right of it on the same centreline (third angle). The
 # vertical budget: the rail-hole stack tops out at about 265 under the 267
 # border. The plan sits right of centre so the three side lanes (the row's
@@ -338,12 +346,35 @@ FRONT_KEEP = {
 END_KEEP = {
     "BarThick": (END_CENTER[0] + _HALF_W_SHEET + LANE, END_CENTER[1]),
 }
+# The faced seats (rule 6, owner ruling 2026-10-30): each Ra 3.2 lands on its
+# face's edge in the end view, SEAT_LAND_BELOW_TOP (model) under the view's
+# top. The *Right view puts model +Z to the sheet's left, so the top seat's
+# symbol stands up-left of the left edge and the underside's up-right of the
+# right edge, both above the view and clear of the far rise's line; their
+# one reason sits centred above them, under the tap callout's block.
+FINISH_CHAR_HEIGHT = 0.0025
+SEAT_LAND_BELOW_TOP = 10.0
+_END_TOP = END_CENTER[1] + _HALF_W_SHEET
+_END_HALF_THICK = BAR_THICK * _S / 2000.0
+SEAT_SYMBOL_OUT = 0.006  # symbol from its edge, sheet x
+SEAT_SYMBOL_UP = 0.010  # symbol above the view's top
+TOP_SEAT_FINISH_XY = (
+    END_CENTER[0] - _END_HALF_THICK - SEAT_SYMBOL_OUT,
+    _END_TOP + SEAT_SYMBOL_UP,
+)
+UNDERSIDE_SEAT_FINISH_XY = (
+    END_CENTER[0] + _END_HALF_THICK + SEAT_SYMBOL_OUT,
+    _END_TOP + SEAT_SYMBOL_UP,
+)
+_SEAT_REASON_HALF = 0.026  # "TABLE AND RAIL SEATS", 20 glyphs
+SEAT_REASON_XY = (END_CENTER[0] - _SEAT_REASON_HALF, _END_TOP + 0.026)  # top-left
 # One slot's sizes count both slots; the width says they go through (r5).
 DIMENSION_TEXT = {"SlotWidth": ("2X ", " THRU"), "SlotRun": ("2X ", "")}
-# The width and thickness are the bar as bought (the feed lever's STOCK); the
-# rail-hole stations' tight band names its mate under the outermost station,
-# the row, at the title block's band since c3-r7, keeps its reason (r3:
-# every hole in line with the rail's row, which the one DRO setting gives).
+# The width is the bar as bought (the feed lever's STOCK); the faced
+# thickness takes the title block's .X band. The rail-hole stations' tight
+# band names its mate under the outermost station, the row, at the title
+# block's band since c3-r7, keeps its reason (r3: every hole in line with
+# the rail's row, which the one DRO setting gives).
 CALLOUTS_BELOW = dict.fromkeys(sorted(STOCK_DIMENSIONS), "STOCK") | {
     f"RailHole{_LAST_HOLE}X": RAIL_MATE_CALLOUT,
     "RailRowY": RAIL_ROW_CALLOUT,
@@ -383,6 +414,38 @@ requirement(
             ("LOW_SIDE_Y",),
         ),
     },
+)
+
+# Both large faces: faced to the printed .X thickness, each a locating seat.
+_SEAT_RA = (SEAT_UM, ("SURFACE_FINISHES",))
+requirement(
+    "top_seat",
+    kind="face",
+    faces=(surface_finish_by_key(SURFACE_FINISHES, "top_seat").face,),
+    requirements=("height", "finish_ra"),
+    fields={
+        "normal": ([0.0, 0.0, 1.0], ("SURFACE_FINISHES",)),
+        "plane": (
+            {"frame": "model", "axis": "z", "value": part_spec.BAR_THICK},
+            ("BAR_THICK",),
+        ),
+        "height": (limits(part_spec.BAR_THICK, part_spec.THICK_PLACES), ("BAR_THICK",)),
+        "height_nominal": (part_spec.BAR_THICK, ("BAR_THICK",)),
+        "finish_ra": _SEAT_RA,
+    },
+    precision={"height": part_spec.THICK_PLACES, "finish_ra": 1},
+)
+requirement(
+    "underside_seat",
+    kind="face",
+    faces=(surface_finish_by_key(SURFACE_FINISHES, "underside_seat").face,),
+    requirements=("finish_ra",),
+    fields={
+        "normal": ([0.0, 0.0, -1.0], ("SURFACE_FINISHES",)),
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
+        "finish_ra": _SEAT_RA,
+    },
+    precision={"finish_ra": 1},
 )
 
 for _index, _x in enumerate(part_spec.RAIL_HOLE_X, start=1):
@@ -548,6 +611,54 @@ def _activate_view(adapter: Any, view: Any, *, label: str) -> None:
         raise RuntimeError(f"failed to activate the {label} view {name!r}")
 
 
+def _seat_edges(view: Any) -> dict[str, Any]:
+    """Each seat's edge in the end view, keyed by its finish control: the
+    visible edge along Y (the bar's width) at that face's model Z, on the far
+    end face the *Right view looks at. One scan serves both seats."""
+    stations = {
+        control.key: control.face.normal[2] * control.face.offset_mm
+        for control in SURFACE_FINISHES
+    }
+    found: dict[str, list[tuple[float, Any]]] = {key: [] for key in stations}
+    for raw in visible_view_entities(view, 1, label="end view seat edges"):
+        edge = _early_bound(raw, "IEdge")
+        start, end = edge.GetStartVertex(), edge.GetEndVertex()
+        if start is None or end is None:
+            continue
+        p0, p1 = (
+            tuple(float(v) * 1000.0 for v in _early_bound(vertex, "IVertex").GetPoint())
+            for vertex in (start, end)
+        )
+        for key, z_mm in stations.items():
+            if abs(p0[2] - z_mm) <= 0.01 and abs(p1[2] - z_mm) <= 0.01:
+                found[key].append((abs(p1[1] - p0[1]), edge))
+    edges = {}
+    for key, candidates in found.items():
+        if not candidates:
+            raise RuntimeError(f"end view shows no {key} edge at z={stations[key]}")
+        span, edge = max(candidates, key=lambda item: item[0])
+        if abs(span - BAR_WIDTH) > 0.01:
+            raise RuntimeError(f"end view's {key} edge spans {span:.3f}, not the width")
+        edges[key] = edge
+    return edges
+
+
+def _add_view_note(
+    adapter: Any, view: Any, text: str, xy: tuple[float, float], *, label: str
+) -> None:
+    """A free note in ``view`` at ``xy`` (its top-left corner); a note that
+    did not land in its view raises (draw_mg_magnifying_vertical_rod)."""
+    _activate_view(adapter, view, label=label)
+    if add_note(adapter, text, *xy) is None:
+        raise RuntimeError(f"failed to add the {label} note")
+    texts = [
+        " ".join(str(_early_bound(found, "INote").GetText() or "").split())
+        for found in (_early_bound(view, "IView").GetNotes() or ())
+    ]
+    if texts.count(" ".join(text.split())) != 1:
+        raise RuntimeError(f"{label} note did not land in its view: {texts!r}")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -646,6 +757,37 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_hole_callout_precision(
         bracket_callout, BRACKET_CALLOUT_PRECISION, label="end bracket holes"
+    )
+    # The faced seats' Ra 3.2, each on its own face's edge in the end view,
+    # under their one reason (rule 7: say why, beside the symbols).
+    seat_edges = _seat_edges(end)
+    for key, symbol_xy, label in (
+        ("top_seat", TOP_SEAT_FINISH_XY, "top seat finish"),
+        ("underside_seat", UNDERSIDE_SEAT_FINISH_XY, "underside seat finish"),
+    ):
+        control = surface_finish_by_key(SURFACE_FINISHES, key)
+        z_mm = control.face.normal[2] * control.face.offset_mm
+        add_surface_finish(
+            adapter,
+            end,
+            symbol_xy=symbol_xy,
+            control=control,
+            label=label,
+            char_height=FINISH_CHAR_HEIGHT,
+            entity=seat_edges[key],
+            leader_attach_xy=model_point_in_view(
+                adapter,
+                end,
+                (
+                    BAR_LENGTH / 1000.0,
+                    (HIGH_SIDE_Y - SEAT_LAND_BELOW_TOP) / 1000.0,
+                    z_mm / 1000.0,
+                ),
+                label=f"{label} landing",
+            ),
+        )
+    _add_view_note(
+        adapter, end, SEAT_FINISH_REASON, SEAT_REASON_XY, label="seat finish reason"
     )
 
     # The property-linked blocks land in the active view: the plan.
