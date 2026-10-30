@@ -10,6 +10,90 @@ goes to the farm)? Read
 — it is the decision tree, the seat/cache invariants and the evidence trail for
 an ad-hoc COM operation, and it links back here for cache detail.
 
+## Read-only cleanup inventory (Windows)
+
+Before a clean slate, inventory the machine without deleting files, pruning
+worktrees, stopping processes, or touching the primary checkout:
+
+```powershell
+# Uses only Python's standard library; run with an existing Python 3.12+.
+# No uv sync, SolidWorks seat, or farm launch is needed.
+python scripts/scan_cleanup.py
+
+# Optional bounded logical-size estimates; JSON still goes only to stdout.
+python scripts/scan_cleanup.py --measure --max-entries 20000 --max-depth 6 --seconds 15
+
+# Include another shallow search root, an exact path, or another Git registry.
+python scripts/scan_cleanup.py --root C:/scratch --path C:/scratch/build.log `
+    --git-repo C:/src/solidworks-pool
+```
+
+The scanner checks only immediate children of the main checkout's parent (and
+the script checkout's parent when different), `C:/`, `C:/tmp`, `LOCALAPPDATA`,
+`LOCALAPPDATA/Temp`, and `TEMP`/`TMP` for `ha-*`, `sp-*`, `harmonic-*`, `mr-*`,
+and `machrev-*`. It also checks immediate children of `~/.claude/projects` for
+names containing `harmonic`; these are name-only leads, not ownership proof.
+It does **not** recursively search the drive, AppData, or Temp.
+Default exact entries include `C:/farm-build`, the main and script checkouts'
+`wip`, `logs`, `build.log`, and `cad/out`, plus `LOCALAPPDATA/ha-farm` (the
+farm launcher's fallback home), project cache/review-scratchpad directories,
+and checkout-specific Claude directories under `LOCALAPPDATA`.
+`HARMONIC_AGENT_SCRATCHPAD` adds both `harmonic-analyzer/farm-runs` and
+`harmonic-analyzer/machinist-review-evals`. Without that override, running from
+an OMP `local` working directory (`OMPCODE=1`) adds its
+`harmonic-analyzer/farm-runs`, matching the launcher. Other sessions' OMP local
+directories are not globally discovered; supply their paths with `--path`.
+Known temporary Codex homes, `PROGRAMDATA/harmonic-analyzer`, and the **shared**
+`PROGRAMDATA/solidworks-pool/archive-cache` are exact entries too. Their presence
+does not make shared caches or authentication links disposable. Missing exact
+paths are reported too; repeat `--path` for other known build logs or WIP
+locations rather than widening the search to an entire drive.
+
+Git's read-only `worktree list --porcelain -z` supplies exact registered paths,
+branches, detached HEADs, locks, and prunable annotations for this repository,
+the main checkout's sibling `solidworks-pool` when present, and every
+`--git-repo`. Git probes ignore inherited `GIT_*` environment overrides.
+`locked` and `prunable` are present as `true` when Git reports them and omitted
+otherwise; optional explanations appear separately as `locked_reason` and
+`prunable_reason`. A Git failure is a warning, not
+evidence that a directory is unregistered. `primary_checkout` identifies Git's
+main worktree, even when the script is in a linked checkout; on probe failure
+it falls back to the script checkout with a warning.
+A checkout with a `.git` marker but no matching registration is explicitly
+flagged unless a reparse point prevents inspection. Primary and queried
+checkouts, their contents, and ancestors are protected and never sized, with
+two narrow exceptions: the exact generated-output paths above, and separately
+registered nested worktrees. A checkout root or ancestor remains protected,
+including the currently queried linked checkout. Generated-output exemptions
+do not apply to paths redirected elsewhere, including into source content.
+Candidates enclosing a registered worktree are flagged for Git-state and
+active-use review, even when the candidate itself is not a registered worktree.
+Inspection failures remain protected and require manual review.
+
+JSON separates project-specific locations from **unverified name-only leads**.
+Neither a prefix match, an old modification time, a detached worktree, nor a
+prunable annotation proves that removal is safe. The scanner does not inspect
+dirty/untracked files or determine whether a process or agent still uses a path.
+Review those separately before any subsequent cleanup; this script has no
+delete mode.
+
+Sizing is opt-in, skips symlinks and **all** Windows reparse points (including
+junctions and non-link tags), and shares one entry/time budget across candidates.
+Discovery likewise skips a root if it or any ancestor is a reparse point;
+it does not resolve that root and traverse its target. Such skips, inaccessible
+roots, and exhausted discovery budgets appear in both `discovery` and `warnings`.
+For a known linked root, an operator can explicitly supply its real target
+with `--root` after reviewing that target. Git-marker inspection is skipped
+under reparse points and the review explains that attribution is incomplete.
+Discovery has its own global `--discovery-entries` cap (default 20000).
+Measurements record limits and per-entry errors; an unreadable child does not
+prevent examining its remaining siblings. Bytes are logical file sizes, not
+allocated or reclaimable disk space; partial totals are lower bounds. Candidates
+whose canonical paths overlap an earlier measured candidate are not sized
+again; totals still must not be summed across overlapping paths. The time budget
+is checked between filesystem operations; it cannot interrupt a blocked
+filesystem call. Git probes have a separate 15-second timeout each.
+
 ## Cached machinist-review leaves
 
 `check:machinist_review:<stem>` is a SolidWorks-free, submitter-only task for
