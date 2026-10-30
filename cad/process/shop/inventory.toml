@@ -6439,7 +6439,7 @@ cite = ["OnlineMetals part 20743 https://www.onlinemetals.com/en/buy/carbon-stee
 [[stock]]
 form = "flat_bar"
 material = "6061-T6511 aluminium"
-note = "Owned OnlineMetals 1173, 1/2 x 6 x 72 in: allocate the TL-21 carrier; face the carrier to 12.0 mm and mill its 520 x 130 outline. The TL-20 base bars moved to 1/2 x 5-1/2 stock (2026-10-30): 6 in does not fit the 6 in vise's stock hard jaws. Purchased nominal dimensions are not receipt measurements."
+note = "Owned OnlineMetals 1173, 1/2 x 6 x 72 in: allocate the TL-21 carrier. Saw a 540 mm length and rip it to about 135 mm wide on the bandsaw first: the 152.4 mm width does not fit the 6 in vise's 5 3/4 in stock hard jaws (owner ruling 2026-10-30). Then face to 12.0 mm and mill the 520 x 130 outline. The TL-20 base bars moved to 1/2 x 5-1/2 stock (2026-10-30). Purchased nominal dimensions are not receipt measurements."
 section_mm = [152.4, 12.7]
 length_mm = 1828.8
 on_hand = true

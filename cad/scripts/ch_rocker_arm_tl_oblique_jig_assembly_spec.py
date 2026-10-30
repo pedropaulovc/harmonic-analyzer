@@ -1329,7 +1329,7 @@ _NUT_TORQUE = f"{NUT_SCREW_TORQUE_NM:.1f} N·m"
 
 # --- The feed lever screws: their tightening torque -----------------------------------
 # The two 5/16-18 screws retain the lever against operator handling loads.
-# Wedge-lock pairs remain under the heads. The TL-21 6061-T651 tap's strip
+# Wedge-lock pairs remain under the heads. The TL-21 6061-T6511 tap's strip
 # load at the worst-case engagement caps the preload at one third of ultimate.
 # The feed itself now always uses the handwheel through the integral nut lug.
 _LEVER_THREAD_STRIP_N = (

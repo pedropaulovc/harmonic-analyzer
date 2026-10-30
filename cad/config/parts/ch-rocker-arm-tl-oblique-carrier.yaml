@@ -2,20 +2,22 @@ ch-rocker-arm-tl-oblique-carrier:
   title: Rocker Oblique Trammel Carrier Plate
   # Shop fixture: the parent MHA-CH-06 Number plus -TL-nn (subsystem-identities.md).
   number: MHA-CH-06-TL-21
-  # The pin holes are reamed and the plate must stay flat on two pins:
-  # a stable, free-machining plate grade.
-  material: 6061-T651 aluminium
-  material_specification: 1/2 in 6061-T651 aluminium plate, ASTM B209
+  # The pin holes are reamed and the plate must stay flat on two pins: a
+  # stable (stress-relieved), free-machining grade. The source is the owned
+  # OnlineMetals 1173 bar (shop inventory), ripped to fit the vise.
+  material: 6061-T6511 aluminium
+  material_specification: 1/2 x 6 in 6061-T6511 aluminium bar, ASTM B221 (owned OnlineMetals 1173)
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
   process: >-
-    start from 1/2 in plate; face to 12.0 drawing thickness and saw/mill to
-    520 x 130; drill and ream the four pivot-pin holes; chamfer each pin hole's
-    underside edge 0.3 min x 45 deg; centre-drill the HUB and CL spots; drill and
-    tap the CR, riser and feed-lever holes; break edges. The unchanged H7 pivot
-    bores turn on TL-VN-77 shoulder screws; the underside seats on TL-VN-78
-    spacers.
+    saw a 540 length from the 1/2 x 6 bar and rip it to about 135 wide (the
+    6 in width does not fit the 5 3/4 in vise jaws); face to 12.0 drawing
+    thickness and mill to 520 x 130; drill and ream the four pivot-pin holes;
+    chamfer each pin hole's underside edge 0.3 min x 45 deg; centre-drill the
+    HUB and CL spots; drill and tap the CR, riser and feed-lever holes; break
+    edges. The unchanged H7 pivot bores turn on TL-VN-77 shoulder screws; the
+    underside seats on TL-VN-78 spacers.
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"

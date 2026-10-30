@@ -146,8 +146,11 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
     "PlateWidth": _xy(_RIGHT[0], -8.0),
     "PlateNearY": _xy(_LEFT[4], -24.0),
     "EdgeX": _xy(-242.5, -120.4),  # lane y 112
-    # The pin chain: the tap axis and B1 from A1, A2/B2 from A1/B1.
-    "A1X": _xy(-191.0, -80.4),  # lane y 132
+    # The pin chain: the tap axis and B1 from A1, A2/B2 from A1/B1. The tap
+    # axis's station stands on the HUB spot, so its extension line rises
+    # from this lane through both lever taps to the spot (machinist review
+    # 54e5c9a: A1X's stopped at the pin line, short of HUB).
+    "HubX": _xy(-191.0, -80.4),  # lane y 132
     "PinSpacing": _xy(172.0, -170.3),  # lane y 81.5
     # Its text 4 sheet mm right of A1's extension line, which now rises past
     # it to the R2 lane.
@@ -321,7 +324,8 @@ _D1 = round(part_spec.D1, 3)
 _DX = round(abs(part_spec.A2_DX), 3)
 _DY = round(part_spec.A2_DY, 3)
 # A1, the X datum, from the tap axis (the model origin's X) at the title
-# block's .XX band: the print's 225.07 runs from A1 to the lever taps and HUB.
+# block's .XX band: the print's 225.07 (HubX, driven equal to A1X) runs from
+# A1 to the HUB spot, its extension line through the lever taps.
 _A1X = round(abs(_A1[0]), 2)
 
 
@@ -332,8 +336,8 @@ def _from_a1(x: float, places: int) -> float:
 
 _CHAIN: dict[str, dict[str, tuple[Any, tuple[Any, ...]]]] = {
     "A1": {
-        "station": (limits(_A1X, 2), ("PIN_HOLES",)),
-        "station_nominal": (_A1X, ("PIN_HOLES",)),
+        "station": (limits(_A1X, 2), ("PIN_HOLES", "STATIONS", "HUB")),
+        "station_nominal": (_A1X, ("PIN_HOLES", "STATIONS", "HUB")),
     },
     "B1": {
         "station": (limits(_D1, 3, _BAND), ("D1", "POSITION_BAND")),
@@ -999,7 +1003,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Oblique Trammel Carrier Plate Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker oblique trammel carrier plate; 6061-T651; MHA-CH-06-TL-21",
+            3: "rocker oblique trammel carrier plate; 6061-T6511; MHA-CH-06-TL-21",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

@@ -372,7 +372,7 @@ PIVOT_BLOCK_HEIGHT = 24.3  # finished from 1 in stock
 PIVOT_SHIM_PACK = 1.0
 PIVOT_SPACER_LENGTH = 15.0  # loose purchased spacer (92871A359)
 PIVOT_SUPPORT_HEIGHT = PIVOT_SHIM_PACK + PIVOT_SPACER_LENGTH
-# Finished dimensions, not purchased stock: face 1/2 in 6061-T651 plate to
+# Finished dimensions, not purchased stock: face 1/2 in 6061-T6511 bar to
 # CARRIER_THICK and 1/4 in acetal to RISER_THICK (#1619). Both native drawing
 # dimensions print at .X and take that title-block band, not a supplier-stock
 # tolerance. CL locator height is set from the actual riser at assembly.

@@ -9,9 +9,11 @@ The rocker blank, on its riser (MHA-CH-06-TL-24), is located on the HUB pin
 (MHA-CH-06-TL-VN-80) and the CL dowel and clamped by the CR screw; the feed
 lever (MHA-CH-06-TL-26) bolts to the -Y edge.
 
-Material and stock: 1/2 in 6061-T651 aluminium plate, OnlineMetals #1250
-custom cut 5.5 x 21 in; faced to 12.0 (``CARRIER_THICK``) and milled to
-520 x 130. Finished thickness takes the .X title-block band, not STOCK.
+Material and stock: 1/2 x 6 in 6061-T6511 aluminium bar, the owned OnlineMetals
+1173 (shop inventory); sawn to length and ripped to about 135 wide, since the
+6 in width does not fit the 5 3/4 in vise jaws, then faced to 12.0
+(``CARRIER_THICK``) and milled to 520 x 130. Finished thickness takes the .X
+title-block band, not STOCK.
 
 Frame (the calculator's carrier frame, and the model frame): origin at the
 midpoint of A1-B1; +X runs A1 -> B1, +Y points toward the part, Z0 is the
@@ -263,10 +265,15 @@ LEVER_TAP_DRILL = TAP_DRILL_MM[LEVER_THREAD]
 # and SpotReference's placements stay origin-based, driven from
 # STATION_REFERENCE: one point on A1's axis and one on each station's feature
 # (the left end's on the -X/-Y corner), each printed dimension the baseline
-# from A1. The tap axis (lever taps and HUB, X = 0) is A1X itself.
+# from A1. The tap axis (lever taps and HUB, X = 0) prints as HubX, its point
+# on the HUB spot: its extension line rises from the X lane through the lever
+# taps to the spot, so one 225.07 visibly locates all three (machinist review
+# 54e5c9a: A1X's line stopped at the pin line, short of HUB). HubX is driven
+# equal to A1X, which stays the model's driving dimension, unprinted.
 STATIONS = {
     "EdgeX": (OUTLINE_X[0], OUTLINE_Y[0]),
     "ClX": CL,
+    "HubX": HUB,
     "RiserX1": RISER_SCREWS[0],
     "RiserX1R": RISER_SCREWS[1],
     "RiserX2": RISER_SCREWS[2],
@@ -337,7 +344,6 @@ SAG_CUTTING_LOAD = CUTTING_LOAD_N * D1**3 / (48.0 * E_6061 * _I)
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"PlateLength", "PlateWidth", "PlateNearY"},
     "PinHoleProfile": {
-        "A1X",
         "PinSpacing",
         "PinHoleDia",
         "A2DX",
@@ -359,7 +365,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PlateNearY": 2,
     },
     "PinHoleProfile": {
-        "A1X": 2,
         "PinSpacing": 3,
         "PinHoleDia": 3,
         "A2DX": 3,
@@ -376,6 +381,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     STATION_REFERENCE: {
         "EdgeX": 1,
         "ClX": 2,
+        "HubX": 2,
         "CrX": 2,
         **{name: RISER_STATION_PLACES for name in STATIONS if name.startswith("Riser")},
     },
