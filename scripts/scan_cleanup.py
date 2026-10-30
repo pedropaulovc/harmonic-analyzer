@@ -352,6 +352,10 @@ def main() -> int:
                 row["review"] = "protected primary checkout, content, or ancestor; not a removal candidate"
             elif row["worktrees"]:
                 row["review"] = "registered worktree; inspect Git state and active users separately"
+            elif any(within(Path(registration["path"]), path) for registration in worktrees):
+                row["review"] = "contains a registered worktree; inspect Git state and active users separately"
+                if link:
+                    row["review"] += "; reparse point in path; Git marker not inspected"
             elif link:
                 row["review"] = "reparse point in path; Git marker not inspected; manual attribution and active-use review required"
             elif row["git_marker"]:

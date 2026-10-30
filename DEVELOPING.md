@@ -53,8 +53,9 @@ Git's read-only `worktree list --porcelain -z` supplies exact registered paths,
 branches, detached HEADs, locks, and prunable annotations for this repository,
 the main checkout's sibling `solidworks-pool` when present, and every
 `--git-repo`. Git probes ignore inherited `GIT_*` environment overrides.
-`locked` and `prunable` are booleans; optional explanations appear separately
-as `locked_reason` and `prunable_reason`. A Git failure is a warning, not
+`locked` and `prunable` are present as `true` when Git reports them and omitted
+otherwise; optional explanations appear separately as `locked_reason` and
+`prunable_reason`. A Git failure is a warning, not
 evidence that a directory is unregistered. `primary_checkout` identifies Git's
 main worktree, even when the script is in a linked checkout; on probe failure
 it falls back to the script checkout with a warning.
@@ -65,6 +66,8 @@ two narrow exceptions: the exact generated-output paths above, and separately
 registered nested worktrees. A checkout root or ancestor remains protected,
 including the currently queried linked checkout. Generated-output exemptions
 do not apply to paths redirected elsewhere, including into source content.
+Candidates enclosing a registered worktree are flagged for Git-state and
+active-use review, even when the candidate itself is not a registered worktree.
 Inspection failures remain protected and require manual review.
 
 JSON separates project-specific locations from **unverified name-only leads**.
