@@ -84,11 +84,13 @@ def test_pin_chain_runs_from_a1_b1_with_banded_mates() -> None:
     for text in spec.CALLOUTS_BELOW.values():
         assert "ERROR" not in text and "1:1" not in text
     # The tap axis (lever taps and HUB) is located from A1, the X datum, at
-    # the .XX band.
+    # the .XX band: HubX prints it from A1 to the HUB spot (driven equal to
+    # A1X, the model's unprinted driver).
     a1 = features["pin_hole_a1"]
     assert a1["station_nominal"] == round(abs(trammel.A1[0]), 2) == 225.07
     assert a1["precision"]["station"] == 2
-    assert "A1X" in spec.DRAWING_DIMENSIONS["PinHoleProfile"]
+    assert "A1X" not in spec.DRAWING_DIMENSIONS["PinHoleProfile"]
+    assert "HubX" in spec.DRAWING_DIMENSIONS[spec.STATION_REFERENCE]
     assert set(spec.POSITION_BANDED) <= set(spec.CALLOUTS_BELOW)
     toleranced = model_toleranced_dimensions(part)
     assert toleranced[("PinHoleProfile", "PinHoleDia")] == "*deviations(PIN_HOLE_BAND)"
@@ -385,13 +387,15 @@ def test_every_x_station_is_a_baseline_from_a1() -> None:
         for name in names
         if "X" in name
     }
-    # The tap axis and the pin chain stay on the pin-hole sketch, A1 its root.
-    assert other_x == {"A1X", "A2DX", "B2DX"}
+    # The pin chain stays on the pin-hole sketch, A1 its root; the tap axis
+    # prints from A1 as a station (HubX), not as the unprinted A1X.
+    assert other_x == {"A2DX", "B2DX"}
     assert "PlateHalfLength" not in spec.DRAWING_DIMENSIONS["PlateProfile"]
     assert spec.DRAWING_DIMENSIONS["CrTap"] == {"CrY"}
     assert spec.STATION_REFERENCE in spec.REFERENCE_SKETCHES
     assert spec.STATIONS["EdgeX"] == (spec.OUTLINE_X[0], spec.OUTLINE_Y[0])
     assert spec.STATIONS["ClX"] == spec.CL and spec.STATIONS["CrX"] == spec.CR
+    assert spec.STATIONS["HubX"] == spec.HUB
     features = _features()
     located = ("hub_spot", "cl_spot", "cr_tap_1", "lever_tap_1", "lever_tap_2")
     for name in located + tuple(f"riser_tap_{i}" for i in range(1, 5)):
@@ -399,8 +403,15 @@ def test_every_x_station_is_a_baseline_from_a1() -> None:
         places = feature["precision"]["station"]
         assert feature["parent"] == "pin_hole_a1", name
         assert feature["station_nominal"] == round(_at(feature)[0] - a1x, places), name
-    # The tap axis prints once, as A1X.
+    # The tap axis prints once, as HubX: its point on the HUB spot, so its
+    # extension line rises through the lever taps to it (machinist review
+    # 54e5c9a: A1X's line stopped at the pin line, short of HUB).
     assert features["lever_tap_1"]["station_nominal"] == 225.07
+    assert features["hub_spot"]["station_nominal"] == 225.07
+    assert drawing.DRAWING_PRECISION_BY_NAME["HubX"] == 2
+    stations = inspect.getsource(part._station_reference)
+    assert '"HubX": _pin_dim("A1X")' in stations
+    assert '"HubX": f\'"HubY@{SPOT_REFERENCE}"\'' in stations
     # Each origin-based placement evaluates to the feature's |X| from its
     # printed station less A1X.
     values = {"A1X@PinHoleProfile": abs(a1x)} | {
@@ -408,7 +419,7 @@ def test_every_x_station_is_a_baseline_from_a1() -> None:
         for name, (x, _y) in spec.STATIONS.items()
     }
     for name, (x, _y) in spec.STATIONS.items():
-        if name == "EdgeX":
+        if name in ("EdgeX", "HubX"):
             continue
         expression = part._origin_x(name)
         for key, value in values.items():

@@ -265,10 +265,15 @@ LEVER_TAP_DRILL = TAP_DRILL_MM[LEVER_THREAD]
 # and SpotReference's placements stay origin-based, driven from
 # STATION_REFERENCE: one point on A1's axis and one on each station's feature
 # (the left end's on the -X/-Y corner), each printed dimension the baseline
-# from A1. The tap axis (lever taps and HUB, X = 0) is A1X itself.
+# from A1. The tap axis (lever taps and HUB, X = 0) prints as HubX, its point
+# on the HUB spot: its extension line rises from the X lane through the lever
+# taps to the spot, so one 225.07 visibly locates all three (machinist review
+# 54e5c9a: A1X's line stopped at the pin line, short of HUB). HubX is driven
+# equal to A1X, which stays the model's driving dimension, unprinted.
 STATIONS = {
     "EdgeX": (OUTLINE_X[0], OUTLINE_Y[0]),
     "ClX": CL,
+    "HubX": HUB,
     "RiserX1": RISER_SCREWS[0],
     "RiserX1R": RISER_SCREWS[1],
     "RiserX2": RISER_SCREWS[2],
@@ -339,7 +344,6 @@ SAG_CUTTING_LOAD = CUTTING_LOAD_N * D1**3 / (48.0 * E_6061 * _I)
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"PlateLength", "PlateWidth", "PlateNearY"},
     "PinHoleProfile": {
-        "A1X",
         "PinSpacing",
         "PinHoleDia",
         "A2DX",
@@ -361,7 +365,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PlateNearY": 2,
     },
     "PinHoleProfile": {
-        "A1X": 2,
         "PinSpacing": 3,
         "PinHoleDia": 3,
         "A2DX": 3,
@@ -378,6 +381,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     STATION_REFERENCE: {
         "EdgeX": 1,
         "ClX": 2,
+        "HubX": 2,
         "CrX": 2,
         **{name: RISER_STATION_PLACES for name in STATIONS if name.startswith("Riser")},
     },

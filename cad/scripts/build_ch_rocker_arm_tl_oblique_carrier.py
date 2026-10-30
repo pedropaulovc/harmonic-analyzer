@@ -405,16 +405,23 @@ async def _station_reference(adapter) -> list[tuple[str, str]]:
     point stands on its feature's centre (the left end's on the -X/-Y corner),
     so its extension line leaves the feature: X from the A1 point (printed,
     the owner the feature placements are driven from), Y from it too (not
-    printed; driven where a printed Y has a name, else the spec's)."""
+    printed; driven where a printed Y has a name, else the spec's). HubX is
+    the tap axis's printed station, driven equal to A1X: the HUB spot and the
+    lever taps stand on the origin's X, so it cannot disagree with them."""
     stations = SketchDims()
     check("create_sketch station reference", await adapter.create_sketch("Top"))
     a1 = PIN_HOLES["A1"]
     origin = _add_point(adapter, a1, "A1 station")
     await anchor_point_to_origin(adapter, origin, *a1, "A1 station")
     stations.record("StationA1X", _pin_dim("A1X"))
+    x_drives = {
+        "EdgeX": '"PlateHalfLength@PlateProfile" - ' + _pin_dim("A1X"),
+        "HubX": _pin_dim("A1X"),
+    }
     y_drives = {
         "EdgeX": '"PlateNearY@PlateProfile"',
         "ClX": f'"ClY@{SPOT_REFERENCE}"',
+        "HubX": f'"HubY@{SPOT_REFERENCE}"',
     }
     for name, point in STATIONS.items():
         target = _add_point(adapter, point, f"{name} station")
@@ -426,12 +433,7 @@ async def _station_reference(adapter) -> list[tuple[str, str]]:
             point[1] - a1[1],
             f"{name} from A1",
         )
-        stations.record(
-            name,
-            '"PlateHalfLength@PlateProfile" - ' + _pin_dim("A1X")
-            if name == "EdgeX"
-            else None,
-        )
+        stations.record(name, x_drives.get(name))
         stations.record(f"{name}Rise", y_drives.get(name))
     await ensure_fully_defined(adapter, "station reference sketch")
     check("exit_sketch station reference", await adapter.exit_sketch())
