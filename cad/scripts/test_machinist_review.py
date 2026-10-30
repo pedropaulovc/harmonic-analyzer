@@ -707,7 +707,10 @@ def sdk_transport(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
         async def connect(self):
             if state.leader_timeout and self.index == 0:
-                await asyncio.sleep(10)
+                # Expire only the leader, with real cancellation but no elapsed
+                # wall-clock budget imposed on otherwise successful followers.
+                async with asyncio.timeout(0):
+                    await asyncio.Event().wait()
             if state.delay:
                 await asyncio.sleep(state.delay)
 
@@ -5490,7 +5493,7 @@ def test_aggregate_sdk_leader_timeout_closes_before_releasing_followers(
     sdk_transport.leader_timeout = True
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
-        report_dir=tmp_path / "reports", retries=0, timeout_s=0.2, force=True,
+        report_dir=tmp_path / "reports", retries=0, force=True,
     )
     assert aggregate["verdict"] == "SHIP" and aggregate["judge"]["skipped"]
     assert "TimeoutExpired" in aggregate["runs"][0]["error"]
