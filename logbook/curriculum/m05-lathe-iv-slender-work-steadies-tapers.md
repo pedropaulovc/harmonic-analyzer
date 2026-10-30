@@ -46,7 +46,7 @@ The cone-gear-shaft tip is one of the three riskiest features in the machine. Do
 ## Sessions
 
 Log entries for this module, newest last. Create them with
-`entries/TEMPLATE.md`; **an agent may create the file, only you may fill it in.**
+`entries/TEMPLATE.md`; **every observation in them comes from you.**
 
 | date | entry | outcome | hours |
 |---|---|---|---|

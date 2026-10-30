@@ -46,7 +46,7 @@ Watch the 4 mm floor under the knife-mount's Ø25.4 bore when you get to boring 
 ## Sessions
 
 Log entries for this module, newest last. Create them with
-`entries/TEMPLATE.md`; **an agent may create the file, only you may fill it in.**
+`entries/TEMPLATE.md`; **every observation in them comes from you.**
 
 | date | entry | outcome | hours |
 |---|---|---|---|

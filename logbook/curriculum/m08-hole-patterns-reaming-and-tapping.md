@@ -48,7 +48,7 @@ The support feet are one tapped joint among several; the knife-mount hanger-stud
 ## Sessions
 
 Log entries for this module, newest last. Create them with
-`entries/TEMPLATE.md`; **an agent may create the file, only you may fill it in.**
+`entries/TEMPLATE.md`; **every observation in them comes from you.**
 
 | date | entry | outcome | hours |
 |---|---|---|---|
