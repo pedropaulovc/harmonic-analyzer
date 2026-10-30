@@ -39,7 +39,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _check import check
-import _config
 from _com import _early_bound, _read_member
 from _drawing_common import (
     DrawingOutputs,
@@ -73,6 +72,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
+from _printed_tolerance import printed_band_mm
 from _named_views import octant_view_name
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
@@ -1800,7 +1800,7 @@ def _dress_bracket_depth_callout(callout: Any) -> None:
                 )
             continue
         lower, upper = DRILL_DEPTH_DEVIATIONS
-        ordinary_band = float(_config.title_block("linear_2pl")["display"].removeprefix("±"))
+        ordinary_band = printed_band_mm(2)
         if not (
             math.isclose(lower, -ordinary_band)
             and math.isclose(upper, ordinary_band)

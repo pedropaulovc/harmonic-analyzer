@@ -33,6 +33,8 @@ PURE DATA, no SolidWorks/COM imports.
 
 from __future__ import annotations
 
+from _printed_tolerance import printed_band_mm
+
 WALL_FLOOR_MM = 1.5
 BODY_DIA_TOL = 0.10
 # Every axial size reads from the outer face, the one faced end (MHA-DT-35
@@ -75,7 +77,7 @@ BODY_CHAMFER_MAX = round(BODY_CHAMFER + BODY_CHAMFER_TOL, 6)
 
 FLOOR_THICKNESS = OVERALL_LENGTH - POCKET_DEPTH
 
-GENERAL_1PL_MM = 0.8
+GENERAL_1PL_MM = printed_band_mm(1)
 FLOOR_THICKNESS_MIN = round(FLOOR_THICKNESS - GENERAL_1PL_MM - POCKET_DEPTH_TOL, 6)
 POCKET_WALL_MIN = round(((BODY_DIA - BODY_DIA_TOL) - POCKET_DIA_MAX) / 2.0, 6)
 # Owner ruling B on #1375: 1/2-in cold-finished rod leaves a cleanup cut over

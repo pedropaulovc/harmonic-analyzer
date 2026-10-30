@@ -14,6 +14,7 @@ import draw_dt_cone_tip_block as drawing
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _surface_finish import SEAT_UM
 
 
@@ -567,9 +568,9 @@ def test_no_leader_on_the_sheet_detours_over_the_part() -> None:
 # The machinist review of d84a42ca7 dropped the explicit +/-0.10 bands: every
 # dimension prints the title block's general band for its places, except the
 # width, which prints its own one-sided band (machinist review of 83e3370f9).
-_GENERAL = {1: 0.8, 2: 0.51, 3: 0.13}
+_GENERAL = {places: printed_band_mm(places) for places in (1, 2, 3)}
 _BANDED = {"Width": (0.0, -0.5)}  # (upper, lower) as the sheet prints it
-_DRILLED_PLUS = 0.10
+_DRILLED_PLUS = drilled_oversize_mm()
 
 
 def _printed(name: str, nominal: float) -> tuple[float, float]:

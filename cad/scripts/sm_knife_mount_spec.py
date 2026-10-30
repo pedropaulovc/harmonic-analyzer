@@ -38,7 +38,7 @@ import sm_vn_knife_mount_dowel_spec as DOWEL
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
-from _printed_tolerance import angular_band_deg, drilled_oversize_mm
+from _printed_tolerance import angular_band_deg, drilled_oversize_mm, printed_band_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 from sm_summing_lever_spec import HEX_H, HEX_W
 
@@ -64,9 +64,9 @@ SURFACE_FINISHES = (
 
 # --- Knife-hanger screw tap and anti-rotation dowel holes (top seat) ---------
 # General tolerances the printed places claim (title block, drawing-guidelines.md rule 3 (decimal places carry the tolerance)).
-_X = float(str(_config.title_block("linear_1pl")["display"]).lstrip("\u00b1"))
-_XX = float(str(_config.title_block("linear_2pl")["display"]).lstrip("\u00b1"))
-_XXX = float(str(_config.title_block("linear_3pl")["display"]).lstrip("\u00b1"))
+_X = printed_band_mm(1)
+_XX = printed_band_mm(2)
+_XXX = printed_band_mm(3)
 # The Ø12 bore is REAMED through (Ra 1.6 on its knife seat is a reamed
 # finish, not a drilled one) to an explicit +0.03/0 band (the MHA-DT-16
 # arbor-pedestal running-bore precedent, ``dt_arbor_pedestal_spec``): the

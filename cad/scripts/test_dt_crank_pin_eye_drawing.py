@@ -15,6 +15,7 @@ import re
 import pytest
 
 import _config
+from _printed_tolerance import printed_band_mm
 import dt_crank_pin_eye_notes as notes
 import dt_crank_pin_eye_spec as spec
 import draw_dt_crank_pin_eye as drawing
@@ -47,7 +48,7 @@ def test_bead_chain_passes_the_smallest_printed_loop() -> None:
     # at, not just at nominal (drawing-guidelines.md: controlled limits must
     # produce the fit).
     places = notes.DRAWING_PRECISION_BY_NAME["LoopID"]
-    band = float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
+    band = printed_band_mm(places)
     smallest = round(notes.LOOP_ID, places) - band
     assert spec.LOOP_ID_MIN == pytest.approx(smallest)
     assert (smallest - chain.BEAD_DIA) / 2.0 >= chain.EYE_BEAD_PASS_AIR

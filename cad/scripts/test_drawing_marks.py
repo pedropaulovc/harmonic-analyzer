@@ -147,14 +147,37 @@ def test_dimension_prefix_uses_native_readback_after_void_setter(
 def test_sub_hundredth_model_bands_get_exact_tolerance_precision(
     band: tuple[float, float], expected: int
 ) -> None:
-    assert _drawing_tolerances._tolerance_places(*band) == expected
+    assert _drawing_tolerances._tolerance_places(*band, display_unit="mm") == expected
 
 
 @pytest.mark.parametrize("band", [PIN_DIA_BAND, CAM_BORE_BAND])
 def test_u27_slip_fit_bands_print_at_two_places(band: tuple[float, float]) -> None:
     # U27 (Main, 2026-09-23): the cam bore and cam pin moved from micron press
     # and slide bands to hundredth slip-fit bands a novice can hold.
-    assert _drawing_tolerances._tolerance_places(*band) == 2
+    assert _drawing_tolerances._tolerance_places(*band, display_unit="mm") == 2
+
+
+@pytest.mark.parametrize(
+    ("band_mm", "display_unit", "expected"),
+    [
+        ((0.1016, 0.0), "in", 3),  # +.004/0 in
+        ((-0.254, 0.254), "in", 2),  # ±.01 in
+        ((-0.254, 0.254), "mm", 3),
+        ((-0.25, 0.25), "deg", 2),
+    ],
+)
+def test_tolerance_places_count_in_the_display_unit(
+    band_mm: tuple[float, float], display_unit: str, expected: int
+) -> None:
+    assert (
+        _drawing_tolerances._tolerance_places(*band_mm, display_unit=display_unit)
+        == expected
+    )
+
+
+def test_tolerance_places_refuse_an_unknown_display_unit() -> None:
+    with pytest.raises(ValueError, match="unknown tolerance display unit"):
+        _drawing_tolerances._tolerance_places(0.1, display_unit="cm")
 
 
 def test_display_precision_times_each_com_step_on_its_own_span(
@@ -351,7 +374,7 @@ def test_tolerance_precision_rejects_silent_com_failure(
 
     with pytest.raises(RuntimeError, match="requested 3 decimals.*reports 2"):
         _drawing_tolerances._set_tolerance_precision(
-            display, (-0.004, 0.004), label="PinDia@PinProfile"
+            display, (-0.004, 0.004), display_unit="mm", label="PinDia@PinProfile"
         )
 
 
@@ -377,7 +400,11 @@ def test_tolerance_prints_at_the_nominals_places_when_asked(
     display = _PrecisionDisplay()
     assert (
         _drawing_tolerances._set_tolerance_precision(
-            display, (-0.010, 0.0), label="PinHoleDia@PinHoleProfile", places=3
+            display,
+            (-0.010, 0.0),
+            display_unit="mm",
+            label="PinHoleDia@PinHoleProfile",
+            places=3,
         )
         == display.tolerance_precision
         == 3
@@ -385,7 +412,7 @@ def test_tolerance_prints_at_the_nominals_places_when_asked(
     # By default the band keeps its fewest places (U27's hundredth bands).
     assert (
         _drawing_tolerances._set_tolerance_precision(
-            display, (-0.010, 0.0), label="PinHoleDia@PinHoleProfile"
+            display, (-0.010, 0.0), display_unit="mm", label="PinHoleDia@PinHoleProfile"
         )
         == 2
     )
@@ -397,7 +424,11 @@ def test_tolerance_places_never_round_a_band(
     monkeypatch.setattr(_drawing_tolerances, "_early_bound", lambda value, _type: value)
     with pytest.raises(ValueError, match="2 tolerance places would round"):
         _drawing_tolerances._set_tolerance_precision(
-            _PrecisionDisplay(), (-0.004, 0.004), label="PinDia@PinProfile", places=2
+            _PrecisionDisplay(),
+            (-0.004, 0.004),
+            display_unit="mm",
+            label="PinDia@PinProfile",
+            places=2,
         )
 
 
@@ -420,7 +451,7 @@ def test_tolerance_precision_has_dimension_labeled_operation_span(
 
     assert (
         _drawing_tolerances._set_tolerance_precision(
-            display, (-0.004, 0.004), label="PinDia@PinProfile"
+            display, (-0.004, 0.004), display_unit="mm", label="PinDia@PinProfile"
         )
         == 3
     )

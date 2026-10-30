@@ -20,24 +20,23 @@ def title_block_properties() -> dict[str, str]:
     independently of any model registry or release identity.
     """
     import _config
+    import _printed_tolerance as tol
 
     return {
-        "TOL_LIN_X": str(_config.title_block("linear_1pl")["display"]),
-        "TOL_LIN_XX": str(_config.title_block("linear_2pl")["display"]),
-        "TOL_LIN_XXX": str(_config.title_block("linear_3pl")["display"]),
-        "TOL_ANG": str(_config.title_block("angular")["display"]),
-        "TOL_SURFACE": str(_config.title_block("surface")["display"]),
+        "TOL_LIN_X": tol.linear_band_display(1),
+        "TOL_LIN_XX": tol.linear_band_display(2),
+        "TOL_LIN_XXX": tol.linear_band_display(3),
+        "TOL_ANG": tol.angular_band_display(),
+        "TOL_SURFACE": str(_config.title_block("surface")["text"]),
         # Sheet-format notes link these values rather than hardcoding them.
-        "TOL_EDGE_BREAK_R": str(_config.title_block("edge_break")["display_r"]),
-        "TOL_CHAMFER_MAX": str(_config.title_block("edge_break")["display_chamfer"]),
-        "TOL_INSIDE_CORNER": (
-            f"R{float(_config.title_block('inside_corner')['radius_mm']):.1f} MAX"
-        ),
+        "TOL_EDGE_BREAK_R": tol.edge_break_radius_display(),
+        "TOL_CHAMFER_MAX": tol.edge_break_chamfer_display(),
+        "TOL_INSIDE_CORNER": tol.inside_corner_display(),
         "THREAD_TYPE": str(_config.title_block("thread")["type"]),
         "THREAD_CLASS": str(_config.title_block("thread")["class"]),
         # The DRILLED HOLES row carries the general unilateral tolerance.
-        "TOL_HOLE_MINUS": str(_config.title_block("drilled_hole")["display_minus"]),
-        "TOL_HOLE_PLUS": str(_config.title_block("drilled_hole")["display_plus"]),
+        "TOL_HOLE_MINUS": tol.drilled_hole_minus_display(),
+        "TOL_HOLE_PLUS": tol.drilled_hole_plus_display(),
     }
 
 

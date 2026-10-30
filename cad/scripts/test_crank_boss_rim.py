@@ -55,8 +55,8 @@ def test_the_64t_station_is_the_collar_stack() -> None:
     thrust collar, which bears on the cone boss's north end; toward the post it
     moves by the boss end long (ConeBossLen's .XX row, half per end) and the
     collar thin (CollarWidth's row).  The two butts are closed nominally."""
-    boss_end = rim._row(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"]) / 2.0
-    collar = rim._row(shaft.DRAWING_PRECISION_BY_NAME["CollarWidth"])
+    boss_end = rim.printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"]) / 2.0
+    collar = rim.printed_band_mm(shaft.DRAWING_PRECISION_BY_NAME["CollarWidth"])
     assert rim.GEAR64_STATION_TOWARD_POST == pytest.approx(boss_end + collar)
     assert rim.collar_contacts(SEATED) == pytest.approx(0.0, abs=1e-9)
     with pytest.raises(ValueError, match="butts are open"):

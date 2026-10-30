@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 
 import _config
+from _printed_tolerance import printed_band_mm
 import _drawing_detail_projection
 import _fit_shaft_h
 import build_dt_cone_gear_shaft as part
@@ -304,7 +305,7 @@ def test_display_precision_is_owned_by_the_part() -> None:
 
 def _band(places: int) -> float:
     """The title-block band a length prints at ``places``."""
-    return float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
+    return printed_band_mm(places)
 
 
 def _setback_margin(j: int, step_band: float) -> float:

@@ -28,6 +28,7 @@ import draw_dt_cone_swing_platform as drawing
 import pytest
 from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, blind_cut_dia_mm
+from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SEAT_UM
 
 
@@ -445,7 +446,7 @@ def test_notch_diameter_saved_text_envelope_clears_the_actual_left_outline() -> 
 
 def test_disengaged_collar_margin_survives_general_bands() -> None:
     """Linear worst case at .X plate outline and .XX base holes keeps 2.0 mm (U27)."""
-    general, base_axis = 0.8, 0.51
+    general, base_axis = printed_band_mm(1), printed_band_mm(2)
     east_slope = (part.EAST_HALF_S - part.HALF_WIDTH_N) / part.PLATE_LEN
     stop_x = -(part.HALF_WIDTH_N + east_slope * (part.NORTH_OVERHANG - geometry.STOP_LOCAL_Z))
     normal = (-1.0, east_slope)
@@ -1157,7 +1158,7 @@ def test_holddown_print_worst_stack_keeps_its_margins() -> None:
     """At .XX (+/-0.51) and the drilled +0.10: head recess under the slide
     face, head clearance, bearing beside the hole, the counterbore-floor
     ledge and every web to a neighbour (U27 2.0)."""
-    xx = 0.51
+    xx = printed_band_mm(2)
     head_d, head_h = 0.183 * 25.4, 0.112 * 25.4
     assert spec.HOLDDOWN_CBORE_DEPTH - xx - head_h >= 0.1
     assert spec.HOLDDOWN_CBORE_DIA - xx - head_d >= 0.25

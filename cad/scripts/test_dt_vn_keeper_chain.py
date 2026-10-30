@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 import _config
+from _printed_tolerance import printed_band_mm
 import _supplier_keeper_dimensions as keeper_dimensions
 import dt_crank_arm_spec as arm
 import dt_crank_hub_geometry as hub_geometry
@@ -38,7 +39,7 @@ def test_each_strand_reaches_the_withdrawn_pin() -> None:
 
 
 def _band(places: int) -> float:
-    return float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
+    return printed_band_mm(places)
 
 
 def _corner_air(

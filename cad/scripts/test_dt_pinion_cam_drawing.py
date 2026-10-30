@@ -177,11 +177,11 @@ def test_set_screw_thread_cannot_break_either_face_at_general_grade() -> None:
     # The rear wall stacks length AND station, independently at .X ±0.8.
     # A 4.5 station would leave 1.808 mm at the rear, below the 2.0 target;
     # the forward-only 4.1 station balances both worst-case walls at 2.208.
-    import _config
+    from _printed_tolerance import printed_band_mm
 
     geometry = dt_pinion_cam_geometry
     spec = dt_pinion_cam_spec
-    assert _config.title_block("linear_1pl")["display"] == "±0.8"
+    assert printed_band_mm(1) == 0.8
     assert spec.GENERAL_LINEAR_TOLERANCE_MM == 0.8
     assert spec.DRAWING_PRECISION["Collar"]["Depth"] == 1
     assert spec.DRAWING_PRECISION["TapDrillProfile"]["TapCz"] == 1

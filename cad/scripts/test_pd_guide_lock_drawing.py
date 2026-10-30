@@ -11,6 +11,7 @@ import draw_pd_guide_lock as drawing
 import pd_guide_lock_spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 
 def test_required_drawing_paths() -> None:
@@ -55,8 +56,8 @@ def test_sheet_runs_at_4_to_1_with_2_to_1_isometric() -> None:
 
 
 # Title block: .X ±0.8; drilled holes +0.10/-0.
-_ONE_PLACE = 0.8
-_DRILLED_PLUS = 0.10
+_ONE_PLACE = printed_band_mm(1)
+_DRILLED_PLUS = drilled_oversize_mm()
 _CHAR_WIDTH = 0.00276  # sheet m per character of 3.5-mm note text
 
 

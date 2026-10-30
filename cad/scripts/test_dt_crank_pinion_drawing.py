@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 
 import _config
+from _printed_tolerance import printed_band_mm
 import build_dt_crank_pinion as part
 import dt_crank_pinion_spec as spec
 import dt_crank_pinion_notes as notes
@@ -670,7 +671,7 @@ def test_w15_boss_walls_the_pin_and_the_shaft_end_stands_proud_at_every_limit() 
     # the 16T, so the binding wall is the pin's to the boss's north face.
     import build_dt_drive_train_assembly as bdt
 
-    printed = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
+    printed = printed_band_mm(1)
     assert spec.OVERALL_LENGTH_GRADE_MM == pytest.approx(printed)
     assert spec.DRAWING_PRECISION["BossProfile"]["OverallLength"] == spec.OVERALL_LENGTH_PLACES
     assert spec.DRAWING_PRECISION["BossProfile"]["FaceWidth"] == spec.FACE_WIDTH_PLACES

@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 import _config
+from _printed_tolerance import printed_band_mm
 import build_dt_crank_pin_ring as part
 import dt_crank_pin_ring_notes as notes
 import dt_crank_pin_ring_spec as spec
@@ -50,7 +51,7 @@ def test_printed_sizes_derive_from_the_ring_spec() -> None:
 
 
 def _band(places: int) -> float:
-    return float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
+    return printed_band_mm(places)
 
 
 def test_smallest_printed_ring_threads_the_fattest_printed_pin_section() -> None:

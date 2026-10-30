@@ -18,6 +18,7 @@ import pd_platen_guide_spec as guide
 import pd_rack_pinion_spec as disc
 import pd_transgear_disc_hub_spec as hub
 import pd_vn_transgear_disc_screw_spec as screw
+from _printed_tolerance import printed_band_mm
 
 IN = 25.4
 # 91794A055: #0-80 x 1/4 under the head; ASME B18.6.3 length band +0/-0.03 in.
@@ -28,7 +29,7 @@ PITCH = IN / 80.0
 # MHA-PD-17 flange 2.40 (title block 3-place +/-0.13); MHA-PD-06 face 3.00 +/-0.13.
 FLANGE = 2.4
 FACE = 3.0
-THREE_PLACE = 0.13
+THREE_PLACE = printed_band_mm(3)
 # MHA-PD-06's tap mouths: a 0.10 burr break on each, its loss counted from the
 # tap drill (rack_pinion_spec, as printed on its sheet; R9-63).
 MOUTH_BREAK = 0.10

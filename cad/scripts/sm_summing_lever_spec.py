@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import math
 from _hole_spec import HoleSpec
+from _printed_tolerance import printed_band_mm
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
 
@@ -44,7 +45,7 @@ ANCHOR_H = 0.75 * MM_PER_IN  # 19.05 summation-anchor boss height (Y)
 # (below); the width prints as a reference, the vertex height .XXX at HEX_BAND.
 HEX_W = 8.080
 HEX_H = 10.268
-HEX_BAND = 0.13  # title-block .XXX band on HEX_H
+HEX_BAND = printed_band_mm(3)  # title-block .XXX band on HEX_H
 HEX_DEPTH = 21.717
 # Included angle of the knife-edge ridge (the top vertex of the hexagon).
 RIDGE_ANGLE_DEG = 2.0 * math.degrees(math.atan2(HEX_W / 2.0, HEX_H / 4.0))

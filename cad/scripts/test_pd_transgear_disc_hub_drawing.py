@@ -43,7 +43,7 @@ DRILL_PLUS = _config.title_block("drilled_hole")["plus_mm"]
 
 def _row(places: int) -> float:
     """The ± the title block prints for a dimension shown at ``places``."""
-    return float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
+    return _printed_tolerance.printed_band_mm(places)
 
 
 def _places(name: str) -> int:

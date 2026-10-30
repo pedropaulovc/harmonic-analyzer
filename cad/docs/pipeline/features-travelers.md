@@ -106,7 +106,7 @@ source closures; `_printed_limits.py` also stays out of every native closure.
 
 Every sourced value carries `file:start-end` citations for Python and
 `file:dotted.key.path` citations for YAML, for example
-`cad/config/title_block.yaml:linear_2pl.display`. Python spans are resolved from
+`cad/config/title_block.yaml:linear_2pl.band_mm`. Python spans are resolved from
 the current AST: a field cites its requirement call site and every named
 spec/notes symbol it reads. Cross-script citations use symbol names, never
 hand-maintained line ranges; missing symbols fail export. YAML paths resolve to

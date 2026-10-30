@@ -1313,6 +1313,7 @@ async def _author_settings_reference(adapter) -> None:
         _set_tolerance_precision(
             display,
             (lower, upper),
+            display_unit="mm",
             label=f"channel settings {name}",
             places=spec.TOLERANCE_PRECISION,
         )

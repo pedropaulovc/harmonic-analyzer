@@ -34,6 +34,7 @@ import dt_crank_drive_gear_spec
 import dt_crank_hub_geometry
 from _fit_deviations import deviations
 from _hole_spec import FRACTIONAL_DRILL_MM, HoleSpec
+from _printed_tolerance import printed_band_mm, printed_deviations
 from _surface_finish import SurfaceFinishControl
 from stock_form_cutter import (
     StockFormProfile,
@@ -247,30 +248,6 @@ BOSS_DIA = ROOT_DIA_MIN
 # The boss's outer end edge takes the title block's edge break: the sized
 # chamfer that once imitated the photo's rounding had no function, and at its
 # general grade it could reach the bore (machinist review of 4d4e038e3).
-
-
-def printed_band_mm(places: int) -> float:
-    """The +/- the metric sheet PRINTS for a dimension shown at ``places``.
-
-    An accepted part is checked against the title block's printed row (.X
-    +/-0.8), not the inch grade behind it (0.03 in = 0.762): Codex P2 on #892.
-    """
-    return float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
-
-
-def printed_deviations(
-    model: float, places: int, limits: tuple[float, float] | None = None
-) -> tuple[float, float]:
-    """``(lower, upper)`` deviations from the MODEL value an accepted part may
-    show: the sheet prints the model rounded to ``places`` and checks the part
-    against that number's limits -- the printed general row unless the
-    dimension's own ``(lower, upper)`` limits (``deviations(band)``) are given."""
-    if limits is None:
-        grade = printed_band_mm(places)
-        limits = (-grade, grade)
-    lower, upper = limits
-    printed = round(model, places)
-    return printed + lower - model, printed + upper - model
 
 
 def ceil_to_places(value: float, places: int) -> float:

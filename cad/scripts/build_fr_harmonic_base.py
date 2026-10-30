@@ -50,6 +50,7 @@ from _feature_tree import name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _paths import OUT_PNG, REFERENCES_DIR
+from _printed_tolerance import printed_band_mm
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
@@ -191,7 +192,6 @@ from fr_harmonic_base_fasteners import (
     through_seat_pocket_clearances_mm,
     require_stop_seat_fit,
     require_through_seat_fit,
-    title_block_band_mm,
 )
 from fr_frame_attachment_spec import (
     BASE_SCREW_SEAT_Z,
@@ -494,7 +494,7 @@ def _general_band_mm() -> float:
     The lengths print one place; the hole-table coordinates
     print at least one, so this band bounds every location term.
     """
-    return title_block_band_mm("linear_1pl")
+    return printed_band_mm(1)
 
 
 def _edge_break_mm() -> float:

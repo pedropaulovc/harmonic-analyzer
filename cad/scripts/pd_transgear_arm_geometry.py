@@ -33,7 +33,7 @@ import pd_support_bar_spec as BAR
 import _mcmaster_90325a174 as PIVOT
 from _fit_close_running import measured_close_running_clearance_mm
 from _gear_quality import reducer_position_diameter_mm
-from _printed_tolerance import angular_band_deg
+from _printed_tolerance import angular_band_deg, drilled_oversize_mm, printed_band_mm
 import pd_transgear_pivot_spacer_spec as SPACER
 import _transgear_arm_plate_locating_interface as LOCATING_PIN
 
@@ -95,7 +95,7 @@ END_HALF_WIDTH = edge_half_width(TIP_STATION)
 # The spot face seats the MHA-PD-VN-63 curved disc spring's OD rim (Ø10.744) under
 # the MHA-PD-VN-57 head; the spring's float on the shoulder still clears its rim.
 SPOT_FACE_DIA = 11.5
-SPOT_FACE_DIA_GROWTH = 0.10  # +0.10/0 (drilled row)
+SPOT_FACE_DIA_GROWTH = drilled_oversize_mm()  # +0.10/0 (drilled row)
 # The floor is dimensioned from the FRONT face so the spring's room never
 # sees the arm's stock thickness (transgear_hanger_joints.SPRING_ROOM_*):
 # 0.70..0.95, inside the spring's catalogue deflection at every corner.
@@ -249,15 +249,15 @@ PIN_HOLE_DEPTH = 8.50
 # The depth prints .XX: the hanger joints judge the pin's full-diameter grip
 # at the shallowest hole, and the latch hook's grip on the pin over the proud
 # range, both at this band.
-PIN_HOLE_DEPTH_BAND = 0.51
+PIN_HOLE_DEPTH_BAND = printed_band_mm(2)
 PIN_HOLE_Z = THICKNESS / 2.0  # mid-thickness, on y = 0
 # The latch pin's axis in the machine frame; the hook's hole is drilled on it.
 PIN_MACHINE_Z = FRONT_FACE_MACHINE_Z + PIN_HOLE_Z  # -120.43125
 
-# --- Bands the sheet prints (hard-coded title-block rows, drawing-guidelines.md rule 3 (decimal places carry the tolerance)) ---
-BAND_X = 0.8
-BAND_XX = 0.51
-BAND_XXX = 0.13
+# --- Bands the sheet prints (the title-block rows, drawing-guidelines.md rule 3 (decimal places carry the tolerance)) ---
+BAND_X = printed_band_mm(1)
+BAND_XX = printed_band_mm(2)
+BAND_XXX = printed_band_mm(3)
 # The end-face latch hole's height is an ordinary .XXX row: the title block
 # governs it, with no tightened band (coordinator ruling (a), #2019).
 LATCH_PIN_HEIGHT_BAND = BAND_XXX

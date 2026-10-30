@@ -280,11 +280,11 @@ def test_hold_down_hole_webs_hold_u27_at_the_printed_worst_case() -> None:
     and the foot depth and strap depth print at one place too. Every web the
     hole leaves must keep the 2.0 target with those bands stacked against it,
     plus the title block's +0.10 drilled-hole oversize."""
-    import _config
+    from _printed_tolerance import printed_band_mm
 
     spec = dt_arbor_pedestal_spec
     band_1pl = 0.8
-    assert _config.title_block("linear_1pl")["display"] == "±0.8"
+    assert printed_band_mm(1) == band_1pl
     radius = spec.SCREW_HOLE_DIA / 2.0 + 0.05
     to_strap_root = spec.STRAP_ROOT_Z - spec.SCREW_Z - radius
     to_ledge_end = spec.SCREW_Z - spec.FOOT_NEAR_Z - radius

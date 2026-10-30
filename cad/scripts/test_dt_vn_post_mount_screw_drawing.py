@@ -10,6 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 import _config
+from _printed_tolerance import printed_band_mm
 import build_dt_vn_post_mount_screw as part
 import dt_cone_pivot_post_spec as post
 import dt_cone_swing_platform_spec as platform
@@ -67,8 +68,8 @@ def test_no_fixed_cut_length_fits_both_in_band_corners() -> None:
     never-proud corner (lowest counterbore floor, thin plate) caps a fixed
     length below what the 0.90D corner (highest floor, after both edge
     breaks) needs.  So no band can go on the print."""
-    one = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
-    two = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
+    one = printed_band_mm(1)
+    two = printed_band_mm(2)
     low = (round(post.BLOCK_HEIGHT, 1) - one) - (
         round(post.ATTACHMENT_CBORE_DEPTH, 2) + two
     )

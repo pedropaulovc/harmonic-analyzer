@@ -26,6 +26,7 @@ Ch. 23 hanger holes (contract §5), all entering the BACK face:
 from __future__ import annotations
 
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
+from _printed_tolerance import printed_band_mm
 from _column_clamp_interface import BAR_DEPTH
 
 # 28 tall (Y), the top edge carrying the hanging platen's top rail at machine
@@ -43,7 +44,7 @@ BAR_HEIGHT = 28.0
 # The bar's .XXX height band: the bottom rail's running clearance under the
 # bar spends it (build_pd_paper_drive_assembly._assert_lock_retention).
 # build_pd_support_bar authors it natively on Height@BarProfile.
-BAR_HEIGHT_BAND = 0.13
+BAR_HEIGHT_BAND = printed_band_mm(3)
 # Deep (Z), BAR_DEPTH (_column_clamp_interface, shared with the wheel
 # bar): the back face on the clamp arcs, the front face carrying the platen's
 # back. 9.5, not the 9.0 stock read, so the MHA-PD-VN-57 pivot screw's faced tip
@@ -52,7 +53,7 @@ BAR_HEIGHT_BAND = 0.13
 # The pivot screw's tip recess and the latch-hook-bracket-screw (MHA-SH-VN-52)
 # tips spend the bar's .XXX thickness band.
 # build_pd_support_bar authors it natively on Depth@Bar.
-BAR_DEPTH_BAND = 0.13
+BAR_DEPTH_BAND = printed_band_mm(3)
 BAR_BAND_PLACES = 3  # both bands print .XXX
 BACK_FACE_Z = BAR_DEPTH / 2.0
 

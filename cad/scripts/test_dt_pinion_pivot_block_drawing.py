@@ -17,6 +17,7 @@ from _drawing_contract import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fit_ream_slide import REAM_SLIDE
 from _hole_spec import blind_cut_dia_mm
+from _printed_tolerance import printed_band_mm
 
 
 def test_raised_pivot_follows_bank_without_changing_the_upper_envelope() -> None:
@@ -381,7 +382,7 @@ def test_worst_stack_bands_are_the_printed_places() -> None:
     import dt_pinion_pivot_shaft_spec
     import pinion_rig_layout as rig
 
-    x_band = 0.8  # title-block .X
+    x_band = printed_band_mm(1)  # title-block .X
     assert dt_pinion_bracket_spec.DRAWING_PRECISION["Strap"]["Depth"] == 1
     assert dt_pinion_bracket_spec.THICKNESS_BAND == x_band
     assert dt_alignment_pinion_spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 1

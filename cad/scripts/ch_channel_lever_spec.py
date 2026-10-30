@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from _gtol_cylinder import CylinderFace
 from _hole_spec import HoleSpec, blind_cut_dia_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
@@ -90,8 +91,8 @@ PLATE_OFFSET_TOLERANCE = 0.05
 # print at one place, title-block +/-0.8; drilled holes +0.10/0; the reamed
 # bore at its top).
 WALL_FLOOR = 2.0
-_LINEAR_1PL = 0.8
-_DRILL_PLUS = 0.10
+_LINEAR_1PL = printed_band_mm(1)
+_DRILL_PLUS = drilled_oversize_mm()
 _SPRING_HOLE_R_MAX = (blind_cut_dia_mm(SPRING_EYE_HOLE_SPEC) + _DRILL_PLUS) / 2.0
 _BAR_PIN_HOLE_R_MAX = (blind_cut_dia_mm(BAR_PIN_HOLE_SPEC) + _DRILL_PLUS) / 2.0
 WALL_MIN = {

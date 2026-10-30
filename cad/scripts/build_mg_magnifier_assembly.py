@@ -572,6 +572,7 @@ async def _author_axle_stack_reference(adapter) -> None:
         _set_tolerance_precision(
             display,
             (-band, band),
+            display_unit="mm",
             label=f"axle stack {name}",
             places=spec.TOLERANCE_PRECISION,
         )

@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 import _config
+from _printed_tolerance import printed_band_mm
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 import _drawing_edges
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
@@ -87,16 +88,16 @@ def test_wall_holds_the_target_at_the_full_worst_case() -> None:
     printed O.D. runout to A, and the title block's larger permitted break
     (radius or chamfer) on both rims of an end face.  One chucking, so no
     run-off."""
-    row = _config.title_block("linear_1pl")["display"].lstrip("±")
+    row = printed_band_mm(1)
     brk = _config.title_block("edge_break")
     setback = max(float(brk["radius_mm"]), float(brk["chamfer_max_mm"]))
-    assert spec.OD_BAND == pytest.approx(float(row))
+    assert spec.OD_BAND == pytest.approx(row)
     assert spec.EDGE_BREAK == pytest.approx(setback)
     # Runout's full indicator movement is twice the axes' offset.
     assert spec.OD_RUNOUT == pytest.approx(0.4)
     assert spec.BORE_ECCENTRICITY == pytest.approx(spec.OD_RUNOUT / 2.0)
     worst = (
-        (spec.OD - float(row) - spec.BORE_DIA_MAX) / 2.0
+        (spec.OD - row - spec.BORE_DIA_MAX) / 2.0
         - spec.OD_RUNOUT / 2.0
         - 2.0 * setback
     )

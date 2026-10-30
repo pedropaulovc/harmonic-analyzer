@@ -2405,6 +2405,7 @@ def _tolerance_hanger_clearance(feature) -> None:
     _set_tolerance_precision(
         display,
         HANGER_CLEARANCE_DIA_BAND,
+        display_unit="mm",
         label="hanger through diameter",
         places=HANGER_CLEARANCE_DIA_PLACES,
     )

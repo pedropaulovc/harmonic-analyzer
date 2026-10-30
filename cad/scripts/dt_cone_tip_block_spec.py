@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from typing import Literal
 
-import _config
+import _printed_tolerance
 from _fit_deviations import deviations
 from _gtol_planar import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
@@ -142,12 +142,10 @@ PINCH_CLEARANCE_DIA = blind_cut_dia_mm(PINCH_CLEARANCE_SPEC)
 
 # Prove every web against what the PRINT permits, not just nominal CAD (U27:
 # 2.0 target, 1.5 floor, at the worst case of the printed bands).
-_GENERAL_1PL_MM = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
-_GENERAL_2PL_MM = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
-_GENERAL_3PL_MM = float(str(_config.title_block("linear_3pl")["display"]).lstrip("±"))
-_DRILLED_HOLE_PLUS_MM = float(
-    str(_config.title_block("drilled_hole")["display_plus"]).lstrip("+")
-)
+_GENERAL_1PL_MM = _printed_tolerance.printed_band_mm(1)
+_GENERAL_2PL_MM = _printed_tolerance.printed_band_mm(2)
+_GENERAL_3PL_MM = _printed_tolerance.printed_band_mm(3)
+_DRILLED_HOLE_PLUS_MM = _printed_tolerance.drilled_oversize_mm()
 _BAND_BY_PLACES = {1: _GENERAL_1PL_MM, 2: _GENERAL_2PL_MM, 3: _GENERAL_3PL_MM}
 # The title block's general bands as (upper, lower) fit bands, so every stack
 # below reads its limits through _fit_deviations.deviations like any other band.

@@ -8,6 +8,7 @@ both parts; the pin slips into them and its peened heads retain it (#1064).
 
 from __future__ import annotations
 
+from _printed_tolerance import printed_band_mm
 from dt_pinion_lever_geometry import HUB_OD, PIN_HOLE_DIA
 
 PIN_DIA = PIN_HOLE_DIA  # 1/16 in drill rod, in its match-drilled hole
@@ -16,8 +17,8 @@ PIN_DIA = PIN_HOLE_DIA  # 1/16 in drill rod, in its match-drilled hole
 # of each face with nothing left to peen.  Both lengths print at .X (+/-0.8),
 # so the shortest pin still stands PEEN_ALLOWANCE proud of each face of the
 # largest hub.
-HUB_OD_BAND = 0.8  # MHA-DT-16 HubOd prints .X
-PIN_LEN_BAND = 0.8  # the cut length prints .X
+HUB_OD_BAND = printed_band_mm(1)  # MHA-DT-16 HubOd prints .X
+PIN_LEN_BAND = printed_band_mm(1)  # the cut length prints .X
 PEEN_ALLOWANCE = 0.5  # minimum stock proud of each hub face, per end
 PIN_LEN = 16.0
 if PIN_LEN - PIN_LEN_BAND < HUB_OD + HUB_OD_BAND + 2.0 * PEEN_ALLOWANCE:

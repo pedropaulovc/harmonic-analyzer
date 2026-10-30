@@ -12,7 +12,12 @@ from __future__ import annotations
 import math
 
 from _hole_spec import DRILL_POINT_H, HoleSpec, blind_cut_dia_mm
-from _printed_tolerance import printed_deviations
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    edge_break_chamfer_mm,
+    printed_band_mm,
+    printed_deviations,
+)
 from mg_magnifying_bracket_spec import DRAWING_PRECISION, FOOT_GRIP_TOL
 from mg_lever_thread_joint import NOSE_R
 import sm_summing_lever_spec as lever
@@ -84,15 +89,15 @@ FLANGE_THICKNESS_BAND = FOOT_GRIP_TOL
 # 7 mm coefficient plate. Neither usable thread nor the drill point is required
 # to stop inside the rib. Ordinary printed depths remain independently bounded.
 THREAD_DEPTH_BAND = 0.05  # native metadata only; the drawing prints 4.95 MIN
-LINEAR_BAND = 0.51  # PRINTED title-block .XX band, not the unrounded .02 in
+LINEAR_BAND = printed_band_mm(2)  # PRINTED title-block .XX band, not the unrounded .02 in
 DRILL_DEPTH_DEVIATIONS = (-LINEAR_BAND, LINEAR_BAND)  # (lower, upper), mm
 POSITION_BAND = 0.05
-DRILLED_DIAMETER_PLUS = 0.10
+DRILLED_DIAMETER_PLUS = drilled_oversize_mm()
 # Engineering floor for the printed pilot, not the finished thread cavity.
 RECEIVER_PILOT_WALL_MIN = 2.0
 HEAD_FLOAT_MIN = (COUNTERBORE_DIA - SCREW_HEAD_DIA) / 2.0
 HEAD_POSITION_MISMATCH_MAX = 2.0 * POSITION_BAND
-EDGE_BREAK = 0.25
+EDGE_BREAK = edge_break_chamfer_mm()
 SCREW_LENGTH_MINUS = 0.76  # conservative stock allowance, not a catalog band
 SCREW_TIP_CHAMFER = 0.7 * SCREW_PITCH
 GRIP_BAND = FLANGE_THICKNESS_BAND

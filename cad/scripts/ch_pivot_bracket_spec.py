@@ -32,6 +32,7 @@ from __future__ import annotations
 from math import sqrt
 
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
+from _printed_tolerance import drilled_oversize_mm
 
 FOOT_W = 16.0  # X, across the support apex (16.933 wide; 0.47 margin each side)
 FOOT_H = 6.0
@@ -82,7 +83,7 @@ EAR_T_BAND = 0.10
 STATION_BAND = 0.508  # title-block .XX
 EDGE_BAND = 0.508  # title-block .XX: the foot's sides
 HOLE_X_BAND = 0.508  # title-block .XX: the hole's centring across the foot
-DRILL_GROWTH = 0.10  # title-block drilled hole, +0.10/0 on the diameter
+DRILL_GROWTH = drilled_oversize_mm()  # title-block drilled hole, +0.10/0 on the diameter
 LIGAMENT_FLOOR = 1.5
 LIGAMENT_TARGET = 2.0
 

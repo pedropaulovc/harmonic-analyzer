@@ -15,6 +15,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _fit_ream_h7 import REAM_H7
 from _fit_ream_slide import REAM_SLIDE
 from _fit_deviations import deviations
+from _printed_tolerance import printed_band_mm
 
 
 def test_required_drawing_paths() -> None:
@@ -379,7 +380,7 @@ def test_fitted_bores_name_their_mates_and_fits() -> None:
 
 
 # Title-block general grades by printed decimal places (.X, .XX, .XXX).
-_GENERAL_GRADE = {1: 0.8, 2: 0.51, 3: 0.13}
+_GENERAL_GRADE = {places: printed_band_mm(places) for places in (1, 2, 3)}
 # The 0.05 drilled-hole allowance every web budget on this strap carries.
 _DRILL_ALLOWANCE = 0.05
 _WEB_FLOOR = 1.5

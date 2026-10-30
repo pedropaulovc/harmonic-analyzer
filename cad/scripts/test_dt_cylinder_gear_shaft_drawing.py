@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 
 import _config
+from _printed_tolerance import printed_band_mm
 import _fit_deviations
 import _fit_shaft_h
 import dt_arbor_pedestal_spec
@@ -69,7 +70,7 @@ def test_the_part_owns_display_precision_and_the_sheet_only_asserts_it() -> None
     assert abs(printed - spec.SHAFT_DIA) <= math.ulp(spec.SHAFT_DIA)
     # One place on the free length claims the title block's .X row, not the
     # tighter .XX band a trailing 187.00 would ask for.
-    assert _config.title_block("linear_1pl")["display"] == "±0.8"
+    assert printed_band_mm(1) == 0.8
 
 
 def test_a_plain_drive_train_shaft_carries_no_gdt_and_no_end_view() -> None:

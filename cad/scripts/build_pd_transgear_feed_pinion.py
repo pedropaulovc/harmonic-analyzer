@@ -405,7 +405,7 @@ def _single_limit(
         raise RuntimeError(f"{label}: single-limit tolerance readback changed")
     if limit_places is not None:
         _set_tolerance_precision(
-            display, limit_deviations, label=label, places=limit_places
+            display, limit_deviations, display_unit="mm", label=label, places=limit_places
         )
     _telemetry.success(f"{label}: limit {printed}")
 

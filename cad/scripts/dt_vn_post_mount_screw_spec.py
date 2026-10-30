@@ -26,6 +26,7 @@ from dataclasses import dataclass
 
 import _config
 import dt_cone_pivot_post_spec as post
+from _printed_tolerance import printed_band_mm
 import dt_cone_swing_platform_spec as platform
 import dt_post_mount_stack as mount_stack
 from _fit_deviations import deviations
@@ -198,8 +199,8 @@ TIP_VIEW_DIMENSIONS = {CUT_END_BREAK_SKETCH: {CUT_END_BREAK_DIMENSION}}
 # The printed bands, as the shop reads them off the title block: the post's
 # overall height is a .X dimension, its counterbore depth a .XX callout, and
 # the plate is 1/4 flat bar as supplied (U41) at its mill tolerance.
-_GENERAL_1PL_MM = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
-_GENERAL_2PL_MM = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
+_GENERAL_1PL_MM = printed_band_mm(1)
+_GENERAL_2PL_MM = printed_band_mm(2)
 _POST_HEIGHT_PRINTED = round(post.BLOCK_HEIGHT, 1)
 _CBORE_DEPTH_PRINTED = round(post.ATTACHMENT_CBORE_DEPTH, 2)
 # Stock thickness and tap-entry breaks are owned by the mating platform.

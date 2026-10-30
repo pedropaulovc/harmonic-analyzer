@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import math
 
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
 from gear_seat_fit import seat_bore_band
 from _fit_shaft_h import SHAFT_H
 
@@ -93,7 +93,7 @@ TIP_COLLAR_AXIAL_PLACES = 3
 TIP_COLLAR_WIDTH_BAND_MM = printed_band_mm(TIP_COLLAR_AXIAL_PLACES)
 TIP_COLLAR_NOSE_LENGTH_MM = 3.0 + TIP_COLLAR_BODY_NORTH_SHIFT_MM
 TIP_COLLAR_TAP_STATION_MM = (TIP_COLLAR_NOSE_LENGTH_MM + TIP_COLLAR_WIDTH_MM) / 2.0
-TIP_COLLAR_FREE_EDGE_BREAK_MAX_MM = 0.25
+TIP_COLLAR_FREE_EDGE_BREAK_MAX_MM = edge_break_chamfer_mm()  # title-block edge break
 _COLLAR_BORE_BAND = seat_bore_band(RUNNING_DIA_BAND)
 TIP_COLLAR_MAX_RADIAL_FLOAT_MM = (_COLLAR_BORE_BAND[0] - RUNNING_DIA_BAND[1]) / 2.0
 TIP_COLLAR_MIN_RADIAL_FLOAT_MM = (_COLLAR_BORE_BAND[1] - RUNNING_DIA_BAND[0]) / 2.0

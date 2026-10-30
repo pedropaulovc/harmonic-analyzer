@@ -2565,7 +2565,7 @@ def test_title_properties_propagate_inside_corner_config(properties, name, monke
 
     def changed_title_block(section):
         if section == "inside_corner":
-            return {"radius_mm": 0.8}
+            return {"radius_mm": 0.8, "digits": 1}
         return title_block(section)
 
     monkeypatch.setattr(_config, "title_block", changed_title_block)
@@ -3100,13 +3100,20 @@ def test_requirement_declarations_do_not_read_title_block_geometry():
     assert "title_block" not in config_files_of(script)
 
 
-@pytest.mark.parametrize(
-    "module",
-    ["_printed_limits", "_printed_tolerance", "dt_vn_cone_lock_knob_spec"],
-)
+@pytest.mark.parametrize("module", ["_printed_limits", "_printed_tolerance"])
 def test_numeric_tolerance_title_block_readers_are_classified(module):
     script = SCRIPTS_DIR / f"{module}.py"
     assert script.stem in bg.TITLE_BLOCK_GEOMETRY_MODULES
+    assert bg.reads_title_block_geometry(script)
+    assert "title_block" in config_files_of(script)
+
+
+@pytest.mark.parametrize("module", ["dt_vn_cone_lock_knob_spec", "dt_cone_tip_block_spec"])
+def test_printed_band_readers_are_classified_through_the_reader(module):
+    # Reads the printed rows only via _printed_tolerance, so its import closure,
+    # not its own stem, keeps title_block.yaml on its recipes.
+    script = SCRIPTS_DIR / f"{module}.py"
+    assert script.stem not in bg.TITLE_BLOCK_GEOMETRY_MODULES
     assert bg.reads_title_block_geometry(script)
     assert "title_block" in config_files_of(script)
 

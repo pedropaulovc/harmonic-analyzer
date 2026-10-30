@@ -158,7 +158,7 @@ from _sketch import (
 import dt_cylinder_bank_setting_spec as bank_settings
 from _rebuild import force_rebuild
 from _session import run_build
-from _printed_tolerance import printed_deviations
+from _printed_tolerance import drilled_oversize_mm, printed_deviations
 from _transforms import ROT_X_NEG90, ROT_Y_180, compose_rows, euler_from_rows
 from channel_frame_geom import (
     CAM_SHAFT_XY,
@@ -1548,9 +1548,7 @@ def tip_block_print_worst_containment_mm(half_widths: dict[str, float]) -> float
 # closes by print tolerance.  The screw floats in its drilled close-clearance
 # hole; the hole's two stations from the pivot bore (HoldDownX, HoldDownZ)
 # and the tap's two stations carry explicit +/-0.10 bands.
-_DRILLED_HOLE_PLUS_MM = float(
-    str(_config.title_block("drilled_hole")["display_plus"]).lstrip("+")
-)
+_DRILLED_HOLE_PLUS_MM = drilled_oversize_mm()
 HOLDDOWN_SCREW_FLOAT_MM = (
     PLAT_HOLDDOWN_CLEARANCE_DIA + _DRILLED_HOLE_PLUS_MM - HOLDDOWN_SHANK_DIA
 ) / 2.0
@@ -4640,7 +4638,11 @@ async def _author_bank_settings_reference(adapter) -> None:
         set_dimension_symmetric_tolerance(adapter, feature, name, upper)
         display, _ = _named_dimension(adapter, feature, name)
         _set_tolerance_precision(
-            display, (lower, upper), label=name, places=bank_settings.TOLERANCE_PRECISION
+            display,
+            (lower, upper),
+            display_unit="mm",
+            label=name,
+            places=bank_settings.TOLERANCE_PRECISION,
         )
         # Imported SetText can write through to the released model (the rack
         # source-save controls); author this annotation before the assembly save.

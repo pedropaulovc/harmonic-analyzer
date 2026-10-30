@@ -11,6 +11,7 @@ import pytest
 import solidworks_mcp.adapters
 
 import _config
+from _printed_tolerance import printed_band_mm
 import _drawing_attachment
 import _drawing_edge_dimensions
 from _drawing_edge_dimensions import assert_dimension_measures
@@ -1798,9 +1799,7 @@ def test_bracket_depth_callout_inherits_printed_two_place_band(bracket_depth_cal
     # row, not value_in (whose metric conversion is intentionally rounded).
     printed_nominal = f"{case.drill.length.Length * 1000.0:.{case.drill.length.Precision}f}"
     assert printed_nominal == "6.50"
-    display = _config.title_block("linear_2pl")["display"]
-    assert display.startswith("±")
-    printed_band = float(display.removeprefix("±"))
+    printed_band = printed_band_mm(2)
     effective_limits = (float(printed_nominal) - printed_band, float(printed_nominal) + printed_band)
     assert effective_limits == pytest.approx((5.99, 7.01))
     physical_limits = tuple(joint.DRILL_DEPTH + delta for delta in joint.DRILL_DEPTH_DEVIATIONS)

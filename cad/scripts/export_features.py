@@ -28,7 +28,16 @@ import _part_properties
 import _surface_finish
 from _feature_requirements import declaration_calls, discover_parts, metadata_for, requirements_for, source_tree
 from _gtol_face import FaceSpec
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import (
+    angular_band_deg,
+    drilled_oversize_mm,
+    drilled_undersize_mm,
+    edge_break_chamfer_display,
+    edge_break_chamfer_mm,
+    edge_break_radius_display,
+    edge_break_radius_mm,
+    printed_band_mm,
+)
 
 SUPPORTED_PARTS = discover_parts(Path(__file__).resolve().parent)
 REPO = Path(__file__).resolve().parents[2]
@@ -338,12 +347,12 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
     general = {
         f"linear_{places}pl": printed_band_mm(places) for places in (1, 2, 3)
     }
-    general.update({"angular_deg": float(_config.title_block("angular")["value_deg"]), "drilled_hole_plus": float(_config.title_block("drilled_hole")["plus_mm"]), "drilled_hole_minus": float(_config.title_block("drilled_hole")["minus_mm"]), "edge_break_r": float(_config.title_block("edge_break")["radius_mm"]), "chamfer_max": float(_config.title_block("edge_break")["chamfer_max_mm"])})
+    general.update({"angular_deg": angular_band_deg(), "drilled_hole_plus": drilled_oversize_mm(), "drilled_hole_minus": drilled_undersize_mm(), "edge_break_r": edge_break_radius_mm(), "chamfer_max": edge_break_chamfer_mm()})
     general["cite"] = {
         key: _title_cite(source)
         for key, source in (
-            ("linear_1pl", "linear_1pl.display"), ("linear_2pl", "linear_2pl.display"),
-            ("linear_3pl", "linear_3pl.display"), ("angular_deg", "angular.value_deg"),
+            ("linear_1pl", "linear_1pl.band_mm"), ("linear_2pl", "linear_2pl.band_mm"),
+            ("linear_3pl", "linear_3pl.band_mm"), ("angular_deg", "angular.value_deg"),
             ("drilled_hole_plus", "drilled_hole.plus_mm"), ("drilled_hole_minus", "drilled_hole.minus_mm"),
             ("edge_break_r", "edge_break.radius_mm"), ("chamfer_max", "edge_break.chamfer_max_mm"),
         )
@@ -354,7 +363,7 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
             if precision_cite:
                 feature["cite"][f"precision.{key}"] = list(dict.fromkeys([*call, *precision_cite]))
             if key in feature["cite"] and isinstance(feature.get(key), list) and len(feature[key]) == 2:
-                tolerance = "angular.value_deg" if key.endswith("_deg") else f"linear_{feature['precision'][key]}pl.display"
+                tolerance = "angular.value_deg" if key.endswith("_deg") else f"linear_{feature['precision'][key]}pl.band_mm"
                 feature["cite"][key] += _title_cite(tolerance, "drilled_hole.plus_mm", "drilled_hole.minus_mm")
         if "finish_ra" in feature:
             if isinstance(feature.get("precision"), dict):
@@ -382,7 +391,7 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
         "cite": {"construction": construction_cite, "units": frame_cite, "precision": fact_citations.get("precision", frame_cite), "frames": frame_cite},
         "drawing": {"number": row["number"], "revision": UNKNOWN, "cite": [*registry_cite("number"), "harmonic-analyzer/cad/config/release.yaml:next_revision", *_cite(_part_properties, "part_properties")]},
         "material": {"spec": row.get("material_specification", UNKNOWN), "name": row.get("material", UNKNOWN), "finish": facts.get("material.finish", row.get("finish", UNKNOWN)), "thickness": facts.get("material.thickness", UNKNOWN), "cite": [*registry_cite("material_specification", "material"), *fact_citations.get("material.finish", registry_cite("finish")), *fact_citations.get("material.thickness", [])]},
-        "notes": {"manufacturing": notes.splitlines(), "process": facts.get("notes.process", row.get("process", UNKNOWN)), "edge_break": f"REMOVE BURRS AND BREAK SHARP EDGES {_config.title_block('edge_break')['display_r']} OR CHAMFER {_config.title_block('edge_break')['display_chamfer']} MAX", "cite": [*fact_citations.get("notes.process", registry_cite("process")), *_title_cite("edge_break.display_r", "edge_break.display_chamfer"), *_cite(notes_module, "DRAWING_NOTES")]},
+        "notes": {"manufacturing": notes.splitlines(), "process": facts.get("notes.process", row.get("process", UNKNOWN)), "edge_break": f"REMOVE BURRS AND BREAK SHARP EDGES {edge_break_radius_display()} OR CHAMFER {edge_break_chamfer_display()} MAX", "cite": [*fact_citations.get("notes.process", registry_cite("process")), *_title_cite("edge_break.radius_mm", "edge_break.chamfer_max_mm", "edge_break.digits"), *_cite(notes_module, "DRAWING_NOTES")]},
         "general_tolerances": general, "frames": frames, "datums": datums, "features": features,
     }
 

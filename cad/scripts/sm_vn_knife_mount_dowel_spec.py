@@ -34,13 +34,13 @@ from __future__ import annotations
 
 import math
 
-import _config
 from _mcmaster_98381a473 import (
     DIA_BAND_IN,
     ENDS,
     DOWEL_SIZE,
     MM_PER_IN,
 )
+from _printed_tolerance import printed_band_mm
 from _supplier_pin_data import SupplierPinReference
 
 SKU = "98381A473"
@@ -70,8 +70,8 @@ if not POINT_DIA_MIN <= ENDS.point_dia <= POINT_DIA_MAX:
 LENGTH_GRADE = 0.010 * MM_PER_IN  # 0.254
 
 # General tolerances the two holes' printed places claim (title block).
-_X = float(str(_config.title_block("linear_1pl")["display"]).lstrip("\u00b1"))
-_XXX = float(str(_config.title_block("linear_3pl")["display"]).lstrip("\u00b1"))
+_X = printed_band_mm(1)
+_XXX = printed_band_mm(3)
 
 # Two pins per knife mount, their axes HANGER_OFFSET either side of the
 # knife-hanger screw axis along machine X in BOTH parts (block local X is
