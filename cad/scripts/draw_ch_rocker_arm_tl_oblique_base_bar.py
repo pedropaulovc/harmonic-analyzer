@@ -230,14 +230,19 @@ _BRACKET_OUTER_TEXT_BELOW = 0.004  # "6.400"'s centre under the bar's -Y edge
 # 6.800 spanned from about 1.5 to 14.2 right of its line (c4-r2 sheet).
 _SHOULDER_TEXT_SPAN = (0.0015, 0.0142)
 _SLOT_RUN_TEXT_LOW = 0.0055  # text centre below the run's lower line
-# The row's block: three lines, about 17 tall. It stands above the row's
-# line, outside its span: under it, the 2026-10-30 narrowing's 49.4 rise left
-# the 88.90's upper arrowhead in the block's first line (machinist review,
-# farm run 20261030T181155138Z). The stock width's text moves under the
-# rise's upper extension line to free that corner.
-_RAIL_ROW_TEXT_HALF_HIGH = 0.0085
+# The row's block: three lines, 14.6 tall (measured on the 2026-10-30 farm
+# sheet). The near rise (49.4) carries its text inside its own span, so the
+# block sits inside the row's span above the rise's upper extension line,
+# 0.7 clear, and under the row's line clear of its upper arrowhead (3.55
+# long). At 0.8 clear and an estimated 17 tall, the 1/2 x 5-1/2 narrowing's
+# taller rise put that arrowhead in "88.90" (machinist review, farm run
+# 20261030T181155138Z); above the row line, outside its span, the block ran
+# into the border and under the stock width's line (run 20261030T185048712Z).
+_RAIL_ROW_TEXT_HALF_HIGH = 0.0073
+_ROW_ARROW_LENGTH = 0.00355
 _ROW_SHEET_Y = _sheet_y(FRONT_CENTER, 0.0)
-_RAIL_ROW_BLOCK_LOW = _ROW_SHEET_Y + 0.0015
+_RISE_TOP_SHEET_Y = _sheet_y(FRONT_CENTER, LOW_SIDE_Y + NEAR_SLOT_RISE)
+_RAIL_ROW_BLOCK_LOW = _RISE_TOP_SHEET_Y + 0.0007
 # Side lanes (sheet m off the plan's end). The row's text clears the near
 # rise's line by 2.5 (r4: the 10.3's outside arrow and its tail struck the
 # block's last "L"); the stock width's line clears the row's text by 2.
@@ -285,7 +290,7 @@ FRONT_KEEP = {
         for k, text_x in enumerate(_HOLE_TEXT_X, start=1)
     },
     "BarLength": (FRONT_CENTER[0], _below_line(5) + TEXT_DROP),
-    "BarWidth": (_LEFT - _BAR_WIDTH_LANE, _BOTTOM + 0.010),
+    "BarWidth": (_LEFT - _BAR_WIDTH_LANE, _ROW_SHEET_Y + 0.010),
     "RailRowY": (
         _LEFT - _RAIL_ROW_LANE,
         _RAIL_ROW_BLOCK_LOW + _RAIL_ROW_TEXT_HALF_HIGH,
