@@ -364,7 +364,15 @@ END_STOPS = {
 }
 
 # --- Height stack (machine Z, table top = 0) ---------------------------------
-BASE_BAR_THICK = round(0.5 * INCH, 9)  # 1/2 in 6061 flat bar
+# The base bars are faced on both large faces from the 1/2 in 6061-T6511 bar
+# (BASE_BAR_STOCK_THICK) to BASE_BAR_THICK (owner ruling 2026-10-30, option A):
+# each face is a static locating seat (the table under bar 1, the rail and the
+# TL-28 brackets on it; bar 2 is the same part turned over). Like the carrier,
+# the finished size prints at .X and takes that title-block band, not STOCK.
+BASE_BAR_STOCK_THICK = round(0.5 * INCH, 9)
+BASE_BAR_THICK = 12.0
+BASE_BAR_THICK_PLACES = 1
+BASE_BAR_THICK_BAND = printed_band_mm(BASE_BAR_THICK_PLACES)
 PIVOT_BLOCK_HEIGHT = 24.3  # finished from 1 in stock
 # Nominal fitted pack: five 0.2 DIN 988 shims (98055A118, TL-VN-79) per
 # support; the 6.85 shoulder seat (owner ruling 2026-10-27) leaves 1.15

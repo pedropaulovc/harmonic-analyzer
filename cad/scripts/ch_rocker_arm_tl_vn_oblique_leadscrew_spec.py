@@ -27,8 +27,9 @@ KP08 bracket, so the screw never passes a stud.
 
 Why lateral 55: the KP08 envelope (55 across the axis, ``KP08_MARGIN`` all
 round) must stay outside pivot block 1's side (lateral 20 ⚙), which runs
-between the two blocks; the 25.4-high bracket lifts the axis to 53.1.
-The handwheel grip sweeps to Z74.6, below the carrier underside at Z80.2.
+between the two blocks; the 25.4-high bracket on the faced 12.0 bar lifts the
+axis to 52.4. The handwheel grip sweeps to Z73.9, below the carrier underside
+at Z80.3.
 Each bracket stands wholly on bar 1 (the user's 2026-10-17 ruling A′: the
 bar widened, now 1/2 x 5-1/2, its column-side edge at lateral 88.9 ⚙), its outer
 end flush with that edge, on 4 x #8 screws in one row: two pairs symmetric
@@ -216,8 +217,8 @@ HANDWHEEL_SWEEP_R = max(
 # --- Layout (rail-1 stations s, lateral; machine Z) -------------------------------
 SCREW_LATERAL = 55.0
 BRACKET_THICK = 1.0 * INCH  # OnlineMetals 1165 half-by-one bar, on edge
-KP08_BASE_Z = trammel.BASE_BAR_THICK + BRACKET_THICK  # 38.1
-SCREW_AXIS_Z = KP08_BASE_Z + KP08_AXIS_HEIGHT  # 53.1
+KP08_BASE_Z = trammel.BASE_BAR_THICK + BRACKET_THICK  # 37.4
+SCREW_AXIS_Z = KP08_BASE_Z + KP08_AXIS_HEIGHT  # 52.4
 HUB_GAP = 6.0  # far KP08 outer face to the handwheel's hub end
 # The drilled parts fix the KP08 stations and the screw length; a vendor swap
 # must not move them. The self-checks below guard them against the bought
@@ -300,9 +301,9 @@ BRACKET_BAR_HOLES_X = tuple(
 SHCS_8_HEAD = 0.164 * INCH  # #8 SHCS head height (ASME B18.3)
 SHCS_8_MAJOR = 0.164 * INCH  # #8 thread major diameter
 BAR_SCREW_LENGTH_MM = 0.625 * INCH
-BAR_SCREW_GRIP = base_bar.BAR_THICK - base_bar.BRACKET_CBORE_DEPTH  # 7.9
-BAR_SCREW_ENGAGEMENT = BAR_SCREW_LENGTH_MM - BAR_SCREW_GRIP  # 7.975 nominal
-# Worst case at TL-20's printed bands (6.955 .. 8.995).
+BAR_SCREW_GRIP = base_bar.BAR_THICK - base_bar.BRACKET_CBORE_DEPTH  # 7.2
+BAR_SCREW_ENGAGEMENT = BAR_SCREW_LENGTH_MM - BAR_SCREW_GRIP  # 8.675 nominal
+# Worst case at TL-20's printed bands (7.365 .. 9.985).
 BAR_SCREW_ENGAGEMENT_RANGE = base_bar.bracket_screw_under_head(BAR_SCREW_LENGTH_MM)
 
 KP08_S = (72.0, 443.0)  # near, far: KP08 axial centre stations

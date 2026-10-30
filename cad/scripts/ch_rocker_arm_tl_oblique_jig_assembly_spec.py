@@ -14,14 +14,15 @@ spindle axis at table top; +X along the table, +Y toward the column, +Z up.
 Rows give the machine image of each part's local axis.
 
 Rail 1 carries the integral feed block; rail 2 carries the plain pivot block.
-Both blocks stand on the carriage tops at 40.7 and finish at 65.0. Selected
+Both blocks stand on the carriage tops at 40.0 and finish at 64.3 (the base
+bars faced to 12.0, owner ruling 2026-10-30). Selected
 DIN 988 shims (nominal five 0.2 a support) and loose 15 mm spacers support the
-carrier at nominal Z81.0.
+carrier at nominal Z80.3.
 The carrier turns directly on purchased shoulder screws. Their shoulders
 bottom in the blocks' counterbores, not on the carrier, and their heads
 positively capture it without clamping its running faces.
 
-The raised leadscrew axis is Z53.1. The flanged nut seats directly in the
+The raised leadscrew axis is Z52.4. The flanged nut seats directly in the
 feed-block lug. KP08 mounting-hole float aligns the screw at both travel ends;
 there is no detachable bracket or transfer-spotted interface.
 
@@ -370,8 +371,8 @@ END_BRACKET_PLACEMENTS: tuple[tuple[Point3, Rows], ...] = tuple(
 )
 
 # --- Heights ⚙ ---------------------------------------------------------------------
-RAIL_TOP_Z = trammel.RAIL_SEAT_Z + trammel.RAIL_HEIGHT  # 27.7
-CARRIAGE_UNDERSIDE_Z = trammel.RAIL_SEAT_Z + trammel.CARRIAGE_UNDER  # 17.0
+RAIL_TOP_Z = trammel.RAIL_SEAT_Z + trammel.RAIL_HEIGHT  # 27.0
+CARRIAGE_UNDERSIDE_Z = trammel.RAIL_SEAT_Z + trammel.CARRIAGE_UNDER  # 16.3
 HUB_PIN_BOTTOM_Z = HUB_PIN_ORIGIN[2]
 PIVOT_HEAD_UNDERSIDE_Z = PIVOT_SCREW_BOTTOM_Z + pivot_screw.SHOULDER_LENGTH
 PIVOT_HEAD_TOP_Z = PIVOT_HEAD_UNDERSIDE_Z + pivot_screw.HEAD_HEIGHT

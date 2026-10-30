@@ -10,7 +10,7 @@ Layout: ONE Front-plane profile -- the bar rectangle from its spindle-end
 face (model x 0), its -Y side ``RAIL_ROW_Y`` below the rail axis, with the
 two slot stadiums inside it, both located from the faced -Y side's corner
 (0, -88.9), like every other feature (rule 10) -- extruded +Z by
-the stock thickness; the rail holes are one Hole Wizard feature tapped THRU
+the faced thickness; the rail holes are one Hole Wizard feature tapped THRU
 from the top face. The row's printed lateral station (88.90 from the -Y
 edge) lives on a hidden reference sketch, ``RailRowReference``. The leadscrew
 brackets' eight #8 holes are one counterbored Hole Wizard feature from the
@@ -40,6 +40,7 @@ from _drawing_precision import apply_drawing_precision
 from _feature_tree import name_last_feature
 from _holes import SharedCoordinate, wizard_holes
 from _part_checks import report_mass_properties, volume_check
+from _part_pmi import author_part_pmi
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
@@ -79,6 +80,7 @@ from ch_rocker_arm_tl_oblique_base_bar_spec import (
     RAIL_ROW_Y,
     SLOT_RUN,
     SLOT_WIDTH,
+    SURFACE_FINISHES,
     TAP_DRILL,
     TAP_SPEC,
     TOLERANCES,
@@ -488,6 +490,8 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # Both faced seats' Ra 3.2 lives on the MODEL as plain annotations.
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
