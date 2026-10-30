@@ -1,9 +1,9 @@
 ---
 module: M06
 title: "Mill I — tramming, squaring, edge finding"
-status: not started      # not started | in progress | competent | applied
+status: in progress      # not started | in progress | competent | applied
 hours_estimated: 16
-hours_actual: 0
+hours_actual: 6.5
 ---
 
 # M06 — Mill I — tramming, squaring, edge finding
@@ -50,4 +50,4 @@ Log entries for this module, newest last. Create them with
 
 | date | entry | outcome | hours |
 |---|---|---|---|
-| | | | |
+| 2026-10-29 | [vise install and first cuts](../entries/2026-10-29-vise-install-and-first-cuts.md) | partial | 6.5 |

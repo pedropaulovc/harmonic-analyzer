@@ -52,4 +52,4 @@ Log entries for this module, newest last. Create them with
 
 | date | entry | outcome | hours |
 |---|---|---|---|
-| | | | |
+| 2026-10-29 | [vise install and first cuts](../entries/2026-10-29-vise-install-and-first-cuts.md) (layout with Dykem and scriber) | partial | 0.5 of 6.5, counted under M06 |
