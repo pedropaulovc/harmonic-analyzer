@@ -11,20 +11,23 @@ table by indicating the pin, so the bar's own position on the table does not
 matter; the only tight bands are the rail holes' end distance and pitch
 (below).
 
-Material and stock: 6061-T6511 aluminium flat bar, 1/2 x 6 in (OnlineMetals
-1173; ⚙ ``BASE_BAR_THICK`` 12.7 x ⚙ ``BASE_BAR_WIDTH`` 152.4), sawn and faced
+Material and stock: 6061-T6511 aluminium flat bar, 1/2 x 5-1/2 in (OnlineMetals
+17666; ⚙ ``BASE_BAR_THICK`` 12.7 x ⚙ ``BASE_BAR_WIDTH`` 139.7), sawn and faced
 to ⚙ ``BASE_BAR_LENGTH`` 440 (the rail's length; rail and bar are flush).
 Width and thickness are left as supplied and print "STOCK". Overall stock size
-440 x 152.4 x 12.7. The user's 2026-10-17 ruling (a) widened the bar from
-1/2 x 4 so the leadscrew's TL-28 end brackets (PR C4) stand wholly on bar 1.
+440 x 139.7 x 12.7. The user's 2026-10-17 ruling (a) widened the bar from
+1/2 x 4 to 1/2 x 6 so the leadscrew's TL-28 end brackets (PR C4) stand wholly
+on bar 1; the 2026-10-30 ruling narrowed it to 1/2 x 5-1/2, the widest listed
+OnlineMetals bar that fits the 6 in vise's stock hard jaws (5 3/4 in), keeping
+the column-side edge and so the brackets.
 
 Frame: origin at the bar's spindle-end face, on the rail axis, on the bottom
 face; +X along the bar away from the spindle, +Y across it, +Z up
 (right-handed). On rail 1 the part's y is minus the calculator's lateral
 (``trammel.rail_point``, +lateral toward the column), so the column-side edge
 ⚙ ``BASE_BAR_COLUMN_EDGE`` (lateral +88.9) is the -Y side and the
-operator-side edge ⚙ ``BASE_BAR_OPERATOR_EDGE`` (lateral -63.5) the +Y side:
-the bar spans x 0 .. 440, y ``LOW_SIDE_Y`` -88.9 .. ``HIGH_SIDE_Y`` 63.5,
+operator-side edge ⚙ ``BASE_BAR_OPERATOR_EDGE`` (lateral -50.8) the +Y side:
+the bar spans x 0 .. 440, y ``LOW_SIDE_Y`` -88.9 .. ``HIGH_SIDE_Y`` 50.8,
 z 0 .. 12.7.
 
 Rail holes: 7 x #8-32 UNC tapped THRU on the rail axis (y 0) at x = ⚙
@@ -55,13 +58,13 @@ carries its reason (``RAIL_ROW_CALLOUT``): every hole in line with the
 rail's straight row of Ø4.5 holes, which the one setting gives.
 
 Hold-down slots: two through slots ⚙ ``HOLD_DOWN_SLOT_WIDTH`` 13.5 wide, axis
-along Y, stud travel ± ⚙ ``HOLD_DOWN_ADJUST`` (19.5 overall). Near slot centre
+along Y, stud travel ± ⚙ ``HOLD_DOWN_ADJUST`` 2 (17.5 overall). Near slot centre
 x = ⚙ ``HOLD_DOWN_NEAR_S`` - ⚙ ``RAIL_NEAR_S`` (20.92), far slot x = ⚙
 ``HOLD_DOWN_FAR_S`` - ⚙ ``RAIL_NEAR_S`` (390), each ± ⚙ ``HOLD_DOWN_LATERAL``
 (37.5) off the rail axis. Per drawing-guidelines rule 12 the slots are
-dimensioned to their radius centres: width 13.50 and the 6.00 between the two
-end-arc centres, each centre carrying a printed centre mark, so the 6.00
-reads as centre-to-centre and not as the slot's 19.5 overall length.
+dimensioned to their radius centres: width 13.50 and the 4.00 between the two
+end-arc centres, each centre carrying a printed centre mark, so the 4.00
+reads as centre-to-centre and not as the slot's 17.5 overall length.
 
 One part, one configuration, two off (Main's ruling): every feature goes
 through, so the bar under rail 2 is the same part turned over (rotated 180°
@@ -71,14 +74,15 @@ the near stud (lateral +37.5) and the rail row on the rail. The part as
 modelled is the rail-1 bar: near slot at y -37.5, far slot at +37.5. Both
 slots are located from the faced -Y side, the datum every hole uses, to
 their lower end centres (c3-r6 review, rule 10: one datum per view): the
-near slot's rise ``NEAR_SLOT_RISE`` 48.4, the far slot's ``FAR_SLOT_RISE``
-123.4. On the 1/2 x 4 bar the far slot's wall to the +Y side, carrying the
+near slot's rise ``NEAR_SLOT_RISE`` 49.4, the far slot's ``FAR_SLOT_RISE``
+124.4. On the 1/2 x 4 bar the far slot's wall to the +Y side, carrying the
 stock width's band, fell to 1.2 worst (c4-r2), so it was dropped from the +Y
-side; the 1/2 x 6 bar's 16.25 wall leaves the band harmless.
+side. The 1/2 x 5-1/2 bar at the old ±3 travel fell to 1.18 worst again; the
+2026-10-30 ruling cut the travel to ±2 rather than bring the +Y datum back.
 
 Walls (rule 17, worst case at the printed bands): the near slot to the bar's
-spindle end 14.2 nominal; a slot end to its bar side 16.25 nominal (the far
-slot to the +Y side; the near slot to the -Y side is 41.65), 13.9 worst (the
+spindle end 14.2 nominal; a slot end to its bar side 4.55 nominal (the far
+slot to the +Y side; the near slot to the -Y side is 42.65), 2.18 worst (the
 far slot's: its rise, run and the stock width's bands all enter it).
 
 End bracket holes (PR C4): 8 x #8 SHCS clearance (``BRACKET_HOLE_DIA``
@@ -111,13 +115,13 @@ import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 INCH = 25.4
 
 BAR_THICK = trammel.BASE_BAR_THICK  # ⚙ 12.7
-BAR_WIDTH = trammel.BASE_BAR_WIDTH  # ⚙ 152.4
+BAR_WIDTH = trammel.BASE_BAR_WIDTH  # ⚙ 139.7
 BAR_LENGTH = trammel.BASE_BAR_LENGTH  # ⚙ 440
 # The two long sides in the rail-1 part frame (y = -lateral): the rail sits
 # off the centreline since the 2026-10-17 widening, so each side is read from
 # its own calculator edge, never as half the width.
 LOW_SIDE_Y = -trammel.BASE_BAR_COLUMN_EDGE  # ⚙ -88.9: the faced -Y, column side
-HIGH_SIDE_Y = -trammel.BASE_BAR_OPERATOR_EDGE  # ⚙ 63.5: the +Y, operator side
+HIGH_SIDE_Y = -trammel.BASE_BAR_OPERATOR_EDGE  # ⚙ 50.8: the +Y, operator side
 if abs(HIGH_SIDE_Y - LOW_SIDE_Y - BAR_WIDTH) > 1e-9:
     raise AssertionError("the base bar's sides miss its stock width")
 
@@ -155,8 +159,8 @@ if RAIL_SCREW_ENGAGEMENT > BAR_THICK:
 
 # --- Hold-down slots ------------------------------------------------------------
 SLOT_WIDTH = trammel.HOLD_DOWN_SLOT_WIDTH  # ⚙ 13.5
-SLOT_RUN = 2.0 * trammel.HOLD_DOWN_ADJUST  # ⚙ 6: the stud's travel along the slot
-SLOT_LENGTH = SLOT_RUN + SLOT_WIDTH  # 19.5 overall
+SLOT_RUN = 2.0 * trammel.HOLD_DOWN_ADJUST  # ⚙ 4: the stud's travel along the slot
+SLOT_LENGTH = SLOT_RUN + SLOT_WIDTH  # 17.5 overall
 SLOT_LATERAL = trammel.HOLD_DOWN_LATERAL  # ⚙ 37.5
 NEAR_SLOT_X = trammel.HOLD_DOWN_NEAR_S - trammel.RAIL_NEAR_S  # ⚙ 20.92
 FAR_SLOT_X = trammel.HOLD_DOWN_FAR_S - trammel.RAIL_NEAR_S  # ⚙ 390
@@ -173,8 +177,8 @@ def slot_rise(y_centre: float) -> float:
     return y_centre - SLOT_RUN / 2.0 - LOW_SIDE_Y
 
 
-NEAR_SLOT_RISE = slot_rise(NEAR_SLOT_Y)  # 48.4, from the -Y side
-FAR_SLOT_RISE = slot_rise(FAR_SLOT_Y)  # 123.4, from the -Y side too
+NEAR_SLOT_RISE = slot_rise(NEAR_SLOT_Y)  # 49.4, from the -Y side
+FAR_SLOT_RISE = slot_rise(FAR_SLOT_Y)  # 124.4, from the -Y side too
 
 # --- Printed places and rule-17 walls -------------------------------------------
 STATION_PLACES = 1  # bar length, width and slot stations: the title block's .X band
@@ -189,16 +193,16 @@ _R_MAX = (SLOT_WIDTH + _XX) / 2.0
 NEAR_END_WALL = NEAR_SLOT_X - SLOT_WIDTH / 2.0  # 14.2 nominal
 NEAR_END_WALL_WORST = NEAR_SLOT_X - _X - _R_MAX
 # The rail sits off the bar's centreline, so each slot has its own side wall:
-# the near slot's to the -Y side (41.65), the far slot's to the +Y side (16.25).
+# the near slot's to the -Y side (42.65), the far slot's to the +Y side (4.55).
 NEAR_SIDE_WALL = NEAR_SLOT_RISE - SLOT_WIDTH / 2.0
 FAR_SIDE_WALL = BAR_WIDTH - (FAR_SLOT_RISE + SLOT_RUN) - SLOT_WIDTH / 2.0
-SIDE_WALL = min(NEAR_SIDE_WALL, FAR_SIDE_WALL)  # 16.25
+SIDE_WALL = min(NEAR_SIDE_WALL, FAR_SIDE_WALL)  # 4.55
 # Both slots are located from the -Y side (c3-r6, rule 10), so the far slot's
 # wall to the +Y side carries the stock width's .X band, its rise's and its
-# run's .XX: 13.885 worst, well over the floor on the 1/2 x 6 bar.
+# run's .XX: 2.175 worst on the 1/2 x 5-1/2 bar at ±2 travel.
 FAR_SIDE_WALL_WORST = (
     (BAR_WIDTH - _X) - (FAR_SLOT_RISE + _X + SLOT_RUN + _XX) - _R_MAX
-)  # 13.885
+)  # 2.175
 SIDE_WALL_WORST = min(NEAR_SLOT_RISE - _X - _R_MAX, FAR_SIDE_WALL_WORST)
 for _label, _nominal, _worst in (
     ("near slot to the bar end", NEAR_END_WALL, NEAR_END_WALL_WORST),

@@ -92,7 +92,7 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A 440 x 152.4 x 12.7 bar: 1:2 puts the 220-wide plan on the B sheet, its end
+# A 440 x 139.7 x 12.7 bar: 1:2 puts the 220-wide plan on the B sheet, its end
 # view projected right of it on the same centreline (third angle). The
 # vertical budget: the rail-hole stack tops out at about 265 under the 267
 # border. The plan sits right of centre so the three side lanes (the row's
@@ -109,7 +109,8 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 # so the end view moves 21.5 right to clear the outermost row's text, and
 # 5 more for the far slot's rise outside them (c3-r6). c4-r8 read the
 # 400.00 block's top line touching the border: the plan and end view drop
-# 3, the iso staying put, its top 7 under the length's text.
+# 3, the iso staying put, its top 7 under the length's text. The 2026-10-30
+# narrowing to 1/2 x 5-1/2 shortens the plan and end view 12.7 at the +Y side.
 SHEET_SCALE = (1.0, 2.0)
 VIEW_SCALE = (1, 2)
 ISO_SCALE = (1, 5)
@@ -217,11 +218,11 @@ _TEXT_GAP = 0.0025  # a text's clearance from the line it sits beside
 # Half text widths (sheet m, measured on the r2 sheet's 3.5 mm text).
 _SLOT_WIDTH_TEXT_HALF = 0.017  # "2X 13.50 THRU", 13 glyphs at r4's 2.6
 _NEAR_SLOT_X_TEXT_HALF = 0.0045  # "20.9"
-_SLOT_RUN_TEXT_HALF = 0.008  # "2X 6.00"
-_FAR_RISE_TEXT_HALF = 0.0055  # "123.4": the r6 sheet's "23.0" was 8.8 wide
+_SLOT_RUN_TEXT_HALF = 0.008  # "2X 4.00"
+_FAR_RISE_TEXT_HALF = 0.0055  # "124.4": the r6 sheet's "23.0" was 8.8 wide
 # "FOR HGR15R RAIL", its widest line (15 glyphs): 38.8 wide on the r4 sheet.
 _RAIL_ROW_TEXT_HALF = 0.0195
-_BAR_WIDTH_TEXT_HALF = 0.0074  # "152.4" over "STOCK": 14.8 wide on r4
+_BAR_WIDTH_TEXT_HALF = 0.0074  # "139.7" over "STOCK": 14.8 wide on r4 ("152.4")
 _BRACKET_NEAR_X_TEXT_HALF = 0.0066  # "57.000"
 _BRACKET_ROW_TEXT_HALF = 0.0070  # "61.400": 13.9 wide on the c4-r9 sheet
 _BRACKET_OUTER_TEXT_BELOW = 0.004  # "6.400"'s centre under the bar's -Y edge

@@ -30,7 +30,7 @@ round) must stay outside pivot block 1's side (lateral 20 ⚙), which runs
 between the two blocks; the 25.4-high bracket lifts the axis to 53.1.
 The handwheel grip sweeps to Z74.6, below the carrier underside at Z80.2.
 Each bracket stands wholly on bar 1 (the user's 2026-10-17 ruling A′: the
-bar widened to 1/2 x 6, its column-side edge at lateral 88.9 ⚙), its outer
+bar widened, now 1/2 x 5-1/2, its column-side edge at lateral 88.9 ⚙), its outer
 end flush with that edge, on 4 x #8 screws in one row: two pairs symmetric
 about the screw axis, the inner at ±11, the outer at ±27.5, the round
 half-span inside the rule-17 window (below) between the #8 tap's wall to the
