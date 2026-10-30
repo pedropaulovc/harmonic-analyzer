@@ -3,11 +3,11 @@
 One file per session at a machine: `YYYY-MM-DD-<slug>.md`, from
 [`TEMPLATE.md`](TEMPLATE.md).
 
-**These are written by the person who did the work, at the machine or straight
-after.** An agent may create the file from the template and tidy formatting
-afterwards; it may not write the observations. Every feed, speed, measurement
-and failure in the book traces back to an entry here, so a fabricated entry
-would poison the whole book.
+**Every observation comes from the person who did the work.** They write the
+entry, or hand an agent their session notes; the agent interviews them and
+writes it up (see [`../AGENTS.md`](../AGENTS.md#writing-an-entry)). Every feed,
+speed, measurement and failure in the book traces back to an entry here, so a
+fabricated observation would poison the whole book.
 
 ## What makes an entry useful later
 

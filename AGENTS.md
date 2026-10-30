@@ -56,8 +56,10 @@ credibility rests on:
    manufacturing tradeoffs called out where known; never ask an unillustrated
    geometry question.
 3. **The logbook is the source of truth for process.** No machining operation is
-   written up in the book that hasn't been performed and logged. An agent may
-   never author a logbook entry.
+   written up in the book that hasn't been performed and logged. Agents write
+   entries from the user's own session notes after interviewing the user (see
+   [`logbook/AGENTS.md`](logbook/AGENTS.md)); every observation and number in
+   an entry comes from the user.
 4. **Nothing from the 2014 Hammack/Kranz/Carpenter book goes into a commercial
    product.** It is free for *non-commercial* use; the book and the campaign are
    commercial. See `kickstarter/campaign/risks.md`.
