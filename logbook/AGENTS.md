@@ -13,19 +13,44 @@ A machining curriculum and its practice log. Prose only.
   citation attached**.
 - Derive which parts a module unlocks from `cad/scripts/build_*.py`,
   `cad/config/parts/*.yaml` and `cad/docs/machining-dfm.md`.
-- Tidy, format and cross-link entries the user has written.
+- Write log entries from the user's session notes, following the workflow
+  below.
+- Tidy, format and cross-link entries.
 - Update `progress.md` and `SKILLS.md` from what the entries actually say.
 
 **May not:**
-- **Write a log entry.** `entries/` records what the user did at a real
-  machine. An agent-written entry is a fabricated observation, and the book is
-  built on these. Create the file from the template, leave it empty.
-- **Invent a number.** Any speed, feed, DOC or measured value in an entry comes
-  from the bench. In a *curriculum* module a starting value may be quoted from
-  a reference — cite it, and mark it as a starting point, not a result.
+- **Invent a number or an observation.** Every speed, feed, DOC, measured
+  value, duration and event in an entry comes from the user. If a value is
+  unknown, the entry says so; it is never filled in from a reference or a
+  calculation. In a *curriculum* module a starting value may be quoted from a
+  reference — cite it, and mark it as a starting point, not a result.
 - **Mark a module complete.** Competency is the user's call, made at the
   machine.
-- Soften a failure. If an entry says the part was scrapped, it stays scrapped.
+- Soften a failure. If the user says the part was scrapped, it stays scrapped.
+
+## Writing an entry
+
+The user hands over a session as bullet points or loosely organized notes.
+
+1. **Interview.** Before drafting, ask the clarifying questions a curious
+   novice hobby machinist would ask on hearing the story: why that approach,
+   what went wrong and how they noticed, how they fixed it, what it felt like,
+   what they'd do differently, and the numbers a reader would want (RPM, feed,
+   DOC, sizes, readings, time spent). Batch them in one round, grouped by
+   topic. Ask about the gaps a reader would trip on, not everything at once.
+   Resolve shorthand, tool names and part names rather than guessing them.
+2. **Draft** from [`entries/TEMPLATE.md`](entries/TEMPLATE.md) as
+   `entries/YYYY-MM-DD-<slug>.md`, dated the day of the session. Write in the
+   user's first person and keep their voice; the "What happened" narrative
+   carries the story, including false starts. Leave a template section out
+   or mark a value `not recorded` rather than padding it.
+3. **Cross-check** part names, stock and equipment against the CAD registry
+   and `cad/process/shop/inventory.toml`, and link the part, module, and any
+   PR or issue the session produced. Where the notes and the repository
+   disagree, ask; don't silently correct either.
+4. **Publish.** Update the entry index in `entries/README.md` and the
+   `progress.md` roll-up, then commit and open a PR under the ordinary git
+   workflow.
 
 ## Curriculum module format
 
