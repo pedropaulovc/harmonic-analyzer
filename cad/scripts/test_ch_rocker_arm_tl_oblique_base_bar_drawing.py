@@ -13,19 +13,26 @@ import ch_rocker_arm_tl_oblique_base_bar_spec as spec
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_base_bar as drawing
+from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm
+from _surface_finish import SEAT_UM
 
 BUILD = Path(drawing.__file__).with_name("build_ch_rocker_arm_tl_oblique_base_bar.py")
 
 
-def test_stock_is_the_calculators_flat_bar() -> None:
+def test_stock_is_the_calculators_flat_bar_faced_to_thickness() -> None:
     assert (spec.BAR_THICK, spec.BAR_WIDTH, spec.BAR_LENGTH) == (
         trammel.BASE_BAR_THICK,
         trammel.BASE_BAR_WIDTH,
         trammel.BASE_BAR_LENGTH,
     )
-    assert spec.BAR_THICK == pytest.approx(12.7)
+    # Owner ruling 2026-10-30 (option A): both large faces faced from the
+    # 1/2 in bar to 12.0, the carrier's .X convention; the width stays stock.
+    assert trammel.BASE_BAR_STOCK_THICK == pytest.approx(12.7)
+    assert spec.BAR_THICK == 12.0 < trammel.BASE_BAR_STOCK_THICK
+    assert spec.THICK_PLACES == trammel.BASE_BAR_THICK_PLACES == 1
+    assert trammel.BASE_BAR_THICK_BAND == printed_band_mm(1)
     assert spec.BAR_WIDTH == pytest.approx(139.7)
     assert spec.BAR_LENGTH == 440.0
     # The 2026-10-30 ruling: 1/2 x 5-1/2 (vise fit) with the column-side edge
@@ -128,12 +135,14 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     assert set(drawing.CALLOUTS_BELOW) <= marked
 
 
-def test_stock_sizes_say_stock_and_nothing_prints_as_reference() -> None:
-    assert spec.STOCK_DIMENSIONS == {"BarWidth", "BarThick"}
+def test_stock_width_says_stock_and_nothing_prints_as_reference() -> None:
+    assert spec.STOCK_DIMENSIONS == {"BarWidth"}
     for name in spec.STOCK_DIMENSIONS:
         assert drawing.CALLOUTS_BELOW[name] == "STOCK"
+    # The faced thickness takes the title block's .X band, never STOCK.
+    assert "BarThick" not in drawing.CALLOUTS_BELOW
     assert spec.DRAWING_PRECISION_BY_NAME["BarWidth"] == 1  # 139.7 STOCK
-    assert spec.DRAWING_PRECISION_BY_NAME["BarThick"] == 2  # 12.70 STOCK
+    assert spec.DRAWING_PRECISION_BY_NAME["BarThick"] == 1  # 12.0
     assert not hasattr(spec, "REFERENCE_DIMENSIONS")
     assert not any("(" in prefix for prefix, _ in drawing.DIMENSION_TEXT.values())
     assert spec.DRAWING_NOTES == ""
@@ -306,7 +315,7 @@ def test_short_span_texts_print_beside_their_spans() -> None:
     )
     assert rise_x > run_text_right
     # 3 of air to the end view: moving the view right instead would push the
-    # 12.70 STOCK text, 2.6 inside the right border on the r9 sheet, over it.
+    # thickness text, 2.6 inside the right border on the r9 sheet, over it.
     assert (
         rise_x + drawing._FAR_RISE_TEXT_HALF + 0.003
         <= drawing.END_CENTER[0] - spec.BAR_THICK / 4000
@@ -398,10 +407,11 @@ def test_bracket_counterbores_sink_and_seat_the_heads() -> None:
     assert spec.BRACKET_HEAD_RECESS_MIN == pytest.approx(0.124, abs=1e-3)
     assert spec.BRACKET_HEAD_CLEARANCE_MIN == pytest.approx(0.572, abs=1e-3)
     assert spec.BRACKET_HEAD_BEARING_MIN == pytest.approx(0.89, abs=1e-3)
-    assert spec.BRACKET_CBORE_FLOOR_MIN == pytest.approx(6.88, abs=1e-3)
-    # Rule 18: a #8-32 x 5/8 reaches 1.5 D into TL-28 at the printed worst.
+    assert spec.BRACKET_CBORE_FLOOR_MIN == pytest.approx(5.89, abs=1e-3)
+    # Rule 18: a #8-32 x 5/8 reaches 1.5 D into TL-28 at the printed worst
+    # (the faced 12.0 bar at its .X band).
     low, high = spec.bracket_screw_under_head(0.625 * 25.4)
-    assert (low, high) == pytest.approx((6.955, 8.995), abs=1e-3)
+    assert (low, high) == pytest.approx((7.365, 9.985), abs=1e-3)
     assert low >= 1.5 * THREAD_MAJOR_MM[leadscrew.BAR_SCREW]
 
 
@@ -541,6 +551,45 @@ def test_places_are_model_authored_and_the_sheet_is_pure() -> None:
 def test_notes_follow_the_simplicity_policy() -> None:
     assert not re.search(r"\d", spec.DRAWING_NOTES)
     assert "REFERENCE" not in spec.DRAWING_NOTES
+    assert not re.search(r"\d", spec.SEAT_FINISH_REASON)
+
+
+def test_both_faced_seats_carry_the_part_owned_seat_finish() -> None:
+    """Owner ruling 2026-10-30: both large faces are static locating seats
+    (rule 6, Ra 3.2), the table under one bar and the rail on the other, so
+    the part owns both controls, authors them on the model and the sheet
+    places each from its control, under the one reason."""
+    by_key = {control.key: control for control in spec.SURFACE_FINISHES}
+    assert set(by_key) == {"top_seat", "underside_seat"}
+    assert all(control.roughness_um == SEAT_UM for control in by_key.values())
+    assert by_key["top_seat"].face == PlanarFace((0.0, 0.0, 1.0), spec.BAR_THICK)
+    assert by_key["underside_seat"].face == PlanarFace((0.0, 0.0, -1.0), 0.0)
+    build = "".join(BUILD.read_text(encoding="utf-8").split())
+    assert "author_part_pmi(adapter,surface_finishes=SURFACE_FINISHES)" in build
+    assert build.index("author_part_pmi(") < build.index("save_part_and_images(")
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert sheet.count("add_surface_finish(") == 1  # one loop over both seats
+    assert "surface_finish_by_key(SURFACE_FINISHES, key)" in sheet
+    assert "roughness_ra=" not in sheet
+    assert spec.SEAT_FINISH_REASON == "TABLE AND RAIL SEATS"
+
+
+def test_seat_symbols_stand_above_the_end_view_outboard_of_their_edges() -> None:
+    top_x, top_y = drawing.TOP_SEAT_FINISH_XY
+    under_x, under_y = drawing.UNDERSIDE_SEAT_FINISH_XY
+    half_thick = spec.BAR_THICK * drawing._S / 2000.0
+    # The *Right view puts model +Z (the top) at the sheet's left.
+    assert top_x < drawing.END_CENTER[0] - half_thick
+    assert under_x > drawing.END_CENTER[0] + half_thick
+    end_top = drawing.END_CENTER[1] + drawing._HALF_W_SHEET
+    assert min(top_y, under_y) > end_top
+    # Clear of the far rise's dimension line and under the reason, which
+    # stays under the tap callout's block and inside the right border.
+    assert top_x > drawing._RIGHT + drawing._FAR_RISE_LANE
+    reason_x, reason_y = drawing.SEAT_REASON_XY
+    assert reason_y - 0.0035 > max(top_y, under_y)
+    assert reason_y + 0.002 <= drawing.TAP_CALLOUT_XY[1] - 0.0048
+    assert reason_x + 2 * drawing._SEAT_REASON_HALF <= 0.4191 - 0.005
 
 
 def test_isometric_is_in_the_hidden_lines_removed_loop() -> None:

@@ -176,13 +176,13 @@ def test_pivot_blocks_and_screws_sit_on_the_pin_stations() -> None:
     for rail, (origin, rows), screw in zip(
         spec.RAILS, spec.BLOCK_PLACEMENTS, spec.PIVOT_SCREW_ORIGINS, strict=True,
     ):
-        assert origin[2] == pytest.approx(40.7)
+        assert origin[2] == pytest.approx(40.0)  # the faced 12.0 bar + 28.0
         bore = _image(rows, origin, (pivot_block.BORE_X, 0.0, 0.0))
         assert bore[:2] == pytest.approx(trammel.rail_point(rail, spec.PIN_STATION))
         assert screw[:2] == pytest.approx(bore[:2])
-        assert screw[2] == pytest.approx(58.15)
-    assert trammel.CARRIER_UNDERSIDE_Z == pytest.approx(81.0)
-    assert trammel.CARRIER_TOP_Z == pytest.approx(93.0)
+        assert screw[2] == pytest.approx(57.45)
+    assert trammel.CARRIER_UNDERSIDE_Z == pytest.approx(80.3)
+    assert trammel.CARRIER_TOP_Z == pytest.approx(92.3)
 
 
 def test_carrier_riser_hub_pin_and_lever_close_on_the_carrier_frame() -> None:
@@ -1172,7 +1172,7 @@ def test_sweep_table_edge_margins(report) -> None:
 # the screw stops inside the part (THRU tap) or short of the full thread
 # (blind tap). Engagement is never more than the receiving thread's depth.
 FASTENER_TABLE = {
-    "RAIL_TO_BAR": ("#8-32 X 3/4 SHCS", 14, 9.35, -3.35),
+    "RAIL_TO_BAR": ("#8-32 X 3/4 SHCS", 14, 9.35, -2.65),  # tip 2.65 short of the faced bar's underside
     "BRACKET_TO_BAR": (
         f"{leadscrew.BAR_SCREW} X {leadscrew.BAR_SCREW_LENGTH} SHCS", 8,
         leadscrew.BAR_SCREW_ENGAGEMENT,
@@ -1281,7 +1281,7 @@ def test_bracket_bar_screws_sit_in_their_rule_17_window() -> None:
 
 def test_bracket_load_cases_hold_the_hand_abuse_thrust() -> None:
     # LOAD_CASES: 4 x #8 at 25 in-lbf on the 12.7-wide on-edge bracket, the
-    # thrust at the raised axis Z53.1. Slip holds 1.5 x both the 1 kN
+    # thrust at the raised axis Z52.4. Slip holds 1.5 x both the 1 kN
     # hand-abuse thrust and the 70 N-pull feed thrust; the heel may lift
     # elastically above the opening onset (owner ruling 2026-10-27).
     assert leadscrew.BAR_SCREW_TORQUE_NM == 2.8
@@ -1398,13 +1398,13 @@ def test_shoulder_pivot_axial_stack_and_thread_engagement() -> None:
         # The pack stacks face to face from the block top up to the spacer.
         for k, (shim, _shim_rows) in enumerate(shims):
             assert shim[:2] == pytest.approx(screw[:2])
-            assert shim[2] == pytest.approx(65.0 + k * pivot_shim.THICKNESS)
+            assert shim[2] == pytest.approx(64.3 + k * pivot_shim.THICKNESS)
         assert spacer[:2] == pytest.approx(screw[:2])
         assert spacer[2] == pytest.approx(shims[-1][0][2] + pivot_shim.THICKNESS)
         assert spacer[2] + pivot_spacer.LENGTH == pytest.approx(trammel.CARRIER_UNDERSIDE_Z)
         head_bottom = screw[2] + pivot_screw.SHOULDER_LENGTH
         assert head_bottom - trammel.CARRIER_TOP_Z == pytest.approx(0.15)
-        assert head_bottom + pivot_screw.HEAD_HEIGHT == pytest.approx(97.65)
+        assert head_bottom + pivot_screw.HEAD_HEIGHT == pytest.approx(96.95)
         assert pivot_screw.HEAD_DIA > carrier.PIN_HOLE_DIA
     assert spec.lock_parent(spec.FEED_BLOCK, 0) == spec.instance_name(spec.CARRIAGE, 0)
     assert spec.lock_parent(spec.PIVOT_BLOCK, 0) == spec.instance_name(spec.CARRIAGE, 1)

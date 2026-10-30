@@ -85,9 +85,10 @@ retain their complete mate identifiers.
 
 The owner-approved 2026-10-23 simplification replaces the captured bearing
 cartridges with purchased shoulder screws, spacers and selected DIN 988 shims.
-The carrier sits at nominal underside Z81.0 (owner ruling 2026-10-27: the
-6.85 shoulder seat leaves the unshimmed gap open at every loose band, and a
-nominal five 0.2 shims a support close it). Positive lift capture runs
+The carrier sits at nominal underside Z80.3 on the TL-20 base bars faced to
+12.0 (owner rulings 2026-10-27: the 6.85 shoulder seat leaves the unshimmed
+gap open at every loose band, and a nominal five 0.2 shims a support close
+it; 2026-10-30: face both large faces of each bar). Positive lift capture runs
 carrier → shoulder-screw head → M8 thread → block → carriage, not through a
 bearing or press fit. Fit the measured head-to-carrier running gap to
 0.05–0.25 mm using the purchased shim stock. The assembly owns the full
@@ -98,7 +99,7 @@ integral feed block `ch-rocker-arm-tl-oblique-feed-block`, MHA-CH-06-TL-32,
 whose spec owns the nut layout. Drill its nut taps to print, not by transfer
 spotting. Both blocks use new 6061 1 × 3-1/2 in bar; TL-28 end brackets use
 owned OnlineMetals 1165 1/2 × 1 in bar on edge, raising the screw axis to
-Z53.1. The owned 1164 1/2 × 3/4 in stock is spare.
+Z52.4. The owned 1164 1/2 × 3/4 in stock is spare.
 
 New purchases are TL-VN-77 shoulder screws (90323A492), TL-VN-78 spacers
 (92871A359), TL-VN-79 shims (98055A118 nominal; 98055A117/98055A121 fitting

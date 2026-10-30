@@ -37,7 +37,8 @@ def _conditional_calibration(**changes):
     """Contract's conditional comparison, with invented-fixture lower spans explicit."""
     values = {
         "finished_length": I(57.2 - 0.8, 57.2 + 0.8),
-        "base_bar_thickness": I(12.7 - 0.51, 12.7 + 0.51),
+        # The faced TL-20 bar's printed 12.0 at the title block's .X band.
+        "base_bar_thickness": I(12.0 - 0.8, 12.0 + 0.8),
         "moving_block_height": I(28.0, 28.0),
         "lower_insertion": I(22.0, 22.0),
         "original_lower_insertion": I(22.0, 22.0),
@@ -213,17 +214,17 @@ def test_feature_selector_distinguishes_actual_cut_end_from_factory_chamfer() ->
 
 def test_conditional_full_finished_band_passes_but_old_stock_band_fails() -> None:
     result = spec.measured_fit_bounds(**_conditional_calibration())
-    assert result.clearance_min_mm == pytest.approx(4.19)
-    assert result.complete_projection_min_mm == pytest.approx(2.69)
+    assert result.clearance_min_mm == pytest.approx(3.2)
+    assert result.complete_projection_min_mm == pytest.approx(3.1)
     assert result.required_projection_mm == pytest.approx(25.4 / 13)
     assert result.full_actual_nut_span_retained and result.lower_loaded_interval_retained
     assert result.insertion_unchanged and result.acceptable
     old = spec.measured_fit_bounds(**_conditional_calibration(finished_length=I(76.2 - 0.8, 76.2 + 0.8)))
-    assert old.clearance_min_mm == pytest.approx(-14.81)
+    assert old.clearance_min_mm == pytest.approx(-15.8)
     assert not old.acceptable
     # A nominal-only height that happens to pass cannot certify its wider band.
-    nominal = spec.measured_fit_bounds(**_conditional_calibration(moving_block_height=I(26.1, 26.1), finished_length=I(57.2, 57.2)))
-    actual = spec.measured_fit_bounds(**_conditional_calibration(moving_block_height=I(26.1, 26.1)))
+    nominal = spec.measured_fit_bounds(**_conditional_calibration(moving_block_height=I(27.1, 27.1), finished_length=I(57.2, 57.2)))
+    actual = spec.measured_fit_bounds(**_conditional_calibration(moving_block_height=I(27.1, 27.1)))
     assert nominal.acceptable and not actual.acceptable
 
 
@@ -252,10 +253,10 @@ def test_complete_pitch_projection_boundary_on_both_sides(delta, accepted) -> No
 
 
 @pytest.mark.parametrize("change", [
-    {"nut_span": I(18.5, 18.5)},
-    {"washer_stack": I(0.8, 0.8)},
+    {"nut_span": I(19.5, 19.5)},
+    {"washer_stack": I(1.5, 1.5)},
     {"base_bar_thickness": I(13.7 - 0.51, 13.7 + 0.51)},
-    {"upper_thread_setback": I(0.0, 2.0)},
+    {"upper_thread_setback": I(0.0, 2.5)},
 ])
 def test_actual_nut_washer_anchor_stack_and_complete_thread_setback_change_the_bound(change) -> None:
     result = spec.measured_fit_bounds(**_conditional_calibration(**change))
@@ -265,7 +266,7 @@ def test_actual_nut_washer_anchor_stack_and_complete_thread_setback_change_the_b
 
 
 def test_deeper_insertion_cannot_rescue_a_failed_clearance() -> None:
-    values = _conditional_calibration(moving_block_height=I(26.5, 26.5))
+    values = _conditional_calibration(moving_block_height=I(27.5, 27.5))
     assert not spec.measured_fit_bounds(**values).acceptable
     values["lower_insertion"] = I(22.5, 22.5)
     result = spec.measured_fit_bounds(**values)

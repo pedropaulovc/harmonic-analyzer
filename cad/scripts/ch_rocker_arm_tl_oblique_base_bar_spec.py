@@ -12,14 +12,21 @@ matter; the only tight bands are the rail holes' end distance and pitch
 (below).
 
 Material and stock: 6061-T6511 aluminium flat bar, 1/2 x 5-1/2 in (OnlineMetals
-17666; ⚙ ``BASE_BAR_THICK`` 12.7 x ⚙ ``BASE_BAR_WIDTH`` 139.7), sawn and faced
-to ⚙ ``BASE_BAR_LENGTH`` 440 (the rail's length; rail and bar are flush).
-Width and thickness are left as supplied and print "STOCK". Overall stock size
-440 x 139.7 x 12.7. The user's 2026-10-17 ruling (a) widened the bar from
-1/2 x 4 to 1/2 x 6 so the leadscrew's TL-28 end brackets (PR C4) stand wholly
-on bar 1; the 2026-10-30 ruling narrowed it to 1/2 x 5-1/2, the widest listed
-OnlineMetals bar that fits the 6 in vise's stock hard jaws (5 3/4 in), keeping
-the column-side edge and so the brackets.
+17666; ⚙ ``BASE_BAR_STOCK_THICK`` 12.7 x ⚙ ``BASE_BAR_WIDTH`` 139.7), sawn and
+faced to ⚙ ``BASE_BAR_LENGTH`` 440 (the rail's length; rail and bar are flush).
+The width is left as supplied and prints "STOCK". Both large faces are faced
+to ⚙ ``BASE_BAR_THICK`` 12.0 (owner ruling 2026-10-30, option A), printed at
+.X and held by the title block's band like the TL-21 carrier: each is a
+static locating seat, so each carries Ra 3.2 (rule 6, ``SURFACE_FINISHES``).
+Bar 1's underside sits on the mill table and its top carries the rail and the
+TL-28 brackets; bar 2, turned over, uses them the other way round. Facing
+takes about 0.35 a face; the PM-30MV's 23 in X and 8.75 in Y travel cover the
+440 x 139.7 face, gripped across the 139.7 in the 146.05 vise opening.
+Overall finished size 440 x 139.7 x 12.0. The user's 2026-10-17 ruling (a)
+widened the bar from 1/2 x 4 to 1/2 x 6 so the leadscrew's TL-28 end brackets
+(PR C4) stand wholly on bar 1; the 2026-10-30 ruling narrowed it to
+1/2 x 5-1/2, the widest listed OnlineMetals bar that fits the 6 in vise's
+stock hard jaws (5 3/4 in), keeping the column-side edge and so the brackets.
 
 Frame: origin at the bar's spindle-end face, on the rail axis, on the bottom
 face; +X along the bar away from the spindle, +Y across it, +Z up
@@ -28,7 +35,7 @@ face; +X along the bar away from the spindle, +Y across it, +Z up
 ⚙ ``BASE_BAR_COLUMN_EDGE`` (lateral +88.9) is the -Y side and the
 operator-side edge ⚙ ``BASE_BAR_OPERATOR_EDGE`` (lateral -50.8) the +Y side:
 the bar spans x 0 .. 440, y ``LOW_SIDE_Y`` -88.9 .. ``HIGH_SIDE_Y`` 50.8,
-z 0 .. 12.7.
+z 0 .. 12.0.
 
 Rail holes: 7 x #8-32 UNC tapped THRU on the rail axis (y 0) at x = ⚙
 ``RAIL_HOLE_END`` + k * ⚙ ``RAIL_HOLE_PITCH`` (40 .. 400). The rail is a
@@ -100,7 +107,7 @@ screws' 0.406 float, so the callout names the mate. Worst-case walls
 (``bracket_hole_walls``): counterbore to the -Y edge 2.05 (the rule-17
 target, which bounds the outer screws' half-span), to the far end 6.85, to its
 row neighbour 7.68, to the nearest rail tap and hold-down slot over 20;
-counterbore floor 6.88.
+counterbore floor 5.89.
 """
 
 from __future__ import annotations
@@ -108,13 +115,15 @@ from __future__ import annotations
 import math
 
 
+from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _surface_finish import SEAT_UM, SurfaceFinishControl
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 
 INCH = 25.4
 
-BAR_THICK = trammel.BASE_BAR_THICK  # ⚙ 12.7
+BAR_THICK = trammel.BASE_BAR_THICK  # ⚙ 12.0, faced
 BAR_WIDTH = trammel.BASE_BAR_WIDTH  # ⚙ 139.7
 BAR_LENGTH = trammel.BASE_BAR_LENGTH  # ⚙ 440
 # The two long sides in the rail-1 part frame (y = -lateral): the rail sits
@@ -183,7 +192,8 @@ FAR_SLOT_RISE = slot_rise(FAR_SLOT_Y)  # 124.4, from the -Y side too
 # --- Printed places and rule-17 walls -------------------------------------------
 STATION_PLACES = 1  # bar length, width and slot stations: the title block's .X band
 SLOT_PLACES = 2  # slot width and run: the .XX band
-THICK_PLACES = 2  # the 1/2 in stock thickness prints 12.70 (the feed lever's)
+# The faced thickness prints 12.0 at .X (the carrier's convention).
+THICK_PLACES = trammel.BASE_BAR_THICK_PLACES
 _X = printed_band_mm(STATION_PLACES)
 _XX = printed_band_mm(SLOT_PLACES)
 # The narrowest printed slot still passes the 1/2 in stud.
@@ -349,8 +359,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BracketHoles": {"BracketHole1X", "BracketHole5X"},
     "BracketRowReference": {f"BracketRow{k}Y" for k in range(1, 5)},
 }
-# The bar's width and thickness are the flat bar as bought: "STOCK" under them.
-STOCK_DIMENSIONS = frozenset({"BarWidth", "BarThick"})
+# The bar's width is the flat bar as bought: "STOCK" under it. The thickness
+# is faced (owner ruling 2026-10-30) and takes the title block's .X band.
+STOCK_DIMENSIONS = frozenset({"BarWidth"})
 # The rail holes' stations carry the one tight band (the rail's pitch); the
 # row's height takes the title block's (c3-r7): (feature, dimension) ->
 # symmetric band.
@@ -382,8 +393,17 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked base bar dimension needs authored places")
 
-SURFACE_FINISHES = ()
-# No general note: the stock sizes say STOCK and the rail holes' mate rides
-# their callout.
+# Both large faces are static locating seats (rule 6, Ra 3.2): bar 1's
+# underside on the mill table and its top under the rail and the TL-28
+# brackets; bar 2, the same part turned over, the other way round.
+SURFACE_FINISHES = (
+    SurfaceFinishControl("top_seat", SEAT_UM, PlanarFace((0.0, 0.0, 1.0), BAR_THICK)),
+    SurfaceFinishControl("underside_seat", SEAT_UM, PlanarFace((0.0, 0.0, -1.0), 0.0)),
+)
+# Why both faces carry a seat finish: each seats on the table or under the
+# rail, depending on the bar (rule 7: say why, beside the symbols).
+SEAT_FINISH_REASON = "TABLE AND RAIL SEATS"
+# No general note: the stock width says STOCK, the seats' reason rides their
+# symbols and the rail holes' mate rides their callout.
 DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:5"
