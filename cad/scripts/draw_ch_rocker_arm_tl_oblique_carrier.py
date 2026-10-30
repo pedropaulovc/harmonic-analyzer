@@ -999,7 +999,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Oblique Trammel Carrier Plate Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker oblique trammel carrier plate; 6061-T651; MHA-CH-06-TL-21",
+            3: "rocker oblique trammel carrier plate; 6061-T6511; MHA-CH-06-TL-21",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

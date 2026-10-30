@@ -122,7 +122,7 @@ from ch_rocker_arm_tl_oblique_carrier_spec import (
 )
 
 PART_NAME = "ch-rocker-arm-tl-oblique-carrier"
-# The registry row prints 6061-T651 aluminium plate.
+# The registry row prints 6061-T6511 aluminium (the owned 1/2 x 6 bar).
 MATERIAL = "6061 Alloy"
 _SAVED_DRAWING_PROPERTIES = (
     "Number",

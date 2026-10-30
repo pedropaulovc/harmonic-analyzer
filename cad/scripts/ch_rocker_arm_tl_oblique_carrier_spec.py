@@ -9,9 +9,11 @@ The rocker blank, on its riser (MHA-CH-06-TL-24), is located on the HUB pin
 (MHA-CH-06-TL-VN-80) and the CL dowel and clamped by the CR screw; the feed
 lever (MHA-CH-06-TL-26) bolts to the -Y edge.
 
-Material and stock: 1/2 in 6061-T651 aluminium plate, OnlineMetals #1250
-custom cut 5.5 x 21 in; faced to 12.0 (``CARRIER_THICK``) and milled to
-520 x 130. Finished thickness takes the .X title-block band, not STOCK.
+Material and stock: 1/2 x 6 in 6061-T6511 aluminium bar, the owned OnlineMetals
+1173 (shop inventory); sawn to length and ripped to about 135 wide, since the
+6 in width does not fit the 5 3/4 in vise jaws, then faced to 12.0
+(``CARRIER_THICK``) and milled to 520 x 130. Finished thickness takes the .X
+title-block band, not STOCK.
 
 Frame (the calculator's carrier frame, and the model frame): origin at the
 midpoint of A1-B1; +X runs A1 -> B1, +Y points toward the part, Z0 is the
