@@ -234,13 +234,26 @@ def test_hold_down_studs_land_on_t_slots_inside_the_table() -> None:
     assert middle - trammel.STUD_Y[1] == pytest.approx(trammel.TSLOT_PITCH)
 
 
-def test_base_bar_is_half_by_six_with_its_column_edge_three_and_a_half_out() -> None:
-    """The user's 2026-10-17 ruling (a): 1/2 x 6 bar, the column-side edge
-    at lateral +88.9 so the TL-28 brackets stand on bar 1; the rail sits off
-    the bar's centreline and both hold-down studs stay on the bar."""
-    assert trammel.BASE_BAR_WIDTH == pytest.approx(152.4)
+def test_base_bar_stock_fits_the_vise_with_its_column_edge_three_and_a_half_out() -> (
+    None
+):
+    """The 2026-10-30 ruling: the bar's stock width (left as supplied) fits the
+    6 in vise's stock hard jaws, and the ordered stock row supplies it. The
+    column-side edge stays at lateral +88.9 (2026-10-17 ruling a) so the TL-28
+    brackets stand on bar 1; both hold-down studs stay on the bar."""
+    inventory = tomllib.loads(
+        (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_bytes().decode()
+    )
+    vise_opening = inventory["fixtures"]["vise-pm-6"]["opening_in"]["value"] * 25.4
+    assert trammel.BASE_BAR_WIDTH <= vise_opening
+    (stock,) = [
+        row for row in inventory["stock"] if "OnlineMetals 17666" in row.get("note", "")
+    ]
+    assert stock["section_mm"] == pytest.approx(
+        [trammel.BASE_BAR_WIDTH, trammel.BASE_BAR_THICK]
+    )
+    assert stock["length_mm"] >= 2 * trammel.BASE_BAR_LENGTH
     assert trammel.BASE_BAR_COLUMN_EDGE == pytest.approx(88.9)
-    assert trammel.BASE_BAR_OPERATOR_EDGE == pytest.approx(-63.5)
     assert (
         trammel.BASE_BAR_COLUMN_EDGE - trammel.BASE_BAR_OPERATOR_EDGE
         == pytest.approx(trammel.BASE_BAR_WIDTH)

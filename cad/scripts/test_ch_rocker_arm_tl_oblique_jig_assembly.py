@@ -1001,11 +1001,11 @@ def test_sweep_extents_and_rail_margins(report) -> None:
                     px, py = pose.to_machine((x, y))
                     assert report.moving_x[0] <= px <= report.moving_x[1]
                     assert report.moving_y[0] <= py <= report.moving_y[1]
-    # The 2026-10-17 widening (1/2 x 6, column-side edge at lateral +88.9):
-    # the far column-side corners set X, the near column-side corners the
-    # top of Y.
+    # The 2026-10-17 widening (column-side edge at lateral +88.9), narrowed to
+    # 1/2 x 5-1/2 on 2026-10-30: the far column-side corners set X, the near
+    # column-side corners the top of Y, the operator-side corners the bottom.
     assert report.fixed_x == pytest.approx((-463.04, 463.04), abs=0.01)
-    assert report.fixed_y == pytest.approx((-127.90, 85.84), abs=0.01)
+    assert report.fixed_y == pytest.approx((-115.33, 85.84), abs=0.01)
     assert report.bar_overhang == pytest.approx({1: 43.94, 2: 43.94}, abs=0.01)
     assert report.carriage_margin["inner"] == pytest.approx((61.52, 14.81), abs=0.01)
     assert report.carriage_margin["outer"] == pytest.approx((64.18, 2.93), abs=0.01)
@@ -1105,7 +1105,7 @@ def test_sweep_table_edge_margins(report) -> None:
         bar = edges[f"base bar {rail}"]
         assert bar[outer] == pytest.approx(-43.94, abs=0.01)
         assert bar[outer] == pytest.approx(-report.bar_overhang[rail])
-        assert bar["front"] == pytest.approx(8.39, abs=0.01)
+        assert bar["front"] == pytest.approx(20.96, abs=0.01)
         # The 2026-10-17 widening: each bar's near column-side corner (Y 85.84)
         # stands 12.59 past the table's back edge (Y 73.25), toward the cover.
         assert bar["back"] == pytest.approx(-12.59, abs=0.01)

@@ -26,12 +26,12 @@ def test_stock_is_the_calculators_flat_bar() -> None:
         trammel.BASE_BAR_LENGTH,
     )
     assert spec.BAR_THICK == pytest.approx(12.7)
-    assert spec.BAR_WIDTH == pytest.approx(152.4)
+    assert spec.BAR_WIDTH == pytest.approx(139.7)
     assert spec.BAR_LENGTH == 440.0
-    # The 2026-10-17 ruling (a): 1/2 x 6 with the column-side edge 3.5 in off
-    # the rail, so the rail sits off the centreline. Rail 1's part frame has
-    # y = -lateral, so the column side is the faced -Y side.
-    assert (spec.LOW_SIDE_Y, spec.HIGH_SIDE_Y) == pytest.approx((-88.9, 63.5))
+    # The 2026-10-30 ruling: 1/2 x 5-1/2 (vise fit) with the column-side edge
+    # still 3.5 in off the rail, so the rail sits off the centreline. Rail 1's
+    # part frame has y = -lateral, so the column side is the faced -Y side.
+    assert (spec.LOW_SIDE_Y, spec.HIGH_SIDE_Y) == pytest.approx((-88.9, 50.8))
     assert spec.LOW_SIDE_Y == -trammel.BASE_BAR_COLUMN_EDGE
     assert spec.HIGH_SIDE_Y == -trammel.BASE_BAR_OPERATOR_EDGE
     assert not hasattr(spec, "HALF_WIDTH")
@@ -50,12 +50,12 @@ def test_rail_screw_engagement_meets_rule_18() -> None:
 
 
 def test_slots_follow_the_brief() -> None:
-    assert spec.SLOT_LENGTH == pytest.approx(19.5)
+    assert spec.SLOT_LENGTH == pytest.approx(17.5)
     assert spec.NEAR_SLOT_X == pytest.approx(20.92, abs=0.005)
     assert spec.FAR_SLOT_X == pytest.approx(390.0)
     assert (spec.NEAR_SLOT_Y, spec.FAR_SLOT_Y) == (-37.5, 37.5)
-    assert spec.NEAR_SLOT_RISE == pytest.approx(48.4)
-    assert spec.FAR_SLOT_RISE == pytest.approx(123.4)
+    assert spec.NEAR_SLOT_RISE == pytest.approx(49.4)
+    assert spec.FAR_SLOT_RISE == pytest.approx(124.4)
     assert spec.LOW_SIDE_Y + spec.NEAR_SLOT_RISE + spec.SLOT_RUN / 2.0 == pytest.approx(
         spec.NEAR_SLOT_Y
     )
@@ -102,15 +102,16 @@ def test_walls_meet_rule_17() -> None:
     assert spec.NEAR_END_WALL == pytest.approx(14.17, abs=0.01)
     # The 2026-10-17 widening: the far slot's wall to the +Y side is the
     # thinner of the two (the rail sits nearer that side).
-    assert spec.NEAR_SIDE_WALL == pytest.approx(41.65)
-    assert spec.FAR_SIDE_WALL == pytest.approx(16.25)
+    assert spec.NEAR_SIDE_WALL == pytest.approx(42.65)
+    assert spec.FAR_SIDE_WALL == pytest.approx(4.55)
     assert spec.SIDE_WALL == spec.FAR_SIDE_WALL
     assert spec.NEAR_END_WALL_WORST >= 1.5
     # c3-r6, rule 10: both slots from the -Y side, so the far slot's wall to
     # the +Y side carries the stock width's .X band and its rise's and run's
     # .XX (c4-r2 dropped it from the +Y side when that left 1.2 on the 1/2 x 4
-    # bar): 152.4 - 0.8 - (123.4 + 0.8 + 6 + 0.51) - 7.005 on the 1/2 x 6.
-    assert spec.FAR_SIDE_WALL_WORST == pytest.approx(13.885)
+    # bar): 139.7 - 0.8 - (124.4 + 0.8 + 4 + 0.51) - 7.005 on the 1/2 x 5-1/2
+    # at the 2026-10-30 ruling's ±2 travel.
+    assert spec.FAR_SIDE_WALL_WORST == pytest.approx(2.185)
     assert spec.SIDE_WALL_WORST == spec.FAR_SIDE_WALL_WORST
     assert spec.SIDE_WALL_WORST >= 1.5
     build = BUILD.read_text(encoding="utf-8")
@@ -131,7 +132,7 @@ def test_stock_sizes_say_stock_and_nothing_prints_as_reference() -> None:
     assert spec.STOCK_DIMENSIONS == {"BarWidth", "BarThick"}
     for name in spec.STOCK_DIMENSIONS:
         assert drawing.CALLOUTS_BELOW[name] == "STOCK"
-    assert spec.DRAWING_PRECISION_BY_NAME["BarWidth"] == 1  # 152.4 STOCK
+    assert spec.DRAWING_PRECISION_BY_NAME["BarWidth"] == 1  # 139.7 STOCK
     assert spec.DRAWING_PRECISION_BY_NAME["BarThick"] == 2  # 12.70 STOCK
     assert not hasattr(spec, "REFERENCE_DIMENSIONS")
     assert not any("(" in prefix for prefix, _ in drawing.DIMENSION_TEXT.values())
@@ -142,8 +143,8 @@ def test_stock_sizes_say_stock_and_nothing_prints_as_reference() -> None:
 
 def test_slot_run_is_centre_to_centre_with_centre_marks() -> None:
     # Rule 12: slots are dimensioned to their radius centres; the marks make
-    # the 2X 6.00 read as centre-to-centre.
-    assert spec.SLOT_RUN == pytest.approx(6.0)
+    # the 2X 4.00 read as centre-to-centre.
+    assert spec.SLOT_RUN == pytest.approx(4.0)
     assert drawing.DIMENSION_TEXT["SlotRun"] == ("2X ", "")
     # r5: the slots never said THRU; the width's text says it for both.
     assert drawing.DIMENSION_TEXT["SlotWidth"] == ("2X ", " THRU")
@@ -210,10 +211,11 @@ def test_side_lanes_clear_each_other_and_the_border() -> None:
     # width's line.
     assert row_x + drawing._RAIL_ROW_TEXT_HALF <= rise_x - 0.0025
     assert row_x - drawing._RAIL_ROW_TEXT_HALF >= width_x + 0.002
-    # The row's three-line block sits inside its span (bottom edge to the
-    # row's line), above the near rise's upper extension line (the 48.4's
-    # text rides inside its own span); the stock width's text rides above the
-    # row's upper extension line.
+    # The row's three-line block sits inside its span, above the near rise's
+    # upper extension line (the 49.4's text rides inside its own span) and
+    # clear of the row's upper arrowhead (2026-10-30 machinist review: the
+    # arrowhead struck "88.90"); the stock width's text rides above the row's
+    # upper extension line.
     row_line = drawing._sheet_y(drawing.FRONT_CENTER, 0.0)
     rise_top = drawing._sheet_y(
         drawing.FRONT_CENTER, spec.LOW_SIDE_Y + spec.NEAR_SLOT_RISE
@@ -221,7 +223,7 @@ def test_side_lanes_clear_each_other_and_the_border() -> None:
     block_low = row_y - drawing._RAIL_ROW_TEXT_HALF_HIGH
     block_high = row_y + drawing._RAIL_ROW_TEXT_HALF_HIGH
     assert block_low >= rise_top + 0.0005
-    assert block_high <= row_line - 0.0015
+    assert block_high <= row_line - drawing._ROW_ARROW_LENGTH - 0.0005
     assert width_y - 0.0045 > row_line
     assert width_x - drawing._BAR_WIDTH_TEXT_HALF >= 0.0124 + 0.002
 
@@ -412,7 +414,7 @@ def test_bracket_hole_walls_meet_rule_17() -> None:
     assert {name: walls[name] for name in fixed} == pytest.approx(
         {
             "-Y edge": 2.045,
-            "+Y edge": 85.845,
+            "+Y edge": 73.145,
             "far end": 6.845,
             "neighbour counterbore": 7.682,
         },
