@@ -340,6 +340,10 @@ def main() -> int:
             row["kind"] = "directory" if stat.S_ISDIR(info.st_mode) else "file"
             row["modified_utc"] = datetime.fromtimestamp(info.st_mtime, timezone.utc).isoformat()
             canonical = path.resolve()
+            encloses_worktree = any(
+                within(Path(registration["path"]).resolve(), canonical)
+                for registration in worktrees
+            )
             encloses_checkout = any(within(p, canonical) for p in protected)
             checkout_content = any(within(canonical, p) for p in protected)
             row["protected"] = protection_uncertain or encloses_checkout or (
@@ -352,16 +356,22 @@ def main() -> int:
                 row["review"] = "protected primary checkout, content, or ancestor; not a removal candidate"
             elif row["worktrees"]:
                 row["review"] = "registered worktree; inspect Git state and active users separately"
-            elif any(within(Path(registration["path"]), path) for registration in worktrees):
+            elif encloses_worktree:
                 row["review"] = "contains a registered worktree; inspect Git state and active users separately"
-                if link:
-                    row["review"] += "; reparse point in path; Git marker not inspected"
             elif link:
                 row["review"] = "reparse point in path; Git marker not inspected; manual attribution and active-use review required"
             elif row["git_marker"]:
                 row["review"] = "Git checkout not in queried registrations; do not treat as an ordinary folder"
             else:
                 row["review"] = "manual attribution and active-use review required; not approved for deletion"
+            if row["protected"] and row["worktrees"]:
+                row["review"] += "; registered worktree; inspect Git state and active users separately"
+            elif row["protected"] and encloses_worktree:
+                row["review"] += "; contains a registered worktree; inspect Git state and active users separately"
+            if link and (row["protected"] or row["worktrees"] or encloses_worktree):
+                row["review"] += "; reparse point in path; Git marker not inspected"
+            if row["git_marker"] and not row["worktrees"] and (row["protected"] or encloses_worktree):
+                row["review"] += "; Git checkout not in queried registrations; do not treat as an ordinary folder"
             if args.measure:
                 overlap = next((p for p in measured_roots
                                 if within(canonical, p) or within(p, canonical)), None)
