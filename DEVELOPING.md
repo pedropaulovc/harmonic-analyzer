@@ -373,6 +373,13 @@ Real cancellation/reaping, the local Python protocol child, 131-KB pipe draining
 no prompt before connection and two attempts remain exercised. Separate slow-start
 and shared-overall-timeout tests still use real time.
 
+The aggregate SDK leader-timeout regression expires a real `asyncio.timeout(0)`
+inside only the fake leader's connection, cancelling a pending await. It keeps
+the ordinary attempt deadline for successful followers: a shared 200-ms budget
+also times out credential loading and staging under parallel load. The regression
+still requires leader disconnection before either follower is constructed, both
+followers to succeed, and every SDK client to disconnect.
+
 The refresh-carrier regression in `tests/test_farm_mode.py` runs a real nested
 pytest against the cache test with a private `--basetemp`, plugin autoload and
 ambient pytest arguments disabled, and global/signal OTLP endpoints explicitly
