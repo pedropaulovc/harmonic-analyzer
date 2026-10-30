@@ -230,14 +230,14 @@ _BRACKET_OUTER_TEXT_BELOW = 0.004  # "6.400"'s centre under the bar's -Y edge
 # 6.800 spanned from about 1.5 to 14.2 right of its line (c4-r2 sheet).
 _SHOULDER_TEXT_SPAN = (0.0015, 0.0142)
 _SLOT_RUN_TEXT_LOW = 0.0055  # text centre below the run's lower line
-# The row's block: three lines, about 17 tall. Since the widening the near
-# rise (48.4) carries its text inside its own span, so the block sits above
-# the rise's upper extension line, 0.8 clear as it stood off the old 10.3's
-# (r4), and under the row's line.
+# The row's block: three lines, about 17 tall. It stands above the row's
+# line, outside its span: under it, the 2026-10-30 narrowing's 49.4 rise left
+# the 88.90's upper arrowhead in the block's first line (machinist review,
+# farm run 20261030T181155138Z). The stock width's text moves under the
+# rise's upper extension line to free that corner.
 _RAIL_ROW_TEXT_HALF_HIGH = 0.0085
 _ROW_SHEET_Y = _sheet_y(FRONT_CENTER, 0.0)
-_RISE_TOP_SHEET_Y = _sheet_y(FRONT_CENTER, LOW_SIDE_Y + NEAR_SLOT_RISE)
-_RAIL_ROW_BLOCK_LOW = _RISE_TOP_SHEET_Y + 0.0008
+_RAIL_ROW_BLOCK_LOW = _ROW_SHEET_Y + 0.0015
 # Side lanes (sheet m off the plan's end). The row's text clears the near
 # rise's line by 2.5 (r4: the 10.3's outside arrow and its tail struck the
 # block's last "L"); the stock width's line clears the row's text by 2.
@@ -285,7 +285,7 @@ FRONT_KEEP = {
         for k, text_x in enumerate(_HOLE_TEXT_X, start=1)
     },
     "BarLength": (FRONT_CENTER[0], _below_line(5) + TEXT_DROP),
-    "BarWidth": (_LEFT - _BAR_WIDTH_LANE, _ROW_SHEET_Y + 0.010),
+    "BarWidth": (_LEFT - _BAR_WIDTH_LANE, _BOTTOM + 0.010),
     "RailRowY": (
         _LEFT - _RAIL_ROW_LANE,
         _RAIL_ROW_BLOCK_LOW + _RAIL_ROW_TEXT_HALF_HIGH,

@@ -211,19 +211,21 @@ def test_side_lanes_clear_each_other_and_the_border() -> None:
     # width's line.
     assert row_x + drawing._RAIL_ROW_TEXT_HALF <= rise_x - 0.0025
     assert row_x - drawing._RAIL_ROW_TEXT_HALF >= width_x + 0.002
-    # The row's three-line block sits inside its span (bottom edge to the
-    # row's line), above the near rise's upper extension line (the 48.4's
-    # text rides inside its own span); the stock width's text rides above the
-    # row's upper extension line.
+    # The row's three-line block stands above the row's line, outside its
+    # span and under the plan's top edge: inside the span the 88.90's upper
+    # arrowhead struck its first line once the 49.4 rise shrank the room
+    # (2026-10-30 machinist review). The stock width's text rides under the
+    # near rise's upper extension line, above the bottom edge.
     row_line = drawing._sheet_y(drawing.FRONT_CENTER, 0.0)
     rise_top = drawing._sheet_y(
         drawing.FRONT_CENTER, spec.LOW_SIDE_Y + spec.NEAR_SLOT_RISE
     )
     block_low = row_y - drawing._RAIL_ROW_TEXT_HALF_HIGH
     block_high = row_y + drawing._RAIL_ROW_TEXT_HALF_HIGH
-    assert block_low >= rise_top + 0.0005
-    assert block_high <= row_line - 0.0015
-    assert width_y - 0.0045 > row_line
+    assert block_low >= row_line + 0.0015
+    assert block_high <= drawing._TOP - 0.002
+    assert width_y + 0.0045 < rise_top
+    assert width_y - 0.0045 > drawing._BOTTOM
     assert width_x - drawing._BAR_WIDTH_TEXT_HALF >= 0.0124 + 0.002
 
 
