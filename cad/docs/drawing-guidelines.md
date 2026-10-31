@@ -20,9 +20,13 @@ jig the package does not tell the builder to make.
 The machine is a hobby-scale scientific instrument, not aerospace hardware.
 Parts that work with loose tolerances are the mark of a good design.
 
-Prints are drawn in millimetres on ASME sheets in third-angle projection.
-Fasteners, taps and drills are US customary (3/8, #14, 1/4-20). That mix is
-intended; a callout is defective only when its unit is genuinely ambiguous.
+Prints use decimal inches on ASME sheets in third-angle projection. During the
+package-by-package conversion, unconverted packages remain in millimetres;
+read each sheet's UNIT cell and its own title-block bands. Metric-only purchased
+product lines retain explicitly labelled millimetre reference sheets.
+Fasteners, taps and drills are US customary (3/8, #14, 1/4-20).
+Fractions are reserved for as-bought stock and supplier dimensions, shown as
+REF with the supplier's tolerance. They have no general FRACTIONS tolerance row.
 
 ## Rule 1 — No questions, nothing extra
 
@@ -45,10 +49,15 @@ two tests seem to pull apart, answer the question.
 ### Rule 2 — The title block is the general specification
 
 Units, the one-, two- and three-place linear tolerances, the angular
-tolerance, the DRILLED HOLES `+0.10 / 0` band, the edge break, the thread
+tolerance, the DRILLED HOLES band, the edge break, the thread
 class, the surface row, material and finish live in the title block and
 nowhere else. A note or callout never restates them, and a reviewer never asks
 for what the title block already says.
+
+Inch sheets use `.X ±.1`, `.XX ±.01`, `.XXX ±.005`, angular `±1°`,
+DRILLED HOLES `+.004 / 0`, edge break `R.010` or `.010` chamfer, and
+inside corners `R.040 MAX`. Unconverted millimetre sheets retain their printed
+metric grades until their package is converted.
 
 - The surface row is a process statement (`CAST/MACHINED`), not a roughness
   grade: a face with no roughness symbol may be left as cast or as machined,
@@ -73,18 +82,23 @@ A dimension with no explicit band is toleranced by its decimal places through
 the title block. A drilled hole with no band is toleranced by the DRILLED
 HOLES row.
 
-- Three places mean "hold it", two mean "routine", one means "near enough".
-  Three places on a drilled hole is a defect, and so are two places on a reamed
-  bearing bore with no band. Two places is the ordinary spelling of a drilled
-  hole (`Øn.nn DRILL THRU`), a tap or tap-drill depth and a routine location;
-  it is never over-specification by itself.
-- Noncritical overall sizes generally need one place (`.X`). Chamfers, edge
-  breaks and clearance holes never need extra places.
-- A dimension that carries its own band (`Øn.nn +0.03/0`, or stacked limits
-  such as `n.nn` over `0.0/-0.5`) is toleranced by that band. Its decimal
-  places are only the number's spelling: never ask it to grow or drop a place,
-  and never round it, which moves its limits.
-- A three-place size with no band and no stated function is
+- On inch sheets, three places mean `.XXX ±.005`, two mean `.XX ±.01`,
+  and one means `.X ±.1`. Use `.X` only for non-functional features such as
+  profiles, chamfers and unmated overall lengths. A feature used by a stack,
+  wall or fit check needs `.XX` or tighter.
+- Inch drill diameters, including native Hole Wizard callouts, use three
+  decimal places. Their tolerance still comes from DRILLED HOLES, not the
+  three-place linear grade. Tap and tap-drill depths and routine locations
+  normally use two places.
+- On unconverted millimetre sheets, the existing one-, two- and three-place
+  grades remain in force; drill diameters normally use two places.
+- Fabricated nominals sit on their printed grid: `.01 in` for `.XX`,
+  `.001 in` for `.XXX`. Gear, chain and rack pitch geometry, kinematic
+  closures, supplier sizes and calibrated spring geometry are exempt.
+- A dimension that carries its own band is toleranced by that band. Its
+  nominal and deviations need enough places to preserve the authored limits;
+  rounding them to the general grade is not permitted.
+- A three-place non-drilled size with no band and no stated function is
   over-specification under this rule. It becomes a rule 4 matter only when the
   sheet or package gives it a function.
 - A tighter band goes on the dimension itself, never in a note and never as a
@@ -125,8 +139,8 @@ a chamfer gets the loosest title-block band that serves it.
 - **Stock that is good enough stays stock.** Where bar stock already meets the
   need, say so (`n STOCK OK`, `.nn (STOCK)`) or give a minimum cleanup size
   rather than a turned band.
-- **Read a band as its total width.** `+0.005 / 0` is 5 µm wide, the same as
-  ±0.0025. Keep the original nominal and the asymmetric limits when checking a
+- **Read a band as its total width.** `+.001 / 0 in` is `.001 in` wide,
+  the same as `±.0005 in`. Keep the nominal and asymmetric limits when checking a
   fit; equal widths are not equal fits.
 - **Necessity before capability.** Being printed does not make precision
   necessary. Unneeded precision is over-specification even when it is hard to
@@ -179,11 +193,11 @@ Because the surface row lets any face stay as cast (rule 2), a roughness symbol
 is the only way a print requires a face to be cut at all. Use it sparingly and
 deliberately:
 
-| surface | grade |
-|---|---|
-| journal or bore that runs, cam-follower contact, slide, knife edge and its seat | Ra 1.6 µm |
-| knife edge or pivot-screw shoulder that must be ground | Ra 0.8 µm |
-| one static mating seat that locates the part on its neighbour (a foot on a base, a bolted register) | Ra 3.2 µm |
+| surface | inch sheet, µin Ra | unconverted metric sheet, µm Ra |
+|---|---|---|
+| journal or bore that runs, cam-follower contact, slide, knife edge and its seat | 63 | 1.6 |
+| knife edge or pivot-screw shoulder that must be ground | 32 | 0.8 |
+| one static mating seat that locates the part on its neighbour (a foot on a base, a bolted register) | 125 | 3.2 |
 
 Gear seats, pinned or pressed bores, clamp faces, register faces that do not
 locate, and every other face carry no symbol. A banded or reamed bore is not a
@@ -370,10 +384,12 @@ depicted geometry, not only its annotation.
 - Prefer coarse threads in soft receivers such as aluminium, and avoid #6-32
   and smaller taps in tough material.
 
-### Rule 17 — Walls and webs: 2.0 mm target, 1.5 mm floor, at the worst case
+### Rule 17 — Walls and webs: .080 in target, .060 in floor, at the worst case
 
-Every machined wall or web targets at least 2.0 mm, with a hard floor of
-1.5 mm. That includes the thread major diameter to an edge or another bore, a
+Every machined wall or web on a converted inch package targets at least
+`.080 in`, with a hard floor of `.060 in`. Unconverted metric packages keep
+their existing 2.0 mm target and 1.5 mm floor until conversion.
+That includes the thread major diameter to an edge or another bore, a
 counterbore or countersink to an outside surface, and the ligament over a
 cross-hole. Judge it at the worst case of the printed bands (the title-block
 band for its decimal places, DRILLED HOLES, or the explicit band) plus
