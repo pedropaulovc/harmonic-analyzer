@@ -13,6 +13,7 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _purchased_fastener_drawing import NumberFit
 from _purchased_part_drawing import build_purchased_part_drawing
 
 
@@ -23,7 +24,11 @@ ITEM = "KP08 PILLOW BLOCK, 8 MM BORE, SET-SCREW INSERT BEARING"
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_part_drawing(adapter, SPEC, item=ITEM)
+    # The 18-character registry number overruns the template's DWG. NO.
+    # cell into REV; fit it there, measured.
+    return await build_purchased_part_drawing(
+        adapter, SPEC, item=ITEM, number_fit=NumberFit.SHRINK_TO_CELL
+    )
 
 
 def _parse_args() -> argparse.Namespace:

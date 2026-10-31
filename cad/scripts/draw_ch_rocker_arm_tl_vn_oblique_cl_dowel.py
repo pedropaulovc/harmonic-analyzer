@@ -12,7 +12,7 @@ import _telemetry
 from _com import _early_bound
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
-from _purchased_fastener_drawing import build_purchased_fastener_drawing
+from _purchased_fastener_drawing import NumberFit, build_purchased_fastener_drawing
 from _supplier_pin_model import _cylinder_radii_mm
 from _supplier_screw_dimensions import annotate_supplier_screw, assert_supplier_screw
 from _supplier_screw_layout import supplier_screw_margins
@@ -87,8 +87,11 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError("91595A452: supplier references omitted or repeated")
         proofs[0]()
 
+    # The 18-character registry number overruns the template's DWG. NO.
+    # cell into REV; fit it there, measured.
     return await build_purchased_fastener_drawing(
-        adapter, SPEC, item=ITEM, supplier_dimensions=supplier_dimensions,
+        adapter, SPEC, item=ITEM, number_fit=NumberFit.SHRINK_TO_CELL,
+        supplier_dimensions=supplier_dimensions,
         supplier_margins=supplier_screw_margins(
             part.SUPPLIER_REFERENCE_DIMENSIONS,
             planes=part.SUPPLIER_REFERENCE_PLANES,

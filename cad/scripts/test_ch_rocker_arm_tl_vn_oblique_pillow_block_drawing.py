@@ -179,12 +179,13 @@ def test_sheet_is_the_registered_purchased_part_reference(monkeypatch) -> None:
     assert drawn.layout is DrawingLayout.LANDSCAPE
     calls = []
 
-    async def fake(adapter, sheet, *, item, cut_to_suit=False):
-        calls.append((adapter, sheet, item, cut_to_suit))
+    async def fake(adapter, sheet, *, item, cut_to_suit=False, number_fit=None):
+        calls.append((adapter, sheet, item, cut_to_suit, number_fit))
         return {"pdf": "x"}
 
     monkeypatch.setattr(draw, "build_purchased_part_drawing", fake)
     adapter = object()
     assert asyncio.run(draw.build(adapter)) == {"pdf": "x"}
-    assert calls == [(adapter, drawn, draw.ITEM, False)]
+    # The 18-character number is fitted to its DWG. NO. cell, clear of REV.
+    assert calls == [(adapter, drawn, draw.ITEM, False, draw.NumberFit.SHRINK_TO_CELL)]
     assert "KP08" in draw.ITEM
