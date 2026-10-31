@@ -3,8 +3,7 @@
 The package declares ``drawing_unit: in``: the sheet, its TOL_* rows and the
 source part print decimal inch. The McMaster 91410A540 sizes stay supplier
 references in the supplier's own form: fractional head width and height,
-decimal length and thread diameter. Native fractions carry their inch mark;
-decimal references carry ``in``. The diameter/thread
+decimal length and thread diameter, each labelled ``in``. The diameter/thread
 text uses a measured native shelf, preserving the source value and physical
 witness stations. Equal FRONT/RIGHT vertical lane budgets preserve third-angle
 alignment without changing the model or the calibrated view scale; native

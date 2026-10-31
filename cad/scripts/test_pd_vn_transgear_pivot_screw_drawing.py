@@ -2664,7 +2664,7 @@ def _saved_shelf_boundary(monkeypatch, state):
         Tolerance=SimpleNamespace(Type=0),
     )
     presentation = screw.SUPPLIER_REFERENCE_DIMENSIONS["SupplierSocketAF"]
-    texts = {1: "(", 2: ")", 4: presentation["callout"]}
+    texts = {1: "(", 2: " in)", 4: presentation["callout"]}
     state.socket_display = SimpleNamespace(
         Type2=2, OffsetText=True, ShowDimensionValue=True, ShowParenthesis=False,
         GetDimension2=lambda _index: state.socket_native,

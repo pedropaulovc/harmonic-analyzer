@@ -62,8 +62,8 @@ def _shown(name: str) -> tuple[int, int, str, str]:
 def test_head_prints_supplier_fractions_and_shank_decimal_inches() -> None:
     # (units, fraction base, prefix, suffix): swINCHES with an exact fraction
     # on the head, decimal on the shank; every value labelled in inches.
-    assert _shown("SupplierHeadWidth") == (3, 2, "(", ")")
-    assert _shown("SupplierHeadHeight") == (3, 2, "(", ")")
+    assert _shown("SupplierHeadWidth") == (3, 2, "(", " in)")
+    assert _shown("SupplierHeadHeight") == (3, 2, "(", " in)")
     assert _shown("SupplierLength") == (3, 1, "(", " in)")
     assert _shown("SupplierThreadDiameter") == (3, 1, "(<MOD-DIAM>", " in)")
     formats = supplier.SUPPLIER_REFERENCE_FORMATS
@@ -186,22 +186,7 @@ def test_head_height_is_an_exact_unrounded_sixteenth() -> None:
     )
     # SetUnits2(UseDoc=False, swINCHES, swFRACTION, 16, RoundToFraction=False, 0).
     assert display.units_call == (False, 3, 2, 16, False, 0)
-    assert (display.text[1], display.text[2]) == ("(", ")")
-    # The duplicate explicit unit must not return after a rebuild either.
-    display.text[2] = " in)"
-    with pytest.raises(RuntimeError, match="suffix"):
-        _supplier_dimensions.assert_supplier_reference_dimension(
-            object(),
-            display,
-            label="SupplierHeadHeight",
-            units="in",
-            precision=precision,
-            expected_mm=supplier.HEAD_H,
-            presentation=presentation,
-            fraction_denominator=denominator,
-            callout=callout,
-        )
-    display.text[2] = ")"
+    assert (display.text[1], display.text[2]) == ("(", " in)")
     # A seat that rounds the head to the nearest fraction no longer proves it.
     display.state["round"] = True
     with pytest.raises(RuntimeError, match="exact supplier fraction"):
