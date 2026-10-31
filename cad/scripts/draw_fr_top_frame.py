@@ -94,6 +94,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+from _title_block_units import LENGTH_UNITS
 from build_fr_top_frame import (
     BAR_POCKET_Z,
     BAR_WEB_X0,
@@ -155,7 +156,7 @@ from fr_top_frame_spec import (
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     EDGE_CHAMFER,
-    GEOMETRIC_TOLERANCES_MM,
+    GEOMETRIC_TOLERANCES_IN,
     HANGER_CLEARANCE_DIA,
     HANGER_CLEARANCE_DIA_BAND,
     HANGER_CLEARANCE_DIA_PLACES,
@@ -175,10 +176,11 @@ from fr_top_frame_spec import (
     KEEPER_TAP_CALLOUT_PRECISION,
     PIN_HOLE_NEG_X,
     PIN_HOLE_X,
-    PRINTED_LINEAR_BAND_MM,
     STUD_Z_FRONT,
     STUD_Z_REAR,
     SURFACE_FINISHES,
+    UNIT,
+    printed_limit,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -233,9 +235,9 @@ DETAIL_TOP_SCALE = SHEET_SCALES["HOLES-SOCKETS"]
 GEOMETRY_VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
 DETAIL_VIEW_SCALE = DETAIL_TOP_SCALE[0] / DETAIL_TOP_SCALE[1]
 
-# Plan extents including the Ø45 corner bosses: the straight rails stop
-# at x +/-214.1 / z +/-131.0, bosses at +/-219.5 / +/-134.5 -> 439 x 269.
-# The boss stack stays 47.3 tall around the unchanged 36.5 rail band.
+# Plan extents including the Ø1.77 corner bosses: the straight rails stop
+# at x +/-214.10 / z +/-131.06, bosses at +/-219.48 / +/-134.49.
+# The boss stack stays 1.864 tall around the 1.437 rail band.
 PLAN_HALF_X = COLUMN_X + BOSS_DIA / 2.0
 PLAN_HALF_Z = abs(FRONT_COLUMN_Z) + BOSS_DIA / 2.0
 GEOMETRY_PLAN_HALF_W = PLAN_HALF_X * GEOMETRY_VIEW_SCALE / 1000.0
@@ -483,14 +485,13 @@ BORE_CHAMFER_TEXT_OFFSET_XY = (0.315, 0.174)
 # A-A's joint note. The near wall between the flush counterbore floor and
 # the socket bore only starts the thread; the far casting wall carries the
 # MHA-FR-VN-53 joint. drawing-guidelines.md rule 17 (walls and webs), print-worst: the stock shank, less the most
-# outboard printed floor (16.35 + band) and the largest printed socket radius.
+# outboard printed floor (.644 + band) and the largest printed socket radius.
 _SOCKET_DIA_PLACES = DRAWING_PRECISION["BoreProfile"]["B0Dia"]
 CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT = (
     CROSS_SCREW_SHANK_LEN
     - COUNTERBORE_MAX_FLOOR_OFFSET
-    - (round(BORE_DIA, _SOCKET_DIA_PLACES) + PRINTED_LINEAR_BAND_MM[_SOCKET_DIA_PLACES])
-    / 2.0
-)  # 14.4
+    - printed_limit(BORE_DIA, _SOCKET_DIA_PLACES, 1.0) / 2.0
+)
 if CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT < 1.5 * CROSS_SCREW_SHANK_DIA:
     raise AssertionError(
         "far casting wall engages MHA-FR-VN-53 under 1.5D at the printed bands"
@@ -558,7 +559,7 @@ VIEW_G_ARROW = (
 )
 HUB_LEFT_TITLE = f"VIEW {VIEW_LETTER}\nSCALE {HUB_LEFT_SCALE[0]}:{HUB_LEFT_SCALE[1]}"
 HUB_LEFT_TITLE_XY = (0.128, 0.0455)
-HUB_LEFT_NOTE = "INNER RIB BOTTOM, GUSSETS SHARP\nOUTER RIB BOTTOM BESIDE BOSS SHARP"
+HUB_LEFT_NOTE = "INNER RIB BOTTOM, GUSSETS SHARP"
 HUB_LEFT_NOTE_XY = (0.093, 0.030)
 
 # Sheet 6: the underside locator at the title block's own scale and the
@@ -609,7 +610,7 @@ HUB_GUSSET_T_OFFSET_XY = (0.390, 0.243)
 # downward, left of both, and passes under nothing.  The dimension line runs
 # at y 145 between them, arrows inside (8 mm), the text parked right on a jog
 # where the 73.0's block stood.
-LAND_END_TEXT_XY = (0.11317, 0.145)
+LAND_END_TEXT_XY = (0.11319, 0.145)
 LAND_TEXT_OFFSET_XY = (0.155, 0.145)
 LAND_END_CALLOUT = "4X LAND END FROM\nCROSSBAR FACE, EACH SIDE"
 # The faced underside plane's linked note C (top-left point).  The bands
@@ -693,20 +694,22 @@ HANGER_PIN_SPAN_TEXT_XY = _hanger_section_xy(
 )
 HANGER_PIN_SPAN_OFFSET_XY = (0.100, 0.1200)
 HANGER_PIN_SPAN_ABOVE = "2X"
-# The depth's value and its two rows (the flat floor and its corner limit,
-# codjiflo round 4) are three rows, more than its 12 mm between extension
+# The depth's value and its three rows (the flat floor and its corner limit,
+# codjiflo round 4) are four rows, more than its 12 mm between extension
 # lines holds, so they park beside its line on a level stub at the ream's
 # mid-depth.  Farm run 20261027T175429300Z measured the native form: the
 # rows centred on the offset x, the value 2.78 mm above the offset y, the
-# first row 2.78 mm under it, the last 8.33 mm under it on the underline
-# the stub meets at its near end; "CORNER R0.1 MAX" runs 41.94 mm.  With
-# the line 34.5 mm right of the gussets' cut end that block ran to x 230,
-# 14 mm into the title block (layout audit keep-out, the dimension's box
-# reaching down to its floor witness at y 50.4), so the line now stands
-# 19.6 mm right of the cut end, its upper tail 2.1 mm right of the 36.50's
-# text, and the block starts 2 mm right of it, its last row level with the
-# stub, and ends 4.8 mm short of the title block.
-HANGER_PIN_DEPTH_OFFSET_XY = (0.19025, 0.07108)
+# rows 5.56 mm apart under it from 2.78 mm, the last on the underline the
+# stub meets at its near end; "CORNER R0.1 MAX" ran 41.94 mm, so the inch
+# corner limit takes its own row ("CORNER R.003 MAX" would overrun the
+# band).  With the line 34.5 mm right of the gussets' cut end that block
+# ran to x 230, 14 mm into the title block (layout audit keep-out, the
+# dimension's box reaching down to its floor witness at y 50.4), so the line
+# now stands 19.6 mm right of the cut end, its upper tail 2.1 mm right of
+# the grip's text, and the block starts 2 mm right of it, its last row
+# level with the stub (one row higher for the fourth), and ends short of
+# the title block.
+HANGER_PIN_DEPTH_OFFSET_XY = (0.19025, 0.07664)
 HANGER_SECTION_KEEP = {
     "HangerPinHoleDepth": _hanger_section_xy(
         BAR_X1 + HANGER_SECTION_GUSSET_REACH + 19.6,
@@ -1383,7 +1386,7 @@ def _tolerance_hanger_callout_clearance(display: Any) -> None:
     lower_m, upper_m = (value/1000.0 for value in (
         min(HANGER_CLEARANCE_DIA_BAND), max(HANGER_CLEARANCE_DIA_BAND),
     ))
-    variable.ToleranceType = 2  # swTolType_e.swTolBILAT, +0.13/0
+    variable.ToleranceType = 2  # swTolType_e.swTolBILAT, +.004/0
     variable.ToleranceMin = lower_m
     variable.ToleranceMax = upper_m
     length = _early_bound(raw, "ICalloutLengthVariable")
@@ -1422,7 +1425,7 @@ def _require_model_hanger_grip(adapter: Any, dimensions: list[Any]) -> Any:
         raise RuntimeError(f"F-F grip reads {value_mm:.6f} mm, not {HANGER_GRIP}")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     if int(tolerance.Type) != 0:  # swTolType_e.swTolNONE
-        raise RuntimeError("F-F grip carries a band; the title block's .XX governs")
+        raise RuntimeError("F-F grip carries a band; the title block's .XXX governs")
     return grips[0]
 
 
@@ -2397,7 +2400,7 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         leader_attach_xy=_hanger_section_xy(*HANGER_PERP_LANDING),
         frame_xy=HANGER_PERP_FRAME_XY,
         characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger press ream perpendicularity"],
+        tolerance=GEOMETRIC_TOLERANCES_IN["knife-hanger press ream perpendicularity"],
         datums=(HANGER_FLOOR_DATUM,),
         diameter=True,
         quantity=HANGER_PERP_FRAME_QUANTITY,
@@ -2479,14 +2482,15 @@ def _set_callout_text(display: Any, which: int, text: str, label: str) -> None:
         raise RuntimeError(f"{label}: callout text {which} did not persist: {applied!r}")
 
 
-_MOD_DIAM_VALUE = re.compile(r"<MOD-DIAM>(\d+(?:\.\d+)?)")
+# A printed number: an inch sheet drops the leading zero (".1240").
+_MOD_DIAM_VALUE = re.compile(r"<MOD-DIAM>(\d*\.?\d+)")
 
 
 # The whole of a definition part that is nothing but the coaxial step: its
 # diameter, optionally behind the counterbore symbol SolidWorks gives a
 # stepped hole, and, optionally, its own depth.
 _COAXIAL_STEP_PART = re.compile(
-    r"(?:<HOLE-SPOT>\s*)?<MOD-DIAM>(\d+(?:\.\d+)?)(?:\s*<HOLE-DEPTH>\s*\d+(?:\.\d+)?)?\s*"
+    r"(?:<HOLE-SPOT>\s*)?<MOD-DIAM>(\d*\.?\d+)(?:\s*<HOLE-DEPTH>\s*\d*\.?\d+)?\s*"
 )
 
 
@@ -2507,7 +2511,10 @@ def _coaxial_step_holders(
     knockout's size)."""
 
     def _is_step(value: str) -> bool:
-        return math.isclose(float(value), step_dia, abs_tol=0.006)
+        # The callout prints in the sheet's unit; ``step_dia`` is model mm.
+        return math.isclose(
+            float(value) * LENGTH_UNITS[UNIT], step_dia, abs_tol=0.006
+        )
 
     holders = []
     for part, text in definitions.items():
@@ -3034,7 +3041,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout,
+        unit=UNIT,
     )
     _set_precise_curve_quality(adapter)
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="top-frame package")
@@ -3313,10 +3321,10 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_mm=WEB_T, orientation="horizontal", exact_linear=True,
         suffix="2X SIDE RAIL WEB", edges=side_section_edges,
     )
-    # The crossbar T: its web below the flange's R3 roots and above the
-    # bottom break, its flange from the top face to the sharp underside's
-    # 3.0 flat outboard of the root.
-    flange_flat_x = (BAR_X0 + BAR_WEB_X0 - ROOT_FILLET_R) / 2.0
+    # The crossbar T: its web below the flange's R.12 roots and above the
+    # bottom break, its flange from the top face to the underside's flat
+    # between its edge break and the root.
+    flange_flat_x = (BAR_X0 + EDGE_CHAMFER + BAR_WEB_X0 - ROOT_FILLET_R) / 2.0
     for p0, p1, expected, xy, offset, orientation, label, qualifier in (
         ((BAR_WEB_X0, 0.0, SIDE_SECTION_Z), (BAR_WEB_X1, 0.0, SIDE_SECTION_Z),
          WEB_T, CROSSBAR_WEB_LINE_XY, CROSSBAR_WEB_TEXT_XY, "horizontal",
@@ -3347,7 +3355,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if add_note(
         adapter,
         "E-E: LEFT SIDE RAIL AND CROSSBAR T\nRIGHT RAIL IDENTICAL; T WEB CENTRED\n"
-        "UNDER FLANGE; CROSSBAR FLANGE UNDERSIDE SHARP",
+        "UNDER FLANGE",
         *SIDE_SECTION_NOTE_XY,
     ) is None:
         raise RuntimeError("failed to identify the cut side rail and crossbar T")
@@ -3493,7 +3501,7 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=hanger_center_landing_xy,
         frame_xy=HANGER_CENTER_FRAME_XY,
         characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger crossbar centring"],
+        tolerance=GEOMETRIC_TOLERANCES_IN["knife-hanger crossbar centring"],
         datums=("D",), quantity=HANGER_CENTER_QUALIFIER,
         label="hanger axes on crossbar median plane",
     )
@@ -3886,12 +3894,12 @@ async def build(adapter: Any) -> dict[str, str]:
         label="front/rear column-retention taps",
         # The native "2X" is the count in THIS view (one tap per end on the
         # face shown); the process states the total once and where every
-        # depth starts.  The 46.0 thread and 49.2 drill depths are the
+        # depth starts.  The 1.810 thread and 1.940 drill depths are the
         # requirement, no tool named (machinist review r1).
         process=CROSS_TAP_CALLOUT,
     )
     set_hole_callout_precision(
-        cross_tap_callout, {"hw-tapdrldepth": 1, "hw-threaddepth": 1},
+        cross_tap_callout, {"hw-tapdrldepth": 3, "hw-threaddepth": 3},
         label="cross tap depths",
     )
     _checked_dimension(
@@ -4253,7 +4261,7 @@ async def build(adapter: Any) -> dict[str, str]:
             leader_attach_xy=hanger_ream_rim(ream_centre, knee),
             frame_xy=HANGER_REAM_FRAME_XY[station],
             characteristic="position",
-            tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger press ream position"],
+            tolerance=GEOMETRIC_TOLERANCES_IN["knife-hanger press ream position"],
             datums=datums,
             translated=datums[1:],
             diameter=True,

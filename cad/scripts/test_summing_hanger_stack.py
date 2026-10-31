@@ -63,7 +63,7 @@ def test_reach_extrema_are_the_fit_up_cut_band_alone() -> None:
     assert asm_spec.HANGER_FIT_REACH_TOL == pytest.approx(0.15)
     assert asm.HANGER_REACH_MIN == pytest.approx(8.77)
     assert asm.HANGER_REACH_MAX == pytest.approx(9.07)
-    assert asm.HANGER_REACH == pytest.approx(8.9173)
+    assert asm.HANGER_REACH == pytest.approx(8.9175)
     assert asm.HANGER_REACH_MIN <= asm.HANGER_REACH <= asm.HANGER_REACH_MAX
     # The cut covers every printed grip and catalogue washer corner, and the
     # longest still comes out of the 2 in stock past its factory end.
@@ -80,8 +80,8 @@ def test_reach_extrema_are_the_fit_up_cut_band_alone() -> None:
     ]
     assert min(cuts) == pytest.approx(asm.HANGER_CUT_LENGTH_MIN)
     assert max(cuts) == pytest.approx(asm.HANGER_CUT_LENGTH_MAX)
-    assert asm.HANGER_CUT_LENGTH_MIN == pytest.approx(45.6744)
-    assert asm.HANGER_CUT_LENGTH_MAX == pytest.approx(47.731)
+    assert asm.HANGER_CUT_LENGTH_MIN == pytest.approx(46.0572)
+    assert asm.HANGER_CUT_LENGTH_MAX == pytest.approx(47.3478)
     assert hanger_screw.CATALOG_LENGTH - max(cuts) > hanger_screw.PITCH
 
 
@@ -281,8 +281,8 @@ def test_knife_dowels_hang_pressed_end_up_from_the_crossbar_reams() -> None:
     assert asm.KNIFE_DOWEL_Y == pytest.approx(
         CASTING_UNDERSIDE_Y + top_frame.HANGER_PIN_HOLE_DEPTH
     )
-    assert asm.KNIFE_DOWEL_Y == pytest.approx(1011.7)
-    assert asm.KNIFE_DOWEL_END_Y == pytest.approx(992.65)
+    assert asm.KNIFE_DOWEL_Y == pytest.approx(1011.638)
+    assert asm.KNIFE_DOWEL_END_Y == pytest.approx(992.588)
 
 
 def test_crossbar_hanger_stations_are_the_assemblys_knife_mount_stations() -> None:

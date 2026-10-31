@@ -40,8 +40,18 @@ from _mcmaster_98381a473 import (
     DOWEL_SIZE,
     MM_PER_IN,
 )
+import _config
+from _package_units import drawing_unit
+from _fit_ream_h7 import REAM_H7
 from _printed_tolerance import printed_band_mm
 from _supplier_pin_data import SupplierPinReference
+
+# The knife mount's slip hole, slot and their depth print on its sheet, in
+# its unit (#290); the press ream's on MHA-FR-02's.
+_MOUNT_UNIT = drawing_unit("parts/sm-knife-mount", _config.parts("sm-knife-mount"))
+# The press ream's size, depth and stations print on MHA-FR-02, in its unit,
+# read off its row (fr_top_frame_spec imports this module).
+_FRAME_UNIT = drawing_unit("parts/fr-top-frame", _config.parts("fr-top-frame"))
 
 SKU = "98381A473"
 DIA, LENGTH = DOWEL_SIZE  # 3.175 x 19.05
@@ -69,9 +79,9 @@ if not POINT_DIA_MIN <= ENDS.point_dia <= POINT_DIA_MAX:
 # DRIVE_PIN_LENGTH_GRADE for the same 98381A family).
 LENGTH_GRADE = 0.010 * MM_PER_IN  # 0.254
 
-# General tolerances the two holes' printed places claim (title block).
-_X = printed_band_mm(1)
-_XXX = printed_band_mm(3)
+# General tolerances the crossbar ream's printed places claim (title block).
+_XX = printed_band_mm(2, unit=_FRAME_UNIT)
+_XXX = printed_band_mm(3, unit=_FRAME_UNIT)
 
 # Two pins per knife mount, their axes HANGER_OFFSET either side of the
 # knife-hanger screw axis along machine X in BOTH parts (block local X is
@@ -79,12 +89,12 @@ _XXX = printed_band_mm(3)
 # (T+H3, machinist ENFORCE review of MHA-SM-02, rule 16): the pins press
 # into the MHA-FR-02 crossbar, each to the floor of a blind ream drilled from
 # the underside, a knockout drilled up from its floor through the top, located
-# by the drawn common axis only (+/-0.13 implied, owner ruling 2026-10-27
+# by the drawn common axis only (+/-.005 implied, owner ruling 2026-10-27
 # (c)), and slip
 # into the hardened knife mount, one into its round hole (datum B) and the
 # other into its slot (datum C), open to the block's -X face.  The crossbar
 # prints each +X ream's station .XXX from its screw axis (HANGER_OFFSET_TOL)
-# and each -X ream BASIC SPAN from its +X ream under a ⌖Ø0.05 frame (fr-top-
+# and each -X ream BASIC SPAN from its +X ream under a ⌖Ø.002 frame (fr-top-
 # frame ENFORCE review, farm run 20261027T030041319Z: a frame needs BASIC
 # locations), so a mount fitted turned end for end, its round hole on the
 # -X pin, still floats inside the crossbar's #10 clearance hole; the block's
@@ -107,29 +117,30 @@ QUANTITY = PER_MOUNT * MOUNTS
 # (codex machinist review of fr_top_frame 4d11a94e); Q7 option C, approved as
 # built by the user 2026-10-13 (#1348): 14.200 BASIC span, 24 crossbar, 25
 # block, Ø4.699 #6 hole drilled from the underside.
-HANGER_OFFSET = 7.632
+HANGER_OFFSET = 7.62  # .300 (#290: was 7.632, off the inch grid)
 HANGER_OFFSET_PLACES = 3
-HANGER_OFFSET_TOL = _XXX  # 0.13
+HANGER_OFFSET_TOL = _XXX  # 0.127
 # The pair's centre-to-centre span along the dowel line: BASIC on the
-# crossbar, within the -X ream's Ø0.05 position zone radius
+# crossbar, within the -X ream's Ø.002 position zone radius
 # (``fr_top_frame_spec.HANGER_PRESS_HOLE_POSITION_TOL``, which asserts it);
 # the knife mount's slot takes that variation as travel.
-SPAN = 2.0 * HANGER_OFFSET  # 15.264
-SPAN_TOL = 0.025
+SPAN = 2.0 * HANGER_OFFSET  # 15.24, .600
+SPAN_TOL = 0.0254
 
 # --- The press: the crossbar's blind reams (owner ruling 2026-10-24, T+H3) --
-# Reamed from the faced underside to a flat floor, printed .X, the pin
+# Reamed from the faced underside to a flat floor, printed .XX, the pin
 # pressed chamfer end first onto it.
-PRESS_DEPTH = 12.0
-PRESS_DEPTH_PLACES = 1
-PRESS_DEPTH_TOL = _X  # 0.8
-# The ream's explicit band, printed at three places: its mate and press are
-# the callout's (rule 4), the MHA-PD-18 latch-pin precedent.
-PRESS_HOLE_DIA = DIA  # 3.175
-PRESS_HOLE_DIA_BAND = (0.0, -0.010)  # (upper, lower)
-PRESS_HOLE_DIA_PLACES = 3
+PRESS_DEPTH = 11.938  # .47
+PRESS_DEPTH_PLACES = 2
+PRESS_DEPTH_TOL = _XX  # 0.254
+# The ream's explicit band, printed at four places: its mate and press are
+# the callout's (rule 4), the MHA-PD-18 latch-pin precedent.  The owned
+# .1240 chucking reamer (cad/process/shop/inventory.toml) at REAM_H7.
+PRESS_HOLE_DIA = 3.1496  # .1240
+PRESS_HOLE_DIA_BAND = REAM_H7  # (upper, lower): +.0005/0
+PRESS_HOLE_DIA_PLACES = 4
 # (loosest, tightest) press from the ream band and the catalogue band:
-# 0.00254..0.01762, printed rounded outward to four places.
+# 0.01524..0.03302, printed rounded outward to four places.
 PRESS_INTERFERENCE = (
     round(DIA_MIN - (PRESS_HOLE_DIA + max(PRESS_HOLE_DIA_BAND)), 6),
     round(DIA_MAX - (PRESS_HOLE_DIA + min(PRESS_HOLE_DIA_BAND)), 6),
@@ -140,15 +151,15 @@ PRESS_INTERFERENCE_PRINTED = (
     math.floor(PRESS_INTERFERENCE[0] * 1e4) / 1e4,
     math.ceil(PRESS_INTERFERENCE[1] * 1e4) / 1e4,
 )
-if PRESS_INTERFERENCE_PRINTED != (0.0025, 0.0177):
+if PRESS_INTERFERENCE_PRINTED != (0.0152, 0.0331):
     raise AssertionError(f"knife-mount dowel press prints {PRESS_INTERFERENCE_PRINTED}")
 # The ream's flat floor ends in a corner radius the depth's callout limits
 # (the title block's inside-corner radius would leave the end flat on a
-# fillet).  B18.8.2's largest point (1.524 radius) still overhangs the
-# floor's flat at the smallest ream and largest corner (1.4825), so its
-# edge stands on the fillet and holds the pin that far off the floor,
-# longer proud below the underside (PROUD_MAX).
-PRESS_FLOOR_CORNER_R_MAX = 0.1
+# fillet).  B18.8.2's largest point (1.524 radius) overhangs the floor's
+# flat at the smallest ream and largest corner (1.4986), so its edge stands
+# on the fillet and holds the pin that far off the floor, longer proud
+# below the underside (PROUD_MAX).
+PRESS_FLOOR_CORNER_R_MAX = 0.0762  # .003
 
 
 def floor_fillet_seating_lift(flat_r: float, wall_r: float, corner_r: float) -> float:
@@ -173,7 +184,7 @@ PRESS_FLOOR_LIFT_MAX = floor_fillet_seating_lift(
     POINT_DIA_MAX / 2.0,
     (PRESS_HOLE_DIA + min(PRESS_HOLE_DIA_BAND)) / 2.0,
     PRESS_FLOOR_CORNER_R_MAX,
-)  # 0.0090
+)  # 0.0044
 if PRESS_FLOOR_LIFT_MAX > 0.02 * PRESS_DEPTH_TOL:
     raise AssertionError(
         f"the ream floor's corner holds the dowel {PRESS_FLOOR_LIFT_MAX:.4f} off its floor"
@@ -181,17 +192,17 @@ if PRESS_FLOOR_LIFT_MAX > 0.02 * PRESS_DEPTH_TOL:
 
 # --- The slip: the knife mount's round hole and open slot -------------------
 # A slip on the pin's catalogue diameter at 0.02..0.10 diametral clearance
-# (the dt_pinion_cam_spec slip band), reamed (the round hole, a stock Ø3.25
-# metric reamer) or milled (the slot's width) to an explicit +/-0.02 band
-# printed .XXX: 0.0474..0.0925.  The band's maximum stays 3.270, so the
-# loosest slip (and the rock, bolt-float, web and slot-margin stacks it
-# feeds) is unchanged; the tightest slip opens from 0.027 to 0.047 to give
-# the pin-to-hole tilt proof real angular margin (codjiflo round 6).
-# Cut soft in the O1 block: hardening's growth (<= 0.003 on this size,
+# (the dt_pinion_cam_spec slip band), reamed (the round hole, a purchased
+# .1280 chucking reamer) or milled (the slot's width) to an explicit
+# .1280 +/-.0007 band: .0020..0.0036 in (0.0508..0.0914).  The band's maximum,
+# .1287 (3.269), keeps the loosest slip (and the rock, bolt-float, web and
+# slot-margin stacks it feeds) under main's 3.270; the tightest slip, .0020,
+# keeps the pin-to-hole tilt proof's angular margin (codjiflo round 6).
+# Cut soft in the O1 block: hardening's growth (<= .0001 in on this size,
 # owner ruling 2026-10-24, H3) stays inside the band.
-SLIP_HOLE_DIA = 3.25
-SLIP_HOLE_DIA_BAND = (0.02, -0.02)
-SLIP_HOLE_DIA_PLACES = 3
+SLIP_HOLE_DIA = 3.2512  # .1280
+SLIP_HOLE_DIA_BAND = (0.01778, -0.01778)  # +/-.0007
+SLIP_HOLE_DIA_PLACES = 4
 SLIP_CLEARANCE_MIN = round(SLIP_HOLE_DIA + SLIP_HOLE_DIA_BAND[1] - DIA_MAX, 6)
 SLIP_CLEARANCE_MAX = round(SLIP_HOLE_DIA + SLIP_HOLE_DIA_BAND[0] - DIA_MIN, 6)
 if SLIP_CLEARANCE_MIN < 0.02 or SLIP_CLEARANCE_MAX > 0.10:
@@ -199,10 +210,11 @@ if SLIP_CLEARANCE_MIN < 0.02 or SLIP_CLEARANCE_MAX > 0.10:
         f"knife-mount dowel slip clearance {SLIP_CLEARANCE_MIN}-"
         f"{SLIP_CLEARANCE_MAX} is outside 0.02-0.10"
     )
-# The block's round hole and slot, blind from its top seat, printed .X.
-SLIP_DEPTH = 9.5
-SLIP_DEPTH_PLACES = 1
-SLIP_DEPTH_TOL = _X  # 0.8
+# The block's round hole and slot, blind from its top seat, printed .XX: the
+# floor-clearance and tilt stacks read the depth's band.
+SLIP_DEPTH = 9.398  # .37
+SLIP_DEPTH_PLACES = 2
+SLIP_DEPTH_TOL = printed_band_mm(2, unit=_MOUNT_UNIT)  # 0.254
 # A press-fit dowel grips at least 1.5 D (the drawing-guidelines.md rule 18 (thread engagement) engagement floor,
 # applied to the press as ``pd_vn_transgear_latch_pin_spec`` does), counted over
 # the full diameter only: the chamfer inside the hole carries no interference.
@@ -223,8 +235,8 @@ def press_engagement_d(hole_depth: float) -> float:
 
 
 # The seat is clamped to the casting underside (no gap), so the pin's proud
-# length goes straight down the knife mount's hole: 7.05 nominal,
-# 5.996..8.113, the longest standing on the floor's corner fillet
+# length goes straight down the knife mount's hole: 7.112 nominal,
+# 6.604..7.624, the longest standing on the floor's corner fillet
 # (PRESS_FLOOR_LIFT_MAX, codjiflo round 5).
 PROUD = proud_length(PRESS_DEPTH)
 PROUD_MIN = proud_length(PRESS_DEPTH + PRESS_DEPTH_TOL, -LENGTH_GRADE)
@@ -232,14 +244,14 @@ PROUD_MAX = (
     proud_length(PRESS_DEPTH - PRESS_DEPTH_TOL, LENGTH_GRADE) + PRESS_FLOOR_LIFT_MAX
 )
 # The shallowest knife-mount hole still takes the longest proud pin, or the
-# pin would bottom and hold the seat off the casting: 8.7 - 8.113 = 0.587.
+# pin would bottom and hold the seat off the casting: 9.144 - 7.624 = 1.520.
 SLIP_DEPTH_CLEARANCE_MIN = SLIP_DEPTH - SLIP_DEPTH_TOL - PROUD_MAX
 if SLIP_DEPTH_CLEARANCE_MIN <= 0.0:
     raise AssertionError(
         f"the longest proud knife-mount dowel ({PROUD_MAX:.3f}) bottoms in the"
         f" shallowest knife-mount hole ({SLIP_DEPTH - SLIP_DEPTH_TOL:.3f})"
     )
-# (11.2 - 0.443) / 3.175 = 3.39 D at the shallowest printed press depth.
+# (11.684 - 0.443) / 3.175 = 3.54 D at the shallowest printed press depth.
 PRESS_ENGAGEMENT_D_MIN = press_engagement_d(PRESS_DEPTH - PRESS_DEPTH_TOL)
 if PRESS_ENGAGEMENT_D_MIN < PRESS_ENGAGEMENT_MIN_D:
     raise AssertionError(
@@ -247,7 +259,7 @@ if PRESS_ENGAGEMENT_D_MIN < PRESS_ENGAGEMENT_MIN_D:
         f" under {PRESS_ENGAGEMENT_MIN_D} D"
     )
 # The shortest proud pin, less its free (round) end's crown, keys the block
-# over at least 1.5 D of full diameter: (5.996 - 0.406) / 3.175 = 1.76 D.
+# over at least 1.5 D of full diameter: (6.604 - 0.406) / 3.175 = 1.95 D.
 SLIP_ENGAGEMENT_D_MIN = (PROUD_MIN - FREE_END_LEN) / DIA
 if SLIP_ENGAGEMENT_D_MIN < PRESS_ENGAGEMENT_MIN_D:
     raise AssertionError(
