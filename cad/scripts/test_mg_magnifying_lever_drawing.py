@@ -978,20 +978,38 @@ def _assert_detail_thread_ink_routes(annotations, native_note, project, detail):
             Segment(root[0], ly - 0.0027781, tip[0], ly - 0.0027781, "dim-line"),
         ),
     )
+    # Under the rod, the incomplete-thread witnesses run down from the rod to
+    # their dimension line below the qualifier station; charge them to 10 mm
+    # below that station.
+    ix, iy, _z = annotations["IncompleteLength"].GetPosition()
+    bottom = -values["RodDia"] / 2.0
+    incomplete = AnnotationGeometry(
+        label="IncompleteLength", kind="dim", owner="detail",
+        segments=tuple(
+            Segment(px, py - 0.001, px, iy - 0.010, "ext-line")
+            for px, py in (
+                project(None, detail, (values["OverallLength"] - values["IncompleteLength"], bottom, 0.0)),
+                project(None, detail, (values["OverallLength"], bottom, 0.0)),
+            )
+        ),
+    )
     # The R10 unwrapped mate/BRACKET row spans64.3701mm. It crosses the
-    # source-derived tip witness at this recipe station; do not lose this control.
+    # source-derived incomplete-thread witness at this station; keep the control.
     unwrapped = AnnotationGeometry(
         label="native detail thread", kind="note", owner="detail",
         text_boxes=(Box(x + 0.0002567, rows[1].ymin, x + 0.0646268, rows[1].ymax),),
     )
-    before = SheetGeometry("Sheet1", template.width_m, template.height_m, region, annotations=(length, unwrapped))
+    before = SheetGeometry("Sheet1", template.width_m, template.height_m, region, annotations=(length, incomplete, unwrapped))
     assert any(item.a == unwrapped.label for item in find_text_on_line(before))
     wrapped = AnnotationGeometry(label=unwrapped.label, kind="note", owner="detail", text_boxes=rows)
-    after = SheetGeometry("Sheet1", template.width_m, template.height_m, region, annotations=(length, wrapped))
+    after = SheetGeometry("Sheet1", template.width_m, template.height_m, region, annotations=(length, incomplete, wrapped))
     assert find_text_on_line(after) == []
     assert find_text_on_text(after) == []
     assert find_border_breaches(after) == []
-    assert min(segment_box_distance(witness, row) for witness in length.segments[:2] for row in rows) >= ARROW_TEXT_CLEARANCE_M
+    # The rows sit wholly under the rod: the leader rises to its near edge.
+    assert max(row.ymax for row in rows) < project(None, detail, (0.0, bottom, 0.0))[1]
+    witnesses = (*length.segments[:2], *incomplete.segments)
+    assert min(segment_box_distance(witness, row) for witness in witnesses for row in rows) >= ARROW_TEXT_CLEARANCE_M
 
 
 

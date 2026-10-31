@@ -59,6 +59,7 @@ from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
+from _supplier_dimensions import supplier_reference_dimension
 from _surface_finish import surface_finish_by_key
 import _telemetry
 import mg_wheel_axle_callouts as callouts
@@ -68,6 +69,7 @@ from mg_wheel_axle_spec import (
     DRAWING_PRECISION,
     LIMIT_PAIRS,
     PIN_DIA,
+    PIN_DIA_FRACTION_DENOMINATOR,
     RELIEF_DIA,
     RELIEF_ROOT_R,
     RELIEF_WIDTH,
@@ -680,6 +682,23 @@ def _assert_part_authored_text(named: dict[str, Any]) -> None:
         )
 
 
+def _pin_stock_reference(adapter: Any, named: dict[str, Any]) -> None:
+    """The drill rod's Ø prints as its REF stock fraction, its below-callout
+    the part-authored fits (draw_mg_magnifying_lever._rod_stock_reference):
+    the fraction set on the model dimension does not reach the sheet."""
+    supplier_reference_dimension(
+        adapter,
+        _display(named["PinDia"]),
+        label="wheel axle drill-rod diameter",
+        units="in",
+        precision=DRAWING_PRECISION_BY_NAME["PinDia"],
+        expected_mm=PIN_DIA,
+        presentation="diameter",
+        fraction_denominator=PIN_DIA_FRACTION_DENOMINATOR,
+        callout=callouts.PIN_DIA_CALLOUT,
+    )
+
+
 def _assert_relief_limits(named: dict[str, Any]) -> None:
     """Each relief size imported with its part's native tolerance: the Ø
     and root radius single limits, the width's LIMIT pair."""
@@ -860,6 +879,7 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*side_annotations, *detail_annotations]
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     named = _by_name(adapter, annotations)
+    _pin_stock_reference(adapter, named)
     _assert_part_authored_text(named)
     _assert_relief_limits(named)
     _dress_relief_roots(adapter, named)

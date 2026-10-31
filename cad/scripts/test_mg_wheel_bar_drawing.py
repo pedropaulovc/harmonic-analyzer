@@ -324,7 +324,7 @@ def test_axle_bore_is_a_marked_reamed_cut() -> None:
         "ClampStation2": 3,
     }
     assert model_toleranced_dimensions(part) == {
-        ("Bar", "BarDepth"): "*deviations(BAR_DEPTH_BAND)",
+        ("Bar", "BarDepth"): "BAR_DEPTH_BAND[0]",
         ("AxleBoreProfile", "AxleBoreDia"): "*deviations(AXLE_BORE_BAND)",
         ("BoreRowReference", "ClampRowFromTop"): "CLAMP_POSITION_BAND",
         ("BoreRowReference", "ClampStation1"): "CLAMP_POSITION_BAND",

@@ -492,11 +492,12 @@ async def build(adapter) -> dict[str, str]:
     # print's dimensions and stamp the make-critical title-block properties.
     # The height has no band: the title block's .XX governs it. Each band
     # prints at its dimension's inch places.
-    set_dimension_bilateral_tolerance(
+    # Equal deviations print as one symmetric +/- band.
+    set_dimension_symmetric_tolerance(
         adapter,
         "Bar",
         "BarDepth",
-        *deviations(BAR_DEPTH_BAND),
+        BAR_DEPTH_BAND[0],
         places=DRAWING_PRECISION["Bar"]["BarDepth"],
         display_unit=UNIT,
     )

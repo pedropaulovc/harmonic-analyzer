@@ -170,7 +170,7 @@ def test_pin_is_one_front_plane_revolve() -> None:
 def test_tolerances_are_native_on_the_model() -> None:
     # The stock Ø carries no model band: the supplier's governs it.
     assert model_toleranced_dimensions(part) == {
-        ("PinProfile", "ThreadLength"): "*deviations(THREAD_LEN_BAND)",
+        ("PinProfile", "ThreadLength"): "THREAD_LEN_BAND[0]",
     }
     assert set(spec.DRAWING_BANDS) == {("PinProfile", "ThreadLength")}
     # Both lengths read from the gauged step: the shank only places the back
@@ -258,9 +258,6 @@ def test_callouts_are_part_authored_and_only_read_by_the_sheet() -> None:
         callouts.TEXT_PREFIX: "(",
         callouts.TEXT_SUFFIX: ")",
     }
-    # The drill rod's Ø is a stock reference.
-    assert authored["PinDia"][callouts.TEXT_PREFIX] == "(<MOD-DIAM>"
-    assert authored["PinDia"][callouts.TEXT_SUFFIX] == ")"
     assert authored["ReliefRootR"] == {callouts.CALLOUT_ABOVE: "2X"}
 
 

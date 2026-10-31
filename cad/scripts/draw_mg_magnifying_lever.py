@@ -61,13 +61,14 @@ DETAIL_CENTER = (0.310, 0.190)
 DETAIL_SCALE = (3, 1)
 DETAIL_FOCUS = (0.156, 0.0, 0.0)
 DETAIL_RADIUS_MM = 12.5
-# Three native callout rows wrap BRACKET below its mate ID between the length
-# witnesses. Their actual font, leader and clearance still require native audit.
+# Three native callout rows wrap BRACKET below its mate ID. They sit under the
+# rod, on the side of the callout's native attachment, so the leader does not
+# cross the part. Their actual font, leader and clearance still require native audit.
 DETAIL_KEEP = {"ThreadLength": (0.323, 0.255), "IncompleteLength": (0.377, 0.165)}
 # R24: end the diameter witnesses left of the unchanged finish symbol/leader;
 # keep the qualifier above the screw-seat note and below the free-end note.
 FRONT_KEEP = {"OverallLength": (0.115, 0.088), "RodDia": (0.055, 0.166)}
-DETAIL_THREAD_NOTE_XY = (0.2926, 0.245)
+DETAIL_THREAD_NOTE_XY = (0.2760, 0.172)
 CALLOUTS = {"IncompleteLength": LEAD_CALLOUT}
 
 

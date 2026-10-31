@@ -71,11 +71,10 @@ if any("\n" in text for text in CALLOUTS[CALLOUT_ABOVE].values()):
     raise AssertionError("an above-callout with a line break never prints")
 
 # The overall is the shank, the thread and the dome summed: a "(2.20)"
-# reference (rule 10). The shank's Ø is the drill rod's as supplied: a
-# "(Ø3/16)" stock reference.
+# reference (rule 10). The shank's "(Ø3/16 in)" stock reference is dressed on
+# the sheet (draw_mg_wheel_axle._pin_stock_reference).
 REFERENCE_TEXT: dict[tuple[str, str], dict[int, str]] = {
     ("PinProfile", "PinLength"): {TEXT_PREFIX: "(", TEXT_SUFFIX: ")"},
-    ("PinProfile", "PinDia"): {TEXT_PREFIX: "(<MOD-DIAM>", TEXT_SUFFIX: ")"},
 }
 
 
