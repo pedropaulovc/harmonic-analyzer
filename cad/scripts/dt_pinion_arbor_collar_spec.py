@@ -183,9 +183,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # fits (their bands ride the dimensions), one everywhere else.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CollarProfile": {"CollarOd": 1},
-    # Four places print the 5/16 drill exactly (7.9375): at two, 7.94 would
-    # reject the drill's own size.
-    "BoreProfile": {"BoreDia": 4},
+    # Two places, the drill grid (drawing-guidelines rule 3); the callout
+    # names the 5/16 drill, which governs the hole (machinist review, #290
+    # batch 0: Ø7.9375 read as a precision no drill holds).
+    "BoreProfile": {"BoreDia": 2},
     "Collar": {"Depth": 1},
     "PinHoleProfile": {"PinHoleDia": 2, "PinHoleCz": 1},
 }
@@ -202,7 +203,7 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # (the MHA-DT-14 strap precedent); the hole callout names the pin it takes,
 # the same callout MHA-DT-22 prints for the same pin (PIN_NUMBER and
 # PIN_HOLE_CALLOUT come from dt_pinion_arbor_pin_spec).
-BORE_CALLOUT = f"DRILL THRU\nSLIDES ON {ARBOR_NUMBER}"
+BORE_CALLOUT = f"5/16 DRILL THRU\nSLIDES ON {ARBOR_NUMBER}"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 
 # The rig's first assembly step (Codex #860, PRRT_kwDOPHDy386mTbe7).  The
