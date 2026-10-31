@@ -32,12 +32,11 @@ from _printed_tolerance import (
     angular_band_deg,
     drilled_oversize_mm,
     drilled_undersize_mm,
-    edge_break_chamfer_display,
     edge_break_chamfer_mm,
-    edge_break_radius_display,
     edge_break_radius_mm,
     printed_band_mm,
 )
+from _title_block_units import edge_break_chamfer_display, edge_break_radius_display
 
 SUPPORTED_PARTS = discover_parts(Path(__file__).resolve().parent)
 REPO = Path(__file__).resolve().parents[2]

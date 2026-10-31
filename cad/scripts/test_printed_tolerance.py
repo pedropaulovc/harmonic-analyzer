@@ -1,5 +1,6 @@
 """The title block's unit-explicit general tolerances (#290): one reader that
-returns physical millimetres, one renderer that derives the printed text."""
+returns physical millimetres (_printed_tolerance) and one renderer that derives
+the printed text (_title_block_units)."""
 
 from __future__ import annotations
 
@@ -7,6 +8,7 @@ import pytest
 
 import _config
 import _printed_tolerance as tol
+import _title_block_units as units
 
 
 def _rows(monkeypatch: pytest.MonkeyPatch, **rows: dict) -> None:
@@ -31,7 +33,7 @@ def _rows(monkeypatch: pytest.MonkeyPatch, **rows: dict) -> None:
     ],
 )
 def test_render_number_round_trips_in_its_own_unit(value, unit, digits, text, per_unit):
-    rendered = tol.render_number(value, unit, digits)
+    rendered = units.render_number(value, unit, digits)
     assert rendered == text
     # Read back in the unit it was printed in, the text is the same physical size.
     assert float(rendered.removesuffix("°")) * per_unit == pytest.approx(
@@ -41,19 +43,19 @@ def test_render_number_round_trips_in_its_own_unit(value, unit, digits, text, pe
 
 def test_render_number_refuses_an_unknown_unit_and_a_signed_magnitude():
     with pytest.raises(ValueError, match="unknown display unit"):
-        tol.render_number(0.5, "cm", 1)
+        units.render_number(0.5, "cm", 1)
     with pytest.raises(ValueError, match="non-negative"):
-        tol.render_number(-0.5, "mm", 1)
+        units.render_number(-0.5, "mm", 1)
 
 
 def test_inch_band_converts_to_millimetres_and_prints_inch_style(monkeypatch):
     _rows(monkeypatch, linear_2pl={"value_in": 0.01, "band_in": 0.01, "digits": 2})
     assert tol.printed_band_mm(2) == pytest.approx(0.254)
-    assert tol.linear_band_display(2) == "±.01"
+    assert units.linear_band_display(2) == "±.01"
     # The same band authored in mm prints and reads as mm.
     _rows(monkeypatch, linear_2pl={"value_in": 0.01, "band_mm": 0.254, "digits": 3})
     assert tol.printed_band_mm(2) == 0.254
-    assert tol.linear_band_display(2) == "±0.254"
+    assert units.linear_band_display(2) == "±0.254"
 
 
 def test_inch_drilled_and_edge_rows_convert_and_render(monkeypatch):
@@ -64,17 +66,17 @@ def test_inch_drilled_and_edge_rows_convert_and_render(monkeypatch):
         inside_corner={"radius_in": 0.040, "digits": 3},
     )
     assert tol.drilled_oversize_mm() == pytest.approx(0.1016)
-    assert (tol.drilled_hole_plus_display(), tol.drilled_hole_minus_display()) == (
+    assert (units.drilled_hole_plus_display(), units.drilled_hole_minus_display()) == (
         "+.004",
         "0",
     )
     assert tol.edge_break_radius_mm() == pytest.approx(0.254)
-    assert (tol.edge_break_radius_display(), tol.edge_break_chamfer_display()) == (
+    assert (units.edge_break_radius_display(), units.edge_break_chamfer_display()) == (
         "R.010",
         ".010",
     )
     assert tol.inside_corner_radius_mm() == pytest.approx(1.016)
-    assert tol.inside_corner_display() == "R.040 MAX"
+    assert units.inside_corner_display() == "R.040 MAX"
 
 
 @pytest.mark.parametrize(
@@ -102,7 +104,7 @@ def test_renderer_refuses_a_missing_digit_count(monkeypatch):
     _rows(monkeypatch, linear_1pl={"band_mm": 0.8})
     assert tol.printed_band_mm(1) == 0.8
     with pytest.raises(ValueError, match="digits"):
-        tol.linear_band_display(1)
+        units.linear_band_display(1)
 
 
 def test_angular_row_must_be_degrees(monkeypatch):

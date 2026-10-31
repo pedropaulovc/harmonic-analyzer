@@ -2351,7 +2351,8 @@ def stamps_title_block_properties(script: Path) -> bool:
 # nothing (Codex #854 review).  Every module that calls the accessor and is not
 # a stamper or a drawing script is listed here (test_dodo_recipe pins it); a
 # module that reads the rows through _printed_tolerance is covered by its import
-# closure (reads_title_block_geometry).
+# closure (reads_title_block_geometry).  The TOL_* text renderer
+# (_title_block_units) is stamping, not geometry, so it stays out.
 TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
     {
         "_printed_limits",

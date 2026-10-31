@@ -164,8 +164,8 @@ def title_block(kind: str) -> dict[str, Any]:
 
     ``title_block('linear_2pl')`` -> ``{value_in, band_mm, digits}``;
     ``title_block('angular')``    -> ``{value_deg, digits}``.  Read printed
-    bands and title-block text through ``_printed_tolerance``, which owns the
-    unit-explicit keys.
+    bands through ``_printed_tolerance`` and render title-block text through
+    ``_title_block_units``, which own the unit-explicit keys.
     """
     return _doc("title_block")[kind]
 

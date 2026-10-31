@@ -4182,7 +4182,8 @@ def test_every_title_block_reader_is_classified() -> None:
     # (drawing tasks always keep the token), or a geometry reader in the set.
     import _buildgraph
 
-    stampers = {"_config", "_part_properties", "_assembly"}  # accessor and TOL_* stamping
+    # The accessor, the TOL_* stampers and the TOL_* text they stamp.
+    stampers = {"_config", "_part_properties", "_assembly", "_title_block_units"}
     readers = {
         path.stem
         for path in (REPO_ROOT / "cad" / "scripts").glob("*.py")

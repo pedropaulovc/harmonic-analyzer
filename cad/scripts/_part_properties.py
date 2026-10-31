@@ -20,7 +20,7 @@ def title_block_properties() -> dict[str, str]:
     independently of any model registry or release identity.
     """
     import _config
-    import _printed_tolerance as tol
+    import _title_block_units as tol
 
     return {
         "TOL_LIN_X": tol.linear_band_display(1),
