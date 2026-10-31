@@ -70,9 +70,11 @@ THREAD_DIA_MM, STOCK_LENGTH_MM, HEAD_H_MM, _HEAD_DIA, _PITCH = FILLISTER_SIZE
 # AFTER geometry is not authorized by this reference-only port.
 #
 # Current catalogue-family recipe: skirt .189600 in (4.815840 mm), slot width
-# .055890 in (1.419606 mm), depth .083835 in (2.129409 mm), near-full-shank
-# threading with under-head runout. These are outside the source's skirt/slot
-# bands and are NOT relabelled with supplier limits on the installed surfaces.
+# .055890 in (1.419606 mm), depth .083835 in (2.129409 mm). These are outside
+# the source's skirt/slot bands and are NOT relabelled with supplier limits on
+# the installed surfaces.  The recipe threads the whole shank; this part
+# restores the plain shank above the source's 1.500 in thread
+# (FACTORY_THREAD_START_MM), so both sheets show the thread MSC supplies.
 # Head OD .414, height .237 and original length 4.000 match source upper limits.
 SUPPLIER_STOCK_CONFIGURATION = "SupplierMaxLimitEnvelope"
 SUPPLIER_STOCK_FEATURE = "SupplierMaxLimitProfile"
@@ -86,7 +88,7 @@ SUPPLIER_STOCK_NOTE = (
     "FINISHED CUT / FIT CONTROLS REMAIN ON SHEET 1."
 )
 SUPPLIER_MODEL_NOTE = (
-    "CURRENT SOLID HAS DIFFERENT SKIRT / SLOT / FULL-SHANK THREAD.\n"
+    "CURRENT SOLID HAS DIFFERENT SKIRT / SLOT.\n"
     "SOURCE LIMITS APPLY ONLY TO THE SEPARATE SHEET-2 DIAGRAM."
 )
 _R = SUPPLIER_HEAD_OD.envelope_mm / 2.0
@@ -270,6 +272,12 @@ FLOOR_HIGH_MM = (post.BLOCK_HEIGHT + _POST_HEIGHT_DEVIATIONS[1]) - (
     post.ATTACHMENT_CBORE_DEPTH + _CBORE_DEPTH_DEVIATIONS[0]
 )
 PLATE_THIN_MM = platform.PLATE_THICKNESS - PLATE_STOCK_BAND_MM
+# The factory thread runs SUPPLIER_THREAD_LENGTH up from the supplied tip; the
+# shank above it is plain.  Even on the lowest floor the plate's tapped hole
+# sits wholly below the thread start, so only full thread engages it.
+FACTORY_THREAD_START_MM = STOCK_LENGTH_MM - _T  # 2.500 in under the head
+if FACTORY_THREAD_START_MM >= FLOOR_LOW_MM:
+    raise ValueError("the plain shank reaches the platform's tapped hole")
 PLATE_THICK_MM = platform.PLATE_THICKNESS + PLATE_STOCK_BAND_MM
 
 # Pending ruling #1019 against rule 18: 0.90D minimum engagement.
@@ -479,5 +487,5 @@ if STOCK_LENGTH_MM - FACTORY_TIP_CHAMFER_MM <= CUT_LENGTH_MM:
 # length is the reference dimension above; its fit-to-hole acceptance is the
 # CutLength callout (CUT_TO_FIT_CALLOUT), not a note.
 MANUFACTURING_NOTES = (
-    "DEBURR CUT END.\nUNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE."
+    "UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE."
 )

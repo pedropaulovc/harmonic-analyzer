@@ -89,6 +89,15 @@ def test_no_fixed_cut_length_fits_both_in_band_corners() -> None:
     assert spec.FIXED_CUT_LENGTH_EXISTS is False
 
 
+def test_only_the_factory_thread_reaches_the_tapped_plate() -> None:
+    """MSC threads 1.500 in up from the supplied tip; the shank above is plain.
+    Even on the lowest floor the plate's tapped hole lies below the thread
+    start, so the engagement chain counts full thread only."""
+    assert spec.FACTORY_THREAD_START_MM == pytest.approx((4.000 - 1.500) * IN)
+    assert spec.FACTORY_THREAD_START_MM < spec.FLOOR_LOW_MM
+    assert spec.FACTORY_THREAD_START_MM < spec.CUT_LENGTH_MM
+
+
 def test_cut_length_prints_as_a_reference_without_a_band() -> None:
     """No fixed length exists, so the model's spec-derived length prints in
     parentheses without a band; the callout carries fit-to-hole acceptance."""
