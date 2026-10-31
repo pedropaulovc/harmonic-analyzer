@@ -74,6 +74,11 @@ _SUPPLIER_LANES = {
 # are placed from measured witness lines and text bounds, not this budget.
 _SUPPLIER_TEXT_ROOM = {"left": 0.0145, "bottom": 0.008, "right": 0.0265, "top": 0.004}
 _POSITION_TOLERANCE_M = 1e-5  # Same 10 um as imported-dimension placement readback.
+# Printed thread-diameter ink tops sit 1.06 mm above the native text box (farm
+# audit 20261031T195237722Z): at the bare 2.2 mm drop the collar witness stood
+# 1.14 mm from the ink and the thread line crossed it within half a text height.
+# The extra 1.5 mm leaves ~2.6 mm printed clearance on both counts.
+_THREAD_TEXT_DROP_M = 0.0015
 SUPPLIER_MARGINS = {
     "*Front": tuple(
         max(offset for side, offset in _SUPPLIER_LANES.values() if side == edge)
@@ -855,6 +860,7 @@ def _place_diameter_vertical_stations(
             "SupplierThreadDiameter": lower
             - CLEAR_GAP_M
             - PLACE_SETTLE_M
+            - _THREAD_TEXT_DROP_M
             - thread.ymax,
         }
         moved = False
