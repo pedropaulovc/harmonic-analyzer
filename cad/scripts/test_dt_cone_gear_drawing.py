@@ -146,7 +146,7 @@ def test_bore_bands_are_the_current_derived_seat_fit_bands() -> None:
     )
     assert spec.BORE_DIA_BAND[0] <= spec.terminal_web_bore_upper_mm()
     assert spec.BORE_DIA_BAND[0] - spec.BORE_DIA_BAND[1] >= 0.02 - 1e-9
-    assert spec.BORE_AF_BAND == pytest.approx((0.02, 0.01))
+    assert spec.BORE_AF_BAND == pytest.approx((0.02032, 0.01016))
     for teeth in spec.CONFIGURATION_TEETH:
         assert spec.bore_dia_mm(teeth) == pytest.approx(
             dt_cone_gear_shaft_spec.SECTION_DIAS[spec.land_section(teeth)]
