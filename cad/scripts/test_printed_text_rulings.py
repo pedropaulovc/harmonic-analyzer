@@ -11,6 +11,7 @@ regression fails outright.
 from __future__ import annotations
 
 import ast
+import functools
 import re
 from pathlib import Path
 
@@ -64,9 +65,17 @@ def printed_constants() -> dict[str, str]:
     """``module.NAME`` -> the literal text of every printed-text constant.
 
     A ``*_notes.py`` module exists to hold sheet text, so every string in it
-    (docstrings aside) counts, including the ones its helpers return."""
+    (docstrings aside) counts, including the ones its helpers return.
+
+    The sources do not change during a session, so the tree is parsed once
+    per scanned directory; each caller gets its own copy of the result."""
+    return dict(_printed_constants_in(SCRIPTS))
+
+
+@functools.cache
+def _printed_constants_in(scripts: Path) -> dict[str, str]:
     found: dict[str, str] = {}
-    for path in sorted(SCRIPTS.glob("*.py")):
+    for path in sorted(scripts.glob("*.py")):
         if path.name.startswith("test_"):
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"))

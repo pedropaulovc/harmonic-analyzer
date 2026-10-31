@@ -13,6 +13,7 @@ import asyncio
 import ast
 import functools
 import inspect
+import unicodedata
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -644,10 +645,24 @@ def test_the_keyword_guard_flags_a_call_without_dimensions_by_feature() -> None:
     ]
 
 
+def _may_import_hidden_sketches(path: Path) -> bool:
+    """Whether ``path`` can route a call to curate_view_dimensions at all.
+
+    The guard only follows calls through an import of _drawing_hidden_sketches,
+    so a source that never spells the module name cannot be flagged. Python
+    NFKC-normalizes identifiers, so non-ASCII text is searched normalized.
+    """
+    text = path.read_text(encoding="utf-8")
+    if not text.isascii():
+        text = unicodedata.normalize("NFKC", text)
+    return "_drawing_hidden_sketches" in text
+
+
 def test_every_hidden_sketch_curate_call_passes_its_required_keywords() -> None:
     wrong = {
         path.name: missing
         for path in sorted(_SCRIPTS.glob("*.py"))
-        if (missing := _hidden_curate_calls_missing_keywords(_tree(path)))
+        if _may_import_hidden_sketches(path)
+        and (missing := _hidden_curate_calls_missing_keywords(_tree(path)))
     }
     assert wrong == {}

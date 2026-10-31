@@ -43,6 +43,7 @@ import logging
 import re
 import sys
 import time
+import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
@@ -1489,7 +1490,15 @@ def test_no_document_the_build_opens_is_opened_view_only():
         for path in sorted(root.rglob("*.py")):
             if "_generated" in path.parts or path.name.startswith("test_"):
                 continue
-            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            text = path.read_text(encoding="utf-8")
+            # Every flagged or counted node names one of these attributes, so a
+            # source spelling none of them has nothing to report. Python
+            # NFKC-normalizes identifiers, so non-ASCII text is searched normalized.
+            spelled = text if text.isascii() else unicodedata.normalize("NFKC", text)
+            if not any(name in spelled for name in ("OpenDoc6", "OpenDoc7", "ViewOnly")):
+                continue
+            tree = ast.parse(text, filename=str(path))
+            relative = path.relative_to(REPO_ROOT).as_posix()
             constants = {
                 target.id: node.value.value
                 for node in tree.body
@@ -1500,7 +1509,7 @@ def test_no_document_the_build_opens_is_opened_view_only():
                 if isinstance(target, ast.Name)
             }
             for node in ast.walk(tree):
-                where = f"{path.relative_to(REPO_ROOT).as_posix()}:{getattr(node, 'lineno', '?')}"
+                where = f"{relative}:{getattr(node, 'lineno', '?')}"
                 if isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Store):
                     if node.attr == "ViewOnly":
                         violations.append(f"{where}: sets ViewOnly")

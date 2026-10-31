@@ -4767,8 +4767,18 @@ def isolated_feature_keys(isolated_assembly_helper_keys, monkeypatch):
         root / dodo.RELEASE_VERSION_FILE.relative_to(REPO_ROOT),
     )
 
-    def snapshot():
-        result = native_snapshot()
+    def snapshot(*, native=True):
+        """Every key group, or with ``native=False`` only ``features``.
+
+        Feature-only callers skip regenerating every part and assembly key, but
+        still start from an empty artefact-digest memo exactly as a full
+        snapshot does, so an edit made since the last call is always re-read.
+        """
+        if native:
+            result = native_snapshot()
+        else:
+            dodo._ARTEFACT_DIGEST_MEMO.clear()
+            result = {}
         tasks = {
             task["name"].removeprefix("features:"): task
             for task in dodo.task_package()
@@ -4822,7 +4832,7 @@ def test_one_draw_edit_rekeys_only_its_features_leaf_not_native_closures(
 )
 def test_features_keys_fold_each_real_shared_or_own_input(isolated_feature_keys, member):
     dodo, root, snapshot = isolated_feature_keys
-    before = snapshot()["features"]
+    before = snapshot(native=False)["features"]
     source = root / member
     assert source.is_file(), member
     if source.suffix == ".yaml":
@@ -4831,7 +4841,7 @@ def test_features_keys_fold_each_real_shared_or_own_input(isolated_feature_keys,
         source.write_bytes(source.read_bytes() + b"\nFEATURE_RECIPE_REVISION = 2\n")
     else:
         source.write_bytes(b"b" * 64 + b"\n")
-    after = snapshot()["features"]
+    after = snapshot(native=False)["features"]
     expected = {
         stem for stem in before if str(source.resolve()) in dodo._feature_export_file_deps(stem)
     }
@@ -4848,9 +4858,9 @@ def test_unrelated_config_edit_preserves_rocker_feature_key(isolated_feature_key
     source = root / member
     assert source.is_file(), member
     assert str(source.resolve()) not in dodo._feature_export_file_deps("ch_rocker_arm")
-    before = snapshot()["features"]["ch_rocker_arm"]
+    before = snapshot(native=False)["features"]["ch_rocker_arm"]
     source.write_bytes(source.read_bytes() + b"\nfeature_recipe_revision: 2\n")
-    assert snapshot()["features"]["ch_rocker_arm"] == before
+    assert snapshot(native=False)["features"]["ch_rocker_arm"] == before
 
 
 def test_prechips_rejects_unexported_enrollment(monkeypatch):

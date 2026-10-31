@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import ast
 import importlib
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -360,12 +361,26 @@ def _call_name(node: ast.Call) -> str | None:
     return None
 
 
+def _identifier_spelling(text: str) -> str:
+    """``text`` as the parser sees its identifiers, for substring prefilters.
+
+    Python NFKC-normalizes identifiers, so ``WIDTH_\uff22AND`` names
+    ``WIDTH_BAND``; search the normalized copy, parse the original."""
+    return text if text.isascii() else unicodedata.normalize("NFKC", text)
+
+
 def _band_uses() -> list[BandUse]:
     uses: list[BandUse] = []
     for path in sorted(SCRIPTS.glob("*.py")):
         if path.name.startswith("test_"):
             continue
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        text = path.read_text(encoding="utf-8")
+        # Every matched call spells one of these names in its source; parsing
+        # only the files that do yields the same uses for a fraction of the cost.
+        spelled = _identifier_spelling(text)
+        if not any(name in spelled for name in (*_BAND_HELPERS, _SETTER)):
+            continue
+        tree = ast.parse(text, filename=str(path))
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
@@ -503,7 +518,10 @@ def _inventory() -> list[tuple[str, str]]:
             or stem.endswith(("_spec", "_geometry", "_geom"))
         ):
             continue
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        text = path.read_text(encoding="utf-8")
+        if "_BAND" not in _identifier_spelling(text):
+            continue  # no assignment target can end in _BAND/_BANDS/_BAND_MM
+        tree = ast.parse(text, filename=str(path))
         for node in tree.body:
             targets = (
                 node.targets
@@ -788,3 +806,18 @@ def test_fit_helpers_share_band_validation(band: tuple[float, float]) -> None:
 )
 def test_deviations_preserves_released_bands(band: tuple[float, float]) -> None:
     assert _fit_deviations.deviations(band) == (band[1], band[0])
+
+
+def test_scans_find_nfkc_normalized_identifiers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The text prefilters must not drop a source the parser would match:
+    Python NFKC-normalizes identifiers, so full-width spellings count."""
+    (tmp_path / "width_spec.py").write_text(
+        "WIDTH_ＢAND = (0.0, 1.0)\nｄeviations(WIDTH_BAND)\n", encoding="utf-8"
+    )
+    monkeypatch.setitem(globals(), "SCRIPTS", tmp_path)
+    assert _inventory() == [("width_spec", "WIDTH_BAND")]
+    assert [(use.module, use.expression) for use in _band_uses()] == [
+        ("width_spec", "WIDTH_BAND")
+    ]
