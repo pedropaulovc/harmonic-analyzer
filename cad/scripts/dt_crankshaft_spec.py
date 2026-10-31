@@ -30,7 +30,6 @@ import dt_cone_pivot_post_spec
 import dt_crank_pinion_spec
 import dt_vn_crank_seat_drive_pin_spec
 import _sprocket_seat_geometry as seat_geometry
-from pd_transgear_removable_spec import UNIT as WHEEL_UNIT
 from dt_crank_hub_geometry import (
     FIDUCIAL_MODEL_DEPTH,  # noqa: F401 -- re-exported to the drawing contract
     FIDUCIAL_MODEL_DIA,  # noqa: F401 -- re-exported to the drawing contract
@@ -408,7 +407,8 @@ if (
 # own loosest clearance on the pilot is smaller, and it is not.  The chain
 # wrapping the wheel moves with it, so the drive train's radial chain air
 # takes this off.
-_DRILL_OVERSIZE = drilled_oversize_mm(unit=WHEEL_UNIT)  # the wheel's sheet
+# The wheel's (MHA-PD-10) sheet is inch: its drilled row.
+_DRILL_OVERSIZE = drilled_oversize_mm(unit="in")
 _WHEEL_PIN_FLOAT = (
     seat_geometry.PIN_HOLE_DIA + _DRILL_OVERSIZE - _DOWEL_OD[0]
 ) / 2.0 + 2.0 * seat_geometry.DRIVE_PIN_OFFSET_TOL
