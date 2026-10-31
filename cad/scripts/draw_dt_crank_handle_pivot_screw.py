@@ -60,6 +60,7 @@ from dt_crank_handle_pivot_screw_spec import (
     CHAMFER_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    END_PLAY_CALLOUT,
     HEAD_DIA,
     HEAD_LENGTH,
     OVERALL_LENGTH,
@@ -68,6 +69,7 @@ from dt_crank_handle_pivot_screw_spec import (
     RELIEF_DIA,
     RELIEF_END_STATION,
     RELIEF_LEAD,
+    SEAT_EDGE_CALLOUT,
     SEAT_STATION,
     SHOULDER_DIA,
     SURFACE_FINISHES,
@@ -271,7 +273,14 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, annotations, {"ReliefDia": RELIEF_CALLOUT}, location="below"
     )
     set_dimension_callouts(
-        adapter, annotations, {"TipChamfer": CHAMFER_CALLOUT}, location="below"
+        adapter,
+        annotations,
+        {
+            "TipChamfer": CHAMFER_CALLOUT,
+            "UnderHeadLocation": END_PLAY_CALLOUT,
+            "ShoulderDia": SEAT_EDGE_CALLOUT,
+        },
+        location="below",
     )
     offset_dimension_text(adapter, side_annotations, {"ReliefDia": RELIEF_DIA_TEXT_XY})
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)

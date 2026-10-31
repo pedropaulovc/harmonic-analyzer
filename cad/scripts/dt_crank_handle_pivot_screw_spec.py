@@ -370,17 +370,22 @@ FILE_ALLOWANCE_MAX = round(THREAD_LENGTH_MAX - ARM_STOCK_THICKNESS_MIN, 6)
 FILE_ALLOWANCE_MIN = round(FULL_THREAD_REACH_MIN - ARM_STOCK_THICKNESS_MAX, 6)
 # The fitted shoulder and both head bands' reasons, stated once (user ruling
 # 2026-09-29, after the MHA-DT-32 machinist review; the length band's reason
-# after the 1d2be3aaf re-review called it over-specification unstated).
+# after the 1d2be3aaf re-review called it over-specification unstated).  #290:
+# the note states function only; the end play and the seat edge's break print
+# as callouts on the dimensions they qualify.
 DRAWING_NOTES = "\n".join(
     (
         "FACE THE UNDER-HEAD TO SUIT THE BONDED MHA-DT-08: UNDER-HEAD TO SEAT",
-        "  FACE (SHOULDER END, EDGE BROKEN "
-        f"{inch_text(SEAT_EDGE_BREAK_MAX, 3)} MAX, ON MHA-DT-06) = FERRULE",
-        f"  FACE TO CUP FLOOR PLUS {inch_text(END_PLAY_RANGE[0], 3)}-"
-        f"{inch_text(END_PLAY_RANGE[1], 3)}. HEAD BEARS ON MHA-DT-35 FLOOR;",
+        "  FACE (SHOULDER END, ON MHA-DT-06) = FERRULE FACE TO CUP FLOOR PLUS",
+        "  THE END PLAY. HEAD BEARS ON MHA-DT-35 FLOOR;",
         "  DIA BAND KEEPS ITS BEARING, LENGTH BAND KEEPS IT BELOW CUP FACE.",
     )
 )
+END_PLAY_CALLOUT = (
+    f"FACED TO SUIT, {inch_text(END_PLAY_RANGE[0], 3)}-"
+    f"{inch_text(END_PLAY_RANGE[1], 3)} END PLAY"
+)
+SEAT_EDGE_CALLOUT = f"SEAT EDGE BREAK {inch_text(SEAT_EDGE_BREAK_MAX, 3)} MAX"
 
 # The shoulder's seat on the arm face: from the arm's printed maximum mouth
 # (the larger of it and the relief lead's envelope) out to the smallest
