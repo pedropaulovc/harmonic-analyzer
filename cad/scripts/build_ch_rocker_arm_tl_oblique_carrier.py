@@ -42,6 +42,8 @@ from collections.abc import Callable
 from typing import Any
 
 from _appearance import apply_material
+from _document_units import apply_package_model_units
+from _part_properties import part_drawing_unit
 from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
@@ -119,6 +121,7 @@ from ch_rocker_arm_tl_oblique_carrier_spec import (
     SECTION_REFERENCE,
     STOCK_REFERENCE_DX,
     PIN_CHAMFER_TOL_TYPE,
+    UNIT,
 )
 
 PART_NAME = "ch-rocker-arm-tl-oblique-carrier"
@@ -681,6 +684,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # --- Plate: Top-plane rectangle, extruded down by the stock -------------
     plate = SketchDims()
@@ -844,13 +848,22 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    # Rule 4: the reamed H7 pin holes and the +/-0.02 pin-position chain.
+    # Rule 4: the reamed pin holes and the pin-position chain; the bands are
+    # millimetres, UNIT prints them in inches.
     set_dimension_bilateral_tolerance(
-        adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_BAND)
+        adapter,
+        "PinHoleProfile",
+        "PinHoleDia",
+        *deviations(PIN_HOLE_BAND),
+        display_unit=UNIT,
     )
     for dimension_name in POSITION_BANDED:
         set_dimension_symmetric_tolerance(
-            adapter, "PinHoleProfile", dimension_name, POSITION_BAND
+            adapter,
+            "PinHoleProfile",
+            dimension_name,
+            POSITION_BAND,
+            display_unit=UNIT,
         )
     _pin_chamfer_min_limit(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)

@@ -9,6 +9,7 @@ import _telemetry
 import ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec as part
 from _com import _early_bound
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import NumberFit, build_purchased_fastener_drawing
 from _session import run_build
 from _supplier_limits import LIMIT
@@ -19,12 +20,12 @@ from _machinist_review_mode import MachinistReviewMode
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_pivot_spacer"]
-ITEM = '18-8 STAINLESS STEEL ROUND SPACER, 10 MM ID X 16 MM OD X 15 MM'
+ITEM = '6061 ALUMINUM ROUND SPACER, 3/8 SCREW, 5/8 OD X 5/8 LONG'
 # Every text shelves right of its own witnesses, clear of the lines: the bore
 # on the Front's top lane, the OD on its bottom lane, the length beside
 # the Top view. Front and Top reserve the same left/right space so the fit
 # centres them on one projection line; the Front's equal top/bottom keeps it
-# level with the unannotated Right. The 16 x 15 mm part fits at 2:1.
+# level with the unannotated Right. The 5/8 x 5/8 part fits at 2:1.
 SHELVES = {
     "SupplierBoreDiameter": (True, "right"),
     "SupplierOuterDiameter": (True, "right"),
@@ -92,6 +93,7 @@ async def build(adapter) -> dict[str, str]:
         supplier_dimensions=supplier_dimensions,
         supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_supplier_dimensions,), supplier_data=part.SUPPLIER_DATA,
+        unit=part_drawing_unit(part.PART_NAME),
     )
 
 

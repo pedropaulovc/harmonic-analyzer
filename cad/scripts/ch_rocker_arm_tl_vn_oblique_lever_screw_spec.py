@@ -37,6 +37,7 @@ y = -length.  Mate the Top Plane to the head's seat, the TL-VN-71 pair's top.
 
 from __future__ import annotations
 
+import _config
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 from _mcmaster_91251a583 import (
     DIMS,
@@ -46,7 +47,12 @@ from _mcmaster_91251a583 import (
     PART_NO,
     THREAD,
 )
+from _package_units import drawing_unit
 
+UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-vn-oblique-lever-screw",
+    _config.parts("ch-rocker-arm-tl-vn-oblique-lever-screw"),
+)
 SKU = PART_NO
 ROW = fasteners.LEVER_TO_CARRIER
 QUANTITY = ROW.count

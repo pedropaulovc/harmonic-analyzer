@@ -14,15 +14,16 @@ spindle axis at table top; +X along the table, +Y toward the column, +Z up.
 Rows give the machine image of each part's local axis.
 
 Rail 1 carries the integral feed block; rail 2 carries the plain pivot block.
-Both blocks stand on the carriage tops at 40.0 and finish at 64.3 (the base
-bars faced to 12.0, owner ruling 2026-10-30). Selected
-DIN 988 shims (nominal five 0.2 a support) and loose 15 mm spacers support the
-carrier at nominal Z80.3.
+Both blocks stand on the carriage tops (``trammel.CARRIAGE_TOP_Z``) and finish
+at ``trammel.PIVOT_BLOCK_TOP_Z`` on base bars faced to ``trammel.BASE_BAR_THICK``
+(owner ruling 2026-10-30). Selected shims (the nominal pack
+``trammel.PIVOT_SHIM_PACK`` a support) and loose spacers support the carrier
+at ``trammel.CARRIER_UNDERSIDE_Z``. The sheet prints decimal inch (``UNIT``).
 The carrier turns directly on purchased shoulder screws. Their shoulders
 bottom in the blocks' counterbores, not on the carrier, and their heads
 positively capture it without clamping its running faces.
 
-The raised leadscrew axis is Z52.4. The flanged nut seats directly in the
+The leadscrew axis is raised (``leadscrew``). The flanged nut seats directly in the
 feed-block lug. KP08 mounting-hole float aligns the screw at both travel ends;
 there is no detachable bracket or transfer-spotted interface.
 
@@ -62,7 +63,9 @@ import math
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+from _assembly_contract import assembly_contract
 from _printed_tolerance import printed_band_mm
+from _title_block_units import LENGTH_UNITS
 
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as pivot_screw
@@ -99,6 +102,25 @@ import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 
 ASM_NAME = "ch-rocker-arm-tl-oblique-jig"
 DRAWING_NUMBER = "MHA-CH-06-TL-00"
+# The sheet's unit (the contract's ``drawing_unit``); every printed length
+# below goes through ``_length``.
+UNIT = assembly_contract(ASM_NAME).drawing_unit
+
+
+def _length(value_mm: float, places: int) -> str:
+    """``value_mm`` as the sheet prints it: ``.080`` or ``-15.250`` in inch."""
+    text = f"{value_mm / LENGTH_UNITS[UNIT]:.{places}f}"
+    if UNIT == "in":
+        text = text.replace("0.", ".", 1) if text.lstrip("-").startswith("0.") else text
+    return text
+
+
+def _bound(value_mm: float, places: int, *, up: bool) -> str:
+    """``value_mm`` rounded outward (``up`` or down) to the sheet's ``places``."""
+    scale = 10**places / LENGTH_UNITS[UNIT]
+    rounded = (math.ceil if up else math.floor)(round(value_mm * scale, 9))
+    return _length(rounded / scale, places)
+
 
 BASE_BAR = "ch-rocker-arm-tl-oblique-base-bar"
 PIVOT_BLOCK = "ch-rocker-arm-tl-oblique-pivot-block"
@@ -333,8 +355,9 @@ CARRIER_ROWS = _rz(POSE.rotation, ((1.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, -1.0,
 RISER_ORIGIN = _at(riser.BLANK_ORIGIN, trammel.CARRIER_TOP_Z)
 RISER_ROWS = PIN_ROWS
 
-# The cut gauge pin is bonded in the unchanged carrier hole, factory end up.
-HUB_SET_ABOVE_RISER = 2.0
+# The cut gauge pin is bonded in the carrier's HUB hole, factory end up, its
+# top set hub_pin.TIP_SET above the riser; its bottom lands on the underside.
+HUB_SET_ABOVE_RISER = hub_pin.TIP_SET
 HUB_PIN_TOP_Z = trammel.CARRIER_TOP_Z + trammel.RISER_THICK + HUB_SET_ABOVE_RISER
 HUB_PIN_ORIGIN = _at(trammel.HUB, HUB_PIN_TOP_Z - hub_pin.CUT_LENGTH)
 HUB_PIN_ROWS = PIN_ROWS
@@ -614,27 +637,46 @@ LEVER_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
 )
 
 # The screw head is the positive carrier lift stop. The shoulder's seating
-# plane is independent of the selected support shims.
-PIVOT_RUNNING_GAP = (0.05, 0.25)
+# plane is independent of the selected support shims. Owner ruling
+# 2026-10-31: the measured head-to-carrier running gap is .002-.010, and the
+# cut thread's tip stands at least .011 above the block bottom.
+_THOU = trammel.INCH / 1000.0
+PIVOT_RUNNING_GAP = (2 * _THOU, 10 * _THOU)  # .002-.010
+PIVOT_TIP_CLEARANCE_MIN = 11 * _THOU  # .011
 PIVOT_SCREW_TORQUE_NM = 4.0
 PIVOT_NOMINAL_RUNNING_GAP = PIVOT_HEAD_UNDERSIDE_Z - trammel.CARRIER_TOP_Z
-PIVOT_THREAD_ENGAGEMENT = pivot_block.PIVOT_THREAD_ENGAGEMENT  # full form, 11.125
+PIVOT_THREAD_ENGAGEMENT = pivot_block.PIVOT_THREAD_ENGAGEMENT  # full form, .487 nominal
 PIVOT_THREAD_TIP_Z = PIVOT_SCREW_BOTTOM_Z - pivot_screw.THREAD_LENGTH
 if not PIVOT_RUNNING_GAP[0] <= PIVOT_NOMINAL_RUNNING_GAP <= PIVOT_RUNNING_GAP[1]:
-    raise AssertionError("the nominal shoulder head must clear the carrier")
-if PIVOT_THREAD_TIP_Z <= trammel.CARRIAGE_TOP_Z:
-    raise AssertionError("the shoulder-screw tip must stay inside the block")
-# Under 1.5D (1.39D): owner exception RV-05 (2026-10-27) in the jig config.
-if round(PIVOT_THREAD_ENGAGEMENT / pivot_screw.THREAD_DIA, 2) < pivot_block.PIVOT_THREAD_ENGAGEMENT_MIN_D:
-    raise AssertionError("the M8 receiver's full-form engagement is under RV-05's stated floor")
+    raise AssertionError("the nominal shoulder head must clear the carrier inside the window")
+if PIVOT_THREAD_TIP_Z - trammel.CARRIAGE_TOP_Z < PIVOT_TIP_CLEARANCE_MIN - 1e-9:
+    raise AssertionError("the shoulder-screw tip must stand inside the block")
+if pivot_block.PIVOT_TIP_CLEARANCE_MIN < PIVOT_TIP_CLEARANCE_MIN - 1e-9:
+    raise AssertionError("the shoulder-screw tip reaches the block bottom at the worst case")
+# Rule 18 at the worst case: the cut thread's full form is at least 1.5D.
+if pivot_block.PIVOT_THREAD_ENGAGEMENT_MIN < 1.5 * pivot_screw.THREAD_DIA:
+    raise AssertionError("the pivot receiver's full-form engagement is under 1.5D")
 if PIVOT_THREAD_ENGAGEMENT != fasteners.PIVOT_SCREW_TO_BLOCK.engagement_mm:
-    raise AssertionError("the fastener table's M8 engagement is not the block's")
+    raise AssertionError("the fastener table's pivot engagement is not the block's")
+# Radially, the shoulder clears its block seat and the carrier's pin holes, and
+# the spacer and shim bores clear the shoulder: no member locates on another.
+_SHOULDER_MAX = pivot_screw.SHOULDER_DIA + pivot_screw.SHOULDER_DIA_BAND[0]
+if pivot_block.PIVOT_LOCATING_CLEARANCE_MIN <= 0.0:
+    raise AssertionError("the shoulder does not clear its block seat")
+if carrier.PIN_HOLE_DIA + min(carrier.PIN_HOLE_BAND) <= _SHOULDER_MAX:
+    raise AssertionError("the shoulder does not clear the carrier's pin holes")
+if pivot_spacer.ID + min(pivot_spacer.ID_BAND) <= _SHOULDER_MAX:
+    raise AssertionError("the spacer bore does not clear the shoulder")
+if pivot_shim.ID + min(pivot_shim.ID_BAND) <= _SHOULDER_MAX:
+    raise AssertionError("the shim bore does not clear the shoulder")
 
-# Owner ruling 2026-10-27 (B), Codex P2: with every stack member at its loose
-# band (shoulder +0.05/0, seat at its printed places, spacer ±0.13, carrier at
-# .X) the unshimmed head gap stays open; shims, which only close it, are the
+# With every stack member at its band (the shoulder length at its +/-.005
+# envelope, seat depth at its printed places, spacer +/-.005, carrier at .XX)
+# the unshimmed head gap stays open; shims, which only close it, are the
 # fitting adjustment that brings the measured gap into PIVOT_RUNNING_GAP.
-_SEAT_BAND = printed_band_mm(pivot_block.DRAWING_PRECISION_BY_NAME["TopBoreDepth"])
+_SEAT_BAND = printed_band_mm(
+    pivot_block.DRAWING_PRECISION_BY_NAME["TopBoreDepth"], unit=pivot_block.UNIT,
+)
 _UNSHIMMED_NOMINAL = (
     pivot_screw.SHOULDER_LENGTH - pivot_block.BORE_DEPTH - pivot_spacer.LENGTH - trammel.CARRIER_THICK
 )
@@ -644,52 +686,52 @@ PIVOT_UNSHIMMED_GAP_RANGE = (
     - pivot_spacer.LENGTH_BAND[0] - trammel.CARRIER_THICK_BAND,
     _UNSHIMMED_NOMINAL + pivot_screw.SHOULDER_LENGTH_BAND[0] + _SEAT_BAND
     - pivot_spacer.LENGTH_BAND[1] + trammel.CARRIER_THICK_BAND,
-)  # +0.09 .. +2.26
+)  # .021 .. .071
 if abs(trammel.PIVOT_SHIM_PACK - pivot_shim.PER_SUPPORT * pivot_shim.THICKNESS) > 1e-9:
     raise AssertionError("the modeled shim pack is not PER_SUPPORT TL-VN-79 shims")
-# Every unshimmed gap in the range reaches the window with a pack in 0.1 steps
-# (the thinnest fitting shim), checked at 0.01 across the whole range.
-_FIT_TENTHS = sorted(round(t * 10) for t in pivot_shim.FIT_SKUS)  # 0.1, 0.2, 0.5
-_GAP_LO, _GAP_HI = (round(g * 100) for g in PIVOT_UNSHIMMED_GAP_RANGE)
-_WIN_LO, _WIN_HI = (round(g * 100) for g in PIVOT_RUNNING_GAP)
-if _FIT_TENTHS[0] != 1:
-    raise AssertionError("the fitting stock no longer steps the pack by 0.1")
+# Every unshimmed gap in the range reaches the window with a pack in steps of
+# the thinnest fitting shim (.004), checked at every .001 across the range.
+_FIT_THOU = sorted(pivot_shim.FIT_SKUS)  # .004, .008, .020
+_STEP = _FIT_THOU[0]
+if any(thou % _STEP for thou in _FIT_THOU):
+    raise AssertionError("a fitting shim is not a whole number of .004 steps")
+_GAP_LO, _GAP_HI = (round(g / _THOU) for g in PIVOT_UNSHIMMED_GAP_RANGE)
+_WIN_LO, _WIN_HI = (round(g / _THOU) for g in PIVOT_RUNNING_GAP)
 if _GAP_LO < _WIN_LO:
     raise AssertionError("an unshimmed head can clamp the carrier at the worst case")
 for _gap in range(_GAP_LO, _GAP_HI + 1):
-    if not any(_WIN_LO <= _gap - 10 * n <= _WIN_HI for n in range(_gap // 10 + 1)):
-        raise AssertionError(f"no shim pack fits a {_gap / 100:.2f} unshimmed gap")
-if not _WIN_LO <= round(PIVOT_NOMINAL_RUNNING_GAP * 100) <= _WIN_HI:
+    if not any(_WIN_LO <= _gap - _STEP * n <= _WIN_HI for n in range(_gap // _STEP + 1)):
+        raise AssertionError(f"no shim pack fits a .{_gap:03d} unshimmed gap")
+if not _WIN_LO <= round(PIVOT_NOMINAL_RUNNING_GAP / _THOU) <= _WIN_HI:
     raise AssertionError("the nominal pack does not fit the nominal stack")
-# The thickest pack the worst case needs (2.1), and the fewest stock shims
-# making it (5: four 0.5 and one 0.1; greedy is exact for 0.5/0.2/0.1).
-_PACK_MAX_TENTHS = math.ceil((_GAP_HI - _WIN_HI) / 10)
-PIVOT_FIT_PACK_MAX = _PACK_MAX_TENTHS / 10
-_WORST_PACK: dict[int, int] = {}  # tenths -> shims
-_rest = _PACK_MAX_TENTHS
-for _tenths in reversed(_FIT_TENTHS):
-    _WORST_PACK[_tenths], _rest = divmod(_rest, _tenths)
+# The thickest pack the worst case needs (.064), and the fewest stock shims
+# making it (4: three .020 and one .004; greedy is exact for .020/.008/.004).
+_PACK_MAX_THOU = math.ceil((_GAP_HI - _WIN_HI) / _STEP) * _STEP
+PIVOT_FIT_PACK_MAX = _PACK_MAX_THOU * _THOU
+_WORST_PACK: dict[int, int] = {}  # thou -> shims
+_rest = _PACK_MAX_THOU
+for _thou in reversed(_FIT_THOU):
+    _WORST_PACK[_thou], _rest = divmod(_rest, _thou)
 PIVOT_FIT_SHIMS_MAX = sum(_WORST_PACK.values())
 # Owner ruling 2026-10-27: TL-VN-79 stays one BOM identity, QTY its modeled
-# nominal pack (5 x 0.2 a support); the fitting stock bought with it is that
+# nominal pack (5 x .008 a support); the fitting stock bought with it is that
 # pack plus the worst-case pack at both supports. Each support's share of the
 # buy builds every pack up to the worst case, so both fit at once.
 _SUPPORTS = pivot_shim.QUANTITY // pivot_shim.PER_SUPPORT  # 2
-_BUY_TENTHS = {tenths: _SUPPORTS * count for tenths, count in _WORST_PACK.items()}
-_BUY_TENTHS[round(pivot_shim.THICKNESS * 10)] += pivot_shim.QUANTITY
-_SKU_BY_TENTHS = {round(t * 10): sku for t, sku in pivot_shim.FIT_SKUS.items()}
-# SKU -> (thickness, count), thinnest first: 0.1 x2, 0.2 x10, 0.5 x8.
+_BUY_THOU = {thou: _SUPPORTS * count for thou, count in _WORST_PACK.items()}
+_BUY_THOU[pivot_shim.THICKNESS_THOU] += pivot_shim.QUANTITY
+# SKU -> (thickness mm, count), thinnest first: .004 x2, .008 x10, .020 x6.
 PIVOT_SHIM_BUY = {
-    _SKU_BY_TENTHS[tenths]: (tenths / 10, _BUY_TENTHS[tenths]) for tenths in _FIT_TENTHS
+    pivot_shim.FIT_SKUS[thou]: (thou * _THOU, _BUY_THOU[thou]) for thou in _FIT_THOU
 }
-if any(count % _SUPPORTS for count in _BUY_TENTHS.values()):
+if any(count % _SUPPORTS for count in _BUY_THOU.values()):
     raise AssertionError("the shim buy list does not split evenly between the supports")
 _BUILDABLE = {0}
-for _tenths, _count in _BUY_TENTHS.items():
+for _thou, _count in _BUY_THOU.items():
     _BUILDABLE = {
-        built + k * _tenths for built in _BUILDABLE for k in range(_count // _SUPPORTS + 1)
+        built + k * _thou for built in _BUILDABLE for k in range(_count // _SUPPORTS + 1)
     }
-if not set(range(_PACK_MAX_TENTHS + 1)) <= _BUILDABLE:
+if not set(range(0, _PACK_MAX_THOU + 1, _STEP)) <= _BUILDABLE:
     raise AssertionError("the shim buy list cannot build every fitting pack at both supports")
 
 # Every instance of every logical family, in insertion order. Ordinary families
@@ -821,24 +863,25 @@ BOM_DESCRIPTIONS = {
     BASE_BAR: "BASE BAR",
     PIVOT_BLOCK: "PIVOT BLOCK",
     FEED_BLOCK: "FEED BLOCK",
-    PIVOT_SCREW: "M8X1.25 SHOULDER SCREW, 10 X 35",
-    PIVOT_SPACER: "SPACER, 10 ID X 16 OD X 15",
-    PIVOT_SHIM: "DIN 988 SHIM 10X16, FITTING STOCK",
+    PIVOT_SCREW: "5/16-18 SHOULDER SCREW, 3/8 X 1-1/2",
+    PIVOT_SPACER: "SPACER, 3/8 ID X 5/8 OD X 5/8",
+    PIVOT_SHIM: "SHIM 3/8 X 5/8, FITTING STOCK",
     CARRIER: "CARRIER PLATE",
     RISER: "ACETAL RISER",
     HUB_PIN: "HUB LOCATOR PIN",
     FEED_LEVER: "FEED LEVER",
     END_BRACKET: "END BRACKET",
     RAIL: (
-        f"HGR15R RAIL, {trammel.RAIL_LENGTH:.0f}, "
-        f"E{trammel.RAIL_HOLE_END:.0f} BOTH ENDS"
+        f"HGR15R RAIL, {trammel.RAIL_LENGTH:.0f} MM, "
+        f"E{trammel.RAIL_HOLE_END:.0f} MM BOTH ENDS"
     ),
     CARRIAGE: "HGH15CA CARRIAGE, Z0 PRELOAD",
-    CL_DOWEL: f"DOWEL PIN {cl_dowel.DIA:.0f} X {cl_dowel.LENGTH:.0f} M6, CL LOCATOR",
-    LEADSCREW: f"TR8X2 LEADSCREW, {leadscrew_stock.LENGTH:.0f} LONG",
+    CL_DOWEL: "DOWEL PIN 1/4 X 1, CL LOCATOR",
+    # Vendor-metric rows keep their millimetres, labelled (#290).
+    LEADSCREW: f"TR8X2 LEADSCREW, {leadscrew_stock.LENGTH:.0f} MM LONG",
     LEADSCREW_NUT: "TR8X2 FLANGED NUT, BRASS",
-    PILLOW_BLOCK: f"PILLOW BLOCK, {leadscrew.KP08_BORE:.0f} BORE, SET SCREWS",
-    HANDWHEEL: f"HANDWHEEL {leadscrew.HANDWHEEL_WHEEL_DIA:.0f} DIA, 8 BORE",
+    PILLOW_BLOCK: f"PILLOW BLOCK, {leadscrew.KP08_BORE:.0f} MM BORE, SET SCREWS",
+    HANDWHEEL: f"HANDWHEEL {leadscrew.HANDWHEEL_WHEEL_DIA:.0f} MM DIA, 8 MM BORE",
     HOLD_DOWN_STUD: hold_down_stud.BOM_DESCRIPTION,
     T_NUT: t_nut.BOM_DESCRIPTION,
     FLANGE_NUT: flange_nut.BOM_DESCRIPTION,
@@ -1060,7 +1103,7 @@ ELEVATION_VIEW_LABEL = "ELEVATION FROM THE OPERATOR SIDE (-Y)"
 # 11), so the elevation prints it as a reference, parenthesised, no band.
 CL_TIP_FEATURE = "ClTipSetting"
 CL_TIP_DIMENSION = "ClTipAboveRiser"
-CL_TIP_PRECISION = 1
+CL_TIP_PRECISION = 3
 CL_TIP_RISER_TOP_Z = trammel.CARRIER_TOP_Z + trammel.RISER_THICK
 # The round tip: the dowel's local +Y end (cl_dowel frame) in the machine frame.
 _CL_TIP = frame_point(CL_DOWEL_PLACEMENTS[0], (0.0, cl_dowel.LENGTH, 0.0))
@@ -1158,8 +1201,10 @@ PLAN_TAGS: tuple[PlanTag, ...] = (
 
 # --- Fitter package text -------------------------------------------------------------
 # The rails are set by indicating a pin in each pivot block; the carrier holds
-# its own pin spacing to ±POSITION_BAND, the same band the readings use.
+# its own pin spacing to ±POSITION_BAND, the same band the readings use. The
+# readings and the band print at the carrier's 4 places (a .0001 DRO).
 ALIGNMENT_BAND = carrier.POSITION_BAND
+ALIGNMENT_PLACES = 4
 ASSEMBLED_CAPTION = (
     "INNER PASS AT THE SYMMETRIC POSITION: A1/B1; OUTER PASS: A2/B2. "
     "BOTH SHOULDER SCREWS MUST BE SEATED AND TORQUED BEFORE CUTTING. "
@@ -1172,9 +1217,10 @@ def _alignment_rows() -> tuple[str, ...]:
     rows = []
     for station, pins in trammel.ALIGNMENT_TARGETS.items():
         (x1, y1), (x2, y2) = pins["rail 1"], pins["rail 2"]
+        x1, y1, x2, y2 = (_length(v, ALIGNMENT_PLACES) for v in (x1, y1, x2, y2))
         rows.append(
-            f"S {station:5.1f}: RAIL 1 X {x1:8.3f} Y {y1:8.3f}; "
-            f"RAIL 2 X {x2:8.3f} Y {y2:8.3f}"
+            f"S {_length(station, 2):>5}: RAIL 1 X {x1:>8} Y {y1:>7}; "
+            f"RAIL 2 X {x2:>8} Y {y2:>7}"
         )
     return tuple(rows)
 
@@ -1183,7 +1229,7 @@ def _sweep_line() -> str:
     # Review bought-tl000-r1: the checks' "sweep of each pass" gets its range,
     # each pin's station over ±trammel.SWEEP, rounded outward.
     spans = ", ".join(
-        f"{name.upper()} {math.floor(lo):.0f} TO {math.ceil(hi):.0f}"
+        f"{name.upper()} {_bound(lo, 1, up=False)} TO {_bound(hi, 1, up=True)}"
         for name, (lo, hi) in trammel.PIN_TRAVEL.items()
     )
     return (
@@ -1194,7 +1240,8 @@ def _sweep_line() -> str:
 
 ALIGNMENT_NOTE_LINES = (
     "RAIL ALIGNMENT TARGETS: PIVOT PIN AXIS, MACHINE X/Y FROM THE SPINDLE, "
-    f"AT STATION S FROM THE SPINDLE ALONG THE RAIL (±{ALIGNMENT_BAND:.2f})",
+    "AT STATION S FROM THE SPINDLE ALONG THE RAIL "
+    f"(±{_length(ALIGNMENT_BAND, ALIGNMENT_PLACES)})",
     *_alignment_rows(),
 )
 SWEEP_NOTE_LINE = _sweep_line()
@@ -1238,12 +1285,16 @@ if leadscrew.BRACKET_SLIP_THRUST < leadscrew.SLIP_MARGIN_MIN * FEED_THRUST_N:
 _AL_SHEAR_ULTIMATE_MPA = 207.0
 _STRIP_SAFETY = 3.0
 _NUT_FACTOR = 0.20
-# A 4 N·m seating torque gives nominal 2.5 kN preload at K=.20 on M8.
-# The 6061 internal-thread shear estimate on the 11.125 full-form engagement
-# (43.4 kN, 17.4x the preload; RV-05 cites it) is deliberately limited to one
-# third of ultimate; this is a seating choice, not a whole-jig load certification.
+# A 4 N·m seating torque gives nominal 2.5 kN preload at K=.20 on the 5/16-18.
+# The 6061 internal-thread shear estimate on the worst-case full-form
+# engagement of the cut thread (.482, about 47 kN, 19x the preload) is
+# deliberately limited to one third of ultimate; this is a seating choice,
+# not a whole-jig load certification.
 PIVOT_SCREW_PRELOAD_N = PIVOT_SCREW_TORQUE_NM / (_NUT_FACTOR * pivot_screw.THREAD_DIA / 1000.0)
-PIVOT_THREAD_STRIP_N = 0.75 * math.pi * pivot_screw.THREAD_DIA * PIVOT_THREAD_ENGAGEMENT * _AL_SHEAR_ULTIMATE_MPA
+PIVOT_THREAD_STRIP_N = (
+    0.75 * math.pi * pivot_screw.THREAD_DIA * pivot_block.PIVOT_THREAD_ENGAGEMENT_MIN
+    * _AL_SHEAR_ULTIMATE_MPA
+)
 if PIVOT_SCREW_PRELOAD_N > PIVOT_THREAD_STRIP_N / _STRIP_SAFETY:
     raise ValueError("pivot seating torque exceeds the receiver-thread basis")
 
@@ -1393,22 +1444,17 @@ def _item(stem: str) -> str:
     return f"(ITEM {ITEM_NUMBERS[stem]})"
 
 
-def _limits(nominal: float, band: tuple[float, float], places: int) -> str:
-    """``low/high`` of ``nominal`` and its ``(upper, lower)`` deviation band."""
-    upper, lower = band
-    return f"{nominal + lower:.{places}f}/{nominal + upper:.{places}f}"
-
-
-# TL-21 supplies centre spots; the finished HUB hole remains unchanged.
+# TL-21 supplies centre spots; fit doc F16 (HUB, the purchased .4000 reamer)
+# and F19 (CL, the owned .2490 reamer) size the finished holes.
 _HUB_HOLE = (
-    f"HUB Ø{hub_pin.DIA:.2f} H7 THRU, BONDED LOCATOR "
+    f"HUB Ø{_length(carrier.HUB_HOLE_LIMITS[0], 4)}-"
+    f"{_length(carrier.HUB_HOLE_LIMITS[1], 4)} THRU, BONDED LOCATOR "
     f"{_item(HUB_PIN)}; LOCTITE 638"
 )
 _CL_HOLE = (
-    f"CL Ø{carrier.CL_DOWEL_DIA:.0f} N7 "
-    f"({_limits(carrier.CL_DOWEL_DIA, carrier.CL_HOLE_BAND, 3)}) THRU, FOR THE "
-    f"Ø{carrier.CL_DOWEL_DIA:.0f} X 20 M6 DOWEL "
-    f"({_limits(carrier.CL_DOWEL_DIA, carrier.CL_DOWEL_BAND, 3)})"
+    f"CL Ø{_length(carrier.CL_DOWEL_DIA + min(carrier.CL_HOLE_BAND), 4)}-"
+    f"{_length(carrier.CL_DOWEL_DIA + max(carrier.CL_HOLE_BAND), 4)} THRU, FOR THE "
+    f"1/4 X 1 DOWEL ({_length(cl_dowel.DIA_MIN, 4)}-{_length(cl_dowel.DIA_MAX, 4)})"
 )
 # The shared stud REWORK sheet points to this installed-stack acceptance.
 OPERATION_SHEET_NUMBER = 9
@@ -1444,9 +1490,9 @@ ASSEMBLY_STEPS = (
     "NO TRANSFER SPOTTING. FIT EACH KP08 "
     f"{_item(PILLOW_BLOCK)} WITH 2 {_KP08_SCREW} {_item(PILLOW_BLOCK_SCREW)}, LOOSE.",
     f"8. OIL THE LEADSCREW {_item(LEADSCREW)} WITH ISO VG 32 AND THREAD IT "
-    f"THROUGH THE KP08S AND NUT, {leadscrew.NEAR_STUB:.0f} PAST THE NEAR BLOCK. "
+    f"THROUGH THE KP08S AND NUT, {_length(leadscrew.NEAR_STUB, 2)} PAST THE NEAR BLOCK. "
     "COMPLETE F1 (SHEET 8). PUSH THE HANDWHEEL "
-    f"{_item(HANDWHEEL)} ON, HUB {leadscrew.HUB_GAP:.0f} OFF THE FAR BLOCK; "
+    f"{_item(HANDWHEEL)} ON, HUB {_length(leadscrew.HUB_GAP, 2)} OFF THE FAR BLOCK; "
     "TIGHTEN ITS AND THE KP08 SET SCREWS ON THE FLATS WITH LOCTITE 222 "
     "THREADLOCKER. THEN COMPLETE F2.",
     "9. REMOVE THE TEMPORARY SHOULDER SCREWS. FIT THE SPACERS AND CARRIER "
@@ -1462,12 +1508,15 @@ ASSEMBLY_STEPS = (
     f"{len(riser.SCREW_HOLES) + 3} HOLES FROM BELOW THROUGH THE FINISHED CARRIER "
     "HOLES; FINISH TO MHA-CH-06-TL-24 AND FIT WITH "
     f"{len(riser.SCREW_HOLES)} {_RISER_SCREW}S {_item(RISER_SCREW)}. "
-    f"ABRASIVE-CUT THE GAUGE PIN {_item(HUB_PIN)} TO {hub_pin.CUT_LENGTH:.1f}; "
+    f"ABRASIVE-CUT THE GAUGE PIN {_item(HUB_PIN)} TO "
+    f"{_length(hub_pin.CUT_LENGTH, hub_pin.CUT_PLACES)}; "
     "DEBURR THE CUT END ONLY, CUT END DOWN, FACTORY END UP. CLEAN AND BOND "
-    "WITH LOCTITE 638; SET ITS FACTORY TOP WITH A 2.0 GAUGE ABOVE THE RISER "
-    "(2.0 +/-0.2); LET THE BOND CURE BEFORE USE. PRESS THE CL DOWEL "
-    f"{_item(CL_DOWEL)} CHAMFERED END FIRST DOWN UNTIL ITS ROUND TIP IS "
-    f"{cl_dowel.TIP_SET_MIN:.2f}-{cl_dowel.TIP_SET_MAX:.2f} ABOVE THE RISER. "
+    f"WITH LOCTITE 638; SET ITS FACTORY TOP WITH A {_length(hub_pin.TIP_SET, 3)} "
+    f"GAUGE ABOVE THE RISER ({_length(hub_pin.TIP_SET, 3)} +/-"
+    f"{_length(hub_pin.TIP_SET_BAND, 3)}); LET THE BOND CURE BEFORE USE. "
+    f"PRESS THE CL DOWEL {_item(CL_DOWEL)} CHAMFERED END FIRST DOWN UNTIL ITS "
+    f"ROUND TIP IS {_length(cl_dowel.TIP_SET_MIN, 3)}-"
+    f"{_length(cl_dowel.TIP_SET_MAX, 3)} ABOVE THE RISER. "
     f"CHECK THE {carrier.STRAP_NUMBER} STRAP SEATS FLAT, LOCATES AND SLIDES OFF; "
     "THE CL TIP MUST NOT STAND ABOVE IT.",
     f"12. BOLT THE FEED LEVER ON WITH 2 {_LEVER_SCREW} {_item(LEVER_SCREW)} "
@@ -1481,7 +1530,8 @@ ASSEMBLY_STEPS = (
     "13D. RETURN TO A1/B1 PER O1; REPEAT HD4 AND THE CHECKS.",
 )
 ASSEMBLY_CHECKS = (
-    f"CHECK: EVERY ALIGNMENT READING WITHIN ±{ALIGNMENT_BAND:.2f} OF ITS TARGET.",
+    "CHECK: EVERY ALIGNMENT READING WITHIN "
+    f"±{_length(ALIGNMENT_BAND, ALIGNMENT_PLACES)} OF ITS TARGET.",
     "CHECK: HANDWHEEL FEEDS EACH COMPLETE PASS WITHOUT BINDING; BOTH "
     "CARRIAGES STAY ON THEIR RAILS AND ALL MOVING PARTS CLEAR STUDS, NUTS "
     "AND COLUMN COVER.",
@@ -1492,16 +1542,16 @@ PIVOT_FIT_STEPS = (
     f"P1. AT EACH SUPPORT SET A LOOSE SPACER {_item(PIVOT_SPACER)} ON THE "
     "BLOCK, NO SHIMS. LOWER THE CARRIER ON THE CHOSEN HOLE PAIR, SEAT BOTH "
     "SHOULDER SCREWS AND MEASURE EACH HEAD-TO-CARRIER GAP. LIFT THE CARRIER; "
-    f"UNDER EACH SPACER STACK SHIMS {_item(PIVOT_SHIM)}, DIN 988 FITTING "
+    f"UNDER EACH SPACER STACK SHIMS {_item(PIVOT_SHIM)}, FITTING "
     "STOCK PER THE BUY LIST UNDER THE BOM ("
-    + ", ".join(f"{sku} {t:.1f}" for t, sku in sorted(pivot_shim.FIT_SKUS.items()))
-    + f"), THAT CLOSE ITS GAP TO {PIVOT_RUNNING_GAP[0]:.2f}-"
-    f"{PIVOT_RUNNING_GAP[1]:.2f} THROUGH FREE SWING: NOMINAL "
-    f"{pivot_shim.PER_SUPPORT} X {pivot_shim.THICKNESS:.1f}, "
-    f"WORST CASE UP TO {PIVOT_FIT_PACK_MAX:.1f} ({PIVOT_FIT_SHIMS_MAX} SHIMS). "
+    + ", ".join(f"{sku} {_length(t * _THOU, 3)}" for t, sku in sorted(pivot_shim.FIT_SKUS.items()))
+    + f"), THAT CLOSE ITS GAP TO {_length(PIVOT_RUNNING_GAP[0], 3)}-"
+    f"{_length(PIVOT_RUNNING_GAP[1], 3)} THROUGH FREE SWING: NOMINAL "
+    f"{pivot_shim.PER_SUPPORT} X {_length(pivot_shim.THICKNESS, 3)}, "
+    f"WORST CASE UP TO {_length(PIVOT_FIT_PACK_MAX, 3)} ({PIVOT_FIT_SHIMS_MAX} SHIMS). "
     "REMEASURE. THE SAME SHIM SET MUST SERVE BOTH HOLE PAIRS; NO SHIM "
     "BETWEEN SPACER AND CARRIER.",
-    "P2. CLEAN THE M8 THREADS; APPLY LOCTITE 222. LIGHTLY GREASE THE "
+    f"P2. CLEAN THE {pivot_screw.THREAD} THREADS; APPLY LOCTITE 222. LIGHTLY GREASE THE "
     "SHOULDERS AND SPACER FACES WITH NLGI 2 LITHIUM GREASE, KEEPING THREADS "
     "CLEAN OF GREASE. "
     f"SEAT THE SHOULDERS IN THEIR COUNTERBORES AND TORQUE TO "
@@ -1512,19 +1562,19 @@ PIVOT_FIT_STEPS = (
 )
 # Sheet 2, under the BOM: what item 7's QTY counts and the fitting stock to buy.
 PIVOT_SHIM_STOCK_NOTE = "\n".join((
-    f"ITEM {ITEM_NUMBERS[PIVOT_SHIM]}: DIN 988 SHIM FITTING STOCK, SELECTED PER P1.",
+    f"ITEM {ITEM_NUMBERS[PIVOT_SHIM]}: SHIM FITTING STOCK, SELECTED PER P1.",
     f"BOM QTY. {pivot_shim.QUANTITY} IS THE NOMINAL PACK, {pivot_shim.PER_SUPPORT} X "
-    f"{pivot_shim.THICKNESS:.1f} A SUPPORT.",
+    f"{_length(pivot_shim.THICKNESS, 3)} A SUPPORT.",
     "BUY, COVERING THE WORST CASE AT BOTH SUPPORTS:",
     ", ".join(
-        f"{sku} ({thickness:.1f}) X{count}"
+        f"{sku} ({_length(thickness, 3)}) X{count}"
         for sku, (thickness, count) in PIVOT_SHIM_BUY.items()
     ) + ".",
 ))
 KP08_ALIGNMENT_STEPS = (
     f"F1. BEFORE TIGHTENING, CHECK ALL FOUR NUT BUTTON HEADS SEAT FLAT "
     f"AND CLEAR THE NUT BODY; TIGHTEN TO {_NUT_TORQUE}. THE KP08S FLOAT "
-    "IN THEIR Ø4.5 MOUNTING HOLES. MOVE THE FEED CARRIAGE TO EACH TRAVEL "
+    "IN THEIR Ø4.5 MM MOUNTING HOLES. MOVE THE FEED CARRIAGE TO EACH TRAVEL "
     "END IN TURN AND ALIGN EACH KP08 TO THE FIXED NUT WITHOUT FORCING "
     "THE SCREW; TIGHTEN THE KP08 MOUNTING SCREWS.",
     "F2. WITH THE HANDWHEEL AND ALL SET SCREWS TIGHT, TURN THE HANDWHEEL "
@@ -1536,7 +1586,9 @@ KP08_ALIGNMENT_STEPS = (
 # the stud drawing (hold_down_stud.measured_fit_bounds evaluates the same G, Q,
 # nut-span, lower-interval and insertion predicates). H is only measurable
 # with the blocks on their carriages over both passes.
-_STUD_CLEARANCE = f"{hold_down_stud.CLEARANCE_MIN:.1f}"
+# The kit's REWORK sheet prints the stud in mm; this inch sheet prints its
+# limits and the clearance rounded outward, the conservative side of HD2.
+_STUD_CLEARANCE = _bound(hold_down_stud.CLEARANCE_MIN, 3, up=True)
 _STUD_PITCH = (
     f"{hold_down_stud.COMPLETE_PROJECTION_PITCHES:g} COMPLETE {hold_down_stud.THREAD} PITCH"
 )
@@ -1546,9 +1598,8 @@ CLAMPING_KIT_NUMBER = "MHA-SH-VN-57"
 # HD2-HD3 cut the studs to the kit drawing's REWORK sheet, its second.
 STUD_REWORK_SHEET = f"{CLAMPING_KIT_NUMBER} SHEET 2"
 _STUD_LIMITS = (
-    f"{hold_down_stud.LENGTH - hold_down_stud.LENGTH_BAND:.{hold_down_stud.LENGTH_PLACES}f}/"
-    f"{hold_down_stud.LENGTH + hold_down_stud.LENGTH_BAND:.{hold_down_stud.LENGTH_PLACES}f} "
-    f"ON {STUD_REWORK_SHEET}"
+    f"{_bound(hold_down_stud.LENGTH - hold_down_stud.LENGTH_BAND, 3, up=False)}/"
+    f"{_bound(hold_down_stud.LENGTH + hold_down_stud.LENGTH_BAND, 3, up=True)}"
 )
 HOLD_DOWN_STEPS = (
     "HD1. FOR UNCUT-STOCK OBSTRUCTIONS, ISOLATE THE SPINDLE, SUPPORT THE "
@@ -1557,7 +1608,7 @@ HOLD_DOWN_STEPS = (
     "ANOTHER. NEVER FORCE MOTION PAST UNCUT STOCK. BEFORE CUTTING THE "
     f"{hold_down_stud.QUANTITY} STUDS {_item(HOLD_DOWN_STUD)}, MEASURE AT EACH "
     "STUD ON THE ACTUAL PARTS, MIN "
-    "AND MAX IN mm WITH GAUGE UNCERTAINTY INCLUDED: B, BAR THICKNESS; D, "
+    "AND MAX IN INCHES WITH GAUGE UNCERTAINTY INCLUDED: B, BAR THICKNESS; D, "
     "STUD LOWER END TO BAR UNDERSIDE AT THE ORIGINAL INSERTION; H, BAR TOP TO "
     f"MOVING BLOCK UNDERSIDE (ITEMS {ITEM_NUMBERS[FEED_BLOCK]}/{ITEM_NUMBERS[PIVOT_BLOCK]}), LEAST OVER BOTH "
     "COMPLETE PASSES: INNER AT STEP 9, OUTER AT STEP 13A; N, SEATED FLANGE "
@@ -1566,7 +1617,8 @@ HOLD_DOWN_STEPS = (
     "STACK (NONE IS ADDED); U, PROPOSED CUT END TO THE FIRST COMPLETE "
     "THREAD, NOT THE CHAMFER. MARK THE LOWER FACTORY END, THE ORIGINAL "
     "INSERTION AND THE ORIGINAL LOWER LOADED COMPLETE-THREAD INTERVAL.",
-    f"HD2. WITH LMIN/LMAX THE STUD'S FINISHED-LENGTH LIMITS ({_STUD_LIMITS}), NOT STOCK "
+    f"HD2. WITH LMIN/LMAX THE STUD'S FINISHED-LENGTH LIMITS ON {STUD_REWORK_SHEET} "
+    f"({_STUD_LIMITS}), NOT STOCK "
     "LENGTH, REQUIRE GMIN = BMIN + HMIN + DMIN - LMAX >= "
     f"{_STUD_CLEARANCE} AND QMIN = LMIN - DMAX - BMAX - WMAX - NMAX - UMAX "
     f">= {_STUD_PITCH}. THE NUT'S WHOLE COMPLETE-THREAD SPAN MUST STAY ON "
@@ -1575,7 +1627,7 @@ HOLD_DOWN_STEPS = (
     "THE SETUP: NO DEEPER INSERTION, NO CUT THROUGH ENGAGED THREADS.",
     "HD3. AT STEP 13B, KEEP THE CARRIER OFF AND THE OTHER HOLD-DOWNS SECURE. "
     "REMOVE, SHORTEN AND REFIT ONE STUD AT A TIME. SHORTEN ONLY THE UNUSED "
-    f"UPPER END TO A FINISHED LENGTH OF {_STUD_LIMITS}; DEBURR, GAUGE THE COMPLETE THREADS AND "
+    f"UPPER END TO THE FINISHED LENGTH ON {STUD_REWORK_SHEET}; DEBURR, GAUGE THE COMPLETE THREADS AND "
     "REMEASURE U. RESTORE THE ORIGINAL INSERTION AND SEAT ITS NUT FULLY "
     "WITH NO WASHER BEFORE REMOVING ANOTHER STUD; DO NOT FORCE OR BOTTOM "
     "DEEPER. AFTER THE LAST STUD REFIT, WITH THE CARRIER STILL OFF, REDO "
@@ -1611,11 +1663,12 @@ CAPTURE_CHECKS = (
     "NO SPINDLE/TOOL/HOLDER CONTACT WITH THE FIXTURE.",
     "KEEP THE REPEATED STEP 6 ACTUAL SPINDLE-AXIS REGISTER; REINDICATE AFTER "
     "XY CHANGES. RECHECK CLEARANCE AFTER TOOL/DEPTH/SETUP CHANGES.",
-    f"REFERENCE TABLE HEIGHTS: WORK {PART_TOP_Z:.1f}; SHOULDER-SCREW HEADS "
-    f"{PIVOT_HEAD_TOP_Z:.2f}, NOMINAL. "
+    f"REFERENCE TABLE HEIGHTS: WORK {_length(PART_TOP_Z, 3)}; SHOULDER-SCREW HEADS "
+    f"{_length(PIVOT_HEAD_TOP_Z, 3)}, NOMINAL. "
     "SET CUTTING DEPTH FROM THE ACTUAL SEATED WORK, NOT THESE REFERENCES.",
     "ACCEPTANCE: THE CARRIAGE/RAIL AND TABLE ANCHORS PASS THE ASSEMBLY CHECKS "
-    f"AFTER FINAL TIGHTENING (EVERY STEP 6 READING WITHIN ±{ALIGNMENT_BAND:.2f}; "
+    "AFTER FINAL TIGHTENING (EVERY STEP 6 READING WITHIN "
+    f"±{_length(ALIGNMENT_BAND, ALIGNMENT_PLACES)}; "
     "FREE SWEEP WITH BOTH CARRIAGES ON THEIR RAILS) AND HD4 AT EVERY STUD.",
 )
 
@@ -1832,14 +1885,14 @@ def moving_outlines(
     out["feed block"] = [
         trammel.rail_point(1, stations[1] + x, -y)
         for x, y in (
-            (pivot_block.BLOCK_X0, -20.0),
-            (feed_block.LUG_X0, -20.0),
+            (pivot_block.BLOCK_X0, feed_block.LUG_Y1),
+            (feed_block.LUG_X0, feed_block.LUG_Y1),
             (feed_block.LUG_X0, feed_block.LUG_Y0),
             (feed_block.LUG_X1, feed_block.LUG_Y0),
-            (feed_block.LUG_X1, -20.0),
-            (pivot_block.BLOCK_X1, -20.0),
-            (pivot_block.BLOCK_X1, 20.0),
-            (pivot_block.BLOCK_X0, 20.0),
+            (feed_block.LUG_X1, feed_block.LUG_Y1),
+            (pivot_block.BLOCK_X1, feed_block.LUG_Y1),
+            (pivot_block.BLOCK_X1, pivot_block.BLOCK_WIDTH / 2.0),
+            (pivot_block.BLOCK_X0, pivot_block.BLOCK_WIDTH / 2.0),
         )
     ]
     out["pivot block 2"] = _rail_rect(
