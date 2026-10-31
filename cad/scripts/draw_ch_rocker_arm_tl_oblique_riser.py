@@ -33,7 +33,6 @@ from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
 from _printed_limits import limits
-from _printed_tolerance import printed_deviations
 from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
@@ -169,8 +168,7 @@ _UNIT = part_spec.UNIT
 def _limits(model: float, places: int) -> list[float]:
     """A general-band dimension's acceptance limits on the inch sheet: the
     title block's band about the value printed at ``places``."""
-    low, high = printed_deviations(model, places, unit=_UNIT)
-    return limits(model, places, (high, low))
+    return limits(model, places, unit=_UNIT)
 
 
 part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME",))

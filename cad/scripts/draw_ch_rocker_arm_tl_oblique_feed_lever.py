@@ -47,7 +47,6 @@ import _telemetry
 import ch_rocker_arm_tl_oblique_feed_lever_spec as part_spec
 from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits
-from _printed_tolerance import printed_deviations
 from _supplier_dimensions import supplier_reference_dimension
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -137,13 +136,12 @@ _HOLE_DIA_PRINTED = round(round(part_spec.HOLE_DIA / 25.4, _CALLOUT_PLACES) * 25
 def _limits(model: float, places: int) -> list[float]:
     """A general-band dimension's acceptance limits on the inch sheet: the
     title block's band about the value printed at ``places``."""
-    low, high = printed_deviations(model, places, unit=_UNIT)
-    return limits(model, places, (high, low))
+    return limits(model, places, unit=_UNIT)
 
 
 def _stock_limits(model: float, band: float) -> list[float]:
     """An as-bought size's supplier band about its nominal."""
-    return limits(model, part_spec.STOCK_PLACES, (band, -band))
+    return [round(model - band, 12), round(model + band, 12)]
 
 
 requirement(
