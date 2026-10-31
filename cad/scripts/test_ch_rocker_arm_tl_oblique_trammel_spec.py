@@ -239,25 +239,24 @@ def test_hold_down_studs_land_on_t_slots_inside_the_table() -> None:
 def test_base_bar_stock_fits_the_vise_with_its_column_edge_three_and_a_half_out() -> (
     None
 ):
-    """The 2026-10-30 ruling: the bar's stock width (left as supplied) fits the
-    6 in vise's stock hard jaws, and the ordered stock row supplies it; its
-    1/2 in thickness is faced to BASE_BAR_THICK (owner ruling 2026-10-30,
-    option A). The column-side edge stays at lateral +88.9 (2026-10-17 ruling
-    a) so the TL-28 brackets stand on bar 1; both hold-down studs stay on the
-    bar."""
+    """The finished bar fits the 6 in vise's stock hard jaws, and the owned
+    stock (owner ruling #2083: both bars from the owned 1173 1/2 x 6 bar) is
+    wide, thick and long enough to mill both bars from it. The column-side
+    edge stays at lateral +88.9 (2026-10-17 ruling a) so the TL-28 brackets
+    stand on bar 1; both hold-down studs stay on the bar."""
     inventory = tomllib.loads(
         (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_bytes().decode()
     )
     vise_opening = inventory["fixtures"]["vise-pm-6"]["opening_in"]["value"] * 25.4
     assert trammel.BASE_BAR_WIDTH <= vise_opening
     (stock,) = [
-        row for row in inventory["stock"] if "OnlineMetals 17666" in row.get("note", "")
+        row for row in inventory["stock"] if "OnlineMetals 1173," in row.get("note", "")
     ]
-    assert stock["section_mm"] == pytest.approx(
-        [trammel.BASE_BAR_WIDTH, trammel.BASE_BAR_STOCK_THICK]
-    )
-    assert trammel.BASE_BAR_THICK < trammel.BASE_BAR_STOCK_THICK
-    assert f"Face both large faces to {trammel.BASE_BAR_THICK:.1f} mm" in stock["note"]
+    assert stock["on_hand"]
+    width, thickness = stock["section_mm"]
+    assert trammel.BASE_BAR_WIDTH < width
+    assert trammel.BASE_BAR_THICK < thickness
+    assert thickness == pytest.approx(trammel.BASE_BAR_STOCK_THICK)
     assert stock["length_mm"] >= 2 * trammel.BASE_BAR_LENGTH
     assert trammel.BASE_BAR_COLUMN_EDGE == pytest.approx(88.9)
     assert (
