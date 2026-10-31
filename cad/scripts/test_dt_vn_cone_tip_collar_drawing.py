@@ -722,8 +722,8 @@ def test_original_journal_span_pays_north_withdrawal_once():
     import dt_cone_gear_shaft_spec as shaft
     import dt_cone_pivot_post_spec as post
     expected = min(
-        post.CONE_BOSS_LENGTH-printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"])-2.0*shaft.THRUST_EDGE_BREAK_MAX,
-        shaft.JOURNAL_END-shaft.printed_band("Sec0End")-shaft.JOURNAL_FREE_END_BREAK_MAX_MM-shaft.THRUST_EDGE_BREAK_MAX-SHAFT_END_PLAY[1],
+        post.CONE_BOSS_LENGTH-printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"], unit=post.UNIT)-2.0*shaft.THRUST_EDGE_BREAK_MAX,
+        shaft.JOURNAL_END+shaft.printed_length_deviations("Sec0End")[0]-shaft.JOURNAL_FREE_END_BREAK_MAX_MM-shaft.THRUST_EDGE_BREAK_MAX-SHAFT_END_PLAY[1],
     )
     assert shaft.JOURNAL_SUPPORT_SPAN_MIN_MM == pytest.approx(expected)
 

@@ -636,7 +636,7 @@ def test_cone_native_tolerances_angularity_and_exact_datums() -> None:
     assert features["journal_bore"]["precision"]["height"] == (
         cone.DRAWING_PRECISION_BY_NAME["JournalAxisY"]
     )
-    assert cone.CRANK_ABOVE_CONE_BAND == (0.37, 0.0)
+    assert cone.CRANK_ABOVE_CONE_BAND == (0.3556, 0.0)
     upper, lower = cone.CRANK_ABOVE_CONE_BAND
     assert crank["separation"] == pytest.approx(
         [cone.CRANK_ABOVE_CONE + lower, cone.CRANK_ABOVE_CONE + upper],
@@ -647,7 +647,9 @@ def test_cone_native_tolerances_angularity_and_exact_datums() -> None:
     assert crank["height_nominal"] == pytest.approx(cone.CRANK_BORE_HEIGHT)
     assert crank["at"] == pytest.approx([0.0, cone.CRANK_BORE_HEIGHT, 0.0])
     angularity = cone.GEOMETRIC_CONTROLS[0]
-    assert crank["angularity_dia"] == float(angularity.tolerance)
+    # The FCF prints inch (#2096); the manifest carries the mm zone.
+    assert crank["angularity_dia"] == cone.CRANK_BORE_ANGULARITY_MM
+    assert crank["angularity_dia"] == pytest.approx(float(angularity.tolerance) * 25.4)
     assert crank["angularity_datums"] == list(angularity.datums)
     assert "angularity_dia" in crank["requirements"]
     assert "angle_tol_deg" not in crank["requirements"]
