@@ -294,20 +294,20 @@ _FRAME_ALLOWED_PAIRS = {
 # The nominal smooth major/tap-drill annulus through the entire neck is the
 # cosmetic-thread overlap. The incomplete root runout is wholly outside it.
 _MG_LEVER_THREAD_TRIPLE_MM = (6.35, 5.105, 12.5)
-_MG_FIXTURE_THREAD_TRIPLE_MM = (2.8448, 2.261, 10.1)
+_MG_FIXTURE_THREAD_TRIPLE_MM = (2.8448, 2.261, 9.8044)
 # #1559 clamp (MHA-MG-02): the 91882A221 #4-40 shank in the thumb tap's
-# Ø2.261 drill from the top face to the lever-bore top (THUMB_TAP_LENGTH 6.30).
-_MG_CLAMP_THUMB_TRIPLE_MM = (2.8448, 2.261, 6.3)
+# Ø2.261 drill from the top face to the lever-bore top (THUMB_TAP_LENGTH 6.2501).
+_MG_CLAMP_THUMB_TRIPLE_MM = (2.8448, 2.261, 6.2501)
 # The vertical rod's #4-40 end (modelled at the 2.845 major) in the clamp's
-# bottom-face Ø2.261 tap drill. Envelope 6.0 = ROD_THREAD_LEN - RELIEF_WIDTH:
+# bottom-face Ø2.261 tap drill. Envelope 5.976 = ROD_THREAD_LEN - RELIEF_WIDTH:
 # the full-major section from the tip to the relief, which also covers the tip
-# chamfer (its cone lies inside that cylinder); the Ø1.85 MAX relief is smaller
-# than the drill and overlaps nothing.
-_MG_ROD_THREAD_TRIPLE_MM = (2.845, 2.261, 6.0)
+# chamfer (its cone lies inside that cylinder); the Ø1.8288 MAX relief is
+# smaller than the drill and overlaps nothing.
+_MG_ROD_THREAD_TRIPLE_MM = (2.845, 2.261, 5.976)
 
 _MG_LEVER_THREAD_LIMIT = _smooth_annulus_limit_mm3(*_MG_LEVER_THREAD_TRIPLE_MM)
 # Only the major/thread-drill annulus from the spigot face to the rod-bore
-# breakout (10.1 mm), not the tangent screw tip or screw/rod overlap, is allowed.
+# breakout (9.8044 mm), not the tangent screw tip or screw/rod overlap, is allowed.
 _MG_FIXTURE_THREAD_LIMIT = _smooth_annulus_limit_mm3(
     *_MG_FIXTURE_THREAD_TRIPLE_MM
 )

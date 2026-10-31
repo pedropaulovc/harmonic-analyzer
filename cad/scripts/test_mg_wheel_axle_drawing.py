@@ -33,14 +33,15 @@ def test_required_drawing_paths() -> None:
 
 def test_spec_values_are_the_drill_rod_pin() -> None:
     spacer = mg_wheel_axle_spacer_spec.LENGTH
-    assert spec.PIN_DIA == pytest.approx(4.7625)
-    assert spec.PIN_DIA_TOL == 0.005
+    # 3/16 drill rod as supplied, its supplier's +/-.0002 in.
+    assert spec.PIN_DIA == pytest.approx(0.1875 * 25.4)
+    assert spec.PIN_DIA_TOL == pytest.approx(0.0002 * 25.4)
     # The rev-10 pin grows by the spacer's length, shank and gauge alike.
     assert spec.SHANK_LEN == pytest.approx(28.4 + spacer)
     assert spec.THREAD == "#4-40"
     assert spec.THREAD_MAJOR == pytest.approx(2.845, abs=1e-3)
-    assert spec.THREAD_LEN == 8.20
-    assert spec.PIN_LEN == pytest.approx(37.40 + spacer)
+    assert spec.THREAD_LEN == pytest.approx(0.323 * 25.4)
+    assert spec.PIN_LEN == pytest.approx(28.4 + spacer + spec.THREAD_LEN + spec.DOME_H)
     # Full thread only: the die's lead runs out in the step's relief (wider
     # than its 1.5 pitches), and the dome cuts one pitch short.
     assert spec.THREAD_PITCH == pytest.approx(0.635)
@@ -50,21 +51,31 @@ def test_spec_values_are_the_drill_rod_pin() -> None:
         spec.PRESS_GAUGE + spec.RELIEF_WIDTH
     )
     assert spec.FULL_THREAD_END_Y == pytest.approx(spec.THREAD_END_Y - 0.635)
-    assert spec.DOME_R == pytest.approx(1.665, abs=1e-3)
-    # Pressed to the gauge from the bar's front face (the origin); the back
-    # end then sits 0.60 inside the 9.5 bar's back face (ruling B grew the
-    # bar 0.5 rearward; the pin keeps its 8.9 in the bore).
-    assert spec.PRESS_GAUGE == spec.STEP_Y == pytest.approx(19.5 + spacer)
-    assert spec.BACK_Y == pytest.approx(-BAR_DEPTH + 0.60)
+    # The dome's R prints .07 exactly; its height follows through the thread
+    # major's edge.
+    assert spec.DOME_R == pytest.approx(0.07 * 25.4)
+    assert (spec.DOME_R - spec.DOME_H) ** 2 + (spec.THREAD_MAJOR / 2.0) ** 2 == (
+        pytest.approx(spec.DOME_R**2)
+    )
+    # Pressed to the gauge from the bar's front face (the origin), the gauge
+    # on the .001 in grid MHA-MG-00 prints; the back end then sits inside the
+    # bar, short of its back face.
+    assert spec.PRESS_GAUGE == spec.STEP_Y
+    assert spec.PRESS_GAUGE == pytest.approx(19.5 + spacer, abs=0.0005 * 25.4)
+    assert spec.PRESS_GAUGE / 25.4 == pytest.approx(round(spec.PRESS_GAUGE / 25.4, 3))
+    assert spec.BACK_Y == pytest.approx(spec.PRESS_GAUGE - spec.SHANK_LEN)
+    assert -BAR_DEPTH < spec.BACK_Y < 0.0
     assert (spec.THREAD_END_Y, spec.TIP_Y) == pytest.approx(
-        (spec.STEP_Y + 8.20, spec.STEP_Y + 9.00)
+        (spec.STEP_Y + spec.THREAD_LEN, spec.STEP_Y + spec.THREAD_LEN + spec.DOME_H)
     )
 
 
 def test_thread_relief_is_cut_under_the_die_root() -> None:
     """Rule 16 (2026-10-24 ENFORCE blocker): the thread running to the shank
     step gets a relief of at least one pitch, the vertical rod's form."""
-    assert (spec.RELIEF_DIA, spec.RELIEF_WIDTH, spec.RELIEF_ROOT_R) == (1.85, 1.10, 0.2)
+    assert (spec.RELIEF_DIA, spec.RELIEF_WIDTH, spec.RELIEF_ROOT_R) == pytest.approx(
+        (0.073 * 25.4, 0.043 * 25.4, 0.008 * 25.4)
+    )
     assert spec.RELIEF_DIA <= spec.THREAD_ROOT_2A_MIN < spec.THREAD_BASIC_MINOR
     assert spec.RELIEF_WIDTH >= spec.THREAD_PITCH
     assert 2.0 * spec.RELIEF_ROOT_R < spec.RELIEF_WIDTH_MIN
@@ -72,10 +83,13 @@ def test_thread_relief_is_cut_under_the_die_root() -> None:
     # The Ø and root radius print as single MAX limits at their model values;
     # the width as a LIMIT pair whose MIN holds rule 16's one pitch.
     assert spec.SINGLE_LIMITS == {
-        ("PinProfile", "ReliefDia"): (1.85, spec.TOL_TYPE_MAX),
-        ("ReliefRoots", "ReliefRootR"): (0.2, spec.TOL_TYPE_MAX),
+        ("PinProfile", "ReliefDia"): (spec.RELIEF_DIA, spec.TOL_TYPE_MAX),
+        ("ReliefRoots", "ReliefRootR"): (spec.RELIEF_ROOT_R, spec.TOL_TYPE_MAX),
     }
-    assert spec.LIMIT_PAIRS == {("PinProfile", "ReliefWidth"): (0.70, 1.10)}
+    assert spec.LIMIT_PAIRS == {
+        ("PinProfile", "ReliefWidth"): (spec.RELIEF_WIDTH_MIN, spec.RELIEF_WIDTH)
+    }
+    assert spec.RELIEF_WIDTH_MIN == pytest.approx(0.028 * 25.4)
     assert spec.THREAD_PITCH <= spec.RELIEF_WIDTH_MIN
     assert spec.TOL_TYPE_MAX == 6  # swTolType_e.swTolMAX
     assert spec.TOL_TYPE_LIMIT == 3  # swTolType_e.swTolLIMIT
@@ -154,18 +168,17 @@ def test_pin_is_one_front_plane_revolve() -> None:
 
 
 def test_tolerances_are_native_on_the_model() -> None:
+    # The stock Ø carries no model band: the supplier's governs it.
     assert model_toleranced_dimensions(part) == {
-        ("PinProfile", "PinDia"): "PIN_DIA_TOL",
         ("PinProfile", "ThreadLength"): "*deviations(THREAD_LEN_BAND)",
     }
     assert set(spec.DRAWING_BANDS) == {("PinProfile", "ThreadLength")}
     # Both lengths read from the gauged step: the shank only places the back
-    # end (.X), the thread holds the locknut (the user's option (c),
-    # 2026-10-12); the overall is reference.
-    assert spec.DRAWING_PRECISION["PinProfile"]["ShankLength"] == 1
-    assert spec.THREAD_LEN_BAND == (0.25, -0.25)
+    # end, the thread holds the locknut (the user's option (c), 2026-10-12, at
+    # +/-.010); the overall is reference.
+    assert spec.DRAWING_PRECISION["PinProfile"]["ShankLength"] == 2
+    assert spec.THREAD_LEN_BAND == pytest.approx((0.010 * 25.4, -0.010 * 25.4))
     assert spec.REFERENCE_DIMENSIONS == {"PinLength"}
-    assert spec.DRAWING_PRECISION["PinProfile"]["PinLength"] == 1
     assert "SHANK STEP" in callouts.SHANK_LENGTH_CALLOUT
     # Rule 4: the band names the stack it sets, its locknut and the feature
     # it ends on; the assembled 2.9 MAX past the locknut is MHA-MG-00's
@@ -173,10 +186,10 @@ def test_tolerances_are_native_on_the_model() -> None:
     words = " ".join(callouts.THREAD_LENGTH_CALLOUT.split())
     for required in ("SHANK STEP", "THREAD END", "MHA-MG-00", "MHA-MG-VN-52"):
         assert required in words, required
-    assert "2.9" not in words
+    assert ".114" not in words
     assert drawing.ORIGIN_DIMENSIONS == ("ShankLength", "ThreadLength")
     assert drawing.BROKEN_LINE_DIMENSIONS == ("PinLength",)
-    assert group.THREAD_PAST_LOCKNUT_MAX <= spec.THREAD_PAST_LOCKNUT_LIMIT == 2.9
+    assert group.THREAD_PAST_LOCKNUT_MAX <= spec.THREAD_PAST_LOCKNUT_LIMIT
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
 
@@ -216,8 +229,7 @@ def test_thread_callout_and_no_general_notes() -> None:
     # The Ø callout names both fits: the press into the bar's reamed bore,
     # at that bore's limits, and the wheel running on the shank.
     words = " ".join(callouts.PIN_DIA_CALLOUT.split())
-    low, high = sorted(spec.BAR_BORE_LIMITS)
-    for required in ("PRESS FIT", "MG-WHEEL-BAR", f"{low:.3f}-{high:.3f}"):
+    for required in ("PRESS FIT", "MG-WHEEL-BAR", ".1865-.1870"):
         assert required in words, required
     assert "MG-MAGNIFYING-WHEEL" in words
 
@@ -246,6 +258,9 @@ def test_callouts_are_part_authored_and_only_read_by_the_sheet() -> None:
         callouts.TEXT_PREFIX: "(",
         callouts.TEXT_SUFFIX: ")",
     }
+    # The drill rod's Ø is a stock reference.
+    assert authored["PinDia"][callouts.TEXT_PREFIX] == "(<MOD-DIAM>"
+    assert authored["PinDia"][callouts.TEXT_SUFFIX] == ")"
     assert authored["ReliefRootR"] == {callouts.CALLOUT_ABOVE: "2X"}
 
 
@@ -280,20 +295,22 @@ def test_part_stamps_make_critical_properties() -> None:
 
 
 def test_wheel_group_stack_fits_the_pin() -> None:
-    assert group.STEP_INSIDE_HUB > 0.0
-    assert group.STEP_INSIDE_HUB == pytest.approx(0.6566, abs=1e-3)
+    # Every corner at the printed limits (inch): the step inside the hub...
+    assert group.STEP_INSIDE_HUB == pytest.approx(0.028 * 25.4, abs=1e-6)
     # (b) on FULL thread: the dome's incomplete pitch is not counted, and the
     # first nut stays clear of the step's relief.
     assert group.LOCKNUT_THREAD_MARGIN >= 0.0
-    assert group.LOCKNUT_THREAD_MARGIN == pytest.approx(0.0016, abs=1e-3)
-    assert group.NUT_RUNOUT_MARGIN == pytest.approx(0.0638, abs=1e-3)
-    assert group.THREAD_PAST_LOCKNUT_MAX <= spec.THREAD_PAST_LOCKNUT_LIMIT == 2.9
-    assert group.THREAD_PAST_LOCKNUT_MAX == pytest.approx(2.8666, abs=1e-3)
-    assert group.THREAD_PAST_LOCKNUT_NOMINAL == pytest.approx(1.6875, abs=1e-3)
-    # Pressed to the gauge, the .X shank lands the back end near the back
-    # face; nothing stands behind it there.
-    assert spec.BACK_END_PROUD_MAX == pytest.approx(0.35)
-    assert spec.BACK_END_SUNK_MAX == pytest.approx(1.55)
+    assert group.NUT_RUNOUT_MARGIN == pytest.approx(0.005 * 25.4, abs=1e-6)
+    # (c) the ruled 2.9 floored to .114, and the long corner under it.
+    assert spec.THREAD_PAST_LOCKNUT_LIMIT == pytest.approx(0.114 * 25.4)
+    assert spec.THREAD_PAST_LOCKNUT_LIMIT <= 2.9
+    assert group.THREAD_PAST_LOCKNUT_MAX == pytest.approx(0.111 * 25.4, abs=1e-6)
+    assert group.THREAD_PAST_LOCKNUT_MAX <= spec.THREAD_PAST_LOCKNUT_LIMIT
+    assert group.THREAD_PAST_LOCKNUT_NOMINAL == pytest.approx(1.68, abs=0.005)
+    # Pressed to the gauge, the shank lands the back end sunk in the bore at
+    # every corner; nothing stands behind it there.
+    assert spec.BACK_END_SUNK_MIN == pytest.approx(0.008 * 25.4, abs=1e-6)
+    assert spec.BACK_END_SUNK_MAX == pytest.approx(0.040 * 25.4, abs=1e-6)
     # The spacer lands the spokes' mid-plane on the pen-rod line.
     assert group.SPOKE_MID_D == pytest.approx(
         mg_wheel_axle_spacer_spec.LENGTH
@@ -309,6 +326,8 @@ def test_wheel_group_stack_fits_the_pin() -> None:
 def test_pin_fits_are_press_in_the_bar_and_running_in_the_wheel() -> None:
     assert min(group.BAR_PRESS) > 0.0
     assert min(group.HUB_RUNNING) > 0.0
+    # M1: the .1865 reamed bore (+.0005/0) on the drill rod's +/-.0002.
+    assert group.BAR_PRESS == pytest.approx((0.0003 * 25.4, 0.0012 * 25.4))
     assert mg_magnifying_wheel_geom.BORE_DIA > spec.PIN_DIA + spec.PIN_DIA_TOL
     assert mg_wheel_bar_geom.AXLE_BORE_DIA + mg_wheel_bar_geom.AXLE_BORE_BAND[0] < (
         spec.PIN_DIA - spec.PIN_DIA_TOL

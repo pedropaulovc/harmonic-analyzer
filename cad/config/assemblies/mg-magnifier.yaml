@@ -51,6 +51,9 @@ required_free_stems:
 # The freed lever knife-rock + the articulated lever-wire's swing/spin; the
 # wheel is COUPLED by the WIRE-1 yoke (no DOF of its own).
 free_dof: 3
+# drawing_unit: the fitter sheet, its TOL_* rows and the saved model's units
+#   are decimal inch (#290 step 3).
+drawing_unit: in
 # machinist_exceptions: the assembly drawing's owner-declared machinist-review
 #   exceptions (drawing-simplicity-policy.md "Named exceptions"); read by
 #   machinist_exceptions.load_exceptions for mg_magnifier_assembly, ignored by

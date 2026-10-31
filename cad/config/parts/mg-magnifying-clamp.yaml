@@ -6,28 +6,27 @@ mg-magnifying-clamp:
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
+  drawing_unit: in
   process: >-
-    Cut 29.50 long from 1/2 hex brass. Native HEX 12.70, not REF and without
-    an explicit tolerance, uses ordinary .XX ±0.51 size 12.19–13.21 on all
-    three opposed-flat pairs over the full height. The drawn hex and square
-    angles use the title-block ±1 degree; unconstrained as-supplied form is
-    not an alternative acceptance route. Face both ends square to the nominal
-    hex axis; the bottom is the MHA-MG-04 shoulder seat.
-    Drill Ø6.50 +0.10/0 through the corners at 19.95 from the bottom, sliding
+    Cut 1.16 long from 1/2 hex brass. The flats are as bought: (1/2 in) is
+    a stock REF, untoleranced; the supplier governs it, assumed ±.005 for
+    the wall checks. Face both ends square to the nominal hex axis; the
+    bottom is the MHA-MG-04 shoulder seat.
+    Drill Ø.257 (F) +.004/0 through the corners at .79 from the bottom, sliding
     on the MHA-MG-03 quarter-inch body. Locate the bore axis and both #4-40
-    axes independently 6.35 from the same actual full-height Z flat at the
-    ordinary .XX ±0.51 band; also locate each #4-40 entry 6.35 from its actual
+    axes independently .25 from the same actual full-height Z flat at the
+    ordinary .XX ±.01 band; also locate each #4-40 entry .25 from its actual
     diagonal stock flat. Do not assume a perfect common stock axis.
-    Tap the top into the bore (6.30 REF thread, 9.55 drill); retain the blind
-    bottom rod tap at 8.55 full thread and 12.75 drill at the .XX band.
-    There is no custom finished 2 MIN wall or 15 MAX envelope inspection.
-    Ordinary HEX size/angles give a conservative calculated full-height
-    transverse bound of 17.00; it is not a printed extra stock limit.
-    Including location, drilled diameter, flat angle and drill wander gives
-    1.644216 minimum bore-to-flat wall, above the 1.5 policy floor but below
-    the 2.0 target; the blind drill-point floor is 2.081671. No perfect
-    common stock centre or all-standard-thread-root guarantee is claimed.
-    The full 17.00 tan(0.3 degree) run-off feeds the finite-tip male/female
+    Tap the top into the bore (.25 REF thread, .37 drill); retain the blind
+    bottom rod tap at .33 full thread and .48 drill at the .XX band.
+    There is no custom finished wall or envelope inspection.
+    The supplied hex at ±.005 and ±1 degree flats gives a conservative
+    calculated full-height transverse bound of .66; it is not a printed
+    stock limit. Including location, drilled diameter, flat angle and drill
+    wander gives .0895 minimum bore-to-flat wall, above the .080 rule-17
+    target; the blind drill-point floor is .1281. No perfect common stock centre or
+    all-standard-thread-root guarantee is claimed.
+    The full .66 tan(0.3 degree) run-off feeds the finite-tip male/female
     FULL overlap and drill-cone checks.
     Seat the actual stock thumb screw on the lever before inspecting overlap
     and collar clearance. Chemically blacken.

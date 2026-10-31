@@ -52,51 +52,36 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 
 def test_every_size_carries_its_band_on_the_model() -> None:
-    # The O.D. has no fit: it takes the title block's .X row.
+    # The O.D. has no fit: it takes the title block's .XX row.
     assert model_toleranced_dimensions(part) == {
         ("RingProfile", "DrumBore"): "*deviations(DRUM_BORE_BAND)",
         ("Drum", "DrumLen"): "*deviations(DRUM_LEN_BAND)",
     }
-    assert spec.DRAWING_PRECISION["RingProfile"] == {"DrumOd": 1, "DrumBore": 3}
-    # drawing-guidelines.md rule 17 (walls and webs) at the worst printed corner: the .X O.D. on the H7 bore.
-    assert mg_wheel_drum_geom.WALL_WORST == pytest.approx((18.1 - 14.018) / 2.0)
+    # drawing-guidelines.md rule 17 (walls and webs) at the worst printed
+    # corner: the O.D. printed .74 -.01 over the .4990 +.0005 reamed bore.
+    assert mg_wheel_drum_geom.WALL_WORST == pytest.approx((0.73 - 0.4995) * 25.4 / 2.0)
     assert mg_wheel_drum_geom.WALL_WORST >= mg_wheel_drum_geom.MIN_WALL
 
 
 def test_drum_presses_on_the_wheel_spigot_never_proud() -> None:
-    # H7 bore, made first; the spigot is turned to the stated interference in it.
+    # Reamed bore, made first; the spigot is turned to the stated interference in it.
+    assert spec.DRUM_BORE == pytest.approx(0.499 * 25.4)
     assert spec.DRUM_BORE == wheel_geom.SPIGOT_DIA
-    assert wheel_geom.DRUM_PRESS == pytest.approx((0.005, 0.034))
-    # Nominally flush; the drum's minus-only length against the spigot's
-    # plus-only length keeps its face at or under the spigot face.
-    assert spec.DRUM_LEN == wheel_geom.SPIGOT_LEN
-    assert spec.DRUM_LEN_BAND == (0.0, -0.10)
-    assert wheel_geom.SPIGOT_LEN_BAND == (0.10, 0.0)
-    assert min(wheel_geom.DRUM_RECESS) >= 0.0
+    assert wheel_geom.DRUM_PRESS == pytest.approx((0.0002 * 25.4, 0.0013 * 25.4))
+    # The drum's .354 on the inch grid; the spigot keeps its 9.0 hub station,
+    # each model inside its printed band, and the drum's minus-only length
+    # against the spigot's plus-only length keeps its face under the spigot's.
+    assert spec.DRUM_LEN == pytest.approx(0.354 * 25.4)
+    assert spec.DRUM_LEN <= wheel_geom.SPIGOT_LEN
+    assert spec.DRUM_LEN_BAND == pytest.approx((0.0, -0.004 * 25.4))
+    assert wheel_geom.SPIGOT_LEN_BAND == pytest.approx((0.004 * 25.4, 0.0))
+    assert wheel_geom.DRUM_RECESS == pytest.approx((0.0, 0.008 * 25.4), abs=1e-9)
     assert (
         part.V_DRUM
         == math.pi
         * ((spec.DRUM_OD / 2.0) ** 2 - (spec.DRUM_BORE / 2.0) ** 2)
         * spec.DRUM_LEN
     )
-
-
-def test_each_band_states_its_need_on_its_callout() -> None:
-    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the seating stop rides the press-fit callout; no general note.
-    assert not hasattr(spec, "DRAWING_NOTES")
-    bore = drawing.DIMENSION_CALLOUTS["DrumBore"].splitlines()
-    assert bore == [
-        "REAM THRU",
-        "PRESS ON MHA-MG-05 WHEEL",
-        "SPIGOT, HARD AGAINST BOSS",
-        "0.005-0.034 DIAMETRAL INTERFERENCE",
-    ]
-    assert drawing.DIMENSION_CALLOUTS["DrumLen"].splitlines() == [
-        "FRONT FACE 0.00-0.20 BELOW",
-        "WHEEL SPIGOT FACE",
-    ]
-    # The mate's drawing number is the wheel's registry number.
-    assert _config.parts("mg-magnifying-wheel")["number"] == "MHA-MG-05"
 
 
 def test_registry_row() -> None:

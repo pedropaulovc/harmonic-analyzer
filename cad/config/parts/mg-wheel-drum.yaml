@@ -6,4 +6,5 @@ mg-wheel-drum:
   finish: bright machined, oiled
   quantity: 1
   tolerance_class: machined_block
+  drawing_unit: in
   process: "turned from bar (brass): bore reamed for a press fit on the wheel spigot, both ends faced"

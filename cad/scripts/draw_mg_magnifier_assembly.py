@@ -1484,7 +1484,7 @@ def _add_setting_axes(adapter: Any, view: Any) -> None:
     Machinist review r7 (run 20261016T162927333Z) read the lever setting
     chain, construction lines on these two axes in the document's long-short
     font, as hidden lines in a hidden-lines-removed view. The chain must stay
-    shown or its 50.0/60.0 hide with it (_drawing_hidden_sketches, r21), and
+    shown or its two settings hide with it (_drawing_hidden_sketches, r21), and
     r14 (run 20261016T171305106Z) proved the chain-font preference prints the
     same pattern, so each part gets its own black centreline, past its ends,
     and the chain reads as the axes it lies on.
@@ -1786,7 +1786,7 @@ def _validate_source(
 
 
 def _create_sheets(adapter: Any) -> None:
-    new_project_drawing(adapter, layout=SPEC.layout, scale=SHEET_SCALE)
+    new_project_drawing(adapter, layout=SPEC.layout, scale=SHEET_SCALE, unit=stack.UNIT)
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="magnifier package")
     for name in SHEET_NAMES:
         sheet = _activate_sheet(adapter, name)

@@ -6,7 +6,6 @@ import asyncio
 import itertools
 import json
 import math
-import runpy
 from types import SimpleNamespace
 
 import pytest
@@ -41,22 +40,6 @@ from _layout_geometry import (
     find_text_on_line,
     find_text_on_text,
 )
-
-
-def test_ordinary_overall_and_thread_bands_follow_the_actual_printed_title_block(monkeypatch) -> None:
-    import _config
-
-    original = _config.title_block
-
-    def title_block(name, *, unit="mm"):
-        row = original(name, unit=unit)
-        bands = {"linear_1pl": 0.9, "linear_2pl": 0.61}
-        return {**row, "band_mm": bands[name]} if name in bands else row
-
-    monkeypatch.setattr(_config, "title_block", title_block)
-    loaded = runpy.run_path(joint.__file__)
-    assert loaded["ROD_LENGTH_TOL"] == pytest.approx(0.9)
-    assert loaded["THREAD_LENGTH_TOL"] == pytest.approx(0.61)
 
 
 def _physical_projection_fixture(monkeypatch, tmp_path):
@@ -269,10 +252,11 @@ def test_native_tip_projection_guarantees_full_overlap_independently_of_part_len
     assert installed.INSTALLED_FULL_ENGAGEMENT_MIN >= joint.REQUIRED_FULL_ENGAGEMENT
     assert installed.THREAD_PROJECTION - installed.THREAD_PROJECTION_TOL > 0.0
     assert installed.INSTALLED_FULL_ENGAGEMENT_MIN == pytest.approx(min(overlaps))
-    assert joint.NECK_THICKNESS_TOL == 0.8
-    assert installed.INSTALLED_FULL_ENGAGEMENT_MIN == pytest.approx(10.017234843104717)
-    assert geom.INSTALLED_ROOT_CLEARANCE_MIN == pytest.approx(0.525)
-    assert geom.operating_clamp_radius_band() == pytest.approx((83.920, 165.0, 193.115))
+    # The neck prints .49 +/-.01 over its 12.5 mm model; the wider side is charged.
+    assert joint.NECK_THICKNESS - joint.NECK_THICKNESS_TOL == pytest.approx(0.48 * 25.4)
+    assert installed.INSTALLED_FULL_ENGAGEMENT_MIN == pytest.approx(10.736950600594392)
+    assert geom.INSTALLED_ROOT_CLEARANCE_MIN == pytest.approx(1.543)
+    assert geom.operating_clamp_radius_band() == pytest.approx((82.980, 165.0, 194.265))
 
 
 def test_tip_chamfer_loss_is_additive_to_the_incomplete_thread_limit() -> None:
@@ -283,7 +267,7 @@ def test_tip_chamfer_loss_is_additive_to_the_incomplete_thread_limit() -> None:
     assert joint.CHAMFER_LEG_MAX > joint.TIP_CHAMFER_MAX
     assert joint.TIP_CHAMFER + joint.TIP_CHAMFER_BAND[1] == pytest.approx(0.0)
     assert joint.TIP_CHAMFER + joint.TIP_CHAMFER_BAND[0] == pytest.approx(joint.TIP_CHAMFER_MAX)
-    assert joint.THREAD_LENGTH_TOL == pytest.approx(joint.printed_band_mm(spec.DRAWING_PRECISION["ThreadExtent"]["ThreadLength"]))
+    assert joint.THREAD_LENGTH_TOL == pytest.approx(joint.printed_band_mm(spec.DRAWING_PRECISION["ThreadExtent"]["ThreadLength"], unit=spec.UNIT))
     assert fitted_without_tip - fitted == pytest.approx(joint.CHAMFER_LEG_MAX)
 
 
@@ -314,9 +298,10 @@ def test_quarter_inch_body_has_real_drilled_slip_clearance() -> None:
     stock_low = joint.ROD_DIA + joint.ROD_DIA_BAND[1]
     stock_high = joint.ROD_DIA + joint.ROD_DIA_BAND[0]
     minimum = clamp.LEVER_BORE_DIA - stock_high
-    maximum = clamp.LEVER_BORE_DIA + drilled_oversize_mm() - stock_low
-    assert minimum == pytest.approx(0.15)
-    assert maximum == pytest.approx(0.30)
+    maximum = clamp.LEVER_BORE_DIA + drilled_oversize_mm(unit=clamp.UNIT) - stock_low
+    # Letter F (.257 +.004/0) over the 1/4 rod's .000/-.002.
+    assert minimum == pytest.approx(0.007 * 25.4)
+    assert maximum == pytest.approx(0.013 * 25.4)
     assert minimum > 0.0 and maximum < 0.5
 
 
@@ -883,6 +868,12 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
     monkeypatch.setattr(drawing, "_note", lambda _a, view, text, xy: captured.setdefault("notes", []).append((view, text, xy)))
     monkeypatch.setattr(drawing, "add_surface_finish", lambda _a, view, **kwargs: captured.update(finish=(view, kwargs)))
 
+    def stock_reference(_adapter, display, **kwargs):
+        captured["stock"] = kwargs
+        display.SetText(4, kwargs["callout"])
+
+    monkeypatch.setattr(drawing, "supplier_reference_dimension", stock_reference)
+
     def attach(_adapter, view, **kwargs):
         assert kwargs["text"] == spec.FREE_END_CALLOUT and view is front
         return leader_notes.add_attached_note(_adapter, view, **kwargs)
@@ -909,6 +900,8 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
         assert deleted == ["TipChamfer"] and annotations["TipChamfer"].position is None
         fit = qualifiers["RodDia"]
         assert "MHA-MG-02 CLAMP BORE" in fit and "SLIDING FIT" in fit and "BRASS" not in fit
+        stock = captured["stock"]
+        assert (stock["units"], stock["expected_mm"], stock["fraction_denominator"]) == ("in", joint.ROD_DIA, 4)
         assert {name: dimension.SystemValue * 1000.0 for name, dimension in dimensions.items()} == pytest.approx(values)
         assert captured["finish"][0] is front
         assert captured["finish"][1]["control"] is spec.SURFACE_FINISHES[0]

@@ -23,6 +23,7 @@ import mg_wheel_axle_spec
 import mg_wheel_group
 from _drawing_common import is_pictorial_orientation
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _title_block_units import render_number
 
 # The LANDSCAPE sheet's free field right of the isometric: inside the border
 # (about 13 mm in from the trim) and above the title block (sheet metres).
@@ -70,13 +71,14 @@ def test_stack_detail_station_increases_right(detail) -> None:
 
 
 def test_the_stack_settings_are_the_group_stations_with_their_bands() -> None:
-    # The rev-10 19.5 plus the spacer that lands the wheel on the pen line.
+    # The rev-10 19.5 plus the spacer that lands the wheel on the pen line,
+    # snapped to the gauge's .001-in grid.
     assert (
         stack.PRESS_GAUGE
         == mg_wheel_axle_spec.PRESS_GAUGE
-        == pytest.approx(19.5 + mg_wheel_axle_spacer_spec.LENGTH)
+        == pytest.approx(19.5 + mg_wheel_axle_spacer_spec.LENGTH, abs=0.0127)
     )
-    assert stack.PRESS_GAUGE_TOL == mg_wheel_axle_spec.PRESS_GAUGE_TOL == 0.05
+    assert stack.PRESS_GAUGE_TOL == mg_wheel_axle_spec.PRESS_GAUGE_TOL
     # The printed endshake band is exactly the group's set window.
     assert stack.ENDSHAKE - stack.ENDSHAKE_TOL == pytest.approx(
         mg_wheel_group.ENDSHAKE_MIN
@@ -99,25 +101,37 @@ def test_the_stack_dimensions_are_marked_banded_and_called_out() -> None:
     assert set(stack.DRAWING_PRECISION[stack.FEATURE]) == names
     assert set(stack.DIMENSION_TOLERANCES) == {stack.ENDSHAKE_DIMENSION}
     assert stack.REFERENCE_DIMENSIONS == {stack.PRESS_GAUGE_DIMENSION}
-    assert stack.DIMENSION_TOLERANCES[stack.ENDSHAKE_DIMENSION] == pytest.approx(0.05)
+    assert stack.DIMENSION_TOLERANCES[stack.ENDSHAKE_DIMENSION] == stack.ENDSHAKE_TOL
+    # The sheet is inch; the endshake and its band print exactly at their
+    # places (render_number refuses a value off the printed grid), so the
+    # printed band is the stack's band.
+    assert stack.UNIT == "in"
+    places = stack.DRAWING_PRECISION[stack.FEATURE]
+    render_number(stack.ENDSHAKE / 25.4, "in", places[stack.ENDSHAKE_DIMENSION])
+    render_number(stack.ENDSHAKE_TOL / 25.4, "in", stack.TOLERANCE_PRECISION)
+    render_number(stack.PRESS_GAUGE / 25.4, "in", places[stack.PRESS_GAUGE_DIMENSION])
     # One detail imports each setting.
     assert set(drawing.PRESSED_KEEP) == {stack.PRESS_GAUGE_DIMENSION}
     assert set(drawing.ENDSHAKE_KEEP) == {stack.ENDSHAKE_DIMENSION}
 
 
 def test_the_press_gauge_is_a_reference_accepted_at_the_nuts() -> None:
-    # Machinist reviews of e04fd60ab and 179705ff2: a ±0.05 band on a hand
+    # Machinist reviews of e04fd60ab and 179705ff2: a band on a hand
     # press is unneeded precision; the gauge prints as a reference and its
     # callout states the acceptance. A press to nominal within the stack's
     # allocation passes it at every corner.
     low = stack.PRESS_GAUGE - stack.PRESS_GAUGE_TOL
     high = stack.PRESS_GAUGE + stack.PRESS_GAUGE_TOL
-    assert stack.PRESS_GAUGE_LOW_LIMIT == pytest.approx(38.0484, abs=1e-4)
-    assert stack.PRESS_GAUGE_HIGH_LIMIT == pytest.approx(38.1834, abs=1e-4)
+    assert stack.PRESS_GAUGE_LOW_LIMIT / 25.4 == pytest.approx(1.498, abs=1e-6)
+    assert stack.PRESS_GAUGE_HIGH_LIMIT / 25.4 == pytest.approx(1.505, abs=1e-6)
     assert stack.PRESS_GAUGE_LOW_LIMIT <= low < high <= stack.PRESS_GAUGE_HIGH_LIMIT
     part, text = stack.SETTING_CALLOUTS[stack.FEATURE][stack.PRESS_GAUGE_DIMENSION]
     assert part == 3 and "\n" not in text
-    assert text == "ACCEPT: LOCKNUT ON FULL THREAD, THREAD END 2.9 MAX PAST IT"
+    # The printed limit, in inches, is the axle's own limit and passes the
+    # worst stack.
+    printed = float(re.search(r"THREAD END (\.\d+) MAX", text).group(1)) * 25.4
+    assert printed == pytest.approx(mg_wheel_axle_spec.THREAD_PAST_LOCKNUT_LIMIT)
+    assert mg_wheel_group.THREAD_PAST_LOCKNUT_MAX <= printed
     # The acceptance is checked once both nuts are set.
     assert "AXLE AS PRESSED ACCEPTANCE" in notes.STEP_TEXT[steps.LOCKNUT_JAMMED_KEY]
     # The one-line callout centres over the value: at the 2.7 mm a capital
@@ -368,7 +382,6 @@ def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
     for name in (
         "set_sketch_direct_db",
         "name_last_feature",
-        "_set_tolerance_precision",
         "apply_drawing_precision",
         "mark_dimensions_for_drawing",
         "_author_setting_callouts",
@@ -391,7 +404,9 @@ def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
     monkeypatch.setattr(
         builder,
         "set_dimension_symmetric_tolerance",
-        lambda adapter, feature, name, tol: toleranced.append((feature, name, tol)),
+        lambda adapter, feature, name, tol, **_kw: toleranced.append(
+            (feature, name, tol)
+        ),
     )
     monkeypatch.setattr(
         builder, "blank_sketch", lambda adapter, feature: blanked.append(feature)
@@ -463,7 +478,8 @@ def test_the_package_has_five_landscape_sheets_with_the_wire_steps_on_sheet_5() 
 def test_the_drawing_key_reads_only_the_package_parts_config() -> None:
     # The builder's COM explode (_mg_magnifier_explode -> _assembly_patterns ->
     # _assembly) reads every parts/* and assemblies/* YAML, so importing it
-    # re-keyed this sheet on any part edit. The drawing reads the pure spec.
+    # re-keyed this sheet on any part edit. The drawing reads the pure spec
+    # (which reads its own contract's drawing_unit, as MHA-MS-00's sheet does).
     from pathlib import Path
 
     import _buildgraph
@@ -475,7 +491,7 @@ def test_the_drawing_key_reads_only_the_package_parts_config() -> None:
         "_assembly_patterns.py",
         "_mg_magnifier_explode.py",
     }
-    assert not [token for token in _buildgraph.config_files_of(script) if "*" in token]
+    assert not _buildgraph.config_files_of(script) & {"parts/*", "**"}
 
 
 def test_the_wire_balloon_lands_on_the_mid_run_ring_facing_the_viewer() -> None:

@@ -36,8 +36,10 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -60,10 +62,7 @@ from _drawing_precision import (
     _named_dimensions,
     apply_drawing_precision,
 )
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 import _telemetry
@@ -75,7 +74,7 @@ from mg_wheel_axle_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     PIN_DIA,
-    PIN_DIA_TOL,
+    PIN_DIA_FRACTION_DENOMINATOR,
     PIN_LEN,
     PRESS_GAUGE,
     SHANK_LEN,
@@ -93,6 +92,7 @@ from mg_wheel_axle_spec import (
     RELIEF_WIDTH,
     TOL_TYPE_LIMIT,
     TIP_Y,
+    UNIT,
 )
 
 PART_NAME = "mg-wheel-axle"
@@ -172,7 +172,35 @@ def _limit_pairs(adapter) -> None:
         display.SetPrecision3(-1, -1, places, -1)
         if int(display.GetPrimaryTolPrecision2()) != places:
             raise RuntimeError(f"{label}: LIMIT precision did not persist")
-        _telemetry.success(f"{label}: LIMIT {high:.{places}f}/{low:.{places}f}")
+        _telemetry.success(
+            f"{label}: LIMIT {high / 25.4:.{places}f}/{low / 25.4:.{places}f} in"
+        )
+
+
+INCH_UNITS = 3  # swLengthUnit_e.swINCHES
+FRACTION_BASE = 2  # swFractionDisplay_e.swFRACTION
+
+
+@_telemetry.traced("wheel_axle.stock_reference")
+def _stock_reference(adapter) -> None:
+    """The shank's Ø is the 3/16 drill rod's as supplied: untoleranced, in its
+    exact native inch fraction (mg_wheel_axle_callouts brackets it as a
+    reference), read back."""
+    display, dimension = _named_dimension(adapter, "PinProfile", "PinDia")
+    display = _early_bound(display, "IDisplayDimension")
+    denominator = PIN_DIA_FRACTION_DENOMINATOR
+    if display.SetUnits2(False, INCH_UNITS, FRACTION_BASE, denominator, False, 0) != 0:
+        raise RuntimeError("PinDia@PinProfile: inch fraction units were rejected")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if (
+        display.GetUseDocUnits()
+        or int(display.GetUnits()) != INCH_UNITS
+        or int(display.GetFractionBase()) != FRACTION_BASE
+        or int(display.GetFractionValue()) != denominator
+        or display.GetRoundToFraction()
+        or int(tolerance.Type) != 0  # swTolType_e.swTolNONE
+    ):
+        raise RuntimeError("PinDia@PinProfile: stock reference did not persist")
 
 
 @_telemetry.traced("wheel_axle.author_callouts")
@@ -201,6 +229,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import AddThreadParameters, RevolveParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -389,9 +419,13 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    set_dimension_symmetric_tolerance(adapter, "PinProfile", "PinDia", PIN_DIA_TOL)
     set_dimension_bilateral_tolerance(
-        adapter, "PinProfile", "ThreadLength", *deviations(THREAD_LEN_BAND)
+        adapter,
+        "PinProfile",
+        "ThreadLength",
+        *deviations(THREAD_LEN_BAND),
+        places=DRAWING_PRECISION["PinProfile"]["ThreadLength"],
+        display_unit=UNIT,
     )
     _single_limits(adapter)
     _limit_pairs(adapter)
@@ -399,6 +433,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    _stock_reference(adapter)
     author_dimension_callouts(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME)

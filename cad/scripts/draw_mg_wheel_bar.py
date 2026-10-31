@@ -1,6 +1,7 @@
 r"""Create the curated machinist drawing for the magnifying-wheel bar.
 
-A 10 x 9 steel bar, 234 long, carrying the wheel axle and the pen-hanger strap.
+A .43 x .374 steel bar, 9.2 long (decimal-inch sheet), carrying the wheel axle
+and the pen-hanger strap.
 Four bores run along the depth (front-back), so the FRONT view (looking down the
 bore axis) shows them as circles: the reamed axle bore, 2x #8 clamp-screw
 clearance holes flanking the column and 1x #8 pen-hanger hole at the free end.
@@ -41,11 +42,12 @@ from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision
 from _drawing_edges import scan_view_edges
 import _drawing_hidden_sketches as hidden_sketches
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -145,6 +147,8 @@ RIGHT_KEEP = {
 # the reamed bore's Ø, the clamps' between that and the row's text.
 HANGER_CALLOUT_XY = (_sheet_x(SCREW_HOLE_X) + 0.025, FRONT_CENTER[1] + 0.035)
 CLAMP_CALLOUT_XY = (_sheet_x(CLAMP_HOLE_X[0]) + 0.010, FRONT_CENTER[1] + 0.035)
+# Each clearance hole's native drill size prints .XXX.
+HOLE_CALLOUT_PRECISION = {"hw-diam": 3}
 # Each band's mate prints under its value, authored on the part's dimension
 # (mg_wheel_bar_callouts): the bore's press fit on the axle, the depth's
 # axle back end, the row's MHA-SH-02 taps.
@@ -270,7 +274,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -332,18 +340,16 @@ async def build(adapter: Any) -> dict[str, str]:
             callouts.CLAMP_HOLE_CALLOUT,
         ),
     ):
-        _add_below_rows(
-            add_native_hole_callout(
-                adapter,
-                front,
-                edge=edge,
-                callout_xy=callout_xy,
-                label=label,
-                process="DRILL",
-            ),
-            rows,
+        callout = add_native_hole_callout(
+            adapter,
+            front,
+            edge=edge,
+            callout_xy=callout_xy,
             label=label,
+            process="DRILL",
         )
+        set_hole_callout_precision(callout, HOLE_CALLOUT_PRECISION, label=label)
+        _add_below_rows(callout, rows, label=label)
 
     # Beside the isometric, over its lower-right run (the view falls from
     # its upper-left end): clear of the title block below and of the depth's

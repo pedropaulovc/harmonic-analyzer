@@ -1,7 +1,7 @@
 """Tolerance-bounded static arm-section screen at the A1 force stations (#1559).
 
 Pure data, import-time asserts. The bracket reaches from the current mounting
-seat to the drum's wire lane (z -173.51). This module bounds the plain
+seat to the drum's wire lane (z -173.5192). This module bounds the plain
 threaded neck, cantilever and relocated two-screw mounting row:
 
 * the load at the neck: the lever group's weight plus wire 1's tension at
@@ -44,13 +44,13 @@ import pn_pen_carriage_geom
 import pn_pen_rod_spec
 import sh_vn_music_wire_lever_geom
 from _printed_tolerance import printed_deviations
-from mg_magnifying_bracket_spec import DRAWING_PRECISION
+from mg_magnifying_bracket_spec import DRAWING_PRECISION, UNIT
 from mg_lever_thread_joint import (
     NECK_THICKNESS,
     NECK_THICKNESS_TOL,
     NOSE_R,
-    NOSE_R_TOL,
-    HOLE_LOCATION_TOL,
+    NOSE_R_DEVIATIONS,
+    HOLE_LOCATION_DEVIATIONS,
     ROD_DIA as LEVER_ROD_DIA,
     ROD_LENGTH_TOL,
 )
@@ -156,7 +156,7 @@ def joint_load(tension: float, weight: float) -> tuple[float, float, float]:
 
 # --- arm section -----------------------------------------------------------------
 ARM_B = NECK_THICKNESS - NECK_THICKNESS_TOL
-ARM_H = 2.0 * (NOSE_R - NOSE_R_TOL)
+ARM_H = 2.0 * (NOSE_R + NOSE_R_DEVIATIONS[0])
 I_VERTICAL = ARM_B * ARM_H**3 / 12.0
 I_LATERAL = ARM_H * ARM_B**3 / 12.0
 _ratio = ARM_H / ARM_B
@@ -167,8 +167,10 @@ J_TORSION = (
 # controls bound the longest thread-axis-to-seat reach without moving the model.
 AXIS_TO_SEAT_MAX = (
     SIDE_PLATE_Z[1]
-    + printed_deviations(SIDE_PLATE_Z[1], DRAWING_PRECISION["NeckProfile"]["SeatToAxis"])[1]
-    + NOSE_R_TOL + HOLE_LOCATION_TOL
+    + printed_deviations(
+        SIDE_PLATE_Z[1], DRAWING_PRECISION["NeckProfile"]["SeatToAxis"], unit=UNIT
+    )[1]
+    + NOSE_R_DEVIATIONS[1] + HOLE_LOCATION_DEVIATIONS[1]
 )
 ARM_SPAN = AXIS_TO_SEAT_MAX - GRIP_MIN
 
@@ -248,13 +250,24 @@ SCREW_SHEAR_STRESS = JOINT_SHEAR_DEMAND_N / (
 # McMaster's 70 ksi (483 MPa) minimum tensile, shear ultimate 0.6 x = 290 MPa,
 # allowable a third of that.
 SCREW_SHEAR_ALLOWABLE = 0.6 * 483.0 / 3.0  # 96.6 N/mm^2
-# Charge the independent mounting location and the foot's own printed width,
-# rather than the receiver's unrelated .XX depth/thickness band.
+
+
+def _row_from_lower_limits(row: float) -> tuple[float, float]:
+    """The mounting ordinate's printed (min, max) from the foot's lower edge."""
+    lower, upper = printed_deviations(
+        row, DRAWING_PRECISION["MountingCoordinates"]["MountingY0"],
+        (-POSITION_BAND, POSITION_BAND), unit=UNIT,
+    )
+    return row + lower, row + upper
+
+
+# Charge the independent mounting location at its printed limits and the
+# foot's own printed width, rather than the receiver's unrelated .XX band.
 JOINT_PRYING_ARM_Y = min(
     min(
-        point[1] - SIDE_PLATE_Y[0] - POSITION_BAND,
+        _row_from_lower_limits(point[1] - SIDE_PLATE_Y[0])[0],
         SIDE_PLATE_HEIGHT + SIDE_PLATE_HEIGHT_DEVIATIONS[0]
-        - (point[1] - SIDE_PLATE_Y[0]) - POSITION_BAND,
+        - _row_from_lower_limits(point[1] - SIDE_PLATE_Y[0])[1],
     )
     for point in BRACKET_HOLE_POINTS
 )

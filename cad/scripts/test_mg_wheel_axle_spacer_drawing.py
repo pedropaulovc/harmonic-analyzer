@@ -57,9 +57,9 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
         for name in names
     }
     assert drawing.DRAWING_PRECISION_BY_NAME == {
-        "SpacerOd": 1,
-        "SpacerBore": 2,
-        "SpacerLength": 2,
+        "SpacerOd": 2,
+        "SpacerBore": 3,
+        "SpacerLength": 3,
     }
 
 
@@ -68,9 +68,10 @@ def test_only_the_length_carries_an_explicit_band() -> None:
     assert model_toleranced_dimensions(part) == {
         ("Spacer", "SpacerLength"): "LENGTH_BAND",
     }
-    assert spec.LENGTH_BAND == 0.03
-    assert spec.WALL_WORST == pytest.approx((11.0 - 0.8 - 5.0) / 2.0)
-    assert spec.WALL_WORST >= spec.MIN_WALL
+    assert spec.LENGTH_BAND == pytest.approx(0.001 * 25.4)
+    # The wall at the .44 O.D.'s least and the #10-drilled bore's largest.
+    assert spec.WALL_WORST == pytest.approx((0.43 - 0.197) / 2.0 * 25.4)
+    assert spec.WALL_WORST >= 0.080 * 25.4
     assert part.V_RING == pytest.approx(
         math.pi * ((spec.OD / 2.0) ** 2 - (spec.BORE_DIA / 2.0) ** 2) * spec.LENGTH
     )
@@ -81,7 +82,10 @@ def test_length_lands_the_wheel_on_the_pen_line() -> None:
         BAR_FRONT_Z - PEN_Z_MID - back_washer.MODEL_THICKNESS - wheel_geom.HUB_BACK_Z
     )
     assert spec.LENGTH > 0.0
-    assert spec.LENGTH * 10.0 == pytest.approx(round(spec.LENGTH * 10.0), abs=1e-6)
+    # The stack reads the limits its rounded .XXX value prints.
+    low, high = spec.LENGTH_LIMITS
+    assert low < spec.LENGTH < high
+    assert high - low == pytest.approx(2.0 * spec.LENGTH_BAND)
     assert group.SPACER_D == 0.0
     assert group.BACK_WASHER_D == pytest.approx(spec.LENGTH)
     assert BAR_FRONT_Z - group.SPOKE_MID_D == pytest.approx(PEN_Z_MID)

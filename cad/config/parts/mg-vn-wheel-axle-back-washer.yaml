@@ -12,4 +12,5 @@ mg-vn-wheel-axle-back-washer:
     FRONT FACE AND THE MAGNIFYING WHEEL HUB.
   quantity: 1
   tolerance_class: machined_block
+  drawing_unit: in
   process: purchased

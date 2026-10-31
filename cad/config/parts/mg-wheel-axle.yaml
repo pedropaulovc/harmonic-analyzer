@@ -5,5 +5,6 @@ mg-wheel-axle:
   finish: bright, oiled
   quantity: 1
   tolerance_class: machined_block
+  drawing_unit: in
   fit_class: shaft_in_bushing
   process: "cut from 3/16 drill rod; thread and domed tip turned; pressed into the wheel bar to its gauge from the front face at assembly"

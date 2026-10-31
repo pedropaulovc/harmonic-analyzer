@@ -1,6 +1,6 @@
 r"""MHA-MG-04 rod to MHA-MG-02 clamp threaded joint (#1559) -- PURE DATA.
 
-The vertical rod's top end is a #4-40 UNC-2A thread turned down from the Ø5
+The vertical rod's top end is a #4-40 UNC-2A thread turned down from the 7/32
 bar; it screws into a blind #4-40 UNC-2B tap in the clamp's bottom face, on
 the hex axis, until the rod's shoulder seats on that face. The shoulder is
 the joint's datum: the seated shoulder carries the rod square to the block,
@@ -61,37 +61,52 @@ DIE_RUNOUT = 1.5 * THREAD_PITCH  # 0.9525
 TIP_INCOMPLETE = THREAD_PITCH  # 0.635
 
 # --- the rod's threaded end, read from the shoulder (the seating face) -------
-# The title block's .XX band as a literal (pinned to _printed_tolerance by
-# test_mg_rod_clamp_joint): the rod and output-fixture geometry import this
-# module, and a title-block edit must not re-key them.
-PRINTED_XX_BAND = 0.51
-# Length from the shoulder to the thread tip, with its own printed band.
+# Both sheets print decimal inch (#290). The title block's .XX band (.010 in)
+# as a literal (pinned to _printed_tolerance by test_mg_rod_clamp_joint): the
+# rod and output-fixture geometry import this module, and a title-block edit
+# must not re-key them.
+PRINTED_XX_BAND = 0.254
+
+
+def _printed_mm(value_mm: float, places: int) -> float:
+    """The inch number a sheet prints for ``value_mm`` (rounded half away from
+    zero, as SOLIDWORKS does), back in millimetres."""
+    scaled = value_mm / MM_PER_IN * 10**places
+    return math.floor(scaled + 0.5 + 1e-9) / 10**places * MM_PER_IN
+
+
+# Length from the shoulder to the thread tip. Exempt from the inch grid: it is
+# the assembly's shoulder station (build_mg_magnifier_assembly.VROD_TOP_Y), so
+# it keeps its millimetre nominal and prints rounded at .XX (.30); every check
+# below reads the PRINTED limits.
 ROD_THREAD_LEN = 7.50
-ROD_THREAD_LEN_BAND = (0.25, -0.25)
+ROD_THREAD_LEN_PLACES = 2
+ROD_THREAD_LEN_PRINTED = _printed_mm(ROD_THREAD_LEN, ROD_THREAD_LEN_PLACES)
 # The relief groove at the shoulder mates with nothing (r1 machinist review),
 # so it carries no tight band: its diameter prints as the single limit
-# "Ø1.85 MAX" (swTolMAX prints the model value, so the model IS the limit),
+# "Ø.072 MAX" (swTolMAX prints the model value, so the model IS the limit),
 # under the die's root so the die cuts full thread right up to the relief; its
 # width prints at the title block's .XX band, wide enough at its narrowest to
 # take the die's run-out, its widest setting the worst-case engagement below.
-RELIEF_DIA = 1.85
+RELIEF_DIA = 1.8288  # .072
 RELIEF_DIA_MAX = RELIEF_DIA
+RELIEF_DIA_PLACES = 3
 RELIEF_DIA_TOL_TYPE = 6  # swTolType_e.swTolMAX
-RELIEF_WIDTH = 1.50
+RELIEF_WIDTH = 1.524  # .06
 RELIEF_WIDTH_PLACES = 2
 # Both internal corners of the relief (thread end to floor, floor to
-# shoulder) carry the grooving tool's nose as the single limit "R0.2 MAX"
+# shoulder) carry the grooving tool's nose as the single limit "R.008 MAX"
 # (swTolMAX: the model sits at the printed maximum, any smaller nose down to
 # sharp is accepted). The shoulder-side root's outer edge, at the largest
 # relief Ø and the largest radius, is RELIEF_ROOT_OUTER_DIA, checked below to
 # stand inside the tap's mouth: the clamp face never meets the fillet.
-RELIEF_ROOT_R = 0.2
-RELIEF_ROOT_R_PLACES = 1
+RELIEF_ROOT_R = 0.2032  # .008
+RELIEF_ROOT_R_PLACES = 3
 RELIEF_ROOT_R_TOL_TYPE = 6  # swTolType_e.swTolMAX
-RELIEF_ROOT_OUTER_DIA = RELIEF_DIA_MAX + 2.0 * RELIEF_ROOT_R  # 2.25
+RELIEF_ROOT_OUTER_DIA = RELIEF_DIA_MAX + 2.0 * RELIEF_ROOT_R
 
-ROD_THREAD_LEN_MIN = ROD_THREAD_LEN + ROD_THREAD_LEN_BAND[1]
-ROD_THREAD_LEN_MAX = ROD_THREAD_LEN + ROD_THREAD_LEN_BAND[0]
+ROD_THREAD_LEN_MIN = ROD_THREAD_LEN_PRINTED - PRINTED_XX_BAND
+ROD_THREAD_LEN_MAX = ROD_THREAD_LEN_PRINTED + PRINTED_XX_BAND
 RELIEF_WIDTH_MIN = RELIEF_WIDTH - PRINTED_XX_BAND
 RELIEF_WIDTH_MAX = RELIEF_WIDTH + PRINTED_XX_BAND
 
@@ -109,13 +124,13 @@ ENGAGEMENT_WORST = ROD_FULL_THREAD_MIN
 # five-pitch lead fits under its deepest print above the shallowest drill.
 HOLE_DEPTH_PLACES = 2
 HOLE_DEPTH_BAND = PRINTED_XX_BAND
-SEAT_TIP_RESERVE = 0.25
+SEAT_TIP_RESERVE = 0.254  # .010
 PLUG_TAP_LEAD = 5.0 * THREAD_PITCH  # 3.175
-_DEPTH_STEP = 0.05  # derived depths round UP to a shop-friendly step
+_DEPTH_STEP = MM_PER_IN / 100.0  # derived depths round UP to the .XX grid
 
 
 def _ceil_step(value: float) -> float:
-    return round(math.ceil(value / _DEPTH_STEP - 1e-9) * _DEPTH_STEP, 2)
+    return round(math.ceil(value / _DEPTH_STEP - 1e-9) * _DEPTH_STEP, 4)
 
 
 ROD_TAP_THREAD_DEPTH = _ceil_step(
@@ -136,7 +151,7 @@ ROD_TAP_THREAD_DEPTH_MAX = ROD_TAP_THREAD_DEPTH + HOLE_DEPTH_BAND
 ROD_TAP_DRILL_DEPTH_MIN = ROD_TAP_DRILL_DEPTH - HOLE_DEPTH_BAND
 ROD_TAP_DRILL_DEPTH_MAX = ROD_TAP_DRILL_DEPTH + HOLE_DEPTH_BAND
 # The tapped hole's minor Ø is its tap drill's (the tap never cuts the
-# minor), and drilled holes print +0.10/0, so the mouth is never smaller.
+# minor), and drilled holes print +.004/0, so the mouth is never smaller.
 ROD_TAP_MINOR_DIA = blind_cut_dia_mm(ROD_TAP_SPEC)  # 2.261, #43
 
 # --- import-time worst-case guards -------------------------------------------
@@ -161,8 +176,12 @@ if RELIEF_DIA_MAX > THREAD_ROOT_2A_MIN + 1e-9:
     )
 if not THREAD_BASIC_MINOR > RELIEF_DIA_MAX:
     raise AssertionError("MHA-MG-04 tip chamfer runs below the relief")
-if round(RELIEF_ROOT_R, RELIEF_ROOT_R_PLACES) != RELIEF_ROOT_R:
-    raise AssertionError("MHA-MG-04 relief root MAX does not print as its model")
+for _limit, _places, _what in (
+    (RELIEF_DIA, RELIEF_DIA_PLACES, "relief Ø"),
+    (RELIEF_ROOT_R, RELIEF_ROOT_R_PLACES, "relief root"),
+):
+    if abs(_printed_mm(_limit, _places) - _limit) > 1e-9:
+        raise AssertionError(f"MHA-MG-04 {_what} MAX does not print as its model")
 if 2.0 * RELIEF_ROOT_R > RELIEF_WIDTH_MIN + 1e-9:
     raise AssertionError("MHA-MG-04 relief roots meet at the narrowest relief")
 if not RELIEF_ROOT_OUTER_DIA < ROD_TAP_MINOR_DIA:

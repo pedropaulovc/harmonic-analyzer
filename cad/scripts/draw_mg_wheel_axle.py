@@ -4,12 +4,13 @@ A 3/16 drill-rod pin (MHA-MG-07): pressed into MG-WHEEL-BAR to MHA-MG-00's
 gauge, the magnifying wheel running on its shank, a #4-40 end for the nut
 stack with a thread relief at the shank step, and a domed tip.
 
-Sheet: the side view at 3:1 carries the shank Ø with both of its fits and
-the journal's Ra 1.6, both lengths from the shank step (origin circles on
-the step), the "(56.0)" overall reference, the dome R and the thread
+Sheet (decimal inch, the part's ``drawing_unit: in``): the side view at 3:1
+carries the shank's stock Ø reference with both of its fits and the
+journal's Ra 63 uin, both lengths from the shank step (origin circles on
+the step), the "(2.20)" overall reference, the dome R and the thread
 callout; detail A, a cropped 10:1 *Front model view turned like the side view
 (draw_mg_magnifying_vertical_rod's detail-A recipe), carries the relief's
-width, its Ø and its two root radii, all single MAX limits. A 3:1 shaded
+width (a LIMIT pair), its Ø and its two root radii (single MAX limits). A 3:1 shaded
 isometric shows the cosmetic thread. No general notes: every requirement
 rides its own callout, and every callout is authored on the part
 (mg_wheel_axle_callouts); this sheet only reads them back (#1942).
@@ -55,6 +56,7 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -144,7 +146,7 @@ SIDE_KEEP = {
     "PinLength": ((BACK_X + TIP_X) / 2.0, _ROW_Y[2]),
     # The shank's dimension line crosses the shank near the step; its text
     # runs left from the line, the fit callout's three lines under it, so the
-    # block stands high enough to keep them off the shank and over the Ra 1.6.
+    # block stands high enough to keep them off the shank and over the Ra.
     "PinDia": (STEP_X - 0.030, SIDE_CENTER[1] + 0.052),
     # Above-right of the tip: the leader lands on the dome's upper half, clear
     # of the overall's extension line dropping from the tip, and under the
@@ -197,7 +199,7 @@ def _detail_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
 _DETAIL_TOP = DETAIL_CENTER[1] + DETAIL_CROP_RADIUS
 _DETAIL_BOTTOM = DETAIL_CENTER[1] - DETAIL_CROP_RADIUS
 _DETAIL_RIGHT = DETAIL_CENTER[0] + DETAIL_CROP_RADIUS
-# The roots' centres (model mm): each R0.2 sits in its corner of the floor,
+# The roots' centres (model mm): each root sits in its corner of the floor,
 # the step's and the flank's, on both sides of the axis (a radius may attach
 # to either silhouette of the turned fillet).
 RELIEF_ROOT_CENTRES_MM = tuple(
@@ -214,8 +216,9 @@ DETAIL_KEEP = {
     # right of the flank's extension line (run 20261027T030250671Z: centred
     # between the extension lines, both struck every line of it).
     "ReliefWidth": (0.1295, _DETAIL_BOTTOM - 0.010),
-    # Over the crop: its line runs between the two floors 0.7 (7 mm) from the
-    # step, inside the flat floor (the flank's root starts 0.9 from it) and
+    # Over the crop: its line runs between the two floors 0.7 (7 mm of sheet)
+    # from the step, inside the flat floor (the flank's root starts 0.89 from
+    # it) and
     # right of the radius's leader, then rises through the groove's open
     # mouth; its text stands over the radius's block, so the radius's leader
     # meets neither the line nor the text on either side of the line (run
@@ -224,7 +227,7 @@ DETAIL_KEEP = {
         _detail_xy(0.0, STEP_Y + 0.7)[0],
         _DETAIL_TOP + 0.015,
     ),
-    # "2X / R0.2 MAX" up-left over the crop, under the Ø's text: the ~21 mm
+    # "2X / R.008 MAX" up-left over the crop, under the Ø's text: the ~21 mm
     # block ends just left of the step-side root's centre, so its leader drops
     # near-vertically through the groove's mouth, 2 mm right of the step face
     # and left of the Ø's line, onto the root on its text's side.
@@ -807,7 +810,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,

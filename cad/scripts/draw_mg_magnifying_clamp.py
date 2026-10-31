@@ -1,8 +1,9 @@
 r"""Create the curated machinist drawing for the magnifying-lever clamp.
 
-A 29.50 length of 1/2 hex brass: the Ø6.50 quarter-inch lever bore drilled across
+A 1.16 length of 1/2 hex brass: the Ø.257 quarter-inch lever bore drilled across
 the corners, a #4-40 thumb-screw tap from the top face into the bore and a
-blind #4-40 rod tap from the bottom face, both on the hex axis.
+blind #4-40 rod tap from the bottom face, both on the hex axis. The sheet
+prints decimal inch (#290); each tap callout prints its drill Ø at .XXX.
 
 Views (3:1, hidden lines removed throughout, drawing-guidelines.md rule 9):
 
@@ -68,6 +69,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_precision import _named_dimension
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
@@ -75,6 +77,10 @@ from _hole_callout_thread_class import omit_title_block_thread_class
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
+from _supplier_dimensions import (
+    assert_supplier_reference_dimension,
+    supplier_reference_dimension,
+)
 import _telemetry
 from build_mg_magnifying_clamp import (
     _assert_location_profiles,
@@ -97,6 +103,7 @@ from mg_magnifying_clamp_spec import (
     VISIBLE_DIMENSIONS,
     HEX_AC,
     HEX_AF,
+    HEX_AF_FRACTION_DENOMINATOR,
     LEVER_BORE_CALLOUT,
     LEVER_BORE_DIA,
     LEVER_BORE_Y,
@@ -107,7 +114,7 @@ from mg_magnifying_clamp_spec import (
     ROD_TAP_PROCESS,
     SEAT_NOTE,
     SECTION_HATCH_PATTERN,
-    HEX_AF_PREFIX,
+    STOCK_REFERENCE_DIMENSION,
     TAP_CALLOUT_PRECISION,
     TAP_DRILL_DEPTH_VARIABLE,
     TAP_THREAD_DEPTH_VARIABLE,
@@ -130,7 +137,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A nominal 14.66 x 12.70 x 29.50 hex with one common-flat location group.
+# A nominal .577 x 1/2 x 1.16 hex with one common-flat location group.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 ISO_SCALE = (2, 1)
@@ -169,8 +176,8 @@ RIGHT_KEEP = {
     "LeverBoreYDim": (_RIGHT_LEFT_X - 0.012, _elev_y(RIGHT_CENTER, LEVER_BORE_Y / 2.0)),
     "LeverBoreDiaDim": (0.165, 0.145),
 }
-# Keep the ordinary HEX size outside both native witnesses/arrow tails.
-# There is no supplied-stock paragraph or independent envelope note.
+# Keep the 1/2 stock REF outside both native witnesses/arrow tails.
+# There is no independent envelope note.
 TOP_KEEP = {"HexAf": (0.152, 0.255)}
 RIGHT_LOCATION_KEEP = {
     # Move R27's whole three-row label right, away from A and the height witness.
@@ -515,6 +522,22 @@ def _omit_tap_thread_class(display: Any, *, label: str) -> None:
 
 
 
+# The flats as bought: the stock's exact 1/2 in fraction, a native REF the
+# supplier's tolerance governs, never a size the shop holds.
+HEX_AF_REFERENCE = {
+    "label": "MHA-MG-02 HexAf stock reference",
+    "units": "in",
+    "precision": DRAWING_PRECISION_BY_NAME[STOCK_REFERENCE_DIMENSION],
+    "expected_mm": HEX_AF,
+    "fraction_denominator": HEX_AF_FRACTION_DENOMINATOR,
+}
+
+
+def _stock_af_display(raw_annotation: Any) -> Any:
+    annotation = _early_bound(raw_annotation, "IAnnotation")
+    return _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+
+
 def _assert_stock_af_import(adapter: Any, view: Any, raw_annotation: Any, *, stage: str) -> None:
     view = _early_bound(view, "IView")
     model = view.ReferencedDocument
@@ -523,7 +546,7 @@ def _assert_stock_af_import(adapter: Any, view: Any, raw_annotation: Any, *, sta
     source = SimpleNamespace(currentModel=model, swApp=adapter.swApp)
     _source_display, source_dimension = _assert_stock_af_source(source, stage=f"{stage}.source")
     annotation = _early_bound(raw_annotation, "IAnnotation")
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display = _stock_af_display(annotation)
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
     _assert_stock_af(display, dimension, stage=stage)
     owner, owner_type = annotation.Owner, annotation.OwnerType
@@ -535,11 +558,12 @@ def _assert_stock_af_import(adapter: Any, view: Any, raw_annotation: Any, *, sta
         app.IsSame(source_dimension, source_dimension), app.IsSame(dimension, dimension),
         app.IsSame(dimension, source_dimension),
     )
-    dangling, prefix = annotation.IsDangling(), display.GetText(1)
+    dangling = annotation.IsDangling()
     names = (source_dimension.FullName, dimension.FullName)
-    _telemetry.info("clamp native stock AF import", operation_stage=stage, identity_codes=repr(codes), owner_type=owner_type, full_names=repr(names), dangling=dangling, hex_prefix=prefix)
-    if any(type(code) is not int or code != 1 for code in codes) or type(owner_type) is not int or owner_type != 0 or names[0] != names[1] or dangling is not False or prefix != HEX_AF_PREFIX:
-        raise RuntimeError(f"HexAf: actual source dimension/top-view ownership or ordinary HEX designation changed at {stage}")
+    _telemetry.info("clamp native stock AF import", operation_stage=stage, identity_codes=repr(codes), owner_type=owner_type, full_names=repr(names), dangling=dangling)
+    if any(type(code) is not int or code != 1 for code in codes) or type(owner_type) is not int or owner_type != 0 or names[0] != names[1] or dangling is not False:
+        raise RuntimeError(f"HexAf: actual source dimension/top-view ownership changed at {stage}")
+    assert_supplier_reference_dimension(adapter, display, **HEX_AF_REFERENCE)
 
 
 
@@ -825,7 +849,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -935,6 +963,8 @@ async def build(adapter: Any) -> dict[str, str]:
     if str(height_display.GetText(4) or ""):
         raise RuntimeError("Height: removed top-tap-wall qualifier remained")
     top_by_name = {dimension_name(adapter, a): a for a in top_annotations}
+    # The as-bought 1/2 hex prints as its stock REF fraction, untoleranced.
+    supplier_reference_dimension(adapter, _stock_af_display(top_by_name["HexAf"]), **HEX_AF_REFERENCE)
     _assert_stock_af_import(adapter, top, top_by_name["HexAf"], stage="HexAf.imported")
 
     # The template marks each end view's tap; a second, scripted mark doubled

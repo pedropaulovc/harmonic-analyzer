@@ -5,10 +5,11 @@ mg-output-fixture:
   finish: as-machined
   quantity: 1
   tolerance_class: machined_block
-  process: "turned from 7/16 hex bar (brass): face the free end, turn the spigot and its full-radius wire groove, width 2R, walls to the Ø7.70 root; hold on flats and centre-drill the 120-degree corner ridge before drilling the Ø5.2 rod bore through the corners on the hex axis; tap #4-40 from the spigot face into the bore"
+  drawing_unit: in
+  process: "turned from 7/16 hex bar (brass): face the free end, turn the spigot and its full-radius wire groove, width 2R, walls to the Ø.30 root; hold on flats and centre-drill the 120-degree corner ridge before drilling the #1 (Ø.228) rod bore through the corners on the hex axis; tap #4-40 from the spigot face into the bore"
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "side view, under the view: the bore's stations 5.30 (free end to the Ø5.2 bore axis) and 12.70 (bore axis to the spigot face) on one row, the overall (18.00) REF outermost."
+      where: "side view, under the view: the bore's stations .209 (free end to the Ø.228 bore axis) and .50 (bore axis to the spigot face) on one row, the overall (.71) REF outermost."
       finding: "overall length is a reference only; the free end is located by a length chained from the cross-hole, not by a real overall (rule 10, dimension from a real feature; rule 11, turned parts read like the lathe)"
-      reason: "owner ruling 2026-10-17 (review r4): the rule 17 2.0 wall forbids a real overall at the title block's bands. With 18.00 and 12.70 both at .XX ±0.51, the free end's 5.30 stacks to ±1.02, and the free-end wall to the Ø5.2 bore (drilled +0.10/0, radius up to 2.65; drill run-off 0.134 at the exit corner) falls to 5.30 - 1.02 - 2.65 - 0.134 = 1.496, under the 2.0 target and the 1.5 floor. Chained, the 5.30 at ±0.51 holds 2.006. The bore is the part's datum (the rod and the thumb screw's reach both work off it), so both stations run from it."
+      reason: "owner ruling 2026-10-17 (review r4), restated for the inch sheet (#290): the rule 17 .080 wall forbids a real overall at the title block's bands. With .71 and .50 both at .XX ±.01, the free end's station stacks to ±.02, and the free-end wall to the Ø.228 bore (drilled +.004/0, radius up to .1160; drill run-off .0053 at the exit corner) falls to .0687, under the .080 target. Chained, the .209 at ±.005 holds .0827. The bore is the part's datum (the rod and the thumb screw's reach both work off it), so both stations run from it."

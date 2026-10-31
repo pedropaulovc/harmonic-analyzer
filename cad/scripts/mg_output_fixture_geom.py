@@ -10,7 +10,7 @@ Bands, places, worst-case walls and sheet text live in
 ``mg_output_fixture_spec``.
 
 The fixture (book ch. 20 p. 48, the photographed small hex block on the
-vertical rod) is a 7/16 brass hex bar: the Ø5 vertical rod slides through a
+vertical rod) is a 7/16 brass hex bar: the vertical rod slides through a
 cross bore across the hex corners, a turned spigot on one end carries the
 full-radius groove the lever wire hooks into, and an axial #4-40 tap from
 the spigot face down to the rod bore takes the thumb screw that locks the
@@ -40,37 +40,66 @@ from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
 
 # --- Stock: 7/16 hex brass bar (independent of the larger MG-02 clamp) -------
+# As bought: the sheet prints the flats as the stock's (7/16 in) REF.
 HEX_AF = 7.0 / 16.0 * 25.4  # 11.1125 across the flats
 # Centre to a corner: the hex's half-extent along local Y.
 HEX_CORNER_RADIUS = HEX_AF / math.sqrt(3.0)
 
 # --- Stations along the hex axis (local x; origin on the rod-bore axis) ----------
+# The free end's and the spigot face's stations, and the groove's station and
+# root Ø below, set the installed hook and the bracket arm's load: they keep
+# their millimetre nominals and print rounded (.209, .50, .15, .30).
 ROD_STATION = 5.30  # free end to the rod-bore axis
 FREE_END_X = -ROD_STATION
-HEX_LENGTH = 11.3  # free end to the shoulder (modelled; printed via the spigot)
-SHOULDER_X = FREE_END_X + HEX_LENGTH
 # Spigot face back to the shoulder: the lathe's own length from the faced end.
-SPIGOT_LENGTH = 6.7
+SPIGOT_LENGTH = 6.604  # .26
+# The spigot face's station from the bore axis (.500).
+_FACE_STATION = 12.70
+HEX_LENGTH = ROD_STATION + _FACE_STATION - SPIGOT_LENGTH  # free end to the shoulder
+SHOULDER_X = FREE_END_X + HEX_LENGTH
 SPIGOT_FACE_X = SHOULDER_X + SPIGOT_LENGTH
 OVERALL_LENGTH = HEX_LENGTH + SPIGOT_LENGTH
 
 # --- Rod bore: across the corners, along local Y, through the hex axis --------
 # Centred between the flats by the hex sketch's symmetry: no location from a
 # flat (mg_output_fixture_spec takes the drill's run-off as its offset).
-ROD_BORE_DIA = 5.2  # drilled: running clearance on the Ø5 vertical rod
+# Drilled running clearance on the vertical rod: the smallest drill-index
+# drill whose size prints exactly at .XXX and clears the rod by .007 or more.
+_CLEARANCE_DRILLS_IN = {
+    "#12": 0.189,
+    "#11": 0.191,
+    "#9": 0.196,
+    "#8": 0.199,
+    "#7": 0.201,
+    "#6": 0.204,
+    "#4": 0.209,
+    "#3": 0.213,
+    "#2": 0.221,
+    "#1": 0.228,
+}
+ROD_BORE_CLEARANCE_MIN = 0.1778  # .007 diametral
+ROD_BORE_DRILL, ROD_BORE_DIA = min(
+    (
+        (drill, round(size_in * 25.4, 6))
+        for drill, size_in in _CLEARANCE_DRILLS_IN.items()
+        if size_in * 25.4 >= VROD_DIA + ROD_BORE_CLEARANCE_MIN - 1e-9
+    ),
+    key=lambda row: row[1],
+)
 
 # --- Spigot and its full-radius wire groove ------------------------------------
-# The groove arc's centre sits exactly on the spigot OD (Ø10.1 = root Ø7.7 +
-# 2 x R1.2), so the groove is a true semicircle, as deep as its radius.  The
-# owner's suggested Ø10.5 would stand the centre inside the OD: a groove
-# 1.4 deep under an R1.2 arc, re-entrant (undercut), not turnable.
-SPIGOT_DIA = 10.1
-GROOVE_RADIUS = 1.2
+# The groove arc's centre sits exactly on the spigot OD (OD = root Ø + 2R), so
+# the groove is a true semicircle, as deep as its radius: a centre inside the
+# OD would cut a re-entrant (undercut) groove, not turnable.  The radius is
+# its LIMIT's upper value (.047), the root Ø the hook's (exempt above), so
+# the OD follows them and prints rounded (.40).
+GROOVE_RADIUS = 1.1938  # .047
 GROOVE_ROOT_DIA = 7.7
-# The internal corner where the spigot turns up to the hex shoulder: the
-# tool-nose radius, modelled at the largest the print allows (R MAX).  It
-# stays on the shoulder face inside the flats and short of the groove.
-SHOULDER_FILLET_R = 0.2
+SPIGOT_DIA = GROOVE_ROOT_DIA + 2.0 * GROOVE_RADIUS
+# The internal corner where the spigot turns up to the hex shoulder: a
+# .008 tool-nose radius.  It stays on the shoulder face inside the flats and
+# short of the groove.
+SHOULDER_FILLET_R = 0.2032  # .008
 # The groove's station from the spigot face: its face-side lip holds the wall
 # target at the worst case; the shoulder side takes the rest of the spigot.
 GROOVE_STATION = 3.75
@@ -79,7 +108,7 @@ GROOVE_X = SPIGOT_FACE_X - GROOVE_STATION
 # from GROOVE_X (the full radius: the centre is on the OD).
 GROOVE_CENTRE_R = GROOVE_ROOT_DIA / 2.0 + GROOVE_RADIUS
 GROOVE_HALF_OPENING = math.sqrt(
-    GROOVE_RADIUS**2 - (GROOVE_CENTRE_R - SPIGOT_DIA / 2.0) ** 2
+    max(GROOVE_RADIUS**2 - (GROOVE_CENTRE_R - SPIGOT_DIA / 2.0) ** 2, 0.0)
 )
 GROOVE_MOUTHS = (GROOVE_X - GROOVE_HALF_OPENING, GROOVE_X + GROOVE_HALF_OPENING)
 
@@ -117,7 +146,7 @@ FIXTURE_AXIS_Y = 919.7  # the hex axis's height on the vertical rod
 # The vertical rod's axis: the drum's wire lane (sh_vn_music_wire_lever_geom.DRUM_END_Z,
 # asserted equal there). A literal, so this part's recipe closure stays free of
 # the wheel and paper modules.
-VROD_Z = -173.51
+VROD_Z = -173.5192
 # The lever wire leaves in the rod's plane (option A1): dz = 0.
 HOOK_TARGET_Z = VROD_Z
 
