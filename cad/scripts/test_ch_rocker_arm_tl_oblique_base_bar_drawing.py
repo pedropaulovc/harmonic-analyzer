@@ -15,6 +15,7 @@ import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_base_bar as drawing
 from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm
 from _surface_finish import SEAT_UM
 
@@ -28,13 +29,18 @@ def test_stock_is_the_calculators_flat_bar_faced_to_thickness() -> None:
         trammel.BASE_BAR_LENGTH,
     )
     # Owner ruling 2026-10-30 (option A): both large faces faced from the
-    # 1/2 in bar to 12.0, the carrier's .X convention; the width stays stock.
+    # 1/2 in bar; the width stays stock. #290: the faced thickness and the
+    # length print on the .XX grid, at the inch title block's band.
     assert trammel.BASE_BAR_STOCK_THICK == pytest.approx(12.7)
-    assert spec.BAR_THICK == 12.0 < trammel.BASE_BAR_STOCK_THICK
-    assert spec.THICK_PLACES == trammel.BASE_BAR_THICK_PLACES == 1
-    assert trammel.BASE_BAR_THICK_BAND == printed_band_mm(1)
+    assert spec.BAR_THICK < trammel.BASE_BAR_STOCK_THICK
+    assert spec.UNIT == "in"
+    assert spec.THICK_PLACES == trammel.BASE_BAR_THICK_PLACES == 2
+    assert trammel.BASE_BAR_THICK_BAND == printed_band_mm(2, unit="in")
+    for value in (spec.BAR_THICK, spec.BAR_LENGTH):
+        assert value / 25.4 == pytest.approx(round(value / 25.4, 2), abs=1e-9)
     assert spec.BAR_WIDTH == pytest.approx(139.7)
-    assert spec.BAR_LENGTH == 440.0
+    # Rail and bar flush within the length's band.
+    assert abs(spec.BAR_LENGTH - trammel.RAIL_LENGTH) < printed_band_mm(2, unit="in")
     # The 2026-10-30 ruling: 1/2 x 5-1/2 (vise fit) with the column-side edge
     # still 3.5 in off the rail, so the rail sits off the centreline. Rail 1's
     # part frame has y = -lateral, so the column side is the faced -Y side.
@@ -57,12 +63,23 @@ def test_rail_screw_engagement_meets_rule_18() -> None:
 
 
 def test_slots_follow_the_brief() -> None:
-    assert spec.SLOT_LENGTH == pytest.approx(17.5)
-    assert spec.NEAR_SLOT_X == pytest.approx(20.92, abs=0.005)
-    assert spec.FAR_SLOT_X == pytest.approx(390.0)
-    assert (spec.NEAR_SLOT_Y, spec.FAR_SLOT_Y) == (-37.5, 37.5)
-    assert spec.NEAR_SLOT_RISE == pytest.approx(49.4)
-    assert spec.FAR_SLOT_RISE == pytest.approx(124.4)
+    assert spec.SLOT_LENGTH == pytest.approx(spec.SLOT_RUN + spec.SLOT_WIDTH)
+    # The 1/2 stud passes the narrowest printed slot.
+    assert spec.SLOT_WIDTH - printed_band_mm(2, unit="in") > spec.HOLD_DOWN_STUD_DIA
+    assert (spec.NEAR_SLOT_Y, spec.FAR_SLOT_Y) == (
+        -trammel.HOLD_DOWN_LATERAL,
+        trammel.HOLD_DOWN_LATERAL,
+    )
+    # Every slot size, rise and the far station on the .XX grid; the near
+    # station closes the T-slot pitch and prints rounded.
+    for value in (
+        spec.SLOT_WIDTH,
+        spec.SLOT_RUN,
+        spec.FAR_SLOT_X,
+        spec.NEAR_SLOT_RISE,
+        spec.FAR_SLOT_RISE,
+    ):
+        assert value / 25.4 == pytest.approx(round(value / 25.4, 2), abs=1e-9)
     assert spec.LOW_SIDE_Y + spec.NEAR_SLOT_RISE + spec.SLOT_RUN / 2.0 == pytest.approx(
         spec.NEAR_SLOT_Y
     )
@@ -106,21 +123,20 @@ def test_one_part_two_off_the_second_turned_over() -> None:
 
 
 def test_walls_meet_rule_17() -> None:
-    assert spec.NEAR_END_WALL == pytest.approx(14.17, abs=0.01)
-    # The 2026-10-17 widening: the far slot's wall to the +Y side is the
-    # thinner of the two (the rail sits nearer that side).
-    assert spec.NEAR_SIDE_WALL == pytest.approx(42.65)
-    assert spec.FAR_SIDE_WALL == pytest.approx(4.55)
-    assert spec.SIDE_WALL == spec.FAR_SIDE_WALL
-    assert spec.NEAR_END_WALL_WORST >= 1.5
+    # The far slot's wall to the +Y side is the thinner of the two side walls
+    # (the rail sits nearer that side).
+    assert spec.SIDE_WALL == spec.FAR_SIDE_WALL < spec.NEAR_SIDE_WALL
     # c3-r6, rule 10: both slots from the -Y side, so the far slot's wall to
-    # the +Y side carries the stock width's .X band and its rise's and run's
-    # .XX (c4-r2 dropped it from the +Y side when that left 1.2 on the 1/2 x 4
-    # bar): 139.7 - 0.8 - (124.4 + 0.8 + 4 + 0.51) - 7.005 on the 1/2 x 5-1/2
-    # at the 2026-10-30 ruling's ±2 travel.
-    assert spec.FAR_SIDE_WALL_WORST == pytest.approx(2.185)
+    # the +Y side carries the stock width's supplier band and its rise's and
+    # run's .XX; the near end wall the near station's rounding as well.
+    assert spec.FAR_SIDE_WALL_WORST == pytest.approx(
+        spec.BAR_WIDTH
+        - spec.BAR_WIDTH_STOCK_BAND
+        - (spec.FAR_SLOT_RISE + spec.SLOT_RUN + 4 * printed_band_mm(2, unit="in") / 2)
+        - (spec.SLOT_WIDTH + printed_band_mm(2, unit="in")) / 2
+    )
     assert spec.SIDE_WALL_WORST == spec.FAR_SIDE_WALL_WORST
-    assert spec.SIDE_WALL_WORST >= 1.5
+    assert min(spec.SIDE_WALL_WORST, spec.NEAR_END_WALL_WORST) >= WALL_TARGET_MM
     build = BUILD.read_text(encoding="utf-8")
     assert "high_corner" not in build
     assert "adapter, low_corner, FAR_SLOT_X, FAR_SLOT_Y, FAR_SLOT_RISE" in build
@@ -135,14 +151,17 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     assert set(drawing.CALLOUTS_BELOW) <= marked
 
 
-def test_stock_width_says_stock_and_nothing_prints_as_reference() -> None:
+def test_stock_width_prints_its_fraction_over_stock() -> None:
     assert spec.STOCK_DIMENSIONS == {"BarWidth"}
-    for name in spec.STOCK_DIMENSIONS:
-        assert drawing.CALLOUTS_BELOW[name] == "STOCK"
-    # The faced thickness takes the title block's .X band, never STOCK.
+    # #290: the stock width prints its supplier fraction as a reference over
+    # STOCK, untoleranced; the faced thickness takes the title block's .XX.
+    assert drawing.STOCK_CALLOUT == "STOCK"
+    assert not spec.STOCK_DIMENSIONS & set(drawing.CALLOUTS_BELOW)
+    assert spec.BAR_WIDTH / 25.4 * spec.BAR_WIDTH_FRACTION_DENOMINATOR == pytest.approx(
+        11
+    )
     assert "BarThick" not in drawing.CALLOUTS_BELOW
-    assert spec.DRAWING_PRECISION_BY_NAME["BarWidth"] == 1  # 139.7 STOCK
-    assert spec.DRAWING_PRECISION_BY_NAME["BarThick"] == 1  # 12.0
+    assert spec.DRAWING_PRECISION_BY_NAME["BarThick"] == 2
     assert not hasattr(spec, "REFERENCE_DIMENSIONS")
     assert not any("(" in prefix for prefix, _ in drawing.DIMENSION_TEXT.values())
     assert spec.DRAWING_NOTES == ""
@@ -152,12 +171,12 @@ def test_stock_width_says_stock_and_nothing_prints_as_reference() -> None:
 
 def test_slot_run_is_centre_to_centre_with_centre_marks() -> None:
     # Rule 12: slots are dimensioned to their radius centres; the marks make
-    # the 2X 4.00 read as centre-to-centre.
-    assert spec.SLOT_RUN == pytest.approx(4.0)
+    # the 2X .16 read as centre-to-centre: twice the stud's travel.
+    assert spec.SLOT_RUN == pytest.approx(2.0 * trammel.HOLD_DOWN_ADJUST)
     assert drawing.DIMENSION_TEXT["SlotRun"] == ("2X ", "")
     # r5: the slots never said THRU; the width's text says it for both.
     assert drawing.DIMENSION_TEXT["SlotWidth"] == ("2X ", " THRU")
-    glyphs = len("".join(drawing.DIMENSION_TEXT["SlotWidth"])) + len("13.50")
+    glyphs = len("".join(drawing.DIMENSION_TEXT["SlotWidth"])) + len(".53")
     assert 2 * drawing._SLOT_WIDTH_TEXT_HALF >= glyphs * 0.0026
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "auto_center_marks(adapter, front, holes=False, slots=True" in source
@@ -172,14 +191,19 @@ def test_rail_holes_hold_a_baseline_band_that_names_its_mate() -> None:
     stations = {f"RailHole{k}X" for k in range(1, 8)}
     assert spec.DRAWING_DIMENSIONS["RailHoles"] == stations
     # c3-r7 (rule 4): only the stations, the rail's pitch, carry the band.
-    assert spec.TOLERANCES == {("RailHoles", name): 0.08 for name in stations}
+    assert set(spec.TOLERANCES) == {("RailHoles", name) for name in stations}
+    assert set(spec.TOLERANCES.values()) == {spec.RAIL_HOLE_BAND}
     assert not stations & spec.STOCK_DIMENSIONS
-    assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 2 for name in stations)
-    # One DRO Y setting cuts the row: only the station band scatters one hole
-    # off another, 0.08 inside the screw's 0.167 a side in the rail's Ø4.5.
-    assert spec.RAIL_SCREW_CLEARANCE == pytest.approx(0.167, abs=0.001)
-    assert spec.RAIL_HOLE_POSITION_RADIUS == spec.RAIL_HOLE_BAND
-    assert spec.RAIL_PATTERN_ALLOWANCE == pytest.approx(0.087, abs=1e-3)
+    # The rail's metric pattern prints rounded at three places.
+    assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 3 for name in stations)
+    # One DRO Y setting cuts the row: only the station band and its rounding
+    # scatter one hole off another, inside the #8's float in the rail's Ø4.5.
+    assert spec.RAIL_HOLE_BAND <= spec.RAIL_HOLE_POSITION_RADIUS
+    assert spec.RAIL_HOLE_POSITION_RADIUS <= spec.RAIL_HOLE_BAND + 0.0005 * 25.4
+    assert spec.RAIL_PATTERN_ALLOWANCE == pytest.approx(
+        spec.RAIL_SCREW_CLEARANCE - spec.RAIL_HOLE_POSITION_RADIUS
+    )
+    assert spec.RAIL_PATTERN_ALLOWANCE > 0.0
     # The mate rides the outermost station, the one lane no extension line
     # crosses; no other station carries a callout.
     assert drawing.CALLOUTS_BELOW["RailHole7X"] == "MATCHES HGR15R RAIL HOLES"
@@ -218,7 +242,7 @@ def test_side_lanes_clear_each_other_and_the_border() -> None:
     # The row's text clears the rise's line, its outside arrow and that
     # arrow's tail (r4: they struck the block's last "L"), and the stock
     # width's line.
-    assert row_x + drawing._RAIL_ROW_TEXT_HALF <= rise_x - 0.0025
+    assert row_x + drawing._RAIL_ROW_TEXT_HALF <= rise_x - 0.0025 + 1e-12
     assert row_x - drawing._RAIL_ROW_TEXT_HALF >= width_x + 0.002
     # The row's three-line block sits inside its span, above the near rise's
     # upper extension line (the 49.4's text rides inside its own span) and
@@ -250,8 +274,10 @@ def test_rail_row_names_what_it_buys() -> None:
     # about 2.6 mm a glyph (r1-r3 assumed 2.2 and the block overran).
     assert 2 * drawing._RAIL_ROW_TEXT_HALF >= widest * 0.0026
     # The stations' band stays inside the screw clearance; the title block's
-    # ±0.51 would not, so only the row (moving all seven together) takes it.
-    assert spec.RAIL_HOLE_BAND < spec.RAIL_SCREW_CLEARANCE < 0.51
+    # .XX would not, so only the row (moving all seven together) takes it.
+    assert (
+        spec.RAIL_HOLE_BAND < spec.RAIL_SCREW_CLEARANCE < printed_band_mm(2, unit="in")
+    )
 
 
 def test_tap_callout_has_clear_air_under_the_border() -> None:
@@ -378,11 +404,16 @@ def test_bracket_holes_are_the_leadscrew_layouts() -> None:
     # is not pinned.
     near_x = leadscrew.BASE_BAR_HOLES[0][0]
     far_x = leadscrew.BASE_BAR_HOLES[-1][0]
-    rows = (-27.5, -44.0, -66.0, -82.5)
+    rows = drawing.BRACKET_ROW_Y
     assert leadscrew.BASE_BAR_HOLES == tuple(
         (x, y) for x in (near_x, far_x) for y in rows
     )
-    assert drawing.BRACKET_ROW_Y == rows
+    assert rows == tuple(-lateral for lateral in leadscrew.BAR_SCREW_LATERALS)
+    # #290: every row from the -Y edge prints as modelled at .XXX; the two
+    # stations are the KP08's metric stations and print rounded.
+    for y in rows:
+        edge = (y - spec.LOW_SIDE_Y) / 25.4
+        assert edge == pytest.approx(round(edge, 3), abs=1e-9)
     assert drawing.BRACKET_HOLES is leadscrew.BASE_BAR_HOLES
     hole = spec.BRACKET_HOLE_SPEC
     wanted = leadscrew.BASE_BAR_HOLE_SPEC
@@ -404,44 +435,36 @@ def test_bracket_holes_are_the_leadscrew_layouts() -> None:
 def test_bracket_counterbores_sink_and_seat_the_heads() -> None:
     assert spec.BRACKET_SCREW_HEAD_DIA == pytest.approx(6.858)
     assert spec.BRACKET_SCREW_HEAD_HEIGHT == pytest.approx(leadscrew.SHCS_8_HEAD)
-    assert spec.BRACKET_HEAD_RECESS_MIN == pytest.approx(0.124, abs=1e-3)
-    assert spec.BRACKET_HEAD_CLEARANCE_MIN == pytest.approx(0.572, abs=1e-3)
-    assert spec.BRACKET_HEAD_BEARING_MIN == pytest.approx(0.89, abs=1e-3)
-    assert spec.BRACKET_CBORE_FLOOR_MIN == pytest.approx(5.89, abs=1e-3)
+    # The head sinks, clears the counterbore and bears on its floor at the
+    # printed bands; the floor keeps rule 17's target.
+    assert spec.BRACKET_HEAD_RECESS_MIN >= 0.1
+    assert spec.BRACKET_HEAD_CLEARANCE_MIN >= 0.25
+    assert spec.BRACKET_HEAD_BEARING_MIN >= 0.5
+    assert spec.BRACKET_CBORE_FLOOR_MIN >= WALL_TARGET_MM
     # Rule 18: a #8-32 x 5/8 reaches 1.5 D into TL-28 at the printed worst
-    # (the faced 12.0 bar at its .X band).
+    # (the faced .47 bar at its .XX band), and never through the 1 in bracket.
     low, high = spec.bracket_screw_under_head(0.625 * 25.4)
-    assert (low, high) == pytest.approx((7.365, 9.985), abs=1e-3)
     assert low >= 1.5 * THREAD_MAJOR_MM[leadscrew.BAR_SCREW]
+    assert high < leadscrew.BRACKET_THICK
 
 
 def test_bracket_hole_walls_meet_rule_17() -> None:
     walls = spec.bracket_hole_walls(leadscrew.BASE_BAR_HOLES)
-    # The rows and the far station are fixed; the near station follows the
-    # leadscrew layout, so its walls are bounded, not pinned. Ruling A′: the
-    # -Y edge's 2.045 is the rule-17 target that bounds the outer screws.
-    fixed = {"-Y edge", "+Y edge", "far end", "neighbour counterbore"}
-    assert {name: walls[name] for name in fixed} == pytest.approx(
-        {
-            "-Y edge": 2.045,
-            "+Y edge": 73.145,
-            "far end": 6.845,
-            "neighbour counterbore": 7.682,
-        },
-        abs=1e-3,
-    )
-    assert walls["-Y edge"] >= 2.0
+    # Ruling A′: the -Y edge wall is the rule-17 target that bounds the outer
+    # screws; every wall clears the target at its printed worst.
+    assert walls["-Y edge"] >= WALL_TARGET_MM
     assert walls["spindle end"] > 50.0
     assert walls["rail tap"] > 20.0
     assert walls["hold-down slot"] > 20.0
-    assert min(walls.values()) >= spec.BRACKET_WALL_MIN
+    assert min(walls.values()) >= WALL_TARGET_MM
+    assert spec.BRACKET_WALL_MIN == WALL_FLOOR_MM
 
 
 def test_bracket_pattern_holds_the_tl28_float_and_names_it() -> None:
-    """Stations and rows at .XXX (±0.13): inside the ±0.15 the TL-28 stack
+    """Stations and rows at .XXX: inside the screw float the TL-28 stack
     leaves; the tight band names its mate, and the plan, looking at the top,
     says the counterbores are on the far side."""
-    assert printed_band_mm(spec.BRACKET_HOLE_PLACES) <= 0.15
+    assert printed_band_mm(spec.BRACKET_HOLE_PLACES, unit="in") <= 0.15
     for name in (
         "BracketHole1X",
         "BracketHole5X",
@@ -451,11 +474,8 @@ def test_bracket_pattern_holds_the_tl28_float_and_names_it() -> None:
     lines = spec.BRACKET_CALLOUT_PROCESS.split("\n")
     assert lines == ["MATCHES MHA-CH-06-TL-28", "DRILL, C'BORE FAR SIDE", ""]
     assert "MHA-CH-06-TL-28" == spec.BRACKET_MATE
-    assert spec.BRACKET_CALLOUT_PRECISION == {
-        "hw-thruholedia": 2,
-        "hw-cbdia": 2,
-        "hw-cbdepth": 2,
-    }
+    # Every Hole Wizard length prints .XXX (#290).
+    assert set(spec.BRACKET_CALLOUT_PRECISION.values()) == {3}
     # Rule 12: the size and a process word, no screw in the place of a size.
     assert "SHCS" not in spec.BRACKET_CALLOUT_PROCESS
 
@@ -505,8 +525,11 @@ def test_bracket_dimensions_and_callout_lay_out_clear() -> None:
     )
     # The leader leaves the far outer hole down and right; at the length's
     # extension line (x _RIGHT) it is under the bar, and it passes under the
-    # 6.400 text.
-    hole = (sx(centre, 428.0), drawing._sheet_y(centre, -82.5))
+    # outer row's text.
+    hole = (
+        sx(centre, drawing.BRACKET_FAR_X),
+        drawing._sheet_y(centre, drawing.BRACKET_OUTER_Y),
+    )
     cx, cy = drawing.BRACKET_CALLOUT_XY
     half_w, half_h = 0.027, 0.010  # "MATCHES MHA-CH-06-TL-28", four rows
     land = (cx - half_w, cy)

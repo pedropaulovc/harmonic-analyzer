@@ -11,25 +11,32 @@ and every bought dimension) belongs to
 ``ch_rocker_arm_tl_vn_oblique_leadscrew_spec``, imported as ``leadscrew``; this
 module never retypes one of its numbers.
 
+Issue #290: the sheet prints decimal inch (``drawing_unit: in``). Lengths
+stay physical millimetres, each fabricated nominal the exact millimetres of
+its printed inch value; the KP08's 42 mm bolt span is the vendor's, so its two
+tap stations print rounded at three places (.548, 2.202) and their walls and
+float read the printed limits.
+
 Material and stock: aluminium flat bar 1/2 x 1 in standing on edge, e.g.
-6061-T6 (the owned OnlineMetals 1165 6061-T6511 bar): 12.70 along the screw,
-25.40 high, sawn and faced to ``leadscrew.BRACKET_LENGTH`` 68.9. Width and
-height stay as bought and print "STOCK". Only the taps need the metal, so
-the title block names the flat-bar family, not a grade (rule 2). The KP08
-foot (13 wide, UNVERIFIED) overhangs the 12.70 top by 0.15 a side
-(``KP08_FOOT_OVERHANG``).
+6061-T6 (the owned OnlineMetals 1165 6061-T6511 bar): 1/2 along the screw,
+1 high, sawn and faced to ``leadscrew.BRACKET_LENGTH`` 2.71. Width and
+height stay as bought: each prints its stock fraction as a reference over
+"STOCK", the supplier's band governing (``WIDTH_STOCK_BAND``). Only the taps
+need the metal, so the title block names the flat-bar family, not a grade
+(rule 2). The KP08 foot (13 mm wide, UNVERIFIED) overhangs the 1/2 top by
+0.15 mm a side (``KP08_FOOT_OVERHANG``).
 
 Frame (SolidWorks model, and the ``PRECHIPS_SOLIDS`` frame; the leadscrew
 spec's): origin on the bottom face at the inner end (toward the rail),
 mid-width; +X outward (machine +lateral), +Y along the screw, +Z up. Envelope
-X 0 .. 68.9, Y -6.35 .. 6.35, Z 0 .. 25.4.
+X 0 .. 2.71, Y -.25 .. .25, Z 0 .. 1.00.
 
 Holes, all six on the mid-width row (Y 0), tapped THRU from the top face:
 
-- Two #6-32 UNC tapped holes at X 14 and 56: the KP08's two base screws
-  at its 42 bolt spacing, about the screw axis. The bought block's holes
+- Two #6-32 UNC tapped holes at X .548 and 2.202: the KP08's two base screws
+  at its 42 mm bolt spacing, about the screw axis. The bought block's holes
   are plain, so the screw is shop-chosen US-customary (fastener policy).
-- Four #8-32 UNC tapped holes at X 7.5, 24, 46 and 62.5: the base-bar
+- Four #8-32 UNC tapped holes at X .285, .942, 1.808 and 2.465: the base-bar
   screws, #8-32 SHCS fitted up through the bar's counterbored clearance holes
   (``leadscrew.BASE_BAR_HOLE_SPEC``) into these taps; two pairs symmetric
   about the screw axis (ruling A′), the outer pair's half-span set by the
@@ -38,28 +45,22 @@ Holes, all six on the mid-width row (Y 0), tapped THRU from the top face:
   ruling).
 
 Bands. Both patterns are fixed-fastener fits, so every station and the row
-print at three places (title block ±0.13): each hole then sits in a 0.13
-half-side square, ``POSITION_RADIUS`` 0.184 from nominal. A #6 (major Ø3.505)
-floats 0.498 in the KP08's Ø4.5 holes (``leadscrew.KP08_HOLE_DIA``,
-UNVERIFIED), leaving ``KP08_PATTERN_ALLOWANCE`` 0.314 for the block's own hole
-positions. A #8 (major Ø4.166) floats 0.406 in the bar's Ø4.978 normal-fit
-clearance, leaving ``BAR_PATTERN_ALLOWANCE`` 0.222 for the bar's pattern. At
-two places (±0.51) the corner would be 0.72 out and neither pattern would fit.
-Each station is a DRO absolute from the faced inner end (rule 10) and names
-its own mate (rule 4); the row is 6.35 from the -Y side face, a hidden
-reference-sketch dimension (base bar ``RailRowReference``), and names both.
-Pair spacings (18, 42) with the edge locations at two places would loosen the
-8 between the patterns to ±1.02; that offset sets the screw line over the
-bar's holes, and the KP08 and bar-screw floats are spent on the patterns
-above, so the edge stations keep three places and carry the mates.
+print at three places (title block ±.005): each hole then sits in a .005
+half-side square, plus the KP08 stations' rounding, ``POSITION_RADIUS`` from
+nominal. A #6 (major Ø.138) floats in the KP08's Ø4.5 mm holes
+(``leadscrew.KP08_HOLE_DIA``, UNVERIFIED), leaving ``KP08_PATTERN_ALLOWANCE``
+for the block's own hole positions. A #8 (major Ø.164) floats in the bar's
+Ø.196 normal-fit clearance, leaving ``BAR_PATTERN_ALLOWANCE`` for the bar's
+pattern. At two places (±.01) this part's and the bar's position radii would
+overrun the #8's float. Each station is a DRO absolute from the faced inner
+end (rule 10) and names its own mate (rule 4); the row is .250 from the -Y
+side face, a hidden reference-sketch dimension (base bar ``RailRowReference``),
+and names both.
 
-Rule 17 (walls, 2.0 target, 1.5 floor) at worst case: every station and the
-row at ±0.13, the length at its one-place ±0.8, the stock width at its
-two-place ±0.51, each thread at its major diameter: #8 at 7.5 to the inner
-end 5.29; #8 at 7.5 to #6 at 14 2.40; #6 at 14 to #8 at 24 5.90; #8 at 24 to
-#8 at 46 17.57; #8 at 46 to #6 at 56 5.90; #6 at 56 to #8 at 62.5 2.40; #8 at
-62.5 to the outer end 3.39 (the length's one place suffices); the row to the
--Y side 4.14, to the +Y side 3.63. No rule-20 shortfall.
+Rule 17 (walls, .080 target, .060 floor) at worst case: every station and the
+row at its printed limits, the length at its .XX band, the stock width at its
+supplier band, each thread at its major diameter (``WALLS_MM``). No rule-20
+shortfall.
 
 Rule 18 belongs to the screws' lengths (leadscrew spec): the #8 engagement is
 ``leadscrew.BAR_SCREW_ENGAGEMENT``; this part only proves its through thread
@@ -71,12 +72,26 @@ from __future__ import annotations
 import math
 from typing import Any
 
+import _config
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _package_units import drawing_unit
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
 
+UNIT = drawing_unit(
+    f"parts/{leadscrew.END_BRACKET}", _config.parts(leadscrew.END_BRACKET)
+)
 # Title-block DRILLED HOLES: plus allowance, zero minus (_printed_tolerance).
-DRILLED_BAND = (drilled_oversize_mm(), 0.0)
+DRILLED_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)
+
+
+def _limits(value: float, places: int) -> tuple[float, float]:
+    """The printed value's (low, high) limits, mm: the title-block band about
+    ``value`` rounded to ``places`` in the sheet's unit."""
+    low, high = printed_deviations(value, places, unit=UNIT)
+    return value + low, value + high
+
 
 # --- Identity ---------------------------------------------------------------
 NUMBER = leadscrew.END_BRACKET_NUMBER
@@ -84,60 +99,82 @@ QUANTITY = leadscrew.END_BRACKET_QUANTITY
 KP08_ID = leadscrew.KP08_ID
 
 # --- Bracket: 6061-T6511 1/2 x 1 in flat on edge, sawn and faced to length ---
-BRACKET_LENGTH = round(leadscrew.BRACKET_LENGTH, 9)  # 68.9
-BRACKET_WIDTH = round(leadscrew.BRACKET_WIDTH, 9)  # 12.7 stock
-BRACKET_THICK = round(leadscrew.BRACKET_THICK, 9)  # 25.4 stock
+BRACKET_LENGTH = round(leadscrew.BRACKET_LENGTH, 9)  # 2.71
+BRACKET_WIDTH = round(leadscrew.BRACKET_WIDTH, 9)  # 1/2 stock
+BRACKET_THICK = round(leadscrew.BRACKET_THICK, 9)  # 1 stock
 HALF_WIDTH = round(BRACKET_WIDTH / 2.0, 9)
-LENGTH_PLACES = 1
-STOCK_PLACES = 2  # 12.70 and 25.40 print exactly at two places
+LENGTH_PLACES = 2
+# Supplier bands, OnlineMetals 6061-T6511 extruded rectangle bar
+# (https://www.onlinemetals.com/en/aluminum-tolerances): .500-.749 ±.009,
+# 1.000-1.499 ±.012. Both sizes print as stock references.
+WIDTH_STOCK_BAND = 0.2286  # .009
+THICK_STOCK_BAND = 0.3048  # .012
+STOCK_PLACES = 2
+STOCK_FRACTION_DENOMINATORS = {"BracketWidth": 2, "BracketThick": 1}  # (1/2), (1)
 STOCK_DIMENSIONS = {"BracketWidth", "BracketThick"}
 
 # --- Holes: six taps THRU on the mid-width row ---------------------------------
 HOLE_PLACES = 3  # fixed-fastener patterns (module docstring)
-HOLE_ROW_Y = HALF_WIDTH  # 6.35 from the -Y side face to the row
+HOLE_ROW_Y = HALF_WIDTH  # .250 from the -Y side face to the row
 BAR_SCREW = leadscrew.BAR_SCREW  # "#8-32"
 BAR_TAP_X: tuple[float, ...] = tuple(round(x, 9) for x in leadscrew.BRACKET_BAR_HOLES_X)
 BAR_TAP_SPEC = HoleSpec("tapped", BAR_SCREW, end="through_all")
-BAR_TAP_DRILL = blind_cut_dia_mm(BAR_TAP_SPEC)  # 3.454
+BAR_TAP_DRILL = blind_cut_dia_mm(BAR_TAP_SPEC)  # #29, .136
 # The KP08's base screws: #6-32 UNC through the block's plain holes.
 KP08_THREAD = leadscrew.KP08_SCREW  # "#6-32"
 KP08_TAP_X: tuple[float, ...] = tuple(
     round(x, 9) for x in leadscrew.BRACKET_KP08_HOLES_X
 )
 KP08_TAP_SPEC = HoleSpec("tapped", KP08_THREAD, end="through_all")
-KP08_TAP_DRILL = blind_cut_dia_mm(KP08_TAP_SPEC)  # 2.705
+KP08_TAP_DRILL = blind_cut_dia_mm(KP08_TAP_SPEC)  # #36, .1065
+# Every tap callout's drill prints .XXX (.136, .107), set per variable.
+TAP_CALLOUT_PLACES = 3
+TAP_CALLOUT_PRECISION = {"hw-tapdrldia": TAP_CALLOUT_PLACES}
 
-_BAND = printed_band_mm(HOLE_PLACES)  # ±0.13
-_LENGTH_BAND = printed_band_mm(LENGTH_PLACES)  # ±0.8
-_STOCK_BAND = printed_band_mm(STOCK_PLACES)  # ±0.51
+_LENGTH_LOW = _limits(BRACKET_LENGTH, LENGTH_PLACES)[0]
 _BAR_R = THREAD_MAJOR_MM[BAR_SCREW] / 2.0
 _KP08_R = THREAD_MAJOR_MM[KP08_THREAD] / 2.0
 
+
+def _deviation(value: float) -> float:
+    """A station's widest excursion from its model value at .XXX."""
+    low, high = _limits(value, HOLE_PLACES)
+    return max(value - low, high - value)
+
+
+_ROW_DEVIATION = _deviation(HOLE_ROW_Y)
+
 # --- The two fixed-fastener fits ------------------------------------------------
-POSITION_RADIUS = math.hypot(_BAND, _BAND)  # 0.184
+POSITION_RADIUS = max(
+    math.hypot(_deviation(x), _ROW_DEVIATION) for x in (*BAR_TAP_X, *KP08_TAP_X)
+)
 KP08_SCREW_FLOAT = (leadscrew.KP08_HOLE_DIA - THREAD_MAJOR_MM[KP08_THREAD]) / 2.0
-KP08_PATTERN_ALLOWANCE = KP08_SCREW_FLOAT - POSITION_RADIUS  # 0.314
+KP08_PATTERN_ALLOWANCE = KP08_SCREW_FLOAT - POSITION_RADIUS
 BAR_HOLE_DIA = CLEARANCE_MM[
     (leadscrew.BASE_BAR_HOLE_SPEC.size, leadscrew.BASE_BAR_HOLE_SPEC.fit)
-]  # 4.978
+]  # .196
 BAR_SCREW_FLOAT = (BAR_HOLE_DIA - THREAD_MAJOR_MM[BAR_SCREW]) / 2.0
-BAR_PATTERN_ALLOWANCE = BAR_SCREW_FLOAT - POSITION_RADIUS  # 0.222
+BAR_PATTERN_ALLOWANCE = BAR_SCREW_FLOAT - POSITION_RADIUS
 if not (KP08_PATTERN_ALLOWANCE > 0.0 and BAR_PATTERN_ALLOWANCE > 0.0):
     raise AssertionError("an end bracket hole pattern does not fit its mate")
-_TWO_PLACE_RADIUS = math.hypot(printed_band_mm(2), printed_band_mm(2))
-if not _TWO_PLACE_RADIUS > max(KP08_SCREW_FLOAT, BAR_SCREW_FLOAT):
+# At two places this part's and TL-20's position radii together overrun the
+# #8's float: the pair needs three places.
+_TWO_PLACE_RADIUS = math.hypot(
+    printed_band_mm(2, unit=UNIT), printed_band_mm(2, unit=UNIT)
+)
+if not 2.0 * _TWO_PLACE_RADIUS > BAR_SCREW_FLOAT:
     raise AssertionError("the end bracket stations no longer need three places")
 
 # Every tight band names its mate (drawing-guidelines rule 4): each station
 # and the row, which serves both patterns.
 KP08_MATE_CALLOUT = "MATCHES KP08 BLOCK HOLES"
 BAR_MATE_CALLOUT = "MATCHES MHA-CH-06-TL-20"
-# One line naming both mates: the 6.35 row's witnesses leave room for two
-# text rows only (the value and this).
+# One line naming both mates: the row's witnesses leave room for two text rows
+# only (the value and this).
 ROW_CALLOUT = "KP08 + MHA-CH-06-TL-20"
 
 # --- The KP08 base lands on the bracket ------------------------------------------
-# Its 13 foot (UNVERIFIED) overhangs the 12.7 stock 0.15 a side (contract).
+# Its 13 mm foot (UNVERIFIED) overhangs the 1/2 stock 0.15 mm a side (contract).
 KP08_FOOT_OVERHANG = max(0.0, (leadscrew.KP08_WIDTH - BRACKET_WIDTH) / 2.0)
 _KP08_CENTRE_X = (KP08_TAP_X[0] + KP08_TAP_X[1]) / 2.0
 if not (
@@ -151,32 +188,45 @@ if abs(KP08_TAP_X[1] - KP08_TAP_X[0] - leadscrew.KP08_BOLT_SPACING) > 1e-9:
 
 # --- Rule 18: the through thread offers 1.5 D to both screws --------------------
 for _thread in (BAR_SCREW, KP08_THREAD):
-    if BRACKET_THICK < 1.5 * THREAD_MAJOR_MM[_thread]:
+    if BRACKET_THICK - THICK_STOCK_BAND < 1.5 * THREAD_MAJOR_MM[_thread]:
         raise AssertionError(f"end bracket {_thread} thread under 1.5 D")
 
 # --- Rule 17: walls at the printed worst case ----------------------------------------
-WALL_TARGET = 2.0
-WALL_FLOOR = 1.5
+WALL_TARGET = WALL_TARGET_MM
+WALL_FLOOR = WALL_FLOOR_MM
 # Every tap to its row neighbours and the end taps to the ends, in row order
-# (ruling A′'s six taps interleave #8 and #6: 7.5/14/24/46/56/62.5).
+# (ruling A′'s six taps interleave #8 and #6).
 _TAPS = sorted(
     [(x, "#8", _BAR_R) for x in BAR_TAP_X] + [(x, "#6", _KP08_R) for x in KP08_TAP_X]
 )
 _FIRST, _LAST = _TAPS[0], _TAPS[-1]
+
+
+def _inch(value: float) -> str:
+    return f"{value / 25.4:.3f}".lstrip("0")
+
+
 WALLS_MM: dict[str, float] = {
-    f"{_FIRST[1]} tap at {_FIRST[0]:g} to inner end": _FIRST[0] - _BAND - _FIRST[2],
+    f"{_FIRST[1]} tap at {_inch(_FIRST[0])} to inner end": _limits(
+        _FIRST[0], HOLE_PLACES
+    )[0]
+    - _FIRST[2],
     **{
-        f"{kind} tap at {x:g} to {next_kind} tap at {next_x:g}": (next_x - _BAND)
-        - (x + _BAND)
+        f"{kind} tap at {_inch(x)} to {next_kind} tap at {_inch(next_x)}": _limits(
+            next_x, HOLE_PLACES
+        )[0]
+        - _limits(x, HOLE_PLACES)[1]
         - r
         - next_r
         for (x, kind, r), (next_x, next_kind, next_r) in zip(_TAPS, _TAPS[1:])
     },
-    f"{_LAST[1]} tap at {_LAST[0]:g} to outer end": (BRACKET_LENGTH - _LENGTH_BAND)
-    - (_LAST[0] + _BAND)
+    f"{_LAST[1]} tap at {_inch(_LAST[0])} to outer end": _LENGTH_LOW
+    - _limits(_LAST[0], HOLE_PLACES)[1]
     - _LAST[2],
-    "row to -Y side": HOLE_ROW_Y - _BAND - _BAR_R,
-    "row to +Y side": (BRACKET_WIDTH - _STOCK_BAND) - (HOLE_ROW_Y + _BAND) - _BAR_R,
+    "row to -Y side": HOLE_ROW_Y - _ROW_DEVIATION - _BAR_R,
+    "row to +Y side": (BRACKET_WIDTH - WIDTH_STOCK_BAND)
+    - (HOLE_ROW_Y + _ROW_DEVIATION)
+    - _BAR_R,
 }
 for _wall, _mm in WALLS_MM.items():
     if _mm < WALL_TARGET:
@@ -207,26 +257,26 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked end bracket dimension needs authored places")
+# Every fabricated value prints as modelled; the KP08 stations are the
+# vendor span's, printed rounded (module docstring).
 for _name, _value in (
     ("BracketLength", BRACKET_LENGTH),
-    ("BracketWidth", BRACKET_WIDTH),
-    ("BracketThick", BRACKET_THICK),
     *((f"BarTap{k}X", x) for k, x in enumerate(BAR_TAP_X, start=1)),
-    ("KP08Tap1X", KP08_TAP_X[0]),
-    ("KP08Tap2X", KP08_TAP_X[1]),
     ("HoleRowY", HOLE_ROW_Y),
 ):
-    if abs(_value - round(_value, DRAWING_PRECISION_BY_NAME[_name])) > 1e-9:
+    _places = DRAWING_PRECISION_BY_NAME[_name]
+    if abs(_value / 25.4 - round(_value / 25.4, _places)) > 1e-9:
         raise AssertionError(f"end bracket {_name} {_value} does not print as modelled")
 
-# Width and thickness are the bar as bought; every station names its mate,
-# and the row names what it buys.
-CALLOUTS_BELOW = dict.fromkeys(sorted(STOCK_DIMENSIONS), "STOCK") | {
+# Width and thickness are the bar as bought (their references carry STOCK);
+# every station names its mate, and the row names what it buys.
+CALLOUTS_BELOW = {
     "KP08Tap1X": KP08_MATE_CALLOUT,
     "KP08Tap2X": KP08_MATE_CALLOUT,
     **dict.fromkeys(sorted(DRAWING_DIMENSIONS["BarTaps"]), BAR_MATE_CALLOUT),
     "HoleRowY": ROW_CALLOUT,
 }
+STOCK_CALLOUT = "STOCK"
 SURFACE_FINISHES = ()
 DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
