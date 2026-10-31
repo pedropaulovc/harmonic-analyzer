@@ -714,7 +714,9 @@ def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
     crop = bore_view_crop_radius(teeth)
     x, y = BORE_VIEW_CENTER
     return {
-        "BoreCutDia": (x - 0.022, y + crop + BORE_VIEW_DIA_LIFT),
+        # 3 mm right of x - 0.022: the inch seat band (+0.04572/+0.0254)
+        # ran the text 1.6 mm past the left inner border (#290 batch 0).
+        "BoreCutDia": (x - 0.019, y + crop + BORE_VIEW_DIA_LIFT),
         "BoreAF": (
             x + flat + BORE_VIEW_AF_GAP + BORE_VIEW_AF_HALF_WIDTH,
             y - crop - BORE_VIEW_AF_DROP,

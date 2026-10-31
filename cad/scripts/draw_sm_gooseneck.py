@@ -271,8 +271,10 @@ SECTION_KEEP = {
     "CounterboreDia": (_SX0 - 0.030, _SY0 - 0.0005),
     "CounterboreFloorCornerR": (_SX0 - 0.032, _SY0 + _SECTION_HALF + 0.0116),
     "PlugDia": (_section_x(ARM_END_X + 4.0), _SY0 - _SECTION_HALF - 0.019),
+    # 1.5 mm left of the shank's centre: the four-place braze window ran
+    # the text 0.26 mm onto the elevation (#290 batch 0).
     "PlugShankDia": (
-        _section_x(TUBE_END_X + PLUG_SHANK_LENGTH / 2.0),
+        _section_x(TUBE_END_X + PLUG_SHANK_LENGTH / 2.0) - 0.0015,
         _SY0 - _SECTION_HALF - 0.044,
     ),
 }
