@@ -6,17 +6,18 @@ dt-crankshaft:
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "turned from bar: 3/8 in core, integral Ø20.6 collar with a Ø17.5 sprocket seat spigot and 2 reamed drive-pin holes, Ø9.0 pinion seat step (steel)"
+  drawing_unit: in
+  process: "turned from bar: 3/8 in core, integral Ø.81 collar with a Ø.689 sprocket seat spigot and 2 reamed drive-pin holes, Ø.3125 pinion seat step (steel)"
   machinist_exceptions:
     # TODO(#1625): remove RV-01 and the INSIDE CORNERS note when the title
     # block gains its inside-corner default.
     - id: "RV-01"
       kind: "accept"
-      where: "inside corners at every shoulder: dome shank to seat spigot, collar to its rear land, the journals and the Ø9.0 seat step"
+      where: "inside corners at every shoulder: dome shank to seat spigot, collar to its rear land, the journals and the Ø.3125 seat step"
       finding: "shoulder fillets/undercuts not sized at each step (rule 11) or a general inside-corner note in place of a title-block default"
-      reason: "owner ruling 2026-10-18 (fr-top-frame / sm-summing-lever / dt-cone-pivot-post precedent): turned with an R0.25 MAX inside-corner ceiling, printed as one note until the shop-wide default goes in the title block under #1625 (owner-accepted)"
+      reason: "owner ruling 2026-10-18 (fr-top-frame / sm-summing-lever / dt-cone-pivot-post precedent): turned with an R.010 MAX inside-corner ceiling, printed as one note until the shop-wide default goes in the title block under #1625 (owner-accepted)"
     - id: "RV-02"
       kind: "minor"
-      where: "end view, under the 2X REAM Ø2.38 drive-pin callout: DRIVE-PIN HOLE TO SPIGOT RIM 0.48 MIN."
-      finding: "wall from each drive-pin hole to the Ø17.50 seat-spigot rim below the 1.5 mm floor (rules 17, 20)"
-      reason: "owner ruling 2026-10-18 on PR #1654 (#991): 0.48 MIN at the smallest printed spigot (Ø17.40) and the hole's worst position; the Ø14 pin circle is shared with MHA-PD-09 and its drive collar, and between the wheel's Ø10.3 bore and the spigot there is only 1.05 of radial room for both walls, so no pin circle meets 1.5 on both sides (a Ø12 circle breaks the wheel's holes into its bore); the spigot diameter is held by the #25 chain wrapping the T12. Accepted as stated until the redesign in #1679 (owner-ruled shortfall)"
+      where: "end view, under the 2X REAM Ø.0937 drive-pin callout: DRIVE-PIN HOLE TO SPIGOT RIM .019 MIN."
+      finding: "wall from each drive-pin hole to the Ø.689 seat-spigot rim below the .060 floor (rules 17, 20)"
+      reason: "owner ruling 2026-10-18 on PR #1654 (#991): .019 MIN at the smallest printed spigot (Ø.685) and the hole's worst position; the Ø.551 pin circle is shared with MHA-PD-09 and its drive collar, and between the wheel's Ø.406 bore and the spigot there is only .041 of radial room for both walls, so no pin circle meets .060 on both sides (a Ø.47 circle breaks the wheel's holes into its bore); the spigot diameter is held by the #25 chain wrapping the T12. Accepted as stated until the redesign in #1679 (owner-ruled shortfall)"

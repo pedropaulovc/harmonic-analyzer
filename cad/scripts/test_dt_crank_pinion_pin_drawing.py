@@ -60,11 +60,9 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert spec.DRAWING_DIMENSIONS == {"PinProfile": {"PinDia", "PinLen"}}
 
 def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
-    # drawing-simplicity-policy.md `How the repository implements the guidelines`: the diameter is routine at the title block's .XX grade (the
-    # match-drilled hole sets the fit) and the length, whose only function is
-    # "not proud", claims no more than the .X grade -- no band, no three-place
-    # number.
-    assert spec.DRAWING_PRECISION_BY_NAME == {"PinDia": 2, "PinLen": 1}
+    # drawing-simplicity-policy.md `How the repository implements the guidelines`: the diameter is the
+    # as-bought rod's fraction reference (the match-drilled hole sets the fit)
+    # and the length takes the title block's grade -- no band of their own.
     assert "draw_dt_crank_pinion_pin.py" in PRECISION_MIGRATED_DRAWINGS
     source = _source()
     assert "set_dimension_precision" not in source
