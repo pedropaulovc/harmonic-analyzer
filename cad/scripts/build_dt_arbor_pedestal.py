@@ -39,9 +39,11 @@ from _appearance import apply_color, apply_material
 from _check import check
 from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -84,6 +86,7 @@ from dt_arbor_pedestal_spec import (
     TAPER_TANGENT_X,
     TAPER_TANGENT_Y,
     TOP_RADIUS,
+    UNIT,
 )
 from _hole_spec import blind_cut_dia_mm
 from _visibility import blank_reference_geometry
@@ -103,13 +106,13 @@ CAD_APPEARANCE = (0.28, 0.28, 0.30)  # neutral charcoal keeps drawing edges legi
 # marked dimensions — so a spec correction rebuilds the SLDPRT from the same
 # values the print annotates (foot envelope, strap, dome, journal bore).
 #
-# STRAP_T: band local z STRAP_ROOT_Z..STRAP_INNER_Z = -2..+8, unchanged by
-# U34c. The -Z ledge carries a #8 close-clearance hole for the MHA-DT-VN-62
+# STRAP_T: band local z STRAP_ROOT_Z..STRAP_INNER_Z, the strap inner face at
+# local z +8 as before U34c. The -Z ledge carries a #8 close-clearance hole for the MHA-DT-VN-62
 # #8-32 x 3/4 fillister (McMaster 90280A197); the base seat under it is
 # transfer-punched through this hole at assembly.
-# SCREW_Z (spec): hole centre on the ledge, local z -11.
+# SCREW_Z (spec): hole centre on the ledge, .75 from the strap inner face.
 # SET_SCREW_Z (spec): the #4-40 apex tap for the MHA-DT-VN-64 set screw (#743),
-# radial through the crown at the strap's mid-depth, local z +3.
+# radial through the crown at the strap's mid-depth, .20 from the inner face.
 
 BORE_RADIUS = BORE_DIA / 2.0
 
@@ -254,6 +257,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): foot extents, strap thickness, dome
     # radius, bore diameter + drive-height station. The mm suffix is
@@ -277,7 +282,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     # Foot flange on the Top plane (sketch y = global -Z): X-centred, its far
-    # edge on the strap inner face (z +8) and running 28 outboard to z -20, so
+    # edge on the strap inner face (z +8) and running FOOT_DEPTH outboard, so
     # the rectangle is anchored at its inner-west corner rather than centred.
     foot = SketchDims()
     check("create_sketch foot", await adapter.create_sketch("Top"))
@@ -313,8 +318,8 @@ async def build(adapter) -> dict[str, str]:
     v_foot = FOOT_WIDTH * FOOT_DEPTH * FOOT_HEIGHT
     volume = await volume_check(adapter, "foot", v_foot, 0.005 * v_foot)
 
-    # True tangent strap: the sides start flush with the 24 mm foot and meet
-    # the concentric R10 crown without a tolerance-sized step or visual kink.
+    # True tangent strap: the sides start flush with the foot and meet the
+    # concentric crown without a tolerance-sized step or visual kink.
     half_root = FOOT_WIDTH / 2.0
     half_tangent = TAPER_TANGENT_X
     tangent_y = TAPER_TANGENT_Y
@@ -377,7 +382,7 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch strap", await adapter.exit_sketch())
     name_last_feature(adapter, "StrapProfile")
     drive_jobs += strap.apply(adapter, "StrapProfile")
-    # L, not T: the strap band hugs the foot's +Z face (local z -2..+8), so
+    # L, not T: the strap band hugs the foot's +Z face, so
     # the extrude starts at an offset instead of straddling the mid-plane.
     extrude_at_offset(adapter, STRAP_T, STRAP_ROOT_Z)
     name_last_feature(adapter, "Strap")
@@ -390,7 +395,7 @@ async def build(adapter) -> dict[str, str]:
     # only the circular cap above that chord.
     # The crown prints as the radius it is, so the model dimensions it as one:
     # a diameter the sheet flips radial keeps its value and re-reads it as a
-    # radius (v37 MHA-DT-02 printed R22 on this R11 part).
+    # radius (v37 MHA-DT-02 printed R22 on an R11 part).
     dome = SketchDims()
     check("create_sketch dome", await adapter.create_sketch("Front"))
     await define_circle(
@@ -440,7 +445,7 @@ async def build(adapter) -> dict[str, str]:
         "cut bore",
         await adapter.create_cut_extrude(
             # Mid-plane TOTAL about the Front sketch plane: the strap band
-            # sits offset (-2..+8), so the cut spans generously past it.
+            # sits offset from it, so the cut spans generously past it.
             ExtrusionParameters(depth=2.0 * FOOT_DEPTH, both_directions=True)
         ),
     )
@@ -526,7 +531,12 @@ async def build(adapter) -> dict[str, str]:
     # (drawing-simplicity-policy.md `How the repository implements the guidelines`); the drawing reads them back instead of rewriting them.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)
+        adapter,
+        "BoreProfile",
+        "BoreDia",
+        *deviations(BORE_DIA_BAND),
+        places=DRAWING_PRECISION["BoreProfile"]["BoreDia"],
+        display_unit=UNIT,
     )
 
     await apply_material(adapter, MATERIAL)

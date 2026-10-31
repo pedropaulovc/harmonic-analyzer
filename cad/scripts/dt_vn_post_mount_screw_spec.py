@@ -26,7 +26,8 @@ from dataclasses import dataclass
 
 import _config
 import dt_cone_pivot_post_spec as post
-from _printed_tolerance import printed_band_mm
+from _package_units import drawing_unit
+from _printed_tolerance import edge_break_chamfer_mm, printed_deviations
 import dt_cone_swing_platform_spec as platform
 import dt_post_mount_stack as mount_stack
 from _fit_deviations import deviations
@@ -46,6 +47,20 @@ from _msc_40923906 import (
 )
 
 SKU = "40923906"
+# #290: the registry row's drawing_unit (in) is this sheet's unit.
+UNIT = drawing_unit("parts/dt-vn-post-mount-screw", _config.parts("dt-vn-post-mount-screw"))
+MM_PER_IN = 25.4
+
+
+def inch_text(value_mm: float, places: int) -> str:
+    """An mm length as ASME decimal-inch text (no leading zero)."""
+    text = f"{value_mm / MM_PER_IN:.{places}f}"
+    return text[1:] if text.startswith("0.") else text
+
+
+def _on_inch_grid(value_mm: float, places: int) -> bool:
+    scaled = value_mm / MM_PER_IN * 10**places
+    return abs(scaled - round(scaled)) < 1e-6
 THREAD = platform.POST_MOUNT_SPEC.size
 THREAD_DIA_MM, STOCK_LENGTH_MM, HEAD_H_MM, _HEAD_DIA, _PITCH = FILLISTER_SIZE
 
@@ -182,7 +197,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     CUT_LENGTH_SKETCH: {CUT_LENGTH_DIMENSION: mount_stack.CUT_LENGTH_PLACES},
-    CUT_END_BREAK_SKETCH: {CUT_END_BREAK_DIMENSION: 1},
+    CUT_END_BREAK_SKETCH: {CUT_END_BREAK_DIMENSION: 3},
 }
 DRAWING_PRECISION_BY_NAME = {
     name: places
@@ -196,24 +211,30 @@ FRONT_VIEW_DIMENSIONS = {CUT_LENGTH_SKETCH: {CUT_LENGTH_DIMENSION}}
 TIP_VIEW_DIMENSIONS = {CUT_END_BREAK_SKETCH: {CUT_END_BREAK_DIMENSION}}
 
 # --- U27: can one fixed cut length serve every in-band post and plate? ---
-# The printed bands, as the shop reads them off the title block: the post's
-# overall height is a .X dimension, its counterbore depth a .XX callout, and
-# the plate is 1/4 flat bar as supplied (U41) at its mill tolerance.
-_GENERAL_1PL_MM = printed_band_mm(1)
-_GENERAL_2PL_MM = printed_band_mm(2)
-_POST_HEIGHT_PRINTED = round(post.BLOCK_HEIGHT, 1)
-_CBORE_DEPTH_PRINTED = round(post.ATTACHMENT_CBORE_DEPTH, 2)
+# The printed bands, as the shop reads them off the title block of the post's
+# own sheet (in the post's own unit): its overall height at the body height's
+# places, its counterbore depth a two-place callout, and the plate is 1/4 flat
+# bar as supplied (U41) at its mill tolerance.
+_POST_UNIT = drawing_unit("parts/dt-cone-pivot-post", _config.parts("dt-cone-pivot-post"))
+_POST_HEIGHT_DEVIATIONS = printed_deviations(
+    post.BLOCK_HEIGHT, post.DRAWING_PRECISION_BY_NAME["MainBodyHt"], unit=_POST_UNIT
+)
+_CBORE_DEPTH_PLACES = 2
+_CBORE_DEPTH_DEVIATIONS = printed_deviations(
+    post.ATTACHMENT_CBORE_DEPTH, _CBORE_DEPTH_PLACES, unit=_POST_UNIT
+)
 # Stock thickness and tap-entry breaks are owned by the mating platform.
 PLATE_STOCK_BAND_MM = platform.PLATE_STOCK_BAND
-# Two breaks eat thread, both held to a deburr, not the title block's 0.25:
+# Two breaks eat thread, both held to a deburr, not the title block's .010:
 # - the screw's cut end: a deburr (the shop hacksaws and files the burr),
-#   0.1 max.  The model holds 0.1 as the nominal of its band; the sheet
-#   prints the single limit "0.1 MAX" in a cropped 10:1 view of the tip, because
-#   a 0.1 dimension at 1:1 is illegible and a printed +0/-0.1 band reads as
-#   permitting no break at all (Main's MHA-DT-VN-61 eye pass on #857).
+#   .003 max (#290: .004 would leave 0.8998D below).  The model holds .003 as
+#   the nominal of its band; the sheet prints the single limit ".003 MAX" in a
+#   cropped 10:1 view of the tip, because so small a dimension at 1:1 is
+#   illegible and a printed +0/-.003 band reads as permitting no break at all
+#   (Main's MHA-DT-VN-61 eye pass on #857).
 POST_MOUNT_TAP_EDGE_BREAK = platform.POST_MOUNT_TAP_EDGE_BREAK
-CUT_END_BREAK_MM = 0.1
-CUT_END_BREAK_BAND = (0.0, -0.1)  # (upper, lower), the _fit_deviations convention
+CUT_END_BREAK_MM = 0.0762  # .003 in
+CUT_END_BREAK_BAND = (0.0, -0.0762)  # (upper, lower), the _fit_deviations convention
 _break_lower, _break_upper = deviations(CUT_END_BREAK_BAND)
 CUT_END_BREAK_MAX_MM = CUT_END_BREAK_MM + _break_upper
 CUT_END_BREAK_MIN_MM = CUT_END_BREAK_MM + _break_lower
@@ -221,7 +242,7 @@ ENGAGEMENT_BREAKS_MM = POST_MOUNT_TAP_EDGE_BREAK + CUT_END_BREAK_MAX_MM
 # Why the part needs its own limit: the title block's general "CHAMFER <C>
 # MAX" is looser than the engagement stack below allows (the 0.90D worst
 # case spends CUT_END_BREAK_MAX_MM), so the sheet must print the tighter max.
-TITLE_BLOCK_CHAMFER_MAX_MM = float(_config.title_block("edge_break")["chamfer_max_mm"])
+TITLE_BLOCK_CHAMFER_MAX_MM = edge_break_chamfer_mm(unit=UNIT)
 if not CUT_END_BREAK_MAX_MM < TITLE_BLOCK_CHAMFER_MAX_MM:
     raise ValueError(
         f"the cut-end break max {CUT_END_BREAK_MAX_MM} no longer tightens the "
@@ -236,17 +257,17 @@ if CUT_END_BREAK_MM != CUT_END_BREAK_MAX_MM:
         f"{CUT_END_BREAK_MAX_MM}: a MAX-limit dimension would print the wrong limit"
     )
 _BREAK_PLACES = DRAWING_PRECISION[CUT_END_BREAK_SKETCH][CUT_END_BREAK_DIMENSION]
-if round(CUT_END_BREAK_MAX_MM, _BREAK_PLACES) != CUT_END_BREAK_MAX_MM:
+if not _on_inch_grid(CUT_END_BREAK_MAX_MM, _BREAK_PLACES):
     raise ValueError("the cut-end break max does not print at its places")
 # What the tip view's dimension must read: the band's max at its places.
-CUT_END_BREAK_TEXT = f"{CUT_END_BREAK_MAX_MM:.{_BREAK_PLACES}f} MAX"
+CUT_END_BREAK_TEXT = f"{inch_text(CUT_END_BREAK_MAX_MM, _BREAK_PLACES)} MAX"
 
 # Counterbore floor above PlateTop (the post foot seats on it), both ends.
-FLOOR_LOW_MM = (_POST_HEIGHT_PRINTED - _GENERAL_1PL_MM) - (
-    _CBORE_DEPTH_PRINTED + _GENERAL_2PL_MM
+FLOOR_LOW_MM = (post.BLOCK_HEIGHT + _POST_HEIGHT_DEVIATIONS[0]) - (
+    post.ATTACHMENT_CBORE_DEPTH + _CBORE_DEPTH_DEVIATIONS[1]
 )
-FLOOR_HIGH_MM = (_POST_HEIGHT_PRINTED + _GENERAL_1PL_MM) - (
-    _CBORE_DEPTH_PRINTED - _GENERAL_2PL_MM
+FLOOR_HIGH_MM = (post.BLOCK_HEIGHT + _POST_HEIGHT_DEVIATIONS[1]) - (
+    post.ATTACHMENT_CBORE_DEPTH + _CBORE_DEPTH_DEVIATIONS[0]
 )
 PLATE_THIN_MM = platform.PLATE_THICKNESS - PLATE_STOCK_BAND_MM
 PLATE_THICK_MM = platform.PLATE_THICKNESS + PLATE_STOCK_BAND_MM
@@ -288,13 +309,15 @@ if _fit_upper != 0.0:
     raise ValueError("the cut-to-fit band must top out flush: never proud")
 POST_SCREW_CUT_TO_FIT_SHORT = -_fit_lower
 # The acceptance prints where the part sheet delegates the cut: the CutLength
-# callout, as well as the drive-train assembly step. The number is the band's,
-# at the cut length's own places; a band the places would round is refused.
+# callout, as well as the drive-train assembly step. The cut length prints
+# .XX; the allowance (.012) needs .XXX, and an allowance those places would
+# round is refused.
 _FIT_PLACES = DRAWING_PRECISION[CUT_LENGTH_SKETCH][CUT_LENGTH_DIMENSION]
 if _FIT_PLACES != mount_stack.CUT_LENGTH_PLACES:
     raise ValueError("post screw cut-length precision diverges from its nominal stack")
-if round(POST_SCREW_CUT_TO_FIT_SHORT, _FIT_PLACES) != POST_SCREW_CUT_TO_FIT_SHORT:
-    raise ValueError("the cut-to-fit allowance does not print at the cut length's places")
+CUT_TO_FIT_SHORT_PLACES = 3
+if not _on_inch_grid(POST_SCREW_CUT_TO_FIT_SHORT, CUT_TO_FIT_SHORT_PLACES):
+    raise ValueError("the cut-to-fit allowance does not print at its places")
 
 # The cut-to-fit nominal: MHA-DT-VN-61's own length, applied by its trim (the
 # shared size row stays the supplied screw).  It is the nominal post and
@@ -346,7 +369,7 @@ if POST_MOUNT_ENGAGEMENT_PRINTED < MIN_ENGAGEMENT_DIAMETERS:
 # Pending exception ruling: MHA-DT-VN-61 engagement (#1019).
 CUT_TO_FIT_CALLOUT = (
     "CUT TO FIT AT ASSEMBLY\n"
-    f"END FLUSH TO {POST_SCREW_CUT_TO_FIT_SHORT:.{_FIT_PLACES}f} SHORT\n"
+    f"END FLUSH TO {inch_text(POST_SCREW_CUT_TO_FIT_SHORT, CUT_TO_FIT_SHORT_PLACES)} SHORT\n"
     "OF MHA-DT-20 UNDERSIDE,\n"
     "NEVER PROUD,\n"
     f"ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN"

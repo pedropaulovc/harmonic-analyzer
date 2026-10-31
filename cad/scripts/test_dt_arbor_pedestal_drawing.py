@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 import dt_arbor_pedestal_spec
 import build_dt_arbor_pedestal as part
 import draw_dt_arbor_pedestal as drawing
@@ -62,18 +64,11 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 def test_the_part_owns_every_printed_decimal_place() -> None:
     """drawing-simplicity-policy.md `How the repository implements the guidelines`: places are the tolerance, so the .SLDPRT carries them."""
     by_name = dt_arbor_pedestal_spec.DRAWING_PRECISION_BY_NAME
+    # Inch sheet: every size and location .XX; the reamed bore's own band
+    # needs four places.
     assert by_name == {
-        "Width": 1,
-        "Depth": 1,
-        "FootHt": 1,
-        "BoreDia": 3,
-        "BoreHeight": 2,
-        "DomeRadius": 1,
-        "StrapDepth": 1,
-        "HoldDownLocation": 1,
-        "HoleLateral": 1,
-        "BoreLateral": 1,
-        "SetScrewLocation": 2,
+        name: (4 if name == "BoreDia" else 2)
+        for name in set().union(*dt_arbor_pedestal_spec.DRAWING_DIMENSIONS.values())
     }
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in part_source
@@ -85,14 +80,14 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
 
 
 def test_only_the_running_bore_asks_for_a_third_decimal() -> None:
-    """cad/docs/tolerance-policy.md reserves three places for mating sizes:
+    """cad/docs/tolerance-policy.md reserves extra places for mating sizes:
     the journal bore is the only one on this post."""
     places = {
         **dt_arbor_pedestal_spec.DRAWING_PRECISION_BY_NAME,
         **dt_arbor_pedestal_spec.DRAWING_REFERENCE_PRECISION,
     }
     assert {name for name, value in places.items() if value > 2} == {"BoreDia"}
-    assert max(places.values()) == 3
+    assert max(places.values()) == 4
     assert model_toleranced_dimensions(part) == {
         ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)"
     }
@@ -120,7 +115,7 @@ def test_crown_radius_is_the_dome_radius_the_part_drives() -> None:
     equation evaluates to the as-built value it drives."""
     spec = dt_arbor_pedestal_spec
     assert spec.DRAWING_DIMENSIONS["DomeProfile"] == {"DomeRadius"}
-    assert spec.DRAWING_PRECISION["DomeProfile"] == {"DomeRadius": 1}
+    assert spec.DRAWING_PRECISION["DomeProfile"] == {"DomeRadius": 2}
     assert "DomeRadius" in drawing.FRONT_KEEP
     globals_mm = {"BoreHeight": spec.BORE_HEIGHT, "TopRadius": spec.TOP_RADIUS}
     as_built = {"DomeCy": spec.BORE_HEIGHT, "DomeRadius": spec.TOP_RADIUS}
@@ -182,9 +177,7 @@ def test_manufacturing_locations_are_model_dimensions() -> None:
     assert spec.REFERENCE_SKETCHES == tuple(owned)
     for sketch, name in owned.items():
         assert spec.DRAWING_DIMENSIONS[sketch] == {name}
-        # The apex tap's station prints at two places (SET_SCREW_WEB_MM).
-        places = 2 if name == "SetScrewLocation" else 1
-        assert spec.DRAWING_PRECISION[sketch] == {name: places}
+        assert spec.DRAWING_PRECISION[sketch] == {name: 2}
     source = _drawing_source()
     assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
     assert source.count("dimensions_by_feature=DRAWING_DIMENSIONS") == 2
@@ -264,40 +257,42 @@ def test_screw_hole_contract_is_part_owned() -> None:
 
 
 def test_foot_grew_outboard_only_around_an_unmoved_strap() -> None:
-    """U34c: the strap band and part origin stay put; only the ledge grew."""
+    """U34c: the strap inner face and part origin stay put; only the ledge
+    grew outboard.  #290: every station sits on the .01-in grid."""
     spec = dt_arbor_pedestal_spec
-    assert (spec.STRAP_ROOT_Z, spec.STRAP_INNER_Z) == (-2.0, 8.0)
-    assert spec.FOOT_DEPTH == 28.0
-    assert spec.LEDGE_DEPTH == 18.0
-    assert spec.FOOT_NEAR_Z == -20.0
-    assert spec.SCREW_Z == -11.0
+    assert spec.STRAP_INNER_Z == 8.0
+    assert spec.STRAP_ROOT_Z == pytest.approx(8.0 - 0.40 * 25.4)
+    assert spec.FOOT_DEPTH == pytest.approx(1.10 * 25.4)
+    assert spec.LEDGE_DEPTH == pytest.approx(0.70 * 25.4)
+    assert spec.FOOT_NEAR_Z == pytest.approx(8.0 - 1.10 * 25.4)
+    assert spec.SCREW_Z == pytest.approx(8.0 - 0.75 * 25.4)
 
 
 def test_hold_down_hole_webs_hold_u27_at_the_printed_worst_case() -> None:
-    """The plan locates the hole off the strap inner face at one place (±0.8),
-    and the foot depth and strap depth print at one place too. Every web the
-    hole leaves must keep the 2.0 target with those bands stacked against it,
-    plus the title block's +0.10 drilled-hole oversize."""
-    from _printed_tolerance import printed_band_mm
+    """The plan locates the hole off the strap inner face at .XX, and the
+    foot depth and strap depth print at .XX too. Every web the hole leaves
+    must keep the .080 target with those bands stacked against it, plus the
+    title block's +.004 drilled-hole oversize."""
+    from _inch_wall_limits import WALL_TARGET_MM
+    from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
     spec = dt_arbor_pedestal_spec
-    band_1pl = 0.8
-    assert printed_band_mm(1) == band_1pl
-    radius = spec.SCREW_HOLE_DIA / 2.0 + 0.05
+    band = printed_band_mm(2, unit="in")
+    radius = (spec.SCREW_HOLE_DIA + drilled_oversize_mm(unit="in")) / 2.0
     to_strap_root = spec.STRAP_ROOT_Z - spec.SCREW_Z - radius
     to_ledge_end = spec.SCREW_Z - spec.FOOT_NEAR_Z - radius
     to_side = spec.FOOT_WIDTH / 2.0 - radius
-    assert to_strap_root - 2 * band_1pl >= 2.0
-    assert to_ledge_end - 2 * band_1pl >= 2.0
-    assert to_side - band_1pl - band_1pl / 2.0 >= 2.0
-    # The MHA-DT-VN-62 head (Ø6.858) floats with the shank in the hole; it must
+    assert to_strap_root - 2 * band >= WALL_TARGET_MM
+    assert to_ledge_end - 2 * band >= WALL_TARGET_MM
+    assert to_side - band - band / 2.0 >= WALL_TARGET_MM
+    # The MHA-DT-VN-62 head (Ø.270) floats with the shank in the hole; it must
     # still clear the strap root it is tightened beside.
     head_r = 6.858 / 2.0
     float_r = (spec.SCREW_HOLE_DIA - 4.1656) / 2.0
-    assert spec.STRAP_ROOT_Z - spec.SCREW_Z - head_r - 2 * band_1pl - float_r >= 2.0
+    assert spec.STRAP_ROOT_Z - spec.SCREW_Z - head_r - 2 * band - float_r >= WALL_TARGET_MM
     # Dimensioned from the strap inner face, the printed value is the strap
     # plus half the ledge -- one datum for every Z on the plan.
-    assert spec.STRAP_INNER_Z - spec.SCREW_Z == 19.0
+    assert spec.STRAP_INNER_Z - spec.SCREW_Z == pytest.approx(0.75 * 25.4)
 
 
 def test_no_dead_band_between_wizard_correction_and_the_builder_assert() -> None:
@@ -599,31 +594,33 @@ def test_crown_callout_says_where_the_tapered_flanks_start() -> None:
 def test_apex_set_screw_tap_keeps_1_5d_only_at_r11() -> None:
     """#743 Q3 (user: "set screw located at apex of straps"): a #4-40 tap
     through the crown onto the arbor. At the printed worst case (crown radius
-    .X low, bore at its maximum, both sags across the thread and a one-pitch
-    entry lost) the photographed R10 crown leaves 1.21D of full thread and
-    fails drawing-guidelines.md rule 17 (walls and webs); R11 leaves 1.57D."""
+    .XX low, bore at its maximum, both sags across the thread and a one-pitch
+    entry lost) the photographed R10 crown would leave under 1.5D of full
+    thread and fail drawing-guidelines.md rule 18; R.43 leaves 1.74D."""
     spec = dt_arbor_pedestal_spec
-    assert spec.TOP_RADIUS == 11.0
+    assert spec.TOP_RADIUS == pytest.approx(0.43 * 25.4)
     assert spec.SET_SCREW_THREAD == "#4-40"
     assert spec.SET_SCREW_HOLE_SPEC.kind == "tapped"
     # Through-next: the tap stops in the bore, never drills on into the strap.
     assert spec.SET_SCREW_HOLE_SPEC.end == "through_next"
     assert spec.set_screw_engagement_d(10.0) < 1.5 <= spec.SET_SCREW_ENGAGEMENT_D
-    assert round(spec.SET_SCREW_ENGAGEMENT_D, 2) == 1.57
-    assert round(spec.SET_SCREW_FULL_THREAD_MM, 2) == 4.47
+    assert round(spec.SET_SCREW_ENGAGEMENT_D, 2) == 1.74
+    assert round(spec.SET_SCREW_FULL_THREAD_MM, 2) == 4.94
     terms = spec.set_screw_wall_terms(spec.TOP_RADIUS)
-    assert terms["crown radius at .X minimum"] == spec.TOP_RADIUS - 0.8
-    assert all(v < 0 for k, v in terms.items() if k != "crown radius at .X minimum")
+    assert terms["crown radius at .XX minimum"] == pytest.approx(spec.TOP_RADIUS - 0.254)
+    assert all(v < 0 for k, v in terms.items() if k != "crown radius at .XX minimum")
 
 
 def test_apex_set_screw_sits_mid_strap_with_its_webs() -> None:
     """The tap stands at the strap's mid-depth; its station prints at two
-    places so the outer web keeps the 2.0 target (1.98 at one place)."""
+    places so the outer web keeps the .080 target."""
+    from _inch_wall_limits import WALL_TARGET_MM
+
     spec = dt_arbor_pedestal_spec
     assert spec.SET_SCREW_Z == (spec.STRAP_INNER_Z + spec.STRAP_ROOT_Z) / 2.0
     assert spec.DRAWING_PRECISION_BY_NAME["SetScrewLocation"] == 2
-    assert spec.SET_SCREW_WEB_MM >= 2.0
-    assert round(spec.SET_SCREW_WEB_MM, 2) == 2.27
+    assert spec.SET_SCREW_WEB_MM >= WALL_TARGET_MM
+    assert round(spec.SET_SCREW_WEB_MM, 2) == 3.15
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert "wizard_hole_on_cylinder(" in part_source
     assert '"SetScrewStationPlane", "Right Plane"' in part_source

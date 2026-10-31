@@ -10,7 +10,8 @@ from types import SimpleNamespace
 import pytest
 
 import _config
-from _printed_tolerance import printed_band_mm
+from _package_units import drawing_unit
+from _printed_tolerance import edge_break_chamfer_mm, printed_deviations
 import build_dt_vn_post_mount_screw as part
 import dt_cone_pivot_post_spec as post
 import dt_cone_swing_platform_spec as platform
@@ -68,14 +69,12 @@ def test_no_fixed_cut_length_fits_both_in_band_corners() -> None:
     never-proud corner (lowest counterbore floor, thin plate) caps a fixed
     length below what the 0.90D corner (highest floor, after both edge
     breaks) needs.  So no band can go on the print."""
-    one = printed_band_mm(1)
-    two = printed_band_mm(2)
-    low = (round(post.BLOCK_HEIGHT, 1) - one) - (
-        round(post.ATTACHMENT_CBORE_DEPTH, 2) + two
-    )
-    high = (round(post.BLOCK_HEIGHT, 1) + one) - (
-        round(post.ATTACHMENT_CBORE_DEPTH, 2) - two
-    )
+    unit = drawing_unit("parts/dt-cone-pivot-post", _config.parts("dt-cone-pivot-post"))
+    places = post.DRAWING_PRECISION_BY_NAME["MainBodyHt"]
+    height_lo, height_hi = printed_deviations(post.BLOCK_HEIGHT, places, unit=unit)
+    depth_lo, depth_hi = printed_deviations(post.ATTACHMENT_CBORE_DEPTH, 2, unit=unit)
+    low = (post.BLOCK_HEIGHT + height_lo) - (post.ATTACHMENT_CBORE_DEPTH + depth_hi)
+    high = (post.BLOCK_HEIGHT + height_hi) - (post.ATTACHMENT_CBORE_DEPTH + depth_lo)
     assert (spec.FLOOR_LOW_MM, spec.FLOOR_HIGH_MM) == pytest.approx((low, high))
     thin = platform.PLATE_THICKNESS - spec.PLATE_STOCK_BAND_MM
     assert spec.FIXED_LENGTH_FLUSH_MAX_MM == pytest.approx(low + thin)
@@ -95,14 +94,18 @@ def test_cut_length_prints_as_a_reference_without_a_band() -> None:
     parentheses without a band; the callout carries fit-to-hole acceptance."""
     assert spec.CUT_LENGTH_MM == part.SHANK_LEN
     places = spec.DRAWING_PRECISION_BY_NAME[spec.CUT_LENGTH_DIMENSION]
-    assert spec.CUT_LENGTH_MM == round(
-        GRIP + platform.PLATE_THICKNESS - spec.POST_SCREW_CUT_TO_FIT_SHORT / 2.0,
-        places,
+    # The model's length sits on the inch grid it prints at (#290).
+    assert spec.CUT_LENGTH_MM / IN * 10**places == pytest.approx(
+        round(spec.CUT_LENGTH_MM / IN * 10**places), abs=1e-6
+    )
+    assert 0.0 <= GRIP + platform.PLATE_THICKNESS - spec.CUT_LENGTH_MM
+    assert GRIP + platform.PLATE_THICKNESS - spec.CUT_LENGTH_MM <= (
+        spec.POST_SCREW_CUT_TO_FIT_SHORT
     )
     callout = drawing.DIMENSION_CALLOUTS["CutLength"]
     # The callout still promises no fixed length: never the modelled cut
     # length, never a band on it.
-    assert f"{spec.CUT_LENGTH_MM:.1f}" not in callout
+    assert spec.inch_text(spec.CUT_LENGTH_MM, places) not in callout
     assert "±" not in callout and "+" not in callout
 
 
@@ -111,16 +114,16 @@ def test_cut_to_fit_acceptance_prints_on_the_delegating_callout() -> None:
     MHA-DT-00 step stated the acceptance the 0.90D worst case depends on.  The
     acceptance is a spec band -- upper 0 (never proud), lower the most a
     screw may be cut short -- and the callout prints it, generated from that
-    band at the cut length's places, not a literal."""
+    band at its own places, not a literal."""
     lower, upper = deviations(spec.POST_SCREW_CUT_TO_FIT_BAND)
     assert upper == 0.0
     assert spec.POST_SCREW_CUT_TO_FIT_SHORT == -lower
-    places = spec.DRAWING_PRECISION_BY_NAME["CutLength"]
+    places = spec.CUT_TO_FIT_SHORT_PLACES
     callout = drawing.DIMENSION_CALLOUTS["CutLength"]
     assert callout == spec.CUT_TO_FIT_CALLOUT
     flat = " ".join(callout.split())
     assert flat.startswith("CUT TO FIT AT ASSEMBLY")
-    assert f"FLUSH TO {-lower:.{places}f} SHORT OF MHA-DT-20 UNDERSIDE" in flat
+    assert f"FLUSH TO {spec.inch_text(-lower, places)} SHORT OF MHA-DT-20 UNDERSIDE" in flat
     assert "NEVER PROUD" in flat
     # The printed allowance is the one the named exception's worst case
     # spends: thinnest plate, full allowance, both breaks at their maximum.
@@ -213,7 +216,7 @@ def test_mha142_prints_no_exception_label() -> None:
 
 def test_cut_to_fit_allowance_is_exported_once() -> None:
     """The per-hole allowance MHA-DT-00 and the platform stack consume."""
-    assert spec.POST_SCREW_CUT_TO_FIT_SHORT == 0.3
+    assert spec.POST_SCREW_CUT_TO_FIT_SHORT == 0.3048  # .012 in
 
 
 
@@ -232,7 +235,7 @@ def test_cut_end_break_is_a_model_owned_deburr_of_at_most_0_1() -> None:
 def test_worst_case_engagement_holds_the_named_minimum() -> None:
     """Cut to fit, the plate limits engagement: thinnest stock, the full
     fit-to-hole allowance, the tap's entry deburr and the cut end's break,
-    both at their maximum.  Recomputed here from the chain: 5.72 = 0.90D."""
+    both at their maximum.  Recomputed here from the chain: 5.739 = 0.904D."""
     lower, upper = deviations(spec.CUT_END_BREAK_BAND)
     worst = (
         platform.PLATE_THICKNESS
@@ -242,7 +245,7 @@ def test_worst_case_engagement_holds_the_named_minimum() -> None:
         - (spec.CUT_END_BREAK_MM + upper)
     )
     assert spec.POST_MOUNT_ENGAGEMENT_WORST == pytest.approx(worst)
-    assert worst == pytest.approx(5.72)
+    assert worst == pytest.approx(5.739)
     assert worst / part.SHANK_DIA >= 0.90
     assert spec.POST_MOUNT_ENGAGEMENT_PRINTED >= 0.90
 
@@ -298,7 +301,7 @@ def test_analytic_removal_volumes_match_a_brute_force_integral() -> None:
     trim, deburr = _independent_removal()
     assert spec.TRIM_REMOVED_MM3 == pytest.approx(trim, rel=1e-4)
     assert spec.CUT_END_DEBURR_REMOVED_MM3 == pytest.approx(deburr, rel=1e-3)
-    assert spec.CUT_END_DEBURR_REMOVED_MM3 == pytest.approx(0.0153, abs=1e-4)
+    assert spec.CUT_END_DEBURR_REMOVED_MM3 == pytest.approx(0.0085, abs=1e-4)
 
 
 def test_cut_end_features_are_driven_by_the_model_dimensions() -> None:
@@ -326,9 +329,9 @@ def test_cut_end_features_are_driven_by_the_model_dimensions() -> None:
 
 def _printed_cut_short_allowance() -> float:
     """The acceptance the sheet prints: "END FLUSH TO <x> SHORT"."""
-    match = re.search(r"END FLUSH TO (\d+(?:\.\d+)?) SHORT", spec.CUT_TO_FIT_CALLOUT)
+    match = re.search(r"END FLUSH TO (\d*\.\d+) SHORT", spec.CUT_TO_FIT_CALLOUT)
     assert match, spec.CUT_TO_FIT_CALLOUT
-    return float(match.group(1))
+    return round(float(match.group(1)) * IN, 9)
 
 
 def _short_of_underside(length_mm: float) -> float:
@@ -350,8 +353,9 @@ def test_the_modelled_length_is_a_cut_the_sheet_accepts() -> None:
     assert not accepted(spec.FLUSH_LENGTH_MM - allowance - 0.01)
     assert accepted(spec.CUT_LENGTH_MM)
     places = spec.DRAWING_PRECISION_BY_NAME[spec.CUT_LENGTH_DIMENSION]
-    assert spec.CUT_LENGTH_MM == round(
-        _short_of_underside(0.0) - allowance / 2.0, places
+    middle = (_short_of_underside(0.0) - allowance / 2.0) / IN
+    assert spec.CUT_LENGTH_MM / IN == pytest.approx(
+        math.floor(middle * 10**places + 0.5) / 10**places
     )
     assert part.SHANK_LEN == spec.CUT_LENGTH_MM
 
@@ -453,13 +457,13 @@ def test_tip_view_prints_the_band_max_as_a_single_limit() -> None:
     swTolMAX single limit; the seat read-back composes the same text."""
     lower, upper = deviations(spec.CUT_END_BREAK_BAND)
     places = spec.DRAWING_PRECISION_BY_NAME["CutEndBreak"]
-    expected = f"{spec.CUT_END_BREAK_MM + upper:.{places}f} MAX"
-    assert spec.CUT_END_BREAK_TEXT == expected == "0.1 MAX"
+    expected = f"{spec.inch_text(spec.CUT_END_BREAK_MM + upper, places)} MAX"
+    assert spec.CUT_END_BREAK_TEXT == expected == ".003 MAX"
     assert spec.CUT_END_BREAK_TOL_TYPE == 6  # swTolType_e.swTolMAX
     # swTolMAX prints the nominal, so the nominal must be the band's max.
     assert spec.CUT_END_BREAK_MM == spec.CUT_END_BREAK_MAX_MM
     # Tighter than the title block's general chamfer, or it would not print.
-    general = float(_config.title_block("edge_break")["chamfer_max_mm"])
+    general = edge_break_chamfer_mm(unit="in")
     assert spec.TITLE_BLOCK_CHAMFER_MAX_MM == general
     assert spec.CUT_END_BREAK_MAX_MM < general
     # The seat composes the rendered text from the read-back parts.
