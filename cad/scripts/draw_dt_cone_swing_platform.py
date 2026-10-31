@@ -62,6 +62,7 @@ from _drawing_dimensions import (
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_hole_callout import add_native_hole_callout, compose_hole_callout_prefix
+from _drawing_tolerances import _tolerance_places
 from _drawing_layout_collect import check_drawing_layout
 from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note, property_link
@@ -1233,6 +1234,28 @@ def _rewrite_hole_callout(
     print(f"{label} callout: definitions={persisted!r} resolved={resolved!r}")
 
 
+def _print_pivot_band_exactly(display: Any) -> None:
+    """Print the pivot ream's band at the places it needs, natively.
+
+    The callout's ``<hw-diam>`` shows the Hole Wizard feature's band at the
+    template's two tolerance places, so the inch H7 band (+0.0127/0) read
+    "+0.01/0.00" (machinist review, #290 batch 0).  ``SetPrecision3`` cannot
+    set a hole callout's tolerance places; ``ICalloutLengthVariable`` can.
+    """
+    from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415
+
+    places = _tolerance_places(*_part.PIVOT_HOLE_BAND, display_unit="mm")
+    for raw in display.GetHoleCalloutVariables() or ():
+        if str(dynamic_dispatch(raw._oleobj_).VariableName) != "hw-diam":
+            continue
+        length = _early_bound(raw, "ICalloutLengthVariable")
+        length.TolerancePrecision = places
+        if int(length.TolerancePrecision) != places:
+            raise RuntimeError("pivot reamed bore: tolerance places did not persist")
+        return
+    raise RuntimeError("pivot reamed bore: callout has no <hw-diam> variable")
+
+
 def _add_holddown_callout(adapter: Any, section: Any) -> Any:
     """The hold-down's native Hole Wizard callout, on its counterbore wall.
 
@@ -2223,6 +2246,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         label="pivot reamed bore",
     )
+    _print_pivot_band_exactly(pivot_callout)
     post_mount_callout = add_native_hole_callout(
         adapter,
         feature,
