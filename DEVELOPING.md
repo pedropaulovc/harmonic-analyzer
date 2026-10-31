@@ -1249,20 +1249,37 @@ retried up to four times over about 4 s, each retry a `WARNING:` line on stderr.
 A persistent or other query fault ends that operation with exit 2 and the
 CIM error, not a successful outcome.
 
-The Windows launcher tests separate hermetic retry contracts from real
-process-tree integration: `test_win32_process_preserves_cim_retry_contract`
-executes the parsed production wrapper against synthetic transient failures,
-then deterministic rows/empty success or persistent failure; a separate synthetic
-dead-launcher status test preserves the full exit-2 fail-closed contract. Orphan
-fixtures record their parent's own PID and wait for an explicit socket release;
-they do not need a CIM lookup or expire during slow test startup. Cleanup waits
-on a handle whose creation time matches the one the spawning parent read from its
-own child handle; only that pinned handle is ever terminated, never a PID Windows
-may have reused. Ownership and
-cancellation integration (including some setup) still queries the real WMI
-provider. Persistent provider failures remain test failures, not skips or proof
-that ownership is empty (see
-[#1617](https://github.com/pedropaulovc/harmonic-analyzer/issues/1617)).
+The Windows launcher tests separate hermetic retry contracts, controlled
+process inventories, and real-provider integration:
+
+- `test_win32_process_preserves_cim_retry_contract` executes the parsed production
+  wrapper against synthetic transient failures, then deterministic rows/empty
+  success or persistent failure. A separate synthetic dead-launcher status test
+  preserves the full exit-2 fail-closed contract.
+- Metadata/state, reused-PID, and orphan-marker regressions must not rely on
+  whole-host WMI availability. Their controlled inventories must retain actual
+  fixture-owned process lifetimes and creation times. Cancellation must still run
+  the production attribution and stop code against real Windows job members and
+  pinned native handles; releasing the fixture cannot stand in for a successful
+  stop. An unrelated live process must remain visible to reused-PID coverage.
+  Unexpected inventory query shapes are errors, never an empty inventory or a
+  fallback to the host provider.
+  `test_owned_process_inventory_rejects_unexpected_queries` and
+  `test_owned_process_inventory_refreshes_job_members_and_liveness` protect that
+  boundary and require fresh native membership/liveness observations.
+  The native job-refresh probe runs a readable temporary `.ps1` file with the
+  normal NoSW guard enabled; its only child is Python waiting for stdin EOF.
+- Orphan fixtures record their parent's own PID and wait for an explicit socket
+  release; they do not need a CIM lookup or expire during slow test startup.
+  Cleanup waits on a handle whose creation time matches the one the spawning
+  parent read from its own child handle; only that pinned handle is ever
+  terminated, never a PID Windows may have reused.
+- `test_real_provider_inventory_attributes_a_fixture_owned_orphan` explicitly
+  exercises the real CIM provider and production orphan attribution. Remaining
+  ownership/cancellation integration and some setup also use real WMI.
+  Persistent provider failures remain test failures, not skips or proof that
+  ownership is empty (see
+  [#1617](https://github.com/pedropaulovc/harmonic-analyzer/issues/1617)).
 
 If the final run-record refresh fails, the launcher still writes `.done` with
 the actual build outcome and reports the refresh error in `cleanup_errors`.
