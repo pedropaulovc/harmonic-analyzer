@@ -98,7 +98,7 @@ def test_mha024_ream_ligaments_meet_rule_12_at_the_printed_bands() -> None:
     assert geometry.SERVICE_PIN_SHOULDER_LIGAMENT_WORST_MM == pytest.approx(
         2.121, abs=1e-3
     )
-    assert geometry.SERVICE_PIN_REAR_LIGAMENT_WORST_MM == pytest.approx(3.321, abs=1e-3)
+    assert geometry.SERVICE_PIN_REAR_LIGAMENT_WORST_MM == pytest.approx(2.451, abs=1e-3)
     assert geometry.SERVICE_PIN_BARREL_WALL_WORST_MM == pytest.approx(7.901, abs=1e-3)
 
 
@@ -114,12 +114,14 @@ def test_rear_relief_clears_the_t12_chain_plates_and_keeps_its_wall() -> None:
     )
     # Title-block .XX on the clearance diameter (R9-37: 0.23 to a real #25
     # plate on the floated T12, 0.08 at .X; test_transgear_removable_seat
-    # judges that corner); the length carries the functional ±0.05 that holds
-    # the chain's floated axial air exactly at its floor, and the overall that
-    # places the rear face it is printed from carries ±0.10.
+    # judges that corner).  The length's short side carries the functional
+    # -0.05 that holds the chain's floated axial air exactly at its floor, and
+    # the overall that places the rear face it is printed from carries +0.10
+    # on its long side; each other side is the title block's (machinist review
+    # of main 31cea0b73, owner ruling 2026-10-31).
     assert geometry.RELIEF_DIA_MAX == pytest.approx(17.01)
-    assert geometry.RELIEF_LENGTH_TOL == 0.05
-    assert geometry.HUB_LENGTH_TOL == 0.10
+    assert geometry.RELIEF_LENGTH_BAND == (geometry.GENERAL_2PL_TOL_MM, -0.05)
+    assert geometry.HUB_LENGTH_BAND == (0.10, -geometry.GENERAL_2PL_TOL_MM)
     assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["ReliefLength"] == 2
     assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["HubLength"] == 2
     assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["ReliefDia"] == 2
@@ -133,11 +135,11 @@ def test_rear_relief_clears_the_t12_chain_plates_and_keeps_its_wall() -> None:
     )
 
 
-def test_hub_overall_band_is_loosened_to_what_the_rear_face_stacks_hold() -> None:
-    # Machinist review of 19e33c6c2: 25.20 +/-0.05 was tighter than the rear
-    # face needs.  At +/-0.10 the drive-pin tips keep air to it and the wheel
-    # floated onto it stays on its pins; the title block's .XX +/-0.51 would
-    # stand the hub on the pin tips.
+def test_hub_overall_band_is_one_sided_to_what_the_rear_face_stacks_hold() -> None:
+    # Machinist reviews of 19e33c6c2 and main 31cea0b73: only the long side
+    # is functional.  At +0.10 the drive-pin tips keep air to the rear face;
+    # at the title block's -0.51 the wheel floated onto it stays on its pins.
+    # The title block's +0.51 would stand the hub on the pin tips.
     kwargs = dict(
         seat_face=dt_crankshaft_spec.SEAT_COLLAR,
         seat_face_band=dt_crankshaft_spec.SEAT_COLLAR_BAND,
@@ -147,16 +149,16 @@ def test_hub_overall_band_is_loosened_to_what_the_rear_face_stacks_hold() -> Non
     )
     air, engagement = dt_crankshaft_spec.drive_pin_front_clearances(
         dt_crankshaft_spec.DRIVE_PIN_PROUD_RANGE,
-        hub_rear_tol=geometry.HUB_LENGTH_TOL,
+        hub_rear_band=geometry.HUB_LENGTH_BAND,
         **kwargs,
     )
-    assert geometry.HUB_LENGTH_TOL == 0.10
+    assert geometry.HUB_LENGTH_BAND[0] == 0.10
     assert air == pytest.approx(0.146, abs=1e-9)
-    assert engagement == pytest.approx(1.046, abs=1e-9)
+    assert engagement == pytest.approx(0.636, abs=1e-9)
     with pytest.raises(AssertionError, match="hub's rear face"):
         dt_crankshaft_spec.drive_pin_front_clearances(
             dt_crankshaft_spec.DRIVE_PIN_PROUD_RANGE,
-            hub_rear_tol=geometry.GENERAL_2PL_TOL_MM,
+            hub_rear_band=(geometry.GENERAL_2PL_TOL_MM, -geometry.GENERAL_2PL_TOL_MM),
             **kwargs,
         )
 

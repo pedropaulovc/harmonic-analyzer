@@ -79,7 +79,10 @@ SEAM_CALLOUT = seam_callout("MHA-DT-06")
 # the 3/8 in cylinder meets the dome; the dome stands proud of the hub (the
 # arm front is already flush with the hub front from the seat press).  The
 # MHA-DT-00 hub step prints the same datum.  The prose reads under the native
-# #14 drill size, in the order the work is done.
+# #14 drill size, in the order the work is done.  The ream's acceptance is
+# the driven pin's seated position: its big end stands at least PIN_PROUD out
+# of the barrel, printed natively on the end view (PIN_PROUD_CALLOUT), so its
+# keeper ring's hole clears the barrel (machinist review of main 31cea0b73).
 FRONT_FACE_DATUM = "MHA-DT-11 DOME ROOT"
 CROSS_HOLE_CALLOUT = "\n".join(
     (
@@ -89,6 +92,7 @@ CROSS_HOLE_CALLOUT = "\n".join(
         "MHA-DT-09: LIGHT DRIVE FIT",
     )
 )
+PIN_PROUD_CALLOUT = "MHA-DT-09 BIG END;\nRING HOLE CLEARS BARREL"
 
 # The two axial bands state the mate they serve, under their dimensions
 # (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the overall places the rear face against the removable sprocket
@@ -105,9 +109,9 @@ RELIEF_LENGTH_CALLOUT = "CLEARS #25 CHAIN ON\nSPROCKET MHA-PD-09"
 # overall length -- not the arm's stock thickness -- places its rear face.
 #   Links:
 #     crank face                    CRANK_FACE_Z                     -183
-#     hub overall, front to rear    HUB_LENGTH +/- HUB_LENGTH_TOL    25.2 +/-0.10
-#     relief, back from rear face   RELIEF_LENGTH +/- RELIEF_LENGTH_TOL
-#                                                                    3.85 +/-0.05
+#     hub overall, front to rear    HUB_LENGTH + HUB_LENGTH_BAND     25.2 +0.10/-0.51
+#     relief, back from rear face   RELIEF_LENGTH + RELIEF_LENGTH_BAND
+#                                                                    3.85 +0.51/-0.05
 #     removable seat face           transgear_removable_spec.SEAT_FACE_Z
 #                                   + crankshaft_spec.SEAT_COLLAR_BAND
 #                                                                    -154.3 +0.1/-0.5

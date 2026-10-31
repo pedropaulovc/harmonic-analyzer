@@ -92,6 +92,7 @@ from sm_gooseneck_spec import (
     DRAWING_PRECISION_BY_NAME,
     TAP_CALLOUT_BELOW,
     TAP_CALLOUT_PRECISION,
+    TUBE_OD_REF_Y,
 )
 from sm_gooseneck_spring_joint import (
     TAP_DRILL_DEPTH_FROM_FLOOR,
@@ -158,11 +159,13 @@ SLEEVE_TOP_Y = _front_y(SLEEVE_TOP)
 # right of the bend, its line 10 degrees above the leg's tangent so it passes
 # under section line A's right arrow and label (at about 40 degrees it ran
 # through the label, farm run 20261027T224212504Z) and over the leg length's
-# upper extension line.
+# upper extension line.  The tube's reference Ø crosses the bare leg on its
+# left, level with the hidden reference line, opposite the leg length.
 FRONT_KEEP = {
     "SleeveLength": (LEG_AXIS_X + 0.018, (FOOT_Y + SLEEVE_TOP_Y) / 2.0),
     "SleeveDia": (LEG_AXIS_X - 0.034, FOOT_Y + 0.040),
     "LegLength": (LEG_AXIS_X + 0.034, (SLEEVE_TOP_Y + BEND_TANGENT_Y) / 2.0),
+    "TubeOdRef": (LEG_AXIS_X - 0.030, _front_y(TUBE_OD_REF_Y)),
     "ArmStraight": ((END_FACE_X + _front_x(-BEND_R)) / 2.0, ARM_AXIS_Y + 0.014),
     "BendRadius": (LEG_AXIS_X + 0.019, ARM_AXIS_Y - 0.0176),
 }

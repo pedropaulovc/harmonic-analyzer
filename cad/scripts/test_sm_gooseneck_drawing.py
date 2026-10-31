@@ -180,8 +180,9 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
     for phrase in (
         "TUBE 1/2 OD X 0.065 WALL, ONLINEMETALS 7322",
         "SLEEVE 5/8 OD X 0.058 WALL, 7324",
-        "TUBE AND SLEEVE AS STOCK",
-        "SLEEVE TO TUBE: CONTINUOUS BRAZE FILLET EACH END",
+        # The stock is as supplied: its catalogue tolerance governs, unprinted.
+        "AS SUPPLIED, SUPPLIER TOLERANCE",
+        "SLEEVE: CONTINUOUS BRAZE FILLET EACH END",
         "BRAZE BAg-7 (AWS A5.8)",
         "END PIECE: FULL-PENETRATION BRAZE OR LOCTITE 638",
         # Owner ruling 2026-10-27 (#1997): join before bending.
@@ -204,6 +205,23 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
     assert re.search(r"\b\d+\.\d{1,2}\b", notes) is None, notes
     assert "<MOD-DIAM>" not in notes and "Ø" not in notes
     assert "THRU" not in notes.upper()
+
+
+def test_stock_diameters_print_as_untoleranced_references() -> None:
+    # Machinist review of main 31cea0b73 (owner ruling 2026-10-31): the as-
+    # supplied tube and sleeve Ø print as native reference dimensions, no
+    # band; the supplier's tolerance governs and the walls stay designations.
+    assert spec.REFERENCE_DIMENSIONS == {
+        "TubeOdReference": frozenset({"TubeOdRef"}),
+        "SleeveProfile": frozenset({"SleeveDia"}),
+    }
+    for feature, names in spec.REFERENCE_DIMENSIONS.items():
+        assert names <= spec.DRAWING_DIMENSIONS[feature]
+        assert set(names) <= set(drawing.FRONT_KEEP)
+    # The reference line runs on the bare leg, between the sleeve and the bend.
+    low = spec.TUBE_OD_REF_Y - spec.TUBE_OD_REF_SPAN / 2.0
+    high = spec.TUBE_OD_REF_Y + spec.TUBE_OD_REF_SPAN / 2.0
+    assert geom.SLEEVE_TOP < low < high < geom.LEG_TOP
 
 
 def test_tap_callout_states_geometry_and_its_mate_within_four_rows() -> None:

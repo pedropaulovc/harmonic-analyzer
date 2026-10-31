@@ -26,7 +26,8 @@ read each sheet's UNIT cell and its own title-block bands. Metric-only purchased
 product lines retain explicitly labelled millimetre reference sheets.
 Fasteners, taps and drills are US customary (3/8, #14, 1/4-20).
 Fractions are reserved for as-bought stock and supplier dimensions, shown as
-REF with the supplier's tolerance. They have no general FRACTIONS tolerance row.
+REF, untoleranced; the supplier's catalogue tolerance governs. They have no
+general FRACTIONS tolerance row.
 
 ## Rule 1 — No questions, nothing extra
 
