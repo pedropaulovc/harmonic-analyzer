@@ -45,13 +45,13 @@ def test_required_drawing_paths() -> None:
 
 def test_printed_sizes_derive_from_the_ring_spec() -> None:
     assert notes.RING_ID == pytest.approx(2.0 * spec.MEAN_R - spec.WIRE_DIA)
-    assert notes.RING_ID == pytest.approx(11.0)
+    assert notes.RING_ID == pytest.approx(0.43 * 25.4)
     # The bead is bigger than the wire it joins, so it reads on the sheet.
     assert spec.JOINT_DIA > spec.WIRE_DIA
 
 
 def _band(places: int) -> float:
-    return printed_band_mm(places)
+    return printed_band_mm(places, unit=spec.UNIT)
 
 
 def test_smallest_printed_ring_threads_the_fattest_printed_pin_section() -> None:
@@ -61,7 +61,7 @@ def test_smallest_printed_ring_threads_the_fattest_printed_pin_section() -> None
     # big end oversize, the hole's station toward the big end), the drilled
     # hole at nominal (it only cuts oversize).
     places = notes.DRAWING_PRECISION_BY_NAME["RingID"]
-    ring_min = round(notes.RING_ID, places) - _band(places)
+    ring_min = round(notes.RING_ID / 25.4, places) * 25.4 - _band(places)
     assert spec.RING_ID_MIN == pytest.approx(ring_min)
     taper = (pin.BIG_END_DIA - pin.SMALL_END_DIA) / pin.PIN_LENGTH
     xx = _band(2)
@@ -92,7 +92,7 @@ def test_marked_dimension_set_lives_in_the_notes_module() -> None:
 
 
 def test_precision_is_authored_on_the_part_at_the_title_block_place() -> None:
-    assert notes.DRAWING_PRECISION_BY_NAME == {"WireDia": 1, "RingID": 1, "JointDia": 1}
+    assert notes.DRAWING_PRECISION_BY_NAME == {"WireDia": 3, "RingID": 2, "JointDia": 2}
     assert "draw_dt_crank_pin_ring.py" in PRECISION_MIGRATED_DRAWINGS
     source = _source()
     assert "set_dimension_precision" not in source

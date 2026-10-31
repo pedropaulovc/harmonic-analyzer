@@ -9,3 +9,4 @@ dt-crank-handle-butt-cup:
   quantity: 1
   tolerance_class: machined_block
   process: "turned (steel); epoxied flush in the MHA-DT-08 butt counterbore; face left flat, the oak's end round turned clear of it"
+  drawing_unit: in

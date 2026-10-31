@@ -30,6 +30,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _check import check
+from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -42,7 +43,6 @@ from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,
-    set_reference_dimension,
 )
 from _drawing_layout_collect import check_drawing_layout
 from _drawing_notes import add_property_linked_note
@@ -51,6 +51,7 @@ from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _supplier_dimensions import supplier_reference_dimension
 from _section_axis import create_section_axis_centerline, position_section_caption
 from _session import run_build
 import _telemetry
@@ -64,7 +65,8 @@ from dt_crank_handle_ferrule_spec import (
     DRAWING_PRECISION_BY_NAME,
     LENGTH,
     OUTER_DIA,
-    REFERENCE_DIMENSIONS,
+    STOCK_FRACTION_DENOMINATOR,
+    UNIT,
 )
 
 
@@ -149,7 +151,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=UNIT,
     )
     stamp_drawing_summary(
         adapter,
@@ -188,22 +194,25 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    # The band and the stock OD carry their mate and reason at the callout.
+    # The band carries its mate and reason at the callout.
     set_dimension_callouts(
-        adapter,
-        annotations,
-        {
-            "BoreDia": BORE_FIT_CALLOUT,
-            "OuterDia": OUTER_DIA_CALLOUT,
-        },
-        location="below",
+        adapter, annotations, {"BoreDia": BORE_FIT_CALLOUT}, location="below"
     )
-    # The OD is the 9/16-in rod as supplied, skimmed at assembly: a reference.
+    # The OD is the 9/16-in rod as supplied, skimmed at assembly: a reference
+    # printed as the rod's fraction, its skim and walls on the callout.
     by_name = {dimension_name(adapter, a): a for a in annotations}
-    for name in sorted(REFERENCE_DIMENSIONS):
-        set_reference_dimension(
-            adapter, by_name[name], label=f"MHA-DT-34 {name}", diameter=name.endswith("Dia")
-        )
+    supplier_reference_dimension(
+        adapter,
+        _early_bound(by_name["OuterDia"], "IAnnotation").GetSpecificAnnotation(),
+        label="MHA-DT-34 OuterDia",
+        units="in",
+        precision=DRAWING_PRECISION_BY_NAME["OuterDia"],
+        expected_mm=OUTER_DIA,
+        presentation="diameter",
+        fraction_denominator=STOCK_FRACTION_DENOMINATOR,
+        callout=OUTER_DIA_CALLOUT,
+    )
+    rebuild_drawing(adapter, label="MHA-DT-34 stock reference")
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the ferrule end view")
     create_section_axis_centerline(
