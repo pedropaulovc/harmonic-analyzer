@@ -522,10 +522,13 @@ both verdicts and the finding diff.
   clusters remain in the report but do not gate. `SHIP`
   means no confirmed gating findings and no aggregate error, or an explicitly
   warned minimal-change skip. If valid runs return zero findings, findings
-  adjudication is skipped. If all runs fail, or the judge fails after
-  retries (including incomplete/duplicate finding coverage), the result is
-  `ERROR` and exits nonzero. Partial run failures remain visible alongside valid
-  evidence; run reports and isolated judge transcripts are retained separately.
+  adjudication is skipped. The judge schema enumerates the submitted finding
+  ids, so a cluster citing any other id is a schema violation (repaired in the
+  same OMP session when possible). If all runs fail, or
+  the judge fails after retries (including incomplete/duplicate finding
+  coverage), the result is `ERROR` and exits nonzero. Partial run failures
+  remain visible alongside valid evidence; run reports and isolated judge
+  transcripts are retained separately.
 - A review counts as a merge gate's visual check only on the exact drawing
   version being merged.
 

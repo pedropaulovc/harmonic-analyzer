@@ -2078,6 +2078,82 @@ def test_omp_verdict_error_uses_the_extractor_parser_and_schema():
     assert len(transport.omp_verdict_error(long_text, schema)) == 503
 
 
+# Recorded on judge ch_rocker_arm_tl_vn_oblique_cl_dowel (report dir
+# machinist-v46-cl-dowel, 2026-10-31): runs r1/r2 filed four clarity findings,
+# r3 three. Both judge attempts zipped the runs by index and cited the
+# nonexistent r3.clarity.4; the static schema accepted it, so no repair turn ran
+# and validate_judgment failed each attempt with the same error.
+_CL_DOWEL_FINDING_IDS = (
+    "r1.over_specification.1", "r1.clarity.1", "r1.clarity.2", "r1.clarity.3", "r1.clarity.4", "r1.minor.1",
+    "r2.over_specification.1", "r2.clarity.1", "r2.clarity.2", "r2.clarity.3", "r2.clarity.4",
+    "r3.over_specification.1", "r3.clarity.1", "r3.clarity.2", "r3.clarity.3",
+)
+_CL_DOWEL_RECORDED_CLUSTERS = (
+    (["r1.over_specification.1", "r2.over_specification.1", "r3.over_specification.1"], "over_specification"),
+    (["r1.clarity.1", "r2.clarity.1", "r3.clarity.1"], "clarity"),
+    (["r1.clarity.2", "r2.clarity.2", "r3.clarity.2"], "clarity"),
+    (["r1.clarity.3", "r2.clarity.3", "r3.clarity.3"], "clarity"),
+    (["r1.clarity.4", "r2.clarity.4", "r3.clarity.4"], "clarity"),
+    (["r1.minor.1"], "minor"),
+)
+
+
+def test_judge_schema_enumerates_finding_ids_so_omp_repairs_an_invented_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import machinist_review_transport as transport
+    findings = [{"id": finding_id} for finding_id in _CL_DOWEL_FINDING_IDS]
+    invented = {"clusters": [
+        _judge_cluster(members, category=category) for members, category in _CL_DOWEL_RECORDED_CLUSTERS
+    ]}
+    corrected = json.loads(json.dumps(invented))
+    corrected["clusters"][4]["member_ids"].remove("r3.clarity.4")
+    static = json.loads(mr.JUDGE_SCHEMA_FILE.read_text(encoding="utf-8"))
+    assert transport.omp_verdict_error(json.dumps(invented), static) is None
+    with pytest.raises(ValueError, match=r"unknown finding id 'r3\.clarity\.4' \(member_ids .*; valid ids \['r1\.over_specification\.1'"):
+        mr.validate_judgment(invented, findings)
+
+    schema = json.loads(mr.judge_schema_bytes(findings))
+    assert schema["properties"]["clusters"]["items"]["properties"]["member_ids"]["items"] == {
+        "type": "string", "enum": list(_CL_DOWEL_FINDING_IDS),
+    }
+    script = tmp_path / "rpc_fixture.py"
+    script.write_text(_OMP_RPC_FIXTURE, encoding="utf-8")
+    home = tmp_path / "private"
+    work = home / "work"
+    work.mkdir(parents=True)
+    (work / "replies.json").write_text(json.dumps([json.dumps(invented), json.dumps(corrected)]), encoding="utf-8")
+    processes, normalized = [], []
+    original = asyncio.create_subprocess_exec
+    async def spawn(executable, *arguments, **kwargs):
+        process = await original(sys.executable, str(script), "valid", *arguments, **kwargs)
+        processes.append(process)
+        return process
+    monkeypatch.setattr(transport.asyncio, "create_subprocess_exec", spawn)
+    provenance = {"private_home": str(home)}
+    async def invoke():
+        async with asyncio.timeout(10):
+            await transport._omp_session(
+                executable=sys.executable, broker_env={},
+                config={"mcpServers": {}, "prompt": "inspect"}, schema=schema, model="test",
+                effort="medium", cwd=str(work), remaining=lambda: 10, startup=5,
+                emit=lambda event, raw: event is not None and normalized.append(event),
+                diagnostics=[], provenance=provenance, continuation="fresh",
+            )
+    asyncio.run(invoke())
+    assert all(process.returncode is not None for process in processes)
+    sent = [json.loads(line) for line in (work / "protocol.jsonl").read_text().splitlines() if '"prompt"' in line]
+    # The review prompt lists the exact ids; the repair turn names the invented one.
+    assert json.dumps(list(_CL_DOWEL_FINDING_IDS)) in sent[0]["message"]
+    [repair] = provenance["omp_repair_turns"]
+    assert repair["error"].startswith(
+        "schema violation at verdict['clusters'][4]['member_ids'][2]: 'r3.clarity.4' is not one of ['r1.over_specification.1'"
+    )
+    assert repair["error"] in sent[1]["message"]
+    judged = mr.extract_claude_verdict(normalized, validator=lambda value: mr.validate_judgment(value, findings))
+    assert judged == corrected
+
+
 def test_omp_broker_reads_actual_ephemeral_url_and_reaps_its_process(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
