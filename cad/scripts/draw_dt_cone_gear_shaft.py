@@ -362,12 +362,14 @@ PARTIAL_CUT_PARENTS = frozenset({CutParent.TIP_DETAIL})
 # about its 393 mm centre), so A's 56 mm line pushes A-A 3 mm right of r2's
 # and B-B 1 mm right: r3 (20261018T065854075Z) measured A's box ending at
 # 0.3693 with A at 0.341, 2.0 mm short of B's at 0.3713, under the proof's
-# CLEAR_GAP_M plus margin.
+# CLEAR_GAP_M plus margin.  The inch flat band's five places (-0.01016)
+# widened both lines: #290 batch 0 read A's box ending at 0.3722, 0.7 mm into
+# B's at 0.3715; B-B already stands at the frame, so A-A moves 3.5 mm left.
 # The across-flat is the part's own dimension (Sec{i}AF, sketched on the
 # land's end plane, parallel to the cut), so it prints its model band.
 D_SECTIONS = (
     DSection(
-        1, "A", SECTION_ENDS[1] - 25.0, CutParent.SIDE, 0.0150, (0.340, 0.165), (2, 1)
+        1, "A", SECTION_ENDS[1] - 25.0, CutParent.SIDE, 0.0150, (0.3365, 0.165), (2, 1)
     ),
     DSection(
         2,
