@@ -27,13 +27,13 @@ from _fit_shaft_h import SHAFT_H
 RUNNING_DIA_BAND = SHAFT_H
 # GEAR_SEAT_BAND (U27, 2026-09-23): the three intermediate lands only carry
 # gears, slid on against the stack (gear_seat_fit).  The upper limit stays at
-# nominal, so every gear still passes down its land to its station; the -0.05
-# lower limit holds the gear within 0.05 radially with its bore band -- a
-# small fraction of the ~0.51 mm module, so mesh runout does not suffer.
-# 2.5x the h band, which a micrometer holds on a manual lathe; -0.10 would
-# allow ~20% of the module in runout on hand-cut teeth.  Spec-local on
-# purpose: _fit_shaft_h is imported by every ground-shaft h-band user.
-GEAR_SEAT_BAND = (0.000, -0.050)
+# nominal, so every gear still passes down its land to its station; the
+# -.0020 in lower limit holds the gear within about .002 in radially with its
+# bore band -- a small fraction of the ~0.51 mm module, so mesh runout does
+# not suffer.  2.5x the h band, which a micrometer holds on a manual lathe.
+# Spec-local on purpose: _fit_shaft_h is imported by every ground-shaft
+# h-band user.
+GEAR_SEAT_BAND = (0.0, -0.0508)
 SECTION_DIA_BANDS: tuple[tuple[float, float], ...] = (
     RUNNING_DIA_BAND,  # Sec0: pivot journal
     GEAR_SEAT_BAND,  # Sec1: T030-T120 seats
@@ -43,7 +43,8 @@ SECTION_DIA_BANDS: tuple[tuple[float, float], ...] = (
 )
 # Shared displayed precision: native drawing and physical-limit consumers
 # read the same per-section table; no unrounded-nominal acceptance mapping.
-LAND_DIA_PLACES = (3, 3, 3, 3, 3)
+# The pivot journal prints four places: its .4825 in nominal is 12.2555.
+LAND_DIA_PLACES = (4, 3, 3, 3, 3)
 LAND_AF_PLACES = (None, 3, 3, 3, 3)
 
 
@@ -71,7 +72,7 @@ TERMINAL_FINISHED_DIA_LIMITS_MM = land_finished_dia_limits_mm(TERMINAL_DIA_MM, 4
 # round guidance, checked at the end of this module: at the deepest printed
 # flat on the largest printed land the round must still wrap past the axis.
 # The collar's screw landing on the flat is gated by dt_vn_cone_tip_collar_spec.
-FLAT_AF_BAND = (0.000, -0.010)
+FLAT_AF_BAND = (0.0, -0.01016)  # 0/-.0004 in
 TERMINAL_FLAT_AF_MM = 0.42
 # The flat's torque corners: the title block's R0.25 would leave the flat
 # face about +/-0.14 wide on this 0.8 land, so the shaft sheet prints its

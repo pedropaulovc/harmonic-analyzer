@@ -203,7 +203,7 @@ def tolerance_at_value_places(adapter, feature_name: str, dimension_name: str) -
     two-place 127.00 would read "127.00 +/-0.1".  The places come from
     DRAWING_PRECISION, the entry that sets the value's places, and are set on
     the model so the drawing imports them verbatim (as
-    build_ch_connecting_rod does for its pin hole)."""
+    build_dt_pinion_bracket does for PinSeatCz)."""
     places = DRAWING_PRECISION[feature_name][dimension_name]
     display, _dimension = _named_dimension(adapter, feature_name, dimension_name)
     display = _early_bound(display, "IDisplayDimension")

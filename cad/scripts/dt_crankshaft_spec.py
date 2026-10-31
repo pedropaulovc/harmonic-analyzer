@@ -135,12 +135,12 @@ if shaft_end_proud_range(SHAFT_LENGTH - _SHAFT_PRINT_STEP)[0] >= -1e-9:
     raise AssertionError("a shaft one print step shorter still stays proud: not the shortest")
 
 # Integral lands run directly in the restored post bore. Derive the journal
-# from the named running fit and the bore's published +0.005/-0.025 band.
+# from the named running fit and the bore's published REAM_H7 band.
 _RUNNING_CLEARANCE = tuple(_config.fit("shaft_in_bushing")["diametral_clearance_mm"])
 JOURNAL_DIA = JOURNAL_BORE_DIA + JOURNAL_BORE_BAND[1] - _RUNNING_CLEARANCE[0]
 JOURNAL_DIA_BAND = (
     0.0,
-    round(JOURNAL_BORE_DIA + JOURNAL_BORE_BAND[0] - _RUNNING_CLEARANCE[1] - JOURNAL_DIA, 3),
+    round(JOURNAL_BORE_DIA + JOURNAL_BORE_BAND[0] - _RUNNING_CLEARANCE[1] - JOURNAL_DIA, 5),
 )
 JOURNAL_CLEARANCE = JOURNAL_BORE_DIA - JOURNAL_DIA
 _JOURNAL_CLEARANCE_LOW = JOURNAL_BORE_BAND[1] - JOURNAL_DIA_BAND[0] + JOURNAL_CLEARANCE
@@ -559,7 +559,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ShaftProfile": {"ShaftDiaDim": 3},
     "Shaft": {"Depth": dt_crank_pinion_spec.SHAFT_LENGTH_PLACES},
     "ShaftDomeProfile": {"DomeHeight": 1},
-    "JournalProfile": {"JournalDiaDim": 3},
+    "JournalProfile": {"JournalDiaDim": 4},  # 11.4046, .449 in
     "ReliefProfile": {"ReliefDiaDim": RELIEF_DIA_PLACES},
     "PinionSeatProfile": {"PinionSeatDiaDim": 3, "NeckDiaDim": NECK_DIA_PLACES},
     "CollarProfile": {"CollarDiaDim": 1},
@@ -602,7 +602,7 @@ CROSS_HOLE_PROCESS = drill_process(PIN_HOLE_SPEC)
 # prefix and the size/depth places live here, the press prose in the notes.
 DRIVE_PIN_HOLE_PROCESS = "REAM"
 HOLE_CALLOUT_PRECISION: dict[str, dict[str, int]] = {
-    "DrivePinProfile": {"DrivePinHoleDia1": 3, "DrivePinHoleDia2": 3},
+    "DrivePinProfile": {"DrivePinHoleDia1": 4, "DrivePinHoleDia2": 4},  # 2.3622, .093 in
     "DrivePinHoles": {"DrivePinDepth": 2},
 }
 # The one general note is the shop's inside-corner ceiling at every shoulder
