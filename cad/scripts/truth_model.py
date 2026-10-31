@@ -64,17 +64,35 @@ def coefficients(preset: str = "config") -> list[float]:
     raise ValueError(f"unknown preset: {preset}")
 
 
+PenTerms = tuple[tuple[tuple[float, int, float], ...], float]
+
+
+def pen_terms(coeffs: list[float] | None = None) -> PenTerms:
+    """The ``(a_j, j, φ_j)`` triples and magnification ``pen_y`` sums over.
+
+    Reading them once lets a caller evaluate many angles without re-reading
+    and re-sorting the channel table per sample (see ``pen_y_of``).
+    """
+    a = coefficients() if coeffs is None else coeffs
+    return tuple(zip(a, harmonics(), phases_rad())), magnify()
+
+
+def pen_y_of(terms: PenTerms, x: float) -> float:
+    """``pen_y`` at ``x`` from already-read ``pen_terms`` (the same sum)."""
+    triples, scale = terms
+    total = sum(aj * math.cos(j * x + p) for aj, j, p in triples)
+    return scale * total
+
+
 def pen_y(x: float, coeffs: list[float] | None = None) -> float:
     """Pen displacement at synthesis angle ``x`` (radians): magnify·Σ a_j cos(j x + φ_j)."""
-    a = coefficients() if coeffs is None else coeffs
-    js, ph = harmonics(), phases_rad()
-    total = sum(aj * math.cos(j * x + p) for aj, j, p in zip(a, js, ph))
-    return magnify() * total
+    return pen_y_of(pen_terms(coeffs), x)
 
 
 def pen_curve(coeffs: list[float] | None = None, samples: int = 25) -> list[tuple[float, float]]:
     """``samples`` evenly spaced (x, pen_y) points over one fundamental period."""
-    return [(x, pen_y(x, coeffs)) for x in (i * TWO_PI / samples for i in range(samples))]
+    terms = pen_terms(coeffs)
+    return [(x, pen_y_of(terms, x)) for x in (i * TWO_PI / samples for i in range(samples))]
 
 
 def _main() -> int:
