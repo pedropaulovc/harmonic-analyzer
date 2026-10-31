@@ -57,7 +57,7 @@ if abs(DIMS.major_dia - ROW.major_mm) > 1e-3:
 
 # Exact-current product table and engineering drawing read 2026-10-21.
 # Hidden nominal source references, not physical-edge/replica assertions.
-# Drawing precision: length/head Ø/head height .XXX, major Ø .XXXX,
+# Drawing precision: length/head Ø/head height/major Ø .XXX,
 # drive an exact 9/64 fraction. The standard-only socket depth is omitted.
 SUPPLIER_PRODUCT_URL = "https://www.mcmaster.com/91251A196/"
 SUPPLIER_DRAWING_URL = (
@@ -93,6 +93,6 @@ SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (3, "length", None, None),
     "SupplierHeadDiameter": (3, "diameter", None, None),
     "SupplierHeadHeight": (3, "length", None, None),
-    "SupplierThreadDiameter": (4, "diameter", None, "8-32"),
+    "SupplierThreadDiameter": (3, "diameter", None, "#8-32"),
     "SupplierDriveWidth": (0, "length", 64, None),
 }

@@ -19,7 +19,10 @@ from _fit_deviations import deviations
 from _package_units import drawing_unit
 
 PART_NAME = "ch-rocker-arm-tl-vn-oblique-pivot-spacer"
-UNIT = drawing_unit(f"parts/{PART_NAME}", _config.parts(PART_NAME))
+UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-vn-oblique-pivot-spacer",
+    _config.parts("ch-rocker-arm-tl-vn-oblique-pivot-spacer"),
+)
 SKU = "AS62-18-40"
 QUANTITY = 2
 ID = 9.7028  # .382
