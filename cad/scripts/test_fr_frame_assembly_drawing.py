@@ -642,7 +642,7 @@ def test_step_9_spot_through_is_declared_on_the_assembly() -> None:
     assert (entry.id, entry.kind) == ("RV-01", "accept")
     assert re.search(r"\brule 19\b", entry.finding)
     assert re.search(r"\bstep 9\b", entry.where)
-    # Without the spot-through, the plate's .XXX station and the base's .XXX
+    # Without the spot-through, the plate's .XX station and the base's .XXX
     # tap station, each on both axes, demand far more diametral float than the
     # screw has.
     float_mm = plate.SCREW_HOLE_DIA - screw.SHANK_DIA

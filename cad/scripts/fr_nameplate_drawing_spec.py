@@ -57,16 +57,17 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # both depths print .XXX so that floor is a measured number
 # (Main ruling 2026-10-14; the floor's shortfall under rule 17's .060 floor is
 # stated on the sheet, MINIMUM_NOTES). The outline and the hole stations
-# print .XXX too: the 3.938 x 1.785 envelope and the .164 stations sit on the
-# .001 grid only; the base is spotted through the plate.
+# print .XX: the outline DXF defines the profile, and the base is spotted
+# through the plate at assembly, so no fit or stack reads either closer; the
+# hole ligament holds rule 17's .080 at the .XX band (HOLE_LIGAMENT_WORST).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateSlab": {"PlateThick": nameplate.PLATE_THICKNESS_PRECISION},
-    "ScrewHoles": {"S0X": 3, "S0Z": 3},
+    "ScrewHoles": {"S0X": 2, "S0Z": 2},
     FACE_REFERENCE: {
-        "PlateWidth": 3,
-        "PlateHeight": 3,
-        "RightHoleStation": 3,
-        "TopHoleStation": 3,
+        "PlateWidth": 2,
+        "PlateHeight": 2,
+        "RightHoleStation": 2,
+        "TopHoleStation": 2,
     },
     SECTION_REFERENCE: {"FieldDepth": 3, "EngravingDepth": 3},
 }

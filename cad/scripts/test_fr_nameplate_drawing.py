@@ -348,12 +348,16 @@ def test_each_hole_prints_one_station_value_per_edge_pair() -> None:
     # "2X" stands for two holes whose stations print the same number.
     places = print_spec.DRAWING_PRECISION_BY_NAME
     bottom_left, bottom_right, top_left, top_right = spec.SCREW_XY
-    assert round(bottom_left[0], places["S0X"]) == round(top_left[0], places["S0X"])
-    assert round(bottom_left[1], places["S0Z"]) == round(bottom_right[1], places["S0Z"])
+    assert round(bottom_left[0] / 25.4, places["S0X"]) == round(
+        top_left[0] / 25.4, places["S0X"]
+    )
+    assert round(bottom_left[1] / 25.4, places["S0Z"]) == round(
+        bottom_right[1] / 25.4, places["S0Z"]
+    )
     right = [spec.PLATE_WIDTH - x for x in (bottom_right[0], top_right[0])]
     top = [spec.PLATE_HEIGHT - y for y in (top_left[1], top_right[1])]
     for values, name in ((right, "RightHoleStation"), (top, "TopHoleStation")):
-        assert len({round(v, places[name]) for v in values}) == 1, name
+        assert len({round(v / 25.4, places[name]) for v in values}) == 1, name
     assert (part.RIGHT_HOLE, part.TOP_HOLE) == (bottom_right, top_left)
 
 
@@ -636,15 +640,18 @@ def _corner_worst_centres(
     stations: tuple[tuple[float, float], ...],
 ) -> list[tuple[float, float]]:
     # Each hole driven to the least printed station from BOTH of its corner's
-    # edges at once: the sheet prints one .XXX value per edge pair (2X), the
-    # smallest of the pair's stations rounded, and accepts that value - .005.
+    # edges at once: the sheet prints one .XX value per edge pair (2X), the
+    # smallest of the pair's stations rounded, and accepts that value - .010.
+    places = print_spec.DRAWING_PRECISION_BY_NAME["S0X"]
+    assert places == 2
     width, height = spec.PLATE_WIDTH, spec.PLATE_HEIGHT
     left = min(x for x, _ in stations if x < width / 2.0)
     right = min(width - x for x, _ in stations if x > width / 2.0)
     bottom = min(y for _, y in stations if y < height / 2.0)
     top = min(height - y for _, y in stations if y > height / 2.0)
     least = {
-        name: round(value / 25.4, 3) * 25.4 - printed_band_mm(3, unit=spec.UNIT)
+        name: round(value / 25.4, places) * 25.4
+        - printed_band_mm(places, unit=spec.UNIT)
         for name, value in (
             ("left", left),
             ("right", right),

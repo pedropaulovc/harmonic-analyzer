@@ -129,10 +129,10 @@ def test_field_is_exactly_the_pinstripe_inner_edge_and_has_pinned_area():
     assert all(dxf.point_in_ring(outline, point) for point in field)
 
 
-def test_screw_stations_sit_the_inset_off_the_dxf_head_marks():
-    # Owner ruling 2026-10-15: each hole moved about 0.1 mm toward the plate
-    # centre in x and y from its traced head mark (now the .164 station from
-    # each edge), and the head still covers the engraved mark.
+def test_screw_stations_sit_on_the_dxf_head_marks():
+    # Each hole sits on its traced head mark at the .16 station from both
+    # edges (within .0001 in), concentric with the outline's rounded corner,
+    # and the head covers the engraved mark.
     rings = _rings(part.ENGRAVING_DXF)
     assert len(spec.SCREW_XY) == len(spec.HEAD_MARK_XY) == 4
     for (sx, sy), mark_xy in zip(spec.SCREW_XY, spec.HEAD_MARK_XY, strict=True):
@@ -148,10 +148,8 @@ def test_screw_stations_sit_the_inset_off_the_dxf_head_marks():
         x0, y0, x1, y1 = dxf.bbox(mark)
         centre = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
         assert math.dist(centre, mark_xy) < 0.01, (mark_xy, centre)
-        toward_centre_x = math.copysign(1.0, spec.PLATE_WIDTH / 2.0 - centre[0])
-        toward_centre_y = math.copysign(1.0, spec.PLATE_HEIGHT / 2.0 - centre[1])
-        assert sx - centre[0] == pytest.approx(toward_centre_x * 0.1, abs=0.02)
-        assert sy - centre[1] == pytest.approx(toward_centre_y * 0.1, abs=0.02)
+        assert sx == pytest.approx(centre[0], abs=0.003)
+        assert sy == pytest.approx(centre[1], abs=0.003)
         reach = max(math.dist((sx, sy), point) for ring in mark for point in ring)
         assert reach < HEAD_DIA / 2.0, (sx, sy, reach)
 

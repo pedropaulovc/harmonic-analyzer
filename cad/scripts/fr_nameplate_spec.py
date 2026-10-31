@@ -16,7 +16,7 @@ others:
 
 Mount transform (user ruling 2026-10-09; ch. 26 p.71 and ch. 30 p002/p003/p006):
 the brass plate's outline IS the traced DXF outer edge, scaled to the
-3.938 x 1.785 in envelope (the #290 inch rebake). It lies FLAT on the WEST
+3.95 x 1.79 in envelope (the #290 inch rebake). It lies FLAT on the WEST
 (+X) end of the black base deck, decorated side up, read by an operator
 standing west of it.
 
@@ -25,12 +25,12 @@ extrudes the body in -Z so the engraving is frontmost and reads with no
 mirror). ``MOUNT_ROWS`` (euler [-90, 90, 0]) lays it flat on the WEST end:
 local +Z (decorated front) -> +Y so the engraving faces up; local +Y (text
 height) -> -X so the text top faces the machine interior and reads upright to
-a west operator; local +X (text length, 3.938) -> -Z so the line runs
+a west operator; local +X (text length, 3.95) -> -Z so the line runs
 front-back; the .063 body (local -Z) drops onto the deck. The placed point is
 the part origin CORNER (decorated face, x=0/y=0): Y 2.063 lays the decorated
-face on top with the .063 body resting on the deck (2.000); Z 1.969 centres
-the 3.938 line at z 0; X 6.42 sets the plate's west edge .16 inside the black
-deck's west edge at x 6.58. The plate spans x 4.635..6.42, clear of the
+face on top with the .063 body resting on the deck (2.000); Z 1.975 centres
+the 3.95 line at z 0; X 6.42 sets the plate's west edge .16 inside the black
+deck's west edge at x 6.58. The plate spans x 4.63..6.42, clear of the
 rocker-arm-support foot.
 
 Row convention (``_transforms.rows_from_euler`` / ``assert_component_placed``):
@@ -63,11 +63,12 @@ DXF_SCREW_XY = (
 )
 
 # --- Plate envelope (build_fr_nameplate owns the rest of the plate geometry). ---
-# The #290 rebake scales the traced artwork to an envelope exact on the .001
-# grid. No uniform scale lands both sides on it, so each axis takes its own
-# scale; they differ by 0.01 %, invisible in the traced art.
-PLATE_WIDTH = 100.0252  # 3.938
-PLATE_HEIGHT = 45.339  # 1.785
+# The #290 rebake scales the traced artwork to an envelope on the .01 grid:
+# the outline DXF defines the profile, so its overall sizes print .XX (no fit
+# or stack reads them). 3.95 x 1.79 is the .01 pair nearest the traced aspect;
+# each axis takes its own scale, 0.035 % apart, invisible in the traced art.
+PLATE_WIDTH = 100.33  # 3.95
+PLATE_HEIGHT = 45.466  # 1.79
 DXF_SCALE_X = PLATE_WIDTH / DXF_OUTER_WIDTH
 DXF_SCALE_Y = PLATE_HEIGHT / DXF_OUTER_HEIGHT
 PLATE_THICKNESS = 1.6002  # .063 C260 sheet (OnlineMetals 23624)
@@ -110,15 +111,16 @@ HEAD_MARK_XY = tuple(
     ((x - DXF_OUTER_ORIGIN[0]) * DXF_SCALE_X, (y - DXF_OUTER_ORIGIN[1]) * DXF_SCALE_Y)
     for x, y in DXF_SCREW_XY
 )
-# Owner ruling 2026-10-15: nameplate holes and frame taps sit inboard of the
-# engraved head marks for corner ligament (PR #1468 r3 review), each hole
-# concentric with the outline's rounded corner. Every station prints .164
-# from its two edges, about .004 inboard of the traced marks in x and y:
-# drilled at both printed station minima (.159) the hole keeps its wall to
-# the corner arc (fr_nameplate_drawing_spec.HOLE_LIGAMENT_WORST measures it
-# on the DXF), and the heads still cover the engraved marks. The base's
-# through seats derive from these stations through MOUNT_HOLE_XZ.
-SCREW_STATION = 4.1656  # .164
+# Owner ruling 2026-10-15: nameplate holes and frame taps sit on the engraved
+# head marks' corners for corner ligament (PR #1468 r3 review), each hole
+# concentric with the outline's rounded corner. Every station prints .16 from
+# its two edges, on the traced marks to within .0003: drilled at both printed
+# station minima (.15) the hole keeps rule 17's .080 wall to the corner arc
+# (fr_nameplate_drawing_spec.HOLE_LIGAMENT_WORST measures it on the DXF), and
+# the heads cover the engraved marks. The base's through seats are spotted
+# through the plate at assembly and derive from these stations through
+# MOUNT_HOLE_XZ, so no receiver reads the stations closer than .XX.
+SCREW_STATION = 4.064  # .16
 SCREW_XY = (
     (SCREW_STATION, SCREW_STATION),
     (PLATE_WIDTH - SCREW_STATION, SCREW_STATION),
@@ -127,7 +129,7 @@ SCREW_XY = (
 )
 
 # --- Mount transform in the machine frame (see the module docstring). ---
-MOUNT_POS = [163.068, 52.4002, 50.0126]  # 6.42, 2.063, 1.969
+MOUNT_POS = [163.068, 52.4002, 50.165]  # 6.42, 2.063, 1.975
 MOUNT_EULER = [-90.0, 90.0, 0.0]
 MOUNT_ROWS = [[0.0, 0.0, -1.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
 

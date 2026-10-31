@@ -551,13 +551,13 @@ def test_nameplate_transfer_is_the_declared_fit_up() -> None:
     assert set(sheet.TRANSFER_NAMEPLATE_HOLES) == nameplate_seats
     assert not nameplate_seats & set(sheet.TABLE_HOLES)
     # The reason's numbers, from literals: #4 close hole .120 over the #4-40
-    # basic major .112; the plate's .XXX stations and this .XXX tap station,
-    # +-.005 each.
+    # basic major .112; the plate's .XX stations (+-.010) and this .XXX tap
+    # station (+-.005).
     float_diametral = 0.120 - 0.112
-    demand = 2.0 * math.sqrt(2.0) * (0.005 + 0.005)
+    demand = 2.0 * math.sqrt(2.0) * (0.010 + 0.005)
     assert f"{float_diametral:.3f}"[1:] == ".008"
-    assert f"{demand:.3f}"[1:] == ".028"
-    assert ".008 diametral" in fit_up.reason and "about .028" in fit_up.reason
+    assert f"{demand:.3f}"[1:] == ".042"
+    assert ".008 diametral" in fit_up.reason and "about .042" in fit_up.reason
 
 
 def _deck_seat_features_in_build() -> dict[str, object]:

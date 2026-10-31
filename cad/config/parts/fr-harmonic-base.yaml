@@ -12,7 +12,7 @@ fr-harmonic-base:
       kind: "accept"
       where: "the 4X nameplate tap callout TRANSFER FROM MHA-FR-04 AT ASSEMBLY; on the four #4-40 MHA-FR-04 seats, which print no station"
       finding: "fit-up at assembly (rule 19)"
-      reason: "the #4 close holes in MHA-FR-04 float only .008 diametral over the #4-40 major, against about .028 demanded by the plate's .XXX hole stations and a .XXX tap station here (2 x sqrt 2 x (.005 + .005)); the four taps are spotted and tapped through the actual plate's holes at assembly, so that stack never forms (owner-accepted)"
+      reason: "the #4 close holes in MHA-FR-04 float only .008 diametral over the #4-40 major, against about .042 demanded by the plate's .XX hole stations and a .XXX tap station here (2 x sqrt 2 x (.010 + .005)); the four taps are spotted and tapped through the actual plate's holes at assembly, so that stack never forms (owner-accepted)"
     - id: "RV-02"
       kind: "accept"
       where: "MHA-FR-01 fr-harmonic-base, sheet 2 HOLES-SOCKETS, generated native hole-table SIZE cells only"

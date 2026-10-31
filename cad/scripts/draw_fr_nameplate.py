@@ -109,7 +109,7 @@ SECTION_SCALE = (8, 1)
 SECTION_LABEL = "A"
 _M_PER_MM = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
 
-# Sheet layout (metres).  At 2:1 the face is 200 x 90.7 mm, x 0.050..0.250,
+# Sheet layout (metres).  At 2:1 the face is 200.7 x 90.9 mm, x 0.050..0.251,
 # y 0.125..0.215.  Third angle: the .063 edge view stands right of it, the
 # isometric top-right, removed section A-A bottom-right above the title
 # block (its crop centred on SECTION_CENTER, its caption hung below-left of
@@ -256,11 +256,13 @@ def _section_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
 # The field's callout is two rows, the feature and why it holds three places,
 # so with its value the block is three rows tall (the r4 render's two-row
 # blocks measured ~9 mm). It stands 0.3 higher than on that render and the
-# engraving's block 0.6 higher, keeping a gap between the two blocks and the
-# field's leader shelf above its outside arrow at the face.
+# engraving's block 0.65 higher, keeping a gap between the two blocks and the
+# field's leader shelf above its outside arrow at the face. The b3 layout
+# audit measured the inch texts .016 and .028 1.70 mm apart (1.78 needed) with
+# the engraving at 3.4; 3.45 raises its block 0.4 mm on the 8:1 sheet.
 SECTION_KEEP = {
     "FieldDepth": _section_xy(SECTION_FIELD_X, 1.7),
-    "EngravingDepth": _section_xy(SECTION_GROOVE_X, 3.4),
+    "EngravingDepth": _section_xy(SECTION_GROOVE_X, 3.45),
 }
 # The floor under the groove: a sheet reference from the groove's floor to
 # the back face (plate x, z), chained below the engraving depth.
