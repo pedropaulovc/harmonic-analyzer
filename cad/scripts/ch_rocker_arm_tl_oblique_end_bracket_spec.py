@@ -5,8 +5,8 @@ identical brackets carry the leadscrew feed's two KP08 pillow blocks (bought,
 shop inventory ``fixtures.trammel-kp08-blocks``) on base bar 1's top
 (MHA-CH-06-TL-20). Each lifts its block's base off the bar by the plate's
 thickness and stands wholly on the bar, its outer end flush with the bar's
-column-side edge (the user's 2026-10-17 ruling A′: the bar widened, now 1/2 x
-5-1/2, so the bracket no longer cantilevers past it). The layout (axis, stations
+column-side edge (the user's 2026-10-17 ruling A′: the bar widened, now 5.50
+wide, so the bracket no longer cantilevers past it). The layout (axis, stations
 and every bought dimension) belongs to
 ``ch_rocker_arm_tl_vn_oblique_leadscrew_spec``, imported as ``leadscrew``; this
 module never retypes one of its numbers.

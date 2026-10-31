@@ -18,22 +18,22 @@ near slot's station (it closes the T-slot pitch) and the bracket holes'
 stations (the leadscrew's KP08 stations); each prints rounded, and every
 worst case below reads the printed value's limits.
 
-Material and stock: 6061-T6511 aluminium flat bar, 1/2 x 5-1/2 in (OnlineMetals
-17666; ⚙ ``BASE_BAR_STOCK_THICK`` x ⚙ ``BASE_BAR_WIDTH``), sawn and faced to
-⚙ ``BASE_BAR_LENGTH`` 17.32 (the rail's 440 cut; rail and bar flush within
-the length's band). The width is left as supplied and prints its stock
-fraction as a reference, the supplier's ±.034 governing. Both large faces are
-faced to ⚙ ``BASE_BAR_THICK`` .47 (owner ruling 2026-10-30, option A), held
-by the title block's .XX band like the TL-21 carrier: each is a static
-locating seat, so each carries Ra 125 µin (rule 6, ``SURFACE_FINISHES``).
-Bar 1's underside sits on the mill table and its top carries the rail and the
-TL-28 brackets; bar 2, turned over, uses them the other way round. The
-PM-30MV's 23 in X and 8.75 in Y travel cover the 17.32 x 5-1/2 face, gripped
-across the 5-1/2 in the 5.75 vise opening. The user's 2026-10-17 ruling (a)
-widened the bar from 1/2 x 4 to 1/2 x 6 so the leadscrew's TL-28 end
-brackets (PR C4) stand wholly on bar 1; the 2026-10-30 ruling narrowed it to
-1/2 x 5-1/2, the widest listed OnlineMetals bar that fits the 6 in vise's
-stock hard jaws, keeping the column-side edge and so the brackets.
+Material and stock: 6061-T6511 aluminium flat bar milled from the owned 1/2 x
+6 bar (OnlineMetals 1173; owner ruling #2083), sawn and faced to ⚙
+``BASE_BAR_LENGTH`` 17.32 (the rail's 440 cut; rail and bar flush within the
+length's band) and milled to width ⚙ ``BASE_BAR_WIDTH`` 5.50 on edge in the
+vise, no bandsaw rip: the width is a machined size at the title block's .XX
+band. Both large faces are faced from ⚙ ``BASE_BAR_STOCK_THICK`` to ⚙
+``BASE_BAR_THICK`` .47 (owner ruling 2026-10-30, option A), held by the title
+block's .XX band like the TL-21 carrier: each is a static locating seat, so
+each carries Ra 125 µin (rule 6, ``SURFACE_FINISHES``). Bar 1's underside
+sits on the mill table and its top carries the rail and the TL-28 brackets;
+bar 2, turned over, uses them the other way round. The PM-30MV's 23 in X and
+8.75 in Y travel cover the 17.32 x 5.50 face, gripped across the 5.50 in the
+5.75 vise opening. The user's 2026-10-17 ruling (a) widened the bar from 1/2 x
+4 to 1/2 x 6 so the leadscrew's TL-28 end brackets (PR C4) stand wholly on bar
+1; the 2026-10-30 ruling narrowed it to 5.50, inside the 6 in vise's stock
+hard jaws, keeping the column-side edge and so the brackets.
 
 Frame: origin at the bar's spindle-end face, on the rail axis, on the bottom
 face; +X along the bar away from the spindle, +Y across it, +Z up
@@ -135,20 +135,19 @@ def _deviation(value: float, places: int, band: float | None = None) -> float:
 
 
 BAR_THICK = trammel.BASE_BAR_THICK  # ⚙ .47, faced
-BAR_WIDTH = trammel.BASE_BAR_WIDTH  # ⚙ 5-1/2 stock
+BAR_WIDTH = trammel.BASE_BAR_WIDTH  # ⚙ 5.50, milled to width (#2083)
 BAR_LENGTH = trammel.BASE_BAR_LENGTH  # ⚙ 17.32
-# OnlineMetals' 6061-T6511 extruded rectangle bar, width 4.000-5.999 in:
-# ±.034 (https://www.onlinemetals.com/en/aluminum-tolerances). The width
-# prints as a reference, so this band, not the title block's, governs it.
-BAR_WIDTH_STOCK_BAND = 0.8636  # .034
-BAR_WIDTH_FRACTION_DENOMINATOR = 2  # (5-1/2)
+# The width is milled from the 1/2 x 6 bar (owner ruling #2083), so it prints
+# as a machined size at the title block's .XX band.
+WIDTH_PLACES = 2
+BAR_WIDTH_BAND = printed_band_mm(WIDTH_PLACES, unit=UNIT)
 # The two long sides in the rail-1 part frame (y = -lateral): the rail sits
 # off the centreline since the 2026-10-17 widening, so each side is read from
 # its own calculator edge, never as half the width.
 LOW_SIDE_Y = -trammel.BASE_BAR_COLUMN_EDGE  # ⚙ -3.50: the faced -Y, column side
 HIGH_SIDE_Y = -trammel.BASE_BAR_OPERATOR_EDGE  # ⚙ 2.00: the +Y, operator side
 if abs(HIGH_SIDE_Y - LOW_SIDE_Y - BAR_WIDTH) > 1e-9:
-    raise AssertionError("the base bar's sides miss its stock width")
+    raise AssertionError("the base bar's sides miss its width")
 
 # --- Rail holes ---------------------------------------------------------------
 RAIL_SCREW = trammel.RAIL_SCREW  # ⚙ "#8-32"
@@ -230,10 +229,9 @@ NEAR_SIDE_WALL = NEAR_SLOT_RISE - SLOT_WIDTH / 2.0
 FAR_SIDE_WALL = BAR_WIDTH - (FAR_SLOT_RISE + SLOT_RUN) - SLOT_WIDTH / 2.0
 SIDE_WALL = min(NEAR_SIDE_WALL, FAR_SIDE_WALL)
 # Both slots are located from the -Y side (c3-r6, rule 10), so the far slot's
-# wall to the +Y side carries the stock width's supplier band, its rise's and
-# its run's .XX.
+# wall to the +Y side carries the width's .XX, its rise's and its run's.
 FAR_SIDE_WALL_WORST = (
-    (BAR_WIDTH - BAR_WIDTH_STOCK_BAND) - (FAR_SLOT_RISE + _XX + SLOT_RUN + _XX) - _R_MAX
+    (BAR_WIDTH - BAR_WIDTH_BAND) - (FAR_SLOT_RISE + _XX + SLOT_RUN + _XX) - _R_MAX
 )
 SIDE_WALL_WORST = min(NEAR_SLOT_RISE - _XX - _R_MAX, FAR_SIDE_WALL_WORST)
 for _label, _worst in (
@@ -348,8 +346,7 @@ def bracket_hole_walls(holes: tuple[tuple[float, float], ...]) -> dict[str, floa
     return {
         "-Y edge": min(y - LOW_SIDE_Y - row(y) for _, y in holes) - radius,
         "+Y edge": min(
-            BAR_WIDTH - BAR_WIDTH_STOCK_BAND - (y - LOW_SIDE_Y + row(y))
-            for _, y in holes
+            BAR_WIDTH - BAR_WIDTH_BAND - (y - LOW_SIDE_Y + row(y)) for _, y in holes
         )
         - radius,
         "spindle end": min(x - station(x) for x, _ in holes) - radius,
@@ -402,10 +399,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BracketHoles": {"BracketHole1X", "BracketHole5X"},
     "BracketRowReference": {f"BracketRow{k}Y" for k in range(1, 5)},
 }
-# The bar's width is the flat bar as bought: its stock fraction prints as a
-# reference with "STOCK" under it. The thickness is faced (owner ruling
-# 2026-10-30) and takes the title block's .XX band.
-STOCK_DIMENSIONS = frozenset({"BarWidth"})
+# The width is milled to size (owner ruling #2083) and the thickness faced
+# (owner ruling 2026-10-30): both take the title block's .XX band.
 # The rail holes' stations carry the one tight band (the rail's pitch); the
 # row's height takes the title block's (c3-r7): (feature, dimension) ->
 # symmetric band.
@@ -417,6 +412,7 @@ _PLACES = {
     "SlotWidth": SLOT_PLACES,
     "SlotRun": SLOT_PLACES,
     "BarThick": THICK_PLACES,
+    "BarWidth": WIDTH_PLACES,
     "RailRowY": RAIL_ROW_PLACES,
     **{name: RAIL_HOLE_PLACES for _feature, name in TOLERANCES},
     **{
@@ -451,7 +447,7 @@ SURFACE_FINISHES = (
 # Why both faces carry a seat finish: each seats on the table or under the
 # rail, depending on the bar (rule 7: say why, beside the symbols).
 SEAT_FINISH_REASON = "TABLE AND RAIL SEATS"
-# No general note: the stock width says STOCK, the seats' reason rides their
-# symbols and the rail holes' mate rides their callout.
+# No general note: the seats' reason rides their symbols and the rail holes'
+# mate rides their callout.
 DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:5"

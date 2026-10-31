@@ -10,10 +10,10 @@ The rocker blank, on its riser (MHA-CH-06-TL-24), is located on the HUB pin
 lever (MHA-CH-06-TL-26) bolts to the -Y edge.
 
 Material and stock: 1/2 x 6 in 6061-T6511 aluminium bar, the owned OnlineMetals
-1173 (shop inventory); sawn to length and ripped to about 5.3 in wide, since
-the 6 in width does not fit the 5 3/4 in vise jaws, then faced to .47
-(``CARRIER_THICK``) and milled to 20.5 x 5.1. Finished thickness takes the .XX
-title-block band, not STOCK.
+1173 (shop inventory); sawn to length and milled to width on edge in the
+vise, no bandsaw rip (owner ruling #2083: the 6 in width does not fit the
+5 3/4 in vise jaws flat), then faced to .47 (``CARRIER_THICK``) and milled to
+20.5 x 5.1. Finished thickness takes the .XX title-block band, not STOCK.
 
 Issue #290: the sheet prints decimal inch (``UNIT``). Lengths stay physical
 millimetres, each fabricated nominal the exact millimetre value of its printed
