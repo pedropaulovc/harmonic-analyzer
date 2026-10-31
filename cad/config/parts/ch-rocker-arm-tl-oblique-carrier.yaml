@@ -24,3 +24,4 @@ ch-rocker-arm-tl-oblique-carrier:
       where: "the 2X 5/16-18 UNC feed-lever taps"
       finding: "engagement 9.53 min (1.20D) in the 12 plate, under 1.5D (rule 18)"
       reason: "12 plate cannot hold 1.5D of 5/16-18 and the feed lever only takes hand load; the shortfall is stated in the tap callout (owner ruling 2026-10-17, via coordinator, RockerV3 session)"
+  drawing_unit: in
