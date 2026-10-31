@@ -4,10 +4,9 @@ from _fit_deviations import deviations
 from _fit_ream_h7 import REAM_H7
 
 # Fit classes: (upper, lower) offsets in mm, added to the nominal.
-# ISO g6 ground shaft, 3-6 mm size range: -0.004 / -0.012.
-# Source: Mitsubishi Materials shaft-fit table, >3 through 6 mm row (micrometres).
-# https://www.mitsubishicarbide.net/contents/mhg/enuk/html/product/technical_information/information/pdf/fit_tolerance_table_shaft.pdf
-SHAFT_G6_3_TO_6_MM = (-0.004, -0.012)
+# A g6-like turned shaft under its REAM_H7 bore: -.0002 / -.0005 in, so the
+# pair runs at .0002-.0010 in diametral.
+SHAFT_G6_3_TO_6_MM = (-0.00508, -0.0127)
 
 
 def measured_close_running_clearance_mm() -> tuple[float, float]:

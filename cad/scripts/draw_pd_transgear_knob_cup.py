@@ -117,7 +117,7 @@ PIN_NUMBER = _config.parts("pd-vn-transgear-knob-cup-pin")["number"]
 # setting before it is pinned (machinist review: the band named no mate).
 BORE_CALLOUT = (
     f"REAM THRU; SLIDES ON\n{SHAFT_NUMBER} JOURNAL,\n"
-    f"{min(BORE_JOURNAL_CLEARANCE):.3f}-{max(BORE_JOURNAL_CLEARANCE):.3f}\n"
+    f"{min(BORE_JOURNAL_CLEARANCE):.4f}-{max(BORE_JOURNAL_CLEARANCE):.4f}\n"
     "DIAMETRAL CLEARANCE"
 )
 DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
