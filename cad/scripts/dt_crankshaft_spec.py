@@ -16,7 +16,11 @@ import math
 import _config
 import cone_line
 from _hole_spec import HoleSpec, blind_cut_dia_mm, drill_process
-from _printed_tolerance import edge_break_chamfer_mm, edge_break_radius_mm
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
+)
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -26,6 +30,7 @@ import dt_cone_pivot_post_spec
 import dt_crank_pinion_spec
 import dt_vn_crank_seat_drive_pin_spec
 import _sprocket_seat_geometry as seat_geometry
+from pd_transgear_removable_spec import UNIT as WHEEL_UNIT
 from dt_crank_hub_geometry import (
     FIDUCIAL_MODEL_DEPTH,  # noqa: F401 -- re-exported to the drawing contract
     FIDUCIAL_MODEL_DIA,  # noqa: F401 -- re-exported to the drawing contract
@@ -403,7 +408,7 @@ if (
 # own loosest clearance on the pilot is smaller, and it is not.  The chain
 # wrapping the wheel moves with it, so the drive train's radial chain air
 # takes this off.
-_DRILL_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
+_DRILL_OVERSIZE = drilled_oversize_mm(unit=WHEEL_UNIT)  # the wheel's sheet
 _WHEEL_PIN_FLOAT = (
     seat_geometry.PIN_HOLE_DIA + _DRILL_OVERSIZE - _DOWEL_OD[0]
 ) / 2.0 + 2.0 * seat_geometry.DRIVE_PIN_OFFSET_TOL

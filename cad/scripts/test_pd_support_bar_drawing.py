@@ -42,7 +42,7 @@ def test_printed_bands_match_the_bar_and_drilled_slot_limits() -> None:
     from _printed_tolerance import drilled_oversize_mm, printed_deviations
 
     # .XXX at the inch print: each band is the printed limit's furthest
-    # reach from the mm nominal, the rounding of 1.102 included (.374 exact).
+    # reach from the mm nominal, the rounding of 1.102 and .374 included.
     for value, band in (
         (spec.BAR_HEIGHT, spec.BAR_HEIGHT_BAND),
         (BAR_DEPTH, spec.BAR_DEPTH_BAND),
@@ -50,7 +50,7 @@ def test_printed_bands_match_the_bar_and_drilled_slot_limits() -> None:
         lower, upper = printed_deviations(value, spec.BAR_BAND_PLACES, unit="in")
         assert band == max(-lower, upper)
     assert (spec.BAR_HEIGHT_BAND, spec.BAR_DEPTH_BAND) == pytest.approx(
-        (0.1362, 0.127)
+        (0.1362, 0.1274)
     )
     assert part.CLAMP_SLOT_WIDTH_LIMITS == (0.0, drilled_oversize_mm(unit="in"))
 

@@ -376,14 +376,15 @@ def test_one_lock_size_retains_the_platen_on_both_rails(monkeypatch) -> None:
     }
     assert _retention(monkeypatch, assembly) == pytest.approx(expected, abs=1e-3)
     assert min(expected.values()) >= assembly.LOCK_SWEEP_FLOOR
-    # A plate 0.5 shorter keeps the hanging platen's bottom rail but would
-    # lose the lifted platen's top rail.
+    # Top plates just short of the retention floor lose the lifted platen's
+    # top rail.
+    short = expected["top"] - assembly.LOCK_RETENTION_FLOOR + 0.01
     monkeypatch.setattr(
         assembly,
         "LOCK_PLATE_Y",
         (
-            (bottom_rail - _LIP, bottom_rail - _LIP + _HEIGHT - 0.5),
-            (top_rail + 5.0 + _LIP - _HEIGHT + 0.5, top_rail + 5.0 + _LIP),
+            (bottom_rail - _LIP, bottom_rail - _LIP + _HEIGHT),
+            (top_rail + 5.0 + _LIP - _HEIGHT + short, top_rail + 5.0 + _LIP),
         ),
     )
     with pytest.raises(AssertionError, match="top plates"):

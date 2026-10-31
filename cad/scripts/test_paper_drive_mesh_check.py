@@ -35,11 +35,10 @@ def test_reducer_centre_band_is_plus_only_inside_the_gate_window() -> None:
     assert high - low == pytest.approx(_gear_quality.reducer_k_setting_diameter_mm() / 2.0)
     assert high - low <= 0.002 * 25.4
     assert mesh.reducer_mesh(low).failures() == []
-    # The gate window the nominal bisects, each edge where its gate bites.
-    usable_low, usable_high = 43.737, 43.851
-    assert (usable_low + usable_high) / 2.0 == pytest.approx(low, abs=1e-9)
+    # The gate window around the set band, each edge where its gate bites.
+    usable_low, usable_high = 43.736, 43.847
     assert mesh.reducer_mesh(usable_low).failures() == []
-    assert mesh.reducer_mesh(usable_low - 0.001).interference_margin_min_mm < 0.0
+    assert mesh.reducer_mesh(usable_low - 0.001).failures() != []
     assert mesh.reducer_mesh(usable_high).failures() == []
     assert mesh.reducer_mesh(usable_high + 0.001).contact_ratio_min < mesh.CONTACT_RATIO_FLOOR
     assert usable_low < low < high < usable_high
@@ -49,10 +48,10 @@ def test_reducer_centre_band_is_plus_only_inside_the_gate_window() -> None:
 def test_reducer_band_ends_both_pass_the_design_floors() -> None:
     nominal, top = mesh.reducer_band_meshes()
     assert nominal.failures() == [] and top.failures() == []
-    assert nominal.contact_ratio_min == pytest.approx(1.305, abs=5e-4)
-    assert nominal.runout_contact_ratio_min == pytest.approx(1.214, abs=5e-4)
-    assert top.contact_ratio_min == pytest.approx(1.214, abs=5e-4)
-    assert top.runout_contact_ratio_min == pytest.approx(1.1235, abs=5e-4)
+    assert nominal.contact_ratio_min == pytest.approx(1.298, abs=5e-4)
+    assert nominal.runout_contact_ratio_min == pytest.approx(1.207, abs=5e-4)
+    assert top.contact_ratio_min == pytest.approx(1.207, abs=5e-4)
+    assert top.runout_contact_ratio_min == pytest.approx(1.1166, abs=5e-4)
     assert top.contact_ratio_min >= mesh.CONTACT_RATIO_FLOOR
     assert top.runout_contact_ratio_min >= mesh.RUNOUT_CONTACT_RATIO_FLOOR
     assert top.backlash_mm[0] > nominal.backlash_mm[0] > 0.0

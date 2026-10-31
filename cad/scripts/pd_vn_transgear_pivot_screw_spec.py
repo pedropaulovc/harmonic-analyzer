@@ -62,9 +62,9 @@ UNIT = drawing_unit(
 # 2026-10-15): never proud of the platen's slide face, close enough for the
 # stake at the tap's mouth to close the thread over the tip.  .008-.020 (#290).
 TIP_RECESS = (0.2032, 0.508)
-# The printed REFERENCE thread length: the nominal .374 bar less the recess
+# The printed REFERENCE thread length: the nominal 9.5 bar less the recess
 # window's middle (transgear_hanger_joints asserts the link), (.360).
-FITTED_THREAD_LEN = 9.144
+FITTED_THREAD_LEN = 9.1444
 SHOULDER_END_Y = -SHOULDER_LEN
 TIP_Y = SHOULDER_END_Y - FITTED_THREAD_LEN
 INCOMPLETE_TIP_LEN_MAX = PITCH
