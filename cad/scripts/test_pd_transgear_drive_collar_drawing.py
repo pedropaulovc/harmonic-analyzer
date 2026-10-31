@@ -330,7 +330,7 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
     assert "KNOB SHAFT" in spec.BORE_CALLOUT and "KNOB SHAFT" in spec.FLAT_CALLOUT
     assert "DOWEL" in spec.PIN_HOLE_CALLOUT
     # The D-bore's diametral clearance moved intact from the former note 2.
-    clearance = f"{spec.BORE_CORE_CLEARANCE[0]:.3f}-{spec.BORE_CORE_CLEARANCE[1]:.3f}"
+    clearance = f"{spec.BORE_CORE_CLEARANCE[0]:.4f}-{spec.BORE_CORE_CLEARANCE[1]:.4f}"
     assert f"{clearance}\nCLEARANCE ON DIA." in spec.BORE_CALLOUT
     assert spec.BORE_CALLOUT.splitlines()[0] == "TRUE D THRU"
     # The D's acute inside corners take their limit from the shaft they
