@@ -15,3 +15,4 @@ ch-rocker-arm-tl-oblique-base-bar:
   quantity: 2
   tolerance_class: machined_block
   process: "saw and face to length; face both large faces to thickness; drill and tap the seven #8-32 rail holes through; drill the eight #8 bracket holes through and counterbore them from the underside; mill the two hold-down slots through; break edges"
+  drawing_unit: in
