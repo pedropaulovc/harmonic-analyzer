@@ -7,6 +7,7 @@ detail regions and titles, the as-shipped note, the assembly steps and checks
 the sheets print. Only draw_pn_pen_assembly (and its tests) import this
 module; no assembly builder may (``test_assembly_sheet_isolation`` pins it),
 so a wording edit here does not rebuild the pen assembly. No SolidWorks.
+Printed lengths are decimal inch, the assembly contract's ``drawing_unit``.
 """
 
 from __future__ import annotations
@@ -24,8 +25,10 @@ import pn_vn_pen_hanger_nut_spec as hanger_nut
 import pn_vn_pen_rod_set_screw_spec as rod_set_screw
 import _mcmaster_99607a213 as thumb_screw
 from _inch_fraction import inch_fraction
+from _assembly_contract import assembly_contract
 from _column_clamp_interface import BAR_DEPTH as WHEEL_BAR_DEPTH
 from pn_pen_assembly_spec import (
+    ASM_NAME,
     BOM_ORDER,
     CARRIAGE_END_MACHINE,
     FRAME,
@@ -59,6 +62,7 @@ from pn_pen_explode_spec import EXPLODE_STEPS
 from sh_vn_music_wire_pen_spec import BOM_DESCRIPTION as _WIRE_BOM_DESCRIPTION
 
 DRAWING_NUMBER = "MHA-PN-00"
+UNIT = assembly_contract(ASM_NAME).drawing_unit
 # A top-level BOM numbers its rows in the builder's insertion order
 # (pn_pen_assembly_spec.BOM_ORDER); the drawing proves each row against this
 # and the steps cite it.
@@ -70,7 +74,7 @@ ITEM = {stem: index for index, stem in enumerate(BOM_ORDER, 1)}
 REFERENCE_DIMENSIONS = frozenset({STUD_DIMENSION})
 DIMENSION_TOLERANCES = {NIB_DIMENSION: NIB_TOLERANCE_MM}
 ANGULAR_TOLERANCES = {YAW_DIMENSION: YAW_TOLERANCE_DEG}
-TOLERANCE_PRECISION = {NIB_DIMENSION: 1, YAW_DIMENSION: 0}
+TOLERANCE_PRECISION = {NIB_DIMENSION: NIB_PRECISION, YAW_DIMENSION: 0}
 DIMENSION_NOMINALS = {STUD_DIMENSION: STUD_HEIGHT, NIB_DIMENSION: NIB_PROTRUSION}
 
 
@@ -89,11 +93,20 @@ def _inch(mm: float) -> str:
     return inch_fraction(mm, what="pen purchased size")
 
 
+def _decimal(mm: float, places: int) -> str:
+    """A length as the inch sheet prints it at ``places``, rounded, no
+    leading zero (.126, 1.024)."""
+    if UNIT != "in":
+        raise AssertionError(f"pen fitter text is authored in inch, not {UNIT!r}")
+    text = f"{mm / 25.4:.{places}f}"
+    return text[1:] if text.startswith("0.") else text
+
+
 STUD_NUT_WRENCH = _inch(stud_nut.ACROSS_FLATS)
 HANGER_NUT_WRENCH = _inch(hanger_nut.ACROSS_FLATS)
 HANGER_JAM_NUT_WRENCH = _inch(hanger_jam_nut.ACROSS_FLATS)
 HANGER_SCREW_WRENCH = _inch(hanger_screw.HEAD_AF)
-ROD_SET_SCREW_KEY = f"{rod_set_screw.HEX_AF / 25.4:.3f}"
+ROD_SET_SCREW_KEY = _decimal(rod_set_screw.HEX_AF, 3)
 
 BOM_DESCRIPTIONS = {
     HANGER: "PEN HANGER, STRAP + 2 U GUIDES",
@@ -203,7 +216,8 @@ STUD_TEXT_POINT = (
 # The stud is set from its measured length (code review C05): the head top
 # stands that length less the nominal engagement, ±STUD_TOLERANCE_MM.
 _STUD_LESS = (
-    f"{stud.OVERALL_LENGTH - STUD_HEIGHT:.{STUD_PRECISION}f} ±{STUD_TOLERANCE_MM:.1f}"
+    f"{_decimal(stud.OVERALL_LENGTH - STUD_HEIGHT, STUD_PRECISION)} "
+    f"±{_decimal(STUD_TOLERANCE_MM, STUD_PRECISION)}"
 )
 DIMENSION_CALLOUTS = {
     STUD_DIMENSION: f"STUD HEAD\nABOVE ROD TOP:\nSTUD LENGTH\nLESS {_STUD_LESS}",
@@ -214,12 +228,15 @@ DIMENSION_CALLOUTS = {
 # --- fitter text ----------------------------------------------------------------
 _STUD_SETTING = f"THE STUD'S MEASURED LENGTH LESS {_STUD_LESS}"
 _STUD_NOMINAL = (
-    f"{STUD_HEIGHT:.{STUD_PRECISION}f} FOR A "
-    f"{stud.OVERALL_LENGTH:.{STUD_PRECISION}f} STUD"
+    f"{_decimal(STUD_HEIGHT, STUD_PRECISION)} FOR A "
+    f"{_decimal(stud.OVERALL_LENGTH, stud.OVERALL_PLACES)} STUD"
 )
-_NIB_SETTING = f"{NIB_PROTRUSION:.{NIB_PRECISION}f} ±{NIB_TOLERANCE_MM:.1f}"
+_NIB_SETTING = (
+    f"{_decimal(NIB_PROTRUSION, NIB_PRECISION)} "
+    f"±{_decimal(NIB_TOLERANCE_MM, NIB_PRECISION)}"
+)
 _YAW_SETTING = f"{YAW_DEG:.0f}° ±{YAW_TOLERANCE_DEG:.0f}°"
-_TRAVEL = f"±{carriage.PEN_TRAVEL_HALF_MM:.0f}"
+_TRAVEL = f"±{_decimal(carriage.PEN_TRAVEL_HALF_MM, 2)}"
 
 # --- detail regions (machine mm): what each fitter detail is centred on and how
 # far round it reaches ------------------------------------------------------------

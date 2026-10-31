@@ -47,9 +47,10 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import drill_process
 from _machinist_review_mode import MachinistReviewMode
@@ -191,6 +192,8 @@ UPPER_ARC_KEEP = {
 # An arrow on the fillet arc or its extension circle stands within
 # (1 + sqrt 2) R (2.9 mm at 6:1) of the sharp corner it rounds.
 _CORNER_TOL = 0.004
+# The native Hole Wizard Ø variable of the #54 eye's drill callout.
+EYE_CALLOUT_PRECISION = {"hw-diam": 3}
 # The eye callout stands up and LEFT of the eye, above the bare thread (the
 # old up-and-right place dropped its leader through the station dimension's
 # line, rule 14). SolidWorks hangs the leader off the text end nearer the
@@ -328,7 +331,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -391,13 +398,17 @@ async def build(adapter: Any) -> dict[str, str]:
         face_xy=spt(*CENTERLINE_PICK),
         label="adjuster stud turning axis",
     )
-    add_native_hole_callout(
+    eye_callout = add_native_hole_callout(
         adapter,
         side,
         edge_xy=spt(*EYE_RIM_PICK),
         callout_xy=spt(*EYE_CALLOUT_XY),
         label="adjuster stud eye",
         process=drill_process(EYE_SPEC),
+    )
+    # The #54 drill's Ø prints .XXX (+.004/0 from the title block).
+    set_hole_callout_precision(
+        eye_callout, EYE_CALLOUT_PRECISION, label="adjuster stud eye"
     )
 
     # The shaded isometric shows the #0-80 the callout names; imported before

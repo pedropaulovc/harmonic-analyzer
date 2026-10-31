@@ -2,9 +2,9 @@ r"""Reproduction script: pen hanger (book ch. 24, pp. 60-63; engineerguy 4/4
 9:15-10:34).
 
 The black tapered strap bolted to the wheel support bar that guides the pen
-rod: a flat strap (3 thick) tapering 16 -> 10 wide, lying on the bar's front
-face and running 170 down from the bar top to just above the platen, with two
-thin open U guide plates brazed across its front face 40 apart.  Each plate's
+rod: a flat 11 gauge strap tapering .63 -> .48 wide, lying on the bar's front
+face and running 6.69 down from the bar top to just above the platen, with two
+thin open U guide plates brazed across its front face.  Each plate's
 slot opens forward (-Z), so the square pen rod hangs on its wire inside both
 slots and lifts straight out of them; the slot sides are the rod's only
 lateral guide, and the slot's two milled bottom corners carry a radius.  The
@@ -17,8 +17,8 @@ Layout: origin at the strap's top-right BACK corner -- on the bar's front
 face, level with the bar top, on the rod line's x (machine ``HANGER_POS``;
 all of the geometry lives in ``pn_pen_hanger_spec``).  The part is authored
 MACHINE-handed and placed IDENTITY, so local axes are machine axes: the strap
-occupies y -170..0, z -3..0, its top edge leaning toward machine east (-x);
-the rod axis is local (0, ., ROD_AXIS_Z).
+occupies y -169.926..0, z -3.038..0 (mm), its top edge leaning toward machine
+east (-x); the rod axis is local (0, ., ROD_AXIS_Z).
 Dimensions: cad/DIMENSIONS.md ch. 24.
 
 Run (SolidWorks already open)::
@@ -34,11 +34,13 @@ import sys
 from _appearance import BAR_STEEL, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
+from _document_units import apply_package_model_units
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
+from _part_properties import part_drawing_unit
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
@@ -89,6 +91,7 @@ from pn_pen_hanger_spec import (
     STRAP_T,
     STRAP_TOP_X,
     STRAP_Z,
+    UNIT,
 )
 
 import _telemetry
@@ -156,6 +159,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). mm suffix load-bearing: this is an INCH
     # document and the equation manager reads BARE numbers in document units.
@@ -313,10 +317,14 @@ async def build(adapter) -> dict[str, str]:
     await report_mass_properties(adapter)
     for (feature_name, dimension_name), band in DRAWING_BANDS.items():
         set_dimension_bilateral_tolerance(
-            adapter, feature_name, dimension_name, *deviations(band)
+            adapter,
+            feature_name,
+            dimension_name,
+            *deviations(band),
+            display_unit=UNIT,
         )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    # "2X R2.0 MAX": the modelled radius is the printed limit (rule 16).
+    # "2X R.08 MAX": the modelled radius is the printed limit (rule 16).
     set_single_limit(
         adapter,
         "UpperSlotCorner",

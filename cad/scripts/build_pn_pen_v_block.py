@@ -28,7 +28,7 @@ Features, in tree order:
   cut +X from the paper end to ``V_CUT_LENGTH``, one corner radius past the
   relief's step.
 * ``VApexFillets``: the rounds where the apex flat meets the flanks, at the
-  ``V_APEX_FILLET_R`` limit; the sheet prints it "2X R0.5 MAX".
+  ``V_APEX_FILLET_R`` limit; the sheet prints it "2X R.020 MAX".
 * ``ReliefProfile`` (Top plane) -> ``Relief``: the slot from ``RELIEF_X0`` to
   the free end, its two step corners the end mill's ``RELIEF_CORNER_R`` arcs,
   cut +Y to the roof.
@@ -63,6 +63,7 @@ from _appearance import apply_material
 from _check import check
 from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -75,6 +76,7 @@ from _feature_tree import _feature_by_name, name_last_feature
 from _fit_deviations import deviations
 from _holes import TAP_DRILL_MM, cross_hole_volume_mm3, wizard_holes
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
@@ -120,6 +122,7 @@ from pn_pen_v_block_spec import (
     RELIEF_Z1,
     SET_SCREW_TAP_SPEC,
     SET_SCREW_Y,
+    UNIT,
     V_FLANK_ANGLE_DEG,
     V_APEX_FILLET_AREA,
     V_APEX_FILLET_BAND,
@@ -213,7 +216,7 @@ async def _outline(adapter, dims: SketchDims) -> None:
     and its back face (NeckZ0 / NeckZ1) and the body's back face at the step
     (Depth), one row printed in the bottom view right of the paper end, where
     the neck's step is an outline change on both long edges and the overall
-    depth closes the row (blind review final9: without it the neck's "20.10"
+    depth closes the row (blind review final9: without it the neck's back face
     read as the overall) -- 16 point DOF less 2 + 8 relations + 6 dims = 0.
     """
     step, side = RELIEF_X0, BODY_SIDE_STEP
@@ -850,7 +853,7 @@ def _single_limits(adapter) -> None:
 
 
 def _author_reference_dimensions(adapter) -> None:
-    """Show each driven dimension as a reference: no tolerance, "(5.0)"
+    """Show each driven dimension as a reference: no tolerance, "(.196)"
     (build_ms_stop_block._author_plate_location_references' recipe)."""
     for feature_name, dimension_name in REFERENCE_DIMENSIONS:
         display, dimension = _named_dimension(adapter, feature_name, dimension_name)
@@ -876,6 +879,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -1181,7 +1186,7 @@ async def build(adapter) -> dict[str, str]:
     # exactly the print's dimensions marked (the drawing must find every one).
     for (feature_name, dimension_name), band in DRAWING_BANDS.items():
         set_dimension_bilateral_tolerance(
-            adapter, feature_name, dimension_name, *deviations(band)
+            adapter, feature_name, dimension_name, *deviations(band), display_unit=UNIT
         )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _single_limits(adapter)

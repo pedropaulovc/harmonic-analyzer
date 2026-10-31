@@ -16,35 +16,47 @@ The tapped hole's axis is the named axis ``SetScrewAxis``
 
 Every printed size is a native associative dimension (``DRAWING_DIMENSIONS``)
 or the Hole Wizard callout; no note carries geometry.
+
+Issue #290: the sheet prints decimal inch (``drawing_unit: in``). Lengths stay
+physical millimetres, each the exact decimal of the inch value it prints.
 """
 
 from __future__ import annotations
 
+import _config
 from _hole_spec import HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
+from _inch_wall_limits import WALL_TARGET_MM
+from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
 
-# The window passes the v-block's 18-deep neck with 1.0 a side (the frame spec
-# stays free of the block's spec; test_pn_pen_frame_drawing pins the copy).
-V_BLOCK_DEPTH = 18.0
-OUTER_WIDTH = 28.0  # X (across the block depth)
-RAIL_SIDE = 4.0  # side rails (local X)
-# End rails (local Y). 6 gives the #4-40 thumb screw drawing-guidelines.md
-# rule 18 (>= 1.5 D full thread) engagement: 6 - the tap's incomplete lead
-# (~1 pitch-and-a-half) still leaves more than 1.5 x 2.845 = 4.27.
-RAIL_END = 6.0
+# The registry row's drawing_unit (in) is this sheet's unit.
+UNIT = drawing_unit("parts/pn-pen-frame", _config.parts("pn-pen-frame"))
+
+# The window passes the v-block's .70-deep neck with .016 a side (the frame
+# spec stays free of the block's spec; test_pn_pen_frame_drawing pins the copy).
+V_BLOCK_DEPTH = 17.78  # .70
+OUTER_WIDTH = 27.94  # 1.10, X (across the block depth)
+RAIL_SIDE = 4.064  # .16, side rails (local X)
+# End rails (local Y). .24 gives the #4-40 thumb screw drawing-guidelines.md
+# rule 18 (>= 1.5 D full thread) engagement: .24 less the tap's incomplete
+# lead (1.5 pitches) still leaves more than 1.5 x .112.
+RAIL_END = 6.096  # .24
 # Y: window height = block height + the marker barrel standing proud of the
 # V-groove + the thumb screw's working throw (pn_pen_carriage_geom asserts it).
-OUTER_HEIGHT = 40.0
-FRAME_DEPTH = 8.0  # Z (along the block length)
-WINDOW_WIDTH = OUTER_WIDTH - 2.0 * RAIL_SIDE
-WINDOW_HEIGHT = OUTER_HEIGHT - 2.0 * RAIL_END
+OUTER_HEIGHT = 40.132  # 1.58
+# Z (along the block length): the stirrup stands between the block's paper
+# end and its body step (pn_pen_carriage_geom).
+FRAME_DEPTH = 7.874  # .31
+WINDOW_WIDTH = OUTER_WIDTH - 2.0 * RAIL_SIDE  # .78
+WINDOW_HEIGHT = OUTER_HEIGHT - 2.0 * RAIL_END  # 1.10
 # The window's internal corners (drawing-guidelines.md rule 16: no sharp
 # internal corner; as large as function allows).  The window's top edge seats
-# on the v-block neck's top with 1.0 a side (pn_pen_carriage_geom asserts the
-# side gap), so a radius over 1.0 would ride on the neck's top edges and lift the
-# stirrup; 1.0 is that largest radius, and a 2.0 end mill cuts it.
-WINDOW_CORNER_R = 1.0
-if WINDOW_CORNER_R > (WINDOW_WIDTH - V_BLOCK_DEPTH) / 2.0:
+# on the v-block neck's top with .016 a side (pn_pen_carriage_geom asserts the
+# side gap), so a radius over that gap would ride on the neck's top edges and
+# lift the stirrup; R.04, the gap itself, is that largest radius.
+WINDOW_CORNER_R = 1.016  # .04
+# 1e-9: the gap equals the radius, up to the float subtraction.
+if WINDOW_CORNER_R > (WINDOW_WIDTH - V_BLOCK_DEPTH) / 2.0 + 1e-9:
     raise AssertionError("window corner radius rides on the v-block's top edges")
 
 # The thumb screw threads INTO the bottom rail, so its hole is an exact #4-40
@@ -55,7 +67,7 @@ SET_SCREW_TAP_DRILL_DIA = TAP_DRILL_MM[SET_SCREW_TAP_SPEC.size]
 SET_SCREW_RADIAL_WALL = (
     min(OUTER_WIDTH, FRAME_DEPTH) / 2.0 - THREAD_MAJOR_MM[SET_SCREW_TAP_SPEC.size] / 2.0
 )
-if SET_SCREW_RADIAL_WALL < 1.5:  # drawing-guidelines.md rule 17 (walls and webs) floor
+if SET_SCREW_RADIAL_WALL < WALL_TARGET_MM:  # drawing-guidelines.md rule 17
     raise AssertionError("#4-40 thumb-screw tap leaves the pen-frame rail too thin")
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
@@ -79,22 +91,17 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ScrewHole": {"ScrewX", "ScrewZ"},
 }
 
-# Printed places (drawing-guidelines.md rule 3).  The noncritical outer
-# envelope, the window height (the thumb screw's throw has over 2 of slack,
-# test_pn_pen_frame_drawing) and the corner radius print .X.  .XX on:
-# - WindowWidth: the window passes the 18-deep block (WINDOW_WIDTH_PRINTED_MIN)
-#   and keeps the right wall at the rule 17 2.0 target (RIGHT_WALL_PRINTED_MIN;
-#   1.89 at .X).
-# - LeftWall and the hole coordinates: routine locations.
-# - BottomWall: at .X (5.2) the tapped rail would leave 4.25 of full thread,
-#   under the rule 18 1.5D = 4.27 (BOTTOM_RAIL_FULL_THREAD_MIN).
-# - Depth: at .X (+/-0.8) the #4-40 thread's wall to the nearer face falls to
-#   8 - 0.8 - (4 + 0.51) - 2.845 / 2 = 1.27, under the rule 17 1.5 floor
-#   (SET_SCREW_PRINTED_WALL_MIN); FRAME_DEPTH is fixed by the carriage's
-#   CG/paper solve (pn_pen_carriage_geom), so geometry cannot buy the wall.
-_ONE_PLACE = {"OuterSpanX", "OuterHeightDim", "WindowHeight", "WindowCornerR"}
+# Printed places (drawing-guidelines.md rule 3).  Every rail, window and
+# envelope size feeds a stack below, and the corner radius is bounded by the
+# neck gap, so nothing prints .X: the title block's .XX everywhere except the
+# tap's depth station ScrewZ, .XXX: at .XX the #4-40 thread's wall to the
+# nearer face would fall to .155 - .01 - .01 - .056 = .079, under the rule 17
+# .080 target (SET_SCREW_PRINTED_WALL_MIN); FRAME_DEPTH is fixed by the
+# carriage's paper solve and the v-block's body step (pn_pen_carriage_geom),
+# so geometry cannot buy the wall.
+_THREE_PLACE = {"ScrewZ"}
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    feature: {name: 1 if name in _ONE_PLACE else 2 for name in names}
+    feature: {name: 3 if name in _THREE_PLACE else 2 for name in names}
     for feature, names in DRAWING_DIMENSIONS.items()
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -106,13 +113,13 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 
 def _band(name: str) -> float:
     """The title-block +/- the named dimension prints at."""
-    return printed_band_mm(DRAWING_PRECISION_BY_NAME[name])
+    return printed_band_mm(DRAWING_PRECISION_BY_NAME[name], unit=UNIT)
 
 
 # The window passes the v-block's neck at both parts' printed worst case: the
 # window at its own band, the neck's two faces at the block's .XX row.
 WINDOW_WIDTH_PRINTED_MIN = WINDOW_WIDTH - _band("WindowWidth")
-if WINDOW_WIDTH_PRINTED_MIN <= V_BLOCK_DEPTH + 2.0 * printed_band_mm(2):
+if WINDOW_WIDTH_PRINTED_MIN <= V_BLOCK_DEPTH + 2.0 * printed_band_mm(2, unit=UNIT):
     raise AssertionError("printed window width may not pass the v-block")
 # The two unprinted rails (right, top) at the printed worst case: the outer
 # size small, the window's corner station and size large (rule 17).
@@ -126,7 +133,7 @@ TOP_WALL_PRINTED_MIN = (
     - (RAIL_END + _band("BottomWall"))
     - (WINDOW_HEIGHT + _band("WindowHeight"))
 )
-if min(RIGHT_WALL_PRINTED_MIN, TOP_WALL_PRINTED_MIN) < 2.0:
+if min(RIGHT_WALL_PRINTED_MIN, TOP_WALL_PRINTED_MIN) < WALL_TARGET_MM:
     raise AssertionError("an unprinted pen-frame rail falls under the rule 17 target")
 # Full #4-40 thread in the bottom rail at its printed minimum, less the tap's
 # incomplete lead (1.5 pitches), against rule 18's 1.5 D.
@@ -143,8 +150,8 @@ SET_SCREW_PRINTED_WALL_MIN = (
     )
     - THREAD_MAJOR_MM[SET_SCREW_TAP_SPEC.size] / 2.0
 )
-if SET_SCREW_PRINTED_WALL_MIN < 1.5:  # drawing-guidelines.md rule 17 floor
-    raise AssertionError("printed bands let the #4-40 tap break the 1.5 wall floor")
+if SET_SCREW_PRINTED_WALL_MIN < WALL_TARGET_MM:  # drawing-guidelines.md rule 17
+    raise AssertionError("printed bands let the #4-40 tap break the .080 wall target")
 
 DRAWING_NOTES = ""
 FRONT_VIEW_NOTE = "FRONT VIEW SCALE 2:1"

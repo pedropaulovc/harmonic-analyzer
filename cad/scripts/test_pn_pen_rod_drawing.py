@@ -105,11 +105,11 @@ def test_side_view_is_turned_and_proved_before_any_import() -> None:
 def test_shoulder_root_is_a_modelled_max_radius() -> None:
     """Rule 16/25: the seat corner is a modelled radius printed as R MAX, not a
     note; its callout names the part it seats on."""
-    assert spec.SHOULDER_FILLET_R == 0.2
+    assert spec.SHOULDER_FILLET_R == 0.2032  # .008
     assert spec.SHOULDER_FILLET_BAND == (0.0, -spec.SHOULDER_FILLET_R)
     assert spec.SHOULDER_FILLET_TOL_TYPE == 6  # swTolMAX
     assert spec.DRAWING_DIMENSIONS["ShoulderFillet"] == {"ShoulderRadius"}
-    assert spec.DRAWING_PRECISION["ShoulderFillet"] == {"ShoulderRadius": 1}
+    assert spec.DRAWING_PRECISION["ShoulderFillet"] == {"ShoulderRadius": 3}
     assert (
         spec.PIVOT_DIA / 2.0 + spec.SHOULDER_FILLET_R
         < (spec.ROD_SECTION + spec.SECTION_BAND[1]) / 2.0
@@ -150,7 +150,7 @@ def test_side_view_layout_stays_clear() -> None:
     pivot_end, shoulder = sx(-spec.PIVOT_LENGTH), sx(0.0)
     # Rule 15: 2:1 lays the rod ~245 mm long, inside the border.
     assert drawing.SIDE_SCALE == (2, 1)
-    assert sx(spec.SQUARE_LENGTH) - pivot_end == pytest.approx(0.245)
+    assert sx(spec.SQUARE_LENGTH) - pivot_end == pytest.approx(0.245, abs=5e-4)
     # Three rows above the rod, 10 mm apart, the overall the outermost.
     rows = [keep["Length"][1], keep["PivotLength"][1], drawing.OVERALL_REF_XY[1]]
     assert rows == sorted(rows)
@@ -270,8 +270,6 @@ def test_bands_are_model_owned_and_name_their_mates() -> None:
     assert "set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)" in (
         _DRAWING_SOURCE
     )
-    # The pivot band prints at its own three places, not the doc default.
-    assert spec.DRAWING_PRECISION["PivotProfile"]["PivotDia"] == 3
 
 
 def test_pivot_band_clears_the_v_block_pivot_bore() -> None:
@@ -364,8 +362,8 @@ def test_stud_tap_is_one_blind_wizard_hole_on_the_top_face_axis() -> None:
 
 def test_overall_length_is_one_parenthesised_reference() -> None:
     """Rule 10: the end-to-end length prints once, as a reference."""
-    assert spec.TOTAL_LENGTH == spec.SQUARE_LENGTH + spec.PIVOT_LENGTH == 122.5
-    assert spec.DRAWING_REFERENCE_PRECISION == 1
+    assert spec.TOTAL_LENGTH == spec.SQUARE_LENGTH + spec.PIVOT_LENGTH == 122.414
+    assert spec.DRAWING_REFERENCE_PRECISION == 2
     tree = ast.parse(_DRAWING_SOURCE)
     (edge,) = _calls(tree, "add_edge_dimension")
     keywords = _keywords(edge)
@@ -418,7 +416,7 @@ def test_overall_picks_resolve_from_the_scanned_edges() -> None:
     assert drawing._top_face_edge(edges) == "near top"
     assert drawing._pivot_end_edge(edges) == "pivot end"
     missing = ViewEdges(label="fake front", edges=edges.edges[:4])
-    with pytest.raises(RuntimeError, match="edges near y -10.5"):
+    with pytest.raises(RuntimeError, match=f"edges near y {-spec.PIVOT_LENGTH:g}"):
         drawing._pivot_end_edge(missing)
     with pytest.raises(RuntimeError, match="found 0"):
         drawing._top_face_edge(ViewEdges(label="fake front", edges=edges.edges[2:]))

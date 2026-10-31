@@ -44,7 +44,8 @@ face); every feature is located across the depth from the body's front face
 
 No datums, frames, basic dimensions or roughness (drawing-simplicity-policy.md
 rules 5 and 6), no note block: material and finish ride the title block.  The
-sheet runs 4:1; the isometric stays 1:1.
+sheet prints decimal inch (the part's ``drawing_unit: in``) and runs 4:1; the
+tap callout's drill diameter prints .XXX.  The isometric runs 3:2.
 
 Run with SolidWorks open::
 
@@ -85,7 +86,7 @@ from _drawing_dimensions import (
 )
 from _drawing_edges import scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
@@ -95,6 +96,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _hole_spec import TAP_DRILL_MM
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _section_axis import position_section_caption
 from _session import run_build
@@ -273,9 +275,9 @@ FRONT_KEEP = {
 #   y ~0.234; text ~0.2355..0.239), its extension lines rising from the
 #   flat's ends (x 0.228 / 0.236) across the end face: 8 mm under the tap's
 #   callout (from y ~0.247).
-# * the flat's height, a reference "(5.0)", right of the view (x
+# * the flat's height, a reference "(.196)", right of the view (x
 #   ~0.283..0.294), 12 mm clear of section A-A (from x 0.306).
-# * the apex rounds' "2X R0.5 MAX" over the view, 70 mm up the back round's
+# * the apex rounds' "2X R.020 MAX" over the view, 70 mm up the back round's
 #   bisector (67.5 deg) from its centre (x 0.2352, y 0.174), so the radial
 #   leader meets the arc square on and crosses only the end face: its text
 #   (~28 mm, x ~0.248..0.276, y ~0.237..0.241) 5 mm right of the flat
@@ -549,7 +551,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("pn-pen-v-block"),
     )
     stamp_drawing_summary(
         adapter,
@@ -684,6 +690,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # Both rows end where the hole does, in the pivot bore, not through; the
     # drill row opens with its process word (rule 12).
     _set_tap_callout_text(tap_callout)
+    set_hole_callout_precision(
+        tap_callout, TAP_CALLOUT_PRECISION, label="rod set-screw tap"
+    )
     rebuild_drawing(adapter, label="near-side diameter leaders")
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
@@ -712,6 +721,9 @@ async def build(adapter: Any) -> dict[str, str]:
 # r13: "Ø 2.26 INTO PIVOT BORE" carried no process word, so the drill row
 # opens with DRILL (rule 12).
 _TAP_END = "INTO PIVOT BORE"
+# The through-next tap's one Hole Wizard length variable, its drill
+# diameter, prints .XXX.
+TAP_CALLOUT_PRECISION = {"hw-tapdrldia": 3}
 _THRU_TOKEN = "<hw-thru>"
 _DRILL_WORD = "DRILL"
 # The drill row's size variable: <hw-tapdrldia> (or <hw-thrutapdrldia> for a

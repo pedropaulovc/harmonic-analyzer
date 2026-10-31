@@ -21,7 +21,7 @@ PAPER_LIMIT_Z = PAPER_FRONT_Z - 2.0 * g.CLEARANCE
 def test_carriage_cg_hangs_on_the_rod_axis() -> None:
     # The pen hangs level only if the off-axis carriage balances about the
     # rod: with the lightening bore gone, the block's length is the knob.
-    assert vb.BLOCK_LENGTH == 27.3
+    assert vb.BLOCK_LENGTH == 27.178  # 1.07
     assert g.plan_cg_residual_mm() <= 0.1
 
 
