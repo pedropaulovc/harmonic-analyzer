@@ -116,9 +116,12 @@ BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0
 # Every size and callout sits outside the silhouettes.
 # - Lengths: the seat from the faced outboard end, the MHA-DT-09 station from
 #   the arm shoulder (drawing-guidelines.md rule 17 (walls and webs)) and the relief from the rear face on
-#   one row below the profile; the toleranced overall, front face to rear
-#   face, on the row below it.  The barrel is the remainder, not printed.
-#   The two banded lengths carry the mate they serve under their text.
+#   rows below the profile; the toleranced overall, front face to rear
+#   face, on the row below them.  The barrel is the remainder, not printed.
+#   The two banded lengths carry the mate they serve under their text.  The
+#   seat and station row stands above the relief's: the overall's stacked
+#   +/- band reached the shared row's extension lines (farm run
+#   20261031T205208603Z).
 # - Relief and barrel diameters: left of the inboard end, the relief nearer.
 #   Seat diameter: between the profile and the end view, its value and
 #   light-press callout above.
@@ -131,6 +134,7 @@ BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0
 #   centreline.  Its value and callout print right of the big end's extension
 #   line, above the bore callout and below the isometric's label.
 _ROW_Y = (0.120, 0.108)
+_STATION_ROW_Y = _ROW_Y[0] + 0.006
 END_KEEP = {
     "BoreDia": (END_CENTER[0] + 0.070, END_CENTER[1] - 0.020),
     "PinProud": (END_CENTER[0] + 0.065, END_CENTER[1] + 0.014),
@@ -147,8 +151,8 @@ SEAM_EDGE_PICK = (
 # far end and crossed both its own text and the bore leader (run a2e1cd67).
 SEAM_CALLOUT_XY = (0.303, 0.105)
 SIDE_KEEP = {
-    "SeatLength": ((OUTBOARD_X + SHOULDER_X) / 2.0, _ROW_Y[0]),
-    "ServicePinFromShoulder": ((SHOULDER_X + SERVICE_PIN_CENTER[0]) / 2.0, _ROW_Y[0]),
+    "SeatLength": ((OUTBOARD_X + SHOULDER_X) / 2.0, _STATION_ROW_Y),
+    "ServicePinFromShoulder": ((SHOULDER_X + SERVICE_PIN_CENTER[0]) / 2.0, _STATION_ROW_Y),
     "HubLength": ((OUTBOARD_X + INBOARD_X) / 2.0, _ROW_Y[1]),
     # Its toleranced text and callout are wider than the relief: they print
     # outside the span, left of the rear face, the dimension line running out
