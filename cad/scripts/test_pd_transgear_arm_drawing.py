@@ -404,7 +404,7 @@ def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
 def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
     """A model reference cannot masquerade as a universal ±.130 bore zone."""
     lower, upper = geometry.PIVOT_BORE_DIAMETRAL_CLEARANCE
-    assert (lower, upper) == pytest.approx((0.130, 0.150))
+    assert (lower, upper) == pytest.approx((0.131, 0.15132))
     assert geometry.PIVOT_BORE_DIA == pytest.approx(pivot_screw.SHOULDER_DIA + (lower + upper) / 2.0)
     assert joints.SHOULDER_RADIAL_CLEARANCE == pytest.approx(lower / 2.0)
     assert joints.PIVOT_RADIAL_FLOAT_MAX == pytest.approx(upper / 2.0)

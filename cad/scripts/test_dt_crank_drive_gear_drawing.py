@@ -129,7 +129,7 @@ def test_bore_bands_fit_both_sec1_land_dimensions_at_every_limit() -> None:
         bore_lower - land_upper,
         bore_upper - land_lower,
     ) == pytest.approx(gear_seat_fit.FLAT_AF_CLEARANCE)
-    assert spec.BORE_AF_BAND == pytest.approx((0.020, 0.010))
+    assert spec.BORE_AF_BAND == pytest.approx((0.02032, 0.01016))
     assert set(spec.DRAWING_DIMENSIONS["BoreProfile"]) == {"BoreDia", "BoreAF"}
     assert set(spec.DRAWING_PRECISION["BoreProfile"]) == {"BoreDia", "BoreAF"}
 

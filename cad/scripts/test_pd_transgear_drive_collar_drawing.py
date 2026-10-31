@@ -255,7 +255,7 @@ def test_true_d_sizes_are_not_a_full_round_hole_or_an_unlocated_flat() -> None:
     assert spec.DRAWING_DIMENSIONS["BoreProfile"] == {"BoreDia", "FlatToAxis"}
     assert {"BoreDia", "FlatToAxis"} <= set(drawing.END_KEEP)
     assert spec.BORE_DIA == pytest.approx(4.860)
-    assert spec.BORE_DIA_BAND == pytest.approx((0.012, 0.0))
+    assert spec.BORE_DIA_BAND == pytest.approx((0.0127, 0.0))
     assert spec.FLAT_TO_AXIS == pytest.approx(2.1525)
     assert spec.FLAT_LIMITS == pytest.approx((2.145, 2.160))
     assert spec.FLAT_BAND == pytest.approx((0.0075, -0.0075))
@@ -275,7 +275,7 @@ def _fresh_collar_spec():
 
 
 def test_d_fit_refuses_round_and_flat_binding_independently(monkeypatch) -> None:
-    assert _fresh_collar_spec().BORE_CORE_CLEARANCE == pytest.approx((0.010, 0.030))
+    assert _fresh_collar_spec().BORE_CORE_CLEARANCE == pytest.approx((0.010, 0.0307))
     monkeypatch.setattr(shaft, "CORE_DIA_BAND", (0.020, 0.0))
     with pytest.raises(AssertionError, match="bore binds"):
         _fresh_collar_spec()
@@ -332,9 +332,9 @@ def test_pilot_wall_worst_and_the_one_decimal_control() -> None:
 
 def test_drive_pin_holes_clear_the_bore_and_the_pilot() -> None:
     # The unchanged dowel circle clears the smaller D-bore and pilot.
-    assert spec.BORE_PIN_WALL_WORST == pytest.approx(3.349)
+    assert spec.BORE_PIN_WALL_WORST == pytest.approx(3.3512)
     assert spec.BORE_PIN_WALL_WORST >= spec.WALL_FLOOR
-    assert spec.PIN_HOLE_INNER_R_MIN == pytest.approx(5.785)
+    assert spec.PIN_HOLE_INNER_R_MIN == pytest.approx(5.78755)
     assert spec.PIN_HOLE_INNER_R_MIN > spec.PILOT_R_MAX
     # Negative controls: holes on a 6.0 radius break into the pilot; on the
     # pilot's own 5.0 radius they leave 0.605 to the bore.
@@ -343,7 +343,7 @@ def test_drive_pin_holes_clear_the_bore_and_the_pilot() -> None:
 
 
 def test_bore_slides_on_the_core_and_the_pilot_in_the_wheel() -> None:
-    assert spec.BORE_CORE_CLEARANCE == pytest.approx((0.010, 0.030))
+    assert spec.BORE_CORE_CLEARANCE == pytest.approx((0.010, 0.0307))
     # Radial: (10.3 - 10.0) / 2 and (10.3 + 0.10 - 9.90) / 2.
     assert spec.PILOT_BORE_CLEARANCE == pytest.approx((0.15, 0.25))
     # Negative controls: a press-type bore band binds on the core; a pilot
@@ -857,11 +857,11 @@ def test_native_rear_entry_has_both_actual_legs_on_both_d_edges(monkeypatch) -> 
     assert spec.BORE_ENTRY_AXIAL_SPAN_MIN == pytest.approx(3.870)
     assert spec.BORE_ENTRY_PROFILE_DEPTH_MIN == pytest.approx(0.270)
     assert spec.BORE_ENTRY_BREAK_GEOMETRY_MAX == pytest.approx(0.270)
-    assert spec.BORE_ENTRY_WALL_WORST == pytest.approx(3.090117421552)
+    assert spec.BORE_ENTRY_WALL_WORST == pytest.approx(3.092317421552)
     assert spec.NECK_CORNER_D_BORE_AIR_MIN == pytest.approx(0.064853316221)
     assert spec.D_DRIVE_AREA_MIN == pytest.approx(7.339179692138)
     assert spec.D_SUPPORT_LENGTH_MIN == pytest.approx(4.072234843105)
-    assert spec.D_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.058542058772)
+    assert spec.D_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.059098147529)
     assert spec.BORE_ENTRY_BREAK_LEG_MIN > spec.BORE_ENTRY_BREAK_REQUIRED_MIN
     assert spec.BORE_ENTRY_BREAK_LEG_MAX < spec.BORE_ENTRY_BREAK_GEOMETRY_MAX
     for width in (spec.BORE_ENTRY_BREAK_MIN, spec.BORE_ENTRY_BREAK_MAX):
