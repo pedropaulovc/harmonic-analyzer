@@ -55,11 +55,6 @@ from _sprocket_seat_geometry import DRIVE_PIN_DIA as _SEAT_PIN_DIA
 from _sprocket_seat_geometry import DRIVE_PIN_HOLE_DIA as _SEAT_PIN_HOLE_DIA
 from dt_vn_crank_seat_drive_pin_spec import PRESS_DEPTH as _CRANK_SEAT_PIN_DEPTH
 from pd_vn_transgear_knob_drive_pin_spec import PRESS_DEPTH as _KNOB_SEAT_PIN_DEPTH
-from magnifying_bracket_joint_layout import (
-    ENGAGEMENT as _BRACKET_SCREW_ENGAGEMENT,
-    SCREW_MAJOR_DIA as _BRACKET_SCREW_MAJOR_DIA,
-    TAP_DRILL_DIA as _BRACKET_TAP_DRILL_DIA,
-)
 from dt_pinion_pivot_block_geometry import BLOCK_HEIGHT as _PINION_BLOCK_HEIGHT
 from dt_vn_slotted_screw_spec import SHANK_DIA as _BLOCK_SCREW_DIA
 from dt_vn_slotted_screw_spec import SHANK_LEN as _BLOCK_SCREW_LENGTH
@@ -304,6 +299,9 @@ _MG_CLAMP_THUMB_TRIPLE_MM = (2.8448, 2.261, 6.2501)
 # chamfer (its cone lies inside that cylinder); the Ø1.8288 MAX relief is
 # smaller than the drill and overlaps nothing.
 _MG_ROD_THREAD_TRIPLE_MM = (2.845, 2.261, 5.976)
+# The bracket's two #2-56 screws (major 2.1844) in the summing lever's Ø1.778
+# receiver drill over the full engagement (magnifying_bracket_joint_layout).
+_MG_BRACKET_SCREW_TRIPLE_MM = (2.1844, 1.778, 4.7625)
 
 _MG_LEVER_THREAD_LIMIT = _smooth_annulus_limit_mm3(*_MG_LEVER_THREAD_TRIPLE_MM)
 # Only the major/thread-drill annulus from the spigot face to the rod-bore
@@ -707,9 +705,7 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
         "mg-magnifier-1/mg-vn-magnifying-bracket-screw",
         range(1, 3),
         "sm-summing-1/sm-summing-lever",
-        _smooth_annulus_limit_mm3(
-            _BRACKET_SCREW_MAJOR_DIA, _BRACKET_TAP_DRILL_DIA, _BRACKET_SCREW_ENGAGEMENT
-        ),
+        _smooth_annulus_limit_mm3(*_MG_BRACKET_SCREW_TRIPLE_MM),
     ),
     **_numbered_pairs(
         "ch-channel-1/ch-vn-spring-hook",

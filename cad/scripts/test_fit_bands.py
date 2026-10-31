@@ -227,6 +227,10 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
         "McMaster 9714K24's catalogue OD tolerance (plus, minus): indexed for "
         "the largest spring under the hub's O10.2"
     ),
+    ("mg_magnifying_vertical_rod_geom", "ROD_DIA_BAND"): (
+        "as-bought 7/32 brass rod's supplier tolerance (upper, lower): indexed "
+        "for the fixture cross-bore clearance and the turned relief"
+    ),
 }
 
 # (upper, lower) fit bands that no helper reads: the owning module indexes them
