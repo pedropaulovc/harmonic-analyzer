@@ -60,13 +60,13 @@ def test_the_pin_is_flush_with_the_bar_and_runs_in_the_lever() -> None:
 def test_worst_case_joint_budget() -> None:
     b = pin.BUDGET
     # Press in the reamed cheeks: real at both band extremes, inside FN2.
-    assert b["interference_min"] == pytest.approx(0.001375, abs=1e-6)
-    assert b["interference_max"] == pytest.approx(0.021375, abs=1e-6)
+    assert b["interference_min"] == pytest.approx(0.000635, abs=1e-6)
+    assert b["interference_max"] == pytest.approx(0.020955, abs=1e-6)
     assert 0.0 < b["interference_min"] < b["interference_max"]
     assert b["interference_max"] <= pin.PRESS_INTERFERENCE_MAX
     # Running fit in the lever's #47 hole.
-    assert b["running_clearance_min"] == pytest.approx(0.004625, abs=1e-6)
-    assert b["running_clearance_max"] == pytest.approx(0.114625, abs=1e-6)
+    assert b["running_clearance_min"] == pytest.approx(0.004545, abs=1e-6)
+    assert b["running_clearance_max"] == pytest.approx(0.114705, abs=1e-6)
     # Flush ends leave the #1038 top-notch gap untouched.
     assert b["neighbour_clearance_min"] == pytest.approx(0.1065, abs=1e-6)
     assert b["neighbour_clearance_min"] >= pin.RUNNING_FLOOR
@@ -74,7 +74,7 @@ def test_worst_case_joint_budget() -> None:
     assert b["notch_roof_clearance_min"] == pytest.approx(0.2001, abs=1e-4)
     assert b["notch_roof_clearance_min"] >= pin.RUNNING_FLOOR
     # The far face, the offset at its long limit on the narrowest stock.
-    assert b["hole_face_wall_min"] == pytest.approx(2.0052, abs=1e-6)
+    assert b["hole_face_wall_min"] == pytest.approx(2.00487, abs=1e-6)
     assert b["hole_face_wall_min"] >= pin.RULE12_WALL_TARGET
     # The 7.5 blank under the title block's .X band.
     assert b["blank_excess_min"] == pytest.approx(0.35, abs=1e-6)

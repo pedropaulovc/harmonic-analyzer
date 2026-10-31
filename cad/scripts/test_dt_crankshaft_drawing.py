@@ -71,7 +71,7 @@ def test_policy_migrated_sheet_carries_no_gdt_and_model_owned_places() -> None:
     # bands (drawing-guidelines.md rule 3 (decimal places carry the tolerance)) at the places that hold them; the rest at one.
     functional_places = {
         "ShaftDiaDim": 3,
-        "JournalDiaDim": 3,
+        "JournalDiaDim": 4,
         "PinionSeatDiaDim": 3,
         "SpigotDiaDim": 2,
         "SpigotLength": 2,
@@ -205,7 +205,7 @@ def test_spigot_rim_is_the_shortfall_the_sheet_states() -> None:
     printed = re.search(r"SPIGOT RIM (\d+\.\d\d) MIN\.", notes.DRIVE_PIN_CALLOUT)
     assert printed
     assert float(printed.group(1)) == rim
-    assert _floor_2(nominal) == spec.DRIVE_PIN_SPIGOT_RIM
+    assert nominal == pytest.approx(spec.DRIVE_PIN_SPIGOT_RIM)
 
 
 def test_drive_pin_depth_prints_its_band_after_the_native_depth() -> None:

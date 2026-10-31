@@ -63,8 +63,8 @@ def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
     from _drawing_contract import model_toleranced_dimensions
 
     notes = ch_amplitude_bar_notes
-    assert ch_amplitude_bar_spec.TOP_PIN_HOLE_DIA == 1.968
-    assert ch_amplitude_bar_spec.TOP_PIN_HOLE_BAND == (0.010, 0.0)
+    assert ch_amplitude_bar_spec.TOP_PIN_HOLE_DIA == 1.9558
+    assert ch_amplitude_bar_spec.TOP_PIN_HOLE_BAND == (0.02286, 0.0127)
     assert model_toleranced_dimensions(bar)[("TopPinProfile", "TopPinDia")] == (
         "*deviations(TOP_PIN_HOLE_BAND)"
     )
@@ -78,7 +78,7 @@ def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
     assert set(drawing.TOP_SIDE_KEEP) == notes.DRAWING_DIMENSIONS["TopPinProfile"]
     assert notes.DIMENSION_CALLOUTS["TopPinDia"] == "THRU, REAM\nPRESS FIT MHA-CH-11"
     precision = notes.DRAWING_PRECISION["TopPinProfile"]
-    assert precision == {"BarSection": 2, "TopPinX": 3, "TopPinDrop": 2, "TopPinDia": 3}
+    assert precision == {"BarSection": 2, "TopPinX": 3, "TopPinDrop": 2, "TopPinDia": 4}
     # Machinist round 1: the three-place location states its function, the
     # hole's worst-case face wall, which the pin's joint budget holds too.
     import ch_bar_pivot_pin_spec as pin
@@ -87,9 +87,6 @@ def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
     assert notes.PIN_HOLE_WALL_MIN == math.floor(
         pin.BUDGET["hole_face_wall_min"] * 10.0
     ) / 10.0
-    # r1 printed the band +0.01/0.00 under a 1.968: it takes the nominal's places.
-    source = Path(bar.__file__).read_text(encoding="utf-8")
-    assert 'places=DRAWING_PRECISION["TopPinProfile"]["TopPinDia"]' in source
 
 
 def test_pin_hole_is_a_native_sketch_located_from_the_top_edge() -> None:

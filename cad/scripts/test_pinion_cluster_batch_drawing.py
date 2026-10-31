@@ -483,13 +483,13 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 second_number=None,
             ),
             # CONTRACT-crank: 2x MHA-DT-VN-67 3/32 dowel (2.38125) pressed into
-            # MHA-DT-11's 2.38 reamed collar holes, 3.95 deep.
+            # MHA-DT-11's 2.3622 reamed collar holes, 3.95 deep.
             **_expected_numbered_pairs(
                 "dt-vn-crank-seat-drive-pin",
                 range(1, 3),
                 "dt-crankshaft",
                 2.38125,
-                2.38,
+                2.3622,
                 3.95,
             ),
         },
@@ -732,13 +732,13 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(
                 ("pd-transgear-thumbnut-1", "pd-transgear-knob-shaft-1")
             ): _annulus_limit(4.070, 3.454, 14.8),
-            # MHA-PD-VN-54 3/32 x 3/16 dowels pressed 2.3625 into MHA-PD-22's 2.38 reams.
+            # MHA-PD-VN-54 3/32 x 3/16 dowels pressed 2.3625 into MHA-PD-22's 2.3622 reams.
             **_expected_numbered_pairs(
                 "pd-vn-transgear-knob-drive-pin",
                 range(1, 3),
                 "pd-transgear-drive-collar",
                 2.38125,
-                2.38,
+                2.3622,
                 2.3625,
             ),
         },
@@ -916,9 +916,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     # both receivers.
     assert 111.2 < crank_allowed[hub_pair] < 111.8
     assert 55.1 < crank_allowed[shaft_pair] < 55.6
-    # MHA-CH-11: each 5/64 bar pivot pin pressed into its bar's Ø1.968 ream
+    # MHA-CH-11: each 5/64 bar pivot pin pressed into its bar's Ø1.9558 ream
     # through both top-notch cheeks (6.35 bar less the 3.15 notch), and
-    # MHA-CH-10: the same pin pressed into its rod's Ø1.968 fork ream through
+    # MHA-CH-10: the same pin pressed into its rod's Ø1.9558 fork ream through
     # both tines (6.075 fork less the 2.675 slot); channel j's pin with
     # channel j's bar or rod only. MHA-CH-VN-53: each #4-40 apex set screw's
     # thread in its MHA-CH-08 ear's tap, over the 9.80 apex (R8 arch lifted
@@ -933,13 +933,13 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             **{
                 frozenset(
                     (f"ch-bar-pivot-pin-{n}", f"ch-amplitude-bar-{n}")
-                ): _annulus_limit(1.984375, 1.968, 3.20)
+                ): _annulus_limit(1.984375, 1.9558, 3.20)
                 for n in range(1, 21)
             },
             **{
                 frozenset(
                     (f"ch-rod-pivot-pin-{n}", f"ch-connecting-rod-{n}")
-                ): _annulus_limit(1.984375, 1.968, 3.40)
+                ): _annulus_limit(1.984375, 1.9558, 3.40)
                 for n in range(1, 21)
             },
             **{

@@ -619,10 +619,9 @@ def test_cone_native_tolerances_angularity_and_exact_datums() -> None:
     manifest = exporter.requirement_manifest("dt_cone_pivot_post")
     features = manifest["features"]
     crank = features["crank_bore"]
-    bore_upper, bore_lower = cone.RUNNING_BORE_BAND
-    for feature, nominal in (
-        (crank, cone.CRANK_BORE_DIA),
-        (features["journal_bore"], cone.BORE_DIA),
+    for feature, nominal, (bore_upper, bore_lower) in (
+        (crank, cone.CRANK_BORE_DIA, cone.RUNNING_BORE_BAND),
+        (features["journal_bore"], cone.BORE_DIA, cone.JOURNAL_BORE_BAND),
     ):
         assert feature["dia"] == pytest.approx(
             [nominal + bore_lower, nominal + bore_upper], rel=0.0, abs=1e-12

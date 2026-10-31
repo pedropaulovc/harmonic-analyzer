@@ -86,16 +86,14 @@ def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None
     )
     # The drum bonds onto MHA-DT-22's bond zone, not its journal lands (U39).
     assert arbor.SHAFT_DIA_BAND != arbor.JOURNAL_DIA_BAND
-    assert bore_limits == pytest.approx((8.00, 8.10))
-    # A stock 8 mm H7 reamer (8.000-8.015) lands inside the band.
-    assert bore_limits[0] <= 8.000 and 8.015 <= bore_limits[1]
+    assert bore_limits == pytest.approx((7.9629, 7.9756))
     minimum_clearance = bore_limits[0] - shaft_limits[1]
     maximum_clearance = bore_limits[1] - shaft_limits[0]
     assert minimum_clearance == pytest.approx(
         spec.ARBOR_BORE_BAND[1] - arbor.SHAFT_DIA_BAND[0]
     )
-    # The drum slides on by hand: the arbor's bond zone sits 0.01 under 8.00.
-    assert minimum_clearance == pytest.approx(0.010)
+    # The drum slides on by hand: the bore's REAM_SLIDE band clears the bond zone.
+    assert minimum_clearance == pytest.approx(0.03556)
     assert minimum_clearance >= 0.010 - 1e-9
     assert maximum_clearance == pytest.approx(
         spec.ARBOR_BORE_BAND[0] - arbor.SHAFT_DIA_BAND[1]

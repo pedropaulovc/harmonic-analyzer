@@ -52,7 +52,7 @@ def test_geometry_matches_the_top_frame_contract() -> None:
     # made-to-order 0.2515 in reamer through both keepers at their installed
     # spacing, that covers the faced rail seats' flatness (ch_fulcrum_shaft_spec).
     assert spec.BORE_DIA == 6.35
-    assert spec.BORE_DIA_BAND == (0.050, 0.038)  # (upper, lower)
+    assert spec.BORE_DIA_BAND == (0.0508, 0.0381)  # (upper, lower)
     # The mate is the OTHER keeper of the pair, which the quantity note states.
     # MR-fleet r1: the supply condition -- no bore until the pair-ream, the
     # crown rounded after it -- is on the two callouts.
@@ -274,7 +274,7 @@ def test_crown_prints_a_full_round_reference_radius() -> None:
     assert terms["least crown over the bore axis"] + terms[
         "crown fall across the thread"
     ] == pytest.approx(spec.crown_least_height(spec._THREAD_HALF_MAJOR))
-    assert round(spec.SET_SCREW_ENGAGEMENT_D, 3) == 1.508
+    assert round(spec.SET_SCREW_ENGAGEMENT_D, 3) == 1.507
     assert (
         sum(spec.set_screw_wall_terms(spec.CROWN_LEAST_R, 0.38).values()) / major < 1.5
     )
