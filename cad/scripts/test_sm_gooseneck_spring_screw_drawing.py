@@ -247,6 +247,78 @@ def test_inch_print_stays_inside_the_joint_envelopes() -> None:
     assert spec.PRINTED_LOOP_CORNER_CLEARANCE_MIN > 0.0
 
 
+_BAND_MODELS = {
+    "HeadDia": geom.HEAD_DIA,
+    "HeadReliefChamfer": geom.HEAD_RELIEF_CHAMFER,
+    "BodyDia": geom.BODY_DIA,
+    "HeadHeight": geom.HEAD_H,
+    "UnderHeadLength": geom.LENGTH,
+    "SlotWidth": geom.SLOT_WIDTH,
+    "SlotDepth": geom.SLOT_DEPTH,
+    "TipChamfer": geom.TIP_CHAMFER,
+}
+
+
+def test_every_printed_band_resolves_to_its_inch_places() -> None:
+    # Every band's limits about its spec model land on the inch grid at the
+    # dimension's own places (farm run on fe9b1b219: the head Ø's limits read
+    # off a noisy SystemValue needed more than eight).
+    from _drawing_tolerances import _tolerance_places
+
+    assert set(_BAND_MODELS) == set(spec.PRINTED_BANDS)
+    for name, (lower, upper) in spec.PRINTED_BANDS.items():
+        model = _BAND_MODELS[name]
+        places = _tolerance_places(model + lower, model + upper, display_unit="in")
+        assert places <= spec.DRAWING_PRECISION_BY_NAME[name], name
+
+
+@pytest.mark.parametrize("name", ["BodyDia", "HeadDia", "HeadReliefChamfer"])
+def test_limit_band_sets_places_from_the_spec_model_not_the_readback(
+    monkeypatch, name: str
+) -> None:
+    model = _BAND_MODELS[name]
+    lower, upper = spec.PRINTED_BANDS[name]
+    stored: dict[str, object] = {}
+
+    class Tolerance:
+        Type = 0
+
+        def SetValues(self, low, high):
+            stored["values"] = (low, high)
+            return True
+
+        def GetMinValue(self):
+            return stored["values"][0]
+
+        def GetMaxValue(self):
+            return stored["values"][1]
+
+    class Display:
+        def SetPrecision3(self, _primary, _dual, tolerance, _dual_tolerance):
+            stored["places"] = tolerance
+
+        def GetPrimaryTolPrecision2(self):
+            return stored["places"]
+
+    # The inch document reads the mm nominal back with float noise.
+    dimension = type(
+        "Dimension",
+        (),
+        {"SystemValue": (model + 1.14e-7) / 1000.0, "Tolerance": Tolerance()},
+    )()
+    monkeypatch.setattr(part, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(
+        part,
+        "_named_dimension",
+        lambda _adapter, _feature, _name: (Display(), dimension),
+    )
+    part._limit_band(object(), "Profile", name, model, (lower, upper), 3)
+    assert stored["values"] == (lower / 1000.0, upper / 1000.0)
+    assert stored["places"] == spec.DRAWING_PRECISION_BY_NAME[name] == 3
+    with pytest.raises(RuntimeError, match="not the spec"):
+        part._limit_band(object(), "Profile", name, model + 0.01, (lower, upper), 3)
+
+
 def test_head_and_relief_bands_name_the_wire_they_clear() -> None:
     # drawing-guidelines.md rule 4: each LIMIT band names what it serves.
     # The head's 0.95 (.037 in) retention under the 1.0 check (owner minor
