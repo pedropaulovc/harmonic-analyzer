@@ -363,7 +363,7 @@ class _StopMathUtility:
         ("cover mating face", "*Left", (0.010668, 0.012573, 0.0), (0.291124, 0.206844)),
     ]),
     (plate_drawing, [
-        ("two cover clearance holes", "*Back", (0.0187198, 0.004064, -0.001016), (0.1427928, 0.157808)),
+        ("two cover clearance holes", "*Back", (0.0183701441, 0.0032198559, -0.001016), (0.1441914, 0.1544314)),
     ]),
 ], ids=["block-plate-and-subsequent-thumb", "plate-clearance"])
 def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
@@ -538,6 +538,10 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
             )
             hole = holes[1]
             mouth = (hole[0] + diameter / 2.0, hole[1], hole[2])
+            if drawing is plate_drawing:
+                # The clearance rim's lower outboard point, off the station witness.
+                rim = diameter / 2.0 / math.sqrt(2.0)
+                mouth = (hole[0] + rim, hole[1] - rim, hole[2])
         assert xyz == pytest.approx(tuple(value / 1000.0 for value in mouth))
         assert edge_xy == pytest.approx(expected_xy)
         assert abs(edge_xy[0] - view.Position[0]) < 0.043
@@ -554,7 +558,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
             )
             wrong_units_x = transform.apply(mouth)[0]
             assert wrong_units_x == pytest.approx(
-                -74.661528 if drawing is plate_drawing else -73.614728
+                -73.262904 if drawing is plate_drawing else -73.614728
             )
             # Preserve the original failing other-rim negative-X signature.
             original = (holes[0][0] + diameter / 2.0, holes[0][1], holes[0][2])

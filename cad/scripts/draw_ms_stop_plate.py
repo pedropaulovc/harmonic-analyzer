@@ -14,6 +14,7 @@ Separate native chamfer size and angle retain their model-owned precision.
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -179,10 +180,13 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, iso)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     _style_plate_chamfer(adapter, annotations)
+    # The rim's lower outboard point, off the .160 witness through the centre,
+    # so the leader from the callout below crosses no station line.
+    rim = part.PLATE_CLEARANCE_DIA / 2.0 / math.sqrt(2.0)
     edge = model_point_in_view(
         adapter, front, (
-            (part.PLATE_HOLE_XS[1] + part.PLATE_CLEARANCE_DIA / 2.0) / 1000.0,
-            part.PLATE_HOLE_Y / 1000.0, part.PLATE_Z_MIN / 1000.0,
+            (part.PLATE_HOLE_XS[1] + rim) / 1000.0,
+            (part.PLATE_HOLE_Y - rim) / 1000.0, part.PLATE_Z_MIN / 1000.0,
         ), label="plate clearance mouth")
     # *Back reverses X: this is the left-sheet hole.
     clearance = add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=CLEARANCE_CALLOUT_XY,
