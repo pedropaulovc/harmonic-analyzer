@@ -2358,7 +2358,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "_printed_tolerance",
         "sm_vn_boss_hook_spec",
         "build_dt_drive_train_assembly",
-        "build_fr_harmonic_base",
         "dt_cone_pivot_post_spec",
         "dt_cone_swing_platform_checks",
         "dt_cone_swing_platform_spec",
@@ -2379,14 +2378,11 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "dt_crankshaft_spec",
         "error_budget",
         "export_features",
-        "fr_harmonic_base_fasteners",
-        "fr_top_frame_spec",
         # Edge-break row bounds both threaded mouths' full lever engagement.
         "mg_lever_thread_joint",
         # Edge-break row takes both exposed edges off each wheel-bar wall.
         "mg_wheel_bar_spec",
         "sm_gooseneck_spring_joint",
-        "sm_knife_mount_spec",
         # Angular row sets the lever-level acceptance the summing sheet prints,
         # held inside the knife edge's free-rock floor.
         "sm_summing_assembly_sheet",

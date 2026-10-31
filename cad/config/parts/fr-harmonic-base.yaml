@@ -5,13 +5,14 @@ fr-harmonic-base:
   finish: "ALKYD PRIME/ENAMEL: RAL6000 BODY; BLACK DECK/UNDERSIDE; MASK+OIL BORES/THREADS/ID"
   quantity: 1
   tolerance_class: machined_block
+  drawing_unit: in
   process: "machined from solid stock or casting"
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
       where: "the 4X nameplate tap callout TRANSFER FROM MHA-FR-04 AT ASSEMBLY; on the four #4-40 MHA-FR-04 seats, which print no station"
       finding: "fit-up at assembly (rule 19)"
-      reason: "the #4 close holes in MHA-FR-04 float only 0.203 diametral over the #4-40 major, against about 3.7 demanded by the plate's .X hole stations and a .XX tap station here (2 x sqrt 2 x (0.8 + 0.51)); the four taps are spotted and tapped through the actual plate's holes at assembly, so that stack never forms (owner-accepted)"
+      reason: "the #4 close holes in MHA-FR-04 float only .008 diametral over the #4-40 major, against about .028 demanded by the plate's .XXX hole stations and a .XXX tap station here (2 x sqrt 2 x (.005 + .005)); the four taps are spotted and tapped through the actual plate's holes at assembly, so that stack never forms (owner-accepted)"
     - id: "RV-02"
       kind: "accept"
       where: "MHA-FR-01 fr-harmonic-base, sheet 2 HOLES-SOCKETS, generated native hole-table SIZE cells only"

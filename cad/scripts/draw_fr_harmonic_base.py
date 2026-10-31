@@ -83,6 +83,7 @@ from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
+from _title_block_units import LENGTH_UNITS
 import _telemetry
 from build_fr_harmonic_base import (
     BASE_CROSS_TAP_DRILL_DIA,
@@ -131,11 +132,13 @@ from fr_harmonic_base_spec import (
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     GREEN_TOP,
+    HOLE_TABLE_PRECISION,
     HEIGHT_REFERENCE_CALLOUTS,
     PART_SURFACE_FINISHES,
     PIVOT_SEAT_DIMENSIONS,
     STACK_HEIGHT,
     POCKET_HALF_X,
+    UNIT,
     pivot_seat_step,
     socket_bore_finish_key,
 )
@@ -484,6 +487,8 @@ _CRITICAL_HOLE_TAG_STATIONS = (
     *sorted(HOLE_XZ, key=lambda xz: math.dist(xz, PIVOT_SCREW_XZ))[:2],
 )
 _TABLE_LOCATION_TOLERANCE_MM = 0.02
+# Every native cross-tap length prints .XXX (the pilot's Hole Wizard places).
+CROSS_TAP_CALLOUT_PRECISION = {"hw-tapdrldia": 3, "hw-tapdrldepth": 3, "hw-threaddepth": 3}
 
 # Hole-table origin is the finished plate's lower-left theoretical sharp
 # corner. The physical corner is filleted, so the native table is seeded from
@@ -570,9 +575,10 @@ def _check_cross_tap_callout(display: Any) -> None:
             raise RuntimeError(
                 f"base tap callout {name}: {actual_mm} != {expected[name]} mm"
             )
-        if name == "hw-tapdrldepth" and int(length.Precision) != 0:
+        if int(length.Precision) != CROSS_TAP_CALLOUT_PRECISION[name]:
             raise RuntimeError(
-                f"base tap-drill depth prints {length.Precision} decimals, not a whole-mm MIN"
+                f"base tap callout {name} prints {length.Precision} decimals, "
+                f"not {CROSS_TAP_CALLOUT_PRECISION[name]}"
             )
         found.add(name)
     required = set(expected) | set(expected_strings)
@@ -829,8 +835,8 @@ class _HoleTableRow(NamedTuple):
 def _hole_table_station_rows(table: Any) -> dict[tuple[float, float], _HoleTableRow]:
     """Resolve every native row to exactly one model station, independent of tag order.
 
-    LOC cells use the theoretical lower-left datum and print to two decimals;
-    use the same 0.02 mm component tolerance as the insertion helper.
+    LOC cells use the theoretical lower-left datum and print .XXX in the
+    sheet's unit; within the same 0.02 mm tolerance as the insertion helper.
     """
     row_count, column_count = int(table.RowCount), int(table.ColumnCount)
     # Include one excess row in a bounded failure inventory, never a COM repr.
@@ -859,7 +865,7 @@ def _hole_table_station_rows(table: Any) -> dict[tuple[float, float], _HoleTable
             raise RuntimeError(f"duplicate or empty native hole-table tag at row {index}: {tag!r}")
         tags.add(tag)
         try:
-            location = (float(row[1]), float(row[2]))
+            location = tuple(float(row[k]) * LENGTH_UNITS[UNIT] for k in (1, 2))
         except ValueError as error:
             raise RuntimeError(f"invalid native hole-table coordinates at row {index}: {row!r}") from error
         if not all(math.isfinite(value) for value in location):
@@ -2007,7 +2013,12 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=UNIT,
+        decimals=HOLE_TABLE_PRECISION,
     )
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="harmonic-base package")
     stamp_drawing_summary(
@@ -2121,7 +2132,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         _serial_edge(top),
-        f'STAMPED ID "{SERIAL_TEXT}"\n{SERIAL_HEIGHT_MM:.1f} HIGH\nAPPROX AS SHOWN',
+        f'STAMPED ID "{SERIAL_TEXT}"\nAPPROX AS SHOWN',
         SERIAL_NOTE_XY,
     )
     deck_control = surface_finish_by_key(PART_SURFACE_FINISHES, "deck")
@@ -2277,6 +2288,7 @@ async def build(adapter: Any) -> dict[str, str]:
         anchor_xy=HOLE_TABLE_ANCHOR,
         basic_locations=False,
         label="harmonic-base mounting",
+        unit=UNIT,
     )
     hole_feature = _early_bound(
         _early_bound(hole_table, "IHoleTableAnnotation").HoleTable, "IHoleTable"
@@ -2360,10 +2372,10 @@ async def build(adapter: Any) -> dict[str, str]:
         process=CROSS_TAP_PROCESS,
     )
     _set_cross_tap_callout_text(tap_callout)
-    # The MIN tap-drill depth prints as a whole millimetre; the diameter keeps
-    # its two places (per-variable, see set_hole_callout_precision).
+    # Every Hole Wizard length prints .XXX, the MIN drill depth included
+    # (per-variable, see set_hole_callout_precision).
     set_hole_callout_precision(
-        tap_callout, {"hw-tapdrldepth": 0}, label="base cross-tap drill depth"
+        tap_callout, CROSS_TAP_CALLOUT_PRECISION, label="base cross-tap drill depth"
     )
     for label, display in (
         ("pinion-block transfer seats", block_callout),

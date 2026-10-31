@@ -1,10 +1,11 @@
 fr-nameplate:
   number: MHA-FR-04
   material: Brass
-  material_specification: Brass sheet, 1.5 mm (C26000 cartridge or C35300 engraving brass)
+  material_specification: Brass sheet, .063 in C260 (C26000 cartridge brass; OnlineMetals 23624)
   finish: polished; sunk field and engraving blackened
   quantity: 1
   tolerance_class: visual_noncritical
+  drawing_unit: in
   process: "engraved brass plate"
   machinist_exceptions:
     - id: "RV-01"
@@ -14,16 +15,11 @@ fr-nameplate:
       reason: "the traced period artwork is the definition of all three: the outline DXF is the plate's traced outer edge and corners, the field DXF the engraving's own pinstripe inner edge, and the engraving DXF the lettering and ornament, each shipped in the release bundle beside the PDF; the acceptance covers the outline DXF as well as the field and engraving (owner ruling 2026-10-15); redrawing any of them as dimensions would restate the artwork (owner-accepted)"
     - id: "RV-02"
       kind: "minor"
-      where: "the sheet note FLOOR UNDER ENGRAVING 0.54 MIN"
-      finding: "floor under the engraving below the 1.5 mm wall floor (rules 17, 20)"
-      reason: "0.54 MIN at the worst printed thickness and engraving depth (0.800 nominal); a decorative engraving floor on a plate that carries no load (owner-ruled shortfall)"
+      where: "the sheet note FLOOR UNDER ENGRAVING .025 MIN"
+      finding: "floor under the engraving below the .060 wall floor (rules 17, 20)"
+      reason: ".025 MIN at the worst printed thickness (.063 C260 sheet) and engraving depth (.035 floor nominal); a decorative engraving floor on a plate that carries no load (owner-ruled shortfall)"
     - id: "RV-03"
       kind: "minor"
-      where: "the sheet note SCREWS ENGAGE 3.73 MIN FULL THREAD"
+      where: "the sheet note SCREWS ENGAGE .143 MIN FULL THREAD"
       finding: "#4-40 screw full-thread engagement below 1.5D (rules 18, 20)"
-      reason: "3.73 MIN (1.31D) for the 1/4 in 90114A511 fillister at its shortest stock length through the thickest printed plate, tip chamfer deducted; it only holds an unloaded cosmetic plate, so the screw stays (owner-ruled shortfall)"
-    - id: "RV-04"
-      kind: "minor"
-      where: "front view, under the DRILL 4X Ø3.05 THRU ALL callout: WALL TO CORNER RADIUS 1.55 MIN"
-      finding: "wall from each screw hole to the outline's corner radius below the 2.0 mm target (rules 17, 20)"
-      reason: "owner ruling 2026-10-24 (#1971): 1.555 at the printed worst case (2X 4.2 stations at .X, the Ø3.05 hole at its DRILLED HOLES maximum), measured to the outline DXF's corner arc, above the 1.5 floor; the holes stay concentric with the engraved screw heads and on the base's tap stations, no geometry change (owner-ruled shortfall)"
+      reason: ".143 MIN (1.28D) for the 1/4 in 90114A511 fillister at its shortest stock length through the thickest printed .063 plate, tip chamfer deducted; this is below the 1.31D accepted earlier for the former 1.5 mm plate, and the owner accepted the .063 C260 plate with this engagement (ruling B1, 2026-10-31); it only holds an unloaded cosmetic plate, so the screw stays (owner-ruled shortfall)"

@@ -8,6 +8,7 @@ import math
 import pytest
 
 import _drawing_hole_callout
+from _inch_wall_limits import WALL_TARGET_MM
 import build_fr_harmonic_base as part
 import cone_line
 import dt_cone_pivot_post_installation
@@ -50,12 +51,12 @@ def test_all_eighteen_deck_seats_are_native_through_taps_at_the_retained_station
 def test_retained_skin_books_the_three_loose_heights_and_both_edge_breaks() -> None:
     fasteners = fr_harmonic_base_fasteners
     spec = fr_harmonic_base_spec
-    assert spec.POCKET_SKIN == 13.0
-    assert spec.POCKET_CEILING_Y == pytest.approx(37.8)
+    assert spec.POCKET_SKIN == 12.954  # .51
+    assert spec.POCKET_CEILING_Y == pytest.approx(37.846)
     assert spec.STACK_HEIGHT - spec.POCKET_CEILING_Y == pytest.approx(spec.POCKET_SKIN)
-    assert fasteners.DECK_HEIGHT_BAND_MM == pytest.approx(1.6)
-    assert fasteners.POCKET_CEILING_BAND_MM == pytest.approx(0.8)
-    assert fasteners.EDGE_BREAK_MAX_MM == pytest.approx(0.25)
+    assert fasteners.DECK_HEIGHT_BAND_MM == pytest.approx(0.508)
+    assert fasteners.POCKET_CEILING_BAND_MM == pytest.approx(0.254)
+    assert fasteners.EDGE_BREAK_MAX_MM == pytest.approx(0.254)
     for tag, seat, stations, bounds in part.THROUGH_SEAT_GROUPS:
         materials = part.THROUGH_SEAT_MATERIAL[tag]
         assert len(materials) == len(stations)
@@ -64,22 +65,22 @@ def test_retained_skin_books_the_three_loose_heights_and_both_edge_breaks() -> N
             assert material.station_xz == xz
             assert material.nominal_segments_mm == fasteners.retained_material_segments_mm(*xz)
             assert material.nominal_segments_mm == ((0.0, spec.POCKET_SKIN),), (tag, xz)
-            assert material.exit_depth_max_mm == pytest.approx(15.4), (tag, xz)
+            assert material.exit_depth_max_mm == pytest.approx(13.716), (tag, xz)
             capacity = sum(end - start for start, end in material.guaranteed_segments_mm)
             assert capacity >= 1.5 * part.THREAD_MAJOR_MM[seat.size]
-            assert material.exit_depth_min_mm >= 13.0 - 3.0 * 0.8 - 1e-9
-            assert material.guaranteed_segments_mm[0][0] == pytest.approx(0.25)
+            assert material.exit_depth_min_mm >= 12.954 - 3.0 * 0.254 - 1e-9
+            assert material.guaranteed_segments_mm[0][0] == pytest.approx(0.254)
     support = part.THROUGH_SEAT_MATERIAL["SupportHoldDownSeats"][0]
-    assert support.nominal_segments_mm == ((0.0, 13.0),)
-    assert sum(end - start for start, end in support.guaranteed_segments_mm) == pytest.approx(10.10)
-    # The old 12 mm skin would miss the unchanged 1.5D female-capacity floor.
-    assert 12.0 - 3.0 * 0.8 - 2.0 * 0.25 < 1.5 * 6.35 < 10.10
+    assert support.nominal_segments_mm == ((0.0, 12.954),)
+    assert sum(end - start for start, end in support.guaranteed_segments_mm) == pytest.approx(11.684)
+    # The .51 skin keeps the unchanged 1.5D female-capacity floor at its loose limits.
+    assert 12.954 - 3.0 * 0.254 - 2.0 * 0.254 > 1.5 * 6.35
 
 
 def test_material_queries_distinguish_skin_ribs_walls_fillets_and_transfer_bounds() -> None:
     fasteners = fr_harmonic_base_fasteners
     spec = fr_harmonic_base_spec
-    assert fasteners.retained_material_segments_mm(100.0, 50.0) == ((0.0, 13.0),)
+    assert fasteners.retained_material_segments_mm(100.0, 50.0) == ((0.0, 12.954),)
     assert fasteners.retained_material_segments_mm(100.0, 0.0) == (
         (0.0, spec.STACK_HEIGHT - spec.RIB_RELIEF),
     )
@@ -102,11 +103,11 @@ def test_material_queries_distinguish_skin_ribs_walls_fillets_and_transfer_bound
         )
         assert material.envelope_xz == (2.0, 5.0)
         assert len(material.guaranteed_segments_mm) == 1
-        assert material.guaranteed_segments_mm[0] == pytest.approx((0.25, 10.35))
+        assert material.guaranteed_segments_mm[0] == pytest.approx((0.254, 11.938))
     # A thread straddling a rib edge cannot credit the axis's entire rib.
     straddling = fasteners.through_seat_material(part.STOP_SEAT_SPEC, (100.0, 4.9))
-    assert straddling.nominal_segments_mm[0][1] > 13.0
-    assert straddling.guaranteed_segments_mm[0][1] == pytest.approx(10.35)
+    assert straddling.nominal_segments_mm[0][1] > 12.954
+    assert straddling.guaranteed_segments_mm[0][1] == pytest.approx(11.938)
 
 
 @pytest.mark.parametrize("xz", ((math.nan, 0.0), (0.0, math.inf), (1000.0, 0.0)))
@@ -167,7 +168,8 @@ def test_through_fit_accepts_exact_engagement_but_refuses_short_overlap_and_floo
         insertion_min_mm=insertion, insertion_max_mm=insertion,
     )
     assert fit.full_thread_engagement_min_mm == pytest.approx(needed)
-    for delta, tip, start in ((-0.001, 0.0, 0.0), (0.0, 0.001, 0.0), (0.0, 0.0, 0.251)):
+    late_start = fasteners.EDGE_BREAK_MAX_MM + 0.001
+    for delta, tip, start in ((-0.001, 0.0, 0.0), (0.0, 0.001, 0.0), (0.0, 0.0, late_start)):
         with pytest.raises(AssertionError, match="full-form overlap"):
             fasteners.require_through_seat_fit(
                 "boundary", part.FOOT_SEAT_SPEC, material,
@@ -256,21 +258,22 @@ def test_nameplate_seats_are_derived_from_the_plate_mount() -> None:
         (fr_nameplate_spec.MOUNT_POS[0] - y, fr_nameplate_spec.MOUNT_POS[2] - x)
         for x, y in fr_nameplate_spec.SCREW_XY
     )
-    # The plate's west edge sits 4.0 inside the deck's west edge (user ruling
+    # The plate's west edge sits .160 inside the deck's west edge (user ruling
     # 2026-10-09), the binding side of its footprint.
     assert part.NAMEPLATE_DECK_CLEARANCE == pytest.approx(
         fr_harmonic_base_spec.DECK_HALF_X - fr_nameplate_spec.MOUNT_POS[0]
     )
-    assert part.NAMEPLATE_DECK_CLEARANCE == pytest.approx(4.0)
+    assert part.NAMEPLATE_DECK_CLEARANCE == pytest.approx(4.064)
     # RV-03 already accepts the purchased screw's limited useful full form.
     # Through-tapping preserves that hardware and ruling, not a new 1.5D claim.
     engagement = SHANK_LEN - fr_nameplate_spec.PLATE_THICKNESS
-    assert engagement == pytest.approx(4.85)
+    assert engagement == pytest.approx(0.250 * 25.4 - 1.6002)
     material = part.THROUGH_SEAT_MATERIAL["NameplateSeats"][0]
     from _printed_tolerance import printed_deviations
 
     plate_band = printed_deviations(
         fr_nameplate_spec.PLATE_THICKNESS, fr_nameplate_spec.PLATE_THICKNESS_PRECISION,
+        unit=fr_nameplate_spec.UNIT,
     )[1]
     # RV-03 states the external projection; the finite receiver additionally
     # loses its entrance break, just as the unchanged joint did before.
@@ -547,13 +550,14 @@ def test_nameplate_transfer_is_the_declared_fit_up() -> None:
     }
     assert set(sheet.TRANSFER_NAMEPLATE_HOLES) == nameplate_seats
     assert not nameplate_seats & set(sheet.TABLE_HOLES)
-    # The reason's numbers, from literals: #4 close hole 0.120 in over the
-    # #4-40 basic major 0.112 in; .X and .XX title-block rows +-0.8, +-0.51.
-    float_diametral = (0.120 - 0.112) * 25.4
-    demand = 2.0 * math.sqrt(2.0) * (0.8 + 0.51)
-    assert f"{float_diametral:.3f}" == "0.203"
-    assert f"{demand:.1f}" == "3.7"
-    assert "0.203" in fit_up.reason and "3.7" in fit_up.reason
+    # The reason's numbers, from literals: #4 close hole .120 over the #4-40
+    # basic major .112; the plate's .XXX stations and this .XXX tap station,
+    # +-.005 each.
+    float_diametral = 0.120 - 0.112
+    demand = 2.0 * math.sqrt(2.0) * (0.005 + 0.005)
+    assert f"{float_diametral:.3f}"[1:] == ".008"
+    assert f"{demand:.3f}"[1:] == ".028"
+    assert ".008 diametral" in fit_up.reason and "about .028" in fit_up.reason
 
 
 def _deck_seat_features_in_build() -> dict[str, object]:
@@ -636,14 +640,14 @@ def test_tapped_hole_note_count_is_derived_from_the_deck_seat_features() -> None
 def test_spotface_band_reaches_the_setter_unchanged() -> None:
     # The band now reads (upper, lower) like every named fit band and goes
     # through deviations(); the setter must still receive (lower, upper) =
-    # (0.0, +0.5), so the printed limits cannot move.
+    # (0.0, +.020), so the printed limits cannot move.
     import ast
     from pathlib import Path
 
     from _fit_deviations import deviations
 
-    assert fr_harmonic_base_spec.SPOTFACE_DEPTH_BAND_MM == (0.5, 0.0)
-    assert deviations(fr_harmonic_base_spec.SPOTFACE_DEPTH_BAND_MM) == (0.0, 0.5)
+    assert fr_harmonic_base_spec.SPOTFACE_DEPTH_BAND_MM == (0.508, 0.0)
+    assert deviations(fr_harmonic_base_spec.SPOTFACE_DEPTH_BAND_MM) == (0.0, 0.508)
     tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
     setter_band_args = [
         ast.unparse(arg)
@@ -2081,11 +2085,12 @@ class _NativeHoleTable:
                 tag, size = ("N1" if pivot_tag == "D1" else "D1"), "#4-40 UNC - 2B THRU"
             else:
                 assert station in sockets
-                tag, size = f"A{sockets.index(station) + 1}", f"Ø{diameter:.2f} THRU"
+                tag, size = f"A{sockets.index(station) + 1}", f"Ø{diameter / 25.4:.3f} THRU"
             self.station_tags[station] = tag
+            # The inch sheet's LOC cells: inches at the table's three places.
             rows.append([
-                tag, f"{x + sheet.BOTTOM_LENGTH / 2.0:.2f}",
-                f"{sheet.BOTTOM_WIDTH / 2.0 - z:.2f}", size,
+                tag, f"{(x + sheet.BOTTOM_LENGTH / 2.0) / 25.4:.3f}",
+                f"{(sheet.BOTTOM_WIDTH / 2.0 - z) / 25.4:.3f}", size,
             ])
         # Native row order is not model selection order. Keep every fixture shuffled.
         rows = (rows[::2] + rows[1::2])[::-1]
@@ -2245,7 +2250,7 @@ def test_native_table_station_resolver_uses_coordinates_not_family_or_row_order(
         assert table.cells[row.index][0] == row.tag
         x, z = station
         assert row.location_mm == pytest.approx(
-            (x + sheet.BOTTOM_LENGTH / 2.0, sheet.BOTTOM_WIDTH / 2.0 - z), abs=0.005,
+            (x + sheet.BOTTOM_LENGTH / 2.0, sheet.BOTTOM_WIDTH / 2.0 - z), abs=0.0127,
         )
 
 
@@ -2308,10 +2313,11 @@ def test_native_table_station_resolver_keeps_insert_helper_coordinate_tolerance(
 
     table = _NativeHoleTable()
     row = table.cells[1]
-    original = row[1]
-    row[1] = str(float(original) + 0.01)
+    x, _z = next(station for station, tag in table.station_tags.items() if tag == row[0])
+    exact = (x + sheet.BOTTOM_LENGTH / 2.0) / 25.4
+    row[1] = str(exact + 0.019 / 25.4)
     sheet._hole_table_station_rows(table)
-    row[1] = str(float(original) + 0.03)
+    row[1] = str(exact + 0.03 / 25.4)
     with pytest.raises(RuntimeError, match="needs one model station"):
         sheet._hole_table_station_rows(table)
 
@@ -2734,33 +2740,37 @@ def test_cross_tap_xs_are_baselines_from_the_flange_edge_on_the_front_view() -> 
     # far tap's.
     view_bottom = sheet.HOLE_SIDE_CENTER[1] - fr_harmonic_base_spec.STACK_HEIGHT * sheet.VIEW_SCALE / 2000.0
     assert keep["CrossTapFarX"][1] < keep["CrossTapX"][1] < view_bottom
-    # 31.6 and 425.6 are also the table's A1/A2 and A3/A4 X LOCs from the same
-    # flange edge.
-    assert part.BOTTOM_LENGTH / 2.0 - part.COLUMN_X == pytest.approx(31.6)
-    assert part.BOTTOM_LENGTH / 2.0 + part.COLUMN_X == pytest.approx(425.6)
+    # 1.244 and 16.756 (flow-through until the column snap: 1.2441 / 16.7559)
+    # are also the table's A1/A2 and A3/A4 X LOCs from the same flange edge.
+    assert part.BOTTOM_LENGTH / 2.0 - part.COLUMN_X == pytest.approx(1.244 * 25.4, abs=0.003)
+    assert part.BOTTOM_LENGTH / 2.0 + part.COLUMN_X == pytest.approx(16.756 * 25.4, abs=0.003)
 
 
 def test_deck_land_worst_case_is_proven_instead_of_noted() -> None:
-    # hb-render-4 eye pass: the 1.0 MIN land note put a dimension in a note.
+    # hb-render-4 eye pass: the MIN land note put a dimension in a note.
     assert not hasattr(fr_harmonic_base_spec, "DRAWING_NOTES")
     # The bore now opens on the green land and reaches the pad's outer edge,
     # whose 1/16 in break (and its general band) is the land's last bite.
-    for stack in part.COLUMN_SOCKET_LAND_STACKS.values():
-        assert stack == pytest.approx({
-            "nominal": 12.5,
-            "flange length": -0.4,
-            "pad length": -0.4,
-            "bore location": -0.8,
-            "matched bore": -0.25,
-            "bore edge break": -0.25,
-            "pad edge chamfer": -2.3875,
+    # The nominal follows the column line: 12.4968 on both axes once the column
+    # snap lands, 12.4992 / 12.5108 (inside the .0005 equal-land grid) before.
+    lands = {"x": part.COLUMN_SOCKET_LAND_X, "z": part.COLUMN_SOCKET_LAND_Z}
+    for axis, stack in part.COLUMN_SOCKET_LAND_STACKS.items():
+        assert stack["nominal"] == pytest.approx(lands[axis])
+        assert stack["nominal"] == pytest.approx(12.4968, abs=0.015)
+        assert {name: v for name, v in stack.items() if name != "nominal"} == pytest.approx({
+            "flange length": -0.127,
+            "pad length": -0.127,
+            "bore location": -0.254,
+            "matched bore": -0.2492,
+            "bore edge break": -0.254,
+            "pad edge chamfer": -1.8542,
         })
-        assert sum(stack.values()) == pytest.approx(8.0125)
-    # The same stack on the rejected 1.6 mm pad land would fail the 1.0 MIN.
+        assert sum(stack.values()) == pytest.approx(stack["nominal"] - 2.8654)
+    # The same stack on the rejected 1.6 mm pad land would fail the .040 MIN.
     assert sum(part.column_socket_land_stack(1.6).values()) < part.COLUMN_SOCKET_LAND_MIN
-    # Main's rider: the Ø26.0 ceiling is a functional judgement, so the
+    # Main's rider: the bore ceiling is a functional judgement, so the
     # stack reports how much bore the land could still absorb.
-    assert part.COLUMN_SOCKET_BREAK_EVEN_BORE == pytest.approx(40.025)
+    assert part.COLUMN_SOCKET_BREAK_EVEN_BORE == pytest.approx(43.2308, abs=0.006)
     rejected = part.column_socket_land_stack(1.6)
     assert part.column_socket_break_even_bore(rejected) < part.COLUMN_SOCKET_MATCH_BORE_MAX
 
@@ -2771,14 +2781,14 @@ def test_retained_pocket_walls_socket_bosses_and_cross_tap_lugs_keep_their_contr
     assert spec.POCKET_HALF_Z == pytest.approx(spec.TOP_WIDTH / 2.0 - spec.POCKET_WALL)
     assert spec.STACK_HEIGHT - spec.POCKET_CEILING_Y == pytest.approx(spec.POCKET_SKIN)
     assert len(part.SOCKET_BOSS_SHAPES) == len(part.CROSS_TAP_LUG_SHAPES) == 4
-    assert spec.CROSS_TAP_LUG_BOTTOM_Y == 26.5
+    assert spec.CROSS_TAP_LUG_BOTTOM_Y == 26.416  # 1.04
     band = part._general_band_mm()
-    assert min(part.CROSS_TAP_LUG_WALLS.values()) - 1.5 * band >= 2.0
+    assert min(part.CROSS_TAP_LUG_WALLS.values()) - 1.5 * band >= WALL_TARGET_MM
     assert (
         part.CROSS_TAP_LUG_WALLS["past tip"]
         >= 1.5 * part.THREAD_MAJOR_MM[part.BASE_CROSS_TAP_SPEC.size]
     )
-    assert part.SOCKET_BOSS_WALL == pytest.approx(8.0)
+    assert part.SOCKET_BOSS_WALL == pytest.approx(7.9502)
 
 
 def test_cross_tap_remains_backed_when_the_pocket_ceiling_is_below_its_axis() -> None:
@@ -2788,15 +2798,15 @@ def test_cross_tap_remains_backed_when_the_pocket_ceiling_is_below_its_axis() ->
     thread_top = part.BASE_SCREW_Y + radius
     lug_interval = (spec.CROSS_TAP_LUG_BOTTOM_Y, spec.POCKET_CEILING_Y)
     skin_interval = (spec.POCKET_CEILING_Y, spec.GREEN_TOP)
-    assert part.BASE_SCREW_Y - spec.POCKET_CEILING_Y == pytest.approx(0.3)
+    assert part.BASE_SCREW_Y - spec.POCKET_CEILING_Y == pytest.approx(0.254)
     # The bore crosses the shared boundary; lug below plus skin above is
     # continuous metal even though the ceiling is lower than the axis.
     assert lug_interval[0] < thread_bottom < lug_interval[1]
     assert lug_interval[1] == skin_interval[0]
     assert skin_interval[0] < thread_top < skin_interval[1]
     margins = part.cross_tap_backing_margins_mm(part._general_band_mm())
-    assert margins["lug/skin join"] == pytest.approx(9.7)
-    assert margins["green skin"] == pytest.approx(6.4)
+    assert margins["lug/skin join"] == pytest.approx(10.922)
+    assert margins["green skin"] == pytest.approx(7.366)
     assert min(margins.values()) > 0.0
     # A looser stack loses finite lateral backing; the check cannot pass
     # simply because the nominal axis still lies above the lug bottom.
@@ -2889,7 +2899,7 @@ def test_specified_hold_down_retains_engagement_and_reports_underside_protrusion
         insertion_max_mm=fasteners.HOLD_DOWN_INSERTION_MAX_MM,
         tip_loss_mm=TIP_CHAMFER,
     )
-    assert fit.full_thread_engagement_min_mm == pytest.approx(9.9476875)
+    assert fit.full_thread_engagement_min_mm == pytest.approx(10.1996875)
     assert fit.full_thread_engagement_min_mm >= 1.5 * 6.35
     assert fit.protrusion_max_mm == pytest.approx(
         fasteners.HOLD_DOWN_INSERTION_MAX_MM - material.exit_depth_min_mm,
@@ -2921,7 +2931,7 @@ def test_socket_fit_note_sits_on_a2_between_the_table_and_the_plan() -> None:
     import draw_fr_harmonic_base as sheet
 
     # The note hangs off the A2 rim between the table and plan.
-    assert sheet.SOCKET_FIT_STATION == (-197.0, -112.0)
+    assert sheet.SOCKET_FIT_STATION == (-part.COLUMN_X, part.FRAME_FRONT_COLUMN_Z)
 
     rows = [row.replace("<MOD-DIAM>", "D") for row in sheet.SOCKET_FIT_NOTE.split("\n")]
     x, y = sheet.SOCKET_FIT_NOTE_XY
@@ -3287,7 +3297,7 @@ def test_retained_lug_bottom_is_a_native_model_dimension_not_a_removed_cast_leve
     import draw_fr_harmonic_base as sheet
 
     assert fr_harmonic_base_spec.DRAWING_DIMENSIONS["CrossTapLugs"] == {"LugBottom"}
-    assert fr_harmonic_base_spec.DRAWING_PRECISION_BY_NAME["LugBottom"] == 1
+    assert fr_harmonic_base_spec.DRAWING_PRECISION_BY_NAME["LugBottom"] == 2
     assert sheet.UNDERSIDE_SECTION_CALLOUTS["LugBottom"] == "4X LUG\nBOTTOMS"
     assert set(sheet.LUGS_LEVEL_NOTES) == {"cross-tap lug bottoms"}
     text, _xy, (x, z) = sheet.LUGS_LEVEL_NOTES["cross-tap lug bottoms"]
@@ -3606,7 +3616,7 @@ def test_pivot_offsets_share_native_marks_precision_and_authoritative_band() -> 
     names = set(spec.PIVOT_SEAT_DIMENSIONS)
     assert names == spec.DRAWING_DIMENSIONS["PivotSeatReference"]
     assert names == set(sheet.HOLE_TOP_KEEP)
-    assert spec.DRAWING_PRECISION["PivotSeatReference"] == dict.fromkeys(names, 2)
+    assert spec.DRAWING_PRECISION["PivotSeatReference"] == dict.fromkeys(names, 3)
     # Both offsets, not their unprinted origin anchors, receive the unchanged
     # functional band. This checks bindings rather than a setter's formatting.
     tree = ast.parse(inspect.getsource(part.build))
@@ -3673,7 +3683,7 @@ def test_height_baselines_preserve_the_spotface_top_land_at_loose_limits() -> No
         "CrossScrewAxisHeight": (-part.COLUMN_X, part.BASE_SCREW_Y),
     }
     assert spec.DRAWING_DIMENSIONS["HeightReference"] == set(stations)
-    assert spec.DRAWING_PRECISION["HeightReference"] == dict.fromkeys(stations, 1)
+    assert spec.DRAWING_PRECISION["HeightReference"] == dict.fromkeys(stations, 2)
     assert "GreenTopHeight" in sheet.SIDE_KEEP
     assert "CrossScrewAxisHeight" in sheet.HOLE_SIDE_KEEP
     assert {"BottomThickness", "DeckRise"} <= set(sheet.SIDE_KEEP)
@@ -3681,26 +3691,15 @@ def test_height_baselines_preserve_the_spotface_top_land_at_loose_limits() -> No
     assert not {"FlangeToDeck", "Spot0Y"} & kept
     assert spec.GREEN_TOP + spec.DECK_RISE == pytest.approx(spec.STACK_HEIGHT)
     band = part._general_band_mm()
-    assert band == pytest.approx(0.8)
+    assert band == pytest.approx(0.254)
     land = spec.cross_screw_top_land_worst_case_mm(
         part.BASE_SCREW_Y, part.SCREW_SPOTFACE_DIAMETER, band
     )
+    # (1.88 - .01) - (1.50 + .01) - (.354 + .01) / 2 = .178.
     assert land == pytest.approx(
-        (47.8 - 0.8) - (38.1 + 0.8) - (9.0 + 0.8) / 2.0
+        ((1.88 - 0.01) - (1.50 + 0.01) - (0.354 + 0.01) / 2.0) * 25.4
     )
-    assert land == pytest.approx(3.2)
-    assert land >= spec.CROSS_SCREW_TOP_LAND_MIN_MM == 2.0
-    # The former chain had another independent .X term and left only 1.6:
-    # the unchanged solid was not protected by the old printed dimensions.
-    chained_green_min = (
-        spec.BOTTOM_THICKNESS - band + spec.TOP_THICKNESS - band
-        - (spec.DECK_RISE + band)
-    )
-    chained_land = (
-        chained_green_min - (part.BASE_SCREW_Y + band)
-        - (part.SCREW_SPOTFACE_DIAMETER + band) / 2.0
-    )
-    assert chained_land < spec.CROSS_SCREW_TOP_LAND_MIN_MM
+    assert land >= spec.CROSS_SCREW_TOP_LAND_MIN_MM == WALL_TARGET_MM
 
 
 @pytest.mark.parametrize("reference", ("pivot", "height"))
@@ -3901,14 +3900,14 @@ def test_nameplate_frame_distinguishes_existing_external_projection_and_female_o
     import build_fr_frame_assembly as frame
     import fr_nameplate_spec as plate
 
-    assert plate.SCREW_FULL_THREAD_MIN == pytest.approx(3.73575)
-    assert frame.NAMEPLATE_BASE_FULL_FORM_MIN == pytest.approx(3.48575)
+    assert plate.SCREW_FULL_THREAD_MIN == pytest.approx(3.63855)
+    assert frame.NAMEPLATE_BASE_FULL_FORM_MIN == pytest.approx(3.38455)
     assert len(frame.NAMEPLATE_BASE_MATERIALS) == 4
-    assert frame.NAMEPLATE_SCREW_MAX_INSERTION == pytest.approx(4.98)
+    assert frame.NAMEPLATE_SCREW_MAX_INSERTION == pytest.approx(4.8768)
     assert frame.NAMEPLATE_TIP_CLEARANCE_MIN > 0.0
     for material in frame.NAMEPLATE_BASE_MATERIALS:
         start, end = material.guaranteed_segments_mm[0]
-        assert start == pytest.approx(0.25)
+        assert start == pytest.approx(0.254)
         assert end > frame.NAMEPLATE_SCREW_MAX_INSERTION
 
 
@@ -3921,7 +3920,8 @@ def test_retained_volume_refuses_overlaps_and_subtracts_earlier_rib_metal() -> N
     alone = part.hanging_volume((on_rib,), (), bottom)
     shared = part.hanging_volume((on_rib,), (part.LONG_RIB_SHAPE,), bottom)
     assert alone == pytest.approx(math.pi * 64.0 * (part.POCKET_CEILING_Y - bottom), rel=1e-6)
-    chord = 2.0 * (5.0 * math.sqrt(64.0 - 25.0) + 64.0 * math.asin(5.0 / 8.0))
+    half_rib = fr_harmonic_base_spec.RIB_THICKNESS / 2.0
+    chord = 2.0 * (half_rib * math.sqrt(64.0 - half_rib**2) + 64.0 * math.asin(half_rib / 8.0))
     assert alone - shared == pytest.approx(chord * (part.POCKET_CEILING_Y - bottom), rel=1e-6)
 
 
@@ -3930,9 +3930,10 @@ def test_through_cut_volume_integrates_skin_full_rib_and_half_rib_without_drill_
     area = math.pi * (part.FOOT_SCREW_HOLE_DIA / 2.0) ** 2
     skin = part.STACK_HEIGHT - part.POCKET_CEILING_Y
     rib = part.STACK_HEIGHT - part.RIB_RELIEF
-    for xz, depth in (((100.0, 50.0), skin), ((100.0, 0.0), rib), ((100.0, 5.0), (skin + rib) / 2.0)):
+    edge = fr_harmonic_base_spec.RIB_THICKNESS / 2.0
+    for xz, depth in (((100.0, 50.0), skin), ((100.0, 0.0), rib), ((100.0, edge), (skin + rib) / 2.0)):
         assert part._through_holes_volume_mm3(seat, (xz,)) == pytest.approx(area * depth, rel=2e-4)
-    combined = part._through_holes_volume_mm3(seat, ((100.0, 50.0), (100.0, 5.0)))
+    combined = part._through_holes_volume_mm3(seat, ((100.0, 50.0), (100.0, edge)))
     assert combined == pytest.approx(area * (skin + (skin + rib) / 2.0), rel=2e-4)
 
 
@@ -3941,9 +3942,9 @@ def test_pedestal_thread_interference_budget_stops_at_actual_retained_skin() -> 
 
     assert fr_harmonic_base_fasteners.PEDESTAL_SCREW_ENGAGEMENT == pytest.approx(14.05)
     for xz in part.PEDESTAL_SCREW_XZ:
-        assert fr_harmonic_base_fasteners.retained_material_segments_mm(*xz)[0] == pytest.approx((0.0, 13.0))
+        assert fr_harmonic_base_fasteners.retained_material_segments_mm(*xz)[0] == pytest.approx((0.0, 12.954))
     allowed = contracts.allowed_interference_pairs("ha-harmonic-analyzer")
-    expected = 1.10 * math.pi / 4.0 * (4.1656**2 - 3.454**2) * 13.0
+    expected = 1.10 * math.pi / 4.0 * (4.1656**2 - 3.454**2) * 12.954
     obsolete = 1.10 * math.pi / 4.0 * (4.1656**2 - 3.454**2) * 14.05
     for number in (1, 2):
         pair = frozenset((
@@ -4276,7 +4277,7 @@ def test_native_through_proof_requires_open_bore_and_real_wall_positive_controls
         seen.append((label, len(points)))
         if label.endswith("breakthrough"):
             return tuple(() for _point in points)
-        return tuple(((0.0, 13.0),) for _point in points)
+        return tuple(((0.0, fr_harmonic_base_spec.POCKET_SKIN),) for _point in points)
 
     monkeypatch.setattr(part, "_native_vertical_segments", rays)
     part._verify_through_breakthrough(adapter, "FootScrewHoles", part.FOOT_SEAT_SPEC, part.FOOT_SCREW_XZ)
@@ -4316,7 +4317,10 @@ def test_native_through_proof_refuses_missing_or_bad_finite_cylinder(monkeypatch
     )
     monkeypatch.setattr(
         part, "_native_vertical_segments",
-        lambda _a, points, label: tuple(() if label.endswith("breakthrough") else ((0.0, 13.0),) for _point in points),
+        lambda _a, points, label: tuple(
+            () if label.endswith("breakthrough") else ((0.0, fr_harmonic_base_spec.POCKET_SKIN),)
+            for _point in points
+        ),
     )
     with pytest.raises(RuntimeError, match="cylinder"):
         part._verify_through_breakthrough(adapter, "FootScrewHoles", part.FOOT_SEAT_SPEC, part.FOOT_SCREW_XZ)
@@ -4347,8 +4351,9 @@ def test_native_contract_proves_all_eighteen_skin_only_exits_and_transfer_probes
     assert len(seen[f"{tag} breakthrough"]) == len(stations) * 16
     assert seen[f"{tag} wall control"] == part._material_probe_points(seat, stations)
     assert len(adapter.cylinder_points) == 48 * len(stations)
+    skin = fr_harmonic_base_spec.POCKET_SKIN
     assert {round(part.STACK_HEIGHT - 1000.0 * point[1], 6) for point in adapter.cylinder_points} == {
-        0.05, 6.5, 12.95,
+        0.05, round(skin / 2.0, 6), round(skin - 0.05, 6),
     }
     radius = part.THREAD_MAJOR_MM[seat.size] / 2.0
     for x, z in stations:
@@ -4535,8 +4540,8 @@ def test_native_rib_sketch_and_equations_place_the_actual_shifted_cross_rib() ->
         (left, -part.RIB_HALF_LENGTH_Z), (right, -part.RIB_HALF_LENGTH_Z),
         (right, part.RIB_HALF_LENGTH_Z), (left, part.RIB_HALF_LENGTH_Z),
     ]
-    assert globals_mm["CrossRibCenterX"] == spec.CROSS_RIB_CENTER_X == 11.0
-    assert anchors[1] == pytest.approx((234.6, part.BOTTOM_WIDTH / 2.0 - part.RIB_HALF_LENGTH_Z))
+    assert globals_mm["CrossRibCenterX"] == spec.CROSS_RIB_CENTER_X == 11.049
+    assert anchors[1] == pytest.approx((234.696, part.BOTTOM_WIDTH / 2.0 - part.RIB_HALF_LENGTH_Z))
     expected = {
         "CrossRibOriginX": part.BOTTOM_LENGTH / 2.0,
         "CrossRibOriginY": part.BOTTOM_WIDTH / 2.0,
@@ -4559,9 +4564,9 @@ def test_native_rib_sketch_and_equations_place_the_actual_shifted_cross_rib() ->
         expression = jobs[f"{name}@CrossRibProfile"]
         assert evaluate(ast.parse(expression, mode="eval").body) == pytest.approx(value)
     globals_mm["CrossRibCenterX"] += 3.0
-    assert evaluate(ast.parse(jobs["CrossRibX@CrossRibProfile"], mode="eval").body) == pytest.approx(237.6)
+    assert evaluate(ast.parse(jobs["CrossRibX@CrossRibProfile"], mode="eval").body) == pytest.approx(237.696)
     assert extrusions == [(spec.POCKET_CEILING_Y - spec.RIB_RELIEF, spec.RIB_RELIEF)] * 2
-    assert dict(verified)["CrossRibHeight@CrossRib"] == pytest.approx(34.8)
+    assert dict(verified)["CrossRibHeight@CrossRib"] == pytest.approx(34.798)
     assert dict(verified)["CrossRibRelief@CrossRib"] == spec.RIB_RELIEF
 
 
@@ -4596,7 +4601,7 @@ def test_shifted_cross_rib_volume_and_all_eighteen_skin_only_cut_footprints() ->
         2.0 * spec.POCKET_HALF_Z * spec.RIB_THICKNESS - spec.RIB_THICKNESS**2
     ) * (spec.POCKET_CEILING_Y - spec.RIB_RELIEF)
     assert cross_volume == pytest.approx(expected_cross)
-    assert cross_volume == pytest.approx(83694.0)
+    assert cross_volume == pytest.approx(82985.6554)
 
 
 @pytest.mark.parametrize(
@@ -4643,11 +4648,11 @@ def test_native_rib_controls_require_full_height_crossing_end_joins_and_open_old
 ) -> None:
     spec = fr_harmonic_base_spec
     expected = (
-        (11.0, -62.625, 47.8), (11.0, 62.625, 47.8),
-        (-105.125, 0.0, 47.8), (105.125, 0.0, 47.8),
-        (11.0, 0.0, 47.8),
-        (11.0, -128.25, 50.8), (11.0, 128.25, 50.8),
-        (1.0, -62.625, 13.0), (1.0, 62.625, 13.0),
+        (11.049, -62.6618, 47.752), (11.049, 62.6618, 47.752),
+        (-105.156, 0.0, 47.752), (105.156, 0.0, 47.752),
+        (11.049, 0.0, 47.752),
+        (11.049, -128.3081, 50.8), (11.049, 128.3081, 50.8),
+        (1.143, -62.6618, 12.954), (1.143, 62.6618, 12.954),
     )
     dimensions = {}
     monkeypatch.setattr(
@@ -4657,10 +4662,12 @@ def test_native_rib_controls_require_full_height_crossing_end_joins_and_open_old
 
     def rays(_adapter, points, label):
         assert label == "retained rib controls"
-        assert points == tuple((x, z) for x, z, _depth in expected)
+        assert [v for point in points for v in point] == pytest.approx(
+            [v for x, z, _depth in expected for v in (x, z)], abs=1e-4,
+        )
         depths = [depth for _x, _z, depth in expected]
         if bad_control is not None:
-            depths[bad_control] = spec.POCKET_SKIN if depths[bad_control] > 13.0 else 47.8
+            depths[bad_control] = spec.POCKET_SKIN if depths[bad_control] > 13.0 else 47.752
         return tuple(((0.0, depth),) for depth in depths)
 
     monkeypatch.setattr(part, "_native_vertical_segments", rays)
@@ -4670,11 +4677,11 @@ def test_native_rib_controls_require_full_height_crossing_end_joins_and_open_old
         with pytest.raises(RuntimeError, match="actual material"):
             part._verify_rib_material(object())
     assert dimensions == pytest.approx({
-        "CrossRibX@CrossRibProfile": 234.6,
-        "CrossRibThickness@CrossRibProfile": 10.0,
-        "CrossRibLength@CrossRibProfile": 262.5,
-        "CrossRibHeight@CrossRib": 34.8,
-        "CrossRibRelief@CrossRib": 3.0,
+        "CrossRibX@CrossRibProfile": 234.696,
+        "CrossRibThickness@CrossRibProfile": 9.906,
+        "CrossRibLength@CrossRibProfile": 262.5852,
+        "CrossRibHeight@CrossRib": 34.798,
+        "CrossRibRelief@CrossRib": 3.048,
     })
 
 
@@ -4740,7 +4747,7 @@ def test_native_r7_records_both_west_tag_strikes_and_the_interior_y_block() -> N
     geometry = _native_r7_geometry()
     # This is the projected DECK west straight edge, not GetOutline padding.
     deck_x = sheet.HOLE_TOP_CENTER[0] - fr_harmonic_base_spec.DECK_HALF_X * sheet.VIEW_SCALE / 1000.0
-    assert deck_x == pytest.approx(0.23825)
+    assert deck_x == pytest.approx(0.238217)
     deck_edge = (deck_x, 0.164, deck_x, 0.226)
     for prefix in ("note DetailItem446 ", "note DetailItem447 "):
         tag = _native_r7_named(geometry, prefix)
@@ -4948,7 +4955,10 @@ def test_native_r7_lower_b_failure_and_conditional_real_cut_endpoint_clearance()
     lower = min(marker.text_boxes, key=lambda box: box.ymin)
     flange_edge = (0.09, 0.1491, 0.20, 0.1491)
     assert sheet.segment_crosses_box(flange_edge, (lower.xmin, lower.ymin, lower.xmax, lower.ymax))
-    assert sheet.UNDERSIDE_CUT_X == pytest.approx(205.875)
+    assert sheet.UNDERSIDE_CUT_X == pytest.approx(
+        (part.COLUMN_X + part.SCREW_SPOTFACE_DIAMETER / 2.0 + part.POCKET_HALF_X) / 2.0
+    )
+    assert sheet.UNDERSIDE_CUT_X == pytest.approx(205.90, abs=0.01)
     dy = sheet.UNDERSIDE_CUT_START_Y - 0.145
     assert dy == pytest.approx(-0.010)
     assert sheet.UNDERSIDE_CUT_END_Y == pytest.approx(0.225)
@@ -5048,7 +5058,7 @@ def _native_base_tap_class_display(monkeypatch, *, drop_unused_class=False):
             variable.String = value
         else:
             variable.Length = value / 1000.0
-            variable.Precision = 0 if name == "hw-tapdrldepth" else 2
+            variable.Precision = sheet.CROSS_TAP_CALLOUT_PRECISION[name]
         variable._oleobj_ = variable
         variables.append(variable)
 
@@ -5129,7 +5139,7 @@ def test_default_class_omission_preserves_quantity_min_depth_native_tokens_and_p
     sheet._check_cross_tap_callout(display)
     depth = next(v for v in display.variables if v.VariableName == "hw-tapdrldepth")
     depth.Precision = 2
-    with pytest.raises(RuntimeError, match="whole-mm MIN"):
+    with pytest.raises(RuntimeError, match="prints 2 decimals, not 3"):
         sheet._check_cross_tap_callout(display)
 
 
