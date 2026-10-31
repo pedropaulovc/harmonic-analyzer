@@ -30,6 +30,7 @@ import ast
 import io
 import re
 import tokenize
+import unicodedata
 from pathlib import Path
 
 import pytest
@@ -117,6 +118,18 @@ def _early_bound_arity_offenders(source: str) -> list[str]:
         elif len(node.args) + len(node.keywords) > 2:
             out.append(f"{node.lineno} ({len(node.args) + len(node.keywords)} args)")
     return out
+
+
+def _mentions_early_bound(source: str) -> bool:
+    """Whether ``source`` can hold an ``_early_bound`` call at all.
+
+    Every offender's callee is spelled ``_early_bound``, so other sources are
+    skipped before parsing. Python NFKC-normalizes identifiers, so non-ASCII
+    text is searched normalized.
+    """
+    if not source.isascii():
+        source = unicodedata.normalize("NFKC", source)
+    return "_early_bound" in source
 
 
 def _build_path_sources() -> list[Path]:
@@ -208,7 +221,8 @@ def test_no_caller_passes_the_removed_method_names() -> None:
     offenders = [
         f"{path.name}:{hit}"
         for path in sorted(SCRIPTS.rglob("*.py"))
-        for hit in _early_bound_arity_offenders(path.read_text(encoding="utf-8"))
+        if _mentions_early_bound(source := path.read_text(encoding="utf-8"))
+        for hit in _early_bound_arity_offenders(source)
     ]
     assert not offenders, (
         "_early_bound no longer accepts method names; these raise TypeError:\n  "
