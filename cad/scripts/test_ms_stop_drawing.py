@@ -71,7 +71,8 @@ def test_native_taps_and_plate_clearance_follow_stock_screws() -> None:
     assert spec.THUMB_TAP_SPEC.kind == "tapped" and spec.THUMB_TAP_SPEC.size == "#4-40"
     # Through-all would drill the opposite roof as well as the thick floor.
     assert spec.THUMB_TAP_SPEC.end == "through_next"
-    assert (spec.THUMB_AXIS_X, spec.THUMB_AXIS_Z) == pytest.approx((_inch(0.42), _inch(0.165)))
+    assert (spec.THUMB_AXIS_X, spec.THUMB_AXIS_Z) == pytest.approx((_inch(0.42), _inch(0.17)))
+    assert spec.WINDOW_Z_MIN < spec.THUMB_AXIS_Z < spec.WINDOW_Z_MAX
     assert spec.THUMB_HOLE_POINTS == ((spec.THUMB_AXIS_X, 0.0, spec.THUMB_AXIS_Z),)
     assert spec.THUMB_HOLE_NORMAL == (0.0, -1.0, 0.0)
     assert spec.PLATE_HOLE_XS == pytest.approx((_inch(0.150), _inch(0.690)))
@@ -213,9 +214,9 @@ def test_each_sheet_imports_the_complete_model_contract(builder, drawing, dimens
     if hasattr(drawing, "BOTTOM_KEEP"):
         keeps |= set(drawing.BOTTOM_KEEP)
     assert marked == keeps == set(precision) == set(values)
-    # .XXX for the rebate, the thumb tap's mid-rebate station, the matched
+    # .XXX for the rebate, the matched
     # pair's stations, cover thickness and pilot drill; whole-degree angles.
-    three = ({"WindowWidth", "WindowHeight", "ThumbFromPlate", *spec.PLATE_LOCATION_DIMENSIONS}
+    three = ({"WindowWidth", "WindowHeight", *spec.PLATE_LOCATION_DIMENSIONS}
              if builder is block
              else {"PlateThickness", "PilotDrillDiameter", *spec.PLATE_LOCATION_DIMENSIONS})
     assert {name: places for name, places in precision.items() if places != 2} == {
@@ -361,7 +362,7 @@ class _StopMathUtility:
     (block_drawing, [
         ("two cover blind taps", "*Back", (0.0184531, 0.004064, 0.0), (0.1238596, 0.172808)),
         ("thumbscrew tap through floor", "*Bottom",
-         (0.0117985, 0.0, 0.004191), (0.150478, 0.078588)),
+         (0.0117985, 0.0, 0.004318), (0.150478, 0.07808)),
         ("cover mating face", "*Left", (0.010668, 0.012573, 0.0), (0.292648, 0.206844)),
     ]),
     (plate_drawing, [

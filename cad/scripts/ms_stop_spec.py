@@ -59,7 +59,10 @@ ROOF_CHAMFER_ANGLE = 45.0
 CUT_OVERHANG = 1.0
 
 THUMB_AXIS_X = BLOCK_LENGTH / 2.0
-THUMB_AXIS_Z = (WINDOW_Z_MIN + WINDOW_Z_MAX) / 2.0
+# Near mid-rebate on the two-place grid: the tip only has to land on the
+# stick's plain face, so the station takes the title block's .XX (machinist
+# review, run 20261031T080758471Z-7cdcb16a, found .165 over-specified).
+THUMB_AXIS_Z = 4.318  # .17
 THUMB_TAP_DRILL = TAP_DRILL_MM["#4-40"]
 THUMB_TAP_SPEC = HoleSpec("tapped", "#4-40", end="through_next", thread_class="2B")
 THUMB_HOLE_POINTS = ((THUMB_AXIS_X, 0.0, THUMB_AXIS_Z),)
@@ -145,12 +148,12 @@ PLATE_LOCATION_DIMENSIONS = frozenset({
 # follows from the rebate and the wall and prints as a reference "(.44)".
 BLOCK_REFERENCE_DIMENSIONS = frozenset({"BlockDepth"})
 # Sizes print the title block's .XX unless they need .XXX: the rebate (its
-# +.004/0 for the stick), the thumb tap's mid-rebate station, the cover
+# +.004/0 for the stick), the cover
 # thickness and the match-drill stations the cover masters (+/-.004); the
 # block repeats those stations at the cover's places as references. Angles
 # print whole degrees against the title block's +/-1 deg.
 _THREE_PLACE = frozenset({
-    "WindowWidth", "WindowHeight", "ThumbFromPlate", "PlateThickness",
+    "WindowWidth", "WindowHeight", "PlateThickness",
     "PilotDrillDiameter", *PLATE_LOCATION_DIMENSIONS,
 })
 
