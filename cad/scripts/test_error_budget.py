@@ -1315,9 +1315,9 @@ def test_shared_table_rocker_matches_original_station_loop(nom, deviations):
         k0x, k0y = eb.rest_contact(d, machine)
         kx = k0x * np.cos(tr) - k0y * np.sin(tr)
         ky = k0x * np.sin(tr) + k0y * np.cos(tr)
-        beta = eb._bisect(
-            lambda b: eb._lever_pin_gap(kx, ky, b, machine), -0.4, 0.4, grid.size
-        )
+        # The tilt solver itself is pinned against the bisection by
+        # test_lever_tilt_matches_the_bisection_to_rounding.
+        beta = eb._lever_tilt(kx, ky, machine)
         s, c = np.sin(beta), np.cos(beta)
         tx = kx - (machine.contact_dx * c - machine.contact_dy * s) + machine.bar_len * s
         ty = ky - (machine.contact_dx * s + machine.contact_dy * c) + machine.bar_len * c
@@ -1339,6 +1339,44 @@ def test_shared_table_rocker_matches_original_station_loop(nom, deviations):
     np.testing.assert_array_equal(tr, tr_before)
     np.testing.assert_array_equal(grid, grid_before)
     np.testing.assert_array_equal(stations, stations_before)
+
+
+@pytest.mark.parametrize(
+    "deviations",
+    [
+        {},
+        {"ecc": 0.05, "pin_x": -0.05, "pin_y": 0.05},
+        {"rod": 0.15, "bar_len": -0.15, "contact_dx": 0.1, "cam_home_deg": 1.5},
+    ],
+)
+def test_lever_tilt_matches_the_bisection_to_rounding(nom, deviations):
+    """The safeguarded Newton tilt is the root the fifty-step bisection
+    brackets, to rounding: at every station from the pivot to the stop, over a
+    whole crank cycle, on nominal and deviated machines."""
+    machine = dataclasses.replace(
+        nom, **{field: getattr(nom, field) + delta for field, delta in deviations.items()}
+    )
+    tr = eb.rocker_angle(eb._READ_GRID, machine)
+    for d in np.linspace(0.0, machine.d_max, 25):
+        k0x, k0y = eb.rest_contact(float(d), machine)
+        kx = k0x * np.cos(tr) - k0y * np.sin(tr)
+        ky = k0x * np.sin(tr) + k0y * np.cos(tr)
+        bisected = eb._bisect(
+            lambda b: eb._lever_pin_gap(kx, ky, b, machine), -0.4, 0.4, kx.size
+        )
+        np.testing.assert_allclose(
+            eb._lever_tilt(kx, ky, machine), bisected, rtol=0.0, atol=1e-14
+        )
+
+
+def test_lever_tilt_falls_back_to_the_bisection_without_a_sign_change(nom):
+    """A contact whose bracket never changes sign gets the bisection's answer
+    (its end of the bracket), not an unconverged Newton iterate."""
+    far = np.array([1.0e4])
+    np.testing.assert_array_equal(
+        eb._lever_tilt(far, far, nom),
+        eb._bisect(lambda b: eb._lever_pin_gap(far, far, b, nom), -0.4, 0.4, 1),
+    )
 
 
 def test_shared_cycle_brackets_preserve_boundaries_and_do_not_mutate_tables():

@@ -339,6 +339,69 @@ def _lever_pin_gap(
     return np.hypot(tx - nom.fulcrum_dx, ty - nom.fulcrum_dy) - nom.bar_pin_arm
 
 
+_TILT_LO, _TILT_HI = -0.4, 0.4
+_TILT_STEPS = 12
+
+
+def _lever_tilt(kx: np.ndarray, ky: np.ndarray, nom: Nominal) -> np.ndarray:
+    """The bar tilt closing ``_lever_pin_gap`` for each contact (kx, ky).
+
+    Safeguarded Newton on the same [-0.4, 0.4] bracket the bisection uses:
+    every evaluation tightens the sign-change bracket exactly as a bisection
+    step would, a Newton step is taken only when it lands inside the
+    bracket, and the bracket midpoint is taken otherwise. The residual is the
+    distance error of the top pin from the lever circle, so its derivative is
+    the radial component of the pin's velocity. Twelve steps reach rounding
+    level from the level-bar start (the bisection needed fifty evaluations of
+    the same trigonometry). An element whose bracket holds no sign change, or
+    whose residual is still above rounding level, is re-solved by the plain
+    bisection, so the root found is always one the bisection brackets.
+    """
+    cdx, cdy, bar = nom.contact_dx, nom.contact_dy, nom.bar_len
+    fdx, fdy, arm = nom.fulcrum_dx, nom.fulcrum_dy, nom.bar_pin_arm
+
+    def residual(beta: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        s, c = np.sin(beta), np.cos(beta)
+        ex = kx - (cdx * c - cdy * s) + bar * s - fdx
+        ey = ky - (cdx * s + cdy * c) + bar * c - fdy
+        h = np.hypot(ex, ey)
+        dex = cdx * s + cdy * c + bar * c
+        dey = cdy * s - cdx * c - bar * s
+        return h - arm, (ex * dex + ey * dey) / h
+
+    lo = np.full(kx.shape, _TILT_LO)
+    hi = np.full(kx.shape, _TILT_HI)
+    lo_negative = residual(lo)[0] < 0
+    # Like the bisection, only the lower end's sign is read up front: the
+    # residual is positive at both ends with the root where it dips below
+    # zero, and the first evaluation (beta = 0, the bisection's own first
+    # midpoint) finds the opposite sign and closes the bracket on that side.
+    beta = np.zeros(kx.shape)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        for _ in range(_TILT_STEPS):
+            g, dg = residual(beta)
+            same = (g < 0) == lo_negative
+            np.putmask(lo, same, beta)
+            np.putmask(hi, ~same, beta)
+            step = beta - g / dg
+            inside = (step >= lo) & (step <= hi)
+            beta = np.where(inside, step, 0.5 * (lo + hi))
+        g = residual(beta)[0]
+    tolerance = 1e-11 * max(1.0, abs(arm))
+    # hi only ever moves to a point whose residual has the opposite sign to
+    # lo's, so a still-initial hi means no sign change was ever bracketed.
+    unresolved = (hi == _TILT_HI) | ~(np.abs(g) <= tolerance)
+    if unresolved.any():
+        fallback = _bisect(
+            lambda b: _lever_pin_gap(kx[unresolved], ky[unresolved], b, nom),
+            _TILT_LO,
+            _TILT_HI,
+            int(unresolved.sum()),
+        )
+        beta[unresolved] = fallback
+    return beta
+
+
 def rest_contact(d: float, nom: Nominal) -> tuple[float, float]:
     """Where the bar's notch roof sits on the R800 arc at station ``d`` (foot-axis
     x from the pivot), arm level -- solve_state's rest pose: the contact rides
@@ -387,7 +450,7 @@ def _hook_from_contacts(tr: np.ndarray, k0x, k0y, nom: Nominal) -> np.ndarray:
     cycle ``tr``."""
     kx = k0x * np.cos(tr) - k0y * np.sin(tr)
     ky = k0x * np.sin(tr) + k0y * np.cos(tr)
-    beta = _bisect(lambda b: _lever_pin_gap(kx, ky, b, nom), -0.4, 0.4, kx.shape)
+    beta = _lever_tilt(kx, ky, nom)
     s, c = np.sin(beta), np.cos(beta)
     tx = kx - (nom.contact_dx * c - nom.contact_dy * s) + nom.bar_len * s
     ty = ky - (nom.contact_dx * s + nom.contact_dy * c) + nom.bar_len * c
