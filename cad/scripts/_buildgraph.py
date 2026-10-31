@@ -2378,7 +2378,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         # Angular row sets the lever-level acceptance the summing sheet prints,
         # held inside the knife edge's free-rock floor.
         "sm_summing_assembly_sheet",
-        "dt_vn_post_mount_screw_spec",
     }
 )
 

@@ -536,9 +536,9 @@ def _manufacturing_controls(adapter) -> None:
             f"{CUT_LENGTH_MM} below the under-head face"
         )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    # The cut end's deburr prints as the single limit "0.1 MAX" (swTolMAX)
+    # The cut end's deburr prints as the single limit ".003 MAX" (swTolMAX)
     # in the sheet's tip detail; the band's deviations stay on the native
-    # tolerance, read back, as the model's record of "none to 0.1".  The cut
+    # tolerance, read back, as the model's record of "none to .003".  The cut
     # length stays unbanded (reference): no fixed length suits every post and
     # plate.
     _single_limit_break(adapter)
