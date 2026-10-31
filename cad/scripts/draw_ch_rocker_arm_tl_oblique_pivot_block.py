@@ -439,11 +439,13 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     floor = create_section_view(adapter,plan,line_start=start,line_end=end,view_xy=FLOOR_XY,
                                 section_label='B',scale=(1,1),partial=True,
                                 label='carriage counterbore floor')
-    if is_feed:
-        # The top face's +Y corner lands where TL-22's full B-B puts it.
-        _cut_face_only(adapter, floor, 'B', (x, part.BLOCK_WIDTH/2, contract.BLOCK_HEIGHT),
-                       (FLOOR_XY[0]-contract.BLOCK_HEIGHT/2000, FLOOR_XY[1]+part.BLOCK_WIDTH/2000),
-                       (FLOOR_XY[0], FLOOR_XY[1]-part.BLOCK_WIDTH/2000-SECTION_CAPTION_GAP), SHEET_SCALE)
+    # Both blocks print B-B as its cut face only (rule 9), the top face's +Y
+    # corner where the full B-B put it. On TL-22's full section the B-B import
+    # delivered CboreFloor but not SectionBlockHeight (farm round 1 at
+    # 9b49bcc), while TL-32's cut-face B-B imported both from the same sketch.
+    _cut_face_only(adapter, floor, 'B', (x, part.BLOCK_WIDTH/2, contract.BLOCK_HEIGHT),
+                   (FLOOR_XY[0]-contract.BLOCK_HEIGHT/2000, FLOOR_XY[1]+part.BLOCK_WIDTH/2000),
+                   (FLOOR_XY[0], FLOOR_XY[1]-part.BLOCK_WIDTH/2000-SECTION_CAPTION_GAP), SHEET_SCALE)
     row_4y = _project(adapter,plan,(part.BLOCK_X1,part.BOLT_Y,contract.BLOCK_HEIGHT),'row 4Y')
     _fit_section_letters(adapter, side, (floor,), below_y=row_4y[1])
     annotations += curate_view_dimensions(adapter,floor,keep=FLOOR_KEEP,view_label='B-B floor',
