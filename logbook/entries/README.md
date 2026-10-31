@@ -34,3 +34,4 @@ fabricated observation would poison the whole book.
 | date | entry | module | part | outcome | hours |
 |---|---|---|---|---|---:|
 | 2026-10-29 | [Install the 6 in vise and start the oblique-jig base bar](2026-10-29-vise-install-and-first-cuts.md) | M06 | `ch-rocker-arm-tl-oblique-base-bar` | partial | 6.5 |
+| 2026-10-30 | [Get the pendant working, then rough the base bar to length](2026-10-30-pendant-and-roughing-base-bar-to-length.md) | M07 | `ch-rocker-arm-tl-oblique-base-bar` | scrapped | 5.0 |
