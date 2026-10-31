@@ -8,7 +8,6 @@ from typing import Any
 import _telemetry
 from _com import _early_bound, _read_member
 from _drawing_precision import _named_dimension
-from _drawing_units import DrawingUnit, checked_drawing_unit
 
 
 # A tolerance display unit, by the unit its deviations are given in: lengths in
@@ -102,16 +101,6 @@ def set_dimension_basic_tolerance(
     _telemetry.success(f"toleranced {dimension_name}@{feature_name}: BASIC")
 
 
-def _length_display_unit(display_unit: str) -> DrawingUnit:
-    """A length tolerance prints on a millimetre or an inch sheet, never in
-    degrees."""
-    return checked_drawing_unit("length tolerance display_unit", display_unit)
-
-
-def _shown(display_unit: DrawingUnit) -> str:
-    return "" if display_unit == "mm" else f", shown in {display_unit}"
-
-
 def set_dimension_symmetric_tolerance(
     adapter: Any,
     feature_name: str,
@@ -119,17 +108,14 @@ def set_dimension_symmetric_tolerance(
     tolerance_mm: float,
     *,
     places: int | None = None,
-    display_unit: DrawingUnit = "mm",
+    display_unit: str = "mm",
 ) -> None:
     """Tolerance one named source-model dimension and verify the stored values.
 
-    ``tolerance_mm`` is physical millimetres whatever the sheet prints;
-    ``display_unit`` is the owning package's ``drawing_unit``, so an inch
-    sheet gets the precision of the inch value (0.127 mm prints ``±.005``, 3
-    places) instead of the millimetre one.  ``places`` prints the tolerance
-    at the nominal's places in that unit (ASME inch: ``.0787 ±.0020``), never
-    fewer than the band needs (``_set_tolerance_precision``)."""
-    display_unit = _length_display_unit(display_unit)
+    ``tolerance_mm`` is physical millimetres; ``display_unit`` is the unit the
+    sheet prints (the package's ``drawing_unit``), which sets the tolerance's
+    places, never fewer than ``places`` (``_set_tolerance_precision``).
+    """
     if tolerance_mm <= 0.0:
         raise ValueError("symmetric dimension tolerance must be positive")
     display, dimension = _named_dimension(adapter, feature_name, dimension_name)
@@ -163,7 +149,7 @@ def set_dimension_symmetric_tolerance(
     )
     _telemetry.success(
         f"toleranced {dimension_name}@{feature_name}: +/-{tolerance_mm:g} mm "
-        f"({precision} decimals{_shown(display_unit)})"
+        f"({precision} decimals)"
     )
 
 
@@ -175,17 +161,15 @@ def set_dimension_bilateral_tolerance(
     upper_deviation_mm: float,
     *,
     places: int | None = None,
-    display_unit: DrawingUnit = "mm",
+    display_unit: str = "mm",
 ) -> None:
     """Apply signed lower/upper deviations to one named source dimension.
 
     ``places`` prints the tolerance at the nominal's places
     (``_set_tolerance_precision``); by default, the fewest that keep it.
-    The deviations are physical millimetres; ``display_unit`` is the owning
-    package's ``drawing_unit``, and both the fewest places and ``places``
-    count decimals of the value shown in it (``+.004/0`` is 3 inch places).
+    The deviations are physical millimetres; ``display_unit`` is the unit the
+    sheet prints them in (``+.004/0`` is three inch places).
     """
-    display_unit = _length_display_unit(display_unit)
     if lower_deviation_mm > upper_deviation_mm:
         raise ValueError("lower dimension deviation must not exceed upper deviation")
     if lower_deviation_mm == upper_deviation_mm:
@@ -221,7 +205,7 @@ def set_dimension_bilateral_tolerance(
     _telemetry.success(
         f"toleranced {dimension_name}@{feature_name}: "
         f"{lower_deviation_mm:+g}/{upper_deviation_mm:+g} mm "
-        f"({precision} decimals{_shown(display_unit)})"
+        f"({precision} decimals)"
     )
 
 

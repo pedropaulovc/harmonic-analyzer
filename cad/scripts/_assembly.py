@@ -27,8 +27,6 @@ from _component_references import (
     semantic_reference_identity,
 )
 from _custom_properties import apply_custom_properties
-from _document_units import require_package_model_units
-from _drawing_units import DrawingUnit, resolved_drawing_unit
 from _part_properties import _SUMMARY_TITLE, apply_summary_info, title_block_properties
 from _part_save import set_isometric_view
 from _source_identity import _git_commit_year, _git_sha
@@ -46,27 +44,22 @@ from _simplified_names import (
 from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
 
 
-def assembly_drawing_unit(assembly_name: str) -> DrawingUnit:
-    """The unit the assembly's sheet prints: its contract's ``drawing_unit``,
-    else the legacy millimetre."""
-    return resolved_drawing_unit(assembly_contract(assembly_name).drawing_unit)
-
-
 def assembly_title_properties(assembly_name: str) -> dict[str, str]:
     """Return title-block properties for an assembly document.
 
     Assembly drawings use the tracked next release revision, not a per-part
     registry row, so native assemblies and their linked title blocks stay in
     lockstep with leaf parts.  The TOL_* rows print in the contract's
-    ``drawing_unit`` (``assembly_drawing_unit``).
+    ``drawing_unit``.
     """
+    contract = assembly_contract(assembly_name)
     return {
         "Title": assembly_name,
-        "Number": assembly_contract(assembly_name).number,
+        "Number": contract.number,
         "Revision": _config.release_revision(),
         "Generator": f"harmonic-analyzer @ {_git_sha()}",
         "COPYRIGHT_YEAR": _git_commit_year(),
-        **title_block_properties(unit=assembly_drawing_unit(assembly_name)),
+        **title_block_properties(unit=contract.drawing_unit),
     }
 
 
@@ -2831,12 +2824,6 @@ async def save_assembly_and_images(
     leaves a manifest beside an assembly it does not describe."""
     if asm_name in ("ch-channel", "sm-summing") and native_contact_check is None:
         raise ValueError(f"{asm_name} assembly requires native_contact_check")
-    # An inch package's model reads in IPS like its sheet (contract
-    # drawing_unit); the builder selected those units right after
-    # create_assembly, so every gate below already runs under them. Prove them
-    # first and never switch them here; millimetre and legacy assemblies are
-    # left untouched.
-    require_package_model_units(adapter, assembly_drawing_unit(asm_name), label=asm_name)
     # The drawings' views at 1:2 and smaller print this derived configuration
     # (gear teeth and screw threads suppressed); Default stays the solved,
     # gated, rendered and saved-active pose.

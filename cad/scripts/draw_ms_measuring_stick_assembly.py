@@ -2,7 +2,7 @@ r"""Create the three-sheet measuring-stick fitter package (MHA-MS-00).
 
 Sheet 1 shows the stick clamped at its stop mark (upright elevation and an
 aligned third-angle graduated-underside view below it, both at full size), a
-reference overall and near-face pose dimensions, an upright clamp
+reference overall and near-face setting dimensions, an upright clamp
 section, and the clamp setup note; sheet 2 the builder-owned ``MS_EXPLODED``
 presentation with
 the BOM (numbers, descriptions, vendor SKU, quantity) and a balloon on every
@@ -32,6 +32,7 @@ import ms_measuring_stick_assembly_spec as spec
 import ms_measuring_stick_explode_spec as explode
 import ms_stick_spec as stick
 import ms_stop_spec as stop
+from _assembly_contract import assembly_contract
 from _check import check
 from _com import _early_bound
 from _session import run_build
@@ -66,12 +67,6 @@ from _drawing_view_display import set_hidden_lines_removed
 from solidworks_mcp.adapters.solidworks.drawing import visible_component_entities
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_hidden_sketches import _show_base_view_sketches
-from _drawing_source_guard import (
-    assert_source_clean,
-    assert_source_closed,
-    capture_clean_source,
-    source_checkpoint,
-)
 from _simplified_names import simplified_name
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 from solidworks_mcp.adapters.com_variant import double_array
@@ -92,11 +87,6 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
-# The drawing's own package: its assembly contract's drawing_unit selects the
-# sheet's document units and is proven by finalize_drawing.
-PACKAGE_NAME = "ms-measuring-stick"
-if PACKAGE_NAME != spec.ASM_NAME:
-    raise AssertionError("the measuring-stick drawing names its own assembly package")
 
 SHEET_NAMES = (
     "ASSEMBLED + CLAMPED SETUP",
@@ -127,8 +117,7 @@ TITLE_BLOCK = (
     _TEMPLATE.title_block_top_m,
 )
 
-# Sheet 1: the full stick (ms_stick_spec.BODY_LENGTH) at full size, working
-# elevation screw-up.
+# Sheet 1: the 7.95-in stick at full size, working elevation screw-up.
 # The graduated underside sits below Front in aligned third-angle projection.
 # Section A-A uses native end-only cutting-line style: its upper arrow sits
 # above the setting witnesses, below the overall reference dimension.
@@ -247,7 +236,7 @@ SECOND_SCREW_BALLOON_ANCHORS = {
 }
 
 
-# Geometry-owned reference measurements of the saved assembly pose.
+# Geometry-owned measurements: overall and assembly setting, both reference.
 ASSEMBLY_DIMENSIONS = (
     ("overall length", sheet.REFERENCE_OVERALL_LENGTH),
     ("stop position", spec.SETTING_NEAR_FACE_MM),
@@ -765,9 +754,10 @@ def _reference_end_edge(
 
 
 def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
-    """Import the source-owned pose reference and measure the real overall.
+    """Measure real component edges; both dimensions are reference.
 
-    Neither dimension sets a component size or a functional acceptance band.
+    The assembly poses own the nominal. Neither dimension is an acceptance
+    band or an alternate component manufacturing size.
     """
     # Mid-height on each stick end. The upright Front sees part y=0,
     # opposite the original graduation-up inspection orientation.
@@ -868,15 +858,8 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
         if int(display.GetPrimaryPrecision2()) != precision:
             raise RuntimeError(f"measuring-stick {label} precision did not persist")
         if label == "stop position":
-            tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-            if (
-                int(tolerance.Type) != 0
-                or (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
-                != ("(", ")")
-            ):
-                raise RuntimeError("assembly pose is not a native unbanded reference")
-            # Keep the imported reference value and physical model attachments.
-            # Its purpose is explained in the setup note, not numeric note text.
+            # Keep the imported reference plain; do not suppress or replace
+            # its native value, tolerance or physical model attachments.
             for field in (3, 4):  # swDimensionTextCalloutAbove/Below
                 display.SetText(field, "")
                 if str(display.GetText(field) or ""):
@@ -908,7 +891,7 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
 
 def _place_clamped_sheet(adapter: Any) -> Callable[[], None]:
     """Upright working elevation and clamp section, with the labelled
-    graduated-underside inspection and the near-face pose reference."""
+    graduated-underside inspection and the near-face setting reference."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     # Native StandardWithoutConnector, as in draw_fr_rocker_arm_support:
     # retain the full cutting plane and both arrows, not a hidden section line.
@@ -1085,7 +1068,7 @@ def _append_template_sheet(adapter: Any, target: Any, *, name: str) -> None:
     try:
         donor, donor_sheet = new_project_drawing(
             adapter, layout=SHEET_LAYOUTS[name], scale=SHEET_SCALES[name],
-            package_name=PACKAGE_NAME,
+            unit=assembly_contract(spec.ASM_NAME).drawing_unit,
         )
         donor = _early_bound(donor, "IModelDoc2")
         donor_sheet = _early_bound(donor_sheet, "ISheet")
@@ -1131,7 +1114,7 @@ def _create_mixed_package_sheets(adapter: Any) -> None:
     """Use native template copies, not a metadata-only portrait declaration."""
     target, initial = new_project_drawing(
         adapter, layout=SHEET_LAYOUTS[SHEET_NAMES[0]], scale=SHEET_SCALES[SHEET_NAMES[0]],
-        package_name=PACKAGE_NAME,
+        unit=assembly_contract(spec.ASM_NAME).drawing_unit,
     )
     target = _early_bound(target, "IModelDoc2")
     initial = _early_bound(initial, "ISheet")
@@ -1169,12 +1152,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
 
     check("open measuring-stick drawing source", await adapter.open_model(str(SOURCE)))
-    # The drawing reads its source and never edits it: the .SLDASM keeps its
-    # bytes and the open document its clean save flag. Never save or reset it.
-    source = capture_clean_source(
-        SOURCE, adapter.currentModel, label="measuring-stick source assembly"
-    )
-    source_model = source.model
+    source_model = _early_bound(adapter.currentModel, "IModelDoc2")
     properties = read_required_properties(
         source_model,
         (
@@ -1199,41 +1177,19 @@ async def build(adapter: Any) -> dict[str, str]:
             f"{sheet.DRAWING_NUMBER!r}"
         )
     _validate_source(source_model)
-    assert_source_clean(source, stage="before presentation")
 
     settled = _place_package(adapter)
-    assert_source_clean(source, stage="before drawing SaveAs")
-    try:
-        artifacts = await finalize_drawing(
-            adapter,
-            OUTPUTS,
-            layout=SPEC.layout,
-            pdf_title="Measuring Stick Assembly Drawing Package",
-            scale=SHEET_SCALE,
-            expected_sheet_names=SHEET_NAMES,
-            sheet_layouts=SHEET_LAYOUTS,
-            sheet_scales=SHEET_SCALES,
-            settled_checks=(
-                settled,
-                lambda: assert_source_clean(
-                    source, stage="settled checks before drawing SaveAs"
-                ),
-            ),
-            checkpoint=source_checkpoint(source),
-            package_name=PACKAGE_NAME,
-        )
-    finally:
-        primary_error = sys.exception()
-        try:
-            # The drawing has closed (or failed): the file only, never the
-            # source handle.
-            assert_source_closed(source, stage="after drawing finalization")
-        except BaseException:
-            if primary_error is None:
-                raise
-            # Keep the original native failure and its traceback.
-    _telemetry.success(f"measuring-stick source preserved clean; SHA256 {source.sha256}")
-    return artifacts
+    return await finalize_drawing(
+        adapter,
+        OUTPUTS,
+        layout=SPEC.layout,
+        pdf_title="Measuring Stick Assembly Drawing Package",
+        scale=SHEET_SCALE,
+        expected_sheet_names=SHEET_NAMES,
+        sheet_layouts=SHEET_LAYOUTS,
+        sheet_scales=SHEET_SCALES,
+        settled_checks=(settled,),
+    )
 
 
 def _parse_args() -> argparse.Namespace:

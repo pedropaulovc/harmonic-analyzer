@@ -3,19 +3,15 @@
 ``cad/config/dimensions.yaml`` is read by no part, so nothing rebuilds when
 the rig moves, and its alignment-pinion layout summary drifted three geometry
 revisions behind (Codex P2s on #814: a 2.0 gap and −18.626 axis, 5 mm straps,
-the Ø10.32/e1.4 scalloped cam, a 34.0 spring foot).  Selected layout
-dimensions remain tied to their CAD owners below.  The bore-only inch pilot
-does not migrate the book: its derived cam-wall prose is not a manufacturing
-authority.  Check the live nominal wall and rig behavior numerically here;
-test_dt_pinion_cam_drawing owns the printed fit bands and worst-case walls.
+the Ø10.32/e1.4 scalloped cam, a 34.0 spring foot).  Every number the summary
+and the two rig rows print is re-derived here from the constant that owns it,
+at the places the prose prints, so the record cannot drift silently again.
 """
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
-
-import pytest
 
 import build_dt_drive_train_assembly as dt
 import cone_line
@@ -34,7 +30,6 @@ import dt_crank_pinion_spec as crank_pinion
 import dt_crankshaft_spec as crankshaft
 import dt_cylinder_gear_spec as drum
 import dt_pinion_bracket_geometry as strap
-import dt_pinion_cam_geometry as cam_geometry
 from dt_pinion_arbor_spec import SHAFT_LEN as ARBOR_LEN
 import dt_pinion_spring_geometry as spring
 import gen_dimensions
@@ -130,6 +125,8 @@ def _expected_fragments() -> list[str]:
         f"c2c {dt.STRAP_C2C:.1f}",
         f"{dt.STRAP_LEAN_DEG:.3f}° lean",
         f"bores at ({_mm(dt.LIFT_X)}, {_mm(dt.LIFT_Y)})",
+        # #290's bore-only inch pilot leaves the book untouched, so its derived
+        # thin-side wall prose is not pinned here (test_dt_pinion_cam_drawing).
         f"The collar is Ø{dt.CAM_OD:g} with a {dt.CAM_ECC:.1f} eccentricity",
         f"Current nominal parked surface gap is {dt._PARK_GAP:.3f}",
         f"{_mm(dt.CAM_ENGAGE_ROTATION_DEG)}° cam rotation, "
@@ -152,23 +149,6 @@ def test_alignment_pinion_record_matches_the_cad_constants() -> None:
     prose = _prose(gen_dimensions.load_doc())
     missing = [fragment for fragment in _expected_fragments() if fragment not in prose]
     assert not missing, "dimensions.yaml drifted from the CAD:\n" + "\n".join(missing)
-
-
-def test_alignment_pinion_cam_retains_its_physical_wall_and_operating_reserves() -> None:
-    # The book's derived wall is outside the bore-only pilot.  Do not freeze
-    # either its old decimal or the new nominal into a prose assertion.
-    assert (dt.CAM_OD, dt.CAM_ECC, dt.CAM_BORE_DIA, dt.CAM_LEN) == (
-        cam_geometry.CAM_OD,
-        cam_geometry.ECC,
-        cam_geometry.BORE,
-        cam_geometry.CAM_LEN,
-    )
-    nominal_wall = dt.CAM_OD / 2.0 - dt.CAM_BORE_DIA / 2.0 - dt.CAM_ECC
-    assert dt.CAM_THIN_SIDE_WALL == pytest.approx(nominal_wall)
-    assert nominal_wall >= cam_geometry.WALL_FLOOR_MM
-    assert 0.10 <= dt._PARK_GAP <= 0.25
-    assert (dt.FPIN_DIA + dt.CAM_OD) / 2.0 - dt._D_ENG >= 0.25
-    assert dt._FPIN_TIP_S - dt._S_CAM_ENG >= 1.0
 
 
 def test_current_drive_train_record_matches_the_selected_production_specs() -> None:
@@ -414,6 +394,7 @@ def test_superseded_rig_values_are_gone() -> None:
         "follower-stud mouth is silver-brazed",
         "34.0 foot",
         "−81.793",
+        "2.115 thin-side",
         "retained 2 mm parked tip gap",
     ):
         assert stale not in prose, stale

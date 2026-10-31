@@ -1,59 +1,27 @@
-"""The ``drawing_unit`` a package declares, validated in one place.
+"""The ``drawing_unit`` a package declares (issue #290 transition switch).
 
-A package (a part's ``cad/config/parts/<dashed-stem>.yaml`` row or an
-assembly's ``cad/config/assemblies/<dashed-stem>.yaml`` contract) may declare
-``drawing_unit: mm`` or ``drawing_unit: in`` (issue #290).  The TOL_* stamping,
-the drawing's document units and the model's document units all follow that one
-selection.  A package that declares nothing keeps the legacy millimetre sheet
-until the final migration; any other value is refused.
+A part's ``cad/config/parts/<stem>.yaml`` row or an assembly's
+``cad/config/assemblies/<stem>.yaml`` contract may declare ``drawing_unit: in``
+or ``drawing_unit: mm``; a package that declares nothing prints millimetres.
+The TOL_* stamps, the model's document units and the sheet's document units
+all follow that one value.  At cutover inches become the default and only
+metric-only supplier packages keep ``mm``.
 
-Pure data: no config reads, no SolidWorks.  Both the part stamping and the
-assembly contract import it, so it must stay free of ``_config`` and
-``_assembly_contract`` (either would widen every importing recipe).
+Pure data: no config reads, no SolidWorks.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 DrawingUnit = Literal["mm", "in"]
 
-DRAWING_UNITS: tuple[DrawingUnit, ...] = ("mm", "in")
-
-# A package without a declaration prints the legacy millimetre sheet.
-LEGACY_DRAWING_UNIT: DrawingUnit = "mm"
-
-DRAWING_UNIT_KEY = "drawing_unit"
-
-
-def checked_drawing_unit(owner: str, value: object) -> DrawingUnit:
-    """``value`` as a drawing unit; anything but ``"mm"``/``"in"`` raises."""
-    if isinstance(value, str) and value in DRAWING_UNITS:
-        return cast(DrawingUnit, value)
-    raise ValueError(
-        f"{owner}: {DRAWING_UNIT_KEY} must be one of {list(DRAWING_UNITS)}, got {value!r}"
-    )
-
-
-def declared_drawing_unit(owner: str, row: Mapping[str, Any]) -> DrawingUnit | None:
-    """The unit ``row`` declares, or ``None`` when it declares none."""
-    if DRAWING_UNIT_KEY not in row:
-        return None
-    return checked_drawing_unit(owner, row[DRAWING_UNIT_KEY])
-
-
-def resolved_drawing_unit(declared: DrawingUnit | None) -> DrawingUnit:
-    """The unit a package prints: its validated declaration, else the legacy
-    millimetre.  The ONE place the legacy fallback lives: a registry row
-    (:func:`drawing_unit`), an assembly contract and a drawing package all
-    resolve their declaration through it."""
-    return LEGACY_DRAWING_UNIT if declared is None else declared
-
 
 def drawing_unit(owner: str, row: Mapping[str, Any] | None) -> DrawingUnit:
-    """The unit ``row`` selects: its declaration, else the legacy millimetre.
-
-    ``row`` is ``None`` for an unregistered package (no row to declare one)."""
-    declared = None if row is None else declared_drawing_unit(owner, row)
-    return resolved_drawing_unit(declared)
+    """``row``'s declared unit, ``"mm"`` when it declares none (or there is no
+    row); any value other than ``"mm"``/``"in"`` raises."""
+    value = "mm" if row is None else row.get("drawing_unit", "mm")
+    if value not in ("mm", "in"):
+        raise ValueError(f"{owner}: drawing_unit must be 'mm' or 'in', got {value!r}")
+    return value

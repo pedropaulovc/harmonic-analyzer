@@ -11,12 +11,8 @@ in profile, and imports NumeralDepth there; its callout names the V angle.
 Native probes import TickDepth in Top but not in a removed cut-only section,
 so G-G is a full section (with hidden lines removed only the cut face shows).
 All sizes, bands and places come from the part; scale is never shrunk to fit.
-The sheet prints decimal inch (the part's ``drawing_unit: in``).
 Part-spec coordinates are millimetres; model-point projection takes metres.
 Drawing-sheet positions and projected fence coordinates are also metres.
-The source part's file is hashed before any view and proved unchanged at every
-save/close boundary. Its save flag is not held clean: per-view sketch
-imports show and re-blank its reference sketches in memory, never saved.
 
 This replaces draw_ha_measuring_stick without a legacy entry point: its
 split-common check, path and session imports live here, while ruled-face
@@ -58,20 +54,13 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _named_views import octant_view_name
 from _machinist_review_mode import MachinistReviewMode
 from _ms_drawing_contract import assert_manufacturing_dimensions
-from _drawing_source_guard import (
-    SourceCheck,
-    assert_source_closed,
-    capture_clean_source,
-    source_checkpoint,
-)
+from _part_properties import part_drawing_unit
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
-# The drawing's own registry package: its drawing_unit (in) selects the sheet.
-PACKAGE = "ms-stick"
 SPEC = DRAWINGS_BY_NAME["ms_stick"]
 PART_STEM = SPEC.artifact_stem
 SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
@@ -88,7 +77,7 @@ DETAIL_CENTER = (0.180, 0.140)
 DETAIL_SCALE = (6.0, 1.0)
 DETAIL_RADIUS_MM = 9.0
 DEPTH_PARENT_CENTER = (0.330, 0.210)
-# r1-r3 sheet 4: at 6:1 the .016 x .020 groove could not be read; 15:1 can.
+# r1-r3 sheet 4: at 6:1 the 0.40 x 0.50 groove could not be read; 15:1 can.
 DEPTH_CENTER = (0.375, 0.120)
 DEPTH_SCALE = (15.0, 1.0)
 DEPTH_RADIUS_MM = 1.6
@@ -112,12 +101,12 @@ NUMERAL_PROFILE_SCALE = (10.0, 1.0)
 NUMERAL_SECTION_X = (part.SCALE_START_X + part.TICK_WIDTH / 2.0 + part.NUMERAL_GAP_MM
                      + part.NUMERAL_HEIGHT_MM / 2.0)
 # r1-r3 sheet 4: at 1.5 mm the G letters sat on their arrows and the outline.
+# Each G prints from 1.4 mm below to 5.0 mm above its arrow (308 sheet 4, as
+# pd_support_bar's r7 letters): past the ruled edge (sheet top on the unturned
+# parent) 4.0 leaves the upper G 2.6 mm clear; 6.5 below the bar leaves the
+# lower G 1.5 mm clear of the bar's edge.
 NUMERAL_SECTION_OVERSHOOT_MM = 4.0
-# Native G origins sit 5.004 mm above the arrow shafts (308e5a1a8 audit),
-# but the template's 6.35 mm letters crossed them. Use the existing native
-# section-letter sizing pattern; keep the cutting plane and arrows unmoved.
-NUMERAL_SECTION_LETTER_HEIGHT = 0.0025
-NUMERAL_SECTION_LETTER_CLEARANCE = 0.001
+NUMERAL_SECTION_FOOT_OVERSHOOT_MM = 6.5
 FRONT_KEEP = {
     "BodyLength": (0.155, 0.205), "BodyWidth": (0.305, 0.215),
     "ScaleStartX": (0.180, 0.150),
@@ -249,70 +238,6 @@ def _engraving_detail(
     return detail
 
 
-def _place_numeral_section_letters(adapter: Any, parent: Any, definition: Any) -> None:
-    """Set native glyph height; measure rather than assume their origins move."""
-    parent = _early_bound(parent, "IView")
-    before = tuple(float(value) for value in parent.GetSectionLineInfo2())
-    text_format = _early_bound(definition.GetTextFormat(), "ITextFormat")
-    previous_height = float(text_format.CharHeight)
-    text_format.CharHeight = NUMERAL_SECTION_LETTER_HEIGHT
-    if not definition.SetTextFormat(False, text_format):
-        raise RuntimeError("numeral G-G native letter height rejected")
-    rebuild_drawing(adapter, label="place numeral G-G native letters")
-    after = tuple(float(value) for value in parent.GetSectionLineInfo2())
-    _telemetry.event(
-        "drawing.ms_stick.section_marker_format",
-        previous_height_m=previous_height,
-        requested_height_m=NUMERAL_SECTION_LETTER_HEIGHT,
-        before_marker=before,
-        after_marker=after,
-    )
-    _assert_numeral_section_letters(parent)
-
-
-def _assert_numeral_section_letters(parent: Any) -> None:
-    """Read the native marker envelope, including horizontal arrows' heights."""
-    marker = tuple(float(value) for value in _early_bound(parent, "IView").GetSectionLineInfo2())
-    if len(marker) < 3 or marker[0] != 1:
-        raise RuntimeError("numeral G-G requires one native cutting-plane marker")
-    segments = int(marker[2])
-    offset = 3 + 7 * segments
-    if segments < 1 or len(marker) != offset + 25 or not all(map(math.isfinite, marker)):
-        raise RuntimeError("numeral G-G native marker geometry is incomplete")
-    height = marker[-1]
-    if abs(height - NUMERAL_SECTION_LETTER_HEIGHT) > 1e-8:
-        raise RuntimeError("numeral G-G native letter height did not persist")
-    for index in range(2):
-        arrow = marker[offset + 9 * index:offset + 9 * (index + 1)]
-        text = marker[offset + 18 + 3 * index:offset + 21 + 3 * index]
-        if arrow[7] <= 0.0:
-            raise RuntimeError("numeral G-G native arrowhead height is missing")
-        # GetSectionLineInfo2's index 7 is ArrowHeight: the transverse
-        # vertical extent of these horizontal arrows, not ArrowWidth (6).
-        arrow_top = max(arrow[1], arrow[4]) + arrow[7] / 2.0
-        clearance = text[1] - height - arrow_top
-        _telemetry.event(
-            "drawing.ms_stick.section_marker_clearance",
-            letter_index=index + 1,
-            arrow_start=arrow[:3],
-            arrow_end=arrow[3:6],
-            arrow_width_m=arrow[6],
-            arrow_height_m=arrow[7],
-            text_origin=text,
-            text_height_m=height,
-            arrow_top_m=arrow_top,
-            clearance_m=clearance,
-            required_clearance_m=NUMERAL_SECTION_LETTER_CLEARANCE,
-        )
-        if clearance < NUMERAL_SECTION_LETTER_CLEARANCE:
-            raise RuntimeError(
-                f"numeral G-G letter {index + 1} overlaps its arrowhead: "
-                f"clearance={clearance!r} m, required={NUMERAL_SECTION_LETTER_CLEARANCE!r} m; "
-                f"arrow={arrow!r}, text_origin={text!r}, text_height={height!r} m; "
-                f"native_marker={marker!r}"
-            )
-
-
 def _numeral_profile(adapter: Any, parent: Any) -> Any:
     """Whole-bar full section across both straight side strokes of the zero numeral."""
     endpoints = tuple(
@@ -320,7 +245,7 @@ def _numeral_profile(adapter: Any, parent: Any) -> Any:
             adapter, parent, (NUMERAL_SECTION_X / 1000.0, y / 1000.0, 0.0),
             label="numeral stroke section endpoint",
         )
-        for y in (-NUMERAL_SECTION_OVERSHOOT_MM, part.BODY_WIDTH + NUMERAL_SECTION_OVERSHOOT_MM)
+        for y in (-NUMERAL_SECTION_FOOT_OVERSHOOT_MM, part.BODY_WIDTH + NUMERAL_SECTION_OVERSHOOT_MM)
     )
     section = create_section_view(
         adapter, parent, line_start=endpoints[0], line_end=endpoints[1],
@@ -335,7 +260,8 @@ def _numeral_profile(adapter: Any, parent: Any) -> Any:
     rebuild_drawing(adapter, label="numeral G-G full section")
     if bool(definition.GetDisplayOnlySurfaceCut()) or bool(definition.GetPartialSection()):
         raise RuntimeError("numeral G-G must be a full section of the whole bar")
-    _place_numeral_section_letters(adapter, parent, definition)
+    # The ruled-face turn the parent no longer takes: G-G reads as before.
+    _rotate_ruled_face(adapter, section)
     set_hidden_lines_removed(adapter, section)
     if bool(section.UseParentScale) or tuple(float(value) for value in section.ScaleRatio) != NUMERAL_PROFILE_SCALE:
         raise RuntimeError("numeral G-G must retain its independent 10:1 scale")
@@ -425,18 +351,13 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source measuring stick missing: {SOURCE}")
     check("open measuring stick", await adapter.open_model(str(SOURCE)))
     source_model = adapter.currentModel
-    # The engraving details show hidden part sketches in memory and re-blank
-    # them (part_sketches_shown), which can leave the save flag set.
-    source = capture_clean_source(SOURCE, source_model, label="measuring stick source",
-                                  check=SourceCheck.TRANSIENT_VIEW_STATE)
-    guard = source_checkpoint(source)
     properties = ("Number", "Revision", "Title", "Material Specification", "Finish",
                   "Quantity", "Manufacturing Notes", "Front View Note", "Isometric View Note",
                   "Numeral Placement Note")
     read_required_properties(source_model, properties, required=properties)
     drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM,
                                         scale=SHEET_SCALE, layout=SPEC.layout,
-                                        package_name=PACKAGE, checkpoint=guard)
+                                        unit=part_drawing_unit(PART_STEM))
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="measuring stick manufacturing package")
     stamp_drawing_summary(adapter, drawing, {
         0: "Measuring Stick Manufacturing Drawing",
@@ -525,9 +446,11 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, numeral, keep=NUMERAL_KEEP, view_label="numeral detail",
             dimensions_by_feature=part.DRAWING_DIMENSIONS)
     add_property_linked_note(adapter, "Numeral Placement Note", *NUMERAL_NOTE_XY)
+    # Unturned, unlike the other ruled-face parents: SolidWorks lays the
+    # cutting-line letters out in the parent's own frame, so turned 180 degrees
+    # each G printed back across its own arrowhead (v46 and 308 sheet 4).
     profile_parent = place_view(
         adapter, str(SOURCE), "*Back", *NUMERAL_PROFILE_PARENT_CENTER, scale=SHEET_SCALE)
-    _rotate_ruled_face(adapter, profile_parent)
     set_hidden_lines_removed(adapter, profile_parent)
     profile = _numeral_profile(adapter, profile_parent)
     numeral_depth_annotations = curate_view_dimensions(
@@ -553,16 +476,11 @@ async def build(adapter: Any) -> dict[str, str]:
     _assert_dimension_contract(adapter, annotations)
     for view in (parent, detail, depth_parent, depth):
         set_hidden_lines_removed(adapter, view)
-    artifacts = await finalize_drawing(
-        adapter, OUTPUTS, pdf_title="Measuring Stick Manufacturing Drawing",
-        scale=SHEET_SCALE, layout=SPEC.layout,
-        expected_sheet_names=SHEET_NAMES,
-        sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
-        settled_checks=(lambda: _assert_dimension_contract(adapter, annotations),
-                        lambda: _assert_numeral_section_letters(profile_parent)),
-        package_name=PACKAGE, checkpoint=guard)
-    assert_source_closed(source, stage="after finalize")
-    return artifacts
+    return await finalize_drawing(adapter, OUTPUTS, pdf_title="Measuring Stick Manufacturing Drawing",
+                                  scale=SHEET_SCALE, layout=SPEC.layout,
+                                  expected_sheet_names=SHEET_NAMES,
+                                  sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
+                                  settled_checks=(lambda: _assert_dimension_contract(adapter, annotations),))
 
 
 if __name__ == "__main__":

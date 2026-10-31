@@ -150,16 +150,16 @@ def test_sub_hundredth_model_bands_get_exact_tolerance_precision(
     assert _drawing_tolerances._tolerance_places(*band, display_unit="mm") == expected
 
 
-def test_u27_slip_fit_band_prints_at_two_places() -> None:
-    # U27 (Main, 2026-09-23): the cam pin moved from a micron press band to a
-    # hundredth slip-fit band a novice can hold.
-    assert _drawing_tolerances._tolerance_places(*PIN_DIA_BAND, display_unit="mm") == 2
-
-
-def test_inch_cam_bore_reamer_band_prints_at_four_inch_places() -> None:
-    # #290 owner ruling: the cam bore is the owned .2510 reamer's +.0005/.0000,
-    # a sub-.001 band that an inch sheet prints at four places.
-    assert _drawing_tolerances._tolerance_places(*CAM_BORE_BAND, display_unit="in") == 4
+@pytest.mark.parametrize(
+    ("band", "unit", "places"), [(PIN_DIA_BAND, "mm", 2), (CAM_BORE_BAND, "in", 4)]
+)
+def test_u27_slip_fit_bands_print_at_their_places(
+    band: tuple[float, float], unit: str, places: int
+) -> None:
+    # U27 (Main, 2026-09-23): the cam bore and cam pin moved from micron press
+    # and slide bands to slip-fit bands a novice can hold.  #290: the cam bore
+    # is the owned .2510 reamer's +.0005/.0000, four places on its inch sheet.
+    assert _drawing_tolerances._tolerance_places(*band, display_unit=unit) == places
 
 
 @pytest.mark.parametrize(

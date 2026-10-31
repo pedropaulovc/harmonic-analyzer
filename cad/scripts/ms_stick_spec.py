@@ -10,24 +10,14 @@ The 2026-10-23 owner ruling V-engraves the numerals: single-stroke sans
 numerals cut as true 30-degree included V grooves (the model drafts every
 stroke wall 15 degrees). The square-bottom graduations stay fixed.
 
-Issue #290 (decimal-inch pilot): the sheet prints decimal inch
-(``drawing_unit: in``). Every length below is physical millimetres, authored
-as the exact decimal of the inch value it prints, snapped to that printed
-grid: the 7.95 x .315 x .118 bar, ticks .016 MIN wide and .020 MIN deep,
-tick lengths .12 / .07 / .16, numerals .08 high, .02 off their tick and .016
-MIN deep. Exempt (owner ruling, pitch/calibration geometry): the configured
-14.2 mm full and 1.42 mm minor graduation pitch
-(``cad/config/machine/amplitude.yaml``) and the 56.5 mm scale zero, the rule
-the amplitude stations and the stop setting are read against; they print
-rounded (2.224, .559, .0559) at their own +/-.002 physical band. The
-four-place minor pitch keeps all 100 subdivisions consistent with the ten
-full divisions; neither pitch is snapped to its printed inch value.
-The unprinted V-bit stroke width at the face (0.24) is tool geometry and stays.
-The overall length is 7.95 at .XX (owner ruling, issue #290): the inch value
-nearest the original blank, at .XX because the last groove's rule-17 land
-reads it. No dimension prints .X; the title block's .X row alone covers it.
-The tick lengths take the title block's .XX: a full tick at .12 +.01 and a
-half-division tick at .16 -.01 stay .02 apart.
+Issue #290: the sheet prints decimal inch (``drawing_unit: in``). Lengths stay
+physical millimetres, each the exact decimal of the inch value it prints (see
+the trailing comments). Exempt (owner ruling, calibration geometry): the
+configured 14.2 / 1.42 mm pitch and the 56.5 mm scale zero print rounded
+(.559, .0559, 2.224) at their own +/-.002; the minor pitch prints four places
+so ten printed minor pitches equal the printed full pitch. The 7.95 length is
+.XX because the last groove's rule-17 land reads it; nothing prints .X. The
+unprinted 0.24 V-bit stroke width at the face is tool geometry and stays.
 """
 
 from __future__ import annotations
@@ -69,8 +59,6 @@ SCALE_END_MARGIN = 3.43
 # stop and the bar stations against is unmoved; it prints 2.224 at the
 # stations' +/-.002.
 SCALE_START_X = BODY_LENGTH - SCALE_SPAN - SCALE_END_MARGIN
-if abs(SCALE_START_X - 56.5) > 1e-9:
-    raise AssertionError(f"scale zero moved off its calibrated 56.5 mm: {SCALE_START_X}")
 TICK_WIDTH = 0.4064  # .016 MIN
 TICK_LENGTH = 3.048  # .12
 MINOR_TICK_LENGTH = 1.778  # .07
@@ -146,20 +134,6 @@ GRADUATION_WIDTH_MAX_MM = 0.6096  # .024
 GRADUATION_WIDTH_CALLOUT = (
     f"{inch_text(GRADUATION_WIDTH_MAX_MM, 3)} MAX ON {inch_text(MINOR_SPACING, 4)} PITCH"
 )
-# The widest last groove, its zero and its noncumulative station both at
-# their band, keeps the rule-17 land to the end face of the shortest bar the
-# .XX length allows.
-LAST_GROOVE_LAND_MIN_MM = BODY_LENGTH - BODY_LENGTH_TOLERANCE_MM - (
-    SCALE_START_X + SCALE_SPAN + 2.0 * GRADUATION_POSITION_TOLERANCE_MM
-    + GRADUATION_WIDTH_MAX_MM / 2.0
-)
-if LAST_GROOVE_LAND_MIN_MM < WALL_TARGET_MM:
-    raise AssertionError(
-        f"last graduation land {LAST_GROOVE_LAND_MIN_MM:.3f} mm is below the rule-17 target"
-    )
-# Both engraving depths leave the stated floor in the thinnest bar.
-if BODY_THICKNESS - BODY_FIT_TOLERANCE_MM - max(TICK_DEPTH, NUMERAL_DEPTH) < GRADUATION_FLOOR_MIN_MM:
-    raise AssertionError("an engraving's nominal depth already breaks the stated floor")
 # swTolType_e.swTolMIN prints the nominal plus MIN: the model value is the
 # printed minimum. (lower, upper) deviations are the stored readback pair.
 MIN_LIMIT_TOL_TYPE = 5

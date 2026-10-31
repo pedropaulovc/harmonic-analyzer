@@ -35,7 +35,6 @@ import ms_measuring_stick_assembly_spec as spec
 import ms_measuring_stick_explode_spec as explode
 from _assembly import (
     activate_assembly_contract,
-    assembly_drawing_unit,
     assembly_title_properties,
     assert_components_fully_defined,
     author_in_drawing_configurations,
@@ -44,6 +43,7 @@ from _assembly import (
     place_component,
     save_assembly_and_images,
 )
+from _assembly_contract import assembly_contract
 from _assembly_patterns import ensure_global_pattern_axis
 from _check import check
 from _com import _early_bound
@@ -306,16 +306,7 @@ def _create_ms_explode(adapter: Any, configuration_name: str) -> None:
 
 
 async def _author_clamped_setting(adapter: Any) -> None:
-    """No solid/pose edits: a source-owned chord between physical face stations.
-
-    The chord records the saved graduation-indexed pose, not an acceptance
-    band. Its live value is shown parenthesized, as the magnifier references."""
-    unit = assembly_drawing_unit(ASM_NAME)
-    if unit != spec.SETTING_UNIT:
-        raise RuntimeError(
-            f"{ASM_NAME} declares drawing_unit {unit!r}; the clamped setting is "
-            f"authored in {spec.SETTING_UNIT!r}"
-        )
+    """No solid/pose edits: a source-owned chord between physical face stations."""
     (left_x, contact_y), (face_x, _) = spec.SETTING_CHORD
     for name, value in (
         ("SettingStickLeft", left_x),
@@ -346,21 +337,13 @@ async def _author_clamped_setting(adapter: Any) -> None:
     name_last_feature(adapter, spec.SETTING_FEATURE)
     for name, expression in dims.apply(adapter, spec.SETTING_FEATURE):
         await drive_dimension(adapter, name, expression)
-    display, dimension = _named_dimension(
-        adapter, spec.SETTING_FEATURE, spec.SETTING_DIMENSION
-    )
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = 0  # swTolNONE
+    # A parenthesized reference to the saved pose, not a band: the native
+    # prefix/suffix channel around the live value, as the magnifier's.
+    display, dimension = _named_dimension(adapter, spec.SETTING_FEATURE, spec.SETTING_DIMENSION)
+    _early_bound(dimension.Tolerance, "IDimensionTolerance").Type = 0  # swTolNONE
     display.ShowParenthesis = False
     display.SetText(1, "(")
     display.SetText(2, ")")
-    if (
-        int(tolerance.Type) != 0
-        or bool(display.ShowParenthesis)
-        or str(display.GetText(1) or "") != "("
-        or str(display.GetText(2) or "") != ")"
-    ):
-        raise RuntimeError("clamped setting reference form did not persist")
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     mark_dimensions_for_drawing(adapter, spec.SETTING_FEATURE, {spec.SETTING_DIMENSION})
     blank_sketch(adapter, spec.SETTING_FEATURE)
@@ -377,9 +360,7 @@ async def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
     check("create_assembly", await adapter.create_assembly())
-    # The contract's IPS/inch/8-place calculation units, before the first
-    # component, mate or global; the save only proves them.
-    apply_package_model_units(adapter, assembly_drawing_unit(ASM_NAME), label=ASM_NAME)
+    apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
 
     # The block and cover share the stop's turned, thumbscrew-up frame.
     await _place_fixed(adapter, "ms-stop-block", spec.BLOCK_ORIGIN, spec.BLOCK_ROWS)

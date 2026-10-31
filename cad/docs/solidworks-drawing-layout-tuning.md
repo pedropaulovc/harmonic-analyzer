@@ -1283,16 +1283,6 @@ assembly's callout and metadata readbacks, saved `Default` collapsed state,
 simplified views, printed dimension text, associative edge balloon landings,
 and unchanged source identity throughout drawing generation.
 
-The MS part and assembly sheets and `dt_pinion_cam` use the one shared
-`_drawing_source_guard`: capture proves the open document is the source file,
-its save flag is clear and records the file's SHA-256 before presentation;
-the `new_project_drawing`/`finalize_drawing` checkpoints and the
-post-finalization proof refuse changed bytes at every stage. Its
-`SourceCheck` is the save-flag lifecycle: `NATIVE_CLEAN` refuses a set flag
-while the drawing is open, `TRANSIENT_VIEW_STATE` records it (shown part
-sketches or a view camera can set it without a write), and `CLOSED` reads
-only the file from the drawing close on, never the source handle.
-
 MS's working pose has the thumbscrew above the stick, both standalone and
 parked in HA. Its graduated face remains against the fixed clamp wall and is
 therefore underneath; the named underside inspection view shows that scale.

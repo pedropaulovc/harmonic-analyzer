@@ -10,9 +10,7 @@ unit is part of its key (``band_mm`` or ``band_in``, ``plus_mm``,
   inch string can never be read back as millimetres.
 * The ``*_display`` renderers derive the TOL_* text from the number and its
   unit (ASME style: ``±0.51`` in mm, ``±.01`` in inches), never the reverse.
-* Every reader and renderer takes the sheet's ``unit`` (``"mm"`` default, or
-  ``"in"`` for a package declaring ``drawing_unit: in``) and refuses a length
-  row printed in any other unit.
+  Each takes the sheet's ``unit`` (``_config.title_block``'s row selection).
 
 The TOL_* stamping (``_part_properties``) imports only this module.  Geometry
 that sizes from the printed rows reads them through ``_printed_tolerance``,
@@ -28,7 +26,6 @@ from collections.abc import Mapping
 from typing import Any
 
 import _config
-from _drawing_units import DrawingUnit
 
 MM_PER_INCH = 25.4
 # Physical millimetres per printed unit, for length rows.
@@ -91,6 +88,12 @@ def _check_printable(label: str, value: float, digits: int) -> None:
         )
 
 
+def length_mm(row_name: str, row: Mapping[str, Any], name: str) -> float:
+    """``row``'s ``<name>_<unit>`` length in millimetres."""
+    value, unit, _digits = quantity(row_name, row, name, LENGTH_UNITS)
+    return value * LENGTH_UNITS[unit]
+
+
 def render_number(value: float, unit: str, digits: int) -> str:
     """``value`` as the sheet prints it in ``unit`` at ``digits`` decimals.
 
@@ -112,86 +115,47 @@ def render_number(value: float, unit: str, digits: int) -> str:
     raise ValueError(f"unknown display unit {unit!r}")
 
 
-def sheet_quantity(
-    row_name: str,
-    row: Mapping[str, Any],
-    name: str,
-    units: Mapping[str, float],
-    *,
-    unit: DrawingUnit,
-) -> tuple[float, str, int]:
-    """``(value, printed unit, digits)`` of ``row``'s ``<name>_<unit>`` entry,
-    where ``row`` is ``_config.title_block(row_name, unit=unit)``.
-
-    A length row must be printed in the sheet's own unit: an inch sheet that
-    fell back to a millimetre band (an ``in:`` row missing from
-    title_block.yaml), or a millimetre sheet carrying an inch band, is refused
-    rather than printed in the wrong unit.
-    """
-    label = row_name if unit == "mm" else f"{unit}.{row_name}"
-    value, printed, digits = quantity(label, row, name, units)
-    if units is LENGTH_UNITS and printed != unit:
-        raise ValueError(
-            f"title_block.{label}.{name}_{printed} cannot print on a {unit!r} "
-            f"sheet; it needs {name}_{unit}"
-        )
-    return value, printed, digits
+def _render(row_name: str, name: str, units: Mapping[str, float], sheet: str) -> str:
+    row = _config.title_block(row_name, unit=sheet)
+    value, unit, digits = quantity(row_name, row, name, units)
+    return render_number(value, unit, digits)
 
 
-def sheet_length_mm(
-    row_name: str, row: Mapping[str, Any], name: str, *, unit: DrawingUnit
-) -> float:
-    """``row``'s ``<name>`` length on a ``unit`` sheet, in millimetres."""
-    value, printed, _digits = sheet_quantity(
-        row_name, row, name, LENGTH_UNITS, unit=unit
-    )
-    return value * LENGTH_UNITS[printed]
-
-
-def _render(
-    row_name: str, name: str, units: Mapping[str, float], unit: DrawingUnit
-) -> str:
-    row = _config.title_block(row_name, unit=unit)
-    value, printed, digits = sheet_quantity(row_name, row, name, units, unit=unit)
-    return render_number(value, printed, digits)
-
-
-def linear_band_display(places: int, *, unit: DrawingUnit = "mm") -> str:
+def linear_band_display(places: int, *, unit: str = "mm") -> str:
     """TOL_LIN_X / _XX / _XXX: the printed +/- for ``places``, e.g. ``±0.51``
     (``±.01`` on an inch sheet)."""
     return "±" + _render(f"linear_{places}pl", "band", LENGTH_UNITS, unit)
 
 
-def angular_band_display(*, unit: DrawingUnit = "mm") -> str:
+def angular_band_display(*, unit: str = "mm") -> str:
     """TOL_ANG, e.g. ``±1°``."""
     return "±" + _render("angular", "value", ANGLE_UNITS, unit)
 
 
-def edge_break_radius_display(*, unit: DrawingUnit = "mm") -> str:
-    """TOL_EDGE_BREAK_R, e.g. ``R0.25`` (``R.010``)."""
+def edge_break_radius_display(*, unit: str = "mm") -> str:
+    """TOL_EDGE_BREAK_R, e.g. ``R0.25``."""
     return "R" + _render("edge_break", "radius", LENGTH_UNITS, unit)
 
 
-def edge_break_chamfer_display(*, unit: DrawingUnit = "mm") -> str:
-    """TOL_CHAMFER_MAX, e.g. ``0.25`` (``.010``)."""
+def edge_break_chamfer_display(*, unit: str = "mm") -> str:
+    """TOL_CHAMFER_MAX, e.g. ``0.25``."""
     return _render("edge_break", "chamfer_max", LENGTH_UNITS, unit)
 
 
-def inside_corner_display(*, unit: DrawingUnit = "mm") -> str:
-    """TOL_INSIDE_CORNER, e.g. ``R1.0 MAX`` (``R.040 MAX``)."""
+def inside_corner_display(*, unit: str = "mm") -> str:
+    """TOL_INSIDE_CORNER, e.g. ``R1.0 MAX``."""
     return f"R{_render('inside_corner', 'radius', LENGTH_UNITS, unit)} MAX"
 
 
-def drilled_hole_plus_display(*, unit: DrawingUnit = "mm") -> str:
-    """TOL_HOLE_PLUS, the upper deviation with its sign, e.g. ``+0.10``
-    (``+.004``)."""
+def drilled_hole_plus_display(*, unit: str = "mm") -> str:
+    """TOL_HOLE_PLUS, the upper deviation with its sign, e.g. ``+0.10``."""
     return "+" + _render("drilled_hole", "plus", LENGTH_UNITS, unit)
 
 
-def drilled_hole_minus_display(*, unit: DrawingUnit = "mm") -> str:
+def drilled_hole_minus_display(*, unit: str = "mm") -> str:
     """TOL_HOLE_MINUS: a nil limit is a bare ``0`` (ASME Y14.5-2009 §2.3.2),
     any other the signed lower deviation."""
     row = _config.title_block("drilled_hole", unit=unit)
-    if sheet_length_mm("drilled_hole", row, "minus", unit=unit) == 0.0:
+    if length_mm("drilled_hole", row, "minus") == 0.0:
         return "0"
     return "-" + _render("drilled_hole", "minus", LENGTH_UNITS, unit)

@@ -112,13 +112,9 @@ EXTENT_MAX = (
 )
 
 # --- Clamped setting (a construction sketch in the .SLDASM) ------------------
-# Reference pose, not a functional acceptance band: STOP_MARK centres the
-# block on a calibrated graduation for the saved clamped/parked presentation.
-# No mating workpiece or measurement-accuracy requirement consumes this span.
-# The former +/-0.10 mm (later .004 in) band had no functional derivation.
-# Keep the exact calibrated station less half the block; the inch grid must
-# not snap this closure or move the graduation geometry.
-SETTING_UNIT = "in"
+# A reference to the saved pose, not an acceptance band: STOP_MARK places the
+# block on a calibrated graduation and no fit consumes this span. It prints
+# parenthesized, at three decimal-inch places.
 SETTING_NEAR_FACE_MM = BLOCK_ORIGIN[0] - STICK_X_MIN
 SETTING_PRECISION = 3
 SETTING_FEATURE = "ClampedSetting"

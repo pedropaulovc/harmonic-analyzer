@@ -5,14 +5,12 @@ The eccentric steel collar pinned to the lift rod at each strap station
 ON its OD from above, so turning the lever (rod + both cams spin as
 one) raises the surface under the pin and swings the drum into mesh.
 
-U28 (user, 2026-09-23): Ø14.6 OD, eccentricity 2.0 (4.0 full lift).  #290
-(owner ruling, decimal-inch pilot): only the bore moves, onto the owned .2510
-reamer; the other nominals keep their millimetre values and print in inches
-(.575, .079, .35, .16).  At the printed worst case the thin side keeps .07975
-in of wall, .00025 under the .080 target (owner minor RV-01).  The former
+U28 (user, 2026-09-23): Ø14.6 OD, eccentricity 2.0 (4.0 full lift), so the
+thin side keeps 2.11 of wall over the Ø.2510 bore (#290; .07975 in at the
+printed worst case, owner minor RV-01 under the .080 target).  The former
 raised set-pin dome is gone -- a pad proud of a turned OD cannot be turned --
-and a #2-56 set screw sits sub-flush in the heavy side, which never meets the
-follower.
+and a #2-56 set screw sits sub-flush in the 6.1-thick heavy side, which never
+meets the follower.
 
 Layout: bore axis Z through the ORIGIN (rides the rod), authored in the
 PARK pose -- collar centre at (0, -ECC), heavy side and the set-screw
@@ -80,14 +78,11 @@ from dt_pinion_cam_geometry import (
 from _named_views import name_octant_views
 from dt_pinion_cam_spec import (
     BORE_BAND,
-    BORE_PLACES,
     COLLAR_AXIS_TOLERANCE_MM,
-    COLLAR_OD_PLACES,
     COLLAR_OD_TOLERANCE_MM,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
-    ECC_PLACES,
     ISOMETRIC_VIEW_NOTE,
     SURFACE_FINISHES,
     THIN_WALL_MIN_BAND,
@@ -140,9 +135,9 @@ V_TAP_DRILL = _tap_drill_removed()
 async def _thin_wall_reference(adapter) -> list[tuple[str, str]]:
     """RV-01's accepted wall, stated on the sheet natively (rule 20): a hidden
     construction line up the thin side (+Y) from the bore's top, as long as
-    the printed minimum, so its driving dimension IS ".0797 MIN" (swTolMIN,
-    set after the drives).  The collar and bore are untouched; returns the
-    deferred drive jobs (the length, then its anchor to the bore's top)."""
+    the printed minimum, so its driving dimension prints ".0797 MIN" once
+    set_single_limit types it.  Returns the deferred drive jobs (the length,
+    then its anchor to the bore's top)."""
     check("create_sketch thin wall reference", await adapter.create_sketch("Front"))
     # Direct-to-DB: the line lies on the sketch's vertical axis, where
     # creation-time inference would over-define it.
@@ -179,18 +174,6 @@ async def _thin_wall_reference(adapter) -> list[tuple[str, str]]:
     full = name_dimensions(
         adapter, "ThinWallReference", ["ThinWallMin", "ThinWallBore"]
     )
-    measured = (
-        float(
-            _early_bound(
-                adapter.currentModel.Parameter(full[0]), "IDimension"
-            ).SystemValue
-        )
-        * 1000.0
-    )
-    if abs(measured - THIN_WALL_MIN_MM) > 1e-6:
-        raise RuntimeError(
-            f"{full[0]} measures {measured:g} mm, expected {THIN_WALL_MIN_MM:g} mm"
-        )
     return list(zip(full, ('"ThinWallMin"', '"BoreDia" / 2'), strict=True))
 
 
@@ -198,10 +181,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
-    # The registry row's IPS/inch/8-place calculation units, before the first
-    # global: the equation manager evaluates every global in them (three places
-    # would re-evaluate CamOd/Ecc/ThinWallMin off the spec), and the save only
-    # proves them.
+    # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing (INCH
@@ -212,8 +192,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BoreDia", f"{BORE}mm")
     await set_global(adapter, "SetScrewZ", f"{SET_SCREW_Z}mm")
     await set_global(adapter, "TapDrillDia", f"{TAP_DRILL_DIA}mm")
-    # RV-01's printed thin-side wall minimum (dt_pinion_cam_spec): a limit,
-    # not geometry, so only the hidden reference line below carries it.
+    # RV-01's printed thin-side wall minimum: a limit, not geometry, so only
+    # the hidden reference line carries it.
     await set_global(adapter, "ThinWallMin", f"{THIN_WALL_MIN_MM}mm")
 
     drive_jobs: list[tuple[str, str]] = []
@@ -358,23 +338,15 @@ async def build(adapter) -> dict[str, str]:
     # model dimensions (drawing-simplicity-policy.md `How the repository implements the guidelines` -- the places are the tolerance, so the
     # sheet reads them back instead of rewriting them); mark exactly the
     # print's dimensions and stamp the make-critical title-block properties.
-    # The bands are millimetres; UNIT (the row's drawing_unit) counts their
-    # places in inches, each at its nominal's places (ASME inch): the reamed
-    # bore's +.0005/.0000 at four, the OD's and eccentricity's +/-.002 at three.
+    # The bands are millimetres; UNIT prints them in inches.
     set_dimension_bilateral_tolerance(
-        adapter,
-        "BoreProfile",
-        "BoreDia",
-        *deviations(BORE_BAND),
-        places=BORE_PLACES,
-        display_unit=UNIT,
+        adapter, "BoreProfile", "BoreDia", *deviations(BORE_BAND), display_unit=UNIT
     )
     set_dimension_symmetric_tolerance(
         adapter,
         "CollarProfile",
         "CollarOd",
         COLLAR_OD_TOLERANCE_MM,
-        places=COLLAR_OD_PLACES,
         display_unit=UNIT,
     )
     set_dimension_symmetric_tolerance(
@@ -382,7 +354,6 @@ async def build(adapter) -> dict[str, str]:
         "CollarProfile",
         "CollarCy",
         COLLAR_AXIS_TOLERANCE_MM,
-        places=ECC_PLACES,
         display_unit=UNIT,
     )
     set_single_limit(

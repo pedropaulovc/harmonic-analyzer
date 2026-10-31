@@ -257,27 +257,11 @@ def test_no_finish_symbol_and_no_gdt() -> None:
 
 
 def test_spec_imports_no_com_or_drawing_modules() -> None:
-    # The sole drawing-prefixed exception is pure registry-unit data. Keep its
-    # import surface constrained just like the measuring-stick spec contract.
-    helper = ast.parse(
-        Path(spec.__file__).with_name("_drawing_units.py").read_text(encoding="utf-8")
-    )
-    helper_imports = {
-        name
-        for node in ast.walk(helper)
-        for name in (
-            [node.module or ""] if isinstance(node, ast.ImportFrom)
-            else [alias.name for alias in node.names] if isinstance(node, ast.Import)
-            else []
-        )
-    }
-    assert helper_imports <= {"__future__", "collections.abc", "typing"}, helper_imports
     code = (
         "import sys, ch_anchor_jam_nut_spec\n"
-        "assert '_drawing_units' in sys.modules\n"
         "bad = sorted(m for m in sys.modules if m.startswith("
         "('win32', 'pythoncom', 'pywintypes', 'solidworks_mcp', '_drawing', "
-        "'_com')) and m != '_drawing_units')\n"
+        "'_com')))\n"
         "print(','.join(bad))\n"
     )
     out = subprocess.run(

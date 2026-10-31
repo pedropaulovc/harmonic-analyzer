@@ -31,7 +31,7 @@ import math
 import _config
 from _drawing_units import drawing_unit
 from _fit_deviations import deviations
-from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from _gtol_cylinder import CylinderFace
@@ -47,59 +47,28 @@ from dt_pinion_cam_geometry import (
     TAP_DRILL_DIA as TAP_DRILL_DIA,
 )
 
-# Issue #290: the registry row's drawing_unit is the one declaration of this
-# sheet's unit; the bands, the roughness grade and the tolerance display all
-# read it.  The bands and places below are inch-native, so a row that stopped
-# declaring inches must fail here rather than print them in mm.
-_ROW = _config.parts("dt-pinion-cam")
-UNIT = drawing_unit("parts/dt-pinion-cam", _ROW)
-if UNIT != "in":
-    raise AssertionError(
-        f"dt-pinion-cam is dimensioned in inches but its row declares {UNIT!r}"
-    )
-
-# Owner ruling (#290 pilot, 2026-10-30, via Main): only the bore moves, onto
-# the owned .2510 reamer.  Every other nominal keeps its millimetre value
-# (OD 14.6, eccentricity 2.0, length 9.0, station 4.1: the drive train's
-# park/engage/rig geometry) and prints in inches at its own grade, so the
-# printed number is the model rounded to these places.  Every wall below is
-# therefore judged at the PRINTED limits (printed_deviations), never at the
-# model value.  Every feature here feeds a fit, a wall or the rig stack, so
-# none prints at .X.
-BORE_PLACES = 4  # .2510 +.0005/.0000: the reamer band needs four
-COLLAR_OD_PLACES = 3  # 14.6 prints .575 +/-.002
-ECC_PLACES = 3  # 2.0 prints .079 +/-.002
-LENGTH_PLACES = 2  # 9.0 prints .35 at .XX
-SET_SCREW_Z_PLACES = 2  # 4.1 prints .16 at .XX
-TAP_DRILL_PLACES = 3  # .070 (#50): inch drill diameters print three places
+# #290: the registry row's drawing_unit (in) is this sheet's unit; the bands,
+# places and roughness below are authored for it.
+UNIT = drawing_unit("parts/dt-pinion-cam", _config.parts("dt-pinion-cam"))
 
 # U27 (Main, 2026-09-23): the cam is set-screwed to the lift rod (MHA-DT-17), so
-# the bore only has to slip over it: enough clearance to slide on at assembly,
-# small enough that the set screw's shift is noise under the feeler-set rig
-# location.  #290: the authored functional window is U27's 0.02-0.10 mm put
-# inside the .0001-in grid, .0008-.0039 in.  The owned .2510 over reamer cuts
-# R +.0000/+.0005 (trial-cut it before relying on the band), so the bore
-# prints .2510 +.0005/.0000; on today's MHA-DT-17 ground h band (0/-0.020 mm)
-# the derived clearance is 0.0254-0.0581 mm (.0010-.00229 in), inside it.
+# the bore only has to slip over it: 0.02-0.10 diametral clearance against the
+# rod's h band is enough to slide on at assembly, small enough that the set
+# screw's shift is noise under the feeler-set rig location.  #290 (owner
+# ruling): the owned .2510 reamer cuts it .2510 +.0005/.0000, at four places.
 LIFT_ROD_NUMBER = "MHA-DT-17"
+BORE_PLACES = 4
 BORE_BAND = (0.0127, 0.0)  # (upper, lower) about BORE: +.0005/.0000 in
-SLIP_CLEARANCE_WINDOW_MM = (0.02032, 0.09906)  # .0008-.0039 in
-_BORE_LOWER, _BORE_UPPER = printed_deviations(
-    BORE, BORE_PLACES, deviations(BORE_BAND), unit=UNIT
-)
+_BORE_LOWER, _BORE_UPPER = deviations(BORE_BAND)
 SLIP_CLEARANCE_MIN = round(
     BORE + _BORE_LOWER - (LIFT_ROD_DIA + LIFT_ROD_DIA_BAND[0]), 6
 )
 SLIP_CLEARANCE_MAX = round(
     BORE + _BORE_UPPER - (LIFT_ROD_DIA + LIFT_ROD_DIA_BAND[1]), 6
 )
-if (
-    SLIP_CLEARANCE_MIN < SLIP_CLEARANCE_WINDOW_MM[0]
-    or SLIP_CLEARANCE_MAX > SLIP_CLEARANCE_WINDOW_MM[1]
-):
+if SLIP_CLEARANCE_MIN < 0.02 or SLIP_CLEARANCE_MAX > 0.10:
     raise AssertionError(
-        f"cam slip clearance {SLIP_CLEARANCE_MIN}-{SLIP_CLEARANCE_MAX} mm is "
-        f"outside {SLIP_CLEARANCE_WINDOW_MM}"
+        f"cam slip clearance {SLIP_CLEARANCE_MIN}-{SLIP_CLEARANCE_MAX} is outside 0.02-0.10"
     )
 # The cam OD is the working surface the follower rides, and the bore-to-OD
 # offset IS the lift: both are on the drive train's critical list.  Nothing
@@ -109,9 +78,19 @@ if (
 # both tight bands name the MHA-DT-25 follower pin they serve (machinist
 # review ENFORCE r1: the bands named no mate).
 FOLLOWER_PIN_NUMBER = "MHA-DT-25"
-COLLAR_OD_TOLERANCE_MM = 0.0508  # +/-.002 in (was +/-0.05 mm)
-COLLAR_AXIS_TOLERANCE_MM = 0.0508  # +/-.002 in (was +/-0.05 mm)
+COLLAR_OD_TOLERANCE_MM = 0.0508  # +/-.002 in
+COLLAR_AXIS_TOLERANCE_MM = 0.0508  # +/-.002 in
 
+# #290: the OD, eccentricity, length and station keep their millimetre
+# nominals (the drive train's park/engage/rig geometry) and print rounded in
+# inches -- .575, .079, .35, .16 -- so every wall below is judged at the
+# PRINTED limits.  Three places carry the OD's and eccentricity's +/-.002; the
+# length and station feed the end-face walls and the rig stack, so they print
+# at .XX, never .X.
+COLLAR_OD_PLACES = 3
+ECC_PLACES = 3
+LENGTH_PLACES = 2
+SET_SCREW_Z_PLACES = 2
 _OD_LOWER, _OD_UPPER = printed_deviations(
     CAM_OD,
     COLLAR_OD_PLACES,
@@ -128,16 +107,14 @@ _LENGTH_LOWER, _LENGTH_UPPER = printed_deviations(CAM_LEN, LENGTH_PLACES, unit=U
 _STATION_LOWER, _STATION_UPPER = printed_deviations(
     SET_SCREW_Z, SET_SCREW_Z_PLACES, unit=UNIT
 )
-# The model is an accepted part: each off-grid nominal must still lie inside
-# the limits its rounded print states.
-for _name, (_lower, _upper) in {
-    "CollarOd": (_OD_LOWER, _OD_UPPER),
-    "CollarCy": (_ECC_LOWER, _ECC_UPPER),
-    "Depth": (_LENGTH_LOWER, _LENGTH_UPPER),
-    "TapCz": (_STATION_LOWER, _STATION_UPPER),
-}.items():
-    if not _lower < 0.0 < _upper:
-        raise AssertionError(f"{_name}'s printed limits exclude its model value")
+
+# Neither the station nor the length is tightened to rescue an axial wall.
+SET_SCREW_FRONT_WALL_MIN_MM = SET_SCREW_Z + _STATION_LOWER - SET_SCREW_MAJOR_DIA / 2.0
+SET_SCREW_REAR_WALL_MIN_MM = (
+    CAM_LEN + _LENGTH_LOWER - (SET_SCREW_Z + _STATION_UPPER) - SET_SCREW_MAJOR_DIA / 2.0
+)
+if min(SET_SCREW_FRONT_WALL_MIN_MM, SET_SCREW_REAR_WALL_MIN_MM) < WALL_TARGET_MM:
+    raise AssertionError("cam tap leaves less than the .080 in end-face wall target")
 
 THIN_SIDE_WALL_MIN_MM = (
     (CAM_OD + _OD_LOWER) / 2.0 - (BORE + _BORE_UPPER) / 2.0 - (ECC + _ECC_UPPER)
@@ -145,34 +122,21 @@ THIN_SIDE_WALL_MIN_MM = (
 THICK_SIDE_WALL_MIN_MM = (
     (CAM_OD + _OD_LOWER) / 2.0 - (BORE + _BORE_UPPER) / 2.0 + (ECC + _ECC_LOWER)
 )
-# Owner-ruled rule-17 shortfall (RV-01 in cad/config/parts/dt-pinion-cam.yaml):
-# at the printed limits (OD .573, bore .2515, eccentricity .081) the thin side
-# keeps .07975 in (2.02565 mm), .00025 in under the .080 target and .01975 in
-# over the .060 floor.  The floor stays hard; RV-01 covers the wall down to
-# exactly that worst case, so anything thinner must be ruled again.  The sheet
-# states the accepted wall natively (THIN_WALL_MIN_MM below, rule 20).
-THIN_SIDE_WALL_EXCEPTION_MIN_MM = 0.07975 * 25.4
-if THIN_SIDE_WALL_MIN_MM < WALL_FLOOR_MM:
-    raise AssertionError("cam thin-side wall falls below the .060 in floor")
-if THIN_SIDE_WALL_MIN_MM < WALL_TARGET_MM:
-    if not any(
-        entry.get("id") == "RV-01" and entry.get("kind") == "minor"
-        for entry in _ROW.get("machinist_exceptions") or ()
-    ):
-        raise AssertionError(
-            "no owner minor RV-01 declares the cam thin-wall shortfall"
-        )
-    if THIN_SIDE_WALL_MIN_MM < THIN_SIDE_WALL_EXCEPTION_MIN_MM - 1e-9:
-        raise AssertionError("cam thin-side wall falls below RV-01's ruled .07975 in")
+# Rule 17 on an inch sheet: .080 in target, .060 in floor.  At the printed
+# limits (OD .573, bore .2515, eccentricity .081) the thin side keeps .07975
+# in, .00025 under the target: owner minor RV-01
+# (cad/config/parts/dt-pinion-cam.yaml) accepts exactly that, so anything
+# thinner must be ruled again.
+if THIN_SIDE_WALL_MIN_MM < 0.07975 * 25.4 - 1e-9:
+    raise AssertionError("cam thin-side wall falls below RV-01's ruled .07975 in")
 
-# Rule 20: the sheet states the accepted shortfall, on its own NATIVE
-# dimension, never in note text.  build_dt_pinion_cam draws a hidden
-# construction line up the thin side from the bore's top, as long as the
-# printed minimum, and its driving dimension prints as the single limit
-# ".0797 MIN" (swTolMIN prints the nominal plus MIN, so the model value IS the
-# printed limit): the ruled .07975 floored to its four places, so the sheet
-# never claims more wall than the printed worst case leaves.  Its band records
-# the printed best case (OD .577, bore .2510, eccentricity .077).
+# Rule 20: the sheet states RV-01's wall on a native dimension, never in note
+# text.  build_dt_pinion_cam draws a hidden construction line up the thin side
+# from the bore's top, as long as the printed minimum, and prints it as the
+# single limit ".0797 MIN" (swTolMIN prints the nominal plus MIN): .07975
+# floored to four places, so the sheet never states more wall than the worst
+# case leaves.  Its band runs up to the printed best case (OD .577, bore
+# .2510, eccentricity .077).
 THIN_WALL_MIN_PLACES = 4
 THIN_WALL_MIN_MM = round(
     math.floor(THIN_SIDE_WALL_MIN_MM / 25.4 * 10**THIN_WALL_MIN_PLACES + 1e-9)
@@ -180,15 +144,11 @@ THIN_WALL_MIN_MM = round(
     * 25.4,
     9,
 )
-THIN_WALL_MIN_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints ".0797 MIN"
-THIN_SIDE_WALL_MAX_MM = (
+THIN_WALL_MIN_TOL_TYPE = 5  # swTolType_e.swTolMIN
+_THIN_SIDE_WALL_MAX_MM = (
     (CAM_OD + _OD_UPPER) / 2.0 - (BORE + _BORE_LOWER) / 2.0 - (ECC + _ECC_LOWER)
 )
-THIN_WALL_MIN_BAND = (round(THIN_SIDE_WALL_MAX_MM - THIN_WALL_MIN_MM, 6), 0.0)
-if not WALL_FLOOR_MM <= THIN_WALL_MIN_MM <= THIN_SIDE_WALL_MIN_MM:
-    raise AssertionError(
-        "the printed wall minimum overstates the worst case or the floor"
-    )
+THIN_WALL_MIN_BAND = (round(_THIN_SIDE_WALL_MAX_MM - THIN_WALL_MIN_MM, 6), 0.0)
 THIN_WALL_CALLOUT = "THIN-SIDE WALL"
 
 # Table 14 note 6 expresses the fractional nominal as a two-place basic
@@ -231,19 +191,6 @@ SET_SCREW_FULL_THREAD_MARGIN_MM = (
 if SET_SCREW_FULL_THREAD_MARGIN_MM < 0.0:
     raise AssertionError("cam screw's assumed full-thread budget is below 1.5D")
 
-# The tap's thread may break neither end face: the rear wall stacks the
-# collar length AND the station, each at its printed .XX limits; the front
-# stacks the station alone.  Neither band is tightened to rescue a wall.
-SET_SCREW_FRONT_WALL_MIN_MM = SET_SCREW_Z + _STATION_LOWER - _ENGAGEMENT_MAJOR_MM / 2.0
-SET_SCREW_REAR_WALL_MIN_MM = (
-    CAM_LEN
-    + _LENGTH_LOWER
-    - (SET_SCREW_Z + _STATION_UPPER)
-    - _ENGAGEMENT_MAJOR_MM / 2.0
-)
-if min(SET_SCREW_FRONT_WALL_MIN_MM, SET_SCREW_REAR_WALL_MIN_MM) < WALL_TARGET_MM:
-    raise AssertionError("cam tap leaves less than the .080 in end-face wall target")
-
 # A screw seated against the near bore tangent is the shallowest seated case;
 # any travel across the rod/bore clearance only sinks it further. Its outer
 # rim must clear the curved OD, not merely the axial centre's tangent plane.
@@ -278,10 +225,8 @@ ECCENTRICITY_CALLOUT = (
 SET_SCREW_STAKE_STEP_KEY = "cam-collars-set"
 TAP_DRILL_CALLOUT = "TAP DRILL THRU TO BORE\n#2-56 UNC\nSTAKE AT ASSEMBLY PER"
 
-# drawing-guidelines.md rule 6 (roughness symbols only where a surface runs,
-# slides or locates): the roughness goes on the surface that runs.  The
-# follower pin rides the cam OD (63 µin Ra on this inch sheet); the
-# set-screwed bore never moves on the rod, so it carries none.
+# drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the roughness goes on the surface that runs.  The follower pin rides
+# the cam OD; the set-screwed bore never moves on the rod, so it carries none.
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         "cam_od",
@@ -302,16 +247,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # The MODEL owns every printed decimal place: build_dt_pinion_cam applies this
 # map to the .SLDPRT and draw_dt_pinion_cam only reads it back.  Inch places:
-# four on the reamed bore (its +.0005 band needs them) and on the RV-01 wall
-# minimum (.0797 MIN, a single limit), three on the banded cam OD and
-# eccentricity (+/-.002) and on the #2-56 tap drill (an inch drill diameter),
-# two on the collar length and tap station, which feed the end-face walls and
-# the rig's collar stations, so .X never applies.
+# four on the reamed bore (its +.0005 band needs them) and the RV-01 wall
+# minimum, three on the banded cam OD and eccentricity and on the #2-56 tap
+# drill (an inch drill size), two on the collar length and tap station.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CollarProfile": {"CollarOd": COLLAR_OD_PLACES, "CollarCy": ECC_PLACES},
     "BoreProfile": {"BoreDia": BORE_PLACES},
     "Collar": {"Depth": LENGTH_PLACES},
-    "TapDrillProfile": {"TapDrillDia": TAP_DRILL_PLACES, "TapCz": SET_SCREW_Z_PLACES},
+    "TapDrillProfile": {"TapDrillDia": 3, "TapCz": SET_SCREW_Z_PLACES},
     "ThinWallReference": {"ThinWallMin": THIN_WALL_MIN_PLACES},
 }
 

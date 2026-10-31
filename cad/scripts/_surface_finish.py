@@ -24,11 +24,8 @@ vocabulary.
 
    The title block carries no roughness number at all (its surface row is the
    process statement ``CAST/MACHINED``), so these callouts are the
-   ONLY roughness ink on a sheet.  Issue #290 converts packages to inch
-   display in batches, so the grade stays a physical micrometre value and
-   :func:`ra` renders it per sheet: ``unit="mm"`` prints micrometres exactly as
-   before, ``unit="in"`` prints the project grade's preferred microinch value
-   (``1.6`` -> ``63``, ``0.8`` -> ``32``, ``3.2`` -> ``125``).
+   ONLY roughness ink on a sheet.  An inch sheet (issue #290) prints the
+   same grades as their preferred microinch values (63, 32, 125).
 """
 
 from __future__ import annotations
@@ -37,7 +34,7 @@ from dataclasses import dataclass
 import math
 from typing import Literal
 
-from _drawing_units import DrawingUnit, checked_drawing_unit
+from _drawing_units import DrawingUnit
 from _gtol_face import FaceSpec
 from _gtol_identity import pmi_annotation_name
 
@@ -72,18 +69,18 @@ _PREFERRED_RA_UIN: tuple[tuple[float, int], ...] = (
 def ra(grade_um: float, *, unit: DrawingUnit = "mm") -> str:
     """Render a grade as the ``roughness_ra`` string a drawing callout takes.
 
-    ``grade_um`` is always the physical Ra in micrometres; ``unit`` is the
-    sheet's display unit.  ``"mm"`` prints one decimal, matching the ISO
-    preferred-series spelling (``0.8``, ``1.6``) that every shipped sheet
-    already prints — so adopting this module is a pure refactor with no ink
-    change.  ``"in"`` prints the preferred microinch value of a project grade
-    and refuses any other grade rather than ink a non-standard number.
+    One decimal, matching the ISO preferred-series spelling (``0.8``, ``1.6``)
+    that every shipped sheet already prints — so adopting this module is a pure
+    refactor with no ink change.  ``grade_um`` is always micrometres; on an
+    inch sheet (``unit="in"``) a project grade prints its preferred microinch
+    value and any other grade is refused.
     """
-    checked_drawing_unit("surface roughness", unit)
-    if not math.isfinite(grade_um) or grade_um <= 0.0:
-        raise ValueError(f"surface roughness must be positive and finite: {grade_um!r}")
+    if grade_um <= 0.0:
+        raise ValueError(f"surface roughness must be positive: {grade_um!r}")
     if unit == "mm":
         return f"{grade_um:.1f}"
+    if unit != "in":
+        raise ValueError(f"unknown surface roughness unit {unit!r}")
     for preferred_um, preferred_uin in _PREFERRED_RA_UIN:
         if math.isclose(grade_um, preferred_um, rel_tol=1e-9):
             return str(preferred_uin)
@@ -97,10 +94,6 @@ def ra(grade_um: float, *, unit: DrawingUnit = "mm") -> str:
 GROUND = ra(GROUND_UM)
 MACHINED = ra(MACHINED_UM)
 SEAT = ra(SEAT_UM)
-# The same grades as an inch sheet prints them (microinches).
-GROUND_INCH = ra(GROUND_UM, unit="in")
-MACHINED_INCH = ra(MACHINED_UM, unit="in")
-SEAT_INCH = ra(SEAT_UM, unit="in")
 
 
 @dataclass(frozen=True)

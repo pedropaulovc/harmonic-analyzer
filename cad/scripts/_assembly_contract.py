@@ -23,7 +23,7 @@ from pathlib import Path
 
 import yaml
 
-from _drawing_units import DRAWING_UNIT_KEY, DrawingUnit, declared_drawing_unit
+from _drawing_units import DrawingUnit, drawing_unit
 
 CONTRACT_DIR = Path(__file__).resolve().parent.parent / "config" / "assemblies"
 
@@ -37,7 +37,7 @@ _KNOWN_KEYS = _REQUIRED_KEYS | {
     "free_dof_per_active_channel",
     "carries_chain",
     "machinist_exceptions",
-    DRAWING_UNIT_KEY,
+    "drawing_unit",
 }
 
 
@@ -60,8 +60,7 @@ class AssemblyContract:
     interference gate gets the authored wheel mounts as its build does
     (541011de0); otherwise every link-on-sprocket mesh reads as interference.
     ``drawing_unit``: the unit the assembly's sheet, TOL_* stamps and model
-    units print in (``"mm"``/``"in"``, see ``_drawing_units``), or ``None``
-    when the contract declares none (the legacy millimetre sheet).
+    units use (``_drawing_units``; ``"mm"`` when undeclared).
     """
 
     stem: str
@@ -73,7 +72,7 @@ class AssemblyContract:
     free_dof: int
     free_dof_per_active_channel: int
     carries_chain: bool
-    drawing_unit: DrawingUnit | None
+    drawing_unit: DrawingUnit
 
 
 def contract_path(stem: str) -> Path:
@@ -144,7 +143,7 @@ def assembly_contract(stem: str) -> AssemblyContract:
             doc.get("free_dof_per_active_channel", 0),
         ),
         carries_chain=_flag(path, "carries_chain", doc.get("carries_chain", False)),
-        drawing_unit=declared_drawing_unit(str(path), doc),
+        drawing_unit=drawing_unit(str(path), doc),
     )
 
 

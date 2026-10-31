@@ -15,8 +15,8 @@ from _source_identity import _git_commit_year, _git_sha
 
 
 def title_block_properties(*, unit: DrawingUnit = "mm") -> dict[str, str]:
-    """Return the shared sheet-format specifications from title_block.yaml for
-    a ``unit`` sheet (the owning package's ``drawing_unit``).
+    """Return the shared sheet-format specifications from title_block.yaml,
+    as a ``unit`` sheet prints them.
 
     Parts, assemblies and template text measurement use the same linked values,
     independently of any model registry or release identity.
@@ -29,47 +29,29 @@ def title_block_properties(*, unit: DrawingUnit = "mm") -> dict[str, str]:
         "TOL_LIN_XX": tol.linear_band_display(2, unit=unit),
         "TOL_LIN_XXX": tol.linear_band_display(3, unit=unit),
         "TOL_ANG": tol.angular_band_display(unit=unit),
-        "TOL_SURFACE": str(_config.title_block("surface", unit=unit)["text"]),
+        "TOL_SURFACE": str(_config.title_block("surface")["text"]),
         # Sheet-format notes link these values rather than hardcoding them.
         "TOL_EDGE_BREAK_R": tol.edge_break_radius_display(unit=unit),
         "TOL_CHAMFER_MAX": tol.edge_break_chamfer_display(unit=unit),
         "TOL_INSIDE_CORNER": tol.inside_corner_display(unit=unit),
-        "THREAD_TYPE": str(_config.title_block("thread", unit=unit)["type"]),
-        "THREAD_CLASS": str(_config.title_block("thread", unit=unit)["class"]),
+        "THREAD_TYPE": str(_config.title_block("thread")["type"]),
+        "THREAD_CLASS": str(_config.title_block("thread")["class"]),
         # The DRILLED HOLES row carries the general unilateral tolerance.
         "TOL_HOLE_MINUS": tol.drilled_hole_minus_display(unit=unit),
         "TOL_HOLE_PLUS": tol.drilled_hole_plus_display(unit=unit),
     }
 
 
-def _registry_name(part_name: str) -> str:
-    """The registry row ``part_name`` stamps from.  Per-channel stretched
-    springs (build_ch_channel_assembly) are length variants of the registered
-    base part -- they inherit its material / tolerance / fit / drawing unit so
-    the tolerance audit stays clean without 10 redundant registry rows."""
-    if part_name.startswith("ch-vn-channel-spring-installed-stretch"):
-        return "ch-vn-channel-spring-installed"
-    return part_name
-
-
-def _registry_row(part_name: str) -> dict[str, Any] | None:
+def part_drawing_unit(part_name: str) -> DrawingUnit:
+    """The unit ``part_name``'s sheet prints: its registry row's
+    ``drawing_unit``, ``"mm"`` for an undeclared or unregistered part."""
     import _config
 
     try:
-        return _config.parts(_registry_name(part_name))
+        row = _config.parts(part_name)
     except KeyError:
-        return None
-
-
-def _row_drawing_unit(part_name: str, row: dict[str, Any] | None) -> DrawingUnit:
-    return drawing_unit(f"parts/{_registry_name(part_name)}", row)
-
-
-def part_drawing_unit(part_name: str) -> DrawingUnit:
-    """The unit ``part_name``'s sheet prints: its registry row's
-    ``drawing_unit``, else the legacy millimetre (an unregistered part, or a
-    row that declares none).  A value other than ``mm``/``in`` raises."""
-    return _row_drawing_unit(part_name, _registry_row(part_name))
+        row = None
+    return drawing_unit(f"parts/{part_name}", row)
 
 
 def part_properties(part_name: str) -> dict[str, str]:
@@ -81,7 +63,6 @@ def part_properties(part_name: str) -> dict[str, str]:
     always the part's slug: it is what the title block's PART cell prints, one
     convention on every sheet (user ruling 2026-09-26), so a registry
     ``title:`` never reaches it (``test_buildgraph.test_part_cell_prints_the_slug``).
-    The TOL_* rows print in the row's ``drawing_unit`` (``part_drawing_unit``).
     """
     import _config
 
@@ -94,12 +75,19 @@ def part_properties(part_name: str) -> dict[str, str]:
         # property and its date built-ins change on every rebuild.
         "COPYRIGHT_YEAR": _git_commit_year(),
     }
-    reg = _registry_row(part_name)
     # Title-block general tolerances (title_block.yaml) — read by the drawing
     # template's title block via $PRPSHEET, so EVERY part carries them,
     # registered in the parts registry or not.
-    props.update(title_block_properties(unit=_row_drawing_unit(part_name, reg)))
-    if reg is None:
+    # Per-channel stretched springs (build_ch_channel_assembly) are length variants of
+    # the registered base part -- they inherit its material / tolerance / fit so
+    # the tolerance audit stays clean without 10 redundant registry rows.
+    registry_name = part_name
+    if part_name.startswith("ch-vn-channel-spring-installed-stretch"):
+        registry_name = "ch-vn-channel-spring-installed"
+    props.update(title_block_properties(unit=part_drawing_unit(registry_name)))
+    try:
+        reg = _config.parts(registry_name)
+    except KeyError:
         return props
     field_map = {
         "Number": "number",
@@ -165,9 +153,8 @@ def apply_block_tolerances(adapter: Any, *, unit: DrawingUnit = "mm") -> None:
     parts whose DimXpert metadata disagrees with title_block.yaml into the shared
     remote cache under the same key as a correct seat.
 
-    ``unit`` is the part's sheet (``part_drawing_unit``): the values come from
-    that sheet's rows, so an inch part's DimXpert block matches its ``±.01`` /
-    ``±.005`` title block.
+    ``unit`` is the part's sheet (``part_drawing_unit``), so an inch part's
+    DimXpert block matches its ``±.01`` / ``±.005`` title block.
     """
     import _config
 

@@ -83,7 +83,6 @@ def _presentation(
     fraction_denominator: int | None,
     callout: str | None,
     expected_mm: float | None,
-    count: str | None = None,
 ) -> tuple[int, int, str, str]:
     if units not in ("in", "mm", "deg") or presentation not in (
         "length", "diameter", "angle"
@@ -108,20 +107,9 @@ def _presentation(
             raise ValueError(f"{label}: exact geometry cannot display that inch fraction")
     if callout is not None and (not isinstance(callout, str) or not callout.strip()):
         raise ValueError(f"{label}: supplier below-callout must be nonempty text")
-    # A repeated feature's count ("6X") precedes the parenthesised value; it
-    # names how many, never the value itself.
-    if count is not None and (
-        not isinstance(count, str)
-        or not count.endswith("X")
-        or not count[:-1].isdigit()
-        or int(count[:-1]) < 2
-    ):
-        raise ValueError(f"{label}: supplier count must read like 6X")
     unit = {"mm": 0, "in": 3, "deg": 0}[units]
     fraction = 2 if fraction_denominator is not None else 1
     prefix = "(<MOD-DIAM>" if presentation == "diameter" else "("
-    if count is not None:
-        prefix = f"{count} {prefix}"
     suffix = ")" if units == "deg" else f" {units})"
     return unit, fraction, prefix, suffix
 
@@ -159,19 +147,16 @@ def supplier_reference_dimension(
     fraction_denominator: int | None = None,
     callout: str | None = None,
     configuration: str | None = None,
-    count: str | None = None,
 ) -> Any:
     """Dress a native measured value; retain its source tolerance, if any.
 
     Imported nominal model references are not claims of physical-edge or
     helical-thread attachment. Callers verify the appropriate source identity.
     A below-callout identifies the native size; it never replaces its value.
-    ``count`` ("6X") prefixes one value printed for every repeated span.
     """
     unit, fraction, prefix, suffix = _presentation(
         label=label, units=units, precision=precision, presentation=presentation,
         fraction_denominator=fraction_denominator, callout=callout, expected_mm=expected_mm,
-        count=count,
     )
     display = _early_bound(dimension, "IDisplayDimension")
     _measured_supplier_value(
@@ -201,7 +186,6 @@ def supplier_reference_dimension(
         presentation=presentation, fraction_denominator=fraction_denominator,
         callout=callout,
         configuration=configuration,
-        count=count,
     )
     return display
 
@@ -220,13 +204,11 @@ def assert_supplier_reference_dimension(
     fraction_denominator: int | None = None,
     callout: str | None = None,
     configuration: str | None = None,
-    count: str | None = None,
 ) -> None:
     """Read persisted native state after the final rebuild; never repair it."""
     unit, fraction, prefix, suffix = _presentation(
         label=label, units=units, precision=precision, presentation=presentation,
         fraction_denominator=fraction_denominator, callout=callout, expected_mm=expected_mm,
-        count=count,
     )
     display = _early_bound(dimension, "IDisplayDimension")
     _measured_supplier_value(

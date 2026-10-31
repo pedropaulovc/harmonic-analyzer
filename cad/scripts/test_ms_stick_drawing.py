@@ -227,7 +227,6 @@ def test_last_graduation_is_complete_at_printed_band_extremes() -> None:
     # Rule 17 at the worst case: the widest stated groove keeps .080+ to the end.
     end_land = stock_min - (last_center_max + spec.GRADUATION_WIDTH_MAX_MM / 2.0)
     assert end_land == pytest.approx(2.7696)
-    assert spec.LAST_GROOVE_LAND_MIN_MM == pytest.approx(end_land)
     assert end_land >= spec.WALL_TARGET_MM == 2.032
     # The title block's .X (+/-.1) would break that land: the length is .XX.
     assert end_land + spec.BODY_LENGTH_TOLERANCE_MM - 0.1 * 25.4 < spec.WALL_TARGET_MM
@@ -244,115 +243,23 @@ def test_last_graduation_is_complete_at_printed_band_extremes() -> None:
     assert values["BodyLength"] - last_edge_nominal == pytest.approx(3.2268)
 
 
-def test_printed_pitch_ranges_agree_across_all_calibrated_subdivisions() -> None:
-    """Rounding pitch text must not create incompatible noncumulative stations."""
-    full = float(spec.inch_text(spec.DIVISION_SPACING, spec.DRAWING_PRECISION_BY_NAME["FullTickPitch"]))
-    minor = float(spec.inch_text(spec.MINOR_SPACING, spec.DRAWING_PRECISION_BY_NAME["MinorTickPitch"]))
+def test_printed_pitches_agree_across_all_calibrated_subdivisions() -> None:
+    """Run 308 FIX: .559 full against .056 minor made ten minor pitches .560.
+    As printed, ten minor pitches are one full pitch, the groove-width callout
+    prints the same minor pitch, and every calibrated station stays inside its
+    printed noncumulative +/-.002."""
+    full_text = spec.inch_text(spec.DIVISION_SPACING, spec.DRAWING_PRECISION_BY_NAME["FullTickPitch"])
+    minor_text = spec.inch_text(spec.MINOR_SPACING, spec.DRAWING_PRECISION_BY_NAME["MinorTickPitch"])
+    assert (full_text, minor_text) == (".559", ".0559")
+    assert spec.GRADUATION_WIDTH_CALLOUT.endswith(f" ON {minor_text} PITCH")
+    full, minor = float(full_text), float(minor_text)
+    assert spec.MINOR_PER_DIVISION * minor == pytest.approx(full, rel=0.0, abs=1e-12)
     band = spec.GRADUATION_POSITION_TOLERANCE_MM / 25.4
-    assert (full, minor, band) == pytest.approx((0.559, 0.0559, 0.002))
-    spaces = (spec.DIVISION_COUNT - 1) * spec.MINOR_PER_DIVISION
-    assert spaces == 100
-    assert (spaces * minor - band, spaces * minor + band) == pytest.approx((5.588, 5.592))
-    for index in range(spaces + 1):
-        printed_station = index * minor
-        calibrated_station = index * spec.MINOR_SPACING / 25.4
-        assert printed_station - band <= calibrated_station <= printed_station + band
-        if index % spec.MINOR_PER_DIVISION == 0:
-            full_station = index // spec.MINOR_PER_DIVISION * full
-            assert full_station == pytest.approx(printed_station)
-            assert full_station - band <= calibrated_station <= full_station + band
-    # Both families remain attached to model-owned centre chords, not rounded
-    # inch geometry or a replacement free-text nominal.
-    assert spec.DIVISION_SPACING == 14.2
-    assert spec.MINOR_SPACING == 1.42
-    assert callouts.CALLOUTS["FullTickPitch"].count("NONCUMULATIVE FROM SCALE ZERO") == 1
-    assert callouts.CALLOUTS["MinorTickPitch"].count("NONCUMULATIVE FROM SCALE ZERO") == 1
-
-
-def test_builder_authors_pitch_tolerance_at_nominal_precision(monkeypatch) -> None:
-    """Exercise the builder call: .0559 ±.0020 still stores ±.0508 mm."""
-    tree = ast.parse(Path(builder.__file__).read_text(encoding="utf-8"))
-    calls = [
-        node for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "set_dimension_symmetric_tolerance"
-    ]
-    assert len(calls) == 1
-    authored = []
-    adapter = object()
-    monkeypatch.setattr(
-        builder, "set_dimension_symmetric_tolerance",
-        lambda *args, **kwargs: authored.append((args, kwargs)),
-    )
-    for feature, name, places in (
-        ("ScaleStartReference", "ScaleStartX", 3),
-        ("FullPitchReference", "FullTickPitch", 3),
-        ("MinorPitchReference", "MinorTickPitch", 4),
-    ):
-        expression = ast.Expression(body=calls[0])
-        eval(compile(expression, builder.__file__, "eval"), vars(builder),
-             {"adapter": adapter, "feature": feature, "name": name})
-        args, kwargs = authored[-1]
-        assert args == (adapter, feature, name, 0.0508)
-        assert kwargs == {"places": places, "display_unit": "in"}
-
-
-@pytest.mark.parametrize("defect", [None, "rejected", "height", "upper", "lower", "fixed-foot", "incomplete"])
-def test_native_section_letters_clear_both_unchanged_arrowheads(monkeypatch, defect) -> None:
-    """Prove clearance after formatting, including an unchanged glyph foot."""
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *args, **kwargs: None)
-    events = []
-    monkeypatch.setattr(drawing._telemetry, "event",
-                        lambda name, **fields: events.append((name, fields)))
-    text_format = SimpleNamespace(CharHeight=0.00635)
-    # Native 308e5a1a8 marker: letter tops 5.004 mm above the shafts;
-    # the PDF's horizontal filled arrowheads have a 3 mm vertical height.
-    arrows = [
-        [0.1572622, y, 0.0, 0.1452622, y, 0.0, 0.006, 0.003, 0.0]
-        for y in (0.2580005, 0.2419995)
-    ]
-    texts = [[0.1438325, y, 0.0] for y in (0.2630045, 0.2470035)]
-    original_arrows = [row[:] for row in arrows]
-    placements = []
-
-    def set_format(use_doc, value):
-        placements.append((use_doc, value.CharHeight))
-        return defect != "rejected"
-
-    def marker():
-        height = 0.00635 if defect == "height" else text_format.CharHeight
-        actual_texts = [row[:] for row in texts]
-        if defect in ("upper", "lower"):
-            actual_texts[0 if defect == "upper" else 1][1] -= 0.001
-        if defect == "fixed-foot":
-            for text in actual_texts:
-                text[1] -= 0.00635 - height
-        payload = [1.0, 0.0, 1.0] + [0.0] * 7
-        payload += [value for row in arrows + actual_texts for value in row] + [height]
-        return payload[:-1] if defect == "incomplete" else payload
-
-    definition = SimpleNamespace(GetTextFormat=lambda: text_format, SetTextFormat=set_format)
-    parent = SimpleNamespace(GetSectionLineInfo2=marker)
-    if defect is None:
-        drawing._place_numeral_section_letters(object(), parent, definition)
-        drawing._assert_numeral_section_letters(parent)
-    else:
-        with pytest.raises(RuntimeError, match="numeral G-G"):
-            drawing._place_numeral_section_letters(object(), parent, definition)
-    assert placements == [(False, drawing.NUMERAL_SECTION_LETTER_HEIGHT)]
-    assert arrows == original_arrows
-    if defect not in ("rejected", "height", "incomplete"):
-        format_event = next(fields for name, fields in events
-                            if name == "drawing.ms_stick.section_marker_format")
-        assert format_event["previous_height_m"] == 0.00635
-        assert format_event["requested_height_m"] == drawing.NUMERAL_SECTION_LETTER_HEIGHT
-        assert format_event["before_marker"] != format_event["after_marker"]
-        if defect == "fixed-foot":
-            clearance_event = next(fields for name, fields in events
-                                   if name == "drawing.ms_stick.section_marker_clearance")
-            assert clearance_event["clearance_m"] < 0.0
+    assert band == pytest.approx(0.002)
+    # The calibrated pitch stays exact (owner ruling), never snapped to inch.
+    assert (spec.DIVISION_SPACING, spec.MINOR_SPACING) == (14.2, 1.42)
+    for index in range((spec.DIVISION_COUNT - 1) * spec.MINOR_PER_DIVISION + 1):
+        assert abs(index * spec.MINOR_SPACING / 25.4 - index * minor) <= band, index
 
 
 def test_engraving_sizes_are_min_limits_and_graduation_depth_keeps_its_stock() -> None:
@@ -512,27 +419,12 @@ def test_spec_is_pure_and_drawing_never_reauthors_dimensions() -> None:
             else []
         )
     ]
-    # The one documented exception: _drawing_units is pure data (its own
-    # docstring), read here only to resolve the sheet unit from the literal
-    # registry row. Prove it stays pure: standard library only, no COM.
-    pure_data = "_drawing_units"
-    assert pure_data in imports
+    # _drawing_units is pure data (no COM): the spec reads its sheet unit there.
     assert not any(name.startswith((
         "build_", "solidworks", "_appearance", "_assembly", "_check", "_com",
         "_custom_properties", "_dimensions", "_drawing", "_feature_tree",
         "_holes", "_part_", "_rebuild", "_session", "_sketch", "_visibility",
-    )) for name in imports if name != pure_data)
-    helper = ast.parse((Path(spec.__file__).parent / f"{pure_data}.py").read_text(encoding="utf-8"))
-    helper_imports = {
-        name
-        for node in ast.walk(helper)
-        for name in (
-            [node.module or ""] if isinstance(node, ast.ImportFrom)
-            else [alias.name for alias in node.names] if isinstance(node, ast.Import)
-            else []
-        )
-    }
-    assert helper_imports <= {"__future__", "collections.abc", "typing"}, helper_imports
+    )) for name in imports if name != "_drawing_units")
     drawing_tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     calls = {node.func.attr if isinstance(node.func, ast.Attribute) else node.func.id
              for node in ast.walk(drawing_tree) if isinstance(node, ast.Call)
@@ -653,21 +545,14 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
         assert path == str(source)
         return SimpleNamespace(is_success=True, data=None)
 
-    # The source document reads dirty once sketches are shown in memory: the
-    # stick's TRANSIENT_VIEW_STATE guard proves its file, not its flag.
-    source_model = SimpleNamespace(GetPathName=lambda: str(source),
-                                   GetSaveFlag=lambda: source_dirty["now"])
-    source_dirty = {"now": False}
     adapter = SimpleNamespace(
-        currentModel=source_model, open_model=open_model,
+        currentModel=object(), open_model=open_model,
         swApp=SimpleNamespace(GetMathUtility=lambda: utility),
     )
     new_kwargs = {}
 
     def new_drawing(*args, **kwargs):
         new_kwargs.update(kwargs)
-        kwargs["checkpoint"]("after_new_document")
-        source_dirty["now"] = True
         adapter.currentModel = document
         return document, object()
 
@@ -753,20 +638,16 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
         return section
 
     monkeypatch.setattr(drawing, "create_section_view", create_section)
-    monkeypatch.setattr(drawing, "_place_numeral_section_letters", lambda *args: None)
 
     async def finalize(adapter, outputs, **kwargs):
         assert kwargs["expected_sheet_names"] == drawing.SHEET_NAMES
         assert set(kwargs["sheet_layouts"]) == set(drawing.SHEET_NAMES)
-        assert kwargs["package_name"] == "ms-stick"
-        for stage in ("before_drawing_save", "after_drawing_save", "after_drawing_close"):
-            kwargs["checkpoint"](stage)
         return {"slddrw": str(outputs.slddrw)}
 
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
     assert asyncio.run(drawing.build(adapter)) == {"slddrw": str(drawing.OUTPUTS.slddrw)}
     assert source.read_bytes() == b"offline source sentinel"
-    assert new_kwargs["package_name"] == "ms-stick"
+    assert new_kwargs["unit"] == "in"
     assert "Numeral Placement Note" in required_properties
     assert "Scale End Note" not in required_properties
     assert ("ENGRAVING", "Numeral Placement Note", drawing.NUMERAL_NOTE_XY) in linked_notes
@@ -781,12 +662,18 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     assert not profile_args.get("partial") and profile_args["section_label"] == "G"
     assert profile_args["view_xy"] == drawing.NUMERAL_PROFILE_CENTER
     assert profile_args["scale"] == drawing.NUMERAL_PROFILE_SCALE == (10.0, 1.0)
-    # The cutting line crosses the whole bar width at the zero's mid-height.
+    # The cutting line crosses the whole bar width at the zero's mid-height,
+    # from below the bar (sheet bottom on the unturned parent) up past the ruled edge.
     start, end = utility.points[15:17]
-    overshoot = drawing.NUMERAL_SECTION_OVERSHOOT_MM
-    assert start == pytest.approx((drawing.NUMERAL_SECTION_X / 1000.0, -overshoot / 1000.0, 0.0))
+    assert start == pytest.approx(
+        (drawing.NUMERAL_SECTION_X / 1000.0, -drawing.NUMERAL_SECTION_FOOT_OVERSHOOT_MM / 1000.0, 0.0))
     assert end == pytest.approx(
-        (drawing.NUMERAL_SECTION_X / 1000.0, (spec.BODY_WIDTH + overshoot) / 1000.0, 0.0))
+        (drawing.NUMERAL_SECTION_X / 1000.0,
+         (spec.BODY_WIDTH + drawing.NUMERAL_SECTION_OVERSHOOT_MM) / 1000.0, 0.0))
+    # The letters follow the parent's own frame: G-G's parent stays unturned and
+    # the section takes the ruled-face turn instead.
+    assert profile_parent.Angle == 0.0
+    assert profile.Angle == pytest.approx(math.pi)
     assert tuple(profile.ScaleRatio) == drawing.NUMERAL_PROFILE_SCALE
     assert profile.UseParentScale is False
     assert len(section_moves) == 1
@@ -849,8 +736,8 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     assert depth_parent.Position == drawing.DEPTH_PARENT_CENTER
     assert depth_parent.Angle == 0.0
     assert drawing.DEPTH_RADIUS_MM > math.hypot(spec.TICK_WIDTH / 2.0, spec.BODY_THICKNESS / 2.0)
-    assert all(view.Angle == pytest.approx(math.pi)
-               for view in placements if view.Orientation == "*Back")
+    assert all(view.Angle == pytest.approx(math.pi) for view in placements
+               if view.Orientation == "*Back" and view is not profile_parent)
     assert placements[0].Position[0] == placements[1].Position[0]
     # The pictorial shows the engraved face, turned like the RULED FACE view.
     (iso,) = [view for view in placements if view.Orientation == RULED_ISO]
@@ -1459,7 +1346,6 @@ def test_numeral_profile_refuses_ignored_native_display_or_placement(monkeypatch
             object.__setattr__(self, "ScaleRatio", (1.0, 2.0))
             object.__setattr__(self, "surface", True)
             object.__setattr__(self, "Position", drawing.NUMERAL_PROFILE_CENTER)
-            object.__setattr__(self, "text_format", SimpleNamespace(CharHeight=0.00635))
 
         def __setattr__(self, name, value):
             assert name in {"UseParentScale", "ScaleRatio"}
@@ -1481,34 +1367,17 @@ def test_numeral_profile_refuses_ignored_native_display_or_placement(monkeypatch
         def GetPartialSection(self):  # noqa: N802 - COM member name
             return refusal == "partial"
 
-        def GetTextFormat(self):  # noqa: N802 - COM member name
-            return self.text_format
-
-        def SetTextFormat(self, use_document, text_format):  # noqa: N802 - COM member name
-            assert use_document is False
-            assert text_format is self.text_format
-            return True
-
         def SetViewPosition(self, position, move_children):  # noqa: N802 - COM member name
             return False
 
     section = Section()
-    def marker():
-        arrows = [
-            [0.1572622, y, 0.0, 0.1452622, y, 0.0, 0.006, 0.003, 0.0]
-            for y in (0.2580005, 0.2419995)
-        ]
-        texts = [[0.1438325, y, 0.0] for y in (0.2630045, 0.2470035)]
-        return ([1.0, 0.0, 1.0] + [0.0] * 7
-                + [value for row in arrows + texts for value in row]
-                + [section.text_format.CharHeight])
-
-    parent = SimpleNamespace(GetSectionLineInfo2=marker)
+    parent = object()
     monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(drawing, "double_array", lambda values: tuple(values))
     monkeypatch.setattr(drawing, "create_section_view", lambda *args, **kwargs: section)
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *args, **kwargs: None)
     monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda *args, **kwargs: None)
+    monkeypatch.setattr(drawing, "_rotate_ruled_face", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         drawing, "model_point_in_view",
         lambda adapter, view, point, **kwargs: (

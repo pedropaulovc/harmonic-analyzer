@@ -2,23 +2,15 @@
 
 The rail is bought cut to length with a special-order hole pattern, so its
 receipt check is dimensioned on the hole face: the cut length, the first
-hole from the -X end face and one pitch for all six gaps. The hole locations
-are imported model dimensions; the length measures the two actual rail end
-edges in FRONT (the imported extrusion depth exposes no native attachments).
-All three are associative native references, labelled in HIWIN's millimetres
-("(440 mm)"): the HG series is metric-only, and the registry declares
-``drawing_unit: mm``. The note only says the pattern is a special order.
+hole from the -X end face and one pitch for all six gaps. Each is the rail
+part's own native model dimension, parenthesised as reference (the rail is
+used as supplied), and the note only says the pattern is a special order.
 
 The shared purchased-part builder lays four views by itself and prints no
 dimension, so this sheet keeps its title block, captions and footer (as
 ``draw_pn_vn_pen_marker`` does) and lays its own views: FRONT (the hole face)
 and TOP at the sheet's 1:2, the RIGHT end profile at 2:1 so its raceway
 grooves read, and the isometric at 1:4.
-
-The supplier source must start clean and open read-only. Native sheet work
-can set its in-memory save flag; source identity, view configuration and
-unchanged bytes remain strict through export/close and on failure paths.
-The source is never saved or its save flag cleared.
 """
 
 from __future__ import annotations
@@ -27,7 +19,7 @@ import argparse
 import math
 import sys
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -37,6 +29,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 import _telemetry
+from _check import check
 from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
@@ -46,16 +39,10 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision
-from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
-from _drawing_edges import scan_view_edges
+from _drawing_dimensions import assert_imported_precision, set_reference_dimension
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _drawing_sheet_region import sheet_drawable_region
-from _drawing_source_guard import (
-    SourceCheck,
-    capture_clean_source,
-)
 from _drawing_view_display import set_hidden_lines_removed
 from _purchased_fastener_drawing import (
     _box,
@@ -63,18 +50,11 @@ from _purchased_fastener_drawing import (
     _center_marks_without_lines,
     _inside,
     _literal_note,
-    _open_supplier_source_read_only,
     _purchased_title_block,
     _rebuild,
-    _source_file_sha256,
-    _supplier_source_checkpoint,
     add_purchased_footer,
 )
 from _session import run_build
-from _supplier_dimensions import (
-    assert_supplier_reference_dimension,
-    supplier_reference_dimension,
-)
 from ch_rocker_arm_tl_vn_oblique_rail_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -82,17 +62,12 @@ from ch_rocker_arm_tl_vn_oblique_rail_spec import (
     HOLE_PITCH_CALLOUT,
     HOLE_X,
     LENGTH,
-    RECEIPT_UNITS,
-    RECEIPT_VALUES_MM,
     WIDTH,
 )
 
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_rail"]
 PART_STEM = SPEC.artifact_stem
-# The sheet's own registry package; its drawing_unit (mm) selects the sheet
-# units and the finalizer's unit proof.
-PACKAGE = "ch-rocker-arm-tl-vn-oblique-rail"
 
 # The source part's properties this sheet prints: the title block's
 # material and finish, the summary's title, the footer's supplier/SKU lines
@@ -196,10 +171,6 @@ RECEIPT_DIMENSIONS = {
     "Length": (0.0, LENGTH, LENGTH_ROW_DROP),
 }
 DIMENSION_PREFIXES = {"HolePitch": HOLE_PITCH_CALLOUT}
-# The source feature each receipt dimension belongs to.
-RECEIPT_FEATURES = {
-    name: feature for feature, names in DRAWING_DIMENSIONS.items() for name in names
-}
 # Smart arrows put the 20 mm and 30 mm spans' arrows outside, where the end
 # distance's and the pitch's met at the first hole (r1); both spans hold their
 # value and arrows inside.
@@ -285,223 +256,47 @@ def _receipt_positions(adapter: Any, front: Any) -> dict[str, tuple[float, float
     }
 
 
-def _receipt_presentation(name: str) -> dict[str, Any]:
-    """The supplier-unit presentation one receipt dimension prints and keeps."""
-    return {
-        "label": f"{name}@{RECEIPT_FEATURES[name]}",
-        "units": RECEIPT_UNITS,
-        "precision": FRONT_DIMENSION_PRECISION[name],
-        "expected_mm": RECEIPT_VALUES_MM[name],
-        "count": DIMENSION_PREFIXES.get(name),
-    }
-
-
-_LENGTH_REFERENCE_NAME = "ReceiptLength"
-
-
-def _length_end_edges(front: Any) -> tuple[Any, Any]:
-    """The visible top edges of the two physical cut-end faces, not hit tests."""
-    edges = scan_view_edges(front, label="rail cut ends")
-    return tuple(
-        edges.exact_line_through(
-            (x, 0.0, HEIGHT), label=f"rail cut end x={x:g} mm"
-        ).edge
-        for x in (0.0, LENGTH)
-    )
-
-
-def _assert_length_attachment(
-    adapter: Any, display: Any, edges: tuple[Any, Any]
-) -> None:
-    assert_dimension_measures(
-        adapter, display, expected_mm=LENGTH, label="rail cut length", entities=edges
-    )
-    native = _early_bound(display.GetDimension2(0), "IDimension")
-    if int(native.DrivenState) != 1:  # swDimensionDriven
-        raise RuntimeError("rail cut length must remain a driven reference")
-
-
 @_telemetry.traced("drawing.rail_receipt_dimensions")
 def _receipt_dimensions(adapter: Any, front: Any) -> list[Any]:
-    """Import the two hole references and measure length on physical end edges."""
-    positions = _receipt_positions(adapter, front)
-    hole_precision = {
-        name: places
-        for name, places in FRONT_DIMENSION_PRECISION.items()
-        if name != "Length"
-    }
+    """Import the order's three model dimensions into FRONT, as reference."""
     annotations = curate_view_dimensions(
         adapter,
         front,
-        keep={name: positions[name] for name in hole_precision},
+        keep=_receipt_positions(adapter, front),
         view_label="rail hole face",
-        dimensions_by_feature={
-            "BoltHoleProfile": DRAWING_DIMENSIONS["BoltHoleProfile"]
-        },
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    assert_imported_precision(adapter, annotations, hole_precision)
+    assert_imported_precision(adapter, annotations, FRONT_DIMENSION_PRECISION)
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
-        display = supplier_reference_dimension(
-            adapter,
-            _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
-            **_receipt_presentation(name),
-        )
+        display = set_reference_dimension(adapter, annotation, label=name)
         if name in ARROWS_INSIDE:
             display.ArrowSide = _DIM_ARROWS_INSIDE
             if int(display.ArrowSide) != _DIM_ARROWS_INSIDE:
                 raise RuntimeError(f"{name} did not keep its arrows inside")
-    edges = _length_end_edges(front)
-    ends = model_points_in_view(
-        adapter,
-        front,
-        [(x / 1000.0, 0.0, HEIGHT / 1000.0) for x in (0.0, LENGTH)],
-        label="rail cut ends",
-    )
-    display = _early_bound(
-        add_edge_dimension(
-            adapter,
-            front,
-            p0=ends[0][:2],
-            p1=ends[1][:2],
-            text_xy=positions["Length"],
-            label="rail cut length",
-            orientation="horizontal",
-            entities=edges,
-        ),
-        "IDisplayDimension",
-    )
-    native = _early_bound(display.GetDimension2(0), "IDimension")
-    native.Name = _LENGTH_REFERENCE_NAME
-    native.DrivenState = 1  # swDimensionDriven; never assign its measured value
-    if str(native.Name) != _LENGTH_REFERENCE_NAME:
-        raise RuntimeError("rail cut length did not retain its reference identity")
-    _assert_length_attachment(adapter, display, edges)
-    supplier_reference_dimension(adapter, display, **_receipt_presentation("Length"))
-    annotations.append(_early_bound(display.GetAnnotation(), "IAnnotation"))
-    return annotations
-
-
-@_telemetry.traced("drawing.rail_receipt_settled_check")
-def _assert_receipt_dimensions(adapter: Any, source: Path) -> None:
-    """Reacquire FRONT after the final rebuild: exactly the three receipt
-    dimensions, each still its source's value in labelled millimetres."""
-    fronts = [
-        _early_bound(view, "IView")
-        for view in iter_views(adapter)
-        if view.GetOrientationName() == "*Front"
-    ]
-    if len(fronts) != 1:
-        raise RuntimeError(f"rail sheet must have one FRONT view: {len(fronts)}")
-    front = fronts[0]
-    if Path(front.GetReferencedModelName()).resolve() != source.resolve():
-        raise RuntimeError("settled rail FRONT references the wrong model")
-    found = set()
-    length_edges = _length_end_edges(front)
-    for raw_annotation in front.GetAnnotations() or ():
-        annotation = _early_bound(raw_annotation, "IAnnotation")
-        if int(annotation.GetType()) != 4:  # swDisplayDimension
+        prefix = DIMENSION_PREFIXES.get(name)
+        if prefix is None:
             continue
-        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        raw_dimension = display.GetDimension2(0)
-        if raw_dimension is None:
-            raise RuntimeError("settled rail dimension has no native dimension")
-        name, _, rest = str(
-            _early_bound(raw_dimension, "IDimension").FullName
-        ).partition("@")
-        if name == _LENGTH_REFERENCE_NAME:
-            name = "Length"
-            _assert_length_attachment(adapter, display, length_edges)
-        elif name == "Length" or RECEIPT_FEATURES.get(name) != rest.partition("@")[0]:
-            raise RuntimeError(f"unexpected settled rail dimension {name}@{rest}")
-        if name in found:
-            raise RuntimeError(f"duplicate settled rail dimension {name}@{rest}")
-        assert_supplier_reference_dimension(
-            adapter, display, **_receipt_presentation(name)
-        )
-        if name in ARROWS_INSIDE and int(display.ArrowSide) != _DIM_ARROWS_INSIDE:
-            raise RuntimeError(f"{name} did not keep its arrows inside")
-        found.add(name)
-    if found != set(RECEIPT_FEATURES):
-        raise RuntimeError(
-            f"settled rail receipt dimensions missing {sorted(set(RECEIPT_FEATURES) - found)}"
-        )
+        # swDimensionTextPrefix: the count before the parenthesised value.
+        display.SetText(1, f"{prefix} (")
+        if str(display.GetText(1) or "") != f"{prefix} (":
+            raise RuntimeError(f"{name}: the {prefix} count did not persist")
+    return annotations
 
 
 async def build(adapter: Any) -> dict[str, str]:
     source = SPEC.source
     if SPEC.source_kind != "part" or not source.is_file():
         raise FileNotFoundError(f"source purchased part is missing: {source}")
-    source_sha256 = _source_file_sha256(source)
-    primary: BaseException | None = None
-    try:
-        model = _open_supplier_source_read_only(adapter, source, label=PART_STEM)
-        # Initial cleanliness stays strict. The native sheet sets the source
-        # save flag before export; existing evidence does not attribute the
-        # first dirty operation. Never save it or reset that flag. Qualified
-        # supplier checks enforce read-only identity/configuration and bytes.
-        capture_clean_source(
-            source, model, label=PART_STEM, check=SourceCheck.NATIVE_CLEAN
-        )
-        configuration = _early_bound(
-            _early_bound(
-                model.ConfigurationManager, "IConfigurationManager"
-            ).ActiveConfiguration,
-            "IConfiguration",
-        ).Name
-        if not isinstance(configuration, str) or not configuration.strip():
-            raise RuntimeError("rail source has no active configuration")
-        guard = _supplier_source_checkpoint(
-            adapter,
-            source,
-            model,
-            source_sha256,
-            label=PART_STEM,
-            evidence=[],
-            configuration=configuration,
-        )
-        return await _build_reference_sheet(
-            adapter, source, model, configuration, guard
-        )
-    except BaseException as error:
-        primary = error
-        raise
-    finally:
-        # Also covers native open, properties and drawing failures/cancellation,
-        # without dereferencing source or view handles after a close attempt.
-        try:
-            if _source_file_sha256(source) != source_sha256:
-                raise RuntimeError(
-                    f"{PART_STEM}: supplier source part bytes changed during drawing"
-                )
-        except BaseException as preservation_error:
-            if primary is None:
-                raise
-            primary.add_note(
-                f"{PART_STEM}: supplier source file preservation also failed: "
-                f"{preservation_error!r}"
-            )
-
-
-async def _build_reference_sheet(
-    adapter: Any,
-    source: Path,
-    model: Any,
-    configuration: str,
-    guard: Callable[[str], None],
-) -> dict[str, str]:
+    check(f"open {PART_STEM} source", await adapter.open_model(str(source)))
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    if Path(model.GetPathName()).resolve() != source.resolve():
+        raise RuntimeError(f"opened purchased part is not {source}")
     properties = read_required_properties(
         model, SOURCE_PROPERTIES, required=SOURCE_PROPERTIES
     )
 
-    draw, sheet = new_project_drawing(
-        adapter,
-        layout=SPEC.layout,
-        scale=SHEET_SCALE,
-        decimals=3,
-        package_name=PACKAGE,
-        checkpoint=guard,
-    )
+    draw, sheet = new_project_drawing(adapter, layout=SPEC.layout, scale=SHEET_SCALE)
     title_block_notes = _purchased_title_block(
         adapter,
         draw,
@@ -525,12 +320,9 @@ async def _build_reference_sheet(
     views = {}
     with _telemetry.span("drawing.rail_views"):
         for name, center, _, scale in VIEWS:
-            guard(f"before_create_view:{name}")
             view = _early_bound(
                 place_view(adapter, str(source), name, *center, scale=scale), "IView"
             )
-            view.ReferencedConfiguration = configuration
-            guard(f"after_select_configuration:{name}")
             # A prism with plain holes: no hidden edge names a feature.
             set_hidden_lines_removed(adapter, view)
             views[name] = view
@@ -539,7 +331,6 @@ async def _build_reference_sheet(
             views[name].UseSheetScale = 0
             views[name].ScaleRatio = double_array([float(value) for value in scale])
         _rebuild(draw, phase="rail view extents")
-        guard("after_configuration_rebuild")
         for name, center, _, _ in VIEWS:
             _center_outline(views[name], name, center)
         _rebuild(draw, phase="centre rail views")
@@ -553,9 +344,7 @@ async def _build_reference_sheet(
             tuple((name, center, None) for name, center, _, _ in VIEWS),
         )
 
-    guard("before_receipt_dimensions")
     _receipt_dimensions(adapter, views["*Front"])
-    guard("after_receipt_dimensions")
 
     notes = []
     with _telemetry.span("drawing.rail_annotations"):
@@ -636,17 +425,14 @@ async def _build_reference_sheet(
         )
 
     paths = SPEC.outputs
-    artifacts = await finalize_drawing(
+    return await finalize_drawing(
         adapter,
         DrawingOutputs(slddrw=paths["slddrw"], pdf=paths["pdf"], png=paths["png"]),
         layout=SPEC.layout,
         pdf_title=title,
         scale=SHEET_SCALE,
-        settled_checks=(lambda: _assert_receipt_dimensions(adapter, source), number_fit),
-        checkpoint=guard,
-        package_name=PACKAGE,
+        settled_checks=(number_fit,),
     )
-    return artifacts
 
 
 def _parse_args() -> argparse.Namespace:

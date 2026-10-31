@@ -33,13 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _assembly  # noqa: E402
 import _assembly_contract  # noqa: E402
-from _buildgraph import (  # noqa: E402
-    ASSEMBLY_ORDER,
-    SCRIPTS_DIR,
-    config_files_of,
-    reads_foreign_assembly_contracts,
-    script_for,
-)
+from _buildgraph import ASSEMBLY_ORDER, SCRIPTS_DIR, config_files_of, script_for  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DASHED = tuple(stem.replace("_", "-") for stem in ASSEMBLY_ORDER)
@@ -208,101 +202,15 @@ def test_contract_schema_rejects_unknown_and_duplicate(tmp_path, monkeypatch):
         with pytest.raises(ValueError):
             _assembly_contract.assembly_contract("bool-dof")
 
-        # drawing_unit: absent is the legacy sheet (None); mm/in are accepted;
-        # anything else fails closed.
-        assert valid.drawing_unit is None
+        # drawing_unit (#290): absent is mm; mm/in accepted; anything else refused.
+        assert valid.drawing_unit == "mm"
         write_contract("inch", drawing_unit="in")
         assert _assembly_contract.assembly_contract("inch").drawing_unit == "in"
-        write_contract("metric", drawing_unit="mm")
-        assert _assembly_contract.assembly_contract("metric").drawing_unit == "mm"
-        for bad, value in (("cm", "cm"), ("inches", "inches"), ("bool", True)):
-            write_contract(f"bad-unit-{bad}", drawing_unit=value)
-            with pytest.raises(ValueError, match="drawing_unit must be one of"):
-                _assembly_contract.assembly_contract(f"bad-unit-{bad}")
+        write_contract("bad-unit", drawing_unit="cm")
+        with pytest.raises(ValueError, match="drawing_unit must be 'mm' or 'in'"):
+            _assembly_contract.assembly_contract("bad-unit")
     finally:
         _assembly_contract.assembly_contract.cache_clear()
-
-
-def _contract_deps(dodo, script, stem: str) -> set[Path]:
-    contract_dir = _assembly_contract.CONTRACT_DIR.resolve()
-    deps = dodo._config_deps(script, stem, "drawing")
-    return {Path(d).resolve() for d in deps if Path(d).resolve().parent == contract_dir}
-
-
-def _contract(stem: str) -> Path:
-    return _assembly_contract.contract_path(stem.replace("_", "-")).resolve()
-
-
-def _family() -> set[Path]:
-    return {path.resolve() for path in _assembly_contract.contract_files()}
-
-
-def test_drawings_carry_their_own_contract_unless_they_read_others(dodo):
-    """A drawing reaching the contracts only through _drawing_package_unit
-    reads its OWN package's drawing_unit: an assembly sheet keys on that one
-    file, a part sheet on none, so a sibling contract edit never re-keys it.
-    A drawing whose closure reads any other contract keeps the whole family."""
-    for stem, spec in dodo.DRAWINGS_BY_NAME.items():
-        if "**" in config_files_of(spec.script):
-            continue  # the whole-config fallback narrows nothing
-        if reads_foreign_assembly_contracts(spec.script):
-            expected = _family()
-        elif spec.source_kind == "assembly":
-            expected = {_contract(spec.part)}
-        else:
-            expected = set()
-        contracts = _contract_deps(dodo, spec.script, spec.part)
-        assert contracts == expected, f"drawing:{stem}: contract deps {sorted(contracts)}"
-
-
-def test_the_top_sheet_keys_on_every_bom_subassembly_contract(dodo):
-    """The top sheet's BOM prints each subassembly's contract number
-    (draw_ha_harmonic_analyzer_assembly), so a subassembly number edit must
-    re-key it, not restore the old sheet from the cache."""
-    spec = dodo.DRAWINGS_BY_NAME["ha_harmonic_analyzer_assembly"]
-    assert reads_foreign_assembly_contracts(spec.script)
-    contracts = _contract_deps(dodo, spec.script, spec.part)
-    assert _contract("dt_drive_train") in contracts
-    assert contracts == _family()
-
-
-def test_an_own_package_sheet_keys_on_no_sibling_contract(dodo):
-    """The inch pilot sheets read only their own package's drawing_unit: a
-    drive-train contract edit leaves them cached."""
-    stick = dodo.DRAWINGS_BY_NAME["ms_measuring_stick_assembly"]
-    assert not reads_foreign_assembly_contracts(stick.script)
-    assert _contract_deps(dodo, stick.script, stick.part) == {
-        _contract("ms_measuring_stick")
-    }
-    cam = dodo.DRAWINGS_BY_NAME["dt_pinion_cam"]
-    assert not reads_foreign_assembly_contracts(cam.script)
-    assert _contract_deps(dodo, cam.script, cam.part) == set()
-
-
-@pytest.mark.parametrize(
-    ("name", "source", "foreign"),
-    (
-        # Only the own-package unit resolver: the own contract alone.
-        ("own_unit", "import _drawing_package_unit\n", False),
-        # A direct read of a sibling's contract keeps the whole family.
-        (
-            "direct_read",
-            "from _assembly_contract import assembly_contract\n"
-            'NUMBER = assembly_contract("dt-drive-train").number\n',
-            True,
-        ),
-        # _assembly takes the assembly name from its caller: whole family.
-        ("assembly_helper", "import _assembly\n", True),
-    ),
-)
-def test_a_drawing_closure_is_classified_by_its_contract_readers(
-    dodo, tmp_path, name, source, foreign
-):
-    script = tmp_path / f"draw_contract_probe_{name}.py"
-    script.write_text(source, encoding="utf-8")
-    assert reads_foreign_assembly_contracts(script) is foreign
-    expected = _family() if foreign else {_contract("ms_measuring_stick")}
-    assert _contract_deps(dodo, script, "ms_measuring_stick") == expected
 
 
 @pytest.mark.parametrize("stem", DASHED)

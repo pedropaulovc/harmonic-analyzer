@@ -37,10 +37,9 @@ from _drawing_marks import (
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _holes import wizard_holes
-import ms_stop_callouts as callouts
 from ms_stop_geom import (
-    author_dimension_text, author_hole_precision, hide_location_references,
-    location_reference, rebate_profile, roof_reference,
+    author_hole_precision, hide_location_references, location_reference,
+    rebate_profile, roof_reference,
 )
 
 PART_NAME = "ms-stop-block"
@@ -74,8 +73,6 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create stop block", await adapter.create_part())
-    # The registry row's IPS/inch/8-place calculation units, before the first
-    # global; the save only proves them.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     for name, value in (
         ("BlockLength", spec.BLOCK_LENGTH), ("BlockHeight", spec.BLOCK_HEIGHT),
@@ -153,18 +150,15 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "finished brass stop block", spec.BLOCK_FINISHED_VOLUME,
                        0.005 * spec.BLOCK_FINISHED_VOLUME)
-    # Physical mm deviations (+.004/0); the inch sheet counts their places.
     lower, upper = spec.WINDOW_SIZE_TOLERANCE_MM
-    set_dimension_bilateral_tolerance(adapter, "WindowProfile", "WindowHeight", lower, upper,
-                                      display_unit=spec.BLOCK_UNIT)
-    set_dimension_bilateral_tolerance(adapter, "WindowProfile", "WindowWidth", lower, upper,
-                                      display_unit=spec.BLOCK_UNIT)
+    for name in ("WindowHeight", "WindowWidth"):
+        set_dimension_bilateral_tolerance(adapter, "WindowProfile", name, lower, upper,
+                                          display_unit=spec.UNIT)
     _author_reference_dimensions(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature, names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    author_dimension_text(adapter, callouts.BLOCK_FEATURE_OF, callouts.BLOCK_CALLOUTS)
     apply_drawing_properties(adapter, PART_NAME, {
         "Mating Face Note": spec.BLOCK_MATING_FACE_NOTE,
         "Isometric View Note": spec.ISOMETRIC_VIEW_NOTE,

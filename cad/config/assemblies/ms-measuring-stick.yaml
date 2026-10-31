@@ -23,8 +23,6 @@ flip_invert: []
 allowed_free_stems: []
 required_free_stems: []
 free_dof: 0
-# drawing_unit: the fitter sheet, its TOL_* stamps and the saved model's units
-#   print decimal inches (#290 pilot, _drawing_units). The clamped setting is
-#   authored on the inch grid (ms_measuring_stick_assembly_spec.SETTING_UNIT);
-#   the builder refuses a declaration that disagrees.
+# drawing_unit: the fitter sheet, its TOL_* rows and the saved model's units
+#   are decimal inch (#290 pilot).
 drawing_unit: in

@@ -255,10 +255,6 @@ _DRAWING_OWN_ROW_READERS = {
     # Supplier stock diagrams bind source = spec.source before their registry
     # read; the binding and callers' own registered SPEC are checked below.
     "_supplier_spring_drawing.py",
-    # declared_package_drawing_unit(package_name): the drawing's own package,
-    # passed to new_project_drawing / finalize_drawing; the caller's argument
-    # is pinned by test_drawing_package_names_are_their_own_package.
-    "_drawing_package_unit.py",
 }
 # Registry-reading helper -> (argument index, keyword spelling).
 _OWN_ROW_HELPERS = {
@@ -278,7 +274,6 @@ _OWN_ROW_HELPERS = {
     "part_configuration_outputs": (0, "stem"),
     "validate_member_exports": (0, "stem"),
     "build_supplier_spring_drawing": (1, "spec"),
-    "part_drawing_unit": (0, "part_name"),
 }
 
 
@@ -800,162 +795,6 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
             assert source.name == own_build, (stem, source.name, calls)
             assert {arg for _name, arg in calls} == {"PART_NAME"}, (stem, calls)
             assert part_name == spec.part.replace("_", "-"), stem
-
-
-# The calls whose package_name selects the sheet's drawing_unit.
-_PACKAGE_UNIT_CALLS = frozenset({"new_project_drawing", "finalize_drawing"})
-# The implementation itself, which resolves package_name rather than forward it.
-_PACKAGE_UNIT_MODULES = frozenset({"_drawing_common.py", "_drawing_package_unit.py"})
-
-
-def _callee(call: ast.Call) -> str:
-    func = call.func
-    return func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
-
-
-def _package_name_problems(
-    script: Path, closure: list[Path], own: str, declared: bool
-) -> list[str]:
-    """Why ``script`` (with its import ``closure``) might not print its own
-    package's ``drawing_unit``.
-
-    * Every ``package_name=`` the draw script passes is its OWN dashed package:
-      a string literal or a module-level string constant.
-    * A helper only forwards its own ``package_name`` parameter, and a helper
-      function that takes ``package_name`` passes it to every
-      ``new_project_drawing`` / ``finalize_drawing`` call it makes.
-    * A package that declares a ``drawing_unit`` passes it at least once, and
-      the draw script's own ``new_project_drawing`` / ``finalize_drawing``
-      calls each carry it.
-    """
-    problems: list[str] = []
-    tree = ast.parse(script.read_text(encoding="utf-8"))
-    constants = {
-        target.id: node.value.value
-        for node in tree.body
-        if isinstance(node, ast.Assign)
-        and isinstance(node.value, ast.Constant)
-        and isinstance(node.value.value, str)
-        for target in node.targets
-        if isinstance(target, ast.Name)
-    }
-    own_passes = 0
-    for call in (node for node in ast.walk(tree) if isinstance(node, ast.Call)):
-        keywords = {kw.arg: kw.value for kw in call.keywords}
-        if "package_name" not in keywords:
-            if declared and _callee(call) in _PACKAGE_UNIT_CALLS:
-                problems.append(f"{script.name}: {_callee(call)} without package_name")
-            continue
-        value = keywords["package_name"]
-        if isinstance(value, ast.Constant):
-            passed = value.value
-        elif isinstance(value, ast.Name):
-            passed = constants.get(value.id)
-        else:
-            passed = None
-        if passed != own:
-            problems.append(
-                f"{script.name}: {_callee(call)}(package_name={ast.unparse(value)}) "
-                f"is not its own package {own!r}"
-            )
-        else:
-            own_passes += 1
-    if declared and not own_passes:
-        problems.append(f"{script.name}: {own} declares drawing_unit; pass package_name")
-    for module in closure:
-        if module.name in _PACKAGE_UNIT_MODULES or module == script:
-            continue
-        problems += _helper_package_problems(
-            module.name, module.read_text(encoding="utf-8")
-        )
-    return problems
-
-
-@cache
-def _helper_package_problems(name: str, text: str) -> tuple[str, ...]:
-    """A helper module's package_name forwarding problems (cached per content:
-    one helper sits in many drawing closures)."""
-    problems = []
-    for function in ast.walk(ast.parse(text)):
-        if not isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        arguments = function.args
-        takes = any(
-            arg.arg == "package_name"
-            for arg in (*arguments.posonlyargs, *arguments.args, *arguments.kwonlyargs)
-        )
-        for call in (node for node in ast.walk(function) if isinstance(node, ast.Call)):
-            keywords = {kw.arg: kw.value for kw in call.keywords}
-            value = keywords.get("package_name")
-            if value is not None and not (
-                isinstance(value, ast.Name) and value.id == "package_name"
-            ):
-                problems.append(
-                    f"{name}:{function.name}: {_callee(call)} must forward "
-                    f"package_name, got {ast.unparse(value)}"
-                )
-            if takes and value is None and _callee(call) in _PACKAGE_UNIT_CALLS:
-                problems.append(
-                    f"{name}:{function.name}: {_callee(call)} drops package_name"
-                )
-    return tuple(problems)
-
-
-def test_drawing_package_names_are_their_own_package():
-    """A sheet's drawing_unit comes from ONE declaration: its own package's
-    registry row or assembly contract, reached only through the package_name
-    its draw script passes (dodo narrows the read to that row/contract)."""
-    import _buildgraph as bg
-    from _drawing_package_unit import declared_package_drawing_unit
-
-    dodo = _load_dodo()
-    problems = []
-    for stem, spec in dodo.DRAWINGS_BY_NAME.items():
-        own = spec.part.replace("_", "-")
-        try:
-            declared = declared_package_drawing_unit(own) is not None
-        except KeyError:
-            declared = False  # an unregistered source declares nothing
-        script = spec.script.resolve()
-        closure = [Path(path) for path in bg.module_deps_of(script)]
-        problems += [
-            f"drawing:{stem}: {problem}"
-            for problem in _package_name_problems(script, closure, own, declared)
-        ]
-    assert not problems, "\n".join(problems)
-
-
-def test_package_name_checker_rejects_a_foreign_dropped_or_missing_package(tmp_path):
-    helper = tmp_path / "_probe_helper.py"
-    helper.write_text(
-        "def forwards(adapter, *, package_name=None):\n"
-        "    new_project_drawing(adapter, package_name=package_name)\n"
-        "    finalize_drawing(adapter, package_name=package_name)\n"
-        "def drops(adapter, *, package_name=None):\n"
-        "    new_project_drawing(adapter)\n"
-        "def rewrites(adapter, spec):\n"
-        "    forwards(adapter, package_name=spec.artifact_stem)\n",
-        encoding="utf-8",
-    )
-    script = tmp_path / "draw_probe.py"
-
-    def problems(text: str, declared: bool) -> list[str]:
-        script.write_text(text, encoding="utf-8")
-        return _package_name_problems(script, [], "pn-pen", declared)
-
-    own = 'PACKAGE = "pn-pen"\nnew_project_drawing(a, package_name=PACKAGE)\n'
-    assert problems(own, True) == []
-    assert problems('new_project_drawing(a, package_name="pn-pen")\n', True) == []
-    assert problems('new_project_drawing(a, package_name="pn-pen-rod")\n', False)
-    assert problems("new_project_drawing(a)\n", False) == []
-    missing = problems("new_project_drawing(a)\n", True)
-    assert any("without package_name" in p for p in missing)
-    assert any("declares drawing_unit" in p for p in missing)
-    script.write_text(own, encoding="utf-8")
-    helper_problems = _package_name_problems(script, [helper], "pn-pen", True)
-    assert any("drops:" in p and "drops package_name" in p for p in helper_problems)
-    assert any("rewrites:" in p and "must forward" in p for p in helper_problems)
-    assert not any("forwards:" in p for p in helper_problems)
 
 
 @pytest.fixture
@@ -5012,42 +4851,6 @@ def test_unrelated_config_edit_preserves_rocker_feature_key(isolated_feature_key
     before = snapshot()["features"]["ch_rocker_arm"]
     source.write_bytes(source.read_bytes() + b"\nfeature_recipe_revision: 2\n")
     assert snapshot()["features"]["ch_rocker_arm"] == before
-
-
-@pytest.mark.parametrize("kind", ("part", "drawing"))
-@pytest.mark.parametrize(
-    ("drawing_name", "foreign"),
-    (
-        ("ch_rocker_arm", False),
-        ("mg_magnifier_assembly", False),
-        ("ha_harmonic_analyzer_assembly", True),
-        ("pd_paper_drive_assembly", True),
-    ),
-)
-def test_package_contract_scope_preserves_foreign_consumers(kind, drawing_name, foreign):
-    """Feature citation closures and drawing tasks obey the same read boundary."""
-    import _buildgraph as bg
-
-    dodo = _load_dodo()
-    spec = dodo.DRAWINGS_BY_NAME[drawing_name]
-    assert bg.reads_foreign_assembly_contracts(spec.script) is foreign
-    family = {Path(path) for path in bg.assembly_contract_files()}
-    deps = {Path(path) for path in dodo._config_deps(spec.script, spec.part, kind)}
-    own = Path(bg.assembly_contract_file(spec.part))
-    expected = family if foreign else ({own} if own.is_file() else set())
-    assert deps & family == expected
-
-
-def test_unclassified_contract_consumer_keeps_the_family(tmp_path):
-    """Only a known package context permits narrowing the generic unit reader."""
-    import _buildgraph as bg
-
-    dodo = _load_dodo()
-    source = tmp_path / "contract_probe.py"
-    source.write_text("import _drawing_package_unit\n", encoding="utf-8")
-    family = set(bg.assembly_contract_files())
-    assert family <= set(dodo._config_deps(source))
-    assert family <= set(dodo._config_deps(source, kind="part"))
 
 
 def test_prechips_rejects_unexported_enrollment(monkeypatch):

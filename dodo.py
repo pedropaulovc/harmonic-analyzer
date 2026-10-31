@@ -135,7 +135,6 @@ from _buildgraph import (  # noqa: E402
     part_stems,
     parts_registry_files,
     read_source,
-    reads_foreign_assembly_contracts,
     reads_title_block_geometry,
     references_of,
     script_for,
@@ -1130,29 +1129,13 @@ def _expand_title_block_token(kind: str | None, script: Path) -> list[str]:
     return [str(_resolved(CONFIG_DIR / "title_block.yaml"))]
 
 
-def _expand_assembly_contracts_token(
-    stem: str | None, kind: str | None, script: Path
-) -> list[str]:
+def _expand_assembly_contracts_token(stem: str | None, kind: str | None) -> list[str]:
     """Per-task expansion of the ``"assemblies/*"`` token (any closure reaching
     ``_assembly_contract``). An ASSEMBLY task reads only its OWN contract -- the
     build activates its own stem -- so a sibling's seed or free-stem edit never
-    re-keys it. A PART or DRAWING whose closure reaches the contracts only through
-    ``_drawing_package_unit`` reads only its own package's contract (its
-    ``drawing_unit``): an assembly-sourced sheet keeps its assembly's file, a
-    part package none. This also covers feature leaves analyzing a part's
-    drawing declaration with kind="part". A closure reading any other contract
-    (``reads_foreign_assembly_contracts``: the top sheet's BOM prints every
-    subassembly's number) keeps the whole family, as does any other consumer
-    (conservative)."""
+    re-keys it; any other consumer keeps the whole family (conservative)."""
     if kind == "assembly" and stem is not None:
         return [assembly_contract_file(stem)]
-    if (
-        kind in ("part", "drawing")
-        and stem is not None
-        and not reads_foreign_assembly_contracts(script)
-    ):
-        own = assembly_contract_file(stem)
-        return [own] if Path(own).is_file() else []
     return assembly_contract_files()
 
 
@@ -1180,7 +1163,7 @@ def _config_deps(script, stem: str | None = None, kind: str | None = None) -> li
         elif tok == "title_block":
             out.update(_expand_title_block_token(kind, script))
         elif tok == ASSEMBLY_CONTRACTS_TOKEN:
-            out.update(_expand_assembly_contracts_token(stem, kind, script))
+            out.update(_expand_assembly_contracts_token(stem, kind))
         else:
             out.add(str(_resolved(CONFIG_DIR / tok)))
     return sorted(out)
@@ -3717,10 +3700,8 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # The title block's unit-explicit general tolerances: one reader that
         # returns mm bands, one renderer for the TOL_* text (#290).
         SCRIPTS_DIR / "test_printed_tolerance.py",
-        # One drawing_unit declaration per package selects the TOL_* stamps,
-        # document units, tolerance precision and the finished-sheet proof.
+        # One drawing_unit declaration per package (#290 transition switch).
         SCRIPTS_DIR / "test_drawing_units.py",
-        SCRIPTS_DIR / "test_drawing_source_guard.py",
         # A fresh detail view's projection is read behind the view barrier
         # and settled within a time budget, not a read count (#1336).
         SCRIPTS_DIR / "test_drawing_detail_projection.py",

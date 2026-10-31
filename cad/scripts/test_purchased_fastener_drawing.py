@@ -229,9 +229,8 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
 
     monkeypatch.setattr(purchased, "read_required_properties", required_properties)
 
-    def new_project_drawing(_adapter, *, layout, checkpoint, package_name):
-        # A sheet whose script names no package keeps the legacy mm units.
-        assert package_name is None
+    def new_project_drawing(_adapter, *, layout, checkpoint, unit):
+        assert unit == "mm"
         calls.append(("new", layout))
         _adapter.currentModel = draw
         checkpoint("after_new_document")
@@ -315,9 +314,7 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
         scale,
         settled_checks,
         checkpoint,
-        package_name,
     ):
-        assert package_name is None
         calls.append(("finalize", layout, pdf_title, scale))
         assert actual_outputs.slddrw == outputs["slddrw"]
         assert actual_outputs.pdf == outputs["pdf"]
@@ -7734,12 +7731,10 @@ def test_source_checkpoint_real_finalizer_boundaries_preserve_native_failure(
         "sanitize_pdf_metadata",
     ):
         monkeypatch.setattr(common, name, lambda *_args, **_kwargs: None)
-    from _part_properties import title_block_properties
-
     monkeypatch.setattr(
         common,
         "read_required_properties",
-        lambda *_args, **_kwargs: title_block_properties(),
+        lambda *_args, **_kwargs: {"TOL_LIN_XX": "±0.51"},
     )
     monkeypatch.setattr(
         common, "pdf_shaded_raster_dpi", lambda *_args: contextlib.nullcontext()

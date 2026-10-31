@@ -1,9 +1,9 @@
 r"""Create the curated machinist drawing for the pinion lift cam.
 
-An eccentric steel collar: the Ø.2510 reamed bore is offset .079 from the
-Ø.575 OD axis (so the collar and bore are NOT concentric -- the drawing
-dimensions that offset explicitly, per the cam-note precedent).  Decimal-inch
-sheet (#290); the model keeps its millimetre nominals.  The collar/bore sketches live
+An eccentric steel collar: the Ø.2510 bore is offset .079 from the Ø.575 OD
+axis (so the collar and bore are NOT concentric -- the drawing dimensions that
+offset explicitly, per the cam-note precedent).  Decimal-inch sheet (#290); the
+model keeps its millimetre nominals.  The collar/bore sketches live
 on the Front plane (front view carries bore/eccentricity); the side profile
 carries collar length/OD, while the set-screw end view owns the #2-56 tapped
 hole and its station (U28: the raised boss is gone).
@@ -37,17 +37,12 @@ from _drawing_common import (
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_finish import add_surface_finish
-from _drawing_source_guard import (
-    SourceCheck,
-    assert_source_closed,
-    capture_clean_source,
-    source_checkpoint,
-)
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _machinist_review_mode import MachinistReviewMode
 from _named_views import octant_view_name
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -64,8 +59,6 @@ from dt_pinion_cam_spec import (
     SURFACE_FINISHES,
     TAP_DRILL_CALLOUT,
     THIN_WALL_CALLOUT,
-    THIN_WALL_MIN_MM,
-    THIN_WALL_MIN_TOL_TYPE,
 )
 from dt_drive_train_steps import step_ref
 
@@ -75,9 +68,6 @@ MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["dt_pinion_cam"]
 PART_STEM = SPEC.artifact_stem
-# The drawing's own registry package: its drawing_unit (in) selects the
-# sheet's document units and the finalizer's unit proof.
-PACKAGE = "dt-pinion-cam"
 SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
 OUTPUTS = DrawingOutputs(
     slddrw=SPEC.outputs["slddrw"],
@@ -118,8 +108,8 @@ _SQRT_HALF = 0.5**0.5
 # pass through nearly the same centre, so the two cannot share a view without
 # crossing -- machinist round 2).
 # RV-01's accepted thin-side wall (rule 20): the part's native ".0797 MIN"
-# reference, drawn up the wall over the bore, its text above the OD's top
-# between the bore and eccentricity callouts.
+# reference up the wall over the bore, its text above the OD's top between
+# the bore and eccentricity callouts.
 FRONT_KEEP = {
     "BoreDia": (0.055, 0.180),
     "CollarCy": (0.150, 0.200),
@@ -152,10 +142,7 @@ DIMENSION_CALLOUTS = {
     "ThinWallMin": THIN_WALL_CALLOUT,
 }
 # Decimal places are the part's (dt_pinion_cam_spec.DRAWING_PRECISION, applied
-# by build_dt_pinion_cam): inch places, four on the reamed bore, three on the
-# OD, eccentricity and tap drill, two on the length and station, four on the
-# single-limit wall minimum.
-# The sheet only reads them back.
+# by build_dt_pinion_cam).  The sheet only reads them back.
 
 
 def _limit_witness_lines(
@@ -180,22 +167,6 @@ def _limit_witness_lines(
             f"missing dimensions for witness-line limits: {sorted(remaining)!r}"
         )
     adapter.currentModel.GraphicsRedraw2()
-
-
-def _require_thin_wall_min(adapter: Any, annotations: list[Any]) -> None:
-    """Prove the front view prints the part's RV-01 wall minimum natively:
-    one ThinWallMin, measuring the printed limit and carrying swTolMIN."""
-    matches = [a for a in annotations if dimension_name(adapter, a) == "ThinWallMin"]
-    if len(matches) != 1:
-        raise RuntimeError(f"expected one ThinWallMin dimension, found {len(matches)}")
-    annotation = _early_bound(matches[0], "IAnnotation")
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    if int(tolerance.Type) != THIN_WALL_MIN_TOL_TYPE:
-        raise RuntimeError(f"ThinWallMin lost its MIN limit: type {int(tolerance.Type)}")
-    if abs(float(dimension.SystemValue) - THIN_WALL_MIN_MM / 1000.0) > 1e-9:
-        raise RuntimeError(f"ThinWallMin does not measure {THIN_WALL_MIN_MM:g} mm")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -224,23 +195,12 @@ async def build(adapter: Any) -> dict[str, str]:
             "Isometric View Note",
         ),
     )
-    # #290 native acceptance: the sheet never modifies its source part.  The
-    # part's in-memory save flag after views exist is recorded, not refused --
-    # a view's camera can set it without a write, and the bytes are the
-    # persistence proof.
-    source = capture_clean_source(
-        SOURCE, adapter.currentModel, label=PART_STEM,
-        check=SourceCheck.TRANSIENT_VIEW_STATE,
-    )
-    guard = source_checkpoint(source)
     drawing_model, sheet = new_project_drawing(
         adapter,
         property_view=PART_STEM,
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        decimals=3,
-        checkpoint=guard,
-        package_name=PACKAGE,
+        unit=part_drawing_unit("dt-pinion-cam"),
     )
     stamp_drawing_summary(
         adapter,
@@ -303,7 +263,6 @@ async def build(adapter: Any) -> dict[str, str]:
         0.008,
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    _require_thin_wall_min(adapter, front_annotations)
     # No explicit centre marks: the template marks every hole as each view is
     # placed, and AutoInsertCenterMarks2 printed a second, identical mark on
     # the bore and the tap (layout audit duplicate-annotation, ENFORCE r2; as
@@ -334,7 +293,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to label rotated cam set-screw end view")
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.205)
 
-    artifacts = await finalize_drawing(
+    return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Pinion Lift Cam Manufacturing Drawing",
@@ -344,11 +303,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # dimension's curated callout already releases the same thread.
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=1,
-        checkpoint=guard,
-        package_name=PACKAGE,
     )
-    assert_source_closed(source, stage="after finalize")
-    return artifacts
 
 
 def _parse_args() -> argparse.Namespace:

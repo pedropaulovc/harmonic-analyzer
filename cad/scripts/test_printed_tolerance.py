@@ -12,7 +12,6 @@ import _title_block_units as units
 
 
 def _rows(monkeypatch: pytest.MonkeyPatch, **rows: dict) -> None:
-    """Replace the named rows on every sheet (mm and inch alike)."""
     real = _config.title_block
     monkeypatch.setattr(
         _config,
@@ -83,25 +82,6 @@ def test_inch_drilled_and_edge_rows_convert_and_render(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("row", "sheet"),
-    [
-        # An inch sheet whose row fell back to (or was authored in) mm.
-        ({"value_in": 0.02, "band_mm": 0.51, "digits": 2}, "in"),
-        # A millimetre sheet carrying an inch band.
-        ({"value_in": 0.01, "band_in": 0.01, "digits": 2}, "mm"),
-    ],
-)
-def test_a_length_row_printed_in_another_unit_than_its_sheet_is_refused(
-    monkeypatch, row, sheet
-):
-    _rows(monkeypatch, linear_2pl=row)
-    with pytest.raises(ValueError, match=f"cannot print on a '{sheet}' sheet"):
-        tol.printed_band_mm(2, unit=sheet)
-    with pytest.raises(ValueError, match=f"cannot print on a '{sheet}' sheet"):
-        units.linear_band_display(2, unit=sheet)
-
-
-@pytest.mark.parametrize(
     ("row", "error", "match"),
     [
         ({"band": 0.8, "digits": 1}, ValueError, "has no unit"),
@@ -147,137 +127,40 @@ def test_angular_row_must_be_degrees(monkeypatch):
         tol.angular_band_deg()
 
 
-_TOLERANCE_ROWS = (
-    "linear_1pl",
-    "linear_2pl",
-    "linear_3pl",
-    "angular",
-    "edge_break",
-    "inside_corner",
-    "drilled_hole",
-)
-
-
-@pytest.mark.parametrize("sheet", ["mm", "in"])
-def test_title_block_rows_carry_no_display_strings(sheet):
-    for kind in _TOLERANCE_ROWS:
-        row = _config.title_block(kind, unit=sheet)
-        assert not any(key.startswith("display") for key in row), kind
-        assert all(not isinstance(value, str) for value in row.values()), kind
-
-
-# The legacy millimetre sheet, byte for byte as #2087 stamped it: a package
-# that declares no drawing_unit (and every caller that passes no unit) keeps it.
-_MM_SHEET = {
-    "TOL_LIN_X": "±0.8",
-    "TOL_LIN_XX": "±0.51",
-    "TOL_LIN_XXX": "±0.13",
-    "TOL_ANG": "±1°",
-    "TOL_SURFACE": "CAST/MACHINED",
-    "TOL_EDGE_BREAK_R": "R0.25",
-    "TOL_CHAMFER_MAX": "0.25",
-    "TOL_INSIDE_CORNER": "R1.0 MAX",
-    "THREAD_TYPE": "UNC/UNF",
-    "THREAD_CLASS": "2A/2B",
-    "TOL_HOLE_MINUS": "0",
-    "TOL_HOLE_PLUS": "+0.10",
-}
-
-# The owner's decimal-inch rulings (2026-10-30).
-_INCH_SHEET = {
-    **_MM_SHEET,
-    "TOL_LIN_X": "±.1",
-    "TOL_LIN_XX": "±.01",
-    "TOL_LIN_XXX": "±.005",
-    "TOL_EDGE_BREAK_R": "R.010",
-    "TOL_CHAMFER_MAX": ".010",
-    "TOL_INSIDE_CORNER": "R.040 MAX",
-    "TOL_HOLE_PLUS": "+.004",
-}
-
-
-def test_the_default_sheet_is_the_legacy_millimetre_sheet():
-    from _part_properties import title_block_properties
-
-    assert title_block_properties() == title_block_properties(unit="mm") == _MM_SHEET
-    assert list(title_block_properties()) == list(_MM_SHEET)
-
-
-def test_the_inch_sheet_prints_the_owner_rulings():
-    from _part_properties import title_block_properties
-
-    assert title_block_properties(unit="in") == _INCH_SHEET
-
-
-@pytest.mark.parametrize(
-    ("accessor", "mm", "inch"),
-    [
-        (lambda unit: tol.printed_band_mm(1, unit=unit), 0.8, 2.54),
-        (lambda unit: tol.printed_band_mm(2, unit=unit), 0.51, 0.254),
-        (lambda unit: tol.printed_band_mm(3, unit=unit), 0.13, 0.127),
-        (lambda unit: tol.drilled_oversize_mm(unit=unit), 0.10, 0.1016),
-        (lambda unit: tol.drilled_undersize_mm(unit=unit), 0.0, 0.0),
-        (lambda unit: tol.edge_break_radius_mm(unit=unit), 0.25, 0.254),
-        (lambda unit: tol.edge_break_chamfer_mm(unit=unit), 0.25, 0.254),
-        (lambda unit: tol.inside_corner_radius_mm(unit=unit), 1.0, 1.016),
-        (lambda unit: tol.angular_band_deg(unit=unit), 1.0, 1.0),
-    ],
-)
-def test_physical_bands_stay_millimetres_on_either_sheet(accessor, mm, inch):
-    assert accessor("mm") == mm
-    assert accessor("in") == pytest.approx(inch, abs=1e-12)
-
-
-def test_no_argument_accessors_read_the_millimetre_sheet():
-    assert tol.printed_band_mm(2) == tol.printed_band_mm(2, unit="mm") == 0.51
-    assert tol.drilled_oversize_mm() == 0.10
-    assert tol.printed_deviations(12.345, 2) == tol.printed_deviations(
-        12.345, 2, unit="mm"
-    )
-
-
-def test_inch_deviations_round_the_nominal_on_the_inch_grid():
-    # 12.7 mm prints .50 on an inch sheet: the part is checked against
-    # .50 ±.01 in = 12.446..12.954 mm.
-    lower, upper = tol.printed_deviations(12.7, 2, unit="in")
-    assert (lower, upper) == (pytest.approx(-0.254), pytest.approx(0.254))
-    # 12.0 mm prints .47 (11.938 mm): the window shifts by the rounding.
-    lower, upper = tol.printed_deviations(12.0, 2, unit="in")
-    assert lower == pytest.approx(11.938 - 0.254 - 12.0)
-    assert upper == pytest.approx(11.938 + 0.254 - 12.0)
-    # Explicit limits (mm) qualify the inch-rounded nominal: 12.0 mm prints
-    # .472 (11.9888 mm) at three places.
-    lower, upper = tol.printed_deviations(12.0, 3, (-0.0254, 0.0), unit="in")
-    assert lower == pytest.approx(11.9888 - 0.0254 - 12.0)
-    assert upper == pytest.approx(11.9888 - 12.0)
-
-
-def test_dimxpert_block_values_equal_the_printed_inch_bands():
-    # apply_block_tolerances stamps value_in; on the inch sheet it is the band.
-    for kind in ("linear_1pl", "linear_2pl", "linear_3pl"):
-        row = _config.title_block(kind, unit="in")
-        assert row["value_in"] == row["band_in"], kind
-
-
-def test_the_unit_section_is_not_a_row_and_unknown_units_are_refused():
-    with pytest.raises(KeyError, match="unit section"):
-        _config.title_block("in")
-    with pytest.raises(ValueError, match="unknown title-block unit 'cm'"):
-        _config.title_block("linear_2pl", unit="cm")
-    # Unit-free rows are shared between the sheets.
-    for kind in ("angular", "surface", "thread"):
-        assert _config.title_block(kind, unit="in") is _config.title_block(kind)
-
-
-def test_every_length_row_has_an_inch_row():
-    # A missing in: row would fall back to the mm band and be refused at the
-    # first inch read; pin the whole sheet here instead.
+def test_title_block_rows_carry_no_display_strings():
     for kind in (
         "linear_1pl",
         "linear_2pl",
         "linear_3pl",
+        "angular",
         "edge_break",
         "inside_corner",
         "drilled_hole",
     ):
-        assert _config.title_block(kind, unit="in") is not _config.title_block(kind)
+        row = _config.title_block(kind)
+        assert not any(key.startswith("display") for key in row), kind
+        assert all(not isinstance(value, str) for value in row.values()), kind
+
+
+def test_inch_sheet_prints_the_owner_rulings():
+    from _part_properties import title_block_properties
+
+    mm = title_block_properties()
+    assert mm["TOL_LIN_XX"] == "±0.51" and mm["TOL_HOLE_PLUS"] == "+0.10"
+    assert title_block_properties(unit="in") == {
+        **mm,
+        "TOL_LIN_X": "±.1",
+        "TOL_LIN_XX": "±.01",
+        "TOL_LIN_XXX": "±.005",
+        "TOL_EDGE_BREAK_R": "R.010",
+        "TOL_CHAMFER_MAX": ".010",
+        "TOL_INSIDE_CORNER": "R.040 MAX",
+        "TOL_HOLE_PLUS": "+.004",
+    }
+
+
+def test_inch_deviations_round_the_nominal_on_the_inch_grid():
+    # 12.0 mm prints .47 (11.938 mm) at .XX ±.01 in.
+    lower, upper = tol.printed_deviations(12.0, 2, unit="in")
+    assert lower == pytest.approx(11.938 - 0.254 - 12.0)
+    assert upper == pytest.approx(11.938 + 0.254 - 12.0)

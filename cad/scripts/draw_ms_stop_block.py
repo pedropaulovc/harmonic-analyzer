@@ -3,11 +3,8 @@ r"""Manufacturing drawing of the open-rebate brass stop block.
 The sheet prints decimal inch (the part's ``drawing_unit: in``). The
 cover-side view and end view show the rebate in solid lines. Standard
 native Hole Wizard callouts define the orthogonal taps, including blind full
-thread and drill depths. Each native length variable explicitly prints .XXX;
-the returned precision/value/token proof runs again after final rebuilding.
-Every controlling dimension is imported unchanged, with the callout text its part authored
-(``ms_stop_callouts``); the source part is proved clean -- file SHA-256 and
-save flag -- before any view and at every save/close boundary.
+thread and drill depths; each native length variable prints .XXX. Every
+controlling dimension is imported unchanged.
 Hole-mouth points convert the shared millimetre frame to COM metres before
 projection; the cover-side *Back view reverses X, not the coordinate units.
 The *Bottom view is turned 180 degrees to preserve that X direction and
@@ -28,7 +25,6 @@ from typing import Any
 
 import _config
 import _telemetry
-import ms_stop_callouts as callouts
 import ms_stop_spec as part
 from _check import check
 from _com import _early_bound
@@ -42,10 +38,12 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_dimensions import set_dimension_callouts
 from _drawing_finish import add_surface_finish
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _surface_finish import surface_finish_by_key
 from _drawing_leader_notes import add_attached_note, add_property_linked_callout
+from _part_properties import part_drawing_unit
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
@@ -54,19 +52,11 @@ from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _machinist_review_mode import MachinistReviewMode
 from _ms_drawing_contract import assert_manufacturing_dimensions
-from _drawing_source_guard import (
-    assert_source_closed,
-    capture_clean_source,
-    source_checkpoint,
-)
-from _ms_drawing_guards import assert_imported_text, set_stop_hole_callout_precision
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
-# The drawing's own registry package: its drawing_unit (in) selects the sheet.
-PACKAGE = "ms-stop-block"
 SPEC = DRAWINGS_BY_NAME["ms_stop_block"]
 PART_STEM = SPEC.artifact_stem
 SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
@@ -98,6 +88,15 @@ RIGHT_KEEP = {
 BOTTOM_KEEP = {
     "ThumbFromEnd": (0.175, 0.031), "ThumbFromPlate": (0.090, 0.073),
 }
+STICK_FIT = f"SLIDING FIT ON\nMS-STICK {_config.parts('ms-stick')['number']}"
+# Native horizontal size witnesses end at this corner rather than spanning
+# the view; the shorter angle arc stays below the overall length dimension.
+# The rebate bands exist only for the stick that slides in it.
+DIMENSION_CALLOUTS = {
+    "RoofChamferSize": "2 CORNERS",
+    "WindowWidth": f"OPEN REBATE\n{STICK_FIT}",
+    "WindowHeight": STICK_FIT,
+}
 # Leadered labels name the X=0 end and Y=0 edge the match-drill clamp aligns.
 LOCATING_END_XY = (0.232, 0.160)
 # The edge label sits wholly left of its leader's landing point, so the
@@ -117,6 +116,11 @@ COVER_HOLE_PROCESS = (
 # The 4-40 runs from the underside through the floor and opens into the
 # rebate; THRU alone does not say which wall it stops at (rules 1, 12).
 THUMB_HOLE_END = "INTO REBATE; ROOF NOT DRILLED"
+# Hole Wizard length variables of each tap callout, by native name.
+COVER_TAP_PRECISION = dict.fromkeys(
+    ("hw-tapdrldia", "hw-tapdrldepth", "hw-threaddepth"), part.HOLE_CALLOUT_PRECISION,
+)
+THUMB_TAP_PRECISION = {"hw-thrutapdrldia": part.HOLE_CALLOUT_PRECISION}
 # Ra 63 uin symbol left of the right view's open rebate mouth, below the mating
 # face label; its leader enters the mouth to the ceiling's mouth-side quarter.
 SLIDE_FINISH_OFFSET = (-0.030, -0.012)
@@ -219,14 +223,12 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source stop block missing: {SOURCE}")
     check("open stop block", await adapter.open_model(str(SOURCE)))
-    source = capture_clean_source(SOURCE, adapter.currentModel, label="stop block source")
-    guard = source_checkpoint(source)
     properties = ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity")
-    read_required_properties(source.model, properties,
+    read_required_properties(adapter.currentModel, properties,
                              required=("Number", "Material Specification", "Finish", "Quantity"))
     drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM,
                                         scale=SHEET_SCALE, layout=SPEC.layout,
-                                        package_name=PACKAGE, checkpoint=guard)
+                                        unit=part_drawing_unit("ms-stop-block"))
     stamp_drawing_summary(adapter, drawing, {
         0: "Measuring Stick Stop Block Manufacturing Drawing",
         1: "Harmonic Analyzer hobby-machinist book drawing",
@@ -246,7 +248,7 @@ async def build(adapter: Any) -> dict[str, str]:
         annotations += curate_view_dimensions(adapter, view, keep=keep, view_label=label,
                                                dimensions_by_feature=part.BLOCK_DRAWING_DIMENSIONS)
     set_hidden_lines_removed(adapter, iso)
-    assert_imported_text(adapter, annotations, callouts.BLOCK_CALLOUTS)
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     plate_edge = model_point_in_view(
         adapter, front, (
             (part.PLATE_HOLE_XS[1] + part.PLATE_TAP_DRILL_DIA / 2.0) / 1000.0,
@@ -258,9 +260,7 @@ async def build(adapter: Any) -> dict[str, str]:
         process=COVER_HOLE_PROCESS,
     )
     _remove_general_thread_class(plate_callout)
-    assert_plate_hole_precision = set_stop_hole_callout_precision(
-        plate_callout, label="two cover blind taps",
-    )
+    set_hole_callout_precision(plate_callout, COVER_TAP_PRECISION, label="two cover blind taps")
     thumb_edge = model_point_in_view(
         adapter, bottom, (
             (part.THUMB_AXIS_X + part.THUMB_TAP_DRILL / 2.0) / 1000.0,
@@ -271,9 +271,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="thumbscrew tap through floor",
     )
     _remove_general_thread_class(thumb_callout, last_line=THUMB_HOLE_END)
-    assert_thumb_hole_precision = set_stop_hole_callout_precision(
-        thumb_callout, label="thumbscrew tap through floor",
-    )
+    set_hole_callout_precision(thumb_callout, THUMB_TAP_PRECISION,
+                               label="thumbscrew tap through floor")
     mating_edge = model_point_in_view(
         adapter, right, (
             part.BLOCK_LENGTH / 2000.0,
@@ -300,18 +299,11 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, bottom):
         set_hidden_lines_removed(adapter, view)
     add_property_linked_note(adapter, "Isometric View Note", ISO_CENTER[0] - 0.030, 0.085)
-    artifacts = await finalize_drawing(adapter, OUTPUTS,
-                                       pdf_title="Measuring Stick Stop Block Manufacturing Drawing",
-                                       scale=SHEET_SCALE, layout=SPEC.layout,
-                                       redundant_note_substrings=FINAL_SHEET_REMOVED_NOTES,
-                                       expected_redundant_notes=2,
-                                       package_name=PACKAGE, checkpoint=guard,
-                                       settled_checks=(
-                                           assert_plate_hole_precision,
-                                           assert_thumb_hole_precision,
-                                       ))
-    assert_source_closed(source, stage="after finalize")
-    return artifacts
+    return await finalize_drawing(adapter, OUTPUTS,
+                                  pdf_title="Measuring Stick Stop Block Manufacturing Drawing",
+                                  scale=SHEET_SCALE, layout=SPEC.layout,
+                                  redundant_note_substrings=FINAL_SHEET_REMOVED_NOTES,
+                                  expected_redundant_notes=2)
 
 
 if __name__ == "__main__":

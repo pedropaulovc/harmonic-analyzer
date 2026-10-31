@@ -258,14 +258,6 @@ DRAWING_DIMENSIONS = {
 DRAWING_PRECISION = {
     feature: dict.fromkeys(names, 0) for feature, names in DRAWING_DIMENSIONS.items()
 }
-# HIWIN's HG series is a metric-only product line (#290 owner ruling: the
-# HGR15 rail and its HGH15 carriage stay millimetre). Each receipt value
-# prints in the supplier's own unit, labelled ("(440 mm)"), so it reads the
-# same beside the project's inch sheets; the registry row declares
-# ``drawing_unit: mm`` for the sheet around it.
-RECEIPT_UNITS = "mm"
-# The exact native value each receipt dimension must read, in millimetres.
-RECEIPT_VALUES_MM = {"Length": LENGTH, "HoleEnd": HOLE_END, "HolePitch": HOLE_PITCH}
 # The one printed pitch stands for every gap between the holes.
 HOLE_PITCH_CALLOUT = f"{HOLE_COUNT - 1}X"
 DRAWING_NOTES = "SPECIAL ORDER CUT LENGTH AND HOLE PATTERN, TO SUIT TL-20."

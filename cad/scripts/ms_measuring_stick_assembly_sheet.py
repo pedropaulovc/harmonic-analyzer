@@ -6,14 +6,10 @@ wording edit rebuilds the drawing alone. Printed dimensions interpolate a
 symbol of ``ms_measuring_stick_assembly_spec`` or a part/vendor spec; mate
 drawing numbers come from the part registry.
 
-The near-face dimension is an associative reference to the saved clamped
-pose, not an acceptance band. STOP_MARK owns the graduation/thumbscrew-axis
-alignment; the notes refer to the shown native dimension without repeating
-its rounded numeric value.
-
-Every printed length is in the package's unit (``spec.SETTING_UNIT``, held
-to the assembly contract's ``drawing_unit`` by the builder), rendered as the
-sheet prints it (ASME inch text has no leading zero and no unit word).
+The near-face setting is a native reference dimension of the saved clamped
+pose, not an acceptance band; step 5 and the setup note name the
+stick-mark/thumbscrew-axis indexing it shows without repeating its value.
+Printed lengths are in the assembly contract's ``drawing_unit``.
 """
 
 from __future__ import annotations
@@ -25,18 +21,14 @@ import ms_measuring_stick_assembly_spec as spec
 import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
 import sh_vn_thumb_screw_spec as thumb
+from _assembly_contract import assembly_contract
 from _title_block_units import LENGTH_UNITS, render_number
 
 DRAWING_NUMBER = "MHA-MS-00"
 PLATE_DRAWING_NUMBER = str(_config.parts("ms-stop-plate")["number"])
+UNIT = assembly_contract(spec.ASM_NAME).drawing_unit
 
 BOM_ORDER = (spec.STICK, spec.BLOCK, spec.PLATE, spec.PLATE_SCREW, spec.THUMB_SCREW)
-
-# Drill diameters print at three places; the match-drill depths at the stop
-# sheets' own hole-callout places, so both drawings print one number.
-DIAMETER_PLACES = 3
-DEPTH_PLACES = stop.HOLE_CALLOUT_PRECISION
-_UNIT = spec.SETTING_UNIT
 
 
 def _inch_fraction(length_mm: float) -> str:
@@ -47,10 +39,11 @@ def _inch_fraction(length_mm: float) -> str:
     return str(inches)
 
 
-def _printed(length_mm: float, places: int) -> str:
-    """A part's model length as the sheet prints it; a length off the
-    ``places`` grid raises instead of printing a number the model is not."""
-    return render_number(length_mm / LENGTH_UNITS[_UNIT], _UNIT, places)
+def _hole(length_mm: float) -> str:
+    """A stop hole length as the stop sheets' hole callouts print it."""
+    return render_number(
+        length_mm / LENGTH_UNITS[UNIT], UNIT, stop.HOLE_CALLOUT_PRECISION
+    )
 
 
 # BOM DESCRIPTION cells (the parts carry no Description property); the steps
@@ -80,11 +73,11 @@ ASSEMBLY_STEPS = (
     "1. PLATE IS MASTER: LAY OUT STOP COVER PLATE HOLES PER "
     f"{PLATE_DRAWING_NUMBER}; LEAVE UNDRILLED. "
     f"CLAMP PLATE AND BLOCK WITH {stop.MATCH_DRILL_DATUM_ALIGNMENT}; PILOT "
-    f"DIA {_printed(stop.PLATE_TAP_DRILL_DIA, DIAMETER_PLACES)} THROUGH PLATE INTO BLOCK TO "
-    f"{_printed(stop.PLATE_TAP_DRILL_DEPTH, DEPTH_PLACES)} CYLINDRICAL DEPTH INTO BLOCK "
+    f"DIA {_hole(stop.PLATE_TAP_DRILL_DIA)} THROUGH PLATE INTO BLOCK TO "
+    f"{_hole(stop.PLATE_TAP_DRILL_DEPTH)} CYLINDRICAL DEPTH INTO BLOCK "
     "(DEPTH EXCLUDES PLATE). REMOVE PLATE; OPEN ITS HOLES TO "
-    f"DIA {_printed(stop.PLATE_CLEARANCE_DIA, DIAMETER_PLACES)}; BOTTOMING-TAP BLOCK "
-    f"{plate_screw.THREAD} TO {_printed(stop.PLATE_TAP_THREAD_DEPTH, DEPTH_PLACES)} FULL THREAD "
+    f"DIA {_hole(stop.PLATE_CLEARANCE_DIA)}; BOTTOMING-TAP BLOCK "
+    f"{plate_screw.THREAD} TO {_hole(stop.PLATE_TAP_THREAD_DEPTH)} FULL THREAD "
     "DEPTH INTO BLOCK. MARK BLOCK AND PLATE AS A PAIR.",
     f"2. START THE {thumb.THREAD} KNURLED THUMBSCREW DOWN INTO THE STOP BLOCK "
     "FROM ITS TAPPED FACE; KEEP THE TIP CLEAR OF THE WINDOW.",
@@ -107,7 +100,7 @@ CLAMPED_SETUP_NOTE = (
     "GRADUATED FACE AGAINST THE FIXED WINDOW WALL; THUMBSCREW ON THE PLAIN FACE."
 )
 
-# Both dimensions describe the saved pose, not component manufacturing sizes.
+# Both dimensions are reference: the assembly pose, not component sizes.
 REFERENCE_OVERALL_LENGTH = spec.STICK_X_MAX - spec.STICK_X_MIN
 DRAWING_REFERENCE_PRECISION = 1
 

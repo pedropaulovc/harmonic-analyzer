@@ -461,11 +461,10 @@ def test_the_package_has_five_landscape_sheets_with_the_wire_steps_on_sheet_5() 
 
 
 def test_the_drawing_key_reads_only_the_package_parts_config() -> None:
-    # Explode geometry comes from the pure spec, not the COM builder. The
-    # generic drawing-unit resolver does emit dynamic package tokens; the
-    # task must expand those to this package rather than every registry row.
+    # The builder's COM explode (_mg_magnifier_explode -> _assembly_patterns ->
+    # _assembly) reads every parts/* and assemblies/* YAML, so importing it
+    # re-keyed this sheet on any part edit. The drawing reads the pure spec.
     from pathlib import Path
-    import importlib.util
 
     import _buildgraph
 
@@ -476,22 +475,7 @@ def test_the_drawing_key_reads_only_the_package_parts_config() -> None:
         "_assembly_patterns.py",
         "_mg_magnifier_explode.py",
     }
-    loader = importlib.util.spec_from_file_location(
-        "dodo", script.resolve().parents[2] / "dodo.py",
-    )
-    assert loader is not None and loader.loader is not None
-    dodo = importlib.util.module_from_spec(loader)
-    loader.loader.exec_module(dodo)
-    spec = dodo.DRAWINGS_BY_NAME["mg_magnifier_assembly"]
-    deps = {Path(path).resolve() for path in dodo._config_deps(script, spec.part, "drawing")}
-    config = _buildgraph.CONFIG_DIR.resolve()
-    # Literal BOM reads remain inputs, even when the component is shared.
-    rows = (set(drawing.PART_ROWS) - {drawing.WIRE_ROW}) | {"sh-vn-music-wire"}
-    assert {config / "parts" / f"{row}.yaml" for row in rows} <= deps
-    assert config / "parts" / "_defaults.yaml" in deps
-    assert config / "parts" / "fr-nameplate.yaml" not in deps
-    contracts = {path for path in deps if path.parent == config / "assemblies"}
-    assert contracts == {config / "assemblies" / "mg-magnifier.yaml"}
+    assert not [token for token in _buildgraph.config_files_of(script) if "*" in token]
 
 
 def test_the_wire_balloon_lands_on_the_mid_run_ring_facing_the_viewer() -> None:
