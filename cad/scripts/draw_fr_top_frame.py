@@ -2158,6 +2158,7 @@ def _hub_boss_section(adapter: Any, parent_view: Any) -> Any:
     leftover construction midlines had to be hunted down and whose position
     had to be re-derived from the cropped outline.)
     """
+    _pin_sheet_scale(adapter)
     line = [
         model_point_in_view(
             adapter, parent_view, (x/1000.0, 0.0, z/1000.0),
@@ -2278,6 +2279,7 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
     Returns the view and its imported dimensions.
     """
     z = HANGER_SECTION_Z
+    _pin_sheet_scale(adapter)
     line = [
         model_point_in_view(
             adapter, parent_view, (x/1000.0, 0.0, z/1000.0),
@@ -2421,6 +2423,7 @@ def _hub_underside_detail(adapter: Any, parent_view: Any) -> Any:
     if not drawing.ActivateView(view_name(adapter, parent_view)):
         raise RuntimeError("failed to activate underside detail parent")
     draw.ClearSelection2(True)
+    _pin_sheet_scale(adapter)
     center = model_point_in_view(
         adapter, parent_view,
         (GOOSENECK_X/1000.0, (-HALF_H-HUB_BOSS_DROP)/1000.0, GOOSENECK_Z/1000.0),
@@ -2794,23 +2797,76 @@ def _add_view_arrow(
     )
 
 
+def _pin_sheet_scale(adapter: Any) -> tuple[float, float]:
+    """Hold the active sheet at its printed scale before a section or detail.
+
+    Inserting model views auto-drifts the sheet scale (finalize_drawing
+    re-pins it before saving), and a native view caption carries its scale
+    field only when its view's scale differs from the sheet's AT CREATION
+    (_section_axis.position_section_caption).  On the inch sheet the drift
+    landed on E-E's own 1:4 (farm leaf b1-fr_top_frame: E-E's caption lost
+    its scale field; in mm the drift had cleared every section's scale), so
+    each caption is made against the scale the title block prints.
+    """
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+    if sheet is None:
+        raise RuntimeError("no active sheet to pin before a section or detail")
+    name = str(adapter._get_attr_or_call(sheet, "GetName") or "")
+    scale = tuple(float(value) for value in SHEET_SCALES[name])
+    if not sheet.SetScale(scale[0], scale[1], False, False):
+        raise RuntimeError(f"failed to pin sheet {name!r} at {scale[0]:g}:{scale[1]:g}")
+    properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
+    if len(properties) < 4 or (float(properties[2]), float(properties[3])) != scale:
+        raise RuntimeError(f"sheet {name!r} scale did not persist: {properties!r}")
+    return scale
+
+
 def _position_view_caption(
     adapter: Any, view: Any, target: tuple[float, float]
 ) -> None:
-    """Move a native section/detail caption without replacing its linked fields."""
+    """Move a native section/detail caption without replacing its linked fields.
+
+    The caption is found by its label field alone, as
+    ``_section_axis.position_section_caption`` finds it.  It must carry the
+    scale field exactly when its view's scale differs from the sheet's
+    printed one (the title block states the rest; ``_pin_sheet_scale``).
+    A miss lists every note the view owns.
+    """
     view = _early_bound(view, "IView")
     if int(view.Type) not in (2, 3):  # swDrawingSectionView, swDrawingDetailView
         raise RuntimeError("caption target is not a native section or detail")
-    candidates = []
-    for raw_note in view.GetNotes() or ():
-        note = _early_bound(raw_note, "INote")
-        linked_text = str(note.PropertyLinkedText or "")
-        # GetText is blank at this point; the native view-label fields persist.
-        if all(token in linked_text for token in ("<VLNAME>", "<VLLABEL>", "<VLSCALEV>")):
-            candidates.append((note, linked_text))
+    label = view_name(adapter, view)
+    notes = [_early_bound(raw_note, "INote") for raw_note in (view.GetNotes() or ())]
+    # GetText is blank at this point; the native view-label fields persist.
+    candidates = [
+        (note, str(note.PropertyLinkedText or ""))
+        for note in notes
+        if "<VLLABEL>" in str(note.PropertyLinkedText or "")
+    ]
     if len(candidates) != 1:
-        raise RuntimeError(f"expected one native linked view caption, found {len(candidates)}")
+        texts = [
+            (str(note.PropertyLinkedText or ""), str(note.GetText() or "")) for note in notes
+        ]
+        raise RuntimeError(
+            f"expected one native linked view caption on {label!r}, found "
+            f"{len(candidates)} among its notes (linked, text) {texts!r}"
+        )
     note, linked_text = candidates[0]
+    sheet_scale = _pin_sheet_scale(adapter)
+    view_scale = tuple(float(value) for value in view.ScaleRatio)
+    differs = (
+        abs(view_scale[0] / view_scale[1] - sheet_scale[0] / sheet_scale[1]) > 1e-9
+    )
+    _telemetry.info(
+        f"{label} caption {linked_text!r} at {view_scale[0]:g}:{view_scale[1]:g} "
+        f"on a {sheet_scale[0]:g}:{sheet_scale[1]:g} sheet"
+    )
+    if differs and "<VLSCALEV>" not in linked_text:
+        raise RuntimeError(
+            f"{label} caption {linked_text!r} at {view_scale[0]:g}:{view_scale[1]:g} "
+            f"lacks the scale on a {sheet_scale[0]:g}:{sheet_scale[1]:g} sheet"
+        )
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     if not annotation.SetPosition2(*target, 0.0):
         raise RuntimeError("failed to position native view caption")
@@ -3201,6 +3257,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # profile beside an identical twin 80 mm away carrying nothing.
     cut_ends = section_cut_ends()
     rail_cut_x = cut_ends["H"][0][0]
+    _pin_sheet_scale(adapter)
     rail_cut = [
         model_point_in_view(
             adapter, geometry_top, (x/1000.0, 0.0, z/1000.0),
@@ -3293,6 +3350,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # print shows the one side rail it dimensions and the crossbar T beside
     # it, its web and flange dimensioned at the T's own station between the
     # gussets -- not the right rail's identical, unannotated twin.
+    _pin_sheet_scale(adapter)
     side_cut = [
         model_point_in_view(
             adapter, geometry_top, (x/1000.0, 0.0, z/1000.0),
@@ -3635,6 +3693,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *DETAIL_FRONT_CENTER,
         scale=DETAIL_FRONT_SCALE,
     )
+    _pin_sheet_scale(adapter)
     cut_x = model_point_in_view(
         adapter,
         detail_front,
