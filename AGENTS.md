@@ -172,8 +172,12 @@ individual PR or stack does not need a successful full `build` before merging.
    Record the checked commit, commands, results and native artifacts in the PR.
    Focused proof must exercise the changed behavior; compilation or a cache hit
    alone does not establish a new native side-effect.
-2. **Remote reviewer approved** — Codex or CodeRabbit approved the latest push
+2. **Remote reviewer approved** — Codjiflo approved the latest push
    (no findings, or its findings were addressed and re-reviewed clean).
+   Request `@codjiflo review` in a new PR comment. If Codjiflo is unavailable
+   or has an issue, file a GitHub issue in `vezzadev/codjiflo-reviewer` with
+   failure evidence, then use `@codex review` as the fallback; its approval
+   must cover the latest push too.
 3. **Visual inspection of renders** — an eye pass over the rendered PNGs of
    every part/assembly the PR touched (regenerate them if stale or hard to
    read; move the camera off the standard axes when needed). The CAD gates
@@ -217,7 +221,8 @@ and owner-authorization requirement for human substitution are unchanged.
 **Stacked PRs may share focused native proof and render inspection** when the
 tested top commit contains every covered change and the evidence identifies the
 covered commits and artifacts. A stack does not require a full build to merge.
-Each PR still needs its own clean Codex or CodeRabbit review of its latest push;
+Each PR still needs its own clean Codjiflo review (or Codex fallback as described
+above) of its latest push;
 code review is not shared. Drawing reviews retain the direct/indirect sheet
 requirements linked above and count only for the exact sheet version merged.
 Order the stack so the riskiest change sits on top;
