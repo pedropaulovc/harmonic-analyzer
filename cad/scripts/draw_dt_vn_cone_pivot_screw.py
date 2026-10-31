@@ -11,6 +11,7 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _com import _early_bound
 from _supplier_screw_dimensions import annotate_supplier_screw
@@ -98,6 +99,7 @@ async def build(adapter: Any) -> dict[str, str]:
             sides=SUPPLIER_REFERENCE_SIDES,
         ),
         settled_checks=(assert_settled,),
+        unit=part_drawing_unit("dt-vn-cone-pivot-screw"),
     )
 
 

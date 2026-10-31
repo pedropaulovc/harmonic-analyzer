@@ -12,9 +12,15 @@ from __future__ import annotations
 
 import math
 
-from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
+import _config
+from _package_units import drawing_unit
+from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm, printed_deviations
 from gear_seat_fit import seat_bore_band
 from _fit_shaft_h import SHAFT_H
+
+# #290: the shaft sheet's unit (its registry row's drawing_unit); every land
+# and across-flat below prints, and is judged, in it.
+UNIT = drawing_unit("parts/dt-cone-gear-shaft", _config.parts("dt-cone-gear-shaft"))
 
 # Diameter bands, one NAMED class per land, applied to the model dimension
 # by build_dt_cone_gear_shaft -- never "+0.00/-0.02" typed as sheet callout text.
@@ -22,8 +28,8 @@ from _fit_shaft_h import SHAFT_H
 # The pivot journal RUNS and keeps the shared ground-shaft h band. The
 # terminal land keeps that class too; only its size changes. Both small gears
 # and the custom MHA-DT-VN-54 collar read the same terminal diameter below.
-# Historical U40 used 1/16 in; the cutter-native 48DP redesign uses 1/32 in
-# so the current printed floor MINs retain the user's T006/T012 web guards.
+# Historical U40 used 1/16 in; the cutter-native 48DP redesign uses a .031 in
+# land so the current printed floor MINs retain the user's T006/T012 web guards.
 RUNNING_DIA_BAND = SHAFT_H
 # GEAR_SEAT_BAND (U27, 2026-09-23): the three intermediate lands only carry
 # gears, slid on against the stack (gear_seat_fit).  The upper limit stays at
@@ -43,14 +49,20 @@ SECTION_DIA_BANDS: tuple[tuple[float, float], ...] = (
 )
 # Shared displayed precision: native drawing and physical-limit consumers
 # read the same per-section table; no unrounded-nominal acceptance mapping.
-# The pivot journal prints four places: its .4825 in nominal is 12.2555.
-LAND_DIA_PLACES = (4, 3, 3, 3, 3)
-LAND_AF_PLACES = (None, 3, 3, 3, 3)
+# Inch places: four on every land and across-flat, the places their
+# .0008/.0020/.0004 in bands need (.4825, .3750, .3450, .0310, .0170).
+LAND_DIA_PLACES = (4, 4, 4, 4, 4)
+LAND_AF_PLACES = (None, 4, 4, 4, 4)
+
+
+def _printed_mm(native_mm: float, places: int) -> float:
+    """The number the shaft sheet prints for ``native_mm`` at ``places``, in mm."""
+    return native_mm + printed_deviations(native_mm, places, (0.0, 0.0), unit=UNIT)[0]
 
 
 def land_finished_dia_limits_mm(native_diameter_mm: float, section: int) -> tuple[float, float]:
     """Absolute PRINTED (MIN,MAX), with the retained named land size band."""
-    nominal = round(native_diameter_mm, LAND_DIA_PLACES[section])
+    nominal = _printed_mm(native_diameter_mm, LAND_DIA_PLACES[section])
     upper, lower = SECTION_DIA_BANDS[section]
     return nominal+lower, nominal+upper
 
@@ -60,12 +72,14 @@ def land_finished_dia_limits_mm(native_diameter_mm: float, section: int) -> tupl
 # The gear owner checks this against its current cutter-owned floor limits;
 # importing a floor here would create a shaft -> gear -> shaft cycle.
 MM_PER_IN = 25.4
-TERMINAL_DIA_IN = 1.0 / 32.0
-TERMINAL_DIA_MM = TERMINAL_DIA_IN * MM_PER_IN
+# F4 (#290): the turned terminal land is .031 in, on the .001 grid; the T006
+# and T012 bores take the .0320 micro reamer over it (gear_seat_fit).
+TERMINAL_DIA_MM = 0.7874  # .031
+TERMINAL_DIA_IN = TERMINAL_DIA_MM / MM_PER_IN
 # Manufacturing limits follow the ACTUAL displayed size, not hidden model
-# digits. Exact native 1/32 representation is retained separately above.
+# digits.
 TERMINAL_DIA_PLACES = LAND_DIA_PLACES[4]
-TERMINAL_PRINTED_DIA_MM = round(TERMINAL_DIA_MM, TERMINAL_DIA_PLACES)
+TERMINAL_PRINTED_DIA_MM = _printed_mm(TERMINAL_DIA_MM, TERMINAL_DIA_PLACES)
 TERMINAL_FINISHED_DIA_LIMITS_MM = land_finished_dia_limits_mm(TERMINAL_DIA_MM, 4)
 # The terminal D-flat: the T006/T012 D-bores are cut to this across-flat and
 # the MHA-DT-VN-54 collar's stock set screw bears on it. Its governing limit is
@@ -73,11 +87,11 @@ TERMINAL_FINISHED_DIA_LIMITS_MM = land_finished_dia_limits_mm(TERMINAL_DIA_MM, 4
 # flat on the largest printed land the round must still wrap past the axis.
 # The collar's screw landing on the flat is gated by dt_vn_cone_tip_collar_spec.
 FLAT_AF_BAND = (0.0, -0.01016)  # 0/-.0004 in
-TERMINAL_FLAT_AF_MM = 0.42
-# The flat's torque corners: the title block's R0.25 would leave the flat
-# face about +/-0.14 wide on this 0.8 land, so the shaft sheet prints its
+TERMINAL_FLAT_AF_MM = 0.4318  # .017
+# The flat's torque corners: the title block's R.010 would leave the flat
+# face about +/-.005 wide on this .031 land, so the shaft sheet prints its
 # own MAX; the collar screw landing books it.
-TERMINAL_FLAT_EDGE_BREAK_MAX = 0.020
+TERMINAL_FLAT_EDGE_BREAK_MAX = 0.0254  # .001
 # Collar geometry the shaft spec reads, so the collar's width, nose and tap
 # station cannot fork between the two parts.
 # Single coupled owned-geometry delta: move the large collar material, tip
@@ -126,9 +140,9 @@ SECTION_CONE_GEAR_TEETH: tuple[tuple[int, ...], ...] = (
 # micrometer reads. Index-aligned with SECTION_DIA_BANDS; Sec0 has no flat.
 SECTION_FLAT_AF: tuple[float | None, ...] = (
     None,  # Sec0: pivot journal
-    8.763,  # Sec1: Ø9.525, 0.762 deep
-    5.842,  # Sec2: Ø6.35, 0.508 deep
-    2.921,  # Sec3: Ø3.175, 0.254 deep
+    8.763,  # Sec1: .345 on the 3/8 land, .030 deep
+    5.842,  # Sec2: .230 on the 1/4 land, .020 deep
+    2.921,  # Sec3: .115 on the 1/8 land, .010 deep
     TERMINAL_FLAT_AF_MM,  # Sec4: deep D held by round guidance, same named AF band
 )
 
@@ -139,7 +153,7 @@ def land_finished_af_limits_mm(section: int) -> tuple[float, float]:
     places = LAND_AF_PLACES[section]
     if native is None or places is None:
         raise ValueError("round pivot journal has no finished across-flat limits")
-    nominal = round(native, places)
+    nominal = _printed_mm(native, places)
     return nominal+FLAT_AF_BAND[1], nominal+FLAT_AF_BAND[0]
 
 

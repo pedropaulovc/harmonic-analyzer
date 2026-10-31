@@ -75,9 +75,14 @@ from _drawing_hidden_sketches import (
     curate_view_dimensions as curate_hidden_owner_dimensions,
     part_sketches_shown,
 )
-from _drawing_hole_callout import add_native_hole_callout, compose_hole_callout_prefix
+from _drawing_hole_callout import (
+    add_native_hole_callout,
+    compose_hole_callout_prefix,
+    set_hole_callout_precision,
+)
 from _drawing_leader_notes import add_leader_note
 from _drawing_leaders import set_near_side_diameter
+from _part_properties import part_drawing_unit
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -366,7 +371,7 @@ CRANK_BORE = requirement(
         "separation": (_band(cone.CRANK_ABOVE_CONE, _P["CrankAboveCone"], cone.CRANK_ABOVE_CONE_BAND), ("CRANK_ABOVE_CONE", "CRANK_ABOVE_CONE_BAND")),
         "height_from": ("journal_bore", (("draw_dt_cone_pivot_post", "build"),)),
         "height_nominal": (cone.CRANK_BORE_HEIGHT, ("CRANK_BORE_HEIGHT",)),
-        "angularity_dia": (float(cone.GEOMETRIC_CONTROLS[0].tolerance), ("CRANK_BORE_ANGULARITY_MM", "GEOMETRIC_CONTROLS")),
+        "angularity_dia": (cone.CRANK_BORE_ANGULARITY_MM, ("CRANK_BORE_ANGULARITY_MM", "GEOMETRIC_CONTROLS")),
         "angularity_datums": (list(cone.GEOMETRIC_CONTROLS[0].datums), ("GEOMETRIC_CONTROLS",)),
         "dimension_type": ("basic", ("BASIC_DIMENSIONS",)),
         "land_angle_nominal_deg": (cone.INCLINE_DEG, ("INCLINE_DEG", "BASIC_DIMENSIONS")),
@@ -1275,6 +1280,11 @@ MOUNT_HOLE_PROCESS = "DRILL\n"
 # IDisplayDimension text definitions (5..8) and the parts SetText writes them
 # through (1..4).
 _HOLE_CALLOUT_DEFINITION_PARTS = ((5, 1), (6, 2), (7, 3), (8, 4))
+# Hole Wizard callouts print three inch places (#290): the drill and the
+# counterbore's diameter and depth.
+MOUNT_HOLE_PRECISION = dict.fromkeys(
+    ("hw-diam", "hw-cbdiam", "hw-cbdepth"), cone.MOUNT_HOLE_CALLOUT_PLACES
+)
 
 
 def mount_hole_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
@@ -1587,7 +1597,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     face_evidence = _model_face_evidence(adapter.currentModel)
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("dt-cone-pivot-post"),
     )
     stamp_drawing_summary(
         adapter,
@@ -1761,6 +1775,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="mounting counterbores",
     )
     _set_mount_hole_process(mount_callout)
+    set_hole_callout_precision(
+        mount_callout, MOUNT_HOLE_PRECISION, label="mounting counterbores"
+    )
 
     # The seat is the elevation's bottom line: the O42.011 foot rim seen
     # edge-on.  A coordinate pick on that line failed on the farm (the two

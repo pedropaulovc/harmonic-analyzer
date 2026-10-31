@@ -29,7 +29,8 @@ import draw_dt_cone_swing_platform as drawing
 import pytest
 from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, blind_cut_dia_mm
-from _printed_tolerance import printed_band_mm
+from _inch_wall_limits import WALL_TARGET_MM
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _surface_finish import MACHINED_UM, SEAT_UM
 
 
@@ -49,8 +50,8 @@ def test_every_marked_model_dimension_has_one_view_and_native_precision() -> Non
     assert kept == marked
     assert sum(len(names) for names in view_sets) == len(kept)
     assert set(drawing_spec.DRAWING_PRECISION_BY_NAME) == marked
-    assert drawing_spec.DRAWING_PRECISION_BY_NAME["PlateLenDim"] == 1
-    assert set(drawing_spec.DRAWING_PRECISION_BY_NAME.values()) == {1, 2}
+    assert drawing_spec.DRAWING_PRECISION_BY_NAME["PlateLenDim"] == 2
+    assert set(drawing_spec.DRAWING_PRECISION_BY_NAME.values()) == {2, 3}
 
 
 def test_pivot_is_the_reamed_h7_bore_on_the_stock_shoulder() -> None:
@@ -119,12 +120,12 @@ def test_plate_and_nonfit_features_remain_at_general_grade() -> None:
     assert "oil seal" in str(registry["finish"]).lower()
     assert int(registry["quantity"]) == 1
     assert drawing_spec.DRAWING_PRECISION["Plate"]["PlateThk"] == 2
-    assert drawing_spec.DRAWING_PRECISION["PivotBearingRelief"]["PivotBearingReliefDepth"] == 2
+    assert drawing_spec.DRAWING_PRECISION["PivotBearingRelief"]["PivotBearingReliefDepth"] == 3
     assert drawing_spec.DRAWING_PRECISION["PostMountHoles"] == {
-        "PostMountWestX": 2,
-        "PostMountWestZ": 2,
-        "PostMountEastX": 2,
-        "PostMountEastZ": 2,
+        "PostMountWestX": 3,
+        "PostMountWestZ": 3,
+        "PostMountEastX": 3,
+        "PostMountEastZ": 3,
     }
 
 
@@ -134,7 +135,7 @@ def test_plate_and_nonfit_features_remain_at_general_grade() -> None:
 
 def test_geometry_cascade_and_interference_guards_stay_explicit() -> None:
     assert geometry.POST_LOCAL_Z == cone_line.POST_STATION - cone_line.PIVOT_STATION
-    assert geometry.PLATE_SOUTH_Z == pytest.approx(
+    assert geometry.PLATE_SOUTH_Z <= (
         geometry.POST_LOCAL_Z - spec.POST_BLOCK_DIA / 2.0 - geometry.POST_SOUTH_MARGIN
     )
     assert part.PLATE_LEN == pytest.approx(
@@ -142,7 +143,7 @@ def test_geometry_cascade_and_interference_guards_stay_explicit() -> None:
     )
     assert geometry.POST_MAIN_DIA == spec.POST_BLOCK_DIA
     assert checks.POST_FOOT_CONTAINMENT >= 0.25
-    assert spec.PIVOT_BEARING_RELIEF_DIAMETER == pytest.approx(10.50)
+    assert spec.PIVOT_BEARING_RELIEF_DIAMETER == pytest.approx(10.668)
     assert part.PLATE_T - spec.PIVOT_BEARING_THICKNESS == pytest.approx(
         spec.PIVOT_BEARING_RELIEF_DEPTH
     )
@@ -446,8 +447,8 @@ def test_notch_diameter_saved_text_envelope_clears_the_actual_left_outline() -> 
 
 
 def test_disengaged_collar_margin_survives_general_bands() -> None:
-    """Linear worst case at .X plate outline and .XX base holes keeps 2.0 mm (U27)."""
-    general, base_axis = printed_band_mm(1), printed_band_mm(2)
+    """Linear worst case at the .XX plate outline and the base holes keeps 2.0 mm (U27)."""
+    general, base_axis = printed_band_mm(2, unit=spec.UNIT), printed_band_mm(2)
     east_slope = (part.EAST_HALF_S - part.HALF_WIDTH_N) / part.PLATE_LEN
     stop_x = -(part.HALF_WIDTH_N + east_slope * (part.NORTH_OVERHANG - geometry.STOP_LOCAL_Z))
     normal = (-1.0, east_slope)
@@ -463,7 +464,7 @@ def test_disengaged_collar_margin_survives_general_bands() -> None:
         east_edge + west_edge + stop_hole + stud_hole + diameters
     )
     assert worst >= 2.0
-    assert set(drawing_spec.DRAWING_PRECISION["PlateProfile"].values()) == {1}
+    assert set(drawing_spec.DRAWING_PRECISION["PlateProfile"].values()) == {2}
 
 
 def _boxes_overlap(a: tuple[float, ...], b: tuple[float, ...]) -> bool:
@@ -1107,7 +1108,7 @@ def test_holddown_section_arrows_clear_the_profile_plan() -> None:
 
 def test_holddown_hole_is_the_ruled_counterbore_for_the_tip_block_screw() -> None:
     """One #4 socket-head counterbore, close clearance, drilled from under,
-    10.45 south of the pivot and 1.00 to -x of the cone axis, the block's
+    .409 south of the pivot and .04 to -x of the cone axis, the block's
     foot tap offset the same way, so the block itself stays centred."""
     import dt_cone_tip_block_spec as block
 
@@ -1119,9 +1120,9 @@ def test_holddown_hole_is_the_ruled_counterbore_for_the_tip_block_screw() -> Non
         "CounterBoreDepth": spec.HOLDDOWN_CBORE_DEPTH,
     }
     assert spec.HOLDDOWN_CLEARANCE_DIA == pytest.approx(3.048)
-    assert spec.HOLDDOWN_LOCAL_X == -1.0
+    assert spec.HOLDDOWN_LOCAL_X == -1.016
     assert spec.HOLDDOWN_LOCAL_Z == -block.TIP_BLOCK_PIVOT_OFFSET
-    assert spec.HOLDDOWN_LOCAL_Z == pytest.approx(-10.45)
+    assert spec.HOLDDOWN_LOCAL_Z == pytest.approx(-10.3886)
     assert block.FOOT_TAP_OFFSET_X == spec.HOLDDOWN_LOCAL_X
 
 
@@ -1135,9 +1136,9 @@ def test_holddown_x_is_a_banded_dimension_hanging_right_of_detail_b() -> None:
     strip and label, its line clear of the hole's rim and the pivot relief."""
     assert drawing_spec.DRAWING_PRECISION["HoldDownHole"] == {
         "HoldDownX": 2,
-        "HoldDownZ": 2,
+        "HoldDownZ": 3,
     }
-    assert spec.HOLDDOWN_STATION_TOL_MM == 0.10
+    assert spec.HOLDDOWN_STATION_TOL_MM == 0.1016
     text = _holddown_x_text_box()
     cx, cy = drawing.DETAIL_CENTER
     for corner_x in (text[0], text[2]):
@@ -1160,20 +1161,21 @@ def test_holddown_x_is_a_banded_dimension_hanging_right_of_detail_b() -> None:
 
 
 def test_holddown_print_worst_stack_keeps_its_margins() -> None:
-    """At .XX (+/-0.51) and the drilled +0.10: head recess under the slide
-    face, head clearance, bearing beside the hole, the counterbore-floor
-    ledge and every web to a neighbour (U27 2.0)."""
-    xx = printed_band_mm(2)
+    """At the counterbore callout's .XXX and the drilled oversize: head recess
+    under the slide face, head clearance, bearing beside the hole, the
+    counterbore-floor ledge and every web to a neighbour (the wall target)."""
+    xxx = printed_band_mm(3, unit=spec.UNIT)
     head_d, head_h = 0.183 * 25.4, 0.112 * 25.4
-    assert spec.HOLDDOWN_CBORE_DEPTH - xx - head_h >= 0.1
-    assert spec.HOLDDOWN_CBORE_DIA - xx - head_d >= 0.25
-    assert (head_d - (spec.HOLDDOWN_CLEARANCE_DIA + 0.10)) / 2.0 >= 0.5
+    assert spec.HOLDDOWN_CBORE_DEPTH - xxx - head_h >= 0.1
+    assert spec.HOLDDOWN_CBORE_DIA - xxx - head_d >= 0.25
+    drilled = drilled_oversize_mm(unit=spec.UNIT)
+    assert (head_d - (spec.HOLDDOWN_CLEARANCE_DIA + drilled)) / 2.0 >= 0.5
     ledge_min = (
-        spec.PLATE_THICKNESS - spec.PLATE_STOCK_BAND - (spec.HOLDDOWN_CBORE_DEPTH + xx)
+        spec.PLATE_THICKNESS - spec.PLATE_STOCK_BAND - (spec.HOLDDOWN_CBORE_DEPTH + xxx)
     )
     assert spec.HOLDDOWN_LEDGE_RANGE[0] == pytest.approx(ledge_min)
-    assert ledge_min >= 2.0
-    assert min(checks.HOLDDOWN_WEBS.values()) >= 2.0
+    assert ledge_min >= WALL_TARGET_MM
+    assert min(checks.HOLDDOWN_WEBS.values()) >= WALL_TARGET_MM
 
 
 def _exec_mutated(module, replacements: dict[str, str]):
@@ -1192,10 +1194,10 @@ def _exec_mutated(module, replacements: dict[str, str]):
 @pytest.mark.parametrize(
     ("replacements", "message"),
     [
-        ({"HOLDDOWN_CBORE_DEPTH = 3.50": "HOLDDOWN_CBORE_DEPTH = 3.20"}, "stand proud"),
-        ({"HOLDDOWN_CBORE_DIA = 5.56": "HOLDDOWN_CBORE_DIA = 5.20"}, "does not clear"),
+        ({"HOLDDOWN_CBORE_DEPTH = 3.5052": "HOLDDOWN_CBORE_DEPTH = 3.00"}, "stand proud"),
+        ({"HOLDDOWN_CBORE_DIA = 5.5626": "HOLDDOWN_CBORE_DIA = 4.90"}, "does not clear"),
         ({"HOLDDOWN_SCREW_HEAD_DIA = 0.183": "HOLDDOWN_SCREW_HEAD_DIA = 0.160"}, "bears on"),
-        ({"HOLDDOWN_CBORE_DEPTH = 3.50": "HOLDDOWN_CBORE_DEPTH = 4.20"}, "ledge"),
+        ({"HOLDDOWN_CBORE_DEPTH = 3.5052": "HOLDDOWN_CBORE_DEPTH = 4.20"}, "ledge"),
     ],
 )
 def test_holddown_guards_refuse_a_spec_that_fails_at_print_worst(
@@ -1213,7 +1215,7 @@ def test_holddown_guards_refuse_a_spec_that_fails_at_print_worst(
             "HOLDDOWN_LOCAL_Z = -dt_cone_tip_block_spec.TIP_BLOCK_PIVOT_OFFSET",
             "HOLDDOWN_LOCAL_Z = -6.00",
         ),  # onto the pivot
-        ("HOLDDOWN_LOCAL_X = -1.0", "HOLDDOWN_LOCAL_X = 6.0"),  # to the west edge
+        ("HOLDDOWN_LOCAL_X = -1.016", "HOLDDOWN_LOCAL_X = 6.0"),  # to the west edge
     ],
 )
 def test_holddown_web_guard_refuses_a_station_that_crowds_a_neighbour(

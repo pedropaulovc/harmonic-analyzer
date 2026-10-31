@@ -14,6 +14,7 @@ import draw_dt_cone_tip_block as drawing
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
+from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _surface_finish import SEAT_UM
 
@@ -46,12 +47,12 @@ def test_adjuster_embed_band_stays_inside_its_engagement_window() -> None:
     spec = dt_cone_tip_block_spec
     assert spec.ADJUSTER_CSK_DIA > 4.826
     assert spec.ADJUSTER_MIN_ENGAGEMENT_D == 1.0
-    assert spec.ADJUSTER_EMBED_WINDOW == pytest.approx((5.3067, 9.1393))
+    assert spec.ADJUSTER_EMBED_WINDOW == pytest.approx((5.3086, 9.0424))
     low, high = spec.ADJUSTER_EMBED_WINDOW
     assert low == pytest.approx(1.0 * 4.826 + spec.ADJUSTER_CSK, abs=1e-3)
-    assert high == pytest.approx(spec.BLOCK_Z - 0.13 - spec.ADJUSTER_CSK)
+    assert high == pytest.approx(spec.BLOCK_Z - 0.127 - spec.ADJUSTER_CSK)
     assert low < spec.ADJUSTER_EMBED < high
-    assert drawing.ADJUSTER_CSK_QUALIFIER == "90° CSK Ø5.0 BOTH ENDS"
+    assert drawing.ADJUSTER_CSK_QUALIFIER == "90° CSK Ø.197 BOTH ENDS"
 
 
 def test_adjuster_callout_names_both_countersinks_under_the_thread() -> None:
@@ -64,7 +65,7 @@ def test_adjuster_callout_names_both_countersinks_under_the_thread() -> None:
     rewritten = drawing._adjuster_callout_definitions(native)
     assert rewritten[5] == native[5]
     assert rewritten[7] == (
-        "<hw-threaddesc> <hw-threadclass> <hw-thru>\n90° CSK Ø5.0 BOTH ENDS"
+        "<hw-threaddesc> <hw-threadclass> <hw-thru>\n90° CSK Ø.197 BOTH ENDS"
     )
     with pytest.raises(RuntimeError):
         drawing._adjuster_callout_definitions({**native, 5: native[7]})
@@ -122,17 +123,12 @@ def test_pinch_spacing_closes_every_print_tolerance_stack() -> None:
     ) < 1e-12
     spec = dt_cone_tip_block_spec
     assert spec.WORST_SCREW_ENVELOPE_GAP_MM > 0.0
-    # U24b / U27: every web keeps 2.0 at the printed limits after edge breaks.
-    # E11/W1's #10-32 root (ref Ø5.04 vs Ø8.28) adds ~1.6 to the adjuster webs.
-    # r3: PinchHeight .XX from the foot, BlockHt .X; AxisHeight .XX (the
-    # machinist review of d84a42ca7 dropped its +/-0.10: the cup capture
-    # closes at .XX, and the slit-mouth web keeps 3.15); the 17 block adds
-    # 1.0 to the adjuster's side wall, and Width at .XXX (the hold-down
-    # containment) adds 0.67 more. On the 38.100 common cone-axis height the
-    # 52.66 block prints 52.7.
-    assert spec.WORST_SLIT_MOUTH_WEB_MM == pytest.approx(3.154, abs=1e-3)
-    assert spec.WORST_TOP_LIGAMENT_MM == pytest.approx(2.26, abs=1e-6)
-    assert spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM == pytest.approx(5.350, abs=1e-3)
+    # U24b / U27: every web keeps the wall target at the printed limits after
+    # edge breaks.  #290: the inch grades (.XX +/-.01, .XXX +/-.005) are
+    # tighter than the mm ones they replace, so every web grows.
+    assert spec.WORST_SLIT_MOUTH_WEB_MM == pytest.approx(3.723, abs=1e-3)
+    assert spec.WORST_TOP_LIGAMENT_MM == pytest.approx(2.889, abs=1e-3)
+    assert spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM == pytest.approx(5.354, abs=1e-3)
     for web in (
         spec.WORST_SLIT_MOUTH_WEB_MM,
         spec.WORST_TOP_LIGAMENT_MM,
@@ -568,9 +564,15 @@ def test_no_leader_on_the_sheet_detours_over_the_part() -> None:
 # The machinist review of d84a42ca7 dropped the explicit +/-0.10 bands: every
 # dimension prints the title block's general band for its places, except the
 # width, which prints its own one-sided band (machinist review of 83e3370f9).
-_GENERAL = {places: printed_band_mm(places) for places in (1, 2, 3)}
-_BANDED = {"Width": (0.0, -0.5)}  # (upper, lower) as the sheet prints it
-_DRILLED_PLUS = drilled_oversize_mm()
+_UNIT = dt_cone_tip_block_spec.UNIT
+_GENERAL = {places: printed_band_mm(places, unit=_UNIT) for places in (1, 2, 3)}
+_BANDED = {"Width": (0.0, -0.508)}  # (upper, lower) as the sheet prints it
+_DRILLED_PLUS = drilled_oversize_mm(unit=_UNIT)
+
+
+def _on_print(nominal: float, places: int) -> float:
+    """The value the inch sheet states, back in millimetres."""
+    return round(nominal / 25.4, places) * 25.4
 
 
 def _printed(name: str, nominal: float) -> tuple[float, float]:
@@ -579,7 +581,7 @@ def _printed(name: str, nominal: float) -> tuple[float, float]:
         return nominal + lower, nominal + upper
     places = dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME[name]
     band = _GENERAL[places]
-    return round(nominal, places) - band, round(nominal, places) + band
+    return _on_print(nominal, places) - band, _on_print(nominal, places) + band
 
 
 def test_width_carries_a_one_sided_band_that_holds_containment() -> None:
@@ -589,7 +591,7 @@ def test_width_carries_a_one_sided_band_that_holds_containment() -> None:
     spec = dt_cone_tip_block_spec
     assert spec.BLOCK_WIDTH_BAND == _BANDED["Width"]
     assert spec.BLOCK_WIDTH_LIMITS == pytest.approx(_printed("Width", spec.BLOCK_X))
-    assert spec.DRAWING_PRECISION_BY_NAME["Width"] == 1
+    assert spec.DRAWING_PRECISION_BY_NAME["Width"] == 2
     assert model_toleranced_dimensions(part)[("BlockProfile", "Width")] == (
         "*deviations(BLOCK_WIDTH_BAND)"
     )
@@ -620,7 +622,7 @@ def test_pinch_clearance_print_breaks_into_the_slit_at_the_worst_case() -> None:
         assert floor >= near_wall + 0.25, (floor, near_wall)
         return
     assert drawing.PINCH_CLEARANCE_EXTENT_TEXT == "DRILL TO SLOT"
-    clearance_max = round(spec.PINCH_CLEARANCE_DIA, 2) + _DRILLED_PLUS
+    clearance_max = spec.PINCH_CLEARANCE_DIA + _DRILLED_PLUS
     point = (clearance_max / 2.0) / math.tan(math.radians(118.0 / 2.0))
     slit_min = _printed("SlitW", spec.SLIT_W)[0]
     past_far_wall = 0.25 + point - slit_min
@@ -639,10 +641,10 @@ def test_pinch_clearance_callout_rewrites_the_blind_depth_to_drill_to_slot() -> 
     with pytest.raises(RuntimeError):
         drawing._pinch_clearance_callout_definitions({**native, 7: native[5]})
     assert drawing._pinch_clearance_callout_resolved(
-        {1: "<MOD-DIAM> 3.26 DRILL TO SLOT", 2: "", 3: "", 4: ""}
+        {1: "<MOD-DIAM> .129 DRILL TO SLOT", 2: "", 3: "", 4: ""}
     )
     assert not drawing._pinch_clearance_callout_resolved(
-        {1: "<MOD-DIAM> 3.26 <HOLE-DEPTH> 6.9", 2: "", 3: "", 4: ""}
+        {1: "<MOD-DIAM> .129 <HOLE-DEPTH> .272", 2: "", 3: "", 4: ""}
     )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     body = source[source.index("async def build(") :]
@@ -659,20 +661,22 @@ def test_far_jaw_is_tapped_full_thread_through_to_the_slit() -> None:
 
 
 def test_r3_prints_no_two_place_dimension_it_does_not_need() -> None:
-    """Over-specification: 46.83, 32.27, 8.42 and 8.85 printed .XX with no fit
-    or asserted margin needing it.  The overall height drops to .X, the rise
-    leaves the print (the pinch hole locates from the foot).  2026-09-29: the
-    block's foot sits straight on the platform, so AxisHeight is the block's
-    own fit; the machinist review of d84a42ca7 printed it .XX, the cup
-    capture's grade, with no band of its own."""
+    """Over-specification: no size prints a place no fit or asserted margin
+    needs.  The rise leaves the print (the pinch hole locates from the foot).
+    2026-09-29: the block's foot sits straight on the platform, so AxisHeight
+    is the block's own fit; the machinist review of d84a42ca7 printed it .XX,
+    the cup capture's grade, with no band of its own."""
     grades = dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME
     assert grades["Depth"] == 3
-    assert grades["BlockHt"] == 1
+    assert grades["BlockHt"] == 2
     assert grades["AxisHeight"] == 2
     assert "PinchRise" not in grades
-    # Kept .XX, each for a named stack (see the report's list).
+    # Nothing prints .X: on the inch sheet its +/-.1 fails every web.
     assert {name for name, places in grades.items() if places == 2} == {
+        "Width",
+        "BlockHt",
         "PinchHeight",
+        "PinchDepthCenter",
         "SlitW",
         "AxisHeight",
     }
@@ -697,21 +701,18 @@ def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
 
 
 def test_top_ligament_needs_the_pinch_height_at_two_places() -> None:
-    """The one r3 .XX kept for a web. The 46.95 pinch height sits on a .X
-    rounding tie; printed up to 47.0 the ligament over the pinch hole closes
-    at 1.92, under the 2.0 target, so only .XX prints it safely."""
+    """The ligament over the pinch hole closes at the wall target with the
+    pinch height at .XX; at the inch .X it would not."""
     spec = dt_cone_tip_block_spec
-    clearance_r = (round(spec.PINCH_CLEARANCE_DIA, 2) + _DRILLED_PLUS) / 2.0
+    clearance_r = (spec.PINCH_CLEARANCE_DIA + _DRILLED_PLUS) / 2.0
     height_min = _printed("BlockHt", spec.BLOCK_HEIGHT)[0]
 
-    def ligament(printed: float, places: int) -> float:
-        pinch_max = printed + _GENERAL[places]
+    def ligament(places: int) -> float:
+        pinch_max = _on_print(spec.PINCH_HEIGHT, places) + _GENERAL[places]
         return height_min - pinch_max - clearance_r - 2.0 * spec.EDGE_BREAK_MAX_MM
 
-    two_places = ligament(round(spec.PINCH_HEIGHT, 2), 2)
-    one_place_up = ligament(math.ceil(round(spec.PINCH_HEIGHT * 10.0, 6)) / 10.0, 1)
-    assert two_places == pytest.approx(spec.WORST_TOP_LIGAMENT_MM)
-    assert round(two_places, 6) >= 2.0 > one_place_up
+    assert ligament(2) == pytest.approx(spec.WORST_TOP_LIGAMENT_MM)
+    assert round(ligament(2), 6) >= WALL_TARGET_MM > ligament(1)
 
 
 def _reference_call(body: str, feature: str) -> str:
@@ -788,24 +789,24 @@ def _worst_far_wall_from_head() -> float:
 def test_far_jaw_keeps_1_5d_of_thread_past_the_slits_far_wall() -> None:
     """72ab asserted 1.5D to the NEAR wall, crediting the slit as thread: the
     1/2 screw kept 3.835 (1.35D) past the far wall.  The 5/8 screw keeps
-    6.39 (2.25D) at the printed worst case: the width's one-sided band tops
-    out at 17.0 on the head's side under the -X datum, PassageCenter .XXX."""
+    2.25D at the printed worst case: the width's one-sided band tops out at
+    its nominal on the head's side under the -X datum, PassageCenter .XXX."""
     spec = dt_cone_tip_block_spec
     engagement = spec.PINCH_SCREW_LENGTH - _worst_far_wall_from_head()
     assert engagement >= 1.5 * _PINCH_MAJOR_MM, engagement
     assert spec.WORST_PINCH_ENGAGEMENT_MM == pytest.approx(engagement)
-    assert engagement == pytest.approx(6.39)
+    assert engagement == pytest.approx(6.477)
 
 
 def test_pinch_screw_tip_stays_inside_the_minus_x_face() -> None:
     """Regression pin (the 1/2 screw passed it too): at the width's lower
     limit the 5/8 screw's tip stays 0.25 inside the far face; the one-sided
-    band's 16.5 leaves 0.625."""
+    band's lower limit leaves 0.635."""
     spec = dt_cone_tip_block_spec
     recess = _printed("Width", spec.BLOCK_X)[0] - spec.PINCH_SCREW_LENGTH
     assert recess >= 0.25
     assert spec.WORST_PINCH_TIP_RECESS_MM == pytest.approx(recess)
-    assert recess == pytest.approx(0.625)
+    assert recess == pytest.approx(0.635)
 
 
 def test_axis_and_hold_down_tap_locate_from_the_minus_x_face() -> None:
@@ -899,15 +900,15 @@ def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
 # import; the unmutated module imports, so the guard is what fails.
 _FOOT_TAP_MUTATIONS = {
     "screw engages under 1.5D": (
-        "HOLDDOWN_LEDGE_RANGE_MM = (2.21, 3.49)",
-        "HOLDDOWN_LEDGE_RANGE_MM = (2.21, 6.0)",
+        "HOLDDOWN_LEDGE_RANGE_MM = (2.5908, 3.0988)",
+        "HOLDDOWN_LEDGE_RANGE_MM = (2.5908, 6.0)",
     ),
     "screw reaches the incomplete threads": (
-        "FOOT_THREAD_DEPTH = 8.5",
-        "FOOT_THREAD_DEPTH = 7.5",
+        "FOOT_THREAD_DEPTH = 8.509",
+        "FOOT_THREAD_DEPTH = 6.9",
     ),
     "drill leaves the tap no lead": (
-        "FOOT_DEPTH = 11.1",
+        "FOOT_DEPTH = 11.0998",
         "FOOT_DEPTH = 8.6",
     ),
     "tap station band eats a web": (
@@ -941,7 +942,7 @@ def test_hold_down_tap_keeps_every_limit_at_the_printed_extremes() -> None:
     spec = dt_cone_tip_block_spec
     ledge_min, ledge_max = spec.HOLDDOWN_LEDGE_RANGE_MM
     places = spec.FOOT_DEPTH_PLACES
-    thread_min = round(spec.FOOT_THREAD_DEPTH, places) - _GENERAL[places]
+    thread_min = _on_print(spec.FOOT_THREAD_DEPTH, places) - _GENERAL[places]
     assert spec.HOLDDOWN_SCREW_LENGTH - ledge_min <= thread_min - 0.25
     assert spec.HOLDDOWN_SCREW_LENGTH_MIN - ledge_max >= 1.5 * _PINCH_MAJOR_MM
     thread_r = _PINCH_MAJOR_MM / 2.0  # the hold-down is #4-40 too
@@ -955,7 +956,7 @@ def test_hold_down_tap_keeps_every_limit_at_the_printed_extremes() -> None:
         "north": z_low - thread_r,
         "south": depth_min - z_high - thread_r,
     }
-    assert min(webs.values()) >= 2.0, webs
+    assert min(webs.values()) >= WALL_TARGET_MM, webs
 
 
 def test_foot_tap_callout_reads_as_a_blind_tap_with_both_depths() -> None:
@@ -965,8 +966,8 @@ def test_foot_tap_callout_reads_as_a_blind_tap_with_both_depths() -> None:
     spec = dt_cone_tip_block_spec
     places = spec.FOOT_DEPTH_PLACES
     thread = f"{spec.HOLDDOWN_THREAD.lstrip('#')} UNC-2B"
-    full = f"{spec.FOOT_THREAD_DEPTH:.{places}f}"
-    drill = f"{spec.FOOT_DEPTH:.{places}f}"
+    full = spec.length_text(spec.FOOT_THREAD_DEPTH, places)
+    drill = spec.length_text(spec.FOOT_DEPTH, places)
     mate = f"\n{drawing.FOOT_TAP_QUALIFIER}"
     good = {1: f"{thread} x {full}{mate}", 2: f"DRILL {spec.FOOT_BORE_DIA:.2f} x {drill}"}
     assert drawing._foot_tap_callout_resolved(good)
@@ -974,9 +975,12 @@ def test_foot_tap_callout_reads_as_a_blind_tap_with_both_depths() -> None:
     assert not drawing._foot_tap_callout_resolved({**good, 2: f"DRILL {spec.FOOT_BORE_DIA:.2f} THRU"})
     assert not drawing._foot_tap_callout_resolved({**good, 1: f"{thread}{mate}"})
     assert not drawing._foot_tap_callout_resolved({1: good[1], 2: ""})
-    # The native two places would print 8.50 and 11.10; neither reads as .X.
+    # The native two places would print .34 and .44; neither reads as .XXX.
     assert not drawing._foot_tap_callout_resolved(
-        {1: f"{thread} x {spec.FOOT_THREAD_DEPTH:.2f}{mate}", 2: f"x {spec.FOOT_DEPTH:.2f}"}
+        {
+            1: f"{thread} x {spec.length_text(spec.FOOT_THREAD_DEPTH, 2)}{mate}",
+            2: f"x {spec.length_text(spec.FOOT_DEPTH, 2)}",
+        }
     )
 
 

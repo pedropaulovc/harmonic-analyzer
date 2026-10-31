@@ -78,6 +78,7 @@ CASES = (
                 "pivot_journal",
                 MACHINED_UM,
                 CylinderFace(dt_cone_gear_shaft_spec.JOURNAL_DIA),
+                display_unit="in",
             ),
         ),
     ),

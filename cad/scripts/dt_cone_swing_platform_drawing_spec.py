@@ -46,39 +46,41 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`
 # ), so the MODEL owns them: build_dt_cone_swing_platform applies this map to the
 # .SLDPRT and draw_dt_cone_swing_platform only reads it back. The whole plate
-# outline prints one place (+/-0.8): the east edge at the swing stop and the
-# west edge at the notch mouth spend the disengaged lock-knob head margin,
-# which dt_cone_swing_platform_geometry.DISENGAGE_HEAD_MARGIN sizes to keep >= 2.0 mm
-# at this band.  Relief diameter and notch stay at the .XX grade; the
-# tapped-hole pattern and the hold-down station print .XX and carry the
-# explicit +/-0.10 bands the tip-block stacks need (dt_cone_swing_platform_spec).
-# Relief depth is a reference nominal governed by the matched fit above. The
-# Hole Wizard owns the pivot- and hold-down-hole sizes/callouts.
+# outline, its corner radii, the relief diameter and the notch print .XX inch
+# (#290); the east edge at the swing stop and the west edge at the notch mouth
+# spend the disengaged lock-knob head margin
+# (dt_cone_swing_platform_geometry.DISENGAGE_HEAD_MARGIN).  The tapped-hole
+# pattern and the hold-down's station along the cone axis are post- and
+# tip-block closures, off the grid, so they print .XXX; with HoldDownX they
+# carry the explicit bands the tip-block stacks need
+# (dt_cone_swing_platform_spec).  Relief depth is a reference nominal governed
+# by the matched fit above. The Hole Wizard owns the pivot- and hold-down-hole
+# sizes/callouts.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateProfile": {
-        "NorthEastX": 1,
-        "NorthEdgeZ": 1,
-        "NorthWestX": 1,
-        "SouthWestX": 1,
-        "PlateLenDim": 1,
-        "SouthEastX": 1,
+        "NorthEastX": 2,
+        "NorthEdgeZ": 2,
+        "NorthWestX": 2,
+        "SouthWestX": 2,
+        "PlateLenDim": 2,
+        "SouthEastX": 2,
     },
     "Plate": {"PlateThk": 2},
     "PivotBearingReliefProfile": {"PivotBearingReliefDia": 2},
-    "PivotBearingRelief": {"PivotBearingReliefDepth": 2},
+    "PivotBearingRelief": {"PivotBearingReliefDepth": 3},
     "PostMountHoles": {
-        "PostMountWestX": 2,
-        "PostMountWestZ": 2,
-        "PostMountEastX": 2,
-        "PostMountEastZ": 2,
+        "PostMountWestX": 3,
+        "PostMountWestZ": 3,
+        "PostMountEastX": 3,
+        "PostMountEastZ": 3,
     },
     "LockNotchCapEProfile": {"CapECx": 2, "CapECz": 2, "CapEDia": 2},
-    # Printed .XX, banded +/-0.10 on the part (HOLDDOWN_STATION_TOL_MM).
-    "HoldDownHole": {"HoldDownX": 2, "HoldDownZ": 2},
-    "CornerNE": {"CornerNER": 1},
-    "CornerNW": {"CornerNWR": 1},
-    "CornerSW": {"CornerSWR": 1},
-    "CornerSE": {"CornerSER": 1},
+    # Banded on the part (HOLDDOWN_STATION_TOL_MM).
+    "HoldDownHole": {"HoldDownX": 2, "HoldDownZ": 3},
+    "CornerNE": {"CornerNER": 2},
+    "CornerNW": {"CornerNWR": 2},
+    "CornerSW": {"CornerSWR": 2},
+    "CornerSE": {"CornerSER": 2},
 }
 
 

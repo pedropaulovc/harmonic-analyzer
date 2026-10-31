@@ -3,9 +3,9 @@ dt-cone-swing-platform:
   # the 61 mm south width and 1/4-20 mounting pattern follow the retained post foot.
   title: Cone Swing Platform
   number: MHA-DT-20
-  # U41 (2026-09-23): the thickness is the stock's, as supplied; the 61 mm
-  # plan envelope fits the 2-1/2 in bar, whose mill tolerance holds the
-  # +/-0.13 the drawing-guidelines.md rule 17 (walls and webs) stacks use (dt_cone_swing_platform_spec.PLATE_STOCK_BAND).
+  # U41 (2026-09-23): the thickness is the stock's, as supplied; the plan
+  # envelope fits the 2-1/2 in bar, whose mill tolerance holds the
+  # +/-.005 the drawing-guidelines.md rule 17 (walls and webs) stacks use (dt_cone_swing_platform_spec.PLATE_STOCK_BAND).
   # Printed in the title block's MATERIAL row: 81788ce9 wrapped the long
   # form onto a second line, so the full wording lives in the spec below.
   material: 1018 CF FLAT 1/4 x 2-1/2 in
@@ -14,9 +14,10 @@ dt-cone-swing-platform:
   quantity: 1
   tolerance_class: machined_block
   process: "machined from supplied steel flat bar"
+  drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
-      where: "sheet 1, the note for the 2X 1/4-20 UNC THRU ALL post taps: 1/4-20 THREAD ENGAGEMENT 0.87D MIN."
+      where: "sheet 1, the note for the 2X 1/4-20 UNC THRU ALL post taps: 1/4-20 THREAD ENGAGEMENT 0.88D MIN."
       finding: "thread engagement below 1.5D (rule 18)"
       reason: "Owner ruling 2026-11-01: MHA-DT-VN-61 post-mount thread engagement 0.87D MIN (0.88D after #2107) accepted as a minor exception; #1019's 0.90D target not met. These taps are that joint's receiver (MHA-DT-VN-61's RV-01)"

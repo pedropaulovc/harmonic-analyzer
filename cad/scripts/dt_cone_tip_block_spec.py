@@ -1,17 +1,28 @@
-r"""Pure-data dimensional contract shared by the cone-tip-block part and drawing."""
+r"""Pure-data dimensional contract shared by the cone-tip-block part and drawing.
+
+The sheet prints decimal inch (#290): every nominal it states is authored as
+exact millimetres on its printed grid, with the inch value in a comment.
+"""
 
 from __future__ import annotations
 
 import math
 from typing import Literal
 
+import _config
 import _printed_tolerance
 from _fit_deviations import deviations
 from _gtol_planar import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
+from _inch_wall_limits import WALL_TARGET_MM
+from _package_units import drawing_unit
 from _surface_finish import SEAT_UM, SurfaceFinishControl
+from _title_block_units import LENGTH_UNITS, render_number
 from _cone_axis_constants import CONE_AXIS_HEIGHT_MM
 from cone_stations import PIVOT_STATION
+
+# The sheet unit the registry row declares; every band below is read for it.
+UNIT = drawing_unit("parts/dt-cone-tip-block", _config.parts("dt-cone-tip-block"))
 
 
 # Small black-steel clamp block on the swing platform that carries the axial
@@ -26,29 +37,31 @@ from cone_stations import PIVOT_STATION
 # foot.  Its station is fixed by that hole, so every fit closes by print
 # tolerance (build_dt_drive_train_assembly proves the cross-part stacks against
 # the bands exported here).
-# U24b (2026-09-23): the adjuster thread's side walls keep 2.0 at the printed
-# width (.X) and passage-centre bands.
-# r3 (user ruling, Main option (a), 2026-09-25): 17 wide, the narrowest .X
-# width whose lower limit keeps the 5/8 pinch screw (McMaster 91794A112)
+# U24b (2026-09-23): the adjuster thread's side walls keep the wall target at
+# the printed width and passage-centre bands.
+# r3 (user ruling, Main option (a), 2026-09-25): the narrowest width whose
+# lower limit keeps the 5/8 pinch screw (McMaster 91794A112)
 # PINCH_SCREW_RECESS_MM short of the -X face (asserted with the screw below).
-BLOCK_X = 17.0  # plan width across the shaft
+BLOCK_X = 17.018  # .67 plan width across the shaft
 # Plan depth along the shaft, printed .XXX.  The north face stands the pivot
 # screw's head gap off the pivot (TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET)
 # and the block grows SOUTH (user ruling 2026-09-29): the depth must hold the
 # adjuster's embed window (below) open over the tip's axial stack, and stay
 # short enough that the MHA-DT-VN-54 stack collar never reaches the south face
-# (build_dt_drive_train_assembly's collar-to-block air).  9.75 sits between the
-# two at print-worst.
-BLOCK_Z = 9.75
+# (build_dt_drive_train_assembly's collar-to-block air).  The depth sits
+# between the two at print-worst, and its half (the pinch hole's and the foot
+# tap's station) stays on the .01 in grid.
+BLOCK_Z = 9.652  # .380
 
 # User ruling 2026-09-29 (eight-views-4.png): the tip block is a straight
 # prism held by one screw in a fixed platform hole under its centre.  Its
 # north face stands TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET south of the pivot,
-# 0.8125 off the pivot screw's head at nominal -- the gap
+# 0.80 off the pivot screw's head at nominal -- the gap
 # build_dt_drive_train_assembly proves at print-worst -- and the block grows
 # SOUTH from there (its depth closes the adjuster's embed window), so the
-# centre, and the platform hole under it, follow the depth.
-TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET = 5.575
+# centre, and the platform hole under it, follow the depth.  On the .001 in
+# grid, with the half depth, so the platform's HoldDownZ prints exactly.
+TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET = 5.5626  # .219
 TIP_BLOCK_NORTH_FACE = PIVOT_STATION - TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
 TIP_BLOCK_STATION = TIP_BLOCK_NORTH_FACE - BLOCK_Z / 2.0
 TIP_BLOCK_PIVOT_OFFSET = PIVOT_STATION - TIP_BLOCK_STATION
@@ -56,17 +69,18 @@ TIP_BLOCK_PIVOT_OFFSET = PIVOT_STATION - TIP_BLOCK_STATION
 # The adjuster and cone journal share one height above the platform top.
 # Free material above the slit floor and the pinch screw's rise stay fixed.
 ADJUSTER_AXIS_HEIGHT = CONE_AXIS_HEIGHT_MM
-# User ruling U24b (2026-09-23, W-target): the pinch screw sits 8.85 above the
-# adjuster axis and the top 14.56 above it, so the slit-mouth web between the
-# pinch clearance hole and the adjuster thread root, and the ligament over the
-# pinch hole, both keep 2.0 after edge breaks at the printed limits.
+# User ruling U24b (2026-09-23, W-target): the pinch screw sits about 8.9 mm
+# above the adjuster axis and the top about 14.5 mm above it, so the slit-mouth
+# web between the pinch clearance hole and the adjuster thread root, and the
+# ligament over the pinch hole, both keep the wall target after edge breaks at
+# the printed limits.
 # r3 (codex FIX review of 72ab, 2026-09-25): the print locates the pinch hole
 # straight from the foot (PinchHeight, .XX) rather than chaining it off the
 # adjuster axis.  PINCH_RISE stays the design offset; it no longer prints.
-TOP_ABOVE_AXIS = 14.56
-BLOCK_HEIGHT = ADJUSTER_AXIS_HEIGHT + TOP_ABOVE_AXIS
-PINCH_RISE = 8.85
-PINCH_HEIGHT = ADJUSTER_AXIS_HEIGHT + PINCH_RISE
+BLOCK_HEIGHT = 52.578  # 2.07
+TOP_ABOVE_AXIS = BLOCK_HEIGHT - ADJUSTER_AXIS_HEIGHT
+PINCH_HEIGHT = 46.99  # 1.85
+PINCH_RISE = PINCH_HEIGHT - ADJUSTER_AXIS_HEIGHT
 # The printed grade of every dimension a stack reads; DRAWING_PRECISION must
 # carry the same (checked at the end of this module).  Every dimension prints
 # the title block's general band for its places (machinist review of
@@ -78,25 +92,25 @@ PINCH_HEIGHT = ADJUSTER_AXIS_HEIGHT + PINCH_RISE
 # review of 83e3370f9 (rules 4 and 19, gating): a symmetric .XXX band bought
 # that containment with a tight band on a size that only has to stay inside
 # an edge.  The face may only come in, so the width carries a one-sided band
-# under its 17.0 nominal (rule 3: the band tolerances it, its places only
-# spell it): containment holds at 17.0 and the -X-face webs and the pinch
-# screw's tip recess hold at 16.5.
-BLOCK_WIDTH_BAND = (0.0, -0.5)
-BLOCK_WIDTH_PLACES = 1
+# under its nominal (rule 3: the band tolerances it, its places only
+# spell it): containment holds at the nominal and the -X-face webs and the
+# pinch screw's tip recess hold at its lower limit.
+BLOCK_WIDTH_BAND = (0.0, -0.508)  # +.000/-.020
+BLOCK_WIDTH_PLACES = 2
 BLOCK_DEPTH_PLACES = 3
-BLOCK_HEIGHT_PLACES = 1
+BLOCK_HEIGHT_PLACES = 2
 # .XX: the tip's vertical capture in the adjuster cup
 # (build_dt_drive_train_assembly) closes at the .XX band.
 AXIS_HEIGHT_PLACES = 2
 PINCH_HEIGHT_PLACES = 2
 PASSAGE_CENTER_PLACES = 3
-PINCH_DEPTH_PLACES = 1
+PINCH_DEPTH_PLACES = 2
 SLIT_W_PLACES = 2
 # The slit depth does not print: its modelled floor stands wholly inside the
 # adjuster tap drill (checked below), so the print says SLOT INTO BORE on the
 # slit width instead.
 SLIT_FLOOR = ADJUSTER_AXIS_HEIGHT - 0.65
-SLIT_W = 1.2
+SLIT_W = 1.27  # .05
 SLIT_DEPTH = BLOCK_HEIGHT - SLIT_FLOOR
 # drawing-guidelines.md rule 18 (thread engagement) E11/W1 (Main, 2026-09-24): a #10-32 x 3/8 cup set screw (McMaster
 # 94025A164) in a thread tapped THROUGH the block, a 90-degree countersink at
@@ -115,10 +129,10 @@ SLIT_DEPTH = BLOCK_HEIGHT - SLIT_FLOOR
 ADJUSTER_THREAD = "#10-32"
 ADJUSTER_SCREW_LENGTH = 9.525
 ADJUSTER_EMBED = 7.77
-# 90-degree countersink on each mouth to Ø5.0, just over the 4.826 major, so
+# 90-degree countersink on each mouth to just over the .190 major, so
 # the first thread starts full rather than on a feather edge (Main,
 # 2026-09-24).  Its depth is the 45-degree break on the tap drill.
-ADJUSTER_CSK_DIA = 5.0
+ADJUSTER_CSK_DIA = 5.0038  # .197
 # ASME B1.1 #10-32 UNF-2B minimum minor diameter (0.1560 in): the tightest
 # envelope the shaft tip passes through.
 ADJUSTER_MINOR_MIN_DIA = 0.1560 * 25.4
@@ -140,25 +154,15 @@ PINCH_CLEARANCE_SPEC = HoleSpec(
 )
 PINCH_CLEARANCE_DIA = blind_cut_dia_mm(PINCH_CLEARANCE_SPEC)
 
-# Prove every web against what the PRINT permits, not just nominal CAD (U27:
-# 2.0 target, 1.5 floor, at the worst case of the printed bands).
-_GENERAL_1PL_MM = _printed_tolerance.printed_band_mm(1)
-_GENERAL_2PL_MM = _printed_tolerance.printed_band_mm(2)
-_GENERAL_3PL_MM = _printed_tolerance.printed_band_mm(3)
-_DRILLED_HOLE_PLUS_MM = _printed_tolerance.drilled_oversize_mm()
-_BAND_BY_PLACES = {1: _GENERAL_1PL_MM, 2: _GENERAL_2PL_MM, 3: _GENERAL_3PL_MM}
-# The title block's general bands as (upper, lower) fit bands, so every stack
-# below reads its limits through _fit_deviations.deviations like any other band.
-GENERAL_BAND_BY_PLACES = {
-    places: (band, -band) for places, band in _BAND_BY_PLACES.items()
-}
+# Prove every web against what the PRINT permits, not just nominal CAD (the
+# wall target at the worst case of the printed bands).
+_DRILLED_HOLE_PLUS_MM = _printed_tolerance.drilled_oversize_mm(unit=UNIT)
 
 
 def _printed_limits(nominal: float, places: int) -> tuple[float, float]:
     """(min, max) the print allows a general-tolerance dimension."""
-    printed = round(nominal, places)
-    lower, upper = deviations(GENERAL_BAND_BY_PLACES[places])
-    return printed + lower, printed + upper
+    lower, upper = _printed_tolerance.printed_deviations(nominal, places, unit=UNIT)
+    return nominal + lower, nominal + upper
 
 
 # (min, max) of the width, which carries its own band rather than a grade.
@@ -168,7 +172,7 @@ BLOCK_WIDTH_LIMITS = (BLOCK_X + _width_lower, BLOCK_X + _width_upper)
 
 def printed_band_mm(places: int) -> float:
     """Half-width of the title block's general band at ``places`` decimals."""
-    return _BAND_BY_PLACES[places]
+    return _printed_tolerance.printed_band_mm(places, unit=UNIT)
 
 
 AXIS_HEIGHT_TOL_MM = printed_band_mm(AXIS_HEIGHT_PLACES)
@@ -200,11 +204,14 @@ def worst_half_widths_mm(datum: XDatumFace) -> dict[XDatumFace, float]:
 
 WORST_HALF_WIDTH_MM = worst_half_widths_mm(PASSAGE_CENTER_DATUM)
 
-# Title block: REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX.
-# Where a web ends in two exposed edges (the slit mouth, the pinch-hole mouth
-# under the top face) both breaks come off the same web.
-EDGE_BREAK_MAX_MM = 0.25
-MIN_WEB_MM = 2.0
+# Title block: REMOVE BURRS AND BREAK SHARP EDGES.  Where a web ends in two
+# exposed edges (the slit mouth, the pinch-hole mouth under the top face) both
+# breaks come off the same web.
+EDGE_BREAK_MAX_MM = max(
+    _printed_tolerance.edge_break_radius_mm(unit=UNIT),
+    _printed_tolerance.edge_break_chamfer_mm(unit=UNIT),
+)
+MIN_WEB_MM = WALL_TARGET_MM
 # ASME B1.1 #10-32 UNF-2B has no specified maximum major diameter; its
 # section 5.8.2(a) reference envelope (basic major + 0.14433757P + the 2B
 # pitch-diameter tolerance, 0.1736 - 0.1697 in) stands in for the finished
@@ -214,9 +221,7 @@ ADJUSTER_ROOT_REF_DIA = (
     THREAD_MAJOR_MM[ADJUSTER_THREAD] + 0.14433757 * _ADJ_PITCH_MM + 0.0039 * 25.4
 )
 _root_r = ADJUSTER_ROOT_REF_DIA / 2.0
-_worst_clearance_radius = (
-    round(PINCH_CLEARANCE_DIA, 2) + _DRILLED_HOLE_PLUS_MM
-) / 2.0
+_worst_clearance_radius = (PINCH_CLEARANCE_DIA + _DRILLED_HOLE_PLUS_MM) / 2.0
 _min_slit_half = _printed_limits(SLIT_W, SLIT_W_PLACES)[0] / 2.0
 _adjuster_major_radius = THREAD_MAJOR_MM[ADJUSTER_THREAD] / 2.0
 _pinch_major_radius = THREAD_MAJOR_MM[PINCH_THREAD] / 2.0
@@ -240,8 +245,7 @@ WORST_SLIT_MOUTH_WEB_MM = (
 WORST_SCREW_ENVELOPE_GAP_MM = (
     _worst_rise - _pinch_major_radius - _adjuster_major_radius
 )
-# PinchHeight keeps .XX for this ligament: its 46.95 sits on a .X rounding
-# tie, and printed up to 47.0 the ligament closes at 1.92.
+# PinchHeight prints .XX for this ligament.
 WORST_TOP_LIGAMENT_MM = (
     _height_limits[0]
     - _pinch_limits[1]
@@ -267,7 +271,9 @@ for _name, _web in (
     ("pinch-depth ligament", WORST_PINCH_DEPTH_LIGAMENT_MM),
 ):
     if round(_web, 6) < MIN_WEB_MM:
-        raise AssertionError(f"{_name} is {_web:.3f} at the printed limits (< 2.0, U27)")
+        raise AssertionError(
+            f"{_name} is {_web:.3f} at the printed limits (< the .080 in wall target)"
+        )
 if WORST_SCREW_ENVELOPE_GAP_MM <= 0.0:
     raise AssertionError("pinch screw can collide with the installed adjuster")
 # The slit must open into the adjuster thread or its jaws never grip it.  The
@@ -427,11 +433,11 @@ HOLDDOWN_SCREW_LENGTH_MIN = HOLDDOWN_SCREW_LENGTH - 0.03 * 25.4
 _HOLDDOWN_MAJOR_MM = THREAD_MAJOR_MM[HOLDDOWN_THREAD]
 _HOLDDOWN_PITCH_MM = 25.4 / 40.0
 # The ledge the head bears on, counterbore floor to platform top, at the
-# plate's stock band and its .XX counterbore depth
+# plate's stock band and its .XXX counterbore depth
 # (dt_cone_swing_platform_spec.HOLDDOWN_LEDGE_RANGE, asserted equal in
 # build_dt_drive_train_assembly; a copy so this part does not re-key on the
 # platform's print).
-HOLDDOWN_LEDGE_RANGE_MM = (2.21, 3.49)
+HOLDDOWN_LEDGE_RANGE_MM = (2.5908, 3.0988)
 # The block's foot sits on the platform top, so the screw reaches past the
 # ledge straight into the tap.
 WORST_HOLDDOWN_ENGAGEMENT_MM = HOLDDOWN_SCREW_LENGTH_MIN - HOLDDOWN_LEDGE_RANGE_MM[1]
@@ -441,16 +447,18 @@ if WORST_HOLDDOWN_ENGAGEMENT_MM < 1.5 * _HOLDDOWN_MAJOR_MM:
         f"hold-down engagement {WORST_HOLDDOWN_ENGAGEMENT_MM:.3f} < 1.5D at the "
         "thickest ledge and shortest screw"
     )
-# Full-thread depth (.X) keeps the longest reach FOOT_TAP_MARGIN_MM clear of
-# the tap's incomplete lead; the tap drill (.X) runs 1.5P past the deepest
-# full thread so a plug tap's lead never eats it.
+# Full-thread depth keeps the longest reach FOOT_TAP_MARGIN_MM clear of
+# the tap's incomplete lead; the tap drill runs 1.5P past the deepest
+# full thread so a plug tap's lead never eats it.  Both print .XXX on the
+# tap's Hole Wizard callout.
 FOOT_TAP_MARGIN_MM = 0.25
-FOOT_THREAD_DEPTH = 8.5
-FOOT_DEPTH = 11.1
-FOOT_DEPTH_PLACES = 1
-if WORST_HOLDDOWN_REACH_MM > FOOT_THREAD_DEPTH - _GENERAL_1PL_MM - FOOT_TAP_MARGIN_MM:
+FOOT_THREAD_DEPTH = 8.509  # .335
+FOOT_DEPTH = 11.0998  # .437
+FOOT_DEPTH_PLACES = 3
+_FOOT_DEPTH_BAND_MM = printed_band_mm(FOOT_DEPTH_PLACES)
+if WORST_HOLDDOWN_REACH_MM > FOOT_THREAD_DEPTH - _FOOT_DEPTH_BAND_MM - FOOT_TAP_MARGIN_MM:
     raise AssertionError("hold-down screw can reach the foot tap's incomplete threads")
-if (FOOT_DEPTH - _GENERAL_1PL_MM) - (FOOT_THREAD_DEPTH + _GENERAL_1PL_MM) < (
+if (FOOT_DEPTH - _FOOT_DEPTH_BAND_MM) - (FOOT_THREAD_DEPTH + _FOOT_DEPTH_BAND_MM) < (
     1.5 * _HOLDDOWN_PITCH_MM
 ):
     raise AssertionError("foot tap drill leaves no lead room past the full thread")
@@ -472,7 +480,7 @@ FOOT_BORE_DIA = blind_cut_dia_mm(FOOT_BORE_SPEC)
 # (dt_cone_swing_platform_spec.HOLDDOWN_LOCAL_X, which says why), so the block
 # body stands centred on the cone line.  Toward -X because the width's band
 # falls on the +X side: there the tap's web is the thinner one.
-FOOT_TAP_OFFSET_X = -1.0
+FOOT_TAP_OFFSET_X = -1.016  # -.04
 FOOT_TAP_X = BLOCK_X / 2.0 + FOOT_TAP_OFFSET_X
 FOOT_TAP_Z = BLOCK_Z / 2.0
 FOOT_TAP_X_PLACES = 3
@@ -483,7 +491,7 @@ FOOT_TAP_STATION_TOL_MM = printed_band_mm(FOOT_TAP_X_PLACES)
 _tap_r = _HOLDDOWN_MAJOR_MM / 2.0
 _tap_drill_top_max = (
     FOOT_DEPTH
-    + _GENERAL_1PL_MM
+    + _FOOT_DEPTH_BAND_MM
     + (FOOT_BORE_DIA / 2.0) / math.tan(math.radians(DRILL_POINT_ANGLE_DEG / 2.0))
 )
 WORST_FOOT_TAP_WEBS_MM = {
@@ -498,13 +506,16 @@ WORST_FOOT_TAP_WEBS_MM = {
 for _name, _web in WORST_FOOT_TAP_WEBS_MM.items():
     if round(_web, 6) < MIN_WEB_MM:
         raise AssertionError(
-            f"foot tap {_name} web is {_web:.3f} at the printed limits (< 2.0, U27)"
+            f"foot tap {_name} web is {_web:.3f} at the printed limits "
+            "(< the .080 in wall target)"
         )
 
 SURFACE_FINISHES = (
     # This face locates the adjuster block on the swing platform. Everything
     # else remains governed by the title-block CAST/MACHINED process row.
-    SurfaceFinishControl("foot_seat", SEAT_UM, PlanarFace((0, -1, 0), 0.0)),
+    SurfaceFinishControl(
+        "foot_seat", SEAT_UM, PlanarFace((0, -1, 0), 0.0), display_unit=UNIT
+    ),
 )
 
 
@@ -580,6 +591,11 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
         )
 
 
+def length_text(value_mm: float, places: int) -> str:
+    """A length as the sheet prints it at ``places``, in its unit."""
+    return render_number(round(value_mm / LENGTH_UNITS[UNIT], places), UNIT, places)
+
+
 def printed_value_text(name: str, nominal: float) -> str:
     """The text a marked dimension prints: the value at its model places."""
-    return f"{nominal:.{DRAWING_PRECISION_BY_NAME[name]}f}"
+    return length_text(nominal, DRAWING_PRECISION_BY_NAME[name])

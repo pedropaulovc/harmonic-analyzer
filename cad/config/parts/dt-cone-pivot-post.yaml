@@ -1,10 +1,11 @@
 dt-cone-pivot-post:
   number: MHA-DT-05
   material_family: ferrous_noncritical
-  finish: RAL 6005 ALKYD; SSPC-SP 3; 50-75 um DFT; MASK MACHINED FACES; OIL BARE FACES ISO VG 32
+  finish: RAL 6005 ALKYD; SSPC-SP 3; 2-3 MIL DFT; MASK MACHINED FACES; OIL BARE FACES ISO VG 32
   quantity: 1
   tolerance_class: machined_block
   process: "machined from solid stock or casting"
+  drawing_unit: in
   # Both journal heights and the body follow the shared raised-axis law in
   # _cone_axis_constants; the head height and mounting pitch are unchanged.
   # Crank axis height and cone incline read the current machine configs;

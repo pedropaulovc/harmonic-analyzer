@@ -10,7 +10,9 @@ import math
 
 import _cone_axis_constants as cone_axis
 
-POST_BODY_HEIGHT_MM = 90.0 + cone_axis.AXIS_RAISE_MM
+# The raised-axis law's 90.0 + AXIS_RAISE_MM (94.732), snapped to the .XX the
+# inch post sheet prints (#290).
+POST_BODY_HEIGHT_MM = 94.742  # 3.73
 POST_MOUNT_COUNTERBORE_DEPTH_MM = 6.0198
 # .005 in: with the screw's cut end at the title block's .010 edge break, the
 # thinnest plate holds 0.87D (dt_vn_post_mount_screw_spec).

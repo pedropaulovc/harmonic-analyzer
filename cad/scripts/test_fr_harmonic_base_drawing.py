@@ -1050,7 +1050,7 @@ def test_native_r5_r6_tag_layout_replays_all_callouts_with_attached_extents() ->
     assert (x, y) == (0.2425, 0.2230)
     text_box = (x - 0.0005, y - height - 0.0005, x + width + 0.0005, y + 0.0005)
     centre = sheet._plan_xy(*sheet.LOCK_KNOB_XZ, center=sheet.HOLE_TOP_CENTER)
-    assert centre == pytest.approx((0.2543912510989887, 0.22292914718948796), abs=1e-12)
+    assert centre == pytest.approx((0.2543928487857444, 0.22294410265486017), abs=1e-12)
     # Native table's rounded-up 5.11 mm drill encloses the source drill.
     assert sheet.LOCK_SCREW_HOLE_DIA <= 5.11
     radius = 5.11 * sheet.VIEW_SCALE / 2000.0
@@ -1063,7 +1063,7 @@ def test_native_r5_r6_tag_layout_replays_all_callouts_with_attached_extents() ->
         max(text_box[3], rim_box[3], shoulder_box[3]),
     )
     assert extent == pytest.approx(
-        (0.242, 0.21821088294314384, 0.2550300010989887, 0.22356789718948794),
+        (0.242, 0.21821088294314384, 0.25503159878574444, 0.22358285265486016),
         abs=1e-12,
     )
     # Guard the attached extent, not just the letter, against the neighbors.
@@ -1086,7 +1086,7 @@ def test_native_r5_r6_tag_layout_replays_all_callouts_with_attached_extents() ->
     x0, y0, x1, y1 = NATIVE_R5_CALLOUTS["MHA-DT-02 pedestal transfer"][1][0]
     dx, dy = x1 - x0, y1 - y0
     gap = (dy * (x0 - extent[2]) - dx * (y0 - extent[3])) / math.hypot(dx, dy)
-    assert gap == pytest.approx(0.0010407034684199465, abs=1e-12)
+    assert gap == pytest.approx(0.001027626715193439, abs=1e-12)
     assert gap >= sheet.CALLOUT_CLEARANCE_M
     proposed = {**NATIVE_R5_OBSTACLES, lock_tag: extent}
     proposed_texts = {**text_obstacles, lock_tag: extent}

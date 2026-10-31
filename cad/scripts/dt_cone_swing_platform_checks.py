@@ -11,7 +11,14 @@ import math
 
 import _config
 import dt_vn_cone_pivot_screw_spec as pivot_stock
-from _printed_tolerance import printed_band_mm
+from _inch_wall_limits import WALL_TARGET_MM
+from _package_units import drawing_unit
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
+    printed_band_mm,
+)
 import dt_swing_stop_screw_spec as stop_stock
 from cone_pitch import COS_I as _COS_I, INCLINE_DEG, SIN_I as _SIN_I
 from dt_cone_swing_platform_geometry import (
@@ -47,6 +54,7 @@ from dt_cone_swing_platform_spec import (
     POST_MOUNT_STATION_TOL_MM,
     POST_MOUNT_TAP_DIA,
     POST_MOUNT_THREAD_DIA,
+    UNIT,
 )
 from dt_cone_swing_platform_pivot_spec import PIVOT_HOLE_DIA
 from dt_vn_cone_lock_knob_spec import HEAD_DIA as LOCK_HEAD_DIA
@@ -89,20 +97,24 @@ if POST_MOUNT_HALF_PITCH + POST_MOUNT_TAP_DIA / 2.0 > _POST_R:
     raise AssertionError("v2 post mount taps fall outside the casting foot")
 
 # drawing-guidelines.md rule 17 (walls and webs) webs round the tip-block hold-down hole (user ruling 2026-09-29), at
-# print worst: the outline at .X, relief and counterbore at .XX, drilled holes
-# +0.10, the hole's two stations (HoldDownX, HoldDownZ) at their +/-0.10
-# bands; the post taps at their +/-0.10 bands, judged at the thread major.
+# print worst: the outline and relief at .XX, the counterbore at its
+# callout's .XXX, drilled holes at the DRILLED HOLES row, the hole's two
+# stations (HoldDownX, HoldDownZ) at their explicit bands; the post taps at
+# their explicit bands, judged at the thread major.
 # The relief is on the TOP face only (there the hole is the drilled
 # clearance), the counterbore on the UNDERSIDE only (there the pivot is the
 # bare drilled bore); each web is judged on the face both share.  The plan
 # corner rounds sweep toward their own corners, away from this hole, so the
 # straight edges bound the outline web.
-_GENERAL_1PL_MM = printed_band_mm(1)
-_GENERAL_2PL_MM = printed_band_mm(2)
-_DRILL_OVERSIZE_MM = float(_config.title_block("drilled_hole")["plus_mm"])
+_XX_MM = printed_band_mm(2, unit=UNIT)
+# MHA-FR-01 locates the stop and pivot taps on its own sheet.
+_BASE_XX_MM = printed_band_mm(
+    2, unit=drawing_unit("parts/fr-harmonic-base", _config.parts("fr-harmonic-base"))
+)
+_DRILL_OVERSIZE_MM = drilled_oversize_mm(unit=UNIT)
 _HOLDDOWN_SHIFT = math.hypot(HOLDDOWN_STATION_TOL_MM, HOLDDOWN_STATION_TOL_MM)
 _HOLDDOWN_THRU_R = (HOLDDOWN_CLEARANCE_DIA + _DRILL_OVERSIZE_MM) / 2.0
-_HOLDDOWN_CBORE_R = (HOLDDOWN_CBORE_DIA + _GENERAL_2PL_MM) / 2.0
+_HOLDDOWN_CBORE_R = (HOLDDOWN_CBORE_DIA + printed_band_mm(3, unit=UNIT)) / 2.0
 _HOLDDOWN_PIVOT_DIST = math.hypot(HOLDDOWN_LOCAL_X, HOLDDOWN_LOCAL_Z)
 
 
@@ -122,7 +134,7 @@ HOLDDOWN_WEBS = {
     "pivot relief (top)": _HOLDDOWN_PIVOT_DIST
     - _HOLDDOWN_SHIFT
     - _HOLDDOWN_THRU_R
-    - (PIVOT_BEARING_RELIEF_DIAMETER + _GENERAL_2PL_MM) / 2.0,
+    - (PIVOT_BEARING_RELIEF_DIAMETER + _XX_MM) / 2.0,
     "pivot bore (underside)": _HOLDDOWN_PIVOT_DIST
     - _HOLDDOWN_SHIFT
     - _HOLDDOWN_CBORE_R
@@ -144,10 +156,10 @@ HOLDDOWN_WEBS = {
     ),
 }
 for _edge in ("north edge", "east edge", "west edge"):
-    HOLDDOWN_WEBS[_edge] -= _HOLDDOWN_SHIFT + _HOLDDOWN_CBORE_R + _GENERAL_1PL_MM
-if min(HOLDDOWN_WEBS.values()) < 2.0:
+    HOLDDOWN_WEBS[_edge] -= _HOLDDOWN_SHIFT + _HOLDDOWN_CBORE_R + _XX_MM
+if min(HOLDDOWN_WEBS.values()) < WALL_TARGET_MM:
     raise AssertionError(
-        f"tip-block hold-down leaves a web under the U27 2.0 target: {HOLDDOWN_WEBS}"
+        f"tip-block hold-down leaves a web under the .080 in wall target: {HOLDDOWN_WEBS}"
     )
 
 
@@ -199,8 +211,7 @@ def manufactured_p1_stop_enclosure() -> dict:
     """
     from dt_cone_swing_platform_spec import PLATE_STOCK_BAND
 
-    edge = _config.title_block("edge_break")
-    edge_break = max(float(edge["radius_mm"]), float(edge["chamfer_max_mm"]))
+    edge_break = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
     core_height = stop_stock.UNSLOTTED_HEAD_HEIGHT_MIN_MM
     contact_height = (edge_break + core_height) / 2.0
     if (
@@ -223,7 +234,7 @@ def manufactured_p1_stop_enclosure() -> dict:
         - pivot_stock.SHOULDER_DIA_BAND[1]
     ) / 2.0
     terms = {
-        "base stop and pivot coordinate errors": 2.0 * math.sqrt(2.0) * _GENERAL_2PL_MM,
+        "base stop and pivot coordinate errors": 2.0 * math.sqrt(2.0) * _BASE_XX_MM,
         "platform shoulder radial fit": pivot_fit,
         **seated_pivot_axis_offset_terms_mm(),
         "stop thread radial fit": clearance / 2.0,
@@ -244,7 +255,7 @@ def manufactured_p1_stop_enclosure() -> dict:
     # Vertices have X +/-g, north Z +/-g, and south Z +/-2g because
     # PlateLenDim is measured from NorthEdgeZ. This Euclidean Hausdorff
     # erosion contains every straight-edge manufacturing corner.
-    outline_erosion = math.sqrt(5.0) * _GENERAL_1PL_MM
+    outline_erosion = math.sqrt(5.0) * _XX_MM
     corners = tuple((x, z) for _, x, z, _ in PLATE_CORNERS)
 
     def fence_margins(angle: float) -> dict[str, float]:
@@ -276,7 +287,7 @@ def manufactured_p1_stop_enclosure() -> dict:
             )
             if theta <= 0.0:
                 raise ValueError("manufactured corner can collapse")
-            cut_reach = (radius + _GENERAL_1PL_MM) / math.tan(theta / 2.0)
+            cut_reach = (radius + _XX_MM) / math.tan(theta / 2.0)
             margins[f"corner {label}"] = (
                 math.dist(point, (x, z)) - reach - outline_erosion - cut_reach
             )
@@ -286,7 +297,7 @@ def manufactured_p1_stop_enclosure() -> dict:
             (
                 "pivot/relief",
                 (0.0, 0.0),
-                (PIVOT_BEARING_RELIEF_DIAMETER + _GENERAL_2PL_MM) / 2.0,
+                (PIVOT_BEARING_RELIEF_DIAMETER + _XX_MM) / 2.0,
                 0.0,
             ),
             ("tip hold-down", _HOLDDOWN_XZ, _HOLDDOWN_CBORE_R, _HOLDDOWN_SHIFT),
@@ -308,7 +319,7 @@ def manufactured_p1_stop_enclosure() -> dict:
                 math.dist(point, centre) - reach - radius - shift - edge_break
             )
         # The relief opens north; the notch's whole chord is a capsule.
-        margins["open north relief"] = -point[1] - reach - _GENERAL_1PL_MM
+        margins["open north relief"] = -point[1] - reach - _XX_MM
         notch_delta = (point[0] - SLOT_E_X, point[1] - SLOT_E_Z)
         along = max(
             0.0,
@@ -323,8 +334,8 @@ def manufactured_p1_stop_enclosure() -> dict:
                 notch_delta[1] - along * SLOT_TZ,
             )
             - reach
-            - (SLOT_W + _GENERAL_2PL_MM) / 2.0
-            - math.sqrt(2.0) * _GENERAL_2PL_MM
+            - (SLOT_W + _XX_MM) / 2.0
+            - math.sqrt(2.0) * _XX_MM
             - edge_break
         )
         return margins

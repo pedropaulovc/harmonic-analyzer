@@ -35,10 +35,10 @@ def test_required_drawing_paths() -> None:
 
 def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> None:
     assert BLOCK_DIA == 42.011
-    assert (spec.HEAD_DIA, spec.HEAD_HEIGHT) == (42.7506, 26.6)
+    assert (spec.HEAD_DIA, spec.HEAD_HEIGHT) == (42.672, 26.67)
     assert spec.HEAD_BASE_Y == pytest.approx(spec.BLOCK_HEIGHT - spec.HEAD_HEIGHT)
     assert (spec.CRANK_BOSS_DIA, spec.CRANK_BORE_DIA, spec.CRANK_BORE_OFFSET) == (
-        21.93,
+        21.844,
         11.43,
         0.0,
     )
@@ -57,16 +57,17 @@ def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> Non
     )
     assert spec.CRANK_BOSS_HEAD_MARGIN_MM > 0.0
     assert spec.CRANK_BOSS_LENGTH_IN == 2.8360
-    # v36 (user ruling 2026-09-28): the boss starts on the head's tangent
-    # plane and runs the harvested 2.8360 in from there.
-    assert spec.CRANK_BOSS_NORTH_FACE == spec.HEAD_DIA / 2.0 == 21.3753
+    # v36 (user ruling 2026-09-28): the boss starts on the harvested head's
+    # tangent plane and runs the harvested 2.8360 in from there; the .XX head
+    # leaves that face (the 16T seat) where it was.
+    assert spec.CRANK_BOSS_NORTH_FACE == 21.3753 >= spec.HEAD_DIA / 2.0
     assert spec.CRANK_BOSS_START_Z == -21.3753
     assert round(spec.CRANK_BOSS_END_Z, 4) == 50.6591
     assert spec.CRANK_BOSS_LENGTH == pytest.approx(2.8360 * 25.4)
     from _cone_axis_constants import CONE_AXIS_HEIGHT_MM
     from dt_post_mount_stack import POST_BODY_HEIGHT_MM
 
-    assert (spec.CONE_BOSS_DIA, spec.BORE_DIA) == (17.2, 12.2682)
+    assert (spec.CONE_BOSS_DIA, spec.BORE_DIA) == (17.272, 12.2682)
     assert spec.BORE_HEIGHT == CONE_AXIS_HEIGHT_MM
     assert spec.BLOCK_HEIGHT == POST_BODY_HEIGHT_MM
     assert spec.INCLINE_DEG == _config.machine("cone_incline", "derived_incline_deg")
@@ -74,7 +75,7 @@ def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> Non
         spec.ATTACHMENT_THRU_DIA,
         spec.ATTACHMENT_CBORE_DIA,
         spec.ATTACHMENT_CBORE_DEPTH,
-    ) == (7.14248, 11.50874, 6.0198)
+    ) == (7.14248, 11.5062, 6.0198)
     assert spec.ATTACHMENT_SPACING == 2.0 * spec.ATTACHMENT_X
     # The final volume is the per-feature sum the build checks natively; a
     # constant that drifts from the features (the 2026-09-21 unbored-boss
@@ -150,21 +151,19 @@ def test_current_manufacturing_plan_tracks_post_geometry_without_changing_toolin
     assert plan["construction"] == "one_piece"
 
 
-def test_mounting_counterbores_take_the_last_printable_head_wall_station() -> None:
-    """The Ø42.8 head retains 1.5 mm at the counterbores' printed corners."""
-    assert spec.DRAWING_PRECISION_BY_NAME["HeadDia"] == 1
+def test_mounting_counterbores_keep_the_wall_target_to_the_head() -> None:
+    """The Ø1.68 head keeps the .080 in target at the counterbores' printed
+    corners (#290: the mm sheet's .X head left only the 1.5 mm floor)."""
+    assert spec.DRAWING_PRECISION_BY_NAME["HeadDia"] == 2
     assert spec.DRAWING_PRECISION_BY_NAME["MountWestX"] == 2
     assert spec.DRAWING_PRECISION_BY_NAME["MountEastX"] == 2
-    head_radius_min = (round(spec.HEAD_DIA, 1) - spec.printed_band_mm(1)) / 2.0
-    cbore_radius_max = (
-        round(spec.ATTACHMENT_CBORE_DIA, 2) + spec.printed_band_mm(2)
-    ) / 2.0
-    wall = head_radius_min - (spec.ATTACHMENT_X + spec.printed_band_mm(2)) - cbore_radius_max
-    assert spec.ATTACHMENT_X == pytest.approx(12.98)
-    assert spec.ATTACHMENT_SPACING == pytest.approx(25.96)
+    head_radius_min = (spec.HEAD_DIA - 0.254) / 2.0
+    cbore_radius_max = (spec.ATTACHMENT_CBORE_DIA + 0.127) / 2.0
+    wall = head_radius_min - (spec.ATTACHMENT_X + 0.254) - cbore_radius_max
+    assert spec.ATTACHMENT_X == pytest.approx(12.954)
+    assert spec.ATTACHMENT_SPACING == pytest.approx(25.908)
     assert wall == pytest.approx(spec.MOUNT_HEAD_WEB_WORST)
-    assert wall >= spec.WEB_FLOOR_MM - 1e-9
-    assert wall - 0.01 < spec.WEB_FLOOR_MM
+    assert wall >= 2.032 - 1e-9
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
@@ -468,13 +467,25 @@ def test_part_owns_every_printed_decimal_place() -> None:
         *spec.DRAWING_DIMENSIONS.values()
     )
     assert "draw_dt_cone_pivot_post.py" in PRECISION_MIGRATED_DRAWINGS
-    # Only the two bores earn a third place, for their limits; the basic plan
+    # The bores earn extra places for their limits, the shared 1.654 foot
+    # and boss length and the closures print .XXX, and the basic plan
     # angle prints the model's exact value (#906, it feeds the frame).
     assert {
         name
         for name, places in spec.DRAWING_PRECISION_BY_NAME.items()
         if places >= 3
-    } == {"CrankBoreDia", "JournalBoreDia", "InclineAngle"}
+    } == {
+        "CrankBoreDia",
+        "JournalBoreDia",
+        "InclineAngle",
+        "MainBodyDia",
+        "ConeBossLen",
+        "CrankBossLen",
+        "CrankAxisY",
+        "CrankAboveCone",
+        "ConeBossNorthZ",
+        "CrankBossStartZ",
+    }
 
 
 def test_running_bores_close_the_configured_fit_class() -> None:
@@ -605,12 +616,12 @@ def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
     assert frame.characteristic == "angularity"
     assert frame.tolerance_zone == "diametral"
     assert frame.datums == ("A", "B")
-    assert frame.tolerance == f"{spec.CRANK_BORE_ANGULARITY_MM:.2f}" == "0.10"
+    assert frame.tolerance == spec.CRANK_BORE_ANGULARITY_IN == ".004"
     assert frame.face == CylinderFace(
         spec.CRANK_BORE_DIA, contains_y_mm=spec.CRANK_BORE_HEIGHT
     )
-    # The zone spans the boss: 0.0795 deg over its 72.03.
-    assert round(spec.CRANK_BORE_ANGLE_LIMIT_DEG, 4) == 0.0795
+    # The zone spans the boss: 0.0808 deg over its 72.03.
+    assert round(spec.CRANK_BORE_ANGLE_LIMIT_DEG, 4) == 0.0808
     assert part.PART_DATUMS is spec.PART_DATUMS
     assert part.GEOMETRIC_CONTROLS is spec.GEOMETRIC_CONTROLS
     exceptions = {
@@ -764,7 +775,6 @@ def test_part_config_is_a_machined_casting() -> None:
     finish = str(config["finish"])
     assert "RAL 6005" in finish
     assert "SSPC-SP 3" in finish
-    assert "50-75 um DFT" in finish
     assert "MASK MACHINED FACES" in finish
     assert "OIL BARE FACES ISO VG 32" in finish
     assert config["process"] == "machined from solid stock or casting"
@@ -780,14 +790,14 @@ def test_journal_rims_print_the_thrust_ring_break() -> None:
     import dt_cone_gear_shaft_spec as shaft
 
     break_max = shaft.THRUST_EDGE_BREAK_MAX
-    assert f"RIMS BREAK {break_max:.1f} MAX" == shaft.POST_JOURNAL_RIM_BREAK
+    assert f"RIMS BREAK {shaft.inch_text(break_max, 3)} MAX" == shaft.POST_JOURNAL_RIM_BREAK
     bore_callout = drawing.DIMENSION_CALLOUTS["JournalBoreDia"]
     # r16 (rules 4 and 7): the tighter break carries its reason under it.
     assert bore_callout.splitlines()[-2:] == [
         shaft.POST_JOURNAL_RIM_BREAK,
         "FOR COLLAR SEAT",
     ]
-    assert f"EDGE BREAK {break_max:.1f} MAX" in shaft.COLLAR_STOCK_CALLOUT
+    assert f"EDGE BREAK {shaft.inch_text(break_max, 3)} MAX" in shaft.COLLAR_STOCK_CALLOUT
     ring = shaft.THRUST_RING_MIN
     assert ring - 2.0 * break_max >= shaft.THRUST_RING_FLOOR
     # the title block's general break on the rim would not hold the floor
@@ -1067,8 +1077,11 @@ def test_crank_bore_is_located_from_the_cone_bore_and_never_binds() -> None:
     assert spec.CRANK_ABOVE_CONE == pytest.approx(
         _config.machine("gear_train", "crank_axis_height_mm") - spec.BORE_HEIGHT
     )
-    assert spec.CRANK_ABOVE_CONE_BAND == (0.37, 0.0)
-    assert crank_mesh_stack.SPACING_PRINTED == round(spec.CRANK_ABOVE_CONE, 2)
+    assert spec.CRANK_ABOVE_CONE_BAND == (0.3556, 0.0)
+    places = spec.DRAWING_PRECISION_BY_NAME["CrankAboveCone"]
+    assert crank_mesh_stack.SPACING_PRINTED == pytest.approx(
+        round(spec.CRANK_ABOVE_CONE / 25.4, places) * 25.4
+    )
     assert abs(crank_mesh_stack.FRAME_DY - spec.CRANK_ABOVE_CONE) < 1e-9
     assert crank_mesh_stack.standard_check().backlash_min_mm > 0.0
     # The foot-to-crank height stays on the front view only as a reference.

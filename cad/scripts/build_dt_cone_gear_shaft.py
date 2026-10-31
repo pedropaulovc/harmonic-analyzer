@@ -83,9 +83,11 @@ from _sketch_circle import define_circle
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _document_units import apply_package_model_units
 from _fit_deviations import deviations
 from _gear import volume_check
 from _part_pmi import author_part_pmi
+from _part_properties import part_drawing_unit
 from _visibility import blank_reference_geometry
 from dt_cone_gear_shaft_spec import (
     COLLAR_DIA,
@@ -107,6 +109,7 @@ from dt_cone_gear_shaft_spec import (
     SECTION_ORIGINS,
     SECTIONS,
     SURFACE_FINISHES,
+    UNIT,
     validate_gear_loading_clearances,
 )
 from solidworks_mcp.adapters.com_variant import double_array
@@ -153,6 +156,8 @@ async def build(adapter) -> dict[str, str]:
 
     validate_gear_loading_clearances()
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): one diameter + one end station per
     # section. The mm suffix is load-bearing -- this is an INCH document and the
@@ -376,13 +381,16 @@ async def build(adapter) -> dict[str, str]:
     await report_mass_properties(adapter)
     # The five turned diameters and the four across-flats carry their fit on
     # the MODEL dimension, so SolidWorks renders the limits and re-renders
-    # them on a unit change.
+    # them on a unit change.  The bands are millimetres; UNIT prints them in
+    # decimal inch at the nominal's places.
     for section, band in enumerate(SECTION_DIA_BANDS):
         set_dimension_bilateral_tolerance(
             adapter,
             f"Sec{section}Profile",
             f"Sec{section}Dia",
             *deviations(band),
+            places=DRAWING_PRECISION[f"Sec{section}Profile"][f"Sec{section}Dia"],
+            display_unit=UNIT,
         )
     for land in FLAT_LANDS:
         set_dimension_bilateral_tolerance(
@@ -390,6 +398,8 @@ async def build(adapter) -> dict[str, str]:
             f"Sec{land}FlatProfile",
             f"Sec{land}AF",
             *deviations(FLAT_AF_BAND),
+            places=DRAWING_PRECISION[f"Sec{land}FlatProfile"][f"Sec{land}AF"],
+            display_unit=UNIT,
         )
     # Display precision is model-owned too (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
