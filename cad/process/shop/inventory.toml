@@ -6439,20 +6439,20 @@ cite = ["OnlineMetals part 20743 https://www.onlinemetals.com/en/buy/carbon-stee
 [[stock]]
 form = "flat_bar"
 material = "6061-T6511 aluminium"
-note = "Owned OnlineMetals 1173, 1/2 x 6 x 72 in: allocate the TL-21 carrier. Saw a 540 mm length and rip it to about 135 mm wide on the bandsaw first: the 152.4 mm width does not fit the 6 in vise's 5 3/4 in stock hard jaws (owner ruling 2026-10-30). Then face to 12.0 mm and mill the 520 x 130 outline. The TL-20 base bars moved to 1/2 x 5-1/2 stock (2026-10-30). Purchased nominal dimensions are not receipt measurements."
+note = "Owned OnlineMetals 1173, 1/2 x 6 x 72 in: allocate the TL-21 carrier and both TL-20 base bars (owner ruling #2083, 2026-10-30: mill the owned bar to width, no bandsaw rip; about 1430 of the 1829 mm). TL-21: saw a 540 mm length and rip it to about 135 mm wide on the bandsaw first: the 152.4 mm width does not fit the 6 in vise's 5 3/4 in stock hard jaws (owner ruling 2026-10-30), then face to 12.0 mm and mill the 520 x 130 outline (#2083 drops the rip; carrier note not yet revised). TL-20: two 443 mm blanks, the long edges milled on edge in the vise to 139.7 wide, both faces faced to 12.0. Purchased nominal dimensions are not receipt measurements."
 section_mm = [152.4, 12.7]
 length_mm = 1828.8
 on_hand = true
-cite = ["Owner-reported purchased stock and allocation, oblique jig simplification 2026-10-23; OnlineMetals 1173"]
+cite = ["Owner-reported purchased stock and allocation, oblique jig simplification 2026-10-23; OnlineMetals 1173", "https://github.com/pedropaulovc/harmonic-analyzer/issues/2083"]
 
 [[stock]]
 form = "flat_bar"
 material = "6061-T6511 aluminium"
-note = "TL-20 base bars x2: OnlineMetals 17666, 1/2 x 5-1/2 in, the widest listed 6061 rectangle bar that fits the 6 in vise's 5 3/4 in stock-hard-jaw capacity (1/2 x 6 does not). Order 36 in: two 440 mm bars plus saw kerf and facing. Face both large faces to 12.0 mm (owner ruling 2026-10-30); the width stays as supplied. Not yet owned."
+note = "Former TL-20 base bar stock (OnlineMetals 17666, 1/2 x 5-1/2 in): not to be ordered; owner ruling #2083 (2026-10-30) makes both bars from the owned 1173 1/2 x 6 bar instead. The v47 drawing still names this stock; that drawing change is open in #2083. Not owned."
 section_mm = [139.7, 12.7]
 length_mm = 914.4
 on_hand = false
-cite = ["OnlineMetals part 17666 https://www.onlinemetals.com/en/buy/aluminum/0-5-x-5-5-aluminum-rectangle-bar-6061-t6511-extruded/pid/17666 read live 2026-10-30, in stock, 36 in $135.92"]
+cite = ["OnlineMetals part 17666 https://www.onlinemetals.com/en/buy/aluminum/0-5-x-5-5-aluminum-rectangle-bar-6061-t6511-extruded/pid/17666 read live 2026-10-30, in stock, 36 in $135.92", "https://github.com/pedropaulovc/harmonic-analyzer/issues/2083"]
 
 [[stock]]
 form = "flat_bar"

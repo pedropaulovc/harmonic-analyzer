@@ -1,0 +1,1621 @@
+# HELD PREVIEW ROUTE: not enrolled in _process_plans.TRAVELER_STEMS and not qualified
+# machining instructions. Shared shop values include unmeasured #1413 placeholders, so any
+# traveler from this plan is PROVISIONAL and is not approval to machine.
+#
+# ch_rocker_arm_tl_oblique_base_bar (MHA-CH-06-TL-20 v47): two identical bars, the second
+# turned over in the jig. Process intent from the owner's hand-written 2026-10-30 traveler
+# (not prechips output) and the v47 drawing (farm run 20261030T220540504Z, machinist SHIP).
+# Stock follows the owner ruling in harmonic-analyzer issue #2083: the owned OnlineMetals
+# 1173 1/2 x 6 bar is milled to width, not ripped. The v47 drawing still prints 1/2 x 5-1/2
+# material and "139.7 STOCK"; that drawing correction is open in #2083, so the width carries
+# no machined acceptance band here.
+# Model frame (features.toml): X0 the spindle-end face, Y0 the rail axis (low side -88.9,
+# high side +50.8), Z0 the underside seat, Z12 the top seat. Face references are bare HAF
+# labels; _process_plans.bind_plan binds them to the exported STEP.
+part = "ch-rocker-arm-tl-oblique-base-bar"
+features = "../../out/features/ch_rocker_arm_tl_oblique_base_bar/features.toml"
+construction = "one_piece"
+quantity = 2
+quantity_cite = ["harmonic-analyzer/cad/config/parts/ch-rocker-arm-tl-oblique-base-bar.yaml:quantity", "AUTHOR'S CHOICE: both bars follow this same route; do not mirror the second"]
+
+[drawing]
+number = "MHA-CH-06-TL-20"
+revision = "v47"
+cite = ["harmonic-analyzer/cad/config/parts/ch-rocker-arm-tl-oblique-base-bar.yaml:ch-rocker-arm-tl-oblique-base-bar.number", "harmonic-analyzer/cad/config/release.yaml:next_revision"]
+
+[dro]
+controller = "el400"
+manual = "Electronica EL400 Operation Manual"
+manual_url = "https://www.dropros.com/documents/EL400%20OpManual.pdf"
+mode = "abs"
+
+[dro.direction]
+x = "right"
+y = "away"
+z = "up"
+
+# One 443 mm blank per bar from the owned 1/2 x 6 bar (#2083): 1.5 over the 440 length at
+# each end, the zero edge about 1.0 proud of the finished -Y side, about 0.35 on each big
+# face. These placements are the author's route choice, not measurements of a sawn blank.
+[stock]
+form = "flat_bar"
+form_verify = false
+material = "6061-T6511 aluminium"
+drawing_material = "ALUMINUM FLAT BAR 1/2 x 5-1/2 in (v47 print; owner ruling #2083 uses the owned 1/2 x 6 bar)"
+material_verify = false
+material_cite = [
+  "harmonic-analyzer/cad/config/parts/ch-rocker-arm-tl-oblique-base-bar.yaml:ch-rocker-arm-tl-oblique-base-bar.material_specification",
+  "https://github.com/pedropaulovc/harmonic-analyzer/issues/2083 (owner decision 2026-10-30: mill the owned OnlineMetals 1173 1/2 x 6 x 72 in 6061-T6511 bar to width; no bandsaw rip)",
+]
+on_hand = true
+prerequisite = "Saw two 443 mm blanks from the owned 1/2 x 6 bar (miter saw or bandsaw), supporting the long end so it does not drop as the cut finishes; file off the saw burrs. Bar 1 was sawn on 2026-10-29 without a recorded length: measure it, it must be at least 441."
+# Catalogue nominal section of OnlineMetals 1173, 6 x 1/2 in = [152.4, 12.7] mm; not a receipt measurement.
+section_mm = [152.4, 12.7]
+length_mm = 443.0
+origin_mm = [-1.5, -89.9, -0.35]
+axis = [1.0, 0.0, 0.0]
+section_axis = [0.0, 1.0, 0.0]
+as_is_faces = []
+cite = [
+  "https://github.com/pedropaulovc/harmonic-analyzer/issues/2083",
+  "Desktop traveler 2026-10-30 Op 10 (hand-written, not prechips): two 443 mm blanks, 1.5 mm to clean up at each end",
+  "AUTHOR'S CHOICE: zero edge 1.0 proud (Op 20 'take as little as you can, usually about 1 mm'); 0.35 a face (about 0.35 per side)",
+]
+
+[frames.edge-low-up]
+origin = [0.0, -88.9, 0.0]
+x = [1.0, 0.0, 0.0]
+y = [0.0, 0.0, 1.0]
+z = [0.0, -1.0, 0.0]
+binding = "nominal"
+note = "AUTHOR'S CHOICE: bar on edge in the vise, zero edge (the -Y side) up; Z0 on the finished zero edge"
+cite = ["AUTHOR'S CHOICE", "features.toml bar_low_side.plane y -88.9"]
+
+[frames.edge-high-up]
+origin = [0.0, -88.9, 0.0]
+x = [1.0, 0.0, 0.0]
+y = [0.0, 0.0, -1.0]
+z = [0.0, 1.0, 0.0]
+binding = "nominal"
+note = "AUTHOR'S CHOICE: bar on edge, zero edge down on the vise floor; Z0 on the zero edge, so Z reads the width"
+cite = ["AUTHOR'S CHOICE", "features.toml bar_low_side.plane y -88.9"]
+
+[frames.table-first]
+origin = [0.0, -88.9, 12.35]
+x = [1.0, 0.0, 0.0]
+y = [0.0, -1.0, 0.0]
+z = [0.0, 0.0, -1.0]
+binding = "nominal"
+note = "AUTHOR'S CHOICE: flat on the mill table, the underside seat up, zero edge toward the column; Z0 on the table"
+cite = ["AUTHOR'S CHOICE", "plan stock origin_mm z -0.35 + 12.7"]
+
+[frames.table-second]
+origin = [440.0, -88.9, 0.0]
+x = [-1.0, 0.0, 0.0]
+y = [0.0, -1.0, 0.0]
+z = [0.0, 0.0, 1.0]
+binding = "nominal"
+note = "AUTHOR'S CHOICE: turned end for end onto the faced underside, zero edge still toward the column; Z0 on the table, so Z reads the thickness"
+cite = ["AUTHOR'S CHOICE", "features.toml underside_seat.plane z 0"]
+
+[frames.vise-cbore-up]
+origin = [0.0, -88.9, 0.0]
+x = [1.0, 0.0, 0.0]
+y = [0.0, -1.0, 0.0]
+z = [0.0, 0.0, -1.0]
+binding = "nominal"
+note = "AUTHOR'S CHOICE: underside seat (the counterbore side) up in the vise, zero edge on the fixed jaw, zero end on the left; X0 Y0 the back-left corner, Z0 on top. Y reads negative toward you."
+cite = ["AUTHOR'S CHOICE", "features.toml bar_spindle_end.plane x 0, bar_low_side.plane y -88.9, underside_seat.plane z 0"]
+
+[frames.bench]
+origin = [0.0, -88.9, 0.0]
+x = [1.0, 0.0, 0.0]
+y = [0.0, 1.0, 0.0]
+z = [0.0, 0.0, 1.0]
+binding = "nominal"
+note = "AUTHOR'S CHOICE: bench frame, top seat up"
+cite = ["AUTHOR'S CHOICE"]
+
+# ---------------------------------------------------------------------------------------
+# E1: 6 in vise, bar on edge gripped across its 12.7 thickness on the vise floor (the setup
+# the owner used on 2026-10-29). Mill the first long edge clean: this is the ZERO EDGE.
+[[setups]]
+id = "E1"
+machine = "PM-30MV"
+frame = "edge-low-up"
+coolant = "cutting oil, brushed on"
+deburr_mm = 0.25
+deburr_cite = "features.toml general_tolerances edge_break R0.25"
+stock_in = "stock"
+note = "Shared shop values include unmeasured #1413 placeholders: this sheet is provisional, not approval to machine. Bar on edge, roughly centred along X, about 140 mm out each side of the vise; seat it with the dead-blow hammer, then re-tighten. The edge you mill here is the ZERO EDGE: every Y on later sheets is measured from it. Write ZERO EDGE on both faces next to it as soon as it is cut. The top stands about 107 mm above the jaws: if it sings, take lighter passes."
+
+[setups.stock_state]
+top_z = 1.0
+bottom_z = -151.4
+
+[setups.hold]
+fixture = "vise-pm-6"
+jaws_along = "x"
+fixed_jaw = "rear"
+parallels = "none"
+jaw_center_along_mm = 220.0
+grip_mm = 44.945
+jaw_above_parallels_mm = 44.945
+stop = "none; bar centred along X by eye"
+clamp = "grip across the 12.7 thickness, the long raw edge down on the vise floor; tap down with the dead-blow hammer, re-tighten"
+align = { indicator = "dti", face = "fixed jaw", over_mm = 100.0, limit_mm = 0.02, cite = "Desktop traveler 2026-10-30: indicate the fixed jaw under 0.02 mm along X, as on 2026-10-29" }
+
+[setups.zero.x]
+edge = "left sawn blank end"
+edge_mm = -1.5
+from = "-x"
+tool = "edge-finder"
+holder = "r8-collets-lms-4860/3-8in"
+check_jog_mm = 10.0
+
+[setups.zero.y]
+edge = "fixed jaw"
+edge_mm = 12.35
+from = "+y"
+method = "Pick the exposed fixed-jaw face beside the bar before loading."
+tool = "edge-finder"
+holder = "r8-collets-lms-4860/3-8in"
+check_jog_mm = 10.0
+
+[setups.zero.z]
+face = "top"
+method = "paper"
+tool = "endmills-tin-10pc/1-2in-2fl"
+holder = "r8-collets-lms-4860/1-2in"
+paper_mm = 0.05
+check_jog_mm = 1.0
+retouch_after = []
+
+[[setups.ops]]
+op = 10
+do = "face"
+feature = "bar_low_side"
+faces = ["HAF_BAR_LOW_SIDE__P01"]
+tool = "endmills-tin-10pc/1-2in-2fl"
+holder = "r8-collets-lms-4860/1-2in"
+direction = "conventional"
+to_z = 0.0
+doc_mm = 0.5
+rpm = 1250.0
+feed_mm_min = 75.0
+approach_mm = 5.0
+stock_removal_bounds = { x = [-1.5, 441.5], y = [-0.35, 12.35], z = [0.0, 1.0] }
+contour = { method = "linear_table", step_mm = 6.0, sweep_frame = "model", sweep_bounds = { x = [-1.5, 441.5], y = [-89.9, -88.9], z = [-0.35, 12.35] } }
+note = "Passes along X with the bottom of the cutter, 0.5 mm per pass, until the whole edge is clean; take as little as you can. On 2026-10-29 2500 rpm at 10 mm/min gave a very clean edge; keep that if it works for you."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 20 step 2"]
+
+# ---------------------------------------------------------------------------------------
+# E2: same vise, bar flipped: zero edge down on the wiped vise floor. Mill the other long
+# edge down to 139.7 wide (about 11.7 off).
+[[setups]]
+id = "E2"
+machine = "PM-30MV"
+frame = "edge-high-up"
+coolant = "cutting oil, brushed on"
+deburr_mm = 0.25
+deburr_cite = "features.toml general_tolerances edge_break R0.25"
+stock_in = "E1"
+note = "Zero edge down on the vise floor; wipe the floor first, grip, tap down. Width 139.7: the v47 drawing prints it as STOCK (1/2 x 5-1/2 bar); milling it from 1/2 x 6 is the owner's #2083 ruling and its drawing band is still open. Measure at both ends and in the middle. Do both bars before you go on."
+
+[setups.stock_state]
+top_z = 151.4
+bottom_z = 0.0
+bottom_feature = "bar_low_side"
+
+[setups.hold]
+fixture = "vise-pm-6"
+jaws_along = "x"
+fixed_jaw = "rear"
+parallels = "none"
+jaw_center_along_mm = 220.0
+grip_mm = 44.945
+jaw_above_parallels_mm = 44.945
+stop = "none; bar centred along X by eye"
+clamp = "grip across the 12.7 thickness, the zero edge down on the wiped vise floor; tap down with the dead-blow hammer, re-tighten"
+
+[setups.zero.x]
+edge = "left sawn blank end"
+edge_mm = -1.5
+from = "-x"
+tool = "edge-finder"
+holder = "r8-collets-lms-4860/3-8in"
+check_jog_mm = 10.0
+
+[setups.zero.y]
+edge = "fixed jaw"
+edge_mm = 0.35
+from = "+y"
+method = "Pick the exposed fixed-jaw face beside the bar before loading."
+tool = "edge-finder"
+holder = "r8-collets-lms-4860/3-8in"
+check_jog_mm = 10.0
+
+[setups.zero.z]
+face = "top"
+method = "measure_then_set"
+gauge = "calipers-18in"
+measure = "bar width, zero edge to the raw top edge"
+measure_before_hold = true
+offset_mm = 0.0
+tool = "endmills-tin-10pc/1-2in-2fl"
+holder = "r8-collets-lms-4860/1-2in"
+paper_mm = 0.05
+check_jog_mm = 1.0
+retouch_after = []
+
+[[setups.ops]]
+op = 10
+do = "face"
+feature = "bar_high_side"
+faces = ["HAF_BAR_HIGH_SIDE__P01"]
+tool = "endmills-tin-10pc/1-2in-2fl"
+holder = "r8-collets-lms-4860/1-2in"
+direction = "conventional"
+to_z = 139.7
+doc_mm = 1.0
+rpm = 1250.0
+feed_mm_min = 75.0
+approach_mm = 5.0
+stock_removal_bounds = { x = [-1.5, 441.5], y = [-12.35, 0.35], z = [139.7, 151.4] }
+contour = { method = "linear_table", step_mm = 6.0, sweep_frame = "model", sweep_bounds = { x = [-1.5, 441.5], y = [50.8, 62.5], z = [-0.35, 12.35] } }
+note = "Passes along X, 0.5 to 1 mm a pass, down to Z 139.70; aim for 139.7 wide."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 20 step 4"]
+
+[[setups.ops]]
+op = 20
+do = "inspect"
+feature = "bar_high_side"
+missing_requirements = { width = "calipers-18in" }
+inspection_methods.width = "Calipers across the two long edges at both ends and in the middle; target 139.7. The v47 drawing prints 139.7 STOCK with no machined band (issue #2083 open): record the readings, do not accept or reject on them here."
+
+# ---------------------------------------------------------------------------------------
+# T1a/T1b: PM-30MV table, vise off (in the vise the bar top would sit below the jaw tops and
+# a facing cutter would hit them). T1a: one strap on each bar end, face the middle. T1b: two
+# straps on the faced middle from the front T-slot, end straps off, face both ends.
+[[setups]]
+id = "T1a"
+machine = "PM-30MV"
+frame = "table-first"
+coolant = "cutting oil, brushed on"
+deburr_mm = 0.25
+deburr_cite = "features.toml general_tolerances edge_break R0.25"
+stock_in = "E2"
+note = "Take the vise off and wipe the table; stone burrs off the table and the bar. One chip under the bar ruins the face. Lay the bar flat along X, ZERO EDGE toward the column. If it rocks, slip paper under the low corner; never clamp it flat over a gap: it springs back after the cut. The mill is CNC-converted: the same zig-zag can run as a CNCjs facing program with the same depths and feeds."
+
+[setups.stock_state]
+top_feature = "underside_seat"
+top_z = 12.7
+bottom_z = 0.0
+
+[setups.hold]
+fixture = "pm30mv-table"
+pose = { origin_mm = [220.0, -88.2, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
+clamps = [
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-mill", restraint = "press", pose = { origin_mm = [1.0, -88.2, 12.7], x = [-1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "left bar end, toe about 15 mm in; stud in the centre T-slot beyond the end, step block a little higher than the bar" },
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-mill", restraint = "press", pose = { origin_mm = [439.0, -88.2, 12.7], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "right bar end, toe about 15 mm in; stud in the centre T-slot beyond the end, step block a little higher than the bar" },
+]
+clamp_order = [1, 2]
+fixed_jaw = "not_applicable"
+grip_mm = "not_applicable"
+stop = "none"
+clamp = "AUTHOR'S CHOICE (Desktop traveler Op 30): the bar flat on the table along X, zero edge toward the column, a strap toe on each bar end"
+
+[setups.zero.x]
+edge = "left sawn blank end"
+edge_mm = -1.5
+from = "-x"
+tool = "edge-finder"
+holder = "r8-collets-lms-4860/3-8in"
+check_jog_mm = 10.0
+
+[setups.zero.y]
+edge = "zero edge (column side)"
+edge_mm = 0.0
+from = "+y"
+tool = "edge-finder"
+holder = "r8-collets-lms-4860/3-8in"
+check_jog_mm = 10.0
+
+[setups.zero.z]
+face = "top"
+method = "measure_then_set"
+gauge = "micrometers/0-1in"
+measure = "bar thickness with the 0-1 in micrometer at the four corners and the middle (the thinnest reading)"
+measure_before_hold = true
+offset_mm = 0.0
+tool = "endmills-lms-6784/3-4in-4fl"
+holder = "r8-collets-lms-4860/3-4in"
+paper_mm = 0.05
+check_jog_mm = 1.0
+retouch_after = []
+
+[[setups.ops]]
+op = 10
+do = "rough_face"
+feature = "underside_seat"
+faces = ["HAF_UNDERSIDE_SEAT__P01"]
+tool = "endmills-lms-6784/3-4in-4fl"
+holder = "r8-collets-lms-4860/3-4in"
+direction = "conventional"
+to_z = 12.45
+doc_mm = 0.25
+rpm = 840.0
+feed_mm_min = 85.0
+approach_mm = 5.0
+stock_removal_bounds = { x = [15.0, 425.0], y = [-139.7, 0.0], z = [12.45, 12.7] }
+contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [15.0, 425.0], y = [-88.9, 50.8], z = [-0.35, 0.0] } }
+note = "Feed along X from X 25 to X 415 (cutter centre), step 15 mm in Y, until the width between the clamps is cut (about 10 passes)."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 6 (feeds are the author's choice, not chart values)"]
+
+[[setups.ops]]
+op = 20
+do = "finish_face"
+feature = "underside_seat"
+faces = ["HAF_UNDERSIDE_SEAT__P01"]
+tool = "endmills-lms-6784/3-4in-4fl"
+holder = "r8-collets-lms-4860/3-4in"
+direction = "conventional"
+to_z = 12.35
+doc_mm = 0.1
+rpm = 840.0
+feed_mm_min = 60.0
+approach_mm = 5.0
+stock_removal_bounds = { x = [15.0, 425.0], y = [-139.7, 0.0], z = [12.35, 12.45] }
+contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [15.0, 425.0], y = [-88.9, 50.8], z = [-0.35, 0.0] } }
+note = "Finish pass 0.10 over the clamped middle at 60 mm/min. Stop if you see chatter marks. A sharp end mill on a light finishing pass normally does better than Ra 3.2."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 8"]
+
+[[setups]]
+id = "T1b"
+machine = "PM-30MV"
+frame = "table-first"
+coolant = "cutting oil, brushed on"
+deburr_mm = 0.25
+deburr_cite = "features.toml general_tolerances edge_break R0.25"
+stock_in = "T1a"
+note = "Put the two front straps on the faced middle with paper under the toes, then take the end straps off. Face both ends at the same Z as the middle."
+
+[setups.stock_state]
+top_feature = "underside_seat"
+top_z = 12.7
+bottom_z = 0.0
+
+[setups.hold]
+fixture = "pm30mv-table"
+pose = { origin_mm = [220.0, -88.2, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
+clamps = [
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-mill", restraint = "press", pose = { origin_mm = [150.0, -113.6, 12.35], x = [0.0, -1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "on the faced middle near the front edge, paper under the toe; stud in the front T-slot" },
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-mill", restraint = "press", pose = { origin_mm = [290.0, -113.6, 12.35], x = [0.0, -1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "on the faced middle near the front edge, paper under the toe; stud in the front T-slot" },
+]
+clamp_order = [1, 2]
+fixed_jaw = "not_applicable"
+grip_mm = "not_applicable"
+stop = "none"
+clamp = "AUTHOR'S CHOICE: two straps from the front T-slot onto the faced middle (paper under the toes), placed before the end straps come off"
+
+[setups.zero.x]
+edge = "left sawn blank end"
+edge_mm = -1.5
+from = "-x"
+tool = "edge-finder"
+holder = "r8-collets-lms-4860/3-8in"
+check_jog_mm = 10.0
+
+[setups.zero.y]
+edge = "zero edge (column side)"
+edge_mm = 0.0
+from = "+y"
+tool = "edge-finder"
+holder = "r8-collets-lms-4860/3-8in"
+check_jog_mm = 10.0
+
+[setups.zero.z]
+face = "top"
+method = "measure_then_set"
+gauge = "micrometers/0-1in"
+measure = "bar thickness with the 0-1 in micrometer at the four corners and the middle (the thinnest reading)"
+measure_before_hold = true
+offset_mm = 0.0
+tool = "endmills-lms-6784/3-4in-4fl"
+holder = "r8-collets-lms-4860/3-4in"
+paper_mm = 0.05
+check_jog_mm = 1.0
+retouch_after = []
+
+[[setups.ops]]
+op = 10
+do = "rough_face"
+feature = "underside_seat"
+faces = ["HAF_UNDERSIDE_SEAT__P01"]
+tool = "endmills-lms-6784/3-4in-4fl"
+holder = "r8-collets-lms-4860/3-4in"
+direction = "conventional"
+to_z = 12.45
+doc_mm = 0.25
+rpm = 840.0
+feed_mm_min = 85.0
+approach_mm = 5.0
+stock_removal_bounds = { x = [-1.5, 39.5], y = [-139.7, 0.0], z = [12.45, 12.7] }
+contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [-1.5, 39.5], y = [-88.9, 50.8], z = [-0.35, 0.0] } }
+note = "Left end: X -15 to 30 (cutter centre)."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 7"]
+
+[[setups.ops]]
+op = 20
+do = "rough_face"
+feature = "underside_seat"
+faces = ["HAF_UNDERSIDE_SEAT__P01"]
+tool = "endmills-lms-6784/3-4in-4fl"
+holder = "r8-collets-lms-4860/3-4in"
+direction = "conventional"
+to_z = 12.45
+doc_mm = 0.25
+rpm = 840.0
+feed_mm_min = 85.0
+approach_mm = 5.0
+stock_removal_bounds = { x = [400.5, 441.5], y = [-139.7, 0.0], z = [12.45, 12.7] }
+contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [400.5, 441.5], y = [-88.9, 50.8], z = [-0.35, 0.0] } }
+note = "Right end: X 410 to 455 (cutter centre)."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 7"]
+
+[[setups.ops]]
+op = 30
+do = "finish_face"
+feature = "underside_seat"
+faces = ["HAF_UNDERSIDE_SEAT__P01"]
+tool = "endmills-lms-6784/3-4in-4fl"
+holder = "r8-collets-lms-4860/3-4in"
+direction = "conventional"
+to_z = 12.35
+doc_mm = 0.1
+rpm = 840.0
+feed_mm_min = 60.0
+approach_mm = 5.0
+stock_removal_bounds = { x = [-1.5, 39.5], y = [-139.7, 0.0], z = [12.35, 12.45] }
+contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [-1.5, 39.5], y = [-88.9, 50.8], z = [-0.35, 0.0] } }
+note = "Left end finish pass at the middle's Z."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 8"]
+
+[[setups.ops]]
+op = 40
+do = "finish_face"
+feature = "underside_seat"
+faces = ["HAF_UNDERSIDE_SEAT__P01"]
+tool = "endmills-lms-6784/3-4in-4fl"
+holder = "r8-collets-lms-4860/3-4in"
+direction = "conventional"
+to_z = 12.35
+doc_mm = 0.1
+rpm = 840.0
+feed_mm_min = 60.0
+approach_mm = 5.0
+stock_removal_bounds = { x = [400.5, 441.5], y = [-139.7, 0.0], z = [12.35, 12.45] }
+contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [400.5, 441.5], y = [-88.9, 50.8], z = [-0.35, 0.0] } }
+note = "Right end finish pass at the middle's Z."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 8"]
+
+# ---------------------------------------------------------------------------------------
+# T2a/T2b: PM-30MV table, vise off (in the vise the bar top would sit below the jaw tops and
+# a facing cutter would hit them). T2a: one strap on each bar end, face the middle. T2b: two
+# straps on the faced middle from the front T-slot, end straps off, face both ends.
+[[setups]]
+id = "T2a"
+machine = "PM-30MV"
+frame = "table-second"
+coolant = "cutting oil, brushed on"
+deburr_mm = 0.25
+deburr_cite = "features.toml general_tolerances edge_break R0.25"
+stock_in = "T1b"
+note = "Flip the bar end for end, faced side down; wipe the table and the faced side. ZERO EDGE still toward the column. Snug the straps; do not crush the bar. The mill is CNC-converted: the same zig-zag can run as a CNCjs facing program with the same depths and feeds."
+
+[setups.stock_state]
+top_feature = "top_seat"
+top_z = 12.35
+bottom_z = 0.0
+bottom_feature = "underside_seat"
+
+[setups.hold]
+fixture = "pm30mv-table"
+pose = { origin_mm = [220.0, -88.2, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
+clamps = [
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-mill", restraint = "press", pose = { origin_mm = [1.0, -88.2, 12.35], x = [-1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "left bar end, toe about 15 mm in; stud in the centre T-slot beyond the end, step block a little higher than the bar" },
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-mill", restraint = "press", pose = { origin_mm = [439.0, -88.2, 12.35], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "right bar end, toe about 15 mm in; stud in the centre T-slot beyond the end, step block a little higher than the bar" },
+]
+clamp_order = [1, 2]
+fixed_jaw = "not_applicable"
+grip_mm = "not_applicable"
+stop = "none"
+clamp = "AUTHOR'S CHOICE (Desktop traveler Op 30): the bar flat on the table along X, zero edge toward the column, a strap toe on each bar end"
+
+[setups.zero.x]
+edge = "left sawn end (the far end, turned round)"
+edge_mm = -1.5
+from = "-x"
+tool = "edge-finder"
+holder = "r8-collets-lms-4860/3-8in"
+check_jog_mm = 10.0
+
+[setups.zero.y]
+edge = "zero edge (column side)"
+edge_mm = 0.0
+from = "+y"
+tool = "edge-finder"
+holder = "r8-collets-lms-4860/3-8in"
+check_jog_mm = 10.0
+
+[setups.zero.z]
+face = "top"
+method = "measure_then_set"
+gauge = "micrometers/0-1in"
+measure = "bar thickness with the 0-1 in micrometer at the four corners and the middle (the thinnest reading)"
+measure_before_hold = true
+offset_mm = 0.0
+tool = "endmills-lms-6784/3-4in-4fl"
+holder = "r8-collets-lms-4860/3-4in"
+paper_mm = 0.05
+check_jog_mm = 1.0
+retouch_after = []
+
+[[setups.ops]]
+op = 10
+do = "rough_face"
+feature = "top_seat"
+faces = ["HAF_TOP_SEAT__P01"]
+tool = "endmills-lms-6784/3-4in-4fl"
+holder = "r8-collets-lms-4860/3-4in"
+direction = "conventional"
+to_z = 12.1
+doc_mm = 0.25
+rpm = 840.0
+feed_mm_min = 85.0
+approach_mm = 5.0
+stock_removal_bounds = { x = [15.0, 425.0], y = [-139.7, 0.0], z = [12.1, 12.35] }
+contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [15.0, 425.0], y = [-88.9, 50.8], z = [12.0, 12.35] } }
+note = "Feed along X from X 25 to X 415 (cutter centre), step 15 mm in Y, until the width between the clamps is cut (about 10 passes)."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 6 (feeds are the author's choice, not chart values)"]
+
+[[setups.ops]]
+op = 20
+do = "finish_face"
+feature = "top_seat"
+faces = ["HAF_TOP_SEAT__P01"]
+tool = "endmills-lms-6784/3-4in-4fl"
+holder = "r8-collets-lms-4860/3-4in"
+direction = "conventional"
+to_z = 12.0
+doc_mm = 0.1
+rpm = 840.0
+feed_mm_min = 60.0
+approach_mm = 5.0
+stock_removal_bounds = { x = [15.0, 425.0], y = [-139.7, 0.0], z = [12.0, 12.1] }
+contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [15.0, 425.0], y = [-88.9, 50.8], z = [12.0, 12.35] } }
+note = "Finish pass 0.10 down to Z 12.00 over the clamped middle; the drawing's band is 11.2 to 12.8 thick. Stop if you see chatter marks. A sharp end mill on a light finishing pass normally does better than Ra 3.2."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 8"]
+
+[[setups]]
+id = "T2b"
+machine = "PM-30MV"
+frame = "table-second"
+coolant = "cutting oil, brushed on"
+deburr_mm = 0.25
+deburr_cite = "features.toml general_tolerances edge_break R0.25"
+stock_in = "T2a"
+note = "Put the two front straps on the faced middle with paper under the toes, then take the end straps off. Face both ends at the same Z as the middle."
+
+[setups.stock_state]
+top_feature = "top_seat"
+top_z = 12.35
+bottom_z = 0.0
+bottom_feature = "underside_seat"
+
+[setups.hold]
+fixture = "pm30mv-table"
+pose = { origin_mm = [220.0, -88.2, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
+clamps = [
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-mill", restraint = "press", pose = { origin_mm = [150.0, -113.6, 12.0], x = [0.0, -1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "on the faced middle near the front edge, paper under the toe; stud in the front T-slot" },
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-mill", restraint = "press", pose = { origin_mm = [290.0, -113.6, 12.0], x = [0.0, -1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "on the faced middle near the front edge, paper under the toe; stud in the front T-slot" },
+]
+clamp_order = [1, 2]
+fixed_jaw = "not_applicable"
+grip_mm = "not_applicable"
+stop = "none"
+clamp = "AUTHOR'S CHOICE: two straps from the front T-slot onto the faced middle (paper under the toes), placed before the end straps come off"
+
+[setups.zero.x]
+edge = "left sawn end (the far end, turned round)"
+edge_mm = -1.5
+from = "-x"
+tool = "edge-finder"
+holder = "r8-collets-lms-4860/3-8in"
+check_jog_mm = 10.0
+
+[setups.zero.y]
+edge = "zero edge (column side)"
+edge_mm = 0.0
+from = "+y"
+tool = "edge-finder"
+holder = "r8-collets-lms-4860/3-8in"
+check_jog_mm = 10.0
+
+[setups.zero.z]
+face = "top"
+method = "measure_then_set"
+gauge = "micrometers/0-1in"
+measure = "bar thickness with the 0-1 in micrometer at the four corners and the middle (the thinnest reading)"
+measure_before_hold = true
+offset_mm = 0.0
+tool = "endmills-lms-6784/3-4in-4fl"
+holder = "r8-collets-lms-4860/3-4in"
+paper_mm = 0.05
+check_jog_mm = 1.0
+retouch_after = []
+
+[[setups.ops]]
+op = 10
+do = "rough_face"
+feature = "top_seat"
+faces = ["HAF_TOP_SEAT__P01"]
+tool = "endmills-lms-6784/3-4in-4fl"
+holder = "r8-collets-lms-4860/3-4in"
+direction = "conventional"
+to_z = 12.1
+doc_mm = 0.25
+rpm = 840.0
+feed_mm_min = 85.0
+approach_mm = 5.0
+stock_removal_bounds = { x = [-1.5, 39.5], y = [-139.7, 0.0], z = [12.1, 12.35] }
+contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [400.5, 441.5], y = [-88.9, 50.8], z = [12.0, 12.35] } }
+note = "Left end: X -15 to 30 (cutter centre)."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 7"]
+
+[[setups.ops]]
+op = 20
+do = "rough_face"
+feature = "top_seat"
+faces = ["HAF_TOP_SEAT__P01"]
+tool = "endmills-lms-6784/3-4in-4fl"
+holder = "r8-collets-lms-4860/3-4in"
+direction = "conventional"
+to_z = 12.1
+doc_mm = 0.25
+rpm = 840.0
+feed_mm_min = 85.0
+approach_mm = 5.0
+stock_removal_bounds = { x = [400.5, 441.5], y = [-139.7, 0.0], z = [12.1, 12.35] }
+contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [-1.5, 39.5], y = [-88.9, 50.8], z = [12.0, 12.35] } }
+note = "Right end: X 410 to 455 (cutter centre)."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 7"]
+
+[[setups.ops]]
+op = 30
+do = "finish_face"
+feature = "top_seat"
+faces = ["HAF_TOP_SEAT__P01"]
+tool = "endmills-lms-6784/3-4in-4fl"
+holder = "r8-collets-lms-4860/3-4in"
+direction = "conventional"
+to_z = 12.0
+doc_mm = 0.1
+rpm = 840.0
+feed_mm_min = 60.0
+approach_mm = 5.0
+stock_removal_bounds = { x = [-1.5, 39.5], y = [-139.7, 0.0], z = [12.0, 12.1] }
+contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [400.5, 441.5], y = [-88.9, 50.8], z = [12.0, 12.35] } }
+note = "Left end finish pass at the middle's Z."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 8"]
+
+[[setups.ops]]
+op = 40
+do = "finish_face"
+feature = "top_seat"
+faces = ["HAF_TOP_SEAT__P01"]
+tool = "endmills-lms-6784/3-4in-4fl"
+holder = "r8-collets-lms-4860/3-4in"
+direction = "conventional"
+to_z = 12.0
+doc_mm = 0.1
+rpm = 840.0
+feed_mm_min = 60.0
+approach_mm = 5.0
+stock_removal_bounds = { x = [400.5, 441.5], y = [-139.7, 0.0], z = [12.0, 12.1] }
+contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [-1.5, 39.5], y = [-88.9, 50.8], z = [12.0, 12.35] } }
+note = "Right end finish pass at the middle's Z."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 8"]
+
+# ---------------------------------------------------------------------------------------
+# A0/A: 6 in vise back on the table and indicated. The counterbore side up (it is the
+# underside of bar 1), zero edge on the fixed jaw, zero end on the left: every hole, both
+# slots and the length are cut in this one clamping. A0 cleans up the zero end; A picks up
+# X on it without unclamping.
+[[setups]]
+id = "A0"
+machine = "PM-30MV"
+frame = "vise-cbore-up"
+coolant = "cutting oil, brushed on"
+deburr_mm = 0.25
+deburr_cite = "features.toml general_tolerances edge_break R0.25"
+stock_in = "T2b"
+note = "Before loading, write ZERO END on one end and C'BORE SIDE - UP IN VISE on one big face; both faces are the same, so pick either. The face on top becomes the bottom of bar 1: the counterbores go in it, so every hole is made in one setup. Check the DRO: moving the spindle right X counts up; moving it toward you Y counts down (every Y on this sheet is negative). The bar hangs about 140 mm out of the vise at each end: don't lean on the ends."
+
+[setups.stock_state]
+top_feature = "underside_seat"
+bottom_feature = "top_seat"
+top_z = 0.0
+bottom_z = -12.0
+
+[setups.stock_state.entry_z]
+rail_hole_1 = 0.0
+rail_hole_2 = 0.0
+rail_hole_3 = 0.0
+rail_hole_4 = 0.0
+rail_hole_5 = 0.0
+rail_hole_6 = 0.0
+rail_hole_7 = 0.0
+bracket_hole_1 = 0.0
+bracket_hole_2 = 0.0
+bracket_hole_3 = 0.0
+bracket_hole_4 = 0.0
+bracket_hole_5 = 0.0
+bracket_hole_6 = 0.0
+bracket_hole_7 = 0.0
+bracket_hole_8 = 0.0
+near_slot = 0.0
+far_slot = 0.0
+
+[setups.stock_state.local_thickness]
+rail_hole_1 = 12.0
+rail_hole_2 = 12.0
+rail_hole_3 = 12.0
+rail_hole_4 = 12.0
+rail_hole_5 = 12.0
+rail_hole_6 = 12.0
+rail_hole_7 = 12.0
+bracket_hole_1 = 12.0
+bracket_hole_2 = 12.0
+bracket_hole_3 = 12.0
+bracket_hole_4 = 12.0
+bracket_hole_5 = 12.0
+bracket_hole_6 = 12.0
+bracket_hole_7 = 12.0
+bracket_hole_8 = 12.0
+near_slot = 12.0
+far_slot = 12.0
+
+[setups.hold]
+fixture = "vise-pm-6"
+jaws_along = "x"
+fixed_jaw = "rear"
+parallels = "parallels-lms-6745/1in"
+parallels_along = "x"
+parallels_centres_mm = [[220.0, -1.5875], [220.0, -138.1125]]
+jaw_center_along_mm = 220.0
+grip_mm = 12.0
+jaw_above_parallels_mm = 19.545
+stop = "none; bar centred along X by eye, about 140 mm out each side"
+clamp = "on the two 1 in parallels, one against each jaw; zero edge on the fixed jaw; tighten, tap down with the dead-blow hammer, re-tighten until neither parallel slides"
+align = { indicator = "dti", face = "fixed jaw", over_mm = 100.0, limit_mm = 0.02, cite = "Desktop traveler 2026-10-30 Op 30 step 11: put the vise back and indicate the fixed jaw under 0.02 mm along X, as on 2026-10-29" }
+
+[setups.zero.x]
+edge = "left sawn end"
+edge_mm = -1.5
+from = "-x"
+tool = "edge-finder"
+holder = "r8-collets-lms-4860/3-8in"
+check_jog_mm = 10.0
+
+[setups.zero.y]
+edge = "zero edge, from behind in the left overhang at about X 100"
+edge_mm = 0.0
+from = "+y"
+tool = "edge-finder"
+holder = "r8-collets-lms-4860/3-8in"
+check_jog_mm = -10.0
+
+[setups.zero.z]
+face = "top"
+method = "paper"
+tool = "endmills-tin-10pc/1-2in-2fl"
+holder = "r8-collets-lms-4860/1-2in"
+paper_mm = 0.05
+check_jog_mm = 1.0
+retouch_after = []
+
+[[setups.ops]]
+op = 10
+do = "finish_profile"
+feature = "bar_spindle_end"
+faces = ["HAF_BAR_SPINDLE_END__P01"]
+tool = "endmills-tin-10pc/1-2in-2fl"
+holder = "r8-collets-lms-4860/1-2in"
+direction = "conventional"
+to_z = -13.0
+doc_mm = 13.0
+ae_mm = 0.5
+rpm = 1250.0
+feed_mm_min = 75.0
+approach_mm = 5.0
+stock_removal_bounds = { x = [-1.5, 0.0], y = [-139.7, 0.0], z = [-13.0, 0.0] }
+contour = { method = "linear_table", step_mm = 0.5, sweep_frame = "model", sweep_bounds = { x = [-1.5, 0.0], y = [-88.9, 50.8], z = [0.0, 12.0] }, open_side = "-x" }
+note = "Spindle off, lower the cutter to 1 mm below the bar beside the left end and lock the head. From left of the end, move in 0.5 in X and feed toward you across the end; repeat until the whole end is clean. Don't take off more than 2.5 mm in total."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A3"]
+
+[[setups]]
+id = "A"
+machine = "PM-30MV"
+frame = "vise-cbore-up"
+coolant = "cutting oil, brushed on"
+deburr_mm = 0.25
+deburr_cite = "features.toml general_tolerances edge_break R0.25"
+stock_in = "A0"
+note = "Same clamping as A0: do not unclamp. Drill only over open air: every hole is clear of the parallels, but look before every hole anyway. Brush on oil, peck every 3 mm, stop exactly on each DRO number. The seven rail holes are the only tight feature (+/-0.08 along X)."
+
+[setups.stock_state]
+top_feature = "underside_seat"
+bottom_feature = "top_seat"
+top_z = 0.0
+bottom_z = -12.0
+
+[setups.stock_state.entry_z]
+rail_hole_1 = 0.0
+rail_hole_2 = 0.0
+rail_hole_3 = 0.0
+rail_hole_4 = 0.0
+rail_hole_5 = 0.0
+rail_hole_6 = 0.0
+rail_hole_7 = 0.0
+bracket_hole_1 = 0.0
+bracket_hole_2 = 0.0
+bracket_hole_3 = 0.0
+bracket_hole_4 = 0.0
+bracket_hole_5 = 0.0
+bracket_hole_6 = 0.0
+bracket_hole_7 = 0.0
+bracket_hole_8 = 0.0
+near_slot = 0.0
+far_slot = 0.0
+
+[setups.stock_state.local_thickness]
+rail_hole_1 = 12.0
+rail_hole_2 = 12.0
+rail_hole_3 = 12.0
+rail_hole_4 = 12.0
+rail_hole_5 = 12.0
+rail_hole_6 = 12.0
+rail_hole_7 = 12.0
+bracket_hole_1 = 12.0
+bracket_hole_2 = 12.0
+bracket_hole_3 = 12.0
+bracket_hole_4 = 12.0
+bracket_hole_5 = 12.0
+bracket_hole_6 = 12.0
+bracket_hole_7 = 12.0
+bracket_hole_8 = 12.0
+near_slot = 12.0
+far_slot = 12.0
+
+[setups.hold]
+fixture = "vise-pm-6"
+jaws_along = "x"
+fixed_jaw = "rear"
+parallels = "parallels-lms-6745/1in"
+parallels_along = "x"
+parallels_centres_mm = [[220.0, -1.5875], [220.0, -138.1125]]
+jaw_center_along_mm = 220.0
+grip_mm = 12.0
+jaw_above_parallels_mm = 19.545
+stop = "none; bar centred along X by eye, about 140 mm out each side"
+clamp = "on the two 1 in parallels, one against each jaw; zero edge on the fixed jaw; tighten, tap down with the dead-blow hammer, re-tighten until neither parallel slides"
+align = { indicator = "dti", face = "fixed jaw", over_mm = 100.0, limit_mm = 0.02, cite = "Desktop traveler 2026-10-30 Op 30 step 11: put the vise back and indicate the fixed jaw under 0.02 mm along X, as on 2026-10-29" }
+
+[setups.zero.x]
+edge = "faced zero end (A0), finder at about Y -70"
+edge_mm = 0.0
+from = "-x"
+tool = "edge-finder"
+holder = "r8-collets-lms-4860/3-8in"
+check_jog_mm = 10.0
+
+[setups.zero.y]
+edge = "zero edge, from behind in the left overhang at about X 100"
+edge_mm = 0.0
+from = "+y"
+tool = "edge-finder"
+holder = "r8-collets-lms-4860/3-8in"
+check_jog_mm = -10.0
+
+[setups.zero.z]
+face = "top"
+method = "paper"
+tool = "endmills-tin-10pc/1-2in-2fl"
+holder = "r8-collets-lms-4860/1-2in"
+paper_mm = 0.05
+check_jog_mm = 1.0
+retouch_after = []
+
+[[setups.ops]]
+op = 10
+do = "finish_profile"
+feature = "bar_far_end"
+faces = ["HAF_BAR_FAR_END__P01"]
+tool = "endmills-tin-10pc/1-2in-2fl"
+holder = "r8-collets-lms-4860/1-2in"
+direction = "conventional"
+to_z = -13.0
+doc_mm = 13.0
+ae_mm = 0.5
+rpm = 1250.0
+feed_mm_min = 75.0
+approach_mm = 5.0
+stock_removal_bounds = { x = [440.0, 441.5], y = [-139.7, 0.0], z = [-13.0, 0.0] }
+contour = { method = "linear_table", step_mm = 0.5, sweep_frame = "model", sweep_bounds = { x = [440.0, 441.5], y = [-88.9, 50.8], z = [0.0, 12.0] }, open_side = "+x" }
+note = "Measure the end mill across its cutting edges (D, normally 12.70). Last pass at X = 440.00 + D/2 (X 446.35 for D 12.70), 0.5 mm passes feeding away from you. Length 439.2 to 440.8."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A5"]
+
+[[setups.ops]]
+op = 20
+do = "spot"
+feature = "rail_hole_1"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 30
+do = "spot"
+feature = "rail_hole_2"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 40
+do = "spot"
+feature = "rail_hole_3"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 50
+do = "spot"
+feature = "rail_hole_4"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 60
+do = "spot"
+feature = "rail_hole_5"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 70
+do = "spot"
+feature = "rail_hole_6"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 80
+do = "spot"
+feature = "rail_hole_7"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 90
+do = "spot"
+feature = "bracket_hole_1"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 100
+do = "spot"
+feature = "bracket_hole_2"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 110
+do = "spot"
+feature = "bracket_hole_3"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 120
+do = "spot"
+feature = "bracket_hole_4"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 130
+do = "spot"
+feature = "bracket_hole_5"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 140
+do = "spot"
+feature = "bracket_hole_6"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 150
+do = "spot"
+feature = "bracket_hole_7"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 160
+do = "spot"
+feature = "bracket_hole_8"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 170
+do = "spot"
+feature = "near_slot"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 180
+do = "spot"
+feature = "far_slot"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 190
+do = "drill"
+feature = "rail_hole_1"
+tool = "drill-index-115/#29"
+holder = "drill-chuck-r8"
+exit_mm = 3.0                     # stop about 3 mm past breakthrough
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 200
+do = "drill"
+feature = "rail_hole_2"
+tool = "drill-index-115/#29"
+holder = "drill-chuck-r8"
+exit_mm = 3.0                     # stop about 3 mm past breakthrough
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 210
+do = "drill"
+feature = "rail_hole_3"
+tool = "drill-index-115/#29"
+holder = "drill-chuck-r8"
+exit_mm = 3.0                     # stop about 3 mm past breakthrough
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 220
+do = "drill"
+feature = "rail_hole_4"
+tool = "drill-index-115/#29"
+holder = "drill-chuck-r8"
+exit_mm = 3.0                     # stop about 3 mm past breakthrough
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 230
+do = "drill"
+feature = "rail_hole_5"
+tool = "drill-index-115/#29"
+holder = "drill-chuck-r8"
+exit_mm = 3.0                     # stop about 3 mm past breakthrough
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 240
+do = "drill"
+feature = "rail_hole_6"
+tool = "drill-index-115/#29"
+holder = "drill-chuck-r8"
+exit_mm = 3.0                     # stop about 3 mm past breakthrough
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 250
+do = "drill"
+feature = "rail_hole_7"
+tool = "drill-index-115/#29"
+holder = "drill-chuck-r8"
+exit_mm = 3.0                     # stop about 3 mm past breakthrough
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 260
+do = "drill"
+feature = "bracket_hole_1"
+tool = "drill-index-115/#9"
+holder = "drill-chuck-r8"
+exit_mm = 3.0                     # stop about 3 mm past breakthrough
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 270
+do = "drill"
+feature = "bracket_hole_2"
+tool = "drill-index-115/#9"
+holder = "drill-chuck-r8"
+exit_mm = 3.0                     # stop about 3 mm past breakthrough
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 280
+do = "drill"
+feature = "bracket_hole_3"
+tool = "drill-index-115/#9"
+holder = "drill-chuck-r8"
+exit_mm = 3.0                     # stop about 3 mm past breakthrough
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 290
+do = "drill"
+feature = "bracket_hole_4"
+tool = "drill-index-115/#9"
+holder = "drill-chuck-r8"
+exit_mm = 3.0                     # stop about 3 mm past breakthrough
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 300
+do = "drill"
+feature = "bracket_hole_5"
+tool = "drill-index-115/#9"
+holder = "drill-chuck-r8"
+exit_mm = 3.0                     # stop about 3 mm past breakthrough
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 310
+do = "drill"
+feature = "bracket_hole_6"
+tool = "drill-index-115/#9"
+holder = "drill-chuck-r8"
+exit_mm = 3.0                     # stop about 3 mm past breakthrough
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 320
+do = "drill"
+feature = "bracket_hole_7"
+tool = "drill-index-115/#9"
+holder = "drill-chuck-r8"
+exit_mm = 3.0                     # stop about 3 mm past breakthrough
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 330
+do = "drill"
+feature = "bracket_hole_8"
+tool = "drill-index-115/#9"
+holder = "drill-chuck-r8"
+exit_mm = 3.0                     # stop about 3 mm past breakthrough
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 340
+do = "drill"
+feature = "near_slot"
+tool = "drills-metric/9.5mm"
+holder = "drill-chuck-r8"
+exit_mm = 3.0                     # stop about 3 mm past breakthrough
+rpm = 2000.0
+approach_mm = 3.0
+note = "Slot starter hole in the middle of the slot."
+
+[[setups.ops]]
+op = 350
+do = "drill"
+feature = "far_slot"
+tool = "drills-metric/9.5mm"
+holder = "drill-chuck-r8"
+exit_mm = 3.0                     # stop about 3 mm past breakthrough
+rpm = 2000.0
+approach_mm = 3.0
+note = "Slot starter hole in the middle of the slot."
+
+[[setups.ops]]
+op = 360
+do = "hand_tap"
+feature = "rail_hole_1"
+tool = "taps-unc-hand/8-32-plug"
+holder = "drill-chuck-r8"
+depth_mm = 16.0                   # all the way through the 12.0 plus the plug lead
+approach_mm = 3.0
+note = "Spindle power OFF at the switch. Tap in the drill chuck, tapping fluid; light quill pressure, turn the chuck clockwise by hand about 3 turns, then finish with the T-handle wrench: one turn in, half back, all the way through. Stiff: back out a full turn and add fluid."
+
+[[setups.ops]]
+op = 370
+do = "hand_tap"
+feature = "rail_hole_2"
+tool = "taps-unc-hand/8-32-plug"
+holder = "drill-chuck-r8"
+depth_mm = 16.0                   # all the way through the 12.0 plus the plug lead
+approach_mm = 3.0
+note = "Spindle power OFF at the switch. Tap in the drill chuck, tapping fluid; light quill pressure, turn the chuck clockwise by hand about 3 turns, then finish with the T-handle wrench: one turn in, half back, all the way through. Stiff: back out a full turn and add fluid."
+
+[[setups.ops]]
+op = 380
+do = "hand_tap"
+feature = "rail_hole_3"
+tool = "taps-unc-hand/8-32-plug"
+holder = "drill-chuck-r8"
+depth_mm = 16.0                   # all the way through the 12.0 plus the plug lead
+approach_mm = 3.0
+note = "Spindle power OFF at the switch. Tap in the drill chuck, tapping fluid; light quill pressure, turn the chuck clockwise by hand about 3 turns, then finish with the T-handle wrench: one turn in, half back, all the way through. Stiff: back out a full turn and add fluid."
+
+[[setups.ops]]
+op = 390
+do = "hand_tap"
+feature = "rail_hole_4"
+tool = "taps-unc-hand/8-32-plug"
+holder = "drill-chuck-r8"
+depth_mm = 16.0                   # all the way through the 12.0 plus the plug lead
+approach_mm = 3.0
+note = "Spindle power OFF at the switch. Tap in the drill chuck, tapping fluid; light quill pressure, turn the chuck clockwise by hand about 3 turns, then finish with the T-handle wrench: one turn in, half back, all the way through. Stiff: back out a full turn and add fluid."
+
+[[setups.ops]]
+op = 400
+do = "hand_tap"
+feature = "rail_hole_5"
+tool = "taps-unc-hand/8-32-plug"
+holder = "drill-chuck-r8"
+depth_mm = 16.0                   # all the way through the 12.0 plus the plug lead
+approach_mm = 3.0
+note = "Spindle power OFF at the switch. Tap in the drill chuck, tapping fluid; light quill pressure, turn the chuck clockwise by hand about 3 turns, then finish with the T-handle wrench: one turn in, half back, all the way through. Stiff: back out a full turn and add fluid."
+
+[[setups.ops]]
+op = 410
+do = "hand_tap"
+feature = "rail_hole_6"
+tool = "taps-unc-hand/8-32-plug"
+holder = "drill-chuck-r8"
+depth_mm = 16.0                   # all the way through the 12.0 plus the plug lead
+approach_mm = 3.0
+note = "Spindle power OFF at the switch. Tap in the drill chuck, tapping fluid; light quill pressure, turn the chuck clockwise by hand about 3 turns, then finish with the T-handle wrench: one turn in, half back, all the way through. Stiff: back out a full turn and add fluid."
+
+[[setups.ops]]
+op = 420
+do = "hand_tap"
+feature = "rail_hole_7"
+tool = "taps-unc-hand/8-32-plug"
+holder = "drill-chuck-r8"
+depth_mm = 16.0                   # all the way through the 12.0 plus the plug lead
+approach_mm = 3.0
+note = "Spindle power OFF at the switch. Tap in the drill chuck, tapping fluid; light quill pressure, turn the chuck clockwise by hand about 3 turns, then finish with the T-handle wrench: one turn in, half back, all the way through. Stiff: back out a full turn and add fluid."
+
+[[setups.ops]]
+op = 430
+do = "counterbore"
+feature = "bracket_hole_1_counterbore"
+tool = "endmills-lms-6784/5-16in-2fl"
+holder = "r8-collets-lms-4860/5-16in"
+depth_mm = 4.8
+rpm = 2000.0
+approach_mm = 3.0
+note = "Quill stop at 4.80 deep (4.29 to 5.31); plunge slowly with oil, then straight up. After this one a #8 socket head must sit below the surface: a steel rule laid across it must not rock."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
+
+[[setups.ops]]
+op = 440
+do = "counterbore"
+feature = "bracket_hole_2_counterbore"
+tool = "endmills-lms-6784/5-16in-2fl"
+holder = "r8-collets-lms-4860/5-16in"
+depth_mm = 4.8
+rpm = 2000.0
+approach_mm = 3.0
+note = "Quill stop at 4.80 deep (4.29 to 5.31); plunge slowly with oil, then straight up."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
+
+[[setups.ops]]
+op = 450
+do = "counterbore"
+feature = "bracket_hole_3_counterbore"
+tool = "endmills-lms-6784/5-16in-2fl"
+holder = "r8-collets-lms-4860/5-16in"
+depth_mm = 4.8
+rpm = 2000.0
+approach_mm = 3.0
+note = "Quill stop at 4.80 deep (4.29 to 5.31); plunge slowly with oil, then straight up."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
+
+[[setups.ops]]
+op = 460
+do = "counterbore"
+feature = "bracket_hole_4_counterbore"
+tool = "endmills-lms-6784/5-16in-2fl"
+holder = "r8-collets-lms-4860/5-16in"
+depth_mm = 4.8
+rpm = 2000.0
+approach_mm = 3.0
+note = "Quill stop at 4.80 deep (4.29 to 5.31); plunge slowly with oil, then straight up."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
+
+[[setups.ops]]
+op = 470
+do = "counterbore"
+feature = "bracket_hole_5_counterbore"
+tool = "endmills-lms-6784/5-16in-2fl"
+holder = "r8-collets-lms-4860/5-16in"
+depth_mm = 4.8
+rpm = 2000.0
+approach_mm = 3.0
+note = "Quill stop at 4.80 deep (4.29 to 5.31); plunge slowly with oil, then straight up."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
+
+[[setups.ops]]
+op = 480
+do = "counterbore"
+feature = "bracket_hole_6_counterbore"
+tool = "endmills-lms-6784/5-16in-2fl"
+holder = "r8-collets-lms-4860/5-16in"
+depth_mm = 4.8
+rpm = 2000.0
+approach_mm = 3.0
+note = "Quill stop at 4.80 deep (4.29 to 5.31); plunge slowly with oil, then straight up."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
+
+[[setups.ops]]
+op = 490
+do = "counterbore"
+feature = "bracket_hole_7_counterbore"
+tool = "endmills-lms-6784/5-16in-2fl"
+holder = "r8-collets-lms-4860/5-16in"
+depth_mm = 4.8
+rpm = 2000.0
+approach_mm = 3.0
+note = "Quill stop at 4.80 deep (4.29 to 5.31); plunge slowly with oil, then straight up."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
+
+[[setups.ops]]
+op = 500
+do = "counterbore"
+feature = "bracket_hole_8_counterbore"
+tool = "endmills-lms-6784/5-16in-2fl"
+holder = "r8-collets-lms-4860/5-16in"
+depth_mm = 4.8
+rpm = 2000.0
+approach_mm = 3.0
+note = "Quill stop at 4.80 deep (4.29 to 5.31); plunge slowly with oil, then straight up."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
+
+# Slots: a 1/2 in (12.7) cutter is smaller than the 13.50 slot, so its R6.35 cannot make the
+# R6.75 ends in one pass, and a single-axis move cannot cut an arc. The 2026-10-30 traveler's
+# rectangular lap (corners at end centre +/-0.4 in X and Y together) overcuts about 0.17
+# outside the R6.75 at 45 degrees. These ops instead keep every cutter-centre point inside
+# the end centres' 0.4 reach along one axis (walls at X +/-0.4, ends at Y +/-0.4 on the slot
+# axis), so no point cuts outside the drawn slot. The ends stay at least R6.626 from their
+# centres (0.124 under R6.75 at 45 degrees), inside the 13.50 +/-0.51 width band's R6.495.
+[[setups.ops]]
+op = 510
+do = "rough_pocket"
+feature = "near_slot"
+tool = "endmills-tin-10pc/1-2in-2fl"
+holder = "r8-collets-lms-4860/1-2in"
+direction = "conventional"
+to_z = -12.5
+doc_mm = 3.0
+rpm = 1250.0
+feed_mm_min = 75.0
+approach_mm = 5.0
+stock_removal_bounds = { x = [16.430, 25.410], y = [-57.89, -44.91], z = [-12.5, 0.0] } # inside the 12.7 cutter's sweep: 4.49 = 6.35 cos 45
+contour = { method = "linear_table", step_mm = 4.0, sweep_frame = "model", sweep_bounds = { x = [14.170, 27.670], y = [-46.25, -28.75], z = [0.0, 12.0] } }
+note = "From the starter hole at X 20.9: go 3 mm deep and move Y from end centre -49.4 to -53.4 and back; repeat at 6, 9 and 12.5 (0.5 below the bar)."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A12"]
+
+[[setups.ops]]
+op = 520
+do = "finish_pocket"
+feature = "near_slot"
+faces = ["HAF_NEAR_SLOT__P01", "HAF_NEAR_SLOT__P02", "HAF_NEAR_SLOT__P03", "HAF_NEAR_SLOT__P04"]
+tool = "endmills-tin-10pc/1-2in-2fl"
+holder = "r8-collets-lms-4860/1-2in"
+direction = "climb"
+to_z = -12.5
+doc_mm = 12.5
+ae_mm = 0.4
+rpm = 1250.0
+feed_mm_min = 75.0
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 0.4, sweep_frame = "model", sweep_bounds = { x = [14.170, 27.670], y = [-46.25, -28.75], z = [0.0, 12.0] } }
+note = "Finishing passes at full depth, one handwheel at a time, cutter centre only: Y from -49.4 to -53.4 at X 20.52 and at X 21.32 (the walls); X from 20.52 to 21.32 at Y -49.4 and at Y -53.4; then at X 20.92, Y out to -49.0 and to -53.8 and back (the end apexes). Never go past these points: a corner move beyond them cuts outside the R6.75 ends. This leaves at most 0.13 on each end at 45 degrees, inside the 13.50 +/-0.51 band. Figures for D 12.70; for another D move every pass out by (13.50 - D)/2. Width 12.99 to 14.01."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A12"]
+
+[[setups.ops]]
+op = 530
+do = "rough_pocket"
+feature = "far_slot"
+tool = "endmills-tin-10pc/1-2in-2fl"
+holder = "r8-collets-lms-4860/1-2in"
+direction = "conventional"
+to_z = -12.5
+doc_mm = 3.0
+rpm = 1250.0
+feed_mm_min = 75.0
+approach_mm = 5.0
+stock_removal_bounds = { x = [385.510, 394.490], y = [-132.89, -119.91], z = [-12.5, 0.0] } # inside the 12.7 cutter's sweep: 4.49 = 6.35 cos 45
+contour = { method = "linear_table", step_mm = 4.0, sweep_frame = "model", sweep_bounds = { x = [383.250, 396.750], y = [28.75, 46.25], z = [0.0, 12.0] } }
+note = "From the starter hole at X 390.0: go 3 mm deep and move Y from end centre -124.4 to -128.4 and back; repeat at 6, 9 and 12.5 (0.5 below the bar)."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A12"]
+
+[[setups.ops]]
+op = 540
+do = "finish_pocket"
+feature = "far_slot"
+faces = ["HAF_FAR_SLOT__P01", "HAF_FAR_SLOT__P02", "HAF_FAR_SLOT__P03", "HAF_FAR_SLOT__P04"]
+tool = "endmills-tin-10pc/1-2in-2fl"
+holder = "r8-collets-lms-4860/1-2in"
+direction = "climb"
+to_z = -12.5
+doc_mm = 12.5
+ae_mm = 0.4
+rpm = 1250.0
+feed_mm_min = 75.0
+approach_mm = 5.0
+contour = { method = "linear_table", step_mm = 0.4, sweep_frame = "model", sweep_bounds = { x = [383.250, 396.750], y = [28.75, 46.25], z = [0.0, 12.0] } }
+note = "Finishing passes at full depth, one handwheel at a time, cutter centre only: Y from -124.4 to -128.4 at X 389.60 and at X 390.40 (the walls); X from 389.60 to 390.40 at Y -124.4 and at Y -128.4; then at X 390.00, Y out to -124.0 and to -128.8 and back (the end apexes). Never go past these points: a corner move beyond them cuts outside the R6.75 ends. This leaves at most 0.13 on each end at 45 degrees, inside the 13.50 +/-0.51 band. Figures for D 12.70; for another D move every pass out by (13.50 - D)/2. Width 12.99 to 14.01. The far slot leaves a 4.55 wall to the far edge: do not open it up more than you have to."
+note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A12"]
+
+# ---------------------------------------------------------------------------------------
+# B: bench. Deburr, then check the part and record both bars.
+[[setups]]
+id = "B"
+machine = "finishing-bench"
+frame = "bench"
+coolant = "none"
+deburr_mm = 0.25
+deburr_cite = "features.toml general_tolerances edge_break R0.25"
+stock_in = "A"
+note = "Shared shop values include unmeasured #1413 placeholders: these checks do not make the bar approved for use. Outside a range, don't use the bar until someone has looked at it. Then make the second bar exactly the same way. Don't mirror it: in the jig bar 2 is simply turned over."
+
+[setups.stock_state]
+top_z = 12.0
+bottom_z = 0.0
+
+[setups.hold]
+fixture = "finishing-rest-plate"
+pose = { origin_mm = [220.0, -69.85, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
+fixed_jaw = "not_applicable"
+grip_mm = "not_applicable"
+stop = "none"
+clamp = "none"
+
+[[setups.ops]]
+op = 10
+do = "deburr"
+feature = "top_seat"
+tool = "deburring-tool-noga-ng8150"
+note = "Run the deburring tool lightly round every edge, one or two passes, 0.25 mm max; don't scratch the faced seats. Run an 8-32 screw through each rail hole."
+
+[[setups.ops]]
+op = 20
+do = "inspect"
+feature = ["top_seat", "underside_seat"]
+checks = { height = "micrometers/0-1in", finish_ra = "roughness-comparator" }
+inspection_methods.height = "Micrometer at the four corners and the middle."
+inspection_methods.finish_ra = "Both faces: an even swirl, no chatter or tearing, and a fingernail slides across without catching. On the mill table, press each corner: the bar must not rock."
+
+[[setups.ops]]
+op = 30
+do = "inspect"
+feature = "bar_far_end"
+checks = { length = "calipers-18in" }
+
+[[setups.ops]]
+op = 40
+do = "inspect"
+feature = ["rail_hole_1", "rail_hole_2", "rail_hole_3", "rail_hole_4", "rail_hole_5", "rail_hole_6", "rail_hole_7"]
+checks = { dia = "pin-gauges", thru = "pin-gauges", station = "calipers-18in", height = "calipers-18in", thread = "unknown", note = "unknown" }
+inspection_methods.height = "Calipers from the zero edge to the near side of a hole, plus 1.73."
+inspection_methods.station = "Calipers from the zero end to the near side of each hole, plus 1.73."
+inspection_methods.thread = "An 8-32 screw turns in all the way with your fingers."
+inspection_methods.note = "The real test: lay the HGR15R rail on the un-marked face, ends flush; all seven #8-32 x 3/4 socket screws start by hand without pushing the rail sideways."
+
+[[setups.ops]]
+op = 50
+do = "inspect"
+feature = ["bracket_hole_1", "bracket_hole_2", "bracket_hole_3", "bracket_hole_4", "bracket_hole_5", "bracket_hole_6", "bracket_hole_7", "bracket_hole_8"]
+checks = { dia = "pin-gauges", thru = "pin-gauges", station = "calipers-18in", height = "calipers-18in", note = "unknown" }
+inspection_methods.station = "Calipers from the zero end to the hole side, plus 2.49."
+inspection_methods.height = "Calipers from the zero edge to the hole side, plus 2.49."
+inspection_methods.note = "A #8 socket screw drops through each hole freely and its head sits below the counterbore face."
+
+[[setups.ops]]
+op = 60
+do = "inspect"
+feature = ["bracket_hole_1_counterbore", "bracket_hole_2_counterbore", "bracket_hole_3_counterbore", "bracket_hole_4_counterbore", "bracket_hole_5_counterbore", "bracket_hole_6_counterbore", "bracket_hole_7_counterbore", "bracket_hole_8_counterbore"]
+checks = { dia = "calipers", depth = "calipers" }
+
+[[setups.ops]]
+op = 70
+do = "inspect"
+feature = ["near_slot", "far_slot"]
+checks = { width = "calipers", separation = "calipers", station = "calipers-18in", height = "calipers", thru = "unknown" }
+inspection_methods.separation = "Slot length minus slot width (about 17.5 - 13.5)."
+inspection_methods.height = "From the zero edge to the near end of the slot plus 6.75 (half the width)."
+inspection_methods.thru = "A 1/2-13 T-slot stud slides end to end in each slot. Far slot: at least 1.5 of wall to the far edge."
