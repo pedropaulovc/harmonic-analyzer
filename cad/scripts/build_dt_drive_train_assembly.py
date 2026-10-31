@@ -158,7 +158,7 @@ from _sketch import (
 import dt_cylinder_bank_setting_spec as bank_settings
 from _rebuild import force_rebuild
 from _session import run_build
-from _printed_tolerance import drilled_oversize_mm, printed_deviations
+from _printed_tolerance import angular_band_deg, drilled_oversize_mm, printed_deviations
 from _transforms import ROT_X_NEG90, ROT_Y_180, compose_rows, euler_from_rows
 from channel_frame_geom import (
     CAM_SHAFT_XY,
@@ -1047,7 +1047,7 @@ from dt_cone_swing_platform_spec import (  # noqa: E402
     POST_MOUNT_STATION_TOL_MM as PLAT_POST_MOUNT_STATION_TOL_MM,
     POST_MOUNT_TAP_EDGE_BREAK,
     POST_MOUNT_THREAD_DIA,
-
+    UNIT as PLAT_UNIT,
 )
 from dt_cone_swing_platform_pivot_spec import (  # noqa: E402
     PIVOT_HOLE_BAND as PLAT_PIVOT_HOLE_BAND,
@@ -1290,6 +1290,7 @@ from dt_cone_pivot_post_spec import (  # noqa: E402
     ATTACHMENT_THRU_DIA as POST_ATTACHMENT_THRU_DIA,
     DRAWING_PRECISION_BY_NAME as POST_DRAWING_PRECISION,
     JOURNAL_AXIS_HEIGHT_TOLERANCE_MM as POST_JOURNAL_AXIS_HEIGHT_TOLERANCE_MM,
+    UNIT as POST_UNIT,
 )
 import crank_boss_rim  # noqa: E402
 import gear64_post_measure  # noqa: E402
@@ -1358,6 +1359,7 @@ from dt_cone_gear_shaft_spec import (  # noqa: E402
     TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET as SHAFT_TIP_BLOCK_NORTH_OFFSET,
     TIP_COLLAR_END_STATION as SHAFT_TIP_COLLAR_END,
     TIP_COLLAR_START_STATION as SHAFT_TIP_COLLAR_START,
+    UNIT as SHAFT_UNIT,
     printed_band as shaft_printed_band,
 )
 import dt_cone_gear_stack  # noqa: E402
@@ -1555,7 +1557,7 @@ def tip_block_print_worst_containment_mm(half_widths: dict[str, float]) -> float
 # closes by print tolerance.  The screw floats in its drilled close-clearance
 # hole; the hole's two stations from the pivot bore (HoldDownX, HoldDownZ)
 # and the tap's two stations carry explicit +/-0.10 bands.
-_DRILLED_HOLE_PLUS_MM = drilled_oversize_mm()
+_DRILLED_HOLE_PLUS_MM = drilled_oversize_mm(unit=PLAT_UNIT)
 HOLDDOWN_SCREW_FLOAT_MM = (
     PLAT_HOLDDOWN_CLEARANCE_DIA + _DRILLED_HOLE_PLUS_MM - HOLDDOWN_SHANK_DIA
 ) / 2.0
@@ -1880,20 +1882,21 @@ _PINION_TURNED_DIA_BAND = printed_deviations(
 # Only the turned band's largest radius can close on T120.
 _PINION_TURNED_RADIUS_UP = _PINION_TURNED_DIA_BAND[1] / 2.0
 _BOSS_NORTH_BAND = printed_deviations(
-    POST_CRANK_BOSS_NORTH_FACE, POST_DRAWING_PRECISION["CrankBossStartZ"]
+    POST_CRANK_BOSS_NORTH_FACE, POST_DRAWING_PRECISION["CrankBossStartZ"], unit=POST_UNIT
 )
 _CONE_BOSS_NORTH_BAND = tuple(
     d / 2.0
-    for d in printed_deviations(POST_CONE_BOSS_LENGTH, POST_DRAWING_PRECISION["ConeBossLen"])
+    for d in printed_deviations(POST_CONE_BOSS_LENGTH, POST_DRAWING_PRECISION["ConeBossLen"], unit=POST_UNIT)
 )
 _COLLAR_WIDTH_BAND = printed_deviations(
-    SHAFT_COLLAR_THICKNESS, SHAFT_DRAWING_PRECISION["CollarWidth"]
+    SHAFT_COLLAR_THICKNESS, SHAFT_DRAWING_PRECISION["CollarWidth"], unit=SHAFT_UNIT
 )
 _GEAR64_FACE_LIMITS = deviations(GEAR64_FACE_WIDTH_BAND)
 _CRANK_HEIGHT_BAND = printed_deviations(
     POST_CRANK_ABOVE_CONE,
     POST_DRAWING_PRECISION["CrankAboveCone"],
     deviations(POST_CRANK_ABOVE_CONE_BAND),
+    unit=POST_UNIT,
 )
 # The crank's end play: set on the feeler, or run south onto the boss.
 PINION_END_PLAY = (-PINION_SEAT_FEELER, 0.0)
@@ -2674,7 +2677,7 @@ TIP_COLLAR_WORST_AIR = tip_collar_worst_air_mm(TIP_COLLAR_AIR_BAND_MM)
 # post turns on its screws' clearance until the tip sits in the cup: that
 # capacity must cover the whole error.
 _POST_TO_TIP = TIP_BLOCK_STATION - POST_STATION
-_ANGULAR_DEG = float(_config.title_block("angular")["value_deg"])
+_ANGULAR_DEG = angular_band_deg(unit=POST_UNIT)
 TIP_LATERAL_ERROR_MM = (
     PLAT_POST_MOUNT_STATION_TOL_MM
     + _POST_TO_TIP

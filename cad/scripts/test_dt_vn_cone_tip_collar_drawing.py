@@ -87,7 +87,7 @@ def test_stock_flat_point_overlaps_the_d_flat_at_every_printed_limit():
 
 
 def test_terminal_web_guard_reads_current_cutter_floor(monkeypatch):
-    assert gears.TERMINAL_WEB_REQUIREMENTS_MM == {6: 0.62, 12: 2.0}
+    assert gears.TERMINAL_WEB_REQUIREMENTS_MM == {6: 0.62, 12: 2.02438}
     for teeth, minimum in gears.TERMINAL_WEB_REQUIREMENTS_MM.items():
         assert gears.terminal_web_mm(teeth) >= minimum
     previous = gears.terminal_web_mm(6)
@@ -705,14 +705,14 @@ def test_coupled_body_shift_has_one_source_and_keeps_radial_and_body_process_env
     assert spec.TAP_STATION-spec.NOSE_LENGTH == 4.0
     assert spec.WIDTH-spec.TAP_STATION == 4.0
     assert spec.NOSE_DIA == 6.40
-    assert lands.TERMINAL_FLAT_AF_MM == 0.420
+    assert lands.TERMINAL_FLAT_AF_MM == 0.4318
 
 
 def test_printed_physical_limits_keep_exact_native_model_and_real_fit_distinct():
-    assert lands.TERMINAL_FINISHED_DIA_LIMITS_MM == pytest.approx((0.77368, 0.794))
-    assert spec.BORE_FINISHED_DIA_LIMITS_MM == pytest.approx((0.8194, 0.8702))
-    assert lands.TERMINAL_DIA_MM == pytest.approx(0.79375)
-    assert spec.BORE_MODEL_DIA_MM == pytest.approx(0.8448)
+    assert lands.TERMINAL_FINISHED_DIA_LIMITS_MM == pytest.approx((0.76708, 0.7874))
+    assert spec.BORE_FINISHED_DIA_LIMITS_MM == pytest.approx((0.8128, 0.8636))
+    assert lands.TERMINAL_DIA_MM == pytest.approx(0.7874)
+    assert spec.BORE_MODEL_DIA_MM == pytest.approx(0.8382)
     minimum = (spec.BORE_FINISHED_DIA_LIMITS_MM[0]-lands.TERMINAL_FINISHED_DIA_LIMITS_MM[1])/2.0
     maximum = (spec.BORE_FINISHED_DIA_LIMITS_MM[1]-lands.TERMINAL_FINISHED_DIA_LIMITS_MM[0])/2.0
     assert (minimum, maximum) == pytest.approx((lands.TIP_COLLAR_MIN_RADIAL_FLOAT_MM, lands.TIP_COLLAR_MAX_RADIAL_FLOAT_MM))
@@ -729,12 +729,12 @@ def test_original_journal_span_pays_north_withdrawal_once():
     assert shaft.JOURNAL_SUPPORT_SPAN_MIN_MM == pytest.approx(expected)
 
 
-@pytest.mark.parametrize("section,native", [(0, 12.2555), (1, 9.525), (2, 6.35), (3, 3.175), (4, 0.79375)])
+@pytest.mark.parametrize("section,native", [(0, 12.2555), (1, 9.525), (2, 6.35), (3, 3.175), (4, 0.7874)])
 def test_all_land_physical_limit_readers_share_native_print_precision(section, native):
     import dt_cone_gear_shaft_spec as shaft
     assert shaft.DRAWING_PRECISION[f"Sec{section}Profile"][f"Sec{section}Dia"] == lands.LAND_DIA_PLACES[section]
     upper, lower = lands.SECTION_DIA_BANDS[section]
-    nominal = round(native, lands.LAND_DIA_PLACES[section])
+    nominal = round(native / 25.4, lands.LAND_DIA_PLACES[section]) * 25.4
     assert lands.land_finished_dia_limits_mm(native, section) == pytest.approx((nominal+lower, nominal+upper))
     if section:
         assert shaft.DRAWING_PRECISION[f"Sec{section}FlatProfile"][f"Sec{section}AF"] == lands.LAND_AF_PLACES[section]

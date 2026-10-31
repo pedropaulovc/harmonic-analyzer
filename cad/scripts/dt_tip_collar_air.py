@@ -60,7 +60,6 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-import _config
 import cone_line
 import cone_set_stack
 import cylinder_bank_layout as bank
@@ -75,6 +74,8 @@ import dt_vn_cone_tip_collar_spec as collar
 import _mcmaster_94025a164 as adjuster
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import (
+    angular_band_deg,
+    drilled_oversize_mm,
     edge_break_chamfer_mm,
     edge_break_radius_mm,
     printed_band_mm,
@@ -198,14 +199,14 @@ DRUM_BORE_END_BREAK_MAX_MM = max(
 # --- printed fastener and location limits -------------------------------------
 # The same limits build_dt_drive_train_assembly books for the post boss face
 # (POST_BOSS_FACE_AXIAL_BAND_MM) and the tip tap (TIP_TAP_LATERAL_BAND_MM).
-_DRILL_PLUS = float(_config.title_block("drilled_hole")["plus_mm"])
-_ANGULAR_RAD = math.radians(float(_config.title_block("angular")["value_deg"]))
+_DRILL_PLUS = drilled_oversize_mm(unit=post.UNIT)  # post and plate both print inch
+_ANGULAR_RAD = math.radians(angular_band_deg(unit=tip.UNIT))
 _POST_FLOAT = (post.ATTACHMENT_THRU_DIA + _DRILL_PLUS - plate.POST_MOUNT_THREAD_DIA) / 2.0
 _TIP_FLOAT = (plate.HOLDDOWN_CLEARANCE_DIA + _DRILL_PLUS - holddown_screw.SHANK_DIA) / 2.0
 _JOURNAL_FLOAT = (
     post.BORE_DIA + post.JOURNAL_BORE_BAND[0] - shaft.JOURNAL_DIA - shaft.RUNNING_DIA_BAND[1]
 ) / 2.0
-_MOUNT_X_BAND = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["MountWestX"])
+_MOUNT_X_BAND = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["MountWestX"], unit=post.UNIT)
 _SIN_I, _COS_I = cone_line.SIN_I, cone_line.COS_I
 _SUPPORT_SPAN = shaft.T006_TIP_STATION - cone_line.POST_STATION
 # The cup screw's #10-32 UNF-2B internal pitch diameter MAX against the
@@ -214,11 +215,11 @@ _SUPPORT_SPAN = shaft.T006_TIP_STATION - cone_line.POST_STATION
 _INTERNAL_PITCH_MAX = 0.1736 * 25.4
 _THREAD_FLOAT = (_INTERNAL_PITCH_MAX - adjuster.EXTERNAL_PITCH_DIA_MIN_MM) / 2.0
 _MIN_EMBED = tip.ADJUSTER_MIN_ENGAGEMENT_D * THREAD_MAJOR_MM[tip.ADJUSTER_THREAD]
-_BLOCK_DEPTH_MAX = tip.BLOCK_Z + printed_band_mm(tip.BLOCK_DEPTH_PLACES)
+_BLOCK_DEPTH_MAX = tip.BLOCK_Z + tip.printed_band_mm(tip.BLOCK_DEPTH_PLACES)
 # The block stands on one screw; its square to the plate is a plain angle and
 # takes the title block's angular band, about that screw, over the cup's reach.
 _CUP_REACH = math.hypot(
-    abs(tip.FOOT_TAP_OFFSET_X) + printed_band_mm(tip.PASSAGE_CENTER_PLACES),
+    abs(tip.FOOT_TAP_OFFSET_X) + tip.printed_band_mm(tip.PASSAGE_CENTER_PLACES),
     abs(shaft.T006_TIP_STATION - tip.TIP_BLOCK_STATION) + _BLOCK_DEPTH_MAX / 2.0,
 )
 # Step 3 seats the tip in the cup, then backs the cup off for SHAFT_END_PLAY.
@@ -261,7 +262,9 @@ AXIAL_TERMS_MM = {
     "post platform tap station": plate.POST_MOUNT_STATION_TOL_MM,
     "post screw clearance": _POST_FLOAT - POST_SCREW_CLEARANCE_TAKEN_UP_MM,
     "post counterbore pattern": _MOUNT_X_BAND * _SIN_I,
-    "post cone boss length": printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"]) / 2.0,
+    "post cone boss length": printed_band_mm(
+        post.DRAWING_PRECISION_BY_NAME["ConeBossLen"], unit=post.UNIT
+    ) / 2.0,
     "shaft thrust collar width": shaft.printed_band("CollarWidth"),
     "gear stack terminal north face": -stack.face_band(stack.COUNT - 1, "north")[1],
     "collar feeler set": COLLAR_FEELER_BAND,
@@ -277,7 +280,7 @@ TIP_END_TERMS_MM = {
     "tip platform hold-down station": plate.HOLDDOWN_STATION_TOL_MM,
     "tip hold-down screw clearance": _TIP_FLOAT,
     "tip block foot tap station": tip.FOOT_TAP_STATION_TOL_MM,
-    "tip passage centre": printed_band_mm(tip.PASSAGE_CENTER_PLACES),
+    "tip passage centre": tip.printed_band_mm(tip.PASSAGE_CENTER_PLACES),
     "tip block square on its one screw": _CUP_REACH * math.sin(_ANGULAR_RAD),
     "tip cup in its thread": _THREAD_FLOAT + _BLOCK_DEPTH_MAX * (2.0 * _THREAD_FLOAT / _MIN_EMBED),
     "shaft swing in the post journal off the cup": _TIP_RELEASE,
