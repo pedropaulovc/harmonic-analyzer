@@ -3,8 +3,9 @@ r"""Manufacturing drawing of the open-rebate brass stop block.
 The sheet prints decimal inch (the part's ``drawing_unit: in``). The
 cover-side view and end view show the rebate in solid lines. Standard
 native Hole Wizard callouts define the orthogonal taps, including blind full
-thread and drill depths, every length at the part's .XXX. Every controlling
-dimension is imported unchanged, with the callout text its part authored
+thread and drill depths. Each native length variable explicitly prints .XXX;
+the returned precision/value/token proof runs again after final rebuilding.
+Every controlling dimension is imported unchanged, with the callout text its part authored
 (``ms_stop_callouts``); the source part is proved clean -- file SHA-256 and
 save flag -- before any view and at every save/close boundary.
 Hole-mouth points convert the shared millimetre frame to COM metres before
@@ -58,7 +59,7 @@ from _drawing_source_guard import (
     capture_clean_source,
     source_checkpoint,
 )
-from _ms_drawing_guards import assert_imported_text
+from _ms_drawing_guards import assert_imported_text, set_stop_hole_callout_precision
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -257,6 +258,9 @@ async def build(adapter: Any) -> dict[str, str]:
         process=COVER_HOLE_PROCESS,
     )
     _remove_general_thread_class(plate_callout)
+    assert_plate_hole_precision = set_stop_hole_callout_precision(
+        plate_callout, label="two cover blind taps",
+    )
     thumb_edge = model_point_in_view(
         adapter, bottom, (
             (part.THUMB_AXIS_X + part.THUMB_TAP_DRILL / 2.0) / 1000.0,
@@ -267,6 +271,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="thumbscrew tap through floor",
     )
     _remove_general_thread_class(thumb_callout, last_line=THUMB_HOLE_END)
+    assert_thumb_hole_precision = set_stop_hole_callout_precision(
+        thumb_callout, label="thumbscrew tap through floor",
+    )
     mating_edge = model_point_in_view(
         adapter, right, (
             part.BLOCK_LENGTH / 2000.0,
@@ -298,7 +305,11 @@ async def build(adapter: Any) -> dict[str, str]:
                                        scale=SHEET_SCALE, layout=SPEC.layout,
                                        redundant_note_substrings=FINAL_SHEET_REMOVED_NOTES,
                                        expected_redundant_notes=2,
-                                       package_name=PACKAGE, checkpoint=guard)
+                                       package_name=PACKAGE, checkpoint=guard,
+                                       settled_checks=(
+                                           assert_plate_hole_precision,
+                                           assert_thumb_hole_precision,
+                                       ))
     assert_source_closed(source, stage="after finalize")
     return artifacts
 

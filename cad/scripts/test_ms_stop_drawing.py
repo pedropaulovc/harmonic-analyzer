@@ -448,6 +448,13 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         lambda *args, **kwargs: native_contracts.append(kwargs),
     )
     monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *a, **kw: [])
+    precision_labels, settled_precision_labels = [], []
+
+    def author_callout_precision(display, *, label):
+        precision_labels.append(label)
+        return lambda: settled_precision_labels.append(label)
+
+    monkeypatch.setattr(drawing, "set_stop_hole_callout_precision", author_callout_precision)
     if drawing is block_drawing:
         monkeypatch.setattr(drawing, "_remove_general_thread_class", lambda *a, **kw: None)
         monkeypatch.setattr(drawing, "_assert_reference_dimensions", lambda *a: None)
@@ -466,9 +473,6 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         monkeypatch.setattr(drawing, "scan_view_edges", lambda *a, **kw: SimpleNamespace(
             circle_at=lambda *a, **kw: SimpleNamespace(edge=rim),
         ))
-        places = []
-        monkeypatch.setattr(drawing, "set_hole_callout_precision",
-                            lambda display, precision, **kw: places.append(precision))
     labelled = []
     monkeypatch.setattr(drawing, "_label_locating_edges", lambda adapter, view: labelled.append(view))
     monkeypatch.setattr(drawing, "auto_center_marks", lambda *a, **kw: True)
@@ -548,10 +552,12 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         assert block_drawing.BOTTOM_KEEP["ThumbFromEnd"][0] - bottom.Position[0] > 0.010
         assert callout_positions["thumbscrew tap through floor"] == (0.060, 0.056)
         assert callout_positions["two cover blind taps"] == (0.065, 0.127)
+        assert precision_labels == ["two cover blind taps", "thumbscrew tap through floor"]
+        assert settled_precision_labels == precision_labels
     else:
         # The native pilot stays at X=.150 (right-sheet); the clearance
         # callout selects X=.690 (left-sheet), so the leaders cannot cross.
-        assert places == [{"hw-diam": 3}]
+        assert precision_labels == settled_precision_labels == ["cover clearance drill"]
         assert callout_positions["two cover clearance holes"] == drawing.CLEARANCE_CALLOUT_XY
         assert drawing.FRONT_KEEP["PilotDrillDiameter"] == (0.285, 0.178)
         assert callout_positions["two cover clearance holes"][0] < front_map.apply(
@@ -1492,21 +1498,131 @@ def test_plate_pilot_identity_resolves_only_named_model_construction_circle(monk
     assert names == ["PilotDrillReference"]
 
 
-def test_plate_native_clearance_variable_prints_truthful_three_place_drill(monkeypatch) -> None:
+@pytest.fixture
+def native_stop_callout(monkeypatch):
+    """Native raw values are read-only; only concrete length precision is writable."""
     import _drawing_hole_callout as hole_callout
     from win32com.client import dynamic
 
-    variable = SimpleNamespace(VariableName="hw-diam")
-    length = SimpleNamespace(_oleobj_=variable, Precision=2)
-    display = SimpleNamespace(GetHoleCalloutVariables=lambda: (length,))
+    class Variable:
+        def __init__(self, name, kind, value):
+            self.VariableName, self.Type, self.value = name, kind, value
+            self._oleobj_ = self
+            self._precision = 2
+            self.refuse = False
+
+        @property
+        def Length(self):
+            return self.value
+
+        @property
+        def Angle(self):
+            return self.value
+
+        @property
+        def String(self):
+            return self.value
+
+        @property
+        def Precision(self):
+            return self._precision
+
+        @Precision.setter
+        def Precision(self, value):
+            if not self.refuse:
+                self._precision = value
+
     monkeypatch.setattr(dynamic, "Dispatch", lambda raw: raw)
     monkeypatch.setattr(hole_callout, "_early_bound", lambda value, interface: value)
-    plate_drawing.set_hole_callout_precision(
-        display, {"hw-diam": spec.HOLE_CALLOUT_PRECISION}, label="cover clearance drill",
-    )
-    # The review's .090 inferred a nominal from a rounded .09. The authoritative
-    # native #2 close drill stays .094; only variable formatting changes.
-    assert length.Precision == 3
-    assert f"{spec.PLATE_CLEARANCE_DIA / 25.4:.{length.Precision}f}" == "0.094"
+    monkeypatch.setattr(guards, "_early_bound", lambda value, interface: value)
+
+    def create(lengths, *, thread="#2-56", hole=True):
+        variables = [Variable(name, 1, value) for name, value in lengths.items()]
+        variables += [Variable("hw-threaddesc", 3, thread),
+                      Variable("hw-drillangle", 2, math.pi * 118.0 / 180.0)]
+        definitions = {
+            5: " ".join(f"<{name}>" for name in lengths),
+            6: "",
+            7: "<hw-threaddesc>",
+            8: "",
+        }
+        annotation = object()
+        return SimpleNamespace(
+            IsHoleCallout=lambda: hole, GetText=definitions.__getitem__,
+            GetHoleCalloutVariables=lambda: tuple(variables),
+            GetAnnotation=lambda: annotation,
+            variables=variables, definitions=definitions,
+        )
+
+    return create
+
+
+@pytest.mark.parametrize("lengths,thread,expected", [
+    ({"hw-tapdrldia": spec.PLATE_TAP_DRILL_DIA / 1000.0,
+      "hw-tapdrldepth": spec.PLATE_TAP_DRILL_DEPTH / 1000.0,
+      "hw-threaddepth": spec.PLATE_TAP_THREAD_DEPTH / 1000.0}, "#2-56",
+     {"hw-tapdrldia": "0.073", "hw-tapdrldepth": "0.300", "hw-threaddepth": "0.250"}),
+    ({"hw-thrutapdrldia": spec.THUMB_TAP_DRILL / 1000.0}, "#4-40",
+     {"hw-thrutapdrldia": "0.089"}),
+    ({"hw-diam": spec.PLATE_CLEARANCE_DIA / 1000.0}, "",
+     {"hw-diam": "0.094"}),
+])
+def test_stop_callouts_format_real_length_variables_without_overrides(
+    native_stop_callout, lengths, thread, expected,
+) -> None:
+    display = native_stop_callout(lengths, thread=thread)
+    original_variables = tuple(display.variables)
+    original_values = [(var.VariableName, var.Type, var.value) for var in display.variables]
+    original_definitions = dict(display.definitions)
+    original_annotation = display.GetAnnotation()
+    settled = guards.set_stop_hole_callout_precision(display, label="native stop drill")
+    settled()
+    assert tuple(display.variables) == original_variables
+    assert [(var.VariableName, var.Type, var.value) for var in display.variables] == original_values
+    assert display.definitions == original_definitions
+    assert display.GetAnnotation() is original_annotation
+    assert {
+        var.VariableName: f"{var.Length * 1000.0 / 25.4:.{var.Precision}f}"
+        for var in display.variables if var.Type == 1
+    } == expected
+    # Source display precision and native callout-variable precision are
+    # separate: every length must receive its own .XXX, not a display setter.
+    assert all(var.Precision == (3 if var.Type == 1 else 2) for var in display.variables)
     assert not spec.PLATE_CLEARANCE_SPEC.overrides_mm
-    assert plate_drawing.CLEARANCE_PROCESS == "REMOVE PLATE; THEN DRILL\n"
+
+
+@pytest.mark.parametrize("fault", [
+    "places", "length", "thread", "angle", "definition", "missing", "duplicate",
+])
+def test_stop_callout_settled_proof_refuses_variable_or_token_drift(native_stop_callout, fault) -> None:
+    display = native_stop_callout({"hw-diam": spec.PLATE_CLEARANCE_DIA / 1000.0})
+    settled = guards.set_stop_hole_callout_precision(display, label="native stop drill")
+    if fault == "places":
+        display.variables[0].Precision = 2
+    elif fault == "length":
+        display.variables[0].value += 0.001
+    elif fault == "thread":
+        display.variables[1].value = "different thread"
+    elif fault == "angle":
+        display.variables[2].value += 0.1
+    elif fault == "definition":
+        display.definitions[5] = "<MOD-DIAM>.090"
+    elif fault == "missing":
+        display.variables.pop(0)
+    elif fault == "duplicate":
+        display.variables.append(display.variables[0])
+    with pytest.raises(RuntimeError, match="native.*changed|native length precision|duplicate native"):
+        settled()
+
+
+@pytest.mark.parametrize("fault", ["refused", "no-drill", "no-token", "not-native"])
+def test_stop_callout_precision_refuses_unproven_native_formatting(native_stop_callout, fault) -> None:
+    name = "hw-depth" if fault == "no-drill" else "hw-diam"
+    display = native_stop_callout({name: spec.PLATE_CLEARANCE_DIA / 1000.0},
+                                  hole=fault != "not-native")
+    if fault == "refused":
+        display.variables[0].refuse = True
+    if fault == "no-token":
+        display.definitions[5] = "<MOD-DIAM>.09"
+    with pytest.raises(RuntimeError, match="precision did not persist|native drill|native hole callout"):
+        guards.set_stop_hole_callout_precision(display, label="native stop drill")

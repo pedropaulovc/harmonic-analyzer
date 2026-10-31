@@ -42,7 +42,7 @@ from _drawing_common import (
     stamp_drawing_summary,
     rebuild_drawing,
 )
-from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _drawing_hole_callout import add_native_hole_callout
 from _drawing_edges import scan_view_edges
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
@@ -58,7 +58,7 @@ from _drawing_source_guard import (
     capture_clean_source,
     source_checkpoint,
 )
-from _ms_drawing_guards import assert_imported_text
+from _ms_drawing_guards import assert_imported_text, set_stop_hole_callout_precision
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -294,9 +294,8 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=CLEARANCE_CALLOUT_XY, label="two cover clearance holes",
         process=CLEARANCE_PROCESS,
     )
-    set_hole_callout_precision(
-        clearance, {"hw-diam": part.HOLE_CALLOUT_PRECISION},
-        label="cover clearance drill",
+    assert_clearance_precision = set_stop_hole_callout_precision(
+        clearance, label="cover clearance drill",
     )
     _outside_drill_arrow(clearance)
     rebuild_drawing(adapter, label="stop plate drill arrows")
@@ -327,7 +326,8 @@ async def build(adapter: Any) -> dict[str, str]:
                                        pdf_title="Measuring Stick Stop Plate Manufacturing Drawing",
                                        scale=SHEET_SCALE, layout=SPEC.layout,
                                        package_name=PACKAGE, checkpoint=guard,
-                                       settled_checks=(assert_drill_attachments,))
+                                       settled_checks=(assert_drill_attachments,
+                                                       assert_clearance_precision))
     assert_source_closed(source, stage="after finalize")
     return artifacts
 
