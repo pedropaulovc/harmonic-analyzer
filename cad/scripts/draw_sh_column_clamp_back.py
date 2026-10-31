@@ -182,8 +182,8 @@ _RELIEF_EDGES_MM = tuple((_SPLIT_X, 4.0, s * _RELIEF_EDGE_Z) for s in (1.0, -1.0
 # The relief arc's far point on the top face, where its centre mark picks it.
 _RELIEF_ARC_MM = (-COLUMN_BORE / 2.0, ARC_HEIGHT / 2.0, 0.0)
 HOLE_CALLOUT_XY = (0.320, 0.250)
-# Native Hole Wizard tap drill diameter at the sheet's .XXX (.136).
-HOLE_CALLOUT_PRECISION = {"hw-tapdrldia": EAR_HOLE_CALLOUT_PLACES}
+# Native Hole Wizard through-tap drill diameter at the sheet's .XXX (.136).
+HOLE_CALLOUT_PRECISION = {"hw-thrutapdrldia": EAR_HOLE_CALLOUT_PLACES}
 # A turned view that is off by a sign misplaces every recipe position, so the
 # build proves ear 1's centre lands where _face_xy puts it.
 _PROJECTION_TOL = 0.0005
