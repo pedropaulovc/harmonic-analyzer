@@ -13,15 +13,15 @@ Consumers read them here, not from ``build_pd_vn_guide_lock_screw``, whose stock
 build recipe would otherwise ride their cache keys (#880).
 
 Ruling R9-48: the 1/4 in screw held 1.26D in the guide's blind rear tap at
-the worst case.  The rear taps now run through the 10.00 guide and the screw
+the worst case.  The rear taps now run through the .40 guide and the screw
 is 3/8 in long through the 1/16 sheet lock (pd_guide_lock_spec), so the
 worst case holds 2.17D (``ENGAGEMENT_WORST``) and the tip stays inside the
 guide (``build_pd_platen_guide`` asserts the tip against the guide's
 shallowest seat).
 
-Ruling R9-49: the lock's hole positions and the guide's Ø0.20 tap
-position need hole-over-screw clearance; the #4 close Ø3.048 left too
-little.  The lock holes are 1/8 DRILL (Ø3.175), and at assembly each lock is
+Ruling R9-49: the lock's hole positions and the guide's Ø.008 tap
+position need hole-over-screw clearance; the #4 close .120 left too
+little.  The lock holes are 1/8 DRILL (.125), and at assembly each lock is
 pushed away from the bar until its holes bear on the screws before they are
 tightened (``pd_paper_drive_assembly_steps`` "guide-locks-set").  Pushed so, a
 lock stands between ``LOCK_SET_OFFSET`` beyond its model position at each
@@ -36,11 +36,15 @@ from __future__ import annotations
 
 import math
 
-import _config
 import pd_guide_lock_spec as lock
 import pd_platen_guide_spec as guide
 from _hole_spec import blind_cut_dia_mm
-from _printed_tolerance import drilled_oversize_mm, printed_deviations
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
+    printed_deviations,
+)
 from _mcmaster_91792a108 import IN, PAN_HEAD_SIZE, PART_NO
 
 SKU = PART_NO
@@ -56,13 +60,12 @@ ENGAGEMENT_FLOOR_D = 1.5
 # The guide's rear tap mouth carries the title block's edge break (the
 # lock seat may be faced at fit-up and re-broken to the same row).
 TAP_MOUTH_BREAK = max(
-    float(_config.title_block("edge_break")[key])
-    for key in ("radius_mm", "chamfer_max_mm")
+    edge_break_radius_mm(unit=guide.UNIT), edge_break_chamfer_mm(unit=guide.UNIT)
 )
 
 # --- R9-48: engagement in the guide's rear through tap -----------------------
 # The lock is 1/16 sheet as supplied: its thickness carries the sheet's own
-# band (pd_guide_lock_spec.LOCK_THICK_BAND), printed on the sheet.
+# band (pd_guide_lock_spec.LOCK_THICK_BAND), the supplier's.
 LOCK_THICK_MAX = lock.LOCK_THICK + lock.LOCK_THICK_BAND
 LOCK_THICK_MIN = lock.LOCK_THICK - lock.LOCK_THICK_BAND
 ENGAGEMENT_NOMINAL = SHANK_LEN - lock.LOCK_THICK
@@ -88,7 +91,7 @@ if ENGAGEMENT_WORST < ENGAGEMENT_FLOOR_D * SHANK_DIA:
 SCREW_MAJOR_MAX = SHANK_DIA
 SCREW_MAJOR_MIN = 0.1061 * IN
 LOCK_HOLE_DIA_MIN = blind_cut_dia_mm(lock.HOLE_SPEC)
-LOCK_HOLE_DIA_MAX = LOCK_HOLE_DIA_MIN + drilled_oversize_mm()
+LOCK_HOLE_DIA_MAX = LOCK_HOLE_DIA_MIN + drilled_oversize_mm(unit=lock.UNIT)
 # Radial position error of one screw axis relative to its lock hole: the
 # radial reach of the lock's ± coordinate band plus half the guide's printed
 # position diameter.
@@ -129,7 +132,7 @@ if LOCK_SET_OFFSET[0] < 0.0:
 _HOLE_X = sorted(x for x, _ in lock.HOLE_XY)
 _HOLE_PITCH_MIN = _HOLE_X[-1] - _HOLE_X[0] - 2.0 * lock.HOLE_LOCATION_BAND
 _WIDTH_DEV = printed_deviations(
-    lock.LOCK_WIDTH, lock.DRAWING_PRECISION["LockProfile"]["Width"]
+    lock.LOCK_WIDTH, lock.DRAWING_PRECISION["LockProfile"]["Width"], unit=lock.UNIT
 )
 CORNER_OVERHANG_MAX = (
     max(_HOLE_X[0], lock.LOCK_WIDTH + _WIDTH_DEV[1] - _HOLE_X[-1])

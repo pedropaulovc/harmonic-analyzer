@@ -22,10 +22,16 @@ from __future__ import annotations
 
 import math
 
+import _config
 import pd_transgear_arm_geometry as ARM
 import pd_transgear_arm_plate_geometry as PLATE
+from _package_units import drawing_unit
 
 IN = 25.4
+# #290: the purchased reference sheet prints decimal inch.
+UNIT = drawing_unit(
+    "parts/pd-vn-transgear-arm-plate-screw", _config.parts("pd-vn-transgear-arm-plate-screw")
+)
 
 SKU = "91790A199"  # verified1in OVAL; cut to the unchanged installed fit
 THREAD = "#8-32"
@@ -92,13 +98,22 @@ LENGTH = CUT_LENGTH
 # The cut end's 45 deg deburr, its radial leg; a single MAX limit, as MHA-DT-VN-61's
 # CUT_END_BREAK_MAX_MM.  The model carries the maximum.  The part sheet's
 # installation note (the registry's ``installation_notes``) prints it.
-CUT_END_BREAK_MAX = 0.1
+CUT_END_BREAK_MAX = 0.1016  # .004
+# The cut tip may stand this far proud of the arm's front face (the joint
+# stack's ``transgear_hanger_joints.PLATE_SCREW_CUT_PROUD_MAX``).
+CUT_PROUD_MAX = 0.2032  # .008
+
+
+def _inch(value_mm: float) -> str:
+    return f"{value_mm / IN:.3f}".removeprefix("0")
+
+
 # What the A06 cut step prints for it.
-CUT_END_BREAK_TEXT = f"{CUT_END_BREAK_MAX:g} MAX"
+CUT_END_BREAK_TEXT = f"{_inch(CUT_END_BREAK_MAX)} MAX"
 
 PURCHASED_STOCK_NOTE = "\n".join((
-    f"1 IN ({STOCK_LENGTH:.2f}) STOCK. CUT LENGTH AT ASSEMBLY (MHA-PD-00, BEFORE THE",
-    "GUIDE-LOCK SWEEP): TIP FLUSH OR PROUD 0.2 MAX OF THE MHA-PD-18 ARM",
+    "1 IN STOCK. CUT LENGTH AT ASSEMBLY (MHA-PD-00, BEFORE THE",
+    f"GUIDE-LOCK SWEEP): TIP FLUSH OR PROUD {_inch(CUT_PROUD_MAX)} MAX OF THE MHA-PD-18 ARM",
     f"FRONT FACE; CUT-END BREAK {CUT_END_BREAK_TEXT}.",
 ))
 

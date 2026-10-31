@@ -2,7 +2,7 @@ r"""Purchased MHA-PD-VN-58 transgear latch pin: McMaster 98381A474.
 
 A 1/8 x 7/8 alloy-steel dowel (``pd_vn_transgear_latch_pin_spec``), pressed chamfer
 end first into the transgear arm's end face and standing PROUD out of it,
-where the latch hook's Ø5.4 hole drops over it.  The stock recipe
+where the latch hook's pin hole drops over it.  The stock recipe
 ``diagnostics/diag_build_98381A474.py`` models the 1/8 series' chamfered and
 rounded ends (read off the 98381A473 vendor model). The supplier drawing
 confirms size and diameter band, but does not dimension those end forms.

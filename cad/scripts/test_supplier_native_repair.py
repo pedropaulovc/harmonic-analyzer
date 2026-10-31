@@ -667,7 +667,7 @@ def _retained_washer_layout(monkeypatch, scope):
 
 
 @pytest.mark.parametrize("scope", (
-    "ch-lever", "ch-thrust", "pd-shim", "sm-hanger", "mg-back", "mg-front",
+    "ch-lever", "ch-thrust", "sm-hanger", "mg-back", "mg-front",
 ))
 def test_washer_consumer_clears_retained_native_od_blocks_and_preserves_neighbors(monkeypatch, scope):
     from _layout_audit import display_box

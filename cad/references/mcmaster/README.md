@@ -95,8 +95,8 @@ recipes:
 | 9714K24 | `ch-vn-rocker-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9714K392 | `dt-vn-cylinder-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9715K43 | `pd-vn-transgear-pivot-spring` (catalogue-only; no vendor model) | Curved Disc Spring |
-| 97431A260 | `pd-vn-transgear-retaining-ring` | Side-Mount External Retaining Ring |
-| 98055A098 | `pd-vn-transgear-pivot-shim` (MHA-PD-VN-67; catalogue-only, no vendor model) | DIN 988 Shim, Stress-Resistant Spring Steel |
+| 97431A240 | `pd-vn-transgear-retaining-ring` (catalogue-only; CAD download refused) | Side-Mount External Retaining Ring |
+| 97431A260 | — (retired 2026-10-31, #290: the 1/8 in pin takes 97431A240; replica recipe removed) | Side-Mount External Retaining Ring |
 | 98296A026 | — (diagnostic recipe; former `vn-transgear-collar-cross-pin`, MHA-VN-037 retired) | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A027 | `dt-vn-pinion-strap-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A031 | `pd-vn-transgear-knob-cup-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
@@ -1297,27 +1297,27 @@ Catalog specifications checked on September 10, 2026:
   replica gate, and its standalone diagnostic is a catalog-only run. Lost:
   316 stainless 93923A353 (same head and length, 80 ksi, three times the
   price).
-- [97431A260](https://www.mcmaster.com/97431A260/) (`pd-vn-transgear-retaining-ring`,
+- [97431A240](https://www.mcmaster.com/97431A240/) (`pd-vn-transgear-retaining-ring`,
   MHA-PD-VN-61, R9-68) is pushed sideways into the MHA-PD-23 pin's groove in front
-  of the MHA-PD-25 front bushing and closes the disc cluster's float. Its page
-  was read live (user-pasted) on October 2, 2026: side-mount external ring
-  for a 5/32 in shaft, phosphate-coated carbon steel, Rockwell C47 min,
-  groove Ø0.116 in, ring O.D. 0.282 in, thickness 0.025 in ±0.002. The
-  user-supplied vendor model was harvested on amet on October 2, 2026
-  (`cad/out/reports/mcmaster-97431A260-dump.json`): one Right-plane outline
-  (outer arc, three prongs on the Ø2.8956 "Free Diameter" circle, two
-  relief arcs), one mid-plane extrude and two fillet sets (R0.4445 at the
-  gap, R0.22225 at the prongs). `diag_build_97431A260.py` replays it and
-  passed the replica gate on October 2, 2026: volume 13.3124 vs 13.3124 mm³,
-  area 64.1486 vs 64.1486 mm², 26 faces each with the same face-area
-  multiset (largest per-face delta 0.0000 mm²), centre of mass on the
-  vendor's (`cad/out/reference/97431A260-replica-report.json`).
-  Evidence SHA-256: native SLDPRT
-  `dc3d0f8549d8851713aa234e24f338e9f0d41dbc96550669c281c99c3d9f4cff`.
+  of the MHA-PD-25 front bushing and closes the disc cluster's float. It
+  replaced 97431A260 (5/32 in shaft) when #290 took the pin from 3.9 mm to
+  1/8 in (owner ruling 2026-10-30). Its page was read live on October 31,
+  2026: side-mount E-style external ring for a 1/8 in shaft,
+  phosphate-coated carbon steel, Rockwell C47, groove Ø0.095 in 0/+0.002,
+  groove width 0.020 in 0/+0.002, ring O.D. 0.230 in, thickness 0.015 in
+  ±0.002, 60 lbf thrust. The CAD download and the 2-D PDF were refused
+  (HTTP 403), so it is catalogue-only with no replica gate. The page's
+  drawing (`97431A240_RingsX.GIF`, SHA-256
+  `439a4768c3d8a643a51fb30e74de18dfb79313963d196b126cc9130fb1643206`) gives
+  the free diameter 0.094 in; measured at 1582 px/in its relief radius,
+  prong radius, gap-corner angle and gap slope match the 97431A260 replica's
+  outline law (harvested on amet October 2, 2026, native SLDPRT SHA-256
+  `dc3d0f8549d8851713aa234e24f338e9f0d41dbc96550669c281c99c3d9f4cff`), so
+  `diag_build_97431A240.py` draws that law on this ring's catalogue circles.
 
 - [9715K43](https://www.mcmaster.com/9715K43/) (`pd-vn-transgear-pivot-spring`,
   MHA-PD-VN-63, one) sits on the MHA-PD-VN-57 pivot shoulder screw's shoulder, between
-  the MHA-PD-VN-67 shim under its head and the floor of the MHA-PD-18 arm's spot face, and
+  its head and the floor of the MHA-PD-18 arm's spot face, and
   preloads the arm forward onto the MHA-PD-20 spacer. Its page was read live on
   October 2, 2026 ("Curved Disc Springs, for 0.190" Shaft Diameter, 0.200"
   ID, 0.423" OD, 0.0113" Thick"): for a 0.190 in shaft, ID 0.200 in, OD
@@ -1338,19 +1338,6 @@ Catalog specifications checked on September 10, 2026:
   SolidWorks model is offered on the page, but none was fetched or kept here,
   so it is catalogue-only: no replica gate, and its standalone diagnostic is
   a catalog-only run.
-- [98055A098](https://www.mcmaster.com/products/din-988-shims/thickness~0-5-mm/shims-1~~/shims-4~performance~stress-resistant/)
-  (`pd-vn-transgear-pivot-shim`, MHA-PD-VN-67, one) sits on the MHA-PD-VN-57 shoulder
-  under its head, on the MHA-PD-VN-63 spring. The 9.5 support bar grew rearward
-  0.5 (user ruling B, 2026-10-15), which carried the shoulder's end and the
-  head 0.5 rearward; the shim takes that back so the spring keeps its room:
-  0.80 nominal, 0.70 min, 1.0008 max against the spring's 0.6858 working and
-  1.1938 free heights, a preload of 15.2-38.9 N. The page was read live on
-  October 15, 2026: DIN 988 shim, stress-resistant spring steel, 5 mm ID x
-  10 mm OD x 0.5 mm thick, thickness -0.05/0, ID 5.03-5.40, OD 9.53-9.96;
-  pack of 50, $6.90. 98089A331 was rejected: its ±0.064 thickness leaves a
-  0.636 minimum room, under the spring's working height.
-  `diag_build_98055A098.py` models the annulus at nominal; no supplier CAD
-  was harvested, so it is catalogue-only: no replica gate.
 
 - [9714K392](https://www.mcmaster.com/9714K392/) (`dt-vn-cylinder-bank-spring`,
   MHA-DT-VN-68, one) sits on the MHA-DT-13 arbor directly between gear 19's

@@ -8,6 +8,7 @@ The fit note names the MHA-PD-17 hub's spigot, and the native #0-80 tap
 callout carries its unchanged mouth-break and assembly-transfer lines (no
 bolt-circle position). The edge view prints the disc thickness, the front
 (clamped) face as datum B and the rear face's parallelism to it.
+Decimal-inch sheet (#290); the model keeps its millimetre nominals.
 """
 
 from __future__ import annotations
@@ -40,6 +41,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _native_axis_datum import add_native_axis_datum
 from _paths import CAD_ROOT
+from _part_properties import part_drawing_unit
 from _rack_bore_finish import add_rack_bore_finish
 from _session import run_build
 import _telemetry
@@ -55,7 +57,7 @@ from pd_rack_pinion_spec import (
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     FRONT_FACE_DATUM,
-    GEOMETRIC_TOLERANCES_MM,
+    GEOMETRIC_TOLERANCES_IN,
     OUTSIDE_DIA,
     PRESSURE_ANGLE_DEG,
     STOCK_PROFILE,
@@ -86,8 +88,8 @@ VIEW_SCALE = (1, 1)
 FRONT_CENTER = (0.220, 0.175)
 RIGHT_CENTER = (0.320, 0.175)
 ISO_CENTER = (0.383, 0.210)  # 0.388 clipped the zone border right by 1.4 mm
-# Below the face view, left of the edge view's 3.000 (19e33c6c2 printed the
-# Ra 1.6 into it): the leader rises to the bore's 0° rim point under the
+# Below the face view, left of the edge view's thickness (19e33c6c2 printed
+# the finish into it): the leader rises to the bore's 0° rim point under the
 # 0° tap, right of the tap callout's leader.
 BORE_FINISH_POSITION = (FRONT_CENTER[0] + 0.030, FRONT_CENTER[1] - 0.082)
 GEAR_DATA_XY = (0.018, 0.262)
@@ -217,7 +219,11 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rack-pinion tooth-space control",
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("pd-rack-pinion"),
     )
     stamp_drawing_summary(
         adapter,
@@ -275,7 +281,7 @@ async def build(adapter: Any) -> dict[str, str]:
         shoulder=True,
         stability_tolerance_m=0.0001,
     )
-    # The tooth-space control reads datum A above, the 13.1 pilot, at the
+    # The tooth-space control reads datum A above, the .501 pilot, at the
     # cutting setup; the assembled control is MHA-PD-00's transfer step.
     add_toothspace_callout(
         adapter,
@@ -288,7 +294,7 @@ async def build(adapter: Any) -> dict[str, str]:
         note_xy=TOOTH_SPACE_CALLOUT_XY,
     )
     # Datum B: a vertical edge with no neighbour inside the pick radius at
-    # this height (the rear face stands 3 mm off), so the hit-test form.
+    # this height (the rear face stands .118 off), so the hit-test form.
     add_datum_feature(
         adapter,
         right,
@@ -303,7 +309,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=PARALLELISM_EDGE,
         frame_xy=PARALLELISM_FRAME,
         characteristic="parallelism",
-        tolerance=GEOMETRIC_TOLERANCES_MM["disc rear face parallelism to front"],
+        tolerance=GEOMETRIC_TOLERANCES_IN["disc rear face parallelism to front"],
         datums=(FRONT_FACE_DATUM,),
         label="disc rear face parallelism to front",
     )

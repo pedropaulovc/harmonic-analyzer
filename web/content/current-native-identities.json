@@ -798,17 +798,6 @@
       ]
     },
     {
-      "sourceStem": "vn-transgear-pivot-shim",
-      "sourceNumber": "MHA-VN-069",
-      "identities": [
-        {
-          "parent": "pd-paper-drive",
-          "stem": "pd-vn-transgear-pivot-shim",
-          "number": "MHA-PD-VN-67"
-        }
-      ]
-    },
-    {
       "sourceStem": "vn-rocker-thrust-washer",
       "sourceNumber": "MHA-VN-070",
       "identities": [
@@ -1063,7 +1052,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "6a44805a6743d1df220fa296380daf14b1c658042f1c88373b2aa932d72e658f",
+  "currentRegistryMapSha256": "17ebbe9fd412e9519092357b906cbac1fc12f46a6f74961d44716113ed87ebe7",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",

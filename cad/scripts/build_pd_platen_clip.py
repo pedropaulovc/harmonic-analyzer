@@ -1,7 +1,7 @@
 r"""Reproduction script: one-piece platen paper holder (book ch. 22, pp. 54-55).
 
 One of the two bright brass holders hugging the platen front's extreme
-left/right edges, running from the TOP edge down about 84 mm.  The reference
+left/right edges, running from the TOP edge down 3.29 in.  The reference
 photos (ch22 img02 front, img03 close-up) show one slotted sheet: a flat screw
 rail along the platen edge and a spring rail toward the paper, separated by
 two narrow open-ended slits that stop either side of one intact middle bridge.
@@ -14,7 +14,7 @@ line/arc path, so every bend is a smooth cylindrical band.  In plan, the
 spring ends are full half-rounds, the screw rail's corners are rounded
 (large on the outer edge, small at the slit), and each slit ends in a full
 half-round at the bridge, as img03 shows.  The two slotted pan heads sit
-directly on the flat 0.8 mm sheet (img03: no raised seats); the platen's rear
+directly on the flat .032 sheet (img03: no raised seats); the platen's rear
 socket bosses take the rest of the stock shank as thread
 (pd_platen_spec.SOCKET_BOSS_H).
 
@@ -32,6 +32,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _config
 import _telemetry
 from _appearance import apply_material
 from _check import check
@@ -66,7 +67,11 @@ from _sketch import (
 from _sketch_circle import define_circle
 from _hole_spec import THREAD_MAJOR_MM
 from _holes import CLEARANCE_MM, HoleSpec, SharedCoordinate, wizard_holes
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _inch_wall_limits import WALL_TARGET_MM
+from _document_units import apply_package_model_units
+from _package_units import drawing_unit
+from _part_properties import part_drawing_unit
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
 from pd_vn_platen_clip_screw_spec import (
     HEAD_DIA,
     HEAD_DIA_MIN,
@@ -79,13 +84,21 @@ from pd_platen_spec import PLATE_THICKNESS, SOCKET_BOSS_H, SOCKET_THREAD_ENGAGEM
 
 PART_NAME = "pd-platen-clip"
 MATERIAL = "Brass"  # see _appearance.apply_material docstring
+# #290: the registry row's drawing_unit (in) is this sheet's unit; lengths are
+# physical millimetres, each the exact decimal of its printed inch value.
+UNIT = drawing_unit(f"parts/{PART_NAME}", _config.parts(PART_NAME))
 
-CLIP_LENGTH = (
-    83.5  # ch22 p.55 rear photo: 86.7 of the 140 mm plate (0.619) x PLATE_HEIGHT 134.82
-)
+# ch22 p.55 rear photo: 86.7 of the 140 mm plate (0.619) x PLATE_HEIGHT
+# 134.82 = 83.5, on the .XX grid.
+CLIP_LENGTH = 83.566  # 3.29
 # ch30-p002 Pose Studio: the photographed clip is 10 * 0.8988 wide.
 PHOTO_CLIP_WIDTH = 8.988
-SHEET_T = 0.8  # photo-backed brass sheet thickness
+# The sheet is the stock's (the print gives it as a reference over SHEET
+# STOCK): 0.032 in C26000 strip, whose thickness ASTM B248 (Table 1, 0.026 to
+# 0.037 in, to 8 in wide) holds to +/-0.002 in.
+STOCK_THICKNESS_IN = 0.032
+STOCK_THICKNESS_TOL_IN = 0.002
+SHEET_T = STOCK_THICKNESS_IN * 25.4
 CLIP_THICKNESS = SHEET_T  # assembly stand-off: one sheet, not a face stack
 
 # ch22 img03 (one clip, 603 x 68 px of brass): the spring rail is 32 px wide
@@ -93,67 +106,70 @@ CLIP_THICKNESS = SHEET_T  # assembly stand-off: one sheet, not a face stack
 PHOTO_SLIT_WIDTH = PHOTO_CLIP_WIDTH * 4.0 / 68.0
 PHOTO_SPRING_RAIL_WIDTH = PHOTO_CLIP_WIDTH * 32.0 / 68.0
 # The photographed 32-px (4.23) screw rail cannot hold a #2 clearance hole
-# with the rule-17 1.5 mm ligament on both sides (user ruling 2026-10-14,
-# option A: widen the screw rail).  Owner ruling 2026-10-15 (default D),
-# adjusted per rule 21: the hole row stays .XXX for pattern float (the hole
-# floats over the shank by both patterns' zones only at .XXX, below) and the
-# clip is held on the plate; the rail width prints .XX (RAIL_WIDTH_PLACES).
-# The hole row keeps its 3.3 station from the outer edge: the platen prints
-# its far sockets from its near edge through the .X overall width, and a
-# higher row would carry the far clip's outer edge past the plate's
-# (test_pd_platen_refit).  With the row at .XXX and the rail at .XX, the slit
-# side binds: W - band2 - (HOLE_Y + band3) - r_max >= 1.5, so W >= 6.965 for
-# the #2 loose hole drilled at its printed Ø2.95; 7.0 holds it.
-SCREW_RAIL_WIDTH = 7.0
+# with its rule-17 ligament on both sides (user ruling 2026-10-14, option A:
+# widen the screw rail; Main 2026-10-31, option B for the inch print: the
+# .080 target on both sides).  The hole row stays .XXX for pattern float (the
+# hole floats over the shank by both patterns' zones only at .XXX, below) and
+# the clip is held on the plate; the rail width prints .XX
+# (RAIL_WIDTH_PLACES).  With the row at .XXX and the rail at .XX, the slit
+# side binds: W - .01 - (HOLE_Y + .005) - r_max >= .080, so W >= .300 for the
+# #2 loose hole drilled at its printed Ø.116.
+SCREW_RAIL_WIDTH = 7.62  # .30
 RAIL_WIDTH_PLACES = 2
-# The overall width is the widest 0.01 step whose inboard edge stays 2.0 off
-# the recording paper with the platen's clip sockets unchanged
-# (pd_platen_spec.SOCKET_X; test_pd_platen_refit asserts the gap): the spring
-# rail is what the screw rail and the slit leave of it (3.35, the photograph's
-# 4.23 short of the widened screw rail).
-CLIP_WIDTH = 11.39
+# The overall width keeps the clip's inboard edge 2.0 off the recording paper
+# with the platen's clip sockets (pd_platen_spec.SOCKET_X; test_pd_platen_refit
+# asserts the gap): the spring rail is what the screw rail and the slit leave
+# of it (.130, the photograph's 4.23 short of the widened screw rail).
+CLIP_WIDTH = 11.938  # .47
 # The slit frees the spring rail to flex out of the sheet on its own while the
 # screw rail stays clamped; the book's clip does that through the photographed
 # 0.53 slit, so the print's narrowest slit keeps at least that open.  It
-# prints .XX (the title block's general band, +/-0.51): the nominal is the
-# floor plus the band, rounded up to the 0.01 grid, 1.04.
+# prints .XX (the title block's general band, +/-.01): the nominal is the
+# floor plus the band, rounded up to the .01 grid, .04.
 SLIT_PLACES = 2
 SLIT_GAP_FLOOR = PHOTO_SLIT_WIDTH
 NOTCH_WIDTH = (
-    math.ceil(round((SLIT_GAP_FLOOR + printed_band_mm(SLIT_PLACES)) * 100.0, 9)) / 100.0
+    math.ceil(
+        round(
+            (SLIT_GAP_FLOOR + printed_band_mm(SLIT_PLACES, unit=UNIT)) / 25.4 * 100.0, 9
+        )
+    )
+    / 100.0
+    * 25.4
 )
 SPRING_RAIL_WIDTH = CLIP_WIDTH - SCREW_RAIL_WIDTH - NOTCH_WIDTH
 SPRING_RAIL_Y0 = SCREW_RAIL_WIDTH + NOTCH_WIDTH
 # img03: the slits stop 77 px apart on their centreline; with their full
-# half-round ends (2 px radius) the tangent points sit 81 px apart.  The
-# bridge length is that tangent-point span, which is also the spring rail's
-# flat middle run; the wider slit's full round (radius NOTCH_WIDTH / 2) ends
-# at the same tangent points.
-CENTER_BRIDGE_LENGTH = CLIP_LENGTH * 81.0 / 603.0
+# half-round ends (2 px radius) the tangent points sit 81 px apart (81/603 of
+# the length, .44), snapped to .45 so both bridge ends print on the .XX grid.
+# The bridge length is that tangent-point span, which is also the spring
+# rail's flat middle run; the wider slit's full round (radius NOTCH_WIDTH / 2)
+# ends at the same tangent points.
+CENTER_BRIDGE_LENGTH = 11.43  # .45
 SLIT_END_RADIUS = NOTCH_WIDTH / 2.0
-BRIDGE_X0 = (CLIP_LENGTH - CENTER_BRIDGE_LENGTH) / 2.0
-BRIDGE_X1 = BRIDGE_X0 + CENTER_BRIDGE_LENGTH
+BRIDGE_X0 = (CLIP_LENGTH - CENTER_BRIDGE_LENGTH) / 2.0  # 1.42
+BRIDGE_X1 = BRIDGE_X0 + CENTER_BRIDGE_LENGTH  # 1.87
 # img03 plan corners: the spring rail ends are full half-rounds; the screw
 # rail's outer corners round at ~18 px (2.5 mm) and its slit-side corners at
 # ~6 px (0.75 mm).
 SPRING_END_RADIUS = SPRING_RAIL_WIDTH / 2.0
-SCREW_RAIL_END_RADIUS = 2.5
-SCREW_RAIL_SLIT_RADIUS = 0.75
-ARCH_RISE = 1.5  # shallow outward bow; editable as ArchRise in Tools > Equations
+SCREW_RAIL_END_RADIUS = 2.54  # .10
+SCREW_RAIL_SLIT_RADIUS = 0.762  # .03
+ARCH_RISE = 1.524  # .06: shallow outward bow; editable as ArchRise in Tools > Equations
 
 # The brass #2-56 slotted pan-head screws (pd-vn-platen-clip-screw; img03's heads
 # read ~2.6-3.0 mm, user ruling 2026-10-15 for the pan head's bearing land)
-# retain their lengthwise stations in the flat rail, 3.3 in from its outer
+# retain their lengthwise stations in the flat rail, .145 in from its outer
 # edge (above); each head lies wholly on the rail.
-HOLE_INSET = 7.1904  # ch30-p002 Pose Studio: 8 * 0.8988 from each end
-HOLE_Y = 3.3
+HOLE_INSET = 7.1882  # .283: ch30-p002 Pose Studio, 8 * 0.8988 from each end
+HOLE_Y = 3.683  # .145
 CLEARANCE_SIZE = THREAD.split("-")[0]  # "#2"
 # #2 LOOSE (user ruling 2026-10-14): the screws are fixed in the platen's
 # taps, so the hole's float over the shank must hold both patterns' printed
 # positions (HOLE_FLOAT_MIN below).
 HOLE_FIT = "loose"
 HOLE_SPEC = HoleSpec("clearance", CLEARANCE_SIZE, fit=HOLE_FIT)
-HOLE_DIA = CLEARANCE_MM[(CLEARANCE_SIZE, HOLE_FIT)]
+HOLE_DIA = CLEARANCE_MM[(CLEARANCE_SIZE, HOLE_FIT)]  # 2.946 (.116)
 HEAD_TO_SPRING_RAIL = SPRING_RAIL_Y0 - (HOLE_Y + HEAD_DIA / 2.0)
 # The head stands nearer the rail's outer edge than its slit edge.
 HEAD_RAIL_MARGIN = min(HOLE_Y, SCREW_RAIL_WIDTH - HOLE_Y) - HEAD_DIA / 2.0
@@ -162,25 +178,33 @@ HEAD_RAIL_MARGIN = min(HOLE_Y, SCREW_RAIL_WIDTH - HOLE_Y) - HEAD_DIA / 2.0
 # stations and the hole row print at .XXX, the screw-rail width at .XX, the
 # holes are DRILLED at the size their callout prints (HOLE_CALLOUT_PRECISION).
 POSITION_PLACES = 3  # pd-platen-clip RV-01
-_POSITION_BAND = printed_band_mm(POSITION_PLACES)
-HOLE_CALLOUT_PRECISION = {"hw-diam": 2}
-HOLE_DIA_PRINTED = round(HOLE_DIA, HOLE_CALLOUT_PRECISION["hw-diam"])
-HOLE_DIA_MAX = HOLE_DIA_PRINTED + drilled_oversize_mm()
-LIGAMENT_FLOOR = 1.5
+_POSITION_BAND = printed_band_mm(POSITION_PLACES, unit=UNIT)
+HOLE_CALLOUT_PRECISION = {"hw-diam": 3}
+HOLE_DIA_MAX = (
+    HOLE_DIA
+    + printed_deviations(
+        HOLE_DIA,
+        HOLE_CALLOUT_PRECISION["hw-diam"],
+        (0.0, drilled_oversize_mm(unit=UNIT)),
+        unit=UNIT,
+    )[1]
+)
+# The slit-side ligament meets the .080 target exactly; allow float rounding.
+LIGAMENT_FLOOR = WALL_TARGET_MM - 1e-9
 EDGE_LIGAMENT_MIN = HOLE_Y - _POSITION_BAND - HOLE_DIA_MAX / 2.0
 SLIT_LIGAMENT_MIN = (
     SCREW_RAIL_WIDTH
-    - printed_band_mm(RAIL_WIDTH_PLACES)
+    - printed_band_mm(RAIL_WIDTH_PLACES, unit=UNIT)
     - (HOLE_Y + _POSITION_BAND)
     - HOLE_DIA_MAX / 2.0
 )
 END_LIGAMENT_MIN = HOLE_INSET - _POSITION_BAND - HOLE_DIA_MAX / 2.0
 # The far hole stands at its own .XXX station from the near end, so the far
 # end's ligament also spends the overall length's printed band.
-LENGTH_PLACES = 1
+LENGTH_PLACES = 2
 FAR_END_LIGAMENT_MIN = (
     CLIP_LENGTH
-    - printed_band_mm(LENGTH_PLACES)
+    - printed_band_mm(LENGTH_PLACES, unit=UNIT)
     - (CLIP_LENGTH - HOLE_INSET + _POSITION_BAND)
     - HOLE_DIA_MAX / 2.0
 )
@@ -197,12 +221,7 @@ HEAD_BEARING_LAND_MIN = (HEAD_DIA_MIN - HOLE_DIA_MAX) / 2.0
 # the thickest stock sheet reaches the least into the platen's through tap,
 # less one pitch of incomplete lead and the tap mouth's title-block edge break.
 SCREW_LENGTH_MINUS = 0.03 * 25.4
-TAP_MOUTH_BREAK = 0.25
-# The sheet is the stock's (the print gives it as a reference over SHEET
-# STOCK): 0.032 in C26000 strip, whose thickness ASTM B248 (Table 1, 0.026 to
-# 0.037 in, to 8 in wide) holds to +/-0.002 in.
-STOCK_THICKNESS_IN = 0.032
-STOCK_THICKNESS_TOL_IN = 0.002
+TAP_MOUTH_BREAK = 0.254  # .010
 SHEET_T_MAX = (STOCK_THICKNESS_IN + STOCK_THICKNESS_TOL_IN) * 25.4
 CLIP_SCREW_ENGAGEMENT_MIN = (
     SHANK_LEN - SCREW_LENGTH_MINUS - SHEET_T_MAX - PITCH - TAP_MOUTH_BREAK
@@ -210,7 +229,6 @@ CLIP_SCREW_ENGAGEMENT_MIN = (
 # The overall width prints .XX from the outer edge, as the slit (SLIT_PLACES)
 # does: the spring rail is what they leave beside the screw rail (a reference).
 WIDTH_PLACES = 2
-
 # Spring rail section (local X, Z) as its sheet MID-SURFACE: the free tip lies
 # flat from its end-round centre out to the screw station, then each free half
 # lifts in one smooth bow of three tangent arcs of equal radius (concave,
@@ -322,32 +340,32 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # the platen's taps: the holes float over the shanks by both patterns' zones
 # only at .XXX) print .XXX (POSITION_PLACES); the bow tangent stations on the
 # hole stations are references spelled as those are, the rest as the bridge
-# ends they meet.  The screw rail's width, the overall width and the slit
-# print .XX; the outline, the bridge, the rise and the radii only shape the
-# spring.
+# ends they meet.  Everything else prints .XX: on a part this small the .X
+# band (+/-.1) would swallow the rail, the slit and the bow; the stock sheet
+# and the spring rail are three-place references.
 _TANGENT_PLACES = {"TangentX1": POSITION_PLACES, "TangentX8": POSITION_PLACES}
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FlatSheetProfile": {
         "Length": LENGTH_PLACES,
         "RailWidth": RAIL_WIDTH_PLACES,
         "SlitWidth": SLIT_PLACES,
-        "BridgeX0": 1,
-        "BridgeX1": 1,
-        "EndR1": 1,
+        "BridgeX0": 2,
+        "BridgeX1": 2,
+        "EndR1": 2,
         "SlitCornerR1": 2,
     },
-    "FlatSheet": {"SheetDepth": 1},
-    "SpringRail": {"SpringRailWidth": 2},
-    "SpringRailPath": {"BendR5": 1},
+    "FlatSheet": {"SheetDepth": 3},
+    "SpringRail": {"SpringRailWidth": 3},
+    "SpringRailPath": {"BendR5": 2},
     "ScrewHoles": {name: POSITION_PLACES for name in ("LeftX", "RightX", "LeftZ")},
     "PlanReference": {"OverallWidth": WIDTH_PLACES},
     "ProfileReference": {
         **{
-            name: _TANGENT_PLACES.get(name, 1)
+            name: _TANGENT_PLACES.get(name, 2)
             for name, _x, _d in DRAWN_TANGENT_STATIONS
         },
-        "CrestRise": 1,
-        "FlatFinger": 1,
+        "CrestRise": 2,
+        "FlatFinger": 2,
     },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -460,10 +478,10 @@ if (
         "platen clip screw-hole ligaments at the printed worst case "
         f"(edge {EDGE_LIGAMENT_MIN:.3f}, slit {SLIT_LIGAMENT_MIN:.3f}, end "
         f"{END_LIGAMENT_MIN:.3f}, far end {FAR_END_LIGAMENT_MIN:.3f}) under the "
-        f"{LIGAMENT_FLOOR} floor (drawing-guidelines.md rule 17)"
+        ".080 in target (drawing-guidelines.md rule 17)"
     )
 # The slit prints its own .XX width; its worst case keeps the floor open.
-SLIT_WIDTH_MIN = NOTCH_WIDTH - printed_band_mm(SLIT_PLACES)
+SLIT_WIDTH_MIN = NOTCH_WIDTH - printed_band_mm(SLIT_PLACES, unit=UNIT)
 if SLIT_WIDTH_MIN < SLIT_GAP_FLOOR - 1e-9:
     raise AssertionError(
         f"platen clip slit narrows to {SLIT_WIDTH_MIN:.3f} at the printed worst "
@@ -1018,6 +1036,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations).  The mm suffix is load-bearing because
     # the template is IPS and bare equation-manager numbers are document units.

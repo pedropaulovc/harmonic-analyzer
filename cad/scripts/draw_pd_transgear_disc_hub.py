@@ -17,6 +17,7 @@ circle.
 
 The bore and its flat import the model's sleeve-matched dimensions and native
 bands; fit callouts derive their clearances from those same printed limits.
+Decimal-inch sheet (#290); the model keeps its millimetre nominals.
 """
 
 from __future__ import annotations
@@ -51,8 +52,10 @@ from _gtol_face_read import face_geometry
 from _gtol_planar import PlanarFace
 from _native_axis_datum import add_native_axis_datum
 from _paths import CAD_ROOT
+from _part_properties import part_drawing_unit
 from _session import run_build
 import _telemetry
+from pd_rack_pinion_spec import inch_text
 from pd_transgear_disc_hub_spec import (
     BORE_DATUM,
     BORE_DIA,
@@ -62,7 +65,7 @@ from pd_transgear_disc_hub_spec import (
     FLANGE_DIA,
     FLANGE_THICK,
     FLAT_CLEARANCE,
-    GEOMETRIC_TOLERANCES_MM,
+    GEOMETRIC_TOLERANCES_IN,
     HUB_FRONT_Z,
     HUB_LENGTH_CALLOUT,
     OIL_HOLE_CALLOUT_BELOW,
@@ -89,7 +92,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø25.1 × 13.70 part: 3:1 keeps the #0-80 holes, the Ø1.2 oil hole and the
+# A Ø.990 × .539 part: 3:1 keeps the #0-80 holes, the #57 oil hole and the
 # thin flange legible with two views across the landscape sheet.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
@@ -128,7 +131,8 @@ _SPIGOT_R = SPIGOT_DIA / 2.0 * _S
 BORE_CALLOUT = "\n".join(
     (
         "THRU",
-        f"(DIA CLR {BOSS_CLEARANCE_LIMITS[0]:.3f}-{BOSS_CLEARANCE_LIMITS[1]:.3f}",
+        f"(DIA CLR {inch_text(BOSS_CLEARANCE_LIMITS[0], 4)}-"
+        f"{inch_text(BOSS_CLEARANCE_LIMITS[1], 4)}",
         f"ON {SLEEVE_NAME}",
         f"{SLEEVE_NUMBER} BOSS)",
     )
@@ -136,7 +140,7 @@ BORE_CALLOUT = "\n".join(
 FLAT_CALLOUT = "\n".join(
     (
         "BORE FLAT",
-        f"(CLR {FLAT_CLEARANCE[0]:.3f}-{FLAT_CLEARANCE[1]:.3f}",
+        f"(CLR {inch_text(FLAT_CLEARANCE[0], 4)}-{inch_text(FLAT_CLEARANCE[1], 4)}",
         f"ON {SLEEVE_NAME}",
         f"{SLEEVE_NUMBER} FLAT)",
     )
@@ -412,7 +416,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("pd-transgear-disc-hub"),
     )
     stamp_drawing_summary(
         adapter,
@@ -495,7 +503,7 @@ async def build(adapter: Any) -> dict[str, str]:
             leader_attach_xy=landing,
             frame_xy=frame_position(landing),
             characteristic="perpendicularity",
-            tolerance=GEOMETRIC_TOLERANCES_MM[key],
+            tolerance=GEOMETRIC_TOLERANCES_IN[key],
             datums=(BORE_DATUM,),
             label=frame.label,
         )

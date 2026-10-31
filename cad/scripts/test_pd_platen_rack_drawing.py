@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import math
+import re
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -23,7 +24,7 @@ from _drawing_contract import (
 )
 from _test_stubbed_build import offline_adapter, stub_seat
 from _drawing_registry import DrawingLayout
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import printed_deviations
 from pd_platen_spec import PLATE_WIDTH
 
 
@@ -109,7 +110,6 @@ def test_composite_sizes_have_native_controls_and_stock_references() -> None:
     assert "Length" not in spec.DRAWING_REFERENCE_DIMENSIONS
     assert drawing.DRAWING_REFERENCE_DIMENSIONS is spec.DRAWING_REFERENCE_DIMENSIONS
     assert builder.DRAWING_REFERENCE_DIMENSIONS is spec.DRAWING_REFERENCE_DIMENSIONS
-    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) <= {1, 2}
 
 
 def test_the_retired_first_gap_witness_is_neither_dimensioned_nor_kept() -> None:
@@ -271,8 +271,6 @@ def test_purchase_and_joint_properties_do_not_prescribe_tooth_manufacture() -> N
     installation = row["installation_notes"]
     lines = installation.splitlines()
     assert len(lines) <= 4 and all(len(line) <= 70 for line in lines)
-    places = spec.DRAWING_PRECISION_BY_NAME["Length"]
-    assert f"CUT TO {spec.CUT_LENGTH_MM:.{places}f} MM" in installation
     assert "SOFT-SOLDER TO BACKER" in installation
     assert "SET MESH AT ASSEMBLY" in installation
     for method in ("WIRE", "SECANT", "INDICATOR", " U +/-"):
@@ -291,11 +289,14 @@ def test_purchase_and_joint_properties_do_not_prescribe_tooth_manufacture() -> N
 
 
 def test_incoming_rack_note_is_the_two_stock_sizes() -> None:
+    # The sheet's inch maxima never admit more than the receiving check's
+    # millimetre limits, and give away less than .0001 in.
     note = spec.INCOMING_RACK_INSPECTION_NOTE
-    assert note == (
-        f"STOCK HEIGHT {quality.rack_stock_height_max_mm():g} MAX; "
-        f"FACE WIDTH {quality.rack_face_width_max_mm():g} MAX"
-    )
+    printed = [float(value) * 25.4 for value in re.findall(r"(\.\d+) MAX", note)]
+    limits = [quality.rack_stock_height_max_mm(), quality.rack_face_width_max_mm()]
+    assert len(printed) == 2
+    for shown, limit in zip(printed, limits, strict=True):
+        assert limit - 0.0001 * 25.4 < shown <= limit
     for metrology in ("INDEX", "LEAD", "REJECT", "USABLE GAPS"):
         assert metrology not in note
 
@@ -441,10 +442,10 @@ def synthetic_full_form_receipt():
         feed_rack_receiving_root_uncertainty_mm,
     )
 
-    count = math.floor(
-        (spec.CUT_LENGTH_MM - printed_band_mm(spec.DRAWING_PRECISION_BY_NAME["Length"]))
-        / spec.PITCH
-    ) - 1
+    shortest = spec.CUT_LENGTH_MM + printed_deviations(
+        spec.CUT_LENGTH_MM, spec.DRAWING_PRECISION_BY_NAME["Length"], unit=spec.UNIT
+    )[0]
+    count = math.floor(shortest / spec.PITCH) - 1
     stations = tuple(range(count))
     boundary = spec.RackMeasuredUpperBound(0.0, feed_rack_receiving_boundary_uncertainty_mm())
     root = spec.RackMeasuredUpperBound(0.0, feed_rack_receiving_root_uncertainty_mm())

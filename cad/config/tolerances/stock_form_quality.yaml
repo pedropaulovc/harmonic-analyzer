@@ -24,13 +24,14 @@ stock_form_quality:
   # Purchased-rack index and assembled face lead share the feed mesh's
   # opposite-flank budget: while two pairs touch (CR 1.215-1.318) the
   # second pair's clearance is the set datum backlash (0.12 MIN) less the
-  # other lateral terms (form 0.025 + pinion index 0.010 + cocking 0.0046
-  # + tilt 0.0001 = 0.0397), leaving 0.080 for rack index + face lead.
-  # Index 0.055 holds SDP/SI's published rack accuracy (Gears.pdf p. 1-190:
-  # tooth-to-tooth .0005 in, total accumulated .002 in = 0.051 mm); the
-  # 0.025 lead takes the rest. Contact continuity is not binding: the
-  # 0.215 overlap of the 2.343 base pitch tolerates 0.54 mm of index.
-  rack_pitch_index_deviation_mm: 0.055
+  # other lateral terms (form 0.025 + pinion index 0.010 + cocking 0.0082
+  # with the .125 running fit + tilt 0.0002 = 0.0434), leaving 0.0766 for
+  # rack index + face lead. Index is SDP/SI's published rack accuracy exactly
+  # (Gears.pdf p. 1-190: tooth-to-tooth .0005 in, total accumulated .002 in
+  # = 0.0508 mm); the 0.025 lead takes the rest. Contact continuity is not
+  # binding: the 0.215 overlap of the 2.343 base pitch tolerates 0.54 mm of
+  # index.
+  rack_pitch_index_deviation_mm: 0.0508
   rack_flank_constraint_deviation_mm: 0.025
   # Source closing/projection outer gives 0.2724567 mm native root air.
   # Keep the 0.25 mm floor: this inclusive MAX pays indicator U 0.002;

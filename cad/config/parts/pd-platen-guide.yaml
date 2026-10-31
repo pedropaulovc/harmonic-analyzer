@@ -6,3 +6,4 @@ pd-platen-guide:
   quantity: 2
   tolerance_class: machined_block
   process: "machined (steel)"
+  drawing_unit: in

@@ -11,9 +11,10 @@ import _config
 import build_pd_platen as build
 import draw_pd_platen as draw
 import pd_platen_spec as spec
-from _hole_spec import blind_cut_dia_mm
+from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
 from _holes import SharedCoordinate
-from _printed_tolerance import printed_band_mm
+from _inch_wall_limits import WALL_TARGET_MM
+from _printed_tolerance import printed_deviations
 from sh_vn_brass_fillister_screw_spec import HEAD_H as FILLISTER_HEAD_H
 
 # ASME B landscape field and title block (sheet metres).
@@ -21,6 +22,12 @@ BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
 TITLE_BLOCK = (0.216, 0.0127, 0.4191, 0.066)
 # Half extent of one printed dimension value (about 2.5 mm a character).
 TEXT_HALF_H = 0.002
+
+
+def _limits(nominal: float, places: int) -> tuple[float, float]:
+    """The least and greatest part the inch sheet accepts for a model value."""
+    lower, upper = printed_deviations(nominal, places, unit=spec.UNIT)
+    return nominal + lower, nominal + upper
 
 
 def _inside(xy, box) -> bool:
@@ -66,20 +73,22 @@ def test_printed_guide_and_screw_numbers_resolve_to_the_registered_parts() -> No
 
 
 def test_boss_walls_survive_the_printed_band():
-    assert spec.SOCKET_BOSS_WALL_MIN == pytest.approx(
-        (spec.SOCKET_BOSS_DIA - printed_band_mm(1)) / 2.0 - 2.184 / 2.0
-    )
-    assert spec.SOCKET_BOSS_WALL_MIN >= 2.0
+    assert spec.UNIT == "in"
+    smallest_boss = _limits(spec.SOCKET_BOSS_DIA, spec.DRAWING_PRECISION_BY_NAME["Boss2Dia"])[0]
+    major = THREAD_MAJOR_MM[spec.SOCKET_SPEC.size]
+    assert spec.SOCKET_BOSS_WALL_MIN == pytest.approx(smallest_boss / 2.0 - major / 2.0)
+    assert spec.SOCKET_BOSS_WALL_MIN >= WALL_TARGET_MM
 
 
 def test_boss_roots_print_a_single_max_limit_on_the_right_view():
     # r7 review: the 4X tap bosses' root corner was unstated.  Each takes the
-    # tool-nose round up to R0.5, printed "4X R0.5 MAX": swTolMAX prints the
+    # tool-nose round up to R.020, printed "4X R.020 MAX": swTolMAX prints the
     # nominal, so the model carries the limit and its band runs down to sharp.
-    assert spec.SOCKET_BOSS_FILLET_R == 0.5
+    assert spec.SOCKET_BOSS_FILLET_R == pytest.approx(0.020 * 25.4)
     assert spec.SOCKET_BOSS_FILLET_BAND == (0.0, -spec.SOCKET_BOSS_FILLET_R)
     places = spec.DRAWING_PRECISION_BY_NAME["BossFilletR"]
-    assert round(spec.SOCKET_BOSS_FILLET_R, places) == spec.SOCKET_BOSS_FILLET_R
+    printed = spec.SOCKET_BOSS_FILLET_R / 25.4 * 10**places
+    assert printed == pytest.approx(round(printed))
     # The printed round is the upper boss nearest the right view's eye (+X);
     # the build rounds it alone and the other three in a second feature, both
     # on one global, each picked on its root circle at the back face.
@@ -98,17 +107,16 @@ def test_boss_roots_print_a_single_max_limit_on_the_right_view():
 
 
 def test_counterbore_floor_holds_the_user_accepted_worst_case():
-    # User ruling 2026-10-14: the thin floor is accepted at its 0.67 worst
-    # case and printed as a reference; nothing may thin it further.
+    # User ruling 2026-10-14 (pd-platen RV-02): the thin floor is accepted at
+    # its 0.67 worst case and printed as a reference; nothing may thin it.
     depth_places = spec.DRAWING_PRECISION_BY_NAME["Depth"]
     cbore_places = spec.GUIDE_CALLOUT_PRECISION["hw-cbdepth"]
     worst = (
-        round(spec.PLATE_THICKNESS, depth_places)
-        - printed_band_mm(depth_places)
-        - round(spec.CBORE_DEPTH, cbore_places)
-        - printed_band_mm(cbore_places)
+        _limits(spec.PLATE_THICKNESS, depth_places)[0]
+        - _limits(spec.CBORE_DEPTH, cbore_places)[1]
     )
     assert worst == pytest.approx(spec.CBORE_FLOOR_MIN)
+    assert worst == pytest.approx(0.027 * 25.4)
     assert worst >= 0.67
     assert spec.CBORE_FLOOR == pytest.approx(spec.PLATE_THICKNESS - spec.CBORE_DEPTH)
     # The reference line crosses the floor's annulus, clear of the through hole
@@ -172,11 +180,11 @@ def test_printed_stations_place_every_hole():
 
 def test_shallowest_printed_counterbore_still_sinks_the_head():
     places = spec.GUIDE_CALLOUT_PRECISION["hw-cbdepth"]
-    shallowest = round(spec.CBORE_DEPTH, places) - printed_band_mm(places)
+    shallowest = _limits(spec.CBORE_DEPTH, places)[0]
     assert shallowest - FILLISTER_HEAD_H == pytest.approx(spec.HEAD_RECESS_MIN)
     assert spec.HEAD_RECESS_MIN > 0.0
-    # The counterbore Ø prints .X: the head still clears its smallest Ø.
-    assert spec.CBORE_DIA - printed_band_mm(1) > 4.6482
+    # The counterbore Ø prints .XX: the head still clears its smallest Ø.
+    assert _limits(spec.CBORE_DIA, spec.GUIDE_CALLOUT_PRECISION["hw-cbdia"])[0] > 4.6482
 
 
 def test_views_and_annotations_stay_in_the_field():

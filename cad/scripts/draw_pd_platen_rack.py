@@ -4,7 +4,8 @@ The long front/top/end group is aligned at 1:1. A separately labelled 4:1
 end view defines the stepped brass section and soft-solder seam in solid
 lines. The standard shaded-with-edges isometric supplements those views.
 All sizes, decimal places and note contents come from the saved part and
-its pure-data spec; this recipe owns only placement.
+its pure-data spec; this recipe owns only placement. The sheet prints decimal
+inch (the part's ``drawing_unit: in``).
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _check import check
 from _com import _early_bound
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _drawing_common import (
@@ -161,6 +163,7 @@ async def build(adapter: Any) -> dict[str, str]:
         property_view=PART_STEM,
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,

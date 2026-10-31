@@ -18,6 +18,7 @@ from pd_transgear_pin_spec import (
     PRESS_INTERFERENCE,
     RING_NUMBER,
     RUNNING_MATES,
+    inch_text,
 )
 
 TEXT_PREFIX = 1  # swDimensionTextPrefix
@@ -33,11 +34,11 @@ GROOVE_CALLOUT = f"FOR {RING_NUMBER} RING, McMASTER {RING.SKU}"
 GROOVE_WIDTH_CALLOUT = f"FOR {RING_NUMBER} RING"
 # The shank's band names its two fits at the Ø (rule 4, review of 6de7230aa
 # and the 2026-10-23 ENFORCE review): the press in the arm's ream and the
-# running bores whose bearing surface the Ra 1.6 marks.
+# running bores whose bearing surface the Ra 63 marks.
 SHANK_CALLOUT = "\n".join(
     (
         f"PRESS FIT IN {ARM_NUMBER} REAM,",
-        f"{PRESS_INTERFERENCE[0]:.3f}-{PRESS_INTERFERENCE[1]:.3f} "
+        f"{inch_text(PRESS_INTERFERENCE[0], 4)}-{inch_text(PRESS_INTERFERENCE[1], 4)} "
         "DIAMETRAL INTERFERENCE;",
         f"RUNS IN {', '.join(RUNNING_MATES)}",
     )
@@ -60,7 +61,7 @@ if any("\n" in text for text in CALLOUTS[CALLOUT_ABOVE].values()):
 
 # The dome heights follow from each radius on its land's Ø, and the land
 # ahead of the groove from the tip apex's station, the load wall's and the
-# tip dome: all three print as REFERENCES, "(0.8)", "(1.5)", "(2.60)"
+# tip dome: all three print as REFERENCES, "(.03)", "(.04)", "(.12)"
 # (rules 10 and 11: the land ends at the dome's junction, which the shop
 # cannot pick up).
 REFERENCE_TEXT: dict[tuple[str, str], dict[int, str]] = {

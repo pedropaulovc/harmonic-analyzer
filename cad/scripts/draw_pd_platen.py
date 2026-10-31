@@ -1,9 +1,10 @@
 r"""Create the curated machinist drawing for the platen plate (MHA-PD-02).
 
-The platen is a 269.64 x 134.82 brass plate, 3.85 thick, with four Ø7 bosses
+The platen is a 10.62 x 5.31 brass plate, .152 thick, with four Ø.28 bosses
 standing proud of its back face round the #2-56 clip-screw through taps and
-ten counterbored #4 loose through holes for the guide screws.  The sheet runs
-at 1:2: the front view carries the outline, the bosses and every hole
+ten counterbored #4 loose through holes for the guide screws.  The sheet
+prints decimal inch (the part's ``drawing_unit: in``) and runs at 1:2: the
+front view carries the outline, the bosses and every hole
 coordinate from the plate's bottom-left corner, an enlarged 1:1 right view the
 thickness on a native text shelf clear of its witnesses and the boss height,
 a 4:1 partial section A-A through one
@@ -70,6 +71,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _section_axis import position_section_caption
 from _session import run_build
@@ -132,7 +134,7 @@ ISO_NOTE_XY = (0.338, 0.168)
 RIGHT_NOTE_XY = (0.262, 0.100)
 # Section A-A: a partial cut down the top row's middle guide hole (x =
 # CBORE_SECTION_X, its cutting plane the part's CBORE_SECTION_PLANE) from
-# SECTION_SPAN below the hole's centre to as far above, past the 6.5
+# SECTION_SPAN below the hole's centre to as far above, past the Ø.26
 # counterbore's rim, at 4:1 (36 mm tall), +Y up.  The floor reference stands
 # mid-annulus below the hole (pd_platen_spec), so its value hangs below the
 # cut's lower end, where the dimension line runs under the text: the text
@@ -144,7 +146,7 @@ _SECTION_S = SECTION_SCALE[0] / SECTION_SCALE[1] / 1000.0
 SECTION_SPAN = 4.5
 SECTION_CENTER = (0.390, 0.114)
 SECTION_CAPTION_XY = (0.385, 0.157)
-# The value's widest row (r5 sheet: "0.67 MIN WORST CASE", 49 mm) ends 2.5
+# The value's widest row (".027 MIN WORST CASE", ~47 mm) ends 2.5
 # short of the near extension line, the floor's counterbore face.
 _SECTION_TEXT_HALF_WIDTH = 0.0245
 SECTION_TEXT_RIGHT = (
@@ -200,8 +202,8 @@ _SOCKET_LOW_Y, _SOCKET_HIGH_Y = sorted({y for _, y in SOCKET_XY})
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  Below the front view the X coordinates stack from the corner,
-# smallest nearest, 7.5 mm apart: the left sockets' 5.393 and the first guide
-# hole's 26.964 print outboard of the plate's left edge (their spans are
+# smallest nearest, 7.5 mm apart: the left sockets' .170 and the first guide
+# hole's 1.062 print outboard of the plate's left edge (their spans are
 # narrower than the text), left of the bottom guide row's Y dimension so its
 # outside arrow strikes neither; the rest mid-span, the overall width
 # outermost.  The guide rows' Y coordinates stand left of the plate, each value
@@ -587,7 +589,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,

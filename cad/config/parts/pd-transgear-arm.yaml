@@ -6,7 +6,8 @@ pd-transgear-arm:
   finish: bright machined; protect with ISO VG 32 machine-oil film
   quantity: 1
   tolerance_class: machined_block
-  process: "saw from 5/16 x 1 precision-ground flat stock (McMaster 9517K466), faces as supplied; mill the outline to the pivot radius and the square end; drill and ream the pivot bore and counterbore the rear spot face; drill and ream the pin bore through, square to the faces, for the MHA-PD-23 press; drill, countersink both sides and tap the plate clamp holes through; before the MHA-PD-23 pin is pressed, clamp MHA-PD-19 on the rear face and, on the mill DRO, set its knob bore at the MHA-PD-00 VIEW K coordinates from the pin bore, indicated true; drill the two common 1.80 locating pilots through the plate and through the arm in that setting; finish plate holes 2.010–2.020 through and arm holes 1.990–2.000 through, separately, with mouth breaks 0.05 MAX; reassemble the original matched pair and inspect the actual hole positions, S-K setting and complete loaded free-motion envelope; drill and ream the blind latch-pin hole flat-bottomed into the square end"
+  process: "saw from 5/16 x 1 precision-ground flat stock (McMaster 9517K466), faces as supplied; mill the outline to the pivot radius and the square end; drill and ream the pivot bore and counterbore the rear spot face; drill and ream the pin bore through, square to the faces, for the MHA-PD-23 press; drill, countersink both sides and tap the plate clamp holes through; before the MHA-PD-23 pin is pressed, clamp MHA-PD-19 on the rear face and, on the mill DRO, set its knob bore at the MHA-PD-00 VIEW K coordinates from the pin bore, indicated true; drill the two common .070 locating pilots through the plate and through the arm in that setting; finish the plate holes to MHA-PD-19 and the arm holes .0784–.0786 through, separately, with mouth breaks .0019 MAX; reassemble the original matched pair and inspect the actual hole positions, S-K setting and complete loaded free-motion envelope; drill and ream the blind latch-pin hole flat-bottomed into the square end"
+  drawing_unit: in
   installation_notes: |-
     INSTALLATION - MATCHED ARM / ARM PLATE
     SET THE SPECIFIED CRITICAL S-K POSE BEFORE MATCH-REAMING.
@@ -25,6 +26,6 @@ pd-transgear-arm:
       reason: "owner ruling 2026-10-27 (#1379): \"MHA-PD-18 latch pin should never come out.\" A permanent press; it is not removed in service, so rule 16's removal path does not apply (owner-accepted)"
     - id: "RV-04"
       kind: "minor"
-      where: "end view, the latch-pin hole callout: PIN HOLE TO FACES 1.67 MIN"
-      finding: "latch-pin hole ligament to the front and rear faces below the 2.0 mm target (rule 17)"
-      reason: "owner ruling 2026-10-27 (#1379): the Ø3.175 MHA-PD-VN-58 hole at mid-thickness of the 5/16 stock leaves 1.678 at full budget, printed 1.67 MIN (stock band ±0.0254, .XXX height band ±0.13 from the title block per coordinator ruling (a), 0.3 deg run-off over the deepest hole, both 0.25 breaks at the mouth), above the 1.5 floor; the next stock size up is tracked in #2019"
+      where: "end view, the latch-pin hole callout: PIN HOLE TO FACES .065 MIN"
+      finding: "latch-pin hole ligament to the front and rear faces below the .080 target (rule 17)"
+      reason: "owner ruling 2026-10-27 (#1379): the .125 MHA-PD-VN-58 hole at mid-thickness of the 5/16 stock leaves .0659 at full budget, printed .065 MIN (stock band ±.001, .XXX height band ±.005 from the title block per coordinator ruling (a), 0.3 deg run-off over the deepest hole, both .010 breaks at the mouth), above the .060 floor; the next stock size up is tracked in #2019"

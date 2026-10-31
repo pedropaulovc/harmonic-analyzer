@@ -308,6 +308,7 @@ def add_feature_control_frame(
     datums: Sequence[str] = (),
     diameter: bool = False,
     projected_zone_height_mm: float | None = None,
+    projection_unit: str = "mm",
     quantity: str = "",
     all_around: bool = False,
     label: str,
@@ -366,6 +367,7 @@ def add_feature_control_frame(
         projected_zone_height_mm=projected_zone_height_mm,
         translated=translated,
         outside_disposition=outside_disposition,
+        projection_unit=projection_unit,
     )
     draw = adapter.currentModel
     expected_signature = _gtol_frame_signature(xml)
@@ -995,6 +997,7 @@ def project_part_pmi(
             datums=control.datums,
             diameter=control.tolerance_zone == "diametral",
             projected_zone_height_mm=control.projected_zone_height_mm,
+            projection_unit=control.projection_unit,
             label=f"{label} {control.key}",
             entity_type=placement.attachment_type,
             entity=placement.entity,

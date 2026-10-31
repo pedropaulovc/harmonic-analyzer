@@ -1,6 +1,7 @@
 r"""Create the curated machinist drawing for the platen support bar (MHA-PD-07).
 
-A 452 x 28 x 9 steel bar clamped across the frame columns. Its BACK face
+A 17.8 x 1.102 x .374 steel bar clamped across the frame columns, printed in
+decimal inch (#290). Its BACK face
 carries the transgear pivot's #8-32 through tap and the latch hook's two
 #4-40 through taps on one row; its FRONT face, which the platen slides on,
 carries the four clamp screws: two counterbored holes on the east column and
@@ -15,7 +16,7 @@ two counterbored slots on the west one (owner ruling 2026-10-15, option A).
 * The lower view looks on the front face (``*Back``, so the left end is on
   the sheet's right): the banded height, the clamp row's banded stations
   from the same end and its banded height (ClampRowReference), the round
-  counterbores' native callout (depth at .XX) naming the back-arc taps the
+  counterbores' native callout (depth at .XX, sizes at .XXX) naming the back-arc taps the
   row locates to, and the front face's slide roughness. Each
   roughness symbol has its reason beside it; the sheet has no general note.
 * Detail C looks face-on at the outer slot: the slot's and its
@@ -86,6 +87,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
 from _hole_spec import blind_cut_dia_mm
 from _paths import CAD_ROOT
+from _part_properties import part_drawing_unit
 from _layout_audit import display_box
 from _layout_geometry import Box, Segment, segment_box_overlap_length
 from _machinist_review_mode import MachinistReviewMode
@@ -112,8 +114,9 @@ from pd_support_bar_spec import (
 )
 from pd_support_bar_drawing_spec import (
     BACK_VIEW_CAPTION,
+    BRACKET_TAP_CALLOUT_PRECISION,
+    CLAMP_CALLOUT_PRECISION,
     CLAMP_CBORE_CALLOUT,
-    CLAMP_CBORE_DEPTH_PLACES,
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -224,9 +227,9 @@ FACE_CAPTION_TOP = (0.150, FACE_BOTTOM - 4.0 * ROW_STEP - 0.008)
 # audit: outside-border). Naming the MHA-SH-02 taps makes it four lines of
 # at most 11 characters: about 18-47 mm by 97-117 mm, under its lower
 # extension line (122 mm) and left of detail C's letter (51 mm). The long
-# rows stand 6 and 7 mm apart, not 8: 8 mm stepping put the 440.50 line a
+# rows stand 6 and 7 mm apart, not 8: 8 mm stepping put the 17.345 line a
 # hairline over detail C's counterbore-width text, whose upper limit then
-# read as part of the 440.50 dimension (machinist review, 2026-10-23).
+# read as part of the 17.345 dimension (machinist review, 2026-10-23).
 BACK_KEEP = {
     "ClampStation1": (RIGHT_END + 0.019, BACK_BOTTOM - 0.010),
     "ClampStation2": (RIGHT_END + 0.019, BACK_BOTTOM - 0.018),
@@ -669,7 +672,7 @@ def _assert_slot_callout_clear(
     adapter: Any, annotations: list[Any], section: Any, back_annotations: list[Any]
 ) -> None:
     """Prove detail C's native width text and leader clear section B-B, and its
-    text has air under the front view's 440.50 line (machinist review: its
+    text has air under the front view's 17.345 line (machinist review: its
     upper limit hung a hairline under that line and read as part of it)."""
     matches = [
         annotation
@@ -695,11 +698,11 @@ def _assert_slot_callout_clear(
     if air < CLEAR_GAP_M:
         raise RuntimeError(
             f"slot counterbore width text {text!r} is {air:.4f} m from the "
-            f"440.50 station's lines {station_lines!r}"
+            f"17.345 station's lines {station_lines!r}"
         )
     _telemetry.info(
         f"slot counterbore width clearance: text={ink.text!r}, "
-        f"native text={text!r}, 440.50 air={air:.4f}, "
+        f"native text={text!r}, 17.345 air={air:.4f}, "
         f"segments={ink.leader!r}, section B-B outline={outline!r}"
     )
 
@@ -1173,12 +1176,12 @@ def _assert_slot_marker_clear(
     marker_left = min((*arrows[0::3], *texts[0::3]))
     if marker_left - witness_x < FRONT_CAPTION_AIR_M:
         raise RuntimeError(
-            f"section B-B marker still meets 440.50 witness: "
+            f"section B-B marker still meets 17.345 witness: "
             f"arrows={arrows!r}, texts={texts!r}, witness_x={witness_x!r}"
         )
     _telemetry.info(
         f"section B-B unchanged plane={actual!r}, arrows={arrows!r}, "
-        f"texts={texts!r}, 440.50 witness_x={witness_x!r}"
+        f"texts={texts!r}, 17.345 witness_x={witness_x!r}"
     )
 
 
@@ -1188,7 +1191,11 @@ _THREAD_CLASS_TOKEN = " <hw-threadclass>"
 def _drop_thread_class(adapter: Any, display: Any) -> None:
     """Drop the Hole Wizard's thread-class token from the native TAP
     callout's definition (rule 2: the title block's THREADS row carries the
-    class); the other tokens stay live (draw_sm_knife_mount precedent)."""
+    class); the other tokens stay live (draw_sm_knife_mount precedent). The
+    tap drill prints .XXX."""
+    set_hole_callout_precision(
+        display, BRACKET_TAP_CALLOUT_PRECISION, label="latch-hook base taps"
+    )
     display = _early_bound(display, "IDisplayDimension")
     before = str(display.GetText(5) or "")  # swDimensionTextPrefixDefinition
     if before.count(_THREAD_CLASS_TOKEN) != 1:
@@ -1206,11 +1213,11 @@ def _drop_thread_class(adapter: Any, display: Any) -> None:
 
 def _name_clamp_screws(display: Any) -> None:
     """Hang the back-arc taps the holes locate to and the screws' part number
-    under the counterbores' native callout, and print its depth at the .XX
-    its head clearance takes."""
+    under the counterbores' native callout; its sizes print .XXX, its depth
+    the .XX its head clearance takes."""
     set_hole_callout_precision(
         display,
-        {"hw-cbdepth": CLAMP_CBORE_DEPTH_PLACES},
+        CLAMP_CALLOUT_PRECISION,
         label="clamp-screw counterbores",
     )
     display = _early_bound(display, "IDisplayDimension")
@@ -1297,7 +1304,11 @@ async def build(adapter: Any) -> dict[str, str]:
         source_model, ("Revision", "Title", *required), required=required
     )
     drawing_model, _sheet_model = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,

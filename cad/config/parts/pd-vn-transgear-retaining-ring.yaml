@@ -3,9 +3,9 @@ pd-vn-transgear-retaining-ring:
   number: MHA-PD-VN-61
   stock_name: Side-Mount External Retaining Ring
   supplier: McMaster-Carr
-  supplier_skus: [97431A260]
+  supplier_skus: [97431A240]
   material: Plain Carbon Steel
-  material_specification: "Carbon steel, phosphate coated, Rockwell C47 min, E-style for 5/32 shaft; McMaster-Carr 97431A260"
+  material_specification: "Carbon steel, phosphate coated, Rockwell C47 min, E-style for 1/8 shaft; McMaster-Carr 97431A240"
   finish: phosphate
   installation_notes: |-
     INSTALLATION - TRANSGEAR PIN MHA-PD-23 GROOVE, FRONT OF MHA-PD-25;
@@ -13,3 +13,4 @@ pd-vn-transgear-retaining-ring:
   quantity: 1
   tolerance_class: machined_block
   process: purchased
+  drawing_unit: in

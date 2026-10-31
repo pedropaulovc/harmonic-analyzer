@@ -7,6 +7,7 @@ pd-transgear-pivot-spacer:
   quantity: 1
   tolerance_class: machined_block
   process: "turned from bar (brass): drill and ream the bore, face both ends to length"
+  drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
@@ -17,4 +18,4 @@ pd-transgear-pivot-spacer:
       kind: "accept"
       where: "the O.D.'s circular runout frame to the pressed bore (datum A)"
       finding: "runout frame over-specified (rule 5)"
-      reason: "bounds the bore's offset in bar chucked as supplied, which the 2.0 wall target is charged against (owner ruling 2026-10-27, #1380)"
+      reason: "bounds the bore's offset in bar chucked as supplied, which the .080 wall target is charged against (owner ruling 2026-10-27, #1380)"

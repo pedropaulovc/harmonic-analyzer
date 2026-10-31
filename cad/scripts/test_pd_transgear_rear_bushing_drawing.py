@@ -16,6 +16,7 @@ import pd_transgear_pin_spec as pin
 import pd_transgear_rear_bushing_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM
 
@@ -57,25 +58,25 @@ def test_the_bore_runs_on_the_pin_and_names_it() -> None:
     callout = drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert callout.splitlines()[0] == "REAM THRU"
     assert pin.PIN_NUMBER in callout
-    assert f"{low:.3f}-{high:.3f}" in callout
+    assert f"{pin.inch_text(low, 4)}-{pin.inch_text(high, 4)}" in callout
 
 
 def test_wall_holds_the_target_at_the_printed_worst_case() -> None:
     worst = (
         spec.OD
-        - printed_band_mm(spec.OD_PLACES)
+        - printed_band_mm(spec.OD_PLACES, unit=spec.UNIT)
         - (spec.BORE_DIA + spec.BORE_DIA_BAND[0])
     ) / 2.0
-    assert worst >= 2.0
+    assert worst >= WALL_TARGET_MM
 
 
 def test_the_length_is_a_printed_term_of_the_disc_cluster_stack() -> None:
-    """#2038: printed 2 places, +/-0.02, named on the stack; nothing is faced
+    """#2038: printed 4 places, +/-.0007, named on the stack; nothing is faced
     to fit, set at assembly or supplied as a blank."""
     assert spec.LENGTH == fit.REAR_BUSHING_LENGTH
     assert spec.LENGTH_BAND == fit.LENGTH_BAND == PRINTED_LENGTH_BAND
-    assert spec.LENGTH_PLACES == fit.LENGTH_PLACES == 2
-    assert spec.DRAWING_PRECISION_BY_NAME["RingLength"] == 2
+    assert spec.LENGTH_PLACES == fit.LENGTH_PLACES == 4
+    assert spec.DRAWING_PRECISION_BY_NAME["RingLength"] == 4
     assert "RingLength" not in spec.REFERENCE_DIMENSIONS
     callout = drawing.DIMENSION_CALLOUTS["RingLength"]
     assert callout == spec.LENGTH_CALLOUT

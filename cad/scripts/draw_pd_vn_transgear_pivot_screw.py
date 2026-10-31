@@ -58,6 +58,7 @@ from _layout_audit import (
     _segment_crossing, _segment_enters_box, annotation_geometry, calibrate_sheet_advance, display_box,
 )
 from _layout_geometry import Box, Segment, segment_box_distance
+from _part_properties import part_drawing_unit
 from _session import run_build
 from _stock_trim_drawing import verify_machining_controls
 from _supplier_dimensions import (
@@ -1966,7 +1967,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter.currentModel, required, required=required
     )
     draw, _sheet = new_project_drawing(
-        adapter, property_view=SPEC.artifact_stem, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter, property_view=SPEC.artifact_stem, scale=SHEET_SCALE, layout=SPEC.layout,
+        unit=part_drawing_unit("pd-vn-transgear-pivot-screw"),
     )
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="finished and original pivot-screw stock")
     if not _early_bound(draw, "IDrawingDoc").ActivateSheet(SHEET_NAMES[0]):

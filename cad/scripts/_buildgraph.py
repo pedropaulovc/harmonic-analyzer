@@ -2390,21 +2390,10 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         # Angular row sets the lever-level acceptance the summing sheet prints,
         # held inside the knife edge's free-rock floor.
         "sm_summing_assembly_sheet",
-        "pd_vn_guide_lock_screw_spec",
         "dt_vn_post_mount_screw_spec",
         "ch_vn_spring_hook_spec",
-        "pd_transgear_disc_hub_spec",
-        "pd_transgear_removable_notes",
-        # Edge-break row sizes the knob tip and the rack window/lateral stacks.
-        "paper_drive_geom",
-        "paper_drive_rack_travel",
+        # Edge-break row sizes the knob tip.
         "pd_transgear_knob_shaft_spec",
-        # Edge-break row shortens the sleeve's bore span in the collar air stack.
-        "pd_cluster_air",
-        # Edge-break row sizes the pivot spacer's wall and its seat flat.
-        "pd_transgear_pivot_spacer_spec",
-        # Edge-break row comes off the locating holes' walls to the arm's edge.
-        "pd_transgear_arm_geometry",
     }
 )
 

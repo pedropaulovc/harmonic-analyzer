@@ -44,6 +44,7 @@ from _drawing_tables import insert_hole_table
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
 from _paths import CAD_ROOT
+from _part_properties import part_drawing_unit
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
@@ -55,7 +56,7 @@ from build_pd_platen_guide import (
 from pd_platen_guide_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    GEOMETRIC_TOLERANCES_MM,
+    GEOMETRIC_TOLERANCES_IN,
     SURFACE_FINISHES,
     TAPPED_HOLE_SPEC,
 )
@@ -194,8 +195,14 @@ async def build(adapter: Any) -> dict[str, str]:
             "Isometric View Note",
         ),
     )
+    # Three places by default: the hole tables' basic stations sit on the
+    # .001 grid (the platen's guide holes) and print in full.
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        layout=SPEC.layout,
+        decimals=3,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -288,9 +295,10 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         hole_entities=front_hole_entities,
         # X LOC = the station from the left face (datum C); Y LOC = the bar's
-        # hole-line height above the bottom face, a constant 2.50.
+        # hole-line height above the bottom face. The sheet prints inches, so
+        # the cells are checked against the stations in inches.
         expected_locations_mm=tuple(
-            (station, (FRONT_HOLE_Y_M - FRONT_BOTTOM_Y_M) * 1000.0)
+            (station / 25.4, (FRONT_HOLE_Y_M - FRONT_BOTTOM_Y_M) * 1000.0 / 25.4)
             for station in FRONT_X
         ),
         anchor_xy=(HOLE_TABLE_X_M, HOLE_TABLE_Y_M),
@@ -305,7 +313,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         hole_entities=rear_hole_entities,
         expected_locations_mm=tuple(
-            (station, (BACK_HOLE_Y_M - BACK_BOTTOM_Y_M) * 1000.0) for station in REAR_X
+            (station / 25.4, (BACK_HOLE_Y_M - BACK_BOTTOM_Y_M) * 1000.0 / 25.4)
+            for station in REAR_X
         ),
         anchor_xy=(REAR_HOLE_TABLE_X_M, HOLE_TABLE_Y_M),
         starting_hole_tag="B",
@@ -393,7 +402,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # leader threads datum A's box and the 10.00 extension line >= 3.1 mm.
         frame_xy=(0.322, 0.0895),
         characteristic="flatness",
-        tolerance=GEOMETRIC_TOLERANCES_MM["platen-mating face flatness"],
+        tolerance=GEOMETRIC_TOLERANCES_IN["platen-mating face flatness"],
         label="platen-mating face flatness",
     )
     add_feature_control_frame(
@@ -412,7 +421,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # already level with the frame.
         frame_xy=(0.384, 0.1135),
         characteristic="parallelism",
-        tolerance=GEOMETRIC_TOLERANCES_MM["guide opposite-face parallelism"],
+        tolerance=GEOMETRIC_TOLERANCES_IN["guide opposite-face parallelism"],
         datums=("A",),
         label="guide opposite-face parallelism",
     )
@@ -426,7 +435,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # 3.2 mm under the dimension line and 3.6 mm clear of the A1 tag.
         frame_xy=(0.097, 0.129),
         characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["guide hole-pattern position"],
+        tolerance=GEOMETRIC_TOLERANCES_IN["guide hole-pattern position"],
         datums=("A", "B", "C"),
         diameter=True,
         quantity="9X",

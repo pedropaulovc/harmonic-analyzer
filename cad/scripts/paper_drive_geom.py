@@ -25,7 +25,7 @@ import pd_latch_hook_geometry as hook
 import pd_transgear_pivot_spacer_spec as spacer
 import pd_vn_transgear_latch_pin_spec as latch_pin
 import pd_latch_hook_spec as hook_spec
-from _printed_tolerance import angular_band_deg
+from _printed_tolerance import angular_band_deg, edge_break_chamfer_mm
 from _gear_quality import (
     rack_flank_constraint_deviation_mm,
     pinion_pitch_index_deviation_mm,
@@ -96,7 +96,7 @@ def _loaded_hanger_bounds() -> tuple[float, float, float]:
     mounting = (
         bar.HOLE_POSITION_BAND + hook_spec.POSITION_TOL + hook_spec.HEAD_FLOAT_MAX
         + hook.SHEET_T_PLUS
-        + bend_lever * math.tan(math.radians(angular_band_deg()))
+        + bend_lever * math.tan(math.radians(angular_band_deg(unit=hook_spec.UNIT)))
     )
     static = math.sqrt(2.0) * (
         mounting + hook_spec.FORMED_BAND + bar.HOLE_POSITION_BAND
@@ -238,9 +238,7 @@ def feed_service_cocking_lateral_deviation_mm() -> float:
     source feed-axis tilt is used, not an assumed world-Z journal.
     Rigid quasi-static kinematics; elastic compliance excluded by scope.
     """
-    import _config
-
-    edge = float(_config.title_block("edge_break")["chamfer_max_mm"])
+    edge = edge_break_chamfer_mm(unit=pd_transgear_feed_pinion_spec.UNIT)
     if not math.isfinite(edge) or edge < 0.0:
         raise ValueError("bore end edge loss must be finite and nonnegative")
     length = (
@@ -312,7 +310,7 @@ def feed_rack_cut_end_section_maxima_mm() -> tuple[float, float]:
     def dimension_band(name: str) -> tuple[float, float]:
         nominal = rack.DRAWING_NOMINALS_MM[name]
         lower, upper = printed_deviations(
-            nominal, rack.DRAWING_PRECISION_BY_NAME[name]
+            nominal, rack.DRAWING_PRECISION_BY_NAME[name], unit=rack.UNIT
         )
         return nominal + lower, nominal + upper
 
@@ -361,7 +359,6 @@ def reducer_axis_tilt_maxima_rad() -> tuple[float, float]:
     """
     import paper_drive_arm_registration as registration
     import pd_transgear_arm_plate_geometry as plate
-    import _config
 
     low_z, high_z = reducer_working_z_band_mm()
     if not (
@@ -375,7 +372,7 @@ def reducer_axis_tilt_maxima_rad() -> tuple[float, float]:
         math.atan(spacer.FRONT_FACE_PERPENDICULARITY / spacer.FACE_PERPENDICULARITY_ZONE_DIA)
         + math.atan(spacer.REAR_FACE_PERPENDICULARITY / spacer.FACE_PERPENDICULARITY_ZONE_DIA)
     )
-    edge = float(_config.title_block("edge_break")["chamfer_max_mm"])
+    edge = edge_break_chamfer_mm(unit=pd_transgear_feed_pinion_spec.UNIT)
     feed_span = (
         pd_transgear_feed_pinion_spec.OVERALL_LENGTH
         - pd_transgear_feed_pinion_spec.STATION_TOL - 2.0 * edge

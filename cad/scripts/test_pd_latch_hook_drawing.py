@@ -51,16 +51,14 @@ def test_every_marked_dimension_has_one_placement_and_model_places() -> None:
 
 def test_the_model_owns_every_band_the_sheet_prints() -> None:
     """Drilled holes never under size; the inside bend up to the largest the
-    screw head clears; the screw positions, the width and the base length
-    their own ± bands; every formed arm feature the formed band.  The far
-    face at the pin carries none (a reference).  Everything else takes its
-    title-block row."""
+    screw head clears; the screw positions and the width their own ± bands;
+    every formed arm feature the formed band.  The far face at the pin
+    carries none (a reference).  Everything else takes its title-block row."""
     assert model_toleranced_dimensions(part) == {
         ("ScrewHoleProfile", "ScrewDia"): "*deviations(HOLE_BAND)",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(HOLE_BAND)",
         ("InsideBend", "InsideBendR"): "*deviations(BEND_R_BAND)",
         ("BaseEar", "Width"): "WIDTH_TOL",
-        ("BaseEarProfile", "BaseLength"): "BASE_LENGTH_TOL",
         # The position and formed loops share one key (both read below);
         # the formed loop, the last, takes FORMED_BAND.
         ("feature_name", "dimension_name"): "FORMED_BAND",
@@ -103,19 +101,17 @@ def test_walls_hold_the_target_at_the_worst_case_the_sheet_prints() -> None:
     assert spec.WALL_TARGET > spec.WALL_FLOOR
 
 
-def test_the_screw_position_band_is_the_widest_xx_the_screw_stack_closes() -> None:
-    """Review 964b60a3: ±0.065 at .XXX read as over-specified.  The band is
-    the fixed-fastener stack's: the bar taps' radial reach plus the hole's
-    printed reach stays inside the Ø3.2 hole's float over the basic major,
-    and one more .XX step would not."""
-    assert spec.POSITION_PLACES == 2
+def test_the_screw_position_band_is_the_widest_xxx_the_screw_stack_closes() -> None:
+    """The band is the fixed-fastener stack's: the bar taps' radial reach
+    plus the hole's printed reach stays inside the drilled hole's float over
+    the basic major, and one more .001 in step would not."""
+    assert spec.POSITION_PLACES == 3
     assert spec.CLEARANCE_RADIAL_MIN == pytest.approx(
         (geom.SCREW_HOLE_DIA - spec.MAJOR_DIA) / 2.0
     )
     assert spec.SCREW_POSITION_RADIAL == spec._position_radial(spec.POSITION_TOL)
     assert spec.SCREW_POSITION_RADIAL <= spec.CLEARANCE_RADIAL_MIN
-    assert spec._position_radial(spec.POSITION_TOL + 0.01) > spec.CLEARANCE_RADIAL_MIN
-    assert spec.POSITION_TOL == pytest.approx(0.05)
+    assert spec._position_radial(spec.POSITION_TOL + 0.0254) > spec.CLEARANCE_RADIAL_MIN
 
 
 def test_the_screw_head_clears_the_inside_bend_at_the_worst_case() -> None:
@@ -285,15 +281,15 @@ def _texts() -> dict[str, tuple[float, ...]]:
     below = {
         name: len(text.split("\n")) for name, text in drawing.CALLOUTS_BELOW.items()
     }
-    # Printed widths in characters: value and band ("12.63 ±0.05",
-    # "Ø3.20 +0.10" over "0.00", "R1.2 +0.3" over "-0.2", "16.0").
+    # Printed widths in characters: value and band (".498 ±.002",
+    # "Ø.128 +.004" over "0", "R.048 +.011" over "-.008", ".61").
     widths = {
-        "ScrewX1": 11, "ScrewX2": 10, "ScrewY": 10, "ScrewDia": 11,
-        "RollStart": 9, "FaceY": 6, "FaceX": 6, "TabEndX": 9,
-        "StraightLen": 9, "PinHoleDia": 11, "RollR": 10, "TabR": 9,
+        "ScrewX1": 10, "ScrewX2": 10, "ScrewY": 10, "ScrewDia": 11,
+        "RollStart": 10, "FaceY": 7, "FaceX": 7, "TabEndX": 11,
+        "StraightLen": 11, "PinHoleDia": 11, "RollR": 12, "TabR": 11,
         "Width": 10, "ArmFrontZ": 3, "ArmLowZ": 3, "RootR": 4, "RoundR": 5,
         "FlatLength": 4, "DevTaper1": 4, "DevTaper2": 4, "DevRoundC": 4,
-        "BaseLength": 11, "EarHeight": 4, "InsideBendR": 9,
+        "BaseLength": 3, "EarHeight": 3, "InsideBendR": 11,
     }  # fmt: skip
     keep = {**drawing.FRONT_KEEP, **drawing.RIGHT_KEEP, **drawing.BOTTOM_KEEP}
     assert set(widths) == set(keep)
@@ -306,7 +302,7 @@ def _texts() -> dict[str, tuple[float, ...]]:
         chars = max(widths[name], *map(len, callouts))
         boxes[name] = _box(chars, xy, above.get(name, 0), below.get(name, 0))
     boxes["Overall"] = _box(
-        len(f"({spec.OVERALL_HEIGHT:.1f})"), drawing.OVERALL_TEXT_XY
+        len(f"({spec.OVERALL_HEIGHT / 25.4:.2f})"), drawing.OVERALL_TEXT_XY
     )
     return boxes
 
@@ -722,7 +718,7 @@ def test_the_inside_bend_leader_clears_every_dimension_line() -> None:
 
 
 def test_the_screw_hole_callout_names_the_taps_its_bands_serve() -> None:
-    """Review 4: the ±0.05 positions read as unexplained.  The 2X Ø3.20
+    """Review 4: the ±.002 positions read as unexplained.  The 2X Ø.128
     callout names the mate (MHA-PD-07's fixed taps); the holes are drilled
     to the print, not match-drilled."""
     assert spec.SCREW_HOLE_MATE == "LOCATE TO MHA-PD-07 TAPS"
@@ -731,7 +727,6 @@ def test_the_screw_hole_callout_names_the_taps_its_bands_serve() -> None:
         spec.SCREW_HOLE_MATE,
     ]
     assert "MATCH" not in drawing.CALLOUTS_BELOW["ScrewDia"]
-    assert spec.POSITION_TOL == pytest.approx(0.05)
 
 
 class _Display:

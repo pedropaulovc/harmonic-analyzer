@@ -17,7 +17,8 @@ the bore, all imported natively from the part with the places, bands and
 callout text the part authored (``pd_transgear_feed_pinion_spec``,
 ``pd_transgear_feed_pinion_callouts``).  The oil hole is drilled through the
 seated hub at assembly, so the section carries only its one-line drill note;
-its station belongs to the hub's sheet.
+its station belongs to the hub's sheet.  Decimal-inch sheet (#290); the
+model keeps its millimetre nominals.
 """
 
 from __future__ import annotations
@@ -62,11 +63,13 @@ from _gear_drawing_entities import visible_circle_edge
 from _native_axis_datum import add_native_axis_datum
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _part_properties import part_drawing_unit
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 import pd_transgear_feed_pinion_callouts as callouts
 from paper_drive_stock_drawing import add_toothspace_callout, require_source_control
+from pd_rack_pinion_spec import inch_text
 from pd_transgear_disc_hub_spec import OIL_HOLE_DIA, OIL_HOLE_SLEEVE_Z
 from pd_transgear_feed_pinion_spec import (
     BORE_DATUM,
@@ -78,7 +81,7 @@ from pd_transgear_feed_pinion_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
-    GEOMETRIC_TOLERANCES_MM,
+    GEOMETRIC_TOLERANCES_IN,
     HUB_NUMBER,
     OUTSIDE_DIA,
     OVERALL_LENGTH,
@@ -332,7 +335,7 @@ REAR_KEEP: dict[str, tuple[float, float]] = {
 # (2026-10-27 ENFORCE review, r1-r3: the match drill named no locating part).
 OIL_HOLE_NOTE = "\n".join(
     (
-        f"\u00d8{OIL_HOLE_DIA:.1f} OIL HOLE THRU HUB AND BOSS",
+        f"\u00d8{inch_text(OIL_HOLE_DIA, 3)} OIL HOLE THRU HUB AND BOSS",
         f"DRILL AT ASSY WITH {HUB_NUMBER}; POSITION SET BY {HUB_NUMBER}",
     )
 )
@@ -398,15 +401,16 @@ SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0548)
 # "Ra 1.6" printed 13.5-37.4 mm right of and 10.8-17.2 mm above the point,
 # over the teeth and across the bore fit leader's landing at 135 degrees.  At
 # 2.5 mm the symbol's ink tops out 9 mm below that landing and its text ends
-# 7 mm left of the tip circle.  The leader lands on the bore's 180° point:
+# 7 mm left of the tip circle.  The leader lands on the bore's 170° point:
 # the nose view once ran the two-tooth span's extension lines along the
 # lower-left diagonal (machinist review, stack6: a -135° finish leader
-# crossed them); the rear-face view mirrors them lower right.  The symbol
-# stands 10 mm below the centre, so the shallower leader still passes right
-# of its own text.
+# crossed them); the rear-face view mirrors them lower right.  On the .125
+# bore (#290) the 180° point stood too near that diagonal, so the landing
+# climbs 10°, still shallow enough to pass right of the symbol's own text.
+# The symbol stands 10 mm below the centre.
 FINISH_ATTACH = (
-    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(180.0)),
-    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(180.0)),
+    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(170.0)),
+    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(170.0)),
 )
 FINISH_SYMBOL = (FRONT_CENTER[0] - HALF_OD - 0.022, FRONT_CENTER[1] - 0.010)
 FINISH_CHAR_HEIGHT = 0.0025
@@ -809,7 +813,11 @@ async def build(adapter: Any) -> dict[str, str]:
         label="feed pinion toothspace/index control",
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("pd-transgear-feed-pinion"),
     )
     stamp_drawing_summary(
         adapter,
@@ -820,7 +828,8 @@ async def build(adapter: Any) -> dict[str, str]:
             2: "Harmonic Analyzer Project",
             3: (
                 f"transgear pinion sleeve; steel; {TEETH}T {DIAMETRAL_PITCH:g}DP "
-                f"PA{PRESSURE_ANGLE_DEG:g} finite stock form s={RADIAL_SETTING:.3f} mm; D-flat boss"
+                f"PA{PRESSURE_ANGLE_DEG:g} finite stock form s={inch_text(RADIAL_SETTING, 4)} in; "
+                "D-flat boss"
             ),
             4: "Generated from the project-owned ASME B drawing standard",
         },
@@ -928,7 +937,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=STEP_FACE_EDGE,
         frame_xy=STEP_FRAME,
         characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["step face perpendicularity to bore"],
+        tolerance=GEOMETRIC_TOLERANCES_IN["step face perpendicularity to bore"],
         datums=(BORE_DATUM,),
         label="step face perpendicularity",
     )
