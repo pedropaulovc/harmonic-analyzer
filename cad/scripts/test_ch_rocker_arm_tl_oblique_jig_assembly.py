@@ -1328,12 +1328,17 @@ def test_bracket_load_cases_hold_the_hand_abuse_thrust() -> None:
     assert leadscrew.BRACKET_OPENING_THRUST == pytest.approx(704.3, abs=0.1)
     assert leadscrew.BRACKET_SLIP_THRUST >= 1.5 * leadscrew.HAND_ABUSE_THRUST
     assert leadscrew.BRACKET_SLIP_THRUST >= 1.5 * spec.FEED_THRUST_N
-    # TL-00 step 1 prints the one torque where the bracket screws go in.
-    assert (
-        "STATION, 4 #8-32 X 5/8 SHCS (ITEM "
-        f"{spec.ITEM_NUMBERS[spec.BRACKET_SCREW]}) PER BRACKET FROM BELOW, "
-        "2.8 N·m (25 IN·LBF)."
-    ) in spec.ASSEMBLY_STEPS[0]
+
+
+@pytest.mark.parametrize("nm", (0.4, 2.8, 4.0, 19.2))
+def test_printed_in_lbf_never_exceeds_its_n_m_torque(nm) -> None:
+    """Every torque prints both units; the in·lbf, derived from the N·m, is
+    within 0.1 below it, so a fitter on either wrench never over-torques."""
+    printed = spec._torque(nm)
+    in_lbf = float(printed.split("(", 1)[1].split(" ", 1)[0])
+    assert printed.startswith(f"{nm:.1f} N·m (")
+    exact = nm / (4.4482216152605 * 0.0254)
+    assert exact - 0.1 < in_lbf <= exact
 
 
 

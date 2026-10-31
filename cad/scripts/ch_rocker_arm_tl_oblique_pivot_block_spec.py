@@ -171,7 +171,11 @@ CALLOUTS_BELOW = {
     # lines pass left of it.
     "CboreFloor": f"M4x20 IN HGH15CA:\n{ENGAGEMENT_TEXT} MIN ENGAGEMENT",
     "BlockLength": "SETS COUNTERBORE END WALL",
-    "BlockWidth": "SETS COUNTERBORE SIDE WALL",
+    # Two narrow rows between the row (CarriageDrills3Y/4Y) values and the
+    # BlockSideY and TL-32 PlanOverallY dimension lines (x 231 and 285 on TL-32's
+    # sheet). One 26-character row spanned x 225..294 and met all three
+    # (layout audit, farm run 20261031T200222206Z).
+    "BlockWidth": "SETS COUNTERBORE\nSIDE WALL",
 }
 REFERENCE_SKETCHES = (CBORE_FLOOR_REFERENCE, PLAN_DATUM_REFERENCE)
 WALLS_MM = {
