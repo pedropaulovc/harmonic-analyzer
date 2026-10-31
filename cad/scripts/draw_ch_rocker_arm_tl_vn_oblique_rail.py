@@ -440,19 +440,29 @@ async def build(adapter: Any) -> dict[str, str]:
         # save flag before export; existing evidence does not attribute the
         # first dirty operation. Never save it or reset that flag. Qualified
         # supplier checks enforce read-only identity/configuration and bytes.
-        capture_clean_source(source, model, label=PART_STEM, check=SourceCheck.NATIVE_CLEAN)
+        capture_clean_source(
+            source, model, label=PART_STEM, check=SourceCheck.NATIVE_CLEAN
+        )
         configuration = _early_bound(
-            _early_bound(model.ConfigurationManager, "IConfigurationManager")
-            .ActiveConfiguration,
+            _early_bound(
+                model.ConfigurationManager, "IConfigurationManager"
+            ).ActiveConfiguration,
             "IConfiguration",
         ).Name
         if not isinstance(configuration, str) or not configuration.strip():
             raise RuntimeError("rail source has no active configuration")
         guard = _supplier_source_checkpoint(
-            adapter, source, model, source_sha256,
-            label=PART_STEM, evidence=[], configuration=configuration,
+            adapter,
+            source,
+            model,
+            source_sha256,
+            label=PART_STEM,
+            evidence=[],
+            configuration=configuration,
         )
-        return await _build_reference_sheet(adapter, source, model, configuration, guard)
+        return await _build_reference_sheet(
+            adapter, source, model, configuration, guard
+        )
     except BaseException as error:
         primary = error
         raise
@@ -461,7 +471,9 @@ async def build(adapter: Any) -> dict[str, str]:
         # without dereferencing source or view handles after a close attempt.
         try:
             if _source_file_sha256(source) != source_sha256:
-                raise RuntimeError(f"{PART_STEM}: supplier source part bytes changed during drawing")
+                raise RuntimeError(
+                    f"{PART_STEM}: supplier source part bytes changed during drawing"
+                )
         except BaseException as preservation_error:
             if primary is None:
                 raise

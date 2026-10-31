@@ -53,7 +53,10 @@ SUPPLIER_MARGINS = supplier_screw_margins(
 
 def _legacy_text_shelves():
     """Translate the recipe's axis names only at the legacy helper boundary."""
-    return {name: (axis == "horizontal", side) for name, (axis, side) in TEXT_SHELVES.items()}
+    return {
+        name: (axis == "horizontal", side)
+        for name, (axis, side) in TEXT_SHELVES.items()
+    }
 
 
 def _align_right_origin(adapter: Any, views: dict[str, Any]):
@@ -64,13 +67,18 @@ def _align_right_origin(adapter: Any, views: dict[str, Any]):
         scale = tuple(float(value) for value in view.ScaleRatio)
         angle = float(view.Angle)
         if (
-            len(position) != 2 or len(scale) != 2
+            len(position) != 2
+            or len(scale) != 2
             or not all(isfinite(value) for value in (*position, *scale, angle))
         ):
             raise RuntimeError(f"gooseneck {name}: unreadable fitted view placement")
         before[name] = (
-            position, scale, angle, str(view.GetReferencedModelName()),
-            str(view.ReferencedConfiguration), str(view.GetOrientationName()),
+            position,
+            scale,
+            angle,
+            str(view.GetReferencedModelName()),
+            str(view.ReferencedConfiguration),
+            str(view.GetOrientationName()),
         )
     front_origin = model_point_in_view(
         adapter, views["*Front"], (0.0, 0.0, 0.0), label="gooseneck Front fitted origin"
@@ -92,14 +100,18 @@ def _align_right_origin(adapter: Any, views: dict[str, Any]):
             expected = target if name == "*Right" else position
             actual = tuple(float(value) for value in view.Position)
             if (
-                len(actual) != 2 or not all(isfinite(value) for value in actual)
+                len(actual) != 2
+                or not all(isfinite(value) for value in actual)
                 or any(abs(a - b) > 1e-8 for a, b in zip(actual, expected, strict=True))
-                or tuple(view.ScaleRatio) != scale or float(view.Angle) != angle
+                or tuple(view.ScaleRatio) != scale
+                or float(view.Angle) != angle
                 or str(view.GetReferencedModelName()) != source
                 or str(view.ReferencedConfiguration) != configuration
                 or str(view.GetOrientationName()) != orientation
             ):
-                raise RuntimeError(f"gooseneck {name}: native placement/source/scale drift")
+                raise RuntimeError(
+                    f"gooseneck {name}: native placement/source/scale drift"
+                )
         _assert_projection_alignment(adapter, views)
 
     settled()
@@ -149,14 +161,18 @@ async def build(adapter: Any) -> dict[str, str]:
             sides=SUPPLIER_REFERENCE_SIDES,
             settled_checks=supplier_checks,
         )
-        shelf_stations.update(shelve_supplier_text(adapter, displays, _legacy_text_shelves()))
+        shelf_stations.update(
+            shelve_supplier_text(adapter, displays, _legacy_text_shelves())
+        )
 
     def assert_supplier_dimensions_settled():
         nonlocal settled
         if settled or callback_count != 1 or len(supplier_checks) != 1:
             raise RuntimeError("supplier dimensions require exactly one settled proof")
         displays = supplier_checks[0]()
-        assert_supplier_shelves(adapter, displays, _legacy_text_shelves(), shelf_stations)
+        assert_supplier_shelves(
+            adapter, displays, _legacy_text_shelves(), shelf_stations
+        )
         _assert_projection_alignment(adapter, supplier_views)
         settled = True
 

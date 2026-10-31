@@ -327,14 +327,32 @@ def test_projection_proof_refuses_origin_or_scale_drift(
             draw._assert_projection_alignment(object(), views)
 
 
-@pytest.mark.parametrize("drift", [None, "right_x", "front_y", "scale", "angle", "source", "configuration", "orientation"])
-def test_post_fit_alignment_moves_only_right_y_and_retains_settled_state(monkeypatch, drift):
+@pytest.mark.parametrize(
+    "drift",
+    [
+        None,
+        "right_x",
+        "front_y",
+        "scale",
+        "angle",
+        "source",
+        "configuration",
+        "orientation",
+    ],
+)
+def test_post_fit_alignment_moves_only_right_y_and_retains_settled_state(
+    monkeypatch, drift
+):
     from types import SimpleNamespace
 
     def view(name, position):
         return SimpleNamespace(
-            Position=position, ScaleRatio=(1, 1), Angle=0.0,
-            source="supplier.SLDPRT", configuration="Default", orientation=name,
+            Position=position,
+            ScaleRatio=(1, 1),
+            Angle=0.0,
+            source="supplier.SLDPRT",
+            configuration="Default",
+            orientation=name,
             GetReferencedModelName=lambda: views[name].source,
             GetOrientationName=lambda: views[name].orientation,
         )
@@ -348,7 +366,11 @@ def test_post_fit_alignment_moves_only_right_y_and_retains_settled_state(monkeyp
     # Expose COM's configuration property while allowing mutation.
     for native in views.values():
         native.ReferencedConfiguration = "Default"
-    monkeypatch.setattr(draw, "model_point_in_view", lambda adapter, native, point, **kw: native.Position)
+    monkeypatch.setattr(
+        draw,
+        "model_point_in_view",
+        lambda adapter, native, point, **kw: native.Position,
+    )
     moves = []
 
     def translate(adapter, native, x, y, *, move_children):
@@ -386,17 +408,24 @@ def test_post_fit_alignment_moves_only_right_y_and_retains_settled_state(monkeyp
 
 def test_wrapper_runs_placement_before_origin_snapshot_and_retains_proof():
     source = inspect.getsource(purchased._build_reference_sheet)
-    assert source.index("scales = _fit_views") < source.index("placement_check = view_placement(")
-    assert source.index("placement_check = view_placement(") < source.index("fitted_origins:")
+    assert source.index("scales = _fit_views") < source.index(
+        "placement_check = view_placement("
+    )
+    assert source.index("placement_check = view_placement(") < source.index(
+        "fitted_origins:"
+    )
     assert "settled_checks = (*settled_checks, placement_check)" in source
     wrapper = ast.parse(inspect.getsource(purchased.build_purchased_fastener_drawing))
     calls = [
-        node for node in ast.walk(wrapper)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        node
+        for node in ast.walk(wrapper)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
         and node.func.id == "_build_reference_sheet"
     ]
     assert len(calls) == 1
     assert any(
-        keyword.arg == "view_placement" and ast.unparse(keyword.value) == "view_placement"
+        keyword.arg == "view_placement"
+        and ast.unparse(keyword.value) == "view_placement"
         for keyword in calls[0].keywords
     )

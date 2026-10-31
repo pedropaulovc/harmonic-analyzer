@@ -406,7 +406,8 @@ def test_sheet_stays_hiwin_millimetres_by_its_own_declaration() -> None:
     build = next(
         node
         for node in tree.body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_build_reference_sheet"
+        if isinstance(node, ast.AsyncFunctionDef)
+        and node.name == "_build_reference_sheet"
     )
     calls = {
         node.func.id: {kw.arg: ast.unparse(kw.value) for kw in node.keywords}
@@ -424,26 +425,37 @@ def test_sheet_stays_hiwin_millimetres_by_its_own_declaration() -> None:
 def test_sheet_proves_its_source_at_every_boundary() -> None:
     tree = ast.parse(Path(draw.__file__).read_text(encoding="utf-8"))
     sheet = next(
-        node for node in tree.body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_build_reference_sheet"
+        node
+        for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef)
+        and node.name == "_build_reference_sheet"
     )
     calls = {
-        node.func.id: node for node in ast.walk(sheet)
+        node.func.id: node
+        for node in ast.walk(sheet)
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     }
     for name in ("new_project_drawing", "finalize_drawing"):
         keywords = {kw.arg: ast.unparse(kw.value) for kw in calls[name].keywords}
         assert keywords["checkpoint"] == "guard", name
     public = next(
-        node for node in tree.body
+        node
+        for node in tree.body
         if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
     )
     public_calls = {
-        node.func.id: node for node in ast.walk(public)
+        node.func.id: node
+        for node in ast.walk(public)
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     }
-    assert public_calls["_open_supplier_source_read_only"].lineno < public_calls["capture_clean_source"].lineno
-    assert public_calls["capture_clean_source"].lineno < public_calls["_build_reference_sheet"].lineno
+    assert (
+        public_calls["_open_supplier_source_read_only"].lineno
+        < public_calls["capture_clean_source"].lineno
+    )
+    assert (
+        public_calls["capture_clean_source"].lineno
+        < public_calls["_build_reference_sheet"].lineno
+    )
 
 
 class _SourceDocument:
@@ -451,6 +463,7 @@ class _SourceDocument:
         self.path = path
         self.dirty = dirty
         from types import SimpleNamespace
+
         self.read_only = True
         self.ConfigurationManager = SimpleNamespace(
             ActiveConfiguration=SimpleNamespace(Name="Supplier")
@@ -473,6 +486,7 @@ class _OpenAdapter:
     def __init__(self, document) -> None:
         self.currentModel = document
         from types import SimpleNamespace
+
         self.swApp = SimpleNamespace(
             GetOpenDocumentByName=lambda _path: document,
             IsSame=lambda left, right: 1 if left is right else 0,
@@ -497,6 +511,7 @@ def _guarded_rail(monkeypatch, tmp_path, document_for):
         lambda _model, names, *, required: dict.fromkeys(names, "x"),
     )
     import _purchased_fastener_drawing as purchased
+
     monkeypatch.setattr(purchased, "iter_views", lambda _adapter: [])
     return source, _OpenAdapter(document_for(source))
 
@@ -508,7 +523,10 @@ def _guarded_rail(monkeypatch, tmp_path, document_for):
             lambda source: _SourceDocument(source, dirty=True),
             "before the drawing starts",
         ),
-        (lambda source: _SourceDocument(source.with_name("other.SLDPRT")), "path identity mismatch"),
+        (
+            lambda source: _SourceDocument(source.with_name("other.SLDPRT")),
+            "path identity mismatch",
+        ),
     ),
 )
 def test_sheet_refuses_a_dirty_or_foreign_source_before_drawing(
@@ -537,7 +555,8 @@ def test_sheet_refuses_a_source_rewritten_during_the_drawing(
 
     monkeypatch.setattr(draw, "new_project_drawing", new_drawing)
     with pytest.raises(
-        RuntimeError, match="source checkpoint after_new_document:.*source part bytes changed"
+        RuntimeError,
+        match="source checkpoint after_new_document:.*source part bytes changed",
     ):
         asyncio.run(draw.build(adapter))
 
@@ -876,7 +895,9 @@ def test_rail_refuses_a_writable_source_before_drawing(monkeypatch, tmp_path) ->
         asyncio.run(draw.build(adapter))
 
 
-@pytest.mark.parametrize("defect", ("none", "writable", "replacement", "configuration", "bytes"))
+@pytest.mark.parametrize(
+    "defect", ("none", "writable", "replacement", "configuration", "bytes")
+)
 def test_rail_qualified_supplier_checkpoint_guards_presentation(
     monkeypatch, tmp_path, defect
 ) -> None:
@@ -927,17 +948,22 @@ def test_rail_qualified_supplier_checkpoint_guards_presentation(
         assert original.dirty is True  # No reset or source save.
         assert source.read_bytes() == b"rail source"
     else:
-        with pytest.raises(RuntimeError, match={
-            "writable": "not read-only",
-            "replacement": "native identity mismatch",
-            "configuration": "configuration mismatch",
-            "bytes": "source part bytes changed",
-        }[defect]):
+        with pytest.raises(
+            RuntimeError,
+            match={
+                "writable": "not read-only",
+                "replacement": "native identity mismatch",
+                "configuration": "configuration mismatch",
+                "bytes": "source part bytes changed",
+            }[defect],
+        ):
             asyncio.run(draw.build(adapter))
 
 
 @pytest.mark.parametrize("fail", (False, True))
-def test_rail_final_byte_guard_also_covers_error_paths(monkeypatch, tmp_path, fail) -> None:
+def test_rail_final_byte_guard_also_covers_error_paths(
+    monkeypatch, tmp_path, fail
+) -> None:
     source, adapter = _guarded_rail(monkeypatch, tmp_path, _SourceDocument)
     primary = asyncio.CancelledError("drawing cancelled")
 
@@ -954,5 +980,7 @@ def test_rail_final_byte_guard_also_covers_error_paths(monkeypatch, tmp_path, fa
         assert caught.value is primary
         assert "source file preservation also failed" in "\n".join(primary.__notes__)
     else:
-        with pytest.raises(RuntimeError, match="source part bytes changed during drawing"):
+        with pytest.raises(
+            RuntimeError, match="source part bytes changed during drawing"
+        ):
             asyncio.run(draw.build(adapter))
