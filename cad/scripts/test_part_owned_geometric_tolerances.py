@@ -12,7 +12,10 @@ import pytest
 
 SCRIPTS = Path(__file__).parent
 FCF_HELPER = "add_feature_control_frame"
-TOLERANCE_MAPPING = "GEOMETRIC_TOLERANCES_MM"
+# A converted (#290) spec authors GEOMETRIC_TOLERANCES_IN as its literal
+# source and derives GEOMETRIC_TOLERANCES_MM from it; an unconverted spec
+# authors the MM table. Drawings may subscript either.
+TOLERANCE_MAPPINGS = ("GEOMETRIC_TOLERANCES_IN", "GEOMETRIC_TOLERANCES_MM")
 
 
 def _fcf_calls(tree: ast.AST) -> list[ast.Call]:
@@ -34,23 +37,25 @@ def _keyword(call: ast.Call, name: str) -> ast.AST:
 
 def _part_mapping(spec_path: Path) -> dict[str, str]:
     tree = ast.parse(spec_path.read_text(encoding="utf-8"), filename=str(spec_path))
-    for node in tree.body:
-        if not isinstance(node, ast.AnnAssign):
-            continue
-        if not isinstance(node.target, ast.Name):
-            continue
-        if node.target.id != TOLERANCE_MAPPING:
-            continue
-        assert isinstance(node.value, ast.Dict)
-        raw_keys = [ast.literal_eval(key) for key in node.value.keys]
-        assert all(isinstance(key, str) for key in raw_keys)
-        assert len(raw_keys) == len(set(raw_keys)), (
-            f"{spec_path}: duplicate {TOLERANCE_MAPPING} keys"
-        )
-        mapping = ast.literal_eval(node.value)
-        assert isinstance(mapping, dict)
-        return mapping
-    raise AssertionError(f"{spec_path} lacks {TOLERANCE_MAPPING}")
+    for name in TOLERANCE_MAPPINGS:
+        for node in tree.body:
+            if not isinstance(node, ast.AnnAssign):
+                continue
+            if not isinstance(node.target, ast.Name) or node.target.id != name:
+                continue
+            if not isinstance(node.value, ast.Dict):
+                continue
+            raw_keys = [ast.literal_eval(key) for key in node.value.keys]
+            assert all(isinstance(key, str) for key in raw_keys)
+            assert len(raw_keys) == len(set(raw_keys)), (
+                f"{spec_path}: duplicate {name} keys"
+            )
+            mapping = ast.literal_eval(node.value)
+            assert isinstance(mapping, dict)
+            return mapping
+    raise AssertionError(
+        f"{spec_path} lacks a literal {' or '.join(TOLERANCE_MAPPINGS)}"
+    )
 
 
 def _loop_string_bindings(tree: ast.AST) -> dict[str, tuple[str, ...]]:
@@ -89,14 +94,12 @@ def _mapping_reference_keys(
     node: ast.Subscript, loop_bindings: dict[str, tuple[str, ...]]
 ) -> tuple[str, ...]:
     assert isinstance(node.value, ast.Name)
-    assert node.value.id == TOLERANCE_MAPPING
+    assert node.value.id in TOLERANCE_MAPPINGS
     if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
         return (node.slice.value,)
     if isinstance(node.slice, ast.Name) and node.slice.id in loop_bindings:
         return loop_bindings[node.slice.id]
-    raise AssertionError(
-        f"line {node.lineno}: cannot prove {TOLERANCE_MAPPING} key set"
-    )
+    raise AssertionError(f"line {node.lineno}: cannot prove {node.value.id} key set")
 
 
 def _require_part_band_profile(
@@ -192,8 +195,10 @@ def test_all_drawing_fcf_values_come_from_part_specs() -> None:
 
         spec_path = SCRIPTS / f"{drawing.stem.removeprefix('draw_')}_spec.py"
         mapping = _part_mapping(spec_path)
-        assert mapping, f"{spec_path}: empty {TOLERANCE_MAPPING}"
-        assert all(re.fullmatch(r"\d+(?:\.\d+)?", value) for value in mapping.values())
+        assert mapping, f"{spec_path}: empty geometric tolerance mapping"
+        assert all(
+            re.fullmatch(r"\d+(?:\.\d+)?|\.\d+", value) for value in mapping.values()
+        )
         assert all(float(value) > 0.0 for value in mapping.values())
         loop_bindings = _loop_string_bindings(tree)
         spec_tree = ast.parse(spec_path.read_text(encoding="utf-8"))
@@ -203,7 +208,7 @@ def test_all_drawing_fcf_values_come_from_part_specs() -> None:
             if (
                 isinstance(tolerance, ast.Subscript)
                 and isinstance(tolerance.value, ast.Name)
-                and tolerance.value.id == TOLERANCE_MAPPING
+                and tolerance.value.id in TOLERANCE_MAPPINGS
             ):
                 assert all(
                     key in mapping
@@ -219,7 +224,7 @@ def test_all_drawing_fcf_values_come_from_part_specs() -> None:
                 continue
             if not isinstance(node.value, ast.Name):
                 continue
-            if node.value.id != TOLERANCE_MAPPING:
+            if node.value.id not in TOLERANCE_MAPPINGS:
                 continue
             references.extend(_mapping_reference_keys(node, loop_bindings))
         assert Counter(references) == Counter(mapping.keys()), (
@@ -280,6 +285,20 @@ def test_part_band_projection_cannot_supply_other_characteristics(characteristic
             tree, _fcf_calls(tree)[0], ast.parse("HEIGHT_BAND = (0.5, 0.0)"), "sample_spec",
         )
 
+
+def test_inch_source_mapping_is_the_spec_table(tmp_path: Path) -> None:
+    spec = tmp_path / "sample_spec.py"
+    spec.write_text(
+        'GEOMETRIC_TOLERANCES_IN: dict[str, str] = {"bore position": ".008"}\n'
+        "GEOMETRIC_TOLERANCES_MM: dict[str, float] = {\n"
+        "    k: float(v) * 25.4 for k, v in GEOMETRIC_TOLERANCES_IN.items()\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    assert _part_mapping(spec) == {"bore position": ".008"}
+    reference = ast.parse('GEOMETRIC_TOLERANCES_IN["bore position"]').body[0]
+    assert isinstance(reference, ast.Expr) and isinstance(reference.value, ast.Subscript)
+    assert _mapping_reference_keys(reference.value, {}) == ("bore position",)
 
 
 def test_within_limits_are_not_literal_drawing_values() -> None:
