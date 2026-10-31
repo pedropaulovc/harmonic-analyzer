@@ -501,10 +501,24 @@ requirement(
 # to their lower end centres (station from the spindle end, rise from the
 # faced -Y side); width and the end centres' run at .XX.
 for _name, _x, _y, _rise, _x_source, _y_source, _rise_source in (
-    ("near_slot", NEAR_SLOT_X, part_spec.NEAR_SLOT_Y, NEAR_SLOT_RISE,
-     "NEAR_SLOT_X", "NEAR_SLOT_Y", "NEAR_SLOT_RISE"),
-    ("far_slot", FAR_SLOT_X, FAR_SLOT_Y, FAR_SLOT_RISE,
-     "FAR_SLOT_X", "FAR_SLOT_Y", "FAR_SLOT_RISE"),
+    (
+        "near_slot",
+        NEAR_SLOT_X,
+        part_spec.NEAR_SLOT_Y,
+        NEAR_SLOT_RISE,
+        "NEAR_SLOT_X",
+        "NEAR_SLOT_Y",
+        "NEAR_SLOT_RISE",
+    ),
+    (
+        "far_slot",
+        FAR_SLOT_X,
+        FAR_SLOT_Y,
+        FAR_SLOT_RISE,
+        "FAR_SLOT_X",
+        "FAR_SLOT_Y",
+        "FAR_SLOT_RISE",
+    ),
 ):
     requirement(
         _name,
@@ -516,7 +530,11 @@ for _name, _x, _y, _rise, _x_source, _y_source, _rise_source in (
         ),
         requirements=("width", "separation", "station", "height", "thru"),
         fields={
-            "at": ([_x, _y, part_spec.BAR_THICK], (_x_source, _y_source, "BAR_THICK")),
+            # The end centre nearer the -Y side: the point the station and rise locate.
+            "at": (
+                [_x, _y - SLOT_RUN / 2.0, part_spec.BAR_THICK],
+                (_x_source, _y_source, "SLOT_RUN", "BAR_THICK"),
+            ),
             "axis": _INTO_BAR,
             "width": (
                 limits(part_spec.SLOT_WIDTH, part_spec.SLOT_PLACES),
@@ -568,7 +586,7 @@ for _index, _x in enumerate(part_spec.RAIL_HOLE_X, start=1):
     }
     requirement(
         f"rail_hole_{_index}",
-        kind="hole",
+        kind="threaded_hole",
         faces=(CylinderFace(part_spec.TAP_DRILL, contains_x_mm=_x),),
         requirements=("thread", "dia", "station", "height", "thru", "note"),
         fields={

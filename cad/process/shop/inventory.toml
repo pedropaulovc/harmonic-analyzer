@@ -3463,6 +3463,23 @@ solids = [
   { name = "T-nut neck", shape = "box", at_mm = [26.1, -6.5, -40.4375], size_mm = [24.0, 13.0, 6.0], supply = "bought", fastener = "1/2-13", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "generic T-nut estimate and authored seating pose; verify undercut fit and engagement" } },
 ]
 
+# Work flat on the table (base bar T1/T2, top 12.0 to 12.7 above the table) with a 3 in
+# stud. The T-nut is pulled up under the slot lip, so its seat is fixed by the table, not
+# by the strap: it is not drawn here (a strap-relative solid would float 0.65-1.35 below the
+# lip at these heights). It stays inside the table slot, below the table top, where no tool
+# in those setups reaches. The stud ends at local Z-34.7, inside the table model's undercut
+# (Z-24..-14) for any top in that range. Same component estimates as strap-pad; not
+# surveyed hardware.
+[fixtures.clamping-kit-pm-52pcck-14mm.members.strap-pad-table]
+kind = "strap_clamp"
+note = "Direct-table selection: 3 in stud, work 12.0-12.7 thick flat on the table; the T-nut under the slot lip is not drawn. Generic component estimates; verify kit dimensions and thread engagement before use."
+solids = [
+  { name = "strap", shape = "box", at_mm = [-12.7, -12.7, 0.0], size_mm = [76.2, 25.4, 12.7], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-31", instrument = "generic catalogue-size estimate; replace with caliper readings" } },
+  { name = "stud-slot", shape = "box", at_mm = [23.1, -6.75, -1.0], size_mm = [30.0, 13.5, 14.7], void = true, cuts = ["strap"], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-31", instrument = "generic clearance-slot estimate; replace with caliper readings" } },
+  { name = "stud", shape = "cylinder", at_mm = [38.1, 0.0, -34.7], axis = [0.0, 0.0, 1.0], dia_mm = 12.7, length_mm = 76.2, supply = "bought", fastener = "1/2-13", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-31", instrument = "3 in stud nominal and authored seating pose; verify with calipers" } },
+  { name = "flange-nut", shape = "cylinder", at_mm = [38.1, 0.0, 12.7], axis = [0.0, 0.0, 1.0], dia_mm = 28.0, length_mm = 13.0, supply = "bought", fastener = "1/2-13", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-31", instrument = "generic flange-nut envelope estimate; replace with caliper readings" } },
+]
+
 # Thin-part face-first hold (Pedro 2026-10-17, ruling (c) via #1577). Flat work fits
 # between the plate clamps: cuts stay inside X+/-250 and Y+/-60, about 19.7 x 4.7 in.
 # It is faced on double-sided film tape over a MIC-6 sub-plate, with no clamp over the
@@ -6439,7 +6456,7 @@ cite = ["OnlineMetals part 20743 https://www.onlinemetals.com/en/buy/carbon-stee
 [[stock]]
 form = "flat_bar"
 material = "6061-T6511 aluminium"
-note = "Owned OnlineMetals 1173, 1/2 x 6 x 72 in: allocate the TL-21 carrier and both TL-20 base bars (owner ruling #2083, 2026-10-30: mill the owned bar to width, no bandsaw rip; about 1430 of the 1829 mm). TL-21: saw a 540 mm length and rip it to about 135 mm wide on the bandsaw first: the 152.4 mm width does not fit the 6 in vise's 5 3/4 in stock hard jaws (owner ruling 2026-10-30), then face to 12.0 mm and mill the 520 x 130 outline (#2083 drops the rip; carrier note not yet revised). TL-20: two 443 mm blanks, the long edges milled on edge in the vise to 139.7 wide, both faces faced to 12.0. Purchased nominal dimensions are not receipt measurements."
+note = "Owned OnlineMetals 1173, 1/2 x 6 x 72 in: allocate the TL-21 carrier and both TL-20 base bars (owner ruling #2083, 2026-10-30: mill the owned bar to width, no bandsaw rip; about 1430 of the 1829 mm). TL-21: a 540 mm length for the 520 x 130 x 12.0 carrier; its process route is not yet written (#2083). TL-20: two 443 mm blanks, the long edges milled on edge in the vise to 139.7 wide, both faces faced to 12.0. Purchased nominal dimensions are not receipt measurements."
 section_mm = [152.4, 12.7]
 length_mm = 1828.8
 on_hand = true

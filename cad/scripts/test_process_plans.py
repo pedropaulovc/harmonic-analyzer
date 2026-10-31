@@ -696,6 +696,44 @@ def _hold_solids(fixtures: dict, ref: str) -> list[dict]:
     return record["solids"]
 
 
+def _vise_jaw_boxes(
+    fixtures: dict, hold: dict, seat_z: float, top: float
+) -> list[tuple[str, tuple[list[float], list[float]]]]:
+    """Setup-frame boxes of an unposed vise hold's jaw plates that stand above ``top``.
+
+    The jaws close on the work over the parallels, so each jaw's inner face is taken at
+    the outer face of the parallel nearest it; real jaws are never closer to the work."""
+    name = hold["fixture"]
+    vise = fixtures[name]
+    assert vise["kind"] == "vise", f"{name}: an unposed hold must be a vise"
+    assert "jaws_angle_deg" not in hold, f"{name}: swivelled jaws not modelled"
+
+    def mm(record: dict, key: str) -> float:
+        field = record[key]
+        return float(field["value"] if isinstance(field, dict) else field) * 25.4
+
+    jaw_top = seat_z + hold["jaw_above_parallels_mm"]
+    if jaw_top <= top:
+        return []
+    kit, _, member = hold["parallels"].partition("/")
+    parallels = {**fixtures[kit], **fixtures[kit].get("members", {}).get(member, {})}
+    reach = mm(parallels, "width_in") / 2
+    across = 1 - "xy".index(hold["jaws_along"])
+    rows = sorted(centre[across] for centre in hold["parallels_centres_mm"])
+    inner = (rows[0] - reach, rows[-1] + reach)
+    half, depth = mm(vise, "jaw_width_in") / 2, mm(vise, "jaw_depth_in")
+    centre = hold["jaw_center_along_mm"]
+    boxes = []
+    for side, span in (
+        ("jaw low", (inner[0] - depth, inner[0])),
+        ("jaw high", (inner[1], inner[1] + depth)),
+    ):
+        low, high = [centre - half] * 2 + [seat_z], [centre + half] * 2 + [jaw_top]
+        low[across], high[across] = span
+        boxes.append((side, (low, high)))
+    return boxes
+
+
 def _posed_box(solid: dict, pose: dict) -> tuple[list[float], list[float]]:
     """Conservative setup-frame AABB for supported box and cylinder primitives."""
     x, z = pose["x"], pose["z"]
@@ -809,9 +847,9 @@ def test_posed_unknown_primitive_names_the_solid():
 def test_every_touch_spot_clears_the_hold_by_the_tool_radius_plus_1mm(stem):
     # A paper touch lowers the tool onto the work's top face at a spot the plan names in
     # prose (prechips 0.1.2 has no touch-position field). The tool's widest diameter must
-    # clear, in plan view, every hold solid standing above that face (the strap clamps) by
-    # 1 mm; solids wholly under it (table, riser blocks, shim stacks) cannot meet a tool
-    # that stops on it, and a touch over a support is the stiffest spot.
+    # clear, in plan view, every hold solid standing above that face (strap clamps, vise
+    # jaws) by 1 mm; solids wholly under it (table, riser blocks, shim stacks) cannot meet
+    # a tool that stops on it, and a touch over a support is the stiffest spot.
     shop = tomllib.loads(
         (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8")
     )
@@ -827,17 +865,25 @@ def test_every_touch_spot_clears_the_hold_by_the_tool_radius_plus_1mm(stem):
             continue
         hold = setup["hold"]
         top = setup["stock_state"]["top_z"]
-        placed = [(hold["fixture"], hold["pose"])] + [
-            (clamp["ref"], clamp["pose"]) for clamp in hold.get("clamps", ())
-        ]
-        boxes = [
-            (ref, solid.get("name", "?"), box)
-            for ref, pose in placed
-            for solid in _hold_solids(shop["fixtures"], ref)
-            if not solid.get("void", False)
-            for box in [_posed_box(solid, pose)]
-            if box[1][2] > top
-        ]
+        if "pose" in hold:
+            placed = [(hold["fixture"], hold["pose"])] + [
+                (clamp["ref"], clamp["pose"]) for clamp in hold.get("clamps", ())
+            ]
+            boxes = [
+                (ref, solid.get("name", "?"), box)
+                for ref, pose in placed
+                for solid in _hold_solids(shop["fixtures"], ref)
+                if not solid.get("void", False)
+                for box in [_posed_box(solid, pose)]
+                if box[1][2] > top
+            ]
+        else:
+            boxes = [
+                (hold["fixture"], name, box)
+                for name, box in _vise_jaw_boxes(
+                    shop["fixtures"], hold, setup["stock_state"]["bottom_z"], top
+                )
+            ]
         for tool, prose in touches:
             where = f"{stem} {setup['id']} {tool} touch"
             spot = _TOUCH_SPOT.search(prose)
