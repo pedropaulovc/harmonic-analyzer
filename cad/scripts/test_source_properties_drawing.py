@@ -21,6 +21,7 @@ executing Python. Unknown shapes fail closed. SolidWorks-free.
 from __future__ import annotations
 
 import ast
+import functools
 from pathlib import Path
 
 import pytest
@@ -478,10 +479,10 @@ def test_unknown_supplier_metadata_selection_fails_closed(tmp_path) -> None:
         _required(drawing)
 
 
-def _build_trees(build: Path) -> list[ast.Module]:
-    """Parse the producer's direct local imports, without executing or recursing."""
-    trees = [_tree(build)]
-    for node in ast.walk(trees[0]):
+def _build_sources(build: Path) -> list[Path]:
+    """The producer and its direct local imports, without executing or recursing."""
+    sources = [build]
+    for node in ast.walk(_tree(build)):
         if isinstance(node, ast.ImportFrom):
             modules = (node.module,) if node.module else ()
         elif isinstance(node, ast.Import):
@@ -493,8 +494,24 @@ def _build_trees(build: Path) -> list[ast.Module]:
                 continue
             module = SCRIPTS / f"{module_name.replace('.', '/')}.py"
             if module.is_file():
-                trees.append(_tree(module))
-    return trees
+                sources.append(module)
+    return sources
+
+
+@functools.lru_cache(maxsize=None)
+def _source_strings_and_marks(text: str) -> tuple[frozenset[str], bool]:
+    """Every string literal in ``text``, and whether it calls the mark stamper.
+
+    Keyed by content: the shared helpers that most producers import are
+    parsed once per session instead of once per drawing, and only these small
+    facts are kept, never the trees."""
+    tree = ast.parse(text)
+    strings = frozenset(
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    )
+    return strings, "apply_drawing_properties" in _call_names(tree)
 
 
 def _configured_stamped(tree: ast.Module) -> set[str]:
@@ -531,13 +548,12 @@ def _stamped(stem: str, build: Path) -> tuple[set[str], bool]:
         assert configurations, f"{build.name}: no configured members inspected"
         prefixes = tuple(f"{configuration} " for configuration in configurations)
     marks = False
-    for tree in _build_trees(build):
-        stamped |= {
-            node.value
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Constant) and isinstance(node.value, str)
-        }
-        marks = marks or "apply_drawing_properties" in _call_names(tree)
+    for source in _build_sources(build):
+        strings, calls_marks = _source_strings_and_marks(
+            source.read_text(encoding="utf-8")
+        )
+        stamped |= strings
+        marks = marks or calls_marks
     if marks:
         stamped |= _DRAWING_MARK_KEYS
     if configured:
