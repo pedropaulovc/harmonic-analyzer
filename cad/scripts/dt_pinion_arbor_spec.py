@@ -224,9 +224,7 @@ JOURNAL_CALLOUT = f"JOURNAL,\nRUNS IN {STRAP_NUMBER}"
 # rests on its land's inner end at every limit; the callout says so.
 # The callout rides the BondZoneDia dimension, which prints the size itself.
 BOND_ZONE_CALLOUT = (
-    "ALL EXCEPT JOURNALS;\n"
-    f"{DRUM_NUMBER} BOND ZONE,\n"
-    "DRUM ENDS ON JOURNALS"
+    f"ALL EXCEPT JOURNALS;\n{DRUM_NUMBER} BOND ZONE,\nDRUM ENDS ON JOURNALS"
 )
 # Smallest overlap of each drum end on its land's inner end, every printed
 # band at its limit: the front land's inner end from its .X station and .X
