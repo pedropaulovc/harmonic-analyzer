@@ -196,7 +196,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # governs (#290): "(Ø1/4 in)".
     supplier_reference_dimension(
         adapter,
-        rod_diameter,
+        rod_diameter.GetSpecificAnnotation(),
         label="RodDia",
         units="in",
         precision=0,

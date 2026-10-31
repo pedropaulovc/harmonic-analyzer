@@ -354,7 +354,7 @@ async def build(adapter: Any) -> dict[str, str]:
         process="DRILL",
     )
     set_hole_callout_precision(
-        screw_callout, SCREW_HOLE_CALLOUT_PRECISION, label="hold-down screw hole"
+        screw_callout, {"hw-diam": SCREW_HOLE_CALLOUT_PRECISION}, label="hold-down screw hole"
     )
     # Anchored on the bore rim at ~30 deg: the pivot centre's AnchorZ witness
     # leaves the rim at 0 deg and LiftBoreX's at 90 deg, and the diameter
