@@ -492,9 +492,9 @@ sections:
         - derived from matched fit
         - med
       - - Cylinder arbor length
-        - 164.88 mm cylindrical strap-to-strap span; 167.88 mm including two domes
+        - 165.20 mm cylindrical strap-to-strap span; 168.20 mm including two domes
         - —
-        - 'Current cylinder_bank_layout.ARBOR_LENGTH / ARBOR_OVERALL_LENGTH: accepted gear stack plus one 2.8 mm south disc and the 0.95 mm north spring gap, with full depth of both 10 mm pedestal straps; each dome 1.5 mm proud. User ruling 2026-10-20 removes the north disc and relocates both pedestal origins from this stack. The earlier ~200 mm estimate and 165.08 mm cylinder are historical, not current cut lengths; final length is measured at fit-up.'
+        - 'Current cylinder_bank_layout.ARBOR_LENGTH / ARBOR_OVERALL_LENGTH: accepted gear stack plus one 2.8 mm south disc and the 0.95 mm north spring gap, with full depth of both 10.16 mm (.40 in) pedestal straps; each dome 1.5 mm proud. User ruling 2026-10-20 removes the north disc and relocates both pedestal origins from this stack. The earlier ~200 mm estimate and 165.08 mm cylinder are historical, not current cut lengths; final length is measured at fit-up.'
         - derived from current bank layout
         - med
       - - Cylinder bank south end disc ×1 (user ruling 2026-10-20)
