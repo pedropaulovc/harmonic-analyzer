@@ -6,3 +6,4 @@ dt-crank-handle:
   quantity: 1
   tolerance_class: visual_noncritical
   process: "turned (wood)"
+  drawing_unit: in
