@@ -6,9 +6,10 @@ Catalogue checked 2026-10-13: https://www.mcmaster.com/92314A253/.
 specification standard and head/length tolerances. Published UNC-2A thread
 major limits are separate from those unspecified supplier tolerances.
 
-The chamfer band and thread-tail MIN below are MODIFIED-PART acceptance,
-not supplier tolerances. Retain a continuous usable tail through at least
-.418 in (10.6172 mm) from the finished tip, with at most one pitch of
+The thread-tail MIN below is MODIFIED-PART acceptance, not a supplier
+tolerance; the cut-end chamfer takes the title block's band. Retain a
+continuous usable tail through at least .418 in (10.6172 mm) from the
+finished tip, with at most one pitch of
 incomplete thread at that tip. Gauge the rest of that tail to the stock's
 UNC-2A class; the print states only #10-24 UNC because the title block's
 thread row already gives class 2A.
@@ -79,10 +80,14 @@ ENGAGEMENT_MIN_D = 1.5
 TIP_Y = 0.0
 HEAD_UNDERFACE_Y = UNDERHEAD_LEN
 HEAD_TOP_Y = HEAD_UNDERFACE_Y + HEAD_H
-# Radial leg from the native ChamferWidth, measured on the tip face:
-# .024 +/-.002.
-CHAMFER_WIDTH = 0.6096  # .024
-CHAMFER_WIDTH_TOLERANCE = 0.0508  # +/-.002
+# Radial leg from the native ChamferWidth, measured on the tip face: .030
+# under the title block's three-place row (.025-.035), no band of its own.
+# Every leg in that band brings the cut thread start inside the MHA-SM-02
+# #25 tap drill (no feather edge left on the major diameter) and keeps the
+# chamfer's axial run inside the one incomplete pitch the thread tail's
+# acceptance allows; .024 +/-.005 would not reach under the drill.
+CHAMFER_WIDTH = 0.762  # .030
+CHAMFER_WIDTH_TOLERANCE = printed_band_mm(3, unit=UNIT)  # +/-.005
 CHAMFER_WIDTH_MIN = CHAMFER_WIDTH - CHAMFER_WIDTH_TOLERANCE
 CHAMFER_WIDTH_MAX = CHAMFER_WIDTH + CHAMFER_WIDTH_TOLERANCE
 CHAMFER_ANGLE = 45.0  # Native driving angle between tip face and chamfer.
@@ -95,10 +100,6 @@ CHAMFER_ANGLE_TOLERANCE = angular_band_deg(unit=UNIT)
 CHAMFER_AXIAL_MAX = CHAMFER_WIDTH_MAX * math.tan(
     math.radians(CHAMFER_ANGLE + CHAMFER_ANGLE_TOLERANCE)
 )
-# The same leg left to the title block's three-place row (.024 +/-.005):
-# its smallest leg would leave the thread start's feather edge outside the
-# MHA-SM-02 tap drill. The explicit band is therefore functional.
-CHAMFER_WIDTH_TITLE_BLOCK_BAND = printed_band_mm(3, unit=UNIT)
 if not 0.0 < CHAMFER_AXIAL_MAX <= INCOMPLETE_TIP_LEN_MAX:
     raise AssertionError("cut-end chamfer exceeds the charged incomplete pitch")
 
@@ -119,18 +120,16 @@ DIMENSION_PRECISION = {
 }
 DIMENSION_TOLERANCE_TYPES = {
     "CutLength": 0,  # Reference: cut at MHA-SM-00 assembly.
-    "ChamferWidth": 4,
-    "ChamferAngle": 11,  # swTolGeneral: native band, title-block print.
+    "ChamferWidth": 11,  # swTolGeneral: native band, title-block print.
+    "ChamferAngle": 11,
     "ThreadLengthMin": 5,
 }
 PRINTED_THREAD = f"{THREAD} UNC"  # Class 2A comes from the title block.
 DIMENSION_CALLOUTS = {
     "CutLength": ("UNDER HEAD TO FINISHED TIP\nCUT AT ASSEMBLY\nPER MHA-SM-00 STEP 4"),
-    # The band on the leg is the engagement reason; the native ChamferAngle
+    # The leg leads the cut end into the mount's tap; the native ChamferAngle
     # prints its own 45 degrees.
-    "ChamferWidth": (
-        "CUT-END CHAMFER\nSETS FULL-THREAD ENGAGEMENT\nIN MHA-SM-02 KNIFE MOUNT"
-    ),
+    "ChamferWidth": "CUT-END CHAMFER\nLEAD-IN TO MHA-SM-02 TAP",
     "ThreadLengthMin": (
         f"{PRINTED_THREAD} CONTINUOUS TAIL FROM TIP\n"
         "INCOMPLETE CUT-END THREAD 1 PITCH MAX\n"

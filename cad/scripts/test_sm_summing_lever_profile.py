@@ -147,10 +147,15 @@ def _witness_clearance(
 
 
 def _plate_top_y_limits() -> tuple[float, float]:
-    """The printed title-block .XX limits about the printed top (.100)."""
-    printed_band = printed_band_mm(2, unit=spec.UNIT)
-    printed_top = round(spec.COEFFICIENT_TOP_Y / spec.MM_PER_IN, 2) * spec.MM_PER_IN
-    return printed_top - printed_band, printed_top + printed_band
+    """The printed chain: the top .10 (.XX) below the knife ridge, which stands
+    half the .404 (.XXX) vertex height above the axis."""
+    xx, xxx = printed_band_mm(2, unit="in"), printed_band_mm(3, unit="in")
+    ridge = round(spec.HEX_H / spec.MM_PER_IN, 3) * spec.MM_PER_IN / 2.0
+    drop = round((spec.HEX_H / 2.0 - spec.COEFFICIENT_TOP_Y) / spec.MM_PER_IN, 2) * spec.MM_PER_IN
+    low = ridge - xxx / 2.0 - (drop + xx) - spec.COEFFICIENT_TOP_Y
+    high = ridge + xxx / 2.0 - (drop - xx) - spec.COEFFICIENT_TOP_Y
+    allowance = max(-low, high)
+    return spec.COEFFICIENT_TOP_Y - allowance, spec.COEFFICIENT_TOP_Y + allowance
 
 
 def test_pilot_ordinary_bands_have_replayable_correlated_wall_witnesses() -> None:

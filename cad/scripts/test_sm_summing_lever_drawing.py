@@ -278,7 +278,7 @@ def _native_knife_height(monkeypatch, identity):
     spec = sm_summing_lever_spec
     state = SimpleNamespace(
         selected=[], picks=[], placements=[], value=(spec.HEX_H / 2.0 - spec.COEFFICIENT_TOP_Y) / 1000.0,
-        precision=2, document_precision=2, refuse_precision=False, tolerance=SimpleNamespace(Type=0),
+        precision=-2, document_precision=2, refuse_precision=False, tolerance=SimpleNamespace(Type=0),
         activate=True, missing=False, dangling=False, source_y=spec.HEX_H / 2000.0,
         view_activate=True, refuse_pick=None, extra_pick_after=None, null_dimension=False,
     )
@@ -369,9 +369,9 @@ def test_knife_height_is_a_native_point_to_actual_plate_top_dimension(monkeypatc
     assert case.state.picks == ["height.end", "plate top"]
     assert case.state.placements == [(*drawing.KNIFE_HEIGHT_LOCATION_XY, 0.0)]
     assert case.state.value * 1000.0 == pytest.approx(2.594)
-    assert case.state.precision == 3  # .102 at the title block's .XXX
-    case.state.precision = 2
-    with pytest.raises(RuntimeError, match=r"\.XXX"):
+    assert case.state.precision == 2  # .10, the title block's .XX
+    case.state.precision = 3
+    with pytest.raises(RuntimeError, match=r"\.XX"):
         check()
 
 
@@ -437,7 +437,7 @@ def test_knife_height_refuses_wrong_reference_or_lost_native_authority(monkeypat
     elif damage == "band":
         case.state.tolerance.Type = 2
     elif damage == "precision":
-        case.state.precision, case.state.refuse_precision = 2, True
+        case.state.precision, case.state.refuse_precision = 3, True
     elif damage == "owner":
         case.annotation.Owner = object()
     elif damage == "hidden":
@@ -600,7 +600,7 @@ def test_receiver_pilot_continues_from_uniform_rib_into_connected_plate() -> Non
         - joint.POSITION_BAND - drill_radius_max - wander
     )
     assert upper_plate_wall == pytest.approx(2.221731, abs=1e-6)
-    assert lower_plate_wall == pytest.approx(2.605131, abs=1e-6)
+    assert lower_plate_wall == pytest.approx(2.579731, abs=1e-6)
     assert joint.receiver_pilot_material_wall_budget() == pytest.approx(
         min(upper_plate_wall, lower_plate_wall),
     )

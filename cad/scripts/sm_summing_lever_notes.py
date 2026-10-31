@@ -151,10 +151,11 @@ SPRING_TAP_CALLOUT_PROCESS = "THREAD THRU COEFFICIENT PLATE\n"
 # --- Decimal places of the sheet's own (drawing-side) dimensions, #290. ---
 # The spring pattern's BASIC row X, start Z and pitch are calibrated stations
 # (1.5689 / .5022 / .2778): four places hold them to under .00005 in.  The
-# boss-top and knife-ridge locations of the coefficient top are exact .275 and
-# .102 at three; the 3.00 anchor X/Z keep the document's .XX.
+# boss-top (.28) and knife-ridge (.10) locations of the coefficient top take
+# the title block's .XX, as do the 3.00 anchor X/Z: their printed limits stay
+# inside every check (sm_summing_lever_profile.PLATE_TOP_Y_ALLOWANCE).
 BASIC_PLACES = 4
-FACE_LOCATION_PLACES = 3
+FACE_LOCATION_PLACES = 2
 # Each Hole Wizard length prints .XXX; the #6-32 and #10-24 tap drills (#36
 # .1065, #25 .1495) print their four-place drill size.  Both are THRU ALL
 # taps, whose native drill variable is <hw-thrutapdrldia>; only the blind
@@ -170,7 +171,7 @@ BRACKET_TAP_PRECISION = dict.fromkeys(
 RECEIVER_COORDINATE_PLACES = 4
 
 # --- Joint proofs the print relies on (drawing-guidelines rules 18 and 20). ---
-# The plate's worst-case thickness at its printed .XXX limit, less 1.5
+# The plate's worst-case thickness at its printed .XX limit, less 1.5
 # incomplete threads, must retain at least 1.5D of full #6-32 thread.
 if HOLE_SPEC.size != "#6-32":
     raise AssertionError(

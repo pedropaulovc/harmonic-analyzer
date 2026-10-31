@@ -25,7 +25,6 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import _named_dimension, apply_drawing_precision
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _fastener_catalog import fastener
 from _feature_tree import _feature_by_name, name_last_feature
 from _rebuild import (
@@ -70,7 +69,6 @@ from sm_vn_knife_hanger_stud_spec import (
     SUPPLIER_STOCK_CONFIGURATION,
     SUPPLIER_STOCK_SUPPRESSED_FEATURES,
     SUPPLIER_STOCK_TITLE,
-    UNIT,
 )
 
 PART_NAME = "sm-vn-knife-hanger-stud"
@@ -330,25 +328,22 @@ def _manufacturing_controls(adapter) -> None:
         raise RuntimeError(
             "CutLength@StockTrimProfile: reference display did not persist"
         )
-    # The leg's band holds the chamfer inside the charged incomplete pitch.
-    set_dimension_symmetric_tolerance(
-        adapter, "StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_TOLERANCE,
-        display_unit=UNIT,
-    )
-    # The driving 45-degree angle keeps its title-block band natively;
-    # swTolGeneral prints no band and leaves the title block's row in force.
-    feature, name = "StockDeburrProfile", "ChamferAngle"
-    band = math.radians(CHAMFER_ANGLE_TOLERANCE)
-    _, dimension = _named_dimension(adapter, feature, name)
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = 11  # swTolType_e.swTolGeneral
-    if (
-        not tolerance.SetValues(-band, band)
-        or int(tolerance.Type) != 11
-        or not math.isclose(float(tolerance.GetMinValue()), -band, abs_tol=1e-9)
-        or not math.isclose(float(tolerance.GetMaxValue()), band, abs_tol=1e-9)
+    # The chamfer leg and its driving 45 degrees keep the title block's bands
+    # natively; swTolGeneral prints no band and leaves those rows in force.
+    for feature, name, band in (
+        ("StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_TOLERANCE / 1000),
+        ("StockDeburrProfile", "ChamferAngle", math.radians(CHAMFER_ANGLE_TOLERANCE)),
     ):
-        raise RuntimeError(f"{name}@{feature}: cannot retain general tolerance")
+        _, dimension = _named_dimension(adapter, feature, name)
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        tolerance.Type = 11  # swTolType_e.swTolGeneral
+        if (
+            not tolerance.SetValues(-band, band)
+            or int(tolerance.Type) != 11
+            or not math.isclose(float(tolerance.GetMinValue()), -band, abs_tol=1e-9)
+            or not math.isclose(float(tolerance.GetMaxValue()), band, abs_tol=1e-9)
+        ):
+            raise RuntimeError(f"{name}@{feature}: cannot retain general tolerance")
     feature, name = "ThreadTailAcceptance", "ThreadLengthMin"
     _, dimension = _named_dimension(adapter, feature, name)
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
