@@ -101,6 +101,7 @@ def test_builder_authors_model_owned_numeral_placement_property(monkeypatch) -> 
     expression = ast.Expression(body=calls[0])
     eval(compile(expression, builder.__file__, "eval"), vars(builder), {"adapter": adapter})
     assert authored["Numeral Placement Note"] == spec.NUMERAL_PLACEMENT_NOTE
+    assert authored["Section Parent View Note"] == spec.SECTION_PARENT_VIEW_NOTE
     assert authored["Manufacturing Notes"] == spec.DRAWING_NOTES
     assert "Numeral Tool Note" not in authored
     assert "Scale End Note" not in authored
@@ -122,22 +123,29 @@ def test_current_identity_and_drawing_paths() -> None:
     ]
 
 
-def test_option_b_preserves_blank_and_grooves_and_relocates_whole_scale() -> None:
-    # 2026-10-23 owner ruling: 202 blank, scale zero and stations unchanged.
-    assert (spec.BODY_LENGTH, spec.BODY_WIDTH, spec.BODY_THICKNESS) == (202.0, 8.0, 3.0)
-    assert (spec.TICK_WIDTH, spec.TICK_DEPTH, spec.TICK_LENGTH) == (0.4, 0.5, 3.0)
-    assert (spec.MINOR_TICK_LENGTH, spec.HALF_TICK_LENGTH) == (1.8, 4.0)
+def test_inch_grid_blank_and_grooves_keep_the_calibrated_scale() -> None:
+    # Issue #290: every printed fabrication size is the exact decimal of its
+    # inch print value; scale zero and the configured pitch stay calibrated.
+    assert spec.UNIT == "in"
+    inch = {
+        "BODY_LENGTH": 7.95, "BODY_WIDTH": 0.315, "BODY_THICKNESS": 0.118,
+        "TICK_WIDTH": 0.016, "TICK_DEPTH": 0.020, "TICK_LENGTH": 0.12,
+        "MINOR_TICK_LENGTH": 0.07, "HALF_TICK_LENGTH": 0.16,
+        "NUMERAL_HEIGHT_MM": 0.08, "NUMERAL_GAP_MM": 0.02, "NUMERAL_DEPTH": 0.016,
+    }
+    for name, value_in in inch.items():
+        assert getattr(spec, name) == pytest.approx(value_in * 25.4, rel=0.0, abs=1e-9), name
+    assert spec.NUMERAL_ROTATION_DEG == 90
     assert spec.DIVISION_COUNT == 11 and spec.MINOR_PER_DIVISION == 10
-    assert spec.SCALE_END_MARGIN == pytest.approx(3.5)
-    assert spec.SCALE_START_X == pytest.approx(56.5)
-    assert spec.NUMERALS_BBOX == (57.300, 1.770, 197.700, 4.400)
+    assert spec.SCALE_START_X == pytest.approx(56.5, rel=0.0, abs=1e-9)
+    assert spec.SCALE_END_MARGIN == pytest.approx(3.43)
+    assert spec.NUMERALS_BBOX == (57.2112, 1.7864, 197.7888, 4.4450)
     assert spec.SCALE_SPAN == pytest.approx(
         (spec.DIVISION_COUNT - 1) * spec.DIVISION_SPACING, rel=0.0, abs=1e-12,
     )
     assert spec.SCALE_START_X + spec.SCALE_SPAN + spec.SCALE_END_MARGIN == pytest.approx(
-        spec.BODY_LENGTH, rel=0.0, abs=1e-12,
+        spec.BODY_LENGTH, rel=0.0, abs=1e-9,
     )
-    assert (spec.NUMERAL_HEIGHT_MM, spec.NUMERAL_GAP_MM, spec.NUMERAL_ROTATION_DEG) == (2.0, 0.6, 90)
     for name in ("BODY_LENGTH", "BODY_WIDTH", "BODY_THICKNESS", "SCALE_START_X",
                  "TICK_WIDTH", "TICK_DEPTH", "NUMERAL_LAYER_DXFS"):
         assert getattr(builder, name) == getattr(spec, name)
@@ -152,10 +160,17 @@ def test_every_printed_size_is_owned_and_precisioned_by_model() -> None:
             | set(drawing.NUMERAL_DEPTH_KEEP)
             | set().union(*(set(row[4]) for row in drawing.LENGTH_DETAILS)))
     assert kept == marked == set(spec.DRAWING_VALUES_BY_NAME) == set(spec.DRAWING_PRECISION_BY_NAME)
-    # The overall length is noncritical: one place, the .X title-block band.
-    assert {name: places for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places != 2} == {
-        "BodyLength": 1}
-    assert set(spec.DRAWING_TOLERANCES) <= marked
+    # Nothing on this part is .X (owner ruling): the overall length, tick
+    # lengths and numeral layout print .XX; the bar's section in the stop
+    # rebate, the engraving limits and the scale stations print .XXX,
+    # except the minor pitch's .XXXX; its physical band remains +/-.002.
+    assert {name: places for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places != 2} == (
+        {**dict.fromkeys(("BodyWidth", "BodyThickness", "Tick0Width", "TickDepth", "NumeralDepth",
+                         "ScaleStartX", "FullTickPitch"), 3), "MinorTickPitch": 4}
+    )
+    assert spec.DRAWING_PRECISION_BY_NAME["BodyLength"] == 2
+    # Only the scale stations carry their own band; the rest ride the title block.
+    assert set(spec.DRAWING_TOLERANCES) == {"ScaleStartX", "FullTickPitch", "MinorTickPitch"}
     assert {"BodyThickness", "TickDepth", "FullTickLength", "MinorTickLength",
             "HalfTickLength", "FullTickPitch", "MinorTickPitch", "NumeralHeight",
             "NumeralXGap", "NumeralYGap", "NumeralDepth"} <= marked
@@ -194,39 +209,64 @@ def test_scale_has_one_printed_origin_without_closing_chain() -> None:
 def test_last_graduation_is_complete_at_printed_band_extremes() -> None:
     """Noncumulative pitch allows one station error, not ten chained errors.
 
-    The overall length takes the .X title block (2026-10-23 owner ruling);
-    the graduation width is a MIN limit, so the land bounds the widest
-    groove that still leaves the last graduation whole."""
+    The overall length takes the title block's .XX because this land reads
+    it; the graduation width is a MIN limit, so the land bounds the widest
+    groove that still leaves the last graduation whole, at the .080 rule-17
+    target."""
     values, bands = spec.DRAWING_VALUES_BY_NAME, spec.DRAWING_TOLERANCES
     assert "BodyLength" not in bands
-    assert spec.DRAWING_PRECISION_BY_NAME["BodyLength"] == 1
-    stock_min = values["BodyLength"] - spec.TITLE_BLOCK_X_TOLERANCE_MM
+    assert spec.DRAWING_PRECISION_BY_NAME["BodyLength"] == 2
+    assert spec.BODY_LENGTH_TOLERANCE_MM == pytest.approx(0.254)
+    assert bands["ScaleStartX"] == bands["FullTickPitch"] == pytest.approx(0.0508)
+    stock_min = values["BodyLength"] - spec.BODY_LENGTH_TOLERANCE_MM
     last_center_max = (
         values["ScaleStartX"] + bands["ScaleStartX"]
         + (spec.DIVISION_COUNT - 1) * values["FullTickPitch"] + bands["FullTickPitch"]
     )
-    assert stock_min == pytest.approx(201.2)
-    assert last_center_max == pytest.approx(198.6)
-    # Rule 17 at the worst case: the widest stated groove keeps 2.0+ to the end.
+    assert stock_min == pytest.approx(201.676)
+    assert last_center_max == pytest.approx(198.6016)
+    # Rule 17 at the worst case: the widest stated groove keeps .080+ to the end.
     end_land = stock_min - (last_center_max + spec.GRADUATION_WIDTH_MAX_MM / 2.0)
-    assert end_land == pytest.approx(2.29) and end_land >= 2.0
-    # The stated 0.62 MAX keeps neighbours apart on the 1.42 minor pitch even
+    assert end_land == pytest.approx(2.7696)
+    assert end_land >= spec.WALL_TARGET_MM == 2.032
+    # The title block's .X (+/-.1) would break that land: the length is .XX.
+    assert end_land + spec.BODY_LENGTH_TOLERANCE_MM - 0.1 * 25.4 < spec.WALL_TARGET_MM
+    # The stated .024 MAX keeps neighbours apart on the .0559 minor pitch even
     # with both stations at their band.
     land_min = spec.MINOR_SPACING - 2.0 * spec.GRADUATION_POSITION_TOLERANCE_MM - spec.GRADUATION_WIDTH_MAX_MM
-    assert land_min == pytest.approx(0.70)
-    assert spec.GRADUATION_WIDTH_CALLOUT == "0.62 MAX ON 1.42 PITCH"
+    assert land_min == pytest.approx(0.7088)
+    assert spec.GRADUATION_WIDTH_CALLOUT == ".024 MAX ON .0559 PITCH"
     assert callouts.CALLOUTS["Tick0Width"].endswith(spec.GRADUATION_WIDTH_CALLOUT)
     last_edge_nominal = (
         values["ScaleStartX"] + (spec.DIVISION_COUNT - 1) * values["FullTickPitch"]
         + values["Tick0Width"] / 2.0
     )
-    assert values["BodyLength"] - last_edge_nominal == pytest.approx(3.30)
+    assert values["BodyLength"] - last_edge_nominal == pytest.approx(3.2268)
+
+
+def test_printed_pitches_agree_across_all_calibrated_subdivisions() -> None:
+    """Run 308 FIX: .559 full against .056 minor made ten minor pitches .560.
+    As printed, ten minor pitches are one full pitch, the groove-width callout
+    prints the same minor pitch, and every calibrated station stays inside its
+    printed noncumulative +/-.002."""
+    full_text = spec.inch_text(spec.DIVISION_SPACING, spec.DRAWING_PRECISION_BY_NAME["FullTickPitch"])
+    minor_text = spec.inch_text(spec.MINOR_SPACING, spec.DRAWING_PRECISION_BY_NAME["MinorTickPitch"])
+    assert (full_text, minor_text) == (".559", ".0559")
+    assert spec.GRADUATION_WIDTH_CALLOUT.endswith(f" ON {minor_text} PITCH")
+    full, minor = float(full_text), float(minor_text)
+    assert spec.MINOR_PER_DIVISION * minor == pytest.approx(full, rel=0.0, abs=1e-12)
+    band = spec.GRADUATION_POSITION_TOLERANCE_MM / 25.4
+    assert band == pytest.approx(0.002)
+    # The calibrated pitch stays exact (owner ruling), never snapped to inch.
+    assert (spec.DIVISION_SPACING, spec.MINOR_SPACING) == (14.2, 1.42)
+    for index in range((spec.DIVISION_COUNT - 1) * spec.MINOR_PER_DIVISION + 1):
+        assert abs(index * spec.MINOR_SPACING / 25.4 - index * minor) <= band, index
 
 
 def test_engraving_sizes_are_min_limits_and_graduation_depth_keeps_its_stock() -> None:
     """No mate needs a band on the engraving: width and both depths are
     single MIN limits (model value = printed limit) that hold the fill, and
-    the graduation depth's ceiling is the stated 2.0 of stock under it."""
+    the graduation depth's ceiling is the stated .080 of stock under it."""
     assert spec.MIN_LIMIT_TOL_TYPE == 5  # swTolType_e.swTolMIN
     assert spec.MIN_LIMIT_DEVIATIONS_MM == {
         "Tick0Width": (0.0, spec.TICK_WIDTH),
@@ -236,16 +276,19 @@ def test_engraving_sizes_are_min_limits_and_graduation_depth_keeps_its_stock() -
     assert not set(spec.MIN_LIMIT_DEVIATIONS_MM) & set(spec.DRAWING_TOLERANCES)
     for name in spec.MIN_LIMIT_DEVIATIONS_MM:
         assert callouts.CALLOUTS[name].count("HOLDS ENAMEL FILL") == 1, name
-    values, bands = spec.DRAWING_VALUES_BY_NAME, spec.DRAWING_TOLERANCES
-    assert spec.GRADUATION_FLOOR_CALLOUT == "STOCK UNDER GROOVE 2.0 MIN"
+    values = spec.DRAWING_VALUES_BY_NAME
+    assert spec.GRADUATION_FLOOR_MIN_MM == spec.WALL_TARGET_MM
+    assert spec.GRADUATION_FLOOR_CALLOUT == "STOCK UNDER GROOVE .080 MIN"
     assert callouts.CALLOUTS["TickDepth"].endswith(spec.GRADUATION_FLOOR_CALLOUT)
     # The V depth states the same stock under it, so it is bounded too.
     assert callouts.CALLOUTS["NumeralDepth"].endswith(spec.NUMERAL_FLOOR_CALLOUT)
-    assert spec.NUMERAL_FLOOR_CALLOUT == "STOCK UNDER 2.0 MIN"
-    depth_max = values["BodyThickness"] - bands["BodyThickness"] - spec.GRADUATION_FLOOR_MIN_MM
-    assert depth_max == pytest.approx(0.90)
-    assert values["TickDepth"] == pytest.approx(0.50)
-    assert values["TickDepth"] < depth_max
+    assert spec.NUMERAL_FLOOR_CALLOUT == "STOCK UNDER .080 MIN"
+    # The thickness rides the title block's .XXX (+/-.005).
+    assert spec.BODY_FIT_TOLERANCE_MM == pytest.approx(0.127)
+    depth_max = values["BodyThickness"] - spec.BODY_FIT_TOLERANCE_MM - spec.GRADUATION_FLOOR_MIN_MM
+    assert depth_max == pytest.approx(0.8382)
+    assert values["TickDepth"] == pytest.approx(0.508)
+    assert values["TickDepth"] < depth_max and values["NumeralDepth"] < depth_max
 
 
 
@@ -344,9 +387,12 @@ def test_reference_equations_follow_editable_tick_geometry(monkeypatch) -> None:
     assert edited["MinorTickPitch@MinorPitchReference"] == pytest.approx(
         (spec.DIVISION_SPACING + 0.1) / spec.MINOR_PER_DIVISION,
     )
-    assert values(TickLength=3.2)["NumeralYGap@NumeralYGapReference"] == pytest.approx(0.4)
-    assert values(TickWidth=0.6)["NumeralXGap@NumeralXGapReference"] == pytest.approx(0.5)
-    assert edited["NumeralXGap@NumeralXGapReference"] == pytest.approx(1.6)
+    assert values(TickLength=spec.TICK_LENGTH + 0.2)["NumeralYGap@NumeralYGapReference"] == pytest.approx(
+        spec.NUMERAL_GAP_MM - 0.2)
+    assert values(TickWidth=spec.TICK_WIDTH + 0.2)["NumeralXGap@NumeralXGapReference"] == pytest.approx(
+        spec.NUMERAL_GAP_MM - 0.1)
+    # Ten wider divisions pull scale zero 1.0 left of the fixed numeral anchor.
+    assert edited["NumeralXGap@NumeralXGapReference"] == pytest.approx(spec.NUMERAL_GAP_MM + 1.0)
     assert edited["NumeralHeight@NumeralHeightReference"] == pytest.approx(spec.NUMERAL_HEIGHT_MM)
     assert not any("ScaleEndReference" in name for name in equations)
     changed_margin = values(ScaleEndMargin=spec.SCALE_END_MARGIN + 0.1)
@@ -446,7 +492,8 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     def make_view(position, scale, center_x, orientation="*Back"):
         ratio = scale[0] / scale[1]
         axes = (0, 2, 1) if orientation == "*Top" else (0, 1, 2)
-        vertical_center = 0.0015 if orientation == "*Top" else 0.004
+        # The bar's mid-thickness (*Top) or mid-width (*Back), in metres.
+        vertical_center = (spec.BODY_THICKNESS if orientation == "*Top" else spec.BODY_WIDTH) / 2000.0
         name = f"offline-view-{len(views)}"
         detail_circles = []
         view = SimpleNamespace(
@@ -502,8 +549,10 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
         currentModel=object(), open_model=open_model,
         swApp=SimpleNamespace(GetMathUtility=lambda: utility),
     )
+    new_kwargs = {}
 
     def new_drawing(*args, **kwargs):
+        new_kwargs.update(kwargs)
         adapter.currentModel = document
         return document, object()
 
@@ -598,9 +647,11 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
     assert asyncio.run(drawing.build(adapter)) == {"slddrw": str(drawing.OUTPUTS.slddrw)}
     assert source.read_bytes() == b"offline source sentinel"
+    assert new_kwargs["unit"] == "in"
     assert "Numeral Placement Note" in required_properties
     assert "Scale End Note" not in required_properties
     assert ("ENGRAVING", "Numeral Placement Note", drawing.NUMERAL_NOTE_XY) in linked_notes
+    assert ("ENGRAVING", "Section Parent View Note", drawing.SECTION_PARENT_NOTE_XY) in linked_notes
     assert "Numeral Tool Note" not in required_properties
     assert all(name != "Numeral Tool Note" for _sheet, name, _xy in linked_notes)
     assert ("BAR", "Manufacturing Notes", (0.045, 0.075)) in linked_notes
@@ -612,10 +663,18 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     assert not profile_args.get("partial") and profile_args["section_label"] == "G"
     assert profile_args["view_xy"] == drawing.NUMERAL_PROFILE_CENTER
     assert profile_args["scale"] == drawing.NUMERAL_PROFILE_SCALE == (10.0, 1.0)
-    # The cutting line crosses the whole bar width at the zero's mid-height.
+    # The cutting line crosses the whole bar width at the zero's mid-height,
+    # from below the bar (sheet bottom on the unturned parent) up past the ruled edge.
     start, end = utility.points[15:17]
-    assert start == pytest.approx((drawing.NUMERAL_SECTION_X / 1000.0, -0.004, 0.0))
-    assert end == pytest.approx((drawing.NUMERAL_SECTION_X / 1000.0, 0.012, 0.0))
+    assert start == pytest.approx(
+        (drawing.NUMERAL_SECTION_X / 1000.0, -drawing.NUMERAL_SECTION_FOOT_OVERSHOOT_MM / 1000.0, 0.0))
+    assert end == pytest.approx(
+        (drawing.NUMERAL_SECTION_X / 1000.0,
+         (spec.BODY_WIDTH + drawing.NUMERAL_SECTION_OVERSHOOT_MM) / 1000.0, 0.0))
+    # The letters follow the parent's own frame: G-G's parent stays unturned and
+    # the section takes the ruled-face turn instead.
+    assert profile_parent.Angle == 0.0
+    assert profile.Angle == pytest.approx(math.pi)
     assert tuple(profile.ScaleRatio) == drawing.NUMERAL_PROFILE_SCALE
     assert profile.UseParentScale is False
     assert len(section_moves) == 1
@@ -678,8 +737,8 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     assert depth_parent.Position == drawing.DEPTH_PARENT_CENTER
     assert depth_parent.Angle == 0.0
     assert drawing.DEPTH_RADIUS_MM > math.hypot(spec.TICK_WIDTH / 2.0, spec.BODY_THICKNESS / 2.0)
-    assert all(view.Angle == pytest.approx(math.pi)
-               for view in placements if view.Orientation == "*Back")
+    assert all(view.Angle == pytest.approx(math.pi) for view in placements
+               if view.Orientation == "*Back" and view is not profile_parent)
     assert placements[0].Position[0] == placements[1].Position[0]
     # The pictorial shows the engraved face, turned like the RULED FACE view.
     (iso,) = [view for view in placements if view.Orientation == RULED_ISO]
@@ -847,17 +906,18 @@ def test_exact_fence_refuses_a_snapped_or_unselected_circle(monkeypatch, fault, 
 def test_numeral_v_contract_is_independent_of_graduations() -> None:
     import math as _math
 
-    assert spec.NUMERAL_DEPTH == 0.40
+    assert spec.NUMERAL_DEPTH == 0.4064  # .016 MIN
     assert spec.NUMERAL_V_INCLUDED_ANGLE_DEG == 30.0
     assert spec.NUMERAL_STROKE_WIDTH_MM == 0.24
-    # A true V: the 15-degree walls leave under 0.03 mm of root at 0.40 deep.
+    # A true V: the 15-degree walls leave under 0.03 mm of root at .016 deep.
     assert spec.NUMERAL_TIP_FLAT_MM == pytest.approx(
-        0.24 - 0.80 * _math.tan(_math.radians(15.0)), abs=1e-12)
+        0.24 - 2.0 * 0.4064 * _math.tan(_math.radians(15.0)), abs=1e-12)
     assert 0.0 < spec.NUMERAL_TIP_FLAT_MM < 0.03
+    assert spec.NUMERAL_DEPTH < spec.NUMERAL_DEPTH_MAX_MM
     assert spec.DRAWING_DIMENSIONS["Numerals"] == {"NumeralDepth"}
-    assert spec.DRAWING_PRECISION["Numerals"] == {"NumeralDepth": 2}
+    assert spec.DRAWING_PRECISION["Numerals"] == {"NumeralDepth": 3}
     assert spec.DRAWING_VALUES_BY_NAME["NumeralDepth"] == spec.NUMERAL_DEPTH
-    assert (spec.TICK_WIDTH, spec.TICK_DEPTH) == (0.4, 0.5)
+    assert (spec.TICK_WIDTH, spec.TICK_DEPTH) == (0.4064, 0.508)
     assert "GRADUATIONS ONLY" in callouts.CALLOUTS["TickDepth"]
     assert "ALL ENGRAVING" not in callouts.CALLOUTS["TickDepth"]
     assert callouts.CALLOUTS["NumeralDepth"].splitlines()[:3] == [
@@ -867,17 +927,20 @@ def test_numeral_v_contract_is_independent_of_graduations() -> None:
 
 
 def test_every_tight_band_states_its_function() -> None:
-    """Rule 4: a band tighter than the title block names its mate or purpose."""
-    reasons = {
-        "BodyWidth": "SLIDES IN MS-STOP-BLOCK\nMHA-MS-02 REBATE",
-        "BodyThickness": "SLIDES IN MS-STOP-BLOCK\nMHA-MS-02 REBATE",
-        "ScaleStartX": "SETS CH-AMPLITUDE-BAR\nMHA-CH-01 STATIONS",
-        "FullTickPitch": "SETS CH-AMPLITUDE-BAR\nMHA-CH-01 STATIONS",
-        "MinorTickPitch": "SETS CH-AMPLITUDE-BAR\nMHA-CH-01 STATIONS",
-    }
+    """Rule 4: a band tighter than the title block names its mate or purpose;
+    the .XXX fit sizes that ride the title block name their mate too."""
+    stations = "SETS CH-AMPLITUDE-BAR\nMHA-CH-01 STATIONS"
+    reasons = dict.fromkeys(("ScaleStartX", "FullTickPitch", "MinorTickPitch"), stations)
     assert set(reasons) == set(spec.DRAWING_TOLERANCES)
     for name, reason in reasons.items():
         assert callouts.CALLOUTS[name].endswith(reason), name
+    # The bar's section slides in the stop rebate: .XXX (+/-.005) from the
+    # title block, and each states that fit.
+    fit = "SLIDES IN MS-STOP-BLOCK\nMHA-MS-02 REBATE"
+    for name in ("BodyWidth", "BodyThickness"):
+        assert spec.DRAWING_PRECISION_BY_NAME[name] == 3, name
+        assert name not in spec.DRAWING_TOLERANCES, name
+        assert callouts.CALLOUTS[name].endswith(fit), name
     for name in ("BodyLength", "FullTickLength", "MinorTickLength", "HalfTickLength",
                  "NumeralHeight", "NumeralXGap", "NumeralYGap", *spec.MIN_LIMIT_DEVIATIONS_MM):
         assert name not in spec.DRAWING_TOLERANCES, name
@@ -1315,6 +1378,7 @@ def test_numeral_profile_refuses_ignored_native_display_or_placement(monkeypatch
     monkeypatch.setattr(drawing, "create_section_view", lambda *args, **kwargs: section)
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *args, **kwargs: None)
     monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda *args, **kwargs: None)
+    monkeypatch.setattr(drawing, "_rotate_ruled_face", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         drawing, "model_point_in_view",
         lambda adapter, view, point, **kwargs: (
@@ -1330,13 +1394,13 @@ def test_numeral_profile_scale_makes_the_v_readable_without_crowding() -> None:
     ratio = drawing.NUMERAL_PROFILE_SCALE[0] / drawing.NUMERAL_PROFILE_SCALE[1]
     assert spec.NUMERAL_DEPTH * ratio >= 4.0
     assert spec.NUMERAL_STROKE_WIDTH_MM * ratio >= 2.4
-    # The full 8 x 3 bar section reads upright: thickness across, width up.
+    # The full .315 x .118 bar section reads upright: thickness across, width up.
     half_width = spec.BODY_THICKNESS * ratio / 2000.0
     half_height = spec.BODY_WIDTH * ratio / 2000.0
     x, y = drawing.NUMERAL_PROFILE_CENTER
     profile = Box(x - half_width, y - half_height, x + half_width, y + half_height)
     assert (profile.xmin, profile.ymin, profile.xmax, profile.ymax) == pytest.approx(
-        (0.265, 0.085, 0.295, 0.165),
+        (0.268014, 0.084995, 0.297986, 0.165005),
     )
     numeral_right = drawing.NUMERAL_CENTER[0] + drawing.NUMERAL_RADIUS_MM * drawing.DETAIL_SCALE[0] / 1000.0
     depth_left = drawing.DEPTH_CENTER[0] - drawing.DEPTH_RADIUS_MM * drawing.DEPTH_SCALE[0] / 1000.0
@@ -1352,6 +1416,9 @@ def test_numeral_profile_scale_makes_the_v_readable_without_crowding() -> None:
     # pitches below the keep height, must pass above the section.
     _tick_x, tick_y = drawing.DEPTH_KEEP["TickDepth"]
     assert tick_y - 2.5 * 0.0034 > profile.ymax + 0.008
-    # The cutting line misses every graduation.
+    # The cutting line misses every graduation by a visible margin and still
+    # crosses the zero's straight side strokes, short of its end facets.
     minor = spec.SCALE_START_X + spec.MINOR_SPACING
-    assert drawing.NUMERAL_SECTION_X - (minor + spec.TICK_WIDTH / 2.0) > 0.1
+    assert drawing.NUMERAL_SECTION_X - (minor + spec.TICK_WIDTH / 2.0) > 0.3
+    zero_start = spec.SCALE_START_X + spec.TICK_WIDTH / 2.0 + spec.NUMERAL_GAP_MM
+    assert drawing.NUMERAL_SECTION_X < zero_start + 0.84 * spec.NUMERAL_HEIGHT_MM

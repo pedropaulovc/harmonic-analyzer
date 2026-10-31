@@ -6,7 +6,7 @@ detail without cross-strip extension lines. ENGRAVING separates numeral
 dimensions from the open-edge Top detail for the square-bottom groove depth.
 The numeral detail and its dimensions leave air at the left border, with its
 placement note below the detail title and scale. Section G-G cuts the whole
-8 x 3 bar across both strokes of the zero numeral, so the true V grooves read
+.315 x .118 bar across both strokes of the zero numeral, so the true V grooves read
 in profile, and imports NumeralDepth there; its callout names the V angle.
 Native probes import TickDepth in Top but not in a removed cut-only section,
 so G-G is a full section (with hidden lines removed only the cut face shows).
@@ -54,6 +54,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _named_views import octant_view_name
 from _machinist_review_mode import MachinistReviewMode
 from _ms_drawing_contract import assert_manufacturing_dimensions
+from _part_properties import part_drawing_unit
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 
@@ -90,15 +91,31 @@ NUMERAL_NOTE_XY = (0.045, 0.068)
 # A 1:1 parent spreads the across-the-bar cutting line (and its two arrows)
 # over a readable 11 mm instead of a 1:2 nick.
 NUMERAL_PROFILE_PARENT_CENTER = (0.200, 0.250)
-NUMERAL_PROFILE_CENTER = (0.280, 0.125)
-# The 0.40 mm V must read as a profile; 10:1 keeps the full 8 x 3 bar on sheet.
+# Upper-left of its label: right of the bar's end, clear of the G letters.
+SECTION_PARENT_NOTE_XY = (0.310, 0.257)
+# 3 mm right of the mm sheet's 0.280: the inch floor row (STOCK UNDER .080
+# MIN) is one character wider between detail F and the section.
+NUMERAL_PROFILE_CENTER = (0.283, 0.125)
+# The .016 V must read as a profile; 10:1 keeps the full bar section on sheet.
 NUMERAL_PROFILE_SCALE = (10.0, 1.0)
-# Mid-height of the zero numeral: the cut crosses both of its straight side
-# strokes square, and no graduation (the nearest minor tick ends 0.18 short).
-NUMERAL_SECTION_X = (part.SCALE_START_X + part.TICK_WIDTH / 2.0 + part.NUMERAL_GAP_MM
-                     + part.NUMERAL_HEIGHT_MM / 2.0)
+# Through the zero's two straight side strokes (they cross the cut square),
+# clear of every tick: midway between the first minor tick's far wall and
+# where the zero's sides turn into its end facets (gen_ms_stick_numerals_dxf
+# ends them at 0.84 of the stroke-centre height). At the zero's mid-height the
+# cut ran 0.10 off that tick wall and read as lying on it, with no tick in
+# G-G (machinist review, run 20261031T070419538Z-20ea55fe).
+_MINOR_TICK_FAR_WALL = part.SCALE_START_X + part.MINOR_SPACING + part.TICK_WIDTH / 2.0
+_ZERO_SIDE_END = (part.SCALE_START_X + part.TICK_WIDTH / 2.0 + part.NUMERAL_GAP_MM
+                  + part.NUMERAL_STROKE_WIDTH_MM / 2.0
+                  + 0.84 * (part.NUMERAL_HEIGHT_MM - part.NUMERAL_STROKE_WIDTH_MM))
+NUMERAL_SECTION_X = (_MINOR_TICK_FAR_WALL + _ZERO_SIDE_END) / 2.0
 # r1-r3 sheet 4: at 1.5 mm the G letters sat on their arrows and the outline.
+# Each G prints from 1.4 mm below to 5.0 mm above its arrow (308 sheet 4, as
+# pd_support_bar's r7 letters): past the ruled edge (sheet top on the unturned
+# parent) 4.0 leaves the upper G 2.6 mm clear; 6.5 below the bar leaves the
+# lower G 1.5 mm clear of the bar's edge.
 NUMERAL_SECTION_OVERSHOOT_MM = 4.0
+NUMERAL_SECTION_FOOT_OVERSHOOT_MM = 6.5
 FRONT_KEEP = {
     "BodyLength": (0.155, 0.205), "BodyWidth": (0.305, 0.215),
     "ScaleStartX": (0.180, 0.150),
@@ -136,7 +153,7 @@ NUMERAL_KEEP = {
 # top of SECTION G-G (machinist review, run 20261023T231808846Z-1d2625e9).
 DEPTH_KEEP = {"TickDepth": (0.380, 0.188)}
 # Text centre: the block ends left of G-G, its underside dimension line at the V.
-NUMERAL_DEPTH_KEEP = {"NumeralDepth": (0.2333, 0.138)}
+NUMERAL_DEPTH_KEEP = {"NumeralDepth": (0.235, 0.138)}
 
 
 @_telemetry.traced("drawing.ms_ruled_face")
@@ -237,7 +254,7 @@ def _numeral_profile(adapter: Any, parent: Any) -> Any:
             adapter, parent, (NUMERAL_SECTION_X / 1000.0, y / 1000.0, 0.0),
             label="numeral stroke section endpoint",
         )
-        for y in (-NUMERAL_SECTION_OVERSHOOT_MM, part.BODY_WIDTH + NUMERAL_SECTION_OVERSHOOT_MM)
+        for y in (-NUMERAL_SECTION_FOOT_OVERSHOOT_MM, part.BODY_WIDTH + NUMERAL_SECTION_OVERSHOOT_MM)
     )
     section = create_section_view(
         adapter, parent, line_start=endpoints[0], line_end=endpoints[1],
@@ -252,6 +269,8 @@ def _numeral_profile(adapter: Any, parent: Any) -> Any:
     rebuild_drawing(adapter, label="numeral G-G full section")
     if bool(definition.GetDisplayOnlySurfaceCut()) or bool(definition.GetPartialSection()):
         raise RuntimeError("numeral G-G must be a full section of the whole bar")
+    # The ruled-face turn the parent no longer takes: G-G reads as before.
+    _rotate_ruled_face(adapter, section)
     set_hidden_lines_removed(adapter, section)
     if bool(section.UseParentScale) or tuple(float(value) for value in section.ScaleRatio) != NUMERAL_PROFILE_SCALE:
         raise RuntimeError("numeral G-G must retain its independent 10:1 scale")
@@ -343,10 +362,11 @@ async def build(adapter: Any) -> dict[str, str]:
     source_model = adapter.currentModel
     properties = ("Number", "Revision", "Title", "Material Specification", "Finish",
                   "Quantity", "Manufacturing Notes", "Front View Note", "Isometric View Note",
-                  "Numeral Placement Note")
+                  "Numeral Placement Note", "Section Parent View Note")
     read_required_properties(source_model, properties, required=properties)
     drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM,
-                                        scale=SHEET_SCALE, layout=SPEC.layout)
+                                        scale=SHEET_SCALE, layout=SPEC.layout,
+                                        unit=part_drawing_unit(PART_STEM))
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="measuring stick manufacturing package")
     stamp_drawing_summary(adapter, drawing, {
         0: "Measuring Stick Manufacturing Drawing",
@@ -435,10 +455,13 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, numeral, keep=NUMERAL_KEEP, view_label="numeral detail",
             dimensions_by_feature=part.DRAWING_DIMENSIONS)
     add_property_linked_note(adapter, "Numeral Placement Note", *NUMERAL_NOTE_XY)
+    # Unturned, unlike the other ruled-face parents: SolidWorks lays the
+    # cutting-line letters out in the parent's own frame, so turned 180 degrees
+    # each G printed back across its own arrowhead (v46 and 308 sheet 4).
     profile_parent = place_view(
         adapter, str(SOURCE), "*Back", *NUMERAL_PROFILE_PARENT_CENTER, scale=SHEET_SCALE)
-    _rotate_ruled_face(adapter, profile_parent)
     set_hidden_lines_removed(adapter, profile_parent)
+    add_property_linked_note(adapter, "Section Parent View Note", *SECTION_PARENT_NOTE_XY)
     profile = _numeral_profile(adapter, profile_parent)
     numeral_depth_annotations = curate_view_dimensions(
         adapter, profile, keep=NUMERAL_DEPTH_KEEP, view_label="numeral V section",

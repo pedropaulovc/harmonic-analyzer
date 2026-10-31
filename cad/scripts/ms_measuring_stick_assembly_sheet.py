@@ -6,10 +6,10 @@ wording edit rebuilds the drawing alone. Printed dimensions interpolate a
 symbol of ``ms_measuring_stick_assembly_spec`` or a part/vendor spec; mate
 drawing numbers come from the part registry.
 
-The near-face setting remains a controlled native model dimension. Its
-attached callout names the measured block face; step 5 explains the
-stick-mark/thumbscrew-axis indexing purpose. STOP_MARK still owns the nominal
-alignment, with no REF qualifier on the controlled setting.
+The near-face setting is a native reference dimension of the saved clamped
+pose, not an acceptance band; step 5 and the setup note name the
+stick-mark/thumbscrew-axis indexing it shows without repeating its value.
+Printed lengths are in the assembly contract's ``drawing_unit``.
 """
 
 from __future__ import annotations
@@ -21,9 +21,12 @@ import ms_measuring_stick_assembly_spec as spec
 import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
 import sh_vn_thumb_screw_spec as thumb
+from _assembly_contract import assembly_contract
+from _title_block_units import LENGTH_UNITS, render_number
 
 DRAWING_NUMBER = "MHA-MS-00"
 PLATE_DRAWING_NUMBER = str(_config.parts("ms-stop-plate")["number"])
+UNIT = assembly_contract(spec.ASM_NAME).drawing_unit
 
 BOM_ORDER = (spec.STICK, spec.BLOCK, spec.PLATE, spec.PLATE_SCREW, spec.THUMB_SCREW)
 
@@ -34,6 +37,13 @@ def _inch_fraction(length_mm: float) -> str:
     if abs(float(inches) * 25.4 - length_mm) > 1e-9:
         raise ValueError(f"{length_mm} mm is not a whole sixty-fourth of an inch")
     return str(inches)
+
+
+def _hole(length_mm: float) -> str:
+    """A stop hole length as the stop sheets' hole callouts print it."""
+    return render_number(
+        length_mm / LENGTH_UNITS[UNIT], UNIT, stop.HOLE_CALLOUT_PRECISION
+    )
 
 
 # BOM DESCRIPTION cells (the parts carry no Description property); the steps
@@ -54,10 +64,6 @@ BOM_DESCRIPTIONS = {
 EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
 UNDERSIDE_CAPTION = "GRADUATED UNDERSIDE"
 DRAWING_DIMENSIONS = {spec.SETTING_FEATURE: {spec.SETTING_DIMENSION}}
-SETTING_CRITERION = (
-    f"NEAR BLOCK FACE {spec.SETTING_NEAR_FACE_MM:.1f} "
-    f"±{spec.SETTING_TOLERANCE_MM:.2f} mm FROM LEFT STICK END"
-)
 # Components own material and finish; no assembly coating operation is required.
 # The fitter's order; the explode (ms_measuring_stick_explode_spec) runs steps
 # 2-5 backwards. Each line names the parts as the BOM's DESCRIPTION column
@@ -67,19 +73,21 @@ ASSEMBLY_STEPS = (
     "1. PLATE IS MASTER: LAY OUT STOP COVER PLATE HOLES PER "
     f"{PLATE_DRAWING_NUMBER}; LEAVE UNDRILLED. "
     f"CLAMP PLATE AND BLOCK WITH {stop.MATCH_DRILL_DATUM_ALIGNMENT}; PILOT "
-    f"DIA {stop.PLATE_TAP_DRILL_DIA:.2f} THROUGH PLATE INTO BLOCK TO "
-    f"{stop.PLATE_TAP_DRILL_DEPTH:.1f} mm CYLINDRICAL DEPTH INTO BLOCK "
+    f"DIA {_hole(stop.PLATE_TAP_DRILL_DIA)} THROUGH PLATE INTO BLOCK TO "
+    f"{_hole(stop.PLATE_TAP_DRILL_DEPTH)} CYLINDRICAL DEPTH INTO BLOCK "
     "(DEPTH EXCLUDES PLATE). REMOVE PLATE; OPEN ITS HOLES TO "
-    f"DIA {stop.PLATE_CLEARANCE_DIA:.1f}; BOTTOMING-TAP BLOCK "
-    f"{plate_screw.THREAD} TO {stop.PLATE_TAP_THREAD_DEPTH:.1f} mm FULL THREAD "
+    f"DIA {_hole(stop.PLATE_CLEARANCE_DIA)}; BOTTOMING-TAP BLOCK "
+    f"{plate_screw.THREAD} TO {_hole(stop.PLATE_TAP_THREAD_DEPTH)} FULL THREAD "
     "DEPTH INTO BLOCK. MARK BLOCK AND PLATE AS A PAIR.",
     f"2. START THE {thumb.THREAD} KNURLED THUMBSCREW DOWN INTO THE STOP BLOCK "
     "FROM ITS TAPPED FACE; KEEP THE TIP CLEAR OF THE WINDOW.",
     "3. LAY THE STICK IN THE OPEN WINDOW, GRADUATED FACE OPPOSITE THE THUMBSCREW.",
     "4. FIT ITS OWN STOP COVER PLATE OVER THE WINDOW, PAIR MARKS TOGETHER; DRIVE "
     f"BOTH {plate_screw.THREAD} BRASS FILLISTER SCREWS UNTIL THE HEADS SEAT.",
-    f"5. SET {SETTING_CRITERION}; THEN TURN THE THUMBSCREW IN BY HAND UNTIL "
-    "ITS TIP CLAMPS THE PLAIN FACE; THUMBSCREW ABOVE THE STICK.",
+    "5. USE THE NEAR-FACE REFERENCE DIMENSION ON SHEET 1 FOR THE SHOWN POSE "
+    f"(STICK GRADUATION {stop.STOP_MARK:.1f} ON THUMBSCREW AXIS); "
+    "TURN THE THUMBSCREW IN BY HAND UNTIL ITS TIP CLAMPS THE PLAIN FACE; "
+    "THUMBSCREW ABOVE THE STICK.",
 )
 ASSEMBLY_CHECKS = (
     "CHECK: WITH THE THUMBSCREW BACKED OFF THE STICK SLIDES FREELY IN THE WINDOW.",
@@ -87,15 +95,13 @@ ASSEMBLY_CHECKS = (
     "CHECK: BOTH SCREW HEADS SEAT ON THE COVER AND THE COVER LIES FLAT ON THE BLOCK.",
 )
 CLAMPED_SETUP_NOTE = (
-    f"CLAMPED SETUP: SET {SETTING_CRITERION}; THEN CLAMP. "
+    "CLAMPED SETUP: NEAR-FACE REFERENCE DIMENSION SHOWS THE SAVED POSE, "
+    f"STICK GRADUATION {stop.STOP_MARK:.1f} ON THUMBSCREW AXIS. "
     "GRADUATED FACE AGAINST THE FIXED WINDOW WALL; THUMBSCREW ON THE PLAIN FACE."
 )
 
-# Overall is pure reference; the near-face value is assembly acceptance only.
+# Both dimensions are reference: the assembly pose, not component sizes.
 REFERENCE_OVERALL_LENGTH = spec.STICK_X_MAX - spec.STICK_X_MIN
-# Name the measured face here; the setting from the left stick end is the
-# whole acceptance (no view shows the division it puts on the thumbscrew axis).
-STOP_POSITION_CALLOUT = "NEAR BLOCK FACE"
 DRAWING_REFERENCE_PRECISION = 1
 
 assert sorted(spec.QUANTITIES) == sorted(BOM_ORDER)

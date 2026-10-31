@@ -1,6 +1,6 @@
 r"""Build the blackened brass cover of the measuring-stick stop.
 
-The block and plate use one frame: the plate occupies Z=-1..0, with its
+The block and plate use one frame: the plate occupies Z=-.040 in..0, with its
 clearance holes along +Z. Roof-end chamfers match the approved block outline.
 Run only through the supervised farm launcher: part:ms_stop_plate.
 """
@@ -13,8 +13,10 @@ import ms_stop_spec as spec
 from _appearance import PANEL_BLACK, apply_color, apply_material
 from _check import check
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -30,7 +32,6 @@ from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _holes import wizard_holes
 from ms_stop_geom import (
     author_hole_precision, hide_location_references, location_reference,
-    pilot_drill_reference,
 )
 
 PART_NAME = "ms-stop-plate"
@@ -43,11 +44,11 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create stop cover", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     for name, value in (
         ("PlateLength", spec.BLOCK_LENGTH), ("PlateHeight", spec.BLOCK_HEIGHT),
         ("PlateThickness", spec.PLATE_THICKNESS),
         ("RoofChamferSize", spec.ROOF_END_CHAMFER),
-        ("PilotDrillDiameter", spec.PLATE_TAP_DRILL_DIA),
     ):
         await set_global(adapter, name, f"{value}mm")
     dims = SketchDims()
@@ -86,7 +87,6 @@ async def build(adapter) -> dict[str, str]:
         spans=spec.PLATE_HOLE_XS, station=spec.PLATE_HOLE_Y,
         names=("PlateLeftFromEnd", "PlateFromHeadFace", "PlateRightFromEnd"),
     )
-    jobs += await pilot_drill_reference(adapter)
     await force_rebuild(adapter)
     for name, expression in jobs:
         await drive_dimension(adapter, name, expression)
@@ -95,10 +95,12 @@ async def build(adapter) -> dict[str, str]:
                        0.005 * spec.PLATE_FINISHED_VOLUME)
     set_dimension_symmetric_tolerance(
         adapter, "Plate", "PlateThickness", spec.PLATE_THICKNESS_TOLERANCE_MM,
+        display_unit=spec.UNIT,
     )
     for name in spec.PLATE_LOCATION_DIMENSIONS:
         set_dimension_symmetric_tolerance(
             adapter, "PlateLocationReference", name, spec.PLATE_HOLE_POSITION_TOLERANCE_MM,
+            display_unit=spec.UNIT,
         )
     clear_dimensions_for_drawing(adapter)
     for feature, names in DRAWING_DIMENSIONS.items():
@@ -107,7 +109,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(adapter, PART_NAME, {
         "Isometric View Note": spec.ISOMETRIC_VIEW_NOTE,
     })
-    hide_location_references(adapter, ("PlateLocationReference", "PilotDrillReference"))
+    hide_location_references(adapter, ("PlateLocationReference",))
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)

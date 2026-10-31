@@ -1190,7 +1190,7 @@ JOINTS: tuple[Joint, ...] = (
             "back to park, so the torque the screw carries reverses every engage/park cycle"
         ),
         axial_capture=(
-            "flat point clamped on the plain round Ø6.35 rod (slip-fit Ø6.40 bore, no flat or spot); the collars "
+            "flat point clamped on the plain round Ø6.35 rod (slip-fit Ø.2510 reamed bore, no flat or spot); the collars "
             "are set on 66MA leaves 0.25/0.90 off the MHA-DT-18 blocks and also carry the rod's axial location"
         ),
         # Rule 23 staked tap mouth (#1176), as the channel's fulcrum set screws
@@ -1860,7 +1860,7 @@ JOINTS: tuple[Joint, ...] = (
             "or motion reaches the thumbscrew axis"
         ),
         axial_capture=(
-            "thumbscrew points down through the block's 8.6 tapped wall into the window; its tip presses "
+            "thumbscrew points down through the block's .336 tapped wall into the window; its tip presses "
             "the stick's plain face so the graduated face bears on the opposite fixed window wall; "
             "knurled head and collar sit above the block's tapped face"
         ),
@@ -1890,7 +1890,7 @@ JOINTS: tuple[Joint, ...] = (
             "opposite fixed window wall, so no operating torque reaches the screw axes"
         ),
         axial_capture=(
-            "fillister heads bear on the plate's outer face through its 2.4 clearance holes; threads in the "
+            "fillister heads bear on the plate's outer face through its .094 #2 close clearance holes; threads in the "
             "block's #2-56 blind taps, tips short of the tapped depth"
         ),
         lock=Lock.NONE,

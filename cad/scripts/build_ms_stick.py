@@ -5,12 +5,12 @@ The unchanged 0-10 scale spans 142 mm at the configured 14.2 mm pitch.
 The longer half-division tick follows the book. The stop is a separate brass
 block, cover and stock hardware in the ms-measuring-stick assembly.
 
-The bar is 202 mm long (2026-10-23 owner ruling; the book annotates 200)
-and 8 mm wide; thickness is photo-derived.
+The bar is 7.95 x .315 x .118 in (201.93 x 8.001 x 2.9972 mm; issue #290's
+decimal-inch sheet, ``ms_stick_spec`` gives the grid and its exemptions).
 
 Layout: bar along +X with the bottom-left corner on the origin; graduations
-engraved 0.5 mm deep into the back face (z=0), tick 0 at x=56.5 following the
-2026-10-10 user Option B ruling: keep the blank and shift the whole scale left.
+engraved .020 deep into the back face (z=0), tick 0 at x=2.224 in (the
+2026-10-10 user Option B ruling shifted the whole scale left on the blank).
 
 Numerals: the 0..10 values are engraved beside their full ticks (page001_img01:
 ~2 mm sans-serif, turned 90 degrees to read with the 10 end up). There is no
@@ -51,8 +51,10 @@ from _appearance import apply_material
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, dump_dimensions, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import _feature_by_name, name_last_feature
 from _part_checks import measure_check, report_mass_properties
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -90,6 +92,7 @@ from ms_stick_spec import (
     MIN_LIMIT_DEVIATIONS_MM,
     MIN_LIMIT_TOL_TYPE,
     NUMERAL_PLACEMENT_NOTE,
+    SECTION_PARENT_VIEW_NOTE,
     FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
     HALF_TICK_LENGTH,
@@ -110,6 +113,7 @@ from ms_stick_spec import (
     TICK_LENGTH,
     TICK_DEPTH,
     TICK_OVERHANG,
+    UNIT,
 )
 from _visibility import blank_sketch_feature
 import _dxf_text as dxf
@@ -629,6 +633,10 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    # The registry row's IPS/inch/8-place calculation units, before the first
+    # global: the equation manager evaluates every global in them, and the save
+    # only proves them.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this is
     # an INCH document and the equation manager reads BARE numbers in document
@@ -864,7 +872,7 @@ async def build(adapter) -> dict[str, str]:
     _assert_numeral_cut(adapter, numeral_sense)
     await _check_volume_unchanged(adapter, "driven measuring-stick (equations neutral)", v_built)
 
-    # Verify the 202 mm length and the untouched front face
+    # Verify the 7.95 in (201.93 mm) length and the untouched front face
     # (the 14.2 mm tick spacing is driven by the linear pattern's spacing).
     # End faces are edge-on in the active view (point picking is
     # screen-projected) — measure the uncut front-bottom edge instead;
@@ -872,7 +880,7 @@ async def build(adapter) -> dict[str, str]:
     mid_y = BODY_WIDTH / 2.0
     await measure_check(
         adapter,
-        "body length (202, 2026-10-23 ruling)",
+        "body length (7.95 in)",
         [{"entity_type": "EDGE", "point": [BODY_LENGTH / 2.0, 0.0, BODY_THICKNESS]}],
         "length",
         BODY_LENGTH,
@@ -896,7 +904,8 @@ async def build(adapter) -> dict[str, str]:
         for name in names:
             if name in DRAWING_TOLERANCES:
                 set_dimension_symmetric_tolerance(
-                    adapter, feature, name, DRAWING_TOLERANCES[name])
+                    adapter, feature, name, DRAWING_TOLERANCES[name],
+                    places=DRAWING_PRECISION[feature][name], display_unit=UNIT)
             if name in MIN_LIMIT_DEVIATIONS_MM:
                 _min_limit(adapter, feature, name)
     clear_dimensions_for_drawing(adapter)
@@ -912,6 +921,7 @@ async def build(adapter) -> dict[str, str]:
             "Front View Note": FRONT_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Numeral Placement Note": NUMERAL_PLACEMENT_NOTE,
+            "Section Parent View Note": SECTION_PARENT_VIEW_NOTE,
         },
     )
     name_octant_views(

@@ -201,6 +201,14 @@ def test_contract_schema_rejects_unknown_and_duplicate(tmp_path, monkeypatch):
         write_contract("bool-dof", free_dof=True)
         with pytest.raises(ValueError):
             _assembly_contract.assembly_contract("bool-dof")
+
+        # drawing_unit (#290): absent is mm; mm/in accepted; anything else refused.
+        assert valid.drawing_unit == "mm"
+        write_contract("inch", drawing_unit="in")
+        assert _assembly_contract.assembly_contract("inch").drawing_unit == "in"
+        write_contract("bad-unit", drawing_unit="cm")
+        with pytest.raises(ValueError, match="drawing_unit must be 'mm' or 'in'"):
+            _assembly_contract.assembly_contract("bad-unit")
     finally:
         _assembly_contract.assembly_contract.cache_clear()
 

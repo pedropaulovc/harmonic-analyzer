@@ -19,9 +19,12 @@ from _appearance import PANEL_BLACK, apply_color, apply_material
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _named_views import name_octant_views, octant_key
 from _part_pmi import author_part_pmi
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -37,7 +40,7 @@ from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _holes import wizard_holes
 from ms_stop_geom import (
     author_hole_precision, hide_location_references, location_reference,
-    rebate_profile, roof_reference,
+    rebate_profile, relief_profile, roof_reference,
 )
 
 PART_NAME = "ms-stop-block"
@@ -71,11 +74,13 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create stop block", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     for name, value in (
         ("BlockLength", spec.BLOCK_LENGTH), ("BlockHeight", spec.BLOCK_HEIGHT),
         ("BlockDepth", spec.BLOCK_DEPTH), ("WindowHeight", spec.WINDOW_HEIGHT),
         ("WindowWidth", spec.WINDOW_WIDTH), ("RoofThickness", spec.ROOF_THICKNESS),
         ("RoofChamferSize", spec.ROOF_END_CHAMFER),
+        ("ReliefDepth", spec.RELIEF_DEPTH), ("ReliefHeight", spec.RELIEF_HEIGHT),
     ):
         await set_global(adapter, name, f"{value}mm")
     jobs: list[tuple[str, str]] = []
@@ -113,6 +118,20 @@ async def build(adapter) -> dict[str, str]:
     jobs.append(("WindowCutDepth@Window", f'2 * ("BlockLength" + {spec.CUT_OVERHANG})'))
     await volume_check(adapter, "open rebate", spec.BLOCK_VOLUME - spec.WINDOW_VOLUME, 0.005 * spec.BLOCK_VOLUME)
 
+    dims = SketchDims()
+    await relief_profile(adapter, dims)
+    name_last_feature(adapter, "ReliefProfile")
+    jobs += dims.apply(adapter, "ReliefProfile")
+    check("corner relief", await adapter.create_cut_extrude(ExtrusionParameters(
+        depth=2.0 * (spec.BLOCK_LENGTH + spec.CUT_OVERHANG), both_directions=True,
+    )))
+    name_last_feature(adapter, "CornerRelief")
+    name_dimensions(adapter, "CornerRelief", ["ReliefCutDepth"])
+    jobs.append(("ReliefCutDepth@CornerRelief", f'2 * ("BlockLength" + {spec.CUT_OVERHANG})'))
+    await volume_check(adapter, "corner relief",
+                       spec.BLOCK_VOLUME - spec.WINDOW_VOLUME - spec.RELIEF_VOLUME,
+                       0.005 * spec.BLOCK_VOLUME)
+
     check("roof end chamfers", await adapter.add_chamfer(
         spec.ROOF_END_CHAMFER,
         [[0.0, spec.BLOCK_HEIGHT, spec.BLOCK_DEPTH / 2.0],
@@ -148,8 +167,9 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "finished brass stop block", spec.BLOCK_FINISHED_VOLUME,
                        0.005 * spec.BLOCK_FINISHED_VOLUME)
     lower, upper = spec.WINDOW_SIZE_TOLERANCE_MM
-    set_dimension_bilateral_tolerance(adapter, "WindowProfile", "WindowHeight", lower, upper)
-    set_dimension_bilateral_tolerance(adapter, "WindowProfile", "WindowWidth", lower, upper)
+    for name in ("WindowHeight", "WindowWidth"):
+        set_dimension_bilateral_tolerance(adapter, "WindowProfile", name, lower, upper,
+                                          display_unit=spec.UNIT)
     _author_reference_dimensions(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature, names in DRAWING_DIMENSIONS.items():
@@ -166,6 +186,10 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
+    name_octant_views(
+        adapter, octants={octant_key(*spec.BLOCK_ISOMETRIC_OCTANT): spec.BLOCK_ISOMETRIC_OCTANT},
+        label=PART_NAME,
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

@@ -5,7 +5,14 @@ from __future__ import annotations
 import pytest
 
 from _gtol_cylinder import CylinderFace
-from _surface_finish import SurfaceFinishControl, surface_finish_by_key
+from _surface_finish import (
+    GROUND_UM,
+    MACHINED_UM,
+    SEAT_UM,
+    SurfaceFinishControl,
+    ra,
+    surface_finish_by_key,
+)
 
 
 def _control(key: str) -> SurfaceFinishControl:
@@ -47,3 +54,22 @@ def test_rejects_missing_or_ambiguous_surface_finish_keys(
         match=rf"surface-finish key 'bore' resolved {expected_count} controls",
     ):
         surface_finish_by_key(controls, "bore")
+
+
+@pytest.mark.parametrize(
+    ("grade_um", "mm", "inch"),
+    [(GROUND_UM, "0.8", "32"), (MACHINED_UM, "1.6", "63"), (SEAT_UM, "3.2", "125")],
+)
+def test_inch_sheets_print_the_preferred_microinch_grade(grade_um, mm, inch) -> None:
+    assert ra(grade_um) == mm
+    assert ra(grade_um, unit="in") == inch
+    control = SurfaceFinishControl(
+        "bore", grade_um, CylinderFace(5.0), display_unit="in"
+    )
+    assert (control.roughness_um, control.roughness_ra) == (grade_um, inch)
+
+
+@pytest.mark.parametrize(("grade_um", "unit"), [(2.0, "in"), (MACHINED_UM, "cm")])
+def test_unmapped_grades_and_unknown_units_are_refused(grade_um, unit) -> None:
+    with pytest.raises(ValueError):
+        ra(grade_um, unit=unit)

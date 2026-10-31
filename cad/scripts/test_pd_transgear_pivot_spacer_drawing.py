@@ -113,8 +113,8 @@ def test_a_larger_permitted_radius_break_charges_the_wall(monkeypatch) -> None:
 
     real = _config.title_block
 
-    def title_block(key):
-        row = real(key)
+    def title_block(key, *, unit="mm"):
+        row = real(key, unit=unit)
         return {**row, "radius_mm": 0.4} if key == "edge_break" else row
 
     monkeypatch.setattr(_config, "title_block", title_block)

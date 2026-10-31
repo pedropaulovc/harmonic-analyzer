@@ -874,14 +874,14 @@ _CHANNEL_ALLOWED_PAIRS = {
 }
 
 # The MHA-MS-00 stop: the #4-40 MHA-MS-VN-50 thumbscrew fills the block's whole
-# 8.6 tapped wall (ms_stop_spec.FLOOR_THICKNESS) up to the window, and each
-# #2-56 x 1/4 MHA-MS-VN-51 plate screw passes the 1.0 cover and engages 5.35 of
-# its Ø1.85 (#49) blind tap. Everything else is contact (bar on the roof, tip
-# on the bar's underside, cover on the block) or clear. Literals, like the rows
-# above, so every assembly does not re-key on the stop's layout;
-# test_ms_measuring_stick_assembly pins them to the specs.
-MS_THUMB_SCREW_THREAD = (2.8448, 2.261, 8.6)
-MS_PLATE_SCREW_THREAD = (2.1844, 1.85, 6.35 - 1.0)
+# 8.5344 (.336) tapped wall (ms_stop_spec.FLOOR_THICKNESS) up to the window, and
+# each #2-56 x 1/4 MHA-MS-VN-51 plate screw passes the 1.016 (.040) cover and
+# engages 5.334 of its Ø1.8542 (#49, .073) blind tap. Everything else is contact
+# (bar on the roof, tip on the bar's underside, cover on the block) or clear.
+# Literals, like the rows above, so every assembly does not re-key on the
+# stop's layout; test_ms_measuring_stick_assembly pins them to the specs.
+MS_THUMB_SCREW_THREAD = (2.8448, 2.261, 8.5344)
+MS_PLATE_SCREW_THREAD = (2.1844, 1.8542, 6.35 - 1.016)
 _MS_MEASURING_STICK_ALLOWED_PAIRS = {
     frozenset(("sh-vn-thumb-screw-1", "ms-stop-block-1")): _smooth_annulus_limit_mm3(
         *MS_THUMB_SCREW_THREAD

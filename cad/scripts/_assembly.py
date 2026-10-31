@@ -49,15 +49,17 @@ def assembly_title_properties(assembly_name: str) -> dict[str, str]:
 
     Assembly drawings use the tracked next release revision, not a per-part
     registry row, so native assemblies and their linked title blocks stay in
-    lockstep with leaf parts.
+    lockstep with leaf parts.  The TOL_* rows print in the contract's
+    ``drawing_unit``.
     """
+    contract = assembly_contract(assembly_name)
     return {
         "Title": assembly_name,
-        "Number": assembly_contract(assembly_name).number,
+        "Number": contract.number,
         "Revision": _config.release_revision(),
         "Generator": f"harmonic-analyzer @ {_git_sha()}",
         "COPYRIGHT_YEAR": _git_commit_year(),
-        **title_block_properties(),
+        **title_block_properties(unit=contract.drawing_unit),
     }
 
 

@@ -106,8 +106,16 @@ def set_dimension_symmetric_tolerance(
     feature_name: str,
     dimension_name: str,
     tolerance_mm: float,
+    *,
+    places: int | None = None,
+    display_unit: str = "mm",
 ) -> None:
-    """Tolerance one named source-model dimension and verify the stored values."""
+    """Tolerance one named source-model dimension and verify the stored values.
+
+    ``tolerance_mm`` is physical millimetres; ``display_unit`` is the unit the
+    sheet prints (the package's ``drawing_unit``), which sets the tolerance's
+    places, never fewer than ``places`` (``_set_tolerance_precision``).
+    """
     if tolerance_mm <= 0.0:
         raise ValueError("symmetric dimension tolerance must be positive")
     display, dimension = _named_dimension(adapter, feature_name, dimension_name)
@@ -135,8 +143,9 @@ def set_dimension_symmetric_tolerance(
     precision = _set_tolerance_precision(
         display,
         (-tolerance_mm, tolerance_mm),
-        display_unit="mm",
+        display_unit=display_unit,
         label=f"{dimension_name}@{feature_name}",
+        places=places,
     )
     _telemetry.success(
         f"toleranced {dimension_name}@{feature_name}: +/-{tolerance_mm:g} mm "
@@ -152,11 +161,14 @@ def set_dimension_bilateral_tolerance(
     upper_deviation_mm: float,
     *,
     places: int | None = None,
+    display_unit: str = "mm",
 ) -> None:
     """Apply signed lower/upper deviations to one named source dimension.
 
     ``places`` prints the tolerance at the nominal's places
     (``_set_tolerance_precision``); by default, the fewest that keep it.
+    The deviations are physical millimetres; ``display_unit`` is the unit the
+    sheet prints them in (``+.004/0`` is three inch places).
     """
     if lower_deviation_mm > upper_deviation_mm:
         raise ValueError("lower dimension deviation must not exceed upper deviation")
@@ -186,7 +198,7 @@ def set_dimension_bilateral_tolerance(
     precision = _set_tolerance_precision(
         display,
         (lower_deviation_mm, upper_deviation_mm),
-        display_unit="mm",
+        display_unit=display_unit,
         label=f"{dimension_name}@{feature_name}",
         places=places,
     )

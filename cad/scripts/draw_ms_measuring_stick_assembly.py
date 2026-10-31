@@ -2,7 +2,7 @@ r"""Create the three-sheet measuring-stick fitter package (MHA-MS-00).
 
 Sheet 1 shows the stick clamped at its stop mark (upright elevation and an
 aligned third-angle graduated-underside view below it, both at full size), a
-reference overall and controlled near-face setting dimension, an upright clamp
+reference overall and near-face setting dimensions, an upright clamp
 section, and the clamp setup note; sheet 2 the builder-owned ``MS_EXPLODED``
 presentation with
 the BOM (numbers, descriptions, vendor SKU, quantity) and a balloon on every
@@ -32,6 +32,7 @@ import ms_measuring_stick_assembly_spec as spec
 import ms_measuring_stick_explode_spec as explode
 import ms_stick_spec as stick
 import ms_stop_spec as stop
+from _assembly_contract import assembly_contract
 from _check import check
 from _com import _early_bound
 from _session import run_build
@@ -116,7 +117,7 @@ TITLE_BLOCK = (
     _TEMPLATE.title_block_top_m,
 )
 
-# Sheet 1: the 202-long stick at full size, working elevation screw-up.
+# Sheet 1: the 7.95-in stick at full size, working elevation screw-up.
 # The graduated underside sits below Front in aligned third-angle projection.
 # Section A-A uses native end-only cutting-line style: its upper arrow sits
 # above the setting witnesses, below the overall reference dimension.
@@ -235,7 +236,7 @@ SECOND_SCREW_BALLOON_ANCHORS = {
 }
 
 
-# Geometry-owned measurements: overall reference and controlled assembly setting.
+# Geometry-owned measurements: overall and assembly setting, both reference.
 ASSEMBLY_DIMENSIONS = (
     ("overall length", sheet.REFERENCE_OVERALL_LENGTH),
     ("stop position", spec.SETTING_NEAR_FACE_MM),
@@ -753,10 +754,10 @@ def _reference_end_edge(
 
 
 def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
-    """Measure real component edges; tolerance only the assembly setting.
+    """Measure real component edges; both dimensions are reference.
 
-    The assembly poses own the nominal. The saved drawing dimension owns the
-    assembly acceptance band, not an alternate component manufacturing size.
+    The assembly poses own the nominal. Neither dimension is an acceptance
+    band or an alternate component manufacturing size.
     """
     # Mid-height on each stick end. The upright Front sees part y=0,
     # opposite the original graduation-up inspection orientation.
@@ -856,10 +857,8 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
             display.SetPrecision3(precision, -1, -1, -1)
         if int(display.GetPrimaryPrecision2()) != precision:
             raise RuntimeError(f"measuring-stick {label} precision did not persist")
-        if label == "stop position" and int(display.GetPrimaryTolPrecision2()) != spec.SETTING_TOLERANCE_PRECISION:
-            raise RuntimeError("assembly setting tolerance precision did not persist")
         if label == "stop position":
-            # Keep the imported acceptance plain; do not suppress or replace
+            # Keep the imported reference plain; do not suppress or replace
             # its native value, tolerance or physical model attachments.
             for field in (3, 4):  # swDimensionTextCalloutAbove/Below
                 display.SetText(field, "")
@@ -881,15 +880,8 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
                 if (prefix, suffix) != ("(", ")") or int(saved_tolerance.Type) != 0:
                     raise RuntimeError("overall is not pure reference")
             else:
-                band_m = spec.SETTING_TOLERANCE_MM / 1000.0
-                if (
-                    (prefix, suffix) != ("", "")
-                    or int(saved_tolerance.Type) != 4
-                    or abs(float(saved_tolerance.GetMinValue()) + band_m) > 1e-9
-                    or int(saved_display.GetPrimaryTolPrecision2()) != spec.SETTING_TOLERANCE_PRECISION
-                    or abs(float(saved_tolerance.GetMaxValue()) - band_m) > 1e-9
-                ):
-                    raise RuntimeError("settled assembly setting band/reference state changed")
+                if (prefix, suffix) != ("(", ")") or int(saved_tolerance.Type) != 0:
+                    raise RuntimeError("settled assembly pose is not pure reference")
                 if any(str(saved_display.GetText(field) or "") for field in (3, 4)):
                     raise RuntimeError("clamped setting: settled native caption is not blank")
                 _assert_section_setting_clearance(front, saved_display)
@@ -899,7 +891,7 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
 
 def _place_clamped_sheet(adapter: Any) -> Callable[[], None]:
     """Upright working elevation and clamp section, with the labelled
-    graduated-underside inspection and the controlled near-face setting."""
+    graduated-underside inspection and the near-face setting reference."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     # Native StandardWithoutConnector, as in draw_fr_rocker_arm_support:
     # retain the full cutting plane and both arrows, not a hidden section line.
@@ -1075,7 +1067,8 @@ def _append_template_sheet(adapter: Any, target: Any, *, name: str) -> None:
     donor_title = ""
     try:
         donor, donor_sheet = new_project_drawing(
-            adapter, layout=SHEET_LAYOUTS[name], scale=SHEET_SCALES[name]
+            adapter, layout=SHEET_LAYOUTS[name], scale=SHEET_SCALES[name],
+            unit=assembly_contract(spec.ASM_NAME).drawing_unit,
         )
         donor = _early_bound(donor, "IModelDoc2")
         donor_sheet = _early_bound(donor_sheet, "ISheet")
@@ -1120,7 +1113,8 @@ def _append_template_sheet(adapter: Any, target: Any, *, name: str) -> None:
 def _create_mixed_package_sheets(adapter: Any) -> None:
     """Use native template copies, not a metadata-only portrait declaration."""
     target, initial = new_project_drawing(
-        adapter, layout=SHEET_LAYOUTS[SHEET_NAMES[0]], scale=SHEET_SCALES[SHEET_NAMES[0]]
+        adapter, layout=SHEET_LAYOUTS[SHEET_NAMES[0]], scale=SHEET_SCALES[SHEET_NAMES[0]],
+        unit=assembly_contract(spec.ASM_NAME).drawing_unit,
     )
     target = _early_bound(target, "IModelDoc2")
     initial = _early_bound(initial, "ISheet")

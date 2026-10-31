@@ -52,7 +52,9 @@ def test_clamped_setting_authors_its_globals_and_drives(monkeypatch) -> None:
     ok = lambda data=None: SimpleNamespace(is_success=True, data=data, error=None)  # noqa: E731
     globals_authored: dict[str, str] = {}
     equations: dict[str, str] = {}
-    toleranced: list[tuple] = []
+    reference_text: dict[int, str] = {}
+    tolerance = SimpleNamespace(Type=4)
+    display = SimpleNamespace(ShowParenthesis=True, SetText=reference_text.__setitem__)
 
     class Adapter:
         _sketch_entities = {"chord": object()}
@@ -93,14 +95,15 @@ def test_clamped_setting_authors_its_globals_and_drives(monkeypatch) -> None:
     monkeypatch.setattr(builder, "SketchDims", Dims)
     for name in ("anchor_point_to_origin", "dimension_between", "ensure_fully_defined"):
         monkeypatch.setattr(builder, name, noop)
-    for name in ("set_sketch_direct_db", "name_last_feature", "_set_tolerance_precision",
+    for name in ("set_sketch_direct_db", "name_last_feature",
                  "apply_drawing_precision", "mark_dimensions_for_drawing", "blank_sketch"):
         monkeypatch.setattr(builder, name, lambda *a, **kw: None)
     monkeypatch.setattr(builder, "_early_bound",
-                        lambda entity, iface: SimpleNamespace(ConstructionGeometry=False))
-    monkeypatch.setattr(builder, "_named_dimension", lambda *a: (object(), None))
-    monkeypatch.setattr(builder, "set_dimension_symmetric_tolerance",
-                        lambda adapter, feature, name, tol: toleranced.append((feature, name, tol)))
+                        lambda entity, iface: entity if iface == "IDimensionTolerance"
+                        else SimpleNamespace(ConstructionGeometry=False))
+    monkeypatch.setattr(builder, "_named_dimension",
+                        lambda adapter, feature, name:
+                        (display, SimpleNamespace(Tolerance=tolerance)))
 
     asyncio.run(builder._author_clamped_setting(Adapter()))
 
@@ -116,7 +119,10 @@ def test_clamped_setting_authors_its_globals_and_drives(monkeypatch) -> None:
         f"SettingContactY@{feature}": '-"SettingContact"',
         f"{spec.SETTING_DIMENSION}@{feature}": '"SettingBlockFace" - "SettingStickLeft"',
     }
-    assert toleranced == [(feature, spec.SETTING_DIMENSION, spec.SETTING_TOLERANCE_MM)]
+    # A parenthesized, unbanded reference: "(2.923)", not "2.923 ±.004".
+    assert tolerance.Type == 0
+    assert reference_text == {1: "(", 2: ")"}
+    assert display.ShowParenthesis is False
 
 
 def test_setting_chord_spans_the_near_face_reference() -> None:
@@ -198,10 +204,12 @@ def test_stop_mark_division_sits_on_the_thumbscrew_axis() -> None:
         stick.SCALE_START_X + stop.STOP_MARK * stick.DIVISION_SPACING
     )
     assert spec.STICK_MARK_X == pytest.approx(84.9)
-    assert spec.STICK_ORIGIN[0] == pytest.approx(-74.4)
-    assert spec.STICK_X_MIN == pytest.approx(-74.4)
-    assert spec.SETTING_NEAR_FACE_MM == pytest.approx(74.4)
-    assert spec.STICK_X_MAX == pytest.approx(127.6)  # 202 bar, stations fixed
+    assert spec.STICK_ORIGIN[0] == pytest.approx(-74.232)
+    assert spec.STICK_X_MIN == pytest.approx(-74.232)
+    assert spec.SETTING_NEAR_FACE_MM == pytest.approx(74.232)
+    # Printed at its three inch places as the "(2.923)" reference.
+    assert f"{spec.SETTING_NEAR_FACE_MM / 25.4:.{spec.SETTING_PRECISION}f}" == "2.923"
+    assert spec.STICK_X_MAX == pytest.approx(127.698)  # 7.95 bar, stations fixed
     assert spec.STICK_X_MIN < 0.0 and spec.STICK_X_MAX > stop.BLOCK_LENGTH
 
 
@@ -262,6 +270,7 @@ def test_assembly_contract_is_fully_fixed() -> None:
     assert contract["free_dof"] == 0
     assert contract["allowed_free_stems"] == []
     assert contract["required_free_stems"] == []
+    assert contract["drawing_unit"] == "in"
 
 
 def _placed_stems() -> list[str]:
@@ -313,10 +322,10 @@ def test_park_pose_sits_on_the_land_inside_the_corridor() -> None:
         top.PARK_WEST_LIMIT_X + top.PARK_EAST_LIMIT_X
     )
     assert min(p[2] for p in corners) + max(p[2] for p in corners) == pytest.approx(0.0)
-    # The unchanged longitudinal axis centres the 202 mm bar on machine Z.
-    assert top.MS_POS[2] == pytest.approx(-26.6)
-    assert _image(top.MS_ROWS, top.MS_POS, (spec.STICK_X_MIN, 0, 0))[2] == pytest.approx(-101)
-    assert _image(top.MS_ROWS, top.MS_POS, (spec.STICK_X_MAX, 0, 0))[2] == pytest.approx(101)
+    # The unchanged longitudinal axis centres the 7.95 in bar on machine Z.
+    assert top.MS_POS[2] == pytest.approx(-26.733)
+    assert _image(top.MS_ROWS, top.MS_POS, (spec.STICK_X_MIN, 0, 0))[2] == pytest.approx(-100.965)
+    assert _image(top.MS_ROWS, top.MS_POS, (spec.STICK_X_MAX, 0, 0))[2] == pytest.approx(100.965)
     assert _flat(rows_from_euler(top.MS_EULER)) == pytest.approx(_flat(top.MS_ROWS))
 
 
@@ -396,9 +405,9 @@ def test_fitter_package_covers_rule_9() -> None:
         assert all(len(line) <= drawing.STEPS_LINE_WIDTH for line in text.splitlines())
     assert drawing.ASSEMBLY_STEPS.count("\n") >= len(sheet.ASSEMBLY_STEPS)
     for instruction in (sheet.ASSEMBLY_STEPS[-1], sheet.CLAMPED_SETUP_NOTE):
-        assert sheet.SETTING_CRITERION in instruction
-        assert "NEAR BLOCK FACE" in instruction
-        assert "FROM LEFT STICK END" in instruction
+        assert "NEAR-FACE REFERENCE DIMENSION" in instruction
+        assert f"STICK GRADUATION {stop.STOP_MARK:.1f} ON THUMBSCREW AXIS" in instruction
+        assert "±" not in instruction  # the reference carries no band
     assert drawing.EXPLODED_CAPTION == sheet.EXPLODED_CAPTION == (
         "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
     )
@@ -681,8 +690,9 @@ def test_mixed_sheets_copy_real_templates_and_close_donors(monkeypatch, defect) 
         CloseDoc=lambda title: closed.append(documents.pop(title)),
     )
 
-    def new_drawing(_adapter, *, layout, scale):
+    def new_drawing(_adapter, *, layout, scale, unit):
         assert scale == (1.0, 1.0)
+        assert unit == "in"  # target and donor sheets alike
         document = Document(f"Drawing{len(created)}", layout)
         documents[document.title] = document
         created.append(document)
@@ -808,33 +818,21 @@ def test_clamped_sheet_places_section_clear_of_setting(monkeypatch, defect) -> N
 
 
 @pytest.mark.parametrize(
-    "mark,tolerance,drill_depth,thread_depth,zero",
-    ((2.5, 0.15, 8.2, 6.5, 57.0), (1.5, 0.08, 7.6, 6.1, 56.0)),
+    "mark,drill_depth,thread_depth,zero",
+    ((2.5, ".320", ".260", 57.0), (1.5, ".290", ".240", 56.0)),
 )
 def test_fitter_text_tracks_mutated_setting_and_depth_specs(
-    monkeypatch, mark, tolerance, drill_depth, thread_depth, zero
+    monkeypatch, mark, drill_depth, thread_depth, zero
 ) -> None:
     """Evaluate real spec and sheet expressions with changed shop values, not
     COM mocks: the mutated spec is the one the sheet module imports."""
     monkeypatch.setattr(stop, "STOP_MARK", mark)
     monkeypatch.setattr(stick, "SCALE_START_X", zero)
-    monkeypatch.setattr(stop, "PLATE_TAP_DRILL_DEPTH", drill_depth)
-    monkeypatch.setattr(stop, "PLATE_TAP_THREAD_DEPTH", thread_depth)
-    monkeypatch.setattr(stop, "PLATE_TAP_DRILL_DIA", 1.85)
-    monkeypatch.setattr(stop, "PLATE_CLEARANCE_DIA", 2.5)
+    monkeypatch.setattr(stop, "PLATE_TAP_DRILL_DEPTH", float(drill_depth) * 25.4)
+    monkeypatch.setattr(stop, "PLATE_TAP_THREAD_DEPTH", float(thread_depth) * 25.4)
+    monkeypatch.setattr(stop, "PLATE_TAP_DRILL_DIA", 0.070 * 25.4)
+    monkeypatch.setattr(stop, "PLATE_CLEARANCE_DIA", 0.096 * 25.4)
     tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
-    assignments = [
-        node for node in tree.body
-        if isinstance(node, ast.Assign)
-        and any(
-            isinstance(target, ast.Name) and target.id == "SETTING_TOLERANCE_MM"
-            for target in node.targets
-        )
-    ]
-    assert len(assignments) == 1
-    assignments[0].value = ast.copy_location(
-        ast.Constant(tolerance), assignments[0].value
-    )
     namespace = {"__name__": "mutated_ms_assembly_spec"}
     exec(compile(ast.fix_missing_locations(tree), spec.__file__, "exec"), namespace)
     mutated_spec = SimpleNamespace(**namespace)
@@ -855,24 +853,20 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
     assert changed.SETTING_NEAR_FACE_MM == pytest.approx(
         changed.STICK_MARK_X - stop.THUMB_AXIS_X
     )
-    assert changed.SETTING_TOLERANCE_MM == tolerance
-    for text in (
-        changed.CLAMPED_SETUP_NOTE,
-        changed.ASSEMBLY_STEPS[-1],
-    ):
-        assert changed.SETTING_CRITERION in text
-        assert f"{changed.SETTING_NEAR_FACE_MM:.1f} ±{tolerance:.2f} mm" in text
-        assert "FROM LEFT STICK END" in text
+    for text in (changed.CLAMPED_SETUP_NOTE, changed.ASSEMBLY_STEPS[-1]):
+        assert f"STICK GRADUATION {mark:.1f} ON THUMBSCREW AXIS" in text
+        assert "±" not in text
     assert "PLATE IS MASTER" in changed.ASSEMBLY_STEPS[0]
     assert stop.MATCH_DRILL_DATUM_ALIGNMENT in changed.ASSEMBLY_STEPS[0]
     pilot = changed.ASSEMBLY_STEPS[0]
-    assert "OPEN ITS HOLES TO DIA 2.5" in pilot
-    assert f"{drill_depth:.1f} mm CYLINDRICAL DEPTH INTO BLOCK" in pilot
+    assert "PILOT DIA .070 THROUGH PLATE" in pilot
+    assert "OPEN ITS HOLES TO DIA .096" in pilot
+    assert f"{drill_depth} CYLINDRICAL DEPTH INTO BLOCK" in pilot
     assert "DEPTH EXCLUDES PLATE" in pilot
     assert "BOTTOMING-TAP" in pilot
-    assert f"{thread_depth:.1f} mm FULL THREAD DEPTH INTO BLOCK" in pilot
+    assert f"{thread_depth} FULL THREAD DEPTH INTO BLOCK" in pilot
     assert changed.PLATE_SCREW_TAP_RESERVE == pytest.approx(
-        thread_depth - changed.PLATE_SCREW_ENGAGED
+        float(thread_depth) * 25.4 - changed.PLATE_SCREW_ENGAGED
     )
     _assert_fitter_text_spacing(changed)
 
@@ -898,19 +892,6 @@ def _assert_fitter_text_spacing(fitter) -> None:
         > drawing.SHEET_INNER_BORDER[1] + line_pitch
     )
     assert drawing.SETUP_NOTE_XY[1] < drawing.UNDERSIDE_CENTER[1] - 0.020
-    # Native audit run20261020T155437689Z-8f0ca7b774c4: the original
-    # setting dimension line crossed the section-A label. Keep the stacked
-    # callout between extension lines and left of that label (~2.5 mm glyphs).
-    char_width = 0.0026
-    section_label_clearance = 0.009  # label's left edge to the near block face
-    span = fitter.SETTING_NEAR_FACE_MM / 1000.0
-    half_width = (
-        max(len(line) for line in fitter.STOP_POSITION_CALLOUT.splitlines())
-        * char_width / 2.0
-    )
-    centre = drawing.STOP_POSITION_TEXT_FRACTION * span
-    assert centre - half_width > 0.0
-    assert centre + half_width < span - section_label_clearance
     # Initial native outline top: 206.0755 mm. The old 4 mm cut overhang
     # left the upper arrow below the setting dimension line.
     # At text Y220 the native setting line is Y211.6656; its witness ends
@@ -920,20 +901,13 @@ def _assert_fitter_text_spacing(fitter) -> None:
     setting_line_y = drawing.STOP_POSITION_TEXT_Y - 0.0083344
     assert upper_arrow_y > setting_line_y + 0.001 + 0.002
     assert upper_arrow_y + 0.00635 < drawing.OVERALL_LENGTH_TEXT_Y - 0.010
-    # The stacked callout stays above Front; the overall reference above it
-    # retains text-height clearance to the inner border.
-    assert (
-        drawing.STOP_POSITION_TEXT_Y
-        - len(fitter.STOP_POSITION_CALLOUT.splitlines()) * line_pitch
-        > drawing.FRONT_CENTER[1] + 0.012
-    )
+    # The reference nominal stays above Front; overall remains above it.
+    assert drawing.STOP_POSITION_TEXT_Y - line_pitch > drawing.FRONT_CENTER[1] + 0.012
     assert drawing.OVERALL_LENGTH_TEXT_Y > drawing.STOP_POSITION_TEXT_Y + line_pitch
     assert drawing.OVERALL_LENGTH_TEXT_Y + line_pitch < drawing.SHEET_INNER_BORDER[3]
 
 
 def test_fitter_text_has_room_for_setting_and_pilot_depths() -> None:
-    assert spec.SETTING_TOLERANCE_MM == pytest.approx(0.10)
-    assert f"±{spec.SETTING_TOLERANCE_MM:.2f} mm" in sheet.SETTING_CRITERION
     _assert_fitter_text_spacing(SimpleNamespace(**{**vars(spec), **vars(sheet)}))
 
 
@@ -1198,7 +1172,7 @@ def test_reference_dimensions_select_owned_visible_end_edges(
             return self.text.get(index, "")
 
         def SetPrecision3(self, precision, *rest):
-            assert rest == (-1, spec.SETTING_TOLERANCE_PRECISION if len(displays) == 2 else -1, -1)
+            assert rest == (-1, -1, -1)
             self.precision = precision
             self.tolerance_precision = rest[1]
 
@@ -1321,11 +1295,9 @@ def test_reference_dimensions_select_owned_visible_end_edges(
         display = Display(spec.SETTING_NEAR_FACE_MM / 1000.0)
         displays.append(display)
         if display.dimension_type in (2, 11):
-            display.text.update({1: "", 2: ""})
+            display.text.update({1: "(", 2: ")"})
             display.precision = spec.SETTING_PRECISION
-            display.tolerance_precision = spec.SETTING_TOLERANCE_PRECISION
-            display.Tolerance.Type = 4
-            display.set_tolerance(-spec.SETTING_TOLERANCE_MM / 1000, spec.SETTING_TOLERANCE_MM / 1000)
+            display.Tolerance.Type = 0
         return [SimpleNamespace(GetSpecificAnnotation=lambda: display)]
 
     monkeypatch.setattr(drawing, "curate_view_dimensions", import_setting)
@@ -1384,30 +1356,28 @@ def test_reference_dimensions_select_owned_visible_end_edges(
         (start, False), (end, True)
     ]
     assert [display.value * 1000.0 for display in displays] == pytest.approx(
-        [202.0, spec.SETTING_NEAR_FACE_MM]
+        [201.93, spec.SETTING_NEAR_FACE_MM]
     )
     for index, display in enumerate(displays):
         assert display.value_reads == 1
-        assert display.text[1] == ("(" if index == 0 else "")
-        assert display.text[2] == (")" if index == 0 else "")
+        assert display.text[1] == "("
+        assert display.text[2] == ")"
         if index == 0:
             assert {1, 2} <= set(display.readbacks)
         assert display.precision == (sheet.DRAWING_REFERENCE_PRECISION if index == 0 else spec.SETTING_PRECISION)
         if index == 1:
-            assert display.Tolerance.Type == 4
-            assert display.minimum == pytest.approx(-spec.SETTING_TOLERANCE_MM / 1000)
-            assert display.maximum == pytest.approx(spec.SETTING_TOLERANCE_MM / 1000)
+            assert display.Tolerance.Type == 0
             assert display.text[3] == display.text[4] == ""
             assert {3, 4} <= set(display.readbacks)
     settled()
-    displays[1].maximum *= 2.0
-    with pytest.raises(RuntimeError, match="settled assembly setting band"):
+    displays[1].Tolerance.Type = 4
+    with pytest.raises(RuntimeError, match="settled assembly pose"):
         settled()
-    displays[1].maximum /= 2.0
-    displays[1].text[1] = "("
-    with pytest.raises(RuntimeError, match="settled assembly setting band"):
-        settled()
+    displays[1].Tolerance.Type = 0
     displays[1].text[1] = ""
+    with pytest.raises(RuntimeError, match="settled assembly pose"):
+        settled()
+    displays[1].text[1] = "("
     for field in (3, 4):
         displays[1].text[field] = "STALE CAPTION"
         with pytest.raises(RuntimeError, match="settled native caption"):

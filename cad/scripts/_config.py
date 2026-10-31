@@ -159,15 +159,21 @@ def fit(group: str, *keys: str) -> Any:
     return node
 
 
-def title_block(kind: str) -> dict[str, Any]:
+def title_block(kind: str, *, unit: str = "mm") -> dict[str, Any]:
     """A title-block general tolerance row from title_block.yaml.
 
     ``title_block('linear_2pl')`` -> ``{value_in, band_mm, digits}``;
-    ``title_block('angular')``    -> ``{value_deg, digits}``.  Read printed
-    bands through ``_printed_tolerance`` and render title-block text through
+    ``title_block('angular')``    -> ``{value_deg, digits}``.  ``unit="in"``
+    reads the ``in:`` section's row where it lists one (``{value_in, band_in,
+    digits}``) and the shared top-level row otherwise.  Read printed bands
+    through ``_printed_tolerance`` and render title-block text through
     ``_title_block_units``, which own the unit-explicit keys.
     """
-    return _doc("title_block")[kind]
+    doc = _doc("title_block")
+    if unit not in ("mm", "in"):
+        raise ValueError(f"unknown title-block unit {unit!r}")
+    section = doc["in"] if unit == "in" else {}
+    return section.get(kind, doc[kind])
 
 
 def provenance(doc: str, *keys: str) -> dict[str, Any]:

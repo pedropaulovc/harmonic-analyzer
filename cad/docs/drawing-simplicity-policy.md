@@ -28,6 +28,32 @@ cannot ask for what the authors were told to leave out.
 
 ## How the repository implements the guidelines
 
+Packages convert to decimal inches in batches under issue #290. The temporary
+`drawing_unit: in` declaration in a package's own part or assembly registry row
+selects the model's TOL_* stamps and document units, and the draw script passes
+it to `new_project_drawing(unit=...)`. Missing declarations mean `mm`; explicit
+`mm` is retained for metric-only supplier packages. `finalize_drawing` refuses
+a sheet whose linked model carries inch rows while the drawing is not in
+inches. Remove the rollout switch when the last batch lands and make inches
+the fabrication default, retaining the supplier-unit exception.
+
+A converted package's builder selects the model's document units with
+`_document_units.apply_package_model_units` right after `create_part` or
+`create_assembly`, before any global, sketch, feature or check
+(`_stock_fastener` does it for purchased stock). They are IPS decimal inches at
+**8** places: calculation precision, because the equation manager evaluates
+every global at the document's places; never set the 3-place print grid there.
+Printed places stay each dimension's `DRAWING_PRECISION`.
+
+The inch grades are `.X ±.1` for non-functional features only, `.XX ±.01` and
+`.XXX ±.005`; drilled holes use `+.004/0` with three-place inch diameters.
+Printed-grid nominals, explicit fits, roughness and worst-case wall checks
+convert together with each package. Unconverted packages keep their metric
+conventions. Supplier fractions remain exact REF values through
+`_supplier_dimensions` with `RoundToFraction=False`; no fractional tolerance
+grade applies. Changes to these shared review documents invalidate every cached
+machinist review once, even though only selected native packages change units.
+
 - **The model owns tolerance and precision (rules 3 and 4).** A band goes on
   the dimension as a native model tolerance
   (`_drawing_tolerances.set_dimension_*_tolerance`). Decimal places are authored
@@ -89,11 +115,11 @@ cannot ask for what the authors were told to leave out.
   or wrong-view native references refuse with expected and observed inventories.
   This layout contract is not a substitute for the rendered comparison with
   the supplier drawing.
-- **Roughness grades (rule 6)** are the `_surface_finish` constants:
-  `MACHINED_UM` (1.6) on `shaft_in_bushing` journals and bores,
-  `cam_follower_contact` faces, the amplitude-bar slide, the knife edge and
-  its seat; `GROUND_UM` (0.8) on knife edges and pivot-screw shoulders;
-  `SEAT_UM` (3.2) on the one locating seat.
+- **Roughness grades (rule 6)** on inch sheets are 63 µin Ra for running
+  journals and bores, cam-follower contact, slides, knife edges and their seats;
+  32 µin Ra for ground knife edges and pivot-screw shoulders; and 125 µin Ra
+  for the one locating seat. Unconverted metric sheets retain `_surface_finish`
+  grades `MACHINED_UM` (1.6), `GROUND_UM` (0.8) and `SEAT_UM` (3.2).
 - **Notes (rule 7)** that live in `<part>_notes.py` stay there. A
   drawing-only note helper enters a part's rebuild closure only if its builder
   imports it. When a builder stamps notes into a saved model property, that
@@ -138,8 +164,8 @@ cannot ask for what the authors were told to leave out.
   base's pure fastener contract). Receiver capacity does not by itself prove
   a purchased screw's installed engagement; existing inspected minima and
   owner-declared shortfalls remain explicit. The 1.5D engagement minimum and
-  the rule-17 wall targets (2.0 mm
-  target, 1.5 mm floor) exist to be forgiving to a first-time hobby machinist:
+  the rule-17 wall targets (.080 in target, .060 in floor after conversion;
+  2.0 mm target, 1.5 mm floor on unconverted packages) allow for a first-time hobby machinist:
   they are design margins for the shop class the guidelines describe, not
   capability limits.
 - **Retention (rule 23).** Mechanical locks are the default, in preference

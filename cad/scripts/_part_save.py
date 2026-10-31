@@ -17,7 +17,12 @@ import _telemetry
 from _check import check, log
 from _com import _early_bound
 from _custom_properties import apply_custom_properties
-from _part_properties import apply_block_tolerances, apply_summary_info, part_properties
+from _part_properties import (
+    apply_block_tolerances,
+    apply_summary_info,
+    part_drawing_unit,
+    part_properties,
+)
 from _paths import DEFAULT_VIEWS, OUT_PNG, OUT_SLDPRT, OUT_STL
 from _preferences import STL_EXPORT_PREFERENCES, enforce_preferences
 from _rebuild import rebuild_stale_configurations
@@ -110,7 +115,7 @@ async def save_part_and_images(
     png_dir.mkdir(parents=True, exist_ok=True)
     views = list(views)
     _prune_stale_part_views(png_dir, part_name, views)
-    apply_block_tolerances(adapter)
+    apply_block_tolerances(adapter, unit=part_drawing_unit(part_name))
     properties = part_properties(part_name)
     apply_custom_properties(adapter, properties)
     # The drawing template's PART cell resolves the linked model's document

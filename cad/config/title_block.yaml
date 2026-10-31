@@ -23,12 +23,14 @@
 # Coherence with the mm classes in tolerances/_base.yaml: ±.02 in = 0.508 mm ≈
 # visual_noncritical; ±.005 in = 0.127 mm ≈ machined_block.
 #
-# INTERIM (issue #290; owner rulings 2026-10-30): generated sheets still
-# dimension in mm, so the printed bands below are mm values (.X ±0.8, .XX ±0.51,
-# .XXX ±0.13, which is why 0.8 mm is not exactly value_in 0.03). The inch pilot
-# moves them to ``band_in`` with the ASME rows .X ±.1 (non-functional features
-# only), .XX ±.01, .XXX ±.005; drilled holes +.004/0, edge break R.010 / .010,
-# inside corners R.040 MAX. The renderer then prints inch style (``±.01``).
+# The top-level rows are the millimetre sheet (issue #290): a package that
+# declares ``drawing_unit: mm``, or none (legacy), prints them (.X ±0.8, .XX
+# ±0.51, .XXX ±0.13, which is why 0.8 mm is not exactly value_in 0.03). A
+# package that declares ``drawing_unit: in`` (its parts/<stem>.yaml row or
+# assemblies/<stem>.yaml contract) prints the ``in:`` rows at the end of this
+# file instead, ASME style (``±.01``); rows the ``in:`` block does not list
+# (angular, surface, thread) carry no length and are shared. A length row read
+# for an inch sheet must be an inch row: the readers refuse an mm band there.
 linear_1pl: { value_in: 0.03,  band_mm: 0.8,  digits: 1 }   # .X
 linear_2pl: { value_in: 0.02,  band_mm: 0.51, digits: 2 }   # .XX
 linear_3pl: { value_in: 0.005, band_mm: 0.13, digits: 2 }   # .XXX
@@ -79,3 +81,17 @@ thread: { type: "UNC/UNF", class: "2A/2B" }
 # "-0"). Upper deviation comes first, so the template row reads TOL_HOLE_PLUS
 # then TOL_HOLE_MINUS -> "+0.10 / 0".
 drilled_hole: { minus_mm: 0.0, plus_mm: 0.10, digits: 2 }
+
+# Decimal-inch sheet (owner rulings 2026-10-30), selected per package by
+# ``drawing_unit: in`` through ``_config.title_block(kind, unit="in")``. ``.X``
+# is for non-functional features only (profiles, chamfer sizes, unmated overall
+# lengths). ``value_in`` feeds DimXpert exactly as above and equals the printed
+# band here. Drilled holes +.004/0; edge break R.010 / .010 chamfer; inside
+# corners R.040 MAX.
+in:
+  linear_1pl: { value_in: 0.1,   band_in: 0.1,   digits: 1 }   # .X
+  linear_2pl: { value_in: 0.01,  band_in: 0.01,  digits: 2 }   # .XX
+  linear_3pl: { value_in: 0.005, band_in: 0.005, digits: 3 }   # .XXX
+  edge_break: { radius_in: 0.010, chamfer_max_in: 0.010, digits: 3 }
+  inside_corner: { radius_in: 0.040, digits: 3 }
+  drilled_hole: { minus_in: 0.0, plus_in: 0.004, digits: 3 }

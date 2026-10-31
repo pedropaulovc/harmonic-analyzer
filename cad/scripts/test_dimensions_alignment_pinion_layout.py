@@ -125,8 +125,9 @@ def _expected_fragments() -> list[str]:
         f"c2c {dt.STRAP_C2C:.1f}",
         f"{dt.STRAP_LEAN_DEG:.3f}° lean",
         f"bores at ({_mm(dt.LIFT_X)}, {_mm(dt.LIFT_Y)})",
-        f"The collar is Ø{dt.CAM_OD:g} with a {dt.CAM_ECC:.1f} eccentricity "
-        f"and keeps a {dt.CAM_THIN_SIDE_WALL:.3f} thin-side wall",
+        # #290's bore-only inch pilot leaves the book untouched, so its derived
+        # thin-side wall prose is not pinned here (test_dt_pinion_cam_drawing).
+        f"The collar is Ø{dt.CAM_OD:g} with a {dt.CAM_ECC:.1f} eccentricity",
         f"Current nominal parked surface gap is {dt._PARK_GAP:.3f}",
         f"{_mm(dt.CAM_ENGAGE_ROTATION_DEG)}° cam rotation, "
         f"{authority:.3f} mm engaged authority and "
@@ -134,8 +135,7 @@ def _expected_fragments() -> list[str]:
         # Engage-lever row keeps the current linkage, not the historical photo angle.
         f"source-law eccentric-cam rotation {_mm(dt.CAM_ENGAGE_ROTATION_DEG)}° "
         f"carries it through vertical to {_mm(dt.LEVER_ENGAGED_TILT_DEG)}°",
-        f"eccentricity {dt.CAM_ECC:.1f}, source thin-side wall "
-        f"{dt.CAM_THIN_SIDE_WALL:.3f}",
+        f"eccentricity {dt.CAM_ECC:.1f}",
         # The current spring's section, pad, offset and contact station remain
         # reader-derived; its historical material interpretation is independent.
         f"{spring.THICK:g} ×{_section_mm(spring.WIDTH)} ",

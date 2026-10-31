@@ -10,3 +10,4 @@ fr-vn-gooseneck-set-screw:
   quantity: 1
   tolerance_class: machined_block
   process: purchased
+  drawing_unit: in

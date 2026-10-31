@@ -10,6 +10,7 @@ unit is part of its key (``band_mm`` or ``band_in``, ``plus_mm``,
   inch string can never be read back as millimetres.
 * The ``*_display`` renderers derive the TOL_* text from the number and its
   unit (ASME style: ``±0.51`` in mm, ``±.01`` in inches), never the reverse.
+  Each takes the sheet's ``unit`` (``_config.title_block``'s row selection).
 
 The TOL_* stamping (``_part_properties``) imports only this module.  Geometry
 that sizes from the printed rows reads them through ``_printed_tolerance``,
@@ -114,45 +115,47 @@ def render_number(value: float, unit: str, digits: int) -> str:
     raise ValueError(f"unknown display unit {unit!r}")
 
 
-def _render(row_name: str, name: str, units: Mapping[str, float]) -> str:
-    value, unit, digits = quantity(row_name, _config.title_block(row_name), name, units)
+def _render(row_name: str, name: str, units: Mapping[str, float], sheet: str) -> str:
+    row = _config.title_block(row_name, unit=sheet)
+    value, unit, digits = quantity(row_name, row, name, units)
     return render_number(value, unit, digits)
 
 
-def linear_band_display(places: int) -> str:
-    """TOL_LIN_X / _XX / _XXX: the printed +/- for ``places``, e.g. ``±0.51``."""
-    return "±" + _render(f"linear_{places}pl", "band", LENGTH_UNITS)
+def linear_band_display(places: int, *, unit: str = "mm") -> str:
+    """TOL_LIN_X / _XX / _XXX: the printed +/- for ``places``, e.g. ``±0.51``
+    (``±.01`` on an inch sheet)."""
+    return "±" + _render(f"linear_{places}pl", "band", LENGTH_UNITS, unit)
 
 
-def angular_band_display() -> str:
+def angular_band_display(*, unit: str = "mm") -> str:
     """TOL_ANG, e.g. ``±1°``."""
-    return "±" + _render("angular", "value", ANGLE_UNITS)
+    return "±" + _render("angular", "value", ANGLE_UNITS, unit)
 
 
-def edge_break_radius_display() -> str:
+def edge_break_radius_display(*, unit: str = "mm") -> str:
     """TOL_EDGE_BREAK_R, e.g. ``R0.25``."""
-    return "R" + _render("edge_break", "radius", LENGTH_UNITS)
+    return "R" + _render("edge_break", "radius", LENGTH_UNITS, unit)
 
 
-def edge_break_chamfer_display() -> str:
+def edge_break_chamfer_display(*, unit: str = "mm") -> str:
     """TOL_CHAMFER_MAX, e.g. ``0.25``."""
-    return _render("edge_break", "chamfer_max", LENGTH_UNITS)
+    return _render("edge_break", "chamfer_max", LENGTH_UNITS, unit)
 
 
-def inside_corner_display() -> str:
+def inside_corner_display(*, unit: str = "mm") -> str:
     """TOL_INSIDE_CORNER, e.g. ``R1.0 MAX``."""
-    return f"R{_render('inside_corner', 'radius', LENGTH_UNITS)} MAX"
+    return f"R{_render('inside_corner', 'radius', LENGTH_UNITS, unit)} MAX"
 
 
-def drilled_hole_plus_display() -> str:
+def drilled_hole_plus_display(*, unit: str = "mm") -> str:
     """TOL_HOLE_PLUS, the upper deviation with its sign, e.g. ``+0.10``."""
-    return "+" + _render("drilled_hole", "plus", LENGTH_UNITS)
+    return "+" + _render("drilled_hole", "plus", LENGTH_UNITS, unit)
 
 
-def drilled_hole_minus_display() -> str:
+def drilled_hole_minus_display(*, unit: str = "mm") -> str:
     """TOL_HOLE_MINUS: a nil limit is a bare ``0`` (ASME Y14.5-2009 §2.3.2),
     any other the signed lower deviation."""
-    row = _config.title_block("drilled_hole")
+    row = _config.title_block("drilled_hole", unit=unit)
     if length_mm("drilled_hole", row, "minus") == 0.0:
         return "0"
-    return "-" + _render("drilled_hole", "minus", LENGTH_UNITS)
+    return "-" + _render("drilled_hole", "minus", LENGTH_UNITS, unit)

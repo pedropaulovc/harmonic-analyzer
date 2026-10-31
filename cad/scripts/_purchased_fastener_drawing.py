@@ -1441,6 +1441,8 @@ async def build_purchased_fastener_drawing(
     settled_checks: Sequence[Callable[[], None]] = (),
     supplier_data: Sequence[str] = (),
     title_block_setup: Callable[[Any], Callable[[], None]] | None = None,
+    view_placement: Callable[[Any, dict[str, Any]], Callable[[], None]] | None = None,
+    unit: str = "mm",
 ) -> dict[str, str]:
     """Export Front/Top/Right plus Isometric without fabrication dimensions or PMI.
 
@@ -1455,6 +1457,9 @@ async def build_purchased_fastener_drawing(
     ``cut_to_suit``-selected default.
     ``title_block_setup`` formats existing linked title notes and returns their
     mandatory final-rebuild check, as for purchased-part reference sheets.
+    ``view_placement`` optionally translates fitted views before their origin
+    snapshot and returns a mandatory final-rebuild proof. It must preserve
+    scales, sources and orientations; final cell/ink checks remain unchanged.
     ``view_layout="supplier_top"`` reserves the supplier screw family's Top
     annotation lanes; ``"tall_top"`` gives a longer axial Top view. Neither
     changes annotation margins or the standard-scale fitting contract.
@@ -1462,6 +1467,7 @@ async def build_purchased_fastener_drawing(
     reserve their annotation space before scale selection. Pass the same mutable
     settled-check list the hook populates, or a predeclared read-only assertion.
     Final checks run after the finalizer's last rebuild, without refitting.
+    ``unit`` is the part's ``drawing_unit`` (``new_project_drawing``).
     """
     stock = fastener(spec.artifact_stem)
     source = spec.source
@@ -1521,6 +1527,8 @@ async def build_purchased_fastener_drawing(
             settled_checks=settled_checks,
             supplier_data=supplier_data,
             title_block_setup=title_block_setup,
+            view_placement=view_placement,
+            unit=unit,
             source_checkpoint=_supplier_source_checkpoint(
                 adapter,
                 source,
@@ -1657,6 +1665,8 @@ async def _build_reference_sheet(
     supplier_data: Sequence[str] = (),
     source_checkpoint: Callable[[str], None] | None = None,
     title_block_setup: Callable[[Any], Callable[[], None]] | None = None,
+    view_placement: Callable[[Any, dict[str, Any]], Callable[[], None]] | None = None,
+    unit: str = "mm",
 ) -> dict[str, str]:
     source = spec.source
     template = DRAWING_TEMPLATES[spec.layout]
@@ -1690,6 +1700,7 @@ async def _build_reference_sheet(
     draw, sheet = new_project_drawing(
         adapter,
         layout=spec.layout,
+        unit=unit,
         **({"checkpoint": source_checkpoint} if source_checkpoint is not None else {}),
     )
     title_block_notes = _purchased_title_block(
@@ -1750,6 +1761,13 @@ async def _build_reference_sheet(
             view.UseSheetScale = 0
             view.ScaleRatio = double_array([1.0, 1.0])
     scales = _fit_views(draw, views, fit_cells)
+    if view_placement is not None:
+        placement_check = view_placement(
+            adapter, {name: view for view, (name, _, _) in zip(views, cells, strict=True)}
+        )
+        if not callable(placement_check):
+            raise TypeError(f"{label}: view placement must return a settled proof")
+        settled_checks = (*settled_checks, placement_check)
     fitted_origins: dict[str, tuple[float, float]] = {}
     fitted_sources: dict[str, tuple[str, str]] = {}
     if supplier_dimensions is not None:

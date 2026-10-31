@@ -229,7 +229,8 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
 
     monkeypatch.setattr(purchased, "read_required_properties", required_properties)
 
-    def new_project_drawing(_adapter, *, layout, checkpoint):
+    def new_project_drawing(_adapter, *, layout, checkpoint, unit):
+        assert unit == "mm"
         calls.append(("new", layout))
         _adapter.currentModel = draw
         checkpoint("after_new_document")
@@ -7726,11 +7727,15 @@ def test_source_checkpoint_real_finalizer_boundaries_preserve_native_failure(
     for name in (
         "apply_custom_properties",
         "assert_asme_b_sheet",
-        "read_required_properties",
         "assert_precise_isometric_views",
         "sanitize_pdf_metadata",
     ):
         monkeypatch.setattr(common, name, lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        common,
+        "read_required_properties",
+        lambda *_args, **_kwargs: {"TOL_LIN_XX": "±0.51"},
+    )
     monkeypatch.setattr(
         common, "pdf_shaded_raster_dpi", lambda *_args: contextlib.nullcontext()
     )

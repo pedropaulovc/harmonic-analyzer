@@ -15,7 +15,6 @@ from _sketch import (
     ensure_fully_defined,
 )
 from _sketch_chains import define_rectilinear_chain
-from _sketch_circle import define_circle
 from _drawing_precision import set_dimension_display_precision
 from _visibility import blank_sketch_feature
 
@@ -96,6 +95,33 @@ async def rebate_profile(adapter: Any, dims: SketchDims) -> None:
     check("exit rebate profile", await adapter.exit_sketch())
 
 
+@_telemetry.traced("sketch.stop_relief_profile")
+async def relief_profile(adapter: Any, dims: SketchDims) -> None:
+    """The X-through corner relief's profile on the Right plane (local X is -Z).
+
+    A notch into the back wall under the roof, from the rebate's back corner:
+    ReliefDepth along the roof underside, then ReliefHeight down the notch.
+    """
+    check("open relief profile", await adapter.create_sketch("Right"))
+    back = spec.WINDOW_Z_MAX + spec.RELIEF_DEPTH
+    low = spec.WINDOW_Y_MAX - spec.RELIEF_HEIGHT
+    points = [
+        (-spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX), (-back, spec.WINDOW_Y_MAX),
+        (-back, low), (-spec.WINDOW_Z_MAX, low),
+    ]
+    lines = await add_line_chain(adapter, points)
+    # Emission order: depth along the roof, notch height, then the corner's
+    # origin anchor (Z station, then roof station).
+    await define_rectilinear_chain(
+        adapter, lines, points, label="corner relief", dims=dims,
+        names=["ReliefDepth", "ReliefHeight", "ReliefWindowStation", "ReliefRoofStation"],
+        drives=['"ReliefDepth"', '"ReliefHeight"', '"WindowWidth"',
+                '"BlockHeight" - "RoofThickness"'],
+    )
+    await ensure_fully_defined(adapter, "relief profile")
+    check("exit relief profile", await adapter.exit_sketch())
+
+
 @_telemetry.traced("appearance.stop_reference_sketches")
 def hide_location_references(adapter: Any, names: tuple[str, ...]) -> None:
     model = _early_bound(adapter.currentModel, "IPartDoc")
@@ -166,31 +192,3 @@ async def roof_reference(adapter: Any) -> list[tuple[str, str]]:
     return list(zip(names, [
         '"RoofThickness"', '"BlockHeight" - "RoofThickness"',
     ], strict=True))
-
-
-@_telemetry.traced("sketch.stop_plate_pilot")
-async def pilot_drill_reference(adapter: Any) -> list[tuple[str, str]]:
-    """Own the earlier match-drill size without changing the finished clearance.
-
-    The final cover only has the opened clearance holes. The construction
-    circle sits concentrically inside an actual clearance, representing the
-    earlier PILOT step before THEN OPEN, not another finished edge. Its native
-    diameter and precision remain model-owned when the drawing shows the sketch.
-    """
-    feature = "PilotDrillReference"
-    dimensions = SketchDims()
-    check(feature, await adapter.create_sketch("Front"))
-    circle = await define_circle(
-        adapter, spec.PLATE_HOLE_XS[0], spec.PLATE_HOLE_Y,
-        spec.PLATE_TAP_DRILL_DIA / 2.0, feature,
-        dims=dimensions, names=(None, None, "PilotDrillDiameter"),
-        drives=(None, None, '"PilotDrillDiameter"'),
-    )
-    segment = _early_bound(adapter._sketch_entities[circle], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not segment.ConstructionGeometry:
-        raise RuntimeError("pilot reference construction flag rejected")
-    await ensure_fully_defined(adapter, feature)
-    check(feature, await adapter.exit_sketch())
-    name_last_feature(adapter, feature)
-    return dimensions.apply(adapter, feature)

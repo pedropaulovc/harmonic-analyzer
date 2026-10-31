@@ -7,3 +7,10 @@ dt-pinion-cam:
   quantity: 2
   tolerance_class: machined_block
   process: "machined (steel)"
+  drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "front view, Ø.2510 +.0005/.0000 reamed bore offset .079 ±.002 inside the Ø.575 ±.002 OD: thin-side wall, stated by the native .0797 MIN THIN-SIDE WALL dimension (ThinWallMin@ThinWallReference)"
+      finding: "thin-side wall .07975 in (2.02565 mm) at the printed worst case, .00025 in (0.00635 mm) under the .080 in target (rule 17); .01975 in over the .060 in floor. The sheet prints it as .0797 MIN (2.02438 mm): the same shortfall, .07975 floored to four places on purpose so the print never states more wall than the worst case leaves"
+      reason: "owner ruling via Main, 2026-10-30 (#290 decimal-inch pilot): the round reamed bore needs its sub-.001 band, so only the bore moves to the owned .2510 reamer (+.0005/.0000); the OD 14.6, eccentricity 2.0, length 9.0 and station 4.1 stay at their drive-train park/engage values and print in inches (.575 ±.002, .079 ±.002), deferring their grid snap to the drive-train batch. Worst case = OD .573, bore .2515, eccentricity .081 (dt_pinion_cam_spec.THIN_SIDE_WALL_MIN_MM, which refuses anything thinner than this declared .07975). The sheet prints the accepted wall as the model-owned single limit .0797 MIN (the .07975 floored to four places), never as note text"

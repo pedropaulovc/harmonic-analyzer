@@ -1,8 +1,9 @@
 r"""Create the curated machinist drawing for the pinion lift cam.
 
-An eccentric steel collar: the Ø6.40 bore is offset 2.0 mm from the Ø14.6 OD
+An eccentric steel collar: the Ø.2510 bore is offset .079 from the Ø.575 OD
 axis (so the collar and bore are NOT concentric -- the drawing dimensions that
-offset explicitly, per the cam-note precedent).  The collar/bore sketches live
+offset explicitly, per the cam-note precedent).  Decimal-inch sheet (#290); the
+model keeps its millimetre nominals.  The collar/bore sketches live
 on the Front plane (front view carries bore/eccentricity); the side profile
 carries collar length/OD, while the set-screw end view owns the #2-56 tapped
 hole and its station (U28: the raised boss is gone).
@@ -41,6 +42,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _machinist_review_mode import MachinistReviewMode
 from _named_views import octant_view_name
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -56,6 +58,7 @@ from dt_pinion_cam_spec import (
     SET_SCREW_STAKE_STEP_KEY,
     SURFACE_FINISHES,
     TAP_DRILL_CALLOUT,
+    THIN_WALL_CALLOUT,
 )
 from dt_drive_train_steps import step_ref
 
@@ -104,9 +107,13 @@ _SQRT_HALF = 0.5**0.5
 # circular view where it is the only diagonal (its and the OD's diagonals both
 # pass through nearly the same centre, so the two cannot share a view without
 # crossing -- machinist round 2).
+# RV-01's accepted thin-side wall (rule 20): the part's native ".0797 MIN"
+# reference up the wall over the bore, its text above the OD's top between
+# the bore and eccentricity callouts.
 FRONT_KEEP = {
     "BoreDia": (0.055, 0.180),
     "CollarCy": (0.150, 0.200),
+    "ThinWallMin": (FRONT_CENTER[0], 0.195),
 }
 SIDE_KEEP = {
     "Depth": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.055),
@@ -132,10 +139,10 @@ DIMENSION_CALLOUTS = {
     "CollarOd": COLLAR_OD_CALLOUT,
     "CollarCy": ECCENTRICITY_CALLOUT,
     "TapDrillDia": f"{TAP_DRILL_CALLOUT}\n{step_ref(SET_SCREW_STAKE_STEP_KEY)}",
+    "ThinWallMin": THIN_WALL_CALLOUT,
 }
 # Decimal places are the part's (dt_pinion_cam_spec.DRAWING_PRECISION, applied
-# by build_dt_pinion_cam): two on the critical bore, OD and eccentricity and on
-# the tap drill, one everywhere else.  The sheet only reads them back.
+# by build_dt_pinion_cam).  The sheet only reads them back.
 
 
 def _limit_witness_lines(
@@ -189,7 +196,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("dt-pinion-cam"),
     )
     stamp_drawing_summary(
         adapter,

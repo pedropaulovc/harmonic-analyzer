@@ -112,6 +112,10 @@ class DrawingOutputs:
 
 
 
+# swUserPreferenceIntegerValue_e.swUnitsLinear and swLengthUnit_e.swINCHES.
+_PREF_UNITS_LINEAR = 47
+_LENGTH_INCHES = 3
+
 # The general-tolerance custom properties every part carries
 # (_part_properties.part_properties, from cad/config/title_block.yaml) and the drawing
 # template's title block reads via $PRPSHEET. finalize_drawing requires them on
@@ -480,6 +484,7 @@ def new_project_drawing(
     scale: tuple[float, float] = (1.0, 1.0),
     decimals: int = 2,
     checkpoint: Callable[[str], None] | None = None,
+    unit: str = "mm",
 ) -> tuple[Any, Any]:
     """Create a drawing from the selected hand-made project template.
 
@@ -492,9 +497,14 @@ def new_project_drawing(
     ``property_view`` is accepted for compatibility and unused.
     ``checkpoint`` runs immediately after native document creation/binding,
     before drawing setup, so source load transitions are not attributed to views.
+    ``unit`` is the package's ``drawing_unit`` (``_part_properties.part_drawing_unit``
+    or the assembly contract's): ``"in"`` selects the SDK's decimal-inch
+    document units, anything else millimetres.
     """
     if checkpoint is not None and not callable(checkpoint):
         raise TypeError("drawing checkpoint must be callable")
+    if unit not in ("mm", "in"):
+        raise ValueError(f"unknown drawing unit {unit!r}")
     _ = property_view
     template = DRAWING_TEMPLATES[layout]
     if not template.path.is_file() or template.path.stat().st_size == 0:
@@ -523,7 +533,10 @@ def new_project_drawing(
     # 2 decimals by default: 3-decimal display (76.000) reads as false precision
     # next to the ±0.25 blanket tolerance. A drawing that genuinely needs finer
     # display (an exact inch conversion like 9.525) can pass decimals=3.
-    set_units_mm(adapter, decimals=decimals)
+    if unit == "in":
+        _sw_drawing.set_units_inch(adapter, decimals=decimals)
+    else:
+        set_units_mm(adapter, decimals=decimals)
     _pin_dimension_text_and_leader_style(draw)
     _pin_annotation_ink(adapter)
     if not sheet.SetScale(float(scale[0]), float(scale[1]), True, False):
@@ -1031,7 +1044,7 @@ async def finalize_drawing(
         linked_model = _sw_type_info.early_bound_or_flag(
             linked_model, "IModelDoc2", "GetCustomInfoValue"
         )
-        read_required_properties(
+        linked_properties = read_required_properties(
             linked_model,
             (
                 *TITLE_BLOCK_TOLERANCE_PROPERTIES,
@@ -1044,6 +1057,21 @@ async def finalize_drawing(
                 TITLE_BLOCK_COPYRIGHT_PROPERTY,
             ),
         )
+        # A model stamped for an inch sheet (its package declares
+        # ``drawing_unit: in``) prints ASME inch rows, which drop the leading
+        # zero (``±.01``; millimetre rows keep it, ``±0.51``). Such a model
+        # must sit on an inch sheet: a draw script that forgot its ``unit``
+        # would otherwise print inch rows beside millimetre dimensions.
+        if linked_properties["TOL_LIN_XX"].startswith("±."):
+            linear = _read_member(drawing_model, "Extension").GetUserPreferenceInteger(
+                _PREF_UNITS_LINEAR, 0
+            )
+            if linear != _LENGTH_INCHES:
+                raise RuntimeError(
+                    f"sheet {sheet_name!r} links {first_name!r}, stamped for an inch "
+                    f"sheet, but the drawing's length unit is {linear!r}; pass the "
+                    "package's drawing_unit to new_project_drawing"
+                )
 
     # Explicit recipe-requested cleanup remains sheet-scoped. When a standard
     # Isometric view is present, the finalizer owns its high-quality Shaded With

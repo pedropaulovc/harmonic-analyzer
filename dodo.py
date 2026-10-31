@@ -3700,6 +3700,8 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # The title block's unit-explicit general tolerances: one reader that
         # returns mm bands, one renderer for the TOL_* text (#290).
         SCRIPTS_DIR / "test_printed_tolerance.py",
+        # One drawing_unit declaration per package (#290 transition switch).
+        SCRIPTS_DIR / "test_package_units.py",
         # A fresh detail view's projection is read behind the view barrier
         # and settled within a time budget, not a read count (#1336).
         SCRIPTS_DIR / "test_drawing_detail_projection.py",

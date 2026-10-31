@@ -14,7 +14,9 @@ import _title_block_units as units
 def _rows(monkeypatch: pytest.MonkeyPatch, **rows: dict) -> None:
     real = _config.title_block
     monkeypatch.setattr(
-        _config, "title_block", lambda kind: rows.get(kind) or real(kind)
+        _config,
+        "title_block",
+        lambda kind, *, unit="mm": rows.get(kind) or real(kind, unit=unit),
     )
 
 
@@ -50,9 +52,9 @@ def test_render_number_refuses_an_unknown_unit_and_a_signed_magnitude():
 
 def test_inch_band_converts_to_millimetres_and_prints_inch_style(monkeypatch):
     _rows(monkeypatch, linear_2pl={"value_in": 0.01, "band_in": 0.01, "digits": 2})
-    assert tol.printed_band_mm(2) == pytest.approx(0.254)
-    assert units.linear_band_display(2) == "±.01"
-    # The same band authored in mm prints and reads as mm.
+    assert tol.printed_band_mm(2, unit="in") == pytest.approx(0.254)
+    assert units.linear_band_display(2, unit="in") == "±.01"
+    # The same band authored in mm prints and reads as mm on the mm sheet.
     _rows(monkeypatch, linear_2pl={"value_in": 0.01, "band_mm": 0.254, "digits": 3})
     assert tol.printed_band_mm(2) == 0.254
     assert units.linear_band_display(2) == "±0.254"
@@ -65,18 +67,18 @@ def test_inch_drilled_and_edge_rows_convert_and_render(monkeypatch):
         edge_break={"radius_in": 0.010, "chamfer_max_in": 0.010, "digits": 3},
         inside_corner={"radius_in": 0.040, "digits": 3},
     )
-    assert tol.drilled_oversize_mm() == pytest.approx(0.1016)
-    assert (units.drilled_hole_plus_display(), units.drilled_hole_minus_display()) == (
-        "+.004",
-        "0",
-    )
-    assert tol.edge_break_radius_mm() == pytest.approx(0.254)
-    assert (units.edge_break_radius_display(), units.edge_break_chamfer_display()) == (
-        "R.010",
-        ".010",
-    )
-    assert tol.inside_corner_radius_mm() == pytest.approx(1.016)
-    assert units.inside_corner_display() == "R.040 MAX"
+    assert tol.drilled_oversize_mm(unit="in") == pytest.approx(0.1016)
+    assert (
+        units.drilled_hole_plus_display(unit="in"),
+        units.drilled_hole_minus_display(unit="in"),
+    ) == ("+.004", "0")
+    assert tol.edge_break_radius_mm(unit="in") == pytest.approx(0.254)
+    assert (
+        units.edge_break_radius_display(unit="in"),
+        units.edge_break_chamfer_display(unit="in"),
+    ) == ("R.010", ".010")
+    assert tol.inside_corner_radius_mm(unit="in") == pytest.approx(1.016)
+    assert units.inside_corner_display(unit="in") == "R.040 MAX"
 
 
 @pytest.mark.parametrize(
@@ -138,3 +140,34 @@ def test_title_block_rows_carry_no_display_strings():
         row = _config.title_block(kind)
         assert not any(key.startswith("display") for key in row), kind
         assert all(not isinstance(value, str) for value in row.values()), kind
+
+
+def test_inch_sheet_prints_the_owner_rulings():
+    from _part_properties import title_block_properties
+
+    mm = title_block_properties()
+    assert mm["TOL_LIN_XX"] == "±0.51" and mm["TOL_HOLE_PLUS"] == "+0.10"
+    assert title_block_properties(unit="in") == {
+        **mm,
+        "TOL_LIN_X": "±.1",
+        "TOL_LIN_XX": "±.01",
+        "TOL_LIN_XXX": "±.005",
+        "TOL_EDGE_BREAK_R": "R.010",
+        "TOL_CHAMFER_MAX": ".010",
+        "TOL_INSIDE_CORNER": "R.040 MAX",
+        "TOL_HOLE_PLUS": "+.004",
+    }
+
+
+def test_inch_deviations_round_the_nominal_on_the_inch_grid():
+    # 12.0 mm prints .47 (11.938 mm) at .XX ±.01 in.
+    lower, upper = tol.printed_deviations(12.0, 2, unit="in")
+    assert lower == pytest.approx(11.938 - 0.254 - 12.0)
+    assert upper == pytest.approx(11.938 + 0.254 - 12.0)
+
+
+def test_inch_ties_round_half_away_like_the_sheet():
+    # 15.875 mm is .625 in: set_units_inch's HalfAway prints .63 (16.002 mm).
+    lower, upper = tol.printed_deviations(15.875, 2, unit="in")
+    assert lower == pytest.approx(16.002 - 0.254 - 15.875)
+    assert upper == pytest.approx(16.002 + 0.254 - 15.875)

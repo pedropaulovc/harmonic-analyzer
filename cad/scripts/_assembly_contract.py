@@ -23,6 +23,8 @@ from pathlib import Path
 
 import yaml
 
+from _package_units import DrawingUnit, drawing_unit
+
 CONTRACT_DIR = Path(__file__).resolve().parent.parent / "config" / "assemblies"
 
 _REQUIRED_KEYS = frozenset(
@@ -35,6 +37,7 @@ _KNOWN_KEYS = _REQUIRED_KEYS | {
     "free_dof_per_active_channel",
     "carries_chain",
     "machinist_exceptions",
+    "drawing_unit",
 }
 
 
@@ -56,6 +59,8 @@ class AssemblyContract:
     ``carries_chain``: the assembly wraps the roller chain, so its soundness
     interference gate gets the authored wheel mounts as its build does
     (541011de0); otherwise every link-on-sprocket mesh reads as interference.
+    ``drawing_unit``: the unit the assembly's sheet, TOL_* stamps and model
+    units use (``_package_units``; ``"mm"`` when undeclared).
     """
 
     stem: str
@@ -67,6 +72,7 @@ class AssemblyContract:
     free_dof: int
     free_dof_per_active_channel: int
     carries_chain: bool
+    drawing_unit: DrawingUnit
 
 
 def contract_path(stem: str) -> Path:
@@ -137,6 +143,7 @@ def assembly_contract(stem: str) -> AssemblyContract:
             doc.get("free_dof_per_active_channel", 0),
         ),
         carries_chain=_flag(path, "carries_chain", doc.get("carries_chain", False)),
+        drawing_unit=drawing_unit(str(path), doc),
     )
 
 

@@ -28,6 +28,7 @@ def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
     assert control.key == "cam_od"
     assert control.roughness_um == 1.6
     assert control.face.diameter_mm == dt_pinion_cam_spec.CAM_OD
+    assert control.roughness_ra == "63"  # #290: µin Ra on the inch sheet
 
 
 def test_required_drawing_paths() -> None:
@@ -65,16 +66,35 @@ def test_eccentricity_is_dimensioned_and_called_out() -> None:
     assert "ECCENTRICITY" in eccentricity
     assert "BORE AXIS TO OD AXIS" in eccentricity
     assert "BOTH END FACES" not in eccentricity
-    # U27/U28: 2.0 target on the thin side, and the 1.5 floor holds at the
-    # printed worst case (OD and eccentricity each +/-0.05, bore at its top).
-    assert dt_pinion_cam_geometry.THIN_SIDE_WALL >= 2.0
-    worst = (
-        (dt_pinion_cam_geometry.CAM_OD - dt_pinion_cam_spec.COLLAR_OD_TOLERANCE_MM) / 2.0
-        - (dt_pinion_cam_geometry.BORE + dt_pinion_cam_spec.BORE_BAND[0]) / 2.0
-        - (dt_pinion_cam_geometry.ECC + dt_pinion_cam_spec.COLLAR_AXIS_TOLERANCE_MM)
-    )
-    assert worst >= 2.0  # 2.01 at the Ø6.43 bore limit
     assert dt_pinion_cam_geometry.CAM_OD == 14.6
+
+
+def test_thin_side_wall_is_owner_minor_rv_01_at_the_printed_limits() -> None:
+    # Rule 17 on the inch sheet: .080 target, .060 floor.  At the printed
+    # limits (OD .575 -.002, bore .2510 +.0005, eccentricity .079 +.002) the
+    # thin side keeps .07975: owner minor RV-01, printed as .0797 MIN.
+    import _config
+
+    spec = dt_pinion_cam_spec
+    worst_in = (0.575 - 0.002) / 2.0 - (0.2510 + 0.0005) / 2.0 - (0.079 + 0.002)
+    assert worst_in == pytest.approx(0.07975)
+    assert spec.THIN_SIDE_WALL_MIN_MM == pytest.approx(worst_in * 25.4)
+    assert 0.060 < worst_in < 0.080
+    assert dt_pinion_cam_geometry.THIN_SIDE_WALL >= 0.080 * 25.4
+    (rv_01,) = [
+        entry
+        for entry in _config.parts("dt-pinion-cam")["machinist_exceptions"]
+        if entry["id"] == "RV-01"
+    ]
+    assert rv_01["kind"] == "minor"
+    # The sheet states the wall on its own native single-limit dimension,
+    # floored so it never claims more than the worst case leaves.
+    assert spec.THIN_WALL_MIN_MM == pytest.approx(0.0797 * 25.4)
+    assert spec.THIN_WALL_MIN_MM <= spec.THIN_SIDE_WALL_MIN_MM
+    assert spec.THIN_WALL_MIN_TOL_TYPE == 5  # swTolType_e.swTolMIN
+    assert "ThinWallMin" in drawing.FRONT_KEEP
+    assert drawing.DIMENSION_CALLOUTS["ThinWallMin"] == "THIN-SIDE WALL"
+    assert "WALL" not in spec.DRAWING_NOTES
 
 
 def test_sheet_runs_at_3_to_1_with_a_set_screw_showing_2_to_1_pictorial() -> None:
@@ -89,22 +109,21 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     # cam OD / eccentricity that sets the follower lift.  Routine controlling
     # dimensions take the title-block grade.
     assert model_toleranced_dimensions(cam) == {
-        ("BoreProfile", "BoreDia"): "BORE_TOLERANCE_MM",
+        ("BoreProfile", "BoreDia"): "*deviations(BORE_BAND)",
         ("CollarProfile", "CollarOd"): "COLLAR_OD_TOLERANCE_MM",
         ("CollarProfile", "CollarCy"): "COLLAR_AXIS_TOLERANCE_MM",
     }
-    # U27 (Main, 2026-09-23): a set-screwed cam only slips over the rod.  A
-    # stock 6.4 reamer at +/-0.03 (the printed band is at least +/-0.025)
-    # against the MHA-DT-17 rod's h band gives 0.02-0.10 diametral clearance.
-    assert dt_pinion_cam_spec.BORE == 6.40
-    assert dt_pinion_cam_spec.BORE_BAND == (0.03, -0.03)
-    assert min(abs(d) for d in dt_pinion_cam_spec.BORE_BAND) >= 0.025
+    # U27 (Main, 2026-09-23): a set-screwed cam only slips over the rod, with
+    # 0.02-0.10 diametral clearance on the MHA-DT-17 rod's h band.  #290: the
+    # owned .2510 reamer, .2510 +.0005/.0000.
+    assert dt_pinion_cam_spec.BORE / 25.4 == pytest.approx(0.2510)
+    assert dt_pinion_cam_spec.BORE_BAND == (0.0127, 0.0)
     rod_max = dt_pinion_lift_rod_spec.ROD_DIA + dt_pinion_lift_rod_spec.ROD_DIA_BAND[0]
     rod_min = dt_pinion_lift_rod_spec.ROD_DIA + dt_pinion_lift_rod_spec.ROD_DIA_BAND[1]
     bore_min = dt_pinion_cam_spec.BORE + dt_pinion_cam_spec.BORE_BAND[1]
     bore_max = dt_pinion_cam_spec.BORE + dt_pinion_cam_spec.BORE_BAND[0]
-    assert round(bore_min - rod_max, 6) == 0.02
-    assert round(bore_max - rod_min, 6) == 0.10
+    assert round(bore_min - rod_max, 6) == 0.0254
+    assert round(bore_max - rod_min, 6) == 0.0581
     assert dt_pinion_cam_spec.LIFT_ROD_NUMBER in drawing.DIMENSION_CALLOUTS["BoreDia"]
     bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert "SLIP FIT" in bore
@@ -173,33 +192,29 @@ def test_part_recipe_does_not_reach_the_assembly_sequence() -> None:
     assert "dt_drive_train_steps" not in deps
 
 
-def test_set_screw_thread_cannot_break_either_face_at_general_grade() -> None:
-    # The rear wall stacks length AND station, independently at .X ±0.8.
-    # A 4.5 station would leave 1.808 mm at the rear, below the 2.0 target;
-    # the forward-only 4.1 station balances both worst-case walls at 2.208.
+def test_set_screw_thread_cannot_break_either_face_at_the_printed_grade() -> None:
+    # The rear wall stacks length AND station, independently at .XX +/-.01:
+    # #290 prints the 9.0 length and 4.1 station as .35 and .16, and both
+    # worst-case walls keep the .080 in target.
     from _printed_tolerance import printed_band_mm
 
     geometry = dt_pinion_cam_geometry
     spec = dt_pinion_cam_spec
-    assert printed_band_mm(1) == 0.8
-    assert spec.GENERAL_LINEAR_TOLERANCE_MM == 0.8
-    assert spec.DRAWING_PRECISION["Collar"]["Depth"] == 1
-    assert spec.DRAWING_PRECISION["TapDrillProfile"]["TapCz"] == 1
+    grade = printed_band_mm(2, unit="in")
+    assert grade == pytest.approx(0.01 * 25.4)
     assert (geometry.SET_SCREW_Z, geometry.CAM_LEN) == (4.1, 9.0)
     radius = THREAD_MAJOR_MM[geometry.SET_SCREW_HOLE_SPEC.size] / 2.0
-    grade = spec.GENERAL_LINEAR_TOLERANCE_MM
     walls = [
         (station - radius, length - station - radius)
         for length, station in itertools.product(
-            (geometry.CAM_LEN - grade, geometry.CAM_LEN + grade),
-            (geometry.SET_SCREW_Z - grade, geometry.SET_SCREW_Z + grade),
+            (0.35 * 25.4 - grade, 0.35 * 25.4 + grade),
+            (0.16 * 25.4 - grade, 0.16 * 25.4 + grade),
         )
     ]
-    assert min(front for front, _ in walls) == pytest.approx(2.208)
-    assert min(rear for _, rear in walls) == pytest.approx(2.208)
-    assert spec.SET_SCREW_FRONT_WALL_MIN_MM == pytest.approx(2.208)
-    assert spec.SET_SCREW_REAR_WALL_MIN_MM == pytest.approx(2.208)
-    assert all(min(pair) >= 2.0 for pair in walls)
+    front, rear = (min(side) for side in zip(*walls, strict=True))
+    assert front == pytest.approx(spec.SET_SCREW_FRONT_WALL_MIN_MM)
+    assert rear == pytest.approx(spec.SET_SCREW_REAR_WALL_MIN_MM)
+    assert all(min(pair) >= 0.080 * 25.4 for pair in walls)
 
 
 def test_supplied_screw_uses_asme_basic_length_and_full_thread_allowance() -> None:
@@ -234,23 +249,23 @@ def test_set_screw_sits_below_the_od_in_the_heavy_side() -> None:
     # Preserve the functional OD/bore/eccentricity bands; do not tighten any
     # of them to rescue screw seating. The rim sees the OD's sag, not just
     # its centre tangent. Rod clearance can only deepen the seated screw.
-    assert spec.COLLAR_OD_TOLERANCE_MM == 0.05
-    assert spec.COLLAR_AXIS_TOLERANCE_MM == 0.05
-    assert spec.BORE_TOLERANCE_MM == 0.03
+    assert spec.COLLAR_OD_TOLERANCE_MM == pytest.approx(0.002 * 25.4)
+    assert spec.COLLAR_AXIS_TOLERANCE_MM == pytest.approx(0.002 * 25.4)
     clearances = []
     for od, bore, eccentricity in itertools.product(
-        (geometry.CAM_OD - 0.05, geometry.CAM_OD + 0.05),
-        (geometry.BORE - 0.03, geometry.BORE + 0.03),
-        (geometry.ECC - 0.05, geometry.ECC + 0.05),
+        (0.573 * 25.4, 0.577 * 25.4),
+        (0.2510 * 25.4, 0.2515 * 25.4),
+        (0.077 * 25.4, 0.081 * 25.4),
     ):
         rim_radius = spec.SET_SCREW_MAJOR_MAX_MM / 2.0
         outer_y = eccentricity + math.sqrt((od / 2.0) ** 2 - rim_radius**2)
         clearances.append(outer_y - bore / 2.0 - spec.SET_SCREW_LENGTH_MAX_MM)
     worst = min(clearances)
-    assert spec.THIN_SIDE_WALL_MIN_MM == pytest.approx(2.01)
-    assert spec.THICK_SIDE_WALL_MIN_MM == pytest.approx(6.01)
+    assert spec.THICK_SIDE_WALL_MIN_MM == pytest.approx(
+        (0.573 / 2.0 - 0.2515 / 2.0 + 0.077) * 25.4
+    )
     assert spec.SET_SCREW_SUBFLUSH_MIN_MM == pytest.approx(worst)
-    assert worst > 0.84  # about 0.848 mm, including the curved OD at the rim
+    assert worst > 0.87  # about 0.876 mm, including the curved OD at the rim
     # The next longer stock length would fail even before the OD sag.
     assert (0.25 + 0.01) * 25.4 > spec.THICK_SIDE_WALL_MIN_MM
     assert not hasattr(geometry, "BOSS_DIA")
@@ -275,19 +290,45 @@ def test_the_print_carries_no_gdt_and_dimensions_on_solid_edges() -> None:
 def test_the_part_owns_every_printed_decimal_place() -> None:
     """drawing-simplicity-policy.md `How the repository implements the guidelines`: the .SLDPRT owns places for every imported nominal.
 
-    Two places serve the critical trio (the reamed running bore, the cam OD
-    and the eccentricity that IS the lift) and the #2-56 tap drill, whose size
-    is the drill's; routine controls use one place.
+    Inch places (#290): four on the reamed bore (its +.0005/.0000 band) and
+    the .0797 MIN wall, three on the +/-.002 cam OD and eccentricity and on the
+    #2-56 tap drill, two (.XX) on the length and tap station.
     """
-    by_name = dt_pinion_cam_spec.DRAWING_PRECISION_BY_NAME
-    assert set(by_name) == set().union(*dt_pinion_cam_spec.DRAWING_DIMENSIONS.values())
-    assert {name for name, places in by_name.items() if places != 1} == {
-        "BoreDia",
-        "CollarOd",
-        "CollarCy",
-        "TapDrillDia",
+    from _drawing_tolerances import _tolerance_places
+    from _fit_deviations import deviations
+
+    spec = dt_pinion_cam_spec
+    by_name = spec.DRAWING_PRECISION_BY_NAME
+    assert set(by_name) == set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert by_name == {
+        "BoreDia": 4,
+        "ThinWallMin": 4,
+        "CollarOd": 3,
+        "CollarCy": 3,
+        "TapDrillDia": 3,
+        "Depth": 2,
+        "TapCz": 2,
     }
-    assert max(by_name.values()) == 2
+    printed = {
+        "BoreDia": spec.BORE,
+        "CollarOd": spec.CAM_OD,
+        "CollarCy": spec.ECC,
+        "TapDrillDia": spec.TAP_DRILL_DIA,
+        "Depth": spec.CAM_LEN,
+        "TapCz": spec.SET_SCREW_Z,
+    }
+    assert {name: round(mm / 25.4, by_name[name]) for name, mm in printed.items()} == {
+        "BoreDia": 0.2510,
+        "CollarOd": 0.575,
+        "CollarCy": 0.079,
+        "TapDrillDia": 0.070,
+        "Depth": 0.35,
+        "TapCz": 0.16,
+    }
+    # Each band prints at its nominal's places.
+    assert _tolerance_places(*deviations(spec.BORE_BAND), display_unit="in") == 4
+    for band in (spec.COLLAR_OD_TOLERANCE_MM, spec.COLLAR_AXIS_TOLERANCE_MM):
+        assert _tolerance_places(-band, band, display_unit="in") == 3
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
@@ -340,27 +381,33 @@ async def test_build_uses_a_native_radial_tap_and_hidden_construction_reference(
     # the rod bore; the tap must be native and stop at that bore.
     success = SimpleNamespace(is_success=True, data=None)
     segment = SimpleNamespace(ConstructionGeometry=False)
+    wall_segment = SimpleNamespace(ConstructionGeometry=False)
     adapter = SimpleNamespace(
         **{
             name: AsyncMock(return_value=success)
             for name in (
                 "create_part", "create_sketch", "exit_sketch",
                 "create_extrusion", "create_cut_extrude", "create_plane",
+                "add_sketch_constraint",
             )
         },
-        _sketch_entities={"tap-reference": segment},
+        add_line=AsyncMock(return_value=SimpleNamespace(is_success=True, data="wall")),
+        _sketch_entities={"tap-reference": segment, "wall": wall_segment},
     )
     for name in (
         "set_global", "force_rebuild", "drive_dimension", "ensure_fully_defined",
         "apply_material", "apply_color", "report_mass_properties",
+        "dimension_between", "anchor_point_to_origin",
     ):
         monkeypatch.setattr(cam, name, AsyncMock())
     for name in (
-        "set_dimension_symmetric_tolerance", "apply_drawing_precision",
+        "set_dimension_symmetric_tolerance", "set_dimension_bilateral_tolerance",
+        "set_single_limit", "apply_drawing_precision",
         "name_octant_views", "clear_dimensions_for_drawing",
         "mark_dimensions_for_drawing", "author_part_pmi", "apply_drawing_properties",
         "require_saved_drawing_properties", "blank_reference_geometry",
         "blank_reference_sketches", "wizard_hole_on_cylinder",
+        "set_sketch_direct_db", "apply_package_model_units",
     ):
         monkeypatch.setattr(cam, name, Mock())
     monkeypatch.setattr(cam, "_early_bound", lambda value, _interface: value)
@@ -408,7 +455,10 @@ async def test_build_uses_a_native_radial_tap_and_hidden_construction_reference(
     assert reference.kwargs["names"] == ("TapCx", "TapCz", "TapDrillDia")
     assert reference.kwargs["drives"] == (None, '"SetScrewZ"', '"TapDrillDia"')
     assert segment.ConstructionGeometry is True
-    cam.blank_reference_sketches.assert_called_once_with(adapter, ("TapDrillProfile",))
+    assert wall_segment.ConstructionGeometry is True
+    cam.blank_reference_sketches.assert_called_once_with(
+        adapter, ("TapDrillProfile", "ThinWallReference")
+    )
     hidden = cam.blank_reference_geometry.call_args.args[1]
     assert ("TapDrillPlane", "PLANE") in hidden
     assert ("SetScrewStationPlane", "PLANE") in hidden

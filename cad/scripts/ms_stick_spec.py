@@ -1,21 +1,23 @@
 r"""Pure model/drawing contract for the graduated brass stick.
 
-The 2026-10-10 user Option B ruling keeps the 200 x 8 x 3 blank and
-groove geometry, shifting the whole scale and numerals 1.00 mm left.
-The 2026-10-23 owner ruling lengthens that blank to 202 x 8 x 3 (still .X):
-at 200 -0.8 the last graduation kept only a 0.29 land to the end face, below
-the rule-17 floor; at 202 it keeps 2.29 at worst case. Scale zero (56.50) and
-every station and numeral stay put; the end margin grows from 1.5 to 3.5.
+The 2026-10-10 user Option B ruling shifted the whole scale and numerals
+1.00 mm left on the blank; the 2026-10-23 owner ruling lengthened the blank so
+the last graduation keeps a rule-17 land to the end face at worst case.
 Model dimensions own the manufacturing values, bands and decimal places.
 The release supplies the engraved native/STEP model and its ruled-face/detail
 drawings, not the generated build-input DXFs.
 The 2026-10-23 owner ruling V-engraves the numerals: single-stroke sans
 numerals cut as true 30-degree included V grooves (the model drafts every
 stroke wall 15 degrees). The square-bottom graduations stay fixed.
-The owner's Q2 ruling gives the tick lengths the title-block .XX band, so a
-full tick at 3.00 +0.51 and a half-division tick at 4.00 -0.51 could invert
-by 0.02 at opposite limits. That follows from the ruling and is kept: the
-length step is a reading aid, not a fit, and no band is added to hold it.
+
+Issue #290: the sheet prints decimal inch (``drawing_unit: in``). Lengths stay
+physical millimetres, each the exact decimal of the inch value it prints (see
+the trailing comments). Exempt (owner ruling, calibration geometry): the
+configured 14.2 / 1.42 mm pitch and the 56.5 mm scale zero print rounded
+(.559, .0559, 2.224) at their own +/-.002; the minor pitch prints four places
+so ten printed minor pitches equal the printed full pitch. The 7.95 length is
+.XX because the last groove's rule-17 land reads it; nothing prints .X. The
+unprinted 0.24 V-bit stroke width at the face is tool geometry and stays.
 """
 
 from __future__ import annotations
@@ -23,6 +25,9 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
+import _config
+from _package_units import drawing_unit
+from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm
 from ms_stick_geom import (
     DIVISION_COUNT as DIVISION_COUNT,
@@ -32,16 +37,33 @@ from ms_stick_geom import (
     SCALE_SPAN,
 )
 
-BODY_LENGTH = 202.0
-BODY_WIDTH = 8.0
-BODY_THICKNESS = 3.0
-SCALE_END_MARGIN = 3.5
+# The sheet unit the registry row declares.
+UNIT = drawing_unit("parts/ms-stick", _config.parts("ms-stick"))
+
+
+def inch_text(value_mm: float, places: int) -> str:
+    """``value_mm`` as decimal-inch print text: ``.080``, ``7.95``."""
+    text = f"{value_mm / 25.4:.{places}f}"
+    return text[1:] if text.startswith("0.") else text
+
+
+BODY_LENGTH = 201.93  # 7.95
+BODY_WIDTH = 8.001  # .315
+BODY_THICKNESS = 2.9972  # .118
+# Unprinted: the bar beyond the last full tick. The model derives scale zero
+# from the length, the configured span and this margin, which the 7.95 length
+# sets to 3.43 so scale zero stays put.
+SCALE_END_MARGIN = 3.43
+# Exempt with the pitch (calibration): scale zero stays at 56.5 where the
+# 2026-10-10 Option B ruling put it, so every graduation the assembly sets the
+# stop and the bar stations against is unmoved; it prints 2.224 at the
+# stations' +/-.002.
 SCALE_START_X = BODY_LENGTH - SCALE_SPAN - SCALE_END_MARGIN
-TICK_WIDTH = 0.4
-TICK_LENGTH = 3.0
-MINOR_TICK_LENGTH = 1.8
-HALF_TICK_LENGTH = 4.0
-TICK_DEPTH = 0.50
+TICK_WIDTH = 0.4064  # .016 MIN
+TICK_LENGTH = 3.048  # .12
+MINOR_TICK_LENGTH = 1.778  # .07
+HALF_TICK_LENGTH = 4.064  # .16
+TICK_DEPTH = 0.508  # .020 MIN
 TICK_OVERHANG = 1.0
 _REFERENCES = Path(__file__).resolve().parents[1] / "references"
 # One DXF per stroke layer (gen_ms_stick_numerals_dxf colours overlapping
@@ -52,16 +74,16 @@ NUMERAL_LAYER_DXFS = (
     _REFERENCES / "ms-stick-numerals-2.dxf",
     _REFERENCES / "ms-stick-numerals-3.dxf",
 )
-NUMERAL_HEIGHT_MM = 2.0
-NUMERAL_GAP_MM = 0.6
+NUMERAL_HEIGHT_MM = 2.032  # .08
+NUMERAL_GAP_MM = 0.508  # .02
 NUMERAL_ROTATION_DEG = 90
 # 2026-10-23 owner ruling: V-engrave the numerals with a 30-degree included
 # V bit (the easiest hobby-mill route in brass). Single-stroke numerals, 0.24
-# wide at the face (12% of the 2.0 height, legible and enamel-holding) and
-# 0.40 deep; the drafted walls leave only NUMERAL_TIP_FLAT_MM at the root.
+# wide at the face (12% of the .08 height, legible and enamel-holding) and
+# .016 MIN deep; the drafted walls leave only NUMERAL_TIP_FLAT_MM at the root.
 NUMERAL_V_INCLUDED_ANGLE_DEG = 30.0
 NUMERAL_STROKE_WIDTH_MM = 0.24
-NUMERAL_DEPTH = 0.40
+NUMERAL_DEPTH = 0.4064  # .016 MIN
 NUMERAL_TIP_FLAT_MM = NUMERAL_STROKE_WIDTH_MM - 2.0 * NUMERAL_DEPTH * math.tan(
     math.radians(NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0)
 )
@@ -79,38 +101,39 @@ if not 0.0 < NUMERAL_DEPTH < NUMERAL_DEPTH_MAX_MM:
         f"NUMERAL_DEPTH {NUMERAL_DEPTH} must stay below {NUMERAL_DEPTH_MAX_MM:.3f}, where the "
         f"{NUMERAL_STROKE_WIDTH_MM} face outline's drafted walls meet; widen the stroke to go deeper"
     )
-NUMERALS_BBOX = (57.300, 1.770, 197.700, 4.400)
-NUMERAL_VOLUME_MM3 = 2.6765
+NUMERALS_BBOX = (57.2112, 1.7864, 197.7888, 4.4450)
+NUMERAL_VOLUME_MM3 = 2.7305
 # Each stroke layer's V removal over the layers cut before it (layers overlap
 # at stroke joints): gen_ms_stick_numerals_dxf.summary()["layer_volumes_mm3"].
-NUMERAL_LAYER_VOLUMES_MM3 = (1.7100, 0.8674, 0.0992)
+NUMERAL_LAYER_VOLUMES_MM3 = (1.7391, 0.8896, 0.1018)
 # Per layer, the least removal one stroke adds as its layer is cut (a dropped
 # stroke removes at least this much less): summary()["min_stroke_volumes_mm3"].
-NUMERAL_LAYER_MIN_STROKE_MM3 = (0.0186, 0.0134, 0.0129)
+NUMERAL_LAYER_MIN_STROKE_MM3 = (0.0189, 0.0138, 0.0133)
 # The least removal one stroke adds to the finished part, every layer cut
 # (later layers cover some of it): summary()["final_min_stroke_mm3"].
-NUMERAL_FINAL_MIN_STROKE_MM3 = 0.0056
+NUMERAL_FINAL_MIN_STROKE_MM3 = 0.0058
 
-# Width and thickness give the sliding clearance in the 8.4 x 3.4 stop
-# rebate; graduation positions set the amplitude-bar stations through the
-# linear READOUT table. Overall length (one place), tick lengths and numeral
-# layout take the title block (2026-10-23 owner ruling): at .X +/-0.8 the
-# 201.2 shortest bar keeps 2.29 past the widest last groove (202 blank,
-# 2026-10-23 owner ruling). Graduation width and both engraving depths name no mate, so they
-# are single "n.nn MIN" limits that hold the enamel fill (coordinator ruling
-# 2026-10-23). Their ceilings are stated facts, not bands (coordinator ruling
-# 2026-10-23, on codjiflo's #1905 review): the graduation width stays 0.62 MAX
-# on the 1.42 minor pitch, so neighbouring grooves never merge and the last
-# one stays on the shortest bar; both depths leave the stated 2.0 of stock
-# under them (bar 2.90 MIN, so the deepest groove or V is 0.90).
-TITLE_BLOCK_X_TOLERANCE_MM = printed_band_mm(1)
-BODY_FIT_TOLERANCE_MM = 0.1
-GRADUATION_POSITION_TOLERANCE_MM = 0.05
-GRADUATION_FLOOR_MIN_MM = 2.0
-GRADUATION_FLOOR_CALLOUT = f"STOCK UNDER GROOVE {GRADUATION_FLOOR_MIN_MM:.1f} MIN"
-NUMERAL_FLOOR_CALLOUT = f"STOCK UNDER {GRADUATION_FLOOR_MIN_MM:.1f} MIN"
-GRADUATION_WIDTH_MAX_MM = 0.62
-GRADUATION_WIDTH_CALLOUT = f"{GRADUATION_WIDTH_MAX_MM:.2f} MAX ON {MINOR_SPACING:.2f} PITCH"
+# Width and thickness give the sliding clearance in the .330 x .134 stop
+# rebate at the title block's .XXX; graduation positions set the
+# amplitude-bar stations through the linear READOUT table, at their own
+# +/-.002. The overall length (.XX), tick lengths and numeral layout take the
+# title block. Graduation width and both engraving depths name no mate, so
+# they are single ".nnn MIN" limits that hold the enamel fill (coordinator
+# ruling 2026-10-23). Their ceilings are stated facts, not bands (coordinator
+# ruling 2026-10-23, on codjiflo's #1905 review): the graduation width stays
+# .024 MAX on the .0559 minor pitch, so neighbouring grooves never merge and
+# the last one stays on the shortest bar; both depths leave the stated .080
+# of stock under them.
+BODY_LENGTH_TOLERANCE_MM = printed_band_mm(2, unit=UNIT)
+BODY_FIT_TOLERANCE_MM = printed_band_mm(3, unit=UNIT)
+GRADUATION_POSITION_TOLERANCE_MM = 0.0508  # +/-.002
+GRADUATION_FLOOR_MIN_MM = WALL_TARGET_MM
+GRADUATION_FLOOR_CALLOUT = f"STOCK UNDER GROOVE {inch_text(GRADUATION_FLOOR_MIN_MM, 3)} MIN"
+NUMERAL_FLOOR_CALLOUT = f"STOCK UNDER {inch_text(GRADUATION_FLOOR_MIN_MM, 3)} MIN"
+GRADUATION_WIDTH_MAX_MM = 0.6096  # .024
+GRADUATION_WIDTH_CALLOUT = (
+    f"{inch_text(GRADUATION_WIDTH_MAX_MM, 3)} MAX ON {inch_text(MINOR_SPACING, 4)} PITCH"
+)
 # swTolType_e.swTolMIN prints the nominal plus MIN: the model value is the
 # printed minimum. (lower, upper) deviations are the stored readback pair.
 MIN_LIMIT_TOL_TYPE = 5
@@ -142,16 +165,28 @@ DRAWING_DIMENSIONS = {
     "Numerals": {"NumeralDepth"},
     **{feature: {row[0]} for feature, row in REFERENCE_DIMENSIONS.items()},
 }
+# Decimal-inch places, authored on the part: the overall length, tick
+# lengths and numeral layout the title block's .XX, and .XXX for the bar's
+# section in the stop rebate, the engraving limits and the scale stations,
+# except the minor pitch's .XXXX needed across 100 calibrated subdivisions.
+# Nothing on this part is .X.
+_TWO_PLACE = frozenset({
+    "BodyLength", "FullTickLength", "MinorTickLength", "HalfTickLength",
+    "NumeralHeight", "NumeralXGap", "NumeralYGap",
+})
 DRAWING_PRECISION = {
-    feature: {name: 1 if name == "BodyLength" else 2 for name in names}
+    feature: {
+        name: 2 if name in _TWO_PLACE else 4 if name == "MinorTickPitch" else 3
+        for name in names
+    }
     for feature, names in DRAWING_DIMENSIONS.items()
 }
 DRAWING_PRECISION_BY_NAME = {
     name: places for dims in DRAWING_PRECISION.values() for name, places in dims.items()
 }
+# The model's own bands, beyond the title block's rows (physical mm, printed
+# in inch): the scale stations' +/-.002.
 DRAWING_TOLERANCES = {
-    "BodyWidth": BODY_FIT_TOLERANCE_MM,
-    "BodyThickness": BODY_FIT_TOLERANCE_MM,
     "ScaleStartX": GRADUATION_POSITION_TOLERANCE_MM,
     "FullTickPitch": GRADUATION_POSITION_TOLERANCE_MM,
     "MinorTickPitch": GRADUATION_POSITION_TOLERANCE_MM,
@@ -166,6 +201,10 @@ NUMERAL_PLACEMENT_NOTE = (
 )
 FRONT_VIEW_NOTE = "RULED FACE SCALE 1:1"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
+# Sheet 4's G-G parent stays unturned so SolidWorks prints each G clear of
+# its arrow; the label says it reads opposite to the other ruled faces
+# (machinist review, run 20261031T082305583Z-d97607f2).
+SECTION_PARENT_VIEW_NOTE = "RULED FACE TURNED 180 DEG FROM SHEET 1"
 
 DRAWING_VALUES_BY_NAME = {
     "BodyLength": BODY_LENGTH,

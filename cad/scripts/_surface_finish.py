@@ -24,16 +24,17 @@ vocabulary.
 
    The title block carries no roughness number at all (its surface row is the
    process statement ``CAST/MACHINED``), so these callouts are the
-   ONLY roughness ink on a sheet — and when issue #290 flips the generated
-   drawings to inch display, this module is the ONE place that has to grow a
-   µin rendering, which is the whole point of collapsing the literals here.
+   ONLY roughness ink on a sheet.  An inch sheet (issue #290) prints the
+   same grades as their preferred microinch values (63, 32, 125).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Literal
 
+from _package_units import DrawingUnit
 from _gtol_face import FaceSpec
 from _gtol_identity import pmi_annotation_name
 
@@ -54,17 +55,38 @@ MACHINED_UM = 1.6
 # on a part that may otherwise be left as-cast has to say so on the face.
 SEAT_UM = 3.2
 
+# The project grades' ISO 1302 / ASME Y14.36 preferred microinch values.  An
+# inch print takes these rounded preferred values, never the arithmetic
+# conversion (0.8 um is 31.5 uin and 3.2 um is 126.0 uin, yet the series
+# prints 32 and 125).  A new grade must add its preferred value here.
+_PREFERRED_RA_UIN: tuple[tuple[float, int], ...] = (
+    (GROUND_UM, 32),
+    (MACHINED_UM, 63),
+    (SEAT_UM, 125),
+)
 
-def ra(grade_um: float) -> str:
+
+def ra(grade_um: float, *, unit: DrawingUnit = "mm") -> str:
     """Render a grade as the ``roughness_ra`` string a drawing callout takes.
 
     One decimal, matching the ISO preferred-series spelling (``0.8``, ``1.6``)
     that every shipped sheet already prints — so adopting this module is a pure
-    refactor with no ink change.
+    refactor with no ink change.  ``grade_um`` is always micrometres; on an
+    inch sheet (``unit="in"``) a project grade prints its preferred microinch
+    value and any other grade is refused.
     """
     if grade_um <= 0.0:
         raise ValueError(f"surface roughness must be positive: {grade_um!r}")
-    return f"{grade_um:.1f}"
+    if unit == "mm":
+        return f"{grade_um:.1f}"
+    if unit != "in":
+        raise ValueError(f"unknown surface roughness unit {unit!r}")
+    for preferred_um, preferred_uin in _PREFERRED_RA_UIN:
+        if math.isclose(grade_um, preferred_um, rel_tol=1e-9):
+            return str(preferred_uin)
+    raise ValueError(
+        f"surface roughness {grade_um!r} um has no preferred microinch grade"
+    )
 
 
 # The strings the sheets pass. Derived, never typed: a grade retune moves the
@@ -85,6 +107,9 @@ class SurfaceFinishControl:
     make every other configuration rebuild with a dangling annotation.  The
     typed ``face`` remains mandatory and is still resolved live by the part
     build and used to place the drawing leader.
+
+    ``roughness_um`` is the physical requirement and stays in micrometres;
+    ``display_unit`` only selects how :attr:`roughness_ra` renders it.
     """
 
     key: str
@@ -92,11 +117,12 @@ class SurfaceFinishControl:
     face: FaceSpec
     production_method: str = ""
     native_attachment: Literal["face", "model"] = "face"
+    display_unit: DrawingUnit = "mm"
 
     def __post_init__(self) -> None:
         if not self.key:
             raise ValueError("surface-finish key cannot be blank")
-        ra(self.roughness_um)
+        ra(self.roughness_um, unit=self.display_unit)
         if self.native_attachment not in {"face", "model"}:
             raise ValueError(
                 "surface-finish native_attachment must be 'face' or 'model', "
@@ -105,7 +131,7 @@ class SurfaceFinishControl:
 
     @property
     def roughness_ra(self) -> str:
-        return ra(self.roughness_um)
+        return ra(self.roughness_um, unit=self.display_unit)
 
     @property
     def annotation_name(self) -> str:

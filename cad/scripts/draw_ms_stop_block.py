@@ -1,8 +1,10 @@
 r"""Manufacturing drawing of the open-rebate brass stop block.
 
-The cover-side view and end view show the rebate in solid lines. Standard
+The sheet prints decimal inch (the part's ``drawing_unit: in``). The
+cover-side view and end view show the rebate in solid lines. Standard
 native Hole Wizard callouts define the orthogonal taps, including blind full
-thread and drill depths. Every controlling dimension is imported unchanged.
+thread and drill depths; each native length variable prints .XXX. Every
+controlling dimension is imported unchanged.
 Hole-mouth points convert the shared millimetre frame to COM metres before
 projection; the cover-side *Back view reverses X, not the coordinate units.
 The *Bottom view is turned 180 degrees to preserve that X direction and
@@ -38,15 +40,17 @@ from _drawing_common import (
 )
 from _drawing_dimensions import set_dimension_callouts
 from _drawing_finish import add_surface_finish
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _surface_finish import surface_finish_by_key
 from _drawing_leader_notes import add_attached_note, add_property_linked_callout
+from _part_properties import part_drawing_unit
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _named_views import octant_view_name
 from _machinist_review_mode import MachinistReviewMode
 from _ms_drawing_contract import assert_manufacturing_dimensions
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
@@ -62,8 +66,8 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_SCALE = (4.0, 1.0)
 FRONT_CENTER = (0.155, 0.185)
 RIGHT_CENTER = (0.315, FRONT_CENTER[1])
-# 7 mm lower than the original 0.080 so the cover-tap callout's three web
-# rows (#1937) clear the underside view's top edge and 4.20 extension line.
+# 7 mm lower than the original 0.080 so the cover-tap callout's rows clear
+# the underside view's top edge and its extension line.
 BOTTOM_CENTER = (FRONT_CENTER[0], 0.073)
 # Native 2:1 outline is 56.4 x 60.3 mm; fit above the title and below the end
 # view, right of the four-line rebate callout.
@@ -79,8 +83,11 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "BlockDepth": (0.315, 0.235), "WindowWidth": (0.262, 0.130),
     "WindowHeight": (0.370, 0.180), "RoofThickness": (0.355, 0.220),
-    # Above the roof, left of the roof-thickness text, under the (11.0).
+    # Above the roof, left of the roof-thickness text, under the (.48).
     "BackWall": (0.345, 0.224),
+    # Depth across the notch, its text left in the open rebate; height right
+    # of the back face, inside the roof-thickness dimension.
+    "ReliefDepth": (0.316, 0.200), "ReliefHeight": (0.346, 0.196),
 }
 BOTTOM_KEEP = {
     "ThumbFromEnd": (0.175, 0.031), "ThumbFromPlate": (0.090, 0.073),
@@ -88,13 +95,11 @@ BOTTOM_KEEP = {
 STICK_FIT = f"SLIDING FIT ON\nMS-STICK {_config.parts('ms-stick')['number']}"
 # Native horizontal size witnesses end at this corner rather than spanning
 # the view; the shorter angle arc stays below the overall length dimension.
-# The rebate bands exist only for the stick that slides in it; the roof's
-# worst case between the 1.5 floor and 2.0 target is stated as a fact.
+# The rebate bands exist only for the stick that slides in it.
 DIMENSION_CALLOUTS = {
     "RoofChamferSize": "2 CORNERS",
     "WindowWidth": f"OPEN REBATE\n{STICK_FIT}",
     "WindowHeight": STICK_FIT,
-    "RoofThickness": part.ROOF_WALL_CALLOUT,
 }
 # Leadered labels name the X=0 end and Y=0 edge the match-drill clamp aligns.
 LOCATING_END_XY = (0.232, 0.160)
@@ -115,7 +120,12 @@ COVER_HOLE_PROCESS = (
 # The 4-40 runs from the underside through the floor and opens into the
 # rebate; THRU alone does not say which wall it stops at (rules 1, 12).
 THUMB_HOLE_END = "INTO REBATE; ROOF NOT DRILLED"
-# Ra 1.6 symbol left of the right view's open rebate mouth, below the mating
+# Hole Wizard length variables of each tap callout, by native name.
+COVER_TAP_PRECISION = dict.fromkeys(
+    ("hw-tapdrldia", "hw-tapdrldepth", "hw-threaddepth"), part.HOLE_CALLOUT_PRECISION,
+)
+THUMB_TAP_PRECISION = {"hw-tapdrldia": part.HOLE_CALLOUT_PRECISION}
+# Ra 63 uin symbol left of the right view's open rebate mouth, below the mating
 # face label; its leader enters the mouth to the ceiling's mouth-side quarter.
 SLIDE_FINISH_OFFSET = (-0.030, -0.012)
 
@@ -221,7 +231,8 @@ async def build(adapter: Any) -> dict[str, str]:
     read_required_properties(adapter.currentModel, properties,
                              required=("Number", "Material Specification", "Finish", "Quantity"))
     drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM,
-                                        scale=SHEET_SCALE, layout=SPEC.layout)
+                                        scale=SHEET_SCALE, layout=SPEC.layout,
+                                        unit=part_drawing_unit("ms-stop-block"))
     stamp_drawing_summary(adapter, drawing, {
         0: "Measuring Stick Stop Block Manufacturing Drawing",
         1: "Harmonic Analyzer hobby-machinist book drawing",
@@ -232,7 +243,8 @@ async def build(adapter: Any) -> dict[str, str]:
     right = place_view(adapter, str(SOURCE), "*Left", *RIGHT_CENTER, scale=SHEET_SCALE)
     bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=SHEET_SCALE)
     _orient_bottom_view(adapter, bottom)
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2.0, 1.0))
+    iso = place_view(adapter, str(SOURCE), octant_view_name(*part.BLOCK_ISOMETRIC_OCTANT),
+                     *ISO_CENTER, scale=(2.0, 1.0))
     annotations = []
     for view, keep, label in ((front, FRONT_KEEP, "cover face"),
                               (right, RIGHT_KEEP, "open rebate end"),
@@ -248,14 +260,12 @@ async def build(adapter: Any) -> dict[str, str]:
             part.PLATE_HOLE_Y / 1000.0, part.PLATE_Z_MAX / 1000.0,
         ), label="plate tap mouth")
     plate_callout = add_native_hole_callout(
-        # Vertically centred: 11 mm below the original 0.138 keeps the web
-        # rows' growth off the 14.1 / (4.00) extension line above it.
         adapter, front, edge_xy=plate_edge, callout_xy=(0.065, 0.127),
         label="two cover blind taps",
         process=COVER_HOLE_PROCESS,
     )
-    # Rule 20: the taps' three worst-case webs below the 2.0 target (#1937).
-    _remove_general_thread_class(plate_callout, last_line="\n".join(part.PLATE_TAP_WEB_LINES))
+    _remove_general_thread_class(plate_callout)
+    set_hole_callout_precision(plate_callout, COVER_TAP_PRECISION, label="two cover blind taps")
     thumb_edge = model_point_in_view(
         adapter, bottom, (
             (part.THUMB_AXIS_X + part.THUMB_TAP_DRILL / 2.0) / 1000.0,
@@ -266,6 +276,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="thumbscrew tap through floor",
     )
     _remove_general_thread_class(thumb_callout, last_line=THUMB_HOLE_END)
+    set_hole_callout_precision(thumb_callout, THUMB_TAP_PRECISION,
+                               label="thumbscrew tap through floor")
     mating_edge = model_point_in_view(
         adapter, right, (
             part.BLOCK_LENGTH / 2000.0,

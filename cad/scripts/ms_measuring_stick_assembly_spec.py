@@ -9,7 +9,7 @@ thumbscrew is above the stick (+Y), the block below it, and the cover faces
 these values; none of them restates a dimension.
 
 Builder data only: everything here reaches the saved .SLDASM (poses, the
-clamped-setting sketch and its tolerance/precision, the top-level park
+clamped-setting reference sketch and its precision, the top-level park
 envelope). The explode lives in ``ms_measuring_stick_explode_spec``; the
 fitter drawing's BOM, captions and text in ``ms_measuring_stick_assembly_sheet``.
 
@@ -50,8 +50,9 @@ DRAWING_EXPLODED_VIEW = "ISO FRONT-TOP-LEFT"
 DRAWING_EXPLODED_OCTANTS = {"FRONT-TOP-LEFT": (-1, 1, 1)}
 
 # --- Stick ------------------------------------------------------------------
-# ms-stick's frame: X along the 202 bar, Y across its 8 width (the ticks hang
-# from the y=8 edge), Z through its 3 thickness from the graduated z=0 face
+# ms-stick's frame: X along the bar (BODY_LENGTH), Y across its BODY_WIDTH (the
+# ticks hang from the y=BODY_WIDTH edge), Z through its BODY_THICKNESS from the
+# graduated z=0 face
 # (outward normal -Z). The same fit, turned screw-up: part -Z -> -Y,
 # part X stays along the stop, and part Y runs across into -Z.
 STICK_ROWS: Rows = ((1.0, 0.0, 0.0), (0.0, 0.0, -1.0), (0.0, 1.0, 0.0))
@@ -111,12 +112,11 @@ EXTENT_MAX = (
 )
 
 # --- Clamped setting (a construction sketch in the .SLDASM) ------------------
-# Assembly acceptance measured between real faces; no component size is changed.
-# The builder applies its tolerance and both precisions to the model dimension.
-SETTING_TOLERANCE_MM = 0.10
+# A reference to the saved pose, not an acceptance band: STOP_MARK places the
+# block on a calibrated graduation and no fit consumes this span. It prints
+# parenthesized, at three decimal-inch places.
 SETTING_NEAR_FACE_MM = BLOCK_ORIGIN[0] - STICK_X_MIN
-SETTING_PRECISION = 1
-SETTING_TOLERANCE_PRECISION = 2
+SETTING_PRECISION = 3
 SETTING_FEATURE = "ClampedSetting"
 SETTING_DIMENSION = "NearFaceFromStickEnd"
 DRAWING_PRECISION = {SETTING_FEATURE: {SETTING_DIMENSION: SETTING_PRECISION}}

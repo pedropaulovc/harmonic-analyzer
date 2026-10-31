@@ -1,18 +1,20 @@
 r"""Manufacturing drawing of the separate brass stop cover.
 
-The cover face locates both clearance holes from one finished end and the
-head-side edge. The aligned end view gives thickness; the native clearance
-callout gives the decimal drill size, never merely a screw designation.
+The sheet prints decimal inch (the part's ``drawing_unit: in``). The cover
+face locates both clearance holes from one finished end and the head-side
+edge. The aligned end view gives thickness; the native clearance callout
+gives the decimal drill size, never merely a screw designation.
 The shared millimetre hole-mouth coordinates convert to COM metres before
 projection into the cover-side *Back view.
-The two native, model-owned drill steps point to the same concentric hole
-pair from the right, clear of the overall and hole-location extension lines.
+The native clearance callout carries the match-drill line; the pilot and
+opening sequence lives in the assembly sheet's step 1, not on this part.
 Separate native chamfer size and angle retain their model-owned precision.
 """
 
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -20,7 +22,6 @@ import _config
 import _telemetry
 import ms_stop_spec as part
 from _check import check
-from solidworks_mcp.adapters.sw_type_info import constant
 from _com import _early_bound
 from _paths import CAD_ROOT
 from _session import run_build
@@ -32,9 +33,10 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimensions import set_dimension_callouts
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
+from _part_properties import part_drawing_unit
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
@@ -54,32 +56,24 @@ OUTPUTS = DrawingOutputs(slddrw=SPEC.outputs["slddrw"], pdf=SPEC.outputs["pdf"],
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_SCALE = (4.0, 1.0)
 FRONT_CENTER = (0.175, 0.170)
-# Far enough right that the pilot callout and the thickness text end clear of it.
+# Far enough right that the thickness text ends clear of the face view.
 RIGHT_CENTER = (0.360, FRONT_CENTER[1])
 ISO_CENTER = (0.345, 0.090)
 FRONT_KEEP = {
-    "PlateLength": (0.175, 0.235), "PlateHeight": (0.070, 0.170),
+    "PlateLength": (0.175, 0.235), "PlateHeight": (0.030, 0.170),
     "RoofChamferSize": (0.247, 0.225), "RoofChamferAngle": (0.227, 0.205),
     # Hole-location texts sit where no other witness line crosses their
-    # mate callouts: 3.50 outboard right, 4.00 below its own witness span and
-    # the 14.1 arrow, 17.50 centred between its witness lines.
+    # mate callouts: .150 outboard right, .160 below its own witness span and
+    # the .56 arrow, .690 centred between its witness lines.
     "PlateLeftFromEnd": (0.250, 0.113),
     "PlateRightFromEnd": (0.182, 0.095),
     "PlateFromHeadFace": (0.100, 0.122),
-    # Right of the outline and below the chamfer-size dimension line.
-    "PilotDrillDiameter": (0.285, 0.178),
 }
 # Text left of the thin edge view, so neither witness line strikes it.
 RIGHT_KEEP = {"PlateThickness": (0.327, 0.225)}
 HOLE_STATION_FIT = f"LOCATES MS-STOP-BLOCK\n{_config.parts('ms-stop-block')['number']} TAPS"
 DIMENSION_CALLOUTS = {
-    "PilotDrillDiameter": (
-        "LAYOUT ON THIS PLATE; PILOT\n"
-        f"THROUGH INTO MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']}\n"
-        f"CLAMPED, {part.MATCH_DRILL_DATUM_ALIGNMENT}\n"
-        f"{part.MATCHED_PAIR_NOTE}"
-    ),
-    # The +/-0.1 hole stations become the block's tapped-hole stations.
+    # The +/-.004 hole stations become the block's tapped-hole stations.
     **{name: HOLE_STATION_FIT for name in part.PLATE_LOCATION_DIMENSIONS},
     # The thickness band sets the plate screws' reach into the blind taps.
     "PlateThickness": (
@@ -87,9 +81,18 @@ DIMENSION_CALLOUTS = {
         f"{_config.parts('ms-stop-block')['number']} TAPS"
     ),
 }
-# Vertically centred and its leader leaves the last row: 6 mm above the
-# one-row 0.140 keeps that leader above LOCATING END's with the end-web row.
-CLEARANCE_CALLOUT_XY = (0.285, 0.146)
+# The three-row callout is wider than the room between the .56 witnesses, so
+# it sits below the cover face, left of the hole-station texts.
+CLEARANCE_CALLOUT_XY = (0.075, 0.100)
+# Function and acceptance, not procedure (the sequence is the assembly
+# sheet's step 1): the pair, its alignment, and what the holes must pass
+# (rule 7 flags the pair at its match-drill callouts).
+CLEARANCE_FUNCTION = (
+    f"{part.MATCHED_PAIR_NOTE}\n"
+    f"{part.MATCH_DRILL_DATUM_ALIGNMENT}, {part.PLATE_SCREW_THREAD.lstrip('#')} SCREWS\n"
+    f"ENTER MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']} TAPS FREELY"
+)
+CLEARANCE_PRECISION = {"hw-diam": part.HOLE_CALLOUT_PRECISION}
 # Leadered labels name the X=0 end and Y=0 edge the match-drill clamp aligns.
 # Note positions are the text's upper-left corner.
 LOCATING_END_XY = (0.228, 0.128)
@@ -99,24 +102,25 @@ LOCATING_EDGE_XY = (0.150, 0.130)
 LOCATING_EDGE_X_MM = 7.0
 
 
-def _style_pilot_diameter(adapter: Any, annotations: list[Any]) -> None:
-    """Keep the model diameter's leader on the concentric, earlier pilot step."""
-    annotation = next(
-        item for item in annotations
-        if dimension_name(adapter, item) == "PilotDrillDiameter"
-    )
-    annotation = _early_bound(annotation, "IAnnotation")
-    native = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    if int(native.Type2) != 6:  # swDiameterDimension
-        raise RuntimeError("match-drill pilot is not a native model diameter")
-    # The importer shows this construction circle inside the opened clearance.
-    # Both steps identify this same hole pair; their separate native dimensions
-    # retain the pilot model value and the finished Hole Wizard value.
-    definition = str(native.GetText(5) or "")
-    prefix = f"2X {definition}"
-    native.SetText(1, prefix)
-    if str(native.GetText(5) or "") != prefix:
-        raise RuntimeError("native pilot quantity prefix did not persist")
+def _append_callout_lines(display: Any, lines: str) -> None:
+    """Append text rows below the native callout; its variables stay live."""
+    native = _early_bound(display, "IDisplayDimension")
+    if not native.IsHoleCallout():
+        raise RuntimeError("stop plate function line requires a native hole callout")
+    revised = str(native.GetText(5) or "").rstrip("\r\n") + "\n" + lines
+    native.SetText(1, revised)  # swDimensionTextPrefix; void return
+    if str(native.GetText(5) or "") != revised:
+        raise RuntimeError("stop plate callout function line did not persist")
+
+
+def _outside_arrow(display: Any) -> None:
+    """One outside arrow on the dimensioned circle; no leader through its centre."""
+    display = _early_bound(display, "IDisplayDimension")
+    display.ArrowSide = 1  # swDimArrowsOutside
+    display.SetSecondArrow(False, False)  # UseDoc, SecondArrow
+    if (int(display.ArrowSide) != 1 or bool(display.GetUseDocSecondArrow())
+            or bool(display.GetSecondArrow())):
+        raise RuntimeError("stop plate drill arrow styling did not persist")
 
 
 def _style_plate_chamfer(adapter: Any, annotations: list[Any]) -> None:
@@ -140,29 +144,6 @@ def _style_plate_chamfer(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"missing native plate chamfer dimensions: {sorted(remaining)}")
 
 
-# The shown Ø1.85 pilot reference circle read as a tapped-hole symbol inside
-# the opened Ø2.40 hole (machinist review, run 20261023T231957372Z-0d874475).
-# A phantom circle is the convention for a removed, earlier-stage feature.
-# swLineStyles_e.swLinePHANTOM = 2, swLineWeights_e.swLW_THIN = 0.
-CONSTRUCTION_CURVE_FONT = {
-    "swLineFontConstructionCurvesStyle": 2,
-    "swLineFontConstructionCurvesThickness": 0,
-}
-
-
-@_telemetry.traced("drawing.ms_stop_plate_construction_font")
-def _construction_curve_font(drawing: Any) -> None:
-    """Construction curves phantom and thin: the pilot reads as an earlier stage."""
-    extension = _early_bound(drawing.Extension, "IModelDocExtension")
-    option = constant("swDetailingNoOptionSpecified")
-    for name, value in CONSTRUCTION_CURVE_FONT.items():
-        pref = constant(name)
-        if not extension.SetUserPreferenceInteger(pref, option, value):
-            raise RuntimeError(f"failed to set document line font {name}")
-        if int(extension.GetUserPreferenceInteger(pref, option)) != value:
-            raise RuntimeError(f"document line font {name} readback differs")
-
-
 def _label_locating_edges(adapter: Any, front: Any) -> None:
     """Leader the match-drill X=0 end and Y=0 edge on the cover-face view."""
     face_z = part.PLATE_Z_MIN / 1000.0
@@ -175,15 +156,6 @@ def _label_locating_edges(adapter: Any, front: Any) -> None:
                           note_xy=note_xy, label=text.lower())
 
 
-def _append_callout_line(display: Any, line: str) -> None:
-    """Rule 20: state the holes' worst-case end web below the native row (#1937)."""
-    native = _early_bound(display, "IDisplayDimension")
-    revised = str(native.GetText(5) or "").rstrip("\r\n") + "\n" + line  # swDimensionTextPrefixDefinition
-    native.SetText(1, revised)  # swDimensionTextPrefix; void return
-    if str(native.GetText(5) or "") != revised:
-        raise RuntimeError("clearance-hole end-web line did not persist")
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source stop cover missing: {SOURCE}")
@@ -192,8 +164,8 @@ async def build(adapter: Any) -> dict[str, str]:
     read_required_properties(adapter.currentModel, properties,
                              required=("Number", "Material Specification", "Finish", "Quantity"))
     drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM,
-                                        scale=SHEET_SCALE, layout=SPEC.layout)
-    _construction_curve_font(drawing)
+                                        scale=SHEET_SCALE, layout=SPEC.layout,
+                                        unit=part_drawing_unit("ms-stop-plate"))
     stamp_drawing_summary(adapter, drawing, {
         0: "Measuring Stick Stop Plate Manufacturing Drawing",
         1: "Harmonic Analyzer hobby-machinist book drawing",
@@ -210,22 +182,21 @@ async def build(adapter: Any) -> dict[str, str]:
                                                dimensions_by_feature=part.PLATE_DRAWING_DIMENSIONS)
     set_hidden_lines_removed(adapter, iso)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    _style_pilot_diameter(adapter, annotations)
     _style_plate_chamfer(adapter, annotations)
+    # The rim's lower outboard point, off the .160 witness through the centre,
+    # so the leader from the callout below crosses no station line.
+    rim = part.PLATE_CLEARANCE_DIA / 2.0 / math.sqrt(2.0)
     edge = model_point_in_view(
         adapter, front, (
-            (part.PLATE_HOLE_XS[0] - part.PLATE_CLEARANCE_DIA / 2.0) / 1000.0,
-            part.PLATE_HOLE_Y / 1000.0, part.PLATE_Z_MIN / 1000.0,
+            (part.PLATE_HOLE_XS[1] + rim) / 1000.0,
+            (part.PLATE_HOLE_Y - rim) / 1000.0, part.PLATE_Z_MIN / 1000.0,
         ), label="plate clearance mouth")
-    # *Back reverses X: this is the right-sheet hole, concentric with the
-    # imported pilot. Two adjacent native callouts avoid an unverified note
-    # dimension-link format while keeping both 2X quantities and sizes live.
-    # Both leaders stay right of the overall-height and hole-location lanes.
-    # Unclamping first makes the opening this plate's alone, not the block's.
+    # *Back reverses X: this is the left-sheet hole. Rule 12: say DRILL.
     clearance = add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=CLEARANCE_CALLOUT_XY,
-                                        label="two cover clearance holes",
-                                        process="REMOVE PLATE; THEN OPEN")
-    _append_callout_line(clearance, part.PLATE_CLEARANCE_WEB_LINE)
+                                        label="two cover clearance holes", process="DRILL")
+    _append_callout_lines(clearance, CLEARANCE_FUNCTION)
+    set_hole_callout_precision(clearance, CLEARANCE_PRECISION, label="two cover clearance holes")
+    _outside_arrow(clearance)
     _label_locating_edges(adapter, front)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("stop clearance centre marks failed")

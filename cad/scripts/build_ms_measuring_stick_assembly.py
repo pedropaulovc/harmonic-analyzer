@@ -43,6 +43,7 @@ from _assembly import (
     place_component,
     save_assembly_and_images,
 )
+from _assembly_contract import assembly_contract
 from _assembly_patterns import ensure_global_pattern_axis
 from _check import check
 from _com import _early_bound
@@ -50,11 +51,8 @@ from _custom_properties import apply_custom_properties
 from _session import run_build
 from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision, _named_dimension
-from _drawing_tolerances import (
-    set_dimension_symmetric_tolerance,
-    _set_tolerance_precision,
-)
 from _dimensions import drive_dimension, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _assembly_named_views import name_standard_views
 from _named_views import name_octant_views
@@ -339,14 +337,13 @@ async def _author_clamped_setting(adapter: Any) -> None:
     name_last_feature(adapter, spec.SETTING_FEATURE)
     for name, expression in dims.apply(adapter, spec.SETTING_FEATURE):
         await drive_dimension(adapter, name, expression)
-    set_dimension_symmetric_tolerance(
-        adapter, spec.SETTING_FEATURE, spec.SETTING_DIMENSION, spec.SETTING_TOLERANCE_MM
-    )
-    display, _ = _named_dimension(adapter, spec.SETTING_FEATURE, spec.SETTING_DIMENSION)
-    _set_tolerance_precision(
-        display, (-spec.SETTING_TOLERANCE_MM, spec.SETTING_TOLERANCE_MM),
-        display_unit="mm", label="clamped setting", places=spec.SETTING_TOLERANCE_PRECISION,
-    )
+    # A parenthesized reference to the saved pose, not a band: the native
+    # prefix/suffix channel around the live value, as the magnifier's.
+    display, dimension = _named_dimension(adapter, spec.SETTING_FEATURE, spec.SETTING_DIMENSION)
+    _early_bound(dimension.Tolerance, "IDimensionTolerance").Type = 0  # swTolNONE
+    display.ShowParenthesis = False
+    display.SetText(1, "(")
+    display.SetText(2, ")")
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     mark_dimensions_for_drawing(adapter, spec.SETTING_FEATURE, {spec.SETTING_DIMENSION})
     blank_sketch(adapter, spec.SETTING_FEATURE)
@@ -363,6 +360,7 @@ async def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
     check("create_assembly", await adapter.create_assembly())
+    apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
 
     # The block and cover share the stop's turned, thumbscrew-up frame.
     await _place_fixed(adapter, "ms-stop-block", spec.BLOCK_ORIGIN, spec.BLOCK_ROWS)

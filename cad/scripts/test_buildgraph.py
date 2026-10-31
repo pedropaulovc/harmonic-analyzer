@@ -2563,10 +2563,10 @@ def test_title_properties_propagate_inside_corner_config(properties, name, monke
 
     title_block = _config.title_block
 
-    def changed_title_block(section):
+    def changed_title_block(section, *, unit="mm"):
         if section == "inside_corner":
             return {"radius_mm": 0.8, "digits": 1}
-        return title_block(section)
+        return title_block(section, unit=unit)
 
     monkeypatch.setattr(_config, "title_block", changed_title_block)
     expected = "R0.8 MAX"
