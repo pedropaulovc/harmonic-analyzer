@@ -31,7 +31,7 @@ the jig sheets (MHA-CH-06-TL-20 to TL-26 and the TL-00 jig assembly) from:
   63.5 mm, spindle centreline 7-1/2 in from the pleated column cover).
 
 Plain shoulder-screw pivots positively capture both supports during both
-passes. Each M8 screw bottoms its shoulder on the block counterbore floor;
+passes. Each 5/16-18 shoulder screw bottoms its shoulder on the block seat;
 its head captures the carrier, which turns on the shoulder and slides on a
 loose spacer over a selected shim. The carrier seat remains at Z80.2.
 Heights alone do not prove spindle/toolholder clearance: installed-machine
@@ -58,12 +58,13 @@ Error sensitivity (printed next to the bands that carry it):
   dimensioned from A1/B1, never from a plate edge.
 * pin spacing: a D error changes R by ``RADIUS_PER_SPACING`` (1.77) per unit
   of spacing error. The spacing is held by one DRO setting.
-* shoulder/carrier clearance: the purchased Ø10 shoulder (-0.025/0) in the
-  carrier Ø10 H7 (0/+0.015) gives 0–0.040 diametral clearance. This can move
-  the edge 1:1; it is not a bearing-internal-play budget. The two supports'
-  opposite radial take-up can change spacing by one diametral clearance,
-  so the radius contribution is ``RADIUS_FROM_SHOULDER_CLEARANCE`` (0.071).
-  The block's H7 locating counterbore has its own shoulder-clearance budget;
+* shoulder/carrier clearance: the purchased Ø.375 shoulder (-.001/0) in the
+  carrier's .3760-.3765 REAM_SLIDE hole gives .0010-.0025 (0.025-0.064 mm)
+  diametral clearance. This can move the edge 1:1; it is not a
+  bearing-internal-play budget. The two supports' opposite radial take-up can
+  change spacing by one diametral clearance, so the radius contribution is
+  ``RADIUS_FROM_SHOULDER_CLEARANCE`` (0.112 mm).
+  The block's locating counterbore has its own shoulder-clearance budget;
   there are no rolling bearings, press fits or mounted C3-play assumptions.
 
 Sweep (Main, 2026-10-16). The brief swept the cutter over the whole 350
@@ -81,7 +82,7 @@ therefore cut the riser clear of every position the part cutter reaches.
 
 Pivot pin offset (owner-approved 2026-10-23). Keep ``PIN_OFFSET`` 32 toward
 the spindle along the rail, preserving both pass stations and the carrier
-hole layout. The plain Ø10 H7 counterbore replaces the former bearing
+hole layout. The plain .375 reamed shoulder seat replaces the former bearing
 cartridge. The carriage centre still runs 107.2 to 421.4 against the rail's
 45.7 to 424.3 (half the 61.4 carriage from each end of the 440 rail).
 """
@@ -192,11 +193,11 @@ def at_arc_station(
 # the riser's countersink either (TrammelJig, jig-r5).
 RISER_SCREW = "#4-40"
 RISER_SCREW_HEAD_DIA = round(0.225 * INCH, 9)
-# The riser's 82-degree countersink mouth, printed at 2 places, and the places
-# the carrier's riser taps (MHA-CH-06-TL-21) print their stations at: the
-# riser's holes are spotted through those taps at assembly, so the tap's
+# The riser's 82-degree countersink mouth, printed at 2 places (.25), and the
+# places the carrier's riser taps (MHA-CH-06-TL-21) print their stations at:
+# the riser's holes are spotted through those taps at assembly, so the tap's
 # station band places each countersink. RISER_SCREW_WALLS judges both bands.
-RISER_CSK_DIA = 6.3
+RISER_CSK_DIA = 6.35  # .25
 RISER_CSK_PLACES = 2
 RISER_TAP_STATION_PLACES = 3
 RISER_SCREW_RADIUS = (RISER_INNER_RADIUS + RISER_OUTER_RADIUS) / 2.0
@@ -228,14 +229,14 @@ RISER_SCREW_WALLS = (
     - _RISER_CSK_MOUTH_MAX
     - _RISER_RADIAL_SHIFT,
 )
-# The milled riser blank, 340 x 40, lies square on the carrier with its
-# corner at RISER_BLANK_ORIGIN (carrier frame). The self-cut band runs from
-# y 21.45 (inner edge at the blank's ends) to 50.90 (outer edge at the
-# apex), nominally at least 5 inside both long edges. At the 40.0 width's
-# .X low limit the outer margin is 4.30, not 5.
-RISER_BLANK_LENGTH = 340.0
-RISER_BLANK_WIDTH = 40.0
-RISER_BLANK_ORIGIN = (-RISER_BLANK_LENGTH / 2.0, 16.0)
+# The milled riser blank, 13.40 x 1.60 in, lies square on the carrier with its
+# corner at RISER_BLANK_ORIGIN (carrier frame, y .63). The self-cut band runs
+# from y 21.40 (inner edge at the blank's ends) to 50.90 (outer edge at the
+# apex), nominally at least 5 inside both long edges. Rule 17 reads the
+# blank's edges, so its size prints .XX (.X is for unread features only).
+RISER_BLANK_LENGTH = 340.36  # 13.40
+RISER_BLANK_WIDTH = 40.64  # 1.60
+RISER_BLANK_ORIGIN = (-RISER_BLANK_LENGTH / 2.0, 16.002)  # y .63
 RISER_BAND_Y = (
     math.sqrt(RISER_INNER_RADIUS**2 - (RISER_BLANK_LENGTH / 2.0) ** 2) - H1,
     RISER_OUTER_RADIUS - H1,
@@ -302,8 +303,9 @@ SYMMETRIC_PIN_STATION = {
 }
 
 # --- Rail alignment targets ⚙ -------------------------------------------------
-# Indicator readings of a pin in the pivot block, machine XY, at stations s.
-ALIGNMENT_STATIONS = (100.0, 200.0, 300.0, 380.0)
+# Indicator readings of a pin in the pivot block, machine XY, at stations s:
+# round inches (a free choice inside the feed carriage's travel).
+ALIGNMENT_STATIONS = tuple(s * INCH for s in (4.0, 8.0, 12.0, 15.0))
 
 
 def rail_point(rail: int, s: float, lateral: float = 0.0) -> tuple[float, float]:
@@ -328,7 +330,9 @@ RADIUS_PER_TENTH_DEG = (
     D1 * math.cos(ALPHA) / (2.0 * math.sin(ALPHA) ** 2) * math.radians(0.1)
 )
 RADIUS_PER_SPACING = 1.0 / (2.0 * math.sin(ALPHA))  # dR/dD
-SHOULDER_CARRIER_CLEARANCE = (0.0, 0.040)  # diametral, Ø10 H7 / bought shoulder
+# Diametral: the .3760-.3765 REAM_SLIDE carrier hole on the bought .375 -.001/0
+# shoulder (carrier_spec PIN_CLEARANCE_MIN/MAX, .0010-.0025).
+SHOULDER_CARRIER_CLEARANCE = (0.0254, 0.0635)
 RADIUS_FROM_SHOULDER_CLEARANCE = (
     RADIUS_PER_SPACING * SHOULDER_CARRIER_CLEARANCE[1]
 )
@@ -435,17 +439,21 @@ BASE_BAR_STOCK_WIDTH_IN = 5.5
 BASE_BAR_WIDTH = round(BASE_BAR_STOCK_WIDTH_IN * INCH, 9)  # 139.7
 BASE_BAR_COLUMN_EDGE = round(3.5 * INCH, 9)  # lateral +88.9
 BASE_BAR_OPERATOR_EDGE = BASE_BAR_COLUMN_EDGE - BASE_BAR_WIDTH  # lateral -50.8
-BASE_BAR_LENGTH = RAIL_LENGTH
-# Two 1/2-13 hold-down studs per bar in 13.5 slots across the bar, one each
+# The rail's 440 cut printed on the bar's .XX grid: the rail overhangs the
+# bar's far end by .07 mm, inside the length's band.
+BASE_BAR_LENGTH = 439.928  # 17.32
+# Two 1/2-13 hold-down studs per bar in .53 slots across the bar, one each
 # side of the rail, outside the carriage's sweep. Their stations put both on
 # T-slots two pitches apart, the far one inside the table end by a T-nut.
-HOLD_DOWN_SLOT_WIDTH = 13.5
-HOLD_DOWN_LATERAL = 37.5  # stud axis from the rail axis; + toward the column
+HOLD_DOWN_SLOT_WIDTH = 13.462  # .53
+HOLD_DOWN_LATERAL = 37.592  # 1.48: stud axis from the rail axis; + toward the column
 # +/- stud travel along each slot (square to the rail). The 2026-10-30 ruling
 # cut it from 3.0 so the narrower 1/2 x 5-1/2 bar keeps the far slot's rule-17
 # wall to its operator-side edge with every slot still located from -Y.
-HOLD_DOWN_ADJUST = 2.0
-HOLD_DOWN_FAR_S = 405.0
+HOLD_DOWN_ADJUST = 2.032  # .08
+# The far slot's bar station is 15.35 (389.89); the near one closes the
+# T-slot pitch exactly (a kinematic closure, printed rounded on the bar).
+HOLD_DOWN_FAR_S = RAIL_NEAR_S + 389.89
 HOLD_DOWN_NEAR_S = HOLD_DOWN_FAR_S - (
     2.0 * TSLOT_PITCH - 2.0 * HOLD_DOWN_LATERAL * math.cos(HALF_ALPHA)
 ) / math.sin(HALF_ALPHA)

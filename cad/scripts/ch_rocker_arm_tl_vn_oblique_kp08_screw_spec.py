@@ -31,9 +31,15 @@ y = -length.  Mate the Top Plane to the head's seat, the KP08's foot (its thickn
 
 from __future__ import annotations
 
+import _config
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 from _mcmaster_91251a150 import DIMS, LENGTH_TEXT, PART_NO, THREAD
+from _package_units import drawing_unit
 
+UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-vn-oblique-kp08-screw",
+    _config.parts("ch-rocker-arm-tl-vn-oblique-kp08-screw"),
+)
 SKU = PART_NO
 ROW = fasteners.KP08_TO_BRACKET
 QUANTITY = ROW.count

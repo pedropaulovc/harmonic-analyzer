@@ -24,9 +24,8 @@ Nominal engagement is at least 1.5 diameters except on two joints:
   The lever-washer spec records the worst-case engagement and possible
   stand-out; the nominal table alone does not bound either.
 
-Threads are US-customary UNC except the bought carriage's M4 holes and the
-supplier-defined M8 shoulder screw.
-The shoulder screw has its own datum-based row: treating its 35 mm shoulder
+Threads are US-customary UNC except the bought carriage's M4 holes.
+The shoulder screw has its own datum-based row: treating its 1.500 shoulder
 as a conventional screw grip would report a false engagement.
 
 Only the feed lever screws use wedge-lock pairs. The four nut screws are
@@ -242,7 +241,7 @@ class ShoulderScrew:
     count: int = pivot_screw.QUANTITY
     shoulder_diameter_mm: float = pivot_screw.SHOULDER_DIA
     shoulder_length_mm: float = pivot_screw.SHOULDER_LENGTH
-    thread_length_mm: float = pivot_screw.THREAD_LENGTH
+    thread_length_mm: float = pivot_screw.CUT_THREAD_LENGTH  # the shop-cut thread
     counterbore_depth_mm: float = pivot_block.BORE_DEPTH
     torque_nm: float = 4.0
     threadlocker: str = "Loctite 222"

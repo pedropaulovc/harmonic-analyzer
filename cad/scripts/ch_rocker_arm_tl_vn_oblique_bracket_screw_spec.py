@@ -31,9 +31,15 @@ y = -length.  Mate the Top Plane to the head's seat, the floor of TL-20's counte
 
 from __future__ import annotations
 
+import _config
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 from _mcmaster_91251a196 import DIMS, LENGTH_TEXT, PART_NO, THREAD
+from _package_units import drawing_unit
 
+UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-vn-oblique-bracket-screw",
+    _config.parts("ch-rocker-arm-tl-vn-oblique-bracket-screw"),
+)
 SKU = PART_NO
 ROW = fasteners.BRACKET_TO_BAR
 QUANTITY = ROW.count
