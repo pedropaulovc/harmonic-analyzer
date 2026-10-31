@@ -316,13 +316,13 @@ if PAIRED_MIN_CLEARANCE_MM < BORE_RUNNING_MIN_CLEARANCE_MM:
 SHAFT_FIT_CLEARANCE_MM = (
     BORE_DIA_BAND[1] - SHAFT_DIA_BAND[0],
     BORE_DIA_BAND[0] - SHAFT_DIA_BAND[1],
-)  # (0.038, 0.070)
+)  # (0.0381, 0.07112), .0015-.0028 in
 # No line ends in punctuation: the widest row ends on the dimension's
 # vertical leader, and a trailing ';' touched it (machinist review r2).
 SHAFT_DIA_CALLOUT = "\n".join(
     (
         "SLIDING FIT IN MHA-CH-07 BORES",
-        f"{SHAFT_FIT_CLEARANCE_MM[0]:.3f}-{SHAFT_FIT_CLEARANCE_MM[1]:.3f} "
+        f"{SHAFT_FIT_CLEARANCE_MM[0]:.4f}-{SHAFT_FIT_CLEARANCE_MM[1]:.4f} "
         "DIAMETRAL CLEARANCE",
         "MHA-CH-02 LEVERS RUN ON IT",
     )

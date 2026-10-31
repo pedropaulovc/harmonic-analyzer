@@ -75,10 +75,11 @@ def stated_max(value: float) -> float:
 DEPTH_PLACES = 2
 EAR_HOLE_CALLOUT_PLACES = 2
 
-# (min, max) diametral clearance of EITHER arc's bore on its column. Centred
-# on the model's own 0.2 (COLUMN_BORE on COLUMN_DIA); the 0.1 floor keeps the
-# slide, the 0.3 ceiling is what the grip budget below can spend per bore.
-BORE_DIAMETRAL_CLEARANCE = (0.10, 0.30)
+# (min, max) diametral clearance of EITHER arc's bore on its column,
+# .004-.012 in. The model's own 0.2 (COLUMN_BORE on COLUMN_DIA) sits inside;
+# the .004 floor keeps the slide, the .012 ceiling is what the grip budget
+# below can spend per bore.
+BORE_DIAMETRAL_CLEARANCE = (0.1016, 0.3048)
 # +/- on the back arc's mating-face offset from its bore axis.
 GRIP_OFFSET_BAND = 0.1
 # +/- on each ear-hole station from its arc's bore axis (both arcs).

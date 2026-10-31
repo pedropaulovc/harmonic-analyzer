@@ -188,13 +188,15 @@ SERVICE_PIN_STATION = HUB_SEAT_LENGTH + SERVICE_PIN_FROM_SHOULDER
 CRANK_FACE_SHIFT = ARM_THICKNESS
 
 # Shared shaft-in-bushing fit class, re-expressed as a bore nominal/band against
-# the already released ground-shaft h band (0/-0.02).  The resulting worst-case
-# diametral clearance is exactly the catalogued 0.025..0.075 mm.  The catalogue
-# pair is restated, not read: _interference_contracts imports this module into
-# every assembly's recipe, and a fit-class read would make them all depend on
-# tolerances/shaft_in_bushing.yaml.  test_dt_crank_hub_drawing pins it to the catalogue.
-SHAFT_DIA_BAND = (0.00, -0.02)
-SHAFT_CLEARANCE_MIN, SHAFT_CLEARANCE_MAX = 0.025, 0.075
+# the already released ground-shaft h band (0/-.0008 in).  The resulting
+# worst-case diametral clearance is exactly the catalogued .0010-.0023 in, and
+# the bore comes out .376 +.0005/.0000 in, the owned .3760 reamer's cut.  The
+# catalogue pair is restated, not read: _interference_contracts imports this
+# module into every assembly's recipe, and a fit-class read would make them
+# all depend on tolerances/shaft_in_bushing.yaml.  test_dt_crank_hub_drawing
+# pins it to the catalogue.
+SHAFT_DIA_BAND = (0.0, -0.02032)
+SHAFT_CLEARANCE_MIN, SHAFT_CLEARANCE_MAX = 0.0254, 0.05842
 HUB_BORE_DIA = SHAFT_DIA + SHAFT_CLEARANCE_MIN
 HUB_BORE_BAND = (
     SHAFT_CLEARANCE_MAX - (HUB_BORE_DIA - (SHAFT_DIA + SHAFT_DIA_BAND[1])),

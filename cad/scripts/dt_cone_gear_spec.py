@@ -379,8 +379,9 @@ TERMINAL_WEB_REQUIREMENTS_MM = {
     12: MACHINED_WEB_TARGET_MM,
 }
 
-# Printed places of the bore band (model-owned, DRAWING_PRECISION).
-BORE_BAND_PLACES = 3
+# Printed places of the bore band (model-owned): five hold the inch class's
+# +.0018/+.0010 in exactly in millimetres (+0.04572/+0.0254).
+BORE_BAND_PLACES = 5
 
 
 # The band is UNIFORM: BoreCutDia is one model dimension across all twenty
@@ -436,9 +437,9 @@ def terminal_web_mm(teeth: int) -> float:
 # land's flat, whose outward normal is local +X (through the phase-0 tooth,
 # FLAT_CLOCK_TOLERANCE_DEG).  Across-flat (AF) is measured from the flat to
 # the far side of the round bore, the land's own AF nominal; the band keeps
-# 0.01-0.03 AF clearance on the land's FLAT_AF_BAND.  One band for all twenty,
+# .0004-.0012 in AF clearance on the land's FLAT_AF_BAND.  One band for all twenty,
 # so one BoreAF tolerance serves every configuration.
-BORE_AF_BAND = flat_bore_af_band(FLAT_AF_BAND)  # (+0.020, +0.010)
+BORE_AF_BAND = flat_bore_af_band(FLAT_AF_BAND)  # +.0008/+.0004 in
 BORE_AF_PLACES = 3
 
 
