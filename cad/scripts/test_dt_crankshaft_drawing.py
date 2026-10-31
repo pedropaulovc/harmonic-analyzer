@@ -15,7 +15,6 @@ import pytest
 from solidworks_mcp.adapters.solidworks import drawing as native_drawing
 
 import build_dt_crankshaft as part
-import _sprocket_seat_geometry as seat_geometry
 import dt_crank_hub_geometry as geometry
 import dt_crankshaft_notes as notes
 import dt_crankshaft_spec as spec
@@ -171,7 +170,7 @@ def test_spigot_rim_is_the_shortfall_the_sheet_states() -> None:
         spec.DRIVE_PIN_CIRCLE_RADIUS
         + spec.DRIVE_PIN_OFFSET_TOL
         + hole_r
-        + seat_geometry.DRIVE_PIN_HOLE_BAND[0] / 2.0
+        + spec.DRIVE_PIN_HOLE_BAND[0] / 2.0
     )
     rim = spec.DRIVE_PIN_SPIGOT_RIM_WORST
     assert worst - 0.0254 < rim <= worst
