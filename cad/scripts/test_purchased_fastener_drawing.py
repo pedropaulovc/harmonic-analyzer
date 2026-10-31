@@ -7730,11 +7730,17 @@ def test_source_checkpoint_real_finalizer_boundaries_preserve_native_failure(
     for name in (
         "apply_custom_properties",
         "assert_asme_b_sheet",
-        "read_required_properties",
         "assert_precise_isometric_views",
         "sanitize_pdf_metadata",
     ):
         monkeypatch.setattr(common, name, lambda *_args, **_kwargs: None)
+    from _part_properties import title_block_properties
+
+    monkeypatch.setattr(
+        common,
+        "read_required_properties",
+        lambda *_args, **_kwargs: title_block_properties(),
+    )
     monkeypatch.setattr(
         common, "pdf_shaded_raster_dpi", lambda *_args: contextlib.nullcontext()
     )
