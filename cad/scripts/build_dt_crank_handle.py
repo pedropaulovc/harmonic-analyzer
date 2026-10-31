@@ -678,6 +678,7 @@ async def build(adapter) -> dict[str, str]:
         "HandleProfile",
         "TenonRootRelief",
         TENON_ROOT_RELIEF_TOL,
+        places=3,
         display_unit=UNIT,
     )
     clear_dimensions_for_drawing(adapter)
