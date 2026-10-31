@@ -127,7 +127,7 @@ reserved:
 monte_carlo:
   draws: 4000
   seed: 20260912
-  distribution: uniform          # deviations uniform within +/- tolerance; cone_flat_play is drawn about the fit's 0.02 mm mean
+  distribution: uniform          # deviations uniform within +/- tolerance; cone_flat_play is drawn about the fit's 0.02032 mm mean
 
 # Channel-specific features. `tolerance` is the +/- half-width of the drawing
 # (or matching/setup) limit; `unit` is mm unless stated. `class`:
@@ -201,12 +201,12 @@ critical_features:
     class: channel
     holds: "index each cone gear's teeth off its D-bore flat on one setup (BoreFlatClock +/-0.25 deg); the shaft flats' own clock is cone_land_clock"
   cone_flat_play:
-    tolerance: 0.010
+    tolerance: 0.01016
     unit: mm
     nominal: null
     quantity: phase
     class: channel
-    holds: "D-bore across-flat fit: 0.01-0.03 mm clearance on every gear (gear_seat_fit.FLAT_AF_CLEARANCE), acting on the shortest flat half-chord MHA-DT-04 accepts (land at its least diameter and greatest AF) less the title block's 0.25 edge break on its torque corner (error_budget.phase_profiles); subtract the common Ø9.525-land mean lag as a crank-index time shift, retain per-land residual and per-gear scatter"
+    holds: "D-bore across-flat fit: .0004-.0012 in (0.01016-0.03048 mm) clearance on every gear (gear_seat_fit.FLAT_AF_CLEARANCE), acting on the shortest flat half-chord MHA-DT-04 accepts (land at its least diameter and greatest AF) less the title block's 0.25 edge break on its torque corner (error_budget.phase_profiles); subtract the common Ø9.525-land mean lag as a crank-index time shift, retain per-land residual and per-gear scatter"
   cone_land_clock:
     tolerance: 1.0
     unit: deg

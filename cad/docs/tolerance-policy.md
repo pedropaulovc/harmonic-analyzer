@@ -290,8 +290,8 @@ flowchart LR
 
 Monte Carlo of [`error_budget.yaml`](../config/error_budget.yaml) (4000 draws,
 zero-centred features uniform within ± tolerance per channel; `cone_flat_play`
-instead draws the physical 0.01–0.03 mm across-flat clearance around its
-0.02 mm mean — `class: channel` drawn once per draw and shared by every trial,
+instead draws the physical .0004–.0012 in (0.01016–0.03048 mm) across-flat
+clearance around its 0.02032 mm mean — `class: channel` drawn once per draw and shared by every trial,
 `class: setup` (station setting) redrawn per trial as the operator resets the bars — applied to each bar's **physical hook waveform** at its
 station — so a gain error scales the channel's second harmonic, a phase error rotates it, and a
 kinematic deviation (eccentricity, the rod pin, the lever's bar pin and spring eye: `feature_axes`) **reshapes** it
@@ -354,7 +354,7 @@ current report does not discharge the operating assumptions or waivers below.
   levers of 2.248, 1.386, 0.522 and 0.146 mm, so the tip land's play is
   about three times the sharp nominal's. Its common large-land mean lag is a
   crank-index time shift, but neither the smaller-land residual nor
-  independent 0.01–0.03 mm clearances are. Crank in one direction only; a
+  independent .0004–.0012 in clearances are. Crank in one direction only; a
   reversal re-seats every mesh on the other flank (0.05–0.20 mm backlash).
 - **Every clearance in the position-driven chain is benign under one-sided load** — strap on
   cam, rod pin, rocker pivot, bar foot, top pin, spring hooks — because the channel spring
