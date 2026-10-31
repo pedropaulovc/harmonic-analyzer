@@ -1012,7 +1012,7 @@ def test_sweep_extents_and_rail_margins(report) -> None:
                     assert report.moving_x[0] <= px <= report.moving_x[1]
                     assert report.moving_y[0] <= py <= report.moving_y[1]
     # The 2026-10-17 widening (column-side edge at lateral +88.9), narrowed to
-    # 1/2 x 5-1/2 on 2026-10-30: the far column-side corners set X, the near
+    # 5.50 wide on 2026-10-30: the far column-side corners set X, the near
     # column-side corners the top of Y, the operator-side corners the bottom.
     assert report.fixed_x == pytest.approx((-463.04, 463.04), abs=0.01)
     assert report.fixed_y == pytest.approx((-115.33, 85.84), abs=0.01)

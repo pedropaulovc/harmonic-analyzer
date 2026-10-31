@@ -1,8 +1,9 @@
 r"""Build the oblique trammel's base bar (MHA-CH-06-TL-20; shop fixture).
 
-A 6061-T6511 1/2 x 5-1/2 in flat bar, rail-length long, with the HIWIN rail's
-seven #8-32 tapped holes on the rail axis (off the bar's centreline, the
-column-side edge 3.50 from it) and two hold-down slots across it
+A 6061-T6511 flat bar milled to 5.50 wide from the owned 1/2 x 6 bar (owner
+ruling #2083), rail-length long, with the HIWIN rail's seven #8-32 tapped
+holes on the rail axis (off the bar's centreline, the column-side edge 3.50
+from it) and two hold-down slots across it
 (``ch_rocker_arm_tl_oblique_base_bar_spec``). One part, one configuration,
 two off: the second bar is the same part turned over. Issue #290: an IPS
 document; the globals keep their millimetre values with the mm suffix.
@@ -188,8 +189,8 @@ async def _slot(
     Each slot's bottom end centre takes its station and rise from the -Y
     side's corner, the one datum the holes use too (c3-r6 review, rule 10:
     the far slot's drop from the +Y side was a second datum in the view; the
-    1/2 x 5-1/2 bar's wall to the +Y side, at ±.08 travel, absorbs the
-    stock width's band).
+    5.50 bar's wall to the +Y side, at ±.08 travel, absorbs the width's
+    band).
     Emission order: the width across the sides, the +X side's straight run,
     then the end centre's x and ``located`` height from the corner. The far slot's run is the printed ``SlotRun`` (2X): its
     dimension lands right of the bar, off the part; the near slot's width is

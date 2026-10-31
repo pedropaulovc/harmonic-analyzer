@@ -426,17 +426,18 @@ TABLE_WIDTH = round(8.25 * INCH, 9)  # 209.55
 TSLOT_PITCH = round(2.5 * INCH, 9)  # 63.5, three slots
 TSLOT_WIDTH = 14.0
 THROAT_TO_COVER = round(7.5 * INCH, 9)  # spindle centreline to the pleated cover
-# Base bar: 1/2 x 5-1/2 in 6061-T6511 flat (OnlineMetals 17666), rail-length
-# long, the rail off its centreline. The user's 2026-10-17 ruling (a) widened it
-# from 1/2 x 4 so the leadscrew's TL-28 end brackets (PR C4) stand wholly on
-# bar 1 instead of cantilevering past its edge: the column-side edge sits
-# BASE_BAR_COLUMN_EDGE off the rail axis (+lateral, toward the column on both
-# rails) and the operator-side edge takes the rest of the stock width. The
-# 2026-10-30 ruling narrowed it from 1/2 x 6 to the widest listed OnlineMetals
-# bar that fits the 6 in vise's stock hard jaws (5 3/4 in capacity, shop
-# inventory ``fixtures.vise-pm-6.opening_in``).
-BASE_BAR_STOCK_WIDTH_IN = 5.5
-BASE_BAR_WIDTH = round(BASE_BAR_STOCK_WIDTH_IN * INCH, 9)  # 139.7
+# Base bar: 6061-T6511 flat milled from the owned 1/2 x 6 bar (OnlineMetals
+# 1173), rail-length long, the rail off its centreline. The user's 2026-10-17
+# ruling (a) widened it from 1/2 x 4 so the leadscrew's TL-28 end brackets
+# (PR C4) stand wholly on bar 1 instead of cantilevering past its edge: the
+# column-side edge sits BASE_BAR_COLUMN_EDGE off the rail axis (+lateral,
+# toward the column on both rails) and the operator-side edge takes the rest
+# of the width. The 2026-10-30 ruling set the width to 5.50, inside the 6 in
+# vise's stock hard jaws (5 3/4 in capacity, shop inventory
+# ``fixtures.vise-pm-6.opening_in``); owner ruling #2083 mills it to width on
+# edge in the vise from the 1/2 x 6 bar, no bandsaw rip.
+BASE_BAR_WIDTH_IN = 5.5
+BASE_BAR_WIDTH = round(BASE_BAR_WIDTH_IN * INCH, 9)  # 139.7, milled
 BASE_BAR_COLUMN_EDGE = round(3.5 * INCH, 9)  # lateral +88.9
 BASE_BAR_OPERATOR_EDGE = BASE_BAR_COLUMN_EDGE - BASE_BAR_WIDTH  # lateral -50.8
 # The rail's 440 cut printed on the bar's .XX grid: the rail overhangs the
@@ -448,8 +449,8 @@ BASE_BAR_LENGTH = 439.928  # 17.32
 HOLD_DOWN_SLOT_WIDTH = 13.462  # .53
 HOLD_DOWN_LATERAL = 37.592  # 1.48: stud axis from the rail axis; + toward the column
 # +/- stud travel along each slot (square to the rail). The 2026-10-30 ruling
-# cut it from 3.0 so the narrower 1/2 x 5-1/2 bar keeps the far slot's rule-17
-# wall to its operator-side edge with every slot still located from -Y.
+# cut it from 3.0 so the narrower 5.50 bar keeps the far slot's rule-17 wall
+# to its operator-side edge with every slot still located from -Y.
 HOLD_DOWN_ADJUST = 2.032  # .08
 # The far slot's bar station is 15.35 (389.89); the near one closes the
 # T-slot pitch exactly (a kinematic closure, printed rounded on the bar).
