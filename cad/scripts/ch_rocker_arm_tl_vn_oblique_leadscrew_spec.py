@@ -31,7 +31,7 @@ Why lateral 2.165 (54.991): the KP08 envelope (55 across the axis,
 lifts the axis to 52.338. The handwheel grip sweeps below the carrier
 underside.
 Each bracket stands wholly on bar 1 (the user's 2026-10-17 ruling A′: the
-bar widened, now 1/2 x 5-1/2, its column-side edge at lateral 88.9 ⚙), its outer
+bar widened, now 5.50 wide, its column-side edge at lateral 88.9 ⚙), its outer
 end flush with that edge, on 4 x #8 screws in one row: two pairs symmetric
 about the screw axis, the inner at ±.433, the outer at ±1.09, the round
 half-span inside the rule-17 window (below) between the #8 tap's wall to the
