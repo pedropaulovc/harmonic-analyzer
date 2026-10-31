@@ -245,7 +245,7 @@ def _package(
             "Manufacturing Notes": part.DRAWING_NOTES,
         }
 
-    def new_drawing(_adapter, *, property_view, scale, layout):
+    def new_drawing(_adapter, *, property_view, scale, layout, unit):
         assert scale == section.STOCK_SCALE
         adapter.currentModel = document
         return document, None

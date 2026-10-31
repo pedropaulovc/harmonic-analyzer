@@ -21,6 +21,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _purchased_variant_drawing import (
     build_purchased_variant_drawing,
     configure_reference_views,
@@ -47,7 +48,6 @@ from _feature_requirements import part_metadata, requirement
 from _gtol_cone import ConeFace
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
-from _printed_limits import limits
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import face_silhouettes_through, visible_view_entities
 from _drawing_projection import model_points_in_view
@@ -137,7 +137,7 @@ requirement(
     requirements=("length", "note"),
     fields={
         "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
-        "length": (limits(stud.LENGTH, stud.LENGTH_PLACES), ("LENGTH", "LENGTH_BAND")),
+        "length": (list(stud.LENGTH_LIMITS), ("LENGTH", "LENGTH_LIMITS")),
         "length_nominal": (stud.LENGTH, ("LENGTH",)),
         "note": (stud.DIMENSION_CALLOUTS["FinishedLength"], ("DIMENSION_CALLOUTS",)),
     },
@@ -1897,6 +1897,7 @@ async def build(adapter: Any) -> dict[str, str]:
         annotate_member=annotate_member,
         additional_sheet_scales={name: SHEET_SCALE for name in SHEET_NAMES},
         append_sheets=append_stud_rework_sheets,
+        unit=part_drawing_unit(PART_STEM),
     )
 
 

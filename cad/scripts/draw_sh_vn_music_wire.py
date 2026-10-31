@@ -39,6 +39,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
+from _part_properties import part_drawing_unit
 from _session import run_build
 from _supplier_spring_drawing import _preserve_reference_source_file
 from _supplier_wire_stock_drawing import STOCK_FIELD, STOCK_SCALE, add_wire_section
@@ -230,6 +231,7 @@ async def build(adapter: Any) -> dict[str, str]:
         property_view=PART_STEM,
         scale=STOCK_SCALE,
         layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
