@@ -524,7 +524,7 @@ BORE_FIT_CALLOUT = "\n".join(
         "BORE LIMITS GOVERN",
         f"MATE SHAFT {CRANKSHAFT_NUMBER}",
         f"(\N{DIAMETER SIGN}{SEAT_DIA:.3f} "
-        f"+{_SHAFT_UPPER:.4f}/{_SHAFT_LOWER:.4f})",
+        f"+{_SHAFT_UPPER:.5f}/{_SHAFT_LOWER:.5f})",
         f"(DIA CLR {_CLEARANCE_MIN:.4f}-{_CLEARANCE_MAX:.4f} mm)",
     )
 )

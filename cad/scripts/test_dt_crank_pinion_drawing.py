@@ -417,7 +417,7 @@ def test_callouts_add_only_what_the_number_cannot_carry() -> None:
             "BORE LIMITS GOVERN",
             f"MATE SHAFT {spec.CRANKSHAFT_NUMBER}",
             f"(\N{DIAMETER SIGN}{dt_crankshaft_spec.PINION_SEAT_DIA:.3f} "
-            f"+{shaft_upper:.4f}/{shaft_lower:.4f})",
+            f"+{shaft_upper:.5f}/{shaft_lower:.5f})",
             f"(DIA CLR {low:.4f}-{high:.4f} mm)",
         )
     )
