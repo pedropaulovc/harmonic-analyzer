@@ -3125,7 +3125,7 @@ if LEVER_Z + LEVER_HUB_LEN / 2.0 > BLOCK_FRONT_Z0 - 0.25:
     raise AssertionError("lever hub reaches the front pivot block")
 if abs((LEVER_Z - (LEVER_HUB_LEN / 2.0 - LEVER_WALL_T)) - LIFT_ROD_Z0) > 1e-9:
     raise AssertionError("lever hub bore floor off the lift rod's front end")
-# The parked lever shaft passes clear of the pinion ARBOR (PR7: the Ø8 steel
+# The parked lever shaft passes clear of the pinion ARBOR (PR7: the Ø5/16 steel
 # arbor replaced the drum's Ø6.35 stubs; it spans the lever's z band, so the
 # 3D clearance is the 2D distance from the arbor's (x, y) to the Ø6 rod's
 # axis line). Perpendicular form when the foot lands on the rod segment,
@@ -3142,7 +3142,7 @@ else:
         _LEV_REL[0] - _end * _LEV_U[0], _LEV_REL[1] - _end * _LEV_U[1]
     )
 # Where the rod plane shares the collar's z band, the Ø15 collar -- not the
-# Ø8 shaft -- is what the lever passes.
+# Ø5/16 shaft -- is what the lever passes.
 _LEV_ROD_Z = (LEVER_Z - 3.0, LEVER_Z + 3.0)
 _ARBOR_DIA_AT_LEVER = (
     ARBOR_COLLAR_OD
@@ -3982,7 +3982,7 @@ for _lo, _hi, _axis_xy, _r, _what in (
         raise AssertionError(f"arbor collar crowds the {_what}")
 
 # --- pinion arbor + rig fasteners (PR7 items 2/11/12/14) ---------------------
-# The steel Ø8 arbor slips through the drum (bonded) and journals in both
+# The steel Ø5/16 arbor slips through the drum (bonded) and journals in both
 # straps' top bores.  Its turned head/neck are integral; MHA-DT-15 is only the
 # separate crossrod, bonded into the head's reamed hole at the unchanged
 # head/cross-hole station.
@@ -5097,7 +5097,7 @@ async def build(adapter) -> dict[str, str]:
         label="pinion-handle (separate grip crossrod through integral head)",
     )
     # MHA-DT-22 is pressed through the brass drum and journaled in both straps'
-    # Ø8 top bores.  Its turned grip head and neck are part of this same solid.
+    # Ø5/16 top bores.  Its turned grip head and neck are part of this same solid.
     # Rotate only about the circular shaft axis so its local-Y cross-hole is
     # coaxial with MHA-DT-15's local-Y rod; every world centre and Z station stays
     # unchanged.

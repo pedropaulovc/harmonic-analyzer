@@ -112,7 +112,7 @@ BEND_RADIUS_CALLOUT = "CLR"
 # callout names no method; note 3 does.
 SHANK_FIT_CALLOUT = (
     "FIT TO TUBE BORE,\n"
-    f"{BRAZE_CLEARANCE_MIN:.2f}-{BRAZE_CLEARANCE_MAX:.2f} DIAMETRAL\n"
+    f"{BRAZE_CLEARANCE_MIN:.4f}-{math.floor(BRAZE_CLEARANCE_MAX * 1e4) / 1e4:.4f} DIAMETRAL\n"
     "CLEARANCE"
 )
 # The sleeve's select-fit window rides its own Ø on the elevation (rule 7: a
@@ -121,7 +121,7 @@ SHANK_FIT_CALLOUT = (
 # no hone).
 SLEEVE_FIT_CALLOUT = (
     "STOCK; FIT ON TUBE,\n"
-    f"{BRAZE_CLEARANCE_MIN:.2f}-{BRAZE_CLEARANCE_MAX:.2f} DIAMETRAL\n"
+    f"{BRAZE_CLEARANCE_MIN:.4f}-{math.floor(BRAZE_CLEARANCE_MAX * 1e4) / 1e4:.4f} DIAMETRAL\n"
     "CLEARANCE"
 )
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {

@@ -47,7 +47,6 @@ import sys
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
-from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
@@ -63,12 +62,11 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
-from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
-import _telemetry
 from _saved_part_guard import require_saved_drawing_properties
 from ch_connecting_rod_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
 from ch_connecting_rod_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
@@ -208,34 +206,6 @@ def finished_volume() -> float:
         - strap_bore_volume()
         - pin_hole_volume()
     )
-
-
-def tolerance_at_dimension_places(
-    adapter, feature_name: str, dimension_name: str
-) -> int:
-    """Print one dimension's band at the dimension's own decimal places.
-
-    The shared tolerance setters print a band at the fewest places that hold
-    it, so PinHoleDia's +0.010/0 read "Ø1.968 +0.01/0.00" (PR #1292 render at
-    1b1f2f7fd): a three-place reamed size with a two-place band.  The places
-    come from DRAWING_PRECISION, the same entry that sets the value's places,
-    and are set here on the model so the drawing imports them verbatim (the
-    pattern build_dt_pinion_bracket uses for PinSeatCz)."""
-    places = DRAWING_PRECISION[feature_name][dimension_name]
-    display, _dimension = _named_dimension(adapter, feature_name, dimension_name)
-    display = _early_bound(display, "IDisplayDimension")
-    do_not_change = -1  # swDimensionPrecisionSettings_e
-    display.SetPrecision3(do_not_change, do_not_change, places, do_not_change)
-    applied = int(display.GetPrimaryTolPrecision2())
-    if applied != places:
-        raise RuntimeError(
-            f"{dimension_name}@{feature_name}: tolerance places did not persist: "
-            f"requested {places}, dimension reports {applied}"
-        )
-    _telemetry.success(
-        f"tolerance places {dimension_name}@{feature_name}: {places} decimals"
-    )
-    return places
 
 
 async def build(adapter) -> dict[str, str]:
@@ -704,14 +674,13 @@ async def build(adapter) -> dict[str, str]:
         adapter, "ForkSlotProfile", "RingFaceNear", face_upper
     )
     set_dimension_symmetric_tolerance(adapter, "Plate", "RingThick", thick_upper)
-    # The reamed press hole's band rides natively on its diameter, which the
-    # front view imports at three places (DRAWING_PRECISION); its band prints
-    # at the same three places (+0.010/0.000), not the fewest that hold it.
+    # The reamed press hole's band rides natively on its diameter; the front
+    # view imports the .077 in nominal at four places (DRAWING_PRECISION) and
+    # the band prints at the five that hold +0.02286/+0.0127 exactly.
     set_dimension_bilateral_tolerance(
         adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_BAND)
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    tolerance_at_dimension_places(adapter, "PinHoleProfile", "PinHoleDia")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

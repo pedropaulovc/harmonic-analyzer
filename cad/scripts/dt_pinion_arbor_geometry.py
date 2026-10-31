@@ -28,20 +28,23 @@ from pinion_rig_layout import (
     RIG_MARGIN_SPARE,
 )
 
-SHAFT_DIA = 8.0
+# 5/16 in (owner ruling 2026-10-30): the arbor follows the owned .3135 over
+# reamer that cuts its strap and drum bores; 8 mm has no owned reamer.
+SHAFT_DIA = 7.9375
 SHAFT_LEN = 226.25  # unchanged origin-to-back-crown-root station
 # Only the two short lands that run in the MHA-DT-14 strap bores (REAM_SLIDE)
 # carry the running band and the Ra 1.6 finish (U39).  Everything else,
-# the MHA-DT-01 drum bond zone included, is Ø8 -0.01/-0.10: the drum keeps its
-# stock-H7-reamer bore (8.000-8.100), so the guaranteed slide-on clearance
-# comes from this side (min 0.010 at 7.99), and the loosest pair (8.10 on
-# 7.90) stays a 0.20 diametral gap, inside Loctite 638's 0.25.
-SHAFT_DIA_BAND = (-0.010, -0.100)
+# the MHA-DT-01 drum bond zone included, is 5/16 -.0004/-.0038 in: the drum's
+# REAM_SLIDE bore starts at .3135, so the guaranteed slide-on clearance is
+# .0014 in, and the loosest pair (.3140 on .3087) stays a .0053 in diametral
+# gap, inside Loctite 638's 0.25 mm.
+SHAFT_DIA_BAND = (-0.01016, -0.09652)
 # The drum also slides over the back land on its way on from the back crown,
-# so the lands sit 0.01 under 8.00 too (Main ruling): the same 0.02-wide band
-# as ground shafting, shifted down, so it is no harder to turn.  In the
-# MHA-DT-14 REAM_SLIDE bores (8.010-8.025) the running clearance is 0.020-0.055.
-JOURNAL_DIA_BAND = (-0.010, -0.030)
+# so the lands sit .0004 in under 5/16 too (Main ruling): the same .0008-wide
+# band as ground shafting, shifted down, so it is no harder to turn.  In the
+# MHA-DT-14 REAM_SLIDE bores (.3135-.3140) the running clearance is
+# .0014-.0027 in.
+JOURNAL_DIA_BAND = (-0.01016, -0.03048)
 
 # Former handle-body envelope, turned integrally with the arbor.  drawing-guidelines.md rule 17 (walls and webs)
 # (audit W6, 2026-09-23): the Ø6 crossrod hole left 1.50 of wall to each face
@@ -303,7 +306,7 @@ if (
 ):
     raise AssertionError("back journal land runs into the back-crown root")
 
-# The bond zone's Ø8 -0.01/-0.10 is dimensioned on its own flank, from a
+# The bond zone's 5/16 -.0004/-.0038 in is dimensioned on its own flank, from a
 # Top-plane reference sketch like the lands', not off the end-on shaft circle:
 # that circle sits in the neck face on the Front plane, so its witnesses ran
 # along the neck and out through the detail-A fence (run 492a7be5).  The
