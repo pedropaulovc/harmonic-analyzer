@@ -4,10 +4,5 @@ sh-column-clamp-back:
   finish: black enamel; bore + tapped ear holes masked, bare surfaces oiled
   quantity: 3
   tolerance_class: machined_block
+  drawing_unit: in
   process: "machined from solid stock or casting"
-  machinist_exceptions:
-    - id: "RV-01"
-      kind: "minor"
-      where: "the sheet note MIN BACK WALL 1.97"
-      finding: "bore-to-back-face wall below the 2.0 mm target (rules 17, 20)"
-      reason: "1.97 MIN (1.9765) from the bore, on the largest A513 DOM column (25.527) at the loosest 0.30 bore clearance, to the back face at the least printed grip offset and depth, above the unchanged 1.5 floor; 2.0 needs a column of at most 25.48, inside the A513 band (owner-ruled shortfall)"

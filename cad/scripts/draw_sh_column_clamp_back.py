@@ -5,12 +5,13 @@ views, dimension layout and hole callout; sheet/template and export behavior
 lives in ``_drawing_common``.  Dimension import and curation live in
 ``_drawing_dimension_import``.
 
-The sheet runs at 2:1 (the arc is 48 mm ear tip to ear tip); the isometric
-carries an explicit 1:1 override so it stays clear of the title block.  Two
-views in third-angle projection: the top view (the 15 x 48 plan carrying the
-column-relief arc, the bore axis centre-marked 0.5 past the split face) and,
-projected to its right, the split face (the 48 x 16 face the relief opens
-into, turned so its 48 runs up the sheet beside the plan's, with the bore
+The sheet prints decimal inch (the part's ``drawing_unit: in``) and runs at
+2:1 (the arc is 1.890 ear tip to ear tip); the isometric carries an explicit
+1:1 override so it stays clear of the title block.  Two views in third-angle
+projection: the top view (the .590 x 1.890 plan carrying the column-relief
+arc, the bore axis centre-marked .020 past the split face) and, projected to
+its right, the split face (the 1.890 x .630 face the relief opens into,
+turned so its 1.890 runs up the sheet beside the plan's, with the bore
 axis drawn as a centerline the ear-hole stations measure from).  No frames
 and no datums (drawing-guidelines.md rule 5; clamps are not on the
 drawing-simplicity allowlist): the bore axis locates the split face, one side
@@ -52,10 +53,11 @@ from _drawing_dimensions import (
     set_reference_dimensions,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
@@ -63,12 +65,13 @@ from _session import run_build
 import _telemetry
 from sh_column_clamp_back_spec import (
     ARC_HEIGHT,
-    BORE_DIAMETRAL_CLEARANCE,
+    BORE_CLEARANCE_TEXT,
     COLUMN_BORE,
     COLUMN_MATE,
     DEPTH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    EAR_HOLE_CALLOUT_PLACES,
     EAR_HOLE_Z,
     FRONT_ARC_MATE,
     GRIP_OFFSET,
@@ -107,11 +110,6 @@ FACE_CENTER = (0.290, 0.175)
 FACE_VIEW_ANGLE = math.pi / 2.0
 ISO_CENTER = (0.385, 0.205)
 ISO_NOTE_XY = (0.352, 0.180)
-# The stated shortfall (sh_column_clamp_back_spec.DRAWING_NOTES) stands in
-# the open lower-left field, left of the top view's width (0.140) and below
-# it, left of the title block (x 0.216, up to y 0.070), where the fleet's
-# notes stand.
-NOTES_XY = (0.020, 0.070)
 # Ear-height text centre off the face view's centre (sheet m): the bottom-face
 # witness stands ARC_HEIGHT / 2 at 2:1 = 0.016 off it, the widest callout
 # line is ~0.040 wide, so 0.040 leaves ~4 mm between text and witness.
@@ -166,10 +164,7 @@ REFERENCE_DIMENSIONS = ("BoreDia",)
 # prints nothing of an above-callout holding a line break
 # (draw_dt_cone_gear_shaft._printable_above_callouts).
 DIMENSION_CALLOUTS = {
-    "BoreDia": (
-        f"{BORE_DIAMETRAL_CLEARANCE[0]:.4f}-{BORE_DIAMETRAL_CLEARANCE[1]:.4f} "
-        f"DIAMETRAL\nCLEARANCE ON\n{COLUMN_MATE}"
-    ),
+    "BoreDia": f"{BORE_CLEARANCE_TEXT} DIAMETRAL\nCLEARANCE ON\n{COLUMN_MATE}",
     "GripOffset": f"BORE AXIS OUTSIDE\nSPLIT FACE\nGRIP GAP TO {FRONT_ARC_MATE}",
     "EarHole1Z": f"ALIGNS WITH\n{FRONT_ARC_MATE} EARS",
     "EarHoleHeight": f"ALIGNS WITH\n{FRONT_ARC_MATE} EARS",
@@ -187,6 +182,8 @@ _RELIEF_EDGES_MM = tuple((_SPLIT_X, 4.0, s * _RELIEF_EDGE_Z) for s in (1.0, -1.0
 # The relief arc's far point on the top face, where its centre mark picks it.
 _RELIEF_ARC_MM = (-COLUMN_BORE / 2.0, ARC_HEIGHT / 2.0, 0.0)
 HOLE_CALLOUT_XY = (0.320, 0.250)
+# Native Hole Wizard tap drill diameter at the sheet's .XXX (.136).
+HOLE_CALLOUT_PRECISION = {"hw-tapdrldia": EAR_HOLE_CALLOUT_PLACES}
 # A turned view that is off by a sign misplaces every recipe position, so the
 # build proves ear 1's centre lands where _face_xy puts it.
 _PROJECTION_TOL = 0.0005
@@ -267,14 +264,17 @@ async def build(adapter: Any) -> dict[str, str]:
         "Material Specification",
         "Finish",
         "Quantity",
-        "Manufacturing Notes",
         "Isometric View Note",
     )
     read_required_properties(
         adapter.currentModel, ("Revision", "Title", *required), required=required
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -337,15 +337,14 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, face, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the split-face view")
 
-    add_native_hole_callout(
+    ear_taps = add_native_hole_callout(
         adapter,
         face,
         edge_xy=ear_2_rim,
         callout_xy=HOLE_CALLOUT_XY,
         label="ear taps",
     )
-    # sh-column-clamp-back RV-01 (BACK_WALL_NOTE).
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
+    set_hole_callout_precision(ear_taps, HOLE_CALLOUT_PRECISION, label="ear taps")
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(

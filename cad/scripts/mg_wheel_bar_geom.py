@@ -35,11 +35,13 @@ BAR_LENGTH = 234.0  # clamped end 29 past the west column + free end (photo, med
 
 # --- hole stations (local X; the bores run along Z, the front-back axis) --------
 SCREW_HOLE_X = -112.0  # pen-hanger screw hole: 5 mm from the fixed free end
-CLAMP_HOLE_X = (70.5, 105.5)  # clamp-screw holes flanking the column line at +88
+# Clamp-screw holes flanking the column line at +88, on the column clamps'
+# .689 ear stations (_clamp_arc.EAR_HOLE_Z, 17.5006).
+CLAMP_HOLE_X = (70.4994, 105.5006)
 # The print reads every station from the left end (the bar is modelled centred).
 LEFT_END_X = -BAR_LENGTH / 2.0
 HANGER_STATION = SCREW_HOLE_X - LEFT_END_X  # 5.0
-CLAMP_STATIONS = tuple(x - LEFT_END_X for x in CLAMP_HOLE_X)  # (187.5, 222.5)
+CLAMP_STATIONS = tuple(x - LEFT_END_X for x in CLAMP_HOLE_X)  # (187.4994, 222.5006)
 
 # Fixed photographic registration, shared by the bar placement and hanger tap
 # (build_pn_pen_hanger places its strap tap on this machine x).
