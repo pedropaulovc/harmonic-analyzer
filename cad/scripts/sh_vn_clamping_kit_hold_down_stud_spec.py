@@ -45,7 +45,8 @@ from dataclasses import dataclass
 
 import _config
 from _package_units import drawing_unit
-from _printed_tolerance import printed_band_mm, printed_deviations
+from _printed_limits import limits
+from _printed_tolerance import printed_band_mm
 
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
@@ -73,17 +74,15 @@ LENGTH = fasteners.HOLD_DOWN_STUD_LENGTH_MM
 LENGTH_PLACES = 2  # .XX: prints 2.25
 LENGTH_BAND = printed_band_mm(LENGTH_PLACES, unit=UNIT)
 # The mm acceptance limits of the printed nominal and its title-block band.
-LENGTH_LIMITS = tuple(
-    round(LENGTH + deviation, 12)
-    for deviation in printed_deviations(LENGTH, LENGTH_PLACES, unit=UNIT)
-)
+LENGTH_LIMITS = tuple(limits(LENGTH, LENGTH_PLACES, unit=UNIT))
 CLEARANCE_MIN = fasteners.HOLD_DOWN_STUD_CLEARANCE_MIN
 COMPLETE_PROJECTION_PITCHES = fasteners.HOLD_DOWN_STUD_COMPLETE_PROJECTION_PITCHES
 THREAD_PITCH_MM = fasteners.HOLD_DOWN_STUD_PITCH_MM
 MAJOR_DIA = base_bar.HOLD_DOWN_STUD_DIA
 
-# Preserve the installed jig's member description under the shared purchase Number.
-BOM_DESCRIPTION = f"{THREAD} STUD, CUT {inch_text(LENGTH, LENGTH_PLACES)}"
+# Preserve the installed jig's member description under the shared purchase Number;
+# the cut length names its unit because the jig sheet is still millimetre.
+BOM_DESCRIPTION = f"{THREAD} STUD, CUT {inch_text(LENGTH, LENGTH_PLACES)} IN"
 PROCESS = (
     "rework purchased PM 52PCCK-9/16-14mm 1/2-13 x 3 in stud stock: shorten only "
     "unused upper end to drawing length and restore cut-end chamfer; preserve "

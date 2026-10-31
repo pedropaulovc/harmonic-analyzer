@@ -48,6 +48,7 @@ from _feature_requirements import part_metadata, requirement
 from _gtol_cone import ConeFace
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
+from _printed_limits import limits
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import face_silhouettes_through, visible_view_entities
 from _drawing_projection import model_points_in_view
@@ -137,7 +138,10 @@ requirement(
     requirements=("length", "note"),
     fields={
         "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
-        "length": (list(stud.LENGTH_LIMITS), ("LENGTH", "LENGTH_LIMITS")),
+        "length": (
+            limits(stud.LENGTH, stud.LENGTH_PLACES, unit=stud.UNIT),
+            ("LENGTH", "LENGTH_BAND"),
+        ),
         "length_nominal": (stud.LENGTH, ("LENGTH",)),
         "note": (stud.DIMENSION_CALLOUTS["FinishedLength"], ("DIMENSION_CALLOUTS",)),
     },

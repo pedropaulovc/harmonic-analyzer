@@ -1546,8 +1546,9 @@ CLAMPING_KIT_NUMBER = "MHA-SH-VN-57"
 # HD2-HD3 cut the studs to the kit drawing's REWORK sheet, its second.
 STUD_REWORK_SHEET = f"{CLAMPING_KIT_NUMBER} SHEET 2"
 _STUD_LIMITS = (
-    "/".join(f"{limit / 25.4:.2f}" for limit in hold_down_stud.LENGTH_LIMITS)
-    + f" IN ON {STUD_REWORK_SHEET}"
+    f"{hold_down_stud.LENGTH - hold_down_stud.LENGTH_BAND:.{hold_down_stud.LENGTH_PLACES}f}/"
+    f"{hold_down_stud.LENGTH + hold_down_stud.LENGTH_BAND:.{hold_down_stud.LENGTH_PLACES}f} "
+    f"ON {STUD_REWORK_SHEET}"
 )
 HOLD_DOWN_STEPS = (
     "HD1. FOR UNCUT-STOCK OBSTRUCTIONS, ISOLATE THE SPINDLE, SUPPORT THE "
