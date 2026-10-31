@@ -127,7 +127,7 @@ coolant = "cutting oil, brushed on"
 deburr_mm = 0.25
 deburr_cite = "features.toml general_tolerances edge_break R0.25"
 stock_in = "stock"
-note = "Shared shop values include unmeasured #1413 placeholders: this sheet is provisional, not approval to machine. Bar on edge, roughly centred along X, about 140 mm out each side of the vise; seat it with the dead-blow hammer, then re-tighten. The edge you mill here is the ZERO EDGE: every Y on later sheets is measured from it. Write ZERO EDGE on both faces next to it as soon as it is cut. If it sings, take lighter passes."
+note = "Provisional: shared shop values include unmeasured #1413 placeholders; not approval to machine. Bar on edge, about 140 mm out each side of the vise. The edge you mill here is the ZERO EDGE: every Y on later sheets is measured from it. Write ZERO EDGE on both faces next to it as soon as it is cut. If it sings, take lighter passes."
 
 [setups.stock_state]
 top_z = 1.0
@@ -187,7 +187,7 @@ feed_mm_min = 75.0
 approach_mm = 5.0
 stock_removal_bounds = { x = [-1.5, 441.5], y = [-0.35, 12.35], z = [0.0, 1.0] }
 contour = { method = "linear_table", step_mm = 6.0, sweep_frame = "model", sweep_bounds = { x = [-1.5, 441.5], y = [-89.9, -88.9], z = [-0.35, 12.35] } }
-note = "Passes along X with the bottom of the cutter, 0.5 mm per pass, until the whole edge is clean; take as little as you can. Start at 1250 rpm and 75 mm/min."
+note = "Face with the bottom of the cutter until the whole edge is clean; take as little as you can. Feed 75 mm/min."
 note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 20 step 2"]
 
 # ---------------------------------------------------------------------------------------
@@ -201,7 +201,7 @@ coolant = "cutting oil, brushed on"
 deburr_mm = 0.25
 deburr_cite = "features.toml general_tolerances edge_break R0.25"
 stock_in = "E1"
-note = "Zero edge down on the vise floor; wipe the floor first, grip, tap down. Width 139.7: the v47 drawing prints it as STOCK (1/2 x 5-1/2 bar); milling it from 1/2 x 6 is the owner's #2083 ruling and its drawing band is still open. Measure at both ends and in the middle. Do both bars before you go on."
+note = "Width 139.7 follows the owner's #2083 ruling to mill the owned 1/2 x 6 bar; the v47 drawing still prints 139.7 STOCK (1/2 x 5-1/2 bar) with no machined band. Do both bars before you go on."
 
 [setups.stock_state]
 top_z = 151.4
@@ -264,7 +264,6 @@ feed_mm_min = 75.0
 approach_mm = 5.0
 stock_removal_bounds = { x = [-1.5, 441.5], y = [-12.35, 0.35], z = [139.7, 151.4] }
 contour = { method = "linear_table", step_mm = 6.0, sweep_frame = "model", sweep_bounds = { x = [-1.5, 441.5], y = [50.8, 62.5], z = [-0.35, 12.35] } }
-note = "Passes along X, 0.5 to 1 mm a pass, down to Z 139.70; aim for 139.7 wide."
 note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 20 step 4"]
 
 [[setups.ops]]
@@ -272,7 +271,7 @@ op = 20
 do = "inspect"
 feature = "bar_high_side"
 missing_requirements = { width = "calipers-18in" }
-inspection_methods.width = "Calipers across the two long edges at both ends and in the middle; target 139.7. The v47 drawing prints 139.7 STOCK with no machined band (issue #2083 open): record the readings, do not accept or reject on them here."
+inspection_methods.width = "Calipers across the two long edges at both ends and in the middle; target 139.7. No machined band yet (#2083): record the readings, do not accept or reject on them here."
 
 # ---------------------------------------------------------------------------------------
 # T1a/T1b: PM-30MV table, vise off (in the vise the bar top would sit below the jaw tops and
@@ -286,7 +285,7 @@ coolant = "cutting oil, brushed on"
 deburr_mm = 0.25
 deburr_cite = "features.toml general_tolerances edge_break R0.25"
 stock_in = "E2"
-note = "Take the vise off and wipe the table; stone burrs off the table and the bar. One chip under the bar ruins the face. Lay the bar flat along X, ZERO EDGE toward the column. If it rocks, slip paper under the low corner; never clamp it flat over a gap: it springs back after the cut. The mill is CNC-converted: the same zig-zag can run as a CNCjs facing program with the same depths and feeds."
+note = "Take the vise off and wipe the table; stone burrs off the table and the bar. One chip under the bar ruins the face. If the bar rocks, slip paper under the low corner; never clamp it flat over a gap: it springs back after the cut. Optional: the same zig-zag can run as a CNCjs facing program with the same depths and feeds."
 
 [setups.stock_state]
 top_feature = "underside_seat"
@@ -298,13 +297,14 @@ fixture = "pm30mv-table"
 pose = { origin_mm = [220.0, -88.2, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
 clamps = [
   { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-table", restraint = "press", pose = { origin_mm = [1.0, -88.2, 12.7], x = [-1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "left bar end, toe about 15 mm in; stud in the centre T-slot beyond the end, step block a little higher than the bar" },
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-table", restraint = "press", pose = { origin_mm = [439.0, -88.2, 12.7], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "right bar end, toe about 15 mm in; stud in the centre T-slot beyond the end, step block a little higher than the bar" },
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-table", restraint = "press", pose = { origin_mm = [439.0, -88.2, 12.7], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "right bar end, set like C1" },
 ]
 clamp_order = [1, 2]
 fixed_jaw = "not_applicable"
 grip_mm = "not_applicable"
 stop = "none"
-clamp = "AUTHOR'S CHOICE (Desktop traveler Op 30): the bar flat on the table along X, zero edge toward the column, a strap toe on each bar end"
+# Desktop traveler 2026-10-30 Op 30: a strap toe on each bar end.
+clamp = "AUTHOR'S CHOICE: the bar flat on the table along X, zero edge toward the column, a strap toe on each bar end"
 
 [setups.zero.x]
 edge = "left sawn blank end"
@@ -326,7 +326,7 @@ check_jog_mm = 10.0
 face = "top"
 method = "measure_then_set"
 gauge = "micrometers/0-1in"
-measure = "bar thickness with the 0-1 in micrometer at the marked spot: the middle of the bar, X 220, 15 mm in from the zero edge"
+measure = "bar thickness at the marked spot: the middle of the bar, X 220, 15 mm in from the zero edge"
 edge = "the marked spot, flat on the table (not over any paper), at X+220.0 Y-15.0"
 measure_before_hold = true
 offset_mm = 0.0
@@ -352,7 +352,7 @@ feed_mm_min = 85.0
 approach_mm = 5.0
 stock_removal_bounds = { x = [15.5, 424.5], y = [-139.7, 0.0], z = [12.35, 12.7] }
 contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [34.53, 405.47], y = [-88.9, 50.8], z = [-0.35, 0.0] } }
-note = "Feed along X from X 25 to X 415 (cutter centre), never past them: the end straps reach in to X 13.7 and from X 426.3. The 19 mm cutter faces X 15.5 to 424.5; the ends are faced in the next setup."
+note = "Stay between the listed X ends: the end straps reach in to X 13.7 and from X 426.3. The ends are faced in the next setup."
 note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 6 (feeds are the author's choice, not chart values)"]
 
 [[setups.ops]]
@@ -370,7 +370,7 @@ feed_mm_min = 60.0
 approach_mm = 5.0
 stock_removal_bounds = { x = [15.5, 424.5], y = [-139.7, 0.0], z = [12.35, 12.45] }
 contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [34.53, 405.47], y = [-88.9, 50.8], z = [-0.35, 0.0] } }
-note = "Finish pass 0.10 over the clamped middle at 60 mm/min. Stop if you see chatter marks. The finish is checked against the roughness comparator at inspection."
+note = "Finish pass 0.10 over the clamped middle at 60 mm/min. Stop if you see chatter marks."
 note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 8"]
 
 [[setups]]
@@ -381,7 +381,7 @@ coolant = "cutting oil, brushed on"
 deburr_mm = 0.25
 deburr_cite = "features.toml general_tolerances edge_break R0.25"
 stock_in = "T1a"
-note = "Do not move the bar, the knee or the quill lock. Put the two front straps on the faced middle with paper under the toes, then take the end straps off. Check Z on the faced middle (it must read its faced height) and face both ends to the same Z."
+note = "Do not move the bar, the knee or the quill lock. Put the two front straps on the faced middle, then take the end straps off. Check Z on the faced middle (it must read its faced height) and face both ends to the same Z."
 
 [setups.stock_state]
 top_feature = "underside_seat"
@@ -393,13 +393,13 @@ fixture = "pm30mv-table"
 pose = { origin_mm = [220.0, -88.2, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
 clamps = [
   { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-table", restraint = "press", pose = { origin_mm = [150.0, -113.6, 12.35], x = [0.0, -1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "toe on the faced middle at X 150, Y -113.6 (26 mm in from the front edge), paper under the toe; stud in the front T-slot at Y -151.7" },
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-table", restraint = "press", pose = { origin_mm = [290.0, -113.6, 12.35], x = [0.0, -1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "toe on the faced middle at X 290, Y -113.6 (26 mm in from the front edge), paper under the toe; stud in the front T-slot at Y -151.7" },
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-table", restraint = "press", pose = { origin_mm = [290.0, -113.6, 12.35], x = [0.0, -1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "the same as C1, at X 290" },
 ]
 clamp_order = [1, 2]
 fixed_jaw = "not_applicable"
 grip_mm = "not_applicable"
 stop = "none"
-clamp = "AUTHOR'S CHOICE: two straps from the front T-slot onto the faced middle (paper under the toes), placed before the end straps come off; the ends' passes keep clear of them (keep-out circles 72 across centred at X 150 and X 290, Y -133, round each strap toe and nut)"
+clamp = "AUTHOR'S CHOICE: two straps from the front T-slot on the faced middle; the end passes keep clear of them (72 mm keep-out circles round each strap toe and nut)"
 
 [setups.zero.x]
 edge = "left sawn blank end"
@@ -444,7 +444,7 @@ feed_mm_min = 85.0
 approach_mm = 5.0
 stock_removal_bounds = { x = [-1.5, 39.5], y = [-139.7, 0.0], z = [12.35, 12.7] }
 contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [-1.5, 39.5], y = [-88.9, 50.8], z = [-0.35, 0.0] }, keep_out = [{ at = [150.0, 44.1], dia_mm = 72.0 }, { at = [290.0, 44.1], dia_mm = 72.0 }] }
-note = "Left end: passes run along Y at cutter centre X -1.5, 12.17, 25.84 and 39.5 (the last overlaps the faced middle at the same Z). The front straps sit at X 150 and X 290, over 85 mm away."
+note = "Left end; the last pass overlaps the faced middle at the same Z. Both end passes stay over 85 mm from the front straps."
 note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 7"]
 
 [[setups.ops]]
@@ -463,7 +463,7 @@ feed_mm_min = 85.0
 approach_mm = 5.0
 stock_removal_bounds = { x = [400.5, 441.5], y = [-139.7, 0.0], z = [12.35, 12.7] }
 contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [400.5, 441.5], y = [-88.9, 50.8], z = [-0.35, 0.0] }, keep_out = [{ at = [150.0, 44.1], dia_mm = 72.0 }, { at = [290.0, 44.1], dia_mm = 72.0 }] }
-note = "Right end: passes run along Y at cutter centre X 400.5 to 441.5 (the first overlaps the faced middle at the same Z). The front straps sit at X 150 and X 290, over 85 mm away."
+note = "Right end; the first pass overlaps the faced middle at the same Z."
 note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 7"]
 
 [[setups.ops]]
@@ -514,7 +514,7 @@ coolant = "cutting oil, brushed on"
 deburr_mm = 0.25
 deburr_cite = "features.toml general_tolerances edge_break R0.25"
 stock_in = "T1b"
-note = "Flip the bar end for end, faced side down; wipe the table and the faced side. ZERO EDGE still toward the column. Snug the straps; do not crush the bar. The mill is CNC-converted: the same zig-zag can run as a CNCjs facing program with the same depths and feeds."
+note = "Flip the bar end for end, faced side down; wipe the table and the faced side. Snug the straps; do not crush the bar."
 
 [setups.stock_state]
 top_feature = "top_seat"
@@ -527,13 +527,14 @@ fixture = "pm30mv-table"
 pose = { origin_mm = [220.0, -88.2, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
 clamps = [
   { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-table", restraint = "press", pose = { origin_mm = [1.0, -88.2, 12.35], x = [-1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "left bar end, toe about 15 mm in; stud in the centre T-slot beyond the end, step block a little higher than the bar" },
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-table", restraint = "press", pose = { origin_mm = [439.0, -88.2, 12.35], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "right bar end, toe about 15 mm in; stud in the centre T-slot beyond the end, step block a little higher than the bar" },
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-table", restraint = "press", pose = { origin_mm = [439.0, -88.2, 12.35], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "right bar end, set like C1" },
 ]
 clamp_order = [1, 2]
 fixed_jaw = "not_applicable"
 grip_mm = "not_applicable"
 stop = "none"
-clamp = "AUTHOR'S CHOICE (Desktop traveler Op 30): the bar flat on the table along X, zero edge toward the column, a strap toe on each bar end"
+# Desktop traveler 2026-10-30 Op 30: a strap toe on each bar end.
+clamp = "AUTHOR'S CHOICE: the bar flat on the table along X, zero edge toward the column, a strap toe on each bar end"
 
 [setups.zero.x]
 edge = "left sawn end (the far end, turned round)"
@@ -555,7 +556,7 @@ check_jog_mm = 10.0
 face = "top"
 method = "measure_then_set"
 gauge = "micrometers/0-1in"
-measure = "bar thickness with the 0-1 in micrometer at the marked spot: the middle of the bar, X 220, 15 mm in from the zero edge"
+measure = "bar thickness at the marked spot: the middle of the bar, X 220, 15 mm in from the zero edge"
 edge = "the marked spot, flat on the table (not over any paper), at X+220.0 Y-15.0"
 measure_before_hold = true
 offset_mm = 0.0
@@ -581,7 +582,7 @@ feed_mm_min = 85.0
 approach_mm = 5.0
 stock_removal_bounds = { x = [15.5, 424.5], y = [-139.7, 0.0], z = [12.0, 12.35] }
 contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [34.53, 405.47], y = [-88.9, 50.8], z = [12.0, 12.35] } }
-note = "Feed along X from X 25 to X 415 (cutter centre), never past them: the end straps reach in to X 13.7 and from X 426.3. The 19 mm cutter faces X 15.5 to 424.5; the ends are faced in the next setup."
+note = "Stay between the listed X ends: the end straps reach in to X 13.7 and from X 426.3. The ends are faced in the next setup."
 note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 6 (feeds are the author's choice, not chart values)"]
 
 [[setups.ops]]
@@ -599,7 +600,7 @@ feed_mm_min = 60.0
 approach_mm = 5.0
 stock_removal_bounds = { x = [15.5, 424.5], y = [-139.7, 0.0], z = [12.0, 12.1] }
 contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [34.53, 405.47], y = [-88.9, 50.8], z = [12.0, 12.35] } }
-note = "Finish pass 0.10 down to Z 12.00 over the clamped middle; the drawing's band is 11.2 to 12.8 thick. Stop if you see chatter marks. The finish is checked against the roughness comparator at inspection."
+note = "Finish pass 0.10 down to Z 12.00 over the clamped middle (drawing band 11.2 to 12.8 thick). Stop if you see chatter marks."
 note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 8"]
 
 [[setups]]
@@ -610,7 +611,7 @@ coolant = "cutting oil, brushed on"
 deburr_mm = 0.25
 deburr_cite = "features.toml general_tolerances edge_break R0.25"
 stock_in = "T2a"
-note = "Do not move the bar, the knee or the quill lock. Put the two front straps on the faced middle with paper under the toes, then take the end straps off. Check Z on the faced middle (it must read its faced height) and face both ends to the same Z."
+note = "Do not move the bar, the knee or the quill lock. Put the two front straps on the faced middle, then take the end straps off. Check Z on the faced middle (it must read its faced height) and face both ends to the same Z."
 
 [setups.stock_state]
 top_feature = "top_seat"
@@ -623,13 +624,13 @@ fixture = "pm30mv-table"
 pose = { origin_mm = [220.0, -88.2, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
 clamps = [
   { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-table", restraint = "press", pose = { origin_mm = [150.0, -113.6, 12.0], x = [0.0, -1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "toe on the faced middle at X 150, Y -113.6 (26 mm in from the front edge), paper under the toe; stud in the front T-slot at Y -151.7" },
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-table", restraint = "press", pose = { origin_mm = [290.0, -113.6, 12.0], x = [0.0, -1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "toe on the faced middle at X 290, Y -113.6 (26 mm in from the front edge), paper under the toe; stud in the front T-slot at Y -151.7" },
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-table", restraint = "press", pose = { origin_mm = [290.0, -113.6, 12.0], x = [0.0, -1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "the same as C1, at X 290" },
 ]
 clamp_order = [1, 2]
 fixed_jaw = "not_applicable"
 grip_mm = "not_applicable"
 stop = "none"
-clamp = "AUTHOR'S CHOICE: two straps from the front T-slot onto the faced middle (paper under the toes), placed before the end straps come off; the ends' passes keep clear of them (keep-out circles 72 across centred at X 150 and X 290, Y -133, round each strap toe and nut)"
+clamp = "AUTHOR'S CHOICE: two straps from the front T-slot on the faced middle; the end passes keep clear of them (72 mm keep-out circles round each strap toe and nut)"
 
 [setups.zero.x]
 edge = "left sawn end (the far end, turned round)"
@@ -674,7 +675,7 @@ feed_mm_min = 85.0
 approach_mm = 5.0
 stock_removal_bounds = { x = [-1.5, 39.5], y = [-139.7, 0.0], z = [12.0, 12.35] }
 contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [400.5, 441.5], y = [-88.9, 50.8], z = [12.0, 12.35] }, keep_out = [{ at = [150.0, 44.1], dia_mm = 72.0 }, { at = [290.0, 44.1], dia_mm = 72.0 }] }
-note = "Left end: passes run along Y at cutter centre X -1.5, 12.17, 25.84 and 39.5 (the last overlaps the faced middle at the same Z). The front straps sit at X 150 and X 290, over 85 mm away."
+note = "Left end; the last pass overlaps the faced middle at the same Z. Both end passes stay over 85 mm from the front straps."
 note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 7"]
 
 [[setups.ops]]
@@ -693,7 +694,7 @@ feed_mm_min = 85.0
 approach_mm = 5.0
 stock_removal_bounds = { x = [400.5, 441.5], y = [-139.7, 0.0], z = [12.0, 12.35] }
 contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [-1.5, 39.5], y = [-88.9, 50.8], z = [12.0, 12.35] }, keep_out = [{ at = [150.0, 44.1], dia_mm = 72.0 }, { at = [290.0, 44.1], dia_mm = 72.0 }] }
-note = "Right end: passes run along Y at cutter centre X 400.5 to 441.5 (the first overlaps the faced middle at the same Z). The front straps sit at X 150 and X 290, over 85 mm away."
+note = "Right end; the first pass overlaps the faced middle at the same Z."
 note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 7"]
 
 [[setups.ops]]
@@ -745,7 +746,7 @@ coolant = "cutting oil, brushed on"
 deburr_mm = 0.25
 deburr_cite = "features.toml general_tolerances edge_break R0.25"
 stock_in = "T2b"
-note = "Before loading, write ZERO END on one end and C'BORE SIDE - UP IN VISE on one big face; both faces are the same, so pick either. The face on top becomes the bottom of bar 1: the counterbores go in it, so every hole is made in one setup. Check the DRO: moving the spindle right X counts up; moving it toward you Y counts down (every Y on this sheet is negative). The bar hangs about 140 mm out of the vise at each end: don't lean on the ends."
+note = "Before loading, write ZERO END on one end and C'BORE SIDE - UP IN VISE on one big face (both faces are the same; pick either). The face on top becomes the bottom of bar 1: the counterbores go in it, so every hole is made in one setup. Check the DRO: X counts up to the right, Y counts down toward you (every Y on this sheet is negative). Don't lean on the overhanging ends."
 
 [setups.stock_state]
 top_feature = "underside_seat"
@@ -847,7 +848,7 @@ feed_mm_min = 75.0
 approach_mm = 5.0
 stock_removal_bounds = { x = [-1.5, 0.0], y = [-139.7, 0.0], z = [-13.0, 0.0] }
 contour = { method = "linear_table", step_mm = 0.5, sweep_frame = "model", sweep_bounds = { x = [-1.5, 0.0], y = [-88.9, 50.8], z = [0.0, 12.0] }, open_side = "-x" }
-note = "Spindle off, lower the cutter to 1 mm below the bar beside the left end and lock the head. From left of the end, move in 0.5 in X and feed toward you across the end; repeat until the whole end is clean. The blank is at least 443 long (stock prerequisite): this takes the end back 1.5 to X 0, and the far end keeps at least 1.5 to clean up when it is cut to 440."
+note = "Spindle off: lower the cutter beside the left end to 1 mm below the bar and lock the head. Feed toward you across the end, stepping in 0.5 in X, until the whole end is clean."
 note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A3"]
 
 [[setups]]
@@ -914,8 +915,8 @@ parallels_centres_mm = [[220.0, -1.5875], [220.0, -138.1125]]
 jaw_center_along_mm = 220.0
 grip_mm = 12.0
 jaw_above_parallels_mm = 19.545
-stop = "none; bar centred along X by eye, about 140 mm out each side"
-clamp = "on the two 1 in parallels, one against each jaw; zero edge on the fixed jaw; tighten, tap down with the dead-blow hammer, re-tighten until neither parallel slides"
+stop = "none; as A0"
+clamp = "as A0, not undone: on the two 1 in parallels, zero edge on the fixed jaw"
 align = { indicator = "dti", face = "fixed jaw", over_mm = 100.0, limit_mm = 0.02, cite = "Desktop traveler 2026-10-30 Op 30 step 11: put the vise back and indicate the fixed jaw under 0.02 mm along X, as on 2026-10-29" }
 
 [setups.zero.x]
@@ -960,7 +961,7 @@ feed_mm_min = 75.0
 approach_mm = 5.0
 stock_removal_bounds = { x = [440.0, 441.5], y = [-139.7, 0.0], z = [-13.0, 0.0] }
 contour = { method = "linear_table", step_mm = 0.5, sweep_frame = "model", sweep_bounds = { x = [440.0, 441.5], y = [-88.9, 50.8], z = [0.0, 12.0] }, open_side = "+x" }
-note = "Measure the end mill across its cutting edges (D, normally 12.70). Last pass at X = 440.00 + D/2 (X 446.35 for D 12.70), 0.5 mm passes feeding away from you. Length 439.2 to 440.8."
+note = "Measure the end mill across its cutting edges (D, normally 12.70). Last pass at X = 440.00 + D/2 (X 446.35 for D 12.70)."
 note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A5"]
 
 [[setups.ops]]
@@ -1519,7 +1520,7 @@ coolant = "none"
 deburr_mm = 0.25
 deburr_cite = "features.toml general_tolerances edge_break R0.25"
 stock_in = "A"
-note = "Shared shop values include unmeasured #1413 placeholders: these checks do not make the bar approved for use. Outside a range, don't use the bar until someone has looked at it. Then make the second bar exactly the same way. Don't mirror it: in the jig bar 2 is simply turned over."
+note = "Provisional (#1413 shop placeholders): these checks do not approve the bar for use. Outside a range, don't use the bar until someone has looked at it. Then make the second bar exactly the same way. Don't mirror it: in the jig bar 2 is simply turned over."
 
 [setups.stock_state]
 top_z = 12.0
