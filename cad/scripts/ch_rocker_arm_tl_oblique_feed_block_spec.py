@@ -5,35 +5,51 @@ on the -X lug face with its long body proud; all coordinates are block-local.
 The nut face's print locates the nut axis from the lug end and the bottom
 face, and the four taps from that axis (``NutPatternReference``), so the
 pattern holds to the spigot recess it surrounds.
+
+Issue #290: the sheet prints decimal inch. The lug outline, the recess and the
+screw clearance sit on the inch grid; the Tr8 nut's interface does not: its
+Ø16 PCD, Ø10.2 spigot and 1.5 spigot length are the vendor's, and the nut
+axis closes on the leadscrew's (``NUT_AXIS_Y`` from its lateral,
+``NUT_AXIS_Z`` = its height over the carriage top).
 """
 from __future__ import annotations
 import math
+import _config
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as lead
 from _hole_spec import HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
+from _inch_wall_limits import WALL_FLOOR_MM
+from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
 
 PART_NAME = "ch-rocker-arm-tl-oblique-feed-block"
+UNIT = drawing_unit(f"parts/{PART_NAME}", _config.parts(PART_NAME))
 NUMBER = "MHA-CH-06-TL-32"
 QUANTITY = 1
 BLOCK_X0, BLOCK_X1 = pivot.BLOCK_X0, pivot.BLOCK_X1
 BLOCK_LENGTH, BLOCK_WIDTH, BLOCK_HEIGHT = pivot.BLOCK_LENGTH, pivot.BLOCK_WIDTH, pivot.BLOCK_HEIGHT
-LUG_X0, LUG_X1 = -9.25, 9.25
-LUG_Y0, LUG_Y1 = -68.0, -20.0
-LUG_WIDTH, LUG_LENGTH = LUG_X1 - LUG_X0, LUG_Y1 - LUG_Y0
+PLAN_LUG_X = 32.766  # 1.29, the lug's -X face from the block's -X edge
+LUG_WIDTH = 18.542  # .73
+PLAN_OVERALL_Y = 88.138  # 3.47, +Y edge to the lug end
+LUG_X0 = BLOCK_X0 + PLAN_LUG_X
+LUG_X1 = LUG_X0 + LUG_WIDTH
+LUG_Y1 = -BLOCK_WIDTH / 2
+LUG_Y0 = BLOCK_WIDTH / 2 - PLAN_OVERALL_Y
+LUG_LENGTH = LUG_Y1 - LUG_Y0
 NUT_FACE_X = LUG_X0
-NUT_AXIS_Y, NUT_AXIS_Z = -55.0, 12.4
-NUT_SPIGOT_DEPTH = 1.5
-NUT_SEAT_DIA = 10.5
-SCREW_CLEARANCE_DIA = 8.5
-NUT_PCD = 16.0
+NUT_AXIS_Y = -lead.SCREW_LATERAL
+NUT_AXIS_Z = 12.4  # the leadscrew axis over the carriage top (checked below)
+NUT_SPIGOT_DEPTH = lead.NUT_BODY_SHORT  # the bought nut's 1.5 spigot
+NUT_SEAT_DIA = 10.668  # .42, clears the Ø10.2 spigot
+SCREW_CLEARANCE_DIA = 8.636  # .34, clears the Tr8 major
+NUT_PCD = lead.NUT_HOLE_PCD  # the bought nut's Ø16
 NUT_PATTERN_ANGLE = 45.0
 NUT_HOLE_OFFSET = NUT_PCD / (2 * math.sqrt(2))
 NUT_HOLES_YZ = tuple((NUT_AXIS_Y + dy * NUT_HOLE_OFFSET, NUT_AXIS_Z + dz * NUT_HOLE_OFFSET)
                      for dy in (-1, 1) for dz in (-1, 1))
-SCREW_TAP_DEPTH = 10.0
-NUT_TAP_DRILL_DEPTH = 12.0
+SCREW_TAP_DEPTH = lead.NUT_SCREW_TAP_DEPTH
+NUT_TAP_DRILL_DEPTH = 11.9888  # .472
 NUT_TAP_DRILL = TAP_DRILL_MM["#4-40"]
 NUT_TAP_SPEC = HoleSpec("tapped", "#4-40", end="blind", depth_mm=NUT_TAP_DRILL_DEPTH,
                         overrides_mm={"ThreadDepth": SCREW_TAP_DEPTH})
@@ -58,11 +74,12 @@ DRAWING_DIMENSIONS = dict(pivot.DRAWING_DIMENSIONS) | {
     "NutClearanceProfile": ("NutClearanceDia",),
     "NutPatternReference": NUT_PATTERN_PRINTED,
 }
+# The nut axis and its pattern are the bought nut's interface: three places.
 NUT_PATTERN_PLACES = 3
 NUT_SEAT_PLACES = 2
 DRAWING_PRECISION = dict(pivot.DRAWING_PRECISION) | {
     feature: {
-        name: (3 if name in pivot.THREE_PLACE_DIMENSIONS or name.startswith("NutTap") else 2)
+        name: (3 if name in pivot.THREE_PLACE_DIMENSIONS or feature == "NutPatternReference" else 2)
         for name in DRAWING_DIMENSIONS[feature]
     }
     for feature in (PLAN_DATUM_REFERENCE, "LugProfile", "NutSeatProfile", "NutClearanceProfile", "NutPatternReference")
@@ -71,26 +88,40 @@ DRAWING_PRECISION_BY_NAME = {
     name: places for dimensions in DRAWING_PRECISION.values()
     for name, places in dimensions.items()
 }
-assert DRAWING_PRECISION_BY_NAME["NutTap3Z"] == NUT_PATTERN_PLACES
+assert DRAWING_PRECISION_BY_NAME["NutTap3Z"] == DRAWING_PRECISION_BY_NAME["NutCentreY"] == NUT_PATTERN_PLACES
 assert DRAWING_PRECISION_BY_NAME["NutSeatDia"] == NUT_SEAT_PLACES
+# The #4-40 taps' Hole Wizard callout prints its drill and depths at three places.
+NUT_TAP_CALLOUT_PRECISION = dict.fromkeys(("hw-tapdrldia", "hw-tapdrldepth", "hw-threaddepth"), 3)
+
+
+def _inch_text(value_in: float, places: int) -> str:
+    """An inch length as the sheet prints it: ``.059``."""
+    return f"{value_in:.{places}f}".removeprefix("0")
+
+
 # Rule 17 shortfall, stated on the sheet (rule 20): the Ø16 PCD is the bought
-# nut's, so a #4-40 major sits 1.33 from the Ø10.50 spigot recess at nominal;
-# no recess that still clears the Ø10.2 spigot reaches the 1.5 floor. Worst
+# nut's, so a #4-40 major sits close to the spigot recess at nominal; no
+# recess that still clears the Ø10.2 spigot reaches the .060 floor. Worst
 # case: the recess at its upper .XX limit, each tap off the axis by its .XXX
 # band in both Y and Z.
 NUT_TAP_MAJOR = THREAD_MAJOR_MM["#4-40"]
+_PATTERN_BAND = printed_band_mm(NUT_PATTERN_PLACES, unit=UNIT)
 NUT_SEAT_WALL_NOMINAL = NUT_PCD / 2 - NUT_SEAT_DIA / 2 - NUT_TAP_MAJOR / 2
 NUT_SEAT_WALL_MIN = (
     NUT_PCD / 2
-    - math.hypot(printed_band_mm(NUT_PATTERN_PLACES), printed_band_mm(NUT_PATTERN_PLACES))
-    - (NUT_SEAT_DIA + printed_band_mm(NUT_SEAT_PLACES)) / 2
+    - math.hypot(_PATTERN_BAND, _PATTERN_BAND)
+    - (NUT_SEAT_DIA + printed_band_mm(NUT_SEAT_PLACES, unit=UNIT)) / 2
     - NUT_TAP_MAJOR / 2
 )
-NUT_SEAT_WALL_TEXT = f"WALL {math.floor(NUT_SEAT_WALL_MIN * 100) / 100:.2f} MIN TO 4-40 TAPS"
-assert 0.0 < NUT_SEAT_WALL_MIN < NUT_SEAT_WALL_NOMINAL < 1.5
-assert NUT_PCD / 2 - lead.NUT_BODY_DIA / 2 - NUT_TAP_MAJOR / 2 < 1.5
+# A MIN printed to .XXX never overstates the worst case.
+NUT_SEAT_WALL_TEXT = f"WALL {_inch_text(math.floor(NUT_SEAT_WALL_MIN / 25.4 * 1000) / 1000, 3)} MIN TO 4-40 TAPS"
+assert 0.0 < NUT_SEAT_WALL_MIN < NUT_SEAT_WALL_NOMINAL < WALL_FLOOR_MM
+assert NUT_PCD / 2 - lead.NUT_BODY_DIA / 2 - NUT_TAP_MAJOR / 2 < WALL_FLOOR_MM
+# The recess clears the bought spigot at its least size; the bore clears the screw.
+assert NUT_SEAT_DIA - printed_band_mm(NUT_SEAT_PLACES, unit=UNIT) > lead.NUT_BODY_DIA
+assert SCREW_CLEARANCE_DIA - printed_band_mm(2, unit=UNIT) > lead.SCREW_MAJOR_DIA
 CALLOUTS_SUFFIX = dict(pivot.CALLOUTS_SUFFIX) | {
-    "NutSeatDia": f" <HOLE-DEPTH> {NUT_SPIGOT_DEPTH:.2f}",
+    "NutSeatDia": f" <HOLE-DEPTH> {_inch_text(NUT_SPIGOT_DEPTH / 25.4, 3)}",
 }
 CALLOUTS_ABOVE = dict(pivot.CALLOUTS_ABOVE) | {"NutClearanceDia": "DRILL THRU"}
 CALLOUTS_BELOW = dict(pivot.CALLOUTS_BELOW) | {
@@ -104,7 +135,10 @@ REFERENCE_SKETCHES = pivot.REFERENCE_SKETCHES + ("NutPatternReference",)
 assert NUT_AXIS_Z - lead.NUT_FLANGE_DIA / 2 >= 0
 assert NUT_AXIS_Z + lead.NUT_FLANGE_DIA / 2 <= BLOCK_HEIGHT
 assert -NUT_AXIS_Y + lead.NUT_FLANGE_DIA / 2 + 2 <= -LUG_Y0
+assert LUG_Y0 < min(y for y, _z in NUT_HOLES_YZ) and max(y for y, _z in NUT_HOLES_YZ) < LUG_Y1
+assert BLOCK_WIDTH / 2 - LUG_Y0 < pivot.STOCK_WIDTH
 assert abs(NUT_MACHINE_Z - lead.SCREW_AXIS_Z) < 1e-6
+assert NUT_FACE_X + SCREW_TAP_DEPTH < LUG_X1
 assert NUT_TAP_DRILL_DEPTH + NUT_TAP_DRILL / 2 * 0.60086 < LUG_WIDTH
 # Travel-end clearance includes the proud purchased nut, not only the lug.
 for _box in lead.KP08_BOXES.values():

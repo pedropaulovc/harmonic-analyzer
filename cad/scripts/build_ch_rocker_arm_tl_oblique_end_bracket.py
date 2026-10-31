@@ -1,6 +1,6 @@
 r"""Build the oblique-trammel jig's end bracket (MHA-CH-06-TL-28; shop fixture).
 
-A 6061-T6511 1/2 x 1 in flat on edge, 68.9 long, two off: each carries one of the
+A 6061-T6511 1/2 x 1 in flat on edge, 2.71 long, two off: each carries one of the
 leadscrew feed's KP08 pillow blocks on base bar 1's top
 (``ch_rocker_arm_tl_oblique_end_bracket_spec``).
 
@@ -8,7 +8,7 @@ Layout (the spec's model frame, +Z up): ONE Front-plane rectangle from the
 inner end face (model x 0) about the mid-width line, extruded +Z by the stock
 thickness; the four #8-32 UNC base-bar taps and the two #6-32 UNC KP08 taps are
 two native Hole Wizard features tapped THRU from the top face on the row y 0.
-The row's printed station (6.35 from the -Y side face) lives on a hidden
+The row's printed station (.250 from the -Y side face) lives on a hidden
 reference sketch, ``HoleRowReference`` (build_ch_rocker_arm_tl_oblique_base_bar's
 ``RailRowReference``).
 
@@ -32,9 +32,11 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _holes import wizard_holes
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
@@ -105,6 +107,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # The mm suffix is load-bearing: the equation manager reads bare numbers
     # in document units.
@@ -225,7 +229,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Every model edit -- material, marked set, model-owned places -- precedes
     # the save. No model band: the stations and row print at three places, so
-    # the title block's ±0.13 governs them (spec module docstring).
+    # the title block's ±.005 governs them (spec module docstring).
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)

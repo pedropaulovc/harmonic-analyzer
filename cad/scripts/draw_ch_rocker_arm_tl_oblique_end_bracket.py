@@ -1,6 +1,6 @@
 r"""Create the drawing for the oblique-trammel jig's end bracket (MHA-CH-06-TL-28).
 
-One part, two off (the title block's quantity). A 68.9 x 12.7 x 25.4 flat at
+One part, two off (the title block's quantity). A 2.71 x 1/2 x 1 in flat at
 2:1: the plan (the *Front view, looking down on the top face) carries the
 six tap stations from the inner end and the length, all stacked below it,
 the row's station from the -Y side face (left), the stock width (right) and
@@ -24,6 +24,7 @@ from typing import Any
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
     view_name,
 )
@@ -39,12 +40,13 @@ from _drawing_common import (
 )
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -53,6 +55,8 @@ from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _printed_limits import limits
+from _printed_tolerance import printed_deviations
+from _supplier_dimensions import supplier_reference_dimension
 from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     BAR_MATE_CALLOUT,
     BAR_TAP_DRILL,
@@ -60,6 +64,7 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     BAR_TAP_X,
     BRACKET_LENGTH,
     BRACKET_THICK,
+    BRACKET_WIDTH,
     CALLOUTS_BELOW,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -70,6 +75,10 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     KP08_TAP_SPEC,
     KP08_TAP_X,
     ROW_CALLOUT,
+    STOCK_CALLOUT,
+    STOCK_FRACTION_DENOMINATORS,
+    TAP_CALLOUT_PLACES,
+    TAP_CALLOUT_PRECISION,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -140,10 +149,10 @@ def text_half_high(rows: int) -> float:
 
 # A two-line block's far edge from its own line, plus the gap to the next.
 MATE_LANE = TWO_LINE_DROP + text_half_high(2) + TEXT_GAP
-# c4-r3: the row's 9.525 dimension line ran 6.35 sheet mm past the -Y side.
+# c4-r3: the row's station dimension line ran 6.35 sheet mm past the -Y side.
 ROW_TAIL = 6.35 / _S
 # The dimension lines below the plan, nearest first, shortest span nearest:
-# the first block clears the 9.525's line tail, each next one the line
+# the first block clears the row station's line tail, each next one the line
 # above it; the length's one-line block clears the last station's line.
 STATION_ORDER = (
     "BarTap1X",
@@ -166,7 +175,7 @@ def plan_sheet(x: float, y: float) -> tuple[float, float]:
     )
 
 
-_ROW_TEXT = "\n".join((f"{HOLE_ROW_Y:.3f}", ROW_CALLOUT))
+_ROW_TEXT = "\n".join((f"{HOLE_ROW_Y / 25.4:.3f}".lstrip("0"), ROW_CALLOUT))
 _ROW_ROWS = _ROW_TEXT.count("\n") + 1
 
 
@@ -216,8 +225,8 @@ END_KEEP: dict[str, tuple[float, float, float]] = {
 # the tap kind, its X, the text block's centre (model X, Y) and the side (-1
 # left, +1 right) whose upper rim the edge pick takes.
 TAP_DRILLS = {"bar": BAR_TAP_DRILL, "kp08": KP08_TAP_DRILL}
-# Each callout's two rows, about this wide (glyphs): "Ø3.45 THRU ALL" /
-# "8-32 UNC THRU ALL" and "Ø2.71 THRU ALL" / "6-32 UNC THRU ALL".
+# Each callout's two rows, about this wide (glyphs): "Ø.136 THRU ALL" /
+# "8-32 UNC THRU ALL" and "Ø.107 THRU ALL" / "6-32 UNC THRU ALL".
 CALLOUT_GLYPHS = {"bar": 17, "kp08": 17}
 _TIER_PITCH = 2.0 * text_half_high(2) + STACK_PITCH + 0.1  # 7.46
 TAP_TIERS = tuple(
@@ -258,6 +267,26 @@ part_metadata(
 
 _INTO_BRACKET = ([0.0, 0.0, -1.0], ("__frame__",))
 _PLACES = part_spec.HOLE_PLACES
+_UNIT = part_spec.UNIT
+
+
+def _limits(model: float, places: int) -> list[float]:
+    """A general-band dimension's acceptance limits on the inch sheet: the
+    title block's band about the value printed at ``places``."""
+    low, high = printed_deviations(model, places, unit=_UNIT)
+    return limits(model, places, (high, low))
+
+
+def _stock_limits(model: float, band: float) -> list[float]:
+    """An as-bought size's supplier band about its nominal."""
+    return limits(model, part_spec.STOCK_PLACES, (band, -band))
+
+
+def _printed(model: float, places: int) -> float:
+    """The millimetres of ``model`` printed at ``places`` inch decimals."""
+    return round(round(model / 25.4, places) * 25.4, 9)
+
+
 _FROM_LOW_SIDE = (
     "bracket_low_side",
     (("draw_ch_rocker_arm_tl_oblique_end_bracket", "build"),),
@@ -273,18 +302,18 @@ requirement(
         "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
         "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
         "thickness": (
-            limits(part_spec.BRACKET_THICK, part_spec.STOCK_PLACES),
-            ("BRACKET_THICK", "STOCK_PLACES"),
+            _stock_limits(part_spec.BRACKET_THICK, part_spec.THICK_STOCK_BAND),
+            ("BRACKET_THICK", "THICK_STOCK_BAND"),
         ),
         "thickness_nominal": (part_spec.BRACKET_THICK, ("BRACKET_THICK",)),
         "length": (
-            limits(part_spec.BRACKET_LENGTH, part_spec.LENGTH_PLACES),
+            _limits(part_spec.BRACKET_LENGTH, part_spec.LENGTH_PLACES),
             ("BRACKET_LENGTH", "LENGTH_PLACES"),
         ),
         "length_nominal": (part_spec.BRACKET_LENGTH, ("BRACKET_LENGTH",)),
         "width": (
-            limits(part_spec.BRACKET_WIDTH, part_spec.STOCK_PLACES),
-            ("BRACKET_WIDTH", "STOCK_PLACES"),
+            _stock_limits(part_spec.BRACKET_WIDTH, part_spec.WIDTH_STOCK_BAND),
+            ("BRACKET_WIDTH", "WIDTH_STOCK_BAND"),
         ),
         "width_nominal": (part_spec.BRACKET_WIDTH, ("BRACKET_WIDTH",)),
     },
@@ -314,7 +343,7 @@ requirement(
 def _row_fields() -> dict[str, tuple[Any, tuple[Any, ...]]]:
     return {
         "height": (
-            limits(part_spec.HOLE_ROW_Y, _PLACES),
+            _limits(part_spec.HOLE_ROW_Y, _PLACES),
             ("HOLE_ROW_Y", "HOLE_PLACES"),
         ),
         "height_nominal": (part_spec.HOLE_ROW_Y, ("HOLE_ROW_Y",)),
@@ -323,7 +352,7 @@ def _row_fields() -> dict[str, tuple[Any, tuple[Any, ...]]]:
 
 
 for _index, _x in enumerate(part_spec.BAR_TAP_X, start=1):
-    _drill = round(part_spec.BAR_TAP_DRILL, 2)
+    _drill = _printed(part_spec.BAR_TAP_DRILL, TAP_CALLOUT_PLACES)
     requirement(
         f"bar_tap_{_index}",
         kind="hole",
@@ -337,16 +366,16 @@ for _index, _x in enumerate(part_spec.BAR_TAP_X, start=1):
                 ("BAR_TAP_SPEC", "BAR_SCREW"),
             ),
             "tap_drill_mm": (part_spec.BAR_TAP_DRILL, ("BAR_TAP_SPEC",)),
-            # The native callout prints the tap drill to two places (3.45).
+            # The native callout prints the tap drill to three places (.136).
             "dia": (
-                limits(_drill, 2, part_spec.DRILLED_BAND),
+                limits(_drill, TAP_CALLOUT_PLACES, part_spec.DRILLED_BAND),
                 ("BAR_TAP_DRILL", "DRILLED_BAND"),
             ),
             "nominal_dia": (_drill, ("BAR_TAP_DRILL",)),
             "thru": (True, ("BAR_TAP_SPEC",)),
             # A DRO absolute from the inner end: base bar 1's bracket holes.
             "station": (
-                limits(_x, _PLACES),
+                _limits(_x, _PLACES),
                 (
                     "BAR_TAP_X",
                     "HOLE_PLACES",
@@ -360,11 +389,11 @@ for _index, _x in enumerate(part_spec.BAR_TAP_X, start=1):
                 ("BAR_MATE_CALLOUT", "BAR_PATTERN_ALLOWANCE", "POSITION_RADIUS"),
             ),
         },
-        precision={"dia": 2, "station": _PLACES, "height": _PLACES},
+        precision={"dia": TAP_CALLOUT_PLACES, "station": _PLACES, "height": _PLACES},
     )
 
 for _index, _x in enumerate(part_spec.KP08_TAP_X, start=1):
-    _drill = round(part_spec.KP08_TAP_DRILL, 2)
+    _drill = _printed(part_spec.KP08_TAP_DRILL, TAP_CALLOUT_PLACES)
     requirement(
         f"kp08_tap_{_index}",
         kind="hole",
@@ -379,14 +408,14 @@ for _index, _x in enumerate(part_spec.KP08_TAP_X, start=1):
             ),
             "tap_drill_mm": (part_spec.KP08_TAP_DRILL, ("KP08_TAP_SPEC",)),
             "dia": (
-                limits(_drill, 2, part_spec.DRILLED_BAND),
+                limits(_drill, TAP_CALLOUT_PLACES, part_spec.DRILLED_BAND),
                 ("KP08_TAP_DRILL", "DRILLED_BAND"),
             ),
             "nominal_dia": (_drill, ("KP08_TAP_DRILL",)),
             "thru": (True, ("KP08_TAP_SPEC",)),
             # A DRO absolute from the inner end: the KP08's 42 bolt spacing.
             "station": (
-                limits(_x, _PLACES),
+                _limits(_x, _PLACES),
                 (
                     "KP08_TAP_X",
                     "HOLE_PLACES",
@@ -401,7 +430,7 @@ for _index, _x in enumerate(part_spec.KP08_TAP_X, start=1):
                 ("KP08_MATE_CALLOUT", "KP08_PATTERN_ALLOWANCE", "POSITION_RADIUS"),
             ),
         },
-        precision={"dia": 2, "station": _PLACES, "height": _PLACES},
+        precision={"dia": TAP_CALLOUT_PLACES, "station": _PLACES, "height": _PLACES},
     )
 
 
@@ -484,6 +513,35 @@ def _activate_view(adapter: Any, view: Any, *, label: str) -> None:
         raise RuntimeError(f"failed to activate the {label} view {name!r}")
 
 
+_STOCK_SIZES = {"BracketWidth": BRACKET_WIDTH, "BracketThick": BRACKET_THICK}
+
+
+def _stock_references(adapter: Any, annotations: list[Any]) -> None:
+    """The as-bought width and thickness print as REF stock fractions over
+    STOCK (#290, draw_mg_magnifying_lever's rod stock)."""
+    by_name: dict[str, list[Any]] = {}
+    for item in annotations:
+        by_name.setdefault(dimension_name(adapter, item), []).append(item)
+    for name, size in _STOCK_SIZES.items():
+        matches = by_name.get(name, [])
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
+        display = _early_bound(
+            _early_bound(matches[0], "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        )
+        supplier_reference_dimension(
+            adapter,
+            display,
+            label=f"end bracket stock {name}",
+            units="in",
+            precision=DRAWING_PRECISION_BY_NAME[name],
+            expected_mm=size,
+            fraction_denominator=STOCK_FRACTION_DENOMINATORS[name],
+            callout=STOCK_CALLOUT,
+        )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -500,7 +558,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter.currentModel, ("Revision", "Title", *required), required=required
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -524,7 +586,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     on_plan = _view_mapper(adapter, plan)
     on_end = _view_mapper(adapter, end)
-    # The plan shows the hidden HoleRowReference sketch, whose 9.525 it prints.
+    # The plan shows the hidden HoleRowReference sketch, whose .250 it prints.
     annotations = [
         *curate_view_dimensions(
             adapter,
@@ -542,14 +604,15 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     ]
     # Places are authored on the part; the sheet only proves the import kept
-    # them, then writes the STOCK and mate callouts.
+    # them, then writes the mate callouts and the stock references.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
+    _stock_references(adapter, annotations)
 
     if not auto_center_marks(adapter, plan, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the plan")
     for kind, x, (text_x, text_y), side in TAP_CALLOUTS:
-        label = f"{'base-bar' if kind == 'bar' else 'KP08'} screw tap at {x:.3f}"
+        label = f"{'base-bar' if kind == 'bar' else 'KP08'} screw tap at {x / 25.4:.3f}"
         callout = add_native_hole_callout(
             adapter,
             plan,
@@ -559,6 +622,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         _call_out_one_hole(callout, label=label)
         _omit_tap_thread_class(callout, label=label)
+        set_hole_callout_precision(callout, TAP_CALLOUT_PRECISION, label=label)
 
     # The property-linked blocks land in the active view: the plan.
     _activate_view(adapter, plan, label="plan")
