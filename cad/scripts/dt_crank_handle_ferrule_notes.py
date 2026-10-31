@@ -50,11 +50,12 @@ ARM_FACE_WALL_MIN = _floor_3pl(FERRULE_ARM_FACE_WALL_MIN)
 
 # The bore's .XXX band is a matched fit: the oak tenon is turned to suit
 # this bore for an epoxy line (r1-r3 finding 1: name the mate and the
-# clearance at the callout, not in a general note).  Short rows keep the block
-# between the bore's extension lines.
+# clearance at the callout, not in a general note).  BORE names the process,
+# so the .XXX row, not DRILLED HOLES, sets its limits (#290 review of
+# eb22a22f1).  Short rows keep the block between the bore's extension lines.
 BORE_FIT_CALLOUT = "\n".join(
     (
-        f"THRU; {HANDLE_NUMBER} TENON",
+        f"BORE THRU; {HANDLE_NUMBER} TENON",
         f"TURNED TO SUIT, {inch_text(TENON_GLUE_LINE[0], 3)}-"
         f"{inch_text(TENON_GLUE_LINE[1], 3)}",
         "DIAMETRAL CLEARANCE",

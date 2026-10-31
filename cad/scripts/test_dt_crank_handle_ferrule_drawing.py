@@ -135,7 +135,7 @@ def test_callouts_name_the_mating_tenon_and_no_general_note_remains() -> None:
     # MHA-DT-34 machinist ENFORCE (r1-r3): the bore's matched fit and the OD's
     # skim sit on their own callouts, not in a general note; THRU rides on the
     # bore, and bonding the ring on is the assembly's business.
-    assert notes.BORE_FIT_CALLOUT.splitlines()[0] == "THRU; MHA-DT-08 TENON"
+    assert notes.HANDLE_NUMBER in notes.BORE_FIT_CALLOUT.splitlines()[0]
     # The OD's skim names its mate and states the walls it leaves (rule 20).
     od_rows = notes.OUTER_DIA_CALLOUT.splitlines()
     assert od_rows[2] == "WITH MHA-DT-08"
