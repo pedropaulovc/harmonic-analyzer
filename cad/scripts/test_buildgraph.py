@@ -1713,8 +1713,9 @@ def test_references_is_inverse_of_dependents():
     exactly once that documented transitive add is accounted for.
     """
     candidates = part_stems() + list(ASSEMBLY_ORDER)
+    references = {a: set(references_of(a)) for a in ASSEMBLY_ORDER}
     for s in candidates:
-        direct = {a for a in ASSEMBLY_ORDER if s in references_of(a)}
+        direct = {a for a in ASSEMBLY_ORDER if s in references[a]}
         legacy = set(dependents_of(s))
         # Only a machine sub flows up to the top; a shop-fixture jig never does.
         machine_direct = {a for a in direct if not bg.is_shop_fixture(a)}
