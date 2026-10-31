@@ -85,7 +85,7 @@ def gear_data(teeth: int) -> str:
         ("WEB MIN (mm, REF)", f"{web:.2f}"),
         # cone_set_stack books each gear's tooth runout about its bore.
         ("TOOTH CUTTING SETUP, ACCEPT AT SETUP",
-         f"{cone_set_stack.TOOTH_RUNOUT_TIR_MM:.2f} TIR MAX TO FINISHED BORE"),
+         f"{cone_set_stack.TOOTH_RUNOUT_TIR_MM:.4f} TIR MAX TO FINISHED BORE"),
         # The measurable acceptance of the circular tooth thickness band
         # (spec.over_pins_limits_mm): every sheet, not only T006 (ENFORCE
         # round 1 of #971).
