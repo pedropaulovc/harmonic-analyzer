@@ -110,7 +110,9 @@ def _presentation(
     unit = {"mm": 0, "in": 3, "deg": 0}[units]
     fraction = 2 if fraction_denominator is not None else 1
     prefix = "(<MOD-DIAM>" if presentation == "diameter" else "("
-    suffix = ")" if units == "deg" else f" {units})"
+    # SolidWorks already prints an inch mark after a fraction (1/4"), so a
+    # fraction takes no " in" suffix; decimals still name their unit.
+    suffix = ")" if units == "deg" or fraction_denominator is not None else f" {units})"
     return unit, fraction, prefix, suffix
 
 
