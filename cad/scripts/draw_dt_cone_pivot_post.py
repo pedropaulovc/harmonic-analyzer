@@ -315,8 +315,10 @@ FRONT_KEEP = {
     # given here: its extension lines run the head's full height and the
     # crank-bore Ra's leader crossed the left one (r9 leader-crosses-leader).
     # The inch ream's four-place band widened the box to x 109.3..160.3 mm,
-    # 12.66 mm from View C's 38.10 (#290 batch 0 view-crowding): 2 mm left.
-    "CrankBoreDia": (0.1324, 0.169),
+    # 12.66 mm from View C's 38.10 (#290 batch 0 view-crowding): 1.4 mm
+    # left, and 1.5 mm down so the 13° extension line, which ends at y 171.6,
+    # stops above the text's left end.
+    "CrankBoreDia": (0.1330, 0.1675),
 }
 
 # The plan's angled ray is the cone bore's axis; its basic 13° runs to it
