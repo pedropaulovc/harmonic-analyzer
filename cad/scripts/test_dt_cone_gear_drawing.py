@@ -814,11 +814,13 @@ _FLOOR_SHELF_DROP = 0.01008
 _THICKNESS_AIR_MARGIN = 0.0005
 
 
-# Text half-widths in the bore view, sheet metres: the stacked diameter
-# (~33 mm, measured when its callout still read "REAM THRU"; "THRU" is
-# narrower), and the two-line title. The clock text's measured block is
-# drawing.BORE_CLOCK_TEXT_HALF_WIDTH/HEIGHT.
-_BORE_DIA_TEXT_HALF_WIDTH = 0.0165
+# Text extents in the bore view, sheet metres: the stacked diameter reaches
+# 18.9 mm left and 23.5 mm right of its position with the inch seat band
+# (+0.04572/+0.02540; layout audit of farm run 20261031T160216760Z, box
+# [11.1, 53.5] mm about x 30.0), and the two-line title. The clock text's
+# measured block is drawing.BORE_CLOCK_TEXT_HALF_WIDTH/HEIGHT.
+_BORE_DIA_TEXT_LEFT_REACH = 0.0189
+_BORE_DIA_TEXT_RIGHT_REACH = 0.0235
 _BORE_TEXT_HALF_HEIGHT = 0.005
 _BORE_TITLE_HEIGHT = 0.008
 # The layout audit compares IView.GetOutline boxes, which pad the geometry:
@@ -868,7 +870,7 @@ def test_bore_view_enlarges_every_d_bore_clear_of_its_neighbours() -> None:
         for x, y in keep.values():
             assert math.dist((x, y), drawing.FRONT_CENTER) > half_od + 0.015
         dia_x, dia_y = keep["BoreCutDia"]
-        assert dia_x - _BORE_DIA_TEXT_HALF_WIDTH > 0.012
+        assert dia_x - _BORE_DIA_TEXT_LEFT_REACH > _ZONE_MARGIN
         assert dia_y - _BORE_TEXT_HALF_HEIGHT > cy + crop - 0.003
         # The across-flat text stands wholly right of the flat's witness,
         # left of the title block, above the title, which stays inside the
@@ -915,7 +917,7 @@ def test_bore_view_enlarges_every_d_bore_clear_of_its_neighbours() -> None:
         assert (vx, vy) == pytest.approx((cx + flat, cy))
         assert clock_x > vx and clock_y > vy
         reach = math.dist((vx, vy), (clock_x, clock_y))
-        assert dia_x + _BORE_DIA_TEXT_HALF_WIDTH < vx - 0.005
+        assert dia_x + _BORE_DIA_TEXT_RIGHT_REACH < clock_box[0] - 0.005
         assert vy + reach + 0.003 < front_bottom, teeth
         assert drawing.bore_view_label(teeth).splitlines() == [
             "BORE PROFILE",
