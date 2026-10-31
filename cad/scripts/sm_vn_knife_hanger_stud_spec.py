@@ -80,14 +80,14 @@ ENGAGEMENT_MIN_D = 1.5
 TIP_Y = 0.0
 HEAD_UNDERFACE_Y = UNDERHEAD_LEN
 HEAD_TOP_Y = HEAD_UNDERFACE_Y + HEAD_H
-# Radial leg from the native ChamferWidth, measured on the tip face: .030
-# under the title block's three-place row (.025-.035), no band of its own.
+# Radial leg from the native ChamferWidth, measured on the tip face: .03
+# under the title block's two-place row (.02-.04), no band of its own.
 # Every leg in that band brings the cut thread start inside the MHA-SM-02
-# #25 tap drill (no feather edge left on the major diameter) and keeps the
-# chamfer's axial run inside the one incomplete pitch the thread tail's
-# acceptance allows; .024 +/-.005 would not reach under the drill.
-CHAMFER_WIDTH = 0.762  # .030
-CHAMFER_WIDTH_TOLERANCE = printed_band_mm(3, unit=UNIT)  # +/-.005
+# #25 tap drill even on the largest 2A major (SHANK_DIA_MAX, .1890), so no
+# feather edge is left on the crest, and keeps the chamfer's axial run
+# inside the one incomplete pitch the thread tail's acceptance allows.
+CHAMFER_WIDTH = 0.762  # .03
+CHAMFER_WIDTH_TOLERANCE = printed_band_mm(2, unit=UNIT)  # +/-.01
 CHAMFER_WIDTH_MIN = CHAMFER_WIDTH - CHAMFER_WIDTH_TOLERANCE
 CHAMFER_WIDTH_MAX = CHAMFER_WIDTH + CHAMFER_WIDTH_TOLERANCE
 CHAMFER_ANGLE = 45.0  # Native driving angle between tip face and chamfer.
@@ -110,7 +110,7 @@ DRAWING_DIMENSIONS = {
 }
 DRAWING_PRECISION = {
     "StockTrimProfile": {"CutLength": 2},
-    "StockDeburrProfile": {"ChamferWidth": 3, "ChamferAngle": 0},
+    "StockDeburrProfile": {"ChamferWidth": 2, "ChamferAngle": 0},
     "ThreadTailAcceptance": {"ThreadLengthMin": 3},
 }
 DIMENSION_PRECISION = {
