@@ -138,6 +138,7 @@ def test_thumb_head_envelope_clears_rail_at_the_contact_angle_bound() -> None:
 
 def test_new_overlap_pairs_are_exact_and_shared_with_top_assembly() -> None:
     from _interference_contracts import (
+        _MG_BRACKET_SCREW_TRIPLE_MM,
         _MG_CLAMP_THUMB_TRIPLE_MM,
         _MG_FIXTURE_THREAD_TRIPLE_MM,
         _MG_LEVER_THREAD_TRIPLE_MM,
@@ -147,6 +148,7 @@ def test_new_overlap_pairs_are_exact_and_shared_with_top_assembly() -> None:
     from _hole_spec import TAP_DRILL_MM
     from sh_vn_thumb_screw_spec import SHANK_DIA
     import mg_magnifying_clamp_geom as clamp
+    import magnifying_bracket_joint_layout as bracket_joint
     import mg_rod_clamp_joint as rod_joint
     from mg_lever_thread_joint import NECK_THICKNESS, ROD_DIA as LEVER_DIA, TAP_DRILL_DIA
 
@@ -168,6 +170,9 @@ def test_new_overlap_pairs_are_exact_and_shared_with_top_assembly() -> None:
         (_MG_LEVER_THREAD_TRIPLE_MM, owned_lever_thread),
         (_MG_CLAMP_THUMB_TRIPLE_MM, owned_clamp_thumb),
         (_MG_ROD_THREAD_TRIPLE_MM, owned_rod_thread),
+        (_MG_BRACKET_SCREW_TRIPLE_MM, (
+            bracket_joint.SCREW_MAJOR_DIA, bracket_joint.TAP_DRILL_DIA, bracket_joint.ENGAGEMENT,
+        )),
     ):
         assert all(
             math.isclose(a, b, rel_tol=0.0, abs_tol=1e-12)
