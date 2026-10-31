@@ -25,6 +25,11 @@ off the plate top, it no longer trades engagement for eye lift.
 The fitter holds the eye at its clocking while the nut is tightened, so the
 trim survives the lock; re-trimming means slackening the nut first.  The
 step text the top-level assembly prints is ``ANCHOR_INSTALL_STEP``.
+
+Issue #290: the sheet prints decimal inch (``drawing_unit: in``).  The two
+shop controls (the finished overall and the restored deburr) are authored as
+the exact millimetre decimals of their printed inch values; the eye, thread
+and as-supplied sizes are the vendor's, unchanged.
 """
 
 import math
@@ -33,9 +38,14 @@ import _config
 import sm_summing_lever_spec
 import ch_anchor_jam_nut_spec as jam_nut
 from _hole_spec import blind_cut_dia_mm
-from _printed_tolerance import printed_band_mm
+from _package_units import drawing_unit
+from _printed_tolerance import angular_band_deg, printed_band_mm
 from stock_anchor_geom import ANCHOR_9489T111, trim
 from _supplier_screw_reference_names import FEATURE_BY_PLANE
+
+UNIT = drawing_unit("parts/ch-vn-spring-hook", _config.parts("ch-vn-spring-hook"))
+# The coefficient plate's thickness band is the lever's own printed .XX row.
+_LEVER_UNIT = drawing_unit("parts/sm-summing-lever", _config.parts("sm-summing-lever"))
 
 _PITCH = ANCHOR_9489T111.thread_pitch_mm
 
@@ -47,23 +57,27 @@ THREAD_ENGAGEMENT_MM = sm_summing_lever_spec.COEFFICIENT_T
 # only 1.09 of full thread past the nut at the thickest limit, under the
 # 1.5875 floor). The trim is sized at the thickest plate; the cut end hangs
 # deepest under the thinnest.
-SEAT_BAND_MM = printed_band_mm(2)
+SEAT_BAND_MM = printed_band_mm(2, unit=_LEVER_UNIT)
 SEAT_T_MAX_MM = THREAD_ENGAGEMENT_MM + SEAT_BAND_MM
 SEAT_T_MIN_MM = THREAD_ENGAGEMENT_MM - SEAT_BAND_MM
-# Owner ruling (C10): one more 0.1 step of the printed overall's grid as
+# The finished overall is a functional length (the past-nut budget reads its
+# band), so it prints .XX, never the .X row.
+OVERALL_PLACES = 2
+FINISHED_OVERALL_TOLERANCE_MM = printed_band_mm(OVERALL_PLACES, unit=UNIT)
+# Owner ruling (C10): one more step of the printed overall's grid (.01) as
 # thread over the floor at that worst corner.
-PAST_NUT_MARGIN_MM = 0.1
-FINISHED_OVERALL_TOLERANCE_MM = _config.title_block("linear_1pl")["value_in"] * 25.4
-CHAMFER_WIDTH_MM = ANCHOR_9489T111.end_chamfer_mm
+PAST_NUT_MARGIN_MM = 0.254  # .01
+# The restored factory deburr (0.4557) on the .XXX grid.
+CHAMFER_WIDTH_MM = 0.4572  # .018
 # At the short chamfer limit the cut end's flat (major radius - chamfer) must
-# still pass the #6-32 tap drill it enters, which allows 0.0556 mm below the
-# factory 0.455676 -- so the deburr is a 2-place control, not a 0.25 band.
-CHAMFER_WIDTH_TOLERANCE_MM = 0.05
+# still pass the #6-32 tap drill it enters, which allows .0022 below the
+# .018 nominal -- so the deburr is a 3-place control, not the title block's.
+CHAMFER_WIDTH_TOLERANCE_MM = 0.0508  # .002
 MIN_CHAMFER_WIDTH_MM = (
     ANCHOR_9489T111.thread_major_dia_mm - blind_cut_dia_mm(sm_summing_lever_spec.HOLE_SPEC)
 ) / 2.0
 CHAMFER_ANGLE_DEG = 45.0
-CHAMFER_ANGLE_TOLERANCE_DEG = _config.title_block("angular")["value_deg"]
+CHAMFER_ANGLE_TOLERANCE_DEG = angular_band_deg(unit=UNIT)
 # The deburr's longest axial run: widest leg at the steepest in-band angle.
 CHAMFER_AXIAL_MAX_MM = (CHAMFER_WIDTH_MM + CHAMFER_WIDTH_TOLERANCE_MM) / math.tan(
     math.radians(CHAMFER_ANGLE_DEG - CHAMFER_ANGLE_TOLERANCE_DEG)
@@ -75,9 +89,8 @@ ADJUSTMENT_TRAVEL_MM = ADJUSTMENT_TURNS * _PITCH
 # Full-form thread showing below the jam nut at the worst case, so the nut's
 # last thread is never on the deburr.
 FULL_THREADS_PAST_NUT = 2
-# The fitter reads the printed .X band (+/-0.8), a hair wider than the
-# title block's 0.03 in the tolerance itself carries: size to the wider.
-LENGTH_BAND_WORST_MM = max(FINISHED_OVERALL_TOLERANCE_MM, printed_band_mm(1))
+# The band the fitter reads on the printed overall.
+LENGTH_BAND_WORST_MM = FINISHED_OVERALL_TOLERANCE_MM
 # Cut end below the thread start (= plate top when seated), nominal part,
 # seated: the thickest plate, thickest nut, two full turns and the ruled
 # margin, the deburr, then the back-out budget and the band the shortest
@@ -94,16 +107,14 @@ _END_BELOW_THREAD_START_MM = (
 _SHANK_REQUIRED_MM = (
     ANCHOR_9489T111.unthreaded_shank_length_mm + _END_BELOW_THREAD_START_MM
 )
-# The overall prints at one place, so it is rounded UP to the 0.1 grid: the
-# printed number is the model's, and rounding never eats the thread.
+# The overall prints at two inch places, so it is rounded UP to the .01 grid:
+# the printed number is the model's, and rounding never eats the thread.
 _OVERALL_REQUIRED_MM = ANCHOR_9489T111.eye_od_mm / 2 - trim(
     ANCHOR_9489T111, _SHANK_REQUIRED_MM
 ).shank_end_y_mm
+_OVERALL_IN = math.ceil(round(_OVERALL_REQUIRED_MM / 25.4 * 100.0, 6)) / 100.0
 SHANK_LENGTH_MM = round(
-    _SHANK_REQUIRED_MM
-    + math.ceil(round(_OVERALL_REQUIRED_MM * 10.0, 6)) / 10.0
-    - _OVERALL_REQUIRED_MM,
-    6,
+    _SHANK_REQUIRED_MM + _OVERALL_IN * 25.4 - _OVERALL_REQUIRED_MM, 6
 )
 TRIM = trim(ANCHOR_9489T111, SHANK_LENGTH_MM)
 FINISHED_OVERALL_MM = round(ANCHOR_9489T111.eye_od_mm / 2 - TRIM.shank_end_y_mm, 6)
@@ -161,7 +172,11 @@ DRAWING_DIMENSIONS = {
     "StockTrimProfile": {"FinishedOverall"},
     "StockDeburrProfile": {"ChamferWidth", "ChamferAngle"},
 }
-DIMENSION_PRECISION = {"FinishedOverall": 1, "ChamferWidth": 2, "ChamferAngle": 0}
+DIMENSION_PRECISION = {
+    "FinishedOverall": OVERALL_PLACES,
+    "ChamferWidth": 3,
+    "ChamferAngle": 0,
+}
 # The overall length and the 45 deg leg defer to the title block (swTolGeneral);
 # the deburr width prints its own symmetric band.
 DIMENSION_TOLERANCE_TYPES = {

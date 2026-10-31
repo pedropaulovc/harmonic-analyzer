@@ -7,3 +7,4 @@ ch-fulcrum-shaft:
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
   process: "machined (steel)"
+  drawing_unit: in

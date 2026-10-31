@@ -7,3 +7,4 @@ ch-pivot-shaft:
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
   process: "turned from Ø5/16 in bar (steel): O.D. turned to the running band over the full length, chuck and tailstock centre with a follow rest; both ends faced to length and domed on the lathe; two set-screw flats milled in line, one side"
+  drawing_unit: in

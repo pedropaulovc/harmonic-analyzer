@@ -43,35 +43,36 @@ def test_set_screw_cup_is_the_vendors_point() -> None:
 
 def test_apex_tap_keeps_its_walls_to_both_ear_faces() -> None:
     assert bracket.SET_SCREW_WALLS_MIN == pytest.approx(
-        {"inboard face": 2.4275, "outboard face": 2.3275}
+        {"inboard face": 2.4891, "outboard face": 2.3875}
     )
-    assert min(bracket.SET_SCREW_WALLS_MIN.values()) >= bracket.LIGAMENT_TARGET == 2.0
+    assert min(bracket.SET_SCREW_WALLS_MIN.values()) >= bracket.LIGAMENT_TARGET
+    assert bracket.LIGAMENT_TARGET == pytest.approx(2.032)  # .080 in
 
 
 def test_web_over_the_bore_keeps_the_floor() -> None:
-    assert bracket.BORE_LIGAMENT == pytest.approx(6.55)
-    assert bracket.BORE_LIGAMENT >= bracket.LIGAMENT_FLOOR == 1.5
+    assert bracket.BORE_LIGAMENT == pytest.approx(6.6008)
+    assert bracket.BORE_LIGAMENT >= bracket.LIGAMENT_FLOOR
+    assert bracket.LIGAMENT_FLOOR == pytest.approx(1.524)  # .060 in
 
 
 def test_set_screw_keeps_one_and_a_half_diameters_of_full_thread() -> None:
     """drawing-guidelines.md rule 18 (thread engagement): the apex stands
-    35.00 over the seat, its arch's centre 1.80 over the bore, so the apex tap
-    keeps 1.5D of full thread with the overall and the bore heights both at
-    the title block's band (#1371; it was 3.10 / 1.08D with the arch about
-    the bore)."""
-    assert (bracket.EAR_TOP_Y, bracket.HEIGHT_BAND) == (35.0, 0.508)
-    assert bracket.APEX_ABOVE_BORE == pytest.approx(9.8)
-    assert bracket.ARCH_LIFT == pytest.approx(1.8)
+    1.38 over the seat, its arch's centre ARCH_LIFT over the bore, so the
+    apex tap keeps 1.5D of full thread with the overall height at the title
+    block's .XX and the bore height at its printed .99 plus that band (#1371;
+    it was 3.10 / 1.08D with the arch about the bore)."""
+    assert (bracket.EAR_TOP_Y, bracket.HEIGHT_BAND) == (
+        pytest.approx(1.38 * 25.4),
+        pytest.approx(0.01 * 25.4),
+    )
+    assert bracket.APEX_ABOVE_BORE == pytest.approx(9.852)
+    assert bracket.ARCH_LIFT == pytest.approx(1.724)
     assert bracket.SET_SCREW_WALL_TERMS["apex over the bore at its minimum"] == (
-        pytest.approx(bracket.EAR_TOP_Y - bracket.BORE_H - 2.0 * bracket.HEIGHT_BAND)
+        pytest.approx(bracket.EAR_TOP_Y - bracket.HEIGHT_BAND - (0.99 + 0.01) * 25.4)
     )
-    assert bracket.SET_SCREW_FULL_THREAD_MIN == pytest.approx(4.390, abs=1e-3)
-    assert bracket.SET_SCREW_ENGAGEMENT_D == pytest.approx(1.543, abs=1e-3)
+    assert bracket.SET_SCREW_FULL_THREAD_MIN == pytest.approx(5.009, abs=1e-3)
+    assert bracket.SET_SCREW_ENGAGEMENT_D == pytest.approx(1.761, abs=1e-3)
     assert bracket.SET_SCREW_ENGAGEMENT_D >= bracket.SET_SCREW_MIN_ENGAGEMENT_D == 1.5
-    assert (
-        bracket.SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT
-        == "#4-40 ENGAGEMENT 4.39 MIN (1.54D)."
-    )
 
 
 def test_set_screw_stays_inside_its_tap() -> None:

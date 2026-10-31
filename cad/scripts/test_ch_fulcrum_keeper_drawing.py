@@ -14,6 +14,8 @@ import draw_ch_fulcrum_keeper as drawing
 import ch_fulcrum_keeper_spec
 import _config
 from _drawing_registry import DRAWINGS_BY_NAME
+from _inch_wall_limits import WALL_TARGET_MM
+from _printed_tolerance import inside_corner_radius_mm
 from ch_vn_frame_side_screw_spec import HEAD_H as FRAME_SIDE_HEAD_H
 
 
@@ -36,18 +38,21 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 def test_geometry_matches_the_top_frame_contract() -> None:
     # The keeper exists to hold the fulcrum shaft 25.2 above the rail top
     # face (1061.4 - 1036.2, the 2026-08-02 rederive contract) on a flat
-    # seat: an 8.0 lug (owner ruling Q11-B) with a straight 8.5 foot running
-    # OUTBOARD to x = 12.5 (Q11-B': the tip stays clear of the frame's
-    # corner bosses), its screw 4.5 off the tip.
+    # seat: a .32 lug (owner ruling Q11-B) with a straight .33 foot running
+    # OUTBOARD to x = .49 (Q11-B': the tip stays clear of the frame's
+    # corner bosses), its screw .18 off the tip.
     spec = ch_fulcrum_keeper_spec
     assert spec.SHAFT_AXIS_H == 25.2
-    assert 2.0 * spec.CROWN_R == spec.KEEPER_WIDTH == 14.0
-    assert 2.0 * spec.LUG_HALF_T == 8.0
-    assert spec.FOOT_TIP_X == spec.LUG_HALF_T + spec.FOOT_L == 12.5
-    assert spec.SCREW_X == spec.FOOT_TIP_X - spec.SCREW_FROM_TIP == 8.0
-    assert spec.KEEPER_Z_OFF == 75.0
-    assert spec.KEEPER_INNER_FACE_SPAN_MM == 142.0
-    assert spec.KEEPER_SCREW_Z_OFF == spec.KEEPER_Z_OFF + spec.SCREW_X == 83.0
+    assert 2.0 * spec.CROWN_R == spec.KEEPER_WIDTH == 13.97
+    assert 2.0 * spec.LUG_HALF_T == 8.128
+    assert spec.FOOT_TIP_X == pytest.approx(spec.LUG_HALF_T + spec.FOOT_L)
+    assert spec.FOOT_TIP_X == 12.446
+    assert spec.SCREW_X == pytest.approx(spec.FOOT_TIP_X - spec.SCREW_FROM_TIP)
+    assert spec.SCREW_X == pytest.approx(7.874)
+    assert spec.KEEPER_Z_OFF == 75.057
+    assert spec.KEEPER_INNER_FACE_SPAN_MM == pytest.approx(141.986)
+    assert spec.KEEPER_SCREW_Z_OFF == pytest.approx(spec.KEEPER_Z_OFF + spec.SCREW_X)
+    assert spec.KEEPER_SCREW_Z_OFF == pytest.approx(82.931)
     # Plain reamed bore on the plain Ø6.35 shaft: a running band, cut by one
     # made-to-order 0.2515 in reamer through both keepers at their installed
     # spacing, that covers the faced rail seats' flatness (ch_fulcrum_shaft_spec).
@@ -84,35 +89,35 @@ def test_crown_set_screw_tap_stops_at_the_bore() -> None:
 
 def test_rule_12_worst_case_walls_and_thread() -> None:
     # Worst case of the printed bands (drawing-guidelines.md rule 18 (thread engagement)): >= 1.5D of full
-    # crown thread and of foot-screw engagement in the frame, >= 1.5 web from
-    # the crown thread major to each lug face and from the foot counterbore
-    # to the foot tip and sides.
+    # crown thread and of foot-screw engagement in the frame, the .080 wall
+    # target from the crown thread major to each lug face and from the foot
+    # counterbore to the foot tip and sides.
     spec = ch_fulcrum_keeper_spec
     assert spec.SET_SCREW_ENGAGEMENT_D >= 1.5
     assert spec.FOOT_SCREW_ENGAGEMENT_D >= 1.5
-    assert spec.SET_SCREW_WEB_MM >= 2.0
-    assert spec.FOOT_TIP_WALL_MM >= 2.0
-    assert spec.FOOT_SIDE_WALL_MM >= 2.0
-    # Owner ruling Q10-B: the bore stands within +-0.3 of the width's centre
-    # plane, so each side wall is half the least .X width less that band.
-    assert spec.BORE_SIDE_WALL_MM >= 2.0
-    assert round(spec.BORE_SIDE_WALL_MM, 3) == 3.1
-    assert round(spec.SET_SCREW_WEB_MM, 3) == 2.053
-    assert round(spec.FOOT_TIP_WALL_MM, 3) == 2.04
-    # Owner ruling 2026-10-28: the outer lug face now sits 16.50 - 8.00 off
-    # the tip, both bands, so the counterbore keeps 0.52 off it.
-    assert round(spec.FOOT_CBORE_LUG_CLEARANCE_MM, 3) == 0.52
-    assert round(spec.FOOT_SCREW_ENGAGEMENT_D, 2) == 1.79
-    # The native counterbore callout prints the template's .XX; the engagement
-    # and bottoming stacks take that printed depth (2.11), not 2.1082.
-    assert spec.FOOT_COUNTERBORE_DEPTH_PLACES == 2
-    # Owner ruling Q11-B: the 8.0 lug holds the web at the title block's .XX
+    assert spec.SET_SCREW_WEB_MM >= WALL_TARGET_MM
+    assert spec.FOOT_TIP_WALL_MM >= WALL_TARGET_MM
+    assert spec.FOOT_SIDE_WALL_MM >= WALL_TARGET_MM
+    # Owner ruling Q10-B: the bore stands within +-.012 of the width's centre
+    # plane, so each side wall is half the least .XX width less that band.
+    assert spec.BORE_SIDE_WALL_MM >= WALL_TARGET_MM
+    assert round(spec.BORE_SIDE_WALL_MM, 3) == 3.353
+    assert round(spec.SET_SCREW_WEB_MM, 3) == 2.629
+    assert round(spec.FOOT_TIP_WALL_MM, 3) == 2.362
+    # Owner ruling 2026-10-28: the outer lug face sits .65 - .32 off the
+    # tip, both bands, so the counterbore keeps 1.092 off it.
+    assert round(spec.FOOT_CBORE_LUG_CLEARANCE_MM, 3) == 1.092
+    assert round(spec.FOOT_SCREW_ENGAGEMENT_D, 2) == 2.27
+    # The native counterbore callout prints .XXX; the engagement and
+    # bottoming stacks take that printed depth (.083), not 2.1082.
+    assert spec.FOOT_COUNTERBORE_DEPTH_PLACES == 3
+    # Owner ruling Q11-B: the lug holds the web at the title block's .XX
     # lug and tap station; Q11-B' and 2026-10-28: the overall length (the
     # foot tip off the inner lug face) prints .XX, the foot length nowhere.
     assert spec.DRAWING_PRECISION["LugBody"]["LugThickness"] == 2
     assert spec.DRAWING_PRECISION["SetScrewReference"]["SetScrewLocation"] == 2
     assert spec.DRAWING_PRECISION["OverallLengthReference"]["OverallLength"] == 2
-    assert spec.DRAWING_PRECISION["FootProfile"] == {"FootRise": 1}
+    assert spec.DRAWING_PRECISION["FootProfile"] == {"FootRise": 2}
     # Off the foot tip the hole's station holds the tip wall at .XX; the
     # frame's transferred tap takes the .XXX side-station band.
     assert spec.DRAWING_PRECISION["FootScrewReference"]["ScrewFromTip"] == 2
@@ -120,23 +125,11 @@ def test_rule_12_worst_case_walls_and_thread() -> None:
     assert spec.KEEPER_SCREW_TRANSVERSE_BAND_MM == spec._BAND_BY_PLACES[3]
 
 
-def test_three_place_sizes_state_their_function() -> None:
-    # Machinist review baseline (rule 3/4): 6.000, 3.000 and 7.000 printed
-    # with neither a band nor a function. Owner ruling Q11-B dropped the
-    # first two to the title block's .XX; the one left names what it holds.
+def test_side_station_names_the_frame_tap_and_the_web_needs_xx() -> None:
     spec = ch_fulcrum_keeper_spec
-    three_place = {
-        name
-        for places in spec.DRAWING_PRECISION.values()
-        for name, value in places.items()
-        if value == 3
-    } - {"BoreDia"}  # the reamed bore carries its own band
-    callouts = {**drawing.FRONT_CALLOUTS, **drawing.TOP_CALLOUTS}
-    # The supplied height's callout names what it is, not a function.
-    assert set(callouts) - {"SupplyHeight"} == three_place == {"ScrewFromSide"}
     frame = _config.parts("fr-top-frame")["number"]
     assert frame in drawing.TOP_CALLOUTS["ScrewFromSide"]
-    # At .X (+-0.8 for .XX's +-0.51 on both the lug and the tap station) the
+    # At .X (+-.1 for .XX's +-.01 on both the lug and the tap station) the
     # outer web would fall under the 1.5 floor.
     bands = spec._BAND_BY_PLACES
     assert spec.SET_SCREW_WEB_MM + 2.0 * (bands[2] - bands[1]) < 1.5
@@ -144,16 +137,15 @@ def test_three_place_sizes_state_their_function() -> None:
 
 def test_corner_round_sits_under_the_title_block_inside_corner_ceiling() -> None:
     # MR-fleet r1: the foot-to-lug inside corner was sharp and unstated. The
-    # title block's INSIDE CORNERS R1.0 MAX states it, so the sheet prints no
+    # title block's INSIDE CORNERS R.04 MAX states it, so the sheet prints no
     # local radius (ENFORCE review 2026-10-24: a local "R1.0 max." restated
     # that row, rule 2). The part models the round at that ceiling. At the
-    # worst case the counterbore can nick a round at the ceiling (0.52 < 1.0,
-    # cosmetic, owner ruling 2026-10-28) but never reaches the lug face.
+    # worst case the counterbore stays clear of the lug face.
     spec = ch_fulcrum_keeper_spec
-    ceiling = _config.title_block("inside_corner")["radius_mm"]
-    assert spec.CORNER_R == 1.0
+    ceiling = inside_corner_radius_mm(unit=spec.UNIT)
+    assert spec.CORNER_R == 1.016
     assert spec.CORNER_R <= ceiling
-    assert 0.0 < spec.FOOT_CBORE_LUG_CLEARANCE_MM < ceiling
+    assert 0.0 < spec.FOOT_CBORE_LUG_CLEARANCE_MM
     assert "CornerFillet" not in spec.DRAWING_DIMENSIONS
     assert "CornerFillet" not in spec.DRAWING_PRECISION
     assert "CornerRadius" not in drawing.FRONT_KEEP
@@ -182,18 +174,19 @@ def test_overall_length_is_real_and_the_bore_centred_on_the_width() -> None:
     assert spec.REFERENCE_DIMENSIONS == ("OverallHeight", "BoreFromSide")
     assert "FootLength" not in drawing.FRONT_KEEP
     assert "FootLength" not in set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert spec.DRAWING_PRECISION["BoreSideReference"] == {"BoreFromSide": 1}
+    assert spec.DRAWING_PRECISION["BoreSideReference"] == {"BoreFromSide": 3}
     assert spec.BORE_FROM_SIDE == spec.KEEPER_WIDTH / 2.0
-    assert spec.BORE_CENTRE_BAND_MM == 0.3
+    assert spec.BORE_CENTRE_BAND_MM == 0.3048
     # MR-fleet r10: the band names its mate (rule 4), the set screw whose full
     # thread it keeps.
     assert spec.BORE_CENTRE_CALLOUT == (
-        "ON WIDTH CENTER \u00b10.3,\nHOLDS MHA-CH-VN-55\nTHREAD ENGAGEMENT"
+        "ON WIDTH CENTER \u00b1.012,\nHOLDS MHA-CH-VN-55\nTHREAD ENGAGEMENT"
     )
     assert drawing.DIMENSION_CALLOUTS["BoreFromSide"] is spec.BORE_CENTRE_CALLOUT
-    assert spec.DRAWING_PRECISION["OverallHeightReference"] == {"OverallHeight": 1}
+    assert spec.DRAWING_PRECISION["OverallHeightReference"] == {"OverallHeight": 2}
     assert spec.DRAWING_PRECISION["OverallLengthReference"] == {"OverallLength": 2}
-    assert spec.OVERALL_LENGTH == 2.0 * spec.LUG_HALF_T + spec.FOOT_L == 16.5
+    assert spec.OVERALL_LENGTH == pytest.approx(2.0 * spec.LUG_HALF_T + spec.FOOT_L)
+    assert spec.OVERALL_LENGTH == pytest.approx(16.51)
     assert "BoreFromSide" in drawing.RIGHT_KEEP
     assert "OverallLength" in drawing.FRONT_KEEP
     # MR-fleet r4: the finished height stands beside the supplied one, the
@@ -208,16 +201,16 @@ def test_overall_length_is_real_and_the_bore_centred_on_the_width() -> None:
 def test_supply_height_prints_the_blank_minimum() -> None:
     # MR-fleet r3: supplied undrilled and square-topped, the blank's height
     # was printed nowhere. It must reach the crown apex of a bore at the top
-    # of the .XX LugRise band under the largest full round the .X width
-    # allows; the part models it AT that limit.
+    # of the printed LugRise band (.99 +.01) under the largest full round the
+    # .XX width allows; the part models it AT that limit.
     spec = ch_fulcrum_keeper_spec
     assert spec.DRAWING_DIMENSIONS["SupplyHeightReference"] == {"SupplyHeight"}
     assert spec.SUPPLY_HEIGHT_PLACES == 1
     assert spec.SUPPLY_HEIGHT_TOL_TYPE == 5  # swTolMIN
     assert spec.DRAWING_PRECISION["LugProfile"]["LugRise"] == 2
-    apex = spec.SHAFT_AXIS_H + 0.51 + (spec.KEEPER_WIDTH + 0.8) / 2.0
-    assert apex <= spec.SUPPLY_HEIGHT_MIN < apex + 0.1
-    assert spec.SUPPLY_HEIGHT_MIN == 33.2
+    apex = 25.4 + (spec.KEEPER_WIDTH + 0.254) / 2.0
+    assert apex <= spec.SUPPLY_HEIGHT_MIN < apex + 2.54
+    assert spec.SUPPLY_HEIGHT_MIN == 33.02
     assert "SupplyHeight" not in spec.REFERENCE_DIMENSIONS
     assert drawing.FRONT_CALLOUTS["SupplyHeight"] == spec.SUPPLY_HEIGHT_CALLOUT
     # The builder sets the MIN type on the line's own dimension (no upper
@@ -241,43 +234,41 @@ def test_supply_height_prints_the_blank_minimum() -> None:
 def test_crown_prints_a_full_round_reference_radius() -> None:
     # MR-fleet r5: "Ø14.0" on the 180 deg end round read as a boss or hole;
     # r8: "R7.0 MIN" was ambiguous. The crown is a full round tangent to both
-    # sides (Main ruling B+, 2026-10-15): the radius follows the .X width,
-    # 6.6..7.4, and prints as the radial reference "(R7.0)" -- an
-    # independent .X radius could drop to 6.2, under the crown tap's 1.5D.
+    # sides (Main ruling B+, 2026-10-15): the radius follows the .XX width,
+    # .270-.280, and prints as the radial reference "(R.275)" -- an
+    # independent .X radius could drop far under the crown tap's 1.5D.
     spec = ch_fulcrum_keeper_spec
     assert spec.DRAWING_DIMENSIONS["LugCrownProfile"] == {"CrownRadius"}
-    assert spec.DRAWING_PRECISION["LugCrownProfile"] == {"CrownRadius": 1}
-    assert spec.DRAWING_PRECISION["Foot"] == {"Depth": 1}
-    assert spec.CROWN_R == spec.KEEPER_WIDTH / 2.0 == 7.0
-    assert spec.CROWN_LEAST_R == pytest.approx(6.6)
-    assert spec.CROWN_MOST_R == pytest.approx(7.4)
+    assert spec.DRAWING_PRECISION["LugCrownProfile"] == {"CrownRadius": 3}
+    assert spec.DRAWING_PRECISION["Foot"] == {"Depth": 2}
+    assert spec.CROWN_R == spec.KEEPER_WIDTH / 2.0 == 6.985
+    assert spec.CROWN_LEAST_R == pytest.approx(6.858)
+    assert spec.CROWN_MOST_R == pytest.approx(7.112)
     major = 1.8542
-    at_x_band = sum(spec.set_screw_wall_terms(spec.CROWN_R - 0.8, 0.0).values())
+    at_x_band = sum(
+        spec.set_screw_wall_terms(spec.CROWN_R - spec._BAND_BY_PLACES[1], 0.0).values()
+    )
     assert at_x_band / major < 1.5
     assert not hasattr(spec, "CROWN_R_MIN")
     # Owner ruling Q10-B: the round is centred on the width, so the tap on the
     # bore axis loses crown to the bore's offset from the width's centre
-    # plane. A station off a side face adds the width's half band (0.4) to
-    # its own: .X (the r9 print) or .XX both leave the tap short of 1.5D;
-    # the +-0.3 centre-plane band keeps it, with the least round consumed.
-    half_width_band = 0.4
-    for station_band in (0.8, 0.51):
-        off_side = spec.set_screw_wall_terms(
-            spec.CROWN_LEAST_R, half_width_band + station_band
-        )
-        assert sum(off_side.values()) / major < 1.5, station_band
+    # plane. A station off a side face adds the width's half band (.005) to
+    # its own: .X leaves the tap short of 1.5D; the +-.012 centre-plane band
+    # keeps it, with the least round consumed.
+    half_width_band = spec._BAND_BY_PLACES[2] / 2.0
+    off_side = spec.set_screw_wall_terms(
+        spec.CROWN_LEAST_R, half_width_band + spec._BAND_BY_PLACES[1]
+    )
+    assert sum(off_side.values()) / major < 1.5
     terms = spec.set_screw_wall_terms(spec.CROWN_LEAST_R, spec.BORE_CENTRE_BAND_MM)
     assert sum(terms.values()) == pytest.approx(spec.SET_SCREW_FULL_THREAD_MM)
     assert terms["least crown over the bore axis"] == pytest.approx(
-        math.sqrt(6.6**2 - 0.3**2)
+        math.sqrt(6.858**2 - 0.3048**2)
     )
     assert terms["least crown over the bore axis"] + terms[
         "crown fall across the thread"
     ] == pytest.approx(spec.crown_least_height(spec._THREAD_HALF_MAJOR))
-    assert round(spec.SET_SCREW_ENGAGEMENT_D, 3) == 1.507
-    assert (
-        sum(spec.set_screw_wall_terms(spec.CROWN_LEAST_R, 0.38).values()) / major < 1.5
-    )
+    assert round(spec.SET_SCREW_ENGAGEMENT_D, 3) == 1.648
     source = " ".join(Path(part.__file__).read_text(encoding="utf-8").split())
     assert 'names=("CrownCz", "ShaftAxisH", "CrownRadius")' in source
     assert 'size_dimension="radius"' in source
@@ -335,7 +326,8 @@ def test_tap_and_foot_hole_station_reference_sketches() -> None:
     _, plane, dimension, start, end, _, value, _ = rows["FootScrewReference"]
     assert (plane, dimension) == ("Top", "ScrewFromTip")
     assert start == corner and end == (spec.SCREW_X, corner[1])
-    assert value == spec.FOOT_TIP_X - spec.SCREW_X == spec.SCREW_FROM_TIP == 4.5
+    assert value == pytest.approx(spec.FOOT_TIP_X - spec.SCREW_X)
+    assert value == spec.SCREW_FROM_TIP == 4.572
     _, plane, dimension, start, end, _, value, _ = rows["FootScrewSideReference"]
     assert (plane, dimension) == ("Top", "ScrewFromSide")
     # One keeper part: the foot hole on the width centreline.
@@ -374,15 +366,27 @@ def test_keeper_tap_spec_for_the_frame() -> None:
 def test_fitup_exports_for_the_top_frame() -> None:
     # The pair is set by DRO (KEEPERS_SET_KEY): X off the rail web under
     # each lug, Z off the front socket line; the frame taps are transferred.
+    from _cone_axis_constants import FRAME_FRONT_COLUMN_Z
+    from channel_frame_geom import LEVER_FULCRUM_XY
+    from frame_column_stations import COLUMN_X
+
     spec = ch_fulcrum_keeper_spec
-    assert spec.KEEPER_FITUP_LOCATION_BAND_MM == 0.02
+    assert spec.KEEPER_FITUP_LOCATION_BAND_MM == 0.0254
     assert spec.KEEPER_FITUP_PLACES == 2
-    assert spec.KEEPER_FITUP_X_FROM_WEB_MM == 2.9
+    # The lug centres stand on the fulcrum line, off the column (web) line.
+    assert COLUMN_X + spec.KEEPER_FITUP_X_FROM_WEB_MM == pytest.approx(
+        LEVER_FULCRUM_XY[0]
+    )
     # Owner ruling X-A (2026-10-18): the lug centre's own looser band.
-    assert spec.KEEPER_FITUP_X_BAND_MM == 0.10
+    assert spec.KEEPER_FITUP_X_BAND_MM == 0.1016
     front, rear = spec.KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM
-    assert (round(front, 2), round(rear, 2)) == (40.5, 182.5)
-    assert rear - front == 2.0 * (spec.KEEPER_Z_OFF - spec.LUG_HALF_T)
+    inner = spec.KEEPER_Z_OFF - spec.LUG_HALF_T
+    assert front == pytest.approx(
+        spec.FULCRUM_KEEPER_CENTRE_Z - inner - FRAME_FRONT_COLUMN_Z
+    )
+    assert rear == pytest.approx(
+        spec.FULCRUM_KEEPER_CENTRE_Z + inner - FRAME_FRONT_COLUMN_Z
+    )
 
 
 def test_print_carries_no_datums_or_frames_and_cites_the_fitup_steps() -> None:

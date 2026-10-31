@@ -14,3 +14,4 @@ ch-vn-rocker-thrust-washer:
   quantity: 2
   tolerance_class: machined_block
   process: purchased
+  drawing_unit: in

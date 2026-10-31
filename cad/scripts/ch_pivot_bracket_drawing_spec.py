@@ -15,20 +15,22 @@ import math
 from _gtol_planar import PlanarFace
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 from ch_pivot_bracket_sides import HEAD_TO_EAR_FACE_MIN
-from ch_pivot_bracket_spec import DRILL_GROWTH
+from ch_pivot_bracket_spec import DRILL_GROWTH, UNIT
 
 # The foot seats on the rocker-arm support's apex and sets the pivot height:
 # the one static seat that locates the part (drawing-guidelines.md rule 6), so
 # it carries the seat grade. PlanarFace offsets run along the outward normal,
 # so the -Y seat at y = 0 sits at 0.
 SURFACE_FINISHES = (
-    SurfaceFinishControl("foot_seat", SEAT_UM, PlanarFace((0, -1, 0), 0.0)),
+    SurfaceFinishControl(
+        "foot_seat", SEAT_UM, PlanarFace((0, -1, 0), 0.0), display_unit=UNIT
+    ),
 )
 
-# The reamed cross-bore holds the drilled-hole row's +0.10/0 explicitly
-# (upper, lower): the apex set screw's full thread is counted at this largest
+# The cross-bore holds the drilled-hole row's +.004/0 explicitly (upper,
+# lower; fit F5): the apex set screw's full thread is counted at this largest
 # bore (ch_pivot_bracket_spec.BORE_RADIUS_MAX), so the print must not leave
-# the reamed bore to the .XX row's +/-0.51.
+# the bore to the .XXX row's +/-.005.
 BORE_DIA_BAND = (DRILL_GROWTH, 0.0)
 
 # The foot-to-ear inside corner (drawing-guidelines.md rule 16): the largest
@@ -36,15 +38,17 @@ BORE_DIA_BAND = (DRILL_GROWTH, 0.0)
 # hold-down screw's head seats on the foot top beside the ear's outboard face
 # (ch_pivot_bracket_sides.HEAD_TO_EAR_FACE_MIN, the worst-case gap), so a
 # corner radius past that gap would lift the head's edge; the limit is that
-# gap rounded DOWN to the one place it prints at. The part models the corner
-# AT the limit and prints it as the single limit "R0.3 MAX" (swTolMAX prints
-# the nominal, so nominal = limit; the band runs from sharp up to it).
-CORNER_R_PLACES = 1
+# gap rounded DOWN to the inch places it prints at. The part models the
+# corner AT the limit and prints it as the single limit "R.02 MAX" (swTolMAX
+# prints the nominal, so nominal = limit; the band runs from sharp up to it).
+CORNER_R_PLACES = 2
 CORNER_R_MAX = (
-    math.floor(HEAD_TO_EAR_FACE_MIN * 10**CORNER_R_PLACES) / 10**CORNER_R_PLACES
+    math.floor(HEAD_TO_EAR_FACE_MIN / 25.4 * 10**CORNER_R_PLACES + 1e-9)
+    / 10**CORNER_R_PLACES
+    * 25.4
 )
 CORNER_R_BAND = (0.0, -CORNER_R_MAX)  # (upper, lower)
-CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.3 MAX"
+CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R.02 MAX"
 if not 0.0 < CORNER_R_MAX <= HEAD_TO_EAR_FACE_MIN:
     raise AssertionError(
         "the foot-to-ear corner has no printable radius the screw head clears"
@@ -86,30 +90,30 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # Decimal places ARE the tolerance statement, so the MODEL owns them:
 # build_ch_pivot_bracket applies this map to the .SLDPRT and the drawing only
-# reads it back. Every length is .XX; the corner radius is .X:
+# reads it back. Inch places, .XX unless stated:
 # - the foot's sides and the hole's centring ride the .XX band the ligament
 #   check spends (ch_pivot_bracket_spec EDGE_BAND, HOLE_X_BAND), and the arch
 #   radius, the overall height and the bore height the bands the set screw's
 #   full thread is counted at (ARCH_R_BAND, HEIGHT_BAND);
-# - the foot length and the hold-down station ride the title block's .XX, the
-#   support (and so the foot) sized for them (ch_pivot_bracket_sides); the ear
-#   thickness and tap station carry their own +/-0.10 at two places;
+# - the foot length and the hold-down station ride the title block's .XX
+#   (ch_pivot_bracket_sides proves the foot for them); the ear thickness and
+#   tap station carry their own +/-.004, so print .XXX;
 # - the foot height sits at .XX in the support's seat-screw reach
 #   (rocker_bracket_seat_layout.FOOT_H_RANGE);
-# - the bore lateral is a routine location of a fitted bore,
-#   and the drilled holes print their drill size to two places;
+# - the bore lateral is a routine location of a fitted bore; the cross-bore
+#   (+.004/0) and the drilled hold-down hole print their size at .XXX;
 # - the corner radius is a single limit at CORNER_R_PLACES (rule 3: no extra
 #   places on radii).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FootProfile": {"FootW": 2, "FootLen": 2},
     "Foot": {"FootHt": 2},
-    "Ear": {"EarThick": 2},
+    "Ear": {"EarThick": 3},
     "ArchProfile": {"ArchRadius": 2},
-    "ShaftBoreProfile": {"BoreCz": 2, "ShaftBoreDia": 2},
-    "HoleProfile": {"HoleStation": 2, "HoleDia": 2},
+    "ShaftBoreProfile": {"BoreCz": 2, "ShaftBoreDia": 3},
+    "HoleProfile": {"HoleStation": 2, "HoleDia": 3},
     "BoreLateralReference": {"BoreLateral": 2},
     "HoleLateralReference": {"HoleLateral": 2},
-    "SetScrewReference": {"SetScrewLocation": 2},
+    "SetScrewReference": {"SetScrewLocation": 3},
     "HeightReference": {"OverallHeight": 2},
     "CornerFillet": {"CornerRadius": CORNER_R_PLACES},
 }

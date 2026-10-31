@@ -1,12 +1,12 @@
 r"""Reproduction script: rocker pivot shaft (MHA-CH-05; book ch. 14 / ch. 17; 1 used).
 
-The Ø6.35 steel shaft that carries the 20 rocker arms at machine
+The Ø.250 steel shaft that carries the 20 rocker arms at machine
 (x, y) = (72.9, 253.8), held by the two pivot brackets and preloaded north by
 the MHA-CH-VN-54 spring (#948 ruling R, PR #1292). It is a PLAIN rod: rocker
 19's hub bears through a MHA-CH-VN-56 thrust washer on the north ear's inner
 face, and the spring pushes on a second washer at hub 0's south face from the
 south ear (``rocker_bank_layout``). The
-cylinder spans both ears' outer faces and each end is domed 1.5 proud, like
+cylinder spans both ears' outer faces and each end is domed .06 proud, like
 the cylinder arbor's ends (ch14 page002_img07 shows the near-flush domed end
 on the ear). One MHA-CH-VN-53 #4-40 cup-point set screw drops through each
 ear's apex onto a flat milled under it; both flats face +Y, in line.
@@ -35,6 +35,7 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
@@ -58,6 +59,7 @@ from _drawing_marks import (
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
+from _part_properties import part_drawing_unit
 from ch_pivot_shaft_spec import (
     DOME_HEIGHT,
     DOME_SPHERE_RADIUS,
@@ -73,6 +75,7 @@ from ch_pivot_shaft_spec import (
     SHAFT_DIA,
     SHAFT_DIA_BAND,
     SURFACE_FINISHES,
+    UNIT,
     V_DOME,
     V_FLAT,
 )
@@ -82,7 +85,7 @@ PART_NAME = "ch-pivot-shaft"
 MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
 SHAFT_R = SHAFT_DIA / 2.0
-SHAFT_LENGTH = PIVOT_SHAFT_LENGTH  # the cylinder: the span over both ears
+SHAFT_LENGTH = PIVOT_SHAFT_LENGTH  # the cylinder: the overall length less both domes
 V_BODY = math.pi * SHAFT_R**2 * SHAFT_LENGTH
 # Each flat's centre from the north cylinder end (the sketch's u), which must
 # be the layout's station; each is DIMENSIONED from its own end's tip.
@@ -401,6 +404,7 @@ async def _dome(adapter, tag: str, u_end: float, sign: float) -> list[tuple[str,
 
 async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -443,7 +447,11 @@ async def build(adapter) -> dict[str, str]:
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
     set_dimension_bilateral_tolerance(
-        adapter, "ShaftProfile", "ShaftDia", *deviations(SHAFT_DIA_BAND)
+        adapter,
+        "ShaftProfile",
+        "ShaftDia",
+        *deviations(SHAFT_DIA_BAND),
+        display_unit=UNIT,
     )
     # Decimal places belong to the model dimension, not to the sheet.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
