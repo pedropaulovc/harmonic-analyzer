@@ -40,9 +40,11 @@ SUPPLIER_REFERENCE_STARTS = {
     "SupplierThreadDiameter": (-MAJOR_DIAMETER_MM / 2.0, -LENGTH_MM / 2.0),
 }
 SUPPLIER_REFERENCE_PLANES = {"SupplierHeadWidth": "Top"}
+# Four-place decimals: 5/32 prints .1563 (half away) and 7/16 .4375 (exact).
+# A native inch fraction prints its own inch mark before the " in" suffix.
 SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (2, "length", None, None),
     "SupplierHeadHeight": (4, "length", None, None),
-    "SupplierHeadWidth": (0, "length", 16, None),
+    "SupplierHeadWidth": (4, "length", None, None),
     "SupplierThreadDiameter": (2, "diameter", None, '1/4"-20'),
 }
