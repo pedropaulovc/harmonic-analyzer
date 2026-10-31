@@ -12,3 +12,4 @@ sh-vn-fillister-screw-90280a108:
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: purchased
+  drawing_unit: in
