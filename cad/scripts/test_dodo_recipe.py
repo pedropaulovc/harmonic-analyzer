@@ -2878,10 +2878,11 @@ def test_config_deps_are_fine_grained():
         "tolerances/cone_drum_oblique_mesh.yaml",
         "tolerances/gear_tip.yaml",
         "parts/dt-cone-gear.yaml",
-        # cone_set_stack reads the drum and arbor specs, whose sheet unit
-        # (#290 drawing_unit) lives on their own registry rows.
+        # cone_set_stack reads the drum, arbor and pedestal specs, whose sheet
+        # unit (#290 drawing_unit) lives on their own registry rows.
         "parts/dt-cylinder-gear.yaml",
         "parts/dt-cylinder-gear-shaft.yaml",
+        "parts/dt-arbor-pedestal.yaml",
         "parts/_defaults.yaml",
         "title_block.yaml",
         "release.yaml",
@@ -2924,7 +2925,11 @@ def test_config_deps_are_fine_grained():
     # registry row (and with it the shared defaults) for its sheet's
     # drawing_unit (UNIT); only those rows may appear.  Cutover removes the
     # switch and this allowance.
-    drawing_unit_rows = {"parts/dt-pinion-pivot-block.yaml", "parts/_defaults.yaml"}
+    drawing_unit_rows = {
+        "parts/dt-pinion-pivot-block.yaml",
+        "parts/dt-arbor-pedestal.yaml",
+        "parts/_defaults.yaml",
+    }
     assert not any(
         t.startswith("parts/") and t not in drawing_unit_rows for t in frame_recipe
     ), frame_recipe

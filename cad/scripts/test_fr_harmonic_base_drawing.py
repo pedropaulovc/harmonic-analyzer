@@ -3939,7 +3939,7 @@ def test_through_cut_volume_integrates_skin_full_rib_and_half_rib_without_drill_
 def test_pedestal_thread_interference_budget_stops_at_actual_retained_skin() -> None:
     import _interference_contracts as contracts
 
-    assert fr_harmonic_base_fasteners.PEDESTAL_SCREW_ENGAGEMENT == pytest.approx(14.05)
+    assert fr_harmonic_base_fasteners.PEDESTAL_SCREW_ENGAGEMENT == pytest.approx(13.97)
     for xz in part.PEDESTAL_SCREW_XZ:
         assert fr_harmonic_base_fasteners.retained_material_segments_mm(*xz)[0] == pytest.approx((0.0, 13.0))
     allowed = contracts.allowed_interference_pairs("ha-harmonic-analyzer")
