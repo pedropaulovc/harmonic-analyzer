@@ -441,7 +441,7 @@ async def build(adapter) -> dict[str, str]:
     # print under the title block's bands.
     set_dimension_bilateral_tolerance(
         adapter, "ScrewProfile", "ShoulderDia", *deviations(SHOULDER_DIA_BAND),
-        display_unit=UNIT,
+        places=4, display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
         adapter, "ScrewProfile", "TipChamfer", *deviations(TIP_CHAMFER_BAND),

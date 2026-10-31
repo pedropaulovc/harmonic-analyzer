@@ -385,7 +385,7 @@ END_PLAY_CALLOUT = (
     f"FACED TO SUIT, {inch_text(END_PLAY_RANGE[0], 3)}-"
     f"{inch_text(END_PLAY_RANGE[1], 3)} END PLAY"
 )
-SEAT_EDGE_CALLOUT = f"SEAT EDGE BREAK {inch_text(SEAT_EDGE_BREAK_MAX, 3)} MAX"
+SEAT_EDGE_CALLOUT = f"SEAT EDGE BREAK\n{inch_text(SEAT_EDGE_BREAK_MAX, 3)} MAX"
 
 # The shoulder's seat on the arm face: from the arm's printed maximum mouth
 # (the larger of it and the relief lead's envelope) out to the smallest
