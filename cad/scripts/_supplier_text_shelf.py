@@ -8,7 +8,9 @@ import put them, and the settled check proves they did. This is the measured
 method of the supplier_top screw shelves
 (``_supplier_screw_dimensions._shelf_supplier_top_text``) for any named
 reference, so the per-part sheet chooses the shelves, not the screw family's
-fixed name table.
+fixed name table. The purchased-part builder also shelves, after every supplier
+hook, each reference still struck by its own witnesses
+(:func:`struck_supplier_text`).
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from typing import Any, Literal
 from _com import _early_bound
 from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
 from _drawing_common import rebuild_drawing
+from _supplier_dimensions import _LINEAR_TYPES
 from _supplier_screw_dimensions import _supplier_top_record
 from _supplier_screw_layout import supplier_top_text_geometry
 
@@ -60,6 +63,64 @@ def _assert_stations(
             raise RuntimeError(f"{name}: supplier text shelf moved native {field}")
     if _line_stations(before, horizontal) != _line_stations(after, horizontal):
         raise RuntimeError(f"{name}: supplier text shelf moved the native dimension line")
+
+
+def _struck(actual: Mapping[str, Any], horizontal: bool) -> bool:
+    """Whether one of the reference's own witness lines runs through its text."""
+    text = actual["text"]
+    along = (text.xmin, text.xmax) if horizontal else (text.ymin, text.ymax)
+    across = (text.ymin, text.ymax) if horizontal else (text.xmin, text.xmax)
+    return any(
+        along[0] - CLEAR_GAP_M < station < along[1] + CLEAR_GAP_M
+        and start < across[1]
+        and end > across[0]
+        for station, start, end in actual["witnesses"]
+    )
+
+
+def struck_supplier_text(
+    adapter: Any, views: Mapping[str, Any]
+) -> tuple[dict[str, Any], dict[str, tuple[bool, Literal["left", "right"]]]]:
+    """Linear references whose own witness lines strike their text, and shelves.
+
+    Centred text wider than its span prints across its extension lines (the
+    4-40 nut's Ø.112 at 5:1). Each struck text shelves on the side of its
+    view it already sits on; a centred span shelves right. Clear text, and
+    text a sheet already shelved, is left alone.
+    """
+    displays: dict[str, Any] = {}
+    shelves: dict[str, tuple[bool, Literal["left", "right"]]] = {}
+    for view in views.values():
+        view = _early_bound(view, "IView")
+        outline = tuple(float(value) for value in view.GetOutline())
+        centre_x = (outline[0] + outline[2]) / 2.0
+        for raw in view.GetAnnotations() or ():
+            annotation = _early_bound(raw, "IAnnotation")
+            if int(annotation.GetType()) != 4:  # swDisplayDimension
+                continue
+            display = _early_bound(
+                annotation.GetSpecificAnnotation(), "IDisplayDimension"
+            )
+            if int(display.Type2) not in _LINEAR_TYPES:
+                continue
+            record = _supplier_top_record(adapter, display)
+            arrows = (record.get("display") or {}).get("arrows") or ()
+            horizontal = (
+                len(arrows) == 2
+                and abs(float(arrows[0][1]) - float(arrows[1][1])) <= 1e-5
+            )
+            actual = supplier_top_text_geometry(record, horizontal=horizontal)
+            if not _struck(actual, horizontal):
+                continue
+            name = str(_early_bound(display.GetDimension2(0), "IDimension").FullName)
+            tips = actual["tips"]
+            station = (tips[0][0] + tips[1][0]) / 2.0
+            displays[name] = display
+            shelves[name] = (
+                horizontal,
+                "left" if station < centre_x - 1e-4 else "right",
+            )
+    return displays, shelves
 
 
 def shelve_supplier_text(

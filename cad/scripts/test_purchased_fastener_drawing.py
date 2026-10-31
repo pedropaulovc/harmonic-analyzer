@@ -1174,6 +1174,134 @@ def test_isometric_scales_independently(monkeypatch, tmp_path):
     assert scales["*Isometric"] == (1, 1)
 
 
+class _PaddedView(_View):
+    """A view whose native outline is its geometry at scale plus fixed padding."""
+
+    def __init__(self, orientation, source, center, size):
+        super().__init__(orientation, source, center)
+        self._size = size
+
+    @property
+    def Position(self):
+        return self._center
+
+    def GetOutline(self):
+        ratio = self.ScaleRatio[0] / self.ScaleRatio[1]
+        width = self._size[0] * ratio + 0.0112
+        height = self._size[1] * ratio + 0.0112
+        x, y = self._center
+        return (x - width / 2, y - height / 2, x + width / 2, y + height / 2)
+
+    def SetViewPosition(self, position, _update):
+        self._center = tuple(position)
+        return True
+
+
+def test_short_top_band_lowers_the_row_instead_of_shrinking_every_view(
+    monkeypatch, tmp_path
+):
+    """A #6-32 x 5/8 SHCS's lane-starved Top band no longer forces 1:8."""
+    monkeypatch.setattr(purchased, "double_array", tuple)
+    margins = {
+        "*Front": (0.026, 0.026, 0.026, 0.020),
+        "*Top": (0.020, 0.026, 0.020, 0.026),
+    }
+    sizes = {
+        "*Front": (0.0057, 0.0197),
+        "*Top": (0.0057, 0.0057),
+        "*Right": (0.0057, 0.0197),
+        "*Isometric": (0.008, 0.021),
+    }
+
+    def fit_cells(lower):
+        outer = purchased.fastener_view_cells(0.073, lower=lower)
+        inner = purchased.supplier_fit_cells(outer, margins, label="t")
+        return purchased._share_front_row(inner)
+
+    def fresh_views(cells):
+        return [
+            _PaddedView(name, tmp_path / "s.SLDPRT", center, sizes[name])
+            for name, center, _ in cells
+        ]
+
+    standard = fit_cells(0.0)
+    assert purchased._fit_views(_Drawing(), fresh_views(standard), standard)[
+        "*Front"
+    ] == (1, 8)
+
+    views = fresh_views(standard)
+    lowering = purchased._top_lowering(_Drawing(), views, standard)
+    assert lowering == pytest.approx(0.0165)
+    assert all(view.ScaleRatio == (1.0, 1.0) for view in views)
+    lowered = fit_cells(lowering)
+    scales = purchased._fit_views(_Drawing(), views, lowered)
+    assert scales["*Front"] == scales["*Top"] == scales["*Right"] == (1, 1)
+    front, _top, right, _isometric = views
+    assert front.Position[1] == pytest.approx(right.Position[1])
+
+    roomy = purchased.fastener_view_cells(0.073)
+    assert purchased._top_lowering(_Drawing(), fresh_views(roomy), roomy) == 0.0
+
+
+def test_front_and_right_share_one_row():
+    outer = purchased.fastener_view_cells(0.073)
+    inset = purchased.supplier_fit_cells(
+        outer, {"*Front": (0.026, 0.026, 0.026, 0.020)}, label="t"
+    )
+    cells = {name: (center, cell) for name, center, cell in inset}
+    assert cells["*Front"][0][1] != cells["*Right"][0][1]
+
+    shared = {
+        name: (center, cell)
+        for name, center, cell in purchased._share_front_row(inset)
+    }
+    front, right = shared["*Front"], shared["*Right"]
+    assert front[0][1] == right[0][1]
+    assert (front[1][1], front[1][3]) == (right[1][1], right[1][3]) == (0.103, 0.162)
+    assert (right[1][0], right[1][2]) == (0.225, 0.405)
+    assert shared["*Top"] == cells["*Top"]
+    with pytest.raises(ValueError):
+        purchased._share_front_row(
+            (("*Front", (0, 0), (0, 0.0, 1, 0.1)), ("*Right", (0, 0), (0, 0.2, 1, 0.3)))
+        )
+
+
+def test_lowered_cells_move_the_row_boundary_only():
+    standard = {name: cell for name, _, cell in purchased.fastener_view_cells(0.073)}
+    lowered = {
+        name: cell
+        for name, _, cell in purchased.fastener_view_cells(0.073, lower=0.010)
+    }
+    for name in ("*Front", "*Right"):
+        assert lowered[name][3] == pytest.approx(standard[name][3] - 0.010)
+        assert lowered[name][:3] == standard[name][:3]
+    for name in ("*Top", purchased._ISOMETRIC):
+        assert lowered[name][1] == pytest.approx(standard[name][1] - 0.010)
+        assert lowered[name][3] == standard[name][3]
+    with pytest.raises(ValueError):
+        purchased.fastener_view_cells(0.073, lower=-0.001)
+
+
+def test_own_witness_through_text_is_struck_and_clear_text_is_not():
+    import _supplier_text_shelf as shelf
+    from _layout_geometry import Box
+
+    # A 4 mm horizontal span; witnesses rise 20 mm from the part to the line.
+    horizontal = ((0.100, 0.050, 0.070), (0.104, 0.050, 0.070))
+    across = {"witnesses": horizontal, "text": Box(0.095, 0.060, 0.110, 0.063)}
+    assert shelf._struck(across, True)
+    shelved = {"witnesses": horizontal, "text": Box(0.1065, 0.060, 0.120, 0.063)}
+    assert not shelf._struck(shelved, True)
+    beyond_ends = {"witnesses": horizontal, "text": Box(0.095, 0.071, 0.110, 0.074)}
+    assert not shelf._struck(beyond_ends, True)
+    # A vertical span: witnesses run along x, so text height is what strikes.
+    vertical = ((0.100, 0.050, 0.070), (0.103, 0.050, 0.070))
+    tall = {"witnesses": vertical, "text": Box(0.060, 0.099, 0.068, 0.104)}
+    assert shelf._struck(tall, False)
+    beside = {"witnesses": vertical, "text": Box(0.072, 0.099, 0.080, 0.104)}
+    assert not shelf._struck(beside, False)
+
+
 def test_footer_notes_hold_rule_seven_budget():
     assert purchased.note_lines("A\nB\nC", label="t") == ("A", "B", "C")
     with pytest.raises(ValueError):

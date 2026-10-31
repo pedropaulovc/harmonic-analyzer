@@ -2,9 +2,11 @@
 
 Every view is hidden-lines-removed. Optional native supplier references use
 explicit annotation margins reserved before fitting. Front/Top/Right share
-the largest fitting standard scale; Isometric has its own fitting scale and
-stays unannotated. All supplier dimensions are reference-only, not fabrication
-controls or claims that nominal envelopes survive every physical feature.
+the largest fitting standard scale, Right level with Front; when only Top's
+band is short, Top takes spare height from the Front/Right row. Isometric has
+its own fitting scale and stays unannotated. All supplier dimensions are
+reference-only, not fabrication controls or claims that nominal envelopes
+survive every physical feature.
 
 Supplier sources are opened read-only and observed through view creation,
 formatting, export and close, with a final SHA-256 guard on error paths too.
@@ -27,6 +29,7 @@ import json
 import math
 from collections.abc import Mapping, Sequence
 from enum import StrEnum
+from functools import partial
 from numbers import Real
 from pathlib import Path
 from typing import Any, Callable, Literal
@@ -65,6 +68,11 @@ from _drawing_scan import _zoomed_on
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_view_display import set_hidden_lines_removed
 from _fastener_catalog import fastener
+from _supplier_text_shelf import (
+    assert_supplier_shelves,
+    shelve_supplier_text,
+    struck_supplier_text,
+)
 import _seat_forensics
 import _telemetry
 
@@ -610,7 +618,10 @@ def _cell(
 
 
 def fastener_view_cells(
-    caption_y: float, *, layout: Literal["standard", "supplier_top", "tall_top"] = "standard"
+    caption_y: float,
+    *,
+    layout: Literal["standard", "supplier_top", "tall_top"] = "standard",
+    lower: float = 0.0,
 ) -> tuple:
     """Third-angle Front/Top/Right with the Isometric upper right.
 
@@ -622,9 +633,12 @@ def fastener_view_cells(
     ``supplier_top`` has 70 mm: two 26 mm annotation lanes leave 18 mm for
     its native outline. ``tall_top`` gives 96 mm. Both lower the bottom-row
     cells and Isometric together without changing the standard layout.
+    ``lower`` moves that same boundary down by sheet metres (:func:`_top_lowering`).
     """
     if layout not in ("standard", "supplier_top", "tall_top"):
         raise ValueError(f"unknown purchased fastener view layout: {layout!r}")
+    if not math.isfinite(lower) or lower < 0.0:
+        raise ValueError(f"purchased fastener row lowering must be >= 0: {lower!r}")
     bottom = caption_y + _CAPTION_TO_CELL
     if layout == "tall_top":
         row_top, top_bottom, isometric_bottom = 0.150, 0.166, 0.160
@@ -632,11 +646,38 @@ def fastener_view_cells(
         row_top, top_bottom, isometric_bottom = 0.176, 0.192, 0.186
     else:
         row_top, top_bottom, isometric_bottom = 0.182, 0.198, 0.192
+    row_top, top_bottom, isometric_bottom = (
+        row_top - lower,
+        top_bottom - lower,
+        isometric_bottom - lower,
+    )
     return (
         _cell("*Front", 0.025, bottom, 0.205, row_top),
         _cell("*Top", 0.025, top_bottom, 0.205, 0.262),
         _cell("*Right", 0.225, bottom, 0.405, row_top),
         _cell(_ISOMETRIC, 0.225, isometric_bottom, 0.415, 0.262),
+    )
+
+
+def _share_front_row(cells: tuple) -> tuple:
+    """Fit Front and Right in the overlap of their cells' heights.
+
+    Each view centres on its own fit cell, and supplier lanes inset Front and
+    Right differently, so RIGHT sat about 3 mm below FRONT. Both views project
+    the same model height, so one shared row keeps them level at any scale.
+    """
+    rows = {name: cell for name, _, cell in cells if name in ("*Front", "*Right")}
+    if len(rows) != 2:
+        raise ValueError(f"purchased layout needs Front and Right cells: {rows!r}")
+    low = max(cell[1] for cell in rows.values())
+    high = min(cell[3] for cell in rows.values())
+    if low >= high:
+        raise ValueError(f"Front and Right cells share no row: {rows!r}")
+    return tuple(
+        _cell(name, cell[0], low, cell[2], high)
+        if name in rows
+        else (name, center, cell)
+        for name, center, cell in cells
     )
 
 
@@ -1038,6 +1079,54 @@ def _fit_views(draw: Any, views: list[Any], cells: tuple) -> dict[str, tuple[int
         scale = _fit_group(draw, group)
         scales.update({cell[0]: scale for _, cell in group})
     return scales
+
+
+@_telemetry.traced("drawing.purchased_top_lowering")
+def _top_lowering(draw: Any, views: list[Any], cells: tuple) -> float:
+    """How far to lower the Front/Right row's top, and Top's band with it.
+
+    Supplier lanes can leave Top's fixed band shorter than its native outline
+    padding, so Top alone set the shared scale (a 5/8 in screw at 1:8 with
+    Front/Right half empty). Measure the standard scales largest first; at the
+    first one whose Front and Right fit with height to spare for an oversized
+    Top, lower the boundary midway through that spare range. Zero keeps the
+    cells. The views return to 1:1 for :func:`_fit_views`, which refits.
+    """
+    group = {
+        name: (view, cell)
+        for view, (name, _, cell) in zip(views, cells, strict=True)
+        if name != _ISOMETRIC
+    }
+    lowering = 0.0
+    for scale in _SCALES:
+        for view, _ in group.values():
+            view.UseSheetScale = 0
+            view.ScaleRatio = double_array([float(scale[0]), float(scale[1])])
+        _rebuild(draw, phase="measure row split")
+        width_spare: dict[str, float] = {}
+        height_spare: dict[str, float] = {}
+        for name, (view, cell) in group.items():
+            box, _ = _refreshed_native_fit_bounds(view, label=name)
+            width_spare[name] = (cell[2] - cell[0]) - (box[2] - box[0])
+            height_spare[name] = (cell[3] - cell[1]) - (box[3] - box[1])
+        row_spare = min(height_spare["*Front"], height_spare["*Right"])
+        top_short = -height_spare["*Top"]
+        if min(width_spare.values()) < 0.0 or row_spare < 0.0:
+            continue
+        if top_short <= 0.0:
+            break
+        if top_short <= row_spare:
+            lowering = (top_short + row_spare) / 2
+            break
+    for view, _ in group.values():
+        view.ScaleRatio = double_array([1.0, 1.0])
+    _rebuild(draw, phase="restore 1:1 after row split")
+    _telemetry.event(
+        "drawing.purchased_top_lowering",
+        scale=f"{scale[0]}:{scale[1]}",
+        lowering_m=lowering,
+    )
+    return lowering
 
 
 @_telemetry.traced("drawing.purchased_center_marks")
@@ -1682,15 +1771,9 @@ async def _build_reference_sheet(
     ):
         raise ValueError(f"{label}: source configuration must be a nonempty name")
     caption_y = view_band_bottom(notes, label=label, supplier_data=supplier_data)
-    cells = (
-        spring_view_cells(caption_y)
-        if spring
-        else fastener_view_cells(caption_y, layout=view_layout)
-    )
     if supplier_dimensions is None:
         if supplier_margins is not None:
             raise ValueError(f"{label}: supplier margins require an annotation hook")
-        fit_cells = cells
     else:
         if not callable(supplier_dimensions):
             raise TypeError(f"{label}: supplier annotation hook must be callable")
@@ -1698,7 +1781,22 @@ async def _build_reference_sheet(
             raise ValueError(
                 f"{label}: supplier annotations require explicit pre-fit margins"
             )
-        fit_cells = supplier_fit_cells(cells, supplier_margins, label=label)
+
+    def layout_cells(lower: float) -> tuple[tuple, tuple]:
+        """The outer cells, and the fitting cells inside them with one Front row."""
+        outer = (
+            spring_view_cells(caption_y)
+            if spring
+            else fastener_view_cells(caption_y, layout=view_layout, lower=lower)
+        )
+        inner = (
+            outer
+            if supplier_margins is None
+            else supplier_fit_cells(outer, supplier_margins, label=label)
+        )
+        return outer, _share_front_row(inner)
+
+    cells, fit_cells = layout_cells(0.0)
     draw, sheet = new_project_drawing(
         adapter,
         layout=spec.layout,
@@ -1762,6 +1860,10 @@ async def _build_reference_sheet(
         for view in views:
             view.UseSheetScale = 0
             view.ScaleRatio = double_array([1.0, 1.0])
+    if not spring:
+        lowering = _top_lowering(draw, views, fit_cells)
+        if lowering:
+            cells, fit_cells = layout_cells(lowering)
     scales = _fit_views(draw, views, fit_cells)
     if view_placement is not None:
         placement_check = view_placement(
@@ -1836,6 +1938,24 @@ async def _build_reference_sheet(
                         for view, (name, _, _) in zip(views, cells, strict=True)
                     },
                 )
+                # A text wider than its span still prints across its own
+                # witnesses (rule 14); shelve it past them, measured.
+                struck, shelves = struck_supplier_text(
+                    adapter,
+                    {
+                        name: view
+                        for view, (name, _, _) in zip(views, cells, strict=True)
+                        if name != _ISOMETRIC
+                    },
+                )
+                if shelves:
+                    stations = shelve_supplier_text(adapter, struck, shelves)
+                    settled_checks = (
+                        *settled_checks,
+                        partial(
+                            assert_supplier_shelves, adapter, struck, shelves, stations
+                        ),
+                    )
             # Import leaves a model view active. Footer/captions are sheet-owned.
             drawing = _early_bound(draw, "IDrawingDoc")
             drawing.ActivateView("")
