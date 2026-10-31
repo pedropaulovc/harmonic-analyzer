@@ -158,18 +158,30 @@ ARM_PLATE_NUMBER = _config.parts("pd-transgear-arm-plate")["number"]
 KNOB_CUP_NUMBER = _config.parts("pd-transgear-knob-cup")["number"]
 THUMBNUT_NUMBER = _config.parts("pd-transgear-thumbnut")["number"]
 COLLAR_SLIDING_FIT = f"SLIDING FIT IN\nDRIVE COLLAR\n{DRIVE_COLLAR_NUMBER} D-BORE"
-# The vertical Ø texts climb in a staircase so each one's three-line mate
-# callout (centred over its text, ~5.5 mm a line) clears the next text up,
-# and no Ø line rises through a text or callout of another: the journal's
-# and the pinion's sit on the first row, the core's over the pinion's
-# callout, the relief's over the core's.
+# An above callout prints only as ONE line (a line break there is stored but
+# never printed: farm run 20261031T205208603Z's four mate callouts went
+# unmatched), set as one run centred on its dimension's text: 40 characters
+# read 110.6 mm (draw_dt_cone_gear_shaft), and the shoulder under a Ø's text
+# spans that run (this sheet's journal: 38 characters, 104.3 mm). Each block
+# runs from 7.3 mm under its keep to 8.7 mm over it plus the callout row.
+ABOVE_CALLOUT_CHAR_WIDTH = 0.1106243 / 40
+_DIA_ROW_PITCH = 0.0205
+# The journal's row, 3 mm under the first row (its shoulder 10 mm over the
+# journal), so the staircase's top block stays 6 mm under the border.
+_DIA_ROW_Y = tuple(_ABOVE_Y - 0.003 + i * _DIA_ROW_PITCH for i in range(4))
+# The vertical Ø texts climb in a staircase, one row each: the journal's
+# hangs RIGHT of its line (left of the view's centre) and ends left of the
+# pinion's line; every other text hangs LEFT, so each line to the right
+# rises past the blocks on its left, and no shoulder runs over a line
+# (that run: the journal's shoulder at its row crossed the core's and the
+# relief's lines).
 SIDE_KEEP: dict[str, tuple[float, float]] = {
-    "OutsideDia": ((F_X + PINION_REAR_X) / 2.0, _ABOVE_Y),
-    "CoreDia": ((F_X + CORE_END_X) / 2.0, _ABOVE_Y + 0.021),
+    "OutsideDia": (F_X - 0.0015, _DIA_ROW_Y[1]),
+    "CoreDia": ((F_X + CORE_END_X) / 2.0, _DIA_ROW_Y[2]),
     # Run 12: from the relief's mid the hung text's shoulder started left of
     # F's witness line (214.4) and ran through the front-neck frame. Four
     # fifths along the relief it starts right of F, above that frame.
-    "ReliefDia": ((CORE_END_X + 4.0 * THREAD_END_X) / 5.0, _ABOVE_Y + 0.0465),
+    "ReliefDia": ((CORE_END_X + 4.0 * THREAD_END_X) / 5.0, _DIA_ROW_Y[3]),
     # A Ø's line stands at its point; right of the view's centre the text
     # hangs LEFT of it (the pinion's and core's, run 20261001T085006647Z), and
     # the blank's banded text and shoulder run 27.5 mm (19e33c6c2: from the
@@ -177,9 +189,9 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     # chamfer the line stands clear of the core runout frame below the text
     # and stays 9 mm off the thread callout's leader to the chamfer.
     "ThreadBlankDia": (CHAMFER_START_X - 0.009, _ABOVE_Y),
-    # 2 mm left of mid-journal: its callout (hung right of the line, over
-    # its text) stays 6 mm off the pinion's.
-    "JournalDia": ((PINION_REAR_X + REAR_X) / 2.0 - 0.002, _ABOVE_Y),
+    # 4 mm left of mid-journal, right of detail B's crop: its one-line run
+    # hangs right of the line and ends 6.7 mm short of the pinion's line.
+    "JournalDia": ((PINION_REAR_X + REAR_X) / 2.0 - 0.004, _DIA_ROW_Y[0]),
     # Its two-line text (45.7 mm wide with "DISC CLUSTER STACK") is wider
     # than the 17.7 mm between its witness lines, so it stands outside right
     # of F's (214.4): text ~218.6..264.3 mm, under the empty rows past F.
@@ -198,14 +210,16 @@ END_KEEP: dict[str, tuple[float, float]] = {
 }
 # Callouts over the vertical Ø texts (a below-callout there would sit on
 # the Ø's own line) and over the tooth span's text (its line meets the text
-# from below).
+# from below), each one line.
 DIMENSION_CALLOUTS_ABOVE = {
-    "JournalDia": f"RUNNING FIT IN\nARM PLATE BORE\n{ARM_PLATE_NUMBER}",
-    "OutsideDia": f"MESHES WITH\nDISC {DISC_NUMBER}",
-    "CoreDia": COLLAR_SLIDING_FIT,
-    "ReliefDia": f"THREAD RELIEF;\nCLEARS THUMBNUT\n{THUMBNUT_NUMBER}",
+    "JournalDia": f"RUNS IN ARM PLATE {ARM_PLATE_NUMBER}",
+    "OutsideDia": f"MESHES WITH DISC {DISC_NUMBER}",
+    "CoreDia": f"SLIDES IN DRIVE COLLAR {DRIVE_COLLAR_NUMBER}",
+    "ReliefDia": f"CLEARS THUMBNUT {THUMBNUT_NUMBER}",
     "ToothSpan": f"MESHES WITH DISC {DISC_NUMBER}",
 }
+if any("\n" in text for text in DIMENSION_CALLOUTS_ABOVE.values()):
+    raise AssertionError("an above-callout with a line break does not print")
 # The face width's ±band names the disc cluster stack (rule 4); its one
 # line hangs into the empty sixth baseline row below it.  The flat's and
 # the journal length's callouts hang under their texts, between witness
@@ -227,7 +241,12 @@ REFERENCE_DIMENSIONS = {"OverallLength": False, "ThreadBlankDia": True}
 THREAD_PICK = (CHAMFER_START_X, SIDE_CENTER[1] + 0.002)
 THREAD_NOTE_XY = ((THREAD_END_X + CHAMFER_START_X) / 2.0, _ABOVE_Y + 0.020)
 # The tip chamfer's callout stands under the tip, its leader climbing to the
-# same blank/chamfer edge from below, right of the tip's witness lines.
+# same blank/chamfer edge from below, right of the tip's witness lines.  On
+# one line it ran 64 mm, under the front view and through the tooth-space
+# note's leader (farm run 20261031T205208603Z); its two 2.78 mm-a-character
+# lines end ~39 mm right of the anchor, short of that leader (x 337..340 mm
+# at the callout's rows).
+TIP_CHAMFER_NOTE = TIP_CHAMFER_CALLOUT.replace(" TO ", "\nTO ")
 CHAMFER_PICK = (CHAMFER_START_X, SIDE_CENTER[1] - 0.002)
 CHAMFER_NOTE_XY = (TIP_X + 0.004, SIDE_CENTER[1] - HALF_OD - 0.002)
 # The running journal owns the one finish.
@@ -716,7 +735,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_attached_note(
         adapter,
         side,
-        text=TIP_CHAMFER_CALLOUT,
+        text=TIP_CHAMFER_NOTE,
         entity_xy=CHAMFER_PICK,
         note_xy=CHAMFER_NOTE_XY,
         label="MHA-PD-08 tip chamfer callout",

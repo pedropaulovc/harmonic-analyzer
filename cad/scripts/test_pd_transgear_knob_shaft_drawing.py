@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import inspect
+import itertools
 import math
 from dataclasses import replace
 from pathlib import Path
@@ -717,6 +718,74 @@ def test_tooth_space_note_lands_low_right_away_from_the_span() -> None:
     assert x > drawing.TIP_X + 0.030 and x + 0.082 < 0.4191
 
 
+def test_tip_chamfer_callout_ends_short_of_the_tooth_space_leader() -> None:
+    # Farm run 20261031T205208603Z: the one-line callout ran [293.4, 357.3] mm
+    # at y 140.9..144.5 and the note's leader, (329.3, 113.6) -> (342.1,
+    # 150.2) mm, ran 3.78 mm through it.  Same character width, two lines.
+    char_w = (0.3573 - 0.2934) / len("CHAMFER 45 DEG TO MINOR")
+    lines = drawing.TIP_CHAMFER_NOTE.splitlines()
+    assert " ".join(lines) == spec.TIP_CHAMFER_CALLOUT and len(lines) == 2
+    right = drawing.CHAMFER_NOTE_XY[0] + max(map(len, lines)) * char_w
+    (x0, y0), (x1, y1) = (0.3293, 0.1136), (0.3421, 0.1502)
+    # The anchor is the text's top left; the leader leans right as it rises,
+    # so its x at the callout's bottom row is the nearest it comes.
+    bottom = drawing.CHAMFER_NOTE_XY[1] - len(lines) * 0.0045
+    leader_x = x0 + (bottom - y0) * (x1 - x0) / (y1 - y0)
+    assert right + 0.003 < leader_x
+    # Negative control: the old single line reaches past the leader.
+    assert drawing.CHAMFER_NOTE_XY[0] + 23 * char_w > leader_x
+
+
+def _dia_block(name: str) -> tuple[float, float, float, float, float]:
+    """(line x, left, right, bottom, top) of a vertical Ø text and its
+    one-line above callout: left of the view's centre it hangs right of its
+    line, else left; the block runs 7.3 mm under the keep to the callout's
+    row 8.7 mm over it (run 20261031T205208603Z, draw_dt_cone_gear_shaft)."""
+    x, y = drawing.SIDE_KEEP[name]
+    char_w = drawing.ABOVE_CALLOUT_CHAR_WIDTH
+    width = len(drawing.DIMENSION_CALLOUTS_ABOVE[name]) * char_w
+    left, right = (x, x + width) if x < drawing.SIDE_CENTER[0] else (x - width, x)
+    return x, left, right, y - 0.0073, y + 0.0087 + 0.0036
+
+
+def test_vertical_dia_shoulders_cross_no_other_dia_line() -> None:
+    # Run 20261031T205208603Z: the journal's shoulder (240.6 -> 136.3 mm at y
+    # 182.2) crossed the core's and the relief's lines.  Every above callout
+    # prints on one line; no Ø line rises through another's block, no two
+    # blocks overlap, and the blocks stay clear of detail B and the border.
+    above = drawing.DIMENSION_CALLOUTS_ABOVE
+    assert all("\n" not in text for text in above.values())
+    names = ("JournalDia", "OutsideDia", "CoreDia", "ReliefDia")
+    blocks = {name: _dia_block(name) for name in names}
+    feature_r = {
+        "JournalDia": spec.JOURNAL_DIA,
+        "OutsideDia": spec.OUTSIDE_DIA,
+        "CoreDia": spec.CORE_DIA,
+        "ReliefDia": spec.RELIEF_DIA,
+    }
+    for name, (line_x, _l, _r, bottom, _t) in blocks.items():
+        line_bottom = drawing._sheet_y(feature_r[name] / 2.0)
+        for other, (_x, left, right, o_bottom, o_top) in blocks.items():
+            if other == name:
+                continue
+            crosses_x = left - 0.002 < line_x < right + 0.002
+            crossed = crosses_x and o_bottom < bottom and o_top > line_bottom
+            assert not crossed, (name, other)
+    for a, b in itertools.combinations(names, 2):
+        _, al, ar, ab, at = blocks[a]
+        _, bl, br, bb, bt = blocks[b]
+        assert ar < bl or br < al or at + 0.0005 < bb or bt + 0.0005 < ab, (a, b)
+    center, crop = drawing.DETAIL_CENTER, drawing.DETAIL_CROP_RADIUS
+    for _x, left, _r, _b, top in blocks.values():
+        assert left > center[0] + crop + 0.002
+        assert top < 0.2667 - 0.003
+    # Negative control: the run's journal row and three-line run cross the
+    # core's line.
+    char_w = drawing.ABOVE_CALLOUT_CHAR_WIDTH
+    run_right = drawing.SIDE_KEEP["JournalDia"][0] + 38 * char_w
+    assert run_right > drawing.SIDE_KEEP["CoreDia"][0]
+
+
 class _NeckView:
     """A recording IView double for detail B's place-move-crop."""
 
@@ -1019,7 +1088,7 @@ def test_build_takes_its_controls_and_callouts_from_the_spec(monkeypatch, tmp_pa
     assert references == drawing.REFERENCE_DIMENSIONS
     # The thread and the tip chamfer each carry one attached callout.
     texts = [kwargs["text"] for _args, kwargs in seat.made["add_attached_note"]]
-    assert texts == [spec.THREAD_CALLOUT, spec.TIP_CHAMFER_CALLOUT]
+    assert texts == [spec.THREAD_CALLOUT, drawing.TIP_CHAMFER_NOTE]
     finishes = [kwargs["label"] for _args, kwargs in seat.made["add_surface_finish"]]
     assert finishes == ["journal finish"]
 
