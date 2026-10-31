@@ -296,11 +296,15 @@ SIDE_KEEP = {
 # 902433a8d: 2.3 mm read as one callout), its landing line 2 mm over the
 # outboard journal's finish symbol and its fit row 7 mm under the cross-hole
 # callout's landing line; the relief's Ø10.4 stands right of it.
+# The inch sliding band (0/-0.02032) widened the Ø9.525's block 6 mm to the
+# right, onto the leader, so the block stands 4 mm higher, where the leader
+# has climbed 2.8 mm past its landing line's end (machinist review, #290
+# batch 0).
 # The existing loose Ø9.5 remains on the inboard neck, over the Ø9.000's
 # block. A separate measured diameter identifies the collar-side neck.
 # The Ø9.000's line stays 2 mm past its step, clear of the retention-pin note.
 DIAMETER_POSITIONS = {
-    "ShaftDiaDim": (PIN_X - 0.016, 0.2195),
+    "ShaftDiaDim": (PIN_X - 0.016, 0.2235),
     "JournalDiaDim": (RELIEF_START_X - 0.0069, 0.224),
     "ReliefDiaDim": (RELIEF_START_X + 0.045, 0.212),
     "PinionSeatDiaDim": (SEAT_STEP_X + 0.002, 0.2125),
