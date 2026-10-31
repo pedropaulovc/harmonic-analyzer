@@ -222,8 +222,9 @@ JOURNAL_CALLOUT = f"JOURNAL,\nRUNS IN {STRAP_NUMBER}"
 # to the non-journal Ø8.  The lands run past the straps' inner faces to hold
 # them through the drum's float (LAND_MARGINS_AT_STOPS), so each drum end
 # rests on its land's inner end at every limit; the callout says so.
+# The callout rides the BondZoneDia dimension, which prints the size itself.
 BOND_ZONE_CALLOUT = (
-    f"ALL<MOD-DIAM>{SHAFT_DIA:.4f} EXCEPT JOURNALS;\n"
+    "ALL EXCEPT JOURNALS;\n"
     f"{DRUM_NUMBER} BOND ZONE,\n"
     "DRUM ENDS ON JOURNALS"
 )
