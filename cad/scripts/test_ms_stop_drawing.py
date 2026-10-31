@@ -37,10 +37,10 @@ def test_shared_frame_and_open_rebate_closure() -> None:
     # millimetre decimal of its printed inch value.
     assert spec.UNIT == "in"
     for got, inch in (
-        (spec.BLOCK_LENGTH, 0.84), (spec.BLOCK_HEIGHT, 0.56), (spec.BLOCK_DEPTH, 0.47),
+        (spec.BLOCK_LENGTH, 0.84), (spec.BLOCK_HEIGHT, 0.56), (spec.BLOCK_DEPTH, 0.48),
         (spec.PLATE_THICKNESS, 0.040), (spec.WINDOW_WIDTH, 0.330), (spec.WINDOW_HEIGHT, 0.134),
-        (spec.ROOF_THICKNESS, 0.09), (spec.ROOF_END_CHAMFER, 0.04), (spec.BACK_WALL_THICKNESS, 0.14),
-        (spec.RELIEF_DEPTH, 0.045), (spec.RELIEF_HEIGHT, 0.06),
+        (spec.ROOF_THICKNESS, 0.09), (spec.ROOF_END_CHAMFER, 0.04), (spec.BACK_WALL_THICKNESS, 0.15),
+        (spec.RELIEF_DEPTH, 0.05), (spec.RELIEF_HEIGHT, 0.06),
     ):
         assert got == pytest.approx(_inch(inch), rel=0.0, abs=1e-9)
     assert (spec.PLATE_Z_MIN, spec.PLATE_Z_MAX) == (-spec.PLATE_THICKNESS, 0.0)
@@ -104,14 +104,14 @@ def test_print_worst_joint_stack_preserves_bottoming_tap_and_ligaments() -> None
     assert spec.PLATE_SCREW_PENETRATION_MAX < spec.PLATE_FULL_THREAD_MIN
     assert spec.PLATE_TAP_LEAD_MIN == pytest.approx(1.016)
     assert spec.PLATE_TAP_LEAD_MIN >= screw.PITCH
-    assert spec.PLATE_TAP_BACK_WALL_MIN == pytest.approx(3.34942, abs=1e-5)
+    assert spec.PLATE_TAP_BACK_WALL_MIN == pytest.approx(3.60342, abs=1e-5)
     assert spec.ROOF_THICKNESS_MIN == pytest.approx(2.032)
     assert spec.PLATE_TAP_WINDOW_WEB_MIN == pytest.approx(2.63271)
     assert spec.PLATE_TAP_END_WEB_MIN == pytest.approx(2.32791)
     assert spec.PLATE_TAP_MAJOR_DIA_MAX == pytest.approx(0.0887 * 25.4)
     assert spec.PLATE_TAP_MAJOR_DIA_MAX > screw.MAJOR_DIA
-    assert spec.WINDOW_BACK_WALL_MIN == pytest.approx(3.302)
-    assert spec.BLOCK_DEPTH_MIN == pytest.approx(11.684)
+    assert spec.WINDOW_BACK_WALL_MIN == pytest.approx(3.556)
+    assert spec.BLOCK_DEPTH_MIN == pytest.approx(11.938)
     assert spec.PLATE_CLEARANCE_END_WEB_MIN == pytest.approx(2.2098)
     assert spec.PLATE_CLEARANCE_HEAD_WEB_MIN == pytest.approx(8.5598)
     assert spec.PLATE_RADIAL_CLEARANCE_MIN == pytest.approx(0.1016)
@@ -153,11 +153,13 @@ def test_hole_wizard_callouts_print_three_places_by_native_variable() -> None:
     for size_mm, printed in ((spec.PLATE_TAP_DRILL_DIA, ".073"), (spec.THUMB_TAP_DRILL, ".089"),
                              (spec.PLATE_CLEARANCE_DIA, ".094")):
         assert f"{size_mm / 25.4:.3f}".lstrip("0") == printed
-    # The plate callout states the pair's function under the native size; the
-    # pilot-and-open procedure lives in the assembly sheet's step 1.
-    assert plate_drawing.CLEARANCE_FUNCTION.splitlines() == [
-        f"MATCH DRILL WITH MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']}",
-        spec.MATCHED_PAIR_NOTE,
+    # The plate callout states what the hole clears and its mate under the
+    # native size; the pilot-and-open procedure lives in the assembly
+    # sheet's step 1. Three text rows keep the callout within four.
+    rows = plate_drawing.CLEARANCE_FUNCTION.splitlines()
+    assert rows[0] == "CLEARS 2-56 SCREWS INTO"
+    assert rows[1:] == [
+        f"MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']} TAPS", spec.MATCHED_PAIR_NOTE,
     ]
 
 
@@ -213,7 +215,7 @@ def test_each_sheet_imports_the_complete_model_contract(builder, drawing, dimens
     assert marked == keeps == set(precision) == set(values)
     # .XXX for the rebate, the matched pair's stations and cover thickness;
     # whole-degree angles.
-    three = ({"WindowWidth", "WindowHeight", "ReliefDepth", *spec.PLATE_LOCATION_DIMENSIONS}
+    three = ({"WindowWidth", "WindowHeight", *spec.PLATE_LOCATION_DIMENSIONS}
              if builder is block
              else {"PlateThickness", *spec.PLATE_LOCATION_DIMENSIONS})
     assert {name: places for name, places in precision.items() if places != 2} == {
@@ -359,8 +361,8 @@ class _StopMathUtility:
     (block_drawing, [
         ("two cover blind taps", "*Back", (0.0184531, 0.004064, 0.0), (0.1238596, 0.172808)),
         ("thumbscrew tap through floor", "*Bottom",
-         (0.0117985, 0.0, 0.004318), (0.150478, 0.079604)),
-        ("cover mating face", "*Left", (0.010668, 0.012573, 0.0), (0.291124, 0.206844)),
+         (0.0117985, 0.0, 0.004318), (0.150478, 0.080112)),
+        ("cover mating face", "*Left", (0.010668, 0.012573, 0.0), (0.290616, 0.206844)),
     ]),
     (plate_drawing, [
         ("two cover clearance holes", "*Back", (0.0183701441, 0.0032198559, -0.001016), (0.1441914, 0.1544314)),
@@ -828,11 +830,10 @@ def test_stock_precision_and_worst_case_walls_use_each_printed_band() -> None:
         name: printed_band_mm(spec.PLATE_DRAWING_PRECISION_BY_NAME[name], unit="in")
         for name in ("PlateLength", "PlateHeight")
     }
-    assert spec.BLOCK_PRINTED_BANDS_MM == {
-        **dict.fromkeys(("BlockLength", "BlockHeight", "RoofThickness", "BackWall"),
-                        pytest.approx(_inch(0.01))),
-        "ReliefDepth": pytest.approx(_inch(0.005)),
-    }
+    assert spec.BLOCK_PRINTED_BANDS_MM == dict.fromkeys(
+        ("BlockLength", "BlockHeight", "RoofThickness", "BackWall", "ReliefDepth"),
+        pytest.approx(_inch(0.01)),
+    )
     # The corner relief's .040 minimum depth clears the title block's R.040
     # MAX corner, and the back wall behind it keeps the .080 target.
     assert spec.RELIEF_DEPTH - spec.BLOCK_PRINTED_BANDS_MM["ReliefDepth"] == pytest.approx(

@@ -40,7 +40,7 @@ assert drawing_unit("parts/ms-stop-plate", _config.parts("ms-stop-plate")) == UN
 
 BLOCK_LENGTH = 21.336  # .84
 BLOCK_HEIGHT = 14.224  # .56
-BLOCK_DEPTH = 11.938  # .47
+BLOCK_DEPTH = 12.192  # .48
 PLATE_THICKNESS = 1.016  # .040
 PLATE_Z_MAX = 0.0
 PLATE_Z_MIN = PLATE_Z_MAX - PLATE_THICKNESS
@@ -56,9 +56,9 @@ FLOOR_THICKNESS = WINDOW_Y_MIN
 BACK_WALL_THICKNESS = BLOCK_DEPTH - WINDOW_Z_MAX
 # Corner relief: a notch in the back wall under the roof, so the stick
 # seats on the roof whatever corner radius (up to the title block's R.040 MAX)
-# the cutter leaves. Its .045 +/-.005 depth clears that radius at its minimum;
-# the .47 depth keeps the wall behind it at the .080 target.
-RELIEF_DEPTH = 1.143  # .045
+# the cutter leaves. Its .05 +/-.01 depth clears that radius at its minimum;
+# the .48 depth keeps the wall behind it at the .080 target.
+RELIEF_DEPTH = 1.27  # .05
 RELIEF_HEIGHT = 1.524  # .06
 ROOF_END_CHAMFER = 1.016  # .04
 ROOF_CHAMFER_ANGLE = 45.0
@@ -152,16 +152,16 @@ PLATE_LOCATION_DIMENSIONS = frozenset({
     "PlateLeftFromEnd", "PlateRightFromEnd", "PlateFromHeadFace",
 })
 # The back wall is dimensioned directly, as the 2026-10-09 ruling did for the
-# roof, so its .XX band lands on the wall; the .47 envelope depth follows
-# from the rebate and the wall and prints as a reference "(.47)".
+# roof, so its .XX band lands on the wall; the .48 envelope depth follows
+# from the rebate and the wall and prints as a reference "(.48)".
 BLOCK_REFERENCE_DIMENSIONS = frozenset({"BlockDepth"})
 # Sizes print the title block's .XX unless they need .XXX: the rebate (its
-# +.004/0 for the stick), the relief depth (.040 minimum clears the corner
-# radius), the cover thickness and the match-drill stations the cover masters
-# (+/-.004); the block repeats those stations at the cover's places as
-# references. Angles print whole degrees against the title block's +/-1 deg.
+# +.004/0 for the stick), the cover
+# thickness and the match-drill stations the cover masters (+/-.004); the
+# block repeats those stations at the cover's places as references. Angles
+# print whole degrees against the title block's +/-1 deg.
 _THREE_PLACE = frozenset({
-    "WindowWidth", "WindowHeight", "ReliefDepth", "PlateThickness", *PLATE_LOCATION_DIMENSIONS,
+    "WindowWidth", "WindowHeight", "PlateThickness", *PLATE_LOCATION_DIMENSIONS,
 })
 
 

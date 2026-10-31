@@ -82,7 +82,7 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "BlockDepth": (0.315, 0.235), "WindowWidth": (0.262, 0.130),
     "WindowHeight": (0.370, 0.180), "RoofThickness": (0.355, 0.220),
-    # Above the roof, left of the roof-thickness text, under the (.47).
+    # Above the roof, left of the roof-thickness text, under the (.48).
     "BackWall": (0.345, 0.224),
     # Depth across the notch, its text left in the open rebate; height right
     # of the back face, inside the roof-thickness dimension.
