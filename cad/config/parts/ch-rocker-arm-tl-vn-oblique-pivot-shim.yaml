@@ -10,3 +10,4 @@ ch-rocker-arm-tl-vn-oblique-pivot-shim:
   quantity: 10
   tolerance_class: visual_noncritical
   process: purchased
+  drawing_unit: in
