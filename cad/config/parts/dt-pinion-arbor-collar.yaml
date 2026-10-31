@@ -9,4 +9,5 @@ dt-pinion-arbor-collar:
   finish: bright machined; protect with ISO VG 32 machine-oil film
   quantity: 1
   tolerance_class: machined_block
-  process: "turn OD and face to length; drill Ø8 slide bore; drill 1/16 spring-pin hole through both walls at the length's centre"
+  process: "turn OD and face to length; drill 5/16 slide bore; drill 1/16 spring-pin hole through both walls at the length's centre"
+  drawing_unit: in

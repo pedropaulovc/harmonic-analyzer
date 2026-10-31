@@ -9,7 +9,13 @@ spring's formed profile re-keys neither the layout importers nor the base.
 
 from __future__ import annotations
 
+import _config
+from _package_units import drawing_unit
+
 MM_PER_IN = 25.4
+# #290: the sheet prints decimal inch; the rig layout and the drive train read
+# its printed rows through this unit.
+UNIT = drawing_unit("parts/dt-pinion-spring", _config.parts("dt-pinion-spring"))
 
 # 17-7 PH (UNS S17700) Condition C strip, 0.015 in thick, sheared 1/4 in wide
 # from McMaster-Carr 2325K19 (6 in x 50 in roll).  #859 ruling 4 (Main,
@@ -27,7 +33,8 @@ THICK_BAND = (0.00075 * MM_PER_IN, -0.00075 * MM_PER_IN)
 WIDTH_PLACES = 2  # StripWidth prints .XX (dt_pinion_spring_spec)
 
 # Screw-down pad width (dt_pinion_spring_geometry has the rest of the pad).
-PAD_WIDTH = 9.5
+# #290: .38, whose half (.19) is the printed hole station from the pad's edge.
+PAD_WIDTH = 9.652  # .38
 PAD_WIDTH_PLACES = 2  # PadWidth prints .XX (dt_pinion_spring_spec)
 
 # The foot screw stands this far east of the swing pivot axis (O5, Main

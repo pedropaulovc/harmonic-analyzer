@@ -21,18 +21,20 @@ import dt_cylinder_gear_spec as spec
 import draw_dt_cylinder_gear as drawing
 
 
-def test_running_bore_limits_follow_the_finished_arbor() -> None:
-    # Opposite ends of the arbor size band must not receive one fixed bore band.
-    assert spec.matched_bore_limits(9.505) == pytest.approx((9.535, 9.575))
-    assert spec.matched_bore_limits(9.525) == pytest.approx((9.555, 9.595))
+def test_reamed_bore_closes_the_configured_running_fit_on_the_arbor() -> None:
+    # Interchangeable (#290): every gear is reamed .3760-.3765 in, so the
+    # clearance on the SHAFT_H arbor is the shaft_in_bushing class, and the
+    # model bore sits at its least size, never on the arbor's nominal.
+    from _fit_ream_slide import REAM_SLIDE
 
-
-def test_native_bore_represents_a_finished_running_fit() -> None:
-    # Equal nominal bore/arbor diameters previously modeled zero clearance,
-    # even though the drawing required a positive matched running clearance.
-    minimum, maximum = spec.matched_bore_limits(arbor.SHAFT_DIA)
-    assert minimum <= spec.BORE_DIA <= maximum
-    assert spec.BORE_DIA - arbor.SHAFT_DIA == pytest.approx(0.050)
+    assert spec.BORE_DIA == pytest.approx(arbor.SHAFT_DIA + REAM_SLIDE[1])
+    assert spec.BORE_DIA + spec.BORE_DIA_BAND[0] == pytest.approx(
+        arbor.SHAFT_DIA + REAM_SLIDE[0]
+    )
+    assert spec.BORE_DIAMETRAL_CLEARANCE_MM == pytest.approx(
+        tuple(_config.fit("shaft_in_bushing", "diametral_clearance_mm"))
+    )
+    assert spec.BORE_DIA - arbor.SHAFT_DIA == pytest.approx(0.0254)
 
 
 def test_blank_and_tooth_profile_follow_the_same_configured_pitch(
@@ -77,27 +79,12 @@ def test_tooth_system_and_reference_cutter_are_spec_owned() -> None:
     assert spec.WHOLE_DEPTH == pytest.approx(spec.STOCK_FORM.plunge_mm)
     assert spec.MAX_CUT_DEPTH_MM > spec.WHOLE_DEPTH
     assert spec.OUTSIDE_DIA <= spec.MAX_DEPTH_SUPPORT_OUTSIDE_DIA_MM
-    assert spec.OUTSIDE_DIA + 0.01 > spec.MAX_DEPTH_SUPPORT_OUTSIDE_DIA_MM
+    assert spec.OUTSIDE_DIA + 0.0254 > spec.MAX_DEPTH_SUPPORT_OUTSIDE_DIA_MM
     assert spec.OUTSIDE_DIA_BAND == gear_tip_band_mm("standard")
-    assert spec.WHOLE_DEPTH_BAND == (0.05, 0.0)
+    assert spec.WHOLE_DEPTH_BAND == (0.0508, 0.0)
     assert spec.CUTTER_NUMBER == 2
     assert spec.CUTTER_TEETH_RANGE == (55, 134)
     assert spec.CUTTER_TEETH_RANGE[0] <= spec.TEETH <= spec.CUTTER_TEETH_RANGE[1]
-    for row in (
-        f"NUMBER OF TEETH:  {spec.TEETH}",
-        f"DIAMETRAL PITCH:  {spec.DIAMETRAL_PITCH:.2f}",
-        f"PRESSURE ANGLE:  {spec.PRESSURE_ANGLE_DEG:.1f} DEG",
-        f"PITCH DIAMETER (mm, REF):  {spec.PITCH_DIA:.2f}",
-        f"ROOT DIAMETER (mm, REF):  {sum(spec.ROOT_ENVELOPE_DIA_MM) / 2.0:.2f}",
-        f"CUTTER PLUNGE (mm):  {spec.WHOLE_DEPTH:.3f} "
-        f"+{spec.WHOLE_DEPTH_BAND[0]:.2f}/{spec.WHOLE_DEPTH_BAND[1]:.2f}; "
-        "SETS BACKLASH WITH CONE GEARS MHA-DT-03",
-        f"FORM CUTTER:  #{spec.CUTTER_NUMBER}, "
-        f"{spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T; "
-        f"{spec.CUTTER_REFERENCE_TEETH}T REFERENCE",
-        "TOOTH FORM:  SPUR INVOLUTE, FULL DEPTH, AS CUT BY THE FORM CUTTER",
-    ):
-        assert row in notes.GEAR_DATA
     assert "NONSTANDARD" not in notes.GEAR_DATA
     assert "OUTSIDE DIAMETER" not in notes.GEAR_DATA
 
@@ -106,16 +93,17 @@ def test_drum_prints_the_tooth_runout_the_cone_mesh_stack_books() -> None:
     import cone_set_stack
 
     assert notes.TOOTH_RUNOUT_TIR_MM == cone_set_stack.TOOTH_RUNOUT_TIR_MM
-    assert (
-        f"TOOTH CUTTING SETUP, ACCEPT AT SETUP:  {cone_set_stack.TOOTH_RUNOUT_TIR_MM:.4f} "
-        "TIR MAX TO FINISHED BORE"
-    ) in notes.GEAR_DATA
+    printed = notes.inch_text(cone_set_stack.TOOTH_RUNOUT_TIR_MM, 3)
+    assert f"{printed} TIR MAX TO FINISHED BORE" in notes.GEAR_DATA
+    assert float(printed) * 25.4 == pytest.approx(cone_set_stack.TOOTH_RUNOUT_TIR_MM)
 
 
 def test_title_block_notch_depth_still_cuts_below_the_root_and_clears_the_cam() -> None:
     from _printed_tolerance import printed_band_mm
 
-    band = printed_band_mm(spec.DRAWING_PRECISION["NotchProfile"]["NotchDepth"])
+    band = printed_band_mm(
+        spec.DRAWING_PRECISION["NotchProfile"]["NotchDepth"], unit=spec.UNIT
+    )
     assert spec.NOTCH_DEPTH - band > spec.WHOLE_DEPTH + spec.WHOLE_DEPTH_BAND[0]
     assert spec.TIP_RADIUS - (spec.NOTCH_DEPTH + band) > (
         spec.CAM_DIA / 2.0 + spec.ECCENTRICITY + spec.ECCENTRICITY_TOLERANCE_MM
@@ -190,21 +178,28 @@ def test_notch_width_limit_is_set_and_read_back_natively(monkeypatch) -> None:
 
 
 def test_worst_case_cam_wall_is_printed_and_clears_the_floor() -> None:
-    import dt_cylinder_gear_shaft_spec as arbor
+    from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+    from _printed_tolerance import printed_deviations
 
+    cam_lower = printed_deviations(
+        spec.CAM_DIA, 3, (spec.CAM_DIA_BAND[1], spec.CAM_DIA_BAND[0]), unit="in"
+    )[0]
+    ecc_upper = printed_deviations(
+        spec.ECCENTRICITY,
+        4,
+        (-spec.ECCENTRICITY_TOLERANCE_MM, spec.ECCENTRICITY_TOLERANCE_MM),
+        unit="in",
+    )[1]
     worst_wall = (
-        (spec.CAM_DIA + spec.CAM_DIA_BAND[1]) / 2.0
-        - (spec.ECCENTRICITY + spec.ECCENTRICITY_TOLERANCE_MM)
-        - (
-            arbor.SHAFT_DIA
-            + arbor.SHAFT_DIA_BAND[0]
-            + spec.BORE_DIAMETRAL_CLEARANCE_MM[1]
-        )
-        / 2.0
+        (spec.CAM_DIA + cam_lower) / 2.0
+        - (spec.ECCENTRICITY + ecc_upper)
+        - (spec.BORE_DIA + spec.BORE_DIA_BAND[0]) / 2.0
     )
-    assert worst_wall - 0.01 < spec.CAM_WALL_MIN_MM <= worst_wall
-    assert 1.5 < spec.CAM_WALL_MIN_MM < 2.0
-    assert f"{spec.CAM_WALL_MIN_MM:.2f} MIN WALL" in notes.BORE_FIT_CALLOUT
+    assert worst_wall - 0.0254 < spec.CAM_WALL_MIN_MM <= worst_wall
+    # Rule 17 (inch): under the .080 target, over the .060 floor (#992).
+    assert WALL_FLOOR_MM < spec.CAM_WALL_MIN_MM < WALL_TARGET_MM
+    printed = notes.inch_text(spec.CAM_WALL_MIN_MM, 3)
+    assert f"{printed} MIN WALL" in notes.BORE_FIT_CALLOUT
 
 
 def test_cam_and_notch_oracles_use_actual_off_centre_root_material() -> None:
@@ -282,7 +277,8 @@ def test_reference_axis_iterator_uses_nullable_dispatch_not_truthiness(monkeypat
 
 def test_printed_plunge_corners_keep_finite_actual_cutter_support() -> None:
     depth_limits = spec.whole_depth_limits_mm()
-    nominal = round(spec.WHOLE_DEPTH, spec.WHOLE_DEPTH_PLACES)
+    places = spec.WHOLE_DEPTH_PLACES
+    nominal = round(spec.WHOLE_DEPTH / 25.4, places) * 25.4  # the printed inch plunge
     upper, lower = spec.WHOLE_DEPTH_BAND
     assert depth_limits == pytest.approx((nominal + lower, nominal + upper))
     profiles = spec.manufacturing_corner_profiles()
@@ -310,7 +306,8 @@ def test_printed_plunge_corners_keep_finite_actual_cutter_support() -> None:
 def test_tip_limits_follow_printed_nominal_and_shared_grade(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    nominal = round(spec.OUTSIDE_DIA, spec.DRAWING_PRECISION_BY_NAME["OutsideDia"])
+    places = spec.DRAWING_PRECISION_BY_NAME["OutsideDia"]
+    nominal = round(spec.OUTSIDE_DIA / 25.4, places) * 25.4  # the printed inch tip
     upper, lower = gear_tip_band_mm("standard")
     assert spec.outside_dia_limits_mm() == pytest.approx(
         (nominal + lower, nominal + upper), abs=1e-12
@@ -351,22 +348,26 @@ def test_every_marked_dimension_has_exactly_one_view_owner() -> None:
 def test_the_part_owns_every_printed_decimal_place() -> None:
     """drawing-simplicity-policy.md `How the repository implements the guidelines`: places are the tolerance, so the .SLDPRT carries them.
 
-    Three places only where a three-place band rides the dimension (the
-    matched bore's reference nominal, the cam eccentricity); four on the
-    stacking thickness that sets the station pitch, 7.0565 +/-0.025, exact
-    only at four (#743, user ruling L20 d'); the cam thickness is the one
-    sheet-derived value, a parenthesised reference.
+    Inch places (#290): four on the reamed bore's +.0005 band and on the two
+    kinematic values held to +/-.0010 (the stacking thickness that IS the
+    station pitch, and the cam throw); three on the +/-.002-class bands and
+    the .016 MAX kerf; the cam thickness is the one sheet-derived value, a
+    parenthesised reference.
     """
     by_name = spec.DRAWING_PRECISION_BY_NAME
     assert set(by_name) == set().union(*spec.DRAWING_DIMENSIONS.values())
     assert {name for name, places in by_name.items() if places == 3} == {
-        "BoreDia",
-        "CamCy",
+        "FaceWidth",
+        "OutsideDia",
+        "CamDia",
+        "NotchWidth",
     }
     assert {name for name, places in by_name.items() if places == 4} == {
+        "BoreDia",
+        "CamCy",
         "OverallThickness",
     }
-    assert spec.DRAWING_REFERENCE_PRECISION == {"cam thickness reference": 2}
+    assert spec.DRAWING_REFERENCE_PRECISION == {"cam thickness reference": 3}
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")

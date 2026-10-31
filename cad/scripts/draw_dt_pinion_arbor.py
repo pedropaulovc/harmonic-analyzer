@@ -47,6 +47,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
 from _layout_geometry import audit_sheet, format_findings
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -467,9 +468,11 @@ def _detail_x(model_z: float) -> float:
 
 DIMENSION_CALLOUTS = {
     # One name for the axial datum every station runs from (Fable m1): the
-    # head end has two shoulders, Ø5/16-Ø10.5 and Ø10.5-Ø15.
+    # head end has two shoulders, Ø5/16-Ø.41 and Ø.41-Ø.59.
     # <MOD-DIAM> carries its own leading gap, so no space before it.
-    "BackRimFromHeadRear": f"FROM BACK CROWN ROOT TO<MOD-DIAM>{HEAD_DIA:.0f} HEAD REAR FACE",
+    "BackRimFromHeadRear": (
+        f"FROM BACK CROWN ROOT TO<MOD-DIAM>{HEAD_DIA / 25.4:.2f} HEAD REAR FACE"
+    ).replace(">0.", ">."),
     "DrumStationFromHeadRear": DRUM_STATION_CALLOUT,
     "OverallLen": "OVERALL",
     "BackCapSagDim": "BACK CROWN",
@@ -1163,7 +1166,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("dt-pinion-arbor"),
     )
     stamp_drawing_summary(
         adapter,
