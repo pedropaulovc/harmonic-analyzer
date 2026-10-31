@@ -166,6 +166,7 @@ def insert_hole_table(
     label: str,
     starting_hole_tag: str = "A",
     unit: str = "mm",
+    location_places: int | None = None,
 ) -> Any:
     """Insert the model-associated TAG/X LOC/Y LOC/SIZE hole table on ``view``.
 
@@ -181,6 +182,8 @@ def insert_hole_table(
     tables on one sheet use distinct tag families.  The table lands with its
     top-left corner at ``anchor_xy`` and is validated before returning.
     ``unit`` is the sheet's length unit, in which the LOC cells print.
+    ``location_places`` overrides the table's own LOC precision (an inch
+    sheet's .XXX); ``None`` keeps the document's.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(
@@ -259,6 +262,10 @@ def insert_hole_table(
     feature = _sw_type_info.early_bound_or_flag(feature, "IHoleTable")
     feature.CombineSameSize = False
     feature.CombineTags = False
+    if location_places is not None:
+        feature.SetHoleLocationPrecision(False, int(location_places))
+        if int(feature.GetHoleLocationPrecision()) != int(location_places):
+            raise RuntimeError(f"{label} hole-table location precision did not persist")
     if datum_point is not None:
         draw.ClearSelection2(True)
         selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
