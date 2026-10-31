@@ -127,7 +127,7 @@ def test_inch_grid_blank_and_grooves_keep_the_calibrated_scale() -> None:
     # inch print value; scale zero and the configured pitch stay calibrated.
     assert spec.UNIT == "in"
     inch = {
-        "BODY_LENGTH": 8.1, "BODY_WIDTH": 0.315, "BODY_THICKNESS": 0.118,
+        "BODY_LENGTH": 7.95, "BODY_WIDTH": 0.315, "BODY_THICKNESS": 0.118,
         "TICK_WIDTH": 0.016, "TICK_DEPTH": 0.020, "TICK_LENGTH": 0.12,
         "MINOR_TICK_LENGTH": 0.07, "HALF_TICK_LENGTH": 0.16,
         "NUMERAL_HEIGHT_MM": 0.08, "NUMERAL_GAP_MM": 0.02, "NUMERAL_DEPTH": 0.016,
@@ -137,7 +137,7 @@ def test_inch_grid_blank_and_grooves_keep_the_calibrated_scale() -> None:
     assert spec.NUMERAL_ROTATION_DEG == 90
     assert spec.DIVISION_COUNT == 11 and spec.MINOR_PER_DIVISION == 10
     assert spec.SCALE_START_X == pytest.approx(56.5, rel=0.0, abs=1e-9)
-    assert spec.SCALE_END_MARGIN == pytest.approx(7.24)
+    assert spec.SCALE_END_MARGIN == pytest.approx(3.43)
     assert spec.NUMERALS_BBOX == (57.2112, 1.7864, 197.7888, 4.4450)
     assert spec.SCALE_SPAN == pytest.approx(
         (spec.DIVISION_COUNT - 1) * spec.DIVISION_SPACING, rel=0.0, abs=1e-12,
@@ -159,14 +159,14 @@ def test_every_printed_size_is_owned_and_precisioned_by_model() -> None:
             | set(drawing.NUMERAL_DEPTH_KEEP)
             | set().union(*(set(row[4]) for row in drawing.LENGTH_DETAILS)))
     assert kept == marked == set(spec.DRAWING_VALUES_BY_NAME) == set(spec.DRAWING_PRECISION_BY_NAME)
-    # The overall length is noncritical: one place, the .X title-block band.
-    # The bar's section in the stop rebate, the engraving limits and the
-    # scale stations print .XXX; tick lengths and numeral layout .XX.
-    assert {name: places for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places != 2} == {
-        "BodyLength": 1,
-        **dict.fromkeys(("BodyWidth", "BodyThickness", "Tick0Width", "TickDepth", "NumeralDepth",
-                         "ScaleStartX", "FullTickPitch", "MinorTickPitch"), 3),
-    }
+    # Nothing on this part is .X (owner ruling): the overall length, tick
+    # lengths and numeral layout print .XX; the bar's section in the stop
+    # rebate, the engraving limits and the scale stations print .XXX.
+    assert {name: places for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places != 2} == (
+        dict.fromkeys(("BodyWidth", "BodyThickness", "Tick0Width", "TickDepth", "NumeralDepth",
+                       "ScaleStartX", "FullTickPitch", "MinorTickPitch"), 3)
+    )
+    assert spec.DRAWING_PRECISION_BY_NAME["BodyLength"] == 2
     # Only the scale stations carry their own band; the rest ride the title block.
     assert set(spec.DRAWING_TOLERANCES) == {"ScaleStartX", "FullTickPitch", "MinorTickPitch"}
     assert {"BodyThickness", "TickDepth", "FullTickLength", "MinorTickLength",
@@ -207,28 +207,29 @@ def test_scale_has_one_printed_origin_without_closing_chain() -> None:
 def test_last_graduation_is_complete_at_printed_band_extremes() -> None:
     """Noncumulative pitch allows one station error, not ten chained errors.
 
-    The overall length takes the .X title block; the graduation width is a
-    MIN limit, so the land bounds the widest groove that still leaves the last
-    graduation whole, at the .080 rule-17 target."""
+    The overall length takes the title block's .XX because this land reads
+    it; the graduation width is a MIN limit, so the land bounds the widest
+    groove that still leaves the last graduation whole, at the .080 rule-17
+    target."""
     values, bands = spec.DRAWING_VALUES_BY_NAME, spec.DRAWING_TOLERANCES
     assert "BodyLength" not in bands
-    assert spec.DRAWING_PRECISION_BY_NAME["BodyLength"] == 1
-    assert spec.TITLE_BLOCK_X_TOLERANCE_MM == pytest.approx(2.54)
+    assert spec.DRAWING_PRECISION_BY_NAME["BodyLength"] == 2
+    assert spec.BODY_LENGTH_TOLERANCE_MM == pytest.approx(0.254)
     assert bands["ScaleStartX"] == bands["FullTickPitch"] == pytest.approx(0.0508)
-    stock_min = values["BodyLength"] - spec.TITLE_BLOCK_X_TOLERANCE_MM
+    stock_min = values["BodyLength"] - spec.BODY_LENGTH_TOLERANCE_MM
     last_center_max = (
         values["ScaleStartX"] + bands["ScaleStartX"]
         + (spec.DIVISION_COUNT - 1) * values["FullTickPitch"] + bands["FullTickPitch"]
     )
-    assert stock_min == pytest.approx(203.2)
+    assert stock_min == pytest.approx(201.676)
     assert last_center_max == pytest.approx(198.6016)
     # Rule 17 at the worst case: the widest stated groove keeps .080+ to the end.
     end_land = stock_min - (last_center_max + spec.GRADUATION_WIDTH_MAX_MM / 2.0)
-    assert end_land == pytest.approx(4.2936)
+    assert end_land == pytest.approx(2.7696)
     assert spec.LAST_GROOVE_LAND_MIN_MM == pytest.approx(end_land)
     assert end_land >= spec.WALL_TARGET_MM == 2.032
-    # One inch-grid size shorter (8.0) would break that land.
-    assert end_land - 0.1 * 25.4 < spec.WALL_TARGET_MM
+    # The title block's .X (+/-.1) would break that land: the length is .XX.
+    assert end_land + spec.BODY_LENGTH_TOLERANCE_MM - 0.1 * 25.4 < spec.WALL_TARGET_MM
     # The stated .024 MAX keeps neighbours apart on the .056 minor pitch even
     # with both stations at their band.
     land_min = spec.MINOR_SPACING - 2.0 * spec.GRADUATION_POSITION_TOLERANCE_MM - spec.GRADUATION_WIDTH_MAX_MM
@@ -239,7 +240,7 @@ def test_last_graduation_is_complete_at_printed_band_extremes() -> None:
         values["ScaleStartX"] + (spec.DIVISION_COUNT - 1) * values["FullTickPitch"]
         + values["Tick0Width"] / 2.0
     )
-    assert values["BodyLength"] - last_edge_nominal == pytest.approx(7.0368)
+    assert values["BodyLength"] - last_edge_nominal == pytest.approx(3.2268)
 
 
 def test_engraving_sizes_are_min_limits_and_graduation_depth_keeps_its_stock() -> None:

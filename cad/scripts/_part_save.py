@@ -17,7 +17,7 @@ import _telemetry
 from _check import check, log
 from _com import _early_bound
 from _custom_properties import apply_custom_properties
-from _document_units import apply_package_model_units
+from _document_units import require_package_model_units
 from _part_properties import (
     apply_block_tolerances,
     apply_summary_info,
@@ -109,6 +109,13 @@ async def save_part_and_images(
     assert_reference_geometry_hidden(adapter, part_name, allowed_shown)
     OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
     part_path = (OUT_SLDPRT / f"{part_name}.SLDPRT").resolve()
+    # The registry row's drawing_unit selects the DimXpert block, the model's
+    # document units (inch packages only) and the TOL_* rows alike.  The
+    # builder selected the model units right after create_part, before any
+    # geometry or check; the save only proves them and never switches them
+    # under checked geometry.
+    unit = part_drawing_unit(part_name)
+    require_package_model_units(adapter, unit, label=part_name)
     set_isometric_view(adapter)  # save on isometric so the .SLDPRT opens isometric
     check(f"save_file -> {part_path}", await adapter.save_file(str(part_path)))
 
@@ -116,11 +123,7 @@ async def save_part_and_images(
     png_dir.mkdir(parents=True, exist_ok=True)
     views = list(views)
     _prune_stale_part_views(png_dir, part_name, views)
-    # The registry row's drawing_unit selects the DimXpert block, the model's
-    # document units (inch packages only) and the TOL_* rows alike.
-    unit = part_drawing_unit(part_name)
     apply_block_tolerances(adapter, unit=unit)
-    apply_package_model_units(adapter, unit, label=part_name)
     properties = part_properties(part_name)
     apply_custom_properties(adapter, properties)
     # The drawing template's PART cell resolves the linked model's document

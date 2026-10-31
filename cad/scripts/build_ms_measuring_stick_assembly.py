@@ -53,6 +53,7 @@ from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision
 from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _dimensions import drive_dimension, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _assembly_named_views import name_standard_views
 from _named_views import name_octant_views
@@ -366,6 +367,9 @@ async def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
     check("create_assembly", await adapter.create_assembly())
+    # The contract's IPS/inch/8-place calculation units, before the first
+    # component, mate or global; the save only proves them.
+    apply_package_model_units(adapter, assembly_drawing_unit(ASM_NAME), label=ASM_NAME)
 
     # The block and cover share the stop's turned, thumbscrew-up frame.
     await _place_fixed(adapter, "ms-stop-block", spec.BLOCK_ORIGIN, spec.BLOCK_ROWS)

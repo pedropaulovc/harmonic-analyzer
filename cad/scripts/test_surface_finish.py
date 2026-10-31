@@ -101,7 +101,7 @@ def test_inch_rendering_refuses_a_grade_without_a_project_mapping(
 
 @pytest.mark.parametrize("unit", ["cm", "inch", "IN", "MM", ""])
 def test_rendering_refuses_an_unsupported_unit(unit: str) -> None:
-    with pytest.raises(ValueError, match="display unit must be 'mm' or 'in'"):
+    with pytest.raises(ValueError, match="drawing_unit"):
         ra(MACHINED_UM, unit=unit)  # type: ignore[arg-type]
 
 
@@ -134,7 +134,7 @@ def test_inch_control_renders_microinches_and_keeps_metric_roughness() -> None:
 
 
 def test_control_rejects_unknown_display_unit() -> None:
-    with pytest.raises(ValueError, match="display_unit must be 'mm' or 'in'"):
+    with pytest.raises(ValueError, match="drawing_unit"):
         SurfaceFinishControl(
             key="bore",
             roughness_um=MACHINED_UM,

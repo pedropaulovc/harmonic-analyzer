@@ -28,7 +28,11 @@ import _config
 import _telemetry
 from _assembly_contract import assembly_contract, contract_path
 from _com import _early_bound
-from _document_units import document_unit_mismatch, read_document_units
+from _document_units import (
+    document_unit_mismatch,
+    model_unit_mismatch,
+    read_document_units,
+)
 from _drawing_units import DrawingUnit, declared_drawing_unit, resolved_drawing_unit
 from _part_properties import title_block_properties
 
@@ -108,9 +112,17 @@ def document_proof_unit(
     return next(iter(units), None)
 
 
+def _line_breaks(text: str) -> str:
+    """``text`` with every line break as ``\\n``: ``INote.GetText`` returns a
+    multi-line note's breaks as CRLF while its linked text may carry LF.  Only
+    the break encoding changes; every other character is compared as read."""
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
 def _unit_notes(draw: Any) -> list[tuple[str, str]]:
     """``(linked text, resolved text)`` of the active sheet's notes that link
-    the UNIT cell (the sheet format's notes ride the sheet view)."""
+    the UNIT cell (the sheet format's notes ride the sheet view), line breaks
+    normalized (:func:`_line_breaks`)."""
     sheet_view = _early_bound(draw, "IDrawingDoc").GetFirstView()
     if sheet_view is None:
         raise RuntimeError("drawing sheet has no sheet view to read the UNIT cell from")
@@ -127,7 +139,7 @@ def _unit_notes(draw: Any) -> list[tuple[str, str]]:
         if type(raw) is not str:
             raise RuntimeError(f"unreadable sheet note link {raw!r}")
         if UNIT_OF_MEASURE_LINK in raw:
-            found.append((raw, str(note.GetText() or "")))
+            found.append((_line_breaks(raw), _line_breaks(str(note.GetText() or ""))))
     return found
 
 
@@ -149,16 +161,18 @@ def assert_sheet_prints_unit(
     stands); the linked model's TOL_* custom properties
     (``linked_properties``) equal ``title_block_properties(unit=unit)``; and,
     on an inch sheet, the linked model's own document units are IPS decimal
-    inches.  The linked model is the referenced document as the drawing
-    loaded it -- on a farm leaf, the restored saved artifact -- so that last
-    readback is the persisted model's units, read without a reopen.
+    inches at the model's 8 calculation places (``model_unit_mismatch``; the
+    drawing's own places are presentation and not compared).  The linked
+    model is the referenced document as the drawing loaded it -- on a farm
+    leaf, the restored saved artifact -- so that last readback is the
+    persisted model's units, read without a reopen.
     Millimetre models keep their template units and are not checked.
     Records every measured value as a span event, then raises on any
     mismatch."""
     document = read_document_units(draw)
     document_mismatch = document_unit_mismatch(document, unit)
     model = read_document_units(linked_model) if unit == "in" else {}
-    model_mismatch = document_unit_mismatch(model, unit) if unit == "in" else {}
+    model_mismatch = model_unit_mismatch(model, unit) if unit == "in" else {}
     notes = _unit_notes(draw)
     unit_cell = [resolved for _raw, resolved in notes]
     unit_cell_expected = [raw.replace(UNIT_OF_MEASURE_LINK, unit) for raw, _ in notes]
@@ -235,7 +249,25 @@ _SW_OPEN_SILENT_READ_ONLY = 1 | 2  # swOpenDocOptions_Silent | _ReadOnly
 
 
 def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    """Streamed, so a large multi-sheet SLDDRW is never buffered whole."""
+    with path.open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def _live_current_model(app: Any, current: Any) -> Any:
+    """``current`` when the session still has it open, else ``None``.
+
+    The saved proof hands the adapter back its previous current model, never
+    a handle to a closed document (``finalize_drawing``'s drawing, closed
+    before the proof): a later call defaulting to ``currentModel`` must not
+    dereference a released ``IModelDoc2``.  Liveness is native identity
+    (``ISldWorks.IsSame`` = swObjectSame, 1) against the open documents."""
+    if current is None:
+        return None
+    for document in app.GetDocuments() or ():
+        if int(app.IsSame(document, current)) == 1:
+            return current
+    return None
 
 
 def _linked_view(draw: Any, sheet: Any) -> Any:
@@ -263,7 +295,8 @@ def prove_saved_drawing_units(
 
     Bounded and read-only: ``OpenDoc6`` silent | read-only, one pass over the
     sheets, ``CloseDoc`` with no save, the file's SHA-256 identical before and
-    after, and the session's previous current model restored.  Refuses a
+    after, and the adapter's current model restored when it was a live
+    document (cleared when it was a closed one).  Refuses a
     drawing that is still open -- reading the in-memory document would prove
     nothing about the file.  For explicitly declared packages only
     (``finalize_drawing``); the legacy fleet never pays the reopen.
@@ -276,7 +309,7 @@ def prove_saved_drawing_units(
     app = _early_bound(adapter.swApp, "ISldWorks")
     if app.GetOpenDocumentByName(path_string) is not None:
         raise RuntimeError(f"{package_name}: close {path.name} before its saved proof")
-    previous_model = adapter.currentModel
+    previous_model = _live_current_model(app, adapter.currentModel)
     proofs: list[dict[str, Any]] = []
     try:
         opened = app.OpenDoc6(
@@ -290,6 +323,7 @@ def prove_saved_drawing_units(
             package=package_name,
             open_error_raw=int(errors),
             open_warning_raw=int(warnings),
+            restores_live_model=previous_model is not None,
         )
         if model is None or errors != 0:
             raise RuntimeError(
@@ -337,11 +371,15 @@ def prove_saved_drawing_units(
                 )
             )
     finally:
-        # Also covers a failed OpenDoc6 that nevertheless loaded the file.
-        reopened = app.GetOpenDocumentByName(path_string)
-        if reopened is not None:
-            app.CloseDoc(str(_early_bound(reopened, "IModelDoc2").GetTitle()))
-        adapter.currentModel = previous_model
+        try:
+            # Also covers a failed OpenDoc6 that nevertheless loaded the file.
+            reopened = app.GetOpenDocumentByName(path_string)
+            if reopened is not None:
+                app.CloseDoc(str(_early_bound(reopened, "IModelDoc2").GetTitle()))
+        finally:
+            # Even when the close itself raises: never leave the reopened
+            # (possibly closed) drawing as the adapter's current model.
+            adapter.currentModel = previous_model
     if app.GetOpenDocumentByName(path_string) is not None:
         raise RuntimeError(f"{package_name}: saved proof left {path.name} open")
     after = _sha256(path)

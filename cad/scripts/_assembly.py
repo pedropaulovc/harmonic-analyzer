@@ -27,7 +27,7 @@ from _component_references import (
     semantic_reference_identity,
 )
 from _custom_properties import apply_custom_properties
-from _document_units import apply_package_model_units
+from _document_units import require_package_model_units
 from _drawing_units import DrawingUnit, resolved_drawing_unit
 from _part_properties import _SUMMARY_TITLE, apply_summary_info, title_block_properties
 from _part_save import set_isometric_view
@@ -2831,6 +2831,12 @@ async def save_assembly_and_images(
     leaves a manifest beside an assembly it does not describe."""
     if asm_name in ("ch-channel", "sm-summing") and native_contact_check is None:
         raise ValueError(f"{asm_name} assembly requires native_contact_check")
+    # An inch package's model reads in IPS like its sheet (contract
+    # drawing_unit); the builder selected those units right after
+    # create_assembly, so every gate below already runs under them. Prove them
+    # first and never switch them here; millimetre and legacy assemblies are
+    # left untouched.
+    require_package_model_units(adapter, assembly_drawing_unit(asm_name), label=asm_name)
     # The drawings' views at 1:2 and smaller print this derived configuration
     # (gear teeth and screw threads suppressed); Default stays the solved,
     # gated, rendered and saved-active pose.
@@ -2862,9 +2868,6 @@ async def save_assembly_and_images(
     _invalidate_massprops_proof(sidecar)
     if dof_manifest:
         dof_manifest_path(asm_name).unlink(missing_ok=True)
-    # An inch package's model reads in IPS like its sheet (contract
-    # drawing_unit); millimetre and legacy assemblies are left untouched.
-    apply_package_model_units(adapter, assembly_drawing_unit(asm_name), label=asm_name)
     # Save on isometric so the .SLDASM opens isometric; runs AFTER any
     # remap_front_to_machine_front (which re-bases the standard views) so the
     # re-based Front/Back/etc. used by the gallery stay correct.

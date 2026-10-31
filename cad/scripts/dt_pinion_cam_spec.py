@@ -31,6 +31,7 @@ import math
 import _config
 from _drawing_units import drawing_unit
 from _fit_deviations import deviations
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from _gtol_cylinder import CylinderFace
@@ -44,7 +45,6 @@ from dt_pinion_cam_geometry import (
     SET_SCREW_Z as SET_SCREW_Z,
     SET_SCREW_MAJOR_DIA as SET_SCREW_MAJOR_DIA,
     TAP_DRILL_DIA as TAP_DRILL_DIA,
-    WALL_FLOOR_MM as WALL_FLOOR_MM,
 )
 
 # Issue #290: the registry row's drawing_unit is the one declaration of this
@@ -57,9 +57,6 @@ if UNIT != "in":
     raise AssertionError(
         f"dt-pinion-cam is dimensioned in inches but its row declares {UNIT!r}"
     )
-# Rule 17 on a converted inch package: .080 in target, .060 in hard floor
-# (dt_pinion_cam_geometry.WALL_FLOOR_MM).
-WALL_TARGET_MM = 2.032
 
 # Owner ruling (#290 pilot, 2026-10-30, via Main): only the bore moves, onto
 # the owned .2510 reamer.  Every other nominal keeps its millimetre value

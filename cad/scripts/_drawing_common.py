@@ -1212,6 +1212,9 @@ async def finalize_drawing(
     ]
     if still_open:
         raise RuntimeError(f"drawing {title!r} did not close after export")
+    # The closed drawing is no current model: a later call defaulting to
+    # ``adapter.currentModel`` must not dereference its released handle.
+    adapter.currentModel = None
     if declared_unit is not None and package_name is not None:
         # A package that declares its unit (the #290 transition) also proves
         # the SAVED file: read-only reopen, the same sheet proof, closed

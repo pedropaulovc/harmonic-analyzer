@@ -22,6 +22,7 @@ them.
 from __future__ import annotations
 
 from _hole_spec import HoleSpec, THREAD_MAJOR_MM, blind_cut_dia_mm
+from _inch_wall_limits import WALL_FLOOR_MM
 
 CAM_OD = 14.6  # K = OD/2 - ECC = 5.3 above the bore axis
 CAM_LEN = 9.0  # collar length along the rod
@@ -38,8 +39,6 @@ SET_SCREW_HOLE_SPEC = HoleSpec(
 TAP_DRILL_DIA = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC)
 SET_SCREW_MAJOR_DIA = THREAD_MAJOR_MM[SET_SCREW_HOLE_SPEC.size]
 
-# Rule 17 hard floor on a converted inch package: .060 in.
-WALL_FLOOR_MM = 1.524
 THIN_SIDE_WALL = CAM_OD / 2.0 - BORE / 2.0 - ECC
 THICK_SIDE_WALL = CAM_OD / 2.0 - BORE / 2.0 + ECC  # seats the loose 3/16-in screw
 if THIN_SIDE_WALL < WALL_FLOOR_MM:

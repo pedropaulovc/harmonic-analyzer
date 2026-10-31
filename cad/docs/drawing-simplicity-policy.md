@@ -35,6 +35,17 @@ mean `mm`; explicit `mm` is retained for metric-only supplier packages. Remove
 the rollout switch when the last batch lands and make inches the fabrication
 default, retaining the supplier-unit exception.
 
+A converted package's builder selects the model's document units with
+`_document_units.apply_package_model_units` as the statement right after
+`create_part` or `create_assembly`, before any global, sketch, feature or
+check (`_stock_fastener` does it for purchased stock). They are IPS decimal
+inches at **8** places: calculation precision, because the equation manager
+re-evaluates every global at the document's places; never set the 3-place
+print grid there. Printed places stay each dimension's `DRAWING_PRECISION`
+and the sheet's own units. The save chokepoints only prove the readback
+(`require_package_model_units`) and refuse a model whose builder skipped the
+early setup; they never switch units under checked geometry.
+
 The inch grades are `.X ±.1` for non-functional features only, `.XX ±.01` and
 `.XXX ±.005`; drilled holes use `+.004/0` with three-place inch diameters.
 Printed-grid nominals, explicit fits, roughness and worst-case wall checks

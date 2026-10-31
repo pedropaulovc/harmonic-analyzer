@@ -37,6 +37,7 @@ from dataclasses import dataclass
 import math
 from typing import Literal
 
+from _drawing_units import DrawingUnit, checked_drawing_unit
 from _gtol_face import FaceSpec
 from _gtol_identity import pmi_annotation_name
 
@@ -57,10 +58,6 @@ MACHINED_UM = 1.6
 # on a part that may otherwise be left as-cast has to say so on the face.
 SEAT_UM = 3.2
 
-# A drawing's display unit, as the package's ``drawing_unit`` selects it.
-DisplayUnit = Literal["mm", "in"]
-DISPLAY_UNITS: tuple[DisplayUnit, ...] = ("mm", "in")
-
 # The project grades' ISO 1302 / ASME Y14.36 preferred microinch values.  An
 # inch print takes these rounded preferred values, never the arithmetic
 # conversion (0.8 um is 31.5 uin and 3.2 um is 126.0 uin, yet the series
@@ -72,7 +69,7 @@ _PREFERRED_RA_UIN: tuple[tuple[float, int], ...] = (
 )
 
 
-def ra(grade_um: float, *, unit: DisplayUnit = "mm") -> str:
+def ra(grade_um: float, *, unit: DrawingUnit = "mm") -> str:
     """Render a grade as the ``roughness_ra`` string a drawing callout takes.
 
     ``grade_um`` is always the physical Ra in micrometres; ``unit`` is the
@@ -82,10 +79,7 @@ def ra(grade_um: float, *, unit: DisplayUnit = "mm") -> str:
     change.  ``"in"`` prints the preferred microinch value of a project grade
     and refuses any other grade rather than ink a non-standard number.
     """
-    if unit not in DISPLAY_UNITS:
-        raise ValueError(
-            f"surface roughness display unit must be 'mm' or 'in', got {unit!r}"
-        )
+    checked_drawing_unit("surface roughness", unit)
     if not math.isfinite(grade_um) or grade_um <= 0.0:
         raise ValueError(f"surface roughness must be positive and finite: {grade_um!r}")
     if unit == "mm":
@@ -130,16 +124,11 @@ class SurfaceFinishControl:
     face: FaceSpec
     production_method: str = ""
     native_attachment: Literal["face", "model"] = "face"
-    display_unit: DisplayUnit = "mm"
+    display_unit: DrawingUnit = "mm"
 
     def __post_init__(self) -> None:
         if not self.key:
             raise ValueError("surface-finish key cannot be blank")
-        if self.display_unit not in DISPLAY_UNITS:
-            raise ValueError(
-                "surface-finish display_unit must be 'mm' or 'in', "
-                f"got {self.display_unit!r}"
-            )
         ra(self.roughness_um, unit=self.display_unit)
         if self.native_attachment not in {"face", "model"}:
             raise ValueError(

@@ -609,8 +609,24 @@ async def test_build_uses_a_native_radial_tap_and_hidden_construction_reference(
     )
     monkeypatch.setattr(cam, "name_bore_axis", AsyncMock(return_value="Axis1"))
     monkeypatch.setattr(cam, "save_part_and_images", AsyncMock(return_value={}))
+    # #290: the model's calculation units are selected right after create_part,
+    # before the first global, sketch or check.
+    order: list[str] = []
+    monkeypatch.setattr(
+        cam, "apply_package_model_units",
+        Mock(side_effect=lambda *_args, **_kwargs: order.append("units")),
+    )
+    adapter.create_part.side_effect = lambda: (order.append("create_part"), success)[1]
+    adapter.create_sketch.side_effect = lambda *_args: (order.append("sketch"), success)[1]
+    cam.set_global.side_effect = lambda _adapter, name, _value: order.append(name)
 
     await cam.build(adapter)
+
+    cam.apply_package_model_units.assert_called_once_with(
+        adapter, "in", label="dt-pinion-cam"
+    )
+    assert order[:3] == ["create_part", "units", "CamOd"]
+    assert order.count("units") == 1
 
     cam.wizard_hole_on_cylinder.assert_called_once_with(
         adapter,

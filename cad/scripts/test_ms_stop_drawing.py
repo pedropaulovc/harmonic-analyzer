@@ -25,6 +25,7 @@ import ms_stop_spec as spec
 import _mcmaster_90114a124 as screw
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import DRILL_POINT_H
+from _inch_wall_limits import WALL_FLOOR_MM
 from _printed_tolerance import printed_band_mm
 
 
@@ -129,7 +130,7 @@ def test_print_worst_joint_stack_preserves_bottoming_tap_and_ligaments() -> None
 def test_every_worst_case_wall_meets_the_inch_rule_17_target() -> None:
     """Rule 17 on the inch sheet: .080 target, .060 floor; each wall and web
     is taken at its printed bands, so no sheet states a shortfall."""
-    assert (spec.WALL_TARGET_MM, spec.WALL_FLOOR_MM) == (2.032, 1.524)
+    assert (spec.WALL_TARGET_MM, WALL_FLOOR_MM) == (2.032, 1.524)
     walls = spec.WORST_CASE_WALLS_MM
     assert walls == {
         "roof": spec.ROOF_THICKNESS_MIN,
@@ -599,7 +600,7 @@ def test_match_drilling_does_not_eliminate_absolute_end_ligament_limits() -> Non
     # A .X length (+/-.1) would break that web: the .84 is .XX for it.
     assert spec.BLOCK_LENGTH - printed_band_mm(1, unit="in") - (
         spec.PLATE_HOLE_XS[1] + spec.PLATE_HOLE_POSITION_TOLERANCE_MM + maximum_drill / 2.0
-    ) < spec.WALL_FLOOR_MM
+    ) < WALL_FLOOR_MM
     assert spec.MATCH_DRILL_MASTER == "MS-STOP-PLATE"
     assert spec.MATCH_DRILL_DATUM_ALIGNMENT == "LOCATING ENDS AND EDGES FLUSH"
     assert (spec.LOCATING_END_NOTE, spec.LOCATING_EDGE_NOTE) == ("LOCATING END", "LOCATING EDGE")
@@ -1043,12 +1044,12 @@ def test_stock_precision_and_worst_case_walls_use_each_printed_band() -> None:
     )
     loose, routine = printed_band_mm(1, unit="in"), printed_band_mm(2, unit="in")
     # Each web would break at a .X band where its sizes now hold .XX.
-    assert spec.PLATE_TAP_BACK_WALL_MIN - (loose - routine) < spec.WALL_FLOOR_MM
-    assert spec.PLATE_CLEARANCE_END_WEB_MIN - (loose - routine) < spec.WALL_FLOOR_MM
+    assert spec.PLATE_TAP_BACK_WALL_MIN - (loose - routine) < WALL_FLOOR_MM
+    assert spec.PLATE_CLEARANCE_END_WEB_MIN - (loose - routine) < WALL_FLOOR_MM
     # Absolute edge error remains after the matched pair's relative error
     # cancels: a .X master station would break both tapped-hole webs.
-    assert spec.PLATE_TAP_END_WEB_MIN - (loose - spec.PLATE_HOLE_POSITION_TOLERANCE_MM) < spec.WALL_FLOOR_MM
-    assert spec.PLATE_TAP_WINDOW_WEB_MIN - (loose - spec.PLATE_HOLE_POSITION_TOLERANCE_MM) < spec.WALL_FLOOR_MM
+    assert spec.PLATE_TAP_END_WEB_MIN - (loose - spec.PLATE_HOLE_POSITION_TOLERANCE_MM) < WALL_FLOOR_MM
+    assert spec.PLATE_TAP_WINDOW_WEB_MIN - (loose - spec.PLATE_HOLE_POSITION_TOLERANCE_MM) < WALL_FLOOR_MM
 
 
 def _window_reference_seat(monkeypatch, *, reject_construction=False):
@@ -1184,6 +1185,7 @@ def test_block_build_cuts_rebate_from_its_profile_driven_marked_and_toleranced(m
 
     class Adapter:
         async def create_part(self):
+            order.append("create_part")
             return result()
 
         async def create_sketch(self, plane):
@@ -1203,6 +1205,7 @@ def test_block_build_cuts_rebate_from_its_profile_driven_marked_and_toleranced(m
             return result()
 
     async def set_global(adapter, name, expression):
+        order.append(name)
         globals_authored[name] = expression
 
     async def drive(adapter, name, expression):
@@ -1220,6 +1223,13 @@ def test_block_build_cuts_rebate_from_its_profile_driven_marked_and_toleranced(m
         return {"part": part_name}
 
     profiles = []
+    # #290: the model's calculation units follow create_part, before any global.
+    order = []
+    units = []
+    monkeypatch.setattr(
+        block, "apply_package_model_units",
+        lambda adapter, unit, *, label: (order.append("units"), units.append((unit, label))),
+    )
     monkeypatch.setattr(block, "set_global", set_global)
     monkeypatch.setattr(block, "drive_dimension", drive)
     monkeypatch.setattr(block, "rebate_profile", rebate)
@@ -1253,6 +1263,8 @@ def test_block_build_cuts_rebate_from_its_profile_driven_marked_and_toleranced(m
     monkeypatch.setattr(block, "apply_drawing_properties",
                         lambda adapter, part_name, values: properties.append(values))
     assert asyncio.run(block.build(Adapter())) == {"part": "ms-stop-block"}
+    assert order[:3] == ["create_part", "units", "BlockLength"]
+    assert units == [("in", "ms-stop-block")]
     assert globals_authored["WindowWidth"] == f"{spec.WINDOW_WIDTH}mm"
     assert len(profiles) == 1
     assert cuts == [(2.0 * (spec.BLOCK_LENGTH + spec.CUT_OVERHANG), True)]

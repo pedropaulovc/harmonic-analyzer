@@ -255,6 +255,78 @@ def test_stock_properties_are_written_before_one_save(monkeypatch, with_metadata
         assert properties["Supplier SKUs"] == "NOT-THE-SKU"
 
 
+def test_an_inch_stock_part_selects_its_units_before_the_first_recipe_feature(monkeypatch):
+    """#290: a purchased row declaring inches gets IPS at 8 calculation places
+    right after create_part, so the recipe's features and volume checks and the
+    supplier references all run under the units the part saves with; the save
+    only proves them."""
+    from diagnostics import diag_mcmaster_lib
+
+    order: list[object] = []
+    bodies = []
+    values = {263: 5, 47: 0, 48: 1, 49: 2}
+
+    def set_preference(pref, _option, value):
+        order.append((pref, value))
+        values[pref] = value
+        return True
+
+    model = SimpleNamespace(
+        ClearSelection2=lambda _all: None,
+        GetBodies2=lambda _kind, _hidden: tuple(bodies),
+        Extension=SimpleNamespace(
+            SetUserPreferenceInteger=set_preference,
+            GetUserPreferenceInteger=lambda pref, _option: values[pref],
+        ),
+    )
+
+    async def create_part():
+        order.append("create_part")
+        return SimpleNamespace(is_success=True, data=None, error=None)
+
+    async def author(_adapter, _truth=None):
+        assert (values[263], values[49]) == (3, 8)  # IPS, 8 places
+        order.append("recipe")
+        bodies.append(SimpleNamespace(Name="StockBody"))
+
+    author.__name__ = "build_TEST123"
+    author.__module__ = "diagnostics.diag_build_TEST123"
+    stock_recipe("TEST123", threaded=False)(author)
+    adapter = SimpleNamespace(
+        currentModel=model, create_part=create_part, _attempt=lambda call, default: call()
+    )
+
+    async def finish(*_args):
+        return None
+
+    async def save(_adapter, part_name, **_kwargs):
+        order.append("save")
+        return {"part": f"{part_name}.SLDPRT"}
+
+    stock = SimpleNamespace(stock_name="Set screw", supplier="McMaster", skus=("TEST123",))
+    monkeypatch.setattr(_stock_fastener, "_early_bound", lambda value, _type: value)
+    monkeypatch.setattr(_stock_fastener, "fastener", lambda _name: stock)
+    monkeypatch.setattr(_stock_fastener, "_blank_recipe_references", lambda _adapter: None)
+    monkeypatch.setattr(_stock_fastener, "apply_custom_properties", lambda *_args: None)
+    monkeypatch.setattr(diag_mcmaster_lib, "assert_seat_sketch_baseline", lambda *_args: None)
+    monkeypatch.setattr(_stock_fastener, "force_rebuild", finish)
+    monkeypatch.setattr(_stock_fastener, "apply_material", finish)
+    monkeypatch.setattr(_stock_fastener, "report_mass_properties", finish)
+    monkeypatch.setattr(_stock_fastener, "_save_stock_part", save)
+
+    asyncio.run(
+        _stock_fastener.build_stock_fastener(
+            adapter,
+            part_name="fr-vn-gooseneck-set-screw",
+            components=(_stock_fastener.StockComponent(sku="TEST123", author=author),),
+            material="Steel",
+        )
+    )
+    assert order == [
+        "create_part", (263, 3), (47, 3), (48, 1), (49, 8), "recipe", "save",
+    ]
+
+
 def _author(sku: str = "TEST123"):
     async def author(_adapter, _truth=None):
         return None

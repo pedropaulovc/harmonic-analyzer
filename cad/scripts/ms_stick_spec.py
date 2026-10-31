@@ -13,7 +13,7 @@ stroke wall 15 degrees). The square-bottom graduations stay fixed.
 Issue #290 (decimal-inch pilot): the sheet prints decimal inch
 (``drawing_unit: in``). Every length below is physical millimetres, authored
 as the exact decimal of the inch value it prints, snapped to that printed
-grid: the 8.1 x .315 x .118 bar, ticks .016 MIN wide and .020 MIN deep,
+grid: the 7.95 x .315 x .118 bar, ticks .016 MIN wide and .020 MIN deep,
 tick lengths .12 / .07 / .16, numerals .08 high, .02 off their tick and .016
 MIN deep. Exempt (owner ruling, pitch/calibration geometry): the configured
 14.2 mm full and 1.42 mm minor graduation pitch
@@ -21,8 +21,9 @@ MIN deep. Exempt (owner ruling, pitch/calibration geometry): the configured
 the amplitude stations and the stop setting are read against; they print
 rounded (2.224, .559, .056) at their own +/-.002.
 The unprinted V-bit stroke width at the face (0.24) is tool geometry and stays.
-The overall length is the one unmated, non-functional size: .X, 8.1 so the
-shortest bar still keeps the .080 rule-17 land past the widest last groove.
+The overall length is 7.95 at .XX (owner ruling, issue #290): the inch value
+nearest the original blank, at .XX because the last groove's rule-17 land
+reads it. No dimension prints .X; the title block's .X row alone covers it.
 The tick lengths take the title block's .XX: a full tick at .12 +.01 and a
 half-division tick at .16 -.01 stay .02 apart.
 """
@@ -34,6 +35,7 @@ from pathlib import Path
 
 import _config
 from _drawing_units import drawing_unit
+from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm
 from ms_stick_geom import (
     DIVISION_COUNT as DIVISION_COUNT,
@@ -45,23 +47,21 @@ from ms_stick_geom import (
 
 # The sheet unit the registry row declares.
 UNIT = drawing_unit("parts/ms-stick", _config.parts("ms-stick"))
-# drawing-guidelines.md rule 17 (walls and webs) on the inch sheet: .080 in.
-WALL_TARGET_MM = 2.032
 
 
 def inch_text(value_mm: float, places: int) -> str:
-    """``value_mm`` as decimal-inch print text: ``.080``, ``8.1``."""
+    """``value_mm`` as decimal-inch print text: ``.080``, ``7.95``."""
     text = f"{value_mm / 25.4:.{places}f}"
     return text[1:] if text.startswith("0.") else text
 
 
-BODY_LENGTH = 205.74  # 8.1
+BODY_LENGTH = 201.93  # 7.95
 BODY_WIDTH = 8.001  # .315
 BODY_THICKNESS = 2.9972  # .118
 # Unprinted: the bar beyond the last full tick. The model derives scale zero
-# from the length, the configured span and this margin, which the 8.1 length
-# grows from 3.5 so scale zero stays put.
-SCALE_END_MARGIN = 7.24
+# from the length, the configured span and this margin, which the 7.95 length
+# sets to 3.43 so scale zero stays put.
+SCALE_END_MARGIN = 3.43
 # Exempt with the pitch (calibration): scale zero stays at 56.5 where the
 # 2026-10-10 Option B ruling put it, so every graduation the assembly sets the
 # stop and the bar stations against is unmoved; it prints 2.224 at the
@@ -126,7 +126,7 @@ NUMERAL_FINAL_MIN_STROKE_MM3 = 0.0058
 # Width and thickness give the sliding clearance in the .330 x .134 stop
 # rebate at the title block's .XXX; graduation positions set the
 # amplitude-bar stations through the linear READOUT table, at their own
-# +/-.002. The overall length (.X), tick lengths and numeral layout take the
+# +/-.002. The overall length (.XX), tick lengths and numeral layout take the
 # title block. Graduation width and both engraving depths name no mate, so
 # they are single ".nnn MIN" limits that hold the enamel fill (coordinator
 # ruling 2026-10-23). Their ceilings are stated facts, not bands (coordinator
@@ -134,7 +134,7 @@ NUMERAL_FINAL_MIN_STROKE_MM3 = 0.0058
 # .024 MAX on the .056 minor pitch, so neighbouring grooves never merge and
 # the last one stays on the shortest bar; both depths leave the stated .080
 # of stock under them.
-TITLE_BLOCK_X_TOLERANCE_MM = printed_band_mm(1, unit=UNIT)
+BODY_LENGTH_TOLERANCE_MM = printed_band_mm(2, unit=UNIT)
 BODY_FIT_TOLERANCE_MM = printed_band_mm(3, unit=UNIT)
 GRADUATION_POSITION_TOLERANCE_MM = 0.0508  # +/-.002
 GRADUATION_FLOOR_MIN_MM = WALL_TARGET_MM
@@ -146,8 +146,8 @@ GRADUATION_WIDTH_CALLOUT = (
 )
 # The widest last groove, its zero and its noncumulative station both at
 # their band, keeps the rule-17 land to the end face of the shortest bar the
-# .X length allows.
-LAST_GROOVE_LAND_MIN_MM = BODY_LENGTH - TITLE_BLOCK_X_TOLERANCE_MM - (
+# .XX length allows.
+LAST_GROOVE_LAND_MIN_MM = BODY_LENGTH - BODY_LENGTH_TOLERANCE_MM - (
     SCALE_START_X + SCALE_SPAN + 2.0 * GRADUATION_POSITION_TOLERANCE_MM
     + GRADUATION_WIDTH_MAX_MM / 2.0
 )
@@ -189,17 +189,17 @@ DRAWING_DIMENSIONS = {
     "Numerals": {"NumeralDepth"},
     **{feature: {row[0]} for feature, row in REFERENCE_DIMENSIONS.items()},
 }
-# Decimal-inch places, authored on the part: the overall length .X, the tick
+# Decimal-inch places, authored on the part: the overall length, tick
 # lengths and numeral layout the title block's .XX, and .XXX for the bar's
 # section in the stop rebate, the engraving limits and the scale stations.
-_ONE_PLACE = frozenset({"BodyLength"})
+# Nothing on this part is .X.
 _TWO_PLACE = frozenset({
-    "FullTickLength", "MinorTickLength", "HalfTickLength",
+    "BodyLength", "FullTickLength", "MinorTickLength", "HalfTickLength",
     "NumeralHeight", "NumeralXGap", "NumeralYGap",
 })
 DRAWING_PRECISION = {
     feature: {
-        name: 1 if name in _ONE_PLACE else 2 if name in _TWO_PLACE else 3
+        name: 2 if name in _TWO_PLACE else 3
         for name in names
     }
     for feature, names in DRAWING_DIMENSIONS.items()

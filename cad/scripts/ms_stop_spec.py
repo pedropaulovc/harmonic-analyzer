@@ -28,6 +28,7 @@ import _config
 from _drawing_units import drawing_unit
 from _gtol_planar import PlanarFace
 from _hole_spec import DRILL_POINT_H, HoleSpec, TAP_DRILL_MM, blind_cut_dia_mm
+from _inch_wall_limits import WALL_TARGET_MM
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _mcmaster_90114a124 import (
@@ -47,10 +48,6 @@ if BLOCK_UNIT != PLATE_UNIT:
     )
 UNIT = BLOCK_UNIT
 
-# drawing-guidelines.md rule 17 (walls and webs) on the inch sheet: .080 in
-# target, .060 in floor.
-WALL_TARGET_MM = 2.032
-WALL_FLOOR_MM = 1.524
 # A worst case computed from exact inch decimals may land a float ulp short.
 _WALL_SLACK_MM = 1e-9
 

@@ -302,6 +302,42 @@ def test_gates_refuse_an_exploded_presentation(save_steps):
     assert "save" not in save_steps
 
 
+def _model_units(model, places):
+    """IPS decimal inches at ``places``; any unit write fails the test."""
+    values = {263: 3, 47: 3, 48: 1, 49: places}  # swUnitSystem .. swUnitsLinearDecimalPlaces
+
+    def refuse(*_args):
+        raise AssertionError("the save switched model units under gated geometry")
+
+    model.Extension.GetUserPreferenceInteger = lambda pref, _option: values[pref]
+    model.Extension.SetUserPreferenceInteger = refuse
+
+
+def test_an_inch_assembly_save_proves_the_units_its_build_selected(save_steps, monkeypatch):
+    # #290: the builder selects IPS at 8 calculation places right after
+    # create_assembly; the save reads them back and never writes them.
+    monkeypatch.setattr(_assembly, "assembly_drawing_unit", lambda _name: "in")
+    adapter, model = _drive_train_like()
+    _model_units(model, 8)
+    _save(adapter, _free_dof_gate)
+    assert "save" in save_steps
+
+
+def test_an_inch_assembly_built_without_early_units_is_refused_before_any_gate(
+    save_steps, monkeypatch
+):
+    # Three places (or no selection at all) means the build skipped the early
+    # setup: switching now would re-evaluate globals the gates already checked.
+    monkeypatch.setattr(_assembly, "assembly_drawing_unit", lambda _name: "in")
+    adapter, model = _drive_train_like()
+    _model_units(model, 3)
+    with pytest.raises(RuntimeError, match="right after create_part/create_assembly"):
+        _save(adapter, _free_dof_gate)
+    assert save_steps == []
+    assert model.rebuild_order == []
+    assert not _assembly.dof_manifest_path(ASM).exists()
+
+
 def test_failing_gate_stops_the_save_and_publishes_no_manifest(save_steps):
     adapter, _model = _drive_train_like(FULLY)  # the freed DOF is pinned
     with pytest.raises(RuntimeError, match="free operational DOF"):

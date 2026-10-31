@@ -5,7 +5,7 @@ The unchanged 0-10 scale spans 142 mm at the configured 14.2 mm pitch.
 The longer half-division tick follows the book. The stop is a separate brass
 block, cover and stock hardware in the ms-measuring-stick assembly.
 
-The bar is 8.1 x .315 x .118 in (205.74 x 8.001 x 2.9972 mm; issue #290's
+The bar is 7.95 x .315 x .118 in (201.93 x 8.001 x 2.9972 mm; issue #290's
 decimal-inch sheet, ``ms_stick_spec`` gives the grid and its exemptions).
 
 Layout: bar along +X with the bottom-left corner on the origin; graduations
@@ -51,8 +51,10 @@ from _appearance import apply_material
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, dump_dimensions, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import _feature_by_name, name_last_feature
 from _part_checks import measure_check, report_mass_properties
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -630,6 +632,10 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    # The registry row's IPS/inch/8-place calculation units, before the first
+    # global: the equation manager evaluates every global in them, and the save
+    # only proves them.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this is
     # an INCH document and the equation manager reads BARE numbers in document
@@ -865,7 +871,7 @@ async def build(adapter) -> dict[str, str]:
     _assert_numeral_cut(adapter, numeral_sense)
     await _check_volume_unchanged(adapter, "driven measuring-stick (equations neutral)", v_built)
 
-    # Verify the 8.1 in (205.74 mm) length and the untouched front face
+    # Verify the 7.95 in (201.93 mm) length and the untouched front face
     # (the 14.2 mm tick spacing is driven by the linear pattern's spacing).
     # End faces are edge-on in the active view (point picking is
     # screen-projected) — measure the uncut front-bottom edge instead;
@@ -873,7 +879,7 @@ async def build(adapter) -> dict[str, str]:
     mid_y = BODY_WIDTH / 2.0
     await measure_check(
         adapter,
-        "body length (8.1 in)",
+        "body length (7.95 in)",
         [{"entity_type": "EDGE", "point": [BODY_LENGTH / 2.0, 0.0, BODY_THICKNESS]}],
         "length",
         BODY_LENGTH,

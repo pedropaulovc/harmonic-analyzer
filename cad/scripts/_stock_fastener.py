@@ -12,8 +12,10 @@ from _appearance import apply_color, apply_material
 from _check import check
 from _com import _com_invoke, _early_bound
 from _custom_properties import apply_custom_properties
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _stock_recipe import RecipeAuthor, recipe_declaration
@@ -369,6 +371,11 @@ async def build_stock_fastener(
     """
 
     check("create_part", await adapter.create_part())
+    # A row that declares inches gets its IPS/inch/8-place calculation units
+    # before the first recipe feature, volume check or supplier reference, so
+    # every check runs under the units the part saves with; the save only
+    # proves them.  Millimetre and legacy stock keeps the template's units.
+    apply_package_model_units(adapter, part_drawing_unit(part_name), label=part_name)
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     component_count = 0
     threaded = False
