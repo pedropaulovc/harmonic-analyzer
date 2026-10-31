@@ -2883,6 +2883,8 @@ def test_config_deps_are_fine_grained():
         "parts/dt-cylinder-gear.yaml",
         "parts/dt-cylinder-gear-shaft.yaml",
         "parts/dt-arbor-pedestal.yaml",
+        # The cone shaft's land bands read its own row's drawing_unit.
+        "parts/dt-cone-gear-shaft.yaml",
         # The cone reads the base casting spec, whose sheet unit (#290
         # drawing_unit) lives on its own registry row.
         "parts/fr-harmonic-base.yaml",
