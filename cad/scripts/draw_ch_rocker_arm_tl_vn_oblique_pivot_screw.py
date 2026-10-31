@@ -29,7 +29,7 @@ from _machinist_review_mode import MachinistReviewMode
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_pivot_screw"]
-ITEM = "18-8 SS PRECISION SHOULDER SCREW, EXTENDED THREAD, 3/8 X 1-1/2, 5/16-18"
+ITEM = "18-8 SS SHOULDER SCREW, EXT THREAD, 3/8 X 1-1/2, 5/16-18"
 # The default "VIEWS ARE REFERENCE ONLY" line would read as overriding the one
 # shop dimension (as on the hub pin's sheet).
 GENERAL_TEXT = (
