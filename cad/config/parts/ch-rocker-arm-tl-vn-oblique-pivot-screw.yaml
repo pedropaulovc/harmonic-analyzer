@@ -12,3 +12,4 @@ ch-rocker-arm-tl-vn-oblique-pivot-screw:
   quantity: 2
   tolerance_class: visual_noncritical
   process: purchased
+  drawing_unit: in

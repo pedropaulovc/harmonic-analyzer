@@ -10,3 +10,4 @@ ch-rocker-arm-tl-oblique-riser:
   quantity: 1
   tolerance_class: machined_block
   process: "start from 1/4 in acetal stock; face to 6.0 drawing thickness and mill the blank to 40 x 340; spot the holes from the carrier at assembly, drill #4 clearance through and countersink 82 degrees for the four screws; drill the HUB, CL and CR clearance holes through; break edges"
+  drawing_unit: in

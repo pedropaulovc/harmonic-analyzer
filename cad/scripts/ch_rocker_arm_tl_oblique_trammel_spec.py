@@ -91,11 +91,23 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+import _config
+from _inch_wall_limits import WALL_TARGET_MM
+from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
 import ch_rocker_arm_spec as rocker
 import _rocker_interface as rocker_interface
 
 INCH = 25.4
+BASE_BAR_UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-oblique-base-bar", _config.parts("ch-rocker-arm-tl-oblique-base-bar")
+)
+CARRIER_UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-oblique-carrier", _config.parts("ch-rocker-arm-tl-oblique-carrier")
+)
+RISER_UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-oblique-riser", _config.parts("ch-rocker-arm-tl-oblique-riser")
+)
 
 
 def _inch_fraction(text: str) -> float:
@@ -199,9 +211,9 @@ RISER_SCREWS = tuple(
 # Rule 17 at worst case: the countersink mouth at its band's top, the carrier
 # tap's station at its X and Y band edges both pushed radially (|sin| + |cos|
 # of the bearing from the arc centre), to the inner and outer self-cut edges.
-_RISER_CSK_MOUTH_MAX = (RISER_CSK_DIA + printed_band_mm(RISER_CSK_PLACES)) / 2.0
+_RISER_CSK_MOUTH_MAX = (RISER_CSK_DIA + printed_band_mm(RISER_CSK_PLACES, unit=RISER_UNIT)) / 2.0
 _RISER_RADIAL_SHIFT = max(
-    printed_band_mm(RISER_TAP_STATION_PLACES)
+    printed_band_mm(RISER_TAP_STATION_PLACES, unit=CARRIER_UNIT)
     * (abs(x) + abs(y + H1))
     / RISER_SCREW_RADIUS
     for x, y in RISER_SCREWS
@@ -364,32 +376,35 @@ END_STOPS = {
 }
 
 # --- Height stack (machine Z, table top = 0) ---------------------------------
+# Issue #290: the jig's fabricated sheets print decimal inch. Each height is
+# the exact millimetre value of its printed inch nominal (.XX grid).
 # The base bars are faced on both large faces from the 1/2 in 6061-T6511 bar
 # (BASE_BAR_STOCK_THICK) to BASE_BAR_THICK (owner ruling 2026-10-30, option A):
 # each face is a static locating seat (the table under bar 1, the rail and the
 # TL-28 brackets on it; bar 2 is the same part turned over). Like the carrier,
-# the finished size prints at .X and takes that title-block band, not STOCK.
+# the finished size takes its printed title-block band, not STOCK. A seat in
+# the height stack prints .XX: the inch .X (+/-.1) is for unread features only.
 BASE_BAR_STOCK_THICK = round(0.5 * INCH, 9)
-BASE_BAR_THICK = 12.0
-BASE_BAR_THICK_PLACES = 1
-BASE_BAR_THICK_BAND = printed_band_mm(BASE_BAR_THICK_PLACES)
-PIVOT_BLOCK_HEIGHT = 24.3  # finished from 1 in stock
-# Nominal fitted pack: five 0.2 DIN 988 shims (98055A118, TL-VN-79) per
-# support; the 6.85 shoulder seat (owner ruling 2026-10-27) leaves 1.15
-# unshimmed, so the pack closes the nominal head gap to 0.15.
-PIVOT_SHIM_PACK = 1.0
-PIVOT_SPACER_LENGTH = 15.0  # loose purchased spacer (92871A359)
+BASE_BAR_THICK = 11.938  # .47
+BASE_BAR_THICK_PLACES = 2
+BASE_BAR_THICK_BAND = printed_band_mm(BASE_BAR_THICK_PLACES, unit=BASE_BAR_UNIT)
+PIVOT_BLOCK_HEIGHT = 24.384  # .96, finished from 1 in stock
+# Nominal fitted pack: five .008 shims (TL-VN-79) per support; the shoulder
+# seat depth leaves .046 unshimmed, so the pack closes the nominal head gap
+# to .006.
+PIVOT_SHIM_PACK = 1.016  # 5 x .008
+PIVOT_SPACER_LENGTH = 15.875  # .625 loose purchased spacer (TL-VN-78)
 PIVOT_SUPPORT_HEIGHT = PIVOT_SHIM_PACK + PIVOT_SPACER_LENGTH
 # Finished dimensions, not purchased stock: face 1/2 in 6061-T6511 bar to
 # CARRIER_THICK and 1/4 in acetal to RISER_THICK (#1619). Both native drawing
-# dimensions print at .X and take that title-block band, not a supplier-stock
+# dimensions take their printed title-block band, not a supplier-stock
 # tolerance. CL locator height is set from the actual riser at assembly.
-CARRIER_THICK = 12.0
-CARRIER_THICK_PLACES = 1
-CARRIER_THICK_BAND = printed_band_mm(CARRIER_THICK_PLACES)
-RISER_THICK = 6.0
-RISER_THICK_PLACES = 1
-RISER_THICK_BAND = printed_band_mm(RISER_THICK_PLACES)
+CARRIER_THICK = 11.938  # .47
+CARRIER_THICK_PLACES = 2
+CARRIER_THICK_BAND = printed_band_mm(CARRIER_THICK_PLACES, unit=CARRIER_UNIT)
+RISER_THICK = 6.096  # .24
+RISER_THICK_PLACES = 2
+RISER_THICK_BAND = printed_band_mm(RISER_THICK_PLACES, unit=RISER_UNIT)
 # The strap is faced to its finished 2.5 (S0) before it goes on the jig (T3).
 STRAP_THICK = rocker.ARM_THICKNESS
 RAIL_SEAT_Z = BASE_BAR_THICK
@@ -495,8 +510,8 @@ if not (
     raise AssertionError("a carriage runs off its rail inside the pass sweep")
 if abs((STUD_Y[0] - STUD_Y[1]) - 2.0 * TSLOT_PITCH) > 1e-9:
     raise AssertionError("the hold-down studs do not land two T-slot pitches apart")
-if min(RISER_SCREW_WALLS) < 2.0:
-    raise AssertionError("a riser countersink breaks rule 17's 2.0 wall")
+if min(RISER_SCREW_WALLS) < WALL_TARGET_MM:
+    raise AssertionError("a riser countersink breaks rule 17's .080 wall target")
 if not (
     RISER_BLANK_ORIGIN[1] + 5.0 <= RISER_BAND_Y[0]
     and RISER_BAND_Y[1] <= RISER_BLANK_ORIGIN[1] + RISER_BLANK_WIDTH - 5.0
