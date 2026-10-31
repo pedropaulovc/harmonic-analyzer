@@ -2,15 +2,17 @@ r"""Create the drawing for the oblique trammel's base bar (MHA-CH-06-TL-20).
 
 One part, one configuration, two off (the title block's quantity); the
 second bar is the same part turned over. Its plan (the *Front view, looking
-down on the top face) carries the bar's length and stock width, the rail
-holes' baseline stations and the row's lateral station from the -Y edge
-under one native tap callout, the end brackets' eight counterbored
-holes (stations from the end face, four rows from the -Y edge, one native
-callout naming the far-side counterbores and the TL-28 mate), and both slots'
-stations, rises, width and centre-to-centre run (slot centre marks); the end
-view, projected right of the plan on its centreline, carries the faced
-thickness and both faced seats' Ra 3.2 under their one reason; the shaded
-isometric rides bottom left under the plan's stack, left of the title block.
+down on the top face) carries the bar's length and stock width (its 5-1/2
+fraction a reference over STOCK), the rail holes' baseline stations and the
+row's lateral station from the -Y edge under one native tap callout, the end
+brackets' eight counterbored holes (stations from the end face, four rows
+from the -Y edge, one native callout naming the far-side counterbores and the
+TL-28 mate), and both slots' stations, rises, width and centre-to-centre run
+(slot centre marks); the end view, projected right of the plan on its
+centreline, carries the faced thickness and both faced seats' Ra 125 µin
+under their one reason; the shaded isometric rides bottom left under the
+plan's stack, left of the title block. The sheet prints decimal inch
+(#290); the model keeps its millimetre nominals.
 
 Run with SolidWorks open::
 
@@ -60,7 +62,9 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _surface_finish import SEAT_UM, surface_finish_by_key
 from _printed_limits import limits
-from _printed_tolerance import drilled_oversize_mm
+from _part_properties import part_drawing_unit
+from _supplier_dimensions import supplier_reference_dimension
+from _printed_tolerance import drilled_oversize_mm, printed_deviations
 from ch_rocker_arm_tl_oblique_base_bar_spec import (
     BAR_LENGTH,
     BAR_THICK,
@@ -82,7 +86,6 @@ from ch_rocker_arm_tl_oblique_base_bar_spec import (
     RAIL_ROW_CALLOUT,
     SEAT_FINISH_REASON,
     SLOT_RUN,
-    STOCK_DIMENSIONS,
     SURFACE_FINISHES,
     TAP_DRILL,
     TAP_SPEC,
@@ -100,7 +103,7 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A 440 x 139.7 x 12.0 bar: 1:2 puts the 220-wide plan on the B sheet, its end
+# A 17.32 x 5-1/2 x .47 bar: 1:2 puts the 220-wide plan on the B sheet, its end
 # view projected right of it on the same centreline (third angle). The
 # vertical budget: the rail-hole stack tops out at about 265 under the 267
 # border. The plan sits right of centre so the three side lanes (the row's
@@ -119,12 +122,14 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 # 400.00 block's top line touching the border: the plan and end view drop
 # 3, the iso staying put, its top 7 under the length's text. The 2026-10-30
 # narrowing to 1/2 x 5-1/2 shortens the plan and end view 12.7 at the +Y side.
+# #290: the stock width's "(5-1/2 in)" reference is wider than "139.7", so
+# the plan and end view move 3 right to keep it off the left border.
 SHEET_SCALE = (1.0, 2.0)
 VIEW_SCALE = (1, 2)
 ISO_SCALE = (1, 5)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
-FRONT_CENTER = (0.1835, 0.1695)
-END_CENTER = (0.363, FRONT_CENTER[1])
+FRONT_CENTER = (0.1865, 0.1695)
+END_CENTER = (0.366, FRONT_CENTER[1])
 ISO_CENTER = (0.090, 0.056)
 ISO_NOTE_XY = (0.060, 0.022)
 # The r3 sheet measured 0.033 x 0.027 for the 101.6 bar; the widening adds
@@ -224,15 +229,16 @@ def _below_line(k: int) -> float:
 # block in the bottom-right corner.
 _TEXT_GAP = 0.0025  # a text's clearance from the line it sits beside
 # Half text widths (sheet m, measured on the r2 sheet's 3.5 mm text).
-_SLOT_WIDTH_TEXT_HALF = 0.017  # "2X 13.50 THRU", 13 glyphs at r4's 2.6
-_NEAR_SLOT_X_TEXT_HALF = 0.0045  # "20.9"
-_SLOT_RUN_TEXT_HALF = 0.008  # "2X 4.00"
-_FAR_RISE_TEXT_HALF = 0.0055  # "124.4": the r6 sheet's "23.0" was 8.8 wide
+_SLOT_WIDTH_TEXT_HALF = 0.017  # "2X .53 THRU", 11 glyphs at r4's 2.6
+_NEAR_SLOT_X_TEXT_HALF = 0.0045  # ".87"
+_SLOT_RUN_TEXT_HALF = 0.008  # "2X .16"
+_FAR_RISE_TEXT_HALF = 0.0055  # "4.90": the r6 sheet's "23.0" was 8.8 wide
 # "FOR HGR15R RAIL", its widest line (15 glyphs): 38.8 wide on the r4 sheet.
 _RAIL_ROW_TEXT_HALF = 0.0195
-_BAR_WIDTH_TEXT_HALF = 0.0074  # "139.7" over "STOCK": 14.8 wide on r4 ("152.4")
-_BRACKET_NEAR_X_TEXT_HALF = 0.0066  # "57.000"
-_BRACKET_ROW_TEXT_HALF = 0.0070  # "61.400": 13.9 wide on the c4-r9 sheet
+# "(5-1/2 in)" over "STOCK": estimated at 2.6 a glyph with a stacked fraction.
+_BAR_WIDTH_TEXT_HALF = 0.0104
+_BRACKET_NEAR_X_TEXT_HALF = 0.0055  # "2.244"
+_BRACKET_ROW_TEXT_HALF = 0.0070  # "2.425": "61.400" was 13.9 wide on the c4-r9 sheet
 _BRACKET_OUTER_TEXT_BELOW = 0.004  # "6.400"'s centre under the bar's -Y edge
 # SolidWorks sets an outside text right of its own line on a shoulder: the
 # 6.800 spanned from about 1.5 to 14.2 right of its line (c4-r2 sheet).
@@ -370,15 +376,17 @@ _SEAT_REASON_HALF = 0.026  # "TABLE AND RAIL SEATS", 20 glyphs
 SEAT_REASON_XY = (END_CENTER[0] - _SEAT_REASON_HALF, _END_TOP + 0.026)  # top-left
 # One slot's sizes count both slots; the width says they go through (r5).
 DIMENSION_TEXT = {"SlotWidth": ("2X ", " THRU"), "SlotRun": ("2X ", "")}
-# The width is the bar as bought (the feed lever's STOCK); the faced
-# thickness takes the title block's .X band. The rail-hole stations' tight
-# band names its mate under the outermost station, the row, at the title
-# block's band since c3-r7, keeps its reason (r3: every hole in line with
-# the rail's row, which the one DRO setting gives).
-CALLOUTS_BELOW = dict.fromkeys(sorted(STOCK_DIMENSIONS), "STOCK") | {
+# The width is the bar as bought: its stock fraction prints as a reference
+# over STOCK (``_stock_width_reference``); the faced thickness takes the
+# title block's .XX band. The rail-hole stations' tight band names its mate
+# under the outermost station, the row, at the title block's band since
+# c3-r7, keeps its reason (r3: every hole in line with the rail's row, which
+# the one DRO setting gives).
+CALLOUTS_BELOW = {
     f"RailHole{_LAST_HOLE}X": RAIL_MATE_CALLOUT,
     "RailRowY": RAIL_ROW_CALLOUT,
 }
+STOCK_CALLOUT = "STOCK"
 # The tap callout's two lines, centred about here, clear the 267 border by
 # about 6 (r3 printed its first line touching it).
 TAP_CALLOUT_XY = (0.318, 0.256)
@@ -391,8 +399,24 @@ BRACKET_CALLOUT_XY = (0.345, 0.105)
 part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME",))
 
 _INTO_BAR = ([0.0, 0.0, -1.0], ("__frame__",))
-_TAP_DRILL_PRINTED = round(part_spec.TAP_DRILL, 2)
-_DRILLED = (drilled_oversize_mm(), 0.0)
+_UNIT = part_spec.UNIT
+
+
+def _limits(model: float, places: int) -> list[float]:
+    """A general-band dimension's acceptance limits on the inch sheet: the
+    title block's band about the value printed at ``places``."""
+    low, high = printed_deviations(model, places, unit=_UNIT)
+    return limits(model, places, (high, low))
+
+
+def _printed(model: float, places: int) -> float:
+    """The millimetres of ``model`` printed at ``places`` inch decimals."""
+    return round(round(model / 25.4, places) * 25.4, 9)
+
+
+_CALLOUT_PLACES = 3  # every Hole Wizard length prints .XXX
+_TAP_DRILL_PRINTED = _printed(part_spec.TAP_DRILL, _CALLOUT_PLACES)
+_DRILLED = (drilled_oversize_mm(unit=_UNIT), 0.0)
 _PLACES = part_spec.RAIL_HOLE_PLACES
 _BAND = (part_spec.RAIL_HOLE_BAND, -part_spec.RAIL_HOLE_BAND)
 _FROM_LOW_SIDE = (
@@ -429,7 +453,10 @@ requirement(
             {"frame": "model", "axis": "z", "value": part_spec.BAR_THICK},
             ("BAR_THICK",),
         ),
-        "height": (limits(part_spec.BAR_THICK, part_spec.THICK_PLACES), ("BAR_THICK",)),
+        "height": (
+            _limits(part_spec.BAR_THICK, part_spec.THICK_PLACES),
+            ("BAR_THICK",),
+        ),
         "height_nominal": (part_spec.BAR_THICK, ("BAR_THICK",)),
         "finish_ra": _SEAT_RA,
     },
@@ -578,7 +605,7 @@ for _index, _x in enumerate(part_spec.RAIL_HOLE_X, start=1):
         ),
         "station_nominal": (_x, ("RAIL_HOLE_X",)),
         "height": (
-            limits(part_spec.RAIL_ROW_Y, part_spec.RAIL_ROW_PLACES),
+            _limits(part_spec.RAIL_ROW_Y, part_spec.RAIL_ROW_PLACES),
             ("RAIL_ROW_Y", "RAIL_ROW_PLACES"),
         ),
         "height_nominal": (part_spec.RAIL_ROW_Y, ("RAIL_ROW_Y",)),
@@ -598,7 +625,7 @@ for _index, _x in enumerate(part_spec.RAIL_HOLE_X, start=1):
             ),
             "tap_drill_mm": (part_spec.TAP_DRILL, ("TAP_SPEC",)),
             "dia": (
-                limits(_TAP_DRILL_PRINTED, 2, _DRILLED),
+                limits(_TAP_DRILL_PRINTED, _CALLOUT_PLACES, _DRILLED),
                 ("TAP_SPEC", "TAP_DRILL"),
             ),
             "nominal_dia": (_TAP_DRILL_PRINTED, ("TAP_DRILL",)),
@@ -610,12 +637,16 @@ for _index, _x in enumerate(part_spec.RAIL_HOLE_X, start=1):
                 ("RAIL_MATE_CALLOUT", "RAIL_SCREW_CLEARANCE", "RAIL_HOLE_BAND"),
             ),
         },
-        precision={"dia": 2, "station": _PLACES, "height": part_spec.RAIL_ROW_PLACES},
+        precision={
+            "dia": _CALLOUT_PLACES,
+            "station": _PLACES,
+            "height": part_spec.RAIL_ROW_PLACES,
+        },
     )
 
 _BRACKET_PLACES = part_spec.BRACKET_HOLE_PLACES
 _CBORE_PLACES = part_spec.BRACKET_CBORE_PLACES
-_BRACKET_DIA_PRINTED = round(BRACKET_HOLE_DIA, 2)
+_BRACKET_DIA_PRINTED = _printed(BRACKET_HOLE_DIA, _CALLOUT_PLACES)
 _FROM_UNDERSIDE = ([0.0, 0.0, 1.0], ("__frame__",))
 _BRACKET_SOURCE = (("ch_rocker_arm_tl_vn_oblique_leadscrew_spec", "BASE_BAR_HOLES"),)
 for _index, (_x, _y) in enumerate(BRACKET_HOLES, start=1):
@@ -630,12 +661,12 @@ for _index, (_x, _y) in enumerate(BRACKET_HOLES, start=1):
             "at": ([_x, _y, 0.0], _BRACKET_SOURCE),
             "axis": _FROM_UNDERSIDE,
             "station": (
-                limits(_x, _BRACKET_PLACES),
+                _limits(_x, _BRACKET_PLACES),
                 (*_BRACKET_SOURCE, "BRACKET_HOLE_PLACES"),
             ),
             "station_nominal": (_x, _BRACKET_SOURCE),
             "height": (
-                limits(_y - part_spec.LOW_SIDE_Y, _BRACKET_PLACES),
+                _limits(_y - part_spec.LOW_SIDE_Y, _BRACKET_PLACES),
                 (*_BRACKET_SOURCE, "LOW_SIDE_Y", "BRACKET_HOLE_PLACES"),
             ),
             "height_nominal": (
@@ -644,7 +675,7 @@ for _index, (_x, _y) in enumerate(BRACKET_HOLES, start=1):
             ),
             "height_from": _FROM_LOW_SIDE,
             "dia": (
-                limits(_BRACKET_DIA_PRINTED, 2, _DRILLED),
+                limits(_BRACKET_DIA_PRINTED, _CALLOUT_PLACES, _DRILLED),
                 ("BRACKET_HOLE_DIA", "BRACKET_HOLE_SPEC"),
             ),
             "dia_nominal": (_BRACKET_DIA_PRINTED, ("BRACKET_HOLE_DIA",)),
@@ -656,7 +687,11 @@ for _index, (_x, _y) in enumerate(BRACKET_HOLES, start=1):
                 ("BRACKET_CALLOUT_PROCESS", "BRACKET_MATE"),
             ),
         },
-        precision={"station": _BRACKET_PLACES, "height": _BRACKET_PLACES, "dia": 2},
+        precision={
+            "station": _BRACKET_PLACES,
+            "height": _BRACKET_PLACES,
+            "dia": _CALLOUT_PLACES,
+        },
     )
     requirement(
         f"bracket_hole_{_index}_counterbore",
@@ -676,12 +711,12 @@ for _index, (_x, _y) in enumerate(BRACKET_HOLES, start=1):
                 ),
             ),
             "dia": (
-                limits(part_spec.BRACKET_CBORE_DIA, _CBORE_PLACES),
+                _limits(part_spec.BRACKET_CBORE_DIA, _CBORE_PLACES),
                 ("BRACKET_CBORE_DIA", "BRACKET_SCREW_HEAD_DIA"),
             ),
             "dia_nominal": (part_spec.BRACKET_CBORE_DIA, ("BRACKET_CBORE_DIA",)),
             "depth": (
-                limits(part_spec.BRACKET_CBORE_DEPTH, _CBORE_PLACES),
+                _limits(part_spec.BRACKET_CBORE_DEPTH, _CBORE_PLACES),
                 ("BRACKET_CBORE_DEPTH", "BRACKET_SCREW_HEAD_HEIGHT"),
             ),
             "depth_ref": (part_spec.BRACKET_CBORE_DEPTH, ("BRACKET_CBORE_DEPTH",)),
@@ -708,6 +743,29 @@ def _set_dimension_text(
             raise RuntimeError(f"dimension text {text!r} did not persist: {got!r}")
     if remaining:
         raise RuntimeError(f"dimension texts not applied: {sorted(remaining)}")
+
+
+def _stock_width_reference(adapter: Any, annotations: list[Any]) -> None:
+    """The as-bought width prints as its REF stock fraction over STOCK."""
+    matches = [
+        item for item in annotations if dimension_name(adapter, item) == "BarWidth"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one BarWidth dimension, found {len(matches)}")
+    display = _early_bound(
+        _early_bound(matches[0], "IAnnotation").GetSpecificAnnotation(),
+        "IDisplayDimension",
+    )
+    supplier_reference_dimension(
+        adapter,
+        display,
+        label="base bar stock width",
+        units="in",
+        precision=DRAWING_PRECISION_BY_NAME["BarWidth"],
+        expected_mm=BAR_WIDTH,
+        fraction_denominator=part_spec.BAR_WIDTH_FRACTION_DENOMINATOR,
+        callout=STOCK_CALLOUT,
+    )
 
 
 def _omit_tap_thread_class(display: Any) -> None:
@@ -793,7 +851,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter.currentModel, ("Revision", "Title", *required), required=required
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("ch-rocker-arm-tl-oblique-base-bar"),
     )
     stamp_drawing_summary(
         adapter,
@@ -841,6 +903,7 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _set_dimension_text(adapter, annotations, DIMENSION_TEXT)
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
+    _stock_width_reference(adapter, annotations)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the plan")
@@ -860,6 +923,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rail screw taps",
     )
     _omit_tap_thread_class(tap_callout)
+    set_hole_callout_precision(
+        tap_callout, {"hw-tapdrldia": _CALLOUT_PLACES}, label="rail screw taps"
+    )
     # The far outer hole's edge, down and right of its centre: the leader
     # leaves away from the far row's station line.
     bracket_callout = add_native_hole_callout(
@@ -876,7 +942,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hole_callout_precision(
         bracket_callout, BRACKET_CALLOUT_PRECISION, label="end bracket holes"
     )
-    # The faced seats' Ra 3.2, each on its own face's edge in the end view,
+    # The faced seats' Ra 125 µin, each on its own face's edge in the end view,
     # under their one reason (rule 7: say why, beside the symbols).
     seat_edges = _seat_edges(end)
     for key, symbol_xy, label in (

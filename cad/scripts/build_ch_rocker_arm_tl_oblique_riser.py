@@ -34,6 +34,8 @@ from collections.abc import Callable
 from typing import Any
 
 from _appearance import apply_material
+from _document_units import apply_package_model_units
+from _part_properties import part_drawing_unit
 import _telemetry
 from _check import check
 from _com import _early_bound, _read_member
@@ -391,8 +393,9 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # The mm suffix is load-bearing: the equation manager reads bare numbers
-    # in document units.
+    # in document units (inch here).
     for name, value in GLOBALS.items():
         await set_global(adapter, name, f"{value}mm")
 

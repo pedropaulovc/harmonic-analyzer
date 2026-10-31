@@ -66,7 +66,7 @@ def test_quantity_thread_and_length_are_the_fastener_tables() -> None:
 
 
 def test_head_seats_nominally_below_the_riser_top() -> None:
-    # Equal 82 deg cones: the Ø0.212 flat top sits where the Ø6.3 countersink
+    # Equal 82 deg cones: the Ø.212 flat top sits where the riser's countersink
     # narrows to it, not flush with the riser top.  Nominal seat only: no
     # head-angle tolerance is sourced or assumed.
     recess = (riser.CSK_DIA - 0.212 * IN) / (2.0 * math.tan(math.radians(41.0)))
@@ -102,9 +102,11 @@ def test_riser_screw_keeps_rule_18_full_thread() -> None:
     assert spec.ENGAGEMENT_REQUIRED == pytest.approx(required)
     assert spec.LENGTH_MIN == pytest.approx((0.625 - 0.03) * IN)
     assert spec.POINT_CHAMFER_LENGTH_MAX == pytest.approx(2.0 * IN / 40.0)
-    assert riser.THICKNESS + riser.THICKNESS_BAND == pytest.approx(6.8)
     assert spec.SCREW_FULL_THREAD_REACH_MIN == pytest.approx(
-        spec.LENGTH_MIN - 6.8 - carrier.TAP_MOUTH_BREAK - spec.POINT_CHAMFER_LENGTH_MAX
+        spec.LENGTH_MIN
+        - (riser.THICKNESS + riser.THICKNESS_BAND)
+        - carrier.TAP_MOUTH_BREAK
+        - spec.POINT_CHAMFER_LENGTH_MAX
     )
     assert spec.RECEIVER_FULL_THREAD_MIN == carrier.ENGAGEMENT_MM[carrier.RISER_THREAD]
     assert spec.ENGAGEMENT_MIN == min(
@@ -237,7 +239,7 @@ def test_sheet_prints_only_the_replacement_sizes(monkeypatch) -> None:
 
 
 def test_reserved_lanes_keep_the_views_in_projection() -> None:
-    """Machinist review b344192: TOP and RIGHT sat 3 mm off FRONT's axis/row."""
+    """Machinist review b344192: TOP and RIGHT sat .12 in off FRONT's axis/row."""
     import draw_ch_rocker_arm_tl_vn_oblique_riser_screw as drawing
     from _purchased_fastener_drawing import fastener_view_cells, supplier_fit_cells
     from _supplier_screw_layout import supplier_screw_margins

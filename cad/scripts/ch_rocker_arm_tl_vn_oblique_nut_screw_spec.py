@@ -37,10 +37,16 @@ seat, the nut flange's -X face.
 
 from __future__ import annotations
 
+import _config
 import _olander_4c50bhca as _catalogue
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 from _olander_4c50bhca import DIMS, LENGTH_TEXT, PART_NO, THREAD
+from _package_units import drawing_unit
 
+UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-vn-oblique-nut-screw",
+    _config.parts("ch-rocker-arm-tl-vn-oblique-nut-screw"),
+)
 SKU = PART_NO
 MCMASTER_XREF = _catalogue.MCMASTER_XREF
 ROW = fasteners.NUT_TO_FEED_BLOCK

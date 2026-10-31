@@ -1,6 +1,6 @@
 r"""Build the oblique-trammel jig's feed lever (MHA-CH-06-TL-26; shop fixture).
 
-A 6061-T6 1/2 x 1 in flat, 300 long, bolted on the carrier plate's top by two
+A 6061-T6 1/2 x 1 in flat, 11.8 long, bolted on the carrier plate's top by two
 5/16-18 SHCS into the carrier's lever stations; the grip end's plan corners are
 broken (``ch_rocker_arm_tl_oblique_feed_lever_spec``).
 
@@ -28,8 +28,10 @@ from _appearance import apply_material
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -142,6 +144,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # The mm suffix is load-bearing: the equation manager reads bare numbers
     # in document units.

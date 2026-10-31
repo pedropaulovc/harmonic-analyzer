@@ -11,6 +11,7 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import name_dimensions
+from _document_units import apply_package_model_units
 from _drawing_marks import clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision
 from _drawing_tolerances import set_dimension_bilateral_tolerance
@@ -18,6 +19,7 @@ from _feature_tree import name_last_feature
 from _fit_deviations import deviations
 from _holes import wizard_holes
 from _part_checks import volume_check, report_mass_properties
+from _part_properties import part_drawing_unit
 from _rebuild import force_rebuild
 from _sketch import SketchDims, add_line_chain, anchor_point_to_origin, anchor_point_to_point, blank_reference_sketches, dimension_between, ensure_fully_defined, set_sketch_direct_db
 from _sketch_chains import define_rectilinear_chain
@@ -114,8 +116,8 @@ async def _cbore_floor_reference(adapter) -> list[tuple[str, str]]:
     its cutting plane is the Right plane (model YZ) carried to X = +BoltX; a
     derived view imports a reference sketch that lies in its cut
     (build_pd_platen ``CboreFloorReference``). One construction line on the
-    Ø4.5 hole's +Y wall, a visible section edge, from the carriage seat
-    (Z = 0) up to the counterbore floor: its foot's Y from the origin
+    M4 clearance hole's +Y wall, a visible section edge, from the carriage
+    seat (Z = 0) up to the counterbore floor: its foot's Y from the origin
     (unprinted; the Z = 0 end sits on the sketch axis), and its rise, the
     printed floor. The off-sketch check in ``_sketch_mapper`` proves the
     plane stands at X = +13 and that the sketch opened on it, not on a
@@ -255,8 +257,8 @@ async def _construction_circle(adapter, dims, base, base_uv, uv, dia, names, lab
 async def _plan_datum_reference(adapter, part) -> None:
     """The hidden top-face sketch that carries the plan's X ordinates from
     the -X edge (rule 10): a construction line ON that edge, construction
-    circles ON the Ø10 seat and one carriage hole per column, and on TL-32 a
-    line ON the lug's -X face, which also carries the 88 overall from the
+    circles ON the shoulder seat and one carriage hole per column, and on
+    TL-32 a line ON the lug's -X face, which also carries the overall from the
     top (+Y) edge. Shown in the plan view, every entity overlies a real edge."""
     feature = spec.PLAN_DATUM_REFERENCE
     z = part.BLOCK_HEIGHT
@@ -336,6 +338,7 @@ async def build_block_model(adapter, part) -> None:
     import math
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
     check("create part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(part.PART_NAME), label=part.PART_NAME)
     await _rectangle(adapter,"BlockProfile",(part.BLOCK_X0,part.BLOCK_X1,-part.BLOCK_WIDTH/2,part.BLOCK_WIDTH/2),
                      ["BlockLength","BlockWidth","BlockEndX","BlockSideY"])
     check("block",await adapter.create_extrusion(ExtrusionParameters(depth=part.BLOCK_HEIGHT)))
@@ -360,7 +363,7 @@ async def build_block_model(adapter, part) -> None:
     expected -= math.pi * (spec.BORE_DIA/2)**2 * spec.BORE_DEPTH
     await _circles(adapter,"TopFace",part.BLOCK_HEIGHT,"PivotTapProfile",
                    [(spec.BORE_X,0,spec.PIVOT_TAP_DRILL,("TapX",None,"TapDrillDia"))])
-    check("M8 tap drill thru",await adapter.create_cut_extrude(ExtrusionParameters(depth=part.BLOCK_HEIGHT*2)))
+    check("pivot tap drill thru",await adapter.create_cut_extrude(ExtrusionParameters(depth=part.BLOCK_HEIGHT*2)))
     name_last_feature(adapter,"PivotTap")
     expected -= math.pi*(spec.PIVOT_TAP_DRILL/2)**2 * (part.BLOCK_HEIGHT-spec.BORE_DEPTH)
     for profile,diameter,depth,feature in (
@@ -405,7 +408,8 @@ async def build_block_model(adapter, part) -> None:
     await force_rebuild(adapter)
     _require_one_solid_body(adapter,label=part.PART_NAME)
     await volume_check(adapter,"finished block",expected,expected*0.002)
-    set_dimension_bilateral_tolerance(adapter,"TopBoreProfile","BoreDia",*deviations(spec.BORE_BAND))
+    set_dimension_bilateral_tolerance(adapter,"TopBoreProfile","BoreDia",*deviations(spec.BORE_BAND),
+                                      places=spec.BORE_PLACES,display_unit=spec.UNIT)
     apply_drawing_precision(adapter,part.DRAWING_PRECISION)
     # Thread identity and fit/process qualifiers belong to the saved model.
     from _drawing_precision import _named_dimension

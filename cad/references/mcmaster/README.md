@@ -48,10 +48,11 @@ recipes:
 | 91251A583 | `ch-rocker-arm-tl-vn-oblique-lever-screw` (MHA-CH-06-TL-VN-69; shop fixture; catalogue-only, product page login-walled, the 7/8 in sibling's vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 91812A215 | — (retired TL-VN-70, 2026-10-23; jig-only diagnostic recipe removed) | Extreme-Vibration-Resistant Wedge Lock Washer |
 | 91812A230 | `ch-rocker-arm-tl-vn-oblique-lever-washer` (MHA-CH-06-TL-VN-71; shop fixture; catalogue-only, product page login-walled, no vendor model) | Extreme-Vibration-Resistant Wedge Lock Washer |
-| 90323A492 | `ch-rocker-arm-tl-vn-oblique-pivot-screw` (MHA-CH-06-TL-VN-77; purchased datasheet model) | 18-8 Precision Shoulder Screw, Ø10 × 35, M8 × 1.25 |
-| 92871A359 | `ch-rocker-arm-tl-vn-oblique-pivot-spacer` (MHA-CH-06-TL-VN-78; purchased datasheet model) | 18-8 Round Spacer, 10 ID × 16 OD × 15 |
-| 98055A118 | `ch-rocker-arm-tl-vn-oblique-pivot-shim` (MHA-CH-06-TL-VN-79; 98055A117/98055A121 fitting stock) | DIN 988 Spring Steel Shim, 10 × 16 × 0.2 |
-| 2281A11-6410N695 | `ch-rocker-arm-tl-vn-oblique-hub-pin` (MHA-CH-06-TL-VN-80; abrasive-cut to 20.0, factory end up) | Class Z Minus Gauge Pin, Ø10.2000, 2 in supply |
+| 90323A492 | — (retired TL-VN-77 source, 2026-10-31; now Huyett BLTS40-0375-1500188P, issue #290) | 18-8 Precision Shoulder Screw, Ø10 × 35, metric thread |
+| 92871A359 | — (retired TL-VN-78 source, 2026-10-31; now AluminumSpacers.com AS62-18-40, issue #290) | 18-8 Round Spacer, 10 ID × 16 OD × 15 |
+| 98055A118 | — (retired TL-VN-79 source with 98055A117/98055A121, 2026-10-31; now Huyett SHIM-0375-004/-008/-020, issue #290) | DIN 988 Spring Steel Shim, 10 × 16 × 0.2 |
+| 2281A11-6410N695 | — (retired TL-VN-80 source, 2026-10-31; now 23065A855-23065A4, issue #290) | Class Z Minus Gauge Pin, Ø10.2000, 2 in supply |
+| 23065A855-23065A4 | `ch-rocker-arm-tl-vn-oblique-hub-pin` (MHA-CH-06-TL-VN-80; abrasive-cut to .79, factory end up) | Class Z NO-GO Plug Gauge, .4000 in, 2 in supply |
 | 91255A106 | — (diagnostic recipe; a former `pd-vn-guide-lock-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (diagnostic recipe; a former `dt-vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91251A150 | `ch-rocker-arm-tl-vn-oblique-kp08-screw` (MHA-CH-06-TL-VN-65; shop fixture; catalogue-only, product page login-walled, no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
@@ -62,7 +63,8 @@ recipes:
 | 91375A942 | `ch-vn-fulcrum-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
 | 91410A538 | — (diagnostic recipe; `fr-vn-gooseneck-set-screw` until 2026-10-12) | Steel Square-Head Cup-Point Set Screw |
 | 91410A540 | `fr-vn-gooseneck-set-screw` (catalogue-only; no vendor model) | Steel Square-Head Cup-Point Set Screw |
-| 91595A452 | `ch-rocker-arm-tl-vn-oblique-cl-dowel` (MHA-CH-06-TL-VN-53; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Dowel Pin |
+| 91595A452 | — (retired TL-VN-53 source, 2026-10-31; now 98381A542, issue #290; diagnostic recipe removed) | Dowel Pin |
+| 98381A542 | `ch-rocker-arm-tl-vn-oblique-cl-dowel` (MHA-CH-06-TL-VN-53; shop fixture; catalogue-only, product page login-walled, vendor STEP read for dimensions, not replica-gated) | Alloy Steel Dowel Pin |
 | 91771A112 | `ch-rocker-arm-tl-vn-oblique-riser-screw` (MHA-CH-06-TL-VN-67; shop fixture; catalogue-only, same-family vendor geometry, not replica-gated) | Stainless Steel Phillips Flat Head Screw |
 | 91790A199 | `pd-vn-transgear-arm-plate-screw` (catalogue-only; populated live SKU verified; 2-D PDF offered, CAD requires login) | 18-8 Stainless Steel Oval Head Slotted Screw |
 | 91792A108 | `pd-vn-guide-lock-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Pan Head Slotted Screw |
@@ -164,8 +166,26 @@ its dimension provider and diagnostic recipe have also been removed.
   and evidence for the same actual support on both passes. Possession and
   receiving qualification remain unconfirmed; the inventory is not marked
   accepted by this catalogue recheck.
-- [91595A452](https://www.mcmaster.com/91595A452/) (`ch-rocker-arm-tl-vn-oblique-cl-dowel`,
-  MHA-CH-06-TL-VN-53, one: the oblique trammel jig carrier's CL locator) was
+- [98381A542](https://www.mcmaster.com/98381A542/) (`ch-rocker-arm-tl-vn-oblique-cl-dowel`,
+  MHA-CH-06-TL-VN-53, one: the oblique trammel jig carrier's CL locator since
+  October 31, 2026, issue #290) was read live on October 31, 2026 from the
+  category table https://www.mcmaster.com/products/dowel-pins/diameter~1-4/length~1/
+  (the product page is login-walled): alloy steel dowel pin, 1/4 in diameter
+  +0.0001/+0.0003 in, 1 in long, 10,000 lbf, Rockwell C47, ASME B18.8.2, end
+  shape "Round x Chamfer", pack of 25, $10.55; length tolerance unstated. Its
+  STEP (SHA-256
+  `2c11cd08667f18773a813b3238df808c1015083b683b6e4a5eb26d88f07853a9`,
+  downloaded October 30, 2026) was read for dimensions only; no copy is kept
+  here: a flat Ø.235 end face and a cone 16° to the axis at the chamfered end,
+  the Ø.250 cylinder, and an R.031 round to a flat Ø.188 face at the other.
+  `_mcmaster_98381a542.py` holds those end forms and
+  `diag_build_98381A542.py` draws them with `diag_mcmaster_dowel.build_dowel`.
+  It is catalogue-only (not replica-gated) and its standalone diagnostic is a
+  catalog-only run. It is pressed, chamfered end first, into the carrier's
+  .2490-.2495 reamed CL hole, its round tip .060-.068 above the actual riser.
+  It supplies `fixtures.trammel-cl-dowel`.
+- [91595A452](https://www.mcmaster.com/91595A452/) (retired TL-VN-53 source,
+  October 31, 2026; historical reading follows) was
   read live on October 17, 2026: 52100 alloy steel dowel pin, 6 mm diameter
   +0.004/+0.012 (DIN 6325-m6 / ISO 8734), 20 mm long, Rockwell C52 min, end
   shape "Round x Chamfer/Round", pack of 25. The page states no end forms; the
@@ -179,7 +199,7 @@ its dimension provider and diagnostic recipe have also been removed.
   536.8453 mm³, with no flat face: at the chamfered end a cone 15° to the
   axis, 1.17 long, from the Ø6 cylinder to Ø5.373, then an R5.0165 spherical
   crown 0.78 high; at the round end an R5.45 spherical dome 0.9 high.
-  `diag_build_91595A452.py` models those end forms (its own section:
+  `diag_build_91595A452.py` (removed October 31, 2026) modelled those end forms (its own section:
   `diag_mcmaster_dowel.build_dowel` draws flat ends), chamfered tip at y = 0
   (the pressed end), at nominal Ø6. It is catalogue-only: NOT replica-gated
   (user ruling October 17, 2026), and its standalone diagnostic is a
@@ -189,7 +209,7 @@ its dimension provider and diagnostic recipe have also been removed.
   setup height leaves cylindrical strap overlap and at least 1.5D press
   contact over the finished plate bands; normal fit-up checks that the strap
   seats flat, locates and slips on/off without the tip standing above it.
-  It also supplies `fixtures.trammel-cl-dowel`; length tolerance unstated.
+  It also supplied `fixtures.trammel-cl-dowel`; length tolerance unstated.
   Both purchases remain unconfirmed in `cad/process/shop/inventory.toml`.
 - [91251A197](https://www.mcmaster.com/91251A197/)
   (`ch-rocker-arm-tl-vn-oblique-rail-screw`, MHA-CH-06-TL-VN-61, 14 in the oblique
