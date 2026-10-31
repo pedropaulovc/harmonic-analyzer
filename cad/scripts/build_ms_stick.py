@@ -92,6 +92,7 @@ from ms_stick_spec import (
     MIN_LIMIT_DEVIATIONS_MM,
     MIN_LIMIT_TOL_TYPE,
     NUMERAL_PLACEMENT_NOTE,
+    SECTION_PARENT_VIEW_NOTE,
     FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
     HALF_TICK_LENGTH,
@@ -920,6 +921,7 @@ async def build(adapter) -> dict[str, str]:
             "Front View Note": FRONT_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Numeral Placement Note": NUMERAL_PLACEMENT_NOTE,
+            "Section Parent View Note": SECTION_PARENT_VIEW_NOTE,
         },
     )
     name_octant_views(

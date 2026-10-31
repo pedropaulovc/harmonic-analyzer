@@ -101,6 +101,7 @@ def test_builder_authors_model_owned_numeral_placement_property(monkeypatch) -> 
     expression = ast.Expression(body=calls[0])
     eval(compile(expression, builder.__file__, "eval"), vars(builder), {"adapter": adapter})
     assert authored["Numeral Placement Note"] == spec.NUMERAL_PLACEMENT_NOTE
+    assert authored["Section Parent View Note"] == spec.SECTION_PARENT_VIEW_NOTE
     assert authored["Manufacturing Notes"] == spec.DRAWING_NOTES
     assert "Numeral Tool Note" not in authored
     assert "Scale End Note" not in authored
@@ -650,6 +651,7 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     assert "Numeral Placement Note" in required_properties
     assert "Scale End Note" not in required_properties
     assert ("ENGRAVING", "Numeral Placement Note", drawing.NUMERAL_NOTE_XY) in linked_notes
+    assert ("ENGRAVING", "Section Parent View Note", drawing.SECTION_PARENT_NOTE_XY) in linked_notes
     assert "Numeral Tool Note" not in required_properties
     assert all(name != "Numeral Tool Note" for _sheet, name, _xy in linked_notes)
     assert ("BAR", "Manufacturing Notes", (0.045, 0.075)) in linked_notes

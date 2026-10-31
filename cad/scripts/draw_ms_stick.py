@@ -91,6 +91,8 @@ NUMERAL_NOTE_XY = (0.045, 0.068)
 # A 1:1 parent spreads the across-the-bar cutting line (and its two arrows)
 # over a readable 11 mm instead of a 1:2 nick.
 NUMERAL_PROFILE_PARENT_CENTER = (0.200, 0.250)
+# Upper-left of its label: right of the bar's end, clear of the G letters.
+SECTION_PARENT_NOTE_XY = (0.310, 0.257)
 # 3 mm right of the mm sheet's 0.280: the inch floor row (STOCK UNDER .080
 # MIN) is one character wider between detail F and the section.
 NUMERAL_PROFILE_CENTER = (0.283, 0.125)
@@ -360,7 +362,7 @@ async def build(adapter: Any) -> dict[str, str]:
     source_model = adapter.currentModel
     properties = ("Number", "Revision", "Title", "Material Specification", "Finish",
                   "Quantity", "Manufacturing Notes", "Front View Note", "Isometric View Note",
-                  "Numeral Placement Note")
+                  "Numeral Placement Note", "Section Parent View Note")
     read_required_properties(source_model, properties, required=properties)
     drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM,
                                         scale=SHEET_SCALE, layout=SPEC.layout,
@@ -459,6 +461,7 @@ async def build(adapter: Any) -> dict[str, str]:
     profile_parent = place_view(
         adapter, str(SOURCE), "*Back", *NUMERAL_PROFILE_PARENT_CENTER, scale=SHEET_SCALE)
     set_hidden_lines_removed(adapter, profile_parent)
+    add_property_linked_note(adapter, "Section Parent View Note", *SECTION_PARENT_NOTE_XY)
     profile = _numeral_profile(adapter, profile_parent)
     numeral_depth_annotations = curate_view_dimensions(
         adapter, profile, keep=NUMERAL_DEPTH_KEEP, view_label="numeral V section",

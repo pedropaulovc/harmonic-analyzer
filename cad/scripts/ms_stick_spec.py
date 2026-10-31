@@ -201,6 +201,10 @@ NUMERAL_PLACEMENT_NOTE = (
 )
 FRONT_VIEW_NOTE = "RULED FACE SCALE 1:1"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
+# Sheet 4's G-G parent stays unturned so SolidWorks prints each G clear of
+# its arrow; the label says it reads opposite to the other ruled faces
+# (machinist review, run 20261031T082305583Z-d97607f2).
+SECTION_PARENT_VIEW_NOTE = "RULED FACE TURNED 180 DEG FROM SHEET 1"
 
 DRAWING_VALUES_BY_NAME = {
     "BodyLength": BODY_LENGTH,
