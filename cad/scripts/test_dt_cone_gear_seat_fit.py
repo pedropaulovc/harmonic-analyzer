@@ -7,7 +7,7 @@ shaft (MHA-DT-04), closing two Codex findings:
   and #839's moved lands arrive in different PRs);
 * #811: a slide-on fit needs a stated, positive clearance.  The solid-stack
   ruling (2026-09-28) makes it the shared gear seat fit (gear_seat_fit):
-  0.025-0.105 diametral on the round, 0.010-0.030 across the flat.
+  0.0254-0.09652 diametral on the round, 0.01016-0.03048 across the flat.
 """
 
 from __future__ import annotations
@@ -79,12 +79,12 @@ def test_every_gear_station_lies_on_its_land() -> None:
 
 
 def test_the_seat_fit_derives_both_bore_bands() -> None:
-    assert GEAR_SEAT_CLEARANCE == (0.025, 0.105)
-    assert FLAT_AF_CLEARANCE == (0.010, 0.030)
-    assert seat_bore_band(lands.GEAR_SEAT_BAND) == pytest.approx((0.055, 0.025))
-    assert seat_bore_band(lands.RUNNING_DIA_BAND) == pytest.approx((0.085, 0.025))
+    assert GEAR_SEAT_CLEARANCE == (0.0254, 0.09652)
+    assert FLAT_AF_CLEARANCE == (0.01016, 0.03048)
+    assert seat_bore_band(lands.GEAR_SEAT_BAND) == pytest.approx((0.04572, 0.0254))
+    assert seat_bore_band(lands.RUNNING_DIA_BAND) == pytest.approx((0.0762, 0.0254))
     assert spec.BORE_AF_BAND == pytest.approx(flat_bore_af_band(lands.FLAT_AF_BAND))
-    assert spec.BORE_AF_BAND == pytest.approx((0.020, 0.010))
+    assert spec.BORE_AF_BAND == pytest.approx((0.02032, 0.01016))
 
 
 def test_every_seat_keeps_both_clearance_windows_at_the_print_extremes() -> None:

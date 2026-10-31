@@ -34,7 +34,7 @@ def test_outboard_proportions_follow_the_u29_enlargement() -> None:
 
 def test_u27_walls_hold_two_millimetres_at_the_printed_bands() -> None:
     assert geometry.WALL_TARGET_MM == 2.0
-    assert geometry.SEAM_WEB_WORST_MM == pytest.approx(2.004, abs=1e-3)
+    assert geometry.SEAM_WEB_WORST_MM == pytest.approx(2.012, abs=1e-3)
     assert geometry.ARM_CHEEK_WORST_MM == pytest.approx(2.049, abs=1e-3)
 
 
@@ -123,8 +123,8 @@ def test_rear_relief_clears_the_t12_chain_plates_and_keeps_its_wall() -> None:
     assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["ReliefLength"] == 2
     assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["HubLength"] == 2
     assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["ReliefDia"] == 2
-    # drawing-guidelines.md rule 17 (walls and webs) wall over the bore: Ø15.99 against the Ø9.580 bore, edges broken.
-    assert geometry.RELIEF_WALL_WORST_MM == pytest.approx(2.705, abs=1e-3)
+    # drawing-guidelines.md rule 17 (walls and webs) wall over the bore: Ø15.99 against the Ø9.5631 bore, edges broken.
+    assert geometry.RELIEF_WALL_WORST_MM == pytest.approx(2.713, abs=1e-3)
     assert geometry.RELIEF_WALL_WORST_MM >= geometry.WALL_TARGET_MM
     # The MHA-DT-09 ream stays on the full barrel.
     assert (

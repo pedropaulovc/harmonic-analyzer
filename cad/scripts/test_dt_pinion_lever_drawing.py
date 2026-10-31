@@ -58,10 +58,10 @@ def test_bore_band_is_a_slip_fit_on_the_lift_rod() -> None:
         dt_pinion_lever_spec.BORE + dt_pinion_lever_spec.BORE_BAND[1],
         dt_pinion_lever_spec.BORE + dt_pinion_lever_spec.BORE_BAND[0],
     )
-    assert (round(low, 6), round(high, 6)) == (6.36, 6.375)
+    assert (round(low, 6), round(high, 6)) == (6.3754, 6.3881)
     min_clearance = low - (ROD_DIA + SHAFT_H[0])
     assert min_clearance > 0.0
-    assert round(min_clearance, 6) == 0.01
+    assert round(min_clearance, 6) == 0.0254
     # ENFORCE r1 (#1011): the bore is the one band; the end wall's own
     # +/-0.25 rescued a wall and named no mate, so it went.
     assert model_toleranced_dimensions(lever) == {
