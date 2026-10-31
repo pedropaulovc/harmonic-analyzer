@@ -49,7 +49,7 @@ def drilled_undersize_mm() -> float:
 def angular_band_deg() -> float:
     """The title block's general angular +/- in degrees."""
     row = _config.title_block("angular")
-    value, _unit = quantity("angular", row, "value", ANGLE_UNITS)
+    value, _unit, _digits = quantity("angular", row, "value", ANGLE_UNITS)
     return value
 
 

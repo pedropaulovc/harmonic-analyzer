@@ -35,11 +35,13 @@ ANGLE_UNITS: Mapping[str, float] = {"deg": 1.0}
 
 def quantity(
     row_name: str, row: Mapping[str, Any], name: str, units: Mapping[str, float]
-) -> tuple[float, str]:
-    """``(value, unit)`` of ``row``'s single ``<name>_<unit>`` entry.
+) -> tuple[float, str, int]:
+    """``(value, unit, digits)`` of ``row``'s single ``<name>_<unit>`` entry.
 
     Refuses a bare ``<name>`` (no unit), an unknown unit suffix, more than one
-    unit, and any value that is not a real number (a display string included).
+    unit, any value that is not a real number (a display string included), a
+    missing ``digits``, and a value the sheet cannot print exactly at
+    ``digits``: the physical band must be the band the sheet prints.
     ``row_name`` only labels the errors.
     """
     found: list[tuple[str, Any]] = []
@@ -68,12 +70,26 @@ def quantity(
         raise TypeError(
             f"title_block.{row_name}.{name}_{unit} must be a number, got {value!r}"
         )
-    return float(value), unit
+    digits = row.get("digits")
+    if isinstance(digits, bool) or not isinstance(digits, int) or digits < 0:
+        raise ValueError(
+            f"title_block.{row_name}.digits must be a non-negative integer, got {digits!r}"
+        )
+    _check_printable(f"title_block.{row_name}.{name}_{unit}", float(value), digits)
+    return float(value), unit, digits
+
+
+def _check_printable(label: str, value: float, digits: int) -> None:
+    if abs(round(value, digits) - value) > 1e-9:
+        raise ValueError(
+            f"{label} = {value!r} does not print exactly at {digits} digits; "
+            "the sheet would show a different band than the stacks use"
+        )
 
 
 def length_mm(row_name: str, row: Mapping[str, Any], name: str) -> float:
     """``row``'s ``<name>_<unit>`` length in millimetres."""
-    value, unit = quantity(row_name, row, name, LENGTH_UNITS)
+    value, unit, _digits = quantity(row_name, row, name, LENGTH_UNITS)
     return value * LENGTH_UNITS[unit]
 
 
@@ -82,9 +98,12 @@ def render_number(value: float, unit: str, digits: int) -> str:
 
     ASME Y14.5: millimetre values below one keep their leading zero
     (``0.51``); inch values drop it (``.01``); degrees take the degree sign.
+    A value that would round at ``digits`` is refused rather than printed as a
+    different number.
     """
     if value < 0.0:
         raise ValueError(f"printed tolerance magnitudes are non-negative: {value!r}")
+    _check_printable("printed tolerance", value, digits)
     text = f"{value:.{digits}f}"
     if unit == "mm":
         return text
@@ -96,13 +115,7 @@ def render_number(value: float, unit: str, digits: int) -> str:
 
 
 def _render(row_name: str, name: str, units: Mapping[str, float]) -> str:
-    row = _config.title_block(row_name)
-    value, unit = quantity(row_name, row, name, units)
-    digits = row.get("digits")
-    if isinstance(digits, bool) or not isinstance(digits, int) or digits < 0:
-        raise ValueError(
-            f"title_block.{row_name}.digits must be a non-negative integer, got {digits!r}"
-        )
+    value, unit, digits = quantity(row_name, _config.title_block(row_name), name, units)
     return render_number(value, unit, digits)
 
 

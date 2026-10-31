@@ -100,11 +100,23 @@ def test_reader_refuses_unitless_unknown_and_non_numeric_bands(
         tol.printed_band_mm(2)
 
 
-def test_renderer_refuses_a_missing_digit_count(monkeypatch):
+def test_a_row_without_a_digit_count_is_refused(monkeypatch):
     _rows(monkeypatch, linear_1pl={"band_mm": 0.8})
-    assert tol.printed_band_mm(1) == 0.8
+    with pytest.raises(ValueError, match="digits"):
+        tol.printed_band_mm(1)
     with pytest.raises(ValueError, match="digits"):
         units.linear_band_display(1)
+
+
+def test_a_band_the_sheet_cannot_print_exactly_is_refused(monkeypatch):
+    # .009 at two places would print ".01" while the stacks used 0.2286 mm.
+    _rows(monkeypatch, linear_2pl={"band_in": 0.009, "digits": 2})
+    with pytest.raises(ValueError, match="does not print exactly at 2 digits"):
+        tol.printed_band_mm(2)
+    with pytest.raises(ValueError, match="does not print exactly at 2 digits"):
+        units.linear_band_display(2)
+    with pytest.raises(ValueError, match="does not print exactly"):
+        units.render_number(0.009, "in", 2)
 
 
 def test_angular_row_must_be_degrees(monkeypatch):
