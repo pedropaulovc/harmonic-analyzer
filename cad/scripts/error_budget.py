@@ -265,17 +265,23 @@ def pen_gain(nom: Nominal, lever_r: float) -> float:
 def _bisect(
     f: Callable[[np.ndarray], np.ndarray], lo: float, hi: float, n: int, iters: int = 50
 ) -> np.ndarray:
-    """Vectorised bisection of ``f`` on [lo, hi] for ``n`` independent roots."""
+    """Vectorised bisection of ``f`` on [lo, hi] for ``n`` independent roots.
+
+    Moving ``lo`` only to a midpoint whose residual has the same sign as the
+    lower end leaves that sign unchanged, so it is read once rather than
+    re-tracked each step. The midpoints and kept ends are those of the plain
+    update, bit for bit; only the redundant arrays are gone.
+    """
     lo_a = np.full(n, lo)
     hi_a = np.full(n, hi)
-    f_lo = f(lo_a)
+    lo_negative = f(lo_a) < 0
+    mid = np.empty(n)
     for _ in range(iters):
-        mid = 0.5 * (lo_a + hi_a)
-        f_mid = f(mid)
-        same = (f_mid < 0) == (f_lo < 0)
-        lo_a = np.where(same, mid, lo_a)
-        f_lo = np.where(same, f_mid, f_lo)
-        hi_a = np.where(same, hi_a, mid)
+        np.add(lo_a, hi_a, out=mid)
+        mid *= 0.5
+        same = (f(mid) < 0) == lo_negative
+        np.copyto(lo_a, mid, where=same)
+        np.copyto(hi_a, mid, where=~same)
     return 0.5 * (lo_a + hi_a)
 
 
@@ -723,11 +729,16 @@ class NominalTrial:
         self.nom = nom
         self.grid = np.arange(1440) * 2.0 * math.pi / 1440
         self._cycle: dict[float, np.ndarray] = {}
+        # Every station shares one rocker cycle: it depends on the grid and the
+        # nominal alone, so solve it once instead of once per station.
+        self._rocker = rocker_angle(self.grid, nom)
         self.f_full = self.fundamental(nom.d_max)
 
     def one_cycle(self, d: float) -> np.ndarray:
         if d not in self._cycle:
-            self._cycle[d] = hook_displacement(self.grid, d, self.nom)
+            self._cycle[d] = _hook_displacement_at_rocker(
+                self.grid, self._rocker, d, self.nom
+            )
         return self._cycle[d]
 
     def fundamental(self, d: float) -> float:
