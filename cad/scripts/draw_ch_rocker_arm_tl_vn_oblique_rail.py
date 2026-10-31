@@ -46,6 +46,7 @@ from _drawing_sheet_region import sheet_drawable_region
 from _drawing_view_display import set_hidden_lines_removed
 from _purchased_fastener_drawing import (
     _box,
+    _fit_number,
     _center_marks_without_lines,
     _inside,
     _literal_note,
@@ -417,6 +418,11 @@ async def build(adapter: Any) -> dict[str, str]:
                 raise RuntimeError(
                     f"rail note leaves its reserved space/border: {linked_text!r}: {box!r}"
                 )
+        # The 18-character registry number overruns the template's DWG. NO.
+        # cell into REV; fit it there, measured, once its link resolves.
+        number_fit = _fit_number(
+            adapter, draw, layout=SPEC.layout, number=properties["Number"]
+        )
 
     paths = SPEC.outputs
     return await finalize_drawing(
@@ -425,6 +431,7 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         pdf_title=title,
         scale=SHEET_SCALE,
+        settled_checks=(number_fit,),
     )
 
 
