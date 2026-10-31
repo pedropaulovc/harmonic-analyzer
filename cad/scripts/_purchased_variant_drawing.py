@@ -93,6 +93,7 @@ async def build_purchased_variant_drawing(
     ] | None = None,
     additional_sheet_scales: Mapping[str, tuple[float, float]] | None = None,
     append_sheets: Callable[[Any], tuple[Callable[[], None], ...]] | None = None,
+    unit: str = "mm",
 ) -> dict[str, str]:
     """Draw purchased-member references, with separately scoped rework sheets.
 
@@ -156,7 +157,7 @@ async def build_purchased_variant_drawing(
                 f"{spec.artifact_stem}: stale {name} {properties[name]!r} != {value!r}"
             )
 
-    draw, sheet = new_project_drawing(adapter, layout=spec.layout)
+    draw, sheet = new_project_drawing(adapter, layout=spec.layout, unit=unit)
     reference_sheet_name = None
     package_sheet_names = None
     package_sheet_scales = None

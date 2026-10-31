@@ -36,6 +36,7 @@ async def build_simple_three_view_drawing(
     iso_center: tuple[float, float],
     pdf_title: str,
     annotate: Callable[[Any], None] | None = None,
+    unit: str = "mm",
 ) -> dict[str, str]:
     """Build the standard three views, then any caller-owned model annotation."""
     if not source.is_file():
@@ -63,7 +64,7 @@ async def build_simple_three_view_drawing(
             "Quantity",
         ),
     )
-    new_project_drawing(adapter, layout=layout, scale=sheet_scale)
+    new_project_drawing(adapter, layout=layout, scale=sheet_scale, unit=unit)
 
     for view_name, center in (
         ("*Front", front_center),
