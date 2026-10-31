@@ -120,9 +120,10 @@ def leaf_pair(setting: float) -> tuple[float, ...]:
 # trapped between the straps' inner faces, and at the drilling set-up it sits
 # hard on the back strap, so the back stop sets its station (61.55 from the
 # MHA-DT-22 head shoulder, ruling (c)'s bond station).
-DRUM_LEN = 143.2
-DRUM_LEN_PLACES = 1  # FaceWidth prints .X (dt_alignment_pinion_spec)
-DRUM_LEN_BAND = printed_band_mm(DRUM_LEN_PLACES)  # 0.8
+DRUM_LEN = 143.256  # 5.64 in
+DRUM_LEN_PLACES = 2  # FaceWidth prints .XX (dt_alignment_pinion_spec)
+DRUM_LEN_UNIT = "in"  # dt_alignment_pinion_spec.UNIT, by the same lockstep
+DRUM_LEN_BAND = printed_band_mm(DRUM_LEN_PLACES, unit=DRUM_LEN_UNIT)  # .01 in
 
 # The rig's axial datum (user ruling, 2026-09-25, P1-2): the base seats are
 # transferred from the blocks, so nothing in the frame fixes the rig along z
@@ -154,7 +155,9 @@ DRUM_BACK_ADVANCE_STACK = {
 }
 DRUM_BACK_ADVANCE_OPEN_TERMS: tuple[str, ...] = ()  # bank held south; set follows actual g19
 DRUM_FRONT_RETREAT_STACK = {
-    "MHA-DT-01 drum length .X": -printed_deviations(DRUM_LEN, DRUM_LEN_PLACES)[0],
+    "MHA-DT-01 drum length .XX": -printed_deviations(
+        DRUM_LEN, DRUM_LEN_PLACES, unit=DRUM_LEN_UNIT
+    )[0],
     "rig-set leaf D, thickest setting": FEELER_SET_ERROR,
 }
 # g0's front face south of the rig's g19-based set: gears 1-19 long inside
@@ -225,7 +228,7 @@ _LENGTH_STEP = LENGTH_UNITS[LENGTH_UNIT] / 10**LENGTH_PLACES
 # Each term reads the deviation the part's sheet PRINTS (_printed_tolerance):
 # the thickest strap, the longest drum and the deepest block lengthen the stack.
 _STRAP_T_UPPER = printed_deviations(STRAP_T, STRAP_T_PLACES, unit=STRAP_UNIT)[1]
-_DRUM_LEN_UPPER = printed_deviations(DRUM_LEN, DRUM_LEN_PLACES)[1]
+_DRUM_LEN_UPPER = printed_deviations(DRUM_LEN, DRUM_LEN_PLACES, unit=DRUM_LEN_UNIT)[1]
 _BLOCK_DEPTH_UPPER = printed_deviations(BLOCK_DEPTH, BLOCK_DEPTH_PLACES, unit=BLOCK_UNIT)[1]
 
 
@@ -256,7 +259,7 @@ def torque_shaft_bearing_stack(shaft_len: float) -> dict[str, float]:
         )[0],
         "MHA-DT-18 back block depth .XX": -_BLOCK_DEPTH_UPPER,
         "MHA-DT-14 strap thickness .XXX (2 straps)": -2.0 * _STRAP_T_UPPER,
-        "MHA-DT-01 drum length .X": -_DRUM_LEN_UPPER,
+        "MHA-DT-01 drum length .XX": -_DRUM_LEN_UPPER,
         "MHA-DT-00 front block feeler band": -FRONT_BLOCK_FEELER_BAND,
         "MHA-DT-19 drum end shim set error": -DRUM_END_SHIM_SET_ERROR,
         "MHA-DT-19 rear end flush set": -FLUSH_SET_ERROR,
@@ -360,7 +363,7 @@ def lift_rod_seat_stack(rod_len: float) -> dict[str, float]:
         )[0],
         "MHA-DT-18 block depth .XX (2 blocks)": -2.0 * _BLOCK_DEPTH_UPPER,
         "MHA-DT-14 strap thickness .XXX (2 straps)": -2.0 * _STRAP_T_UPPER,
-        "MHA-DT-01 drum length .X": -_DRUM_LEN_UPPER,
+        "MHA-DT-01 drum length .XX": -_DRUM_LEN_UPPER,
         "MHA-DT-00 front block feeler band": -FRONT_BLOCK_FEELER_BAND,
         "MHA-DT-19 drum end shim set error": -DRUM_END_SHIM_SET_ERROR,
     }
