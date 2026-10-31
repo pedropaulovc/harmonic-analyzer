@@ -477,7 +477,7 @@ JOURNAL_BORE = requirement(
     requirements=("dia", "thru", "finish_ra", "height", "unknown"), fields={
         "at": ([0.0, cone.BORE_HEIGHT, 0.0], ("BORE_HEIGHT",)),
         "axis": ([-_NORMAL[0], 0.0, -_NORMAL[2]], ("INCLINE_DEG",)),
-        "dia": (_band(cone.BORE_DIA, _P["JournalBoreDia"], cone.RUNNING_BORE_BAND), ("BORE_DIA", "RUNNING_BORE_BAND")),
+        "dia": (_band(cone.BORE_DIA, _P["JournalBoreDia"], cone.JOURNAL_BORE_BAND), ("BORE_DIA", "JOURNAL_BORE_BAND")),
         "nominal_dia": (cone.BORE_DIA, ("BORE_DIA",)), "thru": (True, (("draw_dt_cone_pivot_post", "DIMENSION_CALLOUTS"),)),
         "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
         "height": (_band(cone.BORE_HEIGHT, _P["JournalAxisY"], (cone.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM, -cone.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM)), ("BORE_HEIGHT", "JOURNAL_AXIS_HEIGHT_TOLERANCE_MM")),

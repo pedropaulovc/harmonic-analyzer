@@ -282,7 +282,11 @@ if min(WORST_WALLS_MM.values()) < WALL_TARGET_MM:
     raise AssertionError(f"custom collar misses the wall target: {WORST_WALLS_MM}")
 if WORST_FULL_ENGAGEMENT_MM < REQUIRED_FULL_ENGAGEMENT_MM:
     raise AssertionError("custom collar set screw has less than 1.5D full thread")
-if abs(_FLOAT_MAX - TIP_COLLAR_MAX_RADIAL_FLOAT_MM) > 1e-12:
+# The sheet prints the bore and land at TERMINAL_DIA_PLACES, so their printed
+# limits may sit up to half a printed digit off the class (the inch class
+# lands off the mm grid); a real divergence is larger than that.
+_PRINT_GRID_TOL_MM = 0.5 * 10**-TERMINAL_DIA_PLACES
+if abs(_FLOAT_MAX - TIP_COLLAR_MAX_RADIAL_FLOAT_MM) > _PRINT_GRID_TOL_MM / 2.0:
     raise AssertionError("collar bore and authoritative journal retention fit diverged")
 if SCREW_LANDING_MARGIN_MM <= 0.0:
     raise AssertionError(
@@ -304,14 +308,14 @@ JOURNAL_CLEARANCE_MM = (
     BORE_FINISHED_DIA_LIMITS_MM[0] - TERMINAL_FINISHED_DIA_LIMITS_MM[1],
     BORE_FINISHED_DIA_LIMITS_MM[1] - TERMINAL_FINISHED_DIA_LIMITS_MM[0],
 )
-if abs(JOURNAL_CLEARANCE_MM[0] - 2.0 * TIP_COLLAR_MIN_RADIAL_FLOAT_MM) > 1e-9 or abs(
+if abs(JOURNAL_CLEARANCE_MM[0] - 2.0 * TIP_COLLAR_MIN_RADIAL_FLOAT_MM) > _PRINT_GRID_TOL_MM or abs(
     JOURNAL_CLEARANCE_MM[1] - 2.0 * TIP_COLLAR_MAX_RADIAL_FLOAT_MM
-) > 1e-9:
+) > _PRINT_GRID_TOL_MM:
     raise AssertionError("printed collar journal clearance diverged from the retention float")
 INSTALLATION_NOTES = "\n".join((
     f"FITS {JOURNAL_PART_NUMBER} TERMINAL JOURNAL \u00d8"
-    f"{TERMINAL_FINISHED_DIA_LIMITS_MM[0]:.3f} TO {TERMINAL_FINISHED_DIA_LIMITS_MM[1]:.3f};",
-    f"DIAMETRAL CLEARANCE {JOURNAL_CLEARANCE_MM[0]:.3f} TO {JOURNAL_CLEARANCE_MM[1]:.3f}.",
+    f"{TERMINAL_FINISHED_DIA_LIMITS_MM[0]:.4f} TO {TERMINAL_FINISHED_DIA_LIMITS_MM[1]:.4f};",
+    f"DIAMETRAL CLEARANCE {JOURNAL_CLEARANCE_MM[0]:.4f} TO {JOURNAL_CLEARANCE_MM[1]:.4f}.",
     f"SET WITH A {COLLAR_FEELER:.2f} FEELER OFF T006 THRUST FACE.",
     "SEAT BOTH ENDS ON JOURNAL ROUND BACK ARC.",
     f"SNUG {SET_SCREW_SKU} SET SCREW ON D-FLAT, THEN REMOVE LEAF.",

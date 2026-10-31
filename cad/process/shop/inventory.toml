@@ -2287,6 +2287,19 @@ oal_mm = { value = 177.8, measured = { status = "measured", by = "placeholder (r
 "drill-chuck-r8" = { value = 150.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers or steel rule, installed holder exit face to cutting tip" } }
 # --- end cone-pivot-post additions ---
 
+# --- inch fit-class purchases (#290) ---
+# Pending purchases: the decimal-inch chucking reamers the inch fit bands call
+# for that the shop does not own. Not owned: no receipt, cutting size or
+# metrology is asserted. Trial-cut each one and pin-check it before relying on
+# a reamer-matched band (each band assumes a reamer cuts its size +.0000/+.0005).
+[tools.reamers-inch-purchases]
+kind = "reamers"
+present = false
+verify = true
+sizes_in = [0.032, 0.0775, 0.093, 0.128, 0.157, 0.161, 0.1855, 0.192, 0.193, 0.2515, 0.4]
+purchase = "Straight-flute chucking reamers, one of each: .0320 solid-carbide micro; .0775; .0930; .1280; .1570; .1610; .1855; .1920; .1930 (or a graded .1920/.1923/.1926/.1929 set); .2515 long-series solid carbide, 12 in OAL, +.0002/-.0000 (Super Tool 9458EL, made to order); .4000. HSS unless stated."
+note = "Uses: .0320 the T006/T012 cone-gear bores and the MHA-DT-VN-54 tip-collar bore; .0775 the 5/64 pin presses in MHA-CH amplitude bar and connecting rod; .0930 the 3/32 drive-pin presses in the DT crankshaft seat and the PD drive collar; .1280 the knife-mount dowel slip hole; .1570 the follower-stud seat; .1610 the crank-handle pivot bore; .1855 the transgear pivot-spacer press; .1920 the drive-collar D-bore; .1930 the transgear arm pivot bore; .2515 the fulcrum-keeper pair ream; .4000 the rocker strap and jig carrier hub holes."
+
 [tools.countersinks]
 name = "Generic five-piece 90-degree three-flute M2 HSS countersink set"
 kind = "countersink_set"

@@ -167,7 +167,7 @@ REFERENCE_DIMENSIONS = ("BoreDia",)
 # (draw_dt_cone_gear_shaft._printable_above_callouts).
 DIMENSION_CALLOUTS = {
     "BoreDia": (
-        f"{BORE_DIAMETRAL_CLEARANCE[0]:.2f}-{BORE_DIAMETRAL_CLEARANCE[1]:.2f} "
+        f"{BORE_DIAMETRAL_CLEARANCE[0]:.4f}-{BORE_DIAMETRAL_CLEARANCE[1]:.4f} "
         f"DIAMETRAL\nCLEARANCE ON\n{COLUMN_MATE}"
     ),
     "GripOffset": f"BORE AXIS OUTSIDE\nSPLIT FACE\nGRIP GAP TO {FRONT_ARC_MATE}",

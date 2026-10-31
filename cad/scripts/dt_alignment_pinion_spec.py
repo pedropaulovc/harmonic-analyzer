@@ -13,6 +13,7 @@ import _config
 import dt_cylinder_gear_spec as drum
 
 from _fit_deviations import deviations
+from _fit_ream_slide import REAM_SLIDE
 from _gear_fit_limits import gear_tip_band_mm
 from _printed_tolerance import printed_deviations
 from _gtol_cylinder import CylinderFace
@@ -92,15 +93,15 @@ ENGAGED_CENTER_RADIAL_STACK_MM = float(
 # leave the cut flanks.
 TOOTH_FORM = TOOTH_FORM_NOTE
 
-BORE_DIA = 8.0  # Ø8 arbor through-bore (build_dt_pinion_arbor.py)
+BORE_DIA = 7.9375  # 5/16 arbor through-bore (build_dt_pinion_arbor.py)
 # Slip fit bonded with Loctite 638, not a press: a press over the full 143.2
-# bore is a seizing risk for a novice (U27, U6 precedent).  The band admits a
-# stock 8 mm H7 reamer (8.000-8.015).  The drum sits on MHA-DT-22's bond zone,
-# not its journal lands (U39: Ø8 -0.01/-0.10), so the diametral clearance
-# runs from 0.010 (the drum slides on by hand) up to the drum's upper
-# deviation minus the arbor's lower one (0.200), inside the 0.25 mm bond gap
-# the 638 technical data sheet allows.
-ARBOR_BORE_BAND = (0.100, 0.000)  # (upper, lower) deviations
+# bore is a seizing risk for a novice (U27, U6 precedent).  The bore is
+# REAM_SLIDE, cut by the owned .3135 over reamer.  The drum sits on
+# MHA-DT-22's bond zone, not its journal lands (U39: 5/16 -.0004/-.0038 in),
+# so the diametral clearance runs from .0014 in (the drum slides on by hand)
+# up to the drum's upper deviation minus the arbor's lower one (.0053 in),
+# inside the 0.25 mm bond gap the 638 technical data sheet allows.
+ARBOR_BORE_BAND = REAM_SLIDE  # (upper, lower) deviations
 RETAINING_COMPOUND = "LOCTITE 638"
 RETAINING_COMPOUND_MAX_GAP_MM = 0.25
 FACE_WIDTH = 143.2  # general .X; located from the back end (drawing note)
@@ -136,7 +137,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": 1},
     OUTSIDE_DIA_REFERENCE: {"OutsideDia": 2},
-    "ArborBoreProfile": {"ArborBoreDia": 2},
+    # Four places print the 5/16 bore exactly (7.9375) and its REAM_SLIDE band.
+    "ArborBoreProfile": {"ArborBoreDia": 4},
 }
 DRAWING_PRECISION_BY_NAME = {
     name: places

@@ -49,7 +49,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "SlotWidth": 3,
         "RingFaceNear": 3,
     },
-    "PinHoleProfile": {"PinHoleDia": 3},
+    "PinHoleProfile": {"PinHoleDia": 4},
 }
 
 DRAWING_NOTES = f"1. TINE WALL {TINE_MIN:.2f} MIN."
