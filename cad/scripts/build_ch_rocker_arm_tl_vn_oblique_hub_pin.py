@@ -28,8 +28,12 @@ from _sketch_circle import define_circle
 from _supplier_screw_reference import add_supplier_reference_sketch
 from _supplier_screw_reference_names import FEATURE_BY_PLANE
 from _visibility import blank_reference_geometry
+from _document_units import apply_package_model_units
+from _part_properties import part_drawing_unit
 
 PART_NAME = "ch-rocker-arm-tl-vn-oblique-hub-pin"
+# swLengthUnit_e for each supplier reference unit.
+_UNIT_CODES = {"mm": 0, "in": 3}
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 AXIS_NAME = "HubAxis"
@@ -64,21 +68,23 @@ async def _supplier_references(adapter):
         precision, presentation, _denominator, callout = part.SUPPLIER_REFERENCE_FORMATS[name]
         if not math.isclose(float(native.SystemValue) * 1000.0, value, abs_tol=1e-5):
             raise RuntimeError(name + ": nominal carrier value changed")
-        if display.SetUnits2(False, 0, 1, 0, False, 0) != 0:
-            raise RuntimeError(name + ": millimetre units rejected")
+        units = part.SUPPLIER_REFERENCE_UNITS[name]
+        code, suffix = _UNIT_CODES[units], f" {units})"
+        if display.SetUnits2(False, code, 1, 0, False, 0) != 0:
+            raise RuntimeError(f"{name}: {units} units rejected")
         if display.SetPrecision3(precision, -1, -1, -1) != 0:
             raise RuntimeError(name + ": source precision rejected")
         prefix = "(<MOD-DIAM>" if presentation == "diameter" else "("
         display.ShowParenthesis = False
         display.SetText(1, prefix)
-        display.SetText(2, " mm)")
+        display.SetText(2, suffix)
         display.SetText(4, callout)
-        if (display.GetUseDocUnits() or int(display.GetUnits()) != 0
+        if (display.GetUseDocUnits() or int(display.GetUnits()) != code
             or int(display.GetPrimaryPrecision2()) != precision
             or display.ShowParenthesis or display.GetOverride()
             or not display.ShowDimensionValue
             or str(display.GetText(1) or "") != prefix
-            or str(display.GetText(2) or "") != " mm)"
+            or str(display.GetText(2) or "") != suffix
             or str(display.GetText(4) or "") != callout
             or int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0):
             raise RuntimeError(name + ": source presentation did not persist")
@@ -88,6 +94,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreateAxisParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     await _ring(adapter, "Pin", part.DIA, 0.0, part.CUT_LENGTH)
     check("publish axis", await adapter.create_axis(CreateAxisParameters(
         mode="two_planes", planes=["Top Plane", "Right Plane"]

@@ -1,10 +1,12 @@
 """Manufacturing sheets for the plain shoulder-screw pivot blocks.
 
-All sizes import native model dimensions; no bearing/cartridge sheets survive.
+Both sheets print decimal inch (each part's ``drawing_unit``). All sizes
+import native model dimensions; no bearing/cartridge sheets survive.
 Plan X locations run from the -X (left) edge through the hidden
-``PlanDatumReference`` sketch; Y from the Ø10 seat axis. Section B-B shows
-the floor from the carriage seat, not a competing counterbore-depth tolerance
-chain. TL-32's nut face is VIEW D on its own 2:1 sheet, its arrow on the plan.
+``PlanDatumReference`` sketch; Y from the shoulder seat's axis. Section B-B
+shows the floor from the carriage seat, not a competing counterbore-depth
+tolerance chain. TL-32's nut face is VIEW D on its own 2:1 sheet, its arrow on
+the plan. The layout notes below give sheet millimetres.
 """
 from __future__ import annotations
 import argparse
@@ -17,7 +19,7 @@ from _drawing_common import (DrawingOutputs, finalize_drawing, new_project_drawi
                              remove_notes_matching)
 from _drawing_dimensions import assert_imported_precision, dimension_name, offset_dimension_text
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -27,6 +29,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _part_properties import part_drawing_unit
 import _telemetry
 from _session import run_build
 from solidworks_mcp.adapters.com_variant import double_array
@@ -395,7 +398,8 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
                                  required=('Number','Material Specification','Finish','Quantity'))
     else:
         read_source_properties(adapter)
-    drawing,_ = new_project_drawing(adapter,property_view=spec.artifact_stem,scale=SHEET_SCALE,layout=spec.layout)
+    drawing,_ = new_project_drawing(adapter,property_view=spec.artifact_stem,scale=SHEET_SCALE,layout=spec.layout,
+                                    unit=part_drawing_unit(spec.artifact_stem))
     is_feed = hasattr(contract,'NUT_FACE_X')
     sheets = ('Pivot and carriage','Nut interface') if is_feed else ('Pivot and carriage',)
     create_blank_drawing_sheets(adapter,sheets,label='block sheets')
@@ -487,6 +491,7 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
                                        label='four nut flange taps')
         omit_title_block_thread_class(taps, label='four nut flange taps')
         _append_callout_row(taps, contract.NUT_FLANGE_MATE_TEXT, label='four nut flange taps')
+        set_hole_callout_precision(taps, contract.NUT_TAP_CALLOUT_PRECISION, label='four nut flange taps')
         rebuild_drawing(adapter, label='nut flange tap callout rows')
         annotations += nut_annotations
         sheet_scales = {sheets[0]: SHEET_SCALE, sheets[1]: NUT_SCALE}
