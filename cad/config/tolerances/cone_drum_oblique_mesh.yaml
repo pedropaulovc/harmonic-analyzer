@@ -9,6 +9,6 @@ cone_drum_oblique_mesh:  # the inclined cone partial engagement
   edge_slack_mm: 0.20               # T120 feeler set point over standard; the CAD placement
   set_feeler_reading_mm: 0.0254     # one 0.001-in feeler leaf step
   pivot_bore_band_mm: [0.0127, 0.0]  # platform pivot bore, .2500 +.0005/.0000 in on the stock 1/4 shoulder
-  tooth_cutting_runout_tir_mm: 0.05 # per gear (each cone and the drum) about its finished bore
+  tooth_cutting_runout_tir_mm: 0.0508 # .002 in TIR per gear (each cone and the drum) about its finished bore
   note: "oblique partial engagement; centre set at assembly on T120 (cone_set_stack)"
 
