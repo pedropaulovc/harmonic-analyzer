@@ -33,6 +33,7 @@ _MODEL_VALUES = {
     "Depth": spec.FRAME_DEPTH,
     "ScrewX": spec.OUTER_WIDTH / 2.0,
     "ScrewZ": spec.FRAME_DEPTH / 2.0,
+    "TapWallMin": spec.TAP_WALL_MIN_MM,
 }
 
 
@@ -199,19 +200,19 @@ def test_printed_precision_is_authored_for_every_marked_dimension() -> None:
     for feature, names in spec.DRAWING_DIMENSIONS.items():
         assert set(spec.DRAWING_PRECISION[feature]) == names
     # Every rail, window and envelope size feeds a printed-worst-case stack,
-    # so nothing prints .X; the tap's depth station prints .XXX for its wall
-    # (pn_pen_frame_spec), everything else .XX.
+    # so nothing prints .X; everything prints .XX except the stated tap wall's
+    # limit, .XXX.
     three_place = {
         name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 3
     }
-    assert three_place == {"ScrewZ"}
+    assert three_place == {"TapWallMin"}
     assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {2, 3}
     assert "assert_imported_precision" in inspect.getsource(drawing.build)
 
 
 def test_printed_worst_case_keeps_the_window_rails_thread_and_tap_wall() -> None:
     unit = spec.UNIT
-    one, two, three = (printed_band_mm(n, unit=unit) for n in (1, 2, 3))
+    one, two = (printed_band_mm(n, unit=unit) for n in (1, 2))
     # The window width prints directly: it passes the block at both parts'
     # loosest printed limits.
     assert spec.WINDOW_WIDTH_PRINTED_MIN == pytest.approx(spec.WINDOW_WIDTH - two)
@@ -232,16 +233,20 @@ def test_printed_worst_case_keeps_the_window_rails_thread_and_tap_wall() -> None
     assert spec.BOTTOM_RAIL_FULL_THREAD_MIN == pytest.approx(spec.RAIL_END - two - lead)
     assert spec.BOTTOM_RAIL_FULL_THREAD_MIN >= 1.5 * major
     assert spec.RAIL_END - one - lead < 1.5 * major
-    # Rule 17: the tap wall meets the target only with its station at three
-    # places.
-    assert spec.SET_SCREW_PRINTED_WALL_MIN == pytest.approx(
-        (spec.FRAME_DEPTH - two) - (spec.FRAME_DEPTH / 2.0 + three) - major / 2.0
-    )
-    assert spec.SET_SCREW_PRINTED_WALL_MIN >= WALL_TARGET_MM
-    station_two_places = (
-        (spec.FRAME_DEPTH - two) - (spec.FRAME_DEPTH / 2.0 + two) - major / 2.0
-    )
-    assert station_two_places < WALL_TARGET_MM
+    # Rule 17: the tap station prints .16 (.XX) about the .155 mid-plane, so
+    # the near wall keeps the target and the far wall falls between the floor
+    # and the target (RV-01), stated natively as .074 MIN.
+    printed = 0.16 * 25.4
+    assert spec.SET_SCREW_NEAR_WALL_MIN == pytest.approx(printed - two - major / 2.0)
+    assert spec.SET_SCREW_NEAR_WALL_MIN >= WALL_TARGET_MM
+    far = (spec.FRAME_DEPTH - two) - (printed + two) - major / 2.0
+    assert spec.SET_SCREW_FAR_WALL_MIN == pytest.approx(far)
+    assert spec.SET_SCREW_PRINTED_WALL_MIN == pytest.approx(far)
+    assert WALL_FLOOR_MM <= far < WALL_TARGET_MM
+    assert spec.TAP_WALL_MIN_MM == pytest.approx(0.074 * 25.4)
+    assert far == pytest.approx(spec.TAP_WALL_MIN_MM, abs=0.001)
+    assert spec.TAP_WALL_MIN_TOL_TYPE == 5  # swTolType_e.swTolMIN
+    assert spec.TAP_WALL_START_Z == pytest.approx(spec.FRAME_DEPTH / 2.0 + major / 2.0)
 
 
 def test_window_height_band_keeps_the_thumb_screw_throw() -> None:

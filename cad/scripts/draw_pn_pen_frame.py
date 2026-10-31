@@ -11,11 +11,11 @@ size is a native associative dimension marked on the part
 (``pn_pen_frame_spec``): the front view carries the outer envelope, the
 window's size, its lower-left corner from the left and bottom faces and the
 4X window-corner radius; the bottom view, looking up at the tapped rail,
-carries the depth, the hole's two coordinates from the outer faces (the
-three-place depth station naming what it holds below its value) and the
-hole's native Hole Wizard callout.  No datums, no frames (drawing-guidelines.md
-rule 5), no note block.  The sheet runs 2:1 in decimal inch (the part's
-``drawing_unit: in``); the isometric stays 2:1.
+carries the depth, the hole's two coordinates from the outer faces, the
+hole's native Hole Wizard callout and the tap's stated far-wall minimum (the
+hidden TapWallReference sketch, shown in that view only).  No datums, no
+frames (drawing-guidelines.md rule 5), no note block.  The sheet runs 2:1 in
+decimal inch (the part's ``drawing_unit: in``); the isometric stays 2:1.
 
 Run with SolidWorks open::
 
@@ -43,8 +43,8 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_edges import scan_view_edges
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
@@ -67,6 +67,8 @@ from pn_pen_frame_spec import (
     RAIL_END,
     RAIL_SIDE,
     SET_SCREW_TAP_SPEC,
+    TAP_WALL_MIN_MM,
+    TAP_WALL_START_Z,
     WINDOW_CORNER_R,
 )
 
@@ -174,15 +176,22 @@ FRONT_KEEP = {
 }
 # Bottom view: the hole's X coordinate below, its Z coordinate left, the depth
 # right; the hole callout stands above-right, between the bottom view and the
-# front view's height dimension.  The .155 carries two callout rows under it
-# (CENTERED / .080 MIN TAP WALL, ~47 mm wide), so it stands 29 mm left of the
-# view: the block's right end ~5 mm clear of the .55's left extension line
-# (x 0.087, dropping from the view), its rows above the view note (y 0.072)
-# and well under the front view's .16 (y 0.128).
+# front view's height dimension.  The tap's far-wall minimum (.074 MIN over
+# TAP WALL) stands left too, outboard of the .16 and above its line: its
+# reference line runs up the far wall from the thread's rim on the hole's
+# axis (sheet y ~0.108..0.112), so its extension lines run left across the
+# rail above the .16's top extension line (y 0.105, from the hole's centre)
+# and cross no dimension line; its two-row text (~19 x 8 mm) stands 27 mm
+# left of the view, clear of the .16's text (x ~0.077, y ~0.101) and 14 mm
+# under the front view's .16 row (y ~0.128).
 BOTTOM_KEEP = {
     "ScrewX": (_bottom_xy(OUTER_WIDTH / 4.0, 0.0)[0], BOTTOM_LOW_Y - 0.010),
-    "ScrewZ": (BOTTOM_LEFT_X - 0.029, _bottom_xy(0.0, FRAME_DEPTH / 4.0)[1]),
+    "ScrewZ": (BOTTOM_LEFT_X - 0.010, _bottom_xy(0.0, FRAME_DEPTH / 4.0)[1]),
     "Depth": (BOTTOM_RIGHT_X + 0.016, BOTTOM_CENTER[1]),
+    "TapWallMin": (
+        BOTTOM_LEFT_X - 0.027,
+        _bottom_xy(0.0, TAP_WALL_START_Z + TAP_WALL_MIN_MM / 2.0)[1],
+    ),
 }
 # The one printed fillet stands for all four equal window corners.  A custom
 # prefix replaces SolidWorks' own radius "R", so it carries it

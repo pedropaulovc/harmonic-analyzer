@@ -215,10 +215,8 @@ STUD_TEXT_POINT = (
 
 # The stud is set from its measured length (code review C05): the head top
 # stands that length less the nominal engagement, ±STUD_TOLERANCE_MM.
-_STUD_LESS = (
-    f"{_decimal(stud.OVERALL_LENGTH - STUD_HEIGHT, STUD_PRECISION)} "
-    f"±{_decimal(STUD_TOLERANCE_MM, STUD_PRECISION)}"
-)
+_STUD_LESS_TEXT = _decimal(stud.OVERALL_LENGTH - STUD_HEIGHT, STUD_PRECISION)
+_STUD_LESS = f"{_STUD_LESS_TEXT} ±{_decimal(STUD_TOLERANCE_MM, STUD_PRECISION)}"
 DIMENSION_CALLOUTS = {
     STUD_DIMENSION: f"STUD HEAD\nABOVE ROD TOP:\nSTUD LENGTH\nLESS {_STUD_LESS}",
     NIB_DIMENSION: "NIB PRESET\nBEYOND END FACE",
@@ -227,10 +225,17 @@ DIMENSION_CALLOUTS = {
 
 # --- fitter text ----------------------------------------------------------------
 _STUD_SETTING = f"THE STUD'S MEASURED LENGTH LESS {_STUD_LESS}"
-_STUD_NOMINAL = (
-    f"{_decimal(STUD_HEIGHT, STUD_PRECISION)} FOR A "
-    f"{_decimal(stud.OVERALL_LENGTH, stud.OVERALL_PLACES)} STUD"
-)
+# The worked example quotes the nominal stud at the setting's three places
+# (1.024, not the stud sheet's two-place 1.02) so the printed numbers add up
+# with the rule and with DETAIL A's native reference (.898): 1.024 - .126.
+_STUD_LENGTH_TEXT = _decimal(stud.OVERALL_LENGTH, STUD_PRECISION)
+_STUD_HEIGHT_TEXT = _decimal(STUD_HEIGHT, STUD_PRECISION)
+if round(
+    float(_STUD_LENGTH_TEXT) - float(_STUD_LESS_TEXT) - float(_STUD_HEIGHT_TEXT),
+    STUD_PRECISION,
+):
+    raise AssertionError("the stud setting's worked example does not add up")
+_STUD_NOMINAL = f"{_STUD_HEIGHT_TEXT} FOR A {_STUD_LENGTH_TEXT} STUD"
 _NIB_SETTING = (
     f"{_decimal(NIB_PROTRUSION, NIB_PRECISION)} "
     f"±{_decimal(NIB_TOLERANCE_MM, NIB_PRECISION)}"

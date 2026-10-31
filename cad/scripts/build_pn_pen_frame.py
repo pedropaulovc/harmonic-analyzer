@@ -17,7 +17,9 @@ at the bottom-left outer corner of the sketch (Front-plane) face, width along
 x = OUTER_WIDTH / 2 and cannot be mounted mirrored. The #4-40 tapped hole is a
 Hole Wizard feature drilled up from the bottom face (y = 0) at
 (OUTER_WIDTH / 2, 0, FRAME_DEPTH / 2), through the bottom rail into the
-window; its axis is the named reference axis ``SetScrewAxis``.
+window; its axis is the named reference axis ``SetScrewAxis``. The hidden
+Top-plane sketch ``TapWallReference`` carries the tap's stated far-wall
+minimum (``TapWallMin``, a native MIN single limit) for the bottom view.
 
 Run (SolidWorks already open)::
 
@@ -32,6 +34,7 @@ import sys
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
+from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _document_units import apply_package_model_units
 from _drawing_marks import (
@@ -48,7 +51,16 @@ from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
-from _sketch import SketchDims, add_line_chain, ensure_fully_defined
+from _single_limit_tolerance import set_single_limit
+from _sketch import (
+    SketchDims,
+    add_line_chain,
+    anchor_point_to_origin,
+    blank_reference_sketches,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _sketch_chains import define_rectilinear_chain
 from pn_pen_frame_spec import (
     BOTTOM_VIEW_NOTE,
@@ -63,6 +75,10 @@ from pn_pen_frame_spec import (
     RAIL_SIDE,
     SET_SCREW_TAP_DRILL_DIA,
     SET_SCREW_TAP_SPEC,
+    TAP_WALL_MIN_BAND,
+    TAP_WALL_MIN_MM,
+    TAP_WALL_MIN_TOL_TYPE,
+    TAP_WALL_START_Z,
     WINDOW_CORNER_R,
     WINDOW_HEIGHT,
     WINDOW_WIDTH,
@@ -90,6 +106,47 @@ V_WINDOW_CORNER = (
 ) * FRAME_DEPTH
 V_SCREW_HOLE = math.pi * (SET_SCREW_TAP_DRILL_DIA / 2.0) ** 2 * RAIL_END
 V_FINAL = V_RING + 4.0 * V_WINDOW_CORNER - V_SCREW_HOLE
+
+
+async def _tap_wall_reference(adapter) -> None:
+    """RV-01's accepted far wall, stated on the sheet natively (rule 20): a
+    hidden construction line on the Top plane (the bottom face; sketch x =
+    model X, sketch y = model -Z) running +Z from the tap's thread major on
+    its axis, as long as the printed minimum, so its driving dimension prints
+    ".074 MIN" once set_single_limit types it (build_dt_pinion_cam's
+    _thin_wall_reference)."""
+    check("create_sketch tap wall reference", await adapter.create_sketch("Top"))
+    # Direct-to-DB: the line starts on the tap's rim, where creation-time
+    # inference would snap it to the hole's edge.
+    set_sketch_direct_db(adapter, True)
+    start = (OUTER_WIDTH / 2.0, -TAP_WALL_START_Z)
+    line = check(
+        "tap wall reference line",
+        await adapter.add_line(*start, start[0], start[1] - TAP_WALL_MIN_MM),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("tap wall reference line did not take the construction flag")
+    check(
+        "tap wall reference vertical",
+        await adapter.add_sketch_constraint(line, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        f"{line}.start",
+        f"{line}.end",
+        "vertical_distance",
+        TAP_WALL_MIN_MM,
+        "tap wall reference",
+    )
+    await anchor_point_to_origin(adapter, f"{line}.start", *start, "tap wall reference")
+    await ensure_fully_defined(adapter, "tap wall reference sketch")
+    check("exit_sketch tap wall reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "TapWallReference")
+    name_dimensions(adapter, "TapWallReference", ["TapWallMin", "TapWallX", "TapWallZ"])
+    blank_reference_sketches(adapter, ("TapWallReference",))
 
 
 async def build(adapter) -> dict[str, str]:
@@ -241,6 +298,7 @@ async def build(adapter) -> dict[str, str]:
         "thumb-screw hole",
     )
     name_last_feature(adapter, "SetScrewAxis")
+    await _tap_wall_reference(adapter)
 
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built
@@ -255,6 +313,14 @@ async def build(adapter) -> dict[str, str]:
     await report_mass_properties(adapter)
     # Printed places live on the model (the sheet only reads them back); then
     # mark exactly the print's dimensions and stamp the title-block properties.
+    set_single_limit(
+        adapter,
+        "TapWallReference",
+        "TapWallMin",
+        limit=TAP_WALL_MIN_MM,
+        band=TAP_WALL_MIN_BAND,
+        tol_type=TAP_WALL_MIN_TOL_TYPE,
+    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

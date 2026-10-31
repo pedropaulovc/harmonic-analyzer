@@ -7,9 +7,13 @@ from collections.abc import Callable
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.solidworks.drawing import set_view_position
+
 import _telemetry
 from _com import _early_bound
 from _session import run_build
+from _drawing_common import rebuild_drawing
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
@@ -29,10 +33,15 @@ SUPPLIER_MARGINS = supplier_screw_margins(
     sides={"ThreadNominalMajor": "bottom"},
 )
 SUPPLIER_MARGINS["*Right"] = (0.011, 0.018, 0.011, 0.0)
-# The three-line nominal-major callout and the .047 in height print wider than
-# their spans, struck by their own witnesses (dabcd16 review): shelve each
-# text right, past its witnesses, at its own height.
-SHELVES = {"ThreadNominalMajor": (True, "right"), "Height": (True, "right")}
+# The three-line nominal-major callout, the ACROSS FLATS line and the .047 in
+# height print as wide as or wider than their spans, struck by or touching
+# their own witnesses (dabcd16 and c03368c reviews): shelve each text right,
+# past its witnesses, at its own height.
+SHELVES = {
+    "ThreadNominalMajor": (True, "right"),
+    "AcrossFlats": (True, "right"),
+    "Height": (True, "right"),
+}
 
 
 def _supplier_dimensions(
@@ -53,7 +62,7 @@ def _supplier_dimensions(
 
 
 def _shelf_displays(views: dict[str, Any]) -> dict[str, Any]:
-    """FRONT's nominal-major chord and RIGHT's one height dimension."""
+    """FRONT's nominal-major chord and AF, and RIGHT's one height dimension."""
 
     def displays(name: str) -> list[tuple[str, Any]]:
         found = []
@@ -65,11 +74,54 @@ def _shelf_displays(views: dict[str, Any]) -> dict[str, Any]:
             display = display.GetNext5()
         return found
 
-    nominal = [d for name, d in displays("*Front") if name == "ThreadNominalMajor"]
+    front = displays("*Front")
+    nominal = [d for name, d in front if name == "ThreadNominalMajor"]
+    flats = [d for name, d in front if name != "ThreadNominalMajor"]
     height = [d for _, d in displays("*Right")]
-    if len(nominal) != 1 or len(height) != 1:
+    if len(nominal) != 1 or len(flats) != 1 or len(height) != 1:
         raise RuntimeError("pen-adjust nut: shelved references are not unique")
-    return {"ThreadNominalMajor": nominal[0], "Height": height[0]}
+    return {
+        "ThreadNominalMajor": nominal[0],
+        "AcrossFlats": flats[0],
+        "Height": height[0],
+    }
+
+
+def _origin_offset(adapter: Any, front: Any, view: Any, axis: int, name: str) -> float:
+    """Sheet coordinate of FRONT's projected model origin less ``view``'s."""
+    origin = (0.0, 0.0, 0.0)
+    front_at = model_point_in_view(
+        adapter, front, origin, label="pen-adjust nut Front origin"
+    )
+    view_at = model_point_in_view(
+        adapter, view, origin, label=f"pen-adjust nut {name} origin"
+    )
+    return front_at[axis] - view_at[axis]
+
+
+def _align_to_front(adapter: Any, views: dict[str, Any]):
+    """FRONT's lopsided reserves (AF above, nominal-major callout below) shift
+    it within its cell (c03368c review: RIGHT stood about 27 px high); move TOP
+    across and RIGHT vertically so all three project from one model origin."""
+    front = views["*Front"]
+    moves = (("*Top", 0), ("*Right", 1))
+    for name, axis in moves:
+        view = views[name]
+        position = [float(value) for value in view.Position]
+        position[axis] += _origin_offset(adapter, front, view, axis, name)
+        if not set_view_position(adapter, view, *position, move_children=False):
+            raise RuntimeError(f"pen-adjust nut {name}: native view translation failed")
+    rebuild_drawing(adapter, label="align pen-adjust nut Top/Right with Front")
+
+    def assert_aligned():
+        for name, axis in moves:
+            if abs(_origin_offset(adapter, front, views[name], axis, name)) > 1e-6:
+                raise RuntimeError(
+                    f"pen-adjust nut {name} is off Front's projection axis"
+                )
+
+    assert_aligned()
+    return assert_aligned
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -97,6 +149,7 @@ async def build(adapter: Any) -> dict[str, str]:
         supplier_dimensions=supplier_dimensions,
         supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_settled,),
+        view_placement=_align_to_front,
         unit=part_drawing_unit("pn-vn-pen-adjust-nut"),
     )
 
