@@ -22,7 +22,7 @@ brass end disc (MHA-DT-26) closes gear 0's cam slot at the south end.
   north planar face. The MHA-DT-VN-68 wave spring squeezed directly between
   them preloads the whole stack south onto the datum. There is no north disc
   (user ruling 2026-10-20).
-* Every gear's overall thickness is +/-0.025 on its print. The measured
+* Every gear's overall thickness is +/-.0010 in on its print. The measured
   20-gear stack acceptance (STACK_L20_ACCEPT, +/-0.10) caps the end-to-end
   deviation; partial stacks may still lean opposite ways (partial_stack_band).
   Accumulation now starts at gear 0's south cam face, not gear 19.
@@ -190,7 +190,7 @@ STRAP_OUTER_SPAN = STRAP_INNER_SPAN + 2.0 * _pedestal.STRAP_T
 # ARBOR_DOME_HEIGHT proud of its strap's outer face. Its cylinder IS the span
 # over both straps, the length the fitter measures and cuts to (#743,
 # superseding U34b's "span less 6.0").
-ARBOR_DOME_HEIGHT = 1.5
+ARBOR_DOME_HEIGHT = 1.524  # .06 (MHA-DT-13 prints it at .XX)
 ARBOR_LENGTH = STRAP_OUTER_SPAN
 ARBOR_SOUTH_Z = FRONT_STRAP_INNER_Z - _pedestal.STRAP_T
 ARBOR_OVERALL_LENGTH = ARBOR_LENGTH + 2.0 * ARBOR_DOME_HEIGHT
@@ -227,11 +227,11 @@ _L20 = f"L20 +/-{STACK_L20_ACCEPT_BAND[0]:.2f}"
 # The bank is preloaded onto its datum, so neither stack carries end play.
 G0_FRONT_SOUTH_STACK = {
     f"gears 1-19 overall thickness, long ({_L20})": _G1_G19_BAND[0],
-    "gear 0 face width (+0.05)": FACE_WIDTH_TOLERANCE_MM,
+    "gear 0 face width (+.002 in)": FACE_WIDTH_TOLERANCE_MM,
 }
 G0_FRONT_NORTH_STACK = {
     f"gears 1-19 overall thickness, short ({_L20})": -_G1_G19_BAND[1],
-    "gear 0 face width (-0.05)": FACE_WIDTH_TOLERANCE_MM,
+    "gear 0 face width (-.002 in)": FACE_WIDTH_TOLERANCE_MM,
 }
 # The pitch-stack band, south / north of nominal.
 G0_G19_BAND = (

@@ -17,6 +17,10 @@ from __future__ import annotations
 import math
 from itertools import product
 
+import _config
+from _fit_ream_slide import REAM_SLIDE
+from _inch_wall_limits import WALL_TARGET_MM
+from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
 from dt_pinion_bracket_geometry import THICKNESS as STRAP_T
 from dt_pinion_bracket_geometry import THICKNESS_BAND as STRAP_T_BAND
@@ -25,13 +29,28 @@ from pinion_rig_layout import (
     DRUM_END_SHIM,
     DRUM_END_SHIM_SET_ERROR,
     DRUM_LEN,
+    DRUM_LEN_BAND as _DRUM_LEN_PRINTED_BAND,
     RIG_MARGIN_SPARE,
 )
+
+# #290: the registry row's drawing_unit (in) is MHA-DT-22's sheet unit.  Every
+# axial station and length on it prints at the title block's .XX: the land,
+# drum-station, pin, wall and run-out stacks all read them, so none is .X.
+UNIT = drawing_unit("parts/dt-pinion-arbor", _config.parts("dt-pinion-arbor"))
+LINEAR_XX_BAND = printed_band_mm(2, unit=UNIT)  # .XX title-block row, .01 in
+
+
+def on_xx_grid(value_mm: float) -> float:
+    """``value_mm`` snapped to the .01-in grid, half away from zero."""
+    return round(math.floor(value_mm / 0.254 + 0.5) * 0.254, 9)
+
 
 # 5/16 in (owner ruling 2026-10-30): the arbor follows the owned .3135 over
 # reamer that cuts its strap and drum bores; 8 mm has no owned reamer.
 SHAFT_DIA = 7.9375
-SHAFT_LEN = 226.25  # unchanged origin-to-back-crown-root station
+# Origin to back-crown root: the back rim prints 8.93 (226.822) from the head
+# rear face at -0.66 (#290; was 226.25, 0.088 longer).
+SHAFT_LEN = 226.162
 # Only the two short lands that run in the MHA-DT-14 strap bores (REAM_SLIDE)
 # carry the running band and the Ra 1.6 finish (U39).  Everything else,
 # the MHA-DT-01 drum bond zone included, is 5/16 -.0004/-.0038 in: the drum's
@@ -71,28 +90,31 @@ JOURNAL_DIA_BAND = (-0.01016, -0.03048)
 # (243.4) are .X; the neck shoulder moves 0.25 forward, 10.0 -> 9.75, so the
 # neck (10.5, flagged at 11.25) is .X too.  The drum station (61.05) and the
 # crossrod station (5.75) are the .XX lengths.
-HEAD_DIA = 15.0
-HEAD_LEN = 12.2
-HEAD_CAP_SAG = 3.0
-HEAD_CAP_R = ((HEAD_DIA / 2.0) ** 2 + HEAD_CAP_SAG**2) / (2.0 * HEAD_CAP_SAG)
-HEAD_CENTER_Z = -6.5  # the released crossrod station
-CROSS_HOLE_STATION = 5.75  # from the head rear face
-HEAD_REAR_Z = HEAD_CENTER_Z + CROSS_HOLE_STATION
+# #290 (decimal inch): every printed nominal sits on its .XX grid.  The head
+# rear face moves 0.09 aft (-0.75 -> -0.66) so the drum station, which the
+# drum's world position fixes, prints exactly 2.40, and the crossrod station
+# .23 then puts the crossrod 0.002 forward of its released -6.5.
+HEAD_DIA = 14.986  # .59
+HEAD_LEN = 12.192  # .48
+# The front crown prints its SR.43; its sag follows and prints as a REF.
+HEAD_CAP_R = 10.922  # SR.43
+HEAD_CAP_SAG = HEAD_CAP_R - math.sqrt(HEAD_CAP_R**2 - (HEAD_DIA / 2.0) ** 2)
+HEAD_REAR_Z = -0.66
+CROSS_HOLE_STATION = 5.842  # .23 from the head rear face
+HEAD_CENTER_Z = HEAD_REAR_Z - CROSS_HOLE_STATION  # the crossrod station
 HEAD_FRONT_Z = HEAD_REAR_Z - HEAD_LEN
 
 # --- Drum station and journal-land length (Main ruling A, 2026-09-24) --------
 # MHA-DT-22 owns where the MHA-DT-01 drum is bonded: its front end sits
 # DRUM_STATION from the head shoulder, and the drum, trapped between the two
 # MHA-DT-14 straps, is what places the arbor's lands on the straps.  Every land
-# end is printed from the head shoulder at .X, and the lands are centred on
-# their straps at nominal (to the one place they print at).  Each land must still cover its strap by
+# end is printed from the head shoulder at .XX, and the lands are centred on
+# their straps at nominal (to the .01 in they print at).  Each land must still cover its strap by
 # MIN_LAND_OVER_STRAP at the worst corner of every printed band (stations,
 # land length, strap thickness, drum length, drum-station band) and of the
-# drum's axial float.  The drum station prints the general .X band, and
-# JOURNAL_LEN is the smallest whole millimetre that keeps every margin with it;
-# no band is tightened to make it fit (U27, Main 2026-09-24: a longer land
-# rather than a tighter station).
-LINEAR_X_BAND = printed_band_mm(1)  # .X title-block row, 0.8
+# drum's axial float.  The drum station prints the .XX band; no band is
+# tightened to make it fit (U27, Main 2026-09-24: a longer land rather than a
+# tighter station).  #290: the land keeps its 20 mm, snapped to .79.
 # MHA-DT-14's thickness band (STRAP_T_BAND) and the MHA-DT-01 drum length come from
 # their geometry owners, dt_pinion_bracket_geometry and pinion_rig_layout, not
 # their drawing contracts: the drive-train recipe reads this spec.
@@ -110,9 +132,10 @@ DRUM_FRONT_Z_AS_BUILT = RELEASED_DRUM_FRONT_Z - RELEASED_ARBOR_ROOT_Z
 DRUM_STATION_AS_BUILT = DRUM_FRONT_Z_AS_BUILT - HEAD_REAR_Z
 DRUM_AFT_SHIFT = 0.3
 DRUM_STATION = DRUM_STATION_AS_BUILT + DRUM_AFT_SHIFT
-DRUM_LEN_BAND = (LINEAR_X_BAND, -LINEAR_X_BAND)  # general .X
+# The MHA-DT-01 drum sheet's own printed length band (pinion_rig_layout).
+DRUM_LEN_BAND = (_DRUM_LEN_PRINTED_BAND, -_DRUM_LEN_PRINTED_BAND)
 MIN_LAND_OVER_STRAP = 0.5
-DRUM_STATION_BAND = LINEAR_X_BAND
+DRUM_STATION_BAND = LINEAR_XX_BAND
 # User ruling 2026-09-24 (option c): the pivot blocks locate the swing
 # cluster.  Option E-a then pins both straps to the torque shaft, which is
 # match-drilled with the END_PLAY feeler as a shim at the drum's front end
@@ -139,18 +162,18 @@ def drum_total_air() -> tuple[float, float]:
 
 
 def land_stations(journal_len: float) -> tuple[float, float]:
-    """Front and back land stations from the head shoulder, printed at .X.
+    """Front and back land stations from the head shoulder, printed at .XX.
 
     Each land is centred on its strap with the drum mid-way through its play,
-    then rounded to the one place it prints at; the worst-case stack below
-    runs on the rounded values.
+    then snapped to the .01-in grid it prints at; the worst-case stack below
+    runs on the snapped values.
     """
     air = END_PLAY / 2.0
     front_inner = DRUM_STATION - air
     back_inner = DRUM_STATION + DRUM_LEN + air
     return (
-        round(front_inner - (journal_len + STRAP_T) / 2.0, 1),
-        round(back_inner - (journal_len - STRAP_T) / 2.0, 1),
+        on_xx_grid(front_inner - (journal_len + STRAP_T) / 2.0),
+        on_xx_grid(back_inner - (journal_len - STRAP_T) / 2.0),
     )
 
 
@@ -165,7 +188,7 @@ def worst_land_margins(
     the float to one end of its range (the drum hard forward or hard aft).
     """
     front, back = land_stations(journal_len)
-    x = LINEAR_X_BAND
+    x = LINEAR_XX_BAND
     shares = (STOPS[stop],) if stop is not None else tuple(STOPS.values())
     worst = dict.fromkeys(LAND_ENDS, math.inf)
     for a, b, length, strap, station, drum, total, share in product(
@@ -204,14 +227,7 @@ def land_margin_slack(journal_len: float) -> float:
     return min(margins.values()) - LAND_OVER_STRAP_REQUIRED
 
 
-def _smallest_journal_len() -> float:
-    for journal_len in range(int(STRAP_T) + 1, 40):
-        if land_margin_slack(float(journal_len)) >= -1e-9:
-            return float(journal_len)
-    raise AssertionError("no whole-mm journal land meets the drum-station stack")
-
-
-JOURNAL_LEN = _smallest_journal_len()
+JOURNAL_LEN = 20.066  # .79
 FRONT_JOURNAL_FROM_HEAD_REAR, BACK_JOURNAL_FROM_HEAD_REAR = land_stations(JOURNAL_LEN)
 LAND_MARGINS_AT_STOPS = {
     stop: worst_land_margins(JOURNAL_LEN, DRUM_STATION_BAND, stop=stop)
@@ -225,19 +241,21 @@ for _stop, _margins in LAND_MARGINS_AT_STOPS.items():
         )
 if END_PLAY - END_PLAY_SET_ERROR < MIN_END_PLAY:
     raise AssertionError("the drum can bind between the straps")
-BACK_CAP_SAG = 1.2
-BACK_CAP_R = (SHAFT_DIA / 2.0) ** 2 / (2.0 * BACK_CAP_SAG) + BACK_CAP_SAG / 2.0
+# The back crown prints its SR.28; its sag follows and prints as a REF.
+BACK_CAP_R = 7.112  # SR.28
+BACK_CAP_SAG = BACK_CAP_R - math.sqrt(BACK_CAP_R**2 - (SHAFT_DIA / 2.0) ** 2)
 
-NECK_DIA = 10.5
-NECK_END_Z = 9.75
-NECK_LEN = NECK_END_Z - HEAD_REAR_Z
+NECK_DIA = 10.414  # .41
+NECK_LEN = 10.414  # .41
+NECK_END_Z = HEAD_REAR_Z + NECK_LEN
 EXPOSED_SHAFT_LEN = SHAFT_LEN - NECK_END_Z
-# R1 (U27 precedent, Main 2026-09-24): a stock 6 mm reamer cuts 6.000-6.015
-# and as-received bar is at most 6.000, so a novice cannot make the old 0.0125
-# press.  The hole is reamed Ø6.00 +0.10/0 and MHA-DT-15 is bonded in with
-# Loctite 638; the model carries both at the 6.00 nominal (line to line).
-CROSS_HOLE_DIA = 6.0
-CROSS_HOLE_DIA_BAND = (0.100, 0.000)  # (upper, lower) deviations
+# R1 (U27 precedent, Main 2026-09-24): as-received bar cannot make a press, so
+# MHA-DT-15 is bonded in with Loctite 638.  #290 (owner ruling): the crossrod
+# is 1/4 bar, and the owned .2510 over reamer cuts the hole .250 +.0015/+.0010
+# (REAM_SLIDE); the model carries rod and hole at the .250 nominal (line to
+# line).
+CROSS_HOLE_DIA = 6.35  # .250
+CROSS_HOLE_DIA_BAND = REAM_SLIDE  # (upper, lower) deviations
 RETAINING_COMPOUND = "LOCTITE 638"
 RETAINING_COMPOUND_MAX_GAP_MM = 0.25  # 638 TDS diametral gap limit
 OVERALL_LEN = SHAFT_LEN + BACK_CAP_SAG - (HEAD_FRONT_Z - HEAD_CAP_SAG)
@@ -250,14 +268,14 @@ BACK_JOURNAL_Z = HEAD_REAR_Z + BACK_JOURNAL_FROM_HEAD_REAR
 # CYLINDER LENGTH" told the shop neither where to measure from nor how
 # closely, so the hole is an ordinary toleranced station from the head rear
 # face.  Every band is the title-block row for the places the value needs
-# (r5: no band tightened for the wall): rear web 5.75 - 0.51 - 6.10 / 2 =
-# 2.19, front web (12.2 - 0.8) - (5.75 + 0.51) - 6.10 / 2 = 2.09.
-HEAD_LEN_PLACES = 1  # HeadLen
-HEAD_CAP_SAG_PLACES = 1  # HeadCapSagDim
-NECK_LEN_PLACES = 1  # NeckLen
-HEAD_LEN_BAND = printed_band_mm(HEAD_LEN_PLACES)  # .X title-block row
+# (r5: no band tightened for the wall): rear web .23 - .01 - .2515 / 2 =
+# .0942 in, front web (.48 - .01) - (.23 + .01) - .2515 / 2 = .1042 in.
+HEAD_LEN_PLACES = 2  # HeadLen
+HEAD_CAP_SAG_PLACES = 2  # HeadCapSagDim (REF)
+NECK_LEN_PLACES = 2  # NeckLen
+HEAD_LEN_BAND = printed_band_mm(HEAD_LEN_PLACES, unit=UNIT)  # .XX title-block row
 CROSS_HOLE_STATION_PLACES = 2  # CrossHoleFromHeadRear
-CROSS_HOLE_STATION_BAND = printed_band_mm(CROSS_HOLE_STATION_PLACES)
+CROSS_HOLE_STATION_BAND = printed_band_mm(CROSS_HOLE_STATION_PLACES, unit=UNIT)
 CROSS_HOLE_REAR_WEB_WORST = (
     CROSS_HOLE_STATION
     - CROSS_HOLE_STATION_BAND
@@ -277,9 +295,9 @@ CROSSROD_MIN_CLEARANCE = (CROSS_HOLE_DIA + CROSS_HOLE_DIA_BAND[1]) - (
 CROSSROD_MAX_CLEARANCE = (CROSS_HOLE_DIA + CROSS_HOLE_DIA_BAND[0]) - (
     ROD_DIA + ROD_DIA_BAND[1]
 )
-# U27 novice-machinist webs: 2.0 target, 1.5 floor.  The machinist review of
-# 7f7fc1717 held this web to the target, not the floor.
-CROSS_HOLE_WEB_TARGET = 2.0
+# Rule 17 on an inch sheet: .080 in target, .060 in floor.  The machinist
+# review of 7f7fc1717 held this web to the target, not the floor.
+CROSS_HOLE_WEB_TARGET = WALL_TARGET_MM
 if CROSS_HOLE_WEB_WORST < CROSS_HOLE_WEB_TARGET:
     raise AssertionError(
         f"crossrod hole web {CROSS_HOLE_WEB_WORST:.2f} is under the "
@@ -301,8 +319,11 @@ if BACK_JOURNAL_Z + JOURNAL_LEN >= SHAFT_LEN:
 # Worst case, the back land's far end plus its finishing run-out still stops
 # short of the back-crown root.
 if (
-    BACK_JOURNAL_FROM_HEAD_REAR + JOURNAL_LEN + 2.0 * LINEAR_X_BAND + LAND_FINISH_RUNOUT
-    > BACK_RIM_FROM_HEAD_REAR - LINEAR_X_BAND
+    BACK_JOURNAL_FROM_HEAD_REAR
+    + JOURNAL_LEN
+    + 2.0 * LINEAR_XX_BAND
+    + LAND_FINISH_RUNOUT
+    > BACK_RIM_FROM_HEAD_REAR - LINEAR_XX_BAND
 ):
     raise AssertionError("back journal land runs into the back-crown root")
 
@@ -331,14 +352,15 @@ if not (
     )
 
 # R1a (user, 2026-09-24): the station of the cross hole for the MHA-DT-33
-# collar's spring pin, at the general .X band from the head rear face (U27:
+# collar's spring pin, at the general band from the head rear face (U27:
 # the collar-to-strap gap grows to absorb it, dt_pinion_arbor_collar_spec).  The
 # drive-train assembly reads the station; the hole itself and its clearance
 # proofs live in dt_pinion_arbor_pin_spec.  38.0, not R1a's 39.0: on #858's
 # pinned straps the drum's front air runs to the whole 0.55 of end play and
 # the 11.5 head moved the drum station to 61.05, which closed the worst-case
-# collar-to-strap gap to 0.00; one millimetre forward restores it to 1.00,
-# over the 0.25 the novice-margin rule asks (dt_pinion_arbor_collar_spec).
-PIN_STATION_FROM_HEAD_REAR = 38.0
-PIN_STATION_BAND = LINEAR_X_BAND
+# collar-to-strap gap to 0.00 at the mm .X band; one millimetre forward
+# restored it to 1.00, over the 0.25 the novice-margin rule asks
+# (dt_pinion_arbor_collar_spec).  #290: snapped to 1.50 at .XX.
+PIN_STATION_FROM_HEAD_REAR = 38.1  # 1.50
+PIN_STATION_BAND = LINEAR_XX_BAND
 PIN_Z = HEAD_REAR_Z + PIN_STATION_FROM_HEAD_REAR

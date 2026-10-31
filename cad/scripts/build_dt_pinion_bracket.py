@@ -41,8 +41,10 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -52,9 +54,9 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
-from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
+from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
@@ -78,38 +80,12 @@ from dt_pinion_bracket_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     PIN_SEAT_DIA_BAND,
-    PIN_SEAT_STATION_TOL,
     PIVOT_BORE_BAND,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 import _telemetry
-
-
-def _tolerance_at_dimension_places(
-    adapter: Any, feature_name: str, dimension_name: str
-) -> None:
-    """Print one dimension's tolerance at the dimension's own decimal places.
-
-    The shared setter prints a tolerance at the fewest places that hold it, so
-    PinSeatCz's +/-0.10 read "4.50 +/-0.1" (pc-ra eye pass).  Main's ruling:
-    this one dimension prints "4.50 +/-0.10", at the places the spec already
-    gives it, set here on the model so the drawing imports it verbatim.
-    """
-    places = DRAWING_PRECISION[feature_name][dimension_name]
-    display, _dimension = _named_dimension(adapter, feature_name, dimension_name)
-    display = _early_bound(display, "IDisplayDimension")
-    do_not_change = -1  # swDimensionPrecisionSettings_e
-    display.SetPrecision3(do_not_change, do_not_change, places, do_not_change)
-    applied = int(display.GetPrimaryTolPrecision2())
-    if applied != places:
-        raise RuntimeError(
-            f"{dimension_name}@{feature_name}: tolerance places did not persist: "
-            f"requested {places}, dimension reports {applied}"
-        )
-    _telemetry.success(
-        f"tolerance places {dimension_name}@{feature_name}: {places} decimals"
-    )
 
 
 def _flank_face(model: Any, point_mm: tuple[float, float, float]) -> Any:
@@ -262,6 +238,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): the strap width (= cap radius x 2), the
     # bore-to-bore centre distance and the bore diameters. The mm suffix is
@@ -537,25 +515,37 @@ async def build(adapter) -> dict[str, str]:
     # Manufacturing drawing support: mark exactly the print's dimensions (the
     # drawing recipe imports the marked set and must find every one of these),
     # author their decimal places ON THE MODEL, and stamp the make-critical
-    # title-block properties.  Only the three fitted bores carry a band, and
-    # each one comes from a named fit class; every other feature is governed
-    # by its decimal places against the title block's general grades.
+    # title-block properties.  Only the three fitted bores and the cross hole
+    # carry a band, each from a named fit class or the spring pin's window;
+    # every other feature is governed by its decimal places against the title
+    # block's general grades.  The bands are millimetres; UNIT prints them.
     set_dimension_bilateral_tolerance(
-        adapter, "StrapProfile", "PivotBoreDia", *deviations(PIVOT_BORE_BAND)
+        adapter,
+        "StrapProfile",
+        "PivotBoreDia",
+        *deviations(PIVOT_BORE_BAND),
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "StrapProfile", "ArborBoreDia", *deviations(ARBOR_BORE_BAND)
+        adapter,
+        "StrapProfile",
+        "ArborBoreDia",
+        *deviations(ARBOR_BORE_BAND),
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "PinSeatProfile", "PinSeatDia", *deviations(PIN_SEAT_DIA_BAND)
-    )
-    # User ruling (a): the seat's station from broad face A, tightened for
-    # its far-face web (dt_pinion_bracket_spec.PIN_SEAT_WEB_WORST).
-    set_dimension_symmetric_tolerance(
-        adapter, "PinSeatProfile", "PinSeatCz", PIN_SEAT_STATION_TOL
+        adapter,
+        "PinSeatProfile",
+        "PinSeatDia",
+        *deviations(PIN_SEAT_DIA_BAND),
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "CrossHoleProfile", "CrossHoleDia", *deviations(CROSS_HOLE_BAND)
+        adapter,
+        "CrossHoleProfile",
+        "CrossHoleDia",
+        *deviations(CROSS_HOLE_BAND),
+        display_unit=UNIT,
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
@@ -563,7 +553,6 @@ async def build(adapter) -> dict[str, str]:
     # Decimal places are the tolerance statement, so the part authors them and
     # the drawing only reads them back (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    _tolerance_at_dimension_places(adapter, "PinSeatProfile", "PinSeatCz")
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
     await apply_material(adapter, MATERIAL)

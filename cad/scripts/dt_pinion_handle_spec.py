@@ -7,6 +7,8 @@ cross-hole, and arbor are one integral MHA-DT-22 part.
 
 from __future__ import annotations
 
+import _config
+from _package_units import drawing_unit
 from dt_pinion_handle_geometry import (
     ROD_DIA as ROD_DIA,
     ROD_DOWN as ROD_DOWN,
@@ -14,14 +16,20 @@ from dt_pinion_handle_geometry import (
     ROD_UP as ROD_UP,
 )
 
+# #290: the registry row's drawing_unit (in) is this sheet's unit.
+UNIT = drawing_unit("parts/dt-pinion-handle", _config.parts("dt-pinion-handle"))
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RodProfile": {"RodDia"},
     "Rod": {"RodSpan"},
 }
 
+# The cut length prints at the title block's .XX.  The as-bought 1/4 bar
+# imports at three places, then the sheet prints it as its stock fraction,
+# a REF the supplier's bar governs (ROD_FRACTION_DENOMINATOR).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "RodProfile": {"RodDia": 1},
-    "Rod": {"RodSpan": 1},
+    "RodProfile": {"RodDia": 3},
+    "Rod": {"RodSpan": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -30,6 +38,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked crossrod dimension needs authored places")
+ROD_FRACTION_DENOMINATOR = 4  # 1/4
 
 SURFACE_FINISHES = ()
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): notes never carry a dimension.  The bar size is the registry's
