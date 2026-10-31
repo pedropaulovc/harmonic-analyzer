@@ -1414,6 +1414,9 @@ def test_numeral_profile_scale_makes_the_v_readable_without_crowding() -> None:
     # pitches below the keep height, must pass above the section.
     _tick_x, tick_y = drawing.DEPTH_KEEP["TickDepth"]
     assert tick_y - 2.5 * 0.0034 > profile.ymax + 0.008
-    # The cutting line misses every graduation.
+    # The cutting line misses every graduation by a visible margin and still
+    # crosses the zero's straight side strokes, short of its end facets.
     minor = spec.SCALE_START_X + spec.MINOR_SPACING
-    assert drawing.NUMERAL_SECTION_X - (minor + spec.TICK_WIDTH / 2.0) > 0.1
+    assert drawing.NUMERAL_SECTION_X - (minor + spec.TICK_WIDTH / 2.0) > 0.3
+    zero_start = spec.SCALE_START_X + spec.TICK_WIDTH / 2.0 + spec.NUMERAL_GAP_MM
+    assert drawing.NUMERAL_SECTION_X < zero_start + 0.84 * spec.NUMERAL_HEIGHT_MM

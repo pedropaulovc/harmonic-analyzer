@@ -898,9 +898,10 @@ def test_pilot_reference_emits_concentric_native_diameter_and_live_equation(monk
             return result()
 
         async def add_circle(self, x, y, radius):
-            self.circles["circle"] = (x, y, radius)
-            self._sketch_entities["circle"] = SimpleNamespace(ConstructionGeometry=False)
-            return result("circle")
+            label = f"circle{len(self.circles)}"
+            self.circles[label] = (x, y, radius)
+            self._sketch_entities[label] = SimpleNamespace(ConstructionGeometry=False)
+            return result(label)
 
         async def add_sketch_constraint(self, *args):
             return result()
@@ -934,24 +935,31 @@ def test_pilot_reference_emits_concentric_native_diameter_and_live_equation(monk
     monkeypatch.setattr(sketch, "_rename_dimensions", rename)
     adapter = Adapter()
     equations = dict(asyncio.run(stop_geom.pilot_drill_reference(adapter)))
-    x, y, radius = adapter.circles["circle"]
-    assert (x, y) == (spec.PLATE_HOLE_XS[0], spec.PLATE_HOLE_Y)
-    assert radius == pytest.approx(spec.PLATE_TAP_DRILL_DIA / 2.0)
-    assert radius < spec.PLATE_CLEARANCE_DIA / 2.0
-    assert adapter._sketch_entities["circle"].ConstructionGeometry
-    diameter, = (dim for dim in adapter.dimensions if dim.name == "PilotDrillDiameter")
-    assert diameter.first == "circle" and diameter.second is None
-    assert diameter.kind == "diameter"
-    assert diameter.value_mm == pytest.approx(2.0 * radius)
-    assert equations == {"PilotDrillDiameter@PilotDrillReference": '"PilotDrillDiameter"'}
-    anchors = [dim for dim in adapter.dimensions if dim is not diameter]
-    assert {dim.kind: dim.value_mm for dim in anchors} == {
-        kind: abs(coordinate) for kind, coordinate in (
-            ("horizontal_distance", x), ("vertical_distance", y),
-        ) if coordinate != 0.0
+    # One construction pilot circle concentric in each clearance hole.
+    assert list(adapter.circles.values()) == [
+        (x, spec.PLATE_HOLE_Y, pytest.approx(spec.PLATE_TAP_DRILL_DIA / 2.0))
+        for x in spec.PLATE_HOLE_XS
+    ]
+    assert spec.PLATE_TAP_DRILL_DIA < spec.PLATE_CLEARANCE_DIA
+    assert all(entity.ConstructionGeometry for entity in adapter._sketch_entities.values())
+    for circle, name in (("circle0", "PilotDrillDiameter"), ("circle1", "PilotDrillDiameter2")):
+        x, y, radius = adapter.circles[circle]
+        diameter, = (dim for dim in adapter.dimensions if dim.name == name)
+        assert diameter.first == circle and diameter.second is None
+        assert diameter.kind == "diameter"
+        assert diameter.value_mm == pytest.approx(2.0 * radius)
+        anchors = [dim for dim in adapter.dimensions if dim.first == f"{circle}.center"]
+        assert {dim.kind: dim.value_mm for dim in anchors} == {
+            kind: abs(coordinate) for kind, coordinate in (
+                ("horizontal_distance", x), ("vertical_distance", y),
+            ) if coordinate != 0.0
+        }
+        assert all(dim.second == "origin" and dim.name is None for dim in anchors)
+    # Both diameters follow the one PilotDrillDiameter global.
+    assert equations == {
+        "PilotDrillDiameter@PilotDrillReference": '"PilotDrillDiameter"',
+        "PilotDrillDiameter2@PilotDrillReference": '"PilotDrillDiameter"',
     }
-    assert all(dim.first == "circle.center" and dim.second == "origin" for dim in anchors)
-    assert all(dim.name is None for dim in anchors)
     assert set(spec.PLATE_DRAWING_DIMENSIONS["PilotDrillReference"]) == {"PilotDrillDiameter"}
 
 

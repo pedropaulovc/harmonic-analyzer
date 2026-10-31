@@ -96,10 +96,17 @@ NUMERAL_PROFILE_PARENT_CENTER = (0.200, 0.250)
 NUMERAL_PROFILE_CENTER = (0.283, 0.125)
 # The .016 V must read as a profile; 10:1 keeps the full bar section on sheet.
 NUMERAL_PROFILE_SCALE = (10.0, 1.0)
-# Mid-height of the zero numeral: the cut crosses both of its straight side
-# strokes square, and no graduation (the nearest minor tick edge is 0.10 short).
-NUMERAL_SECTION_X = (part.SCALE_START_X + part.TICK_WIDTH / 2.0 + part.NUMERAL_GAP_MM
-                     + part.NUMERAL_HEIGHT_MM / 2.0)
+# Through the zero's two straight side strokes (they cross the cut square),
+# clear of every tick: midway between the first minor tick's far wall and
+# where the zero's sides turn into its end facets (gen_ms_stick_numerals_dxf
+# ends them at 0.84 of the stroke-centre height). At the zero's mid-height the
+# cut ran 0.10 off that tick wall and read as lying on it, with no tick in
+# G-G (machinist review, run 20261031T070419538Z-20ea55fe).
+_MINOR_TICK_FAR_WALL = part.SCALE_START_X + part.MINOR_SPACING + part.TICK_WIDTH / 2.0
+_ZERO_SIDE_END = (part.SCALE_START_X + part.TICK_WIDTH / 2.0 + part.NUMERAL_GAP_MM
+                  + part.NUMERAL_STROKE_WIDTH_MM / 2.0
+                  + 0.84 * (part.NUMERAL_HEIGHT_MM - part.NUMERAL_STROKE_WIDTH_MM))
+NUMERAL_SECTION_X = (_MINOR_TICK_FAR_WALL + _ZERO_SIDE_END) / 2.0
 # r1-r3 sheet 4: at 1.5 mm the G letters sat on their arrows and the outline.
 # Each G prints from 1.4 mm below to 5.0 mm above its arrow (308 sheet 4, as
 # pd_support_bar's r7 letters): past the ruled edge (sheet top on the unturned
