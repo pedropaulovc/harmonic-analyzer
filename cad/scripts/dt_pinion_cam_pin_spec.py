@@ -13,7 +13,9 @@ from __future__ import annotations
 import _config
 from _fit_ream_h7 import REAM_H7
 from _gtol_cylinder import CylinderFace
+from _package_units import drawing_unit
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from dt_pinion_bracket_geometry import PIN_BORE as SEAT_DIA
 from dt_pinion_cam_pin_geometry import (
     CAP_RADIUS as CAP_RADIUS,
     CAP_SAG as CAP_SAG,
@@ -22,12 +24,16 @@ from dt_pinion_cam_pin_geometry import (
     SEAT_LEN as SEAT_LEN,
 )
 
-# U27 (Main, 2026-09-23): no press.  The stud is stock 4 mm drill rod (h9,
-# 4.000-3.970) slipped into the MHA-DT-14 strap's reamed H7 follower seat
-# (4.000-4.012) and bonded with LOCTITE 638: 0.000-0.042 diametral clearance,
+# #290: the registry row's drawing_unit (in) is this sheet's unit.
+UNIT = drawing_unit("parts/dt-pinion-cam-pin", _config.parts("dt-pinion-cam-pin"))
+
+# U27 (Main, 2026-09-23): no press.  The stud is stock drill rod slipped into
+# the MHA-DT-14 strap's reamed follower seat and bonded with LOCTITE 638,
 # inside the 0.25 mm bond gap the 638 data sheet allows (the U6 drum-to-arbor
-# precedent).  A novice cannot hold the old +/-0.004 press band.
-PIN_DIA_BAND = (0.0, -0.03)  # (upper, lower): h9 drill rod
+# precedent).  A novice cannot hold the old +/-0.004 press band.  #290: 5/32
+# O1 drill rod at the supplier's .1563 +/-.0005 in, in the .1570 +.0005/.0000
+# reamed seat.
+PIN_DIA_BAND = (0.0127, -0.0127)  # (upper, lower): +/-.0005 in, the drill rod's
 SEAT_NUMBER = "MHA-DT-14"
 RETAINING_COMPOUND = "LOCTITE 638"
 RETAINING_COMPOUND_MAX_GAP_MM = 0.25
@@ -45,10 +51,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia", "Depth"},
     "CapProfile": {"CapR"},
 }
-# Decimal places ARE the tolerance statement (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the h9 stock
-# band is hundredths, and the length and crown radius take the .XX band.
+# Decimal places ARE the tolerance statement (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the drill
+# rod's +/-.0005 band needs four, and the length and crown radius take the
+# .XX band.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "PinProfile": {"PinDia": 2, "Depth": 2},
+    "PinProfile": {"PinDia": 4, "Depth": 2},
     "CapProfile": {"CapR": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -62,17 +69,17 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # The stock is stated once, in the title block's Material cell (the registry
 # row): repeating it on the diameter callout was over-specification (machinist
 # review of 7f7fc1717), and a callout that names no bar cannot disagree with
-# the title block (Codex P2 on #814).  The h9 slip fit above assumes drill rod.
+# the title block (Codex P2 on #814).  The bonded slip fit above assumes drill rod.
 STOCK = _config.parts("dt-pinion-cam-pin")["material"]
 if "drill rod" not in STOCK.lower():
-    raise AssertionError(f"the h9 bonded slip fit assumes drill rod, not {STOCK!r}")
+    raise AssertionError(f"the bonded slip fit assumes drill rod, not {STOCK!r}")
 PIN_DIA_CALLOUT = f"SLIP FIT IN {SEAT_NUMBER} FOLLOWER SEAT"
 DEPTH_CALLOUT = "SEATED FLAT END\nTO CROWN ROOT"
 CAP_RADIUS_CALLOUT = "OUTER CROWN"
 
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs,
-# slides or locates): the cam rides the Ø4 shank, a cam-follower contact, so
-# the shank carries Ra 1.6 (ground drill rod meets it as received; Codex P2 on
+# slides or locates): the cam rides the shank, a cam-follower contact, so
+# the shank carries Ra 63 uin (ground drill rod meets it as received; Codex P2 on
 # #1687).  Name both the function and its physical surface so the free crown
 # cannot be mistaken for the contact (epoch4 review of #1687).  This remains
 # the existing whole cylindrical-face control, not a localized contact band.
@@ -84,12 +91,14 @@ SURFACE_FINISHES = (
         roughness_um=MACHINED_UM,
         face=CylinderFace(diameter_mm=PIN_DIA),
         production_method=SHANK_FINISH_TARGET,
+        display_unit=UNIT,
     ),
 )
 
+# The bond gap between the stud's and the seat's printed limits.
 SEAT_BAND = REAM_H7
-BOND_CLEARANCE_MIN = round(SEAT_BAND[1] - PIN_DIA_BAND[0], 6)
-BOND_CLEARANCE_MAX = round(SEAT_BAND[0] - PIN_DIA_BAND[1], 6)
+BOND_CLEARANCE_MIN = round(SEAT_DIA + SEAT_BAND[1] - (PIN_DIA + PIN_DIA_BAND[0]), 6)
+BOND_CLEARANCE_MAX = round(SEAT_DIA + SEAT_BAND[0] - (PIN_DIA + PIN_DIA_BAND[1]), 6)
 if BOND_CLEARANCE_MIN < 0.0 or BOND_CLEARANCE_MAX > RETAINING_COMPOUND_MAX_GAP_MM:
     raise AssertionError(
         f"bonded pin gap {BOND_CLEARANCE_MIN}-{BOND_CLEARANCE_MAX} is outside the"

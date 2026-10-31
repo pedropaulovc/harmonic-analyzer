@@ -7,9 +7,10 @@ dt-pinion-lever:
   quantity: 1
   tolerance_class: machined_block
   process: "machined (steel)"
+  drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
       where: "inside corner where the grip rod's root meets the hub OD (rod-to-hub junction)"
       finding: "sharp modeled rod-to-hub internal corner rather than an explicit fillet (rules 16, 21)"
-      reason: "owner ruling 2026-10-18 (fr-top-frame precedent): sharp inside corners take the shop's R1.0 MAX ceiling, now supplied by the shared title block (#1625, PR #1718); one piece machined from solid, as section A-A hatches it; no geometry change (owner-accepted)"
+      reason: "owner ruling 2026-10-18 (fr-top-frame precedent): sharp inside corners take the shop's R.040 MAX ceiling, now supplied by the shared title block (#1625, PR #1718); one piece machined from solid, as section A-A hatches it; no geometry change (owner-accepted)"

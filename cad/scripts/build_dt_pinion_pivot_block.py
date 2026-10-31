@@ -43,8 +43,11 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _document_units import apply_package_model_units
+from _drawing_precision import apply_drawing_precision
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
+from _part_properties import part_drawing_unit
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 from _part_pmi import author_part_pmi
@@ -59,12 +62,14 @@ from dt_pinion_pivot_block_spec import (
     BORE_DIA_BAND,
     BORE_UP,
     DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     LIFT_BORE_RISE,
     LIFT_BORE_SPACING,
     SCREW_HOLE_SPEC,
     SCREW_HALF_SPACING,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 PART_NAME = "dt-pinion-pivot-block"
@@ -86,6 +91,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): the block envelope, the two bores and
     # their spacing. The mm suffix is load-bearing -- this is an INCH document and
@@ -224,11 +230,20 @@ async def build(adapter) -> dict[str, str]:
     # drawing recipe imports the marked set and must find every one of these),
     # and stamp the make-critical title-block properties.
     set_dimension_bilateral_tolerance(
-        adapter, "BlockProfile", "PivotBoreDia", *deviations(BORE_DIA_BAND)
+        adapter,
+        "BlockProfile",
+        "PivotBoreDia",
+        *deviations(BORE_DIA_BAND),
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "BlockProfile", "LiftBoreDia", *deviations(BORE_DIA_BAND)
+        adapter,
+        "BlockProfile",
+        "LiftBoreDia",
+        *deviations(BORE_DIA_BAND),
+        display_unit=UNIT,
     )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

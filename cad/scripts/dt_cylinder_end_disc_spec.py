@@ -11,21 +11,30 @@ a north disc.
 
 from __future__ import annotations
 
+import _config
+from _package_units import drawing_unit
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from dt_cylinder_end_disc_clearance import clearance_budget
 
-WASHER_OD = 55.0
-OUTSIDE_DIA_PLACES = 1
-OUTSIDE_DIA_BAND_MM = printed_band_mm(OUTSIDE_DIA_PLACES)
+# #290: the registry row's drawing_unit (in) is this sheet's unit; the bands
+# and places below are authored for it.
+UNIT = drawing_unit("parts/dt-cylinder-end-disc", _config.parts("dt-cylinder-end-disc"))
+
+WASHER_OD = 55.118  # 2.17
+# .XX, not .X: the drive and ring-capture budgets read the OD's band.
+OUTSIDE_DIA_PLACES = 2
+OUTSIDE_DIA_BAND_MM = printed_band_mm(OUTSIDE_DIA_PLACES, unit=UNIT)
 RUNNING_AIR_MM = 0.10
 CLEARANCE_SPARE_MM = 0.25
-WASHER_BORE = 9.6  # slips on the O9.525 (3/8 in) cylinder arbor
-WASHER_THICK = 2.8
-THICKNESS_PLACES = 1
-WASHER_THICK_TOLERANCE_MM = printed_band_mm(THICKNESS_PLACES)
+# Letter V drill (.377), clearing the 3/8 in MHA-DT-13 cylinder arbor.
+WASHER_BORE = 9.5758  # .377
+WASHER_THICK = 2.794  # .11
+# .XX, not .X: the bank's datum chain reads the thickness band.
+THICKNESS_PLACES = 2
+WASHER_THICK_TOLERANCE_MM = printed_band_mm(THICKNESS_PLACES, unit=UNIT)
 # The DRILL THRU callout inherits this band from the title block.
-WASHER_BORE_BAND = (drilled_oversize_mm(), 0.0)  # (upper, lower) deviations
-BORE_CALLOUT = "DRILL THRU\nCLEARANCE ON MHA-DT-13"
+WASHER_BORE_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)  # (upper, lower) deviations
+BORE_CALLOUT = "LETTER V DRILL THRU\nCLEARANCE ON MHA-DT-13"
 THICKNESS_CALLOUT = "SOUTH BANK DATUM BETWEEN\nMHA-DT-12 AND MHA-DT-02"
 
 # Decimal places select the ordinary size bands; the actual disc thickness
@@ -35,7 +44,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Disc": {"DiscThick"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "RingProfile": {"DiscDia": OUTSIDE_DIA_PLACES, "BoreDia": 2},
+    "RingProfile": {"DiscDia": OUTSIDE_DIA_PLACES, "BoreDia": 3},
     "Disc": {"DiscThick": THICKNESS_PLACES},
 }
 DRAWING_PRECISION_BY_NAME = {

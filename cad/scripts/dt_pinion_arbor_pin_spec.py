@@ -3,7 +3,7 @@ r"""Pure data: MHA-DT-22's cross hole for the MHA-DT-33 collar's spring pin (R1a
 User ruling 2026-09-24: the collar is pinned to the arbor with the rig's one
 pin family, the ASME B18.8.2 1/16 x 1/2 slotted spring pin, in a hole drilled
 with the MHA-DT-30 1/16 drill (``dt_vn_pinion_strap_pin_spec``).  The hole is drilled
-at the bench at a .X station from the head rear face, on the crossrod's local
+at the bench at a .XX station from the head rear face, on the crossrod's local
 axis so one V-block setup serves both cross holes.
 
 Kept apart from ``dt_pinion_arbor_spec`` on purpose: the drive-train assembly
@@ -15,10 +15,11 @@ spec read the hole from here.
 from __future__ import annotations
 
 import dt_vn_pinion_strap_pin_spec as _pin
+from _inch_wall_limits import WALL_TARGET_MM
 from dt_pinion_arbor_spec import (
     FRONT_JOURNAL_FROM_HEAD_REAR,
     LAND_FINISH_RUNOUT,
-    LINEAR_X_BAND,
+    LINEAR_XX_BAND,
     NECK_LEN,
     PIN_STATION_BAND,
     PIN_STATION_FROM_HEAD_REAR,
@@ -32,17 +33,17 @@ PIN_HOLE_DIA_MAX = _pin.HOLE_MAX
 # The hole's function is the pin it takes: the stock MHA-DT-VN-63 (McMaster
 # 98296A027), the third of its BOM line.  Both sheets that drill for it,
 # MHA-DT-22 and the MHA-DT-33 collar, print this one callout, so a machinist
-# reading the arbor's +0.06/0 band sees why it beats the title block's
+# reading the arbor's +.0025/.0000 band sees why it beats the title block's
 # drilled-hole row (codex machinist pass on pc-r8; Main, 2026-09-26).
 PIN_NUMBER = "MHA-DT-VN-63"
 PIN_HOLE_CALLOUT = f"{_pin.DRILL_THRU_CALLOUT}\nFOR {PIN_NUMBER} SPRING PIN"
 
-# At its worst corner the hole stays clear of the front land and its Ra 1.6
-# run-out (the pin never enters the land), clear of the Ø10.5 neck shoulder,
-# and leaves the U27 2.0 web target of steel beside it.
+# At its worst corner the hole stays clear of the front land and its Ra 63
+# run-out (the pin never enters the land), clear of the Ø.41 neck shoulder,
+# and leaves the .080 in web target of steel beside it.
 PIN_HOLE_LAND_CLEARANCE = (
     FRONT_JOURNAL_FROM_HEAD_REAR
-    - LINEAR_X_BAND
+    - LINEAR_XX_BAND
     - LAND_FINISH_RUNOUT
     - (PIN_STATION_FROM_HEAD_REAR + PIN_STATION_BAND + PIN_HOLE_DIA_MAX / 2.0)
 )
@@ -50,13 +51,15 @@ PIN_HOLE_NECK_CLEARANCE = (
     PIN_STATION_FROM_HEAD_REAR
     - PIN_STATION_BAND
     - PIN_HOLE_DIA_MAX / 2.0
-    - (NECK_LEN + LINEAR_X_BAND)
+    - (NECK_LEN + LINEAR_XX_BAND)
 )
 PIN_HOLE_LIGAMENT_WORST = (SHAFT_DIA + SHAFT_DIA_BAND[1] - PIN_HOLE_DIA_MAX) / 2.0
 for _name, _margin in (
     ("front land run-out", PIN_HOLE_LAND_CLEARANCE),
-    ("Ø10.5 neck shoulder", PIN_HOLE_NECK_CLEARANCE),
+    ("Ø.41 neck shoulder", PIN_HOLE_NECK_CLEARANCE),
     ("arbor ligament beside the hole", PIN_HOLE_LIGAMENT_WORST),
 ):
-    if _margin < 2.0:
-        raise AssertionError(f"collar pin hole: {_name} is {_margin:.2f}, under 2.0")
+    if _margin < WALL_TARGET_MM:
+        raise AssertionError(
+            f"collar pin hole: {_name} is {_margin:.3f}, under {WALL_TARGET_MM}"
+        )

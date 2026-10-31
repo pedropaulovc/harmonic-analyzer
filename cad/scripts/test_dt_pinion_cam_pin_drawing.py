@@ -27,7 +27,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
     assert drawing.PIN_DIA == dt_pinion_cam_pin_spec.PIN_DIA
-    assert drawing.PIN_DIA == 4.0
+    assert drawing.PIN_DIA == pytest.approx(0.1563 * 25.4)  # 5/32 drill rod
     assert drawing.PIN_LEN == dt_pinion_cam_pin_spec.PIN_LEN
 
 
@@ -111,19 +111,19 @@ def test_end_view_keeps_the_templates_one_center_mark(monkeypatch) -> None:
 
 def test_bonded_slip_fit_replaces_the_press() -> None:
     """U27 (Main, 2026-09-23): stock drill rod slipped into the strap's H7 seat
-    and bonded with LOCTITE 638 (the U6 drum-to-arbor precedent)."""
+    and bonded with LOCTITE 638 (the U6 drum-to-arbor precedent).  #290: 5/32
+    drill rod (+/-.0005) in the .1570 seat."""
     import dt_pinion_bracket_spec
 
-    assert dt_pinion_cam_pin_spec.PIN_DIA == 4.0
-    assert dt_pinion_cam_pin_spec.PIN_DIA_BAND == (0.0, -0.03)
+    assert dt_pinion_cam_pin_spec.PIN_DIA == pytest.approx(0.1563 * 25.4)
+    assert dt_pinion_cam_pin_spec.PIN_DIA_BAND == (0.0127, -0.0127)
     assert dt_pinion_cam_pin_spec.SEAT_BAND == dt_pinion_bracket_spec.PIN_SEAT_DIA_BAND
-    assert dt_pinion_bracket_spec.PIN_BORE == dt_pinion_cam_pin_spec.PIN_DIA
     seat_min = dt_pinion_bracket_spec.PIN_BORE + dt_pinion_bracket_spec.PIN_SEAT_DIA_BAND[1]
     seat_max = dt_pinion_bracket_spec.PIN_BORE + dt_pinion_bracket_spec.PIN_SEAT_DIA_BAND[0]
     pin_min = dt_pinion_cam_pin_spec.PIN_DIA + dt_pinion_cam_pin_spec.PIN_DIA_BAND[1]
     pin_max = dt_pinion_cam_pin_spec.PIN_DIA + dt_pinion_cam_pin_spec.PIN_DIA_BAND[0]
-    assert round(seat_min - pin_max, 6) == 0.0
-    assert round(seat_max - pin_min, 6) == 0.0427
+    assert round(seat_min - pin_max, 6) == 0.00508
+    assert round(seat_max - pin_min, 6) == 0.04318
     assert seat_max - pin_min <= dt_pinion_cam_pin_spec.RETAINING_COMPOUND_MAX_GAP_MM
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Main's MHA-DT-25 eye pass): the bond is the fit-up step, not a note.
     assert dt_pinion_cam_pin_spec.ASSEMBLY_STEP == (
@@ -175,7 +175,7 @@ def test_no_gdt_the_shank_carries_the_finish_and_only_the_fit_is_banded() -> Non
     )
     assert "add_view_centerline(" in source
     assert model_toleranced_dimensions(pin) == {
-        ("PinProfile", "PinDia"): "*deviations(PIN_DIA_BAND)",
+        ("PinProfile", "PinDia"): "PIN_DIA_BAND[0]",
     }
     assert "FINAL SIZE" not in drawing.DIMENSION_CALLOUTS["PinDia"]
     assert drawing.DIMENSION_CALLOUTS["Depth"] is dt_pinion_cam_pin_spec.DEPTH_CALLOUT
@@ -188,7 +188,7 @@ def test_no_gdt_the_shank_carries_the_finish_and_only_the_fit_is_banded() -> Non
     assert "set_reference_dimension(" in source
     assert "SetPrecision3(DRAWING_REFERENCE_PRECISION" in source
     assert "REF AXIAL HEIGHT" not in source
-    assert round(drawing.OVERALL, 6) == 20.8
+    assert drawing.OVERALL == pytest.approx(20.801, abs=5e-4)
 
 
 def test_the_cam_rides_the_shank_short_of_the_crown() -> None:
@@ -265,7 +265,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 
     spec = _config.parts("dt-pinion-cam-pin")
     assert spec["number"] == "MHA-DT-25"
-    assert spec["material"] == spec["material_specification"]
+    assert "5/32" in spec["material_specification"]
     assert spec["material_specification"]
     assert spec["finish"]
     assert "fit_class" not in spec
@@ -313,7 +313,7 @@ def test_the_part_owns_the_printed_precision() -> None:
         feature: set(names) for feature, names in precision.items()
     } == dt_pinion_cam_pin_spec.DRAWING_DIMENSIONS
     assert dt_pinion_cam_pin_spec.DRAWING_PRECISION_BY_NAME == {
-        "PinDia": 2,
+        "PinDia": 4,
         "Depth": 2,
         "CapR": 2,
     }

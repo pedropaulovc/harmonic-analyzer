@@ -34,8 +34,10 @@ from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
 from _dimensions import drive_dimension, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -50,8 +52,7 @@ from _sketch import (
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_bilateral_tolerance
-from _fit_deviations import deviations
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from dt_pinion_cam_pin_spec import (
@@ -63,6 +64,7 @@ from dt_pinion_cam_pin_spec import (
     PIN_DIA_BAND,
     PIN_LEN,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 PART_NAME = "dt-pinion-cam-pin"
@@ -76,8 +78,8 @@ _SAVED_DRAWING_PROPERTIES = (
 )
 
 PIN_R = PIN_DIA / 2.0
-CAP_R = (PIN_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 2.9
-V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 5.29
+CAP_R = (PIN_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 3.048, .12
+V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0
 V_PIN = math.pi * PIN_R**2 * PIN_LEN
 
 
@@ -85,6 +87,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import RevolveParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing (INCH
     # document; the equation manager reads bare numbers in document units).
@@ -220,10 +224,10 @@ async def build(adapter) -> dict[str, str]:
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.  Only the bonded
-    # diameter carries a band; the length and crown radius take the title
-    # block's .XX (dt_pinion_cam_pin_spec).
-    set_dimension_bilateral_tolerance(
-        adapter, "PinProfile", "PinDia", *deviations(PIN_DIA_BAND)
+    # diameter carries a band, the drill rod's own +/-.0005; the length and
+    # crown radius take the title block's .XX (dt_pinion_cam_pin_spec).
+    set_dimension_symmetric_tolerance(
+        adapter, "PinProfile", "PinDia", PIN_DIA_BAND[0], display_unit=UNIT
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

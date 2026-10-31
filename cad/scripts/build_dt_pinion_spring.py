@@ -69,6 +69,8 @@ from _drawing_marks import (
 )
 from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _saved_part_guard import require_saved_drawing_properties
+from _document_units import apply_package_model_units
+from _part_properties import part_drawing_unit
 from dt_pinion_spring_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -88,6 +90,7 @@ from dt_pinion_spring_spec import (
     R_BEND,
     R_KINK,
     THICK,
+    UNIT,
     WIDTH,
 )
 from dt_pinion_spring_geometry import (
@@ -434,6 +437,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing --
     # INCH document, the equation manager reads bare numbers in doc units.
@@ -645,14 +649,14 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Manufacturing drawing support: the formed features that set the crest's
-    # preload carry the one formed band, the rest of the profile rides the
-    # title-block .X row, the blank's cut features its .XX row, and the pad's
-    # bend relief a single MAX limit. The part authors the decimal places and
-    # the drawing reads them back.
+    # preload carry the one formed band, the rest of the profile and the
+    # blank's cut features ride the title-block .XX row, and the pad's bend
+    # relief a single MAX limit. The part authors the decimal places and the
+    # drawing reads them back.
     for feature_name, dimension_names in FORMED_BANDED_DIMENSIONS.items():
         for name in sorted(dimension_names):
             set_dimension_symmetric_tolerance(
-                adapter, feature_name, name, FORMED_TOLERANCE_MM
+                adapter, feature_name, name, FORMED_TOLERANCE_MM, display_unit=UNIT
             )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

@@ -30,12 +30,14 @@ import sys
 
 import _telemetry
 from _appearance import apply_material
+from _document_units import apply_package_model_units
 from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -67,6 +69,7 @@ from dt_cylinder_gear_shaft_spec import (
     SHAFT_DIA,
     SHAFT_DIA_BAND,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 PART_NAME = "dt-cylinder-gear-shaft"
@@ -227,6 +230,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): the arbor diameter and length. The mm
     # suffix is load-bearing -- this is an INCH document and the equation manager
@@ -289,7 +294,11 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     set_dimension_bilateral_tolerance(
-        adapter, "ShaftProfile", "ShaftDia", *deviations(SHAFT_DIA_BAND)
+        adapter,
+        "ShaftProfile",
+        "ShaftDia",
+        *deviations(SHAFT_DIA_BAND),
+        display_unit=UNIT,
     )
     # Decimal places belong to the model dimension, not to the sheet: the
     # drawing imports these and only asserts they survived.

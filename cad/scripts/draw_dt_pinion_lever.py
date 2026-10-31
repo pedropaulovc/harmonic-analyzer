@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the pinion engage lever.
 
-A turned hub slipped over the MHA-DT-17 lift rod's front end, with a straight Ø6
+A turned hub slipped over the MHA-DT-17 lift rod's front end, with a straight
 grip rod rising out of it; the MHA-DT-30 pin (U36) match-drilled through hub and rod at
 assembly carries the drive.  The 1:1 front view carries the hub and grip sizes,
 the projected top view the crown, and section A-A (in the side view's place)
@@ -48,6 +48,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _section_axis import position_section_caption
 from _session import run_build
@@ -479,7 +480,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,

@@ -2,12 +2,20 @@ r"""Pure-data dimensional contract shared by the cylinder-gear arbor and drawing
 
 from __future__ import annotations
 
+import _config
 from _fit_shaft_h import SHAFT_H
 from _gtol_cylinder import CylinderFace
+from _package_units import drawing_unit
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
 MM_PER_IN = 25.4
+
+# #290: the registry row's drawing_unit (in) is this sheet's unit; the band,
+# places and roughness below are authored for it.
+UNIT = drawing_unit(
+    "parts/dt-cylinder-gear-shaft", _config.parts("dt-cylinder-gear-shaft")
+)
 
 SHAFT_DIA = 0.375 * MM_PER_IN  # ch13: = cam bore (legacy parameters.kcl)
 SHAFT_RADIUS = SHAFT_DIA / 2.0
@@ -53,6 +61,7 @@ SURFACE_FINISHES = (
         MACHINED_UM,
         # Any station on the cylinder: the gears run on it end to end.
         CylinderFace(SHAFT_DIA, contains_y_mm=ARBOR_BEARING_PROBE_Y_MM),
+        display_unit=UNIT,
     ),
 )
 
@@ -73,18 +82,18 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 
 # Decimal places are the tolerance (drawing-simplicity-policy.md `How the repository implements the guidelines`), so the MODEL owns them and
-# the sheet only asserts what it imported.  3/8 in = 9.525 exactly: two places
-# would print 9.525 as 9.53 and contradict the bore mates built on the exact
-# inch conversion, and the O.D. carries the running band anyway.  The overall
+# the sheet only asserts what it imported.  Four places on the O.D.: its
+# SHAFT_H band is 0/-.0008, and an inch nominal prints at its tolerance's
+# places (.3750).  The overall
 # length is a free dimension -- one place puts it on the title block's .X row
-# instead of claiming the .XX band a trailing 161.90 would, and the sheet
-# parenthesizes it: the cut-to-fit callout, not the nominal, sets it.
+# instead of claiming the .XX band, and the sheet parenthesizes it: the
+# cut-to-fit callout, not the nominal, sets it.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "ShaftProfile": {"ShaftDia": 3},
+    "ShaftProfile": {"ShaftDia": 4},
     "Shaft": {"Depth": 1},
-    # One place: a filed or form-turned dome only has to read as the dome
-    # and clears nothing (it stands proud of the strap in free air).
-    "DomeReference": {"DomeHeight": 1, "DomeRadius": 1},
+    # Two places: .X would print the .06 dome as .1 (2.5 mm), a different
+    # dome; the reference radius follows at the same places.
+    "DomeReference": {"DomeHeight": 2, "DomeRadius": 2},
 }
 _PRECISION_NAMES = [
     (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
@@ -101,20 +110,21 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
 # Three part-specific facts a machinist cannot read off the views (policy
-# drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). The O.D. IS a catalog stock size, so the 20 um running band is a
-# stock buy rather than a grind between centres, and a 162:9.5 slender bar is
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). The O.D. IS a catalog stock size, so the .0008 in running band is a
+# stock buy rather than a grind between centres, and a 6.5:.375 slender bar is
 # turned between centres -- saying the centre holes may stay saves a phone
 # call (each dome is turned on its centre, which may stay).
-# The length is cut at assembly, so the shop supplies the bar long (190 covers
-# the nominal span plus both domes and facing stock) and the domes are turned
-# on the cut ends (r1 machinist review: nothing tied the end form to the
-# cut-to-fit). The set screws' cup points bear in spots drilled through the
-# pedestal taps at assembly (#743), so the bar itself is never flatted.
+# The length is cut at assembly, so the shop supplies the bar long (7-1/2 in
+# stock covers the nominal span plus both domes and facing stock) and the
+# domes are turned on the cut ends (r1 machinist review: nothing tied the end
+# form to the cut-to-fit). The set screws' cup points bear in spots drilled
+# through the pedestal taps at assembly (#743), so the bar itself is never
+# flatted.
 DRAWING_NOTES = "\n".join(
     (
-        "3/8 IN GROUND STOCK OK.",
+        "3/8 GROUND STOCK OK.",
         "CENTRES OK.",
-        "SUPPLY 190 LONG, UNCUT; CUT AND DOME BOTH ENDS AT ASSEMBLY.",
+        "SUPPLY 7-1/2 LONG, UNCUT; CUT AND DOME BOTH ENDS AT ASSEMBLY.",
         "NO FLATS; SET-SCREW SPOTS ARE DRILLED AT ASSEMBLY.",
     )
 )

@@ -30,11 +30,12 @@ def test_gear_overall_thickness_is_the_station_pitch() -> None:
 
 
 def test_gear_and_stack_bands_are_centred() -> None:
-    # User ruling L20 d' (#743) retired the one-sided +0.05/0: the same 0.05
-    # wide band, centred, stacks 20 gears about nominal, and the acceptance
-    # holds a long stack (re-face) and a short one (remake a gear) alike.
+    # User ruling L20 d' (#743) retired the one-sided +0.05/0: the same-width
+    # band (#290: +/-.0010 in), centred, stacks 20 gears about nominal, and
+    # the acceptance holds a long stack (re-face) and a short one (remake a
+    # gear) alike.
     upper, lower = gear.OVERALL_THICKNESS_BAND
-    assert upper - lower == pytest.approx(0.05)
+    assert upper - lower == pytest.approx(0.0508)
     assert upper == pytest.approx(-lower)
     # #948 ruling R tightened the acceptance to +/-0.10 (a fit-up re-face).
     assert bank.STACK_L20_ACCEPT == pytest.approx(
@@ -43,11 +44,14 @@ def test_gear_and_stack_bands_are_centred() -> None:
 
 
 def _extreme_stacks(per_gear: float, accept: float):
-    """Every accepted stack with each gear at a band limit, up to order."""
-    for long_gears in range(bank.COUNT + 1):
-        stack = [per_gear] * long_gears + [-per_gear] * (bank.COUNT - long_gears)
-        if abs(sum(stack)) <= accept + 1e-12:
-            yield stack
+    """Every accepted stack with each gear at a band limit but at most one,
+    which sits wherever the acceptance limit puts it, up to order."""
+    for long_gears in range(bank.COUNT):
+        stack = [per_gear] * long_gears + [-per_gear] * (bank.COUNT - 1 - long_gears)
+        for target in (accept, -accept):
+            last = min(per_gear, max(-per_gear, target - sum(stack)))
+            if abs(sum(stack) + last) <= accept + 1e-12:
+                yield [*stack, last]
 
 
 @pytest.mark.parametrize("n", range(bank.COUNT + 1))
@@ -102,20 +106,20 @@ def test_g0_to_g19_band_is_capped_by_the_stack_acceptance() -> None:
     assert bank.G0_FRONT_FROM_G19_BACK == pytest.approx(
         -(19 * bank.BANK_PITCH + gear.FACE_WIDTH)
     )
-    # Gears 1-19 against L20 +/-0.10: 19 x 0.025 is capped at 0.10 + 0.025.
-    assert bank.G0_G19_BAND == pytest.approx((-0.175, 0.175))
+    # Gears 1-19 against L20 +/-0.10: 19 x .0010 in is capped at 0.10 + .0010.
+    assert bank.G0_G19_BAND == pytest.approx((-0.1762, 0.1762))
     # Preloaded: no end-play term south.
-    assert sum(bank.G0_FRONT_SOUTH_STACK.values()) == pytest.approx(0.175)
-    assert sum(bank.G0_FRONT_NORTH_STACK.values()) == pytest.approx(0.175)
+    assert sum(bank.G0_FRONT_SOUTH_STACK.values()) == pytest.approx(0.1762)
+    assert sum(bank.G0_FRONT_NORTH_STACK.values()) == pytest.approx(0.1762)
 
 
 def test_station_accumulation_starts_at_the_south_cam_face() -> None:
     # The first tooth plane carries its own overall thickness, not 19 north
     # gears. The longest accepted prefix is 12 gears, reaching gear 11.
-    assert bank.station_stack_band(0) == pytest.approx((-0.05, 0.05))
-    assert bank.station_stack_band(11) == pytest.approx((-0.325, 0.325))
-    assert bank.station_stack_band(19) == pytest.approx((-0.125, 0.125))
-    assert bank.STATION_STACK_BAND == pytest.approx((-0.325, 0.325))
+    assert bank.station_stack_band(0) == pytest.approx((-0.0508, 0.0508))
+    assert bank.station_stack_band(11) == pytest.approx((-0.3286, 0.3286))
+    assert bank.station_stack_band(19) == pytest.approx((-0.1254, 0.1254))
+    assert bank.STATION_STACK_BAND == pytest.approx((-0.3286, 0.3286))
     assert bank.G19_BACK_FACE_BAND == pytest.approx((-0.10, 0.10))
 
 
@@ -148,21 +152,29 @@ def test_a_closed_slot_always_holds_the_whole_ring() -> None:
     assert ring_max == pytest.approx(2.225)
     assert bank.RING_MAX == pytest.approx(ring_max)
     assert bank.SHANK_MAX == pytest.approx(ring_max)
-    # d': the thinnest in-band gear, 7.0565 - 0.025, less FW + 0.05.
-    assert bank.SLOT_MIN == pytest.approx(3.9815)
+    # d': the thinnest in-band gear, 7.0565 - .0010 in, less FW + .002 in.
+    assert bank.SLOT_MIN == pytest.approx(3.9831)
     assert bank.RING_SLOT_MARGIN == pytest.approx(bank.SLOT_MIN - ring_max)
     assert bank.RING_SLOT_MARGIN >= bank.MARGIN_SPARE
 
 
 def test_each_gear_is_accepted_on_its_print_band() -> None:
+    from _printed_tolerance import printed_deviations
+
     upper, lower = gear.OVERALL_THICKNESS_BAND
     assert bank.GEAR_THICKNESS_ACCEPT == pytest.approx(
         (gear.OVERALL_THICKNESS + lower, gear.OVERALL_THICKNESS + upper)
     )
-    # Four places print the band exactly; three would move a limit inward.
-    places = gear.DRAWING_PRECISION_BY_NAME["OverallThickness"]
-    for limit in bank.GEAR_THICKNESS_ACCEPT:
-        assert round(limit, places) == pytest.approx(limit, abs=1e-12)
+    # The four-place inch print (.2778 +/-.0010) moves each limit by under a
+    # micrometre: the print is the acceptance.
+    printed = printed_deviations(
+        gear.OVERALL_THICKNESS,
+        gear.DRAWING_PRECISION_BY_NAME["OverallThickness"],
+        (lower, upper),
+        unit="in",
+    )
+    for limit, deviation in zip(bank.GEAR_THICKNESS_ACCEPT, printed, strict=True):
+        assert gear.OVERALL_THICKNESS + deviation == pytest.approx(limit, abs=0.001)
 
 
 def test_ring_faces_stay_on_flat_web_through_the_whole_stroke() -> None:

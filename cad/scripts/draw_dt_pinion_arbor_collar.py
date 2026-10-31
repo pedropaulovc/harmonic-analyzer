@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the pinion-arbor collar (R1a).
 
-A plain turned steel collar: Ø15 x 17, a drilled Ø5/16 slide bore, and one
+A plain turned steel collar: Ø.59 x .66, a drilled Ø5/16 slide bore, and one
 1/16 in spring-pin hole through both walls at the length's centre.  The
 profile lies as it sits in the lathe (axis horizontal) and looks along the
 pin hole, so the hole is a solid circle located from the right-hand end face;
@@ -45,6 +45,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _layout_geometry import audit_sheet, format_findings
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -219,7 +220,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("dt-pinion-arbor-collar"),
     )
     stamp_drawing_summary(
         adapter,

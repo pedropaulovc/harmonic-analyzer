@@ -703,6 +703,7 @@ if abs(SEAT_PIN.DIA - seat_geometry.DRIVE_PIN_DIA) > 1e-12:
     raise AssertionError("crank-seat-drive-pin is not the removable's drive pin")
 from dt_cylinder_end_disc_spec import (  # noqa: E402
     OUTSIDE_DIA_PLACES as END_DISC_OD_PLACES,
+    UNIT as END_DISC_UNIT,
     WASHER_OD as END_DISC_DIA,
     WASHER_THICK as END_DISC_THICK,
 )
@@ -1160,6 +1161,7 @@ from dt_pinion_arbor_geometry import (  # noqa: E402
     NECK_LEN_PLACES as ARBOR_NECK_LEN_PLACES,
     PIN_Z as ARBOR_PIN_Z,
     SHAFT_DIA as ARBOR_DIA,
+    UNIT as ARBOR_UNIT,
 )
 from dt_pinion_arbor_collar_geometry import (  # noqa: E402
     COLLAR_LEN as ARBOR_COLLAR_LEN,
@@ -1177,6 +1179,7 @@ from dt_pinion_bracket_geometry import (  # noqa: E402
     R_END as STRAP_R_END,
     THICKNESS as STRAP_T,
     THICKNESS_PLACES as STRAP_T_PLACES,
+    UNIT as STRAP_UNIT,
 )
 from dt_pinion_pivot_block_geometry import (  # noqa: E402
     BLOCK_DEPTH,
@@ -1248,6 +1251,7 @@ from dt_pinion_spring_geometry import (  # noqa: E402
 from dt_pinion_spring_section import (  # noqa: E402
     THICK as SPRING_T,
     THICK_BAND as SPRING_T_BAND,
+    UNIT as SPRING_UNIT,
     WIDTH as SPRING_W,
     WIDTH_PLACES as SPRING_W_PLACES,
 )
@@ -3143,7 +3147,7 @@ else:
     )
 # Where the rod plane shares the collar's z band, the Ø15 collar -- not the
 # Ø5/16 shaft -- is what the lever passes.
-_LEV_ROD_Z = (LEVER_Z - 3.0, LEVER_Z + 3.0)
+_LEV_ROD_Z = (LEVER_Z - LEVER_ROD_DIA / 2.0, LEVER_Z + LEVER_ROD_DIA / 2.0)
 _ARBOR_DIA_AT_LEVER = (
     ARBOR_COLLAR_OD
     if _LEV_ROD_Z[0] < ARBOR_COLLAR_Z[1] + 0.25 and _LEV_ROD_Z[1] > ARBOR_COLLAR_Z[0] - 0.25
@@ -3270,10 +3274,10 @@ if SPRING_FOOT_TAN_X - (SPRING_HOLE_X + FSCREW_HEAD_DIA / 2.0) < 0.25:
 # authored pose) the collar top hovers a designed ~0.15 under the pin (exact
 # tangency tips the interference gate on FP noise -- the PR5 gap lesson); the
 # return spring holds the strap west on it.
-# U27: the drill-rod stud slips into the H7 seat line-to-line and is bonded
-# (LOCTITE 638), so the nominal solids touch without overlapping.
-if abs(FPIN_DIA - STRAP_PIN_BORE) > 1e-9:
-    raise AssertionError("follower pin nominal is not line-to-line with its seat")
+# U27: the drill-rod stud slips into the reamed seat and is bonded (LOCTITE
+# 638); #290's .1563 rod in the .157 seat leaves the nominal solids apart.
+if not 0.0 < STRAP_PIN_BORE - FPIN_DIA < 0.25:
+    raise AssertionError("follower pin nominal does not slip into its seat")
 if abs(FPIN_SEAT - FPIN_SEAT_LEN) > 1e-9:
     raise AssertionError("pin SEAT_LEN disagrees with the bracket PIN_SEAT")
 # U27 slip fit: the set-screwed cam needs only 0.02-0.10 diametral clearance on
@@ -3544,7 +3548,7 @@ _STRESS_SF = 1.5  # on yield, at the stiff corner
 # thickness excess.  Soft: thinnest, narrowest strip.  Stiff: thickest strip.
 # Each is then walked over every formed corner (below).
 _SPR_T_LO, _SPR_T_HI = (SPRING_T + _d for _d in deviations(SPRING_T_BAND))
-_SPR_W_LO = SPRING_W + printed_deviations(SPRING_W, SPRING_W_PLACES)[0]
+_SPR_W_LO = SPRING_W + printed_deviations(SPRING_W, SPRING_W_PLACES, unit=SPRING_UNIT)[0]
 _SPR_STEPS = 1 + math.ceil(math.degrees(_PHI_ENG) / 0.25)
 _SPR_BLADE_SAMPLES = 16
 _SPR_CREST_OUTER_R = SPR_R_KINK + SPRING_T  # the crest's contact-face radius
@@ -3812,22 +3816,26 @@ if abs(_LEV_Z[1] - (LIFT_ROD_Z0 + RIG.LEVER_PLANE_NORTH_FROM_ROD_END)) > 1e-9:
     raise AssertionError("the lever throw plane drifted from the rig layout's")
 GRIP_ROD_SOUTH_TRAVEL_STACK = {
     **ARBOR_SOUTH_TRAVEL_STACK,
-    "MHA-DT-22 head length .X, half (crossrod centred)": _upper(
-        ARBOR_HEAD_LEN, ARBOR_HEAD_LEN_PLACES
-    )
+    "MHA-DT-22 head length .X, half (crossrod centred)": printed_deviations(
+        ARBOR_HEAD_LEN, ARBOR_HEAD_LEN_PLACES, unit=ARBOR_UNIT
+    )[1]
     / 2.0,
     "MHA-DT-15 crossrod dia, half": HANDLE_ROD_DIA_BAND[0] / 2.0,
 }
 GRIP_HEAD_SOUTH_TRAVEL_STACK = {
     **ARBOR_SOUTH_TRAVEL_STACK,
-    "MHA-DT-22 head length .X": _upper(ARBOR_HEAD_LEN, ARBOR_HEAD_LEN_PLACES),
-    "MHA-DT-22 front crown sag .X": _upper(
-        ARBOR_HEAD_CAP_SAG, ARBOR_HEAD_CAP_SAG_PLACES
-    ),
+    "MHA-DT-22 head length .X": printed_deviations(
+        ARBOR_HEAD_LEN, ARBOR_HEAD_LEN_PLACES, unit=ARBOR_UNIT
+    )[1],
+    "MHA-DT-22 front crown sag .X": printed_deviations(
+        ARBOR_HEAD_CAP_SAG, ARBOR_HEAD_CAP_SAG_PLACES, unit=ARBOR_UNIT
+    )[1],
 }
 GRIP_HEAD_NORTH_TRAVEL_STACK = {
     **ARBOR_NORTH_TRAVEL_STACK,
-    "MHA-DT-22 neck length .XX": _upper(ARBOR_NECK_LEN, ARBOR_NECK_LEN_PLACES),
+    "MHA-DT-22 neck length .XX": printed_deviations(
+        ARBOR_NECK_LEN, ARBOR_NECK_LEN_PLACES, unit=ARBOR_UNIT
+    )[1],
 }
 # Radial envelope of the alignment drum against the enlarged south end disc.
 # DiscDia's own precision selects its actual ordinary title-block band.
@@ -3835,7 +3843,10 @@ DRUM_TIP_TO_END_DISC_STACK = {
     "MHA-DT-01 critical tip, half": (
         _ALIGNMENT_PINION.outside_dia_limits_mm()[1] / 2.0 - TIP_APINION
     ),
-    "end disc dia, general band, half": _upper(END_DISC_DIA, END_DISC_OD_PLACES) / 2.0,
+    "end disc dia, general band, half": printed_deviations(
+        END_DISC_DIA, END_DISC_OD_PLACES, unit=END_DISC_UNIT
+    )[1]
+    / 2.0,
 }
 
 
@@ -3846,9 +3857,13 @@ DRUM_TIP_TO_END_DISC_STACK = {
 # strip's front edge south, toward the gear.
 SPRING_TO_J19_STACK = {
     "rig-set leaf D, thinnest setting": RIG.FEELER_SET_ERROR,
-    "MHA-DT-14 strap thickness .X, thinnest": _lower(STRAP_T, STRAP_T_PLACES),
+    "MHA-DT-14 strap thickness .XXX, thinnest": -printed_deviations(
+        STRAP_T, STRAP_T_PLACES, unit=STRAP_UNIT
+    )[0],
     "spring pad leaf, thickest setting": RIG.FEELER_SET_ERROR,
-    "MHA-DT-24 strip width .XX, widest": _upper(SPRING_W, SPRING_W_PLACES),
+    "MHA-DT-24 strip width .XX, widest": printed_deviations(
+        SPRING_W, SPRING_W_PLACES, unit=SPRING_UNIT
+    )[1],
 }
 
 

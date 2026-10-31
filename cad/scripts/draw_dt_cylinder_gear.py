@@ -36,7 +36,6 @@ from _drawing_dimensions import (
     offset_dimension_text,
     set_dimension_callouts,
     set_reference_dimension,
-    set_reference_dimensions,
 )
 from _drawing_edge_dimensions import assert_dimension_measures
 from _drawing_edges import visible_view_entities
@@ -48,6 +47,7 @@ from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_vis
 from _gear_drawing_entities import visible_circle_edge
 from _gtol_face_read import face_geometry
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -531,8 +531,8 @@ def _pattern_notch_reference(adapter: Any, annotations: list[Any]) -> Any:
     The kerf is sawn into a root the tooth indexing already cut, so the
     angle has nothing separate to inspect (dt_cylinder_gear_spec).  The
     part leaves the driven dimension untoleranced; it prints (90°) through
-    main's prefix/suffix reference form, as (Ø9.575) on this sheet: at
-    f68549253 ShowParenthesis read True on this angle but rendered "90°".
+    main's prefix/suffix reference form: at f68549253 ShowParenthesis read
+    True on this angle but rendered "90°".
     """
     matches = [annotation for annotation in annotations
                if dimension_name(adapter, annotation) == "PatternNotchPhase"]
@@ -582,7 +582,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("dt-cylinder-gear"),
     )
     stamp_drawing_summary(
         adapter,
@@ -632,7 +636,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # import: a dimension that fell back to the sheet default would print a
     # band nobody specified.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    set_reference_dimensions(adapter, annotations, {"BoreDia"})
     _pattern_notch_reference(adapter, annotations)
     # Keep the controlled face-width value while moving only its text outside
     # the side-view extension lines; the offset leader returns to the dimension.

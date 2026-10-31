@@ -7,9 +7,4 @@ dt-pinion-bracket:
   quantity: 2
   tolerance_class: machined_block
   process: "machined (steel)"
-  machinist_exceptions:
-    - id: "RV-01"
-      kind: "minor"
-      where: "left side view, Ø4.00 follower seat located 4.50 ±0.10 in the 9.0 thickness: WALL 1.5 MIN"
-      finding: "follower-seat wall to the far broad face below the 2.0 mm target (rule 17)"
-      reason: "owner ruling (a), 2026-09-25 (dt_pinion_bracket_spec PIN_SEAT_STATION_TOL; #904 row 1): the Ø4 MHA-DT-25 stud and the 9.0 strap stay, and the station alone tightens to ±0.10 so the far-face wall holds the 1.5 floor (1.544 at the thinnest .X bar, the station's upper limit, the seat's upper-limit radius and 0.05 drill wander); the 2.0 target gives way. The geometry fixes (Ø3 stud, 9.5 strap) are tracked in #904. The sheet prints WALL 1.5 MIN"
+  drawing_unit: in

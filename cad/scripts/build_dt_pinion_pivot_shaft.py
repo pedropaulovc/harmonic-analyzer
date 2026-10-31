@@ -53,6 +53,8 @@ from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
+from _document_units import apply_package_model_units
+from _part_properties import part_drawing_unit
 from dt_pinion_pivot_shaft_spec import (
     CAP_SAG,
     DRAWING_DIMENSIONS,
@@ -66,6 +68,7 @@ from dt_pinion_pivot_shaft_spec import (
     SHAFT_DIA_BAND,
     SHAFT_LEN,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 PART_NAME = "dt-pinion-pivot-shaft"
@@ -259,6 +262,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): the shaft diameter and length. The mm
     # suffix is load-bearing -- this is an INCH document and the equation manager
@@ -378,12 +382,20 @@ async def build(adapter) -> dict[str, str]:
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.
     set_dimension_bilateral_tolerance(
-        adapter, "ShaftProfile", "ShaftDia", *deviations(SHAFT_DIA_BAND)
+        adapter,
+        "ShaftProfile",
+        "ShaftDia",
+        *deviations(SHAFT_DIA_BAND),
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_BAND)
+        adapter,
+        "PinHoleProfile",
+        "PinHoleDia",
+        *deviations(PIN_HOLE_BAND),
+        display_unit=UNIT,
     )
-    apply_drawing_precision(adapter, DRAWING_PRECISION)  # lengths at .X (U27)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)  # lengths at .XX
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

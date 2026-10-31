@@ -28,6 +28,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -68,8 +69,8 @@ SECTION_LINE = (
     (FRONT_CENTER[0], FRONT_CENTER[1] - HALF_OD - 0.005),
     (FRONT_CENTER[0], FRONT_CENTER[1] + HALF_OD + 0.005),
 )
-# The 2.8 thickness text and its two-line datum callout sit right of the
-# 2.8-wide extension-line pair on the extended dimension line: centred over
+# The .11 thickness text and its two-line datum callout sit right of the
+# 2.8 mm-wide extension-line pair on the extended dimension line: centred over
 # the lines, their overshoot struck 'AND' in the callout (machinist review,
 # 2026-10-23). The ~62 mm block clears the right line by ~6 mm and stays
 # above the isometric.
@@ -150,7 +151,11 @@ async def build(adapter: Any) -> dict[str, str]:
         required=("Number", "Material Specification", "Finish", "Quantity"),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("dt-cylinder-end-disc"),
     )
     stamp_drawing_summary(
         adapter,

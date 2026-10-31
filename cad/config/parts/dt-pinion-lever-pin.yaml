@@ -8,3 +8,4 @@ dt-pinion-lever-pin:
   quantity: 1
   tolerance_class: machined_block
   process: "cut from drill rod; inserted, trimmed and peened at assembly"
+  drawing_unit: in

@@ -6,8 +6,11 @@ dt-pinion-handle:
   # cold-finished low-carbon families; the note keeps COLD-FINISHED BAR AS
   # RECEIVED, whose drawn size bounds the MHA-DT-22 bond gap.
   material: "Low-carbon steel: 1018, 1020 or 12L14"
-  material_specification: low-carbon cold-finished steel rod, 6 mm, ASTM A108 (1018, 1020 or 12L14)
+  # #290 (owner ruling): 1/4 bar replaces the 6 mm (e.g. OnlineMetals 4791,
+  # 1018 cold finish).
+  material_specification: low-carbon cold-finished steel rod, 1/4 in, ASTM A108 (1018, 1020 or 12L14)
   finish: mill bright; protect with ISO VG 32 machine-oil film
   quantity: 1
   tolerance_class: machined_block
   process: "cut and face grip crossrod; use diameter as received"
+  drawing_unit: in
