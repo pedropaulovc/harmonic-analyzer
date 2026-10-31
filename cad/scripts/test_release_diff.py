@@ -1,5 +1,6 @@
 """Offline consumers retain every historical geometry of shared vendor SKUs."""
 
+import functools
 import importlib.util
 import json
 from pathlib import Path
@@ -13,6 +14,7 @@ import trimesh
 TOOLS = Path(__file__).resolve().parents[1] / "comparisons" / "tools"
 sys.path.insert(0, str(TOOLS))
 
+import release_diff
 from release_diff import (
     HISTORICAL_IDENTITY_MAP, IDENTITY_MAP, canonical_keys, identity_inventory,
     load_identity_map, member, mesh_deviation, paired_keys,
@@ -56,12 +58,34 @@ def mesh_key(stem, configuration):
     return stem if configuration == "Default" else f"{stem}--{configuration.lower()}"
 
 
+# Every mesh these tests compare is a box (write_mesh, plus one smaller box).
+# Distance to a convex set is convex, so its maximum over a convex polytope is
+# attained at a vertex, and both deviation paths always query every vertex
+# before topping up with random surface samples. The sample count therefore
+# cannot change any value asserted here; the production default (40,000 per
+# direction) only made each comparison cost about a second of nearest-point
+# queries.
+_BOX_QUERY_POINTS = 256
+
+
+@pytest.fixture(autouse=True)
+def _box_query_points(monkeypatch):
+    monkeypatch.setattr(
+        release_diff,
+        "_query_points",
+        functools.partial(release_diff._query_points, n=_BOX_QUERY_POINTS),
+    )
+
+
 @pytest.fixture
 def render_diff(monkeypatch):
     monkeypatch.setitem(sys.modules, "osmesa_win", SimpleNamespace(enable_offscreen_gl=lambda: None))
     spec = importlib.util.spec_from_file_location("render_diff_pairing_test", TOOLS / "render_diff.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    monkeypatch.setattr(
+        module, "_hausdorff", functools.partial(module._hausdorff, n=_BOX_QUERY_POINTS)
+    )
     return module
 
 
