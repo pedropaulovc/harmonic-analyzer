@@ -365,7 +365,12 @@ def _band_uses() -> list[BandUse]:
     for path in sorted(SCRIPTS.glob("*.py")):
         if path.name.startswith("test_"):
             continue
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        text = path.read_text(encoding="utf-8")
+        # Every matched call spells one of these names in its source; parsing
+        # only the files that do yields the same uses for a fraction of the cost.
+        if not any(name in text for name in (*_BAND_HELPERS, _SETTER)):
+            continue
+        tree = ast.parse(text, filename=str(path))
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
@@ -503,7 +508,10 @@ def _inventory() -> list[tuple[str, str]]:
             or stem.endswith(("_spec", "_geometry", "_geom"))
         ):
             continue
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        text = path.read_text(encoding="utf-8")
+        if "_BAND" not in text:
+            continue  # no assignment target can end in _BAND/_BANDS/_BAND_MM
+        tree = ast.parse(text, filename=str(path))
         for node in tree.body:
             targets = (
                 node.targets
