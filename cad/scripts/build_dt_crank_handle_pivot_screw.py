@@ -31,8 +31,10 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import (
     active_configuration_name,
@@ -64,9 +66,7 @@ from dt_crank_handle_pivot_screw_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     HEAD_DIA,
-    HEAD_DIA_TOL,
     HEAD_LENGTH,
-    HEAD_LENGTH_TOL,
     INSTALLED_CONFIG,
     INSTALLED_THREAD_LENGTH,
     INSTALLED_TIP_CHAMFER,
@@ -83,7 +83,6 @@ from dt_crank_handle_pivot_screw_spec import (
     SHOULDER_DIA_BAND,
     SHOULDER_LENGTH,
     SLOT_DEPTH,
-    SLOT_DEPTH_TOL,
     SLOT_WIDTH,
     SURFACE_FINISHES,
     THREAD_LENGTH,
@@ -91,6 +90,7 @@ from dt_crank_handle_pivot_screw_spec import (
     THREAD_MODEL_DIA,
     TIP_CHAMFER,
     TIP_CHAMFER_BAND,
+    UNIT,
 )
 
 
@@ -152,6 +152,8 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # The mm suffix is load-bearing: the equation manager reads bare numbers in
     # document units (see build_dt_crankshaft).
     for name, value in (
@@ -429,34 +431,31 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven slotted screw (equations neutral)", V_FINAL, 0.02 * V_SLOT
     )
 
-    # Model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the running-fit shoulder and its
-    # length, and the thread length that must stay inside the 8.0 arm.
+    # Model-owned bands (drawing-simplicity-policy.md `How the repository
+    # implements the guidelines`): the running-fit shoulder, the tip chamfer
+    # the MHA-DT-32 re-review found could print as nothing, the relief
+    # diameter that keeps the die's run-out under the thread root and a flat
+    # seat (Codex P1 on #1139), the relief lead that prints as limits in the
+    # relief callout (the model owning its band all the same, Codex P2), and
+    # the thread length that must engage the arm.  The head and slot sizes
+    # print under the title block's bands.
     set_dimension_bilateral_tolerance(
-        adapter, "ScrewProfile", "ShoulderDia", *deviations(SHOULDER_DIA_BAND)
-    )
-    set_dimension_symmetric_tolerance(adapter, "ScrewProfile", "HeadDia", HEAD_DIA_TOL)
-    # The head length keeps the head below the MHA-DT-35 face at the widest
-    # end play (Codex P2 on #1139).
-    set_dimension_symmetric_tolerance(
-        adapter, "ScrewProfile", "HeadLength", HEAD_LENGTH_TOL
-    )
-    # The two small features the MHA-DT-32 re-review found could print as
-    # nothing at .X: the tip chamfer and the slot depth.
-    set_dimension_bilateral_tolerance(
-        adapter, "ScrewProfile", "TipChamfer", *deviations(TIP_CHAMFER_BAND)
-    )
-    set_dimension_symmetric_tolerance(adapter, "DriverSlot", "SlotDepth", SLOT_DEPTH_TOL)
-    # The relief diameter keeps the die's run-out under the thread root and a
-    # flat seat (Codex P1 on #1139); the relief lead prints as limits in the
-    # relief callout, the model owning its band all the same (Codex P2).
-    set_dimension_symmetric_tolerance(
-        adapter, "ScrewProfile", "ReliefDia", RELIEF_DIA_TOL
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "ScrewProfile", "ReliefLead", RELIEF_LEAD_TOL
+        adapter, "ScrewProfile", "ShoulderDia", *deviations(SHOULDER_DIA_BAND),
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "ScrewProfile", "ThreadLength", *deviations(THREAD_LENGTH_BAND)
+        adapter, "ScrewProfile", "TipChamfer", *deviations(TIP_CHAMFER_BAND),
+        display_unit=UNIT,
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "ScrewProfile", "ReliefDia", RELIEF_DIA_TOL, display_unit=UNIT
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "ScrewProfile", "ReliefLead", RELIEF_LEAD_TOL, display_unit=UNIT
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "ScrewProfile", "ThreadLength", *deviations(THREAD_LENGTH_BAND),
+        display_unit=UNIT,
     )
 
     # Every model edit -- the material, the appearance, the drawing marks, the

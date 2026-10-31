@@ -7,3 +7,4 @@ dt-crank-pin:
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: "machined (steel)"
+  drawing_unit: in

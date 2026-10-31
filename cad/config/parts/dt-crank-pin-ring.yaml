@@ -1,8 +1,9 @@
 dt-crank-pin-ring:
   number: MHA-DT-27
   material: Brass
-  material_specification: C26000 brass wire
+  material_specification: C26000 brass wire, .040 in
   finish: "bright"
   tolerance_class: visual_noncritical
   quantity: 1
   process: "formed brass wire, ends silver-soldered"
+  drawing_unit: in

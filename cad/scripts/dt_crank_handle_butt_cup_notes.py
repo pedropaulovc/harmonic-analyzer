@@ -18,6 +18,13 @@ from dt_crank_handle_butt_cup_spec import (
     POCKET_CLEARANCE,
     POCKET_DIA_MAX,
 )
+from _title_block_units import MM_PER_INCH, render_number
+
+
+def inch_text(value_mm: float, places: int) -> str:
+    """``value_mm`` as this sheet prints it: ``.257``."""
+    return render_number(round(value_mm / MM_PER_INCH, places), "in", places)
+
 
 # The mating parts, quoted only to identify them (rule 7); the offline test
 # checks them against the registry.
@@ -34,9 +41,10 @@ BODY_FIT_CALLOUT = f"EPOXY FIT IN {HANDLE_NUMBER}"
 POCKET_FIT_CALLOUT = "\n".join(
     (
         f"BORE TO SUIT {SCREW_NUMBER}",
-        f"{SCREW_NAME} HEAD, {POCKET_CLEARANCE[0]:.1f}-{POCKET_CLEARANCE[1]:.1f}",
+        f"{SCREW_NAME} HEAD, {inch_text(POCKET_CLEARANCE[0], 3)}-"
+        f"{inch_text(POCKET_CLEARANCE[1], 3)}",
         "DIAMETRAL CLEARANCE,",
-        f"<MOD-DIAM>{POCKET_DIA_MAX:.1f} MAX",
+        f"<MOD-DIAM>{inch_text(POCKET_DIA_MAX, 3)} MAX",
     )
 )
 # The depth band's mate and reason (r1 finding 4).  The floor corner's
