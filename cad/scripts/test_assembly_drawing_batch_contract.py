@@ -389,7 +389,7 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
     monkeypatch.setattr(
         _assembly_drawing,
         "new_project_drawing",
-        lambda _adapter, *, layout, scale: calls.append(("new", layout, scale)),
+        lambda _adapter, *, layout, scale, unit: calls.append(("new", layout, scale)),
     )
 
     def place(_adapter, path, name, x, y, *, scale):
