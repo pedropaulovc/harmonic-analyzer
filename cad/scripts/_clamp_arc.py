@@ -28,8 +28,10 @@ from typing import Any
 from _appearance import PANEL_BLACK, apply_color, apply_material
 from _check import check
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _rebuild import force_rebuild
 from _sketch import (
     SketchDims,
@@ -44,10 +46,10 @@ from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
 from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
 
-ARC_WIDTH = 48.0  # lateral (Z) span, ear tip to ear tip (old collar OD)
-ARC_HALF_H = 8.0  # 16 tall along the column, like the old one-piece collar
-COLUMN_BORE = 25.6  # half-cylinder relief: slides on the Ø25.4 column
-EAR_HOLE_Z = 17.5  # ear screw line flanks the column (ch30 p002 heads)
+ARC_WIDTH = 48.006  # 1.890: lateral (Z) span, ear tip to ear tip (old collar OD)
+ARC_HALF_H = 8.001  # .315: .630 tall along the column, like the old one-piece collar
+COLUMN_BORE = 25.6032  # 1.008: half-cylinder relief: slides on the Ø1.000 column
+EAR_HOLE_Z = 17.5006  # .689: ear screw line flanks the column (ch30 p002 heads)
 MATERIAL = "Gray Cast Iron"  # black casting (ch30 p005)
 
 # Ear-hole placement contract, per ear ((x name, drive), (y name, drive)) in
@@ -102,6 +104,7 @@ async def build_arc(
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(part_name), label=part_name)
 
     # Editable knobs (Tools > Equations). mm suffix is load-bearing -- INCH
     # document, the equation manager reads bare numbers in document units.

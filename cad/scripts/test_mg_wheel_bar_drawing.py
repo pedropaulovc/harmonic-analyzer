@@ -43,7 +43,7 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
     # read; the extra height lies below it.
     assert geom.BAR_TOP_ABOVE_ROW == 5.0
     assert geom.BORE_ROW_HEIGHT == geom.BAR_SIDE - geom.BAR_TOP_ABOVE_ROW == 6.0
-    assert geom.CLAMP_HOLE_X == (70.5, 105.5)
+    assert geom.CLAMP_HOLE_X == (70.4994, 105.5006)
     assembly = (
         Path(part.__file__)
         .with_name("build_mg_magnifier_assembly.py")
@@ -94,7 +94,7 @@ def test_screw_hole_stations_are_model_dimensions_from_the_left_end() -> None:
     assert geom.CLAMP_STATIONS == pytest.approx(
         tuple(x - left_end for x in geom.CLAMP_HOLE_X)
     )
-    assert geom.CLAMP_STATIONS == (187.5, 222.5)
+    assert geom.CLAMP_STATIONS == pytest.approx((187.4994, 222.5006))
 
 
 def test_station_rows_stack_shortest_nearest_under_the_bar() -> None:

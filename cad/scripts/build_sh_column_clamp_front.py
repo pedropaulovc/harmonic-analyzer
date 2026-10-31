@@ -2,10 +2,10 @@ r"""Reproduction script: column clamp, FRONT semi-arc (book ch. 21/22, ch30).
 
 The bar-side half of the two-piece black collar clamping the platen support
 bar to each front column (ch30 p005 quarter view): its front face carries the
-bar's back face, its relief wraps the column's front half, and the two O4.4
+bar's back face, its relief wraps the column's front half, and the two Ø.196
 ear holes pass the clamp screws whose heads show on the bar front (ch30
-p002). Depth 17.4 spans bar back (machine z -129.4) to the column-axis plane
-(z -112). Geometry: _clamp_arc.py; layout: memory/paper-drive-rework.md E2.
+p002). Depth .685 spans the bar back face to the column-axis plane. Geometry:
+_clamp_arc.py; layout: memory/paper-drive-rework.md E2.
 
 Run (SolidWorks already open)::
 
@@ -36,13 +36,14 @@ from sh_column_clamp_front_spec import (
     EAR_STATION_BAND,
     EAR_STATION_DIMENSIONS,
     ISOMETRIC_VIEW_NOTE,
+    UNIT,
 )
 
 PART_NAME = "sh-column-clamp-front"
 
 DEPTH = ARC_DEPTH  # bar back face to the column-axis plane
-# The O3.9 clamp-screw shanks PASS THROUGH here (front arc = bar side):
-# #8 clearance (normal fit Ø4.978; nearest UNC to the ~Ø4 screw).
+# The Ø.164 clamp-screw shanks PASS THROUGH here (front arc = bar side):
+# #8 clearance (normal fit Ø.196; nearest UNC to the ~Ø4 screw).
 
 
 async def build(adapter) -> dict[str, str]:
@@ -60,10 +61,14 @@ async def build(adapter) -> dict[str, str]:
     # the print's dimensions and stamp the make-critical title-block properties.
     for dimension_name in EAR_STATION_DIMENSIONS:
         set_dimension_symmetric_tolerance(
-            adapter, "EarHoles", dimension_name, EAR_STATION_BAND
+            adapter, "EarHoles", dimension_name, EAR_STATION_BAND, display_unit=UNIT
         )
     set_dimension_symmetric_tolerance(
-        adapter, EAR_HEIGHT_REFERENCE, EAR_HEIGHT_DIMENSION, EAR_HEIGHT_BAND
+        adapter,
+        EAR_HEIGHT_REFERENCE,
+        EAR_HEIGHT_DIMENSION,
+        EAR_HEIGHT_BAND,
+        display_unit=UNIT,
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

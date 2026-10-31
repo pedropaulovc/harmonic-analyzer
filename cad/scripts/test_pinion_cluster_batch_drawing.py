@@ -543,7 +543,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "sh-column-clamp-back",
                 4.1656,
                 3.454,
-                4.35,
+                4.342,
             ),
             frozenset(("sh-vn-thumb-screw-1", "mg-magnifying-clamp-1")): (
                 _mg_clamp_thumb_limit()
