@@ -31,8 +31,14 @@ SPEC = DRAWINGS_BY_NAME["fr_vn_lag_screw"]
 # The footer's ITEM row: the catalogue designation in plain text. The stem's
 # "lag" is historical: this is a machine screw, so the row says so outright.
 ITEM = "1/4-20 x 3/4 HEX HEAD MACHINE SCREW, FULLY THREADED (NOT A LAG)"
-# The Ø/thread text is wider than the shank: shelve it right of its witnesses.
-SHELVES = {"SupplierThreadDiameter": (True, "right")}
+# Each of these spans is shorter than its text, so the witnesses ran through
+# it: shelve the text past its outer witness (farm proof 20261031T195237722Z
+# cleared the thread shelf; the head height and width text still collided).
+SHELVES = {
+    "SupplierHeadHeight": (False, "left"),
+    "SupplierThreadDiameter": (True, "right"),
+    "SupplierHeadWidth": (True, "right"),
+}
 
 
 def _origin_drop(adapter: Any, front: Any, right: Any) -> float:

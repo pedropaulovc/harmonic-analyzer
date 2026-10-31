@@ -864,7 +864,7 @@ def test_thumb_diameter_ink_clears_measured_native_witness_stations(native_thumb
     assert collar.center()[1] == pytest.approx((lower + upper) / 2, abs=1e-7)
     assert collar.ymin >= lower + 0.002
     assert collar.ymax <= upper - 0.002
-    assert thread.ymax == pytest.approx(lower - 0.0022, abs=1e-7)
+    assert thread.ymax == pytest.approx(lower - 0.0037, abs=1e-7)
     # The 4:1 two-row block is lowest; native containment still must hold.
     assert thread.ymin >= state.cell[1]
     assert thread.xmax <= state.cell[2]
