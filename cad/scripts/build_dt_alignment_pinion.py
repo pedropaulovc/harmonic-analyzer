@@ -172,15 +172,15 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven alignment pinion (equations neutral)", expected, 0.02 * v_bore
     )
     # The printed tip band rides the side-view witness, not the Front-plane
-    # blank circle that only drives the solid.  Both bands print at their
-    # nominal's places (+0.00/-0.10), authored here so the .SLDPRT is the one
-    # source the drawing imports (Codex P1 on #1647).
+    # blank circle that only drives the solid.  The bore band prints at its
+    # nominal's places; the inch tip band (0/-0.1016) needs four, so its places
+    # stay automatic (#290 batch 0).  Both are authored here so the .SLDPRT is
+    # the one source the drawing imports (Codex P1 on #1647).
     set_dimension_bilateral_tolerance(
         adapter,
         "OutsideDiaReference",
         "OutsideDia",
         *deviations(OUTSIDE_DIA_BAND),
-        places=DRAWING_PRECISION[OUTSIDE_DIA_REFERENCE]["OutsideDia"],
     )
     set_dimension_bilateral_tolerance(
         adapter,
