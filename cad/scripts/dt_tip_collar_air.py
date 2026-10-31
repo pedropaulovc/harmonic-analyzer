@@ -200,7 +200,7 @@ _ANGULAR_RAD = math.radians(float(_config.title_block("angular")["value_deg"]))
 _POST_FLOAT = (post.ATTACHMENT_THRU_DIA + _DRILL_PLUS - plate.POST_MOUNT_THREAD_DIA) / 2.0
 _TIP_FLOAT = (plate.HOLDDOWN_CLEARANCE_DIA + _DRILL_PLUS - holddown_screw.SHANK_DIA) / 2.0
 _JOURNAL_FLOAT = (
-    post.BORE_DIA + post.RUNNING_BORE_BAND[0] - shaft.JOURNAL_DIA - shaft.RUNNING_DIA_BAND[1]
+    post.BORE_DIA + post.JOURNAL_BORE_BAND[0] - shaft.JOURNAL_DIA - shaft.RUNNING_DIA_BAND[1]
 ) / 2.0
 _MOUNT_X_BAND = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["MountWestX"])
 _SIN_I, _COS_I = cone_line.SIN_I, cone_line.COS_I

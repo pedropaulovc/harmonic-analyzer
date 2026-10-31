@@ -75,7 +75,7 @@ def seam_callout(mate: str, pin: str = "MHA-DT-VN-59") -> str:
 # reference restatement.
 BORE_CALLOUT = (
     "REAM THRU\n"
-    f"({SHAFT_CLEARANCE_MIN:.3f}-{SHAFT_CLEARANCE_MAX:.3f} DIAMETRAL\n"
+    f"({SHAFT_CLEARANCE_MIN:.4f}-{SHAFT_CLEARANCE_MAX:.4f} DIAMETRAL\n"
     "CLEARANCE ON MHA-DT-11)"
 )
 # The arm bore is made first and carries the band; this seat is turned to fit

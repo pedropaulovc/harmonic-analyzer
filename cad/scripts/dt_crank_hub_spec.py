@@ -85,9 +85,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         # on the floated T12; 0.08 at .X).
         "ReliefDia": 2,
     },
-    # Two places, as its +0.03/0.00 band prints: a third place changed no
-    # limit (review of farm run 20261101T111956470Z).
-    "BoreProfile": {"BoreDia": 2},
+    # Four places: the .376 in nominal is 9.5504 mm, off the mm grid.
+    "BoreProfile": {"BoreDia": 4},
     # Two places: the .XX band is what keeps the MHA-DT-09 ream's ligament to
     # the arm shoulder at 2.1 mm (dt_crank_hub_geometry, drawing-guidelines.md rule 17 (walls and webs)).
     "ServicePinStationReference": {"ServicePinFromShoulder": 2},

@@ -362,8 +362,10 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
             if precision_cite:
                 feature["cite"][f"precision.{key}"] = list(dict.fromkeys([*call, *precision_cite]))
             if key in feature["cite"] and isinstance(feature.get(key), list) and len(feature[key]) == 2:
-                tolerance = "angular.value_deg" if key.endswith("_deg") else f"linear_{feature['precision'][key]}pl.band_mm"
-                feature["cite"][key] += _title_cite(tolerance, "drilled_hole.plus_mm", "drilled_hole.minus_mm")
+                places = feature["precision"][key]
+                # A size finer than the title block's .XXX row carries its own band.
+                general = ("angular.value_deg",) if key.endswith("_deg") else (f"linear_{places}pl.band_mm",) if places <= 3 else ()
+                feature["cite"][key] += _title_cite(*general, "drilled_hole.plus_mm", "drilled_hole.minus_mm")
         if "finish_ra" in feature:
             if isinstance(feature.get("precision"), dict):
                 feature["precision"]["finish_ra"] = _finish_precision()

@@ -141,7 +141,7 @@ DETAIL_AXIS_MIN_DOT = 0.999
 NOTE_CENTRING_TOL_M = 0.001
 NOTE_CENTRING_PASSES = 2
 # The head diameter lives in an end-on Front-plane profile sketch, so the
-# end-on donor imports it and it moves onto the 1:1 profile.  The Ø8 is
+# end-on donor imports it and it moves onto the 1:1 profile.  The Ø5/16 is
 # dimensioned on the profile itself, from the bond zone's flank.  The neck
 # diameter is imported straight into detail A (see DETAIL_KEEP).
 DONOR_KEEP = {
@@ -263,7 +263,7 @@ FRONT_JOURNAL_DIA_X = FRONT_JOURNAL_DIA_POINT_X - JOURNAL_DIA_LINE_OFFSET
 # head end and the drum station's text, a gap over the drum station's block
 # and 10 mm short of the front land's.  Above the shaft (r1 of #1685) the
 # two-line callout naming its scope and drum no longer fit under detail A.
-# Its lines name every Ø8 span but the lands, so it no longer reads as the
+# Its lines name every Ø5/16 span but the lands, so it no longer reads as the
 # front "JOURNAL" shelf's pair (Main and Fable, 63468ee9).  Its arrows sit
 # inside the flanks (ARROWS_INSIDE): an outside tail would rise into the back
 # Ra symbol over the shaft.  r3 added a third line (the drum's ends on the
@@ -272,7 +272,7 @@ FRONT_JOURNAL_DIA_X = FRONT_JOURNAL_DIA_POINT_X - JOURNAL_DIA_LINE_OFFSET
 BOND_ZONE_TEXT_XY = (_sheet_x(BOND_ZONE_DIA_Z), 0.1474)
 # The drum-station and bond-zone reference sketches stand alone, so the
 # profile shows them, and each ends on a short construction witness lying ON
-# the lower Ø8 outline.  The view paints that witness construction grey over
+# the lower Ø5/16 outline.  The view paints that witness construction grey over
 # the black silhouette, which at 1:1 read as a break in the outline, i.e. a
 # groove or relief to a machinist (Main, 5471a6ef).  Each is re-coloured in
 # the view to the outline's black; the model sketch and its dimension are
@@ -467,7 +467,7 @@ def _detail_x(model_z: float) -> float:
 
 DIMENSION_CALLOUTS = {
     # One name for the axial datum every station runs from (Fable m1): the
-    # head end has two shoulders, Ø8-Ø10.5 and Ø10.5-Ø15.
+    # head end has two shoulders, Ø5/16-Ø10.5 and Ø10.5-Ø15.
     # <MOD-DIAM> carries its own leading gap, so no space before it.
     "BackRimFromHeadRear": f"FROM BACK CROWN ROOT TO<MOD-DIAM>{HEAD_DIA:.0f} HEAD REAR FACE",
     "DrumStationFromHeadRear": DRUM_STATION_CALLOUT,
@@ -961,7 +961,7 @@ def _label_detail(
 def _add_turning_axis(adapter: Any, view: Any) -> None:
     """Draw one centreline over the whole turned axis.
 
-    The journal split lines cut the Ø8 cylinder into five faces, so a
+    The journal split lines cut the Ø5/16 cylinder into five faces, so a
     face-derived ``InsertCenterLine2`` would cover a single zone.  The axis is
     instead a view-sketch centreline between two model points on it, created
     direct-to-database so screen-space inference cannot snap an end onto the
@@ -1129,9 +1129,9 @@ def _assert_outline_unbroken(
             f"{name}: {len(columns)} column(s) from x={columns[0]} px"
             for name, columns in broken.items()
         )
-        raise RuntimeError(f"pinion-arbor: Ø8 outline broken over reference witness: {detail}")
+        raise RuntimeError(f"pinion-arbor: Ø5/16 outline broken over reference witness: {detail}")
     _telemetry.info(
-        f"pinion-arbor: Ø8 outline unbroken over {len(spans)} reference witnesses",
+        f"pinion-arbor: Ø5/16 outline unbroken over {len(spans)} reference witnesses",
         witnesses=len(spans),
     )
 

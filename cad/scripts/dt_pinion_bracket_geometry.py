@@ -37,7 +37,7 @@ THICKNESS = 9.0
 THICKNESS_PLACES = 1  # Depth prints .X (dt_pinion_bracket_spec.DRAWING_PRECISION)
 THICKNESS_BAND = printed_band_mm(THICKNESS_PLACES)  # 0.8; the rig's stack reads it
 PIVOT_BORE = 6.35
-ARBOR_BORE = 8.0
+ARBOR_BORE = 7.9375  # 5/16 in, REAM_SLIDE on the MHA-DT-22 arbor
 PIN_BORE = 4.0
 PIN_DROP = -7.0  # NEGATIVE: the stud seat is 7 ABOVE the pivot bore (on the
 # straight flank).  U28 raised it from 6: the O4 seat keeps a 2.4 mm worst-case

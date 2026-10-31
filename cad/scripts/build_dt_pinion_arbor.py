@@ -108,7 +108,7 @@ V_HEAD = math.pi * HEAD_R**2 * HEAD_LEN
 V_FRONT_CAP = math.pi * HEAD_CAP_SAG**2 * (3.0 * HEAD_CAP_R - HEAD_CAP_SAG) / 3.0
 V_BACK_CAP = math.pi * BACK_CAP_SAG**2 * (3.0 * BACK_CAP_R - BACK_CAP_SAG) / 3.0
 # Split lines reach this far past the shaft flank so the projection crosses
-# the whole Ø8 face on both sides of the Top plane.
+# the whole Ø5/16 face on both sides of the Top plane.
 SPLIT_OVERHANG = 2.0
 JOURNAL_AREA = math.pi * SHAFT_DIA * JOURNAL_LEN
 # Each land's diameter is measured at a short construction witness this far
@@ -120,7 +120,7 @@ JOURNAL_AREA = math.pi * SHAFT_DIA * JOURNAL_LEN
 JOURNAL_DIA_POINT_FROM_CROWN_END = 2.0
 JOURNAL_DIA_POINT_LEN = 1.0
 # The drum station has no feature on the shaft, so its far end is a short
-# construction witness ON THE Ø8 FLANK (sketch +x, the sheet's lower flank
+# construction witness ON THE Ø5/16 FLANK (sketch +x, the sheet's lower flank
 # under the -90 deg *Top profile), not a point on the axis: from the axis its
 # sheet witness drew a 4 mm stub inside the silhouette that read as a step a
 # machinist might cut (Main, c3419623).
@@ -274,7 +274,7 @@ async def _add_journal_land(
     journal_z: float,
     station_expression: str,
 ) -> list[tuple[str, str]]:
-    """Split one MHA-DT-14 journal land off the Ø8 shaft and dimension it.
+    """Split one MHA-DT-14 journal land off the Ø5/16 shaft and dimension it.
 
     One Top-plane sketch owns the land: two real cross lines at its ends
     (projected both ways they cut the cylinder into its own face), a
@@ -402,7 +402,7 @@ async def _add_journal_land(
     name_last_feature(adapter, feature_name)
     drive_jobs = dims.apply(adapter, feature_name)
 
-    # Projected split line: the sketch at mark 4, the Ø8 face it cuts at mark 1.
+    # Projected split line: the sketch at mark 4, the Ø5/16 face it cuts at mark 1.
     before = len(_shaft_faces(adapter))
     target = _journal_face(adapter, prefix, journal_z)
     model = _early_bound(adapter.currentModel, "IModelDoc2")
@@ -415,7 +415,7 @@ async def _add_journal_land(
     selection_data = _early_bound(selection_manager.CreateSelectData(), "ISelectData")
     selection_data.Mark = 1
     if not _early_bound(target, "IEntity").Select4(True, selection_data):
-        raise RuntimeError(f"{feature_name}: failed to select the Ø8 shaft face")
+        raise RuntimeError(f"{feature_name}: failed to select the Ø5/16 shaft face")
     previous = feature_name_by_type(adapter, "PLine")
     model.InsertSplitLineProject(False, False)  # both directions: a full ring
     model.ClearSelection2(True)
@@ -426,7 +426,7 @@ async def _add_journal_land(
     after = len(_shaft_faces(adapter))
     if after != before + 2:
         raise RuntimeError(
-            f"{prefix}Split: Ø8 shaft faces went {before} -> {after}; "
+            f"{prefix}Split: Ø5/16 shaft faces went {before} -> {after}; "
             "expected the land split off as its own face"
         )
     area = float(_early_bound(_journal_face(adapter, prefix, journal_z), "IFace2").GetArea())
@@ -437,7 +437,7 @@ async def _add_journal_land(
             f"{JOURNAL_AREA:.1f} mm^2"
         )
     _telemetry.success(
-        f"{prefix}Split: Ø8 shaft faces {before} -> {after}, land {area_mm2:.1f} mm^2",
+        f"{prefix}Split: Ø5/16 shaft faces {before} -> {after}, land {area_mm2:.1f} mm^2",
         faces=after,
         land_area_mm2=area_mm2,
     )
@@ -445,7 +445,7 @@ async def _add_journal_land(
 
 
 async def _add_bond_zone_reference(adapter) -> list[tuple[str, str]]:
-    """Dimension the Ø8 bond zone on its own flank, like a journal land.
+    """Dimension the Ø5/16 bond zone on its own flank, like a journal land.
 
     A Top-plane sketch with no model geometry: the turning axis from the head
     shoulder to the bond-zone station, a construction witness on the flank
@@ -792,7 +792,7 @@ async def build(adapter) -> dict[str, str]:
     expected += V_BACK_CAP
     await volume_check(adapter, "back crown", expected, 0.03 * V_BACK_CAP)
 
-    # R1a: the MHA-DT-33 collar's 1/16 in spring-pin hole, through the Ø8 on
+    # R1a: the MHA-DT-33 collar's 1/16 in spring-pin hole, through the Ø5/16 on
     # the crossrod's local Y (one V-block setup drills both cross holes).
     pin_hole = SketchDims()
     check("create_sketch collar pin hole", await adapter.create_sketch("Top"))
@@ -884,7 +884,7 @@ async def build(adapter) -> dict[str, str]:
         station_expression='"BackJournalFromHeadRear"',
     )
     if len(_shaft_faces(adapter)) != 5:
-        raise RuntimeError("the Ø8 shaft must read as two journal lands and three plain zones")
+        raise RuntimeError("the Ø5/16 shaft must read as two journal lands and three plain zones")
     drive_jobs += await _add_bond_zone_reference(adapter)
 
     await force_rebuild(adapter)
