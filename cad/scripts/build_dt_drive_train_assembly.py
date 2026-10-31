@@ -3803,7 +3803,9 @@ def _lower(value: float, places: int) -> float:
 
 ARBOR_SOUTH_TRAVEL_STACK = {
     **RIG.DRUM_BACK_ADVANCE_STACK,
-    "MHA-DT-01 drum length .X (longest)": _upper(RIG.DRUM_LEN, RIG.DRUM_LEN_PLACES),
+    "MHA-DT-01 drum length .XX (longest)": printed_deviations(
+        RIG.DRUM_LEN, RIG.DRUM_LEN_PLACES, unit=RIG.DRUM_LEN_UNIT
+    )[1],
     "MHA-DT-22 drum station .X (deepest)": ARBOR_DRUM_STATION_BAND,
 }
 ARBOR_NORTH_TRAVEL_STACK = {

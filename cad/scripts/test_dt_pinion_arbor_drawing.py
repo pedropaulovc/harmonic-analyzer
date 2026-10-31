@@ -885,6 +885,7 @@ def test_journal_lands_cover_their_straps_in_the_pose() -> None:
         start = assembly.ARBOR_Z0 + land_z
         margins += [lo - start, start + spec.JOURNAL_LEN - hi]
     assert min(margins) >= spec.MIN_LAND_OVER_STRAP
+
     source = inspect.getsource(assembly)
     assert "falls short of the back strap" not in source
     assert "journal land misses its strap" in source
