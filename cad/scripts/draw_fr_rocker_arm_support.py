@@ -940,6 +940,7 @@ async def build(adapter: Any) -> dict[str, str]:
         datum_point=datum_point,
         expected_locations_mm=EXPECTED_HOLE_TABLE_LOCATIONS_MM,
         unit=part_drawing_unit(PART_STEM),
+        location_places=3,
         datum_axes=datum_axes,
         anchor_xy=HOLE_TABLE_ANCHOR,
         basic_locations=False,

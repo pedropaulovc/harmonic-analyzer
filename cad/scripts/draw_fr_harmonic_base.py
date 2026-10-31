@@ -2289,6 +2289,7 @@ async def build(adapter: Any) -> dict[str, str]:
         basic_locations=False,
         label="harmonic-base mounting",
         unit=UNIT,
+        location_places=3,
     )
     hole_feature = _early_bound(
         _early_bound(hole_table, "IHoleTableAnnotation").HoleTable, "IHoleTable"
