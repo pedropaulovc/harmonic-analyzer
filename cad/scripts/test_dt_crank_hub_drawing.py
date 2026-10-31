@@ -353,21 +353,24 @@ def test_side_view_lies_as_in_the_lathe_with_one_outboard_baseline() -> None:
     assert drawing.END_CENTER[0] > drawing.OUTBOARD_X  # third-angle right view
     assert drawing.END_CENTER[1] == drawing.SIDE_CENTER[1]
     # Seat from the faced end, the pin station from the shoulder (drawing-guidelines.md rule 11 (turned parts read like the lathe)
-    # ), the relief from the rear face on one row; the toleranced overall,
-    # front face to rear face, on the row below.  No chained barrel length.
+    # ), the relief from the rear face below the profile; the toleranced
+    # overall, front face to rear face, on the row below.  No chained barrel
+    # length.  The seat and station row stands above the relief's, clear of
+    # the overall's stacked band (farm run 20261031T205208603Z).
     seat_row = drawing.SIDE_KEEP["SeatLength"][1]
     assert drawing.SIDE_KEEP["ServicePinFromShoulder"][1] == seat_row
-    assert drawing.SIDE_KEEP["ReliefLength"][1] == seat_row
+    relief_row = drawing.SIDE_KEEP["ReliefLength"][1]
     overall_row = drawing.SIDE_KEEP["HubLength"][1]
-    assert seat_row < drawing.BARREL_BOTTOM and seat_row - overall_row >= 0.010
+    assert seat_row < drawing.BARREL_BOTTOM and seat_row - overall_row >= 0.016
+    assert seat_row > relief_row and relief_row - overall_row >= 0.010
     assert "BarrelLength" not in drawing.SIDE_KEEP
     printed = {
         name for names in dt_crank_hub_spec.DRAWING_DIMENSIONS.values() for name in names
     }
     assert "BarrelLength" not in printed and "HubLength" in printed
     assert drawing.SHOULDER_X > drawing.SERVICE_PIN_CENTER[0] > drawing.RELIEF_X
-    # The relief's toleranced length and the pin station share the seat row
-    # without their text meeting (~2.5 mm per character).
+    # The relief's toleranced length and the pin station sit 6 mm apart in
+    # height, so their text must not meet across (~2.5 mm per character).
     relief_right = drawing.SIDE_KEEP["ReliefLength"][0] + len("3.60±0.05") * 0.00125
     pin_left = drawing.SIDE_KEEP["ServicePinFromShoulder"][0] - len("5.60") * 0.00125
     assert relief_right < pin_left

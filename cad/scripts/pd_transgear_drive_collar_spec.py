@@ -182,9 +182,11 @@ STUD_D_BORE_AIR = min(
 # Keep one full manufacturing-tolerance span beyond the actual shaft corner
 # envelope, without spending favourable neck/bore air to shrink the entry.
 # This derives the inherited .200 nominal / .150.. .250 controlled size
-# from the mating geometry; its explicit band and three-place PMI are unchanged.
+# from the mating geometry; its explicit band is unchanged.  It prints at
+# two places: a third place on a 0.10-wide band adds nothing (machinist
+# review of main 31cea0b73).
 BORE_ENTRY_BREAK_BAND = (0.050, -0.050)
-BORE_ENTRY_BREAK_PLACES = 3
+BORE_ENTRY_BREAK_PLACES = 2
 BORE_ENTRY_BREAK = round(
     FRONT_CORNER_RADIUS_MAX
     + max(BORE_ENTRY_BREAK_BAND) - min(BORE_ENTRY_BREAK_BAND),
@@ -489,8 +491,10 @@ PIN_HOLE_CALLOUT = f"2X REAM THROUGH\nPRESS FIT, DRIVE\nDOWEL {DOWEL_NUMBER}"
 # The dowels must enter the sprocket's drilled holes, which carry the same
 # location band (_sprocket_seat_geometry.DRIVE_PIN_OFFSET_TOL).
 PIN_LOCATION_CALLOUT = f"LOCATES SPROCKET\n{SPROCKET_NUMBER}"
-PILOT_DIA_CALLOUT = f"CLEARS SPROCKET\n{SPROCKET_NUMBER} BORE"
-OD_CALLOUT = f"CLEARS #25 CHAIN ON\n{SPROCKET_NUMBER} T12"
+# Three short lines each: the two blocks stand side by side right of the
+# pilot face, and two-line blocks met (farm run 20261031T205208603Z).
+PILOT_DIA_CALLOUT = f"CLEARS\nSPROCKET\n{SPROCKET_NUMBER} BORE"
+OD_CALLOUT = f"CLEARS #25\nCHAIN ON\n{SPROCKET_NUMBER} T12"
 # The rear D entry clears the shaft's root corner so the rear face seats on
 # F; it is cut on the rear end only, after that face is faced to fit.
 BORE_ENTRY_BREAK_CALLOUT = (

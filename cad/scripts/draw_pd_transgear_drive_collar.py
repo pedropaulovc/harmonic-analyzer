@@ -110,7 +110,9 @@ _PILOT_X = _SEAT_X + PILOT_LENGTH * _S / 1000.0
 # under them: between them its arrows sit outside the 8.7 mm span and their
 # tails struck both (run 20261010T001620278Z). Each pin location reads left
 # of the view, its text toward the outer witness so its mate lines stay
-# between the witnesses and clear of the rim.
+# between the witnesses and clear of the rim. The -Y text's top line stands
+# clear under the axis, where the +Y dimension line starts (run
+# 20261031T205208603Z: that line struck it).
 _BORE_TEXT_HALF = 0.017
 _PIN_TEXT_HALF = 0.022
 END_KEEP = {
@@ -118,7 +120,7 @@ END_KEEP = {
     "FlatToAxis": (END_CENTER[0] + HALF_OD + 0.017, END_CENTER[1] - 0.0215),
     "PinPosDia": (END_CENTER[0] - 0.018 - _PIN_TEXT_HALF, END_CENTER[1] + 0.061),
     "PinPosY": (END_CENTER[0] - HALF_OD - 0.025, END_CENTER[1] + PIN_R * 0.65),
-    "PinNegY": (END_CENTER[0] - HALF_OD - 0.025, END_CENTER[1] - PIN_R * 0.35),
+    "PinNegY": (END_CENTER[0] - HALF_OD - 0.025, END_CENTER[1] - PIN_R * 0.35 - 0.006),
 }
 # SolidWorks prints "SECTION A-A / SCALE 4:1" under the section, its top
 # 16.6 mm under the view's lower edge and centred on it (measured on run
