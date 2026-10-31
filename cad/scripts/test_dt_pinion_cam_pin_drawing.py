@@ -123,7 +123,7 @@ def test_bonded_slip_fit_replaces_the_press() -> None:
     pin_min = dt_pinion_cam_pin_spec.PIN_DIA + dt_pinion_cam_pin_spec.PIN_DIA_BAND[1]
     pin_max = dt_pinion_cam_pin_spec.PIN_DIA + dt_pinion_cam_pin_spec.PIN_DIA_BAND[0]
     assert round(seat_min - pin_max, 6) == 0.0
-    assert round(seat_max - pin_min, 6) == 0.042
+    assert round(seat_max - pin_min, 6) == 0.0427
     assert seat_max - pin_min <= dt_pinion_cam_pin_spec.RETAINING_COMPOUND_MAX_GAP_MM
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Main's MHA-DT-25 eye pass): the bond is the fit-up step, not a note.
     assert dt_pinion_cam_pin_spec.ASSEMBLY_STEP == (

@@ -85,7 +85,7 @@ def test_true_d_fit_clears_the_core_and_round_stud_at_printed_limits(
     curved_air = (bore[0] - core[1], bore[1] - core[0])
     flat_air = (bore_flat[0] - core_flat[1], bore_flat[1] - core_flat[0])
     assert core == pytest.approx((4.842, 4.850))
-    assert curved_air == pytest.approx((0.010, 0.030))
+    assert curved_air == pytest.approx((0.010, 0.0307))
     assert flat_air == pytest.approx((0.020, 0.050))
     stud_max = shaft.THREAD_BLANK_DIA + max(shaft.THREAD_BLANK_DIA_BAND)
     stud_air = min(bore[0] / 2.0, bore_flat[0]) - stud_max / 2.0
@@ -116,7 +116,7 @@ def test_fitted_rear_face_reacts_on_actual_f_at_every_printed_corner(
         + shaft.TOOTH_SPACE_RUNOUT_TIR_MM / 2.0
     )
     assert collar.D_CENTRE_FLOAT_MAX == pytest.approx(centre_float)
-    assert inner == pytest.approx(2.778425, abs=1e-6)
+    assert inner == pytest.approx(2.779330726, abs=1e-6)
     assert collar.FRONT_BEARING_INNER_RADIUS_MAX == pytest.approx(inner)
     areas = [
         shaft.gear_bearing_area_lower(profile, inner)

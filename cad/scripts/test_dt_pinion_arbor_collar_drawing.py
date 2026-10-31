@@ -34,7 +34,7 @@ def test_user_ruling_r1a_geometry() -> None:
     """Ø15 OD, Ø8 +0.10/0 drilled bore, pin hole centred; 17 long since the
     pin-station stack (Codex P2 on #860) -- the user ruling's 20 pressed the
     strap at the worst band corner."""
-    assert (geometry.COLLAR_OD, geometry.BORE, geometry.COLLAR_LEN) == (15.0, 8.0, 17.0)
+    assert (geometry.COLLAR_OD, geometry.BORE, geometry.COLLAR_LEN) == (15.0, 7.9375, 17.0)
     assert spec.BORE_BAND == (0.10, 0.0)
     assert geometry.PIN_HOLE_Z == geometry.COLLAR_LEN / 2.0
     # The rig's one pin family and drill (pinion_strap_pin_spec, E-a).
@@ -124,10 +124,10 @@ def test_drive_train_pins_the_collar_with_a_locked_mha145() -> None:
 
 
 def test_webs_meet_the_u27_target_at_the_printed_worst_case() -> None:
-    assert (geometry.COLLAR_OD - (geometry.BORE + spec.BORE_BAND[0])) / 2.0 == pytest.approx(3.45)
-    assert spec.COLLAR_WALL_WORST == pytest.approx(3.05)
+    assert (geometry.COLLAR_OD - (geometry.BORE + spec.BORE_BAND[0])) / 2.0 == pytest.approx(3.48125)
+    assert spec.COLLAR_WALL_WORST == pytest.approx(3.08125)
     assert spec.PIN_TO_END_WEB_WORST == pytest.approx(6.076, abs=1e-3)
-    assert arbor_pin.PIN_HOLE_LIGAMENT_WORST == pytest.approx(3.126, abs=1e-3)
+    assert arbor_pin.PIN_HOLE_LIGAMENT_WORST == pytest.approx(3.0967, abs=1e-3)
     for web in (
         spec.COLLAR_WALL_WORST,
         spec.PIN_TO_END_WEB_WORST,

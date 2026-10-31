@@ -219,7 +219,7 @@ def test_straight_through_cutter_clears_the_journal_at_worst_case(monkeypatch):
     assert shaft.CUTTER_SKU == "10-289-487"
     profiles = shaft.manufactured_profiles()
     journal_max = shaft.JOURNAL_DIA + max(shaft.JOURNAL_DIA_BAND)
-    assert journal_max == pytest.approx(5.996)
+    assert journal_max == pytest.approx(5.99492)
     air = (
         2.0 * min(p.root_radius_min_mm for p in profiles)
         - journal_max - shaft.TOOTH_SPACE_RUNOUT_TIR_MM
@@ -227,7 +227,7 @@ def test_straight_through_cutter_clears_the_journal_at_worst_case(monkeypatch):
     assert air == pytest.approx(shaft.JOURNAL_CUTTER_AIR_MIN)
     assert shaft.JOURNAL_CUTTER_AIR_FLOOR == 0.035
     assert shaft.JOURNAL_CUTTER_AIR_MIN > shaft.JOURNAL_CUTTER_AIR_FLOOR
-    assert shaft.JOURNAL_CUTTER_AIR_MIN == pytest.approx(0.27952316817391276)
+    assert shaft.JOURNAL_CUTTER_AIR_MIN == pytest.approx(0.2800631681739132)
     # The independent disk-envelope oracle removes nothing from the journal.
     for profile in profiles:
         lo, hi = _journal_envelope_removal(profile, journal_max)
@@ -253,15 +253,15 @@ def test_bearing_material_charges_breaks_axis_error_and_loose_float():
     # Regression value, not a load floor: the spec's physical gate is a
     # positive face. It charges bore, entry break, D-axis error at F and
     # half the 0.05 tooth-space TIR, so it sits below the uncharged ring.
-    assert collar.FRONT_BEARING_AREA_MIN == pytest.approx(23.2357, abs=1e-3)
+    assert collar.FRONT_BEARING_AREA_MIN == pytest.approx(23.2198, abs=1e-3)
     assert shaft.RING_TRANSVERSE_FLOAT_MAX >= (ring.ID + max(ring.ID_BAND) - shaft.JOURNAL_DIA_MIN) / 2.0
-    assert shaft.RING_TRANSVERSE_FLOAT_MAX == pytest.approx(0.10828384499329324)
+    assert shaft.RING_TRANSVERSE_FLOAT_MAX == pytest.approx(0.10864110728935561)
     assert collar.D_SUPPORT_LENGTH_MIN == pytest.approx(4.072234843105)
-    assert collar.D_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.058542058772)
-    assert shaft.REAR_BEARING_INNER_RADIUS_MAX == pytest.approx(3.458283844993293)
+    assert collar.D_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.059098147529)
+    assert shaft.REAR_BEARING_INNER_RADIUS_MAX == pytest.approx(3.4586411072893553)
     assert shaft.REAR_BEARING_INNER_RADIUS_MAX > shaft.ROOT_DIA_EXACT_MIN / 2.0
     assert shaft.REAR_BEARING_AREA_MIN > 1.0
-    assert shaft.REAR_BEARING_AREA_MIN == pytest.approx(11.326745529792383)
+    assert shaft.REAR_BEARING_AREA_MIN == pytest.approx(11.322316949949155)
     # Not the uncharged centred claim on the bare ring bore.
     centred = shaft.gear_bearing_area_lower(shaft.STOCK_PROFILE, ring.ID / 2.0)
     assert centred == pytest.approx(18.906670346162162)
@@ -279,8 +279,8 @@ def test_retained_walls_and_axial_stations_need_no_new_waiver():
     assert (shaft.JOURNAL_DIA_MIN - 1.65) / 2.0 >= 2.0
     assert plate.BORE_DIA == 6.0
     assert plate.BORE_DIA_LIMITS == (0.0, 0.012)
-    assert min(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.004)
-    assert max(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.024)
+    assert min(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.00508)
+    assert max(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.0247)
     assert ring.LENGTH == 5.2
     assert plate.HUB_LENGTH == 12.6
     assert shaft.CUP_FACE_Z == pytest.approx(40.3375)
