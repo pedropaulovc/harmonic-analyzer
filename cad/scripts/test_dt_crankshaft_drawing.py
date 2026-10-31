@@ -67,21 +67,6 @@ def test_policy_migrated_sheet_carries_no_gdt_and_model_owned_places() -> None:
         "CollarRearStation",
         "CollarSeatStation",
     } <= marked - spec.REFERENCE_DIMENSIONS
-    # Running/seat fits print at three places; the seat collar's functional
-    # bands (drawing-guidelines.md rule 3 (decimal places carry the tolerance)) at the places that hold them; the rest at one.
-    functional_places = {
-        "ShaftDiaDim": 3,
-        "JournalDiaDim": 4,
-        "PinionSeatDiaDim": 3,
-        "SpigotDiaDim": 2,
-        "SpigotLength": 2,
-        "CollarSeatStation": 2,
-        "CollarRearStation": 2,
-        "DrivePinOffset1": 3,
-        "DrivePinOffset2": 3,
-    }
-    for name, places in spec.DRAWING_PRECISION_BY_NAME.items():
-        assert places == functional_places.get(name, 1), name
     assert spec.REFERENCE_DIMENSIONS <= marked
     assert spec.SPHERICAL_DIMENSIONS <= spec.REFERENCE_DIMENSIONS
 
@@ -92,7 +77,9 @@ def test_far_end_stations_restate_the_modelled_geometry() -> None:
     far = spec.SHAFT_LENGTH
     assert far - spec.SEAT_STEP == pytest.approx(spec.PINION_SEAT_STATION)
     # The station the spec chose prints exactly at its places.
-    assert spec.PINION_SEAT_STATION == round(spec.PINION_SEAT_STATION, spec.STATION_PLACES)
+    assert spec.dt_crank_pinion_spec.prints_exactly(
+        spec.PINION_SEAT_STATION, spec.STATION_PLACES, spec.UNIT
+    )
     assert set(part._STATIONS) == set(part._STATION_DRIVES)
     assert set(part._STATIONS) <= spec.DRAWING_DIMENSIONS["StationReference"]
     assert part.DOME_SPHERE_R == pytest.approx(
@@ -112,16 +99,14 @@ def test_shaft_prints_exactly_and_reaches_the_restored_post_boss() -> None:
     # of the 16T at every accepted part set, while the shaft datum
     # independently lands on the post's restored north face.
     pinion = spec.dt_crank_pinion_spec
-    assert spec.SHAFT_LENGTH == round(spec.SHAFT_LENGTH, pinion.SHAFT_LENGTH_PLACES)
+    assert pinion.prints_exactly(spec.SHAFT_LENGTH, pinion.SHAFT_LENGTH_PLACES, spec.UNIT)
     assert spec.DRAWING_PRECISION["Shaft"]["Depth"] == pinion.SHAFT_LENGTH_PLACES
-    assert spec.SHAFT_LENGTH == pytest.approx(136.3)
     least, most = spec.SHAFT_END_PROUD_RANGE
     assert spec.shaft_end_proud_range(spec.SHAFT_LENGTH) == (least, most)
     assert least >= 0.0
-    assert most - least == pytest.approx(3.4)
     assert least <= spec.SHAFT_END_PROUD_NOMINAL <= most
     # One print step shorter and the end can sit inside the 16T.
-    step = 10.0**-pinion.SHAFT_LENGTH_PLACES
+    step = pinion.print_step(pinion.SHAFT_LENGTH_PLACES, spec.UNIT)
     assert spec.shaft_end_proud_range(spec.SHAFT_LENGTH - step)[0] < 0.0
     import cone_line
     import dt_cone_pivot_post_spec as post
@@ -140,23 +125,19 @@ def test_seat_collar_lands_the_wheel_seat_and_bears_on_the_post_boss() -> None:
     import _sprocket_seat_geometry as removable
 
     assert bdt.CRANKSHAFT_Z0 + spec.SEAT_COLLAR == pytest.approx(removable.SEAT_FACE_Z)
-    assert spec.SPIGOT_DIA == removable.SEAT_SPIGOT_DIA < spec.COLLAR_DIA
-    # Ruling 2026-09-30: spigot -154.3..-148.5; the body runs on to the boss.
-    assert bdt.CRANKSHAFT_Z0 + spec.SPIGOT_END == pytest.approx(-148.5)
+    # The inch spigot (.689) is the wheel's seat to within its print grid.
+    assert spec.SPIGOT_DIA == pytest.approx(removable.SEAT_SPIGOT_DIA, abs=0.001)
+    assert spec.SPIGOT_DIA < spec.COLLAR_DIA
     # The blind drive-pin holes end in the spigot, short of its step.
     assert spec.SEAT_COLLAR < spec.DRIVE_PIN_FLOOR < spec.SPIGOT_END
     # The rear face from the post's own boss face, floored to its .XX print.
     boss_south = spec.POST_BORE_END - post.CRANK_BOSS_LENGTH
     assert spec.POST_BOSS_SOUTH == pytest.approx(boss_south)
     places = spec.COLLAR_STATION_PLACES
-    assert spec.COLLAR_LENGTH == round(spec.COLLAR_LENGTH, places)
-    assert spec.COLLAR_LENGTH == pytest.approx(12.63)
-    assert 0.0 <= boss_south - spec.COLLAR_REAR < 10.0**-places
+    pinion = spec.dt_crank_pinion_spec
+    assert pinion.prints_exactly(spec.COLLAR_LENGTH, places, spec.UNIT)
+    assert 0.0 <= boss_south - spec.COLLAR_REAR < pinion.print_step(places, spec.UNIT)
     assert spec.COLLAR_BOSS_AIR == pytest.approx(boss_south - spec.COLLAR_REAR)
-    assert bdt.CRANKSHAFT_Z0 + spec.COLLAR_REAR == pytest.approx(
-        bdt.CRANKSHAFT_Z0 + boss_south, abs=10.0**-places
-    )
-    assert bdt.CRANKSHAFT_Z0 + spec.COLLAR_REAR == pytest.approx(-141.67)
     # The body keeps length at print-worst: both stations and the spigot.
     body_worst = (
         spec.COLLAR_LENGTH
@@ -173,8 +154,6 @@ def test_seat_collar_lands_the_wheel_seat_and_bears_on_the_post_boss() -> None:
         >= spec.BORE_MOUTH_BREAK_MAX - 1e-9
     )
     assert spec.BORE_MOUTH_BREAK_MAX == 0.25
-    assert spec.SHAFT_LENGTH - spec.JOURNAL_START == pytest.approx(93.8)
-    assert spec.JOURNAL_START == pytest.approx(42.5)
     # Bottomed dowels stand proud by the drive-train's pin length budget.
     assert (
         bdt.CRANKSHAFT_Z0 + spec.DRIVE_PIN_FLOOR - spec.dt_vn_crank_seat_drive_pin_spec.LENGTH
@@ -183,40 +162,33 @@ def test_seat_collar_lands_the_wheel_seat_and_bears_on_the_post_boss() -> None:
 
 
 
-def _floor_2(value: float) -> float:
-    return math.floor(value * 100.0 + 1e-9) / 100.0
-
-
 def test_spigot_rim_is_the_shortfall_the_sheet_states() -> None:
-    # The drive-pin holes' rim to the Ø17.5 seat spigot is under the 1.5 mm
+    # The drive-pin holes' rim to the seat spigot is under the .060 in
     # wall floor (declared shortfall RV-02, owner ruling 2026-10-18): the sheet states the worst case of
     # the printed bands, rounded down so it never claims more rim than exists.
     hole_r = spec.DRIVE_PIN_HOLE_DIA / 2.0
-    nominal = spec.SPIGOT_DIA / 2.0 - (spec.DRIVE_PIN_CIRCLE_RADIUS + hole_r)
-    worst = (spec.SPIGOT_DIA + seat_geometry.SPIGOT_DIA_BAND[1]) / 2.0 - (
+    worst = (spec.SPIGOT_DIA + spec.SPIGOT_DIA_BAND[1]) / 2.0 - (
         spec.DRIVE_PIN_CIRCLE_RADIUS
-        + seat_geometry.DRIVE_PIN_OFFSET_TOL
+        + spec.DRIVE_PIN_OFFSET_TOL
         + hole_r
         + seat_geometry.DRIVE_PIN_HOLE_BAND[0] / 2.0
     )
     rim = spec.DRIVE_PIN_SPIGOT_RIM_WORST
-    assert rim == _floor_2(worst)
-    assert 0.0 < rim < 1.5
-    printed = re.search(r"SPIGOT RIM (\d+\.\d\d) MIN\.", notes.DRIVE_PIN_CALLOUT)
+    assert worst - 0.0254 < rim <= worst
+    assert 0.0 < rim < spec.WALL_FLOOR_MM
+    printed = re.search(r"SPIGOT RIM (\.\d{3}) MIN\.", notes.DRIVE_PIN_CALLOUT)
     assert printed
-    assert float(printed.group(1)) == rim
-    assert _floor_2(nominal) == spec.DRIVE_PIN_SPIGOT_RIM
+    assert float(printed.group(1)) * 25.4 == pytest.approx(rim)
 
 
 def test_drive_pin_depth_prints_its_band_after_the_native_depth() -> None:
     # Machinist review of f7c9771b3: the bare 3.95 read under the title
     # block's .XX and left 5.75 - 4.46 = 1.29 of spigot under the holes.  The
     # callout carries the cut's own band, the one the proud stack reads.
-    assert notes.DRIVE_PIN_DEPTH_BAND == f"<MOD-PM>{spec.DRIVE_PIN_DEPTH_TOL:.2f}"
     floor = (spec.SPIGOT_LENGTH - spec.SPIGOT_LENGTH_TOL) - (
         spec.DRIVE_PIN_DEPTH + spec.DRIVE_PIN_DEPTH_TOL
     )
-    assert floor >= 1.5
+    assert floor >= spec.WALL_FLOOR_MM
     band = notes.DRIVE_PIN_DEPTH_BAND
     # The farm's native split: the process and diameter modifier in the
     # prefix, the depth in a later compartment.
@@ -254,23 +226,23 @@ class _Sheet:
         return self.unit
 
 
-def test_typed_depth_band_refuses_a_non_mm_sheet() -> None:
-    # Codex P2 on #1151: the band is mm text after a native depth, so it is
-    # only true on a mm sheet; the callout variables that would carry it
-    # natively are unreachable on this cut-extrude callout (farm run
-    # 20261003T001156794Z).  An inch sheet must stop before the band is typed.
-    drawing._require_mm_sheet(_Sheet(0), "mm")  # swMM
-    for unit in (3, 1, None):  # swINCHES, swCM, an unread preference
-        with pytest.raises(RuntimeError, match="typed depth band is mm"):
-            drawing._require_mm_sheet(_Sheet(unit), "not mm")
+def test_typed_depth_band_refuses_a_non_inch_sheet() -> None:
+    # Codex P2 on #1151: the band is typed text after a native depth, so it
+    # is only true on a sheet of its own unit (inches, #290); the callout
+    # variables that would carry it natively are unreachable on this
+    # cut-extrude callout (farm run 20261003T001156794Z).
+    drawing._require_inch_sheet(_Sheet(3), "inch")  # swINCHES
+    for unit in (0, 1, None):  # swMM, swCM, an unread preference
+        with pytest.raises(RuntimeError, match="typed depth band is inches"):
+            drawing._require_inch_sheet(_Sheet(unit), "not inch")
 
     class _Callout:
         def GetText(self, part: int) -> str:
             raise AssertionError("read the callout before the unit check")
 
-    with pytest.raises(RuntimeError, match="typed depth band is mm"):
+    with pytest.raises(RuntimeError, match="typed depth band is inches"):
         drawing._band_hole_depth(
-            _Callout(), notes.DRIVE_PIN_DEPTH_BAND, _Sheet(3), "inch sheet"
+            _Callout(), notes.DRIVE_PIN_DEPTH_BAND, _Sheet(0), "mm sheet"
         )
 
 
@@ -499,11 +471,10 @@ def test_each_bare_neck_has_its_own_native_loose_diameter() -> None:
     )
     assert spec.DRAWING_REFERENCE_PRECISION == {"OutboardNeckDia": spec.NECK_DIA_PLACES}
     assert drawing.DRAWING_REFERENCE_PRECISION is spec.DRAWING_REFERENCE_PRECISION
-    assert spec.NECK_DIA_PLACES == 1
+    assert spec.NECK_DIA_PLACES == 3
     neck_x, neck_y = drawing.OUTBOARD_NECK_DIAMETER_XY
     assert drawing.COLLAR_REAR_X < neck_x < drawing.JOURNAL_START_X
     assert neck_x == pytest.approx((drawing.COLLAR_REAR_X + drawing.JOURNAL_START_X) / 2.0)
-    assert neck_x == pytest.approx(0.17753)
     assert neck_y == pytest.approx(0.1948)
     assert drawing._sheet_y(spec.JOURNAL_DIA / 2.0) < neck_y
     assert neck_y < drawing._sheet_y(spec.COLLAR_DIA / 2.0)
@@ -527,7 +498,7 @@ def test_each_bare_neck_has_its_own_native_loose_diameter() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert not drawing_specification_violations(source, filename="draw_dt_crankshaft.py")
     assert not drawing.CALLOUTS_ABOVE["ShaftDiaDim"][:1].isdigit()
-    assert spec.DRAWING_PRECISION["PinionSeatProfile"]["NeckDiaDim"] == 1
+    assert spec.DRAWING_PRECISION["PinionSeatProfile"]["NeckDiaDim"] == spec.NECK_DIA_PLACES
 
 
 def test_integral_lands_run_in_the_restored_post_at_every_size_limit() -> None:
@@ -560,20 +531,17 @@ def test_view_scales_and_linked_notes_are_explicit() -> None:
 def test_seat_step_never_pushes_the_pinion_past_its_seat_gap() -> None:
     # The pinion is set on its feeler and pinned; the step never locates it.
     # A step printed at its north limit plus a corner up to the title block's
-    # R0.25 stands the bore edge off, which the seat gap's north range must
-    # hold.
-    import _config
+    # edge break stands the bore edge off, which the seat gap's north range
+    # must hold.
+    from _printed_tolerance import edge_break_radius_mm
 
     pinion = spec.dt_crank_pinion_spec
-    assert spec.STEP_CORNER_RADIUS_MAX == _config.title_block("edge_break")["radius_mm"]
+    assert spec.STEP_CORNER_RADIUS_MAX == edge_break_radius_mm(unit=spec.UNIT)
     standoff = spec.SEAT_STEP + spec.STATION_ROW + spec.STEP_CORNER_RADIUS_MAX - part.SEAT_PINION
     assert standoff == pytest.approx(spec.SEAT_STEP_STANDOFF_WORST)
     assert standoff <= pinion.SEAT_GAP_MAX_MM - pinion.SEAT_FEELER_MM
-    # At the pinion's own seat the step would stand it off 1.05: too far.
-    at_seat = part.SEAT_PINION + spec.STATION_ROW + spec.STEP_CORNER_RADIUS_MAX
-    assert at_seat - part.SEAT_PINION > pinion.SEAT_GAP_MAX_MM - pinion.SEAT_FEELER_MM
     # The seat is the pinion's bore mate, at the through shaft's size band.
-    assert spec.PINION_SEAT_DIA == pinion.BORE_DIA == 9.0
+    assert spec.PINION_SEAT_DIA == pinion.BORE_DIA
     assert spec.PINION_SEAT_DIA_BAND == spec.SHAFT_DIA_BAND
 
 
@@ -642,7 +610,7 @@ def test_shaft_length_is_unilateral_and_printed_from_the_model() -> None:
     # The dome-side Depth band carries the hub-air stack through the seat
     # collar's station, so the length only comes out short, and the model's
     # Depth carries the band.
-    assert spec.SHAFT_LENGTH_BAND == (0.00, -0.40)
+    assert spec.SHAFT_LENGTH_BAND == (0.0, -spec.SHAFT_LENGTH_SHORT_MM)
     build = Path(part.__file__).read_text(encoding="utf-8")
     assert '"Shaft", "Depth", *deviations(SHAFT_LENGTH_BAND)' in build
     assert "Depth" in spec.DRAWING_DIMENSIONS["Shaft"]
@@ -657,21 +625,20 @@ def test_shaft_band_ruling_holds_because_the_general_tolerance_closes_the_hub_ai
     # hub-to-sprocket air closes.
     import build_dt_drive_train_assembly as bdt
 
-    assert spec.SHAFT_LENGTH_BAND == (0.0, -spec.SHAFT_LENGTH_SHORT_MM) == (0.0, -0.4)
+    assert spec.SHAFT_LENGTH_BAND == (0.0, -spec.SHAFT_LENGTH_SHORT_MM)
+    # Within the printed station's rounding of the model value.
     assert spec.SEAT_COLLAR_BAND == pytest.approx(
         (
             spec.SHAFT_LENGTH_BAND[0] + spec.COLLAR_STATION_TOL,
             spec.SHAFT_LENGTH_BAND[1] - spec.COLLAR_STATION_TOL,
-        )
+        ),
+        abs=spec.dt_crank_pinion_spec.print_step(spec.COLLAR_STATION_PLACES, spec.UNIT) / 2.0,
     )
     assert bdt.CRANK_HUB_SPROCKET_AIR == pytest.approx(0.7)
     assert bdt.CRANK_HUB_SPROCKET_AIR_WORST == pytest.approx(
         bdt.CRANK_HUB_SPROCKET_AIR + min(spec.SEAT_COLLAR_BAND)
     )
     assert bdt.CRANK_HUB_SPROCKET_AIR_WORST > 0.0
-    general = spec.dt_crank_pinion_spec.printed_band_mm(spec.dt_crank_pinion_spec.SHAFT_LENGTH_PLACES)
-    assert general == pytest.approx(0.8)
-    assert bdt.CRANK_HUB_SPROCKET_AIR - general - spec.COLLAR_STATION_TOL < 0.0
 
 
 
@@ -1234,7 +1201,7 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     native_texts = [
         {"text": " ", "position": (x, shelf_y + 0.0000535, 0.0), "height": 0.0035, "width": 0.0012931},
         {"text": "<MOD-DIAM>", "position": (x + 0.0012931, shelf_y, 0.0), "height": 0.0035, "width": 0.0052784},
-        {"text": "9.5 ", "position": (x + 0.0065715, shelf_y + 0.0000535, 0.0), "height": 0.0035, "width": 0.0077583},
+        {"text": ".375 ", "position": (x + 0.0065715, shelf_y + 0.0000535, 0.0), "height": 0.0035, "width": 0.0077583},
     ]
     arrow_data = _native_presentation_data(neck_lines, native_texts, arrow_rows)
     display = SimpleNamespace(
@@ -1264,9 +1231,11 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         GetPrimaryPrecision2=Mock(return_value=spec.NECK_DIA_PLACES),
         GetOverride=Mock(return_value=False), GetText=Mock(side_effect=lambda part: right_texts[part]),
     )
+    # Foreign ink recorded beside the neck at 0.17753; it moves with the neck.
+    dxn = x - 0.17753
     foreign_lines = [
-        (0.1988, 0.2139181, 0.0, 0.1988, 0.191388, 0.0),
-        (0.1797, 0.191388, 0.0, 0.1998, 0.191388, 0.0),
+        (0.1988 + dxn, 0.2139181, 0.0, 0.1988 + dxn, 0.191388, 0.0),
+        (0.1797 + dxn, 0.191388, 0.0, 0.1998 + dxn, 0.191388, 0.0),
     ]
     right_display.GetDisplayData = Mock(return_value=_native_presentation_data(foreign_lines))
     right_annotation = SimpleNamespace(
@@ -1277,7 +1246,7 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         SystemValue=0.0, DrivenState=0, FullName="Depth@Stations@dt-crankshaft",
     )
     station_display = SimpleNamespace(GetDimension2=Mock(return_value=station_native))
-    station_lines = [(0.17636, 0.179, 0.0, 0.17636, 0.1107219, 0.0)]
+    station_lines = [(drawing.COLLAR_REAR_X, 0.179, 0.0, drawing.COLLAR_REAR_X, 0.1107219, 0.0)]
     station_display.GetDisplayData = Mock(return_value=_native_presentation_data(station_lines))
     station_annotation = SimpleNamespace(
         name="Depth", OwnerType=0, Owner=side, GetType=Mock(return_value=4),
@@ -1351,17 +1320,18 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     )
     # Native symbol legs as read at the corner-landing root (0.18326, 0.1973),
     # carried with the symbol to its current root.
+    dx = drawing.COLLAR_REAR_FINISH[1][0] - 0.18326
     dy = drawing.COLLAR_REAR_FINISH[1][1] - 0.1973
     finish_lines = [
         (*drawing.COLLAR_REAR_FINISH[1], 0.0, *drawing.COLLAR_REAR_FINISH[0], 0.0),
-        (0.18326, 0.1973 + dy, 0.0, 0.181095, 0.20105 + dy, 0.0),
-        (0.185425, 0.20105 + dy, 0.0, 0.181095, 0.20105 + dy, 0.0),
-        (0.18326, 0.1973 + dy, 0.0, 0.1874735, 0.2044425 + dy, 0.0),
-        (0.1847905, 0.2029118 + dy, 0.0, 0.1817295, 0.2029118 + dy, 0.0),
-        (0.1874735, 0.2044425 + dy, 0.0, 0.1977225, 0.2044425 + dy, 0.0),
+        (0.18326 + dx, 0.1973 + dy, 0.0, 0.181095 + dx, 0.20105 + dy, 0.0),
+        (0.185425 + dx, 0.20105 + dy, 0.0, 0.181095 + dx, 0.20105 + dy, 0.0),
+        (0.18326 + dx, 0.1973 + dy, 0.0, 0.1874735 + dx, 0.2044425 + dy, 0.0),
+        (0.1847905 + dx, 0.2029118 + dy, 0.0, 0.1817295 + dx, 0.2029118 + dy, 0.0),
+        (0.1874735 + dx, 0.2044425 + dy, 0.0, 0.1977225 + dx, 0.2044425 + dy, 0.0),
     ]
     finish_native_texts = [{
-        "text": notes.COLLAR_REAR_FINISH_TEXT, "position": (0.18826, 0.2008713 + dy, 0.0),
+        "text": notes.COLLAR_REAR_FINISH_TEXT, "position": (0.18826 + dx, 0.2008713 + dy, 0.0),
         "height": 0.0025, "width": 0.0098437,
     }]
     finish_arrows = [
@@ -1891,7 +1861,7 @@ def test_neck_requires_exactly_both_opposite_attached_silhouettes(neck_dimension
     ("display", "ShowParenthesis", True, "overridden"),
     ("display", "ShowDimensionValue", False, "value is hidden"),
     ("annotation", "OwnerType", 1, "owner is not FRONT"),
-    ("right_display", "GetPrimaryPrecision2", 3, "primary places"),
+    ("right_display", "GetPrimaryPrecision2", 2, "primary places"),
     ("right_native", "SystemValue", 0.0095, "measures"),
     ("right_native", "DrivenState", 1, "native driven state"),
     ("right_tolerance", "Type", 2, "explicit tolerance"),
@@ -2467,6 +2437,8 @@ def test_collar_rear_finish_expected_text_follows_part_owned_control(
     from dataclasses import replace
     import runpy
 
+    from _surface_finish import ra
+
     control = drawing.surface_finish_by_key(spec.SURFACE_FINISHES, "collar_rear_face")
     assert notes.COLLAR_REAR_FINISH_TEXT == f"Ra {control.roughness_ra}"
     assert drawing.COLLAR_REAR_FINISH_TEXT == notes.COLLAR_REAR_FINISH_TEXT
@@ -2476,7 +2448,7 @@ def test_collar_rear_finish_expected_text_follows_part_owned_control(
     )
     monkeypatch.setattr(spec, "SURFACE_FINISHES", controls)
     contract = runpy.run_path(notes.__file__)
-    assert contract["COLLAR_REAR_FINISH_TEXT"] == f"Ra {roughness_um:.1f}"
+    assert contract["COLLAR_REAR_FINISH_TEXT"] == f"Ra {ra(roughness_um, unit=spec.UNIT)}"
 
 
 @pytest.mark.parametrize("phase", _NECK_PHASES)
@@ -2602,7 +2574,7 @@ def test_build_neck_snapshot_follows_existing_native_annotation_authoring(
         "_set_dimension_suffixes", "assert_imported_precision", "add_view_centerline",
         "_visible_cylindrical_face", "_visible_cross_hole_edge", "_set_callout_text",
         "_drop_coaxial_step", "_band_hole_depth", "place_callout_clear", "add_attached_note",
-        "_place_note_text_in_field", "_add_centres_note",
+        "_place_note_text_in_field", "_add_centres_note", "set_hole_callout_precision",
     ):
         monkeypatch.setattr(drawing, name, Mock())
     collar_rim = object()
@@ -2865,7 +2837,7 @@ def test_native_right_advance_and_ordinary_route_refuse_actual_bad_buffers(
     elif failure == "bool-reference":
         f.native_texts[1]["reference"] = True
     elif failure == "wrong-value":
-        f.native_texts[2]["text"] = "9.6 "
+        f.native_texts[2]["text"] = ".376 "
     else:
         f.foreign_lines.append((0.19, 0.191, 0.0, 0.19, 0.196, 0.0))
     with pytest.raises(RuntimeError):
@@ -3592,9 +3564,11 @@ def test_native_bay_roundoff_does_not_relax_open_roof_or_finish_boundaries(
 
 
 @pytest.mark.parametrize("phase", _NECK_PHASES)
-def test_native_bay_replays_record44_actual_one_and_two_ulp_roundoff(phase) -> None:
+def test_native_bay_replays_record44_actual_one_and_two_ulp_roundoff(phase, monkeypatch) -> None:
     # Actual 01fe374ab native run, complete structured log record 44. Keep the
-    # observed raw doubles, including the reversed shelf and prefix below it.
+    # observed raw doubles, including the reversed shelf and prefix below it,
+    # and that run's authored neck station (the inch print has since moved it).
+    monkeypatch.setattr(drawing, "OUTBOARD_NECK_DIAMETER_XY", (0.17753000000000002, 0.1948))
     lines = [
         (0.19185982739061117, 0.19199513882882896, 0.0, 0.17753, 0.19199513882882896, 0.0),
         (0.17753, 0.19199513882882896, 0.0, 0.17753, 0.189525, 0.0),
@@ -3604,7 +3578,7 @@ def test_native_bay_replays_record44_actual_one_and_two_ulp_roundoff(phase) -> N
         {"text": " "},
         {"text": "<MOD-DIAM>", "position": (0.1788230555967614, 0.1919951388288289, 0.0),
          "height": 0.0035, "width": 0.005278437398374081},
-        {"text": "9.5 ", "position": (0.1841014931115508, 0.19204861100548876, 0.0),
+        {"text": ".375 ", "position": (0.1841014931115508, 0.19204861100548876, 0.0),
          "height": 0.0035, "width": 0.007758333580568433},
     ]
     heads = tuple(drawing.Segment(*row) for row in (

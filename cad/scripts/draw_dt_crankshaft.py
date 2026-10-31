@@ -24,12 +24,12 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import sys
 from typing import Any, Callable, Sequence
 
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
-    _SW_LENGTH_MM,
     _SW_PREF_UNITS_LINEAR,
     auto_center_marks,
     dimension_name,
@@ -59,7 +59,7 @@ from _drawing_dimensions import (
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_points_in_view
@@ -87,11 +87,13 @@ from _layout_geometry import (
 )
 from _pdf_ink import read_pdf_ink
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from build_dt_crankshaft import PINION_PIN_DIA, PINION_PIN_STATION_Y
+from dt_crank_drive_gear_spec import inch_text
 from dt_crank_pinion_spec import CRANKSHAFT_PIN_HOLE_PROCESS
 from dt_crankshaft_notes import (
     CENTRES_NOTE,
@@ -128,6 +130,7 @@ from dt_crankshaft_spec import (
     DRIVE_PIN_HOLE_PROCESS,
     DRIVE_PIN_KNOCKOUT_DIA,
     FIDUCIAL_MODEL_DIA,
+    HOLE_CALLOUT_PLACES,
     JOURNAL_DIA,
     JOURNAL_END,
     JOURNAL_START,
@@ -405,6 +408,9 @@ DRIVE_PIN_CALLOUT_XY = (0.066, 0.250)
 # the leader's slope that the diameter blocks under it are laid out around
 # (DIAMETER_POSITIONS).
 HOLE_CALLOUT_XY = (PIN_X + 0.077, 0.251)
+# The Hole Wizard drills' (#9 cross-hole, #54 knockouts) native size prints
+# the title block's .XXX on the inch sheet.
+WIZARD_CALLOUT_PRECISION = {"hw-diam": 3}
 # The knockouts' native callout (drill above, size, purpose below; ~44 mm
 # wide) centres under the end view, below the lower 7.000 row's PINS SLIP
 # block (bottom ~0.131) and left of the dome's extension line (x 0.0897).
@@ -553,13 +559,14 @@ def _drop_coaxial_step(display: Any, step_dia: float, label: str) -> None:
     back.
     """
     display = _early_bound(display, "IDisplayDimension")
-    marker = f"<MOD-DIAM>{step_dia:.2f}"
     definitions = {
         part: str(display.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE
     }
-    holders = [part for part, text in definitions.items() if marker in text]
+    holders = [
+        part for part, text in definitions.items() if _has_coaxial_step(text, step_dia)
+    ]
     for part in holders:
-        if not definitions[part].startswith(marker):
+        if not _has_coaxial_step(definitions[part], step_dia, leading=True):
             raise RuntimeError(f"{label}: coaxial step mixed into part {part}: {definitions!r}")
         display.SetText(_DEFINITION_TO_WRITABLE[part], "")
         if str(display.GetText(part) or ""):
@@ -576,23 +583,43 @@ def _drop_coaxial_step(display: Any, step_dia: float, label: str) -> None:
     _telemetry.info(f"{label}: cleared coaxial step from parts {holders}: {definitions!r}")
 
 
-def _require_mm_sheet(draw: Any, label: str) -> None:
-    """Refuse unless the drawing's linear unit is the millimetre.
+# swLengthUnit_e.swINCHES: the unit ``set_units_inch`` writes.
+_SW_LENGTH_INCHES = 3
+# Every step SolidWorks folds into a callout prints as ``<MOD-DIAM>`` and a
+# decimal at the sheet's places.
+_STEP_SIZE = re.compile(r"<MOD-DIAM>(\d*\.\d+)")
 
-    The depth band is typed text in mm: SolidWorks re-renders the callout's
-    native depth in the sheet's units but never the text after it, so the
-    band is only true on a mm sheet.  The callout has no native route for it:
+
+def _has_coaxial_step(text: str, step_dia: float, *, leading: bool = False) -> bool:
+    """Whether ``text`` prints ``step_dia`` (mm) as an inch ``<MOD-DIAM>``
+    size -- anywhere, or (``leading``) as its first characters."""
+    matches = [_STEP_SIZE.match(text)] if leading else _STEP_SIZE.finditer(text)
+    for match in matches:
+        if match is None:
+            continue
+        printed = match.group(1)
+        if printed == inch_text(step_dia, len(printed.partition(".")[2])):
+            return True
+    return False
+
+
+def _require_inch_sheet(draw: Any, label: str) -> None:
+    """Refuse unless the drawing's linear unit is the inch.
+
+    The depth band is typed text in inches: SolidWorks re-renders the
+    callout's native depth in the sheet's units but never the text after it,
+    so the band is only true on an inch sheet.  The callout has no native route for it:
     ``GetHoleCalloutVariables`` raised DISP_E_BADVARTYPE on this cut-extrude
     callout on the farm (run 20261003T001156794Z); every repo caller it works
     for is a Hole Wizard feature.  Reads the document preference
-    ``set_units_mm`` writes (``IModelDoc2::GetUserPreferenceIntegerValue``).
+    ``set_units_inch`` writes (``IModelDoc2::GetUserPreferenceIntegerValue``).
     """
     doc = _early_bound(draw, "IModelDoc2")
     unit = doc.GetUserPreferenceIntegerValue(_SW_PREF_UNITS_LINEAR)
-    if type(unit) is not int or unit != _SW_LENGTH_MM:
+    if type(unit) is not int or unit != _SW_LENGTH_INCHES:
         raise RuntimeError(
-            f"{label}: the typed depth band is mm, but the sheet's linear unit"
-            f" is {unit!r} (swLengthUnit_e; swMM = {_SW_LENGTH_MM})"
+            f"{label}: the typed depth band is inches, but the sheet's linear unit"
+            f" is {unit!r} (swLengthUnit_e; swINCHES = {_SW_LENGTH_INCHES})"
         )
 
 
@@ -604,9 +631,9 @@ def _band_hole_depth(display: Any, band: str, draw: Any, label: str) -> None:
     where the native size and depth stay associative.  Read back like the
     prose.  The callout-below compartment is rewritten by the matched-fit
     prose afterwards, so a depth there is refused rather than lost.  The band
-    is mm text, so the sheet must be mm (``_require_mm_sheet``).
+    is inch text, so the sheet must be inch (``_require_inch_sheet``).
     """
-    _require_mm_sheet(draw, label)
+    _require_inch_sheet(draw, label)
     display = _early_bound(display, "IDisplayDimension")
     definitions = {
         part: str(display.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE
@@ -1443,7 +1470,7 @@ def _assert_neck_right_advance(
     lines = _neck_native_lines(data, label=label)
     texts = _neck_native_texts(data, label=label)
     if tuple(row["text"].strip() for row in texts) != (
-        "<MOD-DIAM>", f"{SHAFT_DIA:.{NECK_DIA_PLACES}f}",
+        "<MOD-DIAM>", inch_text(SHAFT_DIA, NECK_DIA_PLACES),
     ):
         raise RuntimeError(f"{label}: native plain diameter text primitives changed")
     shelves = [line for line in lines if line.y0 == line.y1]
@@ -2358,8 +2385,17 @@ async def build(adapter: Any) -> dict[str, str]:
             f"crankshaft Pinion Pin Hole Process {pinion_process!r} != "
             f"crank_pinion_spec {CRANKSHAFT_PIN_HOLE_PROCESS!r}"
         )
+    # Inch sheet (#290).  The drive-pin holes are a cut, not a Hole Wizard
+    # feature, so their native callout prints at the document's places: the
+    # sheet opens at HOLE_CALLOUT_PLACES, and every Hole Wizard callout is set
+    # back to the title block's three below.
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        decimals=HOLE_CALLOUT_PLACES,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -2458,6 +2494,9 @@ async def build(adapter: Any) -> dict[str, str]:
         process=CROSS_HOLE_PROCESS,
     )
     _set_callout_text(cross_hole, 4, CROSS_HOLE_CALLOUT, "tapered-pin cross-hole")
+    set_hole_callout_precision(
+        cross_hole, WIZARD_CALLOUT_PRECISION, label="tapered-pin cross-hole"
+    )
     drive_pins = add_native_hole_callout(
         adapter,
         end,
@@ -2503,6 +2542,9 @@ async def build(adapter: Any) -> dict[str, str]:
     _drop_coaxial_step(knockouts, DRIVE_PIN_HOLE_DIA, "drive-pin knockout holes")
     _set_callout_text(knockouts, 3, KNOCKOUT_CALLOUT_ABOVE, "drive-pin knockout holes")
     _set_callout_text(knockouts, 4, KNOCKOUT_CALLOUT_BELOW, "drive-pin knockout holes")
+    set_hole_callout_precision(
+        knockouts, WIZARD_CALLOUT_PRECISION, label="drive-pin knockout holes"
+    )
     add_attached_note(
         adapter,
         end,

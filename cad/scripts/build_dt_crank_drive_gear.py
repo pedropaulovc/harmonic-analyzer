@@ -46,8 +46,10 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import _feature_by_name, name_last_feature
 from _part_checks import report_mass_properties
+from _part_properties import part_drawing_unit
 from _paths import IN
 from _rebuild import force_rebuild
 from _session import run_build
@@ -75,6 +77,7 @@ from dt_crank_drive_gear_spec import (
     OUTSIDE_DIA_TOLERANCE_MM,
     STOCK_PROFILE,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 
@@ -147,6 +150,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # This INCH document needs explicit mm suffixes in its editable globals.
     # The face width, round bore, across-flat witness and entry chamfer
@@ -244,7 +249,7 @@ async def build(adapter) -> dict[str, str]:
     # -X and the D-flat chord on +X. The north rim stays square against T120.
     # A ≥Ø8 end mill leaves at most MAX_FLAT_CRESCENT (≈0.960 mm at print
     # worst) of horn + axial runout where the shaft flat meets its collar;
-    # the minimum 1.00-mm, 45° chamfer swallows it. A single native feature
+    # the minimum .05 in (1.27 mm), 45° chamfer swallows it. A single native feature
     # removes both sides of that crescent, not just the easy round arc.
     check(
         "chamfer south D-bore entry",
@@ -277,14 +282,15 @@ async def build(adapter) -> dict[str, str]:
     face_lower, face_upper = deviations(FACE_WIDTH_BAND)
     if face_lower != -face_upper:
         raise AssertionError("the 64T face-width band must be symmetric")
+    # The bands are millimetres; UNIT prints them in inches.
     set_dimension_symmetric_tolerance(
-        adapter, "GearBlank", "FaceWidth", face_upper
+        adapter, "GearBlank", "FaceWidth", face_upper, display_unit=UNIT
     )
     set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)
+        adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND), display_unit=UNIT
     )
     set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreAF", *deviations(BORE_AF_BAND)
+        adapter, "BoreProfile", "BoreAF", *deviations(BORE_AF_BAND), display_unit=UNIT
     )
     await volume_check(
         adapter, "driven crank-drive gear (equations neutral)",
@@ -311,7 +317,11 @@ async def build(adapter) -> dict[str, str]:
     # Its own band: the crank-mesh stack's tip-to-root air takes it
     # (dt_crank_drive_gear_spec).
     set_dimension_symmetric_tolerance(
-        adapter, "OutsideDiaReference", "OutsideDia", OUTSIDE_DIA_TOLERANCE_MM
+        adapter,
+        "OutsideDiaReference",
+        "OutsideDia",
+        OUTSIDE_DIA_TOLERANCE_MM,
+        display_unit=UNIT,
     )
 
     await apply_material(adapter, MATERIAL)

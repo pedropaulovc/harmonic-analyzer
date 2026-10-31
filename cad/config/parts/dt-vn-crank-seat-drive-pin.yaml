@@ -9,4 +9,5 @@ dt-vn-crank-seat-drive-pin:
   finish: plain; no coating
   quantity: 2
   tolerance_class: machined_block
+  drawing_unit: in
   process: purchased

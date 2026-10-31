@@ -35,8 +35,10 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import _feature_by_name, name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties
+from _part_properties import part_drawing_unit
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
@@ -88,6 +90,7 @@ from dt_crank_pinion_spec import (
     stock_profile,
     TURNED_DIA,
     TURNED_DIA_TOLERANCE_MM,
+    UNIT,
 )
 
 PART_NAME = "dt-crank-pinion"
@@ -96,7 +99,7 @@ MATERIAL = "Plain Carbon Steel"  # steel like its mate (p.19/20)
 # FACE_WIDTH (the whole tooth length), SHOULDER_LENGTH, TURNED_DIA and
 # BOSS_LENGTH are in dt_crank_pinion_spec. build_dt_drive_train_assembly checks the
 # installed south face, the T120 clearances and the 64T row overlap.
-BORE_DIAMETER = BORE_DIA  # the crankshaft's Ø9.0 pinion seat (dt_crank_pinion_spec)
+BORE_DIAMETER = BORE_DIA  # the crankshaft's Ø.3125 pinion seat (dt_crank_pinion_spec)
 
 # The hub boss as the runtime gate reads it (#906 diag v3, d6ca08eb7): a boss
 # revolve coincident with the gap floors' root arcs vanished on a
@@ -177,6 +180,8 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): every length carries the load-bearing
     # mm suffix (INCH document; the equation manager reads bare numbers in
@@ -658,29 +663,30 @@ async def build(adapter) -> dict[str, str]:
     # and prove the solid kept its boss (the rebuild's own verdict did not).
     await force_rebuild(adapter)
     await assert_boss_present(adapter, "driven crank pinion")
+    # The bands are millimetres; UNIT prints them in inches.
     set_dimension_bilateral_tolerance(
-        adapter, "BossProfile", "BoreDia", *deviations(BORE_DIA_BAND)
+        adapter, "BossProfile", "BoreDia", *deviations(BORE_DIA_BAND), display_unit=UNIT
     )
     # The tip diameter's own band, on the witness the sheet imports: the
     # crank-mesh stack's tip-to-root air takes it (dt_crank_pinion_spec).  None on
     # the boss -- nothing runs on it.
     set_dimension_symmetric_tolerance(
-        adapter, "BossProfile", "OutsideDia", OUTSIDE_DIA_TOLERANCE_MM
+        adapter, "BossProfile", "OutsideDia", OUTSIDE_DIA_TOLERANCE_MM, display_unit=UNIT
     )
-    # The face's own +0/-0.30: the drive train proves the 64T row engagement
+    # The face's own +.000/-.010: the drive train proves the 64T row engagement
     # at its short limit and the turned band's T120 clearance at its long one
     # (Codex P1 on #1128; user ruling 2026-09-30).  It rides the printed
     # lower witness; the blank's own extrude depth stays definition-only.
     set_dimension_bilateral_tolerance(
-        adapter, "BossProfile", "FaceWidth", *FACE_WIDTH_LIMITS
+        adapter, "BossProfile", "FaceWidth", *FACE_WIDTH_LIMITS, display_unit=UNIT
     )
-    # The shoulder's +0/-0.30 and the turned diameter's +/-0.10: the drive
+    # The shoulder's +.000/-.010 and the turned diameter's +/-.004: the drive
     # train proves the T120 air and radial clearance at their long/large limits.
     set_dimension_bilateral_tolerance(
-        adapter, "BossProfile", "ShoulderLength", *SHOULDER_LENGTH_LIMITS
+        adapter, "BossProfile", "ShoulderLength", *SHOULDER_LENGTH_LIMITS, display_unit=UNIT
     )
     set_dimension_symmetric_tolerance(
-        adapter, "TurnedBandProfile", "TurnedDia", TURNED_DIA_TOLERANCE_MM
+        adapter, "TurnedBandProfile", "TurnedDia", TURNED_DIA_TOLERANCE_MM, display_unit=UNIT
     )
     # The tooth-face shoulder: sharp up to its printed R MAX (dt_crank_pinion_spec).
     _shoulder_radius_max_limit(adapter)

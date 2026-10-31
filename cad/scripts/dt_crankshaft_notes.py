@@ -7,10 +7,12 @@ Imported ONLY by ``draw_crankshaft`` and its offline test (codex #361; see
 from __future__ import annotations
 
 from _surface_finish import surface_finish_by_key
+from dt_crank_drive_gear_spec import inch_text
 from dt_crankshaft_spec import (
     DRIVE_PIN_DEPTH_TOL,
     DRIVE_PIN_KNOCKOUT_PROCESS,
     DRIVE_PIN_SPIGOT_RIM_WORST,
+    HOLE_CALLOUT_PLACES,
     SURFACE_FINISHES,
 )
 
@@ -39,7 +41,7 @@ CROSS_HOLE_CALLOUT = "\n".join(
 # crowded band under the cross-hole callout, so each diameter takes one
 # short row above its value (the fit) and one below (the mate): SolidWorks
 # drops a multi-row callout above a dimension.  The station rows are 9.5 mm
-# apart, so their stacks ride on the same line as a suffix.
+# apart on the sheet, so their stacks ride on the same line as a suffix.
 SLIDING_FIT = "SLIDING FIT"
 SHANK_MATE = "IN MHA-DT-31"
 JOURNAL_FIT = "2X RUNNING FIT"
@@ -59,7 +61,7 @@ SHAFT_LENGTH_MATE = " SETS MHA-DT-31 TO MHA-PD-09 AIR"
 # the shop holds, under the holes' own callout.
 # Emits approved declaration dt-crankshaft RV-02 (owner ruling 2026-10-18,
 # #991; redesign tracked in #1679).
-DRIVE_PIN_RIM_NOTE = f"DRIVE-PIN HOLE TO SPIGOT RIM {DRIVE_PIN_SPIGOT_RIM_WORST:.2f} MIN."
+DRIVE_PIN_RIM_NOTE = f"DRIVE-PIN HOLE TO SPIGOT RIM {inch_text(DRIVE_PIN_SPIGOT_RIM_WORST, 3)} MIN."
 
 # Under the native REAM callout on the seat spigot's two blind holes: the
 # purchased dowel each receives and how it goes in (bottomed, which is what
@@ -72,20 +74,19 @@ DRIVE_PIN_CALLOUT = "\n".join(
     )
 )
 
-# The native REAM callout prints the hole depth bare, so it reads under the
-# title block's .XX +/-0.51, though the cut's depth carries the part's
-# +/-0.10 (crankshaft_spec: pressed to the floor, the depth sets the pin's
+# The native REAM callout prints the hole depth bare, so it would read under
+# the title block's general band, though the cut's depth carries the part's
+# +/-.004 (crankshaft_spec: pressed to the floor, the depth sets the pin's
 # proud length).  The band is appended to the depth at the end of the
-# callout's own format text, in mm: draw_crankshaft refuses a non-mm sheet.
-DRIVE_PIN_DEPTH_BAND = f"<MOD-PM>{DRIVE_PIN_DEPTH_TOL:.2f}"
+# callout's own format text, in inches at the callout's places:
+# draw_dt_crankshaft refuses any other sheet.
+DRIVE_PIN_DEPTH_BAND = f"<MOD-PM>{inch_text(DRIVE_PIN_DEPTH_TOL, HOLE_CALLOUT_PLACES)}"
 
-# Under each 7.000 location: the mate the +/-0.025 serves.  The MHA-PD-09
-# holes (2.5, drilled +0.10/0) slip over the pressed dowels (Ø2.389 max) with
-# 0.111 diametral clearance, which must absorb the pin-spacing error of both
-# parts: 2 x (2 x 0.025) = 0.100 < 0.111.  The title block's .XXX +/-0.13
-# would need 4 x 0.13 = 0.52; the widest per-part band the clearance allows is
-# +/-0.0278 (crankshaft_spec DRIVE_PIN_SPACING_ERROR_MAX check).
-# Four short rows, none wider than the 7.000 value above them: the text runs
+# Under each location: the mate the +/-.0009 serves.  The MHA-PD-09 holes
+# slip over the pressed dowels with a diametral clearance that must absorb
+# the pin-spacing error of both parts (crankshaft_spec
+# DRIVE_PIN_SPACING_ERROR_MAX check); the title block's .XXX band could not.
+# Four short rows, none wider than the location value above them: the text runs
 # right from the dimension line beside the end view and must end before the
 # dome tip's extension lines (machinist review of 19e33c6c2: the two-row
 # form ran ~44 mm wide, across them).
@@ -103,7 +104,7 @@ KNOCKOUT_CALLOUT_BELOW = "DRIVE-PIN KNOCKOUT"
 FIDUCIAL_NOTE = "PUNCH\nMARK\nBY EYE"
 
 # Where the shop may drill a lathe centre hole (drawing-guidelines.md rule
-# 11): the plain Ø9.000 far end only, never the dome.  The leader to that
+# 11): the plain far end only, never the dome.  The leader to that
 # end's rim is what names the end (rule 7: flag it where it applies); the
 # unleadered "AT PLAIN END" row named an end the sheet never identified.  The
 # restriction is on the centre hole, a turning location: the dome's punched

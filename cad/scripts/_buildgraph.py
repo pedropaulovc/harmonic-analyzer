@@ -2367,7 +2367,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         # Angular row sets the through tap's angle in the screw landing gate.
         "dt_vn_cone_tip_collar_spec",
         "dt_crank_hub_geometry",
-        "dt_crank_pinion_spec",
         # Drilled-hole row bounds the rocker's #47 hole the rod-slot pin enters.
         "ch_rocker_arm_profile_check",
         # Drilled-hole row bounds the hub's supply bore under the Ø6.50 ream.
@@ -2376,7 +2375,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "ch_rocker_arm_tl_oblique_carrier_spec",
         # Edge-break row sizes the pillow-block screws' full engagement.
         "ch_rocker_arm_tl_vn_oblique_leadscrew_spec",
-        "dt_crankshaft_spec",
         "error_budget",
         "export_features",
         "fr_harmonic_base_fasteners",
