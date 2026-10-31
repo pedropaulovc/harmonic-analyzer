@@ -128,7 +128,7 @@ def test_decimal_places_cover_every_marked_dimension_and_resolve_fit_bands() -> 
     # The follower-seat height sets engagement geometry, so it is the one
     # dimension held to the title block's finest general grade.
     assert by_name["PinSeatCy"] == 3
-    assert max(by_name.values()) == 3
+    assert max(by_name.values()) == by_name["ArborBoreDia"] == 4
 
 
 def test_overall_length_is_a_derived_reference_with_spec_owned_places() -> None:
