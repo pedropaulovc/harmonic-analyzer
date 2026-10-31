@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the pinion-arbor collar (R1a).
 
-A plain turned steel collar: Ø15 x 17, a drilled Ø8 slide bore, and one
+A plain turned steel collar: Ø15 x 17, a drilled Ø5/16 slide bore, and one
 1/16 in spring-pin hole through both walls at the length's centre.  The
 profile lies as it sits in the lathe (axis horizontal) and looks along the
 pin hole, so the hole is a solid circle located from the right-hand end face;
