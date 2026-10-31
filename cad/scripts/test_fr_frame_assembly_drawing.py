@@ -622,7 +622,9 @@ def test_step_9_spot_through_is_declared_on_the_assembly() -> None:
     """Step 9's spot-through fit-up is an owner-accepted rule-19 departure:
     the nominal screw float cannot absorb independent plate/base stations."""
     import sh_vn_brass_fillister_screw_spec as screw
+    import fr_harmonic_base_spec as base_spec
     import fr_nameplate_drawing_spec as plate
+    import fr_nameplate_spec as nameplate
     from _assembly_contract import assembly_contract
     from _drawing_registry import DRAWINGS_BY_NAME
     from _paths import CAD_ROOT
@@ -640,10 +642,17 @@ def test_step_9_spot_through_is_declared_on_the_assembly() -> None:
     assert (entry.id, entry.kind) == ("RV-01", "accept")
     assert re.search(r"\brule 19\b", entry.finding)
     assert re.search(r"\bstep 9\b", entry.where)
-    # Without the spot-through, the plate's .X station and a .XX base tap,
-    # each on both axes, demand far more diametral float than the screw has.
+    # Without the spot-through, the plate's .XXX station and the base's .XXX
+    # tap station, each on both axes, demand far more diametral float than the
+    # screw has.
     float_mm = plate.SCREW_HOLE_DIA - screw.SHANK_DIA
-    demand_mm = 2.0 * math.sqrt(2.0) * (printed_band_mm(1) + printed_band_mm(2))
+    station_band = printed_band_mm(
+        plate.DRAWING_PRECISION["ScrewHoles"]["S0X"], unit=nameplate.UNIT
+    )
+    demand_mm = 2.0 * math.sqrt(2.0) * (
+        station_band
+        + printed_band_mm(base_spec.HOLE_TABLE_PRECISION, unit=base_spec.UNIT)
+    )
     assert float_mm < demand_mm
     # The build reads the same file and ignores the declaration.
     assert assembly_contract("fr-frame").number == "MHA-FR-00"
@@ -742,8 +751,8 @@ def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
         added.update(view=view, entities=edges, text_xy=text_xy, label=label)
         return "display"
 
-    def check(_adapter, display, *, expected_mm, label):
-        checked.update(display=display, expected_mm=expected_mm)
+    def check(_adapter, display, *, expected_mm, places, label):
+        checked.update(display=display, expected_mm=expected_mm, places=places)
         return display
 
     monkeypatch.setattr(drawing, "model_points_in_view", project)
@@ -797,7 +806,13 @@ def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
             0.180 - text_z / 3.0,
         )
     )
-    assert checked == {"display": "display", "expected_mm": drawing.NAMEPLATE_END_INSET}
+    assert checked == {
+        "display": "display",
+        "expected_mm": drawing.NAMEPLATE_END_INSET,
+        "places": drawing.INSET_PLACES,
+    }
+    # The inset prints .16 exactly on its .XX grid.
+    assert drawing.NAMEPLATE_END_INSET == pytest.approx(0.16 * 25.4, abs=1e-9)
 
 
 def _scripted_inset_edges(monkeypatch, rays, readback, *, selected_view="B-B"):
@@ -1335,7 +1350,7 @@ def _settled_inset_harness(monkeypatch):
         "edges": initial_edges, "attached": initial_edges, "dangling": False,
         "types": (), "inventory": (), "equality_unknown": False,
     }
-    native = SimpleNamespace(SystemValue=0.004)
+    native = SimpleNamespace(SystemValue=drawing.NAMEPLATE_END_INSET / 1000.0)
     annotation = SimpleNamespace(
         IsDangling=lambda: state["dangling"],
         GetAttachedEntityTypes=lambda: state["types"],
@@ -1382,7 +1397,7 @@ def test_settled_inset_reacquires_both_section_refs_and_checks_the_native_dimens
     state.update(edges=regenerated, attached=regenerated[::-1])
     drawing._assert_inset_dimension_settled(adapter, proof)
     assert mapped == [*model_edges, *model_edges]
-    assert events[-1][1]["measured_mm"] == pytest.approx(4.0)
+    assert events[-1][1]["measured_mm"] == pytest.approx(drawing.NAMEPLATE_END_INSET)
     assert events[-1][1]["section_owned"] is True
     assert events[-1][1]["expected_instances"] == ("fr-nameplate-1", "fr-harmonic-base-1")
     assert events[-1][1]["types"] == ()  # Native summary is empty even on the screen control.
@@ -1453,7 +1468,9 @@ def test_a_checked_linear_dimension_refuses_to_dangle(monkeypatch) -> None:
         GetAnnotation=lambda: annotation,
     )
     with pytest.raises(RuntimeError, match="inset is dangling \\(attached entity types \\(1, 1\\)\\)"):
-        drawing._checked_linear_dimension(None, display, expected_mm=4.0, label="inset")
+        drawing._checked_linear_dimension(
+            None, display, expected_mm=4.0, places=drawing.INSET_PLACES, label="inset"
+        )
 
 
 class _InsetSelection:

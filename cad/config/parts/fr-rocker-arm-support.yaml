@@ -4,4 +4,5 @@ fr-rocker-arm-support:
   finish: GREEN ENAMEL; MASK MOUNTING FACE; LIGHT OIL BARE MACHINED SURFACES
   quantity: 1
   tolerance_class: machined_block
+  drawing_unit: in
   process: "machined from solid stock or casting"

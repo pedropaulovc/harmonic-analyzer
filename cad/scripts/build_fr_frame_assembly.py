@@ -42,7 +42,7 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
   reclosed rod-pin hole 125.890 out reaches the cam centre at -52.990, rods plumb; the old
   "arbor 47.5 + 25.4 rod lever" chain died with the ch30 re-anchor).
   Inserted at its exact authored transform and locked to the fixed base.
-* top-frame x1: the green one-piece casting at mid-plane Y = 1017.95 (side
+* top-frame x1: the green one-piece casting at mid-plane Y = 40.077 in (side
   rails 34.2 wide / front-rear rails 38 wide x 36.5 tall, band
   y 999.7..1036.2; corner bosses Ø45 rise to 1040.7), bored around the
   four columns; its east rail (-X) carries the gooseneck hub and its west
@@ -65,8 +65,8 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
 
 Hold-down: four stock 1/4-20 UNC-2A hex-head screws install from the top,
 through the support foot's 5/16 clearance drills, into through 1/4-20 UNC-2B
-seats in the base. The foot pattern transforms from local X +/-60.32,
-Z +/-17.46 to machine x 55.44/90.36, z -60.32/+60.32 (the base's shared
+seats in the base. The foot pattern transforms from local X +/-2.375,
+Z +/-.687 to machine x 2.183/3.557, z -2.375/+2.375 in (the base's shared
 SUPPORT_HOLD_DOWN_XZ contract). Each McMaster 92240A540 screw bears on the
 bottom of its exact vendor-modeled 0.277813 mm under-head washer transition,
 crosses the 6.35 mm foot, and inserts 12.422187 mm into the base receiver.
@@ -99,11 +99,13 @@ import _telemetry
 from _check import check
 from _com import _early_bound
 from _custom_properties import apply_custom_properties
+from _document_units import apply_package_model_units
 from _paths import OUT_SLDPRT
 from _session import run_build
 from _drawing_marks import DRAWN_BY
 from _printed_tolerance import printed_deviations
 from _simplified_names import simplified_name
+from _assembly_contract import assembly_contract
 from _assembly import (
     activate_assembly_contract,
     assembly_title_properties,
@@ -159,6 +161,7 @@ from fr_nameplate_spec import (
     PLATE_THICKNESS as NAMEPLATE_THICKNESS,
     PLATE_THICKNESS_PRECISION as NAMEPLATE_THICKNESS_PRECISION,
     SCREW_FULL_THREAD_MIN as NAMEPLATE_STOCK_FULL_THREAD_MIN,
+    UNIT as NAMEPLATE_UNIT,
 )
 from fr_rocker_arm_support_section_spec import FOOT_THICKNESS as LAG_FOOT_THICKNESS
 from fr_rocker_arm_support_spec import (
@@ -203,6 +206,7 @@ from fr_frame_attachment_spec import (
     TUBE_CROSS_HOLE_DIAMETER,
 )
 from fr_harmonic_base_spec import STACK_HEIGHT
+from frame_column_stations import COLUMN_X
 from fr_vn_tube_frame_cap_spec import (
     INSIDE_HEIGHT as CAP_INSIDE_HEIGHT,
     TOTAL_HEIGHT as CAP_TOTAL_HEIGHT,
@@ -213,7 +217,6 @@ ASM_NAME = "fr-frame"
 FRAME_EXPLODED = "FRAME_EXPLODED"
 
 BASE_TOP_Y = STACK_HEIGHT
-COLUMN_X = 197.0
 FRONT_COLUMN_Z = FRAME_FRONT_COLUMN_Z
 REAR_COLUMN_Z = FRAME_REAR_COLUMN_Z
 SUPPORT_X = SUPPORT_WORLD_X  # rocker pivot x: the seesaw mid-span (ch30 GT arm-end
@@ -276,9 +279,9 @@ TOP_FRAME_MID_Y = TOP_SCREW_Y
 # --- Frame cross-screw stack -------------------------------------------------
 # The stock screw origin is its under-head seat and its shank runs along local
 # -Y. Front placements rotate it toward +Z; rear placements toward -Z. Each
-# 44.45-mm shank crosses the near casting, both Ø5 tube walls, and at least one
-# major diameter of far casting while retaining 1.55 mm of full thread beyond
-# the tip in the 46-mm interrupted tap.
+# 1.750-in shank crosses the near casting, both Ø.197 tube walls, and at least
+# one major diameter of far casting while retaining .060 of full thread beyond
+# the tip in the 1.81-deep interrupted tap.
 COLUMN_RADIUS = COLUMN_OUTER_DIA / 2.0
 SOCKET_RADIUS = COLUMN_SOCKET_DIAMETER / 2.0
 BASE_CROSS_SCREW_TIP_Z = BASE_SCREW_SEAT_Z - CROSS_SCREW_SHANK_LEN
@@ -381,7 +384,7 @@ if NAMEPLATE_SCREW_SHANK_LEN < NAMEPLATE_THICKNESS + 2.0:
 # NOT a claim that the installed female overlap reaches 1.5D. The original
 # shortfall calculation did not deduct the unchanged female entrance break.
 _NAMEPLATE_THICKNESS_LOW = printed_deviations(
-    NAMEPLATE_THICKNESS, NAMEPLATE_THICKNESS_PRECISION,
+    NAMEPLATE_THICKNESS, NAMEPLATE_THICKNESS_PRECISION, unit=NAMEPLATE_UNIT,
 )[0]
 NAMEPLATE_SCREW_MAX_INSERTION = (
     NAMEPLATE_SCREW_SHANK_LEN - NAMEPLATE_THICKNESS - _NAMEPLATE_THICKNESS_LOW
@@ -684,6 +687,7 @@ async def build(adapter) -> dict[str, str]:
     top_frame_path = _part("fr-top-frame")
 
     check("create_assembly", await adapter.create_assembly())
+    apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
 
     # Base: first insert is auto-fixed by SolidWorks.
     res = await adapter.insert_component(InsertComponentParameters(file_path=base_path))

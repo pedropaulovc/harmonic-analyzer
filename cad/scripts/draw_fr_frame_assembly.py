@@ -86,6 +86,8 @@ from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from _simplified_names import simplified_name
 import _telemetry
+from _assembly_contract import assembly_contract
+from _title_block_units import render_number
 from fr_frame_attachment_spec import (
     BASE_SCREW_Y,
     CAP_TOP_Y,
@@ -124,6 +126,14 @@ PNG = OUTPUTS.png
 # B-B looks down on both edges and dimensions the inset between them; step 9
 # points to that dimension instead of repeating its value.
 NAMEPLATE_END_INSET = DECK_HALF_X - NAMEPLATE_MOUNT_POS[0]
+# The fitter sheets print decimal inch (fr-frame.yaml ``drawing_unit``).
+UNIT = assembly_contract("fr-frame").drawing_unit
+# Places the sheet-made checked dimensions print: both heights follow the
+# .001 grid of the cap stack (41.134, 40.077); the inset is .16.
+HEIGHT_PLACES = 3
+INSET_PLACES = 2
+# The tube match holes' finished drill, as steps 2 and 5 print it (.197).
+CROSS_HOLE_TEXT = render_number(TUBE_CROSS_HOLE_DIAMETER / 25.4, UNIT, 3)
 # Machine z stations each inset edge's ray is cast at, in turn: on both
 # edges, clear of the plate's corner screw heads (z +/-42) and the deck's
 # centre line (z 0). The first station whose ray meets an edge chooses it; the
@@ -172,7 +182,7 @@ WORKING_FRONT_CENTER = (0.053763, 0.163612)
 # which stand right of the A/B cutting-plane arrows and letters. Those letters
 # reach CUTTING_LETTER_REACH_M past the view's flange edge: on the r4 render
 # (run 20261015T235155114Z) they ended at 92.9 mm against the flange's
-# 82.3 mm, and the (1044.8) line at 92.0 mm struck the right-hand "B". Each
+# 82.3 mm, and the (41.134) line at 92.0 mm struck the right-hand "B". Each
 # height line keeps HEIGHT_LINE_CLEARANCE_M from the letters, from its
 # neighbour and from section A-A's flange edge. Between the overall line and
 # A-A's flange edge there is VIEW_GAP_M or more, so the dimensions read as the
@@ -292,7 +302,7 @@ ASSEMBLY_STEPS = "\n".join(
         "2. RESEAT EACH MATCHED COLUMN. THROUGH THE EXISTING CASTING BORES,",
         "   PILOT-TRANSFER THE LOWER AXIS THROUGH BOTH TUBE WALLS WITH A DRILL",
         "   BELOW THE #10-32 THREAD MINOR; PROTECT BOTH THREAD SEGMENTS. REMOVE",
-        f"   COLUMN; ENLARGE BOTH WALLS TO DIA {TUBE_CROSS_HOLE_DIAMETER:.2f} "
+        f"   COLUMN; ENLARGE BOTH WALLS TO DIA {CROSS_HOLE_TEXT} "
         "AND DEBURR. THE ACTUAL",
         "   MHA-FR-VN-53 SHANK MUST PASS FREELY WITHOUT THREAD CONTACT.",
         "",
@@ -312,7 +322,7 @@ ASSEMBLY_STEPS = "\n".join(
         "5. THROUGH THE EXISTING MHA-FR-02 CASTING BORES, PILOT-TRANSFER EACH",
         "   TOP AXIS THROUGH BOTH TUBE WALLS AS STEP 2; PROTECT BOTH THREAD",
         "   SEGMENTS. REMOVE MHA-FR-02/COLUMNS; ENLARGE BOTH WALLS TO",
-        f"   DIA {TUBE_CROSS_HOLE_DIAMETER:.2f}, DEBURR, AND VERIFY FREE PASSAGE "
+        f"   DIA {CROSS_HOLE_TEXT}, DEBURR, AND VERIFY FREE PASSAGE "
         "OF THE ACTUAL MHA-FR-VN-53",
         "   SHANK.",
         "",
@@ -420,7 +430,7 @@ def _configure_view(
 
 
 def _checked_linear_dimension(
-    adapter: Any, display: Any, *, expected_mm: float, label: str
+    adapter: Any, display: Any, *, expected_mm: float, places: int, label: str
 ) -> Any:
     display = _early_bound(display, "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
@@ -434,10 +444,10 @@ def _checked_linear_dimension(
         # A dangling dimension measures and prints (in the dangling colour)
         # without being attached to anything the sheet draws.
         raise RuntimeError(f"{label} is dangling (attached entity types {types})")
-    if int(display.SetPrecision3(1, -1, -1, -1)) < 0:
+    if int(display.SetPrecision3(places, -1, -1, -1)) < 0:
         raise RuntimeError(f"failed to set {label} precision")
-    if int(display.GetPrimaryPrecision2()) != 1:
-        raise RuntimeError(f"{label} did not retain one-place precision")
+    if int(display.GetPrimaryPrecision2()) != places:
+        raise RuntimeError(f"{label} did not retain {places}-place precision")
     adapter.currentModel.EditRebuild3()
     return display
 
@@ -620,6 +630,7 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         adapter,
         overall,
         expected_mm=CAP_TOP_Y,
+        places=HEIGHT_PLACES,
         label="finished frame overall height",
     )
     overall = set_reference_dimension(
@@ -651,6 +662,7 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         adapter,
         screw_axis,
         expected_mm=TOP_SCREW_Y,
+        places=HEIGHT_PLACES,
         label="installed top cross-screw axis height",
     )
     screw_axis = _set_dimension_suffix(
@@ -1076,7 +1088,11 @@ def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> _InsetDimensio
         text_xy=(text_xy[0], text_xy[1]), label="nameplate end inset",
     )
     display = _checked_linear_dimension(
-        adapter, display, expected_mm=NAMEPLATE_END_INSET, label="nameplate end inset"
+        adapter,
+        display,
+        expected_mm=NAMEPLATE_END_INSET,
+        places=INSET_PLACES,
+        label="nameplate end inset",
     )
     proof = _InsetDimensionProof(section, display, references)
     _assert_inset_dimension_settled(adapter, proof, phase="creation rebuild")
@@ -1345,7 +1361,7 @@ def _append_template_sheet(
     donor_title = ""
     try:
         donor, donor_sheet = new_project_drawing(
-            adapter, layout=layout, scale=SHEET_SCALES[new_name]
+            adapter, layout=layout, scale=SHEET_SCALES[new_name], unit=UNIT
         )
         donor = _early_bound(donor, "IModelDoc2")
         donor_sheet = _early_bound(donor_sheet, "ISheet")
@@ -1379,7 +1395,10 @@ def _append_template_sheet(
 def _create_mixed_package_sheets(adapter: Any) -> None:
     """Create landscape/portrait/landscape/landscape sheets from the project templates."""
     target, initial = new_project_drawing(
-        adapter, layout=SHEET_LAYOUTS[SHEET_NAMES[0]], scale=SHEET_SCALES[SHEET_NAMES[0]]
+        adapter,
+        layout=SHEET_LAYOUTS[SHEET_NAMES[0]],
+        scale=SHEET_SCALES[SHEET_NAMES[0]],
+        unit=UNIT,
     )
     target = _early_bound(target, "IModelDoc2")
     initial = _early_bound(initial, "ISheet")

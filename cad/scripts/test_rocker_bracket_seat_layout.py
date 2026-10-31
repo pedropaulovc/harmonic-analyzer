@@ -69,13 +69,11 @@ def test_seat_stack_margins() -> None:
     assert seats.ENGAGEMENT_MIN == pytest.approx(7.801, abs=1e-3)
     assert seats.ENGAGEMENT_MIN >= 1.5 * seats.SCREW_MAJOR_DIA
     assert seats.SEAT_THREAD_DEPTH - seats.LINEAR_1PL - seats.SCREW_REACH_MAX == (
-        pytest.approx(0.317, abs=1e-3)
+        pytest.approx(0.323, abs=1e-3)
     )
-    assert (seats.SEAT_THREAD_DEPTH, seats.SEAT_DRILL_DEPTH) == (11.5, 14.7)
+    assert seats.SEAT_THREAD_DEPTH == pytest.approx(0.453 * 25.4)
+    assert seats.SEAT_DRILL_DEPTH == pytest.approx(0.579 * 25.4)
     assert seats.SEAT_DRILL_NAME == "#29"
-    # The print carries each depth row at .X.
-    for value in (seats.SEAT_DRILL_DEPTH, seats.SEAT_THREAD_DEPTH):
-        assert round(value, 1) == value
 
 
 def test_seat_thread_keeps_the_web_wall_at_the_printed_worst_case() -> None:
@@ -87,7 +85,7 @@ def test_seat_thread_keeps_the_web_wall_at_the_printed_worst_case() -> None:
     assert support.WEB is seats.WEB
     assert 2.0 * seats.WEB == pytest.approx(12.70)  # 1/2 in
     assert (seats.WEB_PLACES, seats.TOP_FLAT_PLACES) == (2, 2)
-    assert seats.TOP_FLAT_EDGE_FROM_WEB == pytest.approx(8.4665 - 6.35)
+    assert seats.TOP_FLAT_EDGE_FROM_WEB == pytest.approx(0.08 * 25.4)
     assert seats.TOP_FLAT_EDGE_BAND == seats.LINEAR_2PL == 0.508
     # The hole off the foot's flush side: nearest at 16.00 - 0.51 wide and
     # 8.00 + 0.51 off the far side, farthest the other way round.
@@ -98,16 +96,16 @@ def test_seat_thread_keeps_the_web_wall_at_the_printed_worst_case() -> None:
     # An 11/64 transfer punch in the #8 close hole at its +0.10 drilled max.
     punch = (4.572 + 0.10 - 11.0 / 64.0 * 25.4) / 2.0
     assert seats.PUNCH_FLOAT == pytest.approx(punch, abs=1e-3)
-    # Toward the near face: the flush edge at 2.12 + 0.51 off it.
-    near = near_hole - (2.1165 + 0.508) - punch
-    # Toward the far face: the edge at 2.12 - 0.51, the web 12.70 - 0.51.
-    far = (12.70 - 0.508) - (far_hole + punch - (2.1165 - 0.508))
+    # Toward the near face: the flush edge at .08 + .02 off it.
+    near = near_hole - (2.032 + 0.508) - punch
+    # Toward the far face: the edge at .08 - .02, the web 12.70 - 0.51.
+    far = (12.70 - 0.508) - (far_hole + punch - (2.032 - 0.508))
     assert seats.SEAT_FROM_NEAR_FACE_MIN == pytest.approx(near, abs=1e-3)
     assert seats.SEAT_FROM_FAR_FACE_MIN == pytest.approx(far, abs=1e-3)
     wall = min(near, far) - seats.SCREW_MAJOR_DIA / 2.0
     assert wall == pytest.approx(seats.WEB_WALL_MIN, abs=1e-3)
-    assert wall == pytest.approx(2.12, abs=0.01)
-    assert far - seats.SCREW_MAJOR_DIA / 2.0 == pytest.approx(2.55, abs=0.01)
+    assert wall == pytest.approx(2.21, abs=0.01)
+    assert far - seats.SCREW_MAJOR_DIA / 2.0 == pytest.approx(2.47, abs=0.01)
     assert wall >= seats.RULE12_WEB_TARGET
 
 
@@ -239,18 +237,18 @@ def test_one_foot_fits_both_ends_of_the_support_and_places_its_hole() -> None:
     assert (round(sides.FOOT_LEN, 2), round(sides.HOLE_STATION, 2)) == (17.79, 12.4)
 
 
-def test_support_is_the_shortest_length_keeping_the_foot_end_wall() -> None:
+def test_support_length_keeps_the_foot_end_wall() -> None:
     """User ruling 2026-10-14 (#954 machinist review): the foot length rides
-    the title block and the foot grew to keep its hole's 2.0 end wall; the
+    the title block and the foot grew to keep its hole's end wall; the
     #1371 review sent the hole station to the title block the same way. The
-    support widened with it so the foot stays flush with its south end."""
-    assert (
-        2.0 * support_spec.SUPPORT_HALF_MACHINE_Z == sides.SUPPORT_LENGTH_MIN == 180.5
-    )
-    assert support.BOSS_DEPTH == pytest.approx(sides.SUPPORT_LENGTH_MIN)
+    support widened with it (now 7.106) so the foot stays flush with its
+    south end."""
+    assert 2.0 * support_spec.SUPPORT_HALF_MACHINE_Z == sides.SUPPORT_LENGTH
+    assert sides.SUPPORT_LENGTH == pytest.approx(7.106 * 25.4)
+    assert support.BOSS_DEPTH == pytest.approx(sides.SUPPORT_LENGTH)
     assert sides.HOLE_LIGAMENTS_MIN["foot end"] >= bracket.LIGAMENT_TARGET
     assert bracket.STATION_BAND == bracket.FOOT_LEN_BAND == 0.508
-    shorter = sides.SUPPORT_LENGTH_MIN - 0.1
+    shorter = sides.SUPPORT_LENGTH - 0.1
     assert not sides._foot_fits(shorter)
 
 

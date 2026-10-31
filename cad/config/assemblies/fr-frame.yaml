@@ -22,6 +22,9 @@ flip_invert: []
 allowed_free_stems: []
 required_free_stems: []
 free_dof: 0
+# drawing_unit: the fitter sheets, their TOL_* rows and the saved model's units
+#   are decimal inch (#290).
+drawing_unit: in
 # machinist_exceptions: the assembly drawing's owner-declared machinist-review
 #   exceptions (drawing-simplicity-policy.md "Named exceptions"); read by
 #   machinist_exceptions.load_exceptions for fr_frame_assembly, ignored by
@@ -31,4 +34,4 @@ machinist_exceptions:
     kind: "accept"
     where: "the MATCH-FIT AND ASSEMBLY SEQUENCE step 9. SET MHA-FR-04 DECORATED FACE UP, CENTRED FRONT TO REAR, PARALLEL TO AND INSET FROM THE NEAR DECK END PER SECTION B-B, SHEET 1; CLAMP. SPOT MHA-FR-01 THROUGH ITS FOUR HOLES; DRILL AND TAP EACH PER ITS MHA-FR-01 TRANSFER CALLOUT. SEAT ALL FOUR MHA-SH-VN-51 HEADS."
     finding: "fit-up at assembly (rule 19)"
-    reason: "the nameplate's four #4-40 base seats are spotted through the clamped plate and drilled and tapped at assembly (the base sheet prints them as transferred from MHA-FR-04), so the plate's holes locate at the title block's .X grade: the 0.203 diametral float of the screw in its 3.048 hole (3.048 - 2.845) is far short of the 3.705 the loose bands would demand (plate station .X +/-0.8 plus a base tap at .XX +/-0.51 on each axis, 2 x sqrt(2) x 1.31 = 3.705), so the step absorbs the whole stack and neither part takes a tighter band (owner ruling 2026-10-15, #1468 option A) (owner-accepted)"
+    reason: "the nameplate's four #4-40 base seats are spotted through the clamped plate and drilled and tapped at assembly (the base sheet prints them as transferred from MHA-FR-04), so the plate's holes locate at the title block's .XXX grade: the .008 diametral float of the screw in its .120 hole (.120 - .112) is far short of the .028 the loose bands would demand (plate station .XXX +/-.005 plus a base tap station at .XXX +/-.005 on each axis, 2 x sqrt(2) x .010 = .028), so the step absorbs the whole stack and neither part takes a tighter band (owner ruling 2026-10-15, #1468 option A; restated in inch, #290) (owner-accepted)"

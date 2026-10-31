@@ -8,7 +8,7 @@ Dimension import and curation live in ``_drawing_dimension_import``.
 
 The tube axis runs along +Y, so the length view is the ``*Front`` orientation
 and the chamfered end view is ``*Top``, aligned above it in third-angle
-projection. The portrait sheet uses the long axis for the 1018.765 mm cut
+projection. The portrait sheet uses the long axis for the 40.109 in cut
 length at 1:5; the end view carries a 2:1 override. The isometric is pictorial only.
 
 Run with SolidWorks open::
@@ -58,6 +58,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _gtol_cone import ConeFace
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -91,7 +92,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 5.0)  # 1:5 whole sheet (1018.765 mm cut tube)
+SHEET_SCALE = (1.0, 5.0)  # 1:5 whole sheet (40.109 in cut tube)
 END_VIEW_SCALE = 2.0
 ISO_VIEW_SCALE = (1, 10)
 # The aligned length/end views occupy the left-centre of the portrait sheet;
@@ -130,8 +131,8 @@ LENGTH_KEEP = {
 # shoulder at 333 mm stays 4.8 mm over the isometric's outline (328.2 mm).
 CHAMFER_TEXT_XY = (0.198, 0.3386)
 _CHAMFER_POSITION_TOLERANCE_M = 0.001
-# The chamfer dimension prints the part-authored break places (one, .X) and
-# a whole-degree angle: "0.5 X 45°".
+# The chamfer dimension prints the part-authored break places (two, .XX) and
+# a whole-degree angle: ".02 X 45°".
 CHAMFER_PLACES = DRAWING_PRECISION_BY_NAME["TopChamfer"]
 IMPORTED_PRECISION = {
     name: places
@@ -143,7 +144,7 @@ _CHAMFER_DIMENSION = 10  # swDimensionType_e.swChamferDimension
 _CHAMFER_TEXT_DIST_ANG = 2
 _CHAMFER_LENGTH = 0  # IDisplayDimension.ChamferPrecision index: length
 _CHAMFER_ANGLE = 1  # IDisplayDimension.ChamferPrecision index: angle
-# The cut length is set at assembly: the supply size rides above the (1018.8)
+# The cut length is set at assembly: the supply size rides above the (40.109)
 # reference and the cut-to-fit stack below it (rule 19), so the requirement
 # is flagged on the length itself rather than in the note block.
 ABOVE_CALLOUTS = {
@@ -413,7 +414,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -537,8 +542,8 @@ async def build(adapter: Any) -> dict[str, str]:
             )
     # The part authored these places (tube_frame_spec.DRAWING_PRECISION); this
     # sheet only proves they survived the import. A silent fallback to the
-    # drawing document's two places would print the 1018.8 cut length as
-    # 1018.77 and ask for a band the match-cut note explicitly refuses.
+    # drawing document's places would print the 40.109 cut length at the
+    # wrong grid and ask for a band the match-cut note explicitly refuses.
     assert_imported_precision(adapter, dimensions, IMPORTED_PRECISION)
     for name in ("Length", "LowerHoleY", "UpperHoleY"):
         references = [

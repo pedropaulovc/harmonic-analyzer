@@ -13,7 +13,7 @@ north one IDENTITY. The ears sit 0.8 apart from mid-support, so the two
 support end faces lie at different distances from them; one part serves both
 sides (#1341, option A): its foot ``FOOT_Z1`` ends flush with the nearer end
 face -- the south one -- and 1.61 short of the north one. The support is
-as long as that foot needs (``SUPPORT_LENGTH_MIN``). The bracket has
+as long as that foot needs (``SUPPORT_LENGTH``). The bracket has
 one MHA-CH-VN-57 hold-down hole in its foot's free run from the ear's outboard
 face to the foot end, its station ``HOLE_Z`` given at the title block's .XX
 from the ear's inboard face, the face fit-up sets (``ch_pivot_bracket_spec``
@@ -102,28 +102,17 @@ def _foot_fits(length: float) -> bool:
     )
 
 
-# The support's length is the shortest .X length, from the source casting's
-# 7 in up, whose nearer end face gives the foot a hold-down hole keeping the
-# 2.0 wall target to the foot end, the head clear of the ear and the seat's
-# end wall at the foot length's and the station's title-block bands (user
-# ruling 2026-10-14 on the #954 machinist review: the foot length dropped its
-# +/-0.10 and the foot grew instead; the #1371 review did the same for the
-# station; the support widened with it so the foot still ends flush with the
-# south end face, #1341 option A). The support's spec carries the length (its
-# importers read no bracket data); this module proves it is that shortest one.
-SOURCE_SUPPORT_LENGTH = 177.8  # the source casting's 7 in
-_LENGTH_STEP = 0.1  # the support's length prints at one place
-SUPPORT_LENGTH_MIN = next(
-    round(SOURCE_SUPPORT_LENGTH + step * _LENGTH_STEP, 1)
-    for step in range(100)
-    if _foot_fits(SOURCE_SUPPORT_LENGTH + step * _LENGTH_STEP)
-)  # 180.5
-if abs(2.0 * SUPPORT_HALF_MACHINE_Z - SUPPORT_LENGTH_MIN) > 1e-9:
+# The support's length (its own spec's; user ruling 2026-10-14 on the #954
+# machinist review grew it for this foot at the millimetre bands) must give
+# the foot a hold-down hole keeping the wall target to the foot end, the head
+# clear of the ear and the seat's end wall.
+SUPPORT_LENGTH = 2.0 * SUPPORT_HALF_MACHINE_Z
+if not _foot_fits(SUPPORT_LENGTH):
     raise AssertionError(
-        f"the rocker-arm support must be {SUPPORT_LENGTH_MIN:.1f} long for the"
-        f" pivot-bracket foot's end wall, not {2.0 * SUPPORT_HALF_MACHINE_Z:.1f}"
+        f"the rocker-arm support's {SUPPORT_LENGTH:.1f} length leaves the"
+        " pivot-bracket foot no hold-down station keeping its walls"
     )
-SUPPORT_END_Z = _support_end_z(2.0 * SUPPORT_HALF_MACHINE_Z)  # S 13.79, N 15.40
+SUPPORT_END_Z = _support_end_z(SUPPORT_LENGTH)  # S 13.79, N 15.40
 # The foot ends flush with the nearer end face (the south), so it stays on the
 # support on both sides.
 FOOT_Z1 = min(SUPPORT_END_Z.values())  # 13.79

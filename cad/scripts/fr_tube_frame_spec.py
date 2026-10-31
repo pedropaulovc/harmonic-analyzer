@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import math
 
+import _config
+from _package_units import drawing_unit
 from fr_frame_attachment_spec import (
     BASE_SCREW_Y,
     COLUMN_BOTTOM_Y,
@@ -21,10 +23,12 @@ from fr_frame_attachment_spec import (
 
 
 MM_PER_IN = 25.4
+# The sheet prints decimal inch (issue #290, ``drawing_unit: in``).
+UNIT = drawing_unit("parts/fr-tube-frame", _config.parts("fr-tube-frame"))
 
 # --- Regular open steel tube. The lower end enters the base socket; the upper
 # end receives a separately purchased recessed cap. The tube cut length follows
-# the shared installed cap stack, keeping the finished cap top at Y=1044.8. ---
+# the shared installed cap stack, keeping the finished cap top at Y=41.134 in. ---
 OUTER_DIA = 1.0 * MM_PER_IN  # 25.4
 WALL_THICKNESS = 0.12 * MM_PER_IN  # 3.048
 INNER_DIA = OUTER_DIA - 2.0 * WALL_THICKNESS  # 19.304
@@ -48,17 +52,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`
 # ), so the MODEL owns them: build_fr_tube_frame applies this map to the .SLDPRT
-# and draw_fr_tube_frame only reads it back. Two places on the cross-hole trio
-# because all three are MATCH-DRILLED from the assembled frame and the sheet's
-# stations are what the fitter sets up to -- 12.70 and 992.55 are exact
-# 0.5/39.077 in conversions, and rounding them to .X would move the upper
-# station by half a millimetre. One place on the cut length and the top break:
-# the length is final-match-cut to the actual stack, and a 0.5 chamfer is a
-# deburr. OuterDia stays at the document default -- it is purchased stock.
+# and draw_fr_tube_frame only reads it back. The cut length and the upper
+# station print three places: both follow the cap stack on the .001 grid
+# (40.109, 39.077), and rounding them to .XX would move them by up to .005.
+# The lower station is .50 exactly. The cross hole is a .197 drill (title
+# block +.004/0). The top break is a .02 deburr. OuterDia stays at the document
+# default -- it is purchased stock.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "Column": {"Length": 1},
-    "CrossHoleProfile": {"LowerHoleY": 2, "UpperHoleY": 2, "CrossHoleDia": 2},
-    "TopEndBreak": {"TopChamfer": 1},
+    "Column": {"Length": 3},
+    "CrossHoleProfile": {"LowerHoleY": 2, "UpperHoleY": 3, "CrossHoleDia": 3},
+    "TopEndBreak": {"TopChamfer": 2},
 }
 
 _PRECISION_NAMES = [
@@ -76,7 +79,7 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
 TOP_END_CALLOUT = "MHA-FR-VN-54 CAP MUST SEAT FULLY BY HAND"
-# Which edge the 0.5 break is on: the imported chamfer dimension's arrows sit
+# Which edge the .02 break is on: the imported chamfer dimension's arrows sit
 # on the top face's extension lines, so the suffix names the edge (MR r1/r3).
 TOP_END_CHAMFER_SUFFIX = " X 45 DEG TOP END OD"
 
@@ -84,14 +87,18 @@ TOP_END_CHAMFER_SUFFIX = " X 45 DEG TOP END OD"
 # oversize and step 4 final match-cuts it to the actual base/top/cap stack
 # (drawing-guidelines.md rule 19). The sheet flags that on the length itself
 # with a supply size (MR fleet: the cut-to-fit lived only in a note and no
-# blank length was given). 10 mm over the nominal cut leaves both saw ends
-# room to square and the match-cut room to absorb the stack, rounded up to a
-# 5 mm saw mark.
-SUPPLY_LENGTH_ALLOWANCE = 10.0
-SUPPLY_LENGTH_MIN = math.ceil((COLUMN_LENGTH + SUPPLY_LENGTH_ALLOWANCE) / 5.0) * 5.0
+# blank length was given). .40 over the nominal cut leaves both saw ends
+# room to square and the match-cut room to absorb the stack, rounded up to the
+# .XX grid the callout prints.
+SUPPLY_LENGTH_ALLOWANCE = 10.16  # .40
+SUPPLY_LENGTH_MIN_IN = (
+    math.ceil(round((COLUMN_LENGTH + SUPPLY_LENGTH_ALLOWANCE) / MM_PER_IN * 100.0, 6))
+    / 100.0
+)
+SUPPLY_LENGTH_MIN = SUPPLY_LENGTH_MIN_IN * MM_PER_IN
 if not SUPPLY_LENGTH_MIN > COLUMN_LENGTH:
     raise AssertionError("the supplied tube is shorter than its cut length")
-LENGTH_SUPPLY_CALLOUT = f"SUPPLY {SUPPLY_LENGTH_MIN:.0f} MIN"
+LENGTH_SUPPLY_CALLOUT = f"SUPPLY {SUPPLY_LENGTH_MIN_IN:.2f} MIN"
 LENGTH_FIT_CALLOUT = "\n".join(
     (
         "CUT TO FIT AT ASSEMBLY",

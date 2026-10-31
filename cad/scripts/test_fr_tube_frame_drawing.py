@@ -36,6 +36,9 @@ def test_open_tube_and_cross_holes_share_the_installed_frame_stations() -> None:
         abs_tol=1e-9,
     )
     assert fr_tube_frame_spec.CROSS_HOLE_DIAMETER > 4.826
+    # The cut length and the upper station sit on the .001 in grid.
+    for value in (fr_tube_frame_spec.COLUMN_LENGTH, fr_tube_frame_spec.UPPER_CROSS_HOLE_Y):
+        assert math.isclose(value / 25.4, round(value / 25.4, 3), abs_tol=1e-9)
     assert fr_tube_frame_spec.OUTER_DIA < COLUMN_SOCKET_DIAMETER
     assert fr_tube_frame_spec.OUTER_DIA == INNER_DIAMETER
     assert fr_tube_frame_spec.OUTER_DIA < MOUTH_INNER_DIAMETER
@@ -46,11 +49,9 @@ def test_length_is_flagged_cut_to_fit_from_a_longer_supply() -> None:
     supply = fr_tube_frame_spec.SUPPLY_LENGTH_MIN
     cut = fr_tube_frame_spec.COLUMN_LENGTH
     assert supply >= cut + fr_tube_frame_spec.SUPPLY_LENGTH_ALLOWANCE
-    assert supply % 5.0 == 0.0
-    assert supply - 5.0 < cut + fr_tube_frame_spec.SUPPLY_LENGTH_ALLOWANCE
-    # The value and its MIN limit are the requirement; the value comes from
-    # the spec, so a recomputed supply still passes.
-    assert fr_tube_frame_spec.LENGTH_SUPPLY_CALLOUT == f"SUPPLY {supply:.0f} MIN"
+    # The supply is the next .01 in above the cut plus its allowance.
+    assert supply - 0.254 < cut + fr_tube_frame_spec.SUPPLY_LENGTH_ALLOWANCE
+    assert math.isclose(supply, 40.51 * 25.4, abs_tol=1e-9)
     assert "CUT TO FIT" in fr_tube_frame_spec.LENGTH_FIT_CALLOUT
     for mate in ("MHA-FR-01", "MHA-FR-02", "MHA-FR-VN-54"):
         assert mate in fr_tube_frame_spec.LENGTH_FIT_CALLOUT
