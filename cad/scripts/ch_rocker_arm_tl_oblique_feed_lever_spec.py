@@ -114,13 +114,15 @@ for _wall, _mm in WALLS_MM.items():
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "LeverProfile": {"LeverLength", "LeverWidth"},
-    "Lever": {"LeverThick"},
+    # The stock thickness: a reference sketch, not the extrusion's depth,
+    # whose import has no drawing-view attachment (farm r1).
+    "LeverThickReference": {"LeverThick"},
     "BoltHoles": {"Hole1X", "Hole2X", "Hole1Y"},
     "GripCorner": {"GripCornerR"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LeverProfile": {"LeverLength": SIZE_PLACES, "LeverWidth": STOCK_PLACES},
-    "Lever": {"LeverThick": THICK_PLACES},
+    "LeverThickReference": {"LeverThick": THICK_PLACES},
     "BoltHoles": {
         "Hole1X": HOLE_X_PLACES,
         "Hole2X": HOLE_X_PLACES,

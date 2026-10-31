@@ -122,6 +122,18 @@ def _bound(value_mm: float, places: int, *, up: bool) -> str:
     return _length(rounded / scale, places)
 
 
+# One in·lbf in N·m (exact: 4.4482216152605 N x 0.0254 m).
+_NM_PER_IN_LBF = 4.4482216152605 * 0.0254
+
+
+def _torque(nm: float) -> str:
+    """A tightening torque as the sheet prints it, ``2.8 N·m (24.7 IN·LBF)``:
+    the in·lbf rounded down so it never exceeds the N·m value."""
+    in_lbf = math.floor(round(nm / _NM_PER_IN_LBF * 10.0, 9)) / 10.0
+    return f"{nm:.1f} N·m ({in_lbf:.1f} IN·LBF)"
+
+
+
 BASE_BAR = "ch-rocker-arm-tl-oblique-base-bar"
 PIVOT_BLOCK = "ch-rocker-arm-tl-oblique-pivot-block"
 FEED_BLOCK = "ch-rocker-arm-tl-oblique-feed-block"
@@ -1391,7 +1403,7 @@ if NUT_FLANGE_SLIP_MARGIN < leadscrew.SLIP_MARGIN_MIN:
         f"the nut flange slips at {NUT_FLANGE_SLIP_NM[0]:.1f} N·m, under "
         f"{leadscrew.SLIP_MARGIN_MIN} x the nut's {NUT_ABUSE_TORQUE_NM:.2f} N·m"
     )
-_NUT_TORQUE = f"{NUT_SCREW_TORQUE_NM:.1f} N·m"
+_NUT_TORQUE = _torque(NUT_SCREW_TORQUE_NM)
 
 
 # --- The feed lever screws: their tightening torque -----------------------------------
@@ -1436,7 +1448,7 @@ _LEVER_STRESS_AREA_MM2 = 0.0524 * trammel.INCH**2
 _A574_TENSILE_MPA = 170_000.0 * 0.006894757
 if not LEVER_SCREW_PRELOAD_N / _LEVER_STRESS_AREA_MM2 < 0.5 * _A574_TENSILE_MPA:
     raise ValueError(f"lever screw preload {LEVER_SCREW_PRELOAD_N:.0f} N overloads it")
-_LEVER_TORQUE = f"{LEVER_SCREW_TORQUE_NM:.1f} N·m"
+_LEVER_TORQUE = _torque(LEVER_SCREW_TORQUE_NM)
 
 
 def _item(stem: str) -> str:
@@ -1467,8 +1479,7 @@ ASSEMBLY_STEPS = (
     f"{_item(END_BRACKET)} ON RAIL 1'S BAR AT EACH KP08 STATION, "
     f"{len(leadscrew.BAR_SCREW_LATERALS)} {_BAR_SCREW} "
     f"{_item(BRACKET_SCREW)} PER BRACKET FROM BELOW, "
-    f"{leadscrew.BAR_SCREW_TORQUE_NM:.1f} N·m "
-    f"({leadscrew.BAR_SCREW_TORQUE_IN_LBF} IN·LBF).",
+    f"{_torque(leadscrew.BAR_SCREW_TORQUE_NM)}.",
     "2. SET BOTH BARS ON THE TABLE, NEAR ENDS TOWARD THE SPINDLE. USE TWO "
     f"UNCUT {fasteners.HOLD_DOWN_STUD_THREAD} STUDS {_item(HOLD_DOWN_STUD)} "
     "PER BAR IN THE OUTER T-SLOTS, IN T-NUTS "
@@ -1555,7 +1566,7 @@ PIVOT_FIT_STEPS = (
     "SHOULDERS AND SPACER FACES WITH NLGI 2 LITHIUM GREASE, KEEPING THREADS "
     "CLEAN OF GREASE. "
     f"SEAT THE SHOULDERS IN THEIR COUNTERBORES AND TORQUE TO "
-    f"{PIVOT_SCREW_TORQUE_NM:.1f} N·m. THE HEADS MUST NOT CLAMP THE CARRIER.",
+    f"{_torque(PIVOT_SCREW_TORQUE_NM)}. THE HEADS MUST NOT CLAMP THE CARRIER.",
     "P3. HANDWHEEL-SWEEP THE FITTED HOLE PAIR'S COMPLETE PASS. CHECK THE GAP AT BOTH "
     "SUPPORTS, FREE ROTATION AND POSITIVE LIFT CAPTURE UNDER BOTH HEADS. "
     "REFIT A FAILED STACK; DO NOT LOOSEN A SEATED SCREW TO MAKE CLEARANCE.",
@@ -1574,7 +1585,7 @@ PIVOT_SHIM_STOCK_NOTE = "\n".join((
 KP08_ALIGNMENT_STEPS = (
     f"F1. BEFORE TIGHTENING, CHECK ALL FOUR NUT BUTTON HEADS SEAT FLAT "
     f"AND CLEAR THE NUT BODY; TIGHTEN TO {_NUT_TORQUE}. THE KP08S FLOAT "
-    "IN THEIR Ø4.5 MM MOUNTING HOLES. MOVE THE FEED CARRIAGE TO EACH TRAVEL "
+    "IN THEIR MOUNTING HOLES. MOVE THE FEED CARRIAGE TO EACH TRAVEL "
     "END IN TURN AND ALIGN EACH KP08 TO THE FIXED NUT WITHOUT FORCING "
     "THE SCREW; TIGHTEN THE KP08 MOUNTING SCREWS.",
     "F2. WITH THE HANDWHEEL AND ALL SET SCREWS TIGHT, TURN THE HANDWHEEL "

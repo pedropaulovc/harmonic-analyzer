@@ -52,7 +52,11 @@ from _drawing_dimensions import (
     offset_dimension_text,
     set_dimension_callouts,
 )
-from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _drawing_hole_callout import add_native_hole_callout
+from ch_rocker_arm_tl_oblique_callouts import (
+    CALLOUT_PLACES,
+    set_callout_lengths_to_three_places,
+)
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -276,18 +280,17 @@ CR_CALLOUT_XY = (0.377, 0.230)
 # screw 4 then passes clear right of the Ø3.00 spot text.
 RISER_CALLOUT_XY = (0.312, 0.248)
 LEVER_CALLOUT_XY = (0.179, 0.143)
-# The THRU tap drills print .XXX (#290: every Hole Wizard length is 3-place inch).
-TAP_CALLOUT_PRECISION = {"hw-tapdrldia": 3}
 
 part_metadata(
     precision_sources=(
         "DRAWING_PRECISION_BY_NAME",
         ("_drawing_hole_callout", "add_native_hole_callout"),
+        ("ch_rocker_arm_tl_oblique_callouts", "set_callout_lengths_to_three_places"),
     )
 )
 
 _UNIT = part_spec.UNIT
-_CALLOUT_PLACES = 3  # every Hole Wizard length prints .XXX
+_CALLOUT_PLACES = CALLOUT_PLACES  # every Hole Wizard length prints .XXX
 _DRILLED = part_spec.DRILLED_BAND
 
 
@@ -1125,9 +1128,7 @@ async def build(adapter: Any) -> dict[str, str]:
             edge=_circle_edge(adapter, top, drill, label, center_x_mm=x, center_y_mm=y),
         )
         _strip_thread_class(callout, label=f"{label} callout", thread=thread)
-        set_hole_callout_precision(
-            callout, TAP_CALLOUT_PRECISION, label=f"{label} callout"
-        )
+        set_callout_lengths_to_three_places(callout, label=f"{label} callout")
         if function is not None:
             _append_callout_below(callout, function, label=f"{label} callout")
 
