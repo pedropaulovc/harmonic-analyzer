@@ -13,3 +13,4 @@ ch-rocker-arm-tl-oblique-pivot-block:
       where: "sheet 1 plan view, the 40.00 overall width's callout SETS COUNTERBORE / SIDE WALL 1.59 MIN: the -Y side wall at the 4X counterbores"
       finding: "-Y counterbore side wall 1.59 min at the worst case of the printed bands (40.00 - 20.00 - 13.000 - Ø8.00/2), below the 2.0 target and above the 1.5 floor (rule 17)"
       reason: "Owner ruling 2026-10-28 accepts it as a stated minor shortfall on this shop-jig TL-22 block; the side-wall callout states the shortfall as a fact."
+  drawing_unit: in
