@@ -2050,7 +2050,7 @@ sections:
         - stated
         - high
       - - Return spring (leaf)
-        - '0.381 ×6.35 17-7 PH stainless strip, Condition C (0.015 in, McMaster 2325K19 sheared 1/4 in wide; PR859 ruling 4, 2026-09-25, supersedes O1-b 0.5 ×6.0 C51000; stainless departs from p.68 brass appearance). Foot screwed 20.0 EAST of pivot, outboard of back strap, 9.5 square pad flush with strip aft edge, widened forward only; R3.3 bend, current raised straight blade 34.216999100 mm (spring arm to the crest 34.794280431 mm), leaning 0.879274675° west / 9.017849127° into parked flank. Crest R3.3 contacts 23.0 up strap / 5 below arbor; 25° flick east, 2.0 flat. Installed nominal parked air 0.15; free preset 4.615178428 into flank / 8.2° further bend, measured at the crest circle centre (the free crest face penetration). Former 4.577524286 understated it as (R + t)(1 − cos 8.2°); approximately 1.0° / 9.2° blade and approximately 2.6 mm / 5.4° preset described the lower rig.'
+        - '0.381 ×6.35 17-7 PH stainless strip, Condition C (0.015 in, McMaster 2325K19 sheared 1/4 in wide; PR859 ruling 4, 2026-09-25, supersedes O1-b 0.5 ×6.0 C51000; stainless departs from p.68 brass appearance). Foot screwed 20.0 EAST of pivot, outboard of back strap, 9.572 × 9.652 pad flush with strip aft edge, widened forward only; R3.3 bend, current raised straight blade 34.216999100 mm (spring arm to the crest 34.794280431 mm), leaning 0.879274675° west / 9.017849127° into parked flank. Crest R3.3 contacts 23.0 up strap / 5 below arbor; 25° flick east, 2.032 flat. Installed nominal parked air 0.15; free preset 4.615178428 into flank / 8.2° further bend, measured at the crest circle centre (the free crest face penetration). Former 4.577524286 understated it as (R + t)(1 − cos 8.2°); approximately 1.0° / 9.2° blade and approximately 2.6 mm / 5.4° preset described the lower rig.'
         - —
         - 'p.68–69 + v4_pinion_013/018/019: brass-coloured leaf on BACK strap east flank, more flexed engaged, holds drum disengaged; front strap clean (t00393). img01''s far-left screw is east/drum-side, not the pre-2026-09-24 west interpretation; img04 locates crest 5 below arbor. Pad aft edge set by 0.65 gage leaf from back block (SPRING_PAD_LEAF / SPRING_BLADE_INSET). dt_pinion_spring_geometry / dt_pinion_spring_section and dimensions.yaml own current geometry/preset; source calculations are not current gravity, bend-trial, preload or stress qualification.'
         - scaled + derived current reader
@@ -2068,13 +2068,13 @@ sections:
         - scaled
         - med
       - - Engage lever rest and throw (2026-09 photo correction)
-        - 'Ø6 ×86 lever, parked +10° toward machine −X; source-law eccentric-cam rotation −76.399° carries it through vertical to −66.399° toward +X at engagement. Ø14.6 ×9 collar, eccentricity 2.0, source thin-side wall 2.100 and sub-flush M2.5 screw; 2.2425 parked tip gap / 40.566667 engaged centre use the finite 26T/55T stock forms at 48DP PA20, not root-tip seating.'
+        - 'Ø6.096 ×86.106 lever, parked +10° toward machine −X; source-law eccentric-cam rotation −76.829° carries it through vertical to −66.829° toward +X at engagement. Ø14.6 ×9 collar, eccentricity 2.0, source thin-side wall 2.100 and sub-flush M2.5 screw; 2.2425 parked tip gap / 40.566667 engaged centre use the finite 26T/55T stock forms at 48DP PA20, not root-tip seating.'
         - —
         - 'Historical ch25 p.68 pair: page002_img08 approximately +10° parked and page002_img07 approximately −76° engaged. Current nominal linkage/whole-process-blank results are recorded in dimensions.yaml and consumed by the rig readers, not a new historical photo measurement or qualification. Former ideal-48DP −80.813° / −70.813° and shallow-root DP49.82 −82.023° / −72.023° belong to earlier reconstructions.'
         - scaled + derived current reader
         - med
       - - Cam-follower pin (per strap)
-        - Ø4 × 20 steel stud, seated 4.0 in a blind edge bore 7.0 ABOVE the pivot axis (U28 2026-09-23 re-solve); 16 proud reaches the lift cam 18.5 out
+        - Ø3.970 × 20.066 steel stud (5/32 drill rod), seated 4.064 in a blind edge bore 7.0 ABOVE the pivot axis (U28 2026-09-23 re-solve); 16.002 proud reaches the lift cam 18.5 out
         - —
         - 'PR8 re-derivation of the p.69 block close-up (page002_img01): the bright follower reads as a fatter (~Ø4-5) stud at the pivot-height band, resting on the eccentric collar. A 4.0 blind edge seat is the geometry that clears the Ø6.35 pivot bore; contact reach + clearances are asserted analytically (build_drive_train CAM_*)'
         - scaled
@@ -2106,10 +2106,10 @@ sections:
       dimensions.yaml / the pure rig readers has axis (−17.129, 95.25), from
       X_DRUM plus drum radius 32.207, pinion radius 8.815 and parked gap 2.2425;
       former axis (−16.876, 90.518) / radii 32.279 and 8.996 were ideal-tooth
-      lower-rig references. Drum z −70.389..+72.811 (143.2 face, all 20
-      stations), integral steel arbor/head root z −130.689..+95.473,
-      head/crossrod axis z −137.191, and separate MHA-DT-15 crossrod at +65°.
-      Straps: 15 wide × 9 thick with R7.5 ends, plain (no cam relief), pivot
+      lower-rig references. Drum z −70.390..+72.810 (143.2 face, all 20
+      stations), integral steel arbor/head root z −130.690..+95.472,
+      head/crossrod axis z −137.192, and separate MHA-DT-15 crossrod at +65°.
+      Straps: 15 wide × 8.9916 thick with R7.5 ends, plain (no cam relief), pivot
       (−13.165, 67.532), bore-to-bore c2c 28.0, parked at an 8.139° lean; the
       former pivot (−12.912, 62.8) belonged to the lower ideal-tooth rig. The swing
       rides the setup DOF (a freed operational DOF, its angle drive spec recorded
@@ -2119,12 +2119,12 @@ sections:
       parked-pose clearances asserted in `build_dt_drive_train_assembly`
       (`SPRING_*`). The engage path is the p.69 cam: the lift rod rides the
       blocks' other bores at (5.335, 69.692); former (5.588, 64.960) belonged
-      to the lower ideal-tooth rig. Each strap tail carries a Ø4
+      to the lower ideal-tooth rig. Each strap tail carries a Ø3.970
       follower pin (table row above), bonded into its blind seat, that the
       rod's eccentric collar lifts. The collar is Ø14.6 with a 2.0 eccentricity
       and keeps a 2.100 thin-side wall. Current nominal parked surface gap is
-      0.161; dimensions.yaml records −76.399° cam rotation, 1.937 mm engaged
-      authority and 2.737 mm follower projection beyond contact. Former
+      0.176; dimensions.yaml records −76.829° cam rotation, 1.922 mm engaged
+      authority and 2.739 mm follower projection beyond contact. Former
       −80.813° / 1.760 / 2.623 results describe the earlier ideal-tooth rig.
       The assembly's CAM_* and segment-distance guards consume current readers;
       their presence is not an exercised-check claim. Current pitch-circle sum
