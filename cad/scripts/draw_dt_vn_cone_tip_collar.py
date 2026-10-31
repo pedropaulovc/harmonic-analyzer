@@ -74,13 +74,20 @@ ISO_CENTER = (0.345, 0.210)
 # (main's review: the line at x 80 mm struck the second '0' of 7.00).
 END_KEEP = {"NoseDia": (0.027, 0.165), "FlatDistance": (0.094, 0.112)}
 # CollarDia is a turned-profile sketch dimension, native to the side view.
-# ShoulderRadius reads up-left of the shoulder: from (282, 205) mm its leader
-# crossed CollarDia's dimension line (main's review). The function lines of
-# CollarWidth and NoseLength (spec.AXIAL_FUNCTION_CALLOUTS) stack on their
-# values: CollarWidth's into the open field below, NoseLength's up, clear of
-# the tap callout (x <= 146 mm).
+# Farm 20261031T205208603Z: the nose spans x 182-196 mm and the body x 196-228,
+# y 135-205; NoseLength's south extension line runs x 182, y 169-213.
+# ShoulderRadius reads up-right, above the body and left of CollarDia's
+# dimension line (x 250): its leader leaves the fillet (194, 183) through the
+# body top at x ~221, left of CollarDia's top extension line (x >= 228), and
+# passes NoseLength's text at x ~230. At (165, 198) it crossed NoseLength's
+# extension line; at (282, 205), CollarDia's dimension line (main's review).
+# The function lines of CollarWidth and NoseLength
+# (spec.AXIAL_FUNCTION_CALLOUTS) stack on their values: CollarWidth's into the
+# open field below, NoseLength's up, centred between its extension lines: at
+# x 182 its 53.5 mm block ([153.6, 207.1] mm) stood 5.7 mm from the tap
+# callout ([94.4, 150.4] x [226.2, 235.3] mm), under one text height.
 SIDE_KEEP = {"CollarWidth": (0.205, 0.110), "CollarDia": (0.250, SIDE_CENTER[1]),
-             "NoseLength": (0.182, 0.218), "ShoulderRadius": (0.165, 0.198)}
+             "NoseLength": (0.189, 0.218), "ShoulderRadius": (0.262, 0.232)}
 # TapStation reads right of the tap centre's extension line, under the hole
 # callout's leader and above the end view's top (y 205 mm at x 80 mm), so its
 # function line clears both extension lines and the left border.
