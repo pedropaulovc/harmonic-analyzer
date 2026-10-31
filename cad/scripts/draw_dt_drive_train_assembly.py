@@ -812,7 +812,7 @@ CONE_CRANK_STEPS = _note_text(
         "2. ALIGN MHA-DT-05 COUNTERBORES TO MHA-DT-20 TAPS; USE 2X",
         f"   MHA-DT-VN-61: MSC {post_screw.SKU}, {post_screw.THREAD} X "
         f"{post_screw.STOCK_LENGTH_MM / 25.4:g} IN STOCK, CUT TO FIT;",
-        f"   FLUSH TO {post_screw.POST_SCREW_CUT_TO_FIT_SHORT:g} SHORT OF "
+        f"   FLUSH TO {post_screw.POST_SCREW_CUT_TO_FIT_SHORT:.1f} SHORT OF "
         "MHA-DT-20 UNDERSIDE, NEVER PROUD.",
         f"   ({post_screw.CUT_LENGTH_MM:.{post_screw.DRAWING_PRECISION_BY_NAME[post_screw.CUT_LENGTH_DIMENSION]}f}) "
         "REF CUT LENGTH. DEBURR ENDS; " + POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT,
