@@ -6,3 +6,4 @@ pn-pen-adjust-screw:
   quantity: 1
   tolerance_class: machined_block
   process: "turned (brass)"
+  drawing_unit: in

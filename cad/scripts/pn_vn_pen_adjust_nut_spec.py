@@ -26,7 +26,7 @@ from _mcmaster_92671a115 import (
 # The thread carrier is the basic nominal major, not a measured thread profile.
 DRAWING_REFERENCE_PRECISION = {"AcrossFlats": 0, "Height": 3, "ThreadNominalMajor": 3}
 SUPPLIER_FRACTION_DENOMINATOR = 32
-SUPPLIER_NOMINAL_MAJOR_MM = 0.060 * 25.4
+SUPPLIER_NOMINAL_MAJOR_MM = 1.524  # .060
 SUPPLIER_REFERENCE_DIMENSIONS = (
     ("ThreadNominalMajor", SUPPLIER_NOMINAL_MAJOR_MM, "horizontal"),
 )

@@ -6,3 +6,4 @@ pn-pen-rod:
   quantity: 1
   tolerance_class: machined_block
   process: "machined (brass)"
+  drawing_unit: in

@@ -13,7 +13,8 @@ window's size, its lower-left corner from the left and bottom faces and the
 4X window-corner radius; the bottom view, looking up at the tapped rail,
 carries the depth, the hole's two coordinates from the outer faces and the
 hole's native Hole Wizard callout.  No datums, no frames (drawing-guidelines.md
-rule 5), no note block.  The sheet runs 2:1; the isometric stays 1:1.
+rule 5), no note block.  The sheet runs 2:1 in decimal inch (the part's
+``drawing_unit: in``); the isometric stays 2:1.
 
 Run with SolidWorks open::
 
@@ -44,9 +45,10 @@ from _drawing_common import (
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision
 from _drawing_edges import scan_view_edges
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _hole_spec import blind_cut_dia_mm
@@ -182,6 +184,9 @@ BOTTOM_KEEP = {
 DIMENSION_PREFIXES = {"WindowCornerR": "4X R"}
 HOLE_CALLOUT_XY = (0.165, 0.128)
 HOLE_CALLOUT_PROCESS = "TAP"
+# The through-next tap's one Hole Wizard length variable, its drill
+# diameter, prints .XXX.
+TAP_CALLOUT_PRECISION = {"hw-tapdrldia": 3}
 
 FRONT_VIEW_NOTE_XY = (0.175, 0.240)
 BOTTOM_VIEW_NOTE_XY = (0.070, 0.072)
@@ -237,7 +242,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -301,6 +310,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # The title block's THREADS row owns the 2B class (drawing-guidelines.md
     # rule 2): the callout reads TAP 4-40 UNC THRU.
     omit_title_block_thread_class(tap_callout, label="thumb-screw tapped hole")
+    set_hole_callout_precision(
+        tap_callout, TAP_CALLOUT_PRECISION, label="thumb-screw tapped hole"
+    )
 
     add_property_linked_note(adapter, "Front View Note", *FRONT_VIEW_NOTE_XY)
     add_property_linked_note(adapter, "Bottom View Note", *BOTTOM_VIEW_NOTE_XY)

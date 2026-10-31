@@ -6,7 +6,7 @@ geometry and applies the bands and places below to its model dimensions;
 keep maps.
 
 Part frame: the origin is the SHOULDER -- the square bar's bottom face, where
-it rests on the v-block top -- on the rod axis. The 5 mm square runs +Y to the
+it rests on the v-block top -- on the rod axis. The .197 square runs +Y to the
 top face (tapped for the adjuster stud); the turned pivot end runs -Y into the
 v-block's pivot bore, so the carriage hangs from the shoulder and can be
 turned (yawed) on the rod and then locked by the v-block set screw.
@@ -19,47 +19,66 @@ Plane ∩ Right Plane), the part's only reference axis.
 
 from __future__ import annotations
 
+import math
+
 import _config
+from _fit_close_running import SHAFT_G6_3_TO_6_MM
 from _hole_spec import DRILL_POINT_H, HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
+from _inch_wall_limits import WALL_FLOOR_MM
+from _package_units import drawing_unit
+
+# #290: the sheet prints decimal inch (``drawing_unit: in``).  Lengths stay
+# millimetres, each the exact decimal of its printed inch value, except the
+# square's length: a closure kept at 112.0 (with the v-block's height it sets
+# the stud eye's height, pn_pen_carriage_geom.STUD_HEAD_TOP_REST_Y), printed
+# rounded, 4.41.
+UNIT = drawing_unit("parts/pn-pen-rod", _config.parts("pn-pen-rod"))
 
 PEN_HANGER_NUMBER = _config.parts("pn-pen-hanger")["number"]
 PEN_V_BLOCK_NUMBER = _config.parts("pn-pen-v-block")["number"]
 
-ROD_SECTION = 5.0  # DIMENSIONS.md ch24: square section (low)
-SECTION_BAND = (0.00, -0.05)
+ROD_SECTION = 5.0038  # .197 square section, machined (DIMENSIONS.md ch24)
+SECTION_BAND = (0.0, -0.0508)  # +.000/-.002
 # Square length: the shoulder sits on the v-block top and the top face carries
 # the jam nut + adjuster stud under the wheel rim. 112 puts the top at the
 # engineerguy 4/4 (9:15-10:34) photo ratio -- rod top ~1.6 rod-lengths of
 # block-top-to-guide spacing above the lower U guide -- and keeps the square
 # engaged in both hanger U guides over the full pen travel
 # (pn_pen_carriage_geom asserts the engagement).
-SQUARE_LENGTH = 112.0
+SQUARE_LENGTH = 112.0  # closure (module docstring); prints 4.41
 
-# Turned pivot end: a slip fit in the v-block's reamed 4 mm pivot bore
-# (pn_pen_v_block_spec.PIVOT_BORE_DIA), turned concentric with the square.
-PIVOT_DIA = 4.0
-PIVOT_BAND = (-0.010, -0.025)  # g6-like running clearance on the 4.000/4.012 bore
-PIVOT_LENGTH = 10.5  # shoulder to end: stops 1.0 above the v-block relief roof
+# Turned pivot end: a close running fit in the v-block's .126 reamed pivot
+# bore (pn_pen_v_block_spec.PIVOT_BORE_DIA, #290 owner ruling: 4 mm -> .126),
+# turned concentric with the square.
+PIVOT_DIA = 3.2004  # .126
+PIVOT_BAND = SHAFT_G6_3_TO_6_MM  # -.0002/-.0005: .0002-.0010 in the reamed bore
+PIVOT_LENGTH = 10.414  # .41, shoulder to end: stops clear above the v-block relief roof
 
 # Adjuster stud tap in the top face. #0-80 is the largest thread whose tap
-# drill leaves the drawing-guidelines.md rule 17 (walls and webs) 1.5 mm floor
-# in the 5 mm square: (5 - 1.524 major) / 2 = 1.74 mm (#2-56 leaves 1.38).
+# drill leaves the drawing-guidelines.md rule 17 (walls and webs) .060 floor
+# in the .197 square (#2-56 would not).
 STUD_THREAD = "#0-80"
 STUD_TAP_SPEC = HoleSpec(
-    "tapped", STUD_THREAD, end="blind", depth_mm=6.0, overrides_mm={"ThreadDepth": 4.5}
+    "tapped",
+    STUD_THREAD,
+    end="blind",
+    depth_mm=5.9944,  # .236
+    overrides_mm={"ThreadDepth": 4.4958},  # .177
 )
 STUD_TAP_DRILL_DIA = TAP_DRILL_MM[STUD_THREAD]
 # The stud threads this far into the tap (rule 18: >= 1.5 D full thread):
 # the centre of the measured-length setting band (pn_pen_assembly_spec,
-# code review C05), which keeps 3.2 ±0.4 short of the 3.99 the tap's printed
-# depth guarantees.
+# code review C05), which stays short of the thread depth the tap's printed
+# callout guarantees.
 STUD_ENGAGEMENT = 3.2
 
 TOTAL_LENGTH = SQUARE_LENGTH + PIVOT_LENGTH
 
 _WALL = (ROD_SECTION + SECTION_BAND[1] - THREAD_MAJOR_MM[STUD_THREAD]) / 2.0
-if _WALL < 1.5:  # drawing-guidelines.md rule 17 (walls and webs) floor
-    raise AssertionError(f"rod stud tap leaves a {_WALL:.2f} mm wall")
+# drawing-guidelines.md rule 17 (walls and webs): 1.714, between the .060
+# floor and the .080 target.
+if _WALL < WALL_FLOOR_MM:
+    raise AssertionError(f"rod stud tap leaves a {_WALL:.3f} mm wall")
 if STUD_ENGAGEMENT < 1.5 * THREAD_MAJOR_MM[STUD_THREAD]:  # rule 18
     raise AssertionError("adjuster stud engagement is under 1.5 D")
 if STUD_ENGAGEMENT >= STUD_TAP_SPEC.overrides_mm["ThreadDepth"]:
@@ -72,26 +91,28 @@ if PIVOT_DIA >= ROD_SECTION:
 # Shoulder root: the square's bottom face seats the carriage on the v-block's
 # top face, so the internal corner where the pivot turns down from it carries
 # a modelled radius, printed as a single MAX limit (sharp is good, anything up
-# to the limit is good). 0.2 leaves the seat face a land on every flat and
+# to the limit is good). .008 leaves the seat face a land on every flat and
 # clears the v-block's broken bore mouth (cross-part assert in
-# pn_pen_carriage_geom).
-SHOULDER_FILLET_R = 0.2
+# pn_pen_v_block_spec).
+SHOULDER_FILLET_R = 0.2032  # .008
 # (upper, lower) deviations: the nominal IS the limit, down to sharp.
 SHOULDER_FILLET_BAND = (0.0, -SHOULDER_FILLET_R)
-SHOULDER_FILLET_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.2 MAX"
-SHOULDER_FILLET_PLACES = 1
+SHOULDER_FILLET_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R.008 MAX"
+SHOULDER_FILLET_PLACES = 3
 if SHOULDER_FILLET_BAND[0] != 0.0 or SHOULDER_FILLET_BAND[1] != -SHOULDER_FILLET_R:
     raise AssertionError("the shoulder radius band must run from sharp to the nominal")
-if round(SHOULDER_FILLET_R, SHOULDER_FILLET_PLACES) != SHOULDER_FILLET_R:
+_FILLET_IN = SHOULDER_FILLET_R / 25.4
+if not math.isclose(
+    round(_FILLET_IN, SHOULDER_FILLET_PLACES), _FILLET_IN, abs_tol=1e-9
+):
     raise AssertionError("the shoulder radius must print exactly at its places")
 if PIVOT_DIA / 2.0 + SHOULDER_FILLET_R >= (ROD_SECTION + SECTION_BAND[1]) / 2.0:
     raise AssertionError("shoulder fillet must end inside the square's seat face")
 
 # The overall length, end face to end face, is a reference only (rule 10):
-# the square and pivot lengths own it. Printed at one place, in parentheses.
-DRAWING_REFERENCE_PRECISION = 1
-if round(TOTAL_LENGTH, DRAWING_REFERENCE_PRECISION) != TOTAL_LENGTH:
-    raise AssertionError("the overall reference must print exactly at its places")
+# the square and pivot lengths own it. Printed at two places, in parentheses;
+# it carries the square's closure length, so it prints rounded, (4.82).
+DRAWING_REFERENCE_PRECISION = 2
 
 # Side view (2:1, rod axis horizontal as in the lathe): the square's length,
 # the pivot's length and banded diameter, and the shoulder root's MAX radius.
@@ -108,14 +129,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShoulderFillet": {"ShoulderRadius"},
 }
 # Places (drawing-guidelines.md rule 3): the banded square and pivot print at
-# their bands' places; the overall length and the pivot length (1.0 clear of
-# the v-block relief roof) are near-enough sizes; the shoulder radius prints
-# its MAX limit at one place.
+# their bands' places (.XXX, .XXXX); the square's length (the guide
+# engagement) and the pivot's length (clear of the v-block relief roof) print
+# the title block's .XX; the shoulder radius prints its MAX limit at three.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "RodProfile": {"Length": 1},
-    "Rod": {"Depth": 2},
-    "PivotProfile": {"PivotDia": 3},
-    "Pivot": {"PivotLength": 1},
+    "RodProfile": {"Length": 2},
+    "Rod": {"Depth": 3},
+    "PivotProfile": {"PivotDia": 4},
+    "Pivot": {"PivotLength": 2},
     "ShoulderFillet": {"ShoulderRadius": SHOULDER_FILLET_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {

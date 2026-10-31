@@ -6,3 +6,4 @@ pn-pen-frame:
   material_specification: "C36000 free-machining brass"
   finish: as machined
   quantity: 1
+  drawing_unit: in

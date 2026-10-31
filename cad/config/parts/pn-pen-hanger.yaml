@@ -7,3 +7,4 @@ pn-pen-hanger:
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: "machined (steel); guide plates silver-brazed to the strap"
+  drawing_unit: in
