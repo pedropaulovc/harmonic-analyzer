@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from enum import StrEnum
 from typing import Any
 
 import _telemetry
@@ -102,6 +103,11 @@ LOCATING_EDGE_XY = (0.150, 0.130)
 LOCATING_EDGE_X_MM = 7.0
 
 
+class DrillStep(StrEnum):
+    PILOT = "pilot"
+    CLEARANCE = "clearance"
+
+
 def _assert_pilot_diameter(adapter: Any, annotations: list[Any]) -> None:
     """The pilot step is the model's own diameter, its leader on the
     concentric, earlier pilot circle; read only."""
@@ -150,24 +156,45 @@ def _pilot_attachment(source: Any) -> Any:
 
 def _assert_drill_attachment(
     adapter: Any, view: Any, annotation: Any, entity: Any, *,
-    pilot: bool,
+    step: DrillStep,
 ) -> None:
-    """Prove the native entity AND actual printed arrow tip, after rebuilding."""
+    """Prove the native entity AND actual printed arrow tip, after rebuilding.
+
+    Imported pilot identity must match the independently resolved source sketch
+    segment, not merely a concentric edge. Refusals retain every attachment
+    predicate's readback so a drawing-context wrapper mismatch can be
+    distinguished from missing, wrong-type or dangling geometry.
+    """
     annotation = _early_bound(annotation, "IAnnotation")
     attached = tuple(annotation.GetAttachedEntities3() or ())
     kinds = tuple(int(kind) for kind in (annotation.GetAttachedEntityTypes() or ()))
-    expected_kinds = (10, 24) if pilot else (1,)  # sketch segment / external segment / edge
-    label = "pilot" if pilot else "clearance"
-    if (annotation.IsDangling() or int(annotation.GetAttachedEntityCount3()) != 1
-            or len(attached) != 1 or len(kinds) != 1 or kinds[0] not in expected_kinds
-            or int(adapter.swApp.IsSame(attached[0], entity)) != 1):
-        raise RuntimeError(f"stop plate {label} lost its native circle attachment")
-    index = 0 if pilot else 1
+    step = DrillStep(step)
+    is_pilot = step is DrillStep.PILOT
+    expected_kinds = (10, 24) if is_pilot else (1,)  # sketch segment / external segment / edge
+    label = step.value
+    dangling = bool(annotation.IsDangling())
+    count = int(annotation.GetAttachedEntityCount3())
+    presence = tuple(item is not None for item in attached)
+    comparable = (
+        count == 1 and len(attached) == 1 and presence == (True,)
+        and len(kinds) == 1 and kinds[0] in expected_kinds
+    )
+    same = int(adapter.swApp.IsSame(attached[0], entity)) if comparable else None
+    if dangling or not comparable or same != 1:
+        expected_source = "PilotDrillReference" if is_pilot else "PlateClearances"
+        raise RuntimeError(
+            f"stop plate {label} lost its native circle attachment: "
+            f"count={count}, entities={len(attached)}, types={kinds}, "
+            f"entity_presence={presence}, dangling={dangling}, IsSame={same}, "
+            f"expected_types={expected_kinds}, expected_source={expected_source}, "
+            f"expected_entity_present={entity is not None}"
+        )
+    index = 0 if is_pilot else 1
     center = model_point_in_view(adapter, view, (
         part.PLATE_HOLE_XS[index] / 1000.0, part.PLATE_HOLE_Y / 1000.0,
-        (0.0 if pilot else part.PLATE_Z_MIN) / 1000.0,
+        (0.0 if is_pilot else part.PLATE_Z_MIN) / 1000.0,
     ), label=f"{label} arrow circle")
-    diameter = part.PLATE_TAP_DRILL_DIA if pilot else part.PLATE_CLEARANCE_DIA
+    diameter = part.PLATE_TAP_DRILL_DIA if is_pilot else part.PLATE_CLEARANCE_DIA
     radius = diameter / 2000.0 * float(_early_bound(view, "IView").ScaleDecimal)
     data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
     if int(data.GetArrowHeadCount()) != 1:
@@ -275,10 +302,12 @@ async def build(adapter: Any) -> dict[str, str]:
     rebuild_drawing(adapter, label="stop plate drill arrows")
 
     def assert_drill_attachments() -> None:
-        _assert_drill_attachment(adapter, front, pilot_annotation, pilot_entity, pilot=True)
+        _assert_drill_attachment(
+            adapter, front, pilot_annotation, pilot_entity, step=DrillStep.PILOT,
+        )
         _assert_drill_attachment(
             adapter, front, _early_bound(clearance, "IDisplayDimension").GetAnnotation(),
-            clearance_entity, pilot=False,
+            clearance_entity, step=DrillStep.CLEARANCE,
         )
 
     assert_drill_attachments()

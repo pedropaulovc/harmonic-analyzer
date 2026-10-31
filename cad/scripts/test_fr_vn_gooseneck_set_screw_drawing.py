@@ -266,11 +266,12 @@ def test_native_thread_text_is_shelved_and_reacquired_after_final_rebuild(
 
     def assert_shelves(adapter, displays, shelves, retained):
         assert displays is reacquired
-        assert shelves == draw.TEXT_SHELVES
+        assert shelves == {"SupplierThreadDiameter": (True, "right")}
         assert retained == stations
         events.append("settled")
 
     async def purchased_sheet(adapter, spec, **kwargs):
+        assert kwargs["view_placement"] is draw._align_right_origin
         kwargs["supplier_dimensions"](adapter, {})
         assert events == ["aligned", "import", "shelve"]
         kwargs["settled_checks"][0]()
@@ -286,20 +287,14 @@ def test_native_thread_text_is_shelved_and_reacquired_after_final_rebuild(
     assert events == ["aligned", "import", "shelve", "settled", "aligned"]
 
 
-def test_right_reserves_front_vertical_lanes_without_changing_front_budget() -> None:
-    original = draw.supplier_screw_margins(
+def test_only_annotated_views_reserve_supplier_margins() -> None:
+    assert draw.SUPPLIER_MARGINS == draw.supplier_screw_margins(
         supplier.SUPPLIER_REFERENCE_DIMENSIONS,
         planes=supplier.SUPPLIER_REFERENCE_PLANES,
         sides=supplier.SUPPLIER_REFERENCE_SIDES,
     )
-    assert draw.SUPPLIER_MARGINS["*Front"] == original["*Front"]
-    assert draw.SUPPLIER_MARGINS["*Top"] == original["*Top"]
-    assert draw.SUPPLIER_MARGINS["*Right"] == (
-        0.0,
-        original["*Front"][1],
-        0.0,
-        original["*Front"][3],
-    )
+    assert "*Right" not in draw.SUPPLIER_MARGINS
+    assert draw.TEXT_SHELVES == {"SupplierThreadDiameter": ("horizontal", "right")}
 
 
 @pytest.mark.parametrize(
@@ -330,3 +325,78 @@ def test_projection_proof_refuses_origin_or_scale_drift(
     else:
         with pytest.raises(RuntimeError, match="third-angle aligned"):
             draw._assert_projection_alignment(object(), views)
+
+
+@pytest.mark.parametrize("drift", [None, "right_x", "front_y", "scale", "angle", "source", "configuration", "orientation"])
+def test_post_fit_alignment_moves_only_right_y_and_retains_settled_state(monkeypatch, drift):
+    from types import SimpleNamespace
+
+    def view(name, position):
+        return SimpleNamespace(
+            Position=position, ScaleRatio=(1, 1), Angle=0.0,
+            source="supplier.SLDPRT", configuration="Default", orientation=name,
+            GetReferencedModelName=lambda: views[name].source,
+            GetOrientationName=lambda: views[name].orientation,
+        )
+
+    views = {
+        "*Front": view("*Front", (0.10, 0.12)),
+        "*Right": view("*Right", (0.30, 0.117)),
+        "*Top": view("*Top", (0.10, 0.22)),
+        "*Isometric": view("*Isometric", (0.30, 0.22)),
+    }
+    # Expose COM's configuration property while allowing mutation.
+    for native in views.values():
+        native.ReferencedConfiguration = "Default"
+    monkeypatch.setattr(draw, "model_point_in_view", lambda adapter, native, point, **kw: native.Position)
+    moves = []
+
+    def translate(adapter, native, x, y, *, move_children):
+        assert move_children is False
+        moves.append(native)
+        native.Position = (x, y)
+        return True
+
+    monkeypatch.setattr(draw, "set_view_position", translate)
+    monkeypatch.setattr(draw, "rebuild_drawing", lambda *args, **kw: None)
+    settled = draw._align_right_origin(object(), views)
+    assert moves == [views["*Right"]]
+    assert views["*Right"].Position == pytest.approx((0.30, 0.12))
+    assert views["*Front"].Position == (0.10, 0.12)
+    if drift == "right_x":
+        views["*Right"].Position = (0.301, 0.12)
+    elif drift == "front_y":
+        views["*Front"].Position = (0.10, 0.121)
+    elif drift == "scale":
+        views["*Top"].ScaleRatio = (2, 1)
+    elif drift == "angle":
+        views["*Right"].Angle = 0.1
+    elif drift == "source":
+        views["*Right"].source = "foreign.SLDPRT"
+    elif drift == "configuration":
+        views["*Right"].ReferencedConfiguration = "Other"
+    elif drift == "orientation":
+        views["*Right"].orientation = "*Left"
+    if drift is None:
+        settled()
+    else:
+        with pytest.raises(RuntimeError, match="placement/source/scale drift"):
+            settled()
+
+
+def test_wrapper_runs_placement_before_origin_snapshot_and_retains_proof():
+    source = inspect.getsource(purchased._build_reference_sheet)
+    assert source.index("scales = _fit_views") < source.index("placement_check = view_placement(")
+    assert source.index("placement_check = view_placement(") < source.index("fitted_origins:")
+    assert "settled_checks = (*settled_checks, placement_check)" in source
+    wrapper = ast.parse(inspect.getsource(purchased.build_purchased_fastener_drawing))
+    calls = [
+        node for node in ast.walk(wrapper)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        and node.func.id == "_build_reference_sheet"
+    ]
+    assert len(calls) == 1
+    assert any(
+        keyword.arg == "view_placement" and ast.unparse(keyword.value) == "view_placement"
+        for keyword in calls[0].keywords
+    )

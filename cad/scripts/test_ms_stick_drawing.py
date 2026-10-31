@@ -298,11 +298,14 @@ def test_builder_authors_pitch_tolerance_at_nominal_precision(monkeypatch) -> No
         assert kwargs == {"places": places, "display_unit": "in"}
 
 
-@pytest.mark.parametrize("defect", [None, "rejected", "height", "upper", "lower", "incomplete"])
+@pytest.mark.parametrize("defect", [None, "rejected", "height", "upper", "lower", "fixed-foot", "incomplete"])
 def test_native_section_letters_clear_both_unchanged_arrowheads(monkeypatch, defect) -> None:
-    """The actual helper moves the native glyph bottoms, never the cut/arrow."""
+    """Prove clearance after formatting, including an unchanged glyph foot."""
     monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *args, **kwargs: None)
+    events = []
+    monkeypatch.setattr(drawing._telemetry, "event",
+                        lambda name, **fields: events.append((name, fields)))
     text_format = SimpleNamespace(CharHeight=0.00635)
     # Native 308e5a1a8 marker: letter tops 5.004 mm above the shafts;
     # the PDF's horizontal filled arrowheads have a 3 mm vertical height.
@@ -323,6 +326,9 @@ def test_native_section_letters_clear_both_unchanged_arrowheads(monkeypatch, def
         actual_texts = [row[:] for row in texts]
         if defect in ("upper", "lower"):
             actual_texts[0 if defect == "upper" else 1][1] -= 0.001
+        if defect == "fixed-foot":
+            for text in actual_texts:
+                text[1] -= 0.00635 - height
         payload = [1.0, 0.0, 1.0] + [0.0] * 7
         payload += [value for row in arrows + actual_texts for value in row] + [height]
         return payload[:-1] if defect == "incomplete" else payload
@@ -337,6 +343,16 @@ def test_native_section_letters_clear_both_unchanged_arrowheads(monkeypatch, def
             drawing._place_numeral_section_letters(object(), parent, definition)
     assert placements == [(False, drawing.NUMERAL_SECTION_LETTER_HEIGHT)]
     assert arrows == original_arrows
+    if defect not in ("rejected", "height", "incomplete"):
+        format_event = next(fields for name, fields in events
+                            if name == "drawing.ms_stick.section_marker_format")
+        assert format_event["previous_height_m"] == 0.00635
+        assert format_event["requested_height_m"] == drawing.NUMERAL_SECTION_LETTER_HEIGHT
+        assert format_event["before_marker"] != format_event["after_marker"]
+        if defect == "fixed-foot":
+            clearance_event = next(fields for name, fields in events
+                                   if name == "drawing.ms_stick.section_marker_clearance")
+            assert clearance_event["clearance_m"] < 0.0
 
 
 def test_engraving_sizes_are_min_limits_and_graduation_depth_keeps_its_stock() -> None:

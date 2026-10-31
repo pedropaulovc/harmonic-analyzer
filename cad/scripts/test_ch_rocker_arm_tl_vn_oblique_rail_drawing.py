@@ -406,7 +406,7 @@ def test_sheet_stays_hiwin_millimetres_by_its_own_declaration() -> None:
     build = next(
         node
         for node in tree.body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_build_reference_sheet"
     )
     calls = {
         node.func.id: {kw.arg: ast.unparse(kw.value) for kw in node.keywords}
@@ -416,34 +416,45 @@ def test_sheet_stays_hiwin_millimetres_by_its_own_declaration() -> None:
         and node.func.id in ("new_project_drawing", "finalize_drawing")
     }
     assert calls["new_project_drawing"]["package_name"] == "PACKAGE"
+    assert calls["new_project_drawing"]["decimals"] == "3"
     assert calls["finalize_drawing"]["package_name"] == "PACKAGE"
     assert "_assert_receipt_dimensions" in calls["finalize_drawing"]["settled_checks"]
 
 
 def test_sheet_proves_its_source_at_every_boundary() -> None:
     tree = ast.parse(Path(draw.__file__).read_text(encoding="utf-8"))
-    build = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    sheet = next(
+        node for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_build_reference_sheet"
     )
     calls = {
-        node.func.id: node
-        for node in ast.walk(build)
+        node.func.id: node for node in ast.walk(sheet)
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     }
     for name in ("new_project_drawing", "finalize_drawing"):
         keywords = {kw.arg: ast.unparse(kw.value) for kw in calls[name].keywords}
         assert keywords["checkpoint"] == "guard", name
-    # Captured before the drawing exists; bytes re-proved once it has closed.
-    assert calls["capture_clean_source"].lineno < calls["new_project_drawing"].lineno
-    assert calls["finalize_drawing"].lineno < calls["assert_source_closed"].lineno
+    public = next(
+        node for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    )
+    public_calls = {
+        node.func.id: node for node in ast.walk(public)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    assert public_calls["_open_supplier_source_read_only"].lineno < public_calls["capture_clean_source"].lineno
+    assert public_calls["capture_clean_source"].lineno < public_calls["_build_reference_sheet"].lineno
 
 
 class _SourceDocument:
     def __init__(self, path: Path, *, dirty: bool = False) -> None:
         self.path = path
         self.dirty = dirty
+        from types import SimpleNamespace
+        self.read_only = True
+        self.ConfigurationManager = SimpleNamespace(
+            ActiveConfiguration=SimpleNamespace(Name="Supplier")
+        )
 
     def GetPathName(self):
         return str(self.path)
@@ -451,13 +462,21 @@ class _SourceDocument:
     def GetSaveFlag(self):
         return self.dirty
 
+    def GetType(self):
+        return 1
+
+    def IsOpenedReadOnly(self):
+        return self.read_only
+
 
 class _OpenAdapter:
     def __init__(self, document) -> None:
         self.currentModel = document
-
-    async def open_model(self, _path):
-        return _Result()
+        from types import SimpleNamespace
+        self.swApp = SimpleNamespace(
+            GetOpenDocumentByName=lambda _path: document,
+            IsSame=lambda left, right: 1 if left is right else 0,
+        )
 
 
 def _guarded_rail(monkeypatch, tmp_path, document_for):
@@ -477,6 +496,8 @@ def _guarded_rail(monkeypatch, tmp_path, document_for):
         "read_required_properties",
         lambda _model, names, *, required: dict.fromkeys(names, "x"),
     )
+    import _purchased_fastener_drawing as purchased
+    monkeypatch.setattr(purchased, "iter_views", lambda _adapter: [])
     return source, _OpenAdapter(document_for(source))
 
 
@@ -487,7 +508,7 @@ def _guarded_rail(monkeypatch, tmp_path, document_for):
             lambda source: _SourceDocument(source, dirty=True),
             "before the drawing starts",
         ),
-        (lambda source: _SourceDocument(source.with_name("other.SLDPRT")), "is not"),
+        (lambda source: _SourceDocument(source.with_name("other.SLDPRT")), "path identity mismatch"),
     ),
 )
 def test_sheet_refuses_a_dirty_or_foreign_source_before_drawing(
@@ -516,7 +537,7 @@ def test_sheet_refuses_a_source_rewritten_during_the_drawing(
 
     monkeypatch.setattr(draw, "new_project_drawing", new_drawing)
     with pytest.raises(
-        RuntimeError, match="after_new_document: source file bytes changed"
+        RuntimeError, match="source checkpoint after_new_document:.*source part bytes changed"
     ):
         asyncio.run(draw.build(adapter))
 
@@ -846,3 +867,92 @@ def test_settled_length_requires_visible_physical_end_edges(monkeypatch) -> None
     )
     with pytest.raises(RuntimeError, match="no exact visible line"):
         settled()
+
+
+def test_rail_refuses_a_writable_source_before_drawing(monkeypatch, tmp_path) -> None:
+    _source, adapter = _guarded_rail(monkeypatch, tmp_path, _SourceDocument)
+    adapter.currentModel.read_only = False
+    with pytest.raises(RuntimeError, match="must be opened read-only"):
+        asyncio.run(draw.build(adapter))
+
+
+@pytest.mark.parametrize("defect", ("none", "writable", "replacement", "configuration", "bytes"))
+def test_rail_qualified_supplier_checkpoint_guards_presentation(
+    monkeypatch, tmp_path, defect
+) -> None:
+    from types import SimpleNamespace
+    import _purchased_fastener_drawing as purchased
+
+    source, adapter = _guarded_rail(monkeypatch, tmp_path, _SourceDocument)
+    original = adapter.currentModel
+
+    async def sheet(_adapter, path, model, configuration, guard):
+        assert model is original
+        assert configuration == "Supplier"
+        assert path == source
+        _adapter.currentModel = SimpleNamespace(
+            GetPathName=lambda: str(source.with_suffix(".SLDDRW")),
+            GetType=lambda: 3,
+            IsOpenedReadOnly=lambda: False,
+            GetSaveFlag=lambda: True,
+        )
+        view = SimpleNamespace(
+            GetOrientationName=lambda: "*Front",
+            GetName2=lambda: "Drawing View1",
+            GetReferencedModelName=lambda: str(source),
+            ReferencedConfiguration=configuration,
+            ReferencedDocument=original,
+        )
+        monkeypatch.setattr(purchased, "iter_views", lambda _adapter: [view])
+        guard("after_new_document")
+        # Native evidence: source presentation dirty, original bytes intact.
+        original.dirty = True
+        if defect == "writable":
+            original.read_only = False
+        elif defect == "replacement":
+            replacement = _SourceDocument(source)
+            _adapter.swApp.GetOpenDocumentByName = lambda _path: replacement
+        elif defect == "configuration":
+            view.ReferencedConfiguration = "Foreign"
+        elif defect == "bytes":
+            source.write_bytes(b"changed native source")
+        guard("before_drawing_save")
+        guard("after_drawing_save")
+        guard("after_drawing_close")
+        return {"pdf": "rail.pdf"}
+
+    monkeypatch.setattr(draw, "_build_reference_sheet", sheet)
+    if defect == "none":
+        assert asyncio.run(draw.build(adapter)) == {"pdf": "rail.pdf"}
+        assert original.dirty is True  # No reset or source save.
+        assert source.read_bytes() == b"rail source"
+    else:
+        with pytest.raises(RuntimeError, match={
+            "writable": "not read-only",
+            "replacement": "native identity mismatch",
+            "configuration": "configuration mismatch",
+            "bytes": "source part bytes changed",
+        }[defect]):
+            asyncio.run(draw.build(adapter))
+
+
+@pytest.mark.parametrize("fail", (False, True))
+def test_rail_final_byte_guard_also_covers_error_paths(monkeypatch, tmp_path, fail) -> None:
+    source, adapter = _guarded_rail(monkeypatch, tmp_path, _SourceDocument)
+    primary = asyncio.CancelledError("drawing cancelled")
+
+    async def sheet(*_args):
+        source.write_bytes(b"changed without checkpoint")
+        if fail:
+            raise primary
+        return {"pdf": "rail.pdf"}
+
+    monkeypatch.setattr(draw, "_build_reference_sheet", sheet)
+    if fail:
+        with pytest.raises(asyncio.CancelledError) as caught:
+            asyncio.run(draw.build(adapter))
+        assert caught.value is primary
+        assert "source file preservation also failed" in "\n".join(primary.__notes__)
+    else:
+        with pytest.raises(RuntimeError, match="source part bytes changed during drawing"):
+            asyncio.run(draw.build(adapter))

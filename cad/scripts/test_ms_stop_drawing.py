@@ -1392,12 +1392,13 @@ def test_plate_drill_arrows_use_single_native_outside_tip(monkeypatch, refuse) -
         assert (display.side, display.use_doc, display.second) == (1, False, False)
 
 
-@pytest.mark.parametrize("pilot", [True, False])
+@pytest.mark.parametrize("step", list(plate_drawing.DrillStep))
 @pytest.mark.parametrize("fault", [
-    "none", "wrong-entity", "wrong-kind", "dangling", "missing",
+    "none", "wrong-entity", "wrong-kind", "dangling", "missing", "null", "count",
     "other-radius", "other-hole", "second-arrow", "unreadable", "nan",
 ])
-def test_plate_drill_guard_proves_identity_and_printed_circle(monkeypatch, pilot, fault) -> None:
+def test_plate_drill_guard_proves_identity_and_printed_circle(monkeypatch, step, fault) -> None:
+    pilot = step is plate_drawing.DrillStep.PILOT
     entity, other = object(), object()
     center = (0.202432 if pilot else 0.147568, 0.157808)
     diameter = spec.PLATE_TAP_DRILL_DIA if pilot else spec.PLATE_CLEARANCE_DIA
@@ -1413,13 +1414,15 @@ def test_plate_drill_guard_proves_identity_and_printed_circle(monkeypatch, pilot
     if fault == "nan":
         tip = (float("nan"), center[1], 0.0)
     attached = () if fault == "missing" else (other if fault == "wrong-entity" else entity,)
+    if fault == "null":
+        attached = (None,)
     kind = 10 if pilot else 1
     if fault == "wrong-kind":
         kind = 1 if pilot else 10
     annotation = SimpleNamespace(
         IsDangling=lambda: fault == "dangling",
         GetAttachedEntities3=lambda: attached,
-        GetAttachedEntityCount3=lambda: len(attached),
+        GetAttachedEntityCount3=lambda: 2 if fault == "count" else len(attached),
         GetAttachedEntityTypes=lambda: (kind,) if attached else (),
         GetDisplayData=lambda: SimpleNamespace(
             GetArrowHeadCount=lambda: 2 if fault == "second-arrow" else 1,
@@ -1436,13 +1439,21 @@ def test_plate_drill_guard_proves_identity_and_printed_circle(monkeypatch, pilot
 
     monkeypatch.setattr(plate_drawing, "model_point_in_view", project)
     if fault != "none":
-        with pytest.raises(RuntimeError, match="native circle attachment|native arrow|own circle"):
+        with pytest.raises(RuntimeError, match="native circle attachment|native arrow|own circle") as failure:
             plate_drawing._assert_drill_attachment(
-                adapter, SimpleNamespace(ScaleDecimal=4.0), annotation, entity, pilot=pilot,
+                adapter, SimpleNamespace(ScaleDecimal=4.0), annotation, entity, step=step,
             )
+        if fault in {"wrong-entity", "wrong-kind", "dangling", "missing", "null", "count"}:
+            message = str(failure.value)
+            assert f"count={2 if fault == 'count' else len(attached)}" in message
+            assert f"types={(kind,) if attached else ()}" in message
+            assert f"entity_presence={tuple(item is not None for item in attached)}" in message
+            assert f"dangling={fault == 'dangling'}" in message
+            assert "IsSame=" in message
+            assert f"expected_source={'PilotDrillReference' if pilot else 'PlateClearances'}" in message
     else:
         plate_drawing._assert_drill_attachment(
-            adapter, SimpleNamespace(ScaleDecimal=4.0), annotation, entity, pilot=pilot,
+            adapter, SimpleNamespace(ScaleDecimal=4.0), annotation, entity, step=step,
         )
         assert projected == [(
             spec.PLATE_HOLE_XS[0 if pilot else 1] / 1000.0,

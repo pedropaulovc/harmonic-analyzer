@@ -5,9 +5,9 @@ source part print decimal inch. The McMaster 91410A540 sizes stay supplier
 references in the supplier's own form: fractional head width and height,
 decimal length and thread diameter, each labelled ``in``. The diameter/thread
 text uses a measured native shelf, preserving the source value and physical
-witness stations. Equal FRONT/RIGHT vertical lane budgets preserve third-angle
-alignment without changing the model or the calibrated view scale; native
-model-origin alignment is required again after the final rebuild.
+witness stations. A post-fit translation aligns the actual FRONT/RIGHT model
+origins without changing the model or calibrated view scales; placement and
+alignment are required again after the final rebuild.
 """
 
 from __future__ import annotations
@@ -17,10 +17,13 @@ import sys
 from typing import Any
 from math import isfinite
 
+from solidworks_mcp.adapters.solidworks.drawing import set_view_position
+
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_projection import model_point_in_view
+from _drawing_common import rebuild_drawing
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _supplier_screw_dimensions import annotate_supplier_screw
 from _supplier_screw_layout import supplier_screw_margins
@@ -40,16 +43,67 @@ PACKAGE = "fr-vn-gooseneck-set-screw"
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "1/4-20 x 3/4 SQUARE HEAD SET SCREW, CUP POINT"
 # Text-only movement: keep the model-owned diameter, thread and witness span.
-TEXT_SHELVES = {"SupplierThreadDiameter": (True, "right")}
-# Equal vertical fit budgets keep the two symmetric side silhouettes aligned.
-# RIGHT needs the same reserved bottom lane even though only FRONT carries ink.
+TEXT_SHELVES = {"SupplierThreadDiameter": ("horizontal", "right")}
 SUPPLIER_MARGINS = supplier_screw_margins(
     SUPPLIER_REFERENCE_DIMENSIONS,
     planes=SUPPLIER_REFERENCE_PLANES,
     sides=SUPPLIER_REFERENCE_SIDES,
 )
-_front_margins = SUPPLIER_MARGINS["*Front"]
-SUPPLIER_MARGINS["*Right"] = (0.0, _front_margins[1], 0.0, _front_margins[3])
+
+
+def _legacy_text_shelves():
+    """Translate the recipe's axis names only at the legacy helper boundary."""
+    return {name: (axis == "horizontal", side) for name, (axis, side) in TEXT_SHELVES.items()}
+
+
+def _align_right_origin(adapter: Any, views: dict[str, Any]):
+    """Translate RIGHT.Y only, retaining all other native placement state."""
+    before = {}
+    for name, view in views.items():
+        position = tuple(float(value) for value in view.Position)
+        scale = tuple(float(value) for value in view.ScaleRatio)
+        angle = float(view.Angle)
+        if (
+            len(position) != 2 or len(scale) != 2
+            or not all(isfinite(value) for value in (*position, *scale, angle))
+        ):
+            raise RuntimeError(f"gooseneck {name}: unreadable fitted view placement")
+        before[name] = (
+            position, scale, angle, str(view.GetReferencedModelName()),
+            str(view.ReferencedConfiguration), str(view.GetOrientationName()),
+        )
+    front_origin = model_point_in_view(
+        adapter, views["*Front"], (0.0, 0.0, 0.0), label="gooseneck Front fitted origin"
+    )
+    right_origin = model_point_in_view(
+        adapter, views["*Right"], (0.0, 0.0, 0.0), label="gooseneck Right fitted origin"
+    )
+    if not all(isfinite(value) for value in (*front_origin, *right_origin)):
+        raise RuntimeError("gooseneck alignment: unreadable projected model origins")
+    right_position = before["*Right"][0]
+    target = (right_position[0], right_position[1] + front_origin[1] - right_origin[1])
+    if not set_view_position(adapter, views["*Right"], *target, move_children=False):
+        raise RuntimeError("gooseneck alignment: native RIGHT translation failed")
+    rebuild_drawing(adapter, label="align gooseneck RIGHT model origin")
+
+    def settled():
+        for name, view in views.items():
+            position, scale, angle, source, configuration, orientation = before[name]
+            expected = target if name == "*Right" else position
+            actual = tuple(float(value) for value in view.Position)
+            if (
+                len(actual) != 2 or not all(isfinite(value) for value in actual)
+                or any(abs(a - b) > 1e-8 for a, b in zip(actual, expected, strict=True))
+                or tuple(view.ScaleRatio) != scale or float(view.Angle) != angle
+                or str(view.GetReferencedModelName()) != source
+                or str(view.ReferencedConfiguration) != configuration
+                or str(view.GetOrientationName()) != orientation
+            ):
+                raise RuntimeError(f"gooseneck {name}: native placement/source/scale drift")
+        _assert_projection_alignment(adapter, views)
+
+    settled()
+    return settled
 
 
 def _assert_projection_alignment(adapter: Any, views: dict[str, Any]) -> None:
@@ -95,14 +149,14 @@ async def build(adapter: Any) -> dict[str, str]:
             sides=SUPPLIER_REFERENCE_SIDES,
             settled_checks=supplier_checks,
         )
-        shelf_stations.update(shelve_supplier_text(adapter, displays, TEXT_SHELVES))
+        shelf_stations.update(shelve_supplier_text(adapter, displays, _legacy_text_shelves()))
 
     def assert_supplier_dimensions_settled():
         nonlocal settled
         if settled or callback_count != 1 or len(supplier_checks) != 1:
             raise RuntimeError("supplier dimensions require exactly one settled proof")
         displays = supplier_checks[0]()
-        assert_supplier_shelves(adapter, displays, TEXT_SHELVES, shelf_stations)
+        assert_supplier_shelves(adapter, displays, _legacy_text_shelves(), shelf_stations)
         _assert_projection_alignment(adapter, supplier_views)
         settled = True
 
@@ -113,6 +167,7 @@ async def build(adapter: Any) -> dict[str, str]:
         supplier_dimensions=supplier_dimensions,
         settled_checks=(assert_supplier_dimensions_settled,),
         supplier_margins=SUPPLIER_MARGINS,
+        view_placement=_align_right_origin,
         package_name=PACKAGE,
     )
 

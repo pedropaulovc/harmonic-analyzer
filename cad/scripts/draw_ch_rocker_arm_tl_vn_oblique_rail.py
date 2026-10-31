@@ -14,6 +14,11 @@ dimension, so this sheet keeps its title block, captions and footer (as
 ``draw_pn_vn_pen_marker`` does) and lays its own views: FRONT (the hole face)
 and TOP at the sheet's 1:2, the RIGHT end profile at 2:1 so its raceway
 grooves read, and the isometric at 1:4.
+
+The supplier source must start clean and open read-only. Native sheet work
+can set its in-memory save flag; source identity, view configuration and
+unchanged bytes remain strict through export/close and on failure paths.
+The source is never saved or its save flag cleared.
 """
 
 from __future__ import annotations
@@ -22,7 +27,7 @@ import argparse
 import math
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -32,7 +37,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 import _telemetry
-from _check import check
 from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
@@ -50,9 +54,7 @@ from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_source_guard import (
     SourceCheck,
-    assert_source_closed,
     capture_clean_source,
-    source_checkpoint,
 )
 from _drawing_view_display import set_hidden_lines_removed
 from _purchased_fastener_drawing import (
@@ -61,8 +63,11 @@ from _purchased_fastener_drawing import (
     _center_marks_without_lines,
     _inside,
     _literal_note,
+    _open_supplier_source_read_only,
     _purchased_title_block,
     _rebuild,
+    _source_file_sha256,
+    _supplier_source_checkpoint,
     add_purchased_footer,
 )
 from _session import run_build
@@ -427,25 +432,61 @@ async def build(adapter: Any) -> dict[str, str]:
     source = SPEC.source
     if SPEC.source_kind != "part" or not source.is_file():
         raise FileNotFoundError(f"source purchased part is missing: {source}")
-    check(f"open {PART_STEM} source", await adapter.open_model(str(source)))
-    # Prove both native cleanliness and unchanged source bytes. Whether this
-    # rail's reference dressing dirties its model must be measured on the farm,
-    # not inferred from another purchased sheet's presentation behavior.
-    clean_source = capture_clean_source(
-        source,
-        adapter.currentModel,
-        label=PART_STEM,
-        check=SourceCheck.NATIVE_CLEAN,
-    )
-    guard = source_checkpoint(clean_source)
+    source_sha256 = _source_file_sha256(source)
+    primary: BaseException | None = None
+    try:
+        model = _open_supplier_source_read_only(adapter, source, label=PART_STEM)
+        # Initial cleanliness stays strict. The native sheet sets the source
+        # save flag before export; existing evidence does not attribute the
+        # first dirty operation. Never save it or reset that flag. Qualified
+        # supplier checks enforce read-only identity/configuration and bytes.
+        capture_clean_source(source, model, label=PART_STEM, check=SourceCheck.NATIVE_CLEAN)
+        configuration = _early_bound(
+            _early_bound(model.ConfigurationManager, "IConfigurationManager")
+            .ActiveConfiguration,
+            "IConfiguration",
+        ).Name
+        if not isinstance(configuration, str) or not configuration.strip():
+            raise RuntimeError("rail source has no active configuration")
+        guard = _supplier_source_checkpoint(
+            adapter, source, model, source_sha256,
+            label=PART_STEM, evidence=[], configuration=configuration,
+        )
+        return await _build_reference_sheet(adapter, source, model, configuration, guard)
+    except BaseException as error:
+        primary = error
+        raise
+    finally:
+        # Also covers native open, properties and drawing failures/cancellation,
+        # without dereferencing source or view handles after a close attempt.
+        try:
+            if _source_file_sha256(source) != source_sha256:
+                raise RuntimeError(f"{PART_STEM}: supplier source part bytes changed during drawing")
+        except BaseException as preservation_error:
+            if primary is None:
+                raise
+            primary.add_note(
+                f"{PART_STEM}: supplier source file preservation also failed: "
+                f"{preservation_error!r}"
+            )
+
+
+async def _build_reference_sheet(
+    adapter: Any,
+    source: Path,
+    model: Any,
+    configuration: str,
+    guard: Callable[[str], None],
+) -> dict[str, str]:
     properties = read_required_properties(
-        clean_source.model, SOURCE_PROPERTIES, required=SOURCE_PROPERTIES
+        model, SOURCE_PROPERTIES, required=SOURCE_PROPERTIES
     )
 
     draw, sheet = new_project_drawing(
         adapter,
         layout=SPEC.layout,
         scale=SHEET_SCALE,
+        decimals=3,
         package_name=PACKAGE,
         checkpoint=guard,
     )
@@ -472,9 +513,12 @@ async def build(adapter: Any) -> dict[str, str]:
     views = {}
     with _telemetry.span("drawing.rail_views"):
         for name, center, _, scale in VIEWS:
+            guard(f"before_create_view:{name}")
             view = _early_bound(
                 place_view(adapter, str(source), name, *center, scale=scale), "IView"
             )
+            view.ReferencedConfiguration = configuration
+            guard(f"after_select_configuration:{name}")
             # A prism with plain holes: no hidden edge names a feature.
             set_hidden_lines_removed(adapter, view)
             views[name] = view
@@ -483,6 +527,7 @@ async def build(adapter: Any) -> dict[str, str]:
             views[name].UseSheetScale = 0
             views[name].ScaleRatio = double_array([float(value) for value in scale])
         _rebuild(draw, phase="rail view extents")
+        guard("after_configuration_rebuild")
         for name, center, _, _ in VIEWS:
             _center_outline(views[name], name, center)
         _rebuild(draw, phase="centre rail views")
@@ -496,7 +541,9 @@ async def build(adapter: Any) -> dict[str, str]:
             tuple((name, center, None) for name, center, _, _ in VIEWS),
         )
 
+    guard("before_receipt_dimensions")
     _receipt_dimensions(adapter, views["*Front"])
+    guard("after_receipt_dimensions")
 
     notes = []
     with _telemetry.span("drawing.rail_annotations"):
@@ -587,7 +634,6 @@ async def build(adapter: Any) -> dict[str, str]:
         checkpoint=guard,
         package_name=PACKAGE,
     )
-    assert_source_closed(clean_source, stage="after finalize")
     return artifacts
 
 

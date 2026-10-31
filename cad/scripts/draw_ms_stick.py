@@ -250,12 +250,23 @@ def _engraving_detail(
 
 
 def _place_numeral_section_letters(adapter: Any, parent: Any, definition: Any) -> None:
-    """Keep both native G glyphs above their arrowheads, not substitute notes."""
+    """Set native glyph height; measure rather than assume their origins move."""
+    parent = _early_bound(parent, "IView")
+    before = tuple(float(value) for value in parent.GetSectionLineInfo2())
     text_format = _early_bound(definition.GetTextFormat(), "ITextFormat")
+    previous_height = float(text_format.CharHeight)
     text_format.CharHeight = NUMERAL_SECTION_LETTER_HEIGHT
     if not definition.SetTextFormat(False, text_format):
         raise RuntimeError("numeral G-G native letter height rejected")
     rebuild_drawing(adapter, label="place numeral G-G native letters")
+    after = tuple(float(value) for value in parent.GetSectionLineInfo2())
+    _telemetry.event(
+        "drawing.ms_stick.section_marker_format",
+        previous_height_m=previous_height,
+        requested_height_m=NUMERAL_SECTION_LETTER_HEIGHT,
+        before_marker=before,
+        after_marker=after,
+    )
     _assert_numeral_section_letters(parent)
 
 
@@ -279,8 +290,27 @@ def _assert_numeral_section_letters(parent: Any) -> None:
         # GetSectionLineInfo2's index 7 is ArrowHeight: the transverse
         # vertical extent of these horizontal arrows, not ArrowWidth (6).
         arrow_top = max(arrow[1], arrow[4]) + arrow[7] / 2.0
-        if text[1] - height - arrow_top < NUMERAL_SECTION_LETTER_CLEARANCE:
-            raise RuntimeError(f"numeral G-G letter {index + 1} overlaps its arrowhead")
+        clearance = text[1] - height - arrow_top
+        _telemetry.event(
+            "drawing.ms_stick.section_marker_clearance",
+            letter_index=index + 1,
+            arrow_start=arrow[:3],
+            arrow_end=arrow[3:6],
+            arrow_width_m=arrow[6],
+            arrow_height_m=arrow[7],
+            text_origin=text,
+            text_height_m=height,
+            arrow_top_m=arrow_top,
+            clearance_m=clearance,
+            required_clearance_m=NUMERAL_SECTION_LETTER_CLEARANCE,
+        )
+        if clearance < NUMERAL_SECTION_LETTER_CLEARANCE:
+            raise RuntimeError(
+                f"numeral G-G letter {index + 1} overlaps its arrowhead: "
+                f"clearance={clearance!r} m, required={NUMERAL_SECTION_LETTER_CLEARANCE!r} m; "
+                f"arrow={arrow!r}, text_origin={text!r}, text_height={height!r} m; "
+                f"native_marker={marker!r}"
+            )
 
 
 def _numeral_profile(adapter: Any, parent: Any) -> Any:

@@ -875,7 +875,6 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
                 != ("(", ")")
             ):
                 raise RuntimeError("assembly pose is not a native unbanded reference")
-        if label == "stop position":
             # Keep the imported reference value and physical model attachments.
             # Its purpose is explained in the setup note, not numeric note text.
             for field in (3, 4):  # swDimensionTextCalloutAbove/Below

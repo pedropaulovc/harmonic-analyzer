@@ -140,7 +140,7 @@ def source_checkpoint(source: CleanSource) -> Callable[[str], None]:
     def checkpoint(stage: str) -> None:
         if stage == AFTER_DRAWING_CLOSE:
             assert_source_closed(source, stage=stage)
-        else:
-            assert_source_clean(source, stage=stage)
+            return
+        assert_source_clean(source, stage=stage)
 
     return checkpoint
