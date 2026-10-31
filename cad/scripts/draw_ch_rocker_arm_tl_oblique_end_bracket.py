@@ -40,7 +40,7 @@ from _drawing_common import (
 )
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -56,6 +56,7 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _printed_limits import limits
 from _supplier_dimensions import supplier_reference_dimension
+from ch_rocker_arm_tl_oblique_callouts import set_callout_lengths_to_three_places
 from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     BAR_MATE_CALLOUT,
     BAR_TAP_DRILL,
@@ -77,7 +78,6 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     STOCK_CALLOUT,
     STOCK_FRACTION_DENOMINATORS,
     TAP_CALLOUT_PLACES,
-    TAP_CALLOUT_PRECISION,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -620,7 +620,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         _call_out_one_hole(callout, label=label)
         _omit_tap_thread_class(callout, label=label)
-        set_hole_callout_precision(callout, TAP_CALLOUT_PRECISION, label=label)
+        set_callout_lengths_to_three_places(callout, label=label)
 
     # The property-linked blocks land in the active view: the plan.
     _activate_view(adapter, plan, label="plan")

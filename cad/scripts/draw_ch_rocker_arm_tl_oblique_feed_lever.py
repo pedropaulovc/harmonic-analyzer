@@ -33,7 +33,9 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
+
+# The front view imports the hidden LeverThickReference sketch's thickness.
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
