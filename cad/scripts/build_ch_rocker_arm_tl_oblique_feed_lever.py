@@ -10,7 +10,9 @@ holes are one native 5/16 clearance Hole Wizard feature from the top face;
 the two grip-end vertical edges are
 filleted last, the printed radius on its own one-edge feature
 (build_pd_guide_lock: an imported fillet dimension attaches to its feature's
-first edge), the other corner driven by the same global.
+first edge), the other corner driven by the same global. The stock thickness
+the front view prints lives on a hidden Front-plane reference sketch,
+``LeverThickReference`` (a drawing view cannot attach the extrusion's depth).
 
 Run (SolidWorks already open)::
 
@@ -35,7 +37,15 @@ from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
-from _sketch import SketchDims, add_line_chain, ensure_fully_defined
+from _sketch import (
+    SketchDims,
+    add_line_chain,
+    anchor_point_to_origin,
+    blank_sketch,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _sketch_chains import define_rectilinear_chain
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import (
@@ -75,6 +85,15 @@ V_LEVER = LEVER_LENGTH * LEVER_WIDTH * LEVER_THICK
 V_HOLES = len(HOLE_X) * math.pi * _R_HOLE**2 * LEVER_THICK
 # Each fillet gives up the square R x R less its quarter disc.
 V_CORNER = (CORNER_R**2 - math.pi * CORNER_R**2 / 4.0) * LEVER_THICK
+
+
+def _as_construction(adapter, entity_id: str) -> None:
+    """Flag a registered sketch line as construction geometry (rebind to the
+    base ISketchSegment, which declares ``ConstructionGeometry``)."""
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
 def _require_one_solid_body(adapter, *, label: str) -> None:
@@ -189,8 +208,10 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=LEVER_THICK)),
     )
     name_last_feature(adapter, "Lever")
+    # The depth stays off the print: the stock thickness prints from
+    # LeverThickReference (below), which a drawing view can attach to.
     drive_jobs.append(
-        (name_dimensions(adapter, "Lever", ["LeverThick"])[0], '"LeverThick"')
+        (name_dimensions(adapter, "Lever", ["LeverDepth"])[0], '"LeverThick"')
     )
     volume = await volume_check(adapter, "lever", V_LEVER, 0.002 * V_LEVER)
 
@@ -228,6 +249,43 @@ async def build(adapter) -> dict[str, str]:
         )
     _require_one_solid_body(adapter, label="feed lever")
 
+    # --- The stock thickness: a reference sketch ------------------------------
+    # Farm r1 (#290): the extrusion's imported depth has no sound drawing-view
+    # attachment, so _supplier_dimensions refuses to dress it as the STOCK
+    # reference; a sketch dimension attaches to its witness line (the base
+    # bar's BarWidth, _supplier_washer_model's thickness witness). One
+    # construction line up the grip end on the Front plane, the front view's.
+    thick = SketchDims()
+    check("create_sketch thickness reference", await adapter.create_sketch("Front"))
+    to_front = _sketch_mapper(adapter, u_axis=0, v_axis=1, label="thickness reference")
+    foot = to_front((LEVER_LENGTH, 0.0, 0.0))
+    top = to_front((LEVER_LENGTH, LEVER_THICK, 0.0))
+    set_sketch_direct_db(adapter, True)
+    witness = check("thickness witness line", await adapter.add_line(*foot, *top))
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, witness)
+    await anchor_point_to_origin(
+        adapter, f"{witness}.start", *foot, "thickness witness foot"
+    )
+    thick.record("ThickWitnessX", '"LeverLength"')
+    check(
+        "thickness witness along Y",
+        await adapter.add_sketch_constraint(witness, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        f"{witness}.start",
+        f"{witness}.end",
+        "distance",
+        LEVER_THICK,
+        "LeverThick",
+    )
+    thick.record("LeverThick", '"LeverThick"')
+    await ensure_fully_defined(adapter, "thickness reference sketch")
+    check("exit_sketch thickness reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "LeverThickReference")
+    drive_jobs += thick.apply(adapter, "LeverThickReference")
+
     await force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:
         await drive_dimension(adapter, dimension_name, expression)
@@ -248,6 +306,10 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
+    # The reference sketch owns a printed dimension but no geometry: hide it
+    # so no assembly renders it; the drawing shows it in the front view that
+    # imports its dimension (_drawing_hidden_sketches).
+    blank_sketch(adapter, "LeverThickReference")
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts

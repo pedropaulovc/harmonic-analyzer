@@ -65,6 +65,7 @@ from _printed_limits import limits
 from _part_properties import part_drawing_unit
 from _supplier_dimensions import supplier_reference_dimension
 from _printed_tolerance import drilled_oversize_mm
+from ch_rocker_arm_tl_oblique_callouts import set_callout_lengths_to_three_places
 from ch_rocker_arm_tl_oblique_base_bar_spec import (
     BAR_LENGTH,
     BAR_THICK,
@@ -922,9 +923,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rail screw taps",
     )
     _omit_tap_thread_class(tap_callout)
-    set_hole_callout_precision(
-        tap_callout, {"hw-tapdrldia": _CALLOUT_PLACES}, label="rail screw taps"
-    )
+    # A THRU tap's callout carries no hw-tapdrldia (farm r1): every length
+    # it does carry prints .XXX.
+    set_callout_lengths_to_three_places(tap_callout, label="rail screw taps")
     # The far outer hole's edge, down and right of its centre: the leader
     # leaves away from the far row's station line.
     bracket_callout = add_native_hole_callout(

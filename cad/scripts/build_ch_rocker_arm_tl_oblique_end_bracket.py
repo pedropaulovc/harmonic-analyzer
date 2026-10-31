@@ -10,7 +10,8 @@ thickness; the four #8-32 UNC base-bar taps and the two #6-32 UNC KP08 taps are
 two native Hole Wizard features tapped THRU from the top face on the row y 0.
 The row's printed station (.250 from the -Y side face) lives on a hidden
 reference sketch, ``HoleRowReference`` (build_ch_rocker_arm_tl_oblique_base_bar's
-``RailRowReference``).
+``RailRowReference``); the stock thickness the end view prints lives on another,
+``BracketThickReference`` (a drawing view cannot attach the extrusion's depth).
 
 Run (SolidWorks already open)::
 
@@ -46,6 +47,7 @@ from _sketch import (
     add_line_chain,
     anchor_point_to_origin,
     blank_sketch,
+    dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
 )
@@ -150,8 +152,10 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=BRACKET_THICK)),
     )
     name_last_feature(adapter, "Bracket")
+    # The depth stays off the print: the stock thickness prints from
+    # BracketThickReference (below), which a drawing view can attach to.
     drive_jobs.append(
-        (name_dimensions(adapter, "Bracket", ["BracketThick"])[0], '"BracketThick"')
+        (name_dimensions(adapter, "Bracket", ["BracketDepth"])[0], '"BracketThick"')
     )
     volume = await volume_check(adapter, "bracket", V_BRACKET, _V_TOL)
 
@@ -216,6 +220,45 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch hole row reference", await adapter.exit_sketch())
     name_last_feature(adapter, "HoleRowReference")
     drive_jobs += row_station.apply(adapter, "HoleRowReference")
+
+    # --- The stock thickness: a reference sketch ------------------------------
+    # Farm r1 (#290): the extrusion's imported depth has no sound drawing-view
+    # attachment, so _supplier_dimensions refuses to dress it as the STOCK
+    # reference; a sketch dimension attaches to its witness line (the base
+    # bar's BarWidth, _supplier_washer_model's thickness witness). One
+    # construction line up the inner end face's -Y edge on the Right plane,
+    # sketch (u, v) = model (-Z, Y) (_oblique_pivot_block_model), the end
+    # view's plane.
+    thick = SketchDims()
+    check("create_sketch thickness reference", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    witness = check(
+        "thickness witness line",
+        await adapter.add_line(0.0, -HALF_WIDTH, -BRACKET_THICK, -HALF_WIDTH),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, witness)
+    await anchor_point_to_origin(
+        adapter, f"{witness}.start", 0.0, -HALF_WIDTH, "thickness witness foot"
+    )
+    thick.record("ThickWitnessY", '"BracketWidth" / 2')
+    check(
+        "thickness witness along Z",
+        await adapter.add_sketch_constraint(witness, None, "horizontal"),
+    )
+    await dimension_between(
+        adapter,
+        f"{witness}.start",
+        f"{witness}.end",
+        "distance",
+        BRACKET_THICK,
+        "BracketThick",
+    )
+    thick.record("BracketThick", '"BracketThick"')
+    await ensure_fully_defined(adapter, "thickness reference sketch")
+    check("exit_sketch thickness reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "BracketThickReference")
+    drive_jobs += thick.apply(adapter, "BracketThickReference")
     _require_one_solid_body(adapter, label="end bracket")
 
     await force_rebuild(adapter)
@@ -239,10 +282,11 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
-    # The reference sketch owns a printed dimension but no geometry: hide it
-    # so no assembly renders it; the drawing shows it in the plan that
-    # imports its dimension (_drawing_hidden_sketches).
+    # The reference sketches own printed dimensions but no geometry: hide
+    # them so no assembly renders them; the drawing shows each in the view
+    # that imports its dimension (_drawing_hidden_sketches).
     blank_sketch(adapter, "HoleRowReference")
+    blank_sketch(adapter, "BracketThickReference")
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts

@@ -127,9 +127,9 @@ KP08_TAP_X: tuple[float, ...] = tuple(
 )
 KP08_TAP_SPEC = HoleSpec("tapped", KP08_THREAD, end="through_all")
 KP08_TAP_DRILL = blind_cut_dia_mm(KP08_TAP_SPEC)  # #36, .1065
-# Every tap callout's drill prints .XXX (.136, .107), set per variable.
+# Every tap callout's lengths print .XXX (.136, .107); a THRU tap's callout
+# carries no hw-tapdrldia (farm r1), so the sheet sets every length it has.
 TAP_CALLOUT_PLACES = 3
-TAP_CALLOUT_PRECISION = {"hw-tapdrldia": TAP_CALLOUT_PLACES}
 
 _LENGTH_LOW = _limits(BRACKET_LENGTH, LENGTH_PLACES)[0]
 _BAR_R = THREAD_MAJOR_MM[BAR_SCREW] / 2.0
@@ -238,14 +238,16 @@ RULE_20_SHORTFALLS: tuple[str, ...] = ()
 # --- Drawing -------------------------------------------------------------------------
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BracketProfile": {"BracketLength", "BracketWidth"},
-    "Bracket": {"BracketThick"},
+    # The stock thickness: a reference sketch, not the extrusion's depth,
+    # whose import has no drawing-view attachment (farm r1).
+    "BracketThickReference": {"BracketThick"},
     "BarTaps": {f"BarTap{k}X" for k in range(1, len(BAR_TAP_X) + 1)},
     "KP08Taps": {"KP08Tap1X", "KP08Tap2X"},
     "HoleRowReference": {"HoleRowY"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BracketProfile": {"BracketLength": LENGTH_PLACES, "BracketWidth": STOCK_PLACES},
-    "Bracket": {"BracketThick": STOCK_PLACES},
+    "BracketThickReference": {"BracketThick": STOCK_PLACES},
     "BarTaps": dict.fromkeys(DRAWING_DIMENSIONS["BarTaps"], HOLE_PLACES),
     "KP08Taps": {"KP08Tap1X": HOLE_PLACES, "KP08Tap2X": HOLE_PLACES},
     "HoleRowReference": {"HoleRowY": HOLE_PLACES},
