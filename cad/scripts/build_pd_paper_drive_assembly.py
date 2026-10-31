@@ -225,6 +225,7 @@ from pd_platen_spec import (  # noqa: E402
     SOCKET_SPEC as PLATEN_SOCKET_SPEC,
     SOCKET_THREAD_ENGAGEMENT as PLATEN_SOCKET_ENGAGEMENT,
     SOCKET_XY as PLATEN_SOCKET_XY,
+    UNIT as PLATEN_UNIT,
 )
 from build_pd_platen_guide import (  # noqa: E402
     GUIDE_DEPTH,
@@ -257,11 +258,13 @@ from pd_guide_lock_spec import (  # noqa: E402
     HOLE_XY as LOCK_HOLE_XY,
     LOCK_THICK_BAND,
     RAIL_EDGE_LIP as LOCK_RAIL_LIP,
+    UNIT as LOCK_UNIT,
 )
 from pd_platen_guide_spec import (  # noqa: E402
     GUIDE_DEPTH_BAND,
     GUIDE_DEPTH_PLACES,
     LOCK_GAP_FIT,
+    UNIT as GUIDE_UNIT,
 )
 from build_pd_platen_clip import (  # noqa: E402
     CLIP_LENGTH,
@@ -309,6 +312,8 @@ from pd_platen_rack_spec import (  # noqa: E402
     RACK_THICKNESS as RACK_TEETH_THICKNESS,
     RACK_Z0 as RACK_TEETH_Z_INSET,
     PITCH as RACK_PITCH,
+    DRAWING_PRECISION_BY_NAME as RACK_PRECISION,
+    UNIT as RACK_UNIT,
 )
 import paper_drive_geom as PAPER_GEOMETRY  # noqa: E402
 import _paper_drive_placement as PAPER_PLACEMENT  # noqa: E402
@@ -385,7 +390,6 @@ import pd_transgear_pin_spec as PIN  # noqa: E402
 import pd_vn_transgear_pivot_screw_spec as PIVOT_SCREW  # noqa: E402
 import pd_transgear_pivot_spacer_spec as SPACER  # noqa: E402
 import pd_vn_transgear_pivot_spring_spec as PIVOT_SPRING  # noqa: E402
-import pd_vn_transgear_pivot_shim_spec as PIVOT_SHIM  # noqa: E402
 import pd_transgear_rear_bushing_spec as REAR_BUSHING  # noqa: E402
 import pd_vn_transgear_retaining_ring_spec as E_RING  # noqa: E402
 import pd_latch_hook_bracket_screw_spec as HOOK_BRACKET_SCREW  # noqa: E402
@@ -440,12 +444,11 @@ ARM_Z0 = ARM.FRONT_FACE_MACHINE_Z  # -124.4: arm front face on the spacer
 if abs(SPACER_Z0 + SPACER.LENGTH - ARM_Z0) > 1e-9:
     raise AssertionError("the arm's front face is off the pivot spacer's rear face")
 # Shoulder screw MHA-PD-VN-57 (Rx+90: shank to -Z): the shoulder bottoms on the
-# bar's back face; under its head the MHA-PD-VN-67 shim and the MHA-PD-VN-63
-# spring (identity: its O.D. rim on the arm's spot-face floor, its I.D. rim
-# under the shim) hold the arm on the spacer.
-PIVOT_SCREW_Z0 = BAR_BACK_Z + PIVOT_SCREW.SHOULDER_LEN  # -116.7 under the head
-PIVOT_SHIM_Z0 = PIVOT_SCREW_Z0 - PIVOT_SHIM.THICKNESS  # -117.2 on the spring
-PIVOT_SPRING_Z0 = ARM_Z0 + ARM.SPOT_FACE_FLOOR_FROM_FRONT  # -118.0
+# bar's back face; under its head the MHA-PD-VN-63 spring (identity: its O.D.
+# rim on the arm's spot-face floor, its I.D. rim under the head) holds the arm
+# on the spacer.
+PIVOT_SCREW_Z0 = BAR_BACK_Z + PIVOT_SCREW.SHOULDER_LEN  # under the head
+PIVOT_SPRING_Z0 = ARM_Z0 + ARM.SPOT_FACE_FLOOR_FROM_FRONT  # the spot-face floor
 # Arm plate (rows Rz(theta): local X along U): its mounting plane on
 # the arm's rear face; hub forward to the thrust ring, boss rearward.
 PLATE_Z0 = ARM_Z0 + ARM.THICKNESS  # -116.4625
@@ -579,11 +582,25 @@ if seat_geometry.PIN_HOLE_ANGLES_DEG != (90.0, 270.0):
 
 # Knob stack on K (front -> back): thumbnut | knob wheel | drive collar | the
 # shaft's 15T | thrust ring | arm-plate hub | plate | boss | knob cup.
-# The front collar seat stays on the wheel rear; its actual rear face is on
-# gear front F. Its fitted body length is a saved native REF, not a front pin.
+# The front collar seat stays on the wheel rear; the knob train stands on
+# the arm chain's F (transgear_cluster_fit.F_Z), and the collar's rear is
+# faced at fit-up to meet it (step collar-rear-faced-to-fit). The model
+# collar is its REF nominal, so the facing's remainder shows as a gap at its
+# rear, never an overlap, and the fitted body stays in its window.
 KNOB_COLLAR_Z0 = seat_geometry.SEAT_FACE_Z  # -154.3
-KNOB_SHAFT_Z0 = KNOB_COLLAR_Z0 + COLLAR.SET_NOMINAL  # F = -148.1
-KNOB_COLLAR_REAR_Z = KNOB_COLLAR_Z0 + COLLAR.LENGTH  # actual rear on F
+KNOB_SHAFT_Z0 = CLUSTER.F_Z  # F
+KNOB_COLLAR_REAR_Z = KNOB_COLLAR_Z0 + COLLAR.LENGTH  # the REF nominal rear
+KNOB_COLLAR_FITTED_LENGTH = KNOB_SHAFT_Z0 - KNOB_COLLAR_Z0
+KNOB_COLLAR_REAR_GAP = KNOB_SHAFT_Z0 - KNOB_COLLAR_REAR_Z
+if KNOB_COLLAR_REAR_GAP < -1e-9:
+    raise AssertionError(
+        f"the drive collar's nominal rear overlaps F by {-KNOB_COLLAR_REAR_GAP:.4f}"
+    )
+if not COLLAR.LENGTH_FITTED_MIN <= KNOB_COLLAR_FITTED_LENGTH <= COLLAR.LENGTH_FITTED_MAX:
+    raise AssertionError(
+        f"the collar faced to F is {KNOB_COLLAR_FITTED_LENGTH:.4f}, outside its fitted "
+        f"{COLLAR.LENGTH_FITTED_MIN}..{COLLAR.LENGTH_FITTED_MAX}"
+    )
 # The two MHA-PD-VN-54 dowels pressed through the collar's holes (Rx-90: pin +Y ->
 # -Z), rounded ends DRIVE_PIN_PROUD in front of it, in the wheel's pin holes.
 KNOB_DRIVE_PIN_Z0 = seat_geometry.DRIVE_PIN_TIP_Z + KNOB_PIN.LENGTH  # -151.9375
@@ -638,15 +655,15 @@ if abs(DISC_Z0 - KNOB_SHAFT_Z0 - CLUSTER.MODEL_M) > 1e-9:
 # parallelism at the rim, and the pin's S projected axis zone at the rim
 # (absent from this gate before #2038).
 PLATEN_YAW_LEVER = (BAR_LENGTH / 2.0) / (BAR_LENGTH / 2.0 - LOCK_STATION_X[0])
-# The platen prints its thickness (pd_platen_spec.DRAWING_PRECISION); the rack
-# bar (6.0) carries no drawing band: .XXX assumed.
-_PLATEN_THICKNESS_BAND = printed_band_mm(PLATEN_PRECISION["Depth"])
-_RACK_THICKNESS_BAND = printed_band_mm(3)
+# The platen prints its thickness and the rack its backer depth
+# (pd_platen_spec / pd_platen_rack_spec DRAWING_PRECISION).
+_PLATEN_THICKNESS_BAND = printed_band_mm(PLATEN_PRECISION["Depth"], unit=PLATEN_UNIT)
+_RACK_THICKNESS_BAND = printed_band_mm(RACK_PRECISION["BackerDepth"], unit=RACK_UNIT)
 DISC_PLATEN_NOMINAL = PLATE_FRONT_Z - (DISC_Z0 + DISC_SPEC.FACE_WIDTH)  # 1.59
 CLUSTER_TILT_AT_DISC_RIM = (
     (
         DISC_SPEC.OUTSIDE_DIA
-        - (REAR_BUSHING.OD - printed_band_mm(REAR_BUSHING.OD_PLACES))
+        - (REAR_BUSHING.OD - printed_band_mm(REAR_BUSHING.OD_PLACES, unit=REAR_BUSHING.UNIT))
     )
     / 2.0
     * CLUSTER.BORE_DIAMETRAL_CLEARANCE[1]
@@ -747,7 +764,10 @@ DISC_PLATEN_AIR_WORST = PLATEN_AIR.arithmetic_mm
 # thickest disc reaches rearward from it.  The platen air is the stack's
 # arithmetic worst case, not its governing statistical one: conservative.
 CLUSTER_TILT_AT_FEED_TIPS = (
-    (FEED.OUTSIDE_DIA - (REAR_BUSHING.OD - printed_band_mm(REAR_BUSHING.OD_PLACES)))
+    (
+        FEED.OUTSIDE_DIA
+        - (REAR_BUSHING.OD - printed_band_mm(REAR_BUSHING.OD_PLACES, unit=REAR_BUSHING.UNIT))
+    )
     / 2.0
     * CLUSTER.BORE_DIAMETRAL_CLEARANCE[1]
     / (FEED.OVERALL_LENGTH - FEED.OVERALL_LENGTH_BAND)
@@ -784,7 +804,11 @@ BUSHING_RACK_AIR_WORST = (
     - _RACK_THICKNESS_BAND
     - (CLUSTER.SLEEVE_REAR_FORWARD_FROM_ARM[1] - REAR_BUSHING.LENGTH)
     - HANGER.HANGER_TILT
-    * (_P_TO_S + (REAR_BUSHING.OD + printed_band_mm(REAR_BUSHING.OD_PLACES)) / 2.0)
+    * (
+        _P_TO_S
+        + (REAR_BUSHING.OD + printed_band_mm(REAR_BUSHING.OD_PLACES, unit=REAR_BUSHING.UNIT))
+        / 2.0
+    )
 )  # 1.89
 if BUSHING_RACK_AIR_WORST < 0.0:
     raise AssertionError(
@@ -1180,7 +1204,7 @@ def _assert_fastener_stacks() -> None:
         (PLATEN_GUIDE_HOLE_DIA - FILLISTER_SHANK_DIA) / 2.0,
     )
     if abs(PLATEN_CBORE_DEPTH - FILLISTER_HEAD_H - PLATEN_HEAD_RECESS) > 1e-9:
-        raise AssertionError("guide head is not recessed by the specified 0.2 mm")
+        raise AssertionError("guide head is not recessed by PLATEN_HEAD_RECESS")
     if (
         abs(GUIDE_SCREW_PASSAGE + GUIDE_SCREW_THREAD_ENGAGEMENT - FILLISTER_SHANK_LEN)
         > 1e-9
@@ -1250,7 +1274,7 @@ def _assert_fastener_stacks() -> None:
 
     # Hanger joints: transgear_hanger_joints owns the stacks; re-prove them
     # against the placed stations.
-    spring_room = PIVOT_SHIM_Z0 - (ARM_Z0 + ARM.SPOT_FACE_FLOOR_FROM_FRONT)
+    spring_room = PIVOT_SCREW_Z0 - PIVOT_SPRING_Z0
     if abs(spring_room - HANGER.SPRING_ROOM_NOMINAL) > 1e-9:
         raise AssertionError(
             f"pivot spring room {spring_room:.4f} is not "
@@ -1326,7 +1350,9 @@ def _assert_fastener_stacks() -> None:
 
     # Knob stack: the thumbnut on the shaft's front thread, seated on the
     # collar's pilot (R9-70); the cup is pinned, not screwed.
-    raw_thumbnut = KNOB_SPEC.TIP_STATION - COLLAR.SET_NOMINAL - COLLAR.PILOT_LENGTH
+    raw_thumbnut = (
+        KNOB_SPEC.TIP_STATION - KNOB_COLLAR_FITTED_LENGTH - COLLAR.PILOT_LENGTH
+    )
     if abs(THUMBNUT_ENGAGEMENT - raw_thumbnut) > 1e-9:
         raise AssertionError("thumbnut engagement is off the collar/pilot stack")
     valid_engagement(
@@ -1390,11 +1416,14 @@ def _latch_hook_sections() -> list[tuple[str, tuple[float, float, float, float]]
         return max(drifts[x] for x in stations)
 
     width_dev = printed_deviations(
-        HOOK.WIDTH, HOOK_SPEC.WIDTH_PLACES, (-HOOK_SPEC.WIDTH_TOL, HOOK_SPEC.WIDTH_TOL)
+        HOOK.WIDTH, HOOK_SPEC.WIDTH_PLACES, (-HOOK_SPEC.WIDTH_TOL, HOOK_SPEC.WIDTH_TOL),
+        unit=HOOK_SPEC.UNIT,
     )
-    ear_rear = printed_deviations(HOOK.EAR_HEIGHT, HOOK_SPEC.EAR_HEIGHT_PLACES)[1]
+    ear_rear = printed_deviations(
+        HOOK.EAR_HEIGHT, HOOK_SPEC.EAR_HEIGHT_PLACES, unit=HOOK_SPEC.UNIT
+    )[1]
     arm_forward = max(
-        -printed_deviations(HOOK.z_local(z), HOOK_SPEC.ARM_BAND_PLACES)[0]
+        -printed_deviations(HOOK.z_local(z), HOOK_SPEC.ARM_BAND_PLACES, unit=HOOK_SPEC.UNIT)[0]
         for z in (HOOK.Z_FRONT, HOOK.Z_FRONT_LOW)
     )
     bend = math.radians(HOOK_SPEC.BEND_TOL_DEG)
@@ -1466,12 +1495,12 @@ def _latch_hook_sections() -> list[tuple[str, tuple[float, float, float, float]]
 LOCK_SWEEP_FLOOR = 0.10
 _BAR_DEPTH_DEV = (-BAR.BAR_DEPTH_BAND, BAR.BAR_DEPTH_BAND)
 _GUIDE_DEPTH_DEV = printed_deviations(
-    GUIDE_DEPTH, GUIDE_DEPTH_PLACES, deviations(GUIDE_DEPTH_BAND)
+    GUIDE_DEPTH, GUIDE_DEPTH_PLACES, deviations(GUIDE_DEPTH_BAND), unit=GUIDE_UNIT
 )
 # The rail's sheet prints its other sizes at the same document places.
-_GUIDE_HEIGHT_DEV = printed_deviations(GUIDE_HEIGHT, GUIDE_DEPTH_PLACES)
+_GUIDE_HEIGHT_DEV = printed_deviations(GUIDE_HEIGHT, GUIDE_DEPTH_PLACES, unit=GUIDE_UNIT)
 _LOCK_THICK_DEV = (-LOCK_THICK_BAND, LOCK_THICK_BAND)  # the sheet's mill band
-_LOCK_HEIGHT_DEV = printed_deviations(LOCK_HEIGHT, LOCK_PRECISION["Height"])
+_LOCK_HEIGHT_DEV = printed_deviations(LOCK_HEIGHT, LOCK_PRECISION["Height"], unit=LOCK_UNIT)
 _SPACER_LENGTH_DEV = (-SPACER.LENGTH_BAND, SPACER.LENGTH_BAND)
 _NOTCH_DEPTH_DEV = printed_deviations(
     ARM_PLATE.NOTCH_DEPTH, ARM_PLATE_SPEC.NOTCH_DEPTH_PLACES
@@ -1563,10 +1592,12 @@ def _assert_lock_station_sweep() -> None:
     # and rearward the tallest boss, or the tip left proud of the shortest one
     # by a thin plate.
     boss_r = PLATEN_SOCKET_BOSS_DIA / 2.0 + PLATEN_BOSS_FILLET_R
-    boss_dy = printed_band_mm(PLATEN_PRECISION["Boss2Dia"]) / 2.0 + printed_band_mm(
-        PLATEN_PRECISION["Socket2Y"]
+    boss_dy = printed_band_mm(
+        PLATEN_PRECISION["Boss2Dia"], unit=PLATEN_UNIT
+    ) / 2.0 + printed_band_mm(PLATEN_PRECISION["Socket2Y"], unit=PLATEN_UNIT)
+    boss_rear = (
+        printed_band_mm(PLATEN_PRECISION["BossH"], unit=PLATEN_UNIT) + _PLATEN_THICKNESS_BAND
     )
-    boss_rear = printed_band_mm(PLATEN_PRECISION["BossH"]) + _PLATEN_THICKNESS_BAND
     bosses = [
         (
             f"clip-screw boss y{y:.1f}",
@@ -1973,7 +2004,9 @@ def _assert_knob_shaft_clearance() -> None:
     # The MHA-PD-25 front bushing at its largest Ø against the knob stack's
     # largest neighbours, whatever their z: the knob wheel's tips, thumbnut and
     # the drive collar.
-    bushing_r = (FRONT_BUSHING.OD + printed_band_mm(FRONT_BUSHING.OD_PLACES)) / 2.0
+    bushing_r = (
+        FRONT_BUSHING.OD + printed_band_mm(FRONT_BUSHING.OD_PLACES, unit=FRONT_BUSHING.UNIT)
+    ) / 2.0
     bushing_air = (
         reach
         - bushing_r
@@ -2667,8 +2700,11 @@ def _assert_knob_collar_capture(adapter, collar: str, shaft: str) -> None:
     })
     rear = world_point(adapter, collar, [0.0, 0.0, length])
     front = world_point(adapter, shaft, [0.0, 0.0, 0.0])
-    if math.dist(rear, front) > 1e-5:
-        raise RuntimeError(f"knob collar actual rear is not on gear F: {rear=}, {front=}")
+    # F stands KNOB_COLLAR_REAR_GAP behind the nominal collar's rear (+Z), on axis.
+    if math.dist((rear[0], rear[1], rear[2] + KNOB_COLLAR_REAR_GAP), front) > 1e-5:
+        raise RuntimeError(
+            f"gear F is not {KNOB_COLLAR_REAR_GAP:.4f} behind the collar rear: {rear=}, {front=}"
+        )
     collar_o = world_point(adapter, collar, [0.0, 0.0, 0.0])
     collar_flat = world_point(adapter, collar, [0.0, -1.0, 0.0])
     shaft_flat = world_point(adapter, shaft, [0.0, -1.0, 0.0])
@@ -3150,21 +3186,13 @@ async def build(adapter) -> dict[str, str]:
         [90.0, 0.0, 0.0],
         ROT_X_POS90,
     )
-    # MHA-PD-VN-63 (identity: +Z axial) in the arm's spot face, under the shim.
+    # MHA-PD-VN-63 (identity: +Z axial) in the arm's spot face, under the head.
     await place_component(
         adapter,
         "pd-vn-transgear-pivot-spring",
         [PIVOT_XY[0], PIVOT_XY[1], PIVOT_SPRING_Z0],
         [0.0, 0.0, 0.0],
         IDENTITY,
-    )
-    # MHA-PD-VN-67 (Rx+90: local +Y axial to +Z) on the spring, under the head.
-    await place_component(
-        adapter,
-        "pd-vn-transgear-pivot-shim",
-        [PIVOT_XY[0], PIVOT_XY[1], PIVOT_SHIM_Z0],
-        [90.0, 0.0, 0.0],
-        ROT_X_POS90,
     )
     plate_origin = [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], PLATE_Z0]
     arm_plate = await place_component(
@@ -3464,12 +3492,23 @@ async def build(adapter) -> dict[str, str]:
         label="integral knob D-core coaxial with collar",
         verify=(knob_shaft, shaft_o),
     )
-    await coincident_mate(
-        adapter, named_ref(f"Front Plane@{knob_shaft}", "PLANE"),
-        named_ref(f"RearFace@{collar}", "PLANE"),
-        label="actual collar rear reaction face on gear front F",
-        verify=(knob_shaft, shaft_o),
-    )
+    # F on the arm chain: the nominal collar's rear stands KNOB_COLLAR_REAR_GAP
+    # in front of it (the fit-up facing's remainder).
+    if KNOB_COLLAR_REAR_GAP > 1e-9:
+        await distance_driver(
+            adapter, named_ref(f"Front Plane@{knob_shaft}", "PLANE"),
+            named_ref(f"RearFace@{collar}", "PLANE"),
+            KNOB_COLLAR_REAR_GAP,
+            label="gear front F behind the nominal collar rear",
+            verify=(knob_shaft, shaft_o),
+        )
+    else:
+        await coincident_mate(
+            adapter, named_ref(f"Front Plane@{knob_shaft}", "PLANE"),
+            named_ref(f"RearFace@{collar}", "PLANE"),
+            label="actual collar rear reaction face on gear front F",
+            verify=(knob_shaft, shaft_o),
+        )
     await parallel_mate(
         adapter, named_ref(f"Right Plane@{knob_shaft}", "PLANE"),
         named_ref(f"Right Plane@{collar}", "PLANE"),

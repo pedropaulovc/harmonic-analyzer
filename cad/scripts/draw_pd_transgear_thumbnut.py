@@ -50,6 +50,7 @@ from _gear_drawing_entities import visible_circle_edge
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _part_properties import part_drawing_unit
 from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
@@ -85,7 +86,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø20.5 × 16.1 nut: 3:1 leaves room round the section for its nine
+# A Ø.81 × .63 nut: 3:1 leaves room round the section for its nine
 # dimensions and the knurl callout on the landscape sheet.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
@@ -419,7 +420,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,

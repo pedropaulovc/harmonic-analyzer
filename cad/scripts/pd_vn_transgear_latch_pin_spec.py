@@ -5,7 +5,7 @@ closure.  One 1/8 x 7/8 alloy-steel dowel, Round x Chamfer ends, pressed
 chamfer end first to the flat floor of a blind hole in the transgear arm's
 square end face, along the arm's centreline (contract round 9 section 4.1,
 user ruling 7, ruling R9-12).  It stands PROUD out of that face; its proud
-length passes through the latch hook's (MHA-PD-14) Ø5.4 hole, which holds the
+length passes through the latch hook's (MHA-PD-14) pin hole, which holds the
 swung arm until the strip is flexed off it.
 
 R9-50: the 3/4 length (98381A473) left the pin's full diameter short of the

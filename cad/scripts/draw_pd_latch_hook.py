@@ -1,6 +1,7 @@
 r"""Create the manufacturing drawing for the latch hook (MHA-PD-14).
 
-One formed spring-steel part, all orthographic views at 3:2 (each pinned so
+One formed spring-steel part, printed in decimal inch (the row's
+``drawing_unit: in``), all orthographic views at 3:2 (each pinned so
 the part origin -- the ear's outer face, the base's underside and its low-Y
 edge -- lands where the layout puts it):
 
@@ -8,7 +9,7 @@ edge -- lands where the layout puts it):
   reads through the edge-on strip): the screw holes on the base, located
   from the ear's outer face and the low-Y edge; the arm's formed profile --
   the roll's start below the ear, its inside radius (shortened leader: the
-  centre is 80 off), the straight's length, the inside tab radius, the tab
+  centre is off the sheet), the straight's length, the inside tab radius, the tab
   end's X -- and the far face where the pin crosses it, in X and Y from the
   origin as references (the fit-up sets it, note 3); the pin hole's size,
   match-drilled at assembly;
@@ -61,6 +62,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -113,8 +115,8 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A 30 x 97 x 16 formed part: 3:2 keeps the arm's 97 drop and its dimensions
-# between the border and the title block, and the 0.8 strip legible.
+# A 30 x 97 x 16 mm formed part: 3:2 keeps the arm's drop and its dimensions
+# between the border and the title block, and the .032 strip legible.
 SHEET_SCALE = (3.0, 2.0)
 VIEW_SCALE = (3, 2)
 ISO_SCALE = (1, 2)
@@ -193,12 +195,12 @@ FRONT_KEEP = {
     "FaceY": _front(30.0, FAR_FACE_POINT[1] / 2.0),
     "FaceX": _front(FAR_FACE_POINT[0] / 2.0, -96.0),
     "TabEndX": _front(OUTER_TAB_END[0] / 2.0, -103.0),
-    "StraightLen": _front(*_on(OUTER_ROLL_END, -28.0, -4.0)),
+    "StraightLen": _front(*_on(OUTER_ROLL_END, -28.0, -5.0)),
     "PinHoleDia": _front(*_on(PIN_HOLE_L, -12.3, 21.2)),
     "RollR": _front(-20.0, -35.0),
     "TabR": _front(
-        TAB_C_L[0] + 21.0 * math.cos(math.radians(175.0)),
-        TAB_C_L[1] + 21.0 * math.sin(math.radians(175.0)),
+        TAB_C_L[0] + 22.0 * math.cos(math.radians(175.0)),
+        TAB_C_L[1] + 22.0 * math.sin(math.radians(175.0)),
     ),
 }
 # Side view: the width left of the ear, the two front-edge heights stacked
@@ -224,7 +226,7 @@ RIGHT_KEEP = {
 BOTTOM_KEEP = {
     "BaseLength": _bottom(-BASE_LENGTH / 2.0, -11.0),
     "EarHeight": _bottom(6.0, EAR_HEIGHT / 2.0),
-    "InsideBendR": _bottom(15.5, -4.0),
+    "InsideBendR": _bottom(13.0, -2.0),
 }
 CALLOUTS_ABOVE = {
     "ScrewDia": PAIR_CALLOUT,
@@ -235,11 +237,11 @@ CALLOUTS_BELOW = {
     "ScrewDia": f"{SCREW_HOLE_CALLOUT}\n{SCREW_HOLE_MATE}",
     "RoundR": ROUND_CALLOUT,
 }
-# The roll's centre sits 80 left of the vertical: off the sheet at 3:2.
+# The roll's centre sits ~80 mm left of the vertical: off the sheet at 3:2.
 SHORTENED_RADII = ("RollR",)
 # The formed overall height (drawing-guidelines.md rule 10 (dimension from a real feature)), a reference left of the side view: its
 # dimension line passes left of the width's text, its text below the front
-# view's 70.4 level and clear right of it; picked on the ear's top edge and
+# view's far-face Y level and clear right of it; picked on the ear's top edge and
 # on the full round, re-anchored to the round's far extreme (its tip).
 _ROUND_PICK_DEG = -120.0  # on the round, clear of its tip and the RoundR leader
 OVERALL_PICKS = (
@@ -297,7 +299,7 @@ def _shorten_radii(
 
 
 def _overall_reference(adapter: Any, right: Any) -> None:
-    """The (96.5) formed overall height, ear top edge to the round's tip."""
+    """The (3.80) formed overall height, ear top edge to the round's tip."""
     label = "latch-hook overall height reference"
     display = add_edge_dimension(
         adapter,
@@ -351,7 +353,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,

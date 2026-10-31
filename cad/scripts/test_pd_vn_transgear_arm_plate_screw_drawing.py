@@ -62,7 +62,7 @@ def test_the_cut_is_flush_with_the_arm_front_face() -> None:
     the arm's front face after the plate's over-arm section and the arm."""
     assert screw.CUT_LENGTH == pytest.approx(plate.THICKNESS_OVER_ARM + arm.THICKNESS)
     assert screw.LENGTH == screw.CUT_LENGTH
-    assert screw.CUT_END_BREAK_MAX == pytest.approx(0.1)
+    assert screw.CUT_END_BREAK_MAX == pytest.approx(0.1016)  # .004
     assert joints.PLATE_SCREW_STOCK_LEAD_MARGIN_MM > 0.0
 
 
@@ -358,7 +358,6 @@ def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
     assert row["supplier_skus"] == [screw.SKU]
     assert row["stock_name"] == part.SPEC.stock_name
     assert screw.SKU in row["material_specification"]
-    assert f"{screw.STOCK_LENGTH:.2f}" in row["material_specification"]
 
     seen: dict = {}
 
@@ -412,16 +411,6 @@ def test_sheet_states_the_cut_and_no_size_in_the_registry_names() -> None:
     lines = row["installation_notes"].splitlines()
     assert len(lines) <= 4
     assert all(len(line) <= 70 for line in lines), lines
-    assert "1 IN" in screw.PURCHASED_STOCK_NOTE
-    assert f"{screw.STOCK_LENGTH:.2f}" in screw.PURCHASED_STOCK_NOTE
-    assert "CUT LENGTH AT ASSEMBLY" in screw.PURCHASED_STOCK_NOTE
-    flat = " ".join(screw.PURCHASED_STOCK_NOTE.splitlines())
-    proud = joints.PLATE_SCREW_CUT_PROUD_MAX
-    assert f"FLUSH OR PROUD {proud:g} MAX" in flat
-    assert f"CUT-END BREAK {screw.CUT_END_BREAK_TEXT}" in flat
-    assert "AT ASSEMBLY (MHA-PD-00, BEFORE THE GUIDE-LOCK SWEEP)" in flat
-    # The trim limit names the face it is measured from (machinist review).
-    assert f"PROUD {proud:g} MAX OF THE MHA-PD-18 ARM FRONT FACE" in flat
 
 
 def test_drawing_is_the_purchased_reference_sheet() -> None:

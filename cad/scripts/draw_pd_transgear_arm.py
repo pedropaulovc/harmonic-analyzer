@@ -62,9 +62,10 @@ from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import visible_view_entities
 from _drawing_gdt import PmiDrawingPlacement, project_part_pmi
 import _drawing_hidden_sketches as hidden_sketches
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
+from _part_properties import part_drawing_unit
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
@@ -582,7 +583,7 @@ def _set_tap_callout_text(display: Any, qualifier: str, *, label: str) -> None:
 
 
 def _set_stock_text(adapter: Any, annotations: list[Any]) -> None:
-    """Print the thickness as the stock's: "5/16 ±.001 IN (7.94) GROUND STOCK".
+    """Print the thickness as the stock's: "5/16 ±.001 (.3125) GROUND STOCK".
 
     The arm is cut from 5/16 ground flat stock with its faces as supplied, so
     the stock's tolerance governs the thickness, not the .XX row.  Prefix and
@@ -874,7 +875,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="transgear arm package")
     ddoc = _early_bound(drawing_model, "IDrawingDoc")
@@ -1059,6 +1061,7 @@ async def build(adapter: Any) -> dict[str, str]:
             label=label,
         )
         _set_tap_callout_text(callout, qualifier, label=label)
+        set_hole_callout_precision(callout, {"hw-tapdrldia": 3}, label=label)
 
     # Sheet 2: the pin bore's projected zone in section D-D, cut from a plan
     # on sheet 1's plan centre (rule 15: its own sheet, not a shrunk view).

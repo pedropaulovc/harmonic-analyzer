@@ -32,7 +32,6 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-import _config
 import paper_drive_arm_registration as REGISTRATION
 import pd_rack_pinion_spec as DISC
 import pd_transgear_arm_plate_geometry as ARM_PLATE
@@ -44,7 +43,7 @@ import pd_transgear_knob_shaft_spec as KNOB_SHAFT
 import pd_transgear_knob_thrust_ring_spec as KNOB_RING
 import pd_transgear_pin_spec as PIN
 import transgear_cluster_fit as FIT
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
 
 COLLAR_AIR_MIN = COLLAR.COLLAR_DISC_AIR_MIN  # 0.10
 PLATEN_AIR_MIN = 0.03  # R9-68
@@ -150,7 +149,9 @@ class AirStack:
 
 
 # --- the governing point and the stops' edges ------------------------------------
-EDGE_BREAK_MAX = float(_config.title_block("edge_break")["chamfer_max_mm"])
+# The cluster's parts print inch, whose .010 edge break also covers the
+# metric knob ring's 0.25.
+EDGE_BREAK_MAX = edge_break_chamfer_mm(unit=PIN.UNIT)
 DISC_TIP_R = DISC.OUTSIDE_DIA / 2.0
 COLLAR_RIM_R = (COLLAR.OD + max(COLLAR.OD_BAND)) / 2.0  # 8.75
 # Q: the disc's tip under the collar's rim (the rim reaches past the tips).
@@ -162,8 +163,9 @@ Q_FROM_DISC_AXIS = min(DISC_TIP_R, DISC.CENTRE_DISTANCE + COLLAR_RIM_R)
 # The disc's tilts pivot on the least of these edges.
 HUB_FACE_STOP_R = (
     min(
-        HUB.HUB_DIA - printed_band_mm(HUB.HUB_DIA_PLACES),
-        FRONT_BUSHING.OD - printed_band_mm(FRONT_BUSHING.OD_PLACES),
+        HUB.HUB_DIA - printed_band_mm(HUB.HUB_DIA_PLACES, unit=HUB.UNIT),
+        FRONT_BUSHING.OD
+        - printed_band_mm(FRONT_BUSHING.OD_PLACES, unit=FRONT_BUSHING.UNIT),
     )
     / 2.0
     - EDGE_BREAK_MAX

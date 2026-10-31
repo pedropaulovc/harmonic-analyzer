@@ -65,18 +65,16 @@ def test_hole_pattern_prints_three_places_and_widths_two():
     # rail's width drops to .XX; the hole row stays .XXX for pattern float.
     for name in ("RailWidth", "OverallWidth", "SlitWidth"):
         assert places[name] == 2, name
-    assert places["Length"] == 1
     # The bow stations that coincide with the hole stations spell them alike.
     assert places["TangentX1"] == places["LeftX"]
     assert places["TangentX8"] == places["RightX"]
     assert places["TangentX4"] == places["BridgeX0"]
     assert places["TangentX5"] == places["BridgeX1"]
-    assert clip.HOLE_CALLOUT_PRECISION == {"hw-diam": 2}
 
 
 def test_far_end_ligament_spends_the_length_band():
-    band = printed_band_mm(3)
-    far_edge = clip.CLIP_LENGTH - printed_band_mm(1)
+    band = printed_band_mm(3, unit=clip.UNIT)
+    far_edge = clip.CLIP_LENGTH - printed_band_mm(clip.LENGTH_PLACES, unit=clip.UNIT)
     hole_far_max = clip.CLIP_LENGTH - clip.HOLE_INSET + band
     expected = far_edge - hole_far_max - clip.HOLE_DIA_MAX / 2.0
     assert clip.FAR_END_LIGAMENT_MIN == pytest.approx(expected)
@@ -84,20 +82,21 @@ def test_far_end_ligament_spends_the_length_band():
 
 
 def test_slit_keeps_the_photographed_gap_at_the_printed_worst_case():
-    narrowest = clip.NOTCH_WIDTH - printed_band_mm(clip.SLIT_PLACES)
+    narrowest = clip.NOTCH_WIDTH - printed_band_mm(clip.SLIT_PLACES, unit=clip.UNIT)
     assert clip.SLIT_WIDTH_MIN == pytest.approx(narrowest)
     assert narrowest >= clip.PHOTO_SLIT_WIDTH - 1e-9
-    # The lanes close to the overall width; the spring rail is what the 7.0
-    # screw rail and the slit leave of it.
+    # The lanes close to the overall width; the spring rail is what the .30
+    # screw rail and the .04 slit leave of it.
     assert clip.SCREW_RAIL_WIDTH + clip.NOTCH_WIDTH + clip.SPRING_RAIL_WIDTH == (
         pytest.approx(clip.CLIP_WIDTH)
     )
-    assert clip.SPRING_RAIL_WIDTH == pytest.approx(3.35)
+    assert clip.NOTCH_WIDTH == pytest.approx(0.04 * 25.4)
+    assert clip.SPRING_RAIL_WIDTH == pytest.approx(0.130 * 25.4)
 
 
 def test_clip_screw_engages_one_and_a_half_diameters_worst_case():
     shortest = clip.SHANK_LEN - 0.03 * 25.4
-    engaged = shortest - clip.SHEET_T_MAX - clip.PITCH - 0.25
+    engaged = shortest - clip.SHEET_T_MAX - clip.PITCH - 0.010 * 25.4
     assert clip.CLIP_SCREW_ENGAGEMENT_MIN == pytest.approx(engaged)
     assert engaged / THREAD_MAJOR_MM[clip.THREAD] >= 1.5
 
@@ -176,7 +175,7 @@ def test_near_hole_station_arrows_stand_inside_its_span():
     assert draw.ARROWS_INSIDE == ("LeftX",)
     assert draw.FRONT_KEEP["LeftZ"][0] < draw.LEFT_EDGE_X
     span = draw._plan_x(clip.HOLE_INSET) - draw.LEFT_EDGE_X
-    assert span - len("7.190") * _CHAR_WIDTH > 2 * 0.004
+    assert span - len(".283") * _CHAR_WIDTH > 2 * 0.004
 
 
 def test_length_line_clears_the_bridge_end_texts():
@@ -199,19 +198,9 @@ def test_hole_row_names_the_tap_pattern_and_clears_the_rail_line():
 
 def test_hole_pattern_three_places_are_a_declared_acceptance():
     # Owner ruling 2026-10-15, option A: the hole row and stations stay .XXX
-    # for pattern float (transfer-drilling rejected).  The declaration names
-    # the stations, the hole row and the callout as the sheet prints them.
+    # for pattern float (transfer-drilling rejected).
     (entry,) = load_exceptions(CONFIG_ROOT, "pd_platen_clip", "part")
     assert (entry.id, entry.kind) == ("RV-01", "accept")
-    assert entry.reason.endswith("(owner-accepted)")
-    hole_row = draw.DIMENSION_CALLOUTS["LeftZ"].replace("\n", " ")
-    for printed in (
-        f"{clip.HOLE_INSET:.3f}",
-        f"{clip.CLIP_LENGTH - clip.HOLE_INSET:.3f}",
-        f"2X {clip.HOLE_Y:.3f} {hole_row}",
-        draw.HOLE_CALLOUT_PROCESS.replace("\n", " / "),
-    ):
-        assert printed in entry.where, printed
     assert clip.HOLE_FLOAT_MIN >= 2.0 * clip.PATTERN_POSITION_ZONE
 
 

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import pd_transgear_disc_hub_spec as HUB
 from pd_cluster_stack_band import STACK_NAME
+from pd_rack_pinion_spec import inch_text
 from pd_transgear_feed_pinion_spec import (
     BORE_PROCESS_CALLOUT,
     HUB_NUMBER,
@@ -31,20 +32,21 @@ CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 
 # The tip and the two-tooth span are set by the rack mesh.
 MESH_CALLOUT = f"MESHES {RACK_NUMBER} RACK"
-# The boss is the hub's locating fit, h6 under its H7 bore.  The clearances
-# are literal text, so they carry their unit (codjiflo P2 on 65a022125: an
-# inch document converts the values but not the text).
+# The boss is the hub's locating fit, +.0005/.0000 under its +.0010/+.0005 bore.
+# The clearances are literal text in the sheet's inches (codjiflo P2 on
+# 65a022125: the document converts dimension values, never text).
 BOSS_CALLOUT = "\n".join(
     (
         f"LOCATES {HUB_NUMBER},",
-        f"{HUB.BOSS_CLEARANCE_LIMITS[0]:.3f}-{HUB.BOSS_CLEARANCE_LIMITS[1]:.3f} mm DIA CLR",
+        f"{inch_text(HUB.BOSS_CLEARANCE_LIMITS[0], 4)}-"
+        f"{inch_text(HUB.BOSS_CLEARANCE_LIMITS[1], 4)} DIA CLR",
     )
 )
 # The flat drives the hub's D-bore.
 FLAT_CALLOUT = "\n".join(
     (
         f"DRIVES {HUB_NUMBER},",
-        f"{HUB.FLAT_CLEARANCE[0]:.3f}-{HUB.FLAT_CLEARANCE[1]:.3f} mm CLR",
+        f"{inch_text(HUB.FLAT_CLEARANCE[0], 4)}-{inch_text(HUB.FLAT_CLEARANCE[1], 4)} CLR",
     )
 )
 # The step seats the hub's spigot: the tooth length places hub and disc.  Its

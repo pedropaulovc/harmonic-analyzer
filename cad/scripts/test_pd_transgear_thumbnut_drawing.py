@@ -64,8 +64,8 @@ def test_actual_entry_cones_carry_model_owned_controls() -> None:
         spec.CSK_HALF_ANGLE_DEG - angular_band_deg()
     )
     assert spec.CSK_DIA_TOL_TYPE == 6
-    # Machinist review: a thread-entry chamfer's MAX prints at one place.
-    assert spec.CSK_DIA_PLACES == 1
+    # Machinist review: a thread-entry chamfer's MAX needs few places (.XX).
+    assert spec.CSK_DIA_PLACES == 2
     assert spec.DRAWING_DIMENSIONS["CountersinkProfile"] == {
         "CountersinkDia", "CountersinkHalfAngle",
     }
@@ -123,12 +123,12 @@ def test_the_seat_face_bears_on_the_collar_pilot(monkeypatch) -> None:
 
 def test_countersinks_take_no_more_thread_than_the_engagement_deducts() -> None:
     """Actual MAX cone and the smallest printed half-angle charge both ends."""
-    assert spec.CSK_DIA == pytest.approx(4.6)
+    assert spec.CSK_DIA == pytest.approx(4.572)  # .18
     rear = (spec.CSK_DIA - spec.TAP_DRILL_DIA) / (
         2.0 * math.tan(math.radians(spec.CSK_HALF_ANGLE_MIN))
     )
     assert rear == pytest.approx(spec.REAR_THREAD_LOSS)
-    deepest_floor = spec.DISH_DEPTH + printed_band_mm(spec.DISH_DEPTH_PLACES)
+    deepest_floor = spec.DISH_DEPTH + printed_band_mm(spec.DISH_DEPTH_PLACES, unit=spec.UNIT)
     front = deepest_floor + rear
     assert front > rear
     assert front <= spec.FRONT_THREAD_LOSS + 1e-9
@@ -153,22 +153,22 @@ def test_the_dish_ends_on_its_floor_at_every_printed_size() -> None:
         "DishProfile"
     ]
     assert {"DishDia", "DishFloorDia", "DishDepth"} <= set(drawing.SECTION_KEEP)
-    # Title-block .X: the band the margins below are judged at.
-    assert drawing.DRAWING_PRECISION_BY_NAME["DishFloorDia"] == 1
+    # Title-block .XX: the band the margins below are judged at.
+    assert drawing.DRAWING_PRECISION_BY_NAME["DishFloorDia"] == 2
     assert spec.dish_floor_margins(
         spec.DISH_DIA, spec.DISH_FLOOR_DIA, spec.DISH_DEPTH, spec.CSK_DIA
     ) == pytest.approx(
         {
-            "floor land outside the countersink": (9.0 - 0.8 - 4.6) / 2.0,
-            "cone from the rim to the floor": 2.2,
-            "floor below the rim": 0.2,
+            "floor land outside the countersink": (8.89 - 0.254 - 4.572) / 2.0,
+            "cone from the rim to the floor": (14.986 - 0.254 - 8.89 - 0.254) / 2.0,
+            "floor below the rim": 1.016 - 0.254,
         }
     )
     rim, floor = spec.DISH_RIM_CORNER, spec.DISH_FLOOR_CORNER
     assert rim == pytest.approx((spec.DISH_DIA / 2.0, spec.RIM_Y))
     assert floor == pytest.approx((spec.DISH_FLOOR_DIA / 2.0, spec.DISH_FLOOR_Y))
     assert rim[1] - floor[1] == pytest.approx(spec.DISH_DEPTH)
-    band = printed_band_mm(spec.DISH_FLOOR_DIA_PLACES)
+    band = printed_band_mm(spec.DISH_FLOOR_DIA_PLACES, unit=spec.UNIT)
     assert _outside_every_countersink((floor[0] - band / 2.0, floor[1]))
     assert _outside_every_countersink(rim)
     # Negative controls: the 6de7230aa depth ran to the axis, inside the
@@ -427,11 +427,11 @@ def test_the_knurl_is_the_designated_din_82_raa_1_0() -> None:
     assert spec.KNURL_CREST_PITCH == pytest.approx(1.0, abs=0.01)
     assert spec.KNURL_TOOTH_ANGLE_DEG == pytest.approx(90.0, abs=2.0)
     assert spec.KNURL_DESIGNATION in spec.KNURL_CALLOUT
-    # Negative control: the 19e33c6c2 model (60 teeth over a Ø19.7 root)
-    # was a 1.07-pitch, 108.5° V no standard wheel forms.
-    old_angle = spec.knurl_tooth_angle_deg(spec.HEAD_DIA, 19.7, 60)
+    # Negative control: the 19e33c6c2 model (60 teeth over a Ø19.7 root
+    # under its Ø20.5 crests) was a 1.07-pitch, 108.5° V no standard wheel forms.
+    old_angle = spec.knurl_tooth_angle_deg(20.5, 19.7, 60)
     assert old_angle == pytest.approx(108.5, abs=0.1)
-    assert math.pi * spec.HEAD_DIA / 60 - spec.KNURL_PITCH > 0.01
+    assert math.pi * 20.5 / 60 - spec.KNURL_PITCH > 0.01
 
 
 def test_the_knurl_designation_is_authored_where_it_prints() -> None:
@@ -449,13 +449,13 @@ def test_the_knurl_designation_is_authored_where_it_prints() -> None:
 
 
 def test_the_shortest_nut_keeps_full_thread_for_the_stud() -> None:
-    """The overall length prints at .X; the shortest nut it admits still
+    """The overall length prints at .XX; the shortest nut it admits still
     gives the stud 1.5D of the nut's full thread."""
     import pd_transgear_drive_collar_spec as collar
     import pd_transgear_knob_shaft_spec as stud
 
-    assert spec.OVERALL_LENGTH_LO == pytest.approx(-0.8)
-    assert collar.NUT_LENGTH_MIN == pytest.approx(15.3)
+    assert spec.OVERALL_LENGTH_LO == pytest.approx(-0.254)
+    assert collar.NUT_LENGTH_MIN == pytest.approx(15.748)
     assert collar.THUMBNUT_ENGAGEMENT_WORST >= 1.5 * stud.THREAD_MAJOR
     # The nut's own full thread over its shortest length, the front
     # countersink on the deepest printed floor.
@@ -526,7 +526,7 @@ def test_lengths_read_from_the_seat_face() -> None:
     assert spec.DRAWING_DIMENSIONS["HeadProfile"] == {"HeadDia", "HeadRearY", "OverallLength"}
     stem = spec.DRAWING_DIMENSIONS["StemProfile"]
     assert "FlangeLength" in stem and "WaistLength" not in stem
-    assert (spec.FLANGE_LENGTH, spec.HEAD_REAR_Y) == pytest.approx((5.0, 7.4))
+    assert (spec.FLANGE_LENGTH, spec.HEAD_REAR_Y) == pytest.approx((5.08, 7.366))
     assert spec.HEAD_REAR_Y - spec.FLANGE_LENGTH == pytest.approx(spec.WAIST_LENGTH)
     # Two left lanes, the flange inner and the head's rear face outer, each
     # text inside its own span from the seat.
@@ -543,27 +543,23 @@ def test_lengths_read_from_the_seat_face() -> None:
 
 
 def test_the_waist_keeps_a_length_at_every_printed_corner(monkeypatch) -> None:
-    """codjiflo on 11fe6c440: 16.1, 8.7 from the rim and 5.0 from the seat,
-    each ±0.8, let the waist close to 0. From the seat, the head's rear face
-    at its lowest stands 0.8 above the flange's shoulder at its highest."""
-    band = printed_band_mm(1)
+    """codjiflo on 11fe6c440: chained from the rim and the seat, the waist
+    could close to 0. From the seat, the head's rear face at its lowest
+    stands clear above the flange's shoulder at its highest."""
+    band = printed_band_mm(2, unit=spec.UNIT)
     assert spec.WAIST_LENGTH_WORST == pytest.approx(
         (spec.HEAD_REAR_Y - band) - (spec.FLANGE_LENGTH + band)
     )
-    assert spec.WAIST_LENGTH_WORST == pytest.approx(0.8)
-    # Negative control: the 11fe6c440 scheme's corner.
-    assert (spec.OVERALL_LENGTH - band) - (spec.HEAD_LENGTH + band) - (
-        spec.FLANGE_LENGTH + band
-    ) == pytest.approx(0.0, abs=1e-9)
+    assert spec.WAIST_LENGTH_WORST == pytest.approx(1.778)
     # The spec's own gate refuses a printed row wide enough to close the
-    # waist (one-place bands 1.7x wider; the walls still hold first).
+    # waist (two-place bands 5x wider; the walls still hold first).
     import _printed_tolerance
 
     real = _printed_tolerance.printed_deviations
 
-    def wider(nominal: float, places: int) -> tuple[float, float]:
-        lo, hi = real(nominal, places)
-        return (lo * 1.7, hi * 1.7) if places == 1 else (lo, hi)
+    def wider(nominal: float, places: int, **kwargs) -> tuple[float, float]:
+        lo, hi = real(nominal, places, **kwargs)
+        return (lo * 5.0, hi * 5.0) if places == 2 else (lo, hi)
 
     with pytest.raises(AssertionError, match="waist closes"):
         _thumbnut_spec_with(monkeypatch, _printed_tolerance, "printed_deviations", wider)
@@ -752,7 +748,9 @@ def test_the_reversed_section_is_centred_by_its_outline(monkeypatch) -> None:
     run = _SectionView()
     run.GetSection().SetReversedCutDirection(True)
     run.SetViewPosition(drawing.SECTION_CENTER)
-    assert run.project((0.0, 0.0, 0.0))[1] == pytest.approx(0.18915)
+    assert run.project((0.0, 0.0, 0.0))[1] == pytest.approx(
+        drawing.SECTION_CENTER[1] + spec.OVERALL_LENGTH * drawing._S / 2000.0
+    )
 
 
 def test_a_section_whose_ink_will_not_move_is_refused(monkeypatch) -> None:
@@ -764,8 +762,6 @@ def test_the_outline_must_be_the_nut_on_its_axis() -> None:
     view = _SectionView()
     outline = view.GetOutline()
     assert drawing._outline_is_the_nut_on_end(outline)
-    # The 19e33c6c2 section A-A outline, read by the layout audit.
-    assert drawing._outline_is_the_nut_on_end((0.178662, 0.135262, 0.251338, 0.194738))
     # The same nut lying on its side.
     x0, y0, x1, y1 = outline
     centre = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)

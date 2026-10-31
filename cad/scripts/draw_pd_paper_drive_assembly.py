@@ -249,8 +249,8 @@ BALLOON_RING_REACH = BALLOON_MARGIN + 0.005
 # clear of the isometric's field (SHEET_TWO_RING_LIMITS[0]). A 1:1 *Top
 # locator, cropped to a circle on the MHA-PD-VN-57 axis and showing only the
 # pivot stack, carries cutting line A-A along that axis. SECTION A-A at 2:1
-# shows every part of the stack cut (the shim and spring under the head and
-# arm too, so no hidden lines are needed) and balloons each part. It is cropped
+# shows every part of the stack cut (the spring under the head and the arm
+# too, so no hidden lines are needed) and balloons each part. It is cropped
 # to a circle in the same way. A *Top view puts machine -Z (the bar's front face) down
 # the sheet, so the cutting line runs vertically through the circle's centre.
 # Points are in the screw's part frame (mm): the head's underside at y 0, the
@@ -286,7 +286,6 @@ PIVOT_VIEW_INSTANCES = frozenset(
     {
         "pd-support-bar-1",
         PIVOT_SCREW_INSTANCE,
-        "pd-vn-transgear-pivot-shim-1",
         "pd-vn-transgear-pivot-spring-1",
         "pd-transgear-pivot-spacer-1",
         "pd-transgear-arm-1",
@@ -304,30 +303,25 @@ if (pivot_screw.HEAD_H - PIVOT_FRONT_FACE_Y) / 2.0 + 1.0 > PIVOT_FRAME_RADIUS_MM
 # inside that part's own cut face. The stack is coaxial, so every tip is
 # written in the screw's part frame (mm), (y along the axis, r off it), on the
 # section plane:
-# head underside y 0; shim; spring (a cone from its ID rim under the shim to
-# its OD rim on the spot-face floor); the arm from that floor to its front face
-# on the spacer; the spacer on the shoulder; and the bar from its back face at
+# head underside y 0; spring (a cone from its ID rim under the head to its OD
+# rim on the spot-face floor); the arm from that floor to its front face on the
+# spacer; the spacer on the shoulder; and the bar from its back face at
 # -SHOULDER_LEN to its front face. Sides alternate down the stack, so each
-# column's leaders are in the same order as their tips.
-_PIVOT_FLOOR_Y = -(joints.SHIM.THICKNESS + spring.MODEL_HEIGHT)
+# column's leaders are in the same order as their tips. The bar's balloon
+# stays left, clear of the stake note right of the axis at the front face.
+_PIVOT_FLOOR_Y = -spring.MODEL_HEIGHT
 _PIVOT_ARM_FRONT_Y = -(pivot_screw.SHOULDER_LEN - joints.SPACER.LENGTH)
 PIVOT_BALLOON_TIPS = (
     (
         "pd-vn-transgear-pivot-screw",
-        "right",
+        "left",
         pivot_screw.HEAD_H / 2.0,
         (pivot_screw.SOCKET_AF / math.sqrt(3.0) + pivot_screw.HEAD_DIA / 2.0) / 2.0,
     ),
     (
-        "pd-vn-transgear-pivot-shim",
-        "left",
-        -joints.SHIM.THICKNESS / 2.0,
-        (joints.SHIM.ID + joints.SHIM.OD) / 4.0,
-    ),
-    (
         "pd-vn-transgear-pivot-spring",
         "right",
-        -joints.SHIM.THICKNESS - spring.MODEL_HEIGHT / 2.0,
+        -spring.MODEL_HEIGHT / 2.0,
         (spring.ID + spring.OD) / 4.0,
     ),
     (
@@ -759,7 +753,6 @@ BOM_PART_NUMBERS = {
     "pd-transgear-pivot-spacer": _config.parts("pd-transgear-pivot-spacer")["number"],
     "pd-vn-transgear-pivot-screw": _config.parts("pd-vn-transgear-pivot-screw")["number"],
     "pd-vn-transgear-pivot-spring": _config.parts("pd-vn-transgear-pivot-spring")["number"],
-    "pd-vn-transgear-pivot-shim": _config.parts("pd-vn-transgear-pivot-shim")["number"],
     "pd-vn-transgear-latch-pin": _config.parts("pd-vn-transgear-latch-pin")["number"],
     "sh-vn-fillister-screw-90280a108": _config.parts("sh-vn-fillister-screw-90280a108")["number"],
     "pd-latch-hook": _config.parts("pd-latch-hook")["number"],
@@ -811,9 +804,6 @@ _SKU = {
     "pd-vn-transgear-pivot-spring": _config.parts("pd-vn-transgear-pivot-spring")["supplier_skus"][
         0
     ],
-    "pd-vn-transgear-pivot-shim": _config.parts("pd-vn-transgear-pivot-shim")[
-        "supplier_skus"
-    ][0],
     "pd-vn-transgear-latch-pin": _config.parts("pd-vn-transgear-latch-pin")["supplier_skus"][0],
     "sh-vn-fillister-screw-90280a108": _config.parts("sh-vn-fillister-screw-90280a108")[
         "supplier_skus"
@@ -874,7 +864,6 @@ BOM_DESCRIPTIONS = {
     "pd-vn-transgear-pivot-spring": (
         f"CURVED DISC SPRING, MCMASTER {_SKU['pd-vn-transgear-pivot-spring']}"
     ),
-    "pd-vn-transgear-pivot-shim": f"SHIM WASHER, MCMASTER {_SKU['pd-vn-transgear-pivot-shim']}",
     "pd-vn-transgear-latch-pin": f"DOWEL PIN, MCMASTER {_SKU['pd-vn-transgear-latch-pin']}",
     "sh-vn-fillister-screw-90280a108": (
         f"FILLISTER SCREW, MCMASTER {_SKU['sh-vn-fillister-screw-90280a108']}"
@@ -936,7 +925,6 @@ TRANSGEAR_QUANTITIES = {
     "pd-transgear-pivot-spacer": 1,
     "pd-vn-transgear-pivot-screw": 1,
     "pd-vn-transgear-pivot-spring": spring.COUNT,
-    "pd-vn-transgear-pivot-shim": 1,
     "pd-vn-transgear-latch-pin": 1,
     "sh-vn-fillister-screw-90280a108": len(hook_geometry.SCREW_X),
     "pd-latch-hook": 1,
@@ -1019,14 +1007,12 @@ if not explode.TRANSGEAR_SHOWN_STEMS <= set(TRANSGEAR_QUANTITIES):
     raise AssertionError("the transgear explode shows transgear families only")
 if not ISO_HIDDEN_STEMS < explode.TRANSGEAR_SHOWN_STEMS:
     raise AssertionError("the explode shows every family the isometric cannot")
-# The pivot's spring and shim sit in the arm's counterbore under the shoulder
-# screw's head, hidden from the isometric: the ENFORCE review of farm run
-# 20261024T090600202Z-8e9ffbb4 found their leaders on the spacer's edge and
-# the arm's face. Section A-A on the same sheet cuts through them and
-# balloons both (PIVOT_BALLOON_TIPS), so the isometric leaves them out.
-ISO_SECTION_ONLY_STEMS = frozenset(
-    {"pd-vn-transgear-pivot-spring", "pd-vn-transgear-pivot-shim"}
-)
+# The pivot's spring sits in the arm's counterbore under the shoulder screw's
+# head, hidden from the isometric: the ENFORCE review of farm run
+# 20261024T090600202Z-8e9ffbb4 found its leader on the spacer's edge and the
+# arm's face. Section A-A on the same sheet cuts through it and balloons it
+# (PIVOT_BALLOON_TIPS), so the isometric leaves it out.
+ISO_SECTION_ONLY_STEMS = frozenset({"pd-vn-transgear-pivot-spring"})
 if not ISO_SECTION_ONLY_STEMS <= {stem for stem, *_ in PIVOT_BALLOON_TIPS}:
     raise AssertionError("Section A-A balloons every family the isometric leaves to it")
 if ISO_SECTION_ONLY_STEMS & explode.TRANSGEAR_SHOWN_STEMS:
@@ -1553,17 +1539,18 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         "arm-plate-screws-cut": (
             f"TAKE BOTH {_N['pd-vn-transgear-arm-plate-screw']} SCREWS OUT; CUT THEIR "
             f"TIPS FLUSH TO {joints.PLATE_SCREW_CUT_PROUD_MAX:.2f} PROUD OF THE ARM'S "
-            f"FRONT FACE; BREAK THE CUT EDGE {plate_screw.CUT_END_BREAK_TEXT}. "
+            "FRONT FACE; BREAK THE CUT EDGE "
+            f"{disc.inch_text(plate_screw.CUT_END_BREAK_MAX, 3)} IN MAX. "
             "REFIT THE SAME SCREWS IN THE SAME HOLES BEFORE PIVOTING THE HANGER."
         ),
         # R9-71: the spacer is pressed on the shoulder, so its faces' tilt is
         # fixed in the bar; the MHA-PD-VN-63 spring holds the arm on it. The
         # screw's tip is faced below the bar's front face, where the platen
-        # slides, and staked there (rule 23); MHA-PD-VN-67 restores the spring
-        # room the 9.5 bar took (transgear_hanger_joints).
+        # slides, and staked there (rule 23); the spot-face floor sets the
+        # spring room (transgear_hanger_joints).
         "hanger-pivoted": (
             f"ON THE {_N['pd-vn-transgear-pivot-screw']} SHOULDER SCREW FROM THE REAR: "
-            f"{_N['pd-vn-transgear-pivot-shim']} SHIM, {_N['pd-vn-transgear-pivot-spring']} "
+            f"{_N['pd-vn-transgear-pivot-spring']} "
             f"SPRING, THEN ARM; PRESS THE {_N['pd-transgear-pivot-spacer']} SPACER, AS "
             "MADE, ON THE SHOULDER, FLUSH WITH ITS END ON A FLAT. FACE THE SCREW'S "
             f"TIP SO THAT, SEATED IN THE {_N['pd-support-bar']} BAR'S THROUGH TAP, IT "
@@ -1594,8 +1581,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "disc-screws-cut": (
             f"CUT {_N['pd-vn-transgear-disc-screw']} TIPS "
-            f"{disc_screw.TIP_BELOW_REAR_FACE_TEXT} BELOW DISC REAR FACE; "
-            f"BREAK {disc_screw.CUT_END_BREAK_TEXT}."
+            f"{disc_screw.TIP_BELOW_REAR_FACE_TEXT} IN BELOW DISC REAR FACE; "
+            f"BREAK {disc.inch_text(disc_screw.CUT_END_BREAK_MAX, 3)} IN MAX."
         ),
         "oil-hole-drilled": (
             f"DRILL THE \u00d8{hub.OIL_HOLE_DIA:.1f} OIL HOLE CENTRED ON THE HUB BODY, "

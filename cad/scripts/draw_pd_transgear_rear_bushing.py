@@ -1,6 +1,6 @@
 r"""Create the manufacturing drawing for the transgear rear bushing (MHA-PD-24).
 
-A turned brass ring: Ø9.0 O.D. over a reamed Ø3.900 bore, its length printed
+A turned brass ring: Ø.35 O.D. over a reamed Ø.1250 bore, its length printed
 to the disc cluster stack's band under the stack callout.  The profile lies
 as it sits in the lathe (axis horizontal): the ``*Top`` view turned a quarter
 turn, so model +Z runs LEFT and the arm face (z 0) is the profile's right
@@ -8,7 +8,8 @@ end, the sleeve face its left end.  Each end face carries its running
 finish, the length sits under the profile and the O.D. moves onto the
 profile (drawing-guidelines.md rule 11 (turned parts read like the lathe): diameters on the side view).  The end view to its left
 (third angle, looking along -Z from the +Z end) keeps the bore, a solid
-circle only end-on.
+circle only end-on.  The sheet prints decimal inch (the part's
+``drawing_unit``); the model keeps its millimetre nominals.
 
 Run with SolidWorks open::
 
@@ -48,6 +49,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _layout_geometry import audit_sheet, format_findings
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -269,7 +271,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,

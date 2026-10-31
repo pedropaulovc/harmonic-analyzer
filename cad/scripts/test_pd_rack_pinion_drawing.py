@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import math
+import re
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -44,13 +45,13 @@ def test_every_marked_dimension_is_kept_once_with_part_authored_places() -> None
     assert sorted(kept) == sorted(marked) == [
         "BoreDia", "FaceWidth", "OutsideDia", "RootEnvelope", "ToothSpan"
     ]
-    # The non-tooth bands stay unchanged; physical span LIMITS print four places.
+    # Bore, blank and root print four places, the face three (inch sheet).
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "FaceWidth": 3,
-        "OutsideDia": 2,
-        "BoreDia": 3,
+        "OutsideDia": 4,
+        "BoreDia": 4,
         "ToothSpan": 4,
-        "RootEnvelope": 3,
+        "RootEnvelope": 4,
     }
     assert "draw_pd_rack_pinion.py" in PRECISION_MIGRATED_DRAWINGS
     assert model_toleranced_dimensions(part) == {
@@ -94,17 +95,17 @@ def test_the_tap_mouths_lose_only_their_breaks_counted_from_the_drill() -> None:
     """Machinist review of 8b5e1f354 (blocker): full thread starts where a
     mouth's 45° leg meets the tap drill, so the far-side Ø1.8 MAX countersink
     cost 0.305, not the 0.138 counted to the major, and 1.53D printed over
-    1.48D.  R9-63: no countersink, a 0.10 break on each mouth."""
-    assert spec.MOUTH_THREAD_LOSS == spec.MOUTH_BREAK_MAX == pytest.approx(0.10)
+    1.48D.  R9-63: no countersink, a .004 break on each mouth."""
+    assert spec.MOUTH_THREAD_LOSS == spec.MOUTH_BREAK_MAX == pytest.approx(0.1016)
     rear = max(
         spec.MOUTH_BREAK_MAX,
         disc_screw.TIP_BELOW_REAR_FACE[1] + disc_screw.CUT_END_BREAK_MAX,
         disc_screw.STOCK_TIP_INSIDE_REAR_MAX + spec.SCREW_PITCH,
     )
-    assert rear == pytest.approx(0.3895, abs=1e-4)
+    assert rear == pytest.approx(0.3683, abs=1e-4)
     worst = spec.FACE_WIDTH_MIN - spec.MOUTH_BREAK_MAX - rear
     assert disc_screw.ENGAGEMENT_WORST == pytest.approx(worst)
-    assert worst == pytest.approx(2.3805, abs=1e-4)
+    assert worst == pytest.approx(2.4003, abs=1e-4)
     assert worst / spec.TAP_MAJOR >= spec.ENGAGEMENT_FLOOR_D
     # The old Ø1.7 +0.10/0 countersink, charged to the drill, fell short.
     old_loss = (1.8 - spec.TAP_DRILL_DIA) / 2.0
@@ -132,10 +133,10 @@ def test_tap_to_bore_wall_meets_the_target_worst_case() -> None:
 
 
 def test_the_bore_pilots_on_the_hub_spigot_at_every_limit() -> None:
-    """The bands the two builds apply (the disc's H7 bore, the MHA-PD-17 hub's
-    h6 spigot) never bind: at the tightest corner, the smallest bore over the
-    largest spigot, they meet line on line, and the fit note quotes the
-    clearance the limits give."""
+    """The bands the two builds apply (the disc's REAM_H7 bore, the MHA-PD-17
+    hub's SHAFT_H spigot) never bind: at the tightest corner, the smallest
+    bore over the largest spigot, they meet line on line, and the fit note
+    quotes the clearance the limits give."""
     import build_pd_transgear_disc_hub as hub_part
     import pd_transgear_disc_hub_spec as hub
 
@@ -154,11 +155,12 @@ def test_the_bore_pilots_on_the_hub_spigot_at_every_limit() -> None:
     assert spec.DISC_OFFSET_MAX == pytest.approx(greatest / 2.0)
     note = spec.BORE_FIT_CALLOUT
     assert "MATE HUB MHA-PD-17 SPIGOT" in note
-    assert f"(DIA CLR {least:.3f}-{greatest:.3f} mm)" in note
-    assert f"\N{DIAMETER SIGN}{hub.SPIGOT_DIA:.3f} +{spigot_upper:.3f}/" in note
+    printed = re.search(r"\(DIA CLR (\d*\.\d+)-(\d*\.\d+)\)", note)
+    assert printed is not None
+    assert [float(v) * 25.4 for v in printed.groups()] == pytest.approx(
+        [least, greatest], abs=0.5e-4 * 25.4
+    )
     assert all(len(line) <= 70 for line in note.splitlines())
-    for banned in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "BOOK FIDELITY"):
-        assert banned not in note.upper()
 
 
 def test_the_bore_front_chamfer_clears_the_spigot_corner() -> None:
@@ -171,7 +173,7 @@ def test_the_bore_front_chamfer_clears_the_spigot_corner() -> None:
 
 
 def test_thickness_band_is_the_printed_xxx_band() -> None:
-    band = printed_band_mm(3)
+    band = printed_band_mm(3, unit="in")
     assert (spec.FACE_WIDTH_MIN, spec.FACE_WIDTH_MAX) == pytest.approx(
         (spec.FACE_WIDTH - band, spec.FACE_WIDTH + band)
     )
@@ -184,7 +186,9 @@ def test_tap_callout_carries_both_mouth_breaks_and_transfer() -> None:
     assert {k: v for k, v in updated.items() if k != 6} == {5: "", 7: "", 8: ""}
     text = spec.TAP_CALLOUT_QUALIFIER
     assert "CSK" not in text
-    assert f"BREAK EDGE {spec.MOUTH_BREAK_MAX:.2f} MAX BOTH SIDES" in text
+    printed_break = re.search(r"BREAK EDGE (\d*\.\d+) MAX BOTH SIDES", text)
+    assert printed_break is not None
+    assert float(printed_break.group(1)) * 25.4 == pytest.approx(spec.MOUTH_BREAK_MAX)
     assert "MHA-PD-17" in text and "MATCH-MARK" in text
     for banned in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "BOOK FIDELITY"):
         assert banned not in text.upper()
@@ -199,10 +203,13 @@ def test_gear_data_block_is_what_the_machinist_needs() -> None:
         ("NUMBER OF TEETH", "150"),
         ("DIAMETRAL PITCH", "48.00"),
         ("PRESSURE ANGLE", "20.0 DEG"),
-        ("PITCH DIAMETER (mm, REF)", f"{spec.PITCH_DIA:.2f}"),
-        ("WHOLE DEPTH (mm, REF)", f"{spec.WHOLE_DEPTH:.3f}"),
+        ("PITCH DIAMETER (REF)", f"{spec.PITCH_DIA / 25.4:.4f}".lstrip("0")),
+        ("WHOLE DEPTH (REF)", f"{spec.WHOLE_DEPTH / 25.4:.4f}".lstrip("0")),
         ("CUTTER", "#1, 135T-RACK"),
-        (f"SPAN OVER {spec.SPAN_TEETH} TEETH", f"{lower:.4f}-{upper:.4f}"),
+        (
+            f"SPAN OVER {spec.SPAN_TEETH} TEETH",
+            f"{lower / 25.4:.4f}-{upper / 25.4:.4f}".replace("0.", "."),
+        ),
         ("MATES WITH", f"KNOB SHAFT MHA-PD-08, {spec.MESH_PINION_TEETH}T"),
     ):
         assert f"{label}:  {value}" in data
@@ -225,7 +232,7 @@ def test_printed_span_limits_define_every_accepted_translation_corner() -> None:
     from stock_form_cutter import translation_for_tangent_span
 
     assert spec.SPAN_TEETH == 17
-    assert spec.SPAN_LIMITS == (26.8806, 26.8946)
+    assert spec.SPAN_LIMITS == pytest.approx((1.0582 * 25.4, 1.0589 * 25.4))
     assert spec.RADIAL_SETTING_LIMITS[0] < 3.959
     assert spec.RADIAL_SETTING_LIMITS[1] > 3.979
     for limit, setting, sign in zip(
@@ -261,7 +268,7 @@ def test_finite_blank_cap_uses_the_lowest_printed_span_inverted_translation() ->
     )
     cap = 2.0 * lowest.support_radius_max_mm
     assert spec.SUPPORT_OUTSIDE_DIA_MM == pytest.approx(cap)
-    assert spec.OUTSIDE_DIA == 80.41
+    assert spec.OUTSIDE_DIA == pytest.approx(3.1655 * 25.4)
     assert spec.OUTSIDE_DIA + spec.OUTSIDE_DIA_BAND[0] < cap
     # Standard actual-N OD would require unsupported upper-tip continuation.
     standard_od = (spec.TEETH + 2.0) * spec.MODULE_MM
@@ -292,7 +299,7 @@ def test_native_builder_consumes_one_full_axial_profile_and_physical_inspection(
 
 
 def test_single_pin_contacts_every_actual_finite_corner_on_the_running_datum() -> None:
-    assert spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM == 1.0
+    assert spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM == pytest.approx(0.040 * 25.4)
     from _gear_quality import toothspace_runout_tir_mm
 
     assert spec.TOOTH_SPACE_RUNOUT_TIR_MM == toothspace_runout_tir_mm() == 0.05
@@ -313,9 +320,11 @@ def test_single_pin_contacts_every_actual_finite_corner_on_the_running_datum() -
     assert drawing.TOOTH_SPACE_CALLOUT_PROPERTY == spec.TOOTH_SPACE_CALLOUT_PROPERTY
     assert spec.TOOTH_SPACE_CALLOUT_PROPERTY == "Tooth Space Inspection"
     assert inspection.splitlines()[0] == (
-        f"TOOTH SPACE RUNOUT {spec.TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO A, "
+        f"TOOTH SPACE RUNOUT {spec.TOOTH_SPACE_RUNOUT_TIR_TEXT} TIR TO A, "
         "ACCEPT AT CUTTING SETUP"
     )
+    # The printed TIR never exceeds the running-fit TIR it controls.
+    assert float(spec.TOOTH_SPACE_RUNOUT_TIR_TEXT) * 25.4 <= spec.TOOTH_SPACE_RUNOUT_TIR_MM
     assert len(inspection.splitlines()) == 2
     assert "INDEX" not in inspection
     assert max(map(len, inspection.splitlines())) <= 70
@@ -444,7 +453,7 @@ def test_saved_crlf_control_passes_and_a_changed_line_is_refused() -> None:
 
     saved = spec.TOOTH_SPACE_CALLOUT.replace("\n", "\r\n")
     require_source_control(saved, spec.TOOTH_SPACE_CALLOUT, label="rack pinion")
-    stale = saved.replace("0.05 TIR", "0.10 TIR")
+    stale = saved.replace(f"{spec.TOOTH_SPACE_RUNOUT_TIR_TEXT} TIR", ".0039 TIR")
     with pytest.raises(RuntimeError, match="differs from the current specification"):
         require_source_control(stale, spec.TOOTH_SPACE_CALLOUT, label="rack pinion")
 

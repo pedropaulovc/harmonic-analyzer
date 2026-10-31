@@ -11,6 +11,8 @@ assemblies import.
 
 from __future__ import annotations
 
+from pd_transgear_removable_spec import BORE_DRILL, PIN_HOLE_DRILL
+
 TEXT_PREFIX = 1  # swDimensionTextPrefix
 TEXT_SUFFIX = 2  # swDimensionTextSuffix
 CALLOUT_ABOVE = 3  # swDimensionTextCalloutAbove
@@ -31,14 +33,14 @@ PLATE_CALLOUT = "   SUPPLIED PLATE; SETS\n   ANSI #25 CHAIN FLOAT"
 
 # lane -> (feature, dimension) -> text.  The two pin holes share one size:
 # the +Y hole's diameter prints for both, as "2X".  Both holes and the bore
-# are drilled through: the title block's DRILLED HOLES row governs their
-# sizes.  A linear dimension's above lane does not print, so the pin
-# locations carry their mates below.
+# are drilled through with the named drill: the title block's DRILLED HOLES
+# row governs their sizes.  A linear dimension's above lane does not print,
+# so the pin locations carry their mates below.
 CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
     CALLOUT_ABOVE: {("BorePinsProfile", "PinPosDia"): "2X"},
     CALLOUT_BELOW: {
-        ("BorePinsProfile", "BoreDiaDim"): "DRILL THRU",
-        ("BorePinsProfile", "PinPosDia"): "DRILL THRU",
+        ("BorePinsProfile", "BoreDiaDim"): f"{BORE_DRILL[0]} DRILL THRU",
+        ("BorePinsProfile", "PinPosDia"): f"{PIN_HOLE_DRILL[0]} DRILL THRU",
         ("BorePinsProfile", "PinPosY"): PIN_LOCATION_CALLOUT,
         ("BorePinsProfile", "PinNegY"): PIN_LOCATION_CALLOUT,
         ("BlankProfile", "BlankWidth"): PLATE_CALLOUT,
@@ -46,7 +48,7 @@ CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
 }
 
 # The supplied outside diameter prints once per configuration's view as a
-# REFERENCE: "(Ø52.0)".  A custom prefix replaces the automatic diameter
+# REFERENCE: "(Ø2.05)".  A custom prefix replaces the automatic diameter
 # glyph, so it carries SOLIDWORKS' own <MOD-DIAM> token.  Each view proves
 # it (the drawing's ``_assert_outside_diameter``).
 REFERENCE_TEXT: dict[tuple[str, str], dict[int, str]] = {

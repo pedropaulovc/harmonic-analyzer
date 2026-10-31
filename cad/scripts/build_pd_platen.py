@@ -6,19 +6,19 @@ strips, and the two back-side guide rails the platen hangs on are
 separate parts (build_pd_platen_rack.py / build_pd_platen_clip.py /
 build_pd_platen_guide.py). Fastener holes:
 
-* four clip-screw #2-56 through receivers at the resized plate's extreme
-  left/right edges (x 4.5/265.14), matching the resized clips'
-  7.1904-inset end holes at local y 29.6604/127.6296, each tapped on
-  through a Ø7 x 1.70 boss on the back face for >= 1.5D engagement, each
-  boss rounded into the face at its R0.5 MAX root;
-* ten #4 loose (Ø3.658) counterbored guide-screw through-holes in two rows
+* four clip-screw #2-56 through receivers at the plate's extreme left/right
+  edges (.170 in from each), matching the clips' .283-inset end holes, each
+  tapped on through a Ø.28 boss on the back face for >= 1.5D engagement,
+  each boss rounded into the face at its R.020 MAX root;
+* ten #4 loose (Ø.144) counterbored guide-screw through-holes in two rows
   of 5 (ch22 front photo) at the guide rail centrelines: bottom row y 13,
   top row y 47 (machine 318 / 352 with the plate at y 305).
 
 Dimensions: the ch30-p002 Pose Studio fit sets the width to 269.64 mm and
 the user-confirmed front-face proportion to height:width = 1:2, hence
 134.82 mm high. Thickness: the p.55 edge-on-photo estimate (~4 mm), thinned
-to 3.85 (R9-68) for disc-to-platen air.
+to 3.85 (R9-68) for disc-to-platen air. The sheet prints decimal inch
+(#290); these three keep their millimetres (pd_platen_spec).
 
 Layout: width along +X, height along +Y from the origin corner, thickness
 extruded +Z.
@@ -43,11 +43,13 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _document_units import apply_package_model_units
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _extrude import extrude_at_offset
 from _feature_tree import _feature_by_name, name_last_feature
 from _fit_deviations import deviations
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -225,6 +227,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): the plate envelope. The mm suffix is
     # load-bearing -- this is an INCH document and the equation manager reads
@@ -292,7 +296,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "plate height (1:2 front-face ratio)", "y", PLATE_HEIGHT
     )
 
-    # Clip-screw receiver bosses: four Ø7 integral bosses on the back face
+    # Clip-screw receiver bosses: four Ø.28 integral bosses on the back face
     # (z = PlateThickness), sketched on the front plane and extruded from that
     # offset, so the through taps below gain the boss height of thread.
     bosses = SketchDims()
@@ -362,7 +366,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Clip-screw receivers: ONE native Hole Wizard #2-56 through-tapped
     # feature (4 points) from the front face. The heads sit on the clip's flat
-    # 0.8 sheet, so the 3.85 plate plus the 1.70 rear boss take the rest of the
+    # .032 sheet, so the plate plus the rear boss take the rest of the
     # stock shank as thread and its tip finishes flush at the boss's rear face
     # rather than bottoming in a blind socket.
     pre = await adapter.get_mass_properties()
@@ -388,9 +392,9 @@ async def build(adapter) -> dict[str, str]:
 
     # Guide-screw through-holes + head counterbores: ONE native Hole Wizard
     # counterbored #4 FILLISTER feature (10 points) from the front face. The
-    # #4 loose shanks pass through into the guide rails and the Ø6.5 x 2.9178
-    # counterbores hold the stock heads exactly 0.2 sub-flush.
-    # The through Ø (#4 loose) and the counterbore Ø6.5 artefact diameter are
+    # #4 loose shanks pass through into the guide rails and the Ø.26 x .115
+    # counterbores hold the stock heads exactly .008 sub-flush.
+    # The through Ø (#4 loose) and the counterbore Ø.26 are
     # explicit overrides; the depth follows the exact purchased head.
     pre = post
     guide_holes = wizard_holes(

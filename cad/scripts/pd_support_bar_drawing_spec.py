@@ -36,39 +36,47 @@ from pd_support_bar_spec import (
     BAR_BAND_PLACES,
     BAR_HEIGHT,
     BRACKET_TAP_SPEC,
+    HOLE_POSITION_PLACES,
     PIVOT_TAP_THREAD,
     TAP_CSK_ANGLE_DEG,
+    UNIT,
 )
 
 # SOLIDWORKS swTolType_e single limits: the nominal prints followed by MIN or
 # MAX, so the model value is the limit itself.
 TOL_MIN = 5  # swTolMIN
 TOL_MAX = 6  # swTolMAX
-HOLE_POSITION_PLACES = 3  # the hanger holes' ±0.065 prints .XXX
-# The clamp holes' row height and stations print .XX: their position band
+# The clamp holes' row height and stations print .XXX: their position band
 # (build_pd_support_bar.CLAMP_POSITION_BAND) is the MHA-SH-02 back-arc taps'
-# fixed-fastener stack, so the title block's .X ±0.8 would miss the taps.
-CLAMP_POSITION_PLACES = 2
+# fixed-fastener stack, which the title block's .XX ±.01 would overrun.
+CLAMP_POSITION_PLACES = 3
 # The clamp counterbores' depth prints .XX: under its band the shallowest
 # depth still sinks the clamp-screw head below the front face the platen
 # slides across (build_pd_support_bar.CLAMP_HEAD_RECESS).
 CLAMP_CBORE_DEPTH_PLACES = 2
-# The round counterbores' native callout prints its Ø at the document's two
-# places, under the title block's DRILLED HOLES row.
-CLAMP_HOLE_CALLOUT_PLACES = 2
-# The west slots' runs still need .XXX to close the column-pitch stack.
-# Their counterbore width instead carries explicit asymmetric limits: retain
-# the proven 8.37 mm minimum for the head's full-float envelope, while allowing
-# the ordinary .XX upper deviation. A symmetric .XX band would let the width
-# fall to 7.99 mm and foul the head; .XXX on both sides needlessly limits the
-# maximum. Geometry and the runs remain unchanged. The round counterbores take
-# 7.99: their head stays coaxial, while a slid head adds the slot run's .XXX
-# overrun (build_pd_support_bar.clamp_slot_head_clearance), so the callout
-# says the minimum is for the slid head (3de09b9 machinist review).
-CLAMP_SLOT_WIDTH_PLACES = 2
+# Every native Hole Wizard length (the round counterbores' Ø, depth) prints
+# .XXX, under the title block's DRILLED HOLES row.
+CLAMP_HOLE_CALLOUT_PLACES = 3
+# By native Hole Wizard variable: the round counterbores' Ø's and depth, the
+# latch-hook taps' drill.
+CLAMP_CALLOUT_PRECISION = {
+    "hw-thruholedia": CLAMP_HOLE_CALLOUT_PLACES,
+    "hw-cbdia": CLAMP_HOLE_CALLOUT_PLACES,
+    "hw-cbdepth": CLAMP_CBORE_DEPTH_PLACES,
+}
+BRACKET_TAP_CALLOUT_PRECISION = {"hw-tapdrldia": 3}
+# The west slots' runs need .XXX to close the column-pitch stack, and their
+# width carries the drilled holes' +.004/0 at .XXX. Their counterbore width
+# carries explicit asymmetric limits: the minimum (.330) clears the head's
+# full-float envelope, while the upper deviation stays the ordinary .XX
+# band. The round counterbores' head stays coaxial, while a slid head adds
+# the slot run's .XXX overrun (build_pd_support_bar.clamp_slot_head_clearance),
+# so the callout says the minimum is for the slid head (3de09b9 machinist
+# review).
+CLAMP_SLOT_WIDTH_PLACES = 3
 CLAMP_SLOT_PLACES = 3
-CLAMP_SLOT_CBORE_WIDTH_PLACES = 2
-CLAMP_SLOT_CBORE_WIDTH_LIMITS = (-0.13, 0.51)
+CLAMP_SLOT_CBORE_WIDTH_PLACES = 3
+CLAMP_SLOT_CBORE_WIDTH_LIMITS = (-0.127, 0.254)  # -.005/+.010
 HANGER_STATION_NAMES = ("PivotTapStation", "BracketTapStation1", "BracketTapStation2")
 CLAMP_STATION_NAMES = (
     "ClampStation1",
@@ -102,8 +110,8 @@ SHEET_PRECISION: dict[str, dict[str, int]] = {
         "ClampRowHeight": CLAMP_POSITION_PLACES,
         **dict.fromkeys(CLAMP_STATION_NAMES, CLAMP_POSITION_PLACES),
     },
-    "PivotTapProfile": {"PivotTapDrillDia": 2},
-    "CountersinkReference": {"PivotCskDia": 1, "BracketCskDia": 1},
+    "PivotTapProfile": {"PivotTapDrillDia": 3},
+    "CountersinkReference": {"PivotCskDia": 3, "BracketCskDia": 3},
     "ClampSlotProfile": {
         "ClampSlotWidth": CLAMP_SLOT_WIDTH_PLACES,
         "ClampSlotTravel": CLAMP_SLOT_PLACES,
@@ -181,10 +189,16 @@ CLAMP_CBORE_CALLOUT = f"{CLAMP_TAP_MATE}\nMHA-SH-VN-53 HEADS BELOW SLIDE FACE"
 # PlanarFace offsets run along the outward normal (point . normal).
 SURFACE_FINISHES = (
     SurfaceFinishControl(
-        "top_slide", MACHINED_UM, PlanarFace((0, 1, 0), BAR_HEIGHT / 2.0)
+        "top_slide",
+        MACHINED_UM,
+        PlanarFace((0, 1, 0), BAR_HEIGHT / 2.0),
+        display_unit=UNIT,
     ),
     SurfaceFinishControl(
-        "front_slide", MACHINED_UM, PlanarFace((0, 0, -1), BAR_DEPTH / 2.0)
+        "front_slide",
+        MACHINED_UM,
+        PlanarFace((0, 0, -1), BAR_DEPTH / 2.0),
+        display_unit=UNIT,
     ),
 )
 

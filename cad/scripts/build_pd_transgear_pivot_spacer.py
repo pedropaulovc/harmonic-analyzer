@@ -46,8 +46,10 @@ from _drawing_tolerances import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
+from _document_units import apply_package_model_units
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
+from _part_properties import part_drawing_unit
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 import pd_transgear_pivot_spacer_callouts as callouts
@@ -58,9 +60,10 @@ from pd_transgear_pivot_spacer_spec import (
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     LENGTH,
-    LENGTH_BAND,
+    LENGTH_TOLERANCE,
     OD,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 PART_NAME = "pd-transgear-pivot-spacer"
@@ -102,6 +105,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -185,9 +190,11 @@ async def build(adapter) -> dict[str, str]:
     # The pivot head play rides the length: its explicit band.  The bore is
     # a press on the shoulder: its reamed one-sided band.  The O.D. is
     # governed by its places alone (the title block's row).
-    set_dimension_symmetric_tolerance(adapter, "Ring", "RingLength", LENGTH_BAND)
+    set_dimension_symmetric_tolerance(
+        adapter, "Ring", "RingLength", LENGTH_TOLERANCE, display_unit=UNIT
+    )
     set_dimension_bilateral_tolerance(
-        adapter, "RingProfile", "BoreDia", *deviations(BORE_DIA_BAND)
+        adapter, "RingProfile", "BoreDia", *deviations(BORE_DIA_BAND), display_unit=UNIT
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

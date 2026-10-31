@@ -5,8 +5,9 @@ views, dimension layout and hole callout;
 sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
-The sheet runs at 4:1 (the plate is 22.5 x 9.8, cut from 1/16 sheet, its four
-corners rounded); the isometric carries an explicit 2:1 override so it stays
+The sheet runs at 4:1 in decimal inch (#290; the plate is .89 x .39, cut from
+1/16 sheet whose thickness prints as a fraction REF, its four corners
+rounded); the isometric carries an explicit 2:1 override so it stays
 clear of the title block.  A flat plate needs only the face view (front), one
 thickness view (right) and the iso.
 No frames and no datums (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the screw holes locate by +/-
@@ -41,21 +42,26 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _part_properties import part_drawing_unit
 from _session import run_build
+from _supplier_dimensions import supplier_reference_dimension
 import _telemetry
 from pd_guide_lock_spec import (
     DRAWING_PRECISION_BY_NAME,
+    HOLE_LOCATION_PLACES,
     HOLE_SPEC,
     HOLE_XY,
     LOCK_HEIGHT,
     LOCK_STOCK_CALLOUT,
+    LOCK_THICK,
+    LOCK_THICK_FRACTION_DENOMINATOR,
     LOCK_WIDTH,
 )
 
@@ -149,12 +155,17 @@ RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0] + 0.023, 0.209)}
 # without, farm run 20261012T061737079Z).
 DIMENSION_PREFIXES = {"Hole1Y": "2X ", "CornerR": "4X R"}
 DIMENSION_CALLOUTS = {"Depth": LOCK_STOCK_CALLOUT}
+# The 1/16 sheet's thickness is stock: a fraction REF, the supplier's band
+# governs it (#290).
+THICKNESS_DIMENSION = "Depth"
+# The 1/8 drill's Ø prints .XXX, as every native Hole Wizard length.
+HOLE_CALLOUT_PRECISION = {"hw-diam": HOLE_LOCATION_PLACES}
 # The bent leader elbows at the text's LEFT end and enters hole 2 from its
 # upper-right quadrant, crossing only the plate's right edge; the text stands
 # between that edge and the right view.
 HOLE_CALLOUT_XY = (0.230, 0.185)
 HOLE_CALLOUT_PROCESS = "DRILL"
-# The hole coordinates' ±0.035 bands exist for the mate (rule 4): the
+# The hole coordinates' ±.001 bands exist for the mate (rule 4): the
 # pattern must land on the platen guide's #4-40 taps with the lock-screw
 # shanks clear in their holes (pd_vn_guide_lock_screw_spec.LOCK_SET_OFFSET),
 # so the callout names both.
@@ -201,6 +212,25 @@ def _set_dimension_prefixes(
             raise RuntimeError(f"dimension prefix {prefix!r} did not persist")
     if remaining:
         raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
+
+
+def _thickness_reference(adapter: Any, annotations: list[Any]) -> None:
+    """Print the 1/16 sheet's thickness as its supplier fraction, REF."""
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        if dimension_name(adapter, annotation) != THICKNESS_DIMENSION:
+            continue
+        supplier_reference_dimension(
+            adapter,
+            annotation.GetSpecificAnnotation(),
+            label="guide-lock sheet thickness",
+            units="in",
+            precision=DRAWING_PRECISION_BY_NAME[THICKNESS_DIMENSION],
+            expected_mm=LOCK_THICK,
+            fraction_denominator=LOCK_THICK_FRACTION_DENOMINATOR,
+        )
+        return
+    raise RuntimeError("guide-lock sheet thickness was not imported")
 
 
 @_telemetry.traced("drawing.hole_callout_below")
@@ -250,7 +280,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -280,17 +314,18 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to hide the right view's tangent edges")
     right.UpdateViewDisplayGeometry()
 
-    # The places and the explicit bands (sheet thickness, hole coordinates)
-    # are authored on the part (the paper-drive lock-station
-    # sweep and the screw set window read the same spec); the sheet only
-    # proves the import kept the places. The hole size ships as a native
-    # wizard callout below.
+    # The places and the hole coordinates' explicit bands are authored on the
+    # part (the paper-drive lock-station sweep and the screw set window read
+    # the same spec); the sheet only proves the import kept the places. The
+    # sheet thickness prints as its stock fraction, REF. The hole size ships
+    # as a native wizard callout below.
     annotations = [
         *curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front"),
         *curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right"),
     ]
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
+    _thickness_reference(adapter, annotations)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="above")
     set_dimension_callouts(
         adapter, annotations, DIMENSION_CALLOUTS_BELOW, location="below"
@@ -309,6 +344,9 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=HOLE_CALLOUT_XY,
         label="guide-lock screw holes",
         process=HOLE_CALLOUT_PROCESS,
+    )
+    set_hole_callout_precision(
+        hole_callout, HOLE_CALLOUT_PRECISION, label="guide-lock screw holes"
     )
     _set_hole_callout_below(hole_callout, HOLE_CALLOUT_BELOW)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)

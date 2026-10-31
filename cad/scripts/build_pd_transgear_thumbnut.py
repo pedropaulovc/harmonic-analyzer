@@ -45,6 +45,7 @@ from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_save import save_part_and_images
@@ -69,6 +70,7 @@ from _drawing_marks import (
 )
 from _holes import wizard_holes
 from _visibility import blank_reference_geometry
+from _part_properties import part_drawing_unit
 from pd_transgear_thumbnut_spec import (
     CSK_DIA,
     CSK_DIA_DEVIATIONS,
@@ -196,6 +198,8 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in

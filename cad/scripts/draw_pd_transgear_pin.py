@@ -13,7 +13,8 @@ removes hidden lines.  The head's underside (its seat on the MHA-PD-18 arm) is
 the one origin: the groove's load wall, the pin's functional station, and the
 tip's apex are dimensioned from it, and the head land runs back from it.  The
 land ahead of the groove, the dome heights and the apex-to-tip overall print
-as references.
+as references.  The sheet prints decimal inch (the part's ``drawing_unit``);
+the model keeps its millimetre nominals.
 
 Run with SolidWorks open::
 
@@ -52,6 +53,7 @@ from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -88,7 +90,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 # The side view prints at the sheet scale, so it needs no caption.  3:1 lays
-# the 54.25 pin 163 mm long and the 0.737 groove 2.2 mm wide.
+# the 2.14 in pin 163 mm long and the .020 groove 1.5 mm wide.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
@@ -214,7 +216,7 @@ def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
 
 
 def _overall_reference(adapter: Any, side: Any) -> None:
-    """The (54.25) overall, head apex to tip apex (rule 10), for the bar cut.
+    """The overall REF, head apex to tip apex (rule 10), for the bar cut.
 
     A drawing-owned dimension, so its reference parentheses are the sheet's
     own text, not an imported part dimension's.
@@ -290,7 +292,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,

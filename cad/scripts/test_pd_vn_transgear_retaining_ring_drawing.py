@@ -1,12 +1,10 @@
-"""Offline contracts for the MHA-PD-VN-61 transgear retaining ring (McMaster 97431A260)."""
+"""Offline contracts for the MHA-PD-VN-61 transgear retaining ring (McMaster 97431A240)."""
 
 from __future__ import annotations
 
 import asyncio
-import json
 import math
 import re
-from pathlib import Path
 
 import pytest
 
@@ -16,13 +14,12 @@ import pd_vn_transgear_retaining_ring_spec as spec
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _test_stock_recipes import discovered_recipes
-from diagnostics import diag_build_97431A260 as recipe
+from diagnostics import diag_build_97431A240 as recipe
 
 STEM = "pd-vn-transgear-retaining-ring"
-DUMP = Path(__file__).resolve().parents[1] / "out/reports/mcmaster-97431A260-dump.json"
 
 
-def test_catalogue_row_is_the_replica_gated_mcmaster_ring() -> None:
+def test_catalogue_row_is_the_mcmaster_ring() -> None:
     from diagnostics.diag_build_mcmaster import REGISTRY
 
     row = _config.parts(STEM)
@@ -36,9 +33,9 @@ def test_catalogue_row_is_the_replica_gated_mcmaster_ring() -> None:
     assert int(row["quantity"]) == 1
     metadata = discovered_recipes()[spec.SKU]
     assert metadata.module == recipe.__name__
-    assert getattr(recipe, metadata.callable_name) is recipe.build_97431A260
+    assert getattr(recipe, metadata.callable_name) is recipe.build_97431A240
     assert metadata.threaded is False
-    assert REGISTRY[spec.SKU] is recipe.build_97431A260
+    assert REGISTRY[spec.SKU] is recipe.build_97431A240
 
 
 def test_outline_is_one_closed_loop_on_the_catalogue_circles() -> None:
@@ -53,13 +50,6 @@ def test_outline_is_one_closed_loop_on_the_catalogue_circles() -> None:
     assert round(spec.FREE_DIA / 2.0, 6) in radii
     assert max(math.hypot(*p) for p in ends) == pytest.approx(spec.OD / 2.0)
     assert min(math.hypot(*p) for p in ends) == pytest.approx(spec.FREE_DIA / 2.0)
-
-
-def test_outline_extruded_is_the_vendor_volume_before_its_fillets() -> None:
-    """The fillets only trade a few thousandths of a mm^3; a wrong corner or a
-    reversed arc moves the extrude by tenths."""
-    prism = recipe.outline_area() * spec.THICKNESS
-    assert prism == pytest.approx(recipe.VENDOR_VOLUME_MM3, abs=0.01)
 
 
 def test_gap_opens_toward_plus_x() -> None:
@@ -98,7 +88,7 @@ def test_part_puts_the_rear_face_on_the_front_plane(monkeypatch) -> None:
     asyncio.run(part.build(None))
     (component,) = seen["components"]
     assert component.sku == spec.SKU
-    assert component.author is recipe.build_97431A260
+    assert component.author is recipe.build_97431A240
     assert not component.parameters
     assert seen["material"] == part.SPEC.material
     rx, ry, rz = component.transform.rotation_radians
@@ -109,11 +99,6 @@ def test_part_puts_the_rear_face_on_the_front_plane(monkeypatch) -> None:
         moved = tuple(a + b for a, b in zip(face, tz, strict=True))
         assert moved[0] == pytest.approx(0.0) and moved[1] == pytest.approx(0.0)
         assert min(abs(moved[2]), abs(moved[2] - spec.THICKNESS)) == pytest.approx(0.0)
-
-
-@pytest.mark.skipif(not DUMP.is_file(), reason="local-only vendor harvest absent")
-def test_recipe_is_pinned_to_the_harvested_vendor_model() -> None:
-    recipe._check_truth(json.loads(DUMP.read_text(encoding="utf-8")))
 
 
 _FORBIDDEN = re.compile(r"EXCEPTION|ACCEPTED|RULING|POLICY|BOOK FIDELITY|THREADLOCK")

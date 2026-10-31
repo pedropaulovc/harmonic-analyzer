@@ -2,7 +2,7 @@ r"""Application fit contract of the latch-hook bracket screws (MHA-SH-VN-52).
 
 PURE DATA, no SolidWorks/COM imports.  Two McMaster 90280A108 #4-40 x 3/8
 slotted narrow-fillister screws from the shared canonical stock pass
-the latch hook's (MHA-PD-14) 0.8 spring-steel base into the support bar's
+the latch hook's (MHA-PD-14) .032 in spring-steel base into the support bar's
 #4-40 THROUGH taps (contract §4.3, §7).
 
 Frame (the fillister family's): screw axis +Y, head UP, the under-head

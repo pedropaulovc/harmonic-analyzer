@@ -8,7 +8,8 @@ Its length is printed (+/-LENGTH_BAND, a term of the disc cluster stack,
 Layout: Front-plane annulus at the origin (O.D., bore) extruded +Z by the
 length, so the arm face is the Front Plane (z = 0) and the sleeve face is the
 ``SleeveFace`` plane at z = LENGTH.  ``Axis1`` is the bore axis (Top Plane ∩
-Right Plane, the local Z axis).
+Right Plane, the local Z axis).  #290: the part saves in inch units (the
+row's ``drawing_unit``).
 
 Run (SolidWorks already open)::
 
@@ -24,8 +25,10 @@ from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -55,6 +58,7 @@ from pd_transgear_rear_bushing_spec import (
     LENGTH_BAND,
     OD,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 PART_NAME = "pd-transgear-rear-bushing"
@@ -74,6 +78,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -157,9 +163,15 @@ async def build(adapter) -> dict[str, str]:
     # The bore runs on the pin: its reamed band lives on the model dimension.
     # The length is printed to the disc cluster stack's band.
     set_dimension_bilateral_tolerance(
-        adapter, "RingProfile", "BoreDia", *deviations(BORE_DIA_BAND)
+        adapter,
+        "RingProfile",
+        "BoreDia",
+        *deviations(BORE_DIA_BAND),
+        display_unit=UNIT,
     )
-    set_dimension_symmetric_tolerance(adapter, "Ring", "RingLength", LENGTH_BAND)
+    set_dimension_symmetric_tolerance(
+        adapter, "Ring", "RingLength", LENGTH_BAND, display_unit=UNIT
+    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

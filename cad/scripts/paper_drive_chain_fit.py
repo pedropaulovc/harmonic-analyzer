@@ -226,7 +226,8 @@ def roller_air_mm(point: Point, centre: Point, teeth: int, phase: float, *,
 def printed_tip_max_deviation_mm(teeth: int) -> float:
     """Upper OD deviation actually printed on this configuration's BlankDia."""
     return printed_deviations(
-        sprocket.outside_dia(teeth), sprocket.DRAWING_PRECISION["BlankProfile"]["BlankDia"]
+        sprocket.outside_dia(teeth), sprocket.DRAWING_PRECISION["BlankProfile"]["BlankDia"],
+        unit=sprocket.UNIT,
     )[1]
 
 

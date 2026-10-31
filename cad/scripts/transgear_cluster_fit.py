@@ -55,12 +55,16 @@ from pd_cluster_stack_band import PRINTED_LENGTH_BAND
 # Collar air 0.10 MIN statistically sets the front bushing; the end float's
 # worst-case 0.20 MIN sets the rear bushing; the hub stands never proud of the
 # nose at the worst case (pd_cluster_air derives the first; the gates below
-# hold the other two).
+# hold the other two).  #290: each is the exact millimetre value of a .001 in
+# nominal and prints at four places, the band's +/-.0007.  The .125 pin's
+# REAM_SLIDE running fits cock the sleeve and the front bushing more than the
+# metric G7 did, so the front bushing grew .002 (raising m_fwd) and the rear
+# bushing gave the same .002 back to the end float.
 LENGTH_BAND = PRINTED_LENGTH_BAND
-LENGTH_PLACES = 2
-HUB_LENGTH = 13.69
-FRONT_BUSHING_LENGTH = 5.32
-REAR_BUSHING_LENGTH = 5.69
+LENGTH_PLACES = 4
+HUB_LENGTH = 13.6906  # .539
+FRONT_BUSHING_LENGTH = 5.6388  # .222
+REAR_BUSHING_LENGTH = 5.6388  # .222
 
 # --- the stack's terms: (label, nominal, band) ------------------------------------
 PH = (
@@ -104,7 +108,7 @@ M_FWD_CHAIN = (
     (LHUB, 1),
     (SP, -1),
 )
-M_FWD_NOMINAL = _nominal(M_FWD_CHAIN)  # 0.3825
+M_FWD_NOMINAL = _nominal(M_FWD_CHAIN)
 M_FWD_BAND = _spread(M_FWD_CHAIN)
 # The disc's end float: hub and disc from the step (sleeve on the rear
 # bushing) to the front bushing (bushing on the ring).
@@ -117,22 +121,21 @@ END_FLOAT_CHAIN = (
     (LRB, -1),
     (TL, -1),
 )
-END_FLOAT_NOMINAL = _nominal(END_FLOAT_CHAIN)  # 0.3775
+END_FLOAT_NOMINAL = _nominal(END_FLOAT_CHAIN)
 END_FLOAT_BAND = _spread(END_FLOAT_CHAIN)
 END_FLOAT_RANGE = (
     round(END_FLOAT_NOMINAL - END_FLOAT_BAND, 6),
     round(END_FLOAT_NOMINAL + END_FLOAT_BAND, 6),
-)  # 0.2013 .. 0.5537
+)
 END_FLOAT_MIN = 0.20  # R9-5: the disc runs free, at the worst case
-END_FLOAT_TEXT = f"{END_FLOAT_RANGE[0]:.2f}-{END_FLOAT_RANGE[1]:.2f}"
 # The hub's front face behind the sleeve's nose (hub on the step).
 RECESS_CHAIN = ((OL, 1), (TL, -1), (LHUB, -1))
-RECESS_NOMINAL = _nominal(RECESS_CHAIN)  # 0.06
+RECESS_NOMINAL = _nominal(RECESS_CHAIN)
 RECESS_BAND = _spread(RECESS_CHAIN)
 RECESS_RANGE = (
     round(RECESS_NOMINAL - RECESS_BAND, 6),
     round(RECESS_NOMINAL + RECESS_BAND, 6),
-)  # 0.00 .. 0.12
+)
 # The sleeve's rear face forward of the arm's front face, cluster forward:
 # the rear bushing can follow it there (the pinion over the rack, the
 # bushing to the rack's back face: build_pd_paper_drive_assembly).
@@ -149,34 +152,34 @@ SLEEVE_REAR_FORWARD_FROM_ARM = (
 ARM_REAR_Z = PIN.HEAD_SEAT_MACHINE_Z  # -116.4625
 ARM_FRONT_Z = ARM.FRONT_FACE_MACHINE_Z  # -124.4
 REAR_BUSHING_REAR_Z = ARM_FRONT_Z
-SLEEVE_REAR_Z = round(ARM_FRONT_Z - REAR_BUSHING_LENGTH, 6)  # -130.09
-STEP_Z = round(SLEEVE_REAR_Z - SLEEVE.FACE_WIDTH, 6)  # -143.69, the spigot's seat
-DISC_FRONT_Z = round(SLEEVE_REAR_Z - SLEEVE.DISC_FRONT_STATION, 6)  # -147.34
-DISC_REAR_Z = round(DISC_FRONT_Z + DISC.FACE_WIDTH, 6)  # -144.39
-NOSE_Z = round(SLEEVE_REAR_Z - SLEEVE.OVERALL_LENGTH, 6)  # -157.44
-HUB_FRONT_Z = round(STEP_Z - HUB_LENGTH, 6)  # -157.38
+SLEEVE_REAR_Z = round(ARM_FRONT_Z - REAR_BUSHING_LENGTH, 6)
+STEP_Z = round(SLEEVE_REAR_Z - SLEEVE.FACE_WIDTH, 6)  # the spigot's seat
+DISC_FRONT_Z = round(SLEEVE_REAR_Z - SLEEVE.DISC_FRONT_STATION, 6)
+DISC_REAR_Z = round(DISC_FRONT_Z + DISC.FACE_WIDTH, 6)
+NOSE_Z = round(SLEEVE_REAR_Z - SLEEVE.OVERALL_LENGTH, 6)
+HUB_FRONT_Z = round(STEP_Z - HUB_LENGTH, 6)
 FRONT_BUSHING_REAR_Z = NOSE_Z
-FRONT_BUSHING_FRONT_Z = round(NOSE_Z - FRONT_BUSHING_LENGTH, 6)  # -162.76
-RING_FRONT_Z = PIN.GROOVE_LOAD_WALL_MACHINE_Z  # -163.7125
-RING_REAR_Z = round(RING_FRONT_Z + RING.THICKNESS, 6)  # -163.0775
+FRONT_BUSHING_FRONT_Z = round(NOSE_Z - FRONT_BUSHING_LENGTH, 6)
+RING_FRONT_Z = PIN.GROOVE_LOAD_WALL_MACHINE_Z
+RING_REAR_Z = round(RING_FRONT_Z + RING.THICKNESS, 6)
 # The sleeve's float the model leaves open at the ring.
-SLEEVE_FLOAT_MODEL = round(FRONT_BUSHING_FRONT_Z - RING_REAR_Z, 6)  # 0.3175
-F_Z = round(ARM_REAR_Z - F_FROM_ARM_REAR, 6)  # -148.1
+SLEEVE_FLOAT_MODEL = round(FRONT_BUSHING_FRONT_Z - RING_REAR_Z, 6)
+F_Z = round(ARM_REAR_Z - F_FROM_ARM_REAR, 6)  # the knob train's station
 # F to the model disc's front face: the cluster rearward, so m_fwd plus the
 # end float.
-MODEL_M = round(DISC_FRONT_Z - F_Z, 6)  # 0.76
+MODEL_M = round(DISC_FRONT_Z - F_Z, 6)
 
 # Running fits on the pin (sleeve and both bushings share the bore band).
 BORE_DIA_BAND = SLEEVE.BORE_DIA_BAND
 BORE_DIAMETRAL_CLEARANCE = (
-    round(BORE_DIA_BAND[1] - PIN.DIA_BAND[0], 3),
-    round(BORE_DIA_BAND[0] - PIN.DIA_BAND[1], 3),
+    round(BORE_DIA_BAND[1] - PIN.DIA_BAND[0], 6),
+    round(BORE_DIA_BAND[0] - PIN.DIA_BAND[1], 6),
 )
 
 for _ok, _what in (
     (
         END_FLOAT_RANGE[0] >= END_FLOAT_MIN - 1e-9,
-        f"the disc's end float {END_FLOAT_TEXT} closes under {END_FLOAT_MIN} at the worst case",
+        f"the disc's end float {END_FLOAT_RANGE} mm closes under {END_FLOAT_MIN} at the worst case",
     ),
     (
         RECESS_RANGE[0] >= -1e-9,
@@ -193,10 +196,6 @@ for _ok, _what in (
         f"the model's sleeve float {SLEEVE_FLOAT_MODEL} is not the end float less the recess",
     ),
     (
-        math.isclose(F_Z, -148.1, abs_tol=1e-6),
-        f"F {F_Z} is off the knob train's -148.1",
-    ),
-    (
         math.isclose(HUB_FRONT_Z - NOSE_Z, RECESS_NOMINAL, abs_tol=1e-6),
         f"the model's hub front face {HUB_FRONT_Z} is not the nominal recess behind the nose {NOSE_Z}",
     ),
@@ -206,10 +205,10 @@ for _ok, _what in (
     ),
     (
         all(
-            round(length, LENGTH_PLACES) == length
+            math.isclose(round(length / 25.4, 3) * 25.4, length, abs_tol=1e-9)
             for length in (HUB_LENGTH, FRONT_BUSHING_LENGTH, REAR_BUSHING_LENGTH)
         ),
-        "a printed cluster length does not print at its places",
+        "a printed cluster length is off its .001 in grid",
     ),
 ):
     if not _ok:

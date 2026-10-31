@@ -6,6 +6,7 @@ pd-transgear-disc-hub:
   finish: bright machined, oiled
   quantity: 1
   tolerance_class: machined_block
+  drawing_unit: in
   process: "turned from bar (brass): face, turn spigot, flange and hub, bore, face the spigot end and flange rear square to the bore in one setup; broach or shape the D-flat; drill the flange screw holes; match-drill the oil hole through hub and sleeve at assembly"
   machinist_exceptions:
     - id: "RV-01"

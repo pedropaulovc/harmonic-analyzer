@@ -28,10 +28,17 @@ from __future__ import annotations
 import math
 from typing import NamedTuple
 
+import _config
 import _gear_quality as quality
+from _package_units import drawing_unit
 
 import pd_transgear_feed_pinion_spec as FEED
 from pd_platen_spec import PLATE_WIDTH
+
+# #290: the sheet prints decimal inch. The backer's sizes are the rack's
+# stations on the platen (its teeth's Z inset and pitch-line height), so they
+# keep their millimetres and print rounded at three places.
+UNIT = drawing_unit("parts/pd-platen-rack", _config.parts("pd-platen-rack"))
 
 MM_PER_IN = FEED.MM_PER_IN
 DP = FEED.DIAMETRAL_PITCH
@@ -56,8 +63,8 @@ if DP != PURCHASED_RACK_DP or PA_DEG != PURCHASED_RACK_PA_DEG:
 
 CUT_LENGTH_MM = PLATE_WIDTH
 BAR_LENGTH = CUT_LENGTH_MM  # rack and backer end flush with the platen
-BAR_HEIGHT = 12.0  # accepted exposed band below the guide rail
-BAR_THICKNESS = 6.0  # accepted edge-on photo envelope
+BAR_HEIGHT = 12.0  # accepted exposed band below the guide rail; prints (.472) REF
+BAR_THICKNESS = 6.0  # accepted edge-on photo envelope; prints .236
 RACK_HEIGHT = PURCHASED_RACK_HEIGHT_IN * MM_PER_IN
 RACK_THICKNESS = PURCHASED_RACK_FACE_WIDTH_IN * MM_PER_IN
 BACKER_HEIGHT = BAR_HEIGHT - RACK_HEIGHT
@@ -449,7 +456,7 @@ def require_rack_form_admission_mm(
         feed_rack_receiving_constraint_uncertainty_mm,
         feed_rack_receiving_root_uncertainty_mm,
     )
-    from _printed_tolerance import printed_band_mm
+    from _printed_tolerance import printed_deviations
 
     controls = feed_rack_form_admission_controls()
     if not isinstance(receipt, RackFormInspectionReceipt):
@@ -464,7 +471,9 @@ def require_rack_form_admission_mm(
         raise ValueError("UNKNOWN rack complete physical gap-station manifest")
     # Cut phase is uncontrolled. Two pitch end strips and one complete-feature
     # span give this conservative necessary count, NOT the nominal CAD count.
-    minimum_length = CUT_LENGTH_MM - printed_band_mm(DRAWING_PRECISION_BY_NAME["Length"])
+    minimum_length = CUT_LENGTH_MM + printed_deviations(
+        CUT_LENGTH_MM, DRAWING_PRECISION_BY_NAME["Length"], unit=UNIT
+    )[0]
     minimum_count = math.floor(minimum_length / PITCH) - 3
     if len(stations) < minimum_count:
         raise ValueError("UNKNOWN rack sample-only manifest cannot cover the finite stock")
@@ -607,13 +616,22 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "EndStockProfile": {"RackDepth", "RackHeight", "RackInset", "SeamHeight"},
     "OverallHeightReference": {"OverallHeight"},
 }
-# The cut length and the backer's two sizes serve no fit, so they print one
-# place under the general .X band; the operating window and the cut-end
-# section maxima are paid at those bands. The rack's inset on the backer and
-# the purchased stock's reference sizes keep two places.
-_ONE_PLACE = frozenset({"Length", "BackerDepth", "SeamHeight"})
+# The cut length serves no fit but bounds the operating window
+# (paper_drive_rack_travel), so it prints .XX; the backer's sizes and the
+# rack's inset on it print .XXX, the rounding of their kept millimetres staying
+# well inside the band, and the cut-end section maxima are paid at those bands.
+# The purchased 3/16 strip prints its exact decimal as a reference.
+_PLACES = {
+    "Length": 2,
+    "BackerDepth": 3,
+    "RackDepth": 4,
+    "RackHeight": 4,
+    "RackInset": 3,
+    "SeamHeight": 3,
+    "OverallHeight": 3,
+}
 DRAWING_PRECISION = {
-    feature: {name: 1 if name in _ONE_PLACE else 2 for name in names}
+    feature: {name: _PLACES[name] for name in names}
     for feature, names in DRAWING_DIMENSIONS.items()
 }
 DRAWING_PRECISION_BY_NAME = {
@@ -646,10 +664,16 @@ PURCHASED_RACK_NOTE = (
 # The material is the title block's; the note does not repeat it.
 GEAR_DATA = f"{PURCHASED_RACK_NOTE}; {DP:g} DP, {PA_DEG:g}\N{DEGREE SIGN} PA"
 # A purchased rack is received by its two stock sizes; its pitch accuracy is
-# the catalogue part's, checked only by the running mesh at assembly.
+# the catalogue part's, checked only by the running mesh at assembly.  The
+# millimetre receiving maxima print in inches floored to four places, so the
+# sheet never admits more than the checker does.
+def _inch_max(value_mm: float) -> str:
+    return f"{math.floor(value_mm / MM_PER_IN * 1e4 + 1e-9) / 1e4:.4f}".lstrip("0")
+
+
 INCOMING_RACK_INSPECTION_NOTE = (
-    f"STOCK HEIGHT {quality.rack_stock_height_max_mm():g} MAX; "
-    f"FACE WIDTH {quality.rack_face_width_max_mm():g} MAX"
+    f"STOCK HEIGHT {_inch_max(quality.rack_stock_height_max_mm())} MAX; "
+    f"FACE WIDTH {_inch_max(quality.rack_face_width_max_mm())} MAX"
 )
 DRAWING_NOTES = "\n".join(
     (

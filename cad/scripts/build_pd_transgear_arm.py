@@ -74,17 +74,19 @@ from _drawing_tolerances import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
+from _document_units import apply_package_model_units
 from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm
 from _holes import find_planar_face, wizard_holes
 from _part_pmi import author_part_pmi
+from _part_properties import part_drawing_unit
 from _native_projected_zone import require_saved_projected_gtols
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 from pd_transgear_arm_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
-    LOCATOR_HOLE_BAND_MM,
+    LOCATOR_HOLE_PRINT_TOLERANCE_MM,
     EDGE_LEAN,
     END_HALF_WIDTH,
     PIN_BORE_DIA,
@@ -118,6 +120,7 @@ from pd_transgear_arm_spec import (
     PIVOT_BORE_CALLOUT,
     SPOT_FACE_DIA_BAND,
     SPOT_FACE_FLOOR_TOLERANCE,
+    UNIT,
 )
 
 PART_NAME = "pd-transgear-arm"
@@ -266,6 +269,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations).  The mm suffix is load-bearing: this
     # is an INCH document and the equation manager reads bare numbers in
@@ -738,29 +743,32 @@ async def build(adapter: Any) -> dict[str, str]:
     # Explicit bands (contract §3.1 / §12); every other printed dimension is
     # governed by its places (the spec's DRAWING_PRECISION).
     set_dimension_bilateral_tolerance(
-        adapter, "SpotFaceProfile", "SpotFaceDia", *deviations(SPOT_FACE_DIA_BAND)
+        adapter, "SpotFaceProfile", "SpotFaceDia", *deviations(SPOT_FACE_DIA_BAND),
+        display_unit=UNIT,
     )
     set_dimension_symmetric_tolerance(
-        adapter, "SpotFaceProfile", "FloorDepth", SPOT_FACE_FLOOR_TOLERANCE
+        adapter, "SpotFaceProfile", "FloorDepth", SPOT_FACE_FLOOR_TOLERANCE,
+        display_unit=UNIT,
     )
-    # The locating ream's band is symmetric, so it prints ± on one line and
-    # the six-line callout under it stays inside the sheet's upper border.
-    if abs(sum(LOCATOR_HOLE_BAND_MM)) > 1e-9:
-        raise AssertionError("the locating ream's band is no longer symmetric")
+    # The locating ream prints ± on one line (the geometry module's print
+    # inside the interface's press limits), so the six-line callout under it
+    # stays inside the sheet's upper border.
     for index in (1, 2):
         set_dimension_symmetric_tolerance(
             adapter, "LocatorProfile", f"LocatorDia{index}",
-            round(deviations(LOCATOR_HOLE_BAND_MM)[1], 6),
+            LOCATOR_HOLE_PRINT_TOLERANCE_MM, display_unit=UNIT,
         )
     for feature_name, dimension_name in BASIC_REDUCER_DIMENSIONS:
         set_dimension_basic_tolerance(adapter, feature_name, dimension_name)
     # PinHoleZ carries no explicit band: its .XXX title-block row governs
     # (coordinator ruling (a), #2019).
     set_dimension_bilateral_tolerance(
-        adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_DIA_BAND)
+        adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_DIA_BAND),
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "PinBoreProfile", "PinBoreDia", *deviations(PIN_BORE_DIA_BAND)
+        adapter, "PinBoreProfile", "PinBoreDia", *deviations(PIN_BORE_DIA_BAND),
+        display_unit=UNIT,
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _author_pivot_fit_annotation(adapter)

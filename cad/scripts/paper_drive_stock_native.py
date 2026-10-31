@@ -31,6 +31,9 @@ from _visibility import blank_reference_geometry
 from paper_drive_stock_inspection import span_contact_points_mm
 from stock_form_cutter import StockFormProfile
 
+# Millimetres per printed unit: a span's places count in its sheet's unit.
+_MM_PER_UNIT = {"mm": 1.0, "in": 25.4}
+
 
 class CutterEndFeatures(NamedTuple):
     plane: str
@@ -180,19 +183,22 @@ async def author_span(
     teeth_spanned: int,
     *,
     places: int,
+    unit: str = "mm",
     feature: str = "SpanProfile",
     name: str = "ToothSpan",
 ) -> float:
     """A real symmetric tangent span, with the anvil rocking DOF removed.
 
     The native reading must print the closed-form span at the drawing's
-    ``places``: any reading within half a unit of the last printed place
-    prints the same LIMITs, and the spec's LIMIT bands are over a hundred
-    times wider than that. SolidWorks carries equation curves as fitted
-    splines, so a nanometre agreement budget measures the fit, not the part.
+    ``places`` in ``unit``: any reading within half a unit of the last
+    printed place prints the same LIMITs, and the spec's LIMIT bands are
+    several times wider than that. SolidWorks carries equation curves as
+    fitted splines, so a nanometre agreement budget measures the fit, not the
+    part.
     """
     if places < 0:
         raise ValueError("printed span places must be nonnegative")
+    per_unit = _MM_PER_UNIT[unit]
     expected = profile.tangent_span_mm(teeth_spanned)
     check("create_sketch physical span", await adapter.create_sketch("Front"))
     suppress_dimension_input(adapter)
@@ -251,7 +257,9 @@ async def author_span(
     text = ((a[0] + b[0]) / 2 + direction[0] * 5.0, (a[1] + b[1]) / 2 + direction[1] * 5.0)
     display = model.AddDimension2(text[0] / 1000.0, text[1] / 1000.0, 0.0)
     model.ClearSelection2(True)
-    actual_mm = _driven_carrier(display, name, expected, 0.5 * 10.0**-places, reference=False)
+    actual_mm = _driven_carrier(
+        display, name, expected, 0.5 * 10.0**-places * per_unit, reference=False
+    )
     check("exit_sketch physical span", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
     # A standalone sketch saves shown and renders in every assembly; the
@@ -267,10 +275,13 @@ def apply_span_limits(
     deviations: tuple[float, float],
     places: int,
     prefix: str,
+    unit: str = "mm",
     feature: str = "SpanProfile",
     name: str = "ToothSpan",
 ) -> None:
-    """The caller's source-owned physical LIMIT band, not REF acceptance ink."""
+    """The caller's source-owned physical LIMIT band, not REF acceptance ink;
+    ``places`` count in the sheet's ``unit``."""
+    per_unit = _MM_PER_UNIT[unit]
     display, dimension = _named_dimension(adapter, feature, name)
     if int(dimension.DrivenState) != 1:
         raise RuntimeError(f"{name}: expected the driven actual-contact carrier")
@@ -298,10 +309,12 @@ def apply_span_limits(
         (actual + float(tolerance.GetMinValue()) * 1000.0, nominal_mm + lower),
         (actual + float(tolerance.GetMaxValue()) * 1000.0, nominal_mm + upper),
     ):
-        if f"{actual_limit:.{places}f}" != f"{source_limit:.{places}f}":
+        actual_printed = actual_limit / per_unit
+        source_printed = source_limit / per_unit
+        if f"{actual_printed:.{places}f}" != f"{source_printed:.{places}f}":
             raise RuntimeError(
                 f"{name}: real native carrier changed the printed physical limits "
-                f"({actual_limit:.{places + 2}f} vs source {source_limit:.{places + 2}f} mm)"
+                f"({actual_printed:.{places + 2}f} vs source {source_printed:.{places + 2}f} {unit})"
             )
     display = _early_bound(display, "IDisplayDimension")
     display.SetPrecision3(-1, -1, places, -1)

@@ -10,7 +10,8 @@ pd-vn-transgear-latch-pin:
   installation_notes: |-
     INSTALLATION - TRANSGEAR ARM MHA-PD-18 END FACE
     PERMANENT PRESS, CHAMFER END FIRST, ALONG THE ARM
-    TO THE HOLE FLOOR: (13.7) PROUD OF THE ARM END FACE, REF.
+    TO THE HOLE FLOOR: (.54) PROUD OF THE ARM END FACE, REF.
   quantity: 1
   tolerance_class: machined_block
   process: purchased
+  drawing_unit: in

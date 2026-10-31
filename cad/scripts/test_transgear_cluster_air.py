@@ -25,11 +25,11 @@ def _worst(chain, sign):
 
 
 def test_ruled_lengths_print_at_the_cluster_band():
-    assert PRINTED_LENGTH_BAND == pytest.approx(0.02)
+    assert PRINTED_LENGTH_BAND == pytest.approx(0.01778)  # .0007 in
     assert (FIT.HUB_LENGTH, FIT.FRONT_BUSHING_LENGTH, FIT.REAR_BUSHING_LENGTH) == (
-        pytest.approx(13.69),
-        pytest.approx(5.32),
-        pytest.approx(5.69),
+        pytest.approx(13.6906),  # .539
+        pytest.approx(5.6388),  # .222
+        pytest.approx(5.6388),  # .222
     )
     for label, _, band in (*TIGHTENED, *PRINTED_LENGTHS):
         assert band == pytest.approx(PRINTED_LENGTH_BAND), label
@@ -37,9 +37,9 @@ def test_ruled_lengths_print_at_the_cluster_band():
     assert FRONT_BUSHING.LENGTH == FIT.FRONT_BUSHING_LENGTH
     assert REAR_BUSHING.LENGTH == FIT.REAR_BUSHING_LENGTH
     for spec in (FRONT_BUSHING, REAR_BUSHING):
-        assert spec.LENGTH_PLACES == 2
+        assert spec.LENGTH_PLACES == 4
         assert not spec.REFERENCE_DIMENSIONS
-    assert HUB.HUB_LENGTH_PLACES == 2
+    assert HUB.HUB_LENGTH_PLACES == 4
     assert not HUB.REFERENCE_DIMENSIONS
 
 
@@ -48,7 +48,7 @@ def test_end_float_holds_at_the_worst_case():
     most = _worst(FIT.END_FLOAT_CHAIN, -1)
     assert FIT.END_FLOAT_RANGE == pytest.approx((least, most))
     assert least >= FIT.END_FLOAT_MIN
-    assert f"{least:.2f}-{most:.2f}" == FIT.END_FLOAT_TEXT
+    assert FIT.END_FLOAT_RANGE == pytest.approx((0.2032, 0.5334))
 
 
 def test_hub_never_stands_proud_of_the_nose():
@@ -88,8 +88,9 @@ def test_collar_air_is_the_statistical_stack():
 def test_forward_stop_chain_pivots_on_the_pin_load_wall():
     # The loose front bushing and its retaining ring cock together about the
     # load wall's broken edge; the disc pivots on its least broken contact.
-    brk = 0.25
-    hub_face = min(HUB.HUB_DIA - 0.8, FRONT_BUSHING.OD - 0.8) / 2.0 - brk
+    brk = 0.254  # the inch title block's .010 break
+    # Hub .520 at .XXX (±.005), front bushing .47 at .XX (±.01).
+    hub_face = min(HUB.HUB_DIA - 0.127, FRONT_BUSHING.OD - 0.254) / 2.0 - brk
     nose = (FIT.SLEEVE.BOSS_DIA + min(FIT.SLEEVE.BOSS_DIA_BAND)) / 2.0 - brk
     assert AIR.HUB_FACE_STOP_R == pytest.approx(hub_face)
     assert AIR.NOSE_STOP_R == pytest.approx(nose)
