@@ -86,7 +86,7 @@ RIGHT_KEEP = {
     "BackWall": (0.345, 0.224),
     # Depth across the notch, its text left in the open rebate; height right
     # of the back face, inside the roof-thickness dimension.
-    "ReliefDepth": (0.316, 0.2015), "ReliefHeight": (0.346, 0.196),
+    "ReliefDepth": (0.316, 0.200), "ReliefHeight": (0.346, 0.196),
 }
 BOTTOM_KEEP = {
     "ThumbFromEnd": (0.175, 0.031), "ThumbFromPlate": (0.090, 0.073),

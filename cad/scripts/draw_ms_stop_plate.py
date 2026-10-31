@@ -80,9 +80,9 @@ DIMENSION_CALLOUTS = {
         f"{_config.parts('ms-stop-block')['number']} TAPS"
     ),
 }
-# The left-sheet hole's callout approaches from the left, between the
-# overall height's witnesses.
-CLEARANCE_CALLOUT_XY = (0.080, 0.178)
+# The three-row callout is wider than the room between the .56 witnesses, so
+# it sits below the cover face, left of the hole-station texts.
+CLEARANCE_CALLOUT_XY = (0.075, 0.100)
 # Function, not procedure (rule 7 flags the pair at its match-drill callouts).
 CLEARANCE_FUNCTION = (
     f"MATCH DRILL WITH MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']}\n"
