@@ -23,7 +23,7 @@ from export_features import bundle_paths
 
 # Migrated plans track drawing revisions even while held from traveler enrollment.
 # Revision participation does not qualify a plan for machining or release staging.
-MIGRATED_PLANS: tuple[str, ...] = ("ch_rocker_arm",)
+MIGRATED_PLANS: tuple[str, ...] = ("ch_rocker_arm", "ch_rocker_arm_tl_oblique_base_bar")
 TRAVELER_STEMS: tuple[str, ...] = ()
 PROCESS_ROOT = Path(__file__).resolve().parents[1] / "process"
 SHOP_FILES = ("inventory.toml", "shop-policy.toml", "cutting-data.toml")

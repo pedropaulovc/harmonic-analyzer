@@ -12,10 +12,13 @@ Inventory collision envelopes and the analytic rocker-profile checks are not
 replacement fabrication CAD or evidence of a fabricated, qualified gauge.
 Before enrollment, qualify the required physical tooling and revalidate the
 route against current geometry and the pinned prechips, then obtain traveler
-exit 0 (step 6 below). The legacy shaft and cone plans remain tracked as provenance,
+exit 0 (step 6 below). The oblique-trammel base bar plan (MHA-CH-06-TL-20) is a
+held preview route from the owned 1/2 x 6 bar (#2083), migrated but not enrolled:
+the v47 drawing still prints the width as stock (#2083 open) and its travelers stay
+provisional. The legacy shaft and cone plans remain tracked as provenance,
 but are stale against the pinned prechips and are not run or shipped. Do not
 enroll one merely because its plan file exists. `_process_plans.MIGRATED_PLANS`
-records migrated plans, including the held rocker; `revision_stems()` is the
+records migrated plans, including the held rocker and base bar; `revision_stems()` is the
 deduplicated union of migrated and enrolled plans for revision tracking only.
 
 ## Bind stable labels, not STEP entity numbers
