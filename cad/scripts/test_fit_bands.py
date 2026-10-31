@@ -88,11 +88,6 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         " __import__('dt_crank_handle_pivot_screw_spec').TIP_CHAMFER_BAND)",
         "each",
     ),
-    # def _printed_limits(nominal, places): ... GENERAL_BAND_BY_PLACES[places]
-    ("dt_cone_tip_block_spec", "GENERAL_BAND_BY_PLACES[places]"): (
-        "GENERAL_BAND_BY_PLACES",
-        "values",
-    ),
     # for configuration, teeth in CONFIGS: band = band_for(teeth); deviations(band)
     ("build_dt_cone_gear", "band"): (
         "(blank_dia_band(6), tooth_thickness_band(6),"

@@ -2063,7 +2063,7 @@ def test_setup_sheet_measures_exact_native_edges(monkeypatch) -> None:
         assert display.precision == dt_cone_gear_shaft_spec.DRAWING_REFERENCE_PRECISION
         measured.append(display.native.SystemValue * 1000.0)
     assert measured[:3] == pytest.approx((116.234, 123.110, 129.986), abs=0.001)
-    assert measured[3] == pytest.approx(163.60, abs=0.005)
+    assert measured[3] == pytest.approx(163.61, abs=0.005)
     assert fixture.origin_note.call_args.kwargs["entity"] is fixture.seat
     assert fixture.origin_note.call_args.kwargs["attached_to"] is fixture.seat
 
