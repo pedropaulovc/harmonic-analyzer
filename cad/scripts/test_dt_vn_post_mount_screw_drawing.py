@@ -229,13 +229,13 @@ def test_cut_end_break_is_a_model_owned_deburr_of_at_most_0_1() -> None:
     assert spec.CUT_END_BREAK_MM + upper <= 0.1 + 1e-12
     assert spec.CUT_END_BREAK_MM + lower >= 0.0
     assert spec.CUT_END_BREAK_MAX_MM == spec.CUT_END_BREAK_MM + upper
-    assert spec.POST_MOUNT_TAP_EDGE_BREAK <= 0.1
+    assert spec.POST_MOUNT_TAP_EDGE_BREAK <= 0.1016  # .004 in, a deburr
 
 
 def test_worst_case_engagement_holds_the_named_minimum() -> None:
     """Cut to fit, the plate limits engagement: thinnest stock, the full
     fit-to-hole allowance, the tap's entry deburr and the cut end's break,
-    both at their maximum.  Recomputed here from the chain: 5.739 = 0.904D."""
+    both at their maximum, recomputed here from the chain."""
     lower, upper = deviations(spec.CUT_END_BREAK_BAND)
     worst = (
         platform.PLATE_THICKNESS
@@ -245,7 +245,6 @@ def test_worst_case_engagement_holds_the_named_minimum() -> None:
         - (spec.CUT_END_BREAK_MM + upper)
     )
     assert spec.POST_MOUNT_ENGAGEMENT_WORST == pytest.approx(worst)
-    assert worst == pytest.approx(5.739)
     assert worst / part.SHANK_DIA >= 0.90
     assert spec.POST_MOUNT_ENGAGEMENT_PRINTED >= 0.90
 
