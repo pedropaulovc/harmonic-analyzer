@@ -18,7 +18,10 @@ from _fit_deviations import deviations
 from _package_units import drawing_unit
 
 PART_NAME = "ch-rocker-arm-tl-vn-oblique-pivot-shim"
-UNIT = drawing_unit(f"parts/{PART_NAME}", _config.parts(PART_NAME))
+UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-vn-oblique-pivot-shim",
+    _config.parts("ch-rocker-arm-tl-vn-oblique-pivot-shim"),
+)
 SKU = "SHIM-0375-008"
 PER_SUPPORT = 5  # the nominal .040 pack under each of the two spacers
 QUANTITY = 2 * PER_SUPPORT

@@ -80,7 +80,8 @@ from _package_units import drawing_unit
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
 
 UNIT = drawing_unit(
-    f"parts/{leadscrew.END_BRACKET}", _config.parts(leadscrew.END_BRACKET)
+    "parts/ch-rocker-arm-tl-oblique-end-bracket",
+    _config.parts("ch-rocker-arm-tl-oblique-end-bracket"),
 )
 # Title-block DRILLED HOLES: plus allowance, zero minus (_printed_tolerance).
 DRILLED_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)
