@@ -60,7 +60,6 @@ from dt_crank_pinion_spec import (
     PIN_DIA as PINION_PIN_DIA,
     PIN_HOLE_SPEC as PINION_PIN_HOLE_SPEC,
 )
-from _sprocket_seat_geometry import DRIVE_PIN_HOLE_BAND
 from dt_crankshaft_spec import (
     COLLAR_DIA,
     COLLAR_LENGTH,
@@ -73,6 +72,7 @@ from dt_crankshaft_spec import (
     DRIVE_PIN_DEPTH,
     DRIVE_PIN_DEPTH_TOL,
     DRIVE_PIN_FLOOR,
+    DRIVE_PIN_HOLE_BAND,
     DRIVE_PIN_HOLE_DIA,
     DRIVE_PIN_KNOCKOUT_DIA,
     DRIVE_PIN_KNOCKOUT_LENGTH,

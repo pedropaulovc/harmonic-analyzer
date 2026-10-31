@@ -358,12 +358,20 @@ if not _PIN_HOLE_OUTER_R < SPIGOT_DIA / 2.0 < COLLAR_DIA / 2.0:
 #   location band spends half of it here, leaving the wheel the same share.
 # - Pressed to the floor, the pin stands PROUD = LENGTH - depth: the depth
 #   band plus the dowel's +/-.010 in length grade must keep the tip clear
-#   of the crank hub and engaged in the wheel.  +/-.004 at .XXX.
+#   of the crank hub and engaged in the wheel.  +/-.004, printed at the
+#   hole callout's places.
 SPIGOT_DIA_PLACES = 3
 SPIGOT_LENGTH_PLACES = 3
 SPIGOT_LENGTH_TOL = 0.0508
-DRIVE_PIN_DEPTH_PLACES = 3
+# The drive-pin holes print through a native callout on their cut-extrude
+# (size and depth stay the model's), not as marked dimensions.  The shared
+# 2.38 hole needs four inch places to print its limits truthfully
+# (.0937/.0933); a cut-extrude callout takes the sheet's document places, so
+# draw_dt_crankshaft opens the sheet at these.
+HOLE_CALLOUT_PLACES = 4
 DRIVE_PIN_DEPTH_TOL = 0.1016
+# The shared hole's (0/-.010) band on the inch grid this sheet prints.
+DRIVE_PIN_HOLE_BAND = (0.0, -0.01016)  # +.0000/-.0004
 # Local (dome-root) deviations of the seat face as (upper, lower): a station
 # printed from the far end moves by its own printed band (its model value is
 # the chain plane's, so it prints rounded) plus the Depth's.  The drive
@@ -383,8 +391,8 @@ _DOWEL_OD = tuple(
     for inch in dt_vn_crank_seat_drive_pin_spec.DIA_BAND_IN
 )
 DRIVE_PIN_PRESS_INTERFERENCE = (
-    _DOWEL_OD[0] - (DRIVE_PIN_HOLE_DIA + seat_geometry.DRIVE_PIN_HOLE_BAND[0]),
-    _DOWEL_OD[1] - (DRIVE_PIN_HOLE_DIA + seat_geometry.DRIVE_PIN_HOLE_BAND[1]),
+    _DOWEL_OD[0] - (DRIVE_PIN_HOLE_DIA + DRIVE_PIN_HOLE_BAND[0]),
+    _DOWEL_OD[1] - (DRIVE_PIN_HOLE_DIA + DRIVE_PIN_HOLE_BAND[1]),
 )
 if min(DRIVE_PIN_PRESS_INTERFERENCE) <= 0.0:
     raise AssertionError("the drive-pin hole band loses the press at its upper limit")
@@ -401,7 +409,7 @@ DRIVE_PIN_KNOCKOUT_PROCESS = drill_process(DRIVE_PIN_KNOCKOUT_SPEC)
 DRIVE_PIN_KNOCKOUT_LENGTH = COLLAR_REAR - DRIVE_PIN_FLOOR
 _KNOCKOUT_DIA_MAX = DRIVE_PIN_KNOCKOUT_DIA + drilled_oversize_mm(unit=UNIT)
 DRIVE_PIN_FLOOR_LAND_WORST = (
-    DRIVE_PIN_HOLE_DIA + seat_geometry.DRIVE_PIN_HOLE_BAND[1] - _KNOCKOUT_DIA_MAX
+    DRIVE_PIN_HOLE_DIA + DRIVE_PIN_HOLE_BAND[1] - _KNOCKOUT_DIA_MAX
 ) / 2.0
 if DRIVE_PIN_FLOOR_LAND_WORST < 0.4:
     raise AssertionError("the knockout leaves the pressed pin no floor to bottom on")
@@ -416,7 +424,7 @@ _SPIGOT_R_WORST = (SPIGOT_DIA + SPIGOT_DIA_BAND[1]) / 2.0
 _PIN_HOLE_OUTER_R_WORST = (
     DRIVE_PIN_CIRCLE_RADIUS
     + DRIVE_PIN_OFFSET_TOL
-    + (DRIVE_PIN_HOLE_DIA + seat_geometry.DRIVE_PIN_HOLE_BAND[0]) / 2.0
+    + (DRIVE_PIN_HOLE_DIA + DRIVE_PIN_HOLE_BAND[0]) / 2.0
 )
 # Pin hole to the spigot rim: under the .060 in floor at nominal and at the
 # printed worst case, rounded DOWN to the .001 in it prints at, so a sheet
@@ -460,7 +468,7 @@ _PROUD = dt_vn_crank_seat_drive_pin_spec.LENGTH - DRIVE_PIN_DEPTH
 # The depth is the interface's (proud length), so it prints rounded.
 _DEPTH_LOWER, _DEPTH_UPPER = printed_deviations(
     DRIVE_PIN_DEPTH,
-    DRIVE_PIN_DEPTH_PLACES,
+    HOLE_CALLOUT_PLACES,
     (-DRIVE_PIN_DEPTH_TOL, DRIVE_PIN_DEPTH_TOL),
     unit=UNIT,
 )
@@ -653,14 +661,8 @@ SPHERICAL_DIMENSIONS = frozenset({"DomeSphereRadius"})
 # The native cross-hole callout's process prefix: the drill reads first; the
 # taper-ream prose under it lives in dt_crankshaft_notes (drawing-only).
 CROSS_HOLE_PROCESS = drill_process(PIN_HOLE_SPEC)
-# The drive-pin holes print through a native callout on their cut-extrude
-# (size and depth stay the model's), not as marked dimensions: the process
-# prefix and the size/depth places live here, the press prose in the notes.
-# The shared 2.38 (0/-.0004 in) hole needs four inch places to print its
-# limits truthfully (.0937/.0933); a cut-extrude callout takes the sheet's
-# document places, so draw_dt_crankshaft opens the sheet at these.
+# The drive-pin holes' process prefix; the press prose is in the notes.
 DRIVE_PIN_HOLE_PROCESS = "REAM"
-HOLE_CALLOUT_PLACES = 4
 HOLE_CALLOUT_PRECISION: dict[str, dict[str, int]] = {
     "DrivePinProfile": {
         "DrivePinHoleDia1": HOLE_CALLOUT_PLACES,

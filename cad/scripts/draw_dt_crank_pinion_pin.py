@@ -157,7 +157,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     supplier_reference_dimension(
         adapter,
-        pin_dia,
+        pin_dia.GetSpecificAnnotation(),
         label="crank pinion pin rod diameter",
         units="in",
         precision=DRAWING_PRECISION_BY_NAME["PinDia"],
