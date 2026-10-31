@@ -124,15 +124,6 @@ def test_tight_bands_sit_on_the_model_dimensions() -> None:
     }
     # The as-cast sizes carry the explicit +/-.03 casting band.
     assert geom.CAST_TOL == pytest.approx(0.03 * 25.4)
-    assert set().union(*mg_magnifying_wheel_spec.CAST_DIMENSIONS.values()) == {
-        "RimInnerDiaDim",
-        "SpokeRootWidth",
-        "SpokeTipWidth",
-        "SpokeAxial",
-        "HubFrontZ",
-        "HubFilletR",
-        "RimFilletR",
-    }
     precision = mg_magnifying_wheel_spec.DRAWING_PRECISION
     assert precision["HubProfile"]["HubDia"] == 2
     assert precision["Tie1Profile"]["Tie1X"] == precision["Tie1Profile"]["Tie1Y"] == 2

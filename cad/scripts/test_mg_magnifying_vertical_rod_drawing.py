@@ -110,6 +110,36 @@ def test_relief_root_radius_reads_clear_in_detail_a() -> None:
     assert math.hypot(spec.SHOULDER_X - fx, y_mm - fy) < drawing.DETAIL_RADIUS_MM
 
 
+def test_upper_root_radius_reads_clear_over_the_body() -> None:
+    """Landed on the mirror-image upper root, the "2X R MAX" stands over the
+    body just right of the shoulder: its leader from the text's left end
+    toward the root centre stays between the Ø's line and the shoulder face,
+    and the text clears the body and the Ø's value."""
+    x_mm, y_mm = drawing.UPPER_RELIEF_ROOT_CENTRE_MM
+    assert (x_mm, y_mm) == pytest.approx(
+        (spec.SHOULDER_X - spec.RELIEF_ROOT_R, spec.RELIEF_DIA / 2.0 + spec.RELIEF_ROOT_R)
+    )
+    cx, cy = drawing._detail_xy(x_mm, y_mm)
+    tx, ty = drawing.UPPER_ROOT_KEEP["ReliefRootR"]
+    end_x = tx - 0.011  # the text's left end, ~11 mm from its centre
+    body_top = drawing._detail_xy(0.0, spec.ROD_DIA / 2.0)[1]
+    shoulder_x = drawing.DETAIL_SHOULDER_X
+    dia_x, dia_y = drawing.DETAIL_KEEP["ReliefDia"]
+    # The leader reaches the body's top >= 2 mm left of the shoulder face,
+    # and stays >= 3 mm right of the Ø's line all the way down.
+    leader_x = end_x + (cx - end_x) * (ty - body_top) / (ty - cy)
+    assert shoulder_x - leader_x >= 0.002
+    assert min(end_x, cx) - dia_x >= 0.003
+    # The tip lands on the circle's upper half, facing the text.
+    assert ty > cy
+    # Text >= 6 mm over the body and >= 10 mm under the Ø's value.
+    assert ty - body_top >= 0.006
+    assert dia_y - ty >= 0.010
+    # The fence keeps the upper root.
+    fx, fy = drawing.DETAIL_FOCUS_MM
+    assert math.hypot(spec.SHOULDER_X - fx, y_mm - fy) < drawing.DETAIL_RADIUS_MM
+
+
 def _fixture_screw_reach() -> tuple[float, float]:
     """Rod stations (from the thread tip) the MHA-MG-06 thumb screw can bear
     on: its axis rides the fixture's hex axis, the hex reaches a corner radius

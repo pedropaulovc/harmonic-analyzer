@@ -243,20 +243,23 @@ _TIE2_OUTWARD = clock_to_local_deg(TIE2_CLOCK_DEG) % 360.0
 _TIE2_INNER = _polar((0.0, 0.0), _TIE2_OUTWARD, RIM_INNER_DIA / 2.0)
 _TIE2_ANGLE_SECTOR = (180.0, _TIE2_OUTWARD)
 # A leader-borne radius's shoulder starts this far (mm) from its text's
-# centre, on the leader's side.  SolidWorks draws the leader on the ray from the arc's
-# centre through that shoulder end, and lands its arrow where the ray meets
-# the arc: each shoulder stands on a ray through its own fillet's arc.
-_RADIUS_SHOULDER_LEFT = 6.2
+# centre, on the leader's side (an "R.12 ±.03" block).  SolidWorks draws the
+# leader on the ray from the arc's centre through that shoulder end, and
+# lands its arrow where the ray meets the arc: each shoulder stands on a ray
+# through its own fillet's arc.  The shoulder runs on under the whole text.
+_RADIUS_SHOULDER_LEFT = 11.3
 # The hub fillet R's arc faces the hub-spoke corner, so its leader reaches it from
 # the material side: up from the seed spoke's -Y fillet through the spoke
 # (crossing only the spoke widths' extension lines and TIE 1's, which
 # drawing-guidelines.md rule 14 allows), left of the root width's line and
-# its text leader, and up the 0-60 window to a shoulder past the OD.
-_HUB_FILLET_SHOULDER = _polar(_HUB_FILLET[0], 95.0, 58.0)
+# its text leader, to a shoulder above the A-A line's top end and arrow,
+# its text left of the shoulder, under the spoke pitch's arc and between
+# its 60 and 120 deg extension lines.
+_HUB_FILLET_SHOULDER = _polar(_HUB_FILLET[0], 93.8, 67.4)
 # The rim fillet R leaves the 180 deg spoke's sheet-+Y rim fillet out through the rim
 # to a shoulder left of the OD, its text left of the shoulder, above TIE 1's
 # Y extension line and right of its dimension line.
-_RIM_FILLET_SHOULDER = _polar(_RIM_FILLET[0], 190.0, 12.2)
+_RIM_FILLET_SHOULDER = _polar(_RIM_FILLET[0], 190.0, 11.2)
 # The mates the matched fits and the tight bands name (drawing-guidelines.md
 # rule 4 (tighten only for function, and name the mate)), by drawing number.
 AXLE_NUMBER = str(_config.parts("mg-wheel-axle")["number"])
@@ -291,10 +294,9 @@ FRONT_KEEP = {
     # its block's shoulder (stacked Ø plus six callout lines).
     "BoreDiaDim": _over((_BORE_BLOCK_X, _BORE_SHOULDER_Y), 8),
     # Each fillet R on its own fillet (_HUB_FILLET_SHOULDER,
-    # _RIM_FILLET_SHOULDER), the hub fillet's text right of its shoulder, the
-    # rim fillet's left.
+    # _RIM_FILLET_SHOULDER), each text left of its shoulder.
     "HubFilletR": _over(
-        (_HUB_FILLET_SHOULDER[0] + _RADIUS_SHOULDER_LEFT, _HUB_FILLET_SHOULDER[1]), 2
+        (_HUB_FILLET_SHOULDER[0] - _RADIUS_SHOULDER_LEFT, _HUB_FILLET_SHOULDER[1]), 2
     ),
     "RimFilletR": _over(
         (_RIM_FILLET_SHOULDER[0] - _RADIUS_SHOULDER_LEFT, _RIM_FILLET_SHOULDER[1]), 2
@@ -310,11 +312,12 @@ FRONT_KEEP = {
     "SpokeTipWidth": _over((RIM_OUTER_DIA / 2.0 + 3.0, -22.0), 2),
     # TIE 1's two coordinates from the bore centre.  The Y between its own
     # extension lines, which run left from the bore's and the hole's centres
-    # past the OD, its text off the lower one, 16 mm outside the rim (the
-    # lines stand only 5.6 apart); the X below the wheel, its extension lines
-    # down from the bore's centre (the A-A line) and the hole's, its text
-    # left of the A-A line under the lower "A" and right of TIE 2's block.
-    "Tie1Y": _face(-(RIM_OUTER_DIA / 2.0 + 16.0), _TIE1[1] - 5.4),
+    # past the OD, its text off the lower one, 26 mm outside the rim, clear
+    # of the rim fillet R's shoulder (the lines stand only 5.6 apart); the X
+    # below the wheel, its extension lines down from the bore's centre (the
+    # A-A line) and the hole's, its text left of the A-A line under the lower
+    # "A" and right of TIE 2's block.
+    "Tie1Y": _face(-(RIM_OUTER_DIA / 2.0 + 26.0), _TIE1[1] - 5.4),
     "Tie1X": _face(-9.0, -RIM_OUTER_DIA / 2.0 - 16.0),
     # The two tie Ø callouts hang off the face, the block's leader from its
     # shoulder's near end (the shoulder runs 7.3 mm under the point).  TIE

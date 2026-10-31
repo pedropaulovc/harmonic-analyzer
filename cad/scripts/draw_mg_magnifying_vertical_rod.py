@@ -179,6 +179,14 @@ RELIEF_ROOT_CENTRE_MM = (
     SHOULDER_X - RELIEF_ROOT_R,
     -(RELIEF_DIA / 2.0 + RELIEF_ROOT_R),
 )
+# SolidWorks may instead land the inserted radius on the mirror-image upper
+# root (farm 20261031T211631726Z, 8fda8c86e: tip (0.14784, 0.20841), on the
+# upper root's circle). Its arc is the down-right quarter; text under the
+# thread would run the leader across the relief, so UPPER_ROOT_KEEP stands it
+# over the body, just right of the shoulder: the leader drops near-vertical
+# to the circle's top, ~2.4 mm left of the shoulder's top corner and ~5 mm
+# right of the Ø's line, crossing nothing.
+UPPER_RELIEF_ROOT_CENTRE_MM = (RELIEF_ROOT_CENTRE_MM[0], -RELIEF_ROOT_CENTRE_MM[1])
 ROOT_TIP_TOL_M = 0.0002
 DETAIL_KEEP = {
     # Its line rises through the relief's air to text over the crop, 0.5
@@ -197,6 +205,15 @@ DETAIL_KEEP = {
     # to the arc, crossing only the relief width's thread-end extension line
     # (y ~0.179) and passing ~3.5 mm under the Ø's lower arrow stub.
     "ReliefRootR": (DETAIL_SHOULDER_X - 0.032, _DETAIL_BOTTOM + 0.003),
+}
+# Upper root: "2X / R.008 MAX" (x ~0.146-0.168) 9 mm over the body's top
+# silhouette, its left end ~4 mm right of the Ø's line and ~12 mm under the
+# Ø's text.
+UPPER_ROOT_KEEP = {
+    "ReliefRootR": (
+        DETAIL_SHOULDER_X + 0.007,
+        _detail_xy(SHOULDER_X, ROD_DIA / 2.0)[1] + 0.009,
+    ),
 }
 # The thread callout's leader lands on the major-diameter silhouette mid-
 # thread; the note stands up and left of the crop.
@@ -530,13 +547,27 @@ def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
     return matches[0]
 
 
+def _root_arrow_tip(display: Any) -> tuple[float, float]:
+    raw = display.GetDisplayData()
+    if raw is None:
+        raise RuntimeError("ReliefRootR has no rebuilt display data")
+    data = _early_bound(raw, "IDisplayData")
+    if int(data.GetArrowHeadCount()) != 1:
+        raise RuntimeError("ReliefRootR must draw exactly one radial arrow")
+    arrow = tuple(float(v) for v in data.GetArrowHeadAtIndex2(0))
+    if len(arrow) != 12 or not all(math.isfinite(v) for v in arrow):
+        raise RuntimeError("ReliefRootR has incomplete arrow-head coordinates")
+    return (arrow[0], arrow[1])
+
+
 def _dress_relief_roots(adapter: Any, detail: Any, annotations: list[Any]) -> None:
     """Prove detail A's imported ReliefRootR prints the roots' R MAX under
-    its "2X", and land its leader on the shoulder's lower root.
+    its "2X", and land its leader on the shoulder root it attached to.
 
     Read back: radial, measuring RELIEF_ROOT_R, the part's native swTolMAX
-    and the count above the value. The text stands down-left of the root,
-    opposite the arc's own (up-right) quarter. SolidWorks ends a radial
+    and the count above the value. On the lower root the text stands
+    down-left, opposite the arc's own (up-right) quarter; on the upper root
+    UPPER_ROOT_KEEP moves it over the body. SolidWorks ends a radial
     leader at the circle point facing its text and does not carry it through
     the centre (farm r4, 0676a2115), so ``ArcExtensionLineOrOppositeSide``
     True draws the arc's extension out to that point. The rebuilt arrow tip
@@ -565,32 +596,52 @@ def _dress_relief_roots(adapter: Any, detail: Any, annotations: list[Any]) -> No
     if display.ArcExtensionLineOrOppositeSide is not True:
         raise RuntimeError("ReliefRootR refused its arc extension line")
     rebuild_drawing(adapter, label="relief roots radius leader")
-    raw = display.GetDisplayData()
-    if raw is None:
-        raise RuntimeError("ReliefRootR has no rebuilt display data")
-    data = _early_bound(raw, "IDisplayData")
-    if int(data.GetArrowHeadCount()) != 1:
-        raise RuntimeError("ReliefRootR must draw exactly one radial arrow")
-    arrow = tuple(float(v) for v in data.GetArrowHeadAtIndex2(0))
-    if len(arrow) != 12 or not all(math.isfinite(v) for v in arrow):
-        raise RuntimeError("ReliefRootR has incomplete arrow-head coordinates")
-    tip = (arrow[0], arrow[1])
-    centre = model_point_in_view(
-        adapter,
-        detail,
-        (RELIEF_ROOT_CENTRE_MM[0] / 1000.0, RELIEF_ROOT_CENTRE_MM[1] / 1000.0, 0.0),
-        label="shoulder's lower relief root centre",
-    )
     radius = RELIEF_ROOT_R * _DS / 1000.0
-    off = (tip[0] - centre[0], tip[1] - centre[1])
-    if abs(math.hypot(*off) - radius) > ROOT_TIP_TOL_M or max(off) > ROOT_TIP_TOL_M:
+    centres = {
+        side: model_point_in_view(
+            adapter,
+            detail,
+            (x_mm / 1000.0, y_mm / 1000.0, 0.0),
+            label=f"shoulder's {side} relief root centre",
+        )
+        for side, (x_mm, y_mm) in (
+            ("lower", RELIEF_ROOT_CENTRE_MM),
+            ("upper", UPPER_RELIEF_ROOT_CENTRE_MM),
+        )
+    }
+
+    def root_side(tip: tuple[float, float]) -> str:
+        for side, (cx, cy) in centres.items():
+            if abs(math.hypot(tip[0] - cx, tip[1] - cy) - radius) <= ROOT_TIP_TOL_M:
+                return side
         raise RuntimeError(
-            f"ReliefRootR's arrow tip {tip} is not on the shoulder's lower root "
-            f"circle's text side (centre {centre}, R {radius})"
+            f"ReliefRootR's arrow tip {tip} is on neither shoulder root circle "
+            f"(centres {centres}, R {radius})"
+        )
+
+    tip = _root_arrow_tip(display)
+    side = root_side(tip)
+    if side == "upper":
+        if not annotation.SetPosition(*UPPER_ROOT_KEEP["ReliefRootR"], 0.0):
+            raise RuntimeError("ReliefRootR refused its upper-root position")
+        rebuild_drawing(adapter, label="relief roots radius upper-root leader")
+        tip = _root_arrow_tip(display)
+        if root_side(tip) != "upper":
+            raise RuntimeError("ReliefRootR left the upper root when moved")
+    off = (tip[0] - centres[side][0], tip[1] - centres[side][1])
+    # Lower: text down-left, so the tip is down-left of the centre; upper:
+    # text over the body, so the tip is on the circle's upper half.
+    facing = (
+        max(off) <= ROOT_TIP_TOL_M if side == "lower" else off[1] >= -ROOT_TIP_TOL_M
+    )
+    if not facing:
+        raise RuntimeError(
+            f"ReliefRootR's arrow tip {tip} is not on the shoulder's {side} root "
+            f"circle's text side (centre {centres[side]}, R {radius})"
         )
     _telemetry.info(
         f"relief roots radius: text {display.GetText(1)!r}, MAX type, count "
-        f"{callout!r}, arrow tip {tip} on the shoulder's lower root"
+        f"{callout!r}, arrow tip {tip} on the shoulder's {side} root"
     )
 
 

@@ -1803,6 +1803,18 @@ def test_rotated_end_stock_af_ink_stands_across_flats_not_corners() -> None:
     assert drawing._end_af_ink_problem(_vertical_af_ink(), _end_flat_points()) is None
 
 
+def test_rotated_end_stock_af_reads_its_fraction_bar_as_text_not_a_stray_stroke() -> None:
+    # The farm's (7/16 in) REF draws its fraction bar as a display line
+    # (run 20261031T211631726Z): inside the text's box it is the text's ink.
+    keep_x, keep_y = drawing.END_KEEP["HexAf"]
+    bar = ((keep_x - 0.004, keep_y), (keep_x - 0.002, keep_y))
+    assert drawing._end_af_ink_problem([*_vertical_af_ink(), bar], _end_flat_points()) is None
+    # The same stroke out beside the hex is no text of this dimension.
+    stray = ((keep_x + 0.020, keep_y), (keep_x + 0.022, keep_y))
+    problem = drawing._end_af_ink_problem([*_vertical_af_ink(), stray], _end_flat_points())
+    assert problem is not None and "neither" in problem
+
+
 @pytest.mark.parametrize("case", ["empty", "missing-flat", "ac-height", "horizontal", "short-witness"])
 def test_rotated_end_stock_af_refuses_wrong_frame_or_unwitnessed_flats(case: str) -> None:
     ink = _vertical_af_ink()
