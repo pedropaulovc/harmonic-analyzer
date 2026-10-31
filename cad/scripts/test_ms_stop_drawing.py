@@ -25,7 +25,7 @@ import _mcmaster_90114a124 as screw
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import DRILL_POINT_H
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import inside_corner_radius_mm, printed_band_mm
 
 
 def _inch(value_in: float) -> float:
@@ -37,9 +37,10 @@ def test_shared_frame_and_open_rebate_closure() -> None:
     # millimetre decimal of its printed inch value.
     assert spec.UNIT == "in"
     for got, inch in (
-        (spec.BLOCK_LENGTH, 0.84), (spec.BLOCK_HEIGHT, 0.56), (spec.BLOCK_DEPTH, 0.44),
+        (spec.BLOCK_LENGTH, 0.84), (spec.BLOCK_HEIGHT, 0.56), (spec.BLOCK_DEPTH, 0.47),
         (spec.PLATE_THICKNESS, 0.040), (spec.WINDOW_WIDTH, 0.330), (spec.WINDOW_HEIGHT, 0.134),
-        (spec.ROOF_THICKNESS, 0.09), (spec.ROOF_END_CHAMFER, 0.04), (spec.BACK_WALL_THICKNESS, 0.11),
+        (spec.ROOF_THICKNESS, 0.09), (spec.ROOF_END_CHAMFER, 0.04), (spec.BACK_WALL_THICKNESS, 0.14),
+        (spec.RELIEF_DEPTH, 0.045), (spec.RELIEF_HEIGHT, 0.06),
     ):
         assert got == pytest.approx(_inch(inch), rel=0.0, abs=1e-9)
     assert (spec.PLATE_Z_MIN, spec.PLATE_Z_MAX) == (-spec.PLATE_THICKNESS, 0.0)
@@ -103,14 +104,14 @@ def test_print_worst_joint_stack_preserves_bottoming_tap_and_ligaments() -> None
     assert spec.PLATE_SCREW_PENETRATION_MAX < spec.PLATE_FULL_THREAD_MIN
     assert spec.PLATE_TAP_LEAD_MIN == pytest.approx(1.016)
     assert spec.PLATE_TAP_LEAD_MIN >= screw.PITCH
-    assert spec.PLATE_TAP_BACK_WALL_MIN == pytest.approx(2.58742, abs=1e-5)
+    assert spec.PLATE_TAP_BACK_WALL_MIN == pytest.approx(3.34942, abs=1e-5)
     assert spec.ROOF_THICKNESS_MIN == pytest.approx(2.032)
     assert spec.PLATE_TAP_WINDOW_WEB_MIN == pytest.approx(2.63271)
     assert spec.PLATE_TAP_END_WEB_MIN == pytest.approx(2.32791)
     assert spec.PLATE_TAP_MAJOR_DIA_MAX == pytest.approx(0.0887 * 25.4)
     assert spec.PLATE_TAP_MAJOR_DIA_MAX > screw.MAJOR_DIA
-    assert spec.WINDOW_BACK_WALL_MIN == pytest.approx(2.54)
-    assert spec.BLOCK_DEPTH_MIN == pytest.approx(10.922)
+    assert spec.WINDOW_BACK_WALL_MIN == pytest.approx(3.302)
+    assert spec.BLOCK_DEPTH_MIN == pytest.approx(11.684)
     assert spec.PLATE_CLEARANCE_END_WEB_MIN == pytest.approx(2.2098)
     assert spec.PLATE_CLEARANCE_HEAD_WEB_MIN == pytest.approx(8.5598)
     assert spec.PLATE_RADIAL_CLEARANCE_MIN == pytest.approx(0.1016)
@@ -188,7 +189,8 @@ def test_analytic_volume_has_no_merged_thumbscrew_or_hidden_extra_wall() -> None
     assert spec.BLOCK_CHAMFER_VOLUME == spec.ROOF_END_CHAMFER**2 * spec.BLOCK_DEPTH
     assert spec.THUMB_HOLE_VOLUME == pytest.approx(math.pi * (spec.THUMB_TAP_DRILL / 2.0)**2 * spec.FLOOR_THICKNESS)
     assert spec.BLOCK_FINISHED_VOLUME == pytest.approx(
-        spec.BLOCK_VOLUME - spec.WINDOW_VOLUME - spec.BLOCK_CHAMFER_VOLUME - spec.THUMB_HOLE_VOLUME - spec.PLATE_TAP_VOLUME)
+        spec.BLOCK_VOLUME - spec.WINDOW_VOLUME - spec.RELIEF_VOLUME - spec.BLOCK_CHAMFER_VOLUME
+        - spec.THUMB_HOLE_VOLUME - spec.PLATE_TAP_VOLUME)
     assert spec.PLATE_FINISHED_VOLUME == pytest.approx(
         spec.PLATE_VOLUME - spec.PLATE_CHAMFER_VOLUME - spec.PLATE_HOLE_VOLUME)
     assert 0.0 < spec.BLOCK_FINISHED_VOLUME < spec.BLOCK_VOLUME
@@ -211,7 +213,7 @@ def test_each_sheet_imports_the_complete_model_contract(builder, drawing, dimens
     assert marked == keeps == set(precision) == set(values)
     # .XXX for the rebate, the matched pair's stations and cover thickness;
     # whole-degree angles.
-    three = ({"WindowWidth", "WindowHeight", *spec.PLATE_LOCATION_DIMENSIONS}
+    three = ({"WindowWidth", "WindowHeight", "ReliefDepth", *spec.PLATE_LOCATION_DIMENSIONS}
              if builder is block
              else {"PlateThickness", *spec.PLATE_LOCATION_DIMENSIONS})
     assert {name: places for name, places in precision.items() if places != 2} == {
@@ -357,8 +359,8 @@ class _StopMathUtility:
     (block_drawing, [
         ("two cover blind taps", "*Back", (0.0184531, 0.004064, 0.0), (0.1238596, 0.172808)),
         ("thumbscrew tap through floor", "*Bottom",
-         (0.0117985, 0.0, 0.004318), (0.150478, 0.07808)),
-        ("cover mating face", "*Left", (0.010668, 0.012573, 0.0), (0.292648, 0.206844)),
+         (0.0117985, 0.0, 0.004318), (0.150478, 0.079604)),
+        ("cover mating face", "*Left", (0.010668, 0.012573, 0.0), (0.291124, 0.206844)),
     ]),
     (plate_drawing, [
         ("two cover clearance holes", "*Back", (0.0187198, 0.004064, -0.001016), (0.1427928, 0.157808)),
@@ -816,15 +818,22 @@ def test_match_drill_callouts_identify_the_current_mate_registry_rows() -> None:
 def test_stock_precision_and_worst_case_walls_use_each_printed_band() -> None:
     assert spec.BLOCK_PRINTED_BANDS_MM == {
         name: printed_band_mm(spec.BLOCK_DRAWING_PRECISION_BY_NAME[name], unit="in")
-        for name in ("BlockLength", "BlockHeight", "RoofThickness", "BackWall")
+        for name in ("BlockLength", "BlockHeight", "RoofThickness", "BackWall", "ReliefDepth")
     }
     assert spec.PLATE_PRINTED_BANDS_MM == {
         name: printed_band_mm(spec.PLATE_DRAWING_PRECISION_BY_NAME[name], unit="in")
         for name in ("PlateLength", "PlateHeight")
     }
-    assert spec.BLOCK_PRINTED_BANDS_MM == dict.fromkeys(
-        ("BlockLength", "BlockHeight", "RoofThickness", "BackWall"), pytest.approx(_inch(0.01)),
-    )
+    assert spec.BLOCK_PRINTED_BANDS_MM == {
+        **dict.fromkeys(("BlockLength", "BlockHeight", "RoofThickness", "BackWall"),
+                        pytest.approx(_inch(0.01))),
+        "ReliefDepth": pytest.approx(_inch(0.005)),
+    }
+    # The corner relief's .040 minimum depth clears the title block's R.040
+    # MAX corner, and the back wall behind it keeps the .080 target.
+    assert spec.RELIEF_DEPTH - spec.BLOCK_PRINTED_BANDS_MM["ReliefDepth"] == pytest.approx(
+        inside_corner_radius_mm(unit="in"))
+    assert spec.RELIEF_BACK_WALL_MIN == pytest.approx(WALL_TARGET_MM)
     assert spec.PLATE_PRINTED_BANDS_MM == dict.fromkeys(("PlateLength", "PlateHeight"), pytest.approx(_inch(0.01)))
     assert spec.WINDOW_FLOOR_MIN == pytest.approx(
         spec.BLOCK_HEIGHT - spec.BLOCK_PRINTED_BANDS_MM["BlockHeight"]
@@ -960,6 +969,25 @@ def test_rebate_profile_refuses_unapplied_back_wall_construction_flag(monkeypatc
     assert all(d.kind != "horizontal_distance" or d.first != "line5.start" for d in adapter.dimensions)
 
 
+def test_relief_profile_notches_the_back_wall_under_the_roof(monkeypatch) -> None:
+    adapter = _window_reference_seat(monkeypatch)
+    dims = sketch.SketchDims()
+    asyncio.run(stop_geom.relief_profile(adapter, dims))
+    back = spec.WINDOW_Z_MAX + spec.RELIEF_DEPTH
+    low = spec.WINDOW_Y_MAX - spec.RELIEF_HEIGHT
+    assert adapter.planes == ["Right"]
+    assert list(adapter.lines.values()) == [
+        ((-spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX), (-back, spec.WINDOW_Y_MAX)),
+        ((-back, spec.WINDOW_Y_MAX), (-back, low)),
+        ((-back, low), (-spec.WINDOW_Z_MAX, low)),
+        ((-spec.WINDOW_Z_MAX, low), (-spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX)),
+    ]
+    assert [name for name, _ in dims._rows] == [
+        "ReliefDepth", "ReliefHeight", "ReliefWindowStation", "ReliefRoofStation",
+    ]
+    assert spec.BLOCK_DRAWING_DIMENSIONS["ReliefProfile"] == {"ReliefDepth", "ReliefHeight"}
+
+
 def test_block_build_cuts_rebate_from_its_profile_driven_marked_and_toleranced(monkeypatch) -> None:
     equations, globals_authored, bands, marks, hidden = {}, {}, [], [], []
     cuts, precisions, properties = [], [], []
@@ -1001,6 +1029,10 @@ def test_block_build_cuts_rebate_from_its_profile_driven_marked_and_toleranced(m
         assert cuts == []
         profiles.append(dims)
 
+    async def relief(adapter, dims):
+        assert len(cuts) == 1 and "ReliefDepth" in globals_authored
+        profiles.append(dims)
+
     async def roof_reference(adapter):
         return []
 
@@ -1011,6 +1043,7 @@ def test_block_build_cuts_rebate_from_its_profile_driven_marked_and_toleranced(m
     monkeypatch.setattr(block, "set_global", set_global)
     monkeypatch.setattr(block, "drive_dimension", drive)
     monkeypatch.setattr(block, "rebate_profile", rebate)
+    monkeypatch.setattr(block, "relief_profile", relief)
     monkeypatch.setattr(block, "roof_reference", roof_reference)
     monkeypatch.setattr(block, "save_part_and_images", save)
     monkeypatch.setattr(block, "SketchDims", lambda: SimpleNamespace(apply=lambda *a: []))
@@ -1038,9 +1071,11 @@ def test_block_build_cuts_rebate_from_its_profile_driven_marked_and_toleranced(m
                         lambda adapter, part_name, values: properties.append(values))
     assert asyncio.run(block.build(Adapter())) == {"part": "ms-stop-block"}
     assert globals_authored["WindowWidth"] == f"{spec.WINDOW_WIDTH}mm"
-    assert len(profiles) == 1
-    assert cuts == [(2.0 * (spec.BLOCK_LENGTH + spec.CUT_OVERHANG), True)]
+    assert len(profiles) == 2
+    assert cuts == [(2.0 * (spec.BLOCK_LENGTH + spec.CUT_OVERHANG), True)] * 2
     assert equations["WindowCutDepth@Window"] == f'2 * ("BlockLength" + {spec.CUT_OVERHANG})'
+    assert equations["ReliefCutDepth@CornerRelief"] == f'2 * ("BlockLength" + {spec.CUT_OVERHANG})'
+    assert ("ReliefProfile", {"ReliefDepth", "ReliefHeight"}) in marks
     assert ("WindowProfile", "WindowWidth", *spec.WINDOW_SIZE_TOLERANCE_MM, "in") in bands
     assert ("WindowProfile", "WindowHeight", *spec.WINDOW_SIZE_TOLERANCE_MM, "in") in bands
     assert ("WindowProfile", {"WindowHeight", "WindowWidth", "BackWall"}) in marks

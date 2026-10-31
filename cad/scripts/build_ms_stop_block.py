@@ -39,7 +39,7 @@ from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _holes import wizard_holes
 from ms_stop_geom import (
     author_hole_precision, hide_location_references, location_reference,
-    rebate_profile, roof_reference,
+    rebate_profile, relief_profile, roof_reference,
 )
 
 PART_NAME = "ms-stop-block"
@@ -79,6 +79,7 @@ async def build(adapter) -> dict[str, str]:
         ("BlockDepth", spec.BLOCK_DEPTH), ("WindowHeight", spec.WINDOW_HEIGHT),
         ("WindowWidth", spec.WINDOW_WIDTH), ("RoofThickness", spec.ROOF_THICKNESS),
         ("RoofChamferSize", spec.ROOF_END_CHAMFER),
+        ("ReliefDepth", spec.RELIEF_DEPTH), ("ReliefHeight", spec.RELIEF_HEIGHT),
     ):
         await set_global(adapter, name, f"{value}mm")
     jobs: list[tuple[str, str]] = []
@@ -115,6 +116,20 @@ async def build(adapter) -> dict[str, str]:
     name_dimensions(adapter, "Window", ["WindowCutDepth"])
     jobs.append(("WindowCutDepth@Window", f'2 * ("BlockLength" + {spec.CUT_OVERHANG})'))
     await volume_check(adapter, "open rebate", spec.BLOCK_VOLUME - spec.WINDOW_VOLUME, 0.005 * spec.BLOCK_VOLUME)
+
+    dims = SketchDims()
+    await relief_profile(adapter, dims)
+    name_last_feature(adapter, "ReliefProfile")
+    jobs += dims.apply(adapter, "ReliefProfile")
+    check("corner relief", await adapter.create_cut_extrude(ExtrusionParameters(
+        depth=2.0 * (spec.BLOCK_LENGTH + spec.CUT_OVERHANG), both_directions=True,
+    )))
+    name_last_feature(adapter, "CornerRelief")
+    name_dimensions(adapter, "CornerRelief", ["ReliefCutDepth"])
+    jobs.append(("ReliefCutDepth@CornerRelief", f'2 * ("BlockLength" + {spec.CUT_OVERHANG})'))
+    await volume_check(adapter, "corner relief",
+                       spec.BLOCK_VOLUME - spec.WINDOW_VOLUME - spec.RELIEF_VOLUME,
+                       0.005 * spec.BLOCK_VOLUME)
 
     check("roof end chamfers", await adapter.add_chamfer(
         spec.ROOF_END_CHAMFER,
