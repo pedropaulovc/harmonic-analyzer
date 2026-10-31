@@ -602,7 +602,7 @@ CROSS_HOLE_PROCESS = drill_process(PIN_HOLE_SPEC)
 # prefix and the size/depth places live here, the press prose in the notes.
 DRIVE_PIN_HOLE_PROCESS = "REAM"
 HOLE_CALLOUT_PRECISION: dict[str, dict[str, int]] = {
-    "DrivePinProfile": {"DrivePinHoleDia1": 4, "DrivePinHoleDia2": 4},  # 2.3622, .093 in
+    "DrivePinProfile": {"DrivePinHoleDia1": 3, "DrivePinHoleDia2": 3},
     "DrivePinHoles": {"DrivePinDepth": 2},
 }
 # The one general note is the shop's inside-corner ceiling at every shoulder
