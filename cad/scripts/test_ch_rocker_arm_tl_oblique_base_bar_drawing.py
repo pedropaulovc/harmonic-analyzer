@@ -13,6 +13,7 @@ import ch_rocker_arm_tl_oblique_base_bar_spec as spec
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_base_bar as drawing
+import export_features
 from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
@@ -20,28 +21,33 @@ from _printed_tolerance import printed_band_mm
 from _surface_finish import SEAT_UM
 
 BUILD = Path(drawing.__file__).with_name("build_ch_rocker_arm_tl_oblique_base_bar.py")
+STEM = "ch_rocker_arm_tl_oblique_base_bar"
 
 
-def test_stock_is_the_calculators_flat_bar_faced_to_thickness() -> None:
+def test_bar_is_milled_from_the_owned_bar_and_faced_to_thickness() -> None:
     assert (spec.BAR_THICK, spec.BAR_WIDTH, spec.BAR_LENGTH) == (
         trammel.BASE_BAR_THICK,
         trammel.BASE_BAR_WIDTH,
         trammel.BASE_BAR_LENGTH,
     )
     # Owner ruling 2026-10-30 (option A): both large faces faced from the
-    # 1/2 in bar; the width stays stock. #290: the faced thickness and the
-    # length print on the .XX grid, at the inch title block's band.
+    # 1/2 in bar; owner ruling #2083: the width milled from the owned 1/2 x 6
+    # bar. #290: the faced thickness, the milled width and the length print
+    # on the .XX grid, at the inch title block's band.
     assert trammel.BASE_BAR_STOCK_THICK == pytest.approx(12.7)
     assert spec.BAR_THICK < trammel.BASE_BAR_STOCK_THICK
     assert spec.UNIT == "in"
     assert spec.THICK_PLACES == trammel.BASE_BAR_THICK_PLACES == 2
+    assert spec.WIDTH_PLACES == spec.DRAWING_PRECISION_BY_NAME["BarWidth"] == 2
     assert trammel.BASE_BAR_THICK_BAND == printed_band_mm(2, unit="in")
-    for value in (spec.BAR_THICK, spec.BAR_LENGTH):
+    assert spec.BAR_WIDTH_BAND == printed_band_mm(spec.WIDTH_PLACES, unit="in")
+    for value in (spec.BAR_THICK, spec.BAR_WIDTH, spec.BAR_LENGTH):
         assert value / 25.4 == pytest.approx(round(value / 25.4, 2), abs=1e-9)
-    assert spec.BAR_WIDTH == pytest.approx(139.7)
+    # Milled from 6 in, the widest part still fits the vise's stock jaws.
+    assert spec.BAR_WIDTH + spec.BAR_WIDTH_BAND < 6.0 * 25.4
     # Rail and bar flush within the length's band.
     assert abs(spec.BAR_LENGTH - trammel.RAIL_LENGTH) < printed_band_mm(2, unit="in")
-    # The 2026-10-30 ruling: 1/2 x 5-1/2 (vise fit) with the column-side edge
+    # The 2026-10-30 ruling: 5.50 wide (vise fit) with the column-side edge
     # still 3.5 in off the rail, so the rail sits off the centreline. Rail 1's
     # part frame has y = -lateral, so the column side is the faced -Y side.
     assert (spec.LOW_SIDE_Y, spec.HIGH_SIDE_Y) == pytest.approx((-88.9, 50.8))
@@ -127,13 +133,14 @@ def test_walls_meet_rule_17() -> None:
     # (the rail sits nearer that side).
     assert spec.SIDE_WALL == spec.FAR_SIDE_WALL < spec.NEAR_SIDE_WALL
     # c3-r6, rule 10: both slots from the -Y side, so the far slot's wall to
-    # the +Y side carries the stock width's supplier band and its rise's and
-    # run's .XX; the near end wall the near station's rounding as well.
+    # the +Y side carries the milled width's .XX and its rise's and run's;
+    # the near end wall the near station's rounding as well.
+    xx = printed_band_mm(2, unit="in")
     assert spec.FAR_SIDE_WALL_WORST == pytest.approx(
         spec.BAR_WIDTH
-        - spec.BAR_WIDTH_STOCK_BAND
-        - (spec.FAR_SLOT_RISE + spec.SLOT_RUN + 4 * printed_band_mm(2, unit="in") / 2)
-        - (spec.SLOT_WIDTH + printed_band_mm(2, unit="in")) / 2
+        - xx
+        - (spec.FAR_SLOT_RISE + spec.SLOT_RUN + 2 * xx)
+        - (spec.SLOT_WIDTH + xx) / 2
     )
     assert spec.SIDE_WALL_WORST == spec.FAR_SIDE_WALL_WORST
     assert min(spec.SIDE_WALL_WORST, spec.NEAR_END_WALL_WORST) >= WALL_TARGET_MM
@@ -147,26 +154,18 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     assert set(drawing.FRONT_KEEP) | set(drawing.END_KEEP) == marked
     assert not set(drawing.FRONT_KEEP) & set(drawing.END_KEEP)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    assert spec.STOCK_DIMENSIONS <= marked
+    assert not hasattr(spec, "STOCK_DIMENSIONS")
     assert set(drawing.CALLOUTS_BELOW) <= marked
 
 
-def test_stock_width_prints_its_fraction_over_stock() -> None:
-    assert spec.STOCK_DIMENSIONS == {"BarWidth"}
-    # #290: the stock width prints its supplier fraction as a reference over
-    # STOCK, untoleranced; the faced thickness takes the title block's .XX.
-    assert drawing.STOCK_CALLOUT == "STOCK"
-    assert not spec.STOCK_DIMENSIONS & set(drawing.CALLOUTS_BELOW)
-    assert spec.BAR_WIDTH / 25.4 * spec.BAR_WIDTH_FRACTION_DENOMINATOR == pytest.approx(
-        11
+def test_milled_width_is_accepted_within_the_xx_band() -> None:
+    # Owner ruling #2083: the width is milled, so it carries the title
+    # block's .XX band like every machined size.
+    side = export_features.requirement_manifest(STEM)["features"]["bar_high_side"]
+    low, high = side["width"]
+    assert (low, high) == pytest.approx(
+        (spec.BAR_WIDTH - spec.BAR_WIDTH_BAND, spec.BAR_WIDTH + spec.BAR_WIDTH_BAND)
     )
-    assert "BarThick" not in drawing.CALLOUTS_BELOW
-    assert spec.DRAWING_PRECISION_BY_NAME["BarThick"] == 2
-    assert not hasattr(spec, "REFERENCE_DIMENSIONS")
-    assert not any("(" in prefix for prefix, _ in drawing.DIMENSION_TEXT.values())
-    assert spec.DRAWING_NOTES == ""
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "Manufacturing Notes" not in source
 
 
 def test_slot_run_is_centre_to_centre_with_centre_marks() -> None:
@@ -193,7 +192,7 @@ def test_rail_holes_hold_a_baseline_band_that_names_its_mate() -> None:
     # c3-r7 (rule 4): only the stations, the rail's pitch, carry the band.
     assert set(spec.TOLERANCES) == {("RailHoles", name) for name in stations}
     assert set(spec.TOLERANCES.values()) == {spec.RAIL_HOLE_BAND}
-    assert not stations & spec.STOCK_DIMENSIONS
+    assert not stations & set(drawing.CALLOUTS_BELOW) - {"RailHole7X"}
     # The rail's metric pattern prints rounded at three places.
     assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 3 for name in stations)
     # One DRO Y setting cuts the row: only the station band and its rounding
@@ -240,14 +239,14 @@ def test_side_lanes_clear_each_other_and_the_border() -> None:
     width_x, width_y = keep["BarWidth"]
     assert rise_x < drawing._LEFT and row_x < rise_x and width_x < row_x
     # The row's text clears the rise's line, its outside arrow and that
-    # arrow's tail (r4: they struck the block's last "L"), and the stock
-    # width's line.
+    # arrow's tail (r4: they struck the block's last "L"), and the width's
+    # line.
     assert row_x + drawing._RAIL_ROW_TEXT_HALF <= rise_x - 0.0025 + 1e-12
     assert row_x - drawing._RAIL_ROW_TEXT_HALF >= width_x + 0.002
     # The row's three-line block sits inside its span, above the near rise's
     # upper extension line (the 49.4's text rides inside its own span) and
     # clear of the row's upper arrowhead (2026-10-30 machinist review: the
-    # arrowhead struck "88.90"); the stock width's text rides above the row's
+    # arrowhead struck "88.90"); the width's text rides above the row's
     # upper extension line.
     row_line = drawing._sheet_y(drawing.FRONT_CENTER, 0.0)
     rise_top = drawing._sheet_y(
