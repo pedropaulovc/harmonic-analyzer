@@ -95,7 +95,7 @@ SUPPLIER_REFERENCE_SIDES = {
     "SupplierDriveWidth": "bottom",
 }
 SUPPLIER_REFERENCE_FORMATS = {
-    "SupplierLength": (0, "length", 2, "4-40"),
+    "SupplierLength": (0, "length", 2, "#4-40"),
     "SupplierHeadDiameter": (3, "diameter", None, None),
     "SupplierHeadHeight": (3, "length", None, None),
     "SupplierDriveWidth": (3, "length", None, None),

@@ -32,7 +32,10 @@ from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
 
 PART_NAME = "ch-rocker-arm-tl-oblique-pivot-block"
-UNIT = drawing_unit(f"parts/{PART_NAME}", _config.parts(PART_NAME))
+UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-oblique-pivot-block",
+    _config.parts("ch-rocker-arm-tl-oblique-pivot-block"),
+)
 NUMBER = "MHA-CH-06-TL-22"
 QUANTITY = 1
 BORE_X, BORE_Y = -32.0, 0.0  # trammel PIN_OFFSET: kinematic, not snapped

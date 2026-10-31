@@ -72,7 +72,7 @@ if abs(DIMS.major_dia - ROW.major_mm) > 1e-3:
 # Hidden nominal source references, not physical-edge/replica assertions.
 # The table's exact head Ø15/32 and height5/16 remain .46875/.3125 in
 # natively; only the engineering drawing's ink rounds them to .469/.313.
-# Length/head Ø/head height have three places, major Ø four; drive is 1/4.
+# Length/head Ø/head height/major Ø have three places; drive is 1/4.
 # Standard-only socket depth/length tolerances are not supplier references.
 SUPPLIER_PRODUCT_URL = "https://www.mcmaster.com/91251A583/"
 SUPPLIER_DRAWING_URL = (
@@ -108,6 +108,6 @@ SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (3, "length", None, None),
     "SupplierHeadDiameter": (3, "diameter", None, None),
     "SupplierHeadHeight": (3, "length", None, None),
-    "SupplierThreadDiameter": (4, "diameter", None, '5/16"-18'),
+    "SupplierThreadDiameter": (3, "diameter", None, '5/16"-18'),
     "SupplierDriveWidth": (0, "length", 4, None),
 }
