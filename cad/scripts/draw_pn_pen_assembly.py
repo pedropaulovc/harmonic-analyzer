@@ -1719,7 +1719,7 @@ def _place_steps_continued_sheet(adapter: Any) -> None:
 
 
 def _place_package(adapter: Any) -> Callable[[], None]:
-    new_project_drawing(adapter, layout=SPEC.layout, scale=SHEET_SCALE)
+    new_project_drawing(adapter, layout=SPEC.layout, scale=SHEET_SCALE, unit=notes.UNIT)
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="pen package")
     for sheet_name in SHEET_NAMES:
         sheet = _activate_sheet(adapter, sheet_name)

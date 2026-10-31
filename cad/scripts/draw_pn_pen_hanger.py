@@ -6,8 +6,9 @@ and the property-linked notes; sheet/template and export behavior lives in
 ``_drawing_common``.  Dimension import and curation live in
 ``_drawing_dimension_import``; places and bands are authored on the part.
 
-The pen hanger is a black tapered steel strap (3 thick, 16 -> 12 wide, 170
-tall) with two open U guide plates brazed across its front face; the pen rod
+The pen hanger is a black tapered steel strap (11 gauge, .63 -> .48 wide,
+6.69 tall; decimal-inch sheet) with two open U guide plates brazed across its
+front face; the pen rod
 hangs in both slots.  The front view (1:1, ``*Back``: looking at the strap's
 front face and the plates from the machine front, as note 1 names it) carries
 the strap outline, the screw-hole station, the upper plate's drop and the
@@ -56,11 +57,12 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_edge_dimensions import add_edge_dimension
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
@@ -105,9 +107,9 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 1.0)  # the 170-tall strap fits the sheet at full size
+SHEET_SCALE = (1.0, 1.0)  # the 6.69-tall strap fits the sheet at full size
 FRONT_SCALE = (1, 1)
-SECTION_SCALE = (2, 1)  # the slot's 0.05 band and its corner radius need room
+SECTION_SCALE = (2, 1)  # the slot's .002 band and its corner radius need room
 # At 1:1 the strap's edges, slots and plates read in the empty right half of
 # the sheet (the 1:2 iso read as a silhouette).  No drawing-view-only
 # lighting exists, so the part's own colour (BAR_STEEL, not PANEL_BLACK:
@@ -150,10 +152,10 @@ _SECTION_Z = (PLATE_FRONT_Z, STRAP_Z[1])
 _SX = (_SECTION_X[0] + _SECTION_X[1]) / 2.0
 _SZ = (_SECTION_Z[0] + _SECTION_Z[1]) / 2.0
 # The plate's +x edge past the strap's cut edge, which the section prints as
-# a reference: the same .X value as the overhang at the plate's top face.
+# a reference: the same .XX value as the overhang at the plate's top face.
 _OVERHANG_AT_CUT = _HALF_PLATE - _STRAP_CUT_X[1]
-if round(_OVERHANG_AT_CUT, DRAWING_REFERENCE_PRECISION) != round(
-    UPPER_PLATE_OVERHANG, DRAWING_REFERENCE_PRECISION
+if round(_OVERHANG_AT_CUT / 25.4, DRAWING_REFERENCE_PRECISION) != round(
+    UPPER_PLATE_OVERHANG / 25.4, DRAWING_REFERENCE_PRECISION
 ):
     raise AssertionError(
         "section A-A sits too far above the plate to read its overhang"
@@ -191,6 +193,8 @@ NOTES_XY = (0.110, 0.094)
 # drops gently right, crossing only the strap's tapered edge and the
 # StrapTaperDx extension line beside it -- no dimension line lies there.
 CALLOUT_XY = (0.137, 0.215)
+# The native Hole Wizard Ø variable of the #8 close clearance callout.
+SCREW_HOLE_CALLOUT_PRECISION = {"hw-diam": 3}
 # Under the front view's StrapTaperDx row (its text at y 0.045).
 FRONT_NOTE_XY = (0.030, 0.034)
 
@@ -293,7 +297,7 @@ SECTION_KEEP = {
         _az((PLATE_FRONT_Z + STRAP_Z[0]) / 2.0),
     ),
     "StrapThick": (_ax(_SECTION_X[0]) + 0.008, _az((STRAP_Z[0] + STRAP_Z[1]) / 2.0)),
-    # "2X R2.0 MAX" (~30 mm) is wider than the 24.5 mm EACH SLOT row that set
+    # "2X R.08 MAX" (~30 mm) is wider than the 24.5 mm EACH SLOT row that set
     # the block's width on the 20261024T091056564Z sheet, so the centre moves
     # 4 mm right of the bare radius's and the left end keeps ~4 mm off the
     # plate's -x edge.
@@ -309,7 +313,7 @@ SLOT_WIDTH_TEXT_XY = (
     _ax(_SECTION_X[0]) + 0.004 + _SLOT_TEXT_HALF_WIDTH,
     SECTION_ROW_Y["SlotWidth"] - 0.004,
 )
-# The strap stock's offset text block ("(3.0)" over SHEET STOCK, about
+# The strap stock's offset text block ("(.1196)" over 11 GA SHEET, about
 # 30 x 8 mm, positioned by its centre): its two rows cannot sit in the 6 mm
 # span, so the block stands level with the strap, its left end 4 mm right of
 # the dimension line (8 mm right of the strap end), and the leader runs level
@@ -542,7 +546,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -618,7 +626,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Pick the hole's rim on its sheet-right side (model -x under *Back), not
     # the hole centre: the leader leaves toward CALLOUT_XY without crossing
     # the dimensions stacked left of the strap.
-    add_native_hole_callout(
+    screw_callout = add_native_hole_callout(
         adapter,
         front,
         edge_xy=(
@@ -628,6 +636,10 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=CALLOUT_XY,
         label="hanger-screw clearance hole",
         process="DRILL",
+    )
+    # The #15 drill's Ø prints .XXX (+.004/0 from the title block).
+    set_hole_callout_precision(
+        screw_callout, SCREW_HOLE_CALLOUT_PRECISION, label="hanger-screw clearance hole"
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)

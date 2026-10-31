@@ -74,6 +74,7 @@ from typing import Any
 
 import _telemetry
 import pn_pen_assembly_spec as spec
+from _assembly_contract import assembly_contract
 from _check import check
 from _com import _early_bound
 from _custom_properties import apply_custom_properties
@@ -84,6 +85,7 @@ from _drawing_tolerances import (
     set_dimension_symmetric_angular_tolerance,
     set_dimension_symmetric_tolerance,
 )
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _sketch import (
     SketchDims,
@@ -369,7 +371,12 @@ async def _author_carriage_setting(adapter: Any) -> None:
     name_last_feature(adapter, spec.CARRIAGE_FEATURE)
     dims.apply(adapter, spec.CARRIAGE_FEATURE)
     set_dimension_symmetric_tolerance(
-        adapter, spec.CARRIAGE_FEATURE, spec.NIB_DIMENSION, spec.NIB_TOLERANCE_MM
+        adapter,
+        spec.CARRIAGE_FEATURE,
+        spec.NIB_DIMENSION,
+        spec.NIB_TOLERANCE_MM,
+        places=spec.NIB_PRECISION,
+        display_unit=assembly_contract(ASM_NAME).drawing_unit,
     )
     set_dimension_symmetric_angular_tolerance(
         adapter, spec.CARRIAGE_FEATURE, spec.YAW_DIMENSION, spec.YAW_TOLERANCE_DEG
@@ -393,6 +400,9 @@ async def build(adapter) -> dict[str, str]:
     # call: each freed DOF is recorded (never authored) and persisted below.
     reset_dof_manifest()
     check("create_assembly", await adapter.create_assembly())
+    apply_package_model_units(
+        adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME
+    )
 
     # The pen carriage slides vertically through the hanger's U guides: the
     # magnifying wheel's wire (flexible, not modeled as geometry --

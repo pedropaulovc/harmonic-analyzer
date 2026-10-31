@@ -14,7 +14,7 @@ import draw_pn_pen_v_block as drawing
 import pn_pen_v_block_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import TAP_DRILL_MM
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import printed_deviations
 
 _PART_SOURCE = Path(part.__file__).read_text(encoding="utf-8")
 _DRAWING_SOURCE = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -128,7 +128,6 @@ def test_every_feature_is_located_from_the_front_face() -> None:
         "Depth",
     }
     assert not {"NeckZ0", "NeckZ1", "Depth"} & spec.DRAWING_DIMENSIONS["VGrooveProfile"]
-    assert spec.DRAWING_PRECISION["OutlineProfile"]["Depth"] == 1
     outline = _PART_SOURCE[_PART_SOURCE.index("async def _outline(") :]
     outline = outline[: outline.index("\nasync def ")]
     for needle in (
@@ -237,7 +236,7 @@ def test_hidden_reference_dimensions_reach_their_views() -> None:
 
 
 def test_relief_corners_carry_the_largest_radius_the_grip_allows() -> None:
-    assert spec.RELIEF_CORNER_R == 1.0
+    assert spec.RELIEF_CORNER_R == 1.016  # .04
     assert spec._GRIP_GAP_AT_BOTTOM - spec.RELIEF_CORNER_R >= 0.25
     assert spec.DIMENSION_PREFIXES == {
         ("VGrooveProfile", "VFlankAngle"): "2X ",
@@ -256,30 +255,25 @@ def test_pivot_bore_drops_wholly_into_the_slot_at_its_printed_limits() -> None:
     import pn_vn_pen_marker_spec as marker
 
     # Review final4: with the step at 10.0 the reamed bore's edge stood 0.5
-    # off it, and at the printed limits (step 10.8, station 11.99, ream
-    # radius 2.006) broke 0.8 into the step wall.  Both stations are .X / .XX
-    # baselines from the paper end; the step moved to 9.0.
-    assert spec.RELIEF_X0 == 9.0
-    assert spec.DRAWING_PRECISION["ReliefProfile"]["ReliefX0"] == 1
-    assert spec.DRAWING_PRECISION["PivotBoreProfile"]["PivotX"] == 2
+    # off it, and at the printed limits broke 0.8 into the step wall.  Both
+    # stations are baselines from the paper end.
     worst_edge = (
         spec.PIVOT_BORE_X
-        - printed_band_mm(2)
+        + _printed_devs(spec.PIVOT_BORE_X, "PivotX")[0]
         - (spec.PIVOT_BORE_DIA + spec.PIVOT_BORE_BAND[0]) / 2.0
     )
-    worst_step = spec.RELIEF_X0 + printed_band_mm(1)
+    worst_step = spec.RELIEF_X0 + _printed_devs(spec.RELIEF_X0, "ReliefX0")[1]
     assert spec.PIVOT_BORE_STEP_CLEARANCE_PRINTED_MIN == pytest.approx(
         worst_edge - worst_step
     )
-    assert 0.15 < spec.PIVOT_BORE_STEP_CLEARANCE_PRINTED_MIN < 0.2
-    # The grip still seats on 9 of its 14.5 (10 before: under 7% of the grip
-    # lost), spans the whole V, and its body clears the corner arcs.
+    assert spec.PIVOT_BORE_STEP_CLEARANCE_PRINTED_MIN > 0.0
+    # The grip seats on the whole V, spans it, and its body clears the
+    # corner arcs.
     grip_length = marker.BARREL_END_Y - marker.BARREL_START_Y
     start, end = carriage.MARKER_GRIP_LOCAL_X
     assert end - start == pytest.approx(grip_length)
     seat = min(end, spec.RELIEF_X0) - max(start, 0.0)
     assert seat == spec.RELIEF_X0
-    assert (10.0 - seat) / grip_length < 0.07
     assert end > spec.RELIEF_X0 + spec.RELIEF_CORNER_R + 1.5
     assert carriage.plan_cg_residual_mm() <= 0.25
 
@@ -378,109 +372,93 @@ def _seat_by_bisector(
     }
 
 
-def _printed_seats(mouth_band: float, flat_band: float) -> list[dict[str, float]]:
+def _printed_devs(model_station: float, name: str) -> tuple[float, float]:
+    """(lower, upper) of a printed dimension about its model value, the
+    sheet printing the model rounded to the spec's places in its unit."""
+    return printed_deviations(
+        model_station, spec.DRAWING_PRECISION_BY_NAME[name], unit=spec.UNIT
+    )
+
+
+def _printed_seats() -> list[dict[str, float]]:
     from _printed_tolerance import angular_band_deg
 
+    station = spec.depth_station
     angles = (
-        spec.V_FLANK_ANGLE_DEG - angular_band_deg(),
-        spec.V_FLANK_ANGLE_DEG + angular_band_deg(),
+        spec.V_FLANK_ANGLE_DEG - angular_band_deg(unit=spec.UNIT),
+        spec.V_FLANK_ANGLE_DEG + angular_band_deg(unit=spec.UNIT),
     )
+    z0_devs = _printed_devs(station(spec.V_MOUTH_Z0), "VMouthZ0")
+    z1_devs = _printed_devs(station(spec.V_MOUTH_Z1), "VMouthZ1")
+    width_devs = _printed_devs(spec.V_FLAT_WIDTH, "VFlatWidth")
     return [
         _seat_by_bisector(z0, z1, front, back, width, spec.V_APEX_FILLET_R)
-        for z0 in (spec.V_MOUTH_Z0 - mouth_band, spec.V_MOUTH_Z0 + mouth_band)
-        for z1 in (spec.V_MOUTH_Z1 - mouth_band, spec.V_MOUTH_Z1 + mouth_band)
+        for z0 in (spec.V_MOUTH_Z0 + dev for dev in z0_devs)
+        for z1 in (spec.V_MOUTH_Z1 + dev for dev in z1_devs)
         for front in angles
         for back in angles
-        for width in (spec.V_FLAT_WIDTH - flat_band, spec.V_FLAT_WIDTH + flat_band)
+        for width in (spec.V_FLAT_WIDTH + dev for dev in width_devs)
     ]
 
 
 def test_title_block_bands_keep_walls_lands_and_clear_the_marker_body() -> None:
     import pn_pen_frame_spec as frame
+    from _inch_wall_limits import WALL_TARGET_MM
 
-    places = spec.DRAWING_PRECISION_BY_NAME
-    # Simplified E (2026-10 ruling, no named exception): every depth-wise
-    # station prints the title block's .X as a baseline from the body's front
-    # face; only the neck's two faces take the routine .XX, for the stirrup's
-    # window.  Nothing prints .XXX but the reamed bore's banded diameter.
-    stations = ("VMouthZ0", "VMouthZ1", "ReliefZ0", "ReliefZ1", "Depth")
-    for name in stations:
-        assert places[name] == 1, name
-    assert places["NeckZ0"] == places["NeckZ1"] == 2
-    assert places["VFlankAngle"] == 0
-    assert {name for name, n in places.items() if n >= 3} == {"PivotDia"}
-    assert spec.V_MOUTH_Z0 == 3.0 and spec.V_MOUTH_Z1 == 15.0
-    assert spec.RELIEF_Z0 == 1.0 and spec.RELIEF_Z1 == 17.0
-    assert spec.NECK_DEPTH == 18.0 and spec.BODY_DEPTH == 22.2
+    # #290: every depth-wise station prints the inch title block's .XX as a
+    # baseline from the body's front face.  The V's mouth stations are the
+    # 12.0 closure, printed rounded: each is judged at its printed limits.
     station = spec.depth_station
-    # Linear bands; the flanks' angle prints whole degrees on the angular row.
-    band = {
-        name: printed_band_mm(n) for name, n in places.items() if name != "VFlankAngle"
+    dev = {
+        "NeckZ0": _printed_devs(station(0.0), "NeckZ0"),
+        "NeckZ1": _printed_devs(station(spec.NECK_DEPTH), "NeckZ1"),
+        "Depth": _printed_devs(spec.BODY_DEPTH, "Depth"),
+        "VMouthZ0": _printed_devs(station(spec.V_MOUTH_Z0), "VMouthZ0"),
+        "VMouthZ1": _printed_devs(station(spec.V_MOUTH_Z1), "VMouthZ1"),
+        "ReliefZ0": _printed_devs(station(spec.RELIEF_Z0), "ReliefZ0"),
+        "ReliefZ1": _printed_devs(station(spec.RELIEF_Z1), "ReliefZ1"),
     }
-
-    def stack(b: dict[str, float]) -> dict[str, float]:
-        # The seated body over the V's printed corners: each mouth edge at its
-        # band and each flank at the title block's +/-1 deg on its own, so the
-        # V may lean and its axis shift toward either wall; the flat's height
-        # is their reference and carries no band.
-        assert b["VMouthZ0"] == b["VMouthZ1"]
-        seats = _printed_seats(b["VMouthZ0"], b["VFlatWidth"])
-        relief_z0 = station(spec.RELIEF_Z0)
-        relief_z1 = station(spec.RELIEF_Z1)
-        # The axis is no printed station: shift it unrounded.
-        axes = [seat["axis_z"] - spec.BODY_Z0 for seat in seats]
-        return {
-            "chord": max(seat["chord"] for seat in seats),
-            "near": min(
-                axis - seat["chord"] - (relief_z0 + b["ReliefZ0"])
-                for axis, seat in zip(axes, seats, strict=True)
-            ),
-            "far": min(
-                (relief_z1 - b["ReliefZ1"]) - axis - seat["chord"]
-                for axis, seat in zip(axes, seats, strict=True)
-            ),
-            "near_wall": relief_z0 - b["ReliefZ0"],
-            "far_wall": spec.BODY_DEPTH - b["Depth"] - (relief_z1 + b["ReliefZ1"]),
-            "near_land": (station(spec.V_MOUTH_Z0) - b["VMouthZ0"])
-            - (station(0.0) + b["NeckZ0"]),
-            "far_land": (station(spec.NECK_DEPTH) - b["NeckZ1"])
-            - (station(spec.V_MOUTH_Z1) + b["VMouthZ1"]),
-            "neck": spec.NECK_DEPTH + b["NeckZ0"] + b["NeckZ1"],
-        }
-
-    worst = stack(band)
-    assert spec.RELIEF_NEAR_WALL_PRINTED_MIN == pytest.approx(worst["near_wall"])
-    assert spec.RELIEF_FAR_WALL_PRINTED_MIN == pytest.approx(worst["far_wall"])
-    assert spec.V_NEAR_LAND_PRINTED_MIN == pytest.approx(worst["near_land"])
-    assert spec.V_FAR_LAND_PRINTED_MIN == pytest.approx(worst["far_land"])
-    assert worst["near_wall"] == pytest.approx(2.3)
-    # The far wall stands at the 1.5 floor exactly (rule: 2.0 target, 1.5
-    # floor at worst case).
-    assert worst["far_wall"] == pytest.approx(1.5)
-    assert worst["near_land"] == pytest.approx(1.69)
-    assert worst["far_land"] == pytest.approx(1.69)
-    for name in ("near_wall", "far_wall", "near_land", "far_land"):
-        assert round(worst[name], 6) >= 1.5, name
-    # The widest body chord: both flanks at 44 deg, the mouth at its widest.
-    assert worst["chord"] == pytest.approx(6.122, abs=5e-4)
-    assert spec.BODY_NEAR_CLEARANCE_PRINTED_MIN == pytest.approx(worst["near"])
-    assert spec.BODY_FAR_CLEARANCE_PRINTED_MIN == pytest.approx(worst["far"])
-    assert worst["near"] == pytest.approx(0.357, abs=5e-4)
-    assert worst["far"] == pytest.approx(0.357, abs=5e-4)
-    # The neck slides through the stirrup's window at its printed limits; the
-    # neck faces' .XX is load-bearing: at .X the neck could print 19.6 wide.
-    assert spec.NECK_WIDTH_PRINTED_MAX == pytest.approx(worst["neck"])
-    assert worst["neck"] == pytest.approx(19.02)
-    assert worst["neck"] < frame.WINDOW_WIDTH_PRINTED_MIN
-    loose = stack(dict(band, NeckZ0=printed_band_mm(1), NeckZ1=printed_band_mm(1)))
-    assert loose["neck"] > frame.WINDOW_WIDTH_PRINTED_MIN
-    # No function text and no tolerance exception: the stations print bare.
-    assert set(spec.DIMENSION_CALLOUTS) == {"PivotDia", "PivotChamferSize"}
-    policy = (
-        Path(__file__).resolve().parents[1] / "docs" / "drawing-simplicity-policy.md"
-    ).read_text(encoding="utf-8")
-    assert "pn-pen-v-block" not in policy
-    assert "Named exception" not in _SPEC_SOURCE
+    relief_z0, relief_z1 = station(spec.RELIEF_Z0), station(spec.RELIEF_Z1)
+    near_wall = relief_z0 + dev["ReliefZ0"][0]
+    far_wall = spec.BODY_DEPTH + dev["Depth"][0] - (relief_z1 + dev["ReliefZ1"][1])
+    near_land = (station(spec.V_MOUTH_Z0) + dev["VMouthZ0"][0]) - (
+        station(0.0) + dev["NeckZ0"][1]
+    )
+    far_land = (station(spec.NECK_DEPTH) + dev["NeckZ1"][0]) - (
+        station(spec.V_MOUTH_Z1) + dev["VMouthZ1"][1]
+    )
+    assert spec.RELIEF_NEAR_WALL_PRINTED_MIN == pytest.approx(near_wall)
+    assert spec.RELIEF_FAR_WALL_PRINTED_MIN == pytest.approx(far_wall)
+    assert spec.V_NEAR_LAND_PRINTED_MIN == pytest.approx(near_land)
+    assert spec.V_FAR_LAND_PRINTED_MIN == pytest.approx(far_land)
+    # Rule 17: every wall and land clears the .080 target at the print's
+    # worst case.
+    for name, wall in (
+        ("near_wall", near_wall),
+        ("far_wall", far_wall),
+        ("near_land", near_land),
+        ("far_land", far_land),
+    ):
+        assert round(wall, 6) >= WALL_TARGET_MM, name
+    # The seated body clears both relief walls over the V's printed corners
+    # (each mouth edge at its printed limits, each flank at +/-1 deg on its
+    # own, so the V may lean and its axis shift toward either wall).
+    seats = _printed_seats()
+    near = min(
+        seat["axis_z"] - seat["chord"] - (spec.RELIEF_Z0 + dev["ReliefZ0"][1])
+        for seat in seats
+    )
+    far = min(
+        (spec.RELIEF_Z1 + dev["ReliefZ1"][0]) - seat["axis_z"] - seat["chord"]
+        for seat in seats
+    )
+    assert spec.BODY_NEAR_CLEARANCE_PRINTED_MIN == pytest.approx(near)
+    assert spec.BODY_FAR_CLEARANCE_PRINTED_MIN == pytest.approx(far)
+    assert min(near, far) > 0.25
+    # The neck slides through the stirrup's window at its printed limits.
+    neck = spec.NECK_DEPTH + dev["NeckZ1"][1] - dev["NeckZ0"][0]
+    assert spec.NECK_WIDTH_PRINTED_MAX == pytest.approx(neck)
+    assert neck < frame.WINDOW_WIDTH_PRINTED_MIN
 
 
 def test_end_view_prints_the_v_edges_in_one_baseline_row() -> None:
@@ -784,15 +762,15 @@ def test_v_is_its_flank_angles_mouth_and_apex_flat_with_a_reference_height() -> 
     assert spec.V_ANGLE_DEG == 90.0
     assert spec.V_MOUTH_WIDTH == 12.0
     assert (spec.V_MOUTH_Z0 + spec.V_MOUTH_Z1) / 2.0 == spec.DEPTH_MID_Z
-    assert spec.RELIEF_WIDTH == 16.0
+    assert spec.RELIEF_WIDTH == pytest.approx(15.748)  # .62
     assert (spec.RELIEF_Z0 + spec.RELIEF_Z1) / 2.0 == spec.DEPTH_MID_Z
     assert (spec.BODY_Z0 + spec.BODY_Z1) / 2.0 == spec.DEPTH_MID_Z
     # The theoretical apex still seats the grip; the flat stands 1.0 under it.
     assert spec.V_APEX_Y == 6.0
     assert spec.MARKER_AXIS_Y == pytest.approx(6.0 - 5.3 * math.sqrt(2.0))
-    assert spec.V_FLAT_WIDTH == 2.0
-    assert spec.V_FLAT_Y == 5.0
-    assert spec.V_GROOVE_AREA == pytest.approx(35.0)
+    assert spec.V_FLAT_WIDTH == 2.032  # .08
+    assert spec.V_FLAT_Y == pytest.approx(4.984)
+    assert spec.V_GROOVE_AREA == pytest.approx(36.0 - 2.032 * 1.016 / 2.0)
     assert carriage.BLOCK_BOTTOM_Y == pytest.approx(366.2)
     assert spec.REFERENCE_DIMENSIONS == (("VGrooveProfile", "VFlatY"),)
     assert {
@@ -807,20 +785,18 @@ def test_v_is_its_flank_angles_mouth_and_apex_flat_with_a_reference_height() -> 
         "ReliefZ1",
         "ReliefHeight",
     }
-    assert spec.DRAWING_PRECISION["VGrooveProfile"]["VFlatY"] == 1
-    assert spec.DRAWING_PRECISION["VGrooveProfile"]["VFlatWidth"] == 1
     # The grip seats on both flanks: each flank at its own printed limit,
-    # each mouth edge at its .X and the flat at its .X, it stays 0.72 under
-    # the flat (1.20 nominal), each contact line at least 1.38 up its flank
-    # and inside its straight run.
-    seats = _printed_seats(printed_band_mm(1), printed_band_mm(1))
+    # each mouth edge and the flat at their printed .XX limits, it stays 0.96
+    # under the flat, each contact line at least 2.03 up its flank and inside
+    # its straight run.
+    seats = _printed_seats()
     assert len(seats) == 32
     flat = min(seat["flat"] for seat in seats)
     assert spec.V_FLAT_GRIP_CLEARANCE_PRINTED_MIN == pytest.approx(flat)
-    assert flat == pytest.approx(0.716, abs=1e-3)
+    assert flat == pytest.approx(0.964, abs=1e-3)
     contact = min(seat["contact"] for seat in seats)
     assert spec.V_CONTACT_MARGIN_PRINTED_MIN == pytest.approx(contact)
-    assert contact == pytest.approx(1.384, abs=1e-3)
+    assert contact == pytest.approx(2.026, abs=1e-3)
     nominal = _seat_by_bisector(
         spec.V_MOUTH_Z0,
         spec.V_MOUTH_Z1,
@@ -830,7 +806,7 @@ def test_v_is_its_flank_angles_mouth_and_apex_flat_with_a_reference_height() -> 
         spec.V_APEX_FILLET_R,
     )
     assert nominal["axis_y"] == pytest.approx(spec.MARKER_AXIS_Y)
-    assert nominal["flat"] == pytest.approx(1.195, abs=1e-3)
+    assert nominal["flat"] == pytest.approx(1.179, abs=1e-3)
     assert spec.V_CONTACT_Y < spec.V_FLAT_Y
     # The spec's seat agrees with this one at every printed corner.
     for mine, theirs in zip(seats, spec.V_PRINTED_CORNERS, strict=True):
@@ -898,13 +874,13 @@ def test_v_is_its_flank_angles_mouth_and_apex_flat_with_a_reference_height() -> 
 def test_apex_flat_corners_are_rounds_at_a_max_limit_clear_of_the_grip() -> None:
     # Blind re-review (rule 16): the flat met the flanks in sharp internal
     # corners.  Each takes any chamfer-mill tip or end-mill corner up to
-    # R0.5, printed "2X R0.5 MAX": swTolMAX prints the nominal, so the model
+    # R.020, printed "2X R.020 MAX": swTolMAX prints the nominal, so the model
     # carries the limit and its band runs from sharp to it.
-    assert spec.V_APEX_FILLET_R == 0.5
+    assert spec.V_APEX_FILLET_R == 0.508  # .020
     assert spec.V_APEX_FILLET_BAND == (0.0, -spec.V_APEX_FILLET_R)
     assert spec.V_APEX_FILLET_TOL_TYPE == 6  # swTolMAX
     assert spec.DRAWING_DIMENSIONS["VApexFillets"] == {"VApexFilletR"}
-    assert spec.DRAWING_PRECISION["VApexFillets"]["VApexFilletR"] == 1
+    assert spec.DRAWING_PRECISION["VApexFillets"]["VApexFilletR"] == 3
     assert (
         "VApexFillets",
         "VApexFilletR",
@@ -917,23 +893,25 @@ def test_apex_flat_corners_are_rounds_at_a_max_limit_clear_of_the_grip() -> None
     assert "await adapter.add_fillet(\n            V_APEX_FILLET_R," in _PART_SOURCE
     assert '("VApexFilletR", V_APEX_FILLET_R)' in _PART_SOURCE
     assert "(fillet_dim[0], '\"VApexFilletR\"')" in _PART_SOURCE
-    # Worst case: the rounds at R0.5, each flank's angle, each mouth edge and
-    # the flat at their printed limits.  The grip clears the rounds by 0.78
-    # (the flat by 0.72), and the narrowest flat (1.2) still runs straight
-    # between the two tangent points.
-    seats = _printed_seats(printed_band_mm(1), printed_band_mm(1))
+    # Worst case: the rounds at R.020, each flank's angle, each mouth edge and
+    # the flat at their printed limits.  The grip clears the rounds by 0.96
+    # (the flat by 0.96), and the narrowest flat still runs straight between
+    # the two tangent points.
+    seats = _printed_seats()
     clearance = spec.V_APEX_FILLET_GRIP_CLEARANCE_PRINTED_MIN
-    assert clearance == pytest.approx(0.775, abs=1e-3)
+    assert clearance == pytest.approx(0.956, abs=1e-3)
     assert clearance == pytest.approx(min(seat["round"] for seat in seats), abs=1e-6)
     assert min(clearance, spec.V_FLAT_GRIP_CLEARANCE_PRINTED_MIN) >= 0.25
     straight = spec.V_FLAT_STRAIGHT_PRINTED_MIN
     assert straight == pytest.approx(min(seat["straight"] for seat in seats))
-    assert straight == pytest.approx(0.776, abs=1e-3)
+    assert straight == pytest.approx(1.347, abs=1e-3)
     # The rounds' section and the groove's finished section feed the volumes.
     assert spec.V_APEX_FILLET_AREA == pytest.approx(
-        2.0 * 0.25 * (math.tan(math.pi / 8.0) - math.pi / 8.0)
+        2.0 * 0.508**2 * (math.tan(math.pi / 8.0) - math.pi / 8.0)
     )
-    assert spec.V_GROOVE_SECTION == pytest.approx(35.0 - spec.V_APEX_FILLET_AREA)
+    assert spec.V_GROOVE_SECTION == pytest.approx(
+        spec.V_GROOVE_AREA - spec.V_APEX_FILLET_AREA
+    )
 
 
 def test_apex_round_radius_text_stays_off_the_part_in_the_end_view() -> None:
@@ -942,7 +920,7 @@ def test_apex_round_radius_text_stays_off_the_part_in_the_end_view() -> None:
     # under the tap's callout rows (from ~0.247), left of section A-A.
     keep = drawing.RIGHT_KEEP
     x, y = keep["VApexFilletR"]
-    half_text = 0.014  # "2X R0.5 MAX", 11 characters at ~2.5 mm
+    half_text = 0.014  # "2X R.020 MAX", 12 characters at ~2.3 mm
     assert y - 0.0018 > drawing._ry(spec.BLOCK_HEIGHT) + 0.008
     assert y + 0.0017 < drawing.TAP_CALLOUT_XY[1] - 0.003 - 0.004
     assert (
@@ -955,8 +933,12 @@ def test_apex_round_radius_text_stays_off_the_part_in_the_end_view() -> None:
     assert bearing == pytest.approx(67.5)
     assert drawing._ROUND_CENTRE == pytest.approx(
         (
-            drawing._rz(spec.DEPTH_MID_Z + 1.0 - 0.5 * math.tan(math.pi / 8.0)),
-            drawing._ry(4.5),
+            drawing._rz(
+                spec.DEPTH_MID_Z
+                + spec.V_FLAT_WIDTH / 2.0
+                - spec.V_APEX_FILLET_R * math.tan(math.pi / 8.0)
+            ),
+            drawing._ry(spec.V_FLAT_Y - spec.V_APEX_FILLET_R),
         )
     )
 
@@ -1131,7 +1113,7 @@ def test_v_runs_past_the_step_so_no_knife_edge_shows_in_the_end_view() -> None:
     near_corner_z = spec.RELIEF_Z0 + spec.RELIEF_CORNER_R
     far_corner_z = spec.RELIEF_Z1 - spec.RELIEF_CORNER_R
     assert near_corner_z < spec.V_MOUTH_Z0 < spec.V_MOUTH_Z1 < far_corner_z
-    assert spec.RELIEF_CORNER_R == 1.0
+    assert spec.RELIEF_CORNER_R == 1.016  # .04
     assert spec.V_CUT_LENGTH == spec.RELIEF_X0 + spec.RELIEF_CORNER_R
     assert spec.V_APEX_Y < spec.RELIEF_HEIGHT
     assert "ExtrusionParameters(depth=V_CUT_LENGTH)" in _PART_SOURCE
@@ -1176,19 +1158,21 @@ def test_section_shows_the_tap_thread_on_a_visible_thin_layer() -> None:
 def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     import pn_pen_carriage_geom as carriage
 
-    # The E: the neck 9 x 18, the body 18.3 x 22.2, 18 tall.
-    assert part.V_BLOCK == pytest.approx(10228.68)
+    # The E: the neck .35 x .70, the body .72 x .86, 18.0 tall.
+    assert part.V_BLOCK == pytest.approx(
+        (8.89 * 17.78 + (27.178 - 8.89) * 21.844) * 18.0
+    )
     # Cut one corner radius past the step, the V's run there lies in the slot:
-    # the relief removes that much less.  The apex flat leaves its 2 x 1 tip
-    # standing: 35 of the sharp V's 36 mm^2; its two R0.5 rounds give back
-    # 0.011 mm^2 more along the whole cut.
-    assert part.V_GROOVE == pytest.approx(350.0)
-    assert part.V_APEX_FILLETS == pytest.approx(0.1076, abs=1e-4)
-    assert part.V_GROOVE_PAST_STEP == pytest.approx(34.989, abs=1e-3)
+    # the relief removes that much less.  The apex flat leaves its tip
+    # standing; its two R.020 rounds give back 0.011 mm^2 more along the
+    # whole cut.
+    assert part.V_GROOVE == pytest.approx(spec.V_GROOVE_AREA * (8.89 + 1.016))
+    assert part.V_APEX_FILLETS == pytest.approx(0.1100, abs=1e-4)
+    assert part.V_GROOVE_PAST_STEP == pytest.approx(35.516, abs=1e-3)
     # The carriage mass model cuts the relief square-cornered and leaves the
     # bore's top chamfer: both under 0.05% of the block.
     assert part.V_RELIEF + part.V_RELIEF_CORNERS + part.V_GROOVE_PAST_STEP == (
-        pytest.approx(1903.2)
+        pytest.approx(15.748 * 6.604 * (27.178 - 8.89))
     )
     corner_r, relief_h = spec.RELIEF_CORNER_R, spec.RELIEF_HEIGHT
     assert part.V_RELIEF_CORNERS == pytest.approx(
@@ -1197,11 +1181,11 @@ def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     assert 0.0 < part.V_RELIEF_CORNERS < 0.0005 * part.V_TOTAL
     assert 0.0 < part.V_PIVOT_CHAMFER < 0.0005 * part.V_TOTAL
     bore_length = spec.BLOCK_HEIGHT - spec.RELIEF_HEIGHT
-    assert part.V_PIVOT_BORE == pytest.approx(math.pi * 4.0 * bore_length)
+    assert part.V_PIVOT_BORE == pytest.approx(math.pi * 1.6002**2 * bore_length)
     tap_r = TAP_DRILL_MM[spec.SET_SCREW_TAP_SPEC.size] / 2.0
-    # The exact tap reaches past the bore wall's 9.1 from the front face on its
-    # axis, never past the bore axis.
-    assert spec.SET_SCREW_TAP_LENGTH == pytest.approx(9.1)
+    # The exact tap reaches past the bore wall's 9.32 from the front face on
+    # its axis, never past the bore axis.
+    assert spec.SET_SCREW_TAP_LENGTH == pytest.approx(9.3218)
     assert (
         math.pi * tap_r**2 * spec.SET_SCREW_TAP_LENGTH
         < part.V_SET_SCREW_TAP

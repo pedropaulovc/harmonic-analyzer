@@ -59,25 +59,29 @@ def test_spec_is_the_turned_brass_stud() -> None:
     assert spec.THREAD_MAJOR == pytest.approx(1.524)
     assert spec.THREAD_PITCH == pytest.approx(25.4 / 80.0)
     assert spec.OVERALL_LENGTH == pytest.approx(26.0)
-    assert (spec.HEAD_DIA, spec.HEAD_HEIGHT) == (6.0, 8.0)
-    assert spec.SHANK_LENGTH == pytest.approx(18.0)
-    assert spec.FULL_THREAD_LENGTH == 15.0
-    assert spec.PLAIN_SHANK == pytest.approx(3.0)
+    assert (spec.HEAD_DIA, spec.HEAD_HEIGHT) == pytest.approx(
+        (0.24 * 25.4, 0.32 * 25.4)
+    )
+    assert spec.SHANK_LENGTH == pytest.approx(26.0 - 0.32 * 25.4)
+    assert spec.FULL_THREAD_LENGTH == pytest.approx(0.58 * 25.4)
+    assert spec.PLAIN_SHANK == pytest.approx(26.0 - 0.90 * 25.4)
     assert spec.EYE_SPEC == HoleSpec("drilled_number", "#54")
     assert spec.EYE_DIA == pytest.approx(1.397)
-    assert spec.EYE_FROM_HEAD_END == pytest.approx(4.0)
-    assert spec.EYE_Y == pytest.approx(22.0)
+    assert spec.EYE_FROM_HEAD_END == pytest.approx(0.16 * 25.4)
+    assert spec.EYE_Y == pytest.approx(26.0 - 0.16 * 25.4)
     assert spec.THREAD_CALLOUT == "#0-80 UNF"
 
 
 def test_every_wall_round_the_eye_clears_rule_17_at_worst_case() -> None:
     """drawing-guidelines.md rule 17: the eye's end, shoulder-side and side
-    walls at the worst case of the printed bands (.X on the station, the head
-    height and the head Ø; DRILLED HOLES +0.10 on the #54) stay >= 1.5."""
+    walls at the worst case of the printed bands (.XX on the station, the head
+    height and the head Ø; DRILLED HOLES +.004 on the #54) stay >= the .080
+    target."""
+    from _inch_wall_limits import WALL_TARGET_MM
     from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
-    band = printed_band_mm(1)
-    eye_r = (spec.EYE_DIA + drilled_oversize_mm()) / 2.0
+    band = printed_band_mm(2, unit=spec.UNIT)
+    eye_r = (spec.EYE_DIA + drilled_oversize_mm(unit=spec.UNIT)) / 2.0
     end = spec.EYE_FROM_HEAD_END - band - eye_r
     shoulder = (spec.HEAD_HEIGHT - band) - (spec.EYE_FROM_HEAD_END + band) - eye_r
     side = (spec.HEAD_DIA - band) / 2.0 - eye_r
@@ -90,30 +94,34 @@ def test_every_wall_round_the_eye_clears_rule_17_at_worst_case() -> None:
         pytest.approx(shoulder),
         pytest.approx(side),
     )
-    assert end == pytest.approx(2.45, abs=0.01)
-    assert shoulder == pytest.approx(1.65, abs=0.01)
-    assert side == pytest.approx(1.85, abs=0.01)
-    assert min(end, shoulder, side) >= 1.5
+    assert end == pytest.approx(3.0607)
+    assert shoulder == pytest.approx(2.8067)
+    assert side == pytest.approx(2.1717)
+    assert min(end, shoulder, side) >= WALL_TARGET_MM
 
 
 def test_full_thread_covers_engagement_nut_and_adjustment() -> None:
-    """The shortest accepted full thread (title-block .X band) still carries
+    """The shortest accepted full thread (title-block .XX band) still carries
     the rod engagement, the jam nut and the adjustment; the worst-case
-    printed stack still leaves the die a pitch of run-out under the head
-    (drawing-guidelines.md rule 16)."""
+    printed stack (the overall length at its printed 1.024 +/-.005) still
+    leaves the die a pitch of run-out under the head (drawing-guidelines.md
+    rule 16)."""
     import pn_vn_pen_adjust_nut_spec as jam_nut
     from _printed_tolerance import printed_band_mm
 
-    band = printed_band_mm(1)
-    assert band == pytest.approx(0.8)
+    band = printed_band_mm(2, unit=spec.UNIT)
+    assert band == pytest.approx(0.254)
     assert spec.FULL_THREAD_LENGTH - band >= (
         pn_pen_rod_spec.STUD_ENGAGEMENT + jam_nut.THICKNESS + spec.ADJUSTMENT_RANGE
     )
-    worst_plain = (
-        (spec.OVERALL_LENGTH - band)
-        - (spec.HEAD_HEIGHT + band)
-        - (spec.FULL_THREAD_LENGTH + band)
+    overall_min = (1.024 - 0.005) * 25.4
+    assert spec.OVERALL_LENGTH + spec.OVERALL_DEVIATIONS[0] == pytest.approx(
+        overall_min
     )
+    worst_plain = (
+        overall_min - (spec.HEAD_HEIGHT + band) - (spec.FULL_THREAD_LENGTH + band)
+    )
+    assert worst_plain == pytest.approx(spec.PLAIN_SHANK_MIN)
     assert worst_plain >= spec.THREAD_PITCH
 
 
@@ -141,13 +149,13 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     } == spec.DRAWING_DIMENSIONS
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "ThreadDia": 3,
-        "FullThreadLength": 1,
-        "HeadDia": 1,
-        "HeadHeight": 1,
-        "OverallLength": 1,
-        "PlainDia": 2,
-        "EyeFromHeadEnd": 1,
-        "ShoulderRadius": 1,
+        "FullThreadLength": 2,
+        "HeadDia": 2,
+        "HeadHeight": 2,
+        "OverallLength": 3,
+        "PlainDia": 3,
+        "EyeFromHeadEnd": 2,
+        "ShoulderRadius": 3,
     }
 
 
@@ -155,23 +163,25 @@ def test_shoulder_root_is_a_modelled_max_radius() -> None:
     """Rule 16: the shank-to-head corner is a modelled fillet printed as R MAX,
     not a note and not sharp. Nothing seats on the head's underside (the jam
     nut bears on the rod top and never reaches the shoulder), so the radius
-    is bounded by the die's worst-case run-out alone; 0.2 is the largest one
-    place value inside it. No callout: there is no mate to name."""
+    is bounded by the die's worst-case run-out alone; R.008 MAX keeps the
+    stud's 0.2 mm corner well inside it. No callout: there is no mate to name."""
     import pn_vn_pen_adjust_nut_spec as jam_nut
     from _printed_tolerance import printed_band_mm
 
-    band = printed_band_mm(1)
-    assert spec.SHOULDER_FILLET_R == 0.2
+    band = printed_band_mm(2, unit=spec.UNIT)
+    assert spec.SHOULDER_FILLET_R == pytest.approx(0.008 * 25.4)
     assert spec.SHOULDER_FILLET_BAND == (0.0, -spec.SHOULDER_FILLET_R)
     assert spec.SHOULDER_FILLET_TOL_TYPE == 6  # swTolMAX
-    assert spec.SHOULDER_FILLET_PLACES == 1
-    limit = spec.PLAIN_SHANK - 3.0 * band - spec.THREAD_PITCH
+    assert spec.SHOULDER_FILLET_PLACES == 3
+    limit = spec.PLAIN_SHANK_MIN - spec.THREAD_PITCH
     assert spec.SHOULDER_FILLET_R_LIMIT == pytest.approx(limit)
-    assert spec.SHOULDER_FILLET_R <= limit < spec.SHOULDER_FILLET_R + 0.1
+    assert spec.SHOULDER_FILLET_R <= limit
     assert spec.THREAD_MAJOR / 2.0 + spec.SHOULDER_FILLET_R < (
         (spec.HEAD_DIA - band) / 2.0
     )
-    shortest_shank = (spec.OVERALL_LENGTH - band) - (spec.HEAD_HEIGHT + band)
+    shortest_shank = (spec.OVERALL_LENGTH + spec.OVERALL_DEVIATIONS[0]) - (
+        spec.HEAD_HEIGHT + band
+    )
     assert spec.SHOULDER_OVER_ROD_TOP_MIN == pytest.approx(
         shortest_shank - pn_pen_rod_spec.STUD_TAP_SPEC.depth_mm
     )

@@ -34,7 +34,7 @@ THREAD_PAST_MIN_PITCHES = 2
 # The existing 4.166 mm bore is rounded; do not label it as exact .164 in.
 DRAWING_REFERENCE_PRECISION = {"AcrossFlats": 0, "Height": 3, "ThreadNominalMajor": 3}
 SUPPLIER_FRACTION_DENOMINATOR = 4
-SUPPLIER_NOMINAL_MAJOR_MM = 0.164 * 25.4
+SUPPLIER_NOMINAL_MAJOR_MM = 4.1656  # .164
 SUPPLIER_REFERENCE_DIMENSIONS = (
     ("ThreadNominalMajor", SUPPLIER_NOMINAL_MAJOR_MM, "horizontal"),
 )
