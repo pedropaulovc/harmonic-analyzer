@@ -448,6 +448,124 @@ requirement(
     precision={"finish_ra": 1},
 )
 
+# The spindle-end face: the frame's x 0, the datum every printed station
+# measures from; the far end carries the printed length.
+requirement(
+    "bar_spindle_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), 0.0),),
+    requirements=(),
+    fields={
+        "normal": ([-1.0, 0.0, 0.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "x", "value": 0.0}, ("__frame__",)),
+    },
+)
+requirement(
+    "bar_far_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), BAR_LENGTH),),
+    requirements=("length",),
+    fields={
+        "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
+        "plane": (
+            {"frame": "model", "axis": "x", "value": BAR_LENGTH},
+            ("BAR_LENGTH",),
+        ),
+        "length": (
+            limits(BAR_LENGTH, part_spec.STATION_PLACES),
+            ("BAR_LENGTH", "STATION_PLACES"),
+        ),
+        "length_nominal": (BAR_LENGTH, ("BAR_LENGTH",)),
+    },
+    precision={"length": part_spec.STATION_PLACES},
+)
+# The +Y side: the width prints "STOCK" (STOCK_DIMENSIONS), so it carries the
+# nominal and that note but no machined acceptance band.
+requirement(
+    "bar_high_side",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), HIGH_SIDE_Y),),
+    requirements=(),
+    fields={
+        "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "plane": (
+            {"frame": "model", "axis": "y", "value": HIGH_SIDE_Y},
+            ("HIGH_SIDE_Y",),
+        ),
+        "width_nominal": (BAR_WIDTH, ("BAR_WIDTH", "STOCK_DIMENSIONS")),
+        "note": ("STOCK", ("STOCK_DIMENSIONS",)),
+    },
+)
+
+# The two through hold-down slots: two walls and two end arcs each, located
+# to their lower end centres (station from the spindle end, rise from the
+# faced -Y side); width and the end centres' run at .XX.
+for _name, _x, _y, _rise, _x_source, _y_source, _rise_source in (
+    (
+        "near_slot",
+        NEAR_SLOT_X,
+        part_spec.NEAR_SLOT_Y,
+        NEAR_SLOT_RISE,
+        "NEAR_SLOT_X",
+        "NEAR_SLOT_Y",
+        "NEAR_SLOT_RISE",
+    ),
+    (
+        "far_slot",
+        FAR_SLOT_X,
+        FAR_SLOT_Y,
+        FAR_SLOT_RISE,
+        "FAR_SLOT_X",
+        "FAR_SLOT_Y",
+        "FAR_SLOT_RISE",
+    ),
+):
+    requirement(
+        _name,
+        kind="slot",
+        faces=(
+            PlanarFace((1.0, 0.0, 0.0), _x - part_spec.SLOT_WIDTH / 2.0),
+            PlanarFace((-1.0, 0.0, 0.0), -(_x + part_spec.SLOT_WIDTH / 2.0)),
+            CylinderFace(part_spec.SLOT_WIDTH, contains_x_mm=_x),
+        ),
+        requirements=("width", "separation", "station", "height", "thru"),
+        fields={
+            # The end centre nearer the -Y side: the point the station and rise locate.
+            "at": (
+                [_x, _y - SLOT_RUN / 2.0, part_spec.BAR_THICK],
+                (_x_source, _y_source, "SLOT_RUN", "BAR_THICK"),
+            ),
+            "axis": _INTO_BAR,
+            "width": (
+                limits(part_spec.SLOT_WIDTH, part_spec.SLOT_PLACES),
+                ("SLOT_WIDTH", "SLOT_PLACES"),
+            ),
+            "width_nominal": (part_spec.SLOT_WIDTH, ("SLOT_WIDTH",)),
+            "separation": (
+                limits(SLOT_RUN, part_spec.SLOT_PLACES),
+                ("SLOT_RUN", "SLOT_PLACES"),
+            ),
+            "station": (
+                limits(_x, part_spec.STATION_PLACES),
+                (_x_source, "STATION_PLACES"),
+            ),
+            "station_nominal": (_x, (_x_source,)),
+            "height": (
+                limits(_rise, part_spec.STATION_PLACES),
+                (_rise_source, "STATION_PLACES"),
+            ),
+            "height_nominal": (_rise, (_rise_source,)),
+            "height_from": _FROM_LOW_SIDE,
+            "thru": (True, ("SLOT_WIDTH",)),
+        },
+        precision={
+            "width": part_spec.SLOT_PLACES,
+            "separation": part_spec.SLOT_PLACES,
+            "station": part_spec.STATION_PLACES,
+            "height": part_spec.STATION_PLACES,
+        },
+    )
+
 for _index, _x in enumerate(part_spec.RAIL_HOLE_X, start=1):
     # Baseline from the spindle-end face (the frame's x 0), in the rail
     # screws' clearance band, and from the faced -Y side at the title block's
@@ -468,7 +586,7 @@ for _index, _x in enumerate(part_spec.RAIL_HOLE_X, start=1):
     }
     requirement(
         f"rail_hole_{_index}",
-        kind="hole",
+        kind="threaded_hole",
         faces=(CylinderFace(part_spec.TAP_DRILL, contains_x_mm=_x),),
         requirements=("thread", "dia", "station", "height", "thru", "note"),
         fields={
