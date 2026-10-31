@@ -15,7 +15,7 @@ Layout (``sm_gooseneck_spring_screw_geom`` frame): axis Z, the under-head face
 at z=0.  ``HeadProfile`` revolves the flat-topped cylinder head in +Z (top
 face at HEAD_H), its under-face edge relieved by a 45-degree chamfer for the
 loop's transition wire; ``ShankProfile`` revolves the body in -Z: one plain
-cylinder from the R0.5 MAX under-head corner to a 45-degree tip chamfer.  The
+cylinder from the R.020 MAX under-head corner to a 45-degree tip chamfer.  The
 body and the thread share the basic major cylinder; the thread callout defines
 the thread.  The driver slot is sketched on a plane at the top face and cut
 SLOT_DEPTH down into the head along local X.  One hidden reference sketch,
@@ -39,8 +39,10 @@ from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -72,21 +74,15 @@ from _single_limit_tolerance import set_single_limit
 from _visibility import blank_reference_geometry
 from sm_gooseneck_spring_screw_geom import (
     BODY_DIA,
-    BODY_DIA_LOWER,
     BODY_DIA_TOL_TYPE,
-    BODY_DIA_UPPER,
     FULL_THREAD_STATION_MAX,
     FULL_THREAD_STATION_MAX_BAND,
     FULL_THREAD_STATION_MAX_TOL_TYPE,
     HEAD_DIA,
-    HEAD_DIA_LOWER,
     HEAD_DIA_TOL_TYPE,
-    HEAD_DIA_UPPER,
     HEAD_H,
     HEAD_RELIEF_CHAMFER,
-    HEAD_RELIEF_CHAMFER_LOWER,
     HEAD_RELIEF_CHAMFER_TOL_TYPE,
-    HEAD_RELIEF_CHAMFER_UPPER,
     LENGTH,
     OVERALL_LENGTH,
     PLAIN_LENGTH_MIN,
@@ -107,6 +103,8 @@ from sm_gooseneck_spring_screw_spec import (
     DRAWING_PRECISION,
     DRAWING_PRECISION_BY_NAME,
     ISOMETRIC_VIEW_NOTE,
+    PRINTED_BANDS,
+    UNIT,
 )
 
 PART_NAME = "sm-gooseneck-spring-screw"
@@ -218,8 +216,9 @@ def _limit_band(
 ) -> None:
     """A dimension as a native LIMIT band: SOLIDWORKS prints the upper and
     lower limits, the model value plus each deviation, at the dimension's own
-    places (build_mg_output_fixture._limit_band), never fewer than the
-    deviations need (_drawing_tolerances._set_tolerance_precision)."""
+    places (build_mg_output_fixture._limit_band).  #290: the mm model is off
+    the inch grid, so the deviations are not; the printed LIMITS are, and they
+    set the places (_drawing_tolerances._set_tolerance_precision)."""
     label = f"{name}@{feature}"
     display, dimension = _named_dimension(adapter, feature, name)
     lower, upper = deviations  # native API order, mm
@@ -237,16 +236,17 @@ def _limit_band(
         )
     ):
         raise RuntimeError(f"{label}: LIMIT tolerance readback changed")
+    value = float(dimension.SystemValue) * 1000.0
     places = _set_tolerance_precision(
         display,
-        deviations,
-        display_unit="mm",
+        (value + lower, value + upper),
+        display_unit=UNIT,
         label=label,
         places=DRAWING_PRECISION_BY_NAME[name],
     )
-    value = float(dimension.SystemValue) * 1000.0
     _telemetry.success(
-        f"{label}: LIMIT {value + upper:.{places}f}/{value + lower:.{places}f}"
+        f"{label}: LIMIT {(value + upper) / 25.4:.{places}f}/"
+        f"{(value + lower) / 25.4:.{places}f} in"
     )
 
 
@@ -275,8 +275,10 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
-    # The mm suffix is load-bearing: the equation manager reads bare numbers in
-    # document units.
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
+    # The mm suffix is load-bearing (INCH document): the equation manager reads
+    # bare numbers in document units.
     for name, value in (
         ("HeadDia", HEAD_DIA),
         ("HeadHeight", HEAD_H),
@@ -648,37 +650,23 @@ async def build(adapter) -> dict[str, str]:
         )
 
     # Model-owned limits (drawing-simplicity-policy.md `How the repository
-    # implements the guidelines`), owner rulings 2026-10-27 (#1951): the body
-    # Ø prints as the LIMIT band 6.32/6.20, the thread blank inside the
-    # 1/4-28 UNF-2A major band; the plain length as the single "3.60 MIN"
-    # from the under-head face, so the loop always bears on the plain body;
-    # the full-thread station as the single "5.71 MAX", so the end piece's
-    # counterbore clears the run-out; the head Ø and its relief chamfer as
-    # the LIMIT bands 11.60/11.40 and 1.50/1.40, so the loop's transition
-    # wire clears the head and the flat inside the relief still bears the
-    # loop.  Every other mark takes the title block's band.
-    _limit_band(
-        adapter,
-        "ShankProfile",
-        "BodyDia",
-        (BODY_DIA_LOWER, BODY_DIA_UPPER),
-        BODY_DIA_TOL_TYPE,
-    )
-    _limit_band(
-        adapter,
-        "HeadProfile",
-        "HeadDia",
-        (HEAD_DIA_LOWER, HEAD_DIA_UPPER),
-        HEAD_DIA_TOL_TYPE,
-    )
-    _limit_band(
-        adapter,
-        "HeadProfile",
-        "HeadReliefChamfer",
-        (HEAD_RELIEF_CHAMFER_LOWER, HEAD_RELIEF_CHAMFER_UPPER),
-        HEAD_RELIEF_CHAMFER_TOL_TYPE,
-    )
-    # The under-head corner's R0.5 MAX (codjiflo round 4 on #1997): the
+    # implements the guidelines`), owner rulings 2026-10-27 (#1951), printed
+    # in inches (#290, sm_gooseneck_spring_screw_spec.PRINTED_BANDS): the body
+    # Ø as the LIMIT band .248/.245, the thread blank inside the 1/4-28
+    # UNF-2A major band; the plain length as the single ".14 MIN" from the
+    # under-head face, so the loop always bears on the plain body; the
+    # full-thread station as the single ".225 MAX", so the end piece's
+    # counterbore clears the run-out; the head Ø and its relief chamfer as the
+    # LIMIT bands .456/.449 and .059/.056, so the loop's transition wire clears
+    # the head and the flat inside the relief still bears the loop.  Every
+    # other mark takes the title block's band.
+    for feature, name, tol_type in (
+        ("ShankProfile", "BodyDia", BODY_DIA_TOL_TYPE),
+        ("HeadProfile", "HeadDia", HEAD_DIA_TOL_TYPE),
+        ("HeadProfile", "HeadReliefChamfer", HEAD_RELIEF_CHAMFER_TOL_TYPE),
+    ):
+        _limit_band(adapter, feature, name, PRINTED_BANDS[name], tol_type)
+    # The under-head corner's R.020 MAX (codjiflo round 4 on #1997): the
     # modelled radius is the limit, the band runs from sharp up to it.
     set_single_limit(
         adapter,

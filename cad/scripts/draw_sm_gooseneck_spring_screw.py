@@ -7,11 +7,12 @@ under-face edge relieved for the spring's transition wire, over a plain
 screw carries no datum and no geometric-control frame (drawing-guidelines.md
 rule 5 (avoid excessive GD&T)): the body Ø, the head Ø and the head's relief
 chamfer print as the part's stacked LIMIT bands, the plain length as the part's
-single "3.60 MIN" and the full-thread station as its single "5.71 MAX", both
-from the under-head face, the under-head corner as its single "R0.5 MAX"
+single ".14 MIN" and the full-thread station as its single ".225 MAX", both
+from the under-head face, the under-head corner as its single "R.020 MAX"
 (codjiflo round 4 on #1997), and every other size is an ordinary model
 dimension at its part-authored places under the title block's band for those
-places (.X for the tip chamfer and the corner, .XX for the rest).
+places (.XX).  Decimal-inch sheet (#290); the model keeps its calibrated
+millimetre nominals, which print rounded on the inch grid.
 
 The screw axis is model +Z, so the ``*Right`` view already lays it horizontal
 as it sits in the lathe: model +Z runs to paper-LEFT, putting the head on the
@@ -63,25 +64,20 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from sm_gooseneck_spring_screw_geom import (
     BODY_DIA,
-    BODY_DIA_LOWER,
     BODY_DIA_TOL_TYPE,
-    BODY_DIA_UPPER,
     FULL_THREAD_STATION_MAX,
     FULL_THREAD_STATION_MAX_TOL_TYPE,
     HEAD_DIA,
-    HEAD_DIA_LOWER,
     HEAD_DIA_TOL_TYPE,
-    HEAD_DIA_UPPER,
     HEAD_H,
     HEAD_RELIEF_CHAMFER,
-    HEAD_RELIEF_CHAMFER_LOWER,
     HEAD_RELIEF_CHAMFER_TOL_TYPE,
-    HEAD_RELIEF_CHAMFER_UPPER,
     LENGTH,
     OVERALL_LENGTH,
     PLAIN_LENGTH_MIN,
@@ -98,6 +94,7 @@ from sm_gooseneck_spring_screw_spec import (
     DIMENSION_CALLOUTS_BY_NAME,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    PRINTED_BANDS,
     REFERENCE_DIMENSIONS,
     THREAD_CALLOUT,
 )
@@ -402,9 +399,7 @@ PRINTED_DIMENSIONS: dict[str, tuple[float, int]] = {
 # Every LIMIT row's (lower, upper) deviations, mm: a LIMIT row without its
 # band would skip the deviation readback, so the two must name the same rows.
 LIMIT_DEVIATIONS: dict[str, tuple[float, float]] = {
-    "BodyDia": (BODY_DIA_LOWER, BODY_DIA_UPPER),
-    "HeadDia": (HEAD_DIA_LOWER, HEAD_DIA_UPPER),
-    "HeadReliefChamfer": (HEAD_RELIEF_CHAMFER_LOWER, HEAD_RELIEF_CHAMFER_UPPER),
+    name: PRINTED_BANDS[name] for name in ("BodyDia", "HeadDia", "HeadReliefChamfer")
 }
 if set(LIMIT_DEVIATIONS) != {
     name for name, (_, kind) in PRINTED_DIMENSIONS.items() if kind == _TOL_LIMIT
@@ -608,7 +603,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _verify_source_dimensions(adapter.currentModel)
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,

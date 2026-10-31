@@ -70,6 +70,7 @@ from sm_vn_knife_hanger_stud_spec import (
     SUPPLIER_STOCK_CONFIGURATION,
     SUPPLIER_STOCK_SUPPRESSED_FEATURES,
     SUPPLIER_STOCK_TITLE,
+    UNIT,
 )
 
 PART_NAME = "sm-vn-knife-hanger-stud"
@@ -331,7 +332,8 @@ def _manufacturing_controls(adapter) -> None:
         )
     # The leg's band holds the chamfer inside the charged incomplete pitch.
     set_dimension_symmetric_tolerance(
-        adapter, "StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_TOLERANCE
+        adapter, "StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_TOLERANCE,
+        display_unit=UNIT,
     )
     # The driving 45-degree angle keeps its title-block band natively;
     # swTolGeneral prints no band and leaves the title block's row in force.

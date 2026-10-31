@@ -7,7 +7,7 @@ Dimension import and curation live in ``_drawing_dimension_import``.
 
 A large green cast-iron first-class lever hung on hex knife-edge trunnions (no
 bore): a coefficients plate on the +X arm carrying the 20 channel-spring anchor
-taps, a solid pivot cylinder (152.4 long, along Z), and a summation arm
+taps, a solid pivot cylinder (6.00 long, along Z), and a summation arm
 reaching to the tapped counter-spring anchor boss on the -X arm.  Both spring
 anchors are purchased eyebolts that thread straight into those taps, so the
 print controls thread identity and position, never a seat bore. Sheet 1
@@ -17,7 +17,9 @@ view, and a shaded underside isometric. VIEW F carries the blind bracket
 receivers, the uniform coefficient plate's visible free-end thickness and
 the receiver row's centreline below the unchanged hex centre.
 The ordinary views and native receiver drill/thread-depth callout retain
-the manufacturing definition without auxiliary sections.
+the manufacturing definition without auxiliary sections.  The sheet prints
+decimal inch (the part's ``drawing_unit: in``); the model keeps its
+millimetre nominals.
 
 Run with SolidWorks open::
 
@@ -63,7 +65,8 @@ from _drawing_hidden_sketches import (
     curate_view_dimensions as curate_hidden_dimensions,
     part_sketches_shown,
 )
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _drawing_precision import set_dimension_display_precision
 from _drawing_leader_notes import add_leader_note
 from _drawing_leaders import dimension_segments, set_near_side_diameter
 from _drawing_notes import add_property_linked_note
@@ -72,31 +75,38 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
+from _part_properties import part_drawing_unit
 from _printed_tolerance import printed_band_mm
 from _named_views import octant_view_name
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
-from _surface_finish import MACHINED, MACHINED_UM, surface_finish_by_key
+from _surface_finish import MACHINED_UM, ra, surface_finish_by_key
 import _telemetry
 from magnifying_bracket_joint_layout import (
     DRILL_DEPTH,
-    DRILL_DEPTH_DEVIATIONS,
+    DRILL_DEPTH_BAND,
     LEVER_HOLE_POINTS,
+    RECEIVER_HOLE_PLACES,
     RECEIVER_ROW_Y,
     TAP_DRILL_DIA,
     THREAD_DEPTH,
 )
 from sm_summing_lever_notes import (
     BACK_VIEW_LETTER,
+    BASIC_PLACES,
     BOSS_Z_CALLOUT,
     BRACKET_TAP_CALLOUT_PROCESS,
+    BRACKET_TAP_PRECISION,
+    COUNTER_TAP_PRECISION,
     CYLINDER_REFERENCE_Z,
     DIMENSION_CALLOUTS_ABOVE,
     DIMENSION_CALLOUTS_BELOW,
     DRAWING_DIMENSIONS,
+    FACE_LOCATION_PLACES,
     FRONT_VIEW_LETTER,
     SPRING_TAP_CALLOUT_PROCESS,
+    SPRING_TAP_PRECISION,
     RECEIVER_ISOMETRIC_OCTANT,
 )
 from sm_summing_lever_spec import (
@@ -109,7 +119,7 @@ from sm_summing_lever_spec import (
     COUNTER_HOLE_SPEC,
     COUNTER_WEB_T,
     DRAWING_PRECISION,
-    GEOMETRIC_TOLERANCES_MM,
+    GEOMETRIC_TOLERANCES_IN,
     HEX_DEPTH,
     HEX_H,
     HOLE_COUNT,
@@ -127,6 +137,7 @@ from sm_summing_lever_spec import (
     RIDGE_ANGLE_DEG,
     SURFACE_FINISHES,
     TIP_X,
+    UNIT,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -286,6 +297,10 @@ def _boss_face_location_check(adapter: Any, front: Any) -> Callable[[], None]:
         text_xy=BOSS_FACE_LOCATION_XY, label=label, orientation="vertical",
         entities=(boss.edge, plate.edge),
     )
+    # The exact .275 prints at three places under the title block's .XXX.
+    set_dimension_display_precision(
+        adapter, "drawing", label, FACE_LOCATION_PLACES, display=dimension,
+    )
 
     def check_faces() -> None:
         drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
@@ -300,13 +315,9 @@ def _boss_face_location_check(adapter: Any, front: Any) -> Callable[[], None]:
         native = _early_bound(display.GetDimension2(0), "IDimension")
         tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
         places = display.GetPrimaryPrecision2()
-        if places == -2:  # swPrecisionFollowsDocumentSetting
-            extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
-            # Same linear-document precision readback as draw_ch_pivot_bracket.
-            places = extension.GetUserPreferenceInteger(24, 206)
-        if places != 2 or tolerance.Type != 0:  # ordinary .XX, no explicit band
-            raise RuntimeError(f"{label}: lost ordinary two-place title-block control")
-        _telemetry.success(f"{label}: native face-attached {measured:.6f} mm at .XX")
+        if places != FACE_LOCATION_PLACES or tolerance.Type != 0:  # title block, no band
+            raise RuntimeError(f"{label}: lost its .XXX title-block control")
+        _telemetry.success(f"{label}: native face-attached {measured:.6f} mm at .XXX")
 
     check_faces()
     return check_faces
@@ -417,6 +428,10 @@ def _knife_height_location_check(adapter: Any, back: Any) -> Callable[[], None]:
         raise RuntimeError(f"{label}: native vertical dimension was not created")
     display = _early_bound(raw_dimension, "IDisplayDimension")
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    # The ridge-to-top .102 holds the knife geometry at three places.
+    set_dimension_display_precision(
+        adapter, "drawing", label, FACE_LOCATION_PLACES, display=display,
+    )
 
     def check_height() -> None:
         if drawing.ActivateSheet(SHEET_NAMES[1]) is not True:
@@ -438,12 +453,9 @@ def _knife_height_location_check(adapter: Any, back: Any) -> Callable[[], None]:
         native = _early_bound(display.GetDimension2(0), "IDimension")
         tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
         places = display.GetPrimaryPrecision2()
-        if places == -2:
-            extension = _early_bound(draw.Extension, "IModelDocExtension")
-            places = extension.GetUserPreferenceInteger(24, 206)
-        if places != 2 or tolerance.Type != 0:
-            raise RuntimeError(f"{label}: lost ordinary two-place title-block control")
-        _telemetry.success(f"{label}: native sharp/face-attached {measured:.6f} mm at .XX")
+        if places != FACE_LOCATION_PLACES or tolerance.Type != 0:
+            raise RuntimeError(f"{label}: lost its .XXX title-block control")
+        _telemetry.success(f"{label}: native sharp/face-attached {measured:.6f} mm at .XXX")
 
     check_height()
     return check_height
@@ -745,7 +757,7 @@ RIDGE_DATUM_RISE = 0.001
 
 def _ridge_datum(adapter: Any, detail: Any) -> Any:
     """Datum A on the knife-edge ridge itself, seen end-on in Detail D: the
-    tag stands on the R0.1 round's arc at the vertex. In the plan, A hung
+    tag stands on the R.004 round's arc at the vertex. In the plan, A hung
     on the -Z ridge's tangent line down the stub's middle, which machinist
     review r9 read as a flat face, leaving no basic from A to the 20 holes;
     end-on it can only be the ridge line, the knife-edge pivot axis that the
@@ -1622,7 +1634,7 @@ def _receiver_axis_centerline(adapter: Any, back: Any) -> Any:
 
 
 # VIEW G carries the shared positive rib profile and its derived reach.
-# The title block owns the R1 MAX ceiling. The web's flush caption stands
+# The title block owns the R.040 MAX ceiling. The web's flush caption stands
 # entirely above the boss's upper witness; 19.05 has no centering caption.
 FRONT_KEEP = {
     "AnchorHeight": (0.145, 0.235),
@@ -1642,7 +1654,7 @@ KNIFE_HEIGHT_LOCATION_XY = (0.4035, 0.128)
 # outside its own model-side span. Back reverses X: RidgeFromLeft prints
 # right, RidgeFromRight left, and the +X flank's exterior wedge is left.
 # Keep that native angle arc; its complete text moves to a separate shelf.
-# R0.1 MAX stands right of the X155.4 mm witness, with a shallow arrow
+# R.004 MAX stands right of the X155.4 mm witness, with a shallow arrow
 # clear of A. Only the two ridge-side witnesses get a local gap above A.
 DETAIL_KEEP = {
     "HexWidth": (0.203, 0.083),
@@ -1799,23 +1811,25 @@ def _dress_bracket_depth_callout(callout: Any) -> None:
                     "persist as a MIN limit"
                 )
             continue
-        lower, upper = DRILL_DEPTH_DEVIATIONS
-        ordinary_band = printed_band_mm(2)
-        if not (
-            math.isclose(lower, -ordinary_band)
-            and math.isclose(upper, ordinary_band)
+        # The source band is the title block's own row at the callout's places
+        # on this sheet's unit (accessor, not a parsed display string).
+        if not math.isclose(
+            DRILL_DEPTH_BAND, printed_band_mm(RECEIVER_HOLE_PLACES, unit=UNIT)
         ):
             raise RuntimeError("bracket tap drill depth must retain its ordinary symmetric band")
         # As for the knife-mount drill-angle callout, suppress only the
-        # variable's explicit band. Native 6.50 then inherits .XX ±0.51;
+        # variable's explicit band. Native .256 then inherits .XXX ±.005;
         # the source Hole Wizard dimension keeps its bounded symmetric band.
         variable.ToleranceType = 0  # swTolType_e.swTolNONE
-        length.Precision = 2
-        if int(variable.ToleranceType) != 0 or int(length.Precision) != 2:
+        length.Precision = RECEIVER_HOLE_PLACES
+        if (
+            int(variable.ToleranceType) != 0
+            or int(length.Precision) != RECEIVER_HOLE_PLACES
+        ):
             raise RuntimeError(
                 f"bracket mounting callout tolerance for {variable_name} did not "
-                f"persist: wanted inherited .XX band {DRILL_DEPTH_DEVIATIONS!r} "
-                "mm at 2 places"
+                f"persist: wanted the inherited title-block band +/-{DRILL_DEPTH_BAND} "
+                f"mm at {RECEIVER_HOLE_PLACES} places"
             )
     if required_depths:
         raise RuntimeError(f"bracket tap callout omits native depths: {required_depths}")
@@ -1853,7 +1867,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -1935,12 +1953,13 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=(0.145, 0.140),
         label="anchor tap",
     )
+    set_hole_callout_precision(anchor_callout, COUNTER_TAP_PRECISION, label="anchor tap")
 
     # Datum A is the common knife-edge pivot ridge, tagged in Detail D on sheet 2.
     # One sweep of the plan's visible edges serves every
     # named pick below.  The ridge is the hexagon's top vertex line, y =
     # HEX_H/2 (vertex-up sketch centred on the pivot axis,
-    # build_sm_summing_lever._hex_knife), rounded at R0.1 MAX: the plan shows
+    # build_sm_summing_lever._hex_knife), rounded at R.004 MAX: the plan shows
     # the round's two tangent lines 0.05 sheet mm either side of it, and the
     # finish names the +X one (the edge of the upper-right face it controls)
     # by entity.  A SolidWorks Top view reverses model Z on the sheet: the
@@ -1977,7 +1996,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # 20X position frame (y 0.192); its leader enters the stub's right side.
     knife_um = surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge").roughness_um
     if knife_um != MACHINED_UM:
-        raise AssertionError(f"-Z knife-edge symbol prints {MACHINED}, not {knife_um}")
+        raise AssertionError(f"-Z knife-edge symbol prints {MACHINED_UM}, not {knife_um}")
     add_surface_finish(
         adapter,
         top,
@@ -1986,7 +2005,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ).edge,
         leader_attach_xy=_top_xy(ridge_x, stub_mid_z),
         symbol_xy=(0.233, 0.1828),
-        roughness_ra=MACHINED,
+        roughness_ra=ra(MACHINED_UM, unit=UNIT),
         label="-Z knife-edge ridge finish",
         char_height=0.0025,
     )
@@ -2129,6 +2148,9 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_types=ridge_entity_types,
     )
     set_basic_dimension(adapter, row_x, label="spring-hole row X")
+    set_dimension_display_precision(
+        adapter, "drawing", "spring-hole row X", BASIC_PLACES, display=row_x,
+    )
     seed_rim_top = _top_xy(HOLE_X, -HOLE_Z_LAST + HOLE_DIA / 2.0)
     # The start Z (12.75) spans 6.4 mm of sheet (0.0919..0.0983); text between
     # the arrows would sit on its own line (3.35 there stood on 7.06's extension
@@ -2155,6 +2177,9 @@ async def build(adapter: Any) -> dict[str, str]:
         entities=(end_edge.edge, seed_rim.edge),
     )
     set_basic_dimension(adapter, start_z, label="spring-hole start Z")
+    set_dimension_display_precision(
+        adapter, "drawing", "spring-hole start Z", BASIC_PLACES, display=start_z,
+    )
     second_rim_bottom = _top_xy(
         HOLE_X, -HOLE_Z_LAST + CHANNEL_PITCH - HOLE_DIA / 2.0
     )
@@ -2176,6 +2201,9 @@ async def build(adapter: Any) -> dict[str, str]:
         entities=(seed_rim.edge, second_rim.edge),
     )
     set_basic_dimension(adapter, pitch, label="spring-hole pitch")
+    set_dimension_display_precision(
+        adapter, "drawing", "spring-hole pitch", BASIC_PLACES, display=pitch,
+    )
     # Twenty taps are nineteen pitches: the count rides the BASIC pitch as
     # its prefix, read back because SetText reports nothing.
     pitch_display = _early_bound(pitch, "IDisplayDimension")
@@ -2203,6 +2231,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spring-hole pattern",
         process=SPRING_TAP_CALLOUT_PROCESS,
     )
+    set_hole_callout_precision(
+        spring_callout, SPRING_TAP_PRECISION, label="spring-hole pattern"
+    )
     # The Top view reverses model Z, so -HOLE_Z_FIRST prints the seed hole at
     # the TOP of the column. The frame sits above the +Z trunnion stub with
     # its right stub ending over the rim, so the leader drops just past the
@@ -2225,7 +2256,7 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=_top_xy(HOLE_X - rim_step, -HOLE_Z_FIRST + rim_step),
         frame_xy=(0.2133, 0.199),
         characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"],
+        tolerance=GEOMETRIC_TOLERANCES_IN["spring-hole pattern position"],
         datums=("A", "B"),
         diameter=True,
         quantity="20X",
@@ -2280,6 +2311,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, back, edge=mounting_rims[0].edge,
         callout_xy=MOUNTING_CALLOUT_XY, label="two blind bracket mounting taps",
         process=BRACKET_TAP_CALLOUT_PROCESS,
+    )
+    set_hole_callout_precision(
+        mounting_callout, BRACKET_TAP_PRECISION, label="two blind bracket mounting taps"
     )
     _dress_bracket_depth_callout(mounting_callout)
     back_annotations = curate_hidden_dimensions(

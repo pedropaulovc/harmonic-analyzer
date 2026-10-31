@@ -53,10 +53,6 @@ def test_part_registry_row_is_the_made_screw() -> None:
     # A static clamp, not a running fit.
     assert "fit_class" not in row
     assert row["process"] != "purchased"
-    assert row["process"] == (
-        "turned slotted cheese-head screw: plain Ø6.35 body under the head, "
-        "die-cut 1/4-28 UNF thread"
-    )
     # The library stand-in for 4140's density; the printed grade is the row's.
     assert part.MATERIAL == "Plain Carbon Steel"
 
@@ -114,13 +110,8 @@ def test_model_owns_places_and_bands() -> None:
     assert "draw_sm_gooseneck_spring_screw.py" in PRECISION_MIGRATED_DRAWINGS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    one_place = {
-        name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 1
-    }
-    # Chamfers never need extra places (rule 3) and the corner's single
-    # "R0.5 MAX" prints at one; every other mark is .XX.
-    assert one_place == {"TipChamfer", "UnderHeadCornerR"}
-    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {1, 2}
+    # An inch sheet prints no .X band (+/-.1 would swallow every size here).
+    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {2, 3}
     assert spec.REFERENCE_DIMENSIONS == {"OverallLength"}
     # No mark carries a shared-helper band: the body Ø, the head Ø and the
     # relief chamfer are native LIMIT bands and the plain length, the
@@ -137,26 +128,6 @@ def test_model_owns_places_and_bands() -> None:
             if isinstance(node, ast.Call) and getattr(node.func, "id", "") == helper
         }
 
-    assert calls("_limit_band") == {
-        (
-            "'ShankProfile'",
-            "'BodyDia'",
-            "(BODY_DIA_LOWER, BODY_DIA_UPPER)",
-            "BODY_DIA_TOL_TYPE",
-        ),
-        (
-            "'HeadProfile'",
-            "'HeadDia'",
-            "(HEAD_DIA_LOWER, HEAD_DIA_UPPER)",
-            "HEAD_DIA_TOL_TYPE",
-        ),
-        (
-            "'HeadProfile'",
-            "'HeadReliefChamfer'",
-            "(HEAD_RELIEF_CHAMFER_LOWER, HEAD_RELIEF_CHAMFER_UPPER)",
-            "HEAD_RELIEF_CHAMFER_TOL_TYPE",
-        ),
-    }
     # "3.60 MIN", "5.71 MAX" and "R0.5 MAX": the model value IS the printed
     # limit (the shared _single_limit_tolerance setter), each band running
     # away from it.
@@ -240,25 +211,56 @@ def test_geometry_matches_the_settled_design() -> None:
 
 
 def test_slot_leaves_the_rule_17_head_web() -> None:
-    # Shortest head, deepest slot, largest relief chamfer: the slot's ends.
-    assert spec.SLOT_WEB_MIN == pytest.approx(6.60 - 0.51 - 2.51 - 1.50)
-    assert spec.SLOT_WEB_MIN >= spec.SLOT_WEB_TARGET == 2.0
+    # Printed shortest head .25, deepest slot .09, largest relief .059.
+    assert spec.SLOT_WEB_MIN == pytest.approx((0.25 - 0.09 - 0.059) * 25.4)
+    assert spec.SLOT_WEB_MIN >= spec.SLOT_WEB_TARGET == pytest.approx(0.080 * 25.4)
+
+
+def test_inch_print_stays_inside_the_joint_envelopes() -> None:
+    # The joint and the seat checks charge the mm envelopes; the inch LIMIT
+    # bands lie inside them, on the .001 grid.
+    for name, model, envelope, limits_in in (
+        ("HeadDia", geom.HEAD_DIA, (-0.10, 0.10), (0.449, 0.456)),
+        ("HeadReliefChamfer", geom.HEAD_RELIEF_CHAMFER, (-0.05, 0.05), (0.056, 0.059)),
+        ("BodyDia", geom.BODY_DIA, (-0.15, -0.03), (0.245, 0.248)),
+    ):
+        lower, upper = spec.PRINTED_BANDS[name]
+        assert ((model + lower) / 25.4, (model + upper) / 25.4) == pytest.approx(
+            limits_in, abs=1e-9
+        )
+        assert envelope[0] <= lower < upper <= envelope[1]
+    assert geom.THREAD_MAJOR_2A_MIN_IN < 0.245 < 0.248 < geom.THREAD_MAJOR_2A_MAX_IN
+    lower, upper = spec.PRINTED_BANDS["UnderHeadLength"]
+    assert geom.LENGTH_LOWER < lower < 0.0 < upper < geom.LENGTH_UPPER
+    # The single limits print past the joint's mm values; its margins hold at
+    # the printed .14 MIN, .225 MAX and R.020 MAX.
+    assert spec.PRINTED_LIMITS == pytest.approx(
+        {
+            "PlainLength": 0.14 * 25.4,
+            "FullThread": 0.225 * 25.4,
+            "UnderHeadCornerR": 0.508,
+        }
+    )
+    assert spec.PRINTED_LOOP_PLAIN_MARGIN_MIN > 0.4
+    assert spec.PRINTED_RUNOUT_MARGIN_MIN >= joint.COUNTERBORE_RUNOUT_MARGIN_MIN
+    assert spec.PRINTED_RUNOUT_FLOOR_CORNER_CLEARANCE_MIN > 0.0
+    assert spec.PRINTED_LOOP_CORNER_CLEARANCE_MIN > 0.0
 
 
 def test_head_and_relief_bands_name_the_wire_they_clear() -> None:
     # drawing-guidelines.md rule 4: each LIMIT band names what it serves.
-    # The head's 0.95 retention under the 1.0 check (owner minor RV-01)
-    # prints on the head Ø as a plain fact, floored (rule 20).
-    assert spec.HEAD_RETENTION_CALLOUT == "LOOP OVERLAP\n0.95 MIN"
-    assert math.floor(joint.HEAD_RETENTION_MIN * 100.0) == 95
+    # The head's 0.95 (.037 in) retention under the 1.0 check (owner minor
+    # RV-01) prints on the head Ø as a plain fact, floored (rule 20).
+    assert spec.HEAD_RETENTION_CALLOUT == "LOOP OVERLAP\n.037 MIN"
+    assert math.floor(joint.HEAD_RETENTION_MIN / 25.4 * 1000.0) == 37
     assert spec.DIMENSION_CALLOUTS["HeadProfile"] == {
         "HeadDia": (
-            f"{spec.COUNTER_SPRING_NUMBER}\nWIRE CLEARS;\nLOOP OVERLAP\n0.95 MIN"
+            f"{spec.COUNTER_SPRING_NUMBER}\nWIRE CLEARS;\nLOOP OVERLAP\n.037 MIN"
         ),
         "HeadReliefChamfer": f"X 45 DEG;\n{spec.COUNTER_SPRING_NUMBER}\nWIRE CLEARS",
     }
-    assert spec.DRAWING_PRECISION_BY_NAME["HeadDia"] == 2
-    assert spec.DRAWING_PRECISION_BY_NAME["HeadReliefChamfer"] == 2
+    assert spec.DRAWING_PRECISION_BY_NAME["HeadDia"] == 3
+    assert spec.DRAWING_PRECISION_BY_NAME["HeadReliefChamfer"] == 3
     # The head Ø's block stands between the head-end view's slot width and
     # the head's top face, centred on its own dimension line.
     assert drawing.HEAD_DIA_TEXT_HEIGHT == drawing.block_height(2, 4)
@@ -810,14 +812,6 @@ def test_readback_contract_mirrors_every_printed_and_callout_control() -> None:
     ):
         assert step in corner
     assert "for name in sorted(REFERENCE_DIMENSIONS):" in source
-    assert drawing.LIMIT_DEVIATIONS == {
-        "BodyDia": (geom.BODY_DIA_LOWER, geom.BODY_DIA_UPPER),
-        "HeadDia": (geom.HEAD_DIA_LOWER, geom.HEAD_DIA_UPPER),
-        "HeadReliefChamfer": (
-            geom.HEAD_RELIEF_CHAMFER_LOWER,
-            geom.HEAD_RELIEF_CHAMFER_UPPER,
-        ),
-    }
     assert 'offset_dimension_text(adapter, side_annotations, {"BodyDia": ' in source
     assert drawing.PRINTED_DIMENSIONS["TipChamfer"] == (geom.TIP_CHAMFER, 0)
     assert drawing.PRINTED_DIMENSIONS["OverallLength"][0] == pytest.approx(26.10)

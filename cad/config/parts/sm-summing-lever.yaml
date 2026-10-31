@@ -4,18 +4,19 @@ sm-summing-lever:
   finish: green enamel; mask knife edges and tapped holes; oil bare machined surfaces
   quantity: 1
   tolerance_class: machined_block
+  drawing_unit: in
   process: "machined from solid stock"
-  # Option A: uniform coefficient slab X0..44.45, Y-4.46..2.54, Z+/-76.20,
-  # 7.00 thick downward from the unchanged spring top; counter web stays
-  # 5.08 centred. Shared positive rib: R15.24 wrap, tangent flanks and R1
-  # blends into both coefficient faces at X35.75. The title block owns the
-  # R1 MAX ceiling; bounded native profile-blend and rib inner-cap-root guards
+  # Option A: uniform coefficient slab X0..1.75, Y-.176..+.100, Z+/-3.00,
+  # .276 thick downward from the unchanged spring top; counter web stays
+  # .20 centred. Shared positive rib: R.60 wrap, tangent flanks and R.040
+  # blends into both coefficient faces at X1.41. The title block owns the
+  # R.040 MAX ceiling; bounded native profile-blend and rib inner-cap-root guards
   # against plate, cylinder and counter web remain. A separate lower longitudinal
   # plate/cylinder family joins the inboard rib caps without tangent propagation.
   # Its source contract is implemented; fresh native corner/interface proof is pending.
   # No blend may reach receiver entry caps or knife shoulders. Not general body fillets.
-  # Spring/nut seats, Ø0.15 pattern and #1769 footprint stay put.
-  # The 9.00 receiver extends inward only; entry face and axes stay fixed.
+  # Spring/nut seats, Ø.006 pattern and #1769 footprint stay put.
+  # The .354 receiver extends inward only; entry face and axes stay fixed.
   # Pad/ledge exceptions are eliminated; unchanged-junction RV-02 remains.
   # Knife-root radius/hardness debt stays separate from the proved rib roots.
   # Native drawing contains six views on two sheets, reduced from nine views.
@@ -23,18 +24,18 @@ sm-summing-lever:
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "the knife-seat and 20-hole spring-pattern position frame (Ø0.15 RFS)"
+      where: "the knife-seat and 20-hole spring-pattern position frame (Ø.006 RFS)"
       finding: "pattern position frame over-specified (rule 5)"
-      reason: "one pattern control keeps the 20 channels spring geometry consistent; its Ø0.15 zone, tightened from Ø0.30 by owner ruling on code review C06, keeps neighbouring MHA-CH-14 jam nuts 0.25 apart with both taps at their worst (owner-accepted)"
+      reason: "one pattern control keeps the 20 channels spring geometry consistent; its Ø.006 zone, tightened from Ø.012 by owner ruling on code review C06, keeps neighbouring MHA-CH-14 jam nuts .010 apart with both taps at their worst (owner-accepted)"
     # Carry forward b2c8d954 RV-02 only at the unchanged junctions below.
-    # The moved coefficient underside, eliminated pad step and proved R1 roots are excluded.
+    # The moved coefficient underside, eliminated pad step and proved R.040 roots are excluded.
     - id: "RV-02"
       kind: "accept"
       where: "the unchanged longitudinal coefficient-plate-top-to-pivot-cylinder and counter-web-to-pivot-cylinder junctions between rib caps; boss-to-counter-web and boss-to-negative-X-middle-rib-flank junctions; negative-X middle-rib-flank-to-counter-web face creases; and knife-stub-to-end-rib shoulders"
       finding: "sharp internal corners retained without modelled blends (rules 11, 16)"
-      reason: "owner ruling 2026-10-18, already authorized in b2c8d954 RV-02: machined from solid with an R1.0 MAX inside-corner ceiling, now carried by the shop-wide title-block row. Carry that authorization forward only for the listed unchanged junctions. The moved coefficient-plate-underside-to-cylinder junction is excluded: its separate bounded R1 MAX longitudinal fillet family is implemented under the owner's 2026-10-21 model-the-blend decision, with fresh native verification pending, not an extended sharp-corner exception. The eliminated pad step, modeled profile blends and now-filleted rib inner-cap side roots against plate, cylinder and counter web are also excluded. Unchanged knife-stub roots retain the separate #1625 local R0.5 MAX debt; knife material/hardness remains separate under #1611 (owner-accepted)"
+      reason: "owner ruling 2026-10-18, already authorized in b2c8d954 RV-02: machined from solid with an R.040 MAX inside-corner ceiling, now carried by the shop-wide title-block row. Carry that authorization forward only for the listed unchanged junctions. The moved coefficient-plate-underside-to-cylinder junction is excluded: its separate bounded R.040 MAX longitudinal fillet family is implemented under the owner's 2026-10-21 model-the-blend decision, with fresh native verification pending, not an extended sharp-corner exception. The eliminated pad step, modeled profile blends and now-filleted rib inner-cap side roots against plate, cylinder and counter web are also excluded. Unchanged knife-stub roots retain the separate #1625 local R.020 MAX debt; knife material/hardness remains separate under #1611 (owner-accepted)"
     - id: "RV-03"
       kind: "accept"
-      where: "front view, 2X R138.85 web arcs; words added to the Ø19.05 callout: 'WEB ARCS RUN FROM QUADRANTS TO AXIS A AT ENDS'"
+      where: "front view, 2X R5.47 web arcs; words added to the Ø.75 callout: 'WEB ARCS RUN FROM QUADRANTS TO AXIS A AT ENDS'"
       finding: "the web arc endpoints are defined only in words added to the boss-diameter callout, and the arc centres are never located"
-      reason: "owner ruling 2026-10-18: the arcs are non-functional web clearance, located by the boss Ø19.05 and stub geometry they join (owner-accepted)"
+      reason: "owner ruling 2026-10-18: the arcs are non-functional web clearance, located by the boss Ø.75 and stub geometry they join (owner-accepted)"

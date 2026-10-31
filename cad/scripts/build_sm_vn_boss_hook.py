@@ -68,11 +68,14 @@ from _drawing_tolerances import (
 from sm_vn_boss_hook_spec import (
     SHANK_LENGTH_MM,
     FINISHED_OVERALL_MM,
+    FINISHED_OVERALL_DEVIATIONS,
     FINISHED_OVERALL_TOLERANCE_MM,
     CHAMFER_WIDTH_MM,
+    CHAMFER_WIDTH_DEVIATIONS,
     CHAMFER_WIDTH_TOLERANCE_MM,
     CHAMFER_ANGLE_DEG,
     CHAMFER_ANGLE_TOLERANCE_DEG,
+    UNIT,
     DRAWING_DIMENSIONS,
     DIMENSION_PRECISION,
     DRAWING_NOTES,
@@ -127,36 +130,51 @@ def _manufacturing_controls(adapter) -> None:
         ):
             raise RuntimeError(f"{name}@{feature}: native precision did not persist")
     set_dimension_symmetric_tolerance(
-        adapter, "StockTrimProfile", "FinishedOverall", FINISHED_OVERALL_TOLERANCE_MM
+        adapter,
+        "StockTrimProfile",
+        "FinishedOverall",
+        FINISHED_OVERALL_TOLERANCE_MM,
+        display_unit=UNIT,
     )
     set_dimension_symmetric_tolerance(
-        adapter, "StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_TOLERANCE_MM
+        adapter,
+        "StockDeburrProfile",
+        "ChamferWidth",
+        CHAMFER_WIDTH_TOLERANCE_MM,
+        display_unit=UNIT,
     )
     set_dimension_symmetric_angular_tolerance(
         adapter, "StockDeburrProfile", "ChamferAngle", CHAMFER_ANGLE_TOLERANCE_DEG
     )
-    # General dimensions retain their numerical acceptance bands natively;
-    # swTolGeneral omits the redundant printed band in favour of the title block.
-    for feature, name, band in (
-        ("StockTrimProfile", "FinishedOverall", FINISHED_OVERALL_TOLERANCE_MM / 1000),
-        ("StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_TOLERANCE_MM / 1000),
+    # General dimensions retain their numerical acceptance bands natively:
+    # the printed band about the model (#290: the mm trim prints rounded in
+    # inches); swTolGeneral omits the redundant printed band in favour of the
+    # title block.
+    angle_band = math.radians(CHAMFER_ANGLE_TOLERANCE_DEG)
+    for feature, name, (lower, upper) in (
+        (
+            "StockTrimProfile",
+            "FinishedOverall",
+            (FINISHED_OVERALL_DEVIATIONS[0] / 1000, FINISHED_OVERALL_DEVIATIONS[1] / 1000),
+        ),
         (
             "StockDeburrProfile",
-            "ChamferAngle",
-            math.radians(CHAMFER_ANGLE_TOLERANCE_DEG),
+            "ChamferWidth",
+            (CHAMFER_WIDTH_DEVIATIONS[0] / 1000, CHAMFER_WIDTH_DEVIATIONS[1] / 1000),
         ),
+        ("StockDeburrProfile", "ChamferAngle", (-angle_band, angle_band)),
     ):
         _, dimension = _named_dimension(adapter, feature, name)
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         tolerance.Type = 11  # swTolType_e.swTolGeneral
-        if not tolerance.SetValues(-band, band):
+        if not tolerance.SetValues(lower, upper):
             raise RuntimeError(
                 f"{name}@{feature}: cannot retain general tolerance values"
             )
         if (
             int(tolerance.Type) != 11
-            or not math.isclose(float(tolerance.GetMinValue()), -band, abs_tol=1e-9)
-            or not math.isclose(float(tolerance.GetMaxValue()), band, abs_tol=1e-9)
+            or not math.isclose(float(tolerance.GetMinValue()), lower, abs_tol=1e-9)
+            or not math.isclose(float(tolerance.GetMaxValue()), upper, abs_tol=1e-9)
         ):
             raise RuntimeError(f"{name}@{feature}: general tolerance readback changed")
     for feature, names in DRAWING_DIMENSIONS.items():

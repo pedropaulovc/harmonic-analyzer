@@ -29,7 +29,7 @@ Seven features (the six .cs features + the hex knife edge):
    leaves PROTRUDE beyond the body (one per side), so each knife edge rests
    on a bearing support on the top plate (ch30-p003), and the stubs share
    every side face's plane by construction (code review C09).
-4. Edge ribs (x2)      -- common tangent R15.24 wrap/flank/R1 profile at the
+4. Edge ribs (x2)      -- common tangent R15.24 wrap/flank/R.040 profile at the
    plate ends, each 5.00 mm thick; the middle rib shares that thickness.
 5. Summation plate     -- Top-plane leaf on the -X (counter-spring) arm: vertical
    base edge, two curved sides, short tip edge.
@@ -67,6 +67,7 @@ import sys
 
 import _telemetry
 from _appearance import CASTING_GREEN, apply_color, apply_material
+from _document_units import apply_package_model_units
 from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound, _read_member
@@ -77,6 +78,7 @@ from _named_views import name_octant_views
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _paths import IN
+from _part_properties import part_drawing_unit
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
@@ -97,8 +99,9 @@ from magnifying_bracket_joint_layout import (
     TAP_SPEC,
     TAP_DRILL_DIA,
     DRILL_DEPTH,
+    DRILL_DEPTH_BAND,
     DRILL_POINT_DEPTH,
-    DRILL_DEPTH_DEVIATIONS,
+    RECEIVER_HOLE_PLACES,
     THREAD_DEPTH_BAND,
     RECEIVER_PILOT_WALL_MIN,
     receiver_pilot_material_wall_budget,
@@ -129,6 +132,7 @@ from sm_summing_lever_notes import (
     DRAWING_DIMENSIONS,
     FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
+    RECEIVER_COORDINATE_PLACES,
     RECEIVER_ISOMETRIC_OCTANT,
     RECEIVER_ISOMETRIC_VIEW_NOTE,
 )
@@ -147,18 +151,23 @@ from sm_summing_lever_spec import (
     HOLE_X,
     HOLE_Z_OFFSET,
     KNIFE_FLANK_TO_SIDE_TOL_DEG,
+    KNIFE_ENVELOPE_PLACES,
     KNIFE_RIDGE_R,
     KNIFE_RIDGE_R_BAND,
+    KNIFE_RIDGE_R_PLACES,
     KNIFE_RIDGE_R_TOL_TYPE,
+    PLATE_W_DEVIATIONS,
     RIDGE_ANGLE_DEG,
     RIDGE_FROM_SIDE_TOL,
     RIB_BLEND_R,
     RIB_BLEND_R_BAND,
+    RIB_BLEND_R_PLACES,
     RIB_BLEND_R_TOL_TYPE,
     RIB_REACH,
     RIB_T,
     RIB_WRAP_R,
     SURFACE_FINISHES,
+    UNIT,
 )
 from sm_summing_lever_profile import LOWER, UPPER, edge_rib_added_area_mm2
 from sm_summing_lever_profile import receiver_pilot_wall_budget, receiver_wall_margin
@@ -220,9 +229,9 @@ RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # both edge-rib inner caps; outside ends fix
 # No plain anchor bore: the counter anchor's seat is the native COUNTER_HOLE_SPEC
 # tap through the boss, authored after the ribs (see _counter_anchor_tap).
 # In X, all ribs stop at 35.75 before the unchanged spring-hole column and
-# worst jam-nut footprint at 36.45. The pilot continues beyond the 5.00 mm
+# worst jam-nut footprint at 36.449. The pilot continues beyond the 5.00 mm
 # entry rib into the connected coefficient plate, not an enlarged receiver.
-# The shared positive-X branch meets both plate faces with R1 tangent
+# The shared positive-X branch meets both plate faces with R.040 tangent
 # transitions, with no separate pad, ledge or vertical tip face.
 if RIB_REACH > HOLE_X - blind_cut_dia_mm(HOLE_SPEC) / 2.0 - 2.0:
     raise AssertionError("a rib's +X end reaches the spring-hole column")
@@ -698,7 +707,7 @@ async def _measured_volume(adapter, label: str) -> float:
 
 
 def _knife_ridge_max_limit(adapter) -> None:
-    """KnifeRidgeRadius as the single limit "R0.1 MAX" carrying the band's
+    """KnifeRidgeRadius as the single limit "R.004 MAX" carrying the band's
     deviations (build_ch_pivot_bracket._corner_radius_max_limit's recipe)."""
     lower, upper = deviations(KNIFE_RIDGE_R_BAND)
     _, dimension = _named_dimension(adapter, "KnifeRidgeFillet", "KnifeRidgeRadius")
@@ -723,7 +732,9 @@ def _knife_ridge_max_limit(adapter) -> None:
         )
     ):
         raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
-    set_dimension_display_precision(adapter, "KnifeRidgeFillet", "KnifeRidgeRadius", 1)
+    set_dimension_display_precision(
+        adapter, "KnifeRidgeFillet", "KnifeRidgeRadius", KNIFE_RIDGE_R_PLACES
+    )
     _telemetry.success(f"{label}: single limit {KNIFE_RIDGE_R:g} MAX")
 
 
@@ -807,11 +818,11 @@ async def _rib_profile_sketch(
 
     set_sketch_direct_db(adapter, True)
     upper_blend = await arc(
-        UPPER.center_xy, UPPER.flank_xy, UPPER.end_xy, "upper R1 blend"
+        UPPER.center_xy, UPPER.flank_xy, UPPER.end_xy, "upper R.040 blend"
     )
     end = await line(UPPER.end_xy, LOWER.end_xy, "buried closing line")
     lower_blend = await arc(
-        LOWER.center_xy, LOWER.end_xy, LOWER.flank_xy, "lower R1 blend"
+        LOWER.center_xy, LOWER.end_xy, LOWER.flank_xy, "lower R.040 blend"
     )
     upper_flank = await line(UPPER.wrap_xy, UPPER.flank_xy, "upper tangent flank")
     lower_flank = await line(LOWER.flank_xy, LOWER.wrap_xy, "lower tangent flank")
@@ -894,7 +905,7 @@ async def _rib_profile_sketch(
 
 
 def _assert_native_rib_profile(adapter, stem: str) -> None:
-    """Prove both real flanks and both R1 blend surfaces, not only the sketch."""
+    """Prove both real flanks and both R.040 blend surfaces, not only the sketch."""
     model = _early_bound(adapter.currentModel, "IPartDoc")
     raw = model.FeatureByName(stem)
     if raw is None:
@@ -928,7 +939,7 @@ def _assert_native_rib_profile(adapter, stem: str) -> None:
             f"{stem}: native tangent profile lost flanks {found_flanks} "
             f"or bounded blends {found_blends}"
         )
-    _telemetry.success(f"{stem}: both native tangent flanks and R1 profile blends")
+    _telemetry.success(f"{stem}: both native tangent flanks and R.040 profile blends")
 
 
 async def _edge_rib(
@@ -1256,7 +1267,7 @@ def _assert_receiver_profile_walls(adapter) -> None:
 def coefficient_underside_root_geometry() -> tuple[
     float, tuple[float, float], tuple[float, float], tuple[tuple[float, float], ...]
 ]:
-    """Nominal lower junction, tangent R1 cylinder and two inboard edge runs.
+    """Nominal lower junction, tangent R.040 cylinder and two inboard edge runs.
 
     The fillet circle is externally tangent to the pivot cylinder and tangent
     to the plate underside. Its centre is R below the underside, at distance
@@ -1347,19 +1358,16 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
         upper_bounds = (center[0] + RIB_BLEND_R, COEFFICIENT_BOTTOM_Y + RIB_BLEND_R)
         covered_runs = set()
         from magnifying_bracket_joint_layout import (
-            DRILLED_DIAMETER_PLUS, DRILL_WANDER_MAX, LINEAR_BAND, POSITION_BAND,
+            DRILL_WANDER_MAX, POSITION_BAND, receiver_pilot_radius_max,
         )
 
-        pilot_radius = (
-            (max(TAP_DRILL_DIA, round(TAP_DRILL_DIA, 2)) + DRILLED_DIAMETER_PLUS) / 2.0
-            + DRILL_WANDER_MAX
-        )
+        pilot_radius = receiver_pilot_radius_max() + DRILL_WANDER_MAX
         # This X-disjointness proof covers the finite pilot, with ordinary
         # free-edge motion and the actual-axis position band. No wall credit
         # is taken for the material added by the concave blend.
         receiver_inner_x = (
             min(point[0] for point in LEVER_HOLE_POINTS)
-            - LINEAR_BAND - POSITION_BAND - pilot_radius
+            + PLATE_W_DEVIATIONS[0] - POSITION_BAND - pilot_radius
         )
         if (
             upper_bounds[0] >= min(receiver_inner_x, PLATE_W, RIB_REACH)
@@ -1375,7 +1383,7 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
         elif surface.IsTorus():
             radius = float(surface.TorusParams[7]) * 1000.0
         # A transition patch can be nonanalytic. It must pass the same exact
-        # bounds, but cannot stand in for a proved cylindrical/toroidal R1.
+        # bounds, but cannot stand in for a proved cylindrical/toroidal R.040.
         # IFace2.GetBox is approximate. A temporary, unsaved sheet body of
         # this actual trimmed fillet face gives exact directional extrema,
         # without confusing its envelope with the plate's X44.45 free edge.
@@ -1447,7 +1455,7 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
 
 
 async def _rib_root_fillets(adapter, drive_jobs: list[tuple[str, str]]) -> None:
-    """Bounded R1 roots with no tangent propagation or geometry fallback."""
+    """Bounded R.040 roots with no tangent propagation or geometry fallback."""
     for name, picks, edge_length_bound in rib_root_edge_families():
         before = await _measured_volume(adapter, f"before {name}")
         check(
@@ -1468,12 +1476,12 @@ async def _rib_root_fillets(adapter, drive_jobs: list[tuple[str, str]]) -> None:
             )
         _assert_root_feature_bounds(adapter, name, len(picks))
         _telemetry.success(
-            f"{name}: bounded native R1 roots added {addition:.6f} mm^3"
+            f"{name}: bounded native R.040 roots added {addition:.6f} mm^3"
         )
 
 
 def _rib_radius_max_limits(adapter) -> None:
-    """Band every modeled rib blend under the title-block R1 MAX ceiling.
+    """Band every modeled rib blend under the title-block R.040 MAX ceiling.
 
     Profile blends, perpendicular rib-side roots and the changed longitudinal
     coefficient underside remain native controls without a duplicate drawing
@@ -1496,14 +1504,14 @@ def _rib_radius_max_limits(adapter) -> None:
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         tolerance.Type = RIB_BLEND_R_TOL_TYPE
         if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
-            raise RuntimeError(f"{name}@{feature}: R1 MAX limits refused")
+            raise RuntimeError(f"{name}@{feature}: R.040 MAX limits refused")
         if (
             int(tolerance.Type) != RIB_BLEND_R_TOL_TYPE
             or abs(float(tolerance.GetMinValue()) - lower / 1000.0) > 1e-12
             or abs(float(tolerance.GetMaxValue()) - upper / 1000.0) > 1e-12
         ):
-            raise RuntimeError(f"{name}@{feature}: R1 MAX limits did not persist")
-        set_dimension_display_precision(adapter, feature, name, 1)
+            raise RuntimeError(f"{name}@{feature}: R.040 MAX limits did not persist")
+        set_dimension_display_precision(adapter, feature, name, RIB_BLEND_R_PLACES)
 
 
 async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -1560,7 +1568,7 @@ def _receiver_model_bands(adapter) -> None:
     feature = _early_bound(model.FeatureByName("BracketMountingTaps"), "IFeature")
     required = {
         "FullThreadDepth": (THREAD_DEPTH, (-THREAD_DEPTH_BAND, THREAD_DEPTH_BAND)),
-        "TapDrillDepth": (DRILL_DEPTH, DRILL_DEPTH_DEVIATIONS),
+        "TapDrillDepth": (DRILL_DEPTH, (-DRILL_DEPTH_BAND, DRILL_DEPTH_BAND)),
     }
     matches = {name: [] for name in required}
     # Hole Wizard thread lengths can belong to its cosmetic-thread subfeature.
@@ -1613,7 +1621,7 @@ def _receiver_model_bands(adapter) -> None:
 def _band_held_dimension(
     display, dimension, deviations: tuple[float, float], label: str
 ) -> None:
-    """(lower, upper) tolerance in mm + 2-place display on an already-resolved
+    """(lower, upper) tolerance in mm + RECEIVER_HOLE_PLACES display on an already-resolved
     dimension: symmetric when the deviations mirror, else bilateral (the
     by-name ``set_dimension_*_tolerance`` contracts, minus lookup)."""
     from _com import _bind, _early_bound
@@ -1639,13 +1647,18 @@ def _band_held_dimension(
             f"{label}: tolerance readback type {int(tolerance.Type)} "
             f"{minimum:g}/{maximum:g} m != type {kind} {lower_m:g}/{upper_m:g} m"
         )
-    _set_tolerance_precision(display, (lower, upper), display_unit="mm", label=label)
+    _set_tolerance_precision(
+        display, (lower, upper), display_unit=UNIT, label=label,
+        places=RECEIVER_HOLE_PLACES,
+    )
     display = _early_bound(display, "IDisplayDimension")
     do_not_change = -1  # swDimensionPrecisionSettings_e
-    display.SetPrecision3(2, do_not_change, do_not_change, do_not_change)
-    if int(display.GetPrimaryPrecision2()) != 2:
+    display.SetPrecision3(RECEIVER_HOLE_PLACES, do_not_change, do_not_change, do_not_change)
+    if int(display.GetPrimaryPrecision2()) != RECEIVER_HOLE_PLACES:
         raise RuntimeError(f"{label}: display precision did not persist")
-    _telemetry.success(f"toleranced {label}: {upper:+g}/{lower:+g} mm (2 decimals)")
+    _telemetry.success(
+        f"toleranced {label}: {upper:+g}/{lower:+g} mm ({RECEIVER_HOLE_PLACES} decimals)"
+    )
 
 
 def _as_construction(adapter, entity_id: str) -> None:
@@ -1929,13 +1942,13 @@ def _drawing_dimension_contract(adapter) -> None:
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     # The knife-edge controls the free-rock check assumes (code review C09):
     # the ridge from each side face and the flank-to-side angle carry their
-    # own tolerances; the vertex height three places, the title block's .XXX.
-    for name in ("HexWidth", "HexHeight", "RidgeFromLeft", "RidgeFromRight"):
-        set_dimension_display_precision(adapter, "KnifeEnvelopeReference", name, 3)
+    # own tolerances; the vertex height the title block's .XXX (the envelope's
+    # places are DRAWING_PRECISION's).
     set_dimension_display_precision(adapter, "KnifeEnvelopeReference", "FlankToSide", 1)
     for name in ("RidgeFromLeft", "RidgeFromRight"):
         set_dimension_symmetric_tolerance(
-            adapter, "KnifeEnvelopeReference", name, RIDGE_FROM_SIDE_TOL
+            adapter, "KnifeEnvelopeReference", name, RIDGE_FROM_SIDE_TOL,
+            places=KNIFE_ENVELOPE_PLACES, display_unit=UNIT,
         )
     set_dimension_symmetric_angular_tolerance(
         adapter,
@@ -2038,9 +2051,12 @@ async def _receiver_coordinate_dimensions(adapter) -> None:
     names = ["ReceiverX0", "ReceiverX1", "ReceiverY0"]
     for name in names + ["ReceiverY1"]:
         set_dimension_symmetric_tolerance(
-            adapter, "ReceiverCoordinates", name, POSITION_BAND
+            adapter, "ReceiverCoordinates", name, POSITION_BAND,
+            places=RECEIVER_COORDINATE_PLACES, display_unit=UNIT,
         )
-        set_dimension_display_precision(adapter, "ReceiverCoordinates", name, 2)
+        set_dimension_display_precision(
+            adapter, "ReceiverCoordinates", name, RECEIVER_COORDINATE_PLACES
+        )
     mark_dimensions_for_drawing(adapter, "ReceiverCoordinates", names)
     model = adapter.currentModel
     model.ClearSelection2(True)
@@ -2082,6 +2098,7 @@ async def _bracket_mounting_taps(adapter) -> None:
 
 async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs: named globals in the equation manager that drive every
     # sketch dim below (a GUI fine-tune edits THESE -- Tools > Equations -- never

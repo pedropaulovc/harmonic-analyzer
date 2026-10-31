@@ -173,7 +173,7 @@ def _native_boss_face_location(monkeypatch, identity):
     state = SimpleNamespace(
         edges=[lower, wrong_axis, inboard, plate, upper],
         attached=(upper.edge, plate.edge), value=(spec.ANCHOR_H / 2.0 - spec.COEFFICIENT_TOP_Y) / 1000.0,
-        sign=1.0, projection_factor=1.0, precision=2, document_precision=2,
+        sign=1.0, projection_factor=1.0, precision=2, document_precision=2, refuse_precision=False,
         tolerance=SimpleNamespace(Type=0), activate=True, sheets=[], picks=[], projections=[],
     )
     annotation = SimpleNamespace(
@@ -189,6 +189,7 @@ def _native_boss_face_location(monkeypatch, identity):
     display = SimpleNamespace(
         GetDimension2=lambda _index: dimension, GetAnnotation=lambda: annotation,
         GetPrimaryPrecision2=lambda: state.precision,
+        SetPrecision3=lambda places, *_rest: state.refuse_precision or setattr(state, "precision", places),
     )
 
     def activate(sheet):
@@ -256,7 +257,7 @@ def test_boss_face_location_rechecks_native_authority(monkeypatch, identity, set
     elif damage == "value":
         case.state.value += 0.0001
     elif damage == "precision":
-        case.state.precision = 1
+        case.state.precision, case.state.refuse_precision = 1, True
     elif damage == "tolerance":
         case.state.tolerance.Type = 2
     else:
@@ -265,23 +266,19 @@ def test_boss_face_location_rechecks_native_authority(monkeypatch, identity, set
         check()
 
 
-@pytest.mark.parametrize("places", [1, 2, 3])
-def test_boss_face_location_reads_document_precision_when_inherited(monkeypatch, identity, places):
+def test_boss_face_location_refuses_inherited_document_precision(monkeypatch, identity):
     case = _native_boss_face_location(monkeypatch, identity)
+    check = case.capture()
     case.state.precision = -2
-    case.state.document_precision = places
-    if places == 2:
-        case.capture()()
-    else:
-        with pytest.raises(RuntimeError):
-            case.capture()
+    with pytest.raises(RuntimeError):
+        check()
 
 
 def _native_knife_height(monkeypatch, identity):
     spec = sm_summing_lever_spec
     state = SimpleNamespace(
         selected=[], picks=[], placements=[], value=(spec.HEX_H / 2.0 - spec.COEFFICIENT_TOP_Y) / 1000.0,
-        precision=2, document_precision=2, tolerance=SimpleNamespace(Type=0),
+        precision=2, document_precision=2, refuse_precision=False, tolerance=SimpleNamespace(Type=0),
         activate=True, missing=False, dangling=False, source_y=spec.HEX_H / 2000.0,
         view_activate=True, refuse_pick=None, extra_pick_after=None, null_dimension=False,
     )
@@ -324,6 +321,7 @@ def _native_knife_height(monkeypatch, identity):
     display = SimpleNamespace(
         GetDimension2=lambda _index: NativeDimension(), GetAnnotation=lambda: annotation,
         GetPrimaryPrecision2=lambda: state.precision,
+        SetPrecision3=lambda places, *_rest: state.refuse_precision or setattr(state, "precision", places),
     )
     state.inventory, state.annotation_count = [annotation], 1
     view.GetAnnotationCount = lambda: state.annotation_count
@@ -371,10 +369,9 @@ def test_knife_height_is_a_native_point_to_actual_plate_top_dimension(monkeypatc
     assert case.state.picks == ["height.end", "plate top"]
     assert case.state.placements == [(*drawing.KNIFE_HEIGHT_LOCATION_XY, 0.0)]
     assert case.state.value * 1000.0 == pytest.approx(2.594)
-    case.state.precision = -2
-    check()  # ordinary precision may follow the existing document
-    case.state.document_precision = 3
-    with pytest.raises(RuntimeError, match="two-place"):
+    assert case.state.precision == 3  # .102 at the title block's .XXX
+    case.state.precision = 2
+    with pytest.raises(RuntimeError, match=r"\.XXX"):
         check()
 
 
@@ -440,7 +437,7 @@ def test_knife_height_refuses_wrong_reference_or_lost_native_authority(monkeypat
     elif damage == "band":
         case.state.tolerance.Type = 2
     elif damage == "precision":
-        case.state.precision = 3
+        case.state.precision, case.state.refuse_precision = 2, True
     elif damage == "owner":
         case.annotation.Owner = object()
     elif damage == "hidden":
@@ -565,8 +562,9 @@ def test_bracket_receiver_retains_the_blind_native_contract_and_final_proof() ->
     assert part.TAP_SPEC.size == "#2-56"
     assert part.TAP_SPEC.depth_mm == 6.50
     assert part.TAP_SPEC.overrides_mm["ThreadDepth"] == 4.95
-    assert joint.THREAD_DEPTH_BAND == 0.05
-    assert joint.DRILL_DEPTH_DEVIATIONS == (-0.51, 0.51)  # ordinary .XX width
+    assert joint.THREAD_DEPTH_BAND == 0.0508
+    # Printed .256 +/-.005 (the lever's .XXX row) about the 6.50 model depth.
+    assert joint.DRILL_DEPTH_DEVIATIONS == pytest.approx((-0.1246, 0.1294))
     assert "PlateThickness" in drawing.BACK_KEEP
     assert "EdgeRibThickness" in drawing.TOP_KEEP
     order = [_call_name(call) for call in _calls_in_order(_builder_function("build"))]
@@ -582,29 +580,27 @@ def test_receiver_pilot_continues_from_uniform_rib_into_connected_plate() -> Non
     import magnifying_bracket_joint_layout as joint
 
     spec = sm_summing_lever_spec
-    drill_radius_max = (
-        max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2))
-        + joint.DRILLED_DIAMETER_PLUS
-    ) / 2.0
+    drill_radius_max = joint.receiver_pilot_radius_max()
     wander = math.tan(math.radians(joint.DRILL_WANDER_DEG)) * (
         joint.DRILL_DEPTH_MAX + drill_radius_max * joint.DRILL_POINT_H
     )
+    rib_t = (spec.RIB_T + spec.RIB_T_DEVIATIONS[0], spec.RIB_T + spec.RIB_T_DEVIATIONS[1])
     for x, y, _z in joint.LEVER_HOLE_POINTS:
         assert x - joint.POSITION_BAND - drill_radius_max > spec.CYL_R
         assert x + joint.POSITION_BAND + drill_radius_max < spec.RIB_REACH
         assert spec.COEFFICIENT_TOP_Y - y == pytest.approx(3.25)
-    assert spec.RIB_T + joint.LINEAR_BAND < joint.DRILL_DEPTH_MIN
-    assert spec.RIB_T - joint.LINEAR_BAND < joint.THREAD_DEPTH
+    assert rib_t[1] < joint.DRILL_DEPTH_MIN
+    assert rib_t[0] < joint.THREAD_DEPTH
     # ReceiverY0 is from the actual top: top-position variation cancels.
     upper_plate_wall = (
         joint.RECEIVER_ROW_FROM_TOP - joint.POSITION_BAND - drill_radius_max - wander
     )
     lower_plate_wall = (
-        spec.COEFFICIENT_T - joint.LINEAR_BAND - joint.RECEIVER_ROW_FROM_TOP
+        spec.COEFFICIENT_T + spec.COEFFICIENT_T_DEVIATIONS[0] - joint.RECEIVER_ROW_FROM_TOP
         - joint.POSITION_BAND - drill_radius_max - wander
     )
-    assert upper_plate_wall == pytest.approx(2.220338, abs=1e-6)
-    assert lower_plate_wall == pytest.approx(2.210338, abs=1e-6)
+    assert upper_plate_wall == pytest.approx(2.221731, abs=1e-6)
+    assert lower_plate_wall == pytest.approx(2.605131, abs=1e-6)
     assert joint.receiver_pilot_material_wall_budget() == pytest.approx(
         min(upper_plate_wall, lower_plate_wall),
     )
@@ -818,9 +814,9 @@ def test_three_rib_size_clears_boss_witness_and_complete_neighbors() -> None:
     )
 
 
-def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides(monkeypatch) -> None:
+def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides() -> None:
     """Code review C09 (owner ruling T1): Detail D holds the ridge sharp
-    4.040 +/-0.05 from each side face and each upper flank 122.4 +/-0.5 deg
+    .159 +/-.002 from each side face and each upper flank 122.4 +/-0.5 deg
     to its side face, on both stubs; the width is a reference."""
     spec = sm_summing_lever_spec
     knife = notes.DRAWING_DIMENSIONS["KnifeEnvelopeReference"]
@@ -849,45 +845,13 @@ def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides(monkeypatch) ->
     assert "PLANE" not in pair
     every_callout = {**notes.DIMENSION_CALLOUTS_ABOVE, **notes.DIMENSION_CALLOUTS_BELOW}
     assert "HexWidth" not in every_callout
-    assert (spec.RIDGE_FROM_SIDE, spec.RIDGE_FROM_SIDE_TOL) == (4.040, 0.05)
+    assert (spec.RIDGE_FROM_SIDE, spec.RIDGE_FROM_SIDE_TOL) == (4.040, 0.0508)
     assert (spec.KNIFE_FLANK_TO_SIDE_DEG, spec.KNIFE_FLANK_TO_SIDE_TOL_DEG) == (122.4, 0.5)
     assert not hasattr(spec, "RIDGE_ANGLE_TOL_DEG")
     assert not hasattr(spec, "KNIFE_SHOULDER_RISE")
 
-    calls = []
-    for name in (
-        "apply_drawing_precision",
-        "set_dimension_display_precision",
-        "set_dimension_symmetric_tolerance",
-        "set_dimension_symmetric_angular_tolerance",
-        "set_dimension_prefix",
-        "mark_dimensions_for_drawing",
-    ):
-        monkeypatch.setattr(
-            lever_build,
-            name,
-            lambda adapter, *args, _name=name, **kwargs: calls.append((_name, args, kwargs)),
-        )
-    monkeypatch.setattr(
-        lever_build, "_hex_width_reference", lambda adapter: calls.append(("reference", (), {}))
-    )
-    lever_build._drawing_dimension_contract(object())
-    feature = "KnifeEnvelopeReference"
-    assert ("set_dimension_display_precision", (feature, "FlankToSide", 1), {}) in calls
-    for name in ("HexWidth", "HexHeight", "RidgeFromLeft", "RidgeFromRight"):
-        assert ("set_dimension_display_precision", (feature, name, 3), {}) in calls
-    for name in ("RidgeFromLeft", "RidgeFromRight"):
-        assert ("set_dimension_symmetric_tolerance", (feature, name, 0.05), {}) in calls
-    assert (
-        "set_dimension_symmetric_angular_tolerance",
-        (feature, "FlankToSide", 0.5),
-        {"require_driven": True},
-    ) in calls
-    # HexWidth is never toleranced: it reads back as the reference.
-    assert ("reference", (), {}) in calls
-    assert not any(
-        name.startswith("set_dimension_symmetric") and args[1] == "HexWidth"
-        for name, args, _ in calls
+    assert spec.DRAWING_PRECISION["KnifeEnvelopeReference"] == dict.fromkeys(
+        ("HexWidth", "HexHeight", "RidgeFromLeft", "RidgeFromRight"), 3,
     )
     # The model sketch's angle is the flank-to-side angle the print rounds.
     assert round(180.0 - spec.RIDGE_ANGLE_DEG / 2.0, 1) == spec.KNIFE_FLANK_TO_SIDE_DEG
@@ -912,11 +876,6 @@ def _call_name(call: ast.Call) -> str:
 
 
 
-def test_body_length_precision_is_part_owned() -> None:
-    """The owner changes only body-end length to the one-place decimal band."""
-    assert sm_summing_lever_spec.DRAWING_PRECISION == {"CoefficientsPlate": {"PlateLength": 1}}
-
-
 @pytest.mark.parametrize("digits", [1, 2, -1, None])
 def test_body_length_import_refuses_lost_part_authored_precision(monkeypatch, digits) -> None:
     import _drawing_dimensions as dimensions
@@ -929,10 +888,10 @@ def test_body_length_import_refuses_lost_part_authored_precision(monkeypatch, di
     )
     monkeypatch.setattr(dimensions, "dimension_name", lambda *_args: "PlateLength")
     precision = sm_summing_lever_spec.DRAWING_PRECISION["CoefficientsPlate"]
-    if digits == 1:
+    if digits == 2:
         dimensions.assert_imported_precision(adapter, [annotation], precision)
     else:
-        with pytest.raises(RuntimeError, match="part authored 1"):
+        with pytest.raises(RuntimeError, match="part authored 2"):
             dimensions.assert_imported_precision(adapter, [annotation], precision)
     with pytest.raises(RuntimeError, match="never reached the sheet"):
         dimensions.assert_imported_precision(adapter, [], precision)
@@ -1282,15 +1241,15 @@ def test_the_coplanarity_readback_passes_one_prism_and_fails_a_stepped_side() ->
 
 
 def test_the_between_stub_ridge_bound_holds_only_with_the_sides_in_one_plane() -> None:
-    """Each ridge is 4.040 +/-0.05 from its stub's sides.  Only with both
-    stubs' sides the same planes does that hold the two ridges within 0.10
-    of each other (0.077 of hook-arm spread over the hole column); the bound,
+    """Each ridge is .159 +/-.002 from its stub's sides.  Only with both
+    stubs' sides the same planes does that hold the two ridges within 0.1016
+    of each other (0.078 of hook-arm spread over the hole column); the bound,
     the callout and the one-prism build stand or fall together."""
     spec = sm_summing_lever_spec
-    assert spec.KNIFE_STUB_RIDGE_OFFSET_MAX == pytest.approx(0.10)
+    assert spec.KNIFE_STUB_RIDGE_OFFSET_MAX == pytest.approx(0.1016)
     assert spec.KNIFE_STUB_RIDGE_OFFSET_MAX == 2.0 * spec.RIDGE_FROM_SIDE_TOL
     assert spec.KNIFE_RIDGE_CONTACT_SPAN == pytest.approx(spec.HEX_Z_INNER + spec.HEX_Z_OUTER)
-    assert spec.KNIFE_HOOK_ARM_SPREAD_MAX == pytest.approx(0.077, abs=5e-4)
+    assert spec.KNIFE_HOOK_ARM_SPREAD_MAX == pytest.approx(0.078, abs=5e-4)
     callout = " ".join(notes.DIMENSION_CALLOUTS_BELOW["RidgeFromRight"].split())
     assert "BOTH STUBS" in callout and "PLANE" not in callout
     assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromLeft")] == "2X "
@@ -1655,9 +1614,9 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
     # Subfeatures are not FeatureByName-reachable and both threads are "D1":
     # band the exact native objects found in the walk, never a by-name lookup.
     assert held == [
-        (True, thread, (-0.05, 0.05), "D1@Hole Thread22"),
-        (True, thread_b, (-0.05, 0.05), "D1@Hole Thread23"),
-        (True, drill, (-0.51, 0.51), "Tap Drill Depth@Sketch14"),
+        (True, thread, (-0.0508, 0.0508), "D1@Hole Thread22"),
+        (True, thread_b, (-0.0508, 0.0508), "D1@Hole Thread23"),
+        (True, drill, (-0.127, 0.127), "Tap Drill Depth@Sketch14"),
     ]
     assert (drill.Name, thread.Name, thread_b.Name, unrelated.Name) == (
         "Tap Drill Depth", "D1", "D1", "Depth"
@@ -1704,17 +1663,17 @@ def test_receiver_native_drill_band_is_explicit_symmetric_ordinary_width(monkeyp
     tolerance = Tolerance()
     display = SimpleNamespace(
         SetPrecision3=lambda *args: True,
-        GetPrimaryPrecision2=lambda: 2,
+        GetPrimaryPrecision2=lambda: 3,
     )
     monkeypatch.setattr(_com, "_bind", lambda value, _kind: value)
     monkeypatch.setattr(_com, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(_drawing_tolerances, "_set_tolerance_precision", lambda *args, **kwargs: None)
     lever_build._band_held_dimension(
         display, SimpleNamespace(Tolerance=tolerance),
-        joint.DRILL_DEPTH_DEVIATIONS, "native receiver drill",
+        (-joint.DRILL_DEPTH_BAND, joint.DRILL_DEPTH_BAND), "native receiver drill",
     )
     assert tolerance.Type == 4  # swTolSYMMETRIC, not bilateral or MIN
-    assert (tolerance.lower, tolerance.upper) == pytest.approx((-0.00051, 0.00051))
+    assert (tolerance.lower, tolerance.upper) == pytest.approx((-0.000127, 0.000127))
 
 
 @pytest.fixture
@@ -1773,19 +1732,19 @@ def bracket_depth_callout(monkeypatch):
     )
 
 
-def test_bracket_depth_callout_inherits_printed_two_place_band(bracket_depth_callout) -> None:
+def test_bracket_depth_callout_inherits_printed_three_place_band(bracket_depth_callout) -> None:
     import magnifying_bracket_joint_layout as joint
 
     case = bracket_depth_callout
     unrelated_before = (dict(case.unrelated.metadata.values), dict(case.unrelated.length.values))
     case.dress()
     assert case.drill.metadata.ToleranceType == 0  # swTolNONE: title-block presentation
-    assert case.drill.length.Precision == 2
+    assert case.drill.length.Precision == 3
     assert case.drill.length.Length == pytest.approx(0.00650)
     # NONE hides the native variable's unused tolerance fields; dressing must
     # not write them or assume SOLIDWORKS retains hidden deviations.
     assert case.drill.metadata.writes == [("ToleranceType", 0)]
-    assert case.drill.length.writes == [("Precision", 2)]
+    assert case.drill.length.writes == [("Precision", 3)]
     assert case.thread.metadata.ToleranceType == 5  # swTolMIN, not a bilateral thread depth
     assert case.thread.length.Length == pytest.approx(0.00495)
     assert case.thread.length.writes == []
@@ -1795,13 +1754,14 @@ def test_bracket_depth_callout_inherits_printed_two_place_band(bracket_depth_cal
     assert case.bound == [case.thread.raw, case.drill.raw]
     assert case.dispatched == [case.unrelated.metadata, case.thread.metadata, case.drill.metadata]
 
-    # Derive the effective band from the printed nominal and the actual sheet
-    # row, not value_in (whose metric conversion is intentionally rounded).
-    printed_nominal = f"{case.drill.length.Length * 1000.0:.{case.drill.length.Precision}f}"
-    assert printed_nominal == "6.50"
-    printed_band = printed_band_mm(2)
-    effective_limits = (float(printed_nominal) - printed_band, float(printed_nominal) + printed_band)
-    assert effective_limits == pytest.approx((5.99, 7.01))
+    # Derive the effective band from the printed inch nominal and the actual
+    # sheet row: .256 +/-.005.
+    printed_in = f"{case.drill.length.Length / 0.0254:.{case.drill.length.Precision}f}"
+    assert printed_in == "0.256"
+    printed_band = printed_band_mm(3, unit="in")
+    printed_mm = float(printed_in) * 25.4
+    effective_limits = (printed_mm - printed_band, printed_mm + printed_band)
+    assert effective_limits == pytest.approx((6.3754, 6.6294))
     physical_limits = tuple(joint.DRILL_DEPTH + delta for delta in joint.DRILL_DEPTH_DEVIATIONS)
     assert effective_limits == pytest.approx(physical_limits)
 
@@ -1846,11 +1806,11 @@ def test_bracket_depth_callout_rejects_ignored_native_setters(
     assert any(name == setter for name, _value in target.writes)
 
 
-@pytest.mark.parametrize("band", [(-0.51, 0.40), (-0.40, 0.40)])
+@pytest.mark.parametrize("band", [0.51, 0.40])
 def test_bracket_depth_callout_rejects_engineering_band_not_inherited_by_print(
     monkeypatch, bracket_depth_callout, band,
 ) -> None:
-    monkeypatch.setattr(drawing, "DRILL_DEPTH_DEVIATIONS", band)
+    monkeypatch.setattr(drawing, "DRILL_DEPTH_BAND", band)
     with pytest.raises(RuntimeError):
         bracket_depth_callout.dress()
 
@@ -2883,17 +2843,17 @@ def test_plate_thickness_settled_witness_movement_records_original_and_current_i
     ("name", "feature", "check_radius", "value_m", "max_type"),
     [
         ("KnifeRidgeRadius", "KnifeRidgeFillet", drawing._assert_knife_ridge_radius,
-         0.0001, drawing.KNIFE_RIDGE_R_TOL_TYPE),
+         sm_summing_lever_spec.KNIFE_RIDGE_R / 1000.0, drawing.KNIFE_RIDGE_R_TOL_TYPE),
         ("KnifeRidgeRadius", "KnifeRidgeFillet", drawing._assert_knife_ridge_radius,
-         0.000100000054, drawing.KNIFE_RIDGE_R_TOL_TYPE),
+         0.0001016004, drawing.KNIFE_RIDGE_R_TOL_TYPE),
     ],
 )
 @pytest.mark.parametrize("damage", [None, "value", "band", "diameter", "missing", "duplicate"])
 def test_imported_radii_keep_the_native_model_value_and_max_band(
     monkeypatch, name, feature, check_radius, value_m, max_type, damage,
 ) -> None:
-    # The nonexact value is the native trace's inch equation result converted
-    # to SI: 0.00393701 in for R0.1.
+    # The nonexact value is a native readback within the one-nanometre
+    # budget of R.004 (0.1016 mm).
     dimension = SimpleNamespace(
         FullName=f"{name}@{feature}@sm-summing-lever.SLDPRT",
         SystemValue=value_m + (0.00001 if damage == "value" else 0.0),
@@ -2920,7 +2880,7 @@ def test_imported_radii_keep_the_native_model_value_and_max_band(
     ("name", "feature", "check_radius", "nominal_m", "max_type"),
     [
         ("KnifeRidgeRadius", "KnifeRidgeFillet", drawing._assert_knife_ridge_radius,
-         0.0001, drawing.KNIFE_RIDGE_R_TOL_TYPE),
+         sm_summing_lever_spec.KNIFE_RIDGE_R / 1000.0, drawing.KNIFE_RIDGE_R_TOL_TYPE),
     ],
 )
 @pytest.mark.parametrize("direction", [-1.0, 1.0])

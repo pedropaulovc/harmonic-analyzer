@@ -83,6 +83,7 @@ from sm_vn_knife_hanger_stud_spec import (
     SUPPLIER_STOCK_CONFIGURATION,
     SUPPLIER_STOCK_TITLE,
     THREAD_LENGTH_MIN,
+    UNIT,
 )
 
 SPEC = DRAWINGS_BY_NAME["sm_vn_knife_hanger_stud"]
@@ -1546,7 +1547,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter.currentModel, required, required=required
     )
     draw, _sheet = new_project_drawing(
-        adapter, property_view=SPEC.artifact_stem, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter, property_view=SPEC.artifact_stem, scale=SHEET_SCALE, layout=SPEC.layout,
+        unit=UNIT,
     )
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="finished and original knife-hanger stock")
     if not _early_bound(draw, "IDrawingDoc").ActivateSheet(SHEET_NAMES[0]):
