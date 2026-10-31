@@ -23,8 +23,3 @@ TAN_I = SIN_I / COS_I
 SEC_I = 1.0 / COS_I
 INCLINE_DEG = math.degrees(math.asin(SIN_I))
 SEAT_PITCH = Z_PITCH * COS_I
-# (upper, lower) faced width of every gear in the solid cone stack -- the
-# twenty cone gears and the 64T crank-drive gear (dt_cone_gear_stack): the
-# cylinder bank's L20 d' rule, +/-.001 in per gear (#290).  One constant, so
-# the two gear sheets and the stack cannot fork.
-GEAR_FACE_WIDTH_BAND = (0.0254, -0.0254)
