@@ -223,9 +223,11 @@ STATION_TEXT_CLEARANCE = 0.002
 # tip face when its station moves.  With its suffix the Ø6.350 text runs over
 # A-A's upper letter, so the three tip-end texts stand 2.5 mm higher than
 # r1's (the tip detail with them); Ø9.525 stands right of all three suffixes,
-# its two mate lines centred on it clear above A-A's letter.
+# its two mate lines centred on it clear above A-A's letter.  The journal's
+# inch size (four-place value, five-place band) widened Ø12.2555's box to
+# 40 mm, so it stands 3.5 mm nearer the end again (#290 batch 0).
 SIDE_DIAMETERS = {
-    "Sec0Dia": (0.2660, 0.1715),
+    "Sec0Dia": (0.2625, 0.1715),
     "Sec1Dia": (0.1600, 0.1800),
     "Sec2Dia": (BIG_END_X - (2.0 * SECTION_ENDS[2] + SECTION_ENDS[1]) / 3000.0, 0.1785),
     "Sec3Dia": (BIG_END_X - (2.0 * SECTION_ENDS[3] + SECTION_ENDS[2]) / 3000.0, 0.1905),
@@ -364,12 +366,13 @@ PARTIAL_CUT_PARENTS = frozenset({CutParent.TIP_DETAIL})
 # 0.3693 with A at 0.341, 2.0 mm short of B's at 0.3713, under the proof's
 # CLEAR_GAP_M plus margin.  The inch flat band's five places (-0.01016)
 # widened both lines: #290 batch 0 read A's box ending at 0.3722, 0.7 mm into
-# B's at 0.3715; B-B already stands at the frame, so A-A moves 3.5 mm left.
+# B's at 0.3715; B-B already stands at the frame, so A-A moves 2.9 mm left
+# and Ø12.2555 (SIDE_DIAMETERS) 3.5 mm left to keep A's box clear of it.
 # The across-flat is the part's own dimension (Sec{i}AF, sketched on the
 # land's end plane, parallel to the cut), so it prints its model band.
 D_SECTIONS = (
     DSection(
-        1, "A", SECTION_ENDS[1] - 25.0, CutParent.SIDE, 0.0150, (0.3365, 0.165), (2, 1)
+        1, "A", SECTION_ENDS[1] - 25.0, CutParent.SIDE, 0.0150, (0.3371, 0.165), (2, 1)
     ),
     DSection(
         2,
