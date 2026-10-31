@@ -4,16 +4,18 @@ ch-rocker-arm-tl-oblique-carrier:
   number: MHA-CH-06-TL-21
   # The pin holes are reamed and the plate must stay flat on two pins: a
   # stable (stress-relieved), free-machining grade. The source is the owned
-  # OnlineMetals 1173 bar (shop inventory), ripped to fit the vise.
+  # OnlineMetals 1173 bar (shop inventory), milled to width on edge in the
+  # vise, no bandsaw rip (owner ruling #2083).
   material: 6061-T6511 aluminium
   material_specification: 1/2 x 6 in 6061-T6511 aluminium bar, ASTM B221 (owned OnlineMetals 1173)
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
   process: >-
-    saw a 21.3 in length from the 1/2 x 6 bar and rip it to about 5.3 wide
-    (the 6 in width does not fit the 5 3/4 in vise jaws); face to .47 drawing
-    thickness and mill to 20.5 x 5.1; drill and ream the four pivot-pin holes
+    saw a 21.3 in length from the 1/2 x 6 bar and mill it to width on edge
+    in the vise, no bandsaw rip (the 6 in width does not fit the 5 3/4 in
+    vise jaws flat); face to .47 drawing thickness and mill to 20.5 x 5.1;
+    drill and ream the four pivot-pin holes
     with the .3760 reamer; chamfer each pin hole's underside edge .012 min x
     45 deg; centre-drill the HUB and CL spots; drill and tap the CR, riser
     and feed-lever holes; break edges. The pivot bores turn on TL-VN-77

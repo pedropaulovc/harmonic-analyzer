@@ -2,8 +2,8 @@ r"""Create the drawing for the oblique trammel's base bar (MHA-CH-06-TL-20).
 
 One part, one configuration, two off (the title block's quantity); the
 second bar is the same part turned over. Its plan (the *Front view, looking
-down on the top face) carries the bar's length and stock width (its 5-1/2
-fraction a reference over STOCK), the rail holes' baseline stations and the
+down on the top face) carries the bar's length and milled width (owner
+ruling #2083), the rail holes' baseline stations and the
 row's lateral station from the -Y edge under one native tap callout, the end
 brackets' eight counterbored holes (stations from the end face, four rows
 from the -Y edge, one native callout naming the far-side counterbores and the
@@ -63,7 +63,6 @@ from _gtol_planar import PlanarFace
 from _surface_finish import SEAT_UM, surface_finish_by_key
 from _printed_limits import limits
 from _part_properties import part_drawing_unit
-from _supplier_dimensions import supplier_reference_dimension
 from _printed_tolerance import drilled_oversize_mm
 from ch_rocker_arm_tl_oblique_callouts import set_callout_lengths_to_three_places
 from ch_rocker_arm_tl_oblique_base_bar_spec import (
@@ -104,11 +103,11 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A 17.32 x 5-1/2 x .47 bar: 1:2 puts the 220-wide plan on the B sheet, its end
+# A 17.32 x 5.50 x .47 bar: 1:2 puts the 220-wide plan on the B sheet, its end
 # view projected right of it on the same centreline (third angle). The
 # vertical budget: the rail-hole stack tops out at about 265 under the 267
 # border. The plan sits right of centre so the three side lanes (the row's
-# three-line callout the widest) and the stock width's text clear the left
+# three-line callout the widest) and the width's text clear the left
 # border (about 12); r3 moved plan and end view 8 right, r4 another 3.5 (the
 # row's block measured wider than estimated). C4: the bracket holes' callout
 # takes the bottom-right corner under the end view, so the 1:5 iso and its
@@ -122,9 +121,9 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 # 5 more for the far slot's rise outside them (c3-r6). c4-r8 read the
 # 400.00 block's top line touching the border: the plan and end view drop
 # 3, the iso staying put, its top 7 under the length's text. The 2026-10-30
-# narrowing to 1/2 x 5-1/2 shortens the plan and end view 12.7 at the +Y side.
-# #290: the stock width's "(5-1/2 in)" reference is wider than "139.7", so
-# the plan and end view move 3 right to keep it off the left border.
+# narrowing to 5.50 shortens the plan and end view 12.7 at the +Y side.
+# #290 moved the plan and end view 3 right for the stock width's "(5-1/2 in)"
+# reference; #2083 mills the width and prints a bare 5.50 there instead.
 SHEET_SCALE = (1.0, 2.0)
 VIEW_SCALE = (1, 2)
 ISO_SCALE = (1, 5)
@@ -211,7 +210,7 @@ def _below_line(k: int) -> float:
 #
 # Left of it, shortest nearest: the near rise, the rail row's lateral station
 # (88.90, from the -Y edge to the row's centreline, its function on two
-# callout lines under it; r3), the stock width, whose text rides above the
+# callout lines under it; r3), the width, whose text rides above the
 # row's line so the row's upper extension line ends short of it. The row's
 # three-line block sits above the near rise's upper extension line.
 # Right of it: the bracket rows from the -Y edge (the outer row's 6.400
@@ -236,8 +235,8 @@ _SLOT_RUN_TEXT_HALF = 0.008  # "2X .16"
 _FAR_RISE_TEXT_HALF = 0.0055  # "4.90": the r6 sheet's "23.0" was 8.8 wide
 # "FOR HGR15R RAIL", its widest line (15 glyphs): 38.8 wide on the r4 sheet.
 _RAIL_ROW_TEXT_HALF = 0.0195
-# "(5-1/2 in)" over "STOCK": estimated at 2.6 a glyph with a stacked fraction.
-_BAR_WIDTH_TEXT_HALF = 0.0104
+# "5.50", four glyphs at 2.6 (the #290 "(5-1/2 in)" over "STOCK" was 0.0104).
+_BAR_WIDTH_TEXT_HALF = 0.0055
 _BRACKET_NEAR_X_TEXT_HALF = 0.0055  # "2.244"
 _BRACKET_ROW_TEXT_HALF = 0.0070  # "2.425": "61.400" was 13.9 wide on the c4-r9 sheet
 _BRACKET_OUTER_TEXT_BELOW = 0.004  # "6.400"'s centre under the bar's -Y edge
@@ -249,10 +248,10 @@ _SLOT_RUN_TEXT_LOW = 0.0055  # text centre below the run's lower line
 # sheet). The near rise (49.4) carries its text inside its own span, so the
 # block sits inside the row's span above the rise's upper extension line,
 # 0.7 clear, and under the row's line clear of its upper arrowhead (3.55
-# long). At 0.8 clear and an estimated 17 tall, the 1/2 x 5-1/2 narrowing's
+# long). At 0.8 clear and an estimated 17 tall, the 5.50 narrowing's
 # taller rise put that arrowhead in "88.90" (machinist review, farm run
 # 20261030T181155138Z); above the row line, outside its span, the block ran
-# into the border and under the stock width's line (run 20261030T185048712Z).
+# into the border and under the width's line (run 20261030T185048712Z).
 _RAIL_ROW_TEXT_HALF_HIGH = 0.0073
 _ROW_ARROW_LENGTH = 0.00355
 _ROW_SHEET_Y = _sheet_y(FRONT_CENTER, 0.0)
@@ -260,7 +259,7 @@ _RISE_TOP_SHEET_Y = _sheet_y(FRONT_CENTER, LOW_SIDE_Y + NEAR_SLOT_RISE)
 _RAIL_ROW_BLOCK_LOW = _RISE_TOP_SHEET_Y + 0.0007
 # Side lanes (sheet m off the plan's end). The row's text clears the near
 # rise's line by 2.5 (r4: the 10.3's outside arrow and its tail struck the
-# block's last "L"); the stock width's line clears the row's text by 2.
+# block's last "L"); the width's line clears the row's text by 2.
 _RAIL_ROW_LANE = LANE + 0.0025 + _RAIL_ROW_TEXT_HALF
 _BAR_WIDTH_LANE = _RAIL_ROW_LANE + _RAIL_ROW_TEXT_HALF + 0.002
 _SLOT_RUN_LANE = 0.011  # its text's left end clears the bar's end face
@@ -377,17 +376,15 @@ _SEAT_REASON_HALF = 0.026  # "TABLE AND RAIL SEATS", 20 glyphs
 SEAT_REASON_XY = (END_CENTER[0] - _SEAT_REASON_HALF, _END_TOP + 0.026)  # top-left
 # One slot's sizes count both slots; the width says they go through (r5).
 DIMENSION_TEXT = {"SlotWidth": ("2X ", " THRU"), "SlotRun": ("2X ", "")}
-# The width is the bar as bought: its stock fraction prints as a reference
-# over STOCK (``_stock_width_reference``); the faced thickness takes the
-# title block's .XX band. The rail-hole stations' tight band names its mate
-# under the outermost station, the row, at the title block's band since
-# c3-r7, keeps its reason (r3: every hole in line with the rail's row, which
-# the one DRO setting gives).
+# The width is milled to size (owner ruling #2083) and the thickness faced:
+# both take the title block's .XX band. The rail-hole stations' tight band
+# names its mate under the outermost station, the row, at the title block's
+# band since c3-r7, keeps its reason (r3: every hole in line with the rail's
+# row, which the one DRO setting gives).
 CALLOUTS_BELOW = {
     f"RailHole{_LAST_HOLE}X": RAIL_MATE_CALLOUT,
     "RailRowY": RAIL_ROW_CALLOUT,
 }
-STOCK_CALLOUT = "STOCK"
 # The tap callout's two lines, centred about here, clear the 267 border by
 # about 6 (r3 printed its first line touching it).
 TAP_CALLOUT_XY = (0.318, 0.256)
@@ -499,29 +496,34 @@ requirement(
             ("BAR_LENGTH",),
         ),
         "length": (
-            limits(BAR_LENGTH, part_spec.STATION_PLACES),
+            _limits(BAR_LENGTH, part_spec.STATION_PLACES),
             ("BAR_LENGTH", "STATION_PLACES"),
         ),
         "length_nominal": (BAR_LENGTH, ("BAR_LENGTH",)),
     },
     precision={"length": part_spec.STATION_PLACES},
 )
-# The +Y side: the width prints "STOCK" (STOCK_DIMENSIONS), so it carries the
-# nominal and that note but no machined acceptance band.
+# The +Y side: the width, milled to size from the 1/2 x 6 bar (owner ruling
+# #2083), at the title block's .XX band from the faced -Y side.
 requirement(
     "bar_high_side",
     kind="face",
     faces=(PlanarFace((0.0, 1.0, 0.0), HIGH_SIDE_Y),),
-    requirements=(),
+    requirements=("width",),
     fields={
         "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
         "plane": (
             {"frame": "model", "axis": "y", "value": HIGH_SIDE_Y},
             ("HIGH_SIDE_Y",),
         ),
-        "width_nominal": (BAR_WIDTH, ("BAR_WIDTH", "STOCK_DIMENSIONS")),
-        "note": ("STOCK", ("STOCK_DIMENSIONS",)),
+        "width": (
+            _limits(BAR_WIDTH, part_spec.WIDTH_PLACES),
+            ("BAR_WIDTH", "WIDTH_PLACES"),
+        ),
+        "width_nominal": (BAR_WIDTH, ("BAR_WIDTH",)),
+        "width_from": _FROM_LOW_SIDE,
     },
+    precision={"width": part_spec.WIDTH_PLACES},
 )
 
 # The two through hold-down slots: two walls and two end arcs each, located
@@ -564,21 +566,21 @@ for _name, _x, _y, _rise, _x_source, _y_source, _rise_source in (
             ),
             "axis": _INTO_BAR,
             "width": (
-                limits(part_spec.SLOT_WIDTH, part_spec.SLOT_PLACES),
+                _limits(part_spec.SLOT_WIDTH, part_spec.SLOT_PLACES),
                 ("SLOT_WIDTH", "SLOT_PLACES"),
             ),
             "width_nominal": (part_spec.SLOT_WIDTH, ("SLOT_WIDTH",)),
             "separation": (
-                limits(SLOT_RUN, part_spec.SLOT_PLACES),
+                _limits(SLOT_RUN, part_spec.SLOT_PLACES),
                 ("SLOT_RUN", "SLOT_PLACES"),
             ),
             "station": (
-                limits(_x, part_spec.STATION_PLACES),
+                _limits(_x, part_spec.STATION_PLACES),
                 (_x_source, "STATION_PLACES"),
             ),
             "station_nominal": (_x, (_x_source,)),
             "height": (
-                limits(_rise, part_spec.STATION_PLACES),
+                _limits(_rise, part_spec.STATION_PLACES),
                 (_rise_source, "STATION_PLACES"),
             ),
             "height_nominal": (_rise, (_rise_source,)),
@@ -745,29 +747,6 @@ def _set_dimension_text(
         raise RuntimeError(f"dimension texts not applied: {sorted(remaining)}")
 
 
-def _stock_width_reference(adapter: Any, annotations: list[Any]) -> None:
-    """The as-bought width prints as its REF stock fraction over STOCK."""
-    matches = [
-        item for item in annotations if dimension_name(adapter, item) == "BarWidth"
-    ]
-    if len(matches) != 1:
-        raise RuntimeError(f"expected one BarWidth dimension, found {len(matches)}")
-    display = _early_bound(
-        _early_bound(matches[0], "IAnnotation").GetSpecificAnnotation(),
-        "IDisplayDimension",
-    )
-    supplier_reference_dimension(
-        adapter,
-        display,
-        label="base bar stock width",
-        units="in",
-        precision=DRAWING_PRECISION_BY_NAME["BarWidth"],
-        expected_mm=BAR_WIDTH,
-        fraction_denominator=part_spec.BAR_WIDTH_FRACTION_DENOMINATOR,
-        callout=STOCK_CALLOUT,
-    )
-
-
 def _omit_tap_thread_class(display: Any) -> None:
     """The title block's THREADS row owns the class (rule 2): the tap row
     reads ``7X 8-32 UNC THRU ALL``, not ``... - 2B ...``."""
@@ -899,11 +878,10 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them, then marks the slot counts and
-    # writes the STOCK and mate callouts.
+    # writes the mate callouts.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _set_dimension_text(adapter, annotations, DIMENSION_TEXT)
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
-    _stock_width_reference(adapter, annotations)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the plan")
