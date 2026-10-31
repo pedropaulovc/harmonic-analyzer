@@ -84,8 +84,11 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     import pinion_rig_park_geometry as park
 
     fitup_shift = assembly.ARBOR_Z0 - (-135.0 + MECHANISM_Z_SHIFT)
+    # The arbor rides the drum's front end; the inch drum (#290) grew 0.056
+    # forward of the released 143.2 face.
+    drum_growth = rig.DRUM_LEN - 143.2
     assert fitup_shift == pytest.approx(
-        0.25 + (9.0 - rig.STRAP_T) + rig.RIG_AFT_SHIFT, abs=1e-9
+        0.25 + (9.0 - rig.STRAP_T) + rig.RIG_AFT_SHIFT - drum_growth, abs=1e-9
     )
     released_origin = (
         assembly.APINION_X,
