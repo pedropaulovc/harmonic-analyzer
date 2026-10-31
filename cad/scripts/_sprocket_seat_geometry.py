@@ -7,8 +7,6 @@ read this interface independently of the removable sprocket's tooth model.
 
 from __future__ import annotations
 
-from _fit_ream_h7 import REAM_H7
-
 _MM_PER_IN = 25.4
 
 # A bought chain's axial envelope (PEER Chain 25R size chart, read
@@ -71,13 +69,10 @@ CHAIN_MID_Z = SEAT_FACE_Z - PLATE / 2.0  # -155.7, the ONE chain plane
 DRIVE_PIN_DIA = 3.0 / 32.0 * _MM_PER_IN  # 2.38125
 DRIVE_PIN_PROUD = 2.4
 DRIVE_PIN_TIP_Z = SEAT_FACE_Z - DRIVE_PIN_PROUD  # -156.7
-# Reamed .0930 in for the press (3/32 nominal), with a purchased .0930
-# chucking reamer: REAM_H7 gives .0930-.0935 in.
-DRIVE_PIN_HOLE_DIA = 2.3622
-# Light press of the hardened 3/32 dowel (+.0001/+.0003 in): .00035-.00105 in
-# interference. The shafts retain their own catalogue-diameter and
-# interference checks.
-DRIVE_PIN_HOLE_BAND = REAM_H7
+DRIVE_PIN_HOLE_DIA = 2.38  # reamed for the press (3/32 nominal)
+# Light press of the hardened 3/32 dowel; the shafts retain their own
+# catalogue-diameter and interference checks.
+DRIVE_PIN_HOLE_BAND = (0.000, -0.010)
 # The shared 98381A stock dowel family's +/-0.010 in length grade.
 DRIVE_PIN_LENGTH_GRADE = 0.010 * _MM_PER_IN
 
