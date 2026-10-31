@@ -181,8 +181,8 @@ BORE_DIAMETRAL_CLEARANCE = tuple(
 _CLEARANCE_MIN, _CLEARANCE_MAX = BORE_DIAMETRAL_CLEARANCE
 _SHAFT_UPPER, _SHAFT_LOWER = dt_crank_hub_geometry.SHAFT_DIA_BAND
 BORE_DIA_BAND = (  # (upper, lower) deviations
-    round(_SHAFT_LOWER + _CLEARANCE_MAX, 3),
-    round(_SHAFT_UPPER + _CLEARANCE_MIN, 3),
+    round(_SHAFT_LOWER + _CLEARANCE_MAX, 5),
+    round(_SHAFT_UPPER + _CLEARANCE_MIN, 5),
 )
 
 FACE_WIDTH = 11.6  # teeth grown north past the 64T row; south face stays seated
@@ -219,9 +219,10 @@ TURNED_LENGTH = FACE_WIDTH - SHOULDER_LENGTH
 # means that no T120 section reaches the full-tip shoulder envelope.
 # Both sheets describe that absence rather than printing an infinite size.
 T120_SHOULDER_AIR_WORST = math.inf
-# 1.8139 exact with the cone swing set 0.20 above standard (edge slack moves
-# X_PITCH; user ruling 2026-10-10), floored to 1.81; the ordinary floor is 0.25.
-T120_TURNED_BAND_RADIAL_WORST = 1.81
+# 1.8573 exact with the cone swing set 0.20 above standard (edge slack moves
+# X_PITCH; user ruling 2026-10-10) and the inch running fits, floored to 1.85;
+# the ordinary floor is 0.25.
+T120_TURNED_BAND_RADIAL_WORST = 1.85
 # The independent fit-up feeler check remains: MHA-DT-10 and T120 are
 # pushed toward each other to take up every running play. A band that stops
 # the feeler is turned down, never under TURNED_DIA_FITUP_MIN; a shoulder
@@ -523,8 +524,8 @@ BORE_FIT_CALLOUT = "\n".join(
         "BORE LIMITS GOVERN",
         f"MATE SHAFT {CRANKSHAFT_NUMBER}",
         f"(\N{DIAMETER SIGN}{SEAT_DIA:.3f} "
-        f"+{_SHAFT_UPPER:.3f}/{_SHAFT_LOWER:.3f})",
-        f"(DIA CLR {_CLEARANCE_MIN:.3f}-{_CLEARANCE_MAX:.3f} mm)",
+        f"+{_SHAFT_UPPER:.5f}/{_SHAFT_LOWER:.5f})",
+        f"(DIA CLR {_CLEARANCE_MIN:.4f}-{_CLEARANCE_MAX:.4f} mm)",
     )
 )
 # One matched-fit note, printed on BOTH sheets (machinist review of 4d4e038e3):

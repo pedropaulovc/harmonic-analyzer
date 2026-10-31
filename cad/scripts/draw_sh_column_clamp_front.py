@@ -167,7 +167,7 @@ REFERENCE_DIMENSIONS = ("BoreDia",)
 # (draw_dt_cone_gear_shaft._printable_above_callouts).
 DIMENSION_CALLOUTS = {
     "BoreDia": (
-        f"{BORE_DIAMETRAL_CLEARANCE[0]:.2f}-{BORE_DIAMETRAL_CLEARANCE[1]:.2f} "
+        f"{BORE_DIAMETRAL_CLEARANCE[0]:.4f}-{BORE_DIAMETRAL_CLEARANCE[1]:.4f} "
         f"DIAMETRAL\nCLEARANCE ON\n{COLUMN_MATE}\nAXIS ON SPLIT FACE"
     ),
     "Depth": f"SETS SCREW ENGAGEMENT\nIN {BACK_ARC_MATE}",

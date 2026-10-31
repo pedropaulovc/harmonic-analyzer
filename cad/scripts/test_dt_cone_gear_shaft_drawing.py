@@ -58,15 +58,15 @@ def test_section_fits_are_toleranced_on_the_model() -> None:
     """
     spec = dt_cone_gear_shaft_spec
     assert spec.RUNNING_DIA_BAND is _fit_shaft_h.SHAFT_H
-    assert spec.GEAR_SEAT_BAND == (0.000, -0.050)
+    assert spec.GEAR_SEAT_BAND == (0.0, -0.0508)
     assert _lands_ride_named_bands(spec.SECTION_DIA_BANDS)
     # Positive control: an equal-valued local retype of either class is caught.
     forked = list(spec.SECTION_DIA_BANDS)
-    forked[2] = (0.000, -0.050)
+    forked[2] = (0.0, -0.0508)
     assert forked[2] == spec.GEAR_SEAT_BAND
     assert not _lands_ride_named_bands(tuple(forked))
     forked = list(spec.SECTION_DIA_BANDS)
-    forked[0] = (0.000, -0.020)
+    forked[0] = (0.0, -0.02032)
     assert not _lands_ride_named_bands(tuple(forked))
     # The custom collar preserves the terminal land's retained slip class.
     tip_max = spec.SECTION_DIAS[-1] + spec.SECTION_DIA_BANDS[-1][0]
@@ -277,7 +277,7 @@ def test_display_precision_is_owned_by_the_part() -> None:
     # journal length, which nothing seats against.
     by_name = dt_cone_gear_shaft_spec.DRAWING_PRECISION_BY_NAME
     assert by_name == {
-        "Sec0Dia": 3,
+        "Sec0Dia": 4,
         "Sec1Dia": 3,
         "Sec2Dia": 3,
         "Sec3Dia": 3,
@@ -1117,14 +1117,14 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     ends = dt_cone_gear_shaft_spec.SECTION_ENDS
     assert all(a > b for a, b in zip(dias, dias[1:]))
     assert all(a < b for a, b in zip(ends, ends[1:]))
-    # The integral bearing journal fits the v2 post at 0.05 diametral
+    # The integral bearing journal fits the v2 post at 0.0127 diametral
     # clearance; every downstream gear seat keeps its existing diameter.
-    assert dt_cone_gear_shaft_spec.JOURNAL_BORE_DIA == pytest.approx(12.2808)
-    assert dt_cone_gear_shaft_spec.JOURNAL_CLEARANCE == pytest.approx(0.05)
-    assert dt_cone_gear_shaft_spec.JOURNAL_DIA == pytest.approx(12.2308)
+    assert dt_cone_gear_shaft_spec.JOURNAL_BORE_DIA == pytest.approx(12.2682)
+    assert dt_cone_gear_shaft_spec.JOURNAL_CLEARANCE == pytest.approx(0.0127)
+    assert dt_cone_gear_shaft_spec.JOURNAL_DIA == pytest.approx(12.2555)
     assert dt_cone_gear_shaft_spec.JOURNAL_END == pytest.approx(43.011)
     assert dias[-1] == cone_shaft_land_bands.TERMINAL_DIA_MM
-    assert dias[:-1] == pytest.approx((12.2308, 9.525, 6.35, 3.175))
+    assert dias[:-1] == pytest.approx((12.2555, 9.525, 6.35, 3.175))
     assert dt_cone_gear_shaft_spec.FRONT_STUB == pytest.approx(
         -cone_line.POST_STATION
         + dt_cone_pivot_post_spec.CONE_BOSS_LENGTH / 2.0

@@ -16,6 +16,7 @@ from __future__ import annotations
 import math
 
 import _config
+from _fit_ream_h7 import REAM_H7
 from _gtol_cylinder import CylinderFace
 from _gtol_controls import GeometricControl, PartDatum
 from _gtol_planar import PlanarFace
@@ -58,7 +59,7 @@ HEAD_BASE_Y = BLOCK_HEIGHT - HEAD_HEIGHT
 # The north face is the boss's machined end, stationed from the post axis on
 # the print.
 CRANK_BOSS_DIA = 21.93
-CRANK_BORE_DIA = 11.438
+CRANK_BORE_DIA = 11.43  # .4500 in
 CRANK_BORE_HEIGHT = _config.machine("gear_train", "crank_axis_height_mm")
 CRANK_BORE_OFFSET = 0.0
 CRANK_BOSS_NORTH_FACE = HEAD_DIA / 2.0
@@ -83,7 +84,7 @@ INCLINE_DEG = _config.machine("cone_incline", "derived_incline_deg")
 CONE_AXIS_VIEW = "CONE JOURNAL"
 BORE_HEIGHT = cone_axis.CONE_AXIS_HEIGHT_MM
 CONE_BOSS_DIA = 17.2
-BORE_DIA = 12.2808
+BORE_DIA = 12.2682  # .483 in
 CONE_BOSS_LENGTH = post_envelope.BLOCK_DIA
 
 # Two vertical ANSI-inch 1/4 Fillister Head Screw counterbores in the top face.
@@ -141,9 +142,9 @@ if CONE_BOSS_NORTH_STATION_TOLERANCE_MM > printed_band_mm(2) / 2.0:
 #   body      pi*(BLOCK_DIA/2)^2*BLOCK_HEIGHT
 #   head      pi*((HEAD_DIA/2)^2 - (BLOCK_DIA/2)^2)*HEAD_HEIGHT
 #   crank boss outside the head cylinder            = + 11 611.2487
-#   crank bore pi*5.719^2*72.0344                    = -  7 401.6750
+#   crank bore pi*5.715^2*72.0344                    = -  7 391.3248
 #   cone pads outside the body cylinder             = +    209.0550
-#   cone bore pi*6.1404^2*42.011                     = -  4 976.2961
+#   cone bore pi*6.1341^2*42.011                     = -  4 966.0901
 #   2x (thru pi*(ATTACHMENT_THRU_DIA/2)^2*(BLOCK_HEIGHT-cbore_depth)
 #       + cbore pi*(ATTACHMENT_CBORE_DIA/2)^2*cbore_depth)
 #
@@ -158,25 +159,28 @@ if CONE_BOSS_NORTH_STATION_TOLERANCE_MM > printed_band_mm(2) / 2.0:
 # Growing the 86 mm feature-sum reference adds only the body column less the
 # two through drills.  The head shell's height and the contained boss/pad/bore
 # intersections are unchanged; the builder independently recomputes them.
-HARVESTED_VOLUME_MM3 = 112_300.8902 + math.pi * (
+# The inch reamed bores (.4500 crank, .483 cone) leave 20.5562 more metal in
+# the 86 mm reference than the former Ø11.438/Ø12.2808 bores.
+HARVESTED_VOLUME_MM3 = 112_321.4464 + math.pi * (
     (post_envelope.BLOCK_DIA / 2.0) ** 2 - 2.0 * (ATTACHMENT_THRU_DIA / 2.0) ** 2
 ) * (BLOCK_HEIGHT - 86.0)
 HARVESTED_MASS_KG = HARVESTED_VOLUME_MM3 * 7.20e-6
 
-# Both bores are running journals, so both carry the SAME size band -- the one
-# the `shaft_in_bushing` fit class needs and no tighter (tolerance-policy.md,
-# "How a critical-feature tolerance is decided", step 6b).  Each mating shaft
-# is turned to (bore nominal - 0.05) with the fleet's `SHAFT_H` (0/-0.020)
-# band, so a bore held +0.005/-0.025 delivers exactly the class's 0.025..0.075
-# mm diametral clearance:
+# Both bores are running journals reamed with owned decimal reamers, each
+# band the one the `shaft_in_bushing` fit class (.0010-.0023 in) needs on its
+# shaft's fleet `SHAFT_H` (0/-.0008 in) band (tolerance-policy.md, "How a
+# critical-feature tolerance is decided", step 6b):
 #
-#   crank:   shaft 11.368..11.388  bore 11.413..11.443  (crankshaft MHA-DT-11)
-#   journal: shaft 12.2108..12.2308 bore 12.2558..12.2858 (cone shaft MHA-DT-04)
+#   crank:   bore .4500 +.0005/.0000 (owned .4500 reamer), shaft .449
+#            (crankshaft MHA-DT-11)
+#   journal: bore .483 +.0010/+.0005 (owned .4835 reamer), shaft .4825
+#            (cone shaft MHA-DT-04)
 #
 # Apart from these two, the spacing between them and the cone-axis height (both
 # below), nothing else on this casting is an accuracy feature, so nothing else
 # carries a band: the title block's general grades govern.
-RUNNING_BORE_BAND = (0.005, -0.025)
+RUNNING_BORE_BAND = REAM_H7  # the crank bore
+JOURNAL_BORE_BAND = (0.0254, 0.0127)  # the cone journal bore
 
 # Crank-above-cone bore spacing (U31, 2026-09-23, option 3a). The crank axis
 # is located FROM THE CONE AXIS, not from the foot. Two foot-referenced .XX
@@ -262,7 +266,7 @@ MOUNT_OTHER_WEBS_WORST = {
         math.radians(INCLINE_DEG + float(_config.title_block("angular")["value_deg"]))
     )
     - (ATTACHMENT_THRU_DIA + _DRILL_OVERSIZE) / 2.0
-    - (round(BORE_DIA, 3) + RUNNING_BORE_BAND[0]) / 2.0,
+    - (round(BORE_DIA, 4) + JOURNAL_BORE_BAND[0]) / 2.0,
     "counterbore floor annulus": (
         round(ATTACHMENT_CBORE_DIA, 2)
         - printed_band_mm(2)
@@ -365,10 +369,11 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "AttachmentScrewHoles": {"MountWestX": 2, "MountEastX": 2},
     "CrankBossProfile": {"CrankAxisY": 2, "CrankBossDia": 1},
     "CrankSprocketBoss": {"CrankBossLen": 1},
-    "CrankBoreProfile": {"CrankBoreDia": 3},
+    "CrankBoreProfile": {"CrankBoreDia": 3},  # 11.430, .4500 in
     "ConeBossProfile": {"JournalAxisY": 2, "ConeBossDia": 1},
     "ConeShaftBoss": {"ConeBossLen": 2},
-    "JournalBoreProfile": {"JournalBoreDia": 3},
+    # Four places print the .483 in nominal exactly (12.2682).
+    "JournalBoreProfile": {"JournalBoreDia": 4},
     # BASIC since #906: it feeds the crank bore's angularity frame; four places
     # retain the configured nominal without changing the frame's zone.
     "JournalPlanReference": {"InclineAngle": 4},

@@ -163,7 +163,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StrapProfile": {
         "PivotBoreDia": 2,
-        "ArborBoreDia": 2,
+        # Four places print the 5/16 arbor bore exactly (7.9375).
+        "ArborBoreDia": 4,
         "ArborBoreCz": 2,
         "BottomCapRadius": END_RADIUS_PLACES,
         "TopCapRadius": END_RADIUS_PLACES,

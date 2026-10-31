@@ -176,7 +176,7 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
     assert all(re.match(r"\d\. ", line) for line in lines)
     assert drawing.NOTES_XY[0] + 0.00242 * max(map(len, lines)) < 0.214
     notes = " ".join(spec.DRAWING_NOTES.split())
-    window = f"{joint.BRAZE_CLEARANCE_MIN:.2f}-{joint.BRAZE_CLEARANCE_MAX:.2f}"
+    window = f"{joint.BRAZE_CLEARANCE_MIN:.4f}-{joint.BRAZE_CLEARANCE_MAX:.4f}"
     for phrase in (
         "TUBE 1/2 OD X 0.065 WALL, ONLINEMETALS 7322",
         "SLEEVE 5/8 OD X 0.058 WALL, 7324",
