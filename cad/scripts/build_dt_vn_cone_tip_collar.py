@@ -57,7 +57,6 @@ CONFIGURATIONS = ("Default", "Collar", "SetScrew")
 COLLAR_FEATURES = (
     "Ring", "Body", "ShoulderRoot",
     "MountFlat", "SetScrewTap",
-    "TapRootPlane", "TapRootGauge",
 )
 SCREW_FEATURES = ("SetScrew", "HexSocket", "SocketAFReference")
 
@@ -162,22 +161,6 @@ async def _ring(adapter, jobs):
         placement_dims=[((None, None), ("TapStation", '"TapStation"'))],
     )
     jobs.extend(hole.placement_drive_jobs)
-    # A manufacturing limit, not a fictional physical root cut: 2B alone has
-    # no root MAX. This source-native gauge dimension controls the tap tool's
-    # permitted envelope and is projected as MAX TAP ROOT on the drawing.
-    _plane(adapter, "TapRootPlane", spec.FLAT_DISTANCE, base="Right Plane")
-    check("tap root gauge sketch", await adapter.create_sketch("TapRootPlane"))
-    dims = SketchDims()
-    await define_circle(
-        adapter, 0.0, spec.TAP_STATION, spec.THREAD_ENVELOPE_DIA / 2.0,
-        "tap root maximum gauge", dims=dims,
-        names=(None, "GaugeTapStation", "TapRootLimit"),
-        drives=(None, '"TapStation"', '"TapRootLimit"'),
-    )
-    await ensure_fully_defined(adapter, "tap root maximum gauge")
-    check("exit root gauge", await adapter.exit_sketch())
-    name_last_feature(adapter, "TapRootGauge")
-    jobs.extend(dims.apply(adapter, "TapRootGauge"))
 
 
 async def _screw(adapter, jobs):
@@ -307,7 +290,6 @@ def _manufacturing_configurations(adapter):
 def _functional_dimension_types(adapter):
     """Author part-owned MAX limits."""
     for feature, name, kind in (
-        ("TapRootGauge", "TapRootLimit", 6),  # swTolMAX
         ("ShoulderRoot", "ShoulderRadius", 6),  # swTolMAX
     ):
         _display, dimension = _named_dimension(adapter, feature, name)
@@ -340,8 +322,7 @@ async def build(adapter) -> dict[str, str]:
                         ("NoseDia", spec.NOSE_DIA), ("NoseLength", spec.NOSE_LENGTH),
                         ("ShoulderRadius", spec.SHOULDER_ROOT_RADIUS),
                         ("TapStation", spec.TAP_STATION),
-                        ("CollarWidth", spec.WIDTH), ("FlatDistance", spec.FLAT_DISTANCE),
-                        ("TapRootLimit", spec.THREAD_ENVELOPE_DIA)):
+                        ("CollarWidth", spec.WIDTH), ("FlatDistance", spec.FLAT_DISTANCE)):
         await set_global(adapter, name, f"{value}mm")
     jobs = []
     await _ring(adapter, jobs)
@@ -374,7 +355,6 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(adapter, PART_NAME, {
         "Description": spec.BOM_DESCRIPTION,
         "Manufacturing Notes": spec.DRAWING_NOTES,
-        "Installation Notes": spec.INSTALLATION_NOTES,
         "Isometric View Note": spec.ISOMETRIC_VIEW_NOTE,
         "Radial Tap View Note": spec.RADIAL_TAP_VIEW_NOTE,
         "Bore View Note": spec.BORE_VIEW_NOTE,
@@ -392,11 +372,9 @@ async def build(adapter) -> dict[str, str]:
         if len(bodies) != expected:
             raise RuntimeError(f"{configuration} has {len(bodies)} solids, expected {expected}")
     _activate_configuration(adapter, "Default")
-    blank_sketch_feature(model, _feature_by_name(adapter, "TapRootGauge"), "tap root limit gauge")
     blank_sketch_feature(model, _feature_by_name(adapter, "SocketAFReference"), "stock socket AF reference")
     blank_reference_geometry(adapter, (
         ("ScrewAxis", "AXIS"), ("InstalledShaftAxis", "AXIS"), ("SocketFace", "PLANE"),
-        ("TapRootPlane", "PLANE"),
     ))
     await report_mass_properties(adapter)
     artefacts = await save_part_and_images(adapter, PART_NAME)

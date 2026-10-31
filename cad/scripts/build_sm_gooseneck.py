@@ -94,6 +94,9 @@ from sm_gooseneck_spec import (
     DRAWING_PRECISION_BY_NAME,
     ELEVATION_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
+    REFERENCE_DIMENSIONS,
+    TUBE_OD_REF_SPAN,
+    TUBE_OD_REF_Y,
 )
 
 # The form nominals live in sm_gooseneck_geom -- the prose-free module the
@@ -271,6 +274,77 @@ def _author_dimension_callouts(adapter) -> None:
                 display.SetText(slot, text)
                 if str(display.GetText(slot) or "").replace("\r\n", "\n") != text:
                     raise RuntimeError(f"{name}@{feature}: callout did not persist")
+
+
+@_telemetry.traced("part.reference_dimensions")
+def _author_reference_dimensions(adapter) -> None:
+    """Parenthesize the stock Ø on their source dimensions: as supplied, they
+    print as reference, untoleranced (the drawing imports them as they are)."""
+    for feature, names in REFERENCE_DIMENSIONS.items():
+        resolved = _named_dimensions(adapter, feature, set(names))
+        for name in names:
+            display, _dimension = resolved[name]
+            display.ShowParenthesis = True
+            if not bool(display.ShowParenthesis):
+                raise RuntimeError(f"{name}@{feature}: reference parentheses did not persist")
+
+
+async def _tube_od_reference(adapter) -> list[tuple[str, str]]:
+    """The tube's stock Ø on the elevation, as a reference: a hidden Front-plane
+    sketch whose construction line runs along the bare leg's right silhouette,
+    TUBE_OD_REF_SPAN about mid-way between the sleeve's top and the bend's entry
+    tangent, Ø-dimensioned from a centreline on the leg axis.  Returns the
+    deferred drive jobs."""
+    y0 = TUBE_OD_REF_Y - TUBE_OD_REF_SPAN / 2.0
+    y1 = TUBE_OD_REF_Y + TUBE_OD_REF_SPAN / 2.0
+    dims = SketchDims()
+    check("create_sketch tube OD reference", await adapter.create_sketch("Front"))
+    # Direct-to-DB: the lines lie on the leg's axis and silhouette, which
+    # creation-time inference would relate to the model's edges.
+    set_sketch_direct_db(adapter, True)
+    try:
+        axis = check(
+            "tube OD reference axis",
+            await adapter.add_centerline(0.0, y0, 0.0, y1),
+        )
+        edge = check(
+            "tube OD reference line",
+            await adapter.add_line(TUBE_DIA / 2.0, y0, TUBE_DIA / 2.0, y1),
+        )
+    finally:
+        set_sketch_direct_db(adapter, False)
+    _construction(adapter, edge, "tube OD reference")
+    for line in (axis, edge):
+        check(
+            f"tube OD reference vertical {line}",
+            await adapter.add_sketch_constraint(line, None, "vertical"),
+        )
+    for end in ("start", "end"):
+        check(
+            f"tube OD reference {end} level",
+            await adapter.add_sketch_constraint(
+                f"{axis}.{end}", f"{edge}.{end}", "horizontal_points"
+            ),
+        )
+    await anchor_point_to_origin(adapter, f"{axis}.start", 0.0, y0, "tube OD reference")
+    dims.record("TubeOdRefStation")
+    await dimension_between(
+        adapter,
+        f"{axis}.start",
+        f"{axis}.end",
+        "vertical_distance",
+        TUBE_OD_REF_SPAN,
+        "tube OD reference span",
+    )
+    dims.record("TubeOdRefSpan")
+    await add_diametric_linear_dimension(
+        adapter, axis, edge, (TUBE_DIA / 2.0 + 4.0, TUBE_OD_REF_Y), "TubeOdRef"
+    )
+    dims.record("TubeOdRef", '"TubeDia"')
+    await ensure_fully_defined(adapter, "tube OD reference sketch")
+    check("exit_sketch tube OD reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "TubeOdReference")
+    return dims.apply(adapter, "TubeOdReference")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -895,6 +969,7 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch station reference", await adapter.exit_sketch())
     name_last_feature(adapter, "StationReference")
     drive_jobs += stations.apply(adapter, "StationReference")
+    drive_jobs += await _tube_od_reference(adapter)
 
     # Apply the deferred drive equations now -- after the whole model + a
     # rebuild exists, so every target resolves. Each equation evaluates to the
@@ -952,10 +1027,12 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _author_dimension_callouts(adapter)
-    # The station reference owns printed dimensions and only reference lines:
-    # hide it so no assembly instance renders it (#880).  The drawing shows it
-    # per view through _drawing_hidden_sketches to import those dimensions.
+    _author_reference_dimensions(adapter)
+    # The reference sketches own printed dimensions and only reference lines:
+    # hide them so no assembly instance renders them (#880).  The drawing shows
+    # them per view through _drawing_hidden_sketches to import those dimensions.
     blank_sketch(adapter, "StationReference")
+    blank_sketch(adapter, "TubeOdReference")
     apply_drawing_properties(
         adapter,
         PART_NAME,
