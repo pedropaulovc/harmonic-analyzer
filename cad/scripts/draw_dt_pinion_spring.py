@@ -1189,7 +1189,7 @@ async def build(adapter: Any) -> dict[str, str]:
         process=HOLE_PROCESS,
     )
     set_hole_callout_precision(
-        hole_callout, HOLE_CALLOUT_PRECISION, label="spring pad clearance hole"
+        hole_callout, {"hw-diam": HOLE_CALLOUT_PRECISION}, label="spring pad clearance hole"
     )
     # After every pick on the hole: its forward rim lies on this line.
     _hole_axis_centerline(
