@@ -26,6 +26,7 @@ import ast
 import importlib
 import inspect
 import re
+import unicodedata
 from pathlib import Path
 
 import pytest
@@ -401,7 +402,13 @@ FORCED_REBUILDS = ("ForceRebuild3", "set_active_configuration(", "assert_saved_c
 
 
 def _creates_configurations(path: Path, *, native_only: bool = False) -> bool:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
+    text = path.read_text(encoding="utf-8")
+    # A matching call spells a creator name in its source, so skip parsing the
+    # rest. Python NFKC-normalizes identifiers; search non-ASCII text normalized.
+    spelled = text if text.isascii() else unicodedata.normalize("NFKC", text)
+    if not CONFIGURATION_CREATORS.search(spelled):
+        return False
+    tree = ast.parse(text)
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue

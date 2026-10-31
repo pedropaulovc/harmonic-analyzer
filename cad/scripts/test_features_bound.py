@@ -273,16 +273,24 @@ def test_bundle_identity_and_face_inventory_must_be_exact(tmp_path: Path, mismat
 
 def test_cli_exit_status_is_actionable(tmp_path: Path) -> None:
     script = str(Path(features_bound.__file__))
-    missing = subprocess.run(
-        [sys.executable, script, "--out", str(tmp_path / "missing")],
-        capture_output=True, text=True, check=False,
-    )
-    assert missing.returncode == 1
-    assert "cannot read required file" in missing.stderr
-    assert "regenerate package:features and export" in missing.stderr
+    # The two runs read disjoint trees, so start both before waiting on either:
+    # each child spends seconds importing the exporter before it checks anything.
+    runs = {
+        name: subprocess.Popen(
+            [sys.executable, script, "--out", str(out)],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        for name, out in (
+            ("missing", tmp_path / "missing"),
+            ("bound", bound_output(tmp_path)),
+        )
+    }
+    results = {name: (run.communicate(), run.returncode) for name, run in runs.items()}
 
-    bound = subprocess.run(
-        [sys.executable, script, "--out", str(bound_output(tmp_path))],
-        capture_output=True, text=True, check=False,
-    )
-    assert bound.returncode == 0, bound.stderr
+    (_out, missing_stderr), missing_code = results["missing"]
+    assert missing_code == 1
+    assert "cannot read required file" in missing_stderr
+    assert "regenerate package:features and export" in missing_stderr
+
+    (_out, bound_stderr), bound_code = results["bound"]
+    assert bound_code == 0, bound_stderr
