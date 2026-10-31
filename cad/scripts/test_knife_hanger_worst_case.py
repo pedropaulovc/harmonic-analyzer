@@ -168,27 +168,27 @@ def test_the_screw_reach_holds_engagement_and_stays_in_the_thread() -> None:
     assert asm.HANGER_UNDERHEAD_Y == pytest.approx(1037.4827)
     assert asm.HANGER_STUD_Y == pytest.approx(990.7827)
     assert asm.HANGER_REACH == pytest.approx(8.9173)
-    # MHA-SM-00 cuts each bolt to its measured stack plus 8.92 +/-0.15.
-    assert asm.HANGER_REACH_MIN == pytest.approx(8.77)
-    assert asm.HANGER_REACH_MAX == pytest.approx(9.07)
-    # Cut-tip lead costs one incomplete pitch: 7.7116667 >= 1.5D =7.239.
+    # MHA-SM-00 cuts each bolt to its measured stack plus .351 +/-.006 in.
+    assert asm.HANGER_REACH_MIN == pytest.approx(8.763)
+    assert asm.HANGER_REACH_MAX == pytest.approx(9.0678)
+    # Cut-tip lead costs one incomplete pitch: 7.7046667 >= 1.5D =7.239.
     assert asm.HANGER_ENGAGEMENT_MIN == pytest.approx(
         asm.HANGER_REACH_MIN - screw.INCOMPLETE_TIP_LEN_MAX
     )
     assert screw.INCOMPLETE_TIP_LEN_MAX == screw.PITCH
-    assert asm.HANGER_ENGAGEMENT_MIN == pytest.approx(7.7116666667)
+    assert asm.HANGER_ENGAGEMENT_MIN == pytest.approx(7.7046666667)
     assert asm.HANGER_ENGAGEMENT_FLOOR == pytest.approx(1.5 * screw.SHANK_DIA)
     assert asm.HANGER_ENGAGEMENT_MIN >= asm.HANGER_ENGAGEMENT_FLOOR
     assert asm.HANGER_ENGAGEMENT_FLOOR == pytest.approx(7.239)
-    # Full tap's shallowest limit stays 0.45 beyond the longest reach.
+    # Full tap's shallowest limit stays 0.4522 beyond the longest reach.
     assert knife_mount.STUD_TAP_THREAD_DEPTH_MIN == pytest.approx(9.52)
     assert asm.HANGER_REACH_MAX <= knife_mount.STUD_TAP_THREAD_DEPTH_MIN
-    assert asm.HANGER_TIP_CLEARANCE == pytest.approx(0.45)
+    assert asm.HANGER_TIP_CLEARANCE == pytest.approx(0.4522)
     # Modified-part incoming inspection proves this cut tail's full form;
     # catalogue "fully threaded" is not assumed to specify thread-to-head.
-    assert screw.THREAD_LENGTH_MIN == pytest.approx(10.62)
-    assert screw.FULL_FORM_TAIL_MIN == pytest.approx(9.5616666667)
-    assert asm.HANGER_THREAD_SPARE == pytest.approx(0.4916666667)
+    assert screw.THREAD_LENGTH_MIN == pytest.approx(10.6172)  # .418 MIN
+    assert screw.FULL_FORM_TAIL_MIN == pytest.approx(9.5588666667)
+    assert asm.HANGER_THREAD_SPARE == pytest.approx(0.4910666667)
     assert (
         screw.THREAD_LENGTH_MIN - screw.INCOMPLETE_TIP_LEN_MAX >= asm.HANGER_REACH_MAX
     )
@@ -611,7 +611,7 @@ def test_the_datum_frame_is_the_zone_the_stacks_were_derived_on() -> None:
     assert knife_mount.KNIFE_BORE_ORIENTATION_TOL == 0.05
     assert knife_mount.KNIFE_BORE_ORIENTATION_TOL < knife_mount.KNIFE_BORE_POSITION_TOL
     assert asm.HANGER_SCREW_MISMATCH == pytest.approx(0.411428, abs=5e-6)
-    assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(6.318959, abs=5e-6)
+    assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(6.322636, abs=5e-6)
 
     # The crossbar's -X ream zone enters the X leg once (B on the -X pin)
     # and the Z leg twice (that ream off the +X ream's line, and the slot's
@@ -663,7 +663,7 @@ def test_the_datum_frame_is_the_zone_the_stacks_were_derived_on() -> None:
     # position zone only through the ridge's yaw over the mouth span.  The
     # refinement closes near Ø0.183, so the old single Ø0.20 frame (its
     # orientation equal to its position) drops the worst rock to 4.83 deg,
-    # while the position zone barely moves it (Ø0.19 6.33, Ø0.25 6.27).
+    # while the position zone barely moves it (Ø0.19 6.33, Ø0.25 6.28).
     block_depth = knife_mount.SUPPORT_Z_THICK + knife_mount.BLOCK_SIZE_TOL
     dowel_yaw = block_depth * math.tan(math.radians(asm.KNIFE_MOUNT_YAW_DEG))
 
@@ -681,11 +681,11 @@ def test_the_datum_frame_is_the_zone_the_stacks_were_derived_on() -> None:
         )
 
     assert worst_rock(0.20, 0.05) == pytest.approx(asm.KNIFE_FREE_ROCK_WORST_DEG)
-    assert worst_rock(0.19, 0.05) == pytest.approx(6.328089, abs=5e-6)
-    assert worst_rock(0.25, 0.05) == pytest.approx(6.273296, abs=5e-6)
-    assert worst_rock(0.20, 0.18) == pytest.approx(5.030027, abs=5e-6)
-    assert worst_rock(0.20, 0.19) == pytest.approx(4.929962, abs=5e-6)
-    assert worst_rock(0.20, 0.20) == pytest.approx(4.829769, abs=5e-6)
+    assert worst_rock(0.19, 0.05) == pytest.approx(6.331766, abs=5e-6)
+    assert worst_rock(0.25, 0.05) == pytest.approx(6.276973, abs=5e-6)
+    assert worst_rock(0.20, 0.18) == pytest.approx(5.033691, abs=5e-6)
+    assert worst_rock(0.20, 0.19) == pytest.approx(4.933625, abs=5e-6)
+    assert worst_rock(0.20, 0.20) == pytest.approx(4.833430, abs=5e-6)
     assert (
         worst_rock(0.20, 0.20)
         < worst_rock(0.20, 0.19)
@@ -727,8 +727,8 @@ def test_the_knife_mount_webs_hold_round_the_hole_and_the_slot() -> None:
 
 
 def test_the_knife_edge_keeps_five_degrees_of_rock_at_the_worst_case() -> None:
-    # Ruling B: HEX_W 8.080, HEX_H 10.268 (.XXX); ridge 115.1 deg.
-    assert (lever.HEX_W, lever.HEX_H, lever.HEX_BAND) == (8.080, 10.268, 0.13)
+    # Ruling B: HEX_W 8.080, HEX_H 10.268 (.XXX, +/-.005); ridge 115.1 deg.
+    assert (lever.HEX_W, lever.HEX_H, lever.HEX_BAND) == (8.080, 10.268, 0.127)
     assert lever.RIDGE_ANGLE_DEG == pytest.approx(115.137, abs=5e-3)
     # Spreading the dowels preserves five-degree rock without moving the
     # mount or lever: atan(0.13246/15.239), the BASIC span less the -X ream's
@@ -771,14 +771,14 @@ def test_the_knife_edge_keeps_five_degrees_of_rock_at_the_worst_case() -> None:
         + asm.KNIFE_RIDGE_YAW_OFFSET
     )
     assert asm.KNIFE_BORE_FAR_END_OFFSET == pytest.approx(0.1972230973)
-    # Code review C09 (owner ruling T1): the print holds the ridge 4.040
-    # +/-0.05 from each side face and each upper flank 122.4 +/-0.5 deg to its
-    # side face.  The worst shoulder is 4.09 out on a flank 58.1 deg off the
-    # vertical, so 2.5458 under the ridge: 6.319 deg in the smallest bore.
-    assert lever.KNIFE_SHOULDER_X_MAX == pytest.approx(4.09)
+    # Code review C09 (owner ruling T1): the print holds the ridge .159
+    # +/-.002 from each side face and each upper flank 122.4 +/-0.5 deg to its
+    # side face.  The worst shoulder is .161 (4.0894) out on a flank 58.1 deg
+    # off the vertical, so 2.5454 under the ridge: 6.323 deg in the smallest bore.
+    assert lever.KNIFE_SHOULDER_X_MAX == pytest.approx(4.0894)
     assert lever.KNIFE_FLANK_HALF_MAX_DEG == pytest.approx(58.1)
-    assert lever.KNIFE_SHOULDER_DROP_MIN == pytest.approx(2.545801, abs=5e-6)
-    assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(6.318959, abs=5e-6)
+    assert lever.KNIFE_SHOULDER_DROP_MIN == pytest.approx(2.545427, abs=5e-6)
+    assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(6.322636, abs=5e-6)
     assert asm.KNIFE_FREE_ROCK_WORST_DEG >= asm.KNIFE_FREE_ROCK_FLOOR_DEG == 5.0
     assert knife_mount.BORE_R_MIN == 6.0
 
@@ -792,30 +792,32 @@ def test_the_knife_edge_keeps_five_degrees_of_rock_at_the_worst_case() -> None:
         )
 
     # Every corner of the two printed bands: the proof's corner is the least.
+    # The side band is about the printed .159, not the 4.040 model value.
+    printed_ridge = round(lever.RIDGE_FROM_SIDE / 25.4, 3) * 25.4
     x_tol, a_tol = lever.RIDGE_FROM_SIDE_TOL, lever.KNIFE_FLANK_TO_SIDE_TOL_DEG
     corners = {
-        (dx, da): rock(lever.RIDGE_FROM_SIDE + dx, lever.KNIFE_FLANK_TO_SIDE_DEG + da)
+        (dx, da): rock(printed_ridge + dx, lever.KNIFE_FLANK_TO_SIDE_DEG + da)
         for dx in (-x_tol, 0.0, x_tol)
         for da in (-a_tol, 0.0, a_tol)
     }
     assert min(corners, key=corners.get) == (x_tol, -a_tol)
     assert min(corners.values()) == pytest.approx(asm.KNIFE_FREE_ROCK_WORST_DEG)
-    assert corners[(0.0, 0.0)] == pytest.approx(6.989, abs=5e-3)
-    assert max(corners.values()) == pytest.approx(7.659, abs=5e-3)
+    assert corners[(0.0, 0.0)] == pytest.approx(6.998, abs=5e-3)
+    assert max(corners.values()) == pytest.approx(7.673, abs=5e-3)
     # The counterexample the old controls admitted (code review C09): the
     # included angle at its nominal, held by HexWidth and the angle only, with
     # the flanks split unevenly about the vertical at the widest .XXX
-    # section.  One flank 2, 3 or 5 deg flatter drops the rock to 5.15, 4.39,
-    # 2.85: under the floor from 3 deg.  T1 bounds each flank to its side
+    # section.  One flank 2, 3 or 5 deg flatter drops the rock to 5.15, 4.40,
+    # 2.86: under the floor from 3 deg.  T1 bounds each flank to its side
     # face, so no split past 0.5 deg passes the print.
     widest_half = (lever.HEX_W + lever.HEX_BAND) / 2.0
     split_rock = {}
-    for split, expected in ((2.0, 5.1453), (3.0, 4.3922), (5.0, 2.8487)):
+    for split, expected in ((2.0, 5.1544), (3.0, 4.4011), (5.0, 2.8574)):
         flank_to_side = 180.0 - (lever.RIDGE_ANGLE_DEG / 2.0 + split)
         split_rock[split] = rock(widest_half, flank_to_side)
         assert split_rock[split] == pytest.approx(expected, abs=5e-4)
         assert flank_to_side < lever.KNIFE_FLANK_TO_SIDE_DEG - a_tol
-        assert widest_half > lever.RIDGE_FROM_SIDE + x_tol
+        assert widest_half > printed_ridge + x_tol
     assert split_rock[5.0] < split_rock[3.0] < asm.KNIFE_FREE_ROCK_FLOOR_DEG
     assert split_rock[2.0] >= asm.KNIFE_FREE_ROCK_FLOOR_DEG
     # The width, now a reference, cannot reach the old widest section.

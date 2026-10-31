@@ -102,10 +102,10 @@ def test_side_by_side_stations_have_head_clearance_and_head_bearing() -> None:
     assert joint.SCREW_MAJOR_DIA < joint.CLEARANCE_DIA < joint.SCREW_HEAD_DIA
     assert joint.COUNTERBORE_DIA - joint.SCREW_HEAD_DIA == pytest.approx(0.244)
     assert joint.HEAD_FLOAT_MIN == pytest.approx(0.122)
-    assert joint.HEAD_POSITION_MISMATCH_MAX == pytest.approx(0.10)
+    assert joint.HEAD_POSITION_MISMATCH_MAX == pytest.approx(0.1016)
     assert joint.HEAD_FLOAT_MIN >= joint.HEAD_POSITION_MISMATCH_MAX
     assert joint.GRIP_MIN == pytest.approx(3.045)
-    assert joint.COUNTERBORE_END_WALL_MIN == pytest.approx(7.0)
+    assert joint.COUNTERBORE_END_WALL_MIN == pytest.approx(6.9992)
     # The bracket ordinate is from its actual lower edge, not its midplane.
     head_radius = (joint.COUNTERBORE_DIA + joint.DRILLED_DIAMETER_PLUS) / 2.0
     row_from_lower = joint.RECEIVER_ROW_Y - joint.SIDE_PLATE_Y[0]
@@ -114,7 +114,7 @@ def test_side_by_side_stations_have_head_clearance_and_head_bearing() -> None:
         joint.SIDE_PLATE_HEIGHT + joint.SIDE_PLATE_HEIGHT_DEVIATIONS[0]
         - row_from_lower - joint.POSITION_BAND - head_radius
     )
-    assert (row_from_lower, lower_wall, upper_wall) == pytest.approx((4.79, 2.79, 3.41))
+    assert (row_from_lower, lower_wall, upper_wall) == pytest.approx((4.79, 2.7892, 3.4092))
     assert joint.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(min(lower_wall, upper_wall))
     assert joint.HEAD_PROTRUSION == pytest.approx(2.1082)
     # A flush head would run the screw past the tap's full thread.
@@ -129,7 +129,7 @@ def test_side_by_side_stations_have_head_clearance_and_head_bearing() -> None:
     assert head_air == pytest.approx(1.522)
     # Receiver stations follow the lever's real free edge: its width band
     # adds a whole-part translation relative to the pivot/knife line.
-    assert head_air - joint.POSITION_BAND - 2.0 * joint.LINEAR_BAND == pytest.approx(0.452)
+    assert head_air - joint.POSITION_BAND - 2.0 * joint.LINEAR_BAND == pytest.approx(0.4512)
 
 
 def test_accepted_foot_corners_retain_head_bearing_and_clearance_hole_material() -> None:
@@ -138,7 +138,7 @@ def test_accepted_foot_corners_retain_head_bearing_and_clearance_hole_material()
     lower_head_walls, upper_head_walls = [], []
     lower_hole_walls, upper_hole_walls = [], []
     for width in (10.2, 11.8):
-        for row_from_lower in (4.74, 4.84):
+        for row_from_lower in (4.79 - joint.POSITION_BAND, 4.79 + joint.POSITION_BAND):
             # The 3.8 circle plus its .10 allowance is a conservative screen,
             # not an invented catalog head-major maximum.
             lower_head_walls.append(row_from_lower - 3.90 / 2.0)
@@ -146,8 +146,8 @@ def test_accepted_foot_corners_retain_head_bearing_and_clearance_hole_material()
             # Native 2.591 prints 2.59 +.10/0: the accepted hole is 2.69 MAX.
             lower_hole_walls.append(row_from_lower - 2.69 / 2.0)
             upper_hole_walls.append(width - row_from_lower - 2.69 / 2.0)
-    assert (min(lower_head_walls), min(upper_head_walls)) == pytest.approx((2.79, 3.41))
-    assert (min(lower_hole_walls), min(upper_hole_walls)) == pytest.approx((3.395, 4.015))
+    assert (min(lower_head_walls), min(upper_head_walls)) == pytest.approx((2.7892, 3.4092))
+    assert (min(lower_hole_walls), min(upper_hole_walls)) == pytest.approx((3.3942, 4.0142))
     assert joint.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(
         min(*lower_head_walls, *upper_head_walls),
     )
@@ -175,20 +175,21 @@ def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
     assert joint.TAP_SPEC.end == "blind"
     assert joint.TAP_SPEC.depth_mm == joint.DRILL_DEPTH == 6.50
     assert joint.TAP_SPEC.overrides_mm["ThreadDepth"] == joint.THREAD_DEPTH == 4.95
-    assert joint.THREAD_DEPTH_BAND == 0.05
+    assert joint.THREAD_DEPTH_BAND == 0.0508
     assert lever.RIB_T == 5.00
     assert joint.LEVER_FRONT_LOCAL_Z + lever.RIB_T == pytest.approx(-71.20)
     assert lever.RIB_T - joint.LINEAR_BAND < joint.THREAD_DEPTH
-    assert joint.SCREW_TIP_GAP_MIN == pytest.approx(0.0075)
-    assert joint.DRILL_DEPTH_DEVIATIONS == (-0.51, 0.51)
-    assert joint.DRILL_DEPTH_MIN == pytest.approx(5.99)
-    assert joint.DRILL_DEPTH_MAX == pytest.approx(7.01)
-    assert joint.TAP_LEAD_MARGIN_MIN == pytest.approx(0.082857142857)
+    assert joint.SCREW_TIP_GAP_MIN == pytest.approx(0.0067)
+    # The lever prints the drill depth .256 +/-.005 about the 6.50 model depth.
+    assert joint.DRILL_DEPTH_DEVIATIONS == pytest.approx((-0.1246, 0.1294))
+    assert joint.DRILL_DEPTH_MIN == pytest.approx(6.3754)
+    assert joint.DRILL_DEPTH_MAX == pytest.approx(6.6294)
+    assert joint.TAP_LEAD_MARGIN_MIN == pytest.approx(0.467457142857)
     # Both the pilot cylinder and point run beyond the rib into the plate.
-    assert joint.DRILL_DEPTH_MIN > lever.RIB_T + joint.LINEAR_BAND
-    assert joint.DRILL_POINT_DEPTH_MAX == pytest.approx(0.94 * 0.60086)
-    assert joint.DRILL_WANDER_MAX == pytest.approx(0.0396619665)
-    assert joint.RECEIVER_PILOT_MATERIAL_WALL_MIN == pytest.approx(2.2103380335)
+    assert joint.DRILL_DEPTH_MIN > lever.RIB_T + lever.RIB_T_DEVIATIONS[1]
+    assert joint.DRILL_POINT_DEPTH_MAX == pytest.approx(0.9398 * 0.60086)
+    assert joint.DRILL_WANDER_MAX == pytest.approx(0.0376685021)
+    assert joint.RECEIVER_PILOT_MATERIAL_WALL_MIN == pytest.approx(2.2217314979)
 
 
 def _joint_with_values(**values):
@@ -211,8 +212,9 @@ def test_width_shortfall_can_make_upper_edge_the_limiting_material_wall() -> Non
     # Deliberately beyond the ordinary -.8 corner, but still above the wall
     # floor: make the upper edge active so a lower-only budget cannot pass.
     narrowed = _joint_with_values(SIDE_PLATE_HEIGHT_DEVIATIONS=(-2.0, 0.8))
-    assert narrowed["COUNTERBORE_HEIGHT_WALL_MIN"] == pytest.approx(9.0 - 4.84 - 1.95)
-    assert narrowed["CLEARANCE_HOLE_HEIGHT_WALL_MIN"] == pytest.approx(9.0 - 4.84 - 1.345)
+    row_max = 4.79 + joint.POSITION_BAND
+    assert narrowed["COUNTERBORE_HEIGHT_WALL_MIN"] == pytest.approx(9.0 - row_max - 1.95)
+    assert narrowed["CLEARANCE_HOLE_HEIGHT_WALL_MIN"] == pytest.approx(9.0 - row_max - 1.345)
     for name in (
         "BRACKET_ORIGIN", "SIDE_PLATE_Y", "BRACKET_HOLE_POINTS", "LEVER_HOLE_POINTS",
         "SCREW_POSITIONS", "GRIP", "ENGAGEMENT_MIN", "SCREW_TIP_GAP_MIN",
@@ -228,7 +230,7 @@ def test_width_shortfall_can_make_upper_edge_the_limiting_material_wall() -> Non
     ({"THREAD_DEPTH": 4.85}, "bottoms"),
     ({"SIDE_PLATE_HEIGHT": 8.0}, r"rule 17 \(walls and webs\) wall"),
     ({"COUNTERBORE_DIA": 3.70}, "head float"),
-    ({"RECEIVER_ROW_FROM_TOP": 3.50}, "receiver pilot material wall"),
+    ({"RECEIVER_ROW_FROM_TOP": 3.85}, "receiver pilot material wall"),
     ({"RECEIVER_ROW_FROM_TOP": 2.95}, "receiver pilot material wall"),
 ])
 def test_joint_guards_reject_numeric_loss_of_function(values, failure: str) -> None:
@@ -330,8 +332,9 @@ def test_transition_material_reacts_to_each_numeric_input(index: int, value: flo
 
 
 def _printed_material_budget_oracle() -> tuple[float, float, float, float]:
+    printed_pilot = round(joint.TAP_DRILL_DIA / 25.4, 3) * 25.4
     radius = (
-        max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2)) + joint.DRILLED_DIAMETER_PLUS
+        max(joint.TAP_DRILL_DIA, printed_pilot) + joint.RECEIVER_DRILLED_DIAMETER_PLUS
     ) / 2.0
     point = radius * joint.DRILL_POINT_H
     wander = math.tan(math.radians(joint.DRILL_WANDER_DEG)) * (joint.DRILL_DEPTH_MAX + point)
@@ -342,10 +345,11 @@ def _printed_material_budget_oracle() -> tuple[float, float, float, float]:
             from_top = lever.COEFFICIENT_TOP_Y - y
             face = (
                 from_top - joint.POSITION_BAND if side == "upper"
-                else lever.COEFFICIENT_T - joint.LINEAR_BAND - from_top - joint.POSITION_BAND
+                else lever.COEFFICIENT_T + lever.COEFFICIENT_T_DEVIATIONS[0] - from_top
+                - joint.POSITION_BAND
             )
             clearances.append(_material_wall_oracle(
-                lever.RIB_T - joint.LINEAR_BAND, face, joint.DRILL_DEPTH_MAX,
+                lever.RIB_T + lever.RIB_T_DEVIATIONS[0], face, joint.DRILL_DEPTH_MAX,
                 radius, joint.DRILL_POINT_H, wander,
             ))
         faces.append(min(clearances))
@@ -353,18 +357,20 @@ def _printed_material_budget_oracle() -> tuple[float, float, float, float]:
         lever.PLATE_W - x - joint.POSITION_BAND - radius - wander
         for x, _y, _z in joint.LEVER_HOLE_POINTS
     )
-    far_end = lever.PLATE_L - 0.8 - joint.DRILL_DEPTH_MAX - point - wander
+    far_end = (
+        lever.PLATE_L + lever.PLATE_L_DEVIATIONS[0] - joint.DRILL_DEPTH_MAX - point - wander
+    )
     return *faces, free_edge, far_end
 
 
 def test_printed_pilot_has_continuous_material_beyond_every_uniform_rib() -> None:
     walls = _printed_material_budget_oracle()
-    assert walls[:2] == pytest.approx((2.2203380335, 2.2103380335))
+    assert walls[:2] == pytest.approx((2.2217314979, 2.6051314979))
     assert min(walls) == pytest.approx(joint.receiver_pilot_material_wall_budget(), abs=1e-12)
     assert joint.RECEIVER_PILOT_MATERIAL_WALL_MIN == pytest.approx(min(walls), abs=1e-12)
-    assert min(walls) >= joint.RECEIVER_PILOT_WALL_MIN == 2.0
-    assert joint.DRILL_DEPTH_MIN > lever.RIB_T + joint.LINEAR_BAND
-    assert joint.THREAD_DEPTH > lever.RIB_T - joint.LINEAR_BAND
+    assert min(walls) >= joint.RECEIVER_PILOT_WALL_MIN == pytest.approx(2.032)
+    assert joint.DRILL_DEPTH_MIN > lever.RIB_T + lever.RIB_T_DEVIATIONS[1]
+    assert joint.THREAD_DEPTH > lever.RIB_T + lever.RIB_T_DEVIATIONS[0]
 
 
 @pytest.mark.parametrize("pilot", [1.778, 1.784])
@@ -387,7 +393,7 @@ def test_material_budget_cancels_correlated_actual_top_translation(monkeypatch) 
 
 
 @pytest.mark.parametrize("name,value", [
-    ("POSITION_BAND", 0.15), ("DRILLED_DIAMETER_PLUS", 0.20),
+    ("POSITION_BAND", 0.15), ("RECEIVER_DRILLED_DIAMETER_PLUS", 0.20),
     ("DRILL_POINT_H", 2.0), ("DRILL_DEPTH_MAX", 7.40), ("DRILL_WANDER_DEG", 0.6),
 ])
 def test_material_budget_rederives_live_pilot_inputs(monkeypatch, name: str, value: float) -> None:
@@ -400,14 +406,14 @@ def test_material_budget_rederives_live_pilot_inputs(monkeypatch, name: str, val
 
 
 def test_thinner_plate_loses_material_even_with_unchanged_rib_and_screw(monkeypatch) -> None:
-    monkeypatch.setattr(lever, "COEFFICIENT_T", 6.70)
+    monkeypatch.setattr(lever, "COEFFICIENT_T", 6.40)
     assert joint.receiver_pilot_material_wall_budget() < joint.RECEIVER_PILOT_WALL_MIN
     with pytest.raises(AssertionError, match="receiver pilot material wall"):
         _joint_with_values()
 
 
 def test_opposite_end_is_real_material_not_an_infinite_plate_assumption(monkeypatch) -> None:
-    monkeypatch.setattr(lever, "PLATE_L", 10.0)
+    monkeypatch.setattr(lever, "PLATE_L", 9.0)
     assert joint.receiver_pilot_material_wall_budget() < joint.RECEIVER_PILOT_WALL_MIN
     with pytest.raises(AssertionError, match="receiver pilot material wall"):
         _joint_with_values()
@@ -443,7 +449,7 @@ def test_drill_limits_separate_tap_lead_from_material_wander() -> None:
     with pytest.raises(AssertionError, match="bottoming-tap lead"):
         _joint_with_values(DRILL_DEPTH_DEVIATIONS=(shallow - joint.DRILL_DEPTH - epsilon, 0.51))
     ordinary = _joint_with_values()
-    deeper = _joint_with_values(DRILL_DEPTH_DEVIATIONS=(-0.51, 0.80))
+    deeper = _joint_with_values(DRILL_DEPTH_DEVIATIONS=(joint.DRILL_DEPTH_DEVIATIONS[0], 0.80))
     assert deeper["TAP_LEAD_MARGIN_MIN"] == ordinary["TAP_LEAD_MARGIN_MIN"]
     assert deeper["RECEIVER_PILOT_MATERIAL_WALL_MIN"] < ordinary["RECEIVER_PILOT_MATERIAL_WALL_MIN"]
     with pytest.raises(AssertionError, match="bottoming-tap lead"):
@@ -453,7 +459,7 @@ def test_drill_limits_separate_tap_lead_from_material_wander() -> None:
 def test_printed_pilot_clears_pivot_and_native_spring_tap_geometry() -> None:
     pilot_radius = (
         max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2))
-        + joint.DRILLED_DIAMETER_PLUS
+        + joint.RECEIVER_DRILLED_DIAMETER_PLUS
     ) / 2.0
     pilot_radius += math.tan(math.radians(joint.DRILL_WANDER_DEG)) * (
         joint.DRILL_DEPTH_MAX + pilot_radius * joint.DRILL_POINT_H
@@ -542,15 +548,15 @@ def test_real_jam_nut_footprint_stays_clear_of_every_rib_at_ordinary_bands() -> 
 
     position_radius = float(lever.GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"]) / 2.0
     nut_inner_x = lever.HOLE_X - position_radius - nut.OD_MAX / 2.0
-    reach_max = lever.RIB_REACH + joint.LINEAR_BAND
-    assert nut_inner_x == pytest.approx(36.45)
-    assert reach_max == pytest.approx(36.26)
-    assert nut_inner_x - reach_max == pytest.approx(0.19)
+    reach_max = lever.RIB_REACH + lever.RIB_REACH_DEVIATIONS[1]
+    assert nut_inner_x == pytest.approx(36.4488)
+    assert reach_max == pytest.approx(36.068)
+    assert nut_inner_x - reach_max == pytest.approx(0.3808)
     # This is positive geometric separation, not a newly invented clearance floor.
     section = lever_profile.RibProfile(reach=reach_max, blend_radius=0.0)
     probe = (nut_inner_x, lever.COEFFICIENT_BOTTOM_Y - 1e-4)
     assert section.signed_boundary_distance(*probe) < 0.0
-    intrusion = lever_profile.RibProfile(reach=reach_max + 0.20, blend_radius=0.0)
+    intrusion = lever_profile.RibProfile(reach=reach_max + 0.40, blend_radius=0.0)
     assert intrusion.signed_boundary_distance(*probe) > 0.0
 
 

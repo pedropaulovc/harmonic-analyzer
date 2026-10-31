@@ -12,6 +12,7 @@ from __future__ import annotations
 import math
 
 from _hole_spec import DRILL_POINT_H, HoleSpec, blind_cut_dia_mm
+from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import (
     drilled_oversize_mm,
     edge_break_chamfer_mm,
@@ -88,13 +89,23 @@ FLANGE_THICKNESS_BAND = FOOT_GRIP_TOL
 # The receiver continues from the uniform 5 mm entry rib into the connected
 # 7 mm coefficient plate. Neither usable thread nor the drill point is required
 # to stop inside the rib. Ordinary printed depths remain independently bounded.
-THREAD_DEPTH_BAND = 0.05  # native metadata only; the drawing prints 4.95 MIN
+# #290: the receiver taps and coordinates print on the lever's decimal-inch
+# sheet (lever.UNIT); the bracket's own bands (LINEAR_BAND, the drilled
+# clearance) stay on its millimetre sheet.  The full-thread and coordinate
+# bands are +/-.002 in, the nearest exact inch decimals to the former 0.05 mm.
+THREAD_DEPTH_BAND = 0.0508  # native metadata only; the drawing prints .195 MIN
 LINEAR_BAND = printed_band_mm(2)  # PRINTED title-block .XX band, not the unrounded .02 in
-DRILL_DEPTH_DEVIATIONS = (-LINEAR_BAND, LINEAR_BAND)  # (lower, upper), mm
-POSITION_BAND = 0.05
+POSITION_BAND = 0.0508
 DRILLED_DIAMETER_PLUS = drilled_oversize_mm()
-# Engineering floor for the printed pilot, not the finished thread cavity.
-RECEIVER_PILOT_WALL_MIN = 2.0
+# The lever sheet prints each receiver Hole Wizard length at three places
+# under its own title block: the drill depth's acceptance follows the printed
+# rounded depth, the pilot its drilled-hole row.
+RECEIVER_HOLE_PLACES = 3
+RECEIVER_DRILLED_DIAMETER_PLUS = drilled_oversize_mm(unit=lever.UNIT)
+DRILL_DEPTH_BAND = printed_band_mm(RECEIVER_HOLE_PLACES, unit=lever.UNIT)
+# Engineering floor for the printed pilot, not the finished thread cavity:
+# the lever's rule-17 wall target on its inch sheet.
+RECEIVER_PILOT_WALL_MIN = WALL_TARGET_MM
 HEAD_FLOAT_MIN = (COUNTERBORE_DIA - SCREW_HEAD_DIA) / 2.0
 HEAD_POSITION_MISMATCH_MAX = 2.0 * POSITION_BAND
 EDGE_BREAK = edge_break_chamfer_mm()
@@ -108,6 +119,9 @@ ENGAGEMENT_MIN = (
 SCREW_REACH_MAX = ENGAGEMENT + GRIP_BAND
 THREAD_DEPTH = 4.95
 DRILL_DEPTH = 6.50
+DRILL_DEPTH_DEVIATIONS = printed_deviations(  # (lower, upper), mm
+    DRILL_DEPTH, RECEIVER_HOLE_PLACES, unit=lever.UNIT,
+)
 DRILL_DEPTH_MIN = DRILL_DEPTH + DRILL_DEPTH_DEVIATIONS[0]
 DRILL_DEPTH_MAX = DRILL_DEPTH + DRILL_DEPTH_DEVIATIONS[1]
 TAP_SPEC = HoleSpec(
@@ -119,10 +133,20 @@ TAP_SPEC = HoleSpec(
     overrides_mm={"ThreadDepth": THREAD_DEPTH},
 )
 TAP_DRILL_DIA = blind_cut_dia_mm(TAP_SPEC)
-# Use the larger native/printed pilot for every point/wander/material budget.
-RECEIVER_PILOT_RADIUS_MAX = (
-    max(TAP_DRILL_DIA, round(TAP_DRILL_DIA, 2)) + DRILLED_DIAMETER_PLUS
-) / 2.0
+
+
+def receiver_pilot_radius_max() -> float:
+    """The larger native/printed pilot radius plus its drilled-hole row: the
+    radius for every point/wander/material budget."""
+    printed_over = printed_deviations(
+        TAP_DRILL_DIA, RECEIVER_HOLE_PLACES, (0.0, 0.0), unit=lever.UNIT,
+    )[1]
+    return (
+        TAP_DRILL_DIA + max(0.0, printed_over) + RECEIVER_DRILLED_DIAMETER_PLUS
+    ) / 2.0
+
+
+RECEIVER_PILOT_RADIUS_MAX = receiver_pilot_radius_max()
 DRILL_POINT_DEPTH = TAP_DRILL_DIA / 2.0 * DRILL_POINT_H
 DRILL_POINT_DEPTH_MAX = RECEIVER_PILOT_RADIUS_MAX * DRILL_POINT_H
 SCREW_TIP_GAP_MIN = THREAD_DEPTH - THREAD_DEPTH_BAND - SCREW_REACH_MAX
@@ -218,14 +242,13 @@ def receiver_pilot_material_wall_budget() -> float:
     The row is from the ACTUAL top, so a rigid top-position shift cancels.
     Thickness and row-location bands remain independent. The sharp transition
     excludes the root fillet; the plate's free edge and opposite end are also
-    real boundaries. The .X plate length takes its ordinary +/-0.8 mm band.
+    real boundaries. Rib, plate thickness and plate length take the lever
+    sheet's printed limits (``lever.*_DEVIATIONS``).
     The entry plane is intentionally open: depths start at that actual face.
     Longitudinal rib flank walls are screened separately by the pure profile.
     No internal-major limit, cavity envelope or tighter depth band is assumed.
     """
-    radius = (
-        max(TAP_DRILL_DIA, round(TAP_DRILL_DIA, 2)) + DRILLED_DIAMETER_PLUS
-    ) / 2.0
+    radius = receiver_pilot_radius_max()
     point_depth = radius * DRILL_POINT_H
     wander = math.tan(math.radians(DRILL_WANDER_DEG)) * (
         DRILL_DEPTH_MAX + point_depth
@@ -234,17 +257,18 @@ def receiver_pilot_material_wall_budget() -> float:
         min(
             *(
                 receiver_material_wall_margin(
-                    lever.RIB_T - LINEAR_BAND, face, DRILL_DEPTH_MAX,
+                    lever.RIB_T + lever.RIB_T_DEVIATIONS[0], face, DRILL_DEPTH_MAX,
                     radius, DRILL_POINT_H, wander,
                 )
                 for face in (
                     lever.COEFFICIENT_TOP_Y - y - POSITION_BAND,
-                    lever.COEFFICIENT_T - LINEAR_BAND
+                    lever.COEFFICIENT_T + lever.COEFFICIENT_T_DEVIATIONS[0]
                     - (lever.COEFFICIENT_TOP_Y - y) - POSITION_BAND,
                 )
             ),
             lever.PLATE_W - x - POSITION_BAND - radius - wander,
-            lever.PLATE_L - 0.8 - DRILL_DEPTH_MAX - point_depth - wander,
+            lever.PLATE_L + lever.PLATE_L_DEVIATIONS[0]
+            - DRILL_DEPTH_MAX - point_depth - wander,
         )
         for x, y, _z in LEVER_HOLE_POINTS
     )

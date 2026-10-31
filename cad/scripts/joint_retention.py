@@ -1470,11 +1470,11 @@ JOINTS: tuple[Joint, ...] = (
             "plain hex head (92314A253) seated on a new 18-8 SAE washer (96659A104), whose lower "
             "bearing face seats on the crossbar's faced top; MHA-SM-00 step 4 cuts each bolt under "
             "the head to the crossbar-underside-to-washer-top height measured at its own hole plus "
-            "8.92 +/-0.15, so the bolt passes the O6.045 clearance hole and reaches 8.9173 nominal "
-            "(8.77..9.07 worst case) into the 9.65 +/-0.13 full thread of the #10-24 bottoming tap, "
+            ".351 +/-.006 in, so the bolt passes the O6.045 clearance hole and reaches 8.9173 nominal "
+            "(8.763..9.0678 worst case) into the 9.65 +/-0.13 full thread of the #10-24 bottoming tap, "
             "drawing the block up against the casting. The independently inspected full-form cut "
-            "tail covers the longest reach with 0.4916667 spare; one incomplete tip pitch leaves "
-            "7.7116667 full engagement, with 0.45 minimum tip air"
+            "tail covers the longest reach with 0.4910667 spare; one incomplete tip pitch leaves "
+            "7.7046667 full engagement, with 0.4522 minimum tip air"
         ),
         lock=Lock.NONE,
         lock_part="",

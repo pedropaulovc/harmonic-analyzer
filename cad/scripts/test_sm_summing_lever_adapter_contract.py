@@ -333,7 +333,8 @@ def _source_helpers(names: tuple[str, ...], **bindings):
         "COEFFICIENT_TOP_Y": spec.COEFFICIENT_TOP_Y,
         "COEFFICIENT_BOTTOM_Y": spec.COEFFICIENT_BOTTOM_Y,
         "COUNTER_WEB_T": spec.COUNTER_WEB_T,
-        "RIB_BLEND_R": spec.RIB_BLEND_R, "RIB_REACH": spec.RIB_REACH,
+        "RIB_BLEND_R": spec.RIB_BLEND_R, "RIB_BLEND_R_PLACES": spec.RIB_BLEND_R_PLACES,
+        "RIB_REACH": spec.RIB_REACH, "PLATE_W_DEVIATIONS": spec.PLATE_W_DEVIATIONS,
         "CYL_R": spec.CYL_R, "PLATE_L": spec.PLATE_L, "PLATE_W": spec.PLATE_W,
         "RIB_T": spec.RIB_T, "SUM_H": spec.SUM_H,
         "RIB_OFFSET": spec.PLATE_L / 2.0 - spec.RIB_T,
@@ -640,7 +641,8 @@ def test_lower_blend_geometry_fails_closed_outside_tangent_inboard_premises(chan
 
 
 def _root_face(
-    box_mm: tuple[float, ...], *, radius: float = 1.0, torus: bool = False, unknown: bool = False,
+    box_mm: tuple[float, ...], *, radius: float = spec.RIB_BLEND_R, torus: bool = False,
+    unknown: bool = False,
     cylinder_center=(0.0, 0.0), axis=(0.0, 0.0, 1.0),
 ):
     surface = SimpleNamespace(
@@ -725,7 +727,7 @@ def test_lower_blend_is_additive_and_its_complete_envelope_cannot_shrink_pilot_w
     # Even the larger bounded three-way cap-corner neighbourhood is outside
     # both pilot envelopes with printed axis/free-edge variation and wander.
     pilot_radius = (
-        (max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2)) + joint.DRILLED_DIAMETER_PLUS) / 2.0
+        (max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2)) + joint.RECEIVER_DRILLED_DIAMETER_PLUS) / 2.0
         + joint.DRILL_WANDER_MAX
     )
     x_max = center[0] + radius
@@ -907,7 +909,7 @@ def test_every_modeled_root_including_lower_longitudinal_family_gets_native_max_
         assert tolerance.Type == spec.RIB_BLEND_R_TOL_TYPE
         assert tolerance.GetMinValue() == -spec.RIB_BLEND_R / 1000.0
         assert tolerance.GetMaxValue() == 0.0
-        assert (owner, name, 1) in precision
+        assert (owner, name, spec.RIB_BLEND_R_PLACES) in precision
 
 
 @pytest.mark.parametrize("result", [None, (False, 0.0, 0.0, 0.0), (True, 0.0, 0.0),
@@ -1082,7 +1084,7 @@ def test_native_backing_refuses_wrong_planes_or_trimmed_material_beyond_rib(dama
         namespace["_assert_receiver_profile_walls"](adapter)
 
 
-@pytest.mark.parametrize("material_wall", [2.0, 2.103])
+@pytest.mark.parametrize("material_wall", [2.032, 2.103])
 def test_receiver_checks_connected_material_budget_after_nominal_native_readbacks(material_wall: float) -> None:
     import magnifying_bracket_joint_layout as joint
 

@@ -25,6 +25,7 @@ from _drawing_hidden_sketches import (
 )
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _drawing_sheet_region import sheet_drawable_region
 from _purchased_fastener_drawing import _box, _inside, assert_supplier_view_fits
 from _rebuild import active_configuration_name
@@ -38,13 +39,13 @@ import _telemetry
 from sm_vn_boss_hook_spec import (
     CHAMFER_ANGLE_DEG,
     CHAMFER_ANGLE_TOLERANCE_DEG,
+    CHAMFER_WIDTH_DEVIATIONS,
     CHAMFER_WIDTH_MM,
-    CHAMFER_WIDTH_TOLERANCE_MM,
     DIMENSION_PRECISION,
     DRAWING_DIMENSIONS,
     DIMENSION_TOLERANCE_TYPES,
+    FINISHED_OVERALL_DEVIATIONS,
     FINISHED_OVERALL_MM,
-    FINISHED_OVERALL_TOLERANCE_MM,
     REFERENCE_SKETCHES,
     SUPPLIER_REFERENCE_PRECISION,
     SUPPLIER_STOCK_CONFIGURATION,
@@ -67,28 +68,28 @@ INK_CELL_YMIN = 0.0651
 # high enough that the cut-end chamfer dimensions clear the notes below it.
 FRONT_CENTER = (0.100, 0.175)
 ISO_CENTER = (0.310, 0.213)
-# The cut-end deburr is dimensioned on the 4:1 front view itself (its 0.8 leg
-# prints 3.2 long); a magnified detail added nothing a machinist needs.
+# The cut-end deburr is dimensioned on the 4:1 front view itself (its .04 leg
+# prints 4 mm long); a magnified detail added nothing a machinist needs.
 FRONT_KEEP = {
     "FinishedOverall": (0.040, 0.175),
     "ChamferWidth": (0.150, 0.089),
     "ChamferAngle": (0.132, 0.106),
 }
 # The lead-in carries the title block's band: even its short leg brings the cut
-# end under the 3.797 tap drill, so the cut thread starts in the lever's tap.
+# end under the #25 tap drill, so the cut thread starts in the lever's tap.
 # The callout names that mate.
 CHAMFER_CALLOUT = {"ChamferWidth": "LEAD-IN TO MHA-SM-03 TAP"}
 NOTES_Y = 0.076
 EXPECTED_CONTROLS = {
     "FinishedOverall": (
         FINISHED_OVERALL_MM / 1000,
-        -FINISHED_OVERALL_TOLERANCE_MM / 1000,
-        FINISHED_OVERALL_TOLERANCE_MM / 1000,
+        FINISHED_OVERALL_DEVIATIONS[0] / 1000,
+        FINISHED_OVERALL_DEVIATIONS[1] / 1000,
     ),
     "ChamferWidth": (
         CHAMFER_WIDTH_MM / 1000,
-        -CHAMFER_WIDTH_TOLERANCE_MM / 1000,
-        CHAMFER_WIDTH_TOLERANCE_MM / 1000,
+        CHAMFER_WIDTH_DEVIATIONS[0] / 1000,
+        CHAMFER_WIDTH_DEVIATIONS[1] / 1000,
     ),
     "ChamferAngle": (
         math.radians(CHAMFER_ANGLE_DEG),
@@ -224,7 +225,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     read_required_properties(adapter.currentModel, required, required=required)
     draw, _sheet = new_project_drawing(
-        adapter, property_view=SPEC.artifact_stem, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=SPEC.artifact_stem,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("sm-vn-boss-hook"),
     )
     stamp_drawing_summary(
         adapter,

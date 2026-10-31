@@ -116,7 +116,7 @@ def test_neighbour_gap_charges_both_taps_position_zones() -> None:
     # lever's RFS spring-hole zone toward the other, and both nuts at the top
     # of their O.D. band; the thinnest nut at the bottom of it.
     zone = float(lever.GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"])
-    assert zone == pytest.approx(0.15)  # owner ruling: Ø0.30 -> Ø0.15
+    assert zone == pytest.approx(0.1524)  # owner ruling: Ø0.30 -> Ø0.15 -> Ø.006 (#290)
     # Each centre sits within a zone radius of true position; worst, each
     # moves that radius toward the other.
     left_tap = 0.0 + zone / 2.0
@@ -126,7 +126,7 @@ def test_neighbour_gap_charges_both_taps_position_zones() -> None:
     assert spec.CENTRE_SPACING_WORST == pytest.approx(spacing)
     od_max, od_min = spec.OD + spec.OD_BAND, spec.OD - spec.OD_BAND
     gap = spacing - od_max  # two radii of od_max between the centres
-    assert spec.NEIGHBOUR_GAP_WORST == pytest.approx(gap) == pytest.approx(0.2565)
+    assert spec.NEIGHBOUR_GAP_WORST == pytest.approx(gap) == pytest.approx(0.2541)
     assert gap >= spec.NEIGHBOUR_CLEARANCE
     wall = (od_min - THREAD_MAJOR_MM["#6-32"]) / 2.0
     assert spec.WALL_WORST == pytest.approx(wall) == pytest.approx(1.5025)
@@ -139,7 +139,7 @@ def test_neighbour_gap_charges_both_taps_position_zones() -> None:
         2.0 * spec.MIN_WALL + THREAD_MAJOR_MM["#6-32"]
     )
     assert window == pytest.approx(0.0015)
-    # Ø0.15 opens it to 0.1515, which holds the ±0.07 band.
+    # Ø.006 (0.1524) opens it to 0.1491, which holds the ±0.07 band.
     assert spec.CENTRE_SPACING_WORST - spec.NEIGHBOUR_CLEARANCE - (
         2.0 * spec.MIN_WALL + THREAD_MAJOR_MM["#6-32"]
     ) >= 2.0 * spec.OD_BAND

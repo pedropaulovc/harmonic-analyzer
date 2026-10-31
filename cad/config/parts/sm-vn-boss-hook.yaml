@@ -16,3 +16,4 @@ sm-vn-boss-hook:
   quantity: 1
   tolerance_class: machined_block
   process: purchased
+  drawing_unit: in

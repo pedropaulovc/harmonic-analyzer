@@ -12,17 +12,20 @@ offline drawing test.
 
 from __future__ import annotations
 
+# LINEAR_BAND is re-exported for test_ch_vn_spring_hook_drawing (the bracket
+# side's millimetre .XX row); the lever's own plate band is
+# COEFFICIENT_T_DEVIATIONS.
 from magnifying_bracket_joint_layout import (
-    LINEAR_BAND,
+    LINEAR_BAND as LINEAR_BAND,
     SCREW_THREAD,
 )
-from sm_summing_lever_spec import COEFFICIENT_T, HOLE_SPEC
+from sm_summing_lever_spec import COEFFICIENT_T, COEFFICIENT_T_DEVIATIONS, HOLE_SPEC
 
 # --- Marked-dimension contract.  build_sm_summing_lever marks exactly these. ---
 # Every cast contour is sized on the views: the uniform coefficient plate,
 # the counter web's side radius, the common positive rib profile, the boss,
 # and the trunnion envelope, length and knife-edge radius. The title block
-# controls inside-corner R1 MAX; modeled rib blends remain native controls.
+# controls inside-corner R.040 MAX; modeled rib blends remain native controls.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"PlateWidth", "PlateThickness"},
     "CoefficientsPlate": {"PlateLength"},
@@ -145,8 +148,27 @@ BOSS_Z_CALLOUT = "BOSS AXIS AND\nMID RIB CENTRE"
 # The 20X 6-32 threads run through the uniform coefficient plate.
 SPRING_TAP_CALLOUT_PROCESS = "THREAD THRU COEFFICIENT PLATE\n"
 
+# --- Decimal places of the sheet's own (drawing-side) dimensions, #290. ---
+# The spring pattern's BASIC row X, start Z and pitch are calibrated stations
+# (1.5689 / .5022 / .2778): four places hold them to under .00005 in.  The
+# boss-top and knife-ridge locations of the coefficient top are exact .275 and
+# .102 at three; the 3.00 anchor X/Z keep the document's .XX.
+BASIC_PLACES = 4
+FACE_LOCATION_PLACES = 3
+# Each Hole Wizard length prints .XXX; the #6-32 and #10-24 tap drills (#36
+# .1065, #25 .1495) print their four-place drill size.
+SPRING_TAP_PRECISION = {"hw-tapdrldia": 4}
+COUNTER_TAP_PRECISION = {"hw-tapdrldia": 4}
+BRACKET_TAP_PRECISION = dict.fromkeys(
+    ("hw-tapdrldia", "hw-tapdrldepth", "hw-threaddepth"),
+    3,
+)
+# The receiver coordinates (1.1201 / .5807 / .1280) stand off the bracket's
+# millimetre stations: four places hold them.
+RECEIVER_COORDINATE_PLACES = 4
+
 # --- Joint proofs the print relies on (drawing-guidelines rules 18 and 20). ---
-# The plate's worst-case thickness at the title block's .XX band, less 1.5
+# The plate's worst-case thickness at its printed .XXX limit, less 1.5
 # incomplete threads, must retain at least 1.5D of full #6-32 thread.
 if HOLE_SPEC.size != "#6-32":
     raise AssertionError(
@@ -154,7 +176,9 @@ if HOLE_SPEC.size != "#6-32":
     )
 SPRING_TAP_MAJOR_DIA = 0.138 * 25.4
 SPRING_TAP_PITCH = 25.4 / 32.0
-SPRING_TAP_ENGAGEMENT_MIN = COEFFICIENT_T - LINEAR_BAND - 1.5 * SPRING_TAP_PITCH
+SPRING_TAP_ENGAGEMENT_MIN = (
+    COEFFICIENT_T + COEFFICIENT_T_DEVIATIONS[0] - 1.5 * SPRING_TAP_PITCH
+)
 if SPRING_TAP_ENGAGEMENT_MIN < 1.5 * SPRING_TAP_MAJOR_DIA:
     raise AssertionError(
         f"20X {HOLE_SPEC.size} keeps {SPRING_TAP_ENGAGEMENT_MIN:.3f} of full "

@@ -16,7 +16,6 @@ from pathlib import Path
 
 import pytest
 
-import _config
 from _printed_tolerance import printed_band_mm
 import magnifying_bracket_joint_layout as joint
 import sm_summing_lever_profile as profile
@@ -63,9 +62,9 @@ def _g1_contract(section: profile.RibProfile) -> None:
 def test_defining_dimensions_derive_the_approved_g1_profile() -> None:
     assert (spec.COEFFICIENT_T, spec.COEFFICIENT_TOP_Y, spec.COEFFICIENT_BOTTOM_Y) == pytest.approx((7.0, 2.54, -4.46))
     assert spec.COEFFICIENT_TOP_Y - spec.COEFFICIENT_BOTTOM_Y == pytest.approx(spec.COEFFICIENT_T)
-    assert (spec.COUNTER_WEB_T, spec.RIB_WRAP_R, spec.RIB_REACH, spec.RIB_BLEND_R) == pytest.approx((5.08, 15.24, 35.75, 1.0))
-    assert profile.UPPER.wrap_xy == pytest.approx((5.516255, 14.206637), abs=1e-6)
-    assert profile.LOWER.wrap_xy == pytest.approx((4.709362, -14.494120), abs=1e-6)
+    assert (spec.COUNTER_WEB_T, spec.RIB_WRAP_R, spec.RIB_REACH, spec.RIB_BLEND_R) == pytest.approx((5.08, 15.24, 35.75, 1.016))
+    assert profile.UPPER.wrap_xy == pytest.approx((5.516736, 14.206450), abs=1e-6)
+    assert profile.LOWER.wrap_xy == pytest.approx((4.709714, -14.494006), abs=1e-6)
     _g1_contract(profile.PROFILE)
     assert profile.rib_bounds(spec.RIB_REACH) == pytest.approx((-4.46, 2.54))
     lower, upper = profile.rib_bounds(29.7)
@@ -86,10 +85,10 @@ def test_uniform_ribs_and_relocated_row_preserve_other_installed_interfaces() ->
     assert all(point[2] == pytest.approx(-76.2) for point in joint.LEVER_HOLE_POINTS)
     assert (spec.RIB_T, joint.DRILL_DEPTH, joint.THREAD_DEPTH) == (5.0, 6.5, 4.95)
     assert joint.LEVER_FRONT_LOCAL_Z + spec.RIB_T == pytest.approx(-71.20)
-    assert joint.DRILL_DEPTH_MIN > spec.RIB_T + joint.LINEAR_BAND
-    assert joint.DRILL_DEPTH_DEVIATIONS == (-0.51, 0.51)
+    assert joint.DRILL_DEPTH_MIN > spec.RIB_T + spec.RIB_T_DEVIATIONS[1]
+    assert joint.DRILL_DEPTH_DEVIATIONS == pytest.approx((-0.1246, 0.1294))
     assert joint.BRACKET_ORIGIN == (40.0, 979.7, -173.51)
-    assert spec.HOLE_X - (joint.TAP_DRILL_DIA + joint.DRILLED_DIAMETER_PLUS) / 2.0 > spec.RIB_REACH
+    assert spec.HOLE_X - (joint.TAP_DRILL_DIA + joint.RECEIVER_DRILLED_DIAMETER_PLUS) / 2.0 > spec.RIB_REACH
 
 
 def test_nearest_distance_is_not_a_vertical_height_or_infinite_line_shortcut() -> None:
@@ -119,9 +118,9 @@ def test_nearest_distance_is_not_a_vertical_height_or_infinite_line_shortcut() -
 
 
 def _receiver_pilot_radius() -> float:
+    printed_pilot = round(joint.TAP_DRILL_DIA / spec.MM_PER_IN, 3) * spec.MM_PER_IN
     pilot_radius = (
-        max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2))
-        + joint.DRILLED_DIAMETER_PLUS
+        max(joint.TAP_DRILL_DIA, printed_pilot) + joint.RECEIVER_DRILLED_DIAMETER_PLUS
     ) / 2.0
     pilot_wander = math.tan(math.radians(joint.DRILL_WANDER_DEG)) * (
         joint.DRILL_DEPTH_MAX + pilot_radius * joint.DRILL_POINT_H
@@ -148,15 +147,10 @@ def _witness_clearance(
 
 
 def _plate_top_y_limits() -> tuple[float, float]:
-    """Independent union of native .XX and printed title-block limits."""
-    row = _config.title_block("linear_2pl")
-    native_band = float(row["value_in"]) * spec.MM_PER_IN
-    printed_band = printed_band_mm(2)
-    printed_top = round(spec.COEFFICIENT_TOP_Y, 2)
-    return (
-        min(spec.COEFFICIENT_TOP_Y - native_band, printed_top - printed_band),
-        max(spec.COEFFICIENT_TOP_Y + native_band, printed_top + printed_band),
-    )
+    """The printed title-block .XX limits about the printed top (.100)."""
+    printed_band = printed_band_mm(2, unit=spec.UNIT)
+    printed_top = round(spec.COEFFICIENT_TOP_Y / spec.MM_PER_IN, 2) * spec.MM_PER_IN
+    return printed_top - printed_band, printed_top + printed_band
 
 
 def test_pilot_ordinary_bands_have_replayable_correlated_wall_witnesses() -> None:
@@ -169,20 +163,32 @@ def test_pilot_ordinary_bands_have_replayable_correlated_wall_witnesses() -> Non
             clearance = getattr(budget, side + "_mm")
             witness = getattr(budget, side + "_witness")
             assert clearance == pytest.approx(_witness_clearance(point[0], witness, side))
-            assert clearance > 2.0
-            assert witness[2] in (0.0, 1.0)  # R1 MAX, never R1 +/-0.51.
+            assert clearance > joint.RECEIVER_PILOT_WALL_MIN
+            assert witness[2] in (0.0, spec.RIB_BLEND_R)  # R.040 MAX, never a band.
             assert any(witness[4] == pytest.approx(limit) for limit in top_limits)
-            assert abs(witness[5] - spec.COEFFICIENT_T) == pytest.approx(0.51)
+            assert any(
+                witness[5] - spec.COEFFICIENT_T == pytest.approx(deviation)
+                for deviation in spec.COEFFICIENT_T_DEVIATIONS
+            )
         assert budget.minimum_mm <= min(budget.upper_mm, budget.lower_mm) + 1e-12
     assert budgets[1].minimum_mm < budgets[0].minimum_mm
     # Check interior dimensions too: the finite corner budget must not hide a
     # lower mid-band wall, nor rely on top and tap motion being independent.
     worst = budgets[1]
+
+    def span(nominal, deviations):
+        return (nominal + deviations[0], nominal, nominal + deviations[1])
+
     for radius, reach, blend, top, thickness in product(
-        (14.73, 15.24, 15.75), (35.24, 35.75, 36.26), (0.0, 0.5, 1.0),
-        (top_limits[0], spec.COEFFICIENT_TOP_Y, top_limits[1]), (6.49, 7.0, 7.51),
+        span(spec.RIB_WRAP_R, spec.RIB_WRAP_R_DEVIATIONS),
+        span(spec.RIB_REACH, spec.RIB_REACH_DEVIATIONS),
+        (0.0, spec.RIB_BLEND_R / 2.0, spec.RIB_BLEND_R),
+        (top_limits[0], spec.COEFFICIENT_TOP_Y, top_limits[1]),
+        span(spec.COEFFICIENT_T, spec.COEFFICIENT_T_DEVIATIONS),
     ):
-        witness = (radius, reach, blend, 44.96, top, thickness, 0.05, 0.05)
+        width = spec.PLATE_W + spec.PLATE_W_DEVIATIONS[1]
+        band = joint.POSITION_BAND
+        witness = (radius, reach, blend, width, top, thickness, band, band)
         assert _witness_clearance(29.7, witness, "upper") >= worst.upper_mm - 1e-10
 
 
@@ -190,11 +196,11 @@ def test_independent_plate_top_boundary_catches_obsolete_half_band(monkeypatch) 
     # Construct the permitted outer receiver's upper-wall corner from the
     # title block, independently of the production top allowance/enumerator.
     top = _plate_top_y_limits()[1]
-    wrap = spec.RIB_WRAP_R - joint.LINEAR_BAND
-    reach = spec.RIB_REACH - joint.LINEAR_BAND
+    wrap = spec.RIB_WRAP_R + spec.RIB_WRAP_R_DEVIATIONS[0]
+    reach = spec.RIB_REACH + spec.RIB_REACH_DEVIATIONS[0]
     blend = spec.RIB_BLEND_R
-    width = spec.PLATE_W + joint.LINEAR_BAND
-    thickness = spec.COEFFICIENT_T - joint.LINEAR_BAND
+    width = spec.PLATE_W + spec.PLATE_W_DEVIATIONS[1]
+    thickness = spec.COEFFICIENT_T + spec.COEFFICIENT_T_DEVIATIONS[0]
     nominal_x, nominal_y, _ = joint.LEVER_HOLE_POINTS[-1]
     witness = (
         wrap, reach, blend, width, top, thickness,
@@ -213,7 +219,7 @@ def test_independent_plate_top_boundary_catches_obsolete_half_band(monkeypatch) 
     foot_x = x + distance * nx
     assert wrap * nx < foot_x < reach - blend * nx
     permitted_wall = distance - _receiver_pilot_radius()
-    assert permitted_wall > joint.RECEIVER_PILOT_WALL_MIN == 2.0
+    assert permitted_wall > joint.RECEIVER_PILOT_WALL_MIN == pytest.approx(2.032)
 
     budget = profile.receiver_pilot_wall_budget()[-1]
     assert budget.upper_mm == pytest.approx(permitted_wall, abs=1e-12)
@@ -225,7 +231,7 @@ def test_independent_plate_top_boundary_catches_obsolete_half_band(monkeypatch) 
 
     # Both a missing top band and the former symmetric-5.08 half-band miss
     # this allowed configuration, reporting more wall than it actually has.
-    printed_band = printed_band_mm(2)
+    printed_band = printed_band_mm(2, unit=spec.UNIT)
     for too_small in (0.0, printed_band / 2.0):
         with monkeypatch.context() as patch:
             patch.setattr(profile, "PLATE_TOP_Y_ALLOWANCE", too_small)
@@ -242,10 +248,13 @@ def test_screw_stack_and_connected_material_are_independent_of_rib_thickness() -
     )
     assert min(joint.SCREW_TIP_GAP_MIN, joint.TAP_LEAD_MARGIN_MIN) > 0.0
     assert joint.ENGAGEMENT_MIN >= 1.5 * joint.SCREW_MAJOR_DIA
-    assert spec.RIB_T - joint.LINEAR_BAND < joint.THREAD_DEPTH
-    assert spec.RIB_T + joint.LINEAR_BAND < joint.DRILL_DEPTH_MIN
+    assert spec.RIB_T + spec.RIB_T_DEVIATIONS[0] < joint.THREAD_DEPTH
+    assert spec.RIB_T + spec.RIB_T_DEVIATIONS[1] < joint.DRILL_DEPTH_MIN
     assert joint.receiver_pilot_material_wall_budget() >= joint.RECEIVER_PILOT_WALL_MIN
-    assert all(wall.minimum_mm > 2.0 for wall in profile.receiver_pilot_wall_budget())
+    assert all(
+        wall.minimum_mm > joint.RECEIVER_PILOT_WALL_MIN
+        for wall in profile.receiver_pilot_wall_budget()
+    )
     # Beyond a shortened rib the relocated row is still backed by the plate.
     # Removing rib material is not itself a breakout; thinning that plate is.
     narrowed = replace(profile.PROFILE, reach=18.0)
@@ -289,7 +298,7 @@ def test_longitudinal_pilot_uses_printed_diameter_and_deepest_wander(monkeypatch
 
 
 @pytest.mark.parametrize("name,value", [
-    ("DRILLED_DIAMETER_PLUS", 0.20),
+    ("RECEIVER_DRILLED_DIAMETER_PLUS", 0.20),
     ("DRILL_WANDER_DEG", 0.6),
     ("DRILL_DEPTH_MAX", 7.4),
     ("DRILL_POINT_H", 1.0),

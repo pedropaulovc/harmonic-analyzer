@@ -401,16 +401,16 @@ def test_the_knife_hanger_is_a_plain_clamp_keyed_by_its_two_dowels() -> None:
     # The length is cut at MHA-SM-00 to the measured stack, not banded on
     # the bolt or carried by the frame's grip band.
     assert "MHA-SM-00 step 4 cuts each bolt" in row.axial_capture
-    assert "measured at its own hole plus 8.92 +/-0.15" in row.axial_capture
+    assert "measured at its own hole plus .351 +/-.006 in" in row.axial_capture
     assert "46.70 +/-0.15" not in row.axial_capture
     assert "36.50 +/-0.05" not in row.axial_capture
     assert "HANGER_FIT_REACH" in row.evidence
     assert "HANGER_SPOTFACE" not in row.evidence
-    assert "8.9173 nominal (8.77..9.07 worst case)" in row.axial_capture
+    assert "8.9173 nominal (8.763..9.0678 worst case)" in row.axial_capture
     assert "9.65 +/-0.13" in row.axial_capture
-    assert "0.4916667 spare" in row.axial_capture
-    assert "7.7116667 full engagement" in row.axial_capture
-    assert "0.45 minimum tip air" in row.axial_capture
+    assert "0.4910667 spare" in row.axial_capture
+    assert "7.7046667 full engagement" in row.axial_capture
+    assert "0.4522 minimum tip air" in row.axial_capture
 
 
 def test_the_channel_apex_set_screws_are_staked_like_the_keeper_screws() -> None:

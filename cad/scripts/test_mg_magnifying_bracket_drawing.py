@@ -108,8 +108,8 @@ def test_overall_precision_bands_do_not_loosen_receiver_or_move_nominal_geometry
     assert mounting.SIDE_PLATE_LENGTH_DEVIATIONS == pytest.approx((-0.85, 0.75))
     assert mounting.SIDE_PLATE_HEIGHT_DEVIATIONS == pytest.approx((-0.8, 0.8))
     assert mounting.LINEAR_BAND == 0.51  # receiver/depth authority is unchanged
-    assert mounting.COUNTERBORE_END_WALL_MIN == pytest.approx(7.0)
-    assert mounting.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(2.79)
+    assert mounting.COUNTERBORE_END_WALL_MIN == pytest.approx(6.9992)
+    assert mounting.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(2.7892)
     assert mounting.GRIP_MIN == pytest.approx(3.045)
     assert mounting.GRIP + mounting.GRIP_BAND == pytest.approx(3.305)
 

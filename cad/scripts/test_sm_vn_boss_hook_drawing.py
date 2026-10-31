@@ -27,18 +27,21 @@ def test_finished_overall_preserves_factory_thread_datum():
 
 
 def test_deburr_band_clears_receiver_and_retains_full_threads():
-    # The lead-in is a one-place chamfer under the printed .X title-block band,
-    # never a tighter one; the governing stack below must hold across it.
-    assert spec.CHAMFER_WIDTH_TOLERANCE_MM == printed_band_mm(1)
-    assert spec.DIMENSION_PRECISION["ChamferWidth"] == 1
-    assert spec.CHAMFER_WIDTH_MM == round(spec.CHAMFER_WIDTH_MM, 1)
+    # The lead-in is a two-place inch chamfer under the printed .XX title-block
+    # band, never a tighter one; the governing stack below must hold across it.
+    band = printed_band_mm(2, unit="in")
+    assert spec.CHAMFER_WIDTH_DEVIATIONS == pytest.approx((-band, band))
+    assert spec.DIMENSION_PRECISION["ChamferWidth"] == 2
+    assert spec.CHAMFER_WIDTH_MM / 25.4 == pytest.approx(
+        round(spec.CHAMFER_WIDTH_MM / 25.4, 2)
+    )
     assert spec.DIMENSION_TOLERANCE_TYPES["ChamferWidth"] == 11  # swTolGeneral
-    minimum = spec.CHAMFER_WIDTH_MM - spec.CHAMFER_WIDTH_TOLERANCE_MM
-    maximum = spec.CHAMFER_WIDTH_MM + spec.CHAMFER_WIDTH_TOLERANCE_MM
+    minimum = spec.CHAMFER_WIDTH_MM + spec.CHAMFER_WIDTH_DEVIATIONS[0]
+    maximum = spec.CHAMFER_WIDTH_MM + spec.CHAMFER_WIDTH_DEVIATIONS[1]
     assert anchor.thread_major_dia_mm - 2 * minimum < TAP_DRILL_MM[anchor.thread_size]
-    # The next one-place nominal down would put the short leg's end over the drill.
+    # The next two-place nominal down would put the short leg's end over the drill.
     assert (
-        anchor.thread_major_dia_mm - 2 * (minimum - 0.1)
+        anchor.thread_major_dia_mm - 2 * (minimum - 0.254)
         >= TAP_DRILL_MM[anchor.thread_size]
     )
     # The long leg still leaves an end flat: the deburr cannot reach the axis.
@@ -47,8 +50,15 @@ def test_deburr_band_clears_receiver_and_retains_full_threads():
     maximum_axial = maximum / math.tan(
         math.radians(spec.CHAMFER_ANGLE_DEG - spec.CHAMFER_ANGLE_TOLERANCE_DEG)
     )
-    short_shank = spec.SHANK_LENGTH_MM - spec.FINISHED_OVERALL_TOLERANCE_MM
+    short_shank = spec.SHANK_LENGTH_MM + spec.FINISHED_OVERALL_DEVIATIONS[0]
     assert short_shank - maximum_axial > 17.0
+
+
+def test_finished_overall_prints_its_model_inside_the_xx_band():
+    lower, upper = spec.FINISHED_OVERALL_DEVIATIONS
+    assert spec.DIMENSION_PRECISION["FinishedOverall"] == 2
+    assert lower < 0.0 < upper
+    assert upper - lower == pytest.approx(2 * printed_band_mm(2, unit="in"))
 
 
 @pytest.mark.parametrize("fault", [None, "rejected", "faults"])
@@ -112,27 +122,30 @@ def test_drawing_accepts_general_controls_and_rejects_lost_control(monkeypatch, 
     """General is toleranced, unlike None; neither replaces a real driving size."""
     monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
     annotations = []
-    for name, nominal, band in (
+    for name, nominal, (lower, upper) in (
         (
             "FinishedOverall",
             spec.FINISHED_OVERALL_MM / 1000,
-            spec.FINISHED_OVERALL_TOLERANCE_MM / 1000,
+            tuple(d / 1000 for d in spec.FINISHED_OVERALL_DEVIATIONS),
         ),
         (
             "ChamferWidth",
             spec.CHAMFER_WIDTH_MM / 1000,
-            spec.CHAMFER_WIDTH_TOLERANCE_MM / 1000,
+            tuple(d / 1000 for d in spec.CHAMFER_WIDTH_DEVIATIONS),
         ),
         (
             "ChamferAngle",
             math.radians(spec.CHAMFER_ANGLE_DEG),
-            math.radians(spec.CHAMFER_ANGLE_TOLERANCE_DEG),
+            (
+                -math.radians(spec.CHAMFER_ANGLE_TOLERANCE_DEG),
+                math.radians(spec.CHAMFER_ANGLE_TOLERANCE_DEG),
+            ),
         ),
     ):
         tolerance = SimpleNamespace(
             Type=spec.DIMENSION_TOLERANCE_TYPES[name],
-            GetMinValue=lambda band=band: -band,
-            GetMaxValue=lambda band=band: band,
+            GetMinValue=lambda lower=lower: lower,
+            GetMaxValue=lambda upper=upper: upper,
         )
         dimension = SimpleNamespace(
             Name=name, DrivenState=2, SystemValue=nominal, Tolerance=tolerance
