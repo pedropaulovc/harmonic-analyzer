@@ -16,7 +16,6 @@ import yaml
 import _sketch as sketch
 
 import _drawing_projection as drawing_projection
-import _ms_drawing_guards as guards
 import _dxf_text as dxf_text
 import build_ms_stick as builder
 import draw_ms_stick as drawing
@@ -525,14 +524,14 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
         return SimpleNamespace(is_success=True, data=None)
 
     # The source document reads dirty once sketches are shown in memory: the
-    # stick's guard proves its file, not its flag.
-    source_model = SimpleNamespace(GetSaveFlag=lambda: source_dirty["now"])
+    # stick's TRANSIENT_VIEW_STATE guard proves its file, not its flag.
+    source_model = SimpleNamespace(GetPathName=lambda: str(source),
+                                   GetSaveFlag=lambda: source_dirty["now"])
     source_dirty = {"now": False}
     adapter = SimpleNamespace(
         currentModel=source_model, open_model=open_model,
         swApp=SimpleNamespace(GetMathUtility=lambda: utility),
     )
-    monkeypatch.setattr(guards, "_early_bound", lambda obj, interface: obj)
     new_kwargs = {}
 
     def new_drawing(*args, **kwargs):

@@ -43,11 +43,17 @@ def declared_drawing_unit(owner: str, row: Mapping[str, Any]) -> DrawingUnit | N
     return checked_drawing_unit(owner, row[DRAWING_UNIT_KEY])
 
 
+def resolved_drawing_unit(declared: DrawingUnit | None) -> DrawingUnit:
+    """The unit a package prints: its validated declaration, else the legacy
+    millimetre.  The ONE place the legacy fallback lives: a registry row
+    (:func:`drawing_unit`), an assembly contract and a drawing package all
+    resolve their declaration through it."""
+    return LEGACY_DRAWING_UNIT if declared is None else declared
+
+
 def drawing_unit(owner: str, row: Mapping[str, Any] | None) -> DrawingUnit:
     """The unit ``row`` selects: its declaration, else the legacy millimetre.
 
     ``row`` is ``None`` for an unregistered package (no row to declare one)."""
-    if row is None:
-        return LEGACY_DRAWING_UNIT
-    declared = declared_drawing_unit(owner, row)
-    return LEGACY_DRAWING_UNIT if declared is None else declared
+    declared = None if row is None else declared_drawing_unit(owner, row)
+    return resolved_drawing_unit(declared)

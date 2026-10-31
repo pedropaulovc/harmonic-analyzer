@@ -46,12 +46,12 @@ from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _machinist_review_mode import MachinistReviewMode
 from _ms_drawing_contract import assert_manufacturing_dimensions
-from _ms_drawing_guards import (
-    assert_imported_text,
-    assert_source_clean,
+from _drawing_source_guard import (
+    assert_source_closed,
     capture_clean_source,
     source_checkpoint,
 )
+from _ms_drawing_guards import assert_imported_text
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -201,7 +201,7 @@ async def build(adapter: Any) -> dict[str, str]:
                                        pdf_title="Measuring Stick Stop Plate Manufacturing Drawing",
                                        scale=SHEET_SCALE, layout=SPEC.layout,
                                        package_name=PACKAGE, checkpoint=guard)
-    assert_source_clean(source, stage="after finalize", in_memory=False)
+    assert_source_closed(source, stage="after finalize")
     return artifacts
 
 

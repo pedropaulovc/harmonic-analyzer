@@ -1170,6 +1170,10 @@ assemblies and every gate behind them) or `verify.py` (on every soundness
 gate's). Any closure reaching `_assembly_contract`
 gets the `assemblies/*` token; `dodo._config_deps` narrows it to the task's OWN
 file for an assembly task, and `_soundness_file_deps` adds the gate's own file.
+A drawing keeps only its own package's contract when `_drawing_package_unit`
+(`_buildgraph.OWN_PACKAGE_CONTRACT_READERS`) is its closure's only contract
+reader; any other reader (the top sheet's BOM prints every subassembly number)
+keeps the whole family (`reads_foreign_assembly_contracts`).
 Each `build_<stem>_assembly.build()` opens with
 `activate_assembly_contract(ASM_NAME)` — the file its seeds come from is the file
 its recipe depends on. A signature two assemblies both query goes in BOTH files

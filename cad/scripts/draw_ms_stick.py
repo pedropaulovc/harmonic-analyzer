@@ -58,7 +58,12 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _named_views import octant_view_name
 from _machinist_review_mode import MachinistReviewMode
 from _ms_drawing_contract import assert_manufacturing_dimensions
-from _ms_drawing_guards import assert_source_clean, capture_clean_source, source_checkpoint
+from _drawing_source_guard import (
+    SourceCheck,
+    assert_source_closed,
+    capture_clean_source,
+    source_checkpoint,
+)
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 
@@ -350,8 +355,10 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source measuring stick missing: {SOURCE}")
     check("open measuring stick", await adapter.open_model(str(SOURCE)))
     source_model = adapter.currentModel
+    # The engraving details show hidden part sketches in memory and re-blank
+    # them (part_sketches_shown), which can leave the save flag set.
     source = capture_clean_source(SOURCE, source_model, label="measuring stick source",
-                                  strict_in_memory=False)
+                                  check=SourceCheck.TRANSIENT_VIEW_STATE)
     guard = source_checkpoint(source)
     properties = ("Number", "Revision", "Title", "Material Specification", "Finish",
                   "Quantity", "Manufacturing Notes", "Front View Note", "Isometric View Note",
@@ -483,7 +490,7 @@ async def build(adapter: Any) -> dict[str, str]:
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
         settled_checks=(lambda: _assert_dimension_contract(adapter, annotations),),
         package_name=PACKAGE, checkpoint=guard)
-    assert_source_clean(source, stage="after finalize", in_memory=False)
+    assert_source_closed(source, stage="after finalize")
     return artifacts
 
 

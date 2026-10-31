@@ -17,7 +17,6 @@ lays the sheets out. It never edits the source assembly or its explodes.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import math
 import struct
 import sys
@@ -67,6 +66,12 @@ from _drawing_view_display import set_hidden_lines_removed
 from solidworks_mcp.adapters.solidworks.drawing import visible_component_entities
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_hidden_sketches import _show_base_view_sketches
+from _drawing_source_guard import (
+    assert_source_clean,
+    assert_source_closed,
+    capture_clean_source,
+    source_checkpoint,
+)
 from _simplified_names import simplified_name
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 from solidworks_mcp.adapters.com_variant import double_array
@@ -1161,53 +1166,18 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     return settled
 
 
-def _source_sha256(path: Path) -> str:
-    """Stream the released source (the magnifier/drive-train identity guard)."""
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _assert_source_identity(source_model: Any, expected_sha256: str, *, phase: str) -> None:
-    """The drawing reads its source and never edits it: the .SLDASM keeps its
-    bytes and the open document its clean save flag. Never save or reset it."""
-    actual_sha256 = _source_sha256(SOURCE)
-    dirty = bool(source_model.GetSaveFlag())
-    _telemetry.info(
-        f"measuring-stick source {phase}: SHA256 {actual_sha256}; "
-        f"expected {expected_sha256}; dirty={dirty}",
-        source_identity_phase=phase,
-        source_sha256=actual_sha256,
-        source_expected_sha256=expected_sha256,
-        source_dirty=dirty,
-    )
-    if dirty:
-        raise RuntimeError(
-            f"measuring-stick drawing dirtied the source assembly {phase}; "
-            "refusing to save or reset it"
-        )
-    if actual_sha256 != expected_sha256:
-        raise RuntimeError(
-            f"measuring-stick drawing changed the source assembly {phase}: "
-            f"SHA256 {expected_sha256} -> {actual_sha256}"
-        )
-
-
 @_telemetry.traced("drawing.ms_measuring_stick_assembly")
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
-    source_sha256 = _source_sha256(SOURCE)
 
     check("open measuring-stick drawing source", await adapter.open_model(str(SOURCE)))
-    source_model = _early_bound(adapter.currentModel, "IModelDoc2")
-    if bool(source_model.GetSaveFlag()):
-        raise RuntimeError(
-            "measuring-stick source assembly is already dirty; refusing to discard user changes"
-        )
-    _assert_source_identity(source_model, source_sha256, phase="on source open")
+    # The drawing reads its source and never edits it: the .SLDASM keeps its
+    # bytes and the open document its clean save flag. Never save or reset it.
+    source = capture_clean_source(
+        SOURCE, adapter.currentModel, label="measuring-stick source assembly"
+    )
+    source_model = source.model
     properties = read_required_properties(
         source_model,
         (
@@ -1232,10 +1202,10 @@ async def build(adapter: Any) -> dict[str, str]:
             f"{sheet.DRAWING_NUMBER!r}"
         )
     _validate_source(source_model)
-    _assert_source_identity(source_model, source_sha256, phase="before presentation")
+    assert_source_clean(source, stage="before presentation")
 
     settled = _place_package(adapter)
-    _assert_source_identity(source_model, source_sha256, phase="before drawing SaveAs")
+    assert_source_clean(source, stage="before drawing SaveAs")
     try:
         artifacts = await finalize_drawing(
             adapter,
@@ -1248,23 +1218,24 @@ async def build(adapter: Any) -> dict[str, str]:
             sheet_scales=SHEET_SCALES,
             settled_checks=(
                 settled,
-                lambda: _assert_source_identity(
-                    source_model, source_sha256, phase="settled checks before drawing SaveAs"
+                lambda: assert_source_clean(
+                    source, stage="settled checks before drawing SaveAs"
                 ),
             ),
+            checkpoint=source_checkpoint(source),
             package_name=PACKAGE_NAME,
         )
     finally:
         primary_error = sys.exception()
         try:
-            _assert_source_identity(
-                source_model, source_sha256, phase="after drawing finalization"
-            )
+            # The drawing has closed (or failed): the file only, never the
+            # source handle.
+            assert_source_closed(source, stage="after drawing finalization")
         except BaseException:
             if primary_error is None:
                 raise
             # Keep the original native failure and its traceback.
-    _telemetry.success(f"measuring-stick source preserved clean; SHA256 {source_sha256}")
+    _telemetry.success(f"measuring-stick source preserved clean; SHA256 {source.sha256}")
     return artifacts
 
 

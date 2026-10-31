@@ -50,11 +50,8 @@ from _com import _early_bound
 from _custom_properties import apply_custom_properties
 from _session import run_build
 from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
-from _drawing_precision import apply_drawing_precision, _named_dimension
-from _drawing_tolerances import (
-    set_dimension_symmetric_tolerance,
-    _set_tolerance_precision,
-)
+from _drawing_precision import apply_drawing_precision
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _dimensions import drive_dimension, set_global
 from _feature_tree import name_last_feature
 from _assembly_named_views import name_standard_views
@@ -351,12 +348,7 @@ async def _author_clamped_setting(adapter: Any) -> None:
         await drive_dimension(adapter, name, expression)
     set_dimension_symmetric_tolerance(
         adapter, spec.SETTING_FEATURE, spec.SETTING_DIMENSION, spec.SETTING_TOLERANCE_MM,
-        display_unit=unit,
-    )
-    display, _ = _named_dimension(adapter, spec.SETTING_FEATURE, spec.SETTING_DIMENSION)
-    _set_tolerance_precision(
-        display, (-spec.SETTING_TOLERANCE_MM, spec.SETTING_TOLERANCE_MM),
-        display_unit=unit, label="clamped setting", places=spec.SETTING_TOLERANCE_PRECISION,
+        places=spec.SETTING_TOLERANCE_PRECISION, display_unit=unit,
     )
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     mark_dimensions_for_drawing(adapter, spec.SETTING_FEATURE, {spec.SETTING_DIMENSION})

@@ -420,6 +420,107 @@ def test_sheet_stays_hiwin_millimetres_by_its_own_declaration() -> None:
     assert "_assert_receipt_dimensions" in calls["finalize_drawing"]["settled_checks"]
 
 
+def test_sheet_proves_its_source_at_every_boundary() -> None:
+    tree = ast.parse(Path(draw.__file__).read_text(encoding="utf-8"))
+    build = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    )
+    calls = {
+        node.func.id: node
+        for node in ast.walk(build)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    for name in ("new_project_drawing", "finalize_drawing"):
+        keywords = {kw.arg: ast.unparse(kw.value) for kw in calls[name].keywords}
+        assert keywords["checkpoint"] == "guard", name
+    # Captured before the drawing exists; bytes re-proved once it has closed.
+    assert calls["capture_clean_source"].lineno < calls["new_project_drawing"].lineno
+    assert calls["finalize_drawing"].lineno < calls["assert_source_closed"].lineno
+
+
+class _SourceDocument:
+    def __init__(self, path: Path, *, dirty: bool = False) -> None:
+        self.path = path
+        self.dirty = dirty
+
+    def GetPathName(self):
+        return str(self.path)
+
+    def GetSaveFlag(self):
+        return self.dirty
+
+
+class _OpenAdapter:
+    def __init__(self, document) -> None:
+        self.currentModel = document
+
+    async def open_model(self, _path):
+        return _Result()
+
+
+def _guarded_rail(monkeypatch, tmp_path, document_for):
+    from types import SimpleNamespace
+
+    source = tmp_path / f"{STEM}.SLDPRT"
+    source.write_bytes(b"rail source")
+    sheet = SimpleNamespace(
+        source=source,
+        source_kind="part",
+        layout=draw.SPEC.layout,
+        outputs=draw.SPEC.outputs,
+    )
+    monkeypatch.setattr(draw, "SPEC", sheet)
+    monkeypatch.setattr(
+        draw,
+        "read_required_properties",
+        lambda _model, names, *, required: dict.fromkeys(names, "x"),
+    )
+    return source, _OpenAdapter(document_for(source))
+
+
+@pytest.mark.parametrize(
+    ("document", "message"),
+    (
+        (
+            lambda source: _SourceDocument(source, dirty=True),
+            "before the drawing starts",
+        ),
+        (lambda source: _SourceDocument(source.with_name("other.SLDPRT")), "is not"),
+    ),
+)
+def test_sheet_refuses_a_dirty_or_foreign_source_before_drawing(
+    monkeypatch, tmp_path, document, message
+) -> None:
+    _source, adapter = _guarded_rail(monkeypatch, tmp_path, document)
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("a drawing was created over an unproven source")
+
+    monkeypatch.setattr(draw, "new_project_drawing", forbidden)
+    with pytest.raises(RuntimeError, match=message):
+        asyncio.run(draw.build(adapter))
+
+
+def test_sheet_refuses_a_source_rewritten_during_the_drawing(
+    monkeypatch, tmp_path
+) -> None:
+    source, adapter = _guarded_rail(monkeypatch, tmp_path, _SourceDocument)
+
+    def new_drawing(_adapter, *, checkpoint, package_name, **_kwargs):
+        assert package_name == draw.PACKAGE
+        source.write_bytes(b"saved by the sheet")
+        checkpoint("after_new_document")
+        pytest.fail("a rewritten source passed the drawing's checkpoint")
+
+    monkeypatch.setattr(draw, "new_project_drawing", new_drawing)
+    with pytest.raises(
+        RuntimeError, match="after_new_document: source file bytes changed"
+    ):
+        asyncio.run(draw.build(adapter))
+
+
 class _ReceiptAnnotation:
     def __init__(self, display) -> None:
         self.display = display

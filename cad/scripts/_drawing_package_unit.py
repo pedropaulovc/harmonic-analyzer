@@ -11,8 +11,10 @@ assembly stamping read the same field for the TOL_* rows
 Build-graph note: a drawing closure that reaches this module reads its OWN
 package's row (``"parts/*"``, narrowed by ``dodo._expand_parts_token``) and its
 OWN assembly contract (``"assemblies/*"``, narrowed by
-``dodo._expand_assembly_contracts_token``); callers pass their own package
-literal (``test_dodo_recipe`` pins it), so a sibling's edit never re-keys them.
+``dodo._expand_assembly_contracts_token`` unless another closure module reads
+contracts: ``_buildgraph.OWN_PACKAGE_CONTRACT_READERS``); callers pass their
+own package literal (``test_dodo_recipe`` pins it), so a sibling's edit never
+re-keys them.
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ import _telemetry
 from _assembly_contract import assembly_contract, contract_path
 from _com import _early_bound
 from _document_units import document_unit_mismatch, read_document_units
-from _drawing_units import LEGACY_DRAWING_UNIT, DrawingUnit, declared_drawing_unit
+from _drawing_units import DrawingUnit, declared_drawing_unit, resolved_drawing_unit
 from _part_properties import title_block_properties
 
 # The title block's UNIT cell: SolidWorks' drawing-document unit property,
@@ -38,12 +40,15 @@ UNIT_OF_MEASURE_LINK = '$PRP:"UnitOfMeasure"'
 _SW_NOTE = 6  # swAnnotationType_e.swNote
 
 
-def declared_package_drawing_unit(package_name: str) -> DrawingUnit | None:
-    """The unit ``package_name`` declares, or ``None`` when it declares none.
+def declared_package_drawing_unit(package_name: str | None) -> DrawingUnit | None:
+    """The unit ``package_name`` declares, or ``None`` when it declares none
+    (or the drawing names no package: the legacy sheet).
 
     An assembly's contract wins when one exists; otherwise the part registry
     row.  A package that is neither raises: a drawing that names its package
     must name a real one."""
+    if package_name is None:
+        return None
     if contract_path(package_name).is_file():
         return assembly_contract(package_name).drawing_unit
     try:
@@ -56,11 +61,10 @@ def declared_package_drawing_unit(package_name: str) -> DrawingUnit | None:
     return declared_drawing_unit(f"parts/{package_name}", row)
 
 
-def package_drawing_unit(package_name: str) -> DrawingUnit:
+def package_drawing_unit(package_name: str | None) -> DrawingUnit:
     """The unit ``package_name``'s sheet prints: its declaration, else the
     legacy millimetre."""
-    declared = declared_package_drawing_unit(package_name)
-    return LEGACY_DRAWING_UNIT if declared is None else declared
+    return resolved_drawing_unit(declared_package_drawing_unit(package_name))
 
 
 def carries_inch_rows(linked_properties: Mapping[str, str]) -> bool:
@@ -68,6 +72,40 @@ def carries_inch_rows(linked_properties: Mapping[str, str]) -> bool:
     was stamped as an inch package, whatever the drawing says about itself."""
     expected = title_block_properties(unit="in")
     return all(linked_properties.get(name) == text for name, text in expected.items())
+
+
+def sheet_proof_unit(
+    declared: DrawingUnit | None, linked_properties: Mapping[str, str]
+) -> DrawingUnit | None:
+    """The unit one sheet must be proved to print, or ``None`` for nothing to
+    prove: the package's declaration; else ``"in"`` when the sheet's linked
+    model carries the inch TOL_* rows (an inch model never ships on a sheet
+    whose drawing forgot its package); else ``None`` (a legacy sheet linking a
+    legacy model)."""
+    if declared is not None:
+        return declared
+    return "in" if carries_inch_rows(linked_properties) else None
+
+
+def document_proof_unit(
+    sheet_units: Mapping[str, DrawingUnit | None],
+) -> DrawingUnit | None:
+    """The ONE unit a drawing document was proved to print, from every sheet's
+    :func:`sheet_proof_unit`, or ``None`` when no sheet needed a proof.
+
+    A drawing document has one unit system, so its sheets must agree: a sheet
+    left unproved beside a proved one, or two different proved units, means
+    the sheets link models stamped for different units, and one of them
+    prints its TOL_* rows in the wrong unit.  That raises; nothing is skipped.
+    """
+    units = set(sheet_units.values())
+    if len(units) > 1:
+        by_sheet = ", ".join(f"{name!r}: {unit}" for name, unit in sheet_units.items())
+        raise RuntimeError(
+            "drawing sheets disagree on the unit they print (one document "
+            f"prints one unit; None = legacy mm model, nothing proved): {by_sheet}"
+        )
+    return next(iter(units), None)
 
 
 def _unit_notes(draw: Any) -> list[tuple[str, str]]:

@@ -713,37 +713,61 @@ class _SourcePart:
         return self.dirty
 
 
-def _guarded_source(monkeypatch, tmp_path: Path) -> Path:
+class _SheetStarted(Exception):
+    pass
+
+
+def _sheet_checkpoint(monkeypatch, tmp_path: Path, part_path: Path | None = None,
+                      *, dirty: bool = False):
+    """Run the real build up to its first drawing call; return the source
+    observer it hands over and the fake part document."""
+    import asyncio
+
     source = tmp_path / "dt-pinion-cam.SLDPRT"
     source.write_bytes(b"part bytes")
     monkeypatch.setattr(drawing, "SOURCE", source)
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(drawing._telemetry, "event", lambda *_args, **_kwargs: None)
-    return source
+    part = _SourcePart(part_path or source, dirty=dirty)
+
+    async def open_model(path):
+        assert path == str(source)
+        return SimpleNamespace(is_success=True, data=None)
+
+    monkeypatch.setattr(drawing, "read_required_properties", lambda *_args, **_kwargs: None)
+    received = {}
+
+    def new_drawing(_adapter, **kwargs):
+        received.update(kwargs)
+        raise _SheetStarted
+
+    monkeypatch.setattr(drawing, "new_project_drawing", new_drawing)
+    with pytest.raises(_SheetStarted):
+        asyncio.run(drawing.build(SimpleNamespace(currentModel=part, open_model=open_model)))
+    return received["checkpoint"], part, source
 
 
 def test_the_sheet_refuses_any_write_to_its_source_part(monkeypatch, tmp_path) -> None:
     # #290 native acceptance: the drawing never saves the part.  The bytes are
     # hashed before the sheet presents the part and at every setup, save and
-    # close checkpoint; both drawing calls receive the same observer.
-    source = _guarded_source(monkeypatch, tmp_path)
-    part = _SourcePart(source)
-    checkpoint = drawing._clean_source_checkpoint(part)
-    for phase in ("after_new_document", "before_drawing_save", "after_drawing_save"):
+    # close checkpoint; both drawing calls receive the same observer.  A
+    # view's camera can set the part's in-memory flag without a write, so the
+    # flag is recorded, not refused.
+    checkpoint, part, source = _sheet_checkpoint(monkeypatch, tmp_path)
+    checkpoint("after_new_document")
+    part.dirty = True
+    for phase in ("before_drawing_save", "after_drawing_save"):
         checkpoint(phase)
     reads = part.flag_reads
     checkpoint("after_drawing_close")  # the closed handle is not dereferenced
     assert part.flag_reads == reads
     source.write_bytes(b"part bytes, resaved")
-    with pytest.raises(RuntimeError, match="must never save its source part"):
+    with pytest.raises(RuntimeError, match="must never save its source"):
         checkpoint("after_pdf_save")
     text = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert text.count("checkpoint=source_checkpoint") == 2
+    assert text.count("checkpoint=guard") == 2
 
 
 def test_the_sheet_refuses_a_dirty_or_foreign_source(monkeypatch, tmp_path) -> None:
-    source = _guarded_source(monkeypatch, tmp_path)
     with pytest.raises(RuntimeError, match="save flag"):
-        drawing._clean_source_checkpoint(_SourcePart(source, dirty=True))
+        _sheet_checkpoint(monkeypatch, tmp_path, dirty=True)
     with pytest.raises(RuntimeError, match="is not"):
-        drawing._clean_source_checkpoint(_SourcePart(tmp_path / "other.SLDPRT"))
+        _sheet_checkpoint(monkeypatch, tmp_path, tmp_path / "other.SLDPRT")

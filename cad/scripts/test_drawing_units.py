@@ -18,7 +18,13 @@ import _document_units
 import _drawing_package_unit
 import _drawing_tolerances
 import _part_properties
-from _drawing_units import checked_drawing_unit, declared_drawing_unit, drawing_unit
+from _drawing_units import (
+    LEGACY_DRAWING_UNIT,
+    checked_drawing_unit,
+    declared_drawing_unit,
+    drawing_unit,
+    resolved_drawing_unit,
+)
 
 # --- the declaration ----------------------------------------------------------
 
@@ -40,6 +46,13 @@ def test_an_undeclared_or_unregistered_package_is_the_legacy_millimetre_sheet():
     assert declared_drawing_unit("parts/x", {"number": "MHA-CH-05"}) is None
     assert drawing_unit("parts/x", {"number": "MHA-CH-05"}) == "mm"
     assert drawing_unit("parts/x", None) == "mm"
+
+
+def test_the_legacy_fallback_lives_in_one_resolver():
+    assert LEGACY_DRAWING_UNIT == "mm"
+    assert resolved_drawing_unit(None) == LEGACY_DRAWING_UNIT
+    assert resolved_drawing_unit("in") == "in"
+    assert resolved_drawing_unit("mm") == "mm"
 
 
 # --- the part and assembly stamping ---------------------------------------------
@@ -128,6 +141,11 @@ def test_a_drawing_package_resolves_its_part_row(monkeypatch):
     assert _drawing_package_unit.declared_package_drawing_unit("probe-inch") == "in"
     assert _drawing_package_unit.declared_package_drawing_unit("probe-legacy") is None
     assert _drawing_package_unit.package_drawing_unit("probe-legacy") == "mm"
+
+
+def test_a_drawing_naming_no_package_is_the_legacy_sheet():
+    assert _drawing_package_unit.declared_package_drawing_unit(None) is None
+    assert _drawing_package_unit.package_drawing_unit(None) == "mm"
 
 
 def test_an_unknown_drawing_package_is_refused():
@@ -324,6 +342,33 @@ def test_an_inch_stamped_model_is_recognised_whatever_the_drawing_declares():
     assert not _drawing_package_unit.carries_inch_rows(
         _part_properties.title_block_properties()
     )
+
+
+def test_each_sheet_is_proved_in_its_package_unit_or_its_inch_model():
+    inch = _part_properties.title_block_properties(unit="in")
+    metric = _part_properties.title_block_properties()
+    proof = _drawing_package_unit.sheet_proof_unit
+    # A declared package proves every sheet in its unit, whatever it links: an
+    # inch package linking a mm-stamped model then fails the TOL_* readback.
+    assert proof("in", metric) == "in"
+    assert proof("mm", inch) == "mm"
+    # An undeclared sheet linking an inch-stamped model is never skipped.
+    assert proof(None, inch) == "in"
+    assert proof(None, metric) is None
+
+
+def test_one_document_unit_requires_every_sheet_to_agree():
+    agree = _drawing_package_unit.document_proof_unit
+    assert agree({}) is None
+    assert agree({"A": None, "B": None}) is None
+    assert agree({"A": "in", "B": "in"}) == "in"
+    assert agree({"A": "mm"}) == "mm"
+    # An inch sheet beside a legacy one, or two proved units, is one document
+    # printing two units: refused rather than proved by the last sheet alone.
+    mixed = ({"A": "in", "B": None}, {"A": None, "B": "in"}, {"A": "in", "B": "mm"})
+    for sheets in mixed:
+        with pytest.raises(RuntimeError, match="sheets disagree on the unit"):
+            agree(sheets)
 
 
 def test_the_open_document_is_reread_after_save():

@@ -93,15 +93,14 @@ def test_clamped_setting_authors_its_globals_and_drives(monkeypatch) -> None:
     monkeypatch.setattr(builder, "SketchDims", Dims)
     for name in ("anchor_point_to_origin", "dimension_between", "ensure_fully_defined"):
         monkeypatch.setattr(builder, name, noop)
-    for name in ("set_sketch_direct_db", "name_last_feature", "_set_tolerance_precision",
+    for name in ("set_sketch_direct_db", "name_last_feature",
                  "apply_drawing_precision", "mark_dimensions_for_drawing", "blank_sketch"):
         monkeypatch.setattr(builder, name, lambda *a, **kw: None)
     monkeypatch.setattr(builder, "_early_bound",
                         lambda entity, iface: SimpleNamespace(ConstructionGeometry=False))
-    monkeypatch.setattr(builder, "_named_dimension", lambda *a: (object(), None))
     monkeypatch.setattr(builder, "set_dimension_symmetric_tolerance",
-                        lambda adapter, feature, name, tol, *, display_unit:
-                        toleranced.append((feature, name, tol, display_unit)))
+                        lambda adapter, feature, name, tol, *, places, display_unit:
+                        toleranced.append((feature, name, tol, places, display_unit)))
 
     asyncio.run(builder._author_clamped_setting(Adapter()))
 
@@ -117,10 +116,14 @@ def test_clamped_setting_authors_its_globals_and_drives(monkeypatch) -> None:
         f"SettingContactY@{feature}": '-"SettingContact"',
         f"{spec.SETTING_DIMENSION}@{feature}": '"SettingBlockFace" - "SettingStickLeft"',
     }
-    # The band prints in the contract's inch unit, authored in the spec's.
+    # One tolerance write: the band prints in the contract's inch unit,
+    # authored in the spec's, at the spec's tolerance places.
     assert toleranced == [
-        (feature, spec.SETTING_DIMENSION, spec.SETTING_TOLERANCE_MM, spec.SETTING_UNIT)
+        (feature, spec.SETTING_DIMENSION, spec.SETTING_TOLERANCE_MM,
+         spec.SETTING_TOLERANCE_PRECISION, spec.SETTING_UNIT)
     ]
+    assert not hasattr(builder, "_set_tolerance_precision")
+    assert not hasattr(builder, "_named_dimension")
 
 
 def test_setting_chord_spans_the_near_face_reference() -> None:
@@ -1579,17 +1582,71 @@ def test_package_prints_the_contract_unit_on_every_sheet() -> None:
         assert len(package) == 1 and getattr(package[0], "id", "") == "PACKAGE_NAME"
 
 
-def test_source_identity_refuses_a_dirty_or_changed_source(monkeypatch, tmp_path) -> None:
+@pytest.mark.parametrize("fault", [None, "dirty-at-open", "dirty-on-save", "bytes-on-save"])
+def test_build_proves_its_source_clean_and_never_reads_it_after_close(
+    monkeypatch, tmp_path, fault
+) -> None:
+    """The real shared guard runs on a fake source document: clean and
+    unchanged before presentation, before SaveAs, at every finalizer
+    checkpoint, and bytes-only once the drawing has closed."""
+    import asyncio
+
     source = tmp_path / "ms-measuring-stick.SLDASM"
     source.write_bytes(b"released assembly")
     monkeypatch.setattr(drawing, "SOURCE", source)
-    digest = drawing._source_sha256(source)
-    clean = SimpleNamespace(GetSaveFlag=lambda: False)
-    drawing._assert_source_identity(clean, digest, phase="on source open")
-    with pytest.raises(RuntimeError, match="dirtied the source assembly"):
-        drawing._assert_source_identity(
-            SimpleNamespace(GetSaveFlag=lambda: True), digest, phase="after finalize"
-        )
-    source.write_bytes(b"resaved assembly")
-    with pytest.raises(RuntimeError, match="changed the source assembly"):
-        drawing._assert_source_identity(clean, digest, phase="after finalize")
+    state = {"dirty": fault == "dirty-at-open", "closed": False}
+    proved_stages = []
+
+    class SourceDocument:
+        def GetPathName(self):
+            return str(source)
+
+        def GetSaveFlag(self):
+            assert not state["closed"], "source handle dereferenced after the drawing closed"
+            return state["dirty"]
+
+    async def open_model(path):
+        assert path == str(source)
+        return SimpleNamespace(is_success=True, data=None)
+
+    adapter = SimpleNamespace(currentModel=SourceDocument(), open_model=open_model)
+    monkeypatch.setattr(
+        drawing, "read_required_properties",
+        lambda *args, **kwargs: {"Number": sheet.DRAWING_NUMBER},
+    )
+    monkeypatch.setattr(drawing, "_validate_source", lambda model: None)
+    monkeypatch.setattr(drawing, "_place_package", lambda adapter: lambda: None)
+
+    async def finalize(adapter, outputs, **kwargs):
+        for settled in kwargs["settled_checks"]:
+            settled()
+        for stage in ("before_drawing_save", "after_drawing_save",
+                      "before_drawing_close", "after_drawing_close"):
+            if stage == "after_drawing_save" and fault == "dirty-on-save":
+                state["dirty"] = True
+            if stage == "after_drawing_save" and fault == "bytes-on-save":
+                source.write_bytes(b"resaved assembly")
+            state["closed"] = stage == "after_drawing_close"
+            kwargs["checkpoint"](stage)
+            proved_stages.append(stage)
+        return {"drawing": str(outputs.slddrw)}
+
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+    run = lambda: asyncio.run(drawing.build(adapter))  # noqa: E731
+    if fault == "dirty-at-open":
+        with pytest.raises(RuntimeError, match="before the drawing starts"):
+            run()
+        return
+    if fault == "dirty-on-save":
+        with pytest.raises(RuntimeError, match="after_drawing_save: the drawing modified"):
+            run()
+        return
+    if fault == "bytes-on-save":
+        with pytest.raises(RuntimeError, match="after_drawing_save: source file bytes changed"):
+            run()
+        return
+    assert run() == {"drawing": str(drawing.OUTPUTS.slddrw)}
+    assert proved_stages == [
+        "before_drawing_save", "after_drawing_save", "before_drawing_close", "after_drawing_close",
+    ]
+    assert source.read_bytes() == b"released assembly"

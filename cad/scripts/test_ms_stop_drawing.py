@@ -377,13 +377,13 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     source_flags = {"dirty": False}
     adapter = SimpleNamespace(
         currentModel=SimpleNamespace(EditRebuild3=lambda: True,
+                                     GetPathName=lambda: str(source),
                                      GetSaveFlag=lambda: source_flags["dirty"]),
         open_model=open_model,
         swApp=SimpleNamespace(GetMathUtility=lambda: utility),
     )
-    # The real clean-source guard runs on the fake document's save flag and
-    # the sentinel file's bytes.
-    monkeypatch.setattr(guards, "_early_bound", lambda obj, interface: obj)
+    # The real clean-source guard runs on the fake document's path and save
+    # flag and the sentinel file's bytes.
     checkpoint_stages = []
     model_center = (
         spec.BLOCK_LENGTH / 2000.0,
@@ -867,7 +867,7 @@ def test_part_build_authors_dimension_text_and_reads_it_back(monkeypatch, refuse
     }
 
 
-@pytest.mark.parametrize("fault", [None, "missing", "text", "prefix"])
+@pytest.mark.parametrize("fault", [None, "crlf", "missing", "text", "prefix"])
 def test_sheet_reads_back_the_parts_imported_text_without_writing(monkeypatch, fault) -> None:
     names = {*callouts.PLATE_CALLOUTS, *callouts.PLATE_PREFIXES}
     displays = {}
@@ -877,7 +877,12 @@ def test_sheet_reads_back_the_parts_imported_text_without_writing(monkeypatch, f
         display.text[5] = callouts.PLATE_PREFIXES.get(name, "") + "<MOD-DIAM>"
         display.SetText = lambda *a: pytest.fail("the sheet must not write imported text")
         displays[name] = display
-    if fault == "text":
+    if fault == "crlf":
+        # The sheet compares rows with the part's own normalizer: a native
+        # CRLF readback of the authored text is the same text.
+        displays["PlateThickness"].text[4] = callouts.PLATE_CALLOUTS["PlateThickness"].replace(
+            "\n", "\r\n")
+    elif fault == "text":
         displays["PlateThickness"].text[4] = "SETS SCREW REACH"
     elif fault == "prefix":
         displays["RoofChamferSize"].text[5] = ""
@@ -890,46 +895,12 @@ def test_sheet_reads_back_the_parts_imported_text_without_writing(monkeypatch, f
     monkeypatch.setattr(guards, "dimension_name", lambda _adapter, item: item.name)
     check = lambda: guards.assert_imported_text(  # noqa: E731
         object(), annotations, callouts.PLATE_CALLOUTS, callouts.PLATE_PREFIXES)
-    if fault is None:
+    if fault in (None, "crlf"):
         check()
     else:
         with pytest.raises(RuntimeError, match="missing from the sheet" if fault == "missing"
                            else "differs from the part"):
             check()
-
-
-@pytest.mark.parametrize("fault", [None, "dirty-at-capture", "dirty-later", "bytes"])
-def test_clean_source_guard_hashes_the_file_and_reads_the_save_flag(monkeypatch, tmp_path, fault) -> None:
-    path = tmp_path / "ms-stop-plate.SLDPRT"
-    path.write_bytes(b"source")
-    flag = {"dirty": fault == "dirty-at-capture"}
-    model = SimpleNamespace(GetSaveFlag=lambda: flag["dirty"])
-    monkeypatch.setattr(guards, "_early_bound", lambda value, interface: value)
-    if fault == "dirty-at-capture":
-        with pytest.raises(RuntimeError, match="modified before the drawing starts"):
-            guards.capture_clean_source(path, model, label="stop cover source")
-        return
-    source = guards.capture_clean_source(path, model, label="stop cover source")
-    checkpoint = guards.source_checkpoint(source)
-    checkpoint("after_new_document")
-    if fault == "dirty-later":
-        flag["dirty"] = True
-        with pytest.raises(RuntimeError, match="modified its source part"):
-            checkpoint("before_drawing_save")
-        # Once the drawing has closed, only the bytes are read.
-        checkpoint("after_drawing_close")
-        # A sheet that toggles source sketches in memory proves the file only.
-        lenient = guards.CleanSource(path=path, sha256=source.sha256, model=model,
-                                     label="measuring stick source", strict_in_memory=False)
-        guards.assert_source_clean(lenient, stage="before_drawing_save")
-    elif fault == "bytes":
-        path.write_bytes(b"saved by the sheet")
-        with pytest.raises(RuntimeError, match="source part bytes changed"):
-            checkpoint("after_drawing_close")
-    else:
-        checkpoint("before_drawing_save")
-        checkpoint("after_drawing_close")
-        guards.assert_source_clean(source, stage="after finalize", in_memory=False)
 
 
 def test_match_drill_callouts_identify_the_current_mate_registry_rows() -> None:

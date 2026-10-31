@@ -31,10 +31,11 @@ from _custom_properties import apply_custom_properties
 from _drawing_package_unit import (
     assert_document_units_after_save,
     assert_sheet_prints_unit,
-    carries_inch_rows,
     declared_package_drawing_unit,
+    document_proof_unit,
     package_drawing_unit,
     prove_saved_drawing_units,
+    sheet_proof_unit,
 )
 from _drawing_units import DrawingUnit
 from _drawing_layout_audit import run_layout_audit
@@ -538,7 +539,7 @@ def new_project_drawing(
     # next to the ±0.25 blanket tolerance. A drawing that genuinely needs finer
     # display (an exact inch conversion like 9.525) can pass decimals=3. The
     # package's drawing_unit picks the SDK's inch or mm document units.
-    unit = "mm" if package_name is None else package_drawing_unit(package_name)
+    unit = package_drawing_unit(package_name)
     if unit == "in":
         _sw_drawing.set_units_inch(adapter, decimals=decimals)
     else:
@@ -919,16 +920,16 @@ async def finalize_drawing(
     the package declares (``_drawing_package_unit.assert_sheet_prints_unit``:
     document units, UNIT cell, linked TOL_* values).  An undeclared or absent
     package is proved too when its linked model carries the inch TOL_* rows,
-    so an inch model can never ship on a sheet that forgot its package.  A
+    so an inch model can never ship on a sheet that forgot its package.  The
+    document has one unit, so every sheet must agree on its proof
+    (``document_proof_unit``): an unproved sheet beside a proved one fails.  A
     package that declares its unit also proves the SAVED file after close
     (``prove_saved_drawing_units``: read-only reopen, the same sheet proof,
     closed unsaved with its bytes unchanged); legacy sheets skip the reopen.
     """
     if checkpoint is not None and not callable(checkpoint):
         raise TypeError("drawing checkpoint must be callable")
-    declared_unit = (
-        None if package_name is None else declared_package_drawing_unit(package_name)
-    )
+    declared_unit = declared_package_drawing_unit(package_name)
     drawing_model = adapter.currentModel
     ddoc = _early_bound(
         drawing_model, "IDrawingDoc"
@@ -976,8 +977,9 @@ async def finalize_drawing(
     # real view after all views exist, validate the linked model's tolerance and
     # current-release Revision properties, and hold every sheet to the same ASME B
     # contract. A sheet of a package that declares its unit, or whose model
-    # carries the inch rows, is also proved to print that unit.
-    proved_unit: DrawingUnit | None = None
+    # carries the inch rows, is also proved to print that unit; the document
+    # has one unit, so every sheet must agree (document_proof_unit).
+    sheet_units: dict[str, DrawingUnit | None] = {}
     for sheet_name in sheet_names:
         if not ddoc.ActivateSheet(sheet_name):
             raise RuntimeError(f"failed to activate drawing sheet {sheet_name!r}")
@@ -1082,9 +1084,8 @@ async def finalize_drawing(
                 TITLE_BLOCK_COPYRIGHT_PROPERTY,
             ),
         )
-        proof_unit = declared_unit
-        if proof_unit is None and carries_inch_rows(linked_properties):
-            proof_unit = "in"
+        proof_unit = sheet_proof_unit(declared_unit, linked_properties)
+        sheet_units[sheet_name] = proof_unit
         if proof_unit is not None:
             assert_sheet_prints_unit(
                 drawing_model,
@@ -1094,7 +1095,7 @@ async def finalize_drawing(
                 linked_model=linked_model,
                 linked_properties=linked_properties,
             )
-            proved_unit = proof_unit
+    proved_unit = document_proof_unit(sheet_units)
 
     # Explicit recipe-requested cleanup remains sheet-scoped. When a standard
     # Isometric view is present, the finalizer owns its high-quality Shaded With

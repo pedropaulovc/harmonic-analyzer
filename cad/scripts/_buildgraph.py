@@ -1868,8 +1868,9 @@ def _data_literals(text: str) -> tuple[str, ...]:
 # per-assembly contracts, for any closure reaching ``_assembly_contract``),
 # ``"**"`` (whole config, the fallback). dodo.py expands these, narrowing
 # ``"parts/*"``/``"title_block"`` per task: a part to its OWN row, an assembly
-# to the rows it actually stamps; and ``"assemblies/*"`` to an assembly's (or
-# an assembly drawing's) OWN contract (see _config_deps in dodo.py).
+# to the rows it actually stamps; and ``"assemblies/*"`` to an assembly's own
+# contract, or to a drawing's own package contract when its closure reads no
+# other (``reads_foreign_assembly_contracts``; see _config_deps in dodo.py).
 
 # Accessors that read a FIXED file (no argument resolution needed). Derived from
 # _config.py; kept in sync by test_config_accessor_coverage. Note active_count
@@ -2170,6 +2171,31 @@ def assembly_contract_files() -> list[str]:
     expansion for a consumer that is not one assembly's task."""
     d = ASSEMBLY_CONTRACT_DIR
     return sorted(str(p.resolve()) for p in d.glob("*.yaml")) if d.is_dir() else []
+
+
+# The modules that import ``_assembly_contract`` but read ONLY the contract of
+# the drawing's own package: ``_drawing_package_unit`` resolves the
+# ``package_name`` its draw script passes, which test_dodo_recipe pins to the
+# drawing's own package.  Every OTHER importer may read any contract -- the top
+# assembly sheet prints every BOM subassembly's number, and ``_assembly``
+# takes the assembly name from its caller -- so a drawing closure holding one
+# keeps the whole contract family.  Listing a module here is a claim about its
+# reads; review it like ``_DRAWING_OWN_ROW_READERS`` in test_dodo_recipe.
+OWN_PACKAGE_CONTRACT_READERS = frozenset({"_drawing_package_unit"})
+
+
+def reads_foreign_assembly_contracts(script: Path) -> bool:
+    """True when ``script``, or a module in its import closure other than an
+    :data:`OWN_PACKAGE_CONTRACT_READERS` entry, imports ``_assembly_contract``
+    itself and so may read a contract other than its own package's."""
+    contract_module = ASSEMBLY_CONTRACT_PY.stem  # a top-level local module
+    script = _resolved(Path(script))
+    for source in (script, *(Path(path) for path in module_deps_of(script))):
+        if source.stem in OWN_PACKAGE_CONTRACT_READERS:
+            continue
+        if contract_module in _direct_local_imports(_resolved(source)):
+            return True
+    return False
 
 
 def part_row_files(dashed_name: str) -> list[str]:

@@ -135,6 +135,7 @@ from _buildgraph import (  # noqa: E402
     part_stems,
     parts_registry_files,
     read_source,
+    reads_foreign_assembly_contracts,
     reads_title_block_geometry,
     references_of,
     script_for,
@@ -1129,17 +1130,26 @@ def _expand_title_block_token(kind: str | None, script: Path) -> list[str]:
     return [str(_resolved(CONFIG_DIR / "title_block.yaml"))]
 
 
-def _expand_assembly_contracts_token(stem: str | None, kind: str | None) -> list[str]:
+def _expand_assembly_contracts_token(
+    stem: str | None, kind: str | None, script: Path
+) -> list[str]:
     """Per-task expansion of the ``"assemblies/*"`` token (any closure reaching
     ``_assembly_contract``). An ASSEMBLY task reads only its OWN contract -- the
     build activates its own stem -- so a sibling's seed or free-stem edit never
-    re-keys it. A DRAWING reads only its own package's contract, for the
-    package's ``drawing_unit`` (``_drawing_package_unit``): an assembly-sourced
-    sheet keeps its assembly's file, a part sheet none.  Any other consumer
-    keeps the whole family (conservative)."""
+    re-keys it. A DRAWING whose closure reaches the contracts only through
+    ``_drawing_package_unit`` reads only its own package's contract (its
+    ``drawing_unit``): an assembly-sourced sheet keeps its assembly's file, a
+    part sheet none.  A drawing whose closure reads any other contract
+    (``reads_foreign_assembly_contracts``: the top sheet's BOM prints every
+    subassembly's number) keeps the whole family, as does any other consumer
+    (conservative)."""
     if kind == "assembly" and stem is not None:
         return [assembly_contract_file(stem)]
-    if kind == "drawing" and stem is not None:
+    if (
+        kind == "drawing"
+        and stem is not None
+        and not reads_foreign_assembly_contracts(script)
+    ):
         own = assembly_contract_file(stem)
         return [own] if Path(own).is_file() else []
     return assembly_contract_files()
@@ -1169,7 +1179,7 @@ def _config_deps(script, stem: str | None = None, kind: str | None = None) -> li
         elif tok == "title_block":
             out.update(_expand_title_block_token(kind, script))
         elif tok == ASSEMBLY_CONTRACTS_TOKEN:
-            out.update(_expand_assembly_contracts_token(stem, kind))
+            out.update(_expand_assembly_contracts_token(stem, kind, script))
         else:
             out.add(str(_resolved(CONFIG_DIR / tok)))
     return sorted(out)
@@ -3709,6 +3719,7 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # One drawing_unit declaration per package selects the TOL_* stamps,
         # document units, tolerance precision and the finished-sheet proof.
         SCRIPTS_DIR / "test_drawing_units.py",
+        SCRIPTS_DIR / "test_drawing_source_guard.py",
         # A fresh detail view's projection is read behind the view barrier
         # and settled within a time budget, not a read count (#1336).
         SCRIPTS_DIR / "test_drawing_detail_projection.py",

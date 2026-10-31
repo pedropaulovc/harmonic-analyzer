@@ -61,11 +61,15 @@ def _registry_row(part_name: str) -> dict[str, Any] | None:
         return None
 
 
+def _row_drawing_unit(part_name: str, row: dict[str, Any] | None) -> DrawingUnit:
+    return drawing_unit(f"parts/{_registry_name(part_name)}", row)
+
+
 def part_drawing_unit(part_name: str) -> DrawingUnit:
     """The unit ``part_name``'s sheet prints: its registry row's
     ``drawing_unit``, else the legacy millimetre (an unregistered part, or a
     row that declares none).  A value other than ``mm``/``in`` raises."""
-    return drawing_unit(f"parts/{_registry_name(part_name)}", _registry_row(part_name))
+    return _row_drawing_unit(part_name, _registry_row(part_name))
 
 
 def part_properties(part_name: str) -> dict[str, str]:
@@ -94,8 +98,7 @@ def part_properties(part_name: str) -> dict[str, str]:
     # Title-block general tolerances (title_block.yaml) — read by the drawing
     # template's title block via $PRPSHEET, so EVERY part carries them,
     # registered in the parts registry or not.
-    unit = drawing_unit(f"parts/{_registry_name(part_name)}", reg)
-    props.update(title_block_properties(unit=unit))
+    props.update(title_block_properties(unit=_row_drawing_unit(part_name, reg)))
     if reg is None:
         return props
     field_map = {

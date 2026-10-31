@@ -16,9 +16,6 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable
-import hashlib
-from pathlib import Path
 import sys
 from typing import Any
 
@@ -40,6 +37,12 @@ from _drawing_common import (
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_finish import add_surface_finish
+from _drawing_source_guard import (
+    SourceCheck,
+    assert_source_closed,
+    capture_clean_source,
+    source_checkpoint,
+)
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
@@ -155,58 +158,6 @@ DIMENSION_CALLOUTS = {
 # The sheet only reads them back.
 
 
-def _source_sha256() -> str:
-    with SOURCE.open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
-
-
-def _clean_source_checkpoint(source_model: Any) -> Callable[[str], None]:
-    """The sheet never modifies its source part (#290 native acceptance).
-
-    Read before the sheet presents the part: the open document IS ``SOURCE``
-    and is clean (``GetSaveFlag`` False), and the file's SHA-256.  Every
-    ``new_project_drawing``/``finalize_drawing`` checkpoint (new document,
-    each artifact save, the drawing close) re-hashes the file and refuses any
-    change.  The part's in-memory save flag after views exist is recorded, not
-    refused -- a view's camera can set it without a write, and the bytes are
-    the persistence proof -- and after the attempted close the old handle is
-    never dereferenced.
-    """
-    model = _early_bound(source_model, "IModelDoc2")
-    opened = Path(str(model.GetPathName())).resolve()
-    if opened != SOURCE.resolve():
-        raise RuntimeError(f"{PART_STEM}: open document {opened} is not {SOURCE}")
-    expected = _source_sha256()
-    save_flag = model.GetSaveFlag()
-    _telemetry.event(
-        "drawing.source_clean",
-        phase="before_presentation",
-        sha256=expected,
-        save_flag=repr(save_flag),
-    )
-    if save_flag is not False:
-        raise RuntimeError(
-            f"{PART_STEM}: source part reports save flag {save_flag!r} before the "
-            "sheet presents it"
-        )
-
-    def checkpoint(phase: str) -> None:
-        current = _source_sha256()
-        closed = phase == "after_drawing_close"
-        flag = "not read" if closed else repr(model.GetSaveFlag())
-        _telemetry.event(
-            "drawing.source_clean", phase=phase, sha256=current, save_flag=flag
-        )
-        if current != expected:
-            raise RuntimeError(
-                f"{PART_STEM}: {SOURCE.name} changed on disk at {phase} "
-                f"({expected[:12]} -> {current[:12]}); the drawing must never save "
-                "its source part"
-            )
-
-    return checkpoint
-
-
 def _limit_witness_lines(
     adapter: Any, annotations: list[Any], names: set[str], length: float
 ) -> None:
@@ -273,13 +224,21 @@ async def build(adapter: Any) -> dict[str, str]:
             "Isometric View Note",
         ),
     )
-    source_checkpoint = _clean_source_checkpoint(adapter.currentModel)
+    # #290 native acceptance: the sheet never modifies its source part.  The
+    # part's in-memory save flag after views exist is recorded, not refused --
+    # a view's camera can set it without a write, and the bytes are the
+    # persistence proof.
+    source = capture_clean_source(
+        SOURCE, adapter.currentModel, label=PART_STEM,
+        check=SourceCheck.TRANSIENT_VIEW_STATE,
+    )
+    guard = source_checkpoint(source)
     drawing_model, sheet = new_project_drawing(
         adapter,
         property_view=PART_STEM,
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        checkpoint=source_checkpoint,
+        checkpoint=guard,
         package_name=PACKAGE,
     )
     stamp_drawing_summary(
@@ -374,7 +333,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to label rotated cam set-screw end view")
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.205)
 
-    return await finalize_drawing(
+    artifacts = await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Pinion Lift Cam Manufacturing Drawing",
@@ -384,9 +343,11 @@ async def build(adapter: Any) -> dict[str, str]:
         # dimension's curated callout already releases the same thread.
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=1,
-        checkpoint=source_checkpoint,
+        checkpoint=guard,
         package_name=PACKAGE,
     )
+    assert_source_closed(source, stage="after finalize")
+    return artifacts
 
 
 def _parse_args() -> argparse.Namespace:

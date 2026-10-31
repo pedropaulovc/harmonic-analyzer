@@ -46,6 +46,12 @@ from _drawing_dimensions import assert_imported_precision
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _drawing_sheet_region import sheet_drawable_region
+from _drawing_source_guard import (
+    SourceCheck,
+    assert_source_closed,
+    capture_clean_source,
+    source_checkpoint,
+)
 from _drawing_view_display import set_hidden_lines_removed
 from _purchased_fastener_drawing import (
     _box,
@@ -358,15 +364,26 @@ async def build(adapter: Any) -> dict[str, str]:
     if SPEC.source_kind != "part" or not source.is_file():
         raise FileNotFoundError(f"source purchased part is missing: {source}")
     check(f"open {PART_STEM} source", await adapter.open_model(str(source)))
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    if Path(model.GetPathName()).resolve() != source.resolve():
-        raise RuntimeError(f"opened purchased part is not {source}")
+    # Prove both native cleanliness and unchanged source bytes. Whether this
+    # rail's reference dressing dirties its model must be measured on the farm,
+    # not inferred from another purchased sheet's presentation behavior.
+    clean_source = capture_clean_source(
+        source,
+        adapter.currentModel,
+        label=PART_STEM,
+        check=SourceCheck.NATIVE_CLEAN,
+    )
+    guard = source_checkpoint(clean_source)
     properties = read_required_properties(
-        model, SOURCE_PROPERTIES, required=SOURCE_PROPERTIES
+        clean_source.model, SOURCE_PROPERTIES, required=SOURCE_PROPERTIES
     )
 
     draw, sheet = new_project_drawing(
-        adapter, layout=SPEC.layout, scale=SHEET_SCALE, package_name=PACKAGE
+        adapter,
+        layout=SPEC.layout,
+        scale=SHEET_SCALE,
+        package_name=PACKAGE,
+        checkpoint=guard,
     )
     title_block_notes = _purchased_title_block(
         adapter,
@@ -496,15 +513,18 @@ async def build(adapter: Any) -> dict[str, str]:
         )
 
     paths = SPEC.outputs
-    return await finalize_drawing(
+    artifacts = await finalize_drawing(
         adapter,
         DrawingOutputs(slddrw=paths["slddrw"], pdf=paths["pdf"], png=paths["png"]),
         layout=SPEC.layout,
         pdf_title=title,
         scale=SHEET_SCALE,
         settled_checks=(lambda: _assert_receipt_dimensions(adapter, source), number_fit),
+        checkpoint=guard,
         package_name=PACKAGE,
     )
+    assert_source_closed(clean_source, stage="after finalize")
+    return artifacts
 
 
 def _parse_args() -> argparse.Namespace:
