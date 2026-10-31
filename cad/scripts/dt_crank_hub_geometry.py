@@ -74,7 +74,7 @@ HUB_SEAT_LENGTH = ARM_THICKNESS
 # locational-interference fit); its line-to-line end is raised to 0.010
 # because the hub is turned to a measured bore, not drawn from stock.  The
 # model seats line-to-line; the shoulder land below reads the largest seat.
-SEAT_PRESS_INTERFERENCE = (0.010, 0.030)  # diametral, mm (min, max)
+SEAT_PRESS_INTERFERENCE = (0.01016, 0.03048)  # diametral (min, max): .0004-.0012 in
 # CONTRACT-crank MHA-DT-31: the barrel behind the arm (observed Ø≈20, review
 # Q4) is turned to its own size, narrower than the 1-in arm, and the hub
 # runs 17.2 from the arm shoulder to a flat rear face 0.7 clear of the

@@ -52,7 +52,7 @@ from _drawing_dimensions import (
 )
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_attached_note
 from _drawing_leaders import (
     assert_leaders_clear,
@@ -63,6 +63,8 @@ from _drawing_leaders import (
 )
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
+from _supplier_dimensions import supplier_reference_dimension
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
@@ -93,6 +95,8 @@ from dt_crank_arm_spec import (
     HANDLE_PIVOT_HOLE_SPEC,
     HUB_SEAT_DIA,
     REFERENCE_DIMENSIONS,
+    STOCK_FRACTION_DENOMINATOR,
+    STOCK_FRACTION_DIMENSIONS,
 )
 
 
@@ -116,8 +120,8 @@ _ANCHOR_HOLE_DIA = blind_cut_dia_mm(ANCHOR_HOLE_SPEC)
 
 SHEET_SCALE = (2.0, 1.0)
 
-# Sheet layout (meters).  At 2:1 the 100.4-mm overall arm remains clear of the
-# title block, and the side view shows the 25.4 x 8 stock section.  The
+# Sheet layout (meters).  At 2:1 the 3.95-in overall arm remains clear of the
+# title block, and the side view shows the 1 x 5/16 stock section.  The
 # principal view sits so its lower edge keeps the dimension rows' height below
 # it; the three callouts over the hub end (seat, seam, anchor tap) stand in a
 # row above it so no leader crosses another.
@@ -236,19 +240,19 @@ FRONT_KEEP = {
     # its leader would run along the witness Y's extension line from the centre.
     "BossRadius": (0.057, 0.106),
     # Below and right of the handle end, clear of the Width row and the
-    # 75.0 station row; its leader lands on the lower-right quarter of the arc.
+    # pivot station row; its leader lands on the lower-right quarter of the arc.
     "EndRadius": (0.268, 0.100),
     "HubSeatDia": (0.048, 0.225),
 }
 # The hub seat's leader lands on the near rim, upper left of the bore: at
 # 0.054 with both arrows it ran down through the bore centre to the far
-# rim and crossed R12.7's leader there (eye pass of w15-301f4bf4e; the
-# 2026-09-23 review had flagged the far-side landing). Nothing but R12.7
+# rim and crossed R.50's leader there (eye pass of w15-301f4bf4e; the
+# 2026-09-23 review had flagged the far-side landing). Nothing but R.50
 # itself may come within half the seat radius of the centre.
 BORE_CENTER = (_sheet_x(0.0), FRONT_CENTER[1])
 HUB_SEAT_KEEP_OUT = HUB_SEAT_DIA * SHEET_SCALE[0] / 4000.0
 # Where each leader must END, from the bore centre (sheet metres): the hub
-# seat on its rim, R12.7 at the centre or on its arc. A reading outside the
+# seat on its rim, R.50 at the centre or on its arc. A reading outside the
 # band means the segments are not sheet metres, and the clear check fails.
 HUB_SEAT_LANDING = (HUB_SEAT_KEEP_OUT, 3.0 * HUB_SEAT_KEEP_OUT)
 BOSS_RADIUS_LANDING = (0.0, 1.2 * HALF_WIDTH * SHEET_SCALE[0] / 1000.0)
@@ -279,7 +283,7 @@ FIDUCIAL_EDGE_PICK = (
 )
 # Under the hub-seat block, its right end left of the mark: the leader runs
 # down and right to the rim, outside the FiducialX ordinate's lines and text
-# (iter 1 of the 2026-10-27 fix: from right of the mark it ran through 7.9).
+# (iter 1 of the 2026-10-27 fix: from right of the mark it ran through its text).
 FIDUCIAL_CALLOUT_XY = (0.016, 0.205)
 # The overall's pick on the handle-end arc: 2 mm below the axis, on the arc.
 _END_PICK_DY_SHEET = 0.004
@@ -292,11 +296,13 @@ RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 DIMENSION_CALLOUTS = {"HubSeatDia": HUB_SEAT_CALLOUT}
 # swDimensionArrowsSide_e.swDimArrowsInside, set rather than left to the
 # document's smart arrows (draw_dt_pinion_arbor's form): left smart, the two
-# 7.9 ordinates drew their arrows outside, and the X's tails ran under the
+# ordinates drew their arrows outside, and the X's tails ran under the
 # punch-mark and hub-seat leaders (machinist review of the 2026-10-27 fix's
 # farm iter 2, rule 14).
 ARROWS_INSIDE = ("FiducialX", "FiducialY")
 _DIM_ARROWS_INSIDE = 0
+# Both taps' native callouts print their tap drill .XXX.
+TAP_CALLOUT_PRECISION = {"hw-tapdrldia": 3}
 
 
 def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
@@ -317,9 +323,9 @@ def _arrows_inside(adapter: Any, annotations: list[Any]) -> None:
 
 
 def _hub_seat_leader_clear(adapter: Any, annotations: list[Any]) -> None:
-    """Land the hub seat bore on its near rim, clear of R12.7.
+    """Land the hub seat bore on its near rim, clear of R.50.
 
-    The bore is made first and keeps the title block's .X band: its limits
+    The bore is made first and keeps the title block's .XX band: its limits
     are the U29 cheek's real limits (crank_hub_geometry).  MHA-DT-31 is turned
     to suit it for a light press, and the note under the value states that
     fit; the band bounds the bore, the note the fit (drawing-guidelines.md rule 4 (tighten only for function, and name the mate): "any
@@ -379,7 +385,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -418,12 +428,24 @@ async def build(adapter: Any) -> dict[str, str]:
     imported_annotations = [*front_annotations, *right_annotations]
     set_dimension_callouts(adapter, imported_annotations, DIMENSION_CALLOUTS)
     # The part authored every displayed decimal place.  The hub seat bore
-    # is a one-place .X size: MHA-DT-31 is turned to suit it.
+    # is a two-place .XX size: MHA-DT-31 is turned to suit it.
     assert_imported_precision(adapter, imported_annotations, DRAWING_PRECISION_BY_NAME)
     # The thickness is the supplied stock's (the stock note governs it).
     for name in sorted(REFERENCE_DIMENSIONS):
         set_reference_dimension(
             adapter, _named(adapter, right_annotations, name), label="arm stock thickness"
+        )
+    # The bar's as-rolled width: the supplier's fraction, its tolerance governs.
+    for name, value_mm in STOCK_FRACTION_DIMENSIONS.items():
+        annotation = _early_bound(_named(adapter, front_annotations, name), "IAnnotation")
+        supplier_reference_dimension(
+            adapter,
+            annotation.GetSpecificAnnotation(),
+            label=f"arm stock {name}",
+            units="in",
+            precision=0,
+            expected_mm=value_mm,
+            fraction_denominator=STOCK_FRACTION_DENOMINATOR,
         )
     _arrows_inside(adapter, front_annotations)
     _hub_seat_leader_clear(adapter, front_annotations)
@@ -455,8 +477,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="anchor tap",
     )
     _omit_title_block_thread_class(anchor_callout)
+    set_hole_callout_precision(anchor_callout, TAP_CALLOUT_PRECISION, label="anchor tap")
     # The true overall (boss extreme to handle-end extreme), as a reference
-    # below the 75.0 station so nobody saws the stock a radius short
+    # below the pivot station so nobody saws the stock a radius short
     # (Harvey #25).  Both ends are arcs, each picked on its outer flank and
     # re-anchored to its far extreme below.
     overall = add_edge_dimension(
@@ -511,6 +534,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="handle pivot tap",
     )
     _omit_title_block_thread_class(pivot_callout)
+    set_hole_callout_precision(
+        pivot_callout, TAP_CALLOUT_PRECISION, label="handle pivot tap"
+    )
     _append_callout_rows(pivot_callout, PIVOT_TAP_ROWS)
     pivot_annotation = _early_bound(pivot_callout, "IDisplayDimension").GetAnnotation()
     set_near_side_diameter(pivot_annotation, "handle pivot tap")

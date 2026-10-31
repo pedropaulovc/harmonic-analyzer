@@ -51,16 +51,16 @@ def test_arm_shoulder_keeps_its_land_over_the_largest_matched_seat() -> None:
     seat_max = (
         geometry.HUB_SEAT_DIA
         + band[dt_crank_hub_spec.DRAWING_PRECISION_BY_NAME["SeatDia"]]
-        + 0.030
+        + 0.03048
     )
-    assert seat_max == pytest.approx(20.23)
+    assert seat_max == pytest.approx(20.23048)
     barrel_places = dt_crank_hub_spec.DRAWING_PRECISION_BY_NAME["BarrelDia"]
     barrel_min = geometry.HUB_BARREL_DIA - band[barrel_places]
     land = (barrel_min - seat_max) / 2.0 - 2.0 * edge_break
     assert land >= edge_break
     assert geometry.HUB_SHOULDER_LAND_WORST_MM == pytest.approx(land)
     assert geometry.SHOULDER_LAND_WORST_MIN == edge_break
-    assert geometry.SEAT_PRESS_INTERFERENCE[1] == 0.030
+    assert geometry.SEAT_PRESS_INTERFERENCE[1] == 0.03048  # .0012 in
     # The same barrel at the title block's .X leaves a 0.11 sliver.
     with pytest.raises(AssertionError, match="shoulder land 0.110"):
         geometry.shoulder_land(geometry.HUB_BARREL_DIA - one_place, seat_max)

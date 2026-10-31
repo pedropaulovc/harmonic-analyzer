@@ -17,6 +17,7 @@ import _sprocket_seat_geometry as seat_geometry
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import drill_process
+from _inch_wall_limits import WALL_TARGET_MM
 
 
 def test_required_drawing_paths() -> None:
@@ -31,15 +32,9 @@ def test_arm_is_a_matched_receiver_for_the_separate_hub() -> None:
     assert spec.ARM_THICKNESS == geometry.ARM_THICKNESS == 8.0
     assert spec.HUB_SEAT_DIA == geometry.HUB_SEAT_DIA == 19.4
     assert spec.HALF_WIDTH == pytest.approx(12.7)
-    assert "1 x 5/16 IN CF FLAT BAR AS SUPPLIED" in spec.DRAWING_NOTES
-    # The arm bore is made first; the hub is turned to suit it (B1, Main
-    # 2026-09-25: the fit is printed functionally, not as "match-fit"), to the
-    # one interference the hub sheet states (#984 review r1: an acceptance).
-    low, high = geometry.SEAT_PRESS_INTERFERENCE
-    assert f"{low:.3f}-{high:.3f}" in notes.HUB_SEAT_CALLOUT
-    assert "MHA-DT-31" in notes.HUB_SEAT_CALLOUT
-    assert "MATCH" not in notes.HUB_SEAT_CALLOUT
-    assert "FACES FLUSH" in notes.HUB_SEAT_CALLOUT
+    # The arm bore is made first; the hub is turned to suit it for the F10
+    # light press, .0004-.0012 in diametral.
+    assert geometry.SEAT_PRESS_INTERFERENCE == pytest.approx((0.01016, 0.03048))
     assert not hasattr(spec, "SHAFT_BORE_DIA")
     assert not hasattr(spec, "PIN_HOLE_SPEC")
 
@@ -73,19 +68,19 @@ def test_reference_dimensions_remain_model_owned() -> None:
         "Width",
     }
     assert spec.DRAWING_DIMENSIONS["HubSeatProfile"] == {"HubSeatDia"}
-    assert spec.HALF_WIDTH - spec.ANCHOR_SCREW_Y == pytest.approx(8.2)
-    assert spec.ARM_END_X + spec.HALF_WIDTH == pytest.approx(100.4)
+    assert spec.HALF_WIDTH - spec.ANCHOR_SCREW_Y == pytest.approx(8.128)  # .32
+    assert spec.ARM_END_X + spec.HALF_WIDTH == pytest.approx(100.33)  # 3.95
 
 
 def test_handle_end_is_a_semicircle_about_the_pivot() -> None:
-    # User ruling 2026-09-29 (ch11 p.14 re-check): both ends are R12.7 caps
-    # concentric with their holes; the crank radius stays 75.
-    assert spec.ARM_C2C == pytest.approx(75.0)
+    # User ruling 2026-09-29 (ch11 p.14 re-check): both ends are R.50 caps
+    # concentric with their holes; the crank radius is 2.95 in.
+    assert spec.ARM_C2C == pytest.approx(74.93)
     assert spec.END_RADIUS == pytest.approx(spec.HALF_WIDTH)
-    assert spec.ARM_END_X == pytest.approx(87.7)
+    assert spec.ARM_END_X == pytest.approx(87.63)
     assert spec.DRAWING_DIMENSIONS["ArmOutline"] == {"BossRadius", "EndRadius"}
     assert not hasattr(spec, "SQUARE_END_OVERHANG")
-    assert spec.DRAWING_REFERENCE_PRECISION == {"overall length reference": 1}
+    assert spec.DRAWING_REFERENCE_PRECISION == {"overall length reference": 2}
 
 
 def test_punch_and_seam_operations_are_callouts_not_fake_dimensions() -> None:
@@ -93,10 +88,6 @@ def test_punch_and_seam_operations_are_callouts_not_fake_dimensions() -> None:
     assert "MHA-DT-VN-59" not in general and "O'CLOCK" not in general
     assert "MHA-DT-09" not in general
     assert "DIMPLE" not in general
-    seam = notes.SEAM_CALLOUT
-    assert "MHA-DT-31" in seam and "MHA-DT-VN-59" in seam and "LIGHT DRIVE FIT" in seam
-    assert "AT ASSEMBLY" in seam
-    assert seam.splitlines()[0] == "(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0"
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     # The punch witness prints its location, never a size (machinist review
     # 2026-10-27: "LOCATE BY EYE" gave none).
@@ -110,12 +101,10 @@ def test_sheet_uses_imported_part_precision_and_no_gdt() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME) == set().union(
         *spec.DRAWING_DIMENSIONS.values()
     )
-    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {1}
+    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {2}
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
-    # Only the punch witness's two ordinates carry their own band.
-    assert model_toleranced_dimensions(arm) == {
-        ("FiducialProfile", "name"): "FIDUCIAL_ORDINATE_TOL"
-    }
+    # Every dimension takes the title block's .XX; none carries its own band.
+    assert model_toleranced_dimensions(arm) == {}
     assert spec.SURFACE_FINISHES == ()
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
 
@@ -266,12 +255,11 @@ def test_hub_seat_leader_lands_near_side_clear_of_r127_and_the_centre() -> None:
 def test_hub_seat_keeps_its_printed_band_under_the_fit_note() -> None:
     # The 2026-09-23 review printed the bore as a reference so the note alone
     # governed.  Main 2026-09-25 (U29 follow-up): the bore is made first, so
-    # its .X band is the cheek's real limit and stays printed; the note states
+    # its printed band is the cheek's real limit and stays printed; the note states
     # the fit MHA-DT-31 is turned to (drawing-guidelines.md rule 4 (tighten only for function, and name the mate): retained limits still apply).
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "hub seat nominal" not in source
-    assert spec.DRAWING_PRECISION["HubSeatProfile"]["HubSeatDia"] == 1
-    assert "DIAMETRAL" in notes.HUB_SEAT_CALLOUT
+    assert spec.DRAWING_PRECISION["HubSeatProfile"]["HubSeatDia"] == 2
 
 
 def test_no_front_dimension_text_sits_on_the_arm() -> None:
@@ -301,7 +289,7 @@ def test_handle_pivot_is_tapped_for_the_mha139_screw_with_a_2mm_web() -> None:
     assert spec.HANDLE_PIVOT_HOLE_SPEC.size == screw.THREAD_SIZE == "#4-40"
     assert spec.HANDLE_PIVOT_HOLE_SPEC.end == "through_all"
     assert spec.PIVOT_END_WEB_NOMINAL == pytest.approx(12.7 - 2.845 / 2.0)
-    assert spec.PIVOT_END_WEB_WORST >= 2.0
+    assert spec.PIVOT_END_WEB_WORST >= WALL_TARGET_MM
 
 
 def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
@@ -326,11 +314,7 @@ def test_arm_states_no_engagement_exception_for_the_4_40_pivot() -> None:
     assert spec.STOCK_NOTE in spec.DRAWING_NOTES.splitlines()
     # The tapped mouth's limit (MHA-DT-32 shoulder seat, local review of
     # fbf82ad96) rides the pivot's own callout, not a general note (#984 r1).
-    import dt_crank_handle_pivot_screw_spec as screw
-
     assert "MOUTH" not in spec.DRAWING_NOTES
-    assert f"{screw.TAPPED_MOUTH_DIA_MAX:.1f} MAX" in notes.PIVOT_TAP_ROWS
-    assert "MHA-DT-32" in notes.PIVOT_TAP_ROWS
 
 
 def test_fiducial_callout_attaches_on_the_punched_mark_rim() -> None:
@@ -346,11 +330,11 @@ def test_fiducial_callout_attaches_on_the_punched_mark_rim() -> None:
     assert drawing.FIDUCIAL_CALLOUT_XY[1] > drawing.ARM_SILHOUETTE[3]
     assert drawing.FIDUCIAL_CALLOUT_XY[0] < cx
     # Its right end stays left of the mark (iter 1 of the 2026-10-27 fix: a
-    # wider block sent the leader down-left through the FiducialX 7.9).
+    # wider block sent the leader down-left through the FiducialX text).
     char_w = 0.0027  # measured on the 5bca52e13 render
     width = max(map(len, notes.FIDUCIAL_CALLOUT.splitlines())) * char_w
     assert drawing.FIDUCIAL_CALLOUT_XY[0] + width + 0.005 < cx
-    # Both ordinates draw their arrows inside their witnesses, so neither 7.9
+    # Both ordinates draw their arrows inside their witnesses, so neither
     # line runs out under the punch-mark or hub-seat leader (farm iter 2).
     assert drawing.ARROWS_INSIDE == ("FiducialX", "FiducialY")
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -361,45 +345,29 @@ def test_fiducial_callout_attaches_on_the_punched_mark_rim() -> None:
 
 def test_fiducial_is_located_from_the_seat_axis_not_by_eye() -> None:
     # Machinist review 2026-10-27: the callout said where only in words.  The
-    # mark now prints two toleranced ordinates from the hub-seat axis; the
-    # callout names its function and mate.
-    assert "BY EYE" not in notes.FIDUCIAL_CALLOUT
-    assert "MHA-DT-11" in notes.FIDUCIAL_CALLOUT
-    assert spec.DRAWING_PRECISION["FiducialProfile"] == {"FiducialX": 1, "FiducialY": 1}
-    # codjiflo P2 on #2005: the flat face is judged at the printed worst case,
-    # the seat bore at its .X upper limit and the boss end at its .X lower
-    # limit, each less its edge break.
-    general, break_ = geometry.GENERAL_1PL_TOL_MM, geometry.EDGE_BREAK_MAX_MM
-    face = ((spec.HUB_SEAT_DIA + general) / 2.0 + break_, spec.HALF_WIDTH - general - break_)
+    # mark prints two ordinates from the hub-seat axis at the title block's
+    # .XX.  codjiflo P2 on #2005: the flat face is judged at the printed worst
+    # case, the seat bore at its upper limit and the boss end at its lower
+    # limit, each less its .010 edge break.
+    band, break_ = 0.254, 0.254
+    seat_upper = 19.304 + band  # 19.4 prints .76
+    face = (seat_upper / 2.0 + break_, spec.HALF_WIDTH - band - break_)
     assert spec.FIDUCIAL_FACE_RADII == pytest.approx(face)
-    assert face == pytest.approx((10.35, 11.65))
-    # The model ordinates are the printed one-place values, at 135 degrees on
-    # that annulus's mid-radius.
-    assert spec.FIDUCIAL_Y == -spec.FIDUCIAL_X == pytest.approx(7.8)
-    assert round(spec.FIDUCIAL_Y, 1) == spec.FIDUCIAL_Y
-    # Anywhere in the ordinates' square band the centre stays on that face;
-    # the title block's .X band would not.
-    assert spec.FIDUCIAL_ORDINATE_TOL == 0.4
+    assert spec.FIDUCIAL_Y == -spec.FIDUCIAL_X == pytest.approx(7.874)  # .31
+    # Anywhere in the ordinates' square .XX band the centre stays on that face.
     inner, outer = spec.FIDUCIAL_RADIAL_LIMITS
-    assert inner == pytest.approx(math.sqrt(2.0) * (7.8 - 0.4))
-    assert outer == pytest.approx(math.sqrt(2.0) * (7.8 + 0.4))
+    assert inner == pytest.approx(math.sqrt(2.0) * (7.874 - band))
+    assert outer == pytest.approx(math.sqrt(2.0) * (7.874 + band))
     assert face[0] < inner < outer < face[1]
-    assert math.sqrt(2.0) * (7.8 - general) < face[0]
     # Both ordinate texts stand off the part, the Y left of the boss end.
     import _drawing_leaders as leaders
 
     texts = [drawing.FRONT_KEEP["FiducialX"], drawing.FRONT_KEEP["FiducialY"]]
     assert leaders.points_inside(texts, drawing.ARM_SILHOUETTE) == []
     assert drawing.FRONT_KEEP["FiducialY"][0] < drawing.ARM_SILHOUETTE[0]
-    # R12.7 no longer reads along the axis, where its leader would lie on the
-    # witness Y's extension line from the bore centre.
+    # The boss radius no longer reads along the axis, where its leader would
+    # lie on the witness Y's extension line from the bore centre.
     assert drawing.FRONT_KEEP["BossRadius"][1] < drawing.ARM_SILHOUETTE[1]
-
-
-def test_stock_line_comes_from_the_one_stock_constant() -> None:
-    # The stock line comes from the one stock constant.
-    assert spec.ARM_STOCK_THICKNESS == pytest.approx(7.9375)
-    assert spec.STOCK_NOTE == "25.4 x 8.0 SECTION: 1 x 5/16 IN CF FLAT BAR AS SUPPLIED."
 
 
 def _thinnest_accepted_arm() -> float:

@@ -1,12 +1,12 @@
 r"""Build crank arm MHA-DT-06 for the separate through-hub construction.
 
-The arm is a plain 8-mm plate with an O19.4 match-fitted MHA-DT-31 seat.  It no
+The arm is a plain 5/16-in bar with a match-fitted MHA-DT-31 seat.  It no
 longer mounts directly on the crankshaft and no longer carries the MHA-DT-09
 cross-hole.  A blind axial seam groove enters the outboard face at six o'clock,
 parallel to the shaft, and accepts MHA-DT-VN-59 for half the arm thickness.  The
 outboard witness is a small punched representation, not a machined dimple.
 
-Layout: arm length +X, width +/-Y, thickness +Z (0..8).  In the drive train
+Layout: arm length +X, width +/-Y, thickness +Z.  In the drive train
 local +X hangs down and local +Z faces outboard.
 
 Run with SolidWorks open::
@@ -24,8 +24,10 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -44,7 +46,6 @@ from _holes import wizard_holes
 
 import _telemetry
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
@@ -63,7 +64,6 @@ from dt_crank_arm_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FIDUCIAL_MODEL_DEPTH,
-    FIDUCIAL_ORDINATE_TOL,
     FIDUCIAL_MODEL_DIA,
     FIDUCIAL_X,
     FIDUCIAL_Y,
@@ -103,6 +103,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): every module constant above as a named
     # global that drives the dimensions below. The mm suffix is load-bearing --
@@ -542,12 +543,6 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    # The punch witness's ordinates carry their own band: the .X default would
-    # let its centre into the seat bore's edge break (dt_crank_arm_spec).
-    for name in ("FiducialX", "FiducialY"):
-        set_dimension_symmetric_tolerance(
-            adapter, "FiducialProfile", name, FIDUCIAL_ORDINATE_TOL
-        )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

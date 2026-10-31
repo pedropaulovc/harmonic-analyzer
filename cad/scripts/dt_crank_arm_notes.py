@@ -10,8 +10,15 @@ from dt_crank_handle_pivot_screw_spec import TAPPED_MOUTH_DIA_MAX
 from dt_crank_hub_geometry import (
     AXIAL_PIN_DIA,
     AXIAL_PIN_LENGTH,
+    MM_PER_IN,
     SEAT_PRESS_INTERFERENCE,
 )
+
+
+def _inch(value_mm: float, places: int) -> str:
+    """``value_mm`` as the inch sheet prints it, without a leading zero."""
+    return f"{value_mm / MM_PER_IN:.{places}f}".removeprefix("0")
+
 
 # Short lines: the callout is centred under the diameter, so its widest line
 # sets how close to the left border the hub-end dimension can stand.  The
@@ -23,7 +30,7 @@ HUB_SEAT_CALLOUT = "\n".join(
     (
         "MHA-DT-31 HUB TURNED TO",
         "SUIT FOR A LIGHT PRESS:",
-        f"{_PRESS_LOW:.3f}-{_PRESS_HIGH:.3f} DIAMETRAL",
+        f"{_inch(_PRESS_LOW, 4)}-{_inch(_PRESS_HIGH, 4)} DIAMETRAL",
         "INTERFERENCE; FACES FLUSH",
     )
 )
@@ -34,7 +41,7 @@ HUB_SEAT_CALLOUT = "\n".join(
 # the drive-fit pin's way out (#984 machinist review r1, blind-hole finding).
 SEAM_CALLOUT = "\n".join(
     (
-        f"(<MOD-DIAM>{AXIAL_PIN_DIA:.1f}) <HOLE-DEPTH> {AXIAL_PIN_LENGTH:.1f}",
+        f"(<MOD-DIAM>{_inch(AXIAL_PIN_DIA, 3)}) <HOLE-DEPTH> {_inch(AXIAL_PIN_LENGTH, 3)}",
         "MATCH-DRILL/REAM WITH MHA-DT-31 AT ASSEMBLY,",
         "CENTRED ON THE SEAM, FOR MHA-DT-VN-59 AXIAL PIN:",
         "LIGHT DRIVE FIT; PRESSING MHA-DT-31 OUT FREES THE PIN",
@@ -46,7 +53,7 @@ SEAM_CALLOUT = "\n".join(
 # the two identical taps nor the face).
 PIVOT_TAP_ROWS = (
     "FOR MHA-DT-32 HANDLE PIVOT;\n"
-    f"MOUTH <MOD-DIAM>{TAPPED_MOUTH_DIA_MAX:.1f} MAX, NEAR SIDE"
+    f"MOUTH <MOD-DIAM>{_inch(TAPPED_MOUTH_DIA_MAX, 3)} MAX, NEAR SIDE"
 )
 # The punched fiducial is flagged at the mark, not in the general notes
 # (#984 machinist review r2/r3: an unlabelled crosshair could read as an
