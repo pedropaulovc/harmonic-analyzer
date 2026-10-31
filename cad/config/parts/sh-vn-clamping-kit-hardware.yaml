@@ -20,3 +20,4 @@ sh-vn-clamping-kit-hardware:
   usage_scope: tooling
   tolerance_class: visual_noncritical
   process: purchased
+  drawing_unit: in

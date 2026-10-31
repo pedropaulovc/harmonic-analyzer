@@ -16,6 +16,7 @@ from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M, sheet_region
 from _drawing_common import is_pictorial_orientation, rebuild_drawing
 from _drawing_layout_audit import _Reader, _dump_annotation
 from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
+from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _session import run_build
 from _supplier_screw_dimensions import annotate_supplier_screw
@@ -367,6 +368,7 @@ async def build(adapter: Any) -> dict[str, str]:
             sides=supplier.SUPPLIER_REFERENCE_SIDES,
         ),
         settled_checks=checks,
+        unit=part_drawing_unit("sh-vn-clamp-screw"),
     )
 
 
