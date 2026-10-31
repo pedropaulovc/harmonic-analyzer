@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import ch_pivot_bracket_spec as _bracket
 from _hole_spec import THREAD_MAJOR_MM
+from _printed_tolerance import printed_band_mm
 from fr_rocker_arm_support_spec import SUPPORT_HALF_MACHINE_Z, SUPPORT_WORLD_Z
 from rocker_bank_layout import PIVOT_BRACKET_Z, STACK_MID_Z
 from ch_vn_bracket_hold_down_screw_spec import HEAD_DIA as SCREW_HEAD_DIA
@@ -58,7 +59,7 @@ def _support_end_z(length: float) -> dict[str, float]:
 # rocker_bracket_seat_layout's 2.0 end wall when the support's end face moves
 # by half its length's title-block .X band and the hole by its station band,
 # on whichever side that end face is nearer.
-SUPPORT_LENGTH_BAND = 0.8  # title-block .X on the support's length
+SUPPORT_LENGTH_BAND = printed_band_mm(1)  # title-block .X on the support's length
 HOLE_Z_MIN = (
     _bracket.EAR_T / 2.0
     + SCREW_HEAD_DIA / 2.0

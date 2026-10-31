@@ -1639,7 +1639,7 @@ def _band_held_dimension(
             f"{label}: tolerance readback type {int(tolerance.Type)} "
             f"{minimum:g}/{maximum:g} m != type {kind} {lower_m:g}/{upper_m:g} m"
         )
-    _set_tolerance_precision(display, (lower, upper), label=label)
+    _set_tolerance_precision(display, (lower, upper), display_unit="mm", label=label)
     display = _early_bound(display, "IDisplayDimension")
     do_not_change = -1  # swDimensionPrecisionSettings_e
     display.SetPrecision3(2, do_not_change, do_not_change, do_not_change)

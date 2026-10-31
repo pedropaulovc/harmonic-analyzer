@@ -162,8 +162,10 @@ def fit(group: str, *keys: str) -> Any:
 def title_block(kind: str) -> dict[str, Any]:
     """A title-block general tolerance row from title_block.yaml.
 
-    ``title_block('linear_2pl')`` -> ``{value_in, display}``;
-    ``title_block('angular')``    -> ``{value_deg, display}``.
+    ``title_block('linear_2pl')`` -> ``{value_in, band_mm, digits}``;
+    ``title_block('angular')``    -> ``{value_deg, digits}``.  Read printed
+    bands through ``_printed_tolerance`` and render title-block text through
+    ``_title_block_units``, which own the unit-explicit keys.
     """
     return _doc("title_block")[kind]
 

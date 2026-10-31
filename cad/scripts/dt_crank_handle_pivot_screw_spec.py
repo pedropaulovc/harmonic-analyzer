@@ -24,6 +24,7 @@ import math
 
 from _gtol_cylinder import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM
+from _printed_tolerance import drilled_oversize_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_crank_handle_butt_cup_spec import (
     BODY_DIA as CUP_BODY_DIA,
@@ -254,7 +255,7 @@ TIP_CHAMFER_MIN, TIP_CHAMFER_MAX = (
 # running play allows (local review of fbf82ad96: the concentric figure
 # overstated it).  The play is the smaller of the head's in the pocket and
 # the shoulder's in the floor hole.
-_FLOOR_HOLE_MAX = CUP_FLOOR_HOLE_DIA + 0.10  # DRILLED HOLES +0.10/0
+_FLOOR_HOLE_MAX = CUP_FLOOR_HOLE_DIA + drilled_oversize_mm()  # DRILLED HOLES +0.10/0
 HEAD_BEARING_RADIAL_CONCENTRIC_MIN = round(
     ((HEAD_DIA - HEAD_DIA_TOL) - _FLOOR_HOLE_MAX) / 2.0 - 2.0 * EDGE_BREAK_MAX_MM, 6
 )

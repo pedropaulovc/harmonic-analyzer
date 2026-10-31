@@ -19,6 +19,7 @@ import _config
 from _gtol_cylinder import CylinderFace
 from _gtol_controls import GeometricControl, PartDatum
 from _gtol_planar import PlanarFace
+from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 import _cone_axis_constants as cone_axis
 import dt_cone_post_envelope as post_envelope
@@ -101,24 +102,20 @@ ATTACHMENT_CBORE_DEPTH = POST_MOUNT_COUNTERBORE_DEPTH_MM
 WEB_FLOOR_MM = 1.5
 
 
-def _row(places: int) -> float:
-    return float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
-
-
 # R2: a nominal v36 hole centre at 13.44 leaves only 1.04 mm to the restored
 # head OD at the printed limits.  The head prints Ø42.8 (.X); the machined
 # counterbore's native hole callout prints Ø11.51 (.XX), unlike its twist-drilled
 # through hole (+0.10 / 0).  Each centre prints .XX.  Move the complete matched
 # post/platform pattern inward by the least printable amount that retains the
 # policy's 1.5 mm hard floor at all three closing corners.
-_HEAD_R_PRINT_MIN = (round(HEAD_DIA, 1) - _row(1)) / 2.0
-_CBORE_R_PRINT_MAX = (round(ATTACHMENT_CBORE_DIA, 2) + _row(2)) / 2.0
+_HEAD_R_PRINT_MIN = (round(HEAD_DIA, 1) - printed_band_mm(1)) / 2.0
+_CBORE_R_PRINT_MAX = (round(ATTACHMENT_CBORE_DIA, 2) + printed_band_mm(2)) / 2.0
 _ATTACHMENT_X_MAX = (
-    _HEAD_R_PRINT_MIN - _CBORE_R_PRINT_MAX - _row(2) - WEB_FLOOR_MM
+    _HEAD_R_PRINT_MIN - _CBORE_R_PRINT_MAX - printed_band_mm(2) - WEB_FLOOR_MM
 )
 ATTACHMENT_X = math.floor((_ATTACHMENT_X_MAX + 1e-10) * 100.0) / 100.0
 ATTACHMENT_SPACING = 2.0 * ATTACHMENT_X
-MOUNT_HEAD_WEB_WORST = _HEAD_R_PRINT_MIN - (ATTACHMENT_X + _row(2)) - _CBORE_R_PRINT_MAX
+MOUNT_HEAD_WEB_WORST = _HEAD_R_PRINT_MIN - (ATTACHMENT_X + printed_band_mm(2)) - _CBORE_R_PRINT_MAX
 if MOUNT_HEAD_WEB_WORST + 1e-9 < WEB_FLOOR_MM:
     raise AssertionError("mounting counterbore breaches the head's print-worst wall")
 if MOUNT_HEAD_WEB_WORST - 0.01 >= WEB_FLOOR_MM:
@@ -131,8 +128,8 @@ if MOUNT_HEAD_WEB_WORST - 0.01 >= WEB_FLOOR_MM:
 # crank_boss_rim, build_dt_drive_train_assembly); the station's own band is the
 # largest two-place band inside that half, so no stack moves.
 CONE_BOSS_NORTH_STATION = CONE_BOSS_LENGTH / 2.0
-CONE_BOSS_NORTH_STATION_TOLERANCE_MM = math.floor(_row(2) / 2.0 * 100.0 + 1e-9) / 100.0
-if CONE_BOSS_NORTH_STATION_TOLERANCE_MM > _row(2) / 2.0:
+CONE_BOSS_NORTH_STATION_TOLERANCE_MM = math.floor(printed_band_mm(2) / 2.0 * 100.0 + 1e-9) / 100.0
+if CONE_BOSS_NORTH_STATION_TOLERANCE_MM > printed_band_mm(2) / 2.0:
     raise AssertionError(
         "north cone-boss face station band exceeds the stacks' half band"
     )
@@ -216,13 +213,13 @@ _CRANK_BORE_R_MAX = (CRANK_BORE_DIA + RUNNING_BORE_BAND[0]) / 2.0
 _CRANK_AXIS_Y_MAX = (
     CRANK_BORE_HEIGHT + JOURNAL_AXIS_HEIGHT_TOLERANCE_MM + CRANK_ABOVE_CONE_BAND[0]
 )
-_HOLE_X_MIN = ATTACHMENT_X - _row(2)
+_HOLE_X_MIN = ATTACHMENT_X - printed_band_mm(2)
 _CBORE_CORNER = (
     _HOLE_X_MIN - _CBORE_R_PRINT_MAX,
     BLOCK_HEIGHT
-    - _row(1)
+    - printed_band_mm(1)
     - round(ATTACHMENT_CBORE_DEPTH, 2)
-    - _row(2)
+    - printed_band_mm(2)
     - _CRANK_AXIS_Y_MAX,
 )
 CRANK_BORE_WEBS_WORST = {
@@ -231,14 +228,14 @@ CRANK_BORE_WEBS_WORST = {
     - _CRANK_BORE_R_MAX,
     # the counterbore's bottom inner corner sits above and beside the bore
     "mounting counterbore": math.hypot(*_CBORE_CORNER) - _CRANK_BORE_R_MAX,
-    "top face": BLOCK_HEIGHT - _row(1) - _CRANK_AXIS_Y_MAX - _CRANK_BORE_R_MAX,
-    "crank boss OD": (CRANK_BOSS_DIA - _row(1)) / 2.0 - _CRANK_BORE_R_MAX,
+    "top face": BLOCK_HEIGHT - printed_band_mm(1) - _CRANK_AXIS_Y_MAX - _CRANK_BORE_R_MAX,
+    "crank boss OD": (CRANK_BOSS_DIA - printed_band_mm(1)) / 2.0 - _CRANK_BORE_R_MAX,
 }
 # The cast boss itself, not just its bore, must also remain below the top at
 # the closing printed corner.  Its lower edge may blend into the lower body;
 # the nominal boss/head containment above is what the volume oracle requires.
 CRANK_BOSS_TOP_MARGIN_WORST_MM = (
-    BLOCK_HEIGHT - _row(1) - _CRANK_AXIS_Y_MAX - (CRANK_BOSS_DIA + _row(1)) / 2.0
+    BLOCK_HEIGHT - printed_band_mm(1) - _CRANK_AXIS_Y_MAX - (CRANK_BOSS_DIA + printed_band_mm(1)) / 2.0
 )
 if CRANK_BOSS_TOP_MARGIN_WORST_MM <= 0.0:
     raise AssertionError("crank boss breaches the post's print-worst top outline")
@@ -257,8 +254,8 @@ for _name, _web in CRANK_BORE_WEBS_WORST.items():
 # the loosest title-block angular row on the cone axis; its BASIC angle and
 # angularity frame are tighter, so this overbounds the printed corner.
 MOUNT_OTHER_WEBS_WORST = {
-    "body foot OD": (round(post_envelope.BLOCK_DIA, 1) - _row(1)) / 2.0
-    - (ATTACHMENT_X + _row(2))
+    "body foot OD": (round(post_envelope.BLOCK_DIA, 1) - printed_band_mm(1)) / 2.0
+    - (ATTACHMENT_X + printed_band_mm(2))
     - (ATTACHMENT_THRU_DIA + _DRILL_OVERSIZE) / 2.0,
     "inclined cone bore": _HOLE_X_MIN
     * math.cos(
@@ -268,7 +265,7 @@ MOUNT_OTHER_WEBS_WORST = {
     - (round(BORE_DIA, 3) + RUNNING_BORE_BAND[0]) / 2.0,
     "counterbore floor annulus": (
         round(ATTACHMENT_CBORE_DIA, 2)
-        - _row(2)
+        - printed_band_mm(2)
         - ATTACHMENT_THRU_DIA
         - _DRILL_OVERSIZE
     ) / 2.0,

@@ -35,6 +35,7 @@ from math import ceil, hypot, sqrt
 
 from _fit_shaft_h import SHAFT_H
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _cone_axis_constants import CHANNEL_Z0, FRAME_FRONT_COLUMN_Z
 
 # --- Station (machine Z). The ONE source for build_ch_channel_assembly
@@ -265,8 +266,8 @@ SET_SCREW_MIN_ENGAGEMENT_D = 1.5  # drawing-guidelines.md rule 18 (thread engage
 
 # --- drawing-guidelines.md rule 17 (walls and webs) at the printed worst case (title block .X +-0.8, .XX +-0.51,
 # .XXX +-0.13, DRILLED HOLES +0.10/0; DRAWING_PRECISION below). ---
-_BAND_BY_PLACES = {1: 0.8, 2: 0.51, 3: 0.13}
-_DRILLED_PLUS = 0.10
+_BAND_BY_PLACES = {places: printed_band_mm(places) for places in (1, 2, 3)}
+_DRILLED_PLUS = drilled_oversize_mm()
 _THREAD_HALF_MAJOR = THREAD_MAJOR_MM[SET_SCREW_THREAD] / 2.0
 _BORE_MAX_RADIUS = (BORE_DIA + BORE_DIA_BAND[0]) / 2.0
 

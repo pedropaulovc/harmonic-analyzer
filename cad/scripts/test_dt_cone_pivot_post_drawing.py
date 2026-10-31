@@ -155,11 +155,11 @@ def test_mounting_counterbores_take_the_last_printable_head_wall_station() -> No
     assert spec.DRAWING_PRECISION_BY_NAME["HeadDia"] == 1
     assert spec.DRAWING_PRECISION_BY_NAME["MountWestX"] == 2
     assert spec.DRAWING_PRECISION_BY_NAME["MountEastX"] == 2
-    head_radius_min = (round(spec.HEAD_DIA, 1) - spec._row(1)) / 2.0
+    head_radius_min = (round(spec.HEAD_DIA, 1) - spec.printed_band_mm(1)) / 2.0
     cbore_radius_max = (
-        round(spec.ATTACHMENT_CBORE_DIA, 2) + spec._row(2)
+        round(spec.ATTACHMENT_CBORE_DIA, 2) + spec.printed_band_mm(2)
     ) / 2.0
-    wall = head_radius_min - (spec.ATTACHMENT_X + spec._row(2)) - cbore_radius_max
+    wall = head_radius_min - (spec.ATTACHMENT_X + spec.printed_band_mm(2)) - cbore_radius_max
     assert spec.ATTACHMENT_X == pytest.approx(12.98)
     assert spec.ATTACHMENT_SPACING == pytest.approx(25.96)
     assert wall == pytest.approx(spec.MOUNT_HEAD_WEB_WORST)
@@ -454,7 +454,7 @@ def test_cone_boss_north_station_shares_the_face_to_face_global() -> None:
     """The printed collar-face station and the boss extrusion cannot drift
     apart, and its band is the half face-to-face band the stacks book."""
     assert spec.CONE_BOSS_NORTH_STATION == spec.CONE_BOSS_LENGTH / 2.0
-    assert spec.CONE_BOSS_NORTH_STATION_TOLERANCE_MM <= spec._row(2) / 2.0
+    assert spec.CONE_BOSS_NORTH_STATION_TOLERANCE_MM <= spec.printed_band_mm(2) / 2.0
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"ConeBossLength": CONE_BOSS_LENGTH,' in source
     assert "drive_jobs.append((boss_length[0], '\"ConeBossLength\"'))" in source

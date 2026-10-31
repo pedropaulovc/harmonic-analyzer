@@ -105,9 +105,9 @@ def _sag(radius: float) -> float:
 # pressed dowel needs a way out; the dt_crankshaft K0 precedent).  The
 # round slip hole and the slot that absorbs the pair's spacing mismatch
 # (rule 19) moved to the hardened MHA-SM-02 block (``sm_knife_mount_spec``).
-_X = float(str(_config.title_block("linear_1pl")["display"]).lstrip("\u00b1"))
-_XX = float(str(_config.title_block("linear_2pl")["display"]).lstrip("\u00b1"))
-_XXX = float(str(_config.title_block("linear_3pl")["display"]).lstrip("\u00b1"))
+_X = printed_band_mm(1)
+_XX = printed_band_mm(2)
+_XXX = printed_band_mm(3)
 # The title block's DRILLED HOLES row: a drilled hole cuts up to this oversize.
 DRILL_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
 # ASME B18.2.8 Table 2: #10 loose, .238 in = 6.0452 mm, rounded to the

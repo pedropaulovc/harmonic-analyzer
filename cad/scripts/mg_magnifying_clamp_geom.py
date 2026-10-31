@@ -28,7 +28,12 @@ import math
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from sh_vn_thumb_screw_spec import COLLAR_DIA, SHANK_LEN, TIP_CHAMFER, TIP_FLAT_R
-from _printed_tolerance import angular_band_deg, drilled_oversize_mm, printed_band_mm
+from _printed_tolerance import (
+    angular_band_deg,
+    drilled_oversize_mm,
+    edge_break_chamfer_mm,
+    printed_band_mm,
+)
 from mg_lever_thread_joint import ROD_DIA, ROD_DIA_BAND
 from mg_rod_clamp_joint import (
     ENGAGEMENT_MIN,
@@ -117,7 +122,7 @@ ROD_TAP_FLOOR_WALL_WORST = (
 # not just female wall length. The stock screw's finite flat tip and 0.75P
 # chamfer consume thread above its contact with the rod.
 TOP_TO_BORE = BLOCK_HEIGHT - LEVER_BORE_Y
-EDGE_BREAK = 0.25  # title block edge break at the tap mouth
+EDGE_BREAK = edge_break_chamfer_mm()  # title block edge break at the tap mouth
 # Conservatively add the general angular band to drill angular run-off.
 # This is a contact allowance, not a new/tighter manufactured angle tolerance.
 THUMB_CONTACT_ANGLE_MAX = math.radians(angular_band_deg() + DRILL_WANDER_DEG)

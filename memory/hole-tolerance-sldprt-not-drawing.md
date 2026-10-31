@@ -24,7 +24,7 @@ governs everything else (`cad/docs/tolerance-policy.md` §Scope; ASME Y14.5 §1.
   Verify hole tolerances on the RENDER, never the exit code.
 - **DEFAULT PATH for drilled holes = the DRILLED HOLES title-block row, not
   per-feature callouts.** `title_block.yaml` `drilled_hole: {minus_mm, plus_mm,
-  display_minus, display_plus}` → `_common.part_properties` stamps
+  digits}` → `_title_block_units` renders and `_part_properties` stamps
   `TOL_HOLE_MINUS`/`TOL_HOLE_PLUS` on EVERY part (like `TOL_LIN_XX`) → the DRWDOT
   title-block row reads them via `$PRPSHEET`, composed PLUS then MINUS →
   **`+0.10 / 0`**. It is UNILATERAL (hard-zero minus): a twist drill cuts

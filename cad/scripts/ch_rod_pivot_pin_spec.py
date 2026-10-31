@@ -31,12 +31,13 @@ import ch_connecting_rod_spec as _rod
 import ch_rocker_arm_spec as _arm
 import _rocker_interface as rocker_interface
 from _hole_spec import NUMBER_DRILL_MM
+from _printed_tolerance import drilled_oversize_mm
 
 MM_PER_IN = 25.4
 
-# --- Title-block drilled-hole band, restated (test_ch_rod_pivot_fit pins it to
-# title_block.yaml): a twist drill cuts on-size to oversize. ---
-DRILLED_PLUS = 0.10
+# --- Title-block drilled-hole band (read from title_block.yaml): a twist
+# drill cuts on-size to oversize. ---
+DRILLED_PLUS = drilled_oversize_mm()
 
 # --- The pin: 5/64 drill rod (AISI O1/W1 drill rod or 1018 pin stock, used
 # annealed as supplied; ground to +/-0.0002 in). ---

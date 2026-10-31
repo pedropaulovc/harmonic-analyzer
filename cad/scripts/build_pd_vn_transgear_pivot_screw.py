@@ -513,7 +513,8 @@ async def _save_supplier_references(adapter, part_name, suppressed_features):
             raise RuntimeError(f"{name}: source-model units/precision did not persist")
         _set_tolerance_precision(
             display,
-            tuple(value / 25.4 for value in band),
+            band,
+            display_unit="in",
             label=name,
             places=places,
         )

@@ -20,6 +20,7 @@ from math import sqrt
 
 from _fit_shaft_h import SHAFT_H
 from _gtol_cylinder import CylinderFace
+from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from ch_fulcrum_keeper_spec import (
     BORE_DIA,
@@ -75,7 +76,7 @@ FLAT_HEIGHT = SHAFT_R - FLAT_DEPTH  # 2.875: the set screw's cup seat above the 
 
 # --- Worst case of the printed bands (drawing-guidelines.md rule 17 (walls and webs); DRAWING_PRECISION
 # below). ---
-_BAND_BY_PLACES = {1: 0.8, 2: 0.51, 3: 0.13}
+_BAND_BY_PLACES = {places: printed_band_mm(places) for places in (1, 2, 3)}
 _FLAT_LENGTH_MIN = FLAT_LENGTH - _BAND_BY_PLACES[1]
 _SHAFT_R_MIN = (SHAFT_DIA + SHAFT_DIA_BAND[1]) / 2.0
 # Least depth: the smallest printed shaft diameter less the largest AcrossFlat

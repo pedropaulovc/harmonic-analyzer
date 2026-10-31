@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 import _config
 import dt_swing_stop_screw_spec as stop_stock
+from _printed_tolerance import printed_band_mm
 import fr_nameplate_spec
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 from dt_arbor_pedestal_spec import FOOT_HEIGHT as PEDESTAL_FLANGE_THICKNESS
@@ -38,12 +39,6 @@ from fr_harmonic_base_spec import (
 
 IN = 25.4
 
-
-def title_block_band_mm(kind: str) -> float:
-    """Use the printed millimetre limit, not its rounded inch equivalent."""
-    return float(str(_config.title_block(kind)["display"]).lstrip("±"))
-
-
 EDGE_BREAK_MAX_MM = max(
     float(_config.title_block("edge_break")[key])
     for key in ("radius_mm", "chamfer_max_mm")
@@ -51,8 +46,8 @@ EDGE_BREAK_MAX_MM = max(
 # The deck elevation is GreenTopHeight + DeckRise; the ceiling is PocketDepth.
 # All three print .X independently. Skin is currently a reference difference,
 # not a directly toleranced skin dimension. Do not book only one of these bands.
-DECK_HEIGHT_BAND_MM = 2.0 * title_block_band_mm("linear_1pl")
-POCKET_CEILING_BAND_MM = title_block_band_mm("linear_1pl")
+DECK_HEIGHT_BAND_MM = 2.0 * printed_band_mm(1)
+POCKET_CEILING_BAND_MM = printed_band_mm(1)
 STOP_PLATE_THICKNESS_ALLOWANCE_MM = IN * float(_config.title_block("linear_2pl")["value_in"])
 
 BASE_CROSS_TAP_SPEC = HoleSpec(
@@ -61,7 +56,7 @@ BASE_CROSS_TAP_SPEC = HoleSpec(
 )
 BASE_CROSS_TAP_DRILL_DIA = TAP_DRILL_MM[BASE_CROSS_TAP_SPEC.size]
 if CASTING_TAP_DRILL_DEPTH - (
-    CASTING_FULL_THREAD_DEPTH + title_block_band_mm("linear_2pl")
+    CASTING_FULL_THREAD_DEPTH + printed_band_mm(2)
 ) < 2.0 * IN / 32.0 - 1e-9:
     raise AssertionError("base cross tap lacks two-pitch bottoming-tap lead")
 
@@ -74,16 +69,16 @@ HOLD_DOWN_ENGAGEMENT = (
     HOLD_DOWN_SCREW_LEN - SUPPORT_FOOT_THICKNESS - HOLD_DOWN_BEARING_OFFSET
 )
 HOLD_DOWN_INSERTION_MIN_MM = (
-    HOLD_DOWN_ENGAGEMENT - HOLD_DOWN_LENGTH_SHORT_ALLOWANCE - title_block_band_mm("linear_2pl")
+    HOLD_DOWN_ENGAGEMENT - HOLD_DOWN_LENGTH_SHORT_ALLOWANCE - printed_band_mm(2)
 )
-HOLD_DOWN_INSERTION_MAX_MM = HOLD_DOWN_ENGAGEMENT + title_block_band_mm("linear_2pl")
+HOLD_DOWN_INSERTION_MAX_MM = HOLD_DOWN_ENGAGEMENT + printed_band_mm(2)
 HOLD_DOWN_SEAT_SPEC = HoleSpec("tapped", HOLD_DOWN_THREAD, thread_class=HOLD_DOWN_THREAD_CLASS)
 HOLD_DOWN_TAP_DRILL_DIA = TAP_DRILL_MM[HOLD_DOWN_THREAD]
 PEDESTAL_SCREW_ENGAGEMENT = PEDESTAL_SCREW_LEN - PEDESTAL_FLANGE_THICKNESS
 PEDESTAL_INSERTION_MIN_MM = (
-    PEDESTAL_SCREW_ENGAGEMENT - PEDESTAL_LENGTH_SHORT_ALLOWANCE - title_block_band_mm("linear_1pl")
+    PEDESTAL_SCREW_ENGAGEMENT - PEDESTAL_LENGTH_SHORT_ALLOWANCE - printed_band_mm(1)
 )
-PEDESTAL_INSERTION_MAX_MM = PEDESTAL_SCREW_ENGAGEMENT + title_block_band_mm("linear_1pl")
+PEDESTAL_INSERTION_MAX_MM = PEDESTAL_SCREW_ENGAGEMENT + printed_band_mm(1)
 NAMEPLATE_SCREW_XZ = fr_nameplate_spec.MOUNT_HOLE_XZ
 NAMEPLATE_SEAT_SPEC = HoleSpec("tapped_bottoming", "#4-40", thread_class="2B")
 
@@ -277,7 +272,7 @@ def through_seat_pocket_clearances_mm(
         raise ValueError("finite station and nonnegative transfer bounds required")
     if seat.kind not in ("tapped", "tapped_bottoming") or seat.end != "through_all":
         raise AssertionError("pocket clearance requires a through-all tapped seat")
-    band = title_block_band_mm("linear_1pl")
+    band = printed_band_mm(1)
     # All these locations/sizes print at least .X; .XX is bounded too.
     relative = 3.0 * (band + 0.05)
     hx, hz = (bound + relative for bound in envelope_xz)
@@ -374,7 +369,7 @@ def through_seat_material(
         math.isfinite(v) for v in (*xz, *envelope_xz)
     ) or min(envelope_xz) < 0:
         raise ValueError("finite station and nonnegative transfer bounds required")
-    band = title_block_band_mm("linear_1pl")
+    band = printed_band_mm(1)
     radius = THREAD_MAJOR_MM[seat.size] / 2.0
     hx, hz = (radius + band + bound for bound in envelope_xz)
     x, z = xz

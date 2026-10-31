@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 import _config
+from _printed_tolerance import printed_band_mm
 import ch_fulcrum_keeper_spec as keeper
 import rocker_bank_layout as rocker_bank
 import ch_vn_frame_side_screw_spec as keeper_screw
@@ -77,9 +78,7 @@ def test_four_cross_taps_are_bottoming_10_32_with_tooling_lead() -> None:
     assert part.SIDE_TAP_SPEC.overrides_mm["ThreadDepth"] == CASTING_FULL_THREAD_DEPTH
     pitch = 25.4 / 32.0
     assert TOP_CASTING_TAP_DRILL_DEPTH - CASTING_FULL_THREAD_DEPTH >= 2.0 * pitch
-    depth_tolerance = float(
-        str(_config.title_block("linear_1pl")["display"]).lstrip("±")
-    )
+    depth_tolerance = printed_band_mm(1)
     assert (
         TOP_CASTING_TAP_DRILL_DEPTH - CASTING_FULL_THREAD_DEPTH - 2.0 * depth_tolerance
         >= 2.0 * pitch

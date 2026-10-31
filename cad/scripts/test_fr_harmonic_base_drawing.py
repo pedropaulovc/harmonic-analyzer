@@ -2899,11 +2899,12 @@ def test_specified_hold_down_retains_engagement_and_reports_underside_protrusion
 
 
 def test_cross_tap_drill_keeps_the_bottoming_lead_past_the_deepest_thread() -> None:
+    from _printed_tolerance import printed_band_mm
     from fr_frame_attachment_spec import CASTING_FULL_THREAD_DEPTH, CASTING_TAP_DRILL_DEPTH
 
     lead = 2.0 * 25.4 / 32.0
     # 48 MIN left 1.49 past 46.00 + 0.51, under two #10-32 pitches.
-    band = fr_harmonic_base_fasteners.title_block_band_mm("linear_2pl")
+    band = printed_band_mm(2)
     assert 48.0 - (CASTING_FULL_THREAD_DEPTH + band) < lead
     assert CASTING_TAP_DRILL_DEPTH - (CASTING_FULL_THREAD_DEPTH + band) >= lead
 

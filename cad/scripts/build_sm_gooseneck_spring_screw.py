@@ -238,7 +238,11 @@ def _limit_band(
     ):
         raise RuntimeError(f"{label}: LIMIT tolerance readback changed")
     places = _set_tolerance_precision(
-        display, deviations, label=label, places=DRAWING_PRECISION_BY_NAME[name]
+        display,
+        deviations,
+        display_unit="mm",
+        label=label,
+        places=DRAWING_PRECISION_BY_NAME[name],
     )
     value = float(dimension.SystemValue) * 1000.0
     _telemetry.success(

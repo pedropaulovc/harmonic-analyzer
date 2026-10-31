@@ -2349,7 +2349,10 @@ def stamps_title_block_properties(script: Path) -> bool:
 # printed band -- rather than for the TOL_* stamping.  A title-block edit moves
 # those, so a build importing one keeps title_block.yaml even when it stamps
 # nothing (Codex #854 review).  Every module that calls the accessor and is not
-# a stamper or a drawing script is listed here (test_dodo_recipe pins it).
+# a stamper or a drawing script is listed here (test_dodo_recipe pins it); a
+# module that reads the rows through _printed_tolerance is covered by its import
+# closure (reads_title_block_geometry).  The TOL_* text renderer
+# (_title_block_units) is stamping, not geometry, so it stays out.
 TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
     {
         "_printed_limits",
@@ -2360,14 +2363,10 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "dt_cone_pivot_post_spec",
         "dt_cone_swing_platform_checks",
         "dt_cone_swing_platform_spec",
-        "dt_cone_tip_block_spec",
         # Drilled-hole and angular rows size the collar-to-bank air stack.
         "dt_tip_collar_air",
-        # Printed platform thickness band bounds the knob's plate-clamp insertion.
-        "dt_vn_cone_lock_knob_spec",
         # Angular row sets the through tap's angle in the screw landing gate.
         "dt_vn_cone_tip_collar_spec",
-        "crank_boss_rim",
         "dt_crank_hub_geometry",
         "dt_crank_pinion_spec",
         # Drilled-hole row bounds the rocker's #47 hole the rod-slot pin enters.
@@ -2395,7 +2394,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "pd_vn_guide_lock_screw_spec",
         "dt_vn_post_mount_screw_spec",
         "ch_vn_spring_hook_spec",
-        "sm_vn_knife_mount_dowel_spec",
         "pd_transgear_disc_hub_spec",
         "pd_transgear_removable_notes",
         # Edge-break row sizes the knob tip and the rack window/lateral stacks.

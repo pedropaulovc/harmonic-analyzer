@@ -20,6 +20,11 @@ import pd_guide_lock_spec as lock
 import pd_platen_guide_spec as guide
 import pd_transgear_pivot_spacer_spec as spacer
 from _hole_spec import HoleSpec, blind_cut_dia_mm
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    edge_break_chamfer_mm,
+    printed_band_mm,
+)
 
 IN = 25.4
 # #4-40 UNC (ASME B1.1): the basic major (above the class-2A max) and the class-2A min.
@@ -27,8 +32,8 @@ MAJOR_MAX = 0.112 * IN
 MAJOR_MIN = 0.1061 * IN
 PITCH = IN / 40.0
 # Title block: drilled holes +0.10/-0; edge break 0.25.
-DRILLED_PLUS = 0.10
-EDGE_BREAK = 0.25
+DRILLED_PLUS = drilled_oversize_mm()
+EDGE_BREAK = edge_break_chamfer_mm()
 # The lock: 1/16 in sheet as supplied, +/-0.005 in (McMaster 1388K196).
 SHEET_MAX = (1.0 / 16.0 + 0.005) * IN
 
@@ -117,7 +122,7 @@ _LIP = 1.2
 _HOLE_Y = _LIP + 2.5
 _WIDTH = 22.5
 _HEIGHT = 9.8
-_HEIGHT_BAND = 0.8
+_HEIGHT_BAND = printed_band_mm(1)
 # Old (R9-59) model: a set plate only translates, so its far edge recedes.
 _OLD_FAR_REACH = -_SET_MIN
 

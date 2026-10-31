@@ -11,6 +11,7 @@ import math
 
 import _config
 import dt_vn_cone_pivot_screw_spec as pivot_stock
+from _printed_tolerance import printed_band_mm
 import dt_swing_stop_screw_spec as stop_stock
 from cone_pitch import COS_I as _COS_I, INCLINE_DEG, SIN_I as _SIN_I
 from dt_cone_swing_platform_geometry import (
@@ -96,8 +97,8 @@ if POST_MOUNT_HALF_PITCH + POST_MOUNT_TAP_DIA / 2.0 > _POST_R:
 # bare drilled bore); each web is judged on the face both share.  The plan
 # corner rounds sweep toward their own corners, away from this hole, so the
 # straight edges bound the outline web.
-_GENERAL_1PL_MM = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
-_GENERAL_2PL_MM = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
+_GENERAL_1PL_MM = printed_band_mm(1)
+_GENERAL_2PL_MM = printed_band_mm(2)
 _DRILL_OVERSIZE_MM = float(_config.title_block("drilled_hole")["plus_mm"])
 _HOLDDOWN_SHIFT = math.hypot(HOLDDOWN_STATION_TOL_MM, HOLDDOWN_STATION_TOL_MM)
 _HOLDDOWN_THRU_R = (HOLDDOWN_CLEARANCE_DIA + _DRILL_OVERSIZE_MM) / 2.0

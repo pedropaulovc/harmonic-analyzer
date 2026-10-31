@@ -20,6 +20,7 @@ import math
 import _config
 from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, HoleSpec, blind_cut_dia_mm
+from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
 import _cone_axis_constants as cone_axis
@@ -74,7 +75,7 @@ PIVOT_RELIEF_FIT_REQUIREMENT = (
 )
 
 
-_XX = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
+_XX = printed_band_mm(2)
 
 def crank_gear_platform_budget() -> dict[str, float]:
     """Full rotating 64T envelope above the unrelieved platform, in mm.
@@ -91,7 +92,7 @@ def crank_gear_platform_budget() -> dict[str, float]:
     post = dt_cone_pivot_post_spec
 
     def upper(nominal: float, places: int) -> float:
-        band = float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
+        band = printed_band_mm(places)
         return round(nominal, places) + band
 
     boss_half_max = upper(

@@ -33,7 +33,12 @@ import math
 import pd_transgear_arm_geometry as ARM
 import _transgear_arm_plate_locating_interface as LOCATING_PIN
 from _gear_quality import reducer_k_setting_diameter_mm
-from _printed_tolerance import angular_band_deg, printed_band_mm, printed_deviations
+from _printed_tolerance import (
+    angular_band_deg,
+    drilled_oversize_mm,
+    printed_band_mm,
+    printed_deviations,
+)
 from pd_cluster_stack_band import PRINTED_LENGTH_BAND
 
 # --- Where the bore sits on the arm (arm frame, mm) -------------------------
@@ -175,7 +180,7 @@ LOCATOR_MOUTH_POSITION_RADIUS_MM = REDUCER_POSITION_RADIUS * (
     1.0 + 2.0 * LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
     / LOCATOR_FULL_CYLINDER_SPAN_MIN_MM
 )
-DRILL_GROWTH = 0.10
+DRILL_GROWTH = drilled_oversize_mm()
 WALL_TARGET = ARM.WALL_TARGET
 # Actual rounded diameter and angular limits control every cone cut and
 # the shortest-stock head seat, not symmetric bands around an unprinted model.

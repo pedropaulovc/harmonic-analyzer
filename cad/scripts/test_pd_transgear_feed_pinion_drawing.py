@@ -439,7 +439,7 @@ _DEVIATION_PLACES = {
     "BoreDia": spec.BORE_PLACES,
     "BossDia": spec.BOSS_DIA_PLACES,
     "FlatToAxis": spec.FLAT_TO_AXIS_PLACES,
-    "OutsideDia": _tolerance_places(*spec.OUTSIDE_DIA_DEVIATIONS),
+    "OutsideDia": _tolerance_places(*spec.OUTSIDE_DIA_DEVIATIONS, display_unit="mm"),
 }
 # The disc-cluster stack terms' symmetric bands; the other lengths print bare
 # under the title block's rows.

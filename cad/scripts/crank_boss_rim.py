@@ -34,19 +34,15 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass
 
-import _config
 import dt_cone_gear_shaft_spec as shaft
 import dt_cone_pivot_post_spec as post
 from dt_cone_post_envelope import BLOCK_DIA
 import dt_crank_drive_gear_spec as gear64
+from _printed_tolerance import printed_band_mm
 
 Point = tuple[float, float, float]
 
 RULING = "user ruling 2026-09-28"
-
-
-def _row(places: int) -> float:
-    return float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
 
 
 SIN_I = math.sin(math.radians(post.INCLINE_DEG))
@@ -63,28 +59,28 @@ BODY_Y = (-post.BORE_HEIGHT, post.BLOCK_HEIGHT - post.BORE_HEIGHT)
 # --- The print-worst terms ----------------------------------------------------
 # Each moves a surface toward the other.
 #   the crank boss's north face, CrankBossStartZ at .XX
-CRANK_BOSS_NORTH = _row(post.DRAWING_PRECISION_BY_NAME["CrankBossStartZ"])
+CRANK_BOSS_NORTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["CrankBossStartZ"])
 #   the cast crank boss, CrankBossDia at .X: its face disc reaches further down
 #   toward the gear's tip
-CRANK_BOSS_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["CrankBossDia"]) / 2.0
+CRANK_BOSS_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["CrankBossDia"]) / 2.0
 #   the crank axis over the crank-above-cone spacing band, both ends taken
 #   (a lower boss reaches deeper into the tip's sweep)
 CRANK_AXIS_Y_BAND = tuple(CRANK_AXIS_Y + d for d in sorted(post.CRANK_ABOVE_CONE_BAND))
 #   the head's lower edge, the top face (MainBodyHt) less the head
 #   (HeadHt), each at .X, with the foot's height about the cone axis
 HEAD_EDGE_LOW = (
-    _row(post.DRAWING_PRECISION_BY_NAME["MainBodyHt"])
-    + _row(post.DRAWING_PRECISION_BY_NAME["HeadHt"])
+    printed_band_mm(post.DRAWING_PRECISION_BY_NAME["MainBodyHt"])
+    + printed_band_mm(post.DRAWING_PRECISION_BY_NAME["HeadHt"])
     + post.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM
 )
 #   the head, HeadDia at .X; the turned body, MainBodyDia at .X
-HEAD_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["HeadDia"]) / 2.0
-BODY_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["MainBodyDia"]) / 2.0
+HEAD_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["HeadDia"]) / 2.0
+BODY_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["MainBodyDia"]) / 2.0
 #   the cone boss's end faces, ConeBossLen at .XX, symmetric about the post
 #   axis: the north end SHORT brings the seated collar and 64T toward the
 #   post; the boss itself, ConeBossDia at .X
-CONE_BOSS_END_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"]) / 2.0
-CONE_BOSS_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["ConeBossDia"]) / 2.0
+CONE_BOSS_END_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"]) / 2.0
+CONE_BOSS_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossDia"]) / 2.0
 #   the 64T's station: the ONE input for how far it may stand toward the
 #   post.  MHA-DT-00 step 1 sets it against MHA-DT-04's thrust collar (#916),
 #   and the collar bears on the cone boss's north end, so the gear's south
@@ -93,7 +89,7 @@ CONE_BOSS_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["ConeBossDia"]) / 2.0
 #   each; collar_contacts below reads their sum) and only ever opening, so
 #   they add nothing toward the post. The stack is the boss end SHORT by
 #   its row and the collar thin by its own (Main's ruling (b), 2026-09-27).
-COLLAR_WIDTH_SHORT = _row(shaft.DRAWING_PRECISION_BY_NAME["CollarWidth"])
+COLLAR_WIDTH_SHORT = printed_band_mm(shaft.DRAWING_PRECISION_BY_NAME["CollarWidth"])
 GEAR64_STATION_TOWARD_POST = CONE_BOSS_END_GROWTH + COLLAR_WIDTH_SHORT
 #   FaceWidth's ±0.025 extends NORTH of the seated south face and does not
 #   consume any margin to the post; only the collar and MHA-DT-05 bands do.

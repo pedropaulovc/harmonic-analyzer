@@ -576,7 +576,9 @@ def test_reamed_pin_hole_band_prints_at_the_value_s_places(
         "PinHoleDia"
     ]
     # The defect: left to the shared setter the band reads +0.01/0.00.
-    assert _drawing_tolerances._tolerance_places(*deviations(spec.PIN_HOLE_BAND)) == 2
+    assert _drawing_tolerances._tolerance_places(
+        *deviations(spec.PIN_HOLE_BAND), display_unit="mm"
+    ) == 2
     assert value_places == 3
 
     calls: list[tuple[int, int, int, int]] = []

@@ -23,6 +23,7 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
+from _printed_tolerance import printed_band_mm
 from ms_stick_geom import (
     DIVISION_COUNT as DIVISION_COUNT,
     DIVISION_SPACING,
@@ -102,7 +103,7 @@ NUMERAL_FINAL_MIN_STROKE_MM3 = 0.0056
 # on the 1.42 minor pitch, so neighbouring grooves never merge and the last
 # one stays on the shortest bar; both depths leave the stated 2.0 of stock
 # under them (bar 2.90 MIN, so the deepest groove or V is 0.90).
-TITLE_BLOCK_X_TOLERANCE_MM = 0.8
+TITLE_BLOCK_X_TOLERANCE_MM = printed_band_mm(1)
 BODY_FIT_TOLERANCE_MM = 0.1
 GRADUATION_POSITION_TOLERANCE_MM = 0.05
 GRADUATION_FLOOR_MIN_MM = 2.0

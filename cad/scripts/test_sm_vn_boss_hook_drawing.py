@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import _config
+from _printed_tolerance import printed_band_mm
 import _stock_trim_drawing as trim_drawing
 import _telemetry
 import build_sm_vn_boss_hook as part
@@ -29,8 +29,7 @@ def test_finished_overall_preserves_factory_thread_datum():
 def test_deburr_band_clears_receiver_and_retains_full_threads():
     # The lead-in is a one-place chamfer under the printed .X title-block band,
     # never a tighter one; the governing stack below must hold across it.
-    printed = _config.title_block("linear_1pl")["display"]
-    assert printed == f"±{spec.CHAMFER_WIDTH_TOLERANCE_MM:.1f}"
+    assert spec.CHAMFER_WIDTH_TOLERANCE_MM == printed_band_mm(1)
     assert spec.DIMENSION_PRECISION["ChamferWidth"] == 1
     assert spec.CHAMFER_WIDTH_MM == round(spec.CHAMFER_WIDTH_MM, 1)
     assert spec.DIMENSION_TOLERANCE_TYPES["ChamferWidth"] == 11  # swTolGeneral

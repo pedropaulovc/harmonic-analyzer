@@ -345,7 +345,7 @@ async def _author_clamped_setting(adapter: Any) -> None:
     display, _ = _named_dimension(adapter, spec.SETTING_FEATURE, spec.SETTING_DIMENSION)
     _set_tolerance_precision(
         display, (-spec.SETTING_TOLERANCE_MM, spec.SETTING_TOLERANCE_MM),
-        label="clamped setting", places=spec.SETTING_TOLERANCE_PRECISION,
+        display_unit="mm", label="clamped setting", places=spec.SETTING_TOLERANCE_PRECISION,
     )
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     mark_dimensions_for_drawing(adapter, spec.SETTING_FEATURE, {spec.SETTING_DIMENSION})

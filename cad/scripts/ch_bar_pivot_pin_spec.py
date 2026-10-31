@@ -32,12 +32,13 @@ import math
 import ch_amplitude_bar_spec as _bar
 import ch_channel_lever_spec as _lever
 from _hole_spec import NUMBER_DRILL_MM
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 MM_PER_IN = 25.4
 
-# --- Title-block drilled-hole band, restated (test_ch_bar_pivot_fit pins it to
-# title_block.yaml): a twist drill cuts on-size to oversize. ---
-DRILLED_PLUS = 0.10
+# --- Title-block drilled-hole band (read from title_block.yaml): a twist
+# drill cuts on-size to oversize. ---
+DRILLED_PLUS = drilled_oversize_mm()
 
 # --- The pin: 5/64 drill rod (AISI O1/W1, used annealed as supplied; ground
 # to +/-0.0002 in). ---
@@ -52,7 +53,10 @@ PIN_INSTALLED_LENGTH = _bar.BAR_WIDTH  # dressed flush with both bar faces
 # dress-flush blank needs. 7.5 keeps the shortest blank proud of the widest bar.
 PIN_BLANK_LENGTH = 7.5
 PIN_BLANK_LENGTH_PLACES = 1
-PIN_BLANK_LENGTH_BAND = (0.8, -0.8)  # (upper, lower) deviations: .X
+PIN_BLANK_LENGTH_BAND = (
+    printed_band_mm(PIN_BLANK_LENGTH_PLACES),
+    -printed_band_mm(PIN_BLANK_LENGTH_PLACES),
+)  # (upper, lower) deviations: .X
 # Dressed ends stand nothing proud of the bar faces: the top-notch stack
 # below leaves 0.1065 against the 0.10 running floor (#1038, owner ruling
 # 2026-10-15 option 2).
@@ -68,8 +72,8 @@ BAR_HOLE_BAND = _bar.TOP_PIN_HOLE_BAND
 BAR_STOCK_UNDERSIZE = _bar.BAR_STOCK_UNDERSIZE  # 0.051
 # The hole's offset from the bar's back face prints at three places on the
 # bar sheet (ch_amplitude_bar_notes.DRAWING_PRECISION TopPinX): the title
-# block's .XXX band (test_ch_bar_pivot_fit pins it to title_block.yaml).
-HOLE_LOCATION_TOLERANCE = 0.13
+# block's .XXX band (read from title_block.yaml).
+HOLE_LOCATION_TOLERANCE = printed_band_mm(3)
 
 # --- The joint's limits (the budget test_ch_bar_pivot_fit holds). ---
 # The tightest press the cheeks take: ANSI B4.1-1967 (R1987) FN2 "medium
@@ -81,11 +85,10 @@ PRESS_INTERFERENCE_MAX = 0.00085 * MM_PER_IN  # 0.0216
 RULE12_WALL_TARGET = 2.0  # drawing-guidelines.md rule 17 (walls and webs)
 RULE12_WALL_FLOOR = 1.5
 RUNNING_FLOOR = _bar.STRADDLE_RUNNING_FLOOR  # 0.10, oiled steel faces
-# Title-block linear bands, restated (test_ch_bar_pivot_fit pins them to
-# title_block.yaml): the lever's height prints at one place, the bar's notch
-# depth and pin drop at two.
-LINEAR_1PL = 0.8
-LINEAR_2PL = 0.51
+# Title-block linear bands (read from title_block.yaml): the lever's height
+# prints at one place, the bar's notch depth and pin drop at two.
+LINEAR_1PL = printed_band_mm(1)
+LINEAR_2PL = printed_band_mm(2)
 # The lever turns on the pin relative to the bar: |lever tilt - bar tilt| over
 # a cam turn at every bar station up to the square preset's 80 mm (channels.yaml
 # a_1), taking the rocker's solved swing in either sense; the loop solves

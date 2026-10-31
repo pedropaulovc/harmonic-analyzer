@@ -201,8 +201,8 @@ def test_hub_keeps_its_od_over_each_wall_floor_and_the_washer_rides_the_shaft() 
 def test_hub_wall_covers_the_worst_printed_limits_and_eccentricity() -> None:
     """The minimum on the sheet is a physical wall, not the raw class band."""
     places = arm_notes.DEFAULT_DRAWING_PRECISION
-    display_band = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
-    assert printed_band_mm(places) == display_band == pytest.approx(0.51)
+    printed_band = printed_band_mm(places)
+    assert printed_band == pytest.approx(0.51)
     od = round(arm.HUB_DIA, places)
     bore_max = round(arm.PIVOT_HOLE_DIA, places) + arm.PIVOT_HOLE_BAND[0]
     eccentricity = arm.HUB_COAXIALITY_DIA / 2.0
@@ -210,7 +210,7 @@ def test_hub_wall_covers_the_worst_printed_limits_and_eccentricity() -> None:
     assert bore_max == pytest.approx(6.53)
     assert arm.HUB_COAXIALITY_DIA == pytest.approx(0.10)
     assert eccentricity == pytest.approx(0.05)
-    wall = (od - display_band - bore_max) / 2.0 - eccentricity
+    wall = (od - printed_band - bore_max) / 2.0 - eccentricity
     raw_class_wall = (od - _BAND_2PL - bore_max) / 2.0 - eccentricity
     assert raw_class_wall == pytest.approx(1.531)
     assert wall == pytest.approx(1.53)
@@ -225,20 +225,20 @@ def test_hub_wall_covers_the_worst_printed_limits_and_eccentricity() -> None:
     assert float(arm.GEOMETRIC_TOLERANCES_MM["hub OD position to bore"]) == arm.HUB_COAXIALITY_DIA
     # The spec's pessimistic hundredth-mm ceiling also covers the rounded
     # printed class; lowering that floor by one printed step does not.
-    floor_wall = (arm.HUB_DIA_MIN - display_band - bore_max) / 2.0 - eccentricity
+    floor_wall = (arm.HUB_DIA_MIN - printed_band - bore_max) / 2.0 - eccentricity
     assert floor_wall >= arm.RULE12_WALL_FLOOR - 1e-9
     step = 1.0 / scale
     assert floor_wall - step / 2.0 < arm.RULE12_WALL_FLOOR
     # R9's inherited Ø0.50 zone is unsafe at the unchanged nominal OD.
     old_coaxiality = 0.50
-    old_wall = (od - display_band - bore_max) / 2.0 - old_coaxiality / 2.0
+    old_wall = (od - printed_band - bore_max) / 2.0 - old_coaxiality / 2.0
     assert old_wall == pytest.approx(1.33)
     assert old_wall < arm.RULE12_WALL_FLOOR
     # Omitting eccentricity recreates the old floor, which cannot meet 1.5.
     old_floor = math.ceil(
         round((bore_max + 2.0 * arm.RULE12_WALL_FLOOR + _BAND_2PL) * scale, 9)
     ) / scale
-    assert (old_floor - display_band - bore_max) / 2.0 - eccentricity < (
+    assert (old_floor - printed_band - bore_max) / 2.0 - eccentricity < (
         arm.RULE12_WALL_FLOOR
     )
 

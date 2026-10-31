@@ -29,6 +29,7 @@ from __future__ import annotations
 import math
 
 from _fit_deviations import deviations
+from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from _gtol_cylinder import CylinderFace
 from dt_pinion_lift_rod_spec import ROD_DIA as LIFT_ROD_DIA
@@ -76,8 +77,8 @@ COLLAR_OD_TOLERANCE_MM = 0.05
 COLLAR_AXIS_TOLERANCE_MM = 0.05
 
 # The station and total length both print at one place; neither is tightened
-# to rescue an axial wall. Tests tie this restatement to the title block.
-GENERAL_LINEAR_TOLERANCE_MM = 0.8
+# to rescue an axial wall. The title block's .X row.
+GENERAL_LINEAR_TOLERANCE_MM = printed_band_mm(1)
 SET_SCREW_FRONT_WALL_MIN_MM = (
     SET_SCREW_Z - GENERAL_LINEAR_TOLERANCE_MM - SET_SCREW_MAJOR_DIA / 2.0
 )

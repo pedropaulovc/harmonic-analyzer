@@ -20,7 +20,6 @@ anywhere along the lock notch.
 
 from __future__ import annotations
 
-import _config
 from _hole_spec import HoleSpec
 from _mcmaster_93585a190 import (
     HEAD_H as _HEAD_H,
@@ -29,6 +28,7 @@ from _mcmaster_93585a190 import (
     MAJOR_R as _MAJOR_R,
     PITCH as _PITCH,
 )
+from _printed_tolerance import printed_band_mm
 from fr_harmonic_base_fasteners import ThroughSeatMaterial, require_through_seat_fit
 
 SOURCE = "cad/out/reports/mcmaster-93585A190-dump.json"
@@ -68,7 +68,7 @@ def require_seat_fit(
         or seat.end != "through_all"
     ):
         raise AssertionError("cone lock requires a through 1/4-20 UNC-2B seat")
-    plate_band = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
+    plate_band = printed_band_mm(2)
     for pose, insertion_min, insertion_max in (
         (
             "plate clamp",

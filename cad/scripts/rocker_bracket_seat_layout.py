@@ -59,6 +59,7 @@ from _hole_spec import (
     THREAD_MAJOR_MM,
     HoleSpec,
 )
+from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
 from ch_pivot_bracket_sides import HOLE_MACHINE_Z, SIDES
 from fr_rocker_arm_support_section_spec import NARROW
 from fr_rocker_arm_support_spec import (
@@ -67,10 +68,10 @@ from fr_rocker_arm_support_spec import (
     SUPPORT_WORLD_Z,
 )
 
-LINEAR_1PL = 0.8  # title-block .X band
+LINEAR_1PL = printed_band_mm(1)  # title-block .X band
 LINEAR_2PL = 0.508  # title-block .XX band
 LINEAR_3PL = 0.127  # title-block .XXX band
-EDGE_BREAK = 0.25  # title-block edge break, also the novice spare
+EDGE_BREAK = edge_break_chamfer_mm()  # title-block edge break, also the novice spare
 RULE12_WEB_TARGET = 2.0
 
 # MHA-CH-VN-57: the channel assembly pins these to the stock part it places.

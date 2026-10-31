@@ -1,12 +1,18 @@
-# Drawing title-block general tolerances (ASME-style, inch — matches the
-# US-customary fastener policy). The dashed-decimal rows mean "a dimension
-# displayed with N decimal places carries this ± unless otherwise specified".
-# ``display`` is pasted verbatim into part/assembly custom properties (TOL_LIN_XX /
-# TOL_LIN_XXX / TOL_ANG / TOL_SURFACE) that the drawing
-# template's title block
-# reads via $PRPSHEET; ``value_in``/``value_deg`` feed the same numbers into
-# each part's DimXpert block-tolerance document properties — keep the pairs in
-# agreement.
+# Drawing title-block general tolerances. The dashed-decimal rows mean "a
+# dimension displayed with N decimal places carries this ± unless otherwise
+# specified".
+#
+# Every printed tolerance is NUMERIC data whose unit is part of its key
+# (``band_mm`` / ``band_in``, ``plus_mm``, ``radius_mm``, ``value_deg``), plus the
+# ``digits`` the sheet prints it at. _printed_tolerance is the one reader: it
+# returns physical bands in mm for worst-case stacks and renders the TOL_*
+# custom-property text (TOL_LIN_X / _XX / _XXX, TOL_ANG, TOL_EDGE_BREAK_R, ...)
+# that the drawing template's title block reads via $PRPSHEET. No row carries a
+# display string, so nothing can parse "±.01" back as millimetres; a key with no
+# unit suffix, or an unknown one, is refused.
+#
+# ``value_in`` / ``value_deg`` also feed each part's DimXpert block-tolerance
+# document properties (_part_properties.apply_block_tolerances).
 #
 # Separate from tolerances/ on purpose: the fit/general classes there are read
 # by assembly GEOMETRY (drive_train / paper_drive via _config.fit), so sharing
@@ -17,16 +23,16 @@
 # Coherence with the mm classes in tolerances/_base.yaml: ±.02 in = 0.508 mm ≈
 # visual_noncritical; ±.005 in = 0.127 mm ≈ machined_block.
 #
-# INTERIM (until the inch migration, issue #290): the ``display`` strings are
-# the mm renderings of the same inch tolerances, because generated sheets
-# still dimension in mm — an inch string like "±.02" on a metric print reads
-# as ±0.02 mm, 25x tighter than intended (Codex P1). When #290 flips the
-# drawings to inch, restore the inch strings: "±.02" / "±.005" / "±1°". The
-# numeric value_in/value_deg fields are unit-explicit and stay put.
-linear_1pl: { value_in: 0.03,  display: "±0.8" }    # .X   (= ±1/32 in, "loose")
-linear_2pl: { value_in: 0.02,  display: "±0.51" }   # .XX  (= ±.02 in)
-linear_3pl: { value_in: 0.005, display: "±0.13" }   # .XXX (= ±.005 in)
-angular:    { value_deg: 1.0,  display: "±1°" }
+# INTERIM (issue #290; owner rulings 2026-10-30): generated sheets still
+# dimension in mm, so the printed bands below are mm values (.X ±0.8, .XX ±0.51,
+# .XXX ±0.13, which is why 0.8 mm is not exactly value_in 0.03). The inch pilot
+# moves them to ``band_in`` with the ASME rows .X ±.1 (non-functional features
+# only), .XX ±.01, .XXX ±.005; drilled holes +.004/0, edge break R.010 / .010,
+# inside corners R.040 MAX. The renderer then prints inch style (``±.01``).
+linear_1pl: { value_in: 0.03,  band_mm: 0.8,  digits: 1 }   # .X
+linear_2pl: { value_in: 0.02,  band_mm: 0.51, digits: 2 }   # .XX
+linear_3pl: { value_in: 0.005, band_mm: 0.13, digits: 2 }   # .XXX
+angular:    { value_deg: 1.0,  digits: 0 }                  # ±1°
 # Surface row is a PROCESS statement, not a roughness number: every surface that
 # needs a grade carries its own symbol (_surface_finish: MACHINED_UM 1.6 on
 # journals/bores, GROUND_UM 0.8 on knife edges — drawing-guidelines.md
@@ -39,18 +45,19 @@ angular:    { value_deg: 1.0,  display: "±1°" }
 # the arm start and the cell ends ~14 characters later — measured 2026-09-09:
 # "SURFACES AS CAST/MACHINED" (25) and "AS CAST/MACHINED" (16) both crossed
 # the title-column rule; this (13) clears it.
-surface:    { display: "CAST/MACHINED" }
+surface:    { text: "CAST/MACHINED" }
 
 # Edge-break row: "REMOVE BURRS AND BREAK SHARP EDGES <R> OR CHAMFER <C> MAX",
-# read via $PRPSHEET:{TOL_EDGE_BREAK_R} / {TOL_CHAMFER_MAX} (2026-09 template).
-edge_break: { radius_mm: 0.25, chamfer_max_mm: 0.25, display_r: "R0.25", display_chamfer: "0.25" }
+# read via $PRPSHEET:{TOL_EDGE_BREAK_R} / {TOL_CHAMFER_MAX} (2026-09 template),
+# rendered "R0.25" / "0.25".
+edge_break: { radius_mm: 0.25, chamfer_max_mm: 0.25, digits: 2 }
 
 # Inside-corner ceiling: the first line of the title block's general-note
-# block, "INSIDE CORNERS <R>", reads $PRPSHEET:{TOL_INSIDE_CORNER}, which
-# _part_properties derives from ``radius_mm`` as "R1.0 MAX".
+# block, "INSIDE CORNERS <R>", reads $PRPSHEET:{TOL_INSIDE_CORNER}, rendered
+# "R1.0 MAX".
 # The title-block convention already scopes it as the default, so
 # feature-specific smaller limits remain native model dimensions (#1625, #1636).
-inside_corner: { radius_mm: 1.0 }
+inside_corner: { radius_mm: 1.0, digits: 1 }
 
 # Thread row: "THREADS <TYPE> CLASS <CLASS>" via $PRPSHEET:{THREAD_TYPE} /
 # {THREAD_CLASS} -- the US-customary fastener policy's default fit class, so
@@ -65,10 +72,10 @@ thread: { type: "UNC/UNF", class: "2A/2B" }
 # drilled hole UOS, so individual clearance holes need no per-feature callout
 # (cad/docs/tolerance-policy.md — only the few critical features carry explicit
 # callouts, via _holes.wizard_holes dia_tolerance_mm when TIGHTER is needed).
-# Stamped as TOL_HOLE_MINUS / TOL_HOLE_PLUS; the title block's DRILLED HOLES row
-# reads them via $PRPSHEET, pasted verbatim like "±0.51". The nil limit is a
-# BARE "0" -- ASME Y14.5-2009 §2.3.2: "where either the plus or minus value is
-# nil, a single zero is shown without a plus or minus sign" (so not "-0.00", not
+# Stamped as TOL_HOLE_MINUS / TOL_HOLE_PLUS, which the title block's DRILLED
+# HOLES row reads via $PRPSHEET. The nil limit renders as a BARE "0" --
+# ASME Y14.5-2009 §2.3.2: "where either the plus or minus value is nil, a
+# single zero is shown without a plus or minus sign" (so not "-0.00", not
 # "-0"). Upper deviation comes first, so the template row reads TOL_HOLE_PLUS
 # then TOL_HOLE_MINUS -> "+0.10 / 0".
-drilled_hole: { minus_mm: 0.0, plus_mm: 0.10, display_minus: "0", display_plus: "+0.10" }
+drilled_hole: { minus_mm: 0.0, plus_mm: 0.10, digits: 2 }

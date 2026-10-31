@@ -16,6 +16,7 @@ import math
 import _config
 import cone_line
 from _hole_spec import HoleSpec, blind_cut_dia_mm, drill_process
+from _printed_tolerance import edge_break_chamfer_mm, edge_break_radius_mm
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -171,7 +172,7 @@ def local_station(far_end_station: float) -> float:
 # start a row south) the land still spans the bore mouth's 0.25 edge break,
 # so the collar's inside corner never rides the bore edge and the rear face
 # seats flat on the boss.
-BORE_MOUTH_BREAK_MAX = 0.25  # the title block's R0.25 / C0.25 edge break
+BORE_MOUTH_BREAK_MAX = edge_break_chamfer_mm()  # the title block's R0.25 / C0.25 edge break
 JOURNAL_START = local_station(
     dt_crank_pinion_spec.floor_to_places(
         SHAFT_LENGTH
@@ -193,7 +194,7 @@ PINION_SEAT_DIA = dt_crank_pinion_spec.SEAT_DIA
 PINION_SEAT_DIA_BAND = SHAFT_DIA_BAND  # the through shaft's turned-fit band
 PINION_SEAT_STATION = 24.1  # far end to the step
 SEAT_STEP = local_station(PINION_SEAT_STATION)
-STEP_CORNER_RADIUS_MAX = 0.25  # the title block's R0.25 edge break
+STEP_CORNER_RADIUS_MAX = edge_break_radius_mm()  # the title block's R0.25 edge break
 SEAT_STEP_STANDOFF_WORST = SEAT_STEP + STATION_ROW + STEP_CORNER_RADIUS_MAX - SEAT_PINION
 SEAT_GAP_NORTH_RANGE = dt_crank_pinion_spec.SEAT_GAP_MAX_MM - dt_crank_pinion_spec.SEAT_FEELER_MM
 if SEAT_STEP_STANDOFF_WORST > SEAT_GAP_NORTH_RANGE + 1e-9:

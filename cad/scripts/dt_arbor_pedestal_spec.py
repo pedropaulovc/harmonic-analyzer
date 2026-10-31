@@ -8,6 +8,7 @@ from __future__ import annotations
 from math import sqrt
 
 from _hole_spec import HoleSpec, THREAD_MAJOR_MM, blind_cut_dia_mm
+from _printed_tolerance import printed_band_mm
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
@@ -85,7 +86,7 @@ SET_SCREW_MIN_ENGAGEMENT_D = 1.5  # drawing-guidelines.md rule 18 (thread engage
 # band; the thread is only full where its major-diameter circle lies wholly
 # in metal, so the crown's sag across the hole and the bore's sag across it
 # are lost, and so is the one-pitch entry chamfer.
-_CROWN_BAND_MM = 0.8  # "crown radius" prints at .X
+_CROWN_BAND_MM = printed_band_mm(1)  # "crown radius" prints at .X
 _BORE_MAX_RADIUS = (BORE_DIA + BORE_DIA_BAND[0]) / 2.0
 _THREAD_HALF_MAJOR = THREAD_MAJOR_MM[SET_SCREW_THREAD] / 2.0
 
@@ -125,8 +126,8 @@ if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
 # Web between the tap and each strap face (z). The strap depth prints at .X
 # and the screw location at .XX from the strap inner face (both below), so
 # the outer web loses both bands. Target 2.0 / floor 1.5 (drawing-guidelines.md rule 17 (walls and webs)).
-_STRAP_DEPTH_BAND_MM = 0.8
-_SET_SCREW_LOCATION_BAND_MM = 0.51
+_STRAP_DEPTH_BAND_MM = printed_band_mm(1)
+_SET_SCREW_LOCATION_BAND_MM = printed_band_mm(2)
 SET_SCREW_WEB_MM = min(
     (STRAP_INNER_Z - SET_SCREW_Z) - _SET_SCREW_LOCATION_BAND_MM - _THREAD_HALF_MAJOR,
     (STRAP_T - _STRAP_DEPTH_BAND_MM)

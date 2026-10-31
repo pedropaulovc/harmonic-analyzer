@@ -2,6 +2,7 @@
 
 import _config
 import sm_vn_boss_hook_jam_nut_spec as jam_nut
+from _printed_tolerance import printed_band_mm
 from stock_anchor_geom import ANCHOR_9490T1, trim
 from sm_summing_lever_spec import ANCHOR_H
 from _supplier_screw_reference_names import FEATURE_BY_PLANE
@@ -22,9 +23,7 @@ FINISHED_OVERALL_TOLERANCE_MM = _config.title_block("linear_1pl")["value_in"] * 
 # end under the 3.797-mm tap drill, which needs at least
 # (4.826 - 3.797) / 2 = 0.5145: 1.4 - 0.8 = 0.6 (1.3 would leave 0.5).
 CHAMFER_WIDTH_MM = 1.4
-CHAMFER_WIDTH_TOLERANCE_MM = float(
-    str(_config.title_block("linear_1pl")["display"]).lstrip("±")
-)
+CHAMFER_WIDTH_TOLERANCE_MM = printed_band_mm(1)
 CHAMFER_ANGLE_DEG = 45.0
 CHAMFER_ANGLE_TOLERANCE_DEG = _config.title_block("angular")["value_deg"]
 

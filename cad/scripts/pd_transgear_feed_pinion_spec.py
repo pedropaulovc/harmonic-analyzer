@@ -41,7 +41,7 @@ from _fit_deviations import deviations
 from _gear_fit_limits import gear_tip_band_mm
 from _gear_quality import toothspace_runout_tir_mm
 from _gtol_cylinder import CylinderFace
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pd_transgear_disc_hub_geometry import SPIGOT_LENGTH, SPIGOT_LENGTH_BAND
 from pd_cluster_stack_band import PRINTED_LENGTH_BAND
@@ -383,7 +383,7 @@ CUTTER_SKU = "10-289-328"
 CUTTER_RUNOUT_TOL_TYPE = 6  # swTolType_e.swTolMAX
 CUTTER_RUNOUT_DEVIATIONS = (FULL_DEPTH_MIN - CUTTER_RUNOUT_MAX, 0.0)
 FLAT_END_DEVIATIONS = (FLAT_END_MIN - FLAT_END_STATION, 0.0)
-_TITLE_BLOCK_EDGE_BREAK = 0.25  # the test reads it back from the title block
+_TITLE_BLOCK_EDGE_BREAK = edge_break_chamfer_mm()
 if FLAT_END_MIN < max(
     FACE_WIDTH + FACE_WIDTH_BAND + _TITLE_BLOCK_EDGE_BREAK, CUTTER_RUNOUT_MAX
 ):

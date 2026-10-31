@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 
 import _config
+from _printed_tolerance import printed_band_mm
 import magnifying_bracket_joint_layout as joint
 import sm_summing_lever_profile as profile
 import sm_summing_lever_spec as spec
@@ -150,7 +151,7 @@ def _plate_top_y_limits() -> tuple[float, float]:
     """Independent union of native .XX and printed title-block limits."""
     row = _config.title_block("linear_2pl")
     native_band = float(row["value_in"]) * spec.MM_PER_IN
-    printed_band = float(str(row["display"]).removeprefix("±"))
+    printed_band = printed_band_mm(2)
     printed_top = round(spec.COEFFICIENT_TOP_Y, 2)
     return (
         min(spec.COEFFICIENT_TOP_Y - native_band, printed_top - printed_band),
@@ -224,8 +225,7 @@ def test_independent_plate_top_boundary_catches_obsolete_half_band(monkeypatch) 
 
     # Both a missing top band and the former symmetric-5.08 half-band miss
     # this allowed configuration, reporting more wall than it actually has.
-    row = _config.title_block("linear_2pl")
-    printed_band = float(str(row["display"]).removeprefix("±"))
+    printed_band = printed_band_mm(2)
     for too_small in (0.0, printed_band / 2.0):
         with monkeypatch.context() as patch:
             patch.setattr(profile, "PLATE_TOP_Y_ALLOWANCE", too_small)

@@ -10,9 +10,15 @@ from _com import _early_bound, _read_member
 from _drawing_precision import _named_dimension
 
 
-def _tolerance_places(*deviations: float) -> int:
-    """Return the fewest decimals that preserve every deviation, in the
-    dimension's display unit (millimetres, or degrees for an angle).
+# A tolerance display unit, by the unit its deviations are given in: lengths in
+# mm print as mm or converted to inches; angles in degrees print as degrees.
+_SOURCE_PER_DISPLAY_UNIT = {"mm": 1.0, "in": 25.4, "deg": 1.0}
+
+
+def _tolerance_places(*deviations: float, display_unit: str) -> int:
+    """Return the fewest decimals that preserve every deviation once shown in
+    ``display_unit``: ``"mm"`` or ``"in"`` for lengths (deviations in mm), or
+    ``"deg"`` for an angle (deviations in degrees).
 
     SOLIDWORKS stores tolerance values in metres or radians but renders them
     in the document's display units.  The drawing template defaults tolerance
@@ -21,10 +27,15 @@ def _tolerance_places(*deviations: float) -> int:
     +/-0.3.  Derive the override from the source values rather than
     maintaining a second per-drawing precision table.
     """
+    try:
+        divisor = _SOURCE_PER_DISPLAY_UNIT[display_unit]
+    except KeyError:
+        raise ValueError(f"unknown tolerance display unit {display_unit!r}") from None
+    shown = [value / divisor for value in deviations]
     for digits in range(9):
         if all(
             math.isclose(value, round(value, digits), rel_tol=0.0, abs_tol=1e-12)
-            for value in deviations
+            for value in shown
         ):
             return digits
     raise ValueError(
@@ -37,17 +48,19 @@ def _set_tolerance_precision(
     display: Any,
     deviations: tuple[float, ...],
     *,
+    display_unit: str,
     label: str,
     places: int | None = None,
 ) -> int:
     """Set and verify a model display dimension's primary tolerance precision.
 
+    ``display_unit`` is the unit the dimension shows (see ``_tolerance_places``).
     ``places`` widens the tolerance to the nominal's places where a band's
     fewest places would print short of it (a 3-place ream's 0/-0.010 read
     "0.00 / -0.01"); it may never drop a digit a deviation needs.
     """
     display = _early_bound(display, "IDisplayDimension")
-    digits = _tolerance_places(*deviations)
+    digits = _tolerance_places(*deviations, display_unit=display_unit)
     if places is not None:
         if places < digits:
             raise ValueError(
@@ -120,7 +133,10 @@ def set_dimension_symmetric_tolerance(
             f"{minimum:g}/{maximum:g} m != +/-{tolerance_m:g} m"
         )
     precision = _set_tolerance_precision(
-        display, (-tolerance_mm, tolerance_mm), label=f"{dimension_name}@{feature_name}"
+        display,
+        (-tolerance_mm, tolerance_mm),
+        display_unit="mm",
+        label=f"{dimension_name}@{feature_name}",
     )
     _telemetry.success(
         f"toleranced {dimension_name}@{feature_name}: +/-{tolerance_mm:g} mm "
@@ -170,6 +186,7 @@ def set_dimension_bilateral_tolerance(
     precision = _set_tolerance_precision(
         display,
         (lower_deviation_mm, upper_deviation_mm),
+        display_unit="mm",
         label=f"{dimension_name}@{feature_name}",
         places=places,
     )
@@ -215,6 +232,7 @@ def set_dimension_symmetric_angular_tolerance(
     precision = _set_tolerance_precision(
         display,
         (-tolerance_degrees, tolerance_degrees),
+        display_unit="deg",
         label=f"{dimension_name}@{feature_name}",
     )
     _telemetry.success(
