@@ -14,7 +14,7 @@ import trimesh
 TOOLS = Path(__file__).resolve().parents[1] / "comparisons" / "tools"
 sys.path.insert(0, str(TOOLS))
 
-import release_diff
+import release_diff  # noqa: E402 - needs TOOLS on sys.path, like the import below
 from release_diff import (
     HISTORICAL_IDENTITY_MAP, IDENTITY_MAP, canonical_keys, identity_inventory,
     load_identity_map, member, mesh_deviation, paired_keys,
