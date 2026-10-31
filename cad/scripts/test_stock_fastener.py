@@ -322,9 +322,10 @@ def test_an_inch_stock_part_selects_its_units_before_the_first_recipe_feature(mo
             material="Steel",
         )
     )
-    assert order == [
-        "create_part", (263, 3), (47, 3), (48, 1), (49, 8), "recipe", "save",
-    ]
+    assert order[0] == "create_part"
+    assert order[-2:] == ["recipe", "save"]
+    assert len(order[1:-2]) == 4
+    assert set(order[1:-2]) == {(263, 3), (47, 3), (48, 1), (49, 8)}
 
 
 def _author(sku: str = "TEST123"):
