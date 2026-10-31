@@ -34,7 +34,10 @@ import dt_crank_drive_gear_spec
 import dt_crank_hub_geometry
 from _fit_deviations import deviations
 from _hole_spec import FRACTIONAL_DRILL_MM, HoleSpec
-from _printed_tolerance import printed_band_mm, printed_deviations
+from _inch_wall_limits import WALL_TARGET_MM
+from _package_units import drawing_unit
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
+from dt_crank_drive_gear_spec import floor_inch_mm, inch_text
 from _surface_finish import SurfaceFinishControl
 from stock_form_cutter import (
     StockFormProfile,
@@ -45,6 +48,16 @@ from stock_form_cutter import (
 
 
 MM_PER_IN = 25.4
+# #290: the registry row's drawing_unit (in) is this sheet's unit; the bands,
+# places and callout text below are authored for it.
+UNIT = drawing_unit("parts/dt-crank-pinion", _config.parts("dt-crank-pinion"))
+
+
+def prints_exactly(value_mm: float, places: int, unit: str = UNIT) -> bool:
+    """Whether ``value_mm`` sits on the ``places``-place grid of ``unit``."""
+    shown = value_mm / (MM_PER_IN if unit == "in" else 1.0)
+    return abs(shown - round(shown, places)) <= 1e-9
+
 
 TEETH = 16
 # The straight pinion uses the pair's standard normal-pitch system with a
@@ -66,9 +79,11 @@ CUTTER_TEMPLATE = template_for_teeth(TEETH, DIAMETRAL_PITCH, PRESSURE_ANGLE_DEG)
 CUTTER_NUMBER = CUTTER_TEMPLATE.cutter_number
 CUTTER_TEETH_RANGE = CUTTER_TEMPLATE.teeth_range
 
-# The blank tip circles retain the ruled +/-0.10 turning band. The fixed-centre
-# mesh's nonbinding stack, rather than an eccentric fit-up, owns tip/root air.
-OUTSIDE_DIA_TOLERANCE_MM = 0.10
+# The blank tip circles retain the ruled turning band, +/-.004 in. The
+# fixed-centre mesh's nonbinding stack, rather than an eccentric fit-up, owns
+# tip/root air.
+OUTSIDE_DIA_TOLERANCE_MM = 0.1016
+OUTSIDE_DIA_PLACES = 3
 # Same retained critical cutting setup as the mate, indicated to this bore;
 # no datum frame or general part-runout tolerance is implied.
 TOOTH_RUNOUT_TIR_MM = _config.fit("crank_mesh", "tooth_cutting_runout_tir_mm")
@@ -120,10 +135,12 @@ _CORNER_PROBES = tuple(
     StockFormProfile(TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, value)
     for value in STOCK_TOOL_TRANSLATION_LIMITS_MM
 )
-OUTSIDE_DIA = math.floor(
-    (2.0 * min(profile.support_radius_max_mm for profile in _CORNER_PROBES)
-     - OUTSIDE_DIA_TOLERANCE_MM) * 100.0
-) / 100.0
+# Floored to the .001 in grid it prints at, so the printed size is the model.
+OUTSIDE_DIA = floor_inch_mm(
+    2.0 * min(profile.support_radius_max_mm for profile in _CORNER_PROBES)
+    - OUTSIDE_DIA_TOLERANCE_MM,
+    OUTSIDE_DIA_PLACES,
+)
 STOCK_PROFILE = StockFormProfile(
     TEETH, CUTTER_TEMPLATE, OUTSIDE_DIA / 2.0, STOCK_TOOL_TRANSLATION_MM
 )
@@ -161,10 +178,11 @@ STOCK_PROFILE_CORNERS = tuple(
     )
 )
 
-# Retain the established 9.0-mm crankshaft step and matching bore. The seat
-# keeps the through shaft's existing size band and fit, while the live boss
-# wall guard checks the standard full-depth root over that bore.
-SEAT_DIA = 9.0
+# The crankshaft's .3125 in step and matching bore (#290, inch fit row K11:
+# the owned .3135 reamer cuts the bore). The seat keeps the through shaft's
+# size band and fit, while the live boss wall guard checks the standard
+# full-depth root over that bore.
+SEAT_DIA = 7.9375  # .3125
 
 # The bore over the crankshaft's seat is the part's one critical fit, and the
 # only reason anything here prints a third decimal: a slip fit exists only if
@@ -185,18 +203,18 @@ BORE_DIA_BAND = (  # (upper, lower) deviations
     round(_SHAFT_UPPER + _CLEARANCE_MIN, 5),
 )
 
-FACE_WIDTH = 11.6  # teeth grown north past the 64T row; south face stays seated
+FACE_WIDTH = 11.684  # .46: teeth grown north past the 64T row; south face stays seated
 # The retained south-face datum and full tooth length still locate the boss
 # step. FaceWidth remains the native GearBlank extrusion with its existing
-# +0/-0.30 functional band, not the wider general .X grade. Actual stock-form
+# +.000/-.010 functional band, not the general .XX grade. Actual stock-form
 # acceptance must prove at least the source-owned row engagement fraction
 # at every manufactured/pose case. The former ideal-profile slice calculation
 # is not a certificate for this cutter-native pinion. The long limit also
 # bounds the turned band's physical T120 clearance independently of contact.
-FACE_WIDTH_BAND = (0.0, -0.30)  # (upper, lower) deviations
+FACE_WIDTH_BAND = (0.0, -0.254)  # (upper, lower) deviations: +.000/-.010
 FACE_WIDTH_LIMITS = deviations(FACE_WIDTH_BAND)  # (lower, upper)
 # Full-OD shoulder: OutsideDia over SHOULDER_LENGTH from the south face,
-# with the established +0/-0.30 band. The assembly retains the 0.25-mm T120
+# with its +.000/-.010 band. The assembly retains the 0.25-mm T120
 # air floor, all axis/fit offsets, the fit-up feeler and the row contact gate.
 # The toothed south face is set directly off the restored MHA-DT-05 north
 # boss face with the assembly step-4 feeler. There is no spot-face retreat
@@ -206,30 +224,30 @@ SEAT_GAP_MAX_MM = 1.0
 PINION_BOSS_NORTH_GAP_RANGE = (SEAT_FEELER_MM, SEAT_GAP_MAX_MM)
 
 
-SHOULDER_LENGTH = 8.5
-SHOULDER_LENGTH_BAND = (0.0, -0.30)
+SHOULDER_LENGTH = 8.382  # .33
+SHOULDER_LENGTH_BAND = (0.0, -0.254)  # +.000/-.010
 SHOULDER_LENGTH_LIMITS = deviations(SHOULDER_LENGTH_BAND)
 # Retain a real north band below the actual finite-supported full blank.
 # guards check its upper size against T120 and its lower size over the row.
-TURNED_DIA = 18.55
-TURNED_DIA_TOLERANCE_MM = 0.10
+TURNED_DIA = 18.542  # .730
+TURNED_DIA_TOLERANCE_MM = 0.1016  # +/-.004
 TURNED_LENGTH = FACE_WIDTH - SHOULDER_LENGTH
 # T120 envelope facts are checked against the assembly's exact printed-corner
 # calculation. Finite clearance is rounded down to 0.01; positive infinity
 # means that no T120 section reaches the full-tip shoulder envelope.
 # Both sheets describe that absence rather than printing an infinite size.
 T120_SHOULDER_AIR_WORST = math.inf
-# 1.8573 exact with the cone swing set 0.20 above standard (edge slack moves
-# X_PITCH; user ruling 2026-10-10) and the inch running fits, floored to 1.85;
-# the ordinary floor is 0.25.
-T120_TURNED_BAND_RADIAL_WORST = 1.85
+# 1.8608 exact with the cone swing set 0.20 above standard (edge slack moves
+# X_PITCH; user ruling 2026-10-10), the inch running fits and the inch-printed
+# turned band (#290), floored to 1.86; the ordinary floor is 0.25.
+T120_TURNED_BAND_RADIAL_WORST = 1.86
 # The independent fit-up feeler check remains: MHA-DT-10 and T120 are
 # pushed toward each other to take up every running play. A band that stops
 # the feeler is turned down, never under TURNED_DIA_FITUP_MIN; a shoulder
 # that stops it is faced back, never under its printed short limit. The
 # assembly proves the fit-up limits clear the feeler and retain engagement.
 T120_FITUP_FEELER_MM = 0.10
-TURNED_DIA_FITUP_MIN = 18.25
+TURNED_DIA_FITUP_MIN = 18.2372  # .718
 SHOULDER_LENGTH_FITUP_MIN = SHOULDER_LENGTH + SHOULDER_LENGTH_LIMITS[0]
 
 # --- Hub boss + retention pin (ch. 12 p. 19, page002_img02 / img06) ---------
@@ -245,55 +263,63 @@ SHOULDER_LENGTH_FITUP_MIN = SHOULDER_LENGTH + SHOULDER_LENGTH_LIMITS[0]
 # extruded from the SAME faced end as the teeth, so the print carries one
 # overall length from that end (drawing-guidelines.md rule 11 (turned parts read like the lathe): lengths from one faced end, the overall
 # length real and conspicuous), and the toothed length is FaceWidth.
-BOSS_DIA = ROOT_DIA_MIN
 # The boss's outer end edge takes the title block's edge break: the sized
 # chamfer that once imitated the photo's rounding had no function, and at its
 # general grade it could reach the bore (machinist review of 4d4e038e3).
 
 
-def ceil_to_places(value: float, places: int) -> float:
+def ceil_to_places(value: float, places: int, unit: str = UNIT) -> float:
+    """``value`` (mm) rounded up to the ``places``-place grid of ``unit``."""
+    per = MM_PER_IN if unit == "in" else 1.0
     scale = 10.0**places
-    return math.ceil(round(value * scale, 6)) / scale
+    return round(math.ceil(round(value / per * scale, 6)) / scale * per, 9)
 
 
-def floor_to_places(value: float, places: int) -> float:
+def floor_to_places(value: float, places: int, unit: str = UNIT) -> float:
+    """``value`` (mm) rounded down to the ``places``-place grid of ``unit``."""
+    per = MM_PER_IN if unit == "in" else 1.0
     scale = 10.0**places
-    return math.floor(round(value * scale, 6)) / scale
+    return round(math.floor(round(value / per * scale, 6)) / scale * per, 9)
+
+
+def print_step(places: int, unit: str = UNIT) -> float:
+    """One step of the ``places``-place grid of ``unit``, in mm."""
+    return 10.0**-places * (MM_PER_IN if unit == "in" else 1.0)
 
 
 # USER RULING 2026-09-25, MHA-DT-10 boss option C: the boss stays at the tooth
 # root, where a form cutter runs out onto it untouched and the photo reads it;
 # a boss proud of the root is scalloped by the cutter's arc up to the pin hole.
-# Its worst wall -- the printed diameter at its general row over the bore's
-# upper limit -- is therefore a shortfall under the 2.0 wall target (pending ruling #1374),
-# held above the 1.5 floor here, so an OD, tooth or bore change that eats
-# into the floor fails loud.
-BOSS_DIA_PLACES = 1
-BOSS_WALL_FLOOR_MM = 1.5
+# #290: the root floored to the .01 in grid it prints at, so the boss sits
+# just under the root.  Over the .3125 bore its worst wall -- the printed
+# diameter at its .XX row over the bore's upper limit -- meets the .080 in
+# rule-17 target (the #1374 shortfall is gone); an OD, tooth or bore change
+# that eats into it fails loud.
+BOSS_DIA_PLACES = 2
+BOSS_DIA = floor_to_places(ROOT_DIA_MIN, BOSS_DIA_PLACES)
 _BORE_LOWER, _BORE_UPPER = deviations(BORE_DIA_BAND)
-_BOSS_DIA_LOWER, _BOSS_DIA_UPPER = printed_deviations(BOSS_DIA, BOSS_DIA_PLACES)
+_BOSS_DIA_LOWER, _BOSS_DIA_UPPER = printed_deviations(BOSS_DIA, BOSS_DIA_PLACES, unit=UNIT)
 BOSS_WALL_WORST = (BOSS_DIA + _BOSS_DIA_LOWER - (BORE_DIA + _BORE_UPPER)) / 2.0
-if BOSS_WALL_WORST < BOSS_WALL_FLOOR_MM:
+if BOSS_WALL_WORST < WALL_TARGET_MM:
     raise AssertionError(
-        f"16T boss worst wall {BOSS_WALL_WORST:.3f} is under the {BOSS_WALL_FLOOR_MM} "
-        "floor of the 2026-09-25 option-C ruling"
+        f"16T boss worst wall {BOSS_WALL_WORST:.3f} is under the .080 in target"
     )
 
 # The internal shoulder where the turned band steps down to the boss at the
 # tooth face is a lathe corner, so it carries a single-limit radius (machinist
 # review of 88d48ad2a7b4, drawing-guidelines.md rules 11 and 16): sharp up to
-# this maximum, printed "R0.4 MAX" from the model value (swTolMAX).  Only the
+# this maximum, printed "R.016 MAX" from the model value (swTolMAX).  Only the
 # 64T crank-drive gear's tooth row reaches over the boss there; its worst tip
-# (max OD at the closest pose the drive train allows) keeps 0.22 mm radial
-# air to a full R0.4 ring around the boss, against 0.62 mm to the sharp corner.
+# (max OD at the closest pose the drive train allows) keeps radial air to a
+# full R.016 ring around the boss.
 # The spaces' form cutter runs out through the ring, so TOOTH_RUNOUT_NOTE stays
 # true; the ring sits north of the teeth and changes no fit or wall.
-SHOULDER_RADIUS = 0.4
+SHOULDER_RADIUS = 0.4064  # .016
 # (upper, lower) deviations: the nominal IS the limit, down to sharp.
 SHOULDER_RADIUS_BAND = (0.0, -SHOULDER_RADIUS)
-SHOULDER_RADIUS_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.4 MAX"
-SHOULDER_RADIUS_PLACES = 1
-if round(SHOULDER_RADIUS, SHOULDER_RADIUS_PLACES) != SHOULDER_RADIUS:
+SHOULDER_RADIUS_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R.016 MAX"
+SHOULDER_RADIUS_PLACES = 3
+if not prints_exactly(SHOULDER_RADIUS, SHOULDER_RADIUS_PLACES):
     raise AssertionError("the shoulder radius must print exactly at its places")
 if BOSS_DIA / 2.0 + SHOULDER_RADIUS >= (TURNED_DIA - TURNED_DIA_TOLERANCE_MM) / 2.0:
     raise AssertionError("the shoulder radius must end on the turned band's face")
@@ -320,27 +346,28 @@ PIN_LENGTH = BOSS_DIA  # flush both sides
 # set (dt_crankshaft_spec.SHAFT_END_PROUD_RANGE).  The shaft therefore fills
 # the boss, and its wall past the pin is never shorter than the boss's own:
 # the binding ligament is the pin's to the boss's north face, held at
-# PIN_EDGE_MIN_WORST at print-worst.  The Ø3.175 pin stays at the actual boss
-# mid-length, with the existing layout allowance.
-PIN_EDGE_MIN_WORST = 2.0
-PIN_STATION_LAYOUT_ALLOWANCE_MM = 0.25
-# The overall length prints at OVERALL_LENGTH_PLACES (.X +/-0.8), and the
+# PIN_EDGE_MIN_WORST (the .080 in rule-17 target) at print-worst.  The
+# Ø.125 pin stays at the actual boss mid-length, with a .010 in layout
+# allowance.
+PIN_EDGE_MIN_WORST = WALL_TARGET_MM
+PIN_STATION_LAYOUT_ALLOWANCE_MM = 0.254
+# The overall length prints at OVERALL_LENGTH_PLACES (.XX +/-.01), and the
 # pin is laid out at the actual boss's middle, so a short boss splits its
 # shortfall between the two ligaments.
-OVERALL_LENGTH_PLACES = 1
-SHAFT_LENGTH_PLACES = 1  # dt_crankshaft_spec prints its Depth here
-FACE_WIDTH_PLACES = 1
+OVERALL_LENGTH_PLACES = 2
+SHAFT_LENGTH_PLACES = 2  # dt_crankshaft_spec prints its Depth here
+FACE_WIDTH_PLACES = 2
 SHOULDER_LENGTH_PLACES = FACE_WIDTH_PLACES  # stated like FaceWidth
-TURNED_DIA_PLACES = 2  # stated like the OutsideDia it cuts into
-OVERALL_LENGTH_GRADE_MM = printed_band_mm(OVERALL_LENGTH_PLACES)
-# W15 sizes the boss for a face accepted anywhere in the .X row. The printed
+TURNED_DIA_PLACES = 3  # stated like the OutsideDia it cuts into
+OVERALL_LENGTH_GRADE_MM = printed_band_mm(OVERALL_LENGTH_PLACES, unit=UNIT)
+# W15 sizes the boss for a face accepted anywhere in the .XX row. The printed
 # band sits inside that row, so every W15 stack only gains margin.
-W15_FACE_ALLOWANCE_MM = printed_band_mm(FACE_WIDTH_PLACES)
+W15_FACE_ALLOWANCE_MM = printed_band_mm(FACE_WIDTH_PLACES, unit=UNIT)
 _FACE_LOWER, _FACE_UPPER = FACE_WIDTH_LIMITS
-if _FACE_LOWER < -W15_FACE_ALLOWANCE_MM or _FACE_UPPER > W15_FACE_ALLOWANCE_MM:
-    raise AssertionError("the 16T face band left the .X row W15 sizes the boss for")
+if _FACE_LOWER < -W15_FACE_ALLOWANCE_MM - 1e-9 or _FACE_UPPER > W15_FACE_ALLOWANCE_MM:
+    raise AssertionError("the 16T face band left the .XX row W15 sizes the boss for")
 # The pin's drilled-hole grade grows its radius by half the printed oversize.
-_PIN_HOLE_RADIUS_GROWTH = float(_config.title_block("drilled_hole")["plus_mm"]) / 2.0
+_PIN_HOLE_RADIUS_GROWTH = drilled_oversize_mm(unit=UNIT) / 2.0
 
 
 def pin_axial_ligament_worst(boss_length: float) -> float:
@@ -367,7 +394,7 @@ BOSS_LENGTH = ceil_to_places(
     + OVERALL_LENGTH_GRADE_MM,
     BOSS_LENGTH_PLACES,
 )
-OVERALL_LENGTH = round(FACE_WIDTH + BOSS_LENGTH, OVERALL_LENGTH_PLACES)
+OVERALL_LENGTH = round(FACE_WIDTH + BOSS_LENGTH, 9)
 for _name, _value, _places in (
     ("FACE_WIDTH", FACE_WIDTH, FACE_WIDTH_PLACES),
     ("OVERALL_LENGTH", OVERALL_LENGTH, OVERALL_LENGTH_PLACES),
@@ -375,7 +402,7 @@ for _name, _value, _places in (
     ("TURNED_DIA", TURNED_DIA, TURNED_DIA_PLACES),
     ("TURNED_DIA_FITUP_MIN", TURNED_DIA_FITUP_MIN, TURNED_DIA_PLACES),
 ):
-    if abs(_value - round(_value, _places)) > 1e-9:
+    if not prints_exactly(_value, _places):
         raise AssertionError(f"{_name} {_value!r} does not print exactly at {_places} places")
 # The turned band is a real band of stub teeth at every accepted size: the
 # shoulder ends short of the tooth end, and the turned diameter stays above
@@ -395,30 +422,30 @@ PIN_AXIAL_LIGAMENT_WORST = pin_axial_ligament_worst(BOSS_LENGTH)
 if PIN_AXIAL_LIGAMENT_WORST < PIN_EDGE_MIN_WORST - 1e-9:
     raise AssertionError("match-drilled pin's wall to the boss end falls below its print-worst floor")
 if (
-    pin_axial_ligament_worst(BOSS_LENGTH - 10.0**-BOSS_LENGTH_PLACES)
+    pin_axial_ligament_worst(BOSS_LENGTH - print_step(BOSS_LENGTH_PLACES))
     >= PIN_EDGE_MIN_WORST - 1e-9
 ):
     raise AssertionError("a boss one print step shorter still holds W15: not the shortest")
 # The print locates the match-drilled hole from the boss's north face, the
 # faced end whose wall the hole must keep (drawing-guidelines.md rule 10: a
 # centre from a real feature, never "mid-length" in words; machinist review
-# r1 of #1652). At that dimension's own .X row the hole still keeps the W15
+# r1 of #1652). At that dimension's own .XXX row the hole still keeps the W15
 # floor to the north face.
 PIN_FROM_BOSS_END = BOSS_LENGTH / 2.0
-PIN_FROM_BOSS_END_PLACES = BOSS_LENGTH_PLACES
-if abs(PIN_FROM_BOSS_END - round(PIN_FROM_BOSS_END, PIN_FROM_BOSS_END_PLACES)) > 1e-9:
+PIN_FROM_BOSS_END_PLACES = BOSS_LENGTH_PLACES + 1
+if not prints_exactly(PIN_FROM_BOSS_END, PIN_FROM_BOSS_END_PLACES):
     raise AssertionError("the pin's station from the boss end does not print exactly")
 PIN_FROM_BOSS_END_LIGAMENT_WORST = (
     PIN_FROM_BOSS_END
-    - printed_band_mm(PIN_FROM_BOSS_END_PLACES)
+    - printed_band_mm(PIN_FROM_BOSS_END_PLACES, unit=UNIT)
     - PIN_DIA / 2.0
     - _PIN_HOLE_RADIUS_GROWTH
 )
 if PIN_FROM_BOSS_END_LIGAMENT_WORST < PIN_EDGE_MIN_WORST - 1e-9:
     raise AssertionError("the printed pin station lets the hole break the boss's north wall")
 # The hole is reamed to fit the pin, so its printed size is a reference
-# nominal from the pin's own diameter, at the drilled-hole row's two places.
-PIN_HOLE_DIA_PLACES = 2
+# nominal from the pin's own diameter, at the drilled-hole row's three places.
+PIN_HOLE_DIA_PLACES = 3
 
 
 def pitch_point_azimuths(
@@ -523,9 +550,9 @@ BORE_FIT_CALLOUT = "\n".join(
     (
         "BORE LIMITS GOVERN",
         f"MATE SHAFT {CRANKSHAFT_NUMBER}",
-        f"(\N{DIAMETER SIGN}{SEAT_DIA:.3f} "
-        f"+{_SHAFT_UPPER:.5f}/{_SHAFT_LOWER:.5f})",
-        f"(DIA CLR {_CLEARANCE_MIN:.4f}-{_CLEARANCE_MAX:.4f} mm)",
+        f"(\N{DIAMETER SIGN}{inch_text(SEAT_DIA, 4)} "
+        f"+{inch_text(_SHAFT_UPPER, 4)}/{inch_text(_SHAFT_LOWER, 4)})",
+        f"(DIA CLR {inch_text(_CLEARANCE_MIN, 4)}-{inch_text(_CLEARANCE_MAX, 4)})",
     )
 )
 # One matched-fit note, printed on BOTH sheets (machinist review of 4d4e038e3):
@@ -602,21 +629,22 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # marks, so ``draw_dt_crank_pinion`` imports each dimension verbatim and only reads
 # ``GetPrimaryPrecision2()`` back off the sheet.
 #
-# The bore is the only size fit on the part and prints three places with its
-# derived band. The outside diameter prints two with its own +/-0.10. The face
-# width prints one place with its own +0/-0.30 (FACE_WIDTH_BAND): the assembly
-# proves the 64T row overlap at its short limit and the turned band's T120
-# clearance at its long one. The shoulder length prints one place and the
-# turned diameter two, each with the band its reason is recorded at above.
-# The boss diameter is routine .XX, not a running surface. The match-drilled
-# hole prints its reference size at two places and its station from the
-# boss's north face at one (PIN_FROM_BOSS_END). The overall length prints
-# one place like the face, with the W15 boss sized for the pin's wall to its
-# north face. The shoulder radius prints its single limit at one place.
+# Inch sheet (#290). The bore is the only size fit on the part and prints
+# four places with its derived band. The outside diameter prints three with
+# its own +/-.004. The face width prints two places with its own +.000/-.010
+# (FACE_WIDTH_BAND): the assembly proves the 64T row overlap at its short
+# limit and the turned band's T120 clearance at its long one. The shoulder
+# length prints two places and the turned diameter three, each with the band
+# its reason is recorded at above. The boss diameter is routine .XX, not a
+# running surface. The match-drilled hole prints its reference size at three
+# places and its station from the boss's north face at three
+# (PIN_FROM_BOSS_END). The overall length prints two places like the face,
+# with the W15 boss sized for the pin's wall to its north face. The shoulder
+# radius prints its single limit at three places.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BossProfile": {
-        "OutsideDia": 2,
-        "BoreDia": 3,
+        "OutsideDia": OUTSIDE_DIA_PLACES,
+        "BoreDia": 4,
         "BossDia": BOSS_DIA_PLACES,
         "OverallLength": OVERALL_LENGTH_PLACES,
         "FaceWidth": FACE_WIDTH_PLACES,
@@ -675,7 +703,7 @@ TURNED_DIA_FITUP_CALLOUT = "\n".join(
         "IF MHA-DT-00 T120",
         "FEELER CHECK FAILS,",
         "TURN AT ASSY TO CLEAR,",
-        f"Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN",
+        f"Ø{inch_text(TURNED_DIA_FITUP_MIN, TURNED_DIA_PLACES)} MIN",
     )
 )
 # Section A-A cuts through a tooth, so the band reads as a solid ring and the
@@ -709,8 +737,8 @@ T120_FITUP_ASSEMBLY_CHECK = "\n".join(
         f"   READING A {T120_FITUP_FEELER_MM:.2f} FEELER ALL ROUND. BAND TO T120 TIPS: "
         "IF THE FEELER",
         "   STOPS, TURN BAND DOWN, "
-        f"Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN. SHOULDER TO T120 SOUTH FACE: IF",
+        f"Ø{TURNED_DIA_FITUP_MIN:.2f} MIN. SHOULDER TO T120 SOUTH FACE: IF",
         "   THE FEELER STOPS, FACE SHOULDER BACK, "
-        f"{SHOULDER_LENGTH_FITUP_MIN:.{SHOULDER_LENGTH_PLACES}f} MIN. RESET, RECHECK.",
+        f"{SHOULDER_LENGTH_FITUP_MIN:.2f} MIN. RESET, RECHECK.",
     )
 )

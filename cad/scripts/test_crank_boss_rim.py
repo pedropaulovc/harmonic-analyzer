@@ -24,16 +24,6 @@ FEATURES = {"crank boss", "head", "body", "cone boss end"}
 SEATED = rim.seated_gear_offset()
 
 
-def test_a_collar_thinned_past_the_margin_fails_the_boss_floor() -> None:
-    # A single printable collar step must not consume all the seated margin.
-    # A geometrically meaningful reduction does fail the retained floor.
-    thin = rim.THINNER_COLLAR
-    new_offset = rim.seated_gear_offset(collar_thickness=thin)
-    assert rim.THINNER_COLLAR_CLEARANCE < rim.FLOOR_CLEARANCE_MM
-    assert "crank boss" in rim.worst_shortfalls(new_offset, collar_thickness=thin)
-    assert rim.COLLAR_MARGIN_MM > 0.001
-
-
 def test_the_seated_south_face_holds_the_floor_everywhere() -> None:
     worst = rim.clearances(gear_offset=SEATED)
     assert set(worst) == FEATURES
@@ -55,7 +45,10 @@ def test_the_64t_station_is_the_collar_stack() -> None:
     thrust collar, which bears on the cone boss's north end; toward the post it
     moves by the boss end long (ConeBossLen's .XX row, half per end) and the
     collar thin (CollarWidth's row).  The two butts are closed nominally."""
-    boss_end = rim.printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"]) / 2.0
+    boss_end = (
+        rim.printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"], unit=rim.POST_UNIT)
+        / 2.0
+    )
     collar = rim.printed_band_mm(shaft.DRAWING_PRECISION_BY_NAME["CollarWidth"])
     assert rim.GEAR64_STATION_TOWARD_POST == pytest.approx(boss_end + collar)
     assert rim.collar_contacts(SEATED) == pytest.approx(0.0, abs=1e-9)

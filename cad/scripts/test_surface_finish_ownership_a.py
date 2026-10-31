@@ -141,6 +141,7 @@ CASES = (
                     )
                     / 2.0,
                 ),
+                display_unit="in",
             ),
             SurfaceFinishControl(
                 "inboard_journal",
@@ -150,11 +151,13 @@ CASES = (
                     contains_y_mm=(dt_crankshaft_spec.RELIEF_END + dt_crankshaft_spec.JOURNAL_END)
                     / 2.0,
                 ),
+                display_unit="in",
             ),
             SurfaceFinishControl(
                 "collar_rear_face",
                 MACHINED_UM,
                 PlanarFace((0, 1, 0), dt_crankshaft_spec.COLLAR_REAR),
+                display_unit="in",
             ),
         ),
     ),

@@ -153,8 +153,8 @@ def test_hub_overall_band_is_one_sided_to_what_the_rear_face_stacks_hold() -> No
         **kwargs,
     )
     assert geometry.HUB_LENGTH_BAND[0] == 0.10
-    assert air == pytest.approx(0.146, abs=1e-9)
-    assert engagement == pytest.approx(0.636, abs=1e-9)
+    assert air == pytest.approx(0.1508, abs=1e-9)
+    assert engagement == pytest.approx(0.6184, abs=1e-9)
     with pytest.raises(AssertionError, match="hub's rear face"):
         dt_crankshaft_spec.drive_pin_front_clearances(
             dt_crankshaft_spec.DRIVE_PIN_PROUD_RANGE,
@@ -188,7 +188,7 @@ def test_chain_clears_the_relief_shoulder_with_the_wheel_floated_onto_the_hub() 
     airs = _stack_a(geometry.RELIEF_LENGTH)
     assert airs["floated_worst"] == pytest.approx(0.2135, abs=1e-9)
     assert airs["floated"] == pytest.approx(0.3635, abs=1e-9)
-    assert airs["seated_worst"] == pytest.approx(0.4135, abs=1e-9)
+    assert airs["seated_worst"] == pytest.approx(0.4075, abs=1e-9)
     assert airs["seated"] == pytest.approx(1.0635, abs=1e-9)
     # The floated pose governs, and the relief is the shortest .XX length
     # that holds the floor there.

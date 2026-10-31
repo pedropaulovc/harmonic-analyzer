@@ -24,8 +24,10 @@ import math
 
 import _config
 import cone_line
+from cone_pitch import GEAR_FACE_WIDTH_BAND
 import cone_shaft_land_bands
 import gear_seat_fit
+from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
 from _surface_finish import SurfaceFinishControl
 from stock_form_cutter import (
@@ -38,6 +40,22 @@ from gear_seat_fit import GEAR_SEAT_CLEARANCE, seat_bore_band
 
 
 MM_PER_IN = 25.4
+# #290: the registry row's drawing_unit (in) is this sheet's unit; the bands,
+# places and gear-data text below are authored for it.
+UNIT = drawing_unit("parts/dt-crank-drive-gear", _config.parts("dt-crank-drive-gear"))
+
+
+def inch_text(value_mm: float, places: int) -> str:
+    """``value_mm`` as decimal-inch print text: ``.375``, ``2.797``."""
+    text = f"{value_mm / MM_PER_IN:.{places}f}"
+    return text[1:] if text.startswith("0.") else text.replace("-0.", "-.")
+
+
+def floor_inch_mm(value_mm: float, places: int) -> float:
+    """``value_mm`` floored to the ``places``-place inch grid, in mm."""
+    scale = 10.0**places
+    return round(math.floor(round(value_mm / MM_PER_IN * scale, 6)) / scale * MM_PER_IN, 9)
+
 
 TEETH = 64
 
@@ -52,8 +70,9 @@ HELIX_ANGLE_DEG = cone_line.INCLINE_DEG
 # MHA-DT-05 north feature off it).  The cone set is a solid stack (user ruling
 # 2026-09-28, dt_cone_gear_stack): the 64T grows NORTH until it bears on T120's
 # grown south face, so its face is the gap between the collar and T120,
-# floored to the four places it prints.  dt_cone_gear_stack pins the two faces
-# together.  The band is the cone gears' +/-0.025.
+# floored to four mm places (a stack closure, so it is not snapped to the
+# inch grid; the sheet prints it rounded at four inch places).
+# dt_cone_gear_stack pins the two faces together.  The band is +/-.001 in.
 LAYOUT_REFERENCE_FACE_WIDTH = 10.0
 LAYOUT_CENTRE_STATION = (
     cone_line.SHAFT_T120_STATION
@@ -69,7 +88,7 @@ FACE_WIDTH = round(
     - (LAYOUT_CENTRE_STATION - LAYOUT_FACE_WIDTH / 2.0 + SOUTH_FACE_SHIFT_NORTH),
     4,
 )
-FACE_WIDTH_BAND = (0.025, -0.025)
+FACE_WIDTH_BAND = GEAR_FACE_WIDTH_BAND  # +/-.001 in, the cone gears' own
 # The centre sits CENTRE_SHIFT_NORTH north of the 19.9 layout station.
 CENTRE_SHIFT_NORTH = SOUTH_FACE_SHIFT_NORTH + (FACE_WIDTH - LAYOUT_FACE_WIDTH) / 2.0
 if not LAYOUT_FACE_WIDTH - SOUTH_FACE_SHIFT_NORTH < FACE_WIDTH < LAYOUT_FACE_WIDTH:
@@ -130,8 +149,9 @@ GEAR_DATA_REFERENCE_PLACES = 3
 # gears' blanks.  The mesh runs at a fixed centre with no adjustment (user
 # ruling 2026-09-28): ``crank_mesh_stack`` books this band as the tip-to-root
 # term of its closing corner (TIP_ROOT_BAND_RADIAL), and crank_boss_rim grows
-# the tip by half of it toward MHA-DT-05.
-OUTSIDE_DIA_TOLERANCE_MM = 0.10
+# the tip by half of it toward MHA-DT-05.  #290: +/-.004 in.
+OUTSIDE_DIA_TOLERANCE_MM = 0.1016
+OUTSIDE_DIA_PLACES = 3
 # Critical tooth-cutting setup, indicated to the finished bore. This process
 # limit is shared by both shop gears; it is not an AGMA/form accuracy class.
 TOOTH_RUNOUT_TIR_MM = _config.fit("crank_mesh", "tooth_cutting_runout_tir_mm")
@@ -203,10 +223,12 @@ _CORNER_PROBES = tuple(
     StockFormProfile(TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, value, HELIX_ANGLE_DEG)
     for value in STOCK_TOOL_TRANSLATION_LIMITS_MM
 )
-OUTSIDE_DIA = math.floor(
-    (2.0 * min(profile.support_radius_max_mm for profile in _CORNER_PROBES)
-     - OUTSIDE_DIA_TOLERANCE_MM) * 100.0
-) / 100.0
+# Floored to the .001 in grid it prints at, so the printed size is the model.
+OUTSIDE_DIA = floor_inch_mm(
+    2.0 * min(profile.support_radius_max_mm for profile in _CORNER_PROBES)
+    - OUTSIDE_DIA_TOLERANCE_MM,
+    OUTSIDE_DIA_PLACES,
+)
 STOCK_PROFILE = StockFormProfile(
     TEETH, CUTTER_TEMPLATE, OUTSIDE_DIA / 2.0, STOCK_TOOL_TRANSLATION_MM, HELIX_ANGLE_DEG
 )
@@ -289,13 +311,14 @@ MIN_FLAT_CUTTER_RADIUS = 4.0  # ≥Ø8 end mill
 # 1.00 +0.10/0 leg read as a tight band with no named mate; rule 4 (tighten
 # only for function, and name the mate) and the owner's standing preference
 # to move the nominal rather than print a tight band).
-BORE_SOUTH_CHAMFER = 1.50
+BORE_SOUTH_CHAMFER = 1.524  # .06
 BORE_SOUTH_CHAMFER_PLACES = 2
 # The limits a part accepted against the printed leg may show: the general
 # .XX row read at the places the leg prints. Not a fit band (the part
 # authors no tolerance on the leg), so plain limits, not a band tuple.
-BORE_SOUTH_CHAMFER_MIN = BORE_SOUTH_CHAMFER - printed_band_mm(BORE_SOUTH_CHAMFER_PLACES)
-BORE_SOUTH_CHAMFER_MAX = BORE_SOUTH_CHAMFER + printed_band_mm(BORE_SOUTH_CHAMFER_PLACES)
+_CHAMFER_ROW = printed_band_mm(BORE_SOUTH_CHAMFER_PLACES, unit=UNIT)
+BORE_SOUTH_CHAMFER_MIN = BORE_SOUTH_CHAMFER - _CHAMFER_ROW
+BORE_SOUTH_CHAMFER_MAX = BORE_SOUTH_CHAMFER + _CHAMFER_ROW
 # The shaft's nominal Sec1 Ø is BORE_DIA; the drawing contract tests it
 # against dt_cone_gear_shaft_spec.SECTION_DIAS[1] without a circular import.
 _SHAFT_MAX_R = (BORE_DIA + cone_shaft_land_bands.SECTION_DIA_BANDS[1][0]) / 2.0
@@ -358,15 +381,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # marks, so ``draw_dt_crank_drive_gear`` imports each dimension verbatim and only
 # reads ``GetPrimaryPrecision2()`` back off the sheet.
 #
-# The round and D-flat bore sizes carry their own fit bands at three places.
-# The outside diameter prints two with +/-0.10. The face width is the four-place
-# ±0.025 member of the solid gear stack; its south face seats on the collar
-# and the tolerance only shifts the north face. The south chamfer leg prints
-# two places under the title block's .XX band, with no band of its own.
+# Inch places: the round and D-flat bore sizes carry their own fit bands at
+# four (+.0018/+.0010, +.0008/+.0004). The outside diameter prints three with
+# +/-.004. The face width is the four-place +/-.001 member of the solid gear
+# stack; its south face seats on the collar and the tolerance only shifts the
+# north face. The south chamfer leg prints two places under the title block's
+# .XX band, with no band of its own.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "OutsideDiaReference": {"OutsideDia": 2},
+    "OutsideDiaReference": {"OutsideDia": OUTSIDE_DIA_PLACES},
     "GearBlank": {"FaceWidth": 4},
-    "BoreProfile": {"BoreDia": 3, "BoreAF": 3},
+    "BoreProfile": {"BoreDia": 4, "BoreAF": 4},
     "BoreSouthChamfer": {"BoreSouthChamferSize": BORE_SOUTH_CHAMFER_PLACES},
 }
 

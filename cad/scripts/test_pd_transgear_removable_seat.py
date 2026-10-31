@@ -101,7 +101,11 @@ def _wheel_float(hole_dia: float) -> float:
     ways along the pins' line."""
     hole_max = hole_dia + float(_config.title_block("drilled_hole")["plus_mm"])
     dowel_min = crank_pin.DIA + dowel_spec.DIA_BAND_IN[0] * dowel_spec.MM_PER_IN
-    return (hole_max - dowel_min) / 2.0 + 2.0 * seat_geometry.DRIVE_PIN_OFFSET_TOL
+    return (
+        (hole_max - dowel_min) / 2.0
+        + crank.DRIVE_PIN_OFFSET_TOL
+        + seat_geometry.DRIVE_PIN_OFFSET_TOL
+    )
 
 
 def test_chain_on_the_floated_crank_wheel_keeps_its_radial_air() -> None:
@@ -112,7 +116,7 @@ def test_chain_on_the_floated_crank_wheel_keeps_its_radial_air() -> None:
     bore clearance; the gate must report that corner's air, and it must stay
     positive."""
     wheel = _wheel_float(seat_geometry.PIN_HOLE_DIA)
-    assert wheel == pytest.approx(0.1581, abs=1e-4)
+    assert wheel == pytest.approx(crank.WHEEL_SEAT_FLOAT, abs=1e-4)
     # The bore is no stop: its tightest clearance on the pilot is wider.
     assert (seat_geometry.BORE_DIA - hub.SHAFT_DIA) / 2.0 > wheel
     hub_float = (hub.HUB_BORE_DIA_MAX - (hub.SHAFT_DIA + hub.SHAFT_DIA_BAND[1])) / 2.0
@@ -198,7 +202,6 @@ def test_knob_pin_tip_stays_inside_the_thinnest_wheel_under_the_thumbnut() -> No
     floor_pressed_max = (
         seat_geometry.DRIVE_PIN_PROUD + crank.DRIVE_PIN_DEPTH_TOL + seat_geometry.DRIVE_PIN_LENGTH_GRADE
     )
-    assert floor_pressed_max == pytest.approx(2.754)
     assert floor_pressed_max < seat_geometry.PLATE
     with pytest.raises(AssertionError, match="thumbnut"):
         knob_pin.checked_tip_inset(floor_pressed_max, knob_pin.THINNEST_PLATE)
@@ -239,16 +242,18 @@ _CRANK_SEAT = dict(
 
 
 def test_crank_pin_tips_are_checked_against_the_hub_rear_face() -> None:
-    # Hand check, dome-root stations: seat forward 28.7 - 0.5, tip 2.754 in
-    # front of it, hub rear long 25.2 + 0.10; floated onto the short hub
-    # (25.2 - 0.51, the title block's side) the thinnest wheel moves
-    # 28.8 - 2.7 - 24.69 off the seat.
+    # Hand check, dome-root stations: the seat at its forward printed limit,
+    # the longest tip in front of it, hub rear long 25.2 + 0.10; floated onto
+    # the short hub (25.2 - 0.51, the title block's side) the thinnest wheel
+    # moves off the seat by the seat's rear printed limit less the wheel and
+    # the short hub.
     air, engagement = crank.drive_pin_front_clearances(
         crank.DRIVE_PIN_PROUD_RANGE, hub_rear=crank.HUB_LENGTH, **_CRANK_SEAT
     )
-    assert crank.DRIVE_PIN_PROUD_RANGE == pytest.approx((2.046, 2.754))
-    assert air == pytest.approx(28.2 - 2.754 - 25.30)
-    assert engagement == pytest.approx(2.046 - 1.41)
+    least, most = crank.DRIVE_PIN_PROUD_RANGE
+    seat_low, seat_high = (crank.SEAT_COLLAR + d for d in sorted(crank.SEAT_COLLAR_BAND))
+    assert air == pytest.approx(seat_low - most - 25.30)
+    assert engagement == pytest.approx(least - (seat_high - 2.7 - 24.69))
     assert (air, engagement) == (
         crank.DRIVE_PIN_HUB_AIR_WORST,
         crank.DRIVE_PIN_ENGAGEMENT_WORST,

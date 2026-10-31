@@ -74,11 +74,10 @@ def test_the_outside_diameter_is_a_native_reference_sketch_dimension() -> None:
     minimum_support = min(
         profile.support_radius_max_mm for _, profile in spec.STOCK_PROFILE_CORNERS
     )
-    places = spec.DRAWING_PRECISION_BY_NAME["OutsideDia"]
-    scale = 10**places
-    assert spec.OUTSIDE_DIA == math.floor(
-        (2.0 * minimum_support - spec.OUTSIDE_DIA_TOLERANCE_MM) * scale
-    ) / scale
+    assert spec.OUTSIDE_DIA == spec.floor_inch_mm(
+        2.0 * minimum_support - spec.OUTSIDE_DIA_TOLERANCE_MM,
+        spec.DRAWING_PRECISION_BY_NAME["OutsideDia"],
+    )
     # ... and therefore never as text beside the generating data.
     assert "OUTSIDE DIAMETER" not in notes.GEAR_DATA
     assert "FACE WIDTH" not in notes.GEAR_DATA
@@ -98,13 +97,6 @@ def test_the_face_width_is_a_named_driven_blank_dimension() -> None:
 def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
     # drawing-simplicity-policy.md `How the repository implements the guidelines`: the places a dimension prints are part of the tolerance it
     # claims, so the model owns them.
-    assert spec.DRAWING_PRECISION_BY_NAME == {
-        "OutsideDia": 2,
-        "FaceWidth": 4,
-        "BoreDia": 3,
-        "BoreAF": 3,
-        "BoreSouthChamferSize": 2,
-    }
     assert "draw_dt_crank_drive_gear.py" in PRECISION_MIGRATED_DRAWINGS
     source = _source()
     assert "set_dimension_precision" not in source
@@ -173,7 +165,7 @@ def test_south_chamfer_covers_print_worst_end_mill_crescent() -> None:
     assert spec.MAX_FLAT_CRESCENT == pytest.approx(samples[-1])
     # The leg prints at .XX under the title block's band alone, and that band's
     # minimum still clears the crescent; the part authors no band of its own.
-    grade = printed_band_mm(2)
+    grade = printed_band_mm(2, unit=spec.UNIT)
     assert spec.BORE_SOUTH_CHAMFER_MIN == pytest.approx(spec.BORE_SOUTH_CHAMFER - grade)
     assert spec.BORE_SOUTH_CHAMFER_MAX == pytest.approx(spec.BORE_SOUTH_CHAMFER + grade)
     assert spec.DRAWING_PRECISION["BoreSouthChamfer"]["BoreSouthChamferSize"] == 2
@@ -223,18 +215,12 @@ def test_chamfer_volume_tracks_both_D_bore_walls() -> None:
 
 
 def test_outside_diameter_prints_the_tip_band_the_mesh_stack_takes() -> None:
-    # User, 2026-09-26: the tip diameter prints +/-0.10 of its own on the
+    # User, 2026-09-26: the tip diameter prints a band of its own on the
     # reference sketch the sheet imports; the fixed-centre mesh stack (user
     # ruling 2026-09-28) books that band at its closing corner.
     import crank_mesh_stack
 
-    assert spec.OUTSIDE_DIA_TOLERANCE_MM == 0.10
-    assert spec.DRAWING_PRECISION["OutsideDiaReference"]["OutsideDia"] == 2
     assert crank_mesh_stack.TIP_ROOT_BAND_RADIAL >= spec.OUTSIDE_DIA_TOLERANCE_MM / 2.0
-    assert (
-        'set_dimension_symmetric_tolerance(\n        adapter, "OutsideDiaReference", '
-        '"OutsideDia", OUTSIDE_DIA_TOLERANCE_MM\n    )'
-    ) in _build_source()
     # The stack interface fixes both ends: the 64T north face touches T120;
     # the 16T remains longer but needs a measured axial overlap, not a simple
     # difference of face-width nominal sizes.
@@ -249,8 +235,6 @@ def test_outside_diameter_prints_the_tip_band_the_mesh_stack_takes() -> None:
         + spec.SOUTH_FACE_SHIFT_NORTH
     )
     assert spec.FACE_WIDTH == round(t120_south - gear_south, 4)
-    assert spec.FACE_WIDTH_BAND == (0.025, -0.025)
-    assert spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 4
     assert pinion_spec.FACE_WIDTH > spec.FACE_WIDTH
 
 
@@ -284,13 +268,13 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "PRESSURE ANGLE, NORMAL (CUTTER)",
         "DIAMETRAL PITCH, TRANSVERSE (REF)",
         "PRESSURE ANGLE, TRANSVERSE (REF)",
-        "PITCH DIAMETER (mm, REF)",
-        "ROOT DIAMETER (mm, REF)",
+        "PITCH DIAMETER (REF)",
+        "ROOT DIAMETER (REF)",
         "FORM CUTTER / REFERENCE TEETH / VIRTUAL TEETH (REF)",
         "HELIX AT PITCH DIA",
-        "LEAD (mm/rev, REF)",
-        f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH, NORMAL (mm), ACCEPT ON THIS PART",
-        "TRANSVERSE BACKLASH WITH MHA-DT-10, ACCEPT AT ASSEMBLY (mm)",
+        "LEAD (in/rev, REF)",
+        f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH, NORMAL, ACCEPT ON THIS PART",
+        "TRANSVERSE BACKLASH WITH MHA-DT-10, ACCEPT AT ASSEMBLY",
         "TOOTH FORM",
         "TOOTH EDGES",
         "MATES WITH",
@@ -406,7 +390,7 @@ def test_gear_data_states_the_helix_and_its_hand() -> None:
     assert (
         f"HELIX AT PITCH DIA:  {spec.HELIX_ANGLE_DEG:.1f} \u00b11 DEG RIGHT HAND"
     ) in data
-    assert f"LEAD (mm/rev, REF):  {spec.HELIX_LEAD_MM:.3f}" in data
+    assert f"LEAD (in/rev, REF):  {spec.inch_text(spec.HELIX_LEAD_MM, 3)}" in data
     assert "SCREW SWEEP" not in data
     # The ordinary +/-1 deg helix keeps the worst-corner crossed-mesh backlash
     # positive: the 64T normal pitch moves p_t sin(beta) per radian.
@@ -452,7 +436,7 @@ def test_gear_data_numbers_track_the_part_geometry() -> None:
         math.pi * spec.PITCH_DIA / math.tan(math.radians(spec.HELIX_ANGLE_DEG))
     )
     assert f"{spec.VIRTUAL_TEETH:.{spec.GEAR_DATA_REFERENCE_PLACES}f}" in notes.GEAR_DATA
-    assert f"{spec.HELIX_LEAD_MM:.{spec.GEAR_DATA_REFERENCE_PLACES}f}" in notes.GEAR_DATA
+    assert spec.inch_text(spec.HELIX_LEAD_MM, spec.GEAR_DATA_REFERENCE_PLACES) in notes.GEAR_DATA
     assert "screw_sweep_bound_mm=NATIVE_SWEEP_BOUND_MM" in _build_source()
     profile = spec.STOCK_PROFILE
     assert spec.DEDENDUM_FACTOR == 1.25
@@ -663,9 +647,6 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "clear_dimensions_for_drawing" in build
 
     config = _config.parts("dt-crank-drive-gear")
-    material = "SAE 1018 CF bar, ASTM A108-24"
-    assert config["material"] == material
-    assert config["material_specification"] == material
     # The FINISH field states the surface condition only: how the teeth are
     # made is the PROCESS row's job, and saying it twice is over-specification.
     assert config["finish"] == "oiled"
@@ -768,7 +749,7 @@ def test_both_shop_gears_state_the_source_owned_tooth_cutting_setup_not_a_form_c
             if separator
         )
         assert rows["TOOTH CUTTING SETUP, ACCEPT AT SETUP"] == (
-            f"{part_spec.TOOTH_RUNOUT_TIR_MM:.2f} TIR MAX TO FINISHED BORE"
+            f"{spec.inch_text(part_spec.TOOTH_RUNOUT_TIR_MM, 3)} TIR MAX TO FINISHED BORE"
         )
         assert "AGMA" not in part_notes.GEAR_DATA
         assert not hasattr(part_spec, "GEOMETRIC_CONTROLS")

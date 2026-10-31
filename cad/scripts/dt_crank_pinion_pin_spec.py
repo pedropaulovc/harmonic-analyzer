@@ -19,15 +19,15 @@ from dt_crank_pinion_spec import PIN_DIA as PIN_DIA  # noqa: PLC0414  # re-expor
 # can never drift from the hole it was cut for.
 if PIN_LENGTH != BOSS_DIA:
     raise AssertionError("retention pin is defined flush with the boss")
-PIN_LEN = PIN_LENGTH  # 13.51
+PIN_LEN = PIN_LENGTH  # .56 in
 
 # Marked model dimensions: the two the print carries, both on the revolve's
 # half-profile so both import into the side view (drawing-guidelines.md rule 11 (turned parts read like the lathe): a turned part's
-# diameter sits beside its length). The diameter is a routine turned / cut
-# size at the title block's .XX general grade -- the match-drilled hole sets
-# the fit (a drill-size pin in its own drill's hole is a light drive fit).
-# The length has no function beyond "not proud": one place, the .X grade
-# (codex machinist review, 2026-09-21: two places claimed a need it lacks).
+# diameter sits beside its length). The diameter is the as-bought 1/8 in
+# rod's, so the sheet prints it as a fraction reference (#290: the supplier's
+# tolerance governs; the match-drilled hole sets the fit -- a drill-size pin
+# in its own drill's hole is a light drive fit). The length is flush with
+# the boss's .XX diameter, so it prints at the same .XX grade.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia", "PinLen"},
 }
@@ -36,8 +36,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # ``build_dt_crank_pinion_pin`` applies this natively and ``draw_dt_crank_pinion_pin``
 # reads it back.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "PinProfile": {"PinDia": 2, "PinLen": 1},
+    "PinProfile": {"PinDia": 3, "PinLen": 2},
 }
+# The diameter's as-bought fraction: 1/8 in.
+PIN_DIA_FRACTION_DENOMINATOR = 8
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: decimals
     for dimensions in DRAWING_PRECISION.values()
