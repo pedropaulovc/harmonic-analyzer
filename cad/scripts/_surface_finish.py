@@ -34,7 +34,7 @@ from dataclasses import dataclass
 import math
 from typing import Literal
 
-from _drawing_units import DrawingUnit
+from _package_units import DrawingUnit
 from _gtol_face import FaceSpec
 from _gtol_identity import pmi_annotation_name
 

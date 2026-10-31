@@ -20,7 +20,7 @@ from typing import Any
 
 import _telemetry
 from _com import _read_member
-from _drawing_units import DrawingUnit
+from _package_units import DrawingUnit
 
 _OPTION_NONE = 0  # swDetailingNoOptionSpecified
 

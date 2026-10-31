@@ -3026,6 +3026,7 @@ def test_actual_export_context_propagates_pdf_proof_failure_before_qualification
     monkeypatch.setattr(drawing_common, "_build_id", lambda: "test-build")
     for name in ("apply_custom_properties", "assert_asme_b_sheet", "read_required_properties", "rebuild_drawing"):
         monkeypatch.setattr(drawing_common, name, Mock())
+    drawing_common.read_required_properties.return_value = {"TOL_LIN_XX": "±0.51"}
     monkeypatch.setattr(drawing_common, "pdf_shaded_raster_dpi", lambda *args: contextlib.nullcontext())
     qualification = Mock()
     publication = Mock()

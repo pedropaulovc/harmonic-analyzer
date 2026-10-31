@@ -23,7 +23,7 @@ from pathlib import Path
 
 import yaml
 
-from _drawing_units import DrawingUnit, drawing_unit
+from _package_units import DrawingUnit, drawing_unit
 
 CONTRACT_DIR = Path(__file__).resolve().parent.parent / "config" / "assemblies"
 
@@ -60,7 +60,7 @@ class AssemblyContract:
     interference gate gets the authored wheel mounts as its build does
     (541011de0); otherwise every link-on-sprocket mesh reads as interference.
     ``drawing_unit``: the unit the assembly's sheet, TOL_* stamps and model
-    units use (``_drawing_units``; ``"mm"`` when undeclared).
+    units use (``_package_units``; ``"mm"`` when undeclared).
     """
 
     stem: str

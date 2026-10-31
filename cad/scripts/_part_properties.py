@@ -10,7 +10,7 @@ from typing import Any
 
 import _telemetry
 from _com import _early_bound, _read_member
-from _drawing_units import DrawingUnit, drawing_unit
+from _package_units import DrawingUnit, drawing_unit
 from _source_identity import _git_commit_year, _git_sha
 
 

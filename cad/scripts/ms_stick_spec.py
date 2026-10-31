@@ -26,7 +26,7 @@ import math
 from pathlib import Path
 
 import _config
-from _drawing_units import drawing_unit
+from _package_units import drawing_unit
 from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm
 from ms_stick_geom import (

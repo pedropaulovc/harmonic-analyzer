@@ -20,7 +20,7 @@ from __future__ import annotations
 import math
 
 import _config
-from _drawing_units import drawing_unit
+from _package_units import drawing_unit
 from _gtol_planar import PlanarFace
 from _hole_spec import DRILL_POINT_H, HoleSpec, TAP_DRILL_MM
 from _inch_wall_limits import WALL_TARGET_MM

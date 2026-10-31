@@ -241,7 +241,7 @@ def test_no_com_in_spec_or_render_time_size_overrides(module) -> None:
             "build_", "solidworks", "_appearance", "_assembly", "_check", "_com",
             "_custom_properties", "_dimensions", "_drawing", "_feature_tree",
             "_holes", "_part_", "_rebuild", "_session", "_sketch", "_visibility",
-        )) for name in imports if name != "_drawing_units")
+        )) for name in imports)
     else:
         calls = {node.func.attr if isinstance(node.func, ast.Attribute) else node.func.id
                  for node in ast.walk(tree) if isinstance(node, ast.Call)

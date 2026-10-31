@@ -419,12 +419,11 @@ def test_spec_is_pure_and_drawing_never_reauthors_dimensions() -> None:
             else []
         )
     ]
-    # _drawing_units is pure data (no COM): the spec reads its sheet unit there.
     assert not any(name.startswith((
         "build_", "solidworks", "_appearance", "_assembly", "_check", "_com",
         "_custom_properties", "_dimensions", "_drawing", "_feature_tree",
         "_holes", "_part_", "_rebuild", "_session", "_sketch", "_visibility",
-    )) for name in imports if name != "_drawing_units")
+    )) for name in imports)
     drawing_tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     calls = {node.func.attr if isinstance(node.func, ast.Attribute) else node.func.id
              for node in ast.walk(drawing_tree) if isinstance(node, ast.Call)

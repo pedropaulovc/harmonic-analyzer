@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from _assembly_contract import assembly_contract
-from _drawing_units import drawing_unit
+from _package_units import drawing_unit
 from _part_properties import part_drawing_unit, part_properties
 
 PILOT_INCH_PARTS = (
