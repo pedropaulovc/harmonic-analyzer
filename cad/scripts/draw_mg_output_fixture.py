@@ -373,6 +373,11 @@ _END_HALF_WIDTH = HEX_CORNER_RADIUS * _S / 1000.0
 END_KEEP = {
     "HexAf": (END_CENTER[0] - _END_HALF_WIDTH - 0.013, END_CENTER[1]),
 }
+# The flats print as the stock's fraction, "(7/16 in)": its fraction bar is
+# a display line of the dimension too.  Strokes wholly inside the text's box
+# round the keep are that text's ink, not dimension geometry.
+_AF_TEXT_HALF_WIDTH = len("(7/16 in)") * _GLYPH_PITCH / 2.0
+_AF_TEXT_HALF_HEIGHT = 0.0035
 # The tap callout reads right of the end view at the hole's height.  Its
 # shoulder clears the corner and the small tap cross; AF witnesses run left.
 # ``callout_xy`` is the text block's centre both ways (the r3 sheet,
@@ -505,9 +510,20 @@ def _end_af_ink_problem(
         if abs(x0 - line_x) <= slop and abs(x1 - line_x) <= slop:
             line_ys += [y0, y1]
             continue
+        keep_x, keep_y = END_KEEP["HexAf"]
+        if all(
+            abs(x - keep_x) <= _AF_TEXT_HALF_WIDTH
+            and abs(y - keep_y) <= _AF_TEXT_HALF_HEIGHT
+            for x, y in ((x0, y0), (x1, y1))
+        ):
+            continue
         matching = [flat for flat in flats if max(abs(y0 - flat[1]), abs(y1 - flat[1])) <= slop]
         if not matching:
-            return "stroke is neither the vertical AF line nor a flat witness"
+            return (
+                f"stroke ({x0 * 1000:.2f}, {y0 * 1000:.2f})-({x1 * 1000:.2f}, "
+                f"{y1 * 1000:.2f}) mm is neither the vertical AF line, its text "
+                "nor a flat witness"
+            )
         witnesses[matching[0]] += [x0, x1]
     low, high = sorted(flat[1] for flat in flats)
     if not line_ys or max(abs(min(line_ys) - low), abs(max(line_ys) - high)) > slop:
