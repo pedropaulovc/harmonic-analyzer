@@ -15,7 +15,6 @@ from _sketch import (
     ensure_fully_defined,
 )
 from _sketch_chains import define_rectilinear_chain
-from _sketch_circle import define_circle
 from _drawing_precision import set_dimension_display_precision
 from _visibility import blank_sketch_feature
 
@@ -166,34 +165,3 @@ async def roof_reference(adapter: Any) -> list[tuple[str, str]]:
     return list(zip(names, [
         '"RoofThickness"', '"BlockHeight" - "RoofThickness"',
     ], strict=True))
-
-
-@_telemetry.traced("sketch.stop_plate_pilot")
-async def pilot_drill_reference(adapter: Any) -> list[tuple[str, str]]:
-    """Own the earlier match-drill size without changing the finished clearance.
-
-    The final cover only has the opened clearance holes. A construction
-    circle sits concentrically inside each clearance, representing the
-    earlier PILOT step before THEN OPEN, not another finished edge; both
-    holes show it, so the 2X pair reads alike (machinist review, run
-    20261031T070419538Z-20ea55fe). The first circle's native diameter and
-    precision remain model-owned when the drawing shows the sketch; the
-    second follows the same global.
-    """
-    feature = "PilotDrillReference"
-    dimensions = SketchDims()
-    check(feature, await adapter.create_sketch("Front"))
-    for x, name in zip(spec.PLATE_HOLE_XS, ("PilotDrillDiameter", "PilotDrillDiameter2"), strict=True):
-        circle = await define_circle(
-            adapter, x, spec.PLATE_HOLE_Y, spec.PLATE_TAP_DRILL_DIA / 2.0, feature,
-            dims=dimensions, names=(None, None, name),
-            drives=(None, None, '"PilotDrillDiameter"'),
-        )
-        segment = _early_bound(adapter._sketch_entities[circle], "ISketchSegment")
-        segment.ConstructionGeometry = True
-        if not segment.ConstructionGeometry:
-            raise RuntimeError("pilot reference construction flag rejected")
-    await ensure_fully_defined(adapter, feature)
-    check(feature, await adapter.exit_sketch())
-    name_last_feature(adapter, feature)
-    return dimensions.apply(adapter, feature)

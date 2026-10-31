@@ -129,7 +129,6 @@ PLATE_DRAWING_DIMENSIONS = {
     "Plate": {"PlateThickness"},
     "RoofChamfers": {"RoofChamferSize", "RoofChamferAngle"},
     "PlateLocationReference": {"PlateLeftFromEnd", "PlateRightFromEnd", "PlateFromHeadFace"},
-    "PilotDrillReference": {"PilotDrillDiameter"},
 }
 # The PLATE is the match-drill master. Its three absolute location bands
 # transfer to the block only when the X=0 ends and Y=0 edges, both labelled on
@@ -153,8 +152,7 @@ BLOCK_REFERENCE_DIMENSIONS = frozenset({"BlockDepth"})
 # block repeats those stations at the cover's places as references. Angles
 # print whole degrees against the title block's +/-1 deg.
 _THREE_PLACE = frozenset({
-    "WindowWidth", "WindowHeight", "PlateThickness",
-    "PilotDrillDiameter", *PLATE_LOCATION_DIMENSIONS,
+    "WindowWidth", "WindowHeight", "PlateThickness", *PLATE_LOCATION_DIMENSIONS,
 })
 
 
@@ -205,7 +203,6 @@ PLATE_DRAWING_VALUES_BY_NAME = {
     "RoofChamferSize": ROOF_END_CHAMFER, "RoofChamferAngle": ROOF_CHAMFER_ANGLE,
     "PlateLeftFromEnd": PLATE_HOLE_XS[0], "PlateRightFromEnd": PLATE_HOLE_XS[1],
     "PlateFromHeadFace": PLATE_HOLE_Y,
-    "PilotDrillDiameter": PLATE_TAP_DRILL_DIA,
 }
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 

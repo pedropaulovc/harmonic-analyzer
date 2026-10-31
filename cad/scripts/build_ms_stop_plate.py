@@ -32,7 +32,6 @@ from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _holes import wizard_holes
 from ms_stop_geom import (
     author_hole_precision, hide_location_references, location_reference,
-    pilot_drill_reference,
 )
 
 PART_NAME = "ms-stop-plate"
@@ -50,7 +49,6 @@ async def build(adapter) -> dict[str, str]:
         ("PlateLength", spec.BLOCK_LENGTH), ("PlateHeight", spec.BLOCK_HEIGHT),
         ("PlateThickness", spec.PLATE_THICKNESS),
         ("RoofChamferSize", spec.ROOF_END_CHAMFER),
-        ("PilotDrillDiameter", spec.PLATE_TAP_DRILL_DIA),
     ):
         await set_global(adapter, name, f"{value}mm")
     dims = SketchDims()
@@ -89,7 +87,6 @@ async def build(adapter) -> dict[str, str]:
         spans=spec.PLATE_HOLE_XS, station=spec.PLATE_HOLE_Y,
         names=("PlateLeftFromEnd", "PlateFromHeadFace", "PlateRightFromEnd"),
     )
-    jobs += await pilot_drill_reference(adapter)
     await force_rebuild(adapter)
     for name, expression in jobs:
         await drive_dimension(adapter, name, expression)
@@ -112,7 +109,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(adapter, PART_NAME, {
         "Isometric View Note": spec.ISOMETRIC_VIEW_NOTE,
     })
-    hide_location_references(adapter, ("PlateLocationReference", "PilotDrillReference"))
+    hide_location_references(adapter, ("PlateLocationReference",))
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)

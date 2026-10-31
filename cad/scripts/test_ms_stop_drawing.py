@@ -23,7 +23,6 @@ import ms_stick_spec as stick
 import ms_stop_spec as spec
 import _mcmaster_90114a124 as screw
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_hole_callout import compose_hole_callout_prefix
 from _hole_spec import DRILL_POINT_H
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm
@@ -153,10 +152,11 @@ def test_hole_wizard_callouts_print_three_places_by_native_variable() -> None:
     for size_mm, printed in ((spec.PLATE_TAP_DRILL_DIA, ".073"), (spec.THUMB_TAP_DRILL, ".089"),
                              (spec.PLATE_CLEARANCE_DIA, ".094")):
         assert f"{size_mm / 25.4:.3f}".lstrip("0") == printed
-    # Run 308 machinist: the clearance is drilled, not "opened".
-    native = "<NUM_INST>X <MOD-DIAM><hw-diam> THRU ALL"
-    assert compose_hole_callout_prefix(plate_drawing.CLEARANCE_PROCESS, native).splitlines() == [
-        "REMOVE PLATE; THEN", f"DRILL {native}",
+    # The plate callout states the pair's function under the native size; the
+    # pilot-and-open procedure lives in the assembly sheet's step 1.
+    assert plate_drawing.CLEARANCE_FUNCTION.splitlines() == [
+        f"MATCH DRILL WITH MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']}",
+        spec.MATCHED_PAIR_NOTE,
     ]
 
 
@@ -171,14 +171,9 @@ def test_matched_pair_uses_functional_positions_and_a_real_shop_sequence() -> No
     # The block's blind depths are measured from its own mating face, not from
     # the clamped plate's exposed face.
     assert f"DEPTHS FROM {spec.BLOCK_MATING_FACE_NOTE}" in block_drawing.COVER_HOLE_PROCESS
-    for callout in (block_drawing.COVER_HOLE_PROCESS,
-                    plate_drawing.DIMENSION_CALLOUTS["PilotDrillDiameter"]):
+    for callout in (block_drawing.COVER_HOLE_PROCESS, plate_drawing.CLEARANCE_FUNCTION):
         assert spec.MATCHED_PAIR_NOTE in callout
     assert "NOT INTERCHANGEABLE" in spec.MATCHED_PAIR_NOTE
-    assert "PilotDrillDiameter" in spec.PLATE_DRAWING_DIMENSIONS["PilotDrillReference"]
-    assert spec.PLATE_DRAWING_VALUES_BY_NAME["PilotDrillDiameter"] == (
-        spec.PLATE_TAP_SPEC.overrides_mm["TapDrillDiameter"]
-    )
 
 def test_window_keeps_functional_clearance_at_printed_size_limits() -> None:
     # The window's own +.004/0 band and the stick's .XXX leave .010 of side
@@ -214,11 +209,11 @@ def test_each_sheet_imports_the_complete_model_contract(builder, drawing, dimens
     if hasattr(drawing, "BOTTOM_KEEP"):
         keeps |= set(drawing.BOTTOM_KEEP)
     assert marked == keeps == set(precision) == set(values)
-    # .XXX for the rebate, the matched
-    # pair's stations, cover thickness and pilot drill; whole-degree angles.
+    # .XXX for the rebate, the matched pair's stations and cover thickness;
+    # whole-degree angles.
     three = ({"WindowWidth", "WindowHeight", *spec.PLATE_LOCATION_DIMENSIONS}
              if builder is block
-             else {"PlateThickness", "PilotDrillDiameter", *spec.PLATE_LOCATION_DIMENSIONS})
+             else {"PlateThickness", *spec.PLATE_LOCATION_DIMENSIONS})
     assert {name: places for name, places in precision.items() if places != 2} == {
         "RoofChamferAngle": 0, **dict.fromkeys(three, 3),
     }
@@ -378,8 +373,6 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     source = tmp_path / f"{drawing.PART_STEM}.SLDPRT"
     source.write_bytes(b"offline source sentinel")
     monkeypatch.setattr(drawing, "SOURCE", source)
-    fonts = []
-    monkeypatch.setattr(drawing, "_construction_curve_font", fonts.append, raising=False)
     monkeypatch.setattr(drawing, "_add_rebate_slide_finish", lambda adapter, view: None, raising=False)
     utility = _StopMathUtility()
 
@@ -433,7 +426,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         monkeypatch.setattr(drawing, "_remove_general_thread_class", lambda *a, **kw: None)
         monkeypatch.setattr(drawing, "_assert_reference_dimensions", lambda *a: None)
     else:
-        monkeypatch.setattr(drawing, "_style_pilot_diameter", lambda *a: None)
+        monkeypatch.setattr(drawing, "_append_callout_lines", lambda *a: None)
         monkeypatch.setattr(drawing, "_style_plate_chamfer", lambda *a: None)
         monkeypatch.setattr(drawing, "_outside_arrow", lambda display: None)
     labelled = []
@@ -508,11 +501,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
             "thumbscrew tap through floor": drawing.THUMB_TAP_PRECISION,
         }
     else:
-        # The native pilot's construction circle is at X=.150 (right-sheet);
-        # the clearance callout takes the X=.690 hole from the left, so the
-        # two leaders cannot cross.
         assert callout_positions["two cover clearance holes"] == drawing.CLEARANCE_CALLOUT_XY
-        assert drawing.FRONT_KEEP["PilotDrillDiameter"] == (0.285, 0.178)
         assert callout_positions["two cover clearance holes"][0] < front_map.apply(
             (spec.PLATE_HOLE_XS[1] / 1000.0, center[1], center[2])
         )[0]
@@ -727,37 +716,6 @@ def test_rebate_ceiling_is_the_graded_sliding_face(monkeypatch) -> None:
     assert call["symbol_xy"] == pytest.approx((0.27, 0.178))
 
 
-@pytest.mark.parametrize("refusal", [None, "set", "readback"])
-def test_construction_curve_font_is_set_and_read_back(monkeypatch, refusal) -> None:
-    # Only the plate restyles construction curves (a phantom pilot). The
-    # block keeps the default: its location chords cross the views' interiors.
-    drawing = plate_drawing
-    assert not hasattr(block_drawing, "CONSTRUCTION_CURVE_FONT")
-    assert drawing.CONSTRUCTION_CURVE_FONT == {
-        "swLineFontConstructionCurvesStyle": 2,
-        "swLineFontConstructionCurvesThickness": 0,
-    }
-    stored = {}
-
-    def set_pref(pref, option, value):
-        if refusal != "set":
-            stored[pref] = value + (1 if refusal == "readback" else 0)
-        return refusal != "set"
-
-    extension = SimpleNamespace(
-        SetUserPreferenceInteger=set_pref,
-        GetUserPreferenceInteger=lambda pref, option: stored[pref],
-    )
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(drawing, "constant", lambda name: name)
-    if refusal:
-        with pytest.raises(RuntimeError, match="line font"):
-            drawing._construction_curve_font(SimpleNamespace(Extension=extension))
-    else:
-        drawing._construction_curve_font(SimpleNamespace(Extension=extension))
-        assert stored == drawing.CONSTRUCTION_CURVE_FONT
-
-
 @pytest.mark.parametrize("separator", ["-", " ", "", " - "])
 def test_native_class_suppression_preserves_live_thread_drill_and_depth_variables(separator) -> None:
     definition = (
@@ -794,29 +752,14 @@ def test_native_class_suppression_refuses_non_native_unbound_or_rejected_text(na
         block_drawing._remove_general_thread_class(native)
 
 
-@pytest.mark.parametrize("kind", [6, 2, 3, 5])
-def test_pilot_callout_requires_model_diameter_and_preserves_native_definition(monkeypatch, kind) -> None:
-    native = _StopDisplay("<MOD-DIAM>", hole=False, kind=kind)
-    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: native)
-    monkeypatch.setattr(plate_drawing, "dimension_name", lambda *a: "PilotDrillDiameter")
-    if kind != 6:
-        with pytest.raises(RuntimeError, match="native model diameter"):
-            plate_drawing._style_pilot_diameter(object(), [annotation])
-        assert native.prefix == "<MOD-DIAM>"
-    else:
-        plate_drawing._style_pilot_diameter(object(), [annotation])
-        assert native.prefix == "2X <MOD-DIAM>"
-        # One outside arrow on the pilot circle itself, no leader through
-        # the centre and the clearance rim (run 308 machinist FIX).
-        assert (native.ArrowSide, native.second_arrow) == (1, (False, False))
-
-
-def test_pilot_callout_refuses_unapplied_native_quantity_prefix(monkeypatch) -> None:
-    native = _StopDisplay("<MOD-DIAM>", hole=False, refusal="prefix")
-    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: native)
-    monkeypatch.setattr(plate_drawing, "dimension_name", lambda *a: "PilotDrillDiameter")
-    with pytest.raises(RuntimeError, match="did not persist"):
-        plate_drawing._style_pilot_diameter(object(), [annotation])
+def test_plate_callout_keeps_native_rows_and_adds_the_pair_function() -> None:
+    definition = "<NUM_INST>X <MOD-DIAM><hw-diam> THRU ALL"
+    native = _StopDisplay(definition)
+    plate_drawing._append_callout_lines(native, plate_drawing.CLEARANCE_FUNCTION)
+    assert native.prefix.splitlines() == [definition, *plate_drawing.CLEARANCE_FUNCTION.splitlines()]
+    for refused in (_StopDisplay(definition, hole=False), _StopDisplay(definition, refusal="prefix")):
+        with pytest.raises(RuntimeError):
+            plate_drawing._append_callout_lines(refused, plate_drawing.CLEARANCE_FUNCTION)
 
 
 @pytest.mark.parametrize("refusal", [None, "prefix"])
@@ -860,108 +803,14 @@ def test_match_drill_callouts_identify_the_current_mate_registry_rows() -> None:
     assert "BOTTOMING TAP" not in block_drawing.COVER_HOLE_PROCESS
     assert f"MATCH-DRILL FROM {spec.MATCH_DRILL_MASTER}" in block_drawing.COVER_HOLE_PROCESS
     assert spec.MATCH_DRILL_DATUM_ALIGNMENT in block_drawing.COVER_HOLE_PROCESS.replace("\n", " ")
-    pilot = plate_drawing.DIMENSION_CALLOUTS["PilotDrillDiameter"]
-    assert "MS-STOP-BLOCK" in pilot
-    assert _config.parts("ms-stop-block")["number"] in pilot
-    # Fit-up requirements, not wording: the plate is the master, the pair is
-    # clamped on its locating faces, and it is flagged as a matched pair.
-    flat = " ".join(pilot.split())
-    assert "PILOT" in flat and "LOCATING ENDS AND EDGES FLUSH" in flat
-    assert spec.MATCHED_PAIR_NOTE in pilot
+    pair = plate_drawing.CLEARANCE_FUNCTION
+    assert "MS-STOP-BLOCK" in pair
+    assert _config.parts("ms-stop-block")["number"] in pair
+    assert spec.MATCHED_PAIR_NOTE in pair
     for name in spec.PLATE_LOCATION_DIMENSIONS:
         station = plate_drawing.DIMENSION_CALLOUTS[name]
         assert "MS-STOP-BLOCK" in station
         assert _config.parts("ms-stop-block")["number"] in station
-    assert spec.PLATE_DRAWING_VALUES_BY_NAME["PilotDrillDiameter"] == (
-        spec.PLATE_TAP_SPEC.overrides_mm["TapDrillDiameter"]
-    )
-
-
-@pytest.mark.parametrize("on_axis", [False, True])
-def test_pilot_reference_emits_concentric_native_diameter_and_live_equation(monkeypatch, on_axis) -> None:
-    """Exercise real define_circle/SketchDims over captured adapter geometry."""
-    if on_axis:
-        monkeypatch.setattr(spec, "PLATE_HOLE_XS", (0.0, spec.PLATE_HOLE_XS[1]))
-    features = {}
-
-    def result(data=True):
-        return SimpleNamespace(is_success=True, data=data)
-
-    class Adapter:
-        def __init__(self):
-            self.currentSketchManager = SimpleNamespace(AddToDB=False)
-            self._sketch_entities = {}
-            self.dimensions = []
-            self.circles = {}
-
-        async def create_sketch(self, plane):
-            assert plane == "Front"
-            return result()
-
-        async def add_circle(self, x, y, radius):
-            label = f"circle{len(self.circles)}"
-            self.circles[label] = (x, y, radius)
-            self._sketch_entities[label] = SimpleNamespace(ConstructionGeometry=False)
-            return result(label)
-
-        async def add_sketch_constraint(self, *args):
-            return result()
-
-        async def add_sketch_dimension(self, first, second, kind, value):
-            dimension = SimpleNamespace(
-                first=first, second=second, kind=kind, value_mm=value,
-                name=None,
-            )
-            self.dimensions.append(dimension)
-            return result(dimension)
-
-        async def exit_sketch(self):
-            return result()
-
-    async def fully_defined(adapter, feature):
-        return None
-
-    def name_feature(adapter, feature):
-        features[feature] = adapter.dimensions
-
-    def rename(dimensions, feature, names):
-        for dimension, name in zip(dimensions, names, strict=True):
-            dimension.name = name
-
-    monkeypatch.setattr(stop_geom, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(stop_geom, "ensure_fully_defined", fully_defined)
-    monkeypatch.setattr(stop_geom, "name_last_feature", name_feature)
-    monkeypatch.setattr(sketch, "_feature_by_name", lambda adapter, name: features[name])
-    monkeypatch.setattr(sketch, "_display_dimensions", lambda feature, name: feature)
-    monkeypatch.setattr(sketch, "_rename_dimensions", rename)
-    adapter = Adapter()
-    equations = dict(asyncio.run(stop_geom.pilot_drill_reference(adapter)))
-    # One construction pilot circle concentric in each clearance hole.
-    assert list(adapter.circles.values()) == [
-        (x, spec.PLATE_HOLE_Y, pytest.approx(spec.PLATE_TAP_DRILL_DIA / 2.0))
-        for x in spec.PLATE_HOLE_XS
-    ]
-    assert spec.PLATE_TAP_DRILL_DIA < spec.PLATE_CLEARANCE_DIA
-    assert all(entity.ConstructionGeometry for entity in adapter._sketch_entities.values())
-    for circle, name in (("circle0", "PilotDrillDiameter"), ("circle1", "PilotDrillDiameter2")):
-        x, y, radius = adapter.circles[circle]
-        diameter, = (dim for dim in adapter.dimensions if dim.name == name)
-        assert diameter.first == circle and diameter.second is None
-        assert diameter.kind == "diameter"
-        assert diameter.value_mm == pytest.approx(2.0 * radius)
-        anchors = [dim for dim in adapter.dimensions if dim.first == f"{circle}.center"]
-        assert {dim.kind: dim.value_mm for dim in anchors} == {
-            kind: abs(coordinate) for kind, coordinate in (
-                ("horizontal_distance", x), ("vertical_distance", y),
-            ) if coordinate != 0.0
-        }
-        assert all(dim.second == "origin" and dim.name is None for dim in anchors)
-    # Both diameters follow the one PilotDrillDiameter global.
-    assert equations == {
-        "PilotDrillDiameter@PilotDrillReference": '"PilotDrillDiameter"',
-        "PilotDrillDiameter2@PilotDrillReference": '"PilotDrillDiameter"',
-    }
-    assert set(spec.PLATE_DRAWING_DIMENSIONS["PilotDrillReference"]) == {"PilotDrillDiameter"}
 
 
 def test_stock_precision_and_worst_case_walls_use_each_printed_band() -> None:
