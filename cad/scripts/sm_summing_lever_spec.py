@@ -150,6 +150,17 @@ SURFACE_FINISHES = (
         ),
         display_unit=UNIT,
     ),
+    # Both knife edges seat (Detail D's 2X): the -Z ridge carries the same grade.
+    SurfaceFinishControl(
+        "knife_edge_ridge_minus_z",
+        MACHINED_UM,
+        PlanarFace(
+            KNIFE_FACE_NORMAL,
+            KNIFE_FACE_OFFSET,
+            contains_z_mm=-(PLATE_L + HEX_DEPTH) / 2.0,
+        ),
+        display_unit=UNIT,
+    ),
 )
 
 # The 20 channel-spring lower anchors (McMaster 9489T111, part ``ch-vn-spring-hook``)

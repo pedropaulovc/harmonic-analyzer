@@ -81,7 +81,7 @@ from _named_views import octant_view_name
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
-from _surface_finish import MACHINED_UM, ra, surface_finish_by_key
+from _surface_finish import surface_finish_by_key
 import _telemetry
 from magnifying_bracket_joint_layout import (
     DRILL_DEPTH,
@@ -1828,8 +1828,8 @@ def _dress_bracket_depth_callout(callout: Any) -> None:
         ):
             raise RuntimeError(
                 f"bracket mounting callout tolerance for {variable_name} did not "
-                f"persist: wanted the inherited title-block band +/-{DRILL_DEPTH_BAND} "
-                f"mm at {RECEIVER_HOLE_PLACES} places"
+                f"persist: wanted the inherited title-block band at "
+                f"{RECEIVER_HOLE_PLACES} places"
             )
     if required_depths:
         raise RuntimeError(f"bracket tap callout omits native depths: {required_depths}")
@@ -1988,15 +1988,11 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=0.0025,
     )
     # Both knife edges seat (Detail D's 2X), so the -Z ridge carries the same
-    # grade (machinist review r11, rule 6: one symbol left the other edge
-    # open to as-cast).  The part's control names the +Z face only, so this
-    # second symbol takes its catalog grade, held equal to the control's.
+    # grade through its own part control (machinist review r11, rule 6: one
+    # symbol left the other edge open to as-cast).
     # It stands over the -Z stub: right of 21.72's upper dimension line (x
     # 0.2235), its text 3 mm over the F arrow's letter and 2 mm under the
     # 20X position frame (y 0.192); its leader enters the stub's right side.
-    knife_um = surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge").roughness_um
-    if knife_um != MACHINED_UM:
-        raise AssertionError(f"-Z knife-edge symbol prints {MACHINED_UM}, not {knife_um}")
     add_surface_finish(
         adapter,
         top,
@@ -2005,7 +2001,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ).edge,
         leader_attach_xy=_top_xy(ridge_x, stub_mid_z),
         symbol_xy=(0.233, 0.1828),
-        roughness_ra=ra(MACHINED_UM, unit=UNIT),
+        control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge_minus_z"),
         label="-Z knife-edge ridge finish",
         char_height=0.0025,
     )
