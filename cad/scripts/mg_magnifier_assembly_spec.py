@@ -14,6 +14,8 @@ chain on the Front plane carries them (LEVER_FEATURE), from the lever rod's
 west tip along its axis to the clamp centre, then down the vertical-rod line
 to the fixture axis. They print at the title block's general tolerance.
 
+Every printed length is in the assembly contract's ``drawing_unit`` (UNIT).
+
 The native setting callout text and its display-dimension compartments belong
 to these model dimensions too: SETTING_CALLOUTS is authored before assembly
 save and only read back by the drawing. BOM rows, steps, checks and the map of
@@ -31,6 +33,11 @@ import mg_wheel_bar_geom as _bar
 import mg_wheel_group as _group
 from sh_vn_music_wire_lever_geom import WHEEL_X
 from mg_wheel_bar_geom import WHEEL_BAR_Y
+from _assembly_contract import assembly_contract
+from _title_block_units import LENGTH_UNITS, render_number
+
+ASM_NAME = "mg-magnifier"
+UNIT = assembly_contract(ASM_NAME).drawing_unit
 
 # Native saved-view contract, captured before rebasing standard Front to -Z.
 # These preserve the fitter package's physical projections, not sheet wording.
@@ -52,19 +59,19 @@ BAR_FRONT_Z = _bar.BAR_FRONT_Z
 
 PRESS_GAUGE = _pin.PRESS_GAUGE
 PRESS_GAUGE_TOL = _pin.PRESS_GAUGE_TOL
-# The press gauge prints as a REFERENCE nominal, (38.10): its acceptance is
+# The press gauge prints as a REFERENCE nominal, (1.500): its acceptance is
 # the function it serves, checked at the nuts once they are set and printed
-# on its callout (machinist review of 179705ff2: a ±0.05 band on a hand press
-# is unneeded precision when the function itself is checkable). The stack
+# on its callout (machinist review of 179705ff2: a band on a hand press is
+# unneeded precision when the function itself is checkable). The stack
 # shows a press to nominal passes that check. PRESS_GAUGE_TOL is the press
 # allocation the wheel-group stack spends (mg_wheel_group corners), inside
 # this window. Low: the shortest gauge whose full thread still runs past the
-# locknut's outer face at the thick-stack corner (LOCKNUT_THREAD_MARGIN) --
-# 38.048. High: the tightest of three upper limits, at the thin-stack corner:
-# at most THREAD_PAST_LOCKNUT_LIMIT of thread past the locknut (38.183), the
-# first nut clear of the axle's thread relief (38.214) and the step inside the hub
-# (38.807). The callout names the thread-past-locknut limit as the high
-# side's acceptance, so it must govern.
+# locknut's outer face at the thick-stack corner (LOCKNUT_THREAD_MARGIN).
+# High: the tightest of three upper limits, at the thin-stack corner: at most
+# THREAD_PAST_LOCKNUT_LIMIT of thread past the locknut, the first nut clear
+# of the axle's thread relief and the step inside the hub. The callout names
+# the thread-past-locknut limit as the high side's acceptance, so it must
+# govern.
 PRESS_GAUGE_LOW_LIMIT = PRESS_GAUGE - PRESS_GAUGE_TOL - _group.LOCKNUT_THREAD_MARGIN
 _PRESS_GAUGE_HIGH_LIMITS = {
     "thread past locknut": _pin.THREAD_PAST_LOCKNUT_LIMIT
@@ -107,8 +114,10 @@ CHAIN_D = (0.0, STEP_D, HUB_FRONT_D, WASHER_D)
 FEATURE = "AxleStackReference"
 PRESS_GAUGE_DIMENSION = "PressGauge"
 ENDSHAKE_DIMENSION = "Endshake"
-DRAWING_PRECISION = {FEATURE: {PRESS_GAUGE_DIMENSION: 2, ENDSHAKE_DIMENSION: 2}}
-TOLERANCE_PRECISION = 2
+DRAWING_PRECISION = {
+    FEATURE: {PRESS_GAUGE_DIMENSION: _pin.PRESS_GAUGE_PLACES, ENDSHAKE_DIMENSION: 3}
+}
+TOLERANCE_PRECISION = 3
 DIMENSION_TOLERANCES = {ENDSHAKE_DIMENSION: ENDSHAKE_TOL}
 # Printed as (value) through the native prefix/suffix channel, no band.
 REFERENCE_DIMENSIONS = frozenset({PRESS_GAUGE_DIMENSION})
@@ -135,8 +144,9 @@ FIXTURE_DROP_DIMENSION = "FixtureDrop"
 LEVER_DRAWING_DIMENSIONS = {
     LEVER_FEATURE: {CLAMP_STATION_DIMENSION, FIXTURE_DROP_DIMENSION}
 }
+# .XX, not .X: both set the output (magnification, trace height).
 LEVER_DRAWING_PRECISION = {
-    LEVER_FEATURE: {CLAMP_STATION_DIMENSION: 1, FIXTURE_DROP_DIMENSION: 1}
+    LEVER_FEATURE: {CLAMP_STATION_DIMENSION: 2, FIXTURE_DROP_DIMENSION: 2}
 }
 
 # A separate native installation witness: flat tip proud of the far neck face.
@@ -150,6 +160,11 @@ THREAD_DRAWING_DIMENSIONS = {THREAD_FEATURE: {THREAD_PROJECTION_DIMENSION}}
 THREAD_DRAWING_PRECISION = {THREAD_FEATURE: {THREAD_PROJECTION_DIMENSION: 2}}
 THREAD_PROJECTION_TOL = _lever.THREAD_PROJECTION_TOL
 INSTALLED_FULL_ENGAGEMENT_MIN = _lever.INSTALLED_FULL_ENGAGEMENT_MIN
+
+# The thread-past-locknut limit as the press-gauge callout prints it.
+THREAD_PAST_LOCKNUT_TEXT = render_number(
+    _pin.THREAD_PAST_LOCKNUT_LIMIT / LENGTH_UNITS[UNIT], UNIT, 3
+)
 
 # Native IDisplayDimension.SetText compartments (swDimensionTextParts_e):
 # 3 = swDimensionTextCalloutAbove, 4 = swDimensionTextCalloutBelow. These are
@@ -165,7 +180,7 @@ SETTING_CALLOUTS = {
         PRESS_GAUGE_DIMENSION: (
             3,
             "ACCEPT: LOCKNUT ON FULL THREAD, THREAD END "
-            f"{_pin.THREAD_PAST_LOCKNUT_LIMIT:.1f} MAX PAST IT",
+            f"{THREAD_PAST_LOCKNUT_TEXT} MAX PAST IT",
         ),
         ENDSHAKE_DIMENSION: (
             4,

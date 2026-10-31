@@ -15,7 +15,8 @@ literals so the wheel group and the axle stay out of this part's recipe;
 
 from __future__ import annotations
 
-from mg_wheel_bar_spec import WALL_CALLOUT_MIN
+from _title_block_units import render_number
+from mg_wheel_bar_spec import WALL_CALLOUT_MIN_IN
 
 CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 
@@ -23,16 +24,16 @@ CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 def _wall_row(bore: str) -> str:
     """The hole's least wall at the full worst case, an owner-ruled minor
     (owner ruling 2026-10-26, #1532; mg_wheel_bar_spec.BORE_ROW_WALLS)."""
-    return f"WALL {WALL_CALLOUT_MIN[bore]:.2f} MIN"
+    return f"WALL {render_number(WALL_CALLOUT_MIN_IN[bore], 'in', 3)} MIN"
 
 
 # The reamed bore names its press fit on the axle by number (rule 4).
 AXLE_BORE_CALLOUT = (
-    "REAM THRU\nPRESS FIT MHA-MG-07 AXLE\n0.010-0.030 DIAMETRAL\nINTERFERENCE\n"
+    "REAM THRU\nPRESS FIT MHA-MG-07 AXLE\n.0003-.0012 DIAMETRAL\nINTERFERENCE\n"
     + _wall_row("axle bore")
 )
 # The depth's band places the pressed axle's back end on the back face.
-BAR_DEPTH_CALLOUT = "MHA-MG-07 AXLE BACK END\n0.35 PROUD TO 1.55 SUNK"
+BAR_DEPTH_CALLOUT = "MHA-MG-07 AXLE BACK END\n.008 TO .040 SUNK"
 # The clamp pair's row: its band is the MHA-SH-02 taps'
 # (mg_wheel_bar_spec.CLAMP_POSITION_BAND).
 CLAMP_ROW_CALLOUT = "2X CLAMP HOLES TO\nMHA-SH-02 TAPS"

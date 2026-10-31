@@ -7,9 +7,10 @@ shows it clamped at ONE column (the machine +x / west one) with a
 free end just past the pen hanger; there is no second clamp on the far
 column at this height.
 
-Section 11 tall x 9.5 deep: the top face 5.0 over the bore row (the
-pen-hanger strap's top is flush with it), the rest below; the depth is the
-support-bar stock's (the front faces of both bars share the machine z -138.9
+Section .43 tall x .374 deep (decimal-inch sheet, #290; the stations and the
+top face's 5.0 mm over the bore row keep the millimetre values other parts
+read): the pen-hanger strap's top is flush with the top face, the rest of the
+section below the row; the depth is the support-bar stock's (the front faces of both bars share the machine z -138.9
 plane; the 9.5 depth puts the back face on the front clamp arc's face at
 -129.4, the same two-piece clamp seat as build_pd_support_bar.py). 234 long:
 the clamped end runs 29 past the west column line (the support-bar idiom --
@@ -22,16 +23,16 @@ margin.
 Holes (all along local Z, the machine front-back axis):
 * 1x reamed axle bore at local (AXLE_BORE_X, 0) = machine x WHEEL_X, the
   mg-wheel-axle pressed in to a gauge from the front face (mg_wheel_axle_spec).
-* 2x O4.4 clamp-screw through-holes flanking the column at local
+* 2x #8 clearance clamp-screw through-holes flanking the column at local
   x 70.5 / 105.5 (the column line crosses the bar at local +88 =
   column +197 - centre +109; ears at +-17.5,
   _clamp_arc.EAR_HOLE_Z): heads on the bar's front face, threading into
   the back arc -- exactly the support-bar stack.
 * 1x #8 close-clearance pen-hanger screw hole at local (-112, 0)
   (machine (-3, 575.7) = local + 109), taking the screw from behind
-  the bar. The centre is 5.0 from the fixed free end; the standard Ø4.572
-  clearance leaves 2.714 mm nominal end wall, with a 2.0 mm finished
-  minimum after the hole-size and end-referenced station tolerances.
+  the bar. The centre is 5.0 from the fixed free end; the standard #8 close
+  clearance leaves the end wall above the .080 target after the hole-size
+  and end-referenced station tolerances.
 
 Run (SolidWorks already open)::
 
@@ -49,8 +50,10 @@ from _appearance import apply_material
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -96,6 +99,7 @@ from mg_wheel_bar_geom import (
     PEN_HANGER_HOLE_DIA,
     PEN_HANGER_HOLE_SPEC,
     SCREW_HOLE_X,
+    UNIT,
     require_hanger_end_wall,
 )
 import mg_wheel_bar_callouts as callouts
@@ -278,6 +282,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): the section, the bar length, and the
     # screw holes (diameters + X stations). The mm suffix is load-bearing --
@@ -484,23 +490,49 @@ async def build(adapter) -> dict[str, str]:
 
     # Manufacturing drawing support: the native bands, then mark exactly the
     # print's dimensions and stamp the make-critical title-block properties.
-    # The height has no band: the title block's .X governs it.
+    # The height has no band: the title block's .XX governs it. Each band
+    # prints at its dimension's inch places.
     set_dimension_bilateral_tolerance(
-        adapter, "Bar", "BarDepth", *deviations(BAR_DEPTH_BAND)
+        adapter,
+        "Bar",
+        "BarDepth",
+        *deviations(BAR_DEPTH_BAND),
+        places=DRAWING_PRECISION["Bar"]["BarDepth"],
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "AxleBoreProfile", "AxleBoreDia", *deviations(AXLE_BORE_BAND)
+        adapter,
+        "AxleBoreProfile",
+        "AxleBoreDia",
+        *deviations(AXLE_BORE_BAND),
+        places=DRAWING_PRECISION["AxleBoreProfile"]["AxleBoreDia"],
+        display_unit=UNIT,
     )
     # The clamp row and stations carry the MHA-SH-02 taps' band; the hanger
     # and axle row is the title block's.
     set_dimension_symmetric_tolerance(
-        adapter, "BoreRowReference", "ClampRowFromTop", CLAMP_POSITION_BAND
+        adapter,
+        "BoreRowReference",
+        "ClampRowFromTop",
+        CLAMP_POSITION_BAND,
+        places=DRAWING_PRECISION["BoreRowReference"]["ClampRowFromTop"],
+        display_unit=UNIT,
     )
     set_dimension_symmetric_tolerance(
-        adapter, "BoreRowReference", "ClampStation1", CLAMP_POSITION_BAND
+        adapter,
+        "BoreRowReference",
+        "ClampStation1",
+        CLAMP_POSITION_BAND,
+        places=DRAWING_PRECISION["BoreRowReference"]["ClampStation1"],
+        display_unit=UNIT,
     )
     set_dimension_symmetric_tolerance(
-        adapter, "BoreRowReference", "ClampStation2", CLAMP_POSITION_BAND
+        adapter,
+        "BoreRowReference",
+        "ClampStation2",
+        CLAMP_POSITION_BAND,
+        places=DRAWING_PRECISION["BoreRowReference"]["ClampStation2"],
+        display_unit=UNIT,
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

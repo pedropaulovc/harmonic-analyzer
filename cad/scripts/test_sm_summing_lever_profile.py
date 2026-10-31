@@ -88,7 +88,7 @@ def test_uniform_ribs_and_relocated_row_preserve_other_installed_interfaces() ->
     assert joint.LEVER_FRONT_LOCAL_Z + spec.RIB_T == pytest.approx(-71.20)
     assert joint.DRILL_DEPTH_MIN > spec.RIB_T + joint.LINEAR_BAND
     assert joint.DRILL_DEPTH_DEVIATIONS == (-0.51, 0.51)
-    assert joint.BRACKET_ORIGIN == (40.0, 979.7, -173.51)
+    assert joint.BRACKET_ORIGIN == (40.0, 979.7, -173.5192)
     assert spec.HOLE_X - (joint.TAP_DRILL_DIA + joint.DRILLED_DIAMETER_PLUS) / 2.0 > spec.RIB_REACH
 
 

@@ -23,14 +23,15 @@ spigot face (x = SPIGOT_FACE_X), flats facing +/-Z, corners on +/-Y.
   The hex's depth is the equation ``RodStation + BoreStation - SpigotLength``.
 * ``ShoulderFillet``: the spigot's internal corner at the hex shoulder,
   ``ShoulderRadius``: one tool-nose radius inside the title block's INSIDE
-  CORNERS R1.0 MAX, which governs it on the sheet (no local callout).
+  CORNERS row, which governs it on the sheet (no local callout).
 * ``GrooveProfile``: the full-radius groove, a Top-plane circle drawn as two
   semicircles meeting at the root, revolved as a cut.  Its centreline runs
   from the bore axis to the spigot face, so ``GrooveStation`` runs from the
   face; ``GrooveRadius`` sizes it (a LIMIT band, the model value its upper
   limit) and ``GrooveRootDia`` is the diametric dimension from the axis to
   the root point.
-* ``RodBoreProfile``: the drilled Ø5.2 cross bore along local Y.
+* ``RodBoreProfile``: the drilled cross bore (the geometry's drill) along
+  local Y.
 * ``AxialTap``: one blind Hole Wizard #4-40 tap from the spigot face (the
   thumb screw's receiver): full thread to where its axis breaks into the
   rod bore, the tap drill on to the bore axis, its point in the bore.
@@ -58,10 +59,12 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _document_units import apply_package_model_units
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _feature_tree import name_last_feature
 from _holes import cross_hole_volume_mm3, wizard_holes
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
@@ -181,6 +184,8 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    # #290: the registry row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -240,7 +245,7 @@ async def build(adapter) -> dict[str, str]:
     )
     await bbox_extent_check(adapter, "overall length", "x", OVERALL_LENGTH)
 
-    # --- Shoulder corner: a tool-nose radius inside the title block's R1.0 MAX --
+    # --- Shoulder corner: a tool-nose radius inside the INSIDE CORNERS row --------
     # Picked on the circular shoulder edge at model -Z: the only edge through
     # that point.
     check(
@@ -254,7 +259,7 @@ async def build(adapter) -> dict[str, str]:
             '"ShoulderRadius"',
         )
     )
-    # Half the fillet's own 0.25 mm^3: a missing or R0.1 corner still fails.
+    # Half the fillet's own ~0.28 mm^3: a missing or half-size corner still fails.
     volume = await volume_check(
         adapter, "shoulder corner fillet", volume + V_FILLET, 0.5 * V_FILLET
     )
@@ -605,7 +610,8 @@ def _limit_band(
         raise RuntimeError(f"{label}: LIMIT precision did not persist")
     value = float(dimension.SystemValue) * 1000.0
     _telemetry.success(
-        f"{label}: LIMIT {value + upper:.{places}f}/{value + lower:.{places}f}"
+        f"{label}: LIMIT {(value + upper) / 25.4:.{places}f}/"
+        f"{(value + lower) / 25.4:.{places}f} in"
     )
 
 

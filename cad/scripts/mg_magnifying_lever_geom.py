@@ -7,7 +7,8 @@ Accepted rods are fitted by tip projection, so their free tips may move.
 from __future__ import annotations
 
 import _config
-from _printed_tolerance import printed_band_mm
+from _assembly_contract import assembly_contract
+from _printed_tolerance import printed_deviations
 from mg_lever_thread_joint import (
     NECK_HALF_X,
     NECK_THICKNESS,
@@ -30,7 +31,14 @@ BRACKET_WINDOW_X = (BRACKET_LOCAL_X - NECK_HALF_X, BRACKET_LOCAL_X + NECK_HALF_X
 # Keep its nominal frame here so assembly metadata does not become a geometry
 # dependency (the assembly spec already imports this module).
 THREAD_PROJECTION = ROD_LENGTH - BRACKET_LOCAL_X - NECK_HALF_X
-THREAD_PROJECTION_TOL = printed_band_mm(2)
+# The MHA-MG-00 sheet prints it at .XX in its own unit; the stacks charge the
+# wider side of those printed limits both ways.
+THREAD_PROJECTION_TOL = max(
+    abs(deviation)
+    for deviation in printed_deviations(
+        THREAD_PROJECTION, 2, unit=assembly_contract("mg-magnifier").drawing_unit
+    )
+)
 INSTALLED_FULL_ENGAGEMENT_MIN = installation_full_overlap(THREAD_PROJECTION, THREAD_PROJECTION_TOL)
 INSTALLED_ROOT_CLEARANCE_MIN = (
     THREAD_LENGTH - THREAD_LENGTH_TOL

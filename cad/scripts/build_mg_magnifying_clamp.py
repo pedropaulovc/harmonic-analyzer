@@ -13,7 +13,7 @@ centre, hex axis +Y, corners on +/-X, flats square to +/-Z.
   (X, -Z)), corners on the sketch's horizontal axis, extruded +Y as ``Block``
   (``Height``). The regular section centres only the nominal CAD origin.
   Five linked native dimensions own the two diagonal and three common-flat locations.
-* ``LeverBoreProfile``: the Ø6.50 drilled lever bore, a Right-plane circle on
+* ``LeverBoreProfile``: the Ø.257 (F) drilled lever bore, a Right-plane circle on
   the hex axis at ``LeverBoreYDim``, cut mid-plane through both corners.
 * ``ThumbTap``: blind Hole Wizard #4-40 from the top face on the hex axis,
   thread ending at the bore, drill to the bore axis.
@@ -45,7 +45,9 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import _named_dimension, apply_drawing_precision
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
+from _part_properties import part_drawing_unit
 from _gtol_face_resolve import resolve_faces
 from _gtol_planar import PlanarFace
 from _holes import blind_hole_volume_mm3, cross_hole_volume_mm3, wizard_holes
@@ -77,7 +79,7 @@ from mg_magnifying_clamp_geom import (
 from mg_magnifying_clamp_spec import (
     AREA_HATCH_STYLE_PATTERN,
     DRAWING_DIMENSIONS,
-    HEX_AF_PREFIX,
+    HEX_AF_PLACES,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     PREF_MATERIAL_HATCH_PATTERN,
@@ -1068,38 +1070,23 @@ def _assert_ordinary_location(display: Any, dimension: Any, name: str) -> None:
 
 
 def _assert_stock_af(display: Any, dimension: Any, *, stage: str) -> None:
-    """The native non-REF .XX AF uses ordinary title-block size acceptance."""
+    """The native AF is the untoleranced 1/2 in stock size; the sheet dresses it REF."""
     import _telemetry
 
-    display = _early_bound(display, "IDisplayDimension")
     dimension = _early_bound(dimension, "IDimension")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     actual = {
         "full_name": dimension.FullName,
         "value_m": dimension.SystemValue,
-        "reference": display.ShowParenthesis,
-        "prefix": str(display.GetText(1) or ""),  # swDimensionTextPrefix
-        "suffix": str(display.GetText(2) or ""),  # swDimensionTextSuffix
-        "places": display.GetPrimaryPrecision2(),
-        "tolerance_places": display.GetPrimaryTolPrecision2(),
         "tolerance_type": tolerance.Type,
-        # Inactive native fields are observations, not the .XX accepted limits.
-        "inactive_minimum_m": tolerance.GetMinValue(),
-        "inactive_maximum_m": tolerance.GetMaxValue(),
     }
-    _telemetry.info("clamp native stock AF acceptance", operation_stage=stage, native_measurement=repr(actual))
+    _telemetry.info("clamp native stock AF", operation_stage=stage, native_measurement=repr(actual))
     if type(actual["full_name"]) is not str or actual["full_name"].split("@")[:2] != ["HexAf", "HexProfile"]:
         raise RuntimeError(f"HexAf: wrong native source dimension at {stage}: {actual!r}")
-    # set_reference_dimension authors these affixes independently of
-    # ShowParenthesis; either stale half must fail every source/import readback.
-    if any("(" in actual[field] or ")" in actual[field] for field in ("prefix", "suffix")):
-        raise RuntimeError(f"HexAf: native reference affix remained at {stage}: {actual!r}")
-    if actual["prefix"] != HEX_AF_PREFIX or actual["suffix"] != "":
-        raise RuntimeError(f"HexAf: ordinary HEX size no longer owns all opposed-flat pairs at {stage}: {actual!r}")
-    if actual["reference"] is not False or any(type(actual[field]) is not int or actual[field] != value for field, value in (("places", 2), ("tolerance_places", 2), ("tolerance_type", 0))):
-        raise RuntimeError(f"HexAf: native non-reference ordinary precision/tolerance changed at {stage}: {actual!r}")
+    if type(actual["tolerance_type"]) is not int or actual["tolerance_type"] != 0:
+        raise RuntimeError(f"HexAf: stock size acquired a tolerance at {stage}: {actual!r}")
     if type(actual["value_m"]) not in (int, float) or not math.isclose(actual["value_m"], HEX_AF / 1000.0, rel_tol=0.0, abs_tol=1e-9):
-        raise RuntimeError(f"HexAf: native receiving size changed at {stage}: {actual!r}")
+        raise RuntimeError(f"HexAf: native stock size changed at {stage}: {actual!r}")
 
 
 def _assert_stock_af_source(adapter: Any, *, stage: str) -> tuple[Any, Any]:
@@ -1128,17 +1115,17 @@ def _assert_stock_af_source(adapter: Any, *, stage: str) -> tuple[Any, Any]:
 
 
 def _author_stock_af(adapter: Any) -> None:
-    # This is a fresh HexProfile, not migration of an old toleranced part.
-    # NONE owns the ordinary band; inactive min/max getters do not define it.
+    # The supplier governs the as-bought flats: NONE, no band; the sheet
+    # dresses the imported size as the 1/2 in stock REF.
     display, dimension = _named_dimension(adapter, "HexProfile", "HexAf")
     display = _early_bound(display, "IDisplayDimension")
     _early_bound(dimension.Tolerance, "IDimensionTolerance").Type = 0
     display.ShowParenthesis = False
-    display.SetText(1, HEX_AF_PREFIX)
+    display.SetText(1, "")
     display.SetText(2, "")
-    precision_status = display.SetPrecision3(2, -1, 2, -1)
-    if type(precision_status) is not int or precision_status != 0:
-        raise RuntimeError(f"HexAf: ordinary precision authoring refused: {precision_status!r}")
+    precision_status = display.SetPrecision3(HEX_AF_PLACES, -1, HEX_AF_PLACES, -1)
+    if type(precision_status) is not int or precision_status != 0 or display.GetPrimaryPrecision2() != HEX_AF_PLACES:
+        raise RuntimeError(f"HexAf: stock size precision authoring refused: {precision_status!r}")
     _assert_stock_af_source(adapter, stage="HexAf.source-authored")
 
 
@@ -1146,6 +1133,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # The registry row's IPS document units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -1263,7 +1252,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Places are the tolerance statement (drawing-guidelines.md rule 3): the
     # part carries them, the drawing reads them back.
-    # The verified drawing title block owns DRILLED HOLES +0.10/0.
+    # The verified drawing title block owns DRILLED HOLES +.004/0.
     # Do not print a duplicate explicit band on the native diameter.
     _bore_display, bore_dimension = _named_dimension(adapter, "LeverBoreProfile", "LeverBoreDiaDim")
     bore_tolerance = _early_bound(bore_dimension.Tolerance, "IDimensionTolerance")

@@ -285,7 +285,7 @@ def test_moved_screw_row_stays_coaxial_without_moving_the_installed_bodies() -> 
     import build_mg_magnifier_assembly as magnifier
     import magnifying_bracket_joint_layout as joint
 
-    assert joint.BRACKET_ORIGIN == (40.0, 979.7, -173.51)
+    assert joint.BRACKET_ORIGIN == (40.0, 979.7, -173.5192)
     assert (
         magnifier.BRACKET_X, magnifier.LEVER_ROD_Y, magnifier.LEVER_ROD_Z,
     ) == joint.BRACKET_ORIGIN

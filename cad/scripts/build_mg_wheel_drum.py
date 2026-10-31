@@ -1,7 +1,7 @@
 r"""Reproduction script: magnifying-wheel drum (MHA-MG-10; 1 used).
 
 The brass ring the lever wire wraps (book ch. 21, p.53 shows the wheel's brass
-hub drum): pressed on the wheel's Ø14.0 spigot up to the boss, its front face
+hub drum): pressed on the wheel's Ø.499 spigot up to the boss, its front face
 never proud of the spigot's (``mg_magnifying_wheel_geom.DRUM_RECESS``). Its
 wire-centre radius sets the wheel's magnification (``mg_wheel_drum_geom``).
 
@@ -23,8 +23,10 @@ from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -48,6 +50,7 @@ from mg_wheel_drum_spec import (
     DRUM_LEN_BAND,
     DRUM_OD,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 PART_NAME = "mg-wheel-drum"
@@ -60,6 +63,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -124,13 +129,17 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    # The O.D. takes the title block's .X row (DRAWING_PRECISION); the bore
-    # and the length carry their fit bands.
+    # The O.D. takes the title block's .XX row (DRAWING_PRECISION); the bore
+    # and the length carry their bands (millimetres, printed in UNIT).
     set_dimension_bilateral_tolerance(
-        adapter, "RingProfile", "DrumBore", *deviations(DRUM_BORE_BAND)
+        adapter,
+        "RingProfile",
+        "DrumBore",
+        *deviations(DRUM_BORE_BAND),
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "Drum", "DrumLen", *deviations(DRUM_LEN_BAND)
+        adapter, "Drum", "DrumLen", *deviations(DRUM_LEN_BAND), display_unit=UNIT
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

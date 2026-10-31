@@ -12,13 +12,15 @@ from __future__ import annotations
 import math
 
 from _hole_spec import DRILL_POINT_H, HoleSpec, blind_cut_dia_mm
+from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import (
     drilled_oversize_mm,
     edge_break_chamfer_mm,
     printed_band_mm,
     printed_deviations,
 )
-from mg_magnifying_bracket_spec import DRAWING_PRECISION, FOOT_GRIP_TOL
+from mg_magnifying_bracket_spec import DRAWING_PRECISION, FOOT_GRIP_TOL, MOUNTING_HOLE_PRECISION
+from mg_magnifying_bracket_spec import UNIT as BRACKET_UNIT
 from mg_lever_thread_joint import NOSE_R
 import sm_summing_lever_spec as lever
 
@@ -34,7 +36,7 @@ SCREW_HEAD_DIA = 3.556
 SCREW_HEAD_HEIGHT = 2.1082
 SCREW_PITCH = 25.4 / 56.0
 
-BRACKET_ORIGIN = (40.0, 979.7, -173.51)  # threaded nose in the drum's wire lane
+BRACKET_ORIGIN = (40.0, 979.7, -173.5192)  # threaded nose in the drum's wire lane
 LEVER_ORIGIN_X = -15.0
 LEVER_FRONT_LOCAL_Z = -76.2
 SEAT_PLANE_Z = -73.11241221957347
@@ -44,10 +46,10 @@ SIDE_PLATE_MACHINE_X = (-8.0, 46.25)  # user-approved +5 free end; mounts/neck s
 # Physical acceptance follows the printed rounded size, not the hidden nominal.
 SIDE_PLATE_LENGTH_DEVIATIONS = printed_deviations(
     SIDE_PLATE_MACHINE_X[1] - SIDE_PLATE_MACHINE_X[0],
-    DRAWING_PRECISION["FlangeProfile"]["FlangeWidth"],
+    DRAWING_PRECISION["FlangeProfile"]["FlangeWidth"], unit=BRACKET_UNIT,
 )
 SIDE_PLATE_HEIGHT_DEVIATIONS = printed_deviations(
-    SIDE_PLATE_HEIGHT, DRAWING_PRECISION["Flange"]["FlangeHeight"],
+    SIDE_PLATE_HEIGHT, DRAWING_PRECISION["Flange"]["FlangeHeight"], unit=BRACKET_UNIT,
 )
 SIDE_PLATE_X = tuple(x - BRACKET_ORIGIN[0] for x in SIDE_PLATE_MACHINE_X)
 SIDE_PLATE_Y = (-SIDE_PLATE_HEIGHT / 2.0, SIDE_PLATE_HEIGHT / 2.0)
@@ -88,10 +90,10 @@ FLANGE_THICKNESS_BAND = FOOT_GRIP_TOL
 # The receiver continues from the uniform 5 mm entry rib into the connected
 # 7 mm coefficient plate. Neither usable thread nor the drill point is required
 # to stop inside the rib. Ordinary printed depths remain independently bounded.
-THREAD_DEPTH_BAND = 0.05  # native metadata only; the drawing prints 4.95 MIN
+THREAD_DEPTH_BAND = 0.0508  # native metadata only; the drawing prints .195 MIN
 LINEAR_BAND = printed_band_mm(2)  # PRINTED title-block .XX band, not the unrounded .02 in
 DRILL_DEPTH_DEVIATIONS = (-LINEAR_BAND, LINEAR_BAND)  # (lower, upper), mm
-POSITION_BAND = 0.05
+POSITION_BAND = 0.0508
 DRILLED_DIAMETER_PLUS = drilled_oversize_mm()
 # Engineering floor for the printed pilot, not the finished thread cavity.
 RECEIVER_PILOT_WALL_MIN = 2.0
@@ -152,10 +154,15 @@ COUNTERBORE_HEIGHT_WALL_MIN = min(
     - (COUNTERBORE_DIA + DRILLED_DIAMETER_PLUS) / 2.0
     for _x, y, _z in BRACKET_HOLE_POINTS
 )
-# The actual clearance hole follows the printed DRILLED HOLES +0.10/0 row.
-# Keep this distinct from the larger conservative screw-head clearance circle.
+# The actual clearance hole follows the bracket sheet's printed DRILLED HOLES
+# row at the callout's places. Keep this distinct from the larger conservative
+# screw-head clearance circle.
 CLEARANCE_HOLE_RADIUS_MAX = (
-    round(CLEARANCE_DIA, 2) + DRILLED_DIAMETER_PLUS
+    CLEARANCE_DIA
+    + printed_deviations(
+        CLEARANCE_DIA, MOUNTING_HOLE_PRECISION["hw-diam"],
+        (0.0, drilled_oversize_mm(unit=BRACKET_UNIT)), unit=BRACKET_UNIT,
+    )[1]
 ) / 2.0
 CLEARANCE_HOLE_HEIGHT_WALL_MIN = min(
     min(
@@ -261,7 +268,7 @@ if HEAD_FLOAT_MIN < HEAD_POSITION_MISMATCH_MAX:
 if min(
     GRIP_MIN, COUNTERBORE_END_WALL_MIN, COUNTERBORE_HEIGHT_WALL_MIN,
     CLEARANCE_HOLE_HEIGHT_WALL_MIN,
-) < 1.5:
+) < WALL_TARGET_MM:
     raise AssertionError("magnifying bracket joint loses a drawing-guidelines.md rule 17 (walls and webs) wall")
 
 RECEIVER_PILOT_MATERIAL_WALL_MIN = receiver_pilot_material_wall_budget()

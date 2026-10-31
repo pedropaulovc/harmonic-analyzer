@@ -13,4 +13,5 @@ mg-vn-wheel-axle-front-washer:
     IT BEARS INSIDE THE SPIGOT END, CLEAR OF THE MHA-MG-10 DRUM.
   quantity: 1
   tolerance_class: machined_block
+  drawing_unit: in
   process: purchased

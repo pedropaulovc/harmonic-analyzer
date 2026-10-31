@@ -1,10 +1,11 @@
 r"""Native manufacturing sheet for the simple threaded L bracket.
 
-Model sizes import from the saved SLDPRT. The ordinary end view and associative
-1/4-20 UNC THRU callout define the simple tapped hole; no section is needed.
-Its fit class, inside corners and ordinary edge breaks follow the title block.
-The native neck prints 12.5; explicit 3.175 +/-0.13 retains the screw-grip stack
-and is witnessed from the foot's free end, where its top and bottom are edges.
+The sheet prints decimal inch (the part's ``drawing_unit: in``). Model sizes
+import from the saved SLDPRT. The ordinary end view and associative 1/4-20
+UNC THRU callout define the simple tapped hole; no section is needed. Its fit
+class, inside corners and ordinary edge breaks follow the title block. The
+explicit foot thickness retains the screw-grip stack and is witnessed from the
+foot's free end, where its top and bottom are edges.
 """
 
 from __future__ import annotations
@@ -29,7 +30,7 @@ from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measur
 from _drawing_edges import scan_view_edges
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_layout_audit import annotation_display
 from _drawing_layout_check import LeaderSegment
 from _drawing_leaders import set_near_side_diameter
@@ -37,6 +38,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
 from _drawing_view_display import set_hidden_lines_removed
+from _part_properties import part_drawing_unit
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _layout_audit import _display_segments
 from _layout_geometry import Box, Segment, estimate_text_box, segment_box_overlap_length, union_boxes
@@ -47,7 +49,7 @@ from _session import run_build
 import _telemetry
 from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, SIDE_PLATE_X, SIDE_PLATE_Y, SIDE_PLATE_Z
 from mg_lever_thread_joint import MOUTH_CHAMFER, NECK_HALF_X, NOSE_R, TAP_DRILL_DIA, THREAD
-from mg_magnifying_bracket_spec import DIMENSION_CALLOUTS, DRAWING_DIMENSIONS, DRAWING_REFERENCE_PRECISION, MOUNTING_HOLE_PROCESS, TAP_PROCESS
+from mg_magnifying_bracket_spec import DIMENSION_CALLOUTS, DRAWING_DIMENSIONS, DRAWING_REFERENCE_PRECISION, MOUNTING_HOLE_PRECISION, MOUNTING_HOLE_PROCESS, TAP_HOLE_PRECISION, TAP_PROCESS
 from mg_magnifying_bracket_finish_spec import SURFACE_FINISHES
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -248,7 +250,7 @@ def _set_hole_process(display: Any, *, mate: str, tapped: bool) -> None:
 
 
 def _exterior_nose_radius(adapter: Any, annotations: list[Any]) -> None:
-    """The R5.50 leader stops at the nose arc, outside the tapped hole.
+    """The nose-radius leader stops at the nose arc, outside the tapped hole.
 
     Native, it ran on from the arc to the hole centre, where the through-tap
     leader also passed: the two leaders crossed there and the tap callout read
@@ -475,6 +477,7 @@ def _add_mounting_callout(adapter: Any, bottom: Any, edge: Any) -> Any:
         label="two mounting clearance holes",
     )
     _set_hole_process(display, mate=MOUNTING_HOLE_PROCESS, tapped=False)
+    set_hole_callout_precision(display, MOUNTING_HOLE_PRECISION, label="two mounting clearance holes")
     rebuild_drawing(adapter, label="settle native mounting drill process")
     annotation = _early_bound(display, "IDisplayDimension").GetAnnotation()
     ink = _dimension_layout_ink(adapter, annotation, label="mounting-hole callout")
@@ -558,7 +561,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(SOURCE)
     check("open threaded bracket source", await adapter.open_model(str(SOURCE)))
     properties = read_required_properties(adapter.currentModel, ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity", "Isometric View Note"), required=("Number", "Material Specification", "Finish", "Quantity", "Isometric View Note"))
-    drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout)
+    drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout, unit=part_drawing_unit("mg-magnifying-bracket"))
     stamp_drawing_summary(adapter, drawing, {0: "Magnifying Bracket Manufacturing Drawing", 1: "Harmonic Analyzer hobby-machinist book drawing", 2: "Harmonic Analyzer Project", 3: "blued low-carbon-steel L bracket; quarter-inch through thread", 4: "Generated from the project-owned ASME B drawing standard"})
     front = place_view(adapter, str(SOURCE), "*Top", *FRONT_CENTER, scale=SHEET_SCALE)
     bottom = place_view(adapter, str(SOURCE), "*Front", *BOTTOM_CENTER, scale=SHEET_SCALE)
@@ -588,9 +591,10 @@ async def build(adapter: Any) -> dict[str, str]:
     tap = add_native_hole_callout(adapter, side, edge=rim.edge, callout_xy=(0.345, 0.236), label="quarter-inch lever through tap")
     _curate_tap_callout(adapter, side, tap)
     _set_hole_process(tap, mate=TAP_PROCESS, tapped=True)
+    set_hole_callout_precision(tap, TAP_HOLE_PRECISION, label="quarter-inch lever through tap")
     tap_annotation = _early_bound(tap, "IDisplayDimension").GetAnnotation()
-    # One arrow on the hole's own rim, no line through the centre, and an
-    # R5.50 leader that stops at the nose arc: the two never meet.
+    # One arrow on the hole's own rim, no line through the centre, and a
+    # nose-radius leader that stops at the nose arc: the two never meet.
     set_near_side_diameter(tap_annotation, "quarter-inch lever through tap")
     _exterior_nose_radius(adapter, imported["thread-axis end"])
     rebuild_drawing(adapter, label="tap near-side and nose-radius exterior leaders")

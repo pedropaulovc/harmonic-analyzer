@@ -53,35 +53,44 @@ def test_no_printed_dimension_carries_its_own_band() -> None:
         assert not hasattr(spec, retired), retired
     assert {
         name: places for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places != 2
-    } == {"HexAf": 3, "GrooveRadius": 1, "RodBoreDia": 1}
+    } == {"HexAf": 3, "GrooveRadius": 3, "RodBoreDia": 3, "RodStation": 3}
     assert spec.LIMIT_BANDS == {
-        "GrooveRadius": ("GrooveProfile", pytest.approx((-0.7, 0.0), abs=1e-12)),
+        "GrooveRadius": ("GrooveProfile", pytest.approx((-0.6858, 0.0), abs=1e-12)),
     }
     assert part.LIMIT_BANDS is spec.LIMIT_BANDS
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "_single_limit" not in source
     assert "_limit_band(adapter, feature_name, dimension_name, limits)" in source
     assert "_drawing_tolerances" not in source and "_fit_deviations" not in source
-    assert printed_band_mm(2) == 0.51
-    assert 2.0 * spec.ROD_BORE_R_MAX == pytest.approx(5.3)
+    assert spec.UNIT == "in"
+    assert printed_band_mm(2, unit=spec.UNIT) == pytest.approx(0.254)
+    # The #1 drill (.228) over the 7/32 rod, plus the DRILLED HOLES row's +.004.
+    assert geom.ROD_BORE_DRILL == "#1"
+    assert 2.0 * spec.ROD_BORE_R_MAX == pytest.approx(0.232 * 25.4)
+    # The largest 7/32 rod (+.005) still runs in the smallest bore.
+    assert spec.ROD_RUNNING_CLEARANCE_MIN == pytest.approx((0.228 - 0.22375) * 25.4)
     assert spec.ROD_BORE_CALLOUT == "DRILL THRU"
 
 
 def test_flats_and_overall_length_print_as_unbanded_references() -> None:
     # Machinist review: the flats at .XXX asked for a size the bar is bought at.
     # r1: the overall length closed a loop with the bore's two stations.
-    assert spec.REFERENCE_DIMENSIONS == {"HexAf", "OverallLength"}
+    assert spec.REFERENCE_DIMENSIONS == {"OverallLength"}
+    # The flats as bought: the exact 7/16 in, a fraction REF.
+    assert spec.STOCK_REFERENCE_DIMENSION == "HexAf"
+    assert spec.HEX_AF_FRACTION_DENOMINATOR == 16
+    assert geom.HEX_AF * spec.HEX_AF_FRACTION_DENOMINATOR / 25.4 == pytest.approx(7.0)
     assert spec.DRAWING_DIMENSIONS["HexProfile"] == {"HexAf"}
-    assert spec.DRAWING_PRECISION_BY_NAME["HexAf"] == 3  # the exact 7/16 in
     assert geom.OVERALL_LENGTH == pytest.approx(geom.ROD_STATION + spec.BORE_STATION)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "for name in sorted(REFERENCE_DIMENSIONS):" in source
     assert "set_reference_dimension(" in source
+    assert "supplier_reference_dimension(" in source
     assert "by_name = {**side_by_name, **end_by_name}" in source
     turned = ast.unparse(
         _function(ast.parse(Path(part.__file__).read_text(encoding="utf-8")), "_turned_profile")
     )
-    # Driven in the part, so the sheet's (18.00) is the model's own sum.
+    # Driven in the part, so the sheet's (.71) is the model's own sum.
     assert "_make_driven(adapter, overall, 'overall length')" in turned
     assert spec.STOCK_NOTE == "7/16 HEX BAR, FLATS AS SUPPLIED."
 
@@ -161,17 +170,17 @@ def test_groove_runs_on_the_spigot_with_both_lips() -> None:
 
 
 def test_every_wall_holds_the_target_and_the_sheet_states_none() -> None:
-    assert spec.WALL_TARGET == 2.0
+    assert spec.WALL_TARGET == pytest.approx(0.080 * 25.4)
     for name, (nominal, worst) in spec.WALLS.items():
         assert worst <= nominal, name
         assert worst >= spec.WALL_TARGET, (name, worst)
     assert {name: worst for name, (_n, worst) in spec.WALLS.items()} == pytest.approx(
         {
-            "rod bore to a flat": 2.7077,
-            "rod bore to the free end": 2.0064,
-            "rod bore to the shoulder": 2.1964,
-            "groove lip to the spigot face": 2.04,
-            "groove root over the thread major": 2.0189,
+            "rod bore to a flat": 2.4128,
+            "rod bore to the free end": 2.1016,
+            "rod bore to the shoulder": 2.508,
+            "groove lip to the spigot face": 2.3622,
+            "groove root over the thread major": 2.1076,
         },
         abs=1e-4,
     )
@@ -190,36 +199,39 @@ def test_every_wall_holds_the_target_and_the_sheet_states_none() -> None:
 
 
 def test_the_owner_ruling_numbers_hold() -> None:
-    # #1559, 2026-10-16: Ø10.1 spigot, R1.2 semicircular groove at 3.75 from
-    # the face on 7/16 hex; the hook stays in the plumb plane.
+    # #1559, 2026-10-16: semicircular groove on the spigot at 3.75 from the
+    # face on 7/16 hex; the hook stays in the plumb plane.  #290: R.047 MAX,
+    # the spigot Ø the root's plus 2R.
     lip = spec.WALLS["groove lip to the spigot face"][1]
     root = spec.WALLS["groove root over the thread major"][1]
-    assert lip == pytest.approx(2.04, abs=0.005)
-    assert root == pytest.approx(2.02, abs=0.005)
-    assert spec.GROOVE_DEPTH_MIN == pytest.approx(0.69, abs=0.005)
+    assert lip == pytest.approx(2.3622, abs=0.005)
+    assert root == pytest.approx(2.1076, abs=0.005)
+    assert spec.GROOVE_DEPTH_MIN == pytest.approx(0.040 * 25.4, abs=0.005)
     assert spec.SHOULDER_ANNULUS == pytest.approx(0.51, abs=0.005)
     assert geom.FIXTURE_YAW_DEG == pytest.approx(26.69, abs=0.005)
 
 
 def test_bore_is_centred_and_its_walls_take_the_drill_run_off() -> None:
     # Independent of the spec's arithmetic: the bore on the thinnest stock
-    # (7/16 in less the 0.13 stock assumption) at its largest drilled Ø (the
-    # title block's DRILLED HOLES +0.10/0), off the hex axis by the drill's
-    # run-off at the exit corner (0.10 start, 0.3 deg over the corner radius):
-    # nothing locates it from a flat, so the run-off is its only offset.
-    assert spec.HEX_STOCK_AF_BAND == 0.13
+    # (7/16 in less the .005 stock assumption) at its largest drilled Ø (the
+    # #1 drill's .228 and the DRILLED HOLES +.004/0), off the hex axis by the
+    # drill's run-off at the exit corner (0.10 start, 0.3 deg over the corner
+    # radius): nothing locates it from a flat, so the run-off is its only
+    # offset.
+    assert spec.HEX_STOCK_AF_BAND == 0.127
     assert geom.HEX_AF == pytest.approx(11.1125, abs=1e-12)
-    smallest_af = 7.0 / 16.0 * 25.4 - 0.13
-    largest_bore_r = (5.2 + 0.10) / 2.0
+    smallest_af = 7.0 / 16.0 * 25.4 - 0.127
+    largest_bore_r = (0.228 + 0.004) * 25.4 / 2.0
     wander = 0.10 + geom.HEX_CORNER_RADIUS * math.tan(math.radians(0.3))
     assert spec.BORE_WANDER == pytest.approx(wander, abs=1e-12)
     assert spec.BORE_OFFSET_MAX == spec.BORE_WANDER
     worst = smallest_af / 2.0 - largest_bore_r - wander
-    assert worst == pytest.approx(2.7077, abs=1e-4)
-    assert spec.WALLS["rod bore to a flat"] == pytest.approx((2.95625, worst), abs=1e-9)
-    # The free-end wall: one .XX station, the drilled Ø, the run-off.
+    assert worst == pytest.approx(2.4128, abs=1e-4)
+    assert spec.WALLS["rod bore to a flat"] == pytest.approx((2.66065, worst), abs=1e-9)
+    # The free-end wall: one station printed .209 +/-.005, the drilled Ø, the
+    # run-off.
     assert spec.WALLS["rod bore to the free end"][1] == pytest.approx(
-        5.30 - 0.51 - largest_bore_r - wander, abs=1e-9
+        (0.209 - 0.005) * 25.4 - largest_bore_r - wander, abs=1e-9
     )
     # Review r3 (rule 7): the thread's extent reads on the tap callout, so the
     # general notes keep only the stock.
@@ -246,7 +258,7 @@ def test_thumb_screw_tap_runs_axially_into_the_rod_bore() -> None:
     assert geom.TAP_SPEC.depth_mm == geom.TAP_DRILL_DEPTH == geom.SPIGOT_FACE_X
     assert geom.TAP_SPEC.overrides_mm == {"ThreadDepth": geom.TAP_LENGTH}
     # Full thread from the spigot face to where the tap's axis meets the bore.
-    assert geom.TAP_LENGTH == pytest.approx(10.1, abs=1e-9)
+    assert geom.TAP_LENGTH == pytest.approx(12.70 - 0.114 * 25.4, abs=1e-9)
     assert geom.TAP_LENGTH == pytest.approx(
         geom.OVERALL_LENGTH - geom.ROD_STATION - geom.ROD_BORE_DIA / 2.0, abs=1e-9
     )
@@ -256,8 +268,12 @@ def test_thumb_screw_tap_runs_axially_into_the_rod_bore() -> None:
     # The extent row under the thread says INTO the bore; the prefix only
     # names the work.
     assert spec.TAP_PROCESS == "TAP"
-    assert spec.TAP_DEPTH_PLACES == 1
-    assert spec.TAP_CALLOUT_PRECISION == {"hw-tapdrldepth": 1, "hw-threaddepth": 1}
+    assert spec.TAP_DEPTH_PLACES == 2
+    assert spec.TAP_CALLOUT_PRECISION == {
+        "hw-tapdrldia": 3,
+        "hw-tapdrldepth": 2,
+        "hw-threaddepth": 2,
+    }
 
 
 def test_a_bottoming_tap_reaches_full_thread_through_the_wall_and_stops_short() -> None:
@@ -271,29 +287,26 @@ def test_a_bottoming_tap_reaches_full_thread_through_the_wall_and_stops_short() 
     assert spec.TAP_SHANK_DIA == pytest.approx(3.5814, abs=1e-9)
     assert spec.BOTTOMING_TAP_CHAMFER_THREADS == (1, 2)
     assert spec.BOTTOMING_TAP_LEAD == pytest.approx(2.0 * pitch, abs=1e-9)
-    # Face to bore axis at the printed worst case: one .XX station, 12.70.
-    face_to_axis_max, face_to_axis_min = 12.70 + 0.51, 12.70 - 0.51
+    # Face to bore axis at the printed worst case: one station, .50 +/-.01.
+    face_to_axis_max, face_to_axis_min = 12.70 + 0.254, 12.70 - 0.254
     assert (spec.FACE_TO_BORE_AXIS_MAX, spec.FACE_TO_BORE_AXIS_MIN) == pytest.approx(
         (face_to_axis_max, face_to_axis_min), abs=1e-9
     )
     # The thread's widest reach off the bore axis: the library's metric basic
     # major Ø2.845, tap oversize and the bore's run-off off the hex axis.
     assert spec.THREAD_MAJOR == 2.845
-    reach_off_axis = 2.845 / 2.0 + 0.025 + spec.BORE_WANDER
-    half_chord = math.sqrt(2.6**2 - reach_off_axis**2)
+    reach_off_axis = 2.845 / 2.0 + 0.0254 + spec.BORE_WANDER
+    half_chord = math.sqrt((0.114 * 25.4) ** 2 - reach_off_axis**2)
     deepest_wall = face_to_axis_max - half_chord
     assert spec.TAP_WALL_DEEPEST == pytest.approx(deepest_wall, abs=1e-9)
-    assert spec.TAP_WALL_DEEPEST == pytest.approx(11.1460, abs=5e-4)
+    assert spec.TAP_WALL_DEEPEST == pytest.approx(10.5284, abs=5e-4)
     assert spec.TAP_REACH_NEEDED == pytest.approx(deepest_wall + 2.0 * pitch, abs=1e-9)
-    assert reach - spec.TAP_REACH_NEEDED == pytest.approx(1.8715, abs=5e-4)
+    assert reach - spec.TAP_REACH_NEEDED == pytest.approx(2.4891, abs=5e-4)
     # On one part both walls move together: the tap stops anywhere in the
     # bore's chord less its lead.
     assert spec.FAR_WALL_NEAREST == pytest.approx(face_to_axis_min + half_chord, abs=1e-9)
     assert spec.TAP_STOP_WINDOW == pytest.approx(2.0 * half_chord - 2.0 * pitch, abs=1e-9)
     assert spec.TAP_STOP_WINDOW > 0.0
-    # The plug tap the sheet asked for before (3-5 thread chamfer) cannot
-    # reach full thread at the worst case: 11.146 + 3.175 = 14.32 > 14.29.
-    assert deepest_wall + 5.0 * pitch > reach
     assert spec.TAP_EXTENT_CALLOUT == "FULL THREAD TO ROD BORE"
     assert spec.TAP_EXTENT_CALLOUT not in spec.DRAWING_NOTES
     for retired in ("PLUG_TAP_USABLE_LENGTH", "PLUG_TAP_LEAD", "TAP_TOOL_NOTE"):
@@ -305,67 +318,58 @@ def test_a_bottoming_tap_reaches_full_thread_through_the_wall_and_stops_short() 
 
 def test_the_bore_datum_holds_the_screw_reach_and_the_rejected_datums_fail() -> None:
     from sh_vn_thumb_screw_spec import PITCH, SHANK_DIA, SHANK_LEN
-    from mg_magnifying_vertical_rod_geom import ROD_STOCK_DIA_LOW
+    from mg_magnifying_vertical_rod_geom import ROD_DIA_BAND
 
-    rod_min = geom.VROD_DIA - ROD_STOCK_DIA_LOW
-    bore_r_max = (5.2 + 0.10) / 2.0
+    rod_min = geom.VROD_DIA + ROD_DIA_BAND[1]
+    bore_r_max = (0.228 + 0.004) * 25.4 / 2.0
     # One .XX band from the spigot face to the bore axis.
-    reach = (12.70 + 0.51) + bore_r_max - rod_min
+    reach = (12.70 + 0.254) + bore_r_max - rod_min
     assert spec.SCREW_REACH_NEEDED == pytest.approx(reach, abs=1e-9)
-    assert spec.SCREW_REACH_NEEDED == pytest.approx(10.91, abs=5e-3)
+    assert spec.SCREW_REACH_NEEDED == pytest.approx(10.4712, abs=5e-3)
     assert SHANK_LEN == pytest.approx(7.0 / 16.0 * 25.4)
     assert spec.SCREW_REACH_MARGIN == pytest.approx(SHANK_LEN - reach, abs=1e-9)
     assert spec.SCREW_REACH_MARGIN > 0.0
-    # r1's datums: the overall length from the free end less the rod station,
-    # two .XX bands to the bore: the screw bottoms before it clamps the rod.
-    stacked = (18.00 + 0.51) - (5.30 - 0.51) + bore_r_max - rod_min
-    assert stacked == pytest.approx(11.42, abs=5e-3)
-    assert stacked > SHANK_LEN
+    # r1's datums: the overall length (.71) from the free end less the rod
+    # station, two .XX bands to the bore: the screw has less margin.
+    stacked = (0.71 + 0.01) * 25.4 - (0.21 - 0.01) * 25.4 + bore_r_max - rod_min
+    assert stacked > reach
     # The bore from the face with the overall from the free end (the rod
     # station a reference) leaves the free-end wall under the target.
-    free_end_wall = (18.00 - 0.51) - (12.70 + 0.51) - bore_r_max
-    assert free_end_wall == pytest.approx(1.63, abs=1e-9)
+    free_end_wall = (0.71 - 0.01) * 25.4 - (12.70 + 0.254) - bore_r_max - spec.BORE_WANDER
+    assert free_end_wall == pytest.approx(1.746, abs=1e-3)
     assert free_end_wall < spec.WALL_TARGET
     # Engagement at the shallowest bore: at least 1.5 D.
-    engagement = (12.70 - 0.51) - bore_r_max - PITCH
+    engagement = (12.70 - 0.254) - bore_r_max - PITCH
     assert spec.ENGAGEMENT_WORST == pytest.approx(engagement, abs=1e-9)
     assert engagement >= 1.5 * SHANK_DIA
 
 
 def test_the_groove_station_from_the_face_holds_the_face_lip() -> None:
-    # One .XX band from the face to the groove centre, and the MAX radius.
-    face_lip = (3.75 - 0.51) - 1.2
+    # One .XX band from the face to the groove centre (.15 +/-.01 over the
+    # 3.75 model), and the MAX radius.
+    station_min, station_max = (0.15 - 0.01) * 25.4, (0.15 + 0.01) * 25.4
+    face_lip = station_min - 0.047 * 25.4
     assert spec.GROOVE_STATION == geom.GROOVE_STATION == pytest.approx(3.75)
     assert geom.GROOVE_X == pytest.approx(geom.SPIGOT_FACE_X - 3.75)
     assert spec.WALLS["groove lip to the spigot face"][1] == pytest.approx(face_lip, abs=1e-9)
     assert face_lip >= spec.WALL_TARGET
-    # From the free end instead (r1's route, now 14.25) with the overall a
-    # reference: three .XX bands to the face put the lip under the target.
-    via_free_end = (12.70 - 0.51) + (5.30 - 0.51) - (14.25 + 0.51) - 1.2
-    assert via_free_end < spec.WALL_TARGET
     # The groove stays on the spigot: its shoulder-side mouth clears the hex
     # shoulder at the worst case (a step up to the hex, not a wall), and the
-    # shoulder's R MAX corner too.  r2 review: the spigot's own length from
-    # the face, one .XX band, not the hex from the free end (three bands).
-    clearance = (6.70 - 0.51) - (3.75 + 0.51 + 1.2)
+    # modelled corner too.  r2 review: the spigot's own length from the
+    # face, one .XX band, not the hex from the free end (three bands).
+    clearance = (0.26 - 0.01) * 25.4 - (station_max + 0.047 * 25.4)
     assert spec.GROOVE_SHOULDER_CLEARANCE == pytest.approx(clearance, abs=1e-9)
-    assert clearance == pytest.approx(0.73)
-    assert spec.GROOVE_FILLET_CLEARANCE == pytest.approx(clearance - 0.2, abs=1e-9)
-    assert spec.GROOVE_FILLET_CLEARANCE == pytest.approx(0.53)
-    via_free_end = (12.70 - 0.51) + (5.30 - 0.51) - (11.30 + 0.51) - (3.75 + 0.51 + 1.2)
-    assert via_free_end == pytest.approx(-0.29)
-    # The wire stays in it at the smallest OD over the largest root.
-    assert spec.GROOVE_DEPTH_MIN == pytest.approx(
-        ((10.10 - 0.51) - (7.70 + 0.51)) / 2.0
-    )
+    assert clearance == pytest.approx(1.0922)
+    assert spec.GROOVE_FILLET_CLEARANCE == pytest.approx(clearance - 0.008 * 25.4, abs=1e-9)
+    # The wire stays in it at the smallest OD (.40) over the largest root (.30).
+    assert spec.GROOVE_DEPTH_MIN == pytest.approx(((0.40 - 0.01) - (0.30 + 0.01)) * 25.4 / 2.0)
     assert spec.GROOVE_DEPTH_MIN > geom.WIRE_DIA / 2.0
 
 
 def test_the_groove_is_a_true_semicircle_centred_on_the_spigot_od() -> None:
-    # Ø10.1 = root Ø7.7 + 2 x R1.2: the arc's centre on the OD, so the
-    # groove is as deep as its radius and opens its full Ø at the mouth.  The
-    # owner's Ø10.5 would bury the centre 0.2 under the OD: 1.4 deep under an
-    # R1.2 arc, a re-entrant groove.
+    # OD = root Ø + 2R: the arc's centre on the OD, so the groove is as deep
+    # as its radius and opens its full Ø at the mouth.  The owner's Ø10.5
+    # would bury the centre under the OD: a re-entrant groove.
     assert geom.SPIGOT_DIA == pytest.approx(
         geom.GROOVE_ROOT_DIA + 2.0 * geom.GROOVE_RADIUS
     )
@@ -384,33 +388,32 @@ def test_the_groove_is_a_true_semicircle_centred_on_the_spigot_od() -> None:
 
 
 def test_the_groove_radius_is_a_limit_band_and_the_title_block_x_row_would_thin_the_face_lip() -> None:
-    # Owner ruling 2026-10-17 (review r4, rule 1: "R1.2 max." had no
+    # Owner ruling 2026-10-17 (review r4, rule 1: a bare MAX had no
     # minimum): a native LIMIT, the model value its upper limit, so every
     # largest-radius proof still runs on the model.
-    assert spec.GROOVE_RADIUS_PLACES == 1 and spec.GROOVE_RADIUS_TOL_TYPE == 3
-    assert spec.GROOVE_RADIUS_MAX == geom.GROOVE_RADIUS == pytest.approx(1.2)
-    assert spec.GROOVE_RADIUS_MIN == pytest.approx(0.5)
+    assert spec.GROOVE_RADIUS_PLACES == 3 and spec.GROOVE_RADIUS_TOL_TYPE == 3
+    assert spec.GROOVE_RADIUS_MAX == geom.GROOVE_RADIUS == pytest.approx(0.047 * 25.4)
+    assert spec.GROOVE_RADIUS_MIN == pytest.approx(0.020 * 25.4)
     lower, upper = spec.GROOVE_RADIUS_DEVIATIONS
-    assert geom.GROOVE_RADIUS + upper == pytest.approx(1.2, abs=1e-12)
-    assert geom.GROOVE_RADIUS + lower == pytest.approx(0.5, abs=1e-12)
+    assert geom.GROOVE_RADIUS + upper == pytest.approx(0.047 * 25.4, abs=1e-12)
+    assert geom.GROOVE_RADIUS + lower == pytest.approx(0.020 * 25.4, abs=1e-12)
     assert spec.GROOVE_HALF_OPENING_MAX == geom.GROOVE_RADIUS
-    # Two rows, "R1.2" over "0.5": the R row is the wider.
-    assert drawing.RADIUS_GLYPHS == len("R1.2")
-    # A bare R1.2 at the title block's .X admits R2.0: across the printed
-    # root and OD the mouth opens past 1.9 and the face lip falls under the
+    # Two rows, "R.047" over ".020": the R row is the wider.
+    assert drawing.RADIUS_GLYPHS == len("R.047")
+    # A bare R.047 at the title block's .X admits R.147: across the printed
+    # root and OD the mouth opens wide and the face lip falls under the
     # target.
-    r = 1.2 + printed_band_mm(1)
+    r = 0.047 * 25.4 + printed_band_mm(1, unit=spec.UNIT)
     half = max(
         spec.groove_half_opening(r, root, od)
-        for root in (7.70 - 0.51, 7.70 + 0.51)
-        for od in (10.10 - 0.51, 10.10 + 0.51)
+        for root in _PRINTED_ROOTS
+        for od in _PRINTED_ODS
     )
-    assert (3.75 - 0.51) - half < spec.WALL_TARGET
-    assert (3.75 - 0.51) - r == pytest.approx(1.24)
+    assert (0.15 - 0.01) * 25.4 - half < spec.WALL_TARGET
 
 
-_PRINTED_ROOTS = (7.70 - 0.51, 7.70 + 0.51)
-_PRINTED_ODS = (10.10 - 0.51, 10.10 + 0.51)
+_PRINTED_ROOTS = ((0.30 - 0.01) * 25.4, (0.30 + 0.01) * 25.4)
+_PRINTED_ODS = ((0.40 - 0.01) * 25.4, (0.40 + 0.01) * 25.4)
 
 
 def _groove_at(radius: float) -> dict[str, float]:
@@ -421,50 +424,51 @@ def _groove_at(radius: float) -> dict[str, float]:
         for root in _PRINTED_ROOTS
         for od in _PRINTED_ODS
     ]
-    far_depth = 3.75 + 0.51 + radius
+    far_depth = (0.15 + 0.01) * 25.4 + radius
     return {
         "narrowest mouth": 2.0 * min(opens),
-        "face lip": (3.75 - 0.51) - max(opens),
-        "root over thread": (7.70 - 0.51) / 2.0 - spec._THREAD_R_MAX - spec._wander(far_depth),
-        "shoulder clearance": (6.70 - 0.51) - (3.75 + 0.51 + max(opens)),
+        "face lip": (0.15 - 0.01) * 25.4 - max(opens),
+        "root over thread": _PRINTED_ROOTS[0] / 2.0 - spec._THREAD_R_MAX - spec._wander(far_depth),
+        "shoulder clearance": (0.26 - 0.01) * 25.4 - ((0.15 + 0.01) * 25.4 + max(opens)),
     }
 
 
 def test_the_groove_holds_the_wire_and_every_wall_at_its_smallest_radius() -> None:
-    # The floor's R0.5 over the Ø0.8 wire's 0.4: the wire seats on the floor
-    # at one line, its centre the root plus its radius (the hook), and the
-    # groove's depth is the root's, whatever the radius.
+    # The floor's R.020 over the lever wire's radius: the wire seats on the
+    # floor at one line, its centre the root plus its radius (the hook), and
+    # the groove's depth is the root's, whatever the radius.
     assert spec.GROOVE_RADIUS_MIN > geom.WIRE_DIA / 2.0
     assert geom.HOOK_RADIAL_OFFSET == pytest.approx(
         geom.GROOVE_ROOT_DIA / 2.0 + geom.WIRE_DIA / 2.0 + geom.WIRE_CLEARANCE
     )
-    assert spec.GROOVE_DEPTH_MIN == pytest.approx(0.69) and spec.GROOVE_DEPTH_MIN > 0.4
-    smallest, largest = _groove_at(0.5), _groove_at(1.2)
-    # R0.5 centres under the OD at every printed root and OD: walls 1.0 apart.
-    assert spec.GROOVE_HALF_OPENING_MIN == pytest.approx(0.5)
-    assert smallest["narrowest mouth"] == pytest.approx(1.0)
+    assert spec.GROOVE_DEPTH_MIN == pytest.approx(0.040 * 25.4) and spec.GROOVE_DEPTH_MIN > 0.4
+    r_min, r_max = 0.020 * 25.4, 0.047 * 25.4
+    smallest, largest = _groove_at(r_min), _groove_at(r_max)
+    # R MIN centres under the OD at every printed root and OD: walls .040 apart.
+    assert spec.GROOVE_HALF_OPENING_MIN == pytest.approx(r_min)
+    assert smallest["narrowest mouth"] == pytest.approx(2.0 * r_min)
     assert smallest["narrowest mouth"] > geom.WIRE_DIA
     # Owner ruling on review r5: the radius's own row reads FULL R, the arc
-    # tangent to both walls (2R wide), the depth the root Ø's.  An R0.5 arc
-    # cannot reach the Ø7.70 root from the Ø10.10 OD (1.20 deep), so its
-    # walls run straight: 0.19 long at the shallowest printed groove, 0.70
-    # at nominal, 1.21 at the deepest.  At R1.2 the shallowest groove (0.69)
-    # is under R: the arc meets the OD first, a 2.172 mouth, not 2R.
+    # tangent to both walls (2R wide), the depth the root Ø's.  An R.020 arc
+    # cannot reach the root from the OD, so its walls run straight: .020 long
+    # at the shallowest printed groove, .040 at the deepest.  At R.047 the
+    # shallowest groove (.040) is under R: the arc meets the OD first, a
+    # narrower mouth than 2R.
     assert spec.GROOVE_RADIUS_CALLOUT == "FULL R"
-    assert spec.GROOVE_WALL_AT_RADIUS_MIN == pytest.approx(0.19)
-    assert (10.10 - 7.70) / 2.0 - 0.5 == pytest.approx(0.70)
-    assert (10.10 + 0.51 - (7.70 - 0.51)) / 2.0 - 0.5 == pytest.approx(1.21)
-    assert largest["narrowest mouth"] == pytest.approx(2.0 * math.sqrt(1.2**2 - 0.51**2))
-    assert largest["narrowest mouth"] == pytest.approx(2.172, abs=5e-4)
+    assert spec.GROOVE_WALL_AT_RADIUS_MIN == pytest.approx(0.020 * 25.4)
+    assert (_PRINTED_ODS[1] - _PRINTED_ROOTS[0]) / 2.0 - r_min == pytest.approx(0.040 * 25.4)
+    above = _PRINTED_ROOTS[1] / 2.0 + r_max - _PRINTED_ODS[0] / 2.0
+    assert largest["narrowest mouth"] == pytest.approx(2.0 * math.sqrt(r_max**2 - above**2))
+    assert largest["narrowest mouth"] == pytest.approx(2.361, abs=5e-4)
     # Each wall the largest radius sets only thickens at the smallest.
     assert largest["face lip"] == pytest.approx(spec.WALLS["groove lip to the spigot face"][1])
     assert largest["root over thread"] == pytest.approx(
         spec.WALLS["groove root over the thread major"][1]
     )
     assert largest["shoulder clearance"] == pytest.approx(spec.GROOVE_SHOULDER_CLEARANCE)
-    assert smallest["face lip"] == pytest.approx(2.74)
-    assert smallest["root over thread"] == pytest.approx(2.0226, abs=1e-4)
-    assert smallest["shoulder clearance"] == pytest.approx(1.43)
+    assert smallest["face lip"] == pytest.approx(3.048)
+    assert smallest["root over thread"] == pytest.approx(2.1112, abs=1e-4)
+    assert smallest["shoulder clearance"] == pytest.approx(1.778)
     for name in ("face lip", "root over thread", "shoulder clearance"):
         assert smallest[name] > largest[name], name
     assert min(smallest["face lip"], smallest["root over thread"]) > spec.WALL_TARGET
@@ -472,42 +476,42 @@ def test_the_groove_holds_the_wire_and_every_wall_at_its_smallest_radius() -> No
 
 def test_the_overall_reference_is_an_accepted_exception_with_its_real_stack() -> None:
     # Owner ruling 2026-10-17 (review r4): the two-station bore location and
-    # the (18.00) REF stay; a real overall would chain the free end's 5.30
-    # from two .XX bands and thin the free-end wall under the floor.
+    # the (.71) REF stay; the bore is the datum the rod and the thumb screw
+    # work off.
     import machinist_exceptions
 
     (exception,) = machinist_exceptions.load_exceptions(
         SCRIPTS.parent / "config", "mg_output_fixture", "part"
     )
     assert exception.id == "RV-01" and exception.kind == "accept"
-    for text in ("5.30", "12.70", "(18.00)"):
+    for text in (".209", ".50", "(.71)"):
         assert text in exception.where, text
     assert "rule 10" in exception.finding and "rule 11" in exception.finding
-    stacked = 5.30 - 2 * 0.51 - spec.ROD_BORE_R_MAX - spec.BORE_WANDER
-    assert stacked == pytest.approx(1.496, abs=5e-4) and stacked < 1.5
-    assert spec.WALLS["rod bore to the free end"][1] == pytest.approx(2.006, abs=5e-4)
-    for number in ("±1.02", "2.65", "0.134", "1.496", "2.006", "2026-10-17"):
+    # A real .71 overall stacks the free end's station to +/-.02.
+    stacked = (0.21 - 0.02) * 25.4 - spec.ROD_BORE_R_MAX - spec.BORE_WANDER
+    assert stacked == pytest.approx(0.0687 * 25.4, abs=5e-3) and stacked < spec.WALL_TARGET
+    assert spec.WALLS["rod bore to the free end"][1] == pytest.approx(0.0827 * 25.4, abs=5e-3)
+    for number in ("±.02", ".1160", ".0053", ".0687", ".0827", "2026-10-17"):
         assert number in exception.reason, number
     assert spec.REFERENCE_DIMENSIONS >= {"OverallLength"}
 
 
 def test_the_spigot_cleans_up_inside_the_thinnest_flats() -> None:
-    # A route check, not a band: the shop turns Ø10.10 inside 10.9825 flats.
-    assert geom.SPIGOT_DIA < geom.HEX_AF - spec.HEX_STOCK_AF_BAND
-    assert geom.HEX_AF - spec.HEX_STOCK_AF_BAND - geom.SPIGOT_DIA == pytest.approx(
-        0.8825
-    )
+    # A route check, not a band: the shop turns the largest printed Ø (.41)
+    # inside the thinnest flats.
+    assert geom.SPIGOT_DIA + spec._SPIGOT_HI < geom.HEX_AF - spec.HEX_STOCK_AF_BAND
+    assert geom.HEX_AF - spec.HEX_STOCK_AF_BAND - 0.41 * 25.4 == pytest.approx(0.5715)
 
 
 def test_the_spigot_prints_its_own_length_and_the_hex_is_the_stations_less_it() -> None:
-    # r2 review: the hex from the free end (11.30) left the turner to find
-    # the shoulder through the stations; the lathe faces the spigot and
-    # measures back to its shoulder.  The hex stays modelled, unprinted.
+    # r2 review: the hex from the free end left the turner to find the
+    # shoulder through the stations; the lathe faces the spigot and measures
+    # back to its shoulder.  The hex stays modelled, unprinted.
     assert "HexLength" not in spec.DRAWING_PRECISION_BY_NAME
     assert spec.DRAWING_PRECISION_BY_NAME["SpigotLength"] == spec.SPIGOT_LENGTH_PLACES == 2
     assert spec.DRAWING_DIMENSIONS["TurnedProfile"] >= {"SpigotLength", "RodStation", "BoreStation"}
-    assert geom.SPIGOT_LENGTH == pytest.approx(6.70)
-    assert geom.HEX_LENGTH == pytest.approx(5.30 + 12.70 - 6.70)
+    assert geom.SPIGOT_LENGTH == pytest.approx(0.26 * 25.4)
+    assert geom.HEX_LENGTH == pytest.approx(5.30 + 12.70 - 0.26 * 25.4)
     assert geom.OVERALL_LENGTH == pytest.approx(18.00)
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"D1@Hex", \'"RodStation" + "BoreStation" - "SpigotLength"\'' in source
@@ -520,15 +524,15 @@ def test_the_spigot_prints_its_own_length_and_the_hex_is_the_stations_less_it() 
 
 
 def test_the_shoulder_corner_takes_the_title_block_inside_corner_row() -> None:
-    # ENFORCE review 2026-10-24 (rule 4): the bare R0.2 MAX named no mate and
-    # nothing seats on the shoulder, so the title block's INSIDE CORNERS R1.0
-    # MAX governs the corner and the sheet prints no size.  The part keeps
-    # its modelled R0.2, one tool nose inside that row.
-    import _config
+    # ENFORCE review 2026-10-24 (rule 4): a bare MAX radius named no mate and
+    # nothing seats on the shoulder, so the title block's INSIDE CORNERS row
+    # (R.040 MAX) governs the corner and the sheet prints no size.  The part
+    # keeps its modelled .008 tool nose inside that row.
+    from _printed_tolerance import inside_corner_radius_mm
 
-    ceiling = float(_config.title_block("inside_corner")["radius_mm"])
-    assert ceiling == pytest.approx(1.0)
-    assert geom.SHOULDER_FILLET_R == pytest.approx(0.2)
+    ceiling = inside_corner_radius_mm(unit=spec.UNIT)
+    assert ceiling == pytest.approx(0.040 * 25.4)
+    assert geom.SHOULDER_FILLET_R == pytest.approx(0.008 * 25.4)
     assert geom.SHOULDER_FILLET_R <= ceiling
     assert "ShoulderFillet" not in spec.DRAWING_DIMENSIONS
     assert "ShoulderRadius" not in spec.DRAWING_PRECISION_BY_NAME
@@ -543,24 +547,18 @@ def test_the_shoulder_corner_takes_the_title_block_inside_corner_row() -> None:
     # The modelled corner sits inside the shoulder's annulus on 7/16 flats,
     # even on the thinnest bar, and clear of the groove's shoulder-side mouth.
     annulus = (geom.HEX_AF - geom.SPIGOT_DIA) / 2.0
-    assert annulus == pytest.approx(0.50625)
+    assert annulus == pytest.approx(0.51245)
     assert spec.SHOULDER_ANNULUS == pytest.approx(annulus)
     thinnest = (geom.HEX_AF - spec.HEX_STOCK_AF_BAND - geom.SPIGOT_DIA) / 2.0
     assert spec.SHOULDER_ANNULUS_MIN == pytest.approx(thinnest)
-    assert thinnest == pytest.approx(0.44125)
+    assert thinnest == pytest.approx(0.44895)
     assert geom.SHOULDER_FILLET_R < thinnest
     nominal = geom.GROOVE_MOUTHS[0] - (geom.SHOULDER_X + geom.SHOULDER_FILLET_R)
-    assert nominal == pytest.approx(1.55, abs=1e-4)
-    assert spec.GROOVE_FILLET_CLEARANCE == pytest.approx(0.53)
-    # At the row's R1.0 the blend clears the groove's mouth at nominal; at
-    # the worst-case stack it reaches 0.27 past the mouth and lifts the
-    # shoulder-side lip by 0.04, adding material: no wall thins, and the
-    # groove's floor, where the wire seats, is untouched.
-    assert geom.GROOVE_MOUTHS[0] - (geom.SHOULDER_X + ceiling) == pytest.approx(0.75, abs=1e-4)
-    overlap = ceiling - spec.GROOVE_SHOULDER_CLEARANCE
-    assert overlap == pytest.approx(0.27)
-    lip_lift = ceiling - math.sqrt(ceiling**2 - overlap**2)
-    assert lip_lift == pytest.approx(0.037, abs=1e-3)
+    assert nominal == pytest.approx(1.457, abs=1e-4)
+    # Even the row's R.040 clears the groove's mouth at the worst-case stack:
+    # an inside-corner blend never reaches the groove.
+    assert geom.GROOVE_MOUTHS[0] - (geom.SHOULDER_X + ceiling) == pytest.approx(0.6442, abs=1e-4)
+    assert spec.GROOVE_SHOULDER_CLEARANCE > ceiling
 
 
 def test_the_builder_fillets_the_shoulder_and_its_volume_is_the_swept_spandrel() -> None:
@@ -575,7 +573,7 @@ def test_the_builder_fillets_the_shoulder_and_its_volume_is_the_swept_spandrel()
         for index in range(steps)
     )
     assert part.V_FILLET == pytest.approx(swept, rel=1e-4)
-    assert part.V_FILLET == pytest.approx(0.275, abs=1e-3)
+    assert part.V_FILLET == pytest.approx(0.2833, abs=1e-3)
     assert part.V_TOTAL == pytest.approx(
         part.V_HEX + part.V_SPIGOT + part.V_FILLET - part.V_GROOVE - part.V_BORE - part.V_TAP
     )
@@ -603,12 +601,12 @@ def _code_strings(tree: ast.Module) -> list[str]:
 
 def test_the_rod_bore_ends_the_thread_and_its_depth_is_ref() -> None:
     # The native thread depth is the nominal wall on the tap's axis; the
-    # callout brackets it as REF, so no .X band (10.1 +/-0.8 would admit 9.3)
-    # governs the thread's extent: the rod bore does (the callout's extent
-    # row).  Review09: a bare 10.1 in the callout read as controlling while the
-    # note said REF.  Review r3 (rule 7): the extent sat in a general note far
-    # from the tap; it is the callout's own row now, words only (the bore's Ø
-    # is its own native dimension; a typed Ø5.2 would not follow the model).
+    # callout brackets it as REF, so no band governs the thread's extent: the
+    # rod bore does (the callout's extent row).  Review09: a bare depth in the
+    # callout read as controlling while the note said REF.  Review r3 (rule
+    # 7): the extent sat in a general note far from the tap; it is the
+    # callout's own row now, words only (the bore's Ø is its own native
+    # dimension; a typed size would not follow the model).
     assert spec.TAP_EXTENT_CALLOUT == "FULL THREAD TO ROD BORE"
     assert not any(ch.isdigit() for ch in spec.TAP_EXTENT_CALLOUT)
     assert not hasattr(spec, "TAP_EXTENT_NOTE")
@@ -617,14 +615,18 @@ def test_the_rod_bore_ends_the_thread_and_its_depth_is_ref() -> None:
     assert geom.TAP_SPEC.overrides_mm["ThreadDepth"] == geom.TAP_LENGTH
     assert geom.TAP_LENGTH == pytest.approx(geom.SPIGOT_FACE_X - geom.ROD_BORE_DIA / 2.0)
     assert set(spec.TAP_CALLOUT_PRECISION) == {
+        spec.TAP_DRILL_DIA_VARIABLE,
         spec.TAP_DRILL_DEPTH_VARIABLE,
         spec.TAP_THREAD_DEPTH_VARIABLE,
-    } == {"hw-tapdrldepth", "hw-threaddepth"}
+    } == {"hw-tapdrldia", "hw-tapdrldepth", "hw-threaddepth"}
     # The native depth stays model-owned: the brackets go round the variable
     # in the definition; no code string types the value.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_hole_callout_precision(" in source
-    printed = (f"{geom.TAP_LENGTH:.1f}", f"{geom.TAP_DRILL_DEPTH:.1f}")
+    printed = (
+        drawing.printed_text(geom.TAP_LENGTH, spec.TAP_DEPTH_PLACES),
+        drawing.printed_text(geom.TAP_DRILL_DEPTH, spec.TAP_DEPTH_PLACES),
+    )
     assert not [
         text for text in _code_strings(ast.parse(source)) if any(p in text for p in printed)
     ]
@@ -788,20 +790,20 @@ _EXTENT = "FULL THREAD TO ROD BORE"
     [
         (
             {
-                1: "TAP 4-40 UNC-2B <HOLE-DEPTH> (10.1)",
-                2: "<MOD-DIAM>2.26 <HOLE-DEPTH> 12.7",
+                1: "TAP 4-40 UNC-2B <HOLE-DEPTH> (.39)",
+                2: "<MOD-DIAM>.089 <HOLE-DEPTH> .50",
                 3: "",
                 4: _EXTENT,
             },
             True,
         ),
-        # Retry09's native reading (20261012T124257186Z), bracketed, under
-        # today's process and with the extent row under the thread.
+        # Retry09's native layout, bracketed, under today's process and with
+        # the extent row under the thread.
         (
             {
-                1: "TAP 4-40 UNC - 2B <HOLE-DEPTH> (10.1)",
+                1: "TAP 4-40 UNC - 2B <HOLE-DEPTH> (.39)",
                 2: "",
-                3: "<MOD-DIAM> 2.26 <HOLE-DEPTH> 12.7",
+                3: "<MOD-DIAM> .089 <HOLE-DEPTH> .50",
                 4: _EXTENT,
             },
             True,
@@ -809,9 +811,9 @@ _EXTENT = "FULL THREAD TO ROD BORE"
         # Review r3's print: the extent only in a general note, not here.
         (
             {
-                1: "TAP INTO BORE 4-40 UNC - 2B <HOLE-DEPTH> (10.1)",
+                1: "TAP INTO BORE 4-40 UNC - 2B <HOLE-DEPTH> (.39)",
                 2: "",
-                3: "<MOD-DIAM> 2.26 <HOLE-DEPTH> 12.7",
+                3: "<MOD-DIAM> .089 <HOLE-DEPTH> .50",
                 4: "",
             },
             False,
@@ -819,9 +821,9 @@ _EXTENT = "FULL THREAD TO ROD BORE"
         # The extent over the drill row, not under the thread.
         (
             {
-                1: "TAP 4-40 UNC - 2B <HOLE-DEPTH> (10.1)",
+                1: "TAP 4-40 UNC - 2B <HOLE-DEPTH> (.39)",
                 2: "",
-                3: f"<MOD-DIAM> 2.26 <HOLE-DEPTH> 12.7\n{_EXTENT}",
+                3: f"<MOD-DIAM> .089 <HOLE-DEPTH> .50\n{_EXTENT}",
                 4: "",
             },
             False,
@@ -829,9 +831,9 @@ _EXTENT = "FULL THREAD TO ROD BORE"
         # The extent stated twice.
         (
             {
-                1: f"TAP 4-40 UNC - 2B <HOLE-DEPTH> (10.1) {_EXTENT}",
+                1: f"TAP 4-40 UNC - 2B <HOLE-DEPTH> (.39) {_EXTENT}",
                 2: "",
-                3: "<MOD-DIAM> 2.26 <HOLE-DEPTH> 12.7",
+                3: "<MOD-DIAM> .089 <HOLE-DEPTH> .50",
                 4: _EXTENT,
             },
             False,
@@ -839,19 +841,20 @@ _EXTENT = "FULL THREAD TO ROD BORE"
         # The thread row off the prefix: the below row would not sit under it.
         (
             {
-                1: "<MOD-DIAM> 2.26 <HOLE-DEPTH> 12.7",
+                1: "<MOD-DIAM> .089 <HOLE-DEPTH> .50",
                 2: "",
-                3: "TAP 4-40 UNC - 2B <HOLE-DEPTH> (10.1)",
+                3: "TAP 4-40 UNC - 2B <HOLE-DEPTH> (.39)",
                 4: _EXTENT,
             },
             False,
         ),
-        # Retry09 as printed: a bare 10.1 reads as controlling (review09).
+        # Retry09 as printed: a bare thread depth reads as controlling
+        # (review09).
         (
             {
-                1: "TAP 4-40 UNC - 2B <HOLE-DEPTH> 10.1",
+                1: "TAP 4-40 UNC - 2B <HOLE-DEPTH> .39",
                 2: "",
-                3: "<MOD-DIAM> 2.26 <HOLE-DEPTH> 12.7",
+                3: "<MOD-DIAM> .089 <HOLE-DEPTH> .50",
                 4: _EXTENT,
             },
             False,
@@ -859,8 +862,8 @@ _EXTENT = "FULL THREAD TO ROD BORE"
         # The reference stated twice, once bare.
         (
             {
-                1: "TAP 4-40 UNC-2B <HOLE-DEPTH> (10.1) 10.1",
-                2: "<MOD-DIAM>2.26 <HOLE-DEPTH> 12.7",
+                1: "TAP 4-40 UNC-2B <HOLE-DEPTH> (.39) .39",
+                2: "<MOD-DIAM>.089 <HOLE-DEPTH> .50",
                 3: "",
                 4: _EXTENT,
             },
@@ -869,8 +872,8 @@ _EXTENT = "FULL THREAD TO ROD BORE"
         # The controlling drill depth bracketed as if it were REF.
         (
             {
-                1: "TAP 4-40 UNC-2B <HOLE-DEPTH> (10.1)",
-                2: "<MOD-DIAM>2.26 <HOLE-DEPTH> (12.7)",
+                1: "TAP 4-40 UNC-2B <HOLE-DEPTH> (.39)",
+                2: "<MOD-DIAM>.089 <HOLE-DEPTH> (.50)",
                 3: "",
                 4: _EXTENT,
             },
@@ -880,17 +883,17 @@ _EXTENT = "FULL THREAD TO ROD BORE"
         (
             {
                 1: "TAP TO BORE 4-40 UNC-2B THRU",
-                2: "<MOD-DIAM>2.26 THRU",
+                2: "<MOD-DIAM>.089 THRU",
                 3: "",
                 4: _EXTENT,
             },
             False,
         ),
-        # Two places on the thread depth asks for the .XX band.
+        # Three places on the thread depth asks for the .XXX band.
         (
             {
-                1: "TAP 4-40 UNC-2B <HOLE-DEPTH> (10.10)",
-                2: "<MOD-DIAM>2.26 <HOLE-DEPTH> 12.7",
+                1: "TAP 4-40 UNC-2B <HOLE-DEPTH> (.386)",
+                2: "<MOD-DIAM>.089 <HOLE-DEPTH> .50",
                 3: "",
                 4: _EXTENT,
             },
@@ -899,8 +902,8 @@ _EXTENT = "FULL THREAD TO ROD BORE"
         # The thread without its process.
         (
             {
-                1: "4-40 UNC-2B <HOLE-DEPTH> (10.1)",
-                2: "<MOD-DIAM>2.26 <HOLE-DEPTH> 12.7",
+                1: "4-40 UNC-2B <HOLE-DEPTH> (.39)",
+                2: "<MOD-DIAM>.089 <HOLE-DEPTH> .50",
                 3: "",
                 4: _EXTENT,
             },
@@ -909,8 +912,8 @@ _EXTENT = "FULL THREAD TO ROD BORE"
         # The drill row without its depth.
         (
             {
-                1: "TAP 4-40 UNC-2B <HOLE-DEPTH> (10.1)",
-                2: "<MOD-DIAM>2.26",
+                1: "TAP 4-40 UNC-2B <HOLE-DEPTH> (.39)",
+                2: "<MOD-DIAM>.089",
                 3: "",
                 4: _EXTENT,
             },
@@ -919,8 +922,8 @@ _EXTENT = "FULL THREAD TO ROD BORE"
         # A band on the REF thread depth.
         (
             {
-                1: "TAP 4-40 UNC-2B <HOLE-DEPTH> (10.1)<MOD-PM>0.8",
-                2: "<MOD-DIAM>2.26 <HOLE-DEPTH> 12.7",
+                1: "TAP 4-40 UNC-2B <HOLE-DEPTH> (.39)<MOD-PM>.01",
+                2: "<MOD-DIAM>.089 <HOLE-DEPTH> .50",
                 3: "",
                 4: _EXTENT,
             },
@@ -964,8 +967,8 @@ def test_final_sheet_census_expects_no_tapped_hole_note_from_the_blind_tap() -> 
     note = drawing.TAPPED_HOLE_NOTE.lower()
     assert note in f"{geom.TAP_SPEC.size} Tapped Hole".lower()
     native_callout = (
-        "<MOD-DIAM> 2.26 <HOLE-DEPTH> 12.7\n"
-        "TAP 4-40 UNC - 2B <HOLE-DEPTH> (10.1)\n"
+        "<MOD-DIAM> .089 <HOLE-DEPTH> .50\n"
+        "TAP 4-40 UNC - 2B <HOLE-DEPTH> (.39)\n"
         "FULL THREAD TO ROD BORE"
     )
     assert note not in native_callout.lower()
@@ -1982,7 +1985,7 @@ def test_station_witness_ids_follow_the_builders_reference_order() -> None:
 _NATIVE15_RADIUS_KEEP = (0.1724, 0.1988)
 # What the radius prints: the part's LIMIT band, the R row over the lower
 # limit, and under them the sheet's callout row (owner ruling, review r5).
-_RADIUS_ROWS = ("R1.2", "0.5", "FULL R")
+_RADIUS_ROWS = ("R.047", ".020", "FULL R")
 # r12's GrooveRadius (20261017T053834039Z: audit display data, 300 dpi PNG):
 # keep (164.8379, 188.2781) mm; " R", "1.2" over "0.5" and a closing space
 # from x 158.8952 to 170.7806 mm, centred on the keep; the upper row on the
@@ -3036,15 +3039,22 @@ def test_radius_readback_refuses_floating_ink_and_lost_native_style(
         drawing._prove_groove_radius(object(), object(), radius, station)
 
 
-@pytest.mark.parametrize("brackets", [("(", ")"), ("", ""), ("(<MOD-DIAM>", ")")])
-def test_end_af_native_proof_preserves_linear_ref_brackets(
-    monkeypatch: pytest.MonkeyPatch, brackets: tuple[str, str],
+@pytest.mark.parametrize("presented", [True, False])
+def test_end_af_native_proof_requires_the_supplier_fraction_reference(
+    monkeypatch: pytest.MonkeyPatch, presented: bool,
 ) -> None:
     display = _NativeDisplay("HexAf", "HexProfile", geom.HEX_AF, kind=2)
-    display.GetText = lambda part: {1: brackets[0], 2: brackets[1]}[part]
     annotation = _RootAnnotation(display)
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
     monkeypatch.setattr(drawing, "dimension_segments", lambda raw: _vertical_af_ink())
+    calls: list[dict] = []
+
+    def supplier(adapter, dimension, *, label, **contract):
+        calls.append(contract)
+        if not presented:
+            raise RuntimeError(f"{label}: native supplier presentation differs")
+
+    monkeypatch.setattr(drawing, "assert_supplier_reference_dimension", supplier)
 
     def project(adapter, view, xyz, *, label):
         return (
@@ -3053,11 +3063,20 @@ def test_end_af_native_proof_preserves_linear_ref_brackets(
         )
 
     monkeypatch.setattr(drawing, "model_point_in_view", project)
-    if brackets == ("(", ")"):
+    if presented:
         drawing._prove_end_stock_reference(object(), object(), annotation)
     else:
-        with pytest.raises(RuntimeError, match="linear stock-reference brackets"):
+        with pytest.raises(RuntimeError, match="supplier presentation"):
             drawing._prove_end_stock_reference(object(), object(), annotation)
+    # The bar's 7/16 in as bought: an exact inch fraction.
+    assert calls == [
+        {
+            "units": "in",
+            "precision": 3,
+            "expected_mm": geom.HEX_AF,
+            "fraction_denominator": 16,
+        }
+    ]
 
 
 def test_native_bore_axis_refuses_null_annotation(monkeypatch: pytest.MonkeyPatch) -> None:

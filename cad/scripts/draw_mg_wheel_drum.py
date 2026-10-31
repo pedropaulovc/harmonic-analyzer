@@ -30,6 +30,7 @@ from _drawing_dimensions import (
 )
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _drawing_registry import DRAWINGS_BY_NAME
 from mg_wheel_drum_spec import (
@@ -79,9 +80,8 @@ DRAWING_PRECISION_BY_NAME = {
 # The bore's four-line callout stands up and right of the face view; the
 # length's two-line callout hangs under the side view, above the title
 # block, so the two text blocks never share a row.  The length's block is
-# wider than the ring (run 14: its widest line printed 66.0 mm, centred on
-# its point), so it stands LEFT of the side view's extension lines, which
-# ran through it when it was centred between them.
+# wider than the ring (about 66 mm), so it stands LEFT of the side view's
+# extension lines rather than centred between them.
 _RECESS_BLOCK_HALF = 0.034
 FRONT_KEEP = {
     "DrumOd": (0.060, 0.090),
@@ -119,7 +119,11 @@ async def build(adapter: Any) -> dict[str, str]:
         required=("Number", "Material Specification", "Finish", "Quantity"),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -168,9 +172,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    # The template centre-marks the bore as the view is placed; run 11's
-    # explicit AutoInsertCenterMarks2 printed a second, identical mark (the
-    # layout audit's duplicate-annotation finding).  The pressed bore takes
+    # The template centre-marks the bore as the view is placed, so an
+    # explicit AutoInsertCenterMarks2 would print a duplicate mark.  The pressed bore takes
     # no roughness symbol (drawing-guidelines.md rule 6): it neither runs nor
     # slides, and the ream and the stated interference control the fit.
 

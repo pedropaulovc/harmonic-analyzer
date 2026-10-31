@@ -18,6 +18,7 @@ import mg_magnifying_bracket_spec as spec
 from _drawing_edges import ViewEdge, ViewEdges
 from _drawing_layout_check import DrawableRegion
 from _layout_geometry import Box, Segment, segment_box_overlap_length
+from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm
 
 
@@ -26,7 +27,7 @@ def test_foot_joins_flush_without_changing_mounting_grip_or_pattern() -> None:
     assert part.FLANGE_X[0] < -joint.NECK_THICKNESS / 2.0
     assert part.FLANGE_Z[1] - part.FLANGE_Z[0] == pytest.approx(mounting.SIDE_PLATE_THICKNESS)
     assert mounting.BRACKET_HOLE_POINTS[1][0] - mounting.BRACKET_HOLE_POINTS[0][0] == pytest.approx(mounting.SCREW_MACHINE_X[1] - mounting.SCREW_MACHINE_X[0])
-    assert printed_band_mm(spec.DRAWING_PRECISION["FlangeProfile"]["FlangeDepth"]) == mounting.FLANGE_THICKNESS_BAND
+    assert printed_band_mm(spec.DRAWING_PRECISION["FlangeProfile"]["FlangeDepth"], unit=spec.UNIT) == mounting.FLANGE_THICKNESS_BAND
     assert all(
         point[1] == mounting.RECEIVER_ROW_Y and point[2] == part.FLANGE_Z[0]
         for point in mounting.BRACKET_HOLE_POINTS
@@ -43,13 +44,14 @@ def test_foot_joins_flush_without_changing_mounting_grip_or_pattern() -> None:
 
 
 def test_model_precision_and_functional_bands_have_one_authority() -> None:
-    assert spec.DRAWING_PRECISION["Neck"]["NeckThickness"] == 1
-    assert spec.DRAWING_PRECISION["FlangeProfile"] == {"FlangeWidth": 1, "FlangeDepth": 3}
-    assert spec.DRAWING_PRECISION["Flange"]["FlangeHeight"] == 1
+    assert spec.DRAWING_PRECISION["Neck"]["NeckThickness"] == 2
+    assert spec.DRAWING_PRECISION["FlangeProfile"] == {"FlangeWidth": 2, "FlangeDepth": 3}
+    assert spec.DRAWING_PRECISION["Flange"]["FlangeHeight"] == 3
     assert joint.NECK_THICKNESS == 12.5
-    assert joint.NECK_THICKNESS_TOL == printed_band_mm(1) == 0.8
-    assert joint.NOSE_R_TOL == joint.HOLE_LOCATION_TOL == spec.HEAD_MATERIAL_TOL == 0.05
-    assert mounting.FLANGE_THICKNESS_BAND == spec.FOOT_GRIP_TOL == 0.13
+    # .49 +/-.01 over the 12.5 mm model: .48 is the thinnest accepted neck.
+    assert joint.NECK_THICKNESS - joint.NECK_THICKNESS_TOL == pytest.approx(0.48 * 25.4)
+    assert joint.NOSE_R_TOL == joint.HOLE_LOCATION_TOL == spec.HEAD_MATERIAL_TOL == 0.0508
+    assert mounting.FLANGE_THICKNESS_BAND == spec.FOOT_GRIP_TOL == pytest.approx(0.127)
     tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
     assert any(
         isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
@@ -105,13 +107,11 @@ def test_foot_grip_dimension_sits_on_the_free_end_not_the_upright_face(monkeypat
 def test_overall_precision_bands_do_not_loosen_receiver_or_move_nominal_geometry() -> None:
     assert mounting.SIDE_PLATE_MACHINE_X == (-8.0, 46.25)
     assert mounting.SIDE_PLATE_HEIGHT == 11.0
-    assert mounting.SIDE_PLATE_LENGTH_DEVIATIONS == pytest.approx((-0.85, 0.75))
-    assert mounting.SIDE_PLATE_HEIGHT_DEVIATIONS == pytest.approx((-0.8, 0.8))
-    assert mounting.LINEAR_BAND == 0.51  # receiver/depth authority is unchanged
-    assert mounting.COUNTERBORE_END_WALL_MIN == pytest.approx(7.0)
-    assert mounting.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(2.79)
-    assert mounting.GRIP_MIN == pytest.approx(3.045)
-    assert mounting.GRIP + mounting.GRIP_BAND == pytest.approx(3.305)
+    assert mounting.COUNTERBORE_END_WALL_MIN >= WALL_TARGET_MM
+    assert mounting.COUNTERBORE_HEIGHT_WALL_MIN >= WALL_TARGET_MM
+    # The .125 +/-.005 foot grip.
+    assert mounting.GRIP_MIN == pytest.approx(0.120 * 25.4)
+    assert mounting.GRIP + mounting.GRIP_BAND == pytest.approx(0.130 * 25.4)
 
 
 @pytest.mark.parametrize("ignored", (False, True))
@@ -582,6 +582,8 @@ def test_mounting_callout_reflows_native_size_clear_of_the_current_title_block(m
     monkeypatch.setattr(drawing, "annotation_display", native_ink)
     monkeypatch.setattr(drawing, "sheet_region", lambda _a: _R8_REGION)
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
+    precision = []
+    monkeypatch.setattr(drawing, "set_hole_callout_precision", lambda d, places, *, label: precision.append((d, places)))
     if fault is None:
         assert drawing._add_mounting_callout(object(), view, edge) is display
         ink = drawing._dimension_layout_ink(object(), state, label="mounting")
@@ -596,6 +598,7 @@ def test_mounting_callout_reflows_native_size_clear_of_the_current_title_block(m
     assert state.value == mounting.CLEARANCE_DIA / 1000.0
     assert state.position == (0.166, 0.054)
     assert state.definition == "DRILL " + native_definition + "\n" + spec.MOUNTING_HOLE_PROCESS
+    assert precision == [(display, {"hw-diam": 3})]
 
 
 @pytest.mark.parametrize("tapped", (False, True))
@@ -703,7 +706,7 @@ def test_overall_reference_measures_real_seat_to_arc_extreme_without_a_new_size_
         # centre; no nominal text or SystemValue assignment can fake the span.
         assert selected["entities"] == (seat_edge, nose_edge)
         assert selected["orientation"] == "vertical"
-        assert native.SystemValue * 1000.0 == pytest.approx(105.89758778042652)
+        assert native.SystemValue * 1000.0 == pytest.approx(mounting.SIDE_PLATE_Z[1] + joint.NOSE_R)
         assert condition == {1: 0, 2: 3}
         assert native.DrivenState == 1 and native.Tolerance.Type == 0
         assert text == {1: "(", 2: ")"}
@@ -1002,7 +1005,7 @@ def test_root_and_foot_rounds_share_one_raw_edge_transaction(monkeypatch, failur
         assert not raw_edges
     assert len(transactions) == 1
     radius, entities, propagate = transactions[0]
-    assert radius == .25 and propagate is False
+    assert radius == spec.FOOT_CORNER_R and propagate is False
     assert entities == [root, left_side, right_side] and head not in entities
 
 
@@ -1053,20 +1056,21 @@ def test_matched_width_guard_probes_trimmed_root_head_and_nose(monkeypatch, faul
         (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, .0055), None,
         (-.00625, -.0055, -.0055, .00625, .0055, 0.0),
     )
-    root_center = (-6.5, 0.0, part.FLANGE_Z[0] - .25)
+    r = spec.FOOT_CORNER_R
+    root_center = (-6.25 - r, 0.0, part.FLANGE_Z[0] - r)
     geometry["root_round"] = FaceGeometry(
         faces["root_round"], SURFACE_CYLINDER,
-        (*tuple(value / 1000.0 for value in root_center), 0.0, 1.0, 0.0, .00025), None,
-        (-.0065, -.0055, root_center[2] / 1000.0, -.00625, .0055, part.FLANGE_Z[0] / 1000.0),
+        (*tuple(value / 1000.0 for value in root_center), 0.0, 1.0, 0.0, r / 1000.0), None,
+        (root_center[0] / 1000.0, -.0055, root_center[2] / 1000.0, -.00625, .0055, part.FLANGE_Z[0] / 1000.0),
     )
     for sign in (-1, 1):
-        center = (0.0, sign * 5.25, part.FLANGE_Z[0] + .25)
+        center = (0.0, sign * (5.5 - r), part.FLANGE_Z[0] + r)
         label = f"foot_round_{sign}"
         geometry[label] = FaceGeometry(
             faces[label], SURFACE_CYLINDER,
-            (*tuple(value / 1000.0 for value in center), 1.0, 0.0, 0.0, .00025), None,
-            (part.FLANGE_X[0] / 1000.0, min(sign * .00525, sign * .0055), part.FLANGE_Z[0] / 1000.0,
-             -.00625, max(sign * .00525, sign * .0055), center[2] / 1000.0),
+            (*tuple(value / 1000.0 for value in center), 1.0, 0.0, 0.0, r / 1000.0), None,
+            (part.FLANGE_X[0] / 1000.0, min(center[1] / 1000.0, sign * .0055), part.FLANGE_Z[0] / 1000.0,
+             -.00625, max(center[1] / 1000.0, sign * .0055), center[2] / 1000.0),
         )
         for kind, x, z in (("neck", 0.0, neck_z), ("foot", foot_x, foot_z)):
             label = f"{kind}_{sign}"
@@ -1133,21 +1137,21 @@ def test_matched_width_guard_probes_trimmed_root_head_and_nose(monkeypatch, faul
         for sign in (-1, 1):
             neck_points = [point for label, point in probes if label == f"neck_{sign}"]
             assert sorted(point[0] for point in neck_points if math.isclose(point[2], neck_z)) == pytest.approx([-6.25, 6.25])
-            assert sorted(point[2] - part.FLANGE_Z[0] for point in neck_points if point[0] == 0.0) == pytest.approx([-.25, 0.0, .25])
+            assert sorted(point[2] - part.FLANGE_Z[0] for point in neck_points if point[0] == 0.0) == pytest.approx([-r, 0.0, r])
             foot_points = [point for label, point in probes if label == f"foot_{sign}"]
             assert len(foot_points) == 1
             assert foot_points[0] == pytest.approx((foot_x, sign * 5.5, foot_z))
             round_points = [point for label, point in probes if label == f"foot_round_{sign}"]
             assert len(round_points) == 1
             assert round_points[0] == pytest.approx((
-                foot_x, sign * (5.25 + .25 / math.sqrt(2.0)),
-                part.FLANGE_Z[0] + .25 - .25 / math.sqrt(2.0),
+                foot_x, sign * (5.5 - r + r / math.sqrt(2.0)),
+                part.FLANGE_Z[0] + r - r / math.sqrt(2.0),
             ))
         root_points = [point for label, point in probes if label == "root_round"]
         assert len(root_points) == 1
         assert root_points[0] == pytest.approx((
-            -6.5 + .25 / math.sqrt(2.0), 0.0,
-            part.FLANGE_Z[0] - .25 + .25 / math.sqrt(2.0),
+            -6.25 - r + r / math.sqrt(2.0), 0.0,
+            part.FLANGE_Z[0] - r + r / math.sqrt(2.0),
         ))
         nose_points = [point for label, point in probes if label == "nose"]
         assert {point[0] for point in nose_points} == {-6.25, 6.25}

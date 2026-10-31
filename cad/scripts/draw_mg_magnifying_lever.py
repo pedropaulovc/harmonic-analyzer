@@ -1,10 +1,12 @@
 r"""Native quarter-inch lever sheet with an enlarged flat-thread-end detail.
 
-The independent model detail imports its dimensions before its circular crop,
-as on MHA-MG-04. Native diameters/lengths/limits remain associative. The model
-retains UNC-2A metadata; drawing instances defer the default class to the title.
-Only the free end domes; its note attaches to the identified spherical face,
-including actual visible-silhouette faces when face enumeration omits them.
+The sheet prints decimal inch; the as-bought rod's diameter is its REF stock
+fraction. The independent model detail imports its dimensions before its
+circular crop, as on MHA-MG-04. Native diameters/lengths/limits remain
+associative. The model retains UNC-2A metadata; drawing instances defer the
+default class to the title. Only the free end domes; its note attaches to the
+identified spherical face, including actual visible-silhouette faces when face
+enumeration omits them.
 """
 
 from __future__ import annotations
@@ -30,6 +32,8 @@ from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
+from _supplier_dimensions import supplier_reference_dimension
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_read import face_geometry
 from _gtol_sphere import SphereFace
@@ -39,7 +43,7 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from mg_lever_thread_joint import INCOMPLETE_THREAD_MAX, ROD_DIA, ROD_LENGTH, THREAD_LENGTH, TIP_CHAMFER
-from mg_magnifying_lever_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, FREE_END_CALLOUT, LEAD_CALLOUT, PRINT_THREAD_CALLOUT, ROD_DIA_CALLOUT, SCREW_SEAT_CALLOUT, SURFACE_FINISHES, THREAD_CALLOUT
+from mg_magnifying_lever_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, FREE_END_CALLOUT, LEAD_CALLOUT, PRINT_THREAD_CALLOUT, ROD_DIA_CALLOUT, ROD_DIA_FRACTION_DENOMINATOR, SCREW_SEAT_CALLOUT, SURFACE_FINISHES, THREAD_CALLOUT
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -64,7 +68,21 @@ DETAIL_KEEP = {"ThreadLength": (0.323, 0.255), "IncompleteLength": (0.377, 0.165
 # keep the qualifier above the screw-seat note and below the free-end note.
 FRONT_KEEP = {"OverallLength": (0.115, 0.088), "RodDia": (0.055, 0.166)}
 DETAIL_THREAD_NOTE_XY = (0.2926, 0.245)
-CALLOUTS = {"RodDia": ROD_DIA_CALLOUT, "IncompleteLength": LEAD_CALLOUT}
+CALLOUTS = {"IncompleteLength": LEAD_CALLOUT}
+
+
+def _rod_stock_reference(adapter: Any, annotations: list[Any]) -> None:
+    """The as-bought rod's diameter prints as its REF stock fraction."""
+    matches = [item for item in annotations if dimension_name(adapter, item) == "RodDia"]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one RodDia dimension, found {len(matches)}")
+    display = _early_bound(_early_bound(matches[0], "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
+    supplier_reference_dimension(
+        adapter, display, label="lever rod stock diameter", units="in",
+        precision=DRAWING_PRECISION["RodProfile"]["RodDia"], expected_mm=ROD_DIA,
+        presentation="diameter", fraction_denominator=ROD_DIA_FRACTION_DENOMINATOR,
+        callout=ROD_DIA_CALLOUT,
+    )
 
 
 def _activate(adapter: Any, view: Any) -> None:
@@ -555,7 +573,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(SOURCE)
     check("open quarter-inch lever source", await adapter.open_model(str(SOURCE)))
     read_required_properties(adapter.currentModel, ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity", "Iso View Note"), required=("Number", "Material Specification", "Finish", "Quantity", "Iso View Note"))
-    drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout)
+    drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout, unit=part_drawing_unit("mg-magnifying-lever"))
     stamp_drawing_summary(adapter, drawing, {0: "Magnifying Lever Rod Manufacturing Drawing", 1: "Harmonic Analyzer hobby-machinist book drawing", 2: "Harmonic Analyzer Project", 3: "quarter-inch brass lever; flat UNC-2A end; external die runout", 4: "Generated from the project-owned ASME B drawing standard"})
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
@@ -567,6 +585,7 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*detailed, *full]
     assert_imported_precision(adapter, annotations, {name: places for names in DRAWING_PRECISION.values() for name, places in names.items()})
     set_dimension_callouts(adapter, annotations, CALLOUTS)
+    _rod_stock_reference(adapter, annotations)
     seeds, instances = import_cosmetic_threads(adapter, detail)
     if (seeds, instances) != (1, 1):
         raise RuntimeError(f"lever thread detail needs one native external thread: {(seeds, instances)}")

@@ -29,13 +29,13 @@ RECORDING_PAPER_RIGHT_INSET_MM = (
 PAPER_FRONT_Z = hook.BAR_BACK_FACE_Z - BAR_DEPTH - platen.PLATE_THICKNESS - 0.5
 # The pen rod line. x: plumb under the magnifying wheel's rim-tangent wire (the
 # wire hangs from the rim groove's 3 o'clock point straight onto the adjuster
-# stud eye on the rod axis). z: the paper-most 0.1-grid line on which the pen
-# stirrup's paper-side corner still stands 2 x 0.25 off the paper with the
-# v-block's pivot bore where the CG balance puts it (pn_pen_carriage_geom;
-# test_pn_pen_carriage_geom asserts both). The magnifying wheel's rim plane
-# derives from it (mg_wheel_group.WHEEL_MID_Z).
+# stud eye on the rod axis). z: the paper-most .001-in line on which the pen
+# carriage's rigid paper-side points (pn_pen_carriage_geom) stay >= 0.02 under
+# the 2 x 0.25 paper stand-off, with the v-block's pivot bore where the CG
+# balance puts it (test_pn_pen_carriage_geom asserts it). The magnifying
+# wheel's rim plane derives from it (mg_wheel_group.WHEEL_MID_Z).
 PEN_ROD_X = round(mg_wheel_bar_geom.WHEEL_X - RIM_WIRE_R, 6)
-PEN_Z_MID = -162.5
+PEN_Z_MID = -162.5092  # -6.398 in
 PEN_BLOCK_YAW_DEG = 45.0
 PEN_PAPER_CLEARANCE_MM = 0.25
 PEN_NIB_X_MM = PEN_ROD_X - math.tan(math.radians(PEN_BLOCK_YAW_DEG)) * (

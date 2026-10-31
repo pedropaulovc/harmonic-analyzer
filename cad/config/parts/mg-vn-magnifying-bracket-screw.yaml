@@ -9,5 +9,6 @@ mg-vn-magnifying-bracket-screw:
   finish: passivated
   quantity: 2
   tolerance_class: machined_block
+  drawing_unit: in
   fit_class: fastener_clearance
   process: purchased
