@@ -78,12 +78,15 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     # the released arbor station, plus RIG_AFT_SHIFT set from the configured
     # g19 datum (user ruling P1-2: rig-set leaf D keeps its full face with
     # margin). Train pitch edits move the datum, not the cutover's local
-    # head or crossrod geometry.
+    # head or crossrod geometry.  #290: the .354 strap is thinner than the
+    # released 9.0, and the drum stands that much further aft.
     import pinion_rig_layout as rig
     import pinion_rig_park_geometry as park
 
     fitup_shift = assembly.ARBOR_Z0 - (-135.0 + MECHANISM_Z_SHIFT)
-    assert fitup_shift == pytest.approx(0.25 + rig.RIG_AFT_SHIFT, abs=1e-9)
+    assert fitup_shift == pytest.approx(
+        0.25 + (9.0 - rig.STRAP_T) + rig.RIG_AFT_SHIFT, abs=1e-9
+    )
     released_origin = (
         assembly.APINION_X,
         assembly.APINION_Y,
