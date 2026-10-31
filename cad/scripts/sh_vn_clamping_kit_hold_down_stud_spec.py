@@ -45,7 +45,6 @@ from dataclasses import dataclass
 
 import _config
 from _package_units import drawing_unit
-from _printed_limits import limits
 from _printed_tolerance import printed_band_mm
 
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
@@ -74,7 +73,8 @@ LENGTH = fasteners.HOLD_DOWN_STUD_LENGTH_MM
 LENGTH_PLACES = 2  # .XX: prints 2.25
 LENGTH_BAND = printed_band_mm(LENGTH_PLACES, unit=UNIT)
 # The mm acceptance limits of the printed nominal and its title-block band.
-LENGTH_LIMITS = tuple(limits(LENGTH, LENGTH_PLACES, unit=UNIT))
+# 2.25 sits on the .XX grid, so the printed nominal is the model length.
+LENGTH_LIMITS = (LENGTH - LENGTH_BAND, LENGTH + LENGTH_BAND)
 CLEARANCE_MIN = fasteners.HOLD_DOWN_STUD_CLEARANCE_MIN
 COMPLETE_PROJECTION_PITCHES = fasteners.HOLD_DOWN_STUD_COMPLETE_PROJECTION_PITCHES
 THREAD_PITCH_MM = fasteners.HOLD_DOWN_STUD_PITCH_MM
