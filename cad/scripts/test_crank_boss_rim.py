@@ -44,12 +44,13 @@ def test_the_64t_station_is_the_collar_stack() -> None:
     """#916 (Main's ruling (b), 2026-09-27): the 64T is set against MHA-DT-04's
     thrust collar, which bears on the cone boss's north end; toward the post it
     moves by the boss end long (ConeBossLen's .XX row, half per end) and the
-    collar thin (CollarWidth's row).  The two butts are closed nominally."""
+    collar thin (CollarWidth's printed short limit).  The two butts are closed
+    nominally."""
     boss_end = (
         rim.printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"], unit=rim.POST_UNIT)
         / 2.0
     )
-    collar = rim.printed_band_mm(shaft.DRAWING_PRECISION_BY_NAME["CollarWidth"])
+    collar = -shaft.printed_length_deviations("CollarWidth")[0]
     assert rim.GEAR64_STATION_TOWARD_POST == pytest.approx(boss_end + collar)
     assert rim.collar_contacts(SEATED) == pytest.approx(0.0, abs=1e-9)
     with pytest.raises(ValueError, match="butts are open"):

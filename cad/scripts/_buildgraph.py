@@ -2357,12 +2357,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
     {
         "_printed_tolerance",
         "sm_vn_boss_hook_spec",
-        "build_dt_drive_train_assembly",
-        "dt_cone_pivot_post_spec",
-        "dt_cone_swing_platform_checks",
-        "dt_cone_swing_platform_spec",
-        # Drilled-hole and angular rows size the collar-to-bank air stack.
-        "dt_tip_collar_air",
         # Angular row sets the through tap's angle in the screw landing gate.
         "dt_vn_cone_tip_collar_spec",
         # Drilled-hole row bounds the rocker's #47 hole the rod-slot pin enters.

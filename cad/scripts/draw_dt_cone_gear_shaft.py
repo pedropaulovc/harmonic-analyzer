@@ -90,15 +90,19 @@ from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _layout_geometry import estimate_text_box
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
+from _supplier_dimensions import supplier_reference_dimension
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_cone_gear_shaft_spec import (
     COLLAR_DIA,
+    COLLAR_DIA_FRACTION_DENOMINATOR,
     COLLAR_END_STATION,
     COLLAR_STOCK_CALLOUT,
     DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     FILLET_CALLOUT,
     FLAT_LANDS,
@@ -257,7 +261,7 @@ DIMENSION_SUFFIXES = {**SEAT_MATE_SUFFIXES, **LENGTH_FUNCTION_SUFFIXES}
 # leader crossed it (final877 eye pass).  The build lifts the block above the
 # finish symbol, from its measured ink (_clear_collar_callout); the dimension
 # line stays on the ring and simply runs longer.
-COLLAR_CALLOUT_LINES = (f"(Ø{COLLAR_DIA:.2f})", *COLLAR_STOCK_CALLOUT.split("\n"))
+COLLAR_CALLOUT_LINES = ("(Ø5/8 in)", *COLLAR_STOCK_CALLOUT.split("\n"))
 COLLAR_CALLOUT_WIDTH = max(len(line) for line in COLLAR_CALLOUT_LINES) * LENGTH_CHAR_WIDTH
 # A measured block narrower than this is a misread (a box around the value
 # line alone), not a layout: the proof refuses it rather than clearing it.
@@ -1540,7 +1544,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("dt-cone-gear-shaft"),
     )
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="cone gear shaft package")
     drawing = _early_bound(drawing_model, "IDrawingDoc")
@@ -1598,8 +1606,17 @@ async def build(adapter: Any) -> dict[str, str]:
         if name in NEAR_SIDE_DIAMETERS:
             set_near_side_diameter(moved, f"{name} near-side diameter")
         if name in REFERENCE_DIAMETERS:
-            set_reference_dimension(
-                adapter, moved, label=f"{name} stock reference", diameter=True
+            # The bar's own size as supplied: an untoleranced 5/8 fraction
+            # reference; its stock statement rides below (DIMENSION_CALLOUTS).
+            supplier_reference_dimension(
+                adapter,
+                _early_bound(moved, "IAnnotation").GetSpecificAnnotation(),
+                label=f"{name} stock reference",
+                units="in",
+                precision=DRAWING_PRECISION_BY_NAME[name],
+                expected_mm=COLLAR_DIA,
+                presentation="diameter",
+                fraction_denominator=COLLAR_DIA_FRACTION_DENOMINATOR,
             )
         annotations.append(moved)
     # Every diameter is now native to the view that shows its shoulder; an

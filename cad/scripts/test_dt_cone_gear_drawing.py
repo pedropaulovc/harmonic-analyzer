@@ -65,6 +65,7 @@ def test_part_and_drawing_share_the_complete_native_dimension_contract() -> None
         "BoreFlatClock",
         "ToothThickness",
         "FloorDia",
+        "WebMin",
     }
     for teeth in spec.CONFIGURATION_TEETH:
         views = (
@@ -73,34 +74,36 @@ def test_part_and_drawing_share_the_complete_native_dimension_contract() -> None
             drawing.bore_view_keep(teeth),
         )
         kept = [name for keep in views for name in keep]
-        # Every marked dimension prints exactly once per sheet.
-        assert sorted(kept) == sorted(marked)
+        # Every marked dimension prints exactly once per sheet; RV-03's web
+        # MIN only on the T012 sheet it accepts.
+        expected = marked if teeth == spec.WEB_REFERENCE_TEETH else marked - {"WebMin"}
+        assert sorted(kept) == sorted(expected)
         # The whole D-bore prints in the bore view, and only there.
         assert set(drawing.bore_view_keep(teeth)) == spec.DRAWING_DIMENSIONS["BoreProfile"]
 
 
 def test_model_owns_precision_for_every_printed_dimension() -> None:
+    # Decimal inch (#290): four places carry every band and narrow floor
+    # window exactly on the .0001 grid; the clock stays at one degree place.
     assert spec.DRAWING_PRECISION_BY_NAME == {
-        "BlankDia": 2,
-        # Fewer places would round the faced gear above its derived seat pitch.
+        "BlankDia": 4,
         "FaceWidth": 4,
-        "BoreCutDia": 3,
-        # The AF band is 0.010 wide; three places print both limits exactly.
-        "BoreAF": 3,
+        "BoreCutDia": 4,
+        "BoreAF": 4,
         "BoreFlatClock": 1,
-        "ToothThickness": 3,
-        # Narrow floor windows need three places to preserve both limits.
-        "FloorDia": 3,
+        "ToothThickness": 4,
+        "FloorDia": 4,
+        "WebMin": 4,
     }
     assert "draw_dt_cone_gear.py" in PRECISION_MIGRATED_DRAWINGS
 
 
 def test_tip_diameter_carries_its_own_mesh_depth_band() -> None:
     # Ordinary undersize-only blank band (user ruling 2026-10-10, cones at
-    # ordinary tolerances); T006 keeps its own -0.02 band for the DT6-FORM1
+    # ordinary tolerances); T006 keeps its own -.0008 band for the DT6-FORM1
     # relief, written into T006 alone.
-    assert spec.BLANK_DIA_BAND == (0.0, -0.05)
-    assert spec.blank_dia_band(6) == spec.CUSTOM_SIX_BLANK_DIA_BAND == (0.0, -0.02)
+    assert spec.BLANK_DIA_BAND == (0.0, -0.0508)
+    assert spec.blank_dia_band(6) == spec.CUSTOM_SIX_BLANK_DIA_BAND == (0.0, -0.02032)
     assert all(spec.blank_dia_band(t) is spec.BLANK_DIA_BAND for t in spec.CONFIGURATION_TEETH if t != 6)
     assert spec.BLANK_DIA_BAND[0] < spec.MODULE_MM / 2.0
     source = Path(part.__file__).read_text(encoding="utf-8")
@@ -116,7 +119,7 @@ def test_face_width_fills_the_seat_pitch_without_crossing_it() -> None:
     # longer than the pitch; cone_gear_stack owns the stack's band.
     assert spec.FACE_WIDTH == math.floor(spec.SEAT_PITCH * 1e4) / 1e4
     assert spec.FACE_WIDTH <= spec.SEAT_PITCH < spec.FACE_WIDTH + 1e-4
-    assert spec.FACE_WIDTH_BAND == (0.025, -0.025)
+    assert spec.FACE_WIDTH_BAND == (0.0254, -0.0254)
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"Blank", "FaceWidth", *deviations(FACE_WIDTH_BAND)' in source
 
@@ -157,10 +160,10 @@ def test_bore_bands_are_the_current_derived_seat_fit_bands() -> None:
 
 
 def test_native_tooth_inspection_reads_the_actual_installed_cutter() -> None:
-    # Ordinary +/-0.075 thickness band about the cutter's standard-depth
+    # Ordinary +/-.003 thickness band about the cutter's standard-depth
     # thickness; T006 alone is thin-only (DT6-FORM1 relief clearance).
-    assert spec.TOOTH_THICKNESS_BAND == (0.075, -0.075)
-    assert spec.tooth_thickness_band(6) == spec.CUSTOM_SIX_TOOTH_THICKNESS_BAND == (0.0, -0.04)
+    assert spec.TOOTH_THICKNESS_BAND == (0.0762, -0.0762)
+    assert spec.tooth_thickness_band(6) == spec.CUSTOM_SIX_TOOTH_THICKNESS_BAND == (0.0, -0.04064)
     for teeth in spec.CONFIGURATION_TEETH:
         _upper, lower = spec.tooth_thickness_band(teeth)
         profile = spec.stock_form_profile(teeth)
@@ -196,7 +199,7 @@ def test_each_sheet_gets_its_own_actual_cutting_recipe() -> None:
         last = len(spec.CONFIGURATION_TEETH) + 1
         cutter = f"NOT STOCK; FORM = TOOTH SPACE, SHEET {last}" if teeth == 6 else "; TEMPLATE "
         assert cutter in data, teeth
-        assert ("RELIEF BELOW R1.531" in data) == (teeth == 6)
+        assert ("RELIEF BELOW R.0603" in data) == (teeth == 6)
         assert "TIF" not in data
         assert notes.CYLINDER_MATE_NUMBER in data
         for obsolete in ("CONTACT RATIO", "RANGE ONLY", "MATCH FLANKS", "LONG ADDENDUM"):
@@ -254,7 +257,8 @@ def test_root_envelope_is_the_actual_translated_arc_not_a_bisector_circle() -> N
         minimum, maximum = spec.floor_limits_mm(teeth)
         assert minimum <= 2.0 * profile.root_radius_min_mm + 1e-9
         assert maximum >= 2.0 * profile.root_radius_max_mm - 1e-9
-        assert minimum == pytest.approx(round(minimum, 3), abs=1e-12)
+        inch = minimum / spec.MM_PER_IN
+        assert inch == pytest.approx(round(inch, 4), abs=1e-12)
         if abs(profile.radial_translation_mm) > 1e-9:
             assert profile.root_radius_min_mm < profile.root_radius_max_mm
     assert drawing.DIMENSION_CALLOUTS["FloorDia"].splitlines()[0] == "ROOT ENVELOPE"
@@ -440,7 +444,7 @@ def test_custom_six_sheet_defines_the_tooth_space_point_by_point() -> None:
     template = profile.template
     data = drawing.cutter_grind_data()
     lines = data.splitlines()
-    assert lines[0] == "T006 TOOTH SPACE FORM, mm"
+    assert lines[0] == "T006 TOOTH SPACE FORM, INCH"
     assert drawing.SHEET_NAMES[0] == "T006"
     assert "OVER PINS PER SHEET 1 " in lines[-1]
     assert notes.CYLINDER_MATE_NUMBER in lines[-2]
@@ -448,21 +452,25 @@ def test_custom_six_sheet_defines_the_tooth_space_point_by_point() -> None:
     assert "COMPARATOR" not in data and "TIF" not in data
     assert "INSPECT" not in data and "TOOL" not in data and "GRIND" not in data
     assert "SYMMETRIC ABOUT THE SPACE CENTERLINE (CL):" in lines
-    assert "ROOT: ARC R1.100 ABOUT GEAR AXIS" in lines
-    assert "ROOT ARC TO R1.531: STRAIGHT LINES ROW TO ROW" in lines
-    assert "ABOVE R1.531: INVOLUTE, BASE R1.492" in lines
-    # Wide only, by half the T006 thinning band (0/-0.04 on thickness).
-    assert spec.CUSTOM_SIX_FORM_TOLERANCE_MM == pytest.approx(0.02)
-    assert "FORM TOLERANCE: X +0.020 / -0.000" in lines
+    assert "ROOT: ARC R.0433 ABOUT GEAR AXIS" in lines
+    assert "ROOT ARC TO R.0603: STRAIGHT LINES ROW TO ROW" in lines
+    assert "ABOVE R.0603: INVOLUTE, BASE R.0587" in lines
+    # Wide only, by half the T006 thinning band (0/-.0016 on thickness).
+    assert spec.CUSTOM_SIX_FORM_TOLERANCE_MM == pytest.approx(0.02032)
+    assert "FORM TOLERANCE: X +.0008 / -.0000" in lines
     points = spec.custom_six_form_points_mm()
     rows = [line for line in lines if line.startswith("R") and "   X" in line]
-    assert rows == [f"R{r:.3f}   X{x:.3f}   Y{y:.3f}" for r, x, y in points]
+
+    def inch(value: float) -> str:
+        return spec.inch_text(value, drawing.FORM_PLACES)
+
+    assert rows == [f"R{inch(r)}   X{inch(x)}   Y{inch(y)}" for r, x, y in points]
     root = template.root_radius_mm
     junction = template.relief_junction_radius_mm
     assert points[0] == (root, 0.0, 0.0)
     assert points[-1][0] == profile.blank_radius_mm
-    # Rows print at 3 places; the relief's end rows round to the nearest.
-    resolution = 0.0005 * math.sqrt(2.0)
+    # X and Y print on the .0001 in grid, rounded to the nearest.
+    resolution = 0.00005 * spec.MM_PER_IN * math.sqrt(2.0)
 
     def model_xy(radius: float) -> tuple[float, float]:
         angle = spec.custom_six_gap_half_angle_rad(radius)
@@ -474,9 +482,10 @@ def test_custom_six_sheet_defines_the_tooth_space_point_by_point() -> None:
     relief, involute = points[1:split + 1], points[split + 1:]
     assert math.dist(relief[0][1:], model_xy(root)) < resolution
     assert math.dist(relief[-1][1:], model_xy(junction)) < resolution
-    assert all(r >= root - resolution for r, _, _ in relief)
+    # The corner rows round outward (ceil X, floor Y) a full .0001 in step.
+    assert all(r >= root - 2.0 * resolution for r, _, _ in relief)
     for radius, x, y in involute:
-        assert junction < radius and (x, y) == pytest.approx(model_xy(radius), abs=1e-12)
+        assert junction < radius and (x, y) == pytest.approx(model_xy(radius), abs=resolution)
     # The straight lines never cut inside the model relief (a line point sits
     # at no smaller polar angle than the relief at its radius), and stand at
     # most 0.006 off it (the rounding of their ends aside).
@@ -493,25 +502,25 @@ def test_custom_six_sheet_defines_the_tooth_space_point_by_point() -> None:
                 spec.custom_six_gap_half_angle_rad(radius)
             ):
                 inside = max(inside, distance)
-    assert inside < 0.0005
+    assert inside < resolution
     assert offset < 0.006
     # Closed-form cross-checks against the native profile: the pitch and
     # blank-OD rows are the tool's pitch thickness and the profile's tip chord.
     by_radius = {round(r, 6): x for r, x, _ in involute}
     pitch_half_gap = math.asin(by_radius[round(profile.pitch_radius_mm, 6)] / profile.pitch_radius_mm)
     thickness = profile.pitch_radius_mm * (profile.angular_pitch_rad - 2.0 * pitch_half_gap)
-    assert thickness == pytest.approx(profile.pitch_tooth_thickness_mm, abs=1e-6)
+    assert thickness == pytest.approx(profile.pitch_tooth_thickness_mm, abs=3e-3)
     assert by_radius[round(profile.blank_radius_mm, 6)] == pytest.approx(
-        profile.blank_radius_mm * math.sin(profile.tip_half_angle_rad), abs=1e-9
+        profile.blank_radius_mm * math.sin(profile.tip_half_angle_rad), abs=resolution
     )
     # Relief and involute meet at the junction row.
     assert template.relief_half_angle_rad(junction) == pytest.approx(
         spec.custom_six_gap_half_angle_rad(junction + 1e-9), abs=1e-6
     )
     assert "(t)" not in data and "sin" not in data and "SOURCE" not in data
-    # Every decimal prints at 3 places.
-    for number in re.findall(r"\d+\.\d+", data):
-        assert len(number.split(".")[1]) == 3, number
+    # Every decimal prints at 4 inch places.
+    for number in re.findall(r"\d*\.\d+", data):
+        assert len(number.split(".")[1]) == 4, number
     # The note stays clear of the title block (4.6 mm a line, run
     # 20261011T114502461Z render of this sheet).
     assert drawing.CUTTER_DETAIL_POS[1] - len(lines) * 0.0046 > 0.100
@@ -533,7 +542,7 @@ def test_over_pins_acceptance_matches_the_closed_form_involute() -> None:
         alpha = math.radians(spec.PRESSURE_ANGLE_DEG)
         base_dia = pitch_dia * math.cos(alpha)
         pin = spec.over_pins_pin_dia_mm(teeth)
-        assert pin == (1.20 if teeth == 6 else 1.00)
+        assert pin == (1.1938 if teeth == 6 else 1.016)
 
         def involute(angle: float) -> float:
             return math.tan(angle) - angle
@@ -557,7 +566,10 @@ def test_over_pins_acceptance_matches_the_closed_form_involute() -> None:
         assert nominal / 2.0 > profile.blank_radius_mm, teeth
         minimum, maximum = spec.over_pins_limits_mm(teeth)
         assert minimum < nominal < maximum + 1e-3, teeth
-        row = f"OVER 2 PINS \u00d8{pin:.2f}, OPPOSITE GAPS (mm):  {minimum:.3f} TO {maximum:.3f}"
+        row = (
+            f"OVER 2 PINS \u00d8{spec.inch_text(pin, 3)}, OPPOSITE GAPS:  "
+            f"{spec.inch_text(minimum, 4)} TO {spec.inch_text(maximum, 4)}"
+        )
         assert row in notes.gear_data(teeth), teeth
     minimum, maximum = spec.over_pins_limits_mm(6)
     assert maximum - minimum == pytest.approx(0.063, abs=0.002)
@@ -583,9 +595,9 @@ def test_tooth_space_sheet_plots_the_table_beside_it() -> None:
     for radius, x, y in rows[1 + len(relief):]:
         half = spec.custom_six_gap_half_angle_rad(radius)
         assert (x, y) == pytest.approx(
-            (radius * math.sin(half), radius * math.cos(half) - rows[0][0]), abs=6e-4
+            (radius * math.sin(half), radius * math.cos(half) - rows[0][0]), abs=1.5e-3
         )
-    assert flank[-1] == pytest.approx(rows[-1][1:], abs=6e-4)
+    assert flank[-1] == pytest.approx(rows[-1][1:], abs=1.5e-3)
     # The table at the default note height: 2.4 mm a character, measured on
     # the run-20261010T051729717Z render of this sheet (113 mm, 47 characters).
     widest = max(map(len, drawing.cutter_grind_data().splitlines()))
@@ -664,7 +676,8 @@ def test_actual_web_prints_as_a_fact(teeth: int) -> None:
     web = notes.root_to_bore_web_min_mm(teeth)
     required = spec.WEB_EXCEPTIONS_MM.get(teeth, spec.MACHINED_WEB_TARGET_MM)
     assert web >= required - 1e-9
-    assert f"WEB MIN (mm, REF):  {math.floor(web * 100.0) / 100.0:.2f}" in data
+    printed = spec.inch_text(spec.inch_grid_mm(web, 4, math.floor), 4)
+    assert f"WEB MIN (REF):  {printed}" in data
 
 
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
@@ -672,7 +685,7 @@ def test_each_sheet_prints_the_tooth_runout_the_mesh_stack_books(teeth: int) -> 
     import cone_set_stack
 
     assert (
-        f"TOOTH CUTTING SETUP, ACCEPT AT SETUP:  {cone_set_stack.TOOTH_RUNOUT_TIR_MM:.4f} "
+        f"TOOTH CUTTING SETUP, ACCEPT AT SETUP:  {spec.inch_text(cone_set_stack.TOOTH_RUNOUT_TIR_MM, 3)} "
         "TIR MAX TO FINISHED BORE"
     ) in notes.gear_data(teeth)
 
@@ -1197,13 +1210,13 @@ class _FakeAdapter:
         self.currentModel = model
 
 
-def test_the_part_saves_both_authoring_sketches_hidden() -> None:
+def test_the_part_saves_every_authoring_sketch_hidden() -> None:
     """#950's save gate: a shown construction sketch renders in the part images
-    and in every assembly that places a gear, so the part blanks both before
+    and in every assembly that places a gear, so the part blanks each before
     its first save and reads the blank back."""
     model = _FakePart(hides=True)
     part._blank_reference_sketches(_FakeAdapter(model))
-    sketches = [spec.TOOTH_REFERENCE_SKETCH, spec.GAP_FLOOR_SKETCH]
+    sketches = [spec.TOOTH_REFERENCE_SKETCH, spec.GAP_FLOOR_SKETCH, spec.WEB_REFERENCE_SKETCH]
     assert model.selected == [(sketch, "SKETCH") for sketch in sketches]
     assert model.blanked == sketches
     source = Path(part.__file__).read_text(encoding="utf-8")

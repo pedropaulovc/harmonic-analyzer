@@ -27,15 +27,19 @@ from cone_line import (
 )
 
 PLATE_T = PLATFORM_THICKNESS_MM  # 1/4" plate
-HALF_WIDTH_N = 16.0  # north (pivot/tip) half-width, EAST side (the lock-slot
-# region keeps its full seat)
-WEST_HALF_N = 8.0  # north half-width, WEST side.  The recentered north arbor
-# pedestal otherwise clips the flared edge; 8.0 leaves 0.37 mm exact plan
+# The outline prints .XX inch (#290, Main ruling: option (a)), so every
+# printed outline station sits on the .01 in grid.
+_GRID_XX = 0.254
+HALF_WIDTH_N = 16.002  # .63 north (pivot/tip) half-width, EAST side (the
+# lock-slot region keeps its full seat)
+WEST_HALF_N = 7.874  # .31 north half-width, WEST side.  The recentered north
+# arbor pedestal otherwise clips the flared edge; the half-width keeps plan
 # clearance while retaining the close photo relationship in ch12 img09.
-EAST_HALF_S = 24.0  # widened for the v2 post's Ø42.011 casting foot
-WEST_HALF_S = 37.0  # west half-width at the south end: the flare that makes
-# the pivot -> lock-knob line solid plate (covers the notch seat + knob head)
-NORTH_OVERHANG = 7.0  # pivot -> north edge (plate continues past the pivot)
+EAST_HALF_S = 23.876  # .94, widened for the v2 post's casting foot
+WEST_HALF_S = 37.084  # 1.46 west half-width at the south end: the flare that
+# makes the pivot -> lock-knob line solid plate (covers the notch seat + knob
+# head)
+NORTH_OVERHANG = 7.112  # .28 pivot -> north edge (plate continues past the pivot)
 
 
 # The engaged plate follows the configured cone journal line.
@@ -44,16 +48,24 @@ NORTH_OVERHANG = 7.0  # pivot -> north edge (plate continues past the pivot)
 # The casting and swing-pivot stations come from the live cone line.
 POST_MAIN_DIA = BLOCK_DIA
 POST_LOCAL_Z = POST_STATION - PIVOT_STATION
-POST_SOUTH_MARGIN = 3.175  # 1/8 in clearance beyond the post's south rim
-PLATE_SOUTH_Z = POST_LOCAL_Z - POST_MAIN_DIA / 2.0 - POST_SOUTH_MARGIN
-PLATE_LEN = NORTH_OVERHANG - PLATE_SOUTH_Z
-# Rounded native plan corners. Shared with the manufactured stop-fence
-# enclosure; the southwest radius clears the relocated lock notch.
+POST_SOUTH_MARGIN = 3.175  # 1/8 in least clearance beyond the post's south rim
+# The length rounds UP to the grid so the margin stays at least 1/8 in.
+PLATE_LEN = round(
+    math.ceil(
+        round((NORTH_OVERHANG - POST_LOCAL_Z + POST_MAIN_DIA / 2.0 + POST_SOUTH_MARGIN)
+              / _GRID_XX, 9)
+    )
+    * _GRID_XX,
+    4,
+)
+PLATE_SOUTH_Z = NORTH_OVERHANG - PLATE_LEN
+# Rounded native plan corners (.XX radii). Shared with the manufactured
+# stop-fence enclosure; the southwest radius clears the relocated lock notch.
 PLATE_CORNERS = (
-    ("NE", -HALF_WIDTH_N, NORTH_OVERHANG, 10.0),
-    ("NW", WEST_HALF_N, NORTH_OVERHANG, 8.0),
-    ("SW", WEST_HALF_S, NORTH_OVERHANG - PLATE_LEN, 5.0),
-    ("SE", -EAST_HALF_S, NORTH_OVERHANG - PLATE_LEN, 12.0),
+    ("NE", -HALF_WIDTH_N, NORTH_OVERHANG, 9.906),  # .39
+    ("NW", WEST_HALF_N, NORTH_OVERHANG, 7.874),  # .31
+    ("SW", WEST_HALF_S, NORTH_OVERHANG - PLATE_LEN, 5.08),  # .20
+    ("SE", -EAST_HALF_S, NORTH_OVERHANG - PLATE_LEN, 11.938),  # .47
 )
 
 # The open-ended lock notch cuts from the engaged stud seat straight out
@@ -64,24 +76,38 @@ PLATE_CORNERS = (
 # is SET AT ASSEMBLY: swing in until the tightest cone meets a feeler/backlash,
 # then tighten. The knob clamps by friction anywhere along the notch.
 # The notch runs along the swing arc's CHORD: at R~192 over ~3 deg to the
-# mouth the sagitta is ~0.07, absorbed by the O6.35-stud-in-8.0 clearance.
+# mouth the sagitta is ~0.07, absorbed by the O6.35 stud's clearance in SLOT_W.
 #
 # LOCAL-FRAME CONVENTION: the assembly places this part at Ry(+INCLINE)
 # (train._plate_local_to_machine), under which local +x maps to machine WEST
 # at the engaged pose -- every west-side feature below (the flare, the lock
 # notch) is authored at local +x, east-side features at local -x.
-SLOT_W = 8.0  # Ø6.35 stud clearance plus chord-vs-arc slack
+SLOT_W = 7.874  # .31: Ø6.35 stud clearance plus chord-vs-arc slack
 # The notch seat was placed for the former stock O25.4-head knob (91882A425):
 # the northern solution beside the post cleared the post but overlapped the
-# T120/64T gear row, so the stud moved west to x 33.0 on the southern solution
+# T120/64T gear row, so the stud moved west to x 1.30 in on the southern solution
 # where that head kept a 2 mm post gap.  The O15.875 93585A190 head keeps the
 # same seat (plate and base unchanged) with a wider post gap; the drive train
 # re-checks the head against the post, gears and stop at import.
-SLOT_E_X = 33.0
+SLOT_E_X = 33.02  # 1.30
 LOCK_HEAD_POST_CLEARANCE = 2.0
-SLOT_E_Z = POST_LOCAL_Z - math.sqrt(
-    (POST_MAIN_DIA / 2.0 + 25.4 / 2.0 + LOCK_HEAD_POST_CLEARANCE) ** 2
-    - SLOT_E_X**2
+# Floored to the grid: the seat moves south, away from the post.
+SLOT_E_Z = round(
+    math.floor(
+        round(
+            (
+                POST_LOCAL_Z
+                - math.sqrt(
+                    (POST_MAIN_DIA / 2.0 + 25.4 / 2.0 + LOCK_HEAD_POST_CLEARANCE) ** 2
+                    - SLOT_E_X**2
+                )
+            )
+            / _GRID_XX,
+            9,
+        )
+    )
+    * _GRID_XX,
+    4,
 )
 SLOT_R = math.hypot(SLOT_E_X, SLOT_E_Z)
 # The plate swings toward disengage (big end away from the drum), so in PLATE
@@ -91,7 +117,7 @@ SLOT_TX, SLOT_TZ = -SLOT_E_Z / SLOT_R, SLOT_E_X / SLOT_R
 
 
 def _west_edge_x(z_local: float) -> float:
-    """Authored x of the west taper edge at local z (linear 8 -> 37)."""
+    """Authored x of the west taper edge at local z (linear WEST_HALF_N -> WEST_HALF_S)."""
     return (
         WEST_HALF_N
         + (WEST_HALF_S - WEST_HALF_N) * (NORTH_OVERHANG - z_local) / PLATE_LEN
@@ -134,11 +160,11 @@ class SwingHardwareGeometry:
 
 # Designed clear air between the lock-knob head and the notch mouth at the
 # disengaged stop, so the knob can be tightened onto bare base to fence the
-# mouth.  Sized so the linear worst case keeps >= 2.0 mm (U27) with the plate
-# outline at .X (+/-0.8) and the base stop/stud holes at .XX (+/-0.51/axis):
-# east edge at the stop 2 x 0.8 (lever 105.6 vs SLOT_R 208.4), west edge at the
-# mouth 0.99 x 0.8, stop hole ~1.1, stud hole ~0.59, head/shank ~0.35 -- 4.41
-# in all.  The base derives its swing-stop hole from this function.
+# mouth.  Sized when the plate outline printed .X (+/-0.8 mm) and the base
+# stop/stud holes .XX (+/-0.51/axis): the linear worst case then spent 4.41
+# and kept >= 2.0 mm (U27).  The outline now prints .XX inch (+/-.01), so the
+# same margin holds with more to spare.  The base derives its swing-stop hole
+# from this function.
 DISENGAGE_HEAD_MARGIN = 6.5
 
 

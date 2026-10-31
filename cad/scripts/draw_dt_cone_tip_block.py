@@ -43,6 +43,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _part_properties import part_drawing_unit
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
@@ -68,6 +69,7 @@ from dt_cone_tip_block_spec import (
     SLIT_DEPTH,
     SLIT_W,
     SURFACE_FINISHES,
+    length_text,
     printed_value_text,
 )
 
@@ -1291,7 +1293,7 @@ def _pinch_clearance_callout_resolved(resolved_parts: dict[int, str]) -> bool:
     return (
         joined.count(PINCH_CLEARANCE_EXTENT_TEXT) == 1
         and "<HOLE-DEPTH>" not in joined
-        and f"{PINCH_CLEARANCE_DIA:.2f}" in joined
+        and length_text(PINCH_CLEARANCE_DIA, HOLE_CALLOUT_PLACES) in joined
     )
 
 
@@ -1335,15 +1337,20 @@ def _pinch_thread_callout_resolved(resolved_parts: dict[int, str]) -> bool:
 # drawing-guidelines.md rule 12 (hole and slot callouts say what to do): a blind tap states its full-thread depth, and here its
 # tap-drill depth too, which sets the lead the tap needs past the thread.
 # Both print at FOOT_DEPTH_PLACES, the general band the spec's reach and lead
-# stacks read, not the native two places.
+# stacks read, as does the tap drill's size: every Hole Wizard callout prints
+# three inch places (#290).
+HOLE_CALLOUT_PLACES = 3
 FOOT_TAP_DEPTH_PRECISION = {
+    "hw-tapdrldia": HOLE_CALLOUT_PLACES,
     "hw-threaddepth": FOOT_DEPTH_PLACES,
     "hw-tapdrldepth": FOOT_DEPTH_PLACES,
 }
+THRU_TAP_DRILL_PRECISION = {"hw-thrutapdrldia": HOLE_CALLOUT_PLACES}
+PINCH_CLEARANCE_PRECISION = {"hw-diam": HOLE_CALLOUT_PLACES}
 
 
 def _states_depth(text: str, depth_mm: float) -> bool:
-    printed = re.escape(f"{depth_mm:.{FOOT_DEPTH_PLACES}f}")
+    printed = re.escape(length_text(depth_mm, FOOT_DEPTH_PLACES))
     return re.search(rf"(?<![\d.]){printed}(?!\d)", text) is not None
 
 
@@ -1403,9 +1410,8 @@ def _check_foot_tap_callout(display: Any) -> None:
 
 # E11/W1: the through thread's two countersinks are one chamfer feature; the
 # callout names them under the thread line, so the hole reads in one place.
-ADJUSTER_CSK_QUALIFIER = (
-    f"90\u00b0 CSK \u00d8{ADJUSTER_BORE_DIA + 2.0 * ADJUSTER_CSK:.1f} BOTH ENDS"
-)
+_CSK_DIA_TEXT = length_text(ADJUSTER_BORE_DIA + 2.0 * ADJUSTER_CSK, HOLE_CALLOUT_PLACES)
+ADJUSTER_CSK_QUALIFIER = f"90\u00b0 CSK \u00d8{_CSK_DIA_TEXT} BOTH ENDS"
 
 
 def _adjuster_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
@@ -1551,7 +1557,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("dt-cone-tip-block"),
     )
     stamp_drawing_summary(
         adapter,
@@ -1701,6 +1711,9 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=_adjuster_callout_xy(adjuster_center),
         label="through adjuster thread",
     )
+    set_hole_callout_precision(
+        adjuster_callout, THRU_TAP_DRILL_PRECISION, label="through adjuster thread"
+    )
     _set_adjuster_callout_text(adjuster_callout)
     pinch_clearance_callout = add_native_hole_callout(
         adapter,
@@ -1709,6 +1722,9 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=PINCH_CLEARANCE_CALLOUT_XY,
         label="pinch entry-jaw clearance",
     )
+    set_hole_callout_precision(
+        pinch_clearance_callout, PINCH_CLEARANCE_PRECISION, label="pinch entry-jaw clearance"
+    )
     _set_pinch_clearance_callout_text(pinch_clearance_callout)
     pinch_thread_callout = add_native_hole_callout(
         adapter,
@@ -1716,6 +1732,9 @@ async def build(adapter: Any) -> dict[str, str]:
         edge=pinch_thread_edge,
         callout_xy=PINCH_THREAD_CALLOUT_XY,
         label="pinch opposite-jaw thread",
+    )
+    set_hole_callout_precision(
+        pinch_thread_callout, THRU_TAP_DRILL_PRECISION, label="pinch opposite-jaw thread"
     )
     _set_pinch_thread_callout_text(pinch_thread_callout)
     foot_tap_callout = add_native_hole_callout(
@@ -1727,7 +1746,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _set_foot_tap_callout_text(foot_tap_callout)
     set_hole_callout_precision(
-        foot_tap_callout, FOOT_TAP_DEPTH_PRECISION, label="hold-down foot tap depths"
+        foot_tap_callout, FOOT_TAP_DEPTH_PRECISION, label="hold-down foot tap sizes"
     )
     _check_foot_tap_callout(foot_tap_callout)
     _audit_isometric_annotation_provenance(adapter, iso)
