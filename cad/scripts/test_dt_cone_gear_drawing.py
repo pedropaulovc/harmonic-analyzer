@@ -672,7 +672,7 @@ def test_each_sheet_prints_the_tooth_runout_the_mesh_stack_books(teeth: int) -> 
     import cone_set_stack
 
     assert (
-        f"TOOTH CUTTING SETUP, ACCEPT AT SETUP:  {cone_set_stack.TOOTH_RUNOUT_TIR_MM:.2f} "
+        f"TOOTH CUTTING SETUP, ACCEPT AT SETUP:  {cone_set_stack.TOOTH_RUNOUT_TIR_MM:.4f} "
         "TIR MAX TO FINISHED BORE"
     ) in notes.gear_data(teeth)
 
