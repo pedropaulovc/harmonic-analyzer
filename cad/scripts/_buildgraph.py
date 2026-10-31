@@ -2355,7 +2355,6 @@ def stamps_title_block_properties(script: Path) -> bool:
 # (_title_block_units) is stamping, not geometry, so it stays out.
 TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
     {
-        "_printed_limits",
         "_printed_tolerance",
         "sm_vn_boss_hook_spec",
         "build_dt_drive_train_assembly",

@@ -57,10 +57,13 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         "(gear_tip_band_mm('standard'), gear_tip_band_mm('contact_critical'))",
         "each",
     ),
-    # drilled_limits derives its local native band from the title-block row.
-    ("_printed_limits", "(float(row['plus_mm']), -float(row['minus_mm']))"): (
-        "((float(_config.title_block('drilled_hole')['plus_mm']),"
-        " -float(_config.title_block('drilled_hole')['minus_mm'])),)",
+    # drilled_limits derives its native band from the title-block drilled row.
+    (
+        "_printed_limits",
+        "(drilled_oversize_mm(unit=unit), -drilled_undersize_mm(unit=unit))",
+    ): (
+        "((drilled_oversize_mm(unit='mm'), -drilled_undersize_mm(unit='mm')),"
+        " (drilled_oversize_mm(unit='in'), -drilled_undersize_mm(unit='in')))",
         "each",
     ),
     # Builders apply the same bands their specs publish on the sheet.

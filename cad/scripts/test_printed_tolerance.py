@@ -171,3 +171,15 @@ def test_inch_ties_round_half_away_like_the_sheet():
     lower, upper = tol.printed_deviations(15.875, 2, unit="in")
     assert lower == pytest.approx(16.002 - 0.254 - 15.875)
     assert upper == pytest.approx(16.002 + 0.254 - 15.875)
+
+
+def test_inch_sheet_acceptance_limits_follow_the_inch_rows():
+    from _printed_limits import drilled_limits, limits
+
+    # 12.0 mm prints .47 at .XX: accept .46-.48 in.
+    assert limits(12.0, 2, unit="in") == pytest.approx([11.684, 12.192])
+    # A drilled hole takes the inch row's +.004/0 about its exact model size.
+    assert drilled_limits(6.35, 3, unit="in") == pytest.approx([6.35, 6.4516])
+    # The millimetre sheet is unchanged.
+    assert limits(12.0, 2) == pytest.approx([11.49, 12.51])
+    assert drilled_limits(6.35, 3) == pytest.approx([6.35, 6.45])
