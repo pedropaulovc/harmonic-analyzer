@@ -1443,6 +1443,7 @@ def test_numeral_profile_refuses_ignored_native_display_or_placement(monkeypatch
             object.__setattr__(self, "ScaleRatio", (1.0, 2.0))
             object.__setattr__(self, "surface", True)
             object.__setattr__(self, "Position", drawing.NUMERAL_PROFILE_CENTER)
+            object.__setattr__(self, "text_format", SimpleNamespace(CharHeight=0.00635))
 
         def __setattr__(self, name, value):
             assert name in {"UseParentScale", "ScaleRatio"}
@@ -1464,11 +1465,29 @@ def test_numeral_profile_refuses_ignored_native_display_or_placement(monkeypatch
         def GetPartialSection(self):  # noqa: N802 - COM member name
             return refusal == "partial"
 
+        def GetTextFormat(self):  # noqa: N802 - COM member name
+            return self.text_format
+
+        def SetTextFormat(self, use_document, text_format):  # noqa: N802 - COM member name
+            assert use_document is False
+            assert text_format is self.text_format
+            return True
+
         def SetViewPosition(self, position, move_children):  # noqa: N802 - COM member name
             return False
 
     section = Section()
-    parent = object()
+    def marker():
+        arrows = [
+            [0.1572622, y, 0.0, 0.1452622, y, 0.0, 0.006, 0.003, 0.0]
+            for y in (0.2580005, 0.2419995)
+        ]
+        texts = [[0.1438325, y, 0.0] for y in (0.2630045, 0.2470035)]
+        return ([1.0, 0.0, 1.0] + [0.0] * 7
+                + [value for row in arrows + texts for value in row]
+                + [section.text_format.CharHeight])
+
+    parent = SimpleNamespace(GetSectionLineInfo2=marker)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(drawing, "double_array", lambda values: tuple(values))
     monkeypatch.setattr(drawing, "create_section_view", lambda *args, **kwargs: section)

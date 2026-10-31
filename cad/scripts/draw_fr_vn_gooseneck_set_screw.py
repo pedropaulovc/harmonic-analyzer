@@ -67,7 +67,9 @@ def _assert_projection_alignment(adapter: Any, views: dict[str, Any]) -> None:
         or origins[1][0] <= origins[0][0]
         or tuple(front.ScaleRatio) != tuple(right.ScaleRatio)
     ):
-        raise RuntimeError("gooseneck Front/Right model origins are not third-angle aligned")
+        raise RuntimeError(
+            "gooseneck Front/Right model origins are not third-angle aligned"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:

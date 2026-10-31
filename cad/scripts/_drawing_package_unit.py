@@ -245,7 +245,9 @@ def assert_document_units_after_save(
 
 
 _SW_DOC_DRAWING = 3  # swDocumentTypes_e.swDocDRAWING
-_SW_OPEN_SILENT_READ_ONLY = 3  # swOpenDocOptions_Silent (1) | _ReadOnly (2); no ViewOnly
+_SW_OPEN_SILENT_READ_ONLY = (
+    3  # swOpenDocOptions_Silent (1) | _ReadOnly (2); no ViewOnly
+)
 
 
 def _sha256(path: Path) -> str:

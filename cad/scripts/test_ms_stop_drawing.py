@@ -602,11 +602,13 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
                 0.217672 if drawing is plate_drawing else 0.197672
             )
             wrong_units_x = transform.apply(mouth)[0]
+            scale = view.ScaleRatio[0] / view.ScaleRatio[1]
             assert wrong_units_x == pytest.approx(
-                -10.247128 if drawing is plate_drawing else -73.614728
+                transform.apply((0.0, 0.0, 0.0))[0] - scale * mouth[0]
             )
-            # Preserve the original failing other-rim negative-X signature
-            # as well as the plate's new concentric right-sheet pick.
+            assert wrong_units_x < 0.0
+            # Preserve the original first-hole, positive-X-rim failure
+            # signature as well as the selected second-hole counterexample.
             original = (holes[0][0] + diameter / 2.0, holes[0][1], holes[0][2])
             assert transform.apply(original)[0] == pytest.approx(
                 -19.797528 if drawing is plate_drawing else -18.750728

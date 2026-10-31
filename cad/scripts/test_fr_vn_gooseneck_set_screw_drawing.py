@@ -191,9 +191,15 @@ def test_head_height_is_an_exact_unrounded_sixteenth() -> None:
     display.text[2] = " in)"
     with pytest.raises(RuntimeError, match="suffix"):
         _supplier_dimensions.assert_supplier_reference_dimension(
-            object(), display, label="SupplierHeadHeight", units="in",
-            precision=precision, expected_mm=supplier.HEAD_H,
-            presentation=presentation, fraction_denominator=denominator, callout=callout,
+            object(),
+            display,
+            label="SupplierHeadHeight",
+            units="in",
+            precision=precision,
+            expected_mm=supplier.HEAD_H,
+            presentation=presentation,
+            fraction_denominator=denominator,
+            callout=callout,
         )
     display.text[2] = ")"
     # A seat that rounds the head to the nearest fraction no longer proves it.
@@ -249,12 +255,16 @@ def test_purchased_sheet_forwards_the_package_to_setup_and_finalize() -> None:
     assert "package_name=package_name," in source
 
 
-def test_native_thread_text_is_shelved_and_reacquired_after_final_rebuild(monkeypatch) -> None:
+def test_native_thread_text_is_shelved_and_reacquired_after_final_rebuild(
+    monkeypatch,
+) -> None:
     imported = {"SupplierThreadDiameter": object()}
     reacquired = {"SupplierThreadDiameter": object()}
     stations = {"SupplierThreadDiameter": {"tips": "retained native tips"}}
     events = []
-    monkeypatch.setattr(draw, "_assert_projection_alignment", lambda *_: events.append("aligned"))
+    monkeypatch.setattr(
+        draw, "_assert_projection_alignment", lambda *_: events.append("aligned")
+    )
 
     def annotate(adapter, views, **kwargs):
         assert kwargs["dimensions"] is supplier.SUPPLIER_REFERENCE_DIMENSIONS
@@ -300,7 +310,10 @@ def test_right_reserves_front_vertical_lanes_without_changing_front_budget() -> 
     assert draw.SUPPLIER_MARGINS["*Front"] == original["*Front"]
     assert draw.SUPPLIER_MARGINS["*Top"] == original["*Top"]
     assert draw.SUPPLIER_MARGINS["*Right"] == (
-        0.0, original["*Front"][1], 0.0, original["*Front"][3]
+        0.0,
+        original["*Front"][1],
+        0.0,
+        original["*Front"][3],
     )
 
 
@@ -320,8 +333,11 @@ def test_projection_proof_refuses_origin_or_scale_drift(
     front = type("View", (), {"ScaleRatio": (1, 1)})()
     right = type("View", (), {"ScaleRatio": right_scale})()
     monkeypatch.setattr(
-        draw, "model_point_in_view",
-        lambda adapter, view, point, **kwargs: (0.10, 0.12) if view is front else right_origin,
+        draw,
+        "model_point_in_view",
+        lambda adapter, view, point, **kwargs: (
+            (0.10, 0.12) if view is front else right_origin
+        ),
     )
     views = {"*Front": front, "*Right": right}
     if valid:
