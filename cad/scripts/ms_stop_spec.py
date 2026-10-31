@@ -215,6 +215,10 @@ PLATE_DRAWING_VALUES_BY_NAME = {
     "PlateFromHeadFace": PLATE_HOLE_Y,
 }
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
+# The block's pictorial looks from +X+Y-Z: the stop-plate mating face with its
+# taps, the roof and an open rebate end. The built-in *Isometric showed only
+# the plain back face (machinist review at a7e406323).
+BLOCK_ISOMETRIC_OCTANT = (1, 1, -1)
 
 # Arithmetic print-worst proof, using the title block the sheets actually
 # print. The additional stock-length allowance is a design reserve requested

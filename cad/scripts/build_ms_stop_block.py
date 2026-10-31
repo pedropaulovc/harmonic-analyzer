@@ -22,6 +22,7 @@ from _dimensions import drive_dimension, name_dimensions, set_global
 from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _named_views import name_octant_views, octant_key
 from _part_pmi import author_part_pmi
 from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
@@ -185,6 +186,10 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
+    name_octant_views(
+        adapter, octants={octant_key(*spec.BLOCK_ISOMETRIC_OCTANT): spec.BLOCK_ISOMETRIC_OCTANT},
+        label=PART_NAME,
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

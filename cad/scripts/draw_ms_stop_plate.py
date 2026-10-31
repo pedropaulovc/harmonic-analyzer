@@ -190,9 +190,9 @@ async def build(adapter: Any) -> dict[str, str]:
             (part.PLATE_HOLE_XS[1] + rim) / 1000.0,
             (part.PLATE_HOLE_Y - rim) / 1000.0, part.PLATE_Z_MIN / 1000.0,
         ), label="plate clearance mouth")
-    # *Back reverses X: this is the left-sheet hole.
+    # *Back reverses X: this is the left-sheet hole. Rule 12: say DRILL.
     clearance = add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=CLEARANCE_CALLOUT_XY,
-                                        label="two cover clearance holes")
+                                        label="two cover clearance holes", process="DRILL")
     _append_callout_lines(clearance, CLEARANCE_FUNCTION)
     set_hole_callout_precision(clearance, CLEARANCE_PRECISION, label="two cover clearance holes")
     _outside_arrow(clearance)

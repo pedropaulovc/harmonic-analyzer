@@ -50,6 +50,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _named_views import octant_view_name
 from _machinist_review_mode import MachinistReviewMode
 from _ms_drawing_contract import assert_manufacturing_dimensions
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
@@ -242,7 +243,8 @@ async def build(adapter: Any) -> dict[str, str]:
     right = place_view(adapter, str(SOURCE), "*Left", *RIGHT_CENTER, scale=SHEET_SCALE)
     bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=SHEET_SCALE)
     _orient_bottom_view(adapter, bottom)
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2.0, 1.0))
+    iso = place_view(adapter, str(SOURCE), octant_view_name(*part.BLOCK_ISOMETRIC_OCTANT),
+                     *ISO_CENTER, scale=(2.0, 1.0))
     annotations = []
     for view, keep, label in ((front, FRONT_KEEP, "cover face"),
                               (right, RIGHT_KEEP, "open rebate end"),

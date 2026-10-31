@@ -1069,6 +1069,9 @@ def test_block_build_cuts_rebate_from_its_profile_driven_marked_and_toleranced(m
     monkeypatch.setattr(block, "mark_dimensions_for_drawing",
                         lambda adapter, feature, names: marks.append((feature, names)))
     monkeypatch.setattr(block, "hide_location_references", lambda adapter, names: hidden.extend(names))
+    named = []
+    monkeypatch.setattr(block, "name_octant_views",
+                        lambda adapter, *, octants, label: named.append(octants) or {})
     pmi = []
     monkeypatch.setattr(block, "author_part_pmi", lambda adapter, **kw: pmi.append(kw))
     monkeypatch.setattr(block, "apply_drawing_precision", lambda adapter, precision: precisions.append(precision))
@@ -1090,6 +1093,8 @@ def test_block_build_cuts_rebate_from_its_profile_driven_marked_and_toleranced(m
     assert properties[0]["Mating Face Note"] == "STOP-PLATE MATING FACE"
     assert "Manufacturing Notes" not in properties[0]
     assert pmi == [{"surface_finishes": spec.BLOCK_SURFACE_FINISHES}]
+    # The drawing's pictorial is the named mating-face octant, not *Isometric.
+    assert named == [{block.octant_key(1, 1, -1): (1, 1, -1)}]
 
 
 def test_roof_reference_lies_on_the_lip_face_not_through_the_lip(monkeypatch) -> None:
