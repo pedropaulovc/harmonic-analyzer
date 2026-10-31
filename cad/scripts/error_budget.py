@@ -263,9 +263,16 @@ def pen_gain(nom: Nominal, lever_r: float) -> float:
 
 
 def _bisect(
-    f: Callable[[np.ndarray], np.ndarray], lo: float, hi: float, n: int, iters: int = 50
+    f: Callable[[np.ndarray], np.ndarray],
+    lo: float,
+    hi: float,
+    n: int | tuple[int, ...],
+    iters: int = 50,
 ) -> np.ndarray:
-    """Vectorised bisection of ``f`` on [lo, hi] for ``n`` independent roots.
+    """Vectorised bisection of ``f`` on [lo, hi] for independent roots of shape ``n``.
+
+    Every step is elementwise, so each root follows exactly the path it would
+    alone: batching independent problems into one array changes no value.
 
     Moving ``lo`` only to a midpoint whose residual has the same sign as the
     lower end leaves that sign unchanged, so it is read once rather than
@@ -280,8 +287,10 @@ def _bisect(
         np.add(lo_a, hi_a, out=mid)
         mid *= 0.5
         same = (f(mid) < 0) == lo_negative
-        np.copyto(lo_a, mid, where=same)
-        np.copyto(hi_a, mid, where=~same)
+        # putmask with a same-shape value array assigns exactly the masked
+        # elements, like copyto(where=), at a third of the per-call cost.
+        np.putmask(lo_a, same, mid)
+        np.putmask(hi_a, ~same, mid)
     return 0.5 * (lo_a + hi_a)
 
 
@@ -334,6 +343,12 @@ def rest_contact(d: float, nom: Nominal) -> tuple[float, float]:
     """Where the bar's notch roof sits on the R800 arc at station ``d`` (foot-axis
     x from the pivot), arm level -- solve_state's rest pose: the contact rides
     the arc and the top pin the lever circle, the bar tilt closes the loop."""
+    kx, ky = _rest_contacts(np.array([d], dtype=float), nom)
+    return float(kx[0]), float(ky[0])
+
+
+def _rest_contacts(d: np.ndarray, nom: Nominal) -> tuple[np.ndarray, np.ndarray]:
+    """``rest_contact`` for every station in ``d`` at once (elementwise)."""
 
     def contact(beta: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         kx = d + nom.contact_dx * np.cos(beta) - nom.contact_dy * np.sin(beta)
@@ -344,9 +359,8 @@ def rest_contact(d: float, nom: Nominal) -> tuple[float, float]:
         kx, ky = contact(beta)
         return _lever_pin_gap(kx, ky, beta, nom)
 
-    beta = _bisect(gap, -0.4, 0.4, 1)
-    kx, ky = contact(beta)
-    return float(kx[0]), float(ky[0])
+    beta = _bisect(gap, -0.4, 0.4, d.shape)
+    return contact(beta)
 
 
 def hook_displacement(theta: np.ndarray, d: float, nom: Nominal) -> np.ndarray:
@@ -365,9 +379,15 @@ def _hook_displacement_at_rocker(
 ) -> np.ndarray:
     """Station-dependent hook motion using an already-solved rocker cycle."""
     k0x, k0y = rest_contact(d, nom)
+    return _hook_from_contacts(tr, k0x, k0y, nom)
+
+
+def _hook_from_contacts(tr: np.ndarray, k0x, k0y, nom: Nominal) -> np.ndarray:
+    """Hook motion for the rest contact ``(k0x, k0y)`` riding the rocker
+    cycle ``tr``."""
     kx = k0x * np.cos(tr) - k0y * np.sin(tr)
     ky = k0x * np.sin(tr) + k0y * np.cos(tr)
-    beta = _bisect(lambda b: _lever_pin_gap(kx, ky, b, nom), -0.4, 0.4, theta.size)
+    beta = _bisect(lambda b: _lever_pin_gap(kx, ky, b, nom), -0.4, 0.4, kx.shape)
     s, c = np.sin(beta), np.cos(beta)
     tx = kx - (nom.contact_dx * c - nom.contact_dy * s) + nom.bar_len * s
     ty = ky - (nom.contact_dx * s + nom.contact_dy * c) + nom.bar_len * c
@@ -584,8 +604,13 @@ class CycleTable:
 
     def _sample_brackets(
         self, d: np.ndarray, alpha: np.ndarray
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Lookup indices/fractions, leaving broadcastable station axes small."""
+    ) -> tuple[np.ndarray, ...]:
+        """Lookup indices/fractions, leaving broadcastable station axes small.
+
+        The station bracket is the flat offset of its row in the C-order
+        (station, angle) table, so a lookup adds the angle index and gathers
+        with one ``take`` per corner: the same elements as two-axis fancy
+        indexing at a fraction of the cost."""
         st = self.stations
         s0 = np.clip(np.searchsorted(st, d, side="right") - 1, 0, len(st) - 2)
         sf = np.clip((d - st[s0]) / (st[s0 + 1] - st[s0]), 0.0, 1.0)
@@ -595,17 +620,15 @@ class CycleTable:
         a0 = a_floor % n
         af = ai - a_floor
         a1 = (a0 + 1) % n
-        return s0, sf, a0, af, a1
+        return s0 * n, sf, a0, af, a1
 
-    def _sample_with_brackets(
-        self,
-        brackets: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
-    ) -> np.ndarray:
+    def _sample_with_brackets(self, brackets: tuple[np.ndarray, ...]) -> np.ndarray:
         """Apply a per-call lookup shared by tables on the same grid."""
-        s0, sf, a0, af, a1 = brackets
+        row0, sf, a0, af, a1 = brackets
+        row1 = row0 + self.cycles.shape[1]
         c = self.cycles
-        top = c[s0, a0] * (1.0 - af) + c[s0, a1] * af
-        bot = c[s0 + 1, a0] * (1.0 - af) + c[s0 + 1, a1] * af
+        top = np.take(c, row0 + a0) * (1.0 - af) + np.take(c, row0 + a1) * af
+        bot = np.take(c, row1 + a0) * (1.0 - af) + np.take(c, row1 + a1) * af
         return top * (1.0 - sf) + bot * sf
 
 
@@ -623,11 +646,19 @@ def _station_grid(nom: Nominal, step_mm: float) -> np.ndarray:
 def _cycles_at(stations: np.ndarray, nom: Nominal) -> np.ndarray:
     # The rocker motion depends on the crank angles and nominal, not the bar
     # station. Keep its solve local to this table, including deviated nominals.
+    # The one-element rest-contact bisections are all overhead, so every
+    # station's is solved in one elementwise array -- each equals its
+    # single-station solve bit for bit
+    # (test_shared_table_rocker_matches_original_station_loop). The hook
+    # bisection stays per station: it is compute-bound, and a whole
+    # (station x angle) array is slower once it no longer fits in cache.
+    stations = np.asarray(stations, dtype=float)
     tr = rocker_angle(_READ_GRID, nom)
+    k0x, k0y = _rest_contacts(stations, nom)
     return np.array(
         [
-            _hook_displacement_at_rocker(_READ_GRID, tr, float(d), nom)
-            for d in stations
+            _hook_from_contacts(tr, float(x), float(y), nom)
+            for x, y in zip(k0x, k0y, strict=True)
         ]
     )
 
@@ -741,11 +772,26 @@ class NominalTrial:
             )
         return self._cycle[d]
 
+    def _prime(self, stations: np.ndarray) -> None:
+        """Solve every uncached station's cycle, the rest contacts in one batch.
+
+        A one-element rest-contact bisection is all per-call overhead; solving
+        them together is elementwise, so each cycle equals ``one_cycle``'s."""
+        missing = [
+            d for d in dict.fromkeys(float(d) for d in stations) if d not in self._cycle
+        ]
+        if not missing:
+            return
+        k0x, k0y = _rest_contacts(np.array(missing), self.nom)
+        for d, x, y in zip(missing, k0x, k0y, strict=True):
+            self._cycle[d] = _hook_from_contacts(self._rocker, float(x), float(y), self.nom)
+
     def fundamental(self, d: float) -> float:
         return 2.0 * float(np.mean(self.one_cycle(d) * np.cos(self.grid)))
 
     def kappa(self, stations: np.ndarray) -> np.ndarray:
         """The table's c2/c1 at each bar's station."""
+        self._prime(stations)
         return np.array(
             [
                 second_harmonic(self.one_cycle(float(d)), self.grid)
@@ -756,11 +802,13 @@ class NominalTrial:
 
     def x_read(self, stations: np.ndarray) -> np.ndarray:
         """The table's read ordinate at each bar's station (signed)."""
+        self._prime(stations)
         return np.array([self.fundamental(float(d)) / self.f_full for d in stations])
 
     def trace(self, stations: np.ndarray, th: np.ndarray) -> np.ndarray:
         """The pen trace y(theta) (hook-displacement units) -- channel j runs
         j cycles per fundamental period."""
+        self._prime(stations)
         y = np.zeros_like(th)
         for j, d in zip(HARMONICS, stations):
             y += np.interp(
