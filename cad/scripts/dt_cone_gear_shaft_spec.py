@@ -15,7 +15,7 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_cone_gear_spec import FACE_WIDTH as CONE_GEAR_FACE_WIDTH, SEAT_PITCH, outside_dia_mm
 from dt_cone_gear_stack import PITCH_LOCKSTEP_TOLERANCE, face_band
 from _cone_axis_constants import GEAR_AXIS_SHIFT
-from dt_cone_pivot_post_spec import RUNNING_BORE_BAND as POST_JOURNAL_BORE_BAND
+from dt_cone_pivot_post_spec import JOURNAL_BORE_BAND as POST_JOURNAL_BORE_BAND
 from cone_shaft_land_bands import (  # noqa: F401  re-exported for the shaft build
     FLAT_AF_BAND,
     GEAR_SEAT_BAND,
@@ -42,12 +42,13 @@ from gear_seat_fit import flat_bore_af_band, seat_bore_band
 
 MM_PER_IN = 25.4
 
-# The manually rederived v2 pivot post has a Ø12.2808 bearing bore spanning
+# The manually rederived v2 pivot post has a .483 in bearing bore spanning
 # 42.011 mm along the cone axis.  The shaft begins 1.0 mm proud of the post's
 # front face, so the integral journal is one millimetre longer than the post
-# body and runs with 0.05 mm diametral clearance.
+# body; it is turned .0005 in under the bore nominal (.4825 in), so the bore's
+# +.0010/+.0005 band closes the shaft_in_bushing class on its SHAFT_H band.
 JOURNAL_BORE_DIA = dt_cone_pivot_post_spec.BORE_DIA
-JOURNAL_CLEARANCE = 0.05
+JOURNAL_CLEARANCE = 0.0127
 JOURNAL_DIA = JOURNAL_BORE_DIA - JOURNAL_CLEARANCE
 # Actual limits for this post/shaft pair, not an intended common clearance.
 JOURNAL_DIAMETRAL_CLEARANCE_MM = (

@@ -7,6 +7,7 @@ SLDDRW recipes from one source (see build_dt_arbor_pedestal.py for the geometry)
 from __future__ import annotations
 from math import sqrt
 
+from _fit_ream_slide import REAM_SLIDE
 from _hole_spec import HoleSpec, THREAD_MAJOR_MM, blind_cut_dia_mm
 from _printed_tolerance import printed_band_mm
 from _gtol_cylinder import CylinderFace
@@ -41,8 +42,10 @@ LEDGE_DEPTH = FOOT_DEPTH - STRAP_T  # exposed hold-down ledge, 18
 # the crown carries the MHA-DT-VN-64 apex set screw (#743, below), and only R11
 # leaves it 1.5D of full thread at the printed worst case.
 TOP_RADIUS = 11.0
-BORE_DIA = 9.55  # finished running bore for the 3/8 in cylinder-arbor journal
-BORE_DIA_BAND = (0.03, 0.0)  # 9.550–9.580 mm running-bore limits
+# Finished running bore for the 3/8 in cylinder-arbor journal: REAM_SLIDE,
+# .3760-.3765 in, cut by the owned .3760 over reamer.
+BORE_DIA = 9.525
+BORE_DIA_BAND = REAM_SLIDE
 BORE_HEIGHT = PLATFORM_THICKNESS_MM + CONE_AXIS_HEIGHT_MM
 _ROOT_HALF_WIDTH = FOOT_WIDTH / 2.0
 _CENTER_RISE = BORE_HEIGHT - FOOT_HEIGHT
@@ -194,7 +197,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FootProfile": {"Width": 1, "Depth": 1},
     "Foot": {"FootHt": 1},
-    "BoreProfile": {"BoreDia": 2, "BoreHeight": 2},
+    "BoreProfile": {"BoreDia": 3, "BoreHeight": 2},
     # One place (R11.0): nothing mates to the crown, and the apex set screw's
     # full thread is sized at this .X band's least radius
     # (set_screw_wall_terms), so the general grade is enough.

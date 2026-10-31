@@ -21,5 +21,5 @@ COLLAR_OD = 15.0  # the integral head's Ø15, the photographed sleeve
 # 20 the worst corner pressed the front strap; 17 keeps every corner clear
 # (dt_pinion_arbor_collar_spec.collar_strap_gaps) with no band tightened (U27).
 COLLAR_LEN = 17.0
-BORE = 8.0  # drilled +0.10/0: a slide fit over the Ø8 -0.01/-0.10 arbor
+BORE = 7.9375  # 5/16 drill, title-block drilled band: a slide fit over the 5/16 arbor
 PIN_HOLE_Z = COLLAR_LEN / 2.0  # centred on the length, from either face

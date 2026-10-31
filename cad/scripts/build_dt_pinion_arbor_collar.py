@@ -2,7 +2,7 @@ r"""Reproduction script: pinion-arbor collar (book ch. 25; MHA-DT-33, R1a).
 
 The ch25 photos show a sleeve on the arbor outboard of the front strap with a
 flush pin end about 10 out (page001_img01, page002_img07).  User ruling R1a
-(2026-09-24): a plain turned steel collar, Ø15 x 20 with a drilled Ø8 bore,
+(2026-09-24): a plain turned steel collar, Ø15 x 20 with a drilled Ø5/16 bore,
 cross-pinned to MHA-DT-22 with the rig's 1/16 in slotted spring pin through a
 hole centred on its length.  It is a northward walk-out backstop behind the
 drum's bond; the gap stack lives in ``dt_pinion_arbor_collar_spec``.
@@ -202,7 +202,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Manufacturing drawing support: only the pin hole's tighter band rides
-    # the model.  The Ø8 bore is a plain drilled hole, so the title block's
+    # the model.  The Ø5/16 bore is a plain drilled hole, so the title block's
     # DRILLED HOLES row governs it and the dimension restates nothing (policy
     # drawing-guidelines.md rule 2 (the title block is the general specification), Codex on #860).  The places are the part's (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     set_dimension_bilateral_tolerance(

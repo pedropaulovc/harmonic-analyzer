@@ -43,7 +43,7 @@ DRILLED_PLUS = drilled_oversize_mm()
 # --- The pin: 5/64 drill rod (AISI O1/W1, used annealed as supplied; ground
 # to +/-0.0002 in). ---
 PIN_DIA = 5.0 / 64.0 * MM_PER_IN  # 1.984
-PIN_DIA_TOLERANCE = 0.005  # +/-, drill-rod grind
+PIN_DIA_TOLERANCE = 0.00508  # +/-.0002 in, drill-rod grind
 PIN_INSTALLED_LENGTH = _bar.BAR_WIDTH  # dressed flush with both bar faces
 # Cut length of the blank: the bar plus dressing stock at each end. Its one
 # function is to stand proud of both faces before dressing, so it prints at

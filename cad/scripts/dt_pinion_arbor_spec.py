@@ -104,7 +104,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # Head and neck diameters are Front-plane circles: imported end-on on the
     # donor view and moved onto the 1:1 profile (5cc191fb's proven path; a
     # detail silhouette screen pick is seat-dependent and failed on w6).  The
-    # Ø8 is not: its circle's witnesses crossed the neck face, so the bond
+    # Ø5/16 is not: its circle's witnesses crossed the neck face, so the bond
     # zone carries its own flank diameter (BondZoneReference).
     "HeadProfile": {"HeadDia"},
     "NeckProfile": {"NeckDia"},
@@ -160,7 +160,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "NeckProfile": {"NeckDia": 1},
     "Head": {"HeadLen": HEAD_LEN_PLACES},
     "Neck": {"NeckLen": NECK_LEN_PLACES},
-    "BondZoneReference": {"BondZoneDia": 2},
+    # Four places print the 5/16 arbor exactly (7.9375), so the inch bands
+    # land on it without drifting.
+    "BondZoneReference": {"BondZoneDia": 4},
     "DrumStationReference": {"DrumStationFromHeadRear": 2},
     "FrontCapProfile": {"HeadCapR": 1, "HeadCapSagDim": HEAD_CAP_SAG_PLACES},
     "BackCapProfile": {"BackCapR": 1, "BackCapSagDim": 1},
@@ -173,12 +175,12 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FrontJournalReference": {
         "FrontJournalFromHeadRear": 1,
         "FrontJournalLen": 1,
-        "FrontJournalDia": 2,
+        "FrontJournalDia": 4,
     },
     "BackJournalReference": {
         "BackJournalFromHeadRear": 1,
         "BackJournalLen": 1,
-        "BackJournalDia": 2,
+        "BackJournalDia": 4,
     },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -213,15 +215,15 @@ CROSS_HOLE_CALLOUT = f"REAM THRU, BONDED FIT\nON {CROSSROD_NUMBER} CROSSROD"
 # it runs in, where the general note used to.
 JOURNAL_CALLOUT = f"JOURNAL,\nRUNS IN {STRAP_NUMBER}"
 # Machinist review r1 of #1685 (blocker): the -0.01/-0.10 band named no mate,
-# and the Ø8 spans either side of the lands carried no diameter (owner,
-# 2026-10-12).  One callout covers every Ø8 surface but the two lands and
+# and the Ø5/16 spans either side of the lands carried no diameter (owner,
+# 2026-10-12).  One callout covers every Ø5/16 surface but the two lands and
 # names the drum bonded on it.  Machinist review r3 (blocker): the 61.05
 # drum station falls on the front journal, which read as the drum confined
 # to the non-journal Ø8.  The lands run past the straps' inner faces to hold
 # them through the drum's float (LAND_MARGINS_AT_STOPS), so each drum end
 # rests on its land's inner end at every limit; the callout says so.
 BOND_ZONE_CALLOUT = (
-    f"ALL<MOD-DIAM>{SHAFT_DIA:.0f} EXCEPT JOURNALS;\n"
+    f"ALL<MOD-DIAM>{SHAFT_DIA:.4f} EXCEPT JOURNALS;\n"
     f"{DRUM_NUMBER} BOND ZONE,\n"
     "DRUM ENDS ON JOURNALS"
 )
@@ -248,7 +250,7 @@ DRUM_STATION_CALLOUT = f"DRUM STATION:\n{DRUM_NUMBER} FRONT END,\nSET AT ASSEMBL
 # pinion fit-up step text (pinion_rig_fitup) that owns this joint.
 # The drum joint's one step covers MHA-DT-01 too (dt_alignment_pinion_spec).
 # The journals' bore moved onto their callouts (JOURNAL_CALLOUT), so the one
-# note is the inside-corner ceiling at the Ø8/Ø10.5 and Ø10.5/Ø15 shoulders
+# note is the inside-corner ceiling at the Ø5/16-Ø10.5 and Ø10.5/Ø15 shoulders
 # (machinist review r1 of #1685; the dt-crankshaft precedent: the title
 # block's R0.25 edge break, until #1625 puts the default in the title block).
 INSIDE_CORNER_R_MAX = 0.25

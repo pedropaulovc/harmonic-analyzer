@@ -53,8 +53,9 @@ DRILL_WANDER_MAX = 0.10
 # - Silver braze, BAg-7: the filler maker's flux-brazed window, 0.002-0.005 in
 #   (0.051-0.127 mm) PER SIDE (Lucas-Milhaupt, "The Effect of Joint
 #   Clearance on Braze Joint Strength", Table 1; per side as in its
-#   "Designing Braze Joints at Temperature"), so 0.102-0.254 diametral,
-#   printed rounded inward at two places.
+#   "Designing Braze Joints at Temperature"), so .004-.010 in diametral;
+#   the window takes .0040-.0098 in (0.1016-0.24892) so it stays inside the
+#   LOCTITE 638 gap below, and prints rounded inward at four places.
 # - LOCTITE 638 retaining compound, the alternative: the same window, inside
 #   the TDS's 0.25 mm gap fill (TDS, August 2016).  ISO 10123 shear 25
 #   N/mm^2 minimum at 24 h, derated by the Henkel Retaining Compound Design
@@ -62,8 +63,8 @@ DRILL_WANDER_MAX = 0.10
 #   end, L/D 0.5 on a 9 mm shaft 0.6) holds about 2.2 N m: 3.7 times the
 #   clamp's worst tightening torque at its needed preload.
 # The leg sleeve's stock select-fit takes the same window (sm_gooseneck_spec).
-BRAZE_CLEARANCE_MIN = 0.11
-BRAZE_CLEARANCE_MAX = 0.25
+BRAZE_CLEARANCE_MIN = 0.1016  # .0040 in
+BRAZE_CLEARANCE_MAX = 0.24892  # .0098 in
 # LOCTITE 638 TDS (August 2016): bond gaps up to 0.25 mm.
 LOCTITE_638_GAP_MAX = 0.25
 if BRAZE_CLEARANCE_MAX > LOCTITE_638_GAP_MAX:

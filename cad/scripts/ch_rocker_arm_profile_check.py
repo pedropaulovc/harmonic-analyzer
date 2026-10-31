@@ -256,8 +256,9 @@ if not ROD_PIN_MAX < _ROD_HOLE_LOW <= (ROD_PIN_GAUGE_IN + 0.001) * INCH:
 # The slot is an H7 width on that pin (ISO 286, 1-3 mm: +0.010/0).
 ROD_SLOT_WIDTH = 1.983
 ROD_SLOT_WIDTH_BAND = (0.010, 0.0)  # (upper, lower)
+ROD_SLOT_WIDTH_MIN = ROD_SLOT_WIDTH + ROD_SLOT_WIDTH_BAND[1]
 ROD_SLOT_WIDTH_MAX = ROD_SLOT_WIDTH + ROD_SLOT_WIDTH_BAND[0]
-if ROD_SLOT_WIDTH - ROD_PIN_MAX <= 0.0:
+if ROD_SLOT_WIDTH_MIN - ROD_PIN_MAX <= 0.0:
     raise AssertionError("the rod-hole pin does not enter the smallest slot")
 ROD_HOLE_RADIAL = float(rocker.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"]) / 2.0
 ROD_HOLE_PLAY = (_ROD_HOLE_HIGH - ROD_PIN_MIN) / 2.0  # 0.0589

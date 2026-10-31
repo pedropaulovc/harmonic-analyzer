@@ -98,9 +98,10 @@ CROWN_TOP_Y = SHAFT_AXIS_H + CROWN_R  # 32.2: the set-screw tap's entry
 # the nominal to its SHAFT_DIA.
 BORE_DIA = 6.35
 BORE_RUNNING_MIN_CLEARANCE_MM = 0.010
-# Lower deviation +0.038: the 8.0 lug spends 0.0274 of the least clearance on
-# the rail-seat budget (BORE_SEAT_ALLOWANCE_MM below).
-BORE_DIA_BAND = (0.050, 0.038)  # (upper, lower)
+# .250 +.0020/+.0015 in: the 8.0 lug spends 0.0274 of the least clearance on
+# the rail-seat budget (BORE_SEAT_ALLOWANCE_MM below), and the .2515 pair
+# reamer's +.0002/-.0000 size lies inside.
+BORE_DIA_BAND = (0.0508, 0.0381)  # (upper, lower)
 KEEPER_INNER_FACE_SPAN_MM = 2.0 * (KEEPER_Z_OFF - LUG_HALF_T)  # 142.0
 KEEPER_OUTER_FACE_SPAN_MM = 2.0 * (KEEPER_Z_OFF + LUG_HALF_T)  # 158.0
 # The one-pass reamer: a 0.2515 in long-series chucking reamer, 12 in overall,

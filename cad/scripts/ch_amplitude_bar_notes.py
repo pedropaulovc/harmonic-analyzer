@@ -58,7 +58,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "BarSection": 2,
         "TopPinX": 3,
         "TopPinDrop": 2,
-        "TopPinDia": 3,
+        "TopPinDia": 4,
     },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {

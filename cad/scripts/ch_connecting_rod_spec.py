@@ -109,11 +109,11 @@ FORK_BASE_BELOW_PIN = 13.0
 # The MHA-CH-10 rod pivot pin presses into this hole through both tines and
 # runs in the arm's #47 rod hole (user ruling 2026-10-09, PR #1292 review F1,
 # press fit as the bar pin; ch_rod_pivot_pin_spec holds the fit budget).
-# Reamed to H7 under the 5/64 drill rod: the 0.0775 in stock reamer cuts
-# inside the band. No countersink: the reamed hole runs straight through each
-# tine, so the tine's whole thickness is the pin's land.
-PIN_HOLE_DIA = 1.968
-PIN_HOLE_BAND = (0.010, 0.0)  # (upper, lower) deviations, reamed; native
+# Reamed .077 +.0009/+.0005 in under the 5/64 drill rod: a purchased .0775
+# chucking reamer cuts inside it. No countersink: the reamed hole runs
+# straight through each tine, so the tine's whole thickness is the pin's land.
+PIN_HOLE_DIA = 1.9558  # .077 in
+PIN_HOLE_BAND = (0.02286, 0.0127)  # (upper, lower) deviations, reamed; native
 # Every inside corner -- the slot floor's two, the fork's root step onto the
 # shank (four) and the shank onto the ring (two) -- is one modelled fillet,
 # inside the title block's INSIDE CORNERS R1.0 MAX, which governs them on the

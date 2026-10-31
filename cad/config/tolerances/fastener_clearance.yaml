@@ -1,7 +1,19 @@
 fastener_clearance:
-  close_mm: 0.10
-  normal_mm: 0.25
-  # The drilled-hole DRAWING tolerance is a title-block general tolerance, not
-  # a fit class -- it lives in title_block.yaml (drilled_hole) with the other
-  # $PRPSHEET-stamped tolerances, so a display edit re-stamps parts without a
-  # geometry FULL rebuild.
+  # ASME B18.2.8 Table 2 inch series, the SolidWorks ANSI-inch Hole Wizard rows
+  # that _hole_spec.CLEARANCE_MM cuts. Each fit names the owned 115-piece drill
+  # index member (cad/process/shop/inventory.toml) that drills it.
+  # The drilled-hole DRAWING tolerance (+.004/.000 in) is a title-block general
+  # tolerance, not a fit class -- it lives in title_block.yaml (drilled_hole)
+  # with the other $PRPSHEET-stamped tolerances, so a display edit re-stamps
+  # parts without a geometry FULL rebuild.
+  units: in
+  sizes:
+    "#2":   {close: {drill: "3/32", dia_in: 0.0938}, normal: {drill: "#38", dia_in: 0.1015}, loose: {drill: "#32", dia_in: 0.1160}}
+    "#3":   {close: {drill: "#36", dia_in: 0.1065}, normal: {drill: "#32", dia_in: 0.1160}, loose: {drill: "#30", dia_in: 0.1285}}
+    "#4":   {close: {drill: "#31", dia_in: 0.1200}, normal: {drill: "#30", dia_in: 0.1285}, loose: {drill: "#27", dia_in: 0.1440}}
+    "#6":   {close: {drill: "#23", dia_in: 0.1540}, normal: {drill: "#18", dia_in: 0.1695}, loose: {drill: "#13", dia_in: 0.1850}}
+    "#8":   {close: {drill: "#15", dia_in: 0.1800}, normal: {drill: "#9", dia_in: 0.1960}, loose: {drill: "#3", dia_in: 0.2130}}
+    "#10":  {close: {drill: "#5", dia_in: 0.2055}, normal: {drill: "#2", dia_in: 0.2210}, loose: {drill: "B", dia_in: 0.2380}}
+    "1/4":  {close: {drill: "H", dia_in: 0.2660}, normal: {drill: "K", dia_in: 0.2810}, loose: {drill: "19/64", dia_in: 0.2969}}
+    "5/16": {close: {drill: "21/64", dia_in: 0.3281}, normal: {drill: "11/32", dia_in: 0.3438}, loose: {drill: "23/64", dia_in: 0.3594}}
+    "3/8":  {free: {drill: "X", dia_in: 0.3970}}
