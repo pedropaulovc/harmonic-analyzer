@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import ast
 import asyncio
-import json
 import math
 import re
 from pathlib import Path
@@ -526,6 +525,7 @@ class _ReceiptAnnotation:
     def __init__(self, display) -> None:
         self.display = display
         self.Visible, self.OwnerType, self.Owner = 1, 0, object()
+        self.entities = (object(), object())
 
     def GetType(self):
         return 4  # swDisplayDimension
@@ -537,7 +537,7 @@ class _ReceiptAnnotation:
         return False
 
     def GetAttachedEntities3(self):
-        return (object(), object())
+        return self.entities
 
     def GetAttachedEntityTypes(self):
         return (1, 1)
@@ -546,19 +546,23 @@ class _ReceiptAnnotation:
         return 2
 
 
+class _ReceiptNativeDimension:
+    def __init__(self, name, feature, value_mm):
+        self.Name, self.feature = name, feature
+        self.SystemValue = value_mm / 1000.0
+        self.DrivenState = 1
+
+    @property
+    def FullName(self):
+        return f"{self.Name}@{self.feature}@{STEM}.SLDPRT"
+
+
 class _ReceiptDisplay:
     """An imported linear model dimension: document units, part places."""
 
     def __init__(self, name: str, feature: str, value_mm: float) -> None:
         self.name = name
-        self.dimension = type(
-            "Dimension",
-            (),
-            {
-                "FullName": f"{name}@{feature}@{STEM}.SLDPRT",
-                "SystemValue": value_mm / 1000.0,
-            },
-        )()
+        self.dimension = _ReceiptNativeDimension(name, feature, value_mm)
         self.Type2 = 2  # swLinearDimension
         self.ShowDimensionValue = True
         self.ShowParenthesis = False
@@ -620,14 +624,69 @@ def _receipt_sheet(monkeypatch, values=None, *, configure=None):
         name: _ReceiptDisplay(name, draw.RECEIPT_FEATURES[name], values[name])
         for name in draw.RECEIPT_FEATURES
     }
+    from types import SimpleNamespace
+    import _drawing_edge_dimensions as edge_dimensions
+    from _drawing_edges import ViewEdge, ViewEdges
+
+    displays["Length"].dimension = _ReceiptNativeDimension(
+        "D1", "DrawingView1", values["Length"]
+    )
+    end_edges = (object(), object())
+    displays["Length"].annotation.entities = end_edges
+    scan = ViewEdges(
+        "rail",
+        tuple(
+            ViewEdge(edge, ((x, -5.0, spec.HEIGHT), (x, 5.0, spec.HEIGHT)), None, None)
+            for x, edge in zip((0.0, spec.LENGTH), end_edges)
+        )
+        + (
+            ViewEdge(
+                object(),
+                ((0.0, -5.0, spec.HEIGHT), (spec.LENGTH, -5.0, spec.HEIGHT)),
+                None,
+                None,
+            ),
+        ),
+    )
+    monkeypatch.setattr(draw, "scan_view_edges", lambda *_args, **_kwargs: scan)
+    monkeypatch.setattr(
+        edge_dimensions,
+        "_is_same_attachment",
+        lambda _adapter, actual, expected, _kind: actual is expected,
+    )
     annotations = [display.annotation for display in displays.values()]
     if configure is not None:
         configure(displays)
     imported = []
-    monkeypatch.setattr(draw, "_receipt_positions", lambda _adapter, _front: {})
+    positions = {
+        name: (index * 0.03, 0.1) for index, name in enumerate(draw.RECEIPT_FEATURES)
+    }
+    monkeypatch.setattr(draw, "_receipt_positions", lambda _adapter, _front: positions)
+
+    def import_holes(_adapter, _front, *, keep, dimensions_by_feature, **_kwargs):
+        assert set(keep) == {"HoleEnd", "HolePitch"}
+        assert dimensions_by_feature == {"BoltHoleProfile": {"HoleEnd", "HolePitch"}}
+        return [displays[name].annotation for name in ("HoleEnd", "HolePitch")]
+
+    monkeypatch.setattr(draw, "curate_view_dimensions", import_holes)
     monkeypatch.setattr(
-        draw, "curate_view_dimensions", lambda *_args, **_kwargs: list(annotations)
+        draw,
+        "model_points_in_view",
+        lambda _adapter, _front, points, **_kwargs: [(x, y) for x, y, _z in points],
     )
+
+    def add_length(_adapter, _front, **kwargs):
+        assert kwargs == {
+            "p0": (0.0, 0.0),
+            "p1": (spec.LENGTH / 1000.0, 0.0),
+            "text_xy": positions["Length"],
+            "label": "rail cut length",
+            "orientation": "horizontal",
+            "entities": end_edges,
+        }
+        return displays["Length"]
+
+    monkeypatch.setattr(draw, "add_edge_dimension", add_length)
     monkeypatch.setattr(
         draw,
         "assert_imported_precision",
@@ -646,9 +705,14 @@ def _receipt_sheet(monkeypatch, values=None, *, configure=None):
         },
     )()
     monkeypatch.setattr(draw, "iter_views", lambda _adapter: [front])
-    draw._receipt_dimensions(object(), front)
-    # The part's own places are read before anything is dressed.
-    assert imported == [draw.FRONT_DIMENSION_PRECISION]
+    draw._receipt_dimensions(SimpleNamespace(), front)
+    assert imported == [
+        {
+            name: places
+            for name, places in draw.FRONT_DIMENSION_PRECISION.items()
+            if name != "Length"
+        }
+    ]
     return (
         displays,
         annotations,
@@ -698,100 +762,87 @@ def test_receipt_presentation_refuses_a_value_off_the_order(monkeypatch) -> None
         _receipt_sheet(monkeypatch, {"HolePitch": 60.5})
 
 
-@pytest.mark.parametrize(
-    ("member", "value", "field", "expected"),
-    (
-        ("IsDangling", lambda: True, "dangling", True),
-        ("Visible", 0, "visible", 0),
-        ("OwnerType", 1, "owner_type", 1),
-        ("Owner", None, "owner_present", False),
-        (
-            "GetAttachedEntities3",
-            lambda: (None, object()),
-            "attached_present",
-            [False, True],
-        ),
-        ("GetAttachedEntities3", lambda: (), "attached_present", []),
-        ("GetAttachedEntityTypes", lambda: (0, 1), "attached_types", [0, 1]),
-        ("GetAttachedEntityTypes", lambda: (1,), "attached_types", [1]),
-        ("GetAttachedEntityCount3", lambda: 3, "attached_count", 3),
-    ),
-)
-def test_receipt_attachment_refusal_logs_all_native_references(
-    monkeypatch, member, value, field, expected
-) -> None:
-    messages = []
-    monkeypatch.setattr(draw._telemetry, "info", messages.append)
-    captured = {}
-
-    def configure(displays):
-        captured.update(displays)
-        setattr(displays["Length"].annotation, member, value)
-
-    with pytest.raises(RuntimeError, match="Length@Rail:.*no sound native attachment"):
-        _receipt_sheet(monkeypatch, configure=configure)
-
-    logs = [
-        json.loads(message.removeprefix("rail_receipt_attachment_failure "))
-        for message in messages
-        if message.startswith("rail_receipt_attachment_failure ")
-    ]
-    assert len(logs) == 1
-    context = logs[0]
-    assert context["view_orientation"] == "*Front"
-    assert context["referenced_model"] == str(draw.SPEC.source)
-    assert context["stage"] == "receipt_presentation_failure_after_curation"
-    rows = {row["full_name"].split("@")[0]: row for row in context["dimensions"]}
-    assert set(rows) == {"Length", "HoleEnd", "HolePitch"}
-    assert rows["Length"][field] == expected
-    for name, row in rows.items():
-        assert row["full_name"] == f"{name}@{draw.RECEIPT_FEATURES[name]}@{STEM}.SLDPRT"
-        assert row["dimension_type"] == 2
-        assert row["system_value"] == spec.RECEIPT_VALUES_MM[name] / 1000.0
-    # No synthetic text or attachment repair rescues the failing reference.
-    assert captured["Length"].units == (True, 0, 1, 0, False)
-    assert captured["Length"].text == {1: "", 2: "", 4: ""}
+def test_receipt_length_is_a_driven_end_edge_dimension(monkeypatch) -> None:
+    displays, _annotations, settled = _receipt_sheet(monkeypatch)
+    native = displays["Length"].dimension
+    assert native.Name == draw._LENGTH_REFERENCE_NAME
+    assert native.feature == "DrawingView1"
+    assert native.DrivenState == 1
+    assert native.SystemValue == spec.LENGTH / 1000.0
+    settled()
 
 
-def test_receipt_diagnostic_keeps_other_fields_when_one_reader_fails(
+def test_receipt_length_rejects_wrong_entities_even_at_the_right_value(
     monkeypatch,
 ) -> None:
-    messages = []
-    monkeypatch.setattr(draw._telemetry, "info", messages.append)
-
     def configure(displays):
-        displays["Length"].annotation.IsDangling = lambda: True
+        displays["Length"].annotation.entities = (object(), object())
 
-        def unavailable():
-            raise RuntimeError("native types reader unavailable")
-
-        displays["HoleEnd"].annotation.GetAttachedEntityTypes = unavailable
-
-    with pytest.raises(RuntimeError, match="Length@Rail:.*no sound native attachment"):
+    with pytest.raises(
+        RuntimeError, match="not the dimension between its named entities"
+    ):
         _receipt_sheet(monkeypatch, configure=configure)
-    message = next(
-        m for m in messages if m.startswith("rail_receipt_attachment_failure ")
+
+
+def test_receipt_length_rejects_an_attachment_free_native_dimension(
+    monkeypatch,
+) -> None:
+    def configure(displays):
+        # Native extrusion-depth census: correct value and non-dangling,
+        # but no entities. This cannot pass for the new end-edge length.
+        annotation = displays["Length"].annotation
+        annotation.entities = ()
+        annotation.GetAttachedEntityTypes = lambda: ()
+        annotation.GetAttachedEntityCount3 = lambda: 0
+
+    with pytest.raises(
+        RuntimeError, match="not the dimension between its named entities"
+    ):
+        _receipt_sheet(monkeypatch, configure=configure)
+
+
+def test_settled_length_rechecks_physical_attachment_and_driven_state(
+    monkeypatch,
+) -> None:
+    displays, _annotations, settled = _receipt_sheet(monkeypatch)
+    length = displays["Length"]
+    original = length.annotation.entities
+    length.annotation.entities = (object(), object())
+    with pytest.raises(
+        RuntimeError, match="not the dimension between its named entities"
+    ):
+        settled()
+    length.annotation.entities = original
+    length.dimension.DrivenState = 0
+    with pytest.raises(RuntimeError, match="driven reference"):
+        settled()
+
+
+def test_receipt_length_cannot_print_a_spec_value_over_wrong_geometry(
+    monkeypatch,
+) -> None:
+    with pytest.raises(RuntimeError, match="measures"):
+        _receipt_sheet(monkeypatch, {"Length": 439.0})
+
+
+def test_receipt_hole_references_keep_the_shared_strict_attachment_guard(
+    monkeypatch,
+) -> None:
+    def configure(displays):
+        displays["HoleEnd"].annotation.entities = ()
+
+    with pytest.raises(
+        RuntimeError, match="HoleEnd@BoltHoleProfile:.*no sound native attachment"
+    ):
+        _receipt_sheet(monkeypatch, configure=configure)
+
+
+def test_settled_length_requires_visible_physical_end_edges(monkeypatch) -> None:
+    from _drawing_edges import ViewEdges
+
+    _displays, _annotations, settled = _receipt_sheet(monkeypatch)
+    monkeypatch.setattr(
+        draw, "scan_view_edges", lambda *_args, **_kwargs: ViewEdges("rail", ())
     )
-    rows = json.loads(message.split(" ", 1)[1])["dimensions"]
-    end = next(row for row in rows if row["full_name"].startswith("HoleEnd@"))
-    assert end["attached_types"] == {
-        "error_type": "RuntimeError",
-        "message": "native types reader unavailable",
-    }
-    assert end["attached_count"] == 2
-    assert end["attached_present"] == [True, True]
-    assert end["dangling"] is False
-    assert any(row["full_name"].startswith("HolePitch@") for row in rows)
-
-
-def test_receipt_diagnostic_failure_cannot_replace_native_refusal(monkeypatch) -> None:
-    def unavailable(*_args):
-        raise RuntimeError("diagnostic logger unavailable")
-
-    monkeypatch.setattr(draw, "_receipt_attachment_diagnostic", unavailable)
-
-    def configure(displays):
-        displays["Length"].annotation.IsDangling = lambda: True
-
-    with pytest.raises(RuntimeError, match="Length@Rail:.*no sound native attachment"):
-        _receipt_sheet(monkeypatch, configure=configure)
+    with pytest.raises(RuntimeError, match="no exact visible line"):
+        settled()

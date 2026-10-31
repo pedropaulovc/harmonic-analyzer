@@ -2,12 +2,12 @@
 
 The rail is bought cut to length with a special-order hole pattern, so its
 receipt check is dimensioned on the hole face: the cut length, the first
-hole from the -X end face and one pitch for all six gaps. Each is the rail
-part's own native model dimension, parenthesised as reference (the rail is
-used as supplied) and labelled in HIWIN's millimetres ("(440 mm)"): the HG
-series is a metric-only product line, and the registry row declares
-``drawing_unit: mm`` for the sheet. The note only says the pattern is a
-special order.
+hole from the -X end face and one pitch for all six gaps. The hole locations
+are imported model dimensions; the length measures the two actual rail end
+edges in FRONT (the imported extrusion depth exposes no native attachments).
+All three are associative native references, labelled in HIWIN's millimetres
+("(440 mm)"): the HG series is metric-only, and the registry declares
+``drawing_unit: mm``. The note only says the pattern is a special order.
 
 The shared purchased-part builder lays four views by itself and prints no
 dimension, so this sheet keeps its title block, captions and footer (as
@@ -19,7 +19,6 @@ grooves read, and the isometric at 1:4.
 from __future__ import annotations
 
 import argparse
-import json
 import math
 import sys
 from pathlib import Path
@@ -44,6 +43,8 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
+from _drawing_edges import scan_view_edges
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _drawing_sheet_region import sheet_drawable_region
@@ -290,114 +291,89 @@ def _receipt_presentation(name: str) -> dict[str, Any]:
     }
 
 
-def _receipt_attachment_diagnostic(front: Any, annotations: list[Any]) -> None:
-    """Log native evidence, not an alternative attachment acceptance path.
+_LENGTH_REFERENCE_NAME = "ReceiptLength"
 
-    An extrusion depth (Length@Rail) and origin-based sketch locations can
-    expose different attachment kinds. GetAttachedEntities3 documents NULL
-    for both unsupported entities (including origins) and lost geometry;
-    IsDangling and the complete types/count census must distinguish them on
-    the farm before changing geometry or the shared supplier contract.
-    Read all three references even when the first one failed.
-    """
 
-    def read(getter):
-        try:
-            return getter()
-        except Exception as exc:
-            return {"error_type": type(exc).__name__, "message": str(exc)}
-
-    context = {
-        "stage": "receipt_presentation_failure_after_curation",
-        "view_orientation": read(lambda: str(front.GetOrientationName())),
-        "referenced_model": read(lambda: str(front.GetReferencedModelName())),
-        "dimensions": [],
-    }
-    for raw_annotation in annotations:
-        row = {}
-        context["dimensions"].append(row)
-        try:
-            annotation = _early_bound(raw_annotation, "IAnnotation")
-            display = _early_bound(
-                annotation.GetSpecificAnnotation(), "IDisplayDimension"
-            )
-            annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
-            row["full_name"] = read(
-                lambda: str(
-                    _early_bound(display.GetDimension2(0), "IDimension").FullName
-                )
-            )
-            row["dimension_type"] = read(lambda: int(display.Type2))
-            row["system_value"] = read(
-                lambda: float(
-                    _early_bound(display.GetDimension2(0), "IDimension").SystemValue
-                )
-            )
-            row["dangling"] = read(lambda: bool(annotation.IsDangling()))
-            row["visible"] = read(lambda: int(annotation.Visible))
-            row["owner_type"] = read(lambda: int(annotation.OwnerType))
-            row["owner_present"] = read(lambda: annotation.Owner is not None)
-            row["attached_count"] = read(
-                lambda: int(annotation.GetAttachedEntityCount3())
-            )
-            row["attached_types"] = read(
-                lambda: [
-                    int(kind) for kind in (annotation.GetAttachedEntityTypes() or ())
-                ]
-            )
-            row["attached_present"] = read(
-                lambda: [
-                    entity is not None
-                    for entity in (annotation.GetAttachedEntities3() or ())
-                ]
-            )
-        except Exception as exc:
-            row["annotation_error"] = {
-                "error_type": type(exc).__name__,
-                "message": str(exc),
-            }
-    _telemetry.info(
-        "rail_receipt_attachment_failure "
-        + json.dumps(context, sort_keys=True, allow_nan=False)
+def _length_end_edges(front: Any) -> tuple[Any, Any]:
+    """The visible top edges of the two physical cut-end faces, not hit tests."""
+    edges = scan_view_edges(front, label="rail cut ends")
+    return tuple(
+        edges.exact_line_through(
+            (x, 0.0, HEIGHT), label=f"rail cut end x={x:g} mm"
+        ).edge
+        for x in (0.0, LENGTH)
     )
+
+
+def _assert_length_attachment(
+    adapter: Any, display: Any, edges: tuple[Any, Any]
+) -> None:
+    assert_dimension_measures(
+        adapter, display, expected_mm=LENGTH, label="rail cut length", entities=edges
+    )
+    native = _early_bound(display.GetDimension2(0), "IDimension")
+    if int(native.DrivenState) != 1:  # swDimensionDriven
+        raise RuntimeError("rail cut length must remain a driven reference")
 
 
 @_telemetry.traced("drawing.rail_receipt_dimensions")
 def _receipt_dimensions(adapter: Any, front: Any) -> list[Any]:
-    """Import the order's three model dimensions into FRONT, as reference.
-
-    The part owns each value's places (``assert_imported_precision`` reads
-    them before anything is dressed); the supplier presentation pins those
-    same places in HIWIN's millimetres, labelled, and proves the native value.
-    """
+    """Import the two hole references and measure length on physical end edges."""
+    positions = _receipt_positions(adapter, front)
+    hole_precision = {
+        name: places
+        for name, places in FRONT_DIMENSION_PRECISION.items()
+        if name != "Length"
+    }
     annotations = curate_view_dimensions(
         adapter,
         front,
-        keep=_receipt_positions(adapter, front),
+        keep={name: positions[name] for name in hole_precision},
         view_label="rail hole face",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
+        dimensions_by_feature={
+            "BoltHoleProfile": DRAWING_DIMENSIONS["BoltHoleProfile"]
+        },
     )
-    assert_imported_precision(adapter, annotations, FRONT_DIMENSION_PRECISION)
+    assert_imported_precision(adapter, annotations, hole_precision)
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
-        try:
-            display = supplier_reference_dimension(
-                adapter,
-                _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
-                **_receipt_presentation(name),
-            )
-        except RuntimeError:
-            # Diagnostics must neither repair native state nor replace the
-            # original strict refusal if a diagnostic getter/logger fails.
-            try:
-                _receipt_attachment_diagnostic(front, annotations)
-            except Exception:
-                pass
-            raise
+        display = supplier_reference_dimension(
+            adapter,
+            _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+            **_receipt_presentation(name),
+        )
         if name in ARROWS_INSIDE:
             display.ArrowSide = _DIM_ARROWS_INSIDE
             if int(display.ArrowSide) != _DIM_ARROWS_INSIDE:
                 raise RuntimeError(f"{name} did not keep its arrows inside")
+    edges = _length_end_edges(front)
+    ends = model_points_in_view(
+        adapter,
+        front,
+        [(x / 1000.0, 0.0, HEIGHT / 1000.0) for x in (0.0, LENGTH)],
+        label="rail cut ends",
+    )
+    display = _early_bound(
+        add_edge_dimension(
+            adapter,
+            front,
+            p0=ends[0][:2],
+            p1=ends[1][:2],
+            text_xy=positions["Length"],
+            label="rail cut length",
+            orientation="horizontal",
+            entities=edges,
+        ),
+        "IDisplayDimension",
+    )
+    native = _early_bound(display.GetDimension2(0), "IDimension")
+    native.Name = _LENGTH_REFERENCE_NAME
+    native.DrivenState = 1  # swDimensionDriven; never assign its measured value
+    if str(native.Name) != _LENGTH_REFERENCE_NAME:
+        raise RuntimeError("rail cut length did not retain its reference identity")
+    _assert_length_attachment(adapter, display, edges)
+    supplier_reference_dimension(adapter, display, **_receipt_presentation("Length"))
+    annotations.append(_early_bound(display.GetAnnotation(), "IAnnotation"))
     return annotations
 
 
@@ -416,6 +392,7 @@ def _assert_receipt_dimensions(adapter: Any, source: Path) -> None:
     if Path(front.GetReferencedModelName()).resolve() != source.resolve():
         raise RuntimeError("settled rail FRONT references the wrong model")
     found = set()
+    length_edges = _length_end_edges(front)
     for raw_annotation in front.GetAnnotations() or ():
         annotation = _early_bound(raw_annotation, "IAnnotation")
         if int(annotation.GetType()) != 4:  # swDisplayDimension
@@ -427,8 +404,13 @@ def _assert_receipt_dimensions(adapter: Any, source: Path) -> None:
         name, _, rest = str(
             _early_bound(raw_dimension, "IDimension").FullName
         ).partition("@")
-        if RECEIPT_FEATURES.get(name) != rest.partition("@")[0] or name in found:
+        if name == _LENGTH_REFERENCE_NAME:
+            name = "Length"
+            _assert_length_attachment(adapter, display, length_edges)
+        elif name == "Length" or RECEIPT_FEATURES.get(name) != rest.partition("@")[0]:
             raise RuntimeError(f"unexpected settled rail dimension {name}@{rest}")
+        if name in found:
+            raise RuntimeError(f"duplicate settled rail dimension {name}@{rest}")
         assert_supplier_reference_dimension(
             adapter, display, **_receipt_presentation(name)
         )

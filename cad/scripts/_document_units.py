@@ -61,8 +61,8 @@ _INCH_MODEL_UNITS: dict[str, int] = {
 
 # Readback names, in write order.  The native cam canary read Custom after
 # explicit component writes despite the earlier IPS selection.  Selecting IPS
-# last is a candidate fix, pending native proof; read every field afterward
-# because the selector must also preserve the equation-safe eight places.
+# last preserved IPS and eight places on the native canary. Read every field
+# afterward because the selector must preserve the equation-safe eight places.
 _PREFERENCES: tuple[tuple[str, int], ...] = (
     ("linear", _PREF_UNITS_LINEAR),
     ("linear_display", _PREF_UNITS_LINEAR_DECIMAL_DISPLAY),
