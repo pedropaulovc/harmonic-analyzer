@@ -868,7 +868,22 @@ def test_sdk_api_retry_succeeds_without_rotation(
 def test_sdk_partial_raw_usage_preserves_failure_evidence_and_accounting(
     tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch, termination: str,
 ) -> None:
+    import time
+
     import claude_agent_sdk as sdk
+
+    # Credential/private-home setup shares the attempt budget. Freeze monotonic
+    # time (also used by the asyncio loop) so host filesystem/ACL latency cannot
+    # expire this test before its controlled partial provider response.
+    clock = [100.0]
+    # A separate real-time watchdog fails closed if a future startup/cleanup
+    # change adds a positive-duration wait against the frozen loop clock.
+    watchdog_deadline = time.perf_counter() + 30
+    def monotonic():
+        if time.perf_counter() >= watchdog_deadline:
+            pytest.fail("partial SDK fixture stalled with its virtual clock frozen")
+        return clock[0]
+    monkeypatch.setattr(sdk_transport.transport.time, "monotonic", monotonic)
 
     converted = []
     original_asdict = sdk_transport.transport.asdict
@@ -894,8 +909,17 @@ def test_sdk_partial_raw_usage_preserves_failure_evidence_and_accounting(
         native_text = (Path(self.options.cwd) / "native-events.jsonl").read_text()
         assert "service_tier" in native_text and "secret-canary" not in native_text
         assert converted == ["AssistantMessage"]
+        assert responses == ["response"]
         if termination == "timeout":
-            await asyncio.sleep(10)
+            # Expire the actual outer attempt timer only after the consumer has
+            # persisted and accounted for the partial message. Two loop turns
+            # deliver its real cancellation without a wall-clock sleep.
+            deadline = sdk_transport.transport._ATTEMPT_DEADLINE.get()
+            assert deadline is not None
+            clock[0] = deadline
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            pytest.fail("the attempt deadline must cancel the partial SDK stream")
         elif termination == "crash":
             raise RuntimeError("original SDK crash")
 
