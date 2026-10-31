@@ -962,6 +962,7 @@ async def build_supplier_spring_drawing(
     cut_to_suit: bool = False,
     spring_metadata: bool = False,
     settled_checks: Sequence[Callable[[], None]] = (),
+    unit: str = "mm",
 ) -> dict[str, str]:
     source = spec.source
     if spec.source_kind != "part" or not source.is_file():
@@ -1073,7 +1074,7 @@ async def build_supplier_spring_drawing(
             "supplier reference owners must exactly name every source-diagram view"
         )
     fit_cells = supplier_fit_cells(cells, supplier_margins, label=spec.artifact_stem)
-    draw, sheet = new_project_drawing(adapter, layout=spec.layout)
+    draw, sheet = new_project_drawing(adapter, layout=spec.layout, unit=unit)
     title_notes = _purchased_title_block(
         adapter,
         draw,
