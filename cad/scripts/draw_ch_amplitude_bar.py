@@ -48,6 +48,7 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
+from _drawing_curve_quality import set_precise_curve_quality
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_projection import model_point_in_view
@@ -755,6 +756,9 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
+    # The pin hole is small enough that the default curve resolution drew it
+    # as a polygon in every view (machinist review of main 31cea0b73).
+    set_precise_curve_quality(adapter, label="amplitude-bar")
 
     # The front view goes on first: the first view is the title block's
     # property view.

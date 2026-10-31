@@ -30,7 +30,7 @@ from dt_crank_hub_geometry import (
     FIDUCIAL_MODEL_DEPTH,  # noqa: F401 -- re-exported to the drawing contract
     FIDUCIAL_MODEL_DIA,  # noqa: F401 -- re-exported to the drawing contract
     HUB_LENGTH,
-    HUB_LENGTH_TOL,
+    HUB_LENGTH_BAND,
     SERVICE_PIN_STATION,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
@@ -426,7 +426,7 @@ if not 0.0 < DRIVE_PIN_PROUD_RANGE[0] < DRIVE_PIN_PROUD_RANGE[1]:
 # first thing in front of it is the crank hub's rear face (the end face of
 # its Ø16.5 relief, which covers the pin circle), the drive train's gap B
 # away.  The hub is set flush with the dome root, so its rear face sits at
-# local HUB_LENGTH +/-HUB_LENGTH_TOL.  The longest pin stands past the
+# local HUB_LENGTH + HUB_LENGTH_BAND.  The longest pin stands past the
 # THINNEST wheel's front face (2.754 > 2.7) into that gap, which is harmless;
 # what must hold is the tip's air to the hub (seat forward, hub long) and,
 # with the thinnest wheel floated forward onto the hub (seat aft, hub short),
@@ -437,7 +437,7 @@ def drive_pin_front_clearances(
     seat_face: float,
     seat_face_band: tuple[float, float],
     hub_rear: float,
-    hub_rear_tol: float,
+    hub_rear_band: tuple[float, float],
     plate_min: float,
 ) -> tuple[float, float]:
     """Worst-case ``(tip air to the hub rear face, floated engagement)`` of the
@@ -445,8 +445,8 @@ def drive_pin_front_clearances(
     closes."""
     seat_fwd = seat_face + min(seat_face_band)
     seat_aft = seat_face + max(seat_face_band)
-    hub_air = seat_fwd - max(proud_range) - (hub_rear + hub_rear_tol)
-    wheel_float = seat_aft - plate_min - (hub_rear - hub_rear_tol)
+    hub_air = seat_fwd - max(proud_range) - (hub_rear + max(hub_rear_band))
+    wheel_float = seat_aft - plate_min - (hub_rear + min(hub_rear_band))
     engagement = min(proud_range) - wheel_float
     if hub_air <= 0.0:
         raise AssertionError(
@@ -464,9 +464,9 @@ DRIVE_PIN_HUB_AIR_WORST, DRIVE_PIN_ENGAGEMENT_WORST = drive_pin_front_clearances
     seat_face=SEAT_COLLAR,
     seat_face_band=SEAT_COLLAR_BAND,
     hub_rear=HUB_LENGTH,
-    hub_rear_tol=HUB_LENGTH_TOL,
+    hub_rear_band=HUB_LENGTH_BAND,
     plate_min=seat_geometry.PLATE + min(seat_geometry.PLATE_BAND),
-)  # 0.146, 1.046
+)  # 0.146, 0.636
 # The bare land behind the collar keeps the bore mouth's edge break at both
 # print limits (JOURNAL_START above).
 if (

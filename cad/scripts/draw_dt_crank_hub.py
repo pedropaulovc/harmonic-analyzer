@@ -38,6 +38,7 @@ from dt_crank_hub_notes import (
     BORE_CALLOUT,
     CROSS_HOLE_CALLOUT,
     HUB_LENGTH_CALLOUT,
+    PIN_PROUD_CALLOUT,
     RELIEF_LENGTH_CALLOUT,
     SEAM_CALLOUT,
     SEAT_CALLOUT,
@@ -125,8 +126,15 @@ BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0
 #   from the hole's top rim, clear of the barrel diameter's extension lines.
 # - Bore callout: right of the end view, its leader entering the bore from the
 #   right, clear of the six-o'clock seam; the seam callout below the end view.
+# - MHA-DT-09 big end's MIN proud: the pin's big end (model -X) is paper-right
+#   on the end view (*Bottom turned half a turn), on the horizontal
+#   centreline.  Its value and callout print right of the big end's extension
+#   line, above the bore callout and below the isometric's label.
 _ROW_Y = (0.120, 0.108)
-END_KEEP = {"BoreDia": (END_CENTER[0] + 0.070, END_CENTER[1] - 0.020)}
+END_KEEP = {
+    "BoreDia": (END_CENTER[0] + 0.070, END_CENTER[1] - 0.020),
+    "PinProud": (END_CENTER[0] + 0.065, END_CENTER[1] + 0.014),
+}
 # The hub's half of the seam is the arc bulging from the seat edge toward the
 # bore; the callout attaches 45 degrees up its right flank.
 SEAM_CENTER = (END_CENTER[0], END_CENTER[1] - AXIAL_PIN_RADIUS_FROM_AXIS * _S)
@@ -151,12 +159,13 @@ SIDE_KEEP = {
     "SeatDia": (OUTBOARD_X + 0.020, 0.225),
 }
 HOLE_CALLOUT_XY = (0.150, 0.222)
-ISO_NOTE_XY = (0.345, 0.180)
+ISO_NOTE_XY = (0.345, 0.190)
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "SeatDia": SEAT_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
     "ReliefLength": RELIEF_LENGTH_CALLOUT,
+    "PinProud": PIN_PROUD_CALLOUT,
 }
 
 

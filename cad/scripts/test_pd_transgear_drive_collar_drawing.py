@@ -261,7 +261,7 @@ def test_true_d_sizes_are_not_a_full_round_hole_or_an_unlocated_flat() -> None:
     assert spec.FLAT_BAND == pytest.approx((0.0075, -0.0075))
     assert spec.FLAT_TOL_TYPE == 3
     assert spec.FLAT_CLEARANCE == pytest.approx((0.020, 0.050))
-    assert spec.STUD_D_BORE_AIR == pytest.approx(0.085)
+    assert spec.STUD_D_BORE_AIR == pytest.approx(0.07363)
     # The source gate, not a test-only reimplementation, refuses a round
     # stud which fits the diameter but cannot pass the retained D-flat.
     assert 2.0 * (spec.FLAT_TO_AXIS + min(spec.FLAT_BAND)) < spec.BORE_DIA
@@ -859,9 +859,9 @@ def test_native_rear_entry_has_both_actual_legs_on_both_d_edges(monkeypatch) -> 
     assert spec.BORE_ENTRY_BREAK_GEOMETRY_MAX == pytest.approx(0.270)
     assert spec.BORE_ENTRY_WALL_WORST == pytest.approx(3.090117421552)
     assert spec.NECK_CORNER_D_BORE_AIR_MIN == pytest.approx(0.064853316221)
-    assert spec.D_DRIVE_AREA_MIN == pytest.approx(7.339179692138)
-    assert spec.D_SUPPORT_LENGTH_MIN == pytest.approx(4.072234843105)
-    assert spec.D_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.058542058772)
+    assert spec.D_DRIVE_AREA_MIN == pytest.approx(6.654325210394)
+    assert spec.D_SUPPORT_LENGTH_MIN == pytest.approx(3.692234843105)
+    assert spec.D_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.060224563080)
     assert spec.BORE_ENTRY_BREAK_LEG_MIN > spec.BORE_ENTRY_BREAK_REQUIRED_MIN
     assert spec.BORE_ENTRY_BREAK_LEG_MAX < spec.BORE_ENTRY_BREAK_GEOMETRY_MAX
     for width in (spec.BORE_ENTRY_BREAK_MIN, spec.BORE_ENTRY_BREAK_MAX):

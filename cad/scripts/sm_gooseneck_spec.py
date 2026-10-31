@@ -176,11 +176,14 @@ TAP_CALLOUT_BELOW = (
 # and arm straight (bend tangent to the end face) on the tube's axes;
 # BendPath the bend's centreline radius; SleeveProfile the sleeve length from
 # the leg's foot (its top station) and its stock Ø, which carries the
-# select-fit window.  EndPieceProfile and CounterboreProfile
+# select-fit window; TubeOdReference a hidden construction sketch on the
+# Front plane carrying the tube's stock Ø across the bare leg above the
+# sleeve.  EndPieceProfile and CounterboreProfile
 # lie on the arm-axis plane, so section A-A (cut along the arm axis) carries
 # them. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StationReference": {"LegLength", "ArmStraight"},
+    "TubeOdReference": {"TubeOdRef"},
     "BendPath": {"BendRadius"},
     "SleeveProfile": {"SleeveLength", "SleeveDia"},
     "EndPieceProfile": {"PlugDia", "PlugHeadLength", "PlugShankDia", "PlugShankLength"},
@@ -190,6 +193,20 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "CounterboreFloorCornerR",
     },
 }
+# The tube and sleeve are as supplied: their stock Ø print as reference,
+# untoleranced, and the supplier's catalogue tolerance governs (drawing-
+# guidelines.md units; machinist review of main 31cea0b73, owner ruling
+# 2026-10-31).  Their walls are hidden on the elevation and cut by no
+# section, so they stay as the stock designations in note 1 (rule 9).
+# sm_gooseneck_geom proves the sleeve's select fit on the supplier's bands.
+REFERENCE_DIMENSIONS: dict[str, frozenset[str]] = {
+    "TubeOdReference": frozenset({"TubeOdRef"}),
+    "SleeveProfile": frozenset({"SleeveDia"}),
+}
+# Where TubeOdReference's line runs on the bare leg: TUBE_OD_REF_SPAN long,
+# centred mid-way between the sleeve's top and the bend's entry tangent.
+TUBE_OD_REF_Y = round((geom.SLEEVE_TOP + geom.LEG_TOP) / 2.0, 1)
+TUBE_OD_REF_SPAN = 20.0
 # The bent form's overall sizes are near enough at one place (the title
 # block's .X band, drawing-guidelines.md rule 3); the arm straight sets the
 # spring eye's station and every end-piece size is turned, so they print at
@@ -210,7 +227,8 @@ if (set(DIMENSION_CALLOUTS_BY_NAME) | set(DIMENSION_CALLOUTS_ABOVE_BY_NAME)) - s
     raise AssertionError("a gooseneck callout names an unmarked dimension")
 
 # Four lines (drawing-guidelines.md rule 7; codjiflo on #1997): the stock,
-# both members as stock and the sleeve's braze with its extent (its
+# both members as supplied, the supplier's tolerance governing them, and the
+# sleeve's braze with its extent (its
 # select-fit window rides the sleeve's Ø), the end piece's joint, then the
 # order the owner ruled (2026-10-27, #1997: join the end piece before
 # bending, cooled or fully cured; recorded as RV-02 in sm-gooseneck.yaml)
@@ -224,7 +242,7 @@ DRAWING_NOTES = "\n".join(
     (
         f"1. TUBE {TUBE_STOCK_SIZE}, {STOCK_SUPPLIER} {TUBE_STOCK_SKU}; "
         f"SLEEVE {SLEEVE_STOCK_SIZE}, {SLEEVE_STOCK_SKU}",
-        "2. TUBE AND SLEEVE AS STOCK; SLEEVE TO TUBE: CONTINUOUS BRAZE FILLET EACH END.",
+        "2. AS SUPPLIED, SUPPLIER TOLERANCE; SLEEVE: CONTINUOUS BRAZE FILLET EACH END.",
         "3. BRAZE BAg-7 (AWS A5.8); END PIECE: FULL-PENETRATION BRAZE OR LOCTITE 638.",
         "4. JOIN END PIECE, COOL OR FULLY CURE, THEN BEND: OVALITY 5% MAX, NO KINKS.",
     )
