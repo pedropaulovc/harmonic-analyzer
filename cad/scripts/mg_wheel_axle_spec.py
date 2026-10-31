@@ -169,11 +169,11 @@ SINGLE_LIMITS: dict[tuple[str, str], tuple[float, int]] = {
 LIMIT_PAIRS: dict[tuple[str, str], tuple[float, float]] = {
     ("PinProfile", "ReliefWidth"): (RELIEF_WIDTH_MIN, RELIEF_WIDTH),
 }
-# Inch places. The stock Ø prints as its fraction (no decimals); the overall
-# reference and the dome R .XX.
+# Inch places; the overall reference and the dome R .XX. The sheet dresses the
+# stock Ø as its exact fraction (draw_mg_wheel_axle._pin_stock_reference).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinProfile": {
-        "PinDia": 0,
+        "PinDia": 2,
         "ShankLength": SHANK_LEN_PLACES,
         "ThreadLength": THREAD_LEN_PLACES,
         "PinLength": 2,

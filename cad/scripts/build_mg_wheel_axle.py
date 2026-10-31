@@ -62,8 +62,7 @@ from _drawing_precision import (
     _named_dimensions,
     apply_drawing_precision,
 )
-from _drawing_tolerances import set_dimension_bilateral_tolerance
-from _fit_deviations import deviations
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _part_pmi import author_part_pmi
 import _telemetry
 import mg_wheel_axle_callouts as callouts
@@ -74,7 +73,6 @@ from mg_wheel_axle_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     PIN_DIA,
-    PIN_DIA_FRACTION_DENOMINATOR,
     PIN_LEN,
     PRESS_GAUGE,
     SHANK_LEN,
@@ -175,32 +173,6 @@ def _limit_pairs(adapter) -> None:
         _telemetry.success(
             f"{label}: LIMIT {high / 25.4:.{places}f}/{low / 25.4:.{places}f} in"
         )
-
-
-INCH_UNITS = 3  # swLengthUnit_e.swINCHES
-FRACTION_BASE = 2  # swFractionDisplay_e.swFRACTION
-
-
-@_telemetry.traced("wheel_axle.stock_reference")
-def _stock_reference(adapter) -> None:
-    """The shank's Ø is the 3/16 drill rod's as supplied: untoleranced, in its
-    exact native inch fraction (mg_wheel_axle_callouts brackets it as a
-    reference), read back."""
-    display, dimension = _named_dimension(adapter, "PinProfile", "PinDia")
-    display = _early_bound(display, "IDisplayDimension")
-    denominator = PIN_DIA_FRACTION_DENOMINATOR
-    if display.SetUnits2(False, INCH_UNITS, FRACTION_BASE, denominator, False, 0) != 0:
-        raise RuntimeError("PinDia@PinProfile: inch fraction units were rejected")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    if (
-        display.GetUseDocUnits()
-        or int(display.GetUnits()) != INCH_UNITS
-        or int(display.GetFractionBase()) != FRACTION_BASE
-        or int(display.GetFractionValue()) != denominator
-        or display.GetRoundToFraction()
-        or int(tolerance.Type) != 0  # swTolType_e.swTolNONE
-    ):
-        raise RuntimeError("PinDia@PinProfile: stock reference did not persist")
 
 
 @_telemetry.traced("wheel_axle.author_callouts")
@@ -419,11 +391,12 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    set_dimension_bilateral_tolerance(
+    # Equal deviations print as one symmetric +/- band.
+    set_dimension_symmetric_tolerance(
         adapter,
         "PinProfile",
         "ThreadLength",
-        *deviations(THREAD_LEN_BAND),
+        THREAD_LEN_BAND[0],
         places=DRAWING_PRECISION["PinProfile"]["ThreadLength"],
         display_unit=UNIT,
     )
@@ -433,7 +406,6 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    _stock_reference(adapter)
     author_dimension_callouts(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME)
