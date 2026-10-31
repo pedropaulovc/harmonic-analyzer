@@ -19,6 +19,7 @@ from solidworks_mcp.adapters.solidworks.drawing import view_name
 from _com import _early_bound
 from _drawing_common import rebuild_drawing
 from _drawing_selection import _activate_and_select_view, _select_edge
+from _title_block_units import LENGTH_UNITS
 import _telemetry
 
 # Global row index, native file/member occurrence counts, released Number, QTY.
@@ -164,6 +165,7 @@ def insert_hole_table(
     basic_locations: bool = True,
     label: str,
     starting_hole_tag: str = "A",
+    unit: str = "mm",
 ) -> Any:
     """Insert the model-associated TAG/X LOC/Y LOC/SIZE hole table on ``view``.
 
@@ -178,6 +180,7 @@ def insert_hole_table(
     view-owned theoretical-corner point.  ``starting_hole_tag`` lets multiple
     tables on one sheet use distinct tag families.  The table lands with its
     top-left corner at ``anchor_xy`` and is validated before returning.
+    ``unit`` is the sheet's length unit, in which the LOC cells print.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(
@@ -320,7 +323,9 @@ def insert_hole_table(
     if tuple(value.upper() for value in header) != expected:
         raise RuntimeError(f"native hole-table header is unexpected: {header!r}")
     if expected_locations_mm is not None:
-        _check_hole_table_locations(contents, expected_locations_mm, label=label)
+        _check_hole_table_locations(
+            contents, expected_locations_mm, label=label, unit=unit
+        )
     _telemetry.success(f"native hole table inserted: {rows - 1} holes, header={header}")
     return table
 
@@ -330,6 +335,7 @@ def _check_hole_table_locations(
     expected_mm: Sequence[tuple[float, float]],
     *,
     label: str,
+    unit: str = "mm",
     tol_mm: float = 0.02,
 ) -> None:
     """Match every printed X/Y LOC cell against an expected station, one-to-one.
@@ -340,17 +346,19 @@ def _check_hole_table_locations(
     endpoint picked instead of the theoretical corner) would shift every
     coordinate SILENTLY. Expected stations are matched as a SET (table rows
     are tag-ordered, not selection-ordered) within ``tol_mm`` (cells print
-    at 2 decimals, so the honest floor is 0.005 rounding).
+    at 2 decimals, so the honest floor is 0.005 rounding; an inch sheet's
+    3-decimal cells, converted from ``unit``, round by at most 0.0127).
     """
     if len(expected_mm) != len(contents) - 1:
         raise RuntimeError(
             f"{label} hole table: {len(expected_mm)} expected locations for "
             f"{len(contents) - 1} rows"
         )
+    scale = LENGTH_UNITS[unit]
     printed: list[tuple[float, float, str]] = []
     for row in contents[1:]:
         try:
-            printed.append((float(row[1]), float(row[2]), row[0]))
+            printed.append((float(row[1]) * scale, float(row[2]) * scale, row[0]))
         except ValueError as error:
             raise RuntimeError(
                 f"{label} hole table: unparseable LOC cells in row {row!r}"
