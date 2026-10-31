@@ -65,8 +65,8 @@ def test_the_rod_arm_and_cam_share_one_plane() -> None:
 
 
 def test_the_pin_is_pressed_in_the_fork_and_runs_in_the_arm() -> None:
-    """The bar pin's joint: the same drill rod pressed into the same Ø1.968
-    +0.010/0 ream, running in a drilled #47 in the moving member."""
+    """The bar pin's joint: the same drill rod pressed into the same Ø1.9558
+    +0.02286/+0.0127 ream, running in a drilled #47 in the moving member."""
     assert pin.PIN_DIA == bar_pin.PIN_DIA
     assert pin.PIN_DIA_TOLERANCE == bar_pin.PIN_DIA_TOLERANCE
     assert pin.ROD_HOLE_DIA == rod.PIN_HOLE_DIA == bar.TOP_PIN_HOLE_DIA
@@ -83,14 +83,14 @@ def test_the_pin_is_pressed_in_the_fork_and_runs_in_the_arm() -> None:
 
 def test_worst_case_joint_budget() -> None:
     b = pin.BUDGET
-    # The press, at the pin's +/-0.005 against the ream's +0.010/0.
-    assert b["interference_min"] == pytest.approx(0.001375, abs=1e-6)
-    assert b["interference_max"] == pytest.approx(0.021375, abs=1e-6)
+    # The press, at the pin's +/-0.00508 against the ream's +0.02286/+0.0127.
+    assert b["interference_min"] == pytest.approx(0.000635, abs=1e-6)
+    assert b["interference_max"] == pytest.approx(0.020955, abs=1e-6)
     assert 0.0 < b["interference_min"] <= b["interference_max"]
     assert b["interference_max"] <= pin.PRESS_INTERFERENCE_MAX
     # The run, in the arm's #47 (1.994 +0.10/0).
-    assert b["running_clearance_min"] == pytest.approx(0.004625, abs=1e-6)
-    assert b["running_clearance_max"] == pytest.approx(0.114625, abs=1e-6)
+    assert b["running_clearance_min"] == pytest.approx(0.004545, abs=1e-6)
+    assert b["running_clearance_max"] == pytest.approx(0.114705, abs=1e-6)
     assert b["side_clearance_min"] == pytest.approx(0.100, abs=1e-6)
     assert b["side_clearance_max"] == pytest.approx(0.250, abs=1e-6)
     assert b["neighbour_clearance_min"] == pytest.approx(0.4815, abs=1e-6)
@@ -103,7 +103,7 @@ def test_worst_case_joint_budget() -> None:
     # Main's raised-drive-axis closure changes ch_rod_pivot_pin_spec's swing
     # to (-8.67, 1.07): -0.0068964928 mm. This PR changes no legacy radius
     # budget input (delta 0); the independent profile-zone proof is below.
-    assert b["crotch_clearance_min"] == pytest.approx(1.2028594525413179, abs=1e-9)
+    assert b["crotch_clearance_min"] == pytest.approx(1.2028194525413178, abs=1e-9)
     assert b["crotch_clearance_min"] >= pin.CROTCH_CLEARANCE_MIN
     assert b["bridge_min"] == pytest.approx(2.234, abs=1e-6)
     assert b["bridge_min"] >= pin.BRIDGE_TARGET

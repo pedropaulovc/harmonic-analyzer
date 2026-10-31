@@ -39,7 +39,7 @@ def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> Non
     assert spec.HEAD_BASE_Y == pytest.approx(spec.BLOCK_HEIGHT - spec.HEAD_HEIGHT)
     assert (spec.CRANK_BOSS_DIA, spec.CRANK_BORE_DIA, spec.CRANK_BORE_OFFSET) == (
         21.93,
-        11.438,
+        11.43,
         0.0,
     )
     assert spec.CRANK_BORE_HEIGHT == _config.machine(
@@ -66,7 +66,7 @@ def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> Non
     from _cone_axis_constants import CONE_AXIS_HEIGHT_MM
     from dt_post_mount_stack import POST_BODY_HEIGHT_MM
 
-    assert (spec.CONE_BOSS_DIA, spec.BORE_DIA) == (17.2, 12.2808)
+    assert (spec.CONE_BOSS_DIA, spec.BORE_DIA) == (17.2, 12.2682)
     assert spec.BORE_HEIGHT == CONE_AXIS_HEIGHT_MM
     assert spec.BLOCK_HEIGHT == POST_BODY_HEIGHT_MM
     assert spec.INCLINE_DEG == _config.machine("cone_incline", "derived_incline_deg")
@@ -478,22 +478,23 @@ def test_part_owns_every_printed_decimal_place() -> None:
 
 
 def test_running_bores_close_the_configured_fit_class() -> None:
-    """User ruling 2026-09-28: MHA-DT-11 runs directly in the restored Ø11.438
-    crank bore, so both bores carry the one running band."""
+    """User ruling 2026-09-28: MHA-DT-11 runs directly in the Ø11.43 crank
+    bore; each bore's band closes the one running fit on its own shaft."""
     import _config
     import dt_cone_gear_shaft_spec
     import dt_crankshaft_spec
 
-    upper, lower = spec.RUNNING_BORE_BAND
     expected = tuple(_config.fit("shaft_in_bushing", "diametral_clearance_mm"))
-    for bore, shaft_nominal, shaft_band in (
+    for bore, (upper, lower), shaft_nominal, shaft_band in (
         (
             spec.CRANK_BORE_DIA,
+            spec.RUNNING_BORE_BAND,
             dt_crankshaft_spec.JOURNAL_DIA,
             dt_crankshaft_spec.JOURNAL_DIA_BAND,
         ),
         (
             spec.BORE_DIA,
+            spec.JOURNAL_BORE_BAND,
             dt_cone_gear_shaft_spec.JOURNAL_DIA,
             dt_cone_gear_shaft_spec.SECTION_DIA_BANDS[0],
         ),
@@ -501,7 +502,7 @@ def test_running_bores_close_the_configured_fit_class() -> None:
         shaft_max = shaft_nominal + shaft_band[0]
         shaft_min = shaft_nominal + shaft_band[1]
         clearances = (bore + lower - shaft_max, bore + upper - shaft_min)
-        assert tuple(round(value, 3) for value in clearances) == expected
+        assert tuple(round(value, 5) for value in clearances) == expected
 
 
 def test_nothing_else_on_the_casting_carries_a_band() -> None:
@@ -516,7 +517,8 @@ def test_nothing_else_on_the_casting_carries_a_band() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert source.count("set_dimension_bilateral_tolerance(") == 3
     assert source.count("set_dimension_symmetric_tolerance(") == 2
-    assert source.count("deviations(RUNNING_BORE_BAND)") == 2
+    assert source.count("deviations(RUNNING_BORE_BAND)") == 1
+    assert source.count("deviations(JOURNAL_BORE_BAND)") == 1
     assert source.count("deviations(CRANK_ABOVE_CONE_BAND)") == 1
     assert not hasattr(spec, "TURNED_DIAMETER_TOLERANCE_MM")
     assert not hasattr(spec, "CRANK_BORE_TOLERANCE_MM")
@@ -795,7 +797,7 @@ def test_journal_rims_print_the_thrust_ring_break() -> None:
     )
     assert ring - break_max - general < shaft.THRUST_RING_FLOOR
     # the ring's bore edge is the post's running bore at its band's top
-    assert shaft.POST_JOURNAL_BORE_BAND == spec.RUNNING_BORE_BAND
+    assert shaft.POST_JOURNAL_BORE_BAND == spec.JOURNAL_BORE_BAND
 
 
 def test_collar_thrust_face_adds_no_setup_note() -> None:
