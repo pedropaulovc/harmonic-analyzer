@@ -84,12 +84,13 @@ DIMENSION_CALLOUTS = {
 # The three-row callout is wider than the room between the .56 witnesses, so
 # it sits below the cover face, left of the hole-station texts.
 CLEARANCE_CALLOUT_XY = (0.075, 0.100)
-# Function, not procedure: what the hole clears and the mate whose taps it
-# lines up with (rule 7 flags the pair at its match-drill callouts).
+# Function and acceptance, not procedure (the sequence is the assembly
+# sheet's step 1): the pair, its alignment, and what the holes must pass
+# (rule 7 flags the pair at its match-drill callouts).
 CLEARANCE_FUNCTION = (
-    f"CLEARS {part.PLATE_SCREW_THREAD.lstrip('#')} SCREWS INTO\n"
-    f"MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']} TAPS\n"
-    f"{part.MATCHED_PAIR_NOTE}"
+    f"{part.MATCHED_PAIR_NOTE}\n"
+    f"{part.MATCH_DRILL_DATUM_ALIGNMENT}, {part.PLATE_SCREW_THREAD.lstrip('#')} SCREWS\n"
+    f"ENTER MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']} TAPS FREELY"
 )
 CLEARANCE_PRECISION = {"hw-diam": part.HOLE_CALLOUT_PRECISION}
 # Leadered labels name the X=0 end and Y=0 edge the match-drill clamp aligns.

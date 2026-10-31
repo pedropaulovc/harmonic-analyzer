@@ -153,13 +153,14 @@ def test_hole_wizard_callouts_print_three_places_by_native_variable() -> None:
     for size_mm, printed in ((spec.PLATE_TAP_DRILL_DIA, ".073"), (spec.THUMB_TAP_DRILL, ".089"),
                              (spec.PLATE_CLEARANCE_DIA, ".094")):
         assert f"{size_mm / 25.4:.3f}".lstrip("0") == printed
-    # The plate callout states what the hole clears and its mate under the
-    # native size; the pilot-and-open procedure lives in the assembly
-    # sheet's step 1. Three text rows keep the callout within four.
+    # The plate callout states the pair, its alignment and the acceptance
+    # under the native size; the pilot-and-open procedure lives in the
+    # assembly sheet's step 1. Three text rows keep the callout within four.
     rows = plate_drawing.CLEARANCE_FUNCTION.splitlines()
-    assert rows[0] == "CLEARS 2-56 SCREWS INTO"
-    assert rows[1:] == [
-        f"MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']} TAPS", spec.MATCHED_PAIR_NOTE,
+    assert rows == [
+        spec.MATCHED_PAIR_NOTE,
+        "LOCATING ENDS AND EDGES FLUSH, 2-56 SCREWS",
+        f"ENTER MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']} TAPS FREELY",
     ]
 
 
