@@ -10,10 +10,10 @@ at CUT_LENGTH_MM, with no band and the cut-to-fit acceptance beneath it:
 cut at assembly, end flush to the spec band's allowance short of the MHA-DT-20
 underside, never proud (dt_vn_post_mount_screw_spec.CUT_TO_FIT_CALLOUT).
 The cut end's break
-is a deburr (Main's MHA-DT-VN-61 eye pass on #857): a 0.1 dimension at 1:1 is
-illegible and its printed +0/-0.1 band read as allowing no break at all, so
+is a deburr (Main's MHA-DT-VN-61 eye pass on #857): so small a dimension at 1:1
+is illegible and a printed +0/-.003 band reads as allowing no break at all, so
 the Front view carries no break dimension.  A 10:1 view of the tip carries
-it instead as the single limit "0.1 MAX" (the model's CutEndBreak at
+it instead as the single limit ".003 MAX" (the model's CutEndBreak at
 swTolMAX, generated from the spec band).  CutEndBreak is a driving
 dimension of the deburr cutter's profile.  The tip view is NOT a detail
 view: no detail child of the Front ever offered CutEndBreak to an import
@@ -92,6 +92,7 @@ from _drawing_detail_crop import native_circle_geometry, _transform_point
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
+from _part_properties import part_drawing_unit
 from _drawing_view_display import set_hidden_lines_removed
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_sheet_region import sheet_drawable_region
@@ -126,6 +127,7 @@ from dt_vn_post_mount_screw_spec import (
     CUT_END_BREAK_SKETCH,
     CUT_END_BREAK_MAX_MM,
     CUT_END_BREAK_TEXT,
+    inch_text,
     CUT_END_BREAK_TOL_TYPE,
     CUT_LENGTH_DIMENSION,
     CUT_LENGTH_MM,
@@ -1629,11 +1631,11 @@ def break_text(value_mm: float, places: int, tol_type: int, prefix: str, suffix:
     """The break dimension's printed text, composed from its read-back parts.
 
     The API exposes no rendered string for a toleranced value, so the seat
-    check composes it: value at its places, the MAX limit when the type is
+    check composes it: value in inches at its places, the MAX limit when the type is
     swTolMAX, and whatever prefix and suffix the display carries.
     """
     limit = " MAX" if tol_type == CUT_END_BREAK_TOL_TYPE else ""
-    return f"{prefix}{value_mm:.{places}f}{limit}{suffix}"
+    return f"{prefix}{inch_text(value_mm, places)}{limit}{suffix}"
 
 
 def _verify_tip_view(adapter: Any, front: Any, tip: Any) -> None:
@@ -1833,7 +1835,11 @@ async def _build_read_only_source(adapter, source_model, source_sha256):
     )
     read_required_properties(adapter.currentModel, required, required=required)
     draw, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="post mount screw source package")
     drawing_doc = _early_bound(draw, "IDrawingDoc")

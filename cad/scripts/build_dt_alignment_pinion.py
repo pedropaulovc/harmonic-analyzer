@@ -15,7 +15,7 @@ the arbor rides the swing brackets' top bores and carries its integral turned
 grip head plus the separate MHA-DT-15 crossrod. The knurled end collars are simplified
 away.
 
-Layout: axis Z, drum z 0..143.2, Ø5/16 through-bore on the axis.
+Layout: axis Z, drum z 0..5.64 in, Ø5/16 through-bore on the axis.
 The ch30/M6.8 model carries it in the DISENGAGED rest state (p. 68
 "gap"). The native gap's half-pitch rotation keeps +X at a tooth crest.
 
@@ -42,9 +42,11 @@ from _appearance import apply_material
 from _check import check
 from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _feature_tree import feature_name_by_type, name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
@@ -78,6 +80,7 @@ from dt_alignment_pinion_spec import (
     REFERENCE_SKETCHES,
     STOCK_FORM,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 PART_NAME = "dt-alignment-pinion"
@@ -97,6 +100,8 @@ _WITNESS_STUB_MM = 1.0
 
 async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing: this
     # is an INCH document and the equation manager reads bare values in inches.
@@ -172,15 +177,16 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven alignment pinion (equations neutral)", expected, 0.02 * v_bore
     )
     # The printed tip band rides the side-view witness, not the Front-plane
-    # blank circle that only drives the solid.  The bore band prints at its
-    # nominal's places; the inch tip band (0/-0.1016) needs four, so its places
-    # stay automatic (#290 batch 0).  Both are authored here so the .SLDPRT is
-    # the one source the drawing imports (Codex P1 on #1647).
+    # blank circle that only drives the solid.  Both bands print at their
+    # nominal's places (+.000/-.004), authored here so the .SLDPRT is the one
+    # source the drawing imports (Codex P1 on #1647).
     set_dimension_bilateral_tolerance(
         adapter,
         "OutsideDiaReference",
         "OutsideDia",
         *deviations(OUTSIDE_DIA_BAND),
+        places=DRAWING_PRECISION[OUTSIDE_DIA_REFERENCE]["OutsideDia"],
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
         adapter,
@@ -188,6 +194,7 @@ async def build(adapter) -> dict[str, str]:
         "ArborBoreDia",
         *deviations(ARBOR_BORE_BAND),
         places=DRAWING_PRECISION["ArborBoreProfile"]["ArborBoreDia"],
+        display_unit=UNIT,
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
 
