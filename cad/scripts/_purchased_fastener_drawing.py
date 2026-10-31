@@ -23,6 +23,7 @@ stock name, which restates the material, is read and checked but not printed.
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import math
 from collections.abc import Mapping, Sequence
@@ -1040,6 +1041,70 @@ def _fit_views(draw: Any, views: list[Any], cells: tuple) -> dict[str, tuple[int
     return scales
 
 
+@_telemetry.traced("drawing.purchased_align_orthographic", label_param="label")
+def _align_orthographic_views(
+    adapter: Any,
+    draw: Any,
+    views: list[Any],
+    cells: tuple,
+    *,
+    scales: dict[str, tuple[int, int]],
+    label: str,
+) -> None:
+    """Align actual model origins after fitting, without changing scale/cells."""
+    by_name = {
+        name: view for view, (name, _, _) in zip(views, cells, strict=True)
+    }
+    origins: dict[str, tuple[float, float]] = {}
+    for name in ("*Front", "*Top", "*Right"):
+        view = by_name[name]
+        view.UpdateViewDisplayGeometry()
+        origin = model_point_in_view(
+            adapter, view, (0.0, 0.0, 0.0), label=f"{label} {name} alignment origin"
+        )
+        if not all(map(math.isfinite, origin)):
+            raise RuntimeError(f"{label} {name}: invalid projected origin {origin!r}")
+        origins[name] = origin
+    front = origins["*Front"]
+    aligned = {
+        "*Front": front,
+        "*Top": (front[0], origins["*Top"][1]),
+        "*Right": (origins["*Right"][0], front[1]),
+    }
+    for name in ("*Top", "*Right"):
+        view = by_name[name]
+        position = tuple(float(value) for value in view.Position)
+        if len(position) != 2 or not all(map(math.isfinite, position)):
+            raise RuntimeError(f"{label} {name}: invalid native view position {position!r}")
+        target = [
+            position[i] + aligned[name][i] - origins[name][i] for i in range(2)
+        ]
+        if not view.SetViewPosition(double_array(target), False):
+            raise RuntimeError(f"{label} {name}: failed to align purchased view")
+    _rebuild(draw, phase="align purchased orthographic origins")
+    for view, (name, _, cell) in zip(views, cells, strict=True):
+        box, _outlines = _refreshed_native_fit_bounds(view, label=f"{label} {name}")
+        if tuple(view.ScaleRatio) != scales[name] or view.UseSheetScale != 0:
+            raise RuntimeError(f"{label} {name}: alignment changed fitted view scale")
+        if not _inside(box, cell):
+            raise RuntimeError(
+                f"{label} {name}: aligned native view leaves its fitted cell: {box!r}"
+            )
+        if name == _ISOMETRIC:
+            continue
+        origin = model_point_in_view(
+            adapter, view, (0.0, 0.0, 0.0), label=f"{label} {name} aligned origin"
+        )
+        if not all(map(math.isfinite, origin)) or any(
+            abs(actual - expected) > 1e-6
+            for actual, expected in zip(origin, aligned[name], strict=True)
+        ):
+            raise RuntimeError(
+                f"{label} {name}: native projected origin failed to align: "
+                f"{origin!r}, expected {aligned[name]!r}"
+            )
+
+
 @_telemetry.traced("drawing.purchased_center_marks")
 def _center_marks_without_lines(views: list[Any], cells: tuple) -> dict[str, int]:
     """Drop the extension lines of every template-inserted centre mark.
@@ -1435,12 +1500,14 @@ async def build_purchased_fastener_drawing(
     general_text: str | None = None,
     number_fit: NumberFit = NumberFit.TEMPLATE,
     view_layout: Literal["standard", "supplier_top", "tall_top"] = "standard",
+    align_orthographic: bool = False,
     supplier_dimensions: SupplierDimensions | None = None,
     supplier_margins: SupplierMargins | None = None,
     configuration: str | None = None,
     settled_checks: Sequence[Callable[[], None]] = (),
     supplier_data: Sequence[str] = (),
     title_block_setup: Callable[[Any], Callable[[], None]] | None = None,
+    saved_check: Callable[[Any, Path], None] | None = None,
 ) -> dict[str, str]:
     """Export Front/Top/Right plus Isometric without fabrication dimensions or PMI.
 
@@ -1458,11 +1525,17 @@ async def build_purchased_fastener_drawing(
     ``view_layout="supplier_top"`` reserves the supplier screw family's Top
     annotation lanes; ``"tall_top"`` gives a longer axial Top view. Neither
     changes annotation margins or the standard-scale fitting contract.
+    ``align_orthographic`` aligns Top's projected model-origin X and Right's Y
+    with Front after fitting, before supplier annotations capture their origins.
     Supplier hooks import native reference sizes after fitting; explicit margins
     reserve their annotation space before scale selection. Pass the same mutable
     settled-check list the hook populates, or a predeclared read-only assertion.
     Final checks run after the finalizer's last rebuild, without refitting.
+    ``saved_check`` optionally reads the saved native drawing after the finalizer
+    closes it, while the supplier-source byte-preservation guard still owns it.
     """
+    if saved_check is not None and not callable(saved_check):
+        raise TypeError("purchased saved drawing check must be callable")
     stock = fastener(spec.artifact_stem)
     source = spec.source
 
@@ -1503,7 +1576,7 @@ async def build_purchased_fastener_drawing(
                         f"{stock.part_name}: stale source {name} {properties[name]!r} != {value!r}"
                     )
 
-        return await _build_reference_sheet(
+        artifacts = await _build_reference_sheet(
             adapter,
             spec,
             properties=properties,
@@ -1515,6 +1588,7 @@ async def build_purchased_fastener_drawing(
             document_title=str(registry["title"]),
             number_fit=number_fit,
             view_layout=view_layout,
+            align_orthographic=align_orthographic,
             supplier_dimensions=supplier_dimensions,
             supplier_margins=supplier_margins,
             configuration=configuration,
@@ -1531,6 +1605,13 @@ async def build_purchased_fastener_drawing(
                 configuration=configuration,
             ),
         )
+        if saved_check is not None:
+            result = saved_check(adapter, Path(artifacts["drawing"]))
+            if result is not None:
+                if inspect.iscoroutine(result):
+                    result.close()
+                raise TypeError("saved_check must be synchronous and return None")
+        return artifacts
     except BaseException as error:
         primary = error
         raise
@@ -1649,6 +1730,7 @@ async def _build_reference_sheet(
     document_title: str | None = None,
     spring: bool = False,
     view_layout: Literal["standard", "supplier_top", "tall_top"] = "standard",
+    align_orthographic: bool = False,
     number_fit: NumberFit = NumberFit.TEMPLATE,
     supplier_dimensions: SupplierDimensions | None = None,
     supplier_margins: SupplierMargins | None = None,
@@ -1665,6 +1747,8 @@ async def _build_reference_sheet(
     check_item(item, label=label)
     if not isinstance(number_fit, NumberFit):
         raise TypeError(f"{label}: number_fit must be a NumberFit: {number_fit!r}")
+    if type(align_orthographic) is not bool:
+        raise TypeError(f"{label}: align_orthographic must be a bool")
     if configuration is not None and (
         not isinstance(configuration, str) or not configuration.strip()
     ):
@@ -1750,6 +1834,10 @@ async def _build_reference_sheet(
             view.UseSheetScale = 0
             view.ScaleRatio = double_array([1.0, 1.0])
     scales = _fit_views(draw, views, fit_cells)
+    if align_orthographic:
+        _align_orthographic_views(
+            adapter, draw, views, fit_cells, scales=scales, label=label
+        )
     fitted_origins: dict[str, tuple[float, float]] = {}
     fitted_sources: dict[str, tuple[str, str]] = {}
     if supplier_dimensions is not None:

@@ -223,9 +223,11 @@ async def test_supplier_angle_refuses_failed_or_non_driving_native_controls(witn
 
 def _nut_carrier(monkeypatch, *, defect=None):
     import _supplier_nut_drawing as nuts
+    import _supplier_screw_dimensions as screws
 
     monkeypatch.setattr(nuts, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(nuts, "_bind", lambda value, _interface: value)
+    monkeypatch.setattr(screws, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(screws, "_bind", lambda value, _interface: value)
     source_points = tuple(
         SimpleNamespace(X=x, Y=0.0, Z=0.0) for x in (-0.003175, 0.003175)
     )
@@ -250,7 +252,9 @@ def _nut_carrier(monkeypatch, *, defect=None):
         GetType=lambda: 0, ConstructionGeometry=True,
         GetStartPoint2=lambda: source_points[0], GetEndPoint2=lambda: source_points[1],
     )
-    sketch = SimpleNamespace(GetSketchSegments=lambda: (segment,))
+    sketch = SimpleNamespace(
+        GetSketchSegments=lambda: (segment,), GetSketchPoints2=lambda: source_points,
+    )
     feature = SimpleNamespace(GetSpecificFeature2=lambda: sketch)
     owner = object() if defect == "source_owner" else feature
     native = SimpleNamespace(
@@ -271,7 +275,10 @@ def _nut_carrier(monkeypatch, *, defect=None):
         raise AssertionError("mapping input is not an actual source endpoint")
 
     view = SimpleNamespace(ReferencedDocument=model, GetCorresponding=corresponding)
-    annotation = SimpleNamespace(GetAttachedEntities3=lambda: tuple(attachments))
+    annotation = SimpleNamespace(
+        GetAttachedEntities3=lambda: tuple(attachments),
+        GetAttachedEntityTypes=lambda: (11,) * len(attachments),
+    )
     display = SimpleNamespace(
         Type2=2, GetDimension2=lambda _index: native, GetAnnotation=lambda: annotation,
     )
@@ -281,17 +288,78 @@ def _nut_carrier(monkeypatch, *, defect=None):
 
 def test_nut_carrier_accepts_exact_view_correspondence_not_raw_part_identity(monkeypatch):
     nuts, adapter, view, display = _nut_carrier(monkeypatch)
-    nuts._assert_nominal_carrier(adapter, view, display, 6.35)
+    proof = nuts._assert_nominal_carrier(adapter, view, display, 6.35)
+    assert proof["proven"] is True
+    source, = proof["sources"]
+    assert source["inventory_complete"] is True
+    assert source["source_member_count"] == source["mapped_member_count"] == 2
+    assert source["mapping_complete"] is True
+    assert [(member["self"], member["forward_self"]) for member in source["members"]] == [
+        (1, 1), (1, 1),
+    ]
+    assert source["distinctness"] == [
+        {"left_index": 0, "right_index": 1, "source_is_same": 0, "forward_is_same": 0},
+    ]
+    assert [attachment["view_source_entity_is_same"] for attachment in proof["attachments"]] == [
+        [1, 0], [0, 1],
+    ]
 
 
-@pytest.mark.parametrize("defect", [
-    "source_geometry", "source_owner", "raw_source_attachment", "foreign_attachment",
-    "duplicate_attachment", "extra_attachment", "duplicate_mapping", "missing_mapping",
+@pytest.mark.parametrize("defect,error", [
+    ("source_geometry", "chord differs from its exact source"),
+    ("source_owner", "dimension lost its native source owner"),
+    ("raw_source_attachment", "attachment is not its view-mapped source endpoint"),
+    ("foreign_attachment", "attachment is not its view-mapped source endpoint"),
+    ("duplicate_attachment", "attachment is not its view-mapped source endpoint"),
+    ("extra_attachment", "carrier requires both endpoint attachments"),
+    ("duplicate_mapping", "attachment is not its view-mapped source endpoint"),
+    ("missing_mapping", "attachment is not its view-mapped source endpoint"),
 ])
-def test_nut_carrier_refuses_wrong_geometry_owner_or_view_endpoint(monkeypatch, defect):
+def test_nut_carrier_refuses_wrong_geometry_owner_or_view_endpoint(monkeypatch, defect, error):
+    import json
+
     nuts, adapter, view, display = _nut_carrier(monkeypatch, defect=defect)
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match=error) as refused:
         nuts._assert_nominal_carrier(adapter, view, display, 6.35)
+    if defect in {"source_geometry", "source_owner", "extra_attachment"}:
+        return
+    proof = json.loads(str(refused.value).split(": ", 1)[1])
+    assert proof["proven"] is False
+    source, = proof["sources"]
+    assert source["inventory_complete"] is True
+    assert source["source_member_count"] == 2
+    assert [member["native"] for member in source["members"]] == [
+        {"present": True}, {"present": True},
+    ]
+    assert [member["forward"] for member in source["members"]] == [
+        {"present": defect != "missing_mapping"},
+        {"present": defect != "missing_mapping"},
+    ]
+    assert [member["self"] for member in source["members"]] == [1, 1]
+    assert [member["forward_self"] for member in source["members"]] == (
+        [None, None] if defect == "missing_mapping" else [1, 1]
+    )
+    assert source["mapped_member_count"] == (0 if defect == "missing_mapping" else 2)
+    assert source["mapping_complete"] is (defect not in {"duplicate_mapping", "missing_mapping"})
+    assert source["distinctness"] == [{
+        "left_index": 0, "right_index": 1, "source_is_same": 0,
+        "forward_is_same": (
+            None if defect == "missing_mapping" else int(defect == "duplicate_mapping")
+        ),
+    }]
+    expected_comparisons = {
+        "raw_source_attachment": [[0, 0], [0, 0]],
+        "foreign_attachment": [[0, 0], [0, 1]],
+        "duplicate_attachment": [[1, 0], [1, 0]],
+        "duplicate_mapping": [[1, 1], [0, 0]],
+        "missing_mapping": [[None, None], [None, None]],
+    }
+    assert [attachment["self"] for attachment in proof["attachments"]] == [1, 1]
+    assert [attachment["view_source_entity_is_same"] for attachment in proof["attachments"]] == (
+        expected_comparisons[defect]
+    )
+    if defect == "duplicate_attachment":
+        assert all(attachment["duplicate_mapped_member"] for attachment in proof["attachments"])
 
 
 @pytest.mark.parametrize("field,bad", [

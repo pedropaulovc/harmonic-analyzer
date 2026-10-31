@@ -1,11 +1,10 @@
-"""Offline contracts for the MHA-SM-VN-55 counter-anchor jam nut (McMaster 90760A140)."""
+"""Boss-nut recipe contracts and shared physical installation-flag boundaries."""
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
 import math
-import re
 from pathlib import Path
 
 import pytest
@@ -218,11 +217,538 @@ def test_purchased_sheet_documents_the_built_part() -> None:
     )
 
 
-@pytest.mark.parametrize("stem", [STEM])
-def test_installation_note_fits_the_sheet(stem: str) -> None:
-    lines = _config.parts(stem)["installation_notes"].splitlines()
-    assert len(lines) <= 4
-    assert all(len(line) <= 70 for line in lines), lines
-    notes = " ".join(lines)
-    assert notes.startswith("INSTALLATION - ")
-    assert not re.search(r"\d+\.\d|\+/-|±|Ø|MAX|MIN| MM\b", notes)
+@pytest.fixture(params=(SHEET, "pn_vn_pen_hanger_jam_nut"), ids=(
+    "boss-z0", "hanger-jam-z-thickness",
+))
+def nut_installation_native(monkeypatch, request):
+    """Real selection/attachment/ink math; replace only native COM access."""
+    from types import SimpleNamespace
+
+    if request.param == SHEET:
+        import draw_sm_vn_boss_hook_jam_nut as drawing
+        supplier = spec
+        bearing_z_mm = 0.0
+    else:
+        import draw_pn_vn_pen_hanger_jam_nut as drawing
+        import pn_vn_pen_hanger_jam_nut_spec as supplier
+        bearing_z_mm = supplier.THICKNESS
+    import _supplier_nut_installation_flag as flags
+    import _drawing_layout_audit as collector
+    from _drawing_edges import ViewEdge, ViewEdges
+    from test_purchased_fastener_drawing import (
+        _KitFlagNativeEdge as Edge,
+        _KitFlagNativeNote as NativeNote,
+        _KitFlagNativeWrapper as Wrapper,
+    )
+
+    monkeypatch.setattr(flags, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(collector, "_early_bound", lambda value, _kind: value)
+    artifact_stem = drawing.SPEC.artifact_stem
+    notes_text = _config.parts(artifact_stem)["installation_notes"]
+    cells = flags.fastener_view_cells(
+        flags.view_band_bottom(notes_text, label=artifact_stem)
+    )
+    _, center, cell = next(row for row in cells if row[0] == "*Right")
+    state = SimpleNamespace(
+        drawing=drawing, flags=flags, supplier=supplier,
+        artifact_stem=artifact_stem,
+        bearing_point_mm=(supplier.ACROSS_FLATS / 2.0, 0.0, bearing_z_mm),
+        cell=cell, center=center, note=None, projections=[],
+        authored=[], inventory_reads=0, repeat_wrappers=False, text_fault=None,
+        notes_text=notes_text, Edge=Edge, Wrapper=Wrapper,
+    )
+
+    class View:
+        def __init__(self, name):
+            self.name = name
+            self.native_identity = object()
+            self.notes = []
+            self.refreshes = 0
+            self.scans = 0
+            self.outline = (
+                center[0] - 0.004, center[1] - 0.004,
+                center[0] + 0.004, center[1] + 0.004,
+            )
+
+        def GetName2(self):
+            return self.name
+
+        def GetOutline(self):
+            return self.outline
+
+        def UpdateViewDisplayGeometry(self):
+            self.refreshes += 1  # Native VT_VOID, not a success boolean.
+
+        def GetNotes(self):
+            state.inventory_reads += 1
+            rows = [Wrapper(note) for note in self.notes]
+            return rows * (2 if state.repeat_wrappers else 1)
+
+    state.right = View("Right")
+    state.sheet = View("Sheet")
+    state.foreign = View("OtherSheetRight")
+    half_af = supplier.ACROSS_FLATS / 2000
+    half_flat = supplier.ACROSS_FLATS * math.tan(math.pi / 6) / 2000
+    target_z = bearing_z_mm / 1000
+    other_z = (supplier.THICKNESS - bearing_z_mm) / 1000
+    endpoints = ((half_af, -half_flat, target_z), (half_af, half_flat, target_z))
+    state.target = Edge(endpoints=endpoints)
+    # Both real nut ends are present. The opposite end, opposite flat and a
+    # trimmed segment omitting the midpoint must not impersonate the contact.
+    state.decoys = [
+        Edge(endpoints=tuple((x, y, other_z) for x, y, z in endpoints)),
+        Edge(endpoints=tuple((-x, y, z) for x, y, z in endpoints)),
+        Edge(endpoints=((half_af, half_flat / 2, target_z), endpoints[1])),
+    ]
+    state.edges = [*state.decoys, state.target]
+
+    def same(first, second):
+        return int(
+            getattr(first, "native_identity", first)
+            is getattr(second, "native_identity", second)
+        )
+
+    state.adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(
+            GetViews=lambda: ((state.foreign,), (state.sheet, state.right))
+        ),
+        swApp=SimpleNamespace(IsSame=same),
+    )
+
+    def scan(view, *, label):
+        assert view is state.right
+        assert view.refreshes > view.scans, "selection must refresh native geometry"
+        view.scans += 1
+        return ViewEdges(label, tuple(
+            ViewEdge(
+                Wrapper(edge),
+                tuple(tuple(value * 1000 for value in p) for p in edge.endpoints),
+                None, None,
+            )
+            for edge in state.edges
+        ))
+
+    def project(_adapter, view, points, *, label):
+        assert view is state.right
+        state.projections.append(tuple(points))
+        # Synthetic COM projection oracle, not an actual Right orientation:
+        # screen X uses model Y and screen Y uses model Z.
+        return [(center[0] + y, center[1] + z) for x, y, z in points]
+
+    class Note(NativeNote):
+        def GetDisplayData(self):
+            if state.text_fault == "unreadable-display":
+                return None
+            data = super().GetDisplayData()
+            # The complete native collector requires all primitive counts,
+            # even when an annotation has no such primitive.
+            for name in (
+                "GetLineCount", "GetArcCount", "GetArrowHeadCount",
+                "GetPolyLineCount", "GetPolygonCount", "GetTriangleCount",
+                "GetEllipseCount",
+            ):
+                setattr(data, name, lambda: 0)
+            data.GetTextFontAtIndex = lambda _i: "Arial"
+            data.GetTextLineSpacingAtIndex = lambda _i: 1.0
+            if state.text_fault == "empty-text":
+                data.GetTextCount = lambda: 0
+            elif state.text_fault == "unreadable-width":
+                def refused_width(_i):
+                    raise RuntimeError("native width read refused")
+                data.GetTextInBoxWidthAtIndex = refused_width
+            elif state.text_fault == "nonfinite-position":
+                data.GetTextPositionAtIndex = lambda _i: (math.nan, center[1], 0.0)
+            elif state.text_fault == "upper-left-equivalent":
+                position = data.GetTextPositionAtIndex
+                data.GetTextPositionAtIndex = lambda i: (
+                    position(i)[0], position(i)[1] + self.height, position(i)[2],
+                )
+                data.GetTextRefPositionAtIndex = lambda _i: 0
+            elif state.text_fault == "lower-right-reference":
+                data.GetTextRefPositionAtIndex = lambda _i: 4
+            elif state.text_fault is not None and state.text_fault.startswith("later-"):
+                # A finite first fragment must not conceal malformed later
+                # geometry in Box.union or a short-position rendering skip.
+                data.GetTextCount = lambda: 2
+                position = data.GetTextPositionAtIndex
+                native_position = position(0)
+                if state.text_fault == "later-nonfinite-angle":
+                    angle = data.GetTextAngleAtIndex
+                    data.GetTextAngleAtIndex = lambda i: math.nan if i else angle(i)
+                else:
+                    malformed = {
+                        "later-short-position": native_position[:1],
+                        "later-missing-z": native_position[:2],
+                        "later-nonfinite-position": (math.nan, *native_position[1:]),
+                        "later-nonfinite-z": (*native_position[:2], math.nan),
+                    }[state.text_fault]
+                    data.GetTextPositionAtIndex = lambda i: malformed if i else position(i)
+            return data
+
+    def author(
+        adapter, view, *, text, entity, attached_to,
+        leader_attach_xy, note_xy, label,
+    ):
+        assert adapter is state.adapter and view is state.right
+        assert entity is attached_to
+        assert same(entity, state.target)
+        assert text == "1"
+        # The synthetic projection uses model Y/Z for sheet X/Y. Jam's
+        # source-derived bearing Z is nonzero; do not silently move it to z=0.
+        point_m = tuple(value / 1000 for value in state.bearing_point_mm)
+        bearing_pick = (center[0] + point_m[1], center[1] + point_m[2])
+        assert leader_attach_xy == pytest.approx(bearing_pick)
+        assert note_xy == pytest.approx((
+            bearing_pick[0] + 0.012, bearing_pick[1] + 0.010,
+        ))
+        note = Note(text, view, entity, leader_attach_xy)
+        note.annotation.position = (*note_xy, 0.0)
+        state.note = note
+        state.authored.append(note)
+        view.notes.append(note)
+        return note
+
+    def add_legend(text=None):
+        legend = Note(
+            '$PRP:"Installation Notes"', state.sheet, state.target, center,
+        )
+        legend.resolved_text = notes_text if text is None else text
+        state.sheet.notes.append(legend)
+        return legend
+
+    def extra_key(view):
+        note = Note("1", view, state.target, center)
+        view.notes.append(note)
+        return note
+
+    state.add_legend = add_legend
+    state.extra_key = extra_key
+    monkeypatch.setattr(flags, "scan_view_edges", scan)
+    monkeypatch.setattr(flags, "model_points_in_view", project)
+    monkeypatch.setattr(flags, "add_attached_note", author)
+    return state
+
+
+def test_nut_flag_targets_recipe_bearing_end_and_checks_settled_readonly(
+    nut_installation_native,
+):
+    state = nut_installation_native
+    settled = state.flags.add_supplier_nut_installation_flag(
+        state.adapter, state.right, artifact_stem=state.artifact_stem,
+        bearing_point_mm=state.bearing_point_mm,
+    )
+    assert callable(settled)
+    assert state.inventory_reads == 0  # Footer is not authored yet.
+    assert state.projections == [(
+        (state.supplier.ACROSS_FLATS / 2000, 0.0, state.bearing_point_mm[2] / 1000),
+    )]
+    state.add_legend(state.notes_text.replace("\n", "\r\n"))
+    # Dispatch wrappers can repeat without representing competing notes.
+    state.repeat_wrappers = True
+    note = state.note
+    # A native note extent can include its leader. Only text primitives may
+    # determine the 2 mm text/view gap, not that leader-inclusive extent.
+    note.extent_includes_leader = True
+    before = (
+        note.annotation.position, tuple(note.annotation.moves),
+        tuple(note.annotation.leader_set_calls), note.GetText(),
+        note.PropertyLinkedText, note.GetExtent(),
+    )
+    settled()
+    settled()
+    assert len(state.authored) == 1
+    assert state.right.scans == state.right.refreshes == 3
+    assert before == (
+        note.annotation.position, tuple(note.annotation.moves),
+        tuple(note.annotation.leader_set_calls), note.GetText(),
+        note.PropertyLinkedText, note.GetExtent(),
+    )
+
+
+def test_nut_flag_preserves_actual_ink_with_an_equivalent_upper_left_reference(
+    nut_installation_native,
+):
+    state = nut_installation_native
+    settled = state.flags.add_supplier_nut_installation_flag(
+        state.adapter, state.right, artifact_stem=state.artifact_stem,
+        bearing_point_mm=state.bearing_point_mm,
+    )
+    state.add_legend()
+    state.text_fault = "upper-left-equivalent"
+    before = state.note.GetExtent(), tuple(state.note.annotation.moves)
+    settled()
+    assert (state.note.GetExtent(), tuple(state.note.annotation.moves)) == before
+
+
+def test_nut_flag_distinguishes_template_border_zone_from_authored_key(
+    nut_installation_native,
+):
+    state = nut_installation_native
+    settled = state.flags.add_supplier_nut_installation_flag(
+        state.adapter, state.right, artifact_stem=state.artifact_stem,
+        bearing_point_mm=state.bearing_point_mm,
+    )
+    state.add_legend()
+    zone = state.extra_key(state.sheet)
+    zone.annotation.OwnerType = 2  # swAnnotationOwner_DrawingTemplate.
+    settled()
+    # The same visible format zone cannot stand in for the authored flag.
+    state.right.notes.remove(state.note)
+    with pytest.raises(RuntimeError, match="native_key_count=0, template_key_count=1"):
+        settled()
+
+
+@pytest.mark.parametrize("owner_type", [0, 1])
+def test_nut_flag_rejects_competing_key_beside_template_zone(
+    nut_installation_native, owner_type,
+):
+    state = nut_installation_native
+    settled = state.flags.add_supplier_nut_installation_flag(
+        state.adapter, state.right, artifact_stem=state.artifact_stem,
+        bearing_point_mm=state.bearing_point_mm,
+    )
+    state.add_legend()
+    zone = state.extra_key(state.sheet)
+    zone.annotation.OwnerType = 2
+    duplicate = state.extra_key(state.foreign if owner_type == 0 else state.sheet)
+    duplicate.annotation.OwnerType = owner_type
+    with pytest.raises(RuntimeError, match="native_key_count=2, template_key_count=1"):
+        settled()
+
+
+@pytest.mark.parametrize("geometry", ["missing", "wrong-end", "trimmed"])
+def test_nut_flag_rejects_nonbearing_geometry(nut_installation_native, geometry):
+    state = nut_installation_native
+    state.edges = {
+        "missing": [], "wrong-end": [state.decoys[0]], "trimmed": [state.decoys[2]],
+    }[geometry]
+    with pytest.raises(RuntimeError):
+        state.flags.add_supplier_nut_installation_flag(
+            state.adapter, state.right, artifact_stem=state.artifact_stem,
+            bearing_point_mm=state.bearing_point_mm,
+        )
+    assert not state.authored
+
+
+def test_nut_flag_rejects_rebound_bearing_identity_on_coincident_geometry(
+    nut_installation_native,
+):
+    state = nut_installation_native
+    state.edges = [state.target]
+    settled = state.flags.add_supplier_nut_installation_flag(
+        state.adapter, state.right, artifact_stem=state.artifact_stem,
+        bearing_point_mm=state.bearing_point_mm,
+    )
+    state.add_legend()
+    # Repeated sightings of the original native edge retain the authoring
+    # identity. Equal coordinates alone do not grant a replacement that identity.
+    state.edges = [state.target, state.target]
+    settled()
+    replacement = state.Edge(endpoints=state.target.endpoints)
+    state.edges = [replacement, state.target]
+    with pytest.raises(RuntimeError, match="bearing edge lost native identity"):
+        settled()
+    assert len(state.authored) == 1
+
+
+@pytest.mark.parametrize("key", ["", "2 "])
+def test_nut_flag_refuses_unbound_instruction_before_authoring(
+    nut_installation_native, monkeypatch, key,
+):
+    state = nut_installation_native
+    unkeyed = state.notes_text.removeprefix("1 ")
+    monkeypatch.setattr(state.flags._config, "parts", lambda _stem: {
+        "installation_notes": key + unkeyed,
+    })
+    with pytest.raises(RuntimeError, match="instruction has no matching key"):
+        state.flags.add_supplier_nut_installation_flag(
+            state.adapter, state.right, artifact_stem=state.artifact_stem,
+            bearing_point_mm=state.bearing_point_mm,
+        )
+    assert not state.authored
+
+
+@pytest.mark.parametrize("fault", [
+    "edge-identity", "wrong-owner", "wrong-owner-type", "wrong-text",
+    "wrong-property-text", "hidden", "attachment-lost", "attachment-wrong-edge",
+    "attachment-wrong-type", "dangling", "missing-leader", "shifted-tip",
+    "short-leader", "nonfinite-leader", "leader-outside-cell",
+    "text-outside-cell", "extent-outside-cell", "view-gap",
+    "unreadable-display", "empty-text", "unreadable-width", "zero-width",
+    "negative-width", "nonfinite-width", "zero-height", "nonfinite-height",
+    "nonfinite-position", "duplicate-key", "foreign-key", "replaced-key",
+    "later-short-position", "later-missing-z", "later-nonfinite-position",
+    "later-nonfinite-z", "later-nonfinite-angle",
+    "right-reference-hides-view-strike",
+    "missing-legend", "changed-legend", "unlinked-legend", "duplicate-legend",
+    "duplicate-literal-instruction", "duplicate-unkeyed-instruction",
+    "duplicate-template-legend", "duplicate-template-instruction",
+])
+def test_nut_flag_rejects_settled_native_drift(nut_installation_native, fault):
+    state = nut_installation_native
+    settled = state.flags.add_supplier_nut_installation_flag(
+        state.adapter, state.right, artifact_stem=state.artifact_stem,
+        bearing_point_mm=state.bearing_point_mm,
+    )
+    legend = state.add_legend()
+    note, annotation = state.note, state.note.annotation
+    if fault == "edge-identity":
+        # Coordinates remain identical, but this is a different native edge.
+        state.edges[-1] = state.Edge(endpoints=state.target.endpoints)
+    elif fault == "wrong-owner":
+        annotation.Owner = state.foreign
+    elif fault == "wrong-owner-type":
+        annotation.OwnerType = 2
+    elif fault == "wrong-text":
+        note.resolved_text = "2"
+    elif fault == "wrong-property-text":
+        note.PropertyLinkedText = "2"
+    elif fault == "hidden":
+        annotation.Visible = 3
+    elif fault == "attachment-lost":
+        annotation.entities, annotation.entity_count = (), 0
+    elif fault == "attachment-wrong-edge":
+        annotation.entities = (state.decoys[0],)
+    elif fault == "attachment-wrong-type":
+        annotation.entity_types = (2,)
+    elif fault == "dangling":
+        annotation.dangling = True
+    elif fault == "missing-leader":
+        annotation.leader_count = 0
+    elif fault == "shifted-tip":
+        x, y, z = annotation.landing
+        annotation.landing = (x + 0.002, y, z)
+    elif fault == "short-leader":
+        annotation.leader_override = annotation.position
+    elif fault == "nonfinite-leader":
+        annotation.leader_override = (*annotation.position, math.nan, 0.1, 0.0)
+    elif fault == "leader-outside-cell":
+        # A remote intermediate elbow with the correct final attachment.
+        annotation.leader_override = (
+            *annotation.position, state.cell[2] + 0.001, state.center[1], 0.0,
+            *annotation.landing,
+        )
+    elif fault == "text-outside-cell":
+        # Insertion point remains inside; native ink extends beyond the cell.
+        note.width = state.cell[2] - annotation.position[0] + 0.003
+        # Keep the independent extent valid: rejection must use native ink,
+        # not merely an insertion point or GetExtent.
+        x0, y0, x1, y1 = state.right.outline
+        note.extent_override = (
+            x1 + 0.003, y1 + 0.003, 0.0, x1 + 0.007, y1 + 0.006, 0.0,
+        )
+    elif fault == "extent-outside-cell":
+        note.extent_override = (
+            state.cell[0] - 0.001, state.center[1], 0.0,
+            state.center[0], state.center[1] + 0.003, 0.0,
+        )
+    elif fault == "view-gap":
+        # Correct attachment, readable ink, and a fully in-cell annotation,
+        # but the actual text-to-outline gap is 1 mm, not the required 2 mm.
+        x0, y0, x1, y1 = note._text_bounds()
+        state.right.outline = (x0 - 0.005, y0, x0 - 0.001, y1)
+    elif fault == "right-reference-hides-view-strike":
+        # The native insertion/reference point clears the view, but a
+        # lower-right anchored glyph extends left into the physical outline.
+        state.text_fault = "lower-right-reference"
+        _x, _y, z = annotation.position
+        annotation.position = (
+            state.right.outline[2] + 0.003 - note.ink_offset[0],
+            state.center[1] - note.ink_offset[1], z,
+        )
+        x0, y0, _x1, y1 = note._text_bounds()
+        assert x0 > state.right.outline[2] + 0.002
+        assert x0 - note.width < state.right.outline[2]
+        assert y0 < state.right.outline[3] and y1 > state.right.outline[1]
+        note.extent_override = (x0 - note.width, y0, z, x0, y1, z)
+    elif fault in (
+        "unreadable-display", "empty-text", "unreadable-width", "nonfinite-position",
+        "later-short-position", "later-missing-z", "later-nonfinite-position",
+        "later-nonfinite-z", "later-nonfinite-angle",
+    ):
+        state.text_fault = fault
+    elif fault in ("zero-width", "negative-width", "nonfinite-width"):
+        note.width = {"zero-width": 0.0, "negative-width": -0.001,
+                      "nonfinite-width": math.nan}[fault]
+    elif fault in ("zero-height", "nonfinite-height"):
+        note.height = 0.0 if fault == "zero-height" else math.inf
+    elif fault == "duplicate-key":
+        state.extra_key(state.right)
+    elif fault == "foreign-key":
+        state.extra_key(state.foreign)
+    elif fault == "replaced-key":
+        state.right.notes.remove(note)
+        state.extra_key(state.right)
+    elif fault == "missing-legend":
+        state.sheet.notes.remove(legend)
+    elif fault == "changed-legend":
+        legend.resolved_text += " CHANGED"
+    elif fault == "unlinked-legend":
+        legend.PropertyLinkedText = state.notes_text
+    elif fault == "duplicate-legend":
+        state.add_legend()
+    elif fault == "duplicate-literal-instruction":
+        duplicate = state.add_legend()
+        duplicate.PropertyLinkedText = state.notes_text
+    elif fault == "duplicate-unkeyed-instruction":
+        duplicate = state.add_legend(state.notes_text.removeprefix("1 "))
+        duplicate.PropertyLinkedText = duplicate.resolved_text
+    elif fault == "duplicate-template-legend":
+        state.add_legend().annotation.OwnerType = 2
+    elif fault == "duplicate-template-instruction":
+        duplicate = state.add_legend()
+        duplicate.PropertyLinkedText = state.notes_text
+        duplicate.annotation.OwnerType = 2
+    else:
+        raise AssertionError(f"unowned boss flag drift: {fault}")
+    with pytest.raises(RuntimeError):
+        settled()
+
+
+def test_nut_flag_legend_is_captured_not_reread(
+    nut_installation_native, monkeypatch,
+):
+    state = nut_installation_native
+    settled = state.flags.add_supplier_nut_installation_flag(
+        state.adapter, state.right, artifact_stem=state.artifact_stem,
+        bearing_point_mm=state.bearing_point_mm,
+    )
+    changed = state.notes_text + " CHANGED"
+    state.add_legend(changed)
+    monkeypatch.setattr(state.flags._config, "parts", lambda _stem: {
+        "installation_notes": changed,
+    })
+    with pytest.raises(RuntimeError):
+        settled()
+
+
+def test_nut_supplier_dimensions_keep_independent_dimension_and_flag_guards(
+    nut_installation_native, monkeypatch,
+):
+    state = nut_installation_native
+    dimension = {"valid": True}
+
+    def dimensions(_adapter, views, **kwargs):
+        assert _adapter is state.adapter
+        assert views["*Right"] is state.right
+        assert kwargs["thickness_mm"] == state.supplier.THICKNESS
+
+        def settled_dimensions():
+            if not dimension["valid"]:
+                raise RuntimeError("native supplier dimension changed")
+
+        return settled_dimensions
+
+    monkeypatch.setattr(state.drawing, "add_supplier_nut_dimensions", dimensions)
+    settled = state.drawing._supplier_dimensions(
+        state.adapter, {"*Right": state.right},
+    )
+    state.add_legend()
+    settled()
+    dimension["valid"] = False
+    with pytest.raises(RuntimeError, match="native supplier dimension changed"):
+        settled()
+    dimension["valid"] = True
+    state.note.annotation.dangling = True
+    with pytest.raises(RuntimeError, match="attachment"):
+        settled()
