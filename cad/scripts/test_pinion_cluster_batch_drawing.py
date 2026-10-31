@@ -844,7 +844,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 1.778,
                 5.2207,
             ),
-            # Owner Q13c: MHA-CH-VN-57 #8-32 x 5/8 through the 6.0 rocker-bracket
+            # Owner Q13c: MHA-CH-VN-57 #8-32 x 5/8 through the .24 rocker-bracket
             # foot, one per bracket since the 2026-10-09 flip.
             **_expected_numbered_pairs(
                 "ch-channel-1/ch-vn-bracket-hold-down-screw",
@@ -852,7 +852,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "fr-frame-1/fr-rocker-arm-support",
                 4.1656,
                 3.454,
-                9.875,
+                15.875 - 6.096,
             ),
         },
     }
@@ -945,9 +945,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             **{
                 frozenset(
                     (f"sh-vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}")
-                ): _annulus_limit(
-                    2.845, 2.261, 9.8 - math.sqrt(3.25**2 - (2.845 / 2.0) ** 2)
-                )
+                ): _interference_contracts.PIVOT_EAR_SET_SCREW_LIMIT
                 for n in (1, 2)
             },
             **{
@@ -959,7 +957,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             **{
                 frozenset(
                     (f"ch-vn-spring-hook-{n}", f"ch-anchor-jam-nut-{n}")
-                ): _annulus_limit(3.505, 2.705, 3.60)
+                ): _annulus_limit(*_interference_contracts.CHANNEL_ANCHOR_NUT_THREAD)
                 for n in range(1, 21)
             },
         }

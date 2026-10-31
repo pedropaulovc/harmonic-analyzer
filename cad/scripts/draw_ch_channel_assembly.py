@@ -86,6 +86,7 @@ from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from _simplified_names import simplified_name
 import _telemetry
+from _title_block_units import LENGTH_UNITS, render_number
 import ch_channel_assembly_sheet as notes
 import ch_channel_assembly_spec as asm
 from fr_top_frame_spec import BORE_DIA as SOCKET_BORE_DIA
@@ -110,7 +111,6 @@ from ch_pivot_bracket_sides import FOOT_Z1 as BRACKET_FOOT_Z1
 from ch_pivot_bracket_spec import (
     FOOT_H as BRACKET_FOOT_H,
     FOOT_W as BRACKET_FOOT_W,
-    SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT,
 )
 from ch_pivot_shaft_spec import (
     DOME_HEIGHT,
@@ -916,6 +916,10 @@ def _block(
     return "\n".join(lines)
 
 
+# The pivot shaft's north tip setting prints .XXX (.050 TO .070).
+TIP_SET_PLACES = 3
+
+
 def _fitup_notes() -> tuple[str, str, str]:
     # Literal stems, so the config-dependency analysis reads exactly these rows.
     arm = _config.parts("ch-rocker-arm")["number"]
@@ -955,7 +959,14 @@ def _fitup_notes() -> tuple[str, str, str]:
     # (ch_pivot_shaft_spec): its north tip set DOME_HEIGHT proud of the north
     # ear, within SHAFT_TIP_SET_BAND, puts both flats under their screws
     # (rocker_bank_layout checks the worst case).
-    tip_low, tip_high = DOME_HEIGHT - SHAFT_TIP_SET_BAND, DOME_HEIGHT + SHAFT_TIP_SET_BAND
+    tip_low, tip_high = (
+        render_number(
+            (DOME_HEIGHT + sign * SHAFT_TIP_SET_BAND) / LENGTH_UNITS[asm.UNIT],
+            asm.UNIT,
+            TIP_SET_PLACES,
+        )
+        for sign in (-1.0, 1.0)
+    )
     # Each keeper lug is set off the top-frame rail web under it (its column's
     # socket axis) in X and off the frame's hole-station origin line, the
     # upper socket centres, in Z (Main's ruling): the lug centre on the
@@ -1031,7 +1042,7 @@ def _fitup_notes() -> tuple[str, str, str]:
         ),
         "shaft-set": (
             f"SLIDE THE {shaft} SHAFT UNTIL ITS NORTH TIP STANDS "
-            f"{tip_low:.2f} TO {tip_high:.2f} PROUD OF THE NORTH EAR'S OUTER FACE."
+            f"{tip_low} TO {tip_high} PROUD OF THE NORTH EAR'S OUTER FACE."
         ),
         # drawing-guidelines.md rule 23: staked like the keeper set screws
         # (fulcrum-set-screws-staked). The Loctite waiver was retired on
@@ -1039,10 +1050,7 @@ def _fitup_notes() -> tuple[str, str, str]:
         "set-screws-driven": (
             f"SHAFT HELD AS SET, FLATS UP: RUN ONE {pivot_set_screw} DOWN EACH "
             "APEX TAP ONTO ITS FLAT, NORTH FIRST; SNUG, AND STAKE EACH TAP "
-            "MOUTH AT 2 POINTS. "
-            # The bracket's engagement fact; the lifted arch meets rule 18
-            # (ch_pivot_bracket_spec), so no exception is declared for it.
-            f"{SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT}"
+            "MOUTH AT 2 POINTS."
         ),
         steps.KEEPERS_PAIR_REAMED_KEY: (
             f"CLAMP BOTH {keeper}, FEET OUTBOARD ON ONE FLAT, INNER LUG FACES "
@@ -1929,7 +1937,7 @@ def _assert_settings(displays: dict[str, Any]) -> None:
                 reference
                 or abs(float(tolerance.GetMaxValue()) - upper / 1000.0) > 1e-9
                 or abs(float(tolerance.GetMinValue()) - lower / 1000.0) > 1e-9
-                or int(display.GetPrimaryTolPrecision2()) != asm.TOLERANCE_PRECISION
+                or int(display.GetPrimaryTolPrecision2()) != asm.TOLERANCE_PRECISION[name]
             ):
                 raise RuntimeError(
                     f"{name}: band is not {asm.DIMENSION_TOLERANCES[name]}"
@@ -2020,7 +2028,7 @@ def _break_line_at_text(display: Any, *, label: str) -> None:
 
 
 def _create_sheets(adapter: Any) -> None:
-    new_project_drawing(adapter, layout=SPEC.layout, scale=SHEET_SCALE)
+    new_project_drawing(adapter, layout=SPEC.layout, scale=SHEET_SCALE, unit=asm.UNIT)
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="channel package")
     for name in SHEET_NAMES:
         sheet = _activate_sheet(adapter, name)

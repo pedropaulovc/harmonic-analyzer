@@ -28,7 +28,7 @@ preloads it with a keeper spring, reversing #743 Q4 (Reading 1, "no keeper"):
   on the datum ear: the bank has no end play.
 * Each hub's length is +0.05/0 on its print, and a fit-up acceptance on the
   measured 20-arm stack caps the cumulative excess (STACK_L20_ACCEPT,
-  +0.10/0, #948 ruling R).
+  +.004/0 in, #948 ruling R).
 * The shaft is a plain rod whose cylinder spans both ears' outer faces, each
   end domed proud of its ear. One #4-40 set screw down through each ear's
   arch apex bites a flat milled on the shaft at that ear's mid-plane, so the
@@ -80,7 +80,8 @@ RUNNING_FLOOR = 0.10  # least running air between oiled steel faces
 MARGIN_SPARE = 0.25  # novice spare over every floor (pinion_rig_layout rule)
 FEELER_STEP = 0.05  # blades of the metric gauge set (pinion_rig_fitup)
 ROCKER_SPRING_SET = _spring.INSTALLED_HEIGHT  # the set blade, 0.60
-ROCKER_SPRING_SET_BAND = 0.10  # set error: the bracket re-set on its screws
+# Set error (the bracket re-set on its screws): ±.004 in, the inch sheet's band.
+ROCKER_SPRING_SET_BAND = 0.1016
 ROCKER_SPRING_HEIGHT = (
     ROCKER_SPRING_SET - ROCKER_SPRING_SET_BAND,
     ROCKER_SPRING_SET + ROCKER_SPRING_SET_BAND,
@@ -130,8 +131,8 @@ NORTH_DATUM_STACK = {
 # --- stack length acceptance ---------------------------------------------------
 STACK_L20 = COUNT * HUB_LENGTH  # hub 0 south face to hub 19 north face
 # (upper, lower): re-face a long stack. #948 ruling R tightens it from +0.20:
-# a fit-up re-face acceptance, not a part band.
-STACK_L20_ACCEPT_BAND = (0.10, 0.0)
+# a fit-up re-face acceptance, not a part band. +.004/0 in on the inch sheet.
+STACK_L20_ACCEPT_BAND = (0.1016, 0.0)
 STACK_L20_ACCEPT = (
     STACK_L20 + STACK_L20_ACCEPT_BAND[1],
     STACK_L20 + STACK_L20_ACCEPT_BAND[0],
@@ -162,19 +163,35 @@ PIVOT_BRACKET_Z = (
 # --- the pivot shaft -----------------------------------------------------------
 # Its cylinder spans both ears' outer faces; the shop makes it to the overall
 # length, tip to tip, and fit-up sets its north tip DOME_HEIGHT proud of the
-# north ear's outer face. The part's origin is the north cylinder end.
-PIVOT_SHAFT_LENGTH = NORTH_EAR_OUTER_Z - SOUTH_EAR_OUTER_Z
-PIVOT_SHAFT_SOUTH_Z = SOUTH_EAR_OUTER_Z
+# north ear's outer face. The part's origin is the north cylinder end. The
+# overall length is the ears' span plus both domes snapped to the printed .XX
+# grid, so the south end stands off the south ear's outer face by the snap.
+_PRINT_GRID = 25.4 / 10 ** _shaft.DRAWING_PRECISION_BY_NAME["OverallLength"]
+PIVOT_SHAFT_OVERALL_LENGTH = (
+    round(
+        (NORTH_EAR_OUTER_Z - SOUTH_EAR_OUTER_Z + 2.0 * _shaft.DOME_HEIGHT)
+        / _PRINT_GRID
+    )
+    * _PRINT_GRID
+)  # 6.40
+PIVOT_SHAFT_LENGTH = PIVOT_SHAFT_OVERALL_LENGTH - 2.0 * _shaft.DOME_HEIGHT
 PIVOT_SHAFT_NORTH_Z = NORTH_EAR_OUTER_Z
-PIVOT_SHAFT_OVERALL_LENGTH = PIVOT_SHAFT_LENGTH + 2.0 * _shaft.DOME_HEIGHT
+PIVOT_SHAFT_SOUTH_Z = PIVOT_SHAFT_NORTH_Z - PIVOT_SHAFT_LENGTH
+# The south cylinder end's nominal offset inboard of the south ear's outer
+# face (negative: proud of it), less than half a grid step.
+SOUTH_END_INSET = PIVOT_SHAFT_SOUTH_Z - SOUTH_EAR_OUTER_Z
+if not abs(SOUTH_END_INSET) <= _PRINT_GRID / 2.0 + 1e-9:
+    raise AssertionError("the shaft's overall length is not the ear span's snap")
 
-# Set-screw flats (user, 2026-10-10): one under each ear's apex screw, at the
-# ear's mid-plane, as stations from the shaft's north end (south, north).
+# Set-screw flats (user, 2026-10-10): one at each end, half an ear from its
+# cylinder end, as stations from the shaft's north end (south, north). The
+# north one sits under the north ear's apex screw; the south one stands off
+# the south ear's by the south end's inset.
 PIVOT_SHAFT_FLAT_STATIONS = (
-    PIVOT_SHAFT_NORTH_Z - PIVOT_BRACKET_Z[0],
-    PIVOT_SHAFT_NORTH_Z - PIVOT_BRACKET_Z[1],
+    PIVOT_SHAFT_LENGTH - _shaft.NORTH_FLAT_STATION,
+    _shaft.NORTH_FLAT_STATION,
 )
-if abs(PIVOT_SHAFT_FLAT_STATIONS[1] - _shaft.NORTH_FLAT_STATION) > 1e-9:
+if abs(PIVOT_SHAFT_NORTH_Z - PIVOT_BRACKET_Z[1] - _shaft.NORTH_FLAT_STATION) > 1e-9:
     raise AssertionError("the north flat is not under the north ear's set screw")
 # Where each flat may sit off its screw at fit-up: the shaft's north tip set
 # by depth gauge, and at the south ear the stack's acceptance excess, the
@@ -184,7 +201,7 @@ if abs(PIVOT_SHAFT_FLAT_STATIONS[1] - _shaft.NORTH_FLAT_STATION) > 1e-9:
 # ear's OUTBOARD face, while the south ear is set from the north ear's INBOARD
 # face (through the stack), so the north ear's thickness band also moves the
 # south flat off its ear.
-SHAFT_TIP_SET_BAND = 0.25
+SHAFT_TIP_SET_BAND = 0.254  # ±.010 in
 _WASHER_DEV = (
     _washer.THICKNESS_MIN - _washer.THICKNESS,
     _washer.THICKNESS_MAX - _washer.THICKNESS,
@@ -196,7 +213,8 @@ SOUTH_EAR_SET_RANGE = (
 FLAT_OFFSET_MAX = (
     SHAFT_TIP_SET_BAND
     + _bracket.EAR_T_BAND
-    + max(abs(v) for v in SOUTH_EAR_SET_RANGE),
+    + max(abs(v) for v in SOUTH_EAR_SET_RANGE)
+    + abs(SOUTH_END_INSET),
     SHAFT_TIP_SET_BAND,
 )  # (south, north)
 # Each flat is stationed from its own end's tip, so the bar goes in either
@@ -206,11 +224,12 @@ FLAT_STATION_ERROR = (
     _shaft.FLAT_STATION_BAND + _shaft.LENGTH_BAND,
     _shaft.FLAT_STATION_BAND,
 )
-# The south tip stands DOME_HEIGHT past the south ear's outer face, give or
-# take the tip's set, the length's band, both ears' thickness bands and the
-# south ear's set: at most this far.
+# The south tip stands DOME_HEIGHT less the south end's inset past the south
+# ear's outer face, give or take the tip's set, the length's band, both ears'
+# thickness bands and the south ear's set: at most this far.
 SOUTH_APEX_REACH_MAX = (
     _shaft.DOME_HEIGHT
+    - SOUTH_END_INSET
     + SHAFT_TIP_SET_BAND
     + _shaft.LENGTH_BAND
     + 2.0 * _bracket.EAR_T_BAND
@@ -286,6 +305,7 @@ __all__ = [
     "ROCKER_SPRING_SET_BAND",
     "ROCKER_SPRING_Z",
     "RUNNING_FLOOR",
+    "SOUTH_END_INSET",
     "SHAFT_TIP_SET_BAND",
     "SOUTH_EAR_INNER_Z",
     "SOUTH_APEX_REACH_MAX",
