@@ -49,6 +49,7 @@ from _drawing_projection import model_points_in_view
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -188,7 +189,7 @@ FRONT_KEEP = {
 # counted in (ch_pivot_bracket_spec.APEX_ABOVE_BORE). A sheet dimension
 # between the bore circle (its centre) and the arch arc (its far point), so
 # the part and its cache key stay as they are. Its text stands in the foot
-# height's lane, halfway up its span, between the 25.20 and 35.00 extension
+# height's lane, halfway up its span, between the bore and overall heights' extension
 # lines it shares; it prints at the two heights' places, which the drawing
 # document's default must already give (the sheet sets no precision).
 APEX_REFERENCE_TEXT_XY = (
@@ -416,7 +417,7 @@ def _add_apex_reference(adapter: Any, view: Any) -> Any:
     the arch arc's furthest point (endpoint 2), each arc condition set and
     read back; its text then put back between the two heights' extension
     lines (SolidWorks keeps the text outside the span the dimension had
-    while both ends sat on centres, 1.80 apart, too short for it -- r1);
+    while both ends sat on centres, ARCH_LIFT apart, too short for it -- r1);
     then parenthesized, its value proved against APEX_ABOVE_BORE (a swapped
     endpoint would read the bore's top to the arch centre, 1.45), its text
     position and its places against the heights'.
@@ -626,7 +627,11 @@ async def build(adapter: Any) -> dict[str, str]:
         required=("Number", "Material", "Material Specification", "Finish", "Quantity"),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("ch-pivot-bracket"),
     )
     stamp_drawing_summary(
         adapter,

@@ -42,9 +42,9 @@ station move the thread toward the end wall. The station is given from the
 ear's inboard face, the face fit-up sets, so the foot length's band is not in
 this chain (user, 2026-10-10, option ii).
 
-The stack is checked at the printed worst case: MHA-CH-08's foot height at
-.XX and its station at +/-0.10, the seat depths and the
-support's 177.8 length at .X, the web at .XX, the screw at its +0/-0.76
+The stack is checked at the printed worst case: MHA-CH-08's foot height and
+its station at its own sheet's .XX, the seat depths and the support's length
+at the support sheet's .X, the web at its .XX, the screw at its +0/-0.76
 commercial length band, and the 0.25 edge break at the seat mouth. Every check
 raises on import.
 """
@@ -60,7 +60,12 @@ from _hole_spec import (
     HoleSpec,
 )
 from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
-from ch_pivot_bracket_sides import HOLE_MACHINE_Z, SIDES
+from ch_pivot_bracket_sides import (
+    HOLE_MACHINE_Z,
+    SIDES,
+    SUPPORT_UNIT,
+    SUPPORT_WALL_TARGET,
+)
 from fr_rocker_arm_support_section_spec import NARROW
 from fr_rocker_arm_support_spec import (
     SUPPORT_HALF_MACHINE_Z,
@@ -68,11 +73,11 @@ from fr_rocker_arm_support_spec import (
     SUPPORT_WORLD_Z,
 )
 
-LINEAR_1PL = printed_band_mm(1)  # title-block .X band
-LINEAR_2PL = 0.508  # title-block .XX band
-LINEAR_3PL = 0.127  # title-block .XXX band
-EDGE_BREAK = edge_break_chamfer_mm()  # title-block edge break, also the novice spare
-RULE12_WEB_TARGET = 2.0
+# The support's own sheet: its title-block bands and edge break.
+LINEAR_1PL = printed_band_mm(1, unit=SUPPORT_UNIT)  # title-block .X band
+LINEAR_2PL = printed_band_mm(2, unit=SUPPORT_UNIT)  # title-block .XX band
+EDGE_BREAK = edge_break_chamfer_mm(unit=SUPPORT_UNIT)  # also the novice spare
+RULE12_WEB_TARGET = SUPPORT_WALL_TARGET
 
 # MHA-CH-VN-57: the channel assembly pins these to the stock part it places.
 SCREW_THREAD = "#8-32"
@@ -117,8 +122,10 @@ SEAT_MACHINE_XZ = tuple((SUPPORT_WORLD_X, HOLE_MACHINE_Z[name]) for name in SIDE
 # (SUPPORT_WORLD_Z - z, 0).
 SEAT_LOCAL_X = tuple(SUPPORT_WORLD_Z - z for _x, z in SEAT_MACHINE_XZ)
 
-# Worst-case stack at the printed limits.
-FOOT_H_RANGE = (_bracket.FOOT_H - LINEAR_2PL, _bracket.FOOT_H + LINEAR_2PL)
+# Worst-case stack at the printed limits. The foot height prints at the
+# bracket sheet's .XX.
+_FOOT_H_BAND = printed_band_mm(2, unit=_bracket.UNIT)
+FOOT_H_RANGE = (_bracket.FOOT_H - _FOOT_H_BAND, _bracket.FOOT_H + _FOOT_H_BAND)
 SCREW_REACH_MAX = SCREW_LENGTH + SCREW_LENGTH_BAND[0] - FOOT_H_RANGE[0]
 SCREW_REACH_MIN = SCREW_LENGTH - SCREW_LENGTH_BAND[1] - FOOT_H_RANGE[1]
 ENGAGEMENT_MIN = SCREW_REACH_MIN - SCREW_TIP_CHAMFER - EDGE_BREAK
@@ -129,28 +136,28 @@ ENGAGEMENT_MIN = SCREW_REACH_MIN - SCREW_TIP_CHAMFER - EDGE_BREAK
 # centring band toward the far side). Toward the far face: the edge at its
 # innermost, the hole at its farthest, the web at its thinnest.
 TRANSFER_PUNCH_DIA = 11.0 / 64.0 * 25.4
-TOP_FLAT_EDGE_BAND = {1: LINEAR_1PL, 2: LINEAR_2PL, 3: LINEAR_3PL}[TOP_FLAT_PLACES]
+TOP_FLAT_EDGE_BAND = printed_band_mm(TOP_FLAT_PLACES, unit=SUPPORT_UNIT)
 HOLE_FROM_FOOT_SIDE_MIN = (_bracket.FOOT_W - _bracket.EDGE_BAND) - (
     _bracket.FOOT_W / 2.0 + _bracket.HOLE_X_BAND
-)  # 6.98
+)  # 7.62
 HOLE_FROM_FOOT_SIDE_MAX = (_bracket.FOOT_W + _bracket.EDGE_BAND) - (
     _bracket.FOOT_W / 2.0 - _bracket.HOLE_X_BAND
-)  # 9.02
+)  # 8.64
 PUNCH_FLOAT = (_bracket.HOLE_DIA + _bracket.DRILL_GROWTH - TRANSFER_PUNCH_DIA) / 2.0
 SEAT_FROM_NEAR_FACE_MIN = (
     HOLE_FROM_FOOT_SIDE_MIN
     - (TOP_FLAT_EDGE_FROM_WEB + TOP_FLAT_EDGE_BAND)
     - PUNCH_FLOAT
-)  # 4.21
+)  # 4.84
 SEAT_FROM_FAR_FACE_MIN = (2.0 * WEB - LINEAR_2PL) - (
     HOLE_FROM_FOOT_SIDE_MAX
     + PUNCH_FLOAT
     - (TOP_FLAT_EDGE_FROM_WEB - TOP_FLAT_EDGE_BAND)
-)  # 4.63
+)  # 5.01
 # Beside the thread, to either web face, at the seat's worst offset.
 WEB_WALL_MIN = (
     min(SEAT_FROM_NEAR_FACE_MIN, SEAT_FROM_FAR_FACE_MIN) - SCREW_MAJOR_DIA / 2.0
-)  # 2.12
+)  # 2.76
 # From the thread to the support's end face on its side, at the worst
 # transferred position: the end face moves by half the support length's .X
 # band, the hole by the bracket's station band from the fit-up-set ear face.
@@ -162,7 +169,7 @@ END_WALL_MIN = tuple(
     - _bracket.STATION_BAND
     - LINEAR_1PL / 2.0
     for x in SEAT_LOCAL_X
-)  # S 2.36, N 3.97
+)  # S 2.61, N 4.22
 
 if ENGAGEMENT_MIN < 1.5 * SCREW_MAJOR_DIA:
     raise AssertionError(
@@ -199,7 +206,6 @@ __all__ = [
     "HOLE_FROM_FOOT_SIDE_MIN",
     "LINEAR_1PL",
     "LINEAR_2PL",
-    "LINEAR_3PL",
     "PUNCH_FLOAT",
     "SCREW_LENGTH",
     "SCREW_REACH_MAX",

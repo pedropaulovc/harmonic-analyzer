@@ -10,9 +10,10 @@ part is the bolt body alone.
 
 Two supplier options this production part takes -- the nut above and LENGTH:
 the vendor's 19.05 mm shank is cut to ``ch_vn_spring_hook_spec.SHANK_LENGTH_MM``
-with the 45 deg deburr restored at the new end, so the shank crosses the plate,
-carries the jam nut and still shows two full threads below it after the
-calibration back-out -- and the factory thread phase survives.
+with the 45 deg deburr restored at the new end (its leg driven to the sheet's
+.018 nominal), so the shank crosses the plate, carries the jam nut and still
+shows two full threads below it after the calibration back-out -- and the
+factory thread phase survives.
 
 The tracked diagnostic recipe is an exact geometric replay of the supplied
 vendor SLDPRT and stays in the vendor's own frame -- eye centre at the origin,
@@ -32,6 +33,7 @@ import sys
 
 from solidworks_mcp.adapters.com_variant import null_variant
 from solidworks_mcp.adapters.solidworks.sketch import _resolve_entity_ref
+import _telemetry
 from _check import check
 from _appearance import PANEL_BLACK
 from _com import _early_bound, _read_member
@@ -85,6 +87,7 @@ from ch_vn_spring_hook_spec import (
     SUPPLIER_STOCK_MM,
     SUPPLIER_THREAD_MAJOR_MM,
     SUPPLIER_THREAD_START_MM,
+    UNIT,
 )
 from stock_anchor_geom import ANCHOR_9489T111
 
@@ -100,6 +103,24 @@ FINISHED_FEATURES = (
 # MHA-CH-14 jam nut is its own part), so no nut geometry belongs in the
 # SLDPRT -- and the trim below would cut through its seat.
 NUT = "omitted"
+
+
+@_telemetry.traced("stock.shank.deburr")
+async def _size_deburr(adapter) -> None:
+    """Drive the restored factory deburr's leg to the sheet's inch nominal.
+
+    The shared trim recipe restores the vendor's 0.4557 leg; the anchor's own
+    driving ChamferWidth then takes the spec's .018 (the boss hook's pattern).
+    """
+    _, dimension = _named_dimension(adapter, "StockDeburrProfile", "ChamferWidth")
+    # swSetValue_InAllConfigurations (2); only the finished configuration exists yet.
+    status = dimension.SetSystemValue3(CHAMFER_WIDTH_MM / 1000, 2, null_variant())
+    if int(status) != 0:  # swSetValueReturnStatus_e.swSetValue_Successful
+        raise RuntimeError(f"ChamferWidth@StockDeburrProfile: deburr rejected ({status})")
+    await force_rebuild(adapter)
+    faults = _hard_faults(adapter, adapter.currentModel)
+    if faults:
+        raise RuntimeError(f"sized deburr rebuilt with faults {faults}")
 
 
 def _manufacturing_controls(adapter) -> None:
@@ -124,10 +145,12 @@ def _manufacturing_controls(adapter) -> None:
         ):
             raise RuntimeError(f"{name}@{feature}: native precision did not persist")
     set_dimension_symmetric_tolerance(
-        adapter, "StockTrimProfile", "FinishedOverall", FINISHED_OVERALL_TOLERANCE_MM
+        adapter, "StockTrimProfile", "FinishedOverall", FINISHED_OVERALL_TOLERANCE_MM,
+        display_unit=UNIT,
     )
     set_dimension_symmetric_tolerance(
-        adapter, "StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_TOLERANCE_MM
+        adapter, "StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_TOLERANCE_MM,
+        display_unit=UNIT,
     )
     set_dimension_symmetric_angular_tolerance(
         adapter, "StockDeburrProfile", "ChamferAngle", CHAMFER_ANGLE_TOLERANCE_DEG
@@ -339,6 +362,7 @@ async def _save_anchor(adapter, part_name, suppressed_features):
 @wraps(build_9489T111)
 async def _modified_anchor(adapter, truth=None, **parameters):
     receipt = await build_9489T111(adapter, truth, **parameters)
+    await _size_deburr(adapter)
     _manufacturing_controls(adapter)
     return receipt
 

@@ -68,9 +68,9 @@ def test_shaft_band_runs_in_the_bracket_bores() -> None:
 def test_the_part_owns_display_precision_and_the_sheet_only_asserts_it() -> None:
     assert part.DRAWING_PRECISION is spec.DRAWING_PRECISION
     assert spec.DRAWING_PRECISION_BY_NAME == {
-        "ShaftDia": 3,
-        "DomeHeight": 1,
-        "Radius": 1,
+        "ShaftDia": 4,
+        "DomeHeight": 2,
+        "Radius": 2,
         "OverallLength": 2,
         "FlatLength": 2,
         "FlatAF": 2,
@@ -209,7 +209,11 @@ def test_the_layout_checks_the_flat_at_its_printed_limits() -> None:
     prints (and the feature export carries), so a precision change cannot
     leave the layout proving a band the machinist never sees (Astra on
     #1344)."""
-    from _printed_limits import limits
+    from _printed_tolerance import printed_deviations
+
+    def limits(model: float, places: int) -> tuple[float, float]:
+        lower, upper = printed_deviations(model, places, unit=spec.UNIT)
+        return model + lower, model + upper
 
     p = spec.DRAWING_PRECISION_BY_NAME
     assert list(spec.FLAT_LENGTH_RANGE) == pytest.approx(limits(spec.FLAT_LENGTH, p["FlatLength"]))
@@ -292,7 +296,8 @@ def _stands_outside(text_x: float, half_width: float, witnesses: tuple) -> bool:
 
 def test_dome_height_callout_stands_outside_its_witness_pair() -> None:
     """r743-3 eye pass: centred on its 1.5 mm span, "1.5 BOTH ENDS" was
-    crossed by both witness lines. In DETAIL A it ends left of the dome tip."""
+    crossed by both witness lines. In DETAIL A it ends left of the dome tip
+    (now ".06 BOTH ENDS")."""
     witnesses = (
         drawing._detail_x(spec.DOME_HEIGHT),  # dome tip
         drawing._detail_x(0.0),  # shaft end
@@ -303,10 +308,10 @@ def test_dome_height_callout_stands_outside_its_witness_pair() -> None:
 
 
 def test_the_dome_radius_prints_as_a_spherical_reference() -> None:
-    """PR #1317 machinist review: the 1.5 height alone left the crown's
-    profile open. The model's sphere radius prints as (SR4.1), read-only."""
-    assert spec.DRAWING_PRECISION["NorthCapProfile"]["Radius"] == 1
-    assert f"{spec.DOME_SPHERE_RADIUS:.1f}" == "4.1"
+    """PR #1317 machinist review: the dome height alone left the crown's
+    profile open. The model's sphere radius prints as (SR.16), read-only."""
+    assert spec.DRAWING_PRECISION["NorthCapProfile"]["Radius"] == 2
+    assert f"{spec.DOME_SPHERE_RADIUS / 25.4:.2f}" == "0.16"
     assert "Radius" in drawing.DETAIL_KEEP
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "_set_spherical_reference(adapter, radius_annotations[0]" in source

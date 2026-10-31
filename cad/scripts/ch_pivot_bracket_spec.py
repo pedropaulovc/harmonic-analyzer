@@ -16,10 +16,14 @@ bank's datum), the preload spring's at the south one (``rocker_bank_layout``).
 
 One MHA-SH-VN-54 #4-40 cup-point set screw drops through the arch apex, on the
 ear's mid-plane, into the bore and onto the pivot shaft's flat (user,
-2026-10-10). EAR_T is 8.0 (was 6.0) so the tap keeps its walls to both ear
-faces; the apex stands 35.00 over the seat, 9.80 over the bore (was the R8
-half-round's 8.00), so the tap keeps 1.5D of full thread with both heights
-at the title block's band (#1371).
+2026-10-10). EAR_T is .320 (was 6.0 mm) so the tap keeps its walls to both
+ear faces; the apex stands 1.38 over the seat, its arch's centre lifted over
+the bore, so the tap keeps 1.5D of full thread with both heights at the
+title block's band (#1371).
+
+Issue #290: the sheet prints decimal inch (``drawing_unit: in``). Lengths
+stay physical millimetres, each the exact decimal of its printed inch value;
+the bore height alone is the rocker pivot's (kinematic) and stays exact.
 
 The foot's end and its one hold-down hole must suit both ends of the support,
 so ``ch_pivot_bracket_sides`` derives them from the bank layout (which
@@ -31,30 +35,40 @@ from __future__ import annotations
 
 from math import sqrt
 
+import _config
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
-from _printed_tolerance import drilled_oversize_mm
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _package_units import drawing_unit
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
 
-FOOT_W = 16.0  # X, across the support apex (16.933 wide; 0.47 margin each side)
-FOOT_H = 6.0
+UNIT = drawing_unit("parts/ch-pivot-bracket", _config.parts("ch-pivot-bracket"))
+
+FOOT_W = 16.256  # .64: X, across the 16.933 support apex
+FOOT_H = 6.096  # .24
 EAR_W = FOOT_W  # X: the ear's sides run flush with the foot's
-EAR_T = 8.0  # Z; the ear's Z band is the bore's (z -4..+4)
+# Z; the ear's Z band is the bore's. Its half, the apex tap's station, and
+# that half plus the shaft's dome both land on the printed grid.
+EAR_T = 8.128  # .320
 FOOT_Z0 = -EAR_T / 2.0  # foot starts at the ear's inboard face
-BORE_H = 25.2  # shaft axis above the seat: the rocker pivot stays at machine
-# y 253.8 on the 228.6 support apex
-BORE_DIA = 6.5  # O6.35 shaft, 0.15 diametral clearance
-EAR_ARCH_R = EAR_W / 2.0  # the ear's top is a half-round, tangent to its sides
+# Shaft axis above the seat: the rocker pivot stays at machine y 253.8 on the
+# 228.6 support apex (kinematic, so exact; it prints .99).
+BORE_H = 25.2
+BORE_H_PLACES = 2
+BORE_DIA = 6.5024  # .256: O.250 shaft, .006 diametral clearance (fit F5)
+EAR_ARCH_R = EAR_W / 2.0  # .32: the ear's top is a half-round, tangent to its sides
 # Every height runs from the seat (drawing-guidelines.md rule 10, #1371 r1
 # review): the bore axis and the arch apex, each at the title block's .XX.
 # The apex tap's wall over the bore is their difference, so it loses both
-# bands; the R8 half-round about the bore left the tap 1.08D of full thread,
-# and lifting the arch's centre 1.80 over the bore gives it 1.5D at that
-# worst case (owner policy: geometry, not a ruling). The arch stays the ear's
-# own half-round, its sides run 1.80 further up.
-EAR_TOP_Y = 35.0  # the overall height, seat to apex
-HEIGHT_BAND = 0.508  # title-block .XX: the overall and the bore heights
-APEX_ABOVE_BORE = EAR_TOP_Y - BORE_H  # 9.80
-ARCH_LIFT = APEX_ABOVE_BORE - EAR_ARCH_R  # 1.80: the arch centre over the bore
-BORE_LIGAMENT = APEX_ABOVE_BORE - BORE_DIA / 2.0  # 6.55: drawing-guidelines.md rule 17 (walls and webs) web over the bore
+# bands (the bore height's off its printed .99); a half-round about the bore
+# left the tap short of thread, and lifting the arch's centre over the bore
+# gives it 1.5D at that worst case (owner policy: geometry, not a ruling). The
+# arch stays the ear's own half-round, its sides run on up to it.
+EAR_TOP_Y = 35.052  # 1.38: the overall height, seat to apex
+HEIGHT_BAND = printed_band_mm(2, unit=UNIT)  # .XX: the overall and the bore heights
+BORE_H_DEVIATIONS = printed_deviations(BORE_H, BORE_H_PLACES, unit=UNIT)
+APEX_ABOVE_BORE = EAR_TOP_Y - BORE_H
+ARCH_LIFT = APEX_ABOVE_BORE - EAR_ARCH_R  # the arch centre over the bore
+BORE_LIGAMENT = APEX_ABOVE_BORE - BORE_DIA / 2.0  # drawing-guidelines.md rule 17 (walls and webs) web over the bore
 # The MHA-CH-VN-57 hold-down passes here: #8 close clearance, the hole MHA-DT-02
 # gives its #8-32 fillister of the same head. The old #19 (0.025 radial over the thread major)
 # caught the screw's under-head junction fillet on its mouth (r743-3C).
@@ -68,24 +82,25 @@ HOLE_DIA = blind_cut_dia_mm(HOLD_DOWN_HOLE_SPEC)
 # length's band (user, 2026-10-10, option ii). Worst case is each term at its
 # OWN band (Codex #936 PRRT_kwDOPHDy386mV3AN). The foot length and the hole
 # station both ride the title block's .XX: the foot is long enough to keep the
-# 2.0 wall to its end, the screw head clear of the ear and the support seat's
-# 2.0 end wall at those bands (user ruling 2026-10-14, #954 machinist review:
-# fix the wall with geometry, not a band; #1371 review: the station's +/-0.10
-# went the same way; ``ch_pivot_bracket_sides`` sizes the support, and so the
-# foot, for it). The ear thickness keeps its +/-0.10 for the thrust faces and
-# the tap's walls. Across the foot its sides stay at .XX (the band
+# wall target to its end, the screw head clear of the ear and the support
+# seat's end wall at those bands (user ruling 2026-10-14, #954 machinist
+# review: fix the wall with geometry, not a band; #1371 review: the station's
+# own band went the same way; ``ch_pivot_bracket_sides`` checks the support,
+# and so the foot, for it). The ear thickness keeps its +/-.004 for the thrust
+# faces and the tap's walls. Across the foot its sides stay at .XX (the band
 # rocker_bracket_seat_layout carries this foot at) and the hole's centring on
-# x = 0 at .XX; a drilled hole grows by the title block's +0.10/0.
-# build_ch_pivot_bracket carries the +/-0.10 band on the model's own
+# x = 0 at .XX; a drilled hole grows by the title block's +.004/0.
+# build_ch_pivot_bracket carries the +/-.004 band on the model's own
 # dimension.
-FOOT_LEN_BAND = 0.508  # title-block .XX
-EAR_T_BAND = 0.10
-STATION_BAND = 0.508  # title-block .XX
-EDGE_BAND = 0.508  # title-block .XX: the foot's sides
-HOLE_X_BAND = 0.508  # title-block .XX: the hole's centring across the foot
-DRILL_GROWTH = drilled_oversize_mm()  # title-block drilled hole, +0.10/0 on the diameter
-LIGAMENT_FLOOR = 1.5
-LIGAMENT_TARGET = 2.0
+_LINEAR_2PL = printed_band_mm(2, unit=UNIT)
+FOOT_LEN_BAND = _LINEAR_2PL
+EAR_T_BAND = 0.1016  # +/-.004
+STATION_BAND = _LINEAR_2PL
+EDGE_BAND = _LINEAR_2PL  # the foot's sides
+HOLE_X_BAND = _LINEAR_2PL  # the hole's centring across the foot
+DRILL_GROWTH = drilled_oversize_mm(unit=UNIT)  # title-block drilled hole, +.004/0 on the diameter
+LIGAMENT_FLOOR = WALL_FLOOR_MM
+LIGAMENT_TARGET = WALL_TARGET_MM
 
 
 def hole_ligaments_min(hole_z: float, foot_z1: float) -> dict[str, float]:
@@ -117,11 +132,11 @@ def head_to_ear_face_min(hole_z: float, head_dia: float) -> float:
 
 
 if BORE_LIGAMENT < LIGAMENT_TARGET:
-    raise AssertionError("ear arch leaves less than the 2.0 web over the bore")
+    raise AssertionError("ear arch leaves less than the .080 web over the bore")
 
 # The arch's radius rides the title block's .XX (the two heights' band is
-# HEIGHT_BAND); the bore grows by the drilled hole's +0.10/0.
-ARCH_R_BAND = 0.508
+# HEIGHT_BAND); the bore grows by the drilled hole's +.004/0.
+ARCH_R_BAND = _LINEAR_2PL
 BORE_RADIUS_MAX = (BORE_DIA + DRILL_GROWTH) / 2.0
 
 # --- apex set screw (user, 2026-10-10) ----------------------------------------
@@ -136,12 +151,12 @@ SET_SCREW_MAJOR_DIA = THREAD_MAJOR_MM[SET_SCREW_THREAD]
 # The cup end the flat must take: the vendor's 45 deg x one-pitch point
 # chamfer off the major (sh_vn_arbor_set_screw_spec.POINT_LENGTH).
 SET_SCREW_POINT_DIA = SET_SCREW_MAJOR_DIA - 2.0 * SET_SCREW_PITCH  # 1.575
-# The tap sits on the ear's mid-plane, held +/-0.10 from the inboard face;
+# The tap sits on the ear's mid-plane, held +/-.004 from the inboard face;
 # that face's mid-plane is itself half the thickness band off, so the tap
 # may stand this far off nominal along the shaft.
-SET_SCREW_STATION_BAND = 0.10
+SET_SCREW_STATION_BAND = 0.1016  # +/-.004
 SET_SCREW_OFF_MID_MAX = SET_SCREW_STATION_BAND + EAR_T_BAND / 2.0
-# The thread's wall to each ear face at the worst case (target 2.0): the
+# The thread's wall to each ear face at the worst case (target .080): the
 # inboard face at the tap's far limit, the outboard face also losing the
 # thickness band.
 SET_SCREW_WALLS_MIN = {
@@ -150,7 +165,7 @@ SET_SCREW_WALLS_MIN = {
     - EAR_T_BAND
     - SET_SCREW_OFF_MID_MAX
     - SET_SCREW_MAJOR_DIA / 2.0,
-}  # 2.43, 2.33
+}  # 2.49, 2.39
 if min(SET_SCREW_WALLS_MIN.values()) < LIGAMENT_TARGET:
     raise AssertionError(
         f"the apex tap leaves {SET_SCREW_WALLS_MIN} to the ear faces at worst"
@@ -167,17 +182,19 @@ def _sag(radius: float) -> float:
 # terms): the thread is full only where its major circle lies wholly in
 # metal, so the arch's and the bore's sags across the hole are lost, and so
 # is the one-pitch entry chamfer. The apex sits at its lowest over the bore
-# (the overall height low, the bore high), the arch at its smallest radius
-# (its largest sag).
+# (the overall height low, the bore high off its printed .99), the arch at its
+# smallest radius (its largest sag).
 SET_SCREW_WALL_TERMS = {
-    "apex over the bore at its minimum": APEX_ABOVE_BORE - 2.0 * HEIGHT_BAND,
+    "apex over the bore at its minimum": EAR_TOP_Y
+    - HEIGHT_BAND
+    - (BORE_H + BORE_H_DEVIATIONS[1]),
     "bore radius at its maximum": -BORE_RADIUS_MAX,
     "arch sag across the thread": -_sag(EAR_ARCH_R - ARCH_R_BAND),
     "bore sag across the thread": -_sag(BORE_RADIUS_MAX),
     "one-pitch entry chamfer": -SET_SCREW_PITCH,
 }
-SET_SCREW_FULL_THREAD_MIN = sum(SET_SCREW_WALL_TERMS.values())  # 4.39
-SET_SCREW_ENGAGEMENT_D = SET_SCREW_FULL_THREAD_MIN / SET_SCREW_MAJOR_DIA  # 1.543D
+SET_SCREW_FULL_THREAD_MIN = sum(SET_SCREW_WALL_TERMS.values())  # 5.01
+SET_SCREW_ENGAGEMENT_D = SET_SCREW_FULL_THREAD_MIN / SET_SCREW_MAJOR_DIA  # 1.76D
 SET_SCREW_ENGAGEMENT_PRINTED = int(SET_SCREW_ENGAGEMENT_D * 100.0) / 100.0
 SET_SCREW_MIN_ENGAGEMENT_D = 1.5  # drawing-guidelines.md rule 18 (thread engagement)
 if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
