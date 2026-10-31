@@ -332,9 +332,9 @@ def test_pilot_wall_worst_and_the_one_decimal_control() -> None:
 
 def test_drive_pin_holes_clear_the_bore_and_the_pilot() -> None:
     # The unchanged dowel circle clears the smaller D-bore and pilot.
-    assert spec.BORE_PIN_WALL_WORST == pytest.approx(3.3512)
+    assert spec.BORE_PIN_WALL_WORST == pytest.approx(3.34865)
     assert spec.BORE_PIN_WALL_WORST >= spec.WALL_FLOOR
-    assert spec.PIN_HOLE_INNER_R_MIN == pytest.approx(5.78755)
+    assert spec.PIN_HOLE_INNER_R_MIN == pytest.approx(5.785)
     assert spec.PIN_HOLE_INNER_R_MIN > spec.PILOT_R_MAX
     # Negative controls: holes on a 6.0 radius break into the pilot; on the
     # pilot's own 5.0 radius they leave 0.605 to the bore.
@@ -857,7 +857,7 @@ def test_native_rear_entry_has_both_actual_legs_on_both_d_edges(monkeypatch) -> 
     assert spec.BORE_ENTRY_AXIAL_SPAN_MIN == pytest.approx(3.870)
     assert spec.BORE_ENTRY_PROFILE_DEPTH_MIN == pytest.approx(0.270)
     assert spec.BORE_ENTRY_BREAK_GEOMETRY_MAX == pytest.approx(0.270)
-    assert spec.BORE_ENTRY_WALL_WORST == pytest.approx(3.092317421552)
+    assert spec.BORE_ENTRY_WALL_WORST == pytest.approx(3.089767421552)
     assert spec.NECK_CORNER_D_BORE_AIR_MIN == pytest.approx(0.064853316221)
     assert spec.D_DRIVE_AREA_MIN == pytest.approx(7.339179692138)
     assert spec.D_SUPPORT_LENGTH_MIN == pytest.approx(4.072234843105)
