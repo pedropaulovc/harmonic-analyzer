@@ -9,7 +9,7 @@ height along Y (y = 0 at mid-height); depth along Z with the FRONT face at
 z = -BAR_DEPTH/2 and the BACK face at z = +BAR_DEPTH/2.  The paper-drive
 assembly places it without rotation with its front face on the platen-back
 plane at machine z -138.9 and its back face on the front clamp arcs at
--138.9 + BAR_DEPTH (-129.4004): the .374 bar grew rearward, the arcs gave it up.
+-138.9 + BAR_DEPTH (-129.4): the 9.5 bar grew rearward, the arcs gave it up.
 
 Ch. 23 hanger holes (contract §5), all entering the BACK face:
 * the MHA-PD-VN-57 pivot screw's #8-32 THROUGH tap at the arm pivot P, machine
@@ -64,7 +64,7 @@ BAR_HEIGHT = 28.0
 BAR_HEIGHT_BAND = _printed_reach(BAR_HEIGHT, BAR_BAND_PLACES)
 # Deep (Z), BAR_DEPTH (_column_clamp_interface, shared with the wheel
 # bar): the back face on the clamp arcs, the front face carrying the platen's
-# back. .374 (9.4996), not the 9.0 stock read, so the MHA-PD-VN-57 pivot
+# back. 9.5 (prints .374), not the 9.0 stock read, so the MHA-PD-VN-57 pivot
 # screw's faced tip (0.20-0.50 below the front face) keeps rule 18's 1.5D at
 # the thinnest bar (user ruling 2026-10-15; transgear_hanger_joints).
 # The pivot screw's tip recess and the latch-hook-bracket-screw (MHA-SH-VN-52)

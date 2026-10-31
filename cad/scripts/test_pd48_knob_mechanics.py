@@ -67,8 +67,9 @@ def test_actual_stock_master_and_real_printed_span_family():
         support.support_radius_max_mm - support.geometry_error_bound_mm
         - (shaft.OUTSIDE_DIA + max(shaft.OUTSIDE_DIA_BAND) + 0.001) / 2.0
     ) < 0.0
-    # Same construction as the disc: both blanks are the floored support.
-    for spec in (shaft, shaft.DISC):
+    # Same construction as the disc: both blanks are the floored support, on
+    # each sheet's grid (0.01 mm; the inch disc .0001 in).
+    for spec, per_mm in ((shaft, 100.0), (shaft.DISC, 1e4 / 25.4)):
         lowest = spec._MIN_SETTING_SUPPORT
         floored = math.floor(
             (
@@ -76,9 +77,10 @@ def test_actual_stock_master_and_real_printed_span_family():
                 - 2.0 * lowest.geometry_error_bound_mm
                 - spec.OUTSIDE_DIA_BAND[0]
             )
-            * 100.0
-        ) / 100.0
-        assert spec.OUTSIDE_DIA == floored
+            * per_mm
+            + 1e-9
+        ) / per_mm
+        assert spec.OUTSIDE_DIA == pytest.approx(floored, abs=1e-9)
 
 
 def test_actual_pin_is_supported_at_every_manufactured_corner():

@@ -558,15 +558,15 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         _smooth_annulus_limit_mm3(4.1656, 3.454, 12.9375 - 5.0),
     ),
     # MHA-PD-VN-57 (pd_vn_transgear_pivot_screw_spec, 90325A174 faced to fit) in the
-    # support bar's THROUGH #8-32 tap: its fitted 9.144 thread less the 1.1938
+    # support bar's THROUGH #8-32 tap: its fitted 9.1444 thread less the 1.1938
     # neck flat under the shoulder, whose Ø3.02 stays inside the #29 drill --
     # the full thread plus the 45° ramp back to the major (the MHA-DT-32 row's
-    # relief-and-lead-cone reading), 7.9502 of overlap; the faced tip stands
+    # relief-and-lead-cone reading), 7.9506 of overlap; the faced tip stands
     # inside the front face. The contract's engagement (transgear_hanger_joints)
     # counts full thread only, less one pitch at the faced tip.
     frozenset(
         ("pd-vn-transgear-pivot-screw-1", "pd-support-bar-1")
-    ): _smooth_annulus_limit_mm3(4.1656, 3.454, 9.144 - 1.1938),
+    ): _smooth_annulus_limit_mm3(4.1656, 3.454, 9.1444 - 1.1938),
     # MHA-SH-VN-52 #4-40 x 3/8 (pd_latch_hook_bracket_screw_spec) through the
     # MHA-PD-14 hook's .032 base (Ø.128 clearance): 9.525 - 0.8128 = 8.7122 in
     # the support bar's #43 taps.

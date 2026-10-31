@@ -208,7 +208,7 @@ _IN = 25.4
 _LOCK_SCREW_LEN_MAX = 0.375 * _IN  # 91792A108; B18.6.3 band +0/-0.03 in
 _LOCK_THICK_MIN = (1.0 / 16.0 - 0.005) * _IN  # 1/16 sheet as supplied, +/-0.005 in
 _GUIDE_DEPTH_MIN = 10.16 - 0.254  # .40 +0/-.01 on the guide sheet
-_BAR_DEPTH_MIN = 9.4996 - 0.127  # MHA-PD-07 .374 +/-.005
+_BAR_DEPTH_MIN = (0.374 - 0.005) * _IN  # MHA-PD-07 .374 +/-.005
 _LOCK_GAP_FIT_MIN = 0.002 * _IN  # the faced lock seats (R9-47)
 
 
