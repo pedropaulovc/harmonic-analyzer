@@ -297,7 +297,7 @@ def _boss_face_location_check(adapter: Any, front: Any) -> Callable[[], None]:
         text_xy=BOSS_FACE_LOCATION_XY, label=label, orientation="vertical",
         entities=(boss.edge, plate.edge),
     )
-    # The exact .275 prints at three places under the title block's .XXX.
+    # The .275 prints .28 under the title block's .XX.
     set_dimension_display_precision(
         adapter, "drawing", label, FACE_LOCATION_PLACES, display=dimension,
     )
@@ -316,8 +316,8 @@ def _boss_face_location_check(adapter: Any, front: Any) -> Callable[[], None]:
         tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
         places = display.GetPrimaryPrecision2()
         if places != FACE_LOCATION_PLACES or tolerance.Type != 0:  # title block, no band
-            raise RuntimeError(f"{label}: lost its .XXX title-block control")
-        _telemetry.success(f"{label}: native face-attached {measured:.6f} mm at .XXX")
+            raise RuntimeError(f"{label}: lost its .XX title-block control")
+        _telemetry.success(f"{label}: native face-attached {measured:.6f} mm at .XX")
 
     check_faces()
     return check_faces
@@ -428,7 +428,7 @@ def _knife_height_location_check(adapter: Any, back: Any) -> Callable[[], None]:
         raise RuntimeError(f"{label}: native vertical dimension was not created")
     display = _early_bound(raw_dimension, "IDisplayDimension")
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
-    # The ridge-to-top .102 holds the knife geometry at three places.
+    # The ridge-to-top .102 prints .10 under the title block's .XX.
     set_dimension_display_precision(
         adapter, "drawing", label, FACE_LOCATION_PLACES, display=display,
     )
@@ -454,8 +454,8 @@ def _knife_height_location_check(adapter: Any, back: Any) -> Callable[[], None]:
         tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
         places = display.GetPrimaryPrecision2()
         if places != FACE_LOCATION_PLACES or tolerance.Type != 0:
-            raise RuntimeError(f"{label}: lost its .XXX title-block control")
-        _telemetry.success(f"{label}: native sharp/face-attached {measured:.6f} mm at .XXX")
+            raise RuntimeError(f"{label}: lost its .XX title-block control")
+        _telemetry.success(f"{label}: native sharp/face-attached {measured:.6f} mm at .XX")
 
     check_height()
     return check_height

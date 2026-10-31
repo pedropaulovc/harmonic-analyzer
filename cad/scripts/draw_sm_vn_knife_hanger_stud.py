@@ -134,6 +134,9 @@ CHAMFER_TEXT_XY = (0.157, TIP_SHEET_Y - 0.014)
 # the head-top edge, the note stands up and right in the open field.
 HEAD_PICK_MM = (HEAD_AF / 4, HEAD_TOP_Y, 0.0)
 PURCHASED_NOTE_XY = (0.130, 0.240)
+# The head AF text stands left of the hex, outside both extension lines
+# (its ~20 mm "HEAD AF" line is wider than the 16 mm head between them).
+HEAD_AF_TEXT_XY = (0.085, 0.255)
 # Every view and the sheet are 2:1, so the title-block SCALE is the view
 # scale and the isometric carries no scale label.
 ISO_CENTER = (0.340, 0.135)
@@ -423,7 +426,7 @@ def _add_supplier_references(adapter: Any, front: Any) -> dict[str, Any]:
         label="SupplierHeadAF",
     )
     display = add_edge_dimension(
-        adapter, front, p0=picks[0], p1=picks[1], text_xy=(0.110, 0.255),
+        adapter, front, p0=picks[0], p1=picks[1], text_xy=HEAD_AF_TEXT_XY,
         label="SupplierHeadAF", orientation="horizontal",
     )
     authored = {

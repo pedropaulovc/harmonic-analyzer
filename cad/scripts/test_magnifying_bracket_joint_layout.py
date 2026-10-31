@@ -365,7 +365,7 @@ def _printed_material_budget_oracle() -> tuple[float, float, float, float]:
 
 def test_printed_pilot_has_continuous_material_beyond_every_uniform_rib() -> None:
     walls = _printed_material_budget_oracle()
-    assert walls[:2] == pytest.approx((2.2217314979, 2.6051314979))
+    assert walls[:2] == pytest.approx((2.2217314979, 2.5797314979))
     assert min(walls) == pytest.approx(joint.receiver_pilot_material_wall_budget(), abs=1e-12)
     assert joint.RECEIVER_PILOT_MATERIAL_WALL_MIN == pytest.approx(min(walls), abs=1e-12)
     assert min(walls) >= joint.RECEIVER_PILOT_WALL_MIN == pytest.approx(2.032)

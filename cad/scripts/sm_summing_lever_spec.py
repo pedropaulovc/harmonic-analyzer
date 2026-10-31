@@ -170,7 +170,7 @@ CHANNEL_PITCH = 7.0565
 # config into every assembly's closure. test_sm_summing_lever_drawing pins it.
 HOLE_Z_OFFSET = -3.52825
 # The whole coefficient plate now supplies the spring tap's 1.5D engagement
-# at its printed .XXX band. Its top and underside remain the
+# at its printed .XX band. Its top and underside remain the
 # existing spring-eye and jam-nut seats; there is no separate pad or step.
 # All three positive-X rib branches use one tangent wrap/flank/root profile.
 RIB_T = 5.00  # every edge/middle rib extrusion, ordinary .XX title-block band (.20)
@@ -206,12 +206,11 @@ KNIFE_HOOK_ARM_SPREAD_MAX = (
 
 # The MODEL owns every printed decimal place (build_sm_summing_lever applies
 # this map; the drawing imports it unchanged).  Inch sheet: .XX on the plain
-# body sizes, every one of which some wall or clearance check reads (none
-# takes the .X row); .XXX on the spring/nut-seat plate thickness (.276) and the
-# exact .855 stub length; the knife envelope and R MAX limits at their own
-# places below.
+# body sizes, every one of which but the stub length (.86) some wall or
+# clearance check reads (none takes the .X row), the plate thickness (.28)
+# among them; the knife envelope and R MAX limits at their own places below.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "PlateProfile": {"PlateWidth": 2, "PlateThickness": 3},
+    "PlateProfile": {"PlateWidth": 2, "PlateThickness": 2},
     "CoefficientsPlate": {"PlateLength": 2},
     "CylinderReference": {"CylinderDia": 2},
     "SummationAnchorProfile": {"AnchorOuterDia": 2},
@@ -220,7 +219,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "SummationPlate": {"WebThickness": 2},
     "EdgeRibFrontProfile": {"EdgeRibFrontArcR": 2, "RibReach": 2},
     "EdgeRibFront": {"EdgeRibThickness": 2},
-    "KnifeStubReference": {"KnifeStubLength": 3},
+    "KnifeStubReference": {"KnifeStubLength": 2},
     "KnifeRidgeFillet": {"KnifeRidgeRadius": KNIFE_RIDGE_R_PLACES},
     "KnifeEnvelopeReference": {
         name: KNIFE_ENVELOPE_PLACES

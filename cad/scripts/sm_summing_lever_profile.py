@@ -15,7 +15,7 @@ from functools import cached_property
 from itertools import product
 import math
 
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import printed_deviations
 import magnifying_bracket_joint_layout as joint
 import sm_summing_lever_spec as spec
 
@@ -23,10 +23,17 @@ Point = tuple[float, float]
 
 # PlateProfile.PlateTopY independently drives CoefficientTopY: unlike the old
 # centred slab, it takes a whole band of its own, not half the thickness band.
-# The sheet locates the top at .XXX from the knife ridge (.102) and the boss
-# top (.275); the whole .XX row covers either .XXX band plus half the ridge's
-# .XXX height band and their sub-.0002 rounding.
-PLATE_TOP_Y_ALLOWANCE = printed_band_mm(2, unit=spec.UNIT)
+# The sheet locates the top .10 (.XX) below the knife ridge, which stands half
+# the .404 (.XXX) vertex height above the axis; the boss top's .28 only
+# narrows it. The allowance is that chain's larger printed excursion.
+_RIDGE = tuple(
+    d / 2.0
+    for d in printed_deviations(spec.HEX_H, spec.KNIFE_ENVELOPE_PLACES, unit=spec.UNIT)
+)
+_RIDGE_TO_TOP = printed_deviations(
+    spec.HEX_H / 2.0 - spec.COEFFICIENT_TOP_Y, 2, unit=spec.UNIT
+)
+PLATE_TOP_Y_ALLOWANCE = max(_RIDGE_TO_TOP[1] - _RIDGE[0], _RIDGE[1] - _RIDGE_TO_TOP[0])
 
 
 @dataclass(frozen=True)
