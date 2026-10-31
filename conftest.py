@@ -174,6 +174,32 @@ def _install_dodo_guard():
         _guard._guard_dodo(sys.modules["dodo"], _refuse)
 
 
+def _memoize_doit_plugin_entry_points():
+    """Scan installed entry points once per session for doit's plugin lookups.
+
+    Every in-process ``DoitMain`` asks ``importlib.metadata`` for each plugin
+    category, and each ask reads the metadata of every installed distribution.
+    Tests build many doit mains (``tests/test_farm_mode.py`` alone made 1,298
+    such scans), and the installed distributions cannot change mid-session.
+    The result is keyed by the exact query, so each group is still answered by
+    the real lookup the first time.
+    """
+    try:
+        import doit.plugin
+    except ImportError:
+        return
+    lookup = doit.plugin.entry_points_impl()
+    answers = {}
+
+    def entry_points(**query):
+        key = tuple(sorted(query.items()))
+        if key not in answers:
+            answers[key] = lookup(**query)
+        return answers[key]
+
+    doit.plugin.entry_points_impl = lambda: entry_points
+
+
 def pytest_configure(config):
     """Isolate the test session from the machine it runs on.
 
@@ -200,6 +226,7 @@ def pytest_configure(config):
     the same refusals through ``tests/_child_guard/sitecustomize.py`` and
     exits on one, which fails the test that started it.
     """
+    _memoize_doit_plugin_entry_points()
     if "HARMONIC_BUILDGRAPH_CACHE" not in os.environ:
         os.environ["HARMONIC_BUILDGRAPH_CACHE"] = tempfile.mkdtemp(
             prefix="buildgraph-facts-"
