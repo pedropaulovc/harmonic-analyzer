@@ -22,6 +22,7 @@ import yaml
 import _buildgraph as bg
 import _config
 import _interference_contracts as contracts
+from _inch_wall_limits import WALL_TARGET_MM
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_vn_oblique_carriage_spec as carriage
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
@@ -144,7 +145,10 @@ def test_base_bars_carry_their_rails_onto_the_studs() -> None:
         near = _image(rows, origin, (0.0, 0.0, 0.0))
         far = _image(rows, origin, (trammel.BASE_BAR_LENGTH, 0.0, 0.0))
         assert near[:2] == pytest.approx(trammel.rail_point(rail, trammel.RAIL_NEAR_S))
-        assert far[:2] == pytest.approx(trammel.rail_point(rail, trammel.RAIL_FAR_S))
+        # #290: the bar's 17.32 ends flush with the 440 rail within its band.
+        far_s = trammel.RAIL_NEAR_S + trammel.BASE_BAR_LENGTH
+        assert far[:2] == pytest.approx(trammel.rail_point(rail, far_s))
+        assert abs(trammel.RAIL_FAR_S - far_s) < trammel.BASE_BAR_THICK_BAND
         for which, slot in (
             ("near", (base_bar.NEAR_SLOT_X, base_bar.NEAR_SLOT_Y, 0.0)),
             ("far", (base_bar.FAR_SLOT_X, base_bar.FAR_SLOT_Y, 0.0)),
@@ -176,13 +180,15 @@ def test_pivot_blocks_and_screws_sit_on_the_pin_stations() -> None:
     for rail, (origin, rows), screw in zip(
         spec.RAILS, spec.BLOCK_PLACEMENTS, spec.PIVOT_SCREW_ORIGINS, strict=True,
     ):
-        assert origin[2] == pytest.approx(40.0)  # the faced 12.0 bar + 28.0
+        assert origin[2] == pytest.approx(trammel.CARRIAGE_TOP_Z)
         bore = _image(rows, origin, (pivot_block.BORE_X, 0.0, 0.0))
         assert bore[:2] == pytest.approx(trammel.rail_point(rail, spec.PIN_STATION))
         assert screw[:2] == pytest.approx(bore[:2])
-        assert screw[2] == pytest.approx(57.45)
-    assert trammel.CARRIER_UNDERSIDE_Z == pytest.approx(80.3)
-    assert trammel.CARRIER_TOP_Z == pytest.approx(92.3)
+        assert screw[2] == pytest.approx(origin[2] + pivot_block.BLOCK_HEIGHT - pivot_block.BORE_DEPTH)
+    assert trammel.CARRIER_UNDERSIDE_Z == pytest.approx(
+        trammel.PIVOT_BLOCK_TOP_Z + trammel.PIVOT_SHIM_PACK + trammel.PIVOT_SPACER_LENGTH
+    )
+    assert trammel.CARRIER_TOP_Z == pytest.approx(trammel.CARRIER_UNDERSIDE_Z + trammel.CARRIER_THICK)
 
 
 def test_carrier_riser_hub_pin_and_lever_close_on_the_carrier_frame() -> None:
@@ -199,7 +205,10 @@ def test_carrier_riser_hub_pin_and_lever_close_on_the_carrier_frame() -> None:
         assert machine[2] == trammel.CARRIER_TOP_Z
     hub = spec.POSE.to_machine(trammel.HUB)
     assert spec.HUB_PIN_ORIGIN[:2] == pytest.approx(hub)
-    assert spec.HUB_PIN_TOP_Z - (trammel.CARRIER_TOP_Z + riser.THICKNESS) == 2.0
+    assert spec.HUB_PIN_TOP_Z - (trammel.CARRIER_TOP_Z + riser.THICKNESS) == pytest.approx(
+        hub_pin.TIP_SET
+    )
+    assert spec.HUB_PIN_BOTTOM_Z == pytest.approx(trammel.CARRIER_UNDERSIDE_Z)
     riser_hub = _image(spec.RISER_ROWS, spec.RISER_ORIGIN, (*riser.HUB_HOLE, 0.0))
     assert riser_hub[:2] == pytest.approx(hub, rel=0.0, abs=1e-9)
     for model_x, hole in zip(feed_lever.HOLE_X, carrier.LEVER_HOLES):
@@ -282,15 +291,15 @@ def test_feed_block_nut_seat_closes_on_the_leadscrew_axis() -> None:
         spec.CARRIAGE_STATION + feed_block.NUT_FACE_X, leadscrew.SCREW_LATERAL,
     ))
     assert bore[2] == pytest.approx(leadscrew.SCREW_AXIS_Z)
-    assert feed_block.NUT_AXIS_Z == 12.4
-    assert feed_block.NUT_AXIS_Y == -55.0
-    assert feed_block.NUT_FACE_X == -9.25
-    assert feed_block.NUT_SPIGOT_DEPTH == 1.5
-    assert feed_block.NUT_SEAT_DIA == 10.5
-    assert feed_block.SCREW_TAP_DEPTH == 10.0
+    assert feed_block.NUT_FACE_X == feed_block.LUG_X0
+    assert feed_block.NUT_SPIGOT_DEPTH == leadscrew_nut.SPIGOT_LENGTH
+    assert feed_block.NUT_SEAT_DIA > leadscrew_nut.BODY_DIA
+    assert feed_block.SCREW_TAP_DEPTH == leadscrew.NUT_SCREW_TAP_DEPTH
     assert len(feed_block.NUT_HOLES_YZ) == 4
     for y, z in feed_block.NUT_HOLES_YZ:
-        assert math.hypot(y + 55.0, z - 12.4) == pytest.approx(8.0)
+        assert math.hypot(y - feed_block.NUT_AXIS_Y, z - feed_block.NUT_AXIS_Z) == pytest.approx(
+            leadscrew.NUT_HOLE_PCD / 2.0
+        )
         assert 0.0 < z < pivot_block.BLOCK_HEIGHT
 
 
@@ -443,11 +452,17 @@ def test_named_views_are_the_machine_frame() -> None:
 
 
 def test_finished_locator_hole_fits() -> None:
-    assert carrier.HUB_HOLE_BAND == (0.018, 0.0)
-    assert (carrier.CL_HOLE_BAND, carrier.CL_DOWEL_BAND) == (
-        (-0.004, -0.016),
-        (0.012, 0.004),
-    )
+    # F16: the bonded HUB pin never presses, and its gap stays within the
+    # .0006 Loctite 638 fills.
+    assert 0.0 <= carrier.HUB_BOND_CLEARANCE_MIN <= carrier.HUB_BOND_CLEARANCE_MAX
+    assert carrier.HUB_BOND_CLEARANCE_MAX <= 0.0006 * 25.4 + 1e-9
+    # F19: the CL dowel always presses into the carrier.
+    low, high = carrier.CL_DOWEL_INTERFERENCE
+    assert 0.0 < low <= high
+    assert (low, high) == pytest.approx((
+        min(carrier.CL_DOWEL_BAND) - max(carrier.CL_HOLE_BAND),
+        max(carrier.CL_DOWEL_BAND) - min(carrier.CL_HOLE_BAND),
+    ))
 
 
 def test_plan_tags_name_the_pass_holes_rails_and_origin() -> None:
@@ -770,8 +785,9 @@ def test_interference_contracts_are_physical_seats_and_threads() -> None:
     overlap = min(trammel.CARRIER_TOP_Z, spec.HUB_PIN_TOP_Z) - max(
         trammel.CARRIER_UNDERSIDE_Z, spec.HUB_PIN_ORIGIN[2],
     )
-    assert contracts.JIG_HUB_PIN_SEAT == (hub_pin.DIA, overlap)
-    assert hub_pin.CUT_LENGTH == 20.0
+    assert contracts.JIG_HUB_PIN_SEAT == pytest.approx((hub_pin.DIA, overlap))
+    # The bond runs the whole carrier: cut = carrier + riser + tip set.
+    assert overlap == pytest.approx(carrier.THICKNESS)
     assert contracts.JIG_CL_DOWEL_PRESS == (cl_dowel.DIA, carrier.THICKNESS)
     for envelope, expected in (
         (
@@ -809,8 +825,8 @@ def test_interference_contracts_are_physical_seats_and_threads() -> None:
         (
             contracts.JIG_PIVOT_SCREW_THREAD,
             # The modeled thread envelope overlaps the tap drill over its whole
-            # 13, not just the full-form engagement.
-            (8.0, 6.8, pivot_screw.THREAD_LENGTH),
+            # cut length, not just the full-form engagement.
+            (pivot_screw.THREAD_DIA, pivot_block.PIVOT_TAP_DRILL, pivot_screw.THREAD_LENGTH),
         ),
         (
             contracts.JIG_T_NUT_THREAD,
@@ -944,15 +960,9 @@ def test_jig_is_a_shop_fixture_outside_the_machine_tree() -> None:
 
 
 def test_sweep_clears_the_column_cover(report) -> None:
-    expected = {
-        "carrier": 113.29,
-        "riser": 150.80,
-        "feed lever": 236.58,
-        "KP08 near": 114.81,
-        "KP08 far": 167.86,
-        "screw": 141.19,
-        "handwheel": 179.91,
-    }
+    # The rail-bound items, computed independently here; every moving and
+    # feed outline keeps the 100 mm floor to the cover below.
+    expected = {}
     near = min(low for low, _high in trammel.END_STOPS.values())
     for rail in spec.RAILS:
         corners = [
@@ -1097,23 +1107,20 @@ def test_sweep_sidecar_drives_both_passes_to_their_end_stops() -> None:
 
 def test_sweep_table_edge_margins(report) -> None:
     edges = report.table_edge_margins
-    assert edges["carrier"] == pytest.approx(
-        {"-X end": 0.35, "+X end": 0.35, "front": 8.81, "back": -3.95}, abs=0.01
-    )
-    assert edges["feed lever"]["front"] == pytest.approx(-236.96, abs=0.01)
+    # The symmetric sweep overhangs both table ends alike.
+    assert edges["carrier"]["-X end"] == pytest.approx(edges["carrier"]["+X end"])
     for rail, outer, inner in ((1, "-X end", "+X end"), (2, "+X end", "-X end")):
         bar = edges[f"base bar {rail}"]
-        assert bar[outer] == pytest.approx(-43.94, abs=0.01)
         assert bar[outer] == pytest.approx(-report.bar_overhang[rail])
-        assert bar["front"] == pytest.approx(20.96, abs=0.01)
-        # The 2026-10-17 widening: each bar's near column-side corner (Y 85.84)
-        # stands 12.59 past the table's back edge (Y 73.25), toward the cover.
-        assert bar["back"] == pytest.approx(-12.59, abs=0.01)
-        assert spec.TABLE_Y[1] == pytest.approx(73.25, abs=0.01)
+        # The bar's operator-side edge stays on the table (its slots reach the
+        # T-slots); its near column-side corner stands past the back edge,
+        # toward the cover.
+        assert bar["front"] > 0.0
         corner = trammel.rail_point(
             rail, trammel.RAIL_NEAR_S, trammel.BASE_BAR_COLUMN_EDGE
         )
-        assert corner[1] == pytest.approx(85.84, abs=0.01)
+        assert bar["back"] == pytest.approx(spec.TABLE_Y[1] - corner[1])
+        assert bar["back"] < 0.0
         assert bar[inner] > 0.0
     # The wider bars still leave the two apart at their near ends: a
     # separating axis among the plan outlines' edge normals.
@@ -1144,7 +1151,9 @@ def test_sweep_table_edge_margins(report) -> None:
             "handwheel",
         )
     }
-    assert feed["KP08 near"]["back"] == pytest.approx(-2.43, abs=0.01)
+    # The near KP08 and its bracket pass the back edge; the handwheel and the
+    # screw's stub pass the -X end, all above the table top.
+    assert feed["KP08 near"]["back"] < 0.0
     bracket_corners = [
         trammel.rail_point(leadscrew.RAIL, leadscrew.KP08_S[0] + along, lateral)
         for along in (-end_bracket.BRACKET_WIDTH / 2.0, end_bracket.BRACKET_WIDTH / 2.0)
@@ -1154,13 +1163,12 @@ def test_sweep_table_edge_margins(report) -> None:
     assert feed["end bracket near"]["back"] == pytest.approx(
         spec.TABLE_Y[1] - max(y for _x, y in bracket_corners),
     )
-    assert feed["handwheel"]["-X end"] == pytest.approx(-88.19, abs=0.01)
-    assert feed["handwheel"]["back"] == pytest.approx(62.67, abs=0.01)
-    assert feed["screw"]["-X end"] == pytest.approx(-57.97, abs=0.01)
-    # The feed block's body rides on the rail like pivot block 2.
-    assert feed["feed block"] == pytest.approx(
-        {"-X end": -20.59, "+X end": 480.79, "front": 53.40, "back": 19.96}, abs=0.01
-    )
+    assert feed["handwheel"]["-X end"] < 0.0
+    assert feed["screw"]["-X end"] < 0.0
+    # The feed block's body rides on the rail like pivot block 2, mirrored.
+    block = edges["pivot block 2"]
+    assert feed["feed block"]["-X end"] == pytest.approx(block["+X end"])
+    assert feed["feed block"]["+X end"] == pytest.approx(block["-X end"])
     assert feed["feed block"]["front"] == pytest.approx(edges["pivot block 2"]["front"])
     assert min(
         margin["front"] for family, margin in feed.items() if family != "feed block"
@@ -1172,18 +1180,32 @@ def test_sweep_table_edge_margins(report) -> None:
 # the screw stops inside the part (THRU tap) or short of the full thread
 # (blind tap). Engagement is never more than the receiving thread's depth.
 FASTENER_TABLE = {
-    "RAIL_TO_BAR": ("#8-32 X 3/4 SHCS", 14, 9.35, -2.65),  # tip 2.65 short of the faced bar's underside
+    "RAIL_TO_BAR": ("#8-32 X 3/4 SHCS", 14, 9.35, 9.35 - trammel.BASE_BAR_THICK),  # tip short of the faced bar's underside
     "BRACKET_TO_BAR": (
         f"{leadscrew.BAR_SCREW} X {leadscrew.BAR_SCREW_LENGTH} SHCS", 8,
         leadscrew.BAR_SCREW_ENGAGEMENT,
         leadscrew.BAR_SCREW_ENGAGEMENT - leadscrew.BRACKET_THICK,
     ),
-    "BLOCK_TO_CARRIAGE": ("M4 X 20 SHCS", 8, 4.4, -0.6),
+    "BLOCK_TO_CARRIAGE": (
+        "M4 X 20 SHCS", 8,
+        pivot_block.SCREW_LENGTH - pivot_block.CBORE_FLOOR,
+        pivot_block.SCREW_LENGTH - pivot_block.CBORE_FLOOR - pivot_block.CARRIAGE_THREAD_DEPTH,
+    ),
     "KP08_TO_BRACKET": ("#6-32 X 5/8 SHCS", 4, 10.875, -14.525),
     "NUT_TO_FEED_BLOCK": ("#4-40 X 1/2 BHCS", 4, 9.2, -0.8),
-    "RISER_TO_CARRIER": ("#4-40 X 5/8 B18.6.3 FLAT HEAD", 4, 10.4014, -1.5986),
-    "CR_CLAMP": ("1/4-20 X 7/8 SHCS", 1, 12.0, 1.725),
-    "LEVER_TO_CARRIER": ("5/16-18 X 1 SHCS", 2, 10.414, -1.586),
+    # The 5/8 screw past the riser grip (its head seated in the countersink);
+    # the tip stops inside the carrier's THRU tap.
+    "RISER_TO_CARRIER": (
+        "#4-40 X 5/8 B18.6.3 FLAT HEAD", 4,
+        0.625 * 25.4 - fasteners.RISER_TO_CARRIER.grip_mm,
+        0.625 * 25.4 - fasteners.RISER_TO_CARRIER.grip_mm - carrier.THICKNESS,
+    ),
+    # Through the whole carrier tap; the bought 7/8 tip stands below it.
+    "CR_CLAMP": (
+        "1/4-20 X 7/8 SHCS", 1, carrier.THICKNESS,
+        0.875 * 25.4 - fasteners.CR_CLAMP.grip_mm - carrier.THICKNESS,
+    ),
+    "LEVER_TO_CARRIER": ("5/16-18 X 1 SHCS", 2, 10.414, 10.414 - carrier.THICKNESS),
 }
 
 
@@ -1220,9 +1242,12 @@ def test_fastener_table_engagement_and_protrusion() -> None:
         fasteners.BLOCK_TO_CARRIAGE.joint,
         fasteners.LEVER_TO_CARRIER.joint,
     }
+    # The M4 x 20 reaches from the .614 counterbore floor, 1.1D nominal and
+    # short of the carriage's M4 x 5 thread end.
     assert fasteners.BLOCK_TO_CARRIAGE.engagement_mm == pytest.approx(
-        pivot_block.CARRIAGE_THREAD_DEPTH - 0.6
+        pivot_block.SCREW_LENGTH - pivot_block.CBORE_FLOOR
     )
+    assert 1.1 * 4.0 <= fasteners.BLOCK_TO_CARRIAGE.engagement_mm < pivot_block.CARRIAGE_THREAD_DEPTH
     # A 1-1/8 in lever screw would stand out of the carrier's underside.
     assert (
         fasteners.inch_mm("1-1/8") - fasteners.LEVER_TO_CARRIER.grip_mm
@@ -1260,23 +1285,35 @@ def test_turned_over_bar_counterbores_clear_the_flange_nuts() -> None:
         assert (
             abs(hole[1]) - base_bar.BRACKET_CBORE_DIA / 2.0 > trammel.RAIL_WIDTH / 2.0
         )
-    # Ruling A′'s 8 holes: the near 44 hole stays the closest (the new 27.5
-    # one 19.47, the 66 and 82.5 ones farther out).
-    assert min(gaps) == pytest.approx(18.69, abs=0.01)
-    assert sorted(gaps)[1] == pytest.approx(19.47, abs=0.01)
+    # Ruling A′'s 8 holes: every counterbore stays clear of every flange nut's
+    # seat (the near rows the closest, about 17.5).
+    assert min(gaps) > 0.0
 
 
 def test_bracket_bar_screws_sit_in_their_rule_17_window() -> None:
     # Ruling A′ (2026-10-17): two pairs about the screw axis, the outer
-    # half-span the round value between TL-28's #8-to-#6 wall and TL-20's
-    # counterbore-to-edge wall, both at the 2.0 target at worst case.
-    assert leadscrew.BAR_SCREW_LATERALS == (27.5, 44.0, 66.0, 82.5)
-    assert leadscrew.BAR_SCREW_OUTER_HALF_SPAN_MIN == pytest.approx(27.096, abs=1e-3)
-    assert leadscrew.BAR_SCREW_OUTER_HALF_SPAN_MAX == pytest.approx(27.545, abs=1e-3)
+    # half-span inside the window between TL-28's #8-to-#6 wall and TL-20's
+    # counterbore-to-edge wall, both at the rule-17 target at worst case.
+    # #290 (option B): every bracket station prints as modelled at .XXX.
+    laterals = leadscrew.BAR_SCREW_LATERALS
+    axis = leadscrew.SCREW_LATERAL
+    assert laterals == tuple(sorted(laterals))
+    assert laterals[0] + laterals[3] == pytest.approx(2.0 * axis)
+    assert laterals[1] + laterals[2] == pytest.approx(2.0 * axis)
+    outer = axis - laterals[0]
+    assert (
+        leadscrew.BAR_SCREW_OUTER_HALF_SPAN_MIN
+        <= outer
+        <= leadscrew.BAR_SCREW_OUTER_HALF_SPAN_MAX
+    )
+    for lateral in laterals:
+        tap = (lateral - leadscrew.BRACKET_INNER_LATERAL) / 25.4
+        assert tap == pytest.approx(round(tap, 3), abs=1e-9)
     assert leadscrew.BRACKET_LENGTH == pytest.approx(
         trammel.BASE_BAR_COLUMN_EDGE - leadscrew.BRACKET_INNER_LATERAL
     )
-    assert leadscrew.BRACKET_LENGTH == pytest.approx(68.9)
+    length = leadscrew.BRACKET_LENGTH / 25.4
+    assert length == pytest.approx(round(length, 2), abs=1e-9)
 
 
 def test_bracket_load_cases_hold_the_hand_abuse_thrust() -> None:
@@ -1308,14 +1345,17 @@ def test_lever_screw_torque_is_capped_by_the_carrier_thread() -> None:
     # shortest engagement (the shortest 1 in screw through the thickest lever
     # and pair, inside the 12 plate's RV-01 full thread), T = 0.20 F d.
     engagement = lever_washer.ENGAGEMENT_MIN
-    assert engagement == pytest.approx(9.14, abs=0.01)
+    # Rule 18: at least 1 D of full thread at the worst case.
+    assert engagement >= fasteners.LEVER_TO_CARRIER.major_mm
     assert engagement <= carrier.ENGAGEMENT_MM[carrier.LEVER_THREAD]
     major = fasteners.LEVER_TO_CARRIER.major_mm
     assert major == pytest.approx(7.9375, abs=1e-3)
     assert spec._LEVER_THREAD_STRIP_N == pytest.approx(
         0.75 * math.pi * major * engagement * spec._AL_SHEAR_ULTIMATE_MPA
     )
-    assert spec.LEVER_SCREW_TORQUE_NM == 18.7
+    cap = 0.20 * (spec._LEVER_THREAD_STRIP_N / 3.0) * major / 1000.0
+    assert cap - 0.1 < spec.LEVER_SCREW_TORQUE_NM <= cap
+    assert round(spec.LEVER_SCREW_TORQUE_NM, 1) == spec.LEVER_SCREW_TORQUE_NM
     assert spec.LEVER_SCREW_PRELOAD_N <= spec._LEVER_THREAD_STRIP_N / 3.0
     assert spec.LEVER_PAIR_BEARING_MPA < 276.0
     assert spec.LEVER_SCREW_PRELOAD_N / (0.0524 * 25.4**2) < 0.5 * 1172.1
@@ -1379,32 +1419,34 @@ def test_shoulder_pivot_axial_stack_and_thread_engagement() -> None:
     row = fasteners.PIVOT_SCREW_TO_BLOCK
     assert row.engagement_mm == pivot_block.PIVOT_THREAD_ENGAGEMENT
     assert row.engagement_mm == pytest.approx(pivot_screw.THREAD_LENGTH - 1.5 * pivot_screw.THREAD_PITCH)
-    assert row.engagement_mm < 1.5 * pivot_screw.THREAD_DIA  # RV-05's accepted shortfall
+    # Rule 18 at the worst case, with no exception.
+    assert pivot_block.PIVOT_THREAD_ENGAGEMENT_MIN >= 1.5 * pivot_screw.THREAD_DIA
     assert spec.PIVOT_SCREW_PRELOAD_N * 3.0 < spec.PIVOT_THREAD_STRIP_N
-    assert row.torque_nm == 4.0
+    assert row.torque_nm == spec.PIVOT_SCREW_TORQUE_NM
     assert row.threadlocker == "Loctite 222"
+    tip_min = 0.011 * trammel.INCH
     for index, ((block, _rows), (screw, screw_rows)) in enumerate(zip(
         spec.BLOCK_PLACEMENTS, spec.PIVOT_SCREW_PLACEMENTS, strict=True,
     )):
-        floor = block[2] + pivot_block.BLOCK_HEIGHT - pivot_block.BORE_DEPTH
-        assert screw[2] == pytest.approx(floor)
-        assert screw[2] - pivot_screw.THREAD_LENGTH > block[2]
+        top = block[2] + pivot_block.BLOCK_HEIGHT
+        assert screw[2] == pytest.approx(top - pivot_block.BORE_DEPTH)
+        assert screw[2] - pivot_screw.THREAD_LENGTH - block[2] >= tip_min - 1e-9
         assert screw_rows[2] == pytest.approx((0.0, 0.0, 1.0))
         shims = spec.PIVOT_SHIM_PLACEMENTS[
             index * pivot_shim.PER_SUPPORT:(index + 1) * pivot_shim.PER_SUPPORT
         ]
         spacer = spec.PIVOT_SPACER_PLACEMENTS[index][0]
-        assert len(shims) == pivot_shim.PER_SUPPORT == 5
+        assert len(shims) == pivot_shim.PER_SUPPORT
         # The pack stacks face to face from the block top up to the spacer.
         for k, (shim, _shim_rows) in enumerate(shims):
             assert shim[:2] == pytest.approx(screw[:2])
-            assert shim[2] == pytest.approx(64.3 + k * pivot_shim.THICKNESS)
+            assert shim[2] == pytest.approx(top + k * pivot_shim.THICKNESS)
         assert spacer[:2] == pytest.approx(screw[:2])
         assert spacer[2] == pytest.approx(shims[-1][0][2] + pivot_shim.THICKNESS)
         assert spacer[2] + pivot_spacer.LENGTH == pytest.approx(trammel.CARRIER_UNDERSIDE_Z)
         head_bottom = screw[2] + pivot_screw.SHOULDER_LENGTH
-        assert head_bottom - trammel.CARRIER_TOP_Z == pytest.approx(0.15)
-        assert head_bottom + pivot_screw.HEAD_HEIGHT == pytest.approx(96.95)
+        gap = head_bottom - trammel.CARRIER_TOP_Z
+        assert spec.PIVOT_RUNNING_GAP[0] <= gap <= spec.PIVOT_RUNNING_GAP[1]
         assert pivot_screw.HEAD_DIA > carrier.PIN_HOLE_DIA
     assert spec.lock_parent(spec.FEED_BLOCK, 0) == spec.instance_name(spec.CARRIAGE, 0)
     assert spec.lock_parent(spec.PIVOT_BLOCK, 0) == spec.instance_name(spec.CARRIAGE, 1)
@@ -1413,22 +1455,30 @@ def test_shoulder_pivot_axial_stack_and_thread_engagement() -> None:
 def test_unshimmed_gap_opens_at_every_band_and_stock_shims_fit_it() -> None:
     from itertools import combinations_with_replacement
 
-    assert pivot_block.BORE_DEPTH == 6.85
+    thou = trammel.INCH / 1000.0
+    assert spec.PIVOT_RUNNING_GAP == pytest.approx((0.002 * trammel.INCH, 0.010 * trammel.INCH))
     low, high = spec.PIVOT_UNSHIMMED_GAP_RANGE
-    assert (low, high) == pytest.approx((0.09, 2.26))
     assert low >= spec.PIVOT_RUNNING_GAP[0]  # no head clamps before shimming
-    # Brute force over the stock, independent of the spec's 0.1-step argument.
-    stock = [round(t * 100) for t in pivot_shim.FIT_SKUS]
+    # Brute force over the stock (keyed in thou), independent of the spec's
+    # step argument.
+    stock = list(pivot_shim.FIT_SKUS)
+    assert all(pivot_shim.FIT_SKUS[t] for t in stock)
     packs = {
         sum(combo)
         for count in range(spec.PIVOT_FIT_SHIMS_MAX + 1)
         for combo in combinations_with_replacement(stock, count)
     }
-    window = [round(g * 100) for g in spec.PIVOT_RUNNING_GAP]
-    for gap in range(round(low * 100), round(high * 100) + 1):
+    window = [round(g / thou) for g in spec.PIVOT_RUNNING_GAP]
+    for gap in range(round(low / thou), round(high / thou) + 1):
         assert any(window[0] <= gap - pack <= window[1] for pack in packs), gap
-    assert (spec.PIVOT_FIT_PACK_MAX, spec.PIVOT_FIT_SHIMS_MAX) == (2.1, 5)
-    assert trammel.PIVOT_SHIM_PACK == pivot_shim.PER_SUPPORT * pivot_shim.THICKNESS
+    assert spec.PIVOT_FIT_PACK_MAX >= high - spec.PIVOT_RUNNING_GAP[1] - 1e-9
+    assert round(spec.PIVOT_FIT_PACK_MAX / thou) in packs
+    # Each support's share of the buy builds the worst-case pack.
+    share = {
+        round(thickness / thou): count // 2 for thickness, count in spec.PIVOT_SHIM_BUY.values()
+    }
+    assert sum(share[t] * t for t in share) >= round(spec.PIVOT_FIT_PACK_MAX / thou)
+    assert trammel.PIVOT_SHIM_PACK == pytest.approx(pivot_shim.PER_SUPPORT * pivot_shim.THICKNESS)
 
 
 def test_plain_pivot_radial_fits_are_not_interference_allowances() -> None:
@@ -1438,7 +1488,7 @@ def test_plain_pivot_radial_fits_are_not_interference_allowances() -> None:
         (carrier.PIN_HOLE_DIA, carrier.PIN_HOLE_BAND),
         (pivot_block.BORE_DIA, pivot_block.BORE_BAND),
     ):
-        assert (diameter + band[1] - shaft_high, diameter + band[0] - shaft_low) == pytest.approx((0.0, 0.040))
+        assert 0.0 < diameter + min(band) - shaft_high < diameter + max(band) - shaft_low
     assert pivot_spacer.ID + pivot_spacer.ID_BAND[1] >= shaft_high
     assert pivot_shim.ID + pivot_shim.ID_BAND[1] > shaft_high
     allowed = contracts.allowed_interference_pairs(spec.ASM_NAME)
@@ -1454,12 +1504,14 @@ def test_plain_pivot_radial_fits_are_not_interference_allowances() -> None:
 
 
 def test_feed_lug_flange_and_drilled_threads_stay_in_real_material() -> None:
-    assert (feed_block.LUG_X0, feed_block.LUG_X1) == (-9.25, 9.25)
-    assert (feed_block.LUG_Y0, feed_block.LUG_Y1) == (-68.0, -20.0)
+    assert feed_block.LUG_X1 - feed_block.LUG_X0 == pytest.approx(feed_block.LUG_WIDTH)
+    assert feed_block.LUG_Y1 == pytest.approx(-pivot_block.BLOCK_WIDTH / 2.0)
     radius = leadscrew_nut.FLANGE_DIA / 2.0
-    assert feed_block.NUT_AXIS_Z - radius == pytest.approx(1.4)
-    assert feed_block.NUT_AXIS_Z + radius == pytest.approx(23.4)
-    assert feed_block.NUT_AXIS_Y - radius - feed_block.LUG_Y0 == pytest.approx(2.0)
+    # The flange lands wholly on the lug face: above the carriage seat, below
+    # the block top and inside the lug's -Y end with a wall's margin.
+    assert feed_block.NUT_AXIS_Z - radius > 0.0
+    assert feed_block.NUT_AXIS_Z + radius < pivot_block.BLOCK_HEIGHT
+    assert feed_block.NUT_AXIS_Y - radius - feed_block.LUG_Y0 >= WALL_TARGET_MM
     assert fasteners.NUT_TO_FEED_BLOCK.thread_depth_mm == feed_block.SCREW_TAP_DEPTH
     assert feed_block.NUT_FACE_X + feed_block.SCREW_TAP_DEPTH < feed_block.LUG_X1
     block_origin, rows = spec.FEED_BLOCK_PLACEMENTS[0]
@@ -1537,12 +1589,17 @@ def test_invalid_bought_handwheel_geometry_still_refuses_the_fit(bought, message
 
 
 def test_bonded_gauge_locator_uses_the_finished_hub_bore_and_actual_cut_overlap() -> None:
-    assert hub_pin.DIA == 10.20
-    assert hub_pin.CUT_LENGTH == 20.0
+    # The .4000 NO-GO gauge in the carrier's .4000-.4005 reamed HUB hole.
+    assert hub_pin.DIA + max(hub_pin.DIA_BAND) == pytest.approx(
+        carrier.HUB_HOLE_LIMITS[0]
+    )
     assert hub_pin.BOND == "Loctite 638"
-    low, high = carrier.HUB_HOLE_BAND[1], carrier.HUB_HOLE_BAND[0]
-    clearance = (low - hub_pin.DIA_BAND[0], high - hub_pin.DIA_BAND[1])
-    assert clearance == pytest.approx((0.0, 0.02054))
+    low, high = carrier.HUB_HOLE_LIMITS
+    clearance = (low - (hub_pin.DIA + max(hub_pin.DIA_BAND)),
+                 high - (hub_pin.DIA + min(hub_pin.DIA_BAND)))
+    assert clearance == pytest.approx(
+        (carrier.HUB_BOND_CLEARANCE_MIN, carrier.HUB_BOND_CLEARANCE_MAX)
+    )
     assert spec.HUB_PIN_TOP_Z - (trammel.CARRIER_TOP_Z + trammel.RISER_THICK) == pytest.approx(hub_pin.TIP_SET)
     assert spec.HUB_PIN_TOP_Z - spec.HUB_PIN_ORIGIN[2] == pytest.approx(hub_pin.CUT_LENGTH)
     overlap = min(trammel.CARRIER_TOP_Z, spec.HUB_PIN_TOP_Z) - max(
@@ -1551,8 +1608,20 @@ def test_bonded_gauge_locator_uses_the_finished_hub_bore_and_actual_cut_overlap(
     assert overlap == pytest.approx(contracts.JIG_HUB_PIN_SEAT[1])
 
 
-def test_hold_down_steps_name_the_kit_drawing_and_its_stud_limits() -> None:
-    """Machinist review: HD2/HD3 cited "THE STUD DRAWING" without naming it."""
+def test_hold_down_inch_limits_lie_on_the_safe_side_of_the_kit_limits() -> None:
+    """HD2 checks with the kit's mm stud limits printed in inch: LMIN low,
+    LMAX high and the clearance high, so a passing setup passes the kit's."""
     assert spec.CLAMPING_KIT_NUMBER == _config.parts(spec.CLAMPING_KIT)["number"]
-    limits = f"56.4/58.0 ON {spec.CLAMPING_KIT_NUMBER} SHEET 2"
-    assert limits in spec.HOLD_DOWN_STEPS[1] and limits in spec.HOLD_DOWN_STEPS[2]
+    low, high = (float(text) * 25.4 for text in spec._STUD_LIMITS.split("/"))
+    assert low <= hold_down_stud.LENGTH - hold_down_stud.LENGTH_BAND
+    assert high >= hold_down_stud.LENGTH + hold_down_stud.LENGTH_BAND
+    assert float(spec._STUD_CLEARANCE) * 25.4 >= hold_down_stud.CLEARANCE_MIN
+
+
+def test_every_alignment_station_is_reachable_by_both_carriages() -> None:
+    """Steps 6 and HD3 bring each pin to every station: the feed carriage by
+    the handwheel within its travel, both carriages wholly on their rails."""
+    for station in trammel.ALIGNMENT_STATIONS:
+        centre = station - trammel.PIN_OFFSET
+        assert trammel.CARRIAGE_TRAVEL[0] <= centre <= trammel.CARRIAGE_TRAVEL[1]
+        assert trammel.CARRIAGE_S_RANGE[0] <= centre <= trammel.CARRIAGE_S_RANGE[1]

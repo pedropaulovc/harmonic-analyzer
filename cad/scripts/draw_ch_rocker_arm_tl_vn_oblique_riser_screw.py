@@ -10,6 +10,7 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import NumberFit, build_purchased_fastener_drawing
 from _supplier_screw_dimensions import annotate_supplier_screw
 from _supplier_screw_layout import supplier_screw_margins
@@ -44,7 +45,7 @@ def _aligned_margins(
     """Keep each view centred in its cell so the views stay in ASME projection.
 
     The builder centres every view in its cell less these lane reserves. One
-    lane on one side (length right, thread below) shifted FRONT 3 mm off the
+    lane on one side (length right, thread below) shifted FRONT about .12 off the
     TOP axis and the RIGHT row. Reserving the larger lane on both sides of the
     axis a view shares with FRONT only adds room; it never shrinks a lane.
     """
@@ -91,6 +92,7 @@ async def build(adapter: Any) -> dict[str, str]:
             supplier_screw_margins(dimensions, planes=planes, sides=sides)
         ),
         settled_checks=checks,
+        unit=part_drawing_unit("ch-rocker-arm-tl-vn-oblique-riser-screw"),
     )
 
 

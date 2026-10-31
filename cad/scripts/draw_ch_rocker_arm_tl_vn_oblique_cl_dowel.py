@@ -16,11 +16,12 @@ from _purchased_fastener_drawing import NumberFit, build_purchased_fastener_draw
 from _supplier_pin_model import _cylinder_radii_mm
 from _supplier_screw_dimensions import annotate_supplier_screw, assert_supplier_screw
 from _supplier_screw_layout import supplier_screw_margins
+from _part_properties import part_drawing_unit
 import ch_rocker_arm_tl_vn_oblique_cl_dowel_spec as part
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_cl_dowel"]
 # The footer's ITEM row: the catalogue designation in plain text.
-ITEM = "Ø6 X 20 M6 DOWEL PIN (DIN 6325)"
+ITEM = "1/4 X 1 ALLOY STEEL DOWEL PIN (ASME B18.8.2)"
 
 
 def _assert_supplier_bands(displays: dict[str, Any]) -> None:
@@ -54,7 +55,7 @@ async def build(adapter: Any) -> dict[str, str]:
         nonlocal callback_count
         callback_count += 1
         if callback_count != 1:
-            raise RuntimeError("91595A452: repeated supplier dimension callback")
+            raise RuntimeError(f"{part.SKU}: repeated supplier dimension callback")
         displays = annotate_supplier_screw(
             adapter, views,
             dimensions=part.SUPPLIER_REFERENCE_DIMENSIONS,
@@ -78,13 +79,13 @@ async def build(adapter: Any) -> dict[str, str]:
             model = _early_bound(views["*Front"], "IView").ReferencedDocument
             radii = _cylinder_radii_mm(model, 1, label=part.SKU)
             if not math.isclose(2.0 * max(radii), part.DIA, rel_tol=0.0, abs_tol=1e-6):
-                raise RuntimeError("91595A452: nominal OD differs from the real cylinder")
+                raise RuntimeError(f"{part.SKU}: nominal OD differs from the real cylinder")
 
         proofs.append(assert_references)
 
     def assert_supplier_dimensions() -> None:
         if callback_count != 1 or len(proofs) != 1:
-            raise RuntimeError("91595A452: supplier references omitted or repeated")
+            raise RuntimeError(f"{part.SKU}: supplier references omitted or repeated")
         proofs[0]()
 
     # The 18-character registry number overruns the template's DWG. NO.
@@ -99,6 +100,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         settled_checks=(assert_supplier_dimensions,),
         supplier_data=part.SUPPLIER_DATA,
+        unit=part_drawing_unit("ch-rocker-arm-tl-vn-oblique-cl-dowel"),
     )
 
 

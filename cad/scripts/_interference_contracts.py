@@ -899,17 +899,19 @@ _MS_MEASURING_STICK_ALLOWED_PAIRS = {
 # or face contacts, never blanket interference exceptions.
 _JIG = "ch-rocker-arm-tl-oblique"
 _JIG_VENDOR = "ch-rocker-arm-tl-vn-oblique"
-JIG_HUB_PIN_SEAT = (10.20, 12.0)  # actual overlap: 20 cut length minus 6 riser minus 2 projection
-JIG_CL_DOWEL_PRESS = (6.0, 12.0)  # (diameter, carrier thickness)
+# (diameter, overlap): the .4000 pin's .79 cut less the .24 riser and .080 set
+# leaves the .47 carrier; the 1/4 dowel spans the whole .47 carrier.
+JIG_HUB_PIN_SEAT = (10.16, 11.938)
+JIG_CL_DOWEL_PRESS = (6.35, 11.938)  # (diameter, carrier thickness)
 JIG_RAIL_SCREW_THREAD = (4.1656, 3.454, 9.35)  # #8-32 into each base bar
-JIG_BRACKET_SCREW_THREAD = (4.1656, 3.454, 8.675)  # #8-32 into a end bracket
-JIG_CARRIAGE_SCREW_THREAD = (4.0, 3.242, 4.4)  # M4 into each HGH15 carriage
+JIG_BRACKET_SCREW_THREAD = (4.1656, 3.454, 8.7376)  # #8-32 into a end bracket
+JIG_CARRIAGE_SCREW_THREAD = (4.0, 3.242, 4.4044)  # M4 into each HGH15 carriage from the .614 floor
 JIG_PILLOW_BLOCK_SCREW_THREAD = (3.5052, 2.705, 10.875)  # #6-32 into a end bracket
 JIG_NUT_SCREW_THREAD = (2.8448, 2.261, 9.2)  # #4-40 into feed block
-JIG_RISER_SCREW_THREAD = (2.8448, 2.261, 10.401409)  # #4-40 into the carrier
-JIG_CLAMP_SCREW_THREAD = (6.35, 5.105, 12.0)  # 1/4-20 through the carrier
+JIG_RISER_SCREW_THREAD = (2.8448, 2.261, 10.334168)  # #4-40 into the carrier past the .24 riser's Ø.25 CSK
+JIG_CLAMP_SCREW_THREAD = (6.35, 5.105, 11.938)  # 1/4-20 through the .47 carrier
 JIG_LEVER_SCREW_THREAD = (7.9375, 6.528, 10.414)  # 5/16-18 into the carrier
-JIG_PIVOT_SCREW_THREAD = (8.0, 6.8, 13.0)  # M8x1.25 below shoulder-end floor
+JIG_PIVOT_SCREW_THREAD = (7.9375, 6.528, 14.478)  # 5/16-18 cut to .570 below shoulder-end floor
 JIG_T_NUT_THREAD = (12.7, 10.716, 14.0)  # 1/2-13 stud in its T-nut
 JIG_FLANGE_NUT_THREAD = (12.7, 10.716, 13.0)  # 1/2-13 stud in its flange nut
 JIG_LEADSCREW_NUT_THREAD = (8.0, 6.0, 15.0)  # Tr8 screw in its flanged nut

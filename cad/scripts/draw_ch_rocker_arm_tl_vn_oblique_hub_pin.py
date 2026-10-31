@@ -12,6 +12,7 @@ import ch_rocker_arm_tl_vn_oblique_hub_pin_spec as part
 from _com import _early_bound
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import NumberFit, build_purchased_fastener_drawing
+from _part_properties import part_drawing_unit
 from _session import run_build
 from _supplier_screw_dimensions import annotate_supplier_screw, assert_supplier_screw
 from _supplier_text_shelf import assert_supplier_shelves, shelve_supplier_text
@@ -20,14 +21,15 @@ from _machinist_review_mode import MachinistReviewMode
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_hub_pin"]
-ITEM = "CLASS Z MINUS GAUGE PIN, Ø10.2 X 2 IN SUPPLY"
+ITEM = "CLASS Z NO-GO PLUG GAUGE, Ø.4000 X 2 IN SUPPLY"
 # The default "VIEWS ARE REFERENCE ONLY" line read as overriding the one shop
-# dimension, the 20.0 cut length (machinist review, 3/3 runs).
+# dimension, the cut length (machinist review, 3/3 runs).
+_CUT_TEXT = f"{part.CUT_LENGTH / 25.4:.{part.CUT_PLACES}f}".removeprefix("0")
 GENERAL_TEXT = (
-    f"PURCHASED PART; CUT TO {part.CUT_LENGTH:.1f} AT ASSEMBLY, "
+    f"PURCHASED PART; CUT TO {_CUT_TEXT} AT ASSEMBLY, "
     "OTHER GEOMETRY AS SUPPLIED (REFERENCE)."
 )
-# tall_top's 96 mm Top cell holds the 20 mm pin at 2:1 (standard's 64 mm: 1:2).
+# tall_top's 96 mm Top cell holds the .79 pin at 2:1 (standard's 64 mm: 1:2).
 VIEW_LAYOUT = "tall_top"
 REFERENCE = "SupplierPinDiameter"
 CUT = "SupplierCutLength"
@@ -53,7 +55,7 @@ def _reference_rows(names):
 
 
 def _make_shop_dimension(display) -> None:
-    """The cut length is the shop's size: a plain 20.0, not a parenthesised reference."""
+    """The cut length is the shop's size: a plain value, not a parenthesised reference."""
     display = _early_bound(display, "IDisplayDimension")
     display.SetText(1, "")  # swDimensionTextPrefix
     display.SetText(2, "")  # swDimensionTextSuffix
@@ -73,7 +75,7 @@ def _assert_shop_dimension(display) -> None:
         or str(display.GetText(4) or "") != _CUT_FORMAT[3]
         or int(tolerance.Type) != 0
     ):
-        raise RuntimeError(f"{CUT}: shop cut length lost its plain 20.0 presentation")
+        raise RuntimeError(f"{CUT}: shop cut length lost its plain presentation")
 
 
 def _settled_cut(adapter) -> object:
@@ -146,6 +148,7 @@ async def build(adapter) -> dict[str, str]:
         supplier_dimensions=supplier_dimensions,
         supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_supplier_dimensions,), supplier_data=part.SUPPLIER_DATA,
+        unit=part_drawing_unit("ch-rocker-arm-tl-vn-oblique-hub-pin"),
     )
 
 
