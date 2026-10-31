@@ -22,6 +22,7 @@ are the assembly-frame images of the part's local axes. No SolidWorks imports.
 
 from __future__ import annotations
 
+from _inch_fraction import MM_PER_IN
 import ms_stick_spec as stick
 import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
@@ -50,8 +51,9 @@ DRAWING_EXPLODED_VIEW = "ISO FRONT-TOP-LEFT"
 DRAWING_EXPLODED_OCTANTS = {"FRONT-TOP-LEFT": (-1, 1, 1)}
 
 # --- Stick ------------------------------------------------------------------
-# ms-stick's frame: X along the 202 bar, Y across its 8 width (the ticks hang
-# from the y=8 edge), Z through its 3 thickness from the graduated z=0 face
+# ms-stick's frame: X along the bar (BODY_LENGTH), Y across its BODY_WIDTH (the
+# ticks hang from the y=BODY_WIDTH edge), Z through its BODY_THICKNESS from the
+# graduated z=0 face
 # (outward normal -Z). The same fit, turned screw-up: part -Z -> -Y,
 # part X stays along the stop, and part Y runs across into -Z.
 STICK_ROWS: Rows = ((1.0, 0.0, 0.0), (0.0, 0.0, -1.0), (0.0, 1.0, 0.0))
@@ -113,10 +115,17 @@ EXTENT_MAX = (
 # --- Clamped setting (a construction sketch in the .SLDASM) ------------------
 # Assembly acceptance measured between real faces; no component size is changed.
 # The builder applies its tolerance and both precisions to the model dimension.
-SETTING_TOLERANCE_MM = 0.10
+# The sheet prints decimal inches (#290; assemblies/ms-measuring-stick.yaml
+# drawing_unit, which the builder holds to SETTING_UNIT). The nominal is the
+# STOP_MARK division's calibrated station less half the block, a closure the
+# inch grid does not snap: the model keeps it exactly and the .XXX print
+# rounds it. The band is the inch value nearest the original 0.10 mm.
+SETTING_UNIT = "in"
+SETTING_TOLERANCE_IN = 0.004
+SETTING_TOLERANCE_MM = SETTING_TOLERANCE_IN * MM_PER_IN
 SETTING_NEAR_FACE_MM = BLOCK_ORIGIN[0] - STICK_X_MIN
-SETTING_PRECISION = 1
-SETTING_TOLERANCE_PRECISION = 2
+SETTING_PRECISION = 3
+SETTING_TOLERANCE_PRECISION = 3
 SETTING_FEATURE = "ClampedSetting"
 SETTING_DIMENSION = "NearFaceFromStickEnd"
 DRAWING_PRECISION = {SETTING_FEATURE: {SETTING_DIMENSION: SETTING_PRECISION}}

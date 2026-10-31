@@ -159,15 +159,32 @@ def fit(group: str, *keys: str) -> Any:
     return node
 
 
-def title_block(kind: str) -> dict[str, Any]:
+# Unit sections of title_block.yaml: nested row sets that override the
+# top-level (millimetre) rows for a package printing in that unit.
+_TITLE_BLOCK_UNIT_SECTIONS = ("in",)
+
+
+def title_block(kind: str, *, unit: str = "mm") -> dict[str, Any]:
     """A title-block general tolerance row from title_block.yaml.
 
     ``title_block('linear_2pl')`` -> ``{value_in, band_mm, digits}``;
-    ``title_block('angular')``    -> ``{value_deg, digits}``.  Read printed
-    bands through ``_printed_tolerance`` and render title-block text through
-    ``_title_block_units``, which own the unit-explicit keys.
+    ``title_block('angular')``    -> ``{value_deg, digits}``.  ``unit`` selects
+    the sheet the row prints on: ``"mm"`` reads the top-level rows, ``"in"``
+    the ``in:`` section's row where it lists one and the shared top-level row
+    otherwise (``title_block('linear_2pl', unit='in')`` -> ``{value_in, band_in,
+    digits}``).  Read printed bands through ``_printed_tolerance`` and render
+    title-block text through ``_title_block_units``, which own the
+    unit-explicit keys and refuse an mm length on an inch sheet.
     """
-    return _doc("title_block")[kind]
+    doc = _doc("title_block")
+    if kind in _TITLE_BLOCK_UNIT_SECTIONS:
+        raise KeyError(f"title_block {kind!r} is a unit section, not a row")
+    if unit == "mm":
+        return doc[kind]
+    if unit not in _TITLE_BLOCK_UNIT_SECTIONS:
+        raise ValueError(f"unknown title-block unit {unit!r}")
+    section = doc[unit]
+    return section[kind] if kind in section else doc[kind]
 
 
 def provenance(doc: str, *keys: str) -> dict[str, Any]:

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import math
 import re
 from pathlib import Path
+
+import pytest
 
 import _config
 import build_ch_rocker_arm_tl_vn_oblique_rail as part
@@ -378,3 +381,214 @@ def test_note_says_special_order_without_its_dimensions() -> None:
     assert not re.search(r"\d", spec.DRAWING_NOTES.replace("TL-20", ""))
     assert len(note_lines(spec.DRAWING_NOTES, label=NAME)) == 1
     assert len(spec.DRAWING_NOTES) <= 80
+
+
+def test_sheet_stays_hiwin_millimetres_by_its_own_declaration() -> None:
+    from _drawing_package_unit import package_drawing_unit
+
+    # #290: HGR15 is a metric-only product line; the row says so explicitly.
+    assert ROW["drawing_unit"] == "mm"
+    assert draw.PACKAGE == STEM == draw.SPEC.artifact_stem
+    assert package_drawing_unit(draw.PACKAGE) == "mm"
+    assert spec.RECEIPT_UNITS == "mm"
+    # The receipt values are the order's own sizes, never re-gridded.
+    assert (
+        spec.RECEIPT_VALUES_MM
+        == {
+            "Length": spec.LENGTH,
+            "HoleEnd": spec.HOLE_END,
+            "HolePitch": spec.HOLE_PITCH,
+        }
+        == {"Length": 440.0, "HoleEnd": 40.0, "HolePitch": 60.0}
+    )
+    assert set(spec.RECEIPT_VALUES_MM) == set(draw.RECEIPT_FEATURES)
+    tree = ast.parse(Path(draw.__file__).read_text(encoding="utf-8"))
+    build = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    )
+    calls = {
+        node.func.id: {kw.arg: ast.unparse(kw.value) for kw in node.keywords}
+        for node in ast.walk(build)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id in ("new_project_drawing", "finalize_drawing")
+    }
+    assert calls["new_project_drawing"]["package_name"] == "PACKAGE"
+    assert calls["finalize_drawing"]["package_name"] == "PACKAGE"
+    assert "_assert_receipt_dimensions" in calls["finalize_drawing"]["settled_checks"]
+
+
+class _ReceiptAnnotation:
+    def __init__(self, display) -> None:
+        self.display = display
+        self.Visible, self.OwnerType, self.Owner = 1, 0, object()
+
+    def GetType(self):
+        return 4  # swDisplayDimension
+
+    def GetSpecificAnnotation(self):
+        return self.display
+
+    def IsDangling(self):
+        return False
+
+    def GetAttachedEntities3(self):
+        return (object(), object())
+
+    def GetAttachedEntityTypes(self):
+        return (1, 1)
+
+    def GetAttachedEntityCount3(self):
+        return 2
+
+
+class _ReceiptDisplay:
+    """An imported linear model dimension: document units, part places."""
+
+    def __init__(self, name: str, feature: str, value_mm: float) -> None:
+        self.name = name
+        self.dimension = type(
+            "Dimension",
+            (),
+            {
+                "FullName": f"{name}@{feature}@{STEM}.SLDPRT",
+                "SystemValue": value_mm / 1000.0,
+            },
+        )()
+        self.Type2 = 2  # swLinearDimension
+        self.ShowDimensionValue = True
+        self.ShowParenthesis = False
+        self.ArrowSide = 2  # swDimArrowsSmart
+        self.units = (True, 0, 1, 0, False)
+        self.precision = 0
+        self.text = {1: "", 2: "", 4: ""}
+        self.annotation = _ReceiptAnnotation(self)
+
+    def GetAnnotation(self):
+        return self.annotation
+
+    def GetDimension2(self, index):
+        assert index == 0
+        return self.dimension
+
+    def GetOverride(self):
+        return False
+
+    def SetUnits2(
+        self, use_doc, units, fraction, denominator, round_to_fraction, _half
+    ):
+        self.units = (use_doc, units, fraction, denominator, round_to_fraction)
+        return 0
+
+    def GetUseDocUnits(self):
+        return self.units[0]
+
+    def GetUnits(self):
+        return self.units[1]
+
+    def GetFractionBase(self):
+        return self.units[2]
+
+    def GetFractionValue(self):
+        return self.units[3]
+
+    def GetRoundToFraction(self):
+        return self.units[4]
+
+    def SetPrecision3(self, primary, *_rest):
+        self.precision = primary
+        return 0
+
+    def GetPrimaryPrecision2(self):
+        return self.precision
+
+    def SetText(self, part, text):
+        self.text[part] = text
+
+    def GetText(self, part):
+        return self.text[part]
+
+
+def _receipt_sheet(monkeypatch, values=None):
+    """Dress real receipt displays; return them and a settled-check runner."""
+    values = {**spec.RECEIPT_VALUES_MM, **(values or {})}
+    displays = {
+        name: _ReceiptDisplay(name, draw.RECEIPT_FEATURES[name], values[name])
+        for name in draw.RECEIPT_FEATURES
+    }
+    annotations = [display.annotation for display in displays.values()]
+    imported = []
+    monkeypatch.setattr(draw, "_receipt_positions", lambda _adapter, _front: {})
+    monkeypatch.setattr(
+        draw, "curate_view_dimensions", lambda *_args, **_kwargs: list(annotations)
+    )
+    monkeypatch.setattr(
+        draw,
+        "assert_imported_precision",
+        lambda _adapter, _annotations, precision: imported.append(dict(precision)),
+    )
+    monkeypatch.setattr(
+        draw, "dimension_name", lambda _adapter, annotation: annotation.display.name
+    )
+    front = type(
+        "Front",
+        (),
+        {
+            "GetOrientationName": lambda _self: "*Front",
+            "GetReferencedModelName": lambda _self: str(draw.SPEC.source),
+            "GetAnnotations": lambda _self: tuple(annotations),
+        },
+    )()
+    monkeypatch.setattr(draw, "iter_views", lambda _adapter: [front])
+    draw._receipt_dimensions(object(), front)
+    # The part's own places are read before anything is dressed.
+    assert imported == [draw.FRONT_DIMENSION_PRECISION]
+    return (
+        displays,
+        annotations,
+        lambda: draw._assert_receipt_dimensions(object(), draw.SPEC.source),
+    )
+
+
+def test_receipt_dimensions_print_labelled_hiwin_millimetres(monkeypatch) -> None:
+    displays, _annotations, settled = _receipt_sheet(monkeypatch)
+    for name, display in displays.items():
+        # Pinned millimetres off the document units, whole millimetres as the
+        # part authors them, the native value visible and parenthesised.
+        assert display.units == (False, 0, 1, 0, False), name
+        assert display.precision == 0, name
+        assert display.text[2] == " mm)", name
+        assert display.text[4] == "", name
+    assert displays["HolePitch"].text[1] == "6X ("
+    assert displays["HoleEnd"].text[1] == displays["Length"].text[1] == "("
+    assert {name for name, d in displays.items() if d.ArrowSide == 0} == set(
+        draw.ARROWS_INSIDE
+    )
+    settled()
+
+
+def test_settled_receipt_check_refuses_a_lost_label_or_alien_ink(monkeypatch) -> None:
+    displays, annotations, settled = _receipt_sheet(monkeypatch)
+    displays["Length"].text[2] = ")"
+    with pytest.raises(RuntimeError, match="suffix"):
+        settled()
+    displays["Length"].text[2] = " mm)"
+    displays["HolePitch"].units = (True, 0, 1, 0, False)
+    with pytest.raises(RuntimeError, match="use_document_units"):
+        settled()
+    displays["HolePitch"].units = (False, 0, 1, 0, False)
+    alien = _ReceiptDisplay("Width", "Rail", spec.WIDTH)
+    annotations.append(alien.annotation)
+    with pytest.raises(RuntimeError, match="unexpected settled rail dimension"):
+        settled()
+    annotations.remove(alien.annotation)
+    annotations.remove(displays["HoleEnd"].annotation)
+    with pytest.raises(RuntimeError, match="missing"):
+        settled()
+
+
+def test_receipt_presentation_refuses_a_value_off_the_order(monkeypatch) -> None:
+    with pytest.raises(RuntimeError, match="native value"):
+        _receipt_sheet(monkeypatch, {"HolePitch": 60.5})

@@ -1,4 +1,10 @@
-"""Create the purchased reference drawing for the gooseneck set screw."""
+"""Create the purchased reference drawing for the gooseneck set screw.
+
+The package declares ``drawing_unit: in``: the sheet, its TOL_* rows and the
+source part print decimal inch. The McMaster 91410A540 sizes stay supplier
+references in the supplier's own form: fractional head width and height,
+decimal length and thread diameter, each labelled ``in``.
+"""
 
 from __future__ import annotations
 
@@ -22,6 +28,8 @@ from _mcmaster_91410a540 import (
 
 
 SPEC = DRAWINGS_BY_NAME["fr_vn_gooseneck_set_screw"]
+# The sheet's own registry package; its drawing_unit selects the sheet units.
+PACKAGE = "fr-vn-gooseneck-set-screw"
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "1/4-20 x 3/4 SQUARE HEAD SET SCREW, CUP POINT"
 
@@ -65,6 +73,7 @@ async def build(adapter: Any) -> dict[str, str]:
             planes=SUPPLIER_REFERENCE_PLANES,
             sides=SUPPLIER_REFERENCE_SIDES,
         ),
+        package_name=PACKAGE,
     )
 
 

@@ -27,6 +27,8 @@ from _component_references import (
     semantic_reference_identity,
 )
 from _custom_properties import apply_custom_properties
+from _document_units import apply_package_model_units
+from _drawing_units import LEGACY_DRAWING_UNIT, DrawingUnit
 from _part_properties import _SUMMARY_TITLE, apply_summary_info, title_block_properties
 from _part_save import set_isometric_view
 from _source_identity import _git_commit_year, _git_sha
@@ -44,12 +46,20 @@ from _simplified_names import (
 from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
 
 
+def assembly_drawing_unit(assembly_name: str) -> DrawingUnit:
+    """The unit the assembly's sheet prints: its contract's ``drawing_unit``,
+    else the legacy millimetre."""
+    declared = assembly_contract(assembly_name).drawing_unit
+    return LEGACY_DRAWING_UNIT if declared is None else declared
+
+
 def assembly_title_properties(assembly_name: str) -> dict[str, str]:
     """Return title-block properties for an assembly document.
 
     Assembly drawings use the tracked next release revision, not a per-part
     registry row, so native assemblies and their linked title blocks stay in
-    lockstep with leaf parts.
+    lockstep with leaf parts.  The TOL_* rows print in the contract's
+    ``drawing_unit`` (``assembly_drawing_unit``).
     """
     return {
         "Title": assembly_name,
@@ -57,7 +67,7 @@ def assembly_title_properties(assembly_name: str) -> dict[str, str]:
         "Revision": _config.release_revision(),
         "Generator": f"harmonic-analyzer @ {_git_sha()}",
         "COPYRIGHT_YEAR": _git_commit_year(),
-        **title_block_properties(),
+        **title_block_properties(unit=assembly_drawing_unit(assembly_name)),
     }
 
 
@@ -2853,6 +2863,9 @@ async def save_assembly_and_images(
     _invalidate_massprops_proof(sidecar)
     if dof_manifest:
         dof_manifest_path(asm_name).unlink(missing_ok=True)
+    # An inch package's model reads in IPS like its sheet (contract
+    # drawing_unit); millimetre and legacy assemblies are left untouched.
+    apply_package_model_units(adapter, assembly_drawing_unit(asm_name), label=asm_name)
     # Save on isometric so the .SLDASM opens isometric; runs AFTER any
     # remap_front_to_machine_front (which re-bases the standard views) so the
     # re-based Front/Back/etc. used by the gallery stay correct.

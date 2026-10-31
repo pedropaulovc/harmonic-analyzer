@@ -17,6 +17,7 @@ lays the sheets out. It never edits the source assembly or its explodes.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import math
 import struct
 import sys
@@ -86,6 +87,11 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
+# The drawing's own package: its assembly contract's drawing_unit selects the
+# sheet's document units and is proven by finalize_drawing.
+PACKAGE_NAME = "ms-measuring-stick"
+if PACKAGE_NAME != spec.ASM_NAME:
+    raise AssertionError("the measuring-stick drawing names its own assembly package")
 
 SHEET_NAMES = (
     "ASSEMBLED + CLAMPED SETUP",
@@ -116,7 +122,8 @@ TITLE_BLOCK = (
     _TEMPLATE.title_block_top_m,
 )
 
-# Sheet 1: the 202-long stick at full size, working elevation screw-up.
+# Sheet 1: the full stick (ms_stick_spec.BODY_LENGTH) at full size, working
+# elevation screw-up.
 # The graduated underside sits below Front in aligned third-angle projection.
 # Section A-A uses native end-only cutting-line style: its upper arrow sits
 # above the setting witnesses, below the overall reference dimension.
@@ -1075,7 +1082,8 @@ def _append_template_sheet(adapter: Any, target: Any, *, name: str) -> None:
     donor_title = ""
     try:
         donor, donor_sheet = new_project_drawing(
-            adapter, layout=SHEET_LAYOUTS[name], scale=SHEET_SCALES[name]
+            adapter, layout=SHEET_LAYOUTS[name], scale=SHEET_SCALES[name],
+            package_name=PACKAGE_NAME,
         )
         donor = _early_bound(donor, "IModelDoc2")
         donor_sheet = _early_bound(donor_sheet, "ISheet")
@@ -1120,7 +1128,8 @@ def _append_template_sheet(adapter: Any, target: Any, *, name: str) -> None:
 def _create_mixed_package_sheets(adapter: Any) -> None:
     """Use native template copies, not a metadata-only portrait declaration."""
     target, initial = new_project_drawing(
-        adapter, layout=SHEET_LAYOUTS[SHEET_NAMES[0]], scale=SHEET_SCALES[SHEET_NAMES[0]]
+        adapter, layout=SHEET_LAYOUTS[SHEET_NAMES[0]], scale=SHEET_SCALES[SHEET_NAMES[0]],
+        package_name=PACKAGE_NAME,
     )
     target = _early_bound(target, "IModelDoc2")
     initial = _early_bound(initial, "ISheet")
@@ -1152,13 +1161,53 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     return settled
 
 
+def _source_sha256(path: Path) -> str:
+    """Stream the released source (the magnifier/drive-train identity guard)."""
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _assert_source_identity(source_model: Any, expected_sha256: str, *, phase: str) -> None:
+    """The drawing reads its source and never edits it: the .SLDASM keeps its
+    bytes and the open document its clean save flag. Never save or reset it."""
+    actual_sha256 = _source_sha256(SOURCE)
+    dirty = bool(source_model.GetSaveFlag())
+    _telemetry.info(
+        f"measuring-stick source {phase}: SHA256 {actual_sha256}; "
+        f"expected {expected_sha256}; dirty={dirty}",
+        source_identity_phase=phase,
+        source_sha256=actual_sha256,
+        source_expected_sha256=expected_sha256,
+        source_dirty=dirty,
+    )
+    if dirty:
+        raise RuntimeError(
+            f"measuring-stick drawing dirtied the source assembly {phase}; "
+            "refusing to save or reset it"
+        )
+    if actual_sha256 != expected_sha256:
+        raise RuntimeError(
+            f"measuring-stick drawing changed the source assembly {phase}: "
+            f"SHA256 {expected_sha256} -> {actual_sha256}"
+        )
+
+
 @_telemetry.traced("drawing.ms_measuring_stick_assembly")
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
+    source_sha256 = _source_sha256(SOURCE)
 
     check("open measuring-stick drawing source", await adapter.open_model(str(SOURCE)))
     source_model = _early_bound(adapter.currentModel, "IModelDoc2")
+    if bool(source_model.GetSaveFlag()):
+        raise RuntimeError(
+            "measuring-stick source assembly is already dirty; refusing to discard user changes"
+        )
+    _assert_source_identity(source_model, source_sha256, phase="on source open")
     properties = read_required_properties(
         source_model,
         (
@@ -1183,19 +1232,40 @@ async def build(adapter: Any) -> dict[str, str]:
             f"{sheet.DRAWING_NUMBER!r}"
         )
     _validate_source(source_model)
+    _assert_source_identity(source_model, source_sha256, phase="before presentation")
 
     settled = _place_package(adapter)
-    return await finalize_drawing(
-        adapter,
-        OUTPUTS,
-        layout=SPEC.layout,
-        pdf_title="Measuring Stick Assembly Drawing Package",
-        scale=SHEET_SCALE,
-        expected_sheet_names=SHEET_NAMES,
-        sheet_layouts=SHEET_LAYOUTS,
-        sheet_scales=SHEET_SCALES,
-        settled_checks=(settled,),
-    )
+    _assert_source_identity(source_model, source_sha256, phase="before drawing SaveAs")
+    try:
+        artifacts = await finalize_drawing(
+            adapter,
+            OUTPUTS,
+            layout=SPEC.layout,
+            pdf_title="Measuring Stick Assembly Drawing Package",
+            scale=SHEET_SCALE,
+            expected_sheet_names=SHEET_NAMES,
+            sheet_layouts=SHEET_LAYOUTS,
+            sheet_scales=SHEET_SCALES,
+            settled_checks=(
+                settled,
+                lambda: _assert_source_identity(
+                    source_model, source_sha256, phase="settled checks before drawing SaveAs"
+                ),
+            ),
+            package_name=PACKAGE_NAME,
+        )
+    finally:
+        primary_error = sys.exception()
+        try:
+            _assert_source_identity(
+                source_model, source_sha256, phase="after drawing finalization"
+            )
+        except BaseException:
+            if primary_error is None:
+                raise
+            # Keep the original native failure and its traceback.
+    _telemetry.success(f"measuring-stick source preserved clean; SHA256 {source_sha256}")
+    return artifacts
 
 
 def _parse_args() -> argparse.Namespace:

@@ -28,6 +28,15 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 from _com import _early_bound, _read_member
 import _config
 from _custom_properties import apply_custom_properties
+from _drawing_package_unit import (
+    assert_document_units_after_save,
+    assert_sheet_prints_unit,
+    carries_inch_rows,
+    declared_package_drawing_unit,
+    package_drawing_unit,
+    prove_saved_drawing_units,
+)
+from _drawing_units import DrawingUnit
 from _drawing_layout_audit import run_layout_audit
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout, layout_report_path
 import _seat_forensics
@@ -480,6 +489,7 @@ def new_project_drawing(
     scale: tuple[float, float] = (1.0, 1.0),
     decimals: int = 2,
     checkpoint: Callable[[str], None] | None = None,
+    package_name: str | None = None,
 ) -> tuple[Any, Any]:
     """Create a drawing from the selected hand-made project template.
 
@@ -492,6 +502,10 @@ def new_project_drawing(
     ``property_view`` is accepted for compatibility and unused.
     ``checkpoint`` runs immediately after native document creation/binding,
     before drawing setup, so source load transitions are not attributed to views.
+    ``package_name`` is the drawing's own DASHED package (registry part or
+    assembly contract); its ``drawing_unit`` selects the SDK's inch or mm
+    document units (``_drawing_package_unit``).  ``None`` keeps the legacy
+    millimetre sheet.
     """
     if checkpoint is not None and not callable(checkpoint):
         raise TypeError("drawing checkpoint must be callable")
@@ -522,8 +536,17 @@ def new_project_drawing(
         raise RuntimeError("project drawing template has no current sheet")
     # 2 decimals by default: 3-decimal display (76.000) reads as false precision
     # next to the ±0.25 blanket tolerance. A drawing that genuinely needs finer
-    # display (an exact inch conversion like 9.525) can pass decimals=3.
-    set_units_mm(adapter, decimals=decimals)
+    # display (an exact inch conversion like 9.525) can pass decimals=3. The
+    # package's drawing_unit picks the SDK's inch or mm document units.
+    unit = "mm" if package_name is None else package_drawing_unit(package_name)
+    if unit == "in":
+        _sw_drawing.set_units_inch(adapter, decimals=decimals)
+    else:
+        set_units_mm(adapter, decimals=decimals)
+    if package_name is not None:
+        _telemetry.event(
+            "drawing.units_selected", package=package_name, unit=unit, decimals=decimals
+        )
     _pin_dimension_text_and_leader_style(draw)
     _pin_annotation_ink(adapter)
     if not sheet.SetScale(float(scale[0]), float(scale[1]), True, False):
@@ -882,6 +905,7 @@ async def finalize_drawing(
     sheet_scales: Mapping[str, tuple[float, float]] | None = None,
     settled_checks: Sequence[Callable[[], None]] = (),
     checkpoint: Callable[[str], None] | None = None,
+    package_name: str | None = None,
 ) -> dict[str, str]:
     """Enforce the sheet/view contract and export SLDDRW, PDF, and rendered PNG.
 
@@ -890,9 +914,21 @@ async def finalize_drawing(
     about the drawing the later rebuilds leave (:func:`assert_balloon_landings`).
     ``checkpoint`` observes each existing native artifact-save boundary and
     drawing close, including failed attempts. It never changes save options.
+    ``package_name`` is the same DASHED package passed to
+    :func:`new_project_drawing`.  Every sheet is proved to print in the unit
+    the package declares (``_drawing_package_unit.assert_sheet_prints_unit``:
+    document units, UNIT cell, linked TOL_* values).  An undeclared or absent
+    package is proved too when its linked model carries the inch TOL_* rows,
+    so an inch model can never ship on a sheet that forgot its package.  A
+    package that declares its unit also proves the SAVED file after close
+    (``prove_saved_drawing_units``: read-only reopen, the same sheet proof,
+    closed unsaved with its bytes unchanged); legacy sheets skip the reopen.
     """
     if checkpoint is not None and not callable(checkpoint):
         raise TypeError("drawing checkpoint must be callable")
+    declared_unit = (
+        None if package_name is None else declared_package_drawing_unit(package_name)
+    )
     drawing_model = adapter.currentModel
     ddoc = _early_bound(
         drawing_model, "IDrawingDoc"
@@ -939,7 +975,9 @@ async def finalize_drawing(
     # Every sheet owns its own $PRPSHEET link. Point each at that sheet's first
     # real view after all views exist, validate the linked model's tolerance and
     # current-release Revision properties, and hold every sheet to the same ASME B
-    # contract.
+    # contract. A sheet of a package that declares its unit, or whose model
+    # carries the inch rows, is also proved to print that unit.
+    proved_unit: DrawingUnit | None = None
     for sheet_name in sheet_names:
         if not ddoc.ActivateSheet(sheet_name):
             raise RuntimeError(f"failed to activate drawing sheet {sheet_name!r}")
@@ -1031,7 +1069,7 @@ async def finalize_drawing(
         linked_model = _sw_type_info.early_bound_or_flag(
             linked_model, "IModelDoc2", "GetCustomInfoValue"
         )
-        read_required_properties(
+        linked_properties = read_required_properties(
             linked_model,
             (
                 *TITLE_BLOCK_TOLERANCE_PROPERTIES,
@@ -1044,6 +1082,19 @@ async def finalize_drawing(
                 TITLE_BLOCK_COPYRIGHT_PROPERTY,
             ),
         )
+        proof_unit = declared_unit
+        if proof_unit is None and carries_inch_rows(linked_properties):
+            proof_unit = "in"
+        if proof_unit is not None:
+            assert_sheet_prints_unit(
+                drawing_model,
+                package_name=package_name or "<no package_name>",
+                unit=proof_unit,
+                sheet_name=sheet_name,
+                linked_model=linked_model,
+                linked_properties=linked_properties,
+            )
+            proved_unit = proof_unit
 
     # Explicit recipe-requested cleanup remains sheet-scoped. When a standard
     # Isometric view is present, the finalizer owns its high-quality Shaded With
@@ -1115,6 +1166,14 @@ async def finalize_drawing(
         )
     if set(artifacts) != {"drawing", "pdf"}:
         raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")
+    if proved_unit is not None:
+        # Same open document: catches a save that drifted the units. The
+        # persisted proof is the reopen after close, below.
+        assert_document_units_after_save(
+            drawing_model,
+            package_name=package_name or "<no package_name>",
+            unit=proved_unit,
+        )
     # The export just computed every view; the precision flag is truthful now.
     assert_precise_isometric_views(adapter, sheet_names)
     sanitize_pdf_metadata(outputs.pdf, title=pdf_title, expected_pages=len(sheet_names))
@@ -1152,4 +1211,11 @@ async def finalize_drawing(
     ]
     if still_open:
         raise RuntimeError(f"drawing {title!r} did not close after export")
+    if declared_unit is not None and package_name is not None:
+        # A package that declares its unit (the #290 transition) also proves
+        # the SAVED file: read-only reopen, the same sheet proof, closed
+        # unsaved with its bytes unchanged. Legacy sheets skip the reopen.
+        prove_saved_drawing_units(
+            adapter, outputs.slddrw, package_name=package_name, unit=declared_unit
+        )
     return artifacts

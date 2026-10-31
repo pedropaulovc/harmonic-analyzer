@@ -5,4 +5,5 @@ ms-stick:
   finish: "polished brass; black-fill all engraving with flat black enamel, wipe-filled and cured before final polish"
   quantity: 1
   tolerance_class: plate_profile
+  drawing_unit: in
   process: "machined (brass)"

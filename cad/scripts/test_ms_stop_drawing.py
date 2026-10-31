@@ -12,6 +12,7 @@ import pytest
 
 import _drawing_projection as drawing_projection
 import _dimensions as dimensions
+import _ms_drawing_guards as guards
 import _sketch as sketch
 import ms_stop_geom as stop_geom
 import build_ms_stop_block as block
@@ -19,25 +20,38 @@ import build_ms_stop_plate as plate
 import draw_ms_stop_block as block_drawing
 import draw_ms_stop_plate as plate_drawing
 import ms_stick_spec as stick
+import ms_stop_callouts as callouts
 import ms_stop_spec as spec
 import _mcmaster_90114a124 as screw
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import DRILL_POINT_H
+from _printed_tolerance import printed_band_mm
+
+
+def _inch(value_in: float) -> float:
+    return value_in * 25.4
 
 
 def test_shared_frame_and_open_rebate_closure() -> None:
-    assert (spec.BLOCK_LENGTH, spec.BLOCK_HEIGHT, spec.BLOCK_DEPTH) == (21.0, 14.1, 11.0)
-    assert (spec.PLATE_Z_MIN, spec.PLATE_Z_MAX, spec.PLATE_THICKNESS) == (-1.0, 0.0, 1.0)
-    assert spec.TOTAL_DEPTH == 12.0
-    assert (spec.WINDOW_Z_MIN, spec.WINDOW_Z_MAX) == (0.0, 8.4)
-    assert (spec.WINDOW_Y_MIN, spec.WINDOW_Y_MAX) == pytest.approx((8.6, 12.0))
-    assert spec.WINDOW_Y_MAX + spec.ROOF_THICKNESS == spec.BLOCK_HEIGHT
-    assert spec.ROOF_THICKNESS == 2.1
-    assert spec.ROOF_THICKNESS - 0.51 >= 1.5
+    # Issue #290: both parts print decimal inch; every printed nominal is the
+    # exact millimetre decimal of its inch value.
+    assert spec.UNIT == spec.BLOCK_UNIT == spec.PLATE_UNIT == "in"
+    for got, inch in (
+        (spec.BLOCK_LENGTH, 0.84), (spec.BLOCK_HEIGHT, 0.56), (spec.BLOCK_DEPTH, 0.44),
+        (spec.PLATE_THICKNESS, 0.040), (spec.WINDOW_WIDTH, 0.330), (spec.WINDOW_HEIGHT, 0.134),
+        (spec.ROOF_THICKNESS, 0.09), (spec.ROOF_END_CHAMFER, 0.04), (spec.BACK_WALL_THICKNESS, 0.11),
+    ):
+        assert got == pytest.approx(_inch(inch), rel=0.0, abs=1e-9)
+    assert (spec.PLATE_Z_MIN, spec.PLATE_Z_MAX) == (-spec.PLATE_THICKNESS, 0.0)
+    assert spec.TOTAL_DEPTH == pytest.approx(spec.BLOCK_DEPTH + spec.PLATE_THICKNESS)
+    assert (spec.WINDOW_Z_MIN, spec.WINDOW_Z_MAX) == (0.0, spec.WINDOW_WIDTH)
+    assert (spec.WINDOW_Y_MIN, spec.WINDOW_Y_MAX) == pytest.approx((8.5344, 11.938))
+    assert spec.WINDOW_Y_MAX + spec.ROOF_THICKNESS == pytest.approx(spec.BLOCK_HEIGHT)
+    # Rule 17 on the inch sheet: .080 target at the roof's .XX low limit.
+    assert spec.ROOF_THICKNESS - printed_band_mm(2, unit="in") >= spec.WALL_TARGET_MM - 1e-9
     assert "WindowFloor" not in set().union(*spec.BLOCK_DRAWING_DIMENSIONS.values())
     assert "RoofThickness" in spec.BLOCK_DRAWING_DIMENSIONS["RoofThicknessReference"]
-    assert spec.BACK_WALL_THICKNESS == pytest.approx(2.6)
-    assert spec.ROOF_END_CHAMFER == 1.0 and spec.ROOF_CHAMFER_ANGLE == 45.0
+    assert spec.ROOF_CHAMFER_ANGLE == 45.0
     assert spec.STOP_MARK == 2.0
     assert block.MATERIAL == plate.MATERIAL == "Brass"
 
@@ -50,61 +64,87 @@ def test_native_taps_and_plate_clearance_follow_stock_screws() -> None:
     assert spec.PLATE_TAP_SPEC.kind == "tapped_bottoming"
     assert spec.PLATE_TAP_SPEC.size == screw.THREAD
     assert spec.PLATE_TAP_SPEC.end == "blind"
-    assert spec.PLATE_TAP_SPEC.depth_mm == spec.PLATE_TAP_DRILL_DEPTH == 7.8
-    assert spec.PLATE_TAP_SPEC.overrides_mm["ThreadDepth"] == spec.PLATE_TAP_THREAD_DEPTH == 6.3
-    assert spec.PLATE_TAP_SPEC.overrides_mm["TapDrillDiameter"] == spec.PLATE_TAP_DRILL_DIA == 1.85
-    assert spec.PLATE_CLEARANCE_SPEC.overrides_mm["HoleDiameter"] == spec.PLATE_CLEARANCE_DIA == 2.4
+    assert spec.PLATE_TAP_SPEC.depth_mm == spec.PLATE_TAP_DRILL_DEPTH == _inch(0.300)
+    assert spec.PLATE_TAP_SPEC.overrides_mm["ThreadDepth"] == spec.PLATE_TAP_THREAD_DEPTH == _inch(0.250)
+    # #49 drill, .073: three places, the shop's drill.
+    assert spec.PLATE_TAP_SPEC.overrides_mm["TapDrillDiameter"] == spec.PLATE_TAP_DRILL_DIA == 1.8542
+    # The cover clearance is the wizard's own #2 close size, .094, unedited.
+    assert spec.PLATE_CLEARANCE_SPEC.kind == "clearance" and spec.PLATE_CLEARANCE_SPEC.fit == "close"
+    assert not spec.PLATE_CLEARANCE_SPEC.overrides_mm
+    assert spec.PLATE_CLEARANCE_DIA == 2.3876
     assert spec.THUMB_TAP_SPEC.kind == "tapped" and spec.THUMB_TAP_SPEC.size == "#4-40"
     # Through-all would drill the opposite roof as well as the thick floor.
     assert spec.THUMB_TAP_SPEC.end == "through_next"
-    assert (spec.THUMB_AXIS_X, spec.THUMB_AXIS_Z) == (10.5, 4.2)
-    assert spec.THUMB_HOLE_POINTS == ((10.5, 0.0, 4.2),)
+    assert (spec.THUMB_AXIS_X, spec.THUMB_AXIS_Z) == pytest.approx((10.668, 4.191))
+    assert spec.THUMB_HOLE_POINTS == ((spec.THUMB_AXIS_X, 0.0, spec.THUMB_AXIS_Z),)
     assert spec.THUMB_HOLE_NORMAL == (0.0, -1.0, 0.0)
-    assert spec.PLATE_HOLE_XS == (3.5, 17.5) and spec.PLATE_HOLE_Y == 4.0
-    assert spec.PLATE_HOLE_PITCH == 14.0
+    assert spec.PLATE_HOLE_XS == pytest.approx((_inch(0.150), _inch(0.690)))
+    assert spec.PLATE_HOLE_Y == pytest.approx(_inch(0.160))
+    assert spec.PLATE_HOLE_PITCH == pytest.approx(_inch(0.540))
     assert spec.PLATE_HOLE_NORMAL == (0.0, 0.0, -1.0)
-    assert spec.BLOCK_PLATE_HOLE_POINTS == ((3.5, 4.0, 0.0), (17.5, 4.0, 0.0))
-    assert spec.PLATE_HOLE_POINTS == ((3.5, 4.0, -1.0), (17.5, 4.0, -1.0))
+    assert spec.BLOCK_PLATE_HOLE_POINTS == tuple((x, spec.PLATE_HOLE_Y, 0.0) for x in spec.PLATE_HOLE_XS)
+    assert spec.PLATE_HOLE_POINTS == tuple(
+        (x, spec.PLATE_HOLE_Y, -spec.PLATE_THICKNESS) for x in spec.PLATE_HOLE_XS)
 
 
 def test_receiver_engagement_and_separation_are_real_geometry() -> None:
-    assert spec.PLATE_SCREW_PENETRATION == pytest.approx(5.35)
+    assert spec.PLATE_SCREW_PENETRATION == pytest.approx(5.334)
     assert 1.5 * screw.MAJOR_DIA < spec.PLATE_SCREW_PENETRATION < spec.PLATE_TAP_THREAD_DEPTH
     assert spec.PLATE_SCREW_PENETRATION < spec.PLATE_TAP_DRILL_DEPTH
     tip = spec.PLATE_TAP_DRILL_DEPTH + spec.PLATE_TAP_DRILL_DIA / 2.0 * DRILL_POINT_H
     assert spec.PLATE_TAP_TIP_Z == pytest.approx(tip)
-    assert spec.BLOCK_DEPTH - tip > 2.0
-    assert spec.PLATE_HOLE_Y + screw.MAJOR_DIA / 2.0 < spec.WINDOW_Y_MIN - 2.0
+    assert spec.BLOCK_DEPTH - tip > spec.WALL_TARGET_MM
+    assert spec.PLATE_HOLE_Y + screw.MAJOR_DIA / 2.0 < spec.WINDOW_Y_MIN - spec.WALL_TARGET_MM
     for x in spec.PLATE_HOLE_XS:
-        assert abs(x - spec.THUMB_AXIS_X) - (screw.MAJOR_DIA + spec.THUMB_MAJOR_DIA) / 2.0 > 2.0
+        assert abs(x - spec.THUMB_AXIS_X) - (screw.MAJOR_DIA + spec.THUMB_MAJOR_DIA) / 2.0 > spec.WALL_TARGET_MM
 
 
 def test_print_worst_joint_stack_preserves_bottoming_tap_and_ligaments() -> None:
-    assert spec.PLATE_THICKNESS_MIN == pytest.approx(0.9)
-    assert spec.PLATE_THICKNESS_MAX == pytest.approx(1.1)
-    assert spec.PLATE_FULL_THREAD_MIN == pytest.approx(5.79)
-    assert spec.PLATE_SCREW_PENETRATION_MAX == pytest.approx(5.704)
+    # Cover thickness at the title block's .XXX (+/-.005).
+    assert spec.PLATE_THICKNESS_MIN == pytest.approx(0.889)
+    assert spec.PLATE_THICKNESS_MAX == pytest.approx(1.143)
+    assert spec.PLATE_FULL_THREAD_MIN == pytest.approx(6.223)
+    assert spec.PLATE_SCREW_PENETRATION_MAX == pytest.approx(5.715)
+    assert spec.PLATE_SCREW_PENETRATION_MIN == pytest.approx(4.953)
     assert spec.PLATE_SCREW_PENETRATION_MIN >= 1.5 * screw.MAJOR_DIA
     assert spec.PLATE_SCREW_PENETRATION_MAX < spec.PLATE_FULL_THREAD_MIN
-    assert spec.PLATE_TAP_LEAD_MIN == pytest.approx(0.48)
+    assert spec.PLATE_TAP_LEAD_MIN == pytest.approx(1.016)
     assert spec.PLATE_TAP_LEAD_MIN >= screw.PITCH
-    assert spec.PLATE_TAP_BACK_WALL_MIN == pytest.approx(1.59416, abs=1e-5)
-    assert spec.PLATE_TAP_BACK_WALL_MIN >= 1.5
-    assert spec.ROOF_THICKNESS_MIN == pytest.approx(1.59)
-    assert spec.PLATE_TAP_WINDOW_WEB_MIN == pytest.approx(1.96351)
-    assert spec.PLATE_TAP_END_WEB_MIN == pytest.approx(1.76351)
+    assert spec.PLATE_TAP_BACK_WALL_MIN == pytest.approx(2.58742, abs=1e-5)
+    assert spec.ROOF_THICKNESS_MIN == pytest.approx(2.032)
+    assert spec.PLATE_TAP_WINDOW_WEB_MIN == pytest.approx(2.60731)
+    assert spec.PLATE_TAP_END_WEB_MIN == pytest.approx(2.30251)
     assert spec.PLATE_TAP_MAJOR_DIA_MAX == pytest.approx(0.0887 * 25.4)
     assert spec.PLATE_TAP_MAJOR_DIA_MAX > screw.MAJOR_DIA
-    assert spec.WINDOW_BACK_WALL_MIN == pytest.approx(2.09)
-    assert spec.BLOCK_DEPTH_MIN == pytest.approx(10.49)
-    assert spec.PLATE_CLEARANCE_END_WEB_MIN == pytest.approx(1.64)
-    assert spec.PLATE_CLEARANCE_HEAD_WEB_MIN >= 1.5
-    assert spec.PLATE_RADIAL_CLEARANCE_MIN == pytest.approx(0.1078)
-    assert spec.ROOF_OPEN_END_EDGE == pytest.approx(1.1)
+    assert spec.WINDOW_BACK_WALL_MIN == pytest.approx(2.54)
+    assert spec.BLOCK_DEPTH_MIN == pytest.approx(10.922)
+    assert spec.PLATE_CLEARANCE_END_WEB_MIN == pytest.approx(2.1844)
+    assert spec.PLATE_CLEARANCE_HEAD_WEB_MIN == pytest.approx(8.5344)
+    assert spec.PLATE_RADIAL_CLEARANCE_MIN == pytest.approx(0.1016)
+    assert spec.ROOF_OPEN_END_EDGE == pytest.approx(1.27)
+
+
+def test_every_worst_case_wall_meets_the_inch_rule_17_target() -> None:
+    """Rule 17 on the inch sheet: .080 target, .060 floor; each wall and web
+    is taken at its printed bands, so no sheet states a shortfall."""
+    assert (spec.WALL_TARGET_MM, spec.WALL_FLOOR_MM) == (2.032, 1.524)
+    walls = spec.WORST_CASE_WALLS_MM
+    assert walls == {
+        "roof": spec.ROOF_THICKNESS_MIN,
+        "rebate back wall": spec.WINDOW_BACK_WALL_MIN,
+        "tap drill point to opposite face": spec.PLATE_TAP_BACK_WALL_MIN,
+        "tap thread to end face": spec.PLATE_TAP_END_WEB_MIN,
+        "tap thread to rebate floor": spec.PLATE_TAP_WINDOW_WEB_MIN,
+        "clearance hole to end face": spec.PLATE_CLEARANCE_END_WEB_MIN,
+        "clearance hole to head edge": spec.PLATE_CLEARANCE_HEAD_WEB_MIN,
+    }
+    assert min(walls.values()) >= spec.WALL_TARGET_MM - 1e-9
+    assert not spec._SHORT
 
 
 def test_matched_pair_uses_functional_positions_and_a_real_shop_sequence() -> None:
-    assert spec.PLATE_HOLE_POSITION_TOLERANCE_MM == 0.1
+    # The master stations ride the title block's .XXX; no own band.
+    assert spec.PLATE_HOLE_POSITION_TOLERANCE_MM == pytest.approx(printed_band_mm(3, unit="in"))
     assert all(block_point[:2] == plate_point[:2] for block_point, plate_point
                in zip(spec.BLOCK_PLATE_HOLE_POINTS, spec.PLATE_HOLE_POINTS, strict=True))
     # Rule 7: the pair is flagged at both match-drill callouts, not in a loose note.
@@ -114,7 +154,7 @@ def test_matched_pair_uses_functional_positions_and_a_real_shop_sequence() -> No
     # the clamped plate's exposed face.
     assert f"DEPTHS FROM {spec.BLOCK_MATING_FACE_NOTE}" in block_drawing.COVER_HOLE_PROCESS
     for callout in (block_drawing.COVER_HOLE_PROCESS,
-                    plate_drawing.DIMENSION_CALLOUTS["PilotDrillDiameter"]):
+                    callouts.PLATE_CALLOUTS["PilotDrillDiameter"]):
         assert spec.MATCHED_PAIR_NOTE in callout
     assert "NOT INTERCHANGEABLE" in spec.MATCHED_PAIR_NOTE
     assert "PilotDrillDiameter" in spec.PLATE_DRAWING_DIMENSIONS["PilotDrillReference"]
@@ -123,9 +163,12 @@ def test_matched_pair_uses_functional_positions_and_a_real_shop_sequence() -> No
     )
 
 def test_window_keeps_functional_clearance_at_printed_size_limits() -> None:
+    # The window's own +.004/-0 band and the stick's title-block .XXX leave
+    # .010 of side and .011 of face clearance at the tightest limits.
     window_lower, _window_upper = spec.WINDOW_SIZE_TOLERANCE_MM
-    assert spec.WINDOW_WIDTH + window_lower - (stick.BODY_WIDTH + stick.BODY_FIT_TOLERANCE_MM) >= 0.3 - 1e-9
-    assert spec.WINDOW_HEIGHT + window_lower - (stick.BODY_THICKNESS + stick.BODY_FIT_TOLERANCE_MM) >= 0.3 - 1e-9
+    assert spec.WINDOW_SIZE_TOLERANCE_MM == pytest.approx((0.0, 0.1016))
+    assert spec.WINDOW_WIDTH + window_lower - (stick.BODY_WIDTH + stick.BODY_FIT_TOLERANCE_MM) == pytest.approx(0.254)
+    assert spec.WINDOW_HEIGHT + window_lower - (stick.BODY_THICKNESS + stick.BODY_FIT_TOLERANCE_MM) == pytest.approx(0.2794)
     assert spec.PLATE_CLEARANCE_DIA > screw.MAJOR_DIA
 
 
@@ -154,13 +197,15 @@ def test_each_sheet_imports_the_complete_model_contract(builder, drawing, dimens
     if hasattr(drawing, "BOTTOM_KEEP"):
         keeps |= set(drawing.BOTTOM_KEEP)
     assert marked == keeps == set(precision) == set(values)
-    loose = ({"BlockHeight", "BlockDepth"} if builder is block
-             else {"PlateHeight", "RoofChamferSize"})
-    assert {name for name, places in precision.items() if places == 1} == loose
-    assert all(places == (
-        0 if builder is plate and name == "RoofChamferAngle"
-        else 1 if name in loose else 2
-    ) for name, places in precision.items())
+    # Decimal inch: no .X on either part (nothing here is nonfunctional);
+    # .XXX for the rebate the stick slides in, the thumbscrew's station from
+    # the cover, the matched-pair stations, cover thickness and pilot drill.
+    three = ({"WindowWidth", "WindowHeight", "ThumbFromPlate", *spec.PLATE_LOCATION_DIMENSIONS}
+             if builder is block
+             else {"PlateThickness", "PilotDrillDiameter", *spec.PLATE_LOCATION_DIMENSIONS})
+    assert {name: places for name, places in precision.items() if places != 2} == {
+        "RoofChamferAngle": 0, **dict.fromkeys(three, 3),
+    }
     assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1]
 
 
@@ -177,11 +222,14 @@ def test_no_com_in_spec_or_render_time_size_overrides(module) -> None:
                 else []
             )
         ]
+        # The literal registry read of the sheet unit is the one drawing
+        # module a pure spec may import (no COM behind it).
         assert not any(name.startswith((
             "build_", "solidworks", "_appearance", "_assembly", "_check", "_com",
             "_custom_properties", "_dimensions", "_drawing", "_feature_tree",
             "_holes", "_part_", "_rebuild", "_session", "_sketch", "_visibility",
-        )) for name in imports)
+        )) and name != "_drawing_units" for name in imports)
+        assert "_drawing_units" in imports
     else:
         calls = {node.func.attr if isinstance(node.func, ast.Attribute) else node.func.id
                  for node in ast.walk(tree) if isinstance(node, ast.Call)
@@ -299,13 +347,13 @@ class _StopMathUtility:
 
 @pytest.mark.parametrize("drawing,cases", [
     (block_drawing, [
-        ("two cover blind taps", "*Back", (0.018425, 0.004, 0.0), (0.1233, 0.1728)),
+        ("two cover blind taps", "*Back", (0.0184531, 0.004064, 0.0), (0.1238596, 0.172808)),
         ("thumbscrew tap through floor", "*Bottom",
-         (0.0116305, 0.0, 0.0042), (0.150478, 0.0782)),
-        ("cover mating face", "*Left", (0.0105, 0.01255, 0.0), (0.293, 0.207)),
+         (0.0117985, 0.0, 0.004191), (0.150478, 0.078588)),
+        ("cover mating face", "*Left", (0.010668, 0.012573, 0.0), (0.292648, 0.206844)),
     ]),
     (plate_drawing, [
-        ("two cover clearance holes", "*Back", (0.0023, 0.004, -0.001), (0.2078, 0.1578)),
+        ("two cover clearance holes", "*Back", (0.0026162, 0.004064, -0.001016), (0.2072072, 0.157808)),
     ]),
 ], ids=["block-plate-and-subsequent-thumb", "plate-clearance"])
 def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
@@ -326,10 +374,17 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         assert path == str(source)
         return SimpleNamespace(is_success=True, data=None)
 
+    source_flags = {"dirty": False}
     adapter = SimpleNamespace(
-        currentModel=SimpleNamespace(EditRebuild3=lambda: True), open_model=open_model,
+        currentModel=SimpleNamespace(EditRebuild3=lambda: True,
+                                     GetSaveFlag=lambda: source_flags["dirty"]),
+        open_model=open_model,
         swApp=SimpleNamespace(GetMathUtility=lambda: utility),
     )
+    # The real clean-source guard runs on the fake document's save flag and
+    # the sentinel file's bytes.
+    monkeypatch.setattr(guards, "_early_bound", lambda obj, interface: obj)
+    checkpoint_stages = []
     model_center = (
         spec.BLOCK_LENGTH / 2000.0,
         spec.BLOCK_HEIGHT / 2000.0,
@@ -352,10 +407,18 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     # Only replace their raw dispatch boundary with the fake object's members.
     monkeypatch.setattr(drawing_projection, "_com_invoke", invoke)
     monkeypatch.setattr(drawing, "place_view", place_view)
-    monkeypatch.setattr(drawing, "new_project_drawing", lambda *a, **kw: (object(), object()))
+    new_kwargs = {}
+
+    def new_drawing(*args, **kwargs):
+        new_kwargs.update(kwargs)
+        kwargs["checkpoint"]("after_new_document")
+        checkpoint_stages.append("after_new_document")
+        return object(), object()
+
+    monkeypatch.setattr(drawing, "new_project_drawing", new_drawing)
     for name in (
         "read_required_properties", "stamp_drawing_summary",
-        "set_hidden_lines_removed", "set_dimension_callouts",
+        "set_hidden_lines_removed", "assert_imported_text",
         "add_property_linked_note",
     ):
         monkeypatch.setattr(drawing, name, lambda *a, **kw: None)
@@ -369,9 +432,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         monkeypatch.setattr(drawing, "_remove_general_thread_class", lambda *a, **kw: None)
         monkeypatch.setattr(drawing, "_assert_reference_dimensions", lambda *a: None)
     else:
-        monkeypatch.setattr(drawing, "_style_pilot_diameter", lambda *a: None)
-        monkeypatch.setattr(drawing, "_style_plate_chamfer", lambda *a: None)
-        monkeypatch.setattr(drawing, "_append_callout_line", lambda *a: None)
+        monkeypatch.setattr(drawing, "_assert_pilot_diameter", lambda *a: None)
     labelled = []
     monkeypatch.setattr(drawing, "_label_locating_edges", lambda adapter, view: labelled.append(view))
     monkeypatch.setattr(drawing, "auto_center_marks", lambda *a, **kw: True)
@@ -384,6 +445,10 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         callout_positions[label] = callout_xy
 
     async def finalize(adapter, outputs, **kwargs):
+        assert kwargs["package_name"] == drawing.PACKAGE
+        for stage in ("before_drawing_save", "after_drawing_save", "after_drawing_close"):
+            kwargs["checkpoint"](stage)
+            checkpoint_stages.append(stage)
         return {"slddrw": str(outputs.slddrw)}
 
     monkeypatch.setattr(drawing, "add_native_hole_callout", add_callout)
@@ -396,16 +461,19 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         )
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
     assert asyncio.run(drawing.build(adapter)) == {"slddrw": str(drawing.OUTPUTS.slddrw)}
+    assert new_kwargs["package_name"] == drawing.PACKAGE == drawing.PART_STEM
+    assert checkpoint_stages == [
+        "after_new_document", "before_drawing_save", "after_drawing_save", "after_drawing_close",
+    ]
+    assert source.read_bytes() == b"offline source sentinel"
     assert len(native_contracts) == 1
-    bands = native_contracts[0]["bands"]
+    bands = native_contracts[0].get("bands", {})
     if drawing is block_drawing:
         assert not set(bands) & (spec.PLATE_LOCATION_DIMENSIONS | spec.BLOCK_REFERENCE_DIMENSIONS)
         assert bands == {name: spec.WINDOW_SIZE_TOLERANCE_MM for name in ("WindowWidth", "WindowHeight")}
     else:
-        assert {name: bands[name] for name in spec.PLATE_LOCATION_DIMENSIONS} == {
-            name: (-spec.PLATE_HOLE_POSITION_TOLERANCE_MM, spec.PLATE_HOLE_POSITION_TOLERANCE_MM)
-            for name in spec.PLATE_LOCATION_DIMENSIONS
-        }
+        # Cover thickness and master stations ride the title block's .XXX.
+        assert not bands
     # The displayed cover face is *Back: +X goes left, +Y goes up. Its
     # third-angle right view is unrotated *Left (+Z right, +Y up); its
     # third-angle underside must retain -X and send +Z down, not up.
@@ -434,13 +502,13 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         assert front.Position[0] == 0.155
         assert max(bottom_map.apply((x, 0.0, 0.0))[0] for x in (
             0.0, spec.BLOCK_LENGTH / 1000.0
-        )) == pytest.approx(0.197)
+        )) == pytest.approx(0.197672)
         assert block_drawing.BOTTOM_KEEP["ThumbFromEnd"][0] == 0.175
         assert block_drawing.BOTTOM_KEEP["ThumbFromEnd"][0] - bottom.Position[0] > 0.010
         assert callout_positions["thumbscrew tap through floor"] == (0.060, 0.056)
         assert callout_positions["two cover blind taps"] == (0.065, 0.127)
     else:
-        # The native pilot's construction circle is at X=3.5, the same
+        # The native pilot's construction circle is at X=.150, the same
         # right-sheet hole selected for the opened clearance callout.
         assert callout_positions["two cover clearance holes"] == drawing.CLEARANCE_CALLOUT_XY
         assert drawing.FRONT_KEEP["PilotDrillDiameter"] == (0.285, 0.178)
@@ -490,43 +558,39 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
             # 20 mm block-column move keeps both real picks within the border.
             transform = view.ModelToViewTransform
             assert transform.apply((0.0, 0.0, 0.0))[0] == pytest.approx(
-                0.217 if drawing is plate_drawing else 0.197
+                0.217672 if drawing is plate_drawing else 0.197672
             )
             wrong_units_x = transform.apply(mouth)[0]
             assert wrong_units_x == pytest.approx(
-                -8.983 if drawing is plate_drawing else -73.503
+                -10.247128 if drawing is plate_drawing else -73.614728
             )
             # Preserve the original failing other-rim negative-X signature
             # as well as the plate's new concentric right-sheet pick.
             original = (holes[0][0] + diameter / 2.0, holes[0][1], holes[0][2])
             assert transform.apply(original)[0] == pytest.approx(
-                -18.583 if drawing is plate_drawing else -17.503
+                -19.797528 if drawing is plate_drawing else -18.750728
             )
 
 
 def test_match_drilling_does_not_eliminate_absolute_end_ligament_limits() -> None:
     """Matched pair error cancels, but the source axes still locate drilled stock."""
-    from _printed_tolerance import printed_band_mm
-
-    length_band = printed_band_mm(spec.PLATE_DRAWING_PRECISION_BY_NAME["PlateLength"])
+    length_band = printed_band_mm(spec.PLATE_DRAWING_PRECISION_BY_NAME["PlateLength"], unit="in")
     maximum_drill = spec.PLATE_CLEARANCE_DIA + spec.DRILL_OVERSIZE_MM
     minimum_end_web = spec.BLOCK_LENGTH - length_band - (
         spec.PLATE_HOLE_XS[1] + spec.PLATE_HOLE_POSITION_TOLERANCE_MM + maximum_drill / 2.0
     )
-    assert minimum_end_web >= 1.5
-    assert spec.BLOCK_LENGTH - printed_band_mm(1) - (
+    assert minimum_end_web == pytest.approx(spec.PLATE_CLEARANCE_END_WEB_MIN)
+    assert minimum_end_web >= spec.WALL_TARGET_MM
+    # A .X length (+/-.1) would break that web: the .84 is .XX for it.
+    assert spec.BLOCK_LENGTH - printed_band_mm(1, unit="in") - (
         spec.PLATE_HOLE_XS[1] + spec.PLATE_HOLE_POSITION_TOLERANCE_MM + maximum_drill / 2.0
-    ) < 1.5
-    assert spec.BLOCK_LENGTH - spec.BLOCK_PRINTED_BANDS_MM["BlockLength"] - (
-        spec.PLATE_HOLE_XS[1] + printed_band_mm(2)
-        + spec.PLATE_SCREW_MAJOR_DIA / 2.0
-    ) < 1.5
+    ) < spec.WALL_FLOOR_MM
     assert spec.MATCH_DRILL_MASTER == "MS-STOP-PLATE"
     assert spec.MATCH_DRILL_DATUM_ALIGNMENT == "LOCATING ENDS AND EDGES FLUSH"
     assert (spec.LOCATING_END_NOTE, spec.LOCATING_EDGE_NOTE) == ("LOCATING END", "LOCATING EDGE")
 
 
-@pytest.mark.parametrize("master_band", [0.0, 0.1, 0.2, 0.51])
+@pytest.mark.parametrize("master_band", [0.0, 0.0508, 0.127, 0.254])
 def test_reference_receiver_end_web_tracks_perturbed_plate_master_band(master_band) -> None:
     # These are absolute plate-master errors transferred from the same X=0
     # edge, not independent or floating block reference-dimension bands.
@@ -539,7 +603,7 @@ def test_reference_receiver_end_web_tracks_perturbed_plate_master_band(master_ba
         spec.PLATE_TAP_END_WEB_MIN + spec.PLATE_HOLE_POSITION_TOLERANCE_MM - master_band
     )
     if master_band <= spec.PLATE_HOLE_POSITION_TOLERANCE_MM:
-        assert actual >= 1.5
+        assert actual >= spec.WALL_TARGET_MM
 
 
 @pytest.mark.parametrize("refusal", [None, "prefix", "suffix", "tolerance", "value"])
@@ -639,6 +703,8 @@ def test_rebate_ceiling_is_the_graded_sliding_face(monkeypatch) -> None:
     # Rule 6: the stick's graduated face slides on the roof underside.
     (control,) = spec.BLOCK_SURFACE_FINISHES
     assert (control.key, control.roughness_um) == ("rebate_slide", 1.6)
+    # The inch sheet grades it in microinches, the physical value unchanged.
+    assert control.display_unit == "in" and control.roughness_ra == "63"
     assert control.face.normal == (0, -1, 0)
     assert control.face.offset_mm == pytest.approx(-spec.WINDOW_Y_MAX)
     calls = []
@@ -707,41 +773,23 @@ def test_thumb_tap_callout_states_where_its_thru_ends() -> None:
     assert "REBATE" in rows[-1] and "ROOF" in rows[-1]
 
 
-def test_owner_ruled_webs_print_floored_under_their_callouts() -> None:
-    # Owner ruling 2026-10-24 (#1937): four webs below the 2.0 target, each
-    # stated on its sheet and declared minor.
+def test_no_stop_web_needs_a_stated_shortfall() -> None:
+    # Issue #290: on the inch grid every web meets the .080 target at its
+    # printed bands, so neither sheet states a web line and neither package
+    # declares an owner exception any more.
     import _config
     from machinist_exceptions import load_exceptions
 
-    assert spec.PLATE_TAP_WEB_LINES == (
-        "DRILL POINT TO OPPOSITE FACE 1.59 MIN", "THREAD TO END FACE 1.76 MIN",
-        "THREAD TO REBATE FLOOR 1.96 MIN",
-    )
-    assert spec.PLATE_CLEARANCE_WEB_LINE == "HOLE TO END FACE 1.64 MIN"
+    for name in ("PLATE_TAP_WEB_LINES", "PLATE_CLEARANCE_WEB_LINE", "ROOF_WALL_CALLOUT"):
+        assert not hasattr(spec, name)
+    assert not hasattr(plate_drawing, "_append_callout_line")
+    for stem in ("ms_stop_block", "ms_stop_plate"):
+        assert load_exceptions(_config.CONFIG_DIR, stem, "part") == ()
+    for package in ("ms-stop-block", "ms-stop-plate"):
+        assert "machinist_exceptions" not in _config.parts(package)
     native = _StopDisplay("<hw-threaddesc>-<hw-threadclass> <HOLE-DEPTH><hw-threaddepth>")
-    block_drawing._remove_general_thread_class(native, last_line="\n".join(spec.PLATE_TAP_WEB_LINES))
-    assert native.prefix.splitlines()[-3:] == list(spec.PLATE_TAP_WEB_LINES)
-    native = _StopDisplay("REMOVE PLATE; THEN OPEN 2X <MOD-DIAM><hw-diam> THRU ALL\n")
-    plate_drawing._append_callout_line(native, spec.PLATE_CLEARANCE_WEB_LINE)
-    assert native.prefix.splitlines() == [
-        "REMOVE PLATE; THEN OPEN 2X <MOD-DIAM><hw-diam> THRU ALL", spec.PLATE_CLEARANCE_WEB_LINE,
-    ]
-    with pytest.raises(RuntimeError, match="did not persist"):
-        plate_drawing._append_callout_line(_StopDisplay("x", refusal="prefix"), "y")
-    declared = {
-        stem: {entry.id: entry for entry in load_exceptions(_config.CONFIG_DIR, stem, "part")}
-        for stem in ("ms_stop_block", "ms_stop_plate")
-    }
-    for stem, entry_id, line in (
-        ("ms_stop_block", "RV-03", spec.PLATE_TAP_WEB_LINES[0]),
-        ("ms_stop_block", "RV-04", spec.PLATE_TAP_WEB_LINES[1]),
-        ("ms_stop_block", "RV-05", spec.PLATE_TAP_WEB_LINES[2]),
-        ("ms_stop_plate", "RV-01", spec.PLATE_CLEARANCE_WEB_LINE),
-    ):
-        entry = declared[stem][entry_id]
-        assert entry.kind == "minor"
-        assert entry.where.endswith(line)
-        assert "owner ruling 2026-10-24 (#1937)" in entry.reason
+    block_drawing._remove_general_thread_class(native)
+    assert native.prefix == "<hw-threaddesc> <HOLE-DEPTH><hw-threaddepth>"
 
 
 @pytest.mark.parametrize("native", [
@@ -756,62 +804,132 @@ def test_native_class_suppression_refuses_non_native_unbound_or_rejected_text(na
 
 
 @pytest.mark.parametrize("kind", [6, 2, 3, 5])
-def test_pilot_callout_requires_model_diameter_and_preserves_native_definition(monkeypatch, kind) -> None:
-    native = _StopDisplay("<MOD-DIAM>", hole=False, kind=kind)
+def test_pilot_callout_requires_model_diameter_and_writes_nothing(monkeypatch, kind) -> None:
+    native = _StopDisplay("2X <MOD-DIAM>", hole=False, kind=kind)
     annotation = SimpleNamespace(GetSpecificAnnotation=lambda: native)
+    monkeypatch.setattr(plate_drawing, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(plate_drawing, "dimension_name", lambda *a: "PilotDrillDiameter")
+    native.SetText = lambda *a: pytest.fail("the sheet must not write imported text")
     if kind != 6:
         with pytest.raises(RuntimeError, match="native model diameter"):
-            plate_drawing._style_pilot_diameter(object(), [annotation])
-        assert native.prefix == "<MOD-DIAM>"
+            plate_drawing._assert_pilot_diameter(object(), [annotation])
     else:
-        plate_drawing._style_pilot_diameter(object(), [annotation])
-        assert native.prefix == "2X <MOD-DIAM>"
+        plate_drawing._assert_pilot_diameter(object(), [annotation])
+    assert native.prefix == "2X <MOD-DIAM>"
 
 
-def test_pilot_callout_refuses_unapplied_native_quantity_prefix(monkeypatch) -> None:
-    native = _StopDisplay("<MOD-DIAM>", hole=False, refusal="prefix")
-    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: native)
-    monkeypatch.setattr(plate_drawing, "dimension_name", lambda *a: "PilotDrillDiameter")
-    with pytest.raises(RuntimeError, match="did not persist"):
-        plate_drawing._style_pilot_diameter(object(), [annotation])
+class _PartDisplay:
+    """A model display dimension: prefix (1), callout below (4), prefix
+    definition (5) -- the text parts the part build authors."""
+
+    def __init__(self, definition="", *, refuse=None):
+        self.text = {1: "", 4: "", 5: definition}
+        self.refuse = refuse
+
+    def SetText(self, which, text):  # noqa: N802 - void native method
+        if which == self.refuse:
+            return
+        if which == 1:
+            self.text[5] = text
+        self.text[which] = text
+
+    def GetText(self, which):  # noqa: N802 - string native method
+        return self.text[which]
 
 
-@pytest.mark.parametrize("refusal", [None, "prefix"])
-def test_plate_chamfer_keeps_native_size_and_angle_with_quantity_prefixes(monkeypatch, refusal) -> None:
-    natives = {
-        "RoofChamferSize": _StopDisplay("", hole=False, refusal=refusal),
-        "RoofChamferAngle": _StopDisplay("", hole=False, refusal=refusal),
+@pytest.mark.parametrize("refuse", [None, 1, 4])
+def test_part_build_authors_dimension_text_and_reads_it_back(monkeypatch, refuse) -> None:
+    displays = {name: _PartDisplay("<MOD-DIAM>" if name == "PilotDrillDiameter" else "",
+                                   refuse=refuse)
+                for name in callouts.PLATE_FEATURE_OF}
+
+    def named(_adapter, feature, names):
+        assert all(callouts.PLATE_FEATURE_OF[name] == feature for name in names)
+        return {name: (displays[name], object()) for name in names}
+
+    monkeypatch.setattr(stop_geom, "_named_dimensions", named)
+    write = lambda: stop_geom.author_dimension_text(  # noqa: E731
+        object(), callouts.PLATE_FEATURE_OF, callouts.PLATE_CALLOUTS, callouts.PLATE_PREFIXES)
+    if refuse:
+        with pytest.raises(RuntimeError, match="did not persist"):
+            write()
+        return
+    write()
+    for name, text in callouts.PLATE_CALLOUTS.items():
+        assert callouts.callout_rows(displays[name].text[4]) == callouts.callout_rows(text)
+    assert displays["PilotDrillDiameter"].text[5] == "2X <MOD-DIAM>"
+    assert displays["RoofChamferSize"].text[5] == "2X "
+    # The part, not the sheet, owns every text row the plate drawing reads.
+    assert set(callouts.PLATE_FEATURE_OF) == {*callouts.PLATE_CALLOUTS, *callouts.PLATE_PREFIXES}
+    assert callouts.BLOCK_FEATURE_OF == {
+        "RoofChamferSize": "RoofChamfers", "WindowWidth": "WindowProfile",
+        "WindowHeight": "WindowProfile",
     }
+
+
+@pytest.mark.parametrize("fault", [None, "missing", "text", "prefix"])
+def test_sheet_reads_back_the_parts_imported_text_without_writing(monkeypatch, fault) -> None:
+    names = {*callouts.PLATE_CALLOUTS, *callouts.PLATE_PREFIXES}
+    displays = {}
+    for name in names:
+        display = _PartDisplay()
+        display.text[4] = callouts.PLATE_CALLOUTS.get(name, "")
+        display.text[5] = callouts.PLATE_PREFIXES.get(name, "") + "<MOD-DIAM>"
+        display.SetText = lambda *a: pytest.fail("the sheet must not write imported text")
+        displays[name] = display
+    if fault == "text":
+        displays["PlateThickness"].text[4] = "SETS SCREW REACH"
+    elif fault == "prefix":
+        displays["RoofChamferSize"].text[5] = ""
     annotations = [
-        SimpleNamespace(name=name, GetSpecificAnnotation=lambda native=native: native)
-        for name, native in natives.items()
+        SimpleNamespace(name=name, GetSpecificAnnotation=lambda display=display: display)
+        for name, display in displays.items()
+        if not (fault == "missing" and name == "PilotDrillDiameter")
     ]
-    monkeypatch.setattr(plate_drawing, "dimension_name", lambda _adapter, item: item.name)
-    if refusal:
-        with pytest.raises(RuntimeError, match="chamfer prefix did not persist"):
-            plate_drawing._style_plate_chamfer(object(), annotations)
+    monkeypatch.setattr(guards, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(guards, "dimension_name", lambda _adapter, item: item.name)
+    check = lambda: guards.assert_imported_text(  # noqa: E731
+        object(), annotations, callouts.PLATE_CALLOUTS, callouts.PLATE_PREFIXES)
+    if fault is None:
+        check()
     else:
-        plate_drawing._style_plate_chamfer(object(), annotations)
-        assert natives["RoofChamferSize"].prefix == "2X "
-        assert natives["RoofChamferAngle"].prefix == ""
-    assert spec.PLATE_DRAWING_PRECISION["RoofChamfers"] == {
-        "RoofChamferSize": 1, "RoofChamferAngle": 0,
-    }
-    assert spec.BLOCK_DRAWING_PRECISION["RoofChamfers"] == {
-        "RoofChamferSize": 2, "RoofChamferAngle": 2,
-    }
+        with pytest.raises(RuntimeError, match="missing from the sheet" if fault == "missing"
+                           else "differs from the part"):
+            check()
 
 
-@pytest.mark.parametrize("names", [[], ["RoofChamferSize"], ["RoofChamferAngle"]])
-def test_plate_chamfer_refuses_missing_native_dimensions(monkeypatch, names) -> None:
-    annotations = [
-        SimpleNamespace(name=name, GetSpecificAnnotation=lambda: _StopDisplay("", hole=False))
-        for name in names
-    ]
-    monkeypatch.setattr(plate_drawing, "dimension_name", lambda _adapter, item: item.name)
-    with pytest.raises(RuntimeError, match="missing native plate chamfer"):
-        plate_drawing._style_plate_chamfer(object(), annotations)
+@pytest.mark.parametrize("fault", [None, "dirty-at-capture", "dirty-later", "bytes"])
+def test_clean_source_guard_hashes_the_file_and_reads_the_save_flag(monkeypatch, tmp_path, fault) -> None:
+    path = tmp_path / "ms-stop-plate.SLDPRT"
+    path.write_bytes(b"source")
+    flag = {"dirty": fault == "dirty-at-capture"}
+    model = SimpleNamespace(GetSaveFlag=lambda: flag["dirty"])
+    monkeypatch.setattr(guards, "_early_bound", lambda value, interface: value)
+    if fault == "dirty-at-capture":
+        with pytest.raises(RuntimeError, match="modified before the drawing starts"):
+            guards.capture_clean_source(path, model, label="stop cover source")
+        return
+    source = guards.capture_clean_source(path, model, label="stop cover source")
+    checkpoint = guards.source_checkpoint(source)
+    checkpoint("after_new_document")
+    if fault == "dirty-later":
+        flag["dirty"] = True
+        with pytest.raises(RuntimeError, match="modified its source part"):
+            checkpoint("before_drawing_save")
+        # Once the drawing has closed, only the bytes are read.
+        checkpoint("after_drawing_close")
+        # A sheet that toggles source sketches in memory proves the file only.
+        lenient = guards.CleanSource(path=path, sha256=source.sha256, model=model,
+                                     label="measuring stick source", strict_in_memory=False)
+        guards.assert_source_clean(lenient, stage="before_drawing_save")
+    elif fault == "bytes":
+        path.write_bytes(b"saved by the sheet")
+        with pytest.raises(RuntimeError, match="source part bytes changed"):
+            checkpoint("after_drawing_close")
+    else:
+        checkpoint("before_drawing_save")
+        checkpoint("after_drawing_close")
+        guards.assert_source_clean(source, stage="after finalize", in_memory=False)
 
 
 def test_match_drill_callouts_identify_the_current_mate_registry_rows() -> None:
@@ -822,7 +940,7 @@ def test_match_drill_callouts_identify_the_current_mate_registry_rows() -> None:
     assert "BOTTOMING TAP" not in block_drawing.COVER_HOLE_PROCESS
     assert f"MATCH-DRILL FROM {spec.MATCH_DRILL_MASTER}" in block_drawing.COVER_HOLE_PROCESS
     assert spec.MATCH_DRILL_DATUM_ALIGNMENT in block_drawing.COVER_HOLE_PROCESS.replace("\n", " ")
-    pilot = plate_drawing.DIMENSION_CALLOUTS["PilotDrillDiameter"]
+    pilot = callouts.PLATE_CALLOUTS["PilotDrillDiameter"]
     assert "MS-STOP-BLOCK" in pilot
     assert _config.parts("ms-stop-block")["number"] in pilot
     # Fit-up requirements, not wording: the plate is the master, the pair is
@@ -831,7 +949,7 @@ def test_match_drill_callouts_identify_the_current_mate_registry_rows() -> None:
     assert "PILOT" in flat and "LOCATING ENDS AND EDGES FLUSH" in flat
     assert spec.MATCHED_PAIR_NOTE in pilot
     for name in spec.PLATE_LOCATION_DIMENSIONS:
-        station = plate_drawing.DIMENSION_CALLOUTS[name]
+        station = callouts.PLATE_CALLOUTS[name]
         assert "MS-STOP-BLOCK" in station
         assert _config.parts("ms-stop-block")["number"] in station
     assert spec.PLATE_DRAWING_VALUES_BY_NAME["PilotDrillDiameter"] == (
@@ -919,30 +1037,32 @@ def test_pilot_reference_emits_concentric_native_diameter_and_live_equation(monk
 
 
 def test_stock_precision_and_worst_case_walls_use_each_printed_band() -> None:
-    from _printed_tolerance import printed_band_mm
-
     assert spec.BLOCK_PRINTED_BANDS_MM == {
-        name: printed_band_mm(spec.BLOCK_DRAWING_PRECISION_BY_NAME[name])
+        name: printed_band_mm(spec.BLOCK_DRAWING_PRECISION_BY_NAME[name], unit="in")
         for name in ("BlockLength", "BlockHeight", "RoofThickness", "BackWall")
     }
     assert spec.PLATE_PRINTED_BANDS_MM == {
-        name: printed_band_mm(spec.PLATE_DRAWING_PRECISION_BY_NAME[name])
+        name: printed_band_mm(spec.PLATE_DRAWING_PRECISION_BY_NAME[name], unit="in")
         for name in ("PlateLength", "PlateHeight")
     }
-    assert spec.BLOCK_PRINTED_BANDS_MM == {
-        "BlockLength": 0.51, "BlockHeight": 0.8, "RoofThickness": 0.51, "BackWall": 0.51,
-    }
-    assert spec.PLATE_PRINTED_BANDS_MM == {"PlateLength": 0.51, "PlateHeight": 0.8}
+    # Every stack size is .XX (+/-.01); none is the nonfunctional .X.
+    assert spec.BLOCK_PRINTED_BANDS_MM == pytest.approx({
+        "BlockLength": 0.254, "BlockHeight": 0.254, "RoofThickness": 0.254, "BackWall": 0.254,
+    })
+    assert spec.PLATE_PRINTED_BANDS_MM == pytest.approx({"PlateLength": 0.254, "PlateHeight": 0.254})
     assert spec.WINDOW_FLOOR_MIN == pytest.approx(
         spec.BLOCK_HEIGHT - spec.BLOCK_PRINTED_BANDS_MM["BlockHeight"]
         - spec.ROOF_THICKNESS - spec.BLOCK_PRINTED_BANDS_MM["RoofThickness"]
         - spec.WINDOW_HEIGHT - spec.WINDOW_SIZE_TOLERANCE_MM[1]
     )
-    assert spec.PLATE_TAP_BACK_WALL_MIN - (printed_band_mm(1) - printed_band_mm(2)) < 1.5
-    assert spec.PLATE_CLEARANCE_END_WEB_MIN - (printed_band_mm(1) - printed_band_mm(2)) < 1.5
-    # Absolute edge error remains after the matched pair's relative error cancels.
-    assert spec.PLATE_TAP_END_WEB_MIN - (printed_band_mm(2) - spec.PLATE_HOLE_POSITION_TOLERANCE_MM) < 1.5
-    assert spec.PLATE_TAP_WINDOW_WEB_MIN - (printed_band_mm(1) - spec.PLATE_HOLE_POSITION_TOLERANCE_MM) < 1.5
+    loose, routine = printed_band_mm(1, unit="in"), printed_band_mm(2, unit="in")
+    # Each web would break at a .X band where its sizes now hold .XX.
+    assert spec.PLATE_TAP_BACK_WALL_MIN - (loose - routine) < spec.WALL_FLOOR_MM
+    assert spec.PLATE_CLEARANCE_END_WEB_MIN - (loose - routine) < spec.WALL_FLOOR_MM
+    # Absolute edge error remains after the matched pair's relative error
+    # cancels: a .X master station would break both tapped-hole webs.
+    assert spec.PLATE_TAP_END_WEB_MIN - (loose - spec.PLATE_HOLE_POSITION_TOLERANCE_MM) < spec.WALL_FLOOR_MM
+    assert spec.PLATE_TAP_WINDOW_WEB_MIN - (loose - spec.PLATE_HOLE_POSITION_TOLERANCE_MM) < spec.WALL_FLOOR_MM
 
 
 def _window_reference_seat(monkeypatch, *, reject_construction=False):
@@ -1131,8 +1251,13 @@ def test_block_build_cuts_rebate_from_its_profile_driven_marked_and_toleranced(m
         "_author_reference_dimensions", "clear_dimensions_for_drawing",
     ):
         monkeypatch.setattr(block, name, lambda *a, **kw: None)
-    monkeypatch.setattr(block, "set_dimension_bilateral_tolerance",
-                        lambda adapter, feature, name, low, high: bands.append((feature, name, low, high)))
+    monkeypatch.setattr(
+        block, "set_dimension_bilateral_tolerance",
+        lambda adapter, feature, name, low, high, **kw: bands.append((feature, name, low, high, kw)))
+    texts = []
+    monkeypatch.setattr(block, "author_dimension_text",
+                        lambda adapter, feature_of, below, prefixes=None: texts.append(
+                            (feature_of, below, prefixes)))
     monkeypatch.setattr(block, "mark_dimensions_for_drawing",
                         lambda adapter, feature, names: marks.append((feature, names)))
     monkeypatch.setattr(block, "hide_location_references", lambda adapter, names: hidden.extend(names))
@@ -1146,8 +1271,10 @@ def test_block_build_cuts_rebate_from_its_profile_driven_marked_and_toleranced(m
     assert len(profiles) == 1
     assert cuts == [(2.0 * (spec.BLOCK_LENGTH + spec.CUT_OVERHANG), True)]
     assert equations["WindowCutDepth@Window"] == f'2 * ("BlockLength" + {spec.CUT_OVERHANG})'
-    assert ("WindowProfile", "WindowWidth", *spec.WINDOW_SIZE_TOLERANCE_MM) in bands
-    assert ("WindowProfile", "WindowHeight", *spec.WINDOW_SIZE_TOLERANCE_MM) in bands
+    for name in ("WindowWidth", "WindowHeight"):
+        assert ("WindowProfile", name, *spec.WINDOW_SIZE_TOLERANCE_MM, {"display_unit": "in"}) in bands
+    # The part, not the sheet, writes the block's dimension text.
+    assert texts == [(callouts.BLOCK_FEATURE_OF, callouts.BLOCK_CALLOUTS, None)]
     assert ("WindowProfile", {"WindowHeight", "WindowWidth", "BackWall"}) in marks
     assert all(feature != "Window" for feature, names in marks)
     assert hidden == ["ThumbLocationReference", "PlateLocationReference", "RoofThicknessReference"]
@@ -1174,38 +1301,31 @@ def test_roof_reference_lies_on_the_lip_face_not_through_the_lip(monkeypatch) ->
     }
 
 
-def test_block_chamfer_keeps_the_ruled_routine_band_inside_the_roof() -> None:
-    """The 2026-10-09 ruling sized the 2.1 roof against the chamfer's routine
-    .XX band; the largest printed chamfer stays inside the thinnest roof."""
-    import _config
-    from _printed_tolerance import printed_band_mm
-
+def test_block_chamfer_keeps_the_routine_band_inside_the_roof() -> None:
+    """The largest printed .04 chamfer stays inside the thinnest .09 roof."""
     assert spec.BLOCK_DRAWING_PRECISION_BY_NAME["RoofChamferSize"] == 2
-    chamfer_max = spec.ROOF_END_CHAMFER + printed_band_mm(2)
+    assert spec.PLATE_DRAWING_PRECISION_BY_NAME["RoofChamferSize"] == 2
+    chamfer_max = spec.ROOF_END_CHAMFER + printed_band_mm(2, unit="in")
     assert chamfer_max < spec.ROOF_THICKNESS_MIN
-    rulings = [entry for entry in _config.parts("ms-stop-block")["machinist_exceptions"]
-               if "2026-10-09" in entry["reason"] and "chamfer" in entry["where"].lower()]
-    assert len(rulings) == 1
+    assert spec.ROOF_THICKNESS_MIN - chamfer_max == pytest.approx(0.762)
 
 
-def test_tight_bands_name_their_mates_and_walls_state_shortfalls() -> None:
+def test_tight_bands_name_their_mates_and_no_wall_states_a_shortfall() -> None:
     import _config
 
     stick_number = _config.parts("ms-stick")["number"]
-    callouts = block_drawing.DIMENSION_CALLOUTS
+    block_text = callouts.BLOCK_CALLOUTS
     for name in ("WindowWidth", "WindowHeight"):
-        assert f"MS-STICK {stick_number}" in callouts[name]
-    # The directly dimensioned back wall meets the 2.0 target, so no shortfall
-    # is stated; the roof's 1.59 is the owner's 2026-10-09 ruling (RV-01).
-    assert "BACK WALL" not in callouts["WindowWidth"] and "BackWall" not in callouts
-    assert spec.WINDOW_BACK_WALL_MIN >= 2.0
-    assert callouts["RoofThickness"] == f"WALL {spec.ROOF_THICKNESS_MIN:.2f} MIN"
-    assert 1.5 <= spec.ROOF_THICKNESS_MIN < 2.0
-    roof_rulings = [entry for entry in _config.parts("ms-stop-block")["machinist_exceptions"]
-                    if entry["kind"] == "minor" and "2026-10-09" in entry["reason"]
-                    and "WALL" in entry["where"]]
-    assert len(roof_rulings) == 1 and f"WALL {spec.ROOF_THICKNESS_MIN:.2f} MIN" in roof_rulings[0]["where"]
-    thickness = plate_drawing.DIMENSION_CALLOUTS["PlateThickness"]
+        assert f"MS-STICK {stick_number}" in block_text[name]
+    # The back wall and roof meet the .080 target at their .XX bands.
+    assert "BackWall" not in block_text and "RoofThickness" not in block_text
+    assert spec.WINDOW_BACK_WALL_MIN >= spec.WALL_TARGET_MM
+    assert spec.ROOF_THICKNESS_MIN >= spec.WALL_TARGET_MM - 1e-9
+    assert not any("MIN" in text for text in (*block_text.values(), *callouts.PLATE_CALLOUTS.values()))
+    thickness = callouts.PLATE_CALLOUTS["PlateThickness"]
     assert "SCREW REACH" in thickness
     assert _config.parts("ms-stop-block")["number"] in thickness
     assert spec.MATCH_DRILL_DATUM_ALIGNMENT in block_drawing.COVER_HOLE_PROCESS
+    # Neither sheet keeps its own copy of the parts' text.
+    assert not hasattr(block_drawing, "DIMENSION_CALLOUTS")
+    assert not hasattr(plate_drawing, "DIMENSION_CALLOUTS")

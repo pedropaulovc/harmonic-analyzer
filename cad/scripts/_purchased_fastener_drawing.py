@@ -1441,6 +1441,7 @@ async def build_purchased_fastener_drawing(
     settled_checks: Sequence[Callable[[], None]] = (),
     supplier_data: Sequence[str] = (),
     title_block_setup: Callable[[Any], Callable[[], None]] | None = None,
+    package_name: str | None = None,
 ) -> dict[str, str]:
     """Export Front/Top/Right plus Isometric without fabrication dimensions or PMI.
 
@@ -1462,12 +1463,21 @@ async def build_purchased_fastener_drawing(
     reserve their annotation space before scale selection. Pass the same mutable
     settled-check list the hook populates, or a predeclared read-only assertion.
     Final checks run after the finalizer's last rebuild, without refitting.
+    ``package_name`` is the drawing's own DASHED registry package, passed by a
+    draw script whose row declares ``drawing_unit``; it selects the sheet's
+    document units and the finalizer's unit proof. ``None`` keeps the legacy
+    millimetre sheet.
     """
     stock = fastener(spec.artifact_stem)
     source = spec.source
 
     if spec.source_kind != "part" or source.stem != stock.part_name:
         raise ValueError(f"purchased drawing source identity mismatch: {spec!r}")
+    if package_name is not None and package_name != stock.part_name:
+        raise ValueError(
+            f"purchased drawing package {package_name!r} is not its own part "
+            f"{stock.part_name!r}"
+        )
     if not source.is_file():
         raise FileNotFoundError(f"source purchased part is missing: {source}")
 
@@ -1521,6 +1531,7 @@ async def build_purchased_fastener_drawing(
             settled_checks=settled_checks,
             supplier_data=supplier_data,
             title_block_setup=title_block_setup,
+            package_name=package_name,
             source_checkpoint=_supplier_source_checkpoint(
                 adapter,
                 source,
@@ -1657,6 +1668,7 @@ async def _build_reference_sheet(
     supplier_data: Sequence[str] = (),
     source_checkpoint: Callable[[str], None] | None = None,
     title_block_setup: Callable[[Any], Callable[[], None]] | None = None,
+    package_name: str | None = None,
 ) -> dict[str, str]:
     source = spec.source
     template = DRAWING_TEMPLATES[spec.layout]
@@ -1690,6 +1702,7 @@ async def _build_reference_sheet(
     draw, sheet = new_project_drawing(
         adapter,
         layout=spec.layout,
+        package_name=package_name,
         **({"checkpoint": source_checkpoint} if source_checkpoint is not None else {}),
     )
     title_block_notes = _purchased_title_block(
@@ -1971,5 +1984,6 @@ async def _build_reference_sheet(
         pdf_title=title,
         scale=scale,
         settled_checks=final_checks,
+        package_name=package_name,
         **({"checkpoint": source_checkpoint} if source_checkpoint is not None else {}),
     )

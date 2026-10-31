@@ -35,6 +35,7 @@ import ms_measuring_stick_assembly_spec as spec
 import ms_measuring_stick_explode_spec as explode
 from _assembly import (
     activate_assembly_contract,
+    assembly_drawing_unit,
     assembly_title_properties,
     assert_components_fully_defined,
     author_in_drawing_configurations,
@@ -308,7 +309,16 @@ def _create_ms_explode(adapter: Any, configuration_name: str) -> None:
 
 
 async def _author_clamped_setting(adapter: Any) -> None:
-    """No solid/pose edits: a source-owned chord between physical face stations."""
+    """No solid/pose edits: a source-owned chord between physical face stations.
+
+    The tolerance and its places print in the contract's ``drawing_unit``,
+    which must be the unit the spec authored the setting in."""
+    unit = assembly_drawing_unit(ASM_NAME)
+    if unit != spec.SETTING_UNIT:
+        raise RuntimeError(
+            f"{ASM_NAME} declares drawing_unit {unit!r}; the clamped setting is "
+            f"authored in {spec.SETTING_UNIT!r}"
+        )
     (left_x, contact_y), (face_x, _) = spec.SETTING_CHORD
     for name, value in (
         ("SettingStickLeft", left_x),
@@ -340,12 +350,13 @@ async def _author_clamped_setting(adapter: Any) -> None:
     for name, expression in dims.apply(adapter, spec.SETTING_FEATURE):
         await drive_dimension(adapter, name, expression)
     set_dimension_symmetric_tolerance(
-        adapter, spec.SETTING_FEATURE, spec.SETTING_DIMENSION, spec.SETTING_TOLERANCE_MM
+        adapter, spec.SETTING_FEATURE, spec.SETTING_DIMENSION, spec.SETTING_TOLERANCE_MM,
+        display_unit=unit,
     )
     display, _ = _named_dimension(adapter, spec.SETTING_FEATURE, spec.SETTING_DIMENSION)
     _set_tolerance_precision(
         display, (-spec.SETTING_TOLERANCE_MM, spec.SETTING_TOLERANCE_MM),
-        display_unit="mm", label="clamped setting", places=spec.SETTING_TOLERANCE_PRECISION,
+        display_unit=unit, label="clamped setting", places=spec.SETTING_TOLERANCE_PRECISION,
     )
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     mark_dimensions_for_drawing(adapter, spec.SETTING_FEATURE, {spec.SETTING_DIMENSION})

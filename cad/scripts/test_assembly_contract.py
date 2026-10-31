@@ -201,8 +201,35 @@ def test_contract_schema_rejects_unknown_and_duplicate(tmp_path, monkeypatch):
         write_contract("bool-dof", free_dof=True)
         with pytest.raises(ValueError):
             _assembly_contract.assembly_contract("bool-dof")
+
+        # drawing_unit: absent is the legacy sheet (None); mm/in are accepted;
+        # anything else fails closed.
+        assert valid.drawing_unit is None
+        write_contract("inch", drawing_unit="in")
+        assert _assembly_contract.assembly_contract("inch").drawing_unit == "in"
+        write_contract("metric", drawing_unit="mm")
+        assert _assembly_contract.assembly_contract("metric").drawing_unit == "mm"
+        for bad, value in (("cm", "cm"), ("inches", "inches"), ("bool", True)):
+            write_contract(f"bad-unit-{bad}", drawing_unit=value)
+            with pytest.raises(ValueError, match="drawing_unit must be one of"):
+                _assembly_contract.assembly_contract(f"bad-unit-{bad}")
     finally:
         _assembly_contract.assembly_contract.cache_clear()
+
+
+def test_drawings_carry_at_most_their_own_contract(dodo):
+    """A drawing reads its package's drawing_unit from its OWN contract
+    (_drawing_package_unit): an assembly sheet keys on that one file, a part
+    sheet on none, so a sibling contract edit never re-keys a sheet."""
+    contract_dir = _assembly_contract.CONTRACT_DIR.resolve()
+    for stem, spec in dodo.DRAWINGS_BY_NAME.items():
+        if "**" in config_files_of(spec.script):
+            continue  # the whole-config fallback narrows nothing
+        deps = dodo._config_deps(spec.script, spec.part, "drawing")
+        contracts = {Path(d).resolve() for d in deps if Path(d).resolve().parent == contract_dir}
+        own = _assembly_contract.contract_path(spec.part.replace("_", "-")).resolve()
+        expected = {own} if spec.source_kind == "assembly" else set()
+        assert contracts == expected, f"drawing:{stem}: contract deps {sorted(contracts)}"
 
 
 @pytest.mark.parametrize("stem", DASHED)

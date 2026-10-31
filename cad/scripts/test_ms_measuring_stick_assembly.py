@@ -100,7 +100,8 @@ def test_clamped_setting_authors_its_globals_and_drives(monkeypatch) -> None:
                         lambda entity, iface: SimpleNamespace(ConstructionGeometry=False))
     monkeypatch.setattr(builder, "_named_dimension", lambda *a: (object(), None))
     monkeypatch.setattr(builder, "set_dimension_symmetric_tolerance",
-                        lambda adapter, feature, name, tol: toleranced.append((feature, name, tol)))
+                        lambda adapter, feature, name, tol, *, display_unit:
+                        toleranced.append((feature, name, tol, display_unit)))
 
     asyncio.run(builder._author_clamped_setting(Adapter()))
 
@@ -116,7 +117,10 @@ def test_clamped_setting_authors_its_globals_and_drives(monkeypatch) -> None:
         f"SettingContactY@{feature}": '-"SettingContact"',
         f"{spec.SETTING_DIMENSION}@{feature}": '"SettingBlockFace" - "SettingStickLeft"',
     }
-    assert toleranced == [(feature, spec.SETTING_DIMENSION, spec.SETTING_TOLERANCE_MM)]
+    # The band prints in the contract's inch unit, authored in the spec's.
+    assert toleranced == [
+        (feature, spec.SETTING_DIMENSION, spec.SETTING_TOLERANCE_MM, spec.SETTING_UNIT)
+    ]
 
 
 def test_setting_chord_spans_the_near_face_reference() -> None:
@@ -197,11 +201,12 @@ def test_stop_mark_division_sits_on_the_thumbscrew_axis() -> None:
     assert spec.STICK_MARK_X == pytest.approx(
         stick.SCALE_START_X + stop.STOP_MARK * stick.DIVISION_SPACING
     )
-    assert spec.STICK_MARK_X == pytest.approx(84.9)
-    assert spec.STICK_ORIGIN[0] == pytest.approx(-74.4)
-    assert spec.STICK_X_MIN == pytest.approx(-74.4)
-    assert spec.SETTING_NEAR_FACE_MM == pytest.approx(74.4)
-    assert spec.STICK_X_MAX == pytest.approx(127.6)  # 202 bar, stations fixed
+    assert spec.STICK_MARK_X == pytest.approx(84.9)  # calibrated graduation
+    # The near face sits half the inch-grid block short of the mark.
+    assert spec.STICK_ORIGIN[0] == pytest.approx(stop.THUMB_AXIS_X - 84.9)
+    assert spec.STICK_X_MIN == spec.STICK_ORIGIN[0]
+    assert spec.SETTING_NEAR_FACE_MM == pytest.approx(84.9 - stop.BLOCK_LENGTH / 2.0)
+    assert spec.STICK_X_MAX == pytest.approx(spec.STICK_X_MIN + stick.BODY_LENGTH)
     assert spec.STICK_X_MIN < 0.0 and spec.STICK_X_MAX > stop.BLOCK_LENGTH
 
 
@@ -262,6 +267,8 @@ def test_assembly_contract_is_fully_fixed() -> None:
     assert contract["free_dof"] == 0
     assert contract["allowed_free_stems"] == []
     assert contract["required_free_stems"] == []
+    # The sheet prints the setting in the unit the spec authored it in.
+    assert contract["drawing_unit"] == spec.SETTING_UNIT == "in"
 
 
 def _placed_stems() -> list[str]:
@@ -313,10 +320,11 @@ def test_park_pose_sits_on_the_land_inside_the_corridor() -> None:
         top.PARK_WEST_LIMIT_X + top.PARK_EAST_LIMIT_X
     )
     assert min(p[2] for p in corners) + max(p[2] for p in corners) == pytest.approx(0.0)
-    # The unchanged longitudinal axis centres the 202 mm bar on machine Z.
-    assert top.MS_POS[2] == pytest.approx(-26.6)
-    assert _image(top.MS_ROWS, top.MS_POS, (spec.STICK_X_MIN, 0, 0))[2] == pytest.approx(-101)
-    assert _image(top.MS_ROWS, top.MS_POS, (spec.STICK_X_MAX, 0, 0))[2] == pytest.approx(101)
+    # The unchanged longitudinal axis centres the bar on machine Z.
+    half = stick.BODY_LENGTH / 2.0
+    assert top.MS_POS[2] == pytest.approx(-(spec.STICK_X_MIN + spec.STICK_X_MAX) / 2.0)
+    assert _image(top.MS_ROWS, top.MS_POS, (spec.STICK_X_MIN, 0, 0))[2] == pytest.approx(-half)
+    assert _image(top.MS_ROWS, top.MS_POS, (spec.STICK_X_MAX, 0, 0))[2] == pytest.approx(half)
     assert _flat(rows_from_euler(top.MS_EULER)) == pytest.approx(_flat(top.MS_ROWS))
 
 
@@ -681,8 +689,10 @@ def test_mixed_sheets_copy_real_templates_and_close_donors(monkeypatch, defect) 
         CloseDoc=lambda title: closed.append(documents.pop(title)),
     )
 
-    def new_drawing(_adapter, *, layout, scale):
+    def new_drawing(_adapter, *, layout, scale, package_name):
         assert scale == (1.0, 1.0)
+        # Target and donor sheets alike take the package's own drawing unit.
+        assert package_name == drawing.PACKAGE_NAME == spec.ASM_NAME
         document = Document(f"Drawing{len(created)}", layout)
         documents[document.title] = document
         created.append(document)
@@ -807,33 +817,39 @@ def test_clamped_sheet_places_section_clear_of_setting(monkeypatch, defect) -> N
     assert cut["scale"] == drawing.CLAMP_SECTION_SCALE
 
 
+def _inch_text(value_in: float, places: int) -> str:
+    """ASME decimal-inch text: no leading zero below one inch."""
+    return f"{value_in:.{places}f}".removeprefix("0")
+
+
 @pytest.mark.parametrize(
-    "mark,tolerance,drill_depth,thread_depth,zero",
-    ((2.5, 0.15, 8.2, 6.5, 57.0), (1.5, 0.08, 7.6, 6.1, 56.0)),
+    "mark,tolerance_in,drill_depth_in,thread_depth_in,zero",
+    ((2.5, 0.006, 0.32, 0.26, 57.0), (1.5, 0.003, 0.29, 0.24, 56.0)),
 )
 def test_fitter_text_tracks_mutated_setting_and_depth_specs(
-    monkeypatch, mark, tolerance, drill_depth, thread_depth, zero
+    monkeypatch, mark, tolerance_in, drill_depth_in, thread_depth_in, zero
 ) -> None:
     """Evaluate real spec and sheet expressions with changed shop values, not
-    COM mocks: the mutated spec is the one the sheet module imports."""
+    COM mocks: the mutated spec is the one the sheet module imports. Every
+    printed length follows its source in decimal inches, with no unit word."""
     monkeypatch.setattr(stop, "STOP_MARK", mark)
     monkeypatch.setattr(stick, "SCALE_START_X", zero)
-    monkeypatch.setattr(stop, "PLATE_TAP_DRILL_DEPTH", drill_depth)
-    monkeypatch.setattr(stop, "PLATE_TAP_THREAD_DEPTH", thread_depth)
-    monkeypatch.setattr(stop, "PLATE_TAP_DRILL_DIA", 1.85)
-    monkeypatch.setattr(stop, "PLATE_CLEARANCE_DIA", 2.5)
+    monkeypatch.setattr(stop, "PLATE_TAP_DRILL_DEPTH", drill_depth_in * 25.4)
+    monkeypatch.setattr(stop, "PLATE_TAP_THREAD_DEPTH", thread_depth_in * 25.4)
+    monkeypatch.setattr(stop, "PLATE_TAP_DRILL_DIA", 0.070 * 25.4)
+    monkeypatch.setattr(stop, "PLATE_CLEARANCE_DIA", 0.096 * 25.4)
     tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
     assignments = [
         node for node in tree.body
         if isinstance(node, ast.Assign)
         and any(
-            isinstance(target, ast.Name) and target.id == "SETTING_TOLERANCE_MM"
+            isinstance(target, ast.Name) and target.id == "SETTING_TOLERANCE_IN"
             for target in node.targets
         )
     ]
     assert len(assignments) == 1
     assignments[0].value = ast.copy_location(
-        ast.Constant(tolerance), assignments[0].value
+        ast.Constant(tolerance_in), assignments[0].value
     )
     namespace = {"__name__": "mutated_ms_assembly_spec"}
     exec(compile(ast.fix_missing_locations(tree), spec.__file__, "exec"), namespace)
@@ -855,24 +871,32 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
     assert changed.SETTING_NEAR_FACE_MM == pytest.approx(
         changed.STICK_MARK_X - stop.THUMB_AXIS_X
     )
-    assert changed.SETTING_TOLERANCE_MM == tolerance
+    assert changed.SETTING_TOLERANCE_MM == pytest.approx(tolerance_in * 25.4)
+    nominal = _inch_text(
+        round(changed.SETTING_NEAR_FACE_MM / 25.4, changed.SETTING_PRECISION),
+        changed.SETTING_PRECISION,
+    )
+    band = _inch_text(tolerance_in, changed.SETTING_TOLERANCE_PRECISION)
     for text in (
         changed.CLAMPED_SETUP_NOTE,
         changed.ASSEMBLY_STEPS[-1],
     ):
         assert changed.SETTING_CRITERION in text
-        assert f"{changed.SETTING_NEAR_FACE_MM:.1f} ±{tolerance:.2f} mm" in text
-        assert "FROM LEFT STICK END" in text
+        assert f"NEAR BLOCK FACE {nominal} ±{band} FROM LEFT STICK END" in text
+        assert " MM " not in f" {text.upper()} "
     assert "PLATE IS MASTER" in changed.ASSEMBLY_STEPS[0]
     assert stop.MATCH_DRILL_DATUM_ALIGNMENT in changed.ASSEMBLY_STEPS[0]
     pilot = changed.ASSEMBLY_STEPS[0]
-    assert "OPEN ITS HOLES TO DIA 2.5" in pilot
-    assert f"{drill_depth:.1f} mm CYLINDRICAL DEPTH INTO BLOCK" in pilot
+    depth_places = stop.HOLE_CALLOUT_PRECISION
+    assert "PILOT DIA .070 THROUGH PLATE" in pilot
+    assert "OPEN ITS HOLES TO DIA .096" in pilot
+    assert f"{_inch_text(drill_depth_in, depth_places)} CYLINDRICAL DEPTH INTO BLOCK" in pilot
     assert "DEPTH EXCLUDES PLATE" in pilot
     assert "BOTTOMING-TAP" in pilot
-    assert f"{thread_depth:.1f} mm FULL THREAD DEPTH INTO BLOCK" in pilot
+    assert f"{_inch_text(thread_depth_in, depth_places)} FULL THREAD DEPTH INTO BLOCK" in pilot
+    assert " MM " not in f" {pilot} "
     assert changed.PLATE_SCREW_TAP_RESERVE == pytest.approx(
-        thread_depth - changed.PLATE_SCREW_ENGAGED
+        thread_depth_in * 25.4 - changed.PLATE_SCREW_ENGAGED
     )
     _assert_fitter_text_spacing(changed)
 
@@ -932,8 +956,14 @@ def _assert_fitter_text_spacing(fitter) -> None:
 
 
 def test_fitter_text_has_room_for_setting_and_pilot_depths() -> None:
-    assert spec.SETTING_TOLERANCE_MM == pytest.approx(0.10)
-    assert f"±{spec.SETTING_TOLERANCE_MM:.2f} mm" in sheet.SETTING_CRITERION
+    # The inch band nearest the original 0.10 mm, at the .XXX the nominal prints.
+    assert spec.SETTING_TOLERANCE_IN == 0.004
+    assert spec.SETTING_TOLERANCE_MM == pytest.approx(0.1016)
+    assert spec.SETTING_PRECISION == spec.SETTING_TOLERANCE_PRECISION == 3
+    assert " ±.004 FROM LEFT STICK END" in sheet.SETTING_CRITERION
+    assert sheet.SETTING_CRITERION.startswith(
+        f"NEAR BLOCK FACE {round(spec.SETTING_NEAR_FACE_MM / 25.4, 3):.3f} "
+    )
     _assert_fitter_text_spacing(SimpleNamespace(**{**vars(spec), **vars(sheet)}))
 
 
@@ -1384,7 +1414,7 @@ def test_reference_dimensions_select_owned_visible_end_edges(
         (start, False), (end, True)
     ]
     assert [display.value * 1000.0 for display in displays] == pytest.approx(
-        [202.0, spec.SETTING_NEAR_FACE_MM]
+        [stick.BODY_LENGTH, spec.SETTING_NEAR_FACE_MM]
     )
     for index, display in enumerate(displays):
         assert display.value_reads == 1
@@ -1526,3 +1556,40 @@ def test_exploded_isometric_shows_every_component() -> None:
         if _hulls_overlap(hulls[a], hulls[b])
     }
     assert overlapping == {frozenset(("block", spec.STICK))}
+
+
+def test_package_prints_the_contract_unit_on_every_sheet() -> None:
+    """The drawing names its own package to both the sheet creation (target
+    and donors) and finalize, which proves the inch document units, UNIT cell
+    and TOL_* rows the contract selects."""
+    from _drawing_package_unit import package_drawing_unit
+
+    assert package_drawing_unit(drawing.PACKAGE_NAME) == spec.SETTING_UNIT == "in"
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    calls = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "id", "") in {"new_project_drawing", "finalize_drawing"}
+    ]
+    assert sorted(node.func.id for node in calls) == [
+        "finalize_drawing", "new_project_drawing", "new_project_drawing"
+    ]
+    for node in calls:
+        package = [kw.value for kw in node.keywords if kw.arg == "package_name"]
+        assert len(package) == 1 and getattr(package[0], "id", "") == "PACKAGE_NAME"
+
+
+def test_source_identity_refuses_a_dirty_or_changed_source(monkeypatch, tmp_path) -> None:
+    source = tmp_path / "ms-measuring-stick.SLDASM"
+    source.write_bytes(b"released assembly")
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    digest = drawing._source_sha256(source)
+    clean = SimpleNamespace(GetSaveFlag=lambda: False)
+    drawing._assert_source_identity(clean, digest, phase="on source open")
+    with pytest.raises(RuntimeError, match="dirtied the source assembly"):
+        drawing._assert_source_identity(
+            SimpleNamespace(GetSaveFlag=lambda: True), digest, phase="after finalize"
+        )
+    source.write_bytes(b"resaved assembly")
+    with pytest.raises(RuntimeError, match="changed the source assembly"):
+        drawing._assert_source_identity(clean, digest, phase="after finalize")

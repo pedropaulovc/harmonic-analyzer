@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import _telemetry
+import ms_stop_callouts as callouts
 import ms_stop_spec as spec
 from _check import check
 from _com import _early_bound
@@ -16,8 +17,39 @@ from _sketch import (
 )
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
-from _drawing_precision import set_dimension_display_precision
+from _drawing_precision import _named_dimensions, set_dimension_display_precision
 from _visibility import blank_sketch_feature
+
+
+@_telemetry.traced("dim.stop_text")
+def author_dimension_text(
+    adapter: Any,
+    feature_of: dict[str, str],
+    below: dict[str, str],
+    prefixes: dict[str, str] | None = None,
+) -> None:
+    """Write each callout below, and each quantity prefix before, its source
+    dimension and read both back: the drawing imports this text and never
+    sets it (#1942), so the sheet leaves the part clean."""
+    prefixes = prefixes or {}
+    by_feature: dict[str, set[str]] = {}
+    for name in {*below, *prefixes}:
+        by_feature.setdefault(feature_of[name], set()).add(name)
+    for feature, names in by_feature.items():
+        displays = _named_dimensions(adapter, feature, names)
+        for name in sorted(names):
+            display, _dimension = displays[name]
+            if name in prefixes:
+                definition = str(display.GetText(callouts.PREFIX_DEFINITION) or "")
+                revised = prefixes[name] + definition
+                display.SetText(callouts.PREFIX, revised)  # void return
+                if str(display.GetText(callouts.PREFIX_DEFINITION) or "") != revised:
+                    raise RuntimeError(f"{name}@{feature}: quantity prefix did not persist")
+            if name in below:
+                display.SetText(callouts.CALLOUT_BELOW, below[name])
+                printed = str(display.GetText(callouts.CALLOUT_BELOW) or "")
+                if callouts.callout_rows(printed) != callouts.callout_rows(below[name]):
+                    raise RuntimeError(f"{name}@{feature}: callout did not persist: {printed!r}")
 
 
 @_telemetry.traced("sketch.stop_location", label_param="feature")

@@ -5,18 +5,29 @@ its thumbscrew face to the roof, and Z points into the block from the cover.
 The cover and block share this frame; stock screw frames have their heads
 above Y=0 and their threads extending along -Y. No SolidWorks imports.
 
-User ruling 2026-10-09, option B in stop_roof_options_v1.png: height 14.1
-and a directly dimensioned 2.1 roof replace the original 14 / 2 sketch.
-Routine +/-0.51 on that direct roof dimension leaves 1.59 minimum; no
-drawing-guidelines.md rule 17 (walls and webs) exception or artificially tightened roof tolerance is required.
+User ruling 2026-10-09, option B in stop_roof_options_v1.png: a directly
+dimensioned roof over the rebate replaces the original sketch's 14 / 2.
+
+Issue #290 (decimal-inch pilot): both stop parts print decimal inch
+(``drawing_unit: in`` on both registry rows; the matched pair shares one
+unit). Every length below is physical millimetres, authored as the exact
+decimal of the inch value its sheet prints (.84 x .56 x .44 block, .040
+cover), snapped to the printed grid: .01 in where a size prints .XX, .001 in
+where it prints .XXX. The roof (.09), back wall (.11) and hole stations (.15
+from each end) were set on that grid so every worst-case web meets the rule-17
+target of .080 in at the inch title block's bands; no web needs a stated
+shortfall. Drill and thread sizes are the native inch drill table's
+(#49 .073 tap drill for the brass #2-56 receiver, #2 close .094 clearance).
 """
 
 from __future__ import annotations
 
 import math
 
+import _config
+from _drawing_units import drawing_unit
 from _gtol_planar import PlanarFace
-from _hole_spec import DRILL_POINT_H, HoleSpec, TAP_DRILL_MM
+from _hole_spec import DRILL_POINT_H, HoleSpec, TAP_DRILL_MM, blind_cut_dia_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _mcmaster_90114a124 import (
@@ -27,41 +38,56 @@ from _mcmaster_90114a124 import (
 )
 from sh_vn_thumb_screw_spec import SHANK_DIA as THUMB_MAJOR_DIA
 
-BLOCK_LENGTH = 21.0
-BLOCK_HEIGHT = 14.1
-BLOCK_DEPTH = 11.0
-PLATE_THICKNESS = 1.0
+# The sheet unit each registry row declares; the matched pair prints one.
+BLOCK_UNIT = drawing_unit("parts/ms-stop-block", _config.parts("ms-stop-block"))
+PLATE_UNIT = drawing_unit("parts/ms-stop-plate", _config.parts("ms-stop-plate"))
+if BLOCK_UNIT != PLATE_UNIT:
+    raise AssertionError(
+        f"the matched stop pair must print one unit: block {BLOCK_UNIT}, plate {PLATE_UNIT}"
+    )
+UNIT = BLOCK_UNIT
+
+# drawing-guidelines.md rule 17 (walls and webs) on the inch sheet: .080 in
+# target, .060 in floor.
+WALL_TARGET_MM = 2.032
+WALL_FLOOR_MM = 1.524
+# A worst case computed from exact inch decimals may land a float ulp short.
+_WALL_SLACK_MM = 1e-9
+
+BLOCK_LENGTH = 21.336  # .84
+BLOCK_HEIGHT = 14.224  # .56
+BLOCK_DEPTH = 11.176  # .44, the rebate plus the back wall
+PLATE_THICKNESS = 1.016  # .040
 PLATE_Z_MAX = 0.0
 PLATE_Z_MIN = PLATE_Z_MAX - PLATE_THICKNESS
 TOTAL_DEPTH = BLOCK_DEPTH + PLATE_THICKNESS
-WINDOW_WIDTH = 8.4
-WINDOW_HEIGHT = 3.4
-ROOF_THICKNESS = 2.1
+WINDOW_WIDTH = 8.382  # .330
+WINDOW_HEIGHT = 3.4036  # .134
+ROOF_THICKNESS = 2.286  # .09
 WINDOW_Z_MIN = PLATE_Z_MAX
 WINDOW_Z_MAX = WINDOW_Z_MIN + WINDOW_WIDTH
 WINDOW_Y_MAX = BLOCK_HEIGHT - ROOF_THICKNESS
 WINDOW_Y_MIN = WINDOW_Y_MAX - WINDOW_HEIGHT
 FLOOR_THICKNESS = WINDOW_Y_MIN
-BACK_WALL_THICKNESS = BLOCK_DEPTH - WINDOW_Z_MAX
-ROOF_END_CHAMFER = 1.0
+BACK_WALL_THICKNESS = BLOCK_DEPTH - WINDOW_Z_MAX  # .11
+ROOF_END_CHAMFER = 1.016  # .04
 ROOF_CHAMFER_ANGLE = 45.0
 CUT_OVERHANG = 1.0
 
-THUMB_AXIS_X = BLOCK_LENGTH / 2.0
-THUMB_AXIS_Z = (WINDOW_Z_MIN + WINDOW_Z_MAX) / 2.0
+THUMB_AXIS_X = BLOCK_LENGTH / 2.0  # .42
+THUMB_AXIS_Z = (WINDOW_Z_MIN + WINDOW_Z_MAX) / 2.0  # .165
 THUMB_TAP_DRILL = TAP_DRILL_MM["#4-40"]
 THUMB_TAP_SPEC = HoleSpec("tapped", "#4-40", end="through_next", thread_class="2B")
 THUMB_HOLE_POINTS = ((THUMB_AXIS_X, 0.0, THUMB_AXIS_Z),)
 THUMB_HOLE_NORMAL = (0.0, -1.0, 0.0)
 
-PLATE_HOLE_EDGE_OFFSET = 3.5
+PLATE_HOLE_EDGE_OFFSET = 3.81  # .150
 PLATE_HOLE_XS = (PLATE_HOLE_EDGE_OFFSET, BLOCK_LENGTH - PLATE_HOLE_EDGE_OFFSET)
 PLATE_HOLE_PITCH = PLATE_HOLE_XS[1] - PLATE_HOLE_XS[0]
-PLATE_HOLE_Y = 4.0
-PLATE_CLEARANCE_DIA = 2.4
-PLATE_TAP_DRILL_DIA = 1.85  # #49, selected for the brass #2-56 receiver
-PLATE_TAP_THREAD_DEPTH = 6.3
-PLATE_TAP_DRILL_DEPTH = 7.8  # cylindrical depth; the drill point continues past it
+PLATE_HOLE_Y = 4.064  # .160
+PLATE_TAP_DRILL_DIA = 1.8542  # #49 (.0730), selected for the brass #2-56 receiver
+PLATE_TAP_THREAD_DEPTH = 6.35  # .250
+PLATE_TAP_DRILL_DEPTH = 7.62  # .300 cylindrical depth; the drill point continues past it
 PLATE_SCREW_PENETRATION = PLATE_SCREW_LENGTH - PLATE_THICKNESS
 PLATE_TAP_SPEC = HoleSpec(
     "tapped_bottoming", PLATE_SCREW_THREAD, end="blind", depth_mm=PLATE_TAP_DRILL_DEPTH,
@@ -69,10 +95,12 @@ PLATE_TAP_SPEC = HoleSpec(
     overrides_mm={"ThreadDepth": PLATE_TAP_THREAD_DEPTH,
                   "TapDrillDiameter": PLATE_TAP_DRILL_DIA},
 )
-PLATE_CLEARANCE_SPEC = HoleSpec(
-    "clearance", "#2", fit="close",
-    overrides_mm={"HoleDiameter": PLATE_CLEARANCE_DIA},
-)
+# The native #2 close clearance, .094: the wizard table's own size (its
+# pinned 2.388 is the same drill rounded to the table's thousandth of a mm).
+PLATE_CLEARANCE_SPEC = HoleSpec("clearance", "#2", fit="close")
+PLATE_CLEARANCE_DIA = 2.3876  # .094
+if abs(PLATE_CLEARANCE_DIA - blind_cut_dia_mm(PLATE_CLEARANCE_SPEC)) > 0.001:
+    raise AssertionError("the cover clearance is the native #2 close drill, .094")
 BLOCK_PLATE_HOLE_POINTS = tuple((x, PLATE_HOLE_Y, PLATE_Z_MAX) for x in PLATE_HOLE_XS)
 PLATE_HOLE_POINTS = tuple((x, PLATE_HOLE_Y, PLATE_Z_MIN) for x in PLATE_HOLE_XS)
 PLATE_HOLE_NORMAL = (0.0, 0.0, -1.0)
@@ -124,46 +152,57 @@ MATCH_DRILL_MASTER = "MS-STOP-PLATE"
 LOCATING_END_NOTE = "LOCATING END"
 LOCATING_EDGE_NOTE = "LOCATING EDGE"
 MATCH_DRILL_DATUM_ALIGNMENT = "LOCATING ENDS AND EDGES FLUSH"
-PLATE_THICKNESS_TOLERANCE_MM = 0.1
-PLATE_HOLE_POSITION_TOLERANCE_MM = 0.1
 PLATE_LOCATION_DIMENSIONS = frozenset({
     "PlateLeftFromEnd", "PlateRightFromEnd", "PlateFromHeadFace",
 })
 # The back wall is dimensioned directly, as the 2026-10-09 ruling did for the
-# roof, so its .XX band lands on the wall; the approved 11.0 envelope depth
-# follows from the rebate and the wall and prints as a reference "(11.0)".
+# roof, so its .XX band lands on the wall; the .44 envelope depth follows
+# from the rebate and the wall and prints as a reference "(.44)".
 BLOCK_REFERENCE_DIMENSIONS = frozenset({"BlockDepth"})
+# Decimal-inch places, authored on the parts. The envelope, roof, back wall,
+# chamfer and the thumb tap's station along the bar take the title block's
+# .XX; a size that needs .XXX prints it: the rebate (its own +.004/0 for the
+# stick), the thumb tap's mid-rebate station (.165), the cover thickness and
+# the match-drill stations the cover masters (title-block .XXX +/-.005). The
+# block repeats those stations at the cover's places as reference labels.
+# Angles print whole degrees against the title block's +/-1 deg.
+_THREE_PLACE = frozenset({
+    "WindowWidth", "WindowHeight", "ThumbFromPlate", "PlateThickness",
+    "PilotDrillDiameter", *PLATE_LOCATION_DIMENSIONS,
+})
+
+
+def _places(name: str) -> int:
+    if name == "RoofChamferAngle":
+        return 0
+    return 3 if name in _THREE_PLACE else 2
+
+
 BLOCK_DRAWING_PRECISION = {
-    feature: {name: 2 for name in names}
+    feature: {name: _places(name) for name in names}
     for feature, names in BLOCK_DRAWING_DIMENSIONS.items()
 }
 PLATE_DRAWING_PRECISION = {
-    feature: {name: 2 for name in names}
+    feature: {name: _places(name) for name in names}
     for feature, names in PLATE_DRAWING_DIMENSIONS.items()
 }
-# The stock bands remain loose wherever the actual worst-case web permits it.
-# Both lengths need .XX: at .X the cover's clearance-hole end web and the
-# block's tap end web (with the tap-major allowance) would breach 1.5 mm.
-BLOCK_DRAWING_PRECISION["BlockProfile"]["BlockHeight"] = 1
-BLOCK_DRAWING_PRECISION["Block"]["BlockDepth"] = 1
-PLATE_DRAWING_PRECISION["PlateProfile"]["PlateHeight"] = 1
-# Only the cover's cosmetic corners use .X; the block chamfer retains .XX,
-# the routine +/-0.51 the 2026-10-09 roof ruling (ms-stop-block.yaml RV-02)
-# sized the 2.1 roof against. Its native angle prints as 45 degrees.
-PLATE_DRAWING_PRECISION["RoofChamfers"].update(RoofChamferSize=1, RoofChamferAngle=0)
 BLOCK_DRAWING_PRECISION_BY_NAME = {name: places for dims in BLOCK_DRAWING_PRECISION.values() for name, places in dims.items()}
 PLATE_DRAWING_PRECISION_BY_NAME = {name: places for dims in PLATE_DRAWING_PRECISION.values() for name, places in dims.items()}
 BLOCK_MATING_FACE_NOTE = "STOP-PLATE MATING FACE"
 # Rule 7: the matched pair is flagged at both match-drill callouts, which
 # already name the mate, not in a loose general note.
 MATCHED_PAIR_NOTE = "MATCHED PAIR; NOT INTERCHANGEABLE"
-HOLE_CALLOUT_PRECISION = 2
-WINDOW_SIZE_TOLERANCE_MM = (0.0, 0.1)
+# Every native Hole Wizard length (drill diameter, drill depth, thread depth,
+# clearance diameter) prints .XXX: the drill table's own sizes and the depths
+# the receiver's engagement and lead are counted at.
+HOLE_CALLOUT_PRECISION = 3
+# The stick slides in the rebate: its sizes may only grow, by .004.
+WINDOW_SIZE_TOLERANCE_MM = (0.0, 0.1016)
 
 assert 0.0 < WINDOW_Y_MIN < WINDOW_Y_MAX < BLOCK_HEIGHT
 assert WINDOW_Z_MIN == 0.0 < WINDOW_Z_MAX < BLOCK_DEPTH
-assert PLATE_TAP_BACK_WALL > 2.0
-assert PLATE_TAP_WINDOW_WEB > 2.0 and PLATE_TAP_THUMB_WEB > 2.0
+assert PLATE_TAP_BACK_WALL > WALL_TARGET_MM
+assert PLATE_TAP_WINDOW_WEB > WALL_TARGET_MM and PLATE_TAP_THUMB_WEB > WALL_TARGET_MM
 assert PLATE_SCREW_PENETRATION > 1.5 * PLATE_SCREW_MAJOR_DIA
 assert PLATE_SCREW_PENETRATION < PLATE_TAP_THREAD_DEPTH < PLATE_TAP_DRILL_DEPTH
 
@@ -190,16 +229,23 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 # Arithmetic print-worst proof, using the title block the sheets actually
 # print. The additional stock-length allowance is a design reserve requested
 # for this joint, NOT a claim that McMaster certifies that length tolerance.
-HOLE_LINEAR_TOLERANCE_MM = printed_band_mm(HOLE_CALLOUT_PRECISION)
+HOLE_LINEAR_TOLERANCE_MM = printed_band_mm(HOLE_CALLOUT_PRECISION, unit=UNIT)
 BLOCK_PRINTED_BANDS_MM = {
-    name: printed_band_mm(BLOCK_DRAWING_PRECISION_BY_NAME[name])
+    name: printed_band_mm(BLOCK_DRAWING_PRECISION_BY_NAME[name], unit=UNIT)
     for name in ("BlockLength", "BlockHeight", "RoofThickness", "BackWall")
 }
 PLATE_PRINTED_BANDS_MM = {
-    name: printed_band_mm(PLATE_DRAWING_PRECISION_BY_NAME[name])
+    name: printed_band_mm(PLATE_DRAWING_PRECISION_BY_NAME[name], unit=UNIT)
     for name in ("PlateLength", "PlateHeight")
 }
-DRILL_OVERSIZE_MM = drilled_oversize_mm()
+# The cover's thickness and its master stations ride the title block's .XXX.
+PLATE_THICKNESS_TOLERANCE_MM = printed_band_mm(
+    PLATE_DRAWING_PRECISION_BY_NAME["PlateThickness"], unit=UNIT
+)
+PLATE_HOLE_POSITION_TOLERANCE_MM = printed_band_mm(
+    PLATE_DRAWING_PRECISION_BY_NAME["PlateLeftFromEnd"], unit=UNIT
+)
+DRILL_OVERSIZE_MM = drilled_oversize_mm(unit=UNIT)
 PLATE_SCREW_LENGTH_RESERVE_MM = 0.254
 PLATE_THICKNESS_MIN = PLATE_THICKNESS - PLATE_THICKNESS_TOLERANCE_MM
 PLATE_THICKNESS_MAX = PLATE_THICKNESS + PLATE_THICKNESS_TOLERANCE_MM
@@ -221,7 +267,7 @@ WINDOW_FLOOR_MIN = BLOCK_HEIGHT - BLOCK_PRINTED_BANDS_MM["BlockHeight"] - (
     + WINDOW_HEIGHT + WINDOW_SIZE_TOLERANCE_MM[1]
 )
 # Reference labels do not make the transferred axes float: retain the plate
-# master's absolute +/-0.10 in both the receiver and cover worst-case proofs.
+# master's absolute .XXX band in both the receiver and cover worst-case proofs.
 # A 2B internal thread has no specified maximum major; the tap that cuts it
 # does. ASME/ANSI B94.9-1987 machine screw taps, #2-56: cut-thread major max
 # 0.0887 in (Table 7), ground-thread 0.0883 in (Table 6). The larger bounds
@@ -255,44 +301,37 @@ PLATE_CLEARANCE_HEAD_WEB_MIN = BLOCK_HEIGHT - PLATE_PRINTED_BANDS_MM["PlateHeigh
     + (PLATE_CLEARANCE_DIA + DRILL_OVERSIZE_MM) / 2.0
 )
 PLATE_RADIAL_CLEARANCE_MIN = (PLATE_CLEARANCE_DIA - PLATE_SCREW_MAJOR_DIA) / 2.0
-ROOF_OPEN_END_EDGE = ROOF_THICKNESS - ROOF_END_CHAMFER  # 1.1 at the approved end-edge break, not the structural roof
+ROOF_OPEN_END_EDGE = ROOF_THICKNESS - ROOF_END_CHAMFER  # .05 at the end-edge break, not the structural roof
+
+# Every worst-case wall and web, each at its printed bands: all meet the
+# rule-17 target, so no sheet states a shortfall (rule 20).
+WORST_CASE_WALLS_MM = {
+    "roof": ROOF_THICKNESS_MIN,
+    "rebate back wall": WINDOW_BACK_WALL_MIN,
+    "tap drill point to opposite face": PLATE_TAP_BACK_WALL_MIN,
+    "tap thread to end face": PLATE_TAP_END_WEB_MIN,
+    "tap thread to rebate floor": PLATE_TAP_WINDOW_WEB_MIN,
+    "clearance hole to end face": PLATE_CLEARANCE_END_WEB_MIN,
+    "clearance hole to head edge": PLATE_CLEARANCE_HEAD_WEB_MIN,
+}
+_SHORT = {
+    name: wall for name, wall in WORST_CASE_WALLS_MM.items()
+    if wall < WALL_TARGET_MM - _WALL_SLACK_MM
+}
+if _SHORT:
+    raise AssertionError(f"stop walls below the {WALL_TARGET_MM} rule-17 target: {_SHORT}")
 
 assert PLATE_SCREW_PENETRATION_MIN >= 1.5 * PLATE_SCREW_MAJOR_DIA
 assert PLATE_SCREW_PENETRATION_MAX < PLATE_FULL_THREAD_MIN
 assert PLATE_TAP_LEAD_MIN >= PLATE_SCREW_PITCH  # one-pitch bottoming-tap lead
-assert PLATE_TAP_BACK_WALL_MIN >= 1.5
-assert ROOF_THICKNESS_MIN >= 1.5
-assert PLATE_TAP_WINDOW_WEB_MIN >= 1.5 and PLATE_TAP_END_WEB_MIN >= 1.5
-assert WINDOW_BACK_WALL_MIN >= 2.0
-assert PLATE_CLEARANCE_END_WEB_MIN >= 1.5 and PLATE_CLEARANCE_HEAD_WEB_MIN >= 1.5
 assert PLATE_RADIAL_CLEARANCE_MIN > 0.0
-
-# The roof's worst case between the 1.5 floor and the 2.0 target, stated on
-# the block print as a fact beside its dimension (rule 20); the owner's
-# 2026-10-09 ruling accepting it is recorded as ms-stop-block.yaml RV-01.
-ROOF_WALL_CALLOUT = f"WALL {ROOF_THICKNESS_MIN:.2f} MIN"
-
-
-def _floor_2(value_mm: float) -> float:
-    """A MIN printed to .XX never overstates the worst case."""
-    return math.floor(value_mm * 100.0 + 1e-9) / 100.0
-
-
-# The other four worst-case webs below the 2.0 target, stated under the hole
-# callouts they bound (rule 20); the owner accepted all four on 2026-10-24
-# (#1937), recorded as ms-stop-block.yaml RV-03, RV-04 and RV-05 and
-# ms-stop-plate.yaml RV-01. Tap depths read from the mating face, so the
-# back wall is the drill point to the opposite face.
-PLATE_TAP_WEB_LINES = (
-    f"DRILL POINT TO OPPOSITE FACE {_floor_2(PLATE_TAP_BACK_WALL_MIN):.2f} MIN",
-    f"THREAD TO END FACE {_floor_2(PLATE_TAP_END_WEB_MIN):.2f} MIN",
-    f"THREAD TO REBATE FLOOR {_floor_2(PLATE_TAP_WINDOW_WEB_MIN):.2f} MIN",
-)
-PLATE_CLEARANCE_WEB_LINE = f"HOLE TO END FACE {_floor_2(PLATE_CLEARANCE_END_WEB_MIN):.2f} MIN"
 
 # Rule 6: the stick's graduated face slides on the roof underside (the
 # rebate ceiling, outward normal -Y at the window top), so that face is the
-# one sliding surface the print grades: Ra 1.6.
+# one sliding surface the print grades: Ra 63 uin (1.6 um).
 BLOCK_SURFACE_FINISHES = (
-    SurfaceFinishControl("rebate_slide", MACHINED_UM, PlanarFace((0, -1, 0), -WINDOW_Y_MAX)),
+    SurfaceFinishControl(
+        "rebate_slide", MACHINED_UM, PlanarFace((0, -1, 0), -WINDOW_Y_MAX),
+        display_unit=BLOCK_UNIT,
+    ),
 )

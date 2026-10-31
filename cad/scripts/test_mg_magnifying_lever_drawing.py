@@ -48,8 +48,8 @@ def test_ordinary_overall_and_thread_bands_follow_the_actual_printed_title_block
 
     original = _config.title_block
 
-    def title_block(name):
-        row = original(name)
+    def title_block(name, *, unit="mm"):
+        row = original(name, unit=unit)
         bands = {"linear_1pl": 0.9, "linear_2pl": 0.61}
         return {**row, "band_mm": bands[name]} if name in bands else row
 

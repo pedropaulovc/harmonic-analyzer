@@ -229,7 +229,9 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
 
     monkeypatch.setattr(purchased, "read_required_properties", required_properties)
 
-    def new_project_drawing(_adapter, *, layout, checkpoint):
+    def new_project_drawing(_adapter, *, layout, checkpoint, package_name):
+        # A sheet whose script names no package keeps the legacy mm units.
+        assert package_name is None
         calls.append(("new", layout))
         _adapter.currentModel = draw
         checkpoint("after_new_document")
@@ -313,7 +315,9 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
         scale,
         settled_checks,
         checkpoint,
+        package_name,
     ):
+        assert package_name is None
         calls.append(("finalize", layout, pdf_title, scale))
         assert actual_outputs.slddrw == outputs["slddrw"]
         assert actual_outputs.pdf == outputs["pdf"]

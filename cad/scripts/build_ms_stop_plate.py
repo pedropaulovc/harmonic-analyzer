@@ -1,7 +1,9 @@
 r"""Build the blackened brass cover of the measuring-stick stop.
 
-The block and plate use one frame: the plate occupies Z=-1..0, with its
+The block and plate use one frame: the plate occupies Z=-.040 in..0, with its
 clearance holes along +Z. Roof-end chamfers match the approved block outline.
+Its thickness and the master hole stations print .XXX against the inch title
+block (+/-.005); the part authors no tolerance of its own.
 Run only through the supervised farm launcher: part:ms_stop_plate.
 """
 
@@ -26,11 +28,11 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _holes import wizard_holes
+import ms_stop_callouts as callouts
 from ms_stop_geom import (
-    author_hole_precision, hide_location_references, location_reference,
-    pilot_drill_reference,
+    author_dimension_text, author_hole_precision, hide_location_references,
+    location_reference, pilot_drill_reference,
 )
 
 PART_NAME = "ms-stop-plate"
@@ -93,17 +95,13 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "finished brass stop cover", spec.PLATE_FINISHED_VOLUME,
                        0.005 * spec.PLATE_FINISHED_VOLUME)
-    set_dimension_symmetric_tolerance(
-        adapter, "Plate", "PlateThickness", spec.PLATE_THICKNESS_TOLERANCE_MM,
-    )
-    for name in spec.PLATE_LOCATION_DIMENSIONS:
-        set_dimension_symmetric_tolerance(
-            adapter, "PlateLocationReference", name, spec.PLATE_HOLE_POSITION_TOLERANCE_MM,
-        )
     clear_dimensions_for_drawing(adapter)
     for feature, names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    author_dimension_text(
+        adapter, callouts.PLATE_FEATURE_OF, callouts.PLATE_CALLOUTS, callouts.PLATE_PREFIXES,
+    )
     apply_drawing_properties(adapter, PART_NAME, {
         "Isometric View Note": spec.ISOMETRIC_VIEW_NOTE,
     })

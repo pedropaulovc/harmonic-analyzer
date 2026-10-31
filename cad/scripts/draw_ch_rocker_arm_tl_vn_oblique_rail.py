@@ -4,7 +4,10 @@ The rail is bought cut to length with a special-order hole pattern, so its
 receipt check is dimensioned on the hole face: the cut length, the first
 hole from the -X end face and one pitch for all six gaps. Each is the rail
 part's own native model dimension, parenthesised as reference (the rail is
-used as supplied), and the note only says the pattern is a special order.
+used as supplied) and labelled in HIWIN's millimetres ("(440 mm)"): the HG
+series is a metric-only product line, and the registry row declares
+``drawing_unit: mm`` for the sheet. The note only says the pattern is a
+special order.
 
 The shared purchased-part builder lays four views by itself and prints no
 dimension, so this sheet keeps its title block, captions and footer (as
@@ -39,7 +42,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_reference_dimension
+from _drawing_dimensions import assert_imported_precision
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _drawing_sheet_region import sheet_drawable_region
@@ -55,6 +58,10 @@ from _purchased_fastener_drawing import (
     add_purchased_footer,
 )
 from _session import run_build
+from _supplier_dimensions import (
+    assert_supplier_reference_dimension,
+    supplier_reference_dimension,
+)
 from ch_rocker_arm_tl_vn_oblique_rail_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -62,12 +69,17 @@ from ch_rocker_arm_tl_vn_oblique_rail_spec import (
     HOLE_PITCH_CALLOUT,
     HOLE_X,
     LENGTH,
+    RECEIPT_UNITS,
+    RECEIPT_VALUES_MM,
     WIDTH,
 )
 
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_rail"]
 PART_STEM = SPEC.artifact_stem
+# The sheet's own registry package; its drawing_unit (mm) selects the sheet
+# units and the finalizer's unit proof.
+PACKAGE = "ch-rocker-arm-tl-vn-oblique-rail"
 
 # The source part's properties this sheet prints: the title block's
 # material and finish, the summary's title, the footer's supplier/SKU lines
@@ -171,6 +183,10 @@ RECEIPT_DIMENSIONS = {
     "Length": (0.0, LENGTH, LENGTH_ROW_DROP),
 }
 DIMENSION_PREFIXES = {"HolePitch": HOLE_PITCH_CALLOUT}
+# The source feature each receipt dimension belongs to.
+RECEIPT_FEATURES = {
+    name: feature for feature, names in DRAWING_DIMENSIONS.items() for name in names
+}
 # Smart arrows put the 20 mm and 30 mm spans' arrows outside, where the end
 # distance's and the pitch's met at the first hole (r1); both spans hold their
 # value and arrows inside.
@@ -256,9 +272,25 @@ def _receipt_positions(adapter: Any, front: Any) -> dict[str, tuple[float, float
     }
 
 
+def _receipt_presentation(name: str) -> dict[str, Any]:
+    """The supplier-unit presentation one receipt dimension prints and keeps."""
+    return {
+        "label": f"{name}@{RECEIPT_FEATURES[name]}",
+        "units": RECEIPT_UNITS,
+        "precision": FRONT_DIMENSION_PRECISION[name],
+        "expected_mm": RECEIPT_VALUES_MM[name],
+        "count": DIMENSION_PREFIXES.get(name),
+    }
+
+
 @_telemetry.traced("drawing.rail_receipt_dimensions")
 def _receipt_dimensions(adapter: Any, front: Any) -> list[Any]:
-    """Import the order's three model dimensions into FRONT, as reference."""
+    """Import the order's three model dimensions into FRONT, as reference.
+
+    The part owns each value's places (``assert_imported_precision`` reads
+    them before anything is dressed); the supplier presentation pins those
+    same places in HIWIN's millimetres, labelled, and proves the native value.
+    """
     annotations = curate_view_dimensions(
         adapter,
         front,
@@ -269,19 +301,56 @@ def _receipt_dimensions(adapter: Any, front: Any) -> list[Any]:
     assert_imported_precision(adapter, annotations, FRONT_DIMENSION_PRECISION)
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
-        display = set_reference_dimension(adapter, annotation, label=name)
+        display = supplier_reference_dimension(
+            adapter,
+            _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+            **_receipt_presentation(name),
+        )
         if name in ARROWS_INSIDE:
             display.ArrowSide = _DIM_ARROWS_INSIDE
             if int(display.ArrowSide) != _DIM_ARROWS_INSIDE:
                 raise RuntimeError(f"{name} did not keep its arrows inside")
-        prefix = DIMENSION_PREFIXES.get(name)
-        if prefix is None:
-            continue
-        # swDimensionTextPrefix: the count before the parenthesised value.
-        display.SetText(1, f"{prefix} (")
-        if str(display.GetText(1) or "") != f"{prefix} (":
-            raise RuntimeError(f"{name}: the {prefix} count did not persist")
     return annotations
+
+
+@_telemetry.traced("drawing.rail_receipt_settled_check")
+def _assert_receipt_dimensions(adapter: Any, source: Path) -> None:
+    """Reacquire FRONT after the final rebuild: exactly the three receipt
+    dimensions, each still its source's value in labelled millimetres."""
+    fronts = [
+        _early_bound(view, "IView")
+        for view in iter_views(adapter)
+        if view.GetOrientationName() == "*Front"
+    ]
+    if len(fronts) != 1:
+        raise RuntimeError(f"rail sheet must have one FRONT view: {len(fronts)}")
+    front = fronts[0]
+    if Path(front.GetReferencedModelName()).resolve() != source.resolve():
+        raise RuntimeError("settled rail FRONT references the wrong model")
+    found = set()
+    for raw_annotation in front.GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if int(annotation.GetType()) != 4:  # swDisplayDimension
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        raw_dimension = display.GetDimension2(0)
+        if raw_dimension is None:
+            raise RuntimeError("settled rail dimension has no native dimension")
+        name, _, rest = str(
+            _early_bound(raw_dimension, "IDimension").FullName
+        ).partition("@")
+        if RECEIPT_FEATURES.get(name) != rest.partition("@")[0] or name in found:
+            raise RuntimeError(f"unexpected settled rail dimension {name}@{rest}")
+        assert_supplier_reference_dimension(
+            adapter, display, **_receipt_presentation(name)
+        )
+        if name in ARROWS_INSIDE and int(display.ArrowSide) != _DIM_ARROWS_INSIDE:
+            raise RuntimeError(f"{name} did not keep its arrows inside")
+        found.add(name)
+    if found != set(RECEIPT_FEATURES):
+        raise RuntimeError(
+            f"settled rail receipt dimensions missing {sorted(set(RECEIPT_FEATURES) - found)}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -296,7 +365,9 @@ async def build(adapter: Any) -> dict[str, str]:
         model, SOURCE_PROPERTIES, required=SOURCE_PROPERTIES
     )
 
-    draw, sheet = new_project_drawing(adapter, layout=SPEC.layout, scale=SHEET_SCALE)
+    draw, sheet = new_project_drawing(
+        adapter, layout=SPEC.layout, scale=SHEET_SCALE, package_name=PACKAGE
+    )
     title_block_notes = _purchased_title_block(
         adapter,
         draw,
@@ -431,7 +502,8 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         pdf_title=title,
         scale=SHEET_SCALE,
-        settled_checks=(number_fit,),
+        settled_checks=(lambda: _assert_receipt_dimensions(adapter, source), number_fit),
+        package_name=PACKAGE,
     )
 
 

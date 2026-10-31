@@ -5,12 +5,12 @@ The unchanged 0-10 scale spans 142 mm at the configured 14.2 mm pitch.
 The longer half-division tick follows the book. The stop is a separate brass
 block, cover and stock hardware in the ms-measuring-stick assembly.
 
-The bar is 202 mm long (2026-10-23 owner ruling; the book annotates 200)
-and 8 mm wide; thickness is photo-derived.
+The bar is 8.1 x .315 x .118 in (205.74 x 8.001 x 2.9972 mm; issue #290's
+decimal-inch sheet, ``ms_stick_spec`` gives the grid and its exemptions).
 
 Layout: bar along +X with the bottom-left corner on the origin; graduations
-engraved 0.5 mm deep into the back face (z=0), tick 0 at x=56.5 following the
-2026-10-10 user Option B ruling: keep the blank and shift the whole scale left.
+engraved .020 deep into the back face (z=0), tick 0 at x=2.224 in (the
+2026-10-10 user Option B ruling shifted the whole scale left on the blank).
 
 Numerals: the 0..10 values are engraved beside their full ticks (page001_img01:
 ~2 mm sans-serif, turned 90 degrees to read with the 10 end up). There is no
@@ -110,6 +110,7 @@ from ms_stick_spec import (
     TICK_LENGTH,
     TICK_DEPTH,
     TICK_OVERHANG,
+    UNIT,
 )
 from _visibility import blank_sketch_feature
 import _dxf_text as dxf
@@ -864,7 +865,7 @@ async def build(adapter) -> dict[str, str]:
     _assert_numeral_cut(adapter, numeral_sense)
     await _check_volume_unchanged(adapter, "driven measuring-stick (equations neutral)", v_built)
 
-    # Verify the 202 mm length and the untouched front face
+    # Verify the 8.1 in (205.74 mm) length and the untouched front face
     # (the 14.2 mm tick spacing is driven by the linear pattern's spacing).
     # End faces are edge-on in the active view (point picking is
     # screen-projected) — measure the uncut front-bottom edge instead;
@@ -872,7 +873,7 @@ async def build(adapter) -> dict[str, str]:
     mid_y = BODY_WIDTH / 2.0
     await measure_check(
         adapter,
-        "body length (202, 2026-10-23 ruling)",
+        "body length (8.1 in)",
         [{"entity_type": "EDGE", "point": [BODY_LENGTH / 2.0, 0.0, BODY_THICKNESS]}],
         "length",
         BODY_LENGTH,
@@ -896,7 +897,7 @@ async def build(adapter) -> dict[str, str]:
         for name in names:
             if name in DRAWING_TOLERANCES:
                 set_dimension_symmetric_tolerance(
-                    adapter, feature, name, DRAWING_TOLERANCES[name])
+                    adapter, feature, name, DRAWING_TOLERANCES[name], display_unit=UNIT)
             if name in MIN_LIMIT_DEVIATIONS_MM:
                 _min_limit(adapter, feature, name)
     clear_dimensions_for_drawing(adapter)

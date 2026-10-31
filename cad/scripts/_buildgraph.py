@@ -1868,8 +1868,8 @@ def _data_literals(text: str) -> tuple[str, ...]:
 # per-assembly contracts, for any closure reaching ``_assembly_contract``),
 # ``"**"`` (whole config, the fallback). dodo.py expands these, narrowing
 # ``"parts/*"``/``"title_block"`` per task: a part to its OWN row, an assembly
-# to the rows it actually stamps; and ``"assemblies/*"`` to an assembly's OWN
-# contract (see _config_deps in dodo.py).
+# to the rows it actually stamps; and ``"assemblies/*"`` to an assembly's (or
+# an assembly drawing's) OWN contract (see _config_deps in dodo.py).
 
 # Accessors that read a FIXED file (no argument resolution needed). Derived from
 # _config.py; kept in sync by test_config_accessor_coverage. Note active_count

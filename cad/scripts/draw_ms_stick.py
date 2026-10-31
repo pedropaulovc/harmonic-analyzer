@@ -6,13 +6,17 @@ detail without cross-strip extension lines. ENGRAVING separates numeral
 dimensions from the open-edge Top detail for the square-bottom groove depth.
 The numeral detail and its dimensions leave air at the left border, with its
 placement note below the detail title and scale. Section G-G cuts the whole
-8 x 3 bar across both strokes of the zero numeral, so the true V grooves read
+.315 x .118 bar across both strokes of the zero numeral, so the true V grooves read
 in profile, and imports NumeralDepth there; its callout names the V angle.
 Native probes import TickDepth in Top but not in a removed cut-only section,
 so G-G is a full section (with hidden lines removed only the cut face shows).
 All sizes, bands and places come from the part; scale is never shrunk to fit.
+The sheet prints decimal inch (the part's ``drawing_unit: in``).
 Part-spec coordinates are millimetres; model-point projection takes metres.
 Drawing-sheet positions and projected fence coordinates are also metres.
+The source part's file is hashed before any view and proved unchanged at every
+save/close boundary. Its save flag is not held clean: per-view sketch
+imports show and re-blank its reference sketches in memory, never saved.
 
 This replaces draw_ha_measuring_stick without a legacy entry point: its
 split-common check, path and session imports live here, while ruled-face
@@ -54,12 +58,15 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _named_views import octant_view_name
 from _machinist_review_mode import MachinistReviewMode
 from _ms_drawing_contract import assert_manufacturing_dimensions
+from _ms_drawing_guards import assert_source_clean, capture_clean_source, source_checkpoint
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
+# The drawing's own registry package: its drawing_unit (in) selects the sheet.
+PACKAGE = "ms-stick"
 SPEC = DRAWINGS_BY_NAME["ms_stick"]
 PART_STEM = SPEC.artifact_stem
 SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
@@ -76,7 +83,7 @@ DETAIL_CENTER = (0.180, 0.140)
 DETAIL_SCALE = (6.0, 1.0)
 DETAIL_RADIUS_MM = 9.0
 DEPTH_PARENT_CENTER = (0.330, 0.210)
-# r1-r3 sheet 4: at 6:1 the 0.40 x 0.50 groove could not be read; 15:1 can.
+# r1-r3 sheet 4: at 6:1 the .016 x .020 groove could not be read; 15:1 can.
 DEPTH_CENTER = (0.375, 0.120)
 DEPTH_SCALE = (15.0, 1.0)
 DEPTH_RADIUS_MM = 1.6
@@ -90,11 +97,13 @@ NUMERAL_NOTE_XY = (0.045, 0.068)
 # A 1:1 parent spreads the across-the-bar cutting line (and its two arrows)
 # over a readable 11 mm instead of a 1:2 nick.
 NUMERAL_PROFILE_PARENT_CENTER = (0.200, 0.250)
-NUMERAL_PROFILE_CENTER = (0.280, 0.125)
-# The 0.40 mm V must read as a profile; 10:1 keeps the full 8 x 3 bar on sheet.
+# 3 mm right of the mm sheet's 0.280: the inch floor row (STOCK UNDER .080
+# MIN) is one character wider between detail F and the section.
+NUMERAL_PROFILE_CENTER = (0.283, 0.125)
+# The .016 V must read as a profile; 10:1 keeps the full bar section on sheet.
 NUMERAL_PROFILE_SCALE = (10.0, 1.0)
 # Mid-height of the zero numeral: the cut crosses both of its straight side
-# strokes square, and no graduation (the nearest minor tick ends 0.18 short).
+# strokes square, and no graduation (the nearest minor tick edge is 0.10 short).
 NUMERAL_SECTION_X = (part.SCALE_START_X + part.TICK_WIDTH / 2.0 + part.NUMERAL_GAP_MM
                      + part.NUMERAL_HEIGHT_MM / 2.0)
 # r1-r3 sheet 4: at 1.5 mm the G letters sat on their arrows and the outline.
@@ -136,7 +145,7 @@ NUMERAL_KEEP = {
 # top of SECTION G-G (machinist review, run 20261023T231808846Z-1d2625e9).
 DEPTH_KEEP = {"TickDepth": (0.380, 0.188)}
 # Text centre: the block ends left of G-G, its underside dimension line at the V.
-NUMERAL_DEPTH_KEEP = {"NumeralDepth": (0.2333, 0.138)}
+NUMERAL_DEPTH_KEEP = {"NumeralDepth": (0.235, 0.138)}
 
 
 @_telemetry.traced("drawing.ms_ruled_face")
@@ -341,12 +350,16 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source measuring stick missing: {SOURCE}")
     check("open measuring stick", await adapter.open_model(str(SOURCE)))
     source_model = adapter.currentModel
+    source = capture_clean_source(SOURCE, source_model, label="measuring stick source",
+                                  strict_in_memory=False)
+    guard = source_checkpoint(source)
     properties = ("Number", "Revision", "Title", "Material Specification", "Finish",
                   "Quantity", "Manufacturing Notes", "Front View Note", "Isometric View Note",
                   "Numeral Placement Note")
     read_required_properties(source_model, properties, required=properties)
     drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM,
-                                        scale=SHEET_SCALE, layout=SPEC.layout)
+                                        scale=SHEET_SCALE, layout=SPEC.layout,
+                                        package_name=PACKAGE, checkpoint=guard)
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="measuring stick manufacturing package")
     stamp_drawing_summary(adapter, drawing, {
         0: "Measuring Stick Manufacturing Drawing",
@@ -463,11 +476,15 @@ async def build(adapter: Any) -> dict[str, str]:
     _assert_dimension_contract(adapter, annotations)
     for view in (parent, detail, depth_parent, depth):
         set_hidden_lines_removed(adapter, view)
-    return await finalize_drawing(adapter, OUTPUTS, pdf_title="Measuring Stick Manufacturing Drawing",
-                                  scale=SHEET_SCALE, layout=SPEC.layout,
-                                  expected_sheet_names=SHEET_NAMES,
-                                  sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
-                                  settled_checks=(lambda: _assert_dimension_contract(adapter, annotations),))
+    artifacts = await finalize_drawing(
+        adapter, OUTPUTS, pdf_title="Measuring Stick Manufacturing Drawing",
+        scale=SHEET_SCALE, layout=SPEC.layout,
+        expected_sheet_names=SHEET_NAMES,
+        sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
+        settled_checks=(lambda: _assert_dimension_contract(adapter, annotations),),
+        package_name=PACKAGE, checkpoint=guard)
+    assert_source_clean(source, stage="after finalize", in_memory=False)
+    return artifacts
 
 
 if __name__ == "__main__":

@@ -1,8 +1,12 @@
 r"""Manufacturing drawing of the open-rebate brass stop block.
 
-The cover-side view and end view show the rebate in solid lines. Standard
+The sheet prints decimal inch (the part's ``drawing_unit: in``). The
+cover-side view and end view show the rebate in solid lines. Standard
 native Hole Wizard callouts define the orthogonal taps, including blind full
-thread and drill depths. Every controlling dimension is imported unchanged.
+thread and drill depths, every length at the part's .XXX. Every controlling
+dimension is imported unchanged, with the callout text its part authored
+(``ms_stop_callouts``); the source part is proved clean -- file SHA-256 and
+save flag -- before any view and at every save/close boundary.
 Hole-mouth points convert the shared millimetre frame to COM metres before
 projection; the cover-side *Back view reverses X, not the coordinate units.
 The *Bottom view is turned 180 degrees to preserve that X direction and
@@ -23,6 +27,7 @@ from typing import Any
 
 import _config
 import _telemetry
+import ms_stop_callouts as callouts
 import ms_stop_spec as part
 from _check import check
 from _com import _early_bound
@@ -36,7 +41,6 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import set_dimension_callouts
 from _drawing_finish import add_surface_finish
 from _drawing_hole_callout import add_native_hole_callout
 from _surface_finish import surface_finish_by_key
@@ -49,11 +53,19 @@ from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _machinist_review_mode import MachinistReviewMode
 from _ms_drawing_contract import assert_manufacturing_dimensions
+from _ms_drawing_guards import (
+    assert_imported_text,
+    assert_source_clean,
+    capture_clean_source,
+    source_checkpoint,
+)
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
+# The drawing's own registry package: its drawing_unit (in) selects the sheet.
+PACKAGE = "ms-stop-block"
 SPEC = DRAWINGS_BY_NAME["ms_stop_block"]
 PART_STEM = SPEC.artifact_stem
 SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
@@ -62,8 +74,8 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_SCALE = (4.0, 1.0)
 FRONT_CENTER = (0.155, 0.185)
 RIGHT_CENTER = (0.315, FRONT_CENTER[1])
-# 7 mm lower than the original 0.080 so the cover-tap callout's three web
-# rows (#1937) clear the underside view's top edge and 4.20 extension line.
+# 7 mm lower than the original 0.080 so the cover-tap callout's rows clear
+# the underside view's top edge and its extension line.
 BOTTOM_CENTER = (FRONT_CENTER[0], 0.073)
 # Native 2:1 outline is 56.4 x 60.3 mm; fit above the title and below the end
 # view, right of the four-line rebate callout.
@@ -79,22 +91,11 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "BlockDepth": (0.315, 0.235), "WindowWidth": (0.262, 0.130),
     "WindowHeight": (0.370, 0.180), "RoofThickness": (0.355, 0.220),
-    # Above the roof, left of the roof-thickness text, under the (11.0).
+    # Above the roof, left of the roof-thickness text, under the (.44).
     "BackWall": (0.345, 0.224),
 }
 BOTTOM_KEEP = {
     "ThumbFromEnd": (0.175, 0.031), "ThumbFromPlate": (0.090, 0.073),
-}
-STICK_FIT = f"SLIDING FIT ON\nMS-STICK {_config.parts('ms-stick')['number']}"
-# Native horizontal size witnesses end at this corner rather than spanning
-# the view; the shorter angle arc stays below the overall length dimension.
-# The rebate bands exist only for the stick that slides in it; the roof's
-# worst case between the 1.5 floor and 2.0 target is stated as a fact.
-DIMENSION_CALLOUTS = {
-    "RoofChamferSize": "2 CORNERS",
-    "WindowWidth": f"OPEN REBATE\n{STICK_FIT}",
-    "WindowHeight": STICK_FIT,
-    "RoofThickness": part.ROOF_WALL_CALLOUT,
 }
 # Leadered labels name the X=0 end and Y=0 edge the match-drill clamp aligns.
 LOCATING_END_XY = (0.232, 0.160)
@@ -115,7 +116,7 @@ COVER_HOLE_PROCESS = (
 # The 4-40 runs from the underside through the floor and opens into the
 # rebate; THRU alone does not say which wall it stops at (rules 1, 12).
 THUMB_HOLE_END = "INTO REBATE; ROOF NOT DRILLED"
-# Ra 1.6 symbol left of the right view's open rebate mouth, below the mating
+# Ra 63 uin symbol left of the right view's open rebate mouth, below the mating
 # face label; its leader enters the mouth to the ceiling's mouth-side quarter.
 SLIDE_FINISH_OFFSET = (-0.030, -0.012)
 
@@ -217,11 +218,14 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source stop block missing: {SOURCE}")
     check("open stop block", await adapter.open_model(str(SOURCE)))
+    source = capture_clean_source(SOURCE, adapter.currentModel, label="stop block source")
+    guard = source_checkpoint(source)
     properties = ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity")
-    read_required_properties(adapter.currentModel, properties,
+    read_required_properties(source.model, properties,
                              required=("Number", "Material Specification", "Finish", "Quantity"))
     drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM,
-                                        scale=SHEET_SCALE, layout=SPEC.layout)
+                                        scale=SHEET_SCALE, layout=SPEC.layout,
+                                        package_name=PACKAGE, checkpoint=guard)
     stamp_drawing_summary(adapter, drawing, {
         0: "Measuring Stick Stop Block Manufacturing Drawing",
         1: "Harmonic Analyzer hobby-machinist book drawing",
@@ -241,21 +245,18 @@ async def build(adapter: Any) -> dict[str, str]:
         annotations += curate_view_dimensions(adapter, view, keep=keep, view_label=label,
                                                dimensions_by_feature=part.BLOCK_DRAWING_DIMENSIONS)
     set_hidden_lines_removed(adapter, iso)
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    assert_imported_text(adapter, annotations, callouts.BLOCK_CALLOUTS)
     plate_edge = model_point_in_view(
         adapter, front, (
             (part.PLATE_HOLE_XS[1] + part.PLATE_TAP_DRILL_DIA / 2.0) / 1000.0,
             part.PLATE_HOLE_Y / 1000.0, part.PLATE_Z_MAX / 1000.0,
         ), label="plate tap mouth")
     plate_callout = add_native_hole_callout(
-        # Vertically centred: 11 mm below the original 0.138 keeps the web
-        # rows' growth off the 14.1 / (4.00) extension line above it.
         adapter, front, edge_xy=plate_edge, callout_xy=(0.065, 0.127),
         label="two cover blind taps",
         process=COVER_HOLE_PROCESS,
     )
-    # Rule 20: the taps' three worst-case webs below the 2.0 target (#1937).
-    _remove_general_thread_class(plate_callout, last_line="\n".join(part.PLATE_TAP_WEB_LINES))
+    _remove_general_thread_class(plate_callout)
     thumb_edge = model_point_in_view(
         adapter, bottom, (
             (part.THUMB_AXIS_X + part.THUMB_TAP_DRILL / 2.0) / 1000.0,
@@ -292,11 +293,14 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, bottom):
         set_hidden_lines_removed(adapter, view)
     add_property_linked_note(adapter, "Isometric View Note", ISO_CENTER[0] - 0.030, 0.085)
-    return await finalize_drawing(adapter, OUTPUTS,
-                                  pdf_title="Measuring Stick Stop Block Manufacturing Drawing",
-                                  scale=SHEET_SCALE, layout=SPEC.layout,
-                                  redundant_note_substrings=FINAL_SHEET_REMOVED_NOTES,
-                                  expected_redundant_notes=2)
+    artifacts = await finalize_drawing(adapter, OUTPUTS,
+                                       pdf_title="Measuring Stick Stop Block Manufacturing Drawing",
+                                       scale=SHEET_SCALE, layout=SPEC.layout,
+                                       redundant_note_substrings=FINAL_SHEET_REMOVED_NOTES,
+                                       expected_redundant_notes=2,
+                                       package_name=PACKAGE, checkpoint=guard)
+    assert_source_clean(source, stage="after finalize", in_memory=False)
+    return artifacts
 
 
 if __name__ == "__main__":
