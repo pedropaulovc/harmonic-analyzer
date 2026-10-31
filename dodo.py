@@ -1136,17 +1136,18 @@ def _expand_assembly_contracts_token(
     """Per-task expansion of the ``"assemblies/*"`` token (any closure reaching
     ``_assembly_contract``). An ASSEMBLY task reads only its OWN contract -- the
     build activates its own stem -- so a sibling's seed or free-stem edit never
-    re-keys it. A DRAWING whose closure reaches the contracts only through
+    re-keys it. A PART or DRAWING whose closure reaches the contracts only through
     ``_drawing_package_unit`` reads only its own package's contract (its
     ``drawing_unit``): an assembly-sourced sheet keeps its assembly's file, a
-    part sheet none.  A drawing whose closure reads any other contract
+    part package none. This also covers feature leaves analyzing a part's
+    drawing declaration with kind="part". A closure reading any other contract
     (``reads_foreign_assembly_contracts``: the top sheet's BOM prints every
     subassembly's number) keeps the whole family, as does any other consumer
     (conservative)."""
     if kind == "assembly" and stem is not None:
         return [assembly_contract_file(stem)]
     if (
-        kind == "drawing"
+        kind in ("part", "drawing")
         and stem is not None
         and not reads_foreign_assembly_contracts(script)
     ):

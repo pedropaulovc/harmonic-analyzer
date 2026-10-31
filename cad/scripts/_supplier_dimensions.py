@@ -3,6 +3,8 @@
 A supplier's displayed precision is not its exact geometry: 7/16 inch may
 print .438, while its native value remains 11.1125 mm. Never assign a value
 or replace its numeric text. Attachment identity remains the caller's job.
+Exact native inch fractions already print an inch mark; only decimal lengths
+need an explicit unit suffix. Both keep the native numerical value visible.
 """
 
 from __future__ import annotations
@@ -122,7 +124,8 @@ def _presentation(
     prefix = "(<MOD-DIAM>" if presentation == "diameter" else "("
     if count is not None:
         prefix = f"{count} {prefix}"
-    suffix = ")" if units == "deg" else f" {units})"
+    # Native inch fractions include their own quote; do not append a second unit.
+    suffix = ")" if units == "deg" or fraction_denominator is not None else f" {units})"
     return unit, fraction, prefix, suffix
 
 

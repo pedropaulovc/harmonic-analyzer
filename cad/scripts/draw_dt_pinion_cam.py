@@ -238,6 +238,7 @@ async def build(adapter: Any) -> dict[str, str]:
         property_view=PART_STEM,
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        decimals=3,
         checkpoint=guard,
         package_name=PACKAGE,
     )

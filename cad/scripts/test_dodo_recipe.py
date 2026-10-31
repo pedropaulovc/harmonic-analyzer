@@ -5014,6 +5014,42 @@ def test_unrelated_config_edit_preserves_rocker_feature_key(isolated_feature_key
     assert snapshot()["features"]["ch_rocker_arm"] == before
 
 
+@pytest.mark.parametrize("kind", ("part", "drawing"))
+@pytest.mark.parametrize(
+    ("drawing_name", "foreign"),
+    (
+        ("ch_rocker_arm", False),
+        ("mg_magnifier_assembly", False),
+        ("ha_harmonic_analyzer_assembly", True),
+        ("pd_paper_drive_assembly", True),
+    ),
+)
+def test_package_contract_scope_preserves_foreign_consumers(kind, drawing_name, foreign):
+    """Feature citation closures and drawing tasks obey the same read boundary."""
+    import _buildgraph as bg
+
+    dodo = _load_dodo()
+    spec = dodo.DRAWINGS_BY_NAME[drawing_name]
+    assert bg.reads_foreign_assembly_contracts(spec.script) is foreign
+    family = {Path(path) for path in bg.assembly_contract_files()}
+    deps = {Path(path) for path in dodo._config_deps(spec.script, spec.part, kind)}
+    own = Path(bg.assembly_contract_file(spec.part))
+    expected = family if foreign else ({own} if own.is_file() else set())
+    assert deps & family == expected
+
+
+def test_unclassified_contract_consumer_keeps_the_family(tmp_path):
+    """Only a known package context permits narrowing the generic unit reader."""
+    import _buildgraph as bg
+
+    dodo = _load_dodo()
+    source = tmp_path / "contract_probe.py"
+    source.write_text("import _drawing_package_unit\n", encoding="utf-8")
+    family = set(bg.assembly_contract_files())
+    assert family <= set(dodo._config_deps(source))
+    assert family <= set(dodo._config_deps(source, kind="part"))
+
+
 def test_prechips_rejects_unexported_enrollment(monkeypatch):
     import _process_plans
     dodo = _load_dodo()

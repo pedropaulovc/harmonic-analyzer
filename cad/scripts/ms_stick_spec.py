@@ -19,7 +19,9 @@ MIN deep. Exempt (owner ruling, pitch/calibration geometry): the configured
 14.2 mm full and 1.42 mm minor graduation pitch
 (``cad/config/machine/amplitude.yaml``) and the 56.5 mm scale zero, the rule
 the amplitude stations and the stop setting are read against; they print
-rounded (2.224, .559, .056) at their own +/-.002.
+rounded (2.224, .559, .0559) at their own +/-.002 physical band. The
+four-place minor pitch keeps all 100 subdivisions consistent with the ten
+full divisions; neither pitch is snapped to its printed inch value.
 The unprinted V-bit stroke width at the face (0.24) is tool geometry and stays.
 The overall length is 7.95 at .XX (owner ruling, issue #290): the inch value
 nearest the original blank, at .XX because the last groove's rule-17 land
@@ -131,7 +133,7 @@ NUMERAL_FINAL_MIN_STROKE_MM3 = 0.0058
 # they are single ".nnn MIN" limits that hold the enamel fill (coordinator
 # ruling 2026-10-23). Their ceilings are stated facts, not bands (coordinator
 # ruling 2026-10-23, on codjiflo's #1905 review): the graduation width stays
-# .024 MAX on the .056 minor pitch, so neighbouring grooves never merge and
+# .024 MAX on the .0559 minor pitch, so neighbouring grooves never merge and
 # the last one stays on the shortest bar; both depths leave the stated .080
 # of stock under them.
 BODY_LENGTH_TOLERANCE_MM = printed_band_mm(2, unit=UNIT)
@@ -142,7 +144,7 @@ GRADUATION_FLOOR_CALLOUT = f"STOCK UNDER GROOVE {inch_text(GRADUATION_FLOOR_MIN_
 NUMERAL_FLOOR_CALLOUT = f"STOCK UNDER {inch_text(GRADUATION_FLOOR_MIN_MM, 3)} MIN"
 GRADUATION_WIDTH_MAX_MM = 0.6096  # .024
 GRADUATION_WIDTH_CALLOUT = (
-    f"{inch_text(GRADUATION_WIDTH_MAX_MM, 3)} MAX ON {inch_text(MINOR_SPACING, 3)} PITCH"
+    f"{inch_text(GRADUATION_WIDTH_MAX_MM, 3)} MAX ON {inch_text(MINOR_SPACING, 4)} PITCH"
 )
 # The widest last groove, its zero and its noncumulative station both at
 # their band, keeps the rule-17 land to the end face of the shortest bar the
@@ -191,7 +193,8 @@ DRAWING_DIMENSIONS = {
 }
 # Decimal-inch places, authored on the part: the overall length, tick
 # lengths and numeral layout the title block's .XX, and .XXX for the bar's
-# section in the stop rebate, the engraving limits and the scale stations.
+# section in the stop rebate, the engraving limits and the scale stations,
+# except the minor pitch's .XXXX needed across 100 calibrated subdivisions.
 # Nothing on this part is .X.
 _TWO_PLACE = frozenset({
     "BodyLength", "FullTickLength", "MinorTickLength", "HalfTickLength",
@@ -199,7 +202,7 @@ _TWO_PLACE = frozenset({
 })
 DRAWING_PRECISION = {
     feature: {
-        name: 2 if name in _TWO_PLACE else 3
+        name: 2 if name in _TWO_PLACE else 4 if name == "MinorTickPitch" else 3
         for name in names
     }
     for feature, names in DRAWING_DIMENSIONS.items()

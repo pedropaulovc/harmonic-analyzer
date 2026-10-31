@@ -6,10 +6,10 @@ wording edit rebuilds the drawing alone. Printed dimensions interpolate a
 symbol of ``ms_measuring_stick_assembly_spec`` or a part/vendor spec; mate
 drawing numbers come from the part registry.
 
-The near-face setting remains a controlled native model dimension. Its
-attached callout names the measured block face; step 5 explains the
-stick-mark/thumbscrew-axis indexing purpose. STOP_MARK still owns the nominal
-alignment, with no REF qualifier on the controlled setting.
+The near-face dimension is an associative reference to the saved clamped
+pose, not an acceptance band. STOP_MARK owns the graduation/thumbscrew-axis
+alignment; the notes refer to the shown native dimension without repeating
+its rounded numeric value.
 
 Every printed length is in the package's unit (``spec.SETTING_UNIT``, held
 to the assembly contract's ``drawing_unit`` by the builder), rendered as the
@@ -53,12 +53,6 @@ def _printed(length_mm: float, places: int) -> str:
     return render_number(length_mm / LENGTH_UNITS[_UNIT], _UNIT, places)
 
 
-def _printed_rounded(length_mm: float, places: int) -> str:
-    """An exempt closure nominal as its native dimension shows it: rounded to
-    ``places``, where the model keeps the exact value."""
-    return render_number(round(length_mm / LENGTH_UNITS[_UNIT], places), _UNIT, places)
-
-
 # BOM DESCRIPTION cells (the parts carry no Description property); the steps
 # below name the parts the same way.
 BOM_DESCRIPTIONS = {
@@ -77,12 +71,6 @@ BOM_DESCRIPTIONS = {
 EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
 UNDERSIDE_CAPTION = "GRADUATED UNDERSIDE"
 DRAWING_DIMENSIONS = {spec.SETTING_FEATURE: {spec.SETTING_DIMENSION}}
-SETTING_CRITERION = (
-    f"NEAR BLOCK FACE "
-    f"{_printed_rounded(spec.SETTING_NEAR_FACE_MM, spec.SETTING_PRECISION)} "
-    f"±{_printed(spec.SETTING_TOLERANCE_MM, spec.SETTING_TOLERANCE_PRECISION)} "
-    "FROM LEFT STICK END"
-)
 # Components own material and finish; no assembly coating operation is required.
 # The fitter's order; the explode (ms_measuring_stick_explode_spec) runs steps
 # 2-5 backwards. Each line names the parts as the BOM's DESCRIPTION column
@@ -103,8 +91,10 @@ ASSEMBLY_STEPS = (
     "3. LAY THE STICK IN THE OPEN WINDOW, GRADUATED FACE OPPOSITE THE THUMBSCREW.",
     "4. FIT ITS OWN STOP COVER PLATE OVER THE WINDOW, PAIR MARKS TOGETHER; DRIVE "
     f"BOTH {plate_screw.THREAD} BRASS FILLISTER SCREWS UNTIL THE HEADS SEAT.",
-    f"5. SET {SETTING_CRITERION}; THEN TURN THE THUMBSCREW IN BY HAND UNTIL "
-    "ITS TIP CLAMPS THE PLAIN FACE; THUMBSCREW ABOVE THE STICK.",
+    "5. USE THE NEAR-FACE REFERENCE DIMENSION ON SHEET 1 FOR THE SHOWN POSE "
+    f"(STICK GRADUATION {stop.STOP_MARK:.1f} ON THUMBSCREW AXIS); "
+    "TURN THE THUMBSCREW IN BY HAND UNTIL ITS TIP CLAMPS THE PLAIN FACE; "
+    "THUMBSCREW ABOVE THE STICK.",
 )
 ASSEMBLY_CHECKS = (
     "CHECK: WITH THE THUMBSCREW BACKED OFF THE STICK SLIDES FREELY IN THE WINDOW.",
@@ -112,15 +102,13 @@ ASSEMBLY_CHECKS = (
     "CHECK: BOTH SCREW HEADS SEAT ON THE COVER AND THE COVER LIES FLAT ON THE BLOCK.",
 )
 CLAMPED_SETUP_NOTE = (
-    f"CLAMPED SETUP: SET {SETTING_CRITERION}; THEN CLAMP. "
+    "CLAMPED SETUP: NEAR-FACE REFERENCE DIMENSION SHOWS THE SAVED POSE, "
+    f"STICK GRADUATION {stop.STOP_MARK:.1f} ON THUMBSCREW AXIS. "
     "GRADUATED FACE AGAINST THE FIXED WINDOW WALL; THUMBSCREW ON THE PLAIN FACE."
 )
 
-# Overall is pure reference; the near-face value is assembly acceptance only.
+# Both dimensions describe the saved pose, not component manufacturing sizes.
 REFERENCE_OVERALL_LENGTH = spec.STICK_X_MAX - spec.STICK_X_MIN
-# Name the measured face here; the setting from the left stick end is the
-# whole acceptance (no view shows the division it puts on the thumbscrew axis).
-STOP_POSITION_CALLOUT = "NEAR BLOCK FACE"
 DRAWING_REFERENCE_PRECISION = 1
 
 assert sorted(spec.QUANTITIES) == sorted(BOM_ORDER)

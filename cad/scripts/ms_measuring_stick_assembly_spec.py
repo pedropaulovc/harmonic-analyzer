@@ -9,7 +9,7 @@ thumbscrew is above the stick (+Y), the block below it, and the cover faces
 these values; none of them restates a dimension.
 
 Builder data only: everything here reaches the saved .SLDASM (poses, the
-clamped-setting sketch and its tolerance/precision, the top-level park
+clamped-setting reference sketch and its precision, the top-level park
 envelope). The explode lives in ``ms_measuring_stick_explode_spec``; the
 fitter drawing's BOM, captions and text in ``ms_measuring_stick_assembly_sheet``.
 
@@ -22,7 +22,6 @@ are the assembly-frame images of the part's local axes. No SolidWorks imports.
 
 from __future__ import annotations
 
-from _inch_fraction import MM_PER_IN
 import ms_stick_spec as stick
 import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
@@ -113,19 +112,15 @@ EXTENT_MAX = (
 )
 
 # --- Clamped setting (a construction sketch in the .SLDASM) ------------------
-# Assembly acceptance measured between real faces; no component size is changed.
-# The builder applies its tolerance and both precisions to the model dimension.
-# The sheet prints decimal inches (#290; assemblies/ms-measuring-stick.yaml
-# drawing_unit, which the builder holds to SETTING_UNIT). The nominal is the
-# STOP_MARK division's calibrated station less half the block, a closure the
-# inch grid does not snap: the model keeps it exactly and the .XXX print
-# rounds it. The band is the inch value nearest the original 0.10 mm.
+# Reference pose, not a functional acceptance band: STOP_MARK centres the
+# block on a calibrated graduation for the saved clamped/parked presentation.
+# No mating workpiece or measurement-accuracy requirement consumes this span.
+# The former +/-0.10 mm (later .004 in) band had no functional derivation.
+# Keep the exact calibrated station less half the block; the inch grid must
+# not snap this closure or move the graduation geometry.
 SETTING_UNIT = "in"
-SETTING_TOLERANCE_IN = 0.004
-SETTING_TOLERANCE_MM = SETTING_TOLERANCE_IN * MM_PER_IN
 SETTING_NEAR_FACE_MM = BLOCK_ORIGIN[0] - STICK_X_MIN
 SETTING_PRECISION = 3
-SETTING_TOLERANCE_PRECISION = 3
 SETTING_FEATURE = "ClampedSetting"
 SETTING_DIMENSION = "NearFaceFromStickEnd"
 DRAWING_PRECISION = {SETTING_FEATURE: {SETTING_DIMENSION: SETTING_PRECISION}}

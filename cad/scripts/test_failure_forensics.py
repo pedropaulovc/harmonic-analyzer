@@ -1476,6 +1476,29 @@ def _open_options(node: ast.expr, constants: dict[str, int]) -> int | None:
     return None
 
 
+@pytest.mark.parametrize(
+    ("expression", "constants", "expected"),
+    [
+        ("3", {}, 3),
+        ("SILENT_READ_ONLY", {"SILENT_READ_ONLY": 3}, 3),
+        ("1 | 2", {}, 3),
+        ("SILENT | READ_ONLY", {"SILENT": 1, "READ_ONLY": 2}, 3),
+        ("3 | 4", {}, 7),
+        ("VIEW_ONLY", {"VIEW_ONLY": 4}, 4),
+        ("UNKNOWN", {}, None),
+        ("1 | UNKNOWN", {}, None),
+        ("get_options()", {}, None),
+    ],
+)
+def test_open_options_preserve_view_only_and_refuse_unknowns(
+    expression, constants, expected
+):
+    options = _open_options(ast.parse(expression, mode="eval").body, constants)
+    assert options == expected
+    if expected is not None:
+        assert bool(options & _SW_OPEN_VIEW_ONLY) == (expected in {4, 7})
+
+
 def test_no_document_the_build_opens_is_opened_view_only():
     """The reader's wait rests on this: ``IsOpenedViewOnly`` is True for a load
     in progress OR a deliberate view-only open, and only the opener can ask for
@@ -1521,7 +1544,9 @@ def test_no_document_the_build_opens_is_opened_view_only():
                 checked.add(path.name)
     assert not violations, "\n".join(violations)
     # The scan must see the build's real open paths, or it proves nothing.
-    assert {"io.py", "assembly.py", "package_native.py"} <= checked, sorted(checked)
+    assert {
+        "io.py", "assembly.py", "package_native.py", "_drawing_package_unit.py"
+    } <= checked, sorted(checked)
 
 
 def test_empty_properties_on_a_loaded_source_name_the_document_api_and_seat(

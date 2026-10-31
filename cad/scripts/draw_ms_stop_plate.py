@@ -6,8 +6,11 @@ edge. The aligned end view gives thickness; the native clearance callout
 gives the decimal drill size, never merely a screw designation.
 The shared millimetre hole-mouth coordinates convert to COM metres before
 projection into the cover-side *Back view.
-The two native, model-owned drill steps point to the same concentric hole
-pair from the right, clear of the overall and hole-location extension lines.
+The two native, model-owned drill steps use different holes: the pilot's
+construction circle at sheet right and the finished clearance rim at left.
+Native outside arrows identify each circle, with settled identity and landing
+readbacks. The clearance's native diameter variable prints three inch places;
+the actual #2 close drill is .094, not the rounded .09's inferred .090.
 Separate native chamfer size and angle retain their model-owned precision.
 Every imported dimension prints the text and quantity prefix its part
 authored (``ms_stop_callouts``); the sheet writes none, and the source part
@@ -18,6 +21,7 @@ save/close boundary.
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -35,8 +39,10 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     stamp_drawing_summary,
+    rebuild_drawing,
 )
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _drawing_edges import scan_view_edges
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
@@ -70,7 +76,7 @@ FRONT_CENTER = (0.175, 0.170)
 RIGHT_CENTER = (0.360, FRONT_CENTER[1])
 ISO_CENTER = (0.345, 0.090)
 FRONT_KEEP = {
-    "PlateLength": (0.175, 0.235), "PlateHeight": (0.070, 0.170),
+    "PlateLength": (0.175, 0.235), "PlateHeight": (0.030, 0.170),
     "RoofChamferSize": (0.247, 0.225), "RoofChamferAngle": (0.227, 0.205),
     # Hole-location texts sit where no other witness line crosses their
     # mate callouts: .150 outboard right, .160 below its own witness span and
@@ -83,8 +89,10 @@ FRONT_KEEP = {
 }
 # Text left of the thin edge view, so neither witness line strikes it.
 RIGHT_KEEP = {"PlateThickness": (0.327, 0.225)}
-# Vertically centred and its leader leaves the last row, above LOCATING END's.
-CLEARANCE_CALLOUT_XY = (0.285, 0.146)
+# The second hole's clearance approaches from the left, between the overall
+# height's witnesses; the right hole's pilot approaches from the right.
+CLEARANCE_CALLOUT_XY = (0.080, 0.178)
+CLEARANCE_PROCESS = "REMOVE PLATE; THEN DRILL\n"
 # Leadered labels name the X=0 end and Y=0 edge the match-drill clamp aligns.
 # Note positions are the text's upper-left corner.
 LOCATING_END_XY = (0.228, 0.128)
@@ -105,6 +113,70 @@ def _assert_pilot_diameter(adapter: Any, annotations: list[Any]) -> None:
     native = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     if int(native.Type2) != 6:  # swDiameterDimension
         raise RuntimeError("match-drill pilot is not a native model diameter")
+
+
+def _outside_drill_arrow(display: Any) -> None:
+    """A single outside arrow points inward to its own native circle."""
+    display = _early_bound(display, "IDisplayDimension")
+    display.ArrowSide = 1  # swDimArrowsOutside
+    display.SetSecondArrow(False, False)
+    if (int(display.ArrowSide) != 1 or bool(display.GetUseDocSecondArrow())
+            or bool(display.GetSecondArrow())):
+        raise RuntimeError("stop plate drill arrow styling did not persist")
+
+
+def _pilot_attachment(source: Any) -> Any:
+    """Resolve the named model sketch, never a hit-test on concentric circles."""
+    feature = _early_bound(source, "IPartDoc").FeatureByName("PilotDrillReference")
+    if feature is None:
+        raise RuntimeError("missing model pilot reference")
+    sketch = _early_bound(
+        _early_bound(feature, "IFeature").GetSpecificFeature2(), "ISketch",
+    )
+    segments = tuple(sketch.GetSketchSegments() or ())
+    if len(segments) != 1:
+        raise RuntimeError("model pilot reference must own exactly one circle")
+    segment = _early_bound(segments[0], "ISketchSegment")
+    if int(segment.GetType()) != 1 or not bool(segment.ConstructionGeometry):
+        raise RuntimeError("model pilot reference is not a construction circle")
+    arc = _early_bound(segment, "ISketchArc")
+    center = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+    if (abs(float(arc.GetRadius()) - part.PLATE_TAP_DRILL_DIA / 2000.0) > 1e-8
+            or abs(float(center.X) - part.PLATE_HOLE_XS[0] / 1000.0) > 1e-8
+            or abs(float(center.Y) - part.PLATE_HOLE_Y / 1000.0) > 1e-8):
+        raise RuntimeError("model pilot reference circle differs from its drill station")
+    return segments[0]
+
+
+def _assert_drill_attachment(
+    adapter: Any, view: Any, annotation: Any, entity: Any, *,
+    pilot: bool,
+) -> None:
+    """Prove the native entity AND actual printed arrow tip, after rebuilding."""
+    annotation = _early_bound(annotation, "IAnnotation")
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    kinds = tuple(int(kind) for kind in (annotation.GetAttachedEntityTypes() or ()))
+    expected_kinds = (10, 24) if pilot else (1,)  # sketch segment / external segment / edge
+    label = "pilot" if pilot else "clearance"
+    if (annotation.IsDangling() or int(annotation.GetAttachedEntityCount3()) != 1
+            or len(attached) != 1 or len(kinds) != 1 or kinds[0] not in expected_kinds
+            or int(adapter.swApp.IsSame(attached[0], entity)) != 1):
+        raise RuntimeError(f"stop plate {label} lost its native circle attachment")
+    index = 0 if pilot else 1
+    center = model_point_in_view(adapter, view, (
+        part.PLATE_HOLE_XS[index] / 1000.0, part.PLATE_HOLE_Y / 1000.0,
+        (0.0 if pilot else part.PLATE_Z_MIN) / 1000.0,
+    ), label=f"{label} arrow circle")
+    diameter = part.PLATE_TAP_DRILL_DIA if pilot else part.PLATE_CLEARANCE_DIA
+    radius = diameter / 2000.0 * float(_early_bound(view, "IView").ScaleDecimal)
+    data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
+    if int(data.GetArrowHeadCount()) != 1:
+        raise RuntimeError(f"stop plate {label} must have one native arrow")
+    arrow = tuple(float(value) for value in data.GetArrowHeadAtIndex2(0))
+    # 0.1 sheet mm is well below the >1 mm pilot/clearance radial separation.
+    if (len(arrow) < 3 or not all(math.isfinite(value) for value in arrow[:3])
+            or abs(math.dist(arrow[:2], center) - radius) > 0.0001):
+        raise RuntimeError(f"stop plate {label} arrow does not land on its own circle")
 
 
 # The shown .073 pilot reference circle read as a tapped-hole symbol inside
@@ -172,19 +244,44 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, iso)
     assert_imported_text(adapter, annotations, callouts.PLATE_CALLOUTS, callouts.PLATE_PREFIXES)
     _assert_pilot_diameter(adapter, annotations)
+    pilot_annotation = next(
+        item for item in annotations
+        if dimension_name(adapter, item) == "PilotDrillDiameter"
+    )
+    pilot_entity = _pilot_attachment(source.model)
+    _outside_drill_arrow(_early_bound(pilot_annotation, "IAnnotation").GetSpecificAnnotation())
+    clearance_entity = scan_view_edges(front, label="cover clearance").circle_at(
+        (part.PLATE_HOLE_XS[1], part.PLATE_HOLE_Y, part.PLATE_Z_MIN),
+        part.PLATE_CLEARANCE_DIA / 2.0, axis=(0.0, 0.0, 1.0),
+        label="left-sheet cover clearance",
+    ).edge
     edge = model_point_in_view(
         adapter, front, (
-            (part.PLATE_HOLE_XS[0] - part.PLATE_CLEARANCE_DIA / 2.0) / 1000.0,
+            (part.PLATE_HOLE_XS[1] + part.PLATE_CLEARANCE_DIA / 2.0) / 1000.0,
             part.PLATE_HOLE_Y / 1000.0, part.PLATE_Z_MIN / 1000.0,
         ), label="plate clearance mouth")
-    # *Back reverses X: this is the right-sheet hole, concentric with the
-    # imported pilot. Two adjacent native callouts avoid an unverified note
-    # dimension-link format while keeping both 2X quantities and sizes live.
-    # Both leaders stay right of the overall-height and hole-location lanes.
-    # Unclamping first makes the opening this plate's alone, not the block's.
-    add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=CLEARANCE_CALLOUT_XY,
-                            label="two cover clearance holes",
-                            process="REMOVE PLATE; THEN OPEN")
+    # *Back reverses X: clearance uses the left-sheet hole, away from the
+    # right-sheet pilot. The named visible rim also defeats ambiguous picks.
+    clearance = add_native_hole_callout(
+        adapter, front, edge_xy=edge, edge=clearance_entity,
+        callout_xy=CLEARANCE_CALLOUT_XY, label="two cover clearance holes",
+        process=CLEARANCE_PROCESS,
+    )
+    set_hole_callout_precision(
+        clearance, {"hw-diam": part.HOLE_CALLOUT_PRECISION},
+        label="cover clearance drill",
+    )
+    _outside_drill_arrow(clearance)
+    rebuild_drawing(adapter, label="stop plate drill arrows")
+
+    def assert_drill_attachments() -> None:
+        _assert_drill_attachment(adapter, front, pilot_annotation, pilot_entity, pilot=True)
+        _assert_drill_attachment(
+            adapter, front, _early_bound(clearance, "IDisplayDimension").GetAnnotation(),
+            clearance_entity, pilot=False,
+        )
+
+    assert_drill_attachments()
     _label_locating_edges(adapter, front)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("stop clearance centre marks failed")
@@ -200,7 +297,8 @@ async def build(adapter: Any) -> dict[str, str]:
     artifacts = await finalize_drawing(adapter, OUTPUTS,
                                        pdf_title="Measuring Stick Stop Plate Manufacturing Drawing",
                                        scale=SHEET_SCALE, layout=SPEC.layout,
-                                       package_name=PACKAGE, checkpoint=guard)
+                                       package_name=PACKAGE, checkpoint=guard,
+                                       settled_checks=(assert_drill_attachments,))
     assert_source_closed(source, stage="after finalize")
     return artifacts
 

@@ -2,7 +2,7 @@ r"""Create the three-sheet measuring-stick fitter package (MHA-MS-00).
 
 Sheet 1 shows the stick clamped at its stop mark (upright elevation and an
 aligned third-angle graduated-underside view below it, both at full size), a
-reference overall and controlled near-face setting dimension, an upright clamp
+reference overall and near-face pose dimensions, an upright clamp
 section, and the clamp setup note; sheet 2 the builder-owned ``MS_EXPLODED``
 presentation with
 the BOM (numbers, descriptions, vendor SKU, quantity) and a balloon on every
@@ -247,7 +247,7 @@ SECOND_SCREW_BALLOON_ANCHORS = {
 }
 
 
-# Geometry-owned measurements: overall reference and controlled assembly setting.
+# Geometry-owned reference measurements of the saved assembly pose.
 ASSEMBLY_DIMENSIONS = (
     ("overall length", sheet.REFERENCE_OVERALL_LENGTH),
     ("stop position", spec.SETTING_NEAR_FACE_MM),
@@ -765,10 +765,9 @@ def _reference_end_edge(
 
 
 def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
-    """Measure real component edges; tolerance only the assembly setting.
+    """Import the source-owned pose reference and measure the real overall.
 
-    The assembly poses own the nominal. The saved drawing dimension owns the
-    assembly acceptance band, not an alternate component manufacturing size.
+    Neither dimension sets a component size or a functional acceptance band.
     """
     # Mid-height on each stick end. The upright Front sees part y=0,
     # opposite the original graduation-up inspection orientation.
@@ -868,11 +867,17 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
             display.SetPrecision3(precision, -1, -1, -1)
         if int(display.GetPrimaryPrecision2()) != precision:
             raise RuntimeError(f"measuring-stick {label} precision did not persist")
-        if label == "stop position" and int(display.GetPrimaryTolPrecision2()) != spec.SETTING_TOLERANCE_PRECISION:
-            raise RuntimeError("assembly setting tolerance precision did not persist")
         if label == "stop position":
-            # Keep the imported acceptance plain; do not suppress or replace
-            # its native value, tolerance or physical model attachments.
+            tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+            if (
+                int(tolerance.Type) != 0
+                or (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+                != ("(", ")")
+            ):
+                raise RuntimeError("assembly pose is not a native unbanded reference")
+        if label == "stop position":
+            # Keep the imported reference value and physical model attachments.
+            # Its purpose is explained in the setup note, not numeric note text.
             for field in (3, 4):  # swDimensionTextCalloutAbove/Below
                 display.SetText(field, "")
                 if str(display.GetText(field) or ""):
@@ -893,15 +898,8 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
                 if (prefix, suffix) != ("(", ")") or int(saved_tolerance.Type) != 0:
                     raise RuntimeError("overall is not pure reference")
             else:
-                band_m = spec.SETTING_TOLERANCE_MM / 1000.0
-                if (
-                    (prefix, suffix) != ("", "")
-                    or int(saved_tolerance.Type) != 4
-                    or abs(float(saved_tolerance.GetMinValue()) + band_m) > 1e-9
-                    or int(saved_display.GetPrimaryTolPrecision2()) != spec.SETTING_TOLERANCE_PRECISION
-                    or abs(float(saved_tolerance.GetMaxValue()) - band_m) > 1e-9
-                ):
-                    raise RuntimeError("settled assembly setting band/reference state changed")
+                if (prefix, suffix) != ("(", ")") or int(saved_tolerance.Type) != 0:
+                    raise RuntimeError("settled assembly pose is not pure reference")
                 if any(str(saved_display.GetText(field) or "") for field in (3, 4)):
                     raise RuntimeError("clamped setting: settled native caption is not blank")
                 _assert_section_setting_clearance(front, saved_display)
@@ -911,7 +909,7 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
 
 def _place_clamped_sheet(adapter: Any) -> Callable[[], None]:
     """Upright working elevation and clamp section, with the labelled
-    graduated-underside inspection and the controlled near-face setting."""
+    graduated-underside inspection and the near-face pose reference."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     # Native StandardWithoutConnector, as in draw_fr_rocker_arm_support:
     # retain the full cutting plane and both arrows, not a hidden section line.

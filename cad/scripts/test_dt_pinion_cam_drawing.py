@@ -753,6 +753,7 @@ def _sheet_checkpoint(monkeypatch, tmp_path: Path, part_path: Path | None = None
 
     def new_drawing(_adapter, **kwargs):
         received.update(kwargs)
+        assert kwargs["decimals"] == 3
         raise _SheetStarted
 
     monkeypatch.setattr(drawing, "new_project_drawing", new_drawing)

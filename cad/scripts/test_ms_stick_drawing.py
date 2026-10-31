@@ -161,10 +161,11 @@ def test_every_printed_size_is_owned_and_precisioned_by_model() -> None:
     assert kept == marked == set(spec.DRAWING_VALUES_BY_NAME) == set(spec.DRAWING_PRECISION_BY_NAME)
     # Nothing on this part is .X (owner ruling): the overall length, tick
     # lengths and numeral layout print .XX; the bar's section in the stop
-    # rebate, the engraving limits and the scale stations print .XXX.
+    # rebate, the engraving limits and the scale stations print .XXX,
+    # except the minor pitch's .XXXX; its physical band remains +/-.002.
     assert {name: places for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places != 2} == (
-        dict.fromkeys(("BodyWidth", "BodyThickness", "Tick0Width", "TickDepth", "NumeralDepth",
-                       "ScaleStartX", "FullTickPitch", "MinorTickPitch"), 3)
+        {**dict.fromkeys(("BodyWidth", "BodyThickness", "Tick0Width", "TickDepth", "NumeralDepth",
+                         "ScaleStartX", "FullTickPitch"), 3), "MinorTickPitch": 4}
     )
     assert spec.DRAWING_PRECISION_BY_NAME["BodyLength"] == 2
     # Only the scale stations carry their own band; the rest ride the title block.
@@ -230,17 +231,112 @@ def test_last_graduation_is_complete_at_printed_band_extremes() -> None:
     assert end_land >= spec.WALL_TARGET_MM == 2.032
     # The title block's .X (+/-.1) would break that land: the length is .XX.
     assert end_land + spec.BODY_LENGTH_TOLERANCE_MM - 0.1 * 25.4 < spec.WALL_TARGET_MM
-    # The stated .024 MAX keeps neighbours apart on the .056 minor pitch even
+    # The stated .024 MAX keeps neighbours apart on the .0559 minor pitch even
     # with both stations at their band.
     land_min = spec.MINOR_SPACING - 2.0 * spec.GRADUATION_POSITION_TOLERANCE_MM - spec.GRADUATION_WIDTH_MAX_MM
     assert land_min == pytest.approx(0.7088)
-    assert spec.GRADUATION_WIDTH_CALLOUT == ".024 MAX ON .056 PITCH"
+    assert spec.GRADUATION_WIDTH_CALLOUT == ".024 MAX ON .0559 PITCH"
     assert callouts.CALLOUTS["Tick0Width"].endswith(spec.GRADUATION_WIDTH_CALLOUT)
     last_edge_nominal = (
         values["ScaleStartX"] + (spec.DIVISION_COUNT - 1) * values["FullTickPitch"]
         + values["Tick0Width"] / 2.0
     )
     assert values["BodyLength"] - last_edge_nominal == pytest.approx(3.2268)
+
+
+def test_printed_pitch_ranges_agree_across_all_calibrated_subdivisions() -> None:
+    """Rounding pitch text must not create incompatible noncumulative stations."""
+    full = float(spec.inch_text(spec.DIVISION_SPACING, spec.DRAWING_PRECISION_BY_NAME["FullTickPitch"]))
+    minor = float(spec.inch_text(spec.MINOR_SPACING, spec.DRAWING_PRECISION_BY_NAME["MinorTickPitch"]))
+    band = spec.GRADUATION_POSITION_TOLERANCE_MM / 25.4
+    assert (full, minor, band) == pytest.approx((0.559, 0.0559, 0.002))
+    spaces = (spec.DIVISION_COUNT - 1) * spec.MINOR_PER_DIVISION
+    assert spaces == 100
+    assert (spaces * minor - band, spaces * minor + band) == pytest.approx((5.588, 5.592))
+    for index in range(spaces + 1):
+        printed_station = index * minor
+        calibrated_station = index * spec.MINOR_SPACING / 25.4
+        assert printed_station - band <= calibrated_station <= printed_station + band
+        if index % spec.MINOR_PER_DIVISION == 0:
+            full_station = index // spec.MINOR_PER_DIVISION * full
+            assert full_station == pytest.approx(printed_station)
+            assert full_station - band <= calibrated_station <= full_station + band
+    # Both families remain attached to model-owned centre chords, not rounded
+    # inch geometry or a replacement free-text nominal.
+    assert spec.DIVISION_SPACING == 14.2
+    assert spec.MINOR_SPACING == 1.42
+    assert callouts.CALLOUTS["FullTickPitch"].count("NONCUMULATIVE FROM SCALE ZERO") == 1
+    assert callouts.CALLOUTS["MinorTickPitch"].count("NONCUMULATIVE FROM SCALE ZERO") == 1
+
+
+def test_builder_authors_pitch_tolerance_at_nominal_precision(monkeypatch) -> None:
+    """Exercise the builder call: .0559 ±.0020 still stores ±.0508 mm."""
+    tree = ast.parse(Path(builder.__file__).read_text(encoding="utf-8"))
+    calls = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "set_dimension_symmetric_tolerance"
+    ]
+    assert len(calls) == 1
+    authored = []
+    adapter = object()
+    monkeypatch.setattr(
+        builder, "set_dimension_symmetric_tolerance",
+        lambda *args, **kwargs: authored.append((args, kwargs)),
+    )
+    for feature, name, places in (
+        ("ScaleStartReference", "ScaleStartX", 3),
+        ("FullPitchReference", "FullTickPitch", 3),
+        ("MinorPitchReference", "MinorTickPitch", 4),
+    ):
+        expression = ast.Expression(body=calls[0])
+        eval(compile(expression, builder.__file__, "eval"), vars(builder),
+             {"adapter": adapter, "feature": feature, "name": name})
+        args, kwargs = authored[-1]
+        assert args == (adapter, feature, name, 0.0508)
+        assert kwargs == {"places": places, "display_unit": "in"}
+
+
+@pytest.mark.parametrize("defect", [None, "rejected", "height", "upper", "lower", "incomplete"])
+def test_native_section_letters_clear_both_unchanged_arrowheads(monkeypatch, defect) -> None:
+    """The actual helper moves the native glyph bottoms, never the cut/arrow."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *args, **kwargs: None)
+    text_format = SimpleNamespace(CharHeight=0.00635)
+    # Native 308e5a1a8 marker: letter tops 5.004 mm above the shafts;
+    # the PDF's filled arrowhead width is 3 mm.
+    arrows = [
+        [0.1572622, y, 0.0, 0.1452622, y, 0.0, 0.006, 0.003, 0.0]
+        for y in (0.2580005, 0.2419995)
+    ]
+    texts = [[0.1438325, y, 0.0] for y in (0.2630045, 0.2470035)]
+    original_arrows = [row[:] for row in arrows]
+    placements = []
+
+    def set_format(use_doc, value):
+        placements.append((use_doc, value.CharHeight))
+        return defect != "rejected"
+
+    def marker():
+        height = 0.00635 if defect == "height" else text_format.CharHeight
+        actual_texts = [row[:] for row in texts]
+        if defect in ("upper", "lower"):
+            actual_texts[0 if defect == "upper" else 1][1] -= 0.001
+        payload = [1.0, 0.0, 1.0] + [0.0] * 7
+        payload += [value for row in arrows + actual_texts for value in row] + [height]
+        return payload[:-1] if defect == "incomplete" else payload
+
+    definition = SimpleNamespace(GetTextFormat=lambda: text_format, SetTextFormat=set_format)
+    parent = SimpleNamespace(GetSectionLineInfo2=marker)
+    if defect is None:
+        drawing._place_numeral_section_letters(object(), parent, definition)
+        drawing._assert_numeral_section_letters(parent)
+    else:
+        with pytest.raises(RuntimeError, match="numeral G-G"):
+            drawing._place_numeral_section_letters(object(), parent, definition)
+    assert placements == [(False, drawing.NUMERAL_SECTION_LETTER_HEIGHT)]
+    assert arrows == original_arrows
 
 
 def test_engraving_sizes_are_min_limits_and_graduation_depth_keeps_its_stock() -> None:
@@ -641,6 +737,7 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
         return section
 
     monkeypatch.setattr(drawing, "create_section_view", create_section)
+    monkeypatch.setattr(drawing, "_place_numeral_section_letters", lambda *args: None)
 
     async def finalize(adapter, outputs, **kwargs):
         assert kwargs["expected_sheet_names"] == drawing.SHEET_NAMES

@@ -250,7 +250,11 @@ def test_no_com_in_spec_or_render_time_size_overrides(module) -> None:
         calls = {node.func.attr if isinstance(node.func, ast.Attribute) else node.func.id
                  for node in ast.walk(tree) if isinstance(node, ast.Call)
                  and isinstance(node.func, (ast.Attribute, ast.Name))}
-        assert not calls & {"SetPrecision3", "set_dimension_precision", "SetValues", "set_hole_callout_precision", "add_gdt_frame", "add_datum_tag"}
+        assert not calls & {"SetPrecision3", "set_dimension_precision", "SetValues", "add_gdt_frame", "add_datum_tag"}
+        if module is block_drawing:
+            assert "set_hole_callout_precision" not in calls
+        # A newly inserted native hole callout owns its variable formatting;
+        # imported dimensions, source values and tolerances remain read-only.
 
 
 class _StopViewTransform:
@@ -369,7 +373,7 @@ class _StopMathUtility:
         ("cover mating face", "*Left", (0.010668, 0.012573, 0.0), (0.292648, 0.206844)),
     ]),
     (plate_drawing, [
-        ("two cover clearance holes", "*Back", (0.0026162, 0.004064, -0.001016), (0.2072072, 0.157808)),
+        ("two cover clearance holes", "*Back", (0.0187198, 0.004064, -0.001016), (0.1427928, 0.157808)),
     ]),
 ], ids=["block-plate-and-subsequent-thumb", "plate-clearance"])
 def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
@@ -449,6 +453,22 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         monkeypatch.setattr(drawing, "_assert_reference_dimensions", lambda *a: None)
     else:
         monkeypatch.setattr(drawing, "_assert_pilot_diameter", lambda *a: None)
+        monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+        pilot_annotation = SimpleNamespace(GetSpecificAnnotation=lambda: object())
+        monkeypatch.setattr(drawing, "curate_view_dimensions",
+                            lambda adapter, view, **kw: [pilot_annotation] if view.orientation == "*Back" else [])
+        monkeypatch.setattr(drawing, "dimension_name", lambda *a: "PilotDrillDiameter")
+        monkeypatch.setattr(drawing, "_pilot_attachment", lambda source: object())
+        monkeypatch.setattr(drawing, "_outside_drill_arrow", lambda display: None)
+        monkeypatch.setattr(drawing, "rebuild_drawing", lambda *a, **kw: None)
+        monkeypatch.setattr(drawing, "_assert_drill_attachment", lambda *a, **kw: None)
+        rim = object()
+        monkeypatch.setattr(drawing, "scan_view_edges", lambda *a, **kw: SimpleNamespace(
+            circle_at=lambda *a, **kw: SimpleNamespace(edge=rim),
+        ))
+        places = []
+        monkeypatch.setattr(drawing, "set_hole_callout_precision",
+                            lambda display, precision, **kw: places.append(precision))
     labelled = []
     monkeypatch.setattr(drawing, "_label_locating_edges", lambda adapter, view: labelled.append(view))
     monkeypatch.setattr(drawing, "auto_center_marks", lambda *a, **kw: True)
@@ -456,12 +476,17 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
 
     callout_positions = {}
 
-    def add_callout(adapter, view, *, edge_xy, callout_xy, label, process=None):
+    def add_callout(adapter, view, *, edge_xy, callout_xy, label, process=None, edge=None):
         callouts.append((view, edge_xy, label))
         callout_positions[label] = callout_xy
-
+        if drawing is plate_drawing:
+            assert edge is rim
+            assert process == "REMOVE PLATE; THEN DRILL\n"
+        return SimpleNamespace(GetAnnotation=lambda: object())
     async def finalize(adapter, outputs, **kwargs):
         assert kwargs["package_name"] == drawing.PACKAGE
+        for settled in kwargs.get("settled_checks", ()):
+            settled()
         for stage in ("before_drawing_save", "after_drawing_save", "after_drawing_close"):
             kwargs["checkpoint"](stage)
             checkpoint_stages.append(stage)
@@ -524,12 +549,13 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         assert callout_positions["thumbscrew tap through floor"] == (0.060, 0.056)
         assert callout_positions["two cover blind taps"] == (0.065, 0.127)
     else:
-        # The native pilot's construction circle is at X=.150, the same
-        # right-sheet hole selected for the opened clearance callout.
+        # The native pilot stays at X=.150 (right-sheet); the clearance
+        # callout selects X=.690 (left-sheet), so the leaders cannot cross.
+        assert places == [{"hw-diam": 3}]
         assert callout_positions["two cover clearance holes"] == drawing.CLEARANCE_CALLOUT_XY
         assert drawing.FRONT_KEEP["PilotDrillDiameter"] == (0.285, 0.178)
-        assert callout_positions["two cover clearance holes"][0] > front_map.apply(
-            (0.0, center[1], center[2])
+        assert callout_positions["two cover clearance holes"][0] < front_map.apply(
+            (spec.PLATE_HOLE_XS[1] / 1000.0, center[1], center[2])
         )[0]
     # Capture the entire block build before checking: the second (thumb) pick
     # must remain covered even when the preceding plate pick used wrong units.
@@ -559,9 +585,8 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
                 if drawing is plate_drawing
                 else (spec.BLOCK_PLATE_HOLE_POINTS, spec.PLATE_TAP_DRILL_DIA)
             )
-            hole = holes[0] if drawing is plate_drawing else holes[1]
-            mouth = (hole[0] + (-diameter if drawing is plate_drawing else diameter) / 2.0,
-                     hole[1], hole[2])
+            hole = holes[1]
+            mouth = (hole[0] + diameter / 2.0, hole[1], hole[2])
         assert xyz == pytest.approx(tuple(value / 1000.0 for value in mouth))
         assert edge_xy == pytest.approx(expected_xy)
         assert abs(edge_xy[0] - view.Position[0]) < 0.043
@@ -1327,3 +1352,148 @@ def test_tight_bands_name_their_mates_and_no_wall_states_a_shortfall() -> None:
     # Neither sheet keeps its own copy of the parts' text.
     assert not hasattr(block_drawing, "DIMENSION_CALLOUTS")
     assert not hasattr(plate_drawing, "DIMENSION_CALLOUTS")
+
+
+@pytest.mark.parametrize("refuse", ["none", "arrow-side", "second-arrow"])
+def test_plate_drill_arrows_use_single_native_outside_tip(monkeypatch, refuse) -> None:
+    class Display:
+        side = 2
+        second = True
+        use_doc = True
+
+        @property
+        def ArrowSide(self):
+            return self.side
+
+        @ArrowSide.setter
+        def ArrowSide(self, value):
+            if refuse != "arrow-side":
+                self.side = value
+
+        def SetSecondArrow(self, use_doc, second):
+            if refuse != "second-arrow":
+                self.use_doc, self.second = use_doc, second
+
+        def GetUseDocSecondArrow(self):
+            return self.use_doc
+
+        def GetSecondArrow(self):
+            return self.second
+
+    monkeypatch.setattr(plate_drawing, "_early_bound", lambda value, interface: value)
+    display = Display()
+    if refuse != "none":
+        with pytest.raises(RuntimeError, match="styling did not persist"):
+            plate_drawing._outside_drill_arrow(display)
+    else:
+        plate_drawing._outside_drill_arrow(display)
+        assert (display.side, display.use_doc, display.second) == (1, False, False)
+
+
+@pytest.mark.parametrize("pilot", [True, False])
+@pytest.mark.parametrize("fault", [
+    "none", "wrong-entity", "wrong-kind", "dangling", "missing",
+    "other-radius", "other-hole", "second-arrow", "unreadable", "nan",
+])
+def test_plate_drill_guard_proves_identity_and_printed_circle(monkeypatch, pilot, fault) -> None:
+    entity, other = object(), object()
+    center = (0.202432 if pilot else 0.147568, 0.157808)
+    diameter = spec.PLATE_TAP_DRILL_DIA if pilot else spec.PLATE_CLEARANCE_DIA
+    radius = diameter / 2000.0 * 4.0
+    if fault == "other-radius":
+        other_diameter = spec.PLATE_CLEARANCE_DIA if pilot else spec.PLATE_TAP_DRILL_DIA
+        radius = other_diameter / 2000.0 * 4.0
+    tip = (center[0] + radius, center[1], 0.0)
+    if fault == "other-hole":
+        tip = (tip[0] + 0.054864, tip[1], 0.0)
+    if fault == "unreadable":
+        tip = ()
+    if fault == "nan":
+        tip = (float("nan"), center[1], 0.0)
+    attached = () if fault == "missing" else (other if fault == "wrong-entity" else entity,)
+    kind = 10 if pilot else 1
+    if fault == "wrong-kind":
+        kind = 1 if pilot else 10
+    annotation = SimpleNamespace(
+        IsDangling=lambda: fault == "dangling",
+        GetAttachedEntities3=lambda: attached,
+        GetAttachedEntityCount3=lambda: len(attached),
+        GetAttachedEntityTypes=lambda: (kind,) if attached else (),
+        GetDisplayData=lambda: SimpleNamespace(
+            GetArrowHeadCount=lambda: 2 if fault == "second-arrow" else 1,
+            GetArrowHeadAtIndex2=lambda index: tip,
+        ),
+    )
+    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)))
+    monkeypatch.setattr(plate_drawing, "_early_bound", lambda value, interface: value)
+    projected = []
+
+    def project(adapter, view, xyz, **kw):
+        projected.append(xyz)
+        return center
+
+    monkeypatch.setattr(plate_drawing, "model_point_in_view", project)
+    if fault != "none":
+        with pytest.raises(RuntimeError, match="native circle attachment|native arrow|own circle"):
+            plate_drawing._assert_drill_attachment(
+                adapter, SimpleNamespace(ScaleDecimal=4.0), annotation, entity, pilot=pilot,
+            )
+    else:
+        plate_drawing._assert_drill_attachment(
+            adapter, SimpleNamespace(ScaleDecimal=4.0), annotation, entity, pilot=pilot,
+        )
+        assert projected == [(
+            spec.PLATE_HOLE_XS[0 if pilot else 1] / 1000.0,
+            spec.PLATE_HOLE_Y / 1000.0,
+            0.0 if pilot else spec.PLATE_Z_MIN / 1000.0,
+        )]
+
+
+@pytest.mark.parametrize("fault", ["none", "missing", "extra", "solid", "line", "diameter", "station"])
+def test_plate_pilot_identity_resolves_only_named_model_construction_circle(monkeypatch, fault) -> None:
+    center = SimpleNamespace(
+        X=(spec.PLATE_HOLE_XS[0] + (1.0 if fault == "station" else 0.0)) / 1000.0,
+        Y=spec.PLATE_HOLE_Y / 1000.0,
+    )
+    segment = SimpleNamespace(
+        GetType=lambda: 0 if fault == "line" else 1,
+        ConstructionGeometry=fault != "solid",
+        GetCenterPoint2=lambda: center,
+        GetRadius=lambda: (spec.PLATE_CLEARANCE_DIA if fault == "diameter"
+                           else spec.PLATE_TAP_DRILL_DIA) / 2000.0,
+    )
+    sketch = SimpleNamespace(GetSketchSegments=lambda: (segment, segment) if fault == "extra" else (segment,))
+    names = []
+
+    def feature_by_name(name):
+        names.append(name)
+        return None if fault == "missing" else SimpleNamespace(GetSpecificFeature2=lambda: sketch)
+
+    source = SimpleNamespace(FeatureByName=feature_by_name)
+    monkeypatch.setattr(plate_drawing, "_early_bound", lambda value, interface: value)
+    if fault != "none":
+        with pytest.raises(RuntimeError, match="pilot reference"):
+            plate_drawing._pilot_attachment(source)
+    else:
+        assert plate_drawing._pilot_attachment(source) is segment
+    assert names == ["PilotDrillReference"]
+
+
+def test_plate_native_clearance_variable_prints_truthful_three_place_drill(monkeypatch) -> None:
+    import _drawing_hole_callout as hole_callout
+    from win32com.client import dynamic
+
+    variable = SimpleNamespace(VariableName="hw-diam")
+    length = SimpleNamespace(_oleobj_=variable, Precision=2)
+    display = SimpleNamespace(GetHoleCalloutVariables=lambda: (length,))
+    monkeypatch.setattr(dynamic, "Dispatch", lambda raw: raw)
+    monkeypatch.setattr(hole_callout, "_early_bound", lambda value, interface: value)
+    plate_drawing.set_hole_callout_precision(
+        display, {"hw-diam": spec.HOLE_CALLOUT_PRECISION}, label="cover clearance drill",
+    )
+    # The review's .090 inferred a nominal from a rounded .09. The authoritative
+    # native #2 close drill stays .094; only variable formatting changes.
+    assert length.Precision == 3
+    assert f"{spec.PLATE_CLEARANCE_DIA / 25.4:.{length.Precision}f}" == "0.094"
+    assert not spec.PLATE_CLEARANCE_SPEC.overrides_mm
+    assert plate_drawing.CLEARANCE_PROCESS == "REMOVE PLATE; THEN DRILL\n"

@@ -62,8 +62,8 @@ def _shown(name: str) -> tuple[int, int, str, str]:
 def test_head_prints_supplier_fractions_and_shank_decimal_inches() -> None:
     # (units, fraction base, prefix, suffix): swINCHES with an exact fraction
     # on the head, decimal on the shank; every value labelled in inches.
-    assert _shown("SupplierHeadWidth") == (3, 2, "(", " in)")
-    assert _shown("SupplierHeadHeight") == (3, 2, "(", " in)")
+    assert _shown("SupplierHeadWidth") == (3, 2, "(", ")")
+    assert _shown("SupplierHeadHeight") == (3, 2, "(", ")")
     assert _shown("SupplierLength") == (3, 1, "(", " in)")
     assert _shown("SupplierThreadDiameter") == (3, 1, "(<MOD-DIAM>", " in)")
     formats = supplier.SUPPLIER_REFERENCE_FORMATS
@@ -186,7 +186,16 @@ def test_head_height_is_an_exact_unrounded_sixteenth() -> None:
     )
     # SetUnits2(UseDoc=False, swINCHES, swFRACTION, 16, RoundToFraction=False, 0).
     assert display.units_call == (False, 3, 2, 16, False, 0)
-    assert (display.text[1], display.text[2]) == ("(", " in)")
+    assert (display.text[1], display.text[2]) == ("(", ")")
+    # The duplicate explicit unit must not return after a rebuild either.
+    display.text[2] = " in)"
+    with pytest.raises(RuntimeError, match="suffix"):
+        _supplier_dimensions.assert_supplier_reference_dimension(
+            object(), display, label="SupplierHeadHeight", units="in",
+            precision=precision, expected_mm=supplier.HEAD_H,
+            presentation=presentation, fraction_denominator=denominator, callout=callout,
+        )
+    display.text[2] = ")"
     # A seat that rounds the head to the nearest fraction no longer proves it.
     display.state["round"] = True
     with pytest.raises(RuntimeError, match="exact supplier fraction"):
@@ -238,3 +247,85 @@ def test_purchased_sheet_forwards_the_package_to_setup_and_finalize() -> None:
     assert calls["finalize_drawing"]["package_name"] == "package_name"
     source = Path(purchased.__file__).read_text(encoding="utf-8")
     assert "package_name=package_name," in source
+
+
+def test_native_thread_text_is_shelved_and_reacquired_after_final_rebuild(monkeypatch) -> None:
+    imported = {"SupplierThreadDiameter": object()}
+    reacquired = {"SupplierThreadDiameter": object()}
+    stations = {"SupplierThreadDiameter": {"tips": "retained native tips"}}
+    events = []
+    monkeypatch.setattr(draw, "_assert_projection_alignment", lambda *_: events.append("aligned"))
+
+    def annotate(adapter, views, **kwargs):
+        assert kwargs["dimensions"] is supplier.SUPPLIER_REFERENCE_DIMENSIONS
+        assert kwargs["formats"] is supplier.SUPPLIER_REFERENCE_FORMATS
+        kwargs["settled_checks"].append(lambda: reacquired)
+        events.append("import")
+        return imported
+
+    def shelve(adapter, displays, shelves):
+        assert displays is imported
+        assert shelves == {"SupplierThreadDiameter": (True, "right")}
+        events.append("shelve")
+        return stations
+
+    def assert_shelves(adapter, displays, shelves, retained):
+        assert displays is reacquired
+        assert shelves == draw.TEXT_SHELVES
+        assert retained == stations
+        events.append("settled")
+
+    async def purchased_sheet(adapter, spec, **kwargs):
+        kwargs["supplier_dimensions"](adapter, {})
+        assert events == ["aligned", "import", "shelve"]
+        kwargs["settled_checks"][0]()
+        with pytest.raises(RuntimeError, match="exactly one settled proof"):
+            kwargs["settled_checks"][0]()
+        return {"pdf": "sheet.pdf"}
+
+    monkeypatch.setattr(draw, "annotate_supplier_screw", annotate)
+    monkeypatch.setattr(draw, "shelve_supplier_text", shelve)
+    monkeypatch.setattr(draw, "assert_supplier_shelves", assert_shelves)
+    monkeypatch.setattr(draw, "build_purchased_fastener_drawing", purchased_sheet)
+    assert asyncio.run(draw.build(object())) == {"pdf": "sheet.pdf"}
+    assert events == ["aligned", "import", "shelve", "settled", "aligned"]
+
+
+def test_right_reserves_front_vertical_lanes_without_changing_front_budget() -> None:
+    original = draw.supplier_screw_margins(
+        supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+        planes=supplier.SUPPLIER_REFERENCE_PLANES,
+        sides=supplier.SUPPLIER_REFERENCE_SIDES,
+    )
+    assert draw.SUPPLIER_MARGINS["*Front"] == original["*Front"]
+    assert draw.SUPPLIER_MARGINS["*Top"] == original["*Top"]
+    assert draw.SUPPLIER_MARGINS["*Right"] == (
+        0.0, original["*Front"][1], 0.0, original["*Front"][3]
+    )
+
+
+@pytest.mark.parametrize(
+    "right_origin,right_scale,valid",
+    [
+        ((0.30, 0.12), (1, 1), True),
+        ((0.30, 0.117), (1, 1), False),
+        ((0.05, 0.12), (1, 1), False),
+        ((0.30, float("nan")), (1, 1), False),
+        ((0.30, 0.12), (2, 1), False),
+    ],
+)
+def test_projection_proof_refuses_origin_or_scale_drift(
+    monkeypatch, right_origin, right_scale, valid
+) -> None:
+    front = type("View", (), {"ScaleRatio": (1, 1)})()
+    right = type("View", (), {"ScaleRatio": right_scale})()
+    monkeypatch.setattr(
+        draw, "model_point_in_view",
+        lambda adapter, view, point, **kwargs: (0.10, 0.12) if view is front else right_origin,
+    )
+    views = {"*Front": front, "*Right": right}
+    if valid:
+        draw._assert_projection_alignment(object(), views)
+    else:
+        with pytest.raises(RuntimeError, match="third-angle aligned"):
+            draw._assert_projection_alignment(object(), views)

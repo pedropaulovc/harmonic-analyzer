@@ -50,8 +50,7 @@ from _com import _early_bound
 from _custom_properties import apply_custom_properties
 from _session import run_build
 from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
-from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_symmetric_tolerance
+from _drawing_precision import apply_drawing_precision, _named_dimension
 from _dimensions import drive_dimension, set_global
 from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
@@ -309,8 +308,8 @@ def _create_ms_explode(adapter: Any, configuration_name: str) -> None:
 async def _author_clamped_setting(adapter: Any) -> None:
     """No solid/pose edits: a source-owned chord between physical face stations.
 
-    The tolerance and its places print in the contract's ``drawing_unit``,
-    which must be the unit the spec authored the setting in."""
+    The chord records the saved graduation-indexed pose, not an acceptance
+    band. Its live value is shown parenthesized, as the magnifier references."""
     unit = assembly_drawing_unit(ASM_NAME)
     if unit != spec.SETTING_UNIT:
         raise RuntimeError(
@@ -347,10 +346,21 @@ async def _author_clamped_setting(adapter: Any) -> None:
     name_last_feature(adapter, spec.SETTING_FEATURE)
     for name, expression in dims.apply(adapter, spec.SETTING_FEATURE):
         await drive_dimension(adapter, name, expression)
-    set_dimension_symmetric_tolerance(
-        adapter, spec.SETTING_FEATURE, spec.SETTING_DIMENSION, spec.SETTING_TOLERANCE_MM,
-        places=spec.SETTING_TOLERANCE_PRECISION, display_unit=unit,
+    display, dimension = _named_dimension(
+        adapter, spec.SETTING_FEATURE, spec.SETTING_DIMENSION
     )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = 0  # swTolNONE
+    display.ShowParenthesis = False
+    display.SetText(1, "(")
+    display.SetText(2, ")")
+    if (
+        int(tolerance.Type) != 0
+        or bool(display.ShowParenthesis)
+        or str(display.GetText(1) or "") != "("
+        or str(display.GetText(2) or "") != ")"
+    ):
+        raise RuntimeError("clamped setting reference form did not persist")
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     mark_dimensions_for_drawing(adapter, spec.SETTING_FEATURE, {spec.SETTING_DIMENSION})
     blank_sketch(adapter, spec.SETTING_FEATURE)

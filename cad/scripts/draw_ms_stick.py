@@ -113,6 +113,11 @@ NUMERAL_SECTION_X = (part.SCALE_START_X + part.TICK_WIDTH / 2.0 + part.NUMERAL_G
                      + part.NUMERAL_HEIGHT_MM / 2.0)
 # r1-r3 sheet 4: at 1.5 mm the G letters sat on their arrows and the outline.
 NUMERAL_SECTION_OVERSHOOT_MM = 4.0
+# Native G origins sit 5.004 mm above the arrow shafts (308e5a1a8 audit),
+# but the template's 6.35 mm letters crossed them. Use the existing native
+# section-letter sizing pattern; keep the cutting plane and arrows unmoved.
+NUMERAL_SECTION_LETTER_HEIGHT = 0.0025
+NUMERAL_SECTION_LETTER_CLEARANCE = 0.001
 FRONT_KEEP = {
     "BodyLength": (0.155, 0.205), "BodyWidth": (0.305, 0.215),
     "ScaleStartX": (0.180, 0.150),
@@ -244,6 +249,38 @@ def _engraving_detail(
     return detail
 
 
+def _place_numeral_section_letters(adapter: Any, parent: Any, definition: Any) -> None:
+    """Keep both native G glyphs above their arrowheads, not substitute notes."""
+    text_format = _early_bound(definition.GetTextFormat(), "ITextFormat")
+    text_format.CharHeight = NUMERAL_SECTION_LETTER_HEIGHT
+    if not definition.SetTextFormat(False, text_format):
+        raise RuntimeError("numeral G-G native letter height rejected")
+    rebuild_drawing(adapter, label="place numeral G-G native letters")
+    _assert_numeral_section_letters(parent)
+
+
+def _assert_numeral_section_letters(parent: Any) -> None:
+    """Read the complete native marker envelope, including arrowhead widths."""
+    marker = tuple(float(value) for value in _early_bound(parent, "IView").GetSectionLineInfo2())
+    if len(marker) < 3 or marker[0] != 1:
+        raise RuntimeError("numeral G-G requires one native cutting-plane marker")
+    segments = int(marker[2])
+    offset = 3 + 7 * segments
+    if segments < 1 or len(marker) != offset + 25 or not all(map(math.isfinite, marker)):
+        raise RuntimeError("numeral G-G native marker geometry is incomplete")
+    height = marker[-1]
+    if abs(height - NUMERAL_SECTION_LETTER_HEIGHT) > 1e-8:
+        raise RuntimeError("numeral G-G native letter height did not persist")
+    for index in range(2):
+        arrow = marker[offset + 9 * index:offset + 9 * (index + 1)]
+        text = marker[offset + 18 + 3 * index:offset + 21 + 3 * index]
+        if arrow[7] <= 0.0:
+            raise RuntimeError("numeral G-G native arrowhead width is missing")
+        arrow_top = max(arrow[1], arrow[4]) + arrow[7] / 2.0
+        if text[1] - height - arrow_top < NUMERAL_SECTION_LETTER_CLEARANCE:
+            raise RuntimeError(f"numeral G-G letter {index + 1} overlaps its arrowhead")
+
+
 def _numeral_profile(adapter: Any, parent: Any) -> Any:
     """Whole-bar full section across both straight side strokes of the zero numeral."""
     endpoints = tuple(
@@ -266,6 +303,7 @@ def _numeral_profile(adapter: Any, parent: Any) -> Any:
     rebuild_drawing(adapter, label="numeral G-G full section")
     if bool(definition.GetDisplayOnlySurfaceCut()) or bool(definition.GetPartialSection()):
         raise RuntimeError("numeral G-G must be a full section of the whole bar")
+    _place_numeral_section_letters(adapter, parent, definition)
     set_hidden_lines_removed(adapter, section)
     if bool(section.UseParentScale) or tuple(float(value) for value in section.ScaleRatio) != NUMERAL_PROFILE_SCALE:
         raise RuntimeError("numeral G-G must retain its independent 10:1 scale")
@@ -488,7 +526,8 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE, layout=SPEC.layout,
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
-        settled_checks=(lambda: _assert_dimension_contract(adapter, annotations),),
+        settled_checks=(lambda: _assert_dimension_contract(adapter, annotations),
+                        lambda: _assert_numeral_section_letters(profile_parent)),
         package_name=PACKAGE, checkpoint=guard)
     assert_source_closed(source, stage="after finalize")
     return artifacts

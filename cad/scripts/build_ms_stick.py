@@ -903,7 +903,8 @@ async def build(adapter) -> dict[str, str]:
         for name in names:
             if name in DRAWING_TOLERANCES:
                 set_dimension_symmetric_tolerance(
-                    adapter, feature, name, DRAWING_TOLERANCES[name], display_unit=UNIT)
+                    adapter, feature, name, DRAWING_TOLERANCES[name],
+                    places=DRAWING_PRECISION[feature][name], display_unit=UNIT)
             if name in MIN_LIMIT_DEVIATIONS_MM:
                 _min_limit(adapter, feature, name)
     clear_dimensions_for_drawing(adapter)
