@@ -235,19 +235,41 @@ def layers() -> list[list[Ring]]:
 
 
 def _depth_field(rects: list[Ring], xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
-    """Removed depth of the drafted cuts of ``rects`` over the grid."""
+    """Removed depth of the drafted cuts of ``rects`` over the grid.
+
+    A stroke is a convex ring: off its bounding box some edge distance is
+    negative, so its clipped depth there is 0 and cannot raise ``depth``. On a
+    ``meshgrid`` each stroke is therefore evaluated only over the grid block
+    its bounding box covers, with the same elementwise arithmetic; any other
+    grid takes the whole-grid path.
+    """
     slope = math.tan(math.radians(NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0))
     depth = np.zeros_like(xs)
+    columns = rows = None
+    if (
+        xs.ndim == 2 and xs.shape == ys.shape
+        and bool((xs == xs[:1]).all()) and bool((ys == ys[:, :1]).all())
+        and bool((np.diff(xs[0]) > 0).all()) and bool((np.diff(ys[:, 0]) > 0).all())
+    ):
+        columns, rows = xs[0], ys[:, 0]
     for rect in rects:
         # Inside distance is positive whichever way the placement wound it.
         sign = -1.0 if dxf.signed_area(rect) > 0.0 else 1.0
-        inside = np.full_like(xs, np.inf)
+        block = (slice(None),) * xs.ndim
+        if columns is not None:
+            x0, x1 = min(x for x, _ in rect), max(x for x, _ in rect)
+            y0, y1 = min(y for _, y in rect), max(y for _, y in rect)
+            c0, c1 = np.searchsorted(columns, x0, "left"), np.searchsorted(columns, x1, "right")
+            r0, r1 = np.searchsorted(rows, y0, "left"), np.searchsorted(rows, y1, "right")
+            block = (slice(r0, r1), slice(c0, c1))
+        bx, by = xs[block], ys[block]
+        inside = np.full_like(bx, np.inf)
         for i in range(len(rect)):
             p, q = rect[i], rect[(i + 1) % len(rect)]
             ex, ey = q[0] - p[0], q[1] - p[1]
-            signed = ((xs - p[0]) * ey - (ys - p[1]) * ex) / math.hypot(ex, ey)
+            signed = ((bx - p[0]) * ey - (by - p[1]) * ex) / math.hypot(ex, ey)
             inside = np.minimum(inside, sign * signed)
-        depth = np.maximum(depth, np.clip(inside / slope, 0.0, NUMERAL_DEPTH))
+        depth[block] = np.maximum(depth[block], np.clip(inside / slope, 0.0, NUMERAL_DEPTH))
     return depth
 
 
