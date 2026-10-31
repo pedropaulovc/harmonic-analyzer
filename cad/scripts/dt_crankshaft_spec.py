@@ -370,7 +370,9 @@ SPIGOT_LENGTH_TOL = 0.0508
 # draw_dt_crankshaft opens the sheet at these.
 HOLE_CALLOUT_PLACES = 4
 DRIVE_PIN_DEPTH_TOL = 0.1016
-# The shared hole's (0/-.010) band on the inch grid this sheet prints.
+# The shared hole's (0/-.010) band on the inch grid this sheet prints; the
+# mm sheets keep the shared constant.  D14 (#290's final step) converts the
+# shared hole and removes this copy.
 DRIVE_PIN_HOLE_BAND = (0.0, -0.01016)  # +.0000/-.0004
 # Local (dome-root) deviations of the seat face as (upper, lower): a station
 # printed from the far end moves by its own printed band (its model value is
