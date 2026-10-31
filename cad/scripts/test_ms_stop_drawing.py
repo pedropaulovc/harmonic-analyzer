@@ -64,8 +64,10 @@ def test_native_taps_and_plate_clearance_follow_stock_screws() -> None:
     assert spec.PLATE_TAP_SPEC.kind == "tapped_bottoming"
     assert spec.PLATE_TAP_SPEC.size == screw.THREAD
     assert spec.PLATE_TAP_SPEC.end == "blind"
-    assert spec.PLATE_TAP_SPEC.depth_mm == spec.PLATE_TAP_DRILL_DEPTH == _inch(0.300)
-    assert spec.PLATE_TAP_SPEC.overrides_mm["ThreadDepth"] == spec.PLATE_TAP_THREAD_DEPTH == _inch(0.250)
+    assert spec.PLATE_TAP_SPEC.depth_mm == spec.PLATE_TAP_DRILL_DEPTH
+    assert spec.PLATE_TAP_DRILL_DEPTH == pytest.approx(_inch(0.300), rel=0.0, abs=1e-9)
+    assert spec.PLATE_TAP_SPEC.overrides_mm["ThreadDepth"] == spec.PLATE_TAP_THREAD_DEPTH
+    assert spec.PLATE_TAP_THREAD_DEPTH == pytest.approx(_inch(0.250), rel=0.0, abs=1e-9)
     # #49 drill, .073: three places, the shop's drill.
     assert spec.PLATE_TAP_SPEC.overrides_mm["TapDrillDiameter"] == spec.PLATE_TAP_DRILL_DIA == 1.8542
     # The cover clearance is the wizard's own #2 close size, .094, unedited.
@@ -222,14 +224,27 @@ def test_no_com_in_spec_or_render_time_size_overrides(module) -> None:
                 else []
             )
         ]
-        # The literal registry read of the sheet unit is the one drawing
-        # module a pure spec may import (no COM behind it).
+        # The one documented exception: _drawing_units is pure data (its own
+        # docstring), read only to resolve the sheet unit from the literal
+        # registry rows. Prove it stays pure: standard library only, no COM.
+        pure_data = "_drawing_units"
+        assert pure_data in imports
         assert not any(name.startswith((
             "build_", "solidworks", "_appearance", "_assembly", "_check", "_com",
             "_custom_properties", "_dimensions", "_drawing", "_feature_tree",
             "_holes", "_part_", "_rebuild", "_session", "_sketch", "_visibility",
-        )) and name != "_drawing_units" for name in imports)
-        assert "_drawing_units" in imports
+        )) for name in imports if name != pure_data)
+        helper = ast.parse((Path(module.__file__).parent / f"{pure_data}.py").read_text(encoding="utf-8"))
+        helper_imports = {
+            name
+            for node in ast.walk(helper)
+            for name in (
+                [node.module or ""] if isinstance(node, ast.ImportFrom)
+                else [alias.name for alias in node.names] if isinstance(node, ast.Import)
+                else []
+            )
+        }
+        assert helper_imports <= {"__future__", "collections.abc", "typing"}, helper_imports
     else:
         calls = {node.func.attr if isinstance(node.func, ast.Attribute) else node.func.id
                  for node in ast.walk(tree) if isinstance(node, ast.Call)

@@ -399,11 +399,27 @@ def test_spec_is_pure_and_drawing_never_reauthors_dimensions() -> None:
             else []
         )
     ]
+    # The one documented exception: _drawing_units is pure data (its own
+    # docstring), read here only to resolve the sheet unit from the literal
+    # registry row. Prove it stays pure: standard library only, no COM.
+    pure_data = "_drawing_units"
+    assert pure_data in imports
     assert not any(name.startswith((
         "build_", "solidworks", "_appearance", "_assembly", "_check", "_com",
         "_custom_properties", "_dimensions", "_drawing", "_feature_tree",
         "_holes", "_part_", "_rebuild", "_session", "_sketch", "_visibility",
-    )) for name in imports)
+    )) for name in imports if name != pure_data)
+    helper = ast.parse((Path(spec.__file__).parent / f"{pure_data}.py").read_text(encoding="utf-8"))
+    helper_imports = {
+        name
+        for node in ast.walk(helper)
+        for name in (
+            [node.module or ""] if isinstance(node, ast.ImportFrom)
+            else [alias.name for alias in node.names] if isinstance(node, ast.Import)
+            else []
+        )
+    }
+    assert helper_imports <= {"__future__", "collections.abc", "typing"}, helper_imports
     drawing_tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     calls = {node.func.attr if isinstance(node.func, ast.Attribute) else node.func.id
              for node in ast.walk(drawing_tree) if isinstance(node, ast.Call)
@@ -471,7 +487,8 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     def make_view(position, scale, center_x, orientation="*Back"):
         ratio = scale[0] / scale[1]
         axes = (0, 2, 1) if orientation == "*Top" else (0, 1, 2)
-        vertical_center = 0.0015 if orientation == "*Top" else 0.004
+        # The bar's mid-thickness (*Top) or mid-width (*Back), in metres.
+        vertical_center = (spec.BODY_THICKNESS if orientation == "*Top" else spec.BODY_WIDTH) / 2000.0
         name = f"offline-view-{len(views)}"
         detail_circles = []
         view = SimpleNamespace(
@@ -652,8 +669,10 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     assert profile_args["scale"] == drawing.NUMERAL_PROFILE_SCALE == (10.0, 1.0)
     # The cutting line crosses the whole bar width at the zero's mid-height.
     start, end = utility.points[15:17]
-    assert start == pytest.approx((drawing.NUMERAL_SECTION_X / 1000.0, -0.004, 0.0))
-    assert end == pytest.approx((drawing.NUMERAL_SECTION_X / 1000.0, 0.012, 0.0))
+    overshoot = drawing.NUMERAL_SECTION_OVERSHOOT_MM
+    assert start == pytest.approx((drawing.NUMERAL_SECTION_X / 1000.0, -overshoot / 1000.0, 0.0))
+    assert end == pytest.approx(
+        (drawing.NUMERAL_SECTION_X / 1000.0, (spec.BODY_WIDTH + overshoot) / 1000.0, 0.0))
     assert tuple(profile.ScaleRatio) == drawing.NUMERAL_PROFILE_SCALE
     assert profile.UseParentScale is False
     assert len(section_moves) == 1
@@ -906,17 +925,20 @@ def test_numeral_v_contract_is_independent_of_graduations() -> None:
 
 
 def test_every_tight_band_states_its_function() -> None:
-    """Rule 4: a band tighter than the title block names its mate or purpose."""
-    reasons = {
-        "BodyWidth": "SLIDES IN MS-STOP-BLOCK\nMHA-MS-02 REBATE",
-        "BodyThickness": "SLIDES IN MS-STOP-BLOCK\nMHA-MS-02 REBATE",
-        "ScaleStartX": "SETS CH-AMPLITUDE-BAR\nMHA-CH-01 STATIONS",
-        "FullTickPitch": "SETS CH-AMPLITUDE-BAR\nMHA-CH-01 STATIONS",
-        "MinorTickPitch": "SETS CH-AMPLITUDE-BAR\nMHA-CH-01 STATIONS",
-    }
+    """Rule 4: a band tighter than the title block names its mate or purpose;
+    the .XXX fit sizes that ride the title block name their mate too."""
+    stations = "SETS CH-AMPLITUDE-BAR\nMHA-CH-01 STATIONS"
+    reasons = dict.fromkeys(("ScaleStartX", "FullTickPitch", "MinorTickPitch"), stations)
     assert set(reasons) == set(spec.DRAWING_TOLERANCES)
     for name, reason in reasons.items():
         assert callouts.CALLOUTS[name].endswith(reason), name
+    # The bar's section slides in the stop rebate: .XXX (+/-.005) from the
+    # title block, and each states that fit.
+    fit = "SLIDES IN MS-STOP-BLOCK\nMHA-MS-02 REBATE"
+    for name in ("BodyWidth", "BodyThickness"):
+        assert spec.DRAWING_PRECISION_BY_NAME[name] == 3, name
+        assert name not in spec.DRAWING_TOLERANCES, name
+        assert callouts.CALLOUTS[name].endswith(fit), name
     for name in ("BodyLength", "FullTickLength", "MinorTickLength", "HalfTickLength",
                  "NumeralHeight", "NumeralXGap", "NumeralYGap", *spec.MIN_LIMIT_DEVIATIONS_MM):
         assert name not in spec.DRAWING_TOLERANCES, name
