@@ -52,7 +52,7 @@ from _drawing_dimensions import (
     offset_dimension_text,
     set_dimension_callouts,
 )
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -65,7 +65,9 @@ from _session import run_build
 import _telemetry
 import ch_rocker_arm_tl_oblique_carrier_spec as part_spec
 from _feature_requirements import part_metadata, requirement
+from _part_properties import part_drawing_unit
 from _printed_limits import limits
+from _printed_tolerance import printed_deviations
 from _gtol_cone import ConeFace
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -275,6 +277,8 @@ CR_CALLOUT_XY = (0.377, 0.230)
 # screw 4 then passes clear right of the Ø3.00 spot text.
 RISER_CALLOUT_XY = (0.312, 0.248)
 LEVER_CALLOUT_XY = (0.179, 0.143)
+# The THRU tap drills print .XXX (#290: every Hole Wizard length is 3-place inch).
+TAP_CALLOUT_PRECISION = {"hw-tapdrldia": 3}
 
 part_metadata(
     precision_sources=(
@@ -282,6 +286,23 @@ part_metadata(
         ("_drawing_hole_callout", "add_native_hole_callout"),
     )
 )
+
+_UNIT = part_spec.UNIT
+_CALLOUT_PLACES = 3  # every Hole Wizard length prints .XXX
+_DRILLED = part_spec.DRILLED_BAND
+
+
+def _limits(model: float, places: int) -> list[float]:
+    """A general-band dimension's acceptance limits on the inch sheet: the
+    title block's band about the value printed at ``places``."""
+    low, high = printed_deviations(model, places, unit=_UNIT)
+    return limits(model, places, (high, low))
+
+
+def _printed(model: float, places: int) -> float:
+    """The millimetres of ``model`` printed at ``places`` inch decimals."""
+    return round(round(model / 25.4, places) * 25.4, 9)
+
 
 requirement(
     "top_face",
@@ -291,9 +312,9 @@ requirement(
     fields={
         "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
         "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
-        "length": (limits(part_spec.PLATE_LENGTH, 1), ("PLATE_LENGTH", "OUTLINE_X")),
+        "length": (_limits(part_spec.PLATE_LENGTH, 1), ("PLATE_LENGTH", "OUTLINE_X")),
         "length_nominal": (part_spec.PLATE_LENGTH, ("PLATE_LENGTH",)),
-        "width": (limits(part_spec.PLATE_WIDTH, 1), ("PLATE_WIDTH", "OUTLINE_Y")),
+        "width": (_limits(part_spec.PLATE_WIDTH, 1), ("PLATE_WIDTH", "OUTLINE_Y")),
         "width_nominal": (part_spec.PLATE_WIDTH, ("PLATE_WIDTH",)),
     },
     precision={"length": 1, "width": 1},
@@ -302,7 +323,7 @@ requirement(
 requirement(
     "bottom_face",
     kind="face",
-    # PlanarFace.offset_mm is n·p: the underside (y = -12) along -Y is +12.
+    # PlanarFace.offset_mm is n·p: the underside (y = -T) along -Y is +T.
     faces=(PlanarFace((0.0, -1.0, 0.0), part_spec.THICKNESS),),
     requirements=("height",),
     fields={
@@ -311,46 +332,50 @@ requirement(
             {"frame": "model", "axis": "y", "value": -part_spec.THICKNESS},
             ("THICKNESS",),
         ),
-        "height": (limits(part_spec.THICKNESS, 1), ("THICKNESS",)),
+        "height": (
+            _limits(part_spec.THICKNESS, part_spec.THICKNESS_PLACES), ("THICKNESS",)
+        ),
         "height_nominal": (part_spec.THICKNESS, ("THICKNESS",)),
     },
-    precision={"height": 1},
+    precision={"height": part_spec.THICKNESS_PLACES},
 )
 
 # The pin chain's tight bands, each on its printed (rounded) nominal: B1 from
 # A1 by the spacing; A2/B2 from A1/B1 by (dX, dY).
+_CHAIN_PLACES = part_spec.DRAWING_PRECISION_BY_NAME["PinSpacing"]
+_STATION_PLACES = part_spec.DRAWING_PRECISION_BY_NAME["HubX"]
 _BAND = (part_spec.POSITION_BAND, -part_spec.POSITION_BAND)
-_D1 = round(part_spec.D1, 3)
-_DX = round(abs(part_spec.A2_DX), 3)
-_DY = round(part_spec.A2_DY, 3)
+_D1 = _printed(part_spec.D1, _CHAIN_PLACES)
+_DX = _printed(abs(part_spec.A2_DX), _CHAIN_PLACES)
+_DY = _printed(part_spec.A2_DY, _CHAIN_PLACES)
 # A1, the X datum, from the tap axis (the model origin's X) at the title
-# block's .XX band: the print's 225.07 (HubX, driven equal to A1X) runs from
-# A1 to the HUB spot, its extension line through the lever taps.
-_A1X = round(abs(_A1[0]), 2)
+# block's .XXX band: the print's HubX (driven equal to A1X) runs from A1 to
+# the HUB spot, its extension line through the lever taps.
+_A1X = _printed(abs(_A1[0]), _STATION_PLACES)
 
 
 def _from_a1(x: float, places: int) -> float:
     """A spot's or tap's printed X station: its baseline from A1's axis."""
-    return round(x - _A1[0], places)
+    return _printed(x - _A1[0], places)
 
 
 _CHAIN: dict[str, dict[str, tuple[Any, tuple[Any, ...]]]] = {
     "A1": {
-        "station": (limits(_A1X, 2), ("PIN_HOLES", "STATIONS", "HUB")),
+        "station": (_limits(abs(_A1[0]), _STATION_PLACES), ("PIN_HOLES", "STATIONS", "HUB")),
         "station_nominal": (_A1X, ("PIN_HOLES", "STATIONS", "HUB")),
     },
     "B1": {
-        "station": (limits(_D1, 3, _BAND), ("D1", "POSITION_BAND")),
+        "station": (limits(_D1, _CHAIN_PLACES, _BAND), ("D1", "POSITION_BAND")),
         "station_nominal": (_D1, ("D1",)),
         "parent": ("pin_hole_a1", ("PIN_HOLES",)),
     },
 }
 for _key, _base in (("A2", "a1"), ("B2", "b1")):
     _CHAIN[_key] = {
-        "station": (limits(_DX, 3, _BAND), ("A2_DX", "POSITION_BAND")),
+        "station": (limits(_DX, _CHAIN_PLACES, _BAND), ("A2_DX", "POSITION_BAND")),
         "station_nominal": (_DX, ("A2_DX",)),
         "parent": (f"pin_hole_{_base}", ("PIN_HOLES",)),
-        "height": (limits(_DY, 3, _BAND), ("A2_DY", "POSITION_BAND")),
+        "height": (limits(_DY, _CHAIN_PLACES, _BAND), ("A2_DY", "POSITION_BAND")),
         "height_nominal": (_DY, ("A2_DY",)),
         "height_from": (f"pin_hole_{_base}", ("PIN_HOLES",)),
     }
@@ -373,7 +398,7 @@ for _key, (_x, _y) in part_spec.PIN_HOLES.items():
             "at": ([_x, 0.0, -_y], ("PIN_HOLES",)),
             "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
             "dia": (
-                limits(part_spec.PIN_HOLE_DIA, 3, part_spec.PIN_HOLE_BAND),
+                limits(part_spec.PIN_HOLE_DIA, _CHAIN_PLACES, part_spec.PIN_HOLE_BAND),
                 ("PIN_HOLE_DIA", "PIN_HOLE_BAND"),
             ),
             "dia_nominal": (part_spec.PIN_HOLE_DIA, ("PIN_HOLE_DIA",)),
@@ -385,16 +410,19 @@ for _key, (_x, _y) in part_spec.PIN_HOLES.items():
             **_chain,
         },
         precision={
-            "dia": 3,
+            "dia": _CHAIN_PLACES,
             **{
-                name: 2 if _key == "A1" else 3
+                name: _STATION_PLACES if _key == "A1" else _CHAIN_PLACES
                 for name in ("station", "height")
                 if name in _chain
             },
         },
     )
 
+_SPOT_DIA_PLACES = part_spec.DRAWING_PRECISION_BY_NAME["SpotDia"]
 for _prefix, (_x, _y) in part_spec.SPOTS.items():
+    _station_places = part_spec.DRAWING_PRECISION_BY_NAME[f"{_prefix}X"]
+    _height_places = part_spec.DRAWING_PRECISION_BY_NAME[f"{_prefix}Y"]
     requirement(
         f"{_prefix.lower()}_spot",
         kind="seat",
@@ -403,18 +431,23 @@ for _prefix, (_x, _y) in part_spec.SPOTS.items():
         requirements=("dia", "angle_deg", "station", "height"),
         fields={
             "at": ([_x, 0.0, -_y], ("SPOTS", "HUB", "CL")),
-            "dia": (limits(part_spec.SPOT_DIA, 2), ("SPOT_DIA",)),
+            "dia": (_limits(part_spec.SPOT_DIA, _SPOT_DIA_PLACES), ("SPOT_DIA",)),
             "dia_nominal": (part_spec.SPOT_DIA, ("SPOT_DIA",)),
             "angle_deg": (part_spec.SPOT_ANGLE, ("SPOT_ANGLE", "CALLOUT_SUFFIXES")),
-            "station": (limits(_from_a1(_x, 2), 2), ("SPOTS", "PIN_HOLES")),
-            "station_nominal": (_from_a1(_x, 2), ("SPOTS", "PIN_HOLES")),
+            "station": (_limits(_x - _A1[0], _station_places), ("SPOTS", "PIN_HOLES")),
+            "station_nominal": (_from_a1(_x, _station_places), ("SPOTS", "PIN_HOLES")),
             "parent": ("pin_hole_a1", ("PIN_HOLES",)),
-            "height": (limits(round(_y, 2), 2), ("SPOTS",)),
+            "height": (_limits(_y, _height_places), ("SPOTS",)),
         },
-        precision={"dia": 2, "angle_deg": 0, "station": 2, "height": 2},
+        precision={
+            "dia": _SPOT_DIA_PLACES,
+            "angle_deg": 0,
+            "station": _station_places,
+            "height": _height_places,
+        },
     )
 
-# (stem, points, thread, tap drill, spec name, station places)
+# (stem, points, thread, tap drill, spec name, station places, height places)
 _TAPS = (
     (
         "cr_tap",
@@ -422,7 +455,8 @@ _TAPS = (
         part_spec.CR_THREAD,
         part_spec.CR_TAP_DRILL,
         "CR_SPEC",
-        2,
+        part_spec.DRAWING_PRECISION_BY_NAME["CrX"],
+        part_spec.DRAWING_PRECISION_BY_NAME["CrY"],
     ),
     (
         "riser_tap",
@@ -431,17 +465,21 @@ _TAPS = (
         part_spec.RISER_TAP_DRILL,
         "RISER_SPEC",
         part_spec.RISER_STATION_PLACES,
+        part_spec.RISER_STATION_PLACES,
     ),
     (
+        # On the tap axis: HubX's extension line is their X station.
         "lever_tap",
         part_spec.LEVER_HOLES,
         part_spec.LEVER_THREAD,
         part_spec.LEVER_TAP_DRILL,
         "LEVER_SPEC",
-        2,
+        _STATION_PLACES,
+        part_spec.DRAWING_PRECISION_BY_NAME["LeverY1"],
     ),
 )
-for _stem, _points, _thread, _drill, _spec_name, _places in _TAPS:
+for _stem, _points, _thread, _drill, _spec_name, _places, _y_places in _TAPS:
+    _drill_printed = _printed(_drill, _CALLOUT_PLACES)
     for _index, (_x, _y) in enumerate(_points, start=1):
         requirement(
             f"{_stem}_{_index}",
@@ -454,21 +492,21 @@ for _stem, _points, _thread, _drill, _spec_name, _places in _TAPS:
                 "thread": (f"{_thread} UNC-2B", (_spec_name,)),
                 "tap_drill_mm": (_drill, (_spec_name,)),
                 "dia": (
-                    limits(round(_drill, 2), 2, part_spec.DRILLED_BAND),
+                    limits(_drill_printed, _CALLOUT_PLACES, _DRILLED),
                     (_spec_name, "DRILLED_BAND"),
                 ),
-                "dia_nominal": (round(_drill, 2), (_spec_name,)),
+                "dia_nominal": (_drill_printed, (_spec_name,)),
                 "thru": (True, (_spec_name,)),
                 "station": (
-                    limits(_from_a1(_x, _places), _places),
+                    _limits(_x - _A1[0], _places),
                     (_spec_name, "PIN_HOLES"),
                 ),
                 "station_nominal": (_from_a1(_x, _places), (_spec_name, "PIN_HOLES")),
                 "parent": ("pin_hole_a1", ("PIN_HOLES",)),
-                "height": (limits(round(_y, _places), _places), (_spec_name,)),
-                "height_nominal": (round(_y, _places), (_spec_name,)),
+                "height": (_limits(_y, _y_places), (_spec_name,)),
+                "height_nominal": (_printed(_y, _y_places), (_spec_name,)),
             },
-            precision={"dia": 2, "station": _places, "height": _places},
+            precision={"dia": _CALLOUT_PLACES, "station": _places, "height": _y_places},
         )
 
 
@@ -994,7 +1032,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter.currentModel, ("Revision", "Title", *required), required=required
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -1085,6 +1127,9 @@ async def build(adapter: Any) -> dict[str, str]:
             edge=_circle_edge(adapter, top, drill, label, center_x_mm=x, center_y_mm=y),
         )
         _strip_thread_class(callout, label=f"{label} callout", thread=thread)
+        set_hole_callout_precision(
+            callout, TAP_CALLOUT_PRECISION, label=f"{label} callout"
+        )
         if function is not None:
             _append_callout_below(callout, function, label=f"{label} callout")
 
