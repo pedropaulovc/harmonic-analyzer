@@ -67,7 +67,6 @@ import ch_rocker_arm_tl_oblique_carrier_spec as part_spec
 from _feature_requirements import part_metadata, requirement
 from _part_properties import part_drawing_unit
 from _printed_limits import limits
-from _printed_tolerance import printed_deviations
 from _gtol_cone import ConeFace
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -295,8 +294,7 @@ _DRILLED = part_spec.DRILLED_BAND
 def _limits(model: float, places: int) -> list[float]:
     """A general-band dimension's acceptance limits on the inch sheet: the
     title block's band about the value printed at ``places``."""
-    low, high = printed_deviations(model, places, unit=_UNIT)
-    return limits(model, places, (high, low))
+    return limits(model, places, unit=_UNIT)
 
 
 def _printed(model: float, places: int) -> float:

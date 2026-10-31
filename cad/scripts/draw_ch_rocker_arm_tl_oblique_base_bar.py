@@ -64,7 +64,7 @@ from _surface_finish import SEAT_UM, surface_finish_by_key
 from _printed_limits import limits
 from _part_properties import part_drawing_unit
 from _supplier_dimensions import supplier_reference_dimension
-from _printed_tolerance import drilled_oversize_mm, printed_deviations
+from _printed_tolerance import drilled_oversize_mm
 from ch_rocker_arm_tl_oblique_base_bar_spec import (
     BAR_LENGTH,
     BAR_THICK,
@@ -405,8 +405,7 @@ _UNIT = part_spec.UNIT
 def _limits(model: float, places: int) -> list[float]:
     """A general-band dimension's acceptance limits on the inch sheet: the
     title block's band about the value printed at ``places``."""
-    low, high = printed_deviations(model, places, unit=_UNIT)
-    return limits(model, places, (high, low))
+    return limits(model, places, unit=_UNIT)
 
 
 def _printed(model: float, places: int) -> float:
