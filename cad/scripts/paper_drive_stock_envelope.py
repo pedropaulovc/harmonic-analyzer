@@ -48,23 +48,39 @@ def _ground_branches(profile: StockFormProfile) -> tuple[tuple[str, float, float
     return tuple(branch for branch in branches if branch[2] > branch[1])
 
 
+# The integrator below runs these two helpers millions of times per spec
+# import, so they avoid builtin max/min calls and per-call closures. Each
+# ``x if x > 0.0 else 0.0`` is exactly ``max(0.0, x)`` (``-0.0`` and NaN give
+# 0.0 either way), ``b if b < a else a`` is ``min(a, b)`` and ``b if b > a
+# else a`` is ``max(a, b)``; every float operation is the same, in the same
+# order, as the builtin form.
+
+
+def _primitive(rho: float, q: float, d: float) -> float:
+    """The circular-cap XZ-area primitive at ``d`` (see ``_cap_measure``)."""
+    v = rho * rho - d * d
+    ratio = d / rho
+    return 0.5 * (
+        d * math.sqrt(v if v > 0.0 else 0.0)
+        + rho * rho * math.asin(ratio if ratio < 1.0 else 1.0)
+    ) - q * d
+
+
 def _cap_measure(rho: float, q: float, d0: float, d1: float | None) -> float:
     """Exact XZ area (or X length when d1 is None) at one positive Y."""
     if q >= rho or d0 >= rho:
         return 0.0
     if d1 is None:
-        return max(0.0, math.sqrt(max(0.0, rho * rho - d0 * d0)) - q)
-    end = min(d1, math.sqrt(max(0.0, rho * rho - q * q)))
+        v = rho * rho - d0 * d0
+        length = math.sqrt(v if v > 0.0 else 0.0) - q
+        return length if length > 0.0 else 0.0
+    v = rho * rho - q * q
+    reach = math.sqrt(v if v > 0.0 else 0.0)
+    end = reach if reach < d1 else d1
     if end <= d0:
         return 0.0
-
-    def primitive(d: float) -> float:
-        return 0.5 * (
-            d * math.sqrt(max(0.0, rho * rho - d * d))
-            + rho * rho * math.asin(min(1.0, d / rho))
-        ) - q * d
-
-    return max(0.0, primitive(end) - primitive(d0))
+    area = _primitive(rho, q, end) - _primitive(rho, q, d0)
+    return area if area > 0.0 else 0.0
 
 
 def _endcut_integral_bounds(
@@ -112,6 +128,20 @@ def _endcut_integral_bounds(
     point_error = max(ground.geometry_error_bound_mm, 256 * math.ulp(axis))
     measure_error = 256 * math.ulp(axis ** (1 if d1 is None else 3))
 
+    def stock_bounds(
+        radius: float, y_min: float, y_max: float, rho_min: float, rho_max: float
+    ) -> tuple[float, float]:
+        if radius == 0.0 or y_min >= radius:
+            return 0.0, 0.0
+        v = radius * radius - y_min * y_min
+        xmax = math.sqrt(v if v > 0.0 else 0.0)
+        v = radius * radius - y_max * y_max
+        xmin = math.sqrt(v if v > 0.0 else 0.0)
+        lower = _cap_measure(rho_min, axis - xmin + point_error, d0, d1)
+        upper = _cap_measure(rho_max, axis - xmax - point_error, d0, d1)
+        lower -= measure_error
+        return (lower if lower > 0.0 else 0.0), upper + measure_error
+
     def cell(
         point0: tuple[float, float], point1: tuple[float, float]
     ) -> tuple[float, float]:
@@ -119,28 +149,21 @@ def _endcut_integral_bounds(
         x1, y1 = point1
         if y1 < y0:
             raise ValueError("finite ground branch reverses its Y direction")
-        y_min, y_max = max(0.0, y0 - point_error), y1 + point_error
-        rho_min = axis - max(x0, x1) - point_error
-        rho_max = axis - min(x0, x1) + point_error
-
-        def stock_bounds(radius: float) -> tuple[float, float]:
-            if radius == 0.0 or y_min >= radius:
-                return 0.0, 0.0
-            xmax = math.sqrt(max(0.0, radius * radius - y_min * y_min))
-            xmin = math.sqrt(max(0.0, radius * radius - y_max * y_max))
-            lower = _cap_measure(rho_min, axis - xmin + point_error, d0, d1)
-            upper = _cap_measure(rho_max, axis - xmax - point_error, d0, d1)
-            return max(0.0, lower - measure_error), upper + measure_error
-
-        outer_lo, outer_hi = stock_bounds(outer_radius)
-        inner_lo, inner_hi = stock_bounds(inner_radius)
-        lower = max(0.0, outer_lo - inner_hi)
-        upper = max(0.0, outer_hi - inner_lo)
+        y_min = y0 - point_error
+        y_min = y_min if y_min > 0.0 else 0.0
+        y_max = y1 + point_error
+        rho_min = axis - (x1 if x1 > x0 else x0) - point_error
+        rho_max = axis - (x1 if x1 < x0 else x0) + point_error
+        outer_lo, outer_hi = stock_bounds(outer_radius, y_min, y_max, rho_min, rho_max)
+        inner_lo, inner_hi = stock_bounds(inner_radius, y_min, y_max, rho_min, rho_max)
+        lower = outer_lo - inner_hi
+        lower = lower if lower > 0.0 else 0.0
+        upper = outer_hi - inner_lo
+        upper = upper if upper > 0.0 else 0.0
         width = y1 - y0
-        return (
-            max(0.0, lower * max(0.0, width - 2 * point_error)),
-            upper * (width + 2 * point_error),
-        )
+        shrunk = width - 2 * point_error
+        lower = lower * (shrunk if shrunk > 0.0 else 0.0)
+        return (lower if lower > 0.0 else 0.0), upper * (width + 2 * point_error)
 
     # Endpoint points belong to this invocation and branch, never a shared cache.
     pending: list[
