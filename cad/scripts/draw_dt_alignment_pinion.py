@@ -41,7 +41,9 @@ from _drawing_finish import add_surface_finish
 from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note, property_link
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_tolerances import _tolerance_places
 from _drawing_view_display import set_hidden_lines_removed
+from _fit_deviations import deviations
 from _gear_drawing_entities import visible_circle_edge
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
@@ -55,6 +57,7 @@ from dt_alignment_pinion_spec import (
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     OUTSIDE_DIA,
+    OUTSIDE_DIA_BAND,
     OUTSIDE_DIA_CALLOUT,
     SURFACE_FINISHES,
     TEETH,
@@ -189,12 +192,14 @@ def _verify_title_material_specification(
         )
 
 
-def _assert_tolerance_places(adapter: Any, annotations: list[Any], name: str) -> None:
-    """Read back that a band imported at its nominal's places (+0.10 / 0.00).
+def _assert_tolerance_places(
+    adapter: Any, annotations: list[Any], name: str, places: int
+) -> None:
+    """Read back that a band imported at the places the part authored.
 
-    The part builder authors the places (``set_dimension_bilateral_tolerance``
-    ``places=``); the sheet only verifies, so the .SLDPRT stays the one source
-    (Codex P1 on #1647).
+    The part builder authors the places (``set_dimension_bilateral_tolerance``);
+    the sheet only verifies, so the .SLDPRT stays the one source (Codex P1 on
+    #1647).
     """
     matches = [
         annotation
@@ -207,7 +212,6 @@ def _assert_tolerance_places(adapter: Any, annotations: list[Any], name: str) ->
         matches[0], "IAnnotation", "GetSpecificAnnotation"
     )
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    places = DRAWING_PRECISION_BY_NAME[name]
     applied = int(display.GetPrimaryTolPrecision2())
     if applied != places:
         raise RuntimeError(
@@ -404,8 +408,19 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*front_annotations, *right_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    _assert_tolerance_places(adapter, front_annotations, "ArborBoreDia")
-    _assert_tolerance_places(adapter, right_annotations, "OutsideDia")
+    _assert_tolerance_places(
+        adapter,
+        front_annotations,
+        "ArborBoreDia",
+        DRAWING_PRECISION_BY_NAME["ArborBoreDia"],
+    )
+    # The inch tip band (0/-0.1016) prints at the four places it needs.
+    _assert_tolerance_places(
+        adapter,
+        right_annotations,
+        "OutsideDia",
+        _tolerance_places(*deviations(OUTSIDE_DIA_BAND), display_unit="mm"),
+    )
     _prefix_diameter_symbol(adapter, right_annotations, "OutsideDia")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to drum bore")
