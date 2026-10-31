@@ -15,13 +15,26 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import NumberFit, build_purchased_fastener_drawing
 from _supplier_pin_model import _cylinder_radii_mm
 from _supplier_screw_dimensions import annotate_supplier_screw, assert_supplier_screw
-from _supplier_screw_layout import supplier_screw_margins
+from _supplier_text_shelf import assert_supplier_shelves, shelve_supplier_text
 from _part_properties import part_drawing_unit
 import ch_rocker_arm_tl_vn_oblique_cl_dowel_spec as part
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_cl_dowel"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "1/4 X 1 ALLOY STEEL DOWEL PIN (ASME B18.8.2)"
+# Machinist review mr1 (rule 14): centred on their short spans, the texts ran
+# across their own witnesses and, for the 1 in length, over the pin. Each now
+# shelves past its outer witness: the diameter right of the Top circle, the
+# length left of its lane on the Front. Front and Top reserve the same
+# left/right space so the fit keeps them on one projection line.
+SHELVES = {
+    "SupplierDowelDiameter": (True, "right"),
+    "SupplierDowelLength": (False, "left"),
+}
+SUPPLIER_MARGINS = {
+    "*Top": (0.070, 0.026, 0.065, 0.020),
+    "*Front": (0.070, 0.020, 0.065, 0.020),
+}
 
 
 def _assert_supplier_bands(displays: dict[str, Any]) -> None:
@@ -66,6 +79,7 @@ async def build(adapter: Any) -> dict[str, str]:
             units=part.SUPPLIER_REFERENCE_UNITS,
         )
         _assert_supplier_bands(displays)
+        stations = shelve_supplier_text(adapter, displays, SHELVES)
 
         def assert_references() -> None:
             fresh = assert_supplier_screw(
@@ -76,6 +90,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 units=part.SUPPLIER_REFERENCE_UNITS,
             )
             _assert_supplier_bands(fresh)
+            assert_supplier_shelves(adapter, fresh, SHELVES, stations)
             model = _early_bound(views["*Front"], "IView").ReferencedDocument
             radii = _cylinder_radii_mm(model, 1, label=part.SKU)
             if not math.isclose(2.0 * max(radii), part.DIA, rel_tol=0.0, abs_tol=1e-6):
@@ -93,11 +108,7 @@ async def build(adapter: Any) -> dict[str, str]:
     return await build_purchased_fastener_drawing(
         adapter, SPEC, item=ITEM, number_fit=NumberFit.SHRINK_TO_CELL,
         supplier_dimensions=supplier_dimensions,
-        supplier_margins=supplier_screw_margins(
-            part.SUPPLIER_REFERENCE_DIMENSIONS,
-            planes=part.SUPPLIER_REFERENCE_PLANES,
-            sides=part.SUPPLIER_REFERENCE_SIDES,
-        ),
+        supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_supplier_dimensions,),
         supplier_data=part.SUPPLIER_DATA,
         unit=part_drawing_unit("ch-rocker-arm-tl-vn-oblique-cl-dowel"),
