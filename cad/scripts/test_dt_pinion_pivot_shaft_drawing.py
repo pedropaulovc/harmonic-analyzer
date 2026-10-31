@@ -116,11 +116,12 @@ def test_linked_notes_are_few_and_carry_no_dimension_or_general_tolerance() -> N
         ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_BAND)",
     }
-    # U27: the lengths read the title-block .X band, not a tight tolerance.
+    # U27: the lengths read the title-block band, not a tight tolerance (#290:
+    # .XX, the row the rig's stacks read).
     assert dt_pinion_pivot_shaft_spec.DRAWING_PRECISION == {
-        "ShaftProfile": {"ShaftDia": 2, "ShaftLength": 1},
-        "CapFrontProfile": {"CapFrontSag": 1, "CapFrontR": 1},
-        "PinHoleProfile": {"PinHoleDia": 2, "OverallLength": 1},
+        "ShaftProfile": {"ShaftDia": 4, "ShaftLength": 2},
+        "CapFrontProfile": {"CapFrontSag": 2, "CapFrontR": 2},
+        "PinHoleProfile": {"PinHoleDia": 4, "OverallLength": 2},
     }
     assert dt_pinion_pivot_shaft_spec.CROWN_CALLOUT == "BOTH ENDS"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -172,7 +173,9 @@ def test_set_pin_holes_print_only_size_and_the_match_drill() -> None:
         dt_pinion_pivot_shaft_spec.__file__
     ).read_text(encoding="utf-8")
     assert dt_pinion_pivot_shaft_spec.PIN_HOLE_DIA == 25.4 / 16.0
-    assert dt_pinion_pivot_shaft_spec.PIN_HOLE_BAND == (0.06, 0.0)
+    assert dt_pinion_pivot_shaft_spec.PIN_HOLE_BAND == pytest.approx(
+        (0.0025 * 25.4, 0.0)
+    )
 
 
 # The shared callout-placement helper (_drawing_annotation_extent), pinned

@@ -15,7 +15,9 @@ import _config
 import dt_cylinder_gear_shaft_spec as arbor
 
 from _fit_deviations import deviations
+from _fit_ream_slide import REAM_SLIDE
 from _gear_fit_limits import gear_tip_band_mm
+from _package_units import drawing_unit
 from _printed_tolerance import printed_deviations
 from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -23,6 +25,10 @@ from stock_form_cutter import CutterTemplate, StockFormProfile
 
 
 MM_PER_IN = 25.4
+
+# #290: the registry row's drawing_unit (in) is this sheet's unit; the bands,
+# places and roughness below are authored for it.
+UNIT = drawing_unit("parts/dt-cylinder-gear", _config.parts("dt-cylinder-gear"))
 
 # --- gear tooth system (build_dt_cylinder_gear.py / gear_train.yaml) ------------
 TEETH = int(_config.machine("gear_train", "cylinder_teeth"))
@@ -43,22 +49,33 @@ _SUPPORT_PROFILE = StockFormProfile(
     TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, CUTTER_RADIAL_TRANSLATION_MM
 )
 SUPPORT_OUTSIDE_DIA_MM = 2.0 * _SUPPORT_PROFILE.support_radius_max_mm
-WHOLE_DEPTH_PLACES = 3
-WHOLE_DEPTH_BAND = (0.05, 0.0)  # retained (upper, lower) plunge requirement
+# Inch places of the printed plunge (GEAR DATA): .0445.
+WHOLE_DEPTH_PLACES = 4
+WHOLE_DEPTH_BAND = (0.0508, 0.0)  # retained (upper, lower) plunge: +.002/0 in
 # A printed plunge can round upward by half its final decimal.  Pay that
-# plus the full depth band before choosing the native two-place blank.
+# plus the full depth band before choosing the native three-place inch blank.
 _DEPTH_SUPPORT_PROFILE = StockFormProfile(
     TEETH,
     CUTTER_TEMPLATE,
     PITCH_DIA / 2.0,
     CUTTER_RADIAL_TRANSLATION_MM
     - WHOLE_DEPTH_BAND[0]
-    - 0.5 * 10.0**-WHOLE_DEPTH_PLACES,
+    - 0.5 * 10.0**-WHOLE_DEPTH_PLACES * MM_PER_IN,
 )
 MAX_DEPTH_SUPPORT_OUTSIDE_DIA_MM = 2.0 * _DEPTH_SUPPORT_PROFILE.support_radius_max_mm
-OUTSIDE_DIA = math.floor(
-    (MAX_DEPTH_SUPPORT_OUTSIDE_DIA_MM - OUTSIDE_DIA_BAND[0]) * 100.0
-) / 100.0
+# The blank is the largest .001 in the depth-paid support allows (printed at
+# three places, so the print IS the model).
+OUTSIDE_DIA_PLACES = 3
+OUTSIDE_DIA = round(
+    math.floor(
+        (MAX_DEPTH_SUPPORT_OUTSIDE_DIA_MM - OUTSIDE_DIA_BAND[0])
+        / MM_PER_IN
+        * 10.0**OUTSIDE_DIA_PLACES
+    )
+    / 10.0**OUTSIDE_DIA_PLACES
+    * MM_PER_IN,
+    9,
+)
 STOCK_FORM = StockFormProfile(
     TEETH, CUTTER_TEMPLATE, OUTSIDE_DIA / 2.0, CUTTER_RADIAL_TRANSLATION_MM
 )
@@ -71,17 +88,25 @@ MAX_CUT_DEPTH_MM = STOCK_FORM.blank_radius_mm - STOCK_FORM.root_radius_min_mm
 PITCH_TOOTH_THICKNESS_MM = STOCK_FORM.pitch_tooth_thickness_mm
 
 # --- machinable blank (build_dt_cylinder_gear.py) ------------------------------
-BORE_DIAMETRAL_CLEARANCE_MM = (0.030, 0.070)  # (minimum, maximum), matched fit
-# Representative finished geometry at the midpoint of the matched running fit.
-# Manufacturing still matches every bore to the actual finished arbor.
-BORE_DIA = arbor.SHAFT_DIA + sum(BORE_DIAMETRAL_CLEARANCE_MM) / 2.0
-FACE_WIDTH = 3.0
+# #290: every gear is reamed interchangeable on the MHA-DT-13 arbor (SHAFT_H),
+# no longer bored to suit it: REAM_SLIDE's .3760-.3765 in, cut by the owned
+# .3760 over reamer and printed .3760 +.0005/.0000.
+BORE_DIA = round(arbor.SHAFT_DIA + REAM_SLIDE[1], 9)  # 9.5504, .3760
+BORE_DIA_BAND = (round(REAM_SLIDE[0] - REAM_SLIDE[1], 9), 0.0)  # (upper, lower)
+BORE_PLACES = 4
+# (minimum, maximum) diametral clearance on the arbor: .0010-.0023 in.
+BORE_DIAMETRAL_CLEARANCE_MM = (
+    round(BORE_DIA + BORE_DIA_BAND[1] - (arbor.SHAFT_DIA + arbor.SHAFT_DIA_BAND[0]), 9),
+    round(BORE_DIA + BORE_DIA_BAND[0] - (arbor.SHAFT_DIA + arbor.SHAFT_DIA_BAND[1]), 9),
+)
+FACE_WIDTH = 2.9972  # .118
 # Face width controls mesh engagement across the mating cone-gear family and,
 # with OVERALL_THICKNESS, the cam length the MHA-CH-03 rod ring rides in
 # (cylinder_bank_layout.SLOT_MIN) and the gear-0 pitch stack.
-FACE_WIDTH_TOLERANCE_MM = 0.05
-CAM_DIA = 30.6  # integral eccentric cam disc
-CAM_DIA_BAND = (0.0, -0.05)  # (upper, lower) deviations
+FACE_WIDTH_TOLERANCE_MM = 0.0508  # +/-.002 in
+CAM_DIA = 30.607  # 1.205, integral eccentric cam disc
+CAM_DIA_BAND = (0.0, -0.0508)  # (upper, lower) deviations: 0/-.002 in
+CAM_DIA_PLACES = 3
 # Solid stack (#743): the overall thickness, cam face to back face, IS the
 # channel station pitch (machine channels.station_pitch_mm, pinned by
 # test_cylinder_bank_layout), so neighbouring gears bear cam face on back face
@@ -91,36 +116,49 @@ CAM_DIA_BAND = (0.0, -0.05)  # (upper, lower) deviations
 # now stack about nominal and the 20-gear acceptance
 # (cylinder_bank_layout.STACK_L20_ACCEPT) passes first time. A long stack is
 # re-faced at fit-up; a short one gets its thinnest gear remade.
+# Exempt from the inch grid (#290): the station-pitch closure, 7.0565 mm, so
+# it prints .2778 at four places (0.4 um under the model).
 OVERALL_THICKNESS = 7.0565
-OVERALL_THICKNESS_BAND = (0.025, -0.025)  # (upper, lower) deviations
+OVERALL_THICKNESS_BAND = (0.0254, -0.0254)  # (upper, lower) deviations: +/-.0010 in
+OVERALL_THICKNESS_PLACES = 4
 CAM_THICKNESS = OVERALL_THICKNESS - FACE_WIDTH  # reference: the closed rod slot
+# Exempt from the inch grid (#290): the throw is the channel's measured
+# kinematic gain (dimensions.yaml ch. 13), 8.64 mm, printed .3402 at four
+# places (1.1 um over the model).
 ECCENTRICITY = 8.64  # cam axis offset from the bore axis
+ECCENTRICITY_PLACES = 4
 # The cam must merge wholly into the actual uncut web, not a fictitious
 # actual-N circular root blank.  The native builder checks this same margin.
 CAM_ROOT_WEB_MIN_MM = STOCK_FORM.root_radius_min_mm - (CAM_DIA / 2.0 + ECCENTRICITY)
 # Per-gear band only: error_budget.yaml cam_eccentricity books each channel's
 # throw independently, so no matched-set range is drawn (machinist review r1).
-ECCENTRICITY_TOLERANCE_MM = 0.025
-# Worst-case crescent wall between the bore and the cam OD, opposite the lobe:
-# smallest cam, largest throw, and the bore at its largest matched size (the
-# largest finished arbor plus the maximum diametral clearance).  Floored to
-# the printed 0.01.  Below the 2.0 mm target, above the 1.5 mm floor (rule
-# 17): printed as a plain fact (rule 20); pending owner ruling (#992).
-CAM_WALL_MIN_MM = (
+ECCENTRICITY_TOLERANCE_MM = 0.0254  # +/-.0010 in
+_CAM_DIA_LOWER = printed_deviations(
+    CAM_DIA, CAM_DIA_PLACES, deviations(CAM_DIA_BAND), unit=UNIT
+)[0]
+_ECC_UPPER = printed_deviations(
+    ECCENTRICITY,
+    ECCENTRICITY_PLACES,
+    (-ECCENTRICITY_TOLERANCE_MM, ECCENTRICITY_TOLERANCE_MM),
+    unit=UNIT,
+)[1]
+# Worst-case crescent wall between the bore and the cam OD, opposite the lobe,
+# at the printed limits: smallest cam, largest throw, largest bore.  Floored
+# to the printed .001 in.  Below the .080 in target, above the .060 in floor
+# (rule 17): printed as a plain fact (rule 20); pending owner ruling (#992).
+CAM_WALL_MIN_MM = round(
     math.floor(
         (
-            (CAM_DIA + CAM_DIA_BAND[1]) / 2.0
-            - (ECCENTRICITY + ECCENTRICITY_TOLERANCE_MM)
-            - (
-                arbor.SHAFT_DIA
-                + arbor.SHAFT_DIA_BAND[0]
-                + BORE_DIAMETRAL_CLEARANCE_MM[1]
-            )
-            / 2.0
+            (CAM_DIA + _CAM_DIA_LOWER) / 2.0
+            - (ECCENTRICITY + _ECC_UPPER)
+            - (BORE_DIA + BORE_DIA_BAND[0]) / 2.0
         )
-        * 100.0
+        / MM_PER_IN
+        * 1000.0
     )
-    / 100.0
+    / 1000.0
+    * MM_PER_IN,
+    9,
 )
 # Cam-lobe direction vs the alignment-notch centreline (the channel's phase
 # datum); error_budget.yaml cam_phase. Carried on the native NotchPhase
@@ -129,16 +167,16 @@ CAM_PHASE_TOLERANCE_DEG = 0.25
 # The kerf is a sighted phase mark, engaged by nothing (no pin, gauge or
 # mating part), so no lower limit carries a function.  Its one functional
 # limit is the maximum: where the flanks meet the root the stock tooth gap is
-# just over 0.41 wide, so a wider kerf nicks both neighbouring teeth (the old
-# +0.10/0 band reached 0.50; machinist review e04fd60 r2/r3).  Printed as the
-# single limit "0.40 MAX": swTolMAX prints the nominal, so the modelled kerf
-# IS the limit and the band runs from nothing up to it.
-NOTCH_WIDTH = 0.4  # alignment saw-kerf
+# just over 0.41 mm wide, so a wider kerf nicks both neighbouring teeth (the
+# old +0.10/0 band reached 0.50; machinist review e04fd60 r2/r3).  Printed as
+# the single limit ".016 MAX": swTolMAX prints the nominal, so the modelled
+# kerf IS the limit and the band runs from nothing up to it.
+NOTCH_WIDTH = 0.4064  # .016 alignment saw-kerf
 NOTCH_WIDTH_BAND = (0.0, -NOTCH_WIDTH)  # (upper, lower): any saw up to the MAX
-NOTCH_WIDTH_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "0.40 MAX"
-# Its depth only has to reach below the tooth root, so it prints to the
-# title-block .X band.
-NOTCH_DEPTH = 3.0
+NOTCH_WIDTH_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints ".016 MAX"
+# Its depth only has to reach below the tooth root and clear the cam; the
+# title-block .XX row (a check reads it, so never .X).
+NOTCH_DEPTH = 3.048  # .12
 TIP_RADIUS = OUTSIDE_DIA / 2.0
 NOTCH_FLOOR_RADIUS = TIP_RADIUS - NOTCH_DEPTH
 NOTCH_MEAN_RADIUS = (NOTCH_FLOOR_RADIUS + TIP_RADIUS) / 2.0
@@ -163,12 +201,15 @@ SURFACE_FINISHES = (
         MACHINED_UM,
         CylinderFace(BORE_DIA),
         production_method="BORE",
+        display_unit=UNIT,
     ),
-    SurfaceFinishControl("cam_follower", MACHINED_UM, CylinderFace(CAM_DIA)),
+    SurfaceFinishControl(
+        "cam_follower", MACHINED_UM, CylinderFace(CAM_DIA), display_unit=UNIT
+    ),
 )
 
 # Marked model dimensions locate the blank, bore, cam, stacking thickness and
-# kerf. Bore diameter is a reference nominal with a finished-fit callout.
+# kerf.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     "GearBlankProfile": {"OutsideDia"},
@@ -180,21 +221,25 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`
 # ), so the MODEL owns them: build_dt_cylinder_gear applies this map to the
-# .SLDPRT and draw_dt_cylinder_gear only reads it back.  Three places where a
-# three-place band rides the dimension (the matched running bore's reference
-# nominal, the cam eccentricity, the +0.05/0 stacking thickness that sets
-# the station pitch); two where the band is a two-place one (cam OD, face
-# width, kerf width); one on the kerf depth. The existing cam-lobe phase is an
-# angle read to the tenth of a degree; the separate pattern locator is BASIC.
+# .SLDPRT and draw_dt_cylinder_gear only reads it back.  Inch places: four on
+# the reamed bore (its +.0005 band) and on the two kinematic values held to
+# +/-.0010 (the stacking thickness that IS the station pitch and the cam
+# throw); three where a +/-.002-class band rides the dimension (tooth tip, cam
+# OD, face width) and on the .016 MAX kerf; two (.XX) on the kerf depth.  The
+# cam-lobe phase is an angle read to the tenth of a degree; the separate
+# pattern locator is BASIC.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "GearBlank": {"FaceWidth": 2},
-    "GearBlankProfile": {"OutsideDia": 2},
-    "BoreProfile": {"BoreDia": 3},
-    "CamProfile": {"CamDia": 2, "CamCy": 3},
-    # Four places: 7.0565 is the station pitch, exact only at four (user
-    # ruling L20 d'); three would round one limit of the band inward.
-    "CamBoss": {"OverallThickness": 4},
-    "NotchProfile": {"NotchDepth": 1, "NotchWidth": 2, "NotchPhase": 1, "PatternNotchPhase": 0},
+    "GearBlank": {"FaceWidth": 3},
+    "GearBlankProfile": {"OutsideDia": OUTSIDE_DIA_PLACES},
+    "BoreProfile": {"BoreDia": BORE_PLACES},
+    "CamProfile": {"CamDia": CAM_DIA_PLACES, "CamCy": ECCENTRICITY_PLACES},
+    "CamBoss": {"OverallThickness": OVERALL_THICKNESS_PLACES},
+    "NotchProfile": {
+        "NotchDepth": 2,
+        "NotchWidth": 3,
+        "NotchPhase": 1,
+        "PatternNotchPhase": 0,
+    },
 }
 
 _PRECISION_NAMES = [
@@ -219,16 +264,10 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 
 # The one sheet-derived dimension: the parenthesised cam thickness (overall
 # less face width, #743), a read-only difference with no model dimension to
-# import.  Two places: it is the closed rod slot, and one place would print
-# 4.1 for the 4.0565 the ring runs in.  Its places are still specification,
-# so the sheet reads them here.
-DRAWING_REFERENCE_PRECISION: dict[str, int] = {"cam thickness reference": 2}
-
-
-def matched_bore_limits(finished_shaft_dia_mm: float) -> tuple[float, float]:
-    """Return finished bore MIN/MAX for the measured mating MHA-DT-13 arbor."""
-    minimum, maximum = BORE_DIAMETRAL_CLEARANCE_MM
-    return finished_shaft_dia_mm + minimum, finished_shaft_dia_mm + maximum
+# import.  Three places: it is the closed rod slot, and two would print .16
+# for the .1598 the ring runs in.  Its places are still specification, so the
+# sheet reads them here.
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {"cam thickness reference": 3}
 
 
 def outside_dia_limits_mm() -> tuple[float, float]:
@@ -237,15 +276,17 @@ def outside_dia_limits_mm() -> tuple[float, float]:
         OUTSIDE_DIA,
         DRAWING_PRECISION_BY_NAME["OutsideDia"],
         deviations(OUTSIDE_DIA_BAND),
+        unit=UNIT,
     )
     return round(OUTSIDE_DIA + lower, 12), round(OUTSIDE_DIA + upper, 12)
 
 
 def whole_depth_limits_mm() -> tuple[float, float]:
     """Accepted cutter plunge MIN/MAX from the actual printed process row."""
-    nominal = round(WHOLE_DEPTH, WHOLE_DEPTH_PLACES)
-    upper, lower = WHOLE_DEPTH_BAND
-    return round(nominal + lower, 12), round(nominal + upper, 12)
+    lower, upper = printed_deviations(
+        WHOLE_DEPTH, WHOLE_DEPTH_PLACES, deviations(WHOLE_DEPTH_BAND), unit=UNIT
+    )
+    return round(WHOLE_DEPTH + lower, 12), round(WHOLE_DEPTH + upper, 12)
 
 
 def manufacturing_corner_profiles() -> tuple[StockFormProfile, ...]:

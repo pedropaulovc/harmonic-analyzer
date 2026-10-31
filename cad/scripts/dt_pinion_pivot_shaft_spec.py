@@ -17,8 +17,10 @@ and the drawing in lockstep (``test_dt_pinion_pivot_shaft_drawing.py``).
 
 from __future__ import annotations
 
+import _config
 from _fit_shaft_h import SHAFT_H
 from _gtol_cylinder import CylinderFace
+from _package_units import drawing_unit
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 import dt_vn_pinion_strap_pin_spec as _strap_pin
 from pinion_rig_layout import (
@@ -26,6 +28,9 @@ from pinion_rig_layout import (
     TORQUE_SHAFT_PIN_HOLE_Z,
 )
 
+UNIT = drawing_unit(
+    "parts/dt-pinion-pivot-shaft", _config.parts("dt-pinion-pivot-shaft")
+)
 SHAFT_DIA = 6.35  # 1/4 in: rides both pivot blocks' east bores and the straps
 # Set back-flush with the back block's outer face; ruling (c) moved the front
 # block inboard to the front strap (pinion_rig_layout), 192 -> 182.0, then
@@ -33,30 +38,28 @@ SHAFT_DIA = 6.35  # 1/4 in: rides both pivot blocks' east bores and the straps
 # shortest shaft still bears 9.5 of the front block
 # (pinion_rig_layout.torque_shaft_bearing_stack).
 SHAFT_LEN = TORQUE_SHAFT_LEN
-CAP_SAG = 1.2  # shallow spherical crown height at each end
+CAP_SAG = 1.27  # .05; shallow spherical crown height at each end
 CAP_RADIUS = ((SHAFT_DIA / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
 SHAFT_DIA_BAND = SHAFT_H
-# U27 (Main, 2026-09-24): the length carries the title-block .X band (+/-0.8),
-# not a tight one.  Pinned to the straps (option E-a) the shaft rides the
-# cluster's end play (0.25 +/- 0.10): drilled back-flush at the back stop,
-# the longest shaft in the shortest stack stands at worst 7.52 proud of the
-# front block, 7.87 at the front stop with the SR crown apex at 9.07, and its
-# back end then sits 0.35 inside the back block, still bearing 10.04 of the
-# shallowest one past its flush setting
+# U27 (Main, 2026-09-24): the length carries the title-block band, not a
+# tight one (#290: .XX, since the rig's stacks read it).  Pinned to the straps
+# (option E-a) the shaft rides the cluster's end play (0.25 +/- 0.10): drilled
+# back-flush at the back stop, its back end then sits inside the back block,
+# still bearing the shallowest one's floor past its flush setting
 # (pinion_rig_layout.torque_shaft_back_bearing_stack).
 # Nothing stands on the shaft's axis past either block: the nearest body, the
 # MHA-DT-16 lever, rides the lift rod 18.63 off it -- hub 8.95 radial clear,
 # arm >= 12.42 clear over the -82 degree throw (test_dt_drive_train_support_layout::
 # test_torque_shaft_length_band_clears_both_ends).
 # Decimal places are the tolerance (drawing-guidelines.md rule 3).  The body
-# length, its crown height and the overall length read the title-block .X
-# band; the O.D. carries its running band at two places, the spring pin's
-# +0.06/0 hole band reads at two places too.  The crown's sphere radius is a
-# reference: the crown height on the toleranced diameter already fixes it.
+# length, its crown height and the overall length read the title-block .XX
+# row; the O.D. carries its running band and the spring pin's hole its
+# +.0025/0 band at four places.  The crown's sphere radius is a reference: the
+# crown height on the toleranced diameter already fixes it.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "ShaftProfile": {"ShaftDia": 2, "ShaftLength": 1},
-    "CapFrontProfile": {"CapFrontSag": 1, "CapFrontR": 1},
-    "PinHoleProfile": {"PinHoleDia": 2, "OverallLength": 1},
+    "ShaftProfile": {"ShaftDia": 4, "ShaftLength": 2},
+    "CapFrontProfile": {"CapFrontSag": 2, "CapFrontR": 2},
+    "PinHoleProfile": {"PinHoleDia": 4, "OverallLength": 2},
 }
 
 # Option E-a set pins (dt_vn_pinion_strap_pin_spec): one cross hole under each
@@ -65,7 +68,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 # assembly shows (pinion_rig_layout) -- so they sit at its strap mid-planes,
 # from the front end (local z 0).  The print
 # carries no station: the strap sets it at assembly, so a printed one would be
-# a second, conflicting specification on a shaft whose length floats +/-0.8.
+# a second, conflicting specification on a shaft whose length floats +/-.01.
 PIN_HOLE_DIA = _strap_pin.HOLE_DIA
 PIN_HOLE_BAND = _strap_pin.HOLE_BAND  # the spring pin's functional band
 PIN_HOLE_Z = TORQUE_SHAFT_PIN_HOLE_Z  # (front, back), pinion_rig_layout
@@ -84,7 +87,9 @@ PIN_HOLE_CALLOUT = "\n".join(
 )
 
 SURFACE_FINISHES = (
-    SurfaceFinishControl("bearing", MACHINED_UM, CylinderFace(SHAFT_DIA)),
+    SurfaceFinishControl(
+        "bearing", MACHINED_UM, CylinderFace(SHAFT_DIA), display_unit=UNIT
+    ),
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -104,7 +109,7 @@ OVERALL_LEN = SHAFT_LEN + 2.0 * CAP_SAG  # tip to tip, a reference
 
 # Part-specific facts a machinist cannot read off the views
 # (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
-# A 187 mm Ø6.35 bar is turned between centres; nothing bears on either
+# A 7.4 in long 1/4 in bar is turned between centres; nothing bears on either
 # crown's apex, so a centre hole there does no harm.
 DRAWING_NOTES = "CENTRES OK."
 # The isometric renders at ISO_SCALE (1, 2) while the sheet/title block reads
