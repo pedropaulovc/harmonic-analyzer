@@ -260,7 +260,7 @@ def _place_numeral_section_letters(adapter: Any, parent: Any, definition: Any) -
 
 
 def _assert_numeral_section_letters(parent: Any) -> None:
-    """Read the complete native marker envelope, including arrowhead widths."""
+    """Read the native marker envelope, including horizontal arrows' heights."""
     marker = tuple(float(value) for value in _early_bound(parent, "IView").GetSectionLineInfo2())
     if len(marker) < 3 or marker[0] != 1:
         raise RuntimeError("numeral G-G requires one native cutting-plane marker")
@@ -275,7 +275,9 @@ def _assert_numeral_section_letters(parent: Any) -> None:
         arrow = marker[offset + 9 * index:offset + 9 * (index + 1)]
         text = marker[offset + 18 + 3 * index:offset + 21 + 3 * index]
         if arrow[7] <= 0.0:
-            raise RuntimeError("numeral G-G native arrowhead width is missing")
+            raise RuntimeError("numeral G-G native arrowhead height is missing")
+        # GetSectionLineInfo2's index 7 is ArrowHeight: the transverse
+        # vertical extent of these horizontal arrows, not ArrowWidth (6).
         arrow_top = max(arrow[1], arrow[4]) + arrow[7] / 2.0
         if text[1] - height - arrow_top < NUMERAL_SECTION_LETTER_CLEARANCE:
             raise RuntimeError(f"numeral G-G letter {index + 1} overlaps its arrowhead")

@@ -305,7 +305,7 @@ def test_native_section_letters_clear_both_unchanged_arrowheads(monkeypatch, def
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *args, **kwargs: None)
     text_format = SimpleNamespace(CharHeight=0.00635)
     # Native 308e5a1a8 marker: letter tops 5.004 mm above the shafts;
-    # the PDF's filled arrowhead width is 3 mm.
+    # the PDF's horizontal filled arrowheads have a 3 mm vertical height.
     arrows = [
         [0.1572622, y, 0.0, 0.1452622, y, 0.0, 0.006, 0.003, 0.0]
         for y in (0.2580005, 0.2419995)
