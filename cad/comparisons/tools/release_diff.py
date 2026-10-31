@@ -202,6 +202,20 @@ def geometry_key(key):
     return key.lower()
 
 
+def _native_occurrence_stem(key, mapping):
+    """The known stem ``key`` names as ``<stem>-<ordinal>``, else ``None``.
+
+    Digits contain no ``-``, so only the text before the last ``-`` can be such
+    a stem; one lookup replaces a regex per known stem (hundreds of patterns,
+    more than ``re``'s compile cache holds)."""
+    stem, separator, ordinal = key.rpartition("-")
+    if not separator or not re.fullmatch(r"\d+", ordinal):
+        return None
+    if stem in mapping.aliases or stem in mapping.shared_groups:
+        return stem
+    return None
+
+
 def canonical_keys(key, mapping, *, drawing=False):
     """Project geometry keys, never reinterpret occurrence ordinals as mesh keys.
 
@@ -209,8 +223,7 @@ def canonical_keys(key, mapping, *, drawing=False):
     covers only the declared active configuration. Other qualifiers stay exact.
     """
     key = geometry_key(key)
-    known = mapping.aliases.keys() | mapping.shared_groups.keys()
-    if any(re.fullmatch(re.escape(stem) + r"-\d+", key) for stem in known):
+    if _native_occurrence_stem(key, mapping) is not None:
         raise ValueError(f"native occurrence request is not a geometry mesh key: {key!r}")
     stem, suffix = split_mesh_key(key)
     group = mapping.shared_groups.get(stem)
