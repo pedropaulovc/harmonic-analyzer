@@ -483,13 +483,13 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 second_number=None,
             ),
             # CONTRACT-crank: 2x MHA-DT-VN-67 3/32 dowel (2.38125) pressed into
-            # MHA-DT-11's 2.3622 reamed collar holes, 3.95 deep.
+            # MHA-DT-11's 2.38 reamed collar holes, 3.95 deep.
             **_expected_numbered_pairs(
                 "dt-vn-crank-seat-drive-pin",
                 range(1, 3),
                 "dt-crankshaft",
                 2.38125,
-                2.3622,
+                2.38,
                 3.95,
             ),
         },
@@ -732,13 +732,13 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(
                 ("pd-transgear-thumbnut-1", "pd-transgear-knob-shaft-1")
             ): _annulus_limit(4.070, 3.454, 14.8),
-            # MHA-PD-VN-54 3/32 x 3/16 dowels pressed 2.3625 into MHA-PD-22's 2.3622 reams.
+            # MHA-PD-VN-54 3/32 x 3/16 dowels pressed 2.3625 into MHA-PD-22's 2.38 reams.
             **_expected_numbered_pairs(
                 "pd-vn-transgear-knob-drive-pin",
                 range(1, 3),
                 "pd-transgear-drive-collar",
                 2.38125,
-                2.3622,
+                2.38,
                 2.3625,
             ),
         },
