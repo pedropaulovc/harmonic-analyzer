@@ -24,7 +24,7 @@ import math
 
 import _config
 import cone_line
-from cone_pitch import GEAR_FACE_WIDTH_BAND
+from gear_face_band import GEAR_FACE_WIDTH_BAND
 import cone_shaft_land_bands
 import gear_seat_fit
 from _package_units import drawing_unit
