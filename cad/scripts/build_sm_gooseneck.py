@@ -291,7 +291,7 @@ def _author_reference_dimensions(adapter) -> None:
 
 async def _tube_od_reference(adapter) -> list[tuple[str, str]]:
     """The tube's stock Ø on the elevation, as a reference: a hidden Front-plane
-    sketch whose construction line runs along the bare leg's right silhouette,
+    sketch whose line runs along the bare leg's right silhouette,
     TUBE_OD_REF_SPAN about mid-way between the sleeve's top and the bend's entry
     tangent, Ø-dimensioned from a centreline on the leg axis.  Returns the
     deferred drive jobs."""
@@ -313,7 +313,6 @@ async def _tube_od_reference(adapter) -> list[tuple[str, str]]:
         )
     finally:
         set_sketch_direct_db(adapter, False)
-    _construction(adapter, edge, "tube OD reference")
     for line in (axis, edge):
         check(
             f"tube OD reference vertical {line}",
@@ -337,6 +336,9 @@ async def _tube_od_reference(adapter) -> list[tuple[str, str]]:
         "tube OD reference span",
     )
     dims.record("TubeOdRefSpan")
+    # The outline stays a solid line: SolidWorks makes a centreline-to-
+    # construction-line dimension plain linear, not diametric (farm run
+    # 20261031T205208603Z).  The sketch feeds no feature and is blanked.
     await add_diametric_linear_dimension(
         adapter, axis, edge, (TUBE_DIA / 2.0 + 4.0, TUBE_OD_REF_Y), "TubeOdRef"
     )
