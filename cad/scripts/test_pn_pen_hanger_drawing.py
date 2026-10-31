@@ -58,10 +58,10 @@ def test_screw_hole_and_nut_fit_all_four_tapered_strap_edges() -> None:
     assert min(distances) == pytest.approx(5.0)
     assert min(distances) == pytest.approx(spec.SCREW_HOLE_EDGE_DISTANCE)
     assert spec.NUT_ACROSS_FLATS / 2.0 < min(distances)
-    # Rule 17 at the printed worst case: the .XXX station (.268 printed for the
-    # bar's 6.8 mm axis offset, +/-.005) and the drilled hole's upper limit
-    # (title block +.004).
-    station = 0.268 * 25.4 - 6.8 + 0.005 * 25.4
+    # Rule 17 at the printed worst case: the .XX station (.20 printed for the
+    # bar's 5.0 mm axis offset, the larger rounding of the two, +/-.01) and
+    # the drilled hole's upper limit (title block +.004).
+    station = 0.20 * 25.4 - 5.0 + 0.01 * 25.4
     assert spec.SCREW_HOLE_WALL_MIN == pytest.approx(
         5.0 - station - (4.572 + 0.004 * 25.4) / 2.0
     )

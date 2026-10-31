@@ -37,15 +37,15 @@ def _engagements(stud_length: float, head_height: float) -> list[float]:
 
 def test_stud_set_from_its_measured_length_holds_engagement_at_both_extremes() -> None:
     # Code review C05: the head top is set the stud's measured length less the
-    # nominal engagement. The stud prints 1.024 (.XXX about the 26.0 closure)
-    # and the rod tap's full thread .177 (.XXX, ±.005).
+    # nominal engagement. The stud prints 1.02 (.XX about the 26.0 closure)
+    # and the rod tap's full thread .18 (.XX, ±.01).
     floor = 1.5 * THREAD_MAJOR_MM[stud.THREAD]
     depth = rod.STUD_TAP_SPEC.overrides_mm["ThreadDepth"] - printed_band_mm(
-        3, unit=rod.UNIT
+        2, unit=rod.UNIT
     )
-    assert depth == pytest.approx(spec.TAP_THREAD_DEPTH_MIN) == pytest.approx(4.3688)
+    assert depth == pytest.approx(spec.TAP_THREAD_DEPTH_MIN) == pytest.approx(4.318)
     shortest, longest = spec.STUD_LENGTH_EXTREMES
-    low, high = printed_deviations(stud.OVERALL_LENGTH, 3, unit=stud.UNIT)
+    low, high = printed_deviations(stud.OVERALL_LENGTH, 2, unit=stud.UNIT)
     assert (shortest, longest) == pytest.approx(
         (stud.OVERALL_LENGTH + low, stud.OVERALL_LENGTH + high)
     )

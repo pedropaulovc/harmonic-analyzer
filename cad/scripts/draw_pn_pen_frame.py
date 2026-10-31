@@ -11,7 +11,8 @@ size is a native associative dimension marked on the part
 (``pn_pen_frame_spec``): the front view carries the outer envelope, the
 window's size, its lower-left corner from the left and bottom faces and the
 4X window-corner radius; the bottom view, looking up at the tapped rail,
-carries the depth, the hole's two coordinates from the outer faces and the
+carries the depth, the hole's two coordinates from the outer faces (the
+three-place depth station naming what it holds below its value) and the
 hole's native Hole Wizard callout.  No datums, no frames (drawing-guidelines.md
 rule 5), no note block.  The sheet runs 2:1 in decimal inch (the part's
 ``drawing_unit: in``); the isometric stays 2:1.
@@ -43,7 +44,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import scan_view_edges
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
@@ -57,6 +58,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from pn_pen_frame_spec import (
+    DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FRAME_DEPTH,
@@ -161,9 +163,6 @@ CORNER_ARC_CENTER_XY = _front_xy(
 #   arc's 0-90 deg span), crossing only the ring's right face.
 # - The 40.0 height moves 30 mm right (was 16) to leave that text 6 mm clear
 #   of its dimension line.
-# Bottom view: the hole's X coordinate below, its Z coordinate left, the depth
-# right; the hole callout stands above-right, between the bottom view and the
-# front view's height dimension.
 FRONT_KEEP = {
     "OuterSpanX": (FRONT_CENTER[0], FRONT_TOP_Y + 0.014),
     "OuterHeightDim": (FRONT_RIGHT_X + 0.030, FRONT_CENTER[1]),
@@ -173,9 +172,16 @@ FRONT_KEEP = {
     "LeftWall": (FRONT_LEFT_X - 0.012, FRONT_BOTTOM_Y - 0.017),
     "WindowCornerR": (FRONT_RIGHT_X + 0.014, FRONT_TOP_Y - 0.006),
 }
+# Bottom view: the hole's X coordinate below, its Z coordinate left, the depth
+# right; the hole callout stands above-right, between the bottom view and the
+# front view's height dimension.  The .155 carries two callout rows under it
+# (CENTERED / .080 MIN TAP WALL, ~47 mm wide), so it stands 29 mm left of the
+# view: the block's right end ~5 mm clear of the .55's left extension line
+# (x 0.087, dropping from the view), its rows above the view note (y 0.072)
+# and well under the front view's .16 (y 0.128).
 BOTTOM_KEEP = {
     "ScrewX": (_bottom_xy(OUTER_WIDTH / 4.0, 0.0)[0], BOTTOM_LOW_Y - 0.010),
-    "ScrewZ": (BOTTOM_LEFT_X - 0.010, _bottom_xy(0.0, FRAME_DEPTH / 4.0)[1]),
+    "ScrewZ": (BOTTOM_LEFT_X - 0.029, _bottom_xy(0.0, FRAME_DEPTH / 4.0)[1]),
     "Depth": (BOTTOM_RIGHT_X + 0.016, BOTTOM_CENTER[1]),
 }
 # The one printed fillet stands for all four equal window corners.  A custom
@@ -290,6 +296,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
 
     if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the bottom view")

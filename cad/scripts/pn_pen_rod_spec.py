@@ -62,10 +62,13 @@ STUD_TAP_SPEC = HoleSpec(
     "tapped",
     STUD_THREAD,
     end="blind",
-    depth_mm=5.9944,  # .236
-    overrides_mm={"ThreadDepth": 4.4958},  # .177
+    depth_mm=6.096,  # .24
+    overrides_mm={"ThreadDepth": 4.572},  # .18
 )
 STUD_TAP_DRILL_DIA = TAP_DRILL_MM[STUD_THREAD]
+# The tap callout prints both depths at the title block's .XX (the drill's Ø
+# stays .XXX, a drilled size under DRILLED HOLES).
+STUD_TAP_DEPTH_PLACES = 2
 # The stud threads this far into the tap (rule 18: >= 1.5 D full thread):
 # the centre of the measured-length setting band (pn_pen_assembly_spec,
 # code review C05), which stays short of the thread depth the tap's printed
