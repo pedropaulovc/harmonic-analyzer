@@ -108,15 +108,16 @@ def test_modified_bolt_nominals_and_inspection_are_separate() -> None:
 
 
 def test_title_block_chamfer_band_leads_into_the_tap_inside_one_pitch() -> None:
-    # Native radial leg .030 under the title block's .XXX +/-.005, at its
+    # Native radial leg .03 under the title block's .XX +/-.01, at its
     # 45 +/-1 degrees.
-    assert bolt.CHAMFER_WIDTH_TOLERANCE == printed_band_mm(3, unit="in") == pytest.approx(0.127)
+    assert bolt.CHAMFER_WIDTH_TOLERANCE == printed_band_mm(2, unit="in") == pytest.approx(0.254)
+    assert bolt.DIMENSION_PRECISION["ChamferWidth"] == 2
     assert (bolt.CHAMFER_WIDTH_MIN, bolt.CHAMFER_WIDTH_MAX) == pytest.approx(
-        (0.635, 0.889)
+        (0.508, 1.016)
     )
     assert bolt.CHAMFER_ANGLE_TOLERANCE == angular_band_deg() == 1.0
     steepest = math.radians(bolt.CHAMFER_ANGLE + bolt.CHAMFER_ANGLE_TOLERANCE)
-    assert bolt.CHAMFER_AXIAL_MAX == pytest.approx(0.889 * math.tan(steepest))
+    assert bolt.CHAMFER_AXIAL_MAX == pytest.approx(1.016 * math.tan(steepest))
     # Inside the one incomplete pitch the worst engagement already charges:
     # reach MIN 8.77 - 1 P = 7.7117 >= 1.5D = 7.239.
     assert bolt.CHAMFER_AXIAL_MAX <= bolt.INCOMPLETE_TIP_LEN_MAX == bolt.PITCH
@@ -125,9 +126,10 @@ def test_title_block_chamfer_band_leads_into_the_tap_inside_one_pitch() -> None:
     tip_loss = max(bolt.CHAMFER_AXIAL_MAX, bolt.INCOMPLETE_TIP_LEN_MAX)
     assert asm.HANGER_REACH_MIN - tip_loss >= floor
     # The smallest leg still takes the cut thread start inside the mount's
-    # #25 tap drill (tip flat 3.556 < 3.797).
+    # #25 tap drill on the largest 2A major .1890 (tip flat 3.7846 < 3.797).
+    assert bolt.SHANK_DIA_MAX == pytest.approx(4.8006)
     tap_drill = TAP_DRILL_MM[bolt.THREAD]
-    assert bolt.SHANK_DIA - 2 * bolt.CHAMFER_WIDTH_MIN < tap_drill
+    assert bolt.SHANK_DIA_MAX - 2 * bolt.CHAMFER_WIDTH_MIN < tap_drill
     assert "1 PITCH MAX" in bolt.DIMENSION_CALLOUTS["ThreadLengthMin"]
     assert bolt.CATALOG_LENGTH - bolt.LENGTH > bolt.PITCH
 
@@ -293,9 +295,9 @@ def test_native_controls_are_owned_and_printed_without_precision_rewrites() -> N
     assert set(bolt_drawing.FRONT_KEEP) == set(bolt_drawing.EXPECTED_CONTROLS) | {
         bolt_drawing.REFERENCE_CONTROL
     }
-    # The leg prints .030 under the title block's .XXX row (swTolGeneral).
+    # The leg prints .03 under the title block's .XX row (swTolGeneral).
     assert bolt_drawing.EXPECTED_CONTROLS["ChamferWidth"] == pytest.approx(
-        (0.000762, -0.000127, 0.000127)
+        (0.000762, -0.000254, 0.000254)
     )
     assert bolt.DIMENSION_TOLERANCE_TYPES["ChamferWidth"] == 11
     # MHA-SM-00 cuts the length at assembly: the driving CutLength prints
@@ -699,7 +701,7 @@ def test_purchased_note_is_a_consumed_native_part_property(monkeypatch):
     # The leg and its angle keep the title block's bands natively.
     leg = tolerances[("StockDeburrProfile", "ChamferWidth")]
     assert leg.Type == 11
-    assert (leg.GetMinValue(), leg.GetMaxValue()) == pytest.approx((-0.000127, 0.000127))
+    assert (leg.GetMinValue(), leg.GetMaxValue()) == pytest.approx((-0.000254, 0.000254))
     angle = tolerances[("StockDeburrProfile", "ChamferAngle")]
     assert angle.Type == 11
     band = math.radians(angular_band_deg())
