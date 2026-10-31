@@ -272,6 +272,20 @@ def load_schema() -> dict[str, Any]:
     return json.loads(SCHEMA_FILE.read_text(encoding="utf-8"))
 
 
+def judge_schema_bytes(findings: Sequence[dict[str, Any]]) -> bytes:
+    """The judge schema with `member_ids` restricted to the submitted finding ids.
+
+    A judge once grouped r1/r2.clarity.4 with a nonexistent r3.clarity.4 on
+    both attempts. With the ids enumerated, the prompt lists them, constrained
+    output cannot cite another, and OMP's same-session repair turn names the
+    allowed ids instead of the review ending in ERROR.
+    """
+    schema = json.loads(JUDGE_SCHEMA_FILE.read_text(encoding="utf-8"))
+    member_ids = schema["properties"]["clusters"]["items"]["properties"]["member_ids"]
+    member_ids["items"] = {"type": "string", "enum": [finding["id"] for finding in findings]}
+    return (json.dumps(schema, indent=2) + "\n").encode("utf-8")
+
+
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -1478,7 +1492,10 @@ def validate_judgment(
             raise ValueError(f"judge cluster {index} member_ids must be nonempty")
         for member in members:
             if not isinstance(member, str) or member not in expected:
-                raise ValueError(f"judge cluster {index} unknown finding id {member!r}")
+                raise ValueError(
+                    f"judge cluster {index} unknown finding id {member!r} "
+                    f"(member_ids {members!r}; valid ids {[finding['id'] for finding in findings]!r})"
+                )
             if member in seen:
                 raise ValueError(f"judge duplicate finding id {member!r}")
             seen.add(member)
@@ -1756,9 +1773,10 @@ def _review_session(
     prompt_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     source_sha = [_sha256(source) for source in snapshot.sources]
     schema_bytes = (
-        PRECHECK_SCHEMA_FILE if precheck_diff is not None
-        else SCHEMA_FILE if judge_findings is None else JUDGE_SCHEMA_FILE
-    ).read_bytes()
+        PRECHECK_SCHEMA_FILE.read_bytes() if precheck_diff is not None
+        else SCHEMA_FILE.read_bytes() if judge_findings is None
+        else judge_schema_bytes(judge_findings)
+    )
     report_dir.mkdir(parents=True, exist_ok=True)
     events_path = report_dir / f"{package.name}.events.jsonl"
 
