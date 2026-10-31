@@ -101,10 +101,6 @@ def _section_mm(value: float) -> str:
     return text + "0" if text.endswith(".") else text
 
 
-def test_the_spring_pad_the_record_calls_square_is_square() -> None:
-    assert spring.PAD_LEN == spring.PAD_WIDTH
-
-
 def _expected_fragments() -> list[str]:
     authority = (dt.FPIN_DIA + dt.CAM_OD) / 2.0 - dt._D_ENG
     follower_reserve = dt._FPIN_TIP_S - dt._S_CAM_ENG
@@ -140,7 +136,7 @@ def _expected_fragments() -> list[str]:
         # reader-derived; its historical material interpretation is independent.
         f"{spring.THICK:g} ×{_section_mm(spring.WIDTH)} ",
         f"{spring.SCREW_EAST_OF_PIVOT:.1f} EAST of pivot",
-        f"{spring.PAD_LEN:g} square pad",
+        f"{spring.PAD_LEN:g} × {spring.PAD_WIDTH:g} pad",
         f"{spring.CONTACT_T:.1f} up strap",
     ]
 
