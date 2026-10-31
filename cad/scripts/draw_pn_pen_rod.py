@@ -13,8 +13,8 @@ pivot's lengths from the shoulder, the pivot's banded diameter between its
 flanks, the shoulder root's R MAX and the (4.82) end-to-end reference; the
 labelled end view (5:1) under it looks at the tapped top face and carries the
 square's banded SQ size and the native Hole Wizard callout of the #0-80 stud
-tap, each native length variable at .XXX; the labelled 1:1 isometric sits
-right.
+tap, its drill Ø at .XXX and both depths at .XX; the labelled 1:1 isometric
+sits right.
 
 Run with SolidWorks open::
 
@@ -74,6 +74,7 @@ from pn_pen_rod_spec import (
     SHOULDER_FILLET_R,
     SHOULDER_FILLET_TOL_TYPE,
     SQUARE_LENGTH,
+    STUD_TAP_DEPTH_PLACES,
     STUD_TAP_DRILL_DIA,
     STUD_TAP_SPEC,
     TOTAL_LENGTH,
@@ -95,10 +96,12 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 # Hole Wizard length variables of the blind stud tap's callout, by native
-# name: each prints .XXX.
-STUD_TAP_PRECISION = dict.fromkeys(
-    ("hw-tapdrldia", "hw-tapdrldepth", "hw-threaddepth"), 3
-)
+# name: the drill's Ø prints .XXX, both depths the spec's places (.XX).
+STUD_TAP_PRECISION = {
+    "hw-tapdrldia": 3,
+    "hw-tapdrldepth": STUD_TAP_DEPTH_PLACES,
+    "hw-threaddepth": STUD_TAP_DEPTH_PLACES,
+}
 
 # Rule 15: at 1:1 the side view stood 5 mm tall in the top half of the sheet
 # (final review 2026-10-14); 2:1 lays the rod 245 mm long and 10 mm tall.

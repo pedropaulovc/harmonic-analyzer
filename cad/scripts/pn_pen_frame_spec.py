@@ -94,11 +94,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Printed places (drawing-guidelines.md rule 3).  Every rail, window and
 # envelope size feeds a stack below, and the corner radius is bounded by the
 # neck gap, so nothing prints .X: the title block's .XX everywhere except the
-# tap's depth station ScrewZ, .XXX: at .XX the #4-40 thread's wall to the
-# nearer face would fall to .155 - .01 - .01 - .056 = .079, under the rule 17
-# .080 target (SET_SCREW_PRINTED_WALL_MIN); FRAME_DEPTH is fixed by the
+# tap's depth station ScrewZ, .XXX: at .XX the #4-40 thread's wall to the far
+# face would fall to (.31 - .01) - (.155 + .01) - .056 = .079, under the rule
+# 17 .080 target (SET_SCREW_PRINTED_WALL_MIN); FRAME_DEPTH is fixed by the
 # carriage's paper solve and the v-block's body step (pn_pen_carriage_geom),
-# so geometry cannot buy the wall.
+# and the thumb screw sits on the mid-plane (THUMB_SCREW_POS), so geometry
+# cannot buy the wall.  The station's own callout states that function
+# (rule 3: a three-place size names why it is tight).
 _THREE_PLACE = {"ScrewZ"}
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     feature: {name: 3 if name in _THREE_PLACE else 2 for name in names}
@@ -152,6 +154,8 @@ SET_SCREW_PRINTED_WALL_MIN = (
 )
 if SET_SCREW_PRINTED_WALL_MIN < WALL_TARGET_MM:  # drawing-guidelines.md rule 17
     raise AssertionError("printed bands let the #4-40 tap break the .080 wall target")
+# What the three-place station holds, on its own dimension (below its text).
+DIMENSION_CALLOUTS = {"ScrewZ": "CENTERED\n.080 MIN TAP WALL"}
 
 DRAWING_NOTES = ""
 FRONT_VIEW_NOTE = "FRONT VIEW SCALE 2:1"

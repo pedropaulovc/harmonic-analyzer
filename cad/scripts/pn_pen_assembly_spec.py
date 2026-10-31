@@ -136,8 +136,8 @@ STUD_LINE = (
 )
 STUD_HEIGHT = carriage.STUD_HEAD_TOP_REST_Y - carriage.ROD_SQUARE_TOP_REST_Y
 # Set by the stud's measured length (owner ruling on code review C05). The
-# stud's printed length band (1.024 at three places about the 26.0 closure,
-# -.0046/+.0054) is not the engagement's limit: the fitter sets the head top
+# stud's printed length band (1.02 at two places about the 26.0 closure,
+# -.0136/+.0064) is not the engagement's limit: the fitter sets the head top
 # the measured length less rod.STUD_ENGAGEMENT, ±STUD_TOLERANCE_MM, so the
 # engagement is that band whatever the stud's length. STUD_HEIGHT is that
 # setting for a nominal stud, the value the model and DETAIL A's reference
@@ -155,12 +155,11 @@ STUD_LENGTH_EXTREMES = (
 _STUD_FULL_THREAD_BAND = printed_band_mm(
     stud.DRAWING_PRECISION_BY_NAME["FullThreadLength"], unit=stud.UNIT
 )
-# The rod sheet's native tap callout prints the thread depth at three places
-# (draw_pn_pen_rod.STUD_TAP_PRECISION, "TAP 0-80 UNF .177"), so the
-# shallowest accepted full thread is .172.
-TAP_THREAD_DEPTH_PLACES = 3
+# The rod sheet's native tap callout prints the thread depth at the rod's
+# places (rod.STUD_TAP_DEPTH_PLACES, "TAP 0-80 UNF .18"), so the shallowest
+# accepted full thread is .17.
 TAP_THREAD_DEPTH_MIN = rod.STUD_TAP_SPEC.overrides_mm["ThreadDepth"] - printed_band_mm(
-    TAP_THREAD_DEPTH_PLACES, unit=rod.UNIT
+    rod.STUD_TAP_DEPTH_PLACES, unit=rod.UNIT
 )
 
 

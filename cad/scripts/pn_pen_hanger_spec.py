@@ -18,7 +18,8 @@ physical millimetres, each the exact decimal of the inch value it prints.
 Exempt from the grid: the strap and plate sheet-stock gauges (as supplied,
 REF), the #8 hole (Hole Wizard), and the hole's station, which is the wheel
 bar's screw axis (``mg_wheel_bar_geom``) relative to the rod line: it keeps
-its value and prints at the .XXX that holds it.
+its value and prints rounded at the title block's .XX (.27, .20), the model
+inside that band.
 """
 
 from __future__ import annotations
@@ -253,9 +254,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 # Places: every strap, plate and slot size feeds a stack, a wall or the
 # plate's flush fit on the strap's foot, so nothing prints .X; the title
-# block's .XX, except the banded slot (+.002/0) and the hole station, which
-# keeps the bar's screw axis and prints the .XXX that holds it.  The stock
-# references print their gauge's four-place decimal.
+# block's .XX, except the banded slot (+.002/0).  The hole station keeps the
+# bar's screw axis and prints it rounded at .XX, the model inside the band
+# (the wall below is judged about the printed value).  The stock references
+# print their gauge's four-place decimal.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StrapProfile": {
         "StrapTopRun": 2,
@@ -264,7 +266,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "StrapBotWidth": 2,
     },
     "Strap": {"StrapThick": 4},
-    "ScrewHole": {"ScrewX": 3, "ScrewY": 3},
+    "ScrewHole": {"ScrewX": 2, "ScrewY": 2},
     "UpperGuide": {"UpperPlateDrop": 2},
     "LowerGuide": {"PlateThick": 4},
     "UpperGuideProfile": {
@@ -319,7 +321,7 @@ if min(NEAR_ARM_MIN, FAR_ARM_MIN) < WALL_TARGET_MM:
     )
 # Rule 17: the screw hole's wall to the strap's nearest edge keeps the target
 # with the hole at its DRILLED HOLES upper limit and its printed station at
-# the far end of its .XXX band (about the printed value, not the model's).
+# the far end of its .XX band (about the printed value, not the model's).
 _station_offset = max(
     abs(deviation)
     for name, model in zip(("ScrewX", "ScrewY"), SCREW_HOLE_XY, strict=True)
