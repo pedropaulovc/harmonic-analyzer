@@ -23,6 +23,8 @@ Pure data over ``title_block.yaml``; no SolidWorks, no drawing imports.
 
 from __future__ import annotations
 
+import math
+
 import _config
 from _title_block_units import ANGLE_UNITS, LENGTH_UNITS, length_mm, quantity
 
@@ -88,5 +90,15 @@ def printed_deviations(
         limits = (-grade, grade)
     lower, upper = limits
     per_unit = LENGTH_UNITS[unit]
-    printed = round(model / per_unit, places) * per_unit
+    if unit == "in":
+        # set_units_inch rounds half away from zero (swUnitsDecimalRounding
+        # HalfAway): .625 prints .63, where round() would give .62. The 1e-9
+        # absorbs the mm-to-inch conversion's float error at an exact tie.
+        scaled = abs(model / per_unit) * 10**places
+        printed = (
+            math.copysign(math.floor(scaled + 0.5 + 1e-9) / 10**places, model)
+            * per_unit
+        )
+    else:
+        printed = round(model / per_unit, places) * per_unit
     return printed + lower - model, printed + upper - model

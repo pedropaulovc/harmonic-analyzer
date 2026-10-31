@@ -164,3 +164,10 @@ def test_inch_deviations_round_the_nominal_on_the_inch_grid():
     lower, upper = tol.printed_deviations(12.0, 2, unit="in")
     assert lower == pytest.approx(11.938 - 0.254 - 12.0)
     assert upper == pytest.approx(11.938 + 0.254 - 12.0)
+
+
+def test_inch_ties_round_half_away_like_the_sheet():
+    # 15.875 mm is .625 in: set_units_inch's HalfAway prints .63 (16.002 mm).
+    lower, upper = tol.printed_deviations(15.875, 2, unit="in")
+    assert lower == pytest.approx(16.002 - 0.254 - 15.875)
+    assert upper == pytest.approx(16.002 + 0.254 - 15.875)
