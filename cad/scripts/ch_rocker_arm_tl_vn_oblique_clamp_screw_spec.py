@@ -154,7 +154,7 @@ if ROW.tip_clearance_mm != trammel.CARRIER_TO_RAIL_GAP:
 
 # Exact-current product table and engineering drawing read 2026-10-21.
 # Hidden nominal source references, not physical-edge/replica assertions.
-# Drawing precision: length/head Ø/head height .XXX, major Ø .XXXX,
+# Drawing precision: length/head Ø/head height/major Ø .XXX,
 # drive an exact 3/16 fraction. The standard-only socket depth is omitted.
 SUPPLIER_PRODUCT_URL = "https://www.mcmaster.com/91251A541/"
 SUPPLIER_DRAWING_URL = (
@@ -190,6 +190,6 @@ SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (3, "length", None, None),
     "SupplierHeadDiameter": (3, "diameter", None, None),
     "SupplierHeadHeight": (3, "length", None, None),
-    "SupplierThreadDiameter": (4, "diameter", None, '1/4"-20'),
+    "SupplierThreadDiameter": (3, "diameter", None, '1/4"-20'),
     "SupplierDriveWidth": (0, "length", 16, None),
 }

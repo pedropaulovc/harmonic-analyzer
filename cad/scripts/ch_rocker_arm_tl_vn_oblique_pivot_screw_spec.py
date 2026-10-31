@@ -20,7 +20,10 @@ import _config
 from _package_units import drawing_unit
 
 PART_NAME = "ch-rocker-arm-tl-vn-oblique-pivot-screw"
-UNIT = drawing_unit(f"parts/{PART_NAME}", _config.parts(PART_NAME))
+UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-vn-oblique-pivot-screw",
+    _config.parts("ch-rocker-arm-tl-vn-oblique-pivot-screw"),
+)
 INCH = 25.4
 
 SKU = "BLTS40-0375-1500188P"

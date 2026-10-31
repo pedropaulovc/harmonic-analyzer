@@ -199,6 +199,6 @@ SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (3, "length", None, None),
     "SupplierHeadDiameter": (3, "diameter", None, "PHILLIPS NO. 1"),
     "SupplierHeadHeight": (3, "length", None, None),
-    "SupplierThreadDiameter": (3, "diameter", None, "4-40"),
+    "SupplierThreadDiameter": (3, "diameter", None, "#4-40"),
     "SupplierHeadAngle": (0, "angle", None, None),
 }

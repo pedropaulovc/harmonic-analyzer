@@ -24,7 +24,10 @@ from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
 
 PART_NAME = "ch-rocker-arm-tl-oblique-feed-block"
-UNIT = drawing_unit(f"parts/{PART_NAME}", _config.parts(PART_NAME))
+UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-oblique-feed-block",
+    _config.parts("ch-rocker-arm-tl-oblique-feed-block"),
+)
 NUMBER = "MHA-CH-06-TL-32"
 QUANTITY = 1
 BLOCK_X0, BLOCK_X1 = pivot.BLOCK_X0, pivot.BLOCK_X1

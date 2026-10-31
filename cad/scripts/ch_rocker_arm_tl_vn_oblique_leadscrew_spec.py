@@ -274,7 +274,10 @@ BAR_SCREW_LENGTH = "5/8"
 # clear of the bar's column-side edge, both at the .080 target.
 WALL_TARGET = WALL_TARGET_MM  # drawing-guidelines rule 17 (floor base_bar.BRACKET_WALL_MIN)
 BAR_SCREW_INNER_HALF_SPAN = 10.9982  # .433
-_TL28_UNIT = drawing_unit(f"parts/{END_BRACKET}", _config.parts(END_BRACKET))
+_TL28_UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-oblique-end-bracket",
+    _config.parts("ch-rocker-arm-tl-oblique-end-bracket"),
+)
 _TL28_BAND = printed_band_mm(3, unit=_TL28_UNIT)  # TL-28's stations print at .XXX
 _BAR_SCREW_R = THREAD_MAJOR_MM[BAR_SCREW] / 2.0
 _KP08_SCREW_R = THREAD_MAJOR_MM[KP08_SCREW] / 2.0
