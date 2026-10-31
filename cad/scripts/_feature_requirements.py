@@ -26,6 +26,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import ast
+import unicodedata
 import inspect
 from functools import lru_cache
 from pathlib import Path
@@ -255,12 +256,26 @@ def declaration_calls(tree: ast.Module, api: str) -> tuple[ast.Call, ...]:
     return tuple(calls)
 
 
+def _may_declare(path: Path) -> bool:
+    """Whether ``path`` can bind the declaration API at all.
+
+    ``declaration_calls`` only follows names imported from
+    ``_feature_requirements``, so a source that never spells the module name
+    declares nothing and is not parsed. Python NFKC-normalizes identifiers,
+    so non-ASCII text is searched normalized.
+    """
+    text = Path(path).read_text(encoding="utf-8")
+    if not text.isascii():
+        text = unicodedata.normalize("NFKC", text)
+    return "_feature_requirements" in text
+
+
 def discover_parts(scripts: Path) -> tuple[str, ...]:
     """Find drawing-owned requirements by AST alone; never import a drawing."""
     return tuple(
         path.stem.removeprefix("draw_")
         for path in sorted(Path(scripts).glob("draw_*.py"))
-        if declaration_calls(source_tree(path), "requirement")
+        if _may_declare(path) and declaration_calls(source_tree(path), "requirement")
     )
 
 
