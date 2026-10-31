@@ -66,7 +66,7 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
         "Width": 1,
         "Depth": 1,
         "FootHt": 1,
-        "BoreDia": 2,
+        "BoreDia": 3,
         "BoreHeight": 2,
         "DomeRadius": 1,
         "StrapDepth": 1,
@@ -84,17 +84,15 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
-def test_no_feature_asks_for_a_third_decimal() -> None:
-    """cad/docs/tolerance-policy.md reserves three places for mating sizes.
-
-    Nothing on this post is one: the journal bore's own band is what holds the
-    running fit, and the axis height perturbs no transfer quantity.
-    """
+def test_only_the_running_bore_asks_for_a_third_decimal() -> None:
+    """cad/docs/tolerance-policy.md reserves three places for mating sizes:
+    the journal bore is the only one on this post."""
     places = {
         **dt_arbor_pedestal_spec.DRAWING_PRECISION_BY_NAME,
         **dt_arbor_pedestal_spec.DRAWING_REFERENCE_PRECISION,
     }
-    assert max(places.values()) == 2
+    assert {name for name, value in places.items() if value > 2} == {"BoreDia"}
+    assert max(places.values()) == 3
     assert model_toleranced_dimensions(part) == {
         ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)"
     }
@@ -238,21 +236,21 @@ def test_reference_lines_restate_the_geometry_their_equations_drive() -> None:
 def test_arbor_bore_closes_the_configured_running_fit() -> None:
     import _config
 
-    assert round(dt_arbor_pedestal_spec.BORE_DIA, 2) == 9.55
+    assert dt_arbor_pedestal_spec.BORE_DIA == 9.525
     # Rule 4: the REAM bore's callout names its mate and the fit it needs.
     arbor = str(_config.parts("dt-cylinder-gear-shaft")["number"])
     bore_callout = drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert bore_callout.startswith("REAM THRU\n")
     assert "FIT ON" in bore_callout
     assert bore_callout.endswith(arbor)
-    shaft_limits = (9.505, 9.525)
-    bore_limits = (9.550, 9.580)
+    shaft_limits = (9.50468, 9.525)
+    bore_limits = (9.5504, 9.5631)
     clearances = (
         bore_limits[0] - shaft_limits[1],
         bore_limits[1] - shaft_limits[0],
     )
     expected = tuple(_config.fit("shaft_in_bushing", "diametral_clearance_mm"))
-    assert tuple(round(value, 3) for value in clearances) == expected
+    assert tuple(round(value, 5) for value in clearances) == expected
 
 
 def test_screw_hole_contract_is_part_owned() -> None:
@@ -612,7 +610,7 @@ def test_apex_set_screw_tap_keeps_1_5d_only_at_r11() -> None:
     assert spec.SET_SCREW_HOLE_SPEC.end == "through_next"
     assert spec.set_screw_engagement_d(10.0) < 1.5 <= spec.SET_SCREW_ENGAGEMENT_D
     assert round(spec.SET_SCREW_ENGAGEMENT_D, 2) == 1.57
-    assert round(spec.SET_SCREW_FULL_THREAD_MM, 2) == 4.46
+    assert round(spec.SET_SCREW_FULL_THREAD_MM, 2) == 4.47
     terms = spec.set_screw_wall_terms(spec.TOP_RADIUS)
     assert terms["crown radius at .X minimum"] == spec.TOP_RADIUS - 0.8
     assert all(v < 0 for k, v in terms.items() if k != "crown radius at .X minimum")

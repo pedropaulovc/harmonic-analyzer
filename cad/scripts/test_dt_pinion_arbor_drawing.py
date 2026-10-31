@@ -199,13 +199,13 @@ def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
 
 
 def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
-    assert spec.JOURNAL_DIA_BAND == (-0.01, -0.03)
-    # Both stacked bands print at 2 places: "-0.01/-0.03" and "-0.01/-0.10".
+    assert spec.JOURNAL_DIA_BAND == (-0.01016, -0.03048)
+    # Both stacked bands print at 5 places: "-0.01016/-0.03048" and "-0.01016/-0.09652".
     for band in (spec.JOURNAL_DIA_BAND, spec.SHAFT_DIA_BAND):
         assert _drawing_tolerances._tolerance_places(
             *_fit_deviations.deviations(band), display_unit="mm"
-        ) == 2
-    assert spec.SHAFT_DIA_BAND == (-0.01, -0.10)
+        ) == 5
+    assert spec.SHAFT_DIA_BAND == (-0.01016, -0.09652)
     assert model_toleranced_dimensions(part) == {
         ("BondZoneReference", "BondZoneDia"): "*deviations(SHAFT_DIA_BAND)",
         ("DrumStationReference", "DrumStationFromHeadRear"): "DRUM_STATION_BAND",
@@ -260,19 +260,19 @@ def test_journal_and_bond_zone_bands_leave_the_intended_fits() -> None:
     strap_upper, strap_lower = strap.ARBOR_BORE_BAND
     # Running fit of each land in its MHA-DT-14 REAM_SLIDE bore.
     assert strap.ARBOR_BORE_BAND is _fit_ream_slide.REAM_SLIDE
-    assert strap_lower - journal_upper == pytest.approx(0.020)
-    assert strap_upper - journal_lower == pytest.approx(0.055)
-    # Every bore slides on from the back crown, so no zone may exceed 8.00.
-    # The drum keeps its stock-H7 bore, so the bond zone sits 0.01 under it
-    # for a guaranteed slide, and the worst gap stays inside Loctite 638's 0.25.
+    assert strap_lower - journal_upper == pytest.approx(0.03556)
+    assert strap_upper - journal_lower == pytest.approx(0.06858)
+    # Every bore slides on from the back crown, so no zone may exceed 5/16.
+    # The drum's REAM_SLIDE bore clears the bond zone by 0.03556 for a
+    # guaranteed slide, and the worst gap stays inside Loctite 638's 0.25.
     shaft_upper, shaft_lower = spec.SHAFT_DIA_BAND
-    assert shaft_upper == pytest.approx(-0.010)
+    assert shaft_upper == pytest.approx(-0.01016)
     drum_upper, drum_lower = drum.ARBOR_BORE_BAND
-    assert drum_lower - shaft_upper == pytest.approx(0.010)
+    assert drum_lower - shaft_upper == pytest.approx(0.03556)
     assert drum_upper - shaft_lower <= 0.20 + 1e-9
     # The drum passes over the back land on its way on, so "SLIDES BY HAND"
-    # must hold there too: every Ø8 zone it crosses stays 0.010 under its bore.
-    assert drum_lower - journal_upper == pytest.approx(0.010)
+    # must hold there too: every Ø5/16 zone it crosses stays 0.010 under its bore.
+    assert drum_lower - journal_upper == pytest.approx(0.03556)
     assert min(drum_lower - journal_upper, drum_lower - shaft_upper) >= 0.010 - 1e-9
 
 
@@ -526,7 +526,7 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     assert spec.DRAWING_DIMENSIONS["BondZoneReference"] == {"BondZoneDia"}
     assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] is spec.BOND_ZONE_CALLOUT
     assert spec.BOND_ZONE_CALLOUT == (
-        "ALL<MOD-DIAM>8 EXCEPT JOURNALS;\nMHA-DT-01 BOND ZONE,\nDRUM ENDS ON JOURNALS"
+        "ALL EXCEPT JOURNALS;\nMHA-DT-01 BOND ZONE,\nDRUM ENDS ON JOURNALS"
     )
     # Machinist review r3 of #1685 (blocker): the drum station falls on the
     # front land; each drum end rests on its land at every printed limit.
@@ -1124,7 +1124,7 @@ def test_collar_pin_hole_is_a_drilled_spring_pin_hole_clear_of_the_front_land() 
     assert spec.PIN_Z == pytest.approx(spec.HEAD_REAR_Z + 38.0)
     assert pin_hole.PIN_HOLE_LAND_CLEARANCE >= 2.0
     assert pin_hole.PIN_HOLE_NECK_CLEARANCE >= 2.0
-    assert pin_hole.PIN_HOLE_LIGAMENT_WORST == pytest.approx(3.126, abs=1e-3)
+    assert pin_hole.PIN_HOLE_LIGAMENT_WORST == pytest.approx(3.0967, abs=1e-3)
     assert pin_hole.PIN_HOLE_LIGAMENT_WORST >= 2.0
     assert spec.DRAWING_DIMENSIONS["PinHoleProfile"] == {"PinHoleDia"}
     assert spec.DRAWING_DIMENSIONS["PinStationReference"] == {"PinStationFromHeadRear"}
@@ -2141,7 +2141,7 @@ def test_two_different_lines_of_one_face_through_the_point_are_refused(monkeypat
     spec_face = spec.SURFACE_FINISHES[0].face.__class__(spec.SHAFT_DIA, contains_z_mm=10.0)
     with pytest.raises(RuntimeError, match=r"2 silhouettes of land's face"):
         _drawing_edges.face_silhouettes_through(
-            SimpleNamespace(), view, {"land": (spec_face, view.sheet((0.0, -0.004, 0.010)))},
+            SimpleNamespace(), view, {"land": (spec_face, view.sheet((0.0, -spec.SHAFT_DIA / 2000.0, 0.010)))},
             label="land",
         )
 

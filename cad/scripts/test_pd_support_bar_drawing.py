@@ -407,8 +407,8 @@ def test_west_slots_take_up_the_column_pitch() -> None:
     # Between an east and a west screw: both bar stations, both clamps' tap
     # stations and both clamps' shift on their columns.
     between = 2.0 * (0.18 + EAR_STATION_BAND + BORE_DIAMETRAL_CLEARANCE[1] / 2.0)
-    assert between == pytest.approx(0.86)
-    for pitch, margin in ((top, 0.6536), (base, 0.1436)):
+    assert between == pytest.approx(0.8648)
+    for pitch, margin in ((top, 0.6488), (base, 0.1388)):
         left = travel + 2.0 * slack - (pitch + between)
         assert left == pytest.approx(margin, abs=5e-4)
         assert part.clamp_slot_closure_margin(pitch) == pytest.approx(left)

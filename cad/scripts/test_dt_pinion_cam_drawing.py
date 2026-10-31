@@ -123,7 +123,7 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     bore_min = dt_pinion_cam_spec.BORE + dt_pinion_cam_spec.BORE_BAND[1]
     bore_max = dt_pinion_cam_spec.BORE + dt_pinion_cam_spec.BORE_BAND[0]
     assert round(bore_min - rod_max, 6) == 0.0254
-    assert round(bore_max - rod_min, 6) == 0.0581
+    assert round(bore_max - rod_min, 6) == 0.05842
     assert dt_pinion_cam_spec.LIFT_ROD_NUMBER in drawing.DIMENSION_CALLOUTS["BoreDia"]
     bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert "SLIP FIT" in bore

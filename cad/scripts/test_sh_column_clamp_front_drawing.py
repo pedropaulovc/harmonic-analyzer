@@ -147,8 +147,8 @@ def test_bore_prints_the_grip_budget_on_the_column() -> None:
     # pair's grip budget allows (sh_column_clamp_fit), not "bored as a pair".
     bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert "DIAMETRAL" in bore and "MHA-FR-03" in bore
-    assert f"{spec.BORE_DIAMETRAL_CLEARANCE[1]:.2f}" in bore
-    assert spec.BORE_DIAMETRAL_CLEARANCE[1] <= 0.30
+    assert f"{spec.BORE_DIAMETRAL_CLEARANCE[1]:.4f}" in bore
+    assert spec.BORE_DIAMETRAL_CLEARANCE[1] <= 0.3048
     assert "MHA-SH-02" in drawing.DIMENSION_CALLOUTS["EarHole1Z"]
     assert "MHA-SH-02" in drawing.DIMENSION_CALLOUTS["EarHoleHeight"]
     # The two-place depth says what it sets; the bore says where its axis is.
@@ -159,21 +159,21 @@ def test_bore_prints_the_grip_budget_on_the_column() -> None:
 
 def test_walls_at_the_largest_column_and_drill_wander() -> None:
     # Independent oracle from literals: the largest A513 DOM column (25.4 +
-    # 0.127) at the loosest 0.30 clearance, the printed Ø4.98 hole at its
+    # 0.127) at the loosest 0.3048 clearance, the printed Ø4.98 hole at its
     # DRILLED HOLES +0.10, the printed .XX/.X limits, and 0.3 deg of drill
     # wander over the through hole's deepest printed length (17.4 + 0.51; the
     # arc gave up 0.5 to the rearward-grown support bar).
-    r_bore = (25.527 + 0.30) / 2.0
+    r_bore = (25.527 + 0.3048) / 2.0
     reach = (4.98 + 0.10) / 2.0 + 17.91 * math.tan(math.radians(0.3))
     web = 17.4 - reach - r_bore
-    assert math.isclose(spec.WALLS_WORST["ear to bore"], web)  # 1.853
+    assert math.isclose(spec.WALLS_WORST["ear to bore"], web)  # 1.850
     assert math.isclose(spec.WALLS_WORST["bar-face wall"], 16.89 - r_bore)
     assert math.isclose(spec.WALLS_WORST["ear to far side"], 47.2 - 24.8 - 17.6 - reach)
     assert min(spec.WALLS_WORST.values()) >= 1.5
     # The web reaches the 2.0 target only on a column under its own Ø25.4
     # nominal, so no column acceptance can lift it: the one owner-ruled
     # shortfall (sh-column-clamp-front RV-01), and the part's least wall.
-    column_at_target = 2.0 * (17.4 - reach - 2.0) - 0.30
+    column_at_target = 2.0 * (17.4 - reach - 2.0) - 0.3048
     assert column_at_target < 25.4
     short = {name for name, wall in spec.WALLS_WORST.items() if wall < 2.0}
     assert short == {"ear to bore"}

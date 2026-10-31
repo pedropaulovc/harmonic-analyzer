@@ -2858,7 +2858,7 @@ def test_front_native_process_keeps_the_nominal_token_and_model_bore_band(
     # The ream band reads as clearance on its named mate (MR #1020).
     assert (pivot.text[3], pivot.text[4]) == ("<native-upper>", ch_rocker_arm_notes.PIVOT_FIT_CALLOUT)
     assert ch_rocker_arm_notes.PIVOT_FIT_CALLOUT == (
-        "(0.15-0.20 DIAMETRAL\nCLEARANCE ON PIVOT\nSHAFT MHA-CH-05)"
+        "(0.15-0.21 DIAMETRAL\nCLEARANCE ON PIVOT\nSHAFT MHA-CH-05)"
     )
 
 

@@ -110,7 +110,7 @@ def test_fit_budget_closes_at_the_printed_limits() -> None:
     low, high = fit.BORE_DIAMETRAL_CLEARANCE
     assert low < spec.COLUMN_BORE - OUTER_DIA < high
     # Faces stay apart with both bores at their loosest and the offset least.
-    assert math.isclose(fit.GRIP_GAP_MIN, 0.4 - 0.3)
+    assert math.isclose(fit.GRIP_GAP_MIN, 0.4 - 0.3048)
     assert fit.GRIP_GAP_MIN > 0.0
     # The ear stations' worst mismatch alone never binds the screw.
     assert fit.EAR_STATION_MISMATCH_MAX < fit.SCREW_FLOAT
@@ -133,25 +133,25 @@ def test_column_limit_is_the_a513_dom_table_row() -> None:
     assert tube["material_specification"].startswith("ASTM A513 T5 ")
     assert "DOM 1x.120in" in tube["material_specification"]
     assert math.isclose(fit.COLUMN_OD_MAX, 25.4 + 0.127)
-    assert math.isclose(fit.BORE_RADIUS_MAX, (25.527 + 0.30) / 2.0)
+    assert math.isclose(fit.BORE_RADIUS_MAX, (25.527 + 0.3048) / 2.0)
 
 
 def test_walls_at_the_largest_column_and_drill_wander() -> None:
     # Independent oracle from literals: the largest A513 column (25.527) at the
-    # loosest 0.30 clearance, the printed .XX/.X limits, and 0.3 deg of drill
+    # loosest 0.3048 clearance, the printed .XX/.X limits, and 0.3 deg of drill
     # wander over the through tap's deepest printed length (15.0 + 0.51).
-    r_bore = (25.527 + 0.30) / 2.0
+    r_bore = (25.527 + 0.3048) / 2.0
     wander = 15.51 * math.tan(math.radians(0.3))
     reach = 4.166 / 2.0 + wander
-    assert math.isclose(spec.WALLS_WORST["back wall"], 0.4 + 14.49 - r_bore)  # 1.9765
+    assert math.isclose(spec.WALLS_WORST["back wall"], 0.4 + 14.49 - r_bore)  # 1.9741
     assert math.isclose(spec.WALLS_WORST["ear to bore"], 17.4 - reach - r_bore)
     assert math.isclose(spec.WALLS_WORST["ear to far side"], 47.2 - 24.8 - 17.6 - reach)
     assert min(spec.WALLS_WORST.values()) >= 1.5
-    # The back wall reaches the 2.0 target only on a column of at most 25.48;
+    # The back wall reaches the 2.0 target only on a column of at most 25.4752;
     # A513 admits 25.527: the one owner-ruled shortfall (sh-column-clamp-back
     # RV-01), and the part's least wall.
-    column_at_target = 2.0 * (0.4 + 14.49 - 2.0) - 0.30
-    assert math.isclose(column_at_target, 25.48)
+    column_at_target = 2.0 * (0.4 + 14.49 - 2.0) - 0.3048
+    assert math.isclose(column_at_target, 25.4752)
     assert column_at_target < fit.COLUMN_OD_MAX
     short = {name for name, wall in spec.WALLS_WORST.items() if wall < 2.0}
     assert short == {"back wall"}

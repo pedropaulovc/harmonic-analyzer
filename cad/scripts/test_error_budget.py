@@ -1595,7 +1595,7 @@ def test_cone_flat_phase_follows_gear_ratio_and_print_worst_lever(budget):
     play = budget["critical_features"]["cone_flat_play"]["tolerance"]
     assert clock == dt_cone_gear_spec.FLAT_CLOCK_TOLERANCE_DEG
     assert play == pytest.approx((clearance_hi - clearance_lo) / 2.0)
-    assert gear_seat_fit.FLAT_AF_CLEARANCE == (0.010, 0.030)
+    assert gear_seat_fit.FLAT_AF_CLEARANCE == (0.01016, 0.03048)
     edge_break = _config.title_block("edge_break")
     lever_loss = max(edge_break["radius_mm"], edge_break["chamfer_max_mm"])
     af_upper, af_lower = cone_shaft_land_bands.FLAT_AF_BAND

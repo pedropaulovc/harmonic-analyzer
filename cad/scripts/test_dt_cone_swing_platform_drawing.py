@@ -66,7 +66,7 @@ def test_pivot_is_the_reamed_h7_bore_on_the_stock_shoulder() -> None:
     assert pivot_spec.PIVOT_HOLE_DIA == pytest.approx(6.350)
     assert pivot_spec.PIVOT_HOLE_BAND == tuple(
         _config.fit("cone_drum_oblique_mesh", "pivot_bore_band_mm")
-    ) == (0.015, 0.0)
+    ) == (0.0127, 0.0)
     shoulder_max = dt_vn_cone_pivot_screw_spec.SHOULDER_DIA + dt_vn_cone_pivot_screw_spec.SHOULDER_DIA_BAND[0]
     assert pivot_spec.PIVOT_HOLE_DIA + pivot_spec.PIVOT_HOLE_BAND[1] >= shoulder_max
 

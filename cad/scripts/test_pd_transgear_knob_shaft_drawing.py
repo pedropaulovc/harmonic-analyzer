@@ -156,7 +156,7 @@ def test_front_core_and_journal_clear_the_straight_through_cutter() -> None:
 def test_real_d_core_thread_and_six_mm_g6_source() -> None:
     assert spec.CORE_DIA == 4.85 and spec.CORE_DIA_BAND == (0.0, -0.008)
     assert spec.CORE_FLAT_FROM_AXIS == 2.125 and spec.CORE_FLAT_BAND == (0.0, -0.015)
-    assert spec.JOURNAL_DIA == 6.0 and spec.JOURNAL_DIA_BAND == (-0.004, -0.012)
+    assert spec.JOURNAL_DIA == 6.0 and spec.JOURNAL_DIA_BAND == (-0.00508, -0.0127)
     # The thread length reads from the relief's shoulder (machinist review r8).
     assert spec.THREAD == "#8-32"
     assert spec.THREAD_CALLOUT == "#8-32 UNC\nTHREAD TO RELIEF"
