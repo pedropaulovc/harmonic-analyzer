@@ -198,6 +198,22 @@ class DrawingSpecificationViolation:
         )
 
 
+_LAST_WALK: list = [None, ()]
+
+
+def _walked(tree: ast.AST) -> tuple[ast.AST, ...]:
+    """``tuple(ast.walk(tree))``, reused while the same tree is being scanned.
+
+    One drawing scan runs a dozen helper passes over one parsed tree, each a
+    full ``ast.walk``. Nothing here mutates a tree, and the walk order depends
+    only on the tree, so the most recent tree's node sequence is kept (keyed
+    by identity) and every pass iterates exactly the nodes it walked before.
+    """
+    if _LAST_WALK[0] is not tree:
+        _LAST_WALK[:] = [tree, tuple(ast.walk(tree))]
+    return _LAST_WALK[1]
+
+
 def _module_is(module: str | None, expected: str) -> bool:
     return bool(module) and (module == expected or module.endswith(f".{expected}"))
 
@@ -207,7 +223,7 @@ def _imported_functions(
 ) -> tuple[dict[str, str], frozenset[str]]:
     direct: dict[str, str] = {}
     modules: set[str] = set()
-    for node in ast.walk(tree):
+    for node in _walked(tree):
         if isinstance(node, ast.ImportFrom) and _module_is(node.module, module_name):
             for alias in node.names:
                 if alias.name in function_names:
@@ -237,7 +253,7 @@ def _call_is(
 
 def _simple_assignments(tree: ast.AST) -> dict[str, ast.expr]:
     assignments: dict[str, ast.expr] = {}
-    for node in ast.walk(tree):
+    for node in _walked(tree):
         if isinstance(node, ast.Assign):
             for target in node.targets:
                 if isinstance(target, ast.Name):
@@ -255,7 +271,7 @@ def _simple_assignments(tree: ast.AST) -> dict[str, ast.expr]:
 def _surface_finish_imports(tree: ast.AST) -> tuple[frozenset[str], frozenset[str]]:
     direct: set[str] = set()
     modules: set[str] = set()
-    for node in ast.walk(tree):
+    for node in _walked(tree):
         if isinstance(node, ast.ImportFrom) and _module_is(
             node.module, "_surface_finish"
         ):
@@ -276,7 +292,7 @@ def _part_spec_imports(tree: ast.AST) -> tuple[frozenset[str], frozenset[str]]:
 
     direct: set[str] = set()
     modules: set[str] = set()
-    for node in ast.walk(tree):
+    for node in _walked(tree):
         if isinstance(node, ast.ImportFrom) and is_part_spec(node.module):
             direct.update(alias.asname or alias.name for alias in node.names)
         if isinstance(node, ast.Import):
@@ -292,7 +308,7 @@ REFERENCE_PRECISION_NAME = "DRAWING_REFERENCE_PRECISION"
 def _reference_precision_names(tree: ast.AST) -> frozenset[str]:
     """Local bindings of a ``*_spec`` module's ``DRAWING_REFERENCE_PRECISION``."""
     names: set[str] = set()
-    for node in ast.walk(tree):
+    for node in _walked(tree):
         if not isinstance(node, ast.ImportFrom):
             continue
         leaf = (node.module or "").rsplit(".", 1)[-1]
@@ -670,7 +686,7 @@ def _rendered_string_expression(
 def _docstring_nodes(tree: ast.AST) -> frozenset[int]:
     found: set[int] = set()
     containers = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
-    for node in ast.walk(tree):
+    for node in _walked(tree):
         if not isinstance(node, containers) or not node.body:
             continue
         first = node.body[0]
@@ -902,7 +918,7 @@ def drawing_specification_violations(
     """
     tree = ast.parse(source, filename=filename)
     parent = {
-        child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)
+        child: node for node in _walked(tree) for child in ast.iter_child_nodes(node)
     }
     docstrings = _docstring_nodes(tree)
     assignments = _simple_assignments(tree)
@@ -936,7 +952,7 @@ def drawing_specification_violations(
             )
         )
 
-    for node in ast.walk(tree):
+    for node in _walked(tree):
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             if id(node) in docstrings or isinstance(parent.get(node), ast.JoinedStr):
                 continue
@@ -1170,7 +1186,7 @@ def model_toleranced_dimensions(build_module: Any) -> dict[tuple[str, str], str]
     """
     tree = ast.parse(Path(build_module.__file__).read_text(encoding="utf-8"))
     found: dict[tuple[str, str], str] = {}
-    for node in ast.walk(tree):
+    for node in _walked(tree):
         if not isinstance(node, ast.Call):
             continue
         name = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
@@ -1214,7 +1230,7 @@ def assert_sheet_references(module: Any, name: str, expected: Any) -> None:
     tree = ast.parse(inspect.getsource(module))
     builds = [
         node
-        for node in ast.walk(tree)
+        for node in _walked(tree)
         if isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef))
         and node.name == "build"
     ]
