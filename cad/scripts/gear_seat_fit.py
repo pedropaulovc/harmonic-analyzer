@@ -7,11 +7,13 @@ no solder, no retaining compound).  Two clearances bound each seat, and both
 bore bands derive from the land's published limits, so moving a land moves
 its bores:
 
-* Round, 0.025-0.105 diametral.  The 0.025 floor lets a novice's gear slide
-  down its land to the stack.  The 0.105 ceiling bounds the gear's runout on
-  the land (half of it, radially); test_cone_gear_mesh_design and
-  crank_mesh_stack book that runout against the meshes.
-* Across the flat, 0.01-0.03 (user ruling 2026-09-28, "interchangeable
+* Round, .0010-.0038 in diametral.  The .0010 floor lets a novice's gear
+  slide down its land to the stack.  The .0038 ceiling bounds the gear's
+  runout on the land (half of it, radially); test_cone_gear_mesh_design and
+  crank_mesh_stack book that runout against the meshes.  On the land's
+  0/-.0020 band the bore prints +.0018/+.0010, which the owned over reamer
+  (.1260, .2510, .3760) cuts.
+* Across the flat, .0004-.0012 in (user ruling 2026-09-28, "interchangeable
   tight"). The flat carries clock; the exact connected-home width barrier
   below bounds its play. Clearance divided by half-chord is only a linear
   approximation, not an angular bound. A channel's cam sees T/120 of the turn.
@@ -23,10 +25,12 @@ from __future__ import annotations
 
 import math
 
-# (minimum, maximum) diametral clearance between a round bore and its land.
-GEAR_SEAT_CLEARANCE = (0.025, 0.105)
-# (minimum, maximum) clearance between a bore's across-flat and its land's.
-FLAT_AF_CLEARANCE = (0.010, 0.030)
+# (minimum, maximum) diametral clearance between a round bore and its land:
+# .0010-.0038 in.
+GEAR_SEAT_CLEARANCE = (0.0254, 0.09652)
+# (minimum, maximum) clearance between a bore's across-flat and its land's:
+# .0004-.0012 in.
+FLAT_AF_CLEARANCE = (0.01016, 0.03048)
 
 
 def _bore_band(
