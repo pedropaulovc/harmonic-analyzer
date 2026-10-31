@@ -212,15 +212,25 @@ async def _volume_check(adapter, label: str, expected: float, tol: float) -> flo
 
 @_telemetry.traced("part.limit_band", label_param="name")
 def _limit_band(
-    adapter, feature: str, name: str, deviations: tuple[float, float], tol_type: int
+    adapter,
+    feature: str,
+    name: str,
+    model: float,
+    deviations: tuple[float, float],
+    tol_type: int,
 ) -> None:
     """A dimension as a native LIMIT band: SOLIDWORKS prints the upper and
     lower limits, the model value plus each deviation, at the dimension's own
     places (build_mg_output_fixture._limit_band).  #290: the mm model is off
     the inch grid, so the deviations are not; the printed LIMITS are, and they
-    set the places (_drawing_tolerances._set_tolerance_precision)."""
+    set the places (_drawing_tolerances._set_tolerance_precision).  The limits
+    come from the spec's ``model`` (mm), never the read-back SystemValue,
+    whose inch-document float noise would need more than eight places."""
     label = f"{name}@{feature}"
     display, dimension = _named_dimension(adapter, feature, name)
+    value = float(dimension.SystemValue) * 1000.0
+    if not math.isclose(value, model, abs_tol=1e-6):
+        raise RuntimeError(f"{label}: nominal {value!r} mm is not the spec's {model!r}")
     lower, upper = deviations  # native API order, mm
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     tolerance.Type = tol_type
@@ -236,17 +246,16 @@ def _limit_band(
         )
     ):
         raise RuntimeError(f"{label}: LIMIT tolerance readback changed")
-    value = float(dimension.SystemValue) * 1000.0
     places = _set_tolerance_precision(
         display,
-        (value + lower, value + upper),
+        (model + lower, model + upper),
         display_unit=UNIT,
         label=label,
         places=DRAWING_PRECISION_BY_NAME[name],
     )
     _telemetry.success(
-        f"{label}: LIMIT {(value + upper) / 25.4:.{places}f}/"
-        f"{(value + lower) / 25.4:.{places}f} in"
+        f"{label}: LIMIT {(model + upper) / 25.4:.{places}f}/"
+        f"{(model + lower) / 25.4:.{places}f} in"
     )
 
 
@@ -660,12 +669,17 @@ async def build(adapter) -> dict[str, str]:
     # LIMIT bands .456/.449 and .059/.056, so the loop's transition wire clears
     # the head and the flat inside the relief still bears the loop.  Every
     # other mark takes the title block's band.
-    for feature, name, tol_type in (
-        ("ShankProfile", "BodyDia", BODY_DIA_TOL_TYPE),
-        ("HeadProfile", "HeadDia", HEAD_DIA_TOL_TYPE),
-        ("HeadProfile", "HeadReliefChamfer", HEAD_RELIEF_CHAMFER_TOL_TYPE),
+    for feature, name, model, tol_type in (
+        ("ShankProfile", "BodyDia", BODY_DIA, BODY_DIA_TOL_TYPE),
+        ("HeadProfile", "HeadDia", HEAD_DIA, HEAD_DIA_TOL_TYPE),
+        (
+            "HeadProfile",
+            "HeadReliefChamfer",
+            HEAD_RELIEF_CHAMFER,
+            HEAD_RELIEF_CHAMFER_TOL_TYPE,
+        ),
     ):
-        _limit_band(adapter, feature, name, PRINTED_BANDS[name], tol_type)
+        _limit_band(adapter, feature, name, model, PRINTED_BANDS[name], tol_type)
     # The under-head corner's R.020 MAX (codjiflo round 4 on #1997): the
     # modelled radius is the limit, the band runs from sharp up to it.
     set_single_limit(

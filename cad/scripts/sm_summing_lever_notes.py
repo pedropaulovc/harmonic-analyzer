@@ -156,9 +156,11 @@ SPRING_TAP_CALLOUT_PROCESS = "THREAD THRU COEFFICIENT PLATE\n"
 BASIC_PLACES = 4
 FACE_LOCATION_PLACES = 3
 # Each Hole Wizard length prints .XXX; the #6-32 and #10-24 tap drills (#36
-# .1065, #25 .1495) print their four-place drill size.
-SPRING_TAP_PRECISION = {"hw-tapdrldia": 4}
-COUNTER_TAP_PRECISION = {"hw-tapdrldia": 4}
+# .1065, #25 .1495) print their four-place drill size.  Both are THRU ALL
+# taps, whose native drill variable is <hw-thrutapdrldia>; only the blind
+# bracket taps carry <hw-tapdrldia> and the two depth lengths.
+SPRING_TAP_PRECISION = {"hw-thrutapdrldia": 4}
+COUNTER_TAP_PRECISION = {"hw-thrutapdrldia": 4}
 BRACKET_TAP_PRECISION = dict.fromkeys(
     ("hw-tapdrldia", "hw-tapdrldepth", "hw-threaddepth"),
     3,
