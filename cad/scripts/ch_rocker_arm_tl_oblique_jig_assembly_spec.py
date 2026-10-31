@@ -407,8 +407,18 @@ HEAD_DOWN_ROWS: Rows = ((1.0, 0.0, 0.0), (0.0, 0.0, -1.0), (0.0, 1.0, 0.0))
 
 
 def _image(rows: Rows, vector: Point3) -> Point3:
-    """``vector`` in a frame with ``rows``, in the parent's axes."""
-    return tuple(sum(vector[i] * rows[i][axis] for i in range(3)) for axis in range(3))
+    """``vector`` in a frame with ``rows``, in the parent's axes.
+
+    Unrolled, with ``sum``'s own starting ``0`` and left-to-right order, so
+    each component is the same float the generator sum produced (signed
+    zeros included); the sweep calls this millions of times."""
+    v0, v1, v2 = vector
+    r0, r1, r2 = rows
+    return (
+        0 + v0 * r0[0] + v1 * r1[0] + v2 * r2[0],
+        0 + v0 * r0[1] + v1 * r1[1] + v2 * r2[1],
+        0 + v0 * r0[2] + v1 * r1[2] + v2 * r2[2],
+    )
 
 
 def axis_rows(x_axis: Point3, y_axis: Point3) -> Rows:
@@ -432,8 +442,13 @@ def compose(parent: Placement, origin: Point3, rows: Rows = IDENTITY_ROWS) -> Pl
 
 
 def frame_point(placement: Placement, point: Point3) -> Point3:
-    """Machine image of a part-frame ``point`` of the part at ``placement``."""
-    return compose(placement, point)[0]
+    """Machine image of a part-frame ``point`` of the part at ``placement``.
+
+    ``compose(placement, point)[0]``, without also rotating the three frame
+    rows that ``compose`` would build and this caller discards."""
+    base, rows = placement
+    offset = _image(rows, point)
+    return tuple(base[axis] + offset[axis] for axis in range(3))
 
 
 # Hardware on the carrier turns with it.

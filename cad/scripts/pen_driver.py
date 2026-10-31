@@ -45,7 +45,10 @@ def _phases_deg() -> list[float]:
 
 def peak_pen_y() -> float:
     """Max |pen_y| over one fundamental period (the curve's half-amplitude)."""
-    peak = max(abs(truth_model.pen_y(2 * math.pi * k / _SAMPLES)) for k in range(_SAMPLES))
+    terms = truth_model.pen_terms()
+    peak = max(
+        abs(truth_model.pen_y_of(terms, 2 * math.pi * k / _SAMPLES)) for k in range(_SAMPLES)
+    )
     return peak or 1.0
 
 

@@ -10,6 +10,7 @@ never feeds the review cache key.
 from __future__ import annotations
 
 import ast
+import functools
 from enum import StrEnum
 from pathlib import Path
 
@@ -21,8 +22,18 @@ class MachinistReviewMode(StrEnum):
 
 
 def mode_for_drawing(script: Path) -> MachinistReviewMode:
-    """Read a literal module-level enum declaration, rejecting ambiguous bindings."""
-    tree = ast.parse(script.read_text(encoding="utf-8"), filename=str(script))
+    """Read a literal module-level enum declaration, rejecting ambiguous bindings.
+
+    The answer is a function of the file's current text alone, so it is
+    cached by (path, text): every graph load asks for every drawing, often
+    several times per process, and an edited file is simply a new key.
+    """
+    return _mode_for_source(str(script), script.read_text(encoding="utf-8"))
+
+
+@functools.lru_cache(maxsize=None)
+def _mode_for_source(script: str, text: str) -> MachinistReviewMode:
+    tree = ast.parse(text, filename=script)
     bindings: list[ast.AST] = []
 
     class Bindings(ast.NodeVisitor):

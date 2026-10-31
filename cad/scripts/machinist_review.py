@@ -308,10 +308,24 @@ def _sheet_count(package: ReviewPackage) -> int:
         return sheets.sheet_count
 
 
+_SHEET_CATALOGS: dict[Any, dict[str, Any]] = {}
+
+
 def _sheet_resource_manifest(sources: Sequence[Path]) -> dict[str, Any]:
-    """Inspect the actual SDK registry before permitting neutral MCP helpers."""
+    """Inspect the actual SDK registry before permitting neutral MCP helpers.
+
+    The sources are opened (and so validated) on every call. The registry
+    itself depends only on the server factory -- ``create_server`` registers
+    tools, never resources -- so each factory's catalog is read from a real
+    server once per process; a different factory (a replaced one included)
+    gets its own inspection.
+    """
     with SheetStore(sources) as sheets:
-        server = _create_sheet_server(sheets)
+        factory = _create_sheet_server
+        known = _SHEET_CATALOGS.get(factory)
+        if known is not None:
+            return dict(known)
+        server = factory(sheets)
 
         async def catalog() -> dict[str, Any]:
             return {
@@ -320,7 +334,9 @@ def _sheet_resource_manifest(sources: Sequence[Path]) -> dict[str, Any]:
                 "resource_templates": len(await server.list_resource_templates()),
             }
 
-        return asyncio.run(catalog())
+        found = asyncio.run(catalog())
+        _SHEET_CATALOGS[factory] = found
+        return dict(found)
 
 
 def _resource_neutrality_permitted(catalog: Any) -> bool:
