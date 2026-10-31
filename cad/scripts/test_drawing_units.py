@@ -207,8 +207,38 @@ def test_inch_models_are_built_ips_at_eight_places_and_read_back():
     readback = _document_units.apply_package_model_units(
         _adapter(model), "in", label="probe"
     )
-    # The unit system first, then length, display, places -- all at option 0.
-    assert ext.writes == [(263, 0, 3), (47, 0, 3), (48, 0, 1), (49, 0, 8)]
+    # Length, display, places, then the unit system -- all at option 0.
+    assert ext.writes == [(47, 0, 3), (48, 0, 1), (49, 0, 8), (263, 0, 3)]
+    assert readback == {
+        "unit_system": 3,
+        "linear": 3,
+        "linear_display": 1,
+        "linear_places": 8,
+    }
+
+
+@pytest.mark.parametrize("initial", [_MMGS, _IPS_MODEL], ids=["mmgs", "already-ips"])
+def test_component_writes_reset_to_custom_until_final_ips_selection(initial):
+    class CustomOnComponentWrite(_Extension):
+        def __init__(self, values):
+            super().__init__(values)
+            self.states = []
+
+        def SetUserPreferenceInteger(self, pref, option, value):
+            ok = super().SetUserPreferenceInteger(pref, option, value)
+            if pref in (47, 48, 49):
+                self.values[263] = 4
+            self.states.append(dict(self.values))
+            return ok
+
+    ext = CustomOnComponentWrite(initial)
+    readback = _document_units.apply_package_model_units(
+        _adapter(SimpleNamespace(Extension=ext)), "in", label="probe"
+    )
+    assert ext.writes == [(47, 0, 3), (48, 0, 1), (49, 0, 8), (263, 0, 3)]
+    assert [state[263] for state in ext.states] == [4, 4, 4, 3]
+    assert ext.states[-2] == {**_IPS_MODEL, 263: 4}
+    assert ext.states[-1] == _IPS_MODEL
     assert readback == {
         "unit_system": 3,
         "linear": 3,

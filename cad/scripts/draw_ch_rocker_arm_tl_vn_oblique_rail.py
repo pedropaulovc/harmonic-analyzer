@@ -19,6 +19,7 @@ grooves read, and the isometric at 1:4.
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import sys
 from pathlib import Path
@@ -289,6 +290,78 @@ def _receipt_presentation(name: str) -> dict[str, Any]:
     }
 
 
+def _receipt_attachment_diagnostic(front: Any, annotations: list[Any]) -> None:
+    """Log native evidence, not an alternative attachment acceptance path.
+
+    An extrusion depth (Length@Rail) and origin-based sketch locations can
+    expose different attachment kinds. GetAttachedEntities3 documents NULL
+    for both unsupported entities (including origins) and lost geometry;
+    IsDangling and the complete types/count census must distinguish them on
+    the farm before changing geometry or the shared supplier contract.
+    Read all three references even when the first one failed.
+    """
+
+    def read(getter):
+        try:
+            return getter()
+        except Exception as exc:
+            return {"error_type": type(exc).__name__, "message": str(exc)}
+
+    context = {
+        "stage": "receipt_presentation_failure_after_curation",
+        "view_orientation": read(lambda: str(front.GetOrientationName())),
+        "referenced_model": read(lambda: str(front.GetReferencedModelName())),
+        "dimensions": [],
+    }
+    for raw_annotation in annotations:
+        row = {}
+        context["dimensions"].append(row)
+        try:
+            annotation = _early_bound(raw_annotation, "IAnnotation")
+            display = _early_bound(
+                annotation.GetSpecificAnnotation(), "IDisplayDimension"
+            )
+            annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+            row["full_name"] = read(
+                lambda: str(
+                    _early_bound(display.GetDimension2(0), "IDimension").FullName
+                )
+            )
+            row["dimension_type"] = read(lambda: int(display.Type2))
+            row["system_value"] = read(
+                lambda: float(
+                    _early_bound(display.GetDimension2(0), "IDimension").SystemValue
+                )
+            )
+            row["dangling"] = read(lambda: bool(annotation.IsDangling()))
+            row["visible"] = read(lambda: int(annotation.Visible))
+            row["owner_type"] = read(lambda: int(annotation.OwnerType))
+            row["owner_present"] = read(lambda: annotation.Owner is not None)
+            row["attached_count"] = read(
+                lambda: int(annotation.GetAttachedEntityCount3())
+            )
+            row["attached_types"] = read(
+                lambda: [
+                    int(kind) for kind in (annotation.GetAttachedEntityTypes() or ())
+                ]
+            )
+            row["attached_present"] = read(
+                lambda: [
+                    entity is not None
+                    for entity in (annotation.GetAttachedEntities3() or ())
+                ]
+            )
+        except Exception as exc:
+            row["annotation_error"] = {
+                "error_type": type(exc).__name__,
+                "message": str(exc),
+            }
+    _telemetry.info(
+        "rail_receipt_attachment_failure "
+        + json.dumps(context, sort_keys=True, allow_nan=False)
+    )
+
+
 @_telemetry.traced("drawing.rail_receipt_dimensions")
 def _receipt_dimensions(adapter: Any, front: Any) -> list[Any]:
     """Import the order's three model dimensions into FRONT, as reference.
@@ -307,11 +380,20 @@ def _receipt_dimensions(adapter: Any, front: Any) -> list[Any]:
     assert_imported_precision(adapter, annotations, FRONT_DIMENSION_PRECISION)
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
-        display = supplier_reference_dimension(
-            adapter,
-            _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
-            **_receipt_presentation(name),
-        )
+        try:
+            display = supplier_reference_dimension(
+                adapter,
+                _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+                **_receipt_presentation(name),
+            )
+        except RuntimeError:
+            # Diagnostics must neither repair native state nor replace the
+            # original strict refusal if a diagnostic getter/logger fails.
+            try:
+                _receipt_attachment_diagnostic(front, annotations)
+            except Exception:
+                pass
+            raise
         if name in ARROWS_INSIDE:
             display.ArrowSide = _DIM_ARROWS_INSIDE
             if int(display.ArrowSide) != _DIM_ARROWS_INSIDE:

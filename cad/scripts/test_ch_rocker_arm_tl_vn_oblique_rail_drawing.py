@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import json
 import math
 import re
 from pathlib import Path
@@ -612,7 +613,7 @@ class _ReceiptDisplay:
         return self.text[part]
 
 
-def _receipt_sheet(monkeypatch, values=None):
+def _receipt_sheet(monkeypatch, values=None, *, configure=None):
     """Dress real receipt displays; return them and a settled-check runner."""
     values = {**spec.RECEIPT_VALUES_MM, **(values or {})}
     displays = {
@@ -620,6 +621,8 @@ def _receipt_sheet(monkeypatch, values=None):
         for name in draw.RECEIPT_FEATURES
     }
     annotations = [display.annotation for display in displays.values()]
+    if configure is not None:
+        configure(displays)
     imported = []
     monkeypatch.setattr(draw, "_receipt_positions", lambda _adapter, _front: {})
     monkeypatch.setattr(
@@ -693,3 +696,102 @@ def test_settled_receipt_check_refuses_a_lost_label_or_alien_ink(monkeypatch) ->
 def test_receipt_presentation_refuses_a_value_off_the_order(monkeypatch) -> None:
     with pytest.raises(RuntimeError, match="native value"):
         _receipt_sheet(monkeypatch, {"HolePitch": 60.5})
+
+
+@pytest.mark.parametrize(
+    ("member", "value", "field", "expected"),
+    (
+        ("IsDangling", lambda: True, "dangling", True),
+        ("Visible", 0, "visible", 0),
+        ("OwnerType", 1, "owner_type", 1),
+        ("Owner", None, "owner_present", False),
+        (
+            "GetAttachedEntities3",
+            lambda: (None, object()),
+            "attached_present",
+            [False, True],
+        ),
+        ("GetAttachedEntities3", lambda: (), "attached_present", []),
+        ("GetAttachedEntityTypes", lambda: (0, 1), "attached_types", [0, 1]),
+        ("GetAttachedEntityTypes", lambda: (1,), "attached_types", [1]),
+        ("GetAttachedEntityCount3", lambda: 3, "attached_count", 3),
+    ),
+)
+def test_receipt_attachment_refusal_logs_all_native_references(
+    monkeypatch, member, value, field, expected
+) -> None:
+    messages = []
+    monkeypatch.setattr(draw._telemetry, "info", messages.append)
+    captured = {}
+
+    def configure(displays):
+        captured.update(displays)
+        setattr(displays["Length"].annotation, member, value)
+
+    with pytest.raises(RuntimeError, match="Length@Rail:.*no sound native attachment"):
+        _receipt_sheet(monkeypatch, configure=configure)
+
+    logs = [
+        json.loads(message.removeprefix("rail_receipt_attachment_failure "))
+        for message in messages
+        if message.startswith("rail_receipt_attachment_failure ")
+    ]
+    assert len(logs) == 1
+    context = logs[0]
+    assert context["view_orientation"] == "*Front"
+    assert context["referenced_model"] == str(draw.SPEC.source)
+    assert context["stage"] == "receipt_presentation_failure_after_curation"
+    rows = {row["full_name"].split("@")[0]: row for row in context["dimensions"]}
+    assert set(rows) == {"Length", "HoleEnd", "HolePitch"}
+    assert rows["Length"][field] == expected
+    for name, row in rows.items():
+        assert row["full_name"] == f"{name}@{draw.RECEIPT_FEATURES[name]}@{STEM}.SLDPRT"
+        assert row["dimension_type"] == 2
+        assert row["system_value"] == spec.RECEIPT_VALUES_MM[name] / 1000.0
+    # No synthetic text or attachment repair rescues the failing reference.
+    assert captured["Length"].units == (True, 0, 1, 0, False)
+    assert captured["Length"].text == {1: "", 2: "", 4: ""}
+
+
+def test_receipt_diagnostic_keeps_other_fields_when_one_reader_fails(
+    monkeypatch,
+) -> None:
+    messages = []
+    monkeypatch.setattr(draw._telemetry, "info", messages.append)
+
+    def configure(displays):
+        displays["Length"].annotation.IsDangling = lambda: True
+
+        def unavailable():
+            raise RuntimeError("native types reader unavailable")
+
+        displays["HoleEnd"].annotation.GetAttachedEntityTypes = unavailable
+
+    with pytest.raises(RuntimeError, match="Length@Rail:.*no sound native attachment"):
+        _receipt_sheet(monkeypatch, configure=configure)
+    message = next(
+        m for m in messages if m.startswith("rail_receipt_attachment_failure ")
+    )
+    rows = json.loads(message.split(" ", 1)[1])["dimensions"]
+    end = next(row for row in rows if row["full_name"].startswith("HoleEnd@"))
+    assert end["attached_types"] == {
+        "error_type": "RuntimeError",
+        "message": "native types reader unavailable",
+    }
+    assert end["attached_count"] == 2
+    assert end["attached_present"] == [True, True]
+    assert end["dangling"] is False
+    assert any(row["full_name"].startswith("HolePitch@") for row in rows)
+
+
+def test_receipt_diagnostic_failure_cannot_replace_native_refusal(monkeypatch) -> None:
+    def unavailable(*_args):
+        raise RuntimeError("diagnostic logger unavailable")
+
+    monkeypatch.setattr(draw, "_receipt_attachment_diagnostic", unavailable)
+
+    def configure(displays):
+        displays["Length"].annotation.IsDangling = lambda: True
+
+    with pytest.raises(RuntimeError, match="Length@Rail:.*no sound native attachment"):
+        _receipt_sheet(monkeypatch, configure=configure)

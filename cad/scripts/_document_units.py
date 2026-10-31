@@ -59,13 +59,15 @@ _INCH_MODEL_UNITS: dict[str, int] = {
     "linear_places": MODEL_INCH_DECIMALS,
 }
 
-# Readback names, in write order (the unit system first: selecting it resets
-# the length unit and places, so they are written after it).
+# Readback names, in write order.  The native cam canary read Custom after
+# explicit component writes despite the earlier IPS selection.  Selecting IPS
+# last is a candidate fix, pending native proof; read every field afterward
+# because the selector must also preserve the equation-safe eight places.
 _PREFERENCES: tuple[tuple[str, int], ...] = (
-    ("unit_system", _PREF_UNIT_SYSTEM),
     ("linear", _PREF_UNITS_LINEAR),
     ("linear_display", _PREF_UNITS_LINEAR_DECIMAL_DISPLAY),
     ("linear_places", _PREF_UNITS_LINEAR_DECIMAL_PLACES),
+    ("unit_system", _PREF_UNIT_SYSTEM),
 )
 
 
