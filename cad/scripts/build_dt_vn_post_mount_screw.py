@@ -66,6 +66,7 @@ from _simplified_part import (
     derive_simplified_on_saved_part,
 )
 from _sketch_chains import define_rectilinear_chain
+from _sketch_circle import define_circle
 from diagnostics.diag_build_40923906 import build_40923906
 from _msc_40923906 import FILLISTER_SIZE
 from diagnostics.diag_mcmaster_lib import no_sketch_inference
@@ -83,6 +84,7 @@ from dt_vn_post_mount_screw_spec import (
     CUT_LENGTH_SKETCH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    FACTORY_THREAD_START_MM,
     MAJOR_RADIUS_MM,
     MANUFACTURING_NOTES,
     REFERENCE_SKETCHES,
@@ -111,6 +113,8 @@ if _STOCK_LEN != STOCK_LENGTH_MM:
     raise ValueError("the stock recipe length is not the supplied length")
 SHANK_LEN = CUT_LENGTH_MM
 
+PLAIN_SHANK_PROFILE = "PlainShankProfile"
+PLAIN_SHANK_FEATURE = "PlainShank"
 TRIM_PROFILE = "CutToLengthProfile"
 TRIM_FEATURE = "CutToLength"
 # The cutter's profile owns CutEndBreak (see dt_vn_post_mount_screw_spec).
@@ -139,10 +143,18 @@ TRIM_VOLUME_TOL_MM3 = 0.005 * TRIM_REMOVED_MM3
 RIM_TOL_MM = 1e-4
 # Actual CURRENT catalogue-family solid features, in dependency order.
 # Do not substitute the paused corrected author's FactoryThreadSplit/BodyUnion:
-# this port preserves HeadSplit, full-shank ThreadGroove and both runout bosses.
+# this port preserves HeadSplit, full-shank ThreadGroove and both runout bosses;
+# PlainShank then restores the unthreaded shank above the factory thread.
 SUPPLIER_SOLID_FEATURES = (
     "Body", "DriverSlot", "HeadSplit", "ThreadGroove", "RunoutFill",
-    "RunoutTaper", "JunctionFillet", TRIM_FEATURE, DEBURR_FEATURE,
+    "RunoutTaper", "JunctionFillet", PLAIN_SHANK_FEATURE, TRIM_FEATURE,
+    DEBURR_FEATURE,
+)
+# The groove PlainShank fills lies between the major and the thread's root
+# radius (UNC basic: 5/8 of the fundamental triangle below the major).
+_THREAD_ROOT_RADIUS_MM = MAJOR_RADIUS_MM - 0.75 * THREAD_PITCH * math.sqrt(3.0) / 2.0
+PLAIN_SHANK_FILL_MAX_MM3 = (
+    math.pi * (MAJOR_RADIUS_MM**2 - _THREAD_ROOT_RADIUS_MM**2) * FACTORY_THREAD_START_MM
 )
 
 
@@ -556,10 +568,46 @@ def _manufacturing_controls(adapter) -> None:
     )
 
 
+async def _restore_plain_shank(adapter) -> None:
+    """The shared recipe threads the whole shank, but MSC threads only the
+    last 1.500 in: a major-diameter boss from the under-head face (the Top
+    plane) down to the factory thread start fills the groove above it."""
+    from solidworks_mcp.adapters.base import ExtrusionParameters
+
+    before = await _volume_mm3(adapter)
+    dims = SketchDims()
+    check(f"create_sketch {PLAIN_SHANK_PROFILE}", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter, 0.0, 0.0, MAJOR_RADIUS_MM, PLAIN_SHANK_PROFILE, dims=dims
+    )
+    await ensure_fully_defined(adapter, f"{PLAIN_SHANK_PROFILE} sketch")
+    check(f"exit_sketch {PLAIN_SHANK_PROFILE}", await adapter.exit_sketch())
+    name_last_feature(adapter, PLAIN_SHANK_PROFILE)
+    dims.apply(adapter, PLAIN_SHANK_PROFILE)
+    check(
+        PLAIN_SHANK_FEATURE,
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=FACTORY_THREAD_START_MM, reverse_direction=True)
+        ),
+    )
+    name_last_feature(adapter, PLAIN_SHANK_FEATURE)
+    await force_rebuild(adapter)
+    filled = await _volume_mm3(adapter) - before
+    # Only groove metal comes back: a boss run up through the head instead
+    # would add a whole Ø.250 stub, over twice this bound.
+    if not 0.0 < filled < PLAIN_SHANK_FILL_MAX_MM3:
+        raise RuntimeError(
+            f"{PLAIN_SHANK_FEATURE} added {filled:.3f} mm^3; the thread groove "
+            f"above the factory thread holds under {PLAIN_SHANK_FILL_MAX_MM3:.3f}"
+        )
+    _telemetry.success(f"{PLAIN_SHANK_FEATURE}: filled {filled:.3f} mm^3 of groove")
+
+
 @wraps(build_40923906)
 async def _cut_to_length(adapter, truth=None, **parameters):
     # The shared recipe builds the supplied screw; the trim cuts it to fit.
     receipt = await build_40923906(adapter, truth, **parameters)
+    await _restore_plain_shank(adapter)
     await _author_cut_controls(adapter)
     await _modify_stock(adapter)
     _manufacturing_controls(adapter)
