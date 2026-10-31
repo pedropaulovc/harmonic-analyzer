@@ -120,7 +120,7 @@ THUMB_HOLE_END = "INTO REBATE; ROOF NOT DRILLED"
 COVER_TAP_PRECISION = dict.fromkeys(
     ("hw-tapdrldia", "hw-tapdrldepth", "hw-threaddepth"), part.HOLE_CALLOUT_PRECISION,
 )
-THUMB_TAP_PRECISION = {"hw-thrutapdrldia": part.HOLE_CALLOUT_PRECISION}
+THUMB_TAP_PRECISION = {"hw-tapdrldia": part.HOLE_CALLOUT_PRECISION}
 # Ra 63 uin symbol left of the right view's open rebate mouth, below the mating
 # face label; its leader enters the mouth to the ceiling's mouth-side quarter.
 SLIDE_FINISH_OFFSET = (-0.030, -0.012)

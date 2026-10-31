@@ -146,7 +146,7 @@ def test_hole_wizard_callouts_print_three_places_by_native_variable() -> None:
     assert block_drawing.COVER_TAP_PRECISION == {
         "hw-tapdrldia": 3, "hw-tapdrldepth": 3, "hw-threaddepth": 3,
     }
-    assert block_drawing.THUMB_TAP_PRECISION == {"hw-thrutapdrldia": 3}
+    assert block_drawing.THUMB_TAP_PRECISION == {"hw-tapdrldia": 3}
     assert plate_drawing.CLEARANCE_PRECISION == {"hw-diam": 3}
     assert spec.HOLE_LINEAR_TOLERANCE_MM == pytest.approx(printed_band_mm(3, unit="in"))
     for size_mm, printed in ((spec.PLATE_TAP_DRILL_DIA, ".073"), (spec.THUMB_TAP_DRILL, ".089"),
