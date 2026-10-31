@@ -150,10 +150,10 @@ def test_every_printed_band_is_no_wider_than_the_arithmetic_assumed() -> None:
 
 def test_the_worst_case_walls_hold_at_the_printed_bands() -> None:
     """Recompute the thinnest walls from the printed title-block rows, with
-    each exposed edge's 0.25 break and the drill run-off (full worst case)."""
+    each exposed edge's 0.254 (R.010) break and the drill run-off (full worst case)."""
     drill = _config.title_block("drilled_hole")["plus_mm"]
     brk = geometry.OUTLINE_EDGE_BREAK_MAX_MM
-    assert brk == 0.25 and arm.DRILL_RUN_OFF_DEG == 0.3
+    assert brk == pytest.approx(0.254) and arm.DRILL_RUN_OFF_DEG == 0.3
     bore_r_max = (geometry.BORE_DIA + geometry.BORE_DIA_LIMITS[1]) / 2.0
     hub_wall = (
         geometry.HUB_DIA - _band(spec.DRAWING_PRECISION_BY_NAME["HubDia"])
