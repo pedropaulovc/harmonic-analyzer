@@ -374,19 +374,20 @@ def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
 
 def test_worst_stack_bands_are_the_printed_places() -> None:
     # Codex #837 P1: the worst fitted stack reads each band from the geometry
-    # module that owns it, at the title-block row for the places its sheet
-    # prints (#290: the strap at .XXX, the shaft and rod lengths at .XX).
+    # module that owns it, at the title-block row for the places (and unit)
+    # its sheet prints (#290: the strap at .XXX, the drum, shaft and rod
+    # lengths at .XX).
     import dt_alignment_pinion_spec
     import dt_pinion_bracket_spec
     import dt_pinion_lift_rod_spec
     import dt_pinion_pivot_shaft_spec
     import pinion_rig_layout as rig
 
-    x_band = printed_band_mm(1)  # the drum's title-block .X
     assert dt_pinion_bracket_spec.DRAWING_PRECISION["Strap"]["Depth"] == 3
     assert dt_pinion_bracket_spec.THICKNESS_BAND == printed_band_mm(3, unit="in")
-    assert dt_alignment_pinion_spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 1
-    assert rig.DRUM_LEN_BAND == x_band
+    assert dt_alignment_pinion_spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 2
+    assert dt_alignment_pinion_spec.UNIT == rig.DRUM_LEN_UNIT == "in"
+    assert rig.DRUM_LEN_BAND == printed_band_mm(2, unit="in")
     assert dt_pinion_lift_rod_spec.DRAWING_PRECISION["RodProfile"]["RodBody"] == 2
     assert dt_pinion_pivot_shaft_spec.DRAWING_PRECISION["ShaftProfile"]["ShaftLength"] == 2
     assert rig.LENGTH_BAND == printed_band_mm(2, unit="in")
@@ -456,6 +457,7 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
     assert "draw_dt_pinion_pivot_block.py" not in PRECISION_MIGRATED_DRAWINGS
     assert dt_pinion_pivot_block_spec.DRAWING_PRECISION["Block"]["Depth"] == 2
     assert dt_pinion_pivot_block_spec.BLOCK_DEPTH == pytest.approx(0.44 * 25.4)
+    assert rig.DRUM_LEN_BAND == xx_in  # the inch drum's .XX
     assert rig.LENGTH_BAND == xx_in
     assert rig.BLOCK_DEPTH_BAND == xx_in
     # Main (Codex #854 P1): each band is the title block's row for the places
