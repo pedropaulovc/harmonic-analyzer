@@ -430,7 +430,7 @@ def test_bracket_holes_are_the_leadscrew_layouts() -> None:
     for x in (near_x, far_x):
         assert x == round(x, spec.BRACKET_STATION_PLACES)
     assert spec.METRIC_DIMENSIONS[("BracketHoles", "BracketHole1X")] == (
-        3,
+        2,
         spec.BRACKET_STATION_BAND,
     )
     assert spec.BRACKET_STATION_BAND == printed_band_mm(3, unit="mm") == 0.13
@@ -485,11 +485,11 @@ def test_bracket_pattern_holds_the_tl28_float_and_names_it() -> None:
     float the TL-28 stack leaves; the tight band names its mate, and the plan,
     looking at the top, says the counterbores are on the far side."""
     assert printed_band_mm(spec.BRACKET_HOLE_PLACES, unit="in") <= 0.15
-    for name in (
-        "BracketHole1X",
-        "BracketHole5X",
-        *(f"BracketRow{row}Y" for row in range(1, 5)),
-    ):
+    # The whole-millimetre KP08 stations print two places under their
+    # explicit ±0.13 mm band; the inch rows hold .XXX.
+    for name in ("BracketHole1X", "BracketHole5X"):
+        assert spec.DRAWING_PRECISION_BY_NAME[name] == 2
+    for name in (f"BracketRow{row}Y" for row in range(1, 5)):
         assert spec.DRAWING_PRECISION_BY_NAME[name] == 3
     lines = spec.BRACKET_CALLOUT_PROCESS.split("\n")
     assert lines == ["MATCHES MHA-CH-06-TL-28", "DRILL, C'BORE FAR SIDE", ""]

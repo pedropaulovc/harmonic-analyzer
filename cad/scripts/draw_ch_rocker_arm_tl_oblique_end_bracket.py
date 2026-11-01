@@ -78,7 +78,7 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     KP08_TAP_X,
     METRIC_DIMENSIONS,
     ROW_CALLOUT,
-    STOCK_CALLOUT,
+    STOCK_CALLOUTS,
     STOCK_FRACTION_DENOMINATORS,
     TAP_CALLOUT_PLACES,
 )
@@ -547,7 +547,7 @@ def _stock_references(adapter: Any, annotations: list[Any]) -> None:
             precision=DRAWING_PRECISION_BY_NAME[name],
             expected_mm=size,
             fraction_denominator=STOCK_FRACTION_DENOMINATORS[name],
-            callout=STOCK_CALLOUT,
+            callout=STOCK_CALLOUTS[name],
         )
 
 

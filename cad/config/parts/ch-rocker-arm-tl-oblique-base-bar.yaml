@@ -17,4 +17,10 @@ ch-rocker-arm-tl-oblique-base-bar:
   quantity: 2
   tolerance_class: machined_block
   process: "saw and face to length; face both large faces to thickness; mill to width on edge in the vise (no bandsaw rip); drill and tap the seven #8-32 rail holes through; drill the eight #8 bracket holes through and counterbore them from the underside; mill the two hold-down slots through; break edges"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "front view: the HGR15R rail-hole row (40.00 ... 400.00 ±.08 mm) and the 8X TL-28 bracket-hole stations 57.00 ±.13 mm and 428.00 ±.13 mm"
+      finding: "metric vendor-mating hole stations print in millimetres on an inch sheet, beside inch dimensions from the same left end"
+      reason: "owner ruling 2026-11-01 (ruling 4B), relayed by Main: the KP08 pillow block, HGR15R rail and Tr8 nut are metric-only vendor lines, so the stations that mate with their holes keep the vendor's exact millimetres, printed in mm with the unit label and an explicit mm band (drawing-simplicity-policy.md, supplier-unit exception), not rounded inch conversions"
   drawing_unit: in

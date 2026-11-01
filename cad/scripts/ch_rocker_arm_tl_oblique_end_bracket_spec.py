@@ -305,7 +305,15 @@ CALLOUTS_BELOW = {
     **dict.fromkeys(sorted(DRAWING_DIMENSIONS["BarTaps"]), BAR_MATE_CALLOUT),
     "HoleRowY": ROW_CALLOUT,
 }
-STOCK_CALLOUT = "STOCK"
+# Rule 1 (units): an as-bought fraction is a REF with the supplier's
+# tolerance (machinist review, final head).
+STOCK_CALLOUTS = {
+    name: "STOCK ±" + f"{band / 25.4:.3f}".lstrip("0")
+    for name, band in (
+        ("BracketWidth", WIDTH_STOCK_BAND),
+        ("BracketThick", THICK_STOCK_BAND),
+    )
+}
 SURFACE_FINISHES = ()
 DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
