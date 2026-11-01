@@ -51,13 +51,14 @@ def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
     }
     marked = set().union(*support.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.VIEW_B_KEEP)
-    assert kept == marked == expected
+    assert marked == expected
+    # The chamfer's size prints as a native chamfer dimension, not imported.
+    assert kept == expected - {"RimChamferSize"}
     assert drawing.DIMENSION_CALLOUTS == {
         "WinWidth": "SQ POCKET BOTH SIDES",
         "PocketRadius": "8X",
         "CavityRadius": "4X",
         "CavWidth": "SQ CAVITY THRU",
-        "RimChamferSize": RIM_CHAMFER_CALLOUT,
         "PocketEndStation": "BOTH SIDES",
         "PocketBottomStation": "BOTH SIDES",
         "TopFlatPlusZStation": "BOTH SIDES\nKEEPS MHA-CH-08\nSEAT TAPS IN WEB",
@@ -640,28 +641,27 @@ def test_bracket_screw_stack_holds_at_the_printed_worst_case() -> None:
 
 def test_rim_chamfer_size_lands_on_an_outside_corner_of_the_front_view() -> None:
     """r7 machinist review (clarity): the size sat on a cavity rim inside the
-    section. A chamfer's size lands on its first selected edge and prints
-    only where that edge is seen end-on, so the +X end face's foot edge goes
-    first and the front view, which sees it end-on at its bottom-right
-    corner, carries the size. The section keeps its targeted import."""
+    section. The front view sees the +X end face's foot edge (the feature's
+    first edge) end-on at its bottom-right corner, so a native chamfer
+    dimension there lands its leader on the chamfered edge (run
+    20261101T051949032Z: the imported linear size's OffsetText leader ended
+    on its own extension lines)."""
     import ast
+    import inspect
 
     first, second = support.CHAMFER_EDGES[:2]
     assert first == [support.BOSS_DEPTH / 2.0, -support.HALF_Y, 0.0]
     assert second == [support.BOSS_DEPTH / 2.0, support.HALF_Y, 0.0]
-    assert "RimChamferSize" in drawing.FRONT_KEEP
+    assert "RimChamferSize" not in drawing.FRONT_KEEP
     assert "RimChamferSize" not in drawing.RIGHT_KEEP
+    assert drawing.RIM_CHAMFER_PLACES == drawing.PART_PRECISION["RimChamferSize"]
     scale = drawing.VIEW_SCALE / 1000
     corner = (
         drawing.FRONT_CENTER[0] + support.BOSS_DEPTH / 2.0 * scale,
         drawing.FRONT_CENTER[1] - support.HALF_Y * scale,
     )
-    line_x, line_y = drawing.FRONT_KEEP["RimChamferSize"]
-    assert 0.0 < line_x - corner[0] <= 0.003
-    assert 0.0 < corner[1] - line_y <= 0.003
-    # The text's leader stays short: the text is in the lane just up-right.
-    text_x, text_y = drawing.RIM_CHAMFER_TEXT_XY
-    assert math.dist((text_x, text_y), (line_x, line_y)) < 0.060
+    # The leader stays short: the text is in the lane just up-right.
+    assert math.dist(drawing.RIM_CHAMFER_TEXT_XY, corner) < 0.075
 
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     curates = {
@@ -682,14 +682,12 @@ def test_rim_chamfer_size_lands_on_an_outside_corner_of_the_front_view() -> None
         assert isinstance(by_feature, ast.Name)
         assert by_feature.id == "DRAWING_DIMENSIONS"
     assert drawing.DRAWING_DIMENSIONS is support.DRAWING_DIMENSIONS
-    offsets = [
-        call
-        for call in ast.walk(tree)
-        if isinstance(call, ast.Call)
-        and isinstance(call.func, ast.Name)
-        and call.func.id == "offset_dimension_text"
-    ]
-    assert [call.args[1].id for call in offsets] == ["front_dimensions"]
+    build_source = inspect.getsource(drawing.build)
+    assert "_add_rim_chamfer_dimension(adapter, front)" in build_source
+    assert "settled_checks=(rim_chamfer_settled,)" in build_source
+    assert "offset_dimension_text" not in Path(drawing.__file__).read_text(
+        encoding="utf-8"
+    )
 
 
 def test_precision_reaches_every_dimension_exactly_once() -> None:
@@ -721,7 +719,7 @@ def test_precision_reaches_every_dimension_exactly_once() -> None:
     assert not part & set(drawing.DIMENSION_PRECISION)
     read_main, read_view_b = part & kept, part & set(drawing.VIEW_B_KEEP)
     assert not read_main & read_view_b
-    assert read_main | read_view_b == part
+    assert read_main | read_view_b == part - {"RimChamferSize"}
 
 
 def _imported(name: str, places: int) -> SimpleNamespace:
@@ -1357,26 +1355,19 @@ def _boxes_clear(a: tuple[float, ...], b: tuple[float, ...], gap: float) -> bool
     )
 
 
-# One chamfer feature (RimChamfer) breaks every outside edge, both pocket rims
-# and the cavity rims on both web faces, so the size's caption names them all:
-# outside chamfers drawn with no size contradict the title block's 0.25 MAX
-# edge break (machinist review, MHA-FR-05 blocker).
-RIM_CHAMFER_CALLOUT = " X 45 DEG\nALL OUTSIDE\nEDGES AND\nPOCKET AND\nCAVITY RIMS"
-RIM_CHAMFER_TEXT = ".06\n" + RIM_CHAMFER_CALLOUT.strip()
+# The native chamfer dimension's text: its ".06 X 45°" value row over the
+# caption's rows, the block centred on x with its cap line at y.
+RIM_CHAMFER_TEXT = ".06 X 45°\n" + drawing.RIM_CHAMFER_CAPTION
 
 
 def _rim_chamfer_box() -> tuple[float, ...]:
-    """The chamfer's text box: on its OffsetText leader the text centres on
-    RIM_CHAMFER_TEXT_XY."""
-    return _text_box(RIM_CHAMFER_TEXT, drawing.RIM_CHAMFER_TEXT_XY)
+    """The chamfer's text box, hanging from RIM_CHAMFER_TEXT_XY's cap line."""
+    rows = len(RIM_CHAMFER_TEXT.splitlines())
+    x, top = drawing.RIM_CHAMFER_TEXT_XY
+    return _text_box(RIM_CHAMFER_TEXT, (x, top - rows * NOTE_LINE_PITCH / 2.0))
 
 
-def test_rim_chamfer_callout_names_every_edge_the_feature_breaks() -> None:
-    assert drawing.DIMENSION_CALLOUTS["RimChamferSize"] == RIM_CHAMFER_CALLOUT
-    # The rows under the size's angle name the edges, digit-free.
-    caption = RIM_CHAMFER_CALLOUT.split("\n", 1)[1]
-    assert "OUTSIDE" in caption and "POCKET" in caption and "CAVITY" in caption
-    assert not any(char.isdigit() for char in caption)
+def test_rim_chamfer_feature_breaks_every_outside_edge_and_rim() -> None:
     # The faces whose every edge the feature breaks: both slant faces (the
     # pocket rims and the outside edges they share), the -X end face and one
     # cavity fillet face. The +X end face is selected as its two edges the

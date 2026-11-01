@@ -156,6 +156,45 @@ _CALLOUT_ABOVE = 3  # swDimensionTextParts_e.swDimensionTextCalloutAbove
 _CALLOUT_BELOW = 4  # swDimensionTextParts_e.swDimensionTextCalloutBelow
 _LEADER_LINE_NONE = 3  # swLeaderLineVisibility_e.swLeaderLineNone
 
+# Precision (non-faceted) HLR/HLV still draws its curves at the drawing's
+# Image Quality wireframe resolution: the 2:1 end view's circles printed as
+# ~40-sided polygons (machinist review, two rounds; the HLR loop alone did not
+# change it). draw_fr_top_frame pins the same three document options.
+_CURVE_QUALITY = (
+    ("swImageQualityWireframe", "swWireframeImageQualityCustom"),
+    ("swImageQualityWireframeValue", 100),
+)
+_CURVE_QUALITY_HIGH = "swImageQualityWireframeHighCurveQuality"
+
+
+def _set_precise_curve_quality(adapter: Any) -> None:
+    """Pin this drawing's curve resolution before any view computes geometry."""
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    option = _sw_type_info.constant("swDetailingNoOptionSpecified")
+    settings = tuple(
+        (
+            _sw_type_info.constant(name),
+            value if isinstance(value, int) else _sw_type_info.constant(value),
+        )
+        for name, value in _CURVE_QUALITY
+    )
+    high = _sw_type_info.constant(_CURVE_QUALITY_HIGH)
+    for preference, value in settings:
+        if not extension.SetUserPreferenceInteger(preference, option, value):
+            raise RuntimeError("failed to set tube drawing curve resolution")
+    if not extension.SetUserPreferenceToggle(high, option, True):
+        raise RuntimeError("failed to improve tube drawing curve quality")
+    readback = tuple(
+        int(extension.GetUserPreferenceInteger(preference, option))
+        for preference, _value in settings
+    )
+    if readback != tuple(value for _preference, value in settings) or not bool(
+        extension.GetUserPreferenceToggle(high, option)
+    ):
+        raise RuntimeError(f"tube drawing curve quality did not persist: {readback!r}")
+
+
+
 
 @_telemetry.traced("drawing.outer_diameter")
 def _add_outer_diameter_reference(
@@ -420,6 +459,7 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         unit=part_drawing_unit(PART_STEM),
     )
+    _set_precise_curve_quality(adapter)
     stamp_drawing_summary(
         adapter,
         drawing_model,

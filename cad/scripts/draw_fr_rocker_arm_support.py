@@ -48,7 +48,6 @@ from _drawing_common import (
 from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import (
     assert_imported_precision,
-    offset_dimension_text,
     set_dimension_callouts,
     set_dimension_precision,
     set_reference_dimension,
@@ -142,15 +141,6 @@ FRONT_KEEP = {
     # through "165.1" (fix3 render).
     "WinWidth": (0.105, 0.110),
     "CavWidth": (0.105, 0.128),
-    # RimChamfer's size lands on its first edge, the +X end face's foot edge,
-    # which the front view sees end-on at its bottom-right outside corner
-    # (build_fr_rocker_arm_support.CHAMFER_EDGES). The dimension line stands
-    # just outside that corner; the text rides an OffsetText leader up into
-    # the lane between the front view and the section.
-    "RimChamferSize": (
-        FRONT_CENTER[0] + BOSS_DEPTH / 2.0 * VIEW_SCALE / 1000.0 + 0.0025,
-        FRONT_CENTER[1] - HALF_Y * VIEW_SCALE / 1000.0 - 0.0025,
-    ),
     # The cavity's and the pockets' locations (CavityLocationReference, blanked
     # in the part) stand above the view's left end, clear of the R6.35 low
     # left: from the -X end face, the pocket wall's 7.70 on the inner band
@@ -181,7 +171,11 @@ CAVITY_RADIUS_CORNER = (1, 1)
 # outside corner, so the caption names everything else it governs; drawn
 # outside chamfers with no size read as breaks past the title block's 0.25
 # MAX (machinist review, MHA-FR-05). The r7 review's "delete the chamfer"
-# (over_spec) was rejected by Main: the callout stays.
+# (over_spec) was rejected by Main: the callout stays. It prints as a native
+# chamfer dimension (_add_rim_chamfer_dimension), not the imported linear
+# RimChamferSize, whose OffsetText leader ended where its own tiny extension
+# lines met rather than on the chamfered edge (machinist review, run
+# 20261101T051949032Z).
 DIMENSION_CALLOUTS = {
     "PocketRadius": "8X",
     "CavityRadius": "4X",
@@ -189,7 +183,6 @@ DIMENSION_CALLOUTS = {
     # near one (r6 machinist review).
     "WinWidth": "SQ POCKET BOTH SIDES",
     "CavWidth": "SQ CAVITY THRU",
-    "RimChamferSize": " X 45 DEG\nALL OUTSIDE\nEDGES AND\nPOCKET AND\nCAVITY RIMS",
     # One location covers both opposed pockets, as the SQ size does.
     "PocketEndStation": "BOTH SIDES",
     "PocketBottomStation": "BOTH SIDES",
@@ -346,10 +339,23 @@ RIGHT_KEEP = {
     "TopFlatPlusZStation": (0.2385, 0.2475),
     "WebFaceStation": (0.1958, 0.1375),
 }
-# The chamfer text on its OffsetText leader (the text centres on its point),
-# in the lane between the front view and the section, low enough that the
-# leader down to the front view's corner stays short.
-RIM_CHAMFER_TEXT_XY = (0.1717, 0.190)
+# The chamfer dimension's text in the lane between the front view and the
+# section, low enough that its leader down to the front view's bottom-right
+# chamfer stays short. AddChamferDim ignores its text point, so SetPosition2
+# places it after insertion: the block's centre at x, its cap line at y
+# (draw_fr_tube_frame's proven behaviour). The value row ".06 X 45°" sits
+# over the caption's four rows.
+RIM_CHAMFER_TEXT_XY = (0.1717, 0.2035)
+RIM_CHAMFER_CAPTION = "ALL OUTSIDE\nEDGES AND\nPOCKET AND\nCAVITY RIMS"
+_RIM_CHAMFER_POSITION_TOLERANCE_M = 0.001
+# The part owns the chamfer's places (build_fr_rocker_arm_support
+# .DRAWING_PRECISION); the native dimension prints them and a whole degree.
+RIM_CHAMFER_PLACES = DRAWING_PRECISION["RimChamfer"]["RimChamferSize"]
+_CHAMFER_DIMENSION = 10  # swDimensionType_e.swChamferDimension
+# swDetailingChamferDimLeaderTextStyle_e.swDetailChamferDimDistAng
+_CHAMFER_TEXT_DIST_ANG = 2
+_CHAMFER_LENGTH = 0  # IDisplayDimension.ChamferPrecision index: length
+_CHAMFER_ANGLE = 1  # IDisplayDimension.ChamferPrecision index: angle
 
 # Top-left anchor; the native four-row table grows down and right while
 # remaining clear of the isometric and title block.
@@ -610,6 +616,142 @@ def _add_view_b_arrow(adapter: Any, front: Any) -> None:
         raise RuntimeError("view B arrow tip moved when its letter was sized")
 
 
+def _front_corner_lines(adapter: Any, view: Any) -> tuple[Any, Any]:
+    """The +X foot chamfer and its end-face lead-in as the front view draws them.
+
+    The front view sees the +X end face's foot edge end-on at its bottom-right
+    corner (build_fr_rocker_arm_support.CHAMFER_EDGES' first edge), so the
+    chamfer face and the end face stand edge-on there. Any visible model line
+    lying in the chamfer's plane draws the 45-degree line, any lying in the
+    end face's plane draws the vertical outline; the longest of each (in the
+    view's XY, the view normal being Z) is taken.
+    """
+    chamfer_offset = BOSS_DEPTH / 2.0 + HALF_Y - CHAMFER
+    end_x = BOSS_DEPTH / 2.0
+    chamfers: list[tuple[float, Any]] = []
+    ends: list[tuple[float, Any]] = []
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    for component in components:
+        edges = (
+            adapter._attempt(
+                lambda c=component: visible_component_entities(view, c, 1),
+                default=(),
+            )
+            or ()
+        )
+        for raw_edge in edges:
+            edge = _early_bound(raw_edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if not curve.IsLine():
+                continue
+            ends_mm = [
+                tuple(
+                    float(value) * 1000.0
+                    for value in _early_bound(vertex, "IVertex").GetPoint()[:2]
+                )
+                for vertex in (edge.GetStartVertex(), edge.GetEndVertex())
+            ]
+            span = math.dist(*ends_mm)
+            if all(abs(x - y - chamfer_offset) <= 1e-3 for x, y in ends_mm) and (
+                all(y < 0.0 for _x, y in ends_mm) and span >= 0.5
+            ):
+                chamfers.append((span, edge))
+            elif all(abs(x - end_x) <= 1e-3 for x, _y in ends_mm) and span >= 1.0:
+                ends.append((span, edge))
+    if not chamfers or not ends:
+        raise RuntimeError(
+            "front view has no visible +X foot chamfer line or end-face line: "
+            f"{len(chamfers)} chamfer, {len(ends)} end-face candidates"
+        )
+    return max(chamfers, key=lambda item: item[0])[1], max(
+        ends, key=lambda item: item[0]
+    )[1]
+
+
+@_telemetry.traced("drawing.rim_chamfer")
+def _add_rim_chamfer_dimension(adapter: Any, front: Any) -> Any:
+    """RimChamfer's size as a native chamfer dimension on the front view's
+    bottom-right corner: its leader lands on the chamfered edge. Returns the
+    settled check that re-proves it after the final rebuild."""
+    chamfer, lead_in = _front_corner_lines(adapter, front)
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    name = view_name(adapter, front)
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"failed to activate rim chamfer view {name!r}")
+    draw.ClearSelection2(True)
+    manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    data = manager.CreateSelectData()
+    data.View = front
+    # Chamfered edge first, then its lead-in (SOLIDWORKS chamfer-dimension order).
+    if not bool(_early_bound(chamfer, "IEntity").Select4(False, data)):
+        raise RuntimeError("failed to select the front view's foot chamfer line")
+    if not bool(_early_bound(lead_in, "IEntity").Select4(True, data)):
+        raise RuntimeError("failed to select the front view's end-face line")
+    selected = int(manager.GetSelectedObjectCount2(-1))
+    if selected != 2:
+        raise RuntimeError(f"rim chamfer selection holds {selected} entities, not 2")
+    text_xy = RIM_CHAMFER_TEXT_XY
+    display = ddoc.AddChamferDim(text_xy[0], text_xy[1], 0.0)
+    draw.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError("failed to add the rim chamfer dimension")
+    display = _early_bound(display, "IDisplayDimension")
+    display.ChamferTextStyle = _CHAMFER_TEXT_DIST_ANG
+    display.SetChamferPrecision(_CHAMFER_LENGTH, RIM_CHAMFER_PLACES)
+    display.SetChamferPrecision(_CHAMFER_ANGLE, 0)
+    display.ShowParenthesis = False
+    lanes = {1: "", 2: "", 3: "", 4: RIM_CHAMFER_CAPTION}
+    for part, text in lanes.items():
+        display.SetText(part, text)
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    if annotation is None:
+        raise RuntimeError("rim chamfer dimension has no annotation")
+    if not annotation.SetPosition2(text_xy[0], text_xy[1], 0.0):
+        raise RuntimeError("failed to position the rim chamfer text")
+
+    def settled() -> None:
+        if bool(annotation.IsDangling()):
+            raise RuntimeError("rim chamfer dimension is dangling")
+        native = _early_bound(display.GetDimension2(0), "IDimension")
+        values = tuple(native.GetSystemChamferValues(0.0, 0.0) or ())
+        if len(values) != 3 or not bool(values[0]):
+            raise RuntimeError(f"rim chamfer reads no chamfer values: {values!r}")
+        length_mm, angle_deg = float(values[1]) * 1000.0, math.degrees(float(values[2]))
+        if abs(length_mm - CHAMFER) > 1e-5 or abs(angle_deg - 45.0) > 1e-6:
+            raise RuntimeError(
+                f"rim chamfer measures {length_mm:g} mm x {angle_deg:g} deg, "
+                f"expected {CHAMFER:g} mm x 45 deg"
+            )
+        read = {part: str(display.GetText(part) or "") for part in lanes}
+        if (
+            int(display.Type2) != _CHAMFER_DIMENSION
+            or int(display.ChamferTextStyle) != _CHAMFER_TEXT_DIST_ANG
+            or int(display.ChamferPrecision(_CHAMFER_LENGTH)) != RIM_CHAMFER_PLACES
+            or int(display.ChamferPrecision(_CHAMFER_ANGLE)) != 0
+            or bool(display.ShowParenthesis)
+            or read != lanes
+        ):
+            raise RuntimeError(
+                "rim chamfer dimension style/lanes did not persist: "
+                f"type={display.Type2}, style={display.ChamferTextStyle}, "
+                f"places=({display.ChamferPrecision(_CHAMFER_LENGTH)}, "
+                f"{display.ChamferPrecision(_CHAMFER_ANGLE)}), lanes={read!r}"
+            )
+        placed = tuple(float(value) for value in (annotation.GetPosition() or ()))
+        if (
+            len(placed) < 2
+            or math.dist(placed[:2], text_xy) > _RIM_CHAMFER_POSITION_TOLERANCE_M
+        ):
+            raise RuntimeError(
+                f"rim chamfer text moved: {placed!r}, requested {text_xy!r}"
+            )
+
+    rebuild_drawing(adapter, label="rim chamfer dimension")
+    settled()
+    return settled
+
+
 def _mirror_right_end_hole_tags(view: Any) -> dict[str, tuple[float, float]]:
     """Shift the right-end hole tags left of their holes; return old -> new x."""
     moved: dict[str, tuple[float, float]] = {}
@@ -863,9 +1005,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, dimensions, imported_precision(set(FRONT_KEEP) | set(RIGHT_KEEP))
     )
     _assert_part_precision(adapter, dimensions, set(FRONT_KEEP) | set(RIGHT_KEEP))
-    offset_dimension_text(
-        adapter, front_dimensions, {"RimChamferSize": RIM_CHAMFER_TEXT_XY}
-    )
+    rim_chamfer_settled = _add_rim_chamfer_dimension(adapter, front)
     _create_view_centerline(
         adapter,
         front,
@@ -1062,6 +1202,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # fails the count instead of printing.
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=0,
+        settled_checks=(rim_chamfer_settled,),
     )
 
 
