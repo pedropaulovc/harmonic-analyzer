@@ -282,6 +282,7 @@ def test_printed_shortfalls_are_owner_declared_minors() -> None:
     assert "rule 18" in engagement.finding
     assert drawing.DIMENSION_CALLOUTS_ABOVE["NutOd"] in wall.where
     assert "rule 17" in wall.finding
-    for entry in (engagement, wall):
-        assert entry.reason.startswith("owner ruling 2026-10-17")
+    assert engagement.reason.startswith("owner ruling 2026-10-17")
+    # The inch wall (.0605 at the .060 floor) is the owner's 2026-11-01 ruling.
+    assert wall.reason.startswith("owner ruling 2026-11-01")
     assert "coordinator ruling" not in Path(spec.__file__).read_text(encoding="utf-8")
