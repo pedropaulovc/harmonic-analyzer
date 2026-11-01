@@ -31,16 +31,13 @@ ITEM = "1/4 X 1 ALLOY STEEL DOWEL PIN (ASME B18.8.2)"
 # Machinist review mr1 (rule 14): centred on their short spans, the texts ran
 # across their own witnesses and, for the 1 in length, over the pin. Each now
 # shelves past its outer witness on the Front: the diameter right of its
-# bottom lane, the length left of its lane. Front and Top reserve the same
-# left/right space so the fit keeps them on one projection line.
+# bottom lane, the length left of its lane. Only the Front is annotated; the
+# projection fit keeps the Top on its column.
 SHELVES = {
     "SupplierDowelDiameter": (True, "right"),
     "SupplierDowelLength": (False, "left"),
 }
-SUPPLIER_MARGINS = {
-    "*Top": (0.070, 0.010, 0.065, 0.010),
-    "*Front": (0.070, 0.026, 0.065, 0.020),
-}
+SUPPLIER_MARGINS = {"*Front": (0.070, 0.026, 0.065, 0.020)}
 
 
 def _assert_supplier_bands(displays: dict[str, Any]) -> None:

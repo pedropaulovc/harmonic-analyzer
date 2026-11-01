@@ -24,18 +24,14 @@ ITEM = 'LOW-CARBON STEEL SHIM, 3/8 X 5/8, .008 THICK'
 # Every text shelves past its own outer witness, clear of the lines: the bore
 # on the Top's top lane, the OD on its bottom lane, both left of the thin
 # strip so the thickness text beside it on the right stays clear of them.
-# Front and Top reserve the same left/right space so the fit centres them on
-# one projection line; the unannotated Front's equal top/bottom keeps it
-# level with the Right. The 5/8 part fits at 2:1.
+# Only the Top is annotated; the projection fit centres the Front under it.
+# The 5/8 part fits at 2:1.
 SHELVES = {
     "SupplierBoreDiameter": (True, "left"),
     "SupplierOuterDiameter": (True, "left"),
     "SupplierThickness": (False, "right"),
 }
-SUPPLIER_MARGINS = {
-    "*Front": (0.060, 0.010, 0.060, 0.010),
-    "*Top": (0.060, 0.018, 0.060, 0.018),
-}
+SUPPLIER_MARGINS = {"*Top": (0.060, 0.018, 0.060, 0.018)}
 
 
 def _assert_supplier_bands(displays):
