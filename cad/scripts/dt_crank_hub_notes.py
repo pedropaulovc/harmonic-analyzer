@@ -131,9 +131,7 @@ PIN_PROUD_CALLOUT = "\n".join(
 # (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the overall places the rear face against the removable sprocket
 # (stack B below), the relief places the barrel's rear shoulder ahead of the
 # #25 chain wrapping it (stack A).
-# Three short rows: two filled the 50 mm between the overall's extension
-# lines (review of farm run 20261101T130334243Z).
-HUB_LENGTH_CALLOUT = "REAR FACE CLEARS\nSPROCKET\nMHA-PD-09"
+HUB_LENGTH_CALLOUT = "REAR FACE CLEARS\nSPROCKET MHA-PD-09"
 RELIEF_LENGTH_CALLOUT = "CLEARS #25 CHAIN ON\nSPROCKET MHA-PD-09"
 
 # Axial stack at the printed worst case (Main, 2026-09-30), machine z, -Z =
