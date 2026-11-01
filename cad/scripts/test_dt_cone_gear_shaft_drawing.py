@@ -1676,6 +1676,11 @@ def test_the_sheet_states_the_collar_as_stock_with_its_break() -> None:
     callout = spec.COLLAR_STOCK_CALLOUT.upper()
     assert "5/8" in callout and "AS SUPPLIED" in callout
     assert f"{spec.inch_text(spec.THRUST_EDGE_BREAK_MAX, 3)} MAX" in callout
+    # PR #2107 review: the tight OD break names its function, the thrust ring
+    # on MHA-DT-05 that its rule-17 floor holds, on the line after it.
+    lines = callout.split("\n")
+    break_line = lines.index(f"EDGE BREAK {spec.inch_text(spec.THRUST_EDGE_BREAK_MAX, 3)} MAX")
+    assert lines[break_line + 1] == "FOR MHA-DT-05 THRUST RING"
     # Machinist review r1: the sharp roots get a limit and both their reason.
     assert f"ROOTS R{spec.inch_text(spec.COLLAR_ROOT_RADIUS_MAX, 3)} MAX" in callout
     assert "SEATS MHA-DT-05 AND 64T" in callout
