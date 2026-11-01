@@ -785,6 +785,22 @@ def test_v_is_its_flank_angles_mouth_and_apex_flat_with_a_reference_height() -> 
         "ReliefZ1",
         "ReliefHeight",
     }
+
+    # The flat's reference height reads what the printed mouth stations, flat
+    # width and 45° flanks close to (machinist review c03368c: (.196) against
+    # (.67 - .19 - .08) / 2 = .20).
+    def printed(mm: float, name: str) -> float:
+        return round(mm / 25.4, spec.DRAWING_PRECISION_BY_NAME[name])
+
+    mouth = printed(spec.depth_station(spec.V_MOUTH_Z1), "VMouthZ1") - printed(
+        spec.depth_station(spec.V_MOUTH_Z0), "VMouthZ0"
+    )
+    closure = (
+        (mouth - printed(spec.V_FLAT_WIDTH, "VFlatWidth"))
+        / 2.0
+        / math.tan(math.radians(spec.V_FLANK_ANGLE_DEG))
+    )
+    assert printed(spec.V_FLAT_Y, "VFlatY") == pytest.approx(closure)
     # The grip seats on both flanks: each flank at its own printed limit,
     # each mouth edge and the flat at their printed .XX limits, it stays 0.96
     # under the flat, each contact line at least 2.03 up its flank and inside

@@ -36,7 +36,16 @@ from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
-from _sketch import SketchDims, add_line_chain, ensure_fully_defined
+from _single_limit_tolerance import set_single_limit
+from _sketch import (
+    SketchDims,
+    add_line_chain,
+    anchor_point_to_origin,
+    blank_reference_sketches,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
 from _drawing_marks import (
@@ -64,6 +73,10 @@ from pn_pen_rod_spec import (
     SQUARE_LENGTH,
     STUD_TAP_DRILL_DIA,
     STUD_TAP_SPEC,
+    TAP_WALL_MIN_BAND,
+    TAP_WALL_MIN_MM,
+    TAP_WALL_MIN_TOL_TYPE,
+    TAP_WALL_START_R,
     UNIT,
 )
 
@@ -101,6 +114,47 @@ def _shoulder_fillet_max_limit(adapter) -> None:
     ):
         raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
     _telemetry.success(f"{label}: single limit {SHOULDER_FILLET_R:g} MAX")
+
+
+async def _tap_wall_reference(adapter) -> None:
+    """RV-01's accepted tap wall, stated on the sheet natively (rule 20): a
+    hidden construction line on the Top plane (the shoulder; sketch x = model
+    X, sketch y = model -Z, as the end view looks) running +Z from the stud
+    tap's thread major on the rod axis toward a flat, as long as the printed
+    minimum, so its driving dimension prints ".067 MIN" once set_single_limit
+    types it (build_pn_pen_frame's _tap_wall_reference)."""
+    check("create_sketch tap wall reference", await adapter.create_sketch("Top"))
+    # Direct-to-DB: the line starts on the axis, where creation-time inference
+    # would snap it to the origin or the pivot's circle.
+    set_sketch_direct_db(adapter, True)
+    start = (0.0, -TAP_WALL_START_R)
+    line = check(
+        "tap wall reference line",
+        await adapter.add_line(*start, start[0], start[1] - TAP_WALL_MIN_MM),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("tap wall reference line did not take the construction flag")
+    check(
+        "tap wall reference vertical",
+        await adapter.add_sketch_constraint(line, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        f"{line}.start",
+        f"{line}.end",
+        "vertical_distance",
+        TAP_WALL_MIN_MM,
+        "tap wall reference",
+    )
+    await anchor_point_to_origin(adapter, f"{line}.start", *start, "tap wall reference")
+    await ensure_fully_defined(adapter, "tap wall reference sketch")
+    check("exit_sketch tap wall reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "TapWallReference")
+    name_dimensions(adapter, "TapWallReference", ["TapWallMin", "TapWallStart"])
+    blank_reference_sketches(adapter, ("TapWallReference",))
 
 
 async def build(adapter) -> dict[str, str]:
@@ -264,6 +318,7 @@ async def build(adapter) -> dict[str, str]:
             f"pen-rod slide axis is {slide_axis!r}; the assembly mates {SLIDE_AXIS!r}"
         )
     _blank_ref_axis(adapter, slide_axis)
+    await _tap_wall_reference(adapter)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
@@ -271,6 +326,14 @@ async def build(adapter) -> dict[str, str]:
         set_dimension_bilateral_tolerance(
             adapter, feature_name, dimension_name, *deviations(band), display_unit=UNIT
         )
+    set_single_limit(
+        adapter,
+        "TapWallReference",
+        "TapWallMin",
+        limit=TAP_WALL_MIN_MM,
+        band=TAP_WALL_MIN_BAND,
+        tol_type=TAP_WALL_MIN_TOL_TYPE,
+    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _shoulder_fillet_max_limit(adapter)
     clear_dimensions_for_drawing(adapter)

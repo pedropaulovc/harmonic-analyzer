@@ -27,11 +27,21 @@ SPEC = DRAWINGS_BY_NAME["pn_vn_hanger_screw"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "#8-32 x 1 HEX HEAD SCREW, FULLY THREADED"
 # Texts wider than their short spans shelve past their own witnesses; the
-# 1 in length keeps its centred text.
+# 1 in length's centred text was struck by its own witnesses (6988bc2
+# review), so it shelves right too.
 SHELVES = {
+    "SupplierLength": (False, "right"),
     "SupplierHeadHeight": (False, "left"),
     "SupplierHeadWidth": (True, "right"),
     "SupplierThreadDiameter": (True, "right"),
+}
+# The hex head's width is across its flats, as on the nut sheets.
+FORMATS = {
+    **SUPPLIER_REFERENCE_FORMATS,
+    "SupplierHeadWidth": (
+        *SUPPLIER_REFERENCE_FORMATS["SupplierHeadWidth"][:3],
+        "ACROSS FLATS",
+    ),
 }
 
 
@@ -50,7 +60,7 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter,
             views_by_orientation,
             dimensions=SUPPLIER_REFERENCE_DIMENSIONS,
-            formats=SUPPLIER_REFERENCE_FORMATS,
+            formats=FORMATS,
             starts=SUPPLIER_REFERENCE_STARTS,
             planes=SUPPLIER_REFERENCE_PLANES,
             sides=SUPPLIER_REFERENCE_SIDES,

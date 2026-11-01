@@ -326,16 +326,16 @@ SECTION_REFERENCE_SKETCHES = REFERENCE_SKETCHES
 # relief's walls, roof and step, the bore and tap stations.  The V prints
 # each flank's angle to the bottom face (one "2X 45°" for both, whole degrees,
 # the title block's +/-1); the flat's height the flanks leave is a reference,
-# driven in the sketch, at three places.  The flat's two rounds and the bore
-# chamfer print their single limits at three places, the reamed bore its
-# +.0005 band at four.
+# driven in the sketch, at the mouth stations' and flat's two places, so it
+# reads what they close to.  The flat's two rounds and the bore chamfer print
+# their single limits at three places, the reamed bore its +.0005 band at four.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OutlineProfile": {"Length": 2, "NeckZ0": 2, "NeckZ1": 2, "Depth": 2},
     "Block": {"Height": 2},
     "VGrooveProfile": {
         "VFlankAngle": 0,
         "VFlatWidth": 2,
-        "VFlatY": 3,
+        "VFlatY": 2,
         "VMouthZ0": 2,
         "VMouthZ1": 2,
     },
@@ -348,8 +348,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 }
 # The one driven sketch dimension the print shows, parenthesised as a
 # reference (no tolerance): the apex flat's height, which the flanks' angles,
-# mouth edges and flat width fix.  It follows the closure apex, so it prints
-# rounded, (.196).
+# mouth edges and flat width fix.  It follows the closure apex (.196) and
+# prints rounded, (.20): what the printed .19 / .67 mouth stations, .08 flat
+# and 45° flanks close to (machinist review c03368c: at three places it
+# disagreed with them).
 REFERENCE_DIMENSIONS: tuple[tuple[str, str], ...] = (("VGrooveProfile", "VFlatY"),)
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -599,7 +601,7 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
 PEN_ROD_NUMBER = _config.parts("pn-pen-rod")["number"]
 DIMENSION_CALLOUTS: dict[str, str] = {
     "PivotDia": f"REAM THRU\nSLIP FIT ON\nPEN ROD PIVOT\n{PEN_ROD_NUMBER}",
-    "PivotChamferSize": "X 45 DEG",
+    "PivotChamferSize": "X 45°",
 }
 # One row: SolidWorks stores a line break in the above compartment but prints
 # nothing of it, while the dimension line still runs under the unprinted text

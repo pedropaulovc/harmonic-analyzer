@@ -12,9 +12,10 @@ the lathe (drawing-guidelines.md rule 11), and carries the square's and the
 pivot's lengths from the shoulder, the pivot's banded diameter between its
 flanks, the shoulder root's R MAX and the (4.82) end-to-end reference; the
 labelled end view (5:1) under it looks at the tapped top face and carries the
-square's banded SQ size and the native Hole Wizard callout of the #0-80 stud
-tap, its drill Ø at .XXX and both depths at .XX; the labelled 1:1 isometric
-sits right.
+square's banded SQ size, the native Hole Wizard callout of the #0-80 stud
+tap, its drill Ø at .XXX and both depths at .XX, and the tap's .067 MIN wall
+(RV-01, from the part's hidden TapWallReference sketch, shown in that view
+only); the labelled 1:1 isometric sits right.
 
 Run with SolidWorks open::
 
@@ -44,14 +45,16 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
+from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import (
     assert_imported_precision,
+    offset_dimension_text,
     set_dimension_callouts,
     set_reference_dimension,
 )
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import ViewEdges, scan_view_edges
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_points_in_view
@@ -77,6 +80,8 @@ from pn_pen_rod_spec import (
     STUD_TAP_DEPTH_PLACES,
     STUD_TAP_DRILL_DIA,
     STUD_TAP_SPEC,
+    TAP_WALL_MIN_MM,
+    TAP_WALL_START_R,
     TOTAL_LENGTH,
 )
 
@@ -147,6 +152,11 @@ def _sy(model_x_mm: float) -> float:
 
 def _end_x(center: tuple[float, float], model_x_mm: float) -> float:
     return center[0] + model_x_mm * END_SCALE[0] / END_SCALE[1] / 1000.0
+
+
+def _end_y(center: tuple[float, float], model_z_mm: float) -> float:
+    """Sheet y of a model z in the end view ("*Top": model +Z points down)."""
+    return center[1] - model_z_mm * END_SCALE[0] / END_SCALE[1] / 1000.0
 
 
 _HALF = ROD_SECTION / 2.0
@@ -238,7 +248,24 @@ _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 # line's lower arrow piece (x 0.132, to y ~0.0561).
 END_KEEP = {
     "Depth": (END_CENTER[0] + 0.052, END_CENTER[1] + 0.00051),
+    "TapWallMin": (
+        END_CENTER[0] - _END_HALF_M - 0.010,
+        _end_y(END_CENTER, TAP_WALL_START_R + TAP_WALL_MIN_MM / 2.0),
+    ),
 }
+# RV-01's tap wall (.067 MIN over TAP WALL) stands left of the square, the
+# one empty side: its reference line runs from the thread's rim straight
+# down the vertical centreline toward the bottom flat (sheet y ~0.0712 to
+# ~0.0627), so its extension lines run left from the centreline, under the
+# centre mark's horizontal arm and clear of the tap callout's leader (which
+# drops onto the rim from above), to its line 10 mm left of the square.
+# The 8.5 mm run cannot hold the ~21 x 9 mm two-row text, so native
+# OffsetText parks it on a leader further left (draw_pn_pen_frame's
+# TAP_WALL_TEXT_XY): x ~0.027..0.052, its right edge ~4.5 mm clear of the
+# extension lines' ends and ~7 mm over the view label's top.  The anchor is
+# the value row's bottom centre.
+TAP_WALL_TEXT_XY = (END_CENTER[0] - _END_HALF_M - 0.028, END_KEEP["TapWallMin"][1])
+_TEXT_SETTLE_M = 0.0005
 TAP_CALLOUT_XY = (END_CENTER[0] + 0.022, END_CENTER[1] + 0.035)
 END_NOTE_WIDTH = 0.075
 END_NOTE_XY = (
@@ -357,6 +384,25 @@ def _dress_shoulder_radius(adapter: Any, annotations: list[Any]) -> None:
     _telemetry.info(
         f"shoulder radius: text {display.GetText(1)!r}, MAX type, callout {callout!r}"
     )
+
+
+def _offset_tap_wall_text(adapter: Any, annotations: list[Any]) -> None:
+    """Park the tap wall's text on its leader shelf and read it back."""
+    offset_dimension_text(adapter, annotations, {"TapWallMin": TAP_WALL_TEXT_XY})
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        if dimension_name(adapter, annotation) != "TapWallMin":
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        position = annotation.GetPosition()
+        if (
+            not bool(display.OffsetText)
+            or position is None
+            or math.dist(position[:2], TAP_WALL_TEXT_XY) > _TEXT_SETTLE_M
+        ):
+            raise RuntimeError(
+                f"tap wall text at {position!r}, not offset to {TAP_WALL_TEXT_XY!r}"
+            )
 
 
 def _center_mark_count(view: Any) -> int:
@@ -551,6 +597,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    _offset_tap_wall_text(adapter, annotations)
     # The template may centre-mark the tap as the view is placed: farm run
     # 20261023T212137739Z's layout audit found two identical marks on it
     # (duplicate-annotation, fleet issue #913) after the explicit call.  Mark
