@@ -92,10 +92,17 @@ if PLATEN_TOP_CLEARANCE < PLATEN_TOP_CLEARANCE_MIN:
         f"(< {PLATEN_TOP_CLEARANCE_MIN})"
     )
 
-# --- Two open U guide plates (16 gauge sheet), brazed across the strap front.
-# The plates are 16 gauge A366/1008 sheet (.0598, tolerance range .0548 to
-# .0648, the Online Metals page above) as supplied, printed as a reference.
-GUIDE_PLATE_T = 1.51892  # .0598, 16 GA
+# --- Two open U guide plates (12 gauge sheet), brazed across the strap front.
+# The plates are 12 gauge A366/1008 sheet (.1046, tolerance range .0986 to
+# .1106, the Online Metals page above) as supplied, printed as a reference.
+# Each plate is a web: its thinnest supplied sheet keeps rule 17's .080 target
+# (16 gauge's .0548 fell under the .060 floor; 14 gauge's .0697 under the target).
+GUIDE_PLATE_T = 2.65684  # .1046, 12 GA
+GUIDE_PLATE_T_STOCK_RANGE = (round(0.0986 * 25.4, 6), round(0.1106 * 25.4, 6))
+if not GUIDE_PLATE_T_STOCK_RANGE[0] < GUIDE_PLATE_T < GUIDE_PLATE_T_STOCK_RANGE[1]:
+    raise AssertionError("the guide plate stock band no longer brackets its gauge")
+if GUIDE_PLATE_T_STOCK_RANGE[0] < WALL_TARGET_MM:
+    raise AssertionError("the thinnest supplied guide plate is under the rule 17 target")
 # The upper plate's top face below the strap top (printed): the plates'
 # pitch follows from it, the rise and the gauge (photo ~42 mm).
 UPPER_PLATE_DROP = 127.0  # 5.00
@@ -348,7 +355,7 @@ DIMENSION_CALLOUTS: dict[str, str] = {
     # machined size: printed as a reference (parenthesised) with the gauge
     # named under it.
     "StrapThick": "11 GA SHEET",
-    "PlateThick": "16 GA SHEET",
+    "PlateThick": "12 GA SHEET",
 }
 # Model dimensions the sheet parenthesises as reference (the stock governs).
 REFERENCE_DIMENSIONS: frozenset[str] = frozenset({"StrapThick", "PlateThick"})
