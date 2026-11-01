@@ -1433,8 +1433,9 @@ Catalog specifications checked on September 10, 2026:
   helix height. 92671A115 is a brass hex nut, standard profile, 0-80 UNF
   Class 2B, 5/32 in across flats, 3/64 in high; `diag_build_92671A115.py`
   extrudes the hexagon with a plain bore at the #0-80 basic major. #0-80 is
-  the stud thread because the 5 mm square rod keeps a 1.71 wall around it
-  where #2-56 leaves 1.38 and #4-40 1.05, under the 1.5 floor of
+  the stud thread because the .197 in square rod, at its .195 minimum, keeps
+  .0675 in around it (printed .067 MIN, RV-01) where #2-56 leaves .0545 and
+  #4-40 .0415, under the .060 in floor of
   drawing-guidelines.md rule 17 (walls and webs). Each page offers only a
   2-D PDF, so both are catalogue-only: no replica gate, and their standalone
   diagnostics are catalog-only runs.
@@ -1458,9 +1459,9 @@ Catalog specifications checked on September 10, 2026:
   family screw at 1 in (8-32 UNC Class 2A, fully threaded, flat tip, 1/4 in
   head width, 7/64 in head height, ASME B18.6.3). The family lists 8-32
   lengths of 3/8, 1/2, 5/8, 3/4, 1, 1-1/4 and 1-1/2 in; 7/8 in is not
-  offered, and 3/4 in (93075A197) would leave 0.8 of full thread past the
+  offered, and 3/4 in (93075A197) would leave 0.3 of full thread past the
   jam nut, under two pitches, once its tip chamfer is excluded. At 1 in,
-  7.2 of full thread stands past the jam nut and the tip stops 3.2 short of
+  6.6 of full thread stands past the jam nut and the tip stops 3.7 short of
   the magnifying-wheel rim. `diag_build_93075A199.py` runs the shared
   hex-head family builder at the catalogue dimensions; no vendor solid is
   committed. Neither nut has a solid used here: `diag_build_90480A009.py`
