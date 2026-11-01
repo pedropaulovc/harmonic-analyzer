@@ -82,8 +82,10 @@ ISO_CENTER = (0.345, 0.210)
 END_KEEP = {"NoseDia": (0.027, 0.165), "FlatDistance": (0.125, 0.156)}
 # Rule 11 (r4 review): the nose diameter across the nose on the turning view,
 # its dimension line left of the nose's south face (x 182, y 157-183), clear
-# of FlatDistance's text and below NoseLength's.
-NOSE_DIA_ON_SIDE = (0.165, SIDE_CENTER[1])
+# of FlatDistance's text and below NoseLength's. Its text prints ~5.5 mm right
+# of the keep: at x 0.165 it reached x 183.3 across NoseLength's south
+# extension line at x 182 (farm run 20261101T005319353Z).
+NOSE_DIA_ON_SIDE = (0.160, SIDE_CENTER[1])
 # CollarDia is a turned-profile sketch dimension, native to the side view.
 # Farm 20261031T205208603Z: the nose spans x 182-196 mm and the body x 196-228,
 # y 135-205; NoseLength's south extension line runs x 182, y 169-213.
