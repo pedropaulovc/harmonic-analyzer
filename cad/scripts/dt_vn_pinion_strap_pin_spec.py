@@ -16,9 +16,11 @@ from __future__ import annotations
 
 import math
 
+import _config
 from _fit_ream_slide import REAM_SLIDE
 from _fit_shaft_h import SHAFT_H
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _package_units import drawing_unit
 from _printed_tolerance import printed_deviations
 from _supplier_pin_data import SupplierPinReference
 from dt_pinion_bracket_geometry import (
@@ -164,6 +166,9 @@ if PIN_DRIVE_SHARE_MAX > 2.0 * PIN_SUB_FLUSH_MAX:
 # Inspected McMaster engineering drawing, 2026-10-19. The .063 print is
 # three-place presentation of the exact installed 1/16 cylinder; the
 # supplier's hole range belongs to a separate MATING HOLE reference.
+# The pin's own sheet unit (#290 drawing_unit), which drops the supplier REFs'
+# " in" on an inch sheet (_supplier_pin_model._reference_suffix).
+SHEET_UNIT = drawing_unit("parts/dt-vn-pinion-strap-pin", _config.parts("dt-vn-pinion-strap-pin"))
 SUPPLIER_REFERENCE = SupplierPinReference(
     sku="98296A027",
     units="in",
@@ -176,4 +181,5 @@ SUPPLIER_REFERENCE = SupplierPinReference(
     wall_precision=3,
     application_hole_limits=(0.062, 0.065),
     application_hole_precision=3,
+    sheet_unit=SHEET_UNIT,
 )
