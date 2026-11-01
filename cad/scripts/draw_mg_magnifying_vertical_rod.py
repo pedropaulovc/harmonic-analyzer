@@ -70,6 +70,7 @@ from mg_magnifying_vertical_rod_spec import (
     RELIEF_ROOTS_CALLOUT,
     RELIEF_START_X,
     ROD_DIA,
+    ROD_DIA_CALLOUT,
     ROD_DIA_FRACTION_DENOMINATOR,
     ROD_LENGTH,
     SHOULDER_X,
@@ -127,7 +128,7 @@ SIDE_KEEP = {
     "OverallLength": (_sheet_x(0.25 * ROD_LENGTH), SIDE_CENTER[1] - 0.027),
     # The Ø line crosses the body three quarters along, its value above the
     # rod, clear of detail A's rows and of the body length's text; the
-    # as-bought rod's supplier REF fraction, no callout.
+    # as-bought rod's supplier REF fraction, its stock band below it.
     "RodDia": (_sheet_x(0.75 * ROD_LENGTH), SIDE_CENTER[1] + 0.020),
     # Above-right of the dome: the leader lands on its upper quarter.
     "DomeR": (DOME_TIP_X + 0.012, SIDE_CENTER[1] + 0.017),
@@ -730,6 +731,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_mm=ROD_DIA,
         presentation="diameter",
         fraction_denominator=ROD_DIA_FRACTION_DENOMINATOR,
+        callout=ROD_DIA_CALLOUT,
     )
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(

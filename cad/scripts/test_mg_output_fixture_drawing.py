@@ -92,7 +92,6 @@ def test_flats_and_overall_length_print_as_unbanded_references() -> None:
     )
     # Driven in the part, so the sheet's (.71) is the model's own sum.
     assert "_make_driven(adapter, overall, 'overall length')" in turned
-    assert spec.STOCK_NOTE == "7/16 HEX BAR, FLATS AS SUPPLIED."
 
 
 def _local_imports(module: Path) -> set[str]:
@@ -195,7 +194,6 @@ def test_every_wall_holds_the_target_and_the_sheet_states_none() -> None:
         "floor_2",
     ):
         assert not hasattr(spec, retired), retired
-    assert "MIN" not in spec.DRAWING_NOTES
 
 
 def test_the_owner_ruling_numbers_hold() -> None:
@@ -233,11 +231,6 @@ def test_bore_is_centred_and_its_walls_take_the_drill_run_off() -> None:
     assert spec.WALLS["rod bore to the free end"][1] == pytest.approx(
         (0.209 - 0.005) * 25.4 - largest_bore_r - wander, abs=1e-9
     )
-    # Review r3 (rule 7): the thread's extent reads on the tap callout, so the
-    # general notes keep only the stock.
-    assert spec.DRAWING_NOTES.splitlines() == [
-        "7/16 HEX BAR, FLATS AS SUPPLIED.",
-    ]
     # Nothing locates the bore from a flat any longer: the hex sketch centres
     # it by equal flats.
     assert not hasattr(geom, "BORE_FROM_FLAT")
@@ -308,7 +301,6 @@ def test_a_bottoming_tap_reaches_full_thread_through_the_wall_and_stops_short() 
     assert spec.TAP_STOP_WINDOW == pytest.approx(2.0 * half_chord - 2.0 * pitch, abs=1e-9)
     assert spec.TAP_STOP_WINDOW > 0.0
     assert spec.TAP_EXTENT_CALLOUT == "FULL THREAD TO ROD BORE"
-    assert spec.TAP_EXTENT_CALLOUT not in spec.DRAWING_NOTES
     for retired in ("PLUG_TAP_USABLE_LENGTH", "PLUG_TAP_LEAD", "TAP_TOOL_NOTE"):
         assert not hasattr(spec, retired), retired
     # The tap drill's full Ø clears the near wall; its point stops short of
@@ -610,8 +602,6 @@ def test_the_rod_bore_ends_the_thread_and_its_depth_is_ref() -> None:
     assert spec.TAP_EXTENT_CALLOUT == "FULL THREAD TO ROD BORE"
     assert not any(ch.isdigit() for ch in spec.TAP_EXTENT_CALLOUT)
     assert not hasattr(spec, "TAP_EXTENT_NOTE")
-    assert "REF" not in spec.DRAWING_NOTES
-    assert "FULL THREAD" not in spec.DRAWING_NOTES
     assert geom.TAP_SPEC.overrides_mm["ThreadDepth"] == geom.TAP_LENGTH
     assert geom.TAP_LENGTH == pytest.approx(geom.SPIGOT_FACE_X - geom.ROD_BORE_DIA / 2.0)
     assert set(spec.TAP_CALLOUT_PRECISION) == {
@@ -1636,21 +1626,23 @@ def test_tap_centre_mark_unmeasured_fails(
         _prove_mark(monkeypatch, marks, edge=edge)
 
 
-def test_notes_are_short() -> None:
-    lines = spec.DRAWING_NOTES.splitlines()
-    # Review r3 (rule 7): the thread's extent is the tap callout's row, so
-    # the stock is the one general note.
-    assert lines == [spec.STOCK_NOTE]
-    assert max(map(len, lines)) <= 68
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+def test_the_sheet_carries_no_general_note() -> None:
+    # Machinist review (run 20261101T025747277Z): the flats' REF named no
+    # supplier band.  It is on the REF's own rows now, so the stock note
+    # (rule 11: notes carry no dimensions) is gone; the thread's extent was
+    # already the tap callout's row (review r3).
+    for retired in ("DRAWING_NOTES", "STOCK_NOTE"):
+        assert not hasattr(spec, retired), retired
+    assert not hasattr(drawing, "NOTES_XY")
+    for module in (part, drawing):
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        assert "Manufacturing Notes" not in source, module.__name__
 
 
 def test_part_stamps_make_critical_properties() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
+    assert "apply_drawing_properties(adapter, PART_NAME)" in source
     assert "clear_dimensions_for_drawing" in source
-    assert "Manufacturing Notes" in part._SAVED_DRAWING_PROPERTIES
     import _config
 
     config = _config.parts("mg-output-fixture")
@@ -1660,20 +1652,20 @@ def test_part_stamps_make_critical_properties() -> None:
     assert int(config["quantity"]) == 1
 
 
-def test_notes_are_model_owned_and_state_no_wall() -> None:
-    assert part.DRAWING_NOTES is spec.DRAWING_NOTES
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert '{"Manufacturing Notes": DRAWING_NOTES}' in source
-    # Every wall holds the target (rule 20): no wall note survives.
-    assert spec.DRAWING_NOTES == spec.STOCK_NOTE
-    for word in ("WALL", "MIN"):
-        assert word not in spec.DRAWING_NOTES, word
-    # r1: the corner-to-corner bore is drawn (the end view's centreline
-    # through the corners), never noted; no note names a method.
-    for word in ("CENTRED", "CORNER", "REAM", "DRILL", "HOLD ON", "PLUG"):
-        assert word not in spec.DRAWING_NOTES, word
-    for retired in ("BORE_TOOL_NOTE", "TAP_TOOL_NOTE"):
-        assert not hasattr(spec, retired), retired
+def test_the_flats_reference_states_the_stock_and_its_supplier_band() -> None:
+    # The supplier's +/-.005 on the 7/16 flats, the band every wall proof
+    # reads, under the fraction REF.
+    assert spec.HEX_AF_CALLOUT == "HEX STOCK,\nSUPPLIER ±.005"
+    assert spec.HEX_STOCK_AF_BAND == pytest.approx(0.005 * 25.4)
+    assert drawing.HEX_AF_REFERENCE["callout"] is spec.HEX_AF_CALLOUT
+    # The REF's rows fit between the side view's turned Ø text and the hex.
+    keep_x = drawing.END_KEEP["HexAf"][0]
+    spigot_text_right = drawing.SIDE_KEEP["SpigotDia"][0] + drawing.TURNED_DIA_TEXT_HALF_WIDTH
+    assert keep_x - drawing._AF_TEXT_HALF_WIDTH > spigot_text_right + 0.003
+    assert keep_x + drawing._AF_TEXT_HALF_WIDTH < drawing.END_CENTER[0] - drawing._END_HALF_WIDTH
+    # The text box stays between the flats, so their witnesses are never
+    # read as text.
+    assert drawing._AF_TEXT_HALF_HEIGHT < drawing._END_HALF_HEIGHT - 0.002
 
 
 def test_projection_precedes_import_and_all_native_ink_proofs_follow_rebuild() -> None:
@@ -3087,6 +3079,7 @@ def test_end_af_native_proof_requires_the_supplier_fraction_reference(
             "precision": 3,
             "expected_mm": geom.HEX_AF,
             "fraction_denominator": 16,
+            "callout": "HEX STOCK,\nSUPPLIER ±.005",
         }
     ]
 

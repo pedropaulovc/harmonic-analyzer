@@ -67,7 +67,6 @@ from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
-from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
 from _sketch import (
     SketchDims,
@@ -104,7 +103,6 @@ from mg_output_fixture_geom import (
 from mg_output_fixture_spec import (
     BORE_STATION,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     DRAWING_PRECISION_BY_NAME,
     GROOVE_STATION,
@@ -122,7 +120,6 @@ BORE_CUT_DEPTH = 2.0 * HEX_CORNER_RADIUS + 2.0
 # The cross-section's corner offset from the axis, for the hex sketch's
 # equation (the corner radius is the flats over sqrt(3)).
 _CORNER_PER_AF = 1.0 / math.sqrt(3.0)
-_SAVED_DRAWING_PROPERTIES = ("Manufacturing Notes",)
 
 # --- Analytic volumes (mm^3) -----------------------------------------------------
 V_HEX = math.sqrt(3.0) / 2.0 * HEX_AF**2 * HEX_LENGTH
@@ -342,12 +339,8 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    apply_drawing_properties(
-        adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}
-    )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
-    require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
-    return artefacts
+    apply_drawing_properties(adapter, PART_NAME)
+    return await save_part_and_images(adapter, PART_NAME)
 
 
 async def _hex_profile(adapter: Any) -> list[tuple[str, str]]:

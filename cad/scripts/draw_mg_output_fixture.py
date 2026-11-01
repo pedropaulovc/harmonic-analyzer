@@ -20,8 +20,9 @@ corner prints no size: the title block's INSIDE CORNERS row governs it
 (nothing seats on the shoulder).  The end view looks at the spigot face: its ``*Right``
 orientation is turned by the measured projected axes until -Z points up,
 matching the side view, and -Y points right.  Its origin is pinned to the
-side view's origin height.  The flats' stock reference, (7/16 in), stands
-vertically, and the #4-40 native callout states the controlling drill depth,
+side view's origin height.  The flats' stock reference, (7/16") over its
+supplier band, stands vertically, and the #4-40 native callout states the
+controlling drill depth,
 the reference thread depth in brackets, and, on its own row under the
 thread, FULL THREAD TO ROD BORE.  One native centreline identifies the rod
 bore's Y axis through the corners, independently of the axial tap's small
@@ -79,7 +80,6 @@ from _supplier_dimensions import (
 )
 from _title_block_units import render_number
 from _drawing_leaders import Segment, dimension_segments, distance_to_point, segments_cross
-from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME, layout_report_path
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
@@ -113,6 +113,7 @@ from mg_output_fixture_spec import (
     GROOVE_RADIUS_MIN,
     GROOVE_RADIUS_TOL_TYPE,
     GROOVE_STATION,
+    HEX_AF_CALLOUT,
     HEX_AF_FRACTION_DENOMINATOR,
     LIMIT_BANDS,
     REFERENCE_DIMENSIONS,
@@ -151,11 +152,12 @@ _S = SHEET_SCALE[0] / SHEET_SCALE[1]
 # Left of the old 125 mm: the radius text now reads right of the spigot face,
 # so the two turned Ø stand further out, clear of the end view's AF.
 SIDE_CENTER = (0.115, 0.180)
-END_CENTER = (0.262, SIDE_CENTER[1])
+# 10 mm right of r12's 0.262: the flats' REF now carries its supplier band
+# on two callout rows, and their widest row needs the room left of the hex.
+END_CENTER = (0.272, SIDE_CENTER[1])
 # Low right, over the title block: the end view's tap callout runs out to
 # the right at the hole's height, above it.
 ISO_CENTER = (0.372, 0.115)
-NOTES_XY = (0.016, 0.078)
 # The side view is centred on the part's axial extent.
 _AXIAL_MID = (FREE_END_X + SPIGOT_FACE_X) / 2.0
 _HALF_AF = HEX_AF / 2.0
@@ -370,14 +372,20 @@ EXTENSION_START_GAP = 0.001
 # vertical stock reference, away from the tap's right-running leader.
 _END_HALF_HEIGHT = HEX_AF / 2.0 * _S / 1000.0
 _END_HALF_WIDTH = HEX_CORNER_RADIUS * _S / 1000.0
+# The flats print as the stock's fraction, (7/16"), over the callout rows
+# naming the stock and its supplier band (HEX_AF_CALLOUT); SolidWorks
+# centres the block on the keep.  The fraction's bar is a display line of
+# the dimension too: strokes wholly inside the text's box are its ink, not
+# dimension geometry.
+_AF_TEXT_ROWS = ('(7/16")', *HEX_AF_CALLOUT.split("\n"))
+_AF_TEXT_HALF_WIDTH = max(len(row) for row in _AF_TEXT_ROWS) * _GLYPH_PITCH / 2.0
+_AF_TEXT_HALF_HEIGHT = len(_AF_TEXT_ROWS) * CALLOUT_ROW_PITCH / 2.0 + 0.002
 END_KEEP = {
-    "HexAf": (END_CENTER[0] - _END_HALF_WIDTH - 0.013, END_CENTER[1]),
+    "HexAf": (
+        END_CENTER[0] - _END_HALF_WIDTH - _AF_TEXT_HALF_WIDTH - 0.003,
+        END_CENTER[1],
+    ),
 }
-# The flats print as the stock's fraction, "(7/16 in)": its fraction bar is
-# a display line of the dimension too.  Strokes wholly inside the text's box
-# round the keep are that text's ink, not dimension geometry.
-_AF_TEXT_HALF_WIDTH = len("(7/16 in)") * _GLYPH_PITCH / 2.0
-_AF_TEXT_HALF_HEIGHT = 0.0035
 # The tap callout reads right of the end view at the hole's height.  Its
 # shoulder clears the corner and the small tap cross; AF witnesses run left.
 # ``callout_xy`` is the text block's centre both ways (the r3 sheet,
@@ -538,13 +546,14 @@ def _end_af_ink_problem(
     return None
 
 
-# The flats as bought: the stock's exact 7/16 in fraction, a native REF the
-# supplier's tolerance governs, never a size the shop holds.
+# The flats as bought: the stock's exact 7/16 in fraction, a native REF, the
+# supplier's band on its callout rows, never a size the shop holds.
 HEX_AF_REFERENCE = {
     "units": "in",
     "precision": DRAWING_PRECISION_BY_NAME[STOCK_REFERENCE_DIMENSION],
     "expected_mm": HEX_AF,
     "fraction_denominator": HEX_AF_FRACTION_DENOMINATOR,
+    "callout": HEX_AF_CALLOUT,
 }
 
 
@@ -1330,14 +1339,12 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -1445,7 +1452,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, side, side_by_name["GrooveRadius"], side_by_name["GrooveStation"]
     )
     _prove_groove_root_diameter(side_by_name["GrooveRootDia"])
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     artifacts = await finalize_drawing(
         adapter,

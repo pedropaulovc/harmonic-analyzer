@@ -149,8 +149,9 @@ SIDE_KEEP = {
     # The shank's dimension line crosses the shank near the step; its text
     # runs left from the line, the stock-and-fit callout's five lines under
     # it, so the block stands high enough to keep them off the shank and over
-    # the Ra (two rows, 9 mm, higher than the three-line callout stood).
-    "PinDia": (STEP_X - 0.030, SIDE_CENTER[1] + 0.061),
+    # the Ra, yet its fraction's numerator keeps about 8 mm under the top
+    # border (run 20261101T025747277Z: 4 mm at +.061, the Ra 16 mm below).
+    "PinDia": (STEP_X - 0.030, SIDE_CENTER[1] + 0.057),
     # Above-right of the tip: the leader lands on the dome's upper half, clear
     # of the overall's extension line dropping from the tip, and under the
     # thread callout.
@@ -807,6 +808,31 @@ def _assert_detail_settled(adapter: Any, detail: Any, named: dict[str, Any]) -> 
     _assert_relief_root_landing(adapter, detail, named)
 
 
+def _hide_side_thread_callout(adapter: Any, side: Any) -> None:
+    """Keep the side view's thread ink; the attached THREAD_CALLOUT note stays
+    the one controlling callout (draw_mg_magnifying_lever's
+    _hide_other_thread_callouts)."""
+    native = _early_bound(side, "IView")
+    thread = native.GetFirstCThread()
+    if thread is None or int(native.GetCThreadCount()) != 1:
+        raise RuntimeError("wheel-axle side view thread inventory differs")
+    note = _early_bound(_early_bound(thread, "ICThread").ThreadCallout, "INote")
+    if note is None:
+        return
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    owner_type = annotation.OwnerType
+    if (
+        type(owner_type) is not int
+        or owner_type not in (0, 1)
+        or annotation.Owner is None
+        or (owner_type == 0 and adapter.swApp.IsSame(annotation.Owner, native) != 1)
+    ):
+        raise RuntimeError("wheel-axle side thread callout is not drawing-local")
+    annotation.Visible = 3  # swAnnotationHidden; drawing-local only
+    if annotation.Visible != 3:
+        raise RuntimeError("could not hide the wheel-axle side thread callout")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -929,13 +955,17 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # The shaded isometric shows the #4-40 the callout names; imported before
     # finalize's note cleanup, so its label is counted rather than first
-    # appearing at the native save (draw_pn_pen_hanger).
-    thread_seeds, thread_instances = import_cosmetic_threads(adapter, iso)
-    if (thread_seeds, thread_instances) != (1, 1):
-        raise RuntimeError(
-            "wheel-axle isometric cosmetic threads: "
-            f"seeds/instances={(thread_seeds, thread_instances)!r}, expected (1, 1)"
-        )
+    # appearing at the native save (draw_pn_pen_hanger). The side view shows
+    # its minor-Ø lines too (final machinist review), imported after every
+    # side-view pick so none lands on them.
+    for view, label in ((iso, "isometric"), (side, "side")):
+        thread_seeds, thread_instances = import_cosmetic_threads(adapter, view)
+        if (thread_seeds, thread_instances) != (1, 1):
+            raise RuntimeError(
+                f"wheel-axle {label} cosmetic threads: "
+                f"seeds/instances={(thread_seeds, thread_instances)!r}, expected (1, 1)"
+            )
+    _hide_side_thread_callout(adapter, side)
 
     return await finalize_drawing(
         adapter,

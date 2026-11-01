@@ -64,7 +64,8 @@ DETAIL_RADIUS_MM = 12.5
 # Three native callout rows wrap BRACKET below its mate ID. They sit under the
 # rod, on the side of the callout's native attachment, so the leader does not
 # cross the part. Their actual font, leader and clearance still require native audit.
-DETAIL_KEEP = {"ThreadLength": (0.323, 0.255), "IncompleteLength": (0.377, 0.165)}
+# The .71 sits just above the rod's threaded end, short witnesses.
+DETAIL_KEEP = {"ThreadLength": (0.323, 0.209), "IncompleteLength": (0.377, 0.165)}
 # R24: end the diameter witnesses left of the unchanged finish symbol/leader;
 # keep the qualifier above the screw-seat note and below the free-end note.
 FRONT_KEEP = {"OverallLength": (0.115, 0.088), "RodDia": (0.055, 0.166)}
@@ -602,7 +603,8 @@ async def build(adapter: Any) -> dict[str, str]:
     free_end = _free_end_face(adapter, front, annotations)
     add_attached_note(adapter, front, text=FREE_END_CALLOUT, entity=free_end, attached_to=free_end, note_xy=(0.030, 0.185), label="free end hemisphere", entity_type="FACE")
     seat_pick = model_point_in_view(adapter, front, (0.040, ROD_DIA / 4000.0, 0.0), label="whole-body screw seat finish")
-    symbol = (seat_pick[0] - 0.010, FRONT_CENTER[1] + 0.020)
+    # Clear of the diameter callout's last row, so it does not read as a third.
+    symbol = (seat_pick[0] - 0.010, FRONT_CENTER[1] + 0.0175)
     add_surface_finish(adapter, front, edge_xy=seat_pick, entity_type="FACE", symbol_xy=symbol, leader_attach_xy=seat_pick, control=surface_finish_by_key(SURFACE_FINISHES, "clamp_screw_seat"), label="lever clamp screw seat finish", char_height=0.0025)
     _note(adapter, front, SCREW_SEAT_CALLOUT, (symbol[0] - 0.0025, symbol[1] + 0.013))
     focus = model_point_in_view(adapter, front, DETAIL_FOCUS, label="parent thread-detail mark")

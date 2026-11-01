@@ -39,7 +39,7 @@ from _sketch import SketchDims, add_line_chain, anchor_point_to_origin, anchor_p
 from _sketch_chains import define_rectilinear_chain
 from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, CLEARANCE_SPEC, POSITION_BAND, SIDE_PLATE_X as FLANGE_X, SIDE_PLATE_Y as FLANGE_Y, SIDE_PLATE_Z as FLANGE_Z, SIDE_PLATE_THICKNESS
 from mg_lever_thread_joint import HOLE_LOCATION_TOL, MOUTH_CHAMFER, MOUTH_CHAMFER_BAND, MOUTH_CHAMFER_MAX, NECK_HALF_X, NECK_THICKNESS, NOSE_R, NOSE_R_TOL, TAP_DRILL_DIA, TAP_SPEC
-from mg_magnifying_bracket_spec import DIMENSION_CALLOUTS, DRAWING_DIMENSIONS, DRAWING_PRECISION, FOOT_CORNER_R, FOOT_GRIP_TOL, ISOMETRIC_VIEW_NOTE, UNIT
+from mg_magnifying_bracket_spec import DIMENSION_CALLOUTS, DRAWING_DIMENSIONS, DRAWING_PRECISION, FOOT_CORNER_R, ISOMETRIC_VIEW_NOTE, UNIT
 from mg_magnifying_bracket_finish_spec import SURFACE_FINISHES
 import _telemetry
 
@@ -340,7 +340,6 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "simple L with through tap and rounded corners", expected, 10.0)
     await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "threaded lever axis")
     set_dimension_symmetric_tolerance(adapter, "NeckProfile", "NoseR", NOSE_R_TOL, display_unit=UNIT)
-    set_dimension_symmetric_tolerance(adapter, "FlangeProfile", "FlangeDepth", FOOT_GRIP_TOL, display_unit=UNIT)
     _author_dimension_callouts(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

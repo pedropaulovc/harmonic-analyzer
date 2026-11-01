@@ -17,6 +17,8 @@ from _printed_tolerance import printed_band_mm
 def test_rod_is_the_threaded_bar_of_the_joint_contract() -> None:
     # As-bought 7/32 brass rod; the shoulder station keeps its 7.50 mm model.
     assert spec.ROD_DIA == pytest.approx(7.0 / 32.0 * 25.4)
+    # The sheet prints the supplier band the fits are judged at.
+    assert spec.ROD_DIA_CALLOUT.endswith(f"<MOD-PM>{geom.ROD_DIA_BAND[0] / 25.4:.3f}".replace("0.", "."))
     assert spec.ROD_LENGTH == pytest.approx(spec.SHOULDER_X + spec.BODY_LENGTH)
     assert spec.SHOULDER_X == spec.ROD_THREAD_LEN == joint.ROD_THREAD_LEN == 7.50
     # The relief mates with nothing (r1): its width at the title block's .XX

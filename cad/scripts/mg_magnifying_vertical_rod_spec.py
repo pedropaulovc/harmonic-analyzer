@@ -21,6 +21,7 @@ from mg_magnifying_vertical_rod_geom import (
     DOME_R,
     RELIEF_START_X,
     ROD_DIA,
+    ROD_DIA_BAND,
     ROD_DIA_FRACTION_DENOMINATOR,
     ROD_LENGTH,
     SHOULDER_X,
@@ -64,6 +65,7 @@ __all__ = [
     "RELIEF_START_X",
     "RELIEF_WIDTH",
     "ROD_DIA",
+    "ROD_DIA_CALLOUT",
     "ROD_DIA_FRACTION_DENOMINATOR",
     "ROD_LENGTH",
     "ROD_THREAD_LEN",
@@ -120,6 +122,12 @@ REFERENCE_DIMENSIONS: tuple[tuple[str, str], ...] = (("RodProfile", "OverallLeng
 # The as-bought 7/32 rod's Ø prints as a supplier REF fraction; its tolerance
 # is the supplier's (mg_magnifying_vertical_rod_geom.ROD_DIA_BAND).
 STOCK_REFERENCE_DIMENSION = "RodDia"
+# Under the REF: the stock form and the supplier's symmetric band
+# (<MOD-PM> is SolidWorks' ±).
+if ROD_DIA_BAND[0] != -ROD_DIA_BAND[1]:
+    raise AssertionError("MHA-MG-04 stock callout prints a symmetric supplier band")
+_STOCK_BAND_TEXT = f"{ROD_DIA_BAND[0] / 25.4:.3f}".lstrip("0")
+ROD_DIA_CALLOUT = f"AS-SUPPLIED STOCK <MOD-PM>{_STOCK_BAND_TEXT}"
 # The body length and the dome (tangent to the body) print .XX.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "RodProfile": {

@@ -19,10 +19,11 @@ Views (3:1, hidden lines removed throughout, drawing-guidelines.md rule 9):
   controlled stock flats above and to the right of the top view, and each tap's
   native callout.
 * SECTION A-A, cut on the hex axis through the corners from the front: the
-  bore through the corners, both blind taps in solid lines and the floor
-  between the rod tap and the bore, under the part's material crosshatch
-  (ANSI31's continuous lines, read back) with the cosmetic threads kept off
-  it; the bottom seat carries its flag note.
+  bore through the corners, both blind taps in solid lines with their
+  cosmetic threads as thin continuous major-Ø lines (the thread lengths read
+  against the drill depths) and the floor between the rod tap and the bore,
+  under the part's material crosshatch (ANSI31's continuous lines, read
+  back); the bottom seat carries its flag note.
 * Shaded isometric, 2:1.
 
 Run with SolidWorks open::
@@ -103,6 +104,7 @@ from mg_magnifying_clamp_spec import (
     VISIBLE_DIMENSIONS,
     HEX_AC,
     HEX_AF,
+    HEX_AF_CALLOUT,
     HEX_AF_FRACTION_DENOMINATOR,
     LEVER_BORE_CALLOUT,
     LEVER_BORE_DIA,
@@ -223,7 +225,7 @@ PROJECTION_SLOP_M = 1e-5
 # swAnnotationType_e: swCosmeticThread, swCenterMarkSym.
 _COSMETIC_THREAD_ANNOTATION = 1
 _CENTER_MARK_ANNOTATION = 13
-_SECTION_THREAD_LAYER = "MG-CLAMP-SECTION-THREADS-HIDDEN"
+_SECTION_THREAD_LAYER = "MG-CLAMP-SECTION-THREADS"
 # The front view shows LeverBoreLocationProfile only to import its common-flat
 # dimensions (_drawing_hidden_sketches); its construction segments duplicate
 # the outline and bore circle (machinist review of 2056e3344 read them as
@@ -392,17 +394,22 @@ def _assert_material_hatch(section: Any) -> None:
     )
 
 
-def _hide_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> int:
-    """Keep the taps' cosmetic-thread ink out of a section (rule 9: a section
-    never carries hidden lines); the callouts state both threads.  The
-    draw_dt_cone_tip_block hidden-layer recipe."""
+def _show_section_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> int:
+    """Draw the taps' cosmetic threads in a section as thin continuous lines.
+
+    In the cut SolidWorks prints a tap's major Ø dashed, as a hidden thread
+    (rule 9: a section never carries hidden lines); a visible thin continuous
+    layer makes it the section's own thread line, so each thread length reads
+    against its drill depth. The draw_sm_knife_mount section-thread recipe:
+    layer state and every annotation's layer are read back."""
     manager = _early_bound(adapter.currentModel.GetLayerManager(), "ILayerMgr")
     layer = manager.GetLayer(_SECTION_THREAD_LAYER)
     if layer is None:
+        # COLORREF black, swLineCONTINUOUS (0), swLW_THIN (0).
         if (
             int(
                 manager.AddLayer(
-                    _SECTION_THREAD_LAYER, "clamp section thread ink hidden", 0, 0, 0
+                    _SECTION_THREAD_LAYER, "clamp section thread lines", 0, 0, 0
                 )
             )
             != 1
@@ -410,10 +417,13 @@ def _hide_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> int:
             raise RuntimeError("failed to add the clamp section thread layer")
         layer = manager.GetLayer(_SECTION_THREAD_LAYER)
     layer = _early_bound(layer, "ILayer")
-    layer.Visible = False
-    if bool(layer.Visible) or bool(layer.Printable):
-        raise RuntimeError("the clamp section thread layer is not hidden")
-    hidden = 0
+    layer.Visible = True
+    if not bool(layer.Visible) or int(layer.Style) != 0 or int(layer.Width) != 0:
+        raise RuntimeError(
+            f"the clamp section thread layer is not visible thin continuous: "
+            f"visible={layer.Visible!r}, style={layer.Style!r}, width={layer.Width!r}"
+        )
+    shown = 0
     for raw_annotation in _early_bound(view, "IView").GetAnnotations() or ():
         annotation = _early_bound(raw_annotation, "IAnnotation")
         if int(annotation.GetType()) != _COSMETIC_THREAD_ANNOTATION:
@@ -421,13 +431,13 @@ def _hide_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> int:
         annotation.Layer = _SECTION_THREAD_LAYER
         if str(annotation.Layer or "") != _SECTION_THREAD_LAYER:
             raise RuntimeError(
-                f"clamp {label} cosmetic thread refused the hidden layer"
+                f"clamp {label} cosmetic thread refused the section thread layer"
             )
-        hidden += 1
-    if not hidden:
-        raise RuntimeError(f"clamp {label} has no cosmetic thread to hide")
-    rebuild_drawing(adapter, label=f"hide clamp {label} cosmetic threads")
-    return hidden
+        shown += 1
+    if shown < 2:
+        raise RuntimeError(f"clamp {label} shows {shown} cosmetic thread(s), not both taps'")
+    rebuild_drawing(adapter, label=f"show clamp {label} cosmetic threads")
+    return shown
 
 
 def _front_reference_visibility(view: Any) -> Any:
@@ -530,6 +540,7 @@ HEX_AF_REFERENCE = {
     "precision": DRAWING_PRECISION_BY_NAME[STOCK_REFERENCE_DIMENSION],
     "expected_mm": HEX_AF,
     "fraction_denominator": HEX_AF_FRACTION_DENOMINATOR,
+    "callout": HEX_AF_CALLOUT,
 }
 
 
@@ -902,8 +913,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_hidden_lines_removed(adapter, section)
     _assert_material_hatch(section)
-    hidden = _hide_cosmetic_threads(adapter, section, label="section A-A")
-    _telemetry.info(f"hid {hidden} cosmetic thread(s) in section A-A")
+    shown = _show_section_cosmetic_threads(adapter, section, label="section A-A")
+    _telemetry.info(f"showed {shown} cosmetic thread(s) in section A-A")
 
     right_annotations = curate_view_dimensions(
         adapter,
