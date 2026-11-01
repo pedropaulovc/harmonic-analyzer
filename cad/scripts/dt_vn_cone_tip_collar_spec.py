@@ -136,10 +136,11 @@ SET_SCREW_END_RADIUS = SET_SCREW_SEAT_RADIUS + SET_SCREW_LENGTH
 # reaches the D-flat from the mounting flat.
 TAP_DRILL_DIA = TAP_DRILL_MM[SET_SCREW_THREAD]
 SET_SCREW_HOLE = HoleSpec("tapped", SET_SCREW_THREAD)
-# Internal 2B has no standard major MAX. The wall budget books this assumed
-# tap-cut envelope (2B pitch-diameter MAX, the full thread depth and 0.10 of
-# tap oversize). It is not printed: the 2-56 UNC-2B callout governs the thread,
-# and a printed root MAX only added an inspection (machinist review of main).
+# Internal 2B has no standard root MAX. This is an explicit manufacturing
+# limit, authored as a native MAX gauge diameter and printed beside the tap,
+# so the envelope the wall budget books (WORST_WALLS_MM) is one the sheet
+# enforces (Codjiflo review of #2101; the machinist review that asked to
+# drop it is waived on this sheet).  Book its rounded PRINTED maximum.
 THREAD_ENVELOPE_DIA = math.ceil((
     0.0772 * IN + 0.64951905 * SET_SCREW_PITCH + 0.10
 ) * 100.0) / 100.0
@@ -336,6 +337,7 @@ DRAWING_DIMENSIONS = {
     "ShoulderRoot": {"ShoulderRadius"},
     "MountFlatProfile": {"FlatDistance"},
     "SetScrewTap": {"TapStation"},
+    "TapRootGauge": {"TapRootLimit"},
 }
 DRAWING_PRECISION = {
     "RingProfile": {"NoseDia": 2, "BoreDia": TERMINAL_DIA_PLACES},
@@ -344,6 +346,7 @@ DRAWING_PRECISION = {
     "Ring": {"CollarWidth": AXIAL_PLACES},
     "MountFlatProfile": {"FlatDistance": 2},
     "SetScrewTap": {"TapStation": AXIAL_PLACES},
+    "TapRootGauge": {"TapRootLimit": 2},
 }
 DRAWING_PRECISION_BY_NAME = {
     name: places for names in DRAWING_PRECISION.values() for name, places in names.items()

@@ -104,8 +104,14 @@ SIDE_KEEP = {"CollarWidth": (0.205, 0.110), "CollarDia": (0.250, SIDE_CENTER[1])
              "NoseLength": (0.189, 0.218), "ShoulderRadius": (0.262, 0.232)}
 # TapStation reads right of the tap centre's extension line, under the hole
 # callout's leader and above the end view's top (y 205 mm at x 80 mm), so its
-# function line clears both extension lines and the left border.
-TAP_KEEP = {"TapStation": (TAP_CENTER[0] + 0.040, TAP_CENTER[1] - 0.024)}
+# function line clears both extension lines and the left border.  The
+# two-line TAP ROOT gauge reads level with the tap, left of the view, as on
+# main; its leader runs straight through the circle.  It bounds the envelope
+# the wall budget books (spec.THREAD_ENVELOPE_DIA).
+TAP_KEEP = {
+    "TapStation": (TAP_CENTER[0] + 0.040, TAP_CENTER[1] - 0.024),
+    "TapRootLimit": (TAP_CENTER[0] - 0.030, TAP_CENTER[1]),
+}
 # Right of the view: the hole callout's text starting past the view's right
 # edge. The view note goes over the view, 3.7 mm inside the top border.
 TAP_CALLOUT_XY = (TAP_CENTER[0] + 0.0553, TAP_CENTER[1] - 0.0062)
@@ -271,6 +277,7 @@ def _precision(keep):
 
 
 # Native tolerance types the part authors: MAX 6.
+TAP_DIMENSION_TYPES = {"TapRootLimit": 6}
 SIDE_DIMENSION_TYPES = {"ShoulderRadius": 6}
 
 
@@ -531,12 +538,17 @@ async def build(adapter: Any) -> dict[str, str]:
     above = {"NoseLength": side_callouts.pop("NoseLength")}
     set_dimension_callouts(adapter, side_marks, side_callouts)
     set_dimension_callouts(adapter, side_marks, above, location="above")
-    tap_marks = curate_view_dimensions(
-        adapter, tap, keep=TAP_KEEP, view_label="collar radial tap station",
+    # TapRootGauge is a blanked sketch: the hidden-owner importer shows it in
+    # this view for the import (draw_ch_rocker_arm_tl_pivot_screw).
+    tap_marks = hidden_sketches.curate_view_dimensions(
+        adapter, tap, keep=TAP_KEEP, view_label="collar radial process controls",
         dimensions_by_feature=spec.DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, tap_marks, _precision(TAP_KEEP))
-    set_dimension_callouts(adapter, tap_marks, _function_callouts(TAP_KEEP))
+    _assert_functional_dimension_types(adapter, tap_marks, TAP_DIMENSION_TYPES)
+    set_dimension_callouts(
+        adapter, tap_marks, {**_function_callouts(TAP_KEEP), "TapRootLimit": "TAP ROOT"}
+    )
     # Source geometry is asymmetric and the views are rotated: use the native
     # model-to-sheet transform rather than assuming the view's box centre is
     # the bore origin or that world +Y still projects vertically.

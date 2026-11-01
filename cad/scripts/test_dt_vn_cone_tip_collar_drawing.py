@@ -260,7 +260,7 @@ def test_part_max_types_are_authored_and_read_back(monkeypatch, refuse):
             if not refuse:
                 self.value = value
 
-    tolerances = {name: Tolerance() for name in ("ShoulderRadius",)}
+    tolerances = {name: Tolerance() for name in ("TapRootLimit", "ShoulderRadius")}
     monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(part, "_named_dimension", lambda _adapter, _feature, name: (
         None, SimpleNamespace(Tolerance=tolerances[name]),
@@ -270,10 +270,12 @@ def test_part_max_types_are_authored_and_read_back(monkeypatch, refuse):
             part._functional_dimension_types(object())
     else:
         part._functional_dimension_types(object())
-        assert tolerances["ShoulderRadius"].Type == 6
+        assert {name: tol.Type for name, tol in tolerances.items()} == {
+            "TapRootLimit": 6, "ShoulderRadius": 6,
+        }
 
 
-@pytest.mark.parametrize("expected", [drawing.SIDE_DIMENSION_TYPES])
+@pytest.mark.parametrize("expected", [drawing.TAP_DIMENSION_TYPES, drawing.SIDE_DIMENSION_TYPES])
 def test_drawing_refuses_a_lost_max_type(monkeypatch, expected):
     types = dict(expected)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
@@ -751,16 +753,17 @@ def test_each_view_asserts_only_the_precision_it_keeps() -> None:
         assert set(drawing._precision(keep)) == set(keep)
 
 
-def test_tap_root_limit_is_gone_but_still_booked_in_the_walls() -> None:
-    """Main's machinist review: the printed 'Ø2.36 max. TAP ROOT' only added an
-    inspection to what the 2-56 UNC-2B callout governs. Neither the drawing nor
-    the part carries the gauge; the wall budget still books the envelope."""
-    assert set(drawing.TAP_KEEP) == {"TapStation"}
-    assert "TapRootGauge" not in spec.DRAWING_DIMENSIONS
-    assert "TapRootLimit" not in spec.DRAWING_PRECISION_BY_NAME
-    assert not {"TapRootGauge", "TapRootPlane"} & set(part.COLLAR_FEATURES)
-    assert "TapRootLimit" not in Path(part.__file__).read_text(encoding="utf-8")
-    assert "TAP ROOT" not in Path(drawing.__file__).read_text(encoding="utf-8")
+def test_tap_root_limit_bounds_the_envelope_the_walls_book() -> None:
+    """Codjiflo review of #2101: 2B alone has no root MAX, so the wall budget's
+    tap envelope holds only while the sheet prints it.  The part carries the
+    blanked gauge, the tap view imports its MAX at the booked diameter, and the
+    north-face wall spends that diameter."""
+    assert set(drawing.TAP_KEEP) == {"TapStation", "TapRootLimit"}
+    assert spec.DRAWING_DIMENSIONS["TapRootGauge"] == {"TapRootLimit"}
+    assert spec.DRAWING_PRECISION_BY_NAME["TapRootLimit"] == 2
+    assert {"TapRootGauge", "TapRootPlane"} <= set(part.COLLAR_FEATURES)
+    assert drawing.TAP_DIMENSION_TYPES == {"TapRootLimit": 6}
+    assert round(spec.THREAD_ENVELOPE_DIA, 2) == spec.THREAD_ENVELOPE_DIA
     assert spec.WORST_WALLS_MM["tap to north face"] == pytest.approx(
         spec.WIDTH
         - spec.WIDTH_BAND_MM
