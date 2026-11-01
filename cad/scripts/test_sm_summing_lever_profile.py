@@ -62,9 +62,9 @@ def _g1_contract(section: profile.RibProfile) -> None:
 def test_defining_dimensions_derive_the_approved_g1_profile() -> None:
     assert (spec.COEFFICIENT_T, spec.COEFFICIENT_TOP_Y, spec.COEFFICIENT_BOTTOM_Y) == pytest.approx((7.0, 2.54, -4.46))
     assert spec.COEFFICIENT_TOP_Y - spec.COEFFICIENT_BOTTOM_Y == pytest.approx(spec.COEFFICIENT_T)
-    assert (spec.COUNTER_WEB_T, spec.RIB_WRAP_R, spec.RIB_REACH, spec.RIB_BLEND_R) == pytest.approx((5.08, 15.24, 35.75, 1.016))
-    assert profile.UPPER.wrap_xy == pytest.approx((5.516736, 14.206450), abs=1e-6)
-    assert profile.LOWER.wrap_xy == pytest.approx((4.709714, -14.494006), abs=1e-6)
+    assert (spec.COUNTER_WEB_T, spec.RIB_WRAP_R, spec.RIB_REACH, spec.RIB_BLEND_R) == pytest.approx((5.08, 15.24, 35.814, 1.016))
+    assert profile.UPPER.wrap_xy == pytest.approx((5.506482, 14.210428), abs=1e-6)
+    assert profile.LOWER.wrap_xy == pytest.approx((4.700858, -14.496880), abs=1e-6)
     _g1_contract(profile.PROFILE)
     assert profile.rib_bounds(spec.RIB_REACH) == pytest.approx((-4.46, 2.54))
     lower, upper = profile.rib_bounds(29.7)
@@ -83,8 +83,8 @@ def test_uniform_ribs_and_relocated_row_preserve_other_installed_interfaces() ->
     assert tuple(point[0] for point in joint.LEVER_HOLE_POINTS) == (16.0, 29.7)
     assert all(point[1] == pytest.approx(-0.71) for point in joint.LEVER_HOLE_POINTS)
     assert all(point[2] == pytest.approx(-76.2) for point in joint.LEVER_HOLE_POINTS)
-    assert (spec.RIB_T, joint.DRILL_DEPTH, joint.THREAD_DEPTH) == (5.0, 6.5, 4.95)
-    assert joint.LEVER_FRONT_LOCAL_Z + spec.RIB_T == pytest.approx(-71.20)
+    assert (spec.RIB_T, joint.DRILL_DEPTH, joint.THREAD_DEPTH) == (5.08, 6.5, 4.95)
+    assert joint.LEVER_FRONT_LOCAL_Z + spec.RIB_T == pytest.approx(-71.12)
     assert joint.DRILL_DEPTH_MIN > spec.RIB_T + spec.RIB_T_DEVIATIONS[1]
     assert joint.DRILL_DEPTH_DEVIATIONS == pytest.approx((-0.1246, 0.1294))
     assert joint.BRACKET_ORIGIN == (40.0, 979.7, -173.51)
@@ -520,10 +520,10 @@ def test_uniform_rib_axial_spans_preserve_both_end_faces_and_centre() -> None:
         (-half, -half + spec.RIB_T), (-spec.RIB_T / 2.0, spec.RIB_T / 2.0),
         (half - spec.RIB_T, half),
     )
-    assert spans[0] == pytest.approx((-76.2, -71.2))
-    assert spans[1] == pytest.approx((-2.5, 2.5))
-    assert spans[2] == pytest.approx((71.2, 76.2))
-    assert all(end - start == pytest.approx(5.00) for start, end in spans)
+    assert spans[0] == pytest.approx((-76.2, -71.12))
+    assert spans[1] == pytest.approx((-2.54, 2.54))
+    assert spans[2] == pytest.approx((71.12, 76.2))
+    assert all(end - start == pytest.approx(5.08) for start, end in spans)
     # The separate counterweb is not a rib: its retained top still meets +2.54.
     assert spec.COUNTER_WEB_T == 5.08
     assert spec.COUNTER_WEB_T / 2.0 == spec.COEFFICIENT_TOP_Y

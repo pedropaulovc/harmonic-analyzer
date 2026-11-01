@@ -30,7 +30,7 @@ Seven features (the six .cs features + the hex knife edge):
    on a bearing support on the top plate (ch30-p003), and the stubs share
    every side face's plane by construction (code review C09).
 4. Edge ribs (x2)      -- common tangent R15.24 wrap/flank/R.040 profile at the
-   plate ends, each 5.00 mm thick; the middle rib shares that thickness.
+   plate ends, each 5.08 mm thick; the middle rib shares that thickness.
 5. Summation plate     -- Top-plane leaf on the -X (counter-spring) arm: vertical
    base edge, two curved sides, short tip edge.
 6. Summation anchor    -- Top-plane concentric ring (outer + bore) at the -X tip,
@@ -228,8 +228,8 @@ ARC_R = RIB_WRAP_R
 RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # both edge-rib inner caps; outside ends fixed
 # No plain anchor bore: the counter anchor's seat is the native COUNTER_HOLE_SPEC
 # tap through the boss, authored after the ribs (see _counter_anchor_tap).
-# In X, all ribs stop at 35.75 before the unchanged spring-hole column and
-# worst jam-nut footprint at 36.449. The pilot continues beyond the 5.00 mm
+# In X, all ribs stop at 35.814 (1.41) before the unchanged spring-hole column
+# and worst jam-nut footprint at 36.449. The pilot continues beyond the 5.08 mm
 # entry rib into the connected coefficient plate, not an enlarged receiver.
 # The shared positive-X branch meets both plate faces with R.040 tangent
 # transitions, with no separate pad, ledge or vertical tip face.
@@ -2124,7 +2124,7 @@ async def build(adapter) -> dict[str, str]:
     # Hole Wizard taps -- a #6-32 seed + linear pattern on the plate and one
     # #10-24 through the boss -- sized by the tap standard from the purchased
     # anchors' own threads, so a diameter knob would be a second, lying source.
-    # HoleX stays -- RibReach references it -- and the three station globals
+    # HoleX stays -- it places the seed -- and the three station globals
     # drive the seed while ChannelPitch also drives the pattern spacing.)
     await set_global(adapter, "HoleX", f"{HOLE_X}mm")
     await set_global(adapter, "ChannelZ0", f"{CHANNEL_Z0}mm")
@@ -2135,7 +2135,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HexDepth", f"{HEX_DEPTH}mm")
     await set_global(adapter, "KnifeRidgeR", f"{KNIFE_RIDGE_R}mm")
     await set_global(adapter, "ArcR", '"CylR" + "RibPad"')
-    await set_global(adapter, "RibReach", '"HoleX" - 4.1mm')
+    # On its printed 1.41 grid (rule 3), not offset from the hole column.
+    await set_global(adapter, "RibReach", f"{RIB_REACH}mm")
     await set_global(adapter, "CoefficientBottomY", '"CoefficientTopY" - "CoefficientT"')
 
     # Per-sketch SketchDims record each dim in the helper's emission order; their
