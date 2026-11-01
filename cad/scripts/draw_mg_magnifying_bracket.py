@@ -348,7 +348,7 @@ def _layout_linear_annotations(
     initial = {name: _dimension_layout_ink(adapter, item, label=name) for name, item in by_name.items()}
     capture("before_text_modes", [(name, by_name[name], ink) for name, ink in initial.items()])
     placed_names = ("NeckThickness", "FlangeDepth", "MountingX0", "MountingX1", "MountingY0", "TapFromTip", "TapFromSide")
-    offset_names = ("NeckThickness", "FlangeDepth", "MountingY0", "TapFromTip", "TapFromSide")
+    offset_names = ("FlangeDepth", "MountingY0", "TapFromTip", "TapFromSide")
     for name in placed_names:
         display = _early_bound(_early_bound(by_name[name], "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
         display.CenterText = False
@@ -373,7 +373,6 @@ def _layout_linear_annotations(
 
     left_foot = min(line.x0 for line in verticals("MountingX0"))
     last_hole = max(line.x0 for line in verticals("MountingX1"))
-    front_outline = tuple(float(v) for v in _early_bound(front, "IView").GetOutline())
     # The builder dimensions FlangeDepth on the free -X end: its witnesses
     # leave the real foot top/bottom corners. Read the solid's projected
     # foot and upright, so the offset text sits in the open L above the
@@ -392,7 +391,8 @@ def _layout_linear_annotations(
         for name, points in (("front foot", foot_corners), ("front upright", arm_corners))
     }
     targets = {
-        "NeckThickness": (max(line.x0 for line in verticals("NeckThickness")) + 0.004, front_outline[3] + 0.004),
+        # On its own dimension line, outside the leg beside the right arrow.
+        "NeckThickness": (max(line.x0 for line in verticals("NeckThickness")) + 0.004, before["NeckThickness"].text[1]),
         "FlangeDepth": (foot_end, max(max(line.y0, line.y1) for line in before["FlangeDepth"].leader) + 0.004),
         "MountingX0": (left_foot - 0.004 - (before["MountingX0"].text[2] - before["MountingX0"].text[0]), before["MountingX0"].text[1]),
         "MountingX1": (last_hole + 0.004, before["MountingX1"].text[1]),
@@ -459,7 +459,7 @@ def _layout_linear_annotations(
         for line in ink.leader:
             require_inside(name, (min(line.x0, line.x1), min(line.y0, line.y1), max(line.x0, line.x1), max(line.y0, line.y1)), region)
         _telemetry.info(f"{name} settled native text={ink.text}")
-    require_clear("NeckThickness", next(ink.text for item, ink in settled if item is by_name["NeckThickness"]), {"front silhouette": front_outline})
+    require_clear("NeckThickness", next(ink.text for item, ink in settled if item is by_name["NeckThickness"]), front_solids)
     require_clear("FlangeDepth", next(ink.text for item, ink in settled if item is by_name["FlangeDepth"]), front_solids)
     foot_points = [
         model_point_in_view(adapter, bottom, (x / 1000.0, y / 1000.0, SIDE_PLATE_Z[1] / 1000.0), label="mounting-face silhouette")

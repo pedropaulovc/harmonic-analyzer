@@ -157,27 +157,30 @@ async def _author_bore_row(adapter) -> list[tuple[str, str]]:
     """The bore row as model dimensions (the dt_cone_tip_block reference-sketch
     pattern): a Hole Wizard placement sketch cannot dimension from the bar's end
     or top face, so construction chains on the row carry the printed stations
-    from the left end, and a drop at each end carries a row's distance from the
+    from the left end, and a drop at a hole carries a row's distance from the
     top face. The row is two chains: the hanger hole and the axle bore from
-    the left end (title-block band), the clamp pair to the right end (the
-    MHA-SH-02 taps' band). The stations drive from the same globals as the
-    Hole Wizard placement points, so each print dimension moves with its
-    hole."""
-    right_end_x = BAR_LENGTH / 2.0
+    the left end (title-block band), the clamp pair (the MHA-SH-02 taps'
+    band). Each drop rises from a hole centre (the hanger hole's, the outer
+    clamp hole's) to the top face, so the sheet shows it as that hole's
+    centreline carried to the face, never as a line along an end face (final
+    machinist review, run 20261101T025747277Z). The row lies on the sketch's
+    y = 0, the bar profile's bore row. The stations drive from the same
+    globals as the Hole Wizard placement points, so each print dimension moves
+    with its hole."""
     top_y = BAR_TOP_ABOVE_ROW
     left_xs = (LEFT_END_X, SCREW_HOLE_X, AXLE_BORE_X)
-    right_xs = (*CLAMP_HOLE_X, right_end_x)
+    right_xs = CLAMP_HOLE_X
     row = SketchDims()
     check("create_sketch bore row", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     try:
         left_rise = check(
-            "bore row left rise",
-            await adapter.add_line(LEFT_END_X, top_y, LEFT_END_X, 0.0),
+            "bore row hanger drop",
+            await adapter.add_line(SCREW_HOLE_X, top_y, SCREW_HOLE_X, 0.0),
         )
         right_rise = check(
-            "bore row right rise",
-            await adapter.add_line(right_end_x, top_y, right_end_x, 0.0),
+            "bore row clamp drop",
+            await adapter.add_line(right_xs[-1], top_y, right_xs[-1], 0.0),
         )
         left_legs = [
             check(
@@ -193,10 +196,10 @@ async def _author_bore_row(adapter) -> list[tuple[str, str]]:
         ]
     finally:
         set_sketch_direct_db(adapter, False)
-    for rise, label in ((left_rise, "left"), (right_rise, "right")):
-        _as_construction(adapter, rise, f"bore row {label} rise")
+    for rise, label in ((left_rise, "hanger"), (right_rise, "clamp")):
+        _as_construction(adapter, rise, f"bore row {label} drop")
         check(
-            f"bore row {label} rise vertical",
+            f"bore row {label} drop vertical",
             await adapter.add_sketch_constraint(rise, None, "vertical"),
         )
     for index, leg in enumerate((*left_legs, *right_legs)):
@@ -205,9 +208,10 @@ async def _author_bore_row(adapter) -> list[tuple[str, str]]:
             f"bore row leg {index} horizontal",
             await adapter.add_sketch_constraint(leg, None, "horizontal"),
         )
-    # The left chain hangs off its rise; the right chain runs on to its rise.
-    chain = [
-        (f"{left_rise}.end", f"{left_legs[0]}.start"),
+    # Each drop ends on its hole's centre; the left chain runs on through the
+    # hanger hole to the axle bore.
+    links = [
+        (f"{left_rise}.end", f"{left_legs[0]}.end"),
         *(
             (f"{leg}.end", f"{after}.start")
             for leg, after in zip(left_legs, left_legs[1:])
@@ -216,18 +220,25 @@ async def _author_bore_row(adapter) -> list[tuple[str, str]]:
             (f"{leg}.end", f"{after}.start")
             for leg, after in zip(right_legs, right_legs[1:])
         ),
-        (f"{right_legs[-1]}.end", f"{right_rise}.end"),
+        (f"{right_rise}.end", f"{right_legs[-1]}.end"),
     ]
-    for index, (point, other) in enumerate(chain):
+    for index, (point, other) in enumerate(links):
         check(
             f"bore row link {index} coincident",
             await adapter.add_sketch_constraint(point, other, "coincident"),
         )
+    # The left end on the row anchors the left chain; the clamp chain lies on
+    # the row's line by relation alone (its stations place it along X).
     await anchor_point_to_origin(
-        adapter, f"{left_rise}.start", LEFT_END_X, top_y, "bar top left corner"
+        adapter, f"{left_legs[0]}.start", LEFT_END_X, 0.0, "bar left end on the row"
     )
     row.record("RowStartX", '"BarLength" / 2')
-    row.record("RowStartTopY", '"BarTop"')
+    check(
+        "clamp chain on the row",
+        await adapter.add_sketch_constraint(
+            f"{right_legs[0]}.start", "origin", "horizontal_points"
+        ),
+    )
     await dimension_between(
         adapter,
         f"{left_rise}.start",
@@ -237,11 +248,6 @@ async def _author_bore_row(adapter) -> list[tuple[str, str]]:
         "hanger and axle row from top",
     )
     row.record("BoreRowFromTop", '"BarTop"')
-    await anchor_point_to_origin(
-        adapter, f"{right_rise}.start", right_end_x, top_y, "bar top right corner"
-    )
-    row.record("RowEndX", '"BarLength" / 2')
-    row.record("RowEndTopY", '"BarTop"')
     await dimension_between(
         adapter,
         f"{right_rise}.start",

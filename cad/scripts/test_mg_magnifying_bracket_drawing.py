@@ -52,16 +52,6 @@ def test_model_precision_and_functional_bands_have_one_authority() -> None:
     assert joint.NECK_THICKNESS - joint.NECK_THICKNESS_TOL == pytest.approx(0.48 * 25.4)
     assert joint.NOSE_R_TOL == joint.HOLE_LOCATION_TOL == spec.HEAD_MATERIAL_TOL == 0.0508
     assert mounting.FLANGE_THICKNESS_BAND == spec.FOOT_GRIP_TOL == pytest.approx(0.127)
-    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
-    assert any(
-        isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-        and node.func.id == "set_dimension_symmetric_tolerance"
-        and len(node.args) == 4
-        and isinstance(node.args[1], ast.Constant) and node.args[1].value == "FlangeProfile"
-        and isinstance(node.args[2], ast.Constant) and node.args[2].value == "FlangeDepth"
-        and isinstance(node.args[3], ast.Name) and node.args[3].id == "FOOT_GRIP_TOL"
-        for node in ast.walk(tree)
-    )
 
 
 def test_foot_grip_dimension_sits_on_the_free_end_not_the_upright_face(monkeypatch) -> None:
@@ -823,7 +813,7 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
 
     def rebuild(_adapter, *, label):
         if label == "settle bracket linear text modes" and fault != "unsettled_modes":
-            assert all(items[name].OffsetText for name in ("NeckThickness", "FlangeDepth", "MountingY0", "TapFromTip", "TapFromSide"))
+            assert all(items[name].OffsetText for name in ("FlangeDepth", "MountingY0", "TapFromTip", "TapFromSide"))
             state.modes_settled = True
 
     def native_display(_adapter, item):
@@ -893,7 +883,7 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
     monkeypatch.setattr(drawing, "dimension_name", lambda _a, item: "" if item.name in ("OverallHeight", "LeverTapCallout") else item.name)
     monkeypatch.setattr(drawing, "move_annotation", move)
     monkeypatch.setattr(drawing, "sheet_region", lambda _a: _R8_REGION)
-    front = SimpleNamespace(GetOutline=lambda: (.048787, .1064632, .109213, .2235368))
+    front = SimpleNamespace()
     # Front (*Top) projection: X right about the upright centre, +Z down
     # from the mounting seat line; the bottom view keeps its own row map.
     monkeypatch.setattr(drawing, "model_point_in_view", lambda _a, view, p, **_kw: (
@@ -924,9 +914,10 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
     else:
         drawing._layout_linear_annotations(object(), front, object(), [item for name, item in items.items() if name not in ("OverallHeight", "LeverTapCallout")], overall_reference=items["OverallHeight"], tap_callout=items["LeverTapCallout"])
         ink = {name: drawing._dimension_layout_ink(object(), item, label=name) for name, item in items.items()}
+        # The leg width sits on its own dimension line, right of the leg.
         assert ink["NeckThickness"].text[0] == pytest.approx(.103625 + .004)
-        assert items["NeckThickness"].OffsetText
-        assert ink["NeckThickness"].text[1] > .2235368
+        assert not items["NeckThickness"].OffsetText
+        assert ink["NeckThickness"].text[1] == pytest.approx(rows["NeckThickness"][0][2])
         # Text starts above the foot's free end, in the open L: clear of the
         # foot top, its own witnesses and dimension line, and the upright.
         assert ink["FlangeDepth"].text[0] == pytest.approx(.097375 + mounting.SIDE_PLATE_X[0] / 1000.0)

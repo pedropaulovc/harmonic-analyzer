@@ -129,7 +129,9 @@ FRONT_KEEP = {
     "Side": (RIGHT_END + 0.040, _BAR_BOTTOM - 0.014),
     "ClampRowFromTop": (RIGHT_END + 0.021, _BAR_TOP + 0.015),
     # The hanger and axle row's drop off the left end, its text above the top
-    # face and left of the bar, clear of the hanger callout's leader.
+    # face and left of the bar, clear of the hanger callout's leader. Both
+    # drops are measured at a hole (the hanger's, the outer clamp's), their
+    # extension lines running out past the bar's ends.
     "BoreRowFromTop": (LEFT_END - 0.018, _BAR_TOP + 0.008),
     # The reamed Ø up and right of the bore, the press lines standing clear
     # of the bar.

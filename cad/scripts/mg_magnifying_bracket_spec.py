@@ -40,8 +40,10 @@ DRAWING_PRECISION = {
     "TapCoordinates": {"TapFromTip": 3, "TapFromSide": 3},
 }
 # Owner decision: preserve geometry and explain these structural controls.
-# They retain tap material and the real screw-grip stack, not a profile fit.
+# They retain tap material, not a profile fit.
 HEAD_MATERIAL_TOL = 0.0508  # +/-.002
+# The screw-grip stack reads the foot thickness's printed .XXX title-block
+# band; the sheet carries no explicit tolerance for it.
 FOOT_GRIP_TOL = printed_band_mm(
     DRAWING_PRECISION["FlangeProfile"]["FlangeDepth"], unit=UNIT
 )

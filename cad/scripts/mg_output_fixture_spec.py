@@ -5,7 +5,8 @@ PURE DATA, no SolidWorks/COM imports.  The shape is
 this one); this module adds what the print states about it: the marked model
 dimensions and their places, the walls at the worst case of the title block's
 rows (each holds the .080 in target, so the sheet states none), and the
-manufacturing notes.  The sheet prints decimal inch (``drawing_unit: in``);
+sheet's callout text; the sheet carries no general note.  The sheet prints
+decimal inch (``drawing_unit: in``);
 lengths stay physical millimetres.
 
 Sheet datums: the rod bore is the datum along the hex axis.  The bore is
@@ -139,10 +140,10 @@ REFERENCE_DIMENSIONS = frozenset({"OverallLength"})
 STOCK_REFERENCE_DIMENSION = "HexAf"
 
 # --- Printed limits ----------------------------------------------------------------
-# An assumption, not a printed band: the flats as supplied stay within
-# +/-.005 in of its own 7/16 in stock; this is not the MG-02 clamp's stock
-# size.  Every wall, the spigot's clean-up and the tap's reach below hold at
-# it.
+# The supplier's band on the flats, printed under their REF (HEX_AF_CALLOUT):
+# within +/-.005 in of its own 7/16 in stock; this is not the MG-02 clamp's
+# stock size.  Every wall, the spigot's clean-up and the tap's reach below
+# hold at it.
 HEX_STOCK_AF_BAND = 0.127
 _ROD_STATION_LO, _ = printed_deviations(ROD_STATION, ROD_STATION_PLACES, unit=UNIT)
 _SPIGOT_LENGTH_LO, _SPIGOT_LENGTH_HI = printed_deviations(
@@ -439,7 +440,11 @@ TAP_CALLOUT_PRECISION = {
     TAP_DRILL_DEPTH_VARIABLE: TAP_DEPTH_PLACES,
     TAP_THREAD_DEPTH_VARIABLE: TAP_DEPTH_PLACES,
 }
-STOCK_NOTE = "7/16 HEX BAR, FLATS AS SUPPLIED."
+# The flats' REF names the stock and the supplier's band it is bought to,
+# on the dimension itself (rule 11: notes carry no dimensions), so the sheet
+# needs no general note.
+_HEX_BAND_TEXT = f"{HEX_STOCK_AF_BAND / 25.4:.3f}".removeprefix("0")
+HEX_AF_CALLOUT = f"HEX STOCK,\nSUPPLIER ±{_HEX_BAND_TEXT}"
 # The thread's extent, on the callout's below row, under the thread it
 # governs (drawing-guidelines.md rule 7: a requirement of one feature reads at
 # that feature, not in a general note the shop must match to it; review r3).
@@ -447,5 +452,3 @@ STOCK_NOTE = "7/16 HEX BAR, FLATS AS SUPPLIED."
 # depth, its nominal, as (REF).  Words only: the bore's Ø is its own native
 # dimension on the side view, and a typed size here would not follow it.
 TAP_EXTENT_CALLOUT = "FULL THREAD TO ROD BORE"
-# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): one row.
-DRAWING_NOTES = STOCK_NOTE

@@ -1079,12 +1079,23 @@ def _assert_finish_ink_routes(annotations, finish, seat_note_xy, project, front)
     assert crossing.kind == "leader-crosses-line"
     assert crossing.at_mm == pytest.approx((70.67076771867922, 123.175))
 
-    # Keep the proven native finish station, physical landing and mate label.
-    assert finish["symbol_xy"] == pytest.approx((0.06125, 0.140))
+    # Keep the proven native finish x, physical landing and mate label; the
+    # symbol and its label sit 2.5 mm under the measured R24 station.
+    drop = 0.140 - finish["symbol_xy"][1]
+    assert finish["symbol_xy"] == pytest.approx((0.06125, 0.1375))
     assert finish["leader_attach_xy"] == pytest.approx(
         project(None, front, (0.040, diameter / 4.0, 0.0))
     )
-    assert seat_note_xy == pytest.approx((0.05875, 0.153))
+    assert seat_note_xy == pytest.approx((0.05875, 0.153 - drop))
+    new_finish = AnnotationGeometry(
+        label=old_finish.label, kind="surface-finish", owner="front",
+        text_boxes=(Box(0.0665535, 0.1442383 - drop, 0.0759737, 0.146785 - drop),),
+        segments=tuple(
+            Segment(x0, y0 - drop, x1, y1 if kind == "leader" else y1 - drop, kind)
+            for x0, y0, x1, y1, kind in finish_strokes
+        ),
+        exact=True,
+    )
     dx, dy, _z = annotations["RodDia"].GetPosition()
     rod_dia = diameter_ink(dx, dy)
     nx, ny = seat_note_xy
@@ -1108,19 +1119,20 @@ def _assert_finish_ink_routes(annotations, finish, seat_note_xy, project, front)
         segments=(Segment(0.0291609, 0.183542, 0.0335495, 0.1169481, "leader"),),
         exact=True,
     )
-    after = sheet(rod_dia, old_finish, seat_label, thread_note, parent_a, free_end)
+    after = sheet(rod_dia, new_finish, seat_label, thread_note, parent_a, free_end)
     assert find_leader_across_lines(after) == []
     assert find_text_on_line(after) == []
     assert find_text_on_text(after) == []
     assert find_leader_through_text(after) == []
     assert find_border_breaches(after) == []
-    moved = {rod_dia.label}
+    moved = {rod_dia.label, new_finish.label, seat_label.label}
     for check in (find_text_clearance, find_text_separation):
         assert not [
             item for item in check(after) if item.a in moved or item.b in moved
         ]
-    assert min(min(line.x0, line.x1) for line in old_finish.segments) - (dx + 0.001) > 0.003
-    assert dy - 0.0100819 - seat_label.text_boxes[0].ymax > 0.0029
+    assert min(min(line.x0, line.x1) for line in new_finish.segments) - (dx + 0.001) > 0.003
+    # The seat label stands 5 mm clear of the callout's underline, not a third row.
+    assert dy - 0.0100819 - seat_label.text_boxes[0].ymax > 0.005
     assert rod_dia.text_boxes[0].ymin - seat_label.text_boxes[0].ymax > 0.0038
     assert free_end.text_boxes[0].ymin - rod_dia.text_boxes[0].ymax > 0.0053
 

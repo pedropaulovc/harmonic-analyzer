@@ -72,14 +72,17 @@ FIXTURE_SCREW_TRAVEL = 20.0
 EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # Wheel group, the stack off the front of the axle, front first. Station d
     # (from the bar's front face, mg_wheel_group) after the move: spacer
-    # 57-75.6, back washer 84, wheel mid-plane 100.6, then the drum, front
+    # 57-75.6, back washer 84, wheel mid-plane 135.6, then the drum, front
     # washer and nuts each at least 43 past the wheel mid-plane, where the
-    # wheel no longer hides them.
-    ExplodeStep("locknut off the axle", ("mg-vn-wheel-axle-nut:2",), "z", -152.0),
-    ExplodeStep("nut off the axle", ("mg-vn-wheel-axle-nut:1",), "z", -141.0),
-    ExplodeStep("front washer off", ("mg-vn-wheel-axle-front-washer",), "z", -131.0),
+    # wheel no longer hides them. The back washer stands 47 short of the
+    # rim's back face (more than 0.71 (R + r) = 39), so its balloon reaches it
+    # without crossing the wheel (machinist review of run
+    # 20261101T025747277Z: balloon 14's leader ran across the rim and spokes).
+    ExplodeStep("locknut off the axle", ("mg-vn-wheel-axle-nut:2",), "z", -187.0),
+    ExplodeStep("nut off the axle", ("mg-vn-wheel-axle-nut:1",), "z", -176.0),
+    ExplodeStep("front washer off", ("mg-vn-wheel-axle-front-washer",), "z", -166.0),
     ExplodeStep(
-        "wheel off the axle", ("mg-magnifying-wheel", "mg-wheel-drum"), "z", -77.0
+        "wheel off the axle", ("mg-magnifying-wheel", "mg-wheel-drum"), "z", -112.0
     ),
     ExplodeStep("drum off the spigot", ("mg-wheel-drum",), "z", -38.0),
     ExplodeStep("back washer off", ("mg-vn-wheel-axle-back-washer",), "z", -65.0),

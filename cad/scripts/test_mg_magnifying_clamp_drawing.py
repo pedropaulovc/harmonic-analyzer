@@ -209,6 +209,8 @@ def test_stock_hex_needs_no_custom_wall_or_envelope_inspection_note() -> None:
     # As-bought 1/2 hex: an exact fraction, judged at an assumed ±.005 supply.
     assert spec.HEX_AF == pytest.approx(25.4 / spec.HEX_AF_FRACTION_DENOMINATOR)
     assert spec.HEX_STOCK_AF_BAND == pytest.approx(0.005 * 25.4)
+    # The sheet prints the same supplier band the wall checks assume.
+    assert spec.HEX_AF_CALLOUT.endswith(f"<MOD-PM>{spec.HEX_STOCK_AF_BAND / 25.4:.3f}".replace("0.", "."))
     assert spec.LEVER_BORE_CALLOUT.splitlines() == [
         "DRILL THRU CORNERS", "SLIP ON 1/4 IN LEVER MHA-MG-03",
     ]
@@ -651,13 +653,15 @@ def _af_fixture(monkeypatch):
         assert (feature, dimension) == ("HexProfile", "HexAf")
         return source_display, source_dimension
 
-    # The sheet dresses the imported AF as the supplier REF "(1/2 in)".
+    # The sheet dresses the imported AF as the supplier REF "(1/2 in)", its
+    # stock form and supplier band below.
     imported_display.prefix, imported_display.suffix = "(", " in)"
+    imported_display.text = spec.HEX_AF_CALLOUT
     supplier_checks = []
 
     def supplier_assert(adapter_, display, **reference):
         supplier_checks.append((display, reference))
-        if reference != drawing.HEX_AF_REFERENCE or (display.prefix, display.suffix) != ("(", " in)"):
+        if reference != drawing.HEX_AF_REFERENCE or (display.prefix, display.suffix, display.text) != ("(", " in)", reference["callout"]):
             raise RuntimeError("HexAf: supplier REF presentation differs")
 
     for module in (part, drawing):
@@ -747,7 +751,7 @@ def test_native_af_import_keeps_stock_ref_on_actual_source_dimension_and_top_vie
     state = _af_fixture(monkeypatch)
     drawing._assert_stock_af_import(state.adapter, state.view, state.annotation, stage="after-final-rebuild")
     assert state.supplier_checks == [(state.display, drawing.HEX_AF_REFERENCE)]
-    assert state.display.GetText(4) == ""
+    assert state.display.GetText(4) == spec.HEX_AF_CALLOUT
     assert any(left is state.dimension and right is state.source_dimension for left, right in state.same_calls)
     assert any(left is state.annotation.Owner and right is state.view for left, right in state.same_calls)
 
@@ -793,7 +797,7 @@ def test_native_top_af_placement_preserves_source_stock_size_and_ownership(monke
     # Assert the settled consumer readback, not a rebuild call-count contract.
     assert state.annotation.GetPosition() == (0.152, 0.255, 0.0)
     assert state.display.GetText(1) == "("
-    assert state.display.GetText(4) == ""
+    assert state.display.GetText(4) == spec.HEX_AF_CALLOUT
     assert before == (state.dimension.SystemValue, state.tolerance.minimum, state.tolerance.maximum,
                       state.annotation.Owner, tuple(state.points))
     assert state.display.GetPrimaryPrecision2() == 3
