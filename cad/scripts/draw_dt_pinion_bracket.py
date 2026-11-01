@@ -239,6 +239,12 @@ DIMENSION_CALLOUTS = {
     "PinSeatCy": "   SETS FOLLOWER HEIGHT\n   ON MHA-DT-23 CAM",
     "PinSeatCz": "CENTRES MHA-DT-25\nFOLLOWER IN BAR",
 }
+# The bar thickness is held at .XXX for the axial stack it closes: two straps,
+# the drum, its shim and feeler fill the span between the MHA-DT-18 blocks
+# (pinion_rig_layout).  Above the value, on one line (a multi-line
+# above-callout does not print, draw_dt_pinion_pivot_block): below it the rows
+# would run across both thickness witnesses and the seat station's.
+CALLOUTS_ABOVE = {"Depth": "AXIAL STACK IN MHA-DT-18 SPAN"}
 
 
 def _overall_reference(adapter: Any, left: Any) -> None:
@@ -414,6 +420,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     annotations = [*front_annotations, *left_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(adapter, left_annotations, CALLOUTS_ABOVE, location="above")
     assert_imported_precision(
         adapter, [*annotations, seat_depth], DRAWING_PRECISION_BY_NAME
     )
