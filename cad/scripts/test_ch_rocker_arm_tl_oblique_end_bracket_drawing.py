@@ -76,8 +76,22 @@ def test_kp08_taps_land_on_the_blocks_bolt_spacing_about_the_screw() -> None:
     assert laterals == pytest.approx(
         [leadscrew.SCREW_LATERAL - half, leadscrew.SCREW_LATERAL + half]
     )
-    # The KP08's metric stations print rounded at .XXX (vendor interface).
-    assert all(abs(x / 25.4 - round(x / 25.4, 3)) <= 0.0005 for x in spec.KP08_TAP_X)
+    # Owner ruling 4 (2026-11-01): the KP08's metric stations print exact
+    # millimetres at three places, labelled mm, with the millimetre title
+    # block's three-place band.
+    assert spec.KP08_TAP_X == pytest.approx((13.925, 55.925))
+    assert all(x == round(x, 3) for x in spec.KP08_TAP_X)
+    assert spec.METRIC_DIMENSIONS == {
+        ("KP08Taps", "KP08Tap1X"): (3, 0.13),
+        ("KP08Taps", "KP08Tap2X"): (3, 0.13),
+    }
+    assert spec.KP08_TAP_BAND == printed_band_mm(3, unit="mm")
+    assert "set_metric_vendor_units(" in Path(part.__file__).read_text(encoding="utf-8")
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "assert_imported_metric_dimensions(" in sheet
+    for hole in holes:
+        x = hole["at"][0]
+        assert hole["station"] == pytest.approx([x - 0.13, x + 0.13])
     assert all(h["at"][1] == 0.0 for h in holes)  # the row on the screw's KP08_S
     assert spec.KP08_TAP_SPEC.kind == "tapped"  # UNC: the block's holes are plain
     assert spec.KP08_TAP_SPEC.size == leadscrew.KP08_SCREW == "#6-32"
@@ -100,7 +114,8 @@ def test_bar_taps_land_on_the_base_bars_bracket_holes() -> None:
 
 
 def test_both_patterns_fit_their_mates_at_three_places() -> None:
-    # Each station's band and rounding at .XXX, about the row's.
+    # Each station's band about the row's: the bar taps' .XXX, the KP08
+    # taps' exact millimetres at ±0.13.
     band = printed_band_mm(spec.HOLE_PLACES, unit="in")
     assert spec.POSITION_RADIUS >= math.hypot(band, band)
     assert spec.POSITION_RADIUS <= math.hypot(band + 0.0127, band)
@@ -174,8 +189,13 @@ def test_through_thread_offers_one_and_a_half_diameters() -> None:
         assert spec.BRACKET_THICK >= 1.5 * THREAD_MAJOR_MM[thread]
 
 
-def test_holes_carry_the_title_block_band_only() -> None:
-    assert model_toleranced_dimensions(part) == {}
+def test_holes_carry_the_title_block_band_except_the_kp08_stations() -> None:
+    # Only the KP08 stations carry a model band: millimetres on the inch
+    # sheet, which the inch title block's rows do not cover (owner ruling 4).
+    # (The loop over METRIC_DIMENSIONS reports its source names.)
+    assert model_toleranced_dimensions(part) == {
+        ("feature_name", "dimension_name"): "band"
+    }
     holes = _features()
     # The tap drills print .XXX with the title block's drilled-hole band.
     for name, drill in (
@@ -186,9 +206,12 @@ def test_holes_carry_the_title_block_band_only() -> None:
         assert low == pytest.approx(round(drill / 25.4, 3) * 25.4)
         assert high - low == pytest.approx(spec.DRILLED_BAND[0])
     band = printed_band_mm(spec.HOLE_PLACES, unit="in")
-    for name in ("kp08_tap_2", "bar_tap_1"):
+    for name, width in (
+        ("kp08_tap_2", 2.0 * spec.KP08_TAP_BAND),
+        ("bar_tap_1", 2.0 * band),
+    ):
         low, high = holes[name]["station"]
-        assert high - low == pytest.approx(2.0 * band)
+        assert high - low == pytest.approx(width)
     assert holes["bar_tap_1"]["height"] == pytest.approx(
         [spec.HOLE_ROW_Y - band, spec.HOLE_ROW_Y + band]
     )
@@ -218,8 +241,12 @@ def test_every_exported_band_endpoint_is_a_printed_value() -> None:
             if (name, requirement) in stock:
                 continue  # the supplier's band about the stock size
             places = feature["precision"][requirement]
+            metric = name.startswith("kp08_tap") and requirement == "station"
             for end in band:
-                assert _on_grid(end, places), (name, requirement)
+                if metric:  # exact millimetres (owner ruling 4)
+                    assert end == pytest.approx(round(end, places), abs=1e-9), name
+                else:
+                    assert _on_grid(end, places), (name, requirement)
     assert checked
 
 

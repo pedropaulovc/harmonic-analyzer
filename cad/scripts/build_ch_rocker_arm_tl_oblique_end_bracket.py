@@ -33,11 +33,13 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _holes import wizard_holes
 from _part_checks import report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
+from _metric_vendor_dimension import set_metric_vendor_units
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
@@ -67,6 +69,7 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     KP08_TAP_DRILL,
     KP08_TAP_SPEC,
     KP08_TAP_X,
+    METRIC_DIMENSIONS,
 )
 
 PART_NAME = "ch-rocker-arm-tl-oblique-end-bracket"
@@ -263,11 +266,17 @@ async def build(adapter) -> dict[str, str]:
     _require_one_solid_body(adapter, label="driven end bracket")
 
     # Every model edit -- material, marked set, model-owned places -- precedes
-    # the save. No model band: the stations and row print at three places, so
-    # the title block's ±.005 governs them (spec module docstring).
+    # the save. The bar taps and row print at three places, so the title
+    # block's ±.005 governs them; the KP08 taps print exact millimetres with
+    # their own band (owner ruling 4; spec module docstring).
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    for (feature_name, dimension_name), (places, band) in METRIC_DIMENSIONS.items():
+        set_dimension_symmetric_tolerance(
+            adapter, feature_name, dimension_name, band, display_unit="mm"
+        )
+        set_metric_vendor_units(adapter, feature_name, dimension_name, places=places)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

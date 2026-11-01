@@ -7,7 +7,8 @@ the row's station from the -Y side face (left), the stock width (right) and
 one native callout per tap over it, each leader on its own hole; the end
 view, projected right of the plan, carries the stock thickness; the shaded
 isometric rides top right at 1:1, clear of the title block. No datums
-(drawing-guidelines.md rule 5).
+(drawing-guidelines.md rule 5). The two KP08 tap stations print exact
+millimetres, labelled mm (owner ruling 4, 2026-11-01).
 
 Run with SolidWorks open::
 
@@ -55,6 +56,7 @@ from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _printed_limits import limits
+from _metric_vendor_dimension import assert_imported_metric_dimensions
 from _supplier_dimensions import supplier_reference_dimension
 from ch_rocker_arm_tl_oblique_callouts import set_callout_lengths_to_three_places
 from ch_rocker_arm_tl_oblique_end_bracket_spec import (
@@ -74,6 +76,7 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     KP08_TAP_DRILL,
     KP08_TAP_SPEC,
     KP08_TAP_X,
+    METRIC_DIMENSIONS,
     ROW_CALLOUT,
     STOCK_CALLOUT,
     STOCK_FRACTION_DENOMINATORS,
@@ -390,6 +393,8 @@ for _index, _x in enumerate(part_spec.BAR_TAP_X, start=1):
         precision={"dia": TAP_CALLOUT_PLACES, "station": _PLACES, "height": _PLACES},
     )
 
+_KP08_PLACES = part_spec.KP08_TAP_PLACES
+_KP08_BAND = (part_spec.KP08_TAP_BAND, -part_spec.KP08_TAP_BAND)
 for _index, _x in enumerate(part_spec.KP08_TAP_X, start=1):
     _drill = _printed(part_spec.KP08_TAP_DRILL, TAP_CALLOUT_PLACES)
     requirement(
@@ -411,12 +416,14 @@ for _index, _x in enumerate(part_spec.KP08_TAP_X, start=1):
             ),
             "nominal_dia": (_drill, ("KP08_TAP_DRILL",)),
             "thru": (True, ("KP08_TAP_SPEC",)),
-            # A DRO absolute from the inner end: the KP08's 42 bolt spacing.
+            # A DRO absolute from the inner end: the KP08's 42 bolt spacing,
+            # exact millimetres with its own band (owner ruling 4).
             "station": (
-                _limits(_x, _PLACES),
+                limits(_x, _KP08_PLACES, _KP08_BAND),
                 (
                     "KP08_TAP_X",
-                    "HOLE_PLACES",
+                    "KP08_TAP_PLACES",
+                    "KP08_TAP_BAND",
                     ("ch_rocker_arm_tl_vn_oblique_leadscrew_spec", "BRACKET_KP08_HOLES_X"),
                     ("ch_rocker_arm_tl_vn_oblique_leadscrew_spec", "KP08_BOLT_SPACING"),
                 ),
@@ -428,7 +435,11 @@ for _index, _x in enumerate(part_spec.KP08_TAP_X, start=1):
                 ("KP08_MATE_CALLOUT", "KP08_PATTERN_ALLOWANCE", "POSITION_RADIUS"),
             ),
         },
-        precision={"dia": TAP_CALLOUT_PLACES, "station": _PLACES, "height": _PLACES},
+        precision={
+            "dia": TAP_CALLOUT_PLACES,
+            "station": _KP08_PLACES,
+            "height": _PLACES,
+        },
     )
 
 
@@ -604,6 +615,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places are authored on the part; the sheet only proves the import kept
     # them, then writes the mate callouts and the stock references.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    assert_imported_metric_dimensions(
+        adapter,
+        annotations,
+        {
+            name: places
+            for (_feature, name), (places, _band) in METRIC_DIMENSIONS.items()
+        },
+    )
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     _stock_references(adapter, annotations)
 

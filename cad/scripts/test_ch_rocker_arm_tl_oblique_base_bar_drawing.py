@@ -190,15 +190,23 @@ def test_rail_holes_hold_a_baseline_band_that_names_its_mate() -> None:
     stations = {f"RailHole{k}X" for k in range(1, 8)}
     assert spec.DRAWING_DIMENSIONS["RailHoles"] == stations
     # c3-r7 (rule 4): only the stations, the rail's pitch, carry the band.
-    assert set(spec.TOLERANCES) == {("RailHoles", name) for name in stations}
-    assert set(spec.TOLERANCES.values()) == {spec.RAIL_HOLE_BAND}
+    # Owner ruling 4 (2026-11-01): the HGR15R pattern is a metric vendor line,
+    # so each station prints exact millimetres at two places with its band.
+    rail = {
+        key: value
+        for key, value in spec.METRIC_DIMENSIONS.items()
+        if key[0] == "RailHoles"
+    }
+    assert set(rail) == {("RailHoles", name) for name in stations}
+    assert set(rail.values()) == {(2, spec.RAIL_HOLE_BAND)}
+    assert spec.RAIL_HOLE_BAND == 0.08
     assert not stations & set(drawing.CALLOUTS_BELOW) - {"RailHole7X"}
-    # The rail's metric pattern prints rounded at three places.
-    assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 3 for name in stations)
-    # One DRO Y setting cuts the row: only the station band and its rounding
-    # scatter one hole off another, inside the #8's float in the rail's Ø4.5.
-    assert spec.RAIL_HOLE_BAND <= spec.RAIL_HOLE_POSITION_RADIUS
-    assert spec.RAIL_HOLE_POSITION_RADIUS <= spec.RAIL_HOLE_BAND + 0.0005 * 25.4
+    assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 2 for name in stations)
+    assert all(x == round(x, 2) for x in spec.RAIL_HOLE_X)
+    # One DRO Y setting cuts the row: only the station band scatters one hole
+    # off another (exact stations add no rounding), inside the #8's float in
+    # the rail's Ø4.5.
+    assert spec.RAIL_HOLE_POSITION_RADIUS == pytest.approx(spec.RAIL_HOLE_BAND)
     assert spec.RAIL_PATTERN_ALLOWANCE == pytest.approx(
         spec.RAIL_SCREW_CLEARANCE - spec.RAIL_HOLE_POSITION_RADIUS
     )
@@ -215,7 +223,7 @@ def test_rail_row_is_located_from_the_faced_low_side() -> None:
     block's .XX band (c3-r7, rule 4: nothing mates with the row's height)."""
     assert spec.RAIL_ROW_Y == pytest.approx(88.9)
     assert spec.DRAWING_DIMENSIONS["RailRowReference"] == {"RailRowY"}
-    assert ("RailRowReference", "RailRowY") not in spec.TOLERANCES
+    assert ("RailRowReference", "RailRowY") not in spec.METRIC_DIMENSIONS
     assert spec.DRAWING_PRECISION_BY_NAME["RailRowY"] == spec.RAIL_ROW_PLACES == 2
     build = BUILD.read_text(encoding="utf-8")
     # Since the 2026-10-17 widening the row is off the centreline: the row
@@ -363,10 +371,15 @@ def test_rail_hole_stack_has_clear_lanes_inside_the_sheet() -> None:
     assert [y for _x, y in keeps] == sorted(y for _x, y in keeps)
     # The two-line top block (value + mate) stays under the 267 mm border.
     assert keeps[-1][1] + 0.0046 <= 0.265
-    # The 40.00 text sits between holes 1 and 2, clear of the end face's
-    # extension line and of hole 1's.
-    sheet_x = [drawing._sheet_x(drawing.FRONT_CENTER, x) for x in spec.RAIL_HOLE_X]
-    assert sheet_x[0] + 0.012 <= keeps[0][0] <= sheet_x[1] - 0.012
+    # The 40.00 ±0.08 mm text is wider than the gap between holes 1 and 2
+    # (owner ruling 4's mm label), so it stands left of the end face's
+    # extension line, above the width's upper extension line along the top
+    # edge and inside the left border.
+    x, y = keeps[0]
+    half = drawing._RAIL_HOLE_1_TEXT_HALF
+    assert x + half <= drawing._LEFT - 0.002
+    assert x - half >= 0.010 + 0.005
+    assert y - 0.00175 >= drawing._TOP + 0.002
 
 
 def test_end_view_projects_on_the_plans_centreline() -> None:
@@ -409,10 +422,18 @@ def test_bracket_holes_are_the_leadscrew_layouts() -> None:
     )
     assert rows == tuple(-lateral for lateral in leadscrew.BAR_SCREW_LATERALS)
     # #290: every row from the -Y edge prints as modelled at .XXX; the two
-    # stations are the KP08's metric stations and print rounded.
+    # stations are the KP08's metric stations (owner ruling 4) and print
+    # exact millimetres with their own band.
     for y in rows:
         edge = (y - spec.LOW_SIDE_Y) / 25.4
         assert edge == pytest.approx(round(edge, 3), abs=1e-9)
+    for x in (near_x, far_x):
+        assert x == round(x, spec.BRACKET_STATION_PLACES)
+    assert spec.METRIC_DIMENSIONS[("BracketHoles", "BracketHole1X")] == (
+        3,
+        spec.BRACKET_STATION_BAND,
+    )
+    assert spec.BRACKET_STATION_BAND == printed_band_mm(3, unit="mm") == 0.13
     assert drawing.BRACKET_HOLES is leadscrew.BASE_BAR_HOLES
     hole = spec.BRACKET_HOLE_SPEC
     wanted = leadscrew.BASE_BAR_HOLE_SPEC
@@ -460,9 +481,9 @@ def test_bracket_hole_walls_meet_rule_17() -> None:
 
 
 def test_bracket_pattern_holds_the_tl28_float_and_names_it() -> None:
-    """Stations and rows at .XXX: inside the screw float the TL-28 stack
-    leaves; the tight band names its mate, and the plan, looking at the top,
-    says the counterbores are on the far side."""
+    """Rows at .XXX and stations at three millimetre places: inside the screw
+    float the TL-28 stack leaves; the tight band names its mate, and the plan,
+    looking at the top, says the counterbores are on the far side."""
     assert printed_band_mm(spec.BRACKET_HOLE_PLACES, unit="in") <= 0.15
     for name in (
         "BracketHole1X",
@@ -483,15 +504,15 @@ def test_bracket_dimensions_and_callout_lay_out_clear() -> None:
     keep = drawing.FRONT_KEEP
     sx = drawing._sheet_x
     centre = drawing.FRONT_CENTER
-    # The near row's station text sits inside its span's right end, clear of
-    # the near slot's centre line and of its own extension line.
+    # The near row's station text (57.000 ±0.13 mm) is wider than its span, so
+    # it sits right of its own extension line, short of the far slot's.
     near_text = keep["BracketHole1X"][0]
-    assert (
-        near_text - drawing._BRACKET_NEAR_X_TEXT_HALF
-        >= sx(centre, spec.NEAR_SLOT_X) + 0.002
-    )
     near_station = sx(centre, drawing.BRACKET_NEAR_X)
-    assert near_text + drawing._BRACKET_NEAR_X_TEXT_HALF <= near_station - 0.002
+    assert near_text - drawing._BRACKET_NEAR_X_TEXT_HALF >= near_station + 0.002
+    assert (
+        near_text + drawing._BRACKET_NEAR_X_TEXT_HALF
+        <= sx(centre, spec.FAR_SLOT_X) - 0.002
+    )
     # Right lanes, nearest first: 6.400 (its text right of its line on a
     # shoulder, under the bar), then 22.900, whose outside arrow under the
     # bar's edge clears that text (c4-r2: it struck the "8"), then 44.900 and
@@ -568,6 +589,25 @@ def test_places_are_model_authored_and_the_sheet_is_pure() -> None:
     assert not _drawing_contract.drawing_specification_violations(
         script.read_text(encoding="utf-8"), filename=script.name
     )
+
+
+def test_metric_vendor_stations_are_model_authored_in_mm() -> None:
+    """Owner ruling 4 (2026-11-01, option B): the HGR15R rail's and KP08's
+    stations print exact millimetres, labelled mm: the part authors them, the
+    sheet proves they survived the import."""
+    assert set(spec.METRIC_DIMENSIONS) == {
+        *(("RailHoles", f"RailHole{k}X") for k in range(1, 8)),
+        ("BracketHoles", "BracketHole1X"),
+        ("BracketHoles", "BracketHole5X"),
+    }
+    for (_feature, name), (places, _band) in spec.METRIC_DIMENSIONS.items():
+        assert spec.DRAWING_PRECISION_BY_NAME[name] == places
+    build = BUILD.read_text(encoding="utf-8")
+    assert "set_metric_vendor_units(" in build
+    assert "METRIC_DIMENSIONS.items()" in build
+    assert "TOLERANCES" not in build
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "assert_imported_metric_dimensions(" in sheet
 
 
 def test_notes_follow_the_simplicity_policy() -> None:

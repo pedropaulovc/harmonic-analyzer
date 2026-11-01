@@ -13,10 +13,13 @@ matter; the only tight bands are the rail holes' end distance and pitch
 
 Issue #290: the sheet prints decimal inch (``drawing_unit: in``). Lengths
 stay physical millimetres, each fabricated nominal the exact millimetres of
-its printed inch value. Exempt: the HGR15R rail's hole pattern (vendor), the
-near slot's station (it closes the T-slot pitch) and the bracket holes'
-stations (the leadscrew's KP08 stations); each prints rounded, and every
-worst case below reads the printed value's limits.
+its printed inch value. Exempt: the near slot's station (it closes the T-slot
+pitch), which prints rounded, its worst cases reading the printed value's
+limits. The HGR15R rail's hole pattern and the bracket holes' stations (the
+leadscrew's KP08 stations along the Tr8 screw) belong to metric-only vendor
+lines (owner ruling 4, 2026-11-01, option B): they print exact millimetres,
+labelled ``mm``, each with its own band (``METRIC_DIMENSIONS``,
+``_metric_vendor_dimension``).
 
 Material and stock: 6061-T6511 aluminium flat bar milled from the owned 1/2 x
 6 bar (OnlineMetals 1173; owner ruling #2083), sawn and faced to ⚙
@@ -44,9 +47,10 @@ operator-side edge ⚙ ``BASE_BAR_OPERATOR_EDGE`` (lateral -2.00) the +Y side.
 
 Rail holes: 7 x #8-32 UNC tapped THRU on the rail axis (y 0) at x = ⚙
 ``RAIL_HOLE_END`` + k * ⚙ ``RAIL_HOLE_PITCH`` (40 .. 400 mm, the rail's own
-pattern, printed 1.575 .. 15.748). The rail is a custom cut; its symmetric
-E = 40 end distance is the ORDER requirement, an unverified vendor value
-until the supplier confirms the cut. The rail's Ø4.5 mm holes take #8 socket
+pattern, printed ``40.00 ±0.08 mm`` .. ``400.00 ±0.08 mm``). The rail is a
+custom cut; its symmetric E = 40 end distance is the ORDER requirement, an
+unverified vendor value until the supplier confirms the cut. The rail's
+Ø4.5 mm holes take #8 socket
 screws (⚙ ``RAIL_SCREW``); a 3/4 in screw seats ⚙ 9.7 mm above the rail base,
 so .368 engages the bar (rule 18: at least 1.5D).
 
@@ -55,17 +59,17 @@ bar's tapped hole has only ``RAIL_SCREW_CLEARANCE`` .0066 a side in the
 rail's Ø4.5 mm hole (a fixed-fastener pattern), so every bar hole's position
 error plus the rail's own must stay inside that radius. Every hole is located
 by DRO absolutes from the two faced datums: its station from the spindle-end
-face at 3 places ± ``RAIL_HOLE_BAND`` .003, the rail's pitch, and the row
+face at 2 mm places ± ``RAIL_HOLE_BAND`` 0.08 mm, the rail's pitch, and the row
 from the faced -Y edge (``RAIL_ROW_Y`` 3.50, the column-side edge's lateral)
 at the title block's .XX (``RAIL_ROW_PLACES``; c3-r7, rule 4: the row's
 height has no mate, the hold-down slots set the bar's place at fit-up and
 the rail is indicated in). All seven holes are cut at the one DRO Y setting,
-so the row's band moves the whole row: only the station band and its
-three-place rounding scatter the holes, ``RAIL_HOLE_POSITION_RADIUS`` from
-nominal, leaving ``RAIL_PATTERN_ALLOWANCE`` for the rail's own hole positions
-(an unverified vendor value). The outermost station carries the mate on a
-second line, "MATCHES HGR15R RAIL HOLES". The row's 3.50 carries its reason
-(``RAIL_ROW_CALLOUT``).
+so the row's band moves the whole row: only the station band scatters the
+holes, ``RAIL_HOLE_POSITION_RADIUS`` from nominal (the stations print exact,
+so no rounding adds to it), leaving ``RAIL_PATTERN_ALLOWANCE`` for the rail's
+own hole positions (an unverified vendor value). The outermost station
+carries the mate on a second line, "MATCHES HGR15R RAIL HOLES". The row's
+3.50 carries its reason (``RAIL_ROW_CALLOUT``).
 
 Hold-down slots: two through slots ⚙ ``HOLD_DOWN_SLOT_WIDTH`` .53 wide, axis
 along Y, stud travel ± ⚙ ``HOLD_DOWN_ADJUST`` .08 (.69 overall). Near slot
@@ -98,10 +102,11 @@ station; rows 2.425, 1.768, .902 and .245 from the -Y edge). Four #8-32 x
 holes before the bar goes on the table; the heads sit below the underside.
 Since the 2026-10-17 widening (ruling A′) each bracket stands wholly on the
 bar, its outer end flush with the -Y edge. Both bars carry the holes; on the
-turned-over bar 2 the counterbores face up, unused. Stations and rows print
-at .XXX: the row's spacings must hold TL-28's tapped row inside the screws'
-float, so the callout names the mate. The two stations are the KP08's
-metric stations and print rounded (2.244, 16.850). Worst-case walls:
+turned-over bar 2 the counterbores face up, unused. The rows print at .XXX:
+their spacings must hold TL-28's tapped row inside the screws' float, so the
+callout names the mate. The two stations are the KP08's metric stations and
+print exact, ``57.000 ±0.13 mm`` and ``428.000 ±0.13 mm`` (the millimetre
+title block's three-place band, stated on each). Worst-case walls:
 ``bracket_hole_walls``.
 """
 
@@ -123,14 +128,19 @@ UNIT = drawing_unit(
     "parts/ch-rocker-arm-tl-oblique-base-bar",
     _config.parts("ch-rocker-arm-tl-oblique-base-bar"),
 )
+# The metric vendor lines' stations print in millimetres on the inch sheet
+# (owner ruling 4, 2026-11-01): exact, so no rounding adds to their band.
+METRIC_UNIT = "mm"
 
 
-def _deviation(value: float, places: int, band: float | None = None) -> float:
+def _deviation(
+    value: float, places: int, band: float | None = None, *, unit: str = UNIT
+) -> float:
     """The widest a part may sit off ``value`` (mm) when the sheet prints it
-    at ``places`` with its title-block band, or ``band``: the band plus the
-    rounding of a value off the printed grid."""
+    at ``places`` of ``unit`` with its title-block band, or ``band``: the band
+    plus the rounding of a value off the printed grid."""
     limits = None if band is None else (-band, band)
-    low, high = printed_deviations(value, places, limits, unit=UNIT)
+    low, high = printed_deviations(value, places, limits, unit=unit)
     return max(-low, high)
 
 
@@ -160,18 +170,19 @@ RAIL_HOLE_X: tuple[float, ...] = tuple(
 if len(RAIL_HOLE_X) != 7:
     raise AssertionError("the brief's base bar carries seven rail holes")
 RAIL_ROW_Y = -LOW_SIDE_Y  # 3.50: the row (y 0) from the faced -Y edge
-# The rail's metric pattern prints at three places, rounded.
-RAIL_HOLE_PLACES = 3
-RAIL_HOLE_BAND = 0.0762  # ±.003, the stations only: the rail's hole pitch
+# The HGR15R rail's metric pattern prints exact millimetres at two places,
+# each station with the rail pitch's own band (``40.00 ±0.08 mm``).
+RAIL_HOLE_PLACES = 2
+RAIL_HOLE_BAND = 0.08  # the stations only: the rail's hole pitch
 # The row's height prints at the title block's band (c3-r7, rule 4): nothing
 # mates with it, and the one DRO Y setting keeps the holes in line.
 RAIL_ROW_PLACES = 2
 RAIL_HOLE_DIA = 4.5  # HGR15R rail's screw hole (catalogue)
 RAIL_SCREW_CLEARANCE = (RAIL_HOLE_DIA - THREAD_MAJOR_MM[RAIL_SCREW]) / 2.0  # .0066
-# One Y setting for the row: only the station band, and each station's
-# three-place rounding, scatter hole from hole.
+# One Y setting for the row: only the station band scatters hole from hole.
 RAIL_HOLE_POSITION_RADIUS = max(
-    _deviation(x, RAIL_HOLE_PLACES, RAIL_HOLE_BAND) for x in RAIL_HOLE_X
+    _deviation(x, RAIL_HOLE_PLACES, RAIL_HOLE_BAND, unit=METRIC_UNIT)
+    for x in RAIL_HOLE_X
 )
 RAIL_PATTERN_ALLOWANCE = RAIL_SCREW_CLEARANCE - RAIL_HOLE_POSITION_RADIUS
 if RAIL_PATTERN_ALLOWANCE <= 0.0:
@@ -266,9 +277,13 @@ BRACKET_HOLE_SPEC = HoleSpec(
         "CounterBoreDepth": BRACKET_CBORE_DEPTH,
     },
 )
-# Stations and rows at .XXX: the row's spacings must hold TL-28's four tapped
-# holes inside the screws' float. Every Hole Wizard length prints .XXX.
+# Rows at .XXX: their spacings must hold TL-28's four tapped holes inside the
+# screws' float. Every Hole Wizard length prints .XXX. The stations are the
+# KP08's along the Tr8 screw (owner ruling 4): exact millimetres at three
+# places, each stating the millimetre title block's three-place band.
 BRACKET_HOLE_PLACES = 3
+BRACKET_STATION_PLACES = 3
+BRACKET_STATION_BAND = printed_band_mm(BRACKET_STATION_PLACES, unit=METRIC_UNIT)  # 0.13
 BRACKET_CBORE_PLACES = 3
 BRACKET_CALLOUT_PRECISION = {
     "hw-thruholedia": 3,
@@ -317,7 +332,9 @@ def bracket_hole_walls(holes: tuple[tuple[float, float], ...]) -> dict[str, floa
     centres."""
 
     def station(x: float) -> float:
-        return _deviation(x, BRACKET_HOLE_PLACES)
+        return _deviation(
+            x, BRACKET_STATION_PLACES, BRACKET_STATION_BAND, unit=METRIC_UNIT
+        )
 
     def row(y: float) -> float:
         return _deviation(y - LOW_SIDE_Y, BRACKET_HOLE_PLACES)
@@ -400,13 +417,20 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BracketRowReference": {f"BracketRow{k}Y" for k in range(1, 5)},
 }
 # The width is milled to size (owner ruling #2083) and the thickness faced
-# (owner ruling 2026-10-30): both take the title block's .XX band.
-# The rail holes' stations carry the one tight band (the rail's pitch); the
-# row's height takes the title block's (c3-r7): (feature, dimension) ->
-# symmetric band.
-TOLERANCES: dict[tuple[str, str], float] = {
-    ("RailHoles", name): RAIL_HOLE_BAND
-    for name in sorted(DRAWING_DIMENSIONS["RailHoles"])
+# (owner ruling 2026-10-30): both take the title block's .XX band; the rail
+# row's height takes it too (c3-r7).
+# The metric vendor lines' stations (owner ruling 4): (feature, dimension) ->
+# (millimetre places, symmetric band mm). The rail holes' carries the one
+# tight band (the rail's pitch).
+METRIC_DIMENSIONS: dict[tuple[str, str], tuple[int, float]] = {
+    **{
+        ("RailHoles", name): (RAIL_HOLE_PLACES, RAIL_HOLE_BAND)
+        for name in sorted(DRAWING_DIMENSIONS["RailHoles"])
+    },
+    **{
+        ("BracketHoles", name): (BRACKET_STATION_PLACES, BRACKET_STATION_BAND)
+        for name in sorted(DRAWING_DIMENSIONS["BracketHoles"])
+    },
 }
 _PLACES = {
     "SlotWidth": SLOT_PLACES,
@@ -414,12 +438,8 @@ _PLACES = {
     "BarThick": THICK_PLACES,
     "BarWidth": WIDTH_PLACES,
     "RailRowY": RAIL_ROW_PLACES,
-    **{name: RAIL_HOLE_PLACES for _feature, name in TOLERANCES},
-    **{
-        name: BRACKET_HOLE_PLACES
-        for feature in ("BracketHoles", "BracketRowReference")
-        for name in DRAWING_DIMENSIONS[feature]
-    },
+    **{name: BRACKET_HOLE_PLACES for name in DRAWING_DIMENSIONS["BracketRowReference"]},
+    **{name: places for (_feature, name), (places, _band) in METRIC_DIMENSIONS.items()},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     feature: {name: _PLACES.get(name, STATION_PLACES) for name in names}

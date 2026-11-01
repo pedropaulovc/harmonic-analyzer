@@ -13,9 +13,11 @@ module never retypes one of its numbers.
 
 Issue #290: the sheet prints decimal inch (``drawing_unit: in``). Lengths
 stay physical millimetres, each fabricated nominal the exact millimetres of
-its printed inch value; the KP08's 42 mm bolt span is the vendor's, so its two
-tap stations print rounded at three places (.548, 2.202) and their walls and
-float read the printed limits.
+its printed inch value; the KP08's 42 mm bolt span is a metric-only vendor
+line (owner ruling 4, 2026-11-01, option B), so its two tap stations print
+exact millimetres, labelled mm, with the millimetre title block's
+three-place band stated on each (``13.925 ±0.13 mm``, ``55.925 ±0.13 mm``;
+``METRIC_DIMENSIONS``), and their walls and float read those limits.
 
 Material and stock: aluminium flat bar 1/2 x 1 in standing on edge, e.g.
 6061-T6 (the owned OnlineMetals 1165 6061-T6511 bar): 1/2 along the screw,
@@ -33,9 +35,9 @@ X 0 .. 2.71, Y -.25 .. .25, Z 0 .. 1.00.
 
 Holes, all six on the mid-width row (Y 0), tapped THRU from the top face:
 
-- Two #6-32 UNC tapped holes at X .548 and 2.202: the KP08's two base screws
-  at its 42 mm bolt spacing, about the screw axis. The bought block's holes
-  are plain, so the screw is shop-chosen US-customary (fastener policy).
+- Two #6-32 UNC tapped holes at X 13.925 and 55.925 mm: the KP08's two base
+  screws at its 42 mm bolt spacing, about the screw axis. The bought block's
+  holes are plain, so the screw is shop-chosen US-customary (fastener policy).
 - Four #8-32 UNC tapped holes at X .285, .942, 1.808 and 2.465: the base-bar
   screws, #8-32 SHCS fitted up through the bar's counterbored clearance holes
   (``leadscrew.BASE_BAR_HOLE_SPEC``) into these taps; two pairs symmetric
@@ -45,8 +47,9 @@ Holes, all six on the mid-width row (Y 0), tapped THRU from the top face:
   ruling).
 
 Bands. Both patterns are fixed-fastener fits, so every station and the row
-print at three places (title block ±.005): each hole then sits in a .005
-half-side square, plus the KP08 stations' rounding, ``POSITION_RADIUS`` from
+print at three places: the bar taps and the row at the title block's ±.005,
+the KP08 taps at ±0.13 mm. Each hole then sits in its band's half-side
+square, ``POSITION_RADIUS`` from
 nominal. A #6 (major Ø.138) floats in the KP08's Ø4.5 mm holes
 (``leadscrew.KP08_HOLE_DIA``, UNVERIFIED), leaving ``KP08_PATTERN_ALLOWANCE``
 for the block's own hole positions. A #8 (major Ø.164) floats in the bar's
@@ -126,6 +129,11 @@ KP08_THREAD = leadscrew.KP08_SCREW  # "#6-32"
 KP08_TAP_X: tuple[float, ...] = tuple(
     round(x, 9) for x in leadscrew.BRACKET_KP08_HOLES_X
 )
+# The KP08 stations print exact millimetres (owner ruling 4) with the
+# millimetre title block's three-place band.
+METRIC_UNIT = "mm"
+KP08_TAP_PLACES = 3
+KP08_TAP_BAND = printed_band_mm(KP08_TAP_PLACES, unit=METRIC_UNIT)  # 0.13
 KP08_TAP_SPEC = HoleSpec("tapped", KP08_THREAD, end="through_all")
 KP08_TAP_DRILL = blind_cut_dia_mm(KP08_TAP_SPEC)  # #36, .1065
 # Every tap callout's lengths print .XXX (.136, .107); a THRU tap's callout
@@ -137,9 +145,20 @@ _BAR_R = THREAD_MAJOR_MM[BAR_SCREW] / 2.0
 _KP08_R = THREAD_MAJOR_MM[KP08_THREAD] / 2.0
 
 
+def _station_limits(value: float) -> tuple[float, float]:
+    """A tap station's printed (low, high) limits, mm: a KP08 tap's exact
+    millimetres with its own band, any other at .XXX."""
+    if value in KP08_TAP_X:
+        low, high = printed_deviations(
+            value, KP08_TAP_PLACES, (-KP08_TAP_BAND, KP08_TAP_BAND), unit=METRIC_UNIT
+        )
+        return value + low, value + high
+    return _limits(value, HOLE_PLACES)
+
+
 def _deviation(value: float) -> float:
-    """A station's widest excursion from its model value at .XXX."""
-    low, high = _limits(value, HOLE_PLACES)
+    """A station's widest excursion from its model value."""
+    low, high = _station_limits(value)
     return max(value - low, high - value)
 
 
@@ -208,21 +227,19 @@ def _inch(value: float) -> str:
 
 
 WALLS_MM: dict[str, float] = {
-    f"{_FIRST[1]} tap at {_inch(_FIRST[0])} to inner end": _limits(
-        _FIRST[0], HOLE_PLACES
-    )[0]
+    f"{_FIRST[1]} tap at {_inch(_FIRST[0])} to inner end": _station_limits(_FIRST[0])[0]
     - _FIRST[2],
     **{
-        f"{kind} tap at {_inch(x)} to {next_kind} tap at {_inch(next_x)}": _limits(
-            next_x, HOLE_PLACES
+        f"{kind} tap at {_inch(x)} to {next_kind} tap at {_inch(next_x)}": _station_limits(
+            next_x
         )[0]
-        - _limits(x, HOLE_PLACES)[1]
+        - _station_limits(x)[1]
         - r
         - next_r
         for (x, kind, r), (next_x, next_kind, next_r) in zip(_TAPS, _TAPS[1:])
     },
     f"{_LAST[1]} tap at {_inch(_LAST[0])} to outer end": _LENGTH_LOW
-    - _limits(_LAST[0], HOLE_PLACES)[1]
+    - _station_limits(_LAST[0])[1]
     - _LAST[2],
     "row to -Y side": HOLE_ROW_Y - _ROW_DEVIATION - _BAR_R,
     "row to +Y side": (BRACKET_WIDTH - WIDTH_STOCK_BAND)
@@ -250,7 +267,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BracketProfile": {"BracketLength": LENGTH_PLACES, "BracketWidth": STOCK_PLACES},
     "BracketThickReference": {"BracketThick": STOCK_PLACES},
     "BarTaps": dict.fromkeys(DRAWING_DIMENSIONS["BarTaps"], HOLE_PLACES),
-    "KP08Taps": {"KP08Tap1X": HOLE_PLACES, "KP08Tap2X": HOLE_PLACES},
+    "KP08Taps": dict.fromkeys(DRAWING_DIMENSIONS["KP08Taps"], KP08_TAP_PLACES),
     "HoleRowReference": {"HoleRowY": HOLE_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -260,8 +277,8 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked end bracket dimension needs authored places")
-# Every fabricated value prints as modelled; the KP08 stations are the
-# vendor span's, printed rounded (module docstring).
+# Every fabricated value prints as modelled at its inch places; the KP08
+# stations (the vendor span's) print exact millimetres (module docstring).
 for _name, _value in (
     ("BracketLength", BRACKET_LENGTH),
     *((f"BarTap{k}X", x) for k, x in enumerate(BAR_TAP_X, start=1)),
@@ -270,6 +287,15 @@ for _name, _value in (
     _places = DRAWING_PRECISION_BY_NAME[_name]
     if abs(_value / 25.4 - round(_value / 25.4, _places)) > 1e-9:
         raise AssertionError(f"end bracket {_name} {_value} does not print as modelled")
+# The metric vendor line's stations (owner ruling 4): (feature, dimension) ->
+# (millimetre places, symmetric band mm).
+METRIC_DIMENSIONS: dict[tuple[str, str], tuple[int, float]] = {
+    ("KP08Taps", name): (KP08_TAP_PLACES, KP08_TAP_BAND)
+    for name in sorted(DRAWING_DIMENSIONS["KP08Taps"])
+}
+for _x in KP08_TAP_X:
+    if abs(_x - round(_x, KP08_TAP_PLACES)) > 1e-9:
+        raise AssertionError(f"end bracket KP08 tap {_x} does not print exact in mm")
 
 # Width and thickness are the bar as bought (their references carry STOCK);
 # every station names its mate, and the row names what it buys.
