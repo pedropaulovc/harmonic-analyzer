@@ -9,6 +9,7 @@ from typing import Any
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 
 from _com import _early_bound
+from _construction_line_font import _construction_curves_as_outline
 from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
 from _drawing_common import rebuild_drawing
 from _drawing_hidden_sketches import _show_hidden_owners, curate_view_dimensions
@@ -26,7 +27,6 @@ from _supplier_spring_drawing import (
     reacquire_supplier_dimensions,
 )
 from _supplier_spring_reference import SUPPLIER_DIAGRAM_CONFIGURATION
-from _supplier_wire_stock_drawing import _construction_curves_as_outline
 from vn_disc_spring_supplier_stock import (
     SUPPLIER_DIMENSION_NAMES,
     SUPPLIER_DIMENSIONS_BY_FEATURE,
