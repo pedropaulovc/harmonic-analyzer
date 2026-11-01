@@ -55,21 +55,19 @@ def test_nut_face_carries_only_the_screw_clearance_and_two_through_taps():
 
 
 def test_nut_taps_are_the_tl27_pair_on_the_axis_line():
-    # Ruling B1: tap 1 .34 from the axis toward the lug end, tap 2 .680 on,
-    # both on the axis's Z line, matching the nut's loose holes.
+    # 2X .340 from the axis, one each side, on the axis's Z line, matching the
+    # nut's loose holes; no tap stands on the other (run 20261101T220223216Z).
     (y1,z1),(y2,z2)=spec.NUT_HOLES_YZ
     assert z1==z2==spec.NUT_AXIS_Z
-    assert math.isclose(spec.NUT_AXIS_Y-y1,.34*INCH)
-    assert math.isclose(y2-y1,.680*INCH)
-    assert math.isclose(y2-spec.NUT_AXIS_Y,spec.NUT_AXIS_Y-y1)
-    assert (spec.NUT_TAP_OFFSET,spec.NUT_TAP_SPACING)==(feed_nut.HOLE_OFFSET,feed_nut.HOLE_SPACING)
+    assert math.isclose(spec.NUT_AXIS_Y-y1,.340*INCH) and math.isclose(y2-spec.NUT_AXIS_Y,.340*INCH)
+    assert spec.NUT_TAP_OFFSET==feed_nut.HOLE_OFFSET
     values=spec.DRAWING_VALUES
-    assert math.isclose(values['NutTap1Y'],.34*INCH) and math.isclose(values['NutTapSpacing'],.680*INCH)
+    assert math.isclose(values['NutTap1Y'],.340*INCH) and math.isclose(values['NutTap2Y'],.340*INCH)
     assert math.isclose(values['NutCentreY'],spec.NUT_AXIS_Y-spec.LUG_Y0)
-    assert spec.DRAWING_DIMENSIONS['NutPatternReference']==('NutCentreZ','NutCentreY','NutTap1Y','NutTapSpacing')
+    assert spec.DRAWING_DIMENSIONS['NutPatternReference']==('NutCentreZ','NutCentreY','NutTap1Y','NutTap2Y')
     assert {name:spec.DRAWING_PRECISION_BY_NAME[name] for name in spec.NUT_PATTERN_PRINTED}=={
-        'NutCentreZ':3,'NutCentreY':3,'NutTap1Y':2,'NutTapSpacing':3}
-    assert spec.CALLOUTS_BELOW['NutTapSpacing']=='MATCHES TL-27 FEED NUT'
+        'NutCentreZ':3,'NutCentreY':3,'NutTap1Y':3,'NutTap2Y':3}
+    assert spec.CALLOUTS_BELOW['NutTap1Y']==spec.CALLOUTS_BELOW['NutTap2Y']=='MATCHES TL-27 FEED NUT'
     # r1 review: the .515 names its mate; the D arrow says where VIEW D prints.
     assert spec.CALLOUTS_BELOW['NutCentreY']=='ON KP08 LEADSCREW AXIS'
     assert spec.CALLOUTS_BELOW['NutCentreZ']=='FROM CARRIAGE FACE\nON KP08 LEADSCREW AXIS'
@@ -77,16 +75,20 @@ def test_nut_taps_are_the_tl27_pair_on_the_axis_line():
     assert "VIEW_SHEET_REF = '(SHEET 2)'" in source
 
 
-def test_loose_nut_holes_absorb_both_printed_pairs():
-    # The Ø.144 float (.016) covers the two parts' pair bands; the normal
-    # Ø.129 (.008) would not.
-    assert math.isclose(spec.FIT_UP_RESIDUAL,math.hypot(.005*INCH,.005*INCH+printed_band_mm(3,unit='mm')))
+def test_loose_nut_holes_absorb_both_printed_stations():
+    # Each screw sees the nut's .340 band and the lug's along the pair (.005 +
+    # .005), the nut's hole line and the lug's 12.400 ±.13 mm axis across:
+    # .014, under the Ø.144's .016 float; the normal Ø.129's .008 would not.
+    assert math.isclose(spec.FIT_UP_Y,.010*INCH)
+    assert math.isclose(spec.FIT_UP_Z,.005*INCH+printed_band_mm(3,unit='mm'))
+    assert math.isclose(spec.FIT_UP_RESIDUAL,math.hypot(spec.FIT_UP_Y,spec.FIT_UP_Z))
+    assert round(spec.FIT_UP_RESIDUAL/INCH,3)==.014
     assert feed_nut.NORMAL_HOLE_FLOAT<spec.FIT_UP_RESIDUAL<=feed_nut.HOLE_FLOAT
 
 
 def test_lug_walls_meet_the_target_at_the_printed_worst_case():
     assert min(spec.LUG_WALLS_MM.values())>=WALL_TARGET_MM
-    assert round(min(spec.LUG_WALLS_MM.values())/INCH,3)==.097
+    assert round(min(spec.LUG_WALLS_MM.values())/INCH,3)==.107
 
 
 def test_nut_screws_stop_inside_the_through_tap():
