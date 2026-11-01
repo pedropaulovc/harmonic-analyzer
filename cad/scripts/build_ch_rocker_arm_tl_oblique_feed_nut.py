@@ -56,7 +56,8 @@ from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
 import ch_rocker_arm_tl_oblique_feed_nut_spec as spec
 
-PART_NAME = spec.PART_NAME
+PART_NAME = "ch-rocker-arm-tl-oblique-feed-nut"
+assert PART_NAME == spec.PART_NAME
 MATERIAL = "Brass"  # C36000 free-cutting brass bar (the registry row names it)
 _SAVED_DRAWING_PROPERTIES = (
     "Number",
