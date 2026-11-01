@@ -5,7 +5,8 @@ drill-rod cylinder pressed into the amplitude bar's reamed top pin hole and
 dressed flush with the bar's faces -- on three native model dimensions, all
 on the side view where a turned part's diameter sits beside its length
 (drawing-guidelines.md rule 11 (turned parts read like the lathe)): the Ø
-with the drill rod's own grind band, its callout naming the stock and both
+as the 5/64 stock fraction's REFERENCE (the drill rod's grind governs), its
+callout naming the stock and both
 mates; the installed length as REFERENCE (the bar's width; the MHA-CH-01
 stock owns it); and the blank's cut length with its band from the part's
 blanked ``BlankReference`` sketch, whose thin dashed ends beyond the installed
@@ -14,9 +15,10 @@ one center mark, the isometric, and the one property-linked note. No datums,
 no frames, no roughness symbol.
 The decimal places and the band are the PART's
 (``ch_bar_pivot_pin_notes.DRAWING_PRECISION``, applied natively by
-``build_ch_bar_pivot_pin``); this script only reads them back off the sheet.
+``build_ch_bar_pivot_pin``); this script reads them back off the sheet and
+dresses the diameter as its stock fraction. Decimal-inch sheet (#290).
 
-Drawn 10:1 -- a Ø1.98 x 6.35 pin is a speck on a B sheet at anything less.
+Drawn 10:1 -- a 5/64 x .25 pin is a speck on a B sheet at anything less.
 
 Run with SolidWorks open::
 
@@ -55,13 +57,17 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from _supplier_dimensions import supplier_reference_dimension
 from ch_bar_pivot_pin_notes import (
+    DIAMETER_CALLOUT,
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    PIN_DIA_FRACTION_DENOMINATOR,
     REFERENCE_DIMENSIONS,
 )
 from ch_bar_pivot_pin_spec import PIN_DIA, PIN_INSTALLED_LENGTH
@@ -163,7 +169,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("ch-bar-pivot-pin"),
     )
     stamp_drawing_summary(
         adapter,
@@ -199,8 +209,28 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, front_annotations, DRAWING_PRECISION_BY_NAME)
     # Descriptive text only; every value and band is the model's.
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    # The diameter is the as-bought drill rod: its native value prints as the
+    # 5/64 stock fraction's REFERENCE (#290: supplier tolerance governs), the
+    # stock and both mates below it (rule 4).
+    diameters = [a for a in front_annotations if dimension_name(adapter, a) == "PinDia"]
+    if len(diameters) != 1:
+        raise RuntimeError("expected one pin PinDia dimension")
+    supplier_reference_dimension(
+        adapter,
+        _early_bound(
+            _early_bound(diameters[0], "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        ),
+        label="pin PinDia",
+        units="in",
+        precision=DRAWING_PRECISION_BY_NAME["PinDia"],
+        expected_mm=PIN_DIA,
+        presentation="diameter",
+        fraction_denominator=PIN_DIA_FRACTION_DENOMINATOR,
+        callout=DIAMETER_CALLOUT,
+    )
     # The installed length is the bar's width: a LINEAR reference. The plural
-    # set_reference_dimensions forces a diameter glyph, printing "(Ø6.35)".
+    # set_reference_dimensions forces a diameter glyph.
     for name in sorted(REFERENCE_DIMENSIONS):
         matches = [a for a in front_annotations if dimension_name(adapter, a) == name]
         if len(matches) != 1:

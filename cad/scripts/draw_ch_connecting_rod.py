@@ -63,6 +63,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_cylinder import CylinderFace
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -75,7 +76,7 @@ from ch_connecting_rod_spec import (
     FORK_THICKNESS,
     FORK_TOP_Y,
     FORK_WIDTH,
-    GEOMETRIC_TOLERANCES_MM,
+    GEOMETRIC_TOLERANCES_IN,
     PIN_HOLE_DIA,
     RING_BORE_DIA,
     RING_BOTTOM_Y,
@@ -117,9 +118,6 @@ LEFT_CENTER = (0.080, FRONT_CENTER[1])
 ISO_CENTER = (0.398, 0.212)
 # Over the isometric: below it, the detail's boss-length witness runs out.
 ISO_NOTE_XY = (0.352, 0.262)
-# The one-line note stands in the open field between the front view's shank
-# and the detail, clear of the bore's finish symbol.
-NOTES_XY = (0.205, 0.130)
 
 # The mates the tight bands name (drawing-guidelines.md rule 7).
 CAM_NUMBER = str(_config.parts("dt-cylinder-gear")["number"])
@@ -167,15 +165,23 @@ NEAR_SIDE_DIAMETERS = ("RingOuterDia", "StrapBoreDia")
 _CLEARANCE_LEAST, _CLEARANCE_MOST = STRAP_DIAMETRAL_CLEARANCE
 _PRESS_LEAST = PIN_JOINT_BUDGET["interference_min"]
 _PRESS_MOST = PIN_JOINT_BUDGET["interference_max"]
+
+
+def _inch(value_mm: float, places: int) -> str:
+    """A millimetre value as inch text at ``places``, no leading zero."""
+    return f"{value_mm / 25.4:.{places}f}".removeprefix("0")
+
+
 FRONT_CALLOUTS = {
     "StrapBoreDia": (
         f"BORE; RUNS ON CAM OF\n{CAM_NUMBER},"
-        f" {_CLEARANCE_LEAST:.2f}-{_CLEARANCE_MOST:.2f}\nDIAMETRAL CLEARANCE"
+        f" {_inch(_CLEARANCE_LEAST, 3)}-{_inch(_CLEARANCE_MOST, 3)}\n"
+        "DIAMETRAL CLEARANCE"
     ),
     "ForkWidthDim": "FULL R",
     "PinHoleDia": (
         f"THRU - REAM; PRESS\nFIT ON PIN {PIN_NUMBER},\n"
-        f"{_PRESS_LEAST:.3f}-{_PRESS_MOST:.3f} INTERFERENCE"
+        f"{_inch(_PRESS_LEAST, 5)}-{_inch(_PRESS_MOST, 5)} INTERFERENCE"
     ),
 }
 
@@ -266,16 +272,18 @@ DETAIL_KEEP = {
 }
 # The near tine's band locates the slot from the datum face (the channel's
 # axial budget) and, with the far tine's, holds the gap to the next channel's
-# rod (#982 review r2: a clearance alone would not need it).
+# rod (#982 review r2: a clearance alone would not need it). Its printed lower
+# limit is the tines' known shortfall against the .080 wall target, named
+# TINE WALL (rule 20; MHA-CH-03 RV-02).
 DETAIL_CALLOUTS = {
-    "TineNear": f"2X; LOCATES SLOT;\nCLEARS NEXT ROD\n{ROD_NUMBER}",
+    "TineNear": f"2X TINE WALL;\nLOCATES SLOT;\nCLEARS NEXT ROD\n{ROD_NUMBER}",
     "SlotWidth": f"RUNS ON ARM\n{ARM_NUMBER}",
     "RingFaceNear": f"PLATE FACE; RING IN\nCAM SLOT OF {CAM_NUMBER}",
 }
 
 BORE_FINISH_EDGE = _sheet_xy(RING_BORE_DIA / 2.0, 0.0)
 # At the plate's 2.5 mm character height (the default printed 5 mm and its
-# "Ra 1.6" ran into the detail's plate-face callout, r1 and r2).
+# roughness text ran into the detail's plate-face callout, r1 and r2).
 BORE_FINISH_SYMBOL = (BORE_FINISH_EDGE[0] + 0.020, BORE_FINISH_EDGE[1] + 0.015)
 BORE_FINISH_CHAR_HEIGHT = 0.0025
 # Datum A on the strap bore at 5 o'clock, its tag below the ring: at 9
@@ -299,7 +307,7 @@ DATUM_A_SYMBOL = _sheet_xy(
 # above the shank width's dimension line (its text stands right of the shank).
 DATUM_B_EDGE = _sheet_xy(-SHANK_WIDTH / 2.0, 100.0)
 DATUM_B_SYMBOL = (DATUM_B_EDGE[0] - 0.016, FRONT_KEEP["ShankWidthDim"][1] + 0.0045)
-# The 4.00 BASIC (datum B to the pin axis) runs on the shank, its text out
+# The .16 BASIC (datum B to the pin axis) runs on the shank, its text out
 # to the left: over the pin its line lay on the position FCF's level leader
 # and under the ream leader (baseline review); inside the head it crowded
 # the hole and the ream callout's leader crossed it (#982 review r3); just
@@ -308,10 +316,10 @@ DATUM_B_SYMBOL = (DATUM_B_EDGE[0] - 0.016, FRONT_KEEP["ShankWidthDim"][1] + 0.00
 # runs up-left from that line to the hole, cannot reach it; above datum B's
 # tag. On the shank its arrow lands on the flank itself, datum B's edge.
 PIN_OFFSET_TEXT_XY = (0.150, _sheet_xy(0.0, 111.0)[1])
-# The 4.00 BASIC from datum A (the bore axis) to datum B (the shank's left
+# The .16 BASIC from datum A (the bore axis) to datum B (the shank's left
 # flank) completes the frame (ENFORCE review: nothing placed B sideways from
 # A): its witness rises from the bore centre up the shank, its text out to
-# the left on the shank above the ring, clear over the Ø40.80 text.
+# the left on the shank above the ring, clear over the ring OD's text.
 DATUM_B_FROM_A_TEXT_XY = (0.150, _sheet_xy(0.0, 55.0)[1])
 
 
@@ -440,7 +448,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
         required=(
@@ -448,12 +455,15 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("ch-connecting-rod"),
     )
     stamp_drawing_summary(
         adapter,
@@ -469,7 +479,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
     # The 1:1 left view (third angle: placed LEFT of the front) shows the
-    # stepped thickness -- one 2.175 plate for ring and shank, and the 6.075
+    # stepped thickness -- one .086 plate for ring and shank, and the .240
     # fork split by its slot into two tines -- and carries DETAIL C's circle.
     # The right-hand column belongs to the title block, so the side view lives
     # on the left.
@@ -617,9 +627,10 @@ async def build(adapter: Any) -> dict[str, str]:
         label="strap bore axis",
     )
     # Datum B: the shank's left flank.  A alone leaves rotation about the bore
-    # axis unconstrained, so the pin-hole position (and the 158.37 direction)
-    # could not be inspected; B clocks the rod, the 4.00 BASIC from A places
-    # B, and the 4.00 BASIC from B places the pin on the shank centreline.
+    # axis unconstrained, so the pin-hole position (and the centre distance's
+    # direction) could not be inspected; B clocks the rod, the .16 BASIC from
+    # A places B, and the .16 BASIC from B places the pin on the shank
+    # centreline.
     add_datum_feature(
         adapter,
         front,
@@ -628,7 +639,7 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="B",
         label="shank left flank",
     )
-    # Both 4.00 BASICs run from the flank to a circle's CENTRE (datum A's bore,
+    # Both .16 BASICs run from the flank to a circle's CENTRE (datum A's bore,
     # the pin's axis), set explicitly rather than left to the arc condition the
     # pick resolves to. Value-only: both picks are coordinate hits.
     datum_b_offset = add_edge_dimension(
@@ -683,13 +694,12 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=pin_fcf_rim,
         frame_xy=(0.222, 0.222),
         characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["rocker pin hole position"],
+        tolerance=GEOMETRIC_TOLERANCES_IN["rocker pin hole position"],
         datums=("A", "B"),
         diameter=True,
         label="rocker pin hole position",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
