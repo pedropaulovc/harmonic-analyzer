@@ -86,15 +86,6 @@ V_KP08_TAPS = len(KP08_TAP_X) * math.pi * (KP08_TAP_DRILL / 2.0) ** 2 * BRACKET_
 _V_TOL = 20.0
 
 
-def _as_construction(adapter, entity_id: str) -> None:
-    """Flag a registered sketch line as construction geometry (rebind to the
-    base ISketchSegment, which declares ``ConstructionGeometry``)."""
-    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError(f"{entity_id} did not take the construction flag")
-
-
 def _require_one_solid_body(adapter, *, label: str) -> None:
     bodies = tuple(
         _early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or ()
@@ -201,8 +192,11 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # --- The row's station: a reference sketch -------------------------------
-    # One construction line down the inner end face from the origin to the -Y
-    # side, driven by the width that side itself reads.
+    # One line down the inner end face from the origin to the -Y side, driven
+    # by the width that side itself reads. It lies on the end face's edge and
+    # stays a plain sketch line: a construction line prints its dash font
+    # over the drawing's outline (machinist review mr4: the end view's bottom
+    # edge printed broken).
     row_station = SketchDims()
     check("create_sketch hole row reference", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -210,7 +204,6 @@ async def build(adapter) -> dict[str, str]:
         "hole row station line", await adapter.add_line(0.0, 0.0, 0.0, -HOLE_ROW_Y)
     )
     set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, row_line)
     await anchor_point_to_origin(adapter, f"{row_line}.start", 0.0, 0.0, "hole row")
     await anchor_point_to_origin(
         adapter, f"{row_line}.end", 0.0, -HOLE_ROW_Y, "hole row station HoleRowY"
@@ -225,10 +218,10 @@ async def build(adapter) -> dict[str, str]:
     # Farm r1 (#290): the extrusion's imported depth has no sound drawing-view
     # attachment, so _supplier_dimensions refuses to dress it as the STOCK
     # reference; a sketch dimension attaches to its witness line (the base
-    # bar's BarWidth, _supplier_washer_model's thickness witness). One
-    # construction line up the inner end face's -Y edge on the Right plane,
-    # sketch (u, v) = model (-Z, Y) (_oblique_pivot_block_model), the end
-    # view's plane.
+    # bar's BarWidth, _supplier_washer_model's thickness witness). One plain
+    # sketch line up the inner end face's -Y edge on the Right plane (on the
+    # edge, as the row's line), sketch (u, v) = model (-Z, Y)
+    # (_oblique_pivot_block_model), the end view's plane.
     thick = SketchDims()
     check("create_sketch thickness reference", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
@@ -237,7 +230,6 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_line(0.0, -HALF_WIDTH, -BRACKET_THICK, -HALF_WIDTH),
     )
     set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, witness)
     await anchor_point_to_origin(
         adapter, f"{witness}.start", 0.0, -HALF_WIDTH, "thickness witness foot"
     )

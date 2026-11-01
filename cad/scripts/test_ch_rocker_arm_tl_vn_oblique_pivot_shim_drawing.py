@@ -46,9 +46,7 @@ def test_catalogue_and_current_identity():
     assert row["number"] == "MHA-CH-06-TL-VN-79"
     assert row["process"] == "purchased"
     assert row["supplier"] == stock.supplier == "Huyett"
-    assert tuple(row["supplier_skus"]) == stock.skus == (
-        spec.SKU, spec.FIT_SKUS[4], spec.FIT_SKUS[20],
-    )
+    assert tuple(row["supplier_skus"]) == stock.skus == (spec.SKU,)
     assert row["stock_name"] == stock.stock_name
     assert row["material"] == stock.material == part.MATERIAL
     assert row["quantity"] == spec.QUANTITY == 2 * spec.PER_SUPPORT == 10

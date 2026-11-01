@@ -377,9 +377,12 @@ async def build(adapter) -> dict[str, str]:
     # --- The row's lateral station: a reference sketch -----------------------
     # The wizard sets the row on y 0 by an origin relation (a zero coordinate
     # takes no dimension), so the printed 88.90 from the faced -Y edge lives
-    # on one construction line down the end face from the origin to that
-    # edge, driven by the station the edge itself reads (the profile's
-    # BarLowSide; build_ch_rocker_arm_tl_outline_template's RodSlotReference).
+    # on one line down the end face from the origin to that edge, driven by
+    # the station the edge itself reads (the profile's BarLowSide;
+    # build_ch_rocker_arm_tl_outline_template's RodSlotReference). It lies on
+    # the end face's edge, so it stays a plain sketch line: a construction
+    # line's dash font prints over the outline (end bracket, machinist review
+    # mr4).
     row_station = SketchDims()
     check("create_sketch rail row reference", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -387,7 +390,6 @@ async def build(adapter) -> dict[str, str]:
         "rail row station line", await adapter.add_line(0.0, 0.0, 0.0, -RAIL_ROW_Y)
     )
     set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, row_line)
     await anchor_point_to_origin(adapter, f"{row_line}.start", 0.0, 0.0, "rail row")
     await anchor_point_to_origin(
         adapter, f"{row_line}.end", 0.0, -RAIL_ROW_Y, "rail row station RailRowY"
