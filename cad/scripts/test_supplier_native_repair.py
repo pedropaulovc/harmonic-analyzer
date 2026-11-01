@@ -65,6 +65,7 @@ def _pin_import_case(monkeypatch, kind, *, defect=None):
     model = SimpleNamespace(
         FeatureByName=lambda requested: owner if requested == feature else None,
         GetBodies2=lambda *_args: (SimpleNamespace(GetFaces=lambda: surfaces),),
+        Extension=SimpleNamespace(GetUserPreferenceInteger=lambda _pref, _option: 0),
     )
     mapped = tuple(SimpleNamespace(**vars(entity)) for entity in entities)
     view = SimpleNamespace(ReferencedDocument=model)
