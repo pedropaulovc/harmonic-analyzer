@@ -703,6 +703,11 @@ def _add_shop_notes(adapter: Any, front: Any, bearing_face: Any) -> None:
         note_xy=TOOTH_EDGE_NOTE_XY,
         label="MHA-PD-08 tooth edge note",
     )
+    # F is picked at the landing like draw_mg_magnifying_lever's seat finish
+    # (SelectByID2 FACE at a projected model point), and the note must then
+    # be attached to the resolved face.  Run 20261101T061718881Z: selected
+    # directly (IEntity.Select4) with a preset landing, the view's selection
+    # never read IsSame to the part's face, so add_attached_note refused it.
     face_r = BEARING_LANDING_RADIUS_MM / 1000.0
     angle = math.radians(BEARING_LANDING_DEG)
     landing = model_point_in_view(
@@ -715,9 +720,9 @@ def _add_shop_notes(adapter: Any, front: Any, bearing_face: Any) -> None:
         adapter,
         front,
         text=BEARING_FACE_NOTE,
-        entity=bearing_face,
+        entity_xy=landing,
         entity_type="FACE",
-        leader_attach_xy=landing,
+        attached_to=bearing_face,
         note_xy=BEARING_NOTE_XY,
         label="MHA-PD-08 bearing face note",
     )

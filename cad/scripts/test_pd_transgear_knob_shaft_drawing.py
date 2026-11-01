@@ -1387,11 +1387,16 @@ def test_build_takes_its_controls_and_callouts_from_the_spec(monkeypatch, tmp_pa
     tip = (tip_r * math.cos(angle), tip_r * math.sin(angle))
     assert tooth["entity_xy"] == pytest.approx(tip)
     assert tooth["note_xy"] == drawing.TOOTH_EDGE_NOTE_XY
-    assert bearing["entity"] == "bearing_face" and bearing["entity_type"] == "FACE"
+    # Run 20261101T061718881Z: a directly selected face with a preset landing
+    # never read IsSame to the part's face; F is picked at the landing and
+    # the note must resolve to it.
+    assert bearing["entity_type"] == "FACE"
+    assert bearing["attached_to"] == "bearing_face"
+    assert "entity" not in bearing and "leader_attach_xy" not in bearing
     face = math.radians(drawing.BEARING_LANDING_DEG)
     face_r = drawing.BEARING_LANDING_RADIUS_MM / 1000.0
     face_point = (face_r * math.cos(face), face_r * math.sin(face))
-    assert bearing["leader_attach_xy"] == pytest.approx(face_point)
+    assert bearing["entity_xy"] == pytest.approx(face_point)
     assert bearing["note_xy"] == drawing.BEARING_NOTE_XY
     # The journal's finish lands on the journal's own side-view silhouette,
     # not on the end view's circle among the teeth.
