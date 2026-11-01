@@ -549,8 +549,8 @@ are the concrete realizations of the classes above, being lifted into `tolerance
 
 - **Summing-lever conventional blind receivers: proof limits.** By explicit
   owner decision, the two **2-56 UNC 2B** taps fasten **MHA-MG-01**, with
-  native **2X Ø.070 DRILL .256** and **.195 MIN** full thread. The drill
-  takes the **+.004/0 in** drilled-hole row and the **.XXX ±.005 in** depth band.
+  native **2X Ø.070 DRILL .26** and **.195 MIN** full thread. The drill
+  takes the **+.004/0 in** drilled-hole row and the **.XX ±.01 in** depth band.
   The fixed-top **7.00 mm** slab stays at **Y=−4.46..+2.54 mm**. The owner
   moved only the matched mounting row down **0.71 mm**: receiver coordinates
   are **.1280 ±.0020 in (3.25 ±0.0508 mm) below the actual top**, with bracket holes and screws
@@ -562,7 +562,7 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   `receiver_pilot_material_wall_budget` / `RECEIVER_PILOT_MATERIAL_WALL_MIN`
   retain the independent **≥.080 in (2.032 mm) pilot-only connected-material** design floor.
   The printed pilot radius **0.9398 mm** and one deepest 0.3° wander charge
-  (**0.037669 mm**) leave approximately **2.221731 / 2.579731 mm** top/bottom walls.
+  (**0.038865 mm**) leave approximately **2.220535 / 2.578535 mm** top/bottom walls.
   `sm_summing_lever_profile.receiver_pilot_wall_budget` /
   `ReceiverPilotWallBudget` bound longitudinal walls against
   `RECEIVER_PILOT_WALL_MIN` using only the printed pilot radius and drill

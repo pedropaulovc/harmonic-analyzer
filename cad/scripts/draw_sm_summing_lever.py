@@ -85,7 +85,7 @@ from magnifying_bracket_joint_layout import (
     DRILL_DEPTH,
     DRILL_DEPTH_BAND,
     LEVER_HOLE_POINTS,
-    RECEIVER_HOLE_PLACES,
+    RECEIVER_DRILL_DEPTH_PLACES,
     RECEIVER_ROW_Y,
     TAP_DRILL_DIA,
     THREAD_DEPTH,
@@ -1894,22 +1894,22 @@ def _dress_bracket_depth_callout(callout: Any) -> None:
         # The source band is the title block's own row at the callout's places
         # on this sheet's unit (accessor, not a parsed display string).
         if not math.isclose(
-            DRILL_DEPTH_BAND, printed_band_mm(RECEIVER_HOLE_PLACES, unit=UNIT)
+            DRILL_DEPTH_BAND, printed_band_mm(RECEIVER_DRILL_DEPTH_PLACES, unit=UNIT)
         ):
             raise RuntimeError("bracket tap drill depth must retain its ordinary symmetric band")
         # As for the knife-mount drill-angle callout, suppress only the
-        # variable's explicit band. Native .256 then inherits .XXX ±.005;
+        # variable's explicit band. Native .26 then inherits .XX ±.01;
         # the source Hole Wizard dimension keeps its bounded symmetric band.
         variable.ToleranceType = 0  # swTolType_e.swTolNONE
-        length.Precision = RECEIVER_HOLE_PLACES
+        length.Precision = RECEIVER_DRILL_DEPTH_PLACES
         if (
             int(variable.ToleranceType) != 0
-            or int(length.Precision) != RECEIVER_HOLE_PLACES
+            or int(length.Precision) != RECEIVER_DRILL_DEPTH_PLACES
         ):
             raise RuntimeError(
                 f"bracket mounting callout tolerance for {variable_name} did not "
                 f"persist: wanted the inherited title-block band at "
-                f"{RECEIVER_HOLE_PLACES} places"
+                f"{RECEIVER_DRILL_DEPTH_PLACES} places"
             )
     if required_depths:
         raise RuntimeError(f"bracket tap callout omits native depths: {required_depths}")

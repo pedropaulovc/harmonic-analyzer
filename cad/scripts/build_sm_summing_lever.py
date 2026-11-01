@@ -101,6 +101,7 @@ from magnifying_bracket_joint_layout import (
     DRILL_DEPTH,
     DRILL_DEPTH_BAND,
     DRILL_POINT_DEPTH,
+    RECEIVER_DRILL_DEPTH_PLACES,
     RECEIVER_HOLE_PLACES,
     THREAD_DEPTH_BAND,
     RECEIVER_PILOT_WALL_MIN,
@@ -1583,9 +1584,15 @@ def _receiver_model_bands(adapter) -> None:
 
     model = _early_bound(adapter.currentModel, "IPartDoc")
     feature = _early_bound(model.FeatureByName("BracketMountingTaps"), "IFeature")
+    # name -> (nominal mm, (lower, upper) mm, display places)
     required = {
-        "FullThreadDepth": (THREAD_DEPTH, (-THREAD_DEPTH_BAND, THREAD_DEPTH_BAND)),
-        "TapDrillDepth": (DRILL_DEPTH, (-DRILL_DEPTH_BAND, DRILL_DEPTH_BAND)),
+        "FullThreadDepth": (
+            THREAD_DEPTH, (-THREAD_DEPTH_BAND, THREAD_DEPTH_BAND), RECEIVER_HOLE_PLACES
+        ),
+        "TapDrillDepth": (
+            DRILL_DEPTH, (-DRILL_DEPTH_BAND, DRILL_DEPTH_BAND),
+            RECEIVER_DRILL_DEPTH_PLACES,
+        ),
     }
     matches = {name: [] for name in required}
     # Hole Wizard thread lengths can belong to its cosmetic-thread subfeature.
@@ -1610,14 +1617,14 @@ def _receiver_model_bands(adapter) -> None:
             parts = full_name.split("@")
             if not linear or len(parts) < 2 or parts[1] != owner:
                 continue
-            for name, (nominal, _band) in required.items():
+            for name, (nominal, _band, _places) in required.items():
                 if abs(value_mm - nominal) < 1e-5:
                     matches[name].append((owner, parts[0], display, dimension))
     # Native shape (farm, 2026-10-09): Hole Wizard owns the tap drill depth on
     # one sketch subfeature, but adds one cosmetic-thread subfeature PER HOLE,
     # each owning its own full-thread depth.
     expected = {"FullThreadDepth": len(LEVER_HOLE_POINTS), "TapDrillDepth": 1}
-    for name, (_nominal, limits) in required.items():
+    for name, (_nominal, limits, places) in required.items():
         owners = {match[0] for match in matches[name]}
         if len(matches[name]) != expected[name] or len(owners) != expected[name]:
             raise RuntimeError(
@@ -1631,14 +1638,14 @@ def _receiver_model_bands(adapter) -> None:
             # reachable by FeatureByName, and the per-hole threads share the
             # name D1, so band the dimensions already held, not by name.
             _band_held_dimension(
-                display, dimension, limits, f"{native_name}@{owner}"
+                display, dimension, limits, f"{native_name}@{owner}", places=places
             )
 
 
 def _band_held_dimension(
-    display, dimension, deviations: tuple[float, float], label: str
+    display, dimension, deviations: tuple[float, float], label: str, *, places: int
 ) -> None:
-    """(lower, upper) tolerance in mm + RECEIVER_HOLE_PLACES display on an already-resolved
+    """(lower, upper) tolerance in mm + ``places`` display on an already-resolved
     dimension: symmetric when the deviations mirror, else bilateral (the
     by-name ``set_dimension_*_tolerance`` contracts, minus lookup)."""
     from _com import _bind, _early_bound
@@ -1666,15 +1673,15 @@ def _band_held_dimension(
         )
     _set_tolerance_precision(
         display, (lower, upper), display_unit=UNIT, label=label,
-        places=RECEIVER_HOLE_PLACES,
+        places=places,
     )
     display = _early_bound(display, "IDisplayDimension")
     do_not_change = -1  # swDimensionPrecisionSettings_e
-    display.SetPrecision3(RECEIVER_HOLE_PLACES, do_not_change, do_not_change, do_not_change)
-    if int(display.GetPrimaryPrecision2()) != RECEIVER_HOLE_PLACES:
+    display.SetPrecision3(places, do_not_change, do_not_change, do_not_change)
+    if int(display.GetPrimaryPrecision2()) != places:
         raise RuntimeError(f"{label}: display precision did not persist")
     _telemetry.success(
-        f"toleranced {label}: {upper:+g}/{lower:+g} mm ({RECEIVER_HOLE_PLACES} decimals)"
+        f"toleranced {label}: {upper:+g}/{lower:+g} mm ({places} decimals)"
     )
 
 
