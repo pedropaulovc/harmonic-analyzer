@@ -549,9 +549,9 @@ if (
 # the ShaftDiaDim band. Both non-mating necks print the core's .375 with an
 # explicit loose ±.010 (the .01 grid's .38 would not be the model, and the
 # title block's .XXX is tighter than a bare neck needs; machinist review),
-# each from its own construction witness circle of the core: NeckDiaDim on
-# the seat step's profile, OutboardNeckDia on the journal's (the shank's
-# ShaftDiaDim would carry the hub's fit band onto the neck).
+# once, as 2X, from the construction witness circle NeckDiaDim on the seat
+# step's profile (the shank's ShaftDiaDim would carry the hub's fit band onto
+# the necks; the collar-side land is too short to take its own callout).
 SHAFT_CORE_LANDS = (
     (0.0, SEAT_COLLAR),
     (COLLAR_REAR, JOURNAL_START),
@@ -602,7 +602,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDiaDim"},
     "Shaft": {"Depth"},
     "ShaftDomeProfile": {"DomeHeight"},
-    "JournalProfile": {"JournalDiaDim", "OutboardNeckDia"},
+    "JournalProfile": {"JournalDiaDim"},
     "ReliefProfile": {"ReliefDiaDim"},
     "PinionSeatProfile": {"PinionSeatDiaDim", "NeckDiaDim"},
     "CollarProfile": {"CollarDiaDim"},
@@ -631,7 +631,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ShaftProfile": {"ShaftDiaDim": 4},
     "Shaft": {"Depth": dt_crank_pinion_spec.SHAFT_LENGTH_PLACES},
     "ShaftDomeProfile": {"DomeHeight": 3},
-    "JournalProfile": {"JournalDiaDim": 4, "OutboardNeckDia": NECK_DIA_PLACES},  # 11.4046, .449 in
+    "JournalProfile": {"JournalDiaDim": 4},  # 11.4046, .449 in
     "ReliefProfile": {"ReliefDiaDim": RELIEF_DIA_PLACES},
     "PinionSeatProfile": {"PinionSeatDiaDim": 4, "NeckDiaDim": NECK_DIA_PLACES},
     "CollarProfile": {"CollarDiaDim": 2},

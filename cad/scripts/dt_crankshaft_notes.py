@@ -47,6 +47,9 @@ SHANK_MATE = "IN MHA-DT-31"
 JOURNAL_FIT = "2X RUNNING FIT"
 JOURNAL_MATE = "IN MHA-DT-05"
 PINION_SEAT_MATE = "IN MHA-DT-10"
+# The one Ø.375 ±.010 covers both bare necks; the callout names where they are.
+NECKS = "2X"
+NECK_LANDS = "BEHIND COLLAR\nAND AT SEAT STEP"
 # The spigot's diameter (under it, never over) and its length from the seat
 # face both keep the #25 chain wrapping MHA-PD-09 clear (dt_crankshaft_spec).
 SPIGOT_AIR = "#25 CHAIN AIR"

@@ -433,9 +433,9 @@ def test_collar_rear_finish_resolves_the_controlled_thrust_face_from_its_rim(
             drawing._collar_rear_face(rim)
 
 
-def test_each_bare_neck_has_its_own_model_loose_diameter() -> None:
-    # Every bare land of the Ø.375 core carries a model diameter: the shank
-    # its hub fit, each neck its own witness at the loose band.
+def test_both_bare_necks_print_one_model_loose_diameter() -> None:
+    # Every bare land of the Ø.375 core is covered by a model diameter: the
+    # shank its hub fit, both necks one 2X witness at the loose band.
     covers = sorted(
         [
             (spec.SEAT_COLLAR, spec.SEAT_COLLAR + spec.COLLAR_LENGTH),
@@ -456,14 +456,9 @@ def test_each_bare_neck_has_its_own_model_loose_diameter() -> None:
     )
     assert spec.SHAFT_CORE_LANDS[1] == (spec.COLLAR_REAR, spec.JOURNAL_START)
     assert spec.DRAWING_DIMENSIONS["PinionSeatProfile"] >= {"NeckDiaDim"}
-    assert spec.DRAWING_DIMENSIONS["JournalProfile"] >= {"OutboardNeckDia"}
-    for name in ("NeckDiaDim", "OutboardNeckDia"):
-        assert spec.DRAWING_PRECISION_BY_NAME[name] == spec.NECK_DIA_PLACES == 3
-        assert name in drawing.END_DIAMETERS
-    # Each neck's text lands on its own land.
-    neck_x, neck_y = drawing.DIAMETER_POSITIONS["OutboardNeckDia"]
-    assert drawing.COLLAR_REAR_X < neck_x < drawing.JOURNAL_START_X
-    assert drawing._sheet_y(spec.JOURNAL_DIA / 2.0) < neck_y < drawing.COLLAR_REAR_FINISH[1][1]
+    assert spec.DRAWING_PRECISION_BY_NAME["NeckDiaDim"] == spec.NECK_DIA_PLACES == 3
+    necks = len(spec.SHAFT_CORE_LANDS) - 1
+    assert drawing.CALLOUTS_ABOVE["NeckDiaDim"] == f"{necks}X"
     assert drawing.JOURNAL_END_X < drawing.DIAMETER_POSITIONS["NeckDiaDim"][0] < drawing.SEAT_STEP_X
     # The loose band keeps the neck under the journal at print-worst.
     assert spec.SHAFT_DIA + spec.NECK_DIA_TOL < spec.JOURNAL_DIA + spec.JOURNAL_DIA_BAND[1]
