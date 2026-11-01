@@ -271,6 +271,25 @@ def _quarter_turn(adapter, view, label):
     rebuild_drawing(adapter, label=f"collar {label} orientation")
 
 
+def _nose_dia_onto_side(adapter, end_marks, end, side):
+    """Move the end view's one NoseDia onto the turning view (rule 11: the
+    nose Ø reads where its length does). Returns the end view's remaining
+    marks and the moved Ø."""
+    donors = [a for a in end_marks if dimension_name(adapter, a) == "NoseDia"]
+    if len(donors) != 1:
+        raise RuntimeError("expected one collar nose diameter donor dimension")
+    moved = move_model_dimension(adapter, donors[0], side, NOSE_DIA_ON_SIDE, source_view=end)
+    return [a for a in end_marks if a is not donors[0]], moved
+
+
+def _side_callouts():
+    """The turning view's function lines: (below their values, above them).
+    NoseLength's reads above: below it, 3.500's two extension lines ran up
+    through the function line (r4 review)."""
+    below = _function_callouts(SIDE_KEEP)
+    return below, {"NoseLength": below.pop("NoseLength")}
+
+
 def _precision(keep):
     """The part-authored places of only the names this view keeps
     (main's per-view form, draw_ch_connecting_rod)."""
@@ -525,18 +544,11 @@ async def build(adapter: Any) -> dict[str, str]:
                                       view_label="collar end", dimensions_by_feature=spec.DRAWING_DIMENSIONS)
     side_marks = curate_view_dimensions(adapter, side, keep=SIDE_KEEP,
                                        view_label="collar turning view", dimensions_by_feature=spec.DRAWING_DIMENSIONS)
-    nose_donors = [a for a in end_marks if dimension_name(adapter, a) == "NoseDia"]
-    if len(nose_donors) != 1:
-        raise RuntimeError("expected one collar nose diameter donor dimension")
-    nose_dia = move_model_dimension(adapter, nose_donors[0], side, NOSE_DIA_ON_SIDE, source_view=end)
-    end_marks = [a for a in end_marks if dimension_name(adapter, a) != "NoseDia"]
+    end_marks, nose_dia = _nose_dia_onto_side(adapter, end_marks, end, side)
     marks = [*end_marks, *side_marks, nose_dia]
     assert_imported_precision(adapter, marks, _precision(END_KEEP | SIDE_KEEP))
     _assert_functional_dimension_types(adapter, side_marks, SIDE_DIMENSION_TYPES)
-    side_callouts = _function_callouts(SIDE_KEEP)
-    # Above its value: below it, 3.500's two extension lines ran up through
-    # the function line (r4 review).
-    above = {"NoseLength": side_callouts.pop("NoseLength")}
+    side_callouts, above = _side_callouts()
     set_dimension_callouts(adapter, side_marks, side_callouts)
     set_dimension_callouts(adapter, side_marks, above, location="above")
     # TapRootGauge is a blanked sketch: the hidden-owner importer shows it in

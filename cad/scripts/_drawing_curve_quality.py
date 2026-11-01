@@ -26,6 +26,7 @@ _WIREFRAME_CUSTOM = 2
 _CURVE_RESOLUTION = 100
 
 
+@_telemetry.traced("drawing.precise_curve_quality", label_param="label")
 def set_precise_curve_quality(adapter: Any, *, label: str) -> None:
     """Pin the active drawing's curve resolution to its finest setting.
 

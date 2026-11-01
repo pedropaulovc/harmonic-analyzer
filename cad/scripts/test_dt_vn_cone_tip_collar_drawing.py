@@ -809,18 +809,60 @@ def test_ream_callout_carries_the_bore_fit_statement() -> None:
     assert '"Installation Notes"' not in source
 
 
-def test_end_view_projects_with_the_turning_view_and_the_nose_dia_moves_onto_it() -> None:
+@pytest.mark.parametrize("keeps", [True, False])
+def test_quarter_turn_puts_the_flat_down_and_refuses_a_lost_turn(monkeypatch, keeps) -> None:
     """r4 review: the end view put the flat facing the turning view's reader
-    while the turning view drew it at the bottom; Ø6.40 sat only on the end
-    view (rule 11); 3.500's extension lines struck its function line."""
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert (
-        'for view, label in ((end, "end view"), (side, "turning view"), '
-        '(tap, "radial tap view")):\n        _quarter_turn(adapter, view, label)'
-    ) in source
-    assert "_horizontal_axis" not in source
-    assert "move_model_dimension(adapter, nose_donors[0], side, NOSE_DIA_ON_SIDE" in source
-    assert 'set_dimension_callouts(adapter, side_marks, above, location="above")' in source
+    while the turning view drew it at the bottom."""
+    class View:
+        def __init__(self):
+            self.value = 0.0
+
+        @property
+        def Angle(self):
+            return self.value
+
+        @Angle.setter
+        def Angle(self, value):
+            if keeps:
+                self.value = value
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    view = View()
+    if not keeps:
+        with pytest.raises(RuntimeError, match="quarter turn"):
+            drawing._quarter_turn(object(), view, "end view")
+        return
+    drawing._quarter_turn(object(), view, "end view")
+    # Model +X (the flat's side) on the sheet after the view's rotation.
+    assert (math.cos(view.Angle), math.sin(view.Angle)) == pytest.approx((0.0, -1.0))
+
+
+def test_nose_dia_moves_from_the_end_view_onto_the_turning_view(monkeypatch) -> None:
+    """r4 review: Ø6.40 sat only on the end view (rule 11)."""
+    marks = [SimpleNamespace(name=name) for name in ("FlatDistance", "NoseDia", "CollarDia")]
+    moves = []
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, mark: mark.name)
+    monkeypatch.setattr(drawing, "move_model_dimension", lambda _adapter, mark, view, xy, source_view: (
+        moves.append((mark.name, view, xy, source_view)) or "moved"
+    ))
+    left, moved = drawing._nose_dia_onto_side(object(), marks, "end", "side")
+    assert moved == "moved"
+    assert [mark.name for mark in left] == ["FlatDistance", "CollarDia"]
+    assert moves == [("NoseDia", "side", drawing.NOSE_DIA_ON_SIDE, "end")]
+    with pytest.raises(RuntimeError, match="one collar nose diameter"):
+        drawing._nose_dia_onto_side(object(), marks[:1], "end", "side")
+
+
+def test_nose_length_function_line_reads_above_its_value() -> None:
+    """r4 review: 3.500's extension lines struck its function line."""
+    below, above = drawing._side_callouts()
+    assert above == {"NoseLength": spec.AXIAL_FUNCTION_CALLOUTS["NoseLength"]}
+    assert "NoseLength" not in below
+    assert below.keys() == drawing._function_callouts(drawing.SIDE_KEEP).keys() - {"NoseLength"}
+
+
+def test_nose_dia_on_the_turning_view_clears_its_neighbours() -> None:
     # Left of the nose's south face, right of FlatDistance's text.
     assert drawing.END_KEEP["FlatDistance"][0] < drawing.NOSE_DIA_ON_SIDE[0]
     assert drawing.NOSE_DIA_ON_SIDE[0] < drawing.SIDE_CENTER[0] - spec.WIDTH * 4 / 2000.0
