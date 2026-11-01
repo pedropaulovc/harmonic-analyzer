@@ -17,13 +17,21 @@ face at y = 0, the rounded lead end at y = LENGTH.
 
 from __future__ import annotations
 
+import _config
 from _mcmaster_98381a434 import (
     DIA_BAND_IN,  # noqa: F401 -- re-exported: catalogue diameter tolerance (in)
     DOWEL_SIZE,
     MM_PER_IN,  # noqa: F401 -- re-exported with the inch band
 )
+from _package_units import drawing_unit
 from _sprocket_seat_geometry import DRIVE_PIN_DIA, DRIVE_PIN_PROUD
 from _supplier_pin_data import SupplierPinReference
+
+# #290: the registry row's drawing_unit (in) is this sheet's unit; it drops
+# the supplier REFs' inch suffix.
+UNIT = drawing_unit(
+    "parts/dt-vn-crank-seat-drive-pin", _config.parts("dt-vn-crank-seat-drive-pin")
+)
 
 SKU = "98381A434"
 DIA, LENGTH = DOWEL_SIZE  # 2.38125 x 6.35
@@ -46,4 +54,5 @@ SUPPLIER_REFERENCE = SupplierPinReference(
     diameter_precision=4,
     length_precision=2,
     diameter_band=(0.0001, 0.0003),
+    sheet_unit=UNIT,
 )
