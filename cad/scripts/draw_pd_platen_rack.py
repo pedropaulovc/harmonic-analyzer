@@ -73,7 +73,6 @@ END_KEEP = {
     "RackInset": (0.375, 0.095),
     "SeamHeight": (0.321, 0.112),
 }
-INCOMING_INSPECTION_XY = (0.020, 0.263)
 GEAR_DATA_XY = (0.020, 0.254)
 # Under the isometric's label (y ~0.077, run 9 touched its first line), left
 # of the title block (x 0.216) and above the border.
@@ -141,7 +140,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Gear Data",
-            "Incoming Rack Inspection",
             "Manufacturing Notes",
             "Isometric View Note",
             "Enlarged End View Note",
@@ -152,7 +150,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Gear Data",
-            "Incoming Rack Inspection",
             "Manufacturing Notes",
             "Isometric View Note",
             "Enlarged End View Note",
@@ -202,7 +199,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # Showing EndStockProfile prints the section's real stock outline and seam;
     # it remains hidden in the source part and in the isometric/assembly views.
     for property_name, position in (
-        ("Incoming Rack Inspection", INCOMING_INSPECTION_XY),
         ("Gear Data", GEAR_DATA_XY),
         ("Manufacturing Notes", NOTES_XY),
         ("Enlarged End View Note", END_NOTE_XY),
