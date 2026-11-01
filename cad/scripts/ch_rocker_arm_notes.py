@@ -84,6 +84,8 @@ DRAWING_PRECISION = {
 HUB_ROOT_R_BAND = (0.0, -HUB_ROOT_RADIUS_MAX)  # (upper, lower)
 HUB_ROOT_R_TOL_TYPE = 6  # swTolType_e.swTolMAX
 HUB_ROOT_PREFIX = "2X R"
+# Why the corner is tighter than the title block: the foot cheeks run over it.
+HUB_ROOT_CALLOUT = "CLEARS\nMHA-CH-01\nCHEEKS"
 # The callout as printed, for the offline requirement exporter (features note).
 HUB_ROOT_NOTE = (
     f"{HUB_ROOT_PREFIX}"
