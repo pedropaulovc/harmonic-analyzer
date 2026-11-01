@@ -1,8 +1,10 @@
 ch-rocker-arm-tl-oblique-feed-block:
   title: Rocker Oblique Trammel Feed Block
   number: MHA-CH-06-TL-32
-  material: 6061-T6 aluminium
-  material_specification: 6061-T6 aluminum flat bar, new 1 x 3-1/2 in stock, machined to .96 high
+  # No grade or temper is functional: the title block names the aluminium
+  # flat-bar family (rule 2; machinist review), as TL-28 does.
+  material: ALUMINUM FLAT BAR 1 x 3-1/2 in
+  material_specification: Aluminum flat bar (e.g. 6061-T6), new 1 x 3-1/2 in stock, machined to .96 high
   finish: as machined
   quantity: 1
   tolerance_class: machined_block

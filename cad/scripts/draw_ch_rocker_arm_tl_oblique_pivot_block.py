@@ -112,8 +112,8 @@ SIDE_KEEP = {'TopBoreDepth':(.120,.088),'TapDrillDia':(.084,.070)}
 # face toward the plan (x 283), bottom at x 307, between the plan's 1.58
 # callout (ends ~x 277) and the pictorial (from ~x 311); the height prints
 # under it, clear of the 4X COUNTERBORE callout at y 150.
-RIGHT_XY = (.295,PLAN_XY[1])
-RIGHT_KEEP = {'BlockHeight':(.295,.176)}
+RIGHT_XY = (.300,PLAN_XY[1])  # 5 mm clear of the plan's SETS COUNTERBORE row
+RIGHT_KEEP = {'BlockHeight':(.300,.176)}
 SEAT_DEPTH_TEXT_XY = (.078,.104)
 # B-B: Y up, its +Y face (Y 20) at y 142.5, Z across with the top face toward
 # the plan (x 322.85) and the carriage seat at x 347.15; the caption ends
