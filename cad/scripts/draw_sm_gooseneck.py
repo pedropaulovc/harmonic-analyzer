@@ -168,13 +168,16 @@ SLEEVE_TOP_Y = _front_y(SLEEVE_TOP)
 # its text at the view's mid-height, 22 mm below the leg length's.  The
 # reference reach (end face to the leg's outer side) runs over the arm
 # straight, its text between that one's (top y 0.247) and the view label
-# (bottom y 0.258).  Machinist review r5 of that run.
+# (bottom y 0.258).  Machinist review r5 of that run.  The arm straight's
+# text stands outside its short span, left of the end face: centred over the
+# span it straddled the end face's extension line, which the reach shares
+# (text-on-line, farm run 20261101T022045634Z: 27.16 at x 235.3-246.6 mm).
 FRONT_KEEP = {
     "SleeveLength": (LEG_AXIS_X + 0.018, (FOOT_Y + SLEEVE_TOP_Y) / 2.0),
     "SleeveDia": (LEG_AXIS_X - 0.034, FOOT_Y + 0.040),
     "LegLength": (LEG_AXIS_X + 0.034, (SLEEVE_TOP_Y + BEND_TANGENT_Y) / 2.0),
     "TubeOdRef": (LEG_AXIS_X - 0.030, _front_y(TUBE_OD_REF_Y)),
-    "ArmStraight": ((END_FACE_X + _front_x(-BEND_R)) / 2.0, ARM_AXIS_Y + 0.014),
+    "ArmStraight": (END_FACE_X - 0.010, ARM_AXIS_Y + 0.014),
     "BendRadius": (LEG_AXIS_X + 0.019, ARM_AXIS_Y - 0.0176),
     "OverallHeight": (
         LEG_AXIS_X + 0.052,
@@ -225,10 +228,16 @@ def _section_x(model_x: float) -> float:
 
 # Section A-A's dimensions: the two lengths in one row over the part; the
 # counterbore depth's LIMIT pair above them, left of the face; the
-# counterbore Ø's LIMIT pair (with its axis row) left of the end face,
+# counterbore Ø's LIMIT pair (with its two axis rows) left of the end face,
 # between its extension lines; the head and shank Ø below the part, the
-# head's block carrying the counterbore wall a row lower, the shank's longer
-# fit callout lower.  Each Ø's text
+# head's block carrying the counterbore wall and its "AT C'BORE MAX" two rows
+# lower, the shank's longer fit callout lower.  The Ø's block centres on its
+# keep, 0.45 mm high (r7, farm run 20261101T022045634Z: the pair and one row
+# inked y 193.6-207.3 about keep 200.0); its ~19.3 mm with the second axis
+# row centre between the extension lines (y 189.5, 210.5), ~0.85 mm clear of
+# each.  The head's fourth row grows its block 5.6 mm about the same keep:
+# its top ~174.8, 6 mm under the part (180.95), its new row ~95-130 mm, left
+# of the shank's line (x 146.2).  Each Ø's text
 # starts at its dimension line and runs right, so the head's line stands
 # near the end face and its text ends short of the shank's line (at
 # ARM_END_X + 10 the shank's line ran through it, farm run
@@ -251,7 +260,7 @@ SECTION_KEEP = {
         _SY0 + _SECTION_HALF + 0.010,
     ),
     "CounterboreDepth": (_SX0 - 0.012, _SY0 + _SECTION_HALF + 0.032),
-    "CounterboreDia": (_SX0 - 0.030, _SY0),
+    "CounterboreDia": (_SX0 - 0.030, _SY0 - 0.0005),
     "CounterboreFloorCornerR": (_SX0 - 0.032, _SY0 + _SECTION_HALF + 0.013),
     "PlugDia": (_section_x(ARM_END_X + 4.0), _SY0 - _SECTION_HALF - 0.019),
     "PlugShankDia": (
