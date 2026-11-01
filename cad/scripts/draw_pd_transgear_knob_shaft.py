@@ -2,10 +2,11 @@ r"""Create the manufacturing drawing for the transgear knob shaft (MHA-PD-08).
 
 A turned side view, aligned rear and front end views, a 10:1 detail of the
 front neck, and an isometric.
-The side view imports the source-owned turned sizes, D-flat and unchanged
+The side view imports the source-owned turned sizes and unchanged
 stations, and a reference overall length; each tight band names its mate.
 The front end view carries the driven parallel-tangent span inspection
-dimension; the rear view identifies the actual running journal datum. The
+dimension and the D-flat's distance from the axis, where the flat shows
+true; the rear view identifies the actual running journal datum. The
 #8-32 thread callout belongs to its real thread blank. Cutter identity, the
 minimum root and approved inspection controls are properties of the saved
 source, never values retyped here.
@@ -147,8 +148,8 @@ CHAMFER_START_X = _sheet_x(-(TIP_STATION - TIP_CHAMFER))
 HALF_OD = OUTSIDE_DIA * _S / 2000.0
 
 # Turned sizes stay beside their own axial regions. Baseline lengths nest
-# below F. The D-flat's native plane-to-axis dimension is visible edge-on in
-# the side view.
+# below F. The D-flat's distance from the axis reads in the end view from
+# the tip, where the flat shows true (END_KEEP).
 _ABOVE_Y = SIDE_CENTER[1] + HALF_OD + 0.016
 _ROW_PITCH = 0.010
 _ROW_Y = tuple(SIDE_CENTER[1] - HALF_OD - 0.016 - i * _ROW_PITCH for i in range(6))
@@ -158,8 +159,8 @@ KNOB_CUP_NUMBER = _config.parts("pd-transgear-knob-cup")["number"]
 THUMBNUT_NUMBER = _config.parts("pd-transgear-thumbnut")["number"]
 # The flat's limits hang right of their line, every row centred on the
 # shoulder under the widest: at 16 characters ("MHA-PD-22 D-BORE") that
-# shoulder ran 251.2 -> 294.5 mm, over the tip's witness lines at 289.1 (run
-# 20261031T233549214Z), so no row runs past 12 characters (~33 mm).
+# shoulder ran 43.3 mm (run 20261031T233549214Z), so no row runs past 12
+# characters (~33 mm).
 COLLAR_SLIDING_FIT = f"SLIDES IN\nDRIVE COLLAR\n{DRIVE_COLLAR_NUMBER}"
 # An above callout prints only as ONE line (a line break there is stored but
 # never printed: farm run 20261031T205208603Z's four mate callouts went
@@ -203,18 +204,21 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     "PlainCore": ((F_X + THREAD_END_X) / 2.0, _ROW_Y[1]),
     "JournalLength": ((PINION_REAR_X + REAR_X) / 2.0, _ROW_Y[0]),
     "TipStation": ((F_X + TIP_X) / 2.0, _ROW_Y[2]),
-    # Its upper limit's top stood at 155.4 mm, on the thread blank's lower
-    # outline (153.9) in that run; 4.5 mm lower it stands 3 mm under it.
-    # At CORE_END_X + 18 mm the "0.000" (29.3 mm right of the keep) ran
-    # into the thread blank Ø's lower arrow at 279.0 (run
-    # 20261101T004958072Z); 5 mm left it ends 3.5 mm short of it.
-    "FlatToAxis": (CORE_END_X + 0.013, SIDE_CENTER[1] - HALF_OD - 0.0085),
     # Reference overall, tip face to rear face, on the last row: under the
     # face width's callout and clear of the gear data block's right edge.
     "OverallLength": ((REAR_X + TIP_X) / 2.0, _ROW_Y[5]),
 }
 END_KEEP: dict[str, tuple[float, float]] = {
     "ToothSpan": (FRONT_CENTER[0] + 0.029, FRONT_CENTER[1] + HALF_OD + 0.021),
+    # The flat's distance from the axis, where the flat shows true (machinist
+    # review r7: in the side view its line ran over the #8-32 thread, level
+    # with the thread's lower edge, so it read as the thread's radius).  The
+    # line stands 5 mm right of the tooth tips; the limits and the collar's
+    # rows hang right of it (32.8 mm, from 12.8 mm under the keep to 12.9 mm
+    # over it in run 20261101T022045634Z), their top 2.7 mm under the flat's
+    # arrow, clear of the tooth span's line and text above (y >= 161) and
+    # the tooth-space note below (y <= 112.4).
+    "FlatToAxis": (FRONT_CENTER[0] + HALF_OD + 0.005, FRONT_CENTER[1] - 0.022),
 }
 # Callouts over the vertical Ø texts (a below-callout there would sit on
 # the Ø's own line) and over the tooth span's text (its line meets the text
@@ -230,8 +234,8 @@ if any("\n" in text for text in DIMENSION_CALLOUTS_ABOVE.values()):
     raise AssertionError("an above-callout with a line break does not print")
 # The face width's ±band names the disc cluster stack (rule 4); its one
 # line hangs into the empty sixth baseline row below it.  The flat's and
-# the journal length's callouts hang under their texts, between witness
-# lines that stop above them.
+# the journal length's callouts hang under their texts, past the ends of
+# their witness lines.
 DIMENSION_CALLOUTS_BELOW = {
     "FaceWidth": FACE_WIDTH_CALLOUT,
     "FlatToAxis": COLLAR_SLIDING_FIT,
@@ -706,10 +710,11 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     # Detail B is placed and dimensioned FIRST: its five dimensions live in
-    # StudProfile and CoreFlatProfile with the side view's, and a dimension
-    # already on the sheet is never imported again (draw_dt_pinion_spring's
-    # detail A), so the side view's targeted import skips the five the detail
-    # holds.  The detail is dimensioned uncropped and cropped after.
+    # StudProfile with the side view's, and in CoreFlatProfile, and a
+    # dimension already on the sheet is never imported again
+    # (draw_dt_pinion_spring's detail A), so the side view's targeted import
+    # skips the five the detail holds.  The detail is dimensioned uncropped
+    # and cropped after.
     detail = _placed_detail_view(adapter)
     set_hidden_lines_removed(adapter, detail)
     detail_annotations = _dimension_then_crop_detail(adapter, detail)

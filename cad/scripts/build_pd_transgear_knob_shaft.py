@@ -40,6 +40,7 @@ from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
+    blank_reference_sketches,
     dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
@@ -567,6 +568,66 @@ async def _cut_core_flat(
     )
 
 
+# The flat's printed distance from the axis rides a hidden Front-plane
+# reference sketch (drawing-simplicity-policy.md's reference-sketch
+# allowance) so it prints in the end view from the tip, where the flat shows
+# true.  CoreFlatProfile's own FlatToAxis lies in the Right plane and prints
+# only in the side view, where the flat stands edge-on beside the thread
+# (machinist review r7: its line ran over the #8-32 thread, level with the
+# thread's lower edge).  One construction line runs along the flat from
+# under the axis to a witness station 0.85 of the half-chord out on model
+# -X, which the tip-end view shows on the right.
+_FLAT_HALF_CHORD = math.sqrt(_R_CORE**2 - CORE_FLAT_FROM_AXIS**2)
+FLAT_WITNESS_STATION = 0.85 * _FLAT_HALF_CHORD
+
+
+async def _flat_end_view_reference(adapter: Any) -> list[tuple[str, str]]:
+    """The printed FlatToAxis, driven by the same ``CoreFlat`` global as the cut."""
+    dims = SketchDims()
+    floor = -CORE_FLAT_FROM_AXIS
+    await _create_sketch(adapter, "Front", "D flat end-view reference")
+    set_sketch_direct_db(adapter, True)
+    flat = check(
+        "D flat reference line",
+        await adapter.add_centerline(-FLAT_WITNESS_STATION, floor, 0.0, floor),
+    )
+    set_sketch_direct_db(adapter, False)
+    check(
+        "D flat reference horizontal",
+        await adapter.add_sketch_constraint(flat, None, "horizontal"),
+    )
+    check(
+        "D flat reference under the axis",
+        await adapter.add_sketch_constraint(f"{flat}.end", "origin", "vertical_points"),
+    )
+    await dimension_between(
+        adapter,
+        f"{flat}.start",
+        "origin",
+        "horizontal_distance",
+        FLAT_WITNESS_STATION,
+        "D flat witness station",
+    )
+    dims.record("FlatWitnessStation")
+    await dimension_between(
+        adapter,
+        f"{flat}.start",
+        "origin",
+        "vertical_distance",
+        CORE_FLAT_FROM_AXIS,
+        "printed D flat from axis",
+    )
+    dims.record("FlatToAxis", '"CoreFlat"')
+    await ensure_fully_defined(adapter, "D flat end-view reference")
+    check("exit_sketch D flat end-view reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "CoreFlatReference")
+    jobs = dims.apply(adapter, "CoreFlatReference")
+    # Saved hidden so no part image or assembly renders it (#880); the
+    # drawing shows it in its tip-end view only (_drawing_hidden_sketches).
+    blank_reference_sketches(adapter, ("CoreFlatReference",))
+    return jobs
+
+
 def _apply_native_limits(
     adapter: Any, feature: str, name: str, nominal: float,
     band: tuple[float, float], tolerance_type: int,
@@ -706,6 +767,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Both cutter terminals are genuinely empty by the pure envelope proofs:
     # the run-out clears the neck and D-core at F and the journal at the rear.
     await author_span(adapter, STOCK_PROFILE, SPAN_TEETH, places=SPAN_PLACES)
+    drive_jobs += await _flat_end_view_reference(adapter)
 
     stations = (
         ("PinionRear", PINION_REAR_Z, '"FaceWidth"'),
@@ -749,7 +811,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, "StudProfile", "OutsideDia", *deviations(OUTSIDE_DIA_BAND)
     )
     set_dimension_bilateral_tolerance(
-        adapter, "CoreFlatProfile", "FlatToAxis", *deviations(CORE_FLAT_BAND)
+        adapter, "CoreFlatReference", "FlatToAxis", *deviations(CORE_FLAT_BAND)
     )
     _apply_neck_and_flat_limits(adapter)
     set_dimension_prefix(

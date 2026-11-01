@@ -242,15 +242,15 @@ def test_every_native_dimension_is_placed_once_with_model_places() -> None:
     assert sum(len(keep) for keep in keeps) == len(marked)
     assert set().union(*keeps) == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    flat_names = {"FlatToAxis", "FlatEnd", "FlatToolRadius"}
-    assert spec.DRAWING_DIMENSIONS["CoreFlatProfile"] == flat_names
+    assert spec.DRAWING_DIMENSIONS["CoreFlatProfile"] == {"FlatEnd", "FlatToolRadius"}
+    assert spec.DRAWING_DIMENSIONS["CoreFlatReference"] == {"FlatToAxis"}
     assert spec.DRAWING_DIMENSIONS["SpanProfile"] == {"ToothSpan"}
     assert "RootInspectionProfile" not in spec.DRAWING_DIMENSIONS
     assert "TipChamfer" not in marked  # "CHAMFER 45 DEG TO MINOR" sizes it
     assert not {"FullDepth", "CutterRunout"} & marked
     assert not {"FullDepth", "CutterRunout"} & set(drawing.SIDE_KEEP)
-    assert set(drawing.END_KEEP) == {"ToothSpan"}
-    assert "FlatToAxis" in drawing.SIDE_KEEP
+    assert set(drawing.END_KEEP) == {"ToothSpan", "FlatToAxis"}
+    assert "FlatToAxis" not in drawing.SIDE_KEEP
     assert "OverallLength" in drawing.SIDE_KEEP
     detail = {"FrontReliefDia", "FrontReliefWidth", "FrontCornerRadius"}
     assert set(drawing.DETAIL_KEEP) == detail | {"FlatEnd", "FlatToolRadius"}
@@ -270,11 +270,9 @@ def test_tool_end_limits_print_as_native_detail_dimensions() -> None:
     assert "TOOL END" not in spec.DRAWING_NOTES
     assert spec.CORE_FLAT_CUT_END_PREFIX == "D-FLAT TOOL END "
     places = spec.DRAWING_PRECISION["CoreFlatProfile"]
-    assert places == {
-        "FlatToAxis": spec.CORE_FLAT_PLACES,
-        "FlatEnd": 2,
-        "FlatToolRadius": 2,
-    }
+    assert places == {"FlatEnd": 2, "FlatToolRadius": 2}
+    flat_places = spec.DRAWING_PRECISION["CoreFlatReference"]
+    assert flat_places == {"FlatToAxis": spec.CORE_FLAT_PLACES}
     assert spec.CORE_FLAT_TOOL_END_RADIUS_TOL_TYPE == 6
     assert spec.CORE_FLAT_CUT_END_TOL_TYPE == 3
     assert len(spec.DRAWING_NOTES.splitlines()) <= 4
@@ -302,7 +300,8 @@ def test_model_bands_and_source_linked_properties() -> None:
     bands = model_toleranced_dimensions(part)
     assert bands[("StudProfile", "CoreDia")] == "*deviations(CORE_DIA_BAND)"
     assert bands[("JournalProfile", "JournalDia")] == "*deviations(JOURNAL_DIA_BAND)"
-    assert bands[("CoreFlatProfile", "FlatToAxis")] == "*deviations(CORE_FLAT_BAND)"
+    assert bands[("CoreFlatReference", "FlatToAxis")] == "*deviations(CORE_FLAT_BAND)"
+    assert ("CoreFlatProfile", "FlatToAxis") not in bands
     assert bands[("StudProfile", "OutsideDia")] == "*deviations(OUTSIDE_DIA_BAND)"
     assert bands[("GearBlank", "FaceWidth")] == "FACE_WIDTH_BAND"
     assert spec.FACE_WIDTH_BAND == PRINTED_LENGTH_BAND
@@ -834,16 +833,6 @@ def test_run_233549_text_clears_the_border_lines_and_labels() -> None:
     circle_x = center[0] - math.sqrt(crop**2 - (low - center[1]) ** 2)
     assert x + 0.01175 < circle_x - 0.002
     assert x + 0.004 + 0.01175 > circle_x - 0.002  # the run's keep
-    # The flat's rows stay within 12 characters, so the shoulder under them
-    # ends short of the tip's witness lines; the block's top (12.9 mm over
-    # the keep in the run) stands under the thread blank's lower outline.
-    rows = drawing.COLLAR_SLIDING_FIT.splitlines()
-    assert max(map(len, rows)) <= 12
-    fx, fy = drawing.SIDE_KEEP["FlatToAxis"]
-    assert fx + 12 * 0.0027 < drawing.TIP_X - 0.003
-    blank_bottom = drawing._sheet_y(-spec.THREAD_BLANK_DIA / 2.0)
-    assert fy + 0.0129 < blank_bottom - 0.002
-    assert fy + 0.0045 + 0.0129 > blank_bottom  # the run's keep
     # The mark's "B" (2 mm wide) stands between the face width's rear
     # witness line and the tooth-tip Ø's lower arrow, 2 mm clear of each.
     bx = drawing.PARENT_LETTER_XY[0]
@@ -851,7 +840,7 @@ def test_run_233549_text_clears_the_border_lines_and_labels() -> None:
     assert bx + 0.002 + 0.002 < drawing.SIDE_KEEP["OutsideDia"][0] - 0.0004 - 0.002
 
 
-def test_run_004958_journal_finish_and_flat_limit_stand_clear() -> None:
+def test_run_004958_journal_finish_stands_clear() -> None:
     # The finish lands on the journal's lower outline, mid-left, where no
     # tooth, line or text is near (machinist review r5: in the end view it
     # landed where the journal circle meets the teeth).
@@ -867,12 +856,66 @@ def test_run_004958_journal_finish_and_flat_limit_stand_clear() -> None:
     assert sx - 0.0064 > drawing.REAR_X + 0.002
     assert sx - 0.0022 + 0.0167 < drawing.SIDE_KEEP["JournalDia"][0] - 0.002
     assert sx - 0.0022 + 0.0167 < drawing.SIDE_KEEP["JournalLength"][0] - 0.0085 - 0.002
-    # The flat's "0.000" (ends 29.3 mm right of its keep in the run) stops
-    # short of the thread blank Ø's lower arrow; the run's keep struck it.
-    fx = drawing.SIDE_KEEP["FlatToAxis"][0]
-    blank_line = drawing.SIDE_KEEP["ThreadBlankDia"][0]
-    assert fx + 0.0293 < blank_line - 0.002
-    assert drawing.CORE_END_X + 0.018 + 0.0293 > blank_line  # the run's keep
+
+
+def test_run_022045_flat_prints_in_the_tip_end_view_clear_of_its_neighbours() -> None:
+    # Machinist review r7: in the side view the flat's line ran over the
+    # #8-32 thread, level with the thread's lower edge, and read as the
+    # thread's radius.  It prints in the end view from the tip instead.
+    assert "FlatToAxis" in drawing.END_KEEP and "FlatToAxis" not in drawing.SIDE_KEEP
+    x, y = drawing.END_KEEP["FlatToAxis"]
+    cx, cy = drawing.FRONT_CENTER
+    flat_y = cy - spec.CORE_FLAT_FROM_AXIS * drawing._S / 1000.0
+    # The line stands right of the tooth tips.  The rows stay within 12
+    # characters; the block hangs right of the line (32.8 mm, from 12.8 mm
+    # under the keep to 12.9 mm over it in run 20261101T022045634Z).
+    assert x > cx + drawing.HALF_OD + 0.003
+    assert max(map(len, drawing.COLLAR_SLIDING_FIT.splitlines())) <= 12
+    # Its top stands under the flat's arrow, its bottom over the tooth-space
+    # note (top 112.4 mm), its right end inside the border (419.1 mm).
+    assert y + 0.0129 < flat_y - 0.002
+    assert y - 0.0128 > 0.1124 + 0.005
+    assert x + 0.0328 < 0.4191 - 0.005
+    # The tooth span's line rises from (339.8, 161.1) mm at 26.1/18.9; at the
+    # flat's line it passes over the upper arrow's stub (6.3 mm over centre).
+    span_y = 0.1611 + (x - 0.3398) * 26.1 / 18.9
+    assert span_y > cy + 0.0063 + 0.002
+
+
+def test_flat_reference_sketch_carries_the_printed_flat_on_the_front_plane(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seat = stub_seat(monkeypatch, part, keep=("_flat_end_view_reference",))
+    seat.check.side_effect = lambda _label, result: result
+    adapter = offline_adapter()
+    adapter.add_centerline.return_value = "Line1"
+    asyncio.run(part._flat_end_view_reference(adapter))
+
+    assert seat._create_sketch.call_args.args[1] == "Front"
+    h, station = spec.CORE_FLAT_FROM_AXIS, part.FLAT_WITNESS_STATION
+    # One construction line on the flat, from under the axis out to the
+    # witness on model -X: the tip-end view mirrors X, so it shows right,
+    # toward the dimension line.  The witness lies on the flat inside the
+    # core circle and outside the thread blank's.
+    assert adapter.add_centerline.await_args.args == (-station, -h, 0.0, -h)
+    assert spec.THREAD_BLANK_DIA / 2.0 < math.hypot(station, h) < spec.CORE_DIA / 2.0
+    constraints = [call.args for call in adapter.add_sketch_constraint.await_args_list]
+    assert constraints == [
+        ("Line1", None, "horizontal"),
+        ("Line1.end", "origin", "vertical_points"),
+    ]
+    dimensions = [call.args[1:5] for call in seat.dimension_between.await_args_list]
+    assert dimensions == [
+        ("Line1.start", "origin", "horizontal_distance", station),
+        ("Line1.start", "origin", "vertical_distance", h),
+    ]
+    # The printed one is driven by the cut's own CoreFlat global.
+    records = [call.args for call in seat.SketchDims.return_value.record.call_args_list]
+    assert records == [("FlatWitnessStation",), ("FlatToAxis", '"CoreFlat"')]
+    names = [name for name, _args, _kwargs in seat.mock_calls]
+    assert names.index("name_last_feature") < names.index("blank_reference_sketches")
+    assert seat.name_last_feature.call_args.args[1] == "CoreFlatReference"
+    assert seat.blank_reference_sketches.call_args.args[1] == ("CoreFlatReference",)
 
 
 class _NeckView:
@@ -1338,6 +1381,10 @@ def test_build_cuts_no_endcut_and_checks_the_full_face_oracle(
     names = [name for name, _args, _kwargs in seat.mock_calls]
     assert names.index("_straight_stock_gaps") < names.index("_stud_profile")
     assert names.index("_stud_profile") < names.index("_journal_profile")
+    # The flat's printed reference sketch follows the span, before the
+    # rebuild that precedes the drive equations.
+    assert names.index("author_span") < names.index("_flat_end_view_reference")
+    assert names.index("_flat_end_view_reference") < names.index("force_rebuild")
     assert "pattern_stock_feature" not in names
     globals_set = [args[1] for name, args, _kwargs in seat.mock_calls if name == "set_global"]
     assert "FaceWidth" in globals_set
