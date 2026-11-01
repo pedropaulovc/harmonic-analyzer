@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dt_crank_handle_butt_cup_spec import (
     POCKET_CLEARANCE,
-    POCKET_DIA_MAX,
+    POCKET_WALL_MIN,
 )
 from _title_block_units import MM_PER_INCH, render_number
 
@@ -36,15 +36,18 @@ FLOOR_HOLE_CALLOUT = "DRILL THRU"
 # The body is epoxied into the MHA-DT-08 counterbore, which is bored to suit
 # it; the band's mate is that bore (r1 finding 3).
 BODY_FIT_CALLOUT = f"EPOXY FIT IN {HANDLE_NUMBER}"
-# Matched fit on the first-made MHA-DT-32 head: name and number, the
-# diametral clearance and the hard limit (rule 4; r1 finding 2).
+# Matched fit on the first-made MHA-DT-32 head: name and number and the
+# diametral clearance (rule 4; r1 finding 2).  The largest head plus the
+# widest clearance is the largest bore, so no separate cap prints (#290 review
+# of eb22a22f1 called a Ø MAX row over-specification); the wall it leaves
+# inside the smallest body is stated as a plain fact (rule 20).
 POCKET_FIT_CALLOUT = "\n".join(
     (
         f"BORE TO SUIT {SCREW_NUMBER}",
         f"{SCREW_NAME} HEAD, {inch_text(POCKET_CLEARANCE[0], 3)}-"
         f"{inch_text(POCKET_CLEARANCE[1], 3)}",
-        "DIAMETRAL CLEARANCE,",
-        f"<MOD-DIAM>{inch_text(POCKET_DIA_MAX, 3)} MAX",
+        "DIAMETRAL CLEARANCE;",
+        f"WALL {inch_text(POCKET_WALL_MIN, 3)} MIN",
     )
 )
 # The depth band's mate and reason (r1 finding 4).  The floor corner's

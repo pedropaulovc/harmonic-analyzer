@@ -511,11 +511,15 @@ CUP_NAME = "BUTT CUP"
 # The matched fits, each flagged on its feature (drawing-guidelines.md rules 4
 # and 7): the mate by name and number, and the acceptance.  Short lines keep
 # each block narrow beside its neighbours on the sheet.
+# The tenon's oak over the pivot bore sits between the rule-17 floor and the
+# target, so its callout states it as a plain fact (rule 20; #290 review of
+# b28d38a16), rounded down to the printed thousandth.
 TENON_FIT_NOTE = (
     f"TURN TO SUIT {FERRULE_NAME}\n"
     f"{FERRULE_NUMBER} BORE, {inch_text(TENON_GLUE_LINE[0], 3)}-"
     f"{inch_text(TENON_GLUE_LINE[1], 3)}\n"
-    "DIAMETRAL CLEARANCE"
+    "DIAMETRAL CLEARANCE;\n"
+    f"WALL {inch_text(math.floor(TENON_WALL_MIN / 0.0254) * 0.0254, 3)} MIN"
 )
 COUNTERBORE_FIT_NOTE = (
     f"BORE TO SUIT {CUP_NAME}\n"

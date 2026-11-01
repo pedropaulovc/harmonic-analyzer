@@ -95,8 +95,10 @@ TOP_KEEP = {
     "RingID": (TOP_CENTER[0] - HALF_OD - 0.012, TOP_CENTER[1] + HALF_OD + 0.008),
     "JointDia": (TOP_CENTER[0] + HALF_OD + 0.022, TOP_CENTER[1] - HALF_OD - 0.012),
 }
+# The wire's callout block (18-character rows) stands up and left, clear of
+# the edge view's left end.
 FRONT_KEEP = {
-    "WireDia": (FRONT_CENTER[0] - HALF_OD - 0.022, FRONT_CENTER[1] + 0.012),
+    "WireDia": (FRONT_CENTER[0] - HALF_OD - 0.032, FRONT_CENTER[1] + 0.018),
 }
 
 

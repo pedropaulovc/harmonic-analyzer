@@ -48,8 +48,10 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, decimals in dimensions.items()
 }
 REFERENCE_DIMENSIONS = frozenset({"WireDia"})
+# The wire is bought stock: an untoleranced reference whose supplier tolerance
+# governs (owner rule; #290 reviews asked for a printed band).
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "WireDia": "WIRE",
+    "WireDia": "WIRE AS SUPPLIED;\nSUPPLIER TOLERANCE",
     "LoopID": "MHA-DT-VN-65 BEAD CHAIN PASSES FREELY",
 }
 if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
@@ -62,7 +64,7 @@ if not REFERENCE_DIMENSIONS <= set(DRAWING_PRECISION_BY_NAME):
 DRAWING_NOTES = "\n".join(
     (
         "1. LOOP CLOSED ON THE TAIL; LOOP AND TAIL IN ONE PLANE.",
-        "2. TAIL CLAMPED FLAT ON THE MHA-DT-06 ARM FACE"
-        " UNDER THE MHA-SH-VN-51 SCREW HEAD.",
+        "2. TAIL STRAIGHT AND FLAT; CLAMPS UNDER THE MHA-SH-VN-51 HEAD"
+        " ON THE MHA-DT-06 ARM.",
     )
 )

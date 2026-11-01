@@ -8,8 +8,8 @@ dimension at its part-authored places.
 
 The screw axis is model +Z, so the ``*Right`` view already lays it horizontal
 as it sits in the lathe: model +Z runs to paper-LEFT, putting the thread tip on
-the left and the slotted head on the right.  Lengths baseline from the
-under-head face (see ``dt_crank_handle_pivot_screw_spec``).  The head-end view is
+the left and the slotted head on the right.  Axial locations read from the
+tip (see ``dt_crank_handle_pivot_screw_spec``).  The head-end view is
 the ``*Back`` orientation, which is exactly the third-angle RIGHT view of that
 profile, so it sits on the profile's axis to its right and shows the slot.
 
@@ -59,7 +59,6 @@ import _telemetry
 from dt_crank_handle_pivot_screw_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    END_PLAY_CALLOUT,
     HEAD_DIA,
     HEAD_DIA_CALLOUT,
     HEAD_LENGTH,
@@ -70,10 +69,12 @@ from dt_crank_handle_pivot_screw_spec import (
     RELIEF_DIA,
     RELIEF_END_STATION,
     RELIEF_LEAD,
+    RELIEF_LEAD_NOTE,
     SEAT_EDGE_NOTE,
     SEAT_STATION,
     SHOULDER_DIA,
     SHOULDER_FIT_CALLOUT,
+    SHOULDER_LENGTH_CALLOUT,
     SURFACE_FINISHES,
     THREAD_CALLOUT,
     THREAD_MODEL_DIA,
@@ -130,18 +131,19 @@ THREAD_START_X = _sheet_x(OVERALL_LENGTH - TIP_CHAMFER)
 HEAD_TOP_Y = _sheet_y(HEAD_DIA / 2.0)
 SHOULDER_TOP_Y = _sheet_y(SHOULDER_DIA / 2.0)
 THREAD_TOP_Y = _sheet_y(THREAD_MODEL_DIA / 2.0)
+THREAD_BOTTOM_Y = _sheet_y(-THREAD_MODEL_DIA / 2.0)
 RELIEF_TOP_Y = _sheet_y(RELIEF_DIA / 2.0)
 RELIEF_MID_X = (SEAT_X + RELIEF_END_X) / 2.0
 # The relief floor runs from the foot of the 45-degree lead to the flank.
 RELIEF_FLOOR_MID_X = (_sheet_x(SEAT_STATION + RELIEF_LEAD) + RELIEF_END_X) / 2.0
 
 # Rows below the profile, 15 mm apart (text sits ~3 mm above its requested
-# point and the dimension line ~5 mm below it).  Row 0 carries the thread size
-# from the seat face on the left and the head length from the under-head face
-# on the right; row 1 the shoulder length from the under-head face; row 2 the
-# reference overall.  Row 0 stands 34 mm below the axis so the relief Ø can
-# print between it and the profile.  No extension line crosses a dimension
-# line.
+# point and the dimension line ~5 mm below it).  Row 0 carries the thread
+# length from the tip on the left and the head length from the under-head face
+# on the right; row 1 the fitted shoulder length from the seat face; row 2 the
+# reference overall.  Row 0 stands 34 mm below the axis so the relief Ø and
+# the thread callout can print between it and the profile.  No extension line
+# crosses a dimension line.
 _ROW_Y = (SIDE_CENTER[1] - 0.034, SIDE_CENTER[1] - 0.049, SIDE_CENTER[1] - 0.064)
 SIDE_KEEP = {
     "ThreadLength": ((TIP_X + SEAT_X) / 2.0, _ROW_Y[0]),
@@ -150,20 +152,21 @@ SIDE_KEEP = {
     # (farm r8 of f5256bf3d: at + 0.020 the 43-mm block's left end crossed
     # the head face's extension line).
     "HeadLength": (HEAD_FACE_X + 0.026, _ROW_Y[0]),
-    # The under-head face located from the tip, like every axial location.
-    "UnderHeadLocation": ((TIP_X + UNDERHEAD_X) / 2.0, _ROW_Y[1]),
+    # The fitted shoulder, seat face to under-head, its fit-up as its callout:
+    # two 46-character rows (117 mm) between its 158-mm extension lines.
+    "ShoulderLength": ((SEAT_X + UNDERHEAD_X) / 2.0, _ROW_Y[1]),
     "OverallLength": ((TIP_X + HEAD_FACE_X) / 2.0, _ROW_Y[2]),
     # Diameters on the side view (drawing-guidelines.md rule 11 (turned parts read like the lathe)).  The shoulder's dimension line
-    # crosses the shoulder near its thread end; the head's stands clear of the
-    # head face, left of the end view.
-    "ShoulderDia": (SEAT_X + 0.056, SIDE_CENTER[1] + 0.030),
+    # crosses the shoulder right of the relief Ø's callout below it; the
+    # head's stands clear of the head face, left of the end view.
+    "ShoulderDia": (SEAT_X + 0.075, SIDE_CENTER[1] + 0.030),
     # Above the head, so the callout under the value stands clear of its
     # extension lines and of the slot depth's text left of it.
     "HeadDia": (HEAD_FACE_X + 0.014, SIDE_CENTER[1] + 0.032),
     # The thread-relief groove against the seat face.  Its width from the seat
-    # face reads above it alone; its Ø reads below it with the 45-degree lead
-    # as its callout, the dimension line standing on the floor so nothing
-    # crosses.
+    # face reads above it alone; its Ø reads below it, the dimension line
+    # standing on the floor so nothing crosses.  The 45-degree lead has its
+    # own leader note (LEAD_NOTE_XY).
     "ReliefWidth": (RELIEF_MID_X, SIDE_CENTER[1] + 0.022),
     "ReliefDia": (RELIEF_FLOOR_MID_X, SIDE_CENTER[1] - 0.016),
     # The tip chamfer's axial leg reads below-left of the tip, clear of the
@@ -179,47 +182,55 @@ SIDE_KEEP = {
 # under it (a dimension exposes no GetExtent), measured on farm run 69a2f961's
 # render: the underline, where the leader lands, sits 5.6 mm below the anchor.
 # Farm r8 of f5256bf3d rendered the inch callout at 2.5 mm a character, so
-# its 18-character rows span 46 mm.  The text's left edge stands 3.5 mm right
-# of the seat face, and 21 mm below the axis the leader drops steeply enough
-# to pass under the seat-face corner rather than through the shoulder.  The
-# shoulder Ø's arrow is right of it.
+# its 18-character rows span 46 mm.  The text's left edge stands 12 mm right
+# of the seat face (3.5 mm before the thread callout moved below the thread)
+# and 28 mm below the axis, so the leader, dropping to the Ø line under the
+# seat-face corner rather than through the shoulder, stays 5 mm clear of the
+# thread callout's right end.  The shoulder Ø's arrow is right of it.
 RELIEF_DIA_TEXT_WIDTH = 0.046
 RELIEF_DIA_TEXT_UNDERLINE_DROP = 0.0056
-RELIEF_DIA_TEXT_CLEARANCE = 0.0035
+RELIEF_DIA_TEXT_CLEARANCE = 0.012
 RELIEF_DIA_TEXT_XY = (
     SEAT_X + RELIEF_DIA_TEXT_CLEARANCE + RELIEF_DIA_TEXT_WIDTH / 2.0,
-    SIDE_CENTER[1] - 0.021,
+    SIDE_CENTER[1] - 0.028,
 )
 # The 3-mm slot is narrower than the text, so the value stands above its
 # extension lines rather than between them.
 END_KEEP = {
     "SlotWidth": (END_CENTER[0] + 0.022, END_CENTER[1] + 0.010),
 }
-# The thread callout's leader lands on the edge where the full thread meets
-# the tip chamfer, the full-thread portion's own end edge in the side view (the
-# relief-flank edge at the other end would read as pointing at the groove).
-# The note stands up and right so its leader slants down-left onto that edge
-# instead of running along the chamfer's own extension line.
-THREAD_PICK = (THREAD_START_X, SIDE_CENTER[1] + 0.004)
-# Up and right of the thread start, so the leader leans back onto the thread.
-THREAD_NOTE_XY = (THREAD_START_X + 0.013, SIDE_CENTER[1] + 0.042)
+# The thread callout lands on the full thread's lower silhouette 3 mm in from
+# the tip chamfer, from below and right, under the thread and clear of the
+# chamfer's extension lines: above the thread, its leader ran through where
+# the relief lead's note now stands (#290 review of b28d38a16).
+THREAD_PICK = (THREAD_START_X + 0.003, THREAD_BOTTOM_Y)
+# Its 9-character text (24 mm) ends left of the relief Ø's leader.
+THREAD_NOTE_XY = (THREAD_START_X + 0.0056, SIDE_CENTER[1] - 0.0095)
+# The 45-degree relief lead's own note (#290 review of b28d38a16), on the
+# lead's upper silhouette.  The lead faces up and left, so the note stands up
+# and left with its 18-character rows (46 mm) ending 15 mm left of the relief
+# end: its leader passes under the relief width's left arrow and over the
+# thread, crossing only that dimension's extension line.
+LEAD_PICK = (
+    SEAT_X - RELIEF_LEAD * _S / 2000.0,
+    _sheet_y(RELIEF_DIA / 2.0 + RELIEF_LEAD / 2.0),
+)
+LEAD_NOTE_WIDTH = 0.046
+LEAD_NOTE_XY = (RELIEF_END_X - 0.0147 - LEAD_NOTE_WIDTH, SIDE_CENTER[1] + 0.022)
 # The running shoulder's upper flank, right of the Ø dimension line and its
 # callout block (farm r1 of eb22a22f1: at x - 0.050 the leader ran through
 # the block's right end).
 FINISH_PICK = (UNDERHEAD_X - 0.040, SHOULDER_TOP_Y)
 FINISH_SYMBOL = (UNDERHEAD_X - 0.030, SIDE_CENTER[1] + 0.030)
 # A point on the shoulder face, clear of the Ø dimension line.
-CENTERLINE_PICK = (UNDERHEAD_X - 0.080, SIDE_CENTER[1] + 0.003)
+CENTERLINE_PICK = (UNDERHEAD_X - 0.025, SIDE_CENTER[1] + 0.003)
 # The seat edge's break note lands on the shoulder's silhouette just right of
 # its seat-face corner, from up and right, above the relief width and the
 # shoulder Ø's callout blocks: landing on the seat face itself, its leader
-# crossed the relief width's dimension line (farm r8 of f5256bf3d), and at
-# x + 0.010 it ran through the thread note's right end (farm r4 of d7fcd19ce).
+# crossed the relief width's dimension line (farm r8 of f5256bf3d).
 SEAT_EDGE_PICK = (SEAT_X + 0.006, SHOULDER_TOP_Y)
 SEAT_EDGE_NOTE_XY = (SEAT_X + 0.020, SIDE_CENTER[1] + 0.060)
 ISO_NOTE_XY = (0.352, 0.200)
-# Bottom-left, above the title-block line, like the other crank sheets.
-NOTES_XY = (0.016, 0.070)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -236,7 +247,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
         required=(
@@ -244,7 +254,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
@@ -296,7 +305,7 @@ async def build(adapter: Any) -> dict[str, str]:
         annotations,
         {
             "TipChamfer": TIP_CHAMFER_CALLOUT,
-            "UnderHeadLocation": END_PLAY_CALLOUT,
+            "ShoulderLength": SHOULDER_LENGTH_CALLOUT,
             "ShoulderDia": SHOULDER_FIT_CALLOUT,
             "HeadDia": HEAD_DIA_CALLOUT,
             "HeadLength": HEAD_LENGTH_CALLOUT,
@@ -330,6 +339,16 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_xy=THREAD_PICK,
         note_xy=THREAD_NOTE_XY,
         label="MHA-DT-32 thread callout",
+        entity_type="SILHOUETTE",
+    )
+    add_attached_note(
+        adapter,
+        side,
+        text=RELIEF_LEAD_NOTE,
+        entity_xy=LEAD_PICK,
+        note_xy=LEAD_NOTE_XY,
+        label="MHA-DT-32 relief lead",
+        entity_type="SILHOUETTE",
     )
     add_attached_note(
         adapter,
@@ -350,7 +369,6 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="SILHOUETTE",
         char_height=0.0025,
     )
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(

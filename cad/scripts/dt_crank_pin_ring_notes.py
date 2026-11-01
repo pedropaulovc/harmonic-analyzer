@@ -52,8 +52,10 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, decimals in dimensions.items()
 }
 REFERENCE_DIMENSIONS = frozenset({"WireDia", "JointDia"})
+# The wire is bought stock: an untoleranced reference whose supplier tolerance
+# governs (owner rule; #290 reviews asked for a printed band).
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "WireDia": "WIRE",
+    "WireDia": "WIRE AS SUPPLIED;\nSUPPLIER TOLERANCE",
     "JointDia": "SILVER-SOLDER JOINT",
 }
 if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(

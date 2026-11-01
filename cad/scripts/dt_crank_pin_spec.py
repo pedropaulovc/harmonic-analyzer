@@ -56,13 +56,16 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 
 # The cross-hole's thinnest wall to the pin surface at the printed worst
 # case: the taper at the hole's .XX station, both at their adverse .XX limits,
-# and the drilled hole at its DRILLED HOLES oversize. Rounded DOWN: the sheet
-# never states more web than the limits give.
+# and the drilled hole at its DRILLED HOLES oversize. The big end's lower limit
+# is the PRINTED .XX value's, not the mm model's (#290 review of 29af6f44d:
+# from Ø.23 -.01 the web is .065, not the .067 the model's .2338 gave).
+# Rounded DOWN: the sheet never states more web than the limits give.
 _XX_BAND = printed_band_mm(2, unit=UNIT)
 _DRILL_OVERSIZE = drilled_oversize_mm(unit=UNIT)
 _TAPER_PER_MM = (BIG_END_DIA - SMALL_END_DIA) / PIN_LENGTH
+BIG_END_DIA_PRINTED = round(BIG_END_DIA / 25.4, 2) * 25.4
 PIN_DIA_AT_RING_HOLE_MIN = (
-    BIG_END_DIA - _XX_BAND - _TAPER_PER_MM * (RING_HOLE_X + _XX_BAND)
+    BIG_END_DIA_PRINTED - _XX_BAND - _TAPER_PER_MM * (RING_HOLE_X + _XX_BAND)
 )
 CROSS_HOLE_WEB_MIN = round(
     math.floor(

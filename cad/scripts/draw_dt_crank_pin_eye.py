@@ -121,9 +121,10 @@ SIDE_KEEP = {
     ),
 }
 # Top view: the wire's stock diameter on the tail's end circle, labelled
-# up and left.
+# up and left: its 18-character callout block stays left of the loop's
+# vertical centre line and above its horizontal one.
 TOP_KEEP = {
-    "WireDia": (TAIL_END_XY[0] - 0.022, TOP_CENTER[1] + 0.016),
+    "WireDia": (TAIL_END_XY[0] - 0.034, TOP_CENTER[1] + 0.020),
 }
 
 
