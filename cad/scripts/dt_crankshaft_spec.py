@@ -627,6 +627,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "CollarSeatStation",
         "PinHoleStation",
         "DomeSphereRadius",
+        "PinionPinHoleDia",
     },
 }
 # Inch places: running/seat diameters carry their fit bands at four (their
@@ -659,6 +660,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "CollarSeatStation": COLLAR_STATION_PLACES,
         "PinHoleStation": STATION_PLACES,
         "DomeSphereRadius": 3,
+        "PinionPinHoleDia": dt_crank_pinion_spec.PIN_HOLE_DIA_PLACES,
     },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -669,9 +671,12 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked crankshaft dimension needs authored places")
 # Read-only restatements: the overall is Depth + DomeHeight, and a spherical
-# cap of DomeHeight on the Ø.375 end already fixes its radius.
-REFERENCE_DIMENSIONS = frozenset({"OverallLength", "DomeSphereRadius"})
+# cap of DomeHeight on the Ø.375 end already fixes its radius.  The 16T pin's
+# cross-hole is reamed to fit the pin at assembly, so its Ø is the pin's REF
+# (as on the 16T's own sheet).
+REFERENCE_DIMENSIONS = frozenset({"OverallLength", "DomeSphereRadius", "PinionPinHoleDia"})
 SPHERICAL_DIMENSIONS = frozenset({"DomeSphereRadius"})
+DIAMETER_REFERENCES = frozenset({"PinionPinHoleDia"})
 
 # The native cross-hole callout's process prefix: the drill reads first; the
 # taper-ream prose under it lives in dt_crankshaft_notes (drawing-only).
