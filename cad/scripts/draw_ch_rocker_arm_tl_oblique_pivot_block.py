@@ -168,11 +168,14 @@ VIEW_ARROW_RUN = .015
 # above the taps, under the step (y 183), the two 5.657 texts outside their
 # 11.3 mm spans. The clearance callouts and the tap callout leave the axis to
 # the right, between the taps (45 deg pattern); the Ø10.50's leader rises
-# from its rim over C's right letter.
+# from its rim over C's right letter. The axis texts carry their function
+# rows (59 mm and 47 mm wide): .488's ends 4 mm left of the bottom face's
+# line at x 165.6, .515's 3 mm left of .223's lower arrow at x 156.6 (farm
+# round 4 layout audit).
 NUT_XY, NUT_SCALE = (.190,.175), (2,1)
 NUT_KEEP = {
-    'NutCentreY':(.133,.100),'NutTap1Y':(.157,.1073),'NutTap3Y':(.145,.1187),
-    'NutCentreZ':(.140,.175),'NutTap3Z':(.150,.160),'NutTap4Z':(.2225,.160),
+    'NutCentreY':(.130,.100),'NutTap1Y':(.157,.1073),'NutTap3Y':(.145,.1187),
+    'NutCentreZ':(.132,.175),'NutTap3Z':(.150,.160),'NutTap4Z':(.2225,.160),
     'NutClearanceDia':(.250,.101),'NutSeatDia':(.258,.140),
 }
 NUT_CAPTION = 'VIEW D'
@@ -337,6 +340,46 @@ def _place_caption(adapter, view, target, letter: str, sheet_scale) -> None:
     _telemetry.info(f'{label}: box {extent!r}')
 
 
+def _log_sheet_dimensions(adapter, view, feature: str) -> None:
+    """DIAGNOSTIC (TL-22 B-B drops SectionBlockHeight, farm rounds 1, 3, 4):
+    every view's display dimensions, hidden ones included, with their
+    annotation Visible, and the source sketch's own dimensions with their
+    drawing marks, in one log line before B-B's import."""
+    def safe(read):
+        try:
+            return read()
+        except Exception as error:  # a diagnostic never stops the build
+            return f'<{type(error).__name__}>'
+    views = {}
+    raw = _early_bound(adapter.currentModel, 'IDrawingDoc').GetFirstView()
+    while raw is not None:
+        typed = _early_bound(raw, 'IView')
+        rows = []
+        display = typed.GetFirstDisplayDimension5()
+        while display is not None:
+            display = _early_bound(display, 'IDisplayDimension')
+            rows.append((safe(lambda d=display: str(_early_bound(d.GetDimension2(0), 'IDimension').FullName)),
+                         safe(lambda d=display: int(_early_bound(d.GetAnnotation(), 'IAnnotation').Visible))))
+            display = display.GetNext5()
+        views[str(typed.GetName2())] = rows
+        raw = typed.GetNextView()
+    def source_rows():
+        model = _early_bound(_early_bound(view, 'IView').ReferencedDocument, 'IPartDoc')
+        sketch = _early_bound(model.FeatureByName(feature), 'IFeature')
+        rows = []
+        display = sketch.GetFirstDisplayDimension()
+        while display is not None:
+            typed = _early_bound(display, 'IDisplayDimension')
+            dimension = _early_bound(typed.GetDimension2(0), 'IDimension')
+            rows.append((safe(lambda d=dimension: str(d.FullName)), safe(lambda d=dimension: int(d.DrivenState)),
+                         safe(lambda d=typed: bool(d.MarkedForDrawing)),
+                         safe(lambda d=dimension: round(float(d.SystemValue) * 1000, 4))))
+            display = sketch.GetNextDisplayDimension(display)
+        return rows
+    _telemetry.info(f'B-B diagnostic: sheet dimensions by view {views!r}; {feature} source '
+                    f'(name, driven state, marked, mm) {safe(source_rows)!r}')
+
+
 def _set_section_arrows(adapter) -> None:
     """Set this document's cutting-line arrow sizes, read back, raise on
     mismatch (draw_dt_cone_gear_shaft._pin_witness_line_extension)."""
@@ -447,6 +490,7 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
                    (FLOOR_XY[0], FLOOR_XY[1]-part.BLOCK_WIDTH/2000-SECTION_CAPTION_GAP), SHEET_SCALE)
     row_4y = _project(adapter,plan,(part.BLOCK_X1,part.BOLT_Y,contract.BLOCK_HEIGHT),'row 4Y')
     _fit_section_letters(adapter, side, (floor,), below_y=row_4y[1])
+    _log_sheet_dimensions(adapter, floor, part.CBORE_FLOOR_REFERENCE)
     annotations += curate_view_dimensions(adapter,floor,keep=FLOOR_KEEP,view_label='B-B floor',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
     set_hidden_lines_removed(adapter,iso)
