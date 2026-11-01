@@ -40,4 +40,3 @@ SUPPLIER_REFERENCE_FORMATS = {'SupplierBoreDiameter': (3, 'diameter', None, 'BOR
 # of the other's witnesses. The length sits right of the Top view.
 SUPPLIER_REFERENCE_SIDES = {'SupplierBoreDiameter': 'top', 'SupplierOuterDiameter': 'bottom', 'SupplierLength': 'right'}
 SUPPLIER_REFERENCE_UNITS = {'SupplierBoreDiameter': 'in', 'SupplierOuterDiameter': 'in', 'SupplierLength': 'in'}
-SUPPLIER_DATA = ('LOOSE BORE IS NOT A LOCATING BUSHING.',)

@@ -164,10 +164,13 @@ if STAND_OUT_MAX_NOMINAL_SEAT >= trammel.PIVOT_SUPPORT_HEIGHT:
 
 # Exact-current product table and engineering drawing read 2026-10-21.
 # Hidden nominal source references, not physical-edge/replica assertions.
-# Head height is the source's thread-top depth, not the ideal sharp cone's
-# junction depth. Length is OVERALL from head top Y=0 to the factory tip.
-# Source decimals have three places and the included angle whole degrees.
-# Phillips No. 1 is nonnumeric metadata; no recess size/depth is invented.
+# Only the sizes needed to buy a replacement: length (OVERALL, from head top
+# Y=0 to the factory tip), head diameter (the riser countersink's fit) and
+# thread. The 82 deg head angle and head height follow from the B18.6.3 flat
+# head in the callout; they are not authored, because the drawing view shows
+# every reference line it dimensions from, printed or not.
+# Source decimals have three places. Phillips No. 1 is nonnumeric metadata;
+# no recess size/depth is invented.
 SUPPLIER_PRODUCT_URL = "https://www.mcmaster.com/91771A112/"
 SUPPLIER_DRAWING_URL = (
     "https://www.mcmaster.com/mvC/Library/CAD2/20260324/D7F7176D/"
@@ -176,29 +179,21 @@ SUPPLIER_DRAWING_URL = (
 SUPPLIER_REFERENCE_DIMENSIONS = (
     ("SupplierLength", -DIMS.length, "vertical"),
     ("SupplierHeadDiameter", DIMS.head_dia, "horizontal"),
-    ("SupplierHeadHeight", -DIMS.thread_top_depth, "vertical"),
     ("SupplierThreadDiameter", DIMS.major_dia, "horizontal"),
-    ("SupplierHeadAngle", DIMS.head_angle_deg, "angle"),
 )
 SUPPLIER_REFERENCE_STARTS = {
     "SupplierLength": (DIMS.major_dia / 2.0, 0.0),
     "SupplierHeadDiameter": (-DIMS.head_dia / 2.0, 0.0),
-    "SupplierHeadHeight": (-DIMS.head_dia / 2.0, 0.0),
     "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, -DIMS.length / 2.0),
-    "SupplierHeadAngle": (0.0, -DIMS.thread_top_depth),
 }
 SUPPLIER_REFERENCE_PLANES = {"SupplierHeadDiameter": "Top"}
 SUPPLIER_REFERENCE_SIDES = {
     "SupplierLength": "right",
     "SupplierHeadDiameter": "top",
-    "SupplierHeadHeight": "left",
     "SupplierThreadDiameter": "bottom",
-    "SupplierHeadAngle": "left",
 }
 SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (3, "length", None, None),
     "SupplierHeadDiameter": (3, "diameter", None, "PHILLIPS NO. 1"),
-    "SupplierHeadHeight": (3, "length", None, None),
     "SupplierThreadDiameter": (3, "diameter", None, "#4-40"),
-    "SupplierHeadAngle": (0, "angle", None, None),
 }

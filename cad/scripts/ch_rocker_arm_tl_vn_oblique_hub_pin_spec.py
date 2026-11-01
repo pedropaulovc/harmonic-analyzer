@@ -26,6 +26,9 @@ UNIT = drawing_unit(
     _config.parts("ch-rocker-arm-tl-vn-oblique-hub-pin"),
 )
 
+# 23065A855 is the .2505-.5005 NO-GO size family; choosing the .4000 size makes
+# the one orderable number 23065A855-23065A4 (Class Z listing, read 2026-11-01;
+# the suffix changes with size: .3995 -7759N446, .4005 -7759N73).
 SKU = "23065A855"
 QUANTITY = 1
 CONFIGURED_SKU = "23065A855-23065A4"
