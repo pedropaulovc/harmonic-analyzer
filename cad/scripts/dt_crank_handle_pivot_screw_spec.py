@@ -225,13 +225,16 @@ CHAMFER_CALLOUT = "X 45 DEG"
 # mouth, so the seat annulus stays flat.  The 45-degree lead rides the
 # relief's Ø callout rather than a third dimension crowded into the narrow
 # groove at 3:1 (machinist review).
-TIP_CHAMFER_CALLOUT = f"{CHAMFER_CALLOUT}; INSIDE\nTHREAD DEPTH,\nSTARTS MHA-DT-06"
+# Rows of 18 characters at most keep each block clear of the extension lines
+# beside it (farm r8 of f5256bf3d).
+TIP_CHAMFER_CALLOUT = f"{CHAMFER_CALLOUT};\nINSIDE THREAD\nDEPTH; STARTS\nMHA-DT-06"
 RELIEF_CALLOUT = "\n".join(
     (
         f"UNDER {THREAD_SIZE} ROOT;",
         f"{inch_text(RELIEF_LEAD_LIMITS[0], 3)}-{inch_text(RELIEF_LEAD_LIMITS[1], 3)} "
-        f"{CHAMFER_CALLOUT} LEAD",
-        "INSIDE MHA-DT-06 THREAD",
+        f"{CHAMFER_CALLOUT}",
+        "LEAD INSIDE",
+        "MHA-DT-06 THREAD",
     )
 )
 SEAT_FLAT_INNER_DIA = RELIEF_DIA + 2.0 * RELIEF_LEAD
