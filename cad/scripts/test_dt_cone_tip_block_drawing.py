@@ -904,11 +904,11 @@ _FOOT_TAP_MUTATIONS = {
         "HOLDDOWN_LEDGE_RANGE_MM = (2.5908, 6.0)",
     ),
     "screw reaches the incomplete threads": (
-        "FOOT_THREAD_DEPTH = 8.509",
+        "FOOT_THREAD_DEPTH = 8.636",
         "FOOT_THREAD_DEPTH = 6.9",
     ),
     "drill leaves the tap no lead": (
-        "FOOT_DEPTH = 11.0998",
+        "FOOT_DEPTH = 11.176",
         "FOOT_DEPTH = 8.6",
     ),
     "tap station band eats a web": (
@@ -962,7 +962,7 @@ def test_hold_down_tap_keeps_every_limit_at_the_printed_extremes() -> None:
 def test_foot_tap_callout_reads_as_a_blind_tap_with_both_depths() -> None:
     """drawing-guidelines.md rule 12 (hole and slot callouts say what to do) on the resolved callout: the thread and its full-thread
     depth on one line, the tap drill's depth on another, no THRU; rule 4:
-    the mate the .XXX stations locate on closes the thread's part."""
+    the mate the stations locate on closes the thread's part."""
     spec = dt_cone_tip_block_spec
     places = spec.FOOT_DEPTH_PLACES
     thread = f"{spec.HOLDDOWN_THREAD.lstrip('#')} UNC-2B"
@@ -975,13 +975,6 @@ def test_foot_tap_callout_reads_as_a_blind_tap_with_both_depths() -> None:
     assert not drawing._foot_tap_callout_resolved({**good, 2: f"DRILL {spec.FOOT_BORE_DIA:.2f} THRU"})
     assert not drawing._foot_tap_callout_resolved({**good, 1: f"{thread}{mate}"})
     assert not drawing._foot_tap_callout_resolved({1: good[1], 2: ""})
-    # The native two places would print .34 and .44; neither reads as .XXX.
-    assert not drawing._foot_tap_callout_resolved(
-        {
-            1: f"{thread} x {spec.length_text(spec.FOOT_THREAD_DEPTH, 2)}{mate}",
-            2: f"x {spec.length_text(spec.FOOT_DEPTH, 2)}",
-        }
-    )
 
 
 def test_foot_tap_mate_line_closes_the_native_thread_part() -> None:

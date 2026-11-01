@@ -449,12 +449,13 @@ if WORST_HOLDDOWN_ENGAGEMENT_MM < 1.5 * _HOLDDOWN_MAJOR_MM:
     )
 # Full-thread depth keeps the longest reach FOOT_TAP_MARGIN_MM clear of
 # the tap's incomplete lead; the tap drill runs 1.5P past the deepest
-# full thread so a plug tap's lead never eats it.  Both print .XXX on the
-# tap's Hole Wizard callout.
+# full thread so a plug tap's lead never eats it.  Both print on the
+# tap's Hole Wizard callout at .XX: the reach and lead checks pass at
+# the two-place band (machinist review: nothing reads the depths finer).
 FOOT_TAP_MARGIN_MM = 0.25
-FOOT_THREAD_DEPTH = 8.509  # .335
-FOOT_DEPTH = 11.0998  # .437
-FOOT_DEPTH_PLACES = 3
+FOOT_THREAD_DEPTH = 8.636  # .34
+FOOT_DEPTH = 11.176  # .44
+FOOT_DEPTH_PLACES = 2
 _FOOT_DEPTH_BAND_MM = printed_band_mm(FOOT_DEPTH_PLACES)
 if WORST_HOLDDOWN_REACH_MM > FOOT_THREAD_DEPTH - _FOOT_DEPTH_BAND_MM - FOOT_TAP_MARGIN_MM:
     raise AssertionError("hold-down screw can reach the foot tap's incomplete threads")

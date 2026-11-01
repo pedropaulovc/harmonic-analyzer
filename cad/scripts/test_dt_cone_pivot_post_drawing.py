@@ -1179,12 +1179,13 @@ def test_33_37_text_is_placed_from_the_box_the_check_reads() -> None:
     assert shift == pytest.approx(0.005)
 
 
-def test_33_37_text_takes_the_nearest_line_beside_it() -> None:
-    """Only a vertical line that runs alongside the text and lies right of its
-    left edge bounds it; the nearest such line wins."""
+def test_33_37_text_takes_the_nearest_line_down_to_the_cone_axis() -> None:
+    """Only a vertical line that reaches down to the cone axis and lies right
+    of the text's left edge bounds it (the spacing's own offset-text leader
+    stays above the crank axis); the nearest such line wins."""
     segments = [
-        # Below the text: does not run alongside it.
-        layout.Segment(0.2000, 0.1400, 0.2000, 0.1530, "line"),
+        # Above the cone axis: the spacing text's leader, not its line.
+        layout.Segment(0.2000, 0.1720, 0.2000, 0.1830, "line"),
         # Left of the text's left edge.
         layout.Segment(0.1700, 0.1500, 0.1700, 0.1700, "line"),
         # Horizontal.
@@ -1199,8 +1200,22 @@ def test_33_37_text_takes_the_nearest_line_beside_it() -> None:
 
 
 def test_33_37_placement_fails_loud_without_its_line() -> None:
-    """With no spacing line alongside, the placement premise is gone: it must
-    raise rather than leave the text wherever it landed."""
-    below = layout.Segment(0.2080, 0.1400, 0.2080, 0.1530, "line")
+    """With no spacing line down to the cone axis, the placement premise is
+    gone: it must raise rather than leave the text wherever it landed."""
+    above = layout.Segment(0.2080, 0.1720, 0.2080, 0.1830, "line")
     with pytest.raises(RuntimeError, match="no vertical CrankAboveCone line"):
-        drawing.journal_axis_text_shift(_journal_sheet(_CONTROL_TEXT, [below]))
+        drawing.journal_axis_text_shift(_journal_sheet(_CONTROL_TEXT, [above]))
+
+
+def test_cone_axis_height_stands_on_its_own_line_clear_of_the_spacing() -> None:
+    """r3 (View C): the 1.50's text, offset onto the line it shared with the
+    1.697, dropped a jogged leader down that line until the two merged.  Its
+    own line now stands well left of the spacing's, its text on that line
+    between the foot and the cone axis."""
+    assert "JournalAxisY" not in drawing.JOURNAL_TEXT_OFFSETS
+    x, y = drawing.JOURNAL_KEEP["JournalAxisY"]
+    assert x < drawing.JOURNAL_KEEP["CrankAboveCone"][0] - 0.010
+    foot_y = drawing.CONE_AXIS_SHEET_Y - spec.BORE_HEIGHT / 1000.0
+    assert foot_y + 0.010 < y < drawing.CONE_AXIS_SHEET_Y - 0.010
+    # The control sheet's spacing line starts at the cone axis.
+    assert drawing.CONE_AXIS_SHEET_Y == pytest.approx(_SPACING_LINE.y0, abs=5e-4)
