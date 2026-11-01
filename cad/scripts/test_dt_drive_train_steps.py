@@ -125,7 +125,9 @@ def test_post_screws_keep_spec_owned_stock_and_cut_to_fit_acceptance() -> None:
     )
     places = screw.DRAWING_PRECISION_BY_NAME[screw.CUT_LENGTH_DIMENSION]
     assert f"({screw.CUT_LENGTH_MM:.{places}f}) REF CUT LENGTH" in fitup
-    assert f"FLUSH TO {screw.POST_SCREW_CUT_TO_FIT_SHORT:.1f} SHORT" in fitup
+    # The step never understates the short the part sheet allows.
+    printed_short = float(re.search(r"FLUSH TO (\d+\.\d+) SHORT", fitup).group(1))
+    assert 0.0 <= printed_short - screw.POST_SCREW_CUT_TO_FIT_SHORT < 0.01
     assert "CUT TO FIT" in fitup and "UNDERSIDE, NEVER PROUD" in fitup
     assert "DEBURR ENDS" in fitup
     assert screw.FIXED_CUT_LENGTH_EXISTS is False

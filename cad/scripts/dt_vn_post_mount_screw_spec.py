@@ -207,6 +207,8 @@ PLATE_STOCK_BAND_MM = platform.PLATE_STOCK_BAND
 # - the platform's tap exit: the platform's own local deburr limit.
 POST_MOUNT_TAP_EDGE_BREAK = platform.POST_MOUNT_TAP_EDGE_BREAK
 CUT_END_BREAK_MAX_MM = edge_break_chamfer_mm(unit=UNIT)
+if CUT_END_BREAK_MAX_MM != mount_stack.SCREW_CUT_END_BREAK_MM:
+    raise ValueError("the platform's stack no longer spends this sheet's cut-end break")
 ENGAGEMENT_BREAKS_MM = POST_MOUNT_TAP_EDGE_BREAK + CUT_END_BREAK_MAX_MM
 
 # Counterbore floor above PlateTop (the post foot seats on it), both ends.
