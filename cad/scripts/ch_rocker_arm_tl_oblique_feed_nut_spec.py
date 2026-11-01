@@ -64,7 +64,10 @@ from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 INCH = 25.4
 PART_NAME = "ch-rocker-arm-tl-oblique-feed-nut"
-UNIT = drawing_unit(f"parts/{PART_NAME}", _config.parts(PART_NAME))
+UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-oblique-feed-nut",
+    _config.parts("ch-rocker-arm-tl-oblique-feed-nut"),
+)
 NUMBER = "MHA-CH-06-TL-27"
 QUANTITY = 1
 DRILLED_OVERSIZE = drilled_oversize_mm(unit=UNIT)  # title-block +.004
@@ -208,7 +211,7 @@ for _name, _value in (
         raise AssertionError(f"feed nut {_name} {_value} does not print as modelled")
 # Model-owned callout rows (swDimensionTextParts_e: 1 prefix, 2 suffix, 4 below).
 CALLOUTS_PREFIX = {"HoleDia": "2X <MOD-DIAM>"}
-CALLOUTS_SUFFIX = {"BoreDia": " THRU", "HoleDia": " THRU"}
+CALLOUTS_SUFFIX = {"BoreDia": " DRILL THRU", "HoleDia": " DRILL THRU"}
 CALLOUTS_BELOW = {
     "BoreDia": f"{BORE_THREAD} THRU",
     "HoleSpacing": MATE_CALLOUT,

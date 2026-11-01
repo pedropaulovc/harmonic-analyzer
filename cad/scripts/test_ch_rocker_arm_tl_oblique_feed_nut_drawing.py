@@ -83,3 +83,12 @@ def test_drawing_is_inch_and_enforced():
     source = (Path(__file__).parent / "draw_ch_rocker_arm_tl_oblique_feed_nut.py").read_text(encoding="utf-8")
     assert "MACHINIST_REVIEW = MachinistReviewMode.ENFORCE" in source
     assert math.isclose(spec.LENGTH_BAND, 0.01 * INCH)
+
+
+def test_hole_callouts_name_the_drill_and_centre_marks_print_once():
+    # r1 review: a callout without DRILL leaves the band unnamed; r1 layout
+    # audit: the template's marks plus AutoInsertCenterMarks2 printed twice.
+    assert spec.CALLOUTS_SUFFIX == {"BoreDia": " DRILL THRU", "HoleDia": " DRILL THRU"}
+    source = (Path(__file__).parent / "draw_ch_rocker_arm_tl_oblique_feed_nut.py").read_text(encoding="utf-8")
+    assert "if _center_mark_count(face) == 0 and not auto_center_marks(" in source
+    assert "FACE_CENTER_MARKS = 3" in source

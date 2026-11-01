@@ -113,9 +113,12 @@ def text_half_high(rows: int) -> float:
 # with its mate row; each text stands over its own line, so no extension line
 # reaches it.
 _OFFSET_LINE = HEIGHT + FIRST_LANE
-_SPACING_LINE = _OFFSET_LINE + TEXT_DROP + text_half_high(1) + TEXT_GAP
+# (r1 audit: one TEXT_GAP left the rows 3.51 mm apart, under one text height.)
+_SPACING_LINE = _OFFSET_LINE + TEXT_DROP + text_half_high(1) + 1.5 * TEXT_GAP
 # Under the face: the bore's station, then the stock width, each text between
-# its extension lines, over its own line.
+# its extension lines, over its own line. The width's text stands right of
+# the bore's extension line, which ends at the station's line just over it
+# (review of farm run 20261101T175835750Z: centred, the line struck "1").
 _BORE_X_LINE = -FIRST_LANE
 _WIDTH_LINE = _BORE_X_LINE - TEXT_GAP - THREE_LINE_DROP - text_half_high(3)
 # Left of the face: the bore's height, then the stock height outboard.
@@ -127,14 +130,14 @@ FACE_KEEP: dict[str, tuple[float, float, float]] = {
     "HoleOffset": ((HOLE_X[0] + BORE_X) / 2.0, _OFFSET_LINE + TEXT_DROP, LENGTH),
     "HoleSpacing": (BORE_X, _SPACING_LINE + TWO_LINE_DROP, LENGTH),
     "BoreX": (BORE_X / 2.0, _BORE_X_LINE + TEXT_DROP, LENGTH),
-    "NutWidth": (WIDTH / 2.0, _WIDTH_LINE + THREE_LINE_DROP, LENGTH),
+    "NutWidth": ((BORE_X + WIDTH) / 2.0, _WIDTH_LINE + THREE_LINE_DROP, LENGTH),
     "BoreY": (_BORE_Y_TEXT, BORE_Y / 2.0, LENGTH),
     "NutHeight": (_HEIGHT_TEXT, HEIGHT / 2.0, LENGTH),
-    # The +X hole's 2X Ø.144 THRU up-right, its leader outboard of that
+    # The +X hole's 2X Ø.144 DRILL THRU up-right, its leader outboard of that
     # hole's extension line; the bore's two rows right, level with the face's
     # lower edge, its leader in through the +X side under the +X hole and
     # over the stock width's extension line (which runs down from the face).
-    "HoleDia": (HOLE_X[1] + 10.0 + text_half("2X Ø.144 THRU"), HEIGHT + 5.5, LENGTH),
+    "HoleDia": (HOLE_X[1] + 10.0 + text_half("2X Ø.144 DRILL THRU"), HEIGHT + 5.5, LENGTH),
     "BoreDia": (WIDTH + 16.0, 2.0, LENGTH),
 }
 # The side view (*Right): the faced length over it.
@@ -166,6 +169,18 @@ def _activate_view(adapter: Any, view: Any, *, label: str) -> None:
     name = view_name(adapter, view)
     if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(name):
         raise RuntimeError(f"failed to activate the {label} view {name!r}")
+
+
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
+FACE_CENTER_MARKS = 3  # the Tr8 bore and the two screw holes
+
+
+def _center_mark_count(view: Any) -> int:
+    """The view's centre-mark annotations (a bare view answers None)."""
+    return len(
+        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION)
+        or ()
+    )
 
 
 _STOCK_SIZES = {"NutWidth": WIDTH, "NutHeight": HEIGHT}
@@ -263,8 +278,18 @@ async def build(adapter: Any) -> dict[str, str]:
     # the import kept the places, then writes the stock references.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _stock_references(adapter, annotations)
-    if not auto_center_marks(adapter, face, holes=True, size=0.0025):
+    # The template centre-marks the face's circles as the view is placed; a
+    # second AutoInsertCenterMarks2 printed all three twice (r1 layout audit,
+    # #913). Mark only a bare view, then prove one mark per hole.
+    if _center_mark_count(face) == 0 and not auto_center_marks(
+        adapter, face, holes=True, size=0.0025
+    ):
         raise RuntimeError("failed to add ASME center marks to the face")
+    found = _center_mark_count(face)
+    if found != FACE_CENTER_MARKS:
+        raise RuntimeError(
+            f"expected {FACE_CENTER_MARKS} centre marks on the face, found {found}"
+        )
 
     # The property-linked block lands in the active view: the face.
     _activate_view(adapter, face, label="face")
