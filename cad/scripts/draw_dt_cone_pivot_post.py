@@ -533,13 +533,19 @@ JOURNAL_TEXT_OFFSETS = {
 # cup the shaft's tip must enter, and the cone boss's north-face station the
 # part whose collar thrusts on that face (r1 and r5 machinist reviews, rule 4:
 # its ±0.25 is the stacks' half band, cone_pivot_post_spec).
+# The values the drive train closes on print three places and say which mate
+# they set (MHA-DT-05 inch machinist review): the crank boss's north face
+# sets the 16T's feeler seat and its length the crankshaft collar's seat on
+# the south face; the cone boss's face-to-face is the cone shaft's bearing
+# length, and the body is turned flush with those faces (one harvested size).
 DIMENSION_CALLOUTS = {
+    "MainBodyDia": "FLUSH WITH CONE\nBOSS FACES",
     "CrankBossDia": "CRANK BOSS",
-    "CrankBossLen": "CRANK BOSS\nLENGTH",
-    "CrankBossStartZ": "CRANK BOSS\nFACE",
+    "CrankBossLen": "CRANK BOSS\nLENGTH, SEATS\nMHA-DT-11 COLLAR",
+    "CrankBossStartZ": "CRANK BOSS\nFACE, SETS\nMHA-DT-10",
     "CrankBoreDia": "RUNS ON MHA-DT-11",
     "JournalBoreDia": f"CONE BORE THRU\nRUNS ON MHA-DT-04\n{POST_JOURNAL_RIM_BREAK}\nFOR COLLAR SEAT",
-    "ConeBossLen": "CONE BOSS FACE-TO-FACE",
+    "ConeBossLen": "CONE BOSS FACE-TO-FACE,\nMHA-DT-04 BEARING LENGTH",
     "ConeBossNorthZ": "THRUST FACE FOR\nMHA-DT-04 COLLAR,\nFROM POST AXIS",
     "CrankAboveCone": "16T:64T\nMESH",
     "JournalAxisY": "AXIS MATCHES\nMHA-DT-21",
@@ -1280,11 +1286,13 @@ MOUNT_HOLE_PROCESS = "DRILL\n"
 # IDisplayDimension text definitions (5..8) and the parts SetText writes them
 # through (1..4).
 _HOLE_CALLOUT_DEFINITION_PARTS = ((5, 1), (6, 2), (7, 3), (8, 4))
-# Hole Wizard callouts print three inch places (#290): the drill and the
-# counterbore's diameter and depth.
-MOUNT_HOLE_PRECISION = dict.fromkeys(
-    ("hw-thruholedia", "hw-cbdia", "hw-cbdepth"), cone.MOUNT_HOLE_CALLOUT_PLACES
-)
+# Hole Wizard callouts print three inch places (#290) for the drill and the
+# counterbore's diameter; the counterbore's depth prints .XX (MHA-DT-05
+# machinist review: it only sinks the fillister head).
+MOUNT_HOLE_PRECISION = {
+    **dict.fromkeys(("hw-thruholedia", "hw-cbdia"), cone.MOUNT_HOLE_CALLOUT_PLACES),
+    "hw-cbdepth": cone.MOUNT_CBORE_DEPTH_PLACES,
+}
 
 
 def mount_hole_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
