@@ -173,8 +173,14 @@ SUPPLIER_REFERENCE_DIMENSIONS = {
 }
 # The helical groove need not leave diametrically opposed crests in one view.
 # This construction-only chord preserves the same exact nominal as the solid.
+# Its station is level with sheet 1's Ø dimension line, so the shown chord
+# prints under that line and leaves no extension lines or loose dashes on
+# the thread (draw_sm_vn_knife_hanger_stud THREAD_MAJOR_TEXT_XY).
+SUPPLIER_THREAD_MAJOR_Y = 32.82
 SUPPLIER_REFERENCE_SKETCH = (("SupplierThreadMajor", SHANK_DIA, "horizontal"),)
-SUPPLIER_REFERENCE_STARTS = {"SupplierThreadMajor": (-SHANK_DIA / 2, LENGTH / 2)}
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierThreadMajor": (-SHANK_DIA / 2, SUPPLIER_THREAD_MAJOR_Y)
+}
 SUPPLIER_DRAWING_DIMENSIONS = {"SupplierReference": {"SupplierThreadMajor"}}
 # Only the finished cuts are suppressed in the drawing-only stock child.
 # The factory thread and all finished/simplified configuration states remain.
