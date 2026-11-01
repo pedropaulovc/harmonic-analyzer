@@ -1285,8 +1285,12 @@ def test_tap_wall_stands_under_the_front_view_clear_of_every_line() -> None:
     assert drawing._fx(spec.PIVOT_BORE_X) + 0.004 < start < end < drawing._fx(0.0)
     bottom = drawing._fy(0.0)
     station_y = drawing.FRONT_KEEP["SetScrewX"][1]
-    assert station_y + 0.0017 < line_y - 0.0033 - 0.005
-    assert line_y < bottom - 0.004
+    # The keep is the line (farm 20261101T085904510Z): it stands off section
+    # line A's arrow, drawn at the cutting line's bottom end, which its
+    # outside leg ran along at the same y.
+    arrow_y = drawing._fy(drawing.SECTION_LINE_MODEL_MM[0][1])
+    assert line_y < arrow_y - 0.004
+    assert station_y + 0.0017 < line_y - 0.005
     x, y = drawing.TAP_WALL_TEXT_XY
     half_w = 0.0105
     assert x - half_w > end + 0.003 + 0.002  # past the line's outside arrow
