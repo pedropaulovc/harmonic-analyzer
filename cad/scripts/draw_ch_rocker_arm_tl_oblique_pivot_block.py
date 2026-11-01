@@ -102,12 +102,17 @@ ROW_DIMENSIONS = ('CarriageDrills3Y','CarriageDrills4Y')
 # left of x .120, or the leader to its right end crosses its last letters
 # (farm run 20261024T133158704Z).
 # A-A is centred on its cut span (X -46..+24), the block's own centre, so its
-# -X face lands at x 139 under the plan's. On TL-22 it also prints the block
-# height (the Block extrusion's depth): its B-B never imported a full-height
-# dimension (farm rounds 1 to 7). Its line stands 12.6 mm right of the +X
-# face (x 201.4), clear of the title block's top (y 64.8) under the view.
+# -X face lands at x 139 under the plan's.
 SIDE_XY = (.170,.080)
-SIDE_KEEP = {'TopBoreDepth':(.120,.088),'TapDrillDia':(.084,.070),'BlockHeight':(.214,.080)}
+SIDE_KEEP = {'TopBoreDepth':(.120,.088),'TapDrillDia':(.084,.070)}
+# TL-22 prints the block height (the Block extrusion's depth) on a standard
+# Right view level with the plan: neither its B-B nor its A-A ever imported a
+# full-height dimension (farm rounds 1 to 9), though TL-32's B-B does. Top
+# face toward the plan (x 283), bottom at x 307, between the plan's 1.58
+# callout (ends ~x 277) and the pictorial (from ~x 311); the height prints
+# under it, clear of the 4X COUNTERBORE callout at y 150.
+RIGHT_XY = (.295,PLAN_XY[1])
+RIGHT_KEEP = {'BlockHeight':(.295,.176)}
 SEAT_DEPTH_TEXT_XY = (.078,.104)
 # B-B: Y up, its +Y face (Y 20) at y 142.5, Z across with the top face toward
 # the plan (x 322.85) and the carriage seat at x 347.15; the caption ends
@@ -457,6 +462,13 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     _fit_section_letters(adapter, side, (floor,), below_y=row_4y[1])
     annotations += curate_view_dimensions(adapter,floor,keep=floor_keep,view_label='B-B floor',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
+    right_keep = {}
+    if not is_feed:
+        right = place_view(adapter,str(source),'*Right',*RIGHT_XY,scale=SHEET_SCALE)
+        set_hidden_lines_removed(adapter,right)
+        right_keep = RIGHT_KEEP
+        annotations += curate_view_dimensions(adapter,right,keep=right_keep,view_label='right end',
+                         dimensions_by_feature=contract.DRAWING_DIMENSIONS)
     set_hidden_lines_removed(adapter,iso)
     sheet_scales = None
     if is_feed:
@@ -506,7 +518,7 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         sheet_scales = {sheets[0]: SHEET_SCALE, sheets[1]: NUT_SCALE}
     # Every printed dimension keeps its part-authored places; the repeated
     # row/column locations left off the sheet print nothing to check.
-    kept = {*plan_keep, *side_keep, *floor_keep, *(NUT_KEEP if is_feed else ())}
+    kept = {*plan_keep, *side_keep, *floor_keep, *right_keep, *(NUT_KEEP if is_feed else ())}
     precision = {name:places for dims in contract.DRAWING_PRECISION.values()
                  for name,places in dims.items() if name in kept}
     assert_imported_precision(adapter,annotations,precision)

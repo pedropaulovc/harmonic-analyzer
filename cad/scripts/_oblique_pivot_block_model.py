@@ -179,8 +179,9 @@ async def _cbore_floor_reference(adapter, part) -> list[tuple[str, str]]:
     if "SectionBlockHeight" in part.DRAWING_DIMENSIONS[feature]:
         # TL-32 prints the block height on B-B. Its line stands inside the
         # cut face, midway between the counterbore wall and the +Y face.
-        # TL-22's B-B never imported it, on or behind the cut plane (farm
-        # rounds 1 to 7), so TL-22 prints the Block extrusion's depth on A-A.
+        # TL-22's sections never imported a full-height dimension (farm
+        # rounds 1 to 9), so TL-22 prints the Block extrusion's depth on a
+        # standard Right view.
         y_side = (BOLT_Y + spec.CBORE_DIA / 2.0 + spec.BLOCK_WIDTH / 2.0) / 2.0
         side_foot = to_sketch((spec.CBORE_SECTION_X, y_side, 0.0))
         side_top = to_sketch((spec.CBORE_SECTION_X, y_side, spec.BLOCK_HEIGHT))

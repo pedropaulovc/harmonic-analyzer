@@ -99,8 +99,8 @@ DRAWING_VALUES = {
 }
 DRAWING_DIMENSIONS = {
     "BlockProfile": ("BlockLength", "BlockWidth", "BlockSideY"),
-    # A-A prints the Block extrusion's own depth: TL-22's B-B never imported
-    # a full-height dimension (farm rounds 1 to 7). TL-32 prints it on B-B.
+    # A standard Right view prints the Block extrusion's own depth: neither
+    # TL-22 section imported a full-height dimension. TL-32 prints it on B-B.
     "Block": ("BlockHeight",),
     "TopBoreProfile": ("BoreDia",),
     "TopBore": ("TopBoreDepth",),
@@ -160,7 +160,7 @@ _CUT_MAX = pivot_screw.CUT_THREAD_LENGTH + printed_band_mm(pivot_screw.CUT_THREA
 PIVOT_THREAD_ENGAGEMENT = pivot_screw.CUT_THREAD_LENGTH - 1.5 * pivot_screw.THREAD_PITCH
 PIVOT_THREAD_ENGAGEMENT_MIN = _CUT_MIN - 1.5 * pivot_screw.THREAD_PITCH
 PIVOT_TIP_CLEARANCE = BLOCK_HEIGHT - BORE_DEPTH - pivot_screw.CUT_THREAD_LENGTH
-# TL-22 prints BlockHeight (A-A), TL-32 SectionBlockHeight (B-B): both .XX.
+# TL-22 prints BlockHeight (Right view), TL-32 SectionBlockHeight (B-B): both .XX.
 PIVOT_TIP_CLEARANCE_MIN = (BLOCK_HEIGHT - _band("BlockHeight")
                            - (BORE_DEPTH + _band("TopBoreDepth")) - _CUT_MAX)
 CALLOUTS_SUFFIX: dict[str, str] = {}
