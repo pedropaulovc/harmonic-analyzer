@@ -30,14 +30,16 @@ Holes, all THRU along Z on the bore's line (Y = BORE_Y):
   tapped Tr8x2-7H RH (the Fedeas TR8X2 HSS tap's class), .63 from the -X
   side and .38 from the bottom face (the owner's "centre of both stock faces"
   on the .01 grid; ruling: bore stations .XX).
-- Two #4 loose-clearance holes, Ø.144 (ASME B18.2.8, the #27 drill): the
-  first .34 from the bore (.XX), the second .680 from the first (.XXX, ruling
-  B1: the pair matches TL-32's taps at three places and names its mate).
+- Two #4 loose-clearance holes, Ø.144 (ASME B18.2.8, the #27 drill), 2X
+  .340 from the bore axis, one each side (.XXX, the pair matches TL-32's
+  taps and names its mate). Each hole stands on the bore, not on the other
+  hole: the review of run 20261101T220223216Z found the chained .63 / .34 /
+  .680 stacking three bands on the far hole.
 
-Fit-up (ruling B1): the loose hole floats a #4 by ``HOLE_FLOAT`` .016, the
-normal-fit Ø.129 by ``NORMAL_HOLE_FLOAT`` .008. TL-32's spec owns the stack
-of both parts' printed pairs (``feed_block.FIT_UP_RESIDUAL``, .011) and
-proves it falls between the two.
+Fit-up: the loose hole floats a #4 by ``HOLE_FLOAT`` .016, the normal-fit
+Ø.129 by ``NORMAL_HOLE_FLOAT`` .008. TL-32's spec owns the stack of both
+parts' printed stations (``feed_block.FIT_UP_RESIDUAL``, .014) and proves it
+falls between the two.
 
 Rule 17 (walls, .080 target) at the printed worst case (``WALLS_MM``): every
 station at its band, the holes at the drilled oversize, the stock at its
@@ -105,19 +107,15 @@ SCREW_SIZE = "#4"
 HOLE_FIT = "loose"
 HOLE_DIA = CLEARANCE_MM[(SCREW_SIZE, HOLE_FIT)]  # 3.658, .144 (#27)
 HOLE_DIA_PLACES = 3
-HOLE_OFFSET = 0.34 * INCH  # 8.636, the first hole from the bore
-HOLE_OFFSET_PLACES = 2
-HOLE_SPACING = 0.680 * INCH  # 17.272, hole to hole (ruling B1)
-HOLE_SPACING_PLACES = 3
-HOLE_X = (BORE_X - HOLE_OFFSET, BORE_X - HOLE_OFFSET + HOLE_SPACING)  # .29, .97
+HOLE_OFFSET = 0.340 * INCH  # 8.636, each hole from the bore axis
+HOLE_OFFSET_PLACES = 3
+HOLE_X = (BORE_X - HOLE_OFFSET, BORE_X + HOLE_OFFSET)  # .29, .97
 HOLE_Y = BORE_Y
-if abs(HOLE_X[0] + HOLE_X[1] - 2.0 * BORE_X) > 1e-9:
-    raise AssertionError("the feed nut's screw pair is not symmetric about its bore")
 MATE_CALLOUT = "MATCHES TL-32 LUG TAPS"
 
-# --- The pair's float: TL-32's spec checks it against both parts' printed pairs ---
+# --- The pair's float: TL-32's spec checks it against both parts' stations ---
 SCREW_MAJOR = THREAD_MAJOR_MM[SCREW_THREAD]
-PAIR_BAND = printed_band_mm(HOLE_SPACING_PLACES, unit=UNIT)  # .005
+HOLE_OFFSET_BAND = printed_band_mm(HOLE_OFFSET_PLACES, unit=UNIT)  # .005
 HOLE_FLOAT = (HOLE_DIA - SCREW_MAJOR) / 2.0  # .016
 NORMAL_HOLE_FLOAT = (CLEARANCE_MM[(SCREW_SIZE, "normal")] - SCREW_MAJOR) / 2.0  # .008
 
@@ -146,18 +144,13 @@ REACH = LENGTH_MAX + SCREW_HEAD_H
 
 # --- Rule 17: walls at the printed worst case --------------------------------
 _STATION = printed_band_mm(BORE_PLACES, unit=UNIT)  # .01 on the bore stations
-_OFFSET = printed_band_mm(HOLE_OFFSET_PLACES, unit=UNIT)  # .01
 _HOLE_R = (HOLE_DIA + DRILLED_OVERSIZE) / 2.0
 _BORE_R = TR8_D4 / 2.0
 WALLS_MM: dict[str, float] = {
-    "Tr8 major to hole 1": HOLE_OFFSET - _OFFSET - _HOLE_R - _BORE_R,
-    "Tr8 major to hole 2": (HOLE_SPACING - HOLE_OFFSET)
-    - (_OFFSET + PAIR_BAND)
-    - _HOLE_R
-    - _BORE_R,
-    "hole 1 to -X side": HOLE_X[0] - _STATION - _OFFSET - _HOLE_R,
+    "Tr8 major to the holes": HOLE_OFFSET - HOLE_OFFSET_BAND - _HOLE_R - _BORE_R,
+    "hole 1 to -X side": HOLE_X[0] - _STATION - HOLE_OFFSET_BAND - _HOLE_R,
     "hole 2 to +X side": (WIDTH - WIDTH_STOCK_BAND)
-    - (HOLE_X[1] + _STATION + _OFFSET + PAIR_BAND)
+    - (HOLE_X[1] + _STATION + HOLE_OFFSET_BAND)
     - _HOLE_R,
     "holes to bottom face": BORE_Y - _STATION - _HOLE_R,
     "holes to top face": (HEIGHT - HEIGHT_STOCK_BAND) - (BORE_Y + _STATION) - _HOLE_R,
@@ -173,7 +166,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "NutProfile": {"NutWidth", "NutHeight"},
     "BoreProfile": {"BoreX", "BoreY", "BoreDia"},
     "HoleProfile": {"HoleDia"},
-    "HolePatternReference": {"HoleOffset", "HoleSpacing"},
+    "HolePatternReference": {"Hole1Offset", "Hole2Offset"},
     # The faced length: a reference sketch, not the extrusion's depth (a
     # drawing view cannot attach the depth; TL-28's BracketThickReference).
     "NutLengthReference": {"NutLength"},
@@ -182,10 +175,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "NutProfile": {"NutWidth": STOCK_PLACES, "NutHeight": STOCK_PLACES},
     "BoreProfile": {"BoreX": BORE_PLACES, "BoreY": BORE_PLACES, "BoreDia": BORE_DRILL_PLACES},
     "HoleProfile": {"HoleDia": HOLE_DIA_PLACES},
-    "HolePatternReference": {
-        "HoleOffset": HOLE_OFFSET_PLACES,
-        "HoleSpacing": HOLE_SPACING_PLACES,
-    },
+    "HolePatternReference": dict.fromkeys(("Hole1Offset", "Hole2Offset"), HOLE_OFFSET_PLACES),
     "NutLengthReference": {"NutLength": LENGTH_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -203,8 +193,8 @@ for _name, _value in (
     ("BoreX", BORE_X),
     ("BoreY", BORE_Y),
     ("BoreDia", BORE_DRILL),
-    ("HoleOffset", HOLE_OFFSET),
-    ("HoleSpacing", HOLE_SPACING),
+    ("Hole1Offset", HOLE_OFFSET),
+    ("Hole2Offset", HOLE_OFFSET),
 ):
     _places = DRAWING_PRECISION_BY_NAME[_name]
     if abs(_value / INCH - round(_value / INCH, _places)) > 1e-9:
@@ -214,7 +204,8 @@ CALLOUTS_PREFIX = {"HoleDia": "2X <MOD-DIAM>"}
 CALLOUTS_SUFFIX = {"BoreDia": " DRILL THRU", "HoleDia": " DRILL THRU"}
 CALLOUTS_BELOW = {
     "BoreDia": f"{BORE_THREAD} THRU",
-    "HoleSpacing": MATE_CALLOUT,
+    "Hole1Offset": MATE_CALLOUT,
+    "Hole2Offset": MATE_CALLOUT,
 }
 # Rule 1 (units): an as-bought fraction is a REF with the supplier's
 # tolerance, the band on its own row (TL-28).
