@@ -14,4 +14,10 @@ ch-rocker-arm-tl-oblique-end-bracket:
   process: "saw and face to length; drill and tap the four #8-32 and the two #6-32 holes through; break edges"
   # KP08 axial foot width 13 is unverified; nominal overhang is 0.15 each side.
   # Reallocate bought 1165 leftover after TL-26; 1164 half-by-three-quarter is spare.
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "front view: the two 6-32 KP08 block-hole stations 13.925 ±.13 mm and 55.925 ±.13 mm"
+      finding: "metric vendor-mating hole stations print in millimetres on an inch sheet, beside inch stations from the same left end"
+      reason: "owner ruling 2026-11-01 (ruling 4B), relayed by Main: the KP08 pillow block, HGR15R rail and Tr8 nut are metric-only vendor lines, so the stations that mate with their holes keep the vendor's exact millimetres, printed in mm with the unit label and an explicit mm band (drawing-simplicity-policy.md, supplier-unit exception), not rounded inch conversions"
   drawing_unit: in

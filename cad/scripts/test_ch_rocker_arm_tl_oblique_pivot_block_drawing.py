@@ -59,7 +59,7 @@ def test_carriage_screws_cut_to_fit_from_the_lowered_floor():
     assert spec.ENGAGEMENT_MIN>=1.16*4.0
     assert spec.ENGAGEMENT_MAX<=spec.CARRIAGE_THREAD_DEPTH-.045+1e-9
     assert spec.SCREW_CUT_LENGTH_MAX<spec.SCREW_LENGTH-spec.SCREW_LENGTH_TOL
-    assert spec.CALLOUTS_BELOW['CboreFloor']=='M4 CUT TO FIT:\n.183 MIN ENGAGEMENT'
+    assert spec.CALLOUTS_BELOW['CboreFloor']=='FLOOR FOR M4 X 20 CUT\nENGAGES .183 MIN (1.16D)'
     assert spec.DRAWING_PRECISION[spec.CBORE_FLOOR_REFERENCE]['CboreFloor']==3
     assert spec.CBORE_FLOOR-printed_band_mm(3,unit=spec.UNIT)>0
 
