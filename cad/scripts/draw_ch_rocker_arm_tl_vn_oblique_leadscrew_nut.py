@@ -34,12 +34,12 @@ from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
 )
-from _supplier_screw_dimensions import (
-    _assert_supplier_top_stations,
-    _supplier_top_record,
-    annotate_supplier_screw,
-)
+from _supplier_screw_dimensions import _supplier_top_record, annotate_supplier_screw
 from _supplier_screw_layout import supplier_screw_margins, supplier_top_text_geometry
+# Tips and witnesses exact, the dimension line on its station: the overall
+# length's inside arrows let its centred text break the line in two, and the
+# shelved text leaves one run (the screw family's exact-run check refused it).
+from _supplier_text_shelf import _assert_stations
 from _transgear_zone_line import (
     CENTER_LINE_STYLE,
     CENTER_LINE_WEIGHT,
@@ -185,7 +185,7 @@ def _shelf_text(adapter: Any, displays: Mapping[str, Any]) -> dict[str, dict[str
         display = _early_bound(displays[name], "IDisplayDimension")
         annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
         actual = _measure(adapter, display, name)
-        _assert_supplier_top_stations(name, before[name], actual)
+        _assert_stations(name, _HORIZONTAL[name], before[name], actual)
         dx = CLEAR_GAP_M + PLACE_SETTLE_M - _shelf_gap(name, actual)
         if TEXT_SHELVES[name] == "left":
             dx = -dx
@@ -207,7 +207,7 @@ def _assert_text_shelves(
         actual = _measure(adapter, display, name)
         if display.OffsetText is not True or _shelf_gap(name, actual) < CLEAR_GAP_M:
             raise RuntimeError(f"{name}: nut supplier text shelf is not clear")
-        _assert_supplier_top_stations(name, stations[name], actual)
+        _assert_stations(name, _HORIZONTAL[name], stations[name], actual)
 
 
 def _set_arrows_inside(displays: Mapping[str, Any]) -> None:
