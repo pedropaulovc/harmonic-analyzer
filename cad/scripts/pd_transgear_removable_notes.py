@@ -24,8 +24,8 @@ _DRILL_OVERSIZE = drilled_oversize_mm(unit=spec.UNIT)
 _WEB_WORST = (
     seat_geometry.PIN_CIRCLE_RADIUS
     - spec.PIN_LOCATION_TOL
-    - (seat_geometry.PIN_HOLE_DIA + _DRILL_OVERSIZE) / 2.0
-    - (seat_geometry.BORE_DIA + _DRILL_OVERSIZE) / 2.0
+    - (spec.PIN_HOLE_DIA + _DRILL_OVERSIZE) / 2.0
+    - (spec.BORE_DIA + _DRILL_OVERSIZE) / 2.0
 )  # 0.4849
 # Rounded DOWN to .001 in, so the sheet never states more web than the
 # limits give.

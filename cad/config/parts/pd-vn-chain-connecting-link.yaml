@@ -10,5 +10,6 @@ pd-vn-chain-connecting-link:
   quantity: 1
   tolerance_class: machined_block
   process: purchased
+  drawing_unit: in
   # Clip-retained outer link that joins the cut 6261K171 chain's two
   # inner-link ends into the closed loop.

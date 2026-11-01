@@ -32,7 +32,7 @@ import _config
 from _fit_shaft_h import SHAFT_H
 from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND_IN
 
 # The hub sheet prints the bolt circle; the disc reads the same unit.
 UNIT = drawing_unit(
@@ -67,7 +67,7 @@ SPIGOT_DIA_BAND = SHAFT_H  # (upper, lower) deviations: 0/-.0008
 SPIGOT_DIA_PLACES = 4
 SPIGOT_LENGTH = 3.6576  # .144
 SPIGOT_LENGTH_PLACES = 4
-SPIGOT_LENGTH_BAND = PRINTED_LENGTH_BAND
+SPIGOT_LENGTH_BAND = PRINTED_LENGTH_BAND_IN
 
 
 def screw_centres() -> tuple[tuple[float, float], ...]:

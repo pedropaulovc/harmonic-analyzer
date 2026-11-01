@@ -16,11 +16,7 @@ import math
 import _config
 import cone_line
 from _hole_spec import HoleSpec, blind_cut_dia_mm, drill_process
-from _printed_tolerance import (
-    drilled_oversize_mm,
-    edge_break_chamfer_mm,
-    edge_break_radius_mm,
-)
+from _printed_tolerance import edge_break_chamfer_mm, edge_break_radius_mm
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -407,8 +403,7 @@ if (
 # own loosest clearance on the pilot is smaller, and it is not.  The chain
 # wrapping the wheel moves with it, so the drive train's radial chain air
 # takes this off.
-# The wheel's (MHA-PD-10) sheet is inch: its drilled row.
-_DRILL_OVERSIZE = drilled_oversize_mm(unit="in")
+_DRILL_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
 _WHEEL_PIN_FLOAT = (
     seat_geometry.PIN_HOLE_DIA + _DRILL_OVERSIZE - _DOWEL_OD[0]
 ) / 2.0 + 2.0 * seat_geometry.DRIVE_PIN_OFFSET_TOL

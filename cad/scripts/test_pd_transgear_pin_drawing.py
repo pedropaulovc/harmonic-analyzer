@@ -23,7 +23,7 @@ from _printed_tolerance import (
     printed_band_mm,
 )
 from _surface_finish import MACHINED_UM
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND, STACK_NAME
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND_IN, STACK_NAME
 
 
 def test_required_drawing_paths() -> None:
@@ -61,7 +61,7 @@ def test_only_the_shank_the_ring_groove_and_its_station_carry_model_bands() -> N
         ("PinProfile", "GrooveWidth"): "*deviations(GROOVE_WIDTH_BAND)",
         ("PinProfile", "GrooveStation"): "GROOVE_STATION_BAND",
     }
-    assert spec.GROOVE_STATION_BAND == PRINTED_LENGTH_BAND
+    assert spec.GROOVE_STATION_BAND == PRINTED_LENGTH_BAND_IN
     assert spec.DRAWING_PRECISION_BY_NAME["ShankDia"] == 4
     assert spec.DRAWING_PRECISION_BY_NAME["GrooveStation"] == 4
     assert spec.DRAWING_PRECISION_BY_NAME["TipDomeZ"] == 2

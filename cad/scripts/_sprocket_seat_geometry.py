@@ -40,17 +40,17 @@ def chain_reach_rear(plate: float) -> float:
 
 
 CHAIN_REACH_REAR_WORST = chain_reach_rear(PLATE + min(PLATE_BAND))  # 3.587
-BORE_DIA = 10.3124  # .406, 13/32 drill; 0.39 radial clear of the Ø9.525 shaft/pilot
-PIN_HOLE_DIA = 2.4892  # .098, #40 drill; slips over the Ø2.38 drive pins (0.05 radial)
+BORE_DIA = 10.3  # 13/32 in, 0.39 radial clear of the Ø9.525 shaft/pilot
+PIN_HOLE_DIA = 2.5  # slip over the Ø2.38 drive pins (0.06 radial)
 PIN_CIRCLE_DIA = 14.0
 PIN_CIRCLE_RADIUS = PIN_CIRCLE_DIA / 2.0
 # Two holes at 180 deg on the part's (and the shafts') +/-Y: 12 and 6 o'clock.
 PIN_HOLE_ANGLES_DEG = (90.0, 270.0)
-# Each drive pin and wheel hole is located +/-.0009 in from the axis.
-# Their diametral clearance absorbs both parts' spacing error, each
+# Each drive pin and wheel hole is located +/-0.025 from the axis at .XXX.
+# Their 0.119 diametral clearance absorbs both parts' spacing error, each
 # spending half of it.
 DRIVE_PIN_OFFSET_PLACES = 3
-DRIVE_PIN_OFFSET_TOL = 0.02286  # +/-.0009 in
+DRIVE_PIN_OFFSET_TOL = 0.025
 
 # Bore <-> pin-hole web, photo-faithful to the p.56 catalogue view: below the
 # 1.5 wall floor, pending ruling #1377.  The printed worst case reads the
@@ -79,10 +79,10 @@ DRIVE_PIN_LENGTH_GRADE = 0.010 * _MM_PER_IN
 # The flat face the wheel's rear face beds on: a Ø17.5 spigot on the crank
 # collar, the whole Ø17.5 collar on the knob shaft.  Small enough that the
 # #25 plates wrapping the T12 clear it (Main's ruling, 2026-09-30).
-SEAT_SPIGOT_DIA = 17.5006  # .689
+SEAT_SPIGOT_DIA = 17.5
 # Both seats share the crank spigot's functional diameter band: the
 # removables must swap between shafts without changing their radial air.
-SPIGOT_DIA_BAND = (0.0, -0.1016)  # .000/-.004 in
+SPIGOT_DIA_BAND = (0.0, -0.10)
 # Pin hole to the spigot's rim: under the 1.5 wall floor (pending ruling #991).
 SEAT_SPIGOT_RIM = (
     SEAT_SPIGOT_DIA / 2.0 - PIN_CIRCLE_RADIUS - DRIVE_PIN_HOLE_DIA / 2.0

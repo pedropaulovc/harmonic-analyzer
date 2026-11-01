@@ -14,6 +14,7 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _supplier_chain_dimensions import (
     SOURCE_FEATURES,
     SUPPLIER_MARGINS,
@@ -57,6 +58,7 @@ async def build(adapter: Any) -> dict[str, str]:
         include_right=False,
         stock_caption="SUPPLIER NOMINAL / APPLICATION DIAGRAM — NOT INSTALLED",
         spring_metadata=True,
+        unit=part_drawing_unit(PART_STEM),
     )
 
 

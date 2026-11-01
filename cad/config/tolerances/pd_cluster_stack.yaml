@@ -5,7 +5,5 @@ pd_cluster_stack:
   # face station, thrust ring, knob pinion face, pin groove station, hub
   # spigot and feed sleeve tooth and overall lengths) prints at this band, so
   # the stack holds the collar-to-disc air with nothing felt or faced at
-  # assembly. transgear_cluster_fit owns the closed-form stack. #290: the
-  # stack's inch sheets print it as +/-.0007 in (.0008 closes the disc's end
-  # float under its 0.20 minimum).
-  printed_length_band_mm: 0.01778  # .0007 in
+  # assembly. transgear_cluster_fit owns the closed-form stack.
+  printed_length_band_mm: 0.02

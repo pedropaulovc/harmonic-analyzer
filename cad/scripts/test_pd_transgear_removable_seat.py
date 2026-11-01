@@ -17,7 +17,6 @@ import pd_vn_transgear_knob_drive_pin_spec as knob_pin
 import pd_vn_transgear_latch_pin_spec as dowel_spec
 import pd_transgear_removable_spec as spec
 import _sprocket_seat_geometry as seat_geometry
-from _printed_tolerance import drilled_oversize_mm
 
 
 @pytest.mark.parametrize(("configuration", "teeth"), spec.CONFIGS)
@@ -100,7 +99,7 @@ def _wheel_float(hole_dia: float) -> float:
     the holes drilled to their largest over the smallest stock dowel, plus
     a pin centre and its hole centre each at their location limit, opposite
     ways along the pins' line."""
-    hole_max = hole_dia + drilled_oversize_mm(unit=spec.UNIT)
+    hole_max = hole_dia + float(_config.title_block("drilled_hole")["plus_mm"])
     dowel_min = crank_pin.DIA + dowel_spec.DIA_BAND_IN[0] * dowel_spec.MM_PER_IN
     return (hole_max - dowel_min) / 2.0 + 2.0 * seat_geometry.DRIVE_PIN_OFFSET_TOL
 
@@ -113,7 +112,7 @@ def test_chain_on_the_floated_crank_wheel_keeps_its_radial_air() -> None:
     bore clearance; the gate must report that corner's air, and it must stay
     positive."""
     wheel = _wheel_float(seat_geometry.PIN_HOLE_DIA)
-    assert wheel == pytest.approx(0.1492, abs=1e-4)
+    assert wheel == pytest.approx(0.1581, abs=1e-4)
     # The bore is no stop: its tightest clearance on the pilot is wider.
     assert (seat_geometry.BORE_DIA - hub.SHAFT_DIA) / 2.0 > wheel
     hub_float = (hub.HUB_BORE_DIA_MAX - (hub.SHAFT_DIA + hub.SHAFT_DIA_BAND[1])) / 2.0
