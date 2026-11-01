@@ -1,8 +1,8 @@
 """Construction-only supplier stock diagrams, never installed chain geometry.
 
 The diagrams are construction sketches (the shared zero-body diagram contract);
-the chain drawings print construction curves at visible-edge weight, so the
-roller and pin outlines read as the diagram's edges.
+the chain drawings print them black at visible-edge weight, so the roller,
+plate and pin section outlines read as the diagram's edges.
 
 6261K171 is the configurable family; its 6261K401 graphic is an eleven-foot
 example. The inspected 6261K281 native/STEP is the family's ONE-foot selection,
@@ -22,11 +22,8 @@ from _feature_tree import name_last_feature
 from _sketch import (
     SketchDims,
     add_line_chain,
-    anchor_point_to_origin,
     blank_reference_sketches,
-    dimension_between,
     ensure_fully_defined,
-    set_sketch_direct_db,
 )
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
@@ -39,6 +36,11 @@ ROLLER_DIAMETER = 3.302
 ROLLER_WIDTH = 3.175
 PLATE_THICKNESS = 0.762
 CONNECTING_PIN_LENGTH = 8.509
+# ANSI #25 link-plate height H 0.228 in (PEER Chain single-strand size chart,
+# 25R column, read 2026-11-01, https://www.peerchain.com/chain-pitches/; the
+# same chart's T 0.030 in matches PLATE_THICKNESS). Drawn only as the plate's
+# nominal section outline in the TOP diagram; it is not a supplier REF.
+PLATE_HEIGHT = 0.228 * 25.4  # 5.7912
 FRONT_FEATURE = "SupplierChainNominalFront"
 SECTION_FEATURE = "SupplierChainNominalSections"
 PITCH_DIMENSION = "SupplierPitch"
@@ -89,46 +91,31 @@ async def _reference_front(adapter: Any) -> str:
 
 
 async def _reference_sections(adapter: Any, *, connecting: bool) -> str:
-    """Separate nominal spans, not dimensions on the installed stand-in.
+    """Separate nominal sections, not dimensions on the installed stand-in.
 
-    The roller and pin spans are one side of their supplier outline, a
-    rectangle as wide as the roller or pin diameter (drawn away from the span's
-    own dimension side), so the extension lines start on printed edges. The
-    supplier gives no plate length, so the plate stays a bare thickness span.
+    Each dimensioned span is one side of its section outline, so the
+    extension lines start on printed edges: the roller (diameter wide), the
+    plate (PLATE_HEIGHT wide) and the pin (diameter wide, drawn back from its
+    span, whose dimension sits on the right). The pin stands at three pitches,
+    clear of the plate outline.
     """
     rows = [(WIDTH_DIMENSION, 0.0, ROLLER_WIDTH, ROLLER_DIAMETER)]
     if connecting:
-        rows.extend(((PLATE_DIMENSION, PITCH, PLATE_THICKNESS, None),
-                     (LENGTH_DIMENSION, 2.0 * PITCH, CONNECTING_PIN_LENGTH, -PIN_DIAMETER)))
+        rows.extend(((PLATE_DIMENSION, PITCH, PLATE_THICKNESS, PLATE_HEIGHT),
+                     (LENGTH_DIMENSION, 3.0 * PITCH, CONNECTING_PIN_LENGTH, -PIN_DIAMETER)))
     check("create supplier chain nominal sections", await adapter.create_sketch("Top"))
     dims = SketchDims()
     for name, x, length, outline in rows:
         y0, y1 = -length / 2.0, length / 2.0
         anchors = [f"{name}StartX"] if x else []
-        if outline is not None:
-            points = [(x, y0), (x, y1), (x + outline, y1), (x + outline, y0)]
-            lines = await add_line_chain(adapter, points)
-            for line in lines:
-                _construction(adapter, line)
-            await define_rectilinear_chain(
-                adapter, lines, points, label=name, dims=dims,
-                names=[name, f"{name}Outline", *anchors, f"{name}StartY"],
-            )
-            continue
-        set_sketch_direct_db(adapter, True)
-        try:
-            line = check(name, await adapter.add_line(x, y0, x, y1))
-        finally:
-            set_sketch_direct_db(adapter, False)
-        _construction(adapter, line)
-        check(f"vertical {name}", await adapter.add_sketch_constraint(line, None, "vertical"))
-        await dimension_between(
-            adapter, f"{line}.start", f"{line}.end", "vertical_distance", length, name,
+        points = [(x, y0), (x, y1), (x + outline, y1), (x + outline, y0)]
+        lines = await add_line_chain(adapter, points)
+        for line in lines:
+            _construction(adapter, line)
+        await define_rectilinear_chain(
+            adapter, lines, points, label=name, dims=dims,
+            names=[name, f"{name}Outline", *anchors, f"{name}StartY"],
         )
-        dims.record(name)
-        await anchor_point_to_origin(adapter, f"{line}.start", x, y0, name)
-        for anchor in (*anchors, f"{name}StartY"):
-            dims.record(anchor)
     await ensure_fully_defined(adapter, SECTION_FEATURE)
     check("exit supplier chain nominal sections", await adapter.exit_sketch())
     name_last_feature(adapter, SECTION_FEATURE)

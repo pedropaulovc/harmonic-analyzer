@@ -165,7 +165,7 @@ def annotate_chain_stock(
     # Sheet-metre x offsets from each TOP dimension line to its shelved text.
     shelves = {stock.WIDTH_DIMENSION: -0.024}
     if connecting:
-        shelves[stock.PLATE_DIMENSION] = -0.012
+        shelves[stock.PLATE_DIMENSION] = -0.010
         shelves[stock.LENGTH_DIMENSION] = 0.024
     options_by_view = {}
     for key, rows in expected_by_view.items():
@@ -181,15 +181,19 @@ def annotate_chain_stock(
         else:
             positions = {stock.WIDTH_DIMENSION: (xmin - 0.014, middle[1])}
             if connecting:
-                # The plate span is too short for inside arrows, and left to
+                # The TOP ink runs roller (x 0) to pin (3 pitches), so the plate
+                # span (1 pitch) is a third of the way across; its outline runs
+                # right of it. The plate dimension line stands 3 mm left of the
+                # span. The span is too short for inside arrows, and left to
                 # itself SolidWorks hung the two-row REF on whichever side it
                 # chose (left at 1:4, over the pin outline at 2:1, run
-                # 20261101T075339529Z). It is shelved left of its line instead,
-                # above the roller outline, ending 6 mm short of the
-                # roller-width line, inside the 40 mm TOP cell.
+                # 20261101T075339529Z), so it is shelved up-left over the
+                # roller, short of the roller-width line, inside the 40 mm
+                # TOP cell.
+                plate_x = xmin + (xmax - xmin) / 3.0
                 positions.update(
                     {
-                        stock.PLATE_DIMENSION: (middle[0], ymax + 0.004),
+                        stock.PLATE_DIMENSION: (plate_x - 0.003, ymax + 0.004),
                         stock.LENGTH_DIMENSION: (xmax + 0.020, middle[1]),
                     }
                 )

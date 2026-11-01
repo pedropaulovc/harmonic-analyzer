@@ -105,10 +105,10 @@ def _chain_sheet(
         (0.001, -chain_stock.ROLLER_DIAMETER / 2000),
         (0.001 + 2 * chain_stock.PITCH / 1000, chain_stock.ROLLER_DIAMETER / 2000),
     )
-    # The TOP ink: the roller outline alone, or roller to pin outline, whose
-    # pin length sets the height.
+    # The TOP ink: the roller outline alone, or roller to pin outline (three
+    # pitches across), whose pin length sets the height.
     top_width, top_height = (
-        (2 * chain_stock.PITCH, chain_stock.CONNECTING_PIN_LENGTH)
+        (3 * chain_stock.PITCH, chain_stock.CONNECTING_PIN_LENGTH)
         if connecting
         else (chain_stock.ROLLER_DIAMETER, chain_stock.ROLLER_WIDTH)
     )
@@ -317,14 +317,15 @@ def test_chain_annotation_positions_follow_source_ink_not_stale_outline(
     }
     top_left = x + 0.002 * ratio
     top_right = top_left + (
-        2 * chain_stock.PITCH if connecting else chain_stock.ROLLER_DIAMETER
+        3 * chain_stock.PITCH if connecting else chain_stock.ROLLER_DIAMETER
     ) / 1000 * ratio
+    plate_span_x = top_left + chain_stock.PITCH / 1000 * ratio
     expected_top = {chain_stock.WIDTH_DIMENSION: (top_left - 0.014, y)}
     if connecting:
         expected_top.update(
             {
                 chain_stock.PLATE_DIMENSION: (
-                    (top_left + top_right) / 2,
+                    plate_span_x - 0.003,
                     y + chain_stock.CONNECTING_PIN_LENGTH / 2000 * ratio + 0.004,
                 ),
                 chain_stock.LENGTH_DIMENSION: (top_right + 0.020, y),
@@ -335,15 +336,17 @@ def test_chain_annotation_positions_follow_source_ink_not_stale_outline(
         for name, xy in expected.items():
             assert views[key].dimension_positions[name] == pytest.approx(xy)
     if connecting and ratio == 2.0:
-        # At the 2:1 fit the shelved two-row plate REF (about 8 mm tall, 20 mm
-        # wide, centred 12 mm left of its line) sits above the roller outline,
-        # short of the roller-width line, inside a 40 mm cell centred on the ink.
+        # At the 2:1 fit the shelved two-row plate REF (about 8 mm tall, 16 mm
+        # wide, centred 10 mm left of its line) sits above the roller outline,
+        # short of the roller-width line, inside a 40 mm cell centred on the ink;
+        # its line stands clear left of the plate outline it measures.
         plate_x, plate_y = views["free_top"].dimension_positions[
             chain_stock.PLATE_DIMENSION
         ]
         assert plate_y - 0.004 > y + chain_stock.ROLLER_WIDTH / 2000 * ratio + 0.001
         assert plate_y + 0.004 < y + 0.020
-        assert plate_x - 0.012 - 0.010 > top_left - 0.014 + 0.002
+        assert plate_x - 0.010 - 0.008 > top_left - 0.014 + 0.002
+        assert plate_x < plate_span_x
     assert not views["installed_iso"].dimension_positions
     settled()
     assert all(view.outline_calls == 0 for view in views.values())
@@ -361,7 +364,7 @@ def test_chain_top_shelves_text_without_moving_native_lines(monkeypatch, connect
     }
     shelves = {chain_stock.WIDTH_DIMENSION: -0.024}
     if connecting:
-        shelves[chain_stock.PLATE_DIMENSION] = -0.012
+        shelves[chain_stock.PLATE_DIMENSION] = -0.010
         shelves[chain_stock.LENGTH_DIMENSION] = 0.024
     for name, dx in shelves.items():
         annotation = by_name[name]
