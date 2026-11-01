@@ -113,6 +113,7 @@ from _drawing_marks import (
 )
 from _drawing_dimension_insert import add_angular_reference_dimension
 from _drawing_tolerances import (
+    set_dimension_basic_tolerance,
     set_dimension_symmetric_angular_tolerance,
     set_dimension_symmetric_tolerance,
 )
@@ -133,6 +134,8 @@ from sm_summing_lever_notes import (
     FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
     RECEIVER_COORDINATE_PLACES,
+    SPRING_ROW_LOCATORS,
+    BASIC_PLACES,
     RECEIVER_ISOMETRIC_OCTANT,
     RECEIVER_ISOMETRIC_VIEW_NOTE,
 )
@@ -147,9 +150,11 @@ from sm_summing_lever_spec import (
     COUNTER_HOLE_SPEC,
     DRAWING_PRECISION,
     HOLE_COUNT,
+    HOLE_END_OFFSET_LAST,
     HOLE_SPEC,
     HOLE_X,
     HOLE_Z_OFFSET,
+    HOLE_Z_LAST,
     KNIFE_FLANK_TO_SIDE_TOL_DEG,
     KNIFE_ENVELOPE_PLACES,
     KNIFE_RIDGE_R,
@@ -244,6 +249,18 @@ RECEIVER_EDGE_MARK = 1.0
 RECEIVER_TAP_MARK = 0.5
 if not RECEIVER_EDGE_MARK < COEFFICIENT_T or not RECEIVER_TAP_MARK < TAP_DRILL_DIA / 2.0:
     raise AssertionError("receiver coordinate marks must stay on printed ink")
+# Spring-row marks (``_spring_row_coordinates``): the ridge mark lies on the
+# plan's ridge centreline beyond the -Z stub's inboard face, the end mark on
+# the +Z end edge at X10 (the edge the plan names datum B), each tap mark on
+# its row inside the tap drill.
+SPRING_ROW_MARK = 1.0
+SPRING_ROW_TAP_MARK = 0.5
+SPRING_ROW_END_MARK_X = 10.0
+if (
+    not 0.3 * HEX_DEPTH + SPRING_ROW_MARK < HEX_DEPTH
+    or not SPRING_ROW_TAP_MARK < blind_cut_dia_mm(HOLE_SPEC) / 2.0
+):
+    raise AssertionError("spring-row coordinate marks must stay on printed ink")
 
 
 # Spring-hole Z stations (world Z); the Top-plane sketch maps world Z to -sketchY.
@@ -2068,6 +2085,128 @@ async def _receiver_coordinate_dimensions(adapter) -> None:
     model.ClearSelection2(True)
 
 
+async def _spring_row_coordinates(adapter) -> None:
+    """Native BASIC locators of the 20X spring-tap pattern for the plan.
+
+    Row X runs from datum A's -Z ridge axis, start Z from the +Z plate end
+    (datum B) and the pitch between the first two stations, each to a hole
+    centre.  As in ``_receiver_coordinate_dimensions``, every end is the start
+    of a short construction mark lying on ink the plan prints anyway: on the
+    ridge centreline beyond the -Z stub, along the +Z end edge, and along each
+    tap's row inside its drill.  The part owns their BASIC type, four places
+    and the 19X count (rule 3); the sketch is saved hidden and the plan shows
+    it (``_drawing_hidden_sketches``).  The Top-plane sketch maps world Z to
+    -sketchY."""
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    check("spring-row coordinate sketch", await adapter.create_sketch("Top"))
+    dimensions = SketchDims()
+    ridge = (0.0, PLATE_L / 2.0 + 0.3 * HEX_DEPTH)
+    end = (SPRING_ROW_END_MARK_X, -PLATE_L / 2.0)
+    seed = (HOLE_X, -HOLE_Z_LAST)
+    second = (HOLE_X, -(HOLE_Z_LAST - CHANNEL_PITCH))
+    set_sketch_direct_db(adapter, True)
+    ridge_mark = check(
+        "spring-row ridge mark",
+        await adapter.add_line(*ridge, ridge[0], ridge[1] + SPRING_ROW_MARK),
+    )
+    end_mark = check(
+        "spring-row end mark",
+        await adapter.add_line(*end, end[0] + SPRING_ROW_MARK, end[1]),
+    )
+    seed_mark = check(
+        "spring-row seed mark",
+        await adapter.add_line(*seed, seed[0] + SPRING_ROW_TAP_MARK, seed[1]),
+    )
+    second_mark = check(
+        "spring-row second mark",
+        await adapter.add_line(*second, second[0] + SPRING_ROW_TAP_MARK, second[1]),
+    )
+    set_sketch_direct_db(adapter, False)
+    for mark in (ridge_mark, end_mark, seed_mark, second_mark):
+        _as_construction(adapter, mark)
+    check(
+        "spring-row ridge mark vertical",
+        await adapter.add_sketch_constraint(ridge_mark, None, "vertical"),
+    )
+    await dimension_between(
+        adapter, f"{ridge_mark}.start", f"{ridge_mark}.end", "vertical_distance",
+        SPRING_ROW_MARK, "spring-row ridge mark length",
+    )
+    dimensions.record("SpringRowRidgeMark", None)
+    await anchor_point_to_origin(
+        adapter, f"{ridge_mark}.start", *ridge, "spring-row ridge station"
+    )
+    dimensions.record("SpringRowRidgeZ", None)
+    check(
+        "spring-row end mark horizontal",
+        await adapter.add_sketch_constraint(end_mark, None, "horizontal"),
+    )
+    await dimension_between(
+        adapter, f"{end_mark}.start", f"{end_mark}.end", "horizontal_distance",
+        SPRING_ROW_MARK, "spring-row end mark length",
+    )
+    dimensions.record("SpringRowEndMark", None)
+    await anchor_point_to_origin(
+        adapter, f"{end_mark}.start", *end, "spring-row plate end"
+    )
+    dimensions.record("SpringRowEndX", None)
+    dimensions.record("SpringRowEndZ", None)
+    for label, mark in (("seed", seed_mark), ("second", second_mark)):
+        check(
+            f"spring-row {label} mark horizontal",
+            await adapter.add_sketch_constraint(mark, None, "horizontal"),
+        )
+        await dimension_between(
+            adapter, f"{mark}.start", f"{mark}.end", "horizontal_distance",
+            SPRING_ROW_TAP_MARK, f"spring-row {label} mark length",
+        )
+        dimensions.record(f"SpringRow{label.title()}Mark", None)
+    await dimension_between(
+        adapter, f"{ridge_mark}.start", f"{seed_mark}.start", "horizontal_distance",
+        HOLE_X, "spring-hole row X",
+    )
+    dimensions.record("SpringRowX", None)
+    await dimension_between(
+        adapter, f"{end_mark}.start", f"{seed_mark}.start", "vertical_distance",
+        HOLE_END_OFFSET_LAST, "spring-hole start Z",
+    )
+    dimensions.record("SpringStartZ", None)
+    check(
+        "spring-row second station on the row",
+        await adapter.add_sketch_constraint(
+            f"{seed_mark}.start", f"{second_mark}.start", "vertical_points"
+        ),
+    )
+    await dimension_between(
+        adapter, f"{seed_mark}.start", f"{second_mark}.start", "vertical_distance",
+        CHANNEL_PITCH, "spring-hole pitch",
+    )
+    dimensions.record("SpringPitch", None)
+    await ensure_fully_defined(adapter, "spring-row coordinate sketch")
+    check("exit spring-row coordinate sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, "SpringRowCoordinates")
+    dimensions.apply(adapter, "SpringRowCoordinates")
+    for name in SPRING_ROW_LOCATORS:
+        set_dimension_basic_tolerance(adapter, "SpringRowCoordinates", name)
+        set_dimension_display_precision(
+            adapter, "SpringRowCoordinates", name, BASIC_PLACES
+        )
+    # Twenty taps are nineteen pitches: the count is the pitch's own prefix.
+    set_dimension_prefix(
+        adapter, "SpringRowCoordinates", "SpringPitch", f"{HOLE_COUNT - 1}X "
+    )
+    mark_dimensions_for_drawing(adapter, "SpringRowCoordinates", SPRING_ROW_LOCATORS)
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        "SpringRowCoordinates", "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError("cannot hide spring-row coordinate sketch")
+    model.BlankSketch()
+    model.ClearSelection2(True)
+
+
 async def _bracket_mounting_taps(adapter) -> None:
     """Cut the two blind front-face taps after all structural additions."""
     mass = await adapter.get_mass_properties()
@@ -2223,6 +2362,7 @@ async def build(adapter) -> dict[str, str]:
     _rib_radius_max_limits(adapter)
     _receiver_model_bands(adapter)
     await _receiver_coordinate_dimensions(adapter)
+    await _spring_row_coordinates(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,

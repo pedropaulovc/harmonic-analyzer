@@ -148,13 +148,16 @@ BOSS_Z_CALLOUT = "BOSS AXIS AND\nMID RIB CENTRE"
 # The 20X 6-32 threads run through the uniform coefficient plate.
 SPRING_TAP_CALLOUT_PROCESS = "THREAD THRU COEFFICIENT PLATE\n"
 
-# --- Decimal places of the sheet's own (drawing-side) dimensions, #290. ---
+# --- Decimal places, #290. ---
 # The spring pattern's BASIC row X, start Z and pitch are calibrated stations
-# (1.5689 / .5022 / .2778): four places hold them to under .00005 in.  The
-# boss-top (.28) and knife-ridge (.10) locations of the coefficient top follow
-# the document's .XX, as do the 3.00 anchor X/Z: their printed limits stay
-# inside every check (sm_summing_lever_profile.PLATE_TOP_Y_ALLOWANCE).
+# (1.5689 / .5022 / .2778): four places hold them to under .00005 in.  They
+# are native model dimensions of the part's hidden SpringRowCoordinates
+# sketch, which owns their BASIC type, places and 19X count.  The drawing's
+# own boss-top (.28) and knife-ridge (.10) locations of the coefficient top
+# follow the document's .XX, as do the 3.00 anchor X/Z: their printed limits
+# stay inside every check (sm_summing_lever_profile.PLATE_TOP_Y_ALLOWANCE).
 BASIC_PLACES = 4
+SPRING_ROW_LOCATORS = ("SpringRowX", "SpringStartZ", "SpringPitch")
 # Every Hole Wizard callout prints .XXX, the #36 and #25 tap drills too
 # (.107, .150).  Both are THRU ALL taps, whose native drill variable is
 # <hw-thrutapdrldia>; only the blind bracket taps carry <hw-tapdrldia> and

@@ -54,7 +54,6 @@ from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
-    set_basic_dimension,
     set_dimension_callouts,
 )
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
@@ -66,7 +65,6 @@ from _drawing_hidden_sketches import (
     part_sketches_shown,
 )
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
-from _drawing_precision import set_dimension_display_precision
 from _drawing_leader_notes import add_leader_note
 from _drawing_leaders import dimension_segments, set_near_side_diameter
 from _drawing_notes import add_property_linked_note
@@ -104,6 +102,7 @@ from sm_summing_lever_notes import (
     DIMENSION_CALLOUTS_BELOW,
     DRAWING_DIMENSIONS,
     FRONT_VIEW_LETTER,
+    SPRING_ROW_LOCATORS,
     SPRING_TAP_CALLOUT_PROCESS,
     SPRING_TAP_PRECISION,
     RECEIVER_ISOMETRIC_OCTANT,
@@ -202,6 +201,7 @@ _NATIVE_NOMINAL_TOL_M = 1e-9
 DIMENSIONS_BY_FEATURE: dict[str, set[str]] = {
     **DRAWING_DIMENSIONS,
     "ReceiverCoordinates": {"ReceiverX0", "ReceiverX1", "ReceiverY0"},
+    "SpringRowCoordinates": set(SPRING_ROW_LOCATORS),
 }
 
 
@@ -747,6 +747,36 @@ def _assert_knife_ridge_radius(adapter: Any, annotations: list[Any]) -> None:
     ):
         raise RuntimeError("KnifeRidgeRadius does not measure the ridge round")
     _telemetry.info(f"knife ridge radius: text {display.GetText(1)!r}, MAX type")
+
+
+def _assert_spring_row_locators(adapter: Any, annotations: list[Any]) -> None:
+    """Prove the plan's imported spring-row locators print as the part
+    authored them: each measures its station, keeps the native BASIC type
+    and four places, and the pitch carries its 19X count."""
+    assert_imported_precision(
+        adapter, annotations, dict.fromkeys(SPRING_ROW_LOCATORS, BASIC_PLACES),
+    )
+    pitch_prefix = f"{HOLE_COUNT - 1}X "
+    for name, nominal_mm in SPRING_ROW_NOMINALS.items():
+        found = [a for a in annotations if dimension_name(adapter, a) == name]
+        if len(found) != 1:
+            raise RuntimeError(f"expected one {name} in the plan, found {len(found)}")
+        annotation = _early_bound(found[0], "IAnnotation")
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        if int(dimension.GetToleranceType()) != 1:  # swTolType_e.swTolBASIC
+            raise RuntimeError(f"{name} lost its native BASIC type")
+        measured_m = float(dimension.SystemValue)
+        if not math.isclose(
+            measured_m, nominal_mm / 1000.0, rel_tol=0.0, abs_tol=_NATIVE_NOMINAL_TOL_M,
+        ):
+            raise RuntimeError(
+                f"{name} measures {measured_m * 1000.0} mm, not {nominal_mm} mm"
+            )
+        prefix = str(display.GetText(1) or "")
+        wanted = pitch_prefix if name == "SpringPitch" else ""
+        if prefix != wanted:
+            raise RuntimeError(f"{name} prefix {prefix!r} is not {wanted!r}")
 
 
 # Datum A's box stands above the actual ridge round in Detail D.
@@ -1754,6 +1784,26 @@ TOP_KEEP = {
     # of the boss's 76.20 extension line (x 0.1972), above and right of the
     # relocated 3X 5.00 block, and 2.3 mm clear of the web's lower arc.
     "CylinderDia": (0.209, _top_xy(0.0, -CYLINDER_REFERENCE_Z)[1] + 0.0028),
+    # The spring row's native BASIC locators (SpringRowCoordinates).  The
+    # four-place boxed 1.5689 nearly fills its span: at 0.248 its box touched
+    # the hole column's extension line, at 0.243 axis A's (machinist review);
+    # centred between them it clears both.
+    "SpringRowX": (0.2455, 0.0723),
+    # The start Z spans 6.4 mm of sheet; text between the arrows would sit on
+    # its own line, so it hangs above the span. Each of these vertical
+    # dimensions draws its line at its text's right end (farm r1 2026-10-16:
+    # the 19X pitch text 0.275..0.2958 with its line there), so the start-Z
+    # text starts 4 mm right of that line -- at 0.292 its shoulder crossed it
+    # -- and stays left of the body-span line (0.396).  Both texts ride with
+    # the hole column (seed centre at sheet y 0.0961 at the 0.8 arm offset).
+    "SpringStartZ": (0.300, _top_xy(HOLE_X, -HOLE_Z_LAST)[1] + 0.0099),
+    "SpringPitch": (0.275, _top_xy(HOLE_X, -HOLE_Z_LAST)[1] + 0.0054),
+}
+# name -> (model mm) each imported BASIC spring locator must measure.
+SPRING_ROW_NOMINALS = {
+    "SpringRowX": HOLE_X,
+    "SpringStartZ": HOLE_END_OFFSET_LAST,
+    "SpringPitch": CHANNEL_PITCH,
 }
 # VIEW F at 1:1, model X reversed. All stations, thickness and caption ride
 # with the view; their ink clears D's native X192.6 mm outer extent.
@@ -2140,111 +2190,10 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError(
             f"anchor boss Z callout did not persist: {boss_z_display.GetText(4)!r}"
         )
-    seed_rim = top_edges.circle_at(
-        (HOLE_X, COEFFICIENT_TOP_Y, HOLE_Z_LAST),
-        HOLE_DIA / 2.0,
-        axis=(0.0, 1.0, 0.0),
-        label="spring-hole seed rim",
-    )
-    second_rim = top_edges.circle_at(
-        (HOLE_X, COEFFICIENT_TOP_Y, HOLE_Z_LAST - CHANNEL_PITCH),
-        HOLE_DIA / 2.0,
-        axis=(0.0, 1.0, 0.0),
-        label="spring-hole second rim",
-    )
-    seed_rim_right = _top_xy(HOLE_X + HOLE_DIA / 2.0, -HOLE_Z_LAST)
-    # The start-Z and pitch texts ride with the hole column (tuned at the 0.8
-    # arm offset, seed centre at sheet y 0.0961), so a station move keeps them.
-    seed_y = seed_rim_right[1]
-    row_x = add_edge_dimension(
-        adapter,
-        top,
-        p0=ridge_dim_edge,
-        p1=seed_rim_right,
-        # The four-place boxed 1.5689 nearly fills its span: at 0.248 its box
-        # touched the hole column's extension line, at 0.243 axis A's
-        # (machinist review); centred between them it clears both.
-        text_xy=(0.2455, 0.0723),
-        label="spring-hole row X",
-        orientation="horizontal",
-        entity_types=ridge_entity_types,
-        entities=(ridge_axis, seed_rim.edge),
-    )
-    assert_dimension_measures(
-        adapter,
-        row_x,
-        expected_mm=HOLE_X,
-        label="spring-hole row X",
-        entities=(ridge_axis, seed_rim.edge),
-        entity_types=ridge_entity_types,
-    )
-    set_basic_dimension(adapter, row_x, label="spring-hole row X")
-    set_dimension_display_precision(
-        adapter, "drawing", "spring-hole row X", BASIC_PLACES, display=row_x,
-    )
-    seed_rim_top = _top_xy(HOLE_X, -HOLE_Z_LAST + HOLE_DIA / 2.0)
-    # The start Z (12.75) spans 6.4 mm of sheet (0.0919..0.0983); text between
-    # the arrows would sit on its own line (3.35 there stood on 7.06's extension
-    # line and the body-span line), so it hangs above the span. Each of these vertical
-    # dimensions draws its line at its text's right end (farm r1 2026-10-16:
-    # the 19X 7.06 text 0.275..0.2958 with its line there), so the 12.75 text
-    # starts 4 mm right of that line -- at 0.292 its shoulder crossed it -- and
-    # stays left of the 152.4 body-span line (0.396).
-    start_z = add_edge_dimension(
-        adapter,
-        top,
-        p0=plate_end_edge,
-        p1=seed_rim_top,
-        text_xy=(0.300, seed_y + 0.0099),
-        label="spring-hole start Z",
-        orientation="vertical",
-        entities=(end_edge.edge, seed_rim.edge),
-    )
-    assert_dimension_measures(
-        adapter,
-        start_z,
-        expected_mm=HOLE_END_OFFSET_LAST,
-        label="spring-hole start Z",
-        entities=(end_edge.edge, seed_rim.edge),
-    )
-    set_basic_dimension(adapter, start_z, label="spring-hole start Z")
-    set_dimension_display_precision(
-        adapter, "drawing", "spring-hole start Z", BASIC_PLACES, display=start_z,
-    )
-    second_rim_bottom = _top_xy(
-        HOLE_X, -HOLE_Z_LAST + CHANNEL_PITCH - HOLE_DIA / 2.0
-    )
-    pitch = add_edge_dimension(
-        adapter,
-        top,
-        p0=seed_rim_top,
-        p1=second_rim_bottom,
-        text_xy=(0.275, seed_y + 0.0054),
-        label="spring-hole pitch",
-        orientation="vertical",
-        entities=(seed_rim.edge, second_rim.edge),
-    )
-    assert_dimension_measures(
-        adapter,
-        pitch,
-        expected_mm=CHANNEL_PITCH,
-        label="spring-hole pitch",
-        entities=(seed_rim.edge, second_rim.edge),
-    )
-    set_basic_dimension(adapter, pitch, label="spring-hole pitch")
-    set_dimension_display_precision(
-        adapter, "drawing", "spring-hole pitch", BASIC_PLACES, display=pitch,
-    )
-    # Twenty taps are nineteen pitches: the count rides the BASIC pitch as
-    # its prefix, read back because SetText reports nothing.
-    pitch_display = _early_bound(pitch, "IDisplayDimension")
-    pitch_prefix = f"{HOLE_COUNT - 1}X "
-    pitch_display.SetText(1, pitch_prefix)  # swDimensionTextPrefix
-    if str(pitch_display.GetText(1) or "") != pitch_prefix:
-        raise RuntimeError(
-            f"spring-hole pitch count {pitch_prefix!r} did not persist: "
-            f"{pitch_display.GetText(1)!r}"
-        )
+    # The row X, start Z and pitch are the part's own BASIC locators
+    # (SpringRowCoordinates: X off datum A's -Z ridge axis, start Z off datum
+    # B's end, each to a hole centre), imported with the plan's dimensions.
+    _assert_spring_row_locators(adapter, top_annotations)
     # The 20X callout hangs on hole 7, with its complete process line in the
     # open field right of the column and clear of the mid-rib witnesses.
     callout_hole_z = HOLE_Z_LAST - (HOLE_COUNT // 2 - 3) * CHANNEL_PITCH
