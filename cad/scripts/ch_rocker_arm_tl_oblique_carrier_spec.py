@@ -17,9 +17,9 @@ vise, no bandsaw rip (owner ruling #2083: the 6 in width does not fit the
 
 Issue #290: the sheet prints decimal inch (``UNIT``). Lengths stay physical
 millimetres, each fabricated nominal the exact millimetre value of its printed
-inch on the printed grid. The kinematic stations (pin holes, HUB, CL, CR and
-the riser taps, all derived from R800/R816) are exempt from snapping: they
-print at 3 places, or 4 where the former band needs it.
+inch on the printed grid. The kinematic stations (pin holes, CL, CR and the
+riser taps, all derived from R800/R816) are exempt from snapping: they print
+at 3 places, or 4 where the former band needs it.
 
 Frame (the calculator's carrier frame, and the model frame): origin at the
 midpoint of A1-B1; +X runs A1 -> B1, +Y points toward the part, Z0 is the
@@ -33,15 +33,21 @@ Values marked (calc) are read from ``trammel``, never retyped:
 * (calc) Pivot-pin holes A1/B1 at (-/+D1/2, 0), D1 = 17.7219 in; A2/B2 at
   ``trammel.A2``/``B2``, chained FROM A1/B1 by dX = (D2 - D1)/2 = .2844 and
   dY = .9638. Never from a plate edge.
-* (calc) HUB (0, 1.792) and CL (-6.334, 1.156): Ø.12 x 90° centre-drill
-  spots only. Both are finished in place on the running jig: HUB to Ø.4000
-  +.0005/0 (the purchased .4000 reamer) for the bonded TL-VN-80 gauge pin,
-  and CL to .2490-.2495 (the owned .2490 reamer) for the bought 1/4 x 1
-  dowel (.2501-.2503, McMaster 98381A542), a .0006-.0013 diametral press
-  (``CL_DOWEL_INTERFERENCE``). The traveler carries these sizes, not this
-  sheet. Each spot's callout names the MHA-CH-13 strap feature it becomes:
-  the HUB's Y station moves the strap's pivot radially 1:1, so it prints at
-  3 places (``HUB_RADIAL_BAND``, inside half the strap's top-edge band).
+* (calc) CL (-6.334, 1.156): a Ø.12 x 90° centre-drill spot only, finished
+  in place on the running jig to .2490-.2495 (the owned .2490 reamer) for the
+  bought 1/4 x 1 dowel (.2501-.2503, McMaster 98381A542), a .0006-.0013
+  diametral press (``CL_DOWEL_INTERFERENCE``). The jig assembly carries that
+  size, not this sheet. The spot's callout names the MHA-CH-13 strap feature
+  it becomes.
+* (calc) HUB (0, 1.792): not on this sheet (owner ruling 5, option A,
+  2026-11-01). Its Y station moves the strap's pivot radially 1:1, so it is
+  drilled in situ at assembly (MHA-CH-06-TL-00 step 10): at the symmetric
+  position, the table run from the apex (the spindle origin) +Y by
+  ``trammel.HUB_OFFSET`` (``HUB_OFFSET_BAND``), then reamed to Ø.4000
+  +.0005/0 (the purchased .4000 reamer) for the bonded TL-VN-80 gauge pin.
+  The pin spacing then moves the HUB with the cut, so only that setting and
+  the pin clearance's shift reach the strap's top edge (``HUB_RADIAL_STACK``,
+  inside half its band at the worst case: rule 19's fit-up).
 * (calc) CR (+6.334, 1.156): 1/4-20 UNC tapped THRU for the clamp screw that
   clamps the MHA-CH-13 strap (``CR_TAP_CALLOUT``); its SHCS head (Ø.375) is
   under the Ø12 mm that clears both cutter paths.
@@ -71,7 +77,7 @@ pair sets R800 or R816 on the MHA-CH-13 strap); the sensitivities stay here:
 Position chains (rule 10: one datum per view). X runs from A1's axis, the
 left lower ream that carries the ±.0008 pair: the left end 1.4 from it, B1 by
 the spacing, and every spot and tap by a baseline of its own
-(``STATION_REFERENCE``), the tap axis (lever taps and HUB) by the 8.861. Y
+(``STATION_REFERENCE``), the lever taps' axis by the 8.861. Y
 runs from the A1-B1 pin line, the reamed pair's own axes, placed 1.77 from
 the -Y edge. A2/B2 chain from A1/B1, never from an edge.
 
@@ -246,15 +252,15 @@ if not PIN_HOLE_DIA / 2.0 + 2.0 <= STOCK_REFERENCE_DX < SECTION_HALF_SPAN:
     raise AssertionError("the stock line must stand in A1's +X wall, inside the cut")
 
 # --- Centre-drill spots (calc) ------------------------------------------------
-HUB = trammel.HUB
 CL = trammel.CL
 SPOT_DIA = 3.048  # .12
 SPOT_ANGLE = 90.0  # included, the centre drill's
 SPOT_FLANK_ANGLE = 90.0 - SPOT_ANGLE / 2.0
-SPOTS = {"Hub": HUB, "Cl": CL}
-# The hidden reference sketch carrying the spots' printed stations and Ø3: a
+# HUB is not spotted: it is drilled in situ at assembly (owner ruling 5).
+SPOTS = {"Cl": CL}
+# The hidden reference sketch carrying the spot's printed station and Ø3: a
 # reference plane's offset cannot be imported into a drawing (farm jig-r1),
-# so the spot planes and cones are driven from this sketch instead.
+# so the spot plane and cone are driven from this sketch instead.
 SPOT_REFERENCE = "SpotReference"
 # The hidden sketch of points carrying every printed X station from A1
 # (``STATIONS``).
@@ -295,9 +301,10 @@ if CR_HEAD_DIA_MAX > CR_HEAD_CLEAR_DIA:
 # would cross the RiserX2R and CrX extension lines, 20.6 sheet mm apart.
 CR_STATION_FUNCTION = "MIRRORS CL STATION"
 CR_TAP_CALLOUT = f"CLAMPS {STRAP_NUMBER}\n{CR_STATION_FUNCTION}"
-# mr4: HubX's 8.861 is 3-place because it locates the HUB spot (the lever
-# taps share its X); mr8: named by the spot its callout defines on the sheet.
-HUB_STATION_CALLOUT = "TO HUB SPOT"
+# mr4: the tap axis's 8.861 is 3-place because it locates the lever taps;
+# mr8: named by the feature it locates on the sheet, its row no wider than
+# the 11-character one it replaced (draw: LeverX's lane).
+LEVER_STATION_CALLOUT = "LEVER TAPS"
 
 RISER_SCREWS = trammel.RISER_SCREWS
 RISER_THREAD = "#4-40"
@@ -326,15 +333,14 @@ LEVER_TAP_DRILL = TAP_DRILL_MM[LEVER_THREAD]
 # and SpotReference's placements stay origin-based, driven from
 # STATION_REFERENCE: one point on A1's axis and one on each station's feature
 # (the left end's on the -X/-Y corner), each printed dimension the baseline
-# from A1. The tap axis (lever taps and HUB, X = 0) prints as HubX, its point
-# on the HUB spot: its extension line rises from the X lane through the lever
-# taps to the spot, so one 8.861 visibly locates all three (machinist review
-# 54e5c9a: A1X's line stopped at the pin line, short of HUB). HubX is driven
-# equal to A1X, which stays the model's driving dimension, unprinted.
+# from A1. The lever taps' axis (X = 0) prints as LeverX, its point on the
+# upper lever tap: its extension line rises from the X lane through both
+# taps, so one 8.861 visibly locates the pair. LeverX is driven equal to A1X,
+# which stays the model's driving dimension, unprinted.
 STATIONS = {
     "EdgeX": (OUTLINE_X[0], OUTLINE_Y[0]),
     "ClX": CL,
-    "HubX": HUB,
+    "LeverX": LEVER_HOLES[0],
     "RiserX1": RISER_SCREWS[0],
     "RiserX1R": RISER_SCREWS[1],
     "RiserX2": RISER_SCREWS[2],
@@ -417,7 +423,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "B2DY",
     },
     SECTION_REFERENCE: {"PinChamferSize", "StockThick"},
-    SPOT_REFERENCE: {"SpotDia", "SpotDiaCl", "HubY", "ClY"},
+    SPOT_REFERENCE: {"SpotDia", "ClY"},
     STATION_REFERENCE: set(STATIONS),
     "CrTap": {"CrY"},
     "RiserTaps": {"RiserY1", "RiserY2"},
@@ -442,13 +448,13 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PinChamferSize": PIN_CHAMFER_PLACES,
         "StockThick": THICKNESS_PLACES,
     },
-    # The kinematic HUB/CL/CR stations (exempt from snapping) print 3 places.
-    SPOT_REFERENCE: {"SpotDia": 2, "SpotDiaCl": 2, "HubY": 3, "ClY": 3},
+    # The kinematic CL/CR stations (exempt from snapping) print 3 places.
+    SPOT_REFERENCE: {"SpotDia": 2, "ClY": 3},
     # The left end at the outline's .X; the TL-24 stations at the walls' places.
     STATION_REFERENCE: {
         "EdgeX": 1,
         "ClX": 3,
-        "HubX": 3,
+        "LeverX": 3,
         "CrX": 3,
         **{name: RISER_STATION_PLACES for name in STATIONS if name.startswith("Riser")},
     },
@@ -464,30 +470,41 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked carrier dimension needs authored places")
 
-# The HUB spot is reamed in place for the bonded pin that carries the strap's
-# pivot, on the cut arcs' centreline (X = 0), so its Y station moves the
-# pivot radially 1:1 against the R800 top edge. The station alone must sit
-# strictly inside half the strap's top-edge band: at .XX (±.010) it would
-# take all of it. Its X station is second order (dx² / 2R).
+# The HUB, reamed for the bonded pin that carries the strap's pivot on the cut
+# arcs' centreline (X = 0), moves the pivot radially 1:1 against the R800 top
+# edge. Rule 19 (owner ruling 5, option A, 2026-11-01): it is drilled in situ
+# on the running jig at the symmetric position, the table run from the apex
+# (the spindle origin, on R_C1) +Y by HUB_OFFSET, so the pin spacing moves it
+# with the cut and no carrier band reaches it. What still does, at the worst
+# case: the DRO setting of that printed offset and the carrier's shift on its
+# pins between drilling and cutting (trammel.RADIUS_FROM_SHOULDER_CLEARANCE).
+# The symmetric position's own error moves the HUB along the arc, second
+# order radially (dx² / 2R).
 _TOP_EDGE_HALF_BAND = (max(rocker.TOP_EDGE_BAND) - min(rocker.TOP_EDGE_BAND)) / 2.0
-HUB_RADIAL_BAND = printed_band_mm(DRAWING_PRECISION_BY_NAME["HubY"], unit=UNIT)
-if HUB_RADIAL_BAND >= _TOP_EDGE_HALF_BAND:
-    raise AssertionError("the HUB station band consumes the strap's top-edge band")
+HUB_OFFSET_PLACES = 4  # a .0001 DRO, as the alignment table
+HUB_OFFSET_BAND = 0.0005 * trammel.INCH  # ±.0005 on the DRO setting
+HUB_OFFSET_PRINTED = (
+    round(trammel.HUB_OFFSET / trammel.INCH, HUB_OFFSET_PLACES) * trammel.INCH
+)
+HUB_RADIAL_STACK = (
+    HUB_OFFSET_BAND
+    + abs(HUB_OFFSET_PRINTED - trammel.HUB_OFFSET)
+    + trammel.RADIUS_FROM_SHOULDER_CLEARANCE
+)
+if HUB_RADIAL_STACK >= _TOP_EDGE_HALF_BAND:
+    raise AssertionError("the HUB fit-up stack exceeds half the strap's top-edge band")
 
 # Symmetric ±.0008 on these (build: set_dimension_symmetric_tolerance).
 POSITION_BANDED = ("PinSpacing", "A2DX", "A2DY", "B2DX", "B2DY")
 
-# Each spot has its own leader and callout (jig-r3: a "2X" with one leader
-# read as one spot), naming the strap feature it becomes (machinist review
-# mr3: the 3-place stations to it read as functional). mr8: CL's stands in
-# the one band outside the plate its leader reaches crossing no dimension
-# line (rule 14): under the 7.287 lane, between the RiserX2 and RiserX1
-# extension lines, ~37 mm wide, so each row stays within 13 characters.
+# The spot has its own leader and callout, naming the strap feature it
+# becomes (machinist review mr3: the 3-place stations to it read as
+# functional). mr8: it stands in the one band outside the plate its leader
+# reaches crossing no dimension line (rule 14): under the 7.287 lane, between
+# the RiserX2 and RiserX1 extension lines, ~37 mm wide, so each row stays
+# within 13 characters.
 SPOT_CALLOUT = "SPOT FOR"
-SPOT_CALLOUTS = {
-    "SpotDia": f"{SPOT_CALLOUT}\n{STRAP_NUMBER} HUB",
-    "SpotDiaCl": f"{SPOT_CALLOUT}\n{STRAP_NUMBER} CL",
-}
+SPOT_CALLOUTS = {"SpotDia": f"{SPOT_CALLOUT}\n{STRAP_NUMBER} CL"}
 CALLOUTS_BELOW = {
     "PinHoleDia": PIN_HOLE_CALLOUT,
     "PinSpacing": SPACING_CALLOUT,
@@ -498,10 +515,10 @@ CALLOUTS_BELOW = {
     **SPOT_CALLOUTS,
     "PinChamferSize": PIN_CHAMFER_CALLOUT,
     **{name: RISER_STATION_CALLOUT for name in RISER_STATIONS},
-    "HubX": HUB_STATION_CALLOUT,
+    "LeverX": LEVER_STATION_CALLOUT,
 }
 _SPOT_SUFFIX = f" X {SPOT_ANGLE:.0f}\u00b0"
-CALLOUT_SUFFIXES = {"SpotDia": _SPOT_SUFFIX, "SpotDiaCl": _SPOT_SUFFIX}
+CALLOUT_SUFFIXES = {"SpotDia": _SPOT_SUFFIX}
 # Each riser row's +X screw shares its -X twin's height (the tap sketch's
 # shared coordinate) and has its own X station from A1, so each printed
 # height covers both holes of its row (carrier-r1 review: the +X pair read as
