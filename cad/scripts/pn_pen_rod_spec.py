@@ -80,7 +80,7 @@ TOTAL_LENGTH = SQUARE_LENGTH + PIVOT_LENGTH
 _WALL = (ROD_SECTION + SECTION_BAND[1] - THREAD_MAJOR_MM[STUD_THREAD]) / 2.0
 # drawing-guidelines.md rule 17 (walls and webs): .0675 to each flat of the
 # smallest square, between the .060 floor and the .080 target: RV-01 in
-# pn-pen-rod.yaml (owner ruling 2026-10-31: no thread is smaller and the
+# pn-pen-rod.yaml (owner ruling 2026-11-01: no thread is smaller and the
 # V-block fixes the square, and rule 17 forbids tightening its band).
 if _WALL < WALL_FLOOR_MM:
     raise AssertionError(f"rod stud tap leaves a {_WALL:.3f} mm wall")

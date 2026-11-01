@@ -156,7 +156,7 @@ if BOTTOM_RAIL_FULL_THREAD_MIN < 1.5 * THREAD_MAJOR_MM[SET_SCREW_TAP_SPEC.size]:
 # (the stirrup's fit between the v-block's paper end and its body step leaves
 # 0.016 mm, pn_pen_carriage_geom), so the far wall, (.31 - .01) - (.16 + .01)
 # - .056 = .074, falls under the rule 17 .080 target and over the .060 floor:
-# RV-01 (pn-pen-frame.yaml, owner ruling 2026-10-31), stated on the sheet by
+# RV-01 (pn-pen-frame.yaml, owner ruling 2026-11-01), stated on the sheet by
 # TapWallMin as .074 MIN.
 _SCREW_Z = FRAME_DEPTH / 2.0
 _SCREW_Z_LOW, _SCREW_Z_HIGH = printed_deviations(
