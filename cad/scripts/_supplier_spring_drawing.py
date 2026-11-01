@@ -321,9 +321,11 @@ def extension_spring_dimensions(
                 ),
                 **arguments,
             )
-            if name == COIL_OD:
-                # One arrow on the near rim: a line through the centre would
-                # end on the far rim beside the wire section's arrow.
+            if key == "free_right":
+                # One arrow on the near rim of each section: a coil OD line
+                # through the centre would end on the far rim beside the
+                # wire section's arrow, and a wire line would cross the
+                # small wire circle it sizes.
                 set_near_side_diameter(by_name[name], name)
             settings[name] = (arguments, configurations[key])
 
