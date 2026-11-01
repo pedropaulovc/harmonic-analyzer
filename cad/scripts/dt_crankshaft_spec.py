@@ -196,12 +196,18 @@ def local_station(far_end_station: float) -> float:
 # start a row south) the land still spans the bore mouth's edge break, so the
 # collar's inside corner never rides the bore edge and the rear face seats
 # flat on the boss.
+# The land is also never under .050, so the sheet's native diameter on it
+# keeps both arrowheads on the land.
 # The post's own sheet (still millimetre) sets its bore mouth's edge break.
 BORE_MOUTH_BREAK_MAX = edge_break_chamfer_mm()
+NECK_LAND_MIN = 1.27  # .050
 JOURNAL_START = local_station(
     _floor(
         SHAFT_LENGTH
-        - (COLLAR_REAR + COLLAR_STATION_TOL + STATION_ROW + BORE_MOUTH_BREAK_MAX),
+        - max(
+            COLLAR_REAR + COLLAR_STATION_TOL + STATION_ROW + BORE_MOUTH_BREAK_MAX,
+            COLLAR_REAR + NECK_LAND_MIN,
+        ),
         STATION_PLACES,
         UNIT,
     )
