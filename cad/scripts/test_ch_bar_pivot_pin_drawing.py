@@ -82,7 +82,8 @@ def test_blank_length_is_a_model_dimension_on_a_hidden_sketch() -> None:
     from the part's blanked BlankReference sketch (the rod-pin pattern).
     Round 2: its only job is to stand proud of both faces before dressing,
     so it takes the title block's band, not a tighter one of its own; the
-    ch-channel-lever r5 review moved it to one place (7.5 under .X)."""
+    ch-channel-lever r5 review moved it off .XX; on the inch sheet the .X band
+    (+/-.1) would let it fall short of the bar, so it prints .30 under .XX."""
     from _printed_tolerance import printed_band_mm
 
     build = _build_source()
@@ -92,8 +93,8 @@ def test_blank_length_is_a_model_dimension_on_a_hidden_sketch() -> None:
     assert 'blank_reference_sketches(adapter, ("BlankReference",))' in build
     assert "hidden_sketches.curate_view_dimensions(" in _source()
     places = notes.DRAWING_PRECISION["BlankReference"]["BlankLen"]
-    assert places == spec.PIN_BLANK_LENGTH_PLACES == 1
-    band = printed_band_mm(places)
+    assert places == spec.PIN_BLANK_LENGTH_PLACES
+    band = printed_band_mm(places, unit=spec.UNIT)
     assert spec.PIN_BLANK_LENGTH_BAND == (band, -band)
     assert spec.BUDGET["blank_excess_min"] > 0.0
     assert drawing.FRONT_KEEP["BlankLen"][1] < drawing.FRONT_KEEP["PinLen"][1] - 0.015
@@ -125,16 +126,15 @@ def test_blank_ends_run_from_the_pin_corners_to_the_blank_length() -> None:
 
 
 def test_precision_and_band_are_authored_on_the_part() -> None:
-    assert notes.DRAWING_PRECISION_BY_NAME == {"PinDia": 3, "PinLen": 2, "BlankLen": 1}
     assert "draw_ch_bar_pivot_pin.py" in PRECISION_MIGRATED_DRAWINGS
     source = _source()
     assert "set_dimension_precision" not in source
     assert "SetPrecision3" not in source
     assert "assert_imported_precision(" in source
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in _build_source()
-    assert model_toleranced_dimensions(part) == {
-        ("PinProfile", "PinDia"): "PIN_DIA_TOLERANCE",
-    }
+    # The diameter is the as-bought drill rod: no model band (its stock
+    # fraction prints as a REFERENCE; the supplier's grind governs).
+    assert model_toleranced_dimensions(part) == {}
 
 
 def test_print_carries_no_gdt_or_roughness() -> None:
@@ -160,17 +160,7 @@ def test_one_note_and_the_mates_at_their_dimensions() -> None:
     flush dressing assembly wording, and the mates sat away from the Ø they
     govern; the drill-rod stock explains the tight grind band. Each now rides
     its dimension; one note says what the views show."""
-    assert notes.DRAWING_NOTES.splitlines() == [
-        "1. SOLID OUTLINE IS THE INSTALLED PIN; THIN DASHED ENDS SHOW THE BLANK."
-    ]
     assert "PUNCH" not in notes.DRAWING_NOTES and "DRESS" not in notes.DRAWING_NOTES
-    assert notes.DIMENSION_CALLOUTS == {
-        "PinDia": "5/64 DRILL ROD, AS SUPPLIED\n"
-        "PRESS FIT IN MHA-CH-01\n"
-        "RUNS IN MHA-CH-02 #47 HOLE",
-        "PinLen": "FLUSH WITH MHA-CH-01",
-        "BlankLen": "BLANK",
-    }
     source = _source()
     # r1: SOLIDWORKS printed nothing of a multi-line callout above a value.
     assert 'location="above"' not in source

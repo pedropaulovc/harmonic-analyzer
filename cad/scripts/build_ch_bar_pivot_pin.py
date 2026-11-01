@@ -17,7 +17,7 @@ into the *Front side view (drawing-guidelines.md rule 11 (turned parts read like
 ``BlankReference`` (blanked, on the Front plane, on the pin axis): the blank,
 as construction geometry the side view draws thin dashed -- a centerline
 on the Right Plane and the blank's two ends run back to the installed pin's
-corners -- whose cut length prints at one place under the title block's band
+corners -- whose cut length prints at two places under the title block's band
 (drawing-simplicity-policy.md `How the repository implements the
 guidelines`: the model, not a note, owns it); the side view prints it below
 the installed length (the ``build_ch_rod_pivot_pin`` pattern).
@@ -37,7 +37,9 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
+from _part_properties import part_drawing_unit
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
@@ -57,13 +59,11 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _saved_part_guard import require_saved_drawing_properties
 from ch_bar_pivot_pin_notes import DRAWING_DIMENSIONS, DRAWING_NOTES, DRAWING_PRECISION
 from ch_bar_pivot_pin_spec import (
     PIN_BLANK_LENGTH,
     PIN_DIA,
-    PIN_DIA_TOLERANCE,
     PIN_INSTALLED_LENGTH,
 )
 
@@ -106,6 +106,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import RevolveParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing (INCH
     # document; the equation manager reads bare numbers in document units).
@@ -289,13 +291,12 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven pin (equations neutral)", volume, 0.005 * V_PIN)
 
-    # The diameter carries the drill rod's grind band natively (drawing-guidelines.md rule 3 (decimal places carry the tolerance)); the
-    # installed length is the bar's width, parenthesized as REFERENCE on the
-    # sheet; the blank's cut length takes the title block's .X band (the
-    # dressing stock, ch_bar_pivot_pin_spec.joint_budget blank_excess_min/max).
-    set_dimension_symmetric_tolerance(
-        adapter, "PinProfile", "PinDia", PIN_DIA_TOLERANCE
-    )
+    # The diameter is the as-bought 5/64 drill rod: untoleranced, the sheet
+    # prints it as the stock fraction's REFERENCE (the supplier's grind
+    # governs); the installed length is the bar's width, parenthesized as
+    # REFERENCE on the sheet; the blank's cut length takes the title block's
+    # .XX band (the dressing stock, ch_bar_pivot_pin_spec.joint_budget
+    # blank_excess_min/max).
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

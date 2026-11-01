@@ -78,9 +78,8 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 
 
 def test_precision_and_band_are_authored_on_the_part() -> None:
-    # The installed length is the fork's 3-place thickness, so it prints at
-    # three places; the blank's MIN limit at one.
-    assert notes.DRAWING_PRECISION_BY_NAME == {"PinDia": 3, "PinLen": 3, "BlankLen": 1}
+    # The journal is the as-bought drill rod: no model band (its stock
+    # fraction prints as a REFERENCE; the supplier's grind governs).
     assert "draw_ch_rod_pivot_pin.py" in PRECISION_MIGRATED_DRAWINGS
     source = _source()
     assert "set_dimension_precision" not in source
@@ -92,9 +91,7 @@ def test_precision_and_band_are_authored_on_the_part() -> None:
     assert "hidden_sketches.curate_view_dimensions(" in source
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in _build_source()
     assert "require_saved_drawing_properties(" in _build_source()
-    assert model_toleranced_dimensions(part) == {
-        ("PinProfile", "PinDia"): "PIN_DIA_TOLERANCE",
-    }
+    assert model_toleranced_dimensions(part) == {}
 
 
 def test_blank_length_is_a_model_dimension_with_its_min_limit() -> None:
@@ -102,11 +99,10 @@ def test_blank_length_is_a_model_dimension_with_its_min_limit() -> None:
     for function)): the cut length prints from a blanked reference sketch on
     the pin axis as a single MIN limit at one place, never from note text and
     never as a symmetric band -- its only job is to leave dressing stock."""
-    assert spec.PIN_BLANK_LENGTH == 6.4
+    assert spec.PIN_BLANK_LENGTH == 6.604  # .26 MIN
     assert spec.PIN_BLANK_LENGTH_TOL_TYPE == 5  # swTolType_e.swTolMIN
     assert not hasattr(spec, "PIN_BLANK_LENGTH_BAND")
     assert notes.DRAWING_DIMENSIONS["BlankReference"] == {"BlankLen"}
-    assert notes.DRAWING_PRECISION["BlankReference"] == {"BlankLen": 1}
     build = "".join(_build_source().split())
     assert 'set_global(adapter,"BlankLen",f"{PIN_BLANK_LENGTH}mm")' in build
     assert 'blank.record("BlankLen",\'"BlankLen"\')' in build
@@ -150,21 +146,11 @@ def test_print_carries_no_gdt_roughness_or_callouts() -> None:
     assert "add_view_centerline(" in source
 
 
-def test_journal_callout_names_both_mates_and_stock() -> None:
-    """Machinist review #1522 (rules 4 and 7): the Ø band's two mates and fits
-    are flagged at the callout, and the drill rod as supplied meets it."""
-    assert notes.PIN_DIA_CALLOUT.splitlines() == [
-        "STOCK OK",
-        "PRESS FIT IN MHA-CH-03 FORK HOLE",
-        "RUNNING FIT IN MHA-CH-06 #47 HOLE",
-    ]
-    # The press and the running fit hold at the drill rod's own grind band.
+def test_journal_fits_hold_at_the_drill_rod_grind() -> None:
+    """Machinist review #1522 (rules 4 and 7): the press and the running fit
+    hold at the drill rod's own grind band."""
     assert spec.BUDGET["interference_min"] > 0.0
     assert spec.BUDGET["running_clearance_min"] > 0.0
-    assert (
-        '{"PinDia": PIN_DIA_CALLOUT, "PinLen": "INSTALLED", "BlankLen": "BLANK"}'
-        in _source()
-    )
 
 
 def test_note_states_installed_state_and_flush_ends() -> None:

@@ -7,3 +7,4 @@ ch-bar-pivot-pin:
   quantity: 20
   tolerance_class: machined_block
   process: "cut from drill rod; pressed into the bar at assembly, ends dressed flush"
+  drawing_unit: in

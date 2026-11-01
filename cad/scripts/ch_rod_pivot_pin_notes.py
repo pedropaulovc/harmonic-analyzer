@@ -30,11 +30,13 @@ if pin.PIN_END_PROUD_MAX != 0.0:
 # --- Drawing contract (drawing-simplicity-policy.md `How the repository implements the guidelines`: the PART owns places and bands). ---
 # The journal and the installed length live on the revolve's half-profile
 # (``PinProfile``), so both import into the side view beside each other
-# (drawing-guidelines.md rule 11 (turned parts read like the lathe), turned part). The journal carries the drill rod's own grind band
-# natively at three places; the installed length is the fork's thickness,
+# (drawing-guidelines.md rule 11 (turned parts read like the lathe), turned part). The journal is the as-bought
+# 5/64 drill rod: the sheet prints it as the stock fraction, a REFERENCE whose
+# supplier grind (+/-.0002) governs (#290 ruling: fractions only on as-bought
+# stock, shown as REF); the installed length is the fork's thickness,
 # printed as REFERENCE (the fork print owns it) at its three places. The
 # blank's cut length lives on the blanked ``BlankReference`` sketch on the
-# same plane as a single MIN limit at one place (the dressing stock in
+# same plane as a single MIN limit at two places (the dressing stock in
 # ch_rod_pivot_pin_spec.joint_budget is judged at it).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia", "PinLen"},
@@ -42,7 +44,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinProfile": {"PinDia": 3, "PinLen": 3},
-    "BlankReference": {"BlankLen": 1},
+    "BlankReference": {"BlankLen": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: decimals
@@ -55,15 +57,16 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 ):
     raise AssertionError("every marked pin dimension needs authored places")
 
-# The journal's fits, flagged at its Ø callout (drawing-guidelines.md rule 4
-# (tighten only for function, and name the mate); machinist review
-# 2026-10-15, #1522): below the value, the drill rod's grind, which already
-# holds the band, as stock, then each mate named with the fit it needs. All
-# below: SOLIDWORKS stores a line break in the ABOVE compartment but never
-# prints it (draw_pd_transgear_pin._printable_above_callouts).
+# The journal's stock and fits, flagged at its Ø callout (drawing-guidelines.md
+# rule 4 (tighten only for function, and name the mate); machinist review
+# 2026-10-15, #1522): below the stock fraction, the drill rod as supplied,
+# then each mate named with the fit it needs. All below: SOLIDWORKS stores a
+# line break in the ABOVE compartment but never prints it
+# (draw_pd_transgear_pin._printable_above_callouts).
+PIN_DIA_FRACTION_DENOMINATOR = 64  # 5/64 drill rod
 PIN_DIA_CALLOUT = "\n".join(
     (
-        "STOCK OK",
+        "DRILL ROD, AS SUPPLIED",
         "PRESS FIT IN MHA-CH-03 FORK HOLE",
         "RUNNING FIT IN MHA-CH-06 #47 HOLE",
     )
