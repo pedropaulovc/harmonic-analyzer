@@ -51,6 +51,7 @@ from dt_crank_pinion_pin_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIN_DIA,
+    PIN_DIA_CALLOUT,
     PIN_DIA_FRACTION_DENOMINATOR,
     PIN_LEN,
 )
@@ -83,9 +84,10 @@ HALF_LEN = PIN_LEN * VIEW_SCALE[0] / 2000.0  # 0.054
 # Side view (a *Right view lays model +Z to the left; a plain pin has no end
 # to prefer): the diameter above the view, its dimension line left of centre
 # so the axis-centerline pick at the view's middle lands on bare face; the
-# length below.
+# length below. The diameter's two callout lines hang under its value, so the
+# value stands a line higher than the length's offset.
 RIGHT_KEEP = {
-    "PinDia": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] + HALF_DIA + 0.016),
+    "PinDia": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] + HALF_DIA + 0.022),
     "PinLen": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_DIA - 0.016),
 }
 
@@ -164,7 +166,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_mm=PIN_DIA,
         presentation="diameter",
         fraction_denominator=PIN_DIA_FRACTION_DENOMINATOR,
-        callout="STOCK, AS SUPPLIED",
+        callout=PIN_DIA_CALLOUT,
     )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pin end view")

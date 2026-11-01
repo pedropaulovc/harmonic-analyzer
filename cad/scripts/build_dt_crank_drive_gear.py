@@ -282,9 +282,11 @@ async def build(adapter) -> dict[str, str]:
     face_lower, face_upper = deviations(FACE_WIDTH_BAND)
     if face_lower != -face_upper:
         raise AssertionError("the 64T face-width band must be symmetric")
-    # The bands are millimetres; UNIT prints them in inches.
+    # The bands are millimetres; UNIT prints them in inches. The face width's
+    # band prints at its nominal's four places, ±.0010 (machinist review).
     set_dimension_symmetric_tolerance(
-        adapter, "GearBlank", "FaceWidth", face_upper, display_unit=UNIT
+        adapter, "GearBlank", "FaceWidth", face_upper,
+        places=DRAWING_PRECISION["GearBlank"]["FaceWidth"], display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND), display_unit=UNIT

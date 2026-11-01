@@ -64,10 +64,11 @@ GEAR_DATA = gear_data_note(
         # range a turner can read (machinist review r1 of #1641), and the
         # plunge row below carries the cut depth.
         ("ROOT DIAMETER (REF)", inch_text(spec.ROOT_DIA_MIN, 3)),
+        # The title block's ±1° governs (HELIX_ANGLE_TOLERANCE_DEG); the row
+        # does not restate it (machinist review).
         (
             "HELIX AT PITCH DIA",
-            f"{spec.HELIX_ANGLE_DEG:.{spec.GEAR_DATA_HELIX_PLACES}f} "
-            f"\u00b1{spec.HELIX_ANGLE_TOLERANCE_DEG:g} DEG {spec.HELIX_HAND}",
+            f"{spec.HELIX_ANGLE_DEG:.{spec.GEAR_DATA_HELIX_PLACES}f} DEG {spec.HELIX_HAND}",
         ),
         (
             "LEAD (in/rev, REF)",
