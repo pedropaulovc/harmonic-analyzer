@@ -6,6 +6,7 @@ import math
 import sys
 
 from solidworks_mcp.adapters.solidworks.drawing import iter_views
+from solidworks_mcp.adapters.sw_type_info import constant
 
 import _telemetry
 import ch_rocker_arm_tl_vn_oblique_hub_pin_spec as part
@@ -26,12 +27,9 @@ MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_hub_pin"]
 ITEM = "CLASS Z NO-GO PLUG GAUGE, Ø.4000 X 2 IN SUPPLY"
 # The default "VIEWS ARE REFERENCE ONLY" line read as overriding the one shop
-# dimension, the cut length (machinist review, 3/3 runs).
-_CUT_TEXT = f"{part.CUT_LENGTH / 25.4:.{part.CUT_PLACES}f}".removeprefix("0")
-GENERAL_TEXT = (
-    f"PURCHASED PART; CUT TO {_CUT_TEXT} AT ASSEMBLY, "
-    "OTHER GEOMETRY AS SUPPLIED (REFERENCE)."
-)
+# dimension, the cut length (machinist review, 3/3 runs). The value itself
+# prints once, on the Top view.
+GENERAL_TEXT = "PURCHASED PART; CUT TO LENGTH AT ASSEMBLY, OTHER GEOMETRY AS SUPPLIED (REFERENCE)."
 # tall_top's 96 mm Top cell holds the .79 pin at 2:1 (standard's 64 mm: 1:2).
 VIEW_LAYOUT = "tall_top"
 REFERENCE = "SupplierPinDiameter"
@@ -43,6 +41,32 @@ SHELVES = {REFERENCE: (True, "right"), CUT: (False, "right")}
 SUPPLIER_MARGINS = {"*Top": (0.010, 0.016, 0.060, 0.010)}
 # The cut length's line, right of the pin, before its text shelves.
 CUT_LANE = 0.006
+# The Ø carrier lies on the Top's end-face edge. Construction curves print as
+# continuous thick lines on this sheet (DP_LineFont, this SLDDRW only), so
+# the carrier prints as that edge, not a grey chain over it.
+_CONSTRUCTION_LINE_FONT = (
+    ("swLineFontConstructionCurvesStyle", "swLineCONTINUOUS"),
+    ("swLineFontConstructionCurvesThickness", "swLW_THICK"),
+)
+
+
+def _construction_curves_as_outline(adapter):
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    option = constant("swDetailingNoOptionSpecified")
+    settings = tuple(
+        (name, constant(name), constant(value)) for name, value in _CONSTRUCTION_LINE_FONT
+    )
+
+    def readback() -> None:
+        for name, preference, value in settings:
+            if int(extension.GetUserPreferenceInteger(preference, option)) != value:
+                raise RuntimeError(f"hub pin line font {name} readback differs")
+
+    for name, preference, value in settings:
+        if not extension.SetUserPreferenceInteger(preference, option, value):
+            raise RuntimeError(f"failed to set hub pin line font {name}")
+    readback()
+    return readback
 
 
 def _assert_shop_dimension(display) -> None:
@@ -110,6 +134,7 @@ async def build(adapter) -> dict[str, str]:
     def supplier_dimensions(adapter, views):
         if proofs:
             raise RuntimeError("supplier reference callback repeated")
+        line_font = _construction_curves_as_outline(adapter)
         displays = annotate_supplier_screw(
             adapter, views, dimensions=part.SUPPLIER_REFERENCE_DIMENSIONS,
             formats=part.SUPPLIER_REFERENCE_FORMATS,
@@ -135,6 +160,7 @@ async def build(adapter) -> dict[str, str]:
         stations = shelve_supplier_text(adapter, {**displays, CUT: cut}, SHELVES)
 
         def assert_references():
+            line_font()
             # The supplier-reference contract covers the diameter only; the
             # cut length is the extrusion's shop dimension, checked on its own.
             fresh = assert_supplier_screw(
