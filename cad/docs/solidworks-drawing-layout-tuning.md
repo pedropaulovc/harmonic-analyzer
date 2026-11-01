@@ -2525,19 +2525,30 @@ has no feature dimension of its own, and the core's dimension carries
 another land's fit band. Give it a **construction witness circle** in a
 model sketch on a plane at the land's end, driven by the core's global and
 toleranced in the build, then drag its diameter onto the land in the
-drawing (`build_dt_crankshaft`: `NeckDiaDim` on the seat step's profile,
-`OutboardNeckDia` on the journal's). Its extension lines then lie on the
-land's own silhouettes. The drawing never authors a tolerance: a
-drawing-created dimension cannot carry a model band, and
-`test_drawing_specification_purity` refuses tolerance writes in a draw
-script. Two SDK traps from the drawing-only measurement this replaced:
+drawing (`build_dt_crankshaft`: `NeckDiaDim` on the seat step's profile).
+Its extension lines then lie on the land's own silhouettes. The drawing
+never authors a tolerance: a drawing-created dimension cannot carry a model
+band, and `test_drawing_specification_purity` refuses tolerance writes in a
+draw script. Two SDK traps from the drawing-only measurement this replaced:
 setting `IView.ProjectedDimensions` deletes the view's existing dimensions,
 and a drawing-created circle diameter reads doubled (19.05 for a 9.525 core)
 in projected mode.
 
+A dragged diameter's text runs from its dimension line AWAY from the witness
+plane: dropped left of the witness it prints left, right of it, right (farm
+run 20261101T061623936Z). On a short land the witness plane therefore picks
+the side, and a toleranced callout (`.375 ±.010` is 27 mm at 2:1) can cover
+the next feature entirely. When no clear spot exists, print one witness as
+`2X` and name both lands in its callout (the crankshaft's necks).
+
+A finish symbol's default bent leader runs its knee horizontally left from
+the V before turning to the pick; it crossed a neighbouring diameter's
+leader on the crankshaft's outboard journal. A straight leader avoids that.
+
 A surface-finish symbol attached to a FACE with a smart arrowhead prints a
 dot (farm run 20261023T182235406Z). Where such a symbol needs a straight
-leader with a filled arrow (the crankshaft collar's rear face), call
+leader with a filled arrow (the crankshaft collar's rear face and outboard
+journal), call
 `SetLeader3(1, 0, False, False, False, False)` then
 `SetArrowHeadStyleAtIndex(0, 1)` on its live `IAnnotation`, each requiring an
 integer status of `0`.

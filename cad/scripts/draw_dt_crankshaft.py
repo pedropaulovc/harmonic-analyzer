@@ -89,6 +89,8 @@ from dt_crankshaft_notes import (
     JOURNAL_MATE,
     KNOCKOUT_CALLOUT_ABOVE,
     KNOCKOUT_CALLOUT_BELOW,
+    NECK_LANDS,
+    NECKS,
     PINION_SEAT_MATE,
     SHAFT_LENGTH_MATE,
     SHANK_MATE,
@@ -198,7 +200,7 @@ JOURNAL_FLANK_Y = _sheet_y(JOURNAL_DIA / 2.0)
 # baseline reaches; the last row clears the title block.
 _ROW_PITCH = 0.0095
 _ROW_Y = tuple(round(0.162 - k * _ROW_PITCH, 4) for k in range(10))
-# The eight diameters are authored in end-profile sketches; the end view
+# The seven diameters are authored in end-profile sketches; the end view
 # receives them first and they are then dragged onto the profile (drawing-guidelines.md rule 11 (turned parts read like the lathe):
 # diameters on the side view).  Their temporary end-view spots are clear of
 # everything else on the sheet.
@@ -210,7 +212,6 @@ END_DIAMETERS = {
     "SpigotDiaDim": (0.024, 0.241),
     "CollarDiaDim": (0.024, 0.254),
     "NeckDiaDim": (0.024, 0.228),
-    "OutboardNeckDia": (0.024, 0.215),
 }
 # The drive-pin holes' locations stay in the end view, the one view that
 # shows them as true (visible) circles: each hole from the shaft axis, its
@@ -281,31 +282,29 @@ SIDE_KEEP = {
 # right, onto the leader, so the block stands 4 mm higher, where the leader
 # has climbed 2.8 mm past its landing line's end (machinist review, #290
 # batch 0).
-# Each bare neck carries the core's Ø.375 ±.010 from its own model witness
-# circle (dt_crankshaft_spec.SHAFT_CORE_LANDS): the right one over the
-# Ø9.000's block, the collar-side one on its short land, text above the
-# journal and under the collar-rear finish symbol.
+# The one model witness NeckDiaDim prints the core's Ø.375 ±.010 as 2X over
+# the Ø9.000's block, its callout naming both bare necks: the collar-side
+# land is 2.7 mm on the sheet, and its own 27 mm callout found no clear spot
+# (farm run 10: on the collar, or across the outboard journal's leaders).
 # The Ø9.000's line stays 2 mm past its step, clear of the retention-pin note.
 DIAMETER_POSITIONS = {
     "ShaftDiaDim": (PIN_X - 0.016, 0.2235),
-    # Right of the collar-side neck's .375 ±.010, left of the journal finish
-    # symbol's V.
+    # Its leader left of the journal finish symbol's V.
     "JournalDiaDim": (RELIEF_START_X - 0.0035, 0.224),
     "ReliefDiaDim": (RELIEF_START_X + 0.045, 0.212),
     "PinionSeatDiaDim": (SEAT_STEP_X + 0.002, 0.2125),
     "SpigotDiaDim": (COLLAR_SEAT_X + 0.0075, 0.2215),
     "CollarDiaDim": (SPIGOT_END_X + 0.002, 0.2075),
     "NeckDiaDim": (JOURNAL_END_X + 0.0006, 0.230),
-    "OutboardNeckDia": ((COLLAR_REAR_X + JOURNAL_START_X) / 2.0, 0.1948),
 }
-# The shank's band is the hub's fit; each bare neck has its own loose
+# The shank's band is the hub's fit; the bare necks carry their own loose
 # diameter. The 2X Ø11.388 still names both bearing lands across the relief.
 CALLOUTS_ABOVE = {
     "ShaftDiaDim": SLIDING_FIT,
     "JournalDiaDim": JOURNAL_FIT,
     "PinionSeatDiaDim": SLIDING_FIT,
     "SpigotDiaDim": SPIGOT_AIR,
-    "NeckDiaDim": "",
+    "NeckDiaDim": NECKS,
 }
 # Each drive-pin location names the mate its +/-0.025 serves
 # (crankshaft_notes), in the clear field under its text; the spigot's length
@@ -321,6 +320,7 @@ CALLOUTS_BELOW = {
     "JournalDiaDim": JOURNAL_MATE,
     "PinionSeatDiaDim": PINION_SEAT_MATE,
     "SpigotDiaDim": SPIGOT_AIR_MATE,
+    "NeckDiaDim": NECK_LANDS,
 }
 # The banded far-end stations name their stack on their own row: a callout
 # below would lift the value into the row above.
@@ -901,6 +901,22 @@ def _far_end_rim(adapter: Any, view: Any) -> Any:
     return matches[0]
 
 
+def _straighten_finish_leader(symbol: Any, *, label: str) -> None:
+    """One straight leader ending in a filled arrow on a finish symbol."""
+    if symbol is None:
+        raise RuntimeError(f"{label}: missing captured native symbol")
+    annotation = _early_bound(symbol, "ISFSymbol").GetAnnotation()
+    if annotation is None:
+        raise RuntimeError(f"{label}: missing captured native annotation")
+    annotation = _early_bound(annotation, "IAnnotation")
+    status = annotation.SetLeader3(1, 0, False, False, False, False)
+    if type(status) is not int or status != 0:
+        raise RuntimeError(f"{label}: SetLeader3 failed ({status!r})")
+    status = annotation.SetArrowHeadStyleAtIndex(0, 1)  # swCLOSED_ARROWHEAD
+    if type(status) is not int or status != 0:
+        raise RuntimeError(f"{label}: SetArrowHeadStyleAtIndex failed ({status!r})")
+
+
 def _centres_note_field() -> Box:
     """Text below the pictorial caption, right of FRONT's station witnesses."""
     return (
@@ -1261,15 +1277,20 @@ async def build(adapter: Any) -> dict[str, str]:
         label="16T retention-pin transfer",
     )
     _add_centres_note(adapter, drawing_model, side)
-    add_surface_finish(
-        adapter,
-        side,
-        edge_xy=JOURNAL_FINISHES["outboard_journal"][0],
-        symbol_xy=JOURNAL_FINISHES["outboard_journal"][1],
-        control=surface_finish_by_key(SURFACE_FINISHES, "outboard_journal"),
+    # A straight leader: the factory's bent knee ran left from the V through
+    # the journal diameter's leader (layout audit, farm run 10).
+    _straighten_finish_leader(
+        add_surface_finish(
+            adapter,
+            side,
+            edge_xy=JOURNAL_FINISHES["outboard_journal"][0],
+            symbol_xy=JOURNAL_FINISHES["outboard_journal"][1],
+            control=surface_finish_by_key(SURFACE_FINISHES, "outboard_journal"),
+            label="crankshaft outboard journal finish",
+            entity_type="SILHOUETTE",
+            char_height=0.0025,
+        ),
         label="crankshaft outboard journal finish",
-        entity_type="SILHOUETTE",
-        char_height=0.0025,
     )
     add_surface_finish(
         adapter,
@@ -1282,36 +1303,23 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=0.0025,
     )
     collar_rear_face = _collar_rear_face(_collar_rear_rim(adapter, side))
-    collar_rear_symbol = add_surface_finish(
-        adapter,
-        side,
-        entity=collar_rear_face,
-        entity_type="FACE",
-        leader_attach_xy=COLLAR_REAR_FINISH[0],
-        symbol_xy=COLLAR_REAR_FINISH[1],
-        control=surface_finish_by_key(SURFACE_FINISHES, "collar_rear_face"),
-        label="crankshaft collar rear (post boss) face finish",
-        char_height=0.0025,
+    # A straight native route; the symbol origin and the exact physical tip
+    # stay the factory's. A smart arrowhead on a FACE attachment prints a dot
+    # (swDOT_ARROWHEAD, farm run 20261023T182235406Z).
+    _straighten_finish_leader(
+        add_surface_finish(
+            adapter,
+            side,
+            entity=collar_rear_face,
+            entity_type="FACE",
+            leader_attach_xy=COLLAR_REAR_FINISH[0],
+            symbol_xy=COLLAR_REAR_FINISH[1],
+            control=surface_finish_by_key(SURFACE_FINISHES, "collar_rear_face"),
+            label="crankshaft collar rear (post boss) face finish",
+            char_height=0.0025,
+        ),
+        label="crankshaft collar rear finish",
     )
-    if collar_rear_symbol is None:
-        raise RuntimeError("crankshaft collar rear finish: missing captured native symbol")
-    collar_rear_annotation = _early_bound(collar_rear_symbol, "ISFSymbol").GetAnnotation()
-    if collar_rear_annotation is None:
-        raise RuntimeError("crankshaft collar rear finish: missing captured native annotation")
-    # This one symbol needs a straight native route; keep the shared finish
-    # factory's default, the symbol origin, and the exact physical tip intact.
-    # A smart arrowhead on a FACE attachment prints a dot (swDOT_ARROWHEAD,
-    # farm run 20261023T182235406Z); the edge-on face line takes the filled
-    # arrow it carried when attached to the rim.
-    collar_rear_annotation = _early_bound(collar_rear_annotation, "IAnnotation")
-    status = collar_rear_annotation.SetLeader3(1, 0, False, False, False, False)
-    if type(status) is not int or status != 0:
-        raise RuntimeError(f"crankshaft collar rear finish: SetLeader3 failed ({status!r})")
-    status = collar_rear_annotation.SetArrowHeadStyleAtIndex(0, 1)  # swCLOSED_ARROWHEAD
-    if type(status) is not int or status != 0:
-        raise RuntimeError(
-            f"crankshaft collar rear finish: SetArrowHeadStyleAtIndex failed ({status!r})"
-        )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     # The end view prints hidden lines removed with the rest (drawing-guidelines.md
