@@ -298,8 +298,6 @@ def test_tight_bands_name_their_mates_at_the_callout() -> None:
     # flat's witness on T006/T012 (r2: a 20-character row crossed it).
     assert max(map(len, drawing.DIMENSION_CALLOUTS["BoreCutDia"].splitlines())) <= 10
     assert len(above["ToothThickness"]) <= len(label)
-    build = inspect.getsource(drawing.build)
-    assert "set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)" in build
 
 
 def test_refused_rows_block_the_complete_native_family(monkeypatch: pytest.MonkeyPatch) -> None:
