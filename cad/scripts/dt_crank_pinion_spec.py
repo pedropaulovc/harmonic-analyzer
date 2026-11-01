@@ -579,14 +579,10 @@ PIN_HOLE_PROCESS = "\n".join(
 )
 # The shaft's narrower field needs the reaming instruction split before the
 # pin identity, without changing any process words or the four-line height.
-# The shaft has no reference diameter of its own on the hole, so the note
-# names the pin's size for the drill and reamer (machinist review).
+# A note carries no dimension: the pin's size is on MHA-DT-29's own sheet.
 CRANKSHAFT_PIN_HOLE_PROCESS = pin_hole_note(
     PINION_NUMBER, "AT ITS BOSS MID-LENGTH"
-).replace(
-    "\nREAM TO FIT PIN ",
-    f" REAM TO FIT\n(\N{DIAMETER SIGN}{inch_text(PIN_DIA, PIN_HOLE_DIA_PLACES)}) PIN ",
-)
+).replace("\nREAM TO FIT PIN ", " REAM TO FIT\nPIN ")
 
 # No roughness symbol: the bore is pinned to the crankshaft (match-drilled
 # pin MHA-DT-29), so it turns with the shaft and never runs, slides or
