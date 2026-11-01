@@ -23,3 +23,8 @@ ch-fulcrum-keeper:
       where: "top view, foot-hole station '.18' off the foot tip (foot end face), beside the crown tap's '.16' off the inner lug face"
       finding: "the top view uses two origins: the foot hole is located .18 off the foot tip while the crown tap and the front view's .32 and .65 baseline from the inner lug face (rule 10)"
       reason: "owner ruling 2026-10-28 (option D): the hole is located off the foot tip because that protects the counterbore tip wall, .0726 at the full worst case (.18 at .XX, the \u00d8.150 counterbore at DRILLED HOLES +.004, two .010 edge breaks, 0.3 deg run-off over its .083 depth); located off the inner lug face (.47) the .65's band joins the stack and leaves .0626"
+    - id: "RV-04"
+      kind: "minor"
+      where: "top view, the foot counterbore \u00d8.150 located .18 off the foot tip: the wall between the counterbore and the foot tip"
+      finding: "counterbore-to-tip wall .0726 at the full worst case, below the .080 target (rule 17)"
+      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions. The keeper foot is short; .0726 is the wall at .18 -.01 with the \u00d8.154 largest counterbore, two .010 edge breaks and 0.3 deg run-off over its .083 depth, above the .060 floor; the \u00d8.150 counterbore is the #2-56 head's \u00d8.140 plus .005 a side, and the inner-lug-face origin leaves .0626 (RV-03)"
