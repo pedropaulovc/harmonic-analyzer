@@ -694,14 +694,25 @@ def test_extension_preparation_only_shows_owners_before_capture(monkeypatch, spe
         raise AssertionError("preparation must not project before capture")
 
     monkeypatch.setattr(layout, "_show_hidden_owners", show_owners)
-    assert (
-        layout.prepare_extension_spring_diagrams(
-            object(),
-            views,
-            reference_bounds=unavailable_bounds,
-        )
-        == ()
-    )
+    fonts = []
+
+    def line_font(adapter):
+        fonts.append(adapter)
+        return readback
+
+    def readback():
+        return None
+
+    monkeypatch.setattr(layout, "_construction_curves_as_outline", line_font)
+    adapter = object()
+    # The coil OD prints closed, not as construction dash-gap arcs, and its
+    # readback runs with the other settled checks.
+    assert layout.prepare_extension_spring_diagrams(
+        adapter,
+        views,
+        reference_bounds=unavailable_bounds,
+    ) == (readback,)
+    assert fonts == [adapter]
     assert shown == {
         "free_front": ("SupplierFreeLengthReference",),
         "free_right": ("SupplierNominalSections",),

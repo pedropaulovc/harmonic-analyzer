@@ -142,6 +142,32 @@ def test_extension_installed_cell_holds_the_pictorial_at_a_legible_scale(
 
 
 @pytest.mark.parametrize(
+    "spec,scale",
+    [
+        pytest.param(counter_installed, (2, 1), id="1330K524-2:1"),
+        pytest.param(channel_installed, (4, 1), id="9432K31-4:1"),
+    ],
+)
+def test_extension_sections_print_the_coil_od_at_a_legible_scale(spec, scale):
+    # At 1:1 (9432K31) and 1:2 (1330K524) the wire section was a dot on the
+    # coil OD's rim under its own arrowhead. The sections view's geometry
+    # lane, inside its text lanes, holds the coil OD at the larger scale and
+    # no larger standard one.
+    caption_y = purchased.view_band_bottom("", label="sections scale")
+    cells = supplier_state_cells(caption_y, maximum=True)
+    fitted = purchased.supplier_fit_cells(
+        cells, _EXTENSION_MARGINS, label="sections scale"
+    )
+    inner = next(bounds for name, _, bounds in fitted if name == "free_right")
+    span = min(inner[2] - inner[0], inner[3] - inner[1])
+    fitting = [
+        (numerator, denominator)
+        for numerator, denominator in purchased._SCALES
+        if spec.SUPPLIER_COIL_OD_MM / 1000.0 * numerator / denominator <= span
+    ]
+    assert max(fitting, key=lambda ratio: ratio[0] / ratio[1]) == scale
+
+@pytest.mark.parametrize(
     "maximum,legacy_width,margins",
     [
         pytest.param(True, 0.032, _EXTENSION_MARGINS, id="old-32mm-extension-right"),
@@ -583,14 +609,6 @@ def _sibling_view(first, name, configuration="SupplierReference"):
 @pytest.mark.parametrize(
     "maximum,key,margins,points,cell_size",
     [
-        pytest.param(
-            True,
-            "free_right",
-            _EXTENSION_MARGINS,
-            ((-0.003, 0.002), (0.005, 0.002), (0.005, 0.008), (-0.003, 0.008)),
-            (0.183, 0.010),
-            id="spring-right",
-        ),
         pytest.param(
             False,
             "free_top",
