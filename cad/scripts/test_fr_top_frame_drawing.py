@@ -25,6 +25,7 @@ from fr_frame_attachment_spec import (
     TOP_CASTING_TAP_DRILL_DEPTH,
     COLUMN_SOCKET_DIAMETER,
     TOP_SCREW_SEAT_Z,
+    TOP_FRAME_MID_Y,
     TOP_SCREW_Y,
     TUBE_CROSS_HOLE_DIAMETER,
 )
@@ -57,16 +58,21 @@ def test_nominal_corner_bores_and_cap_recesses_clear_the_installed_stack() -> No
         0.1016,
         abs_tol=1e-9,
     )
-    assert part.CAP_RECESS_FLOOR_Y - part.SIDE_TAP_DRILL_DIA / 2.0 > 0.0
+    assert part.CAP_RECESS_FLOOR_Y - (spec.SCREW_AXIS_Y + part.SIDE_TAP_DRILL_DIA / 2.0) > 0.0
     assert part.CAP_RECESS_DIAMETER_BAND == pytest.approx((0.2032, 0.0))
     assert part.CAP_RECESS_DEPTH_BAND == pytest.approx((0.3048, 0.0))
-    recess_floor_world = TOP_SCREW_Y + part.CAP_RECESS_FLOOR_Y
-    assert math.isclose(CAP_MOUTH_Y - recess_floor_world, 1.51765, abs_tol=1e-6)
+    recess_floor_world = TOP_FRAME_MID_Y + part.CAP_RECESS_FLOOR_Y
+    assert math.isclose(CAP_MOUTH_Y - recess_floor_world, 1.44145, abs_tol=1e-6)
     assert math.isclose(
         recess_floor_world - (TOP_SCREW_Y + TUBE_CROSS_HOLE_DIAMETER / 2.0),
-        3.937,
+        4.0513,
         abs_tol=1e-6,
     )
+    # The taps' plane is the attachment's TOP_SCREW_Y in the casting's frame:
+    # .72 below the rail top, .90 below the .18 boss top.
+    assert spec.SCREW_AXIS_Y == pytest.approx(TOP_SCREW_Y - TOP_FRAME_MID_Y)
+    assert spec.SCREW_AXIS_BELOW_RAIL_TOP == pytest.approx(0.72 * 25.4)
+    assert part.HALF_H + part.BOSS_ABOVE - spec.SCREW_AXIS_Y == pytest.approx(0.90 * 25.4)
 
 
 def test_four_cross_taps_are_bottoming_10_32_with_tooling_lead() -> None:
@@ -142,12 +148,14 @@ def test_counterbore_floor_keeps_rule_12_target_to_the_cap_recess() -> None:
     )
     recess_radius = (part.CAP_RECESS_DIAMETER + part.CAP_RECESS_DIAMETER_BAND[0]) / 2.0
     recess_floor = part.CAP_RECESS_FLOOR_Y - part.CAP_RECESS_DEPTH_BAND[0]
-    rim = spec.PRINTED_LINEAR_BAND_MM[axis_places] + spec.printed_limit(
-        part.COUNTERBORE_DIA, seat_places, 1.0
-    ) / 2.0
+    rim = (
+        spec.SCREW_AXIS_Y
+        + spec.PRINTED_LINEAR_BAND_MM[axis_places]
+        + spec.printed_limit(part.COUNTERBORE_DIA, seat_places, 1.0) / 2.0
+    )
     ligament = math.hypot(floor_offset - recess_radius, recess_floor - rim)
     assert ligament == pytest.approx(part.COUNTERBORE_PRINTED_CAP_LIGAMENT)
-    assert ligament == pytest.approx(2.803, abs=5e-4)
+    assert ligament == pytest.approx(2.790, abs=5e-4)
     assert ligament >= 2.032
     assert part.COUNTERBORE_PRINTED_NEAR_WALL >= 2.032
     assert part.COUNTERBORE_PRINTED_HEAD_RECESS > 0.0
@@ -167,9 +175,9 @@ def test_cross_tap_ends_stay_in_the_real_boss_and_side_web_union() -> None:
     assert part.SIDE_TAP_THREAD_END_Z == pytest.approx(thread_end_z)
     assert part.SIDE_TAP_DRILL_POINT_Z == pytest.approx(drill_point_z)
     assert 0.0 < drill_point_z < thread_end_z < part.WEB_IN_Z
-    assert part.SIDE_TAP_THREAD_WALL_MARGIN == pytest.approx(4.0894)
-    assert part.SIDE_TAP_DRILL_WALL_MARGIN == pytest.approx(4.4831)
-    assert major_dia / 2.0 < part.HALF_H
+    assert part.SIDE_TAP_THREAD_WALL_MARGIN == pytest.approx(4.064)
+    assert part.SIDE_TAP_DRILL_WALL_MARGIN == pytest.approx(4.4577)
+    assert major_dia / 2.0 < part.HALF_H - abs(spec.SCREW_AXIS_Y)
 
 
 def test_smaller_bosses_leave_real_plan_corners_and_the_outward_foot_seat() -> None:
@@ -326,8 +334,8 @@ def test_boss_additions_match_an_independent_t_section_area_integral() -> None:
     actual_upper, actual_lower = part._boss_add_volumes()
     assert actual_upper == pytest.approx(upper, abs=10.0)
     assert actual_lower == pytest.approx(lower, abs=10.0)
-    assert actual_upper == pytest.approx(18706.158033061965)
-    assert actual_lower == pytest.approx(28532.016293968834)
+    assert actual_upper == pytest.approx(18849.255507527712)
+    assert actual_lower == pytest.approx(28692.886599139645)
 
 
 def test_counterbore_and_cross_tap_volumes_match_smooth_integrals() -> None:
@@ -376,13 +384,13 @@ def test_top_rim_chamfers_cover_new_corners_and_window_mitres() -> None:
     # The wider bar shortens the two window rims by its extra width of break
     # (c^2 / 2 mm^2 per mm).
     assert window == pytest.approx(1600.1415656888973, rel=2e-4)
-    assert part.WEB_T == pytest.approx(13.0048)  # .512
+    assert part.WEB_T == pytest.approx(12.954)  # .51
     root_chord = math.sqrt((part.BOSS_DIA / 2.0) ** 2 - (part.WEB_T / 2.0) ** 2)
     side_run = 2.0 * (abs(part.FRONT_COLUMN_Z) - root_chord)
     front_rear_run = 2.0 * (part.COLUMN_X - root_chord)
     outer_run = 2.0 * side_run - part.HUB_RIB_W + 2.0 * front_rear_run
     window_run = outer_run - 2.0 * (part.LAND_X1 - part.LAND_X0)
-    assert root_chord == pytest.approx(21.517997937540564)
+    assert root_chord == pytest.approx(21.525657063142113)
     fillet_area = (1.0 - math.pi / 4.0) * part.ROOT_FILLET_R**2
     crossbar_run = 2.0 * 2.0 * part.BAR_POCKET_Z
     assert part._t_root_add() == pytest.approx(
@@ -600,7 +608,7 @@ def test_flange_corner_crop_chord_holds_at_every_printed_limit() -> None:
         part.RAIL_W_FR, "front rear flange width", "rail web thickness"
     )
     web_faces = [side[1] - side_overhang, front_rear[1] - fr_overhang]
-    assert web_faces == pytest.approx([6.8199, 6.9469], abs=5e-5)
+    assert web_faces == pytest.approx([6.858, 6.985], abs=5e-5)
     assert part.CORNER_CROP_WEB_FACE_MAX == pytest.approx(max(web_faces))
     assert min(min(point) for point in part.CORNER_CROP_TRIANGLE) > max(web_faces)
 
@@ -689,7 +697,7 @@ def test_t_flange_underside_breaks_need_a_printed_shelf() -> None:
         ),
     }
     assert expected == pytest.approx(
-        {"side rail": 7.1501, "front/rear rail": 9.0551, "crossbar": 2.5781}
+        {"side rail": 7.112, "front/rear rail": 9.017, "crossbar": 2.540}
     )
     assert part.T_FLANGE_SHELF_PRINTED_MIN == pytest.approx(expected)
     needed = part.EDGE_BREAK_PRINTED_MAX + part.EDGE_BREAK_SLIVER_MIN
@@ -1131,16 +1139,16 @@ def test_transferred_keeper_receiver_keeps_real_normal_wall_at_printed_bands() -
     assert part.KEEPER_TAP_X == part.COLUMN_X + keeper.KEEPER_FITUP_X_FROM_WEB_MM
     assert part.KEEPER_MAX_TRANSVERSE_OFFSET == pytest.approx(0.53)
     assert part.KEEPER_MAX_WEB_CENTRE_OFFSET == pytest.approx(3.53)
-    assert part.KEEPER_MIN_WEB_HALF_WIDTH == pytest.approx(6.4389)
+    assert part.KEEPER_MIN_WEB_HALF_WIDTH == pytest.approx(6.35)
     assert part.KEEPER_MIN_ROOT_RADIUS == pytest.approx(2.794)
     assert part.KEEPER_MIN_FLANGE_THICKNESS == pytest.approx(7.874)
     assert part.KEEPER_MAX_FULL_THREAD_DEPTH == pytest.approx(7.7216)
     assert part.KEEPER_TAP_THREAD_WALL_MARGIN_NO_WANDER == pytest.approx(
-        2.6777298407359256
+        2.6030314247741773
     )
-    assert part.KEEPER_TAP_DRILL_WALL_MARGIN_NO_WANDER == pytest.approx(1.9691)
-    assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(2.6168179913276948)
-    assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(1.9081881505917684)
+    assert part.KEEPER_TAP_DRILL_WALL_MARGIN_NO_WANDER == pytest.approx(1.8802)
+    assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(2.5421195753659465)
+    assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(1.8192881505917686)
     assert (
         min(part.KEEPER_TAP_THREAD_WALL_MARGIN, part.KEEPER_TAP_DRILL_WALL_MARGIN)
         >= 1.524
@@ -1860,7 +1868,7 @@ def test_set_screw_boss_carries_the_spot_face_proud_of_the_rail() -> None:
     ]
     assert spec.printed_limit(spec.HUB_SET_SPOT_DIA, 2, -1.0) > 6.35 * math.sqrt(2.0)
     assert part.SET_SPOT_LAND_MIN == pytest.approx(
-        {"across the boss": 2.794, "under the flange": 3.6449}
+        {"across the boss": 2.794, "under the flange": 3.556}
     )
     assert min(part.SET_SPOT_LAND_MIN.values()) >= part.EDGE_BREAK_SLIVER_MIN
     assert spec.HUB_SET_BOSS_W < part.HUB_RIB_W
@@ -2188,114 +2196,31 @@ def test_knife_hanger_is_a_plain_10_loose_drilled_hole() -> None:
     assert part.STUD_Z_REAR + spec.HANGER_WASHER.OD_MAX/2 < part.INNER_Z+part.GUSSET
 
 
-def test_knife_hanger_wizard_is_a_plain_clearance_row_from_the_underside() -> None:
-    """A plain native Hole Wizard clearance row. A plain hole ignores
-    HoleFit, so _holes writes the pinned 6.045 over any seeded size and the
-    build reads the cut diameter back; no depth is driven."""
-    import _holes
-
-    hole = spec.HANGER_HOLE_SPEC
-    # swWzdHole, swStandardAnsiInchScrewClearances.
-    assert _holes._KINDS[hole.kind] == (2, 22)
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    call = source[source.index("hanger_wizard = wizard_holes(") :]
-    call = call[: call.index("\n    )\n")]
-    assert "HANGER_HOLE_SPEC," in call
-    assert "expect_dia_mm=HANGER_CLEARANCE_DIA" in call
-    assert "HoleSpec(" not in call
-    # Entered at the faced underside (outward normal -Y), drilled to the top.
-    assert "[[HANGER_X, -HALF_H, STUD_Z_FRONT], [HANGER_X, -HALF_H, STUD_Z_REAR]]," in call
-    assert "(0.0, -1.0, 0.0)," in call
-    assert 'name="StudHoles"' in call
-    # The hole runs the full grip; nothing drives a wizard depth.
-    assert (
-        "v_hangers = 2.0 * math.pi * (HANGER_CLEARANCE_DIA / 2.0) ** 2 * RING_HEIGHT"
-        in source
-    )
-    assert "hanger_depth" not in source and "HANGER_SPOTFACE" not in source
-
-
-def test_hanger_through_diameter_has_a_native_unilateral_band(monkeypatch) -> None:
+def test_hanger_through_diameter_takes_the_title_block_drilled_band(monkeypatch) -> None:
     from types import SimpleNamespace
 
-    assert spec.HANGER_CLEARANCE_DIA_BAND == pytest.approx((0.1016, 0.0))  # +.004/0
+    assert spec.HANGER_CLEARANCE_DIA_BAND == pytest.approx((spec.DRILL_OVERSIZE, 0.0))
     assert spec.HANGER_CLEARANCE_DIA_MIN == pytest.approx(6.045)
     assert spec.HANGER_CLEARANCE_DIA_MAX == pytest.approx(6.1466)
-    monkeypatch.setattr(part, "_early_bound", lambda entity, _kind: entity)
-    monkeypatch.setattr(drawing, "_early_bound", lambda entity, _kind: entity)
-    precisions = []
-    monkeypatch.setattr(
-        part, "_set_tolerance_precision",
-        lambda *_args, **kwargs: precisions.append(kwargs),
-    )
-
-    class Tolerance:
-        Type = 0
-        minimum = maximum = 0.0
-
-        def SetValues(self, minimum, maximum):
-            self.minimum, self.maximum = minimum, maximum
-            return True
-
-        def GetMinValue(self):
-            return self.minimum
-
-        def GetMaxValue(self):
-            return self.maximum
-
-    def display(name, value):
-        dimension = SimpleNamespace(FullName=name, SystemValue=value, Tolerance=Tolerance())
-        return SimpleNamespace(GetDimension2=lambda _index: dimension)
-
-    # Deliberately put the plain wizard's through depth before its diameter.
-    displays = [
-        display("Thru Hole Depth@StudHoles", part.RING_HEIGHT / 1000.0),
-        display("Thru Hole Dia.@StudHoles", 0.006045),
-    ]
-    feature = SimpleNamespace(
-        GetFirstDisplayDimension=lambda: displays[0],
-        GetNextDisplayDimension=lambda value: (
-            displays[displays.index(value)+1] if value is not displays[-1] else None
-        ),
-    )
-    part._tolerance_hanger_clearance(feature)
-    native = displays[-1].GetDimension2(0).Tolerance
-    assert native.Type == 2
-    assert (native.GetMinValue(), native.GetMaxValue()) == pytest.approx(
-        (0.0, 0.0001016), abs=1e-12,
-    )
-    assert displays[0].GetDimension2(0).Tolerance.Type == 0
-    assert precisions[-1]["places"] == 3
 
     from win32com.client import dynamic
 
-    def length_interface(raw, kind):
-        assert kind == "ICalloutLengthVariable"
-        return raw
-
-    monkeypatch.setattr(drawing, "_early_bound", length_interface)
     monkeypatch.setattr(dynamic, "Dispatch", lambda pointer: pointer)
     # A plain HOLE-THRU callout's diameter variable is hw-diam; the
     # counterbore format's hw-thruholedia must not be mistaken for it.
-    clearance = SimpleNamespace(VariableName="hw-diam")
-    spot = SimpleNamespace(VariableName="hw-thruholedia", ToleranceType=0)
-    # Only the late object exposes metadata; the concrete interface exposes
-    # length precision. Binding it as generic ICalloutVariable must fail.
-    raw_clearance = SimpleNamespace(_oleobj_=clearance, TolerancePrecision=0)
-    raw_spot = SimpleNamespace(_oleobj_=spot, TolerancePrecision=0)
+    clearance = SimpleNamespace(VariableName="hw-diam", ToleranceType=2)
+    spot = SimpleNamespace(VariableName="hw-thruholedia", ToleranceType=2)
     callout = SimpleNamespace(
-        GetHoleCalloutVariables=lambda: (raw_spot, raw_clearance)
+        GetHoleCalloutVariables=lambda: (
+            SimpleNamespace(_oleobj_=spot), SimpleNamespace(_oleobj_=clearance),
+        )
     )
-    drawing._tolerance_hanger_callout_clearance(callout)
-    assert clearance.ToleranceType == 2
-    assert (clearance.ToleranceMin, clearance.ToleranceMax) == pytest.approx(
-        (0.0, 0.0001016), abs=1e-12,
-    )
-    assert raw_clearance.TolerancePrecision == 3
-    assert spot.ToleranceType == 0 and raw_spot.TolerancePrecision == 0
+    drawing._clear_hanger_callout_band(callout)
+    assert clearance.ToleranceType == 0
+    assert spot.ToleranceType == 2
     with pytest.raises(RuntimeError, match="through-diameter variable"):
-        drawing._tolerance_hanger_callout_clearance(
-            SimpleNamespace(GetHoleCalloutVariables=lambda: (raw_spot,)),
+        drawing._clear_hanger_callout_band(
+            SimpleNamespace(GetHoleCalloutVariables=lambda: (SimpleNamespace(_oleobj_=spot),)),
         )
 
 
@@ -5124,7 +5049,7 @@ def test_boss_and_socket_diameters_take_one_near_side_arrow() -> None:
 def test_cap_recess_bands_preserve_the_counterbore_ligament() -> None:
     assert part.CAP_RECESS_DIAMETER_BAND == pytest.approx((0.2032, 0.0))
     assert part.CAP_RECESS_DEPTH_BAND == pytest.approx((0.3048, 0.0))
-    assert part.COUNTERBORE_PRINTED_CAP_LIGAMENT == pytest.approx(2.8031348397820595)
+    assert part.COUNTERBORE_PRINTED_CAP_LIGAMENT == pytest.approx(2.790100688147285)
 
 
 def test_ream_size_parks_above_the_plan_right_of_the_rear_frame() -> None:
@@ -5294,7 +5219,7 @@ def test_hanger_callout_states_drill_thru_on_the_native_rows(monkeypatch) -> Non
         lambda _display, precision, *, label: calls.append(("places", precision)),
     )
     monkeypatch.setattr(
-        drawing, "_tolerance_hanger_callout_clearance", lambda _display: calls.append("band"),
+        drawing, "_clear_hanger_callout_band", lambda _display: calls.append("band"),
     )
     display = Display()
     drawing._set_hanger_hole_callout(display)
@@ -5752,7 +5677,7 @@ def test_keeper_facing_note_is_the_part_property_and_the_seats_carry_no_frame() 
     # method, no new dimension (machinist review r13).
     assert spec.DRAWING_NOTES_B.splitlines() == [
         "WHOLE TOP EXCEPT 4 BOSSES:",
-        "Ra 125 µIN.",
+        "Ra 125.",
     ]
     for name in ("KEEPER_FLATNESS_NOTE", "KEEPER_FLATNESS_QUALIFIER", "KEEPER_FLATNESS_FRAME_XY"):
         assert not hasattr(drawing, name), name
@@ -5815,13 +5740,13 @@ def test_keeper_facing_note_is_the_part_property_and_the_seats_carry_no_frame() 
 
 
 def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> None:
-    assert part.WEB_T == pytest.approx(13.0048)
+    assert part.WEB_T == pytest.approx(12.954)
     assert part.WEB_OUT_X - part.WEB_IN_X == pytest.approx(part.WEB_T)
     assert (part.HALF_H, part.FLANGE, part.FLANGE_BOT_Y) == pytest.approx(
         (18.2499, 8.128, 10.1219)
     )
-    assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(2.6168179913276948)
-    assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(1.9081881505917684)
+    assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(2.5421195753659465)
+    assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(1.8192881505917686)
     assert min(part.KEEPER_FOOT_BOSS_MARGINS) >= 1.016
     # Along the rail the faced top runs boss to boss, so the fitted foot
     # stays on it exactly when it clears the bosses at the printed bands.
@@ -5941,7 +5866,7 @@ def test_underside_facing_note_is_the_part_property_carrying_the_seat_finish() -
     assert spec.DRAWING_NOTES_C.splitlines() == [
         "UNDERSIDE PLANE BETWEEN BOSSES",
         "(MHA-SM-02 KNIFE-MOUNT SEATS):",
-        "Ra 125 µIN; BOSS BOTTOMS AND",
+        "Ra 125; BOSS BOTTOMS AND",
         "HUB GUSSETS EXCLUDED.",
     ]
     assert _config.parts("sm-knife-mount")["number"] == "MHA-SM-02"

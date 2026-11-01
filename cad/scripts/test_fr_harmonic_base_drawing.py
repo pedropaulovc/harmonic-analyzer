@@ -2801,6 +2801,7 @@ def test_review_b2_dimensions_print_xx_and_sit_on_the_01_grid() -> None:
         ("DeckEdgeBreak", "DeckEdgeChamfer"),
         ("TopRimBreaks", "TopRimChamfer"),
         ("BottomEdgeBreak", "BottomEdgeChamfer"),
+        ("BaseSpotFaceRearProfile", "SpotFaceDia"),
         ("LongRibProfile", "LongRibY"),
         *(("CrossTapLugProfile", n) for n in ("Lug1X", "Lug3X", "Lug1Y", "Lug0Y")),
     ):
@@ -2812,6 +2813,7 @@ def test_review_b2_dimensions_print_xx_and_sit_on_the_01_grid() -> None:
         "PocketWid": (2.0 * spec.POCKET_HALF_Z, 9.87),
         "DeckEdgeChamfer": (spec.DECK_EDGE_BREAK, 0.03),
         "RimChamfer": (part.RIM_CHAMFER, 0.06),
+        "SpotFaceDia": (part.SCREW_SPOTFACE_DIAMETER, 0.35),
         "Lug1X": (part.BOTTOM_LENGTH / 2.0 - spec.CROSS_TAP_LUG_INNER_X, 1.56),
         "Lug3X": (part.BOTTOM_LENGTH / 2.0 + spec.CROSS_TAP_LUG_INNER_X, 16.44),
         "Lug1Y": (spec.BOTTOM_WIDTH / 2.0 - spec.CROSS_TAP_LUG_INNER_Z, 2.70),
@@ -2905,6 +2907,43 @@ def test_sheet_scale_setter_requires_native_readback(monkeypatch) -> None:
     stale, _ = _scaled_sheet(lambda _calls: (0, 0, 1.0, 4.0, False))
     with pytest.raises(RuntimeError, match="scale did not persist"):
         sheet._set_active_sheet_scale(stale, (1, 1))
+
+
+@pytest.mark.parametrize("preinserted", (0, 22))
+def test_center_marks_are_inserted_only_on_a_bare_view(monkeypatch, preinserted) -> None:
+    # Inch review b2: the template inserts marks on view placement, and the
+    # unconditional auto_center_marks pass stacked a second identical set.
+    from types import SimpleNamespace
+
+    import draw_fr_harmonic_base as sheet
+
+    marks = [object()] * preinserted
+    view = SimpleNamespace(GetAnnotationsByType=lambda kind: tuple(marks) if kind == 13 else ())
+    calls = []
+
+    def insert(_adapter, target, **kwargs):
+        calls.append(kwargs)
+        marks.extend([object()] * 22)
+        return True
+
+    monkeypatch.setattr(sheet, "_early_bound", lambda value, _name: value)
+    monkeypatch.setattr(sheet, "auto_center_marks", insert)
+    assert sheet.HOLE_TOP_CENTER_MARKS == 22 and sheet.HOLE_SIDE_CENTER_MARKS == 2
+    sheet._require_single_center_marks(None, view, 22, label="plan")
+    assert calls == ([] if preinserted else [{"holes": True, "size": 0.0025}])
+    marks.extend([object()] * 22)
+    with pytest.raises(RuntimeError, match="carries 44 center marks, expected 22"):
+        sheet._require_single_center_marks(None, view, 22, label="plan")
+
+
+def test_hole_sheet_views_take_the_guarded_center_marks_only() -> None:
+    from pathlib import Path
+
+    import draw_fr_harmonic_base as sheet
+
+    source = Path(sheet.__file__).read_text(encoding="utf-8")
+    assert source.count("auto_center_marks(") == 1
+    assert source.count("_require_single_center_marks(\n        adapter, hole_") == 2
 
 
 def test_retained_pocket_walls_socket_bosses_and_cross_tap_lugs_keep_their_contracts() -> None:
@@ -3827,9 +3866,9 @@ def test_height_baselines_preserve_the_spotface_top_land_at_loose_limits() -> No
     land = spec.cross_screw_top_land_worst_case_mm(
         part.BASE_SCREW_Y, part.SCREW_SPOTFACE_DIAMETER, band
     )
-    # (1.88 - .01) - (1.50 + .01) - (.354 + .01) / 2 = .178.
+    # (1.88 - .01) - (1.50 + .01) - (.350 + .01) / 2 = .180.
     assert land == pytest.approx(
-        ((1.88 - 0.01) - (1.50 + 0.01) - (0.354 + 0.01) / 2.0) * 25.4
+        ((1.88 - 0.01) - (1.50 + 0.01) - (0.350 + 0.01) / 2.0) * 25.4
     )
     assert land >= spec.CROSS_SCREW_TOP_LAND_MIN_MM == WALL_TARGET_MM
 
@@ -5090,7 +5129,7 @@ def test_native_r7_lower_b_failure_and_conditional_real_cut_endpoint_clearance()
     assert sheet.UNDERSIDE_CUT_X == pytest.approx(
         (part.COLUMN_X + part.SCREW_SPOTFACE_DIAMETER / 2.0 + part.POCKET_HALF_X) / 2.0
     )
-    assert sheet.UNDERSIDE_CUT_X == pytest.approx(205.90, abs=0.01)
+    assert sheet.UNDERSIDE_CUT_X == pytest.approx(205.88, abs=0.01)
     dy = sheet.UNDERSIDE_CUT_START_Y - 0.145
     assert dy == pytest.approx(-0.010)
     assert sheet.UNDERSIDE_CUT_END_Y == pytest.approx(0.225)

@@ -174,7 +174,7 @@ FRONT_KEEP = {
 }
 # The cavity corner CornerFillet's dimension attaches to, as sheet signs.
 CAVITY_RADIUS_CORNER = (1, 1)
-# RimChamfer is ONE model feature: 1.27 x 45 on every edge of the two slant
+# RimChamfer is ONE model feature: .06 x 45 on every edge of the two slant
 # faces and the two end faces (all twelve outside edges plus both pocket
 # rims) and on the cavity rims on both web faces. Its one size sits on an
 # outside corner, so the caption names everything else it governs; drawn
@@ -377,12 +377,14 @@ HOLE_TABLE_SIZE_COLUMN = 3
 HOLE_TABLE_SIZE_HEADING = "DRILL"
 # The four foot clearances match the base's hold-down taps (machinist review
 # b2: the .XXX table named no mate). MHA-FR-01's own hole table tags those
-# taps C2-C5 at the same 4.750 x 1.374 pattern. The note stands under the
-# table's right end, right of the seat callout and over the title block.
+# taps C2-C5 at the same 4.750 x 1.374 pattern. A free note anchors at its
+# text's top-left (inspect-3: at x 392 the 39.4 mm block crossed the right
+# border), so it starts 23 mm right of the seat callout's last character,
+# its top 4.7 mm under the table, above the title block.
 HOLE_PATTERN_NOTE = (
     f"HOLE PATTERN\nMATCHES\n{_config.parts('fr-harmonic-base')['number']} C2-C5"
 )
-HOLE_PATTERN_NOTE_XY = (0.392, 0.084)
+HOLE_PATTERN_NOTE_XY = (0.355, 0.092)
 
 
 @_telemetry.traced("drawing.rocker_support.hole_table_process")

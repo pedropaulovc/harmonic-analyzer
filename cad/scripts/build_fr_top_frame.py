@@ -7,18 +7,19 @@ measurement anchored on the 394 x 224 column pitch), the GT bundle solve
 rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
 
 * Rail band y 999.7058..1036.2058 (H 36.4998 = 1.437; the old 41-tall band
-  top 1040.7 was the BOSS top -- the rail top face is 4.4958 lower). Assembly
+  top 1040.7 was the BOSS top -- the rail top face is 4.572 lower). Assembly
   inserts the part at ring mid-plane TOP_FRAME_MID_Y = 1017.9558.
 * Side rails (along Z at x +/-197.0024) 34.29 (1.35) wide -> outer faces
   x +/-214.1474, window x +/-179.8574. Front/rear rails (along X at
   z -/+112.014) 38.1 (1.50) wide -> outer faces z -/+131.064, window z -/+92.964.
-* Corner bosses O44.958 (1.77) spanning y 993.3558..1040.7016 (proud .177
-  above the rail top, hanging .25 below the underside). All four upper/lower
-  bosses use the smaller user-ruled diameter so the outward keeper feet sit
-  flat. The O25.5016 column bores and O27.5082 cap recesses follow the
-  column and attachment specs. Four stock 1-3/4 in cross screws seat flush in
-  front/rear O8.9916 (.354) counterbores and clear both tube walls into the
-  far casting wall/web through #10-32 taps.
+* Corner bosses O44.958 (1.77) spanning y 993.2797..1040.7777 (proud .18
+  above the rail top, hanging .253 below the underside, 1.87 overall). All
+  four upper/lower bosses use the smaller user-ruled diameter so the
+  outward keeper feet sit flat. The O25.5016 column bores and O27.5082 cap
+  recesses follow the column and attachment specs. Four stock 1-3/4 in
+  cross screws seat flush in front/rear O8.89 (.35) counterbores and clear
+  both tube walls into the far casting wall/web through #10-32 taps on
+  TOP_SCREW_Y, .72 below the rail top (.90 below the boss top).
 * The whole TOP plane between the four corner bosses -- rail flange tops,
   crossbar and gussets -- is faced at the Ra 125 µin locating-seat finish (user
   rulings 2026-10-11 and 2026-10-14, one linked manufacturing note), the
@@ -38,14 +39,14 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   coaxiality the title block's implied +/-.005, charged in the floor land
   (.0124, accepted as RV-06 by owner ruling 2026-10-27). Over its middle
   (|z| <= 68.834, short of the knife-mount seats) the bar is a T like the
-  rails: the .99-wide, .32-tall top flange over a .512 web centred on the
+  rails: the .99-wide, .32-tall top flange over a .51 web centred on the
   knife line through the
   underside, with R.12 roots.
 * Every face on the underside plane 999.7058 between the bosses -- rail web
   bottoms, junction lands, plan gussets and the crossbar's full-depth ends
   under both knife mounts -- is faced at the Ra 125 µin seat finish (user
   ruling 2026-10-12, one linked manufacturing note); the corner-boss
-  bottoms .25 below it and the hub boss and V-gussets .31 below stay off
+  bottoms .253 below it and the hub boss and V-gussets .31 below stay off
   it. 999.7058 is the FINISHED plane: the cut comes out of casting allowance,
   so the model, its bands and every stack read from it unchanged. It is
   faced first. The #10 clearance holes are drilled through from it (Q7
@@ -64,10 +65,11 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   O1.18 x .31 with twin V-gussets (ch30 p004), a square-sided cast boss under
   the top flange on the rib's outer face (ch19 img04; user ruling
   2026-10-12), spot-faced .83 from the bore axis, and a 1/4-20 tap from
-  the spot face to the bore for the square-head set screw (book p.45: "a
+  the spot face to the bore for the square-head set screw on the cross
+  taps' plane, .72 below the rail top (book p.45: "a
   square-head screw pinches the post in its socket").
 * Webbed faces (T-rail section): a .32-tall full-thickness top flange, then
-  the web thins to .512 centred on each rail and STAYS thin through the
+  the web thins to .51 centred on each rail and STAYS thin through the
   bottom edge. The former photo-read 12.7 web is thickened for the keeper
   receivers' printed-band plus drill-wander stack; full-thickness lands remain
   at the bosses, hub rib and crossbar junctions.
@@ -152,10 +154,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import (
-    _set_tolerance_precision,
-    set_dimension_bilateral_tolerance,
-)
+from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _visibility import blank_reference_geometry
 from _holes import (
     DRILL_POINT_H,
@@ -202,8 +201,8 @@ from fr_top_frame_spec import (
     HANGER_WASHER_CONCENTRIC_ANNULUS_MIN,
     HANGER_CLEARANCE_DIA,
     HANGER_CLEARANCE_DIA_MAX,
-    HANGER_CLEARANCE_DIA_BAND,
-    HANGER_CLEARANCE_DIA_PLACES,
+    SCREW_AXIS_BELOW_RAIL_TOP,
+    SCREW_AXIS_Y,
     HANGER_GRIP,
     HANGER_GRIP_TOL,
     HANGER_HOLE_SPEC,
@@ -302,7 +301,9 @@ FRAME_CENTER_Z = FRAME_COLUMN_Z_CENTER  # 0.0
 RAIL_W_SIDE = 34.29  # 1.35 side rails, along Z (GT corner rescale 221.5 -> 214.1)
 RAIL_W_FR = 38.1  # 1.50 front/rear rails, along X (GT z-corner rescale 137.4 -> 131)
 
-BOSS_BELOW = 6.35  # .25 boss hang below the underside (p006 read 5.7-7)
+# .253 boss hang below the underside (p006 read 5.7-7): the boss's overall
+# height closes on the .XX grid at 1.87 over the .18 rise and the 1.437 rail.
+BOSS_BELOW = 6.4262
 CAP_RECESS_DIAMETER_BAND = (0.2032, 0.0)  # +.008/0
 CAP_RECESS_DEPTH_BAND = (0.3048, 0.0)  # +.012/0
 CAP_RECESS_DIAMETRAL_CLEARANCE = CAP_RECESS_DIAMETER - CAP_MAX_OUTER_DIAMETER
@@ -410,7 +411,7 @@ SIDE_SCREW_FACES = (
     ("front", -1.0, True),
     ("rear", 1.0, False),
 )
-if CAP_RECESS_FLOOR_Y - SIDE_TAP_DRILL_DIA / 2.0 <= 0.0:
+if CAP_RECESS_FLOOR_Y - (SCREW_AXIS_Y + SIDE_TAP_DRILL_DIA / 2.0) <= 0.0:
     raise AssertionError("cap recess breaks into the cross-screw drill")
 
 # --- Fulcrum keepers (west rail top face; shaft-end brackets, ch17 p.40) ----
@@ -431,13 +432,13 @@ KEEPER_TAP_Z_REAR = FULCRUM_KEEPER_CENTRE_Z + KEEPER_SCREW_Z_OFF  # +82.496
 # per-face setback differs by rail family (the rails are 34.2/38.0 wide but
 # share one web thickness).
 FLANGE = FLANGE_THICKNESS_MM  # final top flange, also below the faced rail top
-RECESS_SIDE = (RAIL_W_SIDE - WEB_T) / 2.0  # 10.5918 setback per side-rail face
-RECESS_FR = (RAIL_W_FR - WEB_T) / 2.0  # 12.5476 setback per front/rear-rail face
+RECESS_SIDE = (RAIL_W_SIDE - WEB_T) / 2.0  # 10.668 setback per side-rail face
+RECESS_FR = (RAIL_W_FR - WEB_T) / 2.0  # 12.573 setback per front/rear-rail face
 FLANGE_BOT_Y = RING_HEIGHT / 2.0 - FLANGE  # +10.2489 (flange underside)
-WEB_OUT_X = COLUMN_X + WEB_T / 2.0  # 203.5048
-WEB_IN_X = COLUMN_X - WEB_T / 2.0  # 190.5
-WEB_OUT_Z = abs(FRONT_COLUMN_Z) + WEB_T / 2.0  # 118.5164
-WEB_IN_Z = abs(FRONT_COLUMN_Z) - WEB_T / 2.0  # 105.5116
+WEB_OUT_X = COLUMN_X + WEB_T / 2.0  # 203.477
+WEB_IN_X = COLUMN_X - WEB_T / 2.0  # 190.523
+WEB_OUT_Z = abs(FRONT_COLUMN_Z) + WEB_T / 2.0  # 118.477
+WEB_IN_Z = abs(FRONT_COLUMN_Z) - WEB_T / 2.0  # 105.523
 LAND_MARGIN = 6.096  # .24 land pad past each gusset leg
 LAND_X0 = BAR_X0 - GUSSET - LAND_MARGIN  # -51.6268; crossbar junction land pads
 LAND_X1 = BAR_X1 + GUSSET + LAND_MARGIN  # +21.6268; front/rear inner faces
@@ -643,7 +644,7 @@ _EDGE_LOCATION_BAND = (
     + PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["crossbar pocket length"]]
 )
 KNIFE_SEAT_EDGE_BREAK_MIN_CLEARANCE = 0.5
-BORE_CHAMFER = 1.016  # .04 note 9: x 45 TOP-end bore breaks; low ends stay sharp
+BORE_CHAMFER = 0.762  # .03 note 9: x 45 TOP-end bore lead-ins (non-functional); low ends stay sharp
 # The set boss's spot face keeps a land inside its cast face's edge breaks at
 # the print-worst corner (drawing-guidelines.md rule 17 (walls and webs)): the shallowest spot (its .X station
 # against the cast face) leaves the most of each break's printed worst leg on
@@ -669,12 +670,12 @@ SET_SPOT_LAND_MIN = {
     - _SET_SPOT_BREAK_REACH
     - _SET_SPOT_R_MAX,
     "under the flange": (
-        HALF_H
+        SCREW_AXIS_BELOW_RAIL_TOP
         - PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["set screw axis from rail top"]]
     )
     - (FLANGE + PRINTED_LINEAR_BAND_MM[FLANGE_THICKNESS_PLACES])
     - _SET_SPOT_BREAK_REACH
-    - _SET_SPOT_R_MAX,  # 1.05
+    - _SET_SPOT_R_MAX,  # 3.56
 }
 for _label, _land in SET_SPOT_LAND_MIN.items():
     if _land < EDGE_BREAK_SLIVER_MIN:
@@ -1120,7 +1121,7 @@ COUNTERBORE_MOUTH_LOW_Z = abs(FRONT_COLUMN_Z) + math.sqrt(
 )
 COUNTERBORE_HEAD_RECESS = COUNTERBORE_MOUTH_LOW_Z - (
     COUNTERBORE_FLOOR + CROSS_SCREW_HEAD_H
-)  # 1.123 nominal
+)  # 0.939 nominal
 _BOSS_DIA_PLACES = DRAWING_PRECISION["BossUpProfile"]["C0Dia"]
 _COUNTERBORE_DIA_PLACES = DRAWING_PRECISION["CounterboreRearProfile"]["CB1Dia"]
 _COUNTERBORE_FLOOR_PLACES = DRAWING_REFERENCE_PRECISION[
@@ -1141,10 +1142,10 @@ COUNTERBORE_MIN_FLOOR_OFFSET = _printed_limit(
 )
 COUNTERBORE_PRINTED_HEAD_RECESS = math.sqrt(
     COUNTERBORE_MIN_BOSS_RADIUS**2 - COUNTERBORE_MAX_RADIUS**2
-) - (COUNTERBORE_MAX_FLOOR_OFFSET + CROSS_SCREW_HEAD_H)  # 0.637
+) - (COUNTERBORE_MAX_FLOOR_OFFSET + CROSS_SCREW_HEAD_H)  # 0.543
 COUNTERBORE_PRINTED_HEAD_CLEARANCE = (
     COUNTERBORE_MIN_RADIUS - CROSS_SCREW_HEAD_DIA / 2.0
-)  # 0.457 radial
+)  # 0.343 radial
 if (
     min(COUNTERBORE_HEAD_RECESS, COUNTERBORE_PRINTED_HEAD_RECESS) <= 0.0
     or COUNTERBORE_PRINTED_HEAD_CLEARANCE <= 0.0
@@ -1159,17 +1160,17 @@ if (
 COUNTERBORE_PRINTED_NEAR_WALL = (
     COUNTERBORE_MIN_FLOOR_OFFSET
     - _printed_limit(BORE_DIA, DRAWING_PRECISION["BoreProfile"]["B0Dia"], 1.0) / 2.0
-)  # 3.378
+)  # 3.442
 # Cap recess to counterbore ligament: the recess's deepest, widest printed
 # corner against the counterbore's outboard-most floor rim, with the tap
 # axis at the high end of its station below the boss top.  The floor's
 # station prints .XX and stands at .65 (TOP_SCREW_SEAT_Z), so this meets
-# drawing-guidelines.md rule 17 (walls and webs)'s .080 target: 2.80 (2.04
+# drawing-guidelines.md rule 17 (walls and webs)'s .080 target: 2.79 (2.04
 # at the metric 16.35).  At 16.1 it left 1.518 at .X (codex review of
 # 67d8b2c6) and 1.80 at .XX (080fda97).
 _AXIS_PLACES = DRAWING_REFERENCE_PRECISION["cross screw axis from boss top"]
 _CAP_LIGAMENT_VERTICAL = (CAP_RECESS_FLOOR_Y - CAP_RECESS_DEPTH_BAND[0]) - (
-    PRINTED_LINEAR_BAND_MM[_AXIS_PLACES] + COUNTERBORE_MAX_RADIUS
+    SCREW_AXIS_Y + PRINTED_LINEAR_BAND_MM[_AXIS_PLACES] + COUNTERBORE_MAX_RADIUS
 )
 if _CAP_LIGAMENT_VERTICAL < 0.0:
     raise AssertionError("the cap recess floor drops past the counterbore's top rim")
@@ -1191,17 +1192,19 @@ SIDE_TAP_DRILL_POINT_Z = (
 )
 # The boss's inward edge is NOT a free wall: the centred side-rail web
 # continues inward at full height. For the whole far tap/drill envelope,
-# |x - ColumnX| <= radius < WebT/2 and |y| <= radius < HalfH, so boss ∪
-# web supplies uninterrupted metal beyond both ends. The actual limiting
-# walls are the web's x faces (and its y faces), not z=112-R22.5. Nominal
-# lateral ligaments: thread major 6.5024-2.413=4.089; drill 6.5024-2.0193=4.483.
+# |x - ColumnX| <= radius < WebT/2 and |y - axis| <= radius < HalfH - |axis|,
+# so boss ∪ web supplies uninterrupted metal beyond both ends. The actual
+# limiting walls are the web's x faces (and its y faces), not z=112-R22.5.
+# Nominal lateral ligaments: thread major 6.477-2.413=4.064; drill
+# 6.477-2.0193=4.458.
 SIDE_TAP_THREAD_WALL_MARGIN = WEB_T / 2.0 - SIDE_TAP_THREAD_MAJOR_DIA / 2.0
 SIDE_TAP_DRILL_WALL_MARGIN = WEB_T / 2.0 - SIDE_TAP_DRILL_DIA / 2.0
 if min(SIDE_TAP_THREAD_WALL_MARGIN, SIDE_TAP_DRILL_WALL_MARGIN) < WALL_TARGET_MM:
     raise AssertionError("top cross-tap leaves less than .080 of side-rail web")
 if not (
     0.0 < SIDE_TAP_DRILL_POINT_Z < SIDE_TAP_THREAD_END_Z < WEB_IN_Z
-    and max(SIDE_TAP_THREAD_MAJOR_DIA, SIDE_TAP_DRILL_DIA) / 2.0 < HALF_H
+    and max(SIDE_TAP_THREAD_MAJOR_DIA, SIDE_TAP_DRILL_DIA) / 2.0
+    < HALF_H - abs(SCREW_AXIS_Y)
 ):
     raise AssertionError(
         "top cross-tap ends are not contained in the far side-rail web"
@@ -1439,7 +1442,8 @@ _KEEPER_DRILL_TIP_Y = (
     _KEEPER_DRILL_BOTTOM_Y - KEEPER_MAX_TAP_DRILL_RADIUS * DRILL_POINT_H
 )
 _CROSS_AXIS_MAX_Y = (
-    PRINTED_LINEAR_BAND_MM[
+    SCREW_AXIS_Y
+    + PRINTED_LINEAR_BAND_MM[
         DRAWING_REFERENCE_PRECISION["cross screw axis from boss top"]
     ]
     + PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["boss top above rail top"]]
@@ -1476,7 +1480,7 @@ KEEPER_CROSS_TAP_WALL = (
     - SIDE_TAP_THREAD_MAJOR_DIA / 2.0
     - _CROSS_TAP_WANDER_MM
     - KEEPER_TAP_AXIS_WANDER_MM
-)  # 1.86: under the .080 target, over the .060 floor
+)  # 3.31: over the .080 target
 if KEEPER_CROSS_TAP_WALL < WALL_FLOOR_MM:
     raise AssertionError("top cross-tap thread leaves under .060 to a keeper drill")
 
@@ -1602,7 +1606,7 @@ def _hub_underhang_volume() -> float:
 
 
 def _counterbore_removal() -> float:
-    """Material one Ø.354 counterbore removes from the Ø1.77 curved boss."""
+    """Material one Ø.35 counterbore removes from the Ø1.77 curved boss."""
     r_d = COUNTERBORE_DIA / 2.0
     r_b = BOSS_DIA / 2.0
     step = 0.01
@@ -2391,55 +2395,6 @@ def _assert_flange_corners_cropped(adapter) -> None:
     )
 
 
-def _tolerance_hanger_clearance(feature) -> None:
-    """Band the plain wizard's one through diameter at its exact 6.045.
-
-    The generic hook's native "Dia" name criterion, additionally resolving
-    the actual cut diameter to the pinned HANGER_CLEARANCE_DIA (the wizard's
-    drift path writes it over the table seed), so a seed size fails here;
-    the band is read back and its places set. Never assume dimension order
-    or manufacture an internal SOLIDWORKS dimension name.
-    """
-    matches = []
-    display = feature.GetFirstDisplayDimension()
-    while display is not None:
-        display = _early_bound(display, "IDisplayDimension")
-        dimension = _early_bound(display.GetDimension2(0), "IDimension")
-        if (
-            "Dia" in str(dimension.FullName)
-            and abs(float(dimension.SystemValue) * 1000.0 - HANGER_CLEARANCE_DIA) < 1e-6
-        ):
-            matches.append((display, dimension))
-        display = feature.GetNextDisplayDimension(display)
-    if len(matches) != 1:
-        raise RuntimeError(f"hanger wizard has {len(matches)} through-diameter matches")
-    display, dimension = matches[0]
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    lower_m, upper_m = (
-        value / 1000.0
-        for value in (
-            min(HANGER_CLEARANCE_DIA_BAND),
-            max(HANGER_CLEARANCE_DIA_BAND),
-        )
-    )
-    tolerance.Type = 2  # swTolType_e.swTolBILAT: explicit +.004/0
-    if not tolerance.SetValues(lower_m, upper_m):
-        raise RuntimeError("native hanger through-diameter band was rejected")
-    if (
-        int(tolerance.Type) != 2
-        or abs(float(tolerance.GetMinValue()) - lower_m) > 1e-9
-        or abs(float(tolerance.GetMaxValue()) - upper_m) > 1e-9
-    ):
-        raise RuntimeError("native hanger through-diameter band did not persist")
-    _set_tolerance_precision(
-        display,
-        HANGER_CLEARANCE_DIA_BAND,
-        display_unit=UNIT,
-        label="hanger through diameter",
-        places=HANGER_CLEARANCE_DIA_PLACES,
-    )
-
-
 def _qualify_machined_faces(adapter) -> None:
     """Area-check every face the surface-finish spec owns.
 
@@ -3004,11 +2959,11 @@ async def build(adapter) -> dict[str, str]:
     await define_circle(
         adapter,
         -GOOSENECK_Z,
-        0.0,
+        SCREW_AXIS_Y,
         HUB_SET_SPOT_DIA / 2.0,
         "set-screw spot face",
         dims=spot,
-        names=("SetSpotZ", None, "SetSpotDia"),
+        names=("SetSpotZ", "SetSpotY", "SetSpotDia"),
     )
     await ensure_fully_defined(adapter, "set spot face sketch")
     check("exit_sketch set spot face", await adapter.exit_sketch())
@@ -3050,11 +3005,11 @@ async def build(adapter) -> dict[str, str]:
             await define_circle(
                 adapter,
                 x,
-                0.0,
+                SCREW_AXIS_Y,
                 COUNTERBORE_DIA / 2.0,
                 f"counterbore {side} (x={x:+.0f})",
                 dims=cbore,
-                names=(f"CB{k}X", None, f"CB{k}Dia"),
+                names=(f"CB{k}X", f"CB{k}Y", f"CB{k}Dia"),
             )
         await ensure_fully_defined(adapter, f"counterbore {side} sketch")
         check(f"exit_sketch counterbore {side}", await adapter.exit_sketch())
@@ -3201,7 +3156,7 @@ async def build(adapter) -> dict[str, str]:
     #     underside-entry wizard feature (the shop drills them from the
     #     underside, so drift grows toward the faced top; HANGER_HOLE_SPEC).
     #     The washers bear on the faced top plane round each hole.
-    hanger_wizard = wizard_holes(
+    wizard_holes(
         adapter,
         HANGER_HOLE_SPEC,
         [[HANGER_X, -HALF_H, STUD_Z_FRONT], [HANGER_X, -HALF_H, STUD_Z_REAR]],
@@ -3214,12 +3169,6 @@ async def build(adapter) -> dict[str, str]:
             (("StudRearX", None), ("StudRearZ", None)),
         ],
     )
-    hanger_feature = _early_bound(adapter.currentModel, "IPartDoc").FeatureByName(
-        hanger_wizard.name,
-    )
-    if hanger_feature is None:
-        raise RuntimeError("native hanger wizard feature disappeared")
-    _tolerance_hanger_clearance(_early_bound(hanger_feature, "IFeature"))
     v_hangers = 2.0 * math.pi * (HANGER_CLEARANCE_DIA / 2.0) ** 2 * RING_HEIGHT
     volume = await volume_check(
         adapter, "knife-hanger clearance holes", volume - v_hangers, 10.0
@@ -3336,7 +3285,7 @@ async def build(adapter) -> dict[str, str]:
         feat = f"SideTaps{side.capitalize()}"
         z_face = sign * COUNTERBORE_FLOOR
         normal = (0.0, 0.0, sign)
-        tap_points = [[x, 0.0, z_face] for x in SIDE_SCREW_XS]
+        tap_points = [[x, SCREW_AXIS_Y, z_face] for x in SIDE_SCREW_XS]
         wizard_holes(
             adapter,
             SIDE_TAP_SPEC,
@@ -3357,11 +3306,11 @@ async def build(adapter) -> dict[str, str]:
     wizard_holes(
         adapter,
         SET_TAP_SPEC,
-        [[SET_SPOT_FACE_X, 0.0, GOOSENECK_Z]],
+        [[SET_SPOT_FACE_X, SCREW_AXIS_Y, GOOSENECK_Z]],
         (-1.0, 0.0, 0.0),
         "gooseneck set-screw tap",
         name="GooseneckTap",
-        placement_dims=[(("SetTapZ", None), (None, None))],
+        placement_dims=[(("SetTapZ", None), ("SetTapY", None))],
     )
     volume = await volume_check(
         adapter, "gooseneck set tap", volume - v_set_tap, 0.1 * v_set_tap + 10.0
@@ -3474,7 +3423,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "top rim breaks", volume - v_rims, 0.03 * v_rims + 100.0
     )
 
-    # 18. C1 x 45 lead-ins on the four cap-recess mouths and gooseneck bore
+    # 18. .03 x 45 lead-ins on the four cap-recess mouths and gooseneck bore
     # top; bore and counterbore low ends stay sharp.
     boss_top_y = HALF_H + BOSS_ABOVE
     r_gn = GOOSENECK_BORE_DIA / 2.0

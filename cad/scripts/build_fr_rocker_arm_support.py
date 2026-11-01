@@ -58,7 +58,7 @@ Z = wall thickness):
   (Y=-82.55) at ``(X ±60.325, Z ±17.4498)`` (2.375, .687). One feature carries all four
   placement points; the visible 1/4-20 hex-head screws install from the top
   into through-tapped seats in the harmonic base.
-* **RimChamfer** -- .05 / 45° on the 12 inner-frame opening edges, the +X
+* **RimChamfer** -- .06 / 45° on the 12 inner-frame opening edges, the +X
   end face's foot and top edges, the two slant faces, the -X end face, and one
   fillet face, with tangent propagation -- i.e. the whole window rim and all
   twelve outside edges.
@@ -336,7 +336,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # tolerance and precision; the drawing imports the dimension verbatim and only
 # reads its places back).
 # A chamfer never needs extra places (drawing-guidelines.md rule 3): no stack
-# reads RimChamferSize, so .05 prints on the .XX band (no .X on a cut feature).
+# reads RimChamferSize, so .06 prints on the .XX band (no .X on a cut feature).
 RIM_CHAMFER_PLACES = 2
 # The seats' REF stations off the end faces print .XXX: they follow the
 # MHA-CH-08 seat stations (rocker_bracket_seat_layout), which flow through
@@ -499,11 +499,17 @@ FOOT_HOLED_VOLUME = (
     - len(HOLES) * math.pi / 4.0 * HOLE_DIA**2 * FOOT_THICKNESS
 )
 
-CHAMFER = 1.27  # leg, 45°
-# The measured window-rim chamfer removal: none of the chamfered edges changes
-# length with the web (the cavity rim loops lie on the web faces, the window
-# rim on the slant faces), so it carries over unchanged.
-RIM_CHAMFER_VOLUME = FOOT_HOLED_VOLUME - SQUARE_RIM_CHAMFER_REMOVAL
+# Leg, 45°: a non-functional edge break at .06 X 45 (fleet ruling: .06 or
+# .03 at .XX, the model equal to the print; .06 is the nearer to the
+# source's 1.27).
+CHAMFER = 1.524
+SOURCE_CHAMFER = 1.27
+# The measured window-rim chamfer removal at the source's 1.27 leg: none of
+# the chamfered edges changes length with the web (the cavity rim loops lie
+# on the web faces, the window rim on the slant faces), so it carries over;
+# a 45° chamfer's cross-section, so its removal, goes as the leg squared.
+RIM_CHAMFER_REMOVAL = SQUARE_RIM_CHAMFER_REMOVAL * (CHAMFER / SOURCE_CHAMFER) ** 2
+RIM_CHAMFER_VOLUME = FOOT_HOLED_VOLUME - RIM_CHAMFER_REMOVAL
 # The rocker brackets' two bottoming-tapped seats, down from the top face on
 # the centreline (rocker_bracket_seat_layout owns their stack). Each runs in
 # solid iron for its whole length: the post outboard of the window edge, the
@@ -1236,7 +1242,7 @@ async def build(adapter) -> dict[str, str]:
     )
     await volume_check(adapter, "FootClearanceHoles", FOOT_HOLED_VOLUME, 200)
 
-    # 8. RimChamfer: 1.27 mm / 45° around the whole window rim and every
+    # 8. RimChamfer: 1.524 mm (.06) / 45° around the whole window rim and every
     #    outside edge -- the +X end face's foot edge first (it carries the
     #    size), its top edge, the 12 inner-frame opening edges, plus the
     #    slant/back-end/fillet faces, tangent-propagated.

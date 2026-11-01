@@ -115,6 +115,23 @@ class Projection:
         return dispatches[header].calls.count(header)
 
 
+def test_checked_heights_print_their_model_values_exactly() -> None:
+    """The sheet's two heights print exactly the model: the overall reference
+    on the cap stack's .001 grid, the top cross-bore axis (MHA-FR-02's taps,
+    .72 under its off-grid rail top) at four places."""
+    for value_mm, places in (
+        (drawing.CAP_TOP_Y, drawing.HEIGHT_PLACES),
+        (drawing.TOP_SCREW_Y, drawing.TOP_AXIS_HEIGHT_PLACES),
+    ):
+        value_in = value_mm / 25.4
+        assert value_in == pytest.approx(round(value_in, places), abs=1e-9)
+    assert drawing.HEIGHT_PLACES == 3
+    # Three places would leave the axis on a rounding tie.
+    assert drawing.TOP_SCREW_Y / 25.4 != pytest.approx(
+        round(drawing.TOP_SCREW_Y / 25.4, 3), abs=1e-9
+    )
+
+
 def test_a_batch_projects_every_point_through_one_transform_read() -> None:
     projection = Projection()
     points = [(0.010, 0.020, 0.030), (0.100, 0.0, 0.0), (-0.050, 0.050, 0.0)]

@@ -128,10 +128,18 @@ PNG = OUTPUTS.png
 NAMEPLATE_END_INSET = DECK_HALF_X - NAMEPLATE_MOUNT_POS[0]
 # The fitter sheets print decimal inch (fr-frame.yaml ``drawing_unit``).
 UNIT = assembly_contract("fr-frame").drawing_unit
-# Places the sheet-made checked dimensions print: both heights follow the
-# .001 grid of the cap stack (41.134, 40.077); the inset is .16.
+# Places the sheet-made checked dimensions print: the overall reference
+# follows the cap stack's .001 grid (41.134); the inset is .16.
 HEIGHT_PLACES = 3
 INSET_PLACES = 2
+# The top cross-bore axis height prints four places, the model equal to the
+# print (40.0755; fr-frame deviation). Step 3 sets all four corners' axes to
+# this one absolute height from the base underside before step 5
+# match-drills the tubes, so the frame's own .72 tap station off its rail top
+# cannot carry it. MHA-FR-02's taps stand .72 below its rail top, and that
+# rail top (world 1036.2057) lies off the inch grid until the frame plane is
+# snapped (PR C), so at three places the height would be a rounding tie.
+TOP_AXIS_HEIGHT_PLACES = 4
 # The tube match holes' finished drill, as steps 2 and 5 print it (.197).
 CROSS_HOLE_TEXT = render_number(TUBE_CROSS_HOLE_DIAMETER / 25.4, UNIT, 3)
 # Machine z stations each inset edge's ray is cast at, in turn: on both
@@ -662,7 +670,7 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         adapter,
         screw_axis,
         expected_mm=TOP_SCREW_Y,
-        places=HEIGHT_PLACES,
+        places=TOP_AXIS_HEIGHT_PLACES,
         label="installed top cross-screw axis height",
     )
     screw_axis = _set_dimension_suffix(

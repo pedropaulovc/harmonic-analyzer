@@ -22,16 +22,21 @@ SOCKET_MOUTH_Y = GREEN_TOP
 COLUMN_BOTTOM_Y = SOCKET_MOUTH_Y - COLUMN_SOCKET_DEPTH
 BASE_SCREW_Y = COLUMN_BOTTOM_Y + 12.7  # .500 above the seated tube end
 BASE_SCREW_SEAT_Z = 132.9944  # 5.236
-TOP_SCREW_Y = 1017.9558  # 40.077
+# The top frame's insert plane (its mid plane) and its taps, .72 below its
+# rail top (MHA-FR-02 prints them at .XX off that face), .0015 below the mid
+# plane. The installed tap axis (40.0755) is off the .001 grid: the tube's
+# upper hole is match-drilled from these taps and prints no station.
+TOP_FRAME_MID_Y = 1017.9558  # 40.077
+TOP_SCREW_Y = 1017.9177  # 40.0755
 # Top-frame bosses take a flush counterbore, not a spotface: the stock
-# fillister head (HEAD_H 4.572) sits below the Ø9 mouth's lowest barrel point
+# fillister head (HEAD_H 4.572) sits below the Ø.35 mouth's lowest barrel point
 # at every printed corner, and the floor stands far enough outboard to keep
 # drawing-guidelines.md rule 17 (walls and webs)'s .080 to the cap recess at its .XX band (build_fr_top_frame proves
 # both; at 128.1 the ligament was 1.80, codex review of 080fda97).
 TOP_SCREW_SEAT_Z = 128.524  # 5.060 (.65 off the column line once it snaps to 4.410)
-TOP_SCREW_COUNTERBORE_DIAMETER = 8.9916  # .354
+TOP_SCREW_COUNTERBORE_DIAMETER = 8.89  # .35
 # The base keeps its spotface seat at the same diameter.
-SCREW_SPOTFACE_DIAMETER = 8.9916  # .354
+SCREW_SPOTFACE_DIAMETER = 8.89  # .35
 # The casting is tapped continuously across the interrupted column socket.
 # Tube walls are clearance-drilled separately after matching their positions.
 CASTING_FULL_THREAD_DEPTH = 45.974  # 1.81

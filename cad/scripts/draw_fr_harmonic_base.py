@@ -1847,6 +1847,35 @@ def _set_active_sheet_scale(adapter: Any, scale: tuple[float, float]) -> None:
         raise RuntimeError(f"sheet {name!r} scale did not persist: {properties!r}")
 
 
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
+# One mark per plan hole (the four sockets and eighteen deck seats), and one
+# per cross-tap X station on the front view.
+HOLE_TOP_CENTER_MARKS = len(ALL_HOLES)
+HOLE_SIDE_CENTER_MARKS = len({x for x, _z in COLUMN_SOCKET_XZ})
+
+
+def _center_mark_count(view: Any) -> int:
+    """The view's centre-mark annotations (a bare view answers None)."""
+    return len(
+        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
+    )
+
+
+def _require_single_center_marks(
+    adapter: Any, view: Any, expected: int, *, label: str
+) -> None:
+    """Exactly one ASME mark per hole: the template inserts them when a view
+    is placed, and a second auto_center_marks pass printed every one twice
+    (inch review b2 layout audit). Insert only on a bare view, then prove it."""
+    if _center_mark_count(view) == 0 and not auto_center_marks(
+        adapter, view, holes=True, size=0.0025
+    ):
+        raise RuntimeError(f"failed to add ASME center marks to the {label}")
+    count = _center_mark_count(view)
+    if count != expected:
+        raise RuntimeError(f"{label} carries {count} center marks, expected {expected}")
+
+
 def _require_section_caption_scale(adapter: Any, section: Any, *, label: str) -> None:
     """The section's one native caption must carry the scale compartment that
     prints SECTION_LABEL_SCALE_TEXT."""
@@ -2303,8 +2332,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # junction is not measurable with hobby-shop kit, so the model keeps its
     # fillet and the deck cutter's own corner radius defines it (2026-09
     # review over-specification item).
-    if not auto_center_marks(adapter, hole_top, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to the base hole pattern")
+    _require_single_center_marks(
+        adapter, hole_top, HOLE_TOP_CENTER_MARKS, label="base hole pattern"
+    )
 
     table_origin = create_view_theoretical_datum(
         adapter,
@@ -2450,8 +2480,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # from the same faced underside as GreenTopHeight. The spec-owned caption
     # names that seating face; no flange-to-deck chain controls either height.
     # Keep the axis-height text below its extension-line band.
-    if not auto_center_marks(adapter, hole_side, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to the base cross-screw entries")
+    _require_single_center_marks(
+        adapter, hole_side, HOLE_SIDE_CENTER_MARKS, label="base cross-screw entries"
+    )
     # The four sockets locate the frame columns, so their bores carry the seat
     # grade (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)) -- the deck symbol stops at the deck plane and the hole
     # table's bore diameters are reference-only match-fit sizes. Section A-A is

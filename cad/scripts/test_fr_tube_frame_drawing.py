@@ -36,9 +36,14 @@ def test_open_tube_and_cross_holes_share_the_installed_frame_stations() -> None:
         abs_tol=1e-9,
     )
     assert fr_tube_frame_spec.CROSS_HOLE_DIAMETER > 4.826
-    # The cut length and the upper station sit on the .001 in grid.
-    for value in (fr_tube_frame_spec.COLUMN_LENGTH, fr_tube_frame_spec.UPPER_CROSS_HOLE_Y):
-        assert math.isclose(value / 25.4, round(value / 25.4, 3), abs_tol=1e-9)
+    # The cut length sits on the .001 in grid and prints. The upper station
+    # is match-drilled from MHA-FR-02's taps (40.0755 installed, off the
+    # grid), so it prints no number: the callout names its mate instead.
+    length = fr_tube_frame_spec.COLUMN_LENGTH
+    assert math.isclose(length / 25.4, round(length / 25.4, 3), abs_tol=1e-9)
+    assert math.isclose(fr_tube_frame_spec.UPPER_CROSS_HOLE_Y, 39.0755 * 25.4, abs_tol=1e-6)
+    assert "UpperHoleY" not in fr_tube_frame_spec.DRAWING_DIMENSIONS["CrossHoleProfile"]
+    assert "UpperHoleY" not in fr_tube_frame_spec.DRAWING_PRECISION_BY_NAME
     assert fr_tube_frame_spec.OUTER_DIA < COLUMN_SOCKET_DIAMETER
     assert fr_tube_frame_spec.OUTER_DIA == INNER_DIAMETER
     assert fr_tube_frame_spec.OUTER_DIA < MOUTH_INNER_DIAMETER

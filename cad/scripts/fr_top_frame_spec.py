@@ -43,7 +43,12 @@ from _cone_axis_constants import (
     FRAME_REAR_COLUMN_Z,
     SUMMING_Z,
 )
-from fr_frame_attachment_spec import CAP_RECESS_DEPTH, COLUMN_SOCKET_DIAMETER
+from fr_frame_attachment_spec import (
+    CAP_RECESS_DEPTH,
+    COLUMN_SOCKET_DIAMETER,
+    TOP_FRAME_MID_Y,
+    TOP_SCREW_Y,
+)
 from frame_column_stations import COLUMN_X
 
 UNIT = drawing_unit("parts/fr-top-frame", _config.parts("fr-top-frame"))
@@ -64,15 +69,22 @@ HANGER_CROSSBAR_WIDTH = 25.146  # .99
 HANGER_CROSSBAR_WIDTH_PLACES = 2
 FLANGE_THICKNESS_MM = 8.128  # .32 final top flange, including the faced right rail top
 FLANGE_THICKNESS_PLACES = 2
-BOSS_ABOVE = 4.4958  # .177 boss proud of the rail top (corner-crop step)
+BOSS_ABOVE = 4.572  # .18 boss proud of the rail top (corner-crop step)
 BOSS_DIA = (
     44.958  # 1.77 user ruling: all four upper/lower bosses clear the outward keeper feet
 )
 BORE_DIA = COLUMN_SOCKET_DIAMETER
 # Every rail's web thickness, centred on its centreline (the keeper plan of
-# MHA-CH-00 draws the west rail's web faces from it).
-WEB_T = 13.0048  # .512 user ruling: retain loose bands plus realistic deep-drill wander
-CAP_RECESS_FLOOR_Y = HALF_H + BOSS_ABOVE - CAP_RECESS_DEPTH  # 6.4389
+# MHA-CH-00 draws the west rail's web faces from it).  .XX: the keeper and
+# cross-tap walls keep the .060 floor at its ±.01 (build_fr_top_frame).
+WEB_T = 12.954  # .51 user ruling: retain loose bands plus realistic deep-drill wander
+CAP_RECESS_FLOOR_Y = HALF_H + BOSS_ABOVE - CAP_RECESS_DEPTH  # 6.5151
+# The cross-screw and set-screw taps share one axis plane, the attachment's
+# TOP_SCREW_Y in the casting's frame: .72 below the rail top, .90 below the
+# boss top, both on the .XX grid (machinist review: the mid-plane's .7185
+# has no .XX station).
+SCREW_AXIS_Y = TOP_SCREW_Y - TOP_FRAME_MID_Y  # -0.0381
+SCREW_AXIS_BELOW_RAIL_TOP = HALF_H - SCREW_AXIS_Y  # 18.288, .72
 GOOSENECK_X = -COLUMN_X  # east rail, -X crank side (summing's post station)
 GOOSENECK_BORE_DIA = 17.018  # .67 the gooseneck's O15.875 sleeve slides through
 
@@ -123,8 +135,10 @@ DRILL_OVERSIZE = drilled_oversize_mm(unit=UNIT)
 # repository's three-place clearance-table precision.
 HANGER_CLEARANCE_DIA = CLEARANCE_MM[("#10", "loose")]  # 6.045
 HANGER_CLEARANCE_DIA_PLACES = 3
-# Explicit manufactured acceptance: never undersize the ANSI loose minimum.
-HANGER_CLEARANCE_DIA_BAND = (0.1016, 0.0)  # +.004/0 (upper, lower), not a supplier guarantee
+# The title block's DRILLED HOLES row is the acceptance (+.004/0): it never
+# undersizes the ANSI loose minimum, so the callout restates no band
+# (machinist review: rule 2).
+HANGER_CLEARANCE_DIA_BAND = (DRILL_OVERSIZE, 0.0)  # (upper, lower), title block
 HANGER_CLEARANCE_DIA_MIN = HANGER_CLEARANCE_DIA + min(HANGER_CLEARANCE_DIA_BAND)
 HANGER_CLEARANCE_DIA_MAX = HANGER_CLEARANCE_DIA + max(HANGER_CLEARANCE_DIA_BAND)
 # The finished top-to-underside grip. User ruling 2026-10-14: the whole top
@@ -479,7 +493,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Crossbar": {"HangerGrip": HANGER_GRIP_PLACES},
     "BossUpProfile": {"C0Dia": 2},
     "BoreProfile": {"B0Dia": 3},
-    "CounterboreRearProfile": {"CB1Dia": 3},
+    "CounterboreRearProfile": {"CB1Dia": 2},
     "BarProfile": {"GussetRunE": 2},
     "HubBossProfile": {"HubDia": 2},
     "RibProfile": {"RibWidth": 2},
@@ -528,22 +542,23 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     # section E-E with the crossbar T and its pockets -- cast stock under the
     # title block's general band.  The X-direction envelope and windows stand
     # off the 15.512 socket pitch and the knife line, so they print .XXX as
-    # those stations flow through; the webs print the receiver walls' .512
-    # (KEEPER_TAP_*_WALL_MARGIN reads it), and the pocket depth is the .XXX
-    # grip less the flange.
+    # those stations flow through.  The webs print .XX: the keeper receiver
+    # and cross-tap walls keep the .060 floor at the ±.01
+    # (KEEPER_TAP_*_WALL_MARGIN reads it).  The pocket depth is the .XXX grip
+    # less the flange, a reference.
     "overall casting width": 3,
     "overall casting depth": 2,
     "side flange width": 2,
     "left window clear width": 3,
     "right window clear width": 3,
     "crossbar flange width": HANGER_CROSSBAR_WIDTH_PLACES,
-    "rail web thickness": 3,
+    "rail web thickness": 2,
     "front rear flange width": 2,
     "top flange thickness": FLANGE_THICKNESS_PLACES,
     "top rim chamfer": 2,
     "T rail root radius": 2,
-    "side rail web thickness": 3,
-    "crossbar web thickness": 3,
+    "side rail web thickness": 2,
+    "crossbar web thickness": 2,
     "crossbar flange thickness": FLANGE_THICKNESS_PLACES,
     "crossbar pocket depth": 3,
     # Sheet 2, HOLES-SOCKETS: the socket pitches are the setup datums the
@@ -563,20 +578,22 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "front keeper z from upper sockets": 3,
     "rear keeper z from upper sockets": 3,
     # Sheet 3, CROSS-TAPS: boss stack, cap-mouth chamfer, opposed counterbore
-    # floors and the tap axis below the boss top.
-    "socket boss overall height": 3,
-    "boss top above rail top": 3,
+    # floors and the tap axis below the boss top, all on the .XX grid (the
+    # cap ligament and keeper cross-tap wall read their ±.01).
+    "socket boss overall height": 2,
+    "boss top above rail top": 2,
     "top bore mouth chamfer": 2,
     "opposed counterbore floor separation": 2,
-    "cross screw axis from boss top": 3,
+    "cross screw axis from boss top": 2,
     # .XX, the floor at .65 (fr_frame_attachment_spec.TOP_SCREW_SEAT_Z):
     # over the .080 target to the cap recess at every printed corner
     # (build_fr_top_frame.COUNTERBORE_PRINTED_CAP_LIGAMENT).
     "counterbore floor from socket axis": 2,
     # Sheet 5, HUB-SET-SCREW: hub station, set-tap axis, gusset ramp and the
     # removed set-screw boss section K-K (spot face, boss face, thread run).
+    # The hub station is the summing axis's (SUMMING_Z): it flows through.
     "hub from left front socket": 3,
-    "set screw axis from rail top": 3,
+    "set screw axis from rail top": 2,
     "hub boss underside drop": 2,
     "hub gusset feather span": 2,
     "hub gusset ramp angle": 1,
@@ -712,7 +729,7 @@ DRAWING_NOTES = (
 # keeper seats carry no flatness frame (rule 5; codex review of PR #1640,
 # owner ruling pending in #1659): MHA-CH-00 pair-reams the keepers and sets
 # them on this face with the shaft through both.
-DRAWING_NOTES_B = f"WHOLE TOP EXCEPT 4 BOSSES:\nRa {ra(SEAT_UM, unit=UNIT)} µIN."
+DRAWING_NOTES_B = f"WHOLE TOP EXCEPT 4 BOSSES:\nRa {ra(SEAT_UM, unit=UNIT)}."
 # User ruling 2026-10-12 (reading (i)): every face on the underside
 # plane between the bosses is faced at the seat finish -- the rail web
 # bottoms, the junction lands and plan gussets, and the crossbar's full-depth
@@ -725,6 +742,6 @@ DRAWING_NOTES_B = f"WHOLE TOP EXCEPT 4 BOSSES:\nRa {ra(SEAT_UM, unit=UNIT)} µIN
 DRAWING_NOTES_C = (
     "UNDERSIDE PLANE BETWEEN BOSSES\n"
     "(MHA-SM-02 KNIFE-MOUNT SEATS):\n"
-    f"Ra {ra(SEAT_UM, unit=UNIT)} µIN; BOSS BOTTOMS AND\n"
+    f"Ra {ra(SEAT_UM, unit=UNIT)}; BOSS BOTTOMS AND\n"
     "HUB GUSSETS EXCLUDED."
 )

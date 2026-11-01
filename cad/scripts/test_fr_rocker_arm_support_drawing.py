@@ -74,7 +74,8 @@ def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
         "WebThickness": 2,
         "FootThickness": 2,
     }
-    # The chamfer leg is .05 exactly on its .XX grid.
+    # The chamfer leg is .06 exactly on its .XX grid (fleet ruling: .06/.03).
+    assert support.CHAMFER == pytest.approx(0.06 * 25.4)
     places = drawing.PART_PRECISION["RimChamferSize"]
     assert places == 2
     assert support.CHAMFER == pytest.approx(round(support.CHAMFER / 25.4, places) * 25.4)
@@ -527,7 +528,10 @@ def test_web_volume_deltas_are_the_closed_forms() -> None:
         support.POCKET_FILLET_VOLUME - support.SQUARE_POCKET_FILLET_VOLUME
     ) == pytest.approx(2.0 * band + corner - pocket + wall + taper_cut2 + pocket_taper)
     removal = support.FOOT_HOLED_VOLUME - support.RIM_CHAMFER_VOLUME
-    assert removal == pytest.approx(support.SQUARE_RIM_CHAMFER_REMOVAL)
+    # The source's measured 1.27-leg removal, scaled by the leg squared.
+    assert removal == pytest.approx(
+        support.SQUARE_RIM_CHAMFER_REMOVAL * (support.CHAMFER / 1.27) ** 2
+    )
     assert support.BRACKET_SEATS_VOLUME < support.RIM_CHAMFER_VOLUME
 
 
@@ -1361,7 +1365,7 @@ def _boxes_clear(a: tuple[float, ...], b: tuple[float, ...], gap: float) -> bool
 # outside chamfers drawn with no size contradict the title block's 0.25 MAX
 # edge break (machinist review, MHA-FR-05 blocker).
 RIM_CHAMFER_CALLOUT = " X 45 DEG\nALL OUTSIDE\nEDGES AND\nPOCKET AND\nCAVITY RIMS"
-RIM_CHAMFER_TEXT = ".05\n" + RIM_CHAMFER_CALLOUT.strip()
+RIM_CHAMFER_TEXT = ".06\n" + RIM_CHAMFER_CALLOUT.strip()
 
 
 def _rim_chamfer_box() -> tuple[float, ...]:
@@ -1649,18 +1653,22 @@ def test_seat_callout_text_sits_between_the_hole_table_and_the_title_block() -> 
 
 def test_hole_pattern_note_names_the_base_taps_beside_the_table() -> None:
     """Machinist review b2: the .XXX table named no mate. The note names the
-    base's matching hold-down taps and stands clear of the table, the seat
-    callout (at its widest either side of its x), the title block and the
-    right border."""
+    base's matching hold-down taps. A free note anchors at its text's
+    top-left (inspect-3 render: anchored at x 0.392 it ran 12.6 mm past the
+    right border), so it must clear the table above, the centred seat
+    callout to its left, the title block below and the right border."""
     assert drawing.HOLE_PATTERN_NOTE.split() == [
         "HOLE", "PATTERN", "MATCHES", "MHA-FR-01", "C2-C5",
     ]
-    note = _text_box(drawing.HOLE_PATTERN_NOTE, drawing.HOLE_PATTERN_NOTE_XY)
-    callout_x = drawing.SEAT_CALLOUT_XY[0]
-    assert note[0] > callout_x + 24 * NOTE_CHAR_WIDTH + 0.002
-    assert note[3] < HOLE_TABLE_BOTTOM - 0.002
-    assert note[1] > TITLE_BLOCK_TOP + 0.002
-    assert note[2] < 0.415 - 0.001  # the right border
+    lines = drawing.HOLE_PATTERN_NOTE.splitlines()
+    left, top = drawing.HOLE_PATTERN_NOTE_XY
+    right = left + max(map(len, lines)) * NOTE_CHAR_WIDTH
+    bottom = top - len(lines) * NOTE_LINE_PITCH
+    callout_right = drawing.SEAT_CALLOUT_XY[0] + 24 * NOTE_CHAR_WIDTH / 2.0
+    assert left > callout_right + 0.002
+    assert top < HOLE_TABLE_BOTTOM - 0.002
+    assert bottom > TITLE_BLOCK_TOP + 0.002
+    assert right < 0.415 - 0.002  # the right border
 
 
 def test_view_b_arrow_looks_down_on_the_rail_from_above_the_front_view() -> None:

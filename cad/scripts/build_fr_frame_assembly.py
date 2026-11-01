@@ -201,6 +201,7 @@ from fr_frame_attachment_spec import (
     CASTING_FULL_THREAD_DEPTH,
     COLUMN_BOTTOM_Y,
     COLUMN_SOCKET_DIAMETER,
+    TOP_FRAME_MID_Y,
     TOP_SCREW_SEAT_Z,
     TOP_SCREW_Y,
     TUBE_CROSS_HOLE_DIAMETER,
@@ -274,8 +275,6 @@ LAG_BASE_THREAD_FITS = tuple(
     for xz in LAG_SCREW_XZ
 )
 
-TOP_FRAME_MID_Y = TOP_SCREW_Y
-
 # --- Frame cross-screw stack -------------------------------------------------
 # The stock screw origin is its under-head seat and its shank runs along local
 # -Y. Front placements rotate it toward +Z; rear placements toward -Z. Each
@@ -323,7 +322,7 @@ if not math.isclose(CAP_MOUTH_Y + CAP_TOTAL_HEIGHT, CAP_TOP_Y, abs_tol=1e-9):
 #
 # gooseneck-set-screw: 1x McMaster 91410A540 1/4-20 x 3/4 square-head cup-point
 # set screw gripping the gooseneck post through the casting's east-hub boss,
-# axis along X at (y TOP_FRAME_MID_Y, z 3.088 -- the hub/post centreline).
+# axis along X at (y TOP_SCREW_Y, z 3.088 -- the hub/post centreline).
 # Entered through the boss's spot face x -218.0 (21.0 from the bore axis):
 # local +Y -> -X (rot_z_rows(90), euler [0,0,90]) points the exact stock shank
 # inboard while retaining its cup tip at x -205.15, 0.21 clear (outboard) of
@@ -816,7 +815,7 @@ async def build(adapter) -> dict[str, str]:
         "lag-screw hold-down grid",
     )
 
-    # Top-frame casting clamped around the four columns, mid-plane y 1017.95.
+    # Top-frame casting clamped around the four columns, at its insert plane.
     target = [0.0, TOP_FRAME_MID_Y, 0.0]
     res = await adapter.insert_component(
         InsertComponentParameters(file_path=top_frame_path, position=target)
@@ -941,7 +940,7 @@ async def build(adapter) -> dict[str, str]:
     # Gooseneck set screw: 1/4-20 x 3/4 square head through the hub boss's tap
     # hole along +X at the hub centreline; tip 0.21 clear of the Ø15.875 sleeve
     # (see SET_SCREW_* constants). Same fix-all treatment.
-    set_target = [SET_SCREW_UNDER_HEAD_X, TOP_FRAME_MID_Y, GOOSENECK_HUB_Z]
+    set_target = [SET_SCREW_UNDER_HEAD_X, TOP_SCREW_Y, GOOSENECK_HUB_Z]
     set_rows = rot_z_rows(90.0)
     set_screw = await place_component(
         adapter,

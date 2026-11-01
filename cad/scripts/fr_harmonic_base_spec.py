@@ -273,9 +273,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # draw_fr_harmonic_base only reads it back. Sizes, plain chamfers and the
 # underside lug/rib/pocket stations print the title block's .XX; a dimension
 # prints .XXX only where its nominal is a .001-grid frame column station (the
-# cross-tap Xs), where a fit needs it (the spotface) or where another
-# subsystem's band reads it (the pivot seat offsets). No fabricated dimension
-# prints .X.
+# cross-tap Xs), where its own band is stated (the spotface depth) or where
+# another subsystem's band reads it (the pivot seat offsets). The spotface
+# diameter .35 prints .XX: the top-land proof already charges the .010 band.
+# No fabricated dimension prints .X.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BottomProfile": {"BottomLen": 2, "BottomWid": 2},
     "TopProfile": {"TopLen": 2, "TopWid": 2},
@@ -300,7 +301,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PivotSeatReference": dict.fromkeys(PIVOT_SEAT_DIMENSIONS, 3),
     "TopRimBreaks": {"TopRimChamfer": 2},
     "BottomEdgeBreak": {"BottomEdgeChamfer": 2},
-    "BaseSpotFaceRearProfile": {"SpotFaceDia": 3},
+    "BaseSpotFaceRearProfile": {"SpotFaceDia": 2},
     "BaseSpotFaceRear": {"SpotFaceDepth": 3},
     "PocketProfile": {"PocketLen": 2, "PocketWid": 2},
     "Pocket": {"PocketDepth": 2},

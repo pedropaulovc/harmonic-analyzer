@@ -19,7 +19,7 @@ fr-top-frame:
       reason: "owner ruling 2026-10-18: the cast window corners and flange junctions take at most the casting's own R.12 root radius, stated once in the general note until the title block gains its inside-corner default (#1625); the model's T-roots carry the dimensioned R.12"
     - id: "RV-03"
       kind: "accept"
-      where: "the whole-top 'Ra 125 µIN' facing note (linked note B) and the underside-plane 'Ra 125 µIN' facing note (linked note C)"
+      where: "the whole-top 'Ra 125' facing note (linked note B) and the underside-plane 'Ra 125' facing note (linked note C)"
       finding: "Ra 125 µin required over whole faced planes, not only the locating seats, and given in note text (rules 6, 7)"
       reason: "owner rulings 2026-10-11, 2026-10-12, 2026-10-14 and 2026-10-18: the top plane between the bosses and the underside plane between the bosses are each faced in one pass for a cohesive appearance, so the keeper feet, hanger washers and knife-mount seats land on one faced plane wherever fit-up puts them"
     - id: "RV-04"

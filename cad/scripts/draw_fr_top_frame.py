@@ -158,7 +158,6 @@ from fr_top_frame_spec import (
     EDGE_CHAMFER,
     GEOMETRIC_TOLERANCES_IN,
     HANGER_CLEARANCE_DIA,
-    HANGER_CLEARANCE_DIA_BAND,
     HANGER_CLEARANCE_DIA_PLACES,
     HANGER_GRIP,
     HANGER_KNOCKOUT_CALLOUT_ABOVE,
@@ -176,6 +175,8 @@ from fr_top_frame_spec import (
     KEEPER_TAP_CALLOUT_PRECISION,
     PIN_HOLE_NEG_X,
     PIN_HOLE_X,
+    SCREW_AXIS_BELOW_RAIL_TOP,
+    SCREW_AXIS_Y,
     STUD_Z_FRONT,
     STUD_Z_REAR,
     SURFACE_FINISHES,
@@ -237,7 +238,7 @@ DETAIL_VIEW_SCALE = DETAIL_TOP_SCALE[0] / DETAIL_TOP_SCALE[1]
 
 # Plan extents including the Ø1.77 corner bosses: the straight rails stop
 # at x +/-214.10 / z +/-131.06, bosses at +/-219.48 / +/-134.49.
-# The boss stack stays 1.864 tall around the 1.437 rail band.
+# The boss stack stays 1.87 tall around the 1.437 rail band.
 PLAN_HALF_X = COLUMN_X + BOSS_DIA / 2.0
 PLAN_HALF_Z = abs(FRONT_COLUMN_Z) + BOSS_DIA / 2.0
 GEOMETRY_PLAN_HALF_W = PLAN_HALF_X * GEOMETRY_VIEW_SCALE / 1000.0
@@ -473,7 +474,9 @@ BOSS_ABOVE_RAIL_LINE_XY = (
 )
 # Above the dimension's own upper arrow, not 51 mm below it -- see the
 # boss-height comment in the A-A recipe for what the long leader crossed.
-BOSS_ABOVE_RAIL_TEXT_XY = (BOSS_ABOVE_RAIL_LINE_XY[0] + 0.0135, 0.176)
+# Its 36.5 mm row ends 2.2 mm short of the recess depth's "+.012" (farm
+# inspect-3: 1.43 at +0.0135).
+BOSS_ABOVE_RAIL_TEXT_XY = (BOSS_ABOVE_RAIL_LINE_XY[0] + 0.0127, 0.176)
 # The A-A witnesses off the boss top, the recess floor and the rail top
 # start this far past the +Z boss's outer face, never across its cut face.
 A_A_WITNESS_STANDOFF = 0.0012
@@ -1362,45 +1365,32 @@ def _set_hanger_hole_callout(display: Any) -> None:
         {"hw-diam": HANGER_CLEARANCE_DIA_PLACES},
         label="hanger clearance diameter",
     )
-    _tolerance_hanger_callout_clearance(display)
+    _clear_hanger_callout_band(display)
 
 
-def _tolerance_hanger_callout_clearance(display: Any) -> None:
-    """Publish/read back the model's unilateral band on its native variable.
+def _clear_hanger_callout_band(display: Any) -> None:
+    """The through diameter takes the title block's DRILLED HOLES band.
 
     SDK ICalloutVariable.ToleranceType, not IDimensionTolerance.Type, owns
-    multivalue-callout rendering (2016+). Length/tolerance values use native
-    SI units; the variable remains attached to the Hole Wizard diameter.
+    multivalue-callout rendering (2016+): set it to none and read it back,
+    so the callout restates no band (machinist review: rule 2).
     """
     from win32com.client.dynamic import Dispatch as dynamic_dispatch
 
     # Concrete callout interfaces alias the generic metadata DISPIDs.
     variables = [
-        (raw, dynamic_dispatch(raw._oleobj_))
+        dynamic_dispatch(raw._oleobj_)
         for raw in display.GetHoleCalloutVariables() or ()
     ]
     matches = [
-        (raw, variable) for raw, variable in variables
+        variable for variable in variables
         if str(variable.VariableName) == "hw-diam"
     ]
     if len(matches) != 1:
         raise RuntimeError("hanger callout lacks one native through-diameter variable")
-    raw, variable = matches[0]
-    lower_m, upper_m = (value/1000.0 for value in (
-        min(HANGER_CLEARANCE_DIA_BAND), max(HANGER_CLEARANCE_DIA_BAND),
-    ))
-    variable.ToleranceType = 2  # swTolType_e.swTolBILAT, +.004/0
-    variable.ToleranceMin = lower_m
-    variable.ToleranceMax = upper_m
-    length = _early_bound(raw, "ICalloutLengthVariable")
-    length.TolerancePrecision = HANGER_CLEARANCE_DIA_PLACES
-    if (
-        int(variable.ToleranceType) != 2
-        or abs(float(variable.ToleranceMin)-lower_m) > 1e-9
-        or abs(float(variable.ToleranceMax)-upper_m) > 1e-9
-        or int(length.TolerancePrecision) != HANGER_CLEARANCE_DIA_PLACES
-    ):
-        raise RuntimeError("native hanger through-diameter callout band did not persist")
+    matches[0].ToleranceType = 0  # swTolType_e.swTolNONE
+    if int(matches[0].ToleranceType) != 0:
+        raise RuntimeError("native hanger through-diameter callout kept a band")
 
 
 def _require_model_hanger_grip(adapter: Any, dimensions: list[Any]) -> Any:
@@ -2205,7 +2195,8 @@ def _hub_boss_section(adapter: Any, parent_view: Any) -> Any:
         (
             ((GOOSENECK_X, -HALF_H-HUB_BOSS_DROP-2.0, GOOSENECK_Z),
              (GOOSENECK_X, HALF_H+2.0, GOOSENECK_Z)),
-            ((SET_BOSS_FACE_X-2.0, 0.0, GOOSENECK_Z), (-INNER_X+2.0, 0.0, GOOSENECK_Z)),
+            ((SET_BOSS_FACE_X-2.0, SCREW_AXIS_Y, GOOSENECK_Z),
+             (-INNER_X+2.0, SCREW_AXIS_Y, GOOSENECK_Z)),
         ),
     )
     # The cut plane runs through the tap axis, so the boss face, the spot face
@@ -2452,6 +2443,21 @@ def _hub_underside_detail(adapter: Any, parent_view: Any) -> Any:
     detail.ScaleRatio = double_array([float(value) for value in HUB_DETAIL_SCALE])
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="_hub_underside_detail")
+    # The fence's letter stands on its right quadrant, where main's print had
+    # it: the native default on the inch sheet put it on the top quadrant,
+    # on the pocket length's rear extension line (farm inspect-3 audit).
+    circles = tuple(parent.GetDetailCircles() or ())
+    if len(circles) != 1:
+        raise RuntimeError(
+            f"expected one detail fence on the underside, found {len(circles)}"
+        )
+    circle = _early_bound(circles[0], "IDetailCircle")
+    letter_xy = (center[0] + radius, center[1])
+    circle.SetLabelPosition(*letter_xy)  # VT_VOID; read back
+    rebuild_drawing(adapter, label="detail J letter")
+    letter = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(letter) != 2 or math.dist(letter, letter_xy) > 1e-8:
+        raise RuntimeError(f"detail J's letter did not persist: {letter}")
     outline = tuple(float(value) for value in detail.GetOutline())
     position = tuple(float(value) for value in detail.Position)
     if len(outline) != 4 or len(position) != 2:
@@ -3400,14 +3406,15 @@ async def build(adapter: Any) -> dict[str, str]:
             suffix=qualifier, offset_text=offset, edges=side_section_edges,
         )
     # The pockets either side of the web, as the underside's 138.0 names
-    # them: their depth from the flange underside's flat to the T's underside.
+    # them: their depth from the flange underside's flat to the T's
+    # underside, the 1.437 grip less the .32 flange -- a reference.
     pocket_depth = _checked_dimension(
         adapter, side_section,
         p0=(flange_flat_x, FLANGE_BOT_Y, SIDE_SECTION_Z), p1=(HANGER_X, -HALF_H, SIDE_SECTION_Z),
         text_xy=CROSSBAR_POCKET_DEPTH_LINE_XY, label="crossbar pocket depth",
         expected_mm=FLANGE_BOT_Y + HALF_H, orientation="vertical", exact_linear=True,
         suffix="2X POCKET", offset_text=CROSSBAR_POCKET_DEPTH_TEXT_XY,
-        edges=side_section_edges,
+        edges=side_section_edges, reference=True,
     )
     pocket_depth.ArrowSide = _DIM_ARROWS_INSIDE
     if int(pocket_depth.ArrowSide) != _DIM_ARROWS_INSIDE:
@@ -3732,7 +3739,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _screw_axis, *bore_axes = _add_view_centerlines(
         adapter, detail_section,
         (
-            ((COLUMN_X, 0.0, -PLAN_HALF_Z), (COLUMN_X, 0.0, PLAN_HALF_Z)),
+            ((COLUMN_X, SCREW_AXIS_Y, -PLAN_HALF_Z), (COLUMN_X, SCREW_AXIS_Y, PLAN_HALF_Z)),
             ((COLUMN_X, -HALF_H-BOSS_BELOW-3.0, FRONT_COLUMN_Z),
              (COLUMN_X, HALF_H+BOSS_ABOVE+3.0, FRONT_COLUMN_Z)),
             ((COLUMN_X, -HALF_H-BOSS_BELOW-3.0, REAR_COLUMN_Z),
@@ -3877,7 +3884,7 @@ async def build(adapter: Any) -> dict[str, str]:
         center_tol_mm=1e-4, radius_tol_mm=1e-4,
     ).edge
     front_tap_edge = detail_front_edges.circle_at(
-        (COLUMN_X, 0.0, TOP_SCREW_SEAT_Z), SIDE_TAP_DRILL_DIA/2, axis=(0.0, 0.0, 1.0),
+        (COLUMN_X, SCREW_AXIS_Y, TOP_SCREW_SEAT_Z), SIDE_TAP_DRILL_DIA/2, axis=(0.0, 0.0, 1.0),
         label="front view column cross-tap circle",
     ).edge
     section_floor_edges = [
@@ -3956,20 +3963,20 @@ async def build(adapter: Any) -> dict[str, str]:
         label="front/rear column-retention taps",
         # The native "2X" is the count in THIS view (one tap per end on the
         # face shown); the process states the total once and where every
-        # depth starts.  The 1.810 thread and 1.940 drill depths are the
+        # depth starts.  The 1.81 thread and 1.94 drill depths are the
         # requirement, no tool named (machinist review r1).
         process=CROSS_TAP_CALLOUT,
     )
     set_hole_callout_precision(
-        cross_tap_callout, {"hw-tapdrldepth": 3, "hw-threaddepth": 3},
+        cross_tap_callout, {"hw-tapdrldepth": 2, "hw-threaddepth": 2},
         label="cross tap depths",
     )
     _checked_dimension(
         adapter, detail_front,
         p0=(COLUMN_X, HALF_H+BOSS_ABOVE, REAR_COLUMN_Z),
-        p1=(COLUMN_X+SIDE_TAP_DRILL_DIA/2, 0.0, TOP_SCREW_SEAT_Z),
+        p1=(COLUMN_X+SIDE_TAP_DRILL_DIA/2, SCREW_AXIS_Y, TOP_SCREW_SEAT_Z),
         text_xy=(0.2605, 0.229), label="cross screw axis from boss top",
-        expected_mm=HALF_H+BOSS_ABOVE, orientation="vertical", center=True,
+        expected_mm=HALF_H+BOSS_ABOVE-SCREW_AXIS_Y, orientation="vertical", center=True,
         # Two taps per column end, opposed across the boss, at both ends of
         # the casting: the count a machinist sets up from is the total.
         suffix="TAP AXIS BELOW BOSS TOP",
@@ -4063,6 +4070,9 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(0.040, 0.225), label="hub from left front socket",
         expected_mm=GOOSENECK_Z-FRONT_COLUMN_Z, orientation="vertical",
         center=True, entities=(left_socket_edge, gooseneck_edge),
+        # The summing axis's station, flowing through at .XXX (machinist
+        # review: a three-place location names what it serves).
+        suffix="ON MHA-SM-00\nSUMMING AXIS",
     )
     set_hidden_lines_removed(adapter, detail_left)
     detail_left_edges = scan_view_edges(detail_left, label="hub side")
@@ -4082,7 +4092,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ):
             rail_top_edge = item.edge
     set_tap_edge = detail_left_edges.circle_at(
-        (tap_x, 0.0, GOOSENECK_Z), tap_radius, axis=(1.0, 0.0, 0.0),
+        (tap_x, SCREW_AXIS_Y, GOOSENECK_Z), tap_radius, axis=(1.0, 0.0, 0.0),
         label="left view set-tap circle",
     ).edge
     if rail_top_edge is None:
@@ -4108,9 +4118,9 @@ async def build(adapter: Any) -> dict[str, str]:
     _checked_dimension(
         adapter, detail_left,
         p0=(-OUTER_X, HALF_H, GOOSENECK_Z),
-        p1=(tap_x, 0.0, GOOSENECK_Z+tap_radius),
+        p1=(tap_x, SCREW_AXIS_Y, GOOSENECK_Z+tap_radius),
         text_xy=(0.230, 0.1125), label="set screw axis from rail top",
-        expected_mm=HALF_H, orientation="vertical", center=True,
+        expected_mm=SCREW_AXIS_BELOW_RAIL_TOP, orientation="vertical", center=True,
         suffix="FROM RAIL TOP\nON BORE CENTRE",
         entities=(rail_top_edge, set_tap_edge), offset_text=(0.252, 0.1125),
     )
