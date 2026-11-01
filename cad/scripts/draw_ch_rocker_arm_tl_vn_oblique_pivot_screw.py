@@ -39,10 +39,8 @@ GENERAL_TEXT = "PURCHASED PART; CUT THREAD AND CHAMFER END AT ASSEMBLY. REST AS 
 VIEW_LAYOUT = "tall_top"
 # Every text shelves right of its own witnesses, clear of the lines: the
 # shoulder Ø on the Top's top lane (past the thread end), the head Ø on its
-# bottom lane (under the head), the shoulder length beside the Top. Front and
-# Top reserve the same left/right space so the fit centres them on one
-# projection line; the unannotated Front's equal top/bottom keeps it level
-# with the Right.
+# bottom lane (under the head), the shoulder length beside the Top. Only the
+# Top is annotated; the projection fit centres the Front under it.
 SHELVES = {
     "SupplierShoulderDiameter": (True, "right"),
     "SupplierHeadDiameter": (True, "right"),
@@ -50,10 +48,7 @@ SHELVES = {
 }
 # The Top's bottom lane holds the head Ø's two rows; with the shoulder Ø's
 # three over the thread end, the ~2.3 in screw still fits the 96 mm cell at 1:1.
-SUPPLIER_MARGINS = {
-    "*Front": (0.010, 0.010, 0.060, 0.010),
-    "*Top": (0.010, 0.014, 0.060, 0.020),
-}
+SUPPLIER_MARGINS = {"*Top": (0.010, 0.014, 0.060, 0.020)}
 # The cut length's text (63 mm wide with its callout row) centres on its line,
 # so the line stands far enough right that the text clears the thread's edge
 # and the shoulder Ø's witness lines (x 94-95 mm), and its outside arrow's
@@ -150,7 +145,6 @@ async def build(adapter) -> dict[str, str]:
             units=part.SUPPLIER_REFERENCE_UNITS,
         )
         _assert_supplier_bands(displays)
-        stations = shelve_supplier_text(adapter, displays, SHELVES)
         _assert_shop_dimension(_place_cut(adapter, views["*Top"]))
         # The shoulder length's line lies on the silhouette, so the Top
         # carries its axis as a native centerline, picked on the shoulder face.
@@ -163,6 +157,9 @@ async def build(adapter) -> dict[str, str]:
                 label="pivot screw TOP shoulder face",
             ),
         )
+        # Shelve last: the cut import and the centerline rebuild the Top, and
+        # the shelf's retained stations are the ones the settled sheet keeps.
+        stations = shelve_supplier_text(adapter, displays, SHELVES)
 
         def assert_references():
             fresh = assert_supplier_screw(
