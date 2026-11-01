@@ -55,7 +55,7 @@ from _supplier_spring_drawing import (
     reacquire_supplier_dimensions,
 )
 from _supplier_spring_reference import SUPPLIER_DIAGRAM_CONFIGURATION
-from _supplier_wire_stock_drawing import _construction_curves_as_outline
+from _construction_line_font import _construction_curves_as_outline
 import dt_vn_cylinder_bank_spring_spec as supplier_spec
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from vn_disc_spring_supplier_stock import (
