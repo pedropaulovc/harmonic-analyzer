@@ -136,9 +136,11 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
     # and sleeve read as one stack): the pin rearward out of the arm (which
     # the cluster's view does not draw), the MHA-PD-VN-68 shims rearward off
     # the arm's front face, the MHA-PD-24 rear bushing in place, then the
-    # sleeve with everything on it forward.
-    ExplodeStep("pin rearward", ("pd-transgear-pin",), "z", 12.0),
-    ExplodeStep("shims rearward", ("pd-vn-transgear-cluster-shim",), "z", 6.0),
+    # sleeve with everything on it forward.  The pin's head is the view's
+    # rearmost point, so its throw grows the view's projected box: at 12 mm
+    # the ring stood 147.4 mm tall in a 147.0 mm field (round 12).
+    ExplodeStep("pin rearward", ("pd-transgear-pin",), "z", 4.0),
+    ExplodeStep("shims rearward", ("pd-vn-transgear-cluster-shim",), "z", 5.5),
     ExplodeStep(
         "cluster forward",
         (
