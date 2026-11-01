@@ -51,9 +51,6 @@ SHANK_CALLOUT = "\n".join(
 GROOVE_STATION_CALLOUT = (
     f"TO RING LOAD WALL;\n{STACK_NAME} ({STACK_SHEET}),\nHOLDS END FLOAT, NO FIT-UP"
 )
-# The seat's root radius names what it keeps (rule 4): the head seats flat on
-# the arm's rear face, its root clear of the ream mouth's deburr.
-SEAT_RADIUS_CALLOUT = f"HEAD SEATS FLAT ON\n{ARM_NUMBER} REAM MOUTH"
 
 # lane -> (feature, dimension) -> text.
 CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
@@ -62,10 +59,11 @@ CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
         ("PinProfile", "ShankDia"): SHANK_CALLOUT,
         ("PinProfile", "GrooveStation"): GROOVE_STATION_CALLOUT,
         ("PinProfile", "GrooveWidth"): GROOVE_WIDTH_CALLOUT,
-        ("SeatFillet", "SeatRadius"): SEAT_RADIUS_CALLOUT,
     },
-    # The root radius is a single limit: the modelled size IS the max, and
-    # the part authors the MAX (SolidWorks' native swTolMAX prints "max.").
+    # The root radius is a single limit, its own one-line "R.005 MAX" (a
+    # local MAX under the title block's inside corner needs no reason): the
+    # modelled size IS the max, and the part authors the MAX (SolidWorks'
+    # native swTolMAX prints "max.").
     TEXT_SUFFIX: {("SeatFillet", "SeatRadius"): SEAT_FILLET_SUFFIX},
 }
 if any("\n" in text for text in CALLOUTS[CALLOUT_ABOVE].values()):

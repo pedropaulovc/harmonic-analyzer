@@ -310,7 +310,7 @@ def test_slide_faces_carry_the_slide_grade() -> None:
     )
 
 
-def test_hole_callouts_pick_the_tap_and_counterbore_edges(monkeypatch) -> None:
+def test_clamp_callout_picks_the_counterbore_rim(monkeypatch) -> None:
     picks = []
 
     class _Edges:
@@ -323,15 +323,8 @@ def test_hole_callouts_pick_the_tap_and_counterbore_edges(monkeypatch) -> None:
             return _Hit()
 
     monkeypatch.setattr(drawing, "scan_view_edges", lambda view, *, label: _Edges())
-    drawing._hole_rims(object(), object())
-    tap_dia = part.blind_cut_dia_mm(spec.BRACKET_TAP_SPEC)
-    csk_depth = (spec.BRACKET_TAP_CSK_DIA - tap_dia) / 2.0
+    drawing._cbore_rim(object())
     assert picks == [
-        (
-            (spec.BRACKET_TAP_X[0], spec.HANGER_TAP_Y, spec.BACK_FACE_Z - csk_depth),
-            tap_dia / 2.0,
-            (0.0, 0.0, 1.0),
-        ),
         (
             (max(part.CLAMP_ROUND_X), spec.CLAMP_TAP_Y, -BAR_DEPTH / 2.0),
             part.CLAMP_CBORE_DIA / 2.0,
