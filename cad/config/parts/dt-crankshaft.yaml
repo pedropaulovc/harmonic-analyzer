@@ -1,7 +1,7 @@
 dt-crankshaft:
   number: MHA-DT-11
-  material: AISI 1018 cold-finished steel bar
-  material_specification: AISI 1018 cold-finished steel bar, ASTM A108
+  material: LOW-CARBON STEEL, E.G. 1018 CF
+  material_specification: LOW-CARBON STEEL, E.G. 1018 CF
   finish: oiled
   quantity: 1
   tolerance_class: machined_block
