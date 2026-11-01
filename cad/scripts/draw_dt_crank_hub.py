@@ -89,7 +89,10 @@ SIDE_VIEW_ANGLE = math.pi / 2.0
 END_VIEW_ANGLE = math.pi
 SIDE_CENTER = (0.200, 0.160)
 END_CENTER = (0.295, SIDE_CENTER[1])
-ISO_CENTER = (0.380, 0.228)
+# 4 mm higher than farm run 20261101T035809796Z, with its label: the
+# four-line pin-proud block stacks up from its dimension line and its value
+# overlapped the label by 0.49 mm.
+ISO_CENTER = (0.380, 0.232)
 
 
 def _sheet_x(station_mm: float) -> float:
@@ -144,11 +147,12 @@ _ROW_Y = (0.120, 0.102)
 _STATION_ROW_Y = _ROW_Y[0] + 0.006
 END_KEEP = {
     "BoreDia": (END_CENTER[0] + 0.070, END_CENTER[1] - 0.020),
-    # Four callout lines (r7 review: name the phantom, the pin and the ring):
-    # one line higher than the three-line block of farm run
-    # 20261031T233549214Z, its last line still above the dimension line, and
-    # 7 mm further right, so the wider block's left edge clears the phantom
-    # big end (x <= END_CENTER + 31.2 mm, y within 6 mm of the axis).
+    # Four callout lines (r7 review: name the phantom, the pin and the ring).
+    # The block stacks up from the dimension line (farm run
+    # 20261101T035809796Z: value top at y 186.9 mm), so its height sets how
+    # close it comes to the isometric's label; 7 mm further right than the
+    # three-line block, so the wider block's left edge clears the phantom
+    # big end (x <= END_CENTER + 31.2 mm).
     "PinProud": (END_CENTER[0] + 0.072, END_CENTER[1] + 0.014),
 }
 # The cross-hole station is measured from the arm shoulder it must stay clear
@@ -182,7 +186,7 @@ SIDE_KEEP = {
     "SeatDia": (OUTBOARD_X + 0.020, 0.225),
 }
 HOLE_CALLOUT_XY = (0.150, 0.222)
-ISO_NOTE_XY = (0.345, 0.190)
+ISO_NOTE_XY = (0.345, 0.195)
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "SeatDia": SEAT_CALLOUT,

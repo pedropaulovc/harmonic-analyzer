@@ -22,21 +22,22 @@ from dt_crank_hub_geometry import (
 )
 
 
-def seat_callout(mate: str) -> str:
+def seat_callout(mate: str, name: str = "CRANK ARM") -> str:
     """Hub-seat fit on MHA-DT-31, turned second to press into ``mate``'s bore.
 
     Four lines (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). The seat end flush with ``mate``'s front
     face is the acceptance, naming both faces (machinist review: FACES FLUSH
     named neither); how the hub gets there (an arbor press) is a method, so
-    the sheet does not say it.
+    the sheet does not say it.  ``name`` is the mate's part name, printed with
+    its number (rule 4; r7 review of farm run 20261101T022045634Z).
     """
     low, high = SEAT_PRESS_INTERFERENCE
     return "\n".join(
         (
-            f"TURN TO SUIT {mate} BORE",
-            f"FOR LIGHT PRESS: {low:.3f}-{high:.3f}",
+            f"TURN TO SUIT {name} {mate}",
+            f"BORE FOR LIGHT PRESS: {low:.3f}-{high:.3f}",
             "DIAMETRAL INTERFERENCE;",
-            f"END FLUSH WITH {mate} FRONT",
+            f"END FLUSH WITH {name} FRONT",
         )
     )
 
@@ -52,9 +53,11 @@ def seam_callout(mate: str, pin: str = "MHA-DT-VN-59") -> str:
     """MHA-DT-VN-59 seam, match-drilled with ``mate``: size first, then the process.
 
     ``pin`` names the pin as the sheet identifies it; the arm's print adds its
-    part name (MHA-DT-06 machinist review, 2026-09-29).  The blind pin makes
-    hub and ``mate`` a permanent pair, serviced at the MHA-DT-09 taper pin
-    (owner ruling 2026-11-01, machinist review: no knockout).
+    part name (MHA-DT-06 machinist review, 2026-09-29).  On the hub's print
+    the seat callout names ``mate`` in full; the four-row limit leaves this
+    one no room (r7 review of farm run 20261101T022045634Z).  The blind pin
+    makes hub and ``mate`` a permanent pair, serviced at the MHA-DT-09 taper
+    pin (owner ruling 2026-11-01, machinist review: no knockout).
     """
     return "\n".join(
         (
@@ -91,10 +94,10 @@ SEAM_CALLOUT = seam_callout("MHA-DT-06")
 FRONT_FACE_DATUM = "MHA-DT-11 DOME ROOT"
 CROSS_HOLE_CALLOUT = "\n".join(
     (
-        "SEAT END FLUSH WITH MHA-DT-11",
-        "DOME ROOT; AT ASSEMBLY, MATCH",
-        "TAPER-REAM 1:48 WITH MHA-DT-11",
-        "FOR MHA-DT-09: LIGHT DRIVE FIT",
+        "SEAT END FLUSH WITH CRANKSHAFT",
+        "MHA-DT-11 DOME ROOT; AT ASSEMBLY,",
+        "MATCH TAPER-REAM 1:48 WITH IT FOR",
+        "TAPER PIN MHA-DT-09: LIGHT DRIVE FIT",
     )
 )
 if FRONT_FACE_DATUM not in " ".join(CROSS_HOLE_CALLOUT.split()):

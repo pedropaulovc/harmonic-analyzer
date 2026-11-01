@@ -260,10 +260,10 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     # interference printed from the notes constant.
     low, high = dt_crank_hub_notes.SEAT_PRESS_INTERFERENCE
     assert seat.splitlines() == [
-        "TURN TO SUIT MHA-DT-06 BORE",
-        f"FOR LIGHT PRESS: {low:.3f}-{high:.3f}",
+        "TURN TO SUIT CRANK ARM MHA-DT-06",
+        f"BORE FOR LIGHT PRESS: {low:.3f}-{high:.3f}",
         "DIAMETRAL INTERFERENCE;",
-        "END FLUSH WITH MHA-DT-06 FRONT",
+        "END FLUSH WITH CRANK ARM FRONT",
     ]
     assert "MATCH-FIT" not in seat
     # The arm bore is made first; the hub seat is turned to suit it, so its
