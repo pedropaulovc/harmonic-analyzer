@@ -39,9 +39,9 @@ def _inch(value_mm: float, places: int) -> str:
     return f"{value_mm / _IN:.{places}f}".removeprefix("0")
 
 
-# The shortfall prints as a plain fact; its governance is the
-# pending ruling issue #1377 and this tag, never the sheet.
-# Pending exception ruling: MHA-PD-09 web (#1377).
+# The shortfall prints as a plain fact; its governance is RV-01 in
+# pd-transgear-removable.yaml (owner ruling 2026-11-01, accepted until
+# D14/#1381), never the sheet.
 BORE_PIN_WEB_NOTE = (
     f"BORE TO DRIVE-PIN HOLE WEB {_inch(BORE_PIN_WEB_WORST_IN * _IN, 3)} MIN."
 )
