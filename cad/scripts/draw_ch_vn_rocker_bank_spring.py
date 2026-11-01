@@ -10,6 +10,7 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _supplier_disc_spring_drawing import (
     prepare_supplier_disc_diagram,
     supplier_disc_reference_features,
@@ -43,6 +44,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         installed_caption="INSTALLED ENVELOPE",
         settled_checks=settled_checks,
+        unit=part_drawing_unit("ch-vn-rocker-bank-spring"),
     )
 
 
