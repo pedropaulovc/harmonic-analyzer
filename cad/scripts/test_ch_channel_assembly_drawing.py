@@ -201,7 +201,13 @@ def test_the_spring_set_and_its_preload_check_are_printed_from_the_layout() -> N
     spring = _config.parts("ch-vn-rocker-bank-spring")["number"]
     shaft = _config.parts("ch-pivot-shaft")["number"]
     setting = _step_body("south-bracket-spring-set")
-    assert f"RUN A {spring} SPRING ALONG THE {shaft}; REJECT ONE THAT BINDS." in setting
+    # Machinist review (#2108): the BOM carries one spring, so the run along
+    # the shaft is an acceptance check, and the wave spring is named apart
+    # from the MHA-SH-VN-54 set screw.
+    assert (
+        f"RUN THE {spring} WAVE SPRING ALONG THE {shaft}: ACCEPT IF IT SLIDES FREE."
+        in setting
+    )
     assert "SPRING-SET BLADE (DETAIL A) BESIDE THE SPRING" in setting
     # Machinist review (PR #1605): the spring-back check is run while the
     # bracket is only clamped, so "repeat" re-sets a bracket that can still
