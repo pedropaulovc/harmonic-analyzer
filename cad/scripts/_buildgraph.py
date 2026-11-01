@@ -2368,10 +2368,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "dt_vn_cone_tip_collar_spec",
         "dt_crank_hub_geometry",
         "dt_crank_pinion_spec",
-        # Drilled-hole row bounds the rocker's #47 hole the rod-slot pin enters.
-        "ch_rocker_arm_profile_check",
-        # Drilled-hole row bounds the hub's supply bore under the Ø6.50 ream.
-        "ch_rocker_hub_spec",
         # Edge-break row takes the tap mouths off the carrier taps' engagement.
         "ch_rocker_arm_tl_oblique_carrier_spec",
         # Edge-break row sizes the pillow-block screws' full engagement.

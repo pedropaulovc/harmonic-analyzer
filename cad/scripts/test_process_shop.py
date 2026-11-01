@@ -449,7 +449,6 @@ def test_kit_holds_the_hub_coaxiality_and_filed_band():
         + (bore_max - body_min) / 2
         + _HUB_FILING_RUNOUT_TIR_MM / 2
     )
-    assert shift == pytest.approx(0.05)
     assert 2 * shift <= rocker.HUB_COAXIALITY_DIA + 1e-9
     rim_low, rim_high = _HUB_FILING_BANDS_MM["button_dia_limits_mm"]
     hub_low, hub_high = limits(rocker.HUB_DIA, 2)

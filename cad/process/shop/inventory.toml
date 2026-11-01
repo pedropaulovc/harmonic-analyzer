@@ -6448,12 +6448,12 @@ cite = ["Online Metals pid 24273 https://www.onlinemetals.com/en/buy/aluminum/0-
 [[stock]]
 form = "flat_bar"
 material = "1018 cold-finish carbon steel"
-note = "MHA-CH-13 strap: 3 x 40 mm, 60 in +/-2 in; vendor title 1005/1018, product information alloy 1018. Require 1018 material certification on purchase. Four 350 mm blanks fit even at the 58 in low length limit; mill to drawing thickness after receipt."
-# Basis: OnlineMetals 22381 catalogue nominal [40, 3] mm and 60 x 25.4 = 1524 mm, zero offsets; not metrology.
-section_mm = [40.0, 3.0]
+note = "MHA-CH-13 strap: 1/8 x 2 in 1018 cold-finish flat, 60 in cut length (+/-1/8 in). Require 1018 material certification on purchase. Four 350 mm blanks fit in the length; mill to drawing thickness after receipt."
+# Basis: OnlineMetals 4808 catalogue nominal .125 x 2 in = [50.8, 3.175] mm and 60 x 25.4 = 1524 mm, zero offsets; not metrology.
+section_mm = [50.8, 3.175]
 length_mm = 1524.0
 on_hand = false
-cite = ["OnlineMetals part 22381 https://www.onlinemetals.com/en/buy/carbon-steel/3mm-x-40mm-carbon-steel-rectangle-bar-1005-1018-metric-60-length/pid/22381 read live 2026-10-16, $70.12"]
+cite = ["OnlineMetals part 4808 https://www.onlinemetals.com/en/buy/carbon-steel/0-125-x-2-carbon-steel-rectangle-bar-1018-cold-finish/pid/4808 read live 2026-10-31"]
 
 [[stock]]
 form = "round_bar"
