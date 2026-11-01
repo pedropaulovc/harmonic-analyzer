@@ -610,6 +610,20 @@ async def build(adapter) -> dict[str, str]:
         names=("JournalCx", "JournalCz", "JournalDiaDim"),
         drives=(None, None, '"JournalDia"'),
     )
+    # The collar-side neck's printed size: a construction circle of the uncut
+    # core (Ø "ShaftDia") on the journal's start face, where that short land
+    # ends. The extrusion ignores it; the drawing drags its diameter onto the
+    # land, as the pinion-seat step's NeckDiaDim witness does on the far side.
+    witness = await define_circle(
+        adapter, 0.0, 0.0, SHAFT_DIA / 2.0, "collar-side neck witness circle",
+        dims=journal,
+        names=(None, None, "OutboardNeckDia"),
+        drives=(None, None, '"ShaftDia"'),
+    )
+    segment = _early_bound(adapter._sketch_entities[witness], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("collar-side neck witness did not take construction flag")
     await ensure_fully_defined(adapter, "bearing journal sketch")
     check("exit_sketch bearing journal", await adapter.exit_sketch())
     name_last_feature(adapter, "JournalProfile")
@@ -1043,10 +1057,14 @@ async def build(adapter) -> dict[str, str]:
         *deviations(PINION_SEAT_DIA_BAND),
         display_unit=UNIT,
     )
-    set_dimension_symmetric_tolerance(
-        adapter, "PinionSeatProfile", "NeckDiaDim", NECK_DIA_TOL,
-        places=NECK_DIA_PLACES, display_unit=UNIT,
-    )
+    # Both bare necks: the core's .375 at an explicit loose ±.010.
+    for profile, witness_name in (
+        ("PinionSeatProfile", "NeckDiaDim"), ("JournalProfile", "OutboardNeckDia"),
+    ):
+        set_dimension_symmetric_tolerance(
+            adapter, profile, witness_name, NECK_DIA_TOL,
+            places=NECK_DIA_PLACES, display_unit=UNIT,
+        )
     # The length is unilateral (dt_crankshaft_spec.SHAFT_LENGTH_BAND, the hub
     # air); it prints from the model on the far-end-to-dome-root Depth.
     set_dimension_bilateral_tolerance(
