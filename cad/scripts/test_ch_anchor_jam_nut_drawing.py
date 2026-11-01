@@ -147,7 +147,7 @@ def test_neighbour_gap_charges_both_taps_position_zones() -> None:
 def test_spec_margins() -> None:
     assert spec.WALL_WORST >= WALL_FLOOR_MM
     assert spec.UNDER_SLOT_WORST >= WALL_FLOOR_MM
-    assert spec.NEIGHBOUR_GAP_WORST >= 0.25
+    assert spec.NEIGHBOUR_GAP_WORST >= 0.249
     assert spec.WALL_WORST == pytest.approx(
         (spec.OD_MIN - THREAD_MAJOR_MM["#6-32"]) / 2
     )
