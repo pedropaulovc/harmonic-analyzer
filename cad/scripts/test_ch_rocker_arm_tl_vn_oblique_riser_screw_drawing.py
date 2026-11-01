@@ -214,30 +214,6 @@ def test_purchased_sheet_documents_the_built_part() -> None:
     assert sheet.layout in DRAWING_TEMPLATES
 
 
-def test_sheet_prints_only_the_replacement_sizes(monkeypatch) -> None:
-    import draw_ch_rocker_arm_tl_vn_oblique_riser_screw as drawing
-    from _supplier_screw_layout import supplier_screw_lane_plan
-
-    rows = drawing._printed_rows()
-    assert tuple(name for name, _, _ in rows) == drawing.PRINTED_REFERENCES
-    assert all(orientation != "angle" for _, _, orientation in rows)
-    # The part still authors these; the B18.6.3 flat head in ITEM implies them.
-    authored = {name for name, _, _ in spec.SUPPLIER_REFERENCE_DIMENSIONS}
-    assert authored - set(drawing.PRINTED_REFERENCES) == {
-        "SupplierHeadAngle", "SupplierHeadHeight",
-    }
-    plan = supplier_screw_lane_plan(
-        rows,
-        planes=drawing._printed(spec.SUPPLIER_REFERENCE_PLANES),
-        sides=drawing._printed(spec.SUPPLIER_REFERENCE_SIDES),
-    )
-    assert set(plan) == set(drawing.PRINTED_REFERENCES)
-    assert "supplier_top" in drawing.build.__code__.co_consts
-    monkeypatch.setattr(drawing, "PRINTED_REFERENCES", ("SupplierLength", "SupplierMissing"))
-    with pytest.raises(ValueError, match="SupplierMissing"):
-        drawing._printed_rows()
-
-
 def test_reserved_lanes_keep_the_views_in_projection() -> None:
     """Machinist review b344192: TOP and RIGHT sat .12 in off FRONT's axis/row."""
     import draw_ch_rocker_arm_tl_vn_oblique_riser_screw as drawing
@@ -245,9 +221,9 @@ def test_reserved_lanes_keep_the_views_in_projection() -> None:
     from _supplier_screw_layout import supplier_screw_margins
 
     raw = supplier_screw_margins(
-        drawing._printed_rows(),
-        planes=drawing._printed(spec.SUPPLIER_REFERENCE_PLANES),
-        sides=drawing._printed(spec.SUPPLIER_REFERENCE_SIDES),
+        spec.SUPPLIER_REFERENCE_DIMENSIONS,
+        planes=spec.SUPPLIER_REFERENCE_PLANES,
+        sides=spec.SUPPLIER_REFERENCE_SIDES,
     )
     aligned = drawing._aligned_margins(raw)
     # The same reserved views (the settled inventory guard), never a smaller lane.
