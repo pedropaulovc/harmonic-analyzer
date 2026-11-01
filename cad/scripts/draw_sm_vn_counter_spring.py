@@ -12,6 +12,7 @@ from typing import Any
 
 import _telemetry
 from _session import run_build
+from _part_properties import part_drawing_unit
 from _drawing_registry import DRAWINGS_BY_NAME
 from _supplier_extension_spring import SOURCE_FEATURES
 from _supplier_spring_drawing import (
@@ -54,6 +55,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "free_right": (0.0, 0.018, 0.045, 0.018),
             "max_front": (0.0, 0.0, 0.0, 0.018),
         },
+        unit=part_drawing_unit(PART_STEM),
     )
 
 
