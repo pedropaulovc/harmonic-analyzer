@@ -22,6 +22,7 @@ def test_identity_stock_and_common_pivot_interface():
     wall,metric,engagement=metadata['machinist_exceptions']
     assert (engagement['id'],engagement['kind'])==('RV-03','minor')
     assert pivot.ENGAGEMENT_TEXT in engagement['where']
+    assert 'Owner exception confirmed' in engagement['reason']
     assert (metric['id'],metric['kind'])==('RV-02','minor')
     assert 'ruling 4B' in metric['reason']
     assert (wall['id'],wall['kind'])==('RV-01','minor')

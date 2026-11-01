@@ -12,5 +12,5 @@ ch-rocker-arm-tl-oblique-pivot-block:
       kind: "minor"
       where: "Section B-B, the .570 counterbore floor callout: ENGAGES .183 MIN (1.16D)"
       finding: "M4 carriage screw engagement .183 min (4.65 mm, 1.16D), under rule 18's 1.5D, stated as a plain fact"
-      reason: "The bought HGH15CA carriage's vendor M4 holes are 5 mm deep, so no M4 reaches 1.5D (6.0 mm). Owner ruling 2026-11-01, option A (the jig's RV-05): the counterbore floor drops .614 to .570 and each screw is cut to fit its own floor at assembly (rule 19), so the reach carries only the ±.005 cut and the .001 reading, 1.16D minimum. Owner exception pending confirmation."
+      reason: "The bought HGH15CA carriage's vendor M4 holes are 5 mm deep, so no M4 reaches 1.5D (6.0 mm). Owner ruling 2026-11-01, option A (the jig's RV-05): the counterbore floor drops .614 to .570 and each screw is cut to fit its own floor at assembly (rule 19), so the reach carries only the ±.005 cut and the .001 reading, 1.16D minimum. Owner exception confirmed 2026-11-01 (relayed by Main)."
   drawing_unit: in
