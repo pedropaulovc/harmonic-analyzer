@@ -228,16 +228,15 @@ def _section_x(model_x: float) -> float:
 
 # Section A-A's dimensions: the two lengths in one row over the part; the
 # counterbore depth's LIMIT pair above them, left of the face; the
-# counterbore Ø's LIMIT pair (with its two axis rows) left of the end face,
-# between its extension lines; the head and shank Ø below the part, the
+# counterbore Ø's LIMIT pair (with its mate and max rows) left of the end
+# face, between its extension lines; the head and shank Ø below the part, the
 # head's block carrying the counterbore wall and its "AT C'BORE MAX" two rows
 # lower, the shank's longer fit callout lower.  The Ø's block centres on its
-# keep, 0.45 mm high (r7, farm run 20261101T022045634Z: the pair and one row
-# inked y 193.6-207.3 about keep 200.0); its ~19.3 mm with the second axis
-# row centre between the extension lines (y 189.5, 210.5), ~0.85 mm clear of
-# each.  The head's fourth row grows its block 5.6 mm about the same keep:
-# its top ~174.8, 6 mm under the part (180.95), its new row ~95-130 mm, left
-# of the shank's line (x 146.2).  Each Ø's text
+# keep, 0.45 mm high: r8 (farm run 20261101T035809796Z) inked the pair and two
+# rows y 190.4-209.6 between the extension lines at 189.5 and 210.5.  The
+# head's block, value and four rows, inked y 148.9-174.8, 6 mm under the part
+# (180.95), its last row x 94.8-129.9, left of the shank's line (x 146.2).
+# Each Ø's text
 # starts at its dimension line and runs right, so the head's line stands
 # near the end face and its text ends short of the shank's line (at
 # ARM_END_X + 10 the shank's line ran through it, farm run
@@ -249,7 +248,12 @@ def _section_x(model_x: float) -> float:
 # Ø's upper extension line.  Its leader's shoulder underlines the whole
 # block, so the block ends short of the end face's extension lines (x 0.075;
 # a 21-character row reached 0.0754 and crossed them, farm run
-# 20261028T083207316Z).
+# 20261028T083207316Z).  With the counterbore's axis limit (r8: the Ø's rows
+# carry its mate and max) the block runs to value and three rows, ~20.3 mm
+# of ink (r8: value and two rows 14.7 mm, centred on the keep, shoulder 0.9
+# mm under): centred at keep y 230.65 its shoulder (~219.6) stands 2.8 mm
+# over the Ø's upper dimension line (its end at 216.8) and its top (~240.8)
+# 2.9 mm under the depth's shoulder (243.7).
 SECTION_KEEP = {
     "PlugHeadLength": (
         _section_x(ARM_END_X + PLUG_HEAD_LENGTH / 2.0),
@@ -261,7 +265,7 @@ SECTION_KEEP = {
     ),
     "CounterboreDepth": (_SX0 - 0.012, _SY0 + _SECTION_HALF + 0.032),
     "CounterboreDia": (_SX0 - 0.030, _SY0 - 0.0005),
-    "CounterboreFloorCornerR": (_SX0 - 0.032, _SY0 + _SECTION_HALF + 0.013),
+    "CounterboreFloorCornerR": (_SX0 - 0.032, _SY0 + _SECTION_HALF + 0.0116),
     "PlugDia": (_section_x(ARM_END_X + 4.0), _SY0 - _SECTION_HALF - 0.019),
     # 1.5 mm left of the shank's centre: the four-place braze window ran
     # the text 0.26 mm onto the elevation (#290 batch 0).

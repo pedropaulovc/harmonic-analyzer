@@ -129,11 +129,15 @@ def test_counterbore_floor_corner_round_clears_the_runout() -> None:
         "CounterboreFloorCornerR"
         in gooseneck_spec.DRAWING_DIMENSIONS["CounterboreProfile"]
     )
-    # The corner names the run-out it clears (rule 4).
+    # The corner says what it clears (rule 4); the counterbore Ø's block,
+    # under it, names whose run-out (machinist review r8).
     assert (
         gooseneck_spec.DIMENSION_CALLOUTS_BY_NAME["CounterboreFloorCornerR"]
         == gooseneck_spec.COUNTERBORE_FLOOR_CALLOUT
-        == f"FLOOR CORNER, CLEARS\n{gooseneck_spec.SCREW_NUMBER} RUN-OUT"
+    )
+    assert gooseneck_spec.COUNTERBORE_FLOOR_CALLOUT.startswith("CLEARS RUN-OUT;\n")
+    assert gooseneck_spec.COUNTERBORE_DIA_CALLOUT.startswith(
+        f"MIN CLEARS {gooseneck_spec.SCREW_NUMBER}\nRUN-OUT"
     )
 
 

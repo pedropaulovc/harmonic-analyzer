@@ -153,14 +153,25 @@ def test_counterbore_callouts_floor_the_wall_from_the_joint() -> None:
     plug_rows = callouts["PlugDia"].splitlines()
     wall_row = plug_rows.index(spec.COUNTERBORE_WALL_CALLOUT)
     assert plug_rows[wall_row + 1 :] == ["AT C'BORE MAX"]
-    # The counterbore Ø's stacked LIMIT pair keeps two rows between its
-    # extension lines: the axis limit as a radial offset between named axes.
-    assert callouts["CounterboreDia"] == spec.COUNTERBORE_AXIS_CALLOUT
+    # Each 0.10 band names its mate and its max's job on its own callout
+    # (machinist review r8, farm run 20261101T035809796Z).
+    assert callouts["CounterboreDia"] == spec.COUNTERBORE_DIA_CALLOUT
+    assert spec.COUNTERBORE_DIA_CALLOUT.splitlines() == [
+        f"MIN CLEARS {spec.SCREW_NUMBER}",
+        "RUN-OUT; MAX SETS WALL",
+    ]
+    # The axis limit, a radial offset between named axes, rides the floor
+    # corner's block under its reason.
     assert spec.COUNTERBORE_AXIS_CALLOUT.splitlines() == [
         "C'BORE AXIS TO TAP AXIS",
         f"{joint.COUNTERBORE_AXIS_OFFSET_MAX:.2f} MAX RADIAL",
     ]
     assert "WITHIN" not in spec.COUNTERBORE_AXIS_CALLOUT
+    assert callouts["CounterboreFloorCornerR"] == spec.COUNTERBORE_FLOOR_CALLOUT
+    assert spec.COUNTERBORE_FLOOR_CALLOUT.splitlines() == [
+        "CLEARS RUN-OUT;",
+        *spec.COUNTERBORE_AXIS_CALLOUT.splitlines(),
+    ]
     # The floor corner's limit is its own native radial dimension, not text
     # under the depth (codjiflo P2 on #1997); the depth names its MIN's mate
     # in one row above its stacked pair (rule 4).
@@ -169,7 +180,6 @@ def test_counterbore_callouts_floor_the_wall_from_the_joint() -> None:
         "CounterboreDepth": f"MIN CLEARS {spec.SCREW_NUMBER} RUN-OUT"
     }
     assert "\n" not in spec.COUNTERBORE_DEPTH_CALLOUT
-    assert callouts["CounterboreFloorCornerR"] == spec.COUNTERBORE_FLOOR_CALLOUT
     marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
     assert set(callouts) | set(spec.DIMENSION_CALLOUTS_ABOVE_BY_NAME) <= marked
     for by_feature in (spec.DIMENSION_CALLOUTS, spec.DIMENSION_CALLOUTS_ABOVE):
@@ -177,11 +187,11 @@ def test_counterbore_callouts_floor_the_wall_from_the_joint() -> None:
             assert set(by_name) <= set(spec.DRAWING_DIMENSIONS[feature])
 
 
-def test_counterbore_dia_block_stands_between_its_extension_lines() -> None:
-    # r7 (farm run 20261101T022045634Z) inked the stacked pair and one row
-    # 13.7 mm tall, centred 0.45 mm above the keep, rows 5.6 mm apart; the
-    # extension lines stand on the modelled Ø (its MIN) at 3:1.
-    rows = len(spec.COUNTERBORE_AXIS_CALLOUT.splitlines())
+def test_counterbore_blocks_stand_between_their_neighbours() -> None:
+    # r8 (farm run 20261101T035809796Z) inked the Ø's stacked pair and two
+    # rows 19.2 mm tall, centred 0.45 mm above the keep, rows 5.6 mm apart;
+    # the extension lines stand on the modelled Ø (its MIN) at 3:1.
+    rows = len(spec.COUNTERBORE_DIA_CALLOUT.splitlines())
     height = 0.0137 + (rows - 1) * 0.0056
     centre = drawing.SECTION_KEEP["CounterboreDia"][1] + 0.00045
     half_span = joint.COUNTERBORE_DIA / 2.0 * drawing._SECTION_S
@@ -192,9 +202,21 @@ def test_counterbore_dia_block_stands_between_its_extension_lines() -> None:
     # Positive control: cca02b34c's single value and three rows (~20.4 mm)
     # was struck by the lower line.
     assert 0.0036 + 3 * 0.0056 > upper - lower - 2 * clearance
-    # Each axis row no longer than r7's 54.8 mm "ON TAP AXIS WITHIN 0.10"
-    # (23 characters), which stood inside the left border and the end face.
-    assert max(map(len, spec.COUNTERBORE_AXIS_CALLOUT.splitlines())) <= 23
+    # The floor corner's block (value 3.6 mm, rows 5.56 mm apart, centred on
+    # its keep, its shoulder 0.9 mm under) between the Ø's upper dimension
+    # line, which ends 6.3 mm over the upper extension line, and the depth's
+    # shoulder (r8: y 243.7 mm, 6.3 mm under the depth's keep y 250.05).
+    floor_rows = len(spec.COUNTERBORE_FLOOR_CALLOUT.splitlines())
+    floor_height = 0.0036 + floor_rows * 0.00556
+    floor_y = drawing.SECTION_KEEP["CounterboreFloorCornerR"][1]
+    shoulder = floor_y - floor_height / 2.0 - 0.0009
+    assert shoulder >= upper + 0.0063 + 0.0025
+    assert floor_y + floor_height / 2.0 <= 0.2437 - 0.0025
+    # Each row no longer than r8's 55.5 mm "C'BORE AXIS TO TAP AXIS" (23
+    # characters), which stood inside the left border and the end face.
+    for callout in (spec.COUNTERBORE_DIA_CALLOUT, spec.COUNTERBORE_FLOOR_CALLOUT):
+        assert max(map(len, callout.splitlines())) <= spec.COUNTERBORE_ROW_MAX_CHARS
+    assert spec.COUNTERBORE_ROW_MAX_CHARS == len("C'BORE AXIS TO TAP AXIS")
 
 
 def test_notes_state_stock_process_and_intent_without_sizes() -> None:
@@ -211,7 +233,7 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
         "TUBE 1/2 OD X 0.065 WALL, ONLINEMETALS 7322",
         "SLEEVE 5/8 OD X 0.058 WALL, 7324",
         # The stock is as supplied: its catalogue tolerance governs, unprinted.
-        "AS SUPPLIED, SUPPLIER TOLERANCE",
+        "BOTH AS SUPPLIED, SUPPLIER TOL.",
         "SLEEVE: CONTINUOUS BRAZE FILLET EACH END",
         "BRAZE BAg-7 (AWS A5.8)",
         "END PIECE: FULL-PENETRATION BRAZE OR LOCTITE 638",
@@ -325,7 +347,10 @@ def test_tap_callout_states_geometry_and_its_mate_within_four_rows() -> None:
     # this job replaces the floor datum's wording).  The row is the drilled
     # hole's finished extent, not a process step: no wander.
     assert rows[0] == f"FOR {spec.SCREW_NUMBER}; DEEPEST DRILL AT C'BORE MAX"
-    assert rows[1] == f"THREAD AXIS TO TUBE AXIS +/-{joint.THREAD_AXIS_OFFSET_MAX:.2f}"
+    assert (
+        rows[1]
+        == f"THREAD AXIS TO TUBE OD AXIS {joint.THREAD_AXIS_OFFSET_MAX:.2f} MAX RADIAL"
+    )
     assert joint.TAP_DRILL_DEPTH_MAX > joint.COUNTERBORE_DEPTH_MAX
     # At most three characters past r7's 39-character row (103.9 mm, x 106.1-
     # 210.0 mm; ~105.3 mm in Century Gothic's metrics): ~1 mm more each side
@@ -333,9 +358,7 @@ def test_tap_callout_states_geometry_and_its_mate_within_four_rows() -> None:
     assert len(rows[0]) <= len(f"FOR {spec.SCREW_NUMBER}; DEPTHS FROM C'BORE FLOOR") + 3
     assert "WANDER" not in spec.TAP_CALLOUT_BELOW
     assert "BRAZE" not in spec.TAP_CALLOUT_BELOW
-    assert (
-        spec.SCREW_NUMBER in spec.DIMENSION_CALLOUTS_BY_NAME["CounterboreFloorCornerR"]
-    )
+    assert spec.SCREW_NUMBER in spec.DIMENSION_CALLOUTS_BY_NAME["CounterboreDia"]
     printed = " ".join((spec.DRAWING_NOTES, spec.TAP_CALLOUT_BELOW)).upper()
     assert "PURCHASED" not in printed and "INTEGRAL" not in printed
     assert "THREADLOCKER" not in printed  # spring-eye clamping belongs to the assembly

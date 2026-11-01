@@ -110,7 +110,8 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     ),
     # _apply_neck_and_flat_limits passes each native LIMIT band in turn.
     ("build_pd_transgear_knob_shaft", "band"): (
-        "(FRONT_CORNER_RADIUS_BAND, CORE_FLAT_CUT_END_BAND, CORE_FLAT_TOOL_END_RADIUS_BAND)",
+        "(FRONT_RELIEF_DIA_BAND, FRONT_CORNER_RADIUS_BAND, CORE_FLAT_CUT_END_BAND,"
+        " CORE_FLAT_TOOL_END_RADIUS_BAND)",
         "each",
     ),
     # for feature, name, band_for in _BANDED_DIMENSIONS: band = band_for(teeth)

@@ -79,11 +79,12 @@ from pd_transgear_knob_shaft_spec import (
     CORE_FLAT_CUT_END_PREFIX,
     CORE_FLAT_CUT_END_TOL_TYPE,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     FACE_WIDTH,
     FACE_WIDTH_BAND,
     FRONT_RELIEF_DIA,
+    FRONT_RELIEF_DIA_BAND,
+    FRONT_RELIEF_DIA_TOL_TYPE,
     FRONT_RELIEF_WIDTH,
     FRONT_CORNER_RADIUS,
     FRONT_CORNER_RADIUS_BAND,
@@ -652,6 +653,14 @@ def _apply_native_limits(
 
 def _apply_neck_and_flat_limits(adapter: Any) -> None:
     _apply_native_limits(
+        adapter,
+        "StudProfile",
+        "FrontReliefDia",
+        FRONT_RELIEF_DIA,
+        FRONT_RELIEF_DIA_BAND,
+        FRONT_RELIEF_DIA_TOL_TYPE,
+    )
+    _apply_native_limits(
         adapter, "StudProfile", "FrontCornerRadius", FRONT_CORNER_RADIUS,
         FRONT_CORNER_RADIUS_BAND, FRONT_CORNER_RADIUS_TOL_TYPE,
     )
@@ -837,7 +846,6 @@ async def build(adapter: Any) -> dict[str, str]:
         PART_NAME,
         {
             "Gear Data": GEAR_DATA,
-            "Manufacturing Notes": DRAWING_NOTES,
             TOOTH_SPACE_CALLOUT_PROPERTY: TOOTH_SPACE_CALLOUT,
         },
     )

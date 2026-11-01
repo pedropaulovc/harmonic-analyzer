@@ -27,7 +27,6 @@ def inch_text(value_mm: float, places: int) -> str:
     """``value_mm`` as the inch sheet prints it, without a leading zero."""
     return f"{value_mm / MM_PER_IN:.{places}f}".removeprefix("0")
 
-
 def seat_callout(mate: str, name: str = "CRANK ARM") -> str:
     """Hub-seat fit on MHA-DT-31, turned second to press into ``mate``'s bore.
 
@@ -35,7 +34,7 @@ def seat_callout(mate: str, name: str = "CRANK ARM") -> str:
     face is the acceptance, naming both faces (machinist review: FACES FLUSH
     named neither); how the hub gets there (an arbor press) is a method, so
     the sheet does not say it.  ``name`` is the mate's part name, printed with
-    its number (rule 4).
+    its number (rule 4; r7 review of farm run 20261101T022045634Z).
     """
     low, high = SEAT_PRESS_INTERFERENCE
     return "\n".join(
@@ -100,10 +99,10 @@ SEAM_CALLOUT = seam_callout("CRANK ARM MHA-DT-06")
 FRONT_FACE_DATUM = "MHA-DT-11 DOME ROOT"
 CROSS_HOLE_CALLOUT = "\n".join(
     (
-        "SEAT END FLUSH WITH MHA-DT-11",
-        "DOME ROOT; AT ASSEMBLY, MATCH",
-        "TAPER-REAM 1:48 WITH MHA-DT-11",
-        "FOR MHA-DT-09: LIGHT DRIVE FIT",
+        "SEAT END FLUSH WITH CRANKSHAFT",
+        "MHA-DT-11 DOME ROOT; AT ASSEMBLY,",
+        "MATCH TAPER-REAM 1:48 WITH IT FOR",
+        "TAPER PIN MHA-DT-09: LIGHT DRIVE FIT",
     )
 )
 if FRONT_FACE_DATUM not in " ".join(CROSS_HOLE_CALLOUT.split()):
