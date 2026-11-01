@@ -29,7 +29,7 @@ HUB_SEAT_CALLOUT = "\n".join(
 # The MHA-DT-VN-59 seam is match-drilled with the hub at assembly; its callout
 # sits on the seam itself, the same requirement the hub's sheet prints (the
 # blind pin makes the pair permanent; owner ruling 2026-11-01).
-SEAM_CALLOUT = seam_callout("MHA-DT-31", "MHA-DT-VN-59 AXIAL PIN")
+SEAM_CALLOUT = seam_callout("CRANK HUB MHA-DT-31")
 # The handle-pivot tap's mouth limit rides its own callout, under the native
 # size, on the face the front view shows: the MHA-DT-32 shoulder seats
 # round it (#984 machinist review r1: as a general note it named neither of

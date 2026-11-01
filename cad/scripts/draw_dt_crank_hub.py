@@ -173,7 +173,11 @@ SEAM_CALLOUT_XY = (0.303, 0.105)
 SIDE_KEEP = {
     "SeatLength": ((OUTBOARD_X + SHOULDER_X) / 2.0, _STATION_ROW_Y),
     "ServicePinFromShoulder": ((SHOULDER_X + SERVICE_PIN_CENTER[0]) / 2.0, _STATION_ROW_Y),
-    "HubLength": ((OUTBOARD_X + INBOARD_X) / 2.0, _ROW_Y[1]),
+    # The toleranced .990 and its two-line callout fill the span between its
+    # extension lines and sat on its own dimension line (machinist review of
+    # the inch sheet, r2): they print right of the outboard face instead, the
+    # dimension line running out to them, clear of the seam callout.
+    "HubLength": (OUTBOARD_X + 0.032, _ROW_Y[1]),
     # Its toleranced text and callout are wider than the relief: they print
     # outside the span, left of the rear face, the dimension line running out
     # to them, the callout ending short of the overall's dimension line.

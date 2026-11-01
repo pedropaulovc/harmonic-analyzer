@@ -28,19 +28,20 @@ def inch_text(value_mm: float, places: int) -> str:
     return f"{value_mm / MM_PER_IN:.{places}f}".removeprefix("0")
 
 
-def seat_callout(mate: str) -> str:
+def seat_callout(mate_name: str, mate: str) -> str:
     """Hub-seat fit on MHA-DT-31, turned second to press into ``mate``'s bore.
 
     Four lines (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). The seat end flush with ``mate``'s front
     face is the acceptance, naming both faces (machinist review: FACES FLUSH
     named neither); how the hub gets there (an arbor press) is a method, so
-    the sheet does not say it.
+    the sheet does not say it.  The matched mate is named by name and number
+    (rule 4).
     """
     low, high = SEAT_PRESS_INTERFERENCE
     return "\n".join(
         (
-            f"TURN TO SUIT {mate} BORE",
-            f"FOR LIGHT PRESS: {inch_text(low, 4)}-{inch_text(high, 4)}",
+            f"TURN TO SUIT {mate_name} {mate}",
+            f"BORE FOR LIGHT PRESS: {inch_text(low, 4)}-{inch_text(high, 4)}",
             "DIAMETRAL INTERFERENCE;",
             f"END FLUSH WITH {mate} FRONT",
         )
@@ -54,20 +55,21 @@ def seat_bore_callout(mate: str) -> str:
     )
 
 
-def seam_callout(mate: str, pin: str = "MHA-DT-VN-59") -> str:
+def seam_callout(mate: str, pin: str = "AXIAL PIN MHA-DT-VN-59") -> str:
     """MHA-DT-VN-59 seam, match-drilled with ``mate``: size first, then the process.
 
-    ``pin`` names the pin as the sheet identifies it; the arm's print adds its
-    part name (MHA-DT-06 machinist review, 2026-09-29).  The blind pin makes
-    hub and ``mate`` a permanent pair, serviced at the MHA-DT-09 taper pin
-    (owner ruling 2026-11-01, machinist review: no knockout).  The depth only
-    has to take the cut pin, so it prints at the title block's .XX.
+    ``mate`` and ``pin`` name the parts by name and number (rule 4; MHA-DT-06
+    machinist review, 2026-09-29).  The blind pin makes hub and arm a
+    permanent pair, serviced at the MHA-DT-09 taper pin (owner ruling
+    2026-11-01, machinist review: no knockout).  The depth only has to take
+    the cut pin, so it prints at the title block's .XX.
     """
     return "\n".join(
         (
-            f"(<MOD-DIAM>{inch_text(AXIAL_PIN_DIA, 3)}) <HOLE-DEPTH> {inch_text(SEAM_DEPTH, 2)}",
-            f"ON SEAM, MATCH-DRILL/REAM WITH {mate}",
-            f"AT ASSEMBLY, {pin} LIGHT DRIVE FIT;",
+            f"(<MOD-DIAM>{inch_text(AXIAL_PIN_DIA, 3)}) <HOLE-DEPTH> {inch_text(SEAM_DEPTH, 2)}"
+            " ON SEAM,",
+            f"MATCH-DRILL/REAM WITH {mate} AT ASSEMBLY;",
+            f"{pin} LIGHT DRIVE FIT;",
             "PERMANENT PAIR; SERVICE AT MHA-DT-09",
         )
     )
@@ -82,8 +84,8 @@ BORE_CALLOUT = (
 )
 # The arm bore is made first and carries the band; this seat is turned to fit
 # it, so its nominal prints as a reference under the match-fit callout.
-SEAT_CALLOUT = seat_callout("MHA-DT-06")
-SEAM_CALLOUT = seam_callout("MHA-DT-06")
+SEAT_CALLOUT = seat_callout("CRANK ARM", "MHA-DT-06")
+SEAM_CALLOUT = seam_callout("CRANK ARM MHA-DT-06")
 # The cross-hole is drilled, then taper-reamed through hub and shaft together
 # at assembly.  The ream fixes the hub on the shaft for good, so the front
 # face -- the seat end, named on the sheet -- is set flush

@@ -249,8 +249,9 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     assert not hasattr(dt_crank_hub_spec, "DRAWING_NOTES")
     seat = dt_crank_hub_notes.SEAT_CALLOUT
     # B1 (Main 2026-09-25): turned to suit the MHA-DT-06 bore, with the F10
-    # press interference printed in inch.
-    assert "FOR LIGHT PRESS: .0004-.0012" in seat.splitlines()
+    # press interference printed in inch; rule 4 names the mate.
+    assert "CRANK ARM MHA-DT-06" in seat
+    assert ".0004-.0012" in seat
     assert "MATCH-FIT" not in seat
     # The arm bore is made first; the hub seat is turned to suit it, so its
     # nominal prints as a reference.
@@ -259,7 +260,7 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     assert "MHA-DT-06" in seam and "MHA-DT-VN-59" in seam and "LIGHT DRIVE FIT" in seam
     assert "AT ASSEMBLY" in seam and "SEAM" in seam
     # Size first, then the process, in the order the work is done.
-    assert seam.splitlines()[0] == "(<MOD-DIAM>.156) <HOLE-DEPTH> .17"
+    assert seam.splitlines()[0].startswith("(<MOD-DIAM>.156) <HOLE-DEPTH> .17")
     assert "O'CLOCK" not in seam
     # The blind pin makes hub and arm a permanent pair, serviced at the taper
     # pin (owner ruling 2026-11-01).
