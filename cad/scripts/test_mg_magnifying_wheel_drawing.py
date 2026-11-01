@@ -116,10 +116,10 @@ def test_tight_bands_sit_on_the_model_dimensions() -> None:
     # The boss Ø and TIE 1's two coordinates ride the title block's .XX: the
     # boss is sized for TIE 1's wall, so none carries a band of its own.
     assert model_toleranced_dimensions(part) == {
-        ("HubProfile", "HubLength"): "*deviations(HUB_LEN_BAND)",
+        ("HubProfile", "HubLength"): "HUB_LEN_BAND[0]",
         ("HubProfile", "SpigotLength"): "*deviations(SPIGOT_LEN_BAND)",
-        ("GrooveProfile", "GrooveR"): "*deviations(GROOVE_R_BAND)",
-        ("GrooveProfile", "GrooveBottomDia"): "*deviations(GROOVE_BOTTOM_BAND)",
+        ("GrooveProfile", "GrooveR"): "GROOVE_R_BAND[0]",
+        ("GrooveProfile", "GrooveBottomDia"): "GROOVE_BOTTOM_BAND[0]",
         ("feature_name", "dimension_name"): "CAST_TOL",
     }
     # The as-cast sizes carry the explicit +/-.03 casting band.
