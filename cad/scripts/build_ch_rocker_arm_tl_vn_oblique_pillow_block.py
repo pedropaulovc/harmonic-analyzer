@@ -36,6 +36,8 @@ from _session import run_build
 from _sketch import add_line_chain, ensure_fully_defined
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
+from _supplier_screw_reference import add_supplier_reference_sketch
+import ch_rocker_arm_tl_vn_oblique_pillow_block_spec as supplier
 from ch_rocker_arm_tl_vn_oblique_pillow_block_spec import (
     AXIS_HEIGHT,
     BASE_AREA,
@@ -163,6 +165,14 @@ async def build(adapter) -> dict[str, str]:
     await apply_color(adapter, POLISHED_STEEL)
     apply_custom_properties(adapter, STOCK_PROPERTIES)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
+    # The plan view's reference sizes: hidden construction chords whose
+    # dimensions the purchased sheet imports.
+    await add_supplier_reference_sketch(
+        adapter,
+        supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+        starts=supplier.SUPPLIER_REFERENCE_STARTS,
+        planes=supplier.SUPPLIER_REFERENCE_PLANES,
+    )
     await report_mass_properties(adapter)
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
