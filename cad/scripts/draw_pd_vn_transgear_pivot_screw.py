@@ -24,6 +24,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name, place_view, set_view_position, view_name,
 )
 
+from _machinist_review_mode import MachinistReviewMode
 import _telemetry
 from _check import check
 from _com import _early_bound
@@ -95,6 +96,9 @@ from pd_vn_transgear_pivot_screw_spec import (
     THREAD_MAJOR,
     TIP_Y,
 )
+
+# Cached machinist review leaf: LEARN until the sheet reaches SHIP.
+MACHINIST_REVIEW = MachinistReviewMode.LEARN
 
 SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_pivot_screw"]
 SOURCE = SPEC.source

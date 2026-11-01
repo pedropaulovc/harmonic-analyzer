@@ -50,6 +50,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _gtol_face_read import face_geometry
 from _gtol_planar import PlanarFace
+from _machinist_review_mode import MachinistReviewMode
 from _native_axis_datum import add_native_axis_datum
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
@@ -79,6 +80,9 @@ from pd_transgear_disc_hub_spec import (
     SPIGOT_LENGTH_CALLOUT,
 )
 
+
+# Cached machinist review leaf: LEARN until the sheet reaches SHIP.
+MACHINIST_REVIEW = MachinistReviewMode.LEARN
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_disc_hub"]
 PART_STEM = SPEC.artifact_stem

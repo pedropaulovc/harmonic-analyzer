@@ -43,6 +43,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_tables import insert_hole_table
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
 from _session import run_build
@@ -61,6 +62,9 @@ from pd_platen_guide_spec import (
     TAPPED_HOLE_SPEC,
 )
 
+
+# Cached machinist review leaf: LEARN until the sheet reaches SHIP.
+MACHINIST_REVIEW = MachinistReviewMode.LEARN
 
 SPEC = DRAWINGS_BY_NAME["pd_platen_guide"]
 PART_STEM = SPEC.artifact_stem
