@@ -604,6 +604,12 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     assert spec.POST_MOUNT_ENGAGEMENT_NOTE == (
         f"1/4-20 THREAD ENGAGEMENT {printed:.2f}D MIN."
     )
+    # The stated shortfall is declared for the blind reviewer, as a minor.
+    from machinist_exceptions import load_exceptions
+
+    (entry,) = load_exceptions(_config.CONFIG_DIR, "dt_cone_swing_platform", "part")
+    assert (entry.id, entry.kind) == ("RV-01", "minor")
+    assert spec.POST_MOUNT_ENGAGEMENT_NOTE in entry.where
     # The taps take the title block's edge break: no local override rides
     # their callout (Main, 2026-11-01).
     assert spec.POST_MOUNT_TAP_EDGE_BREAK == post_mount.PLATE_TAP_EDGE_BREAK_MM
