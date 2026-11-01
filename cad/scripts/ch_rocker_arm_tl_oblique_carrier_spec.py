@@ -295,9 +295,9 @@ if CR_HEAD_DIA_MAX > CR_HEAD_CLEAR_DIA:
 # would cross the RiserX2R and CrX extension lines, 20.6 sheet mm apart.
 CR_STATION_FUNCTION = "MIRRORS CL STATION"
 CR_TAP_CALLOUT = f"CLAMPS {STRAP_NUMBER}\n{CR_STATION_FUNCTION}"
-# mr4: HubX's 8.861 is 3-place because it puts the HUB spot (and the lever
-# taps) on the A1-B1 midline, the cut's centre line.
-HUB_STATION_CALLOUT = "MIDWAY A1-B1"
+# mr4: HubX's 8.861 is 3-place because it locates the HUB spot (the lever
+# taps share its X); mr8: named by the spot its callout defines on the sheet.
+HUB_STATION_CALLOUT = "TO HUB SPOT"
 
 RISER_SCREWS = trammel.RISER_SCREWS
 RISER_THREAD = "#4-40"
@@ -479,13 +479,14 @@ POSITION_BANDED = ("PinSpacing", "A2DX", "A2DY", "B2DX", "B2DY")
 
 # Each spot has its own leader and callout (jig-r3: a "2X" with one leader
 # read as one spot), naming the strap feature it becomes (machinist review
-# mr3: the 3-place stations to it read as functional). CL's is one row: it
-# stands in the shallow band above the 4.154 lane, outside the plate (mr4,
-# rule 14).
-SPOT_CALLOUT = "CENTRE DRILL SPOT"
+# mr3: the 3-place stations to it read as functional). mr8: CL's stands in
+# the one band outside the plate its leader reaches crossing no dimension
+# line (rule 14): under the 7.287 lane, between the RiserX2 and RiserX1
+# extension lines, ~37 mm wide, so each row stays within 13 characters.
+SPOT_CALLOUT = "SPOT FOR"
 SPOT_CALLOUTS = {
-    "SpotDia": f"{SPOT_CALLOUT}\nFOR {STRAP_NUMBER} HUB",
-    "SpotDiaCl": f"{SPOT_CALLOUT} FOR {STRAP_NUMBER} CL",
+    "SpotDia": f"{SPOT_CALLOUT}\n{STRAP_NUMBER} HUB",
+    "SpotDiaCl": f"{SPOT_CALLOUT}\n{STRAP_NUMBER} CL",
 }
 CALLOUTS_BELOW = {
     "PinHoleDia": PIN_HOLE_CALLOUT,
