@@ -1277,7 +1277,7 @@ def test_fastener_table_engagement_and_protrusion() -> None:
     assert fasteners.HOLD_DOWN_STUD_COUNT == 4
 
 
-def test_carriage_screws_are_cut_to_fit_under_a_pending_owner_exception() -> None:
+def test_carriage_screws_are_cut_to_fit_under_a_confirmed_owner_exception() -> None:
     """Owner ruling 2026-11-01 (option A): step 5 measures each counterbore
     floor and cuts each M4 x 20 to it; RV-05 accepts the 1.16D reach."""
     from _paths import CAD_ROOT
@@ -1298,7 +1298,7 @@ def test_carriage_screws_are_cut_to_fit_under_a_pending_owner_exception() -> Non
     assert reach.kind == "accept"
     assert "+ .189" in reach.where and ".183-.195" in reach.where
     assert "1.16D" in reach.finding
-    assert "pending confirmation" in reach.reason
+    assert "Owner exception confirmed" in reach.reason
 
 
 
