@@ -34,22 +34,22 @@ ITEM = "KP08 PILLOW BLOCK, 8 MM BORE, SET-SCREW INSERT BEARING"
 SHELVES = {"SupplierBoltHoleDiameter": (False, "left")}
 
 
-def _margins() -> dict[str, tuple[float, float, float, float]]:
-    """The lane plan's reserves, the plan view's columns balanced.
+# The hole's shelved text reaches 26 mm past its 6 mm lane: the lane plan's
+# 26 mm left reserve put its ink 5 mm past the Front cell (farm run
+# 20261101T115426386Z). 34 mm holds it; the empty right keeps the plan's
+# 20 mm, so the 121 mm-wide 2:1 plan view still fits the 180 mm cell. The
+# fit centres Front and Top on their shared column, so they stay aligned.
+_HOLE_TEXT_ROOM_M = 0.034
 
-    Front shares its column with Top; equal left/right reserves keep the
-    plan view centred under the section view.
-    """
+
+def _margins() -> dict[str, tuple[float, float, float, float]]:
     margins = supplier_screw_margins(
         supplier.SUPPLIER_REFERENCE_DIMENSIONS,
         planes=supplier.SUPPLIER_REFERENCE_PLANES,
         sides=supplier.SUPPLIER_REFERENCE_SIDES,
     )
-    balanced = {}
-    for name, (left, bottom, right, top) in margins.items():
-        side = max(left, right)
-        balanced[name] = (side, bottom, side, top)
-    return balanced
+    _left, bottom, right, top = margins["*Front"]
+    return {**margins, "*Front": (_HOLE_TEXT_ROOM_M, bottom, right, top)}
 
 
 SUPPLIER_MARGINS = _margins()
