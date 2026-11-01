@@ -7,3 +7,9 @@ pd-transgear-drive-collar:
   quantity: 1
   tolerance_class: machined_block
   process: "turned from bar (brass): turn the body and pilot from blanks with the specified facing allowance; drill undersize and finish the true D-bore, retaining its separately limited flat; ream the two drive-pin holes through; face the rear to fit directly on the knob gear front F, finish the final rear D-bore entry at 45 degrees with the specified equal-leg limits, and face the pilot to the specified sprocket proudness at assembly"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "sheet note 1: DRIVE-PIN HOLE TO COLLAR RIM 0.28 MIN."
+      finding: "wall from each drive-pin hole to the Ø17.50 0/-0.51 collar OD below the 1.5 mm floor (rules 17, 20)"
+      reason: "owner ruling 2026-11-01 on PR #2101: rim 0.28 MIN until the D14 geometry fix (#1381). 0.28 at the smallest printed OD (Ø16.99) and the hole's worst position; the Ø14 pin circle and the 3/32 dowel hole are shared with the crank seat (MHA-DT-11, its own 0.48 MIN exception) and MHA-PD-09, whose web to its Ø10.3 bore leaves no room to move the pins inward, and the Ø17.50 OD maximum keeps the #25 plates on a swapped T12 clear, so the OD cannot grow. The OD minimum has no mate and stays at the title block"

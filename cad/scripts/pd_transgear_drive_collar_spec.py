@@ -660,11 +660,11 @@ FIT_UP_NOTE = "\n".join(
     )
 )
 
-# The external drive-pin rim shortfall only (pending ruling #1381, never on
-# the sheet). The pilot now meets the target and the obsolete slotted-floor
+# The external drive-pin rim shortfall only: owner-ruled minor exception RV-01
+# in cad/config/parts/pd-transgear-drive-collar.yaml until the D14 geometry
+# fix (#1381). The pilot now meets the target and the obsolete slotted-floor
 # exception no longer exists. The D-bore's fit prints at its own callout
 # (BORE_CALLOUT). The drawing numbers this 1 and appends the two fitted
 # lengths as notes 2 and 3 with their assembly steps
 # (draw_pd_transgear_drive_collar.FIT_NOTES).
-# Pending exception ruling: MHA-PD-22 collar rim (#1381).
 DRAWING_NOTES = f"1. DRIVE-PIN HOLE TO COLLAR RIM {DRIVE_PIN_COLLAR_RIM_WORST:.2f} MIN."
