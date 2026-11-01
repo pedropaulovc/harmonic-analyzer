@@ -6,11 +6,11 @@ import math
 import sys
 
 from solidworks_mcp.adapters.solidworks.drawing import iter_views
-from solidworks_mcp.adapters.sw_type_info import constant
 
 import _telemetry
 import ch_rocker_arm_tl_vn_oblique_pivot_shim_spec as part
 from _com import _early_bound
+from _construction_line_font import _construction_curves_as_outline
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _part_properties import part_drawing_unit
@@ -49,32 +49,9 @@ _BORE_REFERENCE = {
     "label": f"{BORE}@{part.BORE_FEATURE}", "units": "in", "precision": part.BORE_FORMAT[0],
     "expected_mm": part.ID, "presentation": part.BORE_FORMAT[1], "callout": part.BORE_FORMAT[3],
 }
-# The OD and thickness carriers lie on Top-view edges, so construction curves
-# print as the continuous thick outline on this sheet (DP_LineFont, this
-# SLDDRW only), not as a dashed chain over the edges.
-_CONSTRUCTION_LINE_FONT = (
-    ("swLineFontConstructionCurvesStyle", "swLineCONTINUOUS"),
-    ("swLineFontConstructionCurvesThickness", "swLW_THICK"),
-)
-
-
-def _construction_curves_as_outline(adapter):
-    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
-    option = constant("swDetailingNoOptionSpecified")
-    settings = tuple(
-        (name, constant(name), constant(value)) for name, value in _CONSTRUCTION_LINE_FONT
-    )
-
-    def readback() -> None:
-        for name, preference, value in settings:
-            if int(extension.GetUserPreferenceInteger(preference, option)) != value:
-                raise RuntimeError(f"shim line font {name} readback differs")
-
-    for name, preference, value in settings:
-        if not extension.SetUserPreferenceInteger(preference, option, value):
-            raise RuntimeError(f"failed to set shim line font {name}")
-    readback()
-    return readback
+# The OD and thickness carriers lie on Top-view edges; construction curves
+# print as the continuous thick outline on this sheet
+# (``_construction_line_font``), not as a dashed chain over the edges.
 
 
 def _assert_supplier_bands(displays):
