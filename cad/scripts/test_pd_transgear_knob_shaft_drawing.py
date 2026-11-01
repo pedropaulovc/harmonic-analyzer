@@ -317,6 +317,7 @@ def test_tool_end_limits_print_as_native_detail_dimensions() -> None:
         assert len(note.splitlines()) <= 4
     assert " ".join(drawing.TOOTH_EDGE_LEADER_NOTE.splitlines()) == spec.TOOTH_EDGE_NOTE
     assert spec.DRIVE_COLLAR_NUMBER in spec.BEARING_FACE_NOTE
+    assert drawing.BEARING_LEADER_NOTE.split() == spec.BEARING_FACE_NOTE.split()
 
 
 def test_the_tool_end_keeps_its_native_limits(monkeypatch) -> None:
@@ -970,19 +971,22 @@ def test_run_035809_shop_notes_land_on_their_features() -> None:
     assert spec.CORE_DIA / 2.0 + 0.2 < r < spec.ROOT_DIA_EXACT_MIN / 2.0 - 0.2
     landing = _front_view_point(r, drawing.BEARING_LANDING_DEG)
     bx, btop = drawing.BEARING_NOTE_XY
-    blines = spec.BEARING_FACE_NOTE.splitlines()
+    blines = drawing.BEARING_LEADER_NOTE.splitlines()
     bbottom = btop - len(blines) * pitch_y
-    assert btop < bottom - 0.003
-    assert bx + max(map(len, blines)) * char_w < 0.4191 - 0.005
-    # Attached at the note's lowest line, its leader still clears the
-    # flat's upper arrow stub (x 353.5, 6.3 mm over centre) by 2 mm.
+    # The audit merges blocks under its 5.66 mm row pitch (run
+    # 20261101T081735465Z: 4.4 mm apart).
+    assert btop < bottom - 0.006
+    # 2.84 mm a glyph, measured on that run's edge-break note.
+    assert bx + max(map(len, blines)) * 0.00284 < 0.4191 - 0.005
+    # The note's left end stands left of the flat's upper arrow stub (x
+    # 353.5, 6.3 mm over centre) and over it, so its leader, running down
+    # and left to F, never reaches the stub.
     stub_x = drawing.END_KEEP["FlatToAxis"][0]
     stub_top = cy + 0.0063
-    attach_y = bbottom + 0.00175
-    slope = (attach_y - landing[1]) / (bx - landing[0])
-    at_stub = landing[1] + (stub_x - landing[0]) * slope
-    assert landing[0] < stub_x < bx
-    assert at_stub > stub_top + 0.002
+    assert landing[0] < bx < stub_x
+    assert bbottom > stub_top + 0.002
+    # Right of the gear's tips at the note's lowest line.
+    assert bx > cx + spec.OUTSIDE_DIA / 2.0 * 0.003 * 0.75
     assert landing[1] > cy + 0.002  # over the centre mark's level arm
 
 
@@ -1376,7 +1380,7 @@ def test_build_takes_its_controls_and_callouts_from_the_spec(monkeypatch, tmp_pa
         spec.THREAD_CALLOUT,
         drawing.TIP_CHAMFER_NOTE,
         drawing.TOOTH_EDGE_LEADER_NOTE,
-        spec.BEARING_FACE_NOTE,
+        drawing.BEARING_LEADER_NOTE,
     ]
     (tooth_args, tooth), (bearing_args, bearing) = attached[2:]
     assert tooth_args[1].name == bearing_args[1].name == "*Back"

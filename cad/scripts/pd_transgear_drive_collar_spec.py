@@ -480,11 +480,15 @@ for _ok, _what in (
         raise AssertionError(f"MHA-PD-22: {_what}")
 
 # drawing-guidelines.md rule 4 (name the mate): every tight band names its
-# mate and fit at its own callout; the native bands print the limits.
+# mate and fit at its own callout; the native bands print the limits.  The
+# D's acute inside corners cannot be sharp; the shaft's broken D-core edges
+# set how large they may be, so the fit states it (r10 review: the title
+# block's R1.0 MAX inside corner would eat the flat).
 BORE_CALLOUT = (
     f"TRUE D THRU\nSLIDING FIT ON\n{SHAFT_NUMBER} {SHAFT_NAME}\n"
     f"D-CORE: {BORE_CORE_CLEARANCE[0]:.3f}-"
-    f"{BORE_CORE_CLEARANCE[1]:.3f}\nCLEARANCE ON DIA."
+    f"{BORE_CORE_CLEARANCE[1]:.3f}\nCLEARANCE ON DIA.\n"
+    "CORNERS CLEAR D-CORE EDGES"
 )
 FLAT_CALLOUT = f"SLIDES ON {SHAFT_NUMBER}\n{SHAFT_NAME} D-FLAT"
 PIN_HOLE_CALLOUT = f"2X REAM THROUGH\nPRESS FIT, DRIVE\nDOWEL {DOWEL_NUMBER}"

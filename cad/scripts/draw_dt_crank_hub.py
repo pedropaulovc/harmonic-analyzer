@@ -210,8 +210,12 @@ DIMENSION_CALLOUTS = {
     "SeatLength": SEAT_LENGTH_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
     "ReliefLength": RELIEF_LENGTH_CALLOUT,
-    "PinProud": PIN_PROUD_CALLOUT,
 }
+# The MIN's value sits on its own dimension line with the pin and ring
+# callout above it.  Printed below, the four lines stood between the value
+# and the line, which read as the note's shelf (r10 review of farm run
+# 20261101T074739942Z).
+DIMENSION_CALLOUTS_ABOVE = {"PinProud": PIN_PROUD_CALLOUT}
 
 
 def _set_callout_below(display: Any, text: str, label: str) -> None:
@@ -338,6 +342,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     annotations = [*front_annotations, *right_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(
+        adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
+    )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_reference_dimensions(adapter, annotations, REFERENCE_DIMENSIONS)
     for name in REFERENCE_LENGTHS:

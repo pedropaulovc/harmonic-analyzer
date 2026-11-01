@@ -333,6 +333,9 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
     clearance = f"{spec.BORE_CORE_CLEARANCE[0]:.3f}-{spec.BORE_CORE_CLEARANCE[1]:.3f}"
     assert f"{clearance}\nCLEARANCE ON DIA." in spec.BORE_CALLOUT
     assert spec.BORE_CALLOUT.splitlines()[0] == "TRUE D THRU"
+    # The D's acute inside corners take their limit from the shaft they
+    # slide on, not the title block's inside-corner radius (r10 review).
+    assert "CORNERS CLEAR D-CORE" in " ".join(spec.BORE_CALLOUT.split())
     assert spec.PIN_HOLE_CALLOUT.splitlines()[0] == "2X REAM THROUGH"
     # The locations' tight band is the sprocket's own: the dowels must enter
     # its drilled holes, each part spending half the 0.119 clearance.

@@ -306,15 +306,18 @@ DATUM_A_SYMBOL = (END_CENTER[0] - 0.017, END_CENTER[1] - 0.018)
 # stands over it, its three ~60 mm lines from 186.5 to 199 mm, under the
 # isometric (from 202.5).  The bearing note lands on F's annulus between
 # the core (R2.425) and the root (R3.30) at model 155 deg (sheet 25 deg:
-# ~(343.0, 163.7)) and stands right of the gear, 4.5 mm under the
-# edge-break note; its leader climbs over the flat's upper arrow stub
-# (x 353.5, top 166.3).  Anchors are top-left.
+# ~(343.0, 163.7)) and stands right of the gear on two lines, its top 7 mm
+# under the edge-break note: three lines 4.4 mm under it read as one block
+# (farm run 20261101T081735465Z, 5.66 mm row pitch).  Its left end stands
+# left of the flat's upper arrow stub (x 353.5, top 166.3), so its leader
+# never reaches the stub.  Anchors are top-left.
 TOOTH_EDGE_LEADER_NOTE = "\n".join(textwrap.wrap(TOOTH_EDGE_NOTE, 23))
 TOOTH_EDGE_TOOTH = 5
 TOOTH_EDGE_NOTE_XY = (0.345, 0.200)
 BEARING_LANDING_RADIUS_MM = 2.9
 BEARING_LANDING_DEG = 155.0
-BEARING_NOTE_XY = (0.356, 0.183)
+BEARING_LEADER_NOTE = " ".join(BEARING_FACE_NOTE.split()).replace(" BEARS", "\nBEARS")
+BEARING_NOTE_XY = (0.3485, 0.180)
 
 # --- Detail B: the front neck at 10:1 -----------------------------------------
 # At 3:1 the 0.400 neck is 1.2 mm of sheet: its Ø, width, corner R and
@@ -721,7 +724,7 @@ def _add_shop_notes(adapter: Any, front: Any) -> None:
     add_attached_note(
         adapter,
         front,
-        text=BEARING_FACE_NOTE,
+        text=BEARING_LEADER_NOTE,
         entity_xy=landing,
         entity_type="FACE",
         note_xy=BEARING_NOTE_XY,
