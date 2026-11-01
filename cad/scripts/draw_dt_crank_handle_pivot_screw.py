@@ -206,7 +206,7 @@ END_KEEP = {
 # axis between the chamfer's extension line and the seat face's, which it
 # crossed when it started 5.6 mm in from the thread start (r10).
 THREAD_PICK = (THREAD_START_X + 0.0015, THREAD_BOTTOM_Y)
-THREAD_NOTE_XY = (THREAD_START_X + 0.0026, SIDE_CENTER[1] - 0.015)
+THREAD_NOTE_XY = (THREAD_START_X + 0.0021, SIDE_CENTER[1] - 0.015)
 # The 45-degree relief lead's own note (#290 review of b28d38a16), on the
 # lead's upper silhouette.  The lead faces up and left, so the note stands up
 # and left with its 18-character rows (46 mm) ending 15 mm left of the relief
@@ -225,11 +225,12 @@ FINISH_PICK = (UNDERHEAD_X - 0.040, SHOULDER_TOP_Y)
 FINISH_SYMBOL = (UNDERHEAD_X - 0.030, SIDE_CENTER[1] + 0.030)
 # A point on the shoulder face, clear of the Ø dimension line.
 CENTERLINE_PICK = (UNDERHEAD_X - 0.025, SIDE_CENTER[1] + 0.003)
-# The seat edge's break note lands on the shoulder's silhouette just right of
-# its seat-face corner, from up and right, above the relief width and the
-# shoulder Ø's callout blocks: landing on the seat face itself, its leader
-# crossed the relief width's dimension line (farm r8 of f5256bf3d).
-SEAT_EDGE_PICK = (SEAT_X + 0.006, SHOULDER_TOP_Y)
+# The seat edge's break note lands on the shoulder's silhouette 2 mm right of
+# its seat-face corner (6 mm read as the shank, not the corner: #290 review of
+# d72bdd039), from up and right, above the relief width and the shoulder Ø's
+# callout blocks: landing on the seat face itself, its leader crossed the
+# relief width's dimension line (farm r8 of f5256bf3d).
+SEAT_EDGE_PICK = (SEAT_X + 0.002, SHOULDER_TOP_Y)
 SEAT_EDGE_NOTE_XY = (SEAT_X + 0.020, SIDE_CENTER[1] + 0.060)
 ISO_NOTE_XY = (0.352, 0.200)
 

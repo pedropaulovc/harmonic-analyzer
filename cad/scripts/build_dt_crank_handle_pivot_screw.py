@@ -73,7 +73,6 @@ from dt_crank_handle_pivot_screw_spec import (
     ISOMETRIC_VIEW_NOTE,
     OVERALL_LENGTH,
     RELIEF_DIA,
-    RELIEF_DIA_TOL,
     RELIEF_END_STATION,
     RELIEF_LEAD,
     RELIEF_LEAD_TOL,
@@ -410,9 +409,6 @@ async def build(adapter) -> dict[str, str]:
         limit=TIP_CHAMFER,
         band=TIP_CHAMFER_BAND,
         tol_type=TIP_CHAMFER_TOL_TYPE,
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "ScrewProfile", "ReliefDia", RELIEF_DIA_TOL, display_unit=UNIT
     )
     set_dimension_symmetric_tolerance(
         adapter, "ScrewProfile", "ReliefLead", RELIEF_LEAD_TOL, display_unit=UNIT

@@ -83,12 +83,11 @@ def test_model_owns_places_and_bands() -> None:
     # the bonded handle, so its length is a reference.
     assert spec.REFERENCE_DIMENSIONS == {"OverallLength", "ShoulderLength"}
     # Every band comes from a named spec constant, never a typed number; the
-    # head and slot hold the title block's bands.
+    # head, slot and relief hold the title block's bands.
     assert model_toleranced_dimensions(part) == {
         ("ScrewProfile", "ShoulderDia"): "*deviations(SHOULDER_DIA_BAND)",
         ("ScrewProfile", "ThreadLength"): "*deviations(THREAD_LENGTH_BAND)",
         ("ScrewProfile", "ReliefLead"): "RELIEF_LEAD_TOL",
-        ("ScrewProfile", "ReliefDia"): "RELIEF_DIA_TOL",
     }
     # The F12 running fit (#290): .156 0/-.0020 in a .161 +.0005/0 ream.
     assert spec.SHOULDER_DIA == pytest.approx(0.156 * 25.4)
@@ -167,8 +166,8 @@ def test_u33_running_fit_end_play_and_engagement() -> None:
 
 
 def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
-    # Banded (Codex P1 on #1139): the largest relief stays under the root.
-    assert spec.RELIEF_DIA_MAX == pytest.approx(spec.RELIEF_DIA + spec.RELIEF_DIA_TOL)
+    # At the title block's .XXX band, the largest relief stays under the root.
+    assert spec.RELIEF_DIA_MAX == pytest.approx(spec.RELIEF_DIA + 0.005 * 25.4)
     # Under the deepest die-cut root, not just the basic one (local reviews
     # of 747487c71 and 21bb244c5): 2A PD min 0.0925 in less 0.649519 P.
     assert spec.THREAD_MINOR_2A_MIN_EST == pytest.approx(
@@ -223,18 +222,18 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert not hasattr(spec, "COLLAR_DIA")
     assert spec.SHOULDER_DIA_MAX < spec.HANDLE_BORE_MIN
     assert 0.0 < spec.SEAT_FLAT_ANNULUS_AREA_MIN < spec.SEAT_FLAT_ANNULUS_AREA
-    # The neck is ~69 percent of the #4-40 tensile stress area (0.00604 in^2).
+    # The neck is ~64 percent of the #4-40 tensile stress area (0.00604 in^2).
     assert spec.NECK_AREA == pytest.approx(math.pi / 4.0 * spec.RELIEF_DIA**2)
     assert spec.TENSILE_STRESS_AREA == pytest.approx(3.90, abs=0.01)
-    assert spec.NECK_TO_STRESS_AREA == pytest.approx(0.69, abs=0.01)
+    assert spec.NECK_TO_STRESS_AREA == pytest.approx(0.64, abs=0.01)
     # The lead's band is model-owned and prints as limits in its callout, and
     # the tip chamfer carries its own band (MHA-DT-32 re-review: at .X either
-    # could print as nothing).  The relief width is routine at .XX: its
-    # straight floor past the longest lead keeps 1.5 #4-40 pitches (machinist
-    # review of crank-v4-16; local review of 20dac9d3f).
+    # could print as nothing).  The relief width (.XX) and diameter (.XXX)
+    # are routine: the floor past the longest lead keeps 1.5 #4-40 pitches
+    # (machinist review of crank-v4-16; local review of 20dac9d3f).
     toleranced = {name for _, name in model_toleranced_dimensions(part)}
-    assert {"ReliefDia", "ReliefLead"} <= toleranced
-    assert "ReliefWidth" not in toleranced
+    assert "ReliefLead" in toleranced
+    assert not {"ReliefWidth", "ReliefDia"} & toleranced
     xx = printed_band_mm(2, unit=spec.UNIT)
     assert spec.RELIEF_WIDTH_MIN == pytest.approx(spec.RELIEF_WIDTH - xx)
     assert spec.RELIEF_FLOOR_MIN == pytest.approx(
