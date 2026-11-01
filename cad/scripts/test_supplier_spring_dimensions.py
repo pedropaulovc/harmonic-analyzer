@@ -424,11 +424,12 @@ def test_extension_dimension_positions_follow_actual_one_dimensional_native_ink(
         (0.19, 0.09)
     )
     projected_radius = radius * scale[0] / scale[1]
+    # Coil OD text above-right, wire text below-left: opposite leader landings.
     assert views["free_right"].kept_positions[extension.COIL_OD] == pytest.approx(
-        (0.30 + projected_radius + 0.006, 0.21 + projected_radius + 0.005)
+        (0.30 + projected_radius + 0.037, 0.21 + projected_radius + 0.005)
     )
     assert views["free_right"].kept_positions[extension.WIRE_DIA] == pytest.approx(
-        (0.30 + projected_radius + 0.006, 0.21 - projected_radius - 0.009)
+        (0.30 - projected_radius - 0.042, 0.21 - projected_radius - 0.009)
     )
 
 

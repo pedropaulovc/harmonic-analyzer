@@ -242,10 +242,17 @@ def extension_spring_dimensions(
     for key, rows in rows_by_view.items():
         view = views[key]
         xmin, ymin, xmax, ymax = reference_bounds(key)
+        # Each section text block sits wholly beside its own circle, so its
+        # leader leaves the near end of the shoulder and runs away from the
+        # text. The wire circle lies on the coil's left (sketch -X in *Right),
+        # so its text goes below-left and the coil OD text above-right: the two
+        # arrows land on opposite sides. Offsets are half the printed callout
+        # row ("NOMINAL STOCK COIL OD" ~61 mm, "... WIRE SECTION" ~72 mm)
+        # plus a 6 mm leader.
         positions = (
             {
-                COIL_OD: (xmax + 0.006, ymax + 0.005),
-                WIRE_DIA: (xmax + 0.006, ymin - 0.009),
+                COIL_OD: (xmax + 0.037, ymax + 0.005),
+                WIRE_DIA: (xmin - 0.042, ymin - 0.009),
             }
             if key == "free_right"
             else {rows[0][0]: ((xmin + xmax) / 2, ymax + 0.010)}
@@ -328,7 +335,14 @@ def extension_spring_dimensions(
 
 
 def supplier_state_cells(caption_y: float, *, maximum: bool) -> tuple:
-    """Reserve an annotation band around every fitted native view."""
+    """Reserve an annotation band around every fitted native view.
+
+    The maximum (extension spring) layout stacks the free gauge over the
+    sections on the left and gives the installed pictorial the full right
+    column, so a long coil prints at a scale where its turns and end loops
+    read instead of merging into a solid bar. The left column is wide enough
+    for the section texts on both sides of the coil.
+    """
     if not maximum:
         return (
             _cell("free_front", 0.028, caption_y + 0.020, 0.235, 0.166),
@@ -337,10 +351,9 @@ def supplier_state_cells(caption_y: float, *, maximum: bool) -> tuple:
             _cell("installed_iso", 0.325, 0.190, 0.406, 0.252),
         )
     return (
-        _cell("free_front", 0.028, 0.166, 0.242, 0.206),
-        _cell("free_top", 0.028, 0.230, 0.242, 0.250),
-        _cell("free_right", 0.267, 0.205, 0.406, 0.252),
-        _cell("installed_iso", 0.325, 0.142, 0.406, 0.175),
+        _cell("free_front", 0.028, 0.212, 0.256, 0.252),
+        _cell("free_right", 0.028, 0.146, 0.256, 0.192),
+        _cell("installed_iso", 0.264, 0.142, 0.406, 0.252),
         _cell("max_front", 0.028, caption_y + 0.020, 0.403, 0.122),
     )
 
