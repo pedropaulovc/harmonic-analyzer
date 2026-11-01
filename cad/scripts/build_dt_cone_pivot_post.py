@@ -522,7 +522,7 @@ async def build(adapter: Any) -> dict[str, str]:
     volume -= CRANK_BORE_MM3
     await volume_check(adapter, "v2 crank bore", volume, 0.001 * volume)
 
-    # 4. O17.2 flush pads and O12.2808 journal on the inclined v2 axis.  Both
+    # 4. O17.2 pads and O12.2808 journal on the inclined v2 axis.  Both
     # are mid-plane extrusions from the harvested ConeShaftNormal reference
     # (material on both sides of the plane, so no cut-direction question).
     # Do not substitute an on-axis revolve here: that SolidWorks topology is

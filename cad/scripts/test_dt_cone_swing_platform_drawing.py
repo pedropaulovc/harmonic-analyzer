@@ -141,6 +141,10 @@ def test_geometry_cascade_and_interference_guards_stay_explicit() -> None:
     assert part.PLATE_LEN == pytest.approx(
         geometry.NORTH_OVERHANG - geometry.PLATE_SOUTH_Z
     )
+    # The 1.65 post body (#290, was the harvested 42.011) keeps the 9.11 plate
+    # (PLATE_LEN rounds up to the .01 in grid), so the platform outline and
+    # the harmonic base's swing-stop seat that follows it stay put.
+    assert (geometry.PLATE_LEN, geometry.PLATE_SOUTH_Z) == pytest.approx((231.394, -224.282))
     assert geometry.POST_MAIN_DIA == spec.POST_BLOCK_DIA
     assert checks.POST_FOOT_CONTAINMENT >= 0.25
     assert spec.PIVOT_BEARING_RELIEF_DIAMETER == pytest.approx(10.668)

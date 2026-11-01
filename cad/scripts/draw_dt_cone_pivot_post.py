@@ -290,9 +290,7 @@ FRONT_KEEP = {
     # One row since the FLUSH rows went (machinist review: the two bands, not
     # the word, define the body and the boss faces): text centred 2.3 mm over
     # its line, as HeadDia's, keeps the line at the three-row callout's 71.6 mm.
-    # Centred right of the body's edge so its suffix runs into the clear
-    # band between the front view and View C.
-    "MainBodyDia": (0.165, 0.074),
+    "MainBodyDia": (0.150, 0.074),
     # A REFERENCE since U31: the crank bore is located from the cone bore
     # (View B), so its height above the foot only follows that chain.
     "CrankAxisY": (0.060, _front_y(CRANK_BORE_HEIGHT / 2.0)),
@@ -466,7 +464,10 @@ JOURNAL_KEEP = {
     # crowding check wants the smaller box's full height of air between
     # views (r17: 0.70 mm overlap at 0.172; r18: 5.47 mm under the caption's
     # 8.10 at 0.1755).  One row needs 3.5 mm: it prints 170.2..173.7, 3.1 mm
-    # over the band and 10.8 mm under the caption.
+    # over the band and 10.8 mm under the caption.  Its 2X (DIMENSION_PREFIXES)
+    # widens the row 6.7 mm about this centre: farm run 20261101T115401213Z's
+    # row spanned x 268.9..315.8, so 265.5..319.2 keeps 6.5 mm to View C's
+    # outline (259.0) and 7.4 mm to the isometric (326.6).
     "ConeBossDia": (0.292, 0.173),
     # View C sees the head side-on above the crank boss: its Ø stands over
     # the head, text out left of the head and below the A-A thrust-face
@@ -481,7 +482,7 @@ CONE_BOSS = requirement(
     "cone_boss", faces=(CylinderFace(cone.CONE_BOSS_DIA),),
     **_size_requirement("boss", {"dia": ("CONE_BOSS_DIA", "ConeBossDia")}, {
         "frame": ("cone_axis", ("BORE_HEIGHT", "INCLINE_DEG", "SURFACE_FINISHES", ("draw_dt_cone_pivot_post", "_cone_source_frames"), ("draw_dt_cone_pivot_post", "build"))),
-        "z_mm": ([round(-cone.CONE_BOSS_LENGTH / 2, 12), round(cone.CONE_BOSS_LENGTH / 2, 12)], ("CONE_BOSS_LENGTH", ("dt_cone_post_envelope", "BLOCK_DIA"))),
+        "z_mm": ([round(-cone.CONE_BOSS_LENGTH / 2, 12), round(cone.CONE_BOSS_LENGTH / 2, 12)], ("CONE_BOSS_LENGTH",)),
     }),
 )
 JOURNAL_BORE = requirement(
@@ -566,15 +567,16 @@ DIMENSION_SUFFIXES = {
     "CrankBoreDia": " THRU",
     "HeadDia": " HEAD",
     "ConeBossDia": " CONE BOSS OD",
-    # Why the body holds three places: its lower limit is the mounting holes'
-    # outer wall (MOUNT_OTHER_WEBS_WORST "body foot OD"; machinist review).
-    "MainBodyDia": " SETS MOUNT-HOLE WALL",
 }
+# Counts written ahead of the native Ø: SECTION A-A shows a boss at each end
+# of the cone bore, and one Ø sizes both (machinist review).
+DIMENSION_PREFIXES = {"ConeBossDia": "2X "}
 # Diameters given on their circles land one arrow on the near rim, the line
 # kept off the centre: two leaders through one centre crossed there (the
 # crank bore's and the crank boss's in r5, the cone bore's and its boss's in
 # r8; machinist reviews).
 NEAR_SIDE_DIAMETERS = ("CrankBossDia", "CrankBoreDia", "ConeBossDia", "JournalBoreDia")
+_DIMENSION_TEXT_PREFIX = 1  # swDimensionTextParts_e.swDimensionTextPrefix
 _DIMENSION_TEXT_SUFFIX = 2  # swDimensionTextParts_e.swDimensionTextSuffix
 
 
@@ -1292,6 +1294,44 @@ def _set_dimension_suffixes(adapter: Any, annotations: list[Any]) -> None:
         )
 
 
+def counted_diameter_prefix(count: str, native: str) -> str:
+    """``count`` ahead of a diameter's native prefix.
+
+    A custom prefix replaces SolidWorks' automatic Ø glyph, so an empty
+    native prefix keeps it as the ``<MOD-DIAM>`` token
+    (draw_ch_rocker_arm's REAM prefix).
+    """
+    if native.lstrip().startswith(count.strip()):
+        raise RuntimeError(f"prefix {native!r} already carries {count.strip()}")
+    return count + (native or "<MOD-DIAM>")
+
+
+def _set_dimension_prefixes(adapter: Any, annotations: list[Any]) -> None:
+    """Write each ``DIMENSION_PREFIXES`` count ahead of its diameter's native
+    Ø, failing loud unless every named dimension takes it exactly once."""
+    applied: dict[str, int] = {}
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        count = DIMENSION_PREFIXES.get(name)
+        if count is None:
+            continue
+        annotation = _early_bound(annotation, "IAnnotation")
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        native = str(display.GetText(_DIMENSION_TEXT_PREFIX) or "")
+        prefix = counted_diameter_prefix(count, native)
+        display.SetText(_DIMENSION_TEXT_PREFIX, prefix)
+        actual = str(display.GetText(_DIMENSION_TEXT_PREFIX) or "")
+        if actual != prefix:
+            raise RuntimeError(
+                f"{name}: prefix {prefix!r} did not persist, read {actual!r}"
+            )
+        applied[name] = applied.get(name, 0) + 1
+    if applied != dict.fromkeys(DIMENSION_PREFIXES, 1):
+        raise RuntimeError(
+            f"expected each of {sorted(DIMENSION_PREFIXES)} prefixed once, got {applied}"
+        )
+
+
 # The mounting holes' process, on its own row above the native through row
 # (rule 12: "2X Ø7.14 THRU ALL" left drill against ream unsaid, r5 machinist
 # review; draw_ch_fulcrum_keeper's foot-hole recipe).
@@ -1732,6 +1772,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     _set_dimension_suffixes(adapter, annotations)
+    _set_dimension_prefixes(adapter, annotations)
     near_side = {name: 0 for name in NEAR_SIDE_DIAMETERS}
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
