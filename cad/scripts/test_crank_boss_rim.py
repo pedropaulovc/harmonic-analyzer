@@ -94,14 +94,17 @@ def test_the_coupled_cone_boss_end_is_the_collar_at_its_low_limit(monkeypatch) -
         assert worst["cone boss end"] == pytest.approx(low, abs=1e-3), term
 
 
-def test_the_body_is_a_normal_distance_flush_with_the_cone_boss_end() -> None:
+def test_the_body_is_a_normal_distance_behind_the_cone_boss_end() -> None:
     """Where the tilted south face is the near surface the body reads the
-    face's distance from the Ø42 body's tangent line, flush with the cone
-    boss end (BLOCK_DIA == CONE_BOSS_LENGTH)."""
+    face's distance from the Ø41.91 body's tangent line.  The boss keeps the
+    harvested 42.011 face-to-face, so its end stands half the difference
+    proud of that line and the body reads that much farther."""
     nominal = rim.clearances(gear_offset=SEATED, worst=False)
     south = SEATED - gear64.FACE_WIDTH / 2.0
+    proud = (post.CONE_BOSS_LENGTH - BLOCK_DIA) / 2.0
+    assert proud == pytest.approx(0.0505)
     assert nominal["body"] == pytest.approx(south - BLOCK_DIA / 2.0, abs=1e-3)
-    assert nominal["body"] == pytest.approx(nominal["cone boss end"], abs=1e-3)
+    assert nominal["body"] == pytest.approx(nominal["cone boss end"] + proud, abs=1e-3)
 
 
 def test_past_a_cylinder_s_height_band_the_distance_runs_to_its_edge() -> None:
@@ -148,10 +151,17 @@ def test_the_cross_check_names_the_feature_it_lands_on(monkeypatch) -> None:
     assert record["predicted_mm"] == pytest.approx(nominal["crank boss"], abs=1e-4)
 
 
-def test_a_flush_tie_names_both_features() -> None:
+def test_the_proud_cone_boss_end_does_not_tie_with_the_body() -> None:
+    """The boss end stands (CONE_BOSS_LENGTH - BLOCK_DIA)/2 beyond the body's
+    tangent line, more than the on-surface tolerance, so its rim is the boss
+    end alone; the body's own tangent line just above the pad is the body."""
     end = post.CONE_BOSS_LENGTH / 2.0
+    assert end - BLOCK_DIA / 2.0 > gear64_post_measure.ON_SURFACE_MM
     on_pad_rim = (end * rim.SIN_I, post.CONE_BOSS_DIA / 2.0, end * rim.COS_I)
-    assert set(gear64_post_measure.post_features_at(on_pad_rim)) == {"cone boss end", "body"}
+    assert gear64_post_measure.post_features_at(on_pad_rim) == ("cone boss end",)
+    body_r = BLOCK_DIA / 2.0
+    above_pad = (body_r * rim.SIN_I, post.CONE_BOSS_DIA / 2.0 + 1.0, body_r * rim.COS_I)
+    assert gear64_post_measure.post_features_at(above_pad) == ("body",)
 
 
 def test_a_point_off_every_feature_is_unclassified() -> None:
