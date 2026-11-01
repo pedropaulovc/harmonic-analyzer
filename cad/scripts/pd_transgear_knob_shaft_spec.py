@@ -222,8 +222,10 @@ if not THREAD_BLANK_LIMITS[0] < THREAD_BLANK_DIA < THREAD_BLANK_LIMITS[1]:
 # The tip chamfer runs 45 degrees down to the thread minor, so its size
 # follows the as-turned blank rather than a printed three-place length.
 TIP_CHAMFER = (THREAD_BLANK_DIA - THREAD_BASIC_MINOR) / 2.0
-# The title block states the UN thread class, so the callout names no class.
-THREAD_CALLOUT = f"{THREAD} UNC"
+# The title block states the UN thread class, so the callout names no class;
+# full thread runs to the relief, whose front shoulder is the PlainCore
+# station (machinist review r8: the callout gave no thread length).
+THREAD_CALLOUT = f"{THREAD} UNC\nTHREAD TO RELIEF"
 TIP_CHAMFER_CALLOUT = "CHAMFER 45 DEG TO MINOR"
 # The tip prints as its station from F (.XX, R9-17), not as a thread length.
 TIP_STATION = 23.9
@@ -290,10 +292,19 @@ CORE_FRONT_FROM_F_PLACES = 2
 
 # Ordinary turned undercut at F: no tiny-radius grade or front disk cut.
 # 3.950, not 4.000: paid the 0.05 tooth-space TIR under the earlier, smaller
-# pinion.  The neck is kept; FRONT_NECK_AIR_MIN is now 1.113 over its 0.320
-# floor.
+# pinion.  The neck prints LIMITS 3.95/3.82 (owner ruling, machinist review
+# r8): the maximum clears the collar's D entry (two places' ±0.51 would put
+# its crown into the torqued core-flat plane, the drive collar's
+# NECK_TORQUE_FLAT_AIR_MIN) and the minimum keeps the section that carries
+# the drive torque (FRONT_RELIEF_AREA_MIN).  FRONT_NECK_AIR_MIN is now 1.178
+# over its 0.320 floor.
 FRONT_RELIEF_DIA = 3.950
-FRONT_RELIEF_DIA_PLACES = 3
+FRONT_RELIEF_DIA_PLACES = 2
+FRONT_RELIEF_DIA_MAX = FRONT_RELIEF_DIA
+FRONT_RELIEF_DIA_MIN = 3.820
+FRONT_RELIEF_DIA_BAND = (0.0, FRONT_RELIEF_DIA_MIN - FRONT_RELIEF_DIA)
+FRONT_RELIEF_DIA_TOL_TYPE = 3  # native LIMIT
+FRONT_RELIEF_AREA_MIN = math.pi * FRONT_RELIEF_DIA_MIN**2 / 4.0
 FRONT_RELIEF_WIDTH = 0.400
 FRONT_RELIEF_WIDTH_PLACES = 3
 # The neck corners print R0.10 MAX (rule 16): native swTolMAX prints the
@@ -304,8 +315,6 @@ FRONT_CORNER_RADIUS_PLACES = 2
 FRONT_CORNER_RADIUS_BAND = (0.0, -FRONT_CORNER_RADIUS_MAX)
 FRONT_CORNER_RADIUS_TOL_TYPE = 6  # swTolMAX: sharp up to R0.10
 FRONT_RELIEF_TOTAL_RUNOUT = float(GEOMETRIC_TOLERANCES_MM["front_neck_total_runout"])
-FRONT_RELIEF_DIA_MIN = FRONT_RELIEF_DIA - printed_band_mm(FRONT_RELIEF_DIA_PLACES)
-FRONT_RELIEF_DIA_MAX = FRONT_RELIEF_DIA + printed_band_mm(FRONT_RELIEF_DIA_PLACES)
 FRONT_RELIEF_WIDTH_MIN = FRONT_RELIEF_WIDTH - printed_band_mm(FRONT_RELIEF_WIDTH_PLACES)
 FRONT_RELIEF_WIDTH_MAX = FRONT_RELIEF_WIDTH + printed_band_mm(FRONT_RELIEF_WIDTH_PLACES)
 CORE_ACTIVE_LENGTH = CORE_FRONT_FROM_F - FRONT_RELIEF_WIDTH  # REF only
@@ -334,11 +343,12 @@ CORE_FLAT_REACH_PAST_SHOULDER_MIN = (
 # The tool's rounded end lies in air under the neck floor.  Detail B prints
 # both of its limits as the part's native FlatEnd (LIMIT, from F) and
 # FlatToolRadius (MAX) dimensions; the prefix names the feature they locate.
-# Its reach past the core shoulder needs no words: the narrowest printed neck
+# Its reach past the core shoulder is the neck width's function (three
+# places, the drawing's callout): the narrowest printed neck
 # (FRONT_RELIEF_WIDTH_MIN) less the farthest allowed tool end is
-# CORE_FLAT_REACH_PAST_SHOULDER_MIN, asserted below.
+# CORE_FLAT_REACH_PAST_SHOULDER_MIN, asserted below; two places' ±0.51
+# would leave none.
 CORE_FLAT_CUT_END_PREFIX = "D-FLAT TOOL END "
-FRONT_RELIEF_AREA_MIN = math.pi * FRONT_RELIEF_DIA_MIN**2 / 4.0
 if (
     CORE_FLAT_GEAR_AIR_MIN < 0.050 - 1e-9
     or CORE_FLAT_REACH_PAST_SHOULDER_MIN < 0.100 - 1e-9
@@ -680,13 +690,12 @@ GEAR_DATA = gear_data_note(
 # The title block's 0.25 edge break is a fifth of this fine tooth's whole
 # depth, so the sheet carries the one part-specific exception it needs. A
 # shop note states the requirement, not the cutter or method (Main ruling
-# 2026-10-10); the cutter lives in the gear data block.
+# 2026-10-10); the cutter lives in the gear data block.  Each note's leader
+# lands on the feature it names (machinist review r8): this one on a tooth.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
 DRIVE_COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
-DRAWING_NOTES = "\n".join((
-    TOOTH_EDGE_NOTE,
-    f"DRIVE COLLAR {DRIVE_COLLAR_NUMBER} REAR FACE BEARS ON {TEETH}T FRONT FACE.",
-))
+# Its leader lands on the 15T front face (F).
+BEARING_FACE_NOTE = f"DRIVE COLLAR\n{DRIVE_COLLAR_NUMBER} BEARS ON\n{TEETH}T FRONT FACE"
 
 
 # One running surface: the journal in the arm plate's bore.  The D-core is a
@@ -732,7 +741,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     "CoreFlatProfile": {"FlatEnd", "FlatToolRadius"},
     "CoreFlatReference": {"FlatToAxis"},
-    "SpanProfile": {"ToothSpan"},
     "StudProfile": {
         "CoreDia",
         "CoreFront",
@@ -755,7 +763,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "FlatToolRadius": CORE_FLAT_TOOL_END_RADIUS_PLACES,
     },
     "CoreFlatReference": {"FlatToAxis": CORE_FLAT_PLACES},
-    "SpanProfile": {"ToothSpan": SPAN_PLACES},
     "StudProfile": {
         "CoreDia": CORE_DIA_PLACES,
         "CoreFront": CORE_FRONT_FROM_F_PLACES,

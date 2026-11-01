@@ -918,14 +918,16 @@ def test_native_rear_entry_has_both_actual_legs_on_both_d_edges(monkeypatch) -> 
         shaft.FRONT_CORNER_RADIUS_MAX
         + max(spec.BORE_ENTRY_BREAK_BAND) - min(spec.BORE_ENTRY_BREAK_BAND)
     )
-    assert spec.BORE_ENTRY_BREAK_REQUIRED_MIN == pytest.approx(0.080)
+    # The knob's neck prints Ø3.95 MAX (its machinist review r8), so the
+    # neck crown sits 0.085 under the core-flat plane.
+    assert spec.BORE_ENTRY_BREAK_REQUIRED_MIN == pytest.approx(0.015)
     assert spec.BORE_ENTRY_FLAT_EDGE_MIN == pytest.approx(2.226477037834)
     assert spec.BORE_ENTRY_ARC_EDGE_MIN == pytest.approx(12.890700407832)
     assert spec.BORE_ENTRY_AXIAL_SPAN_MIN == pytest.approx(3.870)
     assert spec.BORE_ENTRY_PROFILE_DEPTH_MIN == pytest.approx(0.270)
     assert spec.BORE_ENTRY_BREAK_GEOMETRY_MAX == pytest.approx(0.270)
     assert spec.BORE_ENTRY_WALL_WORST == pytest.approx(3.090117421552)
-    assert spec.NECK_CORNER_D_BORE_AIR_MIN == pytest.approx(0.064853316221)
+    assert spec.NECK_CORNER_D_BORE_AIR_MIN == pytest.approx(0.129853316221)
     assert spec.D_DRIVE_AREA_MIN == pytest.approx(6.654325210394)
     assert spec.D_SUPPORT_LENGTH_MIN == pytest.approx(3.692234843105)
     assert spec.D_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.060224563080)

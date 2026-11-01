@@ -136,8 +136,9 @@ def test_true_front_disk_clears_active_core_and_both_neck_corners():
 
 def test_physical_flat_terminal_has_two_actual_end_limits():
     assert shaft.FRONT_RELIEF_DIA == 3.95
+    # LIMITS 3.95/3.82 (owner ruling, machinist review r8).
     assert shaft.FRONT_RELIEF_DIA_MIN == pytest.approx(3.82)
-    assert shaft.FRONT_RELIEF_DIA_MAX == pytest.approx(4.08)
+    assert shaft.FRONT_RELIEF_DIA_MAX == pytest.approx(3.95)
     assert shaft.CORE_FLAT_CUT_END_FROM_F == pytest.approx(0.110)
     assert shaft.CORE_FLAT_CUT_END_LIMITS == (0.050, 0.170)
     assert shaft.CORE_FLAT_CUT_END_Z == -shaft.CORE_FLAT_CUT_END_FROM_F
@@ -162,9 +163,9 @@ def test_torque_contact_uses_no_favourable_bore_float_credit():
         shaft.FRONT_RELIEF_DIA_MAX / 2.0
         + (shaft.CORE_TOTAL_RUNOUT + shaft.FRONT_RELIEF_TOTAL_RUNOUT) / 2.0
     )
-    assert flat_min - neck_crown == pytest.approx(0.020)
+    assert flat_min - neck_crown == pytest.approx(0.085)
     assert collar.NECK_TORQUE_FLAT_AIR_MIN == pytest.approx(flat_min - neck_crown)
-    assert collar.NECK_CORNER_D_BORE_AIR_MIN == pytest.approx(0.064853316221)
+    assert collar.NECK_CORNER_D_BORE_AIR_MIN == pytest.approx(0.129853316221)
     # A legal zero general edge break would seat on the gear-side fillet.
     assert flat_min - neck_crown - shaft.FRONT_CORNER_RADIUS_MAX < 0.0
     assert collar.BORE_ENTRY_BREAK_MIN == pytest.approx(0.150)
@@ -183,8 +184,8 @@ def test_shortened_drive_face_is_real_not_old_full_core_length():
     assert shaft.CORE_ACTIVE_LENGTH == pytest.approx(4.85)
     assert shaft.CORE_ACTIVE_LENGTH_MIN == pytest.approx(4.21)
     assert collar.D_DRIVE_AREA_MIN == pytest.approx(6.654325210394)
-    assert collar.D_DRIVE_AREA_MIN > 0.0
     assert shaft.FRONT_RELIEF_AREA_MIN == pytest.approx(math.pi * 3.82**2 / 4.0)
+    assert collar.D_DRIVE_AREA_MIN > 0.0
     assert collar.LENGTH == collar.SET_NOMINAL == 6.2
     assert (collar.LENGTH_FITTED_MIN, collar.LENGTH_FITTED_MAX) == (3.870, 6.900)
     assert collar.BODY_BLANK_LENGTH_MIN >= collar.LENGTH_FITTED_MAX + collar.FACING_ALLOWANCE
