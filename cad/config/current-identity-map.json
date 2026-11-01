@@ -68,17 +68,6 @@
       ]
     },
     {
-      "old_stem": "ch-rocker-arm-tl-oblique-leadscrew-nut",
-      "old_number": "MHA-CH-006-TL-35",
-      "new_identities": [
-        {
-          "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-leadscrew-nut",
-          "number": "MHA-CH-06-TL-VN-55"
-        }
-      ]
-    },
-    {
       "old_stem": "ch-rocker-arm-tl-oblique-leadscrew",
       "old_number": "MHA-CH-006-TL-34",
       "new_identities": [
@@ -2259,6 +2248,17 @@
       ]
     },
     {
+      "old_stem": "ch-rocker-arm-tl-oblique-feed-nut",
+      "old_number": null,
+      "introduced": "2026-11-01",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-feed-nut",
+          "number": "MHA-CH-06-TL-27"
+        }
+      ]
+    },
+    {
       "old_stem": "ch-rocker-arm-tl-vn-oblique-pivot-screw",
       "old_number": null,
       "introduced": "2026-10-23",
@@ -2647,6 +2647,18 @@
         {
           "stem": "ch-rocker-arm-tl-oblique-pivot-pin",
           "number": "MHA-CH-06-TL-23"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-leadscrew-nut",
+      "old_number": "MHA-CH-006-TL-35",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-leadscrew-nut",
+          "number": "MHA-CH-06-TL-VN-55"
         }
       ],
       "status": "retired"
