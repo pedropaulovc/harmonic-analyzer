@@ -23,15 +23,16 @@ face); every feature is located across the depth from the body's front face
   the V's two mouth edges; at the back mouth corner, out of the view in the
   wedge vertically opposite the groove's, the flanks' "2X 45°" to the bottom
   face, its short arc at the corner and its text offset right of the view;
-  over the view, its apex flat's width and, up the back round's bisector,
-  the rounds' single-limit radius; right of it, the flat's reference height.
+  over the view, its apex flat's width; right of it, the flat's reference
+  height.  Its inside corners print nothing: the title block's INSIDE
+  CORNERS R.040 MAX governs them.
   Through the V it looks along
   the open relief slot: the V is cut on past the step
   (``pn_pen_v_block_spec.V_CUT_LENGTH``), so no brass shows inside it.
 * bottom: ``*Bottom`` turned 180 degrees to keep the front view's X, looking
   up into the V and the relief; through the relief the roof shows the pivot
   bore.  It carries the stations from the paper end and the overall length
-  under it, the relief's corner radius over it, the neck's two faces and the
+  under it, the neck's two faces and the
   body's back face from the body's front face (right of the paper end, where
   the neck's step is an outline change) and the pivot bore's reamed, banded
   diameter.
@@ -123,8 +124,6 @@ from pn_pen_v_block_spec import (
     SET_SCREW_TAP_SPEC,
     SET_SCREW_Y,
     V_ANGLE_DEG,
-    V_APEX_FILLET_R,
-    V_FLAT_WIDTH,
     V_FLAT_Y,
     V_MOUTH_Z0,
     V_MOUTH_Z1,
@@ -277,23 +276,7 @@ FRONT_KEEP = {
 #   callout (from y ~0.247).
 # * the flat's height, a reference "(.20)", right of the view (x
 #   ~0.283..0.292), 12 mm clear of section A-A (from x 0.306).
-# * the apex rounds' "2X R.020 MAX" over the view, 70 mm up the back round's
-#   bisector (67.5 deg) from its centre (x 0.2352, y 0.174), so the radial
-#   leader meets the arc square on and crosses only the end face: its text
-#   (~28 mm, x ~0.248..0.276, y ~0.237..0.241) 5 mm right of the flat
-#   width's outside arrow (to ~0.243), 6 mm under the tap's callout (from y
-#   ~0.247) and 30 mm left of section A-A.
 _END_ROW = 0.007
-_ROUND_BEARING = math.radians((90.0 + V_ANGLE_DEG / 2.0) / 2.0)
-_ROUND_CENTRE = (
-    _rz(
-        _CZ
-        + V_FLAT_WIDTH / 2.0
-        - V_APEX_FILLET_R * math.tan(math.radians(45.0 - V_ANGLE_DEG / 4.0))
-    ),
-    _ry(V_FLAT_Y - V_APEX_FILLET_R),
-)
-_ROUND_TEXT_RUN = 0.070
 # The flank's continuation past the corner runs down-right at the flank's
 # angle under the bottom face's line; the arc stands on the bisector between.
 _FLANK_ARC_BEARING = -math.radians(90.0 - V_ANGLE_DEG / 2.0) / 2.0
@@ -309,10 +292,6 @@ RIGHT_KEEP = {
     ),
     "VFlatWidth": (RIGHT_CENTER[0], _ry(BLOCK_HEIGHT) + 0.0093),
     "VFlatY": (_rz(BODY_Z1) + 0.012, _ry(V_FLAT_Y / 2.0)),
-    "VApexFilletR": (
-        _ROUND_CENTRE[0] + _ROUND_TEXT_RUN * math.cos(_ROUND_BEARING),
-        _ROUND_CENTRE[1] + _ROUND_TEXT_RUN * math.sin(_ROUND_BEARING),
-    ),
 }
 # Bottom (front faces at the top, y 0.128 for the body's, 0.1196 for the
 # neck's):
@@ -322,16 +301,7 @@ RIGHT_KEEP = {
 #   border).  The length's extension lines drop from the paper end's and the
 #   free end's back corners; its text toward the free end (x ~0.065..0.076).
 #   Over the view, from the front corners, its line fenced off the air in
-#   front of the block, where the relief corner's radius now prints.
-# * the relief corner's radius over the view (blind review final9: in the
-#   notch in front of the neck it was squeezed): its text (~16 mm, x
-#   ~0.135..0.151, y ~0.133..0.136) 3.7 mm over the neck faces' datum
-#   extension line (y 0.128), 5 mm under the front view's tap station (its
-#   line ~0.141, its extension lines down to ~0.139 at x 0.105 / 0.155).
-#   The radial leader, from its shoulder 3.3 mm left of the text, runs ~50
-#   deg down to the front corner's arc (centre x 0.1146, y 0.1116), across
-#   the datum's extension line and the neck's front edge 2.7 mm right of the
-#   step.
+#   front of the block.
 # * the neck's two faces and the body's back face right of the paper end,
 #   one baseline row from the body's front face at the step, nested
 #   shortest-innermost: the front face's "2.10" inside its 8.4 mm span (x
@@ -361,7 +331,6 @@ BOTTOM_KEEP = {
     "ReliefX0": (_fx(RELIEF_X0 / 2.0), _bz(BODY_Z1) - _PAPER_ROW),
     "PivotX": (_fx(PIVOT_BORE_X / 2.0), _bz(BODY_Z1) - 2 * _PAPER_ROW),
     "Length": (_fx(BLOCK_LENGTH) + 0.025, _bz(BODY_Z1) - 3 * _PAPER_ROW),
-    "ReliefCornerR": (_fx(RELIEF_X0) + 0.0245, _bz(BODY_Z0) + 0.0065),
     "NeckZ0": (_NECK_ROW_X, (_bz(BODY_Z0) + _bz(0.0)) / 2.0),
     "NeckZ1": (_NECK_ROW_X + _END_ROW, (_bz(BODY_Z0) + _bz(NECK_DEPTH)) / 2.0),
     "Depth": (

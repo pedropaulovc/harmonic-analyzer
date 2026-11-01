@@ -27,11 +27,12 @@ Features, in tree order:
   flat's height a driven reference,
   cut +X from the paper end to ``V_CUT_LENGTH``, one corner radius past the
   relief's step.
-* ``VApexFillets``: the rounds where the apex flat meets the flanks, at the
-  ``V_APEX_FILLET_R`` limit; the sheet prints it "2X R.020 MAX".
+* ``VApexFillets``: the rounds where the apex flat meets the flanks, at
+  ``V_APEX_FILLET_R``; the sheet prints no radius (the title block's INSIDE
+  CORNERS R.040 MAX governs).
 * ``ReliefProfile`` (Top plane) -> ``Relief``: the slot from ``RELIEF_X0`` to
-  the free end, its two step corners the end mill's ``RELIEF_CORNER_R`` arcs,
-  cut +Y to the roof.
+  the free end, its two step corners the end mill's ``RELIEF_CORNER_R`` arcs
+  (unprinted, under the same title-block row), cut +Y to the roof.
 * ``PivotBoreProfile`` (Top plane) -> ``PivotBore``: the reamed bore, a
   sketched through cut; it removes brass only between the top face and the
   relief roof.  Its diameter carries the H7 band.
@@ -125,9 +126,7 @@ from pn_pen_v_block_spec import (
     UNIT,
     V_FLANK_ANGLE_DEG,
     V_APEX_FILLET_AREA,
-    V_APEX_FILLET_BAND,
     V_APEX_FILLET_R,
-    V_APEX_FILLET_TOL_TYPE,
     V_CUT_LENGTH,
     V_FLAT_WIDTH,
     V_FLAT_Y,
@@ -792,8 +791,7 @@ async def _pivot_reference(adapter) -> list[tuple[str, str]]:
 
 
 # (feature, dimension, the limit the model carries, its native band,
-# swTolType_e, the word it prints): the pivot bore's chamfer has a floor, the
-# V's apex rounds a ceiling.
+# swTolType_e, the word it prints): the pivot bore's chamfer has a floor.
 _SINGLE_LIMITS = (
     (
         "PivotReference",
@@ -802,14 +800,6 @@ _SINGLE_LIMITS = (
         PIVOT_CHAMFER_BAND,
         PIVOT_CHAMFER_TOL_TYPE,
         "MIN",
-    ),
-    (
-        "VApexFillets",
-        "VApexFilletR",
-        V_APEX_FILLET_R,
-        V_APEX_FILLET_BAND,
-        V_APEX_FILLET_TOL_TYPE,
-        "MAX",
     ),
 )
 
@@ -954,10 +944,11 @@ async def build(adapter) -> dict[str, str]:
     ]
     volume = await volume_check(adapter, "V-groove", volume - V_GROOVE, 0.01 * V_GROOVE)
 
-    # 2b. The rounds where the apex flat meets the flanks, at the radius the
-    # print allows (R MAX): each edge picked mid-neck on its flat end, the
-    # only edge through that point.  They add ~0.1 mm^3, under the mass
-    # properties' resolution: the check proves the round ate nothing else.
+    # 2b. The rounds where the apex flat meets the flanks, a chamfer mill's
+    # tip (the title block's inside-corner row governs): each edge picked
+    # mid-neck on its flat end, the only edge through that point.  They add
+    # ~0.1 mm^3, under the mass properties' resolution: the check proves the
+    # round ate nothing else.
     check(
         "fillet V apex flat corners",
         await adapter.add_fillet(
