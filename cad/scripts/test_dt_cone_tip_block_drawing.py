@@ -543,6 +543,11 @@ def test_the_slid_view_row_fits_the_sheet() -> None:
         and box[3] > TITLE_BLOCK[1]
     ]
     assert on_title == []
+    # Blind machinist review of c289ee94: the foot finish's shoulder 0.1 mm
+    # over the title block's box printed 1.2 mm over its line and read as
+    # touching; it now keeps a text clearance over the box.
+    finish = drawing.sheet_text_boxes()["foot finish"]
+    assert finish[1] - TITLE_BLOCK[3] >= drawing.TEXT_CLEARANCE
     names = sorted(views)
     touching = [
         (first, second)
@@ -552,10 +557,12 @@ def test_the_slid_view_row_fits_the_sheet() -> None:
     ]
     assert touching == []
     # The slide is what the callout needs: the right view's north face stands
-    # one text clearance past the callout's right end.
+    # the callout's air (3 mm, blind machinist review of c289ee94) past the
+    # callout's right end.
     callout = drawing.sheet_text_boxes()["adjuster callout"]
+    assert drawing.ADJUSTER_VIEW_AIR >= 0.003
     assert views["right"][0] - callout[2] == pytest.approx(
-        drawing.TEXT_CLEARANCE + drawing.ROUND_OUT, abs=1e-9
+        drawing.ADJUSTER_VIEW_AIR + drawing.ROUND_OUT, abs=1e-9
     )
 
 
