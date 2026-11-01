@@ -9,6 +9,7 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _supplier_screw_dimensions import annotate_supplier_screw
@@ -22,6 +23,7 @@ from _mcmaster_93585a190 import (
 )
 
 
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SPEC = DRAWINGS_BY_NAME["dt_vn_cone_lock_knob"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "1/4-20 x 3/4 HIGH-PROFILE KNURLED-HEAD THUMB SCREW"
