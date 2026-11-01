@@ -43,7 +43,7 @@ def test_pilot_parts_print_inches_and_stamp_inch_rows(part):
 
 
 def test_the_metric_supplier_rail_and_unconverted_parts_stay_millimetres():
-    for part in ("ch-rocker-arm-tl-vn-oblique-rail", "dt-cone-gear", "no-such-part"):
+    for part in ("ch-rocker-arm-tl-vn-oblique-rail", "fr-harmonic-base", "no-such-part"):
         assert part_drawing_unit(part) == "mm"
     assert part_properties("ch-rocker-arm-tl-vn-oblique-rail")["TOL_LIN_XX"] == "±0.51"
 
