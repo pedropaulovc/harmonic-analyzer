@@ -5414,6 +5414,11 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         annotations.append(case.annotation)
     elif drift == "unknown":
         case.native.FullName = "Unrequested@SupplierReference@stock.SLDPRT"
+        # A named shop carrier is the caller's to check, not alien ink.
+        with pytest.raises(RuntimeError, match=r"missing \['Length'\]"):
+            screws.assert_supplier_screw(
+                adapter, {"*Front": case.view}, shop={"Unrequested"}, **settings
+            )
     elif drift == "view-owner":
         case.annotation.Owner = object()
     elif drift == "feature-membership":
