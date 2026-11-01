@@ -91,6 +91,7 @@ from dt_crankshaft_notes import (
     KNOCKOUT_CALLOUT_BELOW,
     NECK_LANDS,
     NECKS,
+    PIN_HOLE_MATE,
     PINION_SEAT_MATE,
     SHAFT_LENGTH_MATE,
     SHANK_MATE,
@@ -102,6 +103,7 @@ from dt_crankshaft_spec import (
     COLLAR_DIA,
     COLLAR_REAR,
     CROSS_HOLE_PROCESS,
+    DIAMETER_REFERENCES,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRIVE_PIN_CIRCLE_RADIUS,
@@ -254,6 +256,11 @@ SIDE_KEEP = {
     # spigot, between the cross-hole's and the collar seat's extension lines,
     # above every row that spans it.
     "SpigotLength": ((PIN_X + COLLAR_SEAT_X) / 2.0, 0.148),
+    # The 16T pin cross-hole's REF Ø (witness on the seat's top silhouette):
+    # on the low row over the seat, text left of its extension lines, under
+    # the Ø9.000's block and right of that block's dimension line, so the
+    # transfer note's leader passes right of the extension lines to the hole.
+    "PinionPinHoleDia": (_sheet_x(PINION_PIN_STATION_Y) - 0.017, 0.203),
 }
 # A dragged diameter prints its dimension line at the requested X with the
 # text running to its RIGHT (run 20260923T030252135Z-49e46990).  Its
@@ -292,7 +299,8 @@ DIAMETER_POSITIONS = {
     # Its leader left of the journal finish symbol's V.
     "JournalDiaDim": (RELIEF_START_X - 0.0035, 0.224),
     "ReliefDiaDim": (RELIEF_START_X + 0.045, 0.212),
-    "PinionSeatDiaDim": (SEAT_STEP_X + 0.002, 0.2125),
+    # Raised 7 mm over the 16T pin cross-hole's REF Ø on the low row.
+    "PinionSeatDiaDim": (SEAT_STEP_X + 0.002, 0.2195),
     "SpigotDiaDim": (COLLAR_SEAT_X + 0.0075, 0.2215),
     "CollarDiaDim": (SPIGOT_END_X + 0.002, 0.2075),
     "NeckDiaDim": (JOURNAL_END_X + 0.0006, 0.230),
@@ -320,6 +328,7 @@ CALLOUTS_BELOW = {
     "JournalDiaDim": JOURNAL_MATE,
     "PinionSeatDiaDim": PINION_SEAT_MATE,
     "SpigotDiaDim": SPIGOT_AIR_MATE,
+    "PinionPinHoleDia": PIN_HOLE_MATE,
     "NeckDiaDim": NECK_LANDS,
 }
 # The banded far-end stations name their stack on their own row: a callout
@@ -397,7 +406,8 @@ FIDUCIAL_NOTE_XY = (0.0145, 0.152)
 # boss at assembly, so the sheet prints the pinion sheet's own matched-fit
 # note with the mates swapped (crank_pinion_spec.CRANKSHAFT_PIN_HOLE_PROCESS,
 # also the part property checked below): the operation, where it runs, the
-# pin it is reamed to, the fit's acceptance and flush -- no size, no station.
+# pin it is reamed to, the fit's acceptance and flush -- no size (the REF Ø
+# over the hole, PinionPinHoleDia, prints it natively), no station.
 # A bare transfer note gave the shaft's machinist none of these (machinist
 # review of 4d4e038e3).  The note is attached to the hole's own visible rim edge: a radial hole in a
 # round shaft has a saddle rim, not a circle, so a native Hole Wizard
@@ -1176,7 +1186,12 @@ async def build(adapter: Any) -> dict[str, str]:
         if name in SPHERICAL_DIMENSIONS:
             _set_spherical_reference(adapter, matches[0], label=f"crankshaft {name}")
             continue
-        set_reference_dimension(adapter, matches[0], label=f"crankshaft {name}")
+        set_reference_dimension(
+            adapter,
+            matches[0],
+            label=f"crankshaft {name}",
+            diameter=name in DIAMETER_REFERENCES,
+        )
 
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; the end view gets the
