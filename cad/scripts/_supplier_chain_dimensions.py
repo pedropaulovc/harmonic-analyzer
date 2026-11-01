@@ -13,6 +13,7 @@ from typing import Any
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from solidworks_mcp.adapters.sw_type_info import constant
 
+import _telemetry
 from _com import _early_bound
 from _drawing_dimensions import offset_dimension_text
 from _drawing_hidden_sketches import _show_hidden_owners, curate_view_dimensions
@@ -67,6 +68,7 @@ def _construction_curves_continuous(adapter: Any) -> Callable[[], None]:
     return readback
 
 
+@_telemetry.traced("drawing.supplier_chain_outline")
 def _format_as_outline(adapter: Any, view: Any, sketches: tuple[str, ...]) -> None:
     """Black, Thick line format on every segment of ``sketches`` in ``view``.
 
@@ -77,6 +79,7 @@ def _format_as_outline(adapter: Any, view: Any, sketches: tuple[str, ...]) -> No
     native = _early_bound(view, "IView")
     part = _early_bound(native.ReferencedDocument, "IPartDoc")
     selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    formatted = 0
     for name in sketches:
         feature = part.FeatureByName(name)
         if feature is None:
@@ -101,6 +104,8 @@ def _format_as_outline(adapter: Any, view: Any, sketches: tuple[str, ...]) -> No
         drawing.SetLineColor(_OUTLINE_COLOR)
         drawing.SetLineWidth(_SW_LW_THICK)
         draw.ClearSelection2(True)
+        formatted += len(segments)
+    _telemetry.annotate(sketches=len(sketches), segments=formatted)
 
 
 def prepare_chain_diagrams(

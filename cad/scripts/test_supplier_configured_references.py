@@ -450,3 +450,46 @@ def test_wire_nominal_cannot_be_read_from_the_installed_envelope(monkeypatch):
             DIA,
             label="supplier wire circle",
         )
+
+
+def test_chain_outline_formats_every_segment_under_one_counted_span(monkeypatch):
+    calls = []
+    selected = []
+
+    class Segment:
+        def Select4(self, append, _data):
+            if not append:
+                selected.clear()
+            selected.append(self)
+            return True
+
+    sketches = {"Front": [Segment(), Segment()], "Sections": [Segment()] * 4}
+    part = SimpleNamespace(
+        FeatureByName=lambda name: SimpleNamespace(
+            GetSpecificFeature2=lambda: SimpleNamespace(
+                GetSketchSegments=lambda: sketches[name]
+            )
+        )
+    )
+    draw = SimpleNamespace(
+        SelectionManager=SimpleNamespace(
+            CreateSelectData=SimpleNamespace,
+            GetSelectedObjectCount2=lambda _mark: len(selected),
+        ),
+        ClearSelection2=lambda _all: selected.clear(),
+        SetLineColor=lambda color: calls.append(("color", color, len(selected))),
+        SetLineWidth=lambda width: calls.append(("width", width, len(selected))),
+    )
+    view = SimpleNamespace(ReferencedDocument=part, GetCorresponding=lambda raw: raw)
+    span = {}
+    monkeypatch.setattr(chain_dimensions, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(
+        chain_dimensions._telemetry, "annotate", lambda **attrs: span.update(attrs)
+    )
+
+    chain_dimensions._format_as_outline(
+        SimpleNamespace(currentModel=draw), view, ("Front", "Sections")
+    )
+
+    assert [count for *_, count in calls] == [2, 2, 4, 4]
+    assert span == {"sketches": 2, "segments": 6}
