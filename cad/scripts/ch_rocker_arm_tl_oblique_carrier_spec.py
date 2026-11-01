@@ -39,9 +39,12 @@ Values marked (calc) are read from ``trammel``, never retyped:
   and CL to .2490-.2495 (the owned .2490 reamer) for the bought 1/4 x 1
   dowel (.2501-.2503, McMaster 98381A542), a .0006-.0013 diametral press
   (``CL_DOWEL_INTERFERENCE``). The traveler carries these sizes, not this
-  sheet, so the spots locate at title-block tolerance.
-* (calc) CR (+6.334, 1.156): 1/4-20 UNC tapped THRU for the clamp screw;
-  its SHCS head (Ø.375) is under the Ø12 mm that clears both cutter paths.
+  sheet. Each spot's callout names the MHA-CH-13 strap feature it becomes:
+  the HUB's Y station moves the strap's pivot radially 1:1, so it prints at
+  3 places (``HUB_RADIAL_BAND``, inside half the strap's top-edge band).
+* (calc) CR (+6.334, 1.156): 1/4-20 UNC tapped THRU for the clamp screw that
+  clamps the MHA-CH-13 strap (``CR_TAP_CALLOUT``); its SHCS head (Ø.375) is
+  under the Ø12 mm that clears both cutter paths.
 * (calc) Riser screws: 4 x #4-40 UNC tapped THRU at ``trammel.RISER_SCREWS``,
   on the R808.0 mm centreline of the riser's self-cut band
   (``trammel.RISER_SCREW_RADIUS``). Their stations print at
@@ -102,6 +105,7 @@ import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as pivot_screw
 import ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec as pivot_spacer
 import ch_rocker_arm_tl_vn_oblique_hub_pin_spec as hub_pin
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
+import ch_rocker_arm_spec as rocker
 import _mcmaster_98381a542 as cl_dowel_stock
 from _fit_deviations import deviations
 from _fit_ream_h7 import REAM_H7
@@ -283,6 +287,8 @@ CR_HEAD_DIA_MAX = 0.375 * trammel.INCH  # ASME B18.3 1/4 SHCS
 CR_HEAD_CLEAR_DIA = 12.0  # clears both cutter paths
 if CR_HEAD_DIA_MAX > CR_HEAD_CLEAR_DIA:
     raise AssertionError("the CR clamp screw head fouls a cutter path")
+# Machinist review mr3: the tap names what its kinematic station serves.
+CR_TAP_CALLOUT = f"CLAMPS {STRAP_NUMBER}"
 
 RISER_SCREWS = trammel.RISER_SCREWS
 RISER_THREAD = "#4-40"
@@ -449,12 +455,27 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked carrier dimension needs authored places")
 
+# The HUB spot is reamed in place for the bonded pin that carries the strap's
+# pivot, on the cut arcs' centreline (X = 0), so its Y station moves the
+# pivot radially 1:1 against the R800 top edge. The station alone must sit
+# strictly inside half the strap's top-edge band: at .XX (±.010) it would
+# take all of it. Its X station is second order (dx² / 2R).
+_TOP_EDGE_HALF_BAND = (max(rocker.TOP_EDGE_BAND) - min(rocker.TOP_EDGE_BAND)) / 2.0
+HUB_RADIAL_BAND = printed_band_mm(DRAWING_PRECISION_BY_NAME["HubY"], unit=UNIT)
+if HUB_RADIAL_BAND >= _TOP_EDGE_HALF_BAND:
+    raise AssertionError("the HUB station band consumes the strap's top-edge band")
+
 # Symmetric ±.0008 on these (build: set_dimension_symmetric_tolerance).
 POSITION_BANDED = ("PinSpacing", "A2DX", "A2DY", "B2DX", "B2DY")
 
 # Each spot has its own leader and callout (jig-r3: a "2X" with one leader
-# read as one spot).
+# read as one spot), naming the strap feature it becomes (machinist review
+# mr3: the 3-place stations to it read as functional).
 SPOT_CALLOUT = "CENTRE DRILL SPOT"
+SPOT_CALLOUTS = {
+    "SpotDia": f"{SPOT_CALLOUT}\nFOR {STRAP_NUMBER} HUB",
+    "SpotDiaCl": f"{SPOT_CALLOUT}\nFOR {STRAP_NUMBER} CL",
+}
 CALLOUTS_BELOW = {
     "PinHoleDia": PIN_HOLE_CALLOUT,
     "PinSpacing": SPACING_CALLOUT,
@@ -462,8 +483,7 @@ CALLOUTS_BELOW = {
     "B2DX": DX_CALLOUT,
     "A2DY": DY_CALLOUT,
     "B2DY": DY_CALLOUT,
-    "SpotDia": SPOT_CALLOUT,
-    "SpotDiaCl": SPOT_CALLOUT,
+    **SPOT_CALLOUTS,
     "PinChamferSize": PIN_CHAMFER_CALLOUT,
     **{name: RISER_STATION_CALLOUT for name in RISER_STATIONS},
 }
