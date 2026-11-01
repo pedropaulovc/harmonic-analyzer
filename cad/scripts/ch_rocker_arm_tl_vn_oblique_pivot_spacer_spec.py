@@ -46,4 +46,3 @@ SUPPLIER_REFERENCE_TOLERANCES_MM = {
     'SupplierOuterDiameter': deviations(OD_BAND),
     'SupplierLength': deviations(LENGTH_BAND),
 }
-SUPPLIER_DATA = ('LOOSE BORE IS NOT A LOCATING BUSHING.',)

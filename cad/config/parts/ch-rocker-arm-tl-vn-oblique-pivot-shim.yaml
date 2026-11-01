@@ -3,7 +3,7 @@ ch-rocker-arm-tl-vn-oblique-pivot-shim:
   number: MHA-CH-06-TL-VN-79
   stock_name: Steel Shim, 3/8 ID x 5/8 OD x .008 in
   supplier: Huyett
-  supplier_skus: ['SHIM-0375-008', 'SHIM-0375-004', 'SHIM-0375-020']
+  supplier_skus: ['SHIM-0375-008']
   material: Plain Carbon Steel
   material_specification: "Full-hard low-carbon steel, plain, lightly oiled"
   finish: as supplied

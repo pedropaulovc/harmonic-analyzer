@@ -436,18 +436,19 @@ joint. The diagnostic mentioned below was removed; this is not a live recipe.
   (`ch-rocker-arm-tl-vn-oblique-lever-washer`, MHA-CH-06-TL-VN-71, 2 pairs in
   the oblique trammel jig: the fastener table's `LEVER_LOCK_WASHER` row, one
   pair under each TL-VN-69 feed lever screw head) was read live on October 17,
-  2026 from the wedge-lock listing; the product page and its 2-D PDF are
-  login-walled. Two-piece wedge-lock washer, reusable up to 15 times,
-  comparable to NORD-LOCK; 316 stainless steel, Rockwell C51, case hardened;
-  for 5/16" / M8; ID 0.340 in, OD 0.530 in, thickness 0.070 to 0.090 in;
-  5 per package, $12.40. UNVERIFIED: the listing does not say whether the
-  thickness is the pair's stack or one washer's, nor whether a package is 5
-  pairs; the model takes the band as the pair's stack at its 0.090 in
-  maximum. `diag_build_91812A230.py` builds the pair's envelope, one plain
-  annulus from y = 0 along +Y (no cam faces, serrations or split). No vendor
-  model was downloaded, so it is not replica-gated: the standalone run is
-  catalogue-only (it builds the recipe, checks the solid and saves it under
-  `cad/out/reference`).
+  2026 from the wedge-lock listing; the product page is login-walled.
+  Two-piece wedge-lock washer, reusable up to 15 times, comparable to
+  NORD-LOCK; 316 stainless steel, Rockwell C51, case hardened; for 5/16" / M8;
+  ID 0.340 in, OD 0.530 in, thickness 0.070 to 0.090 in; package quantity 5.
+  Re-read November 1, 2026 ($17.39 per package): the listing sells "these
+  two-piece lock washers", so one item is a pair and a package is five pairs,
+  and the public 2-D drawing (CAD2/20260617/385104C2) dimensions 0.09/0.07
+  across the two-piece stack, so the thickness is the pair's stack; the model
+  takes it at its 0.090 in maximum. `diag_build_91812A230.py` builds the pair's
+  envelope, one plain annulus from y = 0 along +Y (no cam faces, serrations or
+  split). No vendor model was downloaded, so it is not replica-gated: the
+  standalone run is catalogue-only (it builds the recipe, checks the solid and
+  saves it under `cad/out/reference`).
 
 ### Historical non-McMaster captured-pivot purchases (retired 2026-10-23)
 

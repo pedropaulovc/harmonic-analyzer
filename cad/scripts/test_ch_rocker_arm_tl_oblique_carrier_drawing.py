@@ -257,6 +257,15 @@ def test_hub_station_moves_the_strap_pivot_inside_its_top_edge_band() -> None:
     assert printed_band_mm(places - 1, unit=spec.UNIT) >= half
 
 
+def test_three_place_hub_and_cr_stations_state_true_functions() -> None:
+    """mr4: 8.861 and CR's 15.195/1.156 printed 3-place with no stated
+    function. HubX puts the HUB on the A1-B1 midline; CR is CL mirrored about
+    that line, so the CR callout (whose lanes hold no row) names it."""
+    a1, b1 = spec.PIN_HOLES["A1"], spec.PIN_HOLES["B1"]
+    assert spec.HUB[0] == pytest.approx((a1[0] + b1[0]) / 2.0)
+    assert spec.CR == pytest.approx((-spec.CL[0], spec.CL[1]))
+
+
 def test_pin_chamfer_retains_the_spacer_thrust_seat() -> None:
     """The entry break leaves a broad seat on the purchased spacer."""
     import ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec as pivot_spacer

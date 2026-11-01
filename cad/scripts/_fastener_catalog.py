@@ -486,12 +486,12 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         supplier="AluminumSpacers.com",
     ),
     # Full-hard low-carbon steel shims: the library's plain carbon steel (default).
+    # The .004/.020 fitting stock is named on the sheet's FITTING STOCK line and
+    # bought by the jig's buy list, not as this part.
     "ch-rocker-arm-tl-vn-oblique-pivot-shim": _stock(
         "ch-rocker-arm-tl-vn-oblique-pivot-shim",
         "Steel Shim, 3/8 ID x 5/8 OD x .008 in",
         "SHIM-0375-008",
-        "SHIM-0375-004",
-        "SHIM-0375-020",
         supplier="Huyett",
     ),
     # Hardened tool-steel gauge pin: the library's Alloy Steel stand-in.

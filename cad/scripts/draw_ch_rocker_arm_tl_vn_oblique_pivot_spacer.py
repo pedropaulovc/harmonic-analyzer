@@ -8,6 +8,8 @@ import sys
 import _telemetry
 import ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec as part
 from _com import _early_bound
+from _drawing_centerline import add_view_centerline
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import NumberFit, build_purchased_fastener_drawing
@@ -21,6 +23,10 @@ MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_pivot_spacer"]
 ITEM = '6061 ALUMINUM ROUND SPACER, 3/8 SCREW, 5/8 OD X 5/8 LONG'
+# How the jig uses the part is a design note, not supplier operating data: it
+# rides the general line (at most the default's 74 characters), every printed
+# size already being the supplier's parenthesised reference.
+GENERAL_TEXT = "PURCHASED PART, USED AS SUPPLIED. LOOSE BORE: NOT A LOCATING BUSHING."
 # Every text shelves right of its own witnesses, clear of the lines: the bore
 # on the Front's top lane, the OD on its bottom lane, the length beside
 # the Top view. Front and Top reserve the same left/right space so the fit
@@ -69,6 +75,16 @@ async def build(adapter) -> dict[str, str]:
         )
         _assert_supplier_bands(displays)
         stations = shelve_supplier_text(adapter, displays, SHELVES)
+        # The RIGHT side view carries the axis as the TOP view does; picked on
+        # the OD face at mid-length (frame: axis +Z from the bottom face).
+        right = views["*Right"]
+        add_view_centerline(
+            adapter, right, label="spacer RIGHT axis",
+            face_xy=model_point_in_view(
+                adapter, right, (part.OD / 2000.0, 0.0, part.LENGTH / 2000.0),
+                label="spacer RIGHT OD face",
+            ),
+        )
 
         def assert_references():
             fresh = assert_supplier_screw(
@@ -89,10 +105,10 @@ async def build(adapter) -> dict[str, str]:
 
     return await build_purchased_fastener_drawing(
         adapter, SPEC, item=ITEM, number_fit=NumberFit.SHRINK_TO_CELL,
-        cut_to_suit=False,
+        general_text=GENERAL_TEXT,
         supplier_dimensions=supplier_dimensions,
         supplier_margins=SUPPLIER_MARGINS,
-        settled_checks=(assert_supplier_dimensions,), supplier_data=part.SUPPLIER_DATA,
+        settled_checks=(assert_supplier_dimensions,),
         unit=part_drawing_unit(part.PART_NAME),
     )
 

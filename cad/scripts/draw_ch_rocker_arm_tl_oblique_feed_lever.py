@@ -31,6 +31,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 
@@ -123,8 +124,12 @@ FRONT_KEEP: dict[str, tuple[float, float, float]] = {
 # audit e5a5f5c19, extension-through-own-text). The text alone shelves right
 # of its witnesses and arrows at the same height, as the CL dowel's
 # references do (draw_ch_rocker_arm_tl_vn_oblique_cl_dowel); the native line
-# and witnesses stay where the import put them.
+# and witnesses stay where the import put them. Machinist review mr4: with
+# the arrows outside, the shelf's native connector ended in open space
+# between the witnesses (no dimension line runs there), so the shelved
+# dimension holds its arrows inside and the connector lands on its line.
 SHELVES = {"LeverThick": (False, "right")}
+_ARROWS_INSIDE = 0  # swDimArrowsInside
 # The hole callout's leader picks hole 2's far edge; its text stands above
 # the view over the lever's inner half.
 HOLE_EDGE_MODEL = (HOLE_X[1] + 0.6 * _R, _H, -HOLE_Y - 0.8 * _R)
@@ -300,6 +305,14 @@ def _stock_references(adapter: Any, annotations: list[Any]) -> dict[str, Any]:
     return displays
 
 
+def _assert_arrows_inside(displays: dict[str, Any]) -> None:
+    """Each shelved reference keeps its arrows inside its witnesses, so its
+    dimension line spans them and the shelf's connector lands on it."""
+    for name, display in displays.items():
+        if int(display.ArrowSide) != _ARROWS_INSIDE:
+            raise RuntimeError(f"{name}: arrows did not hold inside")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -366,9 +379,14 @@ async def build(adapter: Any) -> dict[str, str]:
     _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
     stock = _stock_references(adapter, annotations)
     shelved = {name: stock[name] for name in SHELVES}
+    for display in shelved.values():
+        display.ArrowSide = _ARROWS_INSIDE
+    rebuild_drawing(adapter, label="feed lever shelved references' arrows inside")
+    _assert_arrows_inside(shelved)
     stations = shelve_supplier_text(adapter, shelved, SHELVES)
 
     def assert_shelves() -> None:
+        _assert_arrows_inside(shelved)
         assert_supplier_shelves(adapter, shelved, SHELVES, stations)
 
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
