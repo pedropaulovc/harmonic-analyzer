@@ -10,6 +10,7 @@ import _telemetry
 from _session import run_build
 from _drawing_annotation_extent import CLEAR_GAP_M
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _supplier_screw_dimensions import _supplier_top_record, annotate_supplier_screw
@@ -25,6 +26,8 @@ from _mcmaster_99607a213 import (
     TS_SH_R,
 )
 
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pn_vn_pen_set_screw"]
 # The footer's ITEM row: the catalogue designation in plain text.
