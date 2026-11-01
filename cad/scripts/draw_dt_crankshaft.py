@@ -260,7 +260,7 @@ SIDE_KEEP = {
     # on the low row over the seat, text left of its extension lines, under
     # the Ø9.000's block and right of that block's dimension line, so the
     # transfer note's leader passes right of the extension lines to the hole.
-    "PinionPinHoleDia": (_sheet_x(PINION_PIN_STATION_Y) - 0.017, 0.2005),
+    "PinionPinHoleDia": (_sheet_x(PINION_PIN_STATION_Y) - 0.017, 0.203),
 }
 # A dragged diameter prints its dimension line at the requested X with the
 # text running to its RIGHT (run 20260923T030252135Z-49e46990).  Its
@@ -299,8 +299,8 @@ DIAMETER_POSITIONS = {
     # Its leader left of the journal finish symbol's V.
     "JournalDiaDim": (RELIEF_START_X - 0.0035, 0.224),
     "ReliefDiaDim": (RELIEF_START_X + 0.045, 0.212),
-    # Raised 9 mm over the 16T pin cross-hole's REF Ø on the low row.
-    "PinionSeatDiaDim": (SEAT_STEP_X + 0.002, 0.221),
+    # Raised 13 mm over the 16T pin cross-hole's REF Ø on the low row.
+    "PinionSeatDiaDim": (SEAT_STEP_X + 0.002, 0.2255),
     "SpigotDiaDim": (COLLAR_SEAT_X + 0.0075, 0.2215),
     "CollarDiaDim": (SPIGOT_END_X + 0.002, 0.2075),
     "NeckDiaDim": (JOURNAL_END_X + 0.0006, 0.230),
