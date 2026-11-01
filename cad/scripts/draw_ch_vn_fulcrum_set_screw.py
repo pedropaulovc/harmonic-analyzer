@@ -24,7 +24,7 @@ from _mcmaster_91375a942 import (
 
 
 SPEC = DRAWINGS_BY_NAME["ch_vn_fulcrum_set_screw"]
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "#1-72 x 5/32 SOCKET SET SCREW, CUP POINT"
 

@@ -24,7 +24,7 @@ from _mcmaster_91794a080 import (
 
 
 SPEC = DRAWINGS_BY_NAME["ch_vn_frame_side_screw"]
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "#2-56 x 7/16 FILLISTER HEAD SLOTTED SCREW"
 
