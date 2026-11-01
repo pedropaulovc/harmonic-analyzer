@@ -2942,6 +2942,7 @@ def test_config_deps_are_fine_grained():
         "parts/sm-vn-knife-mount-dowel.yaml",
         "parts/dt-crank-pin.yaml",
         "parts/dt-crank-pin-ring.yaml",
+        "parts/dt-vn-crank-seat-drive-pin.yaml",
         "parts/_defaults.yaml",
     }
     assert not any(
