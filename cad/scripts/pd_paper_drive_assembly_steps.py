@@ -19,6 +19,8 @@ live proof.
 
 from __future__ import annotations
 
+import math
+
 import dt_drive_train_steps
 import pd_transgear_drive_collar_spec as collar
 import paper_drive_mesh_check as mesh_check
@@ -144,6 +146,13 @@ KNOB_SETTING_VIEW_NAME = "VIEW K"
 def knob_setting_ref() -> str:
     """The pointer the arm and plate sheets print: ``MHA-PD-00 VIEW K``."""
     return f"{DRAWING_NUMBER} {KNOB_SETTING_VIEW_NAME}"
+
+
+def mm_max_text(limit: float, places: int) -> str:
+    """An inch-authored maximum in the sheet's mm, rounded down so the printed
+    limit never admits a value the part spec refuses."""
+    scale = 10**places
+    return f"{math.floor(round(limit * scale, 9)) / scale:.{places}f} MAX"
 
 
 # --- Values the procedure owns (CONTRACT-paper-drive.md §13.2) --------------

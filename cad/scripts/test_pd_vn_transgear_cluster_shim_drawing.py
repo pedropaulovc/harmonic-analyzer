@@ -70,6 +70,26 @@ def test_purchased_sheet_documents_the_built_part() -> None:
     )
 
 
+def test_the_sheet_is_drawn_in_the_unit_the_model_reference_ink_names(
+    monkeypatch,
+) -> None:
+    """The model's supplier ink drops " in" on an inch sheet; the drawing
+    must open on that same inch sheet or the native read-back refuses it."""
+    import asyncio
+
+    import draw_pd_vn_transgear_cluster_shim as drawing
+
+    seen = {}
+
+    async def capture(*_args, **kwargs):
+        seen.update(kwargs)
+        return {}
+
+    monkeypatch.setattr(drawing, "build_purchased_fastener_drawing", capture)
+    asyncio.run(drawing.build(None))
+    assert seen["unit"] == _config.parts(STEM)["drawing_unit"] == "in"
+
+
 def test_installation_note_fits_the_sheet() -> None:
     lines = _config.parts(STEM)["installation_notes"].splitlines()
     assert len(lines) <= 4

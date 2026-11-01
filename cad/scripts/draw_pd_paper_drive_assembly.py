@@ -1610,7 +1610,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"TAKE BOTH {_N['pd-vn-transgear-arm-plate-screw']} SCREWS OUT; CUT THEIR "
             f"TIPS FLUSH TO {joints.PLATE_SCREW_CUT_PROUD_MAX:.2f} PROUD OF THE ARM'S "
             "FRONT FACE; BREAK THE CUT EDGE "
-            f"{math.floor(plate_screw.CUT_END_BREAK_MAX * 100) / 100:.2f} MAX. "
+            f"{steps.mm_max_text(plate_screw.CUT_END_BREAK_MAX, 2)}. "
             "REFIT THE SAME SCREWS IN THE SAME HOLES BEFORE PIVOTING THE HANGER."
         ),
         # R9-71: the spacer is pressed on the shoulder, so its faces' tilt is

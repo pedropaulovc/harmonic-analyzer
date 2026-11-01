@@ -4,11 +4,12 @@ PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  A turned brass ring on the MHA-PD-23 pin between the MHA-PD-VN-68
 shims on the MHA-PD-18 arm's front face and the MHA-PD-10 sleeve's rear face.
 Its length only sets the disc's end float, which the shims close at assembly
-(owner ruling 2026-11-01, #2124), so it prints at the title block:
-``transgear_cluster_fit.REAR_BUSHING_LENGTH`` keeps the unshimmed float over
-``transgear_cluster_fit.END_FLOAT_MIN`` at the worst case.  It runs free on
-the pin; both faces bear.  #290: the sheet prints decimal inch; every length
-is the exact millimetre value of its inch nominal.
+(owner ruling 2026-11-01, #2124): ``transgear_cluster_fit.REAR_BUSHING_LENGTH``
+keeps the unshimmed float over ``transgear_cluster_fit.END_FLOAT_MIN`` at the
+worst case, and its band holds the shim count to the supplier's four.  It
+runs free on the pin; the MHA-PD-10 sleeve's rear face turns on its front
+face.  #290: the sheet prints decimal inch; every length is the exact
+millimetre value of its inch nominal.
 
 Part frame: axis local +Z through the origin (``Axis1``); faces at z = 0
 (Front Plane, on the arm's front face) and z = LENGTH (``SleeveFace``, on
@@ -25,6 +26,7 @@ from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from pd_cluster_stack_band import STACK_NAME, STACK_SHEET
 
 UNIT = drawing_unit(
     "parts/pd-transgear-rear-bushing", _config.parts("pd-transgear-rear-bushing")
@@ -51,19 +53,20 @@ WALL_WORST = (
 if WALL_WORST < WALL_TARGET_MM:
     raise AssertionError(f"MHA-PD-24 wall {WALL_WORST:.3f} under {WALL_TARGET_MM}")
 
-# --- Length: title block (owner ruling 2026-11-01, #2124) -----------------------
-# The shims under it set the disc's end float, so its .XXX band only moves
-# the shim count (transgear_cluster_fit.SHIM_COUNT_RANGE).
+# --- Length: the shim count's band (owner ruling 2026-11-01, #2124) -------------
+# The shims under it set the disc's end float; its band only moves the shim
+# count (transgear_cluster_fit.SHIM_COUNT_RANGE, at most SHIM_COUNT_MAX).
 LENGTH = FIT.REAR_BUSHING_LENGTH  # .214
+LENGTH_BAND = FIT.REAR_BUSHING_LENGTH_BAND
 LENGTH_PLACES = FIT.LENGTH_PLACES
+# Rule 4: the band names the stack it serves and where it is shimmed.
+LENGTH_CALLOUT = f"{STACK_NAME},\nSHIMMED AT {STACK_SHEET}"
 
+# The sleeve's rear face turns on the front face and thrusts on it, cluster
+# rearward; the arm face only seats on the shims, at the title block's finish.
+SLEEVE_NUMBER = _config.parts("pd-transgear-feed-pinion")["number"]
+THRUST_FACE_CAPTION = f"THRUST FACE AGAINST\n{SLEEVE_NUMBER}"
 SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "arm_face",
-        MACHINED_UM,
-        PlanarFace((0.0, 0.0, -1.0), 0.0),
-        display_unit=UNIT,
-    ),
     SurfaceFinishControl(
         "sleeve_face",
         MACHINED_UM,

@@ -11,6 +11,7 @@ import _telemetry
 from _drawing_registry import DRAWINGS_BY_NAME
 from _machinist_review_mode import MachinistReviewMode
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
+from _part_properties import part_drawing_unit
 from _session import run_build
 from _supplier_washer_drawing import supplier_washer_dimensions
 import pd_vn_transgear_cluster_shim_spec as part
@@ -63,6 +64,7 @@ async def build(adapter: Any) -> dict[str, str]:
         supplier_dimensions=dimensions,
         supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_dimensions,),
+        unit=part_drawing_unit(SPEC.artifact_stem),
     )
 
 

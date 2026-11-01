@@ -46,8 +46,15 @@ AXIS_XY = placement.STUD_XY
 LINE_Y = AXIS_XY[1] + (pin.DIA / 2.0 + ring.OD / 2.0) / 2.0
 START_UV = (-cluster.RING_REAR_Z, LINE_Y)
 END_UV = (START_UV[0] - NOMINAL_MM, LINE_Y)
-# The dimension's text point (machine mm), above the ring.
-TEXT_POINT = (AXIS_XY[0], AXIS_XY[1] + ring.OD / 2.0 + 2.0, cluster.RING_REAR_Z)
+# The dimension's text point (machine mm): forward of the ring and above it,
+# on the dimension line extended past the front extension line, where only
+# the pin's shank runs below it.  Over the gap the extension lines, the
+# bushing's outline and its chamfer struck the text (round 10 review).
+TEXT_POINT = (
+    AXIS_XY[0],
+    AXIS_XY[1] + ring.OD / 2.0 + 1.0,
+    cluster.RING_FRONT_Z - 3.0,
+)
 
 if abs(AXIS_XY[0]) > 1e-9:
     raise AssertionError("the cluster setting's Right-plane sketch needs S on x = 0")

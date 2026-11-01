@@ -38,11 +38,12 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert set(drawing.PROFILE_KEEP) == {"RingLength"}
 
 
-def test_the_bore_carries_its_model_band_and_the_length_the_title_block() -> None:
+def test_the_bore_and_the_length_carry_model_bands() -> None:
     """The bore runs on the pin, so its reamed band lives on the model
-    dimension; the length only feeds the shimmed end float (#2124)."""
+    dimension; the length's band holds the shim count (#2124)."""
     assert model_toleranced_dimensions(part) == {
         ("RingProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)",
+        ("Ring", "RingLength"): "LENGTH_BAND",
     }
 
 
@@ -68,31 +69,35 @@ def test_wall_holds_the_target_at_the_printed_worst_case() -> None:
     assert worst >= WALL_TARGET_MM
 
 
-def test_the_title_block_length_leaves_the_unshimmed_float_open() -> None:
-    """#2124: the shims set the end float, so the length prints .XXX and its
-    worst case still leaves the unshimmed float over the floor."""
+def test_the_length_band_holds_the_float_open_and_the_count_to_four() -> None:
+    """#2124: the shortest bushing leaves the unshimmed float over the floor;
+    the longest gap takes no more than four of the thinnest shims, and the
+    title block's .XXX row would take a fifth."""
     assert spec.LENGTH == fit.REAR_BUSHING_LENGTH
-    assert spec.LENGTH_PLACES == fit.LENGTH_PLACES == 3
-    assert spec.DRAWING_PRECISION_BY_NAME["RingLength"] == 3
-    assert fit.REAR_BUSHING_LENGTH_BAND == printed_band_mm(3, unit=spec.UNIT)
+    assert spec.LENGTH_BAND == fit.REAR_BUSHING_LENGTH_BAND
+    assert spec.DRAWING_PRECISION_BY_NAME["RingLength"] == fit.LENGTH_PLACES == 3
     assert fit.UNSHIMMED_FLOAT_RANGE[0] >= fit.END_FLOAT_MIN
+    assert fit.SHIM_COUNT_RANGE[1] <= fit.SHIM_COUNT_MAX == 4
+    row = printed_band_mm(3, unit=spec.UNIT)
+    longest_at_row = fit.UNSHIMMED_FLOAT_RANGE[1] + row - spec.LENGTH_BAND
+    assert (longest_at_row - fit.END_FLOAT_MIN) // fit.SHIM.THICKNESS_MIN > 4
+    assert drawing.DIMENSION_CALLOUTS["RingLength"] == spec.LENGTH_CALLOUT
 
 
-def test_both_end_faces_run_machined() -> None:
-    faces = {
-        control.key: (control.roughness_um, control.face)
-        for control in spec.SURFACE_FINISHES
-    }
-    assert set(faces) == {"arm_face", "sleeve_face"}
-    assert {ra for ra, _ in faces.values()} == {MACHINED_UM}
-    assert (tuple(faces["arm_face"][1].normal), faces["arm_face"][1].offset_mm) == (
-        (0.0, 0.0, -1.0),
-        0.0,
+def test_only_the_sleeve_thrust_face_carries_a_finish() -> None:
+    """The MHA-PD-10 sleeve turns on the front face; the arm face seats on
+    the shims at the title block's finish."""
+    (control,) = spec.SURFACE_FINISHES
+    assert control.key == "sleeve_face"
+    assert control.roughness_um == MACHINED_UM
+    assert (tuple(control.face.normal), control.face.offset_mm) == (
+        (0.0, 0.0, 1.0),
+        spec.LENGTH,
     )
-    assert (
-        tuple(faces["sleeve_face"][1].normal),
-        faces["sleeve_face"][1].offset_mm,
-    ) == ((0.0, 0.0, 1.0), spec.LENGTH)
+    assert set(drawing.FACE_FINISHES) == {"sleeve_face"}
+    assert _config.parts("pd-transgear-feed-pinion")["number"] in (
+        spec.THRUST_FACE_CAPTION
+    )
 
 
 def test_face_symbols_attach_to_their_own_end_of_the_lathe_profile() -> None:

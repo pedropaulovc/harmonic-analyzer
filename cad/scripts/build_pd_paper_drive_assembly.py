@@ -2505,7 +2505,8 @@ async def _author_cluster_float_reference(adapter) -> None:
     # The window itself, +x/-0 on the floor: an assembly setting is an
     # associative model dimension, never a note (#1388).
     set_dimension_bilateral_tolerance(
-        adapter, spec.FEATURE, spec.DIMENSION, *spec.TOLERANCE_MM, places=spec.PLACES
+        adapter, spec.FEATURE, spec.DIMENSION, *CLUSTER_FLOAT.TOLERANCE_MM,
+        places=spec.PLACES,
     )
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     mark_dimensions_for_drawing(
