@@ -83,18 +83,18 @@ def _station_delta(j: int) -> tuple[float, float]:
 
 def test_the_clear_window_is_the_flat_rods() -> None:
     low, high = _clear_window()
-    assert (low, high) == pytest.approx((-0.72825, 0.72825), abs=1e-6)
+    assert (low, high) == pytest.approx((-0.73345, 0.73345), abs=1e-6)
     # The plate's near face prints from the fork's datum face and its
     # thickness at the ring (#982 review r1): the same window the two face
-    # ordinates (+/-0.05 each) spent.
-    assert rod.RING_FACE_BAND == rod.RING_THICKNESS_BAND == (0.05, -0.05)
+    # ordinates (+/-.002 each) spent.
+    assert rod.RING_FACE_BAND == rod.RING_THICKNESS_BAND == (0.0508, -0.0508)
     assert rod.SHANK_THICKNESS_BAND == rod.RING_THICKNESS_BAND
 
 
 def test_the_worst_station_keeps_a_spare() -> None:
     worst = max(range(bank.COUNT), key=lambda j: _station_delta(j)[1] - _station_delta(j)[0])
     assert worst == 12
-    assert _station_delta(worst) == pytest.approx((-0.5635, 0.6901), abs=1e-4)
+    assert _station_delta(worst) == pytest.approx((-0.5635, 0.6905), abs=1e-4)
 
 
 
