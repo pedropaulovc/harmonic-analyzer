@@ -166,13 +166,14 @@ DIMENSION_CALLOUTS = {
     # width's band. The counterbore's minimum clears the slid MHA-SH-VN-53
     # head; the reason names no limit word, which under the two-sided band
     # read as ".335 MIN" (machinist review round 2). Short lines: detail C is
-    # 2:1 in a corner, and two lines keep the block between section B-B and
-    # the 440.50 line.
+    # 2:1 in a corner, and two lines of at most 15 characters keep the block
+    # between section B-B and the 440.50 line (farm run after round 2: an
+    # 18-character "MHA-SH-VN-53 HEADS" row crowded section B-B).
     "ClampSlotWidth": (
         "THRU, MAX SEATS\nMHA-SH-VN-53 HEADS;\nTRAVEL AND STATIONS\n"
         "KEEP THE FULL TAKE-UP\nOF MHA-SH-02 PITCH"
     ),
-    "ClampSlotCboreWidth": "CLEARS SLIDING\nMHA-SH-VN-53 HEADS",
+    "ClampSlotCboreWidth": "CLEARS SLIDING\nMHA-SH-VN-53",
     "ClampSlotCboreDepth": "MHA-SH-VN-53\nHEADS BELOW\nSLIDE FACE",
 }
 # The slot widths' count: both west slots share one detail.

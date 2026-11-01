@@ -18,11 +18,13 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
     remove_notes_matching,
 )
 
+import _config
 from _check import check
 from _com import _early_bound
 from _drawing_common import (
@@ -120,13 +122,29 @@ DATUM_B_SYMBOL_X_M = FRONT_LEFT_X_M + (FRONT_X[2] + FRONT_X[3]) / 2000.0
 # The bar-slide finish lands on the bottom edge (model y 0, front face z 0)
 # midway between the A1 and A2 axes, clear of both centre marks. The landing
 # is projected from the model at draw time. The symbol is anchored at its
-# lower-left; its "SLIDES ON MHA-PD-07" line stands ~20 mm above that anchor
-# and runs ~90 mm right (farm layout audit after B2: at y 0.086 it sat at
-# y 105.8..112.3 mm, across the tags' leaders). At y 0.068 the line ends under
-# the tags (box bottom ~100.2 mm) and left of datum B's tag, right of the
-# hole-table origin's "0 -> X" row (ends ~0.078).
+# lower-left. At the default text height its "SLIDES ON MHA-PD-07" line stood
+# ~7 mm tall and its long leg crossed its own leader, which dropped from the
+# landing past the symbol's right side (machinist review round 3). At 2.5 mm
+# text (the house finish height, draw_ch_channel_lever) the symbol stands ~7
+# mm tall and right of the landing, so the leader reaches it from the left,
+# clear of the long leg, and its line ends under the tags (box bottom ~100.2
+# mm), left of datum B's tag.
 BAR_SLIDE_STATION_MM = (FRONT_X[0] + REAR_X[0]) / 2.0
-BAR_SLIDE_FINISH_XY = (FRONT_LEFT_X_M + BAR_SLIDE_STATION_MM / 1000.0 - 0.006, 0.068)
+BAR_SLIDE_FINISH_XY = (FRONT_LEFT_X_M + BAR_SLIDE_STATION_MM / 1000.0 + 0.003, 0.090)
+FINISH_CHAR_HEIGHT = 0.0025
+# The position frame names the parts whose holes the 9X taps must match
+# (machinist review round 3: a frame and basic table with no mating pattern
+# named read as over-specification). The note stands right of the frame, under
+# the overall length's line and above the tags over the bar.
+FCF_MATE_NOTE = (
+    f"MATCHES {_config.parts('pd-platen')['number']} AND "
+    f"{_config.parts('pd-guide-lock')['number']} HOLES"
+)
+FCF_MATE_NOTE_XY = (0.141, 0.1285)
+# The right view's depth: its text stack left of the extension lines (x 0.365
+# and 0.375) and 21 mm under the view, under the height's ".29" (bottom ~0.108)
+# and datum A's tag (bottom 0.1065).
+DEPTH_TEXT_XY = (0.341, 0.085)
 # The table fits above the front view; 0.020 also clears the 12.7 mm zone
 # margin enforced by the sheet audit.
 HOLE_TABLE_X_M = 0.020
@@ -320,7 +338,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # dimensions live in the
     # GuideProfile sketch (Front plane). Their places, and the depth's, are the
     # part's (platen_guide_spec.DRAWING_PRECISION); the sheet proves the import
-    # kept them.
+    # kept them. The depth's value, limits and two-line reason stack above its
+    # dimension line; between its extension lines (10 mm apart) both lines
+    # struck the 44 mm stack (machinist review round 3), so the stack stands
+    # left of them, below datum A's tag and the height's text.
     annotations = [
         *curate_view_dimensions(
             adapter,
@@ -332,7 +353,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *curate_view_dimensions(
             adapter,
             right,
-            keep={"Depth": (0.370, 0.095)},
+            keep={"Depth": DEPTH_TEXT_XY},
             view_label="right",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
@@ -450,6 +471,8 @@ async def build(adapter: Any) -> dict[str, str]:
         quantity="9X",
         label="guide hole-pattern position",
     )
+    if add_note(adapter, FCF_MATE_NOTE, *FCF_MATE_NOTE_XY) is None:
+        raise RuntimeError("hole-pattern mate note was not inserted")
     # The platen hangs by the top rail's bottom face (datum B) on the bar's top
     # edge and slides along it: the one running surface takes the part-owned
     # Ra symbol, landed on that face's edge in the front view.
@@ -460,6 +483,7 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "bar_slide"),
         label="bar-slide face finish",
         entity=datum_b_entity,
+        char_height=FINISH_CHAR_HEIGHT,
         leader_attach_xy=model_point_in_view(
             adapter,
             front,

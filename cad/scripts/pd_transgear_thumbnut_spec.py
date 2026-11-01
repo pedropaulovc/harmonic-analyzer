@@ -51,7 +51,7 @@ HEAD_DIA = 20.574  # .81, knurl crests: the diameter over the knurl
 KNURL_TEETH = 64
 KNURL_ROOT_DIA = HEAD_DIA - 1.0  # 19.574, not printed
 KNURL_TPI = 25
-KNURL_DESIGNATION = f"{KNURL_TPI} TPI, 90° TOOTH"
+KNURL_DESIGNATION = f"{KNURL_TPI} TPI"  # the standard wheel's 90° tooth
 KNURL_PITCH = MM_PER_IN / KNURL_TPI
 KNURL_FLANK_ANGLE_DEG = 90.0
 WAIST_DIA = 10.922  # .43
@@ -287,12 +287,16 @@ REAR_THREAD_LOSS = REAR_CSK_BREAK / math.tan(math.radians(CSK_HALF_ANGLE_MIN))
 FRONT_THREAD_LOSS = DISH_DEPTH + _DISH_DEPTH_HI + REAR_THREAD_LOSS
 
 # The Ø.81 dimension is the diameter over the knurl; the designation gives
-# the pitch and the 90° tooth, so no tooth count prints (R9-57).  One line:
-# it prints in the dimension's above-callout compartment, and SolidWorks
-# keeps a two-line above callout in the document but prints none of it (run
+# the pitch, and a standard inch straight-knurl wheel forms the 90° tooth,
+# so no tooth count prints (R9-57).  One line above: SolidWorks keeps a
+# two-line above callout in the document but prints none of it (run
 # 20261001T154021634Z: "...\nDIA OVER KNURL" read back over Ø20.5 and was
-# missing from the PDF).
-KNURL_CALLOUT = f"STRAIGHT KNURL {KNURL_DESIGNATION}; DIA OVER KNURL"
+# missing from the PDF).  It fits inside the Ø.81's extension lines, and
+# "OVER KNURL" rides the value as its suffix: the one-line callout wider
+# than the span ran the dimension line out under its text past the left
+# extension line (machinist review round 3).
+KNURL_CALLOUT = f"STRAIGHT KNURL {KNURL_DESIGNATION}"
+KNURL_DIA_SUFFIX = " OVER KNURL"
 
 # No roughness symbol: the seat face clamps the wheel (a clamp face, not a
 # running, sliding or locating surface; drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).

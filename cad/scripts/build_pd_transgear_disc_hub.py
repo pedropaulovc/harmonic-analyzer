@@ -21,7 +21,7 @@ both terms of the disc cluster stack (#2038).  The bore
 is two Front-plane cuts: the D-bore (its flat on local -Y) forward through
 flange and body, and the round bore back through the spigot.  The three
 screw holes lie on a construction bolt circle whose driving diameter is the
-printed Ø.748.  The radial oil hole is a Top-plane cut toward +Y through one
+printed Ø.75.  The radial oil hole is a Top-plane cut toward +Y through one
 wall, at its printed station from the hub front face by a construction
 station line (R9-60).  ``Axis1`` is the gear axis (Top Plane ∩ Right Plane);
 the paper-drive assembly mates it to the sleeve's axis and the Front Plane

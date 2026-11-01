@@ -2,12 +2,12 @@ r"""MHA-PD-17 transgear-disc-hub: the brass hub and flange in front of the reduc
 
 The retained Ø.52 turned hub has a .313 +.0010/+.0005 bore (an owned .3135
 reamer) on the pinion sleeve's (MHA-PD-10) .313 +.0005/.0000 boss and drives
-through its D-flat, with a Ø.990 × .094 flange and a Ø.501 SHAFT_H rear
+through its D-flat, with a Ø1.01 × .094 flange and a Ø.501 SHAFT_H rear
 spigot.  The spigot passes the reducer disc's (MHA-PD-06)
 bore, which pilots on it, and its end seats on the sleeve's step face (the
 12T's tooth ends); the flange's rear face clamps the disc's front face, the
 spigot's length ahead of the step.  Three #0-80 fillister screws (MHA-PD-VN-55)
-pass the flange's #51 holes on the Ø.748 circle into the disc's taps
+pass the flange's #51 holes on the Ø.75 circle into the disc's taps
 (``pd_transgear_disc_hub_geometry``; the taps are spotted through these holes at
 assembly, R9-9). The bore's round diameter holds its band over its whole
 length; the flat only drives, from the flange's rear face forward, and starts
@@ -25,8 +25,8 @@ assembly (R9-8), at a printed .XX station from the hub front face, so the
 sheet carries a match-drill callout, not a free drilled hole.
 
 Sizes (drawing-guidelines.md rule 17 (walls and webs)): every wall holds the
-.080 target at the printed worst case; the flange is .990 so the screw hole
-keeps it to the rim.
+.080 target at the printed worst case; the flange is Ø1.01 so the screw
+hole keeps it to the rim with the flange and the circle both at .XX.
 
 Printed lengths, from the spigot's end and the flange's rear face: the
 overall, spigot end to hub front face, and the spigot (both terms of the
@@ -106,12 +106,13 @@ SCREW_MAJOR_DIA, SCREW_LENGTH, SCREW_HEAD_H, SCREW_HEAD_DIA, _SCREW_PITCH = (
 SCREW_HEAD_DIA_ALLOWANCE = 0.05
 
 # --- turned body ------------------------------------------------------------
-# The flange's .XXX holds the screw holes' wall to its rim (at .XX the wall
-# falls under the target), so its dimension names that.  The body's walls
-# over the bore and flat and the heads' air read the hub diameter too, but
-# hold at .XX.
-FLANGE_DIA = 25.146  # .990
-FLANGE_DIA_PLACES = 3
+# Every turned diameter but the spigot prints .XX.  The flange is sized so
+# the screw holes' wall to its rim holds the .080 target at the .XX row on
+# both it and the bolt circle (machinist review: a .XXX flange held only to
+# rescue that wall is over-specification); the body's walls over the bore
+# and flat and the heads' air hold at .XX too.
+FLANGE_DIA = 25.654  # 1.01
+FLANGE_DIA_PLACES = 2
 FLANGE_THICK = 2.3876  # .094
 FLANGE_THICK_PLACES = 3  # the screw-tip-to-platen stack reads it (R9-5)
 HUB_DIA = 13.208  # .52
@@ -467,10 +468,6 @@ SPIGOT_LENGTH_CALLOUT = STACK_NAME
 # The flange's .XXX thickness sets the disc screws' reach (the cut window
 # in pd_vn_transgear_disc_screw_spec reads it).
 FLANGE_THICK_CALLOUT = f"SETS {SCREW_NAME}\n{SCREW_NUMBER} REACH"
-# The two .XXX sizes the screw holes' walls read (hole_to_rim_worst,
-# HOLE_TO_BORE_WORST; the disc's tap-to-bore wall reads the circle too).
-FLANGE_DIA_CALLOUT = "HOLE WALL\nTO RIM"
-BOLT_CIRCLE_CALLOUT = "SETS HOLE WALLS\nTO BORE AND RIM"
 # The spigot's native SHAFT_H limits print with the dimension; the callout
 # names its sharp root, the mate and the clearance the pair gives.
 SPIGOT_CALLOUT_BELOW = "\n".join(

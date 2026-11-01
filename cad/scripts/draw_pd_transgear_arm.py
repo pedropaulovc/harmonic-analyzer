@@ -614,6 +614,37 @@ def _set_stock_text(adapter: Any, annotations: list[Any]) -> None:
     raise RuntimeError("arm end view has no Depth dimension to label")
 
 
+_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+
+
+def _end_radius_to_arc(adapter: Any, annotations: list[Any]) -> None:
+    """R.49's leader runs from its text to the end round and stops there.
+
+    Machinist review r3 (clarity): left to the document's style, its line
+    ran on to the pivot centre and met the Ø.1935 bore's diameter leader
+    there.  Arrow outside, no solid leader (draw_dt_crank_handle's radius
+    style), so it never reaches the bore.
+    """
+    for annotation in annotations:
+        if dimension_name(adapter, annotation) != "PivotEndR":
+            continue
+        display = _early_bound(
+            _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension"
+        )
+        display.ArcExtensionLineOrOppositeSide = False
+        display.ArrowSide = _ARROWS_OUTSIDE
+        display.SolidLeader = False
+        if (
+            bool(display.Diametric)
+            or bool(display.ArcExtensionLineOrOppositeSide)
+            or int(display.ArrowSide) != _ARROWS_OUTSIDE
+            or bool(display.SolidLeader)
+        ):
+            raise RuntimeError("PivotEndR kept its leader to the pivot centre")
+        return
+    raise RuntimeError("arm plan view has no PivotEndR dimension to style")
+
+
 @_telemetry.traced("drawing.transgear_arm.projected_zone_chains", label_param="label")
 def _add_projected_zone_chains(adapter: Any, view: Any, label: str) -> None:
     """Every projected zone drawn in ``view`` (section ``label``) at its
@@ -948,6 +979,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_reference_dimensions(adapter, annotations, ("PivotBoreDia",))
     _set_stock_text(adapter, annotations)
+    _end_radius_to_arc(adapter, annotations)
     offset_dimension_text(adapter, annotations, {"FloorDepth": FLOOR_TEXT_XY})
     # Model-owned circular zones and actual feature datums. BASIC stations
     # are imported from the part; no drawing-only coordinate tolerances.
