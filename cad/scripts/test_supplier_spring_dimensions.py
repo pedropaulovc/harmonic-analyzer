@@ -231,6 +231,21 @@ def test_extension_final_checks_reacquire_actual_annotations(
             check()
 
 
+@pytest.mark.parametrize("spec", [channel, counter], ids=["9432K31", "1330K524"])
+def test_extension_section_diameters_each_take_one_near_side_arrow(monkeypatch, spec):
+    views = _extension_views(spec)
+    _readback_environment(monkeypatch, layout, views)
+    near_side = []
+    monkeypatch.setattr(
+        layout,
+        "set_near_side_diameter",
+        lambda annotation, label: near_side.append(label),
+    )
+    _extension_checks(spec, views)
+    # A line through the small wire circle crossed the section it sizes.
+    assert sorted(near_side) == sorted((extension.COIL_OD, extension.WIRE_DIA))
+
+
 @pytest.mark.parametrize("corruption", ["type", "lower", "upper", "precision"])
 def test_channel_source_od_band_is_rechecked_after_rebuild(monkeypatch, corruption):
     views = _extension_views(channel)
@@ -694,14 +709,25 @@ def test_extension_preparation_only_shows_owners_before_capture(monkeypatch, spe
         raise AssertionError("preparation must not project before capture")
 
     monkeypatch.setattr(layout, "_show_hidden_owners", show_owners)
-    assert (
-        layout.prepare_extension_spring_diagrams(
-            object(),
-            views,
-            reference_bounds=unavailable_bounds,
-        )
-        == ()
-    )
+    fonts = []
+
+    def line_font(adapter):
+        fonts.append(adapter)
+        return readback
+
+    def readback():
+        return None
+
+    monkeypatch.setattr(layout, "_construction_curves_as_outline", line_font)
+    adapter = object()
+    # The coil OD prints closed, not as construction dash-gap arcs, and its
+    # readback runs with the other settled checks.
+    assert layout.prepare_extension_spring_diagrams(
+        adapter,
+        views,
+        reference_bounds=unavailable_bounds,
+    ) == (readback,)
+    assert fonts == [adapter]
     assert shown == {
         "free_front": ("SupplierFreeLengthReference",),
         "free_right": ("SupplierNominalSections",),

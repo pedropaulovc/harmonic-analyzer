@@ -31,6 +31,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _com import _bind, _early_bound
+from _construction_line_font import _construction_curves_as_outline
 import _config
 import _telemetry
 from _drawing_common import (
@@ -195,17 +196,24 @@ def prepare_extension_spring_diagrams(
     *,
     reference_bounds: Callable[[str], tuple[float, float, float, float]],
 ) -> tuple[Callable[[], None], ...]:
-    """Show only assigned construction gauges before native geometry fitting."""
+    """Show only assigned construction gauges before native geometry fitting.
+
+    The gauges are construction geometry. In the default construction font the
+    coil OD printed as dash-gap arcs, and the wire section sat in one of the
+    gaps, so the two sections read as one broken shape. This SLDDRW draws
+    construction curves solid, as the disc-spring diagrams do.
+    """
     if set(views) != {*SOURCE_FEATURES, "installed_iso"}:
         raise RuntimeError(
             "extension spring diagram needs free, section, maximum and installed views"
         )
+    line_font = _construction_curves_as_outline(adapter)
     for key, names in SOURCE_FEATURES.items():
         if set(_show_hidden_owners(adapter, views[key], names, view_label=key)) != set(
             names
         ):
             raise RuntimeError(f"{key}: nominal supplier gauges must be saved hidden")
-    return ()
+    return (line_font,)
 
 
 def extension_spring_dimensions(
@@ -313,9 +321,11 @@ def extension_spring_dimensions(
                 ),
                 **arguments,
             )
-            if name == COIL_OD:
-                # One arrow on the near rim: a line through the centre would
-                # end on the far rim beside the wire section's arrow.
+            if key == "free_right":
+                # One arrow on the near rim of each section: a coil OD line
+                # through the centre would end on the far rim beside the
+                # wire section's arrow, and a wire line would cross the
+                # small wire circle it sizes.
                 set_near_side_diameter(by_name[name], name)
             settings[name] = (arguments, configurations[key])
 
@@ -363,7 +373,10 @@ def supplier_state_cells(caption_y: float, *, maximum: bool) -> tuple:
     sections on the left and gives the installed pictorial the full right
     column, so a long coil prints at a scale where its turns and end loops
     read instead of merging into a solid bar. The left column is wide enough
-    for the section texts on both sides of the coil.
+    for the section texts on both sides of the coil. The sections cell reaches
+    down to 6 mm over the maximum cell, so that after the caller's 18 mm text
+    lanes above and below, the coil OD prints at 4:1 (9432K31, Ø.25) or 2:1
+    (1330K524, Ø.500) and the wire section is a circle, not a dot.
     """
     if not maximum:
         return (
@@ -374,7 +387,7 @@ def supplier_state_cells(caption_y: float, *, maximum: bool) -> tuple:
         )
     return (
         _cell("free_front", 0.028, 0.212, 0.256, 0.252),
-        _cell("free_right", 0.028, 0.146, 0.256, 0.192),
+        _cell("free_right", 0.028, 0.128, 0.256, 0.192),
         _cell("installed_iso", 0.264, 0.142, 0.406, 0.252),
         _cell("max_front", 0.028, caption_y + 0.020, 0.403, 0.122),
     )
