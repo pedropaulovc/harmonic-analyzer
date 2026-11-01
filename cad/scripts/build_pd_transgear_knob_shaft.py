@@ -8,7 +8,7 @@ gaps run straight at full depth through the whole face width; the stock
 disk runs out in air over the neck, D-core and journal, so no generated-
 profile shift, endcut or flat end-mill slot is modelled.
 
-Root REF and driven tangent-span carriers use the same physical finite
+Driven tangent-span carriers use the same physical finite
 contact curves. The running-journal datum and source-approved core controls
 are saved on the native part. Local D-flat normal is -Y; the assembly owns
 clocking of the complete collar/wheel/dowel stack to the phased shaft.
@@ -40,6 +40,7 @@ from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
+    blank_reference_sketches,
     dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
@@ -57,7 +58,6 @@ from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from paper_drive_stock_native import (
     apply_span_limits,
-    author_root_envelope,
     author_span,
     measure_one_solid_body_volume,
     pattern_stock_feature,
@@ -76,8 +76,8 @@ from pd_transgear_knob_shaft_spec import (
     CORE_FLAT_TOOL_END_RADIUS_BAND,
     CORE_FLAT_TOOL_END_RADIUS_TOL_TYPE,
     CORE_FLAT_CUT_END_BAND,
+    CORE_FLAT_CUT_END_PREFIX,
     CORE_FLAT_CUT_END_TOL_TYPE,
-    CORE_FLAT_TOOL_REACH_NOTE,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -95,11 +95,11 @@ from pd_transgear_knob_shaft_spec import (
     JOURNAL_LENGTH,
     OUTSIDE_DIA_BAND,
     OUTSIDE_DIA,
+    OVERALL_LENGTH,
     PINION_REAR_Z,
     PLAIN_CORE,
     PART_DATUMS,
     REAR_END_Z,
-    ROOT_ACCEPTANCE,
     RELIEF_DIA,
     SPAN_DEVIATIONS,
     SPAN_NOMINAL,
@@ -110,7 +110,6 @@ from pd_transgear_knob_shaft_spec import (
     SURFACE_FINISHES,
     TEETH,
     THREAD_BLANK_DIA,
-    THREAD_BLANK_DIA_BAND,
     THREAD_END_Z,
     TIP_CHAMFER,
     TIP_STATION,
@@ -323,8 +322,20 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
         "tooth-tip blank witness",
         await adapter.add_line(0.0, OUTSIDE_DIA / 2.0, -FACE_WIDTH, OUTSIDE_DIA / 2.0),
     )
+    # Construction witness for the reference overall length: from the tip
+    # face's top corner back to the rear end face's station.
+    overall = check(
+        "overall-length witness",
+        await adapter.add_line(
+            TIP_STATION,
+            _R_BLANK - TIP_CHAMFER,
+            -REAR_END_Z,
+            _R_BLANK - TIP_CHAMFER,
+        ),
+    )
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, outside)
+    _as_construction(adapter, overall)
     for line, relation in (
         (front_face, "vertical"),
         (neck_floor, "horizontal"),
@@ -337,6 +348,7 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
         (tip_face, "vertical"),
         (axis_edge, "horizontal"),
         (outside, "horizontal"),
+        (overall, "horizontal"),
     ):
         check(
             f"stud profile {relation} {line}",
@@ -363,6 +375,12 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
         "tip witness starts at F",
         await adapter.add_sketch_constraint(
             f"{outside}.start", "origin", "vertical_points"
+        ),
+    )
+    check(
+        "overall witness starts at the tip face",
+        await adapter.add_sketch_constraint(
+            f"{overall}.start", f"{chamfer}.end", "coincident"
         ),
     )
     await anchor_point_to_origin(
@@ -418,6 +436,15 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
         "tooth-tip witness span",
     )
     profile.record("BlankSpan", '"FaceWidth"')
+    await dimension_between(
+        adapter,
+        f"{overall}.start",
+        f"{overall}.end",
+        "horizontal_distance",
+        OVERALL_LENGTH,
+        "overall-length witness span",
+    )
+    profile.record("OverallLength", '"TipStation" + "FaceWidth" + "JournalLength"')
     for name, target, xy in (
         ("CoreDia", core, ((FRONT_RELIEF_WIDTH + CORE_FRONT_FROM_F) / 2.0, _R_CORE + 5.0)),
         ("FrontReliefDia", neck_floor, (FRONT_RELIEF_WIDTH / 2.0, _R_NECK + 5.0)),
@@ -504,8 +531,10 @@ async def _cut_core_flat(
         CORE_FRONT_FROM_F, "flat front shoulder station",
     )
     dims.record("FlatCoreFront", '"CoreFront"')
+    # Anchored at the tool end's lower tangent point, not its far closure
+    # corner, so Detail B's fence holds both of FlatEnd's references.
     await dimension_between(
-        adapter, f"{tool_end}.end", "origin", "horizontal_distance",
+        adapter, f"{tool_end}.start", "origin", "horizontal_distance",
         end, "signed physical tool end station",
     )
     dims.record("FlatEnd", '"FlatEnd"')
@@ -537,6 +566,66 @@ async def _cut_core_flat(
         adapter, "actual D circular-segment removal", volume - removed, volume - removed,
         0.005 * removed,
     )
+
+
+# The flat's printed distance from the axis rides a hidden Front-plane
+# reference sketch (drawing-simplicity-policy.md's reference-sketch
+# allowance) so it prints in the end view from the tip, where the flat shows
+# true.  CoreFlatProfile's own FlatToAxis lies in the Right plane and prints
+# only in the side view, where the flat stands edge-on beside the thread
+# (machinist review r7: its line ran over the #8-32 thread, level with the
+# thread's lower edge).  One construction line runs along the flat from
+# under the axis to a witness station 0.85 of the half-chord out on model
+# -X, which the tip-end view shows on the right.
+_FLAT_HALF_CHORD = math.sqrt(_R_CORE**2 - CORE_FLAT_FROM_AXIS**2)
+FLAT_WITNESS_STATION = 0.85 * _FLAT_HALF_CHORD
+
+
+async def _flat_end_view_reference(adapter: Any) -> list[tuple[str, str]]:
+    """The printed FlatToAxis, driven by the same ``CoreFlat`` global as the cut."""
+    dims = SketchDims()
+    floor = -CORE_FLAT_FROM_AXIS
+    await _create_sketch(adapter, "Front", "D flat end-view reference")
+    set_sketch_direct_db(adapter, True)
+    flat = check(
+        "D flat reference line",
+        await adapter.add_centerline(-FLAT_WITNESS_STATION, floor, 0.0, floor),
+    )
+    set_sketch_direct_db(adapter, False)
+    check(
+        "D flat reference horizontal",
+        await adapter.add_sketch_constraint(flat, None, "horizontal"),
+    )
+    check(
+        "D flat reference under the axis",
+        await adapter.add_sketch_constraint(f"{flat}.end", "origin", "vertical_points"),
+    )
+    await dimension_between(
+        adapter,
+        f"{flat}.start",
+        "origin",
+        "horizontal_distance",
+        FLAT_WITNESS_STATION,
+        "D flat witness station",
+    )
+    dims.record("FlatWitnessStation")
+    await dimension_between(
+        adapter,
+        f"{flat}.start",
+        "origin",
+        "vertical_distance",
+        CORE_FLAT_FROM_AXIS,
+        "printed D flat from axis",
+    )
+    dims.record("FlatToAxis", '"CoreFlat"')
+    await ensure_fully_defined(adapter, "D flat end-view reference")
+    check("exit_sketch D flat end-view reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "CoreFlatReference")
+    jobs = dims.apply(adapter, "CoreFlatReference")
+    # Saved hidden so no part image or assembly renders it (#880); the
+    # drawing shows it in its tip-end view only (_drawing_hidden_sketches).
+    blank_reference_sketches(adapter, ("CoreFlatReference",))
+    return jobs
 
 
 def _apply_native_limits(
@@ -677,8 +766,8 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Both cutter terminals are genuinely empty by the pure envelope proofs:
     # the run-out clears the neck and D-core at F and the journal at the rear.
-    await author_root_envelope(adapter, STOCK_PROFILE)
     await author_span(adapter, STOCK_PROFILE, SPAN_TEETH, places=SPAN_PLACES)
+    drive_jobs += await _flat_end_view_reference(adapter)
 
     stations = (
         ("PinionRear", PINION_REAR_Z, '"FaceWidth"'),
@@ -716,19 +805,18 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, "StudProfile", "CoreDia", *deviations(CORE_DIA_BAND)
     )
     set_dimension_bilateral_tolerance(
-        adapter, "StudProfile", "ThreadBlankDia", *deviations(THREAD_BLANK_DIA_BAND)
-    )
-    set_dimension_bilateral_tolerance(
         adapter, "JournalProfile", "JournalDia", *deviations(JOURNAL_DIA_BAND)
     )
     set_dimension_bilateral_tolerance(
         adapter, "StudProfile", "OutsideDia", *deviations(OUTSIDE_DIA_BAND)
     )
     set_dimension_bilateral_tolerance(
-        adapter, "CoreFlatProfile", "FlatToAxis", *deviations(CORE_FLAT_BAND)
+        adapter, "CoreFlatReference", "FlatToAxis", *deviations(CORE_FLAT_BAND)
     )
     _apply_neck_and_flat_limits(adapter)
-    set_dimension_prefix(adapter, "RootInspectionProfile", "RootEnvelope", "REFERENCE ROOT ")
+    set_dimension_prefix(
+        adapter, "CoreFlatProfile", "FlatEnd", CORE_FLAT_CUT_END_PREFIX
+    )
     apply_span_limits(
         adapter, nominal_mm=SPAN_NOMINAL, deviations=SPAN_DEVIATIONS,
         places=SPAN_PLACES, prefix=SPAN_PREFIX,
@@ -749,8 +837,7 @@ async def build(adapter: Any) -> dict[str, str]:
         PART_NAME,
         {
             "Gear Data": GEAR_DATA,
-            "Manufacturing Notes": "\n".join((DRAWING_NOTES, CORE_FLAT_TOOL_REACH_NOTE)),
-            "Root Acceptance": ROOT_ACCEPTANCE,
+            "Manufacturing Notes": DRAWING_NOTES,
             TOOTH_SPACE_CALLOUT_PROPERTY: TOOTH_SPACE_CALLOUT,
         },
     )

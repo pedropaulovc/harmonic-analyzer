@@ -2,12 +2,14 @@ r"""Create the manufacturing drawing for the transgear knob shaft (MHA-PD-08).
 
 A turned side view, aligned rear and front end views, a 10:1 detail of the
 front neck, and an isometric.
-The side view imports the source-owned turned sizes, D-flat and unchanged
-stations. The front end view carries genuine finite-root REF and driven
-parallel-tangent span inspection dimensions; the rear view identifies the
-actual running journal datum. The #8-32 thread callout belongs to its real
-thread blank. Cutter identity, root acceptance and approved inspection
-controls are properties of the saved source, never values retyped here.
+The side view imports the source-owned turned sizes and unchanged
+stations, and a reference overall length; each tight band names its mate.
+The front end view carries the driven parallel-tangent span inspection
+dimension and the D-flat's distance from the axis, where the flat shows
+true; the rear view identifies the actual running journal datum. The
+#8-32 thread callout belongs to its real thread blank. Cutter identity, the
+minimum root and approved inspection controls are properties of the saved
+source, never values retyped here.
 The source-linked formed-flank callout carries radial TIR, the paid
 pitch-index range at REF pitch diameter, all-space/wrap receiving and the
 certified pin. Neither span thickness nor a pin-centre radius substitutes
@@ -27,6 +29,7 @@ from typing import Any
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, dimension_name, place_view
 
+import _config
 from _check import check
 from _com import _early_bound
 from _drawing_centerline import add_view_centerline
@@ -39,7 +42,11 @@ from _drawing_common import (
     view_name,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_leader_notes import add_attached_note
@@ -55,10 +62,10 @@ from _surface_finish import surface_finish_by_key
 import _telemetry
 from paper_drive_stock_drawing import add_toothspace_callout, require_source_control
 from pd_transgear_knob_shaft_spec import (
-    CHAMFER_CALLOUT,
+    DISC_NUMBER,
+    DRIVE_COLLAR_NUMBER,
     CORE_DIA,
     CORE_FRONT_Z,
-    CORE_REAR_Z,
     CUTTER_NUMBER,
     FRONT_CORNER_RADIUS,
     FRONT_RELIEF_DIA,
@@ -84,6 +91,7 @@ from pd_transgear_knob_shaft_spec import (
     TEETH,
     THREAD_CALLOUT,
     TIP_CHAMFER,
+    TIP_CHAMFER_CALLOUT,
     TIP_STATION,
     TIP_Z,
 )
@@ -105,12 +113,13 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
-SIDE_CENTER = (0.180, 0.160)
+SIDE_CENTER = (0.183, 0.160)
 # Third-angle: the rear face is the side view's LEFT end, so the view from
 # the rear stands left of it, on the shaft axis.
 END_CENTER = (0.045, SIDE_CENTER[1])
 FRONT_CENTER = (0.335, SIDE_CENTER[1])
-ISO_CENTER = (0.365, 0.215)
+# Raised clear of the tooth span's mate callout over its text.
+ISO_CENTER = (0.370, 0.228)
 ISO_SCALE = (1, 1)
 _BBOX_MID_Z = (TIP_Z + REAR_END_Z) / 2.0
 
@@ -139,26 +148,54 @@ CHAMFER_START_X = _sheet_x(-(TIP_STATION - TIP_CHAMFER))
 HALF_OD = OUTSIDE_DIA * _S / 2000.0
 
 # Turned sizes stay beside their own axial regions. Baseline lengths nest
-# below F. The D-flat's native plane-to-axis dimension is visible edge-on in
-# the side view.
+# below F. The D-flat's distance from the axis reads in the end view from
+# the tip, where the flat shows true (END_KEEP).
 _ABOVE_Y = SIDE_CENTER[1] + HALF_OD + 0.016
 _ROW_PITCH = 0.010
 _ROW_Y = tuple(SIDE_CENTER[1] - HALF_OD - 0.016 - i * _ROW_PITCH for i in range(6))
+# Mates named at their tight bands (drawing-guidelines rule 4).
+ARM_PLATE_NUMBER = _config.parts("pd-transgear-arm-plate")["number"]
+KNOB_CUP_NUMBER = _config.parts("pd-transgear-knob-cup")["number"]
+THUMBNUT_NUMBER = _config.parts("pd-transgear-thumbnut")["number"]
+# The flat's limits hang right of their line, every row centred on the
+# shoulder under the widest: at 16 characters ("MHA-PD-22 D-BORE") that
+# shoulder ran 43.3 mm (run 20261031T233549214Z), so no row runs past 12
+# characters (~33 mm).
+COLLAR_SLIDING_FIT = f"SLIDES IN\nDRIVE COLLAR\n{DRIVE_COLLAR_NUMBER}"
+# An above callout prints only as ONE line (a line break there is stored but
+# never printed: farm run 20261031T205208603Z's four mate callouts went
+# unmatched), set as one run centred on its dimension's text: 40 characters
+# read 110.6 mm (draw_dt_cone_gear_shaft), and the shoulder under a Ø's text
+# spans that run (this sheet's journal: 38 characters, 104.3 mm). Each block
+# runs from 7.3 mm under its keep to 8.7 mm over it plus the callout row.
+ABOVE_CALLOUT_CHAR_WIDTH = 0.1106243 / 40
+_DIA_ROW_PITCH = 0.0205
+# The journal's row, 3 mm under the first row (its shoulder 10 mm over the
+# journal), so the staircase's top block stays 6 mm under the border.
+_DIA_ROW_Y = tuple(_ABOVE_Y - 0.003 + i * _DIA_ROW_PITCH for i in range(4))
+# The vertical Ø texts climb in a staircase, one row each: the journal's
+# hangs RIGHT of its line (left of the view's centre) and ends left of the
+# pinion's line; every other text hangs LEFT, so each line to the right
+# rises past the blocks on its left, and no shoulder runs over a line
+# (that run: the journal's shoulder at its row crossed the core's and the
+# relief's lines).
 SIDE_KEEP: dict[str, tuple[float, float]] = {
-    "OutsideDia": ((F_X + PINION_REAR_X) / 2.0, _ABOVE_Y),
-    "CoreDia": ((F_X + CORE_END_X) / 2.0, _ABOVE_Y + 0.010),
+    "OutsideDia": (F_X - 0.0015, _DIA_ROW_Y[1]),
+    "CoreDia": ((F_X + CORE_END_X) / 2.0, _DIA_ROW_Y[2]),
     # Run 12: from the relief's mid the hung text's shoulder started left of
     # F's witness line (214.4) and ran through the front-neck frame. Four
     # fifths along the relief it starts right of F, above that frame.
-    "ReliefDia": ((CORE_END_X + 4.0 * THREAD_END_X) / 5.0, _ABOVE_Y + 0.0265),
+    "ReliefDia": ((CORE_END_X + 4.0 * THREAD_END_X) / 5.0, _DIA_ROW_Y[3]),
     # A Ø's line stands at its point; right of the view's centre the text
     # hangs LEFT of it (the pinion's and core's, run 20261001T085006647Z), and
     # the blank's banded text and shoulder run 27.5 mm (19e33c6c2: from the
     # blank's mid the shoulder crossed the relief's line).  9 mm in from the
-    # chamfer the line stands clear of the core runout frame below the text
-    # and stays 9 mm off the thread callout's leader to the chamfer.
+    # chamfer the line stays 9 mm off the thread callout's leader to the
+    # chamfer.
     "ThreadBlankDia": (CHAMFER_START_X - 0.009, _ABOVE_Y),
-    "JournalDia": ((PINION_REAR_X + REAR_X) / 2.0, _ABOVE_Y),
+    # 4 mm left of mid-journal, right of detail B's crop: its one-line run
+    # hangs right of the line and ends 6.7 mm short of the pinion's line.
+    "JournalDia": ((PINION_REAR_X + REAR_X) / 2.0 - 0.004, _DIA_ROW_Y[0]),
     # Its two-line text (45.7 mm wide with "DISC CLUSTER STACK") is wider
     # than the 17.7 mm between its witness lines, so it stands outside right
     # of F's (214.4): text ~218.6..264.3 mm, under the empty rows past F.
@@ -167,41 +204,76 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     "PlainCore": ((F_X + THREAD_END_X) / 2.0, _ROW_Y[1]),
     "JournalLength": ((PINION_REAR_X + REAR_X) / 2.0, _ROW_Y[0]),
     "TipStation": ((F_X + TIP_X) / 2.0, _ROW_Y[2]),
-    "FlatToAxis": (CORE_END_X + 0.018, SIDE_CENTER[1] - HALF_OD - 0.004),
-    "TipChamfer": (TIP_X + 0.012, SIDE_CENTER[1] - HALF_OD),
+    # Reference overall, tip face to rear face, on the last row: under the
+    # face width's callout and clear of the gear data block's right edge.
+    "OverallLength": ((REAR_X + TIP_X) / 2.0, _ROW_Y[5]),
 }
 END_KEEP: dict[str, tuple[float, float]] = {
-    # Right of the view, its leader entering the -15 deg tooth gap (this view
-    # prints teeth at 0 and -30 deg): the shoulder end stands 22 mm out along
-    # -15 deg, the 50 mm text right of it.  Left of the view, its text and
-    # shoulder ran over the side view's tip witness and axial rows
-    # (mr-stack6).
-    "RootEnvelope": (FRONT_CENTER[0] + 0.0494, FRONT_CENTER[1] - 0.0021),
     "ToothSpan": (FRONT_CENTER[0] + 0.029, FRONT_CENTER[1] + HALF_OD + 0.021),
+    # The flat's distance from the axis, where the flat shows true (machinist
+    # review r7: in the side view its line ran over the #8-32 thread, level
+    # with the thread's lower edge, so it read as the thread's radius).  The
+    # line stands 5 mm right of the tooth tips; the limits and the collar's
+    # rows hang right of it (32.8 mm, from 12.8 mm under the keep to 12.9 mm
+    # over it in run 20261101T022045634Z), their top 2.7 mm under the flat's
+    # arrow, clear of the tooth span's line and text above (y >= 161) and
+    # the tooth-space note below (y <= 112.4).
+    "FlatToAxis": (FRONT_CENTER[0] + HALF_OD + 0.005, FRONT_CENTER[1] - 0.022),
 }
+# Callouts over the vertical Ø texts (a below-callout there would sit on
+# the Ø's own line) and over the tooth span's text (its line meets the text
+# from below), each one line.
+DIMENSION_CALLOUTS_ABOVE = {
+    "JournalDia": f"RUNS IN ARM PLATE {ARM_PLATE_NUMBER}",
+    "OutsideDia": f"MESHES WITH DISC {DISC_NUMBER}",
+    "CoreDia": f"SLIDES IN DRIVE COLLAR {DRIVE_COLLAR_NUMBER}",
+    "ReliefDia": f"CLEARS THUMBNUT {THUMBNUT_NUMBER}",
+    "ToothSpan": f"MESHES WITH DISC {DISC_NUMBER}",
+}
+if any("\n" in text for text in DIMENSION_CALLOUTS_ABOVE.values()):
+    raise AssertionError("an above-callout with a line break does not print")
 # The face width's ±band names the disc cluster stack (rule 4); its one
-# line hangs into the empty sixth baseline row below it.
+# line hangs into the empty sixth baseline row below it.  The flat's and
+# the journal length's callouts hang under their texts, past the ends of
+# their witness lines.
 DIMENSION_CALLOUTS_BELOW = {
-    "TipChamfer": CHAMFER_CALLOUT,
     "FaceWidth": FACE_WIDTH_CALLOUT,
+    "FlatToAxis": COLLAR_SLIDING_FIT,
+    "JournalLength": f"SETS PIN WALL IN\nKNOB CUP {KNOB_CUP_NUMBER}",
 }
+# Detail B's neck Ø: its text hangs left of its line under the border, so
+# its reason runs on the same line, into the empty space left of it: 30
+# characters start at x ~23.6 mm, 10.9 mm inside the border (the 36 of run
+# 20261031T233549214Z crossed it by 5.7 mm).
+DIMENSION_SUFFIXES = {"FrontReliefDia": f" CLEARS COLLAR {DRIVE_COLLAR_NUMBER}"}
+# Reference sizes (parenthesized): the overall, and the thread blank the
+# #8-32 UNC-2A class governs.  Name -> diameter glyph.
+REFERENCE_DIMENSIONS = {"OverallLength": False, "ThreadBlankDia": True}
 
 # The thread callout lands on the edge where the thread blank meets the tip
 # chamfer and stands up and left, clear of the tooth-tip Ø over the pinion.
 THREAD_PICK = (CHAMFER_START_X, SIDE_CENTER[1] + 0.002)
 THREAD_NOTE_XY = ((THREAD_END_X + CHAMFER_START_X) / 2.0, _ABOVE_Y + 0.020)
-# The actual active core (not the new neck) and running journal own finishes.
-JOURNAL_FINISH_SYMBOL = (END_CENTER[0] + 0.008, END_CENTER[1] + HALF_OD + 0.012)
-_JOURNAL_R = JOURNAL_DIA * _S / 2000.0
-JOURNAL_FINISH_ATTACH = (
-    END_CENTER[0] + _JOURNAL_R * 0.5,
-    END_CENTER[1] + _JOURNAL_R * 3.0**0.5 / 2.0,
-)
-CORE_FINISH_PICK = (
-    _sheet_x((CORE_FRONT_Z + CORE_REAR_Z) / 2.0), _sheet_y(CORE_DIA / 2.0)
-)
-# Over the core, right of its rear end.
-CORE_FINISH_SYMBOL = (F_X + 0.0115, SIDE_CENTER[1] + HALF_OD + 0.004)
+# The tip chamfer's callout stands under the tip, its leader climbing to the
+# same blank/chamfer edge from below, right of the tip's witness lines.  On
+# one line it ran 64 mm, under the front view and through the tooth-space
+# note's leader (farm run 20261031T205208603Z); its two 2.78 mm-a-character
+# lines end ~39 mm right of the anchor, short of that leader (x 337..340 mm
+# at the callout's rows).
+TIP_CHAMFER_NOTE = TIP_CHAMFER_CALLOUT.replace(" TO ", "\nTO ")
+CHAMFER_PICK = (CHAMFER_START_X, SIDE_CENTER[1] - 0.002)
+CHAMFER_NOTE_XY = (TIP_X + 0.004, SIDE_CENTER[1] - HALF_OD - 0.002)
+# The running journal owns the one finish, in the side view where the
+# journal reads alone: in the rear end view its leader landed where the
+# journal circle meets the teeth and read as a finish on the teeth
+# (machinist review r5).  The native symbol's V tip stands at its position,
+# its leader runs 6.35 mm level toward the landing then to it, and its
+# "Ra" text tops out ~10.3 mm over the tip (run 20261101T004958072Z's end
+# view symbol).  Under the journal's left half the symbol stands 3 mm
+# below the outline, right of the rear witness line (76.9 mm) and left of
+# the journal Ø's lower arrow (134.4 mm) and the 40.938 text (from 129.8).
+JOURNAL_FINISH_PICK = (REAR_X + 0.018, _sheet_y(-JOURNAL_DIA / 2.0))
+JOURNAL_FINISH_SYMBOL = (REAR_X + 0.023, JOURNAL_FINISH_PICK[1] - 0.0135)
 # A point on the journal's face for the turning axis.
 CENTERLINE_PICK = ((PINION_REAR_X + REAR_X) / 2.0, SIDE_CENTER[1] + 0.003)
 # Lower left, under the journal's 40.938 row (y 0.133) and over the notes
@@ -209,16 +281,7 @@ CENTERLINE_PICK = ((PINION_REAR_X + REAR_X) / 2.0, SIDE_CENTER[1] + 0.003)
 GEAR_DATA_XY = (0.016, 0.118)
 GEAR_DATA_CHAR_HEIGHT = 0.0025
 NOTES_XY = (0.016, 0.070)
-ROOT_ACCEPTANCE_XY = (0.286, 0.103)
 DATUM_A_SYMBOL = (END_CENTER[0] - 0.017, END_CENTER[1] - 0.018)
-# The core frame sits low over the thread blank, under the blank's Ø text;
-# its leader runs under the core finish symbol to the core's front quarter
-# (run 12: from above it crossed the blank's Ø and thread callout texts).
-CORE_RUNOUT_LANDING = (
-    _sheet_x(CORE_REAR_Z + 0.75 * (CORE_FRONT_Z - CORE_REAR_Z)),
-    _sheet_y(CORE_DIA / 2.0),
-)
-CORE_RUNOUT_FRAME = (THREAD_END_X + 0.0066, SIDE_CENTER[1] + 0.0155)
 
 # --- Detail B: the front neck at 10:1 -----------------------------------------
 # At 3:1 the 0.400 neck is 1.2 mm of sheet: its Ø, width, corner R and
@@ -234,15 +297,16 @@ DETAIL_LABEL_TEXT = f"DETAIL {DETAIL_LETTER}\nSCALE {DETAIL_SCALE[0]} : {DETAIL_
 # The fence, model mm (z, y): mid-neck, 0.1 under the axis.  Radius 2.7
 # holds both neck floors (the Ø's two arrows land on drawn floor), the
 # core's top step corner (2.53 out), the Ø's lower arrow tail (2.6 under
-# the axis; 2.52 out), and the axis and F origin that
-# FrontReliefDia and FrontReliefWidth reference: a crop drops a dimension
-# whose reference it cuts away.
+# the axis; 2.52 out), the axis and F origin that FrontReliefDia,
+# FrontReliefWidth and FlatEnd reference, and the D-flat tool's end arc
+# and its lower tangent point (2.13 out) that FlatEnd and FlatToolRadius
+# reference: a crop drops a dimension whose reference it cuts away.
 DETAIL_FOCUS_MM = (-FRONT_RELIEF_WIDTH / 2.0, -0.1)
 _DETAIL_FOCUS_M = (0.0, DETAIL_FOCUS_MM[1] / 1000.0, DETAIL_FOCUS_MM[0] / 1000.0)
 DETAIL_RADIUS_MM = 2.7
 DETAIL_CROP_RADIUS = DETAIL_RADIUS_MM * _DS / 1000.0
-# Upper left, over the journal: x 0.078-0.132 clears the end view's journal
-# finish symbol (x <= 0.068) and the journal Ø's witness line (x 0.1353);
+# Upper left, over the journal: x 0.078-0.132 clears the end view (x <=
+# 0.064) and the journal Ø's witness line (x 0.1364);
 # y 0.196-0.250 stands over the journal Ø's text (top 0.193) and leaves the
 # frame row under the border (0.2667).
 DETAIL_CENTER = (0.105, 0.223)
@@ -263,10 +327,11 @@ def _detail_xy(z_mm: float, y_mm: float) -> tuple[float, float]:
 _NECK_FLOOR_R = FRONT_RELIEF_DIA / 2.0
 _STEP_X = _detail_xy(-FRONT_RELIEF_WIDTH, 0.0)[0]
 _CORNER_CENTER = _detail_xy(-FRONT_CORNER_RADIUS, _NECK_FLOOR_R + FRONT_CORNER_RADIUS)
+_F_DETAIL_X = _detail_xy(0.0, 0.0)[0]
 _DETAIL_TOP = DETAIL_CENTER[1] + DETAIL_CROP_RADIUS
 _DETAIL_BOTTOM = DETAIL_CENTER[1] - DETAIL_CROP_RADIUS
 # The neck frame's leader lands on the straight floor 0.15 from F and climbs
-# the neck's air to a frame left of it, 1 mm right of the corner R's arrow.
+# the neck's air to a frame left of it, 0.5 mm right of the corner R's arrow.
 # A frame prints 31.3 mm wide and 7 mm tall with a 6.3 mm shoulder at
 # mid-height (stack PDF: box x 0.1884-0.2197, shoulder to 0.2260), so its
 # right edge stands one shoulder left of the landing and the leader climbs
@@ -281,33 +346,62 @@ NECK_RUNOUT_LANDING = _detail_xy(NECK_LANDING_Z_MM, _NECK_FLOOR_R)
 NECK_RUNOUT_FRAME = (
     NECK_RUNOUT_LANDING[0] - _FRAME_SHOULDER - _FRAME_WIDTH, _FRAME_ROW_TOP
 )
+# The core frame also stands in detail B: in the side view every route to
+# the core crossed a Ø line (main and run 20261031T233549214Z: its leader
+# from over the thread blank crossed the relief's line at x 238.6; from the
+# left it would cross the core's or the pinion's).  It lands on the core's
+# round top 0.8 behind F, inside the crop (2.60 from the focus), right of
+# the neck Ø's line, and stands right of the crop at the neck frame's
+# height, its box left of the relief's mate callout (x >= 169.8 mm) and its
+# shoulder on the box's left, so the leader descends 7.75 mm over 18.2 mm
+# into the crop.
+CORE_LANDING_Z_MM = -0.8
+CORE_RUNOUT_LANDING = _detail_xy(CORE_LANDING_Z_MM, CORE_DIA / 2.0)
+CORE_RUNOUT_FRAME = (
+    CORE_RUNOUT_LANDING[0] + _FRAME_SHOULDER + 0.0182,
+    _DETAIL_TOP + 0.0095,
+)
 DETAIL_KEEP: dict[str, tuple[float, float]] = {
-    # Its line rises through the neck's air 0.30 from F, 1.5 mm right of the
-    # frame's leader, past the frame's row to text over it.  The text hangs
-    # LEFT of the line (3f50160d9 full build: [87.8, 256.6]..[104.6, 260.2]
-    # mm for a keep at (106.0, 258.5), right edge 1.4 mm short of the line),
-    # so level with the frame the frame's shoulder ran 6.35 mm through it.
-    # Over the frame the shoulder and the plumb leader both stay under the
-    # text: centred 4.6 mm over the frame's top, the 3.6 mm text clears the
-    # frame by 2.8 mm and the border (0.2667) by 2.0 mm on either side.
-    "FrontReliefDia": (_detail_xy(-0.30, 0.0)[0], _FRAME_ROW_TOP + 0.0046),
+    # Its line rises through the neck's air 0.27 from F, 1.2 mm right of the
+    # frame's leader and short of the core corner's tangent (0.30), past the
+    # frame's row to text over it.  The text hangs LEFT of the line
+    # (3f50160d9 full build: [87.8, 256.6]..[104.6, 260.2] mm for a keep at
+    # (106.0, 258.5), right edge 1.4 mm short of the line), so level with the
+    # frame the frame's shoulder ran 6.35 mm through it.  Over the frame the
+    # shoulder and the plumb leader both stay under the text: centred 4.6 mm
+    # over the frame's top, the 3.6 mm text clears the frame by 2.8 mm and
+    # the border (0.2667) by 2.0 mm on either side; its suffix runs left.
+    "FrontReliefDia": (_detail_xy(-0.27, 0.0)[0], _FRAME_ROW_TOP + 0.0046),
     # Under the crop, the text right of the step's witness line: centred on
     # the 4 mm span it would sit on both witness lines.
     "FrontReliefWidth": (_STEP_X + 0.0078, _DETAIL_BOTTOM - 0.007),
     # Left of the crop: the leader runs from the corner 12-24 deg below
     # level, inside the corner's own quadrant, through the pinion's blank
-    # interior under its root and over the axis.
-    "FrontCornerRadius": (_CORNER_CENTER[0] - 0.0325, _CORNER_CENTER[1] - 0.006),
+    # interior under its root and over the axis.  Its 23.5 mm text, centred
+    # on the keep, ends 2.5 mm short of the crop circle (at 32.5 mm in, run
+    # 20261031T233549214Z, the circle crossed its last letter).
+    "FrontCornerRadius": (_CORNER_CENTER[0] - 0.0365, _CORNER_CENTER[1] - 0.006),
+    # The D-flat tool's end from F, a row under the neck width's: its
+    # prefixed text (~43 mm, centred on the keep) stands left of F's witness
+    # line, right of the end view's teeth (top 0.1735) and over the
+    # journal's outline (top 0.169).
+    "FlatEnd": (_F_DETAIL_X - 0.0265, _DETAIL_BOTTOM - 0.018),
+    # Left of the crop, level with the tool's end arc (centre ~0.105, 0.2018):
+    # the leader enters the arc's own quadrant from the left, under the
+    # detail label.
+    "FlatToolRadius": (_F_DETAIL_X - 0.031, _DETAIL_BOTTOM + 0.007),
 }
 # Top-left anchors.  The label stands left of the crop, 3 mm under the
 # corner R's text (its limits print to 5 mm under its point).
 DETAIL_LABEL_XY = (0.042, _CORNER_CENTER[1] - 0.014)
-# The mark's "B" stands under the pinion, between the tooth-tip Ø's lower arrow
-# (x 0.2056) and F's witness lines (x 0.2144), clear of the mark circle.
-PARENT_LETTER_XY = (F_X - 0.0057, SIDE_CENTER[1] - HALF_OD - 0.0025)
+# The mark's "B" stands under the pinion, right of the face width's rear
+# witness line (x 199.7 mm) and 7 mm left of the tooth-tip Ø's lower arrow,
+# which now stands just behind F (run 20261031T233549214Z: at F - 5.7 mm
+# the "B" stood 1.4 mm from that arrow), clear of the mark circle.
+PARENT_LETTER_XY = (PINION_REAR_X + 0.007, SIDE_CENTER[1] - HALF_OD - 0.0025)
 
 # Each frame's leader landing on its surface's upper outline, and the frame.
-# The neck's straight floor is 0.3 mm long between its two 0.05 corner tori,
+# The neck's straight floor is 0.2 mm long between its two R0.10 corner tori,
 # so a silhouette hit-test there landed on a neighbour (run 10: a type-46
 # silhouette of another face). Like main's arbor finishes, each frame
 # attaches to the model FACE its spec control names, resolved on the
@@ -316,9 +410,13 @@ CONTROL_ATTACHMENTS = {
     "core_total_runout": (CORE_RUNOUT_LANDING, CORE_RUNOUT_FRAME),
     "front_neck_total_runout": (NECK_RUNOUT_LANDING, NECK_RUNOUT_FRAME),
 }
-CONTROL_VIEWS = {"core_total_runout": "side", "front_neck_total_runout": "detail"}
-# Upper right: the leader drops nearly straight to the gap.
-TOOTHSPACE_NOTE_XY = (0.322, 0.258)
+CONTROL_VIEWS = {"core_total_runout": "detail", "front_neck_total_runout": "detail"}
+# Lower right: the gauge gap is TOOTH_SPACE_GAP_INDEX pitches round from
+# the first, so its landing sits low right of the front view, away from the
+# tooth span's contacts, bisector and witness lines, and the note's leader
+# climbs to it from below without crossing them.
+TOOTH_SPACE_GAP_INDEX = 9
+TOOTHSPACE_NOTE_XY = (0.330, 0.115)
 
 
 def _activate_view(adapter: Any, view: Any, *, label: str) -> str:
@@ -536,6 +634,24 @@ def _label_detail(adapter: Any, detail: Any, side: Any) -> None:
             raise RuntimeError(f"{label} note did not land in its view: {texts!r}")
 
 
+def _set_dimension_suffixes(adapter: Any, annotations: list[Any]) -> None:
+    """Write each DIMENSION_SUFFIXES dimension's native suffix (after its
+    value, on its one line) and read it back; the value stays the model's."""
+    remaining = dict(DIMENSION_SUFFIXES)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        text = remaining.pop(dimension_name(adapter, annotation), None)
+        if text is None:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.SetText(2, text)  # swDimensionTextSuffix
+        got = str(display.GetText(2) or "")
+        if got != text:
+            raise RuntimeError(f"dimension suffix {text!r} did not persist: {got!r}")
+    if remaining:
+        raise RuntimeError(f"dimension suffixes not applied: {sorted(remaining)}")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -552,7 +668,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Gear Data",
             "Manufacturing Notes",
-            "Root Acceptance",
             TOOTH_SPACE_CALLOUT_PROPERTY,
         ),
         required=(
@@ -562,7 +677,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Gear Data",
             "Manufacturing Notes",
-            "Root Acceptance",
             TOOTH_SPACE_CALLOUT_PROPERTY,
         ),
     )
@@ -595,11 +709,12 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (side, end, front, iso):
         set_hidden_lines_removed(adapter, view)
 
-    # Detail B is placed and dimensioned FIRST: its three dimensions live in
-    # StudProfile with the side view's, and a dimension already on the sheet
-    # is never imported again (draw_dt_pinion_spring's detail A), so the
-    # side view's targeted import skips the three the detail holds.  The
-    # detail is dimensioned uncropped and cropped after.
+    # Detail B is placed and dimensioned FIRST: its five dimensions live in
+    # StudProfile with the side view's, and in CoreFlatProfile, and a
+    # dimension already on the sheet is never imported again
+    # (draw_dt_pinion_spring's detail A), so the side view's targeted import
+    # skips the five the detail holds.  The detail is dimensioned uncropped
+    # and cropped after.
     detail = _placed_detail_view(adapter)
     set_hidden_lines_removed(adapter, detail)
     detail_annotations = _dimension_then_crop_detail(adapter, detail)
@@ -619,8 +734,19 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     annotations = [*side_annotations, *end_annotations, *detail_annotations]
     set_dimension_callouts(
+        adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
+    )
+    set_dimension_callouts(
         adapter, annotations, DIMENSION_CALLOUTS_BELOW, location="below"
     )
+    _set_dimension_suffixes(adapter, annotations)
+    for annotation in annotations:
+        name = dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
+        if name in REFERENCE_DIMENSIONS:
+            set_reference_dimension(
+                adapter, annotation, label=f"knob shaft {name} reference",
+                diameter=REFERENCE_DIMENSIONS[name],
+            )
     # Decimal places (and so the general-tolerance row each dimension claims)
     # are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
@@ -636,26 +762,25 @@ async def build(adapter: Any) -> dict[str, str]:
         note_xy=THREAD_NOTE_XY,
         label="MHA-PD-08 stud thread callout",
     )
-
-    # The two running surfaces, authored on the part and read back (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
-    add_surface_finish(
+    add_attached_note(
         adapter,
-        end,
-        symbol_xy=JOURNAL_FINISH_SYMBOL,
-        control=surface_finish_by_key(SURFACE_FINISHES, "journal"),
-        label="journal finish",
-        entity=visible_circle_edge(adapter, end, JOURNAL_DIA),
-        leader_attach_xy=JOURNAL_FINISH_ATTACH,
-        char_height=0.0025,
+        side,
+        text=TIP_CHAMFER_NOTE,
+        entity_xy=CHAMFER_PICK,
+        note_xy=CHAMFER_NOTE_XY,
+        label="MHA-PD-08 tip chamfer callout",
     )
+
+    # The one running surface, authored on the part and read back (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
     add_surface_finish(
         adapter,
         side,
-        edge_xy=CORE_FINISH_PICK,
-        symbol_xy=CORE_FINISH_SYMBOL,
-        control=surface_finish_by_key(SURFACE_FINISHES, "core"),
-        label="core finish",
+        edge_xy=JOURNAL_FINISH_PICK,
+        symbol_xy=JOURNAL_FINISH_SYMBOL,
+        control=surface_finish_by_key(SURFACE_FINISHES, "journal"),
+        label="journal finish",
         entity_type="SILHOUETTE",
+        leader_attach_xy=JOURNAL_FINISH_PICK,
         char_height=0.0025,
     )
     # The saved source owns datum/control semantics. The drawing attaches
@@ -696,7 +821,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_toothspace_callout(
         adapter, front, profile=STOCK_PROFILE,
         actual_pin_diameter_mm=TOOTH_SPACE_GAUGE_PIN_DIA_MM,
-        rotate_rad=math.pi / TEETH, axial_station_mm=0.0,
+        rotate_rad=math.pi / TEETH + TOOTH_SPACE_GAP_INDEX * 2.0 * math.pi / TEETH,
+        axial_station_mm=0.0,
         property_name=TOOTH_SPACE_CALLOUT_PROPERTY,
         note_xy=TOOTHSPACE_NOTE_XY,
     )
@@ -709,9 +835,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_property_linked_note(
         adapter, "Manufacturing Notes", *NOTES_XY, char_height=0.0025
-    )
-    add_property_linked_note(
-        adapter, "Root Acceptance", *ROOT_ACCEPTANCE_XY, char_height=0.0025
     )
     return await finalize_drawing(
         adapter,

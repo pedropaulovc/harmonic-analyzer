@@ -51,18 +51,23 @@ from pd_paper_drive_assembly_steps import step_ref
 from pd_transgear_drive_collar_spec import (
     BODY_SUPPLY_NOTE,
     BORE_CALLOUT,
+    BORE_DIA,
     BORE_ENTRY_BREAK_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
+    FLAT_CALLOUT,
     LENGTH,
     OD,
+    OD_CALLOUT,
     OVERALL_LENGTH,
+    PILOT_DIA_CALLOUT,
     PILOT_SUPPLY_NOTE,
     PILOT_DIA,
     PILOT_LENGTH,
     PIN_CIRCLE_RADIUS,
     PIN_HOLE_CALLOUT,
+    PIN_LOCATION_CALLOUT,
 )
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_drive_collar"]
@@ -83,7 +88,8 @@ VIEW_SCALE = (4, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
 END_CENTER = (0.100, 0.165)
 SIDE_CENTER = (0.235, END_CENTER[1])
-ISO_CENTER = (0.345, END_CENTER[1])
+# Right of the section, clear of the outside diameter's mate callout.
+ISO_CENTER = (0.380, END_CENTER[1])
 ISO_SCALE = (2, 1)
 HALF_OD = OD * _S / 2000.0
 HALF_PILOT = PILOT_DIA * _S / 2000.0
@@ -93,41 +99,48 @@ PIN_R = PIN_CIRCLE_RADIUS * _S / 1000.0
 _SEAT_X = SIDE_CENTER[0] + (LENGTH - PILOT_LENGTH) * _S / 2000.0
 _REAR_X = _SEAT_X - LENGTH * _S / 1000.0
 _PILOT_X = _SEAT_X + PILOT_LENGTH * _S / 1000.0
-# SolidWorks draws a diameter's leader from its text THROUGH the circle's
-# centre to the far rim (farm run 20261009T224545531Z: the bore's leader from
-# above crossed the upper pin hole, and the pin's from below crossed the
-# bore). So each text stands where that whole line is clear: the bore's up
-# and right of the bore, between the pins and right of section line A; the
-# dimensioned (+Y) pin hole's up and left of that hole, outside the part. The
-# flat's size stands right of the view BELOW its witness lines, the matched-
-# fit line under it: between them its arrows sit outside the 8.7 mm span
-# and their tails struck both (run 20261010T001620278Z). The bore's text
-# stands 4 mm lower and the rear entry break 3 mm higher than that run, where
-# the bore's tolerance printed on the break's underline.
+# SolidWorks draws a diameter's leader from the shoulder under its last
+# callout line THROUGH the circle's centre to the far rim (farm run
+# 20261009T224545531Z: the bore's leader from above crossed the upper pin
+# hole, and the pin's from below crossed the bore). So each text stands where
+# that whole line is clear: the bore's up and right of the end view, above
+# section line A's arrow, its mate lines hanging toward the bore; the
+# dimensioned (+Y) pin hole's up and left of that hole, outside the part.
+# The flat's limits stand right of the view BELOW its witness lines, its mate
+# under them: between them its arrows sit outside the 8.7 mm span and their
+# tails struck both (run 20261010T001620278Z). Each pin location reads left
+# of the view, its text toward the outer witness so its mate lines stay
+# between the witnesses and clear of the rim. The -Y text's top line stands
+# clear under the axis, where the +Y dimension line starts (run
+# 20261031T205208603Z: that line struck it).
 _BORE_TEXT_HALF = 0.017
 _PIN_TEXT_HALF = 0.022
 END_KEEP = {
-    "BoreDia": (END_CENTER[0] + 0.040 + _BORE_TEXT_HALF, END_CENTER[1] + 0.026),
-    "FlatToAxis": (END_CENTER[0] + HALF_OD + 0.025, END_CENTER[1] - 0.0215),
-    "PinPosDia": (END_CENTER[0] - 0.018 - _PIN_TEXT_HALF, END_CENTER[1] + 0.055),
-    "PinPosY": (END_CENTER[0] - HALF_OD - 0.012, END_CENTER[1] + PIN_R / 2.0),
-    "PinNegY": (END_CENTER[0] - HALF_OD - 0.012, END_CENTER[1] - PIN_R / 2.0),
+    "BoreDia": (END_CENTER[0] + 0.048 + _BORE_TEXT_HALF, END_CENTER[1] + 0.063),
+    "FlatToAxis": (END_CENTER[0] + HALF_OD + 0.017, END_CENTER[1] - 0.0215),
+    "PinPosDia": (END_CENTER[0] - 0.018 - _PIN_TEXT_HALF, END_CENTER[1] + 0.061),
+    "PinPosY": (END_CENTER[0] - HALF_OD - 0.025, END_CENTER[1] + PIN_R * 0.65),
+    "PinNegY": (END_CENTER[0] - HALF_OD - 0.025, END_CENTER[1] - PIN_R * 0.35 - 0.006),
 }
 # SolidWorks prints "SECTION A-A / SCALE 4:1" under the section, its top
 # 16.6 mm under the view's lower edge and centred on it (measured on run
 # 20261009T224545531Z's sheet), so nothing tall may stand there. The two
 # fitted lengths share one row just under the section, each with only a
-# pointer to its sheet note; the pilot's text stands right of its short
-# span. The overall reference reads above the section, and the rear entry
-# break above its rear edge wholly left of the overall's rear witness line.
-# The outside diameter reads right of the pilot's.
+# pointer to its sheet note: the pilot's text right of its short span, the
+# body's left of the rear witness, which struck it inside its own span
+# (baseline run 20261031T145011192Z). The overall reference reads above
+# the section. The rear entry break stands left of the rear face at the
+# chamfered bore edge, its dimension line in the bore's air, so its
+# witnesses stay short. Both diameters read right of the pilot face, each
+# mate callout clear of the other.
 _LENGTH_ROW_Y = SIDE_CENTER[1] - HALF_OD - 0.006
+_BORE_EDGE_Y = SIDE_CENTER[1] + BORE_DIA * _S / 2000.0
 SIDE_KEEP = {
     "PilotLength": (_PILOT_X + 0.019, _LENGTH_ROW_Y),
-    "CollarLength": ((_REAR_X + _SEAT_X) / 2.0 - 0.003, _LENGTH_ROW_Y),
-    "CollarDia": (_PILOT_X + 0.047, SIDE_CENTER[1]),
-    "PilotDia": (_PILOT_X + 0.014, SIDE_CENTER[1]),
-    "BoreEntryBreak": (_REAR_X - 0.035, SIDE_CENTER[1] + HALF_OD + 0.015),
+    "CollarLength": (_REAR_X - 0.018, _LENGTH_ROW_Y),
+    "CollarDia": (_PILOT_X + 0.069, SIDE_CENTER[1]),
+    "PilotDia": (_PILOT_X + 0.022, SIDE_CENTER[1]),
+    "BoreEntryBreak": (_REAR_X - 0.031, _BORE_EDGE_Y - 0.0012),
 }
 OVERALL_TEXT_XY = ((_REAR_X + _SEAT_X) / 2.0, SIDE_CENTER[1] + HALF_OD + 0.010)
 # Physical annular end-face picks, outside the actual rear entry relief and
@@ -136,7 +149,7 @@ _OVERALL_PICK_Y = SIDE_CENTER[1] + PILOT_DIA * 3.0 * _S / 8000.0
 OVERALL_PICKS = ((_PILOT_X, _OVERALL_PICK_Y), (_REAR_X, _OVERALL_PICK_Y))
 # The pilot is supplied long and faced at assembly, and the body's rear face
 # is faced on F; each fitted band and its assembly step is a numbered sheet
-# note, continuing the part's notes 1-2, and its length points at it.
+# note, continuing the part's note 1, and its length points at it.
 FIT_STEP_KEY = "pilot-faced-to-fit"
 BODY_FIT_STEP_KEY = "collar-rear-faced-to-fit"
 _NOTE_WIDTH = 70
@@ -153,23 +166,29 @@ def _numbered(number: int, text: str) -> str:
     )
 
 
-PILOT_NOTE = 3
-BODY_NOTE = 4
+PILOT_NOTE = 2
+BODY_NOTE = 3
 FIT_NOTES = "\n".join(
     (
         _numbered(PILOT_NOTE, f"{PILOT_SUPPLY_NOTE}, PER {step_ref(FIT_STEP_KEY)}."),
         _numbered(BODY_NOTE, f"{BODY_SUPPLY_NOTE}, PER {step_ref(BODY_FIT_STEP_KEY)}."),
     )
 )
+# Every tight band names its mate and fit where it prints (rule 4).
 DIMENSION_CALLOUTS_BELOW = {
     "BoreDia": BORE_CALLOUT,
+    "FlatToAxis": FLAT_CALLOUT,
     "PinPosDia": PIN_HOLE_CALLOUT,
+    "PinPosY": PIN_LOCATION_CALLOUT,
+    "PinNegY": PIN_LOCATION_CALLOUT,
+    "PilotDia": PILOT_DIA_CALLOUT,
+    "CollarDia": OD_CALLOUT,
     "PilotLength": f"SEE NOTE {PILOT_NOTE}",
     "CollarLength": f"SEE NOTE {BODY_NOTE}",
     "BoreEntryBreak": BORE_ENTRY_BREAK_CALLOUT,
 }
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.040)
-# The part's two notes, then the drawing's two fitted-length notes, in one
+# The part's note, then the drawing's two fitted-length notes, in one
 # block; the actual fit procedure is linked to its assembly step.
 NOTES_XY = (0.016, 0.085)
 NOTES_TEXT = f"{property_link('Manufacturing Notes')}\n{FIT_NOTES}"

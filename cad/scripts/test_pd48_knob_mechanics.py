@@ -146,12 +146,13 @@ def test_physical_flat_terminal_has_two_actual_end_limits():
     # Rounding is already INCLUDED in the physical foremost-point dimension.
     assert shaft.CORE_FLAT_GEAR_AIR_MIN == pytest.approx(0.050)
     assert shaft.CORE_FLAT_REACH_PAST_SHOULDER_MIN == pytest.approx(0.100)
-    # The tool end lies in air: its limits print once, in the notes, from
-    # these constants, not as dimensions on invisible geometry.
-    assert not {"FlatEnd", "FlatToolRadius"} & shaft.DRAWING_DIMENSIONS["CoreFlatProfile"]
+    # The tool end lies in air under the neck: detail B prints both limits as
+    # the part's own FlatEnd (LIMIT from F) and FlatToolRadius (MAX)
+    # dimensions, from these constants; no note repeats them.
+    assert {"FlatEnd", "FlatToolRadius"} <= shaft.DRAWING_DIMENSIONS["CoreFlatProfile"]
     assert shaft.TEETH == 15
-    assert "TOOL END 0.05-0.17 FROM 15T FRONT FACE" in shaft.CORE_FLAT_TOOL_REACH_NOTE
-    assert "R0.100 MAX" in shaft.CORE_FLAT_TOOL_REACH_NOTE
+    assert not hasattr(shaft, "CORE_FLAT_TOOL_REACH_NOTE")
+    assert shaft.CORE_FLAT_TOOL_END_RADIUS_MAX == pytest.approx(0.100)
     assert shaft.FRONT_RELIEF_WIDTH_MIN > 2.0 * shaft.FRONT_CORNER_RADIUS_MAX
 
 
@@ -180,8 +181,8 @@ def test_torque_contact_uses_no_favourable_bore_float_credit():
 def test_shortened_drive_face_is_real_not_old_full_core_length():
     assert shaft.CORE_FRONT_FROM_F == 5.25
     assert shaft.CORE_ACTIVE_LENGTH == pytest.approx(4.85)
-    assert shaft.CORE_ACTIVE_LENGTH_MIN == pytest.approx(4.59)
-    assert collar.D_DRIVE_AREA_MIN == pytest.approx(7.339179692138)
+    assert shaft.CORE_ACTIVE_LENGTH_MIN == pytest.approx(4.21)
+    assert collar.D_DRIVE_AREA_MIN == pytest.approx(6.654325210394)
     assert collar.D_DRIVE_AREA_MIN > 0.0
     assert shaft.FRONT_RELIEF_AREA_MIN == pytest.approx(math.pi * 3.82**2 / 4.0)
     assert collar.LENGTH == collar.SET_NOMINAL == 6.2
@@ -253,11 +254,11 @@ def test_bearing_material_charges_breaks_axis_error_and_loose_float():
     # Regression value, not a load floor: the spec's physical gate is a
     # positive face. It charges bore, entry break, D-axis error at F and
     # half the 0.05 tooth-space TIR, so it sits below the uncharged ring.
-    assert collar.FRONT_BEARING_AREA_MIN == pytest.approx(23.2198, abs=1e-3)
+    assert collar.FRONT_BEARING_AREA_MIN == pytest.approx(23.1902, abs=1e-3)
     assert shaft.RING_TRANSVERSE_FLOAT_MAX >= (ring.ID + max(ring.ID_BAND) - shaft.JOURNAL_DIA_MIN) / 2.0
     assert shaft.RING_TRANSVERSE_FLOAT_MAX == pytest.approx(0.10864110728935561)
-    assert collar.D_SUPPORT_LENGTH_MIN == pytest.approx(4.072234843105)
-    assert collar.D_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.059098147529)
+    assert collar.D_SUPPORT_LENGTH_MIN == pytest.approx(3.692234843105)
+    assert collar.D_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.060796633879)
     assert shaft.REAR_BEARING_INNER_RADIUS_MAX == pytest.approx(3.4586411072893553)
     assert shaft.REAR_BEARING_INNER_RADIUS_MAX > shaft.ROOT_DIA_EXACT_MIN / 2.0
     assert shaft.REAR_BEARING_AREA_MIN > 1.0

@@ -93,8 +93,10 @@ HUB_SHOULDER_TO_REAR = 17.2
 # the shoulder's local station; its machine z is the drive train's
 # crank-face datum plus it); dt_crank_hub_notes carries the axial stack.
 RELIEF_DIA = 16.5
-# Printed from the rear face at .XX with a functional ±0.05: with the hub
-# length below it places the shoulder the chain must clear.
+# Printed from the rear face at .XX.  Only its short side is functional:
+# with the hub length below it places the shoulder the chain must clear, so
+# it may come out RELIEF_LENGTH_TOL short; long, it only moves the shoulder
+# away from the chain, so that side is the title block's (RELIEF_LENGTH_BAND).
 RELIEF_LENGTH_TOL = 0.05
 # Stack A, a bought ANSI #25 chain floated frontmost against the relief
 # shoulder, has two poses.  Seated, the wheel's rear face is on the shaft's
@@ -122,13 +124,15 @@ RELIEF_LENGTH = round(
 )  # 3.85
 HUB_BARREL_LENGTH = round(HUB_SHOULDER_TO_REAR - RELIEF_LENGTH, 6)
 HUB_LENGTH = HUB_SEAT_LENGTH + HUB_SHOULDER_TO_REAR
-# The hub prints its overall length, front face to rear face, at .XX with a
-# functional ±0.10.  The fitter sets the front face flush with the crankshaft's
-# dome root (CRANK_FACE_Z) before the MHA-DT-09 match-ream, so this band (not the arm's stock
-# thickness) places the rear face: the 0.7 air to the removable and, with
-# the relief, the chain's air to the shoulder.  At ±0.10 the worst hub-to-T12
-# air is 0.10 and the drive-pin tips' 0.146; the title block's ±0.51 would
-# close both (machinist review of 19e33c6c2 loosened it from ±0.05).
+# The hub prints its overall length, front face to rear face, at .XX.  The
+# fitter sets the front face flush with the crankshaft's dome root
+# (CRANK_FACE_Z) before the MHA-DT-09 match-ream, so this length (not the arm's
+# stock thickness) places the rear face: the 0.7 air to the removable and, with
+# the relief, the chain's air to the shoulder.  Only its long side is
+# functional: at +0.10 the worst hub-to-T12 air is 0.10 and the drive-pin
+# tips' 0.146, which +0.51 would close.  Short, it only opens those airs, so
+# that side is the title block's (HUB_LENGTH_BAND; owner ruling 2026-10-31,
+# machinist review of main 31cea0b73).
 HUB_LENGTH_TOL = 0.10
 RELIEF_STATION = round(HUB_LENGTH - RELIEF_LENGTH, 6)
 HUB_SHOULDER_STATION = HUB_SEAT_LENGTH
@@ -232,6 +236,10 @@ HUB_BORE_DIA_MAX = HUB_BORE_DIA + HUB_BORE_BAND[0]
 GENERAL_2PL_TOL_MM = round(
     float(_config.title_block("linear_2pl")["value_in"]) * MM_PER_IN, 2
 )
+# The two printed axial bands, (upper, lower): each functional on one side
+# only, the title block's .XX on the other (see HUB_LENGTH_TOL).
+HUB_LENGTH_BAND = (HUB_LENGTH_TOL, -GENERAL_2PL_TOL_MM)
+RELIEF_LENGTH_BAND = (GENERAL_2PL_TOL_MM, -RELIEF_LENGTH_TOL)
 # drawing-guidelines.md rule 17 (walls and webs) (U27): MHA-DT-09 ream ligaments at the worst case of the printed
 # bands.  The ream never exceeds the pin's big end, which stands proud of the
 # hub.  Ahead of it the arm shoulder: the .XX station printed from it.  Behind
@@ -243,8 +251,8 @@ SERVICE_PIN_SHOULDER_LIGAMENT_WORST_MM = (
     SERVICE_PIN_FROM_SHOULDER - SERVICE_PIN_REAM_RADIUS_MAX - GENERAL_2PL_TOL_MM
 )
 SERVICE_PIN_REAR_LIGAMENT_WORST_MM = (
-    (HUB_LENGTH - HUB_LENGTH_TOL)
-    - (RELIEF_LENGTH + RELIEF_LENGTH_TOL)
+    (HUB_LENGTH + HUB_LENGTH_BAND[1])
+    - (RELIEF_LENGTH + RELIEF_LENGTH_BAND[0])
     - (HUB_SEAT_LENGTH + GENERAL_1PL_TOL_MM)
     - (SERVICE_PIN_FROM_SHOULDER + GENERAL_2PL_TOL_MM)
     - SERVICE_PIN_REAM_RADIUS_MAX

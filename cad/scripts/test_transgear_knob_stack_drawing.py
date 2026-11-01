@@ -87,9 +87,10 @@ def test_true_d_fit_clears_the_core_and_round_stud_at_printed_limits(
     assert core == pytest.approx((4.842, 4.850))
     assert curved_air == pytest.approx((0.010, 0.0307))
     assert flat_air == pytest.approx((0.020, 0.050))
-    stud_max = shaft.THREAD_BLANK_DIA + max(shaft.THREAD_BLANK_DIA_BAND)
+    # The #8-32 UNC-2A class governs the blank: its largest major.
+    stud_max = max(shaft.THREAD_BLANK_LIMITS)
     stud_air = min(bore[0] / 2.0, bore_flat[0]) - stud_max / 2.0
-    assert stud_air == pytest.approx(0.085)
+    assert stud_air == pytest.approx(0.07363)
     assert collar.STUD_D_BORE_AIR == pytest.approx(stud_air)
     with monkeypatch.context() as patch:
         with pytest.raises(AssertionError, match="the D-flat binds"):
@@ -116,7 +117,7 @@ def test_fitted_rear_face_reacts_on_actual_f_at_every_printed_corner(
         + shaft.TOOTH_SPACE_RUNOUT_TIR_MM / 2.0
     )
     assert collar.D_CENTRE_FLOAT_MAX == pytest.approx(centre_float)
-    assert inner == pytest.approx(2.779330726, abs=1e-6)
+    assert inner == pytest.approx(2.781029, abs=1e-6)
     assert collar.FRONT_BEARING_INNER_RADIUS_MAX == pytest.approx(inner)
     areas = [
         shaft.gear_bearing_area_lower(profile, inner)
@@ -138,14 +139,12 @@ def test_fitted_rear_face_reacts_on_actual_f_at_every_printed_corner(
 
 
 def test_thread_blank_lies_inside_the_2a_major() -> None:
-    """The die cuts #8-32 UNC-2A on a blank inside 3.990..4.143."""
-    blank = (
-        shaft.THREAD_BLANK_DIA + min(shaft.THREAD_BLANK_DIA_BAND),
-        shaft.THREAD_BLANK_DIA + max(shaft.THREAD_BLANK_DIA_BAND),
-    )
-    assert _stud_places("ThreadBlankDia") == 3
-    assert blank == pytest.approx((4.020, 4.120))
-    assert MAJOR_2A[0] <= blank[0] and blank[1] <= MAJOR_2A[1]
+    """The die cuts #8-32 UNC-2A on a blank inside 3.990..4.143; the class
+    governs the blank, which prints only as a two-place reference."""
+    blank = shaft.THREAD_BLANK_LIMITS
+    assert _stud_places("ThreadBlankDia") == 2
+    assert blank == pytest.approx(MAJOR_2A)
+    assert blank[0] < shaft.THREAD_BLANK_DIA < blank[1]
     # The tip chamfer still runs 45 degrees down to the basic minor.
     basic_minor = BASIC_MAJOR - 1.082532 * PITCH
     assert shaft.THREAD_BLANK_DIA - 2.0 * shaft.TIP_CHAMFER == pytest.approx(
@@ -163,7 +162,7 @@ def test_relief_holds_the_die_lead_under_the_deepest_root() -> None:
     deepest die-cut root and inside the nut's smallest minor."""
     core_max = _limits(shaft.CORE_FRONT_FROM_F, _stud_places("CoreFront"))[1]
     thread_end_min = _limits(shaft.PLAIN_CORE, _stud_places("PlainCore"))[0]
-    assert thread_end_min - core_max == pytest.approx(1.99)
+    assert thread_end_min - core_max == pytest.approx(1.23)
     assert thread_end_min - core_max >= 1.5 * PITCH
     relief_max = _limits(shaft.RELIEF_DIA, _stud_places("ReliefDia"))[1]
     assert relief_max == pytest.approx(2.93)
@@ -178,12 +177,12 @@ def test_thumbnut_runs_clear_of_the_core_step_at_the_rearward_stop(
 ) -> None:
     """At the shortest fitted body with its rear face on F and the shortest
     pilot, the nut's seat stands 3.87 + 2.75 = 6.62 in front of F, clear of
-    the longest core 5.38; its thread runs only on full thread or relief."""
+    the longest core 5.76; its thread runs only on full thread or relief."""
     seat = collar.LENGTH_FITTED_MIN
     nut_seat = seat + collar.PILOT_LENGTH_FITTED_MIN
     core_max = _limits(shaft.CORE_FRONT_FROM_F, _stud_places("CoreFront"))[1]
     assert nut_seat - core_max == pytest.approx(collar.NUT_CORE_STEP_AIR)
-    assert nut_seat - core_max == pytest.approx(1.24)
+    assert nut_seat - core_max == pytest.approx(0.86)
     assert nut_seat - core_max > 0.0
     # Negative control: a full-thread end 6.5 in front of F, with a
     # one-pitch lead behind it, would put the nut's first full thread on
@@ -203,7 +202,7 @@ def test_thumbnut_engages_one_and_a_half_diameters_over_the_travel(
     nut's seat countersink on the longest fitted pilot (R9-70: the nut seats
     on the collar's pilot, not the T24), or the shortest stud's full-thread
     end; each countersink's loss counted from the tap drill at its smallest
-    printed angle (R9-63). Least 11.89664 at the shortest fitted body."""
+    printed angle (R9-63). Least 11.51664 at the shortest fitted body."""
     tip_min = _limits(shaft.TIP_STATION, shaft.TIP_STATION_PLACES)[0]
     thread_end_max = _limits(shaft.PLAIN_CORE, _stud_places("PlainCore"))[1]
     nut_min = _limits(nut.OVERALL_LENGTH, nut.OVERALL_LENGTH_PLACES)[0]
@@ -240,7 +239,7 @@ def test_thumbnut_engages_one_and_a_half_diameters_over_the_travel(
         for i in range(101)
     ]
     worst = min(engagement(seat) for seat in settings)
-    assert worst == pytest.approx(11.89664, abs=1e-5)
+    assert worst == pytest.approx(11.51664, abs=1e-5)
     assert worst >= ENGAGEMENT_FLOOR
     assert collar.THUMBNUT_ENGAGEMENT_WORST == pytest.approx(worst)
     # Negative control: a stud tip 8 shorter leaves less than 1.5 D.

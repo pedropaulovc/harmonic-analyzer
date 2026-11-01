@@ -8248,6 +8248,13 @@ def _washer_paint_native(monkeypatch, case):
         item = case.imports[label]
         item.display.OffsetText = False
         item.annotation.SetPosition2 = lambda x, y, z, label=label: position(label, x, y, z)
+        # Document default: smart arrows, solid two-arrow diameter line.
+        item.display.ArrowSide, item.display.SolidLeader = 2, True
+        item.second = SimpleNamespace(use_doc=True, arrow=True)
+        item.display.SetSecondArrow = lambda use_doc, arrow, second=item.second: (
+            vars(second).update(use_doc=use_doc, arrow=arrow))
+        item.display.GetUseDocSecondArrow = lambda second=item.second: second.use_doc
+        item.display.GetSecondArrow = lambda second=item.second: second.arrow
 
     def rebuild(_adapter, **_kwargs):
         paint = case.paint[thick]
@@ -8491,6 +8498,14 @@ def test_washer_import_never_repairs_source_or_import_value_band_and_geometry(mo
         case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
     if defect.startswith("source_") and defect != "source_import_mutation":
         assert case.imported_calls == []
+
+
+def test_washer_bore_line_still_through_the_centre_fails_the_build(monkeypatch):
+    case = _washer_import_native(monkeypatch)
+    # The seat keeps the far-side arrow: the bore line still spans the centre.
+    case.imports[case.helper.BORE_DIAMETER].display.SetSecondArrow = lambda *_args: None
+    with pytest.raises(RuntimeError):
+        case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
 
 
 @pytest.mark.parametrize("label", (

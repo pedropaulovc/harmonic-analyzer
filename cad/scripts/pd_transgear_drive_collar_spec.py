@@ -116,14 +116,18 @@ LENGTH_FITTED_MAX = SEAT_MAX_FROM_F
 LENGTH_PLACES = 2
 BODY_BLANK_LENGTH_MIN = 7.400
 OD = SEAT_SPIGOT_DIA  # 17.5, the crank spigot's seat
-# The removables swap between shafts: the crank spigot's functional band.
-OD_BAND = SPIGOT_DIA_BAND  # (upper, lower) = (0, -0.10)
 OD_PLACES = 2
+# The removables swap between shafts: the crank spigot's maximum keeps the
+# #25 plates wrapping a T12 clear of this seat.  Nothing needs a minimum
+# tighter than the title block (the rim is a stated shortfall, not a band).
+OD_BAND = (max(SPIGOT_DIA_BAND), -printed_band_mm(OD_PLACES))  # (0, -0.51)
 
 # --- Pilot on the front face, through the wheel's Ø10.3 bore (ruling 5) -------
 PILOT_DIA = 10.0
-PILOT_DIA_BAND = (0.0, -0.10)
 PILOT_DIA_PLACES = 2
+# The maximum keeps radial air in the wheel's drilled bore; the minimum is
+# the title block's.
+PILOT_DIA_BAND = (0.0, -printed_band_mm(PILOT_DIA_PLACES))  # (0, -0.51)
 # R9-70 (N-A): the thumbnut's seat.  The fitter faces the pilot so its front
 # face stands PILOT_PROUD_RANGE proud of the wheel's front face (the plate
 # measured, the pilot faced to it plus 0.10 ±0.05), so the wheel is free under
@@ -178,9 +182,11 @@ STUD_D_BORE_AIR = min(
 # Keep one full manufacturing-tolerance span beyond the actual shaft corner
 # envelope, without spending favourable neck/bore air to shrink the entry.
 # This derives the inherited .200 nominal / .150.. .250 controlled size
-# from the mating geometry; its explicit band and three-place PMI are unchanged.
+# from the mating geometry; its explicit band is unchanged.  It prints at
+# two places: a third place on a 0.10-wide band adds nothing (machinist
+# review of main 31cea0b73).
 BORE_ENTRY_BREAK_BAND = (0.050, -0.050)
-BORE_ENTRY_BREAK_PLACES = 3
+BORE_ENTRY_BREAK_PLACES = 2
 BORE_ENTRY_BREAK = round(
     FRONT_CORNER_RADIUS_MAX
     + max(BORE_ENTRY_BREAK_BAND) - min(BORE_ENTRY_BREAK_BAND),
@@ -207,9 +213,6 @@ BORE_ENTRY_BREAK_LEG_MIN = min(
 BORE_ENTRY_BREAK_LEG_MAX = max(
     BORE_ENTRY_BREAK_MAX,
     BORE_ENTRY_BREAK_MAX * math.tan(math.radians(max(BORE_ENTRY_BREAK_ANGLE_LIMITS))),
-)
-BORE_ENTRY_BREAK_CALLOUT = (
-    f"X {BORE_ENTRY_BREAK_ANGLE_DEG:g} DEG\nBOTH D EDGES; BOTH LEGS"
 )
 # Spend both turned-surface axes independently; no perfect common-axis credit.
 NECK_D_BORE_AIR_MIN = (
@@ -310,10 +313,10 @@ def floor_2(value: float) -> float:
 
 
 # --- Walls (contract §8) ---------------------------------------------------------
-_OD_R_MIN = (OD + min(OD_BAND)) / 2.0  # 8.70
+_OD_R_MIN = (OD + min(OD_BAND)) / 2.0  # 8.495
 _PIN_HOLE_R_MAX = (PIN_HOLE_DIA + max(PIN_HOLE_BAND)) / 2.0  # 1.19
 # Drive-pin hole to the Ø17.5 rim: 8.75 - 7.0 - 1.19 = 0.56 nominal;
-# 8.70 - 7.025 - 1.19 = 0.485 worst, printed 0.48.
+# 8.495 - 7.025 - 1.19 = 0.28 worst, printed 0.28.
 DRIVE_PIN_COLLAR_RIM = OD / 2.0 - PIN_CIRCLE_RADIUS - PIN_HOLE_DIA / 2.0
 DRIVE_PIN_COLLAR_RIM_WORST = floor_2(
     _OD_R_MIN - PIN_CIRCLE_RADIUS - PIN_OFFSET_TOL - _PIN_HOLE_R_MAX
@@ -412,16 +415,20 @@ PIN_REAR_INSET_WORST = pin_rear_inset(
     LENGTH_FITTED_MIN, PIN_LENGTH + DRIVE_PIN_LENGTH_GRADE, min(PROUD_RANGE)
 )
 
-# The mating shaft, named on the sheet so the fit and the seat face are found.
+# The mating parts, named at the callouts they serve (drawing-guidelines.md
+# rule 4): the shaft, the pressed dowels and the removable sprocket.
 SHAFT_NUMBER = "MHA-PD-08"
+SHAFT_NAME = "KNOB SHAFT"
 SHAFT_SEAT_FACE = f"{SHAFT_NUMBER} {SHAFT_TEETH}T FRONT FACE"
+DOWEL_NUMBER = "MHA-PD-VN-54"
+SPROCKET_NUMBER = "MHA-PD-09"
 
 # --- Fitted axial reaction -------------------------------------------------
 # With the rear face seated on the actual gear shoulder, body length IS the
 # front wheel seat's distance from F. No front pin or unreacted axial gap.
 BODY_REAR_FACE_FROM_F = 0.0
 BODY_LENGTH_CALLOUT = (
-    f"FITTED {LENGTH_FITTED_MIN:.3f}-{LENGTH_FITTED_MAX:.3f}\n"
+    f"FITTED {LENGTH_FITTED_MIN:.2f}-{LENGTH_FITTED_MAX:.2f}\n"
     f"REAR FACE TO FIT, SEATED ON {SHAFT_SEAT_FACE}"
 )
 BODY_FACE_PHRASE = (
@@ -472,10 +479,28 @@ for _ok, _what in (
     if not _ok:
         raise AssertionError(f"MHA-PD-22: {_what}")
 
-# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the callout states the requirement, not a method; the
-# native +0.012/0.000 band already prints the curved portion's H7.
-BORE_CALLOUT = "TRUE D THRU"
-PIN_HOLE_CALLOUT = "2X REAM THROUGH"
+# drawing-guidelines.md rule 4 (name the mate): every tight band names its
+# mate and fit at its own callout; the native bands print the limits.
+BORE_CALLOUT = (
+    f"TRUE D THRU\nSLIDING FIT ON\n{SHAFT_NUMBER} {SHAFT_NAME}\n"
+    f"D-CORE: {BORE_CORE_CLEARANCE[0]:.4f}-"
+    f"{BORE_CORE_CLEARANCE[1]:.4f}\nCLEARANCE ON DIA."
+)
+FLAT_CALLOUT = f"SLIDES ON {SHAFT_NUMBER}\n{SHAFT_NAME} D-FLAT"
+PIN_HOLE_CALLOUT = f"2X REAM THROUGH\nPRESS FIT, DRIVE\nDOWEL {DOWEL_NUMBER}"
+# The dowels must enter the sprocket's drilled holes, which carry the same
+# location band (_sprocket_seat_geometry.DRIVE_PIN_OFFSET_TOL).
+PIN_LOCATION_CALLOUT = f"LOCATES SPROCKET\n{SPROCKET_NUMBER}"
+# Three short lines each: the two blocks stand side by side right of the
+# pilot face, and two-line blocks met (farm run 20261031T205208603Z).
+PILOT_DIA_CALLOUT = f"CLEARS\nSPROCKET\n{SPROCKET_NUMBER} BORE"
+OD_CALLOUT = f"CLEARS #25\nCHAIN ON\n{SPROCKET_NUMBER} T12"
+# The rear D entry clears the shaft's root corner so the rear face seats on
+# F; it is cut on the rear end only, after that face is faced to fit.
+BORE_ENTRY_BREAK_CALLOUT = (
+    f"X {BORE_ENTRY_BREAK_ANGLE_DEG:g} DEG, BOTH LEGS\nREAR END ARC AND FLAT\n"
+    f"AFTER REAR FACE FIT\nCLEARS {SHAFT_NUMBER} KNOB\nSHAFT ROOT CORNER"
+)
 # The overall, pilot front face to rear face, prints as a .X reference.
 OVERALL_LENGTH = LENGTH + PILOT_LENGTH
 DRAWING_REFERENCE_PRECISION = 1
@@ -504,7 +529,7 @@ STUD_CUT_PHRASE = (
 # nut seats on the pilot's faced front face (R9-70), the fitted pilot length
 # in front of the seat.
 _TIP_STATION_MIN = TIP_STATION - printed_band_mm(TIP_STATION_PLACES)  # 23.39
-_PLAIN_CORE_MAX = PLAIN_CORE + printed_band_mm(PLAIN_CORE_PLACES)  # 7.63
+_PLAIN_CORE_MAX = PLAIN_CORE + printed_band_mm(PLAIN_CORE_PLACES)  # 8.01
 _CORE_FRONT_MAX = CORE_FRONT_FROM_F + printed_band_mm(CORE_FRONT_FROM_F_PLACES)
 NUT_LENGTH_MIN = NUT_LENGTH + NUT_LENGTH_LO  # 15.3
 
@@ -539,7 +564,7 @@ if THUMBNUT_ENGAGEMENT_WORST < ENGAGEMENT_FLOOR_D * THREAD_MAJOR - 1e-9:
     )
 # At the rearward stop the nut's seat stands in front of the core's step, so
 # its thread runs only on full thread or over the relief, never onto the core
-# or a die run-out: 3.87 + 2.75 - 5.38 = 1.24.
+# or a die run-out: 3.87 + 2.75 - 5.76 = 0.86.
 NUT_CORE_STEP_AIR = LENGTH_FITTED_MIN + PILOT_LENGTH_FITTED_MIN - _CORE_FRONT_MAX
 if NUT_CORE_STEP_AIR <= 0.0:
     raise AssertionError(
@@ -594,17 +619,15 @@ COLLAR_DISC_AIR_PHRASE = (
 # The pilot's length: faced at assembly, its requirement printed with the
 # dimension; the sheet appends the step that sets it.
 PILOT_LENGTH_CALLOUT = (
-    f"SET AT ASSEMBLY {PILOT_LENGTH_FITTED_MIN:.2f}-{PILOT_LENGTH_FITTED_MAX:.2f}"
-    "\nFACED TO FIT"
+    f"FACED TO {PILOT_LENGTH_FITTED_MIN:.2f}-{PILOT_LENGTH_FITTED_MAX:.2f}"
 )
 # The sheet's numbered fitted-length notes: supply length, then the
 # requirement; the sheet appends the step that sets each.
 PILOT_SUPPLY_NOTE = (
-    f"PILOT: SUPPLY {PILOT_BLANK_LENGTH_MIN:.2f} MIN; "
-    f"{PILOT_LENGTH_CALLOUT.replace(chr(10), ', ')}"
+    f"PILOT: SUPPLY {PILOT_BLANK_LENGTH_MIN:.2f} MIN; {PILOT_LENGTH_CALLOUT}"
 )
 BODY_SUPPLY_NOTE = (
-    f"BODY: SUPPLY {BODY_BLANK_LENGTH_MIN:.3f} MIN; "
+    f"BODY: SUPPLY {BODY_BLANK_LENGTH_MIN:.2f} MIN; "
     f"{BODY_LENGTH_CALLOUT.replace(chr(10), ', ')}"
 )
 PILOT_PROUD_TEXT = f"{PILOT_PROUD_RANGE[0]:.2f} TO {PILOT_PROUD_RANGE[1]:.2f}"
@@ -629,14 +652,9 @@ FIT_UP_NOTE = "\n".join(
 
 # The external drive-pin rim shortfall only (pending ruling #1381, never on
 # the sheet). The pilot now meets the target and the obsolete slotted-floor
-# exception no longer exists. The drawing numbers these 1 and 2 and appends the
-# two fitted lengths as notes 3 and 4 with their assembly steps
+# exception no longer exists. The D-bore's fit prints at its own callout
+# (BORE_CALLOUT). The drawing numbers this 1 and appends the two fitted
+# lengths as notes 2 and 3 with their assembly steps
 # (draw_pd_transgear_drive_collar.FIT_NOTES).
 # Pending exception ruling: MHA-PD-22 collar rim (#1381).
-DRAWING_NOTES = "\n".join(
-    (
-        f"1. DRIVE-PIN HOLE TO COLLAR RIM {DRIVE_PIN_COLLAR_RIM_WORST:.2f} MIN.",
-        f"2. D-BORE SLIDES ON {SHAFT_NUMBER} D-CORE: {BORE_CORE_CLEARANCE[0]:.4f}-"
-        f"{BORE_CORE_CLEARANCE[1]:.4f} CLEARANCE ON DIA.",
-    )
-)
+DRAWING_NOTES = f"1. DRIVE-PIN HOLE TO COLLAR RIM {DRIVE_PIN_COLLAR_RIM_WORST:.2f} MIN."

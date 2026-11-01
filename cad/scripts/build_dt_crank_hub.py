@@ -38,18 +38,20 @@ from _sketch_circle import define_circle
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
+from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _features import lens_area
 from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_hole_on_cylinder
 from _part_pmi import author_part_pmi
+from _single_limit_tolerance import SW_TOL_MIN, set_single_limit
 from _visibility import blank_reference_geometry
 from dt_crank_hub_geometry import (
     AXIAL_PIN_DIA,
-    HUB_LENGTH_TOL,
+    HUB_LENGTH_BAND,
     AXIAL_PIN_LENGTH,
     AXIAL_PIN_RADIUS_FROM_AXIS,
+    RELIEF_LENGTH_BAND,
 )
 from crank_native_acceptance import assert_signed_circle_center
 from dt_crank_hub_spec import (
@@ -63,15 +65,17 @@ from dt_crank_hub_spec import (
     HUB_SEAT_DIA,
     HUB_SEAT_LENGTH,
     ISOMETRIC_VIEW_NOTE,
+    PIN_PROUD_MIN_BAND,
     SERVICE_PIN_FROM_SHOULDER,
     SERVICE_PIN_HOLE_SPEC,
     SERVICE_PIN_STATION,
     SURFACE_FINISHES,
     RELIEF_DIA,
     RELIEF_LENGTH,
-    RELIEF_LENGTH_TOL,
     RELIEF_STATION,
 )
+from dt_crank_pin_ring_spec import PIN_PROUD
+from dt_crank_pin_spec import BIG_END_DIA as PIN_BIG_END_DIA
 
 
 PART_NAME = "dt-crank-hub"
@@ -88,11 +92,113 @@ V_BODY = math.pi * (
 )
 V_BORE = math.pi * BORE_R**2 * HUB_LENGTH
 V_SEAM_GROOVE = lens_area(PIN_R, SEAT_R) * AXIAL_PIN_LENGTH
+# The MHA-DT-09 big end drawn in phantom on the end view (r5 review: the
+# PinProud MIN's outer extension line ended in air, nothing drawn there):
+# its silhouette leaves the barrel's outline at PIN_STUB_X off the axis.
+PIN_BIG_END_R = PIN_BIG_END_DIA / 2.0
+PIN_STUB_X = math.sqrt(BARREL_R**2 - PIN_BIG_END_R**2)
 
 
 async def _volume(adapter) -> float:
     result = await adapter.get_mass_properties()
     return result.data.volume if result.is_success else float("nan")
+
+
+async def _pin_proud_reference(adapter) -> list[tuple[str, str]]:
+    """The MHA-DT-09 ream's acceptance, printed natively on the end view: a
+    hidden construction line out from the barrel along the pin's axis on its
+    big-end side (local -X, where the drill enters), as long as PIN_PROUD, so
+    its driving dimension prints "4.45 MIN" once set_single_limit types it.
+    The pin's proud big end is drawn round it as construction (phantom on the
+    sheet): its face across the line's outer end, Ø PIN_BIG_END_DIA, and two
+    silhouette stubs back to the barrel's outline, so the MIN's extension
+    line lands on drawn geometry (r5 review).  No model geometry changes.
+    On the Top plane, parallel to the *Bottom end view that imports it; Top
+    (u, v) -> (X, -Z), so the line lies on the pin's projected axis.  Returns
+    the deferred drive jobs (the length, its anchor to the barrel, then the
+    big end's face and the stubs' start)."""
+    check("create_sketch pin proud reference", await adapter.create_sketch("Top"))
+    tip = -(BARREL_R + PIN_PROUD)
+    # Direct-to-DB: the line lies on the sketch's horizontal axis, where
+    # creation-time inference would over-define it.
+    set_sketch_direct_db(adapter, True)
+    try:
+        line = check(
+            "pin proud reference line",
+            await adapter.add_line(-BARREL_R, 0.0, tip, 0.0),
+        )
+        top, face, bottom = await add_line_chain(
+            adapter,
+            [
+                (-PIN_STUB_X, PIN_BIG_END_R),
+                (tip, PIN_BIG_END_R),
+                (tip, -PIN_BIG_END_R),
+                (-PIN_STUB_X, -PIN_BIG_END_R),
+            ],
+            close=False,
+        )
+    finally:
+        set_sketch_direct_db(adapter, False)
+    for entity in (line, top, face, bottom):
+        segment = _early_bound(adapter._sketch_entities[entity], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(f"pin proud reference {entity} did not take the construction flag")
+    for entity, relation in ((line, "horizontal"), (top, "horizontal"), (bottom, "horizontal"), (face, "vertical")):
+        check(
+            f"pin proud reference {entity} {relation}",
+            await adapter.add_sketch_constraint(entity, None, relation),
+        )
+    check(
+        "pin big end centred on the pin axis",
+        await adapter.add_sketch_constraint(f"{line}.end", face, "midpoint"),
+    )
+    await dimension_between(
+        adapter,
+        f"{line}.start",
+        f"{line}.end",
+        "horizontal_distance",
+        PIN_PROUD,
+        "pin proud reference",
+    )
+    await anchor_point_to_origin(
+        adapter, f"{line}.start", -BARREL_R, 0.0, "pin proud reference at the barrel"
+    )
+    await dimension_between(
+        adapter,
+        f"{face}.start",
+        f"{face}.end",
+        "vertical_distance",
+        PIN_BIG_END_DIA,
+        "pin big end face",
+    )
+    await dimension_between(
+        adapter,
+        f"{top}.start",
+        "origin",
+        "horizontal_distance",
+        PIN_STUB_X,
+        "pin big end stubs at the barrel",
+    )
+    check(
+        "pin big end stubs start square",
+        await adapter.add_sketch_constraint(f"{top}.start", f"{bottom}.end", "vertical_points"),
+    )
+    await ensure_fully_defined(adapter, "pin proud reference sketch")
+    check("exit_sketch pin proud reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "PinProudReference")
+    full = name_dimensions(
+        adapter,
+        "PinProudReference",
+        ["PinProud", "PinProudBarrel", "PinBigEnd", "PinBigEndStub"],
+    )
+    return list(
+        zip(
+            full,
+            ('"PinProud"', '"BarrelDia" / 2', '"PinBigEndDia"', '"PinBigEndStubX"'),
+            strict=True,
+        )
+    )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -114,6 +220,12 @@ async def build(adapter) -> dict[str, str]:
         ("ServicePinFromShoulder", SERVICE_PIN_FROM_SHOULDER),
         ("AxialPinDia", AXIAL_PIN_DIA),
         ("AxialPinLength", AXIAL_PIN_LENGTH),
+        # The MHA-DT-09 ream's acceptance: a limit, not geometry, so only the
+        # hidden reference line carries it.
+        ("PinProud", PIN_PROUD),
+        # Its phantom big end on the end view (reference sketch only).
+        ("PinBigEndDia", PIN_BIG_END_DIA),
+        ("PinBigEndStubX", PIN_STUB_X),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -336,6 +448,7 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch service pin station", await adapter.exit_sketch())
     name_last_feature(adapter, "ServicePinStationReference")
     drive_jobs += station.apply(adapter, "ServicePinStationReference")
+    drive_jobs += await _pin_proud_reference(adapter)
     # Axis1 is the shaft/hub axis; Axis2 is the axial seam-pin axis.
     await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "hub axis")
     seam_axis = await name_bore_axis(
@@ -366,13 +479,22 @@ async def build(adapter) -> dict[str, str]:
         adapter, "BoreProfile", "BoreDia", *deviations(HUB_BORE_BAND)
     )
     # The overall and the relief length place the relief shoulder and the
-    # rear face the #25 chain and the removable clear, so both carry their
-    # functional band (dt_crank_hub_geometry).
-    set_dimension_symmetric_tolerance(
-        adapter, "HubProfile", "HubLength", HUB_LENGTH_TOL
+    # rear face the #25 chain and the removable clear, so each carries its
+    # functional limit on the side that closes an air, the title block's on
+    # the other (dt_crank_hub_geometry).
+    set_dimension_bilateral_tolerance(
+        adapter, "HubProfile", "HubLength", *deviations(HUB_LENGTH_BAND)
     )
-    set_dimension_symmetric_tolerance(
-        adapter, "HubProfile", "ReliefLength", RELIEF_LENGTH_TOL
+    set_dimension_bilateral_tolerance(
+        adapter, "HubProfile", "ReliefLength", *deviations(RELIEF_LENGTH_BAND)
+    )
+    set_single_limit(
+        adapter,
+        "PinProudReference",
+        "PinProud",
+        limit=PIN_PROUD,
+        band=PIN_PROUD_MIN_BAND,
+        tol_type=SW_TOL_MIN,
     )
     await volume_check(adapter, "driven crank hub", final_volume, 0.001 * final_volume)
     # Both datum planes stay selectable by name for the drive-train mates.
@@ -398,6 +520,7 @@ async def build(adapter) -> dict[str, str]:
     # no assembly instance renders it (#880).  The drawing shows it per view
     # through _drawing_hidden_sketches to import those dimensions.
     blank_sketch(adapter, "ServicePinStationReference")
+    blank_sketch(adapter, "PinProudReference")
     return await save_part_and_images(adapter, PART_NAME)
 
 

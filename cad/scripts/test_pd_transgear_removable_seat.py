@@ -233,21 +233,22 @@ def test_knob_pin_sheet_prints_the_press_stop_range() -> None:
 _CRANK_SEAT = dict(
     seat_face=crank.SEAT_COLLAR,
     seat_face_band=crank.SEAT_COLLAR_BAND,
-    hub_rear_tol=crank.HUB_LENGTH_TOL,
+    hub_rear_band=crank.HUB_LENGTH_BAND,
     plate_min=seat_geometry.PLATE + min(seat_geometry.PLATE_BAND),
 )
 
 
 def test_crank_pin_tips_are_checked_against_the_hub_rear_face() -> None:
     # Hand check, dome-root stations: seat forward 28.7 - 0.5, tip 2.754 in
-    # front of it, hub rear long 25.2 + 0.10; floated onto the short hub the
-    # thinnest wheel moves 28.8 - 2.7 - 25.10 off the seat.
+    # front of it, hub rear long 25.2 + 0.10; floated onto the short hub
+    # (25.2 - 0.51, the title block's side) the thinnest wheel moves
+    # 28.8 - 2.7 - 24.69 off the seat.
     air, engagement = crank.drive_pin_front_clearances(
         crank.DRIVE_PIN_PROUD_RANGE, hub_rear=crank.HUB_LENGTH, **_CRANK_SEAT
     )
     assert crank.DRIVE_PIN_PROUD_RANGE == pytest.approx((2.046, 2.754))
     assert air == pytest.approx(28.2 - 2.754 - 25.30)
-    assert engagement == pytest.approx(2.046 - 1.0)
+    assert engagement == pytest.approx(2.046 - 1.41)
     assert (air, engagement) == (
         crank.DRIVE_PIN_HUB_AIR_WORST,
         crank.DRIVE_PIN_ENGAGEMENT_WORST,

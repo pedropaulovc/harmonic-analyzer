@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -259,7 +260,7 @@ def test_part_max_types_are_authored_and_read_back(monkeypatch, refuse):
             if not refuse:
                 self.value = value
 
-    tolerances = {name: Tolerance() for name in ("TapRootLimit", "ShoulderRadius")}
+    tolerances = {name: Tolerance() for name in ("ShoulderRadius",)}
     monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(part, "_named_dimension", lambda _adapter, _feature, name: (
         None, SimpleNamespace(Tolerance=tolerances[name]),
@@ -269,12 +270,10 @@ def test_part_max_types_are_authored_and_read_back(monkeypatch, refuse):
             part._functional_dimension_types(object())
     else:
         part._functional_dimension_types(object())
-        assert {name: tol.Type for name, tol in tolerances.items()} == {
-            "TapRootLimit": 6, "ShoulderRadius": 6,
-        }
+        assert tolerances["ShoulderRadius"].Type == 6
 
 
-@pytest.mark.parametrize("expected", [drawing.TAP_DIMENSION_TYPES, drawing.SIDE_DIMENSION_TYPES])
+@pytest.mark.parametrize("expected", [drawing.SIDE_DIMENSION_TYPES])
 def test_drawing_refuses_a_lost_max_type(monkeypatch, expected):
     types = dict(expected)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
@@ -752,18 +751,101 @@ def test_each_view_asserts_only_the_precision_it_keeps() -> None:
         assert set(drawing._precision(keep)) == set(keep)
 
 
-def test_tap_view_keeps_the_blanked_root_gauge_limit() -> None:
-    # 8f1cd4a9f: the blanked TapRootGauge sketch's TapRootLimit never imported.
-    assert "TapRootLimit" in drawing.TAP_KEEP
-    assert "TapRootLimit" in spec.DRAWING_DIMENSIONS["TapRootGauge"]
+def test_tap_root_limit_is_gone_but_still_booked_in_the_walls() -> None:
+    """Main's machinist review: the printed 'Ø2.36 max. TAP ROOT' only added an
+    inspection to what the 2-56 UNC-2B callout governs. Neither the drawing nor
+    the part carries the gauge; the wall budget still books the envelope."""
+    assert set(drawing.TAP_KEEP) == {"TapStation"}
+    assert "TapRootGauge" not in spec.DRAWING_DIMENSIONS
+    assert "TapRootLimit" not in spec.DRAWING_PRECISION_BY_NAME
+    assert not {"TapRootGauge", "TapRootPlane"} & set(part.COLLAR_FEATURES)
+    assert "TapRootLimit" not in Path(part.__file__).read_text(encoding="utf-8")
+    assert "TAP ROOT" not in Path(drawing.__file__).read_text(encoding="utf-8")
+    assert spec.WORST_WALLS_MM["tap to north face"] == pytest.approx(
+        spec.WIDTH
+        - spec.WIDTH_BAND_MM
+        - spec.TAP_STATION
+        - spec.TAP_STATION_BAND_MM
+        - spec.THREAD_ENVELOPE_DIA / 2.0
+        - spec.EDGE_BREAK
+        - spec._TAP_AXIAL_DRIFT_MAX
+    )
 
 
-def test_the_setting_feeler_is_named() -> None:
-    """Machinist review of the stack build: the collar's setting feeler had
-    no thickness on the sheet."""
+def test_part_sheet_carries_no_assembly_procedure() -> None:
+    """Main's machinist review: four of the note lines were assembly or
+    operating procedure. MHA-DT-00 step 3 sets the collar off its feeler and
+    locks its set screw; the sheet keeps the stock line and the bore's fit."""
+    import draw_dt_drive_train_assembly as assembly
     from cone_stack_end_play import COLLAR_FEELER
 
-    assert f"SET WITH A {COLLAR_FEELER:.2f} FEELER OFF T006 THRUST FACE." in spec.INSTALLATION_NOTES
+    printed = f"{spec.DRAWING_NOTES}\n{spec.INSTALLATION_NOTES}"
+    for word in ("FEELER", "LEAF", "SNUG", "SWING", "SEAT", "T006"):
+        assert word not in printed
+    assert spec.INSTALLATION_NOTES.count("\n") == 1
+    step = (
+        f"PUSH MHA-DT-VN-54 ONTO A\n   {COLLAR_FEELER:.2f} FEELER ON T006; "
+        "LOCK ITS SET SCREW ON THE FLAT."
+    )
+    assert step in assembly.CONE_CRANK_STEPS
+
+
+def test_stock_line_is_a_supply_size_the_turned_od_comes_from() -> None:
+    """Main's machinist review: '3/4 STEEL BAR STOCK OK.' said the bar stays at
+    19.05 while the sheet prints a turned Ø17.48."""
+    assert spec.DRAWING_NOTES == "SUPPLY 3/4 ROUND BAR."
+    assert spec.OUTER_DIA + spec.ROUTINE_BAND_MM < spec.STOCK_DIA
+
+
+def test_ream_callout_carries_the_bore_fit_statement() -> None:
+    """Main's machinist review: the REAM band's mate was named only in the
+    unattached note block. Its fit lines now ride the callout, unchanged."""
+    assert spec.BORE_CALLOUT == f"REAM THRU\n{spec.INSTALLATION_NOTES}"
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '{"BoreDia": spec.BORE_CALLOUT}' in source
+    assert '"Installation Notes"' not in source
+
+
+def test_end_view_projects_with_the_turning_view_and_the_nose_dia_moves_onto_it() -> None:
+    """r4 review: the end view put the flat facing the turning view's reader
+    while the turning view drew it at the bottom; Ø6.40 sat only on the end
+    view (rule 11); 3.500's extension lines struck its function line."""
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert (
+        'for view, label in ((end, "end view"), (side, "turning view"), '
+        '(tap, "radial tap view")):\n        _quarter_turn(adapter, view, label)'
+    ) in source
+    assert "_horizontal_axis" not in source
+    assert "move_model_dimension(adapter, nose_donors[0], side, NOSE_DIA_ON_SIDE" in source
+    assert 'set_dimension_callouts(adapter, side_marks, above, location="above")' in source
+    # Left of the nose's south face, right of FlatDistance's text.
+    assert drawing.END_KEEP["FlatDistance"][0] < drawing.NOSE_DIA_ON_SIDE[0]
+    assert drawing.NOSE_DIA_ON_SIDE[0] < drawing.SIDE_CENTER[0] - spec.WIDTH * 4 / 2000.0
+    # Farm run 20261101T005319353Z: its text box ran to keep + 18.3 mm and
+    # crossed NoseLength's south extension line at x 182; it ends one text
+    # clearance (1.78 mm) short of it.
+    assert drawing.NOSE_DIA_ON_SIDE[0] + 0.0183 < 0.182 - 0.00178
+    assert not 0.165 + 0.0183 < 0.182 - 0.00178
+
+
+def test_three_place_lengths_state_their_function() -> None:
+    """Main's machinist review: 11.500, 3.500 and 7.500 had no stated function.
+    They hold the tap's walls; at .XX those walls fall below the floor."""
+    three_place = {
+        name
+        for name, places in spec.DRAWING_PRECISION_BY_NAME.items()
+        if places == 3 and name != "BoreDia"
+    }
+    assert three_place == {"NoseLength", "CollarWidth", "TapStation"}
+    assert set(spec.AXIAL_FUNCTION_CALLOUTS) == three_place
+    for text in spec.AXIAL_FUNCTION_CALLOUTS.values():
+        assert not re.search(r"\d", text) and "\n" not in text
+    side = drawing._function_callouts(drawing.SIDE_KEEP)
+    tap = drawing._function_callouts(drawing.TAP_KEEP)
+    assert side.keys() | tap.keys() == three_place
+    loosen = 2.0 * (printed_band_mm(2) - spec.AXIAL_BAND_MM)
+    for wall in ("tap to south shoulder", "tap to north face"):
+        assert spec.WORST_WALLS_MM[wall] - loosen < 1.5
 
 
 def test_installation_notes_name_the_journal_and_its_clearance() -> None:
