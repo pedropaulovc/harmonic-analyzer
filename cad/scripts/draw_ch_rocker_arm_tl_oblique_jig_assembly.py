@@ -546,9 +546,9 @@ if spec.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
 
 
 # Glues an item citation ("ITEM 22") and a value with its unit ("3.5 N·m",
-# "25 IN·LBF") into one word while wrapping, so the fitter never reads "ITEM"
-# or a number at a line end and what it belongs to on the next.
-_UNBROKEN = re.compile(r"\bITEM (?=\d)|(?<=\d) (?=N·m|IN·LBF)")
+# "25 IN·LBF", "2.0 MM") into one word while wrapping, so the fitter never
+# reads "ITEM" or a number at a line end and what it belongs to on the next.
+_UNBROKEN = re.compile(r"\bITEM (?=\d)|(?<=\d) (?=N·m|IN·LBF|MM\b)")
 _GLUE = "\x00"
 # A step's label: its number, or a sub-step's ("7A").
 _STEP_LABEL = re.compile(r"\d+[A-Z]?")
