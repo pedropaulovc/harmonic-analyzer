@@ -60,7 +60,11 @@ NUT_REACH_X = (NUT_FACE_X - lead.NUT_FLANGE_THICK - lead.NUT_BODY_LONG,
                max(LUG_X1, NUT_FACE_X + lead.NUT_BODY_SHORT))
 NUT_MACHINE_Z = trammel.CARRIAGE_TOP_Z + NUT_AXIS_Z
 PLAN_DATUM_REFERENCE = pivot.PLAN_DATUM_REFERENCE
-DRAWING_VALUES = dict(pivot.DRAWING_VALUES) | {
+CBORE_FLOOR_REFERENCE = pivot.CBORE_FLOOR_REFERENCE
+# B-B prints the block height from the floor sketch's interior line (TL-22,
+# whose B-B never imported it, prints the Block extrusion's depth on A-A).
+DRAWING_VALUES = {k: v for k, v in pivot.DRAWING_VALUES.items() if k != "BlockHeight"} | {
+    "SectionBlockHeight": BLOCK_HEIGHT,
     "LugWidth": LUG_WIDTH, "PlanLugX": LUG_X0 - BLOCK_X0,
     "PlanOverallY": BLOCK_WIDTH / 2 - LUG_Y0,
     "NutSeatDia": NUT_SEAT_DIA, "NutClearanceDia": SCREW_CLEARANCE_DIA,
@@ -70,7 +74,8 @@ DRAWING_VALUES = dict(pivot.DRAWING_VALUES) | {
 # The four taps print as offsets from the nut axis: rows on the -Z column
 # (taps 1 and 3), columns on the +Y row (taps 3 and 4).
 NUT_PATTERN_PRINTED = ("NutCentreZ", "NutCentreY", "NutTap3Z", "NutTap4Z", "NutTap1Y", "NutTap3Y")
-DRAWING_DIMENSIONS = dict(pivot.DRAWING_DIMENSIONS) | {
+DRAWING_DIMENSIONS = {k: v for k, v in pivot.DRAWING_DIMENSIONS.items() if k != "Block"} | {
+    CBORE_FLOOR_REFERENCE: pivot.DRAWING_DIMENSIONS[CBORE_FLOOR_REFERENCE] + ("SectionBlockHeight",),
     PLAN_DATUM_REFERENCE: pivot.DRAWING_DIMENSIONS[PLAN_DATUM_REFERENCE] + ("PlanLugX", "PlanOverallY"),
     "LugProfile": ("LugWidth",),
     "NutSeatProfile": ("NutSeatDia",),
@@ -85,12 +90,13 @@ NUT_PATTERN_PLACES = 3
 NUT_SEAT_PLACES = 2
 # The leadscrew clearance is drilled: inch drill sizes print three places.
 THREE_PLACE_DIMENSIONS = pivot.THREE_PLACE_DIMENSIONS | {"NutClearanceDia"}
-DRAWING_PRECISION = dict(pivot.DRAWING_PRECISION) | {
+DRAWING_PRECISION = {k: v for k, v in pivot.DRAWING_PRECISION.items() if k != "Block"} | {
     feature: {
         name: (3 if name in THREE_PLACE_DIMENSIONS or feature == "NutPatternReference" else 2)
         for name in DRAWING_DIMENSIONS[feature]
     }
-    for feature in (PLAN_DATUM_REFERENCE, "LugProfile", "NutSeatProfile", "NutClearanceProfile", "NutPatternReference")
+    for feature in (CBORE_FLOOR_REFERENCE, PLAN_DATUM_REFERENCE, "LugProfile", "NutSeatProfile",
+                    "NutClearanceProfile", "NutPatternReference")
 }
 DRAWING_PRECISION_BY_NAME = {
     name: places for dimensions in DRAWING_PRECISION.values()
