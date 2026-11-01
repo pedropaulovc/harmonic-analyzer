@@ -31,12 +31,14 @@ at PRESS_DEPTH inside the arm's end face.
 
 from __future__ import annotations
 
+import _config
 from _mcmaster_98381a474 import (
     DIA_BAND_IN,
     ENDS,
     DOWEL_SIZE,
     MM_PER_IN,
 )
+from _package_units import drawing_unit
 from _supplier_pin_data import SupplierPinReference
 
 SKU = "98381A474"
@@ -101,4 +103,7 @@ SUPPLIER_REFERENCE = SupplierPinReference(
     diameter_precision=4,
     length_precision=3,
     diameter_band=(0.0001, 0.0003),
+    sheet_unit=drawing_unit(
+        "parts/pd-vn-transgear-latch-pin", _config.parts("pd-vn-transgear-latch-pin")
+    ),
 )
