@@ -544,14 +544,18 @@ JOURNAL_TEXT_OFFSETS = {
 # sets the 16T's feeler seat and its length the crankshaft collar's seat on
 # the south face; the cone boss's face-to-face is the cone shaft's bearing
 # length, and the body is turned flush with those faces (one harvested size).
+# Two of them keep their old footprint (r5 layout gate): the face station's
+# two rows of at most ten characters, its dimension line otherwise dropping
+# onto the counterbore callout's leader, and the face-to-face's one row, two
+# rows standing it through the sheet's top border.
 DIMENSION_CALLOUTS = {
     "MainBodyDia": "FLUSH WITH CONE\nBOSS FACES",
     "CrankBossDia": "CRANK BOSS",
     "CrankBossLen": "CRANK BOSS\nLENGTH, SEATS\nMHA-DT-11 COLLAR",
-    "CrankBossStartZ": "CRANK BOSS\nFACE, SETS\nMHA-DT-10",
+    "CrankBossStartZ": "FACE SETS\nMHA-DT-10",
     "CrankBoreDia": "RUNS ON MHA-DT-11",
     "JournalBoreDia": f"CONE BORE THRU\nRUNS ON MHA-DT-04\n{POST_JOURNAL_RIM_BREAK}\nFOR COLLAR SEAT",
-    "ConeBossLen": "CONE BOSS FACE-TO-FACE,\nMHA-DT-04 BEARING LENGTH",
+    "ConeBossLen": "MHA-DT-04 BEARING LENGTH",
     "ConeBossNorthZ": "THRUST FACE FOR\nMHA-DT-04 COLLAR,\nFROM POST AXIS",
     "CrankAboveCone": "16T:64T\nMESH",
     "JournalAxisY": "AXIS MATCHES\nMHA-DT-21",
@@ -559,7 +563,7 @@ DIMENSION_CALLOUTS = {
 # Text after the size and its band, on the same line: one row keeps the
 # head's Ø in the narrow band between View C's head and the A-A station,
 # and the cone boss's Ø between the bore's block and SECTION A-A's caption
-# (named as Section A-A's CONE BOSS FACE-TO-FACE names the same boss).
+# (named so it reads as the boss Section A-A gives face-to-face).
 DIMENSION_SUFFIXES = {
     "CrankBoreDia": " THRU",
     "HeadDia": " HEAD",
