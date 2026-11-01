@@ -22,13 +22,14 @@ _MATCH_TOLERANCE_PERCENT = float(
 )
 
 
-# Function only: the rate is measured between any two inside-hook lengths
-# within the free and maximum lengths the sheet dimensions natively.
+# Function only: every spring's rate is measured between the same two
+# inside-hook lengths, chosen within the free and maximum lengths the sheet
+# dimensions natively (machinist review: varying lengths spoil the match).
 DRAWING_NOTES = "\n".join(
     (
         f"MATCHED SET: ORDER {_ORDER_QUANTITY} FROM ONE LOT; KEEP {_MATCHED_SET_SIZE} "
         "WHOSE RATE, MEASURED",
-        "BETWEEN TWO LENGTHS WITHIN THE FREE AND MAXIMUM SHOWN, IS WITHIN",
-        f"\u00b1{_MATCH_TOLERANCE_PERCENT:.2f}% OF THEIR MEAN, FOR EQUAL FORCE IN EVERY CHANNEL.",
+        "BETWEEN THE SAME TWO LENGTHS WITHIN THE FREE AND MAXIMUM SHOWN,",
+        f"IS WITHIN \u00b1{_MATCH_TOLERANCE_PERCENT:.2f}% OF THEIR MEAN, FOR EQUAL FORCE IN EVERY CHANNEL.",
     )
 )
