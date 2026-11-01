@@ -51,8 +51,10 @@ from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -107,6 +109,7 @@ from ch_channel_lever_spec import (
     SPRING_EYE_HOLE_SPEC,
     SURFACE_FINISHES,
     TIP_ARC_CX,
+    UNIT,
 )
 
 PART_NAME = "ch-channel-lever"
@@ -225,6 +228,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): the lever's design constants. A GUI
     # fine-tune edits THESE globals -- never an auto "D1@Sketch1". The mm suffix
@@ -356,8 +361,8 @@ async def build(adapter) -> dict[str, str]:
     expected += v_hub
     await volume_check(adapter, "lever + hub", expected, 0.005 * expected)
 
-    # Fulcrum hole (Ø6.5, rides the fulcrum shaft): a bearing bore, kept a plain
-    # circle cut. On the origin, so only its diameter is a dim.
+    # Fulcrum hole (Ø.256 reamed, rides the fulcrum shaft): a bearing bore, kept
+    # a plain circle cut. On the origin, so only its diameter is a dim.
     fulcrum = SketchDims()
     check("create_sketch fulcrum hole", await adapter.create_sketch("Front"))
     await define_circle(
@@ -442,22 +447,27 @@ async def build(adapter) -> dict[str, str]:
     # Bands ride natively on the model dimensions the print imports
     # (drawing-simplicity-policy.md): the reamed fulcrum bore, the plate the
     # bar's top notch straddles, the hub faces that set the station pitch, and
-    # the two gain arms from the fulcrum bore.
+    # the two gain arms from the fulcrum bore. The bands are millimetres; UNIT
+    # prints them in inches.
     set_dimension_bilateral_tolerance(
-        adapter, "FulcrumProfile", "FulcrumDia", *deviations(PIVOT_HOLE_BAND)
+        adapter, "FulcrumProfile", "FulcrumDia", *deviations(PIVOT_HOLE_BAND),
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "Hub", "HubLength", *deviations(HUB_LENGTH_BAND)
+        adapter, "Hub", "HubLength", *deviations(HUB_LENGTH_BAND), display_unit=UNIT
     )
     set_dimension_symmetric_tolerance(
-        adapter, "LeverBody", "LeverThick", LEVER_THICKNESS_TOLERANCE
+        adapter, "LeverBody", "LeverThick", LEVER_THICKNESS_TOLERANCE, display_unit=UNIT
     )
     set_dimension_symmetric_tolerance(
-        adapter, "PlateOffsetReference", "PlateOffset", PLATE_OFFSET_TOLERANCE
+        adapter, "PlateOffsetReference", "PlateOffset", PLATE_OFFSET_TOLERANCE,
+        display_unit=UNIT,
     )
-    set_dimension_symmetric_tolerance(adapter, "BarPinHole", "BarPinCx", BAR_PIN_X_TOLERANCE)
     set_dimension_symmetric_tolerance(
-        adapter, "SpringHole", "SpringCx", LEVER_SPRING_X_TOLERANCE
+        adapter, "BarPinHole", "BarPinCx", BAR_PIN_X_TOLERANCE, display_unit=UNIT
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "SpringHole", "SpringCx", LEVER_SPRING_X_TOLERANCE, display_unit=UNIT
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     for feature_name, dimension_name in (
