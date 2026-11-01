@@ -18,9 +18,9 @@ the sleeve's float, the one gap a feeler reaches (front bushing to ring,
 cluster rearward), into ``RING_FLOAT_RANGE``, one shim wide over
 ``END_FLOAT_MIN`` (R9-5); the disc's end float is that plus the recess, so
 it never closes under the floor either.  The rear bushing is short enough
-that the unshimmed float always clears the floor.  The lengths that also
-set the collar-to-disc air and keep the hub off the nose print +/-.001
-(``pd_cluster_stack_band``); the rear bushing prints at the title block.  The
+that the unshimmed float always clears the floor, and its band holds the
+count to four shims.  The lengths that also set the collar-to-disc air and
+keep the hub off the nose print +/-.001 (``pd_cluster_stack_band``).  The
 collar-to-disc and disc-to-platen air are statistical stacks
 (``pd_cluster_air``, machining-dfm.md "air stack" method).
 
@@ -54,19 +54,19 @@ import pd_transgear_knob_thrust_ring_spec as KNOB_RING
 import pd_transgear_pin_spec as PIN
 import pd_vn_transgear_cluster_shim_spec as SHIM
 import pd_vn_transgear_retaining_ring_spec as RING
-from _printed_tolerance import printed_band_mm
 from pd_cluster_stack_band import FIT_LENGTH_BAND_IN
 
 # --- the three cluster lengths -----------------------------------------------------
 # The statistical collar air (0.10 MIN, pd_cluster_air) and the hub never
 # proud of the nose hold the hub and the front bushing to +/-.001; the rear
-# bushing only feeds the shimmed end float, so it prints .XXX at the title
-# block.  Each is the exact millimetre value of a .001 in nominal.  The rear
-# bushing is short by the shims' room: the unshimmed float's worst case
-# still clears the floor.
+# bushing only feeds the shimmed end float, so its band only sets the shim
+# count: +/-.004, one thou inside the title block's .XXX, keeps the longest
+# unshimmed gap to SHIM_COUNT_MAX thinnest shims.  Each is the exact
+# millimetre value of a .001 in nominal.  The rear bushing is short by the
+# shims' room: the unshimmed float's worst case still clears the floor.
 LENGTH_BAND = FIT_LENGTH_BAND_IN  # the hub and the front bushing
 LENGTH_PLACES = 3
-REAR_BUSHING_LENGTH_BAND = printed_band_mm(LENGTH_PLACES, unit=PIN.UNIT)
+REAR_BUSHING_LENGTH_BAND = 0.1016  # +/-.004
 HUB_LENGTH = 13.6906  # .539
 FRONT_BUSHING_LENGTH = 5.6388  # .222
 REAR_BUSHING_LENGTH = 5.4356  # .214
@@ -148,6 +148,8 @@ SHIM_COUNT_RANGE = (
     ),
     math.floor((UNSHIMMED_FLOAT_RANGE[1] - END_FLOAT_MIN) / SHIM.THICKNESS_MIN),
 )
+# The supplier's family note: a stack of more than four may shift.
+SHIM_COUNT_MAX = 4
 # The model carries the nominal cluster's count at catalogue nominal.
 SHIM_COUNT_MODEL = 2
 SHIM_STACK_MODEL = round(SHIM_COUNT_MODEL * SHIM.THICKNESS, 6)
@@ -233,6 +235,11 @@ for _ok, _what in (
     (
         SHIM_COUNT_RANGE[0] <= SHIM_COUNT_MODEL <= SHIM_COUNT_RANGE[1],
         f"the model's {SHIM_COUNT_MODEL} shims are off the fit-up's {SHIM_COUNT_RANGE}",
+    ),
+    (
+        SHIM_COUNT_RANGE[1] <= SHIM_COUNT_MAX,
+        f"the longest unshimmed gap takes {SHIM_COUNT_RANGE[1]} shims, over "
+        f"{SHIM_COUNT_MAX}",
     ),
     (
         RECESS_RANGE[0] >= -1e-9,

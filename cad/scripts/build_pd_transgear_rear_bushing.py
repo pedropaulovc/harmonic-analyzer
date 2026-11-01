@@ -2,8 +2,8 @@ r"""Reproduction script: transgear rear bushing (MHA-PD-24; R9-68; 1 used).
 
 The turned brass ring on the MHA-PD-23 pin between the MHA-PD-18 arm's front
 face and the MHA-PD-10 sleeve's rear face (``pd_transgear_rear_bushing_spec``).
-Its length prints at the title block: the MHA-PD-VN-68 shims under it set the
-disc's end float (#2124).
+Its length prints the band that holds the MHA-PD-VN-68 shims under it, which
+set the disc's end float (#2124), to four.
 
 Layout: Front-plane annulus at the origin (O.D., bore) extruded +Z by the
 length, so the arm face is the Front Plane (z = 0) and the sleeve face is the
@@ -40,7 +40,10 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _drawing_tolerances import (
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
@@ -52,6 +55,7 @@ from pd_transgear_rear_bushing_spec import (
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     LENGTH,
+    LENGTH_BAND,
     OD,
     SURFACE_FINISHES,
     UNIT,
@@ -157,7 +161,7 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     # The bore runs on the pin: its reamed band lives on the model dimension.
-    # The length is printed to the disc cluster stack's band.
+    # The length prints the band that holds the shim count to four.
     set_dimension_bilateral_tolerance(
         adapter,
         "RingProfile",
@@ -165,11 +169,14 @@ async def build(adapter) -> dict[str, str]:
         *deviations(BORE_DIA_BAND),
         display_unit=UNIT,
     )
+    set_dimension_symmetric_tolerance(
+        adapter, "Ring", "RingLength", LENGTH_BAND, display_unit=UNIT
+    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    # Both bearing faces, resolved by outward normal and offset: a ring
+    # The sleeve's thrust face, resolved by outward normal and offset: a ring
     # extruded -Z would have no +Z face at z = LENGTH and refuse here.
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(

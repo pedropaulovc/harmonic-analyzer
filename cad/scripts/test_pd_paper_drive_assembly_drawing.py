@@ -1593,6 +1593,21 @@ def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:
     }
 
 
+def test_view_e_text_stands_forward_of_the_ring_over_the_bare_pin() -> None:
+    """The ring gap's text sits ahead of the ring (machine -Z), above the
+    ring's rim, where only the pin's shank runs below it: no bushing outline,
+    chamfer or extension line crosses it.  The circle still frames it."""
+    import pd_paper_drive_cluster_float_spec as cluster_float
+    import pd_vn_transgear_retaining_ring_spec as ring
+
+    _, y, z = cluster_float.TEXT_POINT
+    assert z < cluster_fit.RING_FRONT_Z - 2.0
+    assert y - cluster_float.AXIS_XY[1] > ring.OD / 2.0 + 0.5
+    reach = math.dist((y, z), drawing.CLUSTER_FLOAT_MODEL_CENTRE[1:])
+    assert reach * drawing._CLUSTER_FLOAT_M_PER_MM < drawing.CLUSTER_FLOAT_RADIUS
+
+
+
 def test_nothing_in_the_disc_cluster_is_faced_at_assembly() -> None:
     for key in (
         "hub-faced-to-nose",
