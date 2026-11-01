@@ -178,12 +178,16 @@ TAP_CALLOUT_BELOW = (
 # the leg's foot (its top station) and its stock Ø, which carries the
 # select-fit window; TubeOdReference a hidden construction sketch on the
 # Front plane carrying the tube's stock Ø across the bare leg above the
-# sleeve.  EndPieceProfile and CounterboreProfile
+# sleeve; OverallReference a hidden construction sketch on the Front plane
+# whose lines lie on drawn edges, carrying the bent form's overall height
+# (foot face to the arm's top) and reach (end face to the leg's outer side).
+# EndPieceProfile and CounterboreProfile
 # lie on the arm-axis plane, so section A-A (cut along the arm axis) carries
 # them. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StationReference": {"LegLength", "ArmStraight"},
     "TubeOdReference": {"TubeOdRef"},
+    "OverallReference": {"OverallHeight", "OverallReach"},
     "BendPath": {"BendRadius"},
     "SleeveProfile": {"SleeveLength", "SleeveDia"},
     "EndPieceProfile": {"PlugDia", "PlugHeadLength", "PlugShankDia", "PlugShankLength"},
@@ -199,9 +203,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # 2026-10-31).  Their walls are hidden on the elevation and cut by no
 # section, so they stay as the stock designations in note 1 (rule 9).
 # sm_gooseneck_geom proves the sleeve's select fit on the supplier's bands.
+# The overall height and reach are references too: the tangent stations
+# (417.1, 27.16) lay out the bend and govern; the overall sizes check the
+# finished bend from real faces (machinist review r5 of farm run
+# 20261101T004958072Z).
 REFERENCE_DIMENSIONS: dict[str, frozenset[str]] = {
     "TubeOdReference": frozenset({"TubeOdRef"}),
     "SleeveProfile": frozenset({"SleeveDia"}),
+    "OverallReference": frozenset({"OverallHeight", "OverallReach"}),
 }
 # Where TubeOdReference's line runs on the bare leg: TUBE_OD_REF_SPAN long,
 # centred mid-way between the sleeve's top and the bend's entry tangent.
@@ -211,7 +220,9 @@ TUBE_OD_REF_SPAN = 20.0
 # block's .X band, drawing-guidelines.md rule 3); the arm straight sets the
 # spring eye's station and every end-piece size is turned, so they print at
 # two.
-ONE_PLACE_DIMENSIONS = frozenset({"LegLength", "BendRadius", "SleeveLength"})
+ONE_PLACE_DIMENSIONS = frozenset(
+    {"LegLength", "BendRadius", "SleeveLength", "OverallHeight", "OverallReach"}
+)
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     feature: {name: 1 if name in ONE_PLACE_DIMENSIONS else 2 for name in sorted(names)}
     for feature, names in DRAWING_DIMENSIONS.items()

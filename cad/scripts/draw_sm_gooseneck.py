@@ -14,7 +14,8 @@ sheet carries, at 1:3:
   the arm straight (bend tangent to the end face) on the tube's axes, from
   the part's hidden ``StationReference``; the bend's centreline radius; the
   sleeve length from the foot and the sleeve's stock Ø with its fit on the
-  tube;
+  tube; the reference overall height and reach to real faces, from the
+  part's hidden ``OverallReference``;
 * the END VIEW (``*Left``, third-angle left of the elevation): the end face,
   carrying the native blind-tap callout with its depth datum and the thread
   axis's location limit;
@@ -161,6 +162,13 @@ SLEEVE_TOP_Y = _front_y(SLEEVE_TOP)
 # through the label, farm run 20261027T224212504Z) and over the leg length's
 # upper extension line.  The tube's reference Ø crosses the bare leg on its
 # left, level with the hidden reference line, opposite the leg length.
+# The reference overall height (foot face to the arm's top) stands outermost
+# on the leg's right, beyond the leg length (its text ended at x 0.310 in farm
+# run 20261101T004958072Z) and clear of the isometric (left edge x 0.358),
+# its text at the view's mid-height, 22 mm below the leg length's.  The
+# reference reach (end face to the leg's outer side) runs over the arm
+# straight, its text between that one's (top y 0.247) and the view label
+# (bottom y 0.258).  Machinist review r5 of that run.
 FRONT_KEEP = {
     "SleeveLength": (LEG_AXIS_X + 0.018, (FOOT_Y + SLEEVE_TOP_Y) / 2.0),
     "SleeveDia": (LEG_AXIS_X - 0.034, FOOT_Y + 0.040),
@@ -168,6 +176,14 @@ FRONT_KEEP = {
     "TubeOdRef": (LEG_AXIS_X - 0.030, _front_y(TUBE_OD_REF_Y)),
     "ArmStraight": ((END_FACE_X + _front_x(-BEND_R)) / 2.0, ARM_AXIS_Y + 0.014),
     "BendRadius": (LEG_AXIS_X + 0.019, ARM_AXIS_Y - 0.0176),
+    "OverallHeight": (
+        LEG_AXIS_X + 0.052,
+        (FOOT_Y + _front_y(ARM_Y + _TUBE_R)) / 2.0,
+    ),
+    "OverallReach": (
+        (END_FACE_X + _front_x(_TUBE_R)) / 2.0,
+        ARM_AXIS_Y + 0.021,
+    ),
 }
 
 # The end view (*Left) looks at the end face along +X: sheet x is model +Z.

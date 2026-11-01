@@ -214,6 +214,7 @@ def test_stock_diameters_print_as_untoleranced_references() -> None:
     assert spec.REFERENCE_DIMENSIONS == {
         "TubeOdReference": frozenset({"TubeOdRef"}),
         "SleeveProfile": frozenset({"SleeveDia"}),
+        "OverallReference": frozenset({"OverallHeight", "OverallReach"}),
     }
     for feature, names in spec.REFERENCE_DIMENSIONS.items():
         assert names <= spec.DRAWING_DIMENSIONS[feature]
@@ -222,6 +223,63 @@ def test_stock_diameters_print_as_untoleranced_references() -> None:
     low = spec.TUBE_OD_REF_Y - spec.TUBE_OD_REF_SPAN / 2.0
     high = spec.TUBE_OD_REF_Y + spec.TUBE_OD_REF_SPAN / 2.0
     assert geom.SLEEVE_TOP < low < high < geom.LEG_TOP
+
+
+def _recorded_equations(module) -> dict[str, str]:
+    return {
+        call.args[0].value: call.args[1].value
+        for call in _calls(module, attr="record")
+        if len(call.args) == 2 and isinstance(call.args[0], ast.Constant)
+    }
+
+
+def test_overall_height_and_reach_print_as_one_place_references() -> None:
+    # Machinist review r5 of farm run 20261101T004958072Z: 417.1 and 27.16
+    # stop at the bend's tangents, so the bent part needs overall sizes to
+    # real faces, printed as references beside the governing tangent ones.
+    names = {"OverallHeight", "OverallReach"}
+    assert spec.DRAWING_DIMENSIONS["OverallReference"] == names
+    assert spec.REFERENCE_DIMENSIONS["OverallReference"] == names
+    assert spec.DRAWING_PRECISION["OverallReference"] == dict.fromkeys(names, 1)
+    assert names <= set(drawing.FRONT_KEEP)
+    # The equations, evaluated on the part's globals, are the faces' spans.
+    globals_mm = {
+        "ArmY": geom.LEG_TOP + geom.BEND_R,
+        "TubeDia": geom.TUBE_DIA,
+        "LegBottom": geom.LEG_BOTTOM,
+        "ArmEndX": geom.ARM_END_X,
+    }
+    equations = _recorded_equations(part)
+
+    def evaluate(name: str) -> float:
+        expression = re.sub(
+            r'"(\w+)"', lambda m: repr(globals_mm[m.group(1)]), equations[name]
+        )
+        return eval(expression)  # noqa: S307 -- the builder's own literal
+
+    height = geom.ARM_Y + geom.TUBE_DIA / 2.0 - geom.LEG_BOTTOM
+    reach = geom.TUBE_DIA / 2.0 - geom.ARM_END_X
+    assert evaluate("OverallHeight") == pytest.approx(height)
+    assert evaluate("OverallReach") == pytest.approx(reach)
+    assert height == pytest.approx(499.65)
+    assert reach == pytest.approx(109.71, abs=0.005)
+    # The sketch is hidden in the part and shown only by the elevation.
+    blanked = {call.args[1].value for call in _calls(part, name="blank_sketch")}
+    assert "OverallReference" in blanked
+
+
+def test_overall_references_stand_clear_of_the_elevation_dimensions() -> None:
+    keep = drawing.FRONT_KEEP
+    height_x, height_y = keep["OverallHeight"]
+    reach_x, reach_y = keep["OverallReach"]
+    # Outermost on the leg's right, short of the isometric's left edge (x
+    # 0.358 in farm run 20261101T004958072Z), its text away from 417.1's.
+    assert keep["LegLength"][0] + 0.015 <= height_x <= drawing.ISO_CENTER[0] - 0.030
+    assert abs(height_y - keep["LegLength"][1]) >= 0.015
+    assert drawing.FOOT_Y < height_y < drawing._front_y(geom.ARM_Y + geom.TUBE_DIA / 2)
+    # Over the arm straight, under the view label (bottom y 0.258).
+    assert keep["ArmStraight"][1] + 0.005 <= reach_y <= 0.258 - 0.0045
+    assert drawing.END_FACE_X < reach_x < drawing._front_x(geom.TUBE_DIA / 2)
 
 
 def test_tap_callout_states_geometry_and_its_mate_within_four_rows() -> None:
