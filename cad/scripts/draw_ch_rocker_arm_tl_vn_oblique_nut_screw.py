@@ -11,6 +11,7 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import NumberFit, build_purchased_fastener_drawing
 from _com import _early_bound
@@ -18,6 +19,8 @@ from _supplier_screw_dimensions import annotate_supplier_screw, assert_supplier_
 from _supplier_screw_layout import supplier_screw_margins
 import ch_rocker_arm_tl_vn_oblique_nut_screw_spec as supplier
 
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_nut_screw"]
 # The footer's ITEM row: the fastener table's callout for the screw.
