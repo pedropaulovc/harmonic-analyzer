@@ -41,7 +41,7 @@ from _drawing_dimensions import (
     offset_dimension_text,
     set_dimension_callouts,
 )
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
@@ -497,6 +497,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _assert_native_thread(thread_callout)
     _omit_thread_class(thread_callout)
+    set_hole_callout_precision(
+        thread_callout, {"hw-thrutapdrldia": 3}, label=f"{THREAD} through thread"
+    )
 
     return await finalize_drawing(
         adapter,
