@@ -11,20 +11,22 @@ edge -- lands where the layout puts it):
   the roll's start below the ear, its inside radius (shortened leader: the
   centre is off the sheet), the straight's length, the inside tab radius, the tab
   end's X -- and the far face where the pin crosses it, in X and Y from the
-  origin as references (the fit-up sets it, note 3); the pin hole's size,
-  match-drilled at assembly;
+  origin as references, the Y flagged as the pin's axis at that face; the
+  pin hole's size, match-drilled at assembly (note 2 names the pin);
 * ``*Right`` (looking -X, Z running left): the width, the arm's front-edge
   heights above and below the taper, the root relief and the full round;
   left of it the formed overall height, a reference from the ear's top edge
   to the full round's tip; beside it the flat pattern, the part's hidden
-  ``FlatBlank`` reference sketch shown in this view only (a thin outline):
-  the blank across the bend and the arm's developed stations of the taper
-  and the round's centre;
-* ``*Bottom`` (looking +Y, X right, Z up), out of projection beside the side
-  view and so labelled: the base length, the ear height and the inside bend.
+  ``FlatBlank`` reference sketch shown in this view only (a thin outline
+  labelled FLAT PATTERN): the blank across the bend, the arm's strip widths
+  as references, and its developed stations of the taper and the round's
+  centre;
+* ``*Bottom`` (looking +Y, X right, Z up), projected under the front view
+  (third angle, so unlabelled): the base length, the ear height and the
+  inside bend.
 
-The process and the heat treatment ride the part's Manufacturing Notes and
-the title block's FINISH cell.
+The heat treatment rides the title block's FINISH cell; the fit-up and
+heat-treat sequence is the assembly's (the registry row's process).
 """
 
 from __future__ import annotations
@@ -98,6 +100,7 @@ from pd_latch_hook_spec import (
     OVERALL_HEIGHT,
     PAIR_CALLOUT,
     PIN_HOLE_CALLOUT,
+    PIN_STATION_CALLOUT,
     REFERENCE_DIMENSIONS,
     ROUND_CALLOUT,
     SCREW_HOLE_CALLOUT,
@@ -137,14 +140,16 @@ _MID_Z = sum(_LOCAL_Z) / 2.0
 
 # View centres (the part's bounding box centre on the sheet): the front view
 # at the left, the side view and its flat pattern level with it, the bottom
-# view and the isometric at the right above the title block (top 0.066).
+# view projected under the front view (its top clear under the front view's
+# lowest text), the isometric at the right above the title block (top
+# 0.066), the notes in the free top-right corner.
 FRONT_CENTER = (0.072, 0.170)
 RIGHT_CENTER = (0.205, FRONT_CENTER[1])
-BOTTOM_CENTER = (0.359, 0.230)
+BOTTOM_CENTER = (FRONT_CENTER[0], 0.0544)
 ISO_CENTER = (0.372, 0.135)
-NOTES_XY = (0.020, 0.062)
+NOTES_XY = (0.320, 0.262)
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.035)
-BOTTOM_NOTE_XY = (BOTTOM_CENTER[0] - 0.013, 0.258)
+FLAT_NOTE_XY = (0.245, 0.083)
 NOTE_HEIGHT = 0.003  # the notes' characters (top-left anchored)
 
 # Where each view puts the part origin.
@@ -188,15 +193,16 @@ def _on(point: tuple[float, float], u: float, n: float = 0.0) -> tuple[float, fl
 # -U side (its extension set clear of the far face's X, which drops from the
 # far face); the pin hole's size up its +N side past the straight's roll-end
 # extension line, under the roll radius, its callout above so the dimension
-# line meets the value and never the callout; the inside roll radius in the
-# roll's concave side, the tab radius outside the tab.
+# line meets the value and never the callout;
+# the inside roll radius in the roll's concave side, the tab radius outside
+# the tab.
 FRONT_KEEP = {
     "ScrewX2": _front(SCREW_HOLE_X[1] / 2.0, 12.5),
     "ScrewX1": _front(SCREW_HOLE_X[0] / 2.0, 17.5),
     "ScrewY": _front(-32.0, SCREW_HOLE_Y / 2.0),
     "ScrewDia": _front(-25.0, -8.0),  # its mate line clear of the arm
     "RollStart": _front(20.0, OUTER_ROLL_START[1] / 2.0),
-    "FaceY": _front(30.0, FAR_FACE_POINT[1] / 2.0),
+    "FaceY": _front(24.0, FAR_FACE_POINT[1] / 2.0),
     "FaceX": _front(FAR_FACE_POINT[0] / 2.0, -96.0),
     "TabEndX": _front(OUTER_TAB_END[0] / 2.0, -103.0),
     "StraightLen": _front(*_on(OUTER_ROLL_END, -28.0, -5.0)),
@@ -209,7 +215,8 @@ FRONT_KEEP = {
 }
 # Side view: the width left of the ear, the two front-edge heights stacked
 # above it, the root relief right of its corner, the round under the tip;
-# the flat's length above it and its developed stations stacked to its right.
+# the flat's length above it, its two strip widths left of it (between the
+# views), and its developed stations stacked to its right.
 RIGHT_KEEP = {
     "Width": _right(26.0, 4.0),
     "ArmFrontZ": _right(3.0, 13.0),
@@ -217,6 +224,8 @@ RIGHT_KEEP = {
     "RootR": _right(-4.0, -8.0),
     "RoundR": _right(-6.0, -95.0),
     "FlatLength": _flat(FLAT_GAP + FLAT_LENGTH / 2.0, 14.0),
+    "FlatArmW": _flat(10.0, -12.0),
+    "FlatLowW": _flat(10.0, -40.0),
     "DevTaper1": _flat(58.0, -DEV_TAPER[0] / 2.0),
     "DevTaper2": _flat(66.0, -DEV_TAPER[1] / 2.0),
     "DevRoundC": _flat(74.0, -45.0),
@@ -239,6 +248,7 @@ CALLOUTS_ABOVE = {
 }
 CALLOUTS_BELOW = {
     "ScrewDia": f"{SCREW_HOLE_CALLOUT}\n{SCREW_HOLE_MATE}",
+    "FaceY": PIN_STATION_CALLOUT,
     "RoundR": ROUND_CALLOUT,
 }
 # The roll's centre sits ~80 mm left of the vertical: off the sheet at 3:2.
@@ -344,7 +354,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
-            "Bottom View Note",
+            "Flat Pattern Note",
         ),
         required=(
             "Number",
@@ -353,7 +363,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
-            "Bottom View Note",
+            "Flat Pattern Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -422,13 +432,11 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     _shorten_radii(adapter, annotations, SHORTENED_RADII)
-    # The far face at the pin: located at fit-up (note 3), so its X and Y
-    # print as references.
+    # The far face at the pin (located at fit-up on the pin's axis) and the
+    # flat pattern's strip widths print as references.
     by_name = {dimension_name(adapter, a): a for a in annotations}
     for name in sorted(REFERENCE_DIMENSIONS):
-        set_reference_dimension(
-            adapter, by_name[name], label=f"MHA-PD-14 far face {name}"
-        )
+        set_reference_dimension(adapter, by_name[name], label=f"MHA-PD-14 {name}")
     _overall_reference(adapter, right)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the screw holes")
@@ -437,7 +445,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for name, xy in (
         ("Manufacturing Notes", NOTES_XY),
         ("Isometric View Note", ISO_NOTE_XY),
-        ("Bottom View Note", BOTTOM_NOTE_XY),
+        ("Flat Pattern Note", FLAT_NOTE_XY),
     ):
         add_property_linked_note(adapter, name, *xy, char_height=NOTE_HEIGHT)
 

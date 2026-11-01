@@ -21,8 +21,8 @@ on the brass (R9-5).  The bore is
 datum A; the flange's rear face and the spigot's end are held square to it,
 all turned in one setup.  A #57 radial oil hole on +Y reaches the bore; it
 is drilled through the hub wall and the sleeve's boss in one operation at
-assembly (R9-8), centred on the hub body (R9-60), so the sheet carries a
-match-drill note, not a free drilled hole.
+assembly (R9-8), at a printed .XX station from the hub front face, so the
+sheet carries a match-drill callout, not a free drilled hole.
 
 Sizes (drawing-guidelines.md rule 17 (walls and webs)): every wall holds the
 .080 target at the printed worst case; the flange is .990 so the screw hole
@@ -42,7 +42,7 @@ rear face, the face that clamps the disc's front face; the spigot runs
 z = 0..+SPIGOT_LENGTH, the flange z = -FLANGE_THICK..0 and the hub body down to the
 front face, so local -Z is the machine's -Z (toward the operator).  Screw 0°
 is local +X, angles counter-clockwise seen from +Z; the bore's flat is on
-local -Y, the oil hole on local +Y, centred on the hub body.  The part sits
+local -Y, the oil hole on local +Y, on the hub body.  The part sits
 in the machine unrotated at z0 = ``transgear_cluster_fit.DISC_FRONT_Z``.
 
 Pure data; no SolidWorks calls.  This module reads the cluster fit, the
@@ -61,6 +61,7 @@ from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import (
     drilled_oversize_mm,
     edge_break_chamfer_mm,
+    inside_corner_radius_mm,
     printed_band_mm,
 )
 from _mcmaster_91794a055 import FILLISTER_SIZE
@@ -154,11 +155,14 @@ FLAT_TO_AXIS_BAND = (0.03556, 0.02032)  # (upper, lower) deviations: +.0014/+.00
 FLAT_TO_AXIS_DEVIATIONS = deviations(FLAT_TO_AXIS_BAND)
 if not 0.0 < FLAT_TO_AXIS < BORE_DIA / 2.0:
     raise AssertionError("MHA-PD-17 bore flat must cut the round bore")
-# Both corners at the flange stay sharp: the #0-80 heads sit beside the
-# hub's, and the disc's bore chamfer clears the spigot's.
+# The spigot's root at the flange stays sharp so the disc's front face
+# seats on the flange: the disc's bore chamfer clears it.  The hub body's
+# root takes the title block's inside corner; the #0-80 heads stand clear
+# of its fillet (checked with the head air below).
 CORNER_RADIUS_MAX = 0.1016  # .004
 if DISC.BORE_FRONT_CHAMFER_LIMITS[0] < CORNER_RADIUS_MAX:
     raise AssertionError("the disc's bore chamfer rides the spigot's corner")
+INSIDE_CORNER_RADIUS_MAX = inside_corner_radius_mm(unit=UNIT)
 
 # (least, greatest) diametral clearance of the round bore on the sleeve's
 # boss, and radial clearance of the flat on the sleeve's flat: each part is
@@ -342,12 +346,12 @@ DRILL_OVERSIZE = drilled_oversize_mm(unit=UNIT)
 SCREW_HOLE_PLACES = 3
 OIL_HOLE_DIA = 1.0922  # .043, a #57 drill
 OIL_HOLE_PLACES = 3
-# The oil hole is centred on the hub body (R9-60): it is match-drilled at
-# assembly through hub and sleeve together, so the drill finds the body's
-# centre at fit-up instead of a printed station.
-OIL_HOLE_STATION = HUB_BODY_LENGTH / 2.0  # behind the hub front face
-# Marking the body's centre with a rule at fit-up.
-OIL_HOLE_CENTRING_TOL = 0.254  # .010
+# The oil hole is match-drilled at assembly through hub and sleeve together,
+# at a printed .XX station from the hub front face (machinist review: a
+# location given only as "centred" is missing), the body's centre to the
+# .01 grid.
+OIL_HOLE_STATION = 3.81  # .15, behind the hub front face
+OIL_HOLE_STATION_PLACES = 2
 OIL_HOLE_Z = HUB_FRONT_Z + OIL_HOLE_STATION  # in the local frame
 # The same hole in the sleeve's frame (its rear face z 0): the spigot's end
 # stands on the step.  The sleeve's model drills it here.
@@ -362,8 +366,8 @@ _OIL_HOLE_MAX_R = (OIL_HOLE_DIA + DRILL_OVERSIZE) / 2.0
 _HEAD_MAX_R = (SCREW_HEAD_DIA + SCREW_HEAD_DIA_ALLOWANCE) / 2.0
 WALL_FLOOR = WALL_TARGET_MM
 # Air from a disc screw's head to the hub body: a clearance for the driver
-# and the head's seat beside the sharp corner, not a web.
-HEAD_AIR_MIN = 1.0
+# and the head's seat clear of the body root's fillet, not a web.
+HEAD_AIR_MIN = max(1.0, INSIDE_CORNER_RADIUS_MAX)
 
 
 def body_walls_worst(hub_dia: float) -> tuple[float, float]:
@@ -408,9 +412,9 @@ HOLE_TO_BORE_WORST = (
     - _SCREW_HOLE_MAX_R
     - _BORE_MAX / 2.0
 )
-# The hole is centred on the body, so its edge sits the same distance from
-# the hub front face and from the flange face: the shortest overall less the
-# longest spigot and thickest flange, and the reverse.
+# The hole's edge to the hub front face, and to the flange face: the
+# station's printed band against the shortest body the overall less the
+# longest spigot and thickest flange leaves.
 HUB_BODY_LENGTH_RANGE = (
     HUB_LENGTH_MIN
     - SPIGOT_LENGTH_MAX
@@ -421,11 +425,16 @@ HUB_BODY_LENGTH_RANGE = (
 )
 # (least, greatest) station of the hole centre behind the hub front face.
 OIL_HOLE_STATION_RANGE = (
-    HUB_BODY_LENGTH_RANGE[0] / 2.0 - OIL_HOLE_CENTRING_TOL,
-    HUB_BODY_LENGTH_RANGE[1] / 2.0 + OIL_HOLE_CENTRING_TOL,
+    OIL_HOLE_STATION - _BAND[OIL_HOLE_STATION_PLACES],
+    OIL_HOLE_STATION + _BAND[OIL_HOLE_STATION_PLACES],
 )
-OIL_HOLE_LIGAMENT_NOMINAL = OIL_HOLE_STATION - OIL_HOLE_DIA / 2.0
-OIL_HOLE_LIGAMENT_WORST = OIL_HOLE_STATION_RANGE[0] - _OIL_HOLE_MAX_R
+OIL_HOLE_LIGAMENT_NOMINAL = min(
+    OIL_HOLE_STATION, HUB_BODY_LENGTH - OIL_HOLE_STATION
+) - OIL_HOLE_DIA / 2.0
+OIL_HOLE_LIGAMENT_WORST = min(
+    OIL_HOLE_STATION_RANGE[0],
+    HUB_BODY_LENGTH_RANGE[0] - OIL_HOLE_STATION_RANGE[1],
+) - _OIL_HOLE_MAX_R
 # The same hole's ligament to the sleeve's nose (the sleeve's wall, judged
 # against its .080 target): the hub front face at its least recess plus the
 # hole's least station, less its largest radius.
@@ -448,20 +457,19 @@ for _label, _wall, _floor in (
         raise AssertionError(f"MHA-PD-17 {_label}: {_wall:.3f} worst < floor {_floor}")
 
 # --- sheet --------------------------------------------------------------------
-CORNER_NOTE = (
-    f"SPIGOT AND HUB CORNERS AT FLANGE SHARP, R{inch_text(CORNER_RADIUS_MAX, 3)} MAX."
-)
-FLANGE_THICK_NOTE = f"FLANGE THICKNESS SETS {SCREW_NAME} {SCREW_NUMBER} REACH."
-DRAWING_NOTES = "\n".join((CORNER_NOTE, FLANGE_THICK_NOTE))
+# No loose notes: each requirement is flagged at its feature (rule 7).
 # The two printed stack lengths name the stack they serve (rule 4); the
 # overall's reason is the nose it must never pass.
 HUB_LENGTH_CALLOUT = f"{STACK_NAME},\nNOT PROUD OF {SLEEVE_NAME} {SLEEVE_NUMBER} NOSE"
 SPIGOT_LENGTH_CALLOUT = STACK_NAME
+# The flange's .XXX thickness sets the disc screws' reach (the cut window
+# in pd_vn_transgear_disc_screw_spec reads it).
+FLANGE_THICK_CALLOUT = f"SETS {SCREW_NAME}\n{SCREW_NUMBER} REACH"
 # The spigot's native SHAFT_H limits print with the dimension; the callout
-# names the mate and the clearance the pair gives.
+# names its sharp root, the mate and the clearance the pair gives.
 SPIGOT_CALLOUT_BELOW = "\n".join(
     (
-        "SPIGOT",
+        f"SPIGOT ROOT R{inch_text(CORNER_RADIUS_MAX, 3)} MAX",
         f"(DIA CLR {inch_text(DISC.SPIGOT_DIAMETRAL_CLEARANCE[0], 4)}-"
         f"{inch_text(DISC.SPIGOT_DIAMETRAL_CLEARANCE[1], 4)}",
         f"IN {DISC_NAME} {DISC_NUMBER} BORE)",
@@ -471,14 +479,13 @@ SPIGOT_CALLOUT_BELOW = "\n".join(
 # Callouts the sheet hangs on the native dimensions.  The holes are drilled
 # (the title block's DRILLED HOLES row governs their sizes); the three screw
 # holes are one patterned feature, equally spaced on the printed circle.  The
-# oil hole is drilled with the hub seated on the sleeve, through both and
-# centred on the hub body (R9-60): the crank pinion's pin-hole wording
+# oil hole is drilled with the hub seated on the sleeve, through both, at its
+# printed station (R9-60): the crank pinion's pin-hole wording
 # (dt_crank_pinion_spec.pin_hole_note).
 SCREW_HOLE_CALLOUT_ABOVE = f"{SCREW_COUNT}X"
 SCREW_HOLE_CALLOUT_BELOW = "DRILL THRU FLANGE, EQ SP"
 OIL_HOLE_CALLOUT_BELOW = "\n".join(
     (
-        "CENTRED ON HUB BODY",
         "MATCH DRILL AT ASSY THRU HUB WALL AND",
         f"{SLEEVE_NAME} {SLEEVE_NUMBER} WITH HUB SEATED",
     )
@@ -487,7 +494,7 @@ OIL_HOLE_CALLOUT_BELOW = "\n".join(
 # Marked model dimensions and the places the model authors on them (policy
 # drawing-simplicity-policy.md `How the repository implements the guidelines`).  Edge view: the turned profile's three diameters, the spigot's and
 # flange's lengths from the flange's rear face, the overall, and the oil
-# hole's size (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)); face view: the bore and its flat, which only show
+# hole's size and station (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)); face view: the bore and its flat, which only show
 # there, and the screw holes on their bolt circle.  The overall and the
 # spigot print the disc cluster's band (#2038).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -501,7 +508,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "BoreProfile": {"BoreDia", "FlatToAxis"},
     "ScrewHoleProfile": {"BoltCircleDia", "ScrewHoleDia"},
-    "OilHoleProfile": {"OilHoleDia"},
+    "OilHoleProfile": {"OilHoleDia", "OilHoleStation"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HubProfile": {
@@ -517,7 +524,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "BoltCircleDia": BOLT_CIRCLE_PLACES,
         "ScrewHoleDia": SCREW_HOLE_PLACES,
     },
-    "OilHoleProfile": {"OilHoleDia": OIL_HOLE_PLACES},
+    "OilHoleProfile": {
+        "OilHoleDia": OIL_HOLE_PLACES,
+        "OilHoleStation": OIL_HOLE_STATION_PLACES,
+    },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

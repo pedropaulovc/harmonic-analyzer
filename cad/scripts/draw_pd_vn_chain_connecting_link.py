@@ -14,6 +14,7 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _supplier_chain_dimensions import (
     SOURCE_FEATURES,
@@ -24,6 +25,9 @@ from _supplier_chain_dimensions import (
 from _supplier_chain_stock import SUPPLIER_REFERENCE_CONFIGURATION
 from _supplier_spring_drawing import build_supplier_spring_drawing
 
+
+# Cached machinist review leaf: LEARN until the sheet reaches SHIP.
+MACHINIST_REVIEW = MachinistReviewMode.LEARN
 
 SPEC = DRAWINGS_BY_NAME["pd_vn_chain_connecting_link"]
 PART_STEM = SPEC.artifact_stem

@@ -43,7 +43,6 @@ from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
 from _drawing_gdt import add_feature_control_frame
-from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -64,12 +63,13 @@ from pd_transgear_disc_hub_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FLANGE_DIA,
-    FLANGE_THICK,
+    FLANGE_THICK_CALLOUT,
     FLAT_CLEARANCE,
     GEOMETRIC_TOLERANCES_IN,
     HUB_FRONT_Z,
     HUB_LENGTH_CALLOUT,
     OIL_HOLE_CALLOUT_BELOW,
+    OIL_HOLE_STATION,
     SCREW_HOLE_CALLOUT_ABOVE,
     SCREW_HOLE_CALLOUT_BELOW,
     SLEEVE_NAME,
@@ -113,7 +113,6 @@ END_CENTER = (0.090, AXIS_Y)
 # view's top-left arc (run 20261028T041908587Z) sat under the callout's
 # widest line, so the view drops below that row and steps right of its end.
 ISO_CENTER = (0.379, 0.188)
-NOTES_XY = (0.020, 0.062)
 
 
 def _side_x(z_mm: float) -> float:
@@ -160,17 +159,21 @@ FLAT_CALLOUT = "\n".join(
 #   flange's outermost so the spigot's extension lines end inside it, the
 #   spigot's callout under its text, clear of the part, the block set a
 #   little low between its extension lines to leave the spigot end's frame
-#   room above it.  The two lengths from the flange's rear face on one row
-#   above: the flange's text left of the flange, the spigot's right of the
+#   room above it.  One row above: the oil hole's station from the hub front
+#   face, its text between its extension lines left of the flange, and the
+#   spigot's length from the flange's rear face, its text right of the
 #   spigot, its whole callout block right of the spigot end's extension line
 #   (the overall's rises through that row) and so clear of the flange's
 #   dimension line.  The overall, printed to the disc cluster stack's band, on the
 #   next row up, outermost, its text and stack callout right of the spigot end's
 #   extension line.  Its ends are the spigot's and the hub's +X corners, so
 #   from a row above its extension lines rise off the part; from below they
-#   ran down across the hub front and the spigot end.  The oil hole's size
-#   with its match-drill callout above-left, over the gap between the two
-#   views, its text ending left of the overall's hub-front extension line.
+#   ran down across the hub front and the spigot end.  Below the part: the
+#   flange's thickness, its text and reach callout right of the flange and
+#   under the flange's frame, and the oil hole's size with its match-drill
+#   callout straight under the hole, so its leader rises to the hole
+#   crossing no dimension (machinist review: from above it crossed the
+#   overall's dimension line).
 # - The two perpendicularity frames stand right of the spigot's end, each
 #   level with its leader's landing so the leader runs square onto its face's
 #   line: the flange's below the spigot, between the spigot's and the
@@ -183,15 +186,17 @@ END_KEEP = {
     "BoreDia": (END_CENTER[0] + 0.030, AXIS_Y - _FLANGE_R - 0.020),
     "FlatToAxis": (END_CENTER[0] - 0.030, AXIS_Y - _FLANGE_R - 0.020),
 }
+_OIL_HOLE_X = _side_x(HUB_FRONT_Z + OIL_HOLE_STATION)
 SIDE_KEEP = {
     "HubDia": (HUB_FRONT_X - 0.014, AXIS_Y),
     "SpigotDia": (SPIGOT_END_X + 0.040, AXIS_Y - 0.003),
     # Clear the spigot's whole fit-callout box, not just its dimension line.
     "FlangeDia": (SPIGOT_END_X + 0.083, AXIS_Y),
-    "FlangeThick": (_side_x(-FLANGE_THICK) - 0.014, AXIS_Y + _FLANGE_R + 0.009),
+    "FlangeThick": (_side_x(0.0) + 0.010, AXIS_Y - _FLANGE_R - 0.012),
+    "OilHoleStation": ((HUB_FRONT_X + _OIL_HOLE_X) / 2.0, AXIS_Y + _FLANGE_R + 0.009),
     "SpigotLength": (SPIGOT_END_X + 0.026, AXIS_Y + _FLANGE_R + 0.009),
     "HubLength": (SPIGOT_END_X + 0.056, AXIS_Y + _FLANGE_R + 0.026),
-    "OilHoleDia": (HUB_FRONT_X - 0.052, AXIS_Y + _FLANGE_R + 0.040),
+    "OilHoleDia": (_OIL_HOLE_X, AXIS_Y - _FLANGE_R - 0.031),
 }
 DIMENSION_CALLOUTS_BELOW = {
     "BoreDia": BORE_CALLOUT,
@@ -201,6 +206,7 @@ DIMENSION_CALLOUTS_BELOW = {
     "SpigotDia": SPIGOT_CALLOUT_BELOW,
     "SpigotLength": SPIGOT_LENGTH_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
+    "FlangeThick": FLANGE_THICK_CALLOUT,
 }
 DIMENSION_CALLOUTS_ABOVE = {"ScrewHoleDia": SCREW_HOLE_CALLOUT_ABOVE}
 
@@ -409,14 +415,12 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -516,7 +520,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # unregenerated, and only a real mode change rebuilds it.
     for view in (end, side):
         set_hidden_lines_removed(adapter, view)
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     return await finalize_drawing(
         adapter,

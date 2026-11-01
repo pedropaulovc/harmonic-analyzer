@@ -31,7 +31,7 @@ from _check import check
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
-from _inch_wall_limits import WALL_FLOOR_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _part_checks import report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
@@ -63,10 +63,12 @@ from pd_platen_guide_spec import (
     GEOMETRIC_TOLERANCES_MM,
     GUIDE_DEPTH_BAND,
     GUIDE_DEPTH_PLACES,
+    GUIDE_HEIGHT,
     LOCK_GAP_FIT,
     LOCK_TAP_SPEC,
     SURFACE_FINISHES,
     TAPPED_HOLE_SPEC,
+    TAP_Y,
     UNIT,
 )
 from _column_clamp_interface import BAR_DEPTH
@@ -79,10 +81,6 @@ MATERIAL = "Plain Carbon Steel"
 # platen's guide holes: both are the platen's (pd_platen_spec; the width is
 # _recording_geometry's, so it keeps its millimetres and prints 10.62).
 GUIDE_LENGTH = PLATE_WIDTH
-# 5.0: the rails' channel and the platen's hole row (GUIDE_Y + 2.5 is the
-# platen's GUIDE_HOLE_Y) are the frame's, so it keeps its millimetres and
-# prints .20.
-GUIDE_HEIGHT = 5.0
 # .40 deep, past the bar's back face so the lock plates clear it: the 9.5 bar
 # grew rearward under the fixed hanger (user ruling 2026-10-15), so the rail's
 # relief shrank to keep the lock-screw heads off the arm plate
@@ -146,6 +144,19 @@ LOCK_TAP_EXIT_WALL_MIN = (
     - 2.0 * TAP_MOUTH_BREAK
 )
 RECEIVER_WALL_FLOOR = WALL_FLOOR_MM
+# Owner ruling 2026-11-01 (B2): each tap row's wall to datum B and to the top
+# face at the height's printed minimum, the tap's major at its Ø.008 zone.
+_HEIGHT_DEV = printed_deviations(GUIDE_HEIGHT, GUIDE_DEPTH_PLACES, unit=UNIT)
+_TAP_REACH = THREAD_MAJOR_MM[TAPPED_HOLE_SPEC.size] / 2.0 + _POSITION_RADIAL
+TAP_EDGE_WALL_MIN = min(
+    TAP_Y - _TAP_REACH, GUIDE_HEIGHT + _HEIGHT_DEV[0] - TAP_Y - _TAP_REACH
+)
+# THREAD_MAJOR_MM rounds the #4-40's .1120 major up to 2.845 (2.8448), so the
+# .080 walls land 0.0001 under 2.032 in millimetres.
+if TAP_EDGE_WALL_MIN < WALL_TARGET_MM - 0.0005:
+    raise AssertionError(
+        f"MHA-PD-11 platen guide tap wall {TAP_EDGE_WALL_MIN:.3f} < {WALL_TARGET_MM}"
+    )
 
 if min(GUIDE_SCREW_THREAD_ENGAGEMENT, LOCK_SCREW_THREAD_ENGAGEMENT) <= 0.0:
     raise AssertionError("platen-guide screw stack has no #4-40 thread engagement")
@@ -242,7 +253,7 @@ async def build(adapter) -> dict[str, str]:
     wizard_holes(
         adapter,
         lock_spec,
-        [[x, GUIDE_HEIGHT / 2.0, -GUIDE_DEPTH] for x in HOLE_X],
+        [[x, TAP_Y, -GUIDE_DEPTH] for x in HOLE_X],
         (0.0, 0.0, -1.0),
         f"lock-screw tapped receivers ({lock_spec.size})",
         name="LockHoles",
@@ -262,7 +273,7 @@ async def build(adapter) -> dict[str, str]:
     wizard_holes(
         adapter,
         screw_spec,
-        [[x, GUIDE_HEIGHT / 2.0, 0.0] for x in SCREW_STATION_X],
+        [[x, TAP_Y, 0.0] for x in SCREW_STATION_X],
         (0.0, 0.0, 1.0),
         f"fastening-screw tapped receivers ({screw_spec.size})",
         name="ScrewHoles",

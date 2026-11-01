@@ -43,7 +43,6 @@ from _machinist_review_mode import MachinistReviewMode
 from _native_axis_datum import add_native_axis_datum
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
-from _rack_bore_finish import add_rack_bore_finish
 from _session import run_build
 import _telemetry
 from paper_drive_stock_drawing import add_toothspace_callout, require_source_control
@@ -59,6 +58,7 @@ from pd_rack_pinion_spec import (
     FACE_WIDTH,
     FRONT_FACE_DATUM,
     GEOMETRIC_TOLERANCES_IN,
+    MESH_CALLOUT,
     OUTSIDE_DIA,
     PRESSURE_ANGLE_DEG,
     STOCK_PROFILE,
@@ -92,10 +92,8 @@ VIEW_SCALE = (1, 1)
 FRONT_CENTER = (0.220, 0.175)
 RIGHT_CENTER = (0.320, 0.175)
 ISO_CENTER = (0.383, 0.210)  # 0.388 clipped the zone border right by 1.4 mm
-# Below the face view, left of the edge view's thickness (19e33c6c2 printed
-# the finish into it): the leader rises to the bore's 0° rim point under the
-# 0° tap, right of the tap callout's leader.
-BORE_FINISH_POSITION = (FRONT_CENTER[0] + 0.030, FRONT_CENTER[1] - 0.082)
+# The bore is a static seat (clamped to the MHA-PD-17 flange): no finish
+# symbol (machinist review, rule 6).
 GEAR_DATA_XY = (0.018, 0.262)
 GEAR_DATA_CHAR_HEIGHT = 0.0022
 # Three rows use the clear upper-right lane, above all physical gear views.
@@ -119,20 +117,33 @@ PARALLELISM_FRAME = (REAR_FACE_X + 0.012, RIGHT_CENTER[1] - HALF_OD * 0.45 - 0.0
 
 FRONT_KEEP = {
     # Approach from upper-left, clear of native datum A below-left; far
-    # enough out that the fit lines under the value stay off the rim.
-    "BoreDia": (FRONT_CENTER[0] - 0.080, FRONT_CENTER[1] + 0.053),
-    "OutsideDia": (FRONT_CENTER[0] + 0.060, FRONT_CENTER[1] + 0.035),
+    # enough out that the fit and chamfer lines under the value stay off the
+    # rim.
+    "BoreDia": (FRONT_CENTER[0] - 0.082, FRONT_CENTER[1] + 0.061),
+    # Below-right, off the rim: its diameter line runs lower-right to
+    # upper-left, clear of the span's upper-right extension lines, the bore's
+    # leader and the tap's (machinist review: from upper right it crossed the
+    # span).
+    "OutsideDia": (FRONT_CENTER[0] + 0.035, FRONT_CENTER[1] - 0.075),
     "ToothSpan": (FRONT_CENTER[0], FRONT_CENTER[1] + 0.050),
     "RootEnvelope": (FRONT_CENTER[0] + 0.050, FRONT_CENTER[1] - 0.028),
 }
-# Below the edge-on disc, clear of datum B above and the frame to the right.
+# Below the edge-on disc, clear of datum B above and the frame to the right;
+# the text right of the rear face's extension line, so neither line strikes
+# it (machinist review).
 RIGHT_KEEP = {
-    "FaceWidth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_OD - 0.012),
+    "FaceWidth": (REAR_FACE_X + 0.010, RIGHT_CENTER[1] - HALF_OD - 0.012),
 }
 # The bore's fit stands under its size, on the bore dimension's own leader:
 # a separate fit-note leader converged on the small bore with the size,
 # datum, diameter and finish leaders (machinist review, stack6: clarity).
-DIMENSION_CALLOUTS = {"BoreDia": f"{BORE_CALLOUT}\n{BORE_FIT_CALLOUT}"}
+# The tip and span bands name the mesh they serve at their dimensions; the
+# span's above its value, clear of the rim below.
+DIMENSION_CALLOUTS = {
+    "BoreDia": f"{BORE_CALLOUT}\n{BORE_FIT_CALLOUT}",
+    "OutsideDia": MESH_CALLOUT,
+}
+DIMENSION_CALLOUTS_ABOVE = {"ToothSpan": MESH_CALLOUT}
 # Lower-left of the face view, off the rim: the leader rises to the lower-left
 # tap, below datum A and clear of the bore.  The pick is on that tap's drill
 # circle at 225° about its centre, off the centre-mark lines.  The face view is
@@ -270,6 +281,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*front_annotations, *right_annotations], DRAWING_PRECISION_BY_NAME
     )
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(
+        adapter, front_annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
+    )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to disc bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
@@ -317,9 +331,6 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=(FRONT_FACE_DATUM,),
         label="disc rear face parallelism to front",
     )
-    # Explicit entity selection supplies the insertion point. No post-insertion
-    # endpoint setter: that setter drops the semantic association on this symbol.
-    add_rack_bore_finish(adapter, front, bore_edge, symbol_xy=BORE_FINISH_POSITION)
 
     # The native thread and drill ride the callout; the mouth breaks and the
     # assembly transfer are the spec's lines under it.

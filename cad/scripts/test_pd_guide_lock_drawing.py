@@ -81,13 +81,13 @@ def test_screw_holes_reach_the_wall_target_at_the_printed_worst_case() -> None:
     """Review of 19e33c6c2 (blocker): 2.5 from the guide-side edge left 0.81
     of ligament under the largest drilled 1/8 hole.  Machinist review ENFORCE
     (PR #1897): the 1.0 lip and the 22.0 plate left 1.83 and 1.53, under the
-    2.0 target, so the plate laps the rail (holes .146 from that edge) and
-    runs .89 long with the holes .157 and .709 from its left end; the inch
-    print holds the .080 target (#290)."""
+    2.0 target, so the plate laps the rail (holes on the .29 rail's tap row,
+    .155 from that edge) and runs .89 long with the holes .157 and .709 from
+    its left end; the inch print holds the .080 target (#290)."""
     assert min(_ligaments(2.5).values()) < 1.0
     assert min(_ligaments(3.5, width=22.0).values()) < WALL_TARGET_MM
     (hole_y,) = {y for _, y in pd_guide_lock_spec.HOLE_XY}
-    assert hole_y == pytest.approx(0.146 * 25.4)
+    assert hole_y == pytest.approx(0.155 * 25.4)
     assert [x for x, _ in pd_guide_lock_spec.HOLE_XY] == pytest.approx(
         [0.157 * 25.4, 0.709 * 25.4]
     )
@@ -160,7 +160,7 @@ def test_the_hole_coordinates_name_the_taps_they_match() -> None:
     # plate's left-edge extension line.
     width = max(len(row) for row in f"MATCHES\n{guide}".split("\n")) * _CHAR_WIDTH
     x_x, _ = drawing.FRONT_KEEP["Hole1X"]
-    assert width <= len("2X .146 ±.001") * _CHAR_WIDTH
+    assert width <= len("2X .155 ±.001") * _CHAR_WIDTH
     assert width <= len(".157 ±.001") * _CHAR_WIDTH
     assert width <= len(".709 ±.001") * _CHAR_WIDTH
     assert x_x + width / 2.0 < drawing.LEFT_EDGE_X - 0.002
@@ -219,7 +219,7 @@ def test_the_thickness_value_stands_outboard_of_its_extension_lines() -> None:
 
 def test_the_hole_y_text_stays_inside_the_border_and_under_the_plate() -> None:
     x, y = drawing.FRONT_KEEP["Hole1Y"]
-    half = len("2X .146±.001") * _CHAR_WIDTH / 2.0
+    half = len("2X .155±.001") * _CHAR_WIDTH / 2.0
     assert x - 2.0 * half > 0.0127  # right-aligned or centred, inside
     assert y < drawing.BOTTOM_EDGE_Y - 0.004
     assert x + half < drawing.LEFT_EDGE_X  # clear of Hole1X's extension

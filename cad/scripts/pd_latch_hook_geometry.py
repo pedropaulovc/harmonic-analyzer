@@ -67,7 +67,7 @@ from __future__ import annotations
 import math
 
 from _cone_axis_constants import FRAME_FRONT_COLUMN_Z
-from pd_support_bar_spec import BRACKET_TAP_X, HANGER_TAP_Y, PIVOT_TAP_X
+from pd_support_bar_spec import BAR_HEIGHT, BRACKET_TAP_X, HANGER_TAP_Y, PIVOT_TAP_X
 from _column_clamp_interface import ARC_DEPTH
 from pd_transgear_arm_geometry import ARM_ANGLE_DEG, PIN_MACHINE_Z
 from pd_vn_transgear_latch_pin_spec import DIA_MAX as PIN_DIA_MAX
@@ -84,8 +84,9 @@ HALF_T = SHEET_T / 2.0
 # --- Machine anchors -------------------------------------------------------------
 # The support bar sits unrotated with its back face on the front clamp arcs
 # (z -129.4, pd_support_bar_spec's frame), so a bar-frame X is a machine X and
-# a bar-frame Y is BAR_CENTRE_Y above.
-BAR_CENTRE_Y = 303.734
+# a bar-frame Y is BAR_CENTRE_Y above: the bar's top edge carries the platen's
+# top rail at machine y 317.734.
+BAR_CENTRE_Y = 317.734 - BAR_HEIGHT / 2.0
 BAR_BACK_FACE_Z = FRAME_FRONT_COLUMN_Z - ARC_DEPTH
 # The hanger's pivot P and its latched direction U (the arm geometry's
 # ARM_ANGLE_DEG, set by the pressed stud's station); N = U turned +90 deg.
@@ -119,8 +120,9 @@ TAPER_Y = (280.0, 270.0)
 SCREW_X = tuple(float(x) for x in BRACKET_TAP_X)  # (65.0, 72.0)
 SCREW_Y = BAR_CENTRE_Y + HANGER_TAP_Y  # 303.234
 SCREW_HOLE_Y = 4.0386  # .159: the screws' row above the base's low-Y edge
-WIDTH = 8.001  # .315
-# Inside the bar's lock-free band 292.2..314.2.
+WIDTH = 8.128  # .32
+# Inside the bar's lock-free band 294.8..313.8 (the .45 lock plates on the .29
+# rails; build_pd_paper_drive_assembly's lock-station sweep proves the air).
 BASE_Y = (SCREW_Y - SCREW_HOLE_Y, SCREW_Y - SCREW_HOLE_Y + WIDTH)
 BASE_LENGTH = 16.764  # .66: the base's -X end to the ear's outer face
 SCREW_HOLE_DIA = 3.2512  # .128 +.004/0: a #30 drill (.1285), #4 clearance

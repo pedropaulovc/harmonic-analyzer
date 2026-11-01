@@ -26,6 +26,15 @@ TAPPED_HOLE_SPEC = HoleSpec("tapped", "#4-40")
 # tips stop inside the rail (build_pd_platen_guide asserts the reach).
 LOCK_TAP_SPEC = HoleSpec("tapped", "#4-40")
 
+# Owner ruling 2026-11-01 (option B2): the rail is .29 tall and both tap rows
+# stand .140 above datum B (local y 0, the bottom face), so each #4-40 major
+# with its Ø.008 position keeps .080 to datum B and to the top face at the
+# height's .XX minimum (build_pd_platen_guide asserts both walls). The bottom
+# rail's datum B stays on the frame's GUIDE_Y over the rack backer, so both
+# rails grow into the support bar's channel (pd_support_bar_spec.BAR_HEIGHT).
+GUIDE_HEIGHT = 7.366  # .29
+TAP_Y = 3.556  # .140
+
 # The rail's depth (``build_pd_platen_guide.GUIDE_DEPTH``) sets how far behind the
 # bar's back face the lock plates ride and how close their slotted pan heads
 # come to the hanger arm and its plate. Both sit inside the paper-drive
@@ -36,6 +45,11 @@ LOCK_TAP_SPEC = HoleSpec("tapped", "#4-40")
 # always cuts; build_pd_platen_guide asserts it). It prints .XX.
 GUIDE_DEPTH_BAND = (0.0, -0.254)  # (upper, lower): +.00/-.01
 GUIDE_DEPTH_PLACES = 2
+# The one-sided band's function, printed at the depth (rule 4): a deeper rail
+# stands the lock-screw heads closer to the hanger's arm plate.
+GUIDE_DEPTH_CALLOUT = (
+    f"LOCK-SCREW HEADS\nCLEAR {_config.parts('pd-transgear-arm-plate')['number']}"
+)
 
 # The print's dimensions, by owning feature (the build marks exactly these and
 # the sheet imports only these), and the places each carries, authored on the
@@ -74,10 +88,8 @@ LOCK_GAP_FIT_TEXT = (
 
 
 # Manufacturing GD&T limits consumed by the part's drawing projection: the
-# printed inch zones, and their exact millimetres for the stacks.
+# printed inch zone, and its exact millimetres for the stacks.
 GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
-    "platen-mating face flatness": ".004",
-    "guide opposite-face parallelism": ".004",
     "guide hole-pattern position": ".008",
 }
 GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
@@ -87,9 +99,14 @@ GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
 # The one running surface (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): the platen HANGS by the top rail's
 # bottom face (local y 0, datum B) on the support bar's top edge and slides
 # along it across the feed. Both rails are this part, so the face is cut on
-# both. Every other face is cast/machined per the title block.
+# both. Every other face is cast/machined per the title block. The symbol
+# names the bar it slides on.
 SURFACE_FINISHES = (
     SurfaceFinishControl(
-        "bar_slide", MACHINED_UM, PlanarFace((0, -1, 0), 0.0), display_unit=UNIT
+        "bar_slide",
+        MACHINED_UM,
+        PlanarFace((0, -1, 0), 0.0),
+        production_method=f"SLIDES ON {_config.parts('pd-support-bar')['number']}",
+        display_unit=UNIT,
     ),
 )

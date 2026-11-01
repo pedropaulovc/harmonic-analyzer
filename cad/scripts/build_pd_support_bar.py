@@ -5,9 +5,11 @@ steel bar clamped across the two front columns by the two-piece column
 clamps (build_sh_column_clamp_front.py and build_sh_column_clamp_back.py), carrying the hanging platen
 (guides + locks on the platen back) and, on its own back face, the ch. 23
 transgear hanger (pivot screw MHA-PD-VN-57) and the latch hook (MHA-PD-14).
-Cross-section 28 tall x 9.5 deep (it fills the platen's guide channel to a
-1.0 bottom-rail clearance; ``pd_support_bar_spec.BAR_HEIGHT`` carries the
-photo chain); 17.8 in long so the ends run ~29 past each column (ch30 p002).
+Cross-section 1.010 tall x 9.5 deep (it fills the platen's guide channel to a
+running clearance over the bottom rail; ``pd_support_bar_spec.BAR_HEIGHT``
+carries the photo chain); 17.8 in long so the ends run ~29 past each column
+(ch30 p002). The clamp line and hanger row keep their machine heights under the
+top edge, so they stand below the bar's centre line.
 The part builds in inch document units and its sheet prints decimal inch
 (#290); the section and stations keep their millimetre interfaces.
 
@@ -91,6 +93,7 @@ from pd_support_bar_spec import (
     BRACKET_TAP_CSK_DIA,
     BRACKET_TAP_SPEC,
     BRACKET_TAP_X,
+    CLAMP_TAP_Y,
     HANGER_TAP_Y,
     HOLE_POSITION_TOL,
     PIVOT_TAP_CSK_DIA,
@@ -164,7 +167,7 @@ HANGER_STATIONS = tuple(x - LEFT_END_X for x in (PIVOT_TAP_X, *BRACKET_TAP_X))
 # end as the hanger row, so one end is the datum on both faces, and the
 # height from the top face, its rise on the +X end.
 CLAMP_ROW_START_X = LEFT_END_X
-CLAMP_ROW_HEIGHT = BAR_HEIGHT / 2.0
+CLAMP_ROW_HEIGHT = BAR_HEIGHT / 2.0 - CLAMP_TAP_Y
 CLAMP_ROW_X = tuple(sorted(CLAMP_HOLE_X))
 CLAMP_STATIONS = tuple(x - CLAMP_ROW_START_X for x in CLAMP_ROW_X)
 
@@ -396,7 +399,7 @@ CLAMP_ROW = ReferenceRow(
     "ClampRowReference",
     "Clamp",
     "ClampRowHeight",
-    0.0,
+    CLAMP_TAP_Y,
     tuple(zip(CLAMP_STATION_NAMES, CLAMP_ROW_X, strict=True)),
 )
 
@@ -484,7 +487,7 @@ async def _author_clamp_slot_profile(
 ) -> tuple[list[tuple[str, str]], bool]:
     """One closed stadium per west clamp slot on the front face
     (``FRONT_FACE_PLANE``): ``width`` across, its straight sides ``run`` long
-    along the bar, centred on the slot's station at mid-height. The outer
+    along the bar, centred on the slot's station on the clamp line. The outer
     slot's (the detail's) width and run are ``{base}Width`` and
     ``{base}Travel``; the inner slot's carry the same names numbered 1. An
     offset plane's sketch axes are SOLIDWORKS' choice, so the centres map
@@ -494,8 +497,8 @@ async def _author_clamp_slot_profile(
     front_z = -BAR_DEPTH / 2.0
     check(f"create_sketch {feature}", await adapter.create_sketch(FRONT_FACE_PLANE))
     outer = max(CLAMP_SLOT_X)
-    u0, v0, w0 = _sketch_uvw(adapter, (outer, 0.0, front_z))
-    u1, v1, _ = _sketch_uvw(adapter, (outer + 1.0, 0.0, front_z))
+    u0, v0, w0 = _sketch_uvw(adapter, (outer, CLAMP_TAP_Y, front_z))
+    u1, v1, _ = _sketch_uvw(adapter, (outer + 1.0, CLAMP_TAP_Y, front_z))
     du, dv = u1 - u0, v1 - v0
     if abs(abs(du) - 1.0) < 1e-4 and abs(dv) < 1e-4:
         u_is_x = True
@@ -503,14 +506,14 @@ async def _author_clamp_slot_profile(
         u_is_x = False
     else:
         raise RuntimeError(f"{feature}: sketch axes are not along X/Y ({du:g}, {dv:g})")
-    w_out = _sketch_uvw(adapter, (outer, 0.0, front_z - 1.0))[2] - w0
+    w_out = _sketch_uvw(adapter, (outer, CLAMP_TAP_Y, front_z - 1.0))[2] - w0
     if abs(abs(w_out) - 1.0) > 1e-4:
         raise RuntimeError(f"{feature}: sketch normal is not along Z (w {w_out:g})")
     dims = SketchDims()
     for index, x in enumerate(sorted(CLAMP_SLOT_X, reverse=True)):
         tag = str(index) if index else ""
         where = f"{feature} at x {x:g}"
-        u, v, w = _sketch_uvw(adapter, (x, 0.0, front_z))
+        u, v, w = _sketch_uvw(adapter, (x, CLAMP_TAP_Y, front_z))
         if abs(w) > 1e-4:
             raise RuntimeError(f"{where} lies {w:g} mm off the sketch plane")
         p1, p2, p3, p4, c_end_b, c_end_a = _stadium_points(
@@ -718,8 +721,8 @@ async def build(adapter) -> dict[str, str]:
     expected = BAR_HEIGHT * BAR_DEPTH * BAR_LENGTH
     await volume_check(adapter, "bar", expected, 0.005 * expected)
 
-    # Clamp-screw holes, through along Z at the bar's mid-height, drilled from
-    # the bar FRONT face (local z = -BAR_DEPTH/2, where the clamp-screw heads
+    # Clamp-screw holes, through along Z on the clamp line (CLAMP_TAP_Y), drilled
+    # from the bar FRONT face (local z = -BAR_DEPTH/2, where the clamp-screw heads
     # sit -- ch30 p002), while the bar is still a plain prism: one native Hole
     # Wizard feature, the east column's 2 clamp-screw #8 COUNTERBORES, which
     # locate the bar (the west pair are slots, below).
@@ -727,7 +730,7 @@ async def build(adapter) -> dict[str, str]:
     clamp_dia = CLAMP_HOLE_DIA
     wizard_holes(
         adapter, CLAMP_HOLE_SPEC,
-        [[x, 0.0, front_z] for x in CLAMP_ROUND_X],
+        [[x, CLAMP_TAP_Y, front_z] for x in CLAMP_ROUND_X],
         (0.0, 0.0, -1.0), "clamp-screw counterbores (#8)", name="ClampHoles",
     )
     v_holes = len(CLAMP_ROUND_X) * (

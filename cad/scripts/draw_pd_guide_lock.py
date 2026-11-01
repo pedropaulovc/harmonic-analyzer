@@ -5,7 +5,7 @@ views, dimension layout and hole callout;
 sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
-The sheet runs at 4:1 in decimal inch (#290; the plate is .89 x .39, cut from
+The sheet runs at 4:1 in decimal inch (#290; the plate is .89 x .45, cut from
 1/16 sheet whose thickness prints as a fraction REF, its four corners
 rounded); the isometric carries an explicit 2:1 override so it stays
 clear of the title block.  A flat plate needs only the face view (front), one
@@ -80,8 +80,8 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (4.0, 1.0)
 
-# Sheet layout (meters).  The front view's model bbox is 22.5 x 9.8 (the plate
-# face); at 4:1 the view is 90 x 39.2 mm, x 0.105..0.195, y 0.155..0.195.
+# Sheet layout (meters).  The front view's model bbox is 22.6 x 11.4 (the plate
+# face); at 4:1 the view is 90 x 45.7 mm, x 0.105..0.195, y 0.152..0.198.
 # Third angle: the right view (the 1/16 sheet edge-on) sits to its right,
 # past the hole callout; the isometric rides top-right.  The whole group sits
 # centred between the border and the title block (it sat 25 mm low and 15 mm
@@ -138,12 +138,14 @@ HOLE_2_X_SHEET = _sheet_x(HOLE_XY[1][0])
 # The 18.000's text rises by the block's extra rows so its shelf keeps the
 # one-row line's place; the block stands under the plate between hole 1's and
 # hole 2's extension lines, right of where the 4.000's line ends.
+# The blocks under the plate hang from its bottom edge, so they follow the
+# plate's height (.45 since the .29 rails, owner ruling 2026-11-01).
 FRONT_KEEP = {
-    "Width": (FRONT_CENTER[0], 0.125),
+    "Width": (FRONT_CENTER[0], BOTTOM_EDGE_Y - 0.0302),
     "Height": (0.057, FRONT_CENTER[1]),
-    "Hole1X": (0.086, 0.1448),
-    "Hole2X": (0.142, 0.1388),
-    "Hole1Y": (0.068, 0.141),
+    "Hole1X": (0.086, BOTTOM_EDGE_Y - 0.0104),
+    "Hole2X": (0.142, BOTTOM_EDGE_Y - 0.0164),
+    "Hole1Y": (0.068, BOTTOM_EDGE_Y - 0.0142),
     "CornerR": (0.215, 0.211),
 }
 RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0] + 0.023, 0.209)}
@@ -232,7 +234,9 @@ def _thickness_reference(adapter: Any, annotations: list[Any]) -> None:
         display.SetText(2, THICKNESS_SUFFIX)  # swDimensionTextSuffix
         readback = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
         if readback != (THICKNESS_PREFIX, THICKNESS_SUFFIX):
-            raise RuntimeError(f"guide-lock thickness text did not persist: {readback!r}")
+            raise RuntimeError(
+                f"guide-lock thickness text did not persist: {readback!r}"
+            )
         return
     raise RuntimeError("guide-lock sheet thickness was not imported")
 

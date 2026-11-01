@@ -117,7 +117,11 @@ _CHAMFER_VERTEX = (
     FRONT_CENTER[0] + (THREAD_MAJOR / 2 - CHAMFER_WIDTH) * _SHEET_PER_MODEL_MM,
     TIP_SHEET_Y,
 )
-_ANGLE_TEXT_RADIUS = 0.016
+# Machinist review (clarity, r1-r3): at 16 mm out the angle's arc and its
+# extension line along the chamfer rose ~12 mm above the tip and crossed the
+# thread major's dimension line.  At 10 mm out they end ~8 mm above the tip,
+# under that line, and the 45 deg text stays clear of the thread.
+_ANGLE_TEXT_RADIUS = 0.010
 # The B-size inner border is 12.7 mm in from the sheet edge; the title block
 # spans x >= 0.216 below y = 0.065.
 FRONT_KEEP = {
@@ -164,6 +168,13 @@ TOP_CENTER = (0.295, 0.245)
 _REFERENCE_SHELF_AXES = {"SupplierHeadHeight": 1, "SupplierSocketAF": 0}
 _PAPER_GAP_M = 0.002
 _MARK_ARM_M = 0.003
+# Machinist review (clarity, r1-r3): 2 mm past the thread major's shelf, the
+# tail text's leader met its (outside-arrowed, so undrawn) dimension line
+# right beside that shelf's end and read as the major's.  The column stands
+# 8 mm clear and its arrows stand inside, so the leader lands on a drawn line
+# and no outside arrow tail strikes the text's shelf.
+_TAIL_COLUMN_GAP_M = 0.008
+_DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
 # The cutting controls verify_machining_controls re-reads. CutLength, the
 # fit-up length, still drives the facing cut but prints as a reference.
 EXPECTED_CONTROLS = {
@@ -1479,8 +1490,12 @@ def _move_tail_column(adapter: Any, tail: Any, major: Any) -> Any:
     display = _early_bound(tail.GetSpecificAnnotation(), "IDisplayDimension")
     frame: dict[str, Any] = {}
     current = None
-    phase = "measure_original"
+    phase = "arrows_inside"
     try:
+        display.ArrowSide = _DIM_ARROWS_INSIDE
+        if int(display.ArrowSide) != _DIM_ARROWS_INSIDE:
+            raise RuntimeError("ThreadLengthMin: arrows did not move inside its extension lines")
+        phase = "measure_original"
         rebuild_drawing(adapter, label="measure pivot tail and thread-major ink")
         before = measure_reference_text(adapter, display, axis=1, label="ThreadLengthMin")
         current = before
@@ -1494,7 +1509,7 @@ def _move_tail_column(adapter: Any, tail: Any, major: Any) -> Any:
             or display.OffsetText is not False
         ):
             raise RuntimeError("ThreadLengthMin: unavailable native column/major bounds")
-        column = reach.xmax + _PAPER_GAP_M + 0.0002
+        column = reach.xmax + _TAIL_COLUMN_GAP_M + 0.0002
         frame.update(
             tips=before["tips"], text=before["text"], column=column,
             words=tuple(sorted(str(row["t"]) for row in before["record"]["display"]["texts"])),
@@ -1559,11 +1574,11 @@ def _assert_tail_layout(adapter: Any, tail: Any, major: Any, *, frame: dict[str,
     try:
         actual = measure_reference_text(adapter, display, axis=1, label="ThreadLengthMin")
         column = frame["column"]
-        if display.OffsetText is not True or any(
+        if display.OffsetText is not True or int(display.ArrowSide) != _DIM_ARROWS_INSIDE or any(
             abs(old[1] - new[1]) > 1e-8 or abs(new[0] - column) > 1e-8
             for old, new in zip(frame["tips"], actual["tips"], strict=True)
         ):
-            raise RuntimeError("ThreadLengthMin: native physical stations/column changed")
+            raise RuntimeError("ThreadLengthMin: native physical stations/column/arrows changed")
         if max(
             abs(getattr(frame["text"], key) - getattr(actual["text"], key))
             for key in ("xmin", "ymin", "xmax", "ymax")
@@ -1580,7 +1595,7 @@ def _assert_tail_layout(adapter: Any, tail: Any, major: Any, *, frame: dict[str,
             raise RuntimeError("ThreadLengthMin: native acceptance fragment placement/format changed")
         current_major = _paper_annotation(adapter, major, label="SupplierThreadMajor")
         full = display_box(current_major["display"])
-        if full is None or column < full.xmax + _PAPER_GAP_M:
+        if full is None or column < full.xmax + _TAIL_COLUMN_GAP_M:
             raise RuntimeError("ThreadLengthMin: physical column crowds complete thread-major ink")
         major_ink = annotation_geometry(
             current_major, owner="SupplierThreadMajor", advance=calibrate_sheet_advance((current_major,)),

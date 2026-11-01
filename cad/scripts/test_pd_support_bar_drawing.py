@@ -42,7 +42,7 @@ def test_printed_bands_match_the_bar_and_drilled_slot_limits() -> None:
     from _printed_tolerance import drilled_oversize_mm, printed_deviations
 
     # .XXX at the inch print: each band is the printed limit's furthest
-    # reach from the mm nominal, the rounding of 1.102 and .374 included.
+    # reach from the mm nominal, the rounding of .374 included.
     for value, band in (
         (spec.BAR_HEIGHT, spec.BAR_HEIGHT_BAND),
         (BAR_DEPTH, spec.BAR_DEPTH_BAND),
@@ -50,7 +50,7 @@ def test_printed_bands_match_the_bar_and_drilled_slot_limits() -> None:
         lower, upper = printed_deviations(value, spec.BAR_BAND_PLACES, unit="in")
         assert band == max(-lower, upper)
     assert (spec.BAR_HEIGHT_BAND, spec.BAR_DEPTH_BAND) == pytest.approx(
-        (0.1362, 0.1274)
+        (0.127, 0.1274)
     )
     assert part.CLAMP_SLOT_WIDTH_LIMITS == (0.0, drilled_oversize_mm(unit="in"))
 
@@ -111,7 +111,10 @@ def test_row_nominals_are_the_built_holes() -> None:
     assert sorted(part.CLAMP_ROUND_X) == [-214.5, -179.5]
     assert sorted(part.CLAMP_SLOT_X) == [179.5, 214.5]
     assert sorted((*part.CLAMP_ROUND_X, *part.CLAMP_SLOT_X)) == list(part.CLAMP_ROW_X)
-    assert part.CLAMP_ROW_HEIGHT == spec.BAR_HEIGHT / 2.0
+    # The clamp line keeps its machine height under the bar's top edge (the
+    # SH column clamps), so it stands off the shortened bar's centre.
+    assert part.CLAMP_ROW_HEIGHT == pytest.approx(14.0)
+    assert part.CLAMP_ROW_HEIGHT == pytest.approx(spec.BAR_HEIGHT / 2.0 - spec.CLAMP_TAP_Y)
 
 
 def _authored_row(monkeypatch, row) -> list[tuple[str, float, str | None]]:
@@ -175,7 +178,7 @@ def _evaluate(equation: str, globals_mm: dict[str, float]) -> float:
 @pytest.mark.parametrize(
     "globals_mm",
     [
-        {"BarLength": 452.12, "BarHeight": 28.0},
+        {"BarLength": 452.12, "BarHeight": 25.654},
         {"BarLength": 500.0, "BarHeight": 30.0},
         {"BarLength": 440.0, "BarHeight": 26.0},
     ],
@@ -190,8 +193,8 @@ def test_reference_rows_follow_the_bar_globals_onto_the_holes(
     carries an equation; evaluated at any bar size it must land on the holes
     the builder places, which stay put relative to the bar centre (the pivot
     circle at PIVOT_TAP_X/HANGER_TAP_Y, the Hole Wizard taps at
-    BRACKET_TAP_X/HANGER_TAP_Y and the clamp counterbores at CLAMP_HOLE_X/0)."""
-    assert (spec.BAR_HEIGHT, part.BAR_LENGTH) == (28.0, 452.12)
+    BRACKET_TAP_X/HANGER_TAP_Y and the clamp counterbores at CLAMP_HOLE_X/CLAMP_TAP_Y)."""
+    assert (spec.BAR_HEIGHT, part.BAR_LENGTH) == (25.654, 452.12)
     built = {"BarLength": part.BAR_LENGTH, "BarHeight": spec.BAR_HEIGHT}
     rows = (
         (
@@ -202,7 +205,7 @@ def test_reference_rows_follow_the_bar_globals_onto_the_holes(
         (
             part.CLAMP_ROW,
             sheet_spec.CLAMP_STATION_NAMES,
-            sorted((x, 0.0) for x in part.CLAMP_HOLE_X),
+            sorted((x, spec.CLAMP_TAP_Y) for x in part.CLAMP_HOLE_X),
         ),
     )
     length, height = globals_mm["BarLength"], globals_mm["BarHeight"]
@@ -330,7 +333,7 @@ def test_hole_callouts_pick_the_tap_and_counterbore_edges(monkeypatch) -> None:
             (0.0, 0.0, 1.0),
         ),
         (
-            (max(part.CLAMP_ROUND_X), 0.0, -BAR_DEPTH / 2.0),
+            (max(part.CLAMP_ROUND_X), spec.CLAMP_TAP_Y, -BAR_DEPTH / 2.0),
             part.CLAMP_CBORE_DIA / 2.0,
             (0.0, 0.0, 1.0),
         ),
@@ -476,8 +479,16 @@ def test_slot_counterbores_leave_rule_17_walls() -> None:
     assert end_wall == pytest.approx(2.899, abs=5e-3)
     web = (outer - inner) - 2.0 * station - 2.0 * cbore_reach
     assert web == pytest.approx(22.757, abs=5e-3)
-    side = (spec.BAR_HEIGHT - spec.BAR_HEIGHT_BAND) / 2.0 - station - cbore_max / 2.0
-    assert side == pytest.approx(9.373, abs=5e-3)
+    # The clamp line stands CLAMP_ROW_HEIGHT under the top face, so the
+    # bottom face (the height's printed minimum) is the nearer one.
+    side = (
+        spec.BAR_HEIGHT
+        - spec.BAR_HEIGHT_BAND
+        - part.CLAMP_ROW_HEIGHT
+        - station
+        - cbore_max / 2.0
+    )
+    assert side == pytest.approx(6.968, abs=5e-3)
     for wall in (end_wall, web, side):
         assert wall >= WALL_TARGET_MM
     # Nominally 5.807 to the end, 23.494 between.
@@ -740,13 +751,14 @@ def test_slot_depth_ignored_baseline_seed_refuses_native_redress(slot_depth_nati
 
 @pytest.mark.parametrize("flip", [-1.0, 1.0])
 def test_slot_material_proof_uses_projected_voids_not_padded_outline(monkeypatch, flip):
+    # Sheet y 0.048 is the clamp line, CLAMP_TAP_Y off the bar's centre.
     def project(_adapter, _view, point, _label):
-        return 0.053 + flip * point[2] / 1000.0, 0.048 + point[1] / 1000.0
+        return 0.053 + flip * point[2] / 1000.0, 0.048 + (point[1] - spec.CLAMP_TAP_Y) / 1000.0
 
     monkeypatch.setattr(drawing, "_sheet", project)
-    front = project(None, None, (0.0, 0.0, -BAR_DEPTH / 2.0), "")[0]
+    front = project(None, None, (0.0, spec.CLAMP_TAP_Y, -BAR_DEPTH / 2.0), "")[0]
     floor = project(
-        None, None, (0.0, 0.0, -BAR_DEPTH / 2.0 + part.CLAMP_CBORE_DEPTH), ""
+        None, None, (0.0, spec.CLAMP_TAP_Y, -BAR_DEPTH / 2.0 + part.CLAMP_CBORE_DEPTH), ""
     )[0]
     witnesses = [
         ((x, 0.04475), (x, 0.0490875)) for x in (front, floor)
@@ -755,7 +767,8 @@ def test_slot_material_proof_uses_projected_voids_not_padded_outline(monkeypatch
     xmin, xmax = sorted((front, 0.053 + flip * BAR_DEPTH / 2000.0))
     cbore = part.CLAMP_CBORE_DIA / 2000.0
     assert material["upper bar"] == pytest.approx((xmin, 0.048 + cbore, xmax, 0.062))
-    assert material["lower bar"] == pytest.approx((xmin, 0.034, xmax, 0.048 - cbore))
+    bottom = 0.048 - (spec.BAR_HEIGHT / 2.0 + spec.CLAMP_TAP_Y) / 1000.0
+    assert material["lower bar"] == pytest.approx((xmin, bottom, xmax, 0.048 - cbore))
     # The whole through-slot lane is genuinely void, including through the
     # back half of the section; contact with the counterbore wall is allowed.
     drawing._require_slot_depth_ink_outside_material(
@@ -1111,7 +1124,7 @@ def test_slot_detail_centres_the_outer_slot(monkeypatch) -> None:
         return _DetailView((x, y), tuple(float(v) for v in scale), (-0.31, 0.0))
 
     def sheet(_adapter, view, xyz, _label):
-        assert xyz == (max(part.CLAMP_SLOT_X), 0.0, -BAR_DEPTH / 2.0)
+        assert xyz == (max(part.CLAMP_SLOT_X), spec.CLAMP_TAP_Y, -BAR_DEPTH / 2.0)
         return (
             view.Position[0] + view.offset[0],
             view.Position[1] + view.offset[1],
@@ -1206,7 +1219,7 @@ def test_slot_profiles_run_along_the_bar_in_any_sketch_frame(
     monkeypatch, frame, feature, base, width
 ) -> None:
     """Whatever axes the front-face sketch gets, each west slot's stadium runs
-    along the bar on its station at mid-height, its width and run carry the
+    along the bar on its station on the clamp line, its width and run carry the
     print's names (the outer slot's bare, the inner's numbered), and the cut
     direction follows the sketch normal."""
     import _sketch
@@ -1276,7 +1289,7 @@ def test_slot_profiles_run_along_the_bar_in_any_sketch_frame(
         for u0, v0, u1, v1 in sides:
             (x0, y0), (x1, y1) = to_model(u0, v0), to_model(u1, v1)
             assert y0 == pytest.approx(y1)
-            assert abs(y0) == pytest.approx(width / 2.0)
+            assert abs(y0 - spec.CLAMP_TAP_Y) == pytest.approx(width / 2.0)
             assert sorted((x0, x1)) == pytest.approx(
                 [slot_x - run / 2.0, slot_x + run / 2.0]
             )
@@ -1285,8 +1298,8 @@ def test_slot_profiles_run_along_the_bar_in_any_sketch_frame(
             for centre in list(arcs.values())[2 * index : 2 * index + 2]
         )
         assert centres == [
-            pytest.approx((slot_x - run / 2.0, 0.0)),
-            pytest.approx((slot_x + run / 2.0, 0.0)),
+            pytest.approx((slot_x - run / 2.0, spec.CLAMP_TAP_Y)),
+            pytest.approx((slot_x + run / 2.0, spec.CLAMP_TAP_Y)),
         ]
-        assert ends[index][1] == pytest.approx(0.0)
+        assert ends[index][1] == pytest.approx(spec.CLAMP_TAP_Y)
         assert abs(ends[index][0] - slot_x) == pytest.approx(run / 2.0)

@@ -3368,7 +3368,8 @@ def test_tail_column_move_uses_complete_major_ink_and_preserves_acceptance_text(
             drawing._move_tail_column(state.adapter, tail, major)
         return
     settled, _frame = drawing._move_tail_column(state.adapter, tail, major)
-    assert [row[0] for row in tail_record["display"]["arrows"]] == pytest.approx([0.2706024] * 2)
+    assert [row[0] for row in tail_record["display"]["arrows"]] == pytest.approx([0.2766024] * 2)
+    assert tail.GetSpecificAnnotation().ArrowSide == drawing._DIM_ARROWS_INSIDE
     for actual, original in zip(tail_record["display"]["texts"], original_text, strict=True):
         assert actual["t"] == original["t"]
         assert actual["pos"] == pytest.approx(original["pos"], abs=1e-12)
@@ -3411,7 +3412,7 @@ def test_tail_offset_restores_measured_native_ink_not_the_dimension_line_anchor(
         assert display.OffsetText is True
         assert tail.GetPosition() == pytest.approx(original_text[0]["pos"], abs=1e-12)
         for old, actual in zip(original_stations, record["display"]["arrows"], strict=True):
-            assert actual[0] == pytest.approx(0.2706024, abs=1e-12)
+            assert actual[0] == pytest.approx(0.2766024, abs=1e-12)
             assert tuple(actual[1:3]) == old[1:3]
         for old, actual in zip(original_text, record["display"]["texts"], strict=True):
             assert actual["t"] == old["t"]
@@ -3439,7 +3440,7 @@ def test_tail_offset_restores_measured_native_ink_not_the_dimension_line_anchor(
     assert evidence["original"]["offset_text"] is False
     assert evidence["current"]["offset_text"] is True
     assert evidence["original"]["arrow_stations"] == tuple(row[:2] for row in original_stations)
-    assert all(abs(tip[0] - 0.2706024) < 1e-12 for tip in evidence["current"]["arrow_stations"])
+    assert all(abs(tip[0] - 0.2766024) < 1e-12 for tip in evidence["current"]["arrow_stations"])
     assert tuple(
         row["text"] for row in evidence["original"]["text_fragments"]
     ) == tuple(row["t"] for row in original_text)

@@ -38,12 +38,10 @@ from _fit_deviations import deviations
 from _fit_ream_h7 import REAM_H7
 from _gear_fit_limits import gear_tip_band_mm
 from _gear_quality import toothspace_runout_tir_mm
-from _gtol_cylinder import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from _mcmaster_91794a055 import FILLISTER_SIZE
 from paper_drive_stock_inspection import GaugeContact, toothspace_gauge_contact_mm
 from pd_transgear_disc_hub_geometry import (
@@ -309,15 +307,16 @@ if SPIGOT_DIAMETRAL_CLEARANCE[0] < 0.0:
         f"MHA-PD-06 bore binds on the MHA-PD-17 spigot: {SPIGOT_DIAMETRAL_CLEARANCE}"
     )
 DISC_OFFSET_MAX = SPIGOT_DIAMETRAL_CLEARANCE[1] / 2.0
-# The rear face stands in air (the hub's flange locates the front face), so
-# the bore's rear edge takes the title block's break.  The front edge is
-# chamfered past the spigot-to-flange corner's R.004 so the front face seats
-# on the flange (pd_transgear_disc_hub_spec checks the pair).
-BORE_FRONT_CHAMFER_LIMITS = (0.1524, 0.254)  # .006-.010, 45 deg
-BORE_FRONT_CHAMFER_NOTE = (
-    f"BORE FRONT EDGE CHAMFER {inch_text(BORE_FRONT_CHAMFER_LIMITS[0], 3)}-"
-    f"{inch_text(BORE_FRONT_CHAMFER_LIMITS[1], 3)} X 45\u00b0."
-)
+# The rear face stands in air (the hub's flange locates the front face, datum
+# B), so the bore's rear edge takes the title block's break.  The front edge
+# is chamfered past the spigot-to-flange corner's R.004 so the front face
+# seats on the flange (pd_transgear_disc_hub_spec checks the pair): a plain
+# .XXX chamfer on the title block's row, flagged at the bore with its reason.
+BORE_FRONT_CHAMFER = 0.254  # .010, 45 deg
+BORE_FRONT_CHAMFER_LIMITS = (
+    BORE_FRONT_CHAMFER - _BAND[3],
+    BORE_FRONT_CHAMFER + _BAND[3],
+)  # .005-.015
 
 # --- screw (MHA-PD-VN-55) -------------------------------------------------------------
 SCREW_MAJOR_DIA, SCREW_LENGTH, _HEAD_H, _HEAD_DIA, SCREW_PITCH = FILLISTER_SIZE
@@ -371,16 +370,19 @@ if TAP_TO_BORE_WALL_WORST < WALL_FLOOR - 1e-9:
 # --- sheet -------------------------------------------------------------------------
 HUB_NUMBER = "MHA-PD-17"
 HUB_NAME = "HUB"
-# Lines appended under the native "#0-80 UNF-2B THRU" hole callout.
+# Lines appended under the native "#0-80 UNF-2B THRU" hole callout.  The
+# .004 mouth breaks are tighter than the title block's .010 because the
+# MHA-PD-VN-55 engagement (pd_vn_transgear_disc_screw_spec) spends them.
 TAP_CALLOUT_LINES = (
-    f"BREAK EDGE {inch_text(MOUTH_BREAK_MAX, 3)} MAX BOTH SIDES",
+    f"BREAK EDGE {inch_text(MOUTH_BREAK_MAX, 3)} MAX BOTH SIDES FOR SCREW ENGAGEMENT",
     f"SPOT THRU {HUB_NUMBER} FLANGE HOLES AT ASSY,",
     "THEN DRILL AND TAP; MATCH-MARK DISC AND FLANGE",
 )
 TAP_CALLOUT_QUALIFIER = "\n".join(TAP_CALLOUT_LINES)
-# Reamed: the bore carries the Ra 63 finish and pilots on the hub's spigot.
-# The bore's native limits print with the dimension; the fit note names the
-# mate.
+# Reamed: the bore pilots on the hub's spigot, clamped to the flange, so it
+# is a static seat and carries no finish symbol (rule 6).  The bore's native
+# limits print with the dimension; the fit note names the mate, and the
+# front-edge chamfer the spigot root it clears.
 BORE_CALLOUT = "THRU - REAM"
 BORE_FIT_CALLOUT = "\n".join(
     (
@@ -390,11 +392,9 @@ BORE_FIT_CALLOUT = "\n".join(
         f"+{inch_text(SPIGOT_DIA_BAND[0], 4)}/-{inch_text(-SPIGOT_DIA_BAND[1], 4)})",
         f"(DIA CLR {inch_text(SPIGOT_DIAMETRAL_CLEARANCE[0], 4)}-"
         f"{inch_text(SPIGOT_DIAMETRAL_CLEARANCE[1], 4)})",
+        f"CHAMFER {inch_text(BORE_FRONT_CHAMFER, 3)} X 45\u00b0 AT B,",
+        f"CLEARS {HUB_NUMBER} SPIGOT ROOT",
     )
-)
-
-SURFACE_FINISHES = (
-    SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA), display_unit=UNIT),
 )
 
 # Marked native model dimensions: the disc thickness, finite blank, bore
@@ -453,11 +453,9 @@ GEAR_DATA = gear_data_note(
     ]
 )
 
-# The teeth are stated by the gear data block; the build appends the disc
-# screw's engagement line (pd_vn_transgear_disc_screw_spec imports this module).
-# A shop note states the requirement, not the measuring method or the design
-# history (Main ruling 2026-10-10).
-DRAWING_NOTES = BORE_FRONT_CHAMFER_NOTE
+# The tip and span bands are the mesh's: each names the mating pinion at its
+# dimension (rule 4).
+MESH_CALLOUT = f"MESHES {KNOB_NUMBER} {MESH_PINION_TEETH}T"
 
 # Spacing is held by the dividing head and is not inspected; one pin in
 # every space on a radial indicator catches eccentricity and gross slips.

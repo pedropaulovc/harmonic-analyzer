@@ -425,7 +425,7 @@ def test_clip_screw_bosses_sweep_clear_of_the_bar_and_hanger(
         # A rail printed at the plain .XX row stands the heads into the plate.
         (
             "_GUIDE_DEPTH_DEV",
-            printed_deviations(assembly.GUIDE_DEPTH, 2),
+            printed_deviations(assembly.GUIDE_DEPTH, 2, unit=assembly.GUIDE_UNIT),
             "heads .* into the arm plate as",
         ),
         # So does a lock plate whose thickness prints .XX, not its sheet band...

@@ -96,25 +96,21 @@ CUT_LENGTH = PLATE.THICKNESS_OVER_ARM + ARM.THICKNESS
 # joint stack read LENGTH as its length.
 LENGTH = CUT_LENGTH
 # The cut end's 45 deg deburr, its radial leg; a single MAX limit, as MHA-DT-VN-61's
-# CUT_END_BREAK_MAX_MM.  The model carries the maximum.  The part sheet's
-# installation note (the registry's ``installation_notes``) prints it.
+# CUT_END_BREAK_MAX_MM.  The model carries the maximum.  Tighter than the
+# title block's .010 edge break on purpose: at .010 the break would take the
+# arm tap's last thread and the joint's worst engagement falls to 1.47D, under
+# the 1.5D ``transgear_hanger_joints`` requires.  The MHA-PD-00 cut step,
+# which does the cut, prints this limit and the tip's proud limit; the part
+# sheet's note only says what the cut is for.
 CUT_END_BREAK_MAX = 0.1016  # .004
 # The cut tip may stand this far proud of the arm's front face (the joint
 # stack's ``transgear_hanger_joints.PLATE_SCREW_CUT_PROUD_MAX``).
 CUT_PROUD_MAX = 0.2032  # .008
 
-
-def _inch(value_mm: float) -> str:
-    return f"{value_mm / IN:.3f}".removeprefix("0")
-
-
-# What the A06 cut step prints for it.
-CUT_END_BREAK_TEXT = f"{_inch(CUT_END_BREAK_MAX)} MAX"
-
 PURCHASED_STOCK_NOTE = "\n".join((
-    "1 IN STOCK. CUT LENGTH AT ASSEMBLY (MHA-PD-00, BEFORE THE",
-    f"GUIDE-LOCK SWEEP): TIP FLUSH OR PROUD {_inch(CUT_PROUD_MAX)} MAX OF THE MHA-PD-18 ARM",
-    f"FRONT FACE; CUT-END BREAK {CUT_END_BREAK_TEXT}.",
+    "CUT TO LENGTH AND BREAK THE CUT END AT ASSEMBLY (MHA-PD-00 CUT STEP,",
+    "BEFORE THE GUIDE-LOCK SWEEP), SO THE TIP CLEARS THE SWEEP AND THE",
+    "THREAD STAYS FULLY ENGAGED IN THE MHA-PD-18 ARM.",
 ))
 
 

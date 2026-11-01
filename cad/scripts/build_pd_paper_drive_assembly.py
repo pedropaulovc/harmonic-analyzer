@@ -256,14 +256,15 @@ from pd_guide_lock_spec import (  # noqa: E402
     DRAWING_PRECISION_BY_NAME as LOCK_PRECISION,
     HOLE_PATTERN_X as LOCK_HOLE_PATTERN_X,
     HOLE_XY as LOCK_HOLE_XY,
+    HOLE_Y as LOCK_HOLE_Y,
     LOCK_THICK_BAND,
-    RAIL_EDGE_LIP as LOCK_RAIL_LIP,
     UNIT as LOCK_UNIT,
 )
 from pd_platen_guide_spec import (  # noqa: E402
     GUIDE_DEPTH_BAND,
     GUIDE_DEPTH_PLACES,
     LOCK_GAP_FIT,
+    TAP_Y as GUIDE_TAP_Y,
     UNIT as GUIDE_UNIT,
 )
 from build_pd_platen_clip import (  # noqa: E402
@@ -329,13 +330,16 @@ PLATE_X0_PHOTO = -33.213
 PLATE_Y0 = PAPER_PLACEMENT.PLATEN_BOTTOM_Y
 PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.75
 
-# The platen hangs: the bar's top edge carries the top guide's underside.
+# The platen hangs: the bar's top edge carries the top guide's underside. The
+# bottom rail's underside sits just over the rack backer on the platen back.
 GUIDE_Y = (283.734, 317.734)  # bottom / top rail seats (machine y)
 BAR_TOP_Y = GUIDE_Y[1]
-BAR_CY = BAR_TOP_Y - BAR_HEIGHT / 2.0  # 303.734
+BAR_CY = BAR_TOP_Y - BAR_HEIGHT / 2.0  # 304.907
+# The SH column clamps' screw line, below the bar's centre (pd_support_bar_spec).
+CLAMP_Y = BAR_CY + BAR.CLAMP_TAP_Y  # 303.734
 # The bar fills the channel between the rails down to this running clearance
 # over the bottom rail's top edge (pd_support_bar_spec.BAR_HEIGHT).
-BOTTOM_RAIL_CLEARANCE = 1.0
+BOTTOM_RAIL_CLEARANCE = 0.98
 if (
     abs(BAR_TOP_Y - BAR_HEIGHT - GUIDE_Y[0] - GUIDE_HEIGHT - BOTTOM_RAIL_CLEARANCE)
     > 1e-9
@@ -355,6 +359,17 @@ RACK_Y0 = RACK_TIP_Y + RACK_BAR_HEIGHT  # Rx180: local +Y maps downward
 RACK_BACK_Z = BAR_FRONT_Z + RACK_BAR_THICKNESS
 RACK_TEETH_BACK_Z = RACK_BACK_Z - RACK_TEETH_Z_INSET
 RACK_TEETH_FRONT_Z = RACK_TEETH_BACK_Z - RACK_TEETH_THICKNESS
+# Both ride the platen back in one z band, so the bottom rail's underside
+# keeps air over the rack backer's tallest received section above the tooth
+# tips (paper_drive_geom; the .29 rails grew into the bar's channel for it).
+RACK_BACKER_RAIL_AIR_WORST = GUIDE_Y[0] - (
+    RACK_TIP_Y + PAPER_GEOMETRY.feed_rack_cut_end_section_maxima_mm()[0]
+)
+if RACK_BACKER_RAIL_AIR_WORST <= 0.0:
+    raise AssertionError(
+        f"MHA-PD-11 bottom guide rail meets the MHA-PD-05 rack backer: air "
+        f"{RACK_BACKER_RAIL_AIR_WORST:.3f}"
+    )
 
 # --- transgear (the real six-gear train) -------------------------------------
 from pd_rack_pinion_spec import (  # noqa: E402
@@ -657,8 +672,19 @@ if abs(DISC_Z0 - KNOB_SHAFT_Z0 - CLUSTER.MODEL_M) > 1e-9:
 PLATEN_YAW_LEVER = (BAR_LENGTH / 2.0) / (BAR_LENGTH / 2.0 - LOCK_STATION_X[0])
 # The platen prints its thickness and the rack its backer depth
 # (pd_platen_spec / pd_platen_rack_spec DRAWING_PRECISION).
-_PLATEN_THICKNESS_BAND = printed_band_mm(PLATEN_PRECISION["Depth"], unit=PLATEN_UNIT)
-_RACK_THICKNESS_BAND = printed_band_mm(RACK_PRECISION["BackerDepth"], unit=RACK_UNIT)
+# Each band is the larger printed deviation from the model (the printed value
+# rounds off the model nominal).
+_PLATEN_THICKNESS_BAND = max(
+    map(abs, printed_deviations(PLATE_THICKNESS, PLATEN_PRECISION["Depth"], unit=PLATEN_UNIT))
+)
+_RACK_THICKNESS_BAND = max(
+    map(
+        abs,
+        printed_deviations(
+            RACK_BAR_THICKNESS, RACK_PRECISION["BackerDepth"], unit=RACK_UNIT
+        ),
+    )
+)
 DISC_PLATEN_NOMINAL = PLATE_FRONT_Z - (DISC_Z0 + DISC_SPEC.FACE_WIDTH)  # 1.59
 CLUSTER_TILT_AT_DISC_RIM = (
     (
@@ -1055,7 +1081,7 @@ GUIDE_SCREW_XY = tuple(
 )
 # Lock screws: 2 per lock plate, heads on the lock backs, into the guides.
 LOCK_SCREW_XY = tuple(
-    (PLATE_X0 + x, gy + GUIDE_HEIGHT / 2.0) for gy in GUIDE_Y for x in GUIDE_LOCK_HOLE_X
+    (PLATE_X0 + x, gy + GUIDE_TAP_Y) for gy in GUIDE_Y for x in GUIDE_LOCK_HOLE_X
 )
 
 # Placed parts that can reach the chain plane (the band the bought chain
@@ -1142,15 +1168,17 @@ CHAIN_PLANE_ENVELOPES = (
 
 # The guide-lock stations ride the platen: each lock plate bridges the bar
 # behind one guide rail (bottom plate up from the lower rail's seat, top plate
-# down from the upper rail's top edge), lapping LOCK_RAIL_LIP past the rail's
-# outer edge (R9-59), its two screws on the rail's mid-line.
-if any(abs(y - LOCK_RAIL_LIP - GUIDE_HEIGHT / 2.0) > 1e-9 for _, y in LOCK_HOLE_XY):
-    raise AssertionError("guide-lock screw holes are off the guide rail's mid-line")
+# down from the upper rail's top edge), its two screws on the rail's tap row,
+# lapping past the rail's outer edge (R9-59): the bottom rail's outer edge is
+# its datum B, the top rail's its top face.
+LOCK_LIP = (LOCK_HOLE_Y - GUIDE_TAP_Y, LOCK_HOLE_Y - (GUIDE_HEIGHT - GUIDE_TAP_Y))
+if any(abs(y - LOCK_HOLE_Y) > 1e-9 for _, y in LOCK_HOLE_XY) or min(LOCK_LIP) < 0.0:
+    raise AssertionError("guide-lock screw holes are off the guide rail's tap row")
 LOCK_PLATE_Y = (
-    (GUIDE_Y[0] - LOCK_RAIL_LIP, GUIDE_Y[0] - LOCK_RAIL_LIP + LOCK_HEIGHT),
+    (GUIDE_Y[0] - LOCK_LIP[0], GUIDE_Y[0] - LOCK_LIP[0] + LOCK_HEIGHT),
     (
-        GUIDE_Y[1] + GUIDE_HEIGHT + LOCK_RAIL_LIP - LOCK_HEIGHT,
-        GUIDE_Y[1] + GUIDE_HEIGHT + LOCK_RAIL_LIP,
+        GUIDE_Y[1] + GUIDE_HEIGHT + LOCK_LIP[1] - LOCK_HEIGHT,
+        GUIDE_Y[1] + GUIDE_HEIGHT + LOCK_LIP[1],
     ),
 )
 
@@ -1548,7 +1576,7 @@ def _assert_lock_station_sweep() -> None:
     plate_inward = max(_LOCK_HEIGHT_DEV[1], 0.0) + LOCK_SET_EDGE_REACH[0]
     moving = []
     for index, (gy, (y0, y1)) in enumerate(zip(GUIDE_Y, LOCK_PLATE_Y, strict=True)):
-        yc = gy + GUIDE_HEIGHT / 2.0
+        yc = gy + GUIDE_TAP_Y
         # The bottom rail's lock laps the rail's underside and is pushed down;
         # the top rail's laps its top and is pushed up.
         grow_down, grow_up = (
@@ -1597,11 +1625,16 @@ def _assert_lock_station_sweep() -> None:
     # and rearward the tallest boss, or the tip left proud of the shortest one
     # by a thin plate.
     boss_r = PLATEN_SOCKET_BOSS_DIA / 2.0 + PLATEN_BOSS_FILLET_R
-    boss_dy = printed_band_mm(
-        PLATEN_PRECISION["Boss2Dia"], unit=PLATEN_UNIT
-    ) / 2.0 + printed_band_mm(PLATEN_PRECISION["Socket2Y"], unit=PLATEN_UNIT)
+    boss_dy = printed_deviations(
+        PLATEN_SOCKET_BOSS_DIA, PLATEN_PRECISION["Boss2Dia"], unit=PLATEN_UNIT
+    )[1] / 2.0 + max(
+        abs(deviation)
+        for _, y in PLATEN_SOCKET_XY
+        for deviation in printed_deviations(y, PLATEN_PRECISION["Socket2Y"], unit=PLATEN_UNIT)
+    )
     boss_rear = (
-        printed_band_mm(PLATEN_PRECISION["BossH"], unit=PLATEN_UNIT) + _PLATEN_THICKNESS_BAND
+        printed_deviations(PLATEN_BOSS_H, PLATEN_PRECISION["BossH"], unit=PLATEN_UNIT)[1]
+        + _PLATEN_THICKNESS_BAND
     )
     bosses = [
         (
@@ -2836,7 +2869,7 @@ async def build(adapter) -> dict[str, str]:
             await place_component(
                 adapter,
                 arc,
-                [sx * COLUMN_X, BAR_CY, COLUMN_Z],
+                [sx * COLUMN_X, CLAMP_Y, COLUMN_Z],
                 [0.0, 90.0, 0.0],
                 ROT_Y_POS90,
                 label=f"{arc} (x{sx * COLUMN_X:+.0f})",
@@ -2846,7 +2879,7 @@ async def build(adapter) -> dict[str, str]:
     clamp_x = sorted(CLAMP_HOLE_X)
     clamp_seeds: list[str] = []
     for index, x in enumerate(clamp_x[:2]):
-        target = [x, BAR_CY, BAR_FRONT_Z + CLAMP_CBORE_DEPTH]
+        target = [x, CLAMP_Y, BAR_FRONT_Z + CLAMP_CBORE_DEPTH]
         seed = await place_component(
             adapter,
             "sh-vn-clamp-screw",
@@ -2864,7 +2897,7 @@ async def build(adapter) -> dict[str, str]:
         )
         assert_component_placed(adapter, seed, target, IDENTITY)
         clamp_seeds.append(seed)
-    clamp_targets = [[x, BAR_CY, BAR_FRONT_Z + CLAMP_CBORE_DEPTH] for x in clamp_x[2:]]
+    clamp_targets = [[x, CLAMP_Y, BAR_FRONT_Z + CLAMP_CBORE_DEPTH] for x in clamp_x[2:]]
     clamp_instances = await linear_component_pattern(
         adapter,
         clamp_seeds,
@@ -2959,11 +2992,10 @@ async def build(adapter) -> dict[str, str]:
         )
         await _lock_to_platen(guide, f"platen-guide y{gy:.1f}")
         guides.append(guide)
-    # Lock plates on the guide backs, bridging BEHIND the bar (1.0 clear of its
-    # back face) and lapping LOCK_RAIL_LIP past each rail's outer edge: top-rail
-    # locks hang DOWN over the bar (Rz180, 3.5 overlap), bottom-rail locks
-    # bridge UP across the 1.0 clearance onto the bar (identity, 2.5 overlap;
-    # _assert_lock_retention).
+    # Lock plates on the guide backs, bridging BEHIND the bar (clear of its
+    # back face) and lapping LOCK_LIP past each rail's outer edge: top-rail
+    # locks hang DOWN over the bar (Rz180), bottom-rail locks bridge UP across
+    # the running clearance onto the bar (identity; _assert_lock_retention).
     for x_c in LOCK_STATION_X:
         # Machine: the station is measured from the platen's +X edge (the mirror
         # of the pre-mirror left-edge station PLATE_X0 + x_c). The plate's hole
