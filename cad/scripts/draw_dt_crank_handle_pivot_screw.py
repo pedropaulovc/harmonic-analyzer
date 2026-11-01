@@ -30,6 +30,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
 )
 
+from _com import _early_bound
 from _check import check
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
@@ -225,14 +226,32 @@ FINISH_PICK = (UNDERHEAD_X - 0.040, SHOULDER_TOP_Y)
 FINISH_SYMBOL = (UNDERHEAD_X - 0.030, SIDE_CENTER[1] + 0.030)
 # A point on the shoulder face, clear of the Ø dimension line.
 CENTERLINE_PICK = (UNDERHEAD_X - 0.025, SIDE_CENTER[1] + 0.003)
-# The seat edge's break note lands on the shoulder's silhouette 2 mm right of
-# its seat-face corner (6 mm read as the shank, not the corner: #290 review of
-# d72bdd039), from up and right, above the relief width and the shoulder Ø's
-# callout blocks: landing on the seat face itself, its leader crossed the
-# relief width's dimension line (farm r8 of f5256bf3d).
-SEAT_EDGE_PICK = (SEAT_X + 0.002, SHOULDER_TOP_Y)
-SEAT_EDGE_NOTE_XY = (SEAT_X + 0.020, SIDE_CENTER[1] + 0.060)
+# The seat edge's break note lands on the shoulder's silhouette 2.5 mm right
+# of its seat-face corner (6 mm read as the shank, not the corner: #290 review
+# of d72bdd039), from up and right, above the relief width and the shoulder
+# Ø's callout blocks: landing on the seat face itself, its leader crossed the
+# relief width's dimension line (farm r8 of f5256bf3d).  The note stands 24 mm
+# right of the seat face so the leader passes right of that dimension line's
+# outside arrow, which ends 6.4 mm right of the seat face (farm r13: from
+# 20 mm and 2 mm the leader crossed it).
+SEAT_EDGE_PICK = (SEAT_X + 0.0025, SHOULDER_TOP_Y)
+SEAT_EDGE_NOTE_XY = (SEAT_X + 0.024, SIDE_CENTER[1] + 0.060)
+# The relief Ø's arrows stand inside the groove: outside, the upper arrow's
+# stub stood above the floor where the lead note's leader passes (#290 review
+# of f166646c4).
+_ARROWS_INSIDE = 0  # swDimArrowsSide_e.swDimArrowsInside
 ISO_NOTE_XY = (0.352, 0.200)
+
+
+def _set_relief_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
+    matches = [a for a in annotations if dimension_name(adapter, a) == "ReliefDia"]
+    if len(matches) != 1:
+        raise RuntimeError("expected one MHA-DT-32 ReliefDia dimension")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display.ArrowSide = _ARROWS_INSIDE
+    if int(display.ArrowSide) != _ARROWS_INSIDE:
+        raise RuntimeError("MHA-DT-32 ReliefDia did not keep its arrows inside")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -315,6 +334,7 @@ async def build(adapter: Any) -> dict[str, str]:
         location="below",
     )
     offset_dimension_text(adapter, side_annotations, {"ReliefDia": RELIEF_DIA_TEXT_XY})
+    _set_relief_arrows_inside(adapter, side_annotations)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     for name in sorted(REFERENCE_DIMENSIONS):
         matches = [
