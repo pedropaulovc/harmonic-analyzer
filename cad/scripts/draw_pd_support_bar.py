@@ -275,11 +275,11 @@ CAPTION_SETTLE_M = 0.0006
 # met its own extension line and arrow, r6 machinist review), the slot's
 # right, its text under the slot's lower edge the same way (inside its 4.98
 # span the block was struck by its own dimension line, r4), the slot's
-# travel below and the counterbore's above; its label right of the slot's
-# width. The slot width's block centres on its point; its five callout
-# lines (the head's reason for the upper limit, then the take-up's) put
-# that point 5 mm higher than the three-line block's, off the border, and
-# the label 4.5 mm higher to keep its air over the block. It is a cropped
+# travel below and the counterbore's above; its label over the detail
+# (DETAIL_LABEL_XY). The slot width's block centres on its point; its five
+# callout lines (the head's reason for the upper limit, then the take-up's)
+# put that point 5 mm higher than the three-line block's, off the border. It
+# is a cropped
 # *Back model view, dimensioned uncropped then cropped (the
 # draw_ch_amplitude_bar notch details): a model view has no native label or
 # parent circle, so its label is a note in the native label's words and its
@@ -296,7 +296,12 @@ DETAIL_SCALE = (2, 1)
 DETAIL_MM = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0  # sheet metres per mm
 DETAIL_RADIUS_MM = 7.5
 DETAIL_LABEL = f"DETAIL C\nSCALE {DETAIL_SCALE[0]} : {DETAIL_SCALE[1]}"
-DETAIL_LABEL_XY = (0.200, 0.0645)  # top centre, above the slot-width text
+# Top centre, over the detail: right of the slot-width text it sat against
+# the title block, away from its view (machinist review round 7). Centred on
+# the detail, its ~27 mm block (y ~0.061..0.0705) clears the counterbore
+# width's upper extension line (~0.058) and shoulder (ends x ~0.107) and
+# stands left of the front caption (starts x ~0.149, bottom ~0.074).
+DETAIL_LABEL_XY = (DETAIL_CENTER[0], 0.0705)
 DETAIL_LETTER = "C"
 DETAIL_LETTER_TOP = (LEFT_END - 0.004, BACK_CENTER[1] - 0.0025)  # top centre
 DETAIL_POSITION_TOL_M = 1e-4
@@ -620,7 +625,7 @@ def _dimension_then_crop(adapter: Any, view: Any) -> list[Any]:
 
 
 def _label_slot_detail(adapter: Any, detail: Any, back: Any) -> None:
-    """Detail C's label right of its callouts, owned by the detail, and its
+    """Detail C's label over the detail, owned by the detail, and its
     mark on the front-face view: a black circle round the outer slot and the
     letter off the bar's end. The back view is left active."""
     _activate(adapter, detail, label="slot detail C")

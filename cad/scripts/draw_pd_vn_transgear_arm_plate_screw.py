@@ -29,15 +29,13 @@ MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_arm_plate_screw"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "#8-32 x 1 OVAL HEAD SLOTTED SCREW"
-# Only the sizes a replacement and the cut need beyond ITEM: the head
-# diameter, the plate countersink's fit, and the as-cut length under the head
-# the views show (machinist review round 6), a reference the MHA-PD-00 cut
-# step governs. ITEM already names the #8-32 thread and 1 in stock, and the
-# installed screw is cut shorter, so a stock length ended in empty space.
+# Only the size a replacement needs beyond ITEM: the head diameter, the plate
+# countersink's fit. ITEM already names the #8-32 thread and 1 in stock, and
+# the installed screw is cut shorter, so a stock length ended in empty space.
 # The standard oval head's 82 deg angle and .052 REF crown are not replacement
 # criteria. The part's reference sketch still authors the unprinted rows by
-# design; FRONT imports only the cut length.
-PRINTED_REFERENCES = ("SupplierHeadDiameter", "SupplierCutLength")
+# design; FRONT imports none of them.
+PRINTED_REFERENCES = ("SupplierHeadDiameter",)
 
 
 def _printed_rows() -> tuple[tuple[str, float, str], ...]:

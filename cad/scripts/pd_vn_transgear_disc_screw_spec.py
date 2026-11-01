@@ -36,6 +36,7 @@ import math
 
 import _config
 from _package_units import drawing_unit
+import _mcmaster_91794a055 as _supplier
 from _mcmaster_91794a055 import (
     HEAD_DIA,
     HEAD_H,
@@ -207,3 +208,27 @@ if ENGAGEMENT_WORST_D < ENGAGEMENT_FLOOR_D - 1e-9:
         f"{ENGAGEMENT_WORST:.3f} ({ENGAGEMENT_WORST_D:.3f}D) under "
         f"{ENGAGEMENT_FLOOR_D}D"
     )
+
+# --- supplier references the part carries and the sheet prints -------------
+# The supplier's references less its stock length: the screw is drawn as
+# cut, so a .25 stock length landed in air below the drawn tip on a witness
+# line that belonged to no feature (machinist review r7, all runs).  The
+# ITEM row's "#0-80 x 1/4" names the stock; the installation note the cut.
+_STOCK_LENGTH = "SupplierStockLength"
+SUPPLIER_REFERENCE_DIMENSIONS = tuple(
+    row for row in _supplier.SUPPLIER_REFERENCE_DIMENSIONS if row[0] != _STOCK_LENGTH
+)
+SUPPLIER_REFERENCE_STARTS = {
+    name: start
+    for name, start in _supplier.SUPPLIER_REFERENCE_STARTS.items()
+    if name != _STOCK_LENGTH
+}
+SUPPLIER_REFERENCE_FORMATS = {
+    name: row
+    for name, row in _supplier.SUPPLIER_REFERENCE_FORMATS.items()
+    if name != _STOCK_LENGTH
+}
+SUPPLIER_REFERENCE_PLANES = _supplier.SUPPLIER_REFERENCE_PLANES
+SUPPLIER_REFERENCE_SIDES = _supplier.SUPPLIER_REFERENCE_SIDES
+if len(SUPPLIER_REFERENCE_DIMENSIONS) != len(_supplier.SUPPLIER_REFERENCE_DIMENSIONS) - 1:
+    raise AssertionError("MHA-PD-VN-55: the supplier stock length reference is not dropped")

@@ -130,10 +130,6 @@ SUPPLIER_DRAWING_URL = (
 # The source STEP also has a different underhead fillet; this port changes
 # neither transition nor any other solid/installed geometry.
 # Stock length is an isolated construction witness, not the installed span.
-# The as-cut length under the head is: FRONT prints it as a reference
-# (machinist review round 6: the views show the screw cut, with no number to
-# check them against), witnessed from the cut end's corner on the thread
-# major up to the bevel-top edge, the oval head's length station.
 # The supplier prints only the 8-32 designation, not a numeric major diameter.
 # This extra carrier is explicitly the current model's basic nominal thread
 # size, not a supplier-printed dimension or a helical-surface measurement.
@@ -141,7 +137,6 @@ SUPPLIER_REFERENCE_SIDES = {
     "SupplierStockLength": "left",
     "SupplierCrownHeight": "right",
     "SupplierNominalThreadMajor": "bottom",
-    "SupplierCutLength": "right",
 }
 SUPPLIER_REFERENCE_DIMENSIONS = (
     ("SupplierStockLength", -STOCK_LENGTH, "vertical"),
@@ -149,7 +144,6 @@ SUPPLIER_REFERENCE_DIMENSIONS = (
     ("SupplierHeadAngle", HEAD_ANGLE_DEG, "angle"),
     ("SupplierHeadDiameter", HEAD_DIA, "horizontal"),
     ("SupplierNominalThreadMajor", THREAD_MAJOR, "horizontal"),
-    ("SupplierCutLength", CUT_LENGTH, "vertical"),
 )
 SUPPLIER_REFERENCE_STARTS = {
     "SupplierStockLength": (-HEAD_DIA, 0.0),
@@ -157,11 +151,8 @@ SUPPLIER_REFERENCE_STARTS = {
     "SupplierHeadAngle": (-HEAD_DIA / 2.0, 0.0),
     "SupplierHeadDiameter": (-HEAD_DIA / 2.0, 0.0),
     "SupplierNominalThreadMajor": (-THREAD_MAJOR / 2.0, -CUT_LENGTH / 2.0),
-    "SupplierCutLength": (THREAD_MAJOR / 2.0, -CUT_LENGTH),
 }
 SUPPLIER_REFERENCE_PLANES = {"SupplierHeadDiameter": "Top"}
-# .XX: a reference no check reads; the cut step's flush-to-proud limit governs.
-CUT_LENGTH_CALLOUT = "AS CUT (MHA-PD-00)"
 SUPPLIER_REFERENCE_FORMATS = {
     "SupplierStockLength": (0, "length", None, "AS-SUPPLIED STOCK LENGTH"),
     "SupplierCrownHeight": (3, "length", None, None),
@@ -170,5 +161,4 @@ SUPPLIER_REFERENCE_FORMATS = {
     "SupplierNominalThreadMajor": (
         3, "diameter", None, "8-32\nNOMINAL THREAD SIZE"
     ),
-    "SupplierCutLength": (2, "length", None, CUT_LENGTH_CALLOUT),
 }

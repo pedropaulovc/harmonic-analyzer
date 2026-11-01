@@ -447,27 +447,16 @@ def test_sheet_prints_only_the_replacement_sizes(monkeypatch) -> None:
     sides = drawing._printed(screw.SUPPLIER_REFERENCE_SIDES)
     plan = supplier_screw_lane_plan(rows, planes=planes, sides=sides)
     assert set(plan) == set(drawing.PRINTED_REFERENCES)
-    # TOP reserves the head diameter's centred lanes, FRONT the cut length's
-    # right lane (round 6); the builder fits TOP in FRONT's column.
+    # Only TOP is reserved, so only TOP may carry imported dimensions; FRONT
+    # and RIGHT stay centred in their cells, in projection with TOP.
     margins = supplier_screw_margins(rows, planes=planes, sides=sides)
-    assert set(margins) == {"*Top", "*Front"}
+    assert set(margins) == {"*Top"}
     left, _bottom, right, _top = margins["*Top"]
     assert left == right
-    front_left, _bottom, front_right, _top = margins["*Front"]
-    assert front_right > front_left
     formats = drawing._printed(screw.SUPPLIER_REFERENCE_FORMATS)
     assert formats == {
-        name: screw.SUPPLIER_REFERENCE_FORMATS[name]
-        for name in ("SupplierHeadDiameter", "SupplierCutLength")
+        "SupplierHeadDiameter": screw.SUPPLIER_REFERENCE_FORMATS["SupplierHeadDiameter"]
     }
-    # The as-cut length under the head: from the bevel top down to the cut
-    # end, the length the views draw, two places as a reference.
-    cut = dict((name, value) for name, value, _ in rows)["SupplierCutLength"]
-    assert cut == pytest.approx(screw.CUT_LENGTH)
-    start = screw.SUPPLIER_REFERENCE_STARTS["SupplierCutLength"]
-    assert (start[1], start[1] + cut) == pytest.approx((-screw.CUT_LENGTH, 0.0))
-    assert formats["SupplierCutLength"][0] == 2
-    assert "MHA-PD-00" in formats["SupplierCutLength"][3]
     assert "supplier_top" in drawing.build.__code__.co_consts
     monkeypatch.setattr(
         drawing, "PRINTED_REFERENCES", ("SupplierStockLength", "SupplierMissing")
