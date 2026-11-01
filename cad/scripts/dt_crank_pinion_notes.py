@@ -46,6 +46,9 @@ GEAR_DATA = mate_notes.gear_data_note(
             f"{inch_text(spec.TOOTH_RUNOUT_TIR_MM, 3)} TIR MAX TO FINISHED BORE",
         ),
         ("TOOTH FORM", TOOTH_FORM_NOTE),
+        # The title block's edge break would erase these fine teeth; the
+        # requirement is a tooth fact, so it reads with them, as on the 64T.
+        ("TOOTH EDGES", "DO NOT BREAK OR CHAMFER FLANKS, TIPS OR ROOTS"),
         ("MATES WITH", "CRANK DRIVE GEAR MHA-DT-07, 64T RIGHT-HAND HELICAL"),
     ]
 )

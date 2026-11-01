@@ -79,6 +79,8 @@ from dt_crank_pinion_spec import (
     PIN_DIA,
     PIN_HOLE_SPEC,
     PIN_FROM_BOSS_END,
+    PIN_FROM_BOSS_END_PLACES,
+    PIN_FROM_BOSS_END_TOL,
     PIN_STATION,
     SHOULDER_LENGTH,
     SHOULDER_LENGTH_LIMITS,
@@ -687,6 +689,14 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_symmetric_tolerance(
         adapter, "TurnedBandProfile", "TurnedDia", TURNED_DIA_TOLERANCE_MM, display_unit=UNIT
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "BossProfile",
+        "PinFromBossEnd",
+        PIN_FROM_BOSS_END_TOL,
+        places=PIN_FROM_BOSS_END_PLACES,
+        display_unit=UNIT,
     )
     # The tooth-face shoulder: sharp up to its printed R MAX (dt_crank_pinion_spec).
     _shoulder_radius_max_limit(adapter)

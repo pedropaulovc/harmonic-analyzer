@@ -192,7 +192,7 @@ def test_the_pin_hole_is_located_from_the_boss_end_and_keeps_its_wall() -> None:
     assert spec.PIN_FROM_BOSS_END == pytest.approx(spec.OVERALL_LENGTH - spec.PIN_STATION)
     assert spec.PIN_FROM_BOSS_END_LIGAMENT_WORST == pytest.approx(
         spec.PIN_FROM_BOSS_END
-        - spec.printed_band_mm(spec.PIN_FROM_BOSS_END_PLACES, unit=spec.UNIT)
+        - spec.PIN_FROM_BOSS_END_TOL
         - spec.PIN_DIA / 2.0
         - spec._PIN_HOLE_RADIUS_GROWTH
     )
@@ -441,8 +441,12 @@ def test_tooth_system_and_pair_acceptance_match_current_geometry() -> None:
 
 
 def test_notes_carry_the_tooth_edge_override_not_an_obsolete_boss_shortfall() -> None:
+    import dt_crank_pinion_notes
+
+    assert "TOOTH EDGES:  DO NOT BREAK OR CHAMFER FLANKS, TIPS OR ROOTS" in (
+        dt_crank_pinion_notes.GEAR_DATA
+    )
     lines = spec.DRAWING_NOTES.split("\n")
-    assert spec.TOOTH_EDGE_NOTE in lines
     assert spec.BOSS_WALL_WORST >= 2.0
     assert not any(line.startswith("BOSS WALL") for line in lines)
     # The T120 fit-up may turn the band down; the sheet states its floor on
