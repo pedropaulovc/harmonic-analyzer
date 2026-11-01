@@ -280,9 +280,9 @@ sections:
         - scaled
         - med
       - - Crankshaft length
-        - 'Current cylindrical length 134.874 mm (dt_crankshaft_spec.SHAFT_LENGTH, 5.31 in), plus the 2.032 mm (.08 in) integral outboard dome'
+        - 'Current cylindrical length 134.366 mm (dt_crankshaft_spec.SHAFT_LENGTH, 5.29 in), plus the 2.032 mm (.08 in) integral outboard dome'
         - —
-        - 'The outboard cylindrical face remains at world z −183. Owner ruling D1 (2026-10-15): the collar bears directly on the post boss south face and the 16T is set on its 0.25 mm feeler off the north face before its pin is match-drilled, so the length is the shortest value on the printed .XX in grid whose end stands proud of the 16T north face at every accepted part set (dt_crankshaft_spec.SHAFT_END_PROUD_RANGE, about 0.08–2.39 mm); the end is left proud, not faced. The 16T boss is 8.382 mm (overall length 20.066 mm; worst pin-to-boss-face ligament 2.299 mm, dt_crank_pinion_spec). The +0/−0.4064 (+.000/−.016 in) length band is retained for the hub air. The earlier 136.3, 137.5 and 138.1 mm lengths are superseded.'
+        - 'The outboard cylindrical face remains at world z −183. Owner ruling D1 (2026-10-15): the collar bears directly on the post boss south face and the 16T is set on its 0.25 mm feeler off the north face before its pin is match-drilled, so the length is the shortest value on the printed .XX in grid whose end stands proud of the 16T north face at every accepted part set (dt_crankshaft_spec.SHAFT_END_PROUD_RANGE, about 0.21–1.17 mm); the end is left proud, not faced. The 16T boss is 8.382 mm (overall length 20.066 mm; worst pin-to-boss-face ligament 2.299 mm, dt_crank_pinion_spec). The +0/−0.4064 (+.000/−.016 in) length band is retained for the hub air. The earlier 134.874 (5.31 in, before the cone post took its inch bands), 136.3, 137.5 and 138.1 mm lengths are superseded.'
         - derived from current spec
         - med
   - prose: |2
