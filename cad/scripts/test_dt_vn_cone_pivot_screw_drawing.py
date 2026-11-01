@@ -114,7 +114,7 @@ def test_only_witness_gaps_leave_reference_ink_bare_and_only_on_edges(gap: float
             assert spans == [], name
 
 
-def test_shoulder_diameter_lane_drop_is_reserved_before_the_fit() -> None:
+def test_lane_moves_are_reserved_before_the_fit() -> None:
     base = supplier_screw_margins(
         screw.SUPPLIER_REFERENCE_DIMENSIONS,
         planes=screw.SUPPLIER_REFERENCE_PLANES,
@@ -123,45 +123,65 @@ def test_shoulder_diameter_lane_drop_is_reserved_before_the_fit() -> None:
     margins = draw.supplier_margins()
     assert set(margins) == set(base) == {"*Front"}
     left, bottom, right, top = base["*Front"]
-    assert margins["*Front"] == (left, bottom + draw.SHOULDER_DIAMETER_DROP_M, right, top)
+    assert margins["*Front"] == (
+        left,
+        bottom + draw.SHOULDER_DIAMETER_DROP_M,
+        right + draw.THREAD_LENGTH_SHIFT_M,
+        top,
+    )
+    assert draw.LANE_MOVES == {
+        "SupplierShoulderDiameter": (0.0, -draw.SHOULDER_DIAMETER_DROP_M),
+        "SupplierThreadLength": (draw.THREAD_LENGTH_SHIFT_M, 0.0),
+    }
     lanes = supplier_screw_lane_plan(
         screw.SUPPLIER_REFERENCE_DIMENSIONS,
         planes=screw.SUPPLIER_REFERENCE_PLANES,
         sides=screw.SUPPLIER_REFERENCE_SIDES,
     )
-    # Ø.190 inner, Ø.250 outer: the drop separates exactly that stacked pair.
+    # Each move separates one stacked pair: Ø.190 inner / Ø.250 outer below,
+    # (.188) inner / (.375) outer on the right.
     assert lanes["SupplierThreadDiameter"] == ("bottom", pytest.approx(0.006))
     assert lanes["SupplierShoulderDiameter"] == ("bottom", pytest.approx(0.014))
-    assert draw.SHOULDER_DIAMETER_DROP_M > 0.0
+    assert lanes["SupplierHeadHeight"] == ("right", pytest.approx(0.006))
+    assert lanes["SupplierThreadLength"] == ("right", pytest.approx(0.014))
+    assert draw.SHOULDER_DIAMETER_DROP_M > 0.0 and draw.THREAD_LENGTH_SHIFT_M > 0.0
 
 
-def test_lowering_moves_the_whole_shoulder_diameter_and_reads_it_back(monkeypatch) -> None:
+def test_lane_moves_move_whole_dimensions_and_read_them_back(monkeypatch) -> None:
     events: list[object] = []
 
     class Annotation:
-        position = (0.1, 0.05, 0.0)
+        def __init__(self, name: str) -> None:
+            self.name, self.position = name, (0.1, 0.05, 0.0)
 
         def GetPosition(self):
             return self.position
 
         def SetPosition2(self, x, y, z):
-            events.append(("set", display.OffsetText, x, y))
+            events.append((self.name, displays[self.name].OffsetText, x, y))
             self.position = (x, y, z)
             return True
 
     class Display:
         OffsetText = True
 
-        def GetAnnotation(self):
-            return annotation
+        def __init__(self, name: str) -> None:
+            self.annotation = Annotation(name)
 
-    annotation, display = Annotation(), Display()
+        def GetAnnotation(self):
+            return self.annotation
+
+    displays = {name: Display(name) for name in draw.LANE_MOVES}
     monkeypatch.setattr(draw, "_early_bound", lambda raw, _interface: raw)
     monkeypatch.setattr(draw, "rebuild_drawing", lambda _adapter, *, label: events.append("rebuild"))
-    draw._lower_shoulder_diameter(object(), {"SupplierShoulderDiameter": display})
-    # Offset mode off first, so the dimension line moves with its text.
-    assert events == [("set", False, 0.1, pytest.approx(0.05 - draw.SHOULDER_DIAMETER_DROP_M)), "rebuild"]
+    draw._move_lanes(object(), displays)
+    # Offset mode off first, so each dimension line moves with its text.
+    assert events == [
+        ("SupplierShoulderDiameter", False, 0.1, pytest.approx(0.05 - draw.SHOULDER_DIAMETER_DROP_M)),
+        ("SupplierThreadLength", False, pytest.approx(0.1 + draw.THREAD_LENGTH_SHIFT_M), 0.05),
+        "rebuild",
+    ]
 
-    annotation.SetPosition2 = lambda *_args: False
-    with pytest.raises(RuntimeError, match="failed to lower"):
-        draw._lower_shoulder_diameter(object(), {"SupplierShoulderDiameter": display})
+    displays["SupplierThreadLength"].annotation.SetPosition2 = lambda *_args: False
+    with pytest.raises(RuntimeError, match="failed to move SupplierThreadLength"):
+        draw._move_lanes(object(), displays)
