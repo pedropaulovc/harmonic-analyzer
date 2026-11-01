@@ -54,7 +54,6 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-from dt_drive_train_steps import step_ref
 from dt_pinion_lever_geometry import ROD_PIN_HOLE_FROM_END
 from dt_pinion_lift_rod_spec import (
     CAP_SAG,
@@ -120,13 +119,12 @@ DETAIL_KEEP = {
     # axis 0.335, front end 0.355): between them the text was struck by both.
     "PinHoleZ": (DETAIL_CENTER[0] + 0.047, DETAIL_CENTER[1] - 0.045),
 }
-LEVER_PIN_SET_STEP_KEY = "lever-pin-set"
 DIMENSION_CALLOUTS = {
     # Below the value: SolidWorks stores a multi-line ABOVE callout but prints
     # none of it (r2 layout audit text-unmatched; draw_dt_cone_gear_shaft).
     "RodDia": ROD_DIA_CALLOUT,
-    # Drilled at MHA-DT-00's LEVER PIN SET; the pointer comes from the registry.
-    "PinHoleDia": f"{PIN_HOLE_CALLOUT},\nPER {step_ref(LEVER_PIN_SET_STEP_KEY)}",
+    # The match-drill and its mate only: MHA-DT-00 names the hole in its step.
+    "PinHoleDia": PIN_HOLE_CALLOUT,
     # The rod has one flat end and one crowned end; "front" named nothing on
     # the sheet (machinist review r2).
     "PinHoleZ": "FROM FLAT END",

@@ -53,7 +53,6 @@ from _paths import CAD_ROOT
 from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
-from dt_drive_train_steps import step_ref
 from dt_pinion_lever_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -162,14 +161,13 @@ DETAIL_KEEP = {
     name: (DETAIL_CENTER[0] - z * _DS, DETAIL_CENTER[1] + y * _DS)
     for name, (z, y) in DETAIL_TEXT_MODEL_MM.items()
 }
-LEVER_PIN_SET_STEP_KEY = "lever-pin-set"
 DIMENSION_CALLOUTS = {
     "HubBore": f"BORE OR REAM\nSLIP ON {LIFT_ROD_NUMBER}",
     "BoreDepthFromB": "FLAT BOTTOM",
     "RodTipY": "FROM HUB AXIS",
     "GripFromB": "GRIP AXIS",
-    # Drilled at MHA-DT-00's LEVER PIN SET; the pointer comes from the registry.
-    "PinHoleDia": f"{PIN_HOLE_CALLOUT},\nPER {step_ref(LEVER_PIN_SET_STEP_KEY)}",
+    # The match-drill and its mate only: MHA-DT-00 names the hole in its step.
+    "PinHoleDia": PIN_HOLE_CALLOUT,
 }
 
 
