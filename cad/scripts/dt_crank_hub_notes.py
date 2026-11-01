@@ -113,15 +113,17 @@ if FRONT_FACE_DATUM not in " ".join(CROSS_HOLE_CALLOUT.split()):
     raise AssertionError("the cross-hole callout no longer names the hub datum")
 # A deeper ream seats the driven pin deeper, so its big end's MIN proud
 # limits the ream (machinist review: the acceptance read apart from it).  The
-# end view draws that big end in phantom; the callout names it, the pin and
-# the keeper ring whose hole must clear the barrel (r7 review of farm run
+# end view outlines that big end (dashed, the view's own line style: the
+# review of farm run 20261101T130334243Z read "(PHANTOM)" against it, so
+# the callout names no line type); the callout names it, the pin and the
+# keeper ring whose hole must clear the barrel (r7 review of farm run
 # 20261101T022045634Z: an unnamed dashed box, an unnamed ring).
 PIN_PROUD_CALLOUT = "\n".join(
     (
-        "MHA-DT-09 TAPER PIN BIG END",
-        "(PHANTOM), DRIVEN; LIMITS",
-        "TAPER-REAM DEPTH; KEEPER RING",
-        "MHA-DT-27 HOLE CLEARS BARREL",
+        "MHA-DT-09 TAPER PIN BIG END,",
+        "DRIVEN; LIMITS TAPER-REAM",
+        "DEPTH; KEEPER RING MHA-DT-27",
+        "HOLE CLEARS BARREL",
     )
 )
 
@@ -129,7 +131,9 @@ PIN_PROUD_CALLOUT = "\n".join(
 # (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the overall places the rear face against the removable sprocket
 # (stack B below), the relief places the barrel's rear shoulder ahead of the
 # #25 chain wrapping it (stack A).
-HUB_LENGTH_CALLOUT = "REAR FACE CLEARS\nSPROCKET MHA-PD-09"
+# Three short rows: two filled the 50 mm between the overall's extension
+# lines (review of farm run 20261101T130334243Z).
+HUB_LENGTH_CALLOUT = "REAR FACE CLEARS\nSPROCKET\nMHA-PD-09"
 RELIEF_LENGTH_CALLOUT = "CLEARS #25 CHAIN ON\nSPROCKET MHA-PD-09"
 
 # Axial stack at the printed worst case (Main, 2026-09-30), machine z, -Z =

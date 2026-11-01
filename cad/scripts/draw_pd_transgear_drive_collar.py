@@ -182,10 +182,13 @@ FIT_NOTES = "\n".join(
         _numbered(BODY_NOTE, f"{BODY_SUPPLY_NOTE}, PER {step_ref(BODY_FIT_STEP_KEY)}."),
     )
 )
-# Every tight band names its mate and fit where it prints (rule 4).
+# Every tight band names its mate and fit where it prints (rule 4).  The
+# flat's rows start at its jogged dimension line; two leading spaces stop
+# their ink short of it (review of farm run 20261101T130334243Z: the line
+# struck the S of SLIDES; draw_ch_fulcrum_shaft's trailing-space form).
 DIMENSION_CALLOUTS_BELOW = {
     "BoreDia": BORE_CALLOUT,
-    "FlatToAxis": FLAT_CALLOUT,
+    "FlatToAxis": "\n".join(f"  {row}" for row in FLAT_CALLOUT.splitlines()),
     "PinPosDia": PIN_HOLE_CALLOUT,
     "PinPosY": PIN_LOCATION_CALLOUT,
     "PinNegY": PIN_LOCATION_CALLOUT,
