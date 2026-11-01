@@ -1496,7 +1496,7 @@ def test_dowel_slot_stadium_closes_counter_clockwise(along_u: bool) -> None:
     )
     assert inner == pytest.approx(part.SLOT_INNER_X)
     assert outer == pytest.approx(part.SLOT_OUTER_X)
-    assert outer + half_w < -(knife_mount.BLK_HALF_X + knife_mount._X / 2.0)
+    assert outer + half_w < -(knife_mount.BLK_HALF_X + knife_mount.BLOCK_SIZE_TOL / 2.0)
 
 
 def _stud_height_case(monkeypatch):
