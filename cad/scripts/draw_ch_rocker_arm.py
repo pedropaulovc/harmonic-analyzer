@@ -1986,7 +1986,8 @@ HUB_OD = requirement(
 # the 132.76 R816/TAPER row). Requested lower, the stack lands in the free
 # band right of D's crop and under that dimension line (~0.131) either way.
 HUB_KEEP = {
-    "PivotDia": (0.120, 0.086),
+    # The inch fit line is wider; 3 mm west keeps 1 mm air to the D crop.
+    "PivotDia": (0.117, 0.086),
     "HubDia": (0.212, 0.108),
 }
 # The 2X 5.59 box sits between its own witnesses: the upper one passes its
