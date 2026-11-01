@@ -1343,6 +1343,19 @@ def test_layout_keeps_text_off_the_part_border_and_title_block() -> None:
     af_x, _af_y = bolt_drawing.HEAD_AF_TEXT_XY
     assert af_x + 0.010 < head_left - 0.003
     assert af_x - 0.010 > 0.0127
+    # The thread-major chord lies on its own dimension line (8.23 mm under
+    # the text position), across the shank between the tail text and the
+    # bearing face, and the three-row text stays under the bearing face.
+    major_x, major_y = bolt_drawing.THREAD_MAJOR_TEXT_XY
+    chord_y = tip_y + bolt.SUPPLIER_THREAD_MAJOR_Y * scale
+    assert major_y - chord_y == pytest.approx(0.00823)
+    assert bolt.SUPPLIER_REFERENCE_STARTS["SupplierThreadMajor"] == (
+        -bolt.SHANK_DIA / 2, bolt.SUPPLIER_THREAD_MAJOR_Y
+    )
+    bearing_y = tip_y + bolt.LENGTH * scale
+    assert keep["ThreadLengthMin"][1] + 0.015 < chord_y < bearing_y - 0.020
+    assert major_y + 0.009 < bearing_y
+    assert major_x > shank_right + 0.040
     # The purchased note above the head; nothing reaches the title block.
     head_top = tip_y + bolt.HEAD_TOP_Y * scale
     assert bolt_drawing.PURCHASED_NOTE_XY[1] > head_top + 0.015
@@ -3942,7 +3955,7 @@ def test_stud_supplier_head_af_direct_call_preserves_picks_format_and_thread_maj
         (thread_display, "SupplierThreadMajor"),
     ]
     assert imports[0][0] is case.front
-    assert imports[0][1]["keep"] == {"SupplierThreadMajor": (0.170, 0.194)}
+    assert imports[0][1]["keep"] == {"SupplierThreadMajor": bolt_drawing.THREAD_MAJOR_TEXT_XY}
     assert imports[0][1]["dimensions_by_feature"] is bolt.SUPPLIER_DRAWING_DIMENSIONS
 
 
