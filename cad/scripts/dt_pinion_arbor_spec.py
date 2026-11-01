@@ -162,7 +162,9 @@ REFERENCE_SKETCHES = (
 # sub-.001 bands print exactly), the reamed cross hole (.250 +.0015/+.0010)
 # and the 1/16 pin hole (.0625 +.0025/.0000); two (.XX) on every other
 # length, station, diameter and crown radius, because the land, drum, pin,
-# web and run-out stacks read them.  The crown sags and the overall are REFs.
+# web and run-out stacks read them.  The crown sags and the overall are REFs;
+# the overall prints one place, (9.6), because its rounded chain (.05 + 8.93 +
+# .48 + (.12)) sums to 9.58 and a two-place (9.57) read as a mismatch.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HeadProfile": {"HeadDia": 2},
     "NeckProfile": {"NeckDia": 2},
@@ -177,7 +179,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinHoleProfile": {"PinHoleDia": 4},
     "PinStationReference": {"PinStationFromHeadRear": 2},
     "BackRimReference": {"BackRimFromHeadRear": 2},
-    "OverallReference": {"OverallLen": 2},
+    "OverallReference": {"OverallLen": 1},
     "FrontJournalReference": {
         "FrontJournalFromHeadRear": 2,
         "FrontJournalLen": 2,
