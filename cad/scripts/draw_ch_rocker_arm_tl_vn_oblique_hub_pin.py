@@ -36,14 +36,10 @@ VIEW_LAYOUT = "tall_top"
 REFERENCE = "SupplierPinDiameter"
 CUT = "SupplierCutLength"
 # Both texts shelve right of their witnesses: the diameter on the Top's
-# bottom lane, the cut length beside it. Front and Top reserve the same
-# left/right space so the fit centres them on one projection line; the
-# unannotated Front's equal top/bottom keeps it level with the Right.
+# bottom lane, the cut length beside it. Only the Top is annotated; the
+# projection fit centres the Front under it.
 SHELVES = {REFERENCE: (True, "right"), CUT: (False, "right")}
-SUPPLIER_MARGINS = {
-    "*Front": (0.010, 0.010, 0.060, 0.010),
-    "*Top": (0.010, 0.016, 0.060, 0.010),
-}
+SUPPLIER_MARGINS = {"*Top": (0.010, 0.016, 0.060, 0.010)}
 _CUT_FORMAT = part.SUPPLIER_REFERENCE_FORMATS[CUT]
 
 
