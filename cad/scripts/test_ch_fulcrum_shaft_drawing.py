@@ -171,13 +171,15 @@ def test_side_view_texts_stand_clear_of_extension_lines() -> None:
     dome_x, _ = keep["DomeRadius"]
     assert dome_x + len("2X (SR.125)") * char / 2.0 + 0.005 <= dia_x - dia_widest * char
     assert dia_y + 0.007 + 0.003 <= drawing._SHAFT_BOTTOM_Y
-    # The Ra symbol (~35 x 15 mm right-up of its vertex) stands right of the
-    # Ø line and left of the across-flat callout.
+    # The Ra symbol (~9 mm tall up from its anchor) stands on the upper
+    # silhouette right of the Ø line, left of the across-flat callout, between
+    # the shaft and the second row's dimension line (~3 mm under its text).
     finish_x, finish_y = drawing.FINISH_SYMBOL
     assert finish_x > dia_x + 0.005
     assert finish_x + 0.035 < across_x
-    assert finish_y + 0.015 < drawing._SHAFT_BOTTOM_Y
-    assert math.isclose(drawing.FINISH_EDGE[1], drawing._SHAFT_BOTTOM_Y)
+    assert finish_y > drawing._SHAFT_TOP_Y + 0.004
+    assert finish_y + 0.009 < keep["FlatBaseline"][1] - 0.003
+    assert math.isclose(drawing.FINISH_EDGE[1], drawing._SHAFT_TOP_Y)
     # Machinist review r2: a row's last glyph meets the dimension's vertical
     # leader, and a trailing ';' touched it.
     for callout in (

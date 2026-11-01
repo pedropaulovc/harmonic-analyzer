@@ -98,11 +98,14 @@ _ROW_1 = AXIS_Y + 0.014
 _ROW_2 = AXIS_Y + 0.026
 _ROW_3 = AXIS_Y + 0.038
 _SHAFT_BOTTOM_Y = AXIS_Y - _on_sheet(SHAFT_DIA / 2.0)
-# The bearing O.D.'s roughness rides the side view's lower silhouette right
-# of centre, its symbol below the shaft, clear of the Ø callout block (which
-# hangs left of mid-length) and of the across-flat callout at the right tip.
-FINISH_EDGE = (RIGHT_CENTER[0] + 0.060, _SHAFT_BOTTOM_Y)
-FINISH_SYMBOL = (RIGHT_CENTER[0] + 0.075, AXIS_Y - 0.024)
+_SHAFT_TOP_Y = AXIS_Y + _on_sheet(SHAFT_DIA / 2.0)
+# The bearing O.D.'s roughness rides the side view's upper silhouette right
+# of centre (as draw_ch_pivot_shaft's does), its symbol in the band between
+# the shaft and the second dimension row; the first row's dimensions stand
+# only at the ends. On the inch part a symbol on the lower silhouette
+# re-attached to another face (two farm leaves, same_entity=False).
+FINISH_EDGE = (RIGHT_CENTER[0] + 0.060, _SHAFT_TOP_Y)
+FINISH_SYMBOL = (RIGHT_CENTER[0] + 0.075, AXIS_Y + 0.012)
 # The fleet's routine finish height, not the dimension height (r1: the
 # symbol was drawn far larger than the other annotation text).
 FINISH_CHAR_HEIGHT = 0.0025
