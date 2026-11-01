@@ -71,25 +71,29 @@ def test_side_by_side_stations_have_head_clearance_and_head_bearing() -> None:
     assert joint.SCREW_PITCH_X == pytest.approx(13.7)
     assert joint.RECEIVER_ROW_FROM_TOP == 3.25
     assert joint.RECEIVER_ROW_Y == pytest.approx(-0.71)
-    assert tuple(point[0] for point in joint.LEVER_HOLE_POINTS) == (16.0, 29.7)
+    # The lever's taps sit at the nearest .001 in (1.120 / .581 from its
+    # free edge, .128 below its top); the bracket keeps its mm stations.
+    assert joint.LEVER_RECEIVER_FROM_EDGE_IN == (1.120, 0.581)
+    assert joint.LEVER_RECEIVER_ROW_FROM_TOP_IN == 0.128
+    assert tuple(point[0] for point in joint.LEVER_HOLE_POINTS) == (16.002, 29.6926)
     for point in joint.LEVER_HOLE_POINTS:
-        assert point[1:] == pytest.approx((-0.71, -76.2))
+        assert point[1:] == pytest.approx((-0.7112, -76.2))
+    assert joint.LEVER_STATION_OFFSET_MAX == pytest.approx(math.hypot(0.0074, 0.0012))
     for bracket_point, lever_point, pose in zip(
         joint.BRACKET_HOLE_POINTS,
         joint.LEVER_HOLE_POINTS,
         joint.SCREW_POSITIONS,
         strict=True,
     ):
-        assert bracket_point[0] + joint.BRACKET_ORIGIN[0] == pytest.approx(
-            lever_point[0] + KNIFE[0]
+        offset = math.hypot(
+            bracket_point[0] + joint.BRACKET_ORIGIN[0] - (lever_point[0] + KNIFE[0]),
+            bracket_point[1] + joint.BRACKET_ORIGIN[1] - (lever_point[1] + KNIFE[1]),
         )
-        assert bracket_point[1] == lever_point[1] == joint.RECEIVER_ROW_Y
-        assert bracket_point[1] + joint.BRACKET_ORIGIN[1] == pytest.approx(
-            lever_point[1] + KNIFE[1]
-        )
-        assert lever.COEFFICIENT_TOP_Y - lever_point[1] == pytest.approx(3.25)
+        assert offset <= joint.LEVER_STATION_OFFSET_MAX + 1e-9
+        assert bracket_point[1] == joint.RECEIVER_ROW_Y
+        assert lever.COEFFICIENT_TOP_Y - lever_point[1] == pytest.approx(3.2512)
         assert pose == (
-            lever_point[0] + KNIFE[0],
+            bracket_point[0] + joint.BRACKET_ORIGIN[0],
             KNIFE[1] + joint.RECEIVER_ROW_Y,
             joint.SIDE_PLATE_FRONT_Z,
         )
@@ -102,8 +106,11 @@ def test_side_by_side_stations_have_head_clearance_and_head_bearing() -> None:
     assert joint.SCREW_MAJOR_DIA < joint.CLEARANCE_DIA < joint.SCREW_HEAD_DIA
     assert joint.COUNTERBORE_DIA - joint.SCREW_HEAD_DIA == pytest.approx(0.244)
     assert joint.HEAD_FLOAT_MIN == pytest.approx(0.122)
-    assert joint.HEAD_POSITION_MISMATCH_MAX == pytest.approx(0.1016)
+    # Both location bands plus the lever grid's nominal offset.
+    assert joint.HEAD_POSITION_MISMATCH_MAX == pytest.approx(0.1016 + joint.LEVER_STATION_OFFSET_MAX)
     assert joint.HEAD_FLOAT_MIN >= joint.HEAD_POSITION_MISMATCH_MAX
+    assert joint.SHANK_FLOAT_MIN == pytest.approx(0.2028)
+    assert joint.SHANK_FLOAT_MIN >= joint.HEAD_POSITION_MISMATCH_MAX
     assert joint.GRIP_MIN == pytest.approx(3.045)
     assert joint.COUNTERBORE_END_WALL_MIN == pytest.approx(6.9992)
     # The bracket ordinate is from its actual lower edge, not its midplane.
@@ -189,7 +196,7 @@ def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
     assert joint.DRILL_DEPTH_MIN > lever.RIB_T + lever.RIB_T_DEVIATIONS[1]
     assert joint.DRILL_POINT_DEPTH_MAX == pytest.approx(0.9398 * 0.60086)
     assert joint.DRILL_WANDER_MAX == pytest.approx(0.0388654599)
-    assert joint.RECEIVER_PILOT_MATERIAL_WALL_MIN == pytest.approx(2.2205345401)
+    assert joint.RECEIVER_PILOT_MATERIAL_WALL_MIN == pytest.approx(2.2217345401)
 
 
 def _joint_with_values(**values):
@@ -230,6 +237,7 @@ def test_width_shortfall_can_make_upper_edge_the_limiting_material_wall() -> Non
     ({"THREAD_DEPTH": 4.85}, "bottoms"),
     ({"SIDE_PLATE_HEIGHT": 8.0}, r"rule 17 \(walls and webs\) wall"),
     ({"COUNTERBORE_DIA": 3.70}, "head float"),
+    ({"CLEARANCE_DIA": 2.35}, "shank float"),
     ({"RECEIVER_ROW_FROM_TOP": 3.85}, "receiver pilot material wall"),
     ({"RECEIVER_ROW_FROM_TOP": 2.95}, "receiver pilot material wall"),
 ])
@@ -240,8 +248,13 @@ def test_joint_guards_reject_numeric_loss_of_function(values, failure: str) -> N
 
 def test_row_input_relocates_every_axis_without_changing_screw_grip_or_l_pose() -> None:
     moved = _joint_with_values(RECEIVER_ROW_FROM_TOP=3.30)
-    delta = -0.05
-    for name in ("BRACKET_HOLE_POINTS", "LEVER_HOLE_POINTS", "SCREW_POSITIONS"):
+    # The bracket row moves by the input; the lever's follows on its .001 grid
+    # (.128 -> .130).
+    deltas = {
+        "BRACKET_HOLE_POINTS": -0.05, "SCREW_POSITIONS": -0.05,
+        "LEVER_HOLE_POINTS": -0.002 * 25.4,
+    }
+    for name, delta in deltas.items():
         for before, after in zip(getattr(joint, name), moved[name], strict=True):
             assert after == pytest.approx((before[0], before[1] + delta, before[2]))
     for name in (
@@ -365,7 +378,7 @@ def _printed_material_budget_oracle() -> tuple[float, float, float, float]:
 
 def test_printed_pilot_has_continuous_material_beyond_every_uniform_rib() -> None:
     walls = _printed_material_budget_oracle()
-    assert walls[:2] == pytest.approx((2.2205345401, 2.5785345401))
+    assert walls[:2] == pytest.approx((2.2217345401, 2.5773345401))
     assert min(walls) == pytest.approx(joint.receiver_pilot_material_wall_budget(), abs=1e-12)
     assert joint.RECEIVER_PILOT_MATERIAL_WALL_MIN == pytest.approx(min(walls), abs=1e-12)
     assert min(walls) >= joint.RECEIVER_PILOT_WALL_MIN == pytest.approx(2.032)
@@ -419,10 +432,12 @@ def test_opposite_end_is_real_material_not_an_infinite_plate_assumption(monkeypa
         _joint_with_values()
 
 
-def test_free_edge_is_real_material_not_an_infinite_plate_assumption() -> None:
+def test_free_edge_is_real_material_not_an_infinite_plate_assumption(monkeypatch) -> None:
+    # Moving only the lever's taps toward the free edge also breaks the
+    # station-offset and float guards first, so screen the budget directly.
     points = tuple((41.50, y, z) for _x, y, z in joint.LEVER_HOLE_POINTS)
-    with pytest.raises(AssertionError, match="receiver pilot material wall"):
-        _joint_with_values(LEVER_HOLE_POINTS=points)
+    monkeypatch.setattr(joint, "LEVER_HOLE_POINTS", points)
+    assert joint.receiver_pilot_material_wall_budget() < joint.RECEIVER_PILOT_WALL_MIN
 
 
 def test_shorter_rib_does_not_remove_plate_or_change_screw_capacity(monkeypatch) -> None:

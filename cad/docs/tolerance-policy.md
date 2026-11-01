@@ -553,7 +553,9 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   takes the **+.004/0 in** drilled-hole row and the **.XX ±.01 in** depth band.
   The fixed-top **7.00 mm** slab stays at **Y=−4.46..+2.54 mm**. The owner
   moved only the matched mounting row down **0.71 mm**: receiver coordinates
-  are **.1280 ±.0020 in (3.25 ±0.0508 mm) below the actual top**, with bracket holes and screws
+  are **.128 ±.002 in (3.2512 ±0.0508 mm) below the actual top** and **1.120 / .581 ±.002 in** from the free edge,
+  the nearest .001 in to the bracket's millimetre stations (at most **0.0075 mm** off, charged
+  to the head and shank float), with bracket holes and screws
   following, while the bracket body/seat and threaded-lever pose remain fixed.
   All three rib extrusions are **5.08 mm**, printed **.20 ±.01 in** by one native
   **3X .20** dimension. The drill continues beyond the rib into continuous
@@ -562,7 +564,7 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   `receiver_pilot_material_wall_budget` / `RECEIVER_PILOT_MATERIAL_WALL_MIN`
   retain the independent **≥.080 in (2.032 mm) pilot-only connected-material** design floor.
   The printed pilot radius **0.9398 mm** and one deepest 0.3° wander charge
-  (**0.038865 mm**) leave approximately **2.220535 / 2.578535 mm** top/bottom walls.
+  (**0.038865 mm**) leave approximately **2.221735 / 2.577335 mm** top/bottom walls.
   `sm_summing_lever_profile.receiver_pilot_wall_budget` /
   `ReceiverPilotWallBudget` bound longitudinal walls against
   `RECEIVER_PILOT_WALL_MIN` using only the printed pilot radius and drill

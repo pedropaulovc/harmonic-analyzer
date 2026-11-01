@@ -331,8 +331,8 @@ retain their outer faces at **Z=±76.20 mm**; their inner caps are now
 **3X .20** thickness dimension replaces the three separate thickness authorities.
 The separate counter-arm leaf remains **5.08 mm**; it is not a rib extrusion.
 
-The two receiver axes move down **0.71 mm** to local **Y=−0.71 mm**.
-**ReceiverY0 = .1280 ±.0020 in (3.25 ±0.0508 mm) below the actual coefficient top** owns that
+The two receiver axes move down to local **Y=−0.7112 mm**, the nearest .001 in to the bracket's **−0.71 mm** row.
+**ReceiverY0 = .128 ±.002 in (3.2512 ±0.0508 mm) below the actual coefficient top** owns that
 location, not the unchanged hex centre. The matching bracket clearance holes
 and installed MHA-MG-VN-53 screws move by the same delta. Their X stations,
 **13.7 mm** pitch, Z stations, **3.175 mm** flange grip, bracket body/seat,
@@ -350,7 +350,7 @@ at the plate's printed **.27 in** (6.858 mm) minimum.
 The printed **Ø.070 +.004/0** pilot has maximum radius **0.9398 mm**. Its
 118° point and 0.3° drift over the deepest **6.858 mm** cylinder plus point
 give **0.038865 mm** wander, leaving conservative top/bottom pilot walls
-of approximately **2.220535 / 2.578535 mm**. The connected-plate proof takes
+of approximately **2.221735 / 2.577335 mm**. The connected-plate proof takes
 no helpful rib or root-fillet credit after the inner cap.
 
 The drill lead reserve is **0.442057 mm**. Usable screw engagement
@@ -481,8 +481,8 @@ plate rather than relying on a special deep rib. Native **4.95 ±0.0508 mm**
 full-thread metadata remains a screw-stack input, not a maximum imposed by the
 printed **.195 MIN**. An unbounded MIN drill remains unacceptable.
 `magnifying_bracket_joint_layout` owns those stacks and the independent
-pilot-only material budget. The **.1280 ±.0020 in** actual-top row location
-places both receiver axes at local **Y=−0.71 mm**; the matched bracket holes
+pilot-only material budget. The **.128 ±.002 in** actual-top row location
+places both receiver axes at local **Y=−0.7112 mm**; the matched bracket holes
 and screws follow it without shifting any body, seat, spring or threaded-lever pose.
 
 The drawing retains **6 views**, reduced from 9 by removing C-C and H-H and

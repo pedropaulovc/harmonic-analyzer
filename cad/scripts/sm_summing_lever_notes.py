@@ -171,9 +171,9 @@ BRACKET_TAP_PRECISION = {
     "hw-tapdrldepth": 2,
     "hw-threaddepth": 3,
 }
-# The receiver coordinates (1.1201 / .5807 / .1280) stand off the bracket's
-# millimetre stations: four places hold them.
-RECEIVER_COORDINATE_PLACES = 4
+# The receiver coordinates (1.120 / .581 / .128) sit on the .001 grid; the
+# lever's taps are modelled there (magnifying_bracket_joint_layout).
+RECEIVER_COORDINATE_PLACES = 3
 
 # --- Joint proofs the print relies on (drawing-guidelines rules 18 and 20). ---
 # The plate's worst-case thickness at its printed .XX limit, less 1.5
