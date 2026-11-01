@@ -184,12 +184,13 @@ VIEW_ARROW_RUN = .015
 # two 5.657 texts outside their 11.3 mm spans and clear of the view's edges.
 # The clearance callouts and the tap callout leave the axis to the right,
 # between the taps (45 deg pattern); the Ø10.50's leader rises from its rim
-# over C's right letter.
+# over C's right letter. The clearance callout stands 3 mm higher than the
+# tap callout's 2.3 mm under it (review of farm run 20261101T134214144Z).
 NUT_XY, NUT_SCALE = (.190,.175), (2,1)
 NUT_KEEP = {
     'NutCentreY':(.104,.100),'NutTap1Y':(.146,.0910),'NutTap3Y':(.146,.1285),
     'NutCentreZ':(.132,.175),'NutTap3Z':(.1465,.160),'NutTap4Z':(.2335,.160),
-    'NutClearanceDia':(.250,.101),'NutSeatDia':(.258,.140),
+    'NutClearanceDia':(.250,.104),'NutSeatDia':(.258,.140),
 }
 NUT_CAPTION = 'VIEW D'
 NUT_CAPTION_XY = (.166,.078)
