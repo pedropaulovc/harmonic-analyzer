@@ -25,6 +25,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -43,7 +44,11 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
+    set_dimension_callouts,
+)
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_edges import scan_view_edges
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
@@ -177,22 +182,28 @@ FRONT_KEEP = {
 # Bottom view: the hole's X coordinate below, its Z coordinate left, the depth
 # right; the hole callout stands above-right, between the bottom view and the
 # front view's height dimension.  The tap's far-wall minimum (.074 MIN over
-# TAP WALL) stands left too, outboard of the .16 and above its line: its
-# reference line runs up the far wall from the thread's rim on the hole's
-# axis (sheet y ~0.108..0.112), so its extension lines run left across the
-# rail above the .16's top extension line (y 0.105, from the hole's centre)
-# and cross no dimension line; its two-row text (~19 x 8 mm) stands 27 mm
-# left of the view, clear of the .16's text (x ~0.077, y ~0.101) and 14 mm
-# under the front view's .16 row (y ~0.128).
+# TAP WALL) stands left too, outboard of the .16: its reference line runs up
+# the far wall from the thread's rim on the hole's axis (sheet y
+# ~0.108..0.112), so its extension lines run left across the rail above the
+# .16's top extension line (y 0.105, from the hole's centre).
 BOTTOM_KEEP = {
     "ScrewX": (_bottom_xy(OUTER_WIDTH / 4.0, 0.0)[0], BOTTOM_LOW_Y - 0.010),
     "ScrewZ": (BOTTOM_LEFT_X - 0.010, _bottom_xy(0.0, FRAME_DEPTH / 4.0)[1]),
     "Depth": (BOTTOM_RIGHT_X + 0.016, BOTTOM_CENTER[1]),
     "TapWallMin": (
-        BOTTOM_LEFT_X - 0.027,
+        BOTTOM_LEFT_X - 0.020,
         _bottom_xy(0.0, TAP_WALL_START_Z + TAP_WALL_MIN_MM / 2.0)[1],
     ),
 }
+# The wall's 3.8 mm run cannot hold its ~21 x 9 mm two-row text: centred on
+# its own line, the line, its arrows and both extension lines ran through
+# ".074 min. TAP WALL" (machinist review of 6988bc279, 3/3).  Native
+# OffsetText parks the text on a leader left of the extension lines' ends
+# (line x - 0.001), its right edge ~4 mm clear of them and ~12 mm clear of
+# the .16's text; the anchor is the value row's bottom centre.
+TAP_WALL_TEXT_XY = (BOTTOM_LEFT_X - 0.036, BOTTOM_KEEP["TapWallMin"][1])
+_TEXT_SETTLE_M = 0.0005
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 # The one printed fillet stands for all four equal window corners.  A custom
 # prefix replaces SolidWorks' own radius "R", so it carries it
 # (draw_pd_guide_lock: "4X 1.8" printed without).
@@ -226,6 +237,32 @@ def _set_dimension_prefixes(
             raise RuntimeError(f"dimension prefix {prefix!r} did not persist")
     if remaining:
         raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
+
+
+def _offset_tap_wall_text(adapter: Any, annotations: list[Any]) -> None:
+    """Park the tap wall's text on its leader shelf and read it back."""
+    offset_dimension_text(adapter, annotations, {"TapWallMin": TAP_WALL_TEXT_XY})
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        if dimension_name(adapter, annotation) != "TapWallMin":
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        position = annotation.GetPosition()
+        if (
+            not bool(display.OffsetText)
+            or position is None
+            or math.dist(position[:2], TAP_WALL_TEXT_XY) > _TEXT_SETTLE_M
+        ):
+            raise RuntimeError(
+                f"tap wall text at {position!r}, not offset to {TAP_WALL_TEXT_XY!r}"
+            )
+
+
+def _center_mark_count(view: Any) -> int:
+    """The view's centre-mark annotations (a bare view answers None)."""
+    return len(
+        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -306,9 +343,20 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _offset_tap_wall_text(adapter, annotations)
 
-    if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
+    # The template may centre-mark the tap as the view is placed: every round's
+    # layout audit found two identical marks on it (duplicate-annotation, as
+    # draw_pn_pen_rod, fleet issue #913).  Mark only a bare view, then prove
+    # the tap carries exactly one.
+    if _center_mark_count(bottom) == 0 and not auto_center_marks(
+        adapter, bottom, holes=True, size=0.0025
+    ):
         raise RuntimeError("failed to add ASME center marks to the bottom view")
+    if (found := _center_mark_count(bottom)) != 1:
+        raise RuntimeError(
+            f"bottom view carries {found} centre marks, not the tap's one"
+        )
     hole_rim = scan_view_edges(bottom, label="bottom").circle_at(
         HOLE_CENTER_MM,
         blind_cut_dia_mm(SET_SCREW_TAP_SPEC) / 2.0,

@@ -402,6 +402,25 @@ def test_hole_callout_clears_the_views_and_their_dimensions() -> None:
     assert drawing.HOLE_CALLOUT_PROCESS == "TAP"
 
 
+def test_tap_wall_text_stands_on_a_shelf_clear_of_every_line() -> None:
+    # The wall's run is shorter than its two-row text: the text is offset on
+    # a leader, left of where its extension lines end (1 mm past its line).
+    line_x, line_y = drawing.BOTTOM_KEEP["TapWallMin"]
+    x, y = drawing.TAP_WALL_TEXT_XY
+    half = _half_width(".074 MIN")
+    assert y == line_y
+    assert x + half < line_x - 0.001 - 0.002
+    assert x - half > 0.0127  # inside the left border
+    # Its rows (value on the anchor, TAP WALL below) stand left of the .16's
+    # text and under the front view's lowest dimension row.
+    screw_x, _ = drawing.BOTTOM_KEEP["ScrewZ"]
+    assert x + half < screw_x - _half_width(_printed_text("ScrewZ")) - 0.002
+    assert y + 0.0035 < drawing.FRONT_KEEP["LeftWall"][1] - 0.0035 - 0.005
+    assert "_offset_tap_wall_text(adapter, annotations)" in inspect.getsource(
+        drawing.build
+    )
+
+
 def test_part_stamps_make_critical_properties() -> None:
     import _config
 
