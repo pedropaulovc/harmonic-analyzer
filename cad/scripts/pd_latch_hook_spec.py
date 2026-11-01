@@ -316,19 +316,18 @@ if HEAD_CLEARANCE_WORST < HEAD_CLEARANCE_FLOOR - 1e-9:
     )
 
 # --- Sheet text --------------------------------------------------------------
-# The title block's MATERIAL cell (the registry row's ``material``); the
-# heat treatment is its FINISH cell, so no note restates either.
+# The title block's MATERIAL cell (the registry row's ``material``, annealed)
+# and FINISH cell (the hardening, after the match-drill): no note restates
+# either (final review).
 MATERIAL_TITLE = f"{SHEET_T / 25.4:.3f} 1095 sheet, annealed".lstrip("0")
 # Part facts only: the fit-up and clamp sequence is the assembly's (the
 # registry row's process).  Note 2 names the pin the match-drilled hole
-# clears, and the state it is drilled in: annealed, the FINISH cell's
-# hardening after (review 3); the hole callout points to it.
+# clears; the hole callout points to it.
 DRAWING_NOTES = "\n".join(
     (
         "1. RADII TO INSIDE SURFACE.",
         "2. PIN HOLE: MATCH-DRILL ON MHA-PD-VN-58",
-        "   LATCH PIN, ARM ANNEALED AND SQUARE TO",
-        "   PIN; HARDEN AND TEMPER AFTER DRILLING.",
+        "   LATCH PIN, SQUARE TO PIN.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

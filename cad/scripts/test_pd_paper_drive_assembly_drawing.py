@@ -1820,13 +1820,25 @@ def test_the_exploded_sheet_balloons_exactly_the_platen_group() -> None:
     assert drawing.SHEET_NAMES[3] == "PLATEN AND SUPPORT"
     assert drawing.SHEET_NAMES[2] == "TRANSGEAR EXPLODED"
     assert not explode.SHOWN_STEMS & explode.TRANSGEAR_SHOWN_STEMS
-    # Balloon 8 lands on a bottom lock plate, the one hanging free of the bar.
+    # Balloon 8 lands on a bottom lock plate, the one hanging free of the bar;
+    # balloon 7 on the top guide (the bottom one stands behind the platen),
+    # on its top edge, between a screw station and a lock station.
     pinned = {
         stem: anchor.instance
         for stem, anchor in drawing.PLATEN_BALLOON_ANCHORS.items()
         if anchor.instance is not None
     }
-    assert pinned == {"pd-guide-lock": "pd-guide-lock-2"}
+    assert pinned == {
+        "pd-guide-lock": "pd-guide-lock-2",
+        "pd-platen-guide": "pd-platen-guide-2",
+    }
+    x, y, z = drawing.PLATEN_GUIDE_BALLOON_POINT_MM
+    from build_pd_platen_guide import HOLE_X, SCREW_STATION_X
+    from pd_platen_guide_spec import GUIDE_HEIGHT
+
+    assert (y, z) == (GUIDE_HEIGHT, 0.0)
+    stations = sorted((*HOLE_X, *SCREW_STATION_X))
+    assert any(a + 10.0 < x < b - 10.0 for a, b in zip(stations, stations[1:]))
 
 
 def _explode_instances() -> list[explode.Instance]:

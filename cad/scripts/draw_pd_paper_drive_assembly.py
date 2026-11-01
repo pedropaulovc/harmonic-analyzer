@@ -1260,9 +1260,24 @@ ASSEMBLED_BALLOON_ANCHORS = {
 # (machinist review of run 20261024T082548908Z-cf4349b5). The bottom plate
 # hangs free under the bar.
 PLATEN_GUIDE_LOCK_INSTANCE = "pd-guide-lock-2"
+# The guides: the builder places the bottom rail first, so pd-platen-guide-1
+# exploded still stands behind the platen, only its end showing past the
+# platen's edge, where the default landing put balloon 7 beside the bar's
+# front clamp screw, its leader through that head and onto balloon 4's
+# arrowhead (machinist review of the final-head run 20261101T135807943Z).
+# The top rail, -2, explodes clear above the platen; its balloon lands on
+# its top edge on the platen-mating face (part frame: x along the rail,
+# y = height, z = 0), mid-span between the A4 and A5 screw stations and
+# clear of both lock stations' plates and screws.
+PLATEN_GUIDE_INSTANCE = "pd-platen-guide-2"
+PLATEN_GUIDE_BALLOON_POINT_MM = (110.0, platen_guide.GUIDE_HEIGHT, 0.0)
 PLATEN_BALLOON_ANCHORS = {
     stem: BalloonAnchor(instance=PLATEN_GUIDE_LOCK_INSTANCE)
     if stem == "pd-guide-lock"
+    else BalloonAnchor(
+        point_mm=PLATEN_GUIDE_BALLOON_POINT_MM, instance=PLATEN_GUIDE_INSTANCE
+    )
+    if stem == "pd-platen-guide"
     else BalloonAnchor()
     for stem in explode.SHOWN_STEMS
 }
@@ -1387,6 +1402,16 @@ def _scale_text(scale: tuple[float, float]) -> str:
     return f"{scale[0]:g}:{scale[1]:g}"
 
 
+def _mm_window(limits: tuple[float, float], places: int) -> str:
+    """An inch-authored (min, max) window in this mm sheet's units, rounded
+    inward so the printed window never admits a value the part spec refuses
+    (machinist review: inch values on a mm sheet stop the fitter)."""
+    scale = 10**places
+    low = math.ceil(round(limits[0] * scale, 9)) / scale
+    high = math.floor(round(limits[1] * scale, 9)) / scale
+    return f"{low:.{places}f}-{high:.{places}f}"
+
+
 # --- sheet wording ---------------------------------------------------------------
 _N = BOM_PART_NUMBERS
 KNOB_TEETH = knob_shaft.TEETH
@@ -1496,7 +1521,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "THEM; TIGHTEN."
         ),
         "lock-seats-faced": (
-            f"FACE LOCK SEATS TO {platen_guide.LOCK_GAP_FIT_TEXT} PLATEN FLOAT; "
+            f"FACE LOCK SEATS TO {_mm_window(platen_guide.LOCK_GAP_FIT, 3)} PLATEN FLOAT; "
             "ELSE STOP AND REPORT."
         ),
         "latch-pin-pressed": (
@@ -1540,7 +1565,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"TAKE BOTH {_N['pd-vn-transgear-arm-plate-screw']} SCREWS OUT; CUT THEIR "
             f"TIPS FLUSH TO {joints.PLATE_SCREW_CUT_PROUD_MAX:.2f} PROUD OF THE ARM'S "
             "FRONT FACE; BREAK THE CUT EDGE "
-            f"{disc.inch_text(plate_screw.CUT_END_BREAK_MAX, 3)} IN MAX. "
+            f"{math.floor(plate_screw.CUT_END_BREAK_MAX * 100) / 100:.2f} MAX. "
             "REFIT THE SAME SCREWS IN THE SAME HOLES BEFORE PIVOTING THE HANGER."
         ),
         # R9-71: the spacer is pressed on the shoulder, so its faces' tilt is
@@ -1581,8 +1606,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "disc-screws-cut": (
             f"CUT {_N['pd-vn-transgear-disc-screw']} TIPS "
-            f"{disc_screw.TIP_BELOW_REAR_FACE_TEXT} IN BELOW DISC REAR FACE; "
-            f"BREAK {disc.inch_text(disc_screw.CUT_END_BREAK_MAX, 3)} IN MAX."
+            f"{_mm_window(disc_screw.TIP_BELOW_REAR_FACE, 2)} BELOW DISC REAR FACE; "
+            "BREAK THE CUT END."
         ),
         "oil-hole-drilled": (
             f"DRILL THE \u00d8{hub.OIL_HOLE_DIA:.1f} OIL HOLE CENTRED ON THE HUB BODY, "
