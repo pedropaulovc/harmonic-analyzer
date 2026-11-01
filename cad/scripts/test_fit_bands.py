@@ -242,10 +242,6 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
         "as-bought 7/32 brass rod's supplier tolerance (upper, lower): indexed "
         "for the fixture cross-bore clearance and the turned relief"
     ),
-    ("mg_wheel_axle_spec", "THREAD_LEN_BAND"): (
-        "axle thread length +/-.010 (printed symmetric): indexed for the "
-        "locknut and runout stack corners, not a fit"
-    ),
 }
 
 # (upper, lower) fit bands that no helper reads: the owning module indexes them
@@ -263,6 +259,18 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec", "OD_BAND"): (
         "catalogue OD band, upper limit indexed for the carrier's thrust-seat "
         "chamfer-mouth check; the sheet prints it as untoleranced REF"
+    ),
+    ("mg_wheel_axle_spec", "THREAD_LEN_BAND"): (
+        "equal band indexed into the native symmetric (+/-) tolerance"
+    ),
+    ("mg_magnifying_wheel_geom", "HUB_LEN_BAND"): (
+        "equal band indexed into the native symmetric (+/-) tolerance"
+    ),
+    ("_mg_wheel_rim_geometry", "GROOVE_R_BAND"): (
+        "equal band indexed into the native symmetric (+/-) tolerance"
+    ),
+    ("_mg_wheel_rim_geometry", "GROOVE_BOTTOM_BAND"): (
+        "equal band indexed into the native symmetric (+/-) tolerance"
     ),
     ("dt_alignment_pinion_spec", "BASE_TANGENT_SPAN_BAND"): (
         "indexed into the span-measurement note text"
