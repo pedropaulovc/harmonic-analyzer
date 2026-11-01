@@ -15,6 +15,9 @@ POST_MOUNT_COUNTERBORE_DEPTH_MM = 6.0198
 # .005 in: with the screw's cut end at the title block's .010 edge break, the
 # thinnest plate still holds 0.90D (dt_vn_post_mount_screw_spec).
 CUT_TO_FIT_SHORT_MM = 0.127  # .005 in
+# MHA-DT-VN-61's cut end takes its inch title block's general edge break; the
+# platform's engagement stack spends it at the plate underside.
+SCREW_CUT_END_BREAK_MM = 0.254  # .010 in
 # MHA-DT-VN-61 prints its reference cut length in inches at these places (#290).
 CUT_LENGTH_PLACES = 2
 

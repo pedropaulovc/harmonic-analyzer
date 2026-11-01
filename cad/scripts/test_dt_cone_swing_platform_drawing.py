@@ -579,21 +579,23 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     """Codex review of 68565ace (B1): the sheet must state MHA-DT-VN-61's exception.
 
     U37 accepts short engagement for the 1/4-20 post screws. The printed worst
-    case is the thinnest stock plate (U41 band), less the .005 cut-to-fit
-    allowance and the local 0.1 break at each end of the tap, floored:
-    5.89 mm = 0.92D, never under the drawing-guidelines.md rule 18 (thread engagement) audit's E7 floor of 0.87D.
+    case is the thinnest stock plate (U41 band), less the local 0.1 tap-entry
+    break and, at the underside, the .005 cut-to-fit allowance plus the
+    screw's .010 cut-end break (it outreaches the 0.1 exit break), floored:
+    5.74 mm = 0.90D, never under the drawing-guidelines.md rule 18 (thread engagement) audit's E7 floor of 0.87D.
     """
     worst = (
         spec.PLATE_THICKNESS
         - spec.PLATE_STOCK_BAND
-        - spec.POST_SCREW_CUT_TO_FIT_SHORT
-        - 2.0 * spec.POST_MOUNT_TAP_EDGE_BREAK
+        - spec.POST_MOUNT_TAP_EDGE_BREAK
+        - (spec.POST_SCREW_CUT_TO_FIT_SHORT + 0.254)
     )
+    assert spec.POST_SCREW_CUT_TO_FIT_SHORT + 0.254 > spec.POST_MOUNT_TAP_EDGE_BREAK
     assert spec.POST_MOUNT_ENGAGEMENT_WORST == pytest.approx(worst)
     diameters = worst / (0.25 * 25.4)
     printed = math.floor(diameters * 100.0) / 100.0
     assert printed <= diameters and printed >= 0.87
-    assert f"{printed:.2f}" == "0.92"
+    assert f"{printed:.2f}" == "0.90"
     assert spec.POST_MOUNT_ENGAGEMENT_NOTE == (
         f"1/4-20 THREAD ENGAGEMENT {printed:.2f}D MIN."
     )
