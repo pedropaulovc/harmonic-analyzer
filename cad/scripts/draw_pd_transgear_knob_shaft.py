@@ -270,8 +270,11 @@ REFERENCE_DIMENSIONS = {"OverallLength": False, "ThreadBlankDia": True}
 
 # The thread callout lands on the edge where the thread blank meets the tip
 # chamfer and stands up and left, clear of the tooth-tip Ø over the pinion.
+# Its right end (~39.2 mm from the anchor) stops 0.5 mm short of the pick,
+# so the leader drops plumb from that end: centred over the blank, it ran
+# down and left through its own second line (farm run 20261101T095301211Z).
 THREAD_PICK = (CHAMFER_START_X, SIDE_CENTER[1] + 0.002)
-THREAD_NOTE_XY = ((THREAD_END_X + CHAMFER_START_X) / 2.0, _ABOVE_Y + 0.020)
+THREAD_NOTE_XY = (THREAD_PICK[0] - 0.0397, _ABOVE_Y + 0.020)
 # The tip chamfer's callout stands under the tip, its leader climbing to the
 # same blank/chamfer edge from below, right of the tip's witness lines.  On
 # one line it ran 64 mm, under the front view and through the tooth-space
@@ -421,8 +424,9 @@ DETAIL_KEEP: dict[str, tuple[float, float]] = {
     # (~52 mm, centred on the keep) and two rows stand left of F's witness
     # line, the block's line at its foot (y ~173.5) over the end view's teeth
     # (top 0.1735) and the journal's outline (top 0.169), its top (~193)
-    # under the crop.
-    "FlatEnd": (_F_DETAIL_X - 0.0265, _DETAIL_BOTTOM - 0.0125),
+    # under the crop.  4 mm further left than farm run 20261101T095301211Z,
+    # where the neck width's outer arrow line ran 2.3 mm into its limits.
+    "FlatEnd": (_F_DETAIL_X - 0.0305, _DETAIL_BOTTOM - 0.0125),
     # Left of the crop, level with the tool's end arc (centre ~0.105, 0.2018):
     # the leader enters the arc's own quadrant from the left, under the
     # detail label.

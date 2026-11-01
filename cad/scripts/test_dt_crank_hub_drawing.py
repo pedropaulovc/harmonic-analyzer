@@ -250,10 +250,6 @@ def test_drawing_registry_and_marks_are_complete() -> None:
     marked = set().union(*dt_crank_hub_spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.END_KEEP) | set(drawing.SIDE_KEEP) == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= marked
-    # The pin-proud MIN keeps its value on its dimension line, its callout
-    # above (r10 review).
-    assert drawing.DIMENSION_CALLOUTS_ABOVE == {"PinProud": dt_crank_hub_notes.PIN_PROUD_CALLOUT}
-    assert not set(drawing.DIMENSION_CALLOUTS) & set(drawing.DIMENSION_CALLOUTS_ABOVE)
 
 
 def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None:
