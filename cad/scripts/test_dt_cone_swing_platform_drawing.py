@@ -579,9 +579,9 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     """Codex review of 68565ace (B1): the sheet must state MHA-DT-VN-61's exception.
 
     U37 accepts short engagement for the 1/4-20 post screws. The printed worst
-    case is the thinnest stock plate (U41 band), less the 0.3 cut-to-fit
+    case is the thinnest stock plate (U41 band), less the .005 cut-to-fit
     allowance and the local 0.1 break at each end of the tap, floored:
-    5.72 mm = 0.90D, never under the drawing-guidelines.md rule 18 (thread engagement) audit's E7 floor of 0.87D.
+    5.89 mm = 0.92D, never under the drawing-guidelines.md rule 18 (thread engagement) audit's E7 floor of 0.87D.
     """
     worst = (
         spec.PLATE_THICKNESS
@@ -593,7 +593,7 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     diameters = worst / (0.25 * 25.4)
     printed = math.floor(diameters * 100.0) / 100.0
     assert printed <= diameters and printed >= 0.87
-    assert f"{printed:.2f}" == "0.90"
+    assert f"{printed:.2f}" == "0.92"
     assert spec.POST_MOUNT_ENGAGEMENT_NOTE == (
         f"1/4-20 THREAD ENGAGEMENT {printed:.2f}D MIN."
     )
@@ -604,11 +604,11 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     assert spec.POST_MOUNT_TAP_BREAK_CALLOUT == "0.1 MAX BREAK EACH END"
     assert drawing.POST_MOUNT_CALLOUT_BELOW[0] == spec.POST_MOUNT_TAP_BREAK_CALLOUT
     # Positive control: the title block's 0.25 break at both ends would print
-    # under the audit floor, which is why the override exists.
+    # under the 0.90D minimum, which is why the override exists.
     title_block = (
         spec.PLATE_THICKNESS - spec.PLATE_STOCK_BAND - spec.POST_SCREW_CUT_TO_FIT_SHORT - 0.5
     ) / (0.25 * 25.4)
-    assert title_block < 0.87
+    assert title_block < 0.90
     # The note sits in the empty band above the title block (2.5 mm text,
     # ~1.93 mm a character, 4.4 mm a line).
     x, y = drawing.ENGAGEMENT_NOTE_XY

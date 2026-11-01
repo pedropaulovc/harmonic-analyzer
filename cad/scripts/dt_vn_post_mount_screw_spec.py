@@ -166,33 +166,14 @@ FLUSH_LENGTH_MM = mount_stack.FLUSH_LENGTH_MM
 
 # Model-owned drawing controls.  The cut length lives on a hidden reference
 # sketch with ONE driving dimension (under-head face to cut end).  The cut
-# end's break is a driving dimension of the deburr CUTTER's own profile,
-# CutEndDeburrProfile -- the boss hook's StockDeburrProfile pattern -- not a
-# hidden reference sketch: no view could import it from one.
-# Dead under: a childless part-hidden CutEndBreakReference, shown in the
-# part in memory (part_sketches_shown) around creating and curating the 10:1
-# detail, targeted feature import (pms857-f543, f54309af5, drawing leaf log
-# dt-logs/spring/pms857-f543-drawing-leaf.log, first xx: "tip detail break
-# view is missing model dimensions: ['CutEndBreak']; available=[] from
-# features=['CutEndBreakReference']").  Observed in that leaf, not claimed as
-# the cause: the detail's hidden-sketch check read the sketch Visible=2
-# (shown), children=0, and showed nothing further.  Untested: the per-view
-# override on a detail, an entire-model import, other detail types.
-# Later (b6552f13b, swmaker000008): no DETAIL view offers CutEndBreak at
-# all -- 10:1 HLR, 10:1 HLV, 5:1, 2:1, before or after the Front's import
-# all returned available=[] -- while a cropped 10:1 MODEL view imported
-# it.  So the break prints in a cropped 10:1 model view of the tip.
+# end's break is the title block's general edge break, not a part dimension.
 CUT_LENGTH_SKETCH = "CutLengthReference"
 CUT_LENGTH_DIMENSION = "CutLength"
-CUT_END_BREAK_SKETCH = "CutEndDeburrProfile"
-CUT_END_BREAK_DIMENSION = "CutEndBreak"
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     CUT_LENGTH_SKETCH: {CUT_LENGTH_DIMENSION},
-    CUT_END_BREAK_SKETCH: {CUT_END_BREAK_DIMENSION},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     CUT_LENGTH_SKETCH: {CUT_LENGTH_DIMENSION: mount_stack.CUT_LENGTH_PLACES},
-    CUT_END_BREAK_SKETCH: {CUT_END_BREAK_DIMENSION: 3},
 }
 DRAWING_PRECISION_BY_NAME = {
     name: places
@@ -200,10 +181,8 @@ DRAWING_PRECISION_BY_NAME = {
     for name, places in dimensions.items()
 }
 REFERENCE_SKETCHES = (CUT_LENGTH_SKETCH, SUPPLIER_STOCK_FEATURE)
-# Which view claims which marked dimension: the 1:1 Front view carries only
-# the cut length; the break is claimed only by the cropped 10:1 tip view.
+# The 1:1 Front view carries the cut length.
 FRONT_VIEW_DIMENSIONS = {CUT_LENGTH_SKETCH: {CUT_LENGTH_DIMENSION}}
-TIP_VIEW_DIMENSIONS = {CUT_END_BREAK_SKETCH: {CUT_END_BREAK_DIMENSION}}
 
 # --- U27: can one fixed cut length serve every in-band post and plate? ---
 # The printed bands, as the shop reads them off the title block of the post's
@@ -220,42 +199,15 @@ _CBORE_DEPTH_DEVIATIONS = printed_deviations(
 )
 # Stock thickness and tap-entry breaks are owned by the mating platform.
 PLATE_STOCK_BAND_MM = platform.PLATE_STOCK_BAND
-# Two breaks eat thread, both held to a deburr, not the title block's .010:
-# - the screw's cut end: a deburr (the shop hacksaws and files the burr),
-#   .003 max (#290: .004 would leave 0.8998D below).  The model holds .003 as
-#   the nominal of its band; the sheet prints the single limit ".003 MAX" in a
-#   cropped 10:1 view of the tip, because so small a dimension at 1:1 is
-#   illegible and a printed +0/-.003 band reads as permitting no break at all
-#   (Main's MHA-DT-VN-61 eye pass on #857).
+# Two breaks eat thread:
+# - the screw's cut end: the title block's general edge break at its maximum
+#   (the shop hacksaws and files the burr).  Main's ruling on the run-7 sheet:
+#   no part-local break limit; the cut-to-fit allowance gave up the thread
+#   instead (dt_post_mount_stack.CUT_TO_FIT_SHORT_MM).
+# - the platform's tap exit: the platform's own local deburr limit.
 POST_MOUNT_TAP_EDGE_BREAK = platform.POST_MOUNT_TAP_EDGE_BREAK
-CUT_END_BREAK_MM = 0.0762  # .003 in
-CUT_END_BREAK_BAND = (0.0, -0.0762)  # (upper, lower), the _fit_deviations convention
-_break_lower, _break_upper = deviations(CUT_END_BREAK_BAND)
-CUT_END_BREAK_MAX_MM = CUT_END_BREAK_MM + _break_upper
-CUT_END_BREAK_MIN_MM = CUT_END_BREAK_MM + _break_lower
+CUT_END_BREAK_MAX_MM = edge_break_chamfer_mm(unit=UNIT)
 ENGAGEMENT_BREAKS_MM = POST_MOUNT_TAP_EDGE_BREAK + CUT_END_BREAK_MAX_MM
-# Why the part needs its own limit: the title block's general "CHAMFER <C>
-# MAX" is looser than the engagement stack below allows (the 0.90D worst
-# case spends CUT_END_BREAK_MAX_MM), so the sheet must print the tighter max.
-TITLE_BLOCK_CHAMFER_MAX_MM = edge_break_chamfer_mm(unit=UNIT)
-if not CUT_END_BREAK_MAX_MM < TITLE_BLOCK_CHAMFER_MAX_MM:
-    raise ValueError(
-        f"the cut-end break max {CUT_END_BREAK_MAX_MM} no longer tightens the "
-        f"title block's chamfer {TITLE_BLOCK_CHAMFER_MAX_MM}: drop the local limit"
-    )
-# swTolMAX prints the dimension's NOMINAL followed by "MAX", so the printed
-# limit is the band's maximum only while the nominal sits at the band's top.
-CUT_END_BREAK_TOL_TYPE = 6  # swTolType_e.swTolMAX
-if CUT_END_BREAK_MM != CUT_END_BREAK_MAX_MM:
-    raise ValueError(
-        f"CutEndBreak nominal {CUT_END_BREAK_MM} is not its band's max "
-        f"{CUT_END_BREAK_MAX_MM}: a MAX-limit dimension would print the wrong limit"
-    )
-_BREAK_PLACES = DRAWING_PRECISION[CUT_END_BREAK_SKETCH][CUT_END_BREAK_DIMENSION]
-if not _on_inch_grid(CUT_END_BREAK_MAX_MM, _BREAK_PLACES):
-    raise ValueError("the cut-end break max does not print at its places")
-# What the tip view's dimension must read: the band's max at its places.
-CUT_END_BREAK_TEXT = f"{inch_text(CUT_END_BREAK_MAX_MM, _BREAK_PLACES)} MAX"
 
 # Counterbore floor above PlateTop (the post foot seats on it), both ends.
 FLOOR_LOW_MM = (post.BLOCK_HEIGHT + _POST_HEIGHT_DEVIATIONS[0]) - (
@@ -311,7 +263,7 @@ if _fit_upper != 0.0:
 POST_SCREW_CUT_TO_FIT_SHORT = -_fit_lower
 # The acceptance prints where the part sheet delegates the cut: the CutLength
 # callout, as well as the drive-train assembly step. The cut length prints
-# .XX; the allowance (.012) needs .XXX, and an allowance those places would
+# .XX; the allowance (.005) needs .XXX, and an allowance those places would
 # round is refused.
 _FIT_PLACES = DRAWING_PRECISION[CUT_LENGTH_SKETCH][CUT_LENGTH_DIMENSION]
 if _FIT_PLACES != mount_stack.CUT_LENGTH_PLACES:
@@ -387,11 +339,10 @@ if ENGAGEMENT_NOMINAL_MM < MIN_ENGAGEMENT_MM:
 
 # --- The modification the shop makes (Main's ruling on the cut end) ---
 # The supplied screw is 4 in, modelled with the family's factory tip chamfer.
-# Cutting to fit removes that tip, so the 0.1 break at the new end is MHA-DT-VN-61's own
-# modification, not a property of the fillister family: the builder builds
-# the stock screw at its supplied length (STOCK_LENGTH_MM, the shared
-# recipe's row), then trims it at CutLength and breaks the new end with
-# CutEndBreak.
+# Cutting to fit removes that tip, MHA-DT-VN-61's own modification, not a
+# property of the fillister family: the builder builds the stock screw at its
+# supplied length (STOCK_LENGTH_MM, the shared recipe's row), then trims it at
+# CutLength.
 if abs(STOCK_LENGTH_MM - 4.0 * 25.4) > 1e-9:
     raise ValueError("the MSC 40923906 row is not the supplied 4 in screw")
 # The family's factory tip: 45 deg x 0.7P (diag_mcmaster_fillister's law).
@@ -462,14 +413,6 @@ TRIM_REMOVED_MM3 = (
     )
     + _metal_per_mm_mm3(MAJOR_RADIUS_MM)
     * (STOCK_LENGTH_MM - FACTORY_TIP_CHAMFER_MM - CUT_LENGTH_MM)
-)
-# Metal the 45 deg break removes at the new end: between the cone and the
-# major radius, over the break's height.
-CUT_END_DEBURR_REMOVED_MM3 = _simpson(
-    lambda h: _metal_per_mm_mm3(MAJOR_RADIUS_MM)
-    - _metal_per_mm_mm3(MAJOR_RADIUS_MM - CUT_END_BREAK_MM + h),
-    0.0,
-    CUT_END_BREAK_MM,
 )
 if not 0.0 < _ROOT_REACHED_MM < FACTORY_TIP_CHAMFER_MM:
     raise ValueError("the factory tip no longer cuts below the thread root")
