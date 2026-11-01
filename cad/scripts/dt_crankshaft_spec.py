@@ -548,9 +548,10 @@ if (
 # journal (to the Ø.3125 seat step).  The shank fits the crank hub and carries
 # the ShaftDiaDim band. Both non-mating necks print the core's .375 with an
 # explicit loose ±.010 (the .01 grid's .38 would not be the model, and the
-# title block's .XXX is tighter than a bare neck needs; machinist review):
-# the right imports NeckDiaDim; the left measures the full width between
-# opposite native silhouettes (the hub's fit band would be over-specified).
+# title block's .XXX is tighter than a bare neck needs; machinist review),
+# each from its own construction witness circle of the core: NeckDiaDim on
+# the seat step's profile, OutboardNeckDia on the journal's (the shank's
+# ShaftDiaDim would carry the hub's fit band onto the neck).
 SHAFT_CORE_LANDS = (
     (0.0, SEAT_COLLAR),
     (COLLAR_REAR, JOURNAL_START),
@@ -560,10 +561,6 @@ if any(start >= end for start, end in SHAFT_CORE_LANDS):
     raise AssertionError("every bare Ø.375 core land must have a length")
 NECK_DIA_PLACES = 3
 NECK_DIA_TOL = 0.254  # ±.010
-# The collar-side neck has no separate authored model dimension to import.
-# Its drawing-only driven linear full-width measurement carries only a native
-# diameter-symbol prefix and the right-hand neck's loose places, not the shank fit.
-DRAWING_REFERENCE_PRECISION = {"OutboardNeckDia": NECK_DIA_PLACES}
 if SHAFT_DIA + NECK_DIA_TOL >= (
     JOURNAL_DIA + JOURNAL_DIA_BAND[1]
 ):
@@ -605,7 +602,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDiaDim"},
     "Shaft": {"Depth"},
     "ShaftDomeProfile": {"DomeHeight"},
-    "JournalProfile": {"JournalDiaDim"},
+    "JournalProfile": {"JournalDiaDim", "OutboardNeckDia"},
     "ReliefProfile": {"ReliefDiaDim"},
     "PinionSeatProfile": {"PinionSeatDiaDim", "NeckDiaDim"},
     "CollarProfile": {"CollarDiaDim"},
@@ -634,7 +631,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ShaftProfile": {"ShaftDiaDim": 4},
     "Shaft": {"Depth": dt_crank_pinion_spec.SHAFT_LENGTH_PLACES},
     "ShaftDomeProfile": {"DomeHeight": 3},
-    "JournalProfile": {"JournalDiaDim": 4},  # 11.4046, .449 in
+    "JournalProfile": {"JournalDiaDim": 4, "OutboardNeckDia": NECK_DIA_PLACES},  # 11.4046, .449 in
     "ReliefProfile": {"ReliefDiaDim": RELIEF_DIA_PLACES},
     "PinionSeatProfile": {"PinionSeatDiaDim": 4, "NeckDiaDim": NECK_DIA_PLACES},
     "CollarProfile": {"CollarDiaDim": 2},
