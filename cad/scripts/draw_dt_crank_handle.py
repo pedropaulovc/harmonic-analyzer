@@ -87,12 +87,12 @@ from dt_crank_handle_spec import (
     INSIDE_CORNER_R_TOL_TYPE,
     OAK_END_X,
     PEAK_X,
-    PIVOT_BORE_CALLOUT,
     REFERENCE_DIMENSIONS,
     REFERENCE_RADII,
     S_CONCAVE_CENTER,
     S_CONVEX_CENTER,
     S_CONVEX_R,
+    SCREW_NUMBER,
     SHOULDER_R,
     SHOULDER_X,
     TANGENT_POINT_DIAMETERS,
@@ -105,6 +105,20 @@ from dt_crank_handle_spec import (
     TENON_X0,
     WAIST_X,
     UNIT,
+    inch_text,
+)
+from dt_crank_handle_pivot_screw_spec import (
+    DIAMETRAL_CLEARANCE_MAX,
+    DIAMETRAL_CLEARANCE_MIN,
+)
+
+# The reamed bore prints as a reference over the running clearance its model
+# band gives on the MHA-DT-32 shoulder's band, at the places that hold it
+# exactly (#290 fit F12: .0050-.0075).
+PIVOT_BORE_CALLOUT = (
+    f"REAM THRU; {inch_text(DIAMETRAL_CLEARANCE_MIN, 4)}-"
+    f"{inch_text(DIAMETRAL_CLEARANCE_MAX, 4)}\n"
+    f"DIAMETRAL CLEARANCE ON\n{SCREW_NUMBER} SHOULDER"
 )
 
 

@@ -63,13 +63,13 @@ def test_model_owns_places_and_bands() -> None:
     assert "draw_dt_crank_handle_pivot_screw.py" in PRECISION_MIGRATED_DRAWINGS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    # The running fit at four places; the head, the small features that could
-    # print as nothing at two places (tip chamfer, relief Ø) at three; the
-    # stations, slot and relief width at the title block's .XX.
+    # The running fit, the head and the small features that could print as
+    # nothing at two places (tip chamfer, relief Ø) at three; the stations,
+    # slot and relief width at the title block's .XX.
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "HeadDia": 3,
         "HeadLength": 3,
-        "ShoulderDia": 4,
+        "ShoulderDia": 3,
         "ThreadLength": 2,
         "ReliefDia": 3,
         "ReliefWidth": 2,
@@ -227,8 +227,6 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert not hasattr(spec, "COLLAR_DIA")
     assert spec.SHOULDER_DIA_MAX < spec.HANDLE_BORE_MIN
     assert 0.0 < spec.SEAT_FLAT_ANNULUS_AREA_MIN < spec.SEAT_FLAT_ANNULUS_AREA
-    assert spec.CHAMFER_CALLOUT == "X 45 DEG"
-    assert drawing.CHAMFER_CALLOUT is spec.CHAMFER_CALLOUT
     # The neck is ~69 percent of the #4-40 tensile stress area (0.00604 in^2).
     assert spec.NECK_AREA == pytest.approx(math.pi / 4.0 * spec.RELIEF_DIA**2)
     assert spec.TENSILE_STRESS_AREA == pytest.approx(3.90, abs=0.01)
@@ -435,6 +433,7 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         drawing.THREAD_NOTE_XY,
         drawing.FINISH_SYMBOL,
         drawing.ISO_NOTE_XY,
+        drawing.SEAT_EDGE_NOTE_XY,
         (drawing.TIP_X, drawing.SIDE_CENTER[1]),
         *drawing.SIDE_KEEP.values(),
         *drawing.END_KEEP.values(),
@@ -501,6 +500,13 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     assert drawing.SEAT_X < shoulder_dim_x < drawing.UNDERHEAD_X
     assert abs(drawing.CENTERLINE_PICK[0] - shoulder_dim_x) > 0.010
     assert abs(drawing.FINISH_PICK[0] - shoulder_dim_x) > 0.010
+    # The seat-break note lands on the seat face's outer edge, outside the
+    # relief lead's edge that projects onto the same line.
+    scale = drawing.SHEET_SCALE[0] / 1000.0
+    lead_r = (spec.RELIEF_DIA / 2.0 + spec.RELIEF_LEAD) * scale
+    assert drawing.SEAT_EDGE_PICK[0] == drawing.SEAT_X
+    pick_r = drawing.SEAT_EDGE_PICK[1] - drawing.SIDE_CENTER[1]
+    assert lead_r + 0.001 < pick_r < drawing.SHOULDER_TOP_Y - drawing.SIDE_CENTER[1]
 
 
 def test_printed_material_fits_one_title_block_line() -> None:

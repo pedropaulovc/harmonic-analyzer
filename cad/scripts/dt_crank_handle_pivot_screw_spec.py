@@ -98,7 +98,7 @@ SLOT_WIDTH = 1.016  # .04
 SLOT_DEPTH = 1.016  # .04
 SLOT_DEPTH_TOL = _GENERAL_2PL
 
-# The running surface under the oak bore (#290 fit F12): .1560 +.0000/-.0020,
+# The running surface under the oak bore (#290 fit F12): .156 +.000/-.002,
 # a loose wood-on-steel running fit in the .1610 reamed bore.  (upper, lower)
 # deviations; the model carries the band natively (drawing-simplicity-policy.md
 # `How the repository implements the guidelines`).  The tenon keeps the rule-17
@@ -217,11 +217,21 @@ RELIEF_LEAD_LIMITS = (
     round(RELIEF_LEAD + RELIEF_LEAD_TOL, 6),
 )
 CHAMFER_CALLOUT = "X 45 DEG"
-# The 45-degree lead rides the relief's Ø callout rather than a third
-# dimension crowded into the narrow groove at 3:1 (machinist review).
-RELIEF_CALLOUT = (
-    f"{inch_text(RELIEF_LEAD_LIMITS[0], 3)}-{inch_text(RELIEF_LEAD_LIMITS[1], 3)} "
-    f"{CHAMFER_CALLOUT} LEAD"
+# Each band tighter than the title block's names what it serves at its
+# callout (#290 review of 29af6f44d, rule 4): the tip chamfer starts the
+# thread in the arm's tapped hole and stays inside the thread depth; the
+# relief clears the die's root and its lead stays inside the arm's tapped
+# mouth, so the seat annulus stays flat.  The 45-degree lead rides the
+# relief's Ø callout rather than a third dimension crowded into the narrow
+# groove at 3:1 (machinist review).
+TIP_CHAMFER_CALLOUT = f"{CHAMFER_CALLOUT}; INSIDE\nTHREAD DEPTH,\nSTARTS MHA-DT-06"
+RELIEF_CALLOUT = "\n".join(
+    (
+        f"UNDER {THREAD_SIZE} ROOT;",
+        f"{inch_text(RELIEF_LEAD_LIMITS[0], 3)}-{inch_text(RELIEF_LEAD_LIMITS[1], 3)} "
+        f"{CHAMFER_CALLOUT} LEAD",
+        "INSIDE MHA-DT-06 THREAD",
+    )
 )
 SEAT_FLAT_INNER_DIA = RELIEF_DIA + 2.0 * RELIEF_LEAD
 # ... and at its printed worst: the largest relief under the longest lead.
@@ -368,24 +378,33 @@ INSTALLED_TIP_CHAMFER = EDGE_BREAK_MAX_MM
 ARM_STOCK_THICKNESS_MAX = 2.0 * ARM_STOCK_THICKNESS - ARM_STOCK_THICKNESS_MIN
 FILE_ALLOWANCE_MAX = round(THREAD_LENGTH_MAX - ARM_STOCK_THICKNESS_MIN, 6)
 FILE_ALLOWANCE_MIN = round(FULL_THREAD_REACH_MIN - ARM_STOCK_THICKNESS_MAX, 6)
-# The fitted shoulder and both head bands' reasons, stated once (user ruling
-# 2026-09-29, after the MHA-DT-32 machinist review; the length band's reason
-# after the 1d2be3aaf re-review called it over-specification unstated).  #290:
-# the note states function only; the end play and the seat edge's break print
-# as callouts on the dimensions they qualify.
+# The fitted shoulder, stated once (user ruling 2026-09-29, after the
+# MHA-DT-32 machinist review).  #290: the note states function only; the end
+# play, the seat edge's break and both head bands' reasons print as callouts
+# on what they qualify (review of 29af6f44d: a band's reason belongs at its
+# callout).
 DRAWING_NOTES = "\n".join(
     (
         "FACE THE UNDER-HEAD TO SUIT THE BONDED MHA-DT-08: UNDER-HEAD TO SEAT",
         "  FACE (SHOULDER END, ON MHA-DT-06) = FERRULE FACE TO CUP FLOOR PLUS",
-        "  THE END PLAY. HEAD BEARS ON MHA-DT-35 FLOOR;",
-        "  DIA BAND KEEPS ITS BEARING, LENGTH BAND KEEPS IT BELOW CUP FACE.",
+        "  THE END PLAY.",
     )
 )
 END_PLAY_CALLOUT = (
     f"FACED TO SUIT, {inch_text(END_PLAY_RANGE[0], 3)}-"
     f"{inch_text(END_PLAY_RANGE[1], 3)} END PLAY"
 )
-SEAT_EDGE_CALLOUT = f"SEAT EDGE BREAK\n{inch_text(SEAT_EDGE_BREAK_MAX, 3)} MAX"
+# The head's bands: its diameter keeps a bearing annulus on the cup floor
+# outside the floor hole, its length keeps it below the cup's face.
+HEAD_DIA_CALLOUT = "BEARS ON\nMHA-DT-35\nFLOOR"
+HEAD_LENGTH_CALLOUT = "KEEPS HEAD BELOW\nMHA-DT-35 FACE"
+# The shoulder's running mate, at its band (rule 4).
+SHOULDER_FIT_CALLOUT = "RUNS IN MHA-DT-08\nREAMED BORE"
+# The seat edge's break, on a leader to that edge, names what seats there.
+SEAT_EDGE_NOTE = (
+    f"SEAT EDGE BREAK {inch_text(SEAT_EDGE_BREAK_MAX, 3)} MAX;\n"
+    "SEATS ON MHA-DT-06 ARM FACE"
+)
 
 # The shoulder's seat on the arm face: from the arm's printed maximum mouth
 # (the larger of it and the relief lead's envelope) out to the smallest
@@ -517,17 +536,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StationReference": {"OverallLength", "UnderHeadLocation"},
 }
 # Decimal places ARE the tolerance (drawing-guidelines.md rule 3 (decimal
-# places carry the tolerance)): the shoulder diameter is the running fit and
-# prints its .0020 band at four places; the head diameter and length (the
-# cup-floor bearing and recess), the relief diameter and the two 45-degree legs
-# at three; every other size at two, the relief width for the 1.5D engagement
-# rule and the thread length with its own +.00/-.02 band; the fitted shoulder
-# length and the overall are references.
+# places carry the tolerance)): the head diameter and length (the cup-floor
+# bearing and recess), the shoulder's running band, the relief diameter and
+# the two 45-degree legs at three; every other size at two, the relief width
+# for the 1.5D engagement rule and the thread length with its own +.00/-.02
+# band; the fitted shoulder length and the overall are references.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ScrewProfile": {
         "HeadDia": 3,
         "HeadLength": 3,
-        "ShoulderDia": 4,
+        "ShoulderDia": 3,
         "ThreadLength": 2,
         "ReliefDia": 3,
         "ReliefWidth": 2,

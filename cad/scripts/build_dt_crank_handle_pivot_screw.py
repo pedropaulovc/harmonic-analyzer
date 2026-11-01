@@ -362,13 +362,18 @@ async def build(adapter) -> dict[str, str]:
     # location reads from (MHA-DT-32 re-reviews): the seat is the thread length
     # from the tip, the under-head face this reference -- the shoulder is
     # turned to suit the bonded handle -- and the head face the overall.  It
-    # runs at mid-height of the under-head annulus so its head end sits on
-    # that face.
-    under_head_v = -(SHOULDER_R + HEAD_R) / 2.0
+    # runs from the overall line's tip end to the corner of the under-head
+    # face and the shoulder.  The construction stub that carries that corner
+    # lies on the shoulder's silhouette, so the sheet prints no line of its
+    # own (#290 review of 29af6f44d: a stub across the whole screw read as a
+    # stray centreline).
+    under_head_v = -SHOULDER_R
     set_sketch_direct_db(adapter, True)
     under_head_line = check(
         "under-head location reference line",
-        await adapter.add_line(-OVERALL_LENGTH, under_head_v, -HEAD_LENGTH, under_head_v),
+        await adapter.add_line(
+            -2.0 * HEAD_LENGTH, under_head_v, -HEAD_LENGTH, under_head_v
+        ),
     )
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[under_head_line], "ISketchSegment")
@@ -379,26 +384,33 @@ async def build(adapter) -> dict[str, str]:
         "under-head location reference horizontal",
         await adapter.add_sketch_constraint(under_head_line, None, "horizontal"),
     )
-    await anchor_point_to_origin(
-        adapter,
-        f"{under_head_line}.start",
-        -OVERALL_LENGTH,
-        under_head_v,
-        "under-head location from the tip",
-    )
-    stations.record(
-        "UnderHeadTipX", '"HeadLength" + "ShoulderLength" + "ThreadLength"'
-    )
-    stations.record("UnderHeadY", '( "ShoulderDia" + "HeadDia" ) / 4')
     await dimension_between(
         adapter,
-        f"{under_head_line}.start",
+        f"{overall_line}.start",
+        f"{under_head_line}.end",
+        "vertical_distance",
+        SHOULDER_R,
+        "under-head corner on the shoulder",
+    )
+    stations.record("UnderHeadY", '"ShoulderDia" / 2')
+    await dimension_between(
+        adapter,
+        f"{overall_line}.end",
         f"{under_head_line}.end",
         "horizontal_distance",
         OVERALL_LENGTH - HEAD_LENGTH,
         "under-head location reference",
     )
     stations.record("UnderHeadLocation", '"ShoulderLength" + "ThreadLength"')
+    await dimension_between(
+        adapter,
+        f"{under_head_line}.start",
+        f"{under_head_line}.end",
+        "horizontal_distance",
+        HEAD_LENGTH,
+        "under-head reference stub",
+    )
+    stations.record("UnderHeadStub", '"HeadLength"')
     await ensure_fully_defined(adapter, "station reference sketch")
     check("exit_sketch station reference", await adapter.exit_sketch())
     name_last_feature(adapter, "StationReference")
@@ -441,7 +453,7 @@ async def build(adapter) -> dict[str, str]:
     # print under the title block's bands.
     set_dimension_bilateral_tolerance(
         adapter, "ScrewProfile", "ShoulderDia", *deviations(SHOULDER_DIA_BAND),
-        places=4, display_unit=UNIT,
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
         adapter, "ScrewProfile", "TipChamfer", *deviations(TIP_CHAMFER_BAND),
