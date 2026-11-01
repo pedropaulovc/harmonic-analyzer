@@ -1312,8 +1312,6 @@ if not (
     and _TIP_LUG[4] - _LUG_TIP_Z > POCKET_CORNER_FILLET_R
 ):
     raise AssertionError("lug-bottom leader tip is not on the lug's flat bottom face")
-# A leader ending on a surface takes a dot (ASME Y14.2).
-_DOT_ARROWHEAD = 3  # swArrowStyle_e.swDOT_ARROWHEAD
 # label -> (text, top-left sheet xy, leader tip machine (X, Z)).
 LUGS_LEVEL_NOTES = {
     "cross-tap lug bottoms": (
@@ -1884,18 +1882,6 @@ def _center_mark_count(view: Any) -> int:
     return len(
         _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
     )
-
-
-def _dot_leader_terminator(adapter: Any, note: Any, *, label: str) -> None:
-    """End a pointer note's one leader in a dot, and prove it took."""
-    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    status = annotation.SetArrowHeadStyleAtIndex(0, _DOT_ARROWHEAD)
-    if type(status) is not int or status != 0:
-        raise RuntimeError(f"{label}: SetArrowHeadStyleAtIndex refused a dot ({status!r})")
-    rebuild_drawing(adapter, label=f"{label} dot terminator")
-    style = annotation.GetArrowHeadStyleAtIndex(0)
-    if type(style) is not int or style != _DOT_ARROWHEAD:
-        raise RuntimeError(f"{label}: leader terminator reads {style!r}, not a dot")
 
 
 def _require_single_center_marks(
@@ -2666,7 +2652,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_note(adapter, LUGS_NOTE, *LUGS_NOTE_XY)
     for label, (text, text_xy, tip_mm) in LUGS_LEVEL_NOTES.items():
-        note = add_leader_note(
+        add_leader_note(
             adapter,
             text,
             text_xy=text_xy,
@@ -2674,7 +2660,6 @@ async def build(adapter: Any) -> dict[str, str]:
             label=label,
             view=lugs,
         )
-        _dot_leader_terminator(adapter, note, label=label)
 
     # drawing-simplicity-policy.md `How the repository implements the guidelines`'s proof obligation, now that no sheet code writes places:
     # every imported dimension must still print what its PART authored. A
