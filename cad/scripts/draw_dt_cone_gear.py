@@ -651,21 +651,19 @@ def _assert_dimension_arrow_length(drawing: Any) -> None:
     _telemetry.info(f"drawing arrow length {live * 1000.0:.3f} mm")
 
 
-# RV-03's T012 web text stands this far off its dimension line, square to it
-# on the side away from the teeth's +X dimensions: clear of the tip circle.
-WEB_MIN_TEXT_OFFSET = 0.034  # r4 review: at 0.026 a tooth outline ran through the text
+# RV-03's T012 web text sits on its own dimension line, carried outboard past
+# the tip circle by this much (sheet metres).  Offset square to the line
+# (r3, r4 reviews), the extension lines ran through the text.
+WEB_MIN_TEXT_OUTBOARD = 0.012
 
 
 def web_min_text_xy() -> tuple[float, float]:
-    """Sheet point of the T012 web text: off the middle of its radial line."""
-    numerator, denominator = _SCALE_BY_TEETH[WEB_REFERENCE_TEETH]
-    start, web, _band = web_reference_mm()
-    middle = (start + web / 2.0) * numerator / (denominator * 1000.0)
+    """Sheet point of the T012 web text: on its radial line, outside the teeth."""
+    reach = rendered_half_od(WEB_REFERENCE_TEETH) + WEB_MIN_TEXT_OUTBOARD
     angle = math.radians(WEB_REFERENCE_ANGLE_DEG)
-    across = angle - math.pi / 2.0
     return (
-        FRONT_CENTER[0] + middle * math.cos(angle) + WEB_MIN_TEXT_OFFSET * math.cos(across),
-        FRONT_CENTER[1] + middle * math.sin(angle) + WEB_MIN_TEXT_OFFSET * math.sin(across),
+        FRONT_CENTER[0] + reach * math.cos(angle),
+        FRONT_CENTER[1] + reach * math.sin(angle),
     )
 
 
