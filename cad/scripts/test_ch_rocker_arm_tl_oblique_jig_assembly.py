@@ -1349,6 +1349,19 @@ def test_printed_torque_leads_with_n_m_and_rounds_in_lbf(nm, printed) -> None:
     assert abs(in_lbf - exact) <= half_step
 
 
+def test_step_10_states_the_in_situ_hub_fit_up() -> None:
+    """Owner ruling 5 (option A, 2026-11-01): TL-21 carries no HUB; step 10
+    sets it from the spindle origin (the apex) by the carrier's printed
+    offset and band, then names its size, band and mating part (rule 19)."""
+    step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("10. "))
+    assert "THE DRO READS X 0, Y .5123 ±.0005" in step
+    assert "MATCH-DRILL AND REAM THE HUB THERE" in step
+    hub_pin = f"(ITEM {spec.ITEM_NUMBERS[spec.HUB_PIN]})"
+    assert f"HUB Ø.4000-.4005 THRU, BONDED LOCATOR {hub_pin}" in step
+    assert "THEIR SPOTS" not in step and "THE CL HOLE OFF ITS SPOT" in step
+    assert spec.carrier.HUB_RADIAL_STACK < 0.25
+
+
 
 
 def test_lever_screw_torque_is_capped_by_the_carrier_thread() -> None:
