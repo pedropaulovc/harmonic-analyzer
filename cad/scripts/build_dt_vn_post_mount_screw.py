@@ -314,6 +314,7 @@ def _manufacturing_controls(adapter) -> None:
     )
 
 
+@_telemetry.traced("part.post_mount_screw.plain_shank")
 async def _restore_plain_shank(adapter) -> None:
     """The shared recipe threads the whole shank, but MSC threads only the
     last 1.500 in: a major-diameter boss from the under-head face (the Top
