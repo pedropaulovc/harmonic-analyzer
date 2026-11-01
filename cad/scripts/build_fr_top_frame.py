@@ -1405,8 +1405,8 @@ KEEPER_TAP_DRILL_WALL_MARGIN_NO_WANDER = (
 KEEPER_TAP_DRILL_WALL_MARGIN = (
     KEEPER_TAP_DRILL_WALL_MARGIN_NO_WANDER - KEEPER_TAP_AXIS_WANDER_MM
 )
-# Owner ruling B7 (#290): the receiver walls stay the accepted shortfall
-# under the .080 target, restated in inch; the .060 floor binds.
+# The drill wall sits under the .080 target (.0716), accepted as RV-08 by
+# owner ruling 2026-11-01; the .060 floor binds.
 if min(KEEPER_TAP_THREAD_WALL_MARGIN, KEEPER_TAP_DRILL_WALL_MARGIN) < WALL_FLOOR_MM:
     raise AssertionError("keeper receiver leaves less than .060 with drill wander")
 KEEPER_MAX_STOCK_ENTRY = FOOT_SCREW_LENGTH_MM - (

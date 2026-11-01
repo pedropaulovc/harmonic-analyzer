@@ -42,3 +42,8 @@ fr-top-frame:
       where: "the faced underside's knife-mount seat patches carry no flatness control"
       finding: "seat flatness unspecified for the knife-mount dowel slip-tilt fit (rules 1, 5)"
       reason: "owner preference 2026-10-27 (no FCF on face-milled seats): the knife-mount slip-tilt proof (build_sm_summing_assembly, #2016) charges an assumed .0004 seat conformity over the .540 minimum seat, which a face-milled seat drawn flat by the bolt holds; the fit binds only past about .0017"
+    - id: "RV-08"
+      kind: "minor"
+      where: "the 2X #2-56 MHA-CH-07 keeper foot taps transferred into the west rail web: the tap drill's wall to the web side"
+      finding: "keeper receiver tap-drill wall below the .080 in target (rule 17)"
+      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions. .0716 MIN (1.819 mm): the #2-56 tap drill at its largest, offset up to .139 from the .51 web's centre by the MHA-CH-07 fit-up station and band, with .0024 drill wander; build_fr_top_frame asserts the .060 floor"
