@@ -230,5 +230,10 @@ SUPPLIER_REFERENCE_FORMATS = {
 }
 SUPPLIER_REFERENCE_PLANES = _supplier.SUPPLIER_REFERENCE_PLANES
 SUPPLIER_REFERENCE_SIDES = _supplier.SUPPLIER_REFERENCE_SIDES
-if len(SUPPLIER_REFERENCE_DIMENSIONS) != len(_supplier.SUPPLIER_REFERENCE_DIMENSIONS) - 1:
-    raise AssertionError("MHA-PD-VN-55: the supplier stock length reference is not dropped")
+if (
+    len(SUPPLIER_REFERENCE_DIMENSIONS)
+    != len(_supplier.SUPPLIER_REFERENCE_DIMENSIONS) - 1
+):
+    raise AssertionError(
+        "MHA-PD-VN-55: the supplier stock length reference is not dropped"
+    )
