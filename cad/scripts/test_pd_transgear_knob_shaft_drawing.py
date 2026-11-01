@@ -237,7 +237,8 @@ def test_neck_diameter_prints_limits_that_state_both_jobs() -> None:
     # past the core shoulder; its callout states that function.
     assert spec.FRONT_RELIEF_WIDTH_PLACES == 3
     assert spec.FRONT_RELIEF_WIDTH - printed_band_mm(2) - 0.170 < 0.100
-    assert drawing.DIMENSION_CALLOUTS_BELOW["FrontReliefWidth"] == "D-FLAT\nRUNOUT"
+    callout = drawing.DIMENSION_CALLOUTS_BELOW["FrontReliefWidth"]
+    assert "FULL D" in callout and "STEP" in callout
 
 
 def test_neck_corner_radius_prints_a_maximum_from_sharp() -> None:

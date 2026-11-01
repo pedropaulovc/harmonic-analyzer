@@ -244,8 +244,12 @@ if any("\n" in text for text in DIMENSION_CALLOUTS_ABOVE.values()):
 # its value and its dimension line, the block centred on the keep (run
 # 20261101T035809796Z: the journal length's two rows put its line 8.3 mm
 # under its keep).  Detail B's neck width and the D-flat tool's end state
-# their functions (machinist review r8): the width holds the flat tool's
-# runout, and the tool end leaves a full flat under the collar.  The neck
+# their functions (machinist review r8): the narrowest neck less the
+# farthest tool end leaves a full D up to the core's step (the spec's
+# CORE_FLAT_REACH_PAST_SHOULDER_MIN; "D-FLAT RUNOUT" named no job, review of
+# farm run 20261101T121701269Z), and the tool end leaves a full flat under
+# the collar.  Two rows of at most 7 characters: the block stands between
+# the step's witness line and the journal Ø's line, under the crop.  The neck
 # Ø's LIMITS state both jobs (owner ruling r8), MAX on the value's line
 # (DIMENSION_SUFFIXES) and MIN in the row under it.
 NECK_DIA_JOBS = (f"MAX CLEARS {DRIVE_COLLAR_NUMBER};", "MIN CARRIES DRIVE TORQUE")
@@ -253,7 +257,7 @@ DIMENSION_CALLOUTS_BELOW = {
     "FaceWidth": FACE_WIDTH_CALLOUT,
     "FlatToAxis": COLLAR_SLIDING_FIT,
     "JournalLength": f"SETS PIN WALL IN\nKNOB CUP {KNOB_CUP_NUMBER}",
-    "FrontReliefWidth": "D-FLAT\nRUNOUT",
+    "FrontReliefWidth": "FULL D\nTO STEP",
     "FlatEnd": f"FULL FLAT FOR\nCOLLAR {DRIVE_COLLAR_NUMBER}",
     "FrontReliefDia": NECK_DIA_JOBS[1],
 }
@@ -410,11 +414,12 @@ DETAIL_KEEP: dict[str, tuple[float, float]] = {
     # (~73 mm from the line, starting ~18 mm inside the border).
     "FrontReliefDia": (_detail_xy(-0.14, 0.0)[0], _DETAIL_TOP + 0.0093),
     # Under the crop, right of the step's witness line (centred on the 4 mm
-    # span it would sit on both witness lines): value and its two rows
-    # (~111.2..126.8 mm) from ~177.5 to 192 mm, clear of the tool end's
-    # outer arrow (y 173.5), the crop (from y 195.4 there) and the journal
-    # Ø's line (x 134.3).
-    "FrontReliefWidth": (_STEP_X + 0.012, _DETAIL_BOTTOM - 0.0087),
+    # span it would sit on both witness lines): value and its two rows (~3.0
+    # mm a character: "TO STEP" ~109.5..130.5 mm) from ~177.5 to 192 mm,
+    # clear of the tool end's outer arrow (y 173.5), the crop (from y 195.0
+    # there), the step's witness line (x 107) and the journal Ø's line (x
+    # 134.3).
+    "FrontReliefWidth": (_STEP_X + 0.013, _DETAIL_BOTTOM - 0.0087),
     # Left of the crop: the leader runs from the corner 12-24 deg below
     # level, inside the corner's own quadrant, through the pinion's blank
     # interior under its root and over the axis.  Its 23.5 mm text, centred
