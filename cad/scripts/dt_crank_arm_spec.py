@@ -131,9 +131,12 @@ HALF_WIDTH = ARM_WIDTH / 2.0
 # Width and thickness are the bar's as rolled, printed as the supplier's
 # fractions under the stock line's "AS SUPPLIED": the mill tolerance governs
 # them, not a title-block band, which would accept a thinner arm and a short
-# MHA-DT-32 engagement (Codex #892; the U41 platform precedent).
+# MHA-DT-32 engagement (Codex #892; the U41 platform precedent).  The width
+# is the imported reference-sketch dimension; the thickness is dimensioned
+# across the side view's faces on the sheet (an imported extrusion depth has
+# no attachment a native reference can be proven on).
 STOCK_FRACTION_DENOMINATOR = 16
-STOCK_FRACTION_DIMENSIONS = {"Width": ARM_WIDTH, "Depth": ARM_THICKNESS}
+STOCK_FRACTION_DIMENSIONS = {"Width": ARM_WIDTH, "Thickness": ARM_THICKNESS}
 
 # Marked dimensions imported by the drawing.  The axial seam groove is an
 # assembly-match feature, so its representation geometry carries no
@@ -144,7 +147,6 @@ STOCK_FRACTION_DIMENSIONS = {"Width": ARM_WIDTH, "Depth": ARM_THICKNESS}
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ArmOutline": {"BossRadius", "EndRadius"},
     "FiducialProfile": {"FiducialX", "FiducialY"},
-    "Arm": {"Depth"},
     "HubSeatProfile": {"HubSeatDia"},
     "StationReference": {
         "PivotStation",

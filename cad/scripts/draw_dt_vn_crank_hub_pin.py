@@ -139,6 +139,7 @@ async def build(adapter: Any) -> dict[str, str]:
             units="in",
             precision=0,
             expected_mm=value_mm,
+            presentation="diameter",
             fraction_denominator=STOCK_FRACTION_DENOMINATOR,
         )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):

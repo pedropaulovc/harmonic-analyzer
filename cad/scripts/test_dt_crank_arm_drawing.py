@@ -57,7 +57,7 @@ def test_axial_seam_key_is_six_oclock_and_the_cut_pin_seats_flush() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert arm.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
+    kept = set(drawing.FRONT_KEEP)
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) == {"HubSeatDia"}
     assert drawing.DIMENSION_CALLOUTS["HubSeatDia"] == notes.HUB_SEAT_CALLOUT
@@ -381,7 +381,7 @@ def _thinnest_accepted_arm() -> float:
     A toleranced 8.0 takes the title block's .X band. A reference (8.0) under
     the "AS SUPPLIED" stock line leaves the bar's own mill tolerance.
     """
-    assert "Depth" in spec.STOCK_FRACTION_DIMENSIONS
+    assert "Thickness" in spec.STOCK_FRACTION_DIMENSIONS
     return geometry.ARM_STOCK_THICKNESS_MIN
 
 
@@ -406,8 +406,12 @@ def test_arm_stock_sizes_print_as_supplier_fractions() -> None:
     # precedent), so neither takes a title-block band.
     assert spec.STOCK_FRACTION_DIMENSIONS == {
         "Width": spec.ARM_WIDTH,
-        "Depth": spec.ARM_THICKNESS,
+        "Thickness": spec.ARM_THICKNESS,
     }
     for value_mm in spec.STOCK_FRACTION_DIMENSIONS.values():
         sixteenths = value_mm / 25.4 * spec.STOCK_FRACTION_DENOMINATOR
         assert sixteenths == pytest.approx(round(sixteenths))
+    # The thickness is dimensioned across the side view's two faces.
+    (x0, y0), (x1, y1) = drawing.THICKNESS_PICKS
+    assert y0 == y1 == drawing.RIGHT_CENTER[1]
+    assert (x1 - x0) * 1000.0 == pytest.approx(spec.ARM_THICKNESS * drawing.SHEET_SCALE[0])

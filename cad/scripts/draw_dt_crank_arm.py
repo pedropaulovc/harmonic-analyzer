@@ -83,6 +83,7 @@ from dt_crank_arm_spec import (
     ANCHOR_SCREW_Y,
     ARM_C2C,
     ARM_END_X,
+    ARM_THICKNESS,
     AXIAL_PIN_DIA,
     AXIAL_PIN_X,
     DRAWING_DIMENSIONS,
@@ -291,7 +292,13 @@ ANCHOR_CALLOUT_XY = (0.195, 0.205)
 # Centre of the four-line pivot callout: its bottom row stays clear above
 # the arm's top edge, its right end left of the isometric view.
 PIVOT_CALLOUT_XY = (0.270, 0.190)
-RIGHT_KEEP = {"Depth": (0.300, 0.108)}
+# The side view's stock thickness, dimensioned across its two faces.
+_HALF_THICKNESS_SHEET = ARM_THICKNESS * SHEET_SCALE[0] / 2000.0
+THICKNESS_PICKS = (
+    (RIGHT_CENTER[0] - _HALF_THICKNESS_SHEET, RIGHT_CENTER[1]),
+    (RIGHT_CENTER[0] + _HALF_THICKNESS_SHEET, RIGHT_CENTER[1]),
+)
+THICKNESS_TEXT_XY = (RIGHT_CENTER[0], 0.108)
 DIMENSION_CALLOUTS = {"HubSeatDia": HUB_SEAT_CALLOUT}
 # swDimensionArrowsSide_e.swDimArrowsInside, set rather than left to the
 # document's smart arrows (draw_dt_pinion_arbor's form): left smart, the two
@@ -429,26 +436,31 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # Right view: stock width by thickness.
-    right_annotations = curate_view_dimensions(
-        adapter,
-        right,
-        keep=RIGHT_KEEP,
-        view_label="right",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    imported_annotations = [*front_annotations, *right_annotations]
-    set_dimension_callouts(adapter, imported_annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
     # The part authored every displayed decimal place.  The hub seat bore
     # is a two-place .XX size: MHA-DT-31 is turned to suit it.
-    assert_imported_precision(adapter, imported_annotations, DRAWING_PRECISION_BY_NAME)
+    assert_imported_precision(adapter, front_annotations, DRAWING_PRECISION_BY_NAME)
+    thickness = add_edge_dimension(
+        adapter,
+        right,
+        p0=THICKNESS_PICKS[0],
+        p1=THICKNESS_PICKS[1],
+        text_xy=THICKNESS_TEXT_XY,
+        label="arm stock thickness",
+        orientation="horizontal",
+    )
     # The bar's as-rolled width and thickness: the supplier's fractions, its
     # tolerance governs (the stock note).
+    stock_displays = {
+        "Width": _early_bound(
+            _named(adapter, front_annotations, "Width"), "IAnnotation"
+        ).GetSpecificAnnotation(),
+        "Thickness": thickness,
+    }
     for name, value_mm in STOCK_FRACTION_DIMENSIONS.items():
-        annotation = _early_bound(_named(adapter, imported_annotations, name), "IAnnotation")
         supplier_reference_dimension(
             adapter,
-            annotation.GetSpecificAnnotation(),
+            stock_displays[name],
             label=f"arm stock {name}",
             units="in",
             precision=0,
