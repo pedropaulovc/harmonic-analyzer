@@ -202,6 +202,15 @@ def test_frame_puts_the_flat_top_at_y0() -> None:
     assert 'screw_axis_planes=("Front Plane", "Right Plane")' in source
 
 
+def test_thread_chord_lies_on_the_head_cone_edge() -> None:
+    # The thread Ø's line is the cone/major junction edge, not a chord drawn
+    # across the threaded shank.
+    d = dims.DIMS
+    start = spec.SUPPLIER_REFERENCE_STARTS["SupplierThreadDiameter"]
+    assert start == (-d.major_dia / 2.0, -d.junction_depth)
+    assert ((d.head_dia / 2.0, 0.0), (-start[0], start[1])) in d.body_profile()
+
+
 def test_purchased_sheet_documents_the_built_part() -> None:
     import draw_ch_rocker_arm_tl_vn_oblique_riser_screw as drawing
 
