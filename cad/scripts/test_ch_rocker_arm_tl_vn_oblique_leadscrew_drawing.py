@@ -17,7 +17,6 @@ import _config
 import _drawing_common as drawing_common
 import _purchased_title_fit as title_fit
 import _supplier_screw_dimensions as supplier_dimensions
-import _supplier_dimensions as supplier_presentation
 import _supplier_spring_drawing as supplier_drawing
 import _stock_trim_drawing as trim_drawing
 import build_ch_rocker_arm_tl_vn_oblique_leadscrew as part
@@ -28,7 +27,6 @@ from _drawing_contract import drawing_specification_violations
 from _drawing_notes import property_link
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from _printed_tolerance import printed_band_mm
-from _supplier_screw_layout import supplier_screw_lane_plan
 
 STEM = "ch-rocker-arm-tl-vn-oblique-leadscrew"
 NAME = "ch_rocker_arm_tl_vn_oblique_leadscrew"
@@ -547,13 +545,16 @@ def test_one_axis_horizontal_view_at_the_largest_fitting_scale() -> None:
         station = spec.FLAT_STATIONS[section.flat]
         assert 2.5 < abs(section.cut_mm - station) < spec.FLAT_LENGTH / 2.0
     assert [s.flat for s in draw.CLOCK_SECTIONS] == list(spec.CLOCKED_FLATS)
-    # The note block (about 70 x 13 mm, top-left anchored) stands under the
-    # main view's lowest text, right of the details and over the title block,
-    # left of the isometric.
+    # The note block (five rows about 22 mm tall, top-left anchored; its
+    # widest printed row 35 glyphs at about 2.5 mm, under 105 mm) stands
+    # under the main view's lowest text, right of the details and over the
+    # title block, left of the isometric.
+    printed = [row.replace("<MOD-DIAM>", "Ø") for row in draw.STOCK_REFERENCE.splitlines()]
+    assert max(len(row) for row in printed) * 0.0025 <= 0.105
     notes = (
         draw.NOTES_XY[0],
-        draw.NOTES_XY[1] - 0.013,
-        draw.NOTES_XY[0] + 0.070,
+        draw.NOTES_XY[1] - 0.022,
+        draw.NOTES_XY[0] + 0.105,
         draw.NOTES_XY[1],
     )
     assert draw._inside_sheet(notes)
@@ -563,1069 +564,6 @@ def test_one_axis_horizontal_view_at_the_largest_fitting_scale() -> None:
         x for detail in draw.END_DETAILS for x, _y in detail.keep.values()
     )
     assert notes[0] > detail_right + 0.015
-
-
-class _SupplierStockNativeView:
-    """Recorded retained frame; the optional fresh-frame shape is synthetic."""
-
-    def __init__(self, *, fresh=False, move_annotations=True):
-        self.Position = (0.183, 0.2626)
-        self.refreshes = 0
-        self.ReferencedDocument = object()
-        self.outline_override = None
-        self.curve_offset = 0.0 if fresh else -0.0201
-        self.frame_half = (0.035588, 0.006388) if fresh else (0.005988, 0.026088)
-        self.annotations = []
-        self.move_annotations = move_annotations
-        self.moves = []
-
-    def reference_bounds(self):
-        x, y = self.Position
-        y += self.curve_offset
-        return (x - 0.030, y - 0.0008, x + 0.030, y + 0.0008)
-
-    def UpdateViewDisplayGeometry(self):
-        self.refreshes += 1
-
-    def GetOutline(self):
-        if self.outline_override is not None:
-            return self.outline_override
-        x, y = self.Position
-        half_x, half_y = self.frame_half
-        return (x - half_x, y - half_y, x + half_x, y + half_y)
-
-    def SetViewPosition(self, position, move_children):
-        assert move_children is False
-        self.moves.append((self.Position, tuple(position)))
-        dx, dy = position[0] - self.Position[0], position[1] - self.Position[1]
-        self.Position = tuple(position)
-        if self.move_annotations:
-            for annotation in self.annotations:
-                annotation.translate(dx, dy)
-        return True
-
-
-def test_supplier_stock_recorded_native_outline_refuses_original_center(
-    monkeypatch,
-) -> None:
-    monkeypatch.setattr(draw, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(draw, "double_array", tuple)
-    monkeypatch.setattr(draw._telemetry, "info", lambda _message: None)
-    view = _SupplierStockNativeView()
-    view.Position = (0.190, 0.243)
-    # rolling-ready line 37: the retained frame, not the source sketch.
-    assert view.GetOutline() == pytest.approx(
-        (0.184012, 0.216912, 0.195988, 0.269088)
-    )
-    assert view.GetOutline()[3] > draw.BORDER[3]
-    assert view.GetOutline()[3] > draw.SUPPLIER_STOCK_FIELD[3]
-    with pytest.raises(RuntimeError, match="view leaves the drawable sheet"):
-        draw._center_view(
-            SimpleNamespace(EditRebuild3=lambda: True),
-            view, (0.190, 0.243), "supplier stock gauges",
-        )
-
-
-def test_supplier_stock_centers_recorded_native_frame_not_offset_source_curves(
-    monkeypatch,
-) -> None:
-    monkeypatch.setattr(draw, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(draw, "double_array", tuple)
-    view = _SupplierStockNativeView()
-    # layout1859 line 41 records BOTH independent bounds after geometry refresh.
-    assert view.GetOutline() == pytest.approx(
-        (0.177012, 0.236512, 0.188988, 0.288688)
-    )
-    assert view.reference_bounds() == pytest.approx(
-        (0.153, 0.2417, 0.213, 0.2433)
-    )
-    before = view.GetOutline()
-    view.UpdateViewDisplayGeometry()
-    assert view.GetOutline() == before  # No invented refresh/shrink behavior.
-    draw._center_view(
-        SimpleNamespace(EditRebuild3=lambda: True), view,
-        draw.SUPPLIER_STOCK_CENTER, "supplier stock gauges",
-    )
-    assert view.Position == pytest.approx((0.183, 0.2365))
-    assert view.GetOutline() == pytest.approx(
-        (0.177012, 0.210412, 0.188988, 0.262588)
-    )
-    assert view.reference_bounds() == pytest.approx(
-        (0.153, 0.2156, 0.213, 0.2172)
-    )
-    assert draw._inside(view.GetOutline(), draw.SUPPLIER_STOCK_FIELD)
-    assert draw._inside(view.reference_bounds(), draw.SUPPLIER_STOCK_FIELD)
-    x0, y0, x1, y1 = view.reference_bounds()
-    assert (x1 - x0, y1 - y0) == pytest.approx((0.060, 0.0016))
-    assert (y0 + y1) / 2.0 - view.Position[1] == pytest.approx(-0.0201)
-    assert view.refreshes == 1
-
-
-@pytest.mark.parametrize(
-    "fault,reason",
-    (
-        ("position", "invalid view position"),
-        ("set", "failed to position"),
-        ("drift", "failed to centre"),
-        ("outline", "invalid view outline"),
-    ),
-)
-def test_supplier_stock_center_refusal_records_native_frame_and_target(
-    monkeypatch, fault, reason
-) -> None:
-    messages = []
-    monkeypatch.setattr(draw, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(draw, "double_array", tuple)
-    monkeypatch.setattr(draw._telemetry, "info", messages.append)
-    view = _SupplierStockNativeView()
-    if fault == "position":
-        view.outline_override = view.GetOutline()
-        view.Position = (math.nan, 0.243)
-    elif fault == "set":
-        view.SetViewPosition = lambda *_args: False
-    elif fault == "drift":
-        view.SetViewPosition = lambda *_args: True
-    elif fault == "outline":
-        view.outline_override = (math.nan, 0.0, 1.0, 1.0)
-    with pytest.raises(RuntimeError, match=reason):
-        draw._center_view(
-            SimpleNamespace(EditRebuild3=lambda: True), view,
-            draw.SUPPLIER_STOCK_CENTER, "supplier stock gauges",
-        )
-    assert len(messages) == 1
-    assert "native_outline_m=" in messages[0]
-    assert f"requested_center_m={draw.SUPPLIER_STOCK_CENTER!r}" in messages[0]
-    assert "actual_center_m=" in messages[0]
-    assert "failure=RuntimeError(" in messages[0]
-
-
-@pytest.fixture
-def supplier_stock_source_state(monkeypatch):
-    """Stateful document/configuration transitions, not native attachment proof."""
-    stock = spec.SUPPLIER_STOCK_CONFIGURATION
-    state = SimpleNamespace(
-        original="InstalledOriginal", configuration="InstalledOriginal",
-        path=draw.SOURCE.resolve(), dirty=False, read_only=True,
-        members=("Default", "InstalledOriginal", stock), events=[],
-        body_counts={"Default": (1, 0), "InstalledOriginal": (1, 0), stock: (0, 0)},
-        activation_fault=None, stock_show_fault=None, dirty_on_activation=False,
-        restore_source_error=None, restore_drawing_error=None,
-        sheet="OriginalSheet", edit_sheet=True, wrong_view_identity=False,
-    )
-    previous = SimpleNamespace(GetName2=lambda: "OriginalDrawingView")
-    other = SimpleNamespace(GetName2=lambda: "OtherDrawingView")
-    state.active_view = previous
-    state.views = {"OriginalDrawingView": previous, "OtherDrawingView": other}
-
-    class Source:
-        Extension = SimpleNamespace(NeedsRebuild2=0)
-        SketchManager = SimpleNamespace(ActiveSketch=None)
-
-        @property
-        def ConfigurationManager(self):
-            return SimpleNamespace(
-                ActiveConfiguration=SimpleNamespace(Name=state.configuration),
-            )
-
-        def GetTitle(self):
-            return "Source.SLDPRT"
-
-        def GetType(self):
-            return 1  # swDocPART, required by the real strict source binding.
-
-        def GetPathName(self):
-            return str(state.path)
-
-        def GetSaveFlag(self):
-            return state.dirty
-
-        def IsOpenedReadOnly(self):
-            return state.read_only
-
-        def GetConfigurationNames(self):
-            return state.members
-
-        def GetConfigurationByName(self, name):
-            return SimpleNamespace(Name=name) if name in state.members else None
-
-        def GetBodies2(self, kind, visible_only):
-            assert visible_only is False
-            return (object(),) * state.body_counts[state.configuration][kind]
-
-        def ShowConfiguration2(self, name):
-            state.events.append(("configuration", name))
-            if name == state.original and state.restore_source_error is not None:
-                raise state.restore_source_error
-            if name == stock and state.stock_show_fault == "return":
-                return False
-            state.configuration = (
-                "Default" if name == stock and state.stock_show_fault == "readback" else name
-            )
-            return True
-
-        def EditRebuild3(self):
-            state.events.append(("source rebuild", state.configuration))
-            self.Extension.NeedsRebuild2 = 0
-            return True
-
-    class Drawing:
-        SketchManager = SimpleNamespace(ActiveSketch=None)
-
-        def GetTitle(self):
-            return "Original.SLDDRW"
-
-        def GetPathName(self):
-            return self.GetTitle()
-
-        def GetCurrentSheet(self):
-            return SimpleNamespace(GetName=lambda: state.sheet)
-
-        @property
-        def ActiveDrawingView(self):
-            return state.active_view
-
-        def GetEditSheet(self):
-            return state.edit_sheet
-
-        def ActivateSheet(self, name):
-            state.events.append(("sheet", name))
-            state.sheet, state.active_view, state.edit_sheet = name, None, True
-            return True
-
-        def ActivateView(self, name):
-            state.events.append(("view", name))
-            state.active_view = state.views.get(name)
-            if name and state.wrong_view_identity:
-                state.active_view = SimpleNamespace(GetName2=lambda: name)
-            # SDK: sheet activation may return False; verify the actual context.
-            return bool(name)
-
-
-    model, drawing = Source(), Drawing()
-    app = SimpleNamespace(ActiveDoc=drawing, IsSame=lambda left, right: int(left is right))
-    adapter = SimpleNamespace(currentModel=drawing, swApp=app)
-    intruder = object()
-
-    def activate(title, use_preferences, rebuild, errors):
-        assert use_preferences is False and rebuild == 1 and errors == 0
-        state.events.append(("activate", title))
-        target = {model.GetTitle(): model, drawing.GetTitle(): drawing}[title]
-        if target is drawing and state.restore_drawing_error is not None:
-            raise state.restore_drawing_error
-        if target is model:
-            # A switch can disturb the inactive drawing: restoration is not a no-op.
-            state.sheet, state.active_view, state.edit_sheet = "OtherSheet", other, False
-            if state.dirty_on_activation:
-                state.dirty = True
-        app.ActiveDoc = target
-        if target is model and state.activation_fault is not None:
-            fault, state.activation_fault = state.activation_fault, None
-            if fault == "returned_identity":
-                return intruder, 0
-            if fault == "active_identity":
-                app.ActiveDoc = intruder
-            if fault == "status":
-                return target, 1
-        return target, 0
-
-    app.ActivateDoc3 = activate
-    monkeypatch.setattr(draw, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(supplier_drawing, "_early_bound", lambda value, _kind: value)
-    for module in (draw, supplier_drawing):
-        monkeypatch.setattr(module, "view_name", lambda _adapter, view: view.GetName2())
-    monkeypatch.setattr(draw._telemetry, "info", lambda _message: None)
-    state.model, state.drawing, state.adapter = model, drawing, adapter
-    state.previous = previous
-
-    def bind_view(view):
-        view.ReferencedDocument = model
-        view.ReferencedConfiguration = stock
-        view.GetReferencedModelName = lambda: str(draw.SOURCE.resolve())
-        if not hasattr(view, "GetName2"):
-            view.GetName2 = lambda: "SupplierStockView"
-        state.view = view
-        state.capture = supplier_drawing._CapturedReferenceView(
-            source=supplier_drawing._ReferenceSourceState(
-                draw.SOURCE.resolve(), model, state.original,
-                tuple(sorted(state.members)), (1, 0), True,
-            ),
-            view=view, name=view.GetName2(), configuration=stock,
-            features=("SupplierReference",), geometry=(object(),),
-        )
-        return state.capture
-
-    state.bind_view = bind_view
-    bind_view(SimpleNamespace())
-    return state
-
-
-@pytest.mark.parametrize("outcome", ("success", "annotation_failure", "refusal"))
-@pytest.mark.parametrize("active_view", (False, True))
-def test_supplier_stock_source_scope_restores_original_nondefault_and_drawing_context(
-    supplier_stock_source_state, outcome, active_view,
-) -> None:
-    state = supplier_stock_source_state
-    state.active_view = state.previous if active_view else None
-    edit_sheet = state.edit_sheet
-    expected_view = state.active_view
-    primary = RuntimeError(outcome)
-    calls = []
-
-    def annotate():
-        assert state.configuration == spec.SUPPLIER_STOCK_CONFIGURATION
-        assert state.adapter.currentModel is state.drawing
-        assert state.adapter.swApp.ActiveDoc is state.drawing
-        assert (state.sheet, state.active_view, state.edit_sheet) == (
-            "OriginalSheet", expected_view, edit_sheet,
-        )
-        calls.append("annotation")
-        state.dirty = True  # Explicit annotation presentation phase; never saved.
-        state.sheet, state.active_view, state.edit_sheet = "OtherSheet", None, not edit_sheet
-        if outcome != "success":
-            raise primary
-
-    def scoped():
-        with draw._supplier_stock_source_scope(
-            state.adapter, state.view, capture=state.capture,
-        ):
-            annotate()
-
-    if outcome == "success":
-        scoped()
-    else:
-        with pytest.raises(RuntimeError) as refused:
-            scoped()
-        assert refused.value is primary
-    assert calls == ["annotation"]
-    assert state.configuration == "InstalledOriginal" != "Default"
-    assert state.dirty is True
-    assert state.adapter.currentModel is state.drawing
-    assert state.adapter.swApp.ActiveDoc is state.drawing
-    assert (state.sheet, state.active_view, state.edit_sheet) == (
-        "OriginalSheet", expected_view, edit_sheet,
-    )
-
-
-@pytest.mark.parametrize(
-    "fault",
-    ("returned_identity", "active_identity", "status", "configuration_return", "configuration_readback"),
-)
-def test_supplier_stock_source_scope_refuses_activation_without_callback(
-    supplier_stock_source_state, fault,
-) -> None:
-    state = supplier_stock_source_state
-    if fault.startswith("configuration_"):
-        state.stock_show_fault = fault.removeprefix("configuration_")
-    else:
-        state.activation_fault = fault
-    calls = []
-    with pytest.raises(RuntimeError):
-        with draw._supplier_stock_source_scope(
-            state.adapter, state.view, capture=state.capture,
-        ):
-            calls.append("unexpected")
-    assert calls == []
-    assert state.configuration == state.original
-    assert state.adapter.currentModel is state.drawing
-    assert (state.sheet, state.active_view, state.edit_sheet) == (
-        "OriginalSheet", state.previous, True,
-    )
-
-
-@pytest.mark.parametrize(
-    "fault", ("configuration", "binding", "read_only", "bodies", "members", "path", "dirty_type"),
-)
-def test_supplier_stock_source_scope_rechecks_callback_source_invariants(
-    supplier_stock_source_state, fault,
-) -> None:
-    state = supplier_stock_source_state
-    with pytest.raises(RuntimeError):
-        with draw._supplier_stock_source_scope(
-            state.adapter, state.view, capture=state.capture,
-        ):
-            if fault == "configuration":
-                state.configuration = "Default"
-            elif fault == "binding":
-                state.view.ReferencedDocument = object()
-            elif fault == "read_only":
-                state.read_only = False
-            elif fault == "bodies":
-                state.body_counts[spec.SUPPLIER_STOCK_CONFIGURATION] = (0, 1)
-            elif fault == "members":
-                state.members += ("UnexpectedConfiguration",)
-            elif fault == "path":
-                state.path = state.path.with_name("unexpected.SLDPRT")
-            else:
-                state.dirty = 1
-    assert state.configuration == state.original
-    assert state.adapter.currentModel is state.drawing
-    assert (state.sheet, state.active_view, state.edit_sheet) == (
-        "OriginalSheet", state.previous, True,
-    )
-
-
-@pytest.mark.parametrize("fault", ("source", "drawing", "both"))
-@pytest.mark.parametrize("primary_failure", (False, True))
-def test_supplier_stock_source_scope_attempts_both_restorations_and_preserves_primary(
-    supplier_stock_source_state, fault, primary_failure,
-) -> None:
-    state = supplier_stock_source_state
-    primary = RuntimeError("original annotation refusal")
-    source_error, drawing_error = OSError("source restore failed"), OSError("drawing restore failed")
-    with pytest.raises((RuntimeError, OSError)) as refused:
-        with draw._supplier_stock_source_scope(
-            state.adapter, state.view, capture=state.capture,
-        ):
-            if fault in ("source", "both"):
-                state.restore_source_error = source_error
-            if fault in ("drawing", "both"):
-                state.restore_drawing_error = drawing_error
-            if primary_failure:
-                raise primary
-    expected = primary if primary_failure else source_error if fault != "drawing" else drawing_error
-    assert refused.value is expected
-    source_attempt = state.events.index(("configuration", state.original))
-    assert ("activate", state.drawing.GetTitle()) in state.events[source_attempt + 1:]
-    if fault == "source":
-        assert state.adapter.currentModel is state.drawing
-        assert (state.sheet, state.active_view, state.edit_sheet) == (
-            "OriginalSheet", state.previous, True,
-        )
-    if fault == "drawing":
-        assert state.configuration == state.original
-    notes = "\n".join(getattr(refused.value, "__notes__", ()))
-    if primary_failure:
-        assert ("source restore failed" in notes) == (fault in ("source", "both"))
-        assert ("drawing restore failed" in notes) == (fault in ("drawing", "both"))
-    elif fault == "both":
-        assert "drawing restore failed" in notes
-
-
-@pytest.mark.parametrize("allow_dirty", (False, True))
-def test_supplier_stock_source_scope_refuses_activation_only_dirty_change(
-    supplier_stock_source_state, allow_dirty,
-) -> None:
-    state = supplier_stock_source_state
-    state.dirty_on_activation = True
-    calls = []
-    with pytest.raises(RuntimeError):
-        with draw._supplier_stock_source_scope(
-            state.adapter, state.view, capture=state.capture,
-            allow_presentation_dirty=allow_dirty,
-        ):
-            calls.append("unexpected")
-    assert calls == []
-    assert state.configuration == state.original
-    assert state.dirty is True  # Refuse, never clear the evidence.
-    assert state.adapter.currentModel is state.drawing
-
-
-def test_supplier_stock_source_scope_refuses_dirty_immediate_entry(
-    supplier_stock_source_state,
-) -> None:
-    state = supplier_stock_source_state
-    state.dirty = True
-    calls = []
-    with pytest.raises(RuntimeError):
-        with draw._supplier_stock_source_scope(
-            state.adapter, state.view, capture=state.capture,
-        ):
-            calls.append("unexpected")
-    assert calls == []
-    assert ("configuration", spec.SUPPLIER_STOCK_CONFIGURATION) not in state.events
-    assert state.configuration == state.original
-    assert state.dirty is True
-    assert state.adapter.currentModel is state.drawing
-
-
-def test_supplier_stock_source_scope_refuses_equal_name_wrong_drawing_view_identity(
-    supplier_stock_source_state,
-) -> None:
-    state = supplier_stock_source_state
-    state.wrong_view_identity = True
-    calls = []
-    with pytest.raises(RuntimeError, match="drawing sheet/view/edit context"):
-        with draw._supplier_stock_source_scope(
-            state.adapter, state.view, capture=state.capture,
-        ):
-            calls.append("unexpected")
-    assert calls == []
-    assert state.configuration == state.original
-    assert state.adapter.currentModel is state.drawing
-
-
-@pytest.mark.parametrize(
-    "fault",
-    ("read_only", "path", "members", "stock_bodies", "binding_cfg", "binding_doc",
-     "binding_path", "edit_context"),
-)
-def test_supplier_stock_source_scope_refuses_invalid_entry_without_callback(
-    supplier_stock_source_state, fault,
-) -> None:
-    state = supplier_stock_source_state
-    if fault == "read_only":
-        state.read_only = False
-    elif fault == "path":
-        state.path = state.path.with_name("unexpected.SLDPRT")
-    elif fault == "members":
-        state.members += ("UnexpectedConfiguration",)
-    elif fault == "stock_bodies":
-        state.body_counts[spec.SUPPLIER_STOCK_CONFIGURATION] = (1, 0)
-    elif fault == "binding_cfg":
-        state.view.ReferencedConfiguration = "Default"
-    elif fault == "binding_doc":
-        state.view.ReferencedDocument = object()
-    elif fault == "binding_path":
-        state.view.GetReferencedModelName = lambda: "unexpected.SLDPRT"
-    else:
-        state.edit_sheet = False
-    calls = []
-    with pytest.raises(RuntimeError):
-        with draw._supplier_stock_source_scope(
-            state.adapter, state.view, capture=state.capture,
-        ):
-            calls.append("unexpected")
-    assert calls == []
-    assert state.configuration == state.original
-    assert state.adapter.currentModel is state.drawing
-
-
-def test_supplier_stock_source_scope_keeps_equal_xyz_distinct_native_identity_refusal(
-    supplier_stock_source_state, supplier_attachment_state, monkeypatch,
-) -> None:
-    source, attachment = supplier_stock_source_state, supplier_attachment_state
-    source.bind_view(attachment.view)
-    predicate_same = attachment.adapter.swApp.IsSame
-    source.adapter.swApp.IsSame = lambda left, right: (
-        predicate_same(left, right)
-        if hasattr(left, "token") and hasattr(right, "token") else int(left is right)
-    )
-    original_source_feature = supplier_dimensions._assert_dimension_source
-
-    def source_feature(*args, **kwargs):
-        assert source.configuration == spec.SUPPLIER_STOCK_CONFIGURATION
-        assert source.adapter.currentModel is source.drawing
-        return original_source_feature(*args, **kwargs)
-
-    monkeypatch.setattr(supplier_dimensions, "_assert_dimension_source", source_feature)
-    assert attachment.attached[0].xyz == attachment.mapped_points[0].xyz
-    assert attachment.attached[0].token != attachment.mapped_points[0].token
-    with pytest.raises(
-        RuntimeError, match="nominal supplier attachment changed source sketch",
-    ) as refused:
-        with draw._supplier_stock_source_scope(
-            source.adapter, source.view, capture=source.capture,
-        ):
-            supplier_dimensions._assert_source(
-                source.adapter, source.view, attachment.display,
-                name="SupplierStockLength", feature="SupplierReference",
-            )
-    assert source.configuration == source.original
-    assert source.adapter.currentModel is source.drawing
-    assert attachment.captures[0]["exception"] is refused.value
-    proof = attachment.captures[0]["attachment_context"]["attachment_correspondence"]
-    assert proof["proven"] is False
-    assert attachment.private_cache == {}
-
-
-@pytest.fixture
-def supplier_stock_inset(monkeypatch, request, supplier_stock_source_state):
-    """Synthetic layout ink; real local source scope, no attachment-proof substitute."""
-    options = getattr(request, "param", {})
-    monkeypatch.setattr(draw, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(draw, "double_array", tuple)
-    view = _SupplierStockNativeView(
-        fresh=options.get("fresh", False),
-        move_annotations=options.get("move_annotations", True),
-    )
-    source_state = supplier_stock_source_state
-    source_state.bind_view(view)
-    rebuilds, redraws = [], []
-    drawing = source_state.drawing
-    drawing.EditRebuild3 = lambda: True
-    drawing.GraphicsRedraw2 = lambda: redraws.append("redraw")
-    adapter = source_state.adapter
-    events, messages, allowance_reads, annotation_cells = [], [], [], []
-    projections, geometry_reads, reacquisitions = [], [], []
-    caption_position = [0.140, 0.264, 0.007]
-    caption_moves, caption_extents = [], []
-    monkeypatch.setattr(draw._telemetry, "info", messages.append)
-
-    def caption_extent():
-        x, y, z = caption_position
-        extent = (x + 0.0012, y - 0.004, z, x + 0.0732, y + 0.005, z)
-        caption_extents.append(extent)
-        return extent
-
-    def set_caption_position(*position):
-        caption_moves.append(position)
-        caption_position[:] = position
-        return True
-
-    caption_annotation = SimpleNamespace(
-        OwnerType=1, GetPosition=lambda: tuple(caption_position),
-        SetPosition2=set_caption_position,
-    )
-    note = SimpleNamespace(
-        GetText=lambda: draw.SUPPLIER_STOCK_CAPTION,
-        GetAnnotation=lambda: caption_annotation, GetExtent=caption_extent,
-    )
-
-    def source_centers():
-        x, y = view.Position
-        origin = y + view.curve_offset - 0.0004
-        return {
-            "SupplierStockLength": (x, origin),
-            "SupplierStockDiameter": (x, origin),
-            "SupplierThreadPitch": (x, origin + 0.0012),
-        }
-
-    class Annotation:
-        def __init__(self, display, name):
-            self.display, self.name = display, name
-            self.position = (1.0, 1.0, 0.0)
-            self.line_anchor = None
-            self.moves = []
-            self.omit_callout = False
-            self.extra_lines = []
-
-        def SetPosition2(self, x, y, z):
-            self.moves.append((self.display.OffsetText, (x, y, z)))
-            self.position = (x, y, z)
-            if not self.display.OffsetText:
-                self.line_anchor = (x, y)
-            return True
-
-        def GetPosition(self):
-            return self.position
-
-        def translate(self, dx, dy):
-            x, y, z = self.position
-            self.position = (x + dx, y + dy, z)
-            if self.line_anchor is not None:
-                x, y = self.line_anchor
-                self.line_anchor = (x + dx, y + dy)
-
-        def texts(self):
-            extra = options.get("glyph_extra", 0.0)
-            shift_x, shift_y = options.get("glyph_shift", (0.0, 0.0))
-            callout = spec.SUPPLIER_REFERENCE_FORMATS[self.name][3]
-            if self.name == "SupplierStockDiameter":
-                rows = [
-                    ("Ø8 mm", 0.004, -0.006, 0.012, math.pi / 2),
-                    (callout, 0.0, -0.015 - extra / 2, 0.030 + extra, math.pi / 2),
-                ]
-            else:
-                length = self.name == "SupplierStockLength"
-                rows = [
-                    ("600 mm" if length else "2 mm",
-                     -0.007 if length else -0.004, 0.002, 0.014, 0.0),
-                    (callout, -0.015 if length else -0.016,
-                     (-0.004 if length else -0.005) - extra,
-                     0.030 if length else 0.032, 0.0),
-                ]
-            x, y, z = self.position
-            return [
-                {"t": text, "pos": (x + rx + shift_x, y + ry + shift_y, z),
-                 "h": 0.003, "w": width, "ang": angle, "ref": 1}
-                for text, rx, ry, width, angle in rows[:1 if self.omit_callout else 2]
-            ]
-
-        def text_box(self):
-            return draw.display_box({"texts": self.texts()})
-
-        def lines(self):
-            x, y = source_centers()[self.name]
-            ax, ay = self.line_anchor
-            text = self.text_box()
-            if self.name == "SupplierStockDiameter":
-                ends = ((x, y - 0.0004), (x, y + 0.0004))
-                arrows = ((ax, ends[0][1]), (ax, ends[1][1]))
-                leader = ((ax, y), (text.xmin, text.ymin))
-            else:
-                half = 0.030 if self.name == "SupplierStockLength" else 0.0001
-                ends = ((x - half, y), (x + half, y))
-                arrows = ((ends[0][0], ay), (ends[1][0], ay))
-                leader = ((x, ay), (text.center()[0], text.ymin))
-            segments = [*zip(ends, arrows, strict=True), arrows, leader, *self.extra_lines]
-            return [
-                [0.0, 0.0, 0.0, 0.0, a[0], a[1], 0.0, b[0], b[1], 0.0]
-                for a, b in segments
-            ]
-
-    displays, annotations = {}, {}
-    for name, _, _ in spec.SUPPLIER_REFERENCE_DIMENSIONS:
-        display = SimpleNamespace(OffsetText=False)
-        annotation = Annotation(display, name)
-        display.GetAnnotation = lambda annotation=annotation: annotation
-        displays[name], annotations[name] = display, annotation
-    view.annotations = list(annotations.values())
-
-    def annotation_geometry(_adapter, annotation):
-        geometry_reads.append(annotation.name)
-        return {"texts": annotation.texts(), "lines": annotation.lines()}, []
-
-    def project(_adapter, native_view, points, **_kwargs):
-        assert native_view is view
-        projections.append(points)
-        origin = view.Position[1] + view.curve_offset - 0.0004
-        return [(view.Position[0] + x * 0.1, origin + y * 0.1) for x, y, _z in points]
-
-    def placed(_adapter, source, orientation, *center, scale):
-        assert source == str(draw.SOURCE) and orientation == "*Front"
-        assert center == draw.SUPPLIER_STOCK_CENTER and scale == (1, 10)
-        view.Position = center
-        return view
-
-    def capture(_adapter, native_draw, views, **kwargs):
-        assert native_draw is drawing and views == {"*Front": view}
-        assert kwargs["source"] == draw.SOURCE
-        assert kwargs["model"] is view.ReferencedDocument
-        assert kwargs["features"] == {"*Front": ("SupplierReference",)}
-        assert kwargs["configurations"] == {
-            "*Front": spec.SUPPLIER_STOCK_CONFIGURATION
-        }
-        events.append("capture")
-        return {"*Front": source_state.capture}
-
-    def bounds(_adapter, native_view, **kwargs):
-        assert native_view is view and kwargs["capture"] is source_state.capture
-        assert source_state.configuration == source_state.original
-        assert adapter.currentModel is drawing
-        source_state.events.append(("layout", source_state.configuration))
-        allowance_reads.append(kwargs["allow_presentation_dirty"])
-        if not kwargs["allow_presentation_dirty"]:
-            assert events == ["capture"] and source_state.dirty is False
-        view.UpdateViewDisplayGeometry()
-        return view.reference_bounds()
-
-    def annotate(_adapter, views, **kwargs):
-        assert views == {"*Front": view} and events == ["capture"]
-        assert source_state.configuration == spec.SUPPLIER_STOCK_CONFIGURATION
-        assert adapter.currentModel is drawing
-        assert source_state.dirty is state.dirty_before_author
-        source_state.events.append(("annotation", source_state.configuration))
-        assert kwargs["dimensions"] is spec.SUPPLIER_REFERENCE_DIMENSIONS
-        assert kwargs["formats"] is spec.SUPPLIER_REFERENCE_FORMATS
-        assert kwargs["starts"] is spec.SUPPLIER_REFERENCE_STARTS
-        assert kwargs["units"] is spec.SUPPLIER_REFERENCE_UNITS
-        events.append("format")
-        source_state.dirty = True
-
-        def check_source():
-            assert source_state.configuration == spec.SUPPLIER_STOCK_CONFIGURATION
-            assert adapter.currentModel is drawing
-            source_state.events.append(("source check", source_state.configuration))
-            events.append("source check")
-
-        kwargs["settled_checks"].append(check_source)
-        return displays
-
-    def reacquire(_adapter, views, **kwargs):
-        assert views == {"*Front": view}
-        assert kwargs["expected"] == {"*Front": {
-            name: "SupplierReference" for name in displays
-        }}
-        assert kwargs["configurations"] == {
-            "*Front": spec.SUPPLIER_STOCK_CONFIGURATION
-        }
-        reacquisitions.append("native inventory")
-        return displays
-
-    def add_caption(_adapter, text, *xy):
-        assert text == draw.SUPPLIER_STOCK_CAPTION
-        assert xy == draw.SUPPLIER_STOCK_CAPTION_XY
-        return note
-
-    def annotations_fit(_adapter, native_view, cell, **_kwargs):
-        assert native_view is view
-        annotation_cells.append(cell)
-        for annotation in annotations.values():
-            data, _refused = annotation_geometry(adapter, annotation)
-            ink = draw.display_box(data)
-            if not draw._inside((ink.xmin, ink.ymin, ink.xmax, ink.ymax), cell):
-                raise RuntimeError("supplier annotation leaves its caption-free cell")
-
-    monkeypatch.setattr(draw, "place_view", placed)
-    monkeypatch.setattr(draw, "set_hidden_lines_removed", lambda *_args: None)
-    monkeypatch.setattr(
-        draw, "rebuild_drawing", lambda *_args, label: rebuilds.append(label)
-    )
-    monkeypatch.setattr(
-        draw, "_show_hidden_owners",
-        lambda _adapter, _view, owners, **_kwargs: list(owners),
-    )
-    monkeypatch.setattr(draw, "_capture_reference_views", capture)
-    monkeypatch.setattr(draw, "_reference_view_bounds", bounds)
-    monkeypatch.setattr(draw, "annotate_supplier_screw", annotate)
-    monkeypatch.setattr(draw, "reacquire_supplier_dimensions", reacquire)
-    monkeypatch.setattr(draw, "model_points_in_view", project)
-    monkeypatch.setattr(draw, "annotation_display", annotation_geometry)
-    monkeypatch.setattr(draw, "add_note", add_caption)
-    monkeypatch.setattr(draw, "assert_supplier_annotations_fit", annotations_fit)
-    state = SimpleNamespace(
-        view=view, note=note, owner=caption_annotation, events=events,
-        messages=messages, allowance_reads=allowance_reads,
-        annotations=annotations, displays=displays, projections=projections,
-        annotation_cells=annotation_cells, caption_position=caption_position,
-        caption_moves=caption_moves, caption_extents=caption_extents,
-        redraws=redraws, rebuilds=rebuilds, geometry_reads=geometry_reads,
-        reacquisitions=reacquisitions, adapter=adapter,
-        source_state=source_state, dirty_before_author=False,
-        defer_presentation=options.get("defer_presentation", False), closed=False,
-    )
-
-    def prepare():
-        state.author = draw._prepare_supplier_stock_inset(adapter)
-        return state.author
-
-    def create():
-        prepare()
-        state.settled = state.author()
-        return state.settled
-
-    state.create = create
-    state.prepare = prepare
-    if not options.get("defer", False):
-        create()
-    return state
-
-
-@pytest.fixture
-def supplier_stock_presentation(monkeypatch, supplier_stock_inset):
-    """Real shared all-three strict guards after synthetic owned layout.
-
-    Distinct native display wrappers expose any stale cached-display check.
-    Attachment endpoint identity has independent substantive coverage below.
-    """
-    state = supplier_stock_inset
-    source = state.source_state
-    reads, view_reads = [], []
-    stock = spec.SUPPLIER_STOCK_CONFIGURATION
-
-    def observe(member, value):
-        assert source.configuration == stock
-        assert state.adapter.currentModel is source.drawing
-        assert not state.closed, "closed native drawing handle was used"
-        reads.append(member)
-        if isinstance(value, Exception):
-            raise value
-        return value
-
-    class Display:
-        def __init__(self, name, dimension):
-            precision, presentation, denominator, callout = spec.SUPPLIER_REFERENCE_FORMATS[name]
-            self.values = {
-                "GetUseDocUnits": False, "GetUnits": 0,
-                "GetPrimaryPrecision2": precision,
-                "GetFractionBase": 2 if denominator else 1,
-                "ShowParenthesis": False, "GetOverride": False, "ShowDimensionValue": True,
-                "GetFractionValue": denominator or -1, "GetRoundToFraction": False,
-                "GetUseDocPrecision": False, "GetPrimaryTolPrecision2": 2,
-                "GetAlternatePrecision2": 3, "GetAlternateTolPrecision2": 4, "Type2": 2,
-            }
-            self.text = {
-                1: "(<MOD-DIAM>" if presentation == "diameter" else "(",
-                2: " mm)", 4: callout,
-            }
-            self.dimension, self.name = dimension, name
-            self.original_text = self.text.copy()
-
-        @property
-        def ShowParenthesis(self):
-            return observe("ShowParenthesis", self.values["ShowParenthesis"])
-
-        @ShowParenthesis.setter
-        def ShowParenthesis(self, value):
-            assert source.configuration == stock and not state.closed
-            self.values["ShowParenthesis"] = value
-
-        def __getattr__(self, member):
-            if member not in self.values:
-                raise AttributeError(member)
-            if member.startswith("Get"):
-                return lambda: observe(member, self.values[member])
-            return observe(member, self.values[member])
-
-        def GetText(self, part):
-            return observe(f"GetText({part})", self.text[part])
-
-        def GetDimension2(self, index):
-            assert index == 0
-            return self.dimension
-
-        def GetAnnotation(self):
-            return state.annotations[self.name]
-
-        def SetUnits2(self, *args):
-            assert source.configuration == stock and not state.closed
-            state.format_calls.append((self.name, "SetUnits2", args))
-            use_document, units, fraction, _denominator, _round, _rounding = args
-            self.values.update(
-                GetUseDocUnits=use_document, GetUnits=units, GetFractionBase=fraction,
-            )
-            return 0
-
-        def SetPrecision3(self, *args):
-            assert source.configuration == stock and not state.closed
-            state.format_calls.append((self.name, "SetPrecision3", args))
-            self.values["GetPrimaryPrecision2"] = args[0]
-            return 0
-
-        def SetText(self, part, text):
-            assert source.configuration == stock and not state.closed
-            state.format_calls.append((self.name, "SetText", (part, text)))
-            self.text[part] = text
-
-    settled_displays, parameters = {}, {}
-    for name, value, _orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS:
-        tolerance = SimpleNamespace(
-            Type=0, GetMinValue=lambda: -0.0001, GetMaxValue=lambda: 0.0002,
-        )
-
-        def system_value(configuration_option, configuration, value=value):
-            assert configuration_option == 3 and configuration == stock
-            return (value / 1000.0,)
-
-        dimension = SimpleNamespace(
-            FullName=f"{name}@SupplierReference@Source.SLDPRT",
-            GetSystemValue3=system_value, Tolerance=tolerance,
-        )
-        parameters[f"{name}@SupplierReference"] = dimension
-        settled_displays[name] = Display(name, dimension)
-        annotation = state.annotations[name]
-        annotation.GetType = lambda: 4
-        annotation.GetSpecificAnnotation = lambda name=name: settled_displays[name]
-        annotation.IsDangling = lambda: False
-        annotation.Visible, annotation.OwnerType, annotation.Owner = 1, 0, state.view
-        annotation.GetAttachedEntities3 = lambda: (object(), object())
-        annotation.GetAttachedEntityTypes = lambda: (11, 11)
-        annotation.GetAttachedEntityCount3 = lambda: 2
-
-    source.model.Parameter = parameters.__getitem__
-    state.view.GetOrientationName = lambda: "*Front"
-
-    def annotations():
-        assert not state.closed, "closed native view inventory was used"
-        view_reads.append("settled annotations")
-        return state.view.annotations
-
-    state.view.GetAnnotations = annotations
-
-    for module in (supplier_dimensions, supplier_presentation):
-        monkeypatch.setattr(module, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(supplier_dimensions, "iter_views", lambda _adapter: (state.view,))
-    monkeypatch.setattr(supplier_dimensions, "view_name", lambda _adapter, view: view.GetName2())
-
-    def source_identity(_adapter, view, display, *, name, feature):
-        assert view is state.view and source.configuration == stock
-        annotation = display.GetAnnotation()
-        if (
-            annotation.Owner is not view or annotation.OwnerType != 0
-            or display.GetDimension2(0) is not source.model.Parameter(f"{name}@{feature}")
-        ):
-            raise RuntimeError("supplier native owner/parameter identity changed")
-
-    monkeypatch.setattr(supplier_dimensions, "_assert_source", source_identity)
-    original_annotate = draw.annotate_supplier_screw
-
-    def annotate(*args, **kwargs):
-        displays = original_annotate(*args, **kwargs)
-        for name, value, _orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS:
-            supplier_presentation.supplier_reference_dimension(
-                state.adapter, settled_displays[name],
-                **supplier_dimensions._reference_settings(
-                    name, "SupplierReference", value,
-                    spec.SUPPLIER_REFERENCE_FORMATS[name],
-                    configuration=stock, units=spec.SUPPLIER_REFERENCE_UNITS[name],
-                ),
-            )
-        binding = (
-            state.view.GetName2(), str(draw.SOURCE.resolve()), stock,
-        )
-        kwargs["settled_checks"].append(
-            lambda: supplier_dimensions.assert_supplier_screw(
-                state.adapter, {"*Front": state.view},
-                dimensions=spec.SUPPLIER_REFERENCE_DIMENSIONS,
-                formats=spec.SUPPLIER_REFERENCE_FORMATS,
-                units=spec.SUPPLIER_REFERENCE_UNITS,
-                _bindings={"*Front": binding},
-            )
-        )
-        return displays
-
-    monkeypatch.setattr(draw, "annotate_supplier_screw", annotate)
-    state.presentation_reads = reads
-    state.settled_view_reads = view_reads
-    state.settled_displays = settled_displays
-    state.format_calls = []
-    if not getattr(state, "defer_presentation", False):
-        state.create()
-    return state
-
-
-@pytest.mark.parametrize("supplier_stock_inset", [{"defer": True}], indirect=True)
-@pytest.mark.parametrize("name", [row[0] for row in spec.SUPPLIER_REFERENCE_DIMENSIONS])
-@pytest.mark.parametrize(
-    "field,actual",
-    (
-        ("GetUseDocUnits", True), ("GetUnits", 3), ("GetPrimaryPrecision2", 2),
-        ("GetFractionBase", 2), ("ShowParenthesis", True), ("GetOverride", True),
-        ("ShowDimensionValue", False), ("GetText(1)", ""), ("GetText(2)", " in)"),
-        ("GetText(4)", "OTHER CALLOUT"),
-    ),
-)
-def test_supplier_stock_presentation_refuses_without_repair_and_restores_source(
-    supplier_stock_presentation, name, field, actual,
-) -> None:
-    state = supplier_stock_presentation
-    display = state.settled_displays[name]
-    if field.startswith("GetText("):
-        display.text[int(field[8])] = actual
-    else:
-        display.values[field] = actual
-    rebuilds, moves = tuple(state.rebuilds), tuple(state.view.moves)
-    with pytest.raises(RuntimeError, match="native supplier presentation differs"):
-        state.settled()
-    assert tuple(state.rebuilds) == rebuilds
-    assert tuple(state.view.moves) == moves
-    assert state.events.count("format") == 1
-    assert state.source_state.configuration == state.source_state.original
-    assert state.adapter.currentModel is state.source_state.drawing
-    if field.startswith("GetText("):
-        assert display.text[int(field[8])] == actual
-    else:
-        assert display.values[field] == actual
-
-
-@pytest.mark.parametrize("supplier_stock_inset", [{"defer": True}], indirect=True)
-@pytest.mark.parametrize("name", [row[0] for row in spec.SUPPLIER_REFERENCE_DIMENSIONS])
-@pytest.mark.parametrize("fault", ("owner", "native_identity", "value", "attachment"))
-def test_supplier_stock_all_three_keep_native_identity_value_and_attachment_guards(
-    supplier_stock_presentation, name, fault,
-) -> None:
-    state = supplier_stock_presentation
-    display = state.settled_displays[name]
-    annotation = state.annotations[name]
-    if fault == "owner":
-        annotation.Owner = object()
-    elif fault == "native_identity":
-        original = display.dimension
-        display.dimension = SimpleNamespace(
-            FullName=original.FullName, GetSystemValue3=original.GetSystemValue3,
-            Tolerance=original.Tolerance,
-        )
-    elif fault == "value":
-        display.dimension.GetSystemValue3 = lambda *_args: (0.123456,)
-    else:
-        annotation.IsDangling = lambda: True
-    formatted = tuple(state.format_calls)
-    with pytest.raises(RuntimeError):
-        state.settled()
-    assert tuple(state.format_calls) == formatted
-    assert state.events.count("format") == 1
-    assert state.source_state.configuration == state.source_state.original
-    assert state.adapter.currentModel is state.source_state.drawing
 
 
 @pytest.fixture
@@ -1951,107 +889,45 @@ def test_number_title_cannot_fit_below_unchanged_three_mm_floor(number_title_nat
 
 
 @pytest.fixture
-def supplier_stock_lifecycle(monkeypatch, supplier_stock_presentation):
-    """Drive the real builder and original formatter through native-like events."""
-    state = supplier_stock_presentation
-    source = state.source_state
-    assert state.events == [] and state.format_calls == []
-    state.lifecycle, state.check_batches = [], []
-    state.mutate_at = state.save_failure = None
-    state.duplicate_before = state.reenter = False
-    state.number_calls, state.number_mutate_at, state.number_changed = [], None, False
-    state.builder_properties = {
-        "Number": ROW["number"], "Supplier": "supplier", "Supplier SKUs": "sku",
-    }
-    state.primary = RuntimeError("native save primary")
-    state.real_number_fit = draw._fit_number_title_note
-    original_prepare = draw._prepare_supplier_stock_inset
-    original_place = draw.place_view
-    original_annotate = draw.annotate_supplier_screw
-    original_note = draw.add_note
-
-    def reset(stage):
-        # Model later manufacturing/finalizer invalidation. An early import
-        # would lose its text here; the candidate must not have imported yet.
-        assert state.events == ["capture"]
-        assert state.format_calls == []
-        state.lifecycle.append(stage)
-        for display in state.settled_displays.values():
-            display.text.update({1: "", 2: "", 4: ""})
-        source.dirty = state.dirty_before_author = True
+def leadscrew_lifecycle(monkeypatch):
+    """Drive the real builder through a native-shaped finalizer; spy the Number."""
+    state = SimpleNamespace(
+        lifecycle=[], number_calls=[], notes=[], number_mutate_at=None,
+        number_changed=False, save_failure=None, closed=False,
+        primary=RuntimeError("native save primary"),
+        properties={
+            "Number": ROW["number"], "Supplier": "supplier", "Supplier SKUs": "sku",
+        },
+    )
+    source = SimpleNamespace(
+        GetSaveFlag=lambda: False,
+        GetPathName=lambda: str(draw.SOURCE),
+        IsOpenedReadOnly=lambda: True,
+    )
+    drawing = SimpleNamespace(EditRebuild3=lambda: True)
+    adapter = SimpleNamespace(currentModel=drawing)
 
     def mutate(stage):
-        if state.mutate_at == stage:
-            state.settled_displays["SupplierStockLength"].text[4] = ""
-            state.lifecycle.append(f"mutate {stage}")
         if state.number_mutate_at == stage:
             state.number_changed = True
 
-    def prepare(adapter):
-        author = original_prepare(adapter)
-        state.author = author
-        state.lifecycle.append("capture")
+    def step(name):
+        def record(*_args, **_kwargs):
+            state.lifecycle.append(name)
+            return []
 
-        def once():
-            check = author()
-            mutate("afterauthor")
+        return record
 
-            def strict():
-                assert not state.closed, "strict check touched closed COM"
-                state.lifecycle.append("strict")
-                before = len(state.presentation_reads)
-                check()
-                batch = state.presentation_reads[before:]
-                assert batch.count("GetText(4)") == 3
-                state.check_batches.append(tuple(
-                    (name, display.text.copy())
-                    for name, display in state.settled_displays.items()
-                ))
+    def note(_adapter, text, *xy):
+        state.notes.append((text, xy))
+        printed = text.replace(property_link("Supplier SKUs"), "sku").replace(
+            property_link("Supplier"), "supplier"
+        )
+        return SimpleNamespace(GetText=lambda: printed.replace("\n", "\r\n"))
 
-            return strict
-
-        return once
-
-    def annotate(*args, **kwargs):
-        state.lifecycle.append("author")
-        if state.reenter:
-            state.checkpoint("before_drawing_save")
-        if state.save_failure == "author":
-            raise state.primary
-        return original_annotate(*args, **kwargs)
-
-    def placed(adapter, path, orientation, *center, scale):
-        if center == draw.SUPPLIER_STOCK_CENTER:
-            return original_place(adapter, path, orientation, *center, scale=scale)
-        return SimpleNamespace(Angle=0.0)
-
-    def controls(*_args, **_kwargs):
-        reset("main reset")
-        return []
-
-    def sections(*_args):
-        reset("section reset")
-        return []
-
-    def details(*_args):
-        reset("detail reset")
-        return []
-
-    def note(adapter, text, *xy):
-        if text == draw.SUPPLIER_STOCK_CAPTION:
-            return original_note(adapter, text, *xy)
-        return SimpleNamespace(GetText=lambda: (
-            f"ITEM: {draw.ITEM}\nSUPPLIER: supplier\nSKU: sku"
-        ))
-
-    def fit_number(adapter, *, expected_number):
-        # The separate native-shaped fixture exercises the real canonical fit.
-        # Here a pure returned-check spy observes builder/finalizer ordering
-        # without replacing any supplier authoring or presentation proof.
-        assert adapter is state.adapter
-        assert expected_number == state.builder_properties["Number"]
-        assert state.lifecycle[-1] == "detail reset"
-        assert state.events == ["capture"] and state.format_calls == []
+    def fit_number(actual, *, expected_number):
+        assert actual is adapter
+        assert expected_number == state.properties["Number"]
         state.number_calls.append(("fit", tuple(state.lifecycle)))
 
         def pure():
@@ -2063,53 +939,39 @@ def supplier_stock_lifecycle(monkeypatch, supplier_stock_presentation):
         return pure
 
     async def finalize(_adapter, outputs, *, settled_checks, checkpoint, **_kwargs):
-        state.checkpoint = checkpoint
-        reset("finalizer reset")
+        state.lifecycle.append("finalizer")
         mutate("finalizer")
         for check in settled_checks:
             check()
-        assert state.events == ["capture"] and state.format_calls == []
         for kind in ("drawing", "pdf"):
             with drawing_common._drawing_checkpoint(checkpoint, f"{kind}_save"):
-                if kind == "drawing" and state.duplicate_before:
-                    checkpoint("before_drawing_save")
                 state.lifecycle.append(f"{kind} save")
                 mutate(kind)
                 if state.save_failure == kind:
                     raise state.primary
-        # This is the existing audit1134 slot, after the PDF/PNG export and
-        # before close. It must observe authored native ink, not run twice.
-        state.lifecycle.append("audit")
-        assert not state.closed
-        assert all(
-            display.text == display.original_text
-            for display in state.settled_displays.values()
-        )
         mutate("beforeclose")
         with drawing_common._drawing_checkpoint(checkpoint, "drawing_close"):
             state.lifecycle.append("close")
             state.closed = True
         return {"drawing": str(outputs.slddrw), "pdf": str(outputs.pdf), "png": str(outputs.png)}
 
-    def pdf_proof(path):
-        assert path == draw.OUTPUTS.pdf and state.closed
-        state.lifecycle.append("pdf proof")
-
-    monkeypatch.setattr(draw, "_prepare_supplier_stock_inset", prepare)
-    monkeypatch.setattr(draw, "annotate_supplier_screw", annotate)
-    monkeypatch.setattr(draw, "place_view", placed)
+    monkeypatch.setattr(draw, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(draw, "active_configuration_name", lambda *_args: "Installed")
     monkeypatch.setattr(
-        draw, "read_required_properties", lambda *_args, **_kwargs: state.builder_properties,
+        draw, "read_required_properties", lambda *_args, **_kwargs: state.properties,
     )
-    monkeypatch.setattr(draw, "_fit_number_title_note", fit_number)
     monkeypatch.setattr(draw, "new_project_drawing", lambda *_args, **_kwargs: (
-        source.drawing, object(),
+        drawing, object(),
     ))
     monkeypatch.setattr(draw, "stamp_drawing_summary", lambda *_args: None)
+    monkeypatch.setattr(
+        draw, "place_view", lambda *_args, **_kwargs: SimpleNamespace(Angle=0.0),
+    )
     monkeypatch.setattr(draw, "_center_view", lambda *_args: None)
-    monkeypatch.setattr(draw, "curate_view_dimensions", controls)
-    monkeypatch.setattr(draw, "_add_clock_sections", sections)
-    monkeypatch.setattr(draw, "_add_end_details", details)
+    monkeypatch.setattr(draw, "set_hidden_lines_removed", lambda *_args: None)
+    monkeypatch.setattr(draw, "curate_view_dimensions", step("main controls"))
+    monkeypatch.setattr(draw, "_add_clock_sections", step("sections"))
+    monkeypatch.setattr(draw, "_add_end_details", step("details"))
     monkeypatch.setattr(draw, "verify_machining_controls", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(draw, "set_dimension_callouts", lambda *_args: None)
     monkeypatch.setattr(draw, "add_view_centerline", lambda *_args, **_kwargs: None)
@@ -2117,497 +979,78 @@ def supplier_stock_lifecycle(monkeypatch, supplier_stock_presentation):
     monkeypatch.setattr(draw, "add_leader_note", lambda *_args, **_kwargs: SimpleNamespace(
         GetText=lambda: draw.THREAD_CALLOUT,
     ))
+    monkeypatch.setattr(draw, "_fit_number_title_note", fit_number)
     monkeypatch.setattr(draw, "finalize_drawing", finalize)
-    monkeypatch.setattr(draw, "_assert_supplier_stock_pdf", pdf_proof)
-    state.run = lambda: asyncio.run(draw._build_read_only_source(
-        state.adapter, source.model, source.original,
-    ))
+    state.run = lambda: asyncio.run(
+        draw._build_read_only_source(adapter, source, "Installed")
+    )
     return state
 
 
-@pytest.mark.parametrize(
-    "supplier_stock_inset", [{"defer": True, "defer_presentation": True}], indirect=True,
-)
-class TestSupplierStockLateLifecycle:
-    def test_authors_once_after_resets_and_audit_sees_ink_before_close(
-        self, supplier_stock_lifecycle,
-    ):
-        state = supplier_stock_lifecycle
-        assert set(state.run()) == {"drawing", "pdf", "png"}
-        assert state.lifecycle == [
-            "capture", "main reset", "section reset", "detail reset", "finalizer reset",
-            "author", "strict", "drawing save", "strict", "pdf save", "strict",
-            "audit", "strict", "close", "pdf proof",
-        ]
-        assert len(state.check_batches) == 4
-        assert state.events.count("format") == 1
-        for name, _value, _orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS:
-            calls = [row[1:] for row in state.format_calls if row[0] == name]
-            assert calls == [
-                ("SetUnits2", (False, 0, 1, 0, False, 0)),
-                ("SetPrecision3", (0, -1, -1, -1)),
-                ("SetText", (1, "(<MOD-DIAM>" if name == "SupplierStockDiameter" else "(")),
-                ("SetText", (2, " mm)")),
-                ("SetText", (4, spec.SUPPLIER_REFERENCE_FORMATS[name][3])),
-            ]
-        source = state.source_state
-        assert source.configuration == source.original and source.read_only is True
-        assert state.adapter.currentModel is source.drawing
-        assert source.sheet == "OriginalSheet" and source.edit_sheet is True
-        assert source.active_view is None
-
-    def test_number_fits_once_before_finalizer_and_checks_only_live_boundaries(
-        self, supplier_stock_lifecycle,
-    ):
-        state = supplier_stock_lifecycle
-        state.builder_properties["Number"] = "COMPLETE-ALTERNATE-SOURCE-NUMBER"
-        state.run()
-        assert [kind for kind, _events in state.number_calls] == ["fit"] + ["check"] * 5
-        assert state.number_calls[0][1] == (
-            "capture", "main reset", "section reset", "detail reset",
-        )
-        snapshots = [events for kind, events in state.number_calls if kind == "check"]
-        assert snapshots[0][-1] == "finalizer reset"
-        assert [events.count("strict") for events in snapshots] == [0, 1, 2, 3, 4]
-        assert snapshots[1][-2:] == ("author", "strict")
-        assert snapshots[2][-2:] == ("drawing save", "strict")
-        assert snapshots[3][-2:] == ("pdf save", "strict")
-        assert snapshots[4][-2:] == ("audit", "strict")
-        assert all("close" not in events and "pdf proof" not in events for events in snapshots)
-        assert state.lifecycle.count("author") == state.events.count("format") == 1
-        assert state.closed and state.lifecycle[-1] == "pdf proof"
-
-    @pytest.mark.parametrize("stage", (
-        "finalizer", "afterauthor", "drawing", "pdf", "beforeclose",
-    ))
-    def test_number_drift_refuses_at_each_boundary_without_refit_or_reauthor(
-        self, supplier_stock_lifecycle, stage,
-    ):
-        state = supplier_stock_lifecycle
-        state.number_mutate_at = stage
-        with pytest.raises(RuntimeError, match="Number presentation drift"):
-            state.run()
-        assert [kind for kind, _events in state.number_calls].count("fit") == 1
-        authors = 0 if stage == "finalizer" else 1
-        assert state.lifecycle.count("author") == state.events.count("format") == authors
-        assert "close" not in state.lifecycle and "pdf proof" not in state.lifecycle
-        assert state.source_state.sheet == "OriginalSheet"
-        assert state.adapter.currentModel is state.source_state.drawing
-
-    @pytest.mark.parametrize("kind", ("drawing", "pdf"))
-    def test_number_after_save_refusal_keeps_primary_native_failure(
-        self, supplier_stock_lifecycle, kind,
-    ):
-        state = supplier_stock_lifecycle
-        state.save_failure = state.number_mutate_at = kind
-        with pytest.raises(RuntimeError) as refused:
-            state.run()
-        assert refused.value is state.primary
-        assert any(
-            f"after_{kind}_save checkpoint also failed" in note
-            and "Number presentation drift" in note
-            for note in refused.value.__notes__
-        )
-        assert state.lifecycle.count("author") == state.events.count("format") == 1
-        assert [event for event, _events in state.number_calls].count("fit") == 1
-        assert "audit" not in state.lifecycle and "pdf proof" not in state.lifecycle
-
-    @pytest.mark.parametrize("stage", (
-        None, "finalizer", "afterauthor", "drawing", "pdf", "beforeclose",
-    ))
-    def test_real_number_contract_replays_through_builder_native_lifecycle(
-        self, number_title_native, supplier_stock_lifecycle, monkeypatch, stage,
-    ):
-        native, state = number_title_native, supplier_stock_lifecycle
-        source = state.source_state
-        native.adapter, native.drawing = state.adapter, source.drawing
-        native.sheet.name = source.sheet
-        native.number.text = state.builder_properties["Number"]
-        original_sheet = source.drawing.GetCurrentSheet
-        fit_events, check_events = [], []
-
-        def current_sheet():
-            assert not state.closed, "Number sheet read touched closed COM"
-            sheet = original_sheet()
-            return native.sheet if sheet.GetName() == native.sheet.name else sheet
-
-        original_fit = draw._fit_title_note
-
-        def fit(*args, **kwargs):
-            fit_events.append(tuple(state.lifecycle))
-            pure = original_fit(*args, **kwargs)
-
-            def check():
-                assert not state.closed, "canonical Number check touched closed COM"
-                check_events.append(tuple(state.lifecycle))
-                if state.number_changed:
-                    native.number.annotation.format.LineLength = 0.2
-                pure()
-
-            return check
-
-        monkeypatch.setattr(source.drawing, "GetCurrentSheet", current_sheet)
-        monkeypatch.setattr(
-            source.drawing, "GetFirstView", lambda: native.sheet_view, raising=False,
-        )
-        monkeypatch.setattr(draw, "_fit_title_note", fit)
-        monkeypatch.setattr(draw, "_fit_number_title_note", state.real_number_fit)
-        state.number_mutate_at = stage
-        if stage is None:
-            state.run()
-            assert [events.count("strict") for events in check_events] == [0, 1, 2, 3, 4]
-            assert state.closed and state.lifecycle[-1] == "pdf proof"
-        else:
-            with pytest.raises(RuntimeError, match="linked title-cell fit did not persist"):
-                state.run()
-            assert "close" not in state.lifecycle and "pdf proof" not in state.lifecycle
-        assert fit_events == [("capture", "main reset", "section reset", "detail reset")]
-        assert len(native.fit_calls) == 1
-        assert native.fit_calls[0][1:4] == (
-            source.drawing, native.sheet, native.number,
-        )
-        assert native.fit_calls[0][4] == {"label": "Number", "minimum": 0.003}
-        # All later checks, including the post-author one, only read the
-        # canonical fit: no formatting or rebuild re-entry repairs the drift.
-        assert len(native.writes) == 2
-        assert all("close" not in events for events in check_events)
-        authors = 0 if stage == "finalizer" else 1
-        assert state.lifecycle.count("author") == state.events.count("format") == authors
-        assert source.sheet == "OriginalSheet"
-        assert state.adapter.currentModel is source.drawing
-
-    @pytest.mark.parametrize("stage", ("afterauthor", "drawing", "pdf", "beforeclose"))
-    def test_later_text_mutation_is_refused_without_reauthoring(
-        self, supplier_stock_lifecycle, stage,
-    ):
-        state = supplier_stock_lifecycle
-        state.mutate_at = stage
-        with pytest.raises(RuntimeError, match="native supplier presentation differs"):
-            state.run()
-        assert state.lifecycle.count("author") == 1
-        assert state.events.count("format") == 1
-        assert len(state.format_calls) == 15
-        assert state.settled_displays["SupplierStockLength"].text[4] == ""
-        assert state.source_state.configuration == state.source_state.original
-        assert state.adapter.currentModel is state.source_state.drawing
-        assert "close" not in state.lifecycle and "pdf proof" not in state.lifecycle
-
-    @pytest.mark.parametrize("reenter", (False, True))
-    def test_duplicate_before_save_and_reentry_are_consumed_not_retried(
-        self, supplier_stock_lifecycle, reenter,
-    ):
-        state = supplier_stock_lifecycle
-        state.reenter, state.duplicate_before = reenter, not reenter
-        with pytest.raises(RuntimeError, match=(
-            "already consumed: AUTHORING" if reenter else "already consumed: AUTHORED"
-        )):
-            state.run()
-        assert state.lifecycle.count("author") == 1
-        assert state.events.count("format") == (0 if reenter else 1)
-        assert state.source_state.configuration == state.source_state.original
-        assert state.adapter.currentModel is state.source_state.drawing
-        assert "drawing save" not in state.lifecycle
-
-    @pytest.mark.parametrize("kind", ("author", "drawing", "pdf"))
-    def test_primary_failure_survives_after_checkpoint_refusal_and_restores_source(
-        self, supplier_stock_lifecycle, kind,
-    ):
-        state = supplier_stock_lifecycle
-        state.save_failure = kind
-        state.mutate_at = kind
-        with pytest.raises(RuntimeError) as refused:
-            state.run()
-        assert refused.value is state.primary
-        if kind != "author":
-            assert any(
-                f"after_{kind}_save checkpoint also failed" in note
-                for note in refused.value.__notes__
-            )
-        assert state.source_state.configuration == state.source_state.original
-        assert state.adapter.currentModel is state.source_state.drawing
-        assert state.source_state.sheet == "OriginalSheet"
-        assert state.source_state.edit_sheet is True
-        assert state.lifecycle.count("author") == 1
-        assert "audit" not in state.lifecycle and "pdf proof" not in state.lifecycle
-        if kind == "author":
-            with pytest.raises(RuntimeError, match="already consumed: FAILED"):
-                state.author()
-
-
-def test_supplier_stock_source_scope_wires_immediate_and_settled_before_layout(
-    supplier_stock_inset,
+def test_builder_prints_the_note_block_with_the_stock_reference_line(
+    leadscrew_lifecycle,
 ) -> None:
-    state = supplier_stock_inset
-    source = state.source_state
-    stock = spec.SUPPLIER_STOCK_CONFIGURATION
-    assert source.configuration == source.original
-    assert source.dirty is True
-    assert [row for row in source.events if row[0] == "annotation"] == [
-        ("annotation", stock),
+    state = leadscrew_lifecycle
+    assert set(state.run()) == {"drawing", "pdf", "png"}
+    assert state.notes == [(draw.NOTES, draw.NOTES_XY)]
+    assert draw.NOTES.splitlines()[-2:] == draw.STOCK_REFERENCE.splitlines()
+
+
+def test_builder_fits_the_number_once_and_checks_only_live_boundaries(
+    leadscrew_lifecycle,
+) -> None:
+    state = leadscrew_lifecycle
+    state.run()
+    assert [kind for kind, _events in state.number_calls] == ["fit"] + ["check"] * 5
+    assert state.number_calls[0][1] == ("main controls", "sections", "details")
+    snapshots = [events for kind, events in state.number_calls if kind == "check"]
+    # The settled check, before and after the drawing save, after the PDF
+    # save and before close; never once the drawing is closed.
+    assert [events[-1] for events in snapshots] == [
+        "finalizer", "finalizer", "drawing save", "pdf save", "pdf save",
     ]
-    immediate_end = len(source.events)
-    state.settled()
-    assert source.configuration == source.original
-    assert state.adapter.currentModel is source.drawing
-    for callback, rows in (
-        ("annotation", source.events[:immediate_end]),
-        ("source check", source.events[immediate_end:]),
-    ):
-        callback_index = rows.index((callback, stock))
-        stock_index = rows.index(("configuration", stock))
-        restored_index = rows.index(("configuration", source.original))
-        assert stock_index < callback_index < restored_index
-        assert any(row[0] == "layout" for row in rows[restored_index + 1:])
-    assert all(
-        row[1] == source.original for row in source.events if row[0] == "layout"
+    assert all("close" not in events for events in snapshots)
+    assert state.closed and state.lifecycle[-1] == "close"
+
+
+@pytest.mark.parametrize("stage", ("finalizer", "drawing", "pdf", "beforeclose"))
+def test_number_drift_refuses_at_each_boundary_without_refit(
+    leadscrew_lifecycle, stage,
+) -> None:
+    state = leadscrew_lifecycle
+    state.number_mutate_at = stage
+    with pytest.raises(RuntimeError, match="Number presentation drift"):
+        state.run()
+    assert [kind for kind, _events in state.number_calls].count("fit") == 1
+    assert "close" not in state.lifecycle
+
+
+@pytest.mark.parametrize("kind", ("drawing", "pdf"))
+def test_number_after_save_refusal_keeps_primary_native_failure(
+    leadscrew_lifecycle, kind,
+) -> None:
+    state = leadscrew_lifecycle
+    state.save_failure = state.number_mutate_at = kind
+    with pytest.raises(RuntimeError) as refused:
+        state.run()
+    assert refused.value is state.primary
+    assert any(
+        f"after_{kind}_save checkpoint also failed" in note
+        and "Number presentation drift" in note
+        for note in refused.value.__notes__
     )
-    assert state.events == ["capture", "format", "source check"]
+    assert [event for event, _events in state.number_calls].count("fit") == 1
+    assert "close" not in state.lifecycle
 
 
-def test_supplier_stock_caption_seats_complete_extent_not_insertion_point(
-    supplier_stock_inset,
-) -> None:
-    state = supplier_stock_inset
-    before = draw._box(state.caption_extents[0], label="before", kind="note")
-    after = draw._box(state.caption_extents[1], label="after", kind="note")
-    assert before == pytest.approx((0.1412, 0.260, 0.2132, 0.269))
-    assert not draw._inside(before, draw.SUPPLIER_STOCK_FIELD)
-    assert after == pytest.approx((0.140, 0.255, 0.212, 0.264))
-    assert draw._inside(after, draw.SUPPLIER_STOCK_FIELD)
-    assert state.caption_moves == [pytest.approx((0.1388, 0.259, 0.007))]
-    assert state.caption_moves[0][2] == 0.007
-    assert state.note.GetText() == (
-        "SUPPLIER NOMINAL STOCK GAUGES\nNOT PART SHAPE — SCALE 1:10"
-    )
-
-
-@pytest.mark.parametrize(
-    "supplier_stock_inset",
-    [
-        {"fresh": fresh, "glyph_extra": extra, "glyph_shift": shift}
-        for fresh in (False, True)
-        for extra in (0.0, 0.0005, 0.001)
-        for shift in ((0.0, 0.0), (0.006, -0.004))
-    ],
-    indirect=True,
-)
-def test_supplier_stock_jointly_places_actual_frame_and_complete_measured_glyphs(
-    supplier_stock_inset,
-) -> None:
-    state = supplier_stock_inset
-    state.settled()
-    records = draw._measure_supplier_stock_dimensions(state.adapter, state.view)
-    caption = draw._box(state.caption_extents[-1], label="caption", kind="note")
-    ink_field = (0.135, 0.208, 0.245, caption[1] - draw.SUPPLIER_STOCK_CAPTION_GAP)
-    assert draw._inside(state.view.GetOutline(), draw.SUPPLIER_STOCK_FIELD)
-    assert draw._inside(state.view.reference_bounds(), ink_field)
-    for name, record in records.items():
-        ink = record["ink"]
-        assert draw._inside((ink.xmin, ink.ymin, ink.xmax, ink.ymax), ink_field)
-        assert record["display"].OffsetText is True
-        assert len(record["data"]["texts"]) == 2  # Includes SetText(4), not just value.
-        assert name in state.geometry_reads
-    draw._assert_supplier_stock_clearance(records)
-    assert len(state.view.moves) == 1  # One joint view translation, no fit/retry.
-    assert state.events == ["capture", "format", "source check"]
-    assert state.allowance_reads == [False, True, True, True, True]
-    assert len(state.annotation_cells) == 2  # After movement and after final rebuild.
-    assert state.redraws == ["redraw"] * 5  # Includes freshness after final rebuild.
-    assert len(state.rebuilds) == 7  # Distinct source/format/measurement/move barriers.
-    assert any("supplier stock captured:" in row for row in state.messages)
-    assert any("joint placement before:" in row for row in state.messages)
-    assert "curve_frame_offset_m=" in state.messages[-1]
-    frame, curves = state.view.GetOutline(), state.view.reference_bounds()
-    offset_y = (curves[1] + curves[3] - frame[1] - frame[3]) / 2
-    assert offset_y == pytest.approx(state.view.curve_offset)
-
-
-def test_supplier_stock_shelves_use_complete_pitch_height_and_length_below_row(
-    supplier_stock_inset,
-) -> None:
-    state = supplier_stock_inset
-    records = draw._measure_supplier_stock_dimensions(state.adapter, state.view)
-    pitch, length = records["SupplierThreadPitch"], records["SupplierStockLength"]
-    diameter = records["SupplierStockDiameter"]
-    assert state.projections == [[
-        (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 0.012, 0.0),
-    ]]
-    assert pitch["text"].height == pytest.approx(0.010)
-    assert length["text"].height == pytest.approx(0.009)
-    length_line = state.annotations["SupplierStockLength"].line_anchor[1]
-    assert length_line - pitch["text"].ymax == pytest.approx(
-        draw.SUPPLIER_STOCK_PLACE_AIR + 0.001
-    )
-    assert length["text"].ymin - length_line == pytest.approx(draw.SUPPLIER_STOCK_PLACE_AIR)
-    assert diameter["text"].xmin - state.view.reference_bounds()[2] == pytest.approx(
-        draw.SUPPLIER_STOCK_GAUGE_GAP + draw.SUPPLIER_STOCK_PLACE_AIR
-    )
-    # The actual bb179 PDF glyph top exceeded its native cap box by 1.065 mm.
-    # Keep that printed envelope, including the 0.13 mm line's half width,
-    # outside the unchanged 3 mm cross-dimension air; do not lower the gauge.
-    actual_pitch_glyph_top = pitch["text"].ymax + 0.001065
-    assert length_line - 0.000065 - actual_pitch_glyph_top >= draw.SUPPLIER_STOCK_TEXT_GAP
-    pitch_line = state.annotations["SupplierThreadPitch"].line_anchor[1]
-    assert pitch_line - state.view.reference_bounds()[3] == pytest.approx(
-        draw.SUPPLIER_STOCK_GAUGE_GAP
-    )
-
-
-@pytest.mark.parametrize(
-    "frame,expected",
-    (
-        # Recorded layout1859 frame and actual captured source bounds below.
-        ((0.177012, 0.236512, 0.188988, 0.288688), (0.0, -0.026906)),
-        # Synthetic refreshed frame centered on exactly those source curves.
-        ((0.147412, 0.236112, 0.218588, 0.248888), (0.002794, -0.026706)),
-    ),
-)
-def test_supplier_stock_joint_translation_uses_midpoint_of_both_actual_constraints(
-    monkeypatch, frame, expected,
-) -> None:
-    monkeypatch.setattr(draw._telemetry, "info", lambda _message: None)
-    curves = (0.153, 0.2417, 0.213, 0.2433)
-    # Synthetic complete dimension footprints, not after-fix native export proof.
-    records = {
-        "SupplierStockLength": {"ink": draw.Box(0.153, 0.2421, 0.213, 0.2771)},
-        "SupplierStockDiameter": {"ink": draw.Box(0.183, 0.2417, 0.227, 0.2773)},
-        "SupplierThreadPitch": {"ink": draw.Box(0.167, 0.2433, 0.199, 0.2603)},
-    }
-    shift = draw._supplier_stock_translation(
-        frame, curves, records, (0.140, 0.255, 0.212, 0.264)
-    )
-    assert shift == pytest.approx(expected)
-
-
-def test_supplier_stock_joint_translation_refuses_incompatible_actual_envelopes(
-    monkeypatch,
-) -> None:
-    messages = []
-    monkeypatch.setattr(draw._telemetry, "info", messages.append)
-    frame = (0.177012, 0.208, 0.188988, 0.265)
-    curves = (0.153, 0.220, 0.213, 0.2216)
-    # Both boxes individually fit their field sizes; their permitted moves do not intersect.
-    records = {"SupplierStockLength": {"ink": draw.Box(0.153, 0.220, 0.213, 0.260)}}
-    with pytest.raises(RuntimeError, match="no joint frame/ink translation") as error:
-        draw._supplier_stock_translation(frame, curves, records, (0.14, 0.255, 0.212, 0.264))
-    for key in (
-        "source_curve_bounds_m=", "native_outline_m=", "curve_frame_offset_m=",
-        "annotation_ink_m=", "caption_box_m=", "ink_field_m=",
-        "permitted_dx_m=", "permitted_dy_m=",
-    ):
-        assert key in str(error.value) and key in messages[-1]
-
-
-@pytest.mark.parametrize(
-    "supplier_stock_inset", [{"glyph_extra": 0.002, "defer": True}], indirect=True
-)
-def test_supplier_stock_refuses_infeasible_measured_two_row_glyph_heights(
-    supplier_stock_inset,
-) -> None:
-    state = supplier_stock_inset
-    with pytest.raises(RuntimeError, match="no joint frame/ink translation"):
-        state.create()
-    assert "permitted_dx_m=" in state.messages[-1]
-    assert "permitted_dy_m=" in state.messages[-1]
-    assert "annotation_ink_m=" in state.messages[-1]
-
-
-@pytest.mark.parametrize(
-    "supplier_stock_inset", [{"move_annotations": False, "defer": True}], indirect=True
-)
-def test_supplier_stock_refuses_native_annotations_not_moving_with_owned_view(
-    supplier_stock_inset,
-) -> None:
-    state = supplier_stock_inset
-    with pytest.raises(RuntimeError, match="did not translate with its view"):
-        state.create()
-    assert any("joint placement before:" in row for row in state.messages)
-    assert "source_curve_bounds_m=" in state.messages[-1]
-    assert "curve_frame_offset_m=" in state.messages[-1]
-
-
-@pytest.mark.parametrize("fault", ("text", "stroke"))
-def test_supplier_stock_checks_pairwise_native_glyph_and_stroke_clearance(
-    supplier_stock_inset, fault,
-) -> None:
-    state = supplier_stock_inset
-    records = draw._measure_supplier_stock_dimensions(state.adapter, state.view)
-    pitch = records["SupplierThreadPitch"]["text"]
-    length = records["SupplierStockLength"]
-    if fault == "text":
-        length["text"] = pitch
-        reason = "supplier text clearance"
-    else:
-        x, y = pitch.center()
-        length["data"] = {"lines": [[0, 0, 0, 0, x, y, 0, x + 0.001, y, 0]]}
-        reason = "supplier stroke/text clearance"
-    with pytest.raises(RuntimeError, match=reason):
-        draw._assert_supplier_stock_clearance(records)
-
-
-def test_supplier_stock_final_stroke_collision_refuses_even_without_box_drift(
-    supplier_stock_inset,
-) -> None:
-    state = supplier_stock_inset
-    pitch = state.annotations["SupplierThreadPitch"].text_box()
-    x, y = pitch.center()
-    state.annotations["SupplierStockLength"].extra_lines.append(
-        ((x, y), (x + 0.001, y))
-    )
-    with pytest.raises(RuntimeError, match="supplier stroke/text clearance"):
-        state.settled()
-
-
-def test_supplier_stock_requires_length_below_callout_native_glyphs(
-    supplier_stock_inset,
-) -> None:
-    state = supplier_stock_inset
-    state.annotations["SupplierStockLength"].omit_callout = True
-    with pytest.raises(RuntimeError, match="incomplete native supplier text/ink"):
-        state.settled()
-
-
-@pytest.mark.parametrize(
-    "fault", ("outline", "annotation", "caption", "text", "owner", "config", "scale")
-)
-def test_supplier_stock_final_guards_refuse_native_drift_and_caption_changes(
-    supplier_stock_inset, fault,
-) -> None:
-    state = supplier_stock_inset
-    if fault == "outline":
-        state.view.outline_override = (0.150, 0.210, 0.220, 0.267)
-    elif fault == "annotation":
-        annotation = state.annotations["SupplierStockLength"]
-        annotation.translate(0.001, 0.0)
-    elif fault == "caption":
-        state.note.GetExtent = lambda: (0.140, 0.260, 0.0, 0.212, 0.269, 0.0)
-    elif fault == "text":
-        state.note.GetText = lambda: draw.SUPPLIER_STOCK_CAPTION + " "
-    elif fault == "owner":
-        state.owner.OwnerType = 0
-    elif fault == "config":
-        state.view.ReferencedConfiguration = "Default"
-    elif fault == "scale":
-        state.view.ScaleRatio = (1, 20)
-    with pytest.raises(RuntimeError) as error:
-        state.settled()
-    if fault not in ("config", "scale"):
-        for key in ("source_curve_bounds_m=", "native_outline_m=", "caption_box_m=", "ink_field_m="):
-            assert key in str(error.value) and key in state.messages[-1]
-
-
-def test_supplier_stock_curve_caption_refusal_is_independent_of_native_outline(
-    supplier_stock_inset,
-) -> None:
-    state = supplier_stock_inset
-    curve_box = (0.150, 0.254, 0.210, 0.255)
-    state.view.reference_bounds = lambda: curve_box
-    assert draw._inside(state.view.GetOutline(), draw.SUPPLIER_STOCK_FIELD)
-    with pytest.raises(RuntimeError, match="curves left their caption-free field") as error:
-        state.settled()
-    assert f"source_curve_bounds_m={curve_box!r}" in str(error.value)
-    assert f"native_outline_m={state.view.GetOutline()!r}" in str(error.value)
-    assert len(state.annotation_cells) == 1  # Final refusal precedes the annotation guard.
+def test_note_block_that_does_not_resolve_is_refused(leadscrew_lifecycle, monkeypatch) -> None:
+    state = leadscrew_lifecycle
+    monkeypatch.setattr(draw, "add_note", lambda *_args: SimpleNamespace(
+        GetText=lambda: f"ITEM: {draw.ITEM}\nSUPPLIER: supplier\nSKU: sku",
+    ))
+    with pytest.raises(RuntimeError, match="note block did not resolve"):
+        state.run()
+    assert state.number_calls == []
 
 
 @pytest.fixture
@@ -2617,7 +1060,7 @@ def readonly_leadscrew_build(monkeypatch, tmp_path):
     source_path.write_bytes(b"original leadscrew source")
     state = SimpleNamespace(
         configuration="Installed", dirty=False, read_only=True,
-        path=str(source_path), events=[], captured=False, presentation_hook=None,
+        path=str(source_path), events=[], presentation_hook=None,
         primary=RuntimeError("stop at first main formatting"),
     )
     source = SimpleNamespace(
@@ -2652,14 +1095,8 @@ def readonly_leadscrew_build(monkeypatch, tmp_path):
         state.events.append(("view", orientation))
         return SimpleNamespace(Angle=0.0)
 
-    def inset(_adapter):
-        assert not state.dirty and not state.captured
-        state.events.append(("capture",))
-        state.captured = True
-        return lambda: None
-
     def first_format(_adapter, _view, **_kwargs):
-        assert state.captured and not state.dirty
+        assert not state.dirty
         state.events.append(("main format",))
         state.dirty = True
         if state.presentation_hook is not None:
@@ -2681,14 +1118,13 @@ def readonly_leadscrew_build(monkeypatch, tmp_path):
     monkeypatch.setattr(draw, "place_view", placed)
     monkeypatch.setattr(draw, "_center_view", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(draw, "set_hidden_lines_removed", lambda *_args: None)
-    monkeypatch.setattr(draw, "_prepare_supplier_stock_inset", inset)
     monkeypatch.setattr(draw, "curate_view_dimensions", first_format)
     return SimpleNamespace(
         adapter=adapter, state=state, source=source, path=source_path,
     )
 
 
-def test_supplier_stock_build_captures_clean_before_source_formatting(
+def test_leadscrew_build_creates_views_from_the_clean_source_before_formatting(
     readonly_leadscrew_build,
 ) -> None:
     seat = readonly_leadscrew_build
@@ -2696,26 +1132,19 @@ def test_supplier_stock_build_captures_clean_before_source_formatting(
         asyncio.run(draw.build(seat.adapter))
     assert error.value is seat.state.primary
     assert [event[0] for event in seat.state.events] == [
-        "hash", "open", "drawing", "view", "view", "capture", "main format", "hash"
+        "hash", "open", "drawing", "view", "view", "main format", "hash"
     ]
     assert seat.state.events[0] == seat.state.events[-1]
-    assert supplier_screw_lane_plan(spec.SUPPLIER_REFERENCE_DIMENSIONS) == {
-        "SupplierStockLength": ("top", 0.006),
-        "SupplierStockDiameter": ("right", 0.006),
-        "SupplierThreadPitch": ("bottom", 0.006),
-    }
 
 
-@pytest.mark.parametrize("configuration", ("", spec.SUPPLIER_STOCK_CONFIGURATION))
 def test_leadscrew_refuses_noninstalled_saved_source_before_creating_views(
-    readonly_leadscrew_build, configuration,
+    readonly_leadscrew_build,
 ) -> None:
     seat = readonly_leadscrew_build
-    seat.state.configuration = configuration
+    seat.state.configuration = ""
     with pytest.raises(RuntimeError, match="without an installed configuration active"):
         asyncio.run(draw.build(seat.adapter))
     assert [event[0] for event in seat.state.events] == ["hash", "open", "hash"]
-    assert not seat.state.captured
 
 
 def test_leadscrew_refuses_dirty_source_before_view_creation(
@@ -2736,7 +1165,7 @@ def test_leadscrew_source_exit_guards_preserve_primary_refusal(
 
     def changed():
         if fault == "configuration":
-            seat.state.configuration = spec.SUPPLIER_STOCK_CONFIGURATION
+            seat.state.configuration = "OtherConfiguration"
         elif fault == "read_only":
             seat.state.read_only = False
         elif fault == "path":
@@ -2766,7 +1195,7 @@ def test_leadscrew_success_path_still_checks_source_on_lifecycle_exit(
     async def completed(_adapter, source_model, installed_configuration):
         assert source_model is seat.source and installed_configuration == "Installed"
         if fault == "configuration":
-            seat.state.configuration = spec.SUPPLIER_STOCK_CONFIGURATION
+            seat.state.configuration = "OtherConfiguration"
         elif fault == "bytes":
             seat.path.write_bytes(b"mutated source on success")
         return {"drawing": "complete"}
@@ -2803,251 +1232,6 @@ def test_leadscrew_hash_guard_covers_read_only_open_failure(
     assert [event[0] for event in seat.state.events] == ["hash", "hash"]
 
 
-_STOCK_PDF_TEXT = (
-    "(600 mm)\r\nAS PURCHASED\r\n"
-    "(Ø8 mm)\r\nNOMINAL MAJOR\r\n"
-    "(2 mm)\r\nPITCH; NO HELIX"
-)
-
-
-@pytest.fixture
-def supplier_stock_pdf_reader(monkeypatch):
-    state = SimpleNamespace(
-        text=_STOCK_PDF_TEXT, pages=1, fault=None, opens=[], bounds=[], closed=[],
-        outside_text="", outside=False,
-    )
-
-    def fail(stage):
-        if state.fault == stage:
-            raise RuntimeError(f"parser {stage} primary")
-
-    class TextPage:
-        def get_text_bounded(self, **bounds):
-            state.bounds.append(bounds)
-            fail("extract")
-            expected = dict(zip(
-                ("left", "bottom", "right", "top"),
-                (value / draw.POINT_M for value in draw.SUPPLIER_STOCK_FIELD),
-                strict=True,
-            ))
-            assert bounds == pytest.approx(expected)
-            return "" if state.outside else state.text
-
-        def close(self):
-            state.closed.append("textpage")
-
-    class Page:
-        def get_textpage(self):
-            fail("textpage")
-            return TextPage()
-
-        def close(self):
-            state.closed.append("page")
-
-    class Document:
-        def __init__(self, path):
-            state.opens.append(path)
-
-        def __len__(self):
-            return state.pages
-
-        def __getitem__(self, index):
-            assert index == 0
-            fail("page")
-            return Page()
-
-        def close(self):
-            state.closed.append("document")
-
-    monkeypatch.setattr(draw.pdfium, "PdfDocument", Document)
-    return state
-
-
-@pytest.mark.parametrize("mark", ("Ø", "⌀", "∅", ""))
-def test_supplier_stock_pdf_exact_fields_accept_text_and_native_vector_diameter(
-    supplier_stock_pdf_reader, mark,
-) -> None:
-    state = supplier_stock_pdf_reader
-    state.text = (_STOCK_PDF_TEXT.replace("Ø", mark)
-                  + "\r\n" + draw.SUPPLIER_STOCK_CAPTION)
-    draw._assert_supplier_stock_pdf(Path("finished.pdf"))
-    assert state.opens == ["finished.pdf"]
-    assert len(state.bounds) == 1
-    assert state.closed == ["textpage", "page", "document"]
-    # No symbol is fabricated from a vector-only export: the native prefix
-    # guard and finished image/audit, not this text-only parser, prove its ink.
-
-
-@pytest.mark.parametrize(
-    "size,callout",
-    (("(600 mm)", "AS PURCHASED"), ("(Ø8 mm)", "NOMINAL MAJOR"),
-     ("(2 mm)", "PITCH; NO HELIX")),
-)
-@pytest.mark.parametrize(
-    "fault", ("missing_size", "value", "prefix", "suffix", "unit",
-              "missing_callout", "changed_callout", "extra_prefix", "extra_suffix"),
-)
-def test_supplier_stock_pdf_refuses_each_exact_size_and_callout_mutation(
-    supplier_stock_pdf_reader, size, callout, fault,
-) -> None:
-    state = supplier_stock_pdf_reader
-    if fault == "missing_callout":
-        state.text = state.text.replace(callout, "")
-    elif fault == "changed_callout":
-        state.text = state.text.replace(callout, callout + " WRONG")
-    else:
-        changed = {
-            "missing_size": "", "value": size.replace(" mm", "0 mm"),
-            "prefix": size.replace("(", "["), "suffix": size[:-1],
-            "unit": size.replace("mm", "in"), "extra_prefix": "REF" + size,
-            "extra_suffix": size + " WRONG",
-        }[fault]
-        state.text = state.text.replace(size, changed)
-    with pytest.raises(RuntimeError, match="supplier stock PDF") as refused:
-        draw._assert_supplier_stock_pdf(Path("finished.pdf"))
-    assert f"raw_stock_text={state.text!r}" in str(refused.value)
-    assert state.closed == ["textpage", "page", "document"]
-
-
-@pytest.mark.parametrize("mark", ("D", "Φ", "<MOD-DIAM>"))
-def test_supplier_stock_pdf_does_not_normalize_arbitrary_diameter_prefixes(
-    supplier_stock_pdf_reader, mark,
-) -> None:
-    state = supplier_stock_pdf_reader
-    state.text = state.text.replace("Ø", mark)
-    with pytest.raises(RuntimeError, match="SupplierStockDiameter size"):
-        draw._assert_supplier_stock_pdf(Path("finished.pdf"))
-
-
-def test_supplier_stock_pdf_does_not_search_unrelated_whole_page_text(
-    supplier_stock_pdf_reader,
-) -> None:
-    state = supplier_stock_pdf_reader
-    state.outside, state.outside_text = True, _STOCK_PDF_TEXT
-    with pytest.raises(RuntimeError, match="raw_stock_text=''"):
-        draw._assert_supplier_stock_pdf(Path("finished.pdf"))
-    assert len(state.bounds) == 1
-    assert state.closed == ["textpage", "page", "document"]
-
-
-@pytest.mark.parametrize("pages", (0, 2))
-def test_supplier_stock_pdf_refuses_physical_page_count_and_closes_document(
-    supplier_stock_pdf_reader, pages,
-) -> None:
-    state = supplier_stock_pdf_reader
-    state.pages = pages
-    with pytest.raises(RuntimeError, match="requires one physical page"):
-        draw._assert_supplier_stock_pdf(Path("finished.pdf"))
-    assert state.bounds == []
-    assert state.closed == ["document"]
-
-
-@pytest.mark.parametrize(
-    "fault,closed",
-    (("page", ["document"]), ("textpage", ["page", "document"]),
-     ("extract", ["textpage", "page", "document"])),
-)
-def test_supplier_stock_pdf_parser_failure_closes_acquired_resources(
-    supplier_stock_pdf_reader, fault, closed,
-) -> None:
-    state = supplier_stock_pdf_reader
-    state.fault = fault
-    with pytest.raises(RuntimeError, match=f"parser {fault} primary"):
-        draw._assert_supplier_stock_pdf(Path("finished.pdf"))
-    assert state.closed == closed
-
-
-def _write_supplier_text_pdf(path, *, outside=False, pages=1):
-    """Small real PDF, including vector-only diameter ink; no extra dependency."""
-    x = 20 if outside else 400
-    # All rows stand inside the unchanged stock field (383..694, 590..751 pt).
-    rows = (
-        ("(600 mm)", 730), ("AS PURCHASED", 710), ("(8 mm)", 690),
-        ("NOMINAL MAJOR", 670), ("(2 mm)", 650), ("PITCH; NO HELIX", 630),
-    )
-    stream = []
-    for text, y in rows:
-        escaped = text.replace("(", r"\(").replace(")", r"\)")
-        stream.append(f"BT /F1 8 Tf 1 0 0 1 {x} {y} Tm ({escaped}) Tj ET")
-    # A symbol represented by paths has deliberately no extractable glyph.
-    stream.append(
-        f"{x + 14} 693 m "
-        f"{x + 14} 694.1 {x + 13.1} 695 {x + 12} 695 c "
-        f"{x + 10.9} 695 {x + 10} 694.1 {x + 10} 693 c "
-        f"{x + 10} 691.9 {x + 10.9} 691 {x + 12} 691 c "
-        f"{x + 13.1} 691 {x + 14} 691.9 {x + 14} 693 c S "
-        f"{x + 10} 690 m {x + 14} 696 l S"
-    )
-    content = "\n".join(stream).encode("ascii")
-    kids = " ".join(f"{5 + index} 0 R" for index in range(pages))
-    objects = [
-        b"<< /Type /Catalog /Pages 2 0 R >>",
-        f"<< /Type /Pages /Kids [{kids}] /Count {pages} >>".encode("ascii"),
-        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-        f"<< /Length {len(content)} >>\nstream\n".encode("ascii") + content + b"\nendstream",
-        *[
-            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 1224 792] "
-            b"/Resources << /Font << /F1 3 0 R >> >> /Contents 4 0 R >>"
-            for _ in range(pages)
-        ],
-    ]
-    data, offsets = bytearray(b"%PDF-1.4\n"), [0]
-    for index, body in enumerate(objects, 1):
-        offsets.append(len(data))
-        data.extend(f"{index} 0 obj\n".encode("ascii") + body + b"\nendobj\n")
-    xref = len(data)
-    data.extend(f"xref\n0 {len(offsets)}\n0000000000 65535 f \n".encode("ascii"))
-    for offset in offsets[1:]:
-        data.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
-    data.extend(
-        f"trailer\n<< /Size {len(offsets)} /Root 1 0 R >>\n"
-        f"startxref\n{xref}\n%%EOF\n".encode("ascii")
-    )
-    path.write_bytes(data)
-
-
-@pytest.mark.parametrize("outside,pages", ((False, 1), (True, 1), (False, 2)))
-def test_supplier_stock_pdf_real_bounded_text_parser(tmp_path, outside, pages):
-    path = tmp_path / "supplier-stock.pdf"
-    _write_supplier_text_pdf(path, outside=outside, pages=pages)
-    if pages != 1:
-        with pytest.raises(RuntimeError, match="requires one physical page"):
-            draw._assert_supplier_stock_pdf(path)
-    elif outside:
-        with pytest.raises(RuntimeError, match="raw_stock_text=''"):
-            draw._assert_supplier_stock_pdf(path)
-    else:
-        draw._assert_supplier_stock_pdf(path)
-    path.unlink()  # The real parser must have released its file handle.
-
-
-def test_supplier_stock_field_and_neighbor_views_are_not_layout_escape_hatches() -> None:
-    assert draw.SUPPLIER_STOCK_FIELD == (0.135, 0.208, 0.245, 0.265)
-    assert draw.SUPPLIER_STOCK_SCALE == (1, 10)
-    assert draw.SUPPLIER_STOCK_CENTER == (0.183, 0.2365)
-    assert draw.SUPPLIER_STOCK_CAPTION_XY == (0.140, 0.264)
-    assert draw.SUPPLIER_STOCK_CAPTION == (
-        "SUPPLIER NOMINAL STOCK GAUGES\nNOT PART SHAPE — SCALE 1:10"
-    )
-    assert draw.MAIN_CENTER == (0.195, 0.160)
-    assert [section.centre for section in draw.CLOCK_SECTIONS] == [
-        (0.090, 0.235),
-        (0.280, 0.235),
-    ]
-    assert draw._inside_sheet(draw.SUPPLIER_STOCK_FIELD)
-    scale = draw.SECTION_SCALE[0] / draw.SECTION_SCALE[1] / 1000.0
-    angle_reach = draw.CLOCK_ANGLE_TEXT_RADIUS_MM * scale + 0.006
-    af_reach = draw.CLOCK_AF_TEXT_RADIUS_MM * scale + 0.006
-    for section in draw.CLOCK_SECTIONS:
-        x, y = section.centre
-        neighbor = (x - angle_reach, y - angle_reach, x + angle_reach, y + af_reach)
-        assert not draw._overlaps(draw.SUPPLIER_STOCK_FIELD, neighbor)
-    assert (
-        draw.MAIN_KEEP["CutLength"][1] + draw.TEXT_HALF_HEIGHT
-        < draw.SUPPLIER_STOCK_FIELD[1]
-    )
-
-
 def test_notes_name_the_item_not_its_length_or_material() -> None:
     # The cut length is the dimension's, the material the title block's, and
     # no line prescribes a method (rule 7).
@@ -3056,7 +1240,15 @@ def test_notes_name_the_item_not_its_length_or_material() -> None:
     assert f"{spec.LENGTH:.0f}" not in draw.NOTES
     for name in ("Supplier", "Supplier SKUs"):
         assert property_link(name) in draw.NOTES
-    assert len(draw.NOTES.splitlines()) == 3
+    # Then the bought stock's sizes as millimetre references (machinist
+    # review: they replaced a confusing 1:10 gauge sketch), from the spec.
+    assert draw.NOTES.splitlines()[3:] == [
+        f"STOCK AS BOUGHT: ({spec.STOCK_LENGTH:g} mm) LONG,",
+        f"(<MOD-DIAM>{spec.MAJOR_DIA:g} mm) NOMINAL MAJOR, ({spec.PITCH:g} mm) PITCH",
+    ]
+    assert (spec.STOCK_LENGTH, spec.MAJOR_DIA, spec.PITCH) == (600.0, 8.0, 2.0)
+    assert not hasattr(draw, "SUPPLIER_STOCK_CAPTION")
+    assert not hasattr(spec, "SUPPLIER_REFERENCE_DIMENSIONS")
     assert "Manufacturing Notes" not in draw.NOTES
     assert not hasattr(spec, "DRAWING_NOTES")
     assert "Manufacturing Notes" not in part.SAVED_PROPERTIES_NO_NOTE
