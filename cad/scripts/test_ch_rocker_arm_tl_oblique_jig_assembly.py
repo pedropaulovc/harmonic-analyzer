@@ -1330,15 +1330,23 @@ def test_bracket_load_cases_hold_the_hand_abuse_thrust() -> None:
     assert leadscrew.BRACKET_SLIP_THRUST >= 1.5 * spec.FEED_THRUST_N
 
 
-@pytest.mark.parametrize("nm", (0.4, 2.8, 4.0, 19.2))
-def test_printed_in_lbf_never_exceeds_its_n_m_torque(nm) -> None:
-    """Every torque prints both units; the in·lbf, derived from the N·m, is
-    within 0.1 below it, so a fitter on either wrench never over-torques."""
-    printed = spec._torque(nm)
+@pytest.mark.parametrize(
+    ("nm", "printed"),
+    (
+        (0.4, "0.4 N·m (3.5 IN·LBF)"),
+        (2.8, "2.8 N·m (25 IN·LBF)"),
+        (4.0, "4.0 N·m (35 IN·LBF)"),
+        (19.2, "19.2 N·m (170 IN·LBF)"),
+    ),
+)
+def test_printed_torque_leads_with_n_m_and_rounds_in_lbf(nm, printed) -> None:
+    """Owner ruling 3 (2026-11-01): the N·m source value first, its in·lbf
+    conversion in parentheses rounded to the nearest two significant figures."""
+    assert spec._torque(nm) == printed
     in_lbf = float(printed.split("(", 1)[1].split(" ", 1)[0])
-    assert printed.startswith(f"{nm:.1f} N·m (")
     exact = nm / (4.4482216152605 * 0.0254)
-    assert exact - 0.1 < in_lbf <= exact
+    half_step = 0.5 * 10 ** (math.floor(math.log10(exact)) - 1)
+    assert abs(in_lbf - exact) <= half_step
 
 
 
