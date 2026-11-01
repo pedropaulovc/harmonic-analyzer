@@ -168,6 +168,7 @@ ENGAGEMENT_MAX = SCREW_REACH + SCREW_CUT_BAND + SCREW_MEASURE_BAND
 SCREW_CUT_LENGTH_MAX = (CBORE_FLOOR + _band("CboreFloor") + SCREW_MEASURE_BAND
                         + SCREW_REACH + SCREW_CUT_BAND)
 ENGAGEMENT_TEXT = f"{math.floor(ENGAGEMENT_MIN / 25.4 * 1000.0) / 1000.0:.3f}".lstrip("0")
+ENGAGEMENT_DIAMETERS = f"{math.floor(ENGAGEMENT_MIN / 4.0 * 100.0) / 100.0:.2f}D"  # of the M4 major
 # The cut screw in its tap: full-form engagement (rule 18) is the cut thread
 # less 1.5 incomplete pitches; the tip stands inside the block at every band
 # (block height at .XX, seat depth and cut length at .XXX).
@@ -193,8 +194,11 @@ CALLOUTS_BELOW = {
     "CarriageCounterbores3Dia": "FLOOR: SECTION B-B",
     # Under the value, two rows, right of B-B (an above-text newline dropped
     # the note, farm run 20261027T175531766Z): the block height's extension
-    # lines pass left of it.
-    "CboreFloor": f"M4 CUT TO FIT:\n{ENGAGEMENT_TEXT} MIN ENGAGEMENT",
+    # lines pass left of it. Machinist review (final head): the value names
+    # the floor and why it is .XXX (the longest cut a high floor needs stays
+    # under the shortest bought M4 x 20, SCREW_CUT_LENGTH_MAX); the shortfall
+    # is a plain fact with its ratio; cutting is assembly step 5's.
+    "CboreFloor": f"FLOOR FOR M4 X 20 CUT\nENGAGES {ENGAGEMENT_TEXT} MIN ({ENGAGEMENT_DIAMETERS})",
     "BlockLength": "SETS COUNTERBORE END WALL",
     # Two narrow rows between the row (CarriageDrills3Y/4Y) values and the
     # BlockSideY and TL-32 PlanOverallY dimension lines (x 231 and 285 on TL-32's
