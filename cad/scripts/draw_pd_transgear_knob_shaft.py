@@ -346,9 +346,10 @@ DETAIL_RADIUS_MM = 2.7
 DETAIL_CROP_RADIUS = DETAIL_RADIUS_MM * _DS / 1000.0
 # Upper left, over the journal: x 0.078-0.132 clears the end view (x <=
 # 0.064) and the journal Ø's witness line (x 0.1364);
-# y 0.196-0.250 stands over the journal Ø's text (top 0.193) and leaves the
-# frame row under the border (0.2667).
-DETAIL_CENTER = (0.105, 0.223)
+# y 0.1945-0.2485 stands over the journal Ø's text (top 0.193) and leaves the
+# frame row under the border (0.2667).  1.5 mm lower than run
+# 20261101T111116817Z, where the neck Ø's upper limit touched the border.
+DETAIL_CENTER = (0.105, 0.2215)
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 # The focus, and the neck landing that proves the view's scale and handing,
 # must land within 0.1 mm of where this script places them.
@@ -411,9 +412,9 @@ DETAIL_KEEP: dict[str, tuple[float, float]] = {
     # Under the crop, right of the step's witness line (centred on the 4 mm
     # span it would sit on both witness lines): value and its two rows
     # (~111.2..126.8 mm) from ~177.5 to 192 mm, clear of the tool end's
-    # outer arrow (y 173.5), the crop (from y 196.9 there) and the journal
+    # outer arrow (y 173.5), the crop (from y 195.4 there) and the journal
     # Ø's line (x 134.3).
-    "FrontReliefWidth": (_STEP_X + 0.012, _DETAIL_BOTTOM - 0.0102),
+    "FrontReliefWidth": (_STEP_X + 0.012, _DETAIL_BOTTOM - 0.0087),
     # Left of the crop: the leader runs from the corner 12-24 deg below
     # level, inside the corner's own quadrant, through the pinion's blank
     # interior under its root and over the axis.  Its 23.5 mm text, centred
@@ -424,13 +425,14 @@ DETAIL_KEEP: dict[str, tuple[float, float]] = {
     # (~52 mm, centred on the keep) and two rows stand left of F's witness
     # line, the block's line at its foot (y ~173.5) over the end view's teeth
     # (top 0.1735) and the journal's outline (top 0.169), its top (~193)
-    # under the crop.  4 mm further left than farm run 20261101T095301211Z,
-    # where the neck width's outer arrow line ran 2.3 mm into its limits.
-    "FlatEnd": (_F_DETAIL_X - 0.0305, _DETAIL_BOTTOM - 0.0125),
-    # Left of the crop, level with the tool's end arc (centre ~0.105, 0.2018):
+    # under the crop.  5 mm further left than farm run 20261101T095301211Z,
+    # where the neck width's outer arrow line ran 2.3 mm into its limits (4 mm
+    # left, run 20261101T111116817Z, left that arrow 1.74 mm from them).
+    "FlatEnd": (_F_DETAIL_X - 0.0315, _DETAIL_BOTTOM - 0.0110),
+    # Left of the crop, just over the tool's end arc (centre ~0.105, 0.2003):
     # the leader enters the arc's own quadrant from the left, under the
     # detail label.
-    "FlatToolRadius": (_F_DETAIL_X - 0.031, _DETAIL_BOTTOM + 0.007),
+    "FlatToolRadius": (_F_DETAIL_X - 0.031, _DETAIL_BOTTOM + 0.0085),
 }
 # Top-left anchors.  The label stands left of the crop, 3 mm under the
 # corner R's text (its limits print to 5 mm under its point).
