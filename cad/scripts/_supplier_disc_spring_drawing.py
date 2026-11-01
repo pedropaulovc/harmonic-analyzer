@@ -8,6 +8,7 @@ from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 
+import _telemetry
 from _com import _early_bound
 from _construction_line_font import _construction_curves_as_outline
 from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
@@ -187,6 +188,7 @@ def _size_text_move(
     return position, lines["left"] - gap - text.xmax, 0.0
 
 
+@_telemetry.traced("drawing.supplier_disc_size_texts", label_param="label")
 def place_disc_size_texts(
     adapter: Any,
     placed: list[tuple[str, str, Any]],
