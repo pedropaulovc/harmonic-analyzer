@@ -105,12 +105,13 @@ SIDE_KEEP = {"CollarWidth": (0.205, 0.110), "CollarDia": (0.250, SIDE_CENTER[1])
 # TapStation reads right of the tap centre's extension line, under the hole
 # callout's leader and above the end view's top (y 205 mm at x 80 mm), so its
 # function line clears both extension lines and the left border.  The
-# two-line TAP ROOT gauge reads level with the tap, left of the view, as on
-# main; its leader runs straight through the circle.  It bounds the envelope
+# two-line TAP ROOT gauge reads right of the view, above the hole callout:
+# left of the view (main's place) its leader crossed TapStation's extension
+# line off the nose face (run 20261101T183557651Z).  It bounds the envelope
 # the wall budget books (spec.THREAD_ENVELOPE_DIA).
 TAP_KEEP = {
     "TapStation": (TAP_CENTER[0] + 0.040, TAP_CENTER[1] - 0.024),
-    "TapRootLimit": (TAP_CENTER[0] - 0.030, TAP_CENTER[1]),
+    "TapRootLimit": (TAP_CENTER[0] + 0.033, TAP_CENTER[1] + 0.012),
 }
 # Right of the view: the hole callout's text starting past the view's right
 # edge. The view note goes over the view, 3.7 mm inside the top border.
