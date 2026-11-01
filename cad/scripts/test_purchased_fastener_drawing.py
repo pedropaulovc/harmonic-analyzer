@@ -4716,6 +4716,8 @@ def _supplier_native(monkeypatch, *, value=0.0111125, kind=11):
     import _supplier_dimensions as supplier
 
     monkeypatch.setattr(supplier, "_early_bound", lambda obj, _interface: obj)
+    # An mm sheet unless a test sets state.sheet; the rule has its own test.
+    monkeypatch.setattr(supplier, "sheet_units", lambda _adapter: state.sheet)
     view = SimpleNamespace()
     native = SimpleNamespace(
         SystemValue=value,
@@ -4735,7 +4737,7 @@ def _supplier_native(monkeypatch, *, value=0.0111125, kind=11):
     annotation.GetAttachedEntityTypes = lambda: (11,) * len(annotation.entities)
     text = {}
     state = SimpleNamespace(
-        unit=0, fraction=1, denominator=0, precision=2, rounding=False
+        unit=0, fraction=1, denominator=0, precision=2, rounding=False, sheet="mm"
     )
     display = SimpleNamespace(
         Type2=kind,
@@ -4793,6 +4795,51 @@ def test_supplier_native_size_preserves_exact_fraction_not_rounded_catalogue_ink
             case.display,
             **{**settings, "expected_mm": 0.438 * 25.4},
         )
+
+
+@pytest.mark.parametrize(
+    ("sheet", "units", "denominator", "suffix"),
+    (
+        ("in", "in", None, ")"),
+        ("mm", "in", None, " in)"),
+        ("in", "mm", None, " mm)"),
+        ("mm", "mm", None, " mm)"),
+        ("in", "in", 16, ")"),
+        ("mm", "in", 16, ")"),
+        ("in", "deg", None, ")"),
+    ),
+)
+def test_supplier_suffix_names_its_unit_only_where_the_sheet_does_not(
+    sheet, units, denominator, suffix,
+):
+    import _supplier_dimensions as supplier
+
+    drawing = SimpleNamespace(Extension=SimpleNamespace(
+        GetUserPreferenceInteger=lambda preference, _option: (
+            {"in": 3, "mm": 0}[sheet] if preference == 47 else None
+        ),
+    ))
+    *_, actual = supplier._presentation(
+        SimpleNamespace(currentModel=drawing), label="supplier size", units=units,
+        precision=3, presentation="angle" if units == "deg" else "length",
+        fraction_denominator=denominator, callout=None,
+        expected_mm=25.4 / 16 if denominator else None,
+    )
+    assert actual == suffix
+
+
+def test_supplier_inch_reference_on_an_inch_sheet_sets_and_reads_back_no_suffix(
+    monkeypatch,
+):
+    case = _supplier_native(monkeypatch)
+    case.state.sheet = "in"
+    settings = dict(label="supplier length", units="in", precision=3, expected_mm=11.1125)
+    case.helper.supplier_reference_dimension(None, case.display, **settings)
+    assert case.text == {1: "(", 2: ")", 4: ""}
+    case.state.sheet = "mm"
+    with pytest.raises(RuntimeError, match=r"suffix: actual='\)', expected=' in\)'"):
+        case.helper.assert_supplier_reference_dimension(None, case.display, **settings)
+
 
 
 def test_supplier_value_uses_referenced_configuration_not_active_model_configuration(
@@ -8527,7 +8574,9 @@ def _washer_import_native(monkeypatch, *, defect=None, axis="y", values=None):
     adapter = SimpleNamespace(swApp=SimpleNamespace(
         IsSame=lambda left, right: int(left is right),
         GetMathUtility=lambda: SimpleNamespace(CreatePoint=Point),
-    ))
+    ), currentModel=SimpleNamespace(Extension=SimpleNamespace(
+        GetUserPreferenceInteger=lambda _preference, _option: 0,  # an mm sheet
+    )))
     source_entities = {}
     features = {}
     for label in values:
@@ -8741,3 +8790,12 @@ def test_washer_import_requires_exact_typed_view_entity_correspondence(monkeypat
             case.adapter, case.model, imported.display, view=imported.annotation.Owner,
             label=label, axis=axis, bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
         )
+
+
+@pytest.mark.parametrize(("units", "sheet", "suffix"), (
+    ("in", "in", ")"), ("in", "mm", " in)"), ("mm", "in", " mm)"), ("mm", "mm", " mm)"),
+))
+def test_washer_model_reference_suffix_follows_its_package_sheet(units, sheet, suffix):
+    import _supplier_washer_model as model_helpers
+
+    assert model_helpers._suffix(units, sheet) == suffix
