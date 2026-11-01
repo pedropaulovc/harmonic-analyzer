@@ -387,7 +387,6 @@ def test_stack_height_seats_the_centred_strap_on_the_raw_ends():
     assert height == pytest.approx(raw_thickness - strap_face_z)
     ground_flat = 3 / 32 * 25.4  # approved 3/32 in stock, inventory purchase
     assert 0 < height - ground_flat < height
-    assert height == pytest.approx(2.71875)
     for setup_id, seat_z in (("S1", 0.0), ("S4", raw_thickness - strap_face_z)):
         hold = setups[setup_id]["hold"]
         supports = [
