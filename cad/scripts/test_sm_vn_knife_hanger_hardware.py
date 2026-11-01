@@ -1807,6 +1807,8 @@ def test_stud_head_height_creates_native_vertical_dimension_with_strict_edge_rea
         case.adapter, case.front, (0.218, 0.216)
     )
     assert display is case.display
+    # Arrows inside: the shelved text's leader lands on a printed line.
+    assert display.ArrowSide == 0
     assert case.selection_log == [
         (case.bearing, False, case.front), (case.top, True, case.front)
     ]

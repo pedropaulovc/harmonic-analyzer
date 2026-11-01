@@ -153,6 +153,7 @@ THREAD_MAJOR_TEXT_XY = (
     + SUPPLIER_THREAD_MAJOR_Y * _SHEET_PER_MODEL_MM
     + _THREAD_MAJOR_LINE_BELOW_TEXT,
 )
+_DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
 # Every view and the sheet are 2:1, so the title-block SCALE is the view
 # scale and the isometric carries no scale label.
 ISO_CENTER = (0.340, 0.135)
@@ -423,6 +424,14 @@ def _add_physical_head_height(adapter: Any, front: Any, text_xy: tuple[float, fl
         display = model.AddVerticalDimension2(text_xy[0], text_xy[1], 0.0)
         if display is None:
             raise RuntimeError("SupplierHeadHeight: AddVerticalDimension2 returned no dimension")
+        # Arrows inside (swDimArrowsInside): the dimension line then runs
+        # between the head's two stations, so the shelved text's offset
+        # leader ends on it. Outside, the span printed no line and the leader
+        # stopped in open space (review of run 20261101T103335542Z).
+        display = _early_bound(display, "IDisplayDimension")
+        display.ArrowSide = _DIM_ARROWS_INSIDE
+        if int(display.ArrowSide) != _DIM_ARROWS_INSIDE:
+            raise RuntimeError("SupplierHeadHeight: arrows did not move inside")
     finally:
         model.ClearSelection2(True)
     _assert_physical_head_height(adapter, front, display, entities=entities, phase="creation")
