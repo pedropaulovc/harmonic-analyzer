@@ -152,3 +152,27 @@ def test_purchased_sheet_documents_the_built_part() -> None:
     assert sheet.source_kind == "part"
     assert sheet.source.stem == part.PART_NAME == sheet.artifact_stem
     assert sheet.layout in DRAWING_TEMPLATES
+
+
+def test_lengths_shelve_either_side_of_the_screw_and_head_height_clears_them() -> None:
+    """Machinist review: the two qualifiers crossed the thread and collided,
+    and the 20 mm's line struck the (4 mm) text on its extension line."""
+    import draw_ch_rocker_arm_tl_vn_oblique_carriage_screw as drawing
+    from _supplier_screw_layout import supplier_screw_lane_plan
+
+    lanes = supplier_screw_lane_plan(
+        spec.SUPPLIER_REFERENCE_DIMENSIONS,
+        planes=spec.SUPPLIER_REFERENCE_PLANES,
+        sides=spec.SUPPLIER_REFERENCE_SIDES,
+    )
+    assert lanes["SupplierLength"][0] == drawing.SHELVES["SupplierLength"][1] == "left"
+    assert lanes["CutLength"][0] == drawing.SHELVES["CutLength"][1] == "right"
+    assert set(drawing.SHELVES) == {
+        name for name, _value, _orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS
+    }
+    assert set(drawing.ARROWS_INSIDE) == {"SupplierLength", "CutLength"}
+    assert drawing.LIFTED == "SupplierHeadHeight"
+    # The stock-length lane plus its widest qualifier fits the left reserve.
+    assert drawing.SUPPLIER_MARGINS["*Front"][0] > lanes["SupplierLength"][1] + 0.062
+    sides = {name: (m[0], m[2]) for name, m in drawing.SUPPLIER_MARGINS.items()}
+    assert sides["*Front"] == sides["*Top"]
