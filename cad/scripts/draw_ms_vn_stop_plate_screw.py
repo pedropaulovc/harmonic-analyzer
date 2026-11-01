@@ -21,6 +21,9 @@ from _mcmaster_90114a124 import (
     SUPPLIER_REFERENCE_SIDES,
     SUPPLIER_REFERENCE_FORMATS,
 )
+from _machinist_review_mode import MachinistReviewMode
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ms_vn_stop_plate_screw"]
 # The footer's ITEM row: the catalogue designation in plain text.

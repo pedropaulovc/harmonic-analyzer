@@ -44,6 +44,9 @@ from _session import run_build
 from _supplier_spring_drawing import _preserve_reference_source_file
 from _supplier_wire_stock_drawing import STOCK_FIELD, STOCK_SCALE, add_wire_section
 from sh_vn_music_wire_pen_geom import CONFIGURATION as ISO_CONFIGURATION
+from _machinist_review_mode import MachinistReviewMode
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["sh_vn_music_wire"]
 PART_STEM = SPEC.artifact_stem
