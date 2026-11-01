@@ -166,6 +166,11 @@ FEED_ISO_XY, FEED_ISO_SCALE = (.360,.225), (1,2)
 VIEW_LETTER = 'D'
 VIEW_LETTER_HEIGHT = .005
 VIEW_ARROW_RUN = .015
+# VIEW D prints on sheet 2: the arrow's letter says so on a row under it,
+# centred under the letter, clear of the 4X DRILL leader above (review of
+# farm run 20261101T175835750Z).
+VIEW_SHEET_REF = '(SHEET 2)'
+VIEW_SHEET_REF_OFFSET = (-.010, -.008)
 # Nut interface, VIEW D, *Left at 2:1 on a 2:1 sheet, at .190,.175: Z runs
 # right from the bottom face at x 165.7, Y=0 prints at y 223, the lug end
 # (Y -68) at y 87; the leadscrew axis at 190.5,113, the TL-27 nut's two taps
@@ -186,7 +191,7 @@ NUT_KEEP = {
     'NutClearanceDia':(.135,.150),
 }
 NUT_CAPTION = 'VIEW D'
-NUT_CAPTION_XY = (.190,.058)
+NUT_CAPTION_XY = (.178,.058)  # the note's left edge; centred under the view
 # TL-32's cut-face sections hang their captions 6 mm under the face.
 SECTION_CAPTION_GAP = .006
 NUT_CALLOUT_XY = (.240,.085)
@@ -378,6 +383,10 @@ def _view_arrow(adapter, plan, contract) -> None:
     note = add_leader_note(adapter, VIEW_LETTER, text_xy=text_xy, attach_xy=tip, view=plan,
                            label=f'view {VIEW_LETTER} viewing arrow')
     _size_note(adapter, note, VIEW_LETTER_HEIGHT, label=f'view {VIEW_LETTER} arrow letter')
+    ref = add_note(adapter, VIEW_SHEET_REF, text_xy[0] + VIEW_SHEET_REF_OFFSET[0],
+                   text_xy[1] + VIEW_SHEET_REF_OFFSET[1])
+    if ref is None:
+        raise RuntimeError(f'failed to insert the view {VIEW_LETTER} sheet reference')
 
 
 async def draw_block(adapter, spec, contract, *, read_source_properties=None):
