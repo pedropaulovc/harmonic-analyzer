@@ -161,13 +161,14 @@ SIDE_KEEP = {
     "TipDomeR": (TIP_X - 0.012, SIDE_CENTER[1] - 0.016),
     "TipDomeSagDim": (TIP_X - 0.012, SIDE_CENTER[1] + 0.016),
     # The tip apex from the head seat, the pin's one faced origin (rule 11):
-    # the one controlled length at that end.
-    "TipDomeZ": ((SEAT_X + TIP_X) / 2.0, _ROW_Y - 0.022),
+    # the one controlled length at that end, under the station's three-row
+    # callout.
+    "TipDomeZ": ((SEAT_X + TIP_X) / 2.0, _ROW_Y - 0.027),
 }
 # The callouts and the dome heights' reference parentheses are authored on
 # the part's dimensions (``pd_transgear_pin_callouts``); the sheet only
 # proves they arrived.
-OVERALL_TEXT_XY = (SIDE_CENTER[0], _ROW_Y - 0.042)
+OVERALL_TEXT_XY = (SIDE_CENTER[0], _ROW_Y - 0.047)
 # The shank's upper silhouette, between the shank Ø's tolerance stack and the
 # head Ø (at 30 mm left of the seat its leader touched the -0.008).
 FINISH_PICK = (SEAT_X - 0.015, SHANK_TOP_Y)

@@ -42,13 +42,17 @@ MM_PER_IN = 25.4
 
 # --- Turned outline (contract §1.6) -------------------------------------------
 HEAD_DIA = 20.574  # .81, knurl crests: the diameter over the knurl
-# Straight knurl DIN 82 RAA 1.0 (R9-57): a 90° V at 1.0 mm pitch, so 64 teeth
-# round the Ø.81 (pitch 1.010 mm at the crest) and a 0.5 mm deep tooth; the
-# sketch's 128-point star puts crests on HEAD_DIA, roots on KNURL_ROOT_DIA.
+# Straight knurl, 25 TPI with a 90° tooth: the inch wheel's pitch is stated
+# in its own unit (machinist review round 2 found the metric "DIN 82-RAA 1.0"
+# pitch unlabelled, and an inch sheet prints no mm).  64 teeth round the Ø.81
+# (pitch 1.010 mm at the crest, 0.6 % off the wheel's 1.016) and a 0.5 mm
+# deep tooth; the sketch's 128-point star puts crests on HEAD_DIA, roots on
+# KNURL_ROOT_DIA.
 KNURL_TEETH = 64
 KNURL_ROOT_DIA = HEAD_DIA - 1.0  # 19.574, not printed
-KNURL_DESIGNATION = "DIN 82-RAA 1.0"
-KNURL_PITCH = 1.0
+KNURL_TPI = 25
+KNURL_DESIGNATION = f"{KNURL_TPI} TPI, 90° TOOTH"
+KNURL_PITCH = MM_PER_IN / KNURL_TPI
 KNURL_FLANK_ANGLE_DEG = 90.0
 WAIST_DIA = 10.922  # .43
 FLANGE_DIA = 12.446  # .49
@@ -92,7 +96,7 @@ def knurl_tooth_angle_deg(crest_dia: float, root_dia: float, teeth: int) -> floa
 # The modelled knurl is the designated one: its crest pitch within 1 % of
 # the wheel's (the wheel tracks the circumference), its V within 2° of 90°,
 # and an even tooth count so the section plane cuts a crest on both sides.
-KNURL_CREST_PITCH = math.pi * HEAD_DIA / KNURL_TEETH  # 1.006
+KNURL_CREST_PITCH = math.pi * HEAD_DIA / KNURL_TEETH  # 1.010
 KNURL_TOOTH_ANGLE_DEG = knurl_tooth_angle_deg(HEAD_DIA, KNURL_ROOT_DIA, KNURL_TEETH)
 if (
     abs(KNURL_CREST_PITCH - KNURL_PITCH) > 0.01 * KNURL_PITCH

@@ -73,11 +73,11 @@ def test_the_spring_room_stays_inside_the_springs_catalogue_travel(
     corner, never pressed past its catalogue working height.  A deeper floor
     (7.0) presses it past that height; the old 6.4 floor, without the retired
     MHA-PD-VN-67 shim, leaves it loose."""
-    assert joints.SPRING_ROOM_MIN == pytest.approx(0.696, abs=1e-3)
-    assert joints.SPRING_ROOM_MAX == pytest.approx(0.955, abs=1e-3)
+    assert joints.SPRING_ROOM_MIN == pytest.approx(0.693, abs=1e-3)
+    assert joints.SPRING_ROOM_MAX == pytest.approx(0.957, abs=1e-3)
     assert spring.WORKING_HEIGHT <= joints.SPRING_ROOM_MIN
     assert joints.SPRING_ROOM_MAX < spring.FREE_HEIGHT
-    assert joints.SPRING_PRELOAD_N == pytest.approx((18.83, 39.23), abs=0.01)
+    assert joints.SPRING_PRELOAD_N == pytest.approx((18.63, 39.43), abs=0.01)
     for floor in (7.0, 6.4):
         monkeypatch.setattr(arm, "SPOT_FACE_FLOOR_FROM_FRONT", floor)
         with pytest.raises(AssertionError, match="leaves the spring"):
@@ -93,7 +93,7 @@ def test_the_shallower_spot_face_gives_the_spring_its_model_room(monkeypatch) ->
         pivot.SHOULDER_LEN - spring.MODEL_HEIGHT
     )
     assert joints.SPRING_ROOM_NOMINAL == pytest.approx(spring.MODEL_HEIGHT)
-    monkeypatch.setattr(arm, "SPOT_FACE_FLOOR_FROM_FRONT", 6.91)
+    monkeypatch.setattr(arm, "SPOT_FACE_FLOOR_FROM_FRONT", 6.905)
     with pytest.raises(AssertionError, match="nominal room"):
         _reload_joints()
 

@@ -93,7 +93,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PivotTapProfile": {"PivotTapDrillDia"},
     "CountersinkReference": {"PivotCskDia", "BracketCskDia"},
     "ClampSlotProfile": {"ClampSlotWidth", "ClampSlotTravel"},
-    "ClampSlotCboreProfile": {"ClampSlotCboreWidth", "ClampSlotCboreTravel"},
+    # The counterbore's run is the slot's: one .118 between the shared end
+    # centres serves both (machinist review round 2: printed twice).
+    "ClampSlotCboreProfile": {"ClampSlotCboreWidth"},
     "ClampSlotCounterbores": {"ClampSlotCboreDepth"},
 }
 
@@ -118,7 +120,6 @@ SHEET_PRECISION: dict[str, dict[str, int]] = {
     },
     "ClampSlotCboreProfile": {
         "ClampSlotCboreWidth": CLAMP_SLOT_CBORE_WIDTH_PLACES,
-        "ClampSlotCboreTravel": CLAMP_SLOT_PLACES,
     },
     "ClampSlotCounterbores": {"ClampSlotCboreDepth": CLAMP_CBORE_DEPTH_PLACES},
 }
@@ -163,13 +164,15 @@ DIMENSION_CALLOUTS = {
     # and nears the counterbore's wall (clamp_slot_head_clearance); the
     # 2026-10-23 review read the take-up reason alone as no reason for the
     # width's band. The counterbore's minimum clears the slid MHA-SH-VN-53
-    # head. Short lines: detail C is 2:1 in a corner, and two lines keep the
-    # block between section B-B and the 440.50 line.
+    # head; the reason names no limit word, which under the two-sided band
+    # read as ".335 MIN" (machinist review round 2). Short lines: detail C is
+    # 2:1 in a corner, and two lines keep the block between section B-B and
+    # the 440.50 line.
     "ClampSlotWidth": (
         "THRU, MAX SEATS\nMHA-SH-VN-53 HEADS;\nTRAVEL AND STATIONS\n"
         "KEEP THE FULL TAKE-UP\nOF MHA-SH-02 PITCH"
     ),
-    "ClampSlotCboreWidth": "MIN CLEARS SLID\nMHA-SH-VN-53",
+    "ClampSlotCboreWidth": "CLEARS SLIDING\nMHA-SH-VN-53 HEADS",
     "ClampSlotCboreDepth": "MHA-SH-VN-53\nHEADS BELOW\nSLIDE FACE",
 }
 # The slot widths' count: both west slots share one detail.

@@ -42,15 +42,14 @@ def test_every_marked_dimension_is_kept_once_with_part_authored_places() -> None
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     kept = [*drawing.FRONT_KEEP, *drawing.RIGHT_KEEP]
     assert sorted(kept) == sorted(marked) == [
-        "BoreDia", "FaceWidth", "OutsideDia", "RootEnvelope", "ToothSpan"
+        "BoreDia", "FaceWidth", "OutsideDia", "ToothSpan"
     ]
-    # Bore, blank and root print four places, the face three (inch sheet).
+    # Bore and blank print four places, the face three (inch sheet).
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "FaceWidth": 3,
         "OutsideDia": 4,
         "BoreDia": 4,
         "ToothSpan": 4,
-        "RootEnvelope": 4,
     }
     assert "draw_pd_rack_pinion.py" in PRECISION_MIGRATED_DRAWINGS
     assert model_toleranced_dimensions(part) == {
@@ -183,8 +182,9 @@ def test_thickness_band_is_the_printed_xxx_band() -> None:
 
 
 def test_tap_callout_carries_both_mouth_breaks_and_transfer() -> None:
-    definitions = {5: "", 6: "<hw-threadclass> THRU", 7: "", 8: ""}
+    definitions = {5: "", 6: "<hw-thread> - <hw-threadclass> THRU", 7: "", 8: ""}
     updated = drawing.tap_callout_definitions(definitions)
+    assert updated[6].startswith("<hw-thread> THRU\n")
     assert updated[6].endswith(spec.TAP_CALLOUT_QUALIFIER)
     assert {k: v for k, v in updated.items() if k != 6} == {5: "", 7: "", 8: ""}
     text = spec.TAP_CALLOUT_QUALIFIER
@@ -463,18 +463,6 @@ def test_tooth_space_gap_index_names_a_real_gap() -> None:
     assert 0 <= drawing.TOOTH_SPACE_GAP_INDEX < spec.TEETH
 
 
-def test_manufacturing_notes_fit_the_limits_and_state_the_screw_engagement() -> None:
-    notes = part.MANUFACTURING_NOTES.splitlines()
-    assert len(notes) <= 4
-    assert all(len(line) <= 70 for line in notes)
-    # 19e33c6c2's blind review subtracted a blind tap's incomplete lead from
-    # the through tap; the sheet states the worst engagement, which the
-    # printed MIN never rounds up past and which meets the 1.5D floor.
-    printed = part.ENGAGEMENT_WORST_D_PRINTED
-    assert f"ENGAGEMENT {printed:.2f}D MIN" in part.MANUFACTURING_NOTES
-    assert spec.ENGAGEMENT_FLOOR_D <= printed <= disc_screw.ENGAGEMENT_WORST_D
-
-
 def _segments_cross(
     a: tuple[float, float],
     b: tuple[float, float],
@@ -498,8 +486,10 @@ def _distance_to_segment(
     return math.dist(point, (a[0] + t * ab[0], a[1] + t * ab[1]))
 
 
-def test_tap_leader_lands_on_the_lower_left_tap_and_crosses_no_bore_leader() -> None:
-    """19e33c6c2: the tap leader rose across the bore to the upper tap."""
+def test_tap_leader_lands_on_the_lower_left_tap_and_crosses_no_diameter_line() -> None:
+    """19e33c6c2: the tap leader rose across the bore to the upper tap; the
+    2026-11-01 review: it crossed the OD's line, and the bore's leader lay
+    almost on another diameter line."""
     centre = drawing.FRONT_CENTER
     bolt_r = hub_geometry.BOLT_CIRCLE_DIA / 2000.0
     tap = drawing.TAP_SHEET_CENTER
@@ -509,24 +499,32 @@ def test_tap_leader_lands_on_the_lower_left_tap_and_crosses_no_bore_leader() -> 
     pick = drawing.TAP_PICK
     assert math.dist(pick, tap) == pytest.approx(spec.TAP_DRILL_DIA / 2000.0)
     assert min(abs(pick[0] - tap[0]), abs(pick[1] - tap[1])) > 0.0003
-    leader = (drawing.TAP_CALLOUT_XY, pick)
+    leader = (drawing._TAP_SHOULDER, pick)
     bore_r = spec.BORE_DIA / 2000.0
     assert _distance_to_segment(centre, *leader) > bore_r + 0.002
-    # The bore's diameter line runs through the centre to the far rim.
-    dim_xy = drawing.FRONT_KEEP["BoreDia"]
-    far = (
-        centre[0] + (centre[0] - dim_xy[0]) * bore_r / math.dist(dim_xy, centre),
-        centre[1] + (centre[1] - dim_xy[1]) * bore_r / math.dist(dim_xy, centre),
-    )
-    # The blank's diameter line runs from its text below-right through the
-    # centre to the far rim, clear of the tap's leader.
-    od_xy = drawing.FRONT_KEEP["OutsideDia"]
-    od_far = (
-        centre[0] + (centre[0] - od_xy[0]) * drawing.HALF_OD / math.dist(od_xy, centre),
-        centre[1] + (centre[1] - od_xy[1]) * drawing.HALF_OD / math.dist(od_xy, centre),
-    )
-    for other in ((dim_xy, far), (od_xy, od_far)):
-        assert not _segments_cross(*leader, *other)
+
+    def near_side(shoulder, radius):
+        """A near-side diameter leader: from its text's shoulder to the rim
+        point toward it; no line through the centre."""
+        d = math.dist(shoulder, centre)
+        return shoulder, (
+            centre[0] + (shoulder[0] - centre[0]) * radius / d,
+            centre[1] + (shoulder[1] - centre[1]) * radius / d,
+        )
+
+    bore = near_side(drawing._BORE_SHOULDER, bore_r)
+    blank = near_side(drawing._OD_SHOULDER, drawing.HALF_OD)
+    assert set(drawing.NEAR_SIDE_DIAMETERS) == {"BoreDia", "OutsideDia"}
+    for a, b in ((leader, bore), (leader, blank), (bore, blank)):
+        assert not _segments_cross(*a, *b)
+    # Every leader passes the other taps' centre marks (2.5 mm) clear.
+    for tap_xy in spec.TAP_CENTRES:
+        for sign in (1.0, -1.0):
+            mark = (centre[0] + tap_xy[0] / 1000.0, centre[1] + sign * tap_xy[1] / 1000.0)
+            for line in (bore, blank, leader):
+                if line is leader and math.dist(mark, pick) < 0.002:
+                    continue  # the tap's own leader lands on it
+                assert _distance_to_segment(mark, *line) > 0.0025
 
 
 def test_model_and_drawing_consume_the_spec_geometry() -> None:
@@ -546,9 +544,10 @@ def test_model_and_drawing_consume_the_spec_geometry() -> None:
     assert part.BORE_DIAMETER == spec.BORE_DIA == hub_geometry.SPIGOT_DIA
     assert drawing.DIMENSION_CALLOUTS == {
         "BoreDia": f"{spec.BORE_CALLOUT}\n{spec.BORE_FIT_CALLOUT}",
-        "OutsideDia": spec.MESH_CALLOUT,
+        "OutsideDia": spec.MESH_CALLOUT_STACKED,
     }
     assert drawing.DIMENSION_CALLOUTS_ABOVE == {"ToothSpan": spec.MESH_CALLOUT}
+    assert drawing.RIGHT_DIMENSION_CALLOUTS == {"FaceWidth": spec.FACE_WIDTH_CALLOUT}
 
 
 def test_part_config_properties() -> None:

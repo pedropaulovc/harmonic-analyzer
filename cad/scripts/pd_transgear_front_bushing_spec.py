@@ -53,12 +53,13 @@ BORE_CALLOUT = (
 )
 # 45 deg, on the ring face's O.D. edge: a single MAX limit (the MHA-160
 # precedent).  Only its largest size matters: it must leave the MHA-PD-VN-61
-# ring a full bearing flat (checked below).
+# ring a full bearing flat (checked below).  The part authors " MAX" as the
+# size's suffix: SolidWorks' native swTolMAX prints a lowercase "max." that
+# reads unlike every other callout (machinist review round 2).
 FRONT_CHAMFER = 0.508  # .02 MAX
-FRONT_CHAMFER_BAND = (0.0, -0.254)  # (upper, lower), down to .01
-FRONT_CHAMFER_TOL_TYPE = 6  # swTolType_e.swTolMAX
 FRONT_CHAMFER_PLACES = 2
-CHAMFER_CALLOUT = " X 45 DEG"
+CHAMFER_SUFFIX = " MAX"
+CHAMFER_CALLOUT = "X 45\u00b0"
 
 WALL_NOMINAL = (OD - BORE_DIA) / 2.0
 WALL_WORST = (

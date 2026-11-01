@@ -1,6 +1,6 @@
 r"""MHA-PD-17 transgear-disc-hub: the brass hub and flange in front of the reducer disc.
 
-The retained Ø.520 turned hub has a .313 +.0010/+.0005 bore (an owned .3135
+The retained Ø.52 turned hub has a .313 +.0010/+.0005 bore (an owned .3135
 reamer) on the pinion sleeve's (MHA-PD-10) .313 +.0005/.0000 boss and drives
 through its D-flat, with a Ø.990 × .094 flange and a Ø.501 SHAFT_H rear
 spigot.  The spigot passes the reducer disc's (MHA-PD-06)
@@ -106,14 +106,16 @@ SCREW_MAJOR_DIA, SCREW_LENGTH, SCREW_HEAD_H, SCREW_HEAD_DIA, _SCREW_PITCH = (
 SCREW_HEAD_DIA_ALLOWANCE = 0.05
 
 # --- turned body ------------------------------------------------------------
-# .XXX on both diameters: the bore's walls and the heads' air read the body,
-# the hole-to-rim wall the flange.
+# The flange's .XXX holds the screw holes' wall to its rim (at .XX the wall
+# falls under the target), so its dimension names that.  The body's walls
+# over the bore and flat and the heads' air read the hub diameter too, but
+# hold at .XX.
 FLANGE_DIA = 25.146  # .990
 FLANGE_DIA_PLACES = 3
 FLANGE_THICK = 2.3876  # .094
 FLANGE_THICK_PLACES = 3  # the screw-tip-to-platen stack reads it (R9-5)
-HUB_DIA = 13.208  # .520
-HUB_DIA_PLACES = 3
+HUB_DIA = 13.208  # .52
+HUB_DIA_PLACES = 2
 # The spigot (``pd_transgear_disc_hub_geometry``): its SHAFT_H band is the
 # model's, its length the cluster's printed band.
 SPIGOT_DIA_DEVIATIONS = deviations(SPIGOT_DIA_BAND)
@@ -465,6 +467,10 @@ SPIGOT_LENGTH_CALLOUT = STACK_NAME
 # The flange's .XXX thickness sets the disc screws' reach (the cut window
 # in pd_vn_transgear_disc_screw_spec reads it).
 FLANGE_THICK_CALLOUT = f"SETS {SCREW_NAME}\n{SCREW_NUMBER} REACH"
+# The two .XXX sizes the screw holes' walls read (hole_to_rim_worst,
+# HOLE_TO_BORE_WORST; the disc's tap-to-bore wall reads the circle too).
+FLANGE_DIA_CALLOUT = "HOLE WALL\nTO RIM"
+BOLT_CIRCLE_CALLOUT = "SETS HOLE WALLS\nTO BORE AND RIM"
 # The spigot's native SHAFT_H limits print with the dimension; the callout
 # names its sharp root, the mate and the clearance the pair gives.
 SPIGOT_CALLOUT_BELOW = "\n".join(
@@ -484,10 +490,14 @@ SPIGOT_CALLOUT_BELOW = "\n".join(
 # (dt_crank_pinion_spec.pin_hole_note).
 SCREW_HOLE_CALLOUT_ABOVE = f"{SCREW_COUNT}X"
 SCREW_HOLE_CALLOUT_BELOW = "DRILL THRU FLANGE, EQ SP"
+# The hole is drilled on +Y, through the round wall opposite the bore's
+# flat on -Y (the face view shows the flat), into the bore.
 OIL_HOLE_CALLOUT_BELOW = "\n".join(
     (
-        "MATCH DRILL AT ASSY THRU HUB WALL AND",
-        f"{SLEEVE_NAME} {SLEEVE_NUMBER} WITH HUB SEATED",
+        "MATCH DRILL AT ASSY WITH",
+        "HUB SEATED ON FEED PINION",
+        f"{SLEEVE_NUMBER}, THRU ONE WALL",
+        "OPPOSITE BORE FLAT",
     )
 )
 

@@ -197,7 +197,8 @@ if LOCATOR_PUNCH_AIR_MIN_MM <= 0.0:
 # screw's engagement are judged at it (codjiflo review of #2015).
 STOCK_THICKNESS_BAND_IN_TEXT = f"±{_inch(ARM.THICKNESS_BAND, 3)}"
 STOCK_TEXT_PREFIX = f"{STOCK_THICKNESS_IN} {STOCK_THICKNESS_BAND_IN_TEXT} ("
-STOCK_TEXT_SUFFIX = ") GROUND STOCK"
+# REF: an as-bought size with the supplier's tolerance (units guidance).
+STOCK_TEXT_SUFFIX = ") GROUND STOCK REF"
 PLATE_TAP_EDGE_BREAK_CALLOUT = (
     f"ENTRY / EXIT EDGE BREAK {_inch(ARM.PLATE_TAP_ENTRY_BREAK_MAX_MM, 3)} MAX BOTH SIDES"
 )
@@ -230,20 +231,22 @@ if set(PROJECTED_ZONE_DIRECTION) != {
 # The heights are sheet-derived (each measures its own chain line) and print
 # to DRAWING_REFERENCE_PRECISION, as the frames print them (Ⓟ .580, Ⓟ 1.273).
 # The counterbore seats the MHA-PD-VN-63 spring's rim under the MHA-PD-VN-57
-# head, and its floor from the FRONT face sets the spring's room there
-# (transgear_hanger_joints.SPRING_ROOM_*): the callout names the spring, and
-# the floor's text says what its band sets (rule 4 (name the mate)).
+# head, and its floor from the FRONT face (datum A) sets the spring's room
+# there (transgear_hanger_joints.SPRING_ROOM_*): the callout names the
+# spring, and the floor's text says what its band sets (rule 4 (name the
+# mate)).  Machinist review (all three runs): "REAR FACE" / "FRONT FACE" read
+# against the plan, which is drawn from the rear, so both callouts name the
+# faces by datum A, which section A-A tags on the front face.
 _SPRING = _config.parts("pd-vn-transgear-pivot-spring")
 _PIVOT_SCREW = _config.parts("pd-vn-transgear-pivot-screw")
 SPOT_FACE_CALLOUT = "\n".join((
-    "COUNTERBORE, REAR FACE",
+    "COUNTERBORE OPPOSITE A",
     f"SEATS PIVOT SPRING {_SPRING['number']}",
 ))
 # The floor's band names the mate it serves at its own callout (review of
 # 2ac1bdb28, rule 4): it sets the pivot spring's preload.
 FLOOR_DEPTH_CALLOUT = "\n".join((
-    "FLOOR FROM",
-    "FRONT FACE:",
+    "FLOOR FROM A:",
     "SETS PRELOAD OF",
     "PIVOT SPRING",
     _SPRING["number"],

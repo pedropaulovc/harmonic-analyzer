@@ -173,8 +173,8 @@ if type(CHAIN_LINK_COUNT) is not int or CHAIN_LINK_COUNT <= 0 or CHAIN_LINK_COUN
 # configuration at .XX as a REFERENCE only: it is not a turning operation.
 #
 # The supplied .110 plate (seat.PLATE 2.8 is the shared stack's value) prints
-# .110 +.000/-.003: 2.718..2.794, inside the 2.7..2.8 every chain-float and
-# drive-pin stack reads (seat.PLATE_BAND).
+# as the limits .110/.107: 2.718..2.794, inside the 2.7..2.8 every chain-float
+# and drive-pin stack reads (seat.PLATE_BAND).
 PLATE_PLACES = 3
 PLATE_PRINTED_BAND = (0.0, -0.0762)  # (upper, lower): +.000/-.003
 # Each pin centre prints .2756 (the shared 7.0 at four places) +/-.0009, the

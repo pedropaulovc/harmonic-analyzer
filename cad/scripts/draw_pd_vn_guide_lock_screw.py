@@ -6,7 +6,6 @@ import argparse
 import sys
 from typing import Any
 
-from _machinist_review_mode import MachinistReviewMode
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -22,9 +21,6 @@ from _mcmaster_91792a108 import (
     SUPPLIER_REFERENCE_FORMATS,
 )
 
-
-# Cached machinist review leaf: LEARN until the sheet reaches SHIP.
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
 
 SPEC = DRAWINGS_BY_NAME["pd_vn_guide_lock_screw"]
 # The footer's ITEM row: the catalogue designation in plain text.

@@ -44,18 +44,15 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 
 def test_the_chamfer_prints_a_max_the_ring_never_reaches() -> None:
-    """The O.D. break prints as a single MAX limit (swTolMAX prints the
-    nominal, so the nominal is the max); the MHA-PD-VN-61 ring bears wholly on the
-    flat inside the largest chamfer on the smallest O.D."""
-    assert spec.FRONT_CHAMFER_TOL_TYPE == 6  # swTolType_e.swTolMAX
-    assert spec.FRONT_CHAMFER_BAND[0] == 0.0 > spec.FRONT_CHAMFER_BAND[1]
+    """The O.D. break prints as a single MAX limit (the modelled size is the
+    max); the MHA-PD-VN-61 ring bears wholly on the flat inside the largest
+    chamfer on the smallest O.D."""
     flat_dia_min = (
         spec.OD
         - printed_band_mm(spec.OD_PLACES, unit=spec.UNIT)
         - 2.0 * spec.FRONT_CHAMFER
     )
     assert ring.OD < flat_dia_min
-    assert drawing.DIMENSION_CALLOUTS["FrontChamferSize"].strip() == "X 45 DEG"
 
 
 def test_the_bore_and_the_printed_length_carry_model_bands() -> None:

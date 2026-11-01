@@ -80,30 +80,17 @@ def test_boss_walls_survive_the_printed_band():
     assert spec.SOCKET_BOSS_WALL_MIN >= WALL_TARGET_MM
 
 
-def test_boss_roots_print_a_single_max_limit_on_the_right_view():
-    # r7 review: the 4X tap bosses' root corner was unstated.  Each takes the
-    # tool-nose round up to R.020, printed "4X R.020 MAX": swTolMAX prints the
-    # nominal, so the model carries the limit and its band runs down to sharp.
-    assert spec.SOCKET_BOSS_FILLET_R == pytest.approx(0.020 * 25.4)
-    assert spec.SOCKET_BOSS_FILLET_BAND == (0.0, -spec.SOCKET_BOSS_FILLET_R)
-    places = spec.DRAWING_PRECISION_BY_NAME["BossFilletR"]
-    printed = spec.SOCKET_BOSS_FILLET_R / 25.4 * 10**places
-    assert printed == pytest.approx(round(printed))
-    # The printed round is the upper boss nearest the right view's eye (+X);
-    # the build rounds it alone and the other three in a second feature, both
-    # on one global, each picked on its root circle at the back face.
-    assert spec.SOCKET_BOSS_FILLET_PRINTED_XY == (
-        max(x for x, _ in spec.SOCKET_XY),
-        max(y for _, y in spec.SOCKET_XY),
-    )
-    # The text stands up-left of the upper boss's root, left of its end face
-    # (half of ~28 mm of text) and under the thickness's outside arrow.
-    x, y = draw.RIGHT_KEEP["BossFilletR"]
-    boss_end_x = draw._right_x(spec.PLATE_THICKNESS + spec.SOCKET_BOSS_H)
-    assert x + 0.014 < boss_end_x - 0.002
-    root_y = draw._right_y(max(y for _, y in spec.SOCKET_XY) + spec.SOCKET_BOSS_DIA / 2)
-    assert abs(y - root_y) < 0.003
-    assert y + TEXT_HALF_H < 0.2458 - 0.002
+def test_boss_roots_stay_inside_the_title_block_inside_corner_limit():
+    # Machinist review round 2: nothing seats on the boss roots, so the title
+    # block's inside-corner limit governs them unprinted; the modelled round
+    # lies inside it and the assembly sweep grows each boss by the limit.
+    from _printed_tolerance import inside_corner_radius_mm
+
+    limit = inside_corner_radius_mm(unit=spec.UNIT)
+    assert spec.SOCKET_BOSS_ROOT_R_MAX == limit == pytest.approx(0.040 * 25.4)
+    assert 0.0 < spec.SOCKET_BOSS_FILLET_R <= limit
+    printed = {n for names in spec.DRAWING_DIMENSIONS.values() for n in names}
+    assert not any("Fillet" in name for name in printed)
 
 
 def test_counterbore_floor_holds_the_user_accepted_worst_case():

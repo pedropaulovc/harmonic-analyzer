@@ -7,7 +7,7 @@ authority for what two parts cut and must agree on: the brass hub's flange
 holes and the reducer disc (MHA-PD-06, ``rack_pinion_spec``) the #0-80 taps;
 the three 91794A055 fillister screws (MHA-PD-VN-55) join them on a Ø.748
 circle, which keeps the disc's taps .080 clear of its Ø.501 bore at the worst
-case (``rack_pinion_spec`` checks it; the heads stand clear of the Ø.520 hub
+case (``rack_pinion_spec`` checks it; the heads stand clear of the Ø.52 hub
 body).  The hub's rear spigot passes the disc's bore and seats on
 the MHA-PD-10 sleeve's step face (R9-68): its diameter is the disc's locating
 fit and its length the disc front face's station ahead of the step, so the

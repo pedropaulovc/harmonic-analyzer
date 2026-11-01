@@ -13,14 +13,13 @@ edge -- lands where the layout puts it):
   end's X -- and the far face where the pin crosses it, in X and Y from the
   origin as references, the Y flagged as the pin's axis at that face; the
   pin hole's size, match-drilled at assembly (note 2 names the pin);
-* ``*Right`` (looking -X, Z running left): the width, the arm's front-edge
-  heights above and below the taper, the root relief and the full round;
-  left of it the formed overall height, a reference from the ear's top edge
-  to the full round's tip; beside it the flat pattern, the part's hidden
-  ``FlatBlank`` reference sketch shown in this view only (a thin outline
-  labelled FLAT PATTERN): the blank across the bend, the arm's strip widths
-  as references, and its developed stations of the taper and the round's
-  centre;
+* ``*Right`` (looking -X, Z running left): the width, the root relief and
+  the full round; left of it the formed overall height, a reference from
+  the ear's top edge to the full round's tip; beside it the flat pattern,
+  the part's hidden ``FlatBlank`` reference sketch shown in this view only (a
+  thin outline labelled FLAT PATTERN): the blank across the bend, the arm's
+  two strip widths (its controlling widths), and its developed stations of
+  the taper and the round's centre;
 * ``*Bottom`` (looking +Y, X right, Z up), projected under the front view
   (third angle, so unlabelled): the base length, the ear height and the
   inside bend.
@@ -107,8 +106,8 @@ from pd_latch_hook_spec import (
     SCREW_HOLE_MATE,
 )
 
-# Cached machinist review leaf: LEARN until the sheet reaches SHIP.
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_latch_hook"]
 PART_STEM = SPEC.artifact_stem
@@ -213,14 +212,12 @@ FRONT_KEEP = {
         TAB_C_L[1] + 22.0 * math.sin(math.radians(175.0)),
     ),
 }
-# Side view: the width left of the ear, the two front-edge heights stacked
-# above it, the root relief right of its corner, the round under the tip;
-# the flat's length above it, its two strip widths left of it (between the
-# views), and its developed stations stacked to its right.
+# Side view: the width left of the ear, the root relief right of its corner,
+# the round under the tip; the flat's length above it, its two strip widths
+# (the arm's controlling widths) left of it, between the views, and its
+# developed stations stacked to its right.
 RIGHT_KEEP = {
     "Width": _right(26.0, 4.0),
-    "ArmFrontZ": _right(3.0, 13.0),
-    "ArmLowZ": _right(2.25, 19.0),
     "RootR": _right(-4.0, -8.0),
     "RoundR": _right(-6.0, -95.0),
     "FlatLength": _flat(FLAT_GAP + FLAT_LENGTH / 2.0, 14.0),
@@ -432,8 +429,8 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     _shorten_radii(adapter, annotations, SHORTENED_RADII)
-    # The far face at the pin (located at fit-up on the pin's axis) and the
-    # flat pattern's strip widths print as references.
+    # The far face at the pin (located at fit-up on the pin's axis) prints
+    # as a reference.
     by_name = {dimension_name(adapter, a): a for a in annotations}
     for name in sorted(REFERENCE_DIMENSIONS):
         set_reference_dimension(adapter, by_name[name], label=f"MHA-PD-14 {name}")

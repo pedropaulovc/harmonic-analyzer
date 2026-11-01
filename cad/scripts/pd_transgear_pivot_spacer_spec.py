@@ -59,10 +59,11 @@ BORE_DIA_MIN = round(BORE_DIA + BORE_DIA_BAND[1], 6)
 BORE_CALLOUT = "REAM THRU"
 # 5.0: the bar grew 0.5 rearward under the arm (user ruling 2026-10-15), so
 # the ring gives it up and the hanger stays put.  It keeps 5.0 (#290: it
-# sets the arm's Z, the chain plane's datum) and prints .1969 ±.0020; the
+# sets the arm's Z, the chain plane's datum) and prints .197 ±.002 on the
+# .001 grid (machinist review: a fourth place was a soft-converted 5 mm); the
 # spring room (transgear_hanger_joints) is judged at that print's reach.
 LENGTH = 5.0
-LENGTH_PLACES = 4
+LENGTH_PLACES = 3
 LENGTH_TOLERANCE = 0.0508  # ±.002
 LENGTH_BAND = max(
     abs(deviation)
@@ -135,8 +136,8 @@ FACE_PERPENDICULARITY_ZONE_DIA = OD - OD_BAND - 2.0 * EDGE_BREAK
 # Marked model dimensions and the places the part authors on them (policy
 # drawing-simplicity-policy.md `How the repository implements the guidelines`).
 # The O.D. prints at .XX under the title block's row; the length
-# (LENGTH_TOLERANCE) and the bore (BORE_DIA_BAND) print at four places under
-# their own model bands.
+# (LENGTH_TOLERANCE) at three places and the bore (BORE_DIA_BAND) at four,
+# under their own model bands.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RingProfile": {"RingOd", "BoreDia"},
     "Ring": {"RingLength"},

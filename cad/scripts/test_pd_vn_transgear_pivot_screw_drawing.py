@@ -1764,6 +1764,7 @@ def _record_drawing_build(
     monkeypatch.setattr(drawing, "set_dimension_callouts", lambda *_args: None)
     monkeypatch.setattr(drawing, "offset_dimension_text", lambda *_args: None)
     monkeypatch.setattr(drawing, "_add_supplier_references", lambda *_args: references)
+    monkeypatch.setattr(drawing, "_blacken_shoulder_witnesses", lambda *_args: None)
     monkeypatch.setattr(drawing, "_align_top_origin", lambda *_args: lambda: None)
     monkeypatch.setattr(drawing, "_trim_top_mark", lambda *_args: lambda: None)
     monkeypatch.setattr(drawing, "_move_tail_column", lambda *_args: (lambda: None, {}))

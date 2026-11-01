@@ -140,7 +140,8 @@ SPOT_FACE_DIA_GROWTH = drilled_oversize_mm(unit=UNIT)  # +.004/0 (drilled row)
 # restored.  It is the spring's seat (exempt from the inch grid, the spring
 # model is untouched): it keeps 6.9, so the room's nominal stays the
 # spring's 0.80 model height, and prints .2717 ±.0020; the room is judged
-# at that print's reach (0.696..0.955, inside the spring's travel).
+# at that print's reach (0.693..0.957 with the spacer's .197 ±.002, inside
+# the spring's travel).
 SPOT_FACE_FLOOR_FROM_FRONT = 6.9
 SPOT_FACE_FLOOR_PLACES = 4
 SPOT_FACE_FLOOR_TOLERANCE = 0.0508  # ±.002

@@ -114,7 +114,7 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
-# The end view's section line stands right of the bore fit note's leader.
+# The end view's section line stands left of the bore fit note's leader.
 # It looks at the rear face (*Back): the section looks along model +X with
 # the rear face left, so its third-angle left view sees the rear face.
 END_VIEW_ORIENTATION = "*Back"
@@ -349,14 +349,17 @@ OIL_HOLE_CALLOUT = (OIL_HOLE_EDGE[0] - 0.008 - _OIL_HOLE_NOTE_WIDTH, _SIDE_TOP +
 NOTE_HEIGHT = 0.0025
 
 _BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
-# The finite-form data block uses the upper-left lane; the bore-fit note
-# remains within the air above the end view, preserving its leader.  It
-# stands 17 mm higher than at the 2026-10-24 review, whose crop showed its
-# last row's ")" struck by the 11 o'clock tooth, and clear above the section
-# line's upper "B", which the rear-face end view turns left, under the note.
+# The finite-form data block uses the upper-left lane.  The bore-fit note
+# stands upper RIGHT of the end view, between it and the section's bore
+# dimension, its leader landing on the bore's 45° point: from the upper
+# left (2026-11-01 review, r3) the leader ran through the tip of the
+# section line's upper "B" arrowhead, which the rear-face end view turns
+# left, under that lane.  From the right it meets neither arrow nor label,
+# and stays above the span's extension lines, which cross the gear on the
+# -45° diagonal below the 45° point.
 GEAR_DATA_XY = (0.016, 0.262)
 GEAR_DATA_CHAR_HEIGHT = 0.0025
-BORE_FIT_NOTE = (0.016, 0.211)
+BORE_FIT_NOTE = (0.094, 0.204)
 BORE_FIT_CHAR_HEIGHT = 0.0022
 # Separate radial-runout and relative-index controls share one source-linked
 # callout on the real finite tooth flank, not the OD. Its three rows use the
@@ -382,8 +385,8 @@ TOOTH_EDGE_ATTACH = (
 NOTES_XY = (0.016, TOOTH_EDGE_NOTE_XY[1] - 0.0100)
 TOOTH_SPACE_CALLOUT_CHAR_HEIGHT = 0.0035
 BORE_FIT_ATTACH = (
-    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(135.0)),
-    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(135.0)),
+    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(45.0)),
+    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(45.0)),
 )
 # The section's native caption, placed by its top centre, sits below the
 # stacked lengths, the overall's two-row callout the lowest.

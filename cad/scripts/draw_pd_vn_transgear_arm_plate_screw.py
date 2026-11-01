@@ -23,8 +23,8 @@ from pd_vn_transgear_arm_plate_screw_spec import (
 )
 
 
-# Cached machinist review leaf: LEARN until the sheet reaches SHIP.
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_arm_plate_screw"]
 # The footer's ITEM row: the catalogue designation in plain text.

@@ -34,8 +34,9 @@ length here stays physical millimetres.  How the sheet locates things:
   wall;
 * the width at the .XX row: the ear's +Y edge in the guide-lock sweep (the
   paper-drive assembly's check) and the screw holes' y-edge walls;
-* the ear height and the arm's two front-edge heights (its z band, from the
-  base's underside) at .XX: the pin hole's walls and the lock sweep;
+* the ear height at .XX and the arm's two strip widths (above and below the
+  taper, from the ear's top edge) at .XX on the flat pattern: the pin hole's
+  walls and the lock sweep;
 * the inside bend radius R.048 +.011/-.008 (R.059 the largest the screw
   head clears); the 90 deg bend at the title block's angular row;
 * every formed arm feature (roll, straight, tab) ±FORMED_BAND at .XXX, the
@@ -53,8 +54,7 @@ length here stays physical millimetres.  How the sheet locates things:
   its own FLAT PATTERN label): the blank's length across the bend and the
   arm's developed stations of the taper and the full round's centre, at .XX
   (developed from the formed part, so off the grid; no check reads them),
-  and the arm's two strip widths as references (they follow from the ear
-  height and the front-edge heights).
+  and the arm's two strip widths (the controlling widths above).
 * the formed overall height, the ear's top edge to the full round's tip: a
   reference only, at DRAWING_REFERENCE_PRECISION.
 
@@ -79,6 +79,7 @@ from _printed_tolerance import (
     printed_deviations,
 )
 from pd_latch_hook_geometry import (
+    ARM_W,
     ARM_Z0,
     ARM_Z1,
     BASE_LENGTH,
@@ -86,6 +87,7 @@ from pd_latch_hook_geometry import (
     EAR_HEIGHT,
     INSIDE_BEND_R,
     INSIDE_BEND_R_MAX,
+    LOW_W,
     PIN_HOLE_DIA,
     PIN_HOLE_ZL,
     ROUND_R,
@@ -119,7 +121,7 @@ WIDTH_PLACES = 2
 WIDTH_TOL = printed_band_mm(WIDTH_PLACES, unit=UNIT)
 BASE_LENGTH_PLACES = 2
 EAR_HEIGHT_PLACES = 2
-ARM_BAND_PLACES = 2  # the arm's z-band edges, from the base's underside
+ARM_WIDTH_PLACES = 2  # the arm's strip widths, from the ear's top edge
 FORMED_BAND = 0.508  # ±.020 on every formed arm feature (roll, straight, tab)
 FORMED_PLACES = 3
 # The far face at the pin prints X and Y from the origin as references: the
@@ -185,6 +187,13 @@ _WIDTH_LOW = printed_deviations(
     WIDTH, WIDTH_PLACES, (-WIDTH_TOL, WIDTH_TOL), unit=UNIT
 )[0]
 _BASE_LOW = _row(BASE_LENGTH, BASE_LENGTH_PLACES)[0]
+# How far the arm's front edge may stand forward (-Z) of the model at the
+# printed worst case: the shortest ear less the widest strip, the larger of
+# the two strips (the paper-drive assembly's lock sweep reads it).
+ARM_FRONT_FORWARD = max(
+    _row(width, ARM_WIDTH_PLACES)[1] - _row(EAR_HEIGHT, EAR_HEIGHT_PLACES)[0]
+    for width in (ARM_W, LOW_W)
+)
 _HOLE_GROW = HOLE_GROWTH / 2.0
 _SCREW_R = SCREW_HOLE_DIA / 2.0
 _PIN_R = PIN_HOLE_DIA / 2.0
@@ -218,7 +227,10 @@ def _screw_web() -> tuple[float, float]:
 def _pin_front_edge() -> tuple[float, float]:
     """The pin hole to the arm's front edge below the taper."""
     nominal = PIN_HOLE_ZL - _PIN_R - ARM_Z0
-    return nominal, nominal - _row(ARM_Z0, ARM_BAND_PLACES)[1] - _HOLE_GROW
+    # The front edge is the ear height less the low strip width: rearward
+    # (toward the hole) with the tallest ear and the narrowest strip.
+    rearward = _row(EAR_HEIGHT, EAR_HEIGHT_PLACES)[1] - _row(LOW_W, ARM_WIDTH_PLACES)[0]
+    return nominal, nominal - rearward - _HOLE_GROW
 
 
 def _pin_rear_edge() -> tuple[float, float]:
@@ -325,11 +337,9 @@ FORMED_DIMENSIONS: dict[str, set[str]] = {
     "ArmProfile": {"RollStart", "RollR", "StraightLen", "TabR", "TabEndX"},
 }
 # The far face at the pin: printed in parentheses (see the band comment).
-FACE_REFERENCES = frozenset({"FaceX", "FaceY"})
-# The arm's strip widths on the flat pattern, above and below the taper:
-# references, the ear height less each front-edge height.
-FLAT_WIDTH_REFERENCES = frozenset({"FlatArmW", "FlatLowW"})
-REFERENCE_DIMENSIONS = FACE_REFERENCES | FLAT_WIDTH_REFERENCES
+REFERENCE_DIMENSIONS = frozenset({"FaceX", "FaceY"})
+# The arm's strip widths, above and below the taper, on the flat pattern.
+ARM_WIDTH_DIMENSIONS = frozenset({"FlatArmW", "FlatLowW"})
 POSITION_DIMENSIONS: dict[str, tuple[str, ...]] = {
     "ScrewHoleProfile": ("ScrewX1", "ScrewX2", "ScrewY"),
 }
@@ -338,14 +348,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BaseEar": {"Width"},
     "InsideBend": {"InsideBendR"},
     "ScrewHoleProfile": {"ScrewX1", "ScrewX2", "ScrewY", "ScrewDia"},
-    "ArmProfile": FORMED_DIMENSIONS["ArmProfile"] | FACE_REFERENCES,
-    "Arm": {"ArmLowZ"},
-    "TaperProfile": {"ArmFrontZ"},
+    "ArmProfile": FORMED_DIMENSIONS["ArmProfile"] | REFERENCE_DIMENSIONS,
     "RootRelief": {"RootR"},
     "RoundProfile": {"RoundR"},
     "PinHoleProfile": {"PinHoleDia"},
     FLAT_SKETCH: {"FlatLength", "DevTaper1", "DevTaper2", "DevRoundC"}
-    | FLAT_WIDTH_REFERENCES,
+    | ARM_WIDTH_DIMENSIONS,
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BaseEarProfile": {
@@ -363,13 +371,12 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ArmProfile": {
         name: FORMED_PLACES for name in sorted(DRAWING_DIMENSIONS["ArmProfile"])
     },
-    "Arm": {"ArmLowZ": ARM_BAND_PLACES},
-    "TaperProfile": {"ArmFrontZ": ARM_BAND_PLACES},
     "RootRelief": {"RootR": ROOT_R_PLACES},
     "RoundProfile": {"RoundR": ROUND_R_PLACES},
     "PinHoleProfile": {"PinHoleDia": HOLE_PLACES},
     FLAT_SKETCH: {
-        name: FLAT_PLACES for name in sorted(DRAWING_DIMENSIONS[FLAT_SKETCH])
+        name: ARM_WIDTH_PLACES if name in ARM_WIDTH_DIMENSIONS else FLAT_PLACES
+        for name in sorted(DRAWING_DIMENSIONS[FLAT_SKETCH])
     },
 }
 _PRECISION_NAMES = [

@@ -52,11 +52,10 @@ from _visibility import blank_reference_geometry
 from pd_transgear_front_bushing_spec import (
     BORE_DIA,
     BORE_DIA_BAND,
+    CHAMFER_SUFFIX,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FRONT_CHAMFER,
-    FRONT_CHAMFER_BAND,
-    FRONT_CHAMFER_TOL_TYPE,
     ISOMETRIC_VIEW_NOTE,
     LENGTH,
     LENGTH_BAND,
@@ -83,30 +82,21 @@ V_TOTAL = V_RING - V_CHAMFER
 
 
 def _chamfer_max_limit(adapter) -> None:
-    """FrontChamferSize as a MAX single limit carrying the band's deviations."""
-    lower, upper = deviations(FRONT_CHAMFER_BAND)
-    _, dimension = _named_dimension(adapter, "FrontChamfer", "FrontChamferSize")
+    """FrontChamferSize as the single limit ".02 MAX": the modelled size IS
+    the max, and the part authors the MAX as the size's suffix (the drawing
+    reads it back; a sheet-side SetText writes through to the part, #1942)."""
+    display, dimension = _named_dimension(adapter, "FrontChamfer", "FrontChamferSize")
     label = "FrontChamferSize@FrontChamfer"
     value = float(dimension.SystemValue)
     if not math.isclose(value, FRONT_CHAMFER / 1000.0, abs_tol=1e-9):
         raise RuntimeError(
-            f"{label}: nominal {value * 1000.0:.7f} is not the band's max {FRONT_CHAMFER}"
+            f"{label}: nominal {value * 1000.0:.7f} is not the limit {FRONT_CHAMFER}"
         )
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = FRONT_CHAMFER_TOL_TYPE
-    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
-        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
-    if (
-        int(tolerance.Type) != FRONT_CHAMFER_TOL_TYPE
-        or not math.isclose(
-            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
-        )
-        or not math.isclose(
-            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
-        )
-    ):
-        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
-    _telemetry.success(f"{label}: single limit {FRONT_CHAMFER:g} MAX")
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetText(2, CHAMFER_SUFFIX)  # swDimensionTextSuffix
+    if str(display.GetText(2) or "") != CHAMFER_SUFFIX:
+        raise RuntimeError(f"{label}: the MAX suffix did not persist")
+    _telemetry.success(f"{label}: single limit {FRONT_CHAMFER:g}{CHAMFER_SUFFIX}")
 
 
 async def build(adapter) -> dict[str, str]:

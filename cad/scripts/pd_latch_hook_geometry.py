@@ -104,13 +104,14 @@ def on_arm(station: float, offset: float = 0.0) -> tuple[float, float]:
 
 
 # --- Machine z bands -------------------------------------------------------------
-# Heights above the base's underside (the bar's back face), printed .XX.
+# Heights above the base's underside (the bar's back face).  The sheet prints
+# the ear height and the arm's two strip widths from the ear's top, all .XX.
 EAR_HEIGHT = 15.494  # .61: the ear's top, the arm's rear edge
 Z_REAR = BAR_BACK_FACE_Z + EAR_HEIGHT
-Z_FRONT = BAR_BACK_FACE_Z + 5.588  # .22: the arm's front edge in the lock sweep
-Z_FRONT_LOW = BAR_BACK_FACE_Z + 4.064  # .16: below the taper, hole and tab
-ARM_W = Z_REAR - Z_FRONT  # 9.906
-LOW_W = Z_REAR - Z_FRONT_LOW  # 11.43
+Z_FRONT = BAR_BACK_FACE_Z + 5.588  # the arm's front edge in the lock sweep
+Z_FRONT_LOW = BAR_BACK_FACE_Z + 4.064  # below the taper, hole and tab
+ARM_W = Z_REAR - Z_FRONT  # 9.906 (.39)
+LOW_W = Z_REAR - Z_FRONT_LOW  # 11.43 (.45)
 # Machine y where the front edge leaves Z_FRONT and where it reaches
 # Z_FRONT_LOW, linear in y between (the taper is cut square to the ear's
 # plane).  The lower guide-lock plate's sweep band ends at y 282.734.

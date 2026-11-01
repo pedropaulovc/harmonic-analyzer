@@ -403,15 +403,14 @@ def test_the_tapped_hole_note_whose_leader_the_callout_crossed_is_removed() -> N
     }
     assert (crossing.x, crossing.y) == pytest.approx((0.0919, 0.1866), abs=1e-4)
     finalize = _calls(drawing.__file__)["finalize_drawing"]
+    keywords = {k.arg: k.value for k in finalize.keywords}
     removal = {
-        k.arg: ast.literal_eval(k.value)
-        for k in finalize.keywords
-        if k.arg in ("redundant_note_substrings", "expected_redundant_notes")
+        "redundant_note_substrings": ast.literal_eval(keywords["redundant_note_substrings"])
     }
-    assert removal == {
-        "redundant_note_substrings": ("Tapped Hole",),
-        "expected_redundant_notes": 1,
-    }
+    assert removal == {"redundant_note_substrings": ("Tapped Hole",)}
+    # The face view's note, plus whatever labels the section's cosmetic thread
+    # brought (counted where they were imported).
+    assert ast.unparse(keywords["expected_redundant_notes"]) == "1 + section_thread_labels"
     # The removal reaches the note, and the callout itself is no note to lose.
     note_text = f"{spec.THREAD} Tapped Hole".lower()
     assert all(s.lower() in note_text for s in removal["redundant_note_substrings"])
@@ -421,10 +420,11 @@ def test_the_tapped_hole_note_whose_leader_the_callout_crossed_is_removed() -> N
     )
 
 
-def test_the_knurl_is_the_designated_din_82_raa_1_0() -> None:
-    """R9-57: the modelled teeth are the 1.0-pitch 90° straight knurl the
-    callout names, so the shop's wheel forms what the model shows."""
-    assert spec.KNURL_CREST_PITCH == pytest.approx(1.0, abs=0.01)
+def test_the_knurl_is_the_designated_wheel() -> None:
+    """R9-57: the modelled teeth are the 90° straight knurl the callout names
+    (25 TPI, 1.016 mm pitch), so the shop's wheel forms what the model shows."""
+    assert spec.KNURL_PITCH == pytest.approx(25.4 / 25)
+    assert spec.KNURL_CREST_PITCH == pytest.approx(spec.KNURL_PITCH, rel=0.01)
     assert spec.KNURL_TOOTH_ANGLE_DEG == pytest.approx(90.0, abs=2.0)
     assert spec.KNURL_DESIGNATION in spec.KNURL_CALLOUT
     # Negative control: the 19e33c6c2 model (60 teeth over a Ø19.7 root

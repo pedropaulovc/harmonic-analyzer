@@ -193,7 +193,6 @@ ROOT_ENVELOPE_DIA_MM = (
     2.0 * STOCK_PROFILE.root_radius_min_mm,
     2.0 * STOCK_PROFILE.root_radius_max_mm,
 )
-ROOT_DIA_PLACES = 4
 ROOT_DIA_MIN = min(2.0 * profile.root_radius_min_mm for profile in _PROFILE_CORNERS)
 ROOT_DEPTH_X_MIN = min(
     profile.root_point(profile.root_half_angle_rad)[0]
@@ -370,15 +369,24 @@ if TAP_TO_BORE_WALL_WORST < WALL_FLOOR - 1e-9:
 # --- sheet -------------------------------------------------------------------------
 HUB_NUMBER = "MHA-PD-17"
 HUB_NAME = "HUB"
-# Lines appended under the native "#0-80 UNF-2B THRU" hole callout.  The
-# .004 mouth breaks are tighter than the title block's .010 because the
-# MHA-PD-VN-55 engagement (pd_vn_transgear_disc_screw_spec) spends them.
+SCREW_NUMBER = "MHA-PD-VN-55"
+# Lines appended under the native "#0-80 UNF THRU" hole callout (the title
+# block's thread row carries the 2B class).  The .004 mouth breaks are
+# tighter than the title block's .010 because the MHA-PD-VN-55 engagement
+# (pd_vn_transgear_disc_screw_spec) spends them; the callout names that
+# screw, so no loose note repeats it.
 TAP_CALLOUT_LINES = (
-    f"BREAK EDGE {inch_text(MOUTH_BREAK_MAX, 3)} MAX BOTH SIDES FOR SCREW ENGAGEMENT",
-    f"SPOT THRU {HUB_NUMBER} FLANGE HOLES AT ASSY,",
-    "THEN DRILL AND TAP; MATCH-MARK DISC AND FLANGE",
+    f"BREAK EDGE {inch_text(MOUTH_BREAK_MAX, 3)} MAX BOTH SIDES,",
+    f"KEEPS {SCREW_NUMBER} ENGAGEMENT",
+    f"SPOT THRU {HUB_NUMBER} FLANGE",
+    "HOLES AT ASSY, THEN DRILL",
+    "AND TAP; MATCH-MARK BOTH",
 )
 TAP_CALLOUT_QUALIFIER = "\n".join(TAP_CALLOUT_LINES)
+# The .XXX thickness is the screw engagement's: its least is the tapped
+# length (pd_vn_transgear_disc_screw_spec), and .XX would cut that below
+# 1.5D.
+FACE_WIDTH_CALLOUT = f"SETS {SCREW_NUMBER}\nENGAGEMENT"
 # Reamed: the bore pilots on the hub's spigot, clamped to the flange, so it
 # is a static seat and carries no finish symbol (rule 6).  The bore's native
 # limits print with the dimension; the fit note names the mate, and the
@@ -398,21 +406,20 @@ BORE_FIT_CALLOUT = "\n".join(
 )
 
 # Marked native model dimensions: the disc thickness, finite blank, bore
-# and controlling actual-flank span. Root-envelope data are axis references;
-# neither OD touch-off nor free span variation certifies tooth-space runout.
+# and controlling actual-flank span.  No root diameter prints: the gear data
+# gives the whole depth (REF), and a third diameter line through the bore
+# crowded the bore's leader (machinist review).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     "GearBlankProfile": {"OutsideDia"},
     "BoreProfile": {"BoreDia"},
     "SpanProfile": {"ToothSpan"},
-    "RootInspectionProfile": {"RootEnvelope"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": FACE_WIDTH_PLACES},
     "GearBlankProfile": {"OutsideDia": OUTSIDE_DIA_PLACES},
     "BoreProfile": {"BoreDia": BORE_PLACES},
     "SpanProfile": {"ToothSpan": SPAN_PLACES},
-    "RootInspectionProfile": {"RootEnvelope": ROOT_DIA_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -456,6 +463,8 @@ GEAR_DATA = gear_data_note(
 # The tip and span bands are the mesh's: each names the mating pinion at its
 # dimension (rule 4).
 MESH_CALLOUT = f"MESHES {KNOB_NUMBER} {MESH_PINION_TEETH}T"
+# The blank's, stacked to stay narrow beside the edge view.
+MESH_CALLOUT_STACKED = f"MESHES\n{KNOB_NUMBER} {MESH_PINION_TEETH}T"
 
 # Spacing is held by the dividing head and is not inspected; one pin in
 # every space on a radial indicator catches eccentricity and gross slips.
