@@ -1,5 +1,7 @@
 """Native dimension and print contract for the full-body quarter-inch lever."""
 
+import math
+
 from _gtol_cylinder import CylinderFace
 from _printed_tolerance import drilled_oversize_mm, printed_deviations
 from _surface_finish import SEAT_UM, SurfaceFinishControl
@@ -11,7 +13,9 @@ from mg_lever_thread_joint import (
     ROD_DIA_BAND,
     ROD_LENGTH_PLACES,
     THREAD,
+    THREAD_LENGTH,
     THREAD_LENGTH_PLACES,
+    THREAD_LENGTH_TOL,
 )
 
 DRAWING_DIMENSIONS = {
@@ -54,7 +58,14 @@ ROD_DIA_CALLOUT = (
 # title-block edge break (native limits 0..max), so it carries no callout.
 THREAD_CALLOUT = f"{THREAD} UNC-2A\nMATES MHA-MG-01 BRACKET"
 PRINT_THREAD_CALLOUT = f"{THREAD} UNC\nMATES MHA-MG-01\nBRACKET"
-LEAD_CALLOUT = "INCOMPLETE THREAD,\nEACH END"
+# Full thread between the two incomplete ends at the printed shortest thread,
+# floored to the thread length's places.
+FULL_THREAD_MIN = THREAD_LENGTH - THREAD_LENGTH_TOL - 2.0 * INCOMPLETE_THREAD_MAX
+_FULL_THREAD_MIN_IN = math.floor(FULL_THREAD_MIN / 25.4 * 10**THREAD_LENGTH_PLACES + 1e-9) / 10**THREAD_LENGTH_PLACES
+LEAD_CALLOUT = (
+    "INCOMPLETE THREAD,\nEACH END OF THREAD\n"
+    f"FULL THREAD {_FULL_THREAD_MIN_IN:.{THREAD_LENGTH_PLACES}f} MIN".replace(" 0.", " .")
+)
 FREE_END_CALLOUT = "FREE END: TANGENT HEMISPHERE"
 SURFACE_FINISHES = (
     SurfaceFinishControl(

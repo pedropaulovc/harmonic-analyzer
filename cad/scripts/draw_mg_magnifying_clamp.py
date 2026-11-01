@@ -187,8 +187,26 @@ RIGHT_LOCATION_KEEP = {
     # All three values are imported/read back; only the verified group leader prints.
     name: (0.150, 0.1755) for name in Z_FLAT_DIMENSIONS
 }
-TOP_LOCATION_KEEP = {"ThumbTapFromDiagonalFlat": (0.043, 0.186)}
-BOTTOM_KEEP = {"RodTapFromDiagonalFlat": (0.043, 0.074)}
+# Each end view's diagonal-flat location (model normal cos 30 X + sin 30 Z:
+# lower-left on the top view, upper-left on the bottom) stands on that flat's
+# normal through the tap centre: its dimension line runs from the centre
+# straight to the flat, perpendicular to it, text 7 mm outside the flat. Off
+# the normal, one extension line ran along the flat (printing it doubled) and
+# the other from the opposite corner through the centre (final2 review).
+_FLAT_NORMAL_TEXT = _HALF_AF + 0.007
+_FLAT_NORMAL = (-0.5 * _FLAT_NORMAL_TEXT, math.sqrt(3.0) / 2.0 * _FLAT_NORMAL_TEXT)
+TOP_LOCATION_KEEP = {
+    "ThumbTapFromDiagonalFlat": (
+        TOP_CENTER[0] + _FLAT_NORMAL[0],
+        TOP_CENTER[1] - _FLAT_NORMAL[1],
+    )
+}
+BOTTOM_KEEP = {
+    "RodTapFromDiagonalFlat": (
+        BOTTOM_CENTER[0] + _FLAT_NORMAL[0],
+        BOTTOM_CENTER[1] + _FLAT_NORMAL[1],
+    )
+}
 
 DIMENSION_CALLOUTS = {
     "Height": "",
