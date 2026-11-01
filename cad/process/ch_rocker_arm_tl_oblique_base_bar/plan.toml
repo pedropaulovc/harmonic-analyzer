@@ -40,7 +40,7 @@ z = "up"
 form = "flat_bar"
 form_verify = false
 material = "6061-T6511 aluminium"
-drawing_material = "ALUMINUM FLAT BAR, MILLED FROM 1/2 x 6 in"
+drawing_material = "ALUMINUM FLAT BAR 1/2 x 6 in"
 material_verify = false
 material_cite = [
   "harmonic-analyzer/cad/config/parts/ch-rocker-arm-tl-oblique-base-bar.yaml:ch-rocker-arm-tl-oblique-base-bar.material_specification",
