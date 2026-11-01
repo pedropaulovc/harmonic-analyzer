@@ -1071,12 +1071,24 @@ def test_the_transgear_explode_views_fit_their_fields_at_the_bom_configuration()
     assert knob[1] > template.title_block_top_m
     # Run 20261024T025815061Z's 1:1 knob-stack outline (its projected box,
     # 247.3 x 226.8 mm) and the cluster's box from the builder's stations
-    # (137.6 x 132.0 mm), at the sheet's scale with both rings, fit.
+    # (137.6 x 132.0 mm, grown by the pin's rearward throw along the
+    # isometric's Z, which draws 1/sqrt(2) across and 1/sqrt(6) up), at the
+    # sheet's scale with both rings, fit.
     scale = drawing.TRANSGEAR_EXPLODED_SCALE[0] / drawing.TRANSGEAR_EXPLODED_SCALE[1]
     reach = 2 * drawing.BALLOON_RING_REACH
+    pin_throw = sum(
+        step.distance_mm for step in explode.TRANSGEAR_STEPS
+        if "pd-transgear-pin" in step.stems
+    ) / 1000.0
     for (width, height), (left, bottom, right, top) in (
         ((0.2473, 0.2268), knob),
-        ((0.1376, 0.1320), cluster),
+        (
+            (
+                0.1376 + pin_throw / math.sqrt(2.0),
+                0.1320 + pin_throw / math.sqrt(6.0),
+            ),
+            cluster,
+        ),
     ):
         assert width * scale + reach < right - left
         assert height * scale + reach < top - bottom
@@ -1920,6 +1932,28 @@ def test_the_transgear_explode_moves_the_knob_wheel_but_not_the_crank_wheel() ->
     # seen from above; the cup pin alone leaves along X, out of its cross hole.
     for step, _names in transgear:
         assert step.axis == ("x" if step.stems == ("pd-vn-transgear-knob-cup-pin",) else "z")
+
+
+def test_the_cluster_explode_spreads_pin_shims_bushing_and_sleeve_in_order() -> None:
+    """Round 11: along the pin, rear to front, the pin's head, the shims,
+    the rear bushing and the sleeve each stand a clear gap from the next."""
+
+    def throw(stem: str) -> float:
+        return sum(s.distance_mm for s in explode.TRANSGEAR_STEPS if stem in s.stems)
+
+    head = cluster_fit.ARM_REAR_Z + throw("pd-transgear-pin")
+    shims = throw("pd-vn-transgear-cluster-shim")
+    shims_rear = cluster_fit.SHIM_REAR_Z + shims
+    shims_front = cluster_fit.SHIM_REAR_Z - cluster_fit.SHIM_STACK_MODEL + shims
+    bushing = throw("pd-transgear-rear-bushing")
+    bushing_rear = cluster_fit.REAR_BUSHING_REAR_Z + bushing
+    bushing_front = cluster_fit.SLEEVE_REAR_Z + bushing
+    sleeve_rear = cluster_fit.SLEEVE_REAR_Z + throw("pd-transgear-feed-pinion")
+    gaps = (head - shims_rear, shims_front - bushing_rear, bushing_front - sleeve_rear)
+    assert all(gap >= 5.0 for gap in gaps), gaps
+    # The disc and everything ahead of it keep their places off the sleeve.
+    assert throw("pd-rack-pinion") == -26.0
+    assert throw("pd-vn-transgear-retaining-ring") == -72.0
 
 
 def test_the_explode_refuses_a_model_missing_a_shown_family() -> None:
