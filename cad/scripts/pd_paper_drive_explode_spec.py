@@ -16,8 +16,9 @@ draws above the parts in front of it, and a screw drawn forward in -Z stands
 clear in front of its hole. The transgear sheet draws two views of the same
 presentation, the hanger and knob stack in one and the disc cluster in the
 other, so each axis's parts spread along it in the order they go on: the
-cup, plate screws, plate and dowels rearward of the arm, the cluster and the
-knob stack forward of it.
+cup, plate screws, plate and dowels rearward of the arm, the knob stack
+forward of it, and along the pin the pin and its shims rearward of the
+rear bushing and the cluster forward of it.
 """
 
 from __future__ import annotations
@@ -130,13 +131,17 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
         "z",
         20.0,
     ),
-    # The disc cluster forward along its pin, in the order it comes off: the
-    # rear bushing with it, then the MHA-PD-VN-68 shims off the arm's front
-    # face into the gap it leaves.
+    # The disc cluster along its pin, in the order it goes on, each part a
+    # clear gap from the next (round 11 review: the pin, shims, rear bushing
+    # and sleeve read as one stack): the pin rearward out of the arm (which
+    # the cluster's view does not draw), the MHA-PD-VN-68 shims rearward off
+    # the arm's front face, the MHA-PD-24 rear bushing in place, then the
+    # sleeve with everything on it forward.
+    ExplodeStep("pin rearward", ("pd-transgear-pin",), "z", 12.0),
+    ExplodeStep("shims rearward", ("pd-vn-transgear-cluster-shim",), "z", 6.0),
     ExplodeStep(
         "cluster forward",
         (
-            "pd-transgear-rear-bushing",
             "pd-transgear-feed-pinion",
             "pd-rack-pinion",
             "pd-transgear-disc-hub",
@@ -147,7 +152,6 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
         "z",
         -6.0,
     ),
-    ExplodeStep("shims forward", ("pd-vn-transgear-cluster-shim",), "z", -3.0),
     ExplodeStep(
         "disc off the sleeve",
         (
@@ -201,13 +205,13 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
     ),
     ExplodeStep("thumbnut forward", ("pd-transgear-thumbnut",), "z", -20.0),
 )
-# The arm, its pressed pins and the knob shaft with its thrust ring stay put;
-# the moved parts read against them.
+# The arm, its pressed latch pin, the cluster's rear bushing and the knob
+# shaft with its thrust ring stay put; the moved parts read against them.
 TRANSGEAR_STATIONARY_STEMS = frozenset(
     {
         "pd-transgear-arm",
-        "pd-transgear-pin",
         "pd-vn-transgear-latch-pin",
+        "pd-transgear-rear-bushing",
         "pd-transgear-knob-shaft",
         "pd-transgear-knob-thrust-ring",
     }
