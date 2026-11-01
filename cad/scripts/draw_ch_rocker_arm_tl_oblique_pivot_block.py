@@ -491,8 +491,18 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     row_4y = _project(adapter,plan,(part.BLOCK_X1,part.BOLT_Y,contract.BLOCK_HEIGHT),'row 4Y')
     _fit_section_letters(adapter, side, (floor,), below_y=row_4y[1])
     _log_sheet_dimensions(adapter, floor, part.CBORE_FLOOR_REFERENCE)
-    annotations += curate_view_dimensions(adapter,floor,keep=FLOOR_KEEP,view_label='B-B floor',
-                     dimensions_by_feature=contract.DRAWING_DIMENSIONS)
+    try:
+        annotations += curate_view_dimensions(adapter,floor,keep=FLOOR_KEEP,view_label='B-B floor',
+                         dimensions_by_feature=contract.DRAWING_DIMENSIONS)
+    except RuntimeError:
+        # DIAGNOSTIC: does a rebuilt view or the entire-model import deliver it?
+        from _drawing_dimension_import import insert_feature_dimensions, insert_marked_dimensions
+        adapter.currentModel.EditRebuild3()
+        again = insert_feature_dimensions(adapter, floor, [part.CBORE_FLOOR_REFERENCE])
+        _telemetry.info(f'B-B diagnostic: targeted import after rebuild {[n for n, _ in again]!r}')
+        whole = [dimension_name(adapter, a) for a in insert_marked_dimensions(adapter, floor)]
+        _telemetry.info(f'B-B diagnostic: entire-model import {whole!r}')
+        raise
     set_hidden_lines_removed(adapter,iso)
     sheet_scales = None
     if is_feed:
