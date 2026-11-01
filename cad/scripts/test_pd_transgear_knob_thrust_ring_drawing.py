@@ -101,9 +101,7 @@ def test_ring_bore_and_opposed_axial_faces_consume_the_new_interface() -> None:
     assert spec.ID == pytest.approx(6.05)
     assert spec.ID_BAND == pytest.approx((0.10, 0.0))
     assert spec.LENGTH == pytest.approx(5.2)
-    assert (
-        spec.LENGTH_TOL == pytest.approx(PRINTED_LENGTH_BAND) == pytest.approx(0.02)
-    )
+    assert spec.LENGTH_TOL == pytest.approx(PRINTED_LENGTH_BAND) == pytest.approx(0.02)
     assert part.V_RING == pytest.approx(
         math.pi * ((spec.OD / 2.0) ** 2 - (spec.ID / 2.0) ** 2) * spec.LENGTH
     )
