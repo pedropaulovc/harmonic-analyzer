@@ -1442,9 +1442,9 @@ if any(
     )
 # U30 post mount (I22): each MHA-DT-VN-61 seats on the MHA-DT-05 counterbore floor and
 # is cut to fit into the MHA-DT-20 tap: never proud of the plate underside, and
-# at least 0.87D of thread (Main, 2026-11-01; ruling #1019's 0.90D target is
-# not met) both at the modelled cut length and at the platform spec's printed
-# worst case.
+# at least 0.87D of thread (owner ruling 2026-11-01, MHA-DT-VN-61's RV-01;
+# #1019's 0.90D target is not met) both at the modelled cut length and at the
+# platform spec's printed worst case.
 _require_tapped_thread("cone-post mount", POST_SCREW_THREAD, POST_MOUNT_SPEC)
 POST_SCREW_SEAT = POST_BLOCK_HEIGHT - POST_CBORE_DEPTH  # above PlateTop
 POST_SCREW_INTO_PLATE = POST_SCREW_LEN - POST_SCREW_SEAT

@@ -178,14 +178,13 @@ POST_MOUNT_ENGAGEMENT_PRINTED = (
 if POST_MOUNT_ENGAGEMENT_PRINTED < 0.87:
     raise AssertionError("MHA-DT-VN-61 engagement fell below the audited 0.87D floor")
 # The sheet states the shortfall as a plain fact, worded like MHA-DT-32's.
-# The taps' callout names the post they mount and carries the break override
-# the figure depends on, so the line names no screw (machinist review r1).
-# Pending exception ruling: MHA-DT-VN-61 engagement (#1019).
+# The taps' callout names the post they mount, so the line names no screw
+# (machinist review r1). Owner-accepted 2026-11-01: MHA-DT-VN-61's RV-01.
 POST_MOUNT_ENGAGEMENT_NOTE = (
     f"1/4-20 THREAD ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN."
 )
 
-# Pending exception ruling: MHA-DT-VN-61 engagement (#1019).  A MIN never
+# Owner-accepted 2026-11-01 (MHA-DT-VN-61's RV-01).  A MIN never
 # rounds up: the length floors to two places like the diameters.
 POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT = (
     f"ENGAGEMENT {math.floor(POST_MOUNT_ENGAGEMENT_WORST * 100.0) / 100.0:.2f} MIN "
