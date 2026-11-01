@@ -39,6 +39,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
+from _machinist_review_mode import MachinistReviewMode
 from _native_axis_datum import add_native_axis_datum
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
@@ -70,6 +71,9 @@ from pd_rack_pinion_spec import (
     TOOTH_SPACE_CALLOUT_PROPERTY,
 )
 
+
+# Cached machinist review leaf: LEARN until the sheet reaches SHIP.
+MACHINIST_REVIEW = MachinistReviewMode.LEARN
 
 SPEC = DRAWINGS_BY_NAME["pd_rack_pinion"]
 PART_STEM = SPEC.artifact_stem

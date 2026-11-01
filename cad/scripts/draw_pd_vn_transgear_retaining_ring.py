@@ -6,12 +6,16 @@ import argparse
 import sys
 from typing import Any
 
+from _machinist_review_mode import MachinistReviewMode
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 
+
+# Cached machinist review leaf: LEARN until the sheet reaches SHIP.
+MACHINIST_REVIEW = MachinistReviewMode.LEARN
 
 SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_retaining_ring"]
 # The footer's ITEM row: the catalogue designation in plain text.

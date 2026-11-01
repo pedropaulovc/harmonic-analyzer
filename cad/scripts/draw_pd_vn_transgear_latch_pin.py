@@ -7,6 +7,7 @@ import sys
 from typing import Any
 from collections.abc import Callable
 
+from _machinist_review_mode import MachinistReviewMode
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -15,6 +16,9 @@ from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _supplier_pin_drawing import DOWEL_SUPPLIER_MARGINS, add_supplier_dowel_dimensions
 from pd_vn_transgear_latch_pin_spec import SUPPLIER_REFERENCE
 
+
+# Cached machinist review leaf: LEARN until the sheet reaches SHIP.
+MACHINIST_REVIEW = MachinistReviewMode.LEARN
 
 SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_latch_pin"]
 # The footer's ITEM row: the catalogue designation in plain text.
