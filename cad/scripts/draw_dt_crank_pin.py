@@ -73,7 +73,6 @@ ISO_CENTER = (0.340, 0.205)
 # big end (model x=0) to the left, small end (x=PIN_LENGTH) to the right.
 _HALF_LENGTH = PIN_LENGTH * SHEET_SCALE[0] / 2000.0
 BIG_END_EDGE = (FRONT_CENTER[0] - _HALF_LENGTH, FRONT_CENTER[1])
-SMALL_END_EDGE = (FRONT_CENTER[0] + _HALF_LENGTH, FRONT_CENTER[1])
 # The upper taper outline at model x = TAPER_PICK_X, where the pin's radius
 # is interpolated between its end diameters: the taper note's leader tip.
 TAPER_PICK_X = PIN_LENGTH * 0.45
@@ -226,6 +225,9 @@ async def build(adapter: Any) -> dict[str, str]:
     add_view_centerline(
         adapter, front, face_xy=AXIS_FACE_PICK, label="crank pin axis centerline"
     )
+    # The big end, the length and the 1:48 ratio define the taper; a printed
+    # small end, rounded to .XX from the mm model, read as a second taper
+    # (#290 machinist review of 29af6f44d), so it is not dimensioned.
     _add_end_diameter(
         adapter,
         front,
@@ -233,14 +235,6 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(BIG_END_EDGE[0] - 0.028, FRONT_CENTER[1] + 0.030),
         below="BIG END",
         label="big end",
-    )
-    _add_end_diameter(
-        adapter,
-        front,
-        edge_xy=SMALL_END_EDGE,
-        text_xy=(SMALL_END_EDGE[0] + 0.028, FRONT_CENTER[1] + 0.030),
-        below="SMALL END",
-        label="small end",
     )
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit

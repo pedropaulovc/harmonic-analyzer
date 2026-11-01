@@ -62,11 +62,10 @@ def test_cross_hole_station_text_clears_its_extension_lines() -> None:
 
 def test_end_diameters_are_drawing_native_true_diameter_callouts() -> None:
     """The model's end dims are half-profile radii, so the print measures the
-    projected end-face circles instead — one Ø dimension per pin end."""
+    projected big-end circle; the length and the 1:48 ratio give the small end."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("_add_end_diameter(") >= 3  # definition + both ends
     assert 'below="BIG END"' in source
-    assert 'below="SMALL END"' in source
+    assert 'below="SMALL END"' not in source
     # Custom 1:48 taper over 45 mm -> 0.9375 on diameter.
     taper_on_dia = dt_crank_pin_spec.BIG_END_DIA - dt_crank_pin_spec.SMALL_END_DIA
     assert round(taper_on_dia, 4) == round(dt_crank_pin_spec.PIN_LENGTH / 48.0, 4)
