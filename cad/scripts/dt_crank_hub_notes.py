@@ -28,15 +28,16 @@ def seat_callout(mate: str, name: str = "CRANK ARM") -> str:
     Four lines (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). The seat end flush with ``mate``'s front
     face is the acceptance, naming both faces (machinist review: FACES FLUSH
     named neither); how the hub gets there (an arbor press) is a method, so
-    the sheet does not say it.  ``name`` is the mate's part name, printed with
-    its number (rule 4; r7 review of farm run 20261101T022045634Z).
+    its number (rule 4; r7 review of farm run 20261101T022045634Z).  The bore
+    is the arm's, said so on the first line: on a turned OD, "BORE FOR LIGHT
+    PRESS" read as this part's bore (review of farm run 20261101T081735465Z).
     """
     low, high = SEAT_PRESS_INTERFERENCE
     return "\n".join(
         (
-            f"TURN TO SUIT {name} {mate}",
-            f"BORE FOR LIGHT PRESS: {low:.3f}-{high:.3f}",
-            "DIAMETRAL INTERFERENCE;",
+            f"TURN TO SUIT BORE OF {name}",
+            f"{mate} FOR LIGHT PRESS:",
+            f"{low:.3f}-{high:.3f} DIAMETRAL INTERFERENCE;",
             f"END FLUSH WITH {name} FRONT",
         )
     )
@@ -52,19 +53,20 @@ def seat_bore_callout(mate: str) -> str:
 def seam_callout(mate: str, pin: str = "MHA-DT-VN-59") -> str:
     """MHA-DT-VN-59 seam, match-drilled with ``mate``: size first, then the process.
 
-    ``pin`` names the pin as the sheet identifies it; the arm's print adds its
-    part name (MHA-DT-06 machinist review, 2026-09-29).  On the hub's print
-    the seat callout names ``mate`` in full; the four-row limit leaves this
-    one no room (r7 review of farm run 20261101T022045634Z).  The blind pin
-    makes hub and ``mate`` a permanent pair, taken apart at the MHA-DT-09
-    taper pin (owner rulings 2026-11-01; r9 review: say it plainly).
+    ``pin`` names the pin as the sheet identifies it, with what it is (SEAM
+    PIN; review of farm run 20261101T081735465Z: every other mate on the
+    sheet has a name).  On the hub's print the seat callout names ``mate`` in
+    full; the four-row limit leaves this one no room (r7 review of farm run
+    20261101T022045634Z).  The blind pin makes hub and ``mate`` a permanent
+    pair, taken apart at the MHA-DT-09 taper pin (owner rulings 2026-11-01;
+    r9 review: say it plainly).
     """
     return "\n".join(
         (
             f"(<MOD-DIAM>{AXIAL_PIN_DIA:.1f}) <HOLE-DEPTH> {AXIAL_PIN_LENGTH:.1f} ON SEAM, MATCH-DRILL/REAM",
-            f"WITH {mate} AT ASSEMBLY; {pin}",
-            "LIGHT DRIVE FIT, PERMANENT PAIR;",
-            "DISASSEMBLE AT TAPER PIN MHA-DT-09",
+            f"WITH {mate} AT ASSEMBLY; SEAM PIN",
+            f"{pin} LIGHT DRIVE FIT, PERMANENT",
+            "PAIR; DISASSEMBLE AT TAPER PIN MHA-DT-09",
         )
     )
 

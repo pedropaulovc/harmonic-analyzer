@@ -257,20 +257,20 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     assert not hasattr(dt_crank_hub_spec, "DRAWING_NOTES")
     seat = dt_crank_hub_notes.SEAT_CALLOUT
     # B1 (Main 2026-09-25): turned to suit the MHA-DT-06 bore, with the press
-    # interference printed from the notes constant.
+    # interference printed from the notes constant; the bore is named as the
+    # arm's, and the seat end's acceptance is flush with the arm's front.
     low, high = dt_crank_hub_notes.SEAT_PRESS_INTERFERENCE
-    assert seat.splitlines() == [
-        "TURN TO SUIT CRANK ARM MHA-DT-06",
-        f"BORE FOR LIGHT PRESS: {low:.3f}-{high:.3f}",
-        "DIAMETRAL INTERFERENCE;",
-        "END FLUSH WITH CRANK ARM FRONT",
-    ]
+    assert len(seat.splitlines()) == 4
+    assert "BORE OF CRANK ARM MHA-DT-06" in _flat(seat)
+    assert f"{low:.3f}-{high:.3f} DIAMETRAL INTERFERENCE" in _flat(seat)
+    assert seat.splitlines()[-1] == "END FLUSH WITH CRANK ARM FRONT"
     assert "MATCH-FIT" not in seat
     # The arm bore is made first; the hub seat is turned to suit it, so its
     # nominal prints as a reference.
     assert dt_crank_hub_spec.REFERENCE_DIMENSIONS == {"SeatDia"}
     seam = dt_crank_hub_notes.SEAM_CALLOUT
-    assert "MHA-DT-06" in seam and "MHA-DT-VN-59" in seam and "LIGHT DRIVE FIT" in seam
+    assert "MHA-DT-06" in seam and "SEAM PIN MHA-DT-VN-59" in _flat(seam)
+    assert "LIGHT DRIVE FIT" in seam and len(seam.splitlines()) == 4
     assert "AT ASSEMBLY" in seam and "SEAM" in seam
     # Size first, then the process, in the order the work is done.
     assert seam.splitlines()[0].startswith("(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0")
@@ -402,9 +402,11 @@ def test_callouts_stand_clear_of_views_and_each_other() -> None:
     def half(text: str) -> float:
         return max(len(line) for line in text.splitlines()) * char_w / 2.0
 
+    # The seat Ø's text stands outside its arrows, so its block starts at its
+    # dimension line and runs right (farm run 20261101T081735465Z: 245..329
+    # mm, the line at 245.2).
     seat_x, seat_y = drawing.SIDE_KEEP["SeatDia"]
-    seat_half = half(dt_crank_hub_notes.SEAT_CALLOUT)
-    seat_block = (seat_x - seat_half, seat_x + seat_half)
+    seat_block = (seat_x, seat_x + 2.0 * half(dt_crank_hub_notes.SEAT_CALLOUT))
     hole_x, hole_y = drawing.HOLE_CALLOUT_XY
     hole_text = f"{dt_crank_hub_notes.CROSS_HOLE_CALLOUT}\n#14 DRILL 0 4.62 THRU ALL"
     hole_block = (hole_x - half(hole_text), hole_x + half(hole_text))

@@ -112,7 +112,11 @@ _PILOT_X = _SEAT_X + PILOT_LENGTH * _S / 1000.0
 # dimensioned (+Y) pin hole's up and left of that hole, outside the part.
 # The flat's limits stand right of the view BELOW its witness lines, its mate
 # under them: between them its arrows sit outside the 8.7 mm span and their
-# tails struck both (run 20261010T001620278Z). Each pin location reads left
+# tails struck both (run 20261010T001620278Z).  The block stands 14 mm in and
+# 7 mm down from where run 20261101T095301211Z put it (x 152..201, top 153.6
+# mm): there its limits sat 2.4 mm under the bore chamfer callout's shelf and
+# read as part of that note.  Now ~138..187 x ~127..147 mm, over SEE NOTE 3
+# (top 122.9) and left of (6.20) (from x 193.2).  Each pin location reads left
 # of the view, its text toward the outer witness so its mate lines stay
 # between the witnesses and clear of the rim. The -Y text's top line stands
 # clear under the axis, where the +Y dimension line starts (run
@@ -121,7 +125,7 @@ _BORE_TEXT_HALF = 0.017
 _PIN_TEXT_HALF = 0.022
 END_KEEP = {
     "BoreDia": (END_CENTER[0] + 0.048 + _BORE_TEXT_HALF, END_CENTER[1] + 0.063),
-    "FlatToAxis": (END_CENTER[0] + HALF_OD + 0.017, END_CENTER[1] - 0.0215),
+    "FlatToAxis": (END_CENTER[0] + HALF_OD + 0.003, END_CENTER[1] - 0.0285),
     "PinPosDia": (END_CENTER[0] - 0.018 - _PIN_TEXT_HALF, END_CENTER[1] + 0.061),
     "PinPosY": (END_CENTER[0] - HALF_OD - 0.025, END_CENTER[1] + PIN_R * 0.65),
     "PinNegY": (END_CENTER[0] - HALF_OD - 0.025, END_CENTER[1] - PIN_R * 0.35 - 0.006),
