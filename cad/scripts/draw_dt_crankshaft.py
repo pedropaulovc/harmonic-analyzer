@@ -72,7 +72,11 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-from build_dt_crankshaft import PINION_PIN_DIA, PINION_PIN_STATION_Y
+from build_dt_crankshaft import (
+    PINION_PIN_CLOCKING_DEG,
+    PINION_PIN_DIA,
+    PINION_PIN_STATION_Y,
+)
 from dt_crank_drive_gear_spec import inch_text
 from dt_crank_pinion_spec import CRANKSHAFT_PIN_HOLE_PROCESS
 from dt_crankshaft_notes import (
@@ -260,7 +264,7 @@ SIDE_KEEP = {
     # on the low row over the seat, text left of its extension lines, under
     # the Ø9.000's block and right of that block's dimension line, so the
     # transfer note's leader passes right of the extension lines to the hole.
-    "PinionPinHoleDia": (_sheet_x(PINION_PIN_STATION_Y) - 0.017, 0.203),
+    "PinionPinHoleDia": (_sheet_x(PINION_PIN_STATION_Y) - 0.017, 0.2005),
 }
 # A dragged diameter prints its dimension line at the requested X with the
 # text running to its RIGHT (run 20260923T030252135Z-49e46990).  Its
@@ -299,8 +303,8 @@ DIAMETER_POSITIONS = {
     # Its leader left of the journal finish symbol's V.
     "JournalDiaDim": (RELIEF_START_X - 0.0035, 0.224),
     "ReliefDiaDim": (RELIEF_START_X + 0.045, 0.212),
-    # Raised 7 mm over the 16T pin cross-hole's REF Ø on the low row.
-    "PinionSeatDiaDim": (SEAT_STEP_X + 0.002, 0.2195),
+    # Raised 9 mm over the 16T pin cross-hole's REF Ø on the low row.
+    "PinionSeatDiaDim": (SEAT_STEP_X + 0.002, 0.221),
     "SpigotDiaDim": (COLLAR_SEAT_X + 0.0075, 0.2215),
     "CollarDiaDim": (SPIGOT_END_X + 0.002, 0.2075),
     "NeckDiaDim": (JOURNAL_END_X + 0.0006, 0.230),
@@ -420,6 +424,14 @@ FIDUCIAL_NOTE_XY = (0.0145, 0.152)
 # window instead (run1b-e7fd1a2ec: the leader tip, not the text, read 0.3 mm
 # under the floor).
 PINION_PIN_X = _sheet_x(PINION_PIN_STATION_Y)
+# The leader lands on the rim's paper-right extreme, so from the note it runs
+# right of the REF Ø's extension lines, which stand on the rim's width (layout
+# audit of bb0779352: landed lower-left, it crossed the right one).  The
+# visible rim's centre sits R*sin(clocking) above the axis.
+PINION_PIN_LEADER_LANDING = (
+    PINION_PIN_X + PINION_PIN_DIA / 2.0 * _S / 1000.0,
+    _sheet_y(PINION_SEAT_DIA / 2.0 * math.sin(math.radians(PINION_PIN_CLOCKING_DEG))),
+)
 # High in its field (top row ~4.5 mm under the border), so the right neck's
 # Ø9.5 and the Ø9.000's block stand under it, and its leader to the hole
 # passes right of the Ø9.000's block.
@@ -1282,6 +1294,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text=CRANKSHAFT_PIN_HOLE_PROCESS,
         entity=_visible_cross_hole_edge(adapter, side, PINION_PIN_DIA),
         note_xy=PINION_PIN_NOTE_XY,
+        leader_attach_xy=PINION_PIN_LEADER_LANDING,
         label="16T retention-pin transfer",
     )
     _place_note_text_in_field(
