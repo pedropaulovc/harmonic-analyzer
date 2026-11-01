@@ -68,6 +68,7 @@ from _drawing_leader_notes import add_leader_note
 from _drawing_notes import property_link
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _layout_audit import _display_segments, display_box
@@ -119,6 +120,8 @@ from ch_rocker_arm_tl_vn_oblique_leadscrew_stock_spec import (
     MAJOR_DIA,
     control_si,
 )
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_leadscrew"]
 PART_STEM = SPEC.artifact_stem

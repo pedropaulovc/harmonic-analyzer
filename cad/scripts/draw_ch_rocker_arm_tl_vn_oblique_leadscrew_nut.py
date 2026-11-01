@@ -20,6 +20,7 @@ from _session import run_build
 from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
 from _drawing_common import rebuild_drawing
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _drawing_view_display import _SW_HLR
 from _purchased_part_drawing import build_purchased_part_drawing
 from _purchased_title_fit import fit_purchased_title_block
@@ -31,6 +32,8 @@ from _supplier_screw_dimensions import (
 from _supplier_screw_layout import supplier_screw_margins, supplier_top_text_geometry
 import ch_rocker_arm_tl_vn_oblique_leadscrew_nut_spec as supplier
 
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_leadscrew_nut"]
 PART_STEM = SPEC.artifact_stem
