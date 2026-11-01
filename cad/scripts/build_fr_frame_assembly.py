@@ -42,9 +42,9 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
   reclosed rod-pin hole 125.890 out reaches the cam centre at -52.990, rods plumb; the old
   "arbor 47.5 + 25.4 rod lever" chain died with the ch30 re-anchor).
   Inserted at its exact authored transform and locked to the fixed base.
-* top-frame x1: the green one-piece casting at mid-plane Y = 40.077 in (side
-  rails 34.2 wide / front-rear rails 38 wide x 36.5 tall, band
-  y 999.7..1036.2; corner bosses Ø45 rise to 1040.7), bored around the
+* top-frame x1: the green one-piece casting at mid-plane Y = 1017.9499 (side
+  rails 34.2 wide / front-rear rails 38 wide x 1.437 tall, band
+  y 999.7..1036.1998; corner bosses Ø45 rise to 1040.77), bored around the
   four columns; its east rail (-X) carries the gooseneck hub and its west
   rail top face seats the fulcrum-keeper feet (ch-channel.SLDASM).
 * tube-frame-cap x4: intact stock McMaster 9275K141 push-on caps seated on the
@@ -102,10 +102,21 @@ from _custom_properties import apply_custom_properties
 from _document_units import apply_package_model_units
 from _paths import OUT_SLDPRT
 from _session import run_build
-from _drawing_marks import DRAWN_BY
+from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
+from _drawing_precision import apply_drawing_precision
+from _drawing_tolerances import set_dimension_symmetric_tolerance
+from _feature_tree import name_last_feature
 from _printed_tolerance import printed_deviations
 from _simplified_names import simplified_name
 from _assembly_contract import assembly_contract
+from _sketch import (
+    SketchDims,
+    anchor_point_to_origin,
+    blank_sketch,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _assembly import (
     activate_assembly_contract,
     assembly_title_properties,
@@ -201,6 +212,10 @@ from fr_frame_attachment_spec import (
     CASTING_FULL_THREAD_DEPTH,
     COLUMN_BOTTOM_Y,
     COLUMN_SOCKET_DIAMETER,
+    TOP_AXIS_HEIGHT_BAND_MM,
+    TOP_AXIS_HEIGHT_DIMENSION,
+    TOP_AXIS_HEIGHT_PLACES,
+    TOP_AXIS_SETTING_FEATURE,
     TOP_FRAME_MID_Y,
     TOP_SCREW_SEAT_Z,
     TOP_SCREW_Y,
@@ -670,6 +685,63 @@ def _create_frame_explode(adapter: Any, configuration_name: str) -> None:
     _telemetry.success(f"{view_name}: 12 native steps verified in world space; all 29 instances restored")
 
 
+async def _author_top_axis_setting(adapter: Any) -> None:
+    """MHA-FR-00 step 3's controlling height: a vertical construction line on
+    the Front plane (sketch u, v = machine X, Y) up the +X column's axis, from
+    the base underside to the top cross-bore axis. Its length carries the
+    setting's band and places for the drawing to import. No solid or pose
+    edits; the sketch is blanked."""
+    dims = SketchDims()
+    check("create top-axis setting sketch", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    line = check(
+        "top-axis setting line",
+        await adapter.add_line(COLUMN_X, 0.0, COLUMN_X, TOP_SCREW_Y),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("top-axis setting line is not construction")
+    check(
+        "top-axis setting vertical",
+        await adapter.add_sketch_constraint(line, None, "vertical"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{line}.start", COLUMN_X, 0.0, "base underside on the column axis"
+    )
+    dims.record("TopAxisColumnX")
+    await dimension_between(
+        adapter,
+        f"{line}.start",
+        f"{line}.end",
+        "vertical_distance",
+        TOP_SCREW_Y,
+        "top cross-bore axis above the base underside",
+    )
+    dims.record(TOP_AXIS_HEIGHT_DIMENSION)
+    await ensure_fully_defined(adapter, "top-axis setting")
+    check("exit top-axis setting sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, TOP_AXIS_SETTING_FEATURE)
+    dims.apply(adapter, TOP_AXIS_SETTING_FEATURE)
+    set_dimension_symmetric_tolerance(
+        adapter,
+        TOP_AXIS_SETTING_FEATURE,
+        TOP_AXIS_HEIGHT_DIMENSION,
+        TOP_AXIS_HEIGHT_BAND_MM,
+        places=TOP_AXIS_HEIGHT_PLACES,
+        display_unit=assembly_contract(ASM_NAME).drawing_unit,
+    )
+    apply_drawing_precision(
+        adapter,
+        {TOP_AXIS_SETTING_FEATURE: {TOP_AXIS_HEIGHT_DIMENSION: TOP_AXIS_HEIGHT_PLACES}},
+    )
+    mark_dimensions_for_drawing(
+        adapter, TOP_AXIS_SETTING_FEATURE, {TOP_AXIS_HEIGHT_DIMENSION}
+    )
+    blank_sketch(adapter, TOP_AXIS_SETTING_FEATURE)
+
+
 async def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
@@ -964,6 +1036,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
     )
+    await _author_top_axis_setting(adapter)
     # Title-block identity for the assembly drawing (draw_fr_frame_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry;

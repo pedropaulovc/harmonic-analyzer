@@ -115,21 +115,28 @@ class Projection:
         return dispatches[header].calls.count(header)
 
 
-def test_checked_heights_print_their_model_values_exactly() -> None:
-    """The sheet's two heights print exactly the model: the overall reference
-    on the cap stack's .001 grid, the top cross-bore axis (MHA-FR-02's taps,
-    .72 under its off-grid rail top) at four places."""
-    for value_mm, places in (
-        (drawing.CAP_TOP_Y, drawing.HEIGHT_PLACES),
-        (drawing.TOP_SCREW_Y, drawing.TOP_AXIS_HEIGHT_PLACES),
-    ):
-        value_in = value_mm / 25.4
-        assert value_in == pytest.approx(round(value_in, places), abs=1e-9)
+def test_checked_heights_print_their_model_values() -> None:
+    """The overall reference prints the cap stack's .001 grid exactly. The top
+    cross-bore axis (MHA-FR-02's taps, .72 under its rail top) is off the inch
+    grid until the FR plane snap, so it prints four places with its own
+    .XX-grade band."""
+    cap_in = drawing.CAP_TOP_Y / 25.4
+    assert cap_in == pytest.approx(round(cap_in, drawing.HEIGHT_PLACES), abs=1e-9)
     assert drawing.HEIGHT_PLACES == 3
-    # Three places would leave the axis on a rounding tie.
-    assert drawing.TOP_SCREW_Y / 25.4 != pytest.approx(
-        round(drawing.TOP_SCREW_Y / 25.4, 3), abs=1e-9
-    )
+    assert drawing.TOP_AXIS_HEIGHT_PLACES == 4
+    assert drawing.TOP_SCREW_Y / 25.4 == pytest.approx(40.0753, abs=5e-5)
+    assert drawing.TOP_AXIS_HEIGHT_BAND_MM == pytest.approx(0.010 * 25.4)
+
+
+def test_top_frame_underside_is_the_knife_mount_seat_plane() -> None:
+    from build_sm_knife_mount import CASTING_UNDERSIDE_Y, MOUNT_GAP
+    from fr_frame_attachment_spec import TOP_FRAME_MID_Y
+    from fr_top_frame_spec import HALF_H
+
+    # The knife mounts clamp to it and the hanger washers seat on the rail
+    # top one band above it: exact contact, no overlap and no gap.
+    assert MOUNT_GAP == 0.0
+    assert TOP_FRAME_MID_Y - HALF_H == pytest.approx(CASTING_UNDERSIDE_Y, abs=1e-9)
 
 
 def test_a_batch_projects_every_point_through_one_transform_read() -> None:

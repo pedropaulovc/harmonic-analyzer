@@ -6,13 +6,13 @@ the east-rail hub, -X crank side). Derived from the ch30 eight views (px
 measurement anchored on the 394 x 224 column pitch), the GT bundle solve
 rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
 
-* Rail band y 999.7058..1036.2058 (H 36.4998 = 1.437; the old 41-tall band
+* Rail band y 999.7..1036.1998 (H 36.4998 = 1.437; the old 41-tall band
   top 1040.7 was the BOSS top -- the rail top face is 4.572 lower). Assembly
-  inserts the part at ring mid-plane TOP_FRAME_MID_Y = 1017.9558.
+  inserts the part at ring mid-plane TOP_FRAME_MID_Y = 1017.9499.
 * Side rails (along Z at x +/-197.0024) 34.29 (1.35) wide -> outer faces
   x +/-214.1474, window x +/-179.8574. Front/rear rails (along X at
   z -/+112.014) 38.1 (1.50) wide -> outer faces z -/+131.064, window z -/+92.964.
-* Corner bosses O44.958 (1.77) spanning y 993.2797..1040.7777 (proud .18
+* Corner bosses O44.958 (1.77) spanning y 993.2738..1040.7718 (proud .18
   above the rail top, hanging .253 below the underside, 1.87 overall). All
   four upper/lower bosses use the smaller user-ruled diameter so the
   outward keeper feet sit flat. The O25.5016 column bores and O27.5082 cap
@@ -29,7 +29,7 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   the finished flange under it.
 * Integral crossbar 25.146 (.99) wide, centred on the knife line x -15.0,
   spanning the window along Z, flush with BOTH faces at its junctions (the
-  faced underside 999.7058 is the knife-mount seat plane), with 18.034 (.71)
+  faced underside 999.7 is the knife-mount seat plane), with 18.034 (.71)
   plan gussets at all four rail
   junctions and, at z 3.088 -/+ 87.06, a plain #10 loose through-hole per
   knife mount. The cut-to-length #10-24 hex bolt bears on a 96659A104
@@ -42,12 +42,12 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   rails: the .99-wide, .32-tall top flange over a .51 web centred on the
   knife line through the
   underside, with R.12 roots.
-* Every face on the underside plane 999.7058 between the bosses -- rail web
+* Every face on the underside plane 999.7 between the bosses -- rail web
   bottoms, junction lands, plan gussets and the crossbar's full-depth ends
   under both knife mounts -- is faced at the Ra 125 µin seat finish (user
   ruling 2026-10-12, one linked manufacturing note); the corner-boss
   bottoms .253 below it and the hub boss and V-gussets .31 below stay off
-  it. 999.7058 is the FINISHED plane: the cut comes out of casting allowance,
+  it. 999.7 is the FINISHED plane: the cut comes out of casting allowance,
   so the model, its bands and every stack read from it unchanged. It is
   faced first. The #10 clearance holes are drilled through from it (Q7
   option C); the dowel reams are cut blind from it and located

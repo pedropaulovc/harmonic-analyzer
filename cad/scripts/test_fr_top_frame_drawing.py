@@ -62,7 +62,7 @@ def test_nominal_corner_bores_and_cap_recesses_clear_the_installed_stack() -> No
     assert part.CAP_RECESS_DIAMETER_BAND == pytest.approx((0.2032, 0.0))
     assert part.CAP_RECESS_DEPTH_BAND == pytest.approx((0.3048, 0.0))
     recess_floor_world = TOP_FRAME_MID_Y + part.CAP_RECESS_FLOOR_Y
-    assert math.isclose(CAP_MOUTH_Y - recess_floor_world, 1.44145, abs_tol=1e-6)
+    assert math.isclose(CAP_MOUTH_Y - recess_floor_world, 1.44735, abs_tol=1e-6)
     assert math.isclose(
         recess_floor_world - (TOP_SCREW_Y + TUBE_CROSS_HOLE_DIAMETER / 2.0),
         4.0513,

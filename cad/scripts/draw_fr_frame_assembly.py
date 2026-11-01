@@ -21,6 +21,7 @@ from solidworks_mcp.adapters.com_variant import dispatch_array, double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
+    dimension_name,
     place_view,
     view_name,
     visible_component_entities,
@@ -49,7 +50,9 @@ from _drawing_common import (
     read_required_properties,
     set_high_quality_shaded_with_edges,
 )
-from _drawing_dimensions import set_arc_endpoints_to_center, set_reference_dimension
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import set_reference_dimension
+from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_edge_dimensions import assert_dimension_measures
 from _drawing_edges import _edge_endpoint_key
 from _drawing_leaders import distance_to_point, segments_cross
@@ -92,13 +95,16 @@ from fr_frame_attachment_spec import (
     BASE_SCREW_Y,
     CAP_TOP_Y,
     CASTING_FULL_THREAD_DEPTH,
+    TOP_AXIS_HEIGHT_BAND_MM,
+    TOP_AXIS_HEIGHT_DIMENSION,
+    TOP_AXIS_HEIGHT_PLACES,
+    TOP_AXIS_SETTING_FEATURE,
     TOP_SCREW_Y,
     TUBE_CROSS_HOLE_DIAMETER,
 )
 from fr_harmonic_base_spec import BOTTOM_WIDTH, DECK_HALF_X
 from fr_nameplate_spec import MOUNT_POS as NAMEPLATE_MOUNT_POS
 from fr_vn_frame_cross_screw_spec import (
-    HEAD_DIA as CROSS_SCREW_HEAD_DIA,
     SHANK_DIA as CROSS_SCREW_SHANK_DIA,
     SHANK_LEN as CROSS_SCREW_SHANK_LEN,
     THREAD as CROSS_SCREW_THREAD,
@@ -132,14 +138,14 @@ UNIT = assembly_contract("fr-frame").drawing_unit
 # follows the cap stack's .001 grid (41.134); the inset is .16.
 HEIGHT_PLACES = 3
 INSET_PLACES = 2
-# The top cross-bore axis height prints four places, the model equal to the
-# print (40.0755; fr-frame deviation). Step 3 sets all four corners' axes to
-# this one absolute height from the base underside before step 5
-# match-drills the tubes, so the frame's own .72 tap station off its rail top
-# cannot carry it. MHA-FR-02's taps stand .72 below its rail top, and that
-# rail top (world 1036.2057) lies off the inch grid until the frame plane is
-# snapped (PR C), so at three places the height would be a rounding tie.
-TOP_AXIS_HEIGHT_PLACES = 4
+# The top cross-bore axis height (fr_frame_attachment_spec TOP_AXIS_*) prints
+# four places, 40.0753, with its .XX-grade band (+/-.0100). Step 3 sets all
+# four corners' axes to this one absolute height from the base underside
+# before step 5 match-drills the tubes, so the frame's own .72 tap station off
+# its rail top cannot carry it. MHA-FR-02 keeps its faced underside on the
+# 999.7 plane the summing knife mounts clamp to, which leaves its rail top and
+# taps off the inch grid until the FR plane snap moves that plane with KNIFE_Y
+# and the channel FULCRUM.
 # The tube match holes' finished drill, as steps 2 and 5 print it (.197).
 CROSS_HOLE_TEXT = render_number(TUBE_CROSS_HOLE_DIAMETER / 25.4, UNIT, 3)
 # Machine z stations each inset edge's ray is cast at, in turn: on both
@@ -647,24 +653,25 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         label="finished frame overall height reference",
     )
 
-    screw_head = _visible_circle_at_height(
-        front,
-        component_stem="fr-vn-frame-cross-screw",
-        height_mm=TOP_SCREW_Y,
-        target_x_m=-_LEFT_COLUMN_X_M,
-        radius_mm=CROSS_SCREW_HEAD_DIA / 2.0,
-        label="installed top cross-screw head",
+    # The setting is the assembly's own TopAxisSetting dimension, shown in
+    # this view and imported with its band.
+    _show_base_view_sketches(
+        adapter, front, (TOP_AXIS_SETTING_FEATURE,), label="working front"
     )
-    screw_axis = _add_entity_height_dimension(
+    annotations = curate_view_dimensions(
         adapter,
         front,
-        base_bottom,
-        screw_head,
-        text_xy=TOP_AXIS_HEIGHT_TEXT_XY,
-        label="installed top cross-screw axis height",
+        keep={TOP_AXIS_HEIGHT_DIMENSION: TOP_AXIS_HEIGHT_TEXT_XY},
+        view_label="working front",
+        dimensions_by_feature={TOP_AXIS_SETTING_FEATURE: {TOP_AXIS_HEIGHT_DIMENSION}},
     )
-    screw_axis = set_arc_endpoints_to_center(
-        adapter, screw_axis, label="installed top cross-screw axis height"
+    (screw_axis,) = (
+        _early_bound(
+            _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        )
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == TOP_AXIS_HEIGHT_DIMENSION
     )
     screw_axis = _checked_linear_dimension(
         adapter,
@@ -673,6 +680,18 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         places=TOP_AXIS_HEIGHT_PLACES,
         label="installed top cross-screw axis height",
     )
+    tolerance = _early_bound(
+        _early_bound(screw_axis.GetDimension2(0), "IDimension").Tolerance,
+        "IDimensionTolerance",
+    )
+    band_m = TOP_AXIS_HEIGHT_BAND_MM / 1000.0
+    if (
+        int(tolerance.Type) != 4  # swTolType_e.swTolSYMMETRIC
+        or abs(float(tolerance.GetMaxValue()) - band_m) > 1e-9
+        or abs(float(tolerance.GetMinValue()) + band_m) > 1e-9
+        or int(screw_axis.GetPrimaryTolPrecision2()) != TOP_AXIS_HEIGHT_PLACES
+    ):
+        raise RuntimeError("installed top cross-screw axis height lost its band")
     screw_axis = _set_dimension_suffix(
         adapter,
         screw_axis,
