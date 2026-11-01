@@ -48,6 +48,7 @@ def test_marked_dimensions_are_exactly_the_kept_set() -> None:
         set(drawing.DIMENSION_CALLOUTS)
         | set(drawing.DIMENSION_PREFIXES)
         | set(drawing.REFERENCE_DIMENSIONS)
+        | set(drawing.LINEAR_REFERENCE_DIMENSIONS)
     )
     assert annotated <= kept
     assert set(spec.EAR_STATION_DIMENSIONS) >= set(spec.DRAWING_DIMENSIONS["EarHoles"])

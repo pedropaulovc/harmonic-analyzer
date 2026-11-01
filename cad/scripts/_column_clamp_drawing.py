@@ -2,8 +2,9 @@
 
 ``draw_sh_column_clamp_front`` and ``draw_sh_column_clamp_back`` print the
 same split-face view of the shared semi-arc (``_clamp_arc``): both mark the
-ear pair's imported dimensions ``2X`` and both draw the bore axis the ear
-stations measure from.  Drawing-only: no part recipe imports this module.
+ear pair's imported dimensions ``2X``, both draw the bore axis the ear
+stations measure from, and both print the bore-axis-to-side-face AnchorZ as a
+plain linear reference.  Drawing-only: no part recipe imports this module.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from solidworks_mcp.adapters.solidworks.drawing import dimension_name, view_name
 
 import _telemetry
 from _com import _early_bound
+from _drawing_dimensions import set_reference_dimension
 
 
 def set_dimension_prefixes(
@@ -33,6 +35,26 @@ def set_dimension_prefixes(
             raise RuntimeError(f"dimension prefix {prefix!r} did not persist")
     if remaining:
         raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
+
+
+def set_linear_reference_dimensions(
+    adapter: Any, annotations: list[Any], names: tuple[str, ...]
+) -> None:
+    """Parenthesize named LINEAR dimensions as references, "(.945)".
+
+    ``_drawing_dimensions.set_reference_dimensions`` writes "(<MOD-DIAM>" on
+    every name, which printed the AnchorZ distance as "(Ø.945)" (farm
+    20261101T002109868Z); the singular helper writes a plain "(" and reads
+    both parts back."""
+    remaining = set(names)
+    for raw in annotations:
+        name = dimension_name(adapter, _early_bound(raw, "IAnnotation"))
+        if name not in remaining:
+            continue
+        set_reference_dimension(adapter, raw, label=f"{name} reference")
+        remaining.discard(name)
+    if remaining:
+        raise RuntimeError(f"linear references not applied: {sorted(remaining)}")
 
 
 @_telemetry.traced("drawing.column_clamp.bore_axis_centerline")

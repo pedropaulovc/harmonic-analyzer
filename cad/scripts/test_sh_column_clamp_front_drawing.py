@@ -51,6 +51,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         set(drawing.DIMENSION_CALLOUTS)
         | set(drawing.DIMENSION_PREFIXES)
         | set(drawing.REFERENCE_DIMENSIONS)
+        | set(drawing.LINEAR_REFERENCE_DIMENSIONS)
     )
     assert annotated <= kept
 

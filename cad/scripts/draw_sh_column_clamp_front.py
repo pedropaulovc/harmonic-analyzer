@@ -38,7 +38,11 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _check import check
-from _column_clamp_drawing import add_bore_axis_centerline, set_dimension_prefixes
+from _column_clamp_drawing import (
+    add_bore_axis_centerline,
+    set_dimension_prefixes,
+    set_linear_reference_dimensions,
+)
 from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
@@ -75,6 +79,7 @@ from sh_column_clamp_front_spec import (
     EAR_HOLE_CALLOUT_PLACES,
     EAR_HOLE_DIA,
     EAR_HOLE_Z,
+    LINEAR_REFERENCE_DIMENSIONS,
     REFERENCE_DIMENSIONS,
 )
 
@@ -328,6 +333,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # and the mates.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_reference_dimensions(adapter, annotations, REFERENCE_DIMENSIONS)
+    set_linear_reference_dimensions(adapter, annotations, LINEAR_REFERENCE_DIMENSIONS)
     set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
 
