@@ -2,7 +2,7 @@
 
 Every view is hidden-lines-removed. Optional native supplier references use
 explicit annotation margins reserved before fitting. Front/Top/Right share
-the largest fitting standard scale, Right level with Front; when only Top's
+the largest fitting standard scale, projected from Front; when only Top's
 band is short, Top takes spare height from the Front/Right row. Isometric has
 its own fitting scale and stays unannotated. All supplier dimensions are
 reference-only, not fabrication controls or claims that nominal envelopes
@@ -659,24 +659,30 @@ def fastener_view_cells(
     )
 
 
-def _share_front_row(cells: tuple) -> tuple:
-    """Fit Front and Right in the overlap of their cells' heights.
+def _project_from_front(cells: tuple) -> tuple:
+    """Fit Right in Front's row and Top in Front's column (third angle).
 
-    Each view centres on its own fit cell, and supplier lanes inset Front and
-    Right differently, so RIGHT sat about 3 mm below FRONT. Both views project
-    the same model height, so one shared row keeps them level at any scale.
+    Each view centres on its own fit cell, and supplier lanes inset the cells
+    differently, so RIGHT sat about 3 mm below FRONT and TOP up to 51.5 mm
+    beside it (the dowels' application lane). Front and Right project the same
+    model height, Front and Top the same width, so fitting each pair in the
+    overlap of its cells keeps them aligned at any scale.
     """
-    rows = {name: cell for name, _, cell in cells if name in ("*Front", "*Right")}
-    if len(rows) != 2:
-        raise ValueError(f"purchased layout needs Front and Right cells: {rows!r}")
-    low = max(cell[1] for cell in rows.values())
-    high = min(cell[3] for cell in rows.values())
-    if low >= high:
-        raise ValueError(f"Front and Right cells share no row: {rows!r}")
+    boxes = {name: cell for name, _, cell in cells}
+    if not {"*Front", "*Top", "*Right"} <= set(boxes):
+        raise ValueError(f"purchased layout needs Front, Top and Right: {cells!r}")
+    front = boxes["*Front"]
+    lows = (max(front[0], boxes["*Top"][0]), max(front[1], boxes["*Right"][1]))
+    highs = (min(front[2], boxes["*Top"][2]), min(front[3], boxes["*Right"][3]))
+    if lows[0] >= highs[0] or lows[1] >= highs[1]:
+        raise ValueError(f"Top/Right cells share no column/row with Front: {cells!r}")
+    shared = {
+        "*Front": (lows[0], lows[1], highs[0], highs[1]),
+        "*Top": (lows[0], boxes["*Top"][1], highs[0], boxes["*Top"][3]),
+        "*Right": (boxes["*Right"][0], lows[1], boxes["*Right"][2], highs[1]),
+    }
     return tuple(
-        _cell(name, cell[0], low, cell[2], high)
-        if name in rows
-        else (name, center, cell)
+        _cell(name, *shared[name]) if name in shared else (name, center, cell)
         for name, center, cell in cells
     )
 
@@ -1794,7 +1800,7 @@ async def _build_reference_sheet(
             if supplier_margins is None
             else supplier_fit_cells(outer, supplier_margins, label=label)
         )
-        return outer, _share_front_row(inner)
+        return outer, _project_from_front(inner)
 
     cells, fit_cells = layout_cells(0.0)
     draw, sheet = new_project_drawing(

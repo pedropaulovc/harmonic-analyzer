@@ -1216,7 +1216,7 @@ def test_short_top_band_lowers_the_row_instead_of_shrinking_every_view(
     def fit_cells(lower):
         outer = purchased.fastener_view_cells(0.073, lower=lower)
         inner = purchased.supplier_fit_cells(outer, margins, label="t")
-        return purchased._share_front_row(inner)
+        return purchased._project_from_front(inner)
 
     def fresh_views(cells):
         return [
@@ -1243,27 +1243,98 @@ def test_short_top_band_lowers_the_row_instead_of_shrinking_every_view(
     assert purchased._top_lowering(_Drawing(), fresh_views(roomy), roomy) == 0.0
 
 
-def test_front_and_right_share_one_row():
+def test_top_and_right_project_from_front():
+    # The dowel lanes: Front's diameter text left, Top's application lane right.
     outer = purchased.fastener_view_cells(0.073)
     inset = purchased.supplier_fit_cells(
-        outer, {"*Front": (0.026, 0.026, 0.026, 0.020)}, label="t"
+        outer,
+        {"*Front": (0.035, 0.024, 0.004, 0.006), "*Top": (0.003, 0.018, 0.075, 0.012)},
+        label="t",
     )
     cells = {name: (center, cell) for name, center, cell in inset}
+    assert cells["*Front"][0][0] - cells["*Top"][0][0] == pytest.approx(0.0515)
     assert cells["*Front"][0][1] != cells["*Right"][0][1]
 
     shared = {
         name: (center, cell)
-        for name, center, cell in purchased._share_front_row(inset)
+        for name, center, cell in purchased._project_from_front(inset)
     }
-    front, right = shared["*Front"], shared["*Right"]
+    front, top, right = shared["*Front"], shared["*Top"], shared["*Right"]
+    assert front[0][0] == top[0][0] == pytest.approx(0.095)
     assert front[0][1] == right[0][1]
-    assert (front[1][1], front[1][3]) == (right[1][1], right[1][3]) == (0.103, 0.162)
-    assert (right[1][0], right[1][2]) == (0.225, 0.405)
-    assert shared["*Top"] == cells["*Top"]
+    assert front[1] == pytest.approx((0.060, 0.101, 0.130, 0.176))
+    assert top[1] == pytest.approx((0.060, 0.216, 0.130, 0.250))
+    assert right[1] == pytest.approx((0.225, 0.101, 0.405, 0.176))
+    assert shared["*Isometric"] == cells["*Isometric"]
     with pytest.raises(ValueError):
-        purchased._share_front_row(
-            (("*Front", (0, 0), (0, 0.0, 1, 0.1)), ("*Right", (0, 0), (0, 0.2, 1, 0.3)))
+        purchased._project_from_front(
+            (
+                ("*Front", (0, 0), (0, 0.0, 1, 0.1)),
+                ("*Top", (0, 0), (0, 0.2, 1, 0.3)),
+                ("*Right", (0, 0), (2, 0.2, 3, 0.3)),
+            )
         )
+
+
+def test_struck_centred_spans_alternate_shelves_outward(monkeypatch):
+    import _supplier_text_shelf as shelf
+
+    # Front outline centred at x=0.110, y=0.130; tips at each dimension line.
+    lines = {
+        "inner@F": ((0.108, 0.100), (0.112, 0.100)),
+        "outer@F": ((0.106, 0.092), (0.114, 0.092)),
+        "flats@F": ((0.104, 0.170), (0.116, 0.170)),
+        "offset@F": ((0.120, 0.090), (0.124, 0.090)),
+        "length@F": ((0.140, 0.110), (0.140, 0.150)),
+    }
+
+    class Display:
+        Type2 = 2
+
+        def __init__(self, name):
+            self.name = name
+
+        def GetDimension2(self, _index):
+            return SimpleNamespace(FullName=self.name)
+
+    class Annotation:
+        def __init__(self, name):
+            self.display = Display(name)
+
+        def GetType(self):
+            return 4
+
+        def GetSpecificAnnotation(self):
+            return self.display
+
+    view = SimpleNamespace(
+        GetOutline=lambda: (0.090, 0.110, 0.130, 0.150),
+        GetAnnotations=lambda: [Annotation(name) for name in lines],
+    )
+
+    def record(_adapter, display):
+        tips = lines[display.name]
+        return {"display": {"arrows": [(*tip, 0, 0, 0, 0, 0, 0) for tip in tips]}}
+
+    monkeypatch.setattr(shelf, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(shelf, "_supplier_top_record", record)
+    monkeypatch.setattr(
+        shelf,
+        "supplier_top_text_geometry",
+        lambda data, horizontal: {
+            "tips": tuple(sorted(row[:2] for row in data["display"]["arrows"]))
+        },
+    )
+    monkeypatch.setattr(shelf, "_struck", lambda _actual, _horizontal: True)
+    displays, shelves = shelf.struck_supplier_text(None, {"*Front": view})
+    assert set(displays) == set(lines)
+    assert shelves == {
+        "inner@F": (True, "right"),
+        "outer@F": (True, "left"),
+        "flats@F": (True, "right"),
+        "offset@F": (True, "right"),
+        "length@F": (False, "right"),
+    }
 
 
 def test_lowered_cells_move_the_row_boundary_only():

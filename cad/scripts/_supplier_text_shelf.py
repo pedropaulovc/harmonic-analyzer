@@ -85,15 +85,19 @@ def struck_supplier_text(
 
     Centred text wider than its span prints across its extension lines (the
     4-40 nut's Ø.112 at 5:1). Each struck text shelves on the side of its
-    view it already sits on; a centred span shelves right. Clear text, and
-    text a sheet already shelved, is left alone.
+    view it already sits on. Centred spans on one side of a view alternate
+    right, left, ... outward, so an inner shelf's dimension line never runs
+    under the next lane's shelved text (the shoulder screw's Ø.190 under
+    Ø.250's stacked limits). Clear text, and text a sheet already shelved,
+    is left alone.
     """
     displays: dict[str, Any] = {}
     shelves: dict[str, tuple[bool, Literal["left", "right"]]] = {}
-    for view in views.values():
+    centred: dict[tuple[str, bool], list[tuple[float, str]]] = {}
+    for key, view in views.items():
         view = _early_bound(view, "IView")
         outline = tuple(float(value) for value in view.GetOutline())
-        centre_x = (outline[0] + outline[2]) / 2.0
+        centre = ((outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0)
         for raw in view.GetAnnotations() or ():
             annotation = _early_bound(raw, "IAnnotation")
             if int(annotation.GetType()) != 4:  # swDisplayDimension
@@ -116,10 +120,16 @@ def struck_supplier_text(
             tips = actual["tips"]
             station = (tips[0][0] + tips[1][0]) / 2.0
             displays[name] = display
-            shelves[name] = (
-                horizontal,
-                "left" if station < centre_x - 1e-4 else "right",
-            )
+            if horizontal and abs(station - centre[0]) <= 1e-4:
+                above = tips[0][1] > centre[1]
+                centred.setdefault((key, above), []).append(
+                    (abs(tips[0][1] - centre[1]), name)
+                )
+                continue
+            shelves[name] = (horizontal, "left" if station < centre[0] else "right")
+    for lanes in centred.values():
+        for lane, (_, name) in enumerate(sorted(lanes)):
+            shelves[name] = (True, "left" if lane % 2 else "right")
     return displays, shelves
 
 
