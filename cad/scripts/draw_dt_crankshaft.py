@@ -91,7 +91,6 @@ from dt_crankshaft_notes import (
     KNOCKOUT_CALLOUT_BELOW,
     NECK_LANDS,
     NECKS,
-    PIN_HOLE_MATE,
     PINION_SEAT_MATE,
     SHAFT_LENGTH_MATE,
     SHANK_MATE,
@@ -257,10 +256,13 @@ SIDE_KEEP = {
     # above every row that spans it.
     "SpigotLength": ((PIN_X + COLLAR_SEAT_X) / 2.0, 0.148),
     # The 16T pin cross-hole's REF Ø (witness on the seat's top silhouette):
-    # on the low row over the seat, text left of its extension lines, under
-    # the Ø9.000's block and right of that block's dimension line, so the
-    # transfer note's leader passes right of the extension lines to the hole.
-    "PinionPinHoleDia": (_sheet_x(PINION_PIN_STATION_Y) - 0.017, 0.203),
+    # one line, text left of its extension lines and joined to the left
+    # arrow's tail, under the Ø9.000's block and right of its dimension line.
+    # Its dimension line sits above where the transfer note's leader passes
+    # the right arrow's tail (layout audit of 467913370: lower, the tail
+    # crossed the leader; arrows inside read as a valueless dimension --
+    # machinist review of 73164fd46).
+    "PinionPinHoleDia": (_sheet_x(PINION_PIN_STATION_Y) - 0.013, 0.2139),
 }
 # A dragged diameter prints its dimension line at the requested X with the
 # text running to its RIGHT (run 20260923T030252135Z-49e46990).  Its
@@ -299,8 +301,8 @@ DIAMETER_POSITIONS = {
     # Its leader left of the journal finish symbol's V.
     "JournalDiaDim": (RELIEF_START_X - 0.0035, 0.224),
     "ReliefDiaDim": (RELIEF_START_X + 0.045, 0.212),
-    # Raised 13 mm over the 16T pin cross-hole's REF Ø on the low row.
-    "PinionSeatDiaDim": (SEAT_STEP_X + 0.002, 0.2255),
+    # Raised 17 mm over the 16T pin cross-hole's REF Ø.
+    "PinionSeatDiaDim": (SEAT_STEP_X + 0.002, 0.2295),
     "SpigotDiaDim": (COLLAR_SEAT_X + 0.0075, 0.2215),
     "CollarDiaDim": (SPIGOT_END_X + 0.002, 0.2075),
     "NeckDiaDim": (JOURNAL_END_X + 0.0006, 0.230),
@@ -328,7 +330,6 @@ CALLOUTS_BELOW = {
     "JournalDiaDim": JOURNAL_MATE,
     "PinionSeatDiaDim": PINION_SEAT_MATE,
     "SpigotDiaDim": SPIGOT_AIR_MATE,
-    "PinionPinHoleDia": PIN_HOLE_MATE,
     "NeckDiaDim": NECK_LANDS,
 }
 # The banded far-end stations name their stack on their own row: a callout
@@ -430,7 +431,7 @@ PINION_PIN_LEADER_LANDING = (PINION_PIN_X + 0.0020, SIDE_CENTER[1] + 0.00055)
 # High in its field (top row ~4.5 mm under the border), so the right neck's
 # Ø9.5 and the Ø9.000's block stand under it, and its leader to the hole
 # passes right of the Ø9.000's block.
-PINION_PIN_NOTE_XY = (0.273, 0.264)
+PINION_PIN_NOTE_XY = (0.269, 0.264)
 PINION_PIN_NOTE_FIELD = (
     HOLE_CALLOUT_XY[0] + 0.032,
     SIDE_CENTER[1],
@@ -1200,18 +1201,6 @@ async def build(adapter: Any) -> dict[str, str]:
             label=f"crankshaft {name}",
             diameter=name in DIAMETER_REFERENCES,
         )
-    # The pin hole's REF Ø keeps its arrows between its extension lines: an
-    # outside arrow's tail ran right into the transfer note's leader (layout
-    # audit of 467913370).
-    (pin_hole,) = [
-        annotation
-        for annotation in annotations
-        if dimension_name(adapter, annotation) == "PinionPinHoleDia"
-    ]
-    pin_hole_display = _early_bound(pin_hole.GetSpecificAnnotation(), "IDisplayDimension")
-    pin_hole_display.ArrowSide = 0  # swDimArrowsInside
-    if int(pin_hole_display.ArrowSide) != 0:
-        raise RuntimeError("the pin hole's REF Ø did not keep its arrows inside")
 
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; the end view gets the
