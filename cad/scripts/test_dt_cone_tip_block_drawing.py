@@ -496,6 +496,26 @@ def test_adjuster_callout_leader_takes_the_short_way_to_its_hole() -> None:
     assert start[0] > front[2]
 
 
+def test_pinch_clearance_leader_stands_off_the_hole_centreline() -> None:
+    """Blind machinist review of e2cfa0d03: 8 deg off vertical, the Ø.129's
+    leader ran down the hole's vertical centreline and read as it.  It now
+    meets the rim 30-45 deg off vertical, aimed at the centre, from the
+    shoulder's right end (the literals in PINCH_CLEARANCE_CALLOUT_XY are the
+    callout's extent)."""
+    leader = drawing.sheet_leaders()["pinch clearance callout"]
+    centre = (drawing.RIGHT_CENTER[0], drawing._elevation_y(drawing.PINCH_HEIGHT, drawing.RIGHT_CENTER))
+    _left, down, right, _up = drawing.PINCH_CLEARANCE_CALLOUT_EXTENT
+    x, y = drawing.PINCH_CLEARANCE_CALLOUT_XY
+    assert leader.start == pytest.approx((x + right, y - down), abs=1e-12)
+    dx, dy = leader.start[0] - leader.tip[0], leader.start[1] - leader.tip[1]
+    angle = math.degrees(math.atan2(dx, dy))
+    assert angle == pytest.approx(math.degrees(drawing.PINCH_CLEARANCE_LEADER_ANGLE))
+    assert 30.0 <= angle <= 45.0
+    assert math.hypot(leader.tip[0] - centre[0], leader.tip[1] - centre[1]) == pytest.approx(
+        drawing.PINCH_CLEARANCE_DIA * drawing._S / 2.0
+    )
+
+
 # The ASME B landscape sheet's frame and title block, as the layout audit's
 # dump reads them (ISheet::GetZoneMargin 12.7 mm each side; the title block's
 # box, layoutcal2-a cone-tip-block.json).
