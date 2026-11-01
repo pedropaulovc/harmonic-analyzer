@@ -1196,8 +1196,8 @@ async def build_supplier_spring_drawing(
     for keys in (
         ("free_front", "free_top"),
         ("free_right",),
-        ("installed_iso",),
-        ("installed_second_iso",),
+        # Two installed variants are read against each other: one joint scale.
+        ("installed_iso", "installed_second_iso"),
         ("max_front",),
     ):
         members = [(views[key], cell) for cell in fit_cells if (key := cell[0]) in keys]
