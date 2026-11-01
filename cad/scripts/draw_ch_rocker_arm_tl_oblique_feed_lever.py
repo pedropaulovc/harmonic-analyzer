@@ -31,7 +31,6 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    rebuild_drawing,
     stamp_drawing_summary,
 )
 
@@ -51,7 +50,6 @@ import ch_rocker_arm_tl_oblique_feed_lever_spec as part_spec
 from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits
 from _supplier_dimensions import supplier_reference_dimension
-from _supplier_text_shelf import assert_supplier_shelves, shelve_supplier_text
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_oblique_feed_lever_spec import (
@@ -116,20 +114,19 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
     # The grip radius off the front-side grip corner, its leader on the arc.
     "GripCornerR": (LEVER_LENGTH + 14.0, _H, 10.0),
 }
-FRONT_KEEP: dict[str, tuple[float, float, float]] = {
-    "LeverThick": (LEVER_LENGTH + 14.0, _H / 2.0, 0.0),
-}
 # The 1/2 thickness's stacked "(1/2 in)" over "STOCK" is taller than its
 # span: centred on its line, the numerator sat on the upper witness (layout
-# audit e5a5f5c19, extension-through-own-text). The text alone shelves right
-# of its witnesses and arrows at the same height, as the CL dowel's
-# references do (draw_ch_rocker_arm_tl_vn_oblique_cl_dowel); the native line
-# and witnesses stay where the import put them. Machinist review mr4: with
-# the arrows outside, the shelf's native connector ended in open space
-# between the witnesses (no dimension line runs there), so the shelved
-# dimension holds its arrows inside and the connector lands on its line.
-SHELVES = {"LeverThick": (False, "right")}
-_ARROWS_INSIDE = 0  # swDimArrowsInside
+# audit e5a5f5c19, extension-through-own-text), and shelved beside the span
+# its connector ended in open space (machinist review mr4) or, arrows held
+# inside, the shelf lost its dimension line (round 8). So the text stands on
+# the dimension line's own run past the lower witness: the line runs from the
+# arrows down to the text, nothing crosses it, and STOCK hangs below. The
+# value's centre sits 8.5 under the witness: clear of the outside arrow
+# (3.6 long) by 2 for a text about 4.6 tall (the base bar's measured
+# "(5-1/2 in)" row); the front view's lower right is otherwise empty.
+FRONT_KEEP: dict[str, tuple[float, float, float]] = {
+    "LeverThick": (LEVER_LENGTH + 14.0, -8.5, 0.0),
+}
 # The hole callout's leader picks hole 2's far edge; its text stands above
 # the view over the lever's inner half.
 HOLE_EDGE_MODEL = (HOLE_X[1] + 0.6 * _R, _H, -HOLE_Y - 0.8 * _R)
@@ -276,10 +273,9 @@ def _set_dimension_prefixes(
 _STOCK_SIZES = {"LeverWidth": LEVER_WIDTH, "LeverThick": LEVER_THICK}
 
 
-def _stock_references(adapter: Any, annotations: list[Any]) -> dict[str, Any]:
+def _stock_references(adapter: Any, annotations: list[Any]) -> None:
     """The as-bought width and thickness print as REF stock fractions over
     STOCK (#290, draw_mg_magnifying_lever's rod stock)."""
-    displays: dict[str, Any] = {}
     by_name: dict[str, list[Any]] = {}
     for item in annotations:
         by_name.setdefault(dimension_name(adapter, item), []).append(item)
@@ -301,16 +297,6 @@ def _stock_references(adapter: Any, annotations: list[Any]) -> dict[str, Any]:
             fraction_denominator=STOCK_FRACTION_DENOMINATORS[name],
             callout=STOCK_CALLOUT,
         )
-        displays[name] = display
-    return displays
-
-
-def _assert_arrows_inside(displays: dict[str, Any]) -> None:
-    """Each shelved reference keeps its arrows inside its witnesses, so its
-    dimension line spans them and the shelf's connector lands on it."""
-    for name, display in displays.items():
-        if int(display.ArrowSide) != _ARROWS_INSIDE:
-            raise RuntimeError(f"{name}: arrows did not hold inside")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -377,17 +363,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # them, then writes the prefixes and the stock references.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
-    stock = _stock_references(adapter, annotations)
-    shelved = {name: stock[name] for name in SHELVES}
-    for display in shelved.values():
-        display.ArrowSide = _ARROWS_INSIDE
-    rebuild_drawing(adapter, label="feed lever shelved references' arrows inside")
-    _assert_arrows_inside(shelved)
-    stations = shelve_supplier_text(adapter, shelved, SHELVES)
-
-    def assert_shelves() -> None:
-        _assert_arrows_inside(shelved)
-        assert_supplier_shelves(adapter, shelved, SHELVES, stations)
+    _stock_references(adapter, annotations)
 
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the feed lever")
@@ -410,7 +386,6 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Rocker Oblique Trammel Feed Lever Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        settled_checks=(assert_shelves,),
     )
 
 
