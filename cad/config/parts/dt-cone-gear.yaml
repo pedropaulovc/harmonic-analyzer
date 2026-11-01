@@ -42,3 +42,8 @@ dt-cone-gear:
       where: "sheet T012, front view: the root-to-bore web stated by the native .0797 MIN dimension (WebMin) from the Ø.0310 +.0018/+.0010 bore to the root envelope MIN"
       finding: "the T012 web is .0797 in (2.0244 mm) at the printed worst case (largest bore .0328, smallest root envelope .1922): .0003 in under the .080 in target (rule 17), .0197 in over the .060 in floor"
       reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions. Here the .031 terminal land (cut by the .0320 micro reamer) and the cutter-native T012 root fix the web at .0797; anything thinner must be ruled again"
+    - id: "RV-04"
+      kind: "minor"
+      where: "sheet T006, GEAR DATA: WEB MIN (REF): .0256"
+      finding: "the T006 root-to-bore web is .0256 in at the printed worst case (largest bore .0328, smallest root envelope .0840), under the .060 in floor (rule 17)"
+      reason: "Owner ruling 2026-11-01: accepted until #1649. The .031 terminal land and its D-bore (RV-01) and the cutter-native T006 root (DT6-FORM1) fix the web; #1649's tip-land geometry pick replaces it"
