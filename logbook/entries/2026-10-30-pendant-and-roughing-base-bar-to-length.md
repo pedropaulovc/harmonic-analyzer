@@ -183,9 +183,9 @@ machine yet; the next entry will say what held up.
 - **Power feed without overrun.** An incremental MDI move in CNCjs
   (`G21 G91 G1 X-50 F400`, then `G90`, plus `G20` if I was in inch mode;
   `G21` makes it 50 mm at 400 mm/min whatever mode was active) gives an exact
-  distance at a set feed with
-  nothing queued. If the pendant can send `$J=` jog commands, FluidNC can
-  cancel a jog on release (unverified against my config).
+  distance at a set feed with nothing queued (unverified against my
+  config). If the pendant can send `$J=` jog commands, FluidNC can cancel a
+  jog on release (unverified against my config).
 - **Screen off.** Set the laptop's screen and sleep timers to Never while
   plugged in and turn off USB selective suspend (unverified).
 
