@@ -279,11 +279,13 @@ BRACKET_HOLE_SPEC = HoleSpec(
 )
 # Rows at .XXX: their spacings must hold TL-28's four tapped holes inside the
 # screws' float. Every Hole Wizard length prints .XXX. The stations are the
-# KP08's along the Tr8 screw (owner ruling 4): exact millimetres at three
-# places, each stating the millimetre title block's three-place band.
+# KP08's along the Tr8 screw (owner ruling 4): exact millimetres, each
+# stating the millimetre title block's three-place band. Whole millimetres,
+# they print two places like the rail row (machinist review: a third place
+# adds nothing under an explicit band).
 BRACKET_HOLE_PLACES = 3
-BRACKET_STATION_PLACES = 3
-BRACKET_STATION_BAND = printed_band_mm(BRACKET_STATION_PLACES, unit=METRIC_UNIT)  # 0.13
+BRACKET_STATION_PLACES = 2
+BRACKET_STATION_BAND = printed_band_mm(3, unit=METRIC_UNIT)  # 0.13
 BRACKET_CBORE_PLACES = 3
 BRACKET_CALLOUT_PRECISION = {
     "hw-thruholedia": 3,
