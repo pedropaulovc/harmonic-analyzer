@@ -2034,7 +2034,7 @@ sections:
       - - Outer diameter
         - '17.63 mm blank; tooth-tip MIN/MAX 17.53..17.63 mm'
         - '0.694'
-        - 'dt_alignment_pinion_spec uses finite #4 stock form, 26T reference, for the 32T 48DP PA20 pinion. dimensions.yaml records nominal support Ø17.979877682; span-corner support Ø17.636770714 pays retained +.0000/−.0040 in tangent-span inspection before selecting the .694 in (17.6276 mm) blank floored to the .001 in grid, with standard tip band +0/−0.10. Nominal root-envelope MIN/MAX Ø15.607797572 / 15.610416667, cutter plunge 1.008591667 and three-tooth tangent span 4.141050236 mm (.1631 in; printed span 4.0411..4.1427) are source geometry, not a loaded-contact certificate. Earlier support-only blank 17.97, ideal-N tip 17.991666666667 / 0.708333 in and circular root 15.610416666667 are historical reference values.'
+        - 'dt_alignment_pinion_spec uses finite #4 stock form, 26T reference, for the 32T 48DP PA20 pinion. dimensions.yaml records nominal support Ø17.979877682; span-corner support Ø17.636770714 pays retained +.0000/−.0040 in tangent-span inspection before selecting the .694 in (17.6276 mm) blank floored to the .001 in grid, with standard tip band +.0000/−.0040 in (17.5260..17.6276). Nominal root-envelope MIN/MAX Ø15.607797572 / 15.610416667, cutter plunge 1.008591667 and three-tooth tangent span 4.141050236 mm (.1631 in; printed span 4.0411..4.1427) are source geometry, not a loaded-contact certificate. Earlier support-only blank 17.97, ideal-N tip 17.991666666667 / 0.708333 in and circular root 15.610416666667 are historical reference values.'
         - derived from selected finite stock form
         - med current nominal geometry; qualification separate
       - - Drum length
@@ -2129,7 +2129,7 @@ sections:
       The assembly's CAM_* and segment-distance guards consume current readers;
       their presence is not an exercised-check claim. Current pitch-circle sum
       40.216667 plus 0.35 extension gives 40.566667. The drum is 32T 48DP PA20,
-      pitch Ø16.933333 with finite-26T-form blank Ø17.6276 (.694 in) / tips 17.5276..17.6276.
+      pitch Ø16.933333 with finite-26T-form blank Ø17.6276 (.694 in) / tips 17.5260..17.6276.
       Historical DP49.82 / Ø17.334 / C2C38.990010 and ideal-32T tip Ø17.991667
       describe prior reconstructions. Alignment is FITUP/zeroing duty: actual
       UNION must retain continuity/no-gap, positive backlash, root air at least
