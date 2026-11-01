@@ -1,15 +1,16 @@
-"""The disc cluster's two air stacks: collar to disc, and disc to platen (#2038).
+"""The disc cluster's two air stacks: collar to disc, and disc to platen.
 
-Owner ruling 2026-10-28 on #2038: the cluster's lengths print
-(``transgear_cluster_fit``) and its air stacks use the repository's air-stack
-method (machining-dfm.md, ``dt_tip_collar_air`` precedent): worst-case
-arithmetic over every source if both stacks clear; otherwise, for both, the
-nominal air minus the arithmetic sum of the in-service clearances (the parts
-can take them all up together) minus the root sum of squares of the
-independent printed manufacturing and set tolerances.  Every source is in
-exactly one class; an unclassified source is refused.  The projections of
-one error are summed into that one source.  The disc's end float and the
-hub's recess stay worst case (``transgear_cluster_fit``).
+The cluster's lengths print (``transgear_cluster_fit``; its end float is
+shimmed at assembly, owner ruling 2026-11-01, #2124) and its air stacks use
+the repository's air-stack method (machining-dfm.md, ``dt_tip_collar_air``
+precedent): worst-case arithmetic over every source if both stacks clear;
+otherwise, for both, the nominal air minus the arithmetic sum of the
+in-service clearances (the parts can take them all up together) minus the
+root sum of squares of the independent printed manufacturing and set
+tolerances (the shim fit-up's window is one).  Every source is in exactly
+one class; an unclassified source is refused.  The projections of one error
+are summed into that one source.  The disc's end float and the hub's recess
+stay worst case (``transgear_cluster_fit``).
 
 Collar air: the MHA-PD-22 drive collar's rear face (seated on F) to the MHA-PD-06
 disc's front face where they overlap, cluster, hub and disc forward and the
@@ -81,6 +82,7 @@ _LENGTHS = (
 INDEPENDENT_TOLERANCES = frozenset(
     {
         *(label for label, _, _ in _LENGTHS),
+        FIT.SHIM_WINDOW_LABEL,
         "sleeve step face perpendicularity",
         "hub spigot end perpendicularity",
         "hub flange rear face perpendicularity",

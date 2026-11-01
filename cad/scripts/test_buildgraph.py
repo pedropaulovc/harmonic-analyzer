@@ -135,7 +135,7 @@ _INSERTED_SOURCES = {
     "pd_transgear_knob_shaft pd_transgear_knob_thrust_ring pd_vn_transgear_latch_pin pd_vn_transgear_pivot_screw "
     "pd_transgear_pin pd_transgear_pivot_spacer pd_vn_transgear_pivot_spring pd_transgear_rear_bushing "
     "pd_transgear_front_bushing "
-    "pd_transgear_removable pd_vn_transgear_retaining_ring "
+    "pd_transgear_removable pd_vn_transgear_retaining_ring pd_vn_transgear_cluster_shim "
     "pd_transgear_thumbnut",
     "ms_measuring_stick": "ms_stick ms_stop_block ms_stop_plate ms_vn_stop_plate_screw sh_vn_thumb_screw",
     "ch_rocker_arm_tl_oblique_jig": "ch_rocker_arm_tl_oblique_base_bar ch_rocker_arm_tl_oblique_carrier "

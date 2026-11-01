@@ -2,8 +2,8 @@ r"""Reproduction script: transgear rear bushing (MHA-PD-24; R9-68; 1 used).
 
 The turned brass ring on the MHA-PD-23 pin between the MHA-PD-18 arm's front
 face and the MHA-PD-10 sleeve's rear face (``pd_transgear_rear_bushing_spec``).
-Its length is printed (+/-LENGTH_BAND, a term of the disc cluster stack,
-#2038).
+Its length prints at the title block: the MHA-PD-VN-68 shims under it set the
+disc's end float (#2124).
 
 Layout: Front-plane annulus at the origin (O.D., bore) extruded +Z by the
 length, so the arm face is the Front Plane (z = 0) and the sleeve face is the
@@ -40,10 +40,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
@@ -55,7 +52,6 @@ from pd_transgear_rear_bushing_spec import (
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     LENGTH,
-    LENGTH_BAND,
     OD,
     SURFACE_FINISHES,
     UNIT,
@@ -168,9 +164,6 @@ async def build(adapter) -> dict[str, str]:
         "BoreDia",
         *deviations(BORE_DIA_BAND),
         display_unit=UNIT,
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "Ring", "RingLength", LENGTH_BAND, display_unit=UNIT
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

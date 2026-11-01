@@ -1,9 +1,7 @@
 pd_cluster_stack:
-  # Owner ruling 2026-10-28 on #2038 (option A): the paper-drive disc
-  # cluster has no faced-to-fit lengths. Every shop-made length in its axial
-  # stack (the MHA-PD-17 hub, the MHA-PD-24/25 bushings, and the arm-plate hub
-  # face station, thrust ring, knob pinion face, pin groove station, hub
-  # spigot and feed sleeve tooth and overall lengths) prints at this band, so
-  # the stack holds the collar-to-disc air with nothing felt or faced at
-  # assembly. transgear_cluster_fit owns the closed-form stack.
+  # The knob train's printed lengths ahead of the disc cluster (the arm-plate
+  # hub face station, the thrust ring and the knob pinion's face width) print
+  # at this band; transgear_cluster_fit owns the closed-form stack. The disc
+  # cluster's own end float is shimmed at assembly (owner ruling 2026-11-01,
+  # #2124), so its inch lengths carry their own bands.
   printed_length_band_mm: 0.02

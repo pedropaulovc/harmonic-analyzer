@@ -3,8 +3,8 @@ r"""MHA-PD-25 transgear-front-bushing: the brass thrust ring in front of the clu
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  A turned brass ring on the MHA-PD-23 pin between the MHA-PD-10
 sleeve's nose (steel: the hub never thrusts, R9-5) and the MHA-PD-VN-61 retaining
-ring.  Its length is printed (#2038 owner ruling 2026-10-28: nothing in the
-disc cluster is faced to fit): ``transgear_cluster_fit.FRONT_BUSHING_LENGTH``
+ring.  Its length prints +/-.001 (the shims behind the cluster set the end
+float, owner ruling 2026-11-01, #2124): ``transgear_cluster_fit.FRONT_BUSHING_LENGTH``
 sets, with the cluster forward, the collar-to-disc air (``pd_cluster_air``).
 It runs free on the pin;
 both faces bear.  Its Ø.47 rear face reaches over the hub's front face, so the
@@ -83,9 +83,9 @@ if HUB_FACE_OVERLAP_WORST < HUB_FACE_OVERLAP_MIN:
         f"past its bore, under {HUB_FACE_OVERLAP_MIN}"
     )
 
-# --- Length: printed (#2038 owner ruling 2026-10-28, option A) --------------------
+# --- Length: +/-.001 (owner ruling 2026-11-01, #2124) ----------------------------
 # With the cluster forward it sets F to the disc's front face (m), so the
-# drive collar's air to the disc: a term of the disc cluster's printed stack.
+# drive collar's air to the disc: a term of the disc cluster's stack.
 LENGTH = FIT.FRONT_BUSHING_LENGTH  # .222
 LENGTH_BAND = FIT.LENGTH_BAND
 LENGTH_PLACES = FIT.LENGTH_PLACES

@@ -23,7 +23,7 @@ from _printed_tolerance import (
     printed_band_mm,
 )
 from _surface_finish import MACHINED_UM
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND_IN, STACK_NAME
+from pd_cluster_stack_band import FIT_LENGTH_BAND_IN, STACK_NAME
 
 
 def test_required_drawing_paths() -> None:
@@ -61,9 +61,9 @@ def test_only_the_shank_the_ring_groove_and_its_station_carry_model_bands() -> N
         ("PinProfile", "GrooveWidth"): "*deviations(GROOVE_WIDTH_BAND)",
         ("PinProfile", "GrooveStation"): "GROOVE_STATION_BAND",
     }
-    assert spec.GROOVE_STATION_BAND == PRINTED_LENGTH_BAND_IN
+    assert spec.GROOVE_STATION_BAND == FIT_LENGTH_BAND_IN
     assert spec.DRAWING_PRECISION_BY_NAME["ShankDia"] == 4
-    assert spec.DRAWING_PRECISION_BY_NAME["GrooveStation"] == 4
+    assert spec.DRAWING_PRECISION_BY_NAME["GrooveStation"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["TipDomeZ"] == 2
     assert spec.DRAWING_PRECISION_BY_NAME["HeadLand"] == 2
 
@@ -218,14 +218,14 @@ def test_the_functional_station_runs_from_the_head_seat_to_the_load_wall() -> No
     assert drawing.LOAD_WALL_X < drawing.GROOVE_REAR_X < drawing.SEAT_X
 
 
-def test_the_four_place_station_names_the_stack_it_sets() -> None:
+def test_the_station_names_the_stack_it_sets() -> None:
     """Rule 4: the station's ±band names the disc cluster stack it serves."""
     import transgear_cluster_fit as fit
 
     callout = _below("GrooveStation")
     assert callout == callouts.GROOVE_STATION_CALLOUT
     assert "LOAD WALL" in callout and STACK_NAME in callout
-    assert spec.DRAWING_PRECISION_BY_NAME["GrooveStation"] == 4
+    assert spec.DRAWING_PRECISION_BY_NAME["GrooveStation"] == 3
     assert fit.GS[1:] == (spec.GROOVE_STATION, spec.GROOVE_STATION_BAND)
 
 

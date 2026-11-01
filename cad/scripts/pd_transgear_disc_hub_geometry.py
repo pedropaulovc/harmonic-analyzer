@@ -32,7 +32,7 @@ import _config
 from _fit_shaft_h import SHAFT_H
 from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND_IN
+from pd_cluster_stack_band import FIT_LENGTH_BAND_IN
 
 # The hub sheet prints the bolt circle; the disc reads the same unit.
 UNIT = drawing_unit(
@@ -60,15 +60,15 @@ if len(SCREW_ANGLES_DEG) != SCREW_COUNT:
 # The retained hub spigot (R9-68): Ø.501 SHAFT_H in the disc's .501 REAM_H7
 # bore (an owned .5010 reamer), the disc pilot and screw-to-bore wall
 # envelope.  Its length runs from the flange's rear face to its end on the
-# sleeve's step: a term of the disc cluster's printed stack
-# (transgear_cluster_fit), printed at the cluster's band (#2038 owner ruling
-# 2026-10-28), four places to carry it.
+# sleeve's step: a term of the disc cluster's stack (transgear_cluster_fit)
+# that sets the collar-to-disc air, so it prints +/-.001 (the shims set the
+# end float: owner ruling 2026-11-01, #2124).
 SPIGOT_DIA = 12.7254  # .501
 SPIGOT_DIA_BAND = SHAFT_H  # (upper, lower) deviations: 0/-.0008
 SPIGOT_DIA_PLACES = 4
 SPIGOT_LENGTH = 3.6576  # .144
-SPIGOT_LENGTH_PLACES = 4
-SPIGOT_LENGTH_BAND = PRINTED_LENGTH_BAND_IN
+SPIGOT_LENGTH_PLACES = 3
+SPIGOT_LENGTH_BAND = FIT_LENGTH_BAND_IN
 
 
 def screw_centres() -> tuple[tuple[float, float], ...]:

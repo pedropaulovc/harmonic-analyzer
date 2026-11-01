@@ -62,7 +62,6 @@ from pd_transgear_rear_bushing_spec import (
     DRAWING_PRECISION_BY_NAME,
     ISOMETRIC_VIEW_SCALE,
     LENGTH,
-    LENGTH_CALLOUT,
     OD,
     SURFACE_FINISHES,
 )
@@ -83,8 +82,8 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø9 x 6 ring: 5:1 keeps the three sizes, the stack callout and both face
-# finishes legible on the landscape sheet.
+# A Ø9 x 6 ring: 5:1 keeps the three sizes and both face finishes legible on
+# the landscape sheet.
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0  # model mm -> sheet m
@@ -111,15 +110,12 @@ END_KEEP = {
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
-    "RingLength": LENGTH_CALLOUT,
 }
-# The length under the profile.  Its three-line block is wider
-# than the 6.0 between its extension lines, so it stands off to the right,
-# under the O.D. dimension, where no extension line runs through it.  The
-# O.D. sits right of the part, its dimension line far enough out that the arm
-# face's finish symbol sits between them.
+# The title-block length under the profile, between its extension lines.
+# The O.D. sits right of the part, its dimension line far enough out that the
+# arm face's finish symbol sits between them.
 PROFILE_KEEP = {
-    "RingLength": (_PROFILE_ARM_X + 0.045, _PROFILE_BOTTOM - 0.022),
+    "RingLength": (PROFILE_CENTER[0], _PROFILE_BOTTOM - 0.012),
 }
 OD_ON_PROFILE = (_PROFILE_ARM_X + 0.040, PROFILE_CENTER[1])
 

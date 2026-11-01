@@ -11,7 +11,6 @@ import _config
 import build_pd_transgear_rear_bushing as part
 import draw_pd_transgear_rear_bushing as drawing
 import transgear_cluster_fit as fit
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND_IN, STACK_NAME
 import pd_transgear_pin_spec as pin
 import pd_transgear_rear_bushing_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
@@ -39,12 +38,11 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert set(drawing.PROFILE_KEEP) == {"RingLength"}
 
 
-def test_the_bore_and_the_printed_length_carry_model_bands() -> None:
+def test_the_bore_carries_its_model_band_and_the_length_the_title_block() -> None:
     """The bore runs on the pin, so its reamed band lives on the model
-    dimension; the length is a printed term of the disc cluster stack."""
+    dimension; the length only feeds the shimmed end float (#2124)."""
     assert model_toleranced_dimensions(part) == {
         ("RingProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)",
-        ("Ring", "RingLength"): "LENGTH_BAND",
     }
 
 
@@ -70,26 +68,14 @@ def test_wall_holds_the_target_at_the_printed_worst_case() -> None:
     assert worst >= WALL_TARGET_MM
 
 
-def test_the_length_is_a_printed_term_of_the_disc_cluster_stack() -> None:
-    """#2038: printed 4 places, +/-.0007, named on the stack; nothing is faced
-    to fit, set at assembly or supplied as a blank."""
+def test_the_title_block_length_leaves_the_unshimmed_float_open() -> None:
+    """#2124: the shims set the end float, so the length prints .XXX and its
+    worst case still leaves the unshimmed float over the floor."""
     assert spec.LENGTH == fit.REAR_BUSHING_LENGTH
-    assert spec.LENGTH_BAND == fit.LENGTH_BAND == PRINTED_LENGTH_BAND_IN
-    assert spec.LENGTH_PLACES == fit.LENGTH_PLACES == 4
-    assert spec.DRAWING_PRECISION_BY_NAME["RingLength"] == 4
-    assert "RingLength" not in spec.REFERENCE_DIMENSIONS
-    callout = drawing.DIMENSION_CALLOUTS["RingLength"]
-    assert callout == spec.LENGTH_CALLOUT
-    assert STACK_NAME in callout
-    sources = (
-        Path(drawing.__file__).read_text(encoding="utf-8"),
-        Path(part.__file__).read_text(encoding="utf-8"),
-    )
-    for text in (*drawing.DIMENSION_CALLOUTS.values(), *sources):
-        for banned in ("FACED TO FIT", "SET AT ASSEMBLY", "SUPPLY", "step_ref"):
-            assert banned not in text
-    assert not hasattr(drawing, "FIT_STEP_KEY")
-    assert not hasattr(spec, "DRAWING_NOTES")
+    assert spec.LENGTH_PLACES == fit.LENGTH_PLACES == 3
+    assert spec.DRAWING_PRECISION_BY_NAME["RingLength"] == 3
+    assert fit.REAR_BUSHING_LENGTH_BAND == printed_band_mm(3, unit=spec.UNIT)
+    assert fit.UNSHIMMED_FLOAT_RANGE[0] >= fit.END_FLOAT_MIN
 
 
 def test_both_end_faces_run_machined() -> None:
