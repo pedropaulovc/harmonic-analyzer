@@ -91,7 +91,10 @@ HANDLE_MAX_DIA = 21.082  # .83 at the swell
 # review of 2026-10-18: a tighter contour allowance had no mate to justify it).
 _GENERAL_2PL = printed_band_mm(2, unit=UNIT)
 # Reamed running bore on the MHA-DT-32 shoulder (#290 fit F12): a .1610
-# chucking reamer cuts .1610-.1615, printed .1610 +.0005/.0000.
+# chucking reamer cuts .1610-.1615.  The checks read that band; the sheet
+# prints the bore as a reference over the running clearance it gives on the
+# shoulder (MHA-DT-08 review of 29af6f44d: a .0005 band in oak was
+# over-specification), the fleet's matched-fit form.
 PIVOT_BORE_DIA = 4.0894  # .1610
 PIVOT_BORE_BAND = (0.0127, 0.0)  # +.0005/.0000
 
@@ -456,13 +459,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
 }
 # Decimal places are the tolerance (drawing-guidelines.md rule 3 (decimal places
-# carry the tolerance)): the reamed bore prints its +.0005 band at four places;
-# the root relief its own band naming the ferrule it serves (rule 4), the
-# inside corners' R.012 MAX limits and the fitted tenon and counterbore
-# diameters (references under their to-suit notes) at three; every other size
-# at two, the .XX band the walls are judged at.
+# carry the tolerance)): the root relief prints its own band naming the
+# ferrule it serves (rule 4), the inside corners' R.012 MAX limits and the
+# fitted bore, tenon and counterbore diameters (references under their fit
+# callouts) at three; every other size at two, the .XX band the walls are
+# judged at.
 _PRECISION_EXCEPTIONS = {
-    "PivotBoreDia": 4,
+    "PivotBoreDia": 3,
     "TenonRootRelief": TENON_ROOT_RELIEF_PLACES,
     "TenonRootRadius": 3,
     "CounterboreFloorRadius": 3,
@@ -482,8 +485,11 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked MHA-DT-08 dimension needs authored places")
-# Fitted to the ferrule and the cup (user ruling 2026-09-29): references.
-REFERENCE_DIMENSIONS = frozenset({"TenonDia", "CounterboreDia", "CounterboreDepth"})
+# Fitted to the ferrule and the cup (user ruling 2026-09-29), and the reamed
+# bore under its running clearance: references.
+REFERENCE_DIMENSIONS = frozenset(
+    {"PivotBoreDia", "TenonDia", "CounterboreDia", "CounterboreDepth"}
+)
 # Driven by the tangencies: references.
 REFERENCE_RADII = frozenset({"FlareR", "SConcaveR", "SConvexR", "DomeR"})
 # The tangent point the inflection station ends on, where the S-curve's
@@ -501,7 +507,6 @@ CUP_NUMBER = "MHA-DT-35"
 SCREW_NUMBER = "MHA-DT-32"
 FERRULE_NAME = "FERRULE"
 CUP_NAME = "BUTT CUP"
-SCREW_NAME = "PIVOT SCREW"
 
 # The matched fits, each flagged on its feature (drawing-guidelines.md rules 4
 # and 7): the mate by name and number, and the acceptance.  Short lines keep
@@ -529,5 +534,4 @@ COUNTERBORE_FLOOR_CALLOUT = f"{CUP_NAME}\nSEAT"
 # 8abe1a641), seating on the shoulder outside it.  Rows of 10 characters at
 # most fit the gap left of the tenon end.
 TENON_ROOT_RELIEF_CALLOUT = f"X 45 DEG;\n{FERRULE_NUMBER}\nSEATS\nOUTSIDE IT"
-PIVOT_BORE_CALLOUT = f"REAM THRU\nRUNS ON {SCREW_NAME}\n{SCREW_NUMBER} SHOULDER"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

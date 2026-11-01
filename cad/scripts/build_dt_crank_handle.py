@@ -57,10 +57,7 @@ from _sketch import (
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _fit_deviations import deviations
 from _saved_part_guard import require_saved_drawing_properties
 
@@ -93,7 +90,6 @@ from dt_crank_handle_spec import (  # noqa: E402
     OAK_END_X,
     PEAK_R,
     PEAK_X,
-    PIVOT_BORE_BAND,
     PIVOT_BORE_DIA,
     S_CONCAVE_CENTER,
     S_CONCAVE_R,
@@ -661,18 +657,11 @@ async def build(adapter) -> dict[str, str]:
 
     # Manufacturing drawing support: the model owns every printed band
     # (drawing-simplicity-policy.md `How the repository implements the guidelines`):
-    # the reamed bore's, and the root relief's, which keeps the root round
-    # behind the ferrule's seat face and the ferrule its shoulder; and the
-    # places every mark prints with.  The tenon and the counterbore are fitted
-    # to the parts they take; the two inside corners carry their single MAX
-    # limit.
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "HandleProfile",
-        "PivotBoreDia",
-        *deviations(PIVOT_BORE_BAND),
-        display_unit=UNIT,
-    )
+    # the root relief's, which keeps the root round behind the ferrule's seat
+    # face and the ferrule its shoulder; and the places every mark prints
+    # with.  The reamed bore, the tenon and the counterbore print as
+    # references under their fit callouts; the two inside corners carry their
+    # single MAX limit.
     set_dimension_symmetric_tolerance(
         adapter,
         "HandleProfile",

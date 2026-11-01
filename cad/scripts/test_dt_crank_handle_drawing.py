@@ -10,6 +10,7 @@ import pytest
 
 import dt_crank_handle_butt_cup_spec as cup
 import dt_crank_handle_ferrule_spec as ferrule
+import dt_crank_handle_pivot_screw_spec as screw
 import dt_crank_handle_spec
 import draw_dt_crank_handle as drawing
 import build_dt_crank_handle as handle
@@ -70,18 +71,16 @@ def test_every_profile_size_is_a_model_dimension() -> None:
     build_source = Path(handle.__file__).read_text(encoding="utf-8")
     assert "_make_driven(adapter, reference, name)" in build_source
     assert "PivotBoreProfile" not in build_source
-    assert spec.PIVOT_BORE_CALLOUT.startswith("REAM THRU")
-    assert "MHA-DT-32" in spec.PIVOT_BORE_CALLOUT
-    assert spec.DRAWING_PRECISION_BY_NAME["PivotBoreDia"] == 4
+    assert drawing.PIVOT_BORE_CALLOUT.startswith("REAM THRU")
+    assert "MHA-DT-32" in drawing.PIVOT_BORE_CALLOUT
     # The fitted sizes and the small corner features print at three places,
     # the routine contour at the title block's two.
     three = {
-        "TenonDia", "CounterboreDia", "TenonRootRadius", "CounterboreFloorRadius",
-        "TenonRootRelief",
+        "PivotBoreDia", "TenonDia", "CounterboreDia", "TenonRootRadius",
+        "CounterboreFloorRadius", "TenonRootRelief",
     }
     for name, places in spec.DRAWING_PRECISION_BY_NAME.items():
-        if name != "PivotBoreDia":
-            assert places == (3 if name in three else 2), name
+        assert places == (3 if name in three else 2), name
 
 
 def test_oak_ends_in_a_ferrule_tenon_and_a_cup_counterbore() -> None:
@@ -170,7 +169,9 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     # suit, so the sizes print as references and the callouts carry the fit.
     spec = dt_crank_handle_spec
     # The counterbore depth seats the cup face flush, so it is fitted too.
-    assert spec.REFERENCE_DIMENSIONS == {"TenonDia", "CounterboreDia", "CounterboreDepth"}
+    assert spec.REFERENCE_DIMENSIONS == {
+        "PivotBoreDia", "TenonDia", "CounterboreDia", "CounterboreDepth",
+    }
     assert spec.TENON_DIA == pytest.approx(ferrule.BORE_DIA - sum(spec.TENON_GLUE_LINE) / 2.0)
     assert spec.COUNTERBORE_DIA == pytest.approx(
         cup.BODY_DIA + sum(spec.COUNTERBORE_GLUE_LINE) / 2.0
@@ -183,7 +184,12 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     assert "DIAMETRAL CLEARANCE" in spec.TENON_FIT_NOTE
     assert "MHA-DT-35" in spec.COUNTERBORE_FIT_NOTE
     assert spec.CUP_NAME in spec.COUNTERBORE_FIT_NOTE
-    assert spec.SCREW_NAME in spec.PIVOT_BORE_CALLOUT
+    # F12 (#290): the reamed bore's running clearance on the shoulder, at
+    # the places that print it exactly.
+    assert drawing.DIMENSION_CALLOUTS["PivotBoreDia"] == drawing.PIVOT_BORE_CALLOUT
+    assert screw.DIAMETRAL_CLEARANCE_MIN == pytest.approx(0.0050 * IN)
+    assert screw.DIAMETRAL_CLEARANCE_MAX == pytest.approx(0.0075 * IN)
+    assert ".0050-.0075" in drawing.PIVOT_BORE_CALLOUT
     assert (
         f"<MOD-DIAM>{spec.inch_text(spec.COUNTERBORE_DIA_MAX, 3)} MAX"
         in spec.COUNTERBORE_FIT_NOTE
@@ -203,7 +209,6 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     # (user ruling 2026-10-01).
     assert not hasattr(ferrule, "OUTER_DIA_TOL")
     assert model_toleranced_dimensions(handle) == {
-        ("HandleProfile", "PivotBoreDia"): "*deviations(PIVOT_BORE_BAND)",
         ("HandleProfile", "TenonRootRelief"): "TENON_ROOT_RELIEF_TOL",
     }
     assert not hasattr(spec, "TENON_LENGTH_TOL")
@@ -218,7 +223,7 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
         spec.TENON_LENGTH - _XX - spec.EDGE_BREAK_MAX_MM - ferrule.SEAT_MOUTH_BREAK_MAX
     )
     assert spec.TENON_GLUE_LENGTH_MIN >= 3.5
-    # F12 (#290): the reamed bore prints .161 +.0005/0, its nominal the limit.
+    # F12 (#290): the .1610 reamer's band, which the walls are judged at.
     assert spec.PIVOT_BORE_DIA == pytest.approx(0.161 * IN)
     assert spec.PIVOT_BORE_BAND == pytest.approx((0.0005 * IN, 0.0))
     # No run-out: the cup cures centred on the waxed MHA-DT-32 at assembly

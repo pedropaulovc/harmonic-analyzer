@@ -57,26 +57,29 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_crank_handle_pivot_screw_spec import (
-    CHAMFER_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     END_PLAY_CALLOUT,
     HEAD_DIA,
+    HEAD_DIA_CALLOUT,
     HEAD_LENGTH,
+    HEAD_LENGTH_CALLOUT,
     OVERALL_LENGTH,
     REFERENCE_DIMENSIONS,
     RELIEF_CALLOUT,
     RELIEF_DIA,
     RELIEF_END_STATION,
     RELIEF_LEAD,
-    SEAT_EDGE_CALLOUT,
+    SEAT_EDGE_NOTE,
     SEAT_STATION,
     SHOULDER_DIA,
+    SHOULDER_FIT_CALLOUT,
     SURFACE_FINISHES,
     THREAD_CALLOUT,
     THREAD_MODEL_DIA,
     THREAD_SIZE,
     TIP_CHAMFER,
+    TIP_CHAMFER_CALLOUT,
 )
 
 
@@ -142,7 +145,9 @@ RELIEF_FLOOR_MID_X = (_sheet_x(SEAT_STATION + RELIEF_LEAD) + RELIEF_END_X) / 2.0
 _ROW_Y = (SIDE_CENTER[1] - 0.034, SIDE_CENTER[1] - 0.049, SIDE_CENTER[1] - 0.064)
 SIDE_KEEP = {
     "ThreadLength": ((TIP_X + SEAT_X) / 2.0, _ROW_Y[0]),
-    "HeadLength": ((UNDERHEAD_X + HEAD_FACE_X) / 2.0, _ROW_Y[0]),
+    # Right of the head face, outside its extension lines, so its callout
+    # stands clear of them and of the under-head and overall extension lines.
+    "HeadLength": (HEAD_FACE_X + 0.020, _ROW_Y[0]),
     # The under-head face located from the tip, like every axial location.
     "UnderHeadLocation": ((TIP_X + UNDERHEAD_X) / 2.0, _ROW_Y[1]),
     "OverallLength": ((TIP_X + HEAD_FACE_X) / 2.0, _ROW_Y[2]),
@@ -150,7 +155,9 @@ SIDE_KEEP = {
     # crosses the shoulder near its thread end; the head's stands clear of the
     # head face, left of the end view.
     "ShoulderDia": (SEAT_X + 0.056, SIDE_CENTER[1] + 0.030),
-    "HeadDia": (HEAD_FACE_X + 0.014, SIDE_CENTER[1]),
+    # Above the head, so the callout under the value stands clear of its
+    # extension lines and of the slot depth's text left of it.
+    "HeadDia": (HEAD_FACE_X + 0.014, SIDE_CENTER[1] + 0.032),
     # The thread-relief groove against the seat face.  Its width from the seat
     # face reads above it alone; its Ø reads below it with the 45-degree lead
     # as its callout, the dimension line standing on the floor so nothing
@@ -165,15 +172,16 @@ SIDE_KEEP = {
 }
 # The relief Ø's dimension line stands on the floor (SIDE_KEEP); its text
 # goes on an OffsetText leader so the seat-face extension line (the thread
-# length's right side) cannot run through "0.5 X 45 DEG LEAD".  With
-# OffsetText the anchor is the CENTRE of the Ø line's bottom edge and the
-# callout is centred under it (a dimension exposes no GetExtent), measured
-# on farm run 69a2f961's render: the LEAD line spans 40.8 mm and its
-# underline, where the leader lands, sits 5.6 mm below the anchor.  The
-# text's left edge stands 3.5 mm right of the seat face, and 21 mm below
-# the axis the leader drops steeply enough to pass under the seat-face
-# corner rather than through the shoulder.  The Ø6.00 arrow is right of it.
-RELIEF_DIA_TEXT_WIDTH = 0.045  # "0.3-0.5 X 45 DEG LEAD": 41 mm measured for "0.5 ...", +4 chars
+# length's right side) cannot run through the callout.  With OffsetText the
+# anchor is the CENTRE of the Ø line's bottom edge and the callout is centred
+# under it (a dimension exposes no GetExtent), measured on farm run 69a2f961's
+# render: the underline, where the leader lands, sits 5.6 mm below the anchor.
+# Farm r3 of 29af6f44d rendered the inch callout at 2.08 mm a character, so
+# its 23-character rows span 48 mm.  The text's left edge stands 3.5 mm right
+# of the seat face, and 21 mm below the axis the leader drops steeply enough
+# to pass under the seat-face corner rather than through the shoulder.  The
+# shoulder Ø's arrow is right of it.
+RELIEF_DIA_TEXT_WIDTH = 0.048
 RELIEF_DIA_TEXT_UNDERLINE_DROP = 0.0056
 RELIEF_DIA_TEXT_CLEARANCE = 0.0035
 RELIEF_DIA_TEXT_XY = (
@@ -194,12 +202,18 @@ THREAD_PICK = (THREAD_START_X, SIDE_CENTER[1] + 0.004)
 # Up and right of the thread start, so the leader leans back onto the thread.
 THREAD_NOTE_XY = (THREAD_START_X + 0.013, SIDE_CENTER[1] + 0.042)
 # The running shoulder's upper flank, right of the Ø dimension line and its
-# seat-break callout block (farm r1 of eb22a22f1: at x - 0.050 the leader ran
-# through the block's right end).
+# callout block (farm r1 of eb22a22f1: at x - 0.050 the leader ran through
+# the block's right end).
 FINISH_PICK = (UNDERHEAD_X - 0.040, SHOULDER_TOP_Y)
 FINISH_SYMBOL = (UNDERHEAD_X - 0.030, SIDE_CENTER[1] + 0.030)
-# A point on the shoulder face, clear of the Ø6.00 dimension line.
+# A point on the shoulder face, clear of the Ø dimension line.
 CENTERLINE_PICK = (UNDERHEAD_X - 0.080, SIDE_CENTER[1] + 0.003)
+# The seat edge's break note lands on the shoulder's seat-face edge, near
+# its outer corner (the relief lead's edge on the same line ends at 62 % of
+# the shoulder radius), from up and right, above the relief width and the
+# shoulder Ø's callout blocks.
+SEAT_EDGE_PICK = (SEAT_X, SIDE_CENTER[1] + 0.9 * (SHOULDER_TOP_Y - SIDE_CENTER[1]))
+SEAT_EDGE_NOTE_XY = (SEAT_X + 0.010, SIDE_CENTER[1] + 0.060)
 ISO_NOTE_XY = (0.352, 0.200)
 # Bottom-left, above the title-block line, like the other crank sheets.
 NOTES_XY = (0.016, 0.070)
@@ -278,9 +292,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         annotations,
         {
-            "TipChamfer": CHAMFER_CALLOUT,
+            "TipChamfer": TIP_CHAMFER_CALLOUT,
             "UnderHeadLocation": END_PLAY_CALLOUT,
-            "ShoulderDia": SEAT_EDGE_CALLOUT,
+            "ShoulderDia": SHOULDER_FIT_CALLOUT,
+            "HeadDia": HEAD_DIA_CALLOUT,
+            "HeadLength": HEAD_LENGTH_CALLOUT,
         },
         location="below",
     )
@@ -311,6 +327,14 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_xy=THREAD_PICK,
         note_xy=THREAD_NOTE_XY,
         label="MHA-DT-32 thread callout",
+    )
+    add_attached_note(
+        adapter,
+        side,
+        text=SEAT_EDGE_NOTE,
+        entity_xy=SEAT_EDGE_PICK,
+        note_xy=SEAT_EDGE_NOTE_XY,
+        label="MHA-DT-32 seat edge break",
     )
     add_surface_finish(
         adapter,
