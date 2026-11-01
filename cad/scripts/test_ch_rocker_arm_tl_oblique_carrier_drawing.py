@@ -773,3 +773,12 @@ def test_relocated_b2dx_clears_outline_border_and_isometric() -> None:
     iso_top = drawing.ISO_CENTER[1] * 1000.0 + 17.0
     assert b2y - 8.0 - 3.0 > iso_top
 
+
+
+def test_lever_tap_station_prints_its_own_two_place_band():
+    # Final review: the 8.861 axis stays 3-place (kinematic), the lever taps
+    # carry the .XX band they need, set on the model dimension.
+    assert spec.DRAWING_PRECISION_BY_NAME["LeverX"] == 3
+    assert spec.LEVER_STATION_BAND == printed_band_mm(2, unit=spec.UNIT)
+    build = (Path(__file__).parent / "build_ch_rocker_arm_tl_oblique_carrier.py").read_text()
+    assert '"LeverX",\n        LEVER_STATION_BAND,' in build.replace("\r\n", "\n")

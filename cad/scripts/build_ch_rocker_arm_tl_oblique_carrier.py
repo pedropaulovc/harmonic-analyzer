@@ -113,6 +113,7 @@ from ch_rocker_arm_tl_oblique_carrier_spec import (
     SPOT_FLANK_ANGLE,
     SPOT_REFERENCE,
     SPOTS,
+    LEVER_STATION_BAND,
     STATION_REFERENCE,
     STATIONS,
     THICKNESS,
@@ -856,6 +857,14 @@ async def build(adapter) -> dict[str, str]:
             POSITION_BAND,
             display_unit=UNIT,
         )
+    # The lever taps' station: its own .XX band on the 3-place axis.
+    set_dimension_symmetric_tolerance(
+        adapter,
+        STATION_REFERENCE,
+        "LeverX",
+        LEVER_STATION_BAND,
+        display_unit=UNIT,
+    )
     _pin_chamfer_min_limit(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
