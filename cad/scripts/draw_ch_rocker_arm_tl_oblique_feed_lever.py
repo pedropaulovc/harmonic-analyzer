@@ -64,7 +64,7 @@ from ch_rocker_arm_tl_oblique_feed_lever_spec import (
     LEVER_LENGTH,
     LEVER_THICK,
     LEVER_WIDTH,
-    STOCK_CALLOUT,
+    STOCK_CALLOUTS,
     STOCK_FRACTION_DENOMINATORS,
 )
 
@@ -295,7 +295,7 @@ def _stock_references(adapter: Any, annotations: list[Any]) -> None:
             precision=DRAWING_PRECISION_BY_NAME[name],
             expected_mm=size,
             fraction_denominator=STOCK_FRACTION_DENOMINATORS[name],
-            callout=STOCK_CALLOUT,
+            callout=STOCK_CALLOUTS[name],
         )
 
 
