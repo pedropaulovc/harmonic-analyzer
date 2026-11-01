@@ -22,7 +22,7 @@ ch-rocker-arm:
       kind: "minor"
       where: "the sheet note HUB WALL .064 MIN"
       finding: "bore-to-hub wall below the .080 in target (rules 17, 20)"
-      reason: ".064 MIN at the worst printed limits (Ø.40 at .XX, the reamed Ø.2560 +.0010 bore, the Ø.004 position zone), above the .060 floor; the OD ceiling is set by the amplitude-bar foot cheeks at rest so the shared hub nominal stays unchanged (owner-ruled shortfall, carried over from the 1.53 mm wall on the metric sheet)"
+      reason: "owner ruling 2026-11-01 (#290): .064 MIN at the worst printed limits (\u00d8.40 at .XX, the reamed \u00d8.2560 +.0010 bore, the \u00d8.004 position zone) stays above the .060 floor; the OD ceiling is set by the amplitude-bar foot cheeks at rest, so the shared hub nominal stays unchanged"
     - id: "RV-04"
       kind: "accept"
       where: "hub OD position frame dia .004 to A, authored by draw_ch_rocker_arm._hub_position_frame from ch_rocker_arm_spec.HUB_COAXIALITY_DIA"
