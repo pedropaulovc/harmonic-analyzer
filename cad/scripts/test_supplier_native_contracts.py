@@ -349,7 +349,8 @@ def test_pin_presentation_refusal_names_first_actual_field_without_reading_later
             raise AttributeError(name)
 
     feature = object()
-    model = SimpleNamespace(FeatureByName=lambda _name: feature)
+    millimetre_part = SimpleNamespace(GetUserPreferenceInteger=lambda _pref, _option: 0)
+    model = SimpleNamespace(FeatureByName=lambda _name: feature, Extension=millimetre_part)
     monkeypatch.setattr(pins, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(pins, "_named_dimensions", lambda *_args, **_kwargs: {
         pins.DIAMETER_DIMENSION: (None, native),
@@ -358,3 +359,18 @@ def test_pin_presentation_refusal_names_first_actual_field_without_reading_later
         pins.assert_supplier_pin_model_reference(
             None, model, Display(), pins.DIAMETER_FEATURE, source, view=None,
         )
+
+
+@pytest.mark.parametrize("units,part_linear,suffix", [
+    ("in", 3, ")"), ("in", 0, " in)"), ("mm", 3, " mm)"), ("mm", 0, " mm)"),
+])
+def test_pin_reference_suffix_follows_the_part_unit(monkeypatch, units, part_linear, suffix):
+    import _supplier_pin_model as pins
+
+    monkeypatch.setattr(pins, "_early_bound", lambda value, _interface: value)
+
+    part = SimpleNamespace(Extension=SimpleNamespace(
+        GetUserPreferenceInteger=lambda pref, _option: {47: part_linear}[pref],
+    ))
+    source = SimpleNamespace(units=units)
+    assert pins._reference_suffix(part, source) == suffix
