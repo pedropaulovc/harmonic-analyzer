@@ -303,7 +303,9 @@ ARC_PROFILE_DATUMS = ("A", "B", "C")
 # 132.76 R816/TAPER row; its leader rises left of the frame to R816.
 ARC_PROFILE_FRAME_XY = {
     "TopRadius": (0.130, 0.211),
-    "BottomRadius": (0.207, 0.163),
+    # 10 mm left of the mm seat: Detail E's letter leader crossed the inch
+    # frame's C cell (inch r1 Opus).
+    "BottomRadius": (0.197, 0.163),
 }
 ARC_PROFILE_PICK_X_MM = {"TopRadius": -130.0, "BottomRadius": 40.0}
 # Both arcs keep the exterior radius-leader dressing.
@@ -359,7 +361,9 @@ OVERALL_WIDTH_TEXT_XY = (FRONT_CENTER[0], 0.254)
 # R800 therefore uses one below-text row above it; a two-row block would
 # route the radius shoulder through this box (PR #1746 native-audit review).
 TAPER_INTERSECTION_TEXT_XY = (0.219, 0.137)
-LEFT_TAPER_TEXT_XY = (0.127, 0.142)
+# 6.5 mm right of its R816-era seat: the wider inch qualifier's left end
+# cleared the taper witness only from x 0.1335 (inch r1 Opus).
+LEFT_TAPER_TEXT_XY = (0.1335, 0.142)
 LAND_LOCATION_TEXT_XY = (0.219, 0.242)
 # The J land's row mirrors the K land's about A (FRONT_CENTER x 0.180): both
 # ends are dimensioned on the view, not left to a mirror note (main-r1 Opus).
@@ -2614,6 +2618,9 @@ def _dress_hub_root(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError("HubRootRadius does not measure the hub root fillet")
     if str(display.GetText(1) or "") != rocker_notes.HUB_ROOT_PREFIX:
         raise RuntimeError("hub root radius lost its part-owned 2X")
+    display.SetText(4, rocker_notes.HUB_ROOT_CALLOUT)
+    if str(display.GetText(4) or "") != rocker_notes.HUB_ROOT_CALLOUT:
+        raise RuntimeError("hub root radius lost its foot-cheek callout")
     display.ArcExtensionLineOrOppositeSide = False
     if bool(display.ArcExtensionLineOrOppositeSide):
         raise RuntimeError("HubRootRadius leader still runs to the opposite side")
