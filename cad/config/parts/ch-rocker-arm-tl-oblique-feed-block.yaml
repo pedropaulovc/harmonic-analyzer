@@ -7,4 +7,10 @@ ch-rocker-arm-tl-oblique-feed-block:
   quantity: 1
   tolerance_class: machined_block
   process: "Integral rail-1 nut lug; drill all four nut taps to print, not match-drilled. Keep carriage counterbore floors .614 above the bottom; pivot seat reamed .3760-.3765, .359 deep from top with a 5/16-18 tapped through hole below."
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "VIEW D, the spigot recess callout's row WALL .036 MIN TO 4-40 TAPS"
+      finding: "wall from the four #4-40 nut-flange taps to the spigot recess under the .060 in floor and the .080 in target (rules 17, 20)"
+      reason: "0.937 mm (.036) at the printed worst case: the bought Tr8 nut's Ø16 PCD puts each #4-40 major beside the Ø.42 recess that clears its Ø10.2 spigot, the recess at its .XX upper limit and each tap off its exact-mm station by the 0.13 band in Y and Z; with #4-40 on that circle no recess that still clears the spigot reaches the floor. The #2-56 redesign (ruling of 2026-11-01, option C) was withdrawn because a #2 button head cannot bear on the nut's Ø3.5 flange holes without washers. Owner exception pending confirmation (main had .035)."
   drawing_unit: in
