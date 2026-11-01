@@ -1327,11 +1327,16 @@ async def build_supplier_spring_drawing(
         text = f"{captions[key]}  {ratio[0]}:{ratio[1]}"
         y = cell[1] - (0.016 if key == "free_right" else 0.012)
         # A small pictorial or thin diagram centred in a tall cell left its
-        # caption far below it: hang each caption just under its view's
-        # outline (text inside it prints over the view) and the annotations
-        # below that, never below the cell floor.
-        outline_bottom = _box(views[key].GetOutline(), label=key)[1]
-        bottom = _view_ink_bottom(adapter, views[key], outline_bottom, label=key)
+        # caption far below it: hang each caption just under everything its
+        # view draws, never below the cell floor. That is the lowest of the
+        # padded outline (text inside it prints over the view), the source
+        # ink (a zero-body diagram's outline can miss its own sketch) and the
+        # annotations.
+        view = views[key]
+        model_bottom = min(
+            _box(view.GetOutline(), label=key)[1], state_bounds(view, key)[1]
+        )
+        bottom = _view_ink_bottom(adapter, view, model_bottom, label=key)
         y = max(y, bottom - 0.004)
         note = _literal_note(adapter, text, center[0], y)
         bounds = _box(note.GetExtent(), label=text, kind="note")
