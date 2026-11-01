@@ -2354,15 +2354,10 @@ async def build(adapter: Any) -> dict[str, str]:
         str(thickness_reference.GetText(2)),
     ) != ("(", ")"):
         raise RuntimeError("stock plate thickness reference state did not persist")
-    for name, feature_name, radius_m in (
-        ("CornerSWR", "CornerSW", 0.005),
-        ("CornerNWR", "CornerNW", 0.008),
-        ("CornerNER", "CornerNE", 0.010),
-        ("CornerSER", "CornerSE", 0.012),
-    ):
+    for label, _x, _z, radius in _part.PLATE_CORNERS:
         _assert_corner_radius_attachment(
             adapter, profile, profile_annotations,
-            name=name, feature_name=feature_name, radius_m=radius_m,
+            name=f"Corner{label}R", feature_name=f"Corner{label}", radius_m=radius / 1000.0,
         )
     if cut.GetDisplayOnlySurfaceCut() is not True:
         raise RuntimeError("pivot section lost its cut-only display after annotation")
