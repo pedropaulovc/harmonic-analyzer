@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from itertools import product
 from pathlib import Path
 
@@ -91,8 +92,11 @@ def test_the_pin_drive_keeps_a_pin_diameter_in_both_collar_walls() -> None:
         _worst_far_wall_grip(spread + spec.PIN_END_DEPTH_SPREAD_STEP)
         < strap_pin.PIN_WALL_ENGAGEMENT_FLOOR
     )
-    printed = f"WITHIN {spread / 25.4:.2f} OF EACH OTHER".replace(" 0.", " .")
-    assert printed in spec.ASSEMBLY_STEP.replace("\n", " ")
+    # MHA-DT-00 is still a millimetre sheet: the step prints the spread in mm,
+    # never looser than the limit.
+    printed = math.floor(spread * 10.0) / 10.0
+    assert printed <= spread
+    assert f"WITHIN {printed:.1f} OF EACH OTHER" in spec.ASSEMBLY_STEP.replace("\n", " ")
 
 
 def test_collar_pin_is_the_stock_mha145_named_on_the_hole_not_a_note() -> None:
