@@ -310,10 +310,10 @@ async def _plan_datum_reference(adapter, part) -> None:
 
 async def _nut_pattern_reference(adapter, part) -> None:
     """The hidden nut-face sketch that carries VIEW D's locations: a
-    construction line ON the lug end, the nut axis (a circle ON the spigot
-    recess) from that end and the bottom face, and the four taps (circles ON
-    their drills) from the nut axis, so the pattern prints against the recess
-    it surrounds."""
+    construction line ON the lug end, the leadscrew axis (a circle ON the
+    screw clearance) from that end and the bottom face, the first tap (a
+    circle ON its drill) from the axis and the second from the first, so the
+    pair prints as the TL-27 nut's (ruling B1)."""
     feature = "NutPatternReference"
     check(f"create_sketch {feature}", await adapter.create_sketch("NutFace"))
     to_sketch = _sketch_mapper(adapter, u_axis=2, v_axis=1, label=feature)
@@ -332,11 +332,14 @@ async def _nut_pattern_reference(adapter, part) -> None:
                             part.BLOCK_HEIGHT, f"{feature} lug end length")
     dims.record("NutEndLength")
     axis_uv = at(part.NUT_AXIS_Y, part.NUT_AXIS_Z)
-    axis = await _construction_circle(adapter, dims, f"{end}.start", end_start, axis_uv, part.NUT_SEAT_DIA,
+    axis = await _construction_circle(adapter, dims, f"{end}.start", end_start, axis_uv, part.SCREW_CLEARANCE_DIA,
                                       ("NutCentreZ", "NutCentreY", "NutCentreDia"), f"{feature} nut axis")
-    for i, (y, z) in enumerate(part.NUT_HOLES_YZ, 1):
-        await _construction_circle(adapter, dims, f"{axis}.center", axis_uv, at(y, z), part.NUT_TAP_DRILL,
-                                   (f"NutTap{i}Z", f"NutTap{i}Y", f"NutTap{i}Dia"), f"{feature} tap {i}")
+    base, base_uv = axis, axis_uv
+    for i, ((y, z), name) in enumerate(zip(part.NUT_HOLES_YZ, ("NutTap1Y", "NutTapSpacing"), strict=True), 1):
+        tap_uv = at(y, z)
+        base = await _construction_circle(adapter, dims, f"{base}.center", base_uv, tap_uv, part.NUT_TAP_DRILL,
+                                          (f"NutTap{i}Z", name, f"NutTap{i}Dia"), f"{feature} tap {i}")
+        base_uv = tap_uv
     await ensure_fully_defined(adapter, feature)
     check(f"exit_sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
@@ -395,25 +398,20 @@ async def build_block_model(adapter, part) -> None:
         check("nut face plane",await adapter.create_plane(CreatePlaneParameters(mode="offset",base_plane="Right Plane",offset=part.NUT_FACE_X)))
         name_last_feature(adapter,"NutFace")
         blank_reference_geometry(adapter,(("NutFace","PLANE"),))
-        for profile,dia,depth,feature,names in (
-            ("NutSeatProfile",part.NUT_SEAT_DIA,part.NUT_RECESS_DEPTH,"NutSeat",("NutAxisZ","NutAxisY","NutSeatDia")),
-            ("NutClearanceProfile",part.SCREW_CLEARANCE_DIA,part.LUG_WIDTH*2,"NutClearance",("NutClearanceZ","NutClearanceY","NutClearanceDia")),
-        ):
-            await _circles(adapter,"NutFace",part.NUT_FACE_X,profile,
-                           [(part.NUT_AXIS_Z,part.NUT_AXIS_Y,dia,names)],side=True)
-            check(feature,await adapter.create_cut_extrude(ExtrusionParameters(depth=depth,reverse_direction=True)))
-            name_last_feature(adapter,feature)
-            name_dimensions(adapter,feature,["NutSeatDepth" if feature=="NutSeat" else "NutClearanceDepth"])
+        await _circles(adapter,"NutFace",part.NUT_FACE_X,"NutClearanceProfile",
+                       [(part.NUT_AXIS_Z,part.NUT_AXIS_Y,part.SCREW_CLEARANCE_DIA,
+                         ("NutClearanceZ","NutClearanceY","NutClearanceDia"))],side=True)
+        check("NutClearance",await adapter.create_cut_extrude(ExtrusionParameters(depth=part.LUG_WIDTH*2,reverse_direction=True)))
+        name_last_feature(adapter,"NutClearance")
+        name_dimensions(adapter,"NutClearance",["NutClearanceDepth"])
         wizard_holes(adapter,part.NUT_TAP_SPEC,
              [[part.NUT_FACE_X,y,z] for y,z in part.NUT_HOLES_YZ],(-1.0,0.0,0.0),
-             "nut flange blind taps",name="NutTaps",expect_dia_mm=part.NUT_TAP_DRILL,
+             "feed nut screw taps (#4-40 through)",name="NutTaps",expect_dia_mm=part.NUT_TAP_DRILL,
              placement_dims=[((f"NutPlacement{i}U",None),(f"NutPlacement{i}V",None))
-                             for i in range(1,5)])
+                             for i in range(1,len(part.NUT_HOLES_YZ)+1)])
         # Drill-to-print pattern dimensions on the physical face; no transfer spotting.
         expected -= math.pi*(part.SCREW_CLEARANCE_DIA/2)**2*part.LUG_WIDTH
-        expected -= math.pi*((part.NUT_SEAT_DIA/2)**2-(part.SCREW_CLEARANCE_DIA/2)**2)*part.NUT_RECESS_DEPTH
-        from _holes import blind_hole_volume_mm3
-        expected -= 4*blind_hole_volume_mm3(part.NUT_TAP_DRILL,part.NUT_TAP_DRILL_DEPTH)
+        expected -= len(part.NUT_HOLES_YZ)*math.pi*(part.NUT_TAP_DRILL/2)**2*part.LUG_WIDTH
         await _nut_pattern_reference(adapter, part)
     await name_bore_axis(adapter,"Right Plane",spec.BORE_X,"Top Plane",0.0,"pivot axis")
     name_last_feature(adapter,spec.PIVOT_AXIS_NAME)
