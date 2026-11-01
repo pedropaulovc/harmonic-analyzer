@@ -135,6 +135,7 @@ from dt_crankshaft_spec import (
     JOURNAL_END,
     JOURNAL_START,
     NECK_DIA_PLACES,
+    NECK_DIA_TOL,
     PIN_HOLE_HEIGHT,
     PIN_HOLE_SPEC,
     PINION_SEAT_DIA,
@@ -308,7 +309,9 @@ SIDE_KEEP = {
 # The Ø9.000's line stays 2 mm past its step, clear of the retention-pin note.
 DIAMETER_POSITIONS = {
     "ShaftDiaDim": (PIN_X - 0.016, 0.2235),
-    "JournalDiaDim": (RELIEF_START_X - 0.0069, 0.224),
+    # Right of the collar-side neck's .375 ±.010 (its native advance ends
+    # left of this leader), left of the journal finish symbol's V.
+    "JournalDiaDim": (RELIEF_START_X - 0.0035, 0.224),
     "ReliefDiaDim": (RELIEF_START_X + 0.045, 0.212),
     "PinionSeatDiaDim": (SEAT_STEP_X + 0.002, 0.2125),
     "SpigotDiaDim": (COLLAR_SEAT_X + 0.0075, 0.2215),
@@ -369,7 +372,9 @@ SUFFIXES = {
 JOURNAL_FINISHES = {
     "outboard_journal": (
         (RELIEF_START_X - 0.0009, JOURNAL_FLANK_Y),
-        (RELIEF_START_X - 0.003, 0.203),
+        # The V's tip over the land's right end: its left arm (2.1 mm) stays
+        # right of the journal diameter's leader.
+        (RELIEF_START_X - 0.0003, 0.203),
     ),
     "inboard_journal": (
         (RELIEF_END_X + 0.015, JOURNAL_FLANK_Y),
@@ -1293,12 +1298,15 @@ def _assert_plain_neck_size(
     places = display.GetPrimaryPrecision2()
     if type(places) is not int or places != NECK_DIA_PLACES:
         raise RuntimeError(f"{label}: primary places {places!r} != {NECK_DIA_PLACES}")
-    tolerance = dimension.Tolerance
-    tolerance_type = None if tolerance is None else _early_bound(tolerance, "IDimensionTolerance").Type
-    if type(tolerance_type) is not int or tolerance_type != 0:
-        raise RuntimeError(f"{label}: unexpected explicit tolerance band")
+    tolerance = None if dimension.Tolerance is None else _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if (
+        tolerance is None or type(tolerance.Type) is not int or tolerance.Type != 4  # swTolSYMMETRIC
+        or abs(float(tolerance.GetMaxValue()) * 1000.0 - NECK_DIA_TOL) > 1e-6
+        or abs(float(tolerance.GetMinValue()) * 1000.0 + NECK_DIA_TOL) > 1e-6
+    ):
+        raise RuntimeError(f"{label}: the neck's native band is not +/-{NECK_DIA_TOL} mm")
     if display.GetOverride() is not False or display.ShowParenthesis is not False:
-        raise RuntimeError(f"{label}: overridden or parenthesized value loses the general band")
+        raise RuntimeError(f"{label}: overridden or parenthesized value loses the neck's band")
     prefix = str(display.GetText(1) or "")
     prose = tuple(str(display.GetText(part) or "") for part in (2, 3, 4))
     allowed_prefixes = ("<MOD-DIAM>",) if linear else ("", "<MOD-DIAM>")
@@ -1469,10 +1477,11 @@ def _assert_neck_right_advance(
 ) -> tuple[tuple[Segment, ...], tuple[dict[str, Any], ...]]:
     lines = _neck_native_lines(data, label=label)
     texts = _neck_native_texts(data, label=label)
-    if tuple(row["text"].strip() for row in texts) != (
-        "<MOD-DIAM>", inch_text(SHAFT_DIA, NECK_DIA_PLACES),
-    ):
-        raise RuntimeError(f"{label}: native plain diameter text primitives changed")
+    words = tuple(row["text"].strip() for row in texts)
+    if words[:1] != ("<MOD-DIAM>",) or "".join(words[1:]).replace("<MOD-PM>", "\N{PLUS-MINUS SIGN}").replace(
+        " ", ""
+    ) != f"{inch_text(SHAFT_DIA, NECK_DIA_PLACES)}\N{PLUS-MINUS SIGN}{inch_text(NECK_DIA_TOL, NECK_DIA_PLACES)}":
+        raise RuntimeError(f"{label}: native diameter text primitives changed: {words!r}")
     shelves = [line for line in lines if line.y0 == line.y1]
     if len(lines) != 3 or len(shelves) != 1 or any(
         line.x0 != line.x1 and line.y0 != line.y1 for line in lines
@@ -1640,7 +1649,7 @@ def _assert_outboard_neck_dimension(
     lines, texts = _assert_neck_right_advance(data, heads, tuple(foreign_lines), label=label)
     _telemetry.info(
         f"{label}: native diameter {full_name!r}, measured_mm={measured_mm}, "
-        f"driven=1, places={NECK_DIA_PLACES}, tolerance=NONE, opposite_silhouettes=True, "
+        f"driven=1, places={NECK_DIA_PLACES}, tolerance=+/-{NECK_DIA_TOL}mm, opposite_silhouettes=True, "
         f"native_leaders={annotation.GetLeaderCount()}"
     )
     return lines, heads, texts, tuple(foreign_lines)
@@ -1726,13 +1735,19 @@ def _add_outboard_neck_dimension(
     display.SetText(1, "<MOD-DIAM>")  # symbol-only prefix; never swDimensionTextAll
     if display.GetText(1) != "<MOD-DIAM>":
         raise RuntimeError(f"{label}: native diameter-symbol prefix did not persist")
+    # The same explicit loose band as the right-hand NeckDiaDim (the build's
+    # NECK_DIA_TOL), printed at the value's places, never a parenthesized
+    # reference.
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = 4  # swTolSYMMETRIC
+    if not tolerance.SetValues(-NECK_DIA_TOL / 1000.0, NECK_DIA_TOL / 1000.0):
+        raise RuntimeError(f"{label}: native symmetric band rejected")
     status = display.SetPrecision3(
-        DRAWING_REFERENCE_PRECISION["OutboardNeckDia"], -1, -1, -1
+        DRAWING_REFERENCE_PRECISION["OutboardNeckDia"], -1,
+        DRAWING_REFERENCE_PRECISION["OutboardNeckDia"], -1,
     )
     if type(status) is not int or status != 0:
         raise RuntimeError(f"{label}: native precision assignment failed ({status!r})")
-    # Driven is not a presentation setting: retain a plain, general-band
-    # callout like the existing NeckDiaDim, not a parenthesized reference.
     display.ShowParenthesis = False
     if not isinstance(dimension.FullName, str) or not dimension.FullName:
         raise RuntimeError(f"{label}: new native dimension has no FullName")
@@ -2075,7 +2090,10 @@ def _assert_neck_pdf_presentation(
             continue
         indices = matches.get(index, ())
         actual = tuple(glyph for number in indices for glyph in page.spans[number].glyphs)
-        if not actual or ink_key("".join(glyph.char for glyph in actual)) != ink_key(row["text"]):
+        # SOLIDWORKS's plus-minus may print as a glyph or as a path.
+        if not actual or ink_key("".join(glyph.char for glyph in actual)).replace(
+            "\N{PLUS-MINUS SIGN}", ""
+        ) != ink_key(row["text"]).replace("\N{PLUS-MINUS SIGN}", ""):
             raise RuntimeError("collar-side neck PDF: complete native numeric/roughness glyph owner is missing")
         boxes = []
         for glyph in actual:

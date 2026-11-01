@@ -1181,7 +1181,7 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     monkeypatch.setattr(drawing, "model_points_in_view", projection)
     native = SimpleNamespace(
         SystemValue=spec.SHAFT_DIA / 1000.0, DrivenState=2,
-        FullName="RD1@FRONT@Drawing1", Tolerance=SimpleNamespace(Type=0),
+        FullName="RD1@FRONT@Drawing1", Tolerance=SimpleNamespace(Type=4, GetMaxValue=lambda: 0.000254, GetMinValue=lambda: -0.000254, SetValues=lambda *_: True),
     )
     texts = {1: "", 2: "", 3: "", 4: ""}
     x = drawing.OUTBOARD_NECK_DIAMETER_XY[0]
@@ -1201,6 +1201,7 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         {"text": " ", "position": (x, shelf_y + 0.0000535, 0.0), "height": 0.0035, "width": 0.0012931},
         {"text": "<MOD-DIAM>", "position": (x + 0.0012931, shelf_y, 0.0), "height": 0.0035, "width": 0.0052784},
         {"text": ".375 ", "position": (x + 0.0065715, shelf_y + 0.0000535, 0.0), "height": 0.0035, "width": 0.0077583},
+        {"text": "<MOD-PM>.010", "position": (x + 0.0143298, shelf_y + 0.0000535, 0.0), "height": 0.0035, "width": 0.006},
     ]
     arrow_data = _native_presentation_data(neck_lines, native_texts, arrow_rows)
     display = SimpleNamespace(
@@ -1222,7 +1223,7 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     display.GetAnnotation = Mock(return_value=annotation)
     right_native = SimpleNamespace(
         SystemValue=spec.SHAFT_DIA / 1000.0, DrivenState=2,
-        FullName="NeckDiaDim@PinionSeatProfile@dt-crankshaft", Tolerance=SimpleNamespace(Type=0),
+        FullName="NeckDiaDim@PinionSeatProfile@dt-crankshaft", Tolerance=SimpleNamespace(Type=4, GetMaxValue=lambda: 0.000254, GetMinValue=lambda: -0.000254, SetValues=lambda *_: True),
     )
     right_texts = {1: "<MOD-DIAM>", 2: "", 3: "", 4: ""}
     right_display = SimpleNamespace(
