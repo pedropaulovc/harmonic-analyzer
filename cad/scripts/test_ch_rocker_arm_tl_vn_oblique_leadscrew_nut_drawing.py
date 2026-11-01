@@ -131,21 +131,23 @@ def test_supplier_references_are_the_drop_in_interface() -> None:
     assert rows == {
         "SupplierLength": (spec.LENGTH, "vertical"),
         "SupplierFlangeThickness": (spec.FLANGE_THICK, "vertical"),
+        "SupplierSpigotLength": (spec.SPIGOT_LENGTH, "vertical"),
         "SupplierBodyDiameter": (spec.BODY_DIA, "horizontal"),
         "SupplierFlangeDiameter": (spec.FLANGE_DIA, "horizontal"),
         "SupplierMountingHoleDiameter": (spec.HOLE_DIA, "vertical"),
-        "SupplierHolePitchDiameter": (spec.HOLE_PCD, "vertical"),
     }
     assert set(spec.SUPPLIER_REFERENCE_STARTS) == set(rows) == set(spec.SUPPLIER_REFERENCE_FORMATS)
-    # The end view carries every diameter and the bolt pattern; the side view
-    # only the two lengths, so its lane reserves balance (projection test).
+    # The end view carries every diameter; the bolt pattern is the drawing's
+    # pitch circle, not a chord. The side view carries only the lengths.
     assert spec.SUPPLIER_REFERENCE_PLANES == {
         "SupplierFlangeDiameter": "Top",
         "SupplierBodyDiameter": "Top",
         "SupplierMountingHoleDiameter": "Top",
-        "SupplierHolePitchDiameter": "Top",
     }
     assert spec.SUPPLIER_REFERENCE_SIDES == {
+        "SupplierLength": "right",
+        "SupplierFlangeThickness": "left",
+        "SupplierSpigotLength": "right",
         "SupplierFlangeDiameter": "top",
         "SupplierBodyDiameter": "bottom",
     }
@@ -165,6 +167,12 @@ def test_supplier_references_are_the_drop_in_interface() -> None:
         (-spec.FLANGE_DIA / 2.0, 0.0),
         (-spec.FLANGE_DIA / 2.0, spec.FLANGE_THICK),
     )
+    # The spigot's projection below the flange, on its own visible edge.
+    assert chord("SupplierSpigotLength") == (
+        (spec.BODY_DIA / 2.0, -spec.SPIGOT_LENGTH),
+        (spec.BODY_DIA / 2.0, 0.0),
+    )
+    assert spec.SUPPLIER_REFERENCE_FORMATS["SupplierSpigotLength"] == (1, "length", None, None)
     # Top sketch reads model (x, -z): the pilot's Ø10.2 is the long body's
     # circle in the end view (the spigot is the same diameter, behind it).
     assert spec.PROFILE[1][0] == spec.PROFILE[6][0] == spec.BODY_DIA / 2.0
@@ -172,8 +180,8 @@ def test_supplier_references_are_the_drop_in_interface() -> None:
         (-spec.BODY_DIA / 2.0, 0.0),
         (spec.BODY_DIA / 2.0, 0.0),
     )
-    # Every chord crosses its circle's centre: the flange OD, the pilot and the
-    # pitch circle on the view's centrelines.
+    # Every chord crosses its circle's centre: the flange OD and the pilot on
+    # the view's centreline.
     assert chord("SupplierFlangeDiameter") == (
         (-spec.FLANGE_DIA / 2.0, 0.0),
         (spec.FLANGE_DIA / 2.0, 0.0),
@@ -182,7 +190,49 @@ def test_supplier_references_are_the_drop_in_interface() -> None:
     centre_x, centre_z = spec.HOLE_CENTRES[0]
     assert hx == centre_x
     assert (hy0 + hy1) / 2.0 == pytest.approx(-centre_z, abs=1e-12)
-    assert chord("SupplierHolePitchDiameter") == ((0.0, -spec.HOLE_PCD / 2.0), (0.0, spec.HOLE_PCD / 2.0))
+
+
+def test_note_names_the_short_spigot_for_the_counterbore() -> None:
+    assert spec.DRAWING_NOTES.startswith("SHORT SPIGOT INTO THE NUT BRACKET'S COUNTERBORE")
+    assert spec.SPIGOT_LENGTH < spec.BODY_LONG
+
+
+def test_pitch_circle_is_a_centreline_circle_dimensioned_as_a_reference_pcd() -> None:
+    from _transgear_zone_line import CENTER_LINE_STYLE
+
+    assert "SupplierHolePitchDiameter" not in spec.SUPPLIER_REFERENCE_FORMATS
+    assert draw.PITCH_CIRCLE_FORMAT == (0, "diameter", None, "PCD")
+    settings = draw._reference_settings()
+    assert settings["expected_mm"] == spec.HOLE_PCD
+    assert (settings["units"], settings["callout"]) == ("mm", "PCD")
+    assert CENTER_LINE_STYLE == 4  # swLineStyles_e.swLineCENTER
+    # The leader lands between the 135° hole (±12.5° of arc at R8) and the
+    # horizontal centreline, the text left of the flange.
+    half = math.degrees(math.asin(spec.HOLE_DIA / spec.HOLE_PCD))
+    assert 135.0 + half < draw.PITCH_LEADER_DEG < 180.0
+    assert draw.PITCH_TEXT_RADIUS_M * 1000.0 > spec.FLANGE_DIA / 2.0
+    # Every hole centre lies on the circle the drawing draws.
+    for x, z in spec.HOLE_CENTRES:
+        assert math.hypot(x, z) == pytest.approx(spec.HOLE_PCD / 2.0)
+
+
+def test_spigot_text_drops_below_and_the_overall_length_keeps_arrows_inside() -> None:
+    from types import SimpleNamespace
+
+    from _supplier_screw_layout import supplier_screw_lane_plan
+
+    lanes = supplier_screw_lane_plan(
+        spec.SUPPLIER_REFERENCE_DIMENSIONS,
+        planes=spec.SUPPLIER_REFERENCE_PLANES,
+        sides=spec.SUPPLIER_REFERENCE_SIDES,
+    )
+    # The spigot nests inside the overall length on the right.
+    assert lanes["SupplierSpigotLength"] == ("right", pytest.approx(0.006))
+    assert lanes["SupplierLength"] == ("right", pytest.approx(0.014))
+    assert draw.LOWERED == "SupplierSpigotLength"
+    assert draw.ARROWS_INSIDE == ("SupplierLength",)
+    actual = {"tips": ((0.1, 0.050), (0.1, 0.0515)), "text": SimpleNamespace(ymax=0.047)}
+    assert draw._drop_clearance(actual) == pytest.approx(0.003)
 
 
 def test_every_chord_shelves_its_text_outward() -> None:
@@ -209,7 +259,7 @@ def test_shelf_gap_measures_clearance_on_the_shelf_side() -> None:
 
     text = SimpleNamespace(xmin=0.070, xmax=0.095)
     actual = {"left": 0.097, "right": 0.108, "text": text}
-    assert draw._shelf_gap("SupplierHolePitchDiameter", actual) == pytest.approx(0.002)
+    assert draw._shelf_gap("SupplierFlangeThickness", actual) == pytest.approx(0.002)
     text = SimpleNamespace(xmin=0.135, xmax=0.160)
     actual = {"left": 0.118, "right": 0.133, "text": text}
     assert draw._shelf_gap("SupplierMountingHoleDiameter", actual) == pytest.approx(0.002)
@@ -341,8 +391,8 @@ def _fitted_cells(
     import _purchased_fastener_drawing as purchased
     from _supplier_screw_layout import supplier_screw_margins
 
-    margins = supplier_screw_margins(
-        spec.SUPPLIER_REFERENCE_DIMENSIONS, planes=planes, sides=sides
+    margins = draw.balanced_columns(
+        supplier_screw_margins(spec.SUPPLIER_REFERENCE_DIMENSIONS, planes=planes, sides=sides)
     )
     caption_y = purchased.view_band_bottom(spec.DRAWING_NOTES, label=STEM)
     cells = purchased.fastener_view_cells(caption_y, layout=draw.VIEW_LAYOUT)
@@ -352,8 +402,9 @@ def _fitted_cells(
 
 def test_front_keeps_the_projection_axes_of_top_and_right() -> None:
     margins, fitted = _fitted_cells()
-    # Front: 26 mm lanes left and right, 20 mm text room above and below.
-    assert margins["*Front"] == pytest.approx((0.026, 0.020, 0.026, 0.020))
+    # Front: 34 mm columns (the right's two lanes, the left balanced to it),
+    # 20 mm text room above and below; Top: 26 mm, the left for the PCD text.
+    assert margins["*Front"] == pytest.approx((0.034, 0.020, 0.034, 0.020))
     assert margins["*Top"] == pytest.approx((0.026, 0.026, 0.026, 0.026))
     assert draw.projection_margins(margins) == margins
     # The builder centres each outline on its fitted cell's centre: Front and
@@ -362,7 +413,7 @@ def test_front_keeps_the_projection_axes_of_top_and_right() -> None:
     assert front[1] == pytest.approx(right[1], abs=1e-12)
     assert front[0] == pytest.approx(top[0], abs=1e-12)
     # And 1:1 still fits: Front 73 - 40 = 33 >= 15 + 11.176; Top 96 - 52 = 44
-    # >= 22 + 11.176; both 180 - 52 = 128 mm wide.
+    # >= 22 + 11.176; Front 180 - 68 = 112 mm wide.
     front_box, top_box = fitted["*Front"][1], fitted["*Top"][1]
     assert front_box[3] - front_box[1] == pytest.approx(0.033)
     assert front_box[3] - front_box[1] >= spec.LENGTH / 1000.0 + _NATIVE_PADDING_M

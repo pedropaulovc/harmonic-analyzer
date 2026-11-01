@@ -121,58 +121,66 @@ SUPPLIER_DRAWING_URLS = (
 # Construction-only source chords are nominal size references, not measurements
 # of the omitted internal thread. No source bore diameter or tolerance is given.
 # Only what a drop-in substitute must match: the flange OD, the pilot (spigot)
-# diameter TL-32's counterbore takes, the overall length (1.5 + 3.5 + 10),
-# the flange thickness (the #4-40 screws' grip) and the bolt pattern.
+# diameter TL-32's counterbore takes, the overall length (1.5 + 3.5 + 10), the
+# spigot's projection below the flange (the counterbore depth it needs), the
+# flange thickness (the #4-40 screws' grip) and the bolt pattern.
 # The sheet is 1:1 in the purchased layout's ``tall_top`` cells: Front
 # 180 x 73 mm, Top (the end view) 180 x 96 mm. Every annotated view reserves
-# 20 mm a side plus 6 mm for a lane, and the native outline is the model
-# extent plus 11.176 mm. Each view is centred in its cell less these
-# reserves, so Front must reserve the same above and below (Right's row) and
-# left and right (Top's column), or it leaves third-angle projection. A
-# horizontal Front size would need 26 mm both above and below: 73 - 52 = 21 <
-# 26.176. So Front carries only the two vertical lengths (20 + 20 + 26.176 <=
-# 73, lanes 26 left and right) and every diameter is read on the end view:
-# the flange OD above it, the pilot (the long body's Ø10.2, the spigot's too)
-# below, the bolt pattern to the sides (26 + 26 + 33.176 <= 96).
-# The overall length runs on the axis; the two end-view diameters run along
-# its horizontal centreline. Hidden construction chords print where an edge
-# or a centreline already is, never across a face.
+# 20 mm a side plus 6 mm a lane, and the native outline is the model extent
+# plus 11.176 mm. Each view is centred in its cell less these reserves, so
+# Front must reserve the same above and below (Right's row) and left and right
+# (Top's column), or it leaves third-angle projection. A horizontal Front size
+# would need 26 mm both above and below: 73 - 52 = 21 < 26.176. So Front
+# carries only the vertical lengths (20 + 20 + 26.176 <= 73; the right side's
+# two lanes reserve 34 mm, the drawing balances the left to match) and every
+# diameter is read on the end view: the flange OD above it, the pilot (the long
+# body's Ø10.2, the spigot's too) below, the hole size to the right. The bolt
+# pattern is not a chord: the drawing draws the pitch circle through the four
+# hole centres and dimensions it there (``draw_*``'s pitch circle, HOLE_PCD).
+# The overall length runs on the axis, the spigot on its own visible edge; the
+# two end-view diameters run along its horizontal centreline. Hidden
+# construction chords print where an edge or a centreline already is, never
+# across a face.
 SUPPLIER_REFERENCE_DIMENSIONS = (
     ("SupplierLength", LENGTH, "vertical"),
     ("SupplierFlangeThickness", FLANGE_THICK, "vertical"),
+    ("SupplierSpigotLength", SPIGOT_LENGTH, "vertical"),
     ("SupplierFlangeDiameter", FLANGE_DIA, "horizontal"),
     ("SupplierBodyDiameter", BODY_DIA, "horizontal"),
     ("SupplierMountingHoleDiameter", HOLE_DIA, "vertical"),
-    ("SupplierHolePitchDiameter", HOLE_PCD, "vertical"),
 )
 SUPPLIER_REFERENCE_STARTS = {
     "SupplierLength": (0.0, -SPIGOT_LENGTH),
     "SupplierFlangeThickness": (-FLANGE_DIA / 2.0, 0.0),
+    "SupplierSpigotLength": (BODY_DIA / 2.0, -SPIGOT_LENGTH),
     "SupplierFlangeDiameter": (-FLANGE_DIA / 2.0, 0.0),
     "SupplierBodyDiameter": (-BODY_DIA / 2.0, 0.0),
     "SupplierMountingHoleDiameter": (
         HOLE_CENTRES[0][0],
         -HOLE_CENTRES[0][1] - HOLE_DIA / 2.0,
     ),
-    "SupplierHolePitchDiameter": (0.0, -HOLE_PCD / 2.0),
 }
 SUPPLIER_REFERENCE_PLANES = {
     "SupplierFlangeDiameter": "Top",
     "SupplierBodyDiameter": "Top",
     "SupplierMountingHoleDiameter": "Top",
-    "SupplierHolePitchDiameter": "Top",
 }
+# The spigot nests inside the overall length on the right, on the spigot's
+# own side of the flange; the flange thickness keeps the left.
 SUPPLIER_REFERENCE_SIDES = {
+    "SupplierLength": "right",
+    "SupplierFlangeThickness": "left",
+    "SupplierSpigotLength": "right",
     "SupplierFlangeDiameter": "top",
     "SupplierBodyDiameter": "bottom",
 }
 SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (0, "length", None, None),
     "SupplierFlangeThickness": (1, "length", None, None),
+    "SupplierSpigotLength": (1, "length", None, None),
     "SupplierFlangeDiameter": (0, "diameter", None, None),
     "SupplierBodyDiameter": (1, "diameter", None, None),
     "SupplierMountingHoleDiameter": (1, "diameter", None, "4X"),
-    "SupplierHolePitchDiameter": (0, "diameter", None, "PCD"),
 }
 SUPPLIER_REFERENCE_UNITS = {
     name: "mm" for name, _, _ in SUPPLIER_REFERENCE_DIMENSIONS
@@ -191,8 +199,10 @@ BODY_VOLUME_MM3 = revolved_volume(PROFILE)
 HOLE_VOLUME_MM3 = math.pi * (HOLE_DIA / 2.0) ** 2 * FLANGE_THICK
 VOLUME_MM3 = BODY_VOLUME_MM3 - len(HOLE_ANGLES_DEG) * HOLE_VOLUME_MM3
 
+# The short spigot (below the flange) is the one that enters the counterbore;
+# the long body points away from the bracket.
 DRAWING_NOTES = (
-    "SPIGOT INTO THE NUT BRACKET'S COUNTERBORE; SCREW THE FLANGE TO THE BRACKET."
+    "SHORT SPIGOT INTO THE NUT BRACKET'S COUNTERBORE; SCREW FLANGE TO BRACKET."
 )
 
 # --- Self-checks ----------------------------------------------------------------
