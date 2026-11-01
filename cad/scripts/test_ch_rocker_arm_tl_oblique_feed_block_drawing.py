@@ -95,3 +95,15 @@ def test_feed_entrypoints_use_the_native_shared_geometry_and_not_a_separate_brac
     assert 'part.NUT_HOLES_YZ' in shared
     drawing=(folder/'draw_ch_rocker_arm_tl_oblique_feed_block.py').read_text()
     assert 'draw_block(adapter,SPEC,part,read_source_properties=_read_source_properties)' in drawing
+
+
+def test_nut_axis_height_and_flange_pattern_print_exact_millimetres():
+    # Owner ruling 4 (2026-11-01): the Tr8/KP08 vendor line prints exact mm.
+    names = {name for (feature, name) in spec.METRIC_DIMENSIONS}
+    assert {feature for (feature, _name) in spec.METRIC_DIMENSIONS} == {'NutPatternReference'}
+    assert names == {'NutCentreZ', 'NutTap3Z', 'NutTap4Z', 'NutTap1Y', 'NutTap3Y'}
+    assert names < set(spec.NUT_PATTERN_PRINTED)
+    assert 'NutCentreY' not in names  # the lug's own (fabricated) closure on the inch grid
+    for places, band in spec.METRIC_DIMENSIONS.values():
+        assert places == 3 and band == printed_band_mm(3, unit='mm')
+    assert spec.NUT_SEAT_WALL_TEXT == 'WALL .036 MIN TO 4-40 TAPS'

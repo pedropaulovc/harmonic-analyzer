@@ -29,6 +29,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _metric_vendor_dimension import assert_imported_metric_dimensions
 from _part_properties import part_drawing_unit
 import _telemetry
 from _session import run_build
@@ -480,6 +481,8 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         set_hidden_lines_removed(adapter,nut_iso)
         nut_annotations = curate_view_dimensions(adapter,nut,keep=NUT_KEEP,view_label='nut face',
                       dimensions_by_feature=contract.DRAWING_DIMENSIONS)
+        assert_imported_metric_dimensions(adapter, nut_annotations,
+                                          {name: places for (_, name), (places, _) in contract.METRIC_DIMENSIONS.items()})
         caption = add_note(adapter, NUT_CAPTION, *NUT_CAPTION_XY)
         if caption is None:
             raise RuntimeError('failed to insert the VIEW D caption')
