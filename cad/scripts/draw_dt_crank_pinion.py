@@ -83,7 +83,6 @@ from dt_crank_pinion_spec import (
     OUTSIDE_DIA,
     OVERALL_LENGTH,
     PIN_HOLE_PROCESS,
-    PIN_STATION,
     SHOULDER_LENGTH,
     SHOULDER_RADIUS,
     SHOULDER_RADIUS_TOL_TYPE,
@@ -276,10 +275,9 @@ RIGHT_KEEP = {
     "BossDia": (BOSS_DIA_TEXT_X, RIGHT_CENTER[1]),
     "PinHoleDia": (0.322, _TOP_ROW_Y),
     "ShoulderLength": (_LENGTH_TEXT_X, _SIDE_BOTTOM - 0.019),
-    "PinFromBossEnd": (
-        (_side_x(PIN_STATION) + _side_x(OVERALL_LENGTH)) / 2.0,
-        _SIDE_BOTTOM - 0.006,
-    ),
+    # The banded text is wider than the hole-to-end span: it stands outside,
+    # right of the end face's extension line, so neither line strikes it.
+    "PinFromBossEnd": (_side_x(OVERALL_LENGTH) + 0.016, _SIDE_BOTTOM - 0.006),
     "FaceWidth": (_FACE_WIDTH_TEXT_X, _SIDE_BOTTOM - 0.026),
     "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.043),
     "ShoulderRadius": (
@@ -287,8 +285,9 @@ RIGHT_KEEP = {
         SHOULDER_RADIUS_ELBOW[1] + RADIUS_SHOULDER_DROP,
     ),
 }
-# The section caption sits right of the face width's callout block.
-SECTION_CAPTION_XY = (0.335, 0.085)
+# The section caption sits under the section's left half, below the overall
+# length and clear of the general note to its left and the title block.
+SECTION_CAPTION_XY = (0.178, 0.081)
 DIMENSION_TEXT_LINE_GAP = 0.0005
 # The boss diameter's text is centred on its dimension line; it read 13.1 mm
 # wide on the f0c105531 render. Its right edge plus a clearance bounds where
