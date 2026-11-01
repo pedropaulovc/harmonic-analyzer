@@ -86,7 +86,7 @@ from magnifying_bracket_joint_layout import (
     DRILL_DEPTH_BAND,
     LEVER_HOLE_POINTS,
     RECEIVER_DRILL_DEPTH_PLACES,
-    RECEIVER_ROW_Y,
+    LEVER_RECEIVER_ROW_Y,
     TAP_DRILL_DIA,
     THREAD_DEPTH,
 )
@@ -1686,8 +1686,8 @@ def _receiver_axis_centerline(adapter: Any, back: Any) -> Any:
         adapter,
         back,
         (
-            (max(stations) + RECEIVER_AXIS_OVERRUN_MM, RECEIVER_ROW_Y, z_mm),
-            (min(stations) - RECEIVER_AXIS_OVERRUN_MM, RECEIVER_ROW_Y, z_mm),
+            (max(stations) + RECEIVER_AXIS_OVERRUN_MM, LEVER_RECEIVER_ROW_Y, z_mm),
+            (min(stations) - RECEIVER_AXIS_OVERRUN_MM, LEVER_RECEIVER_ROW_Y, z_mm),
         ),
         label="receiver row centreline",
     )

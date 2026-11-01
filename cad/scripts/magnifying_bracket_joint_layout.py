@@ -66,9 +66,32 @@ SCREW_PITCH_X = SCREW_MACHINE_X[1] - SCREW_MACHINE_X[0]
 BRACKET_HOLE_POINTS = tuple(
     (x - BRACKET_ORIGIN[0], RECEIVER_ROW_Y, SIDE_PLATE_Z[0]) for x in SCREW_MACHINE_X
 )
-LEVER_HOLE_POINTS = tuple(
-    (x - LEVER_ORIGIN_X, RECEIVER_ROW_Y, LEVER_FRONT_LOCAL_Z) for x in SCREW_MACHINE_X
+# MHA-MG-01 keeps its millimetre stations; the lever's taps sit at the
+# nearest .001 in to them, off its own free-edge corner and actual top (rule
+# 3: the model is the printed nominal; today 1.120 / .581 from the +X edge,
+# .128 below the top, in SCREW_MACHINE_X order).  Each lever tap then stands
+# at most LEVER_STATION_OFFSET_MAX off its bracket hole (half a grid step per
+# axis at worst), charged to the head and shank float below.
+_MM_PER_IN = 25.4
+LEVER_RECEIVER_FROM_EDGE_IN = tuple(
+    round((lever.PLATE_W - (x - LEVER_ORIGIN_X)) / _MM_PER_IN, 3) for x in SCREW_MACHINE_X
 )
+LEVER_RECEIVER_ROW_FROM_TOP_IN = round(RECEIVER_ROW_FROM_TOP / _MM_PER_IN, 3)
+LEVER_RECEIVER_ROW_FROM_TOP = round(LEVER_RECEIVER_ROW_FROM_TOP_IN * _MM_PER_IN, 6)
+LEVER_RECEIVER_ROW_Y = round(lever.COEFFICIENT_TOP_Y - LEVER_RECEIVER_ROW_FROM_TOP, 6)
+LEVER_HOLE_POINTS = tuple(
+    (round(lever.PLATE_W - inches * _MM_PER_IN, 6), LEVER_RECEIVER_ROW_Y, LEVER_FRONT_LOCAL_Z)
+    for inches in LEVER_RECEIVER_FROM_EDGE_IN
+)
+LEVER_STATION_OFFSET_MAX = max(
+    math.hypot(lever_x - (x - LEVER_ORIGIN_X), lever_y - RECEIVER_ROW_Y)
+    for (lever_x, lever_y, _z), x in zip(LEVER_HOLE_POINTS, SCREW_MACHINE_X, strict=True)
+)
+if LEVER_STATION_OFFSET_MAX > math.hypot(0.0005, 0.0005) * _MM_PER_IN + 1e-9:
+    raise AssertionError(
+        f"lever receiver grid moves a tap {LEVER_STATION_OFFSET_MAX:.4f} mm off its "
+        "bracket hole"
+    )
 # A flush head would run this screw past the tap's full thread and bottom it.
 # The heads instead bear on the flange's front face, no counterbore, inside a
 # head-clearance circle (still named COUNTERBORE_DIA) that keeps their float.
@@ -109,7 +132,10 @@ DRILL_DEPTH_BAND = printed_band_mm(RECEIVER_DRILL_DEPTH_PLACES, unit=lever.UNIT)
 # the lever's rule-17 wall target on its inch sheet.
 RECEIVER_PILOT_WALL_MIN = WALL_TARGET_MM
 HEAD_FLOAT_MIN = (COUNTERBORE_DIA - SCREW_HEAD_DIA) / 2.0
-HEAD_POSITION_MISMATCH_MAX = 2.0 * POSITION_BAND
+# Both rows' location bands plus the lever grid's nominal offset.
+HEAD_POSITION_MISMATCH_MAX = 2.0 * POSITION_BAND + LEVER_STATION_OFFSET_MAX
+# The shank's least radial float in the printed (+0.10/0) clearance hole.
+SHANK_FLOAT_MIN = (round(CLEARANCE_DIA, 2) - SCREW_MAJOR_DIA) / 2.0
 EDGE_BREAK = edge_break_chamfer_mm()
 SCREW_LENGTH_MINUS = 0.76  # conservative stock allowance, not a catalog band
 SCREW_TIP_CHAMFER = 0.7 * SCREW_PITCH
@@ -284,6 +310,8 @@ if TAP_LEAD_MARGIN_MIN < 0.0:
     raise AssertionError("magnifying bracket tap drill loses bottoming-tap lead design allowance")
 if HEAD_FLOAT_MIN < HEAD_POSITION_MISMATCH_MAX:
     raise AssertionError("magnifying bracket counterbore loses head float")
+if SHANK_FLOAT_MIN < HEAD_POSITION_MISMATCH_MAX:
+    raise AssertionError("magnifying bracket clearance hole loses shank float")
 if min(
     GRIP_MIN, COUNTERBORE_END_WALL_MIN, COUNTERBORE_HEIGHT_WALL_MIN,
     CLEARANCE_HOLE_HEIGHT_WALL_MIN,

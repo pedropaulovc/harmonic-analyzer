@@ -80,8 +80,9 @@ def test_uniform_ribs_and_relocated_row_preserve_other_installed_interfaces() ->
     assert (spec.CHANNEL_Z0, spec.CHANNEL_PITCH) == pytest.approx((-67.1, 7.0565))
     assert (spec.HEX_W, spec.HEX_H, spec.HEX_DEPTH) == pytest.approx((8.080, 10.268, 21.717))
     assert (spec.TIP_X, spec.ANCHOR_H) == pytest.approx((-76.2, 19.05))
-    assert tuple(point[0] for point in joint.LEVER_HOLE_POINTS) == (16.0, 29.7)
-    assert all(point[1] == pytest.approx(-0.71) for point in joint.LEVER_HOLE_POINTS)
+    # The lever's taps sit at the nearest .001 in (1.120 / .581, .128).
+    assert tuple(point[0] for point in joint.LEVER_HOLE_POINTS) == (16.002, 29.6926)
+    assert all(point[1] == pytest.approx(-0.7112) for point in joint.LEVER_HOLE_POINTS)
     assert all(point[2] == pytest.approx(-76.2) for point in joint.LEVER_HOLE_POINTS)
     assert (spec.RIB_T, joint.DRILL_DEPTH, joint.THREAD_DEPTH) == (5.08, 6.604, 4.95)
     assert joint.LEVER_FRONT_LOCAL_Z + spec.RIB_T == pytest.approx(-71.12)
@@ -194,7 +195,9 @@ def test_pilot_ordinary_bands_have_replayable_correlated_wall_witnesses() -> Non
         width = spec.PLATE_W + spec.PLATE_W_DEVIATIONS[1]
         band = joint.POSITION_BAND
         witness = (radius, reach, blend, width, top, thickness, band, band)
-        assert _witness_clearance(29.7, witness, "upper") >= worst.upper_mm - 1e-10
+        assert _witness_clearance(
+            joint.LEVER_HOLE_POINTS[-1][0], witness, "upper"
+        ) >= worst.upper_mm - 1e-10
 
 
 def test_independent_plate_top_boundary_catches_obsolete_half_band(monkeypatch) -> None:

@@ -435,7 +435,7 @@ def test_extracted_taps_use_relocated_joint_axes_and_preserve_complete_pilot_vol
     assert len(cuts) == 1
     arguments, options = cuts[0]
     assert arguments[:4] == (adapter, joint.TAP_SPEC, joint.LEVER_HOLE_POINTS, (0.0, 0.0, -1.0))
-    assert all(y == pytest.approx(spec.COEFFICIENT_TOP_Y - 3.25) for _, y, _ in arguments[2])
+    assert all(y == pytest.approx(spec.COEFFICIENT_TOP_Y - 3.2512) for _, y, _ in arguments[2])
     assert options["expect_dia_mm"] == joint.TAP_DRILL_DIA
     assert joint.DRILL_DEPTH > spec.RIB_T
     complete_pilot = len(joint.LEVER_HOLE_POINTS) * math.pi * (joint.TAP_DRILL_DIA / 2.0)**2 * (

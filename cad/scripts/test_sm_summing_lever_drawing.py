@@ -591,19 +591,19 @@ def test_receiver_pilot_continues_from_uniform_rib_into_connected_plate() -> Non
     for x, y, _z in joint.LEVER_HOLE_POINTS:
         assert x - joint.POSITION_BAND - drill_radius_max > spec.CYL_R
         assert x + joint.POSITION_BAND + drill_radius_max < spec.RIB_REACH
-        assert spec.COEFFICIENT_TOP_Y - y == pytest.approx(3.25)
+        assert spec.COEFFICIENT_TOP_Y - y == pytest.approx(3.2512)  # .128 in
     assert rib_t[1] < joint.DRILL_DEPTH_MIN
     assert rib_t[0] < joint.THREAD_DEPTH
     # ReceiverY0 is from the actual top: top-position variation cancels.
     upper_plate_wall = (
-        joint.RECEIVER_ROW_FROM_TOP - joint.POSITION_BAND - drill_radius_max - wander
+        joint.LEVER_RECEIVER_ROW_FROM_TOP - joint.POSITION_BAND - drill_radius_max - wander
     )
     lower_plate_wall = (
-        spec.COEFFICIENT_T + spec.COEFFICIENT_T_DEVIATIONS[0] - joint.RECEIVER_ROW_FROM_TOP
+        spec.COEFFICIENT_T + spec.COEFFICIENT_T_DEVIATIONS[0] - joint.LEVER_RECEIVER_ROW_FROM_TOP
         - joint.POSITION_BAND - drill_radius_max - wander
     )
-    assert upper_plate_wall == pytest.approx(2.220535, abs=1e-6)
-    assert lower_plate_wall == pytest.approx(2.578535, abs=1e-6)
+    assert upper_plate_wall == pytest.approx(2.221735, abs=1e-6)
+    assert lower_plate_wall == pytest.approx(2.577335, abs=1e-6)
     assert joint.receiver_pilot_material_wall_budget() == pytest.approx(
         min(upper_plate_wall, lower_plate_wall),
     )
@@ -682,15 +682,15 @@ def test_view_f_centerline_projects_only_the_actual_relocated_receiver_row(
     segment = drawing._receiver_axis_centerline(adapter, back)
     assert activated == ["VIEW F"]
     assert projected_points == [
-        pytest.approx((0.0317, -0.00071, -0.0762)),
-        pytest.approx((0.0140, -0.00071, -0.0762)),
+        pytest.approx((0.0316926, -0.0007112, -0.0762)),
+        pytest.approx((0.014002, -0.0007112, -0.0762)),
     ]
     assert created_lines == [pytest.approx((
-        origin[0] - scale * 0.0317 + 0.03,
-        origin[1] - scale * 0.00071 - 0.02,
+        origin[0] - scale * 0.0316926 + 0.03,
+        origin[1] - scale * 0.0007112 - 0.02,
         0.0,
-        origin[0] - scale * 0.0140 + 0.03,
-        origin[1] - scale * 0.00071 - 0.02,
+        origin[0] - scale * 0.014002 + 0.03,
+        origin[1] - scale * 0.0007112 - 0.02,
         0.0,
     ))]
     assert manager.AddToDB is False

@@ -615,7 +615,8 @@ Live catalog verification on October 8, 2026:
   specifies usable full thread without an additional maximum cutting reach.
   The owner's 2026-10-22 relocation retains that screw/grip stack but lowers
   the matched mounting row **0.71 mm**. Both lever taps sit at local
-  **Y=−0.71 mm**, **.1280 ±.0020 in (3.25 ±0.0508 mm) below the actual coefficient top**; matching
+  **Y=−0.7112 mm**, **.128 ±.002 in (3.2512 ±0.0508 mm) below the actual coefficient top**, the nearest
+  .001 in to the bracket's −0.71 mm row; matching
   bracket holes and installed screws follow, without moving the L bracket
   body, seat or threaded-lever pose. All three lever rib extrusions are now
   **5.00 mm**, printed **.20 ±.01 in**, with end-rib inner caps **Z=±71.20 mm** and outer
@@ -627,13 +628,13 @@ Live catalog verification on October 8, 2026:
   enforce a **≥.080 in (2.032 mm) pilot-only** material design floor. With printed
   **Ø.070 +.004/0**, the maximum radius is **0.9398 mm**; the deepest 0.3°
   wander is approximately **0.038865 mm**. Actual-top row correlation and the
-  printed thickness limits leave approximately **2.220535 / 2.578535 mm**
+  printed thickness limits leave approximately **2.221735 / 2.577335 mm**
   top/bottom pilot walls. `sm_summing_lever_profile.receiver_pilot_wall_budget`
   separately bounds longitudinal rib-profile walls; native trimmed-face
   comparisons subtract **TAP_DRILL_DIA/2**. The native pilot and cosmetic
   threads do not prove exact physical thread-cutting geometry or strength.
   The Ø3.8 head-clearance circle is not a counterbore; its **0.122 mm**
-  minimum radial float exceeds the **0.1016 mm** station mismatch. The moved
+  minimum radial float exceeds the **0.1091 mm** station mismatch (both bands plus the lever grid's **0.0075 mm** offset). The moved
   row's **5.64 ±0.05 mm** lower-edge ordinate leaves **3.64 / 4.55 mm**
   lower/upper head-envelope walls under the retained printed bands; the end
   wall is **7.00 mm**. Native screw-head/knife-mount and rib/nut clearances
