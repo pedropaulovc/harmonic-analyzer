@@ -306,9 +306,10 @@ CALLOUTS_BELOW = {
     "HoleRowY": ROW_CALLOUT,
 }
 # Rule 1 (units): an as-bought fraction is a REF with the supplier's
-# tolerance (machinist review, final head).
+# tolerance (machinist review, final head), the band on its own row so the
+# width's text stays as narrow as before (the bar's end runs beside it).
 STOCK_CALLOUTS = {
-    name: "STOCK ±" + f"{band / 25.4:.3f}".lstrip("0")
+    name: "STOCK\n±" + f"{band / 25.4:.3f}".lstrip("0")
     for name, band in (
         ("BracketWidth", WIDTH_STOCK_BAND),
         ("BracketThick", THICK_STOCK_BAND),
