@@ -35,7 +35,13 @@ it to `new_project_drawing(unit=...)`. Missing declarations mean `mm`; explicit
 `mm` is retained for metric-only supplier packages. `finalize_drawing` refuses
 a sheet whose linked model carries inch rows while the drawing is not in
 inches. Remove the rollout switch when the last batch lands and make inches
-the fabrication default, retaining the supplier-unit exception.
+the fabrication default, retaining the supplier-unit exception. On an inch
+fabrication sheet, a metric-only vendor line's dimension (HGR15R, KP08, Tr8)
+keeps its exact millimetres: the builder gives the model dimension its own
+symmetric band (`set_dimension_symmetric_tolerance(display_unit="mm")`) and
+`_metric_vendor_dimension.set_metric_vendor_units` prints it in mm labelled
+`mm`; the draw script proves the import kept that with
+`assert_imported_metric_dimensions`.
 
 A converted package's builder selects the model's document units with
 `_document_units.apply_package_model_units` right after `create_part` or
