@@ -7,6 +7,7 @@ from copy import copy
 from dataclasses import replace
 import hashlib
 from itertools import combinations
+import math
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -18,7 +19,9 @@ import _supplier_chain_dimensions as chain_dimensions
 import _supplier_spring_drawing as supplier_drawing
 from _supplier_reference_geometry import NativeSketchGeometry
 from _supplier_spring_drawing import supplier_state_cells
+import ch_vn_channel_spring_installed_spec as channel_installed
 import ch_vn_channel_spring_stock_geom as channel
+import sm_vn_counter_spring_spec as counter_installed
 
 
 # Representative annotation requirements, independent of the layout coordinates.
@@ -68,9 +71,8 @@ def test_state_cells_leave_positive_geometry_and_all_annotation_budgets(
     cells = supplier_state_cells(caption_y, maximum=maximum)
     fitted = purchased.supplier_fit_cells(cells, margins, label="supplier layout")
     originals = {name: (center, bounds) for name, center, bounds in cells}
-    expected_names = {"free_front", "free_top", "free_right", "installed_iso"}
-    if maximum:
-        expected_names.add("max_front")
+    expected_names = {"free_front", "free_right", "installed_iso"}
+    expected_names.add("max_front" if maximum else "free_top")
     assert {name for name, _, _ in fitted} == set(originals) == expected_names
 
     for name, center, inner in fitted:
@@ -80,8 +82,8 @@ def test_state_cells_leave_positive_geometry_and_all_annotation_budgets(
             ((inner[0] + inner[2]) / 2.0, (inner[1] + inner[3]) / 2.0)
         ), name
         if name not in margins:
-            # The extension Top and every installed pictorial keep their whole
-            # cells; unused views must not pay another view's annotation budget.
+            # Every installed pictorial keeps its whole cell; unused views
+            # must not pay another view's annotation budget.
             assert inner == outer, name
             assert center == outer_center, name
             continue
@@ -109,6 +111,34 @@ def test_state_cells_leave_positive_geometry_and_all_annotation_budgets(
             name_a,
             name_b,
         )
+
+
+@pytest.mark.parametrize(
+    "spec,scale",
+    [
+        pytest.param(counter_installed, (1, 2), id="1330K524-1:2"),
+        pytest.param(channel_installed, (2, 1), id="9432K31-2:1"),
+    ],
+)
+def test_extension_installed_cell_holds_the_pictorial_at_a_legible_scale(
+    spec, scale
+):
+    # At 1:8 the counter spring's turns merged into a solid bar. A box around
+    # the installed coil (axis +X, loops/hooks inside the OD) bounds its
+    # standard isometric: X projects (sqrt(1/2), -1/sqrt(6)), Y (0, sqrt(2/3)).
+    caption_y = purchased.view_band_bottom("", label="installed scale")
+    cell = next(
+        bounds
+        for name, _, bounds in supplier_state_cells(caption_y, maximum=True)
+        if name == "installed_iso"
+    )
+    diameter = spec.SUPPLIER_COIL_OD_MM
+    run = spec.INSTALLED_LENGTH_MM + 2.0 * spec.SUPPLIER_WIRE_DIA_MM + diameter
+    ratio = scale[0] / scale[1] / 1000.0
+    width = math.sqrt(0.5) * run * ratio
+    height = (run / math.sqrt(6.0) + math.sqrt(2.0 / 3.0) * diameter) * ratio
+    assert width <= cell[2] - cell[0]
+    assert height <= cell[3] - cell[1]
 
 
 @pytest.mark.parametrize(
@@ -558,7 +588,7 @@ def _sibling_view(first, name, configuration="SupplierReference"):
             "free_right",
             _EXTENSION_MARGINS,
             ((-0.003, 0.002), (0.005, 0.002), (0.005, 0.008), (-0.003, 0.008)),
-            (0.094, 0.011),
+            (0.183, 0.010),
             id="spring-right",
         ),
         pytest.param(

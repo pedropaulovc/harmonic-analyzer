@@ -6,10 +6,10 @@ from collections.abc import Callable
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
-from solidworks_mcp.adapters.sw_type_info import constant
 
 import _telemetry
 from _com import _early_bound
+from _construction_line_font import _construction_curves_as_outline
 from _drawing_common import rebuild_drawing
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_projection import model_point_in_view
@@ -42,34 +42,6 @@ STOCK_TEXT = (0.175, 0.183)
 STOCK_LABEL = f"WIRE END VIEW SCALE {STOCK_SCALE[0]}:{STOCK_SCALE[1]}"
 STOCK_LABEL_XY = (0.121, 0.152)
 STOCK_FIELD = (0.100, 0.130, 0.260, 0.220)
-# The supplier circle is model construction geometry (the zero-body diagram
-# contract). The package's other view is a shaded solid with its sketches
-# blanked, so construction curves draw only this end view's solid visible
-# outline: DP_LineFont, this SLDDRW only.
-_CONSTRUCTION_LINE_FONT = (
-    ("swLineFontConstructionCurvesStyle", "swLineCONTINUOUS"),
-    ("swLineFontConstructionCurvesThickness", "swLW_THICK"),
-)
-
-
-def _construction_curves_as_outline(adapter) -> Callable[[], None]:
-    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
-    option = constant("swDetailingNoOptionSpecified")
-    settings = tuple(
-        (name, constant(name), constant(value))
-        for name, value in _CONSTRUCTION_LINE_FONT
-    )
-
-    def readback() -> None:
-        for name, preference, value in settings:
-            if int(extension.GetUserPreferenceInteger(preference, option)) != value:
-                raise RuntimeError(f"wire section line font {name} readback differs")
-
-    for name, preference, value in settings:
-        if not extension.SetUserPreferenceInteger(preference, option, value):
-            raise RuntimeError(f"failed to set wire section line font {name}")
-    readback()
-    return readback
 
 
 def _delete_center_marks(adapter, view) -> None:
