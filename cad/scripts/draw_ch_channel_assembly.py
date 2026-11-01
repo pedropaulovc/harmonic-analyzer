@@ -1018,7 +1018,8 @@ def _fitup_notes() -> tuple[str, str, str]:
             "ACCEPT IF THE ARM SWINGS FREE UNDER ITS OWN WEIGHT."
         ),
         "north-ear-datum": (
-            f"NORTH {bracket} SET AT {steps.NORTH_BRACKET_SET_REF}: SWING "
+            f"NORTH {bracket} SET AND SCREWED DOWN WITH ONE {hold_down} AT "
+            f"{steps.NORTH_BRACKET_SET_REF}: SWING "
             f"EACH ARM UP ON ITS ROD; PUSH THE {shaft} SHAFT, FLATS UP, "
             "SOUTH THROUGH THE EAR, THE "
             f"{washer} WASHER MEASURED AT THAT STEP, THEN HUBS {last} TO 0."
@@ -1028,8 +1029,8 @@ def _fitup_notes() -> tuple[str, str, str]:
         # failed check is re-set before anything is drilled, tapped or staked
         # (machinist review, PR #1605).
         "south-bracket-spring-set": (
-            f"RUN A {spring} SPRING ALONG THE {shaft}; REJECT ONE THAT BINDS. "
-            f"FIT IT ON. SET THE SOUTH {bracket} OFF THE WASHER ON A "
+            f"RUN THE {spring} WAVE SPRING ALONG THE {shaft}: ACCEPT IF IT "
+            f"SLIDES FREE. FIT IT ON. SET THE SOUTH {bracket} OFF THE WASHER ON A "
             f"SPRING-SET BLADE (DETAIL {DETAIL_LETTER}) BESIDE THE SPRING, "
             "BANK PUSHED NORTH. CLAMP AND PULL THE BLADE. ACCEPT: PUSHED "
             "SOUTH, THE BANK SPRINGS BACK ONTO THE NORTH WASHER; ELSE UNCLAMP "
@@ -1048,7 +1049,8 @@ def _fitup_notes() -> tuple[str, str, str]:
         # (fulcrum-set-screws-staked). The Loctite waiver was retired on
         # 2026-10-16 under the user's standing no-threadlocker rule.
         "set-screws-driven": (
-            f"SHAFT HELD AS SET, FLATS UP: RUN ONE {pivot_set_screw} DOWN EACH "
+            "SHAFT HELD AS SET, FLATS UP, WITH THE CUP-POINT SET SCREWS: "
+            f"RUN ONE {pivot_set_screw} DOWN EACH "
             "APEX TAP ONTO ITS FLAT, NORTH FIRST; SNUG, AND STAKE EACH TAP "
             "MOUTH AT 2 POINTS."
         ),
