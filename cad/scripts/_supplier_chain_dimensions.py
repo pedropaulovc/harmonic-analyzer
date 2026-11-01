@@ -144,6 +144,10 @@ def annotate_chain_stock(
             ),
         )
     expected_by_view = {"free_front": front, "free_top": top}
+    # Sheet-metre x offsets from each TOP dimension line to its shelved text.
+    shelves = {stock.WIDTH_DIMENSION: -0.024}
+    if connecting:
+        shelves[stock.LENGTH_DIMENSION] = 0.024
     options_by_view = {}
     for key, rows in expected_by_view.items():
         view = _early_bound(views[key], "IView")
@@ -197,14 +201,17 @@ def annotate_chain_stock(
             }
             supplier_reference_dimension(adapter, display, **options[name])
         options_by_view[key] = options
-        if key == "free_top" and not connecting:
-            # Keep the native vertical line/witnesses where curation put them;
-            # shelf the complete two-row width label to their left.
-            width_x, width_y = positions[stock.WIDTH_DIMENSION]
+        if key == "free_top":
+            # Keep the native vertical lines/witnesses where curation put them;
+            # shelf the complete two-row labels off them, the width to the left
+            # and the pin length to the right, clear of the spans between.
             offset_dimension_text(
                 adapter,
                 imported,
-                {stock.WIDTH_DIMENSION: (width_x - 0.024, width_y)},
+                {
+                    name: (positions[name][0] + dx, positions[name][1])
+                    for name, dx in shelves.items()
+                },
             )
 
     expected = {
@@ -243,13 +250,9 @@ def annotate_chain_stock(
                         f"{name}: unprovided supplier tolerance appeared"
                     )
                 assert_supplier_reference_dimension(adapter, display, **presentation)
-                if (
-                    name == stock.WIDTH_DIMENSION
-                    and not connecting
-                    and display.OffsetText is not True
-                ):
+                if name in shelves and display.OffsetText is not True:
                     raise RuntimeError(
-                        f"{name}: roller width text returned to its native dimension line"
+                        f"{name}: supplier text returned to its native dimension line"
                     )
 
     return (settled,)

@@ -330,18 +330,29 @@ def test_chain_annotation_positions_follow_source_ink_not_stale_outline(
     assert all(view.outline_calls == 0 for view in views.values())
 
 
-def test_chain_roller_width_shelves_text_without_moving_its_native_line(monkeypatch):
+@pytest.mark.parametrize("connecting", [False, True])
+def test_chain_top_shelves_text_without_moving_native_lines(monkeypatch, connecting):
     views, settled = _chain_sheet(
-        monkeypatch, connecting=False, scale=(5.0, 1.0)
+        monkeypatch, connecting=connecting, scale=(5.0, 1.0)
     )
-    annotation = views["free_top"].annotations[0]
-    line = views["free_top"].dimension_positions[chain_stock.WIDTH_DIMENSION]
-    assert annotation.display.OffsetText is True
-    assert annotation.line_position == pytest.approx((*line, 0.0))
-    assert annotation.position == pytest.approx((line[0] - 0.024, line[1], 0.0))
+    top = views["free_top"]
+    by_name = {
+        annotation.display.native.FullName.split("@")[0]: annotation
+        for annotation in top.annotations
+    }
+    shelves = {chain_stock.WIDTH_DIMENSION: -0.024}
+    if connecting:
+        shelves[chain_stock.LENGTH_DIMENSION] = 0.024
+        assert by_name[chain_stock.PLATE_DIMENSION].display.OffsetText is False
+    for name, dx in shelves.items():
+        annotation = by_name[name]
+        line = top.dimension_positions[name]
+        assert annotation.display.OffsetText is True
+        assert annotation.line_position == pytest.approx((*line, 0.0))
+        assert annotation.position == pytest.approx((line[0] + dx, line[1], 0.0))
     settled()
-    annotation.display.OffsetText = False
-    with pytest.raises(RuntimeError, match="roller width text returned"):
+    by_name[chain_stock.WIDTH_DIMENSION].display.OffsetText = False
+    with pytest.raises(RuntimeError, match="text returned to its native dimension line"):
         settled()
 
 
