@@ -32,7 +32,7 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
 from _drawing_dimensions import (
     assert_imported_precision,
     move_model_dimension,
@@ -247,6 +247,8 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hole_callout_precision(
         thread_callout, THREAD_CALLOUT_PRECISION, label="jam nut through tap"
     )
+    # The face view shows the tap's major-diameter arc too (machinist review).
+    import_cosmetic_threads(adapter, front)
 
     return await finalize_drawing(
         adapter,
