@@ -104,6 +104,16 @@ def test_frame_puts_the_bearing_face_at_y0() -> None:
     assert 'screw_axis_planes=("Front Plane", "Right Plane")' in source
 
 
+def test_thread_chord_lies_on_the_bearing_face_edge() -> None:
+    # The thread Ø's line runs under the head's bearing-face edge (y = 0), not
+    # across the threaded shank.
+    assert spec.SUPPLIER_REFERENCE_STARTS["SupplierThreadDiameter"] == (
+        -dims.DIMS.major_dia / 2.0,
+        0.0,
+    )
+    assert dims.DIMS.head_dia > dims.DIMS.major_dia
+
+
 def test_purchased_sheet_documents_the_built_part() -> None:
     import draw_ch_rocker_arm_tl_vn_oblique_clamp_screw as drawing
 
