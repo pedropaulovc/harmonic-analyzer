@@ -103,6 +103,7 @@ from __future__ import annotations
 
 import math
 
+import _config
 import ch_rocker_arm_tl_vn_oblique_rail_spec as rail
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 from ch_rocker_arm_tl_oblique_pivot_block_spec import CARRIAGE_THREAD_DEPTH
@@ -316,4 +317,8 @@ CAP_INTERNAL_MM3 = (A_CAP_OUTLINE - VENDOR_CHANNEL_MM2) * 2.0 * CAP_LENGTH - 2.0
     VENDOR_CAP_VOLUME_MM3 + VENDOR_SEAL_VOLUME_MM3
 )
 
-DRAWING_NOTES = "MOUNT ON THE OBLIQUE TRAMMEL RAIL; GREASE THROUGH THE END NIPPLE."
+# The note names the rail by its drawing number, read from the registry.
+RAIL_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-rail")["number"]
+DRAWING_NOTES = (
+    f"MOUNT ON THE OBLIQUE TRAMMEL RAIL {RAIL_NUMBER}; GREASE THROUGH THE END NIPPLE."
+)
