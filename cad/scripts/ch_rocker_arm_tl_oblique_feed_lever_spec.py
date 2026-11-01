@@ -149,9 +149,15 @@ for _name, _value in (
         raise AssertionError(f"feed lever {_name} {_value} does not print as modelled")
 
 # Width and thickness are the bar as bought: their stock references carry
-# STOCK under them.
+# STOCK and the supplier's band under them (rule 1, machinist review).
 STOCK_DIMENSIONS = frozenset({"LeverWidth", "LeverThick"})
-STOCK_CALLOUT = "STOCK"
+STOCK_CALLOUTS = {
+    name: "STOCK\n±" + f"{band / 25.4:.3f}".lstrip("0")
+    for name, band in (
+        ("LeverWidth", WIDTH_STOCK_BAND),
+        ("LeverThick", THICK_STOCK_BAND),
+    )
+}
 # Both holes stand on the one Y station the part prints (Hole1Y); the one
 # printed fillet stands for both corners. A custom prefix replaces
 # SolidWorks' own "R", so it carries it (draw_pd_guide_lock).
