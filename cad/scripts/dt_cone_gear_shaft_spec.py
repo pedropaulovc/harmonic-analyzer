@@ -593,20 +593,18 @@ _LENGTH_NOMINALS = {
     "CollarWidth": COLLAR_THICKNESS,
     "ShoulderR": FILLET_RADIUS,
 }
-# Lengths that carry their own band instead of the title block's.
-_LENGTH_BANDS = {"ShoulderR": FILLET_R_BAND}
 
 
 def printed_length_deviations(name: str) -> tuple[float, float]:
     """(lower, upper) mm about the model of a marked length's printed limits:
-    the inch value the sheet prints, with its own band or the title block's."""
-    band = _LENGTH_BANDS.get(name)
-    if band is None:
+    the inch value the sheet prints, with its own band (the step roots) or the
+    title block's."""
+    if name == "ShoulderR":
         return printed_deviations(
-            _LENGTH_NOMINALS[name], DRAWING_PRECISION_BY_NAME[name], unit=UNIT
+            FILLET_RADIUS, DRAWING_PRECISION_BY_NAME[name], deviations(FILLET_R_BAND), unit=UNIT
         )
     return printed_deviations(
-        _LENGTH_NOMINALS[name], DRAWING_PRECISION_BY_NAME[name], deviations(band), unit=UNIT
+        _LENGTH_NOMINALS[name], DRAWING_PRECISION_BY_NAME[name], unit=UNIT
     )
 
 
