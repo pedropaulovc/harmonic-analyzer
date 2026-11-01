@@ -34,11 +34,15 @@ def set_precise_curve_quality(adapter: Any, *, label: str) -> None:
     """
     extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
     before = (
-        extension.GetUserPreferenceInteger(_IMAGE_QUALITY_WIREFRAME, _NO_PREFERENCE_OPTION),
+        extension.GetUserPreferenceInteger(
+            _IMAGE_QUALITY_WIREFRAME, _NO_PREFERENCE_OPTION
+        ),
         extension.GetUserPreferenceInteger(
             _IMAGE_QUALITY_WIREFRAME_VALUE, _NO_PREFERENCE_OPTION
         ),
-        extension.GetUserPreferenceToggle(_IMAGE_QUALITY_HIGH_CURVES, _NO_PREFERENCE_OPTION),
+        extension.GetUserPreferenceToggle(
+            _IMAGE_QUALITY_HIGH_CURVES, _NO_PREFERENCE_OPTION
+        ),
     )
     for preference, value in (
         (_IMAGE_QUALITY_WIREFRAME, _WIREFRAME_CUSTOM),
@@ -57,11 +61,15 @@ def set_precise_curve_quality(adapter: Any, *, label: str) -> None:
     ):
         raise RuntimeError(f"failed to improve {label} drawing curve quality")
     after = (
-        extension.GetUserPreferenceInteger(_IMAGE_QUALITY_WIREFRAME, _NO_PREFERENCE_OPTION),
+        extension.GetUserPreferenceInteger(
+            _IMAGE_QUALITY_WIREFRAME, _NO_PREFERENCE_OPTION
+        ),
         extension.GetUserPreferenceInteger(
             _IMAGE_QUALITY_WIREFRAME_VALUE, _NO_PREFERENCE_OPTION
         ),
-        extension.GetUserPreferenceToggle(_IMAGE_QUALITY_HIGH_CURVES, _NO_PREFERENCE_OPTION),
+        extension.GetUserPreferenceToggle(
+            _IMAGE_QUALITY_HIGH_CURVES, _NO_PREFERENCE_OPTION
+        ),
     )
     if after[:2] != (_WIREFRAME_CUSTOM, _CURVE_RESOLUTION) or after[2] is not True:
         raise RuntimeError(f"{label} drawing curve quality did not persist: {after!r}")
