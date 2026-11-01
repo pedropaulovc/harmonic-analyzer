@@ -244,19 +244,27 @@ def _sy(model_y_mm: float) -> float:
 # tap's wall to the step: its reference line runs from the thread's rim
 # toward the step at the tap's height (x ~0.110..0.117, y 0.204), its
 # extension lines straight down through the face, right of the section
-# line, to its line ~6 mm under the bottom face, inside the station's
+# line, to its line 11 mm under the bottom face, inside the station's
 # extension lines.  Over the view they would cross the tap callout's leader.
+# The keep is the line itself (farm 20261101T085904510Z: at 6 mm under, y
+# 0.150, the line's outside leg ran along section line A's arrow, drawn at
+# the cutting line's bottom end, 1.5 mm model under the face), so the line
+# stands 5 mm under that arrow and 7 mm over the station's text.
+_SECTION_ARROW_Y = _fy(SECTION_LINE_MODEL_MM[0][1])
 FRONT_KEEP = {
     "Height": (_fx(BLOCK_LENGTH) - 0.014, _fy(_CY)),
     "SetScrewY": (_fx(0.0) + 0.010, _fy(SET_SCREW_Y / 2.0)),
     "SetScrewX": (_fx(PIVOT_BORE_X / 4.0), _fy(0.0) - 0.020),
-    "TapWallMin": (_fx(TAP_WALL_START_X - TAP_WALL_MIN_MM / 2.0), _fy(0.0) - 0.006),
+    "TapWallMin": (
+        _fx(TAP_WALL_START_X - TAP_WALL_MIN_MM / 2.0),
+        _SECTION_ARROW_Y - 0.005,
+    ),
 }
 # The wall's 6.5 mm run cannot hold its ~21 x 9 mm two-row text (the
 # frame's lesson): native OffsetText parks it on a leader right of the line,
 # ~6 mm clear of its extension lines, between the view's bottom face (~3.5 mm
-# over the text) and the station's text (~7 mm under); the anchor is the
-# value row's bottom centre.
+# over the text) and the station's text (~7 mm under), its leader dropping
+# to the line's right end; the anchor is the value row's bottom centre.
 TAP_WALL_TEXT_XY = (0.134, _fy(0.0) - 0.007)
 _TEXT_SETTLE_M = 0.0005
 # Paper end: one baseline row under the view from the body's front face (the
