@@ -294,21 +294,25 @@ FRONT_KEEP = {
 # both.
 PASSAGE_CENTER_RISE = 0.0212 + TWO_ROW_LINE_DROP
 # swDimensionArrowsSide_e, set rather than left to the document's smart
-# arrows: swDimArrowsOutside = 1, swDimArrowsInside = 0.  The plan depth's
-# value and mate rows and the 4.875's short span leave no room for inside arrows
-# (d84a42ca7: the 4.875's line and arrows struck its "5"); outside, a
-# vertical dimension prints no line between them.
-ARROWS_OUTSIDE = ("SlitW", "Depth", "FootTapZ")
+# arrows: swDimArrowsOutside = 1, swDimArrowsInside = 0.  The 4.875's short
+# span leaves no room for inside arrows (d84a42ca7: the 4.875's line and
+# arrows struck its "5"); outside, a vertical dimension prints no line
+# between them.
+ARROWS_OUTSIDE = ("SlitW", "FootTapZ")
 # The pinch depth's span holds its two 3.4 mm
 # arrows: with no outside tail right of the hole-centre witness, the pinch
 # clearance callout's leader passes there (leader-crosses-line, af13c8ff8).
 # The width and FootTapX hold theirs inside too, so no tail runs toward the
-# bottom view's callout.
+# bottom view's callout.  The plan depth's text stands on its offset shelf,
+# so its 19.3 mm span holds both arrows and the line joining them, which the
+# shelf's leader meets (machinist review of PR 2107: with outside arrows the
+# leader ended in empty space between the witnesses).
 ARROWS_INSIDE = (
     "PinchHeight",
     "PinchDepthCenter",
     "Width",
     "FootTapX",
+    "Depth",
 )
 _DIM_ARROWS_OUTSIDE = 1
 _DIM_ARROWS_INSIDE = 0
@@ -878,10 +882,17 @@ def sheet_dimension_ink(
     }
     # The offset shelf belongs to the same native dimension.  Keep its text
     # and connecting run in this recipe's ink model, not at the import seed.
+    # Offset, the value no longer breaks the line: it runs whole between the
+    # inside arrows, and the shelf's leader leaves its midpoint.
     depth = ink["Depth"]
+    witnesses = depth.lines[:2]
     ink["Depth"] = DimensionInk(
         (
-            *depth.lines,
+            *witnesses,
+            (
+                (PLAN_DEPTH_LINE_X, _plan_y(Z_NORTH)),
+                (PLAN_DEPTH_LINE_X, _plan_y(Z_SOUTH)),
+            ),
             (
                 (PLAN_DEPTH_LINE_X, _plan_y(0.0)),
                 (texts["Depth"][0], TOP_TEXT_OFFSETS["Depth"][1]),
