@@ -70,7 +70,10 @@ SUPPLIER_DRAWING_URL = (
 )
 # The installed screw is cut to fit: its length on the solid prints as a
 # reference (CutLength), and the as-supplied 20 mm is a SEPARATE stock witness
-# left of the solid, labelled as stock (the 91794A055 cut-to-fit idiom).
+# left of the solid, labelled as stock (the 91794A055 cut-to-fit idiom). Its
+# construction chord runs down the shank's own left edge and on through the
+# uncut tip the drawing outlines in phantom, so its witnesses land on drawn
+# geometry; the thread Ø's chord lies on the cut end, not across the shank.
 SUPPLIER_REFERENCE_DIMENSIONS = (
     ("CutLength", -CUT_LENGTH, "vertical"),
     ("SupplierLength", -DIMS.length, "vertical"),
@@ -81,10 +84,10 @@ SUPPLIER_REFERENCE_DIMENSIONS = (
 )
 SUPPLIER_REFERENCE_STARTS = {
     "CutLength": (DIMS.major_dia / 2.0, 0.0),
-    "SupplierLength": (-DIMS.head_dia, 0.0),
+    "SupplierLength": (-DIMS.major_dia / 2.0, 0.0),
     "SupplierHeadDiameter": (-DIMS.head_dia / 2.0, 0.0),
     "SupplierHeadHeight": (DIMS.head_dia / 2.0, 0.0),
-    "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, -CUT_LENGTH / 2.0),
+    "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, -CUT_LENGTH),
     "SupplierDriveWidth": (-DIMS.socket_af / 2.0, 0.0),
 }
 SUPPLIER_REFERENCE_PLANES = {
