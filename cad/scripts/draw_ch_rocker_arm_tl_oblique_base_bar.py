@@ -66,7 +66,7 @@ from _surface_finish import SEAT_UM, surface_finish_by_key
 from _printed_limits import limits
 from _part_properties import part_drawing_unit
 from _printed_tolerance import drilled_oversize_mm
-from _metric_vendor_dimension import assert_imported_metric_dimensions
+from _drawing_metric_vendor import assert_imported_metric_dimensions
 from ch_rocker_arm_tl_oblique_callouts import set_callout_lengths_to_three_places
 from ch_rocker_arm_tl_oblique_base_bar_spec import (
     BAR_LENGTH,
