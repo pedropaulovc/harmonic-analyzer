@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 import re
 
+import pytest
+
 import _config
 import build_ch_rocker_arm_tl_oblique_riser as part
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier_spec
@@ -14,7 +16,7 @@ import ch_rocker_arm_tl_vn_oblique_hub_pin_spec as hub_pin
 import draw_ch_rocker_arm_tl_oblique_riser as drawing
 import export_features
 from _drawing_contract import model_toleranced_dimensions
-from _inch_wall_limits import WALL_TARGET_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 
 STEM = "ch_rocker_arm_tl_oblique_riser"
 INCH = 25.4
@@ -162,15 +164,41 @@ def test_hole_locations_are_reference_values_from_the_carrier() -> None:
             assert "station" not in feature and "width" not in feature, name
 
 
-def test_clamp_holes_pass_their_mates_and_hold_the_band_walls() -> None:
+def test_clamp_holes_pass_their_mates_and_state_the_band_wall_shortfall() -> None:
+    """Owner ruling 6 (2026-11-01): the CL/CR holes are spotted through
+    TL-21's, so the band walls take the carrier stations' error about the
+    cut's centre; the outer wall falls under the .080 target, over the .060
+    floor, and the CL/CR callout states it as plain fact (RV-01)."""
     lo, _hi = _features()["cl_hole"]["dia"]
     assert spec.CL_DOWEL_MAX == carrier_spec.CL_DOWEL_DIA + max(
         carrier_spec.CL_DOWEL_BAND
     )
     assert lo > spec.CL_DOWEL_MAX
     assert lo > spec.CR_SCREW_MAJOR
+    # The carrier's 3-place CL station (±.005 each way, X also half the D1
+    # band from A1 to the cut's centre), resolved along the radius to CL.
+    centre = trammel.ARC_CENTRE
+    radius = math.dist(trammel.CL, centre)
+    cos_x = abs(trammel.CL[0] - centre[0]) / radius
+    cos_y = abs(trammel.CL[1] - centre[1]) / radius
+    station = 0.005 * INCH
+    error = cos_x * (station + carrier_spec.POSITION_BAND / 2.0) + cos_y * station
+    assert spec.CLAMP_STATION_ERROR == pytest.approx(error)
+    assert 0.14 < spec.CLAMP_STATION_ERROR < 0.16
+    hole_r = (spec.CLAMP_DIA + spec.DRILLED_BAND[0]) / 2.0
     inner, outer = spec.CLAMP_BAND_WALLS
-    assert inner > outer >= WALL_TARGET_MM
+    assert inner == pytest.approx(radius - hole_r - error - trammel.RISER_INNER_RADIUS)
+    assert outer == pytest.approx(trammel.RISER_OUTER_RADIUS - radius - hole_r - error)
+    assert inner >= WALL_TARGET_MM
+    assert WALL_FLOOR_MM < outer < WALL_TARGET_MM
+    # Stated floored to three places: a MIN never rounds up.
+    assert outer / INCH == pytest.approx(0.0749, abs=0.0001)
+    assert spec.CLAMP_WALL_MIN_TEXT == "WALL .074 MIN TO CUT EDGE"
+    rows = spec.CALLOUTS_BELOW["ClampDia"].split("\n")
+    assert rows[:3] == ["DRILL THRU", "CL AND CR HOLES", spec.CLAMP_WALL_MIN_TEXT]
+    exceptions = _config.parts("ch-rocker-arm-tl-oblique-riser")["machinist_exceptions"]
+    assert [(e["id"], e["kind"]) for e in exceptions] == [("RV-01", "minor")]
+    assert spec.CLAMP_WALL_MIN_TEXT in exceptions[0]["where"]
 
 
 def test_each_row_count_matches_the_holes_on_that_row() -> None:
