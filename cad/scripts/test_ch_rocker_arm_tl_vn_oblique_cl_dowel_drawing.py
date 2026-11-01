@@ -100,6 +100,16 @@ def test_end_forms_are_the_vendor_steps() -> None:
     assert spec.LEAD_IN == pytest.approx(section[4][1])
 
 
+def test_reference_lines_lie_on_front_edges() -> None:
+    # The diameter on the chamfer's edge with the cylinder (the STEP's cone
+    # end), the length on the silhouette; no chord crosses the Top end view.
+    assert set(spec.SUPPLIER_REFERENCE_PLANES.values()) == {"Front"}
+    assert spec.SUPPLIER_REFERENCE_STARTS == {
+        "SupplierDowelDiameter": (-spec.DIA / 2.0, spec.LEAD_IN),
+        "SupplierDowelLength": (-spec.DIA / 2.0, 0.0),
+    }
+
+
 def test_closed_form_volume_is_the_vendor_steps() -> None:
     assert dowel_volume(dims.DOWEL_SIZE, dims.ENDS) == pytest.approx(
         VENDOR_VOLUME, rel=1e-6

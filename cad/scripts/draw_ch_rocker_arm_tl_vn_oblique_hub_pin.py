@@ -10,6 +10,8 @@ from solidworks_mcp.adapters.solidworks.drawing import iter_views
 import _telemetry
 import ch_rocker_arm_tl_vn_oblique_hub_pin_spec as part
 from _com import _early_bound
+from _drawing_centerline import add_view_centerline
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import NumberFit, build_purchased_fastener_drawing
 from _part_properties import part_drawing_unit
@@ -33,14 +35,14 @@ GENERAL_TEXT = (
 VIEW_LAYOUT = "tall_top"
 REFERENCE = "SupplierPinDiameter"
 CUT = "SupplierCutLength"
-# Both texts shelve right of their witnesses: the diameter on the Front's
-# bottom lane, the cut length beside the Top view. Front and Top reserve the
-# same left/right space so the fit centres them on one projection line; the
-# Front's equal top/bottom keeps it level with the unannotated Right.
+# Both texts shelve right of their witnesses: the diameter on the Top's
+# bottom lane, the cut length beside it. Front and Top reserve the same
+# left/right space so the fit centres them on one projection line; the
+# unannotated Front's equal top/bottom keeps it level with the Right.
 SHELVES = {REFERENCE: (True, "right"), CUT: (False, "right")}
 SUPPLIER_MARGINS = {
-    "*Front": (0.010, 0.016, 0.060, 0.016),
-    "*Top": (0.010, 0.010, 0.060, 0.010),
+    "*Front": (0.010, 0.010, 0.060, 0.010),
+    "*Top": (0.010, 0.016, 0.060, 0.010),
 }
 _CUT_FORMAT = part.SUPPLIER_REFERENCE_FORMATS[CUT]
 
@@ -79,7 +81,7 @@ def _assert_shop_dimension(display) -> None:
 
 
 def _settled_cut(adapter) -> object:
-    """Reacquire the Top view's one dimension: the native cut length."""
+    """Reacquire the Top view's one native cut length."""
     tops = [view for view in iter_views(adapter) if str(view.GetOrientationName()) == "*Top"]
     if len(tops) != 1:
         raise RuntimeError(f"{CUT}: settled sheet has no single Top view")
@@ -88,12 +90,11 @@ def _settled_cut(adapter) -> object:
     display = view.GetFirstDisplayDimension6()
     while display is not None:
         display = _early_bound(display, "IDisplayDimension")
-        found.append(display)
+        if str(_early_bound(display.GetDimension2(0), "IDimension").FullName).startswith(CUT + "@"):
+            found.append(display)
         display = display.GetNext5()
-    if len(found) != 1 or not str(
-        _early_bound(found[0].GetDimension2(0), "IDimension").FullName
-    ).startswith(CUT + "@"):
-        raise RuntimeError(f"{CUT}: Top view must carry exactly the cut length")
+    if len(found) != 1:
+        raise RuntimeError(f"{CUT}: Top view must carry the cut length once")
     return found[0]
 
 
@@ -121,12 +122,23 @@ async def build(adapter) -> dict[str, str]:
         _assert_shop_dimension(displays[CUT])
         _assert_reference_band(displays[REFERENCE])
         stations = shelve_supplier_text(adapter, displays, SHELVES)
+        # The cut length's line lies on the silhouette, so the Top carries the
+        # axis as a native centerline, picked on the pin face at mid-length.
+        top = views["*Top"]
+        add_view_centerline(
+            adapter, top, label="hub pin TOP axis",
+            face_xy=model_point_in_view(
+                adapter, top, (0.0, part.DIA / 2000.0, part.CUT_LENGTH / 2000.0),
+                label="hub pin TOP face",
+            ),
+        )
 
         def assert_references():
             # The supplier-reference contract covers the diameter only; the
             # Top view's cut length is the shop dimension, checked on its own.
             fresh = assert_supplier_screw(
-                adapter, {"*Front": views["*Front"]}, **_reference_rows({REFERENCE}),
+                adapter, {"*Top": views["*Top"]}, **_reference_rows({REFERENCE}),
+                shop={CUT},
             )
             _assert_reference_band(fresh[REFERENCE])
             cut = _settled_cut(adapter)
