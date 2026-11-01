@@ -58,10 +58,6 @@ from _sketch import (
 )
 from _sketch_chains import define_polygon_chain
 from _visibility import blank_reference_geometry
-from _supplier_screw_reference import add_supplier_reference_sketch
-from _supplier_screw_reference_names import FEATURE_BY_PLANE
-from _supplier_spring_reference import ReferenceState, add_supplier_reference_configurations
-import ch_rocker_arm_tl_vn_oblique_leadscrew_stock_spec as supplier
 from ch_rocker_arm_tl_vn_oblique_leadscrew_stock_spec import (
     BLANK_VOLUME_MM3,
     CLOCKED_FLATS,
@@ -572,31 +568,6 @@ def _manufacturing_controls(adapter) -> None:
         mark_dimensions_for_drawing(adapter, feature_name, names)
 
 
-async def _supplier_stock_references(adapter) -> None:
-    """Keep purchased-stock gauges out of every installed/reworked state."""
-    async def references(target):
-        await add_supplier_reference_sketch(
-            target,
-            supplier.SUPPLIER_REFERENCE_DIMENSIONS,
-            starts=supplier.SUPPLIER_REFERENCE_STARTS,
-        )
-        return (FEATURE_BY_PLANE["Front"],)
-
-    await add_supplier_reference_configurations(
-        adapter,
-        (
-            ReferenceState(
-                supplier.SUPPLIER_STOCK_CONFIGURATION,
-                None,
-                references,
-                body_count=0,
-                kind="diagram",
-            ),
-        ),
-        body_count=1,
-    )
-
-
 async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
     await _revolve_screw(adapter)
@@ -638,7 +609,6 @@ async def build(adapter) -> dict[str, str]:
     await apply_color(adapter, POLISHED_STEEL)  # 304 stainless, as rolled
     apply_custom_properties(adapter, STOCK_PROPERTIES)
     apply_drawing_properties(adapter, PART_NAME)
-    await _supplier_stock_references(adapter)
     await report_mass_properties(adapter)
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, SAVED_PROPERTIES_NO_NOTE)
