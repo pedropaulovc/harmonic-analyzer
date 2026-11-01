@@ -249,6 +249,9 @@ def test_plan_view_carries_the_receipt_check_reference_sizes() -> None:
     }
     assert draw.SHELVES == {"SupplierBoltHoleDiameter": (False, "left")}
     left, bottom, right, top = draw.SUPPLIER_MARGINS["*Front"]
-    assert left == right and bottom == top
+    # The hole text's left reserve; the plan view (55 x 13 at 2:1 plus 11.176
+    # mm of native padding) still fits the 180 mm cell beside it.
+    assert (left, right) == (0.034, 0.020) and bottom == top
+    assert 0.180 - left - right >= 2 * spec.LENGTH / 1000.0 + 0.011176
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "supplier.SUPPLIER_REFERENCE_DIMENSIONS" in source
