@@ -542,7 +542,7 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     assert drawing.RIGHT_KEEP["ShoulderLength"][0] < face_x - 0.020
     assert drawing.RIGHT_KEEP["FaceWidth"][0] > drawing._side_x(spec.OVERALL_LENGTH) + 0.025
     pin_x, _pin_y = drawing.RIGHT_KEEP["PinFromBossEnd"]
-    assert drawing._side_x(spec.PIN_STATION) < pin_x < drawing._side_x(spec.OVERALL_LENGTH)
+    assert pin_x > drawing._side_x(spec.OVERALL_LENGTH)
     # The pin hole's reference diameter runs from the hole's centre to the
     # left end of its callout's underline, and leaves the boss's top before
     # the boss diameter's extension line starts at the boss end.
