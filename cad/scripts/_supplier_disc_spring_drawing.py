@@ -150,8 +150,8 @@ def _size_text_move(
     over the plan centre. A height's offset text goes a clear gap beyond its
     own dimension line, witnesses and arrows (the washer thickness pattern).
     The application gauge cell has no room beside its wide planes for a
-    stacked callout, so its text runs along its own dimension line to just
-    over the highest plane's arrow.
+    stacked callout, so its text sits over the highest plane's arrow,
+    centred on its own dimension line.
     """
     reader = _Reader(adapter)
     record = _dump_annotation(reader, display.GetAnnotation())
@@ -197,16 +197,14 @@ def place_disc_size_texts(
     """Move each size text off every line it would sit on.
 
     Plan diameters take one near-side arrow (no line through the shared
-    centre, so concentric leaders cannot cross). Thin edge-view heights take
-    native offset text, which keeps the dimension line at its station and
-    lets the position write move only the text. A gauge height's text moves
-    along its own line instead: an offset connector to the gap between its
-    outside arrows ended in mid-air.
+    centre, so concentric leaders cannot cross). Heights take native offset
+    text, which keeps the dimension line at its station and lets the
+    position write move only the text.
     """
     for key, semantic, display in placed:
         if key == "free_top":
             set_near_side_diameter(display.GetAnnotation(), f"{label} {semantic}")
-        elif key != "free_right":
+        else:
             display.OffsetText = True
     rebuild_drawing(adapter, label=f"{label} disc size styles")
     for key, semantic, display in placed:
