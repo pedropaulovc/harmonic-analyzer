@@ -164,6 +164,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_mm=PIN_DIA,
         presentation="diameter",
         fraction_denominator=PIN_DIA_FRACTION_DENOMINATOR,
+        callout="STOCK, AS SUPPLIED",
     )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pin end view")
