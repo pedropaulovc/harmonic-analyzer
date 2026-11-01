@@ -292,7 +292,7 @@ def test_feed_block_nut_seat_closes_on_the_leadscrew_axis() -> None:
     ))
     assert bore[2] == pytest.approx(leadscrew.SCREW_AXIS_Z)
     assert feed_block.NUT_FACE_X == feed_block.LUG_X0
-    assert feed_block.NUT_SPIGOT_DEPTH == leadscrew_nut.SPIGOT_LENGTH
+    assert feed_block.NUT_RECESS_DEPTH > leadscrew_nut.SPIGOT_LENGTH
     assert feed_block.NUT_SEAT_DIA > leadscrew_nut.BODY_DIA
     assert feed_block.SCREW_TAP_DEPTH == leadscrew.NUT_SCREW_TAP_DEPTH
     assert len(feed_block.NUT_HOLES_YZ) == 4
@@ -1192,7 +1192,7 @@ FASTENER_TABLE = {
         pivot_block.SCREW_LENGTH - pivot_block.CBORE_FLOOR - pivot_block.CARRIAGE_THREAD_DEPTH,
     ),
     "KP08_TO_BRACKET": ("#6-32 X 5/8 SHCS", 4, 10.875, -14.525),
-    "NUT_TO_FEED_BLOCK": ("#4-40 X 1/2 BHCS", 4, 9.2, -0.8),
+    "NUT_TO_FEED_BLOCK": ("#4-40 X 1/2 BHCS", 4, 9.2, 9.2 - feed_block.SCREW_TAP_DEPTH),
     # The 5/8 screw past the riser grip (its head seated in the countersink);
     # the tip stops inside the carrier's THRU tap.
     "RISER_TO_CARRIER": (

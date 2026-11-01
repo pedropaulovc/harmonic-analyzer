@@ -168,9 +168,9 @@ NUT_SCREW_ENGAGEMENT = NUT_SCREW_LENGTH_MM - NUT_SCREW_GRIP  # 9.2 nominal
 NUT_SCREW_FULL_THREAD_MIN = full_thread_min(
     NUT_SCREW_LENGTH, NUT_SCREW_GRIP, NUT_SCREW
 )  # 7.236, 2.54 D
-# The longest screw (B18.3: never long) on the flange's nominal stops 0.8
-# inside TL-32's full thread.
-NUT_SCREW_TAP_DEPTH = NUT_SCREW_ENGAGEMENT + 0.8  # full thread: 10.0
+# The longest screw (B18.3: never long) on the flange's nominal stops .028
+# inside TL-32's full thread, printed at .XX.
+NUT_SCREW_TAP_DEPTH = 9.906  # .39 full thread
 # KP08 pillow block. Verified: axis height, bolt spacing, length, height, bore.
 KP08_AXIS_HEIGHT = 15.0
 KP08_BOLT_SPACING = 42.0
