@@ -262,7 +262,7 @@ SIDE_KEEP = {
     # the right arrow's tail (layout audit of 467913370: lower, the tail
     # crossed the leader; arrows inside read as a valueless dimension --
     # machinist review of 73164fd46).
-    "PinionPinHoleDia": (_sheet_x(PINION_PIN_STATION_Y) - 0.013, 0.2139),
+    "PinionPinHoleDia": (_sheet_x(PINION_PIN_STATION_Y) - 0.013, 0.2145),
 }
 # A dragged diameter prints its dimension line at the requested X with the
 # text running to its RIGHT (run 20260923T030252135Z-49e46990).  Its
@@ -431,7 +431,7 @@ PINION_PIN_LEADER_LANDING = (PINION_PIN_X + 0.0020, SIDE_CENTER[1] + 0.00055)
 # High in its field (top row ~4.5 mm under the border), so the right neck's
 # Ø9.5 and the Ø9.000's block stand under it, and its leader to the hole
 # passes right of the Ø9.000's block.
-PINION_PIN_NOTE_XY = (0.269, 0.264)
+PINION_PIN_NOTE_XY = (0.273, 0.264)
 PINION_PIN_NOTE_FIELD = (
     HOLE_CALLOUT_XY[0] + 0.032,
     SIDE_CENTER[1],

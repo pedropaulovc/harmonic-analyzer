@@ -587,7 +587,7 @@ PIN_HOLE_PROCESS = "\n".join(
 # RADIAL: the shaft's side view sees the clocked hole's saddle rim off the
 # axis (machinist review of 467913370 read it as an offset hole).
 CRANKSHAFT_PIN_HOLE_PROCESS = pin_hole_note(
-    PINION_NUMBER, "RADIAL AT ITS BOSS MID-LENGTH"
+    PINION_NUMBER, "RADIAL, AT BOSS MID-LENGTH"
 ).replace("\nREAM TO FIT PIN ", " REAM TO FIT\nPIN ")
 
 # No roughness symbol: the bore is pinned to the crankshaft (match-drilled
