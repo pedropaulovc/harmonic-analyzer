@@ -839,13 +839,14 @@ def test_final_stock_set_screw_references_accept_an_unlabelled_native_length(mon
         options = dict(options)
         options.pop("expected_degrees", None)
         options.setdefault("fraction_denominator", None)
-        _presentation(**options)
+        _presentation(_adapter, **options)
         checked[options["label"]] = options["callout"]
 
     monkeypatch.setattr(drawing, "assert_supplier_reference_dimension", check_presentation)
-    drawing._assert_stock_references(
-        SimpleNamespace(), {"title"}, identities, {"side", "end", "iso"},
-    )
+    mm_sheet = SimpleNamespace(currentModel=SimpleNamespace(Extension=SimpleNamespace(
+        GetUserPreferenceInteger=lambda _preference, _option: 0,  # swMM
+    )))
+    drawing._assert_stock_references(mm_sheet, {"title"}, identities, {"side", "end", "iso"})
     assert checked == {
         "stock set-screw ScrewLength": None,
         "stock set-screw ScrewMajorDia": spec.SET_SCREW_THREAD,

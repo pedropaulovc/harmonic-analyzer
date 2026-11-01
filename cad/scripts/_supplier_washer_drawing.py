@@ -24,6 +24,7 @@ from _drawing_layout_audit import _Reader, _dump_annotation
 from _layout_audit import display_box
 from _supplier_dimensions import (
     assert_supplier_reference_dimension,
+    sheet_units,
     supplier_reference_dimension,
 )
 from _supplier_screw_layout import supplier_top_text_geometry
@@ -305,7 +306,8 @@ def assert_supplier_washer_dimensions(
         )
     assert_supplier_washer_references(
         adapter, model, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm,
-        thickness_mm=thickness_mm, units=units, precision=precision,
+        thickness_mm=thickness_mm, units=units, sheet_units=sheet_units(adapter),
+        precision=precision,
         bands=bands, bore_callout=next(
             reference.callout for reference in references if reference.label == BORE_DIAMETER
         ),
@@ -331,9 +333,10 @@ def supplier_washer_dimensions(
     assert_supplier_washer_body(
         model, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm, thickness_mm=thickness_mm,
     )
+    sheet = sheet_units(adapter)
     assert_supplier_washer_references(
         adapter, model, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm,
-        thickness_mm=thickness_mm, units=units, precision=precision,
+        thickness_mm=thickness_mm, units=units, sheet_units=sheet, precision=precision,
         bands=bands, bore_callout=bore_callout,
     )
     face = views["*Top" if axis == "y" else "*Front"]
@@ -384,7 +387,7 @@ def supplier_washer_dimensions(
             )
     assert_supplier_washer_references(
         adapter, model, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm,
-        thickness_mm=thickness_mm, units=units, precision=precision,
+        thickness_mm=thickness_mm, units=units, sheet_units=sheet, precision=precision,
         bands=bands, bore_callout=bore_callout,
     )
     unbanded = tuple(label for label in (OUTER_DIAMETER, BORE_DIAMETER) if label not in bands)
