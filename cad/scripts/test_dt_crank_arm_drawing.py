@@ -136,8 +136,8 @@ def test_assembly_keeps_common_face_and_established_inboard_stations() -> None:
     assert drive.CRANK_FACE_Z == -183.0
     assert drive.CRANKSHAFT_Z0 == drive.CRANK_HUB_Z0 == drive.CRANK_ARM_Z0 == -183.0
     assert drive.CRANK_ARM_ORIGIN_Z == pytest.approx(-183.0 + spec.ARM_THICKNESS)
-    # MHA-DT-09 stands the hub's .22 station behind the arm shoulder.
-    assert drive.CRANK_PIN_Z == pytest.approx(-183.0 + 7.9375 + 5.588)
+    # MHA-DT-09 stands at the hub's .53 station from its faced outboard end.
+    assert drive.CRANK_PIN_Z == pytest.approx(-183.0 + 13.462)
     # The hub rear reaches the removable: the .990 hub's 0.754 air to its
     # front face.
     assert drive.CRANK_HUB_REAR_Z == pytest.approx(-183.0 + 25.146)

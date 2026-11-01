@@ -31,6 +31,20 @@ hours_actual: 0
 - Depth of cut and feed on slender work; the finishing pass
 - Tapers: tailstock offset, taper attachment, compound
 
+## Controlled mistakes
+
+Make each on scrap first, under the
+[rules](README.md#the-twist-break-it-on-purpose-first), then do it right and
+compare.
+
+- **No steady.** Take a light pass along a 20:1 scrap rod between centres
+  without a steady. Measure the barrel or taper along it, then add the steady
+  and repeat.
+- **Tailstock too tight.** Run a pass with the tailstock centre over-tight and
+  feel the rod warm and bow. Then set it right.
+- **Steady jaws over-tight.** Close the steady too hard on scrap and look at
+  the marks it leaves.
+
 ## Now make — the real part this unlocks
 
 **`ch-pivot-shaft`** (Ø6.35 × 203.2, L/D 32:1) and **`ch-fulcrum-shaft`** (Ø6.35 × 182, 29:1). Then, when M02-M05 are all solid, the **`dt-cone-gear-shaft`** — five steps ending in a Ø0.79 × 33.6 mm (1/32 in) terminal land in steel, 42:1.

@@ -105,9 +105,16 @@ def _chain_sheet(
         (0.001, -chain_stock.ROLLER_DIAMETER / 2000),
         (0.001 + 2 * chain_stock.PITCH / 1000, chain_stock.ROLLER_DIAMETER / 2000),
     )
+    # The TOP ink: the roller outline alone, or roller to pin outline (three
+    # pitches across), whose pin length sets the height.
+    top_width, top_height = (
+        (3 * chain_stock.PITCH, chain_stock.CONNECTING_PIN_LENGTH)
+        if connecting
+        else (chain_stock.ROLLER_DIAMETER, chain_stock.ROLLER_WIDTH)
+    )
     views["free_top"].source_points = (
-        (0.002, -chain_stock.PLATE_THICKNESS / 1000),
-        (0.002 + chain_stock.ROLLER_WIDTH / 1000, chain_stock.PLATE_THICKNESS / 1000),
+        (0.002, -top_height / 2000),
+        (0.002 + top_width / 1000, top_height / 2000),
     )
     for view in views.values():
         view.Position = position
@@ -309,14 +316,17 @@ def test_chain_annotation_positions_follow_source_ink_not_stale_outline(
         ),
     }
     top_left = x + 0.002 * ratio
-    top_right = top_left + chain_stock.ROLLER_WIDTH / 1000 * ratio
+    top_right = top_left + (
+        3 * chain_stock.PITCH if connecting else chain_stock.ROLLER_DIAMETER
+    ) / 1000 * ratio
+    plate_span_x = top_left + chain_stock.PITCH / 1000 * ratio
     expected_top = {chain_stock.WIDTH_DIMENSION: (top_left - 0.014, y)}
     if connecting:
         expected_top.update(
             {
                 chain_stock.PLATE_DIMENSION: (
-                    (top_left + top_right) / 2,
-                    y + chain_stock.PLATE_THICKNESS / 1000 * ratio + 0.008,
+                    plate_span_x - 0.003,
+                    y + chain_stock.CONNECTING_PIN_LENGTH / 2000 * ratio + 0.004,
                 ),
                 chain_stock.LENGTH_DIMENSION: (top_right + 0.020, y),
             }
@@ -325,23 +335,46 @@ def test_chain_annotation_positions_follow_source_ink_not_stale_outline(
         assert set(views[key].dimension_positions) == set(expected)
         for name, xy in expected.items():
             assert views[key].dimension_positions[name] == pytest.approx(xy)
+    if connecting and ratio == 2.0:
+        # At the 2:1 fit the shelved two-row plate REF (about 8 mm tall, 16 mm
+        # wide, centred 10 mm left of its line) sits above the roller outline,
+        # short of the roller-width line, inside a 40 mm cell centred on the ink;
+        # its line stands clear left of the plate outline it measures.
+        plate_x, plate_y = views["free_top"].dimension_positions[
+            chain_stock.PLATE_DIMENSION
+        ]
+        assert plate_y - 0.004 > y + chain_stock.ROLLER_WIDTH / 2000 * ratio + 0.001
+        assert plate_y + 0.004 < y + 0.020
+        assert plate_x - 0.010 - 0.008 > top_left - 0.014 + 0.002
+        assert plate_x < plate_span_x
     assert not views["installed_iso"].dimension_positions
     settled()
     assert all(view.outline_calls == 0 for view in views.values())
 
 
-def test_chain_roller_width_shelves_text_without_moving_its_native_line(monkeypatch):
+@pytest.mark.parametrize("connecting", [False, True])
+def test_chain_top_shelves_text_without_moving_native_lines(monkeypatch, connecting):
     views, settled = _chain_sheet(
-        monkeypatch, connecting=False, scale=(5.0, 1.0)
+        monkeypatch, connecting=connecting, scale=(5.0, 1.0)
     )
-    annotation = views["free_top"].annotations[0]
-    line = views["free_top"].dimension_positions[chain_stock.WIDTH_DIMENSION]
-    assert annotation.display.OffsetText is True
-    assert annotation.line_position == pytest.approx((*line, 0.0))
-    assert annotation.position == pytest.approx((line[0] - 0.024, line[1], 0.0))
+    top = views["free_top"]
+    by_name = {
+        annotation.display.native.FullName.split("@")[0]: annotation
+        for annotation in top.annotations
+    }
+    shelves = {chain_stock.WIDTH_DIMENSION: -0.024}
+    if connecting:
+        shelves[chain_stock.PLATE_DIMENSION] = -0.010
+        shelves[chain_stock.LENGTH_DIMENSION] = 0.024
+    for name, dx in shelves.items():
+        annotation = by_name[name]
+        line = top.dimension_positions[name]
+        assert annotation.display.OffsetText is True
+        assert annotation.line_position == pytest.approx((*line, 0.0))
+        assert annotation.position == pytest.approx((line[0] + dx, line[1], 0.0))
     settled()
-    annotation.display.OffsetText = False
-    with pytest.raises(RuntimeError, match="roller width text returned"):
+    by_name[chain_stock.WIDTH_DIMENSION].display.OffsetText = False
+    with pytest.raises(RuntimeError, match="text returned to its native dimension line"):
         settled()
 
 
@@ -357,6 +390,38 @@ def test_chain_top_fit_lane_accommodates_five_to_one_source_gauge():
     available_height = top[3] - top[1]
     assert chain_stock.ROLLER_WIDTH / 1000 * 5 < available_height
     assert chain_stock.ROLLER_WIDTH / 1000 * 8 > available_height
+
+
+def test_chain_top_roller_square_projects_over_front_roller_circle():
+    import draw_sh_vn_chain_link as chain_drawing
+
+    cells = {
+        name: center
+        for name, center, _box in supplier_drawing.supplier_fit_cells(
+            supplier_drawing.supplier_state_cells(0.08, maximum=False),
+            chain_drawing._CHAIN_SUPPLIER_MARGINS,
+            label="chain reference",
+        )
+    }
+    # Each diagram's ink is centred in its cell: FRONT runs pin left edge to
+    # roller right edge, TOP is the roller square alone (both at 5:1).
+    front_ink_centre = (
+        -chain_stock.PIN_DIAMETER / 2 + chain_stock.PITCH + chain_stock.ROLLER_DIAMETER / 2
+    ) / 2
+    roller_x = cells["free_front"][0] + (chain_stock.PITCH - front_ink_centre) / 1000 * 5
+    assert cells["free_top"][0] == pytest.approx(roller_x)
+
+
+def test_connecting_link_top_fit_lane_accommodates_two_to_one_pin_length():
+    cells = supplier_drawing.supplier_fit_cells(
+        supplier_drawing.supplier_state_cells(0.08, maximum=False),
+        chain_dimensions.SUPPLIER_MARGINS,
+        label="connecting link reference",
+    )
+    top = next(box for name, _center, box in cells if name == "free_top")
+    available_height = top[3] - top[1]
+    assert chain_stock.CONNECTING_PIN_LENGTH / 1000 * 2 < available_height
+    assert chain_stock.CONNECTING_PIN_LENGTH / 1000 * 4 > available_height
 
 
 def test_wire_nominal_cannot_be_read_from_the_installed_envelope(monkeypatch):
@@ -385,3 +450,46 @@ def test_wire_nominal_cannot_be_read_from_the_installed_envelope(monkeypatch):
             DIA,
             label="supplier wire circle",
         )
+
+
+def test_chain_outline_formats_every_segment_under_one_counted_span(monkeypatch):
+    calls = []
+    selected = []
+
+    class Segment:
+        def Select4(self, append, _data):
+            if not append:
+                selected.clear()
+            selected.append(self)
+            return True
+
+    sketches = {"Front": [Segment(), Segment()], "Sections": [Segment()] * 4}
+    part = SimpleNamespace(
+        FeatureByName=lambda name: SimpleNamespace(
+            GetSpecificFeature2=lambda: SimpleNamespace(
+                GetSketchSegments=lambda: sketches[name]
+            )
+        )
+    )
+    draw = SimpleNamespace(
+        SelectionManager=SimpleNamespace(
+            CreateSelectData=SimpleNamespace,
+            GetSelectedObjectCount2=lambda _mark: len(selected),
+        ),
+        ClearSelection2=lambda _all: selected.clear(),
+        SetLineColor=lambda color: calls.append(("color", color, len(selected))),
+        SetLineWidth=lambda width: calls.append(("width", width, len(selected))),
+    )
+    view = SimpleNamespace(ReferencedDocument=part, GetCorresponding=lambda raw: raw)
+    span = {}
+    monkeypatch.setattr(chain_dimensions, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(
+        chain_dimensions._telemetry, "annotate", lambda **attrs: span.update(attrs)
+    )
+
+    chain_dimensions._format_as_outline(
+        SimpleNamespace(currentModel=draw), view, ("Front", "Sections")
+    )
+
+    assert [count for *_, count in calls] == [2, 2, 4, 4]
+    assert span == {"sketches": 2, "segments": 6}

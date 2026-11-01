@@ -44,6 +44,16 @@ REFERENCE_SKETCHES = (
 )
 
 
+def _reference_suffix(source: SupplierPinReference) -> str:
+    """As _supplier_dimensions: an inch sheet already reads UNIT: IN.
+
+    The drawing shares this model-owned text, so the package's sheet unit
+    names it, not a document's: a millimetre part keeps its template's units,
+    which read inches on one farm seat and millimetres on another (98296A031).
+    """
+    return ")" if source.units == "in" and source.sheet_unit == "in" else f" {source.units})"
+
+
 def _reference_contract(
     source: SupplierPinReference, feature: str
 ) -> tuple[str, dict[str, Any], tuple[float, float, int] | None]:
@@ -210,7 +220,7 @@ def assert_supplier_pin_model_reference(
         ("override", lambda: bool(display.GetOverride()), False),
         ("show_native_value", lambda: bool(display.ShowDimensionValue), True),
         ("prefix", lambda: str(display.GetText(1) or ""), prefix),
-        ("suffix", lambda: str(display.GetText(2) or ""), f" {source.units})"),
+        ("suffix", lambda: str(display.GetText(2) or ""), _reference_suffix(source)),
         ("below_callout", lambda: str(display.GetText(4) or ""), kwargs["callout"] or ""),
     )
     for field, read, expected in presentation_fields:
@@ -299,7 +309,7 @@ def _finish_reference(
         raise RuntimeError(f"{source.sku}: {name} source primary/tolerance precision was rejected")
     display.ShowParenthesis = False
     display.SetText(1, "(<MOD-DIAM>" if kwargs["presentation"] == "diameter" else "(")
-    display.SetText(2, f" {source.units})")
+    display.SetText(2, _reference_suffix(source))
     display.SetText(4, kwargs["callout"] or "")
     mark_dimensions_for_drawing(adapter, feature, {name})
     assert_supplier_pin_model_reference(

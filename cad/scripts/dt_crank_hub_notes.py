@@ -27,6 +27,7 @@ def inch_text(value_mm: float, places: int) -> str:
     """``value_mm`` as the inch sheet prints it, without a leading zero."""
     return f"{value_mm / MM_PER_IN:.{places}f}".removeprefix("0")
 
+
 def seat_callout(mate: str, name: str = "CRANK ARM") -> str:
     """Hub-seat fit on MHA-DT-31, turned second to press into ``mate``'s bore.
 
@@ -34,14 +35,16 @@ def seat_callout(mate: str, name: str = "CRANK ARM") -> str:
     face is the acceptance, naming both faces (machinist review: FACES FLUSH
     named neither); how the hub gets there (an arbor press) is a method, so
     the sheet does not say it.  ``name`` is the mate's part name, printed with
-    its number (rule 4; r7 review of farm run 20261101T022045634Z).
+    its number (rule 4; r7 review of farm run 20261101T022045634Z).  The bore
+    is the arm's, said so on the first line: on a turned OD, "BORE FOR LIGHT
+    PRESS" read as this part's bore (review of farm run 20261101T081735465Z).
     """
     low, high = SEAT_PRESS_INTERFERENCE
     return "\n".join(
         (
-            f"TURN TO SUIT {name} {mate}",
-            f"BORE FOR LIGHT PRESS: {inch_text(low, 4)}-{inch_text(high, 4)}",
-            "DIAMETRAL INTERFERENCE;",
+            f"TURN TO SUIT BORE OF {name}",
+            f"{mate} FOR LIGHT PRESS:",
+            f"{inch_text(low, 4)}-{inch_text(high, 4)} DIAMETRAL INTERFERENCE;",
             f"END FLUSH WITH {name} FRONT",
         )
     )
@@ -54,14 +57,15 @@ def seat_bore_callout(mate: str) -> str:
     )
 
 
-def seam_callout(mate: str, pin: str = "AXIAL PIN MHA-DT-VN-59") -> str:
+def seam_callout(mate: str, pin: str = "SEAM PIN MHA-DT-VN-59") -> str:
     """MHA-DT-VN-59 seam, match-drilled with ``mate``: size first, then the process.
 
     ``mate`` and ``pin`` name the parts by name and number (rule 4; MHA-DT-06
-    machinist review, 2026-09-29).  The blind pin makes hub and arm a
-    permanent pair, serviced at the MHA-DT-09 taper pin (owner ruling
-    2026-11-01, machinist review: no knockout).  The depth only has to take
-    the cut pin, so it prints at the title block's .XX.
+    machinist review, 2026-09-29; review of farm run 20261101T081735465Z:
+    SEAM PIN says what the pin is).  The blind pin makes hub and arm a
+    permanent pair, taken apart at the MHA-DT-09 taper pin (owner rulings
+    2026-11-01; r9 review: say it plainly).  The depth only has to take the
+    cut pin, so it prints at the title block's .XX.
     """
     return "\n".join(
         (
@@ -69,7 +73,7 @@ def seam_callout(mate: str, pin: str = "AXIAL PIN MHA-DT-VN-59") -> str:
             " ON SEAM, MATCH-DRILL/REAM",
             f"WITH {mate} AT ASSEMBLY;",
             f"{pin} LIGHT DRIVE FIT;",
-            "PERMANENT PAIR; SERVICE AT MHA-DT-09",
+            "PERMANENT PAIR; DISASSEMBLE AT MHA-DT-09",
         )
     )
 
@@ -85,9 +89,16 @@ BORE_CALLOUT = (
 # it, so its nominal prints as a reference under the match-fit callout.
 SEAT_CALLOUT = seat_callout("MHA-DT-06")
 SEAM_CALLOUT = seam_callout("CRANK ARM MHA-DT-06")
+# The seat length is the arm's thickness as made, not a turned size: the
+# seat end finishes flush with the arm, so the arm shoulder is wherever the
+# arm puts it (owner ruling 2026-11-01; r9 review: a toleranced seat length
+# read against the flush condition).  Its nominal prints as a reference over
+# this.
+SEAT_LENGTH_CALLOUT = "TO SUIT\nCRANK ARM,\nEND FLUSH"
 # The cross-hole is drilled, then taper-reamed through hub and shaft together
 # at assembly.  The ream fixes the hub on the shaft for good, so the front
-# face -- the seat end, named on the sheet -- is set flush
+# face -- the crank-arm end, named on the sheet by what it carries (review of
+# farm run 20261101T111956470Z: SEAT END named no face) -- is set flush
 # with the crankshaft's dome root first -- the crank face, CRANK_FACE_Z, where
 # the 3/8 in cylinder meets the dome; the dome stands proud of the hub (the
 # arm front is already flush with the hub front from the seat press).  The
@@ -99,7 +110,7 @@ SEAM_CALLOUT = seam_callout("CRANK ARM MHA-DT-06")
 FRONT_FACE_DATUM = "MHA-DT-11 DOME ROOT"
 CROSS_HOLE_CALLOUT = "\n".join(
     (
-        "SEAT END FLUSH WITH CRANKSHAFT",
+        "CRANK-ARM END FLUSH WITH CRANKSHAFT",
         "MHA-DT-11 DOME ROOT; AT ASSEMBLY,",
         "MATCH TAPER-REAM 1:48 WITH IT FOR",
         "TAPER PIN MHA-DT-09: LIGHT DRIVE FIT",
@@ -109,15 +120,17 @@ if FRONT_FACE_DATUM not in " ".join(CROSS_HOLE_CALLOUT.split()):
     raise AssertionError("the cross-hole callout no longer names the hub datum")
 # A deeper ream seats the driven pin deeper, so its big end's MIN proud
 # limits the ream (machinist review: the acceptance read apart from it).  The
-# end view draws that big end in phantom; the callout names it, the pin and
-# the keeper ring whose hole must clear the barrel (r7 review of farm run
+# end view outlines that big end (dashed, the view's own line style: the
+# review of farm run 20261101T130334243Z read "(PHANTOM)" against it, so
+# the callout names no line type); the callout names it, the pin and the
+# keeper ring whose hole must clear the barrel (r7 review of farm run
 # 20261101T022045634Z: an unnamed dashed box, an unnamed ring).
 PIN_PROUD_CALLOUT = "\n".join(
     (
-        "MHA-DT-09 TAPER PIN BIG END",
-        "(PHANTOM), DRIVEN; LIMITS",
-        "TAPER-REAM DEPTH; KEEPER RING",
-        "MHA-DT-27 HOLE CLEARS BARREL",
+        "MHA-DT-09 TAPER PIN BIG END,",
+        "DRIVEN; LIMITS TAPER-REAM",
+        "DEPTH; KEEPER RING MHA-DT-27",
+        "HOLE CLEARS BARREL",
     )
 )
 

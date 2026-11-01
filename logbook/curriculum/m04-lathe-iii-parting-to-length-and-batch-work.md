@@ -31,6 +31,21 @@ hours_actual: 0
 - Batch discipline: one setup, one session, no mid-run tool changes
 - Recovering (or not) from an undersize part
 
+## Controlled mistakes
+
+Make each on scrap first, under the
+[rules](README.md#the-twist-break-it-on-purpose-first), then do it right and
+compare.
+
+- **Parting tool above centre.** Part scrap at low speed with the blade a
+  little high and look at the pip and the rubbing. A blade below centre can dig
+  in and climb over the work, so that one is described, not staged.
+- **No length stop.** Part five scrap bushings by eye and the DRO, then five
+  against the collet stop. Measure both sets and compare the spreads.
+- **Add up parts instead of measuring the stack.** Sum the five single
+  measurements, then stack the five and measure the stack. The difference is a
+  preview of how error builds up over nineteen.
+
 ## Now make — the real part this unlocks
 
 The full sets: **19× `pivot-bushing` at 4.5565 mm** and **19× `lever-bushing` at 4.0565 mm**. Do not mix the sets.

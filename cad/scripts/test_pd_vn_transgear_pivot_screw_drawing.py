@@ -1176,6 +1176,7 @@ def _saved_physical_fixture(monkeypatch, tmp_path):
     monkeypatch.setattr(drawing, "SOURCE", tmp_path / "pivot.SLDPRT")
     _attach_stock_fixture(state)
     monkeypatch.setattr(supplier, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(supplier, "sheet_units", lambda _adapter: "mm")  # an mm sheet
     path = tmp_path / "pivot.SLDDRW"
     path.touch()
     state.path = path.resolve()

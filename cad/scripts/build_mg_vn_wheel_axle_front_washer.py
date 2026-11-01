@@ -22,6 +22,7 @@ from functools import wraps
 import math
 import sys
 
+from _part_properties import part_drawing_unit
 from _session import run_build
 from _sketch import blank_reference_sketches
 from _fastener_catalog import fastener
@@ -46,6 +47,7 @@ async def _build_with_supplier_references(adapter, truth=None):
     await author_supplier_washer_references(
         adapter, axis="z", bore_mm=part.ID, outer_mm=part.OD,
         thickness_mm=part.MODEL_THICKNESS, units=part.SUPPLIER_UNITS,
+        sheet_units=part_drawing_unit(PART_NAME),
         precision=part.DRAWING_REFERENCE_PRECISION, bands=part.SUPPLIER_TOLERANCES,
         bore_callout=part.SUPPLIER_BORE_CALLOUT,
     )

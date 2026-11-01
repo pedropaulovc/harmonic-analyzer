@@ -9,6 +9,7 @@ from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -25,6 +26,7 @@ from _drawing_common import (
 from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,
+    set_reference_dimension,
     set_reference_dimensions,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
@@ -47,6 +49,7 @@ from dt_crank_hub_notes import (
     RELIEF_LENGTH_CALLOUT,
     SEAM_CALLOUT,
     SEAT_CALLOUT,
+    SEAT_LENGTH_CALLOUT,
 )
 from dt_crank_hub_spec import (
     AXIAL_PIN_DIA,
@@ -124,12 +127,15 @@ BARREL_BOTTOM = _sheet_y(HUB_BARREL_DIA / 2.0)
 # inside its circle sees no face (run 20260923T023246758Z-97bfca38).
 BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0.015)
 # Every size and callout sits outside the silhouettes.
-# - Lengths: the seat and the MHA-DT-09 station from the faced outboard end
-#   (the station's ligament to the shoulder is drawing-guidelines.md rule 17
-#   (walls and webs)) and the relief from the rear face on
+# - Lengths: the MHA-DT-09 station from the faced outboard end (the
+#   machinist's baseline; its ligament to the shoulder is drawing-guidelines.md
+#   rule 17 (walls and webs)) and the relief from the rear face on
 #   rows below the profile; the toleranced overall, front face to rear
 #   face, on the row below them.  The barrel is the remainder, not printed.
 #   The two banded lengths carry the mate they serve under their text.  The
+#   seat length is a fit-up reference: its value and three-line callout
+#   print right of the outboard end, short of the end view, where the
+#   overall's text below cannot reach them.  The
 #   seat and station row stands above the relief's: the overall's stacked
 #   +/- band reached the shared row's extension lines (farm run
 #   20261031T205208603Z).  The overall's text stands clear under the
@@ -146,7 +152,9 @@ BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0
 #   on the end view (*Bottom turned half a turn), on the horizontal
 #   centreline.  Its value and callout print right of the big end's extension
 #   line, above the bore callout and below the isometric's label.
-_ROW_Y = (0.120, 0.102)
+# The overall's row stands under the seat length's three-line fit-up callout,
+# which hangs right of the outboard end over the overall's text.
+_ROW_Y = (0.120, 0.090)
 _STATION_ROW_Y = _ROW_Y[0] + 0.006
 END_KEEP = {
     "BoreDia": (END_CENTER[0] + 0.070, END_CENTER[1] - 0.020),
@@ -158,6 +166,10 @@ END_KEEP = {
     # big end (x <= END_CENTER + 31.2 mm).
     "PinProud": (END_CENTER[0] + 0.072, END_CENTER[1] + 0.014),
 }
+# The seat length is a fit-up reference (the seat is turned to suit the arm,
+# end flush; owner ruling 2026-11-01 on the r9 review), so nothing chains
+# through it: the cross-hole station prints from the faced outboard end.
+REFERENCE_LENGTHS = ("SeatLength",)
 # The hub's half of the seam is the arc bulging from the seat edge toward the
 # bore; the callout attaches 45 degrees up its right flank.
 SEAM_CENTER = (END_CENTER[0], END_CENTER[1] - AXIAL_PIN_RADIUS_FROM_AXIS * _S)
@@ -170,8 +182,10 @@ SEAM_EDGE_PICK = (
 # far end and crossed both its own text and the bore leader (run a2e1cd67).
 SEAM_CALLOUT_XY = (0.303, 0.105)
 SIDE_KEEP = {
-    "SeatLength": ((OUTBOARD_X + SHOULDER_X) / 2.0, _STATION_ROW_Y),
-    # The station from the same faced end, on its own row under the seat's
+    # Right of the seat diameter's dimension line (OUTBOARD_X + 0.020), which
+    # crossed its text there (farm run 20261101T074739942Z).
+    "SeatLength": (OUTBOARD_X + 0.029, _STATION_ROW_Y),
+    # The station from the faced outboard end, on its own row under the seat's
     # (machinist review of the inch sheet: no chain through the shoulder).
     "ServicePinStation": ((OUTBOARD_X + SERVICE_PIN_CENTER[0]) / 2.0, 0.113),
     # The toleranced .990 and its two-line callout fill the span between its
@@ -192,6 +206,7 @@ ISO_NOTE_XY = (0.345, 0.195)
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "SeatDia": SEAT_CALLOUT,
+    "SeatLength": SEAT_LENGTH_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
     "ReliefLength": RELIEF_LENGTH_CALLOUT,
     "PinProud": PIN_PROUD_CALLOUT,
@@ -202,7 +217,7 @@ def _set_callout_below(display: Any, text: str, label: str) -> None:
     """Put the matched-operation prose UNDER a native hole callout.
 
     The drill size reads first, in the order the work is done; the fit and
-    mate prose follows in the callout-below compartment (the Ø9.550 bore
+    mate prose follows in the callout-below compartment (the Ø9.55 bore
     callout's order).  ``SetText`` reports nothing, so it is read back.
     """
     display = _early_bound(display, "IDisplayDimension")
@@ -210,6 +225,7 @@ def _set_callout_below(display: Any, text: str, label: str) -> None:
     applied = str(display.GetText(4) or "")
     if applied.replace("\r", "") != text:
         raise RuntimeError(f"{label}: callout-below text did not persist: {applied!r}")
+
 
 
 
@@ -289,6 +305,13 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_reference_dimensions(adapter, annotations, REFERENCE_DIMENSIONS)
+    for name in REFERENCE_LENGTHS:
+        matches = [a for a in annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"expected one crank-hub {name} dimension, got {len(matches)}"
+            )
+        set_reference_dimension(adapter, matches[0], label=f"crank hub {name}")
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to crank-hub end view")

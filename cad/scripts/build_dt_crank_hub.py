@@ -67,6 +67,7 @@ from dt_crank_hub_spec import (
     HUB_SEAT_LENGTH,
     ISOMETRIC_VIEW_NOTE,
     PIN_PROUD_MIN_BAND,
+
     SERVICE_PIN_HOLE_SPEC,
     SERVICE_PIN_STATION,
     SURFACE_FINISHES,

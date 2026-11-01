@@ -40,9 +40,14 @@ SOURCE_DIMENSIONS = {
 }
 
 
+def _suffix(units: Literal["in", "mm"], sheet_units: Literal["in", "mm"]) -> str:
+    """As _supplier_dimensions: an inch sheet's UNIT: IN already names inches."""
+    return ")" if units == sheet_units == "in" else f" {units})"
+
+
 def _assert_supplier_washer_presentation(
     display: Any, *, label: str, units: Literal["in", "mm"],
-    precision: int, expected_mm: float, callout: str | None,
+    sheet_units: Literal["in", "mm"], precision: int, expected_mm: float, callout: str | None,
 ) -> None:
     """Read model-owned ink without assuming a visible drawing-view owner."""
     display = _early_bound(display, "IDisplayDimension")
@@ -67,7 +72,7 @@ def _assert_supplier_washer_presentation(
         or display.GetOverride()
         or not display.ShowDimensionValue
         or str(display.GetText(1) or "") != prefix
-        or str(display.GetText(2) or "") != f" {units})"
+        or str(display.GetText(2) or "") != _suffix(units, sheet_units)
         or str(display.GetText(4) or "") != (callout or "")
     ):
         raise RuntimeError(f"{label}: model supplier units/precision/reference ink changed")
@@ -417,7 +422,7 @@ def assert_supplier_washer_source_attachment(
 
 def _finish_reference(
     adapter: Any, dims: SketchDims, feature: str, labels: tuple[str, ...], *,
-    values: Mapping[str, float], units: Literal["in", "mm"],
+    values: Mapping[str, float], units: Literal["in", "mm"], sheet_units: Literal["in", "mm"],
     precision: Mapping[str, int], bands: Mapping[str, tuple[float, float, str]],
     bore_callout: str | None,
 ) -> None:
@@ -452,10 +457,10 @@ def _finish_reference(
             raise RuntimeError(f"{label}: model supplier precision failed ({status!r})")
         display.ShowParenthesis = False
         display.SetText(1, "(" if label == THICKNESS else "(<MOD-DIAM>")
-        display.SetText(2, f" {units})")
+        display.SetText(2, _suffix(units, sheet_units))
         display.SetText(4, bore_callout if label == BORE_DIAMETER and bore_callout else "")
         _assert_supplier_washer_presentation(
-            display, label=label, units=units, precision=precision[label],
+            display, label=label, units=units, sheet_units=sheet_units, precision=precision[label],
             expected_mm=nominal, callout=bore_callout if label == BORE_DIAMETER else None,
         )
         assert_supplier_washer_band(display, nominal_mm=nominal, band=bands[label],
@@ -467,10 +472,14 @@ def _finish_reference(
 async def author_supplier_washer_references(
     adapter: Any, *, axis: Literal["y", "z"], bore_mm: float,
     outer_mm: float, thickness_mm: float, units: Literal["in", "mm"],
+    sheet_units: Literal["in", "mm"],
     precision: Mapping[str, int], bands: Mapping[str, tuple[float, float, str]],
     bore_callout: str | None = None,
 ) -> None:
-    """Append only banded witnesses after the unchanged +Y stock recipe."""
+    """Append only banded witnesses after the unchanged +Y stock recipe.
+
+    ``sheet_units`` is the part's package drawing unit (part_drawing_unit).
+    """
     if set(bands) not in ({THICKNESS}, {OUTER_DIAMETER, BORE_DIAMETER, THICKNESS}):
         raise ValueError("unsupported washer supplier band coverage")
     assert_supplier_washer_body(adapter.currentModel, axis="y", bore_mm=bore_mm,
@@ -490,7 +499,8 @@ async def author_supplier_washer_references(
         await ensure_fully_defined(adapter, "supplier washer face reference")
         check("exit supplier washer face reference", await adapter.exit_sketch())
         _finish_reference(adapter, dims, FACE_FEATURE, face_labels, values=values, units=units,
-                          precision=precision, bands=bands, bore_callout=bore_callout)
+                          sheet_units=sheet_units, precision=precision, bands=bands,
+                          bore_callout=bore_callout)
     check("create supplier washer thickness reference",
           await adapter.create_sketch("Front" if axis == "y" else "Top"))
     dims = SketchDims()
@@ -505,10 +515,12 @@ async def author_supplier_washer_references(
     await ensure_fully_defined(adapter, "supplier washer thickness reference")
     check("exit supplier washer thickness reference", await adapter.exit_sketch())
     _finish_reference(adapter, dims, THICKNESS_FEATURE, (THICKNESS,), values=values, units=units,
-                      precision=precision, bands=bands, bore_callout=bore_callout)
+                      sheet_units=sheet_units, precision=precision, bands=bands,
+                      bore_callout=bore_callout)
     assert_supplier_washer_references(
         adapter, adapter.currentModel, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm, thickness_mm=thickness_mm,
-        units=units, precision=precision, bands=bands, bore_callout=bore_callout,
+        units=units, sheet_units=sheet_units, precision=precision, bands=bands,
+        bore_callout=bore_callout,
     )
 
 
@@ -516,6 +528,7 @@ async def author_supplier_washer_references(
 def assert_supplier_washer_references(
     adapter: Any, model: Any, *, axis: Literal["y", "z"], bore_mm: float,
     outer_mm: float, thickness_mm: float, units: Literal["in", "mm"],
+    sheet_units: Literal["in", "mm"],
     precision: Mapping[str, int], bands: Mapping[str, tuple[float, float, str]],
     bore_callout: str | None = None,
 ) -> None:
@@ -530,7 +543,7 @@ def assert_supplier_washer_references(
             outer_mm=outer_mm, thickness_mm=thickness_mm,
         )
         _assert_supplier_washer_presentation(
-            display, label=label, units=units, precision=precision[label],
+            display, label=label, units=units, sheet_units=sheet_units, precision=precision[label],
             expected_mm=values[label], callout=bore_callout if label == BORE_DIAMETER else None,
         )
         assert_supplier_washer_band(display, nominal_mm=values[label], band=band,

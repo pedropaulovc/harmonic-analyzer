@@ -139,6 +139,7 @@ HUB_LENGTH = 25.146  # .99
 HUB_LENGTH_TOL = 0.1016  # .004
 HUB_SHOULDER_TO_REAR = HUB_LENGTH - HUB_SEAT_LENGTH
 HUB_BARREL_LENGTH = round(HUB_SHOULDER_TO_REAR - RELIEF_LENGTH, 6)
+
 RELIEF_STATION = round(HUB_LENGTH - RELIEF_LENGTH, 6)
 HUB_SHOULDER_STATION = HUB_SEAT_LENGTH
 
@@ -191,7 +192,6 @@ PHOTO_ARM_TO_HUB_RATIO = PHOTO_ARM / PHOTO_HUB
 # machinist review of the inch sheet): drawing-guidelines.md rule 17 (walls
 # and webs) ligaments below.
 SERVICE_PIN_STATION = 13.462  # .53
-SERVICE_PIN_FROM_SHOULDER = SERVICE_PIN_STATION - HUB_SEAT_LENGTH
 CRANK_FACE_SHIFT = ARM_THICKNESS
 
 # Shared shaft-in-bushing fit class, re-expressed as a bore nominal/band against
@@ -249,13 +249,15 @@ HUB_LENGTH_BAND = (HUB_LENGTH_TOL, -GENERAL_2PL_TOL_MM)
 # drawing-guidelines.md rule 17 (walls and webs) (U27): MHA-DT-09 ream ligaments at the worst case of the printed
 # bands.  The ream never exceeds the pin's big end, which stands proud of the
 # hub.  The ream is placed from the front face by the .XX station; ahead of it
-# the arm shoulder, placed from the same face by the .XX seat length.  Behind
-# it the relief shoulder, which the print places from the front face through
-# the .XX overall and the .XX relief back from the rear face.
+# the arm shoulder, which sits wherever the arm puts it: the seat length is a
+# fit-up reference turned to suit the arm (end flush), so the thickest 5/16
+# stock the mill ships places it.  Behind it the relief shoulder, which the
+# print places from the front face through the .XX overall and the .XX relief
+# back from the rear face.
 SERVICE_PIN_REAM_RADIUS_MAX = SERVICE_PIN_BIG_END_DIA / 2.0
 SERVICE_PIN_SHOULDER_LIGAMENT_WORST_MM = (
     (SERVICE_PIN_STATION - GENERAL_2PL_TOL_MM)
-    - (HUB_SEAT_LENGTH + GENERAL_2PL_TOL_MM)
+    - ARM_STOCK_THICKNESS_MAX
     - SERVICE_PIN_REAM_RADIUS_MAX
 )
 SERVICE_PIN_REAR_LIGAMENT_WORST_MM = (

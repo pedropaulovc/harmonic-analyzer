@@ -39,6 +39,19 @@ hours_actual: 0
 - Draw filing, stoning, polishing brass, blacking steel
 - Matching the original: matte-black rods, bright amplitude bars, black-stained crank handle
 
+## Controlled mistakes
+
+Make each on scrap first, under the
+[rules](README.md#the-twist-break-it-on-purpose-first), then do it right and
+compare.
+
+- **Round the flat.** Deburr a scrap D-bore entry carelessly until the flat
+  rounds, then try it on a shaft flat and feel the rock.
+- **Overheat the joint.** Silver-solder one scrap joint until the flux burns
+  and one at the right heat. Pull both to destruction.
+- **Skip a grit.** Polish scrap brass skipping one grit and another piece
+  through every grit. Compare the scratch patterns.
+
 ## Now make — the real part this unlocks
 
 The **cone gear stack on its D-flat shaft**: the 64T and twenty cone gears slid on flat to flat, touching, with the stack collar locked off a feeler. Silver-solder the `dt-crank-pin-ring` ends. Then finish the `dt-crank-handle` and a `ch-connecting-rod`.

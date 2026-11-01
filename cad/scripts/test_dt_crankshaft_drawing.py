@@ -288,7 +288,7 @@ def test_mha024_station_and_notes_belong_to_hub_and_shaft() -> None:
     assert part.PIN_HOLE_SPEC is spec.PIN_HOLE_SPEC
     assert drawing.PIN_HOLE_SPEC is spec.PIN_HOLE_SPEC
     assert drawing._PIN_HOLE_DIA == blind_cut_dia_mm(spec.PIN_HOLE_SPEC)
-    assert spec.PIN_HOLE_HEIGHT == geometry.SERVICE_PIN_STATION == pytest.approx(13.5255)
+    assert spec.PIN_HOLE_HEIGHT == geometry.SERVICE_PIN_STATION == pytest.approx(13.462)
     # The drill size reads first (the prefix of the native callout); the
     # matched fit, naming both mating parts, reads under it.
     assert spec.CROSS_HOLE_PROCESS == "#9 DRILL"

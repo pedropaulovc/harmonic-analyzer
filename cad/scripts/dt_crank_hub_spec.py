@@ -20,7 +20,6 @@ from dt_crank_hub_geometry import (
     RELIEF_LENGTH,
     RELIEF_LENGTH_TOL,
     RELIEF_STATION,
-    SERVICE_PIN_FROM_SHOULDER,
     SERVICE_PIN_STATION,
     SHAFT_CLEARANCE_MAX,
     SHAFT_CLEARANCE_MIN,
@@ -83,9 +82,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ReliefDia": 2,
     },
     "BoreProfile": {"BoreDia": 4},  # 9.5504, .376 in
-    # Two places from the faced outboard end: with the seat length's .XX, the
-    # band is what keeps the MHA-DT-09 ream's ligament to the arm shoulder
-    # over the rule-17 wall (dt_crank_hub_geometry, drawing-guidelines.md rule 17 (walls and webs)).
+    # Two places from the faced outboard end: the .XX band, with the thickest
+    # arm stock placing the shoulder (the seat length is a fit-up reference),
+    # is what keeps the MHA-DT-09 ream's ligament to the arm shoulder over the
+    # rule-17 wall (dt_crank_hub_geometry, drawing-guidelines.md rule 17 (walls and webs)).
     "ServicePinStationReference": {"ServicePinStation": 2},
     "PinProudReference": {"PinProud": 2},
 }

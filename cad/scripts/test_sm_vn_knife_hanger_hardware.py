@@ -3310,6 +3310,7 @@ def _saved_stud_height_case(monkeypatch, tmp_path):
         bolt_drawing, "assert_supplier_reference_dimension",
         supplier_dimensions.assert_supplier_reference_dimension,
     )
+    monkeypatch.setattr(supplier_dimensions, "sheet_units", lambda _adapter: "mm")
     # Simulate successful native/PDF saves before the pre-close checkpoint.
     # Annotation COM anchors stay identical while actual document/name fields change.
     original_identities = dict(case.identities)
@@ -4344,6 +4345,7 @@ def test_stud_stock_settled_and_saved_census_resolve_fresh_physical_stations(
                 if settings["label"] == "SupplierStockLength" else None
             ),
         )
+        monkeypatch.setattr(supplier_dimensions, "sheet_units", lambda _adapter: "mm")
     elif fault == "band":
         stock.native.Tolerance.Type = 2
     with pytest.raises(RuntimeError):

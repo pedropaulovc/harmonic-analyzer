@@ -32,6 +32,19 @@ hours_actual: 0
 - Backlash in the index: always approach from one direction
 - Co-phasing: making twenty parts share one angular reference
 
+## Controlled mistakes
+
+Make each on scrap first, under the
+[rules](README.md#the-twist-break-it-on-purpose-first), then do it right and
+compare.
+
+- **Index from the wrong direction.** On a scrap disc, take up the backlash on
+  half the divisions and not on the other half. Measure the angular error.
+- **Miscount once.** Set the sector arms one hole wrong for a single division
+  on a test disc and see what one misindex looks like beside the right ones.
+- **Lose the datum.** Unclamp the work, put it back without re-indicating, and
+  measure how far the phase moved.
+
 ## Now make — the real part this unlocks
 
 The **0.4 mm alignment notch** on the `dt-cylinder-gear`s — then prove you can repeat the phase on a second part.

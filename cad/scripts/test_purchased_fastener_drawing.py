@@ -1174,6 +1174,205 @@ def test_isometric_scales_independently(monkeypatch, tmp_path):
     assert scales["*Isometric"] == (1, 1)
 
 
+class _PaddedView(_View):
+    """A view whose native outline is its geometry at scale plus fixed padding."""
+
+    def __init__(self, orientation, source, center, size):
+        super().__init__(orientation, source, center)
+        self._size = size
+
+    @property
+    def Position(self):
+        return self._center
+
+    def GetOutline(self):
+        ratio = self.ScaleRatio[0] / self.ScaleRatio[1]
+        width = self._size[0] * ratio + 0.0112
+        height = self._size[1] * ratio + 0.0112
+        x, y = self._center
+        return (x - width / 2, y - height / 2, x + width / 2, y + height / 2)
+
+    def SetViewPosition(self, position, _update):
+        self._center = tuple(position)
+        return True
+
+
+def test_short_top_band_lowers_the_row_instead_of_shrinking_every_view(
+    monkeypatch, tmp_path
+):
+    """A #6-32 x 5/8 SHCS's lane-starved Top band no longer forces 1:8."""
+    monkeypatch.setattr(purchased, "double_array", tuple)
+    margins = {
+        "*Front": (0.026, 0.026, 0.026, 0.020),
+        "*Top": (0.020, 0.026, 0.020, 0.026),
+    }
+    sizes = {
+        "*Front": (0.0057, 0.0197),
+        "*Top": (0.0057, 0.0057),
+        "*Right": (0.0057, 0.0197),
+        "*Isometric": (0.008, 0.021),
+    }
+
+    def fit_cells(lower):
+        outer = purchased.fastener_view_cells(0.073, lower=lower)
+        inner = purchased.supplier_fit_cells(outer, margins, label="t")
+        return purchased._project_from_front(inner)
+
+    def fresh_views(cells):
+        return [
+            _PaddedView(name, tmp_path / "s.SLDPRT", center, sizes[name])
+            for name, center, _ in cells
+        ]
+
+    standard = fit_cells(0.0)
+    assert purchased._fit_views(_Drawing(), fresh_views(standard), standard)[
+        "*Front"
+    ] == (1, 8)
+
+    views = fresh_views(standard)
+    lowering = purchased._top_lowering(_Drawing(), views, standard)
+    assert lowering == pytest.approx(0.0165)
+    assert all(view.ScaleRatio == (1.0, 1.0) for view in views)
+    lowered = fit_cells(lowering)
+    scales = purchased._fit_views(_Drawing(), views, lowered)
+    assert scales["*Front"] == scales["*Top"] == scales["*Right"] == (1, 1)
+    front, _top, right, _isometric = views
+    assert front.Position[1] == pytest.approx(right.Position[1])
+
+    roomy = purchased.fastener_view_cells(0.073)
+    assert purchased._top_lowering(_Drawing(), fresh_views(roomy), roomy) == 0.0
+
+
+def test_top_and_right_project_from_front():
+    # The dowel lanes: Front's diameter text left, Top's application lane right.
+    outer = purchased.fastener_view_cells(0.073)
+    inset = purchased.supplier_fit_cells(
+        outer,
+        {"*Front": (0.035, 0.024, 0.004, 0.006), "*Top": (0.003, 0.018, 0.075, 0.012)},
+        label="t",
+    )
+    cells = {name: (center, cell) for name, center, cell in inset}
+    assert cells["*Front"][0][0] - cells["*Top"][0][0] == pytest.approx(0.0515)
+    assert cells["*Front"][0][1] != cells["*Right"][0][1]
+
+    shared = {
+        name: (center, cell)
+        for name, center, cell in purchased._project_from_front(inset)
+    }
+    front, top, right = shared["*Front"], shared["*Top"], shared["*Right"]
+    assert front[0][0] == top[0][0] == pytest.approx(0.095)
+    assert front[0][1] == right[0][1]
+    assert front[1] == pytest.approx((0.060, 0.101, 0.130, 0.176))
+    assert top[1] == pytest.approx((0.060, 0.216, 0.130, 0.250))
+    assert right[1] == pytest.approx((0.225, 0.101, 0.405, 0.176))
+    assert shared["*Isometric"] == cells["*Isometric"]
+    with pytest.raises(ValueError):
+        purchased._project_from_front(
+            (
+                ("*Front", (0, 0), (0, 0.0, 1, 0.1)),
+                ("*Top", (0, 0), (0, 0.2, 1, 0.3)),
+                ("*Right", (0, 0), (2, 0.2, 3, 0.3)),
+            )
+        )
+
+
+def test_struck_centred_spans_alternate_shelves_outward(monkeypatch):
+    import _supplier_text_shelf as shelf
+
+    # Front outline centred at x=0.110, y=0.130; tips at each dimension line.
+    lines = {
+        "inner@F": ((0.108, 0.100), (0.112, 0.100)),
+        "outer@F": ((0.106, 0.092), (0.114, 0.092)),
+        "flats@F": ((0.104, 0.170), (0.116, 0.170)),
+        "offset@F": ((0.120, 0.090), (0.124, 0.090)),
+        "length@F": ((0.140, 0.110), (0.140, 0.150)),
+    }
+
+    class Display:
+        Type2 = 2
+
+        def __init__(self, name):
+            self.name = name
+
+        def GetDimension2(self, _index):
+            return SimpleNamespace(FullName=self.name)
+
+    class Annotation:
+        def __init__(self, name):
+            self.display = Display(name)
+
+        def GetType(self):
+            return 4
+
+        def GetSpecificAnnotation(self):
+            return self.display
+
+    view = SimpleNamespace(
+        GetOutline=lambda: (0.090, 0.110, 0.130, 0.150),
+        GetAnnotations=lambda: [Annotation(name) for name in lines],
+    )
+
+    def record(_adapter, display):
+        tips = lines[display.name]
+        return {"display": {"arrows": [(*tip, 0, 0, 0, 0, 0, 0) for tip in tips]}}
+
+    monkeypatch.setattr(shelf, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(shelf, "_supplier_top_record", record)
+    monkeypatch.setattr(
+        shelf,
+        "supplier_top_text_geometry",
+        lambda data, horizontal: {
+            "tips": tuple(sorted(row[:2] for row in data["display"]["arrows"]))
+        },
+    )
+    monkeypatch.setattr(shelf, "_struck", lambda _actual, _horizontal: True)
+    displays, shelves = shelf.struck_supplier_text(None, {"*Front": view})
+    assert set(displays) == set(lines)
+    assert shelves == {
+        "inner@F": (True, "right"),
+        "outer@F": (True, "left"),
+        "flats@F": (True, "right"),
+        "offset@F": (True, "right"),
+        "length@F": (False, "right"),
+    }
+
+
+def test_lowered_cells_move_the_row_boundary_only():
+    standard = {name: cell for name, _, cell in purchased.fastener_view_cells(0.073)}
+    lowered = {
+        name: cell
+        for name, _, cell in purchased.fastener_view_cells(0.073, lower=0.010)
+    }
+    for name in ("*Front", "*Right"):
+        assert lowered[name][3] == pytest.approx(standard[name][3] - 0.010)
+        assert lowered[name][:3] == standard[name][:3]
+    for name in ("*Top", purchased._ISOMETRIC):
+        assert lowered[name][1] == pytest.approx(standard[name][1] - 0.010)
+        assert lowered[name][3] == standard[name][3]
+    with pytest.raises(ValueError):
+        purchased.fastener_view_cells(0.073, lower=-0.001)
+
+
+def test_own_witness_through_text_is_struck_and_clear_text_is_not():
+    import _supplier_text_shelf as shelf
+    from _layout_geometry import Box
+
+    # A 4 mm horizontal span; witnesses rise 20 mm from the part to the line.
+    horizontal = ((0.100, 0.050, 0.070), (0.104, 0.050, 0.070))
+    across = {"witnesses": horizontal, "text": Box(0.095, 0.060, 0.110, 0.063)}
+    assert shelf._struck(across, True)
+    shelved = {"witnesses": horizontal, "text": Box(0.1065, 0.060, 0.120, 0.063)}
+    assert not shelf._struck(shelved, True)
+    beyond_ends = {"witnesses": horizontal, "text": Box(0.095, 0.071, 0.110, 0.074)}
+    assert not shelf._struck(beyond_ends, True)
+    # A vertical span: witnesses run along x, so text height is what strikes.
+    vertical = ((0.100, 0.050, 0.070), (0.103, 0.050, 0.070))
+    tall = {"witnesses": vertical, "text": Box(0.060, 0.099, 0.068, 0.104)}
+    assert shelf._struck(tall, False)
+    beside = {"witnesses": vertical, "text": Box(0.072, 0.099, 0.080, 0.104)}
+    assert not shelf._struck(beside, False)
+
+
 def test_footer_notes_hold_rule_seven_budget():
     assert purchased.note_lines("A\nB\nC", label="t") == ("A", "B", "C")
     with pytest.raises(ValueError):
@@ -4517,6 +4716,8 @@ def _supplier_native(monkeypatch, *, value=0.0111125, kind=11):
     import _supplier_dimensions as supplier
 
     monkeypatch.setattr(supplier, "_early_bound", lambda obj, _interface: obj)
+    # An mm sheet unless a test sets state.sheet; the rule has its own test.
+    monkeypatch.setattr(supplier, "sheet_units", lambda _adapter: state.sheet)
     view = SimpleNamespace()
     native = SimpleNamespace(
         SystemValue=value,
@@ -4536,7 +4737,7 @@ def _supplier_native(monkeypatch, *, value=0.0111125, kind=11):
     annotation.GetAttachedEntityTypes = lambda: (11,) * len(annotation.entities)
     text = {}
     state = SimpleNamespace(
-        unit=0, fraction=1, denominator=0, precision=2, rounding=False
+        unit=0, fraction=1, denominator=0, precision=2, rounding=False, sheet="mm"
     )
     display = SimpleNamespace(
         Type2=kind,
@@ -4594,6 +4795,51 @@ def test_supplier_native_size_preserves_exact_fraction_not_rounded_catalogue_ink
             case.display,
             **{**settings, "expected_mm": 0.438 * 25.4},
         )
+
+
+@pytest.mark.parametrize(
+    ("sheet", "units", "denominator", "suffix"),
+    (
+        ("in", "in", None, ")"),
+        ("mm", "in", None, " in)"),
+        ("in", "mm", None, " mm)"),
+        ("mm", "mm", None, " mm)"),
+        ("in", "in", 16, ")"),
+        ("mm", "in", 16, ")"),
+        ("in", "deg", None, ")"),
+    ),
+)
+def test_supplier_suffix_names_its_unit_only_where_the_sheet_does_not(
+    sheet, units, denominator, suffix,
+):
+    import _supplier_dimensions as supplier
+
+    drawing = SimpleNamespace(Extension=SimpleNamespace(
+        GetUserPreferenceInteger=lambda preference, _option: (
+            {"in": 3, "mm": 0}[sheet] if preference == 47 else None
+        ),
+    ))
+    *_, actual = supplier._presentation(
+        SimpleNamespace(currentModel=drawing), label="supplier size", units=units,
+        precision=3, presentation="angle" if units == "deg" else "length",
+        fraction_denominator=denominator, callout=None,
+        expected_mm=25.4 / 16 if denominator else None,
+    )
+    assert actual == suffix
+
+
+def test_supplier_inch_reference_on_an_inch_sheet_sets_and_reads_back_no_suffix(
+    monkeypatch,
+):
+    case = _supplier_native(monkeypatch)
+    case.state.sheet = "in"
+    settings = dict(label="supplier length", units="in", precision=3, expected_mm=11.1125)
+    case.helper.supplier_reference_dimension(None, case.display, **settings)
+    assert case.text == {1: "(", 2: ")", 4: ""}
+    case.state.sheet = "mm"
+    with pytest.raises(RuntimeError, match=r"suffix: actual='\)', expected=' in\)'"):
+        case.helper.assert_supplier_reference_dimension(None, case.display, **settings)
+
 
 
 def test_supplier_value_uses_referenced_configuration_not_active_model_configuration(
@@ -8328,7 +8574,9 @@ def _washer_import_native(monkeypatch, *, defect=None, axis="y", values=None):
     adapter = SimpleNamespace(swApp=SimpleNamespace(
         IsSame=lambda left, right: int(left is right),
         GetMathUtility=lambda: SimpleNamespace(CreatePoint=Point),
-    ))
+    ), currentModel=SimpleNamespace(Extension=SimpleNamespace(
+        GetUserPreferenceInteger=lambda _preference, _option: 0,  # an mm sheet
+    )))
     source_entities = {}
     features = {}
     for label in values:
@@ -8542,3 +8790,12 @@ def test_washer_import_requires_exact_typed_view_entity_correspondence(monkeypat
             case.adapter, case.model, imported.display, view=imported.annotation.Owner,
             label=label, axis=axis, bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
         )
+
+
+@pytest.mark.parametrize(("units", "sheet", "suffix"), (
+    ("in", "in", ")"), ("in", "mm", " in)"), ("mm", "in", " mm)"), ("mm", "mm", " mm)"),
+))
+def test_washer_model_reference_suffix_follows_its_package_sheet(units, sheet, suffix):
+    import _supplier_washer_model as model_helpers
+
+    assert model_helpers._suffix(units, sheet) == suffix

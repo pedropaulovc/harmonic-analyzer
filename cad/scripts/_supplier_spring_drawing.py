@@ -31,6 +31,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _com import _bind, _early_bound
+from _construction_line_font import _construction_curves_as_outline
 import _config
 import _telemetry
 from _drawing_common import (
@@ -42,10 +43,13 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_hidden_sketches import _show_hidden_owners, curate_view_dimensions
+from _drawing_layout_audit import annotation_display
+from _drawing_leaders import set_near_side_diameter
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DrawingSpec
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_view_display import set_hidden_lines_removed
+from _layout_audit import display_box
 from _purchased_fastener_drawing import (
     _PROPERTIES,
     _SCALES,
@@ -90,6 +94,21 @@ from _supplier_reference_geometry import (
     native_sketch_view_bounds,
 )
 from _visibility import FeatureWalk, REFERENCE_FEATURE_KINDS
+
+
+def _view_ink_bottom(adapter: Any, view: Any, bottom: float, *, label: str) -> float:
+    """Lowest sheet y a view draws: its model ink ``bottom`` and its annotations."""
+    for raw in view.GetAnnotations() or ():
+        annotation = _early_bound(raw, "IAnnotation")
+        if int(annotation.Visible) != 1:
+            continue
+        geometry, refused = annotation_display(adapter, annotation)
+        if refused:
+            raise RuntimeError(f"{label}: unreadable annotation ink {refused!r}")
+        ink = display_box(geometry)
+        if ink is not None:
+            bottom = min(bottom, ink.ymin)
+    return bottom
 
 
 def reacquire_supplier_dimensions(
@@ -177,17 +196,24 @@ def prepare_extension_spring_diagrams(
     *,
     reference_bounds: Callable[[str], tuple[float, float, float, float]],
 ) -> tuple[Callable[[], None], ...]:
-    """Show only assigned construction gauges before native geometry fitting."""
+    """Show only assigned construction gauges before native geometry fitting.
+
+    The gauges are construction geometry. In the default construction font the
+    coil OD printed as dash-gap arcs, and the wire section sat in one of the
+    gaps, so the two sections read as one broken shape. This SLDDRW draws
+    construction curves solid, as the disc-spring diagrams do.
+    """
     if set(views) != {*SOURCE_FEATURES, "installed_iso"}:
         raise RuntimeError(
             "extension spring diagram needs free, section, maximum and installed views"
         )
+    line_font = _construction_curves_as_outline(adapter)
     for key, names in SOURCE_FEATURES.items():
         if set(_show_hidden_owners(adapter, views[key], names, view_label=key)) != set(
             names
         ):
             raise RuntimeError(f"{key}: nominal supplier gauges must be saved hidden")
-    return ()
+    return (line_font,)
 
 
 def extension_spring_dimensions(
@@ -242,10 +268,17 @@ def extension_spring_dimensions(
     for key, rows in rows_by_view.items():
         view = views[key]
         xmin, ymin, xmax, ymax = reference_bounds(key)
+        # Each section text block sits wholly beside its own circle, so its
+        # leader leaves the near end of the shoulder and runs away from the
+        # text. The wire circle lies on the coil's left (sketch -X in *Right),
+        # so its text goes below-left and the coil OD text above-right: the two
+        # arrows land on opposite sides. Offsets are half the printed callout
+        # row ("NOMINAL STOCK COIL OD" ~61 mm, "... WIRE SECTION" ~72 mm)
+        # plus a 6 mm leader.
         positions = (
             {
-                COIL_OD: (xmax + 0.006, ymax + 0.005),
-                WIRE_DIA: (xmax + 0.006, ymin - 0.009),
+                COIL_OD: (xmax + 0.037, ymax + 0.005),
+                WIRE_DIA: (xmin - 0.042, ymin - 0.009),
             }
             if key == "free_right"
             else {rows[0][0]: ((xmin + xmax) / 2, ymax + 0.010)}
@@ -288,6 +321,12 @@ def extension_spring_dimensions(
                 ),
                 **arguments,
             )
+            if key == "free_right":
+                # One arrow on the near rim of each section: a coil OD line
+                # through the centre would end on the far rim beside the
+                # wire section's arrow, and a wire line would cross the
+                # small wire circle it sizes.
+                set_near_side_diameter(by_name[name], name)
             settings[name] = (arguments, configurations[key])
 
     def settled() -> None:
@@ -328,7 +367,17 @@ def extension_spring_dimensions(
 
 
 def supplier_state_cells(caption_y: float, *, maximum: bool) -> tuple:
-    """Reserve an annotation band around every fitted native view."""
+    """Reserve an annotation band around every fitted native view.
+
+    The maximum (extension spring) layout stacks the free gauge over the
+    sections on the left and gives the installed pictorial the full right
+    column, so a long coil prints at a scale where its turns and end loops
+    read instead of merging into a solid bar. The left column is wide enough
+    for the section texts on both sides of the coil. The sections cell reaches
+    down to 6 mm over the maximum cell, so that after the caller's 18 mm text
+    lanes above and below, the coil OD prints at 4:1 (9432K31, Ø.25) or 2:1
+    (1330K524, Ø.500) and the wire section is a circle, not a dot.
+    """
     if not maximum:
         return (
             _cell("free_front", 0.028, caption_y + 0.020, 0.235, 0.166),
@@ -337,10 +386,9 @@ def supplier_state_cells(caption_y: float, *, maximum: bool) -> tuple:
             _cell("installed_iso", 0.325, 0.190, 0.406, 0.252),
         )
     return (
-        _cell("free_front", 0.028, 0.166, 0.242, 0.206),
-        _cell("free_top", 0.028, 0.230, 0.242, 0.250),
-        _cell("free_right", 0.267, 0.205, 0.406, 0.252),
-        _cell("installed_iso", 0.325, 0.142, 0.406, 0.175),
+        _cell("free_front", 0.028, 0.212, 0.256, 0.252),
+        _cell("free_right", 0.028, 0.128, 0.256, 0.192),
+        _cell("installed_iso", 0.264, 0.142, 0.406, 0.252),
         _cell("max_front", 0.028, caption_y + 0.020, 0.403, 0.122),
     )
 
@@ -1183,8 +1231,8 @@ async def build_supplier_spring_drawing(
     for keys in (
         ("free_front", "free_top"),
         ("free_right",),
-        ("installed_iso",),
-        ("installed_second_iso",),
+        # Two installed variants are read against each other: one joint scale.
+        ("installed_iso", "installed_second_iso"),
         ("max_front",),
     ):
         members = [(views[key], cell) for cell in fit_cells if (key := cell[0]) in keys]
@@ -1291,6 +1339,18 @@ async def build_supplier_spring_drawing(
         ratio = scales[key]
         text = f"{captions[key]}  {ratio[0]}:{ratio[1]}"
         y = cell[1] - (0.016 if key == "free_right" else 0.012)
+        # A small pictorial or thin diagram centred in a tall cell left its
+        # caption far below it: hang each caption just under everything its
+        # view draws, never below the cell floor. That is the lowest of the
+        # padded outline (text inside it prints over the view), the source
+        # ink (a zero-body diagram's outline can miss its own sketch) and the
+        # annotations.
+        view = views[key]
+        model_bottom = min(
+            _box(view.GetOutline(), label=key)[1], state_bounds(view, key)[1]
+        )
+        bottom = _view_ink_bottom(adapter, view, model_bottom, label=key)
+        y = max(y, bottom - 0.004)
         note = _literal_note(adapter, text, center[0], y)
         bounds = _box(note.GetExtent(), label=text, kind="note")
         annotation = _early_bound(note.GetAnnotation(), "IAnnotation")

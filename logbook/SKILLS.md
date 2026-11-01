@@ -16,9 +16,9 @@ failure mode that would make the book worthless.
 | Drilling, boring, reaming to a fit | M03 | `pivot-bushing`, `lever-bushing`, `dt-cylinder-gear` bore, `sm-knife-mount` bore, `mg-magnifying-wheel` | ch. 10 Drilling, boring, reaming |
 | Parting to a length, batch repeatability | M04 | 19× `pivot-bushing`, 19× `lever-bushing`, spacers | ch. 11 Parting to a length tolerance |
 | Slender turning, steadies, followers | M05 | `ch-pivot-shaft`, `ch-fulcrum-shaft`, `dt-cone-gear-shaft`, `dt-cylinder-gear-shaft`, `dt-pinion-arbor`, `ch-amplitude-bar` | ch. 12 Slender work |
-| Tramming, squaring, edge finding | M06 | `sm-knife-mount` ×2, `dt-pinion-pivot-block`, `pd-transgear-arm`, `dt-arbor-pedestal` | ch. 13 Milling |
-| Profile milling, slots, batch fixturing | M07 | `ch-rocker-arm` ×20, `ch-connecting-rod` ×20, `ch-channel-lever` ×20, `pd-platen-guide`, `mg-wheel-bar` | ch. 13 Milling |
-| Hole patterns, reaming, tapping | M08 | `fr-rocker-arm-support` (4× 1/2-13 UNC-2B, `cad/scripts/build_fr_rocker_arm_support.py`), `sm-summing-lever` 20× Ø2.0 pattern, `fr-harmonic-base` | ch. 14 Hole patterns and tapping |
+| Workholding, facing to length, tramming, squaring, edge finding | M06 | oblique jig (`ch-rocker-arm-tl-oblique-*`): end bracket ×2, feed lever, base bar ×2, pivot block, feed block, carrier; then `sm-knife-mount` ×2, `dt-pinion-pivot-block`, `pd-transgear-arm`, `dt-arbor-pedestal` | ch. 13 Milling |
+| Profile milling, slots, jig fit-up, batch fixturing | M07 | oblique jig base-bar slots, riser, assembled `ch-rocker-arm-tl-oblique-jig`; then `ch-rocker-arm` ×20 cut on it, `ch-connecting-rod` ×20, `ch-channel-lever` ×20, `pd-platen-guide`, `mg-wheel-bar` | ch. 13 Milling |
+| Hole patterns, reaming, tapping, counterbores | M08 | oblique jig taps, counterbores, H7 pivot seats and reamed carrier pin holes; then `fr-rocker-arm-support` (4× 1/2-13 UNC-2B, `cad/scripts/build_fr_rocker_arm_support.py`), `sm-summing-lever` 20× Ø2.0 pattern, `fr-harmonic-base` | ch. 14 Hole patterns and tapping |
 | Dividing head, indexing, co-phasing | M09 | `dt-cylinder-gear` notches ×20, every gear blank | ch. 15 Indexing |
 | Form-cutter making (ground form tool; button tool, Law ch. 12) | M10 | the T006 cone gear's DT6-FORM1 cutter, the one gear no stock cutter range covers | ch. 16 Making your own gear cutters |
 | Gear cutting and inspection | M10 | `dt-cone-gear` ×20, `dt-cylinder-gear` ×20, `dt-crank-pinion`, `dt-alignment-pinion`, `pd-rack-pinion`, `pd-transgear-*`, `pd-vn-transgear-*`, `pd-platen-rack` | ch. 17 Cutting the gears |

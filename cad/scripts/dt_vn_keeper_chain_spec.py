@@ -52,7 +52,12 @@ import math
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from dt_crank_arm_spec import ANCHOR_SCREW_X, ANCHOR_SCREW_Y, ARM_C2C
 from dt_crank_arm_spec import ARM_THICKNESS, HALF_WIDTH
-from dt_crank_hub_geometry import HUB_BARREL_DIA, HUB_LENGTH, SERVICE_PIN_STATION
+from dt_crank_hub_geometry import (
+    ARM_STOCK_THICKNESS_MAX,
+    HUB_BARREL_DIA,
+    HUB_LENGTH,
+    SERVICE_PIN_STATION,
+)
 from dt_crank_hub_spec import DRAWING_PRECISION_BY_NAME as HUB_PRECISION
 from dt_crank_pin_eye_spec import ANCHOR_AIR, LOOP_ID_MIN, LOOP_INNER_R, LOOP_R
 from dt_crank_pin_eye_spec import TAIL_LEN as EYE_TAIL_LEN
@@ -125,11 +130,15 @@ HUB_R = HUB_BARREL_DIA / 2.0
 ARM_Z = (0.0, ARM_THICKNESS)
 HUB_Z = (ARM_THICKNESS, HUB_LENGTH)
 PIN_Z = SERVICE_PIN_STATION
-# The hub prints the pin's station from its arm shoulder, which is the arm's
-# inboard face (ARM_Z[1]), at ServicePinFromShoulder's places. At the band's
-# arm-side limit the pin, and the ring hanging from it, sit that much nearer
-# the arm.
-PIN_Z_BAND = printed_band_mm(HUB_PRECISION["ServicePinFromShoulder"])
+# The hub prints the pin's station from its faced outboard end, flush with the
+# arm's outboard face (ARM_Z[0]), at ServicePinStation's places; its seat
+# length is a fit-up reference turned to suit the arm, so the arm's inboard
+# face (ARM_Z[1]) is wherever the stock's thickness puts it. At the station
+# band's arm-side limit in the thickest stock the mill ships, the pin, and the
+# ring hanging from it, sit that much nearer the arm.
+PIN_Z_BAND = printed_band_mm(HUB_PRECISION["ServicePinStation"]) + (
+    ARM_STOCK_THICKNESS_MAX - ARM_THICKNESS
+)
 PIN_Z_ARMWARD = PIN_Z - PIN_Z_BAND
 PIN_X0 = -HUB_R - PIN_PROUD  # the pin's big end
 RING_X = PIN_X0 + RING_HOLE_X  # the ring's through leg and plane
@@ -285,7 +294,8 @@ if RING_ARM_AIR_NOMINAL < RING_ARM_AIR:
 # * No clamp: at the adverse printed corner every ring the title block accepts
 #   has a pose clear of the arm (ring_clear_pose_air), so the arm is a
 #   one-sided stop the ring can always leave and the pin seats with the ring
-#   held clear. The corner: the pin at ServicePinFromShoulder's arm-side limit
+#   held clear. The corner: the pin at ServicePinStation's arm-side limit in
+#   the thickest arm stock
 #   (PIN_Z_ARMWARD), the hole at its station's hub-side limit, the pin's
 #   fattest printed section through it, and the hole drilled to size (the
 #   least room to slide in). The arm's hub end cannot grow past the

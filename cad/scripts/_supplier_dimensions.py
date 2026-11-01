@@ -11,6 +11,7 @@ import math
 from typing import Any, Literal
 
 from _com import _early_bound
+from _drawing_common import _LENGTH_INCHES, _PREF_UNITS_LINEAR
 import _telemetry
 
 # swDimensionType_e: check type before interpreting the native SI value.
@@ -74,7 +75,15 @@ def _measured_supplier_value(
     return measured
 
 
+def sheet_units(adapter: Any) -> Literal["in", "mm"]:
+    """The active drawing's linear unit: inches, else millimetres."""
+    drawing = _early_bound(adapter.currentModel, "IModelDoc2")
+    linear = int(drawing.Extension.GetUserPreferenceInteger(_PREF_UNITS_LINEAR, 0))
+    return "in" if linear == _LENGTH_INCHES else "mm"
+
+
 def _presentation(
+    adapter: Any,
     *,
     label: str,
     units: str,
@@ -110,9 +119,15 @@ def _presentation(
     unit = {"mm": 0, "in": 3, "deg": 0}[units]
     fraction = 2 if fraction_denominator is not None else 1
     prefix = "(<MOD-DIAM>" if presentation == "diameter" else "("
-    # SolidWorks already prints an inch mark after a fraction (1/4"), so a
-    # fraction takes no " in" suffix; decimals still name their unit.
-    suffix = ")" if units == "deg" or fraction_denominator is not None else f" {units})"
+    # SolidWorks already prints an inch mark after a fraction (1/4"), and an
+    # inch sheet's title block already reads UNIT: IN, so neither takes an
+    # " in" suffix. Other decimals still name their unit.
+    if units == "deg" or fraction_denominator is not None or (
+        units == "in" and sheet_units(adapter) == "in"
+    ):
+        suffix = ")"
+    else:
+        suffix = f" {units})"
     return unit, fraction, prefix, suffix
 
 
@@ -157,7 +172,7 @@ def supplier_reference_dimension(
     A below-callout identifies the native size; it never replaces its value.
     """
     unit, fraction, prefix, suffix = _presentation(
-        label=label, units=units, precision=precision, presentation=presentation,
+        adapter, label=label, units=units, precision=precision, presentation=presentation,
         fraction_denominator=fraction_denominator, callout=callout, expected_mm=expected_mm,
     )
     display = _early_bound(dimension, "IDisplayDimension")
@@ -209,7 +224,7 @@ def assert_supplier_reference_dimension(
 ) -> None:
     """Read persisted native state after the final rebuild; never repair it."""
     unit, fraction, prefix, suffix = _presentation(
-        label=label, units=units, precision=precision, presentation=presentation,
+        adapter, label=label, units=units, precision=precision, presentation=presentation,
         fraction_denominator=fraction_denominator, callout=callout, expected_mm=expected_mm,
     )
     display = _early_bound(dimension, "IDisplayDimension")

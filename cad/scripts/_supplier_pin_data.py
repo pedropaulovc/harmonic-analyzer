@@ -41,6 +41,11 @@ class SupplierPinReference:
     wall_precision: int | None = None
     application_hole_limits: tuple[float, float] | None = None
     application_hole_precision: int | None = None
+    # The package's sheet unit (its drawing_unit). An inch sheet already reads
+    # UNIT: IN, so an inch source drops its " in" there. The drawing refuses a
+    # sheet whose unit differs; a mm part's own document unit is its
+    # template's, which differs between farm seats.
+    sheet_unit: Literal["in", "mm"] = "mm"
 
     @property
     def unit_mm(self) -> float:
