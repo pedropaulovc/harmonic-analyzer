@@ -416,11 +416,26 @@ VIEW_C_ARROW = (
 # far left, but the north-face witness rises from the hole's height, not the
 # block's top (af13c8ff8 print), so that leader crossed it
 # (leader-crosses-line).  At 2:1 the pinch depth's line spans far enough
-# that a leader from the text's right end still crossed it, so the text now
-# reaches 3.5 mm past the hole centre: its leader drops from the shoulder's
-# right end to the hole, right of the hole-centre witness and the line's
-# arrow.
-PINCH_CLEARANCE_CALLOUT_XY = (RIGHT_CENTER[0] + 0.0035 - 0.0264, 0.2013)
+# that a leader from the text's right end still crossed it, so the text
+# reaches past the hole centre: its leader drops from the shoulder's right
+# end to the hole, right of the hole-centre witness and the line's arrow.
+# Blind machinist review of e2cfa0d03: 3.5 mm past the centre the leader
+# fell 8 deg off vertical, on the hole's vertical centreline, and read as
+# it.  The shoulder's right end now stands far enough right that the leader
+# meets the rim PINCH_CLEARANCE_LEADER_ANGLE off vertical (17.4 mm past the
+# centre); it still enters through the view's top, under a millimetre
+# longer over the part than the hole's approach from the south face.  The
+# literals are PINCH_CLEARANCE_CALLOUT_EXTENT's drop (0.0030) and right
+# reach (0.0264), defined with the other callout extents below.
+PINCH_CLEARANCE_CALLOUT_Y = 0.2013
+PINCH_CLEARANCE_LEADER_ANGLE = math.radians(35.0)
+_PINCH_CLEARANCE_SHOULDER_DX = (
+    PINCH_CLEARANCE_CALLOUT_Y - 0.0030 - _elevation_y(PINCH_HEIGHT, RIGHT_CENTER)
+) * math.tan(PINCH_CLEARANCE_LEADER_ANGLE)
+PINCH_CLEARANCE_CALLOUT_XY = (
+    RIGHT_CENTER[0] + _PINCH_CLEARANCE_SHOULDER_DX - 0.0264,
+    PINCH_CLEARANCE_CALLOUT_Y,
+)
 # The pinch thread callout stands above VIEW B, its shoulder's left end far
 # enough right of the hole that the leader drops steeply through the 2:1
 # view's top (16 mm right of centre ran 4.2 mm longer than the hole's
