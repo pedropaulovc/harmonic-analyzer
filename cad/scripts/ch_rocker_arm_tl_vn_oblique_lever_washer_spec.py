@@ -14,21 +14,21 @@ inventory carries no washer stock (no ``INVENTORY_ID``).
 Sources:
 
 * SOURCED, https://www.mcmaster.com/products/washers/washer-type~wedge/ read
-  live 2026-10-17 (the detail page is login-walled): two-piece wedge-lock
-  washer, reusable up to 15 times, comparable to NORD-LOCK; 316 stainless
-  steel, Rockwell C51, case hardened; for 5/16" / M8; ID 0.340 in, OD
-  0.530 in, thickness 0.070 to 0.090 in; 5 per package, $12.40.
+  live 2026-10-17 and 2026-11-01 (the detail page is login-walled): two-piece
+  wedge-lock washer, reusable up to 15 times, comparable to NORD-LOCK; 316
+  stainless steel, Rockwell C51, case hardened; for 5/16" / M8; ID 0.340 in,
+  OD 0.530 in, thickness 0.070 to 0.090 in; package quantity 5.
 * EXACT-CURRENT PRIMARY, https://www.mcmaster.com/91812A230/ read 2026-10-21:
   the product table repeats those dimensions. Its engineering drawing
   (``SUPPLIER_DRAWING_URL``) spans the depicted two-piece stack, not an
   individual half. References below describe only the unchanged plain
   envelope; they do not assert that the model contains a physical pair.
-* RETAINED RECEIPT CAVEAT: the 2026-10-17 listing alone did not identify a
-  pair stack or a single half, nor whether a package is 5 pairs. The model
-  keeps the pair's stack at its 0.090 in maximum (``_mcmaster_91812a230``),
-  the worst case for the screw's engagement and its head's height; the C4
-  fastener table carries the same stack as a literal
-  (``fasteners.LEVER_LOCK_STACK``), pinned here.  Verify on receipt.
+* PAIR AND PACKAGE (2026-11-01, ``_mcmaster_91812a230``): one catalogue item
+  is the two-piece washer, so a package of 5 is five pairs, and the drawing's
+  thickness is the pair's stack.  The model keeps the stack at its 0.090 in
+  maximum, the worst case for the screw's engagement and its head's height;
+  the C4 fastener table carries the same stack as a literal
+  (``fasteners.LEVER_LOCK_STACK``), pinned here.
 * Catalogue-only: no vendor model was downloaded, so there is no replica
   gate.  The geometry is the plain annulus of the pair's envelope (the cam
   faces, serrations and the split between the halves are not modelled); the
@@ -91,7 +91,7 @@ SKU = PART_NO
 ROW = fasteners.LEVER_LOCK_WASHER
 SCREW_ROW = fasteners.LEVER_TO_CARRIER
 QUANTITY = ROW.count  # pairs, one under each lever screw head
-PACK_QUANTITY = PACKAGE_QTY  # UNVERIFIED: pairs or single washers
+PACK_QUANTITY = PACKAGE_QTY  # pairs per package
 UNIT = drawing_unit(
     "parts/ch-rocker-arm-tl-vn-oblique-lever-washer",
     _config.parts("ch-rocker-arm-tl-vn-oblique-lever-washer"),
@@ -103,8 +103,8 @@ TOP_Y = THICKNESS
 # Exact-current engineering image inspected 2026-10-21. Use its two-place
 # inch precision (.34 ID, .53 OD, .07-.09 stack), not the product table's
 # three-place typography (.340, .530, .070-.090); the values agree exactly.
-# No diameter band is supplied. Keep the existing maximum-stack envelope
-# and receipt caveat; neither the pair split nor its locking faces are added.
+# No diameter band is supplied. Keep the maximum-stack envelope; neither the
+# pair split nor its locking faces are added.
 SUPPLIER_DRAWING_URL = (
     "https://www.mcmaster.com/mvC/Library/CAD2/20260617/385104C2/"
     "91812A230_Extreme-Vibration-Resistant%20Wedge%20Lock%20WasherX.GIF"
@@ -120,10 +120,8 @@ SUPPLIER_TOLERANCES = {
 }
 SUPPLIER_BORE_CALLOUT = "FOR 5/16 SCREW SIZE"
 SUPPLIER_DATA = (
-    "SUPPLIER DRAWING SHOWS A TWO-PIECE WEDGE-LOCK STACK.",
-    "MODEL IS THE MAXIMUM-THICKNESS PLAIN ENVELOPE.",
-    "SPLIT, CAMS AND SERRATIONS ARE NOT MODELLED.",
-    "PAIR / PACKAGE INTERPRETATION: VERIFY ON RECEIPT.",
+    "SOLD AS TWO-PIECE WEDGE-LOCK PAIRS, 5 PAIRS PER PACKAGE.",
+    "REFERENCE THICKNESS IS THE TWO-PIECE PAIR STACK.",
 )
 REFERENCE_SKETCHES = ("SupplierWasherThicknessReference",)
 DRAWING_PRECISION = {
