@@ -12,9 +12,10 @@ so the length prints as a REFERENCE and each screw is cut to its own hole at
 assembly.
 
 The engagement this leaves falls short of drawing guideline rule 18; the owner
-accepted 0.87D MIN as a minor exception on 2026-11-01 (RV-01). The sheet
-states it as a plain fact, "ENGAGEMENT 0.87D MIN", the last line of the
-cut-length callout (CUT_TO_FIT_CALLOUT), formatted from the floored worst case
+accepted 0.87D MIN (0.88D after #2107) as a minor exception on 2026-11-01
+(RV-01). The sheet states it as a plain fact, "ENGAGEMENT 0.88D MIN", the last
+line of the cut-length callout (CUT_TO_FIT_CALLOUT), formatted from the floored
+worst case
 POST_MOUNT_ENGAGEMENT_PRINTED; the asserts below still guard that value and
 the nominal chain.
 """

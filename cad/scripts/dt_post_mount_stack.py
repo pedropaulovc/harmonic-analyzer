@@ -15,7 +15,7 @@ import _cone_axis_constants as cone_axis
 POST_BODY_HEIGHT_MM = 94.742  # 3.73
 POST_MOUNT_COUNTERBORE_DEPTH_MM = 6.0198
 # .005 in: with the screw's cut end at the title block's .010 edge break, the
-# thinnest plate holds 0.87D (dt_vn_post_mount_screw_spec).
+# thinnest plate holds 0.88D (dt_vn_post_mount_screw_spec).
 CUT_TO_FIT_SHORT_MM = 0.127  # .005 in
 # MHA-DT-VN-61's cut end takes its inch title block's general edge break; the
 # platform's engagement stack spends it at the plate underside.
