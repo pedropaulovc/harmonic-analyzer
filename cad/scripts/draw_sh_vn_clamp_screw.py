@@ -31,6 +31,9 @@ from _layout_audit import (
     severity,
 )
 import sh_vn_clamp_screw_spec as supplier
+from _machinist_review_mode import MachinistReviewMode
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["sh_vn_clamp_screw"]

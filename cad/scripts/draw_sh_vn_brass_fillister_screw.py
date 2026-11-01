@@ -15,6 +15,9 @@ from _supplier_screw_dimensions import annotate_supplier_screw
 from _supplier_screw_layout import supplier_screw_margins
 from _supplier_text_shelf import assert_supplier_shelves, shelve_supplier_text
 import sh_vn_brass_fillister_screw_spec as supplier
+from _machinist_review_mode import MachinistReviewMode
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["sh_vn_brass_fillister_screw"]
