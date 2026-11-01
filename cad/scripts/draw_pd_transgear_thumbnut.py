@@ -5,8 +5,7 @@ it carries the native #8-32 UNC-2B through-thread callout, and stands
 directly above section A-A on one vertical centreline, top view over front
 (third angle; machinist review round 2). Both actual entry cones print a
 model-owned MAX diameter and their half-angle in section, measured from the
-section's full axis centreline; the section also shows the thread's
-cosmetic lines.
+section's full axis centreline.
 Section A-A uses the Front plane through the axis and two knurl crests, so the
 knurl diameter, the head, waist and flange, the overall length and the
 flange length from the seat face (the waist is their remainder) and the
@@ -39,7 +38,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
+from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
@@ -137,6 +136,19 @@ def _section_y(model_y_mm: float) -> float:
 # cross another feature's hatching. The cone diameter sits below the seat,
 # left of the caption; the half-angle's short arc stays at the actual cone.
 _STEM_TEXT_X = _section_x(HEAD_DIA / 2.0) + 0.021
+# A horizontal diameter's line prints this far below its text anchor (run
+# 20261101T070124857Z: anchored at mid-height, the Ø.43 and Ø.49 lines
+# printed 3.0 and 2.8 mm lower), so the anchor stands that much above the
+# feature's mid-height to put the LINE there: Ø.43 anchored at the waist's
+# middle drew its line on the Ø.49 shoulder (machinist review round 4).
+DIM_LINE_BELOW_TEXT = 0.0029
+
+
+def _stem_dia_anchor(bottom_mm: float, top_mm: float) -> tuple[float, float]:
+    """Text anchor whose dimension line runs mid-way up a stem feature."""
+    return (_STEM_TEXT_X, _section_y((bottom_mm + top_mm) / 2.0) + DIM_LINE_BELOW_TEXT)
+
+
 SECTION_KEEP = {
     "HeadDia": (SECTION_CENTER[0], _section_y(OVERALL_LENGTH) + 0.030),
     "DishDia": (SECTION_CENTER[0], _section_y(OVERALL_LENGTH) + 0.014),
@@ -154,8 +166,8 @@ SECTION_KEEP = {
         _section_x(-HEAD_DIA / 2.0) - 0.016,
         _section_y(FLANGE_LENGTH / 2.0),
     ),
-    "FlangeDia": (_STEM_TEXT_X, _section_y(FLANGE_LENGTH / 2.0)),
-    "WaistDia": (_STEM_TEXT_X, _section_y(FLANGE_LENGTH + WAIST_LENGTH / 2.0)),
+    "FlangeDia": _stem_dia_anchor(0.0, FLANGE_LENGTH),
+    "WaistDia": _stem_dia_anchor(FLANGE_LENGTH, FLANGE_LENGTH + WAIST_LENGTH),
     # A sheet-outboard angular anchor makes the native cone/axis arc huge
     # (4e9a4df). First place its arc just beyond the actual rear cone, then
     # offset only its text; the imported model association stays unchanged.
@@ -491,28 +503,6 @@ def _add_section_axis(adapter: Any, section: Any) -> None:
         )
 
 
-def _show_section_thread(adapter: Any, section: Any) -> int:
-    """Draw the #8-32 thread's cosmetic lines in section A-A (machinist review
-    round 2) and return how many "Tapped Hole" label notes the import added
-    there: the face view's native callout already states the thread, so the
-    finalizer removes those labels with the face view's own."""
-    seeds, instances = import_cosmetic_threads(adapter, section)
-    if instances != 1:
-        raise RuntimeError(
-            f"thumbnut section A-A shows {seeds} cosmetic-thread seed(s) / "
-            f"{instances} instance(s), expected the one through thread"
-        )
-    labels = 0
-    for raw in _early_bound(section, "IView").GetAnnotations() or ():
-        annotation = _early_bound(raw, "IAnnotation")
-        if int(annotation.GetType()) != 6:  # swNote
-            continue
-        note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
-        if "Tapped Hole" in str(note.GetText() or ""):
-            labels += 1
-    return labels
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -604,7 +594,6 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, face, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the thumbnut face view")
     _add_section_axis(adapter, section)
-    section_thread_labels = _show_section_thread(adapter, section)
     # The tap-drill edge under the front countersink: the one visible circle
     # of the Hole Wizard feature from the front.
     thread_callout = add_native_hole_callout(
@@ -627,13 +616,12 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         layout=SPEC.layout,
         # SolidWorks pins its own tapped-hole note to the face view once the
-        # real native callout exists, and the section's cosmetic thread may
-        # bring its own; each repeats the thread the callout states. The face
-        # view's sat on the tap drill, so the callout's radial leader crossed
-        # it (run 20261001T151531763Z).  finalize removes them before its
-        # layout audit.
+        # real native callout exists; it repeats the thread the callout
+        # states, and it sat on the tap drill, so the callout's radial leader
+        # crossed it (run 20261001T151531763Z).  finalize removes it before
+        # its layout audit.
         redundant_note_substrings=("Tapped Hole",),
-        expected_redundant_notes=1 + section_thread_labels,
+        expected_redundant_notes=1,
     )
 
 

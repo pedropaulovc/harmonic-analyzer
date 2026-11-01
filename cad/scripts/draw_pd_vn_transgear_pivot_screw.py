@@ -415,12 +415,6 @@ def _add_supplier_references(adapter: Any, front: Any, top: Any) -> dict[str, An
         authored[name] = _format_supplier_reference(adapter, display, name)
         if name == "SupplierHeadDiameter":
             height = _add_physical_head_height(adapter, front, (0.224, 0.201))
-            # Machinist review r3 (minor): with outside arrows no line ran
-            # between the extension lines, so the shelved text's leader
-            # ended on nothing.  Inside, it lands on the drawn line.
-            height.ArrowSide = _DIM_ARROWS_INSIDE
-            if int(height.ArrowSide) != _DIM_ARROWS_INSIDE:
-                raise RuntimeError("SupplierHeadHeight: arrows did not move inside")
             authored["SupplierHeadHeight"] = _format_supplier_reference(
                 adapter, height, "SupplierHeadHeight"
             )

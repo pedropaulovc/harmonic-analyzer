@@ -164,6 +164,10 @@ SIDE_KEEP = {
     # the one controlled length at that end, under the station's three-row
     # callout.
     "TipDomeZ": ((SEAT_X + TIP_X) / 2.0, _ROW_Y - 0.027),
+    # The seat root's R MAX and its callout under the profile, left of the
+    # seat's extension line (the station's and the head land's) and right of
+    # the shank Ø's lower arrow and the groove width's block.
+    "SeatRadius": (SEAT_X - 0.028, SIDE_CENTER[1] - 0.018),
 }
 # The callouts and the dome heights' reference parentheses are authored on
 # the part's dimensions (``pd_transgear_pin_callouts``); the sheet only
@@ -214,6 +218,24 @@ def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(
             f"imported dimension text differs from the part's: {wrong!r}"
         )
+
+
+def _dress_seat_radius(adapter: Any, annotations: list[Any]) -> None:
+    """The seat root's R MAX prints radial, and its leader stops at the
+    corner: ``ArcExtensionLineOrOppositeSide`` False keeps it from running on
+    through the arc centre into the head (draw_pn_pen_rod's shoulder)."""
+    found = [a for a in annotations if dimension_name(adapter, a) == "SeatRadius"]
+    if len(found) != 1:
+        raise RuntimeError(
+            f"expected one SeatRadius on the side view, found {len(found)}"
+        )
+    annotation = _early_bound(found[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if bool(display.Diametric):
+        raise RuntimeError("the imported seat radius is not radial")
+    display.ArcExtensionLineOrOppositeSide = False
+    if display.ArcExtensionLineOrOppositeSide is not False:
+        raise RuntimeError("SeatRadius leader still runs to the opposite side")
 
 
 def _overall_reference(adapter: Any, side: Any) -> None:
@@ -325,6 +347,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _assert_part_authored_text(adapter, annotations)
+    _dress_seat_radius(adapter, annotations)
     _overall_reference(adapter, side)
 
     add_view_centerline(

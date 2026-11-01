@@ -39,13 +39,14 @@ from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import SketchDims, add_line_chain, ensure_fully_defined
 from _sketch_chains import define_rectilinear_chain
-from _drawing_precision import apply_drawing_precision
+from _com import _early_bound
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _drawing_tolerances import _set_tolerance_precision
 from _fit_deviations import deviations
 from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
 from _holes import wizard_holes
@@ -183,12 +184,46 @@ if GUIDE_DEPTH + _GUIDE_DEPTH_DEV[0] - (BAR_DEPTH + BAR_DEPTH_BAND) < LOCK_GAP_F
         f"fitted max {LOCK_GAP_FIT[1]:.2f}"
     )
 
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
+# 1:2 (machinist review round 4: at 1:4 the black-oxide bar read as a dark
+# sliver); the sheet places the isometric at this scale.
+ISOMETRIC_VIEW_SCALE = (1, 2)
+ISOMETRIC_VIEW_NOTE = (
+    f"ISOMETRIC VIEW SCALE {ISOMETRIC_VIEW_SCALE[0]}:{ISOMETRIC_VIEW_SCALE[1]}"
+)
+
+_TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 
 
 def _apply_drawing_properties(adapter) -> None:
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
+    )
+
+
+def _depth_limits(adapter) -> None:
+    """The depth's one-sided band as native LIMITs (.40/.39): bilateral, its
+    zero upper deviation printed ".00" with no sign (machinist review round
+    4); the limits say the same with nothing to misread
+    (build_pd_transgear_removable._plate_limits)."""
+    label = "Depth@Guide"
+    display, dimension = _named_dimension(adapter, "Guide", "Depth")
+    lower, upper = deviations(GUIDE_DEPTH_BAND)
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = _TOL_LIMIT
+    if tolerance.SetValues(lower / 1000.0, upper / 1000.0) is not True:
+        raise RuntimeError(f"{label}: LIMIT deviations were rejected")
+    if (
+        int(tolerance.Type) != _TOL_LIMIT
+        or abs(float(tolerance.GetMinValue()) - lower / 1000.0) > 1e-12
+        or abs(float(tolerance.GetMaxValue()) - upper / 1000.0) > 1e-12
+    ):
+        raise RuntimeError(f"{label}: LIMIT tolerance readback changed")
+    _set_tolerance_precision(
+        display,
+        (lower, upper),
+        display_unit=UNIT,
+        label=label,
+        places=GUIDE_DEPTH_PLACES,
     )
 
 
@@ -302,14 +337,7 @@ async def build(adapter) -> dict[str, str]:
     # The depth's one-sided band is the paper-drive lock-station sweep's
     # (pd_platen_guide_spec), native on the model so the sheet prints it; every
     # printed dimension's places are authored here too (drawing-simplicity-policy.md `How the repository implements the guidelines`).
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "Guide",
-        "Depth",
-        *deviations(GUIDE_DEPTH_BAND),
-        places=GUIDE_DEPTH_PLACES,
-        display_unit=UNIT,
-    )
+    _depth_limits(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

@@ -91,7 +91,6 @@ from pd_latch_hook_geometry import (
     PIN_HOLE_L,
     ROUND_C_L,
     ROUND_R,
-    SCREW_HOLE_X,
     SCREW_HOLE_Y,
     TAB_C_L,
     WIDTH,
@@ -193,8 +192,11 @@ def _on(point: tuple[float, float], u: float, n: float = 0.0) -> tuple[float, fl
 
 
 # Per-view survivors of the marked-dimension import: name -> sheet position.
-# Front: the screw X pair stacked above the base, their Y and size left of
-# it; the roll start and the far face's Y right of the arm; the far face's X
+# Front: the screw X pair stacked above the base, their texts right of the
+# ear's outer face (its extension line crossed them between the arrows,
+# review 4), their Y and size left of it; the roll start and the far face's
+# Y right of the arm, the roll start inside so its text clears the far
+# face's dimension line; the far face's X
 # and the tab end's X stacked below it; the straight's length on the arm's
 # -U side (its extension set clear of the far face's X, which drops from the
 # far face); the pin hole's size up its +N side past the straight's roll-end
@@ -205,11 +207,11 @@ def _on(point: tuple[float, float], u: float, n: float = 0.0) -> tuple[float, fl
 # (147-182 deg about its centre), clear of the end face and its X.
 _TAB_LEADER_DEG = 165.0
 FRONT_KEEP = {
-    "ScrewX2": _front(SCREW_HOLE_X[1] / 2.0, 12.5),
-    "ScrewX1": _front(SCREW_HOLE_X[0] / 2.0, 17.5),
+    "ScrewX2": _front(11.0, 12.5),
+    "ScrewX1": _front(11.0, 17.5),
     "ScrewY": _front(-32.0, SCREW_HOLE_Y / 2.0),
     "ScrewDia": _front(-25.0, -8.0),  # its mate line clear of the arm
-    "RollStart": _front(20.0, OUTER_ROLL_START[1] / 2.0),
+    "RollStart": _front(14.0, OUTER_ROLL_START[1] / 2.0),
     "FaceY": _front(24.0, FAR_FACE_POINT[1] / 2.0),
     "FaceX": _front(FAR_FACE_POINT[0] / 2.0, -96.0),
     "TabEndX": _front(OUTER_TAB_END[0] / 2.0, -103.0),

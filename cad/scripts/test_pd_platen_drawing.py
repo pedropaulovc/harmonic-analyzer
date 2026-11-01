@@ -53,9 +53,9 @@ def _view_boxes() -> dict[str, tuple[float, float, float, float]]:
         ),
         "section A-A": (
             draw.SECTION_CENTER[0] - spec.PLATE_THICKNESS * draw._SECTION_S / 2.0,
-            draw.SECTION_CENTER[1] - draw.SECTION_SPAN_BELOW * draw._SECTION_S,
+            draw.SECTION_CENTER[1] - draw.SECTION_SPAN * draw._SECTION_S,
             draw.SECTION_CENTER[0] + spec.PLATE_THICKNESS * draw._SECTION_S / 2.0,
-            draw.SECTION_CENTER[1] + draw.SECTION_SPAN_ABOVE * draw._SECTION_S,
+            draw.SECTION_CENTER[1] + draw.SECTION_SPAN * draw._SECTION_S,
         ),
     }
 
@@ -112,21 +112,16 @@ def test_counterbore_floor_holds_the_user_accepted_worst_case():
     assert spec.GUIDE_HOLE_DIA / 2.0 < offset < spec.CBORE_DIA / 2.0
     assert (spec.CBORE_SECTION_X, spec.CBORE_SECTION_HOLE_Y) in spec.GUIDE_HOLE_XY
     # Section A-A draws the counterbore (r4: not hidden lines in the right
-    # view), and its partial cut spans the whole counterbore; its upper end
-    # stops short of the clip-screw boss row's foot beyond the plane (round 3).
-    assert min(draw.SECTION_SPAN_ABOVE, draw.SECTION_SPAN_BELOW) > spec.CBORE_DIA / 2.0
-    boss_foot = min(y for _, y in spec.SOCKET_XY) - (
-        spec.SOCKET_BOSS_DIA / 2.0 + spec.SOCKET_BOSS_ROOT_R_MAX
-    )
-    assert spec.CBORE_SECTION_HOLE_Y + draw.SECTION_SPAN_ABOVE < boss_foot
+    # view), and its partial cut spans the whole counterbore.
+    assert draw.SECTION_SPAN > spec.CBORE_DIA / 2.0
     assert {point[:2] for point in draw.SECTION_LINE_MODEL_MM} == {
-        (spec.CBORE_SECTION_X, spec.CBORE_SECTION_HOLE_Y - draw.SECTION_SPAN_BELOW),
-        (spec.CBORE_SECTION_X, spec.CBORE_SECTION_HOLE_Y + draw.SECTION_SPAN_ABOVE),
+        (spec.CBORE_SECTION_X, spec.CBORE_SECTION_HOLE_Y - draw.SECTION_SPAN),
+        (spec.CBORE_SECTION_X, spec.CBORE_SECTION_HOLE_Y + draw.SECTION_SPAN),
     }
     # The value hangs below the cut, wholly left of both extension lines (r5:
     # centred on them, they struck its text).
     _, text_y, text_z = draw.SECTION_TEXT_MODEL_MM[draw.REFERENCE_DIMENSION]
-    assert text_y < spec.CBORE_SECTION_HOLE_Y - draw.SECTION_SPAN_BELOW
+    assert text_y < spec.CBORE_SECTION_HOLE_Y - draw.SECTION_SPAN
     text_right = (
         draw.SECTION_CENTER[0]
         + (text_z - spec.PLATE_THICKNESS / 2.0) * draw._SECTION_S

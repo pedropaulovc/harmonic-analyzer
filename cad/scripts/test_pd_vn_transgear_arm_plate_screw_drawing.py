@@ -409,7 +409,13 @@ def test_sheet_states_the_cut_and_no_size_in_the_registry_names() -> None:
         assert not _SIZE.search(str(row[field])), (field, row[field])
     assert row["installation_notes"] == screw.PURCHASED_STOCK_NOTE
     lines = row["installation_notes"].splitlines()
-    assert len(lines) <= 4
+    # The builder's own budget beside the general line (round 4's native
+    # failure ran four lines).
+    from _purchased_fastener_drawing import note_lines
+
+    assert note_lines(row["installation_notes"], label="plate screw") == tuple(lines)
+    with pytest.raises(ValueError, match="rule 7"):
+        note_lines(row["installation_notes"] + "\nA FOURTH LINE.", label="plate screw")
     assert all(len(line) <= 70 for line in lines), lines
 
 

@@ -169,8 +169,12 @@ DIMENSION_CALLOUTS = {
     # 2:1 in a corner, and two lines of at most 15 characters keep the block
     # between section B-B and the 440.50 line (farm run after round 2: an
     # 18-character "MHA-SH-VN-53 HEADS" row crowded section B-B).
+    # The slot width's broken leader runs down its text's left end to the
+    # underline, so the widest row's first glyph rode that line (machinist
+    # review round 4). A no-break space each side of the widest row widens
+    # the block by a space past every glyph; the centred rows stand clear.
     "ClampSlotWidth": (
-        "THRU, MAX SEATS\nMHA-SH-VN-53 HEADS;\nTRAVEL AND STATIONS\n"
+        "THRU, MAX SEATS\n\u00a0MHA-SH-VN-53 HEADS;\u00a0\nTRAVEL AND STATIONS\n"
         "KEEP THE FULL TAKE-UP\nOF MHA-SH-02 PITCH"
     ),
     "ClampSlotCboreWidth": "CLEARS SLIDING\nMHA-SH-VN-53",

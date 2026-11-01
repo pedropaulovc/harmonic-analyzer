@@ -403,14 +403,15 @@ def test_the_tapped_hole_note_whose_leader_the_callout_crossed_is_removed() -> N
     }
     assert (crossing.x, crossing.y) == pytest.approx((0.0919, 0.1866), abs=1e-4)
     finalize = _calls(drawing.__file__)["finalize_drawing"]
-    keywords = {k.arg: k.value for k in finalize.keywords}
     removal = {
-        "redundant_note_substrings": ast.literal_eval(keywords["redundant_note_substrings"])
+        k.arg: ast.literal_eval(k.value)
+        for k in finalize.keywords
+        if k.arg in ("redundant_note_substrings", "expected_redundant_notes")
     }
-    assert removal == {"redundant_note_substrings": ("Tapped Hole",)}
-    # The face view's note, plus whatever labels the section's cosmetic thread
-    # brought (counted where they were imported).
-    assert ast.unparse(keywords["expected_redundant_notes"]) == "1 + section_thread_labels"
+    assert removal == {
+        "redundant_note_substrings": ("Tapped Hole",),
+        "expected_redundant_notes": 1,
+    }
     # The removal reaches the note, and the callout itself is no note to lose.
     note_text = f"{spec.THREAD} Tapped Hole".lower()
     assert all(s.lower() in note_text for s in removal["redundant_note_substrings"])
@@ -498,8 +499,16 @@ def test_the_stem_diameters_print_across_their_own_cut() -> None:
         "WaistDia": (spec.FLANGE_LENGTH, spec.FLANGE_LENGTH + spec.WAIST_LENGTH),
     }.items():
         x, y = drawing.SECTION_KEEP[name]
-        assert lo < _section_station(y) < hi, name
+        # Round 4: the printed LINE, which runs DIM_LINE_BELOW_TEXT under the
+        # anchor, sits at the feature's mid-height, clear of both its ends.
+        line = _section_station(y - drawing.DIM_LINE_BELOW_TEXT)
+        assert line == pytest.approx((lo + hi) / 2.0), name
         assert x > head_right, name
+    # Negative control: round 4's Ø.43 anchored at the waist's middle drew
+    # its line within 0.2 mm (model) of the Ø.49 shoulder.
+    old_anchor = drawing._section_y(spec.FLANGE_LENGTH + spec.WAIST_LENGTH / 2.0)
+    old_line = _section_station(old_anchor - drawing.DIM_LINE_BELOW_TEXT)
+    assert old_line - spec.FLANGE_LENGTH < 0.2
     # The text clears the overall length's dimension line beyond it.
     assert drawing.SECTION_KEEP["OverallLength"][0] - drawing._STEM_TEXT_X > 0.004
     # All nine turned/dished sizes remain above the seat. The cone diameter

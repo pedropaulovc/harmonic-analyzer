@@ -30,7 +30,7 @@ import pd_vn_transgear_retaining_ring_spec as RING
 from _gtol_cylinder import CylinderFace
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
 from pd_cluster_stack_band import PRINTED_LENGTH_BAND_IN
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
@@ -84,6 +84,25 @@ HEAD_LAND_FLOOR = WALL_TARGET_MM
 HEAD_DOME_R = 4.572  # .18
 HEAD_DOME_SAG = HEAD_DOME_R - math.sqrt(HEAD_DOME_R**2 - (HEAD_DIA / 2.0) ** 2)
 HEAD_HEIGHT = HEAD_LAND + HEAD_DOME_SAG  # proud of the arm's rear face
+# The inside corner where the shank meets the head's seat: the tool-nose
+# radius the print allows, a single R MAX limit (machinist review round 4: the
+# title block's .040 inside corner is wider than the .0375 step and could eat
+# the whole seat).  At .005 it sinks less than .003 into the 45-deg corner, so
+# the ream mouth's deburr clears it and the head seats flat on the arm.
+SEAT_FILLET_R = 0.127  # .005 MAX
+SEAT_FILLET_PLACES = 3
+SEAT_FILLET_SUFFIX = " MAX"
+# The arm's rear face under the head: outside the ream's broken mouth, inside
+# the head's broken rim.
+SEAT_CONTACT_WIDTH_MIN = round(
+    (HEAD_DIA - printed_band_mm(2, unit=UNIT)) / 2.0
+    - edge_break_chamfer_mm(unit=UNIT)
+    - max(
+        ARM.PIN_BORE_DIA_MAX / 2.0 + edge_break_chamfer_mm(unit=UNIT),
+        DIA_MAX / 2.0 + SEAT_FILLET_R,
+    ),
+    6,
+)
 
 # --- Ring groove -------------------------------------------------------------
 # The groove's FRONT wall is the load wall: the cluster pushed forward bears
@@ -161,6 +180,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "HeadDomeProfile": {"HeadDomeR", "HeadDomeSagDim"},
     "TipDomeProfile": {"TipDomeR", "TipDomeSagDim", "TipDomeZ"},
+    "SeatFillet": {"SeatRadius"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinProfile": {
@@ -178,6 +198,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "TipDomeSagDim": 2,
         "TipDomeZ": TIP_STATION_PLACES,
     },
+    "SeatFillet": {"SeatRadius": SEAT_FILLET_PLACES},
 }
 # The overall, apex to tip, a drawing reference for the bar cut (rule 10);
 # the dome heights print as references through ``pd_transgear_pin_callouts``.
@@ -201,6 +222,11 @@ for _ok, _what in (
         f"{inch_text(FRONT_LAND_FLOOR, 4)}, the wall target or three groove depths",
     ),
     (GROOVE_DIA < DIA_MIN, "the groove does not cut below the shank"),
+    (
+        SEAT_CONTACT_WIDTH_MIN > 0.0,
+        f"the head has no seat on the {ARM_NUMBER} rear face past its broken "
+        f"edges and the R{inch_text(SEAT_FILLET_R, SEAT_FILLET_PLACES)} root",
+    ),
     (
         HEAD_LAND_MIN >= HEAD_LAND_FLOOR - 1e-9,
         f"the head land {inch_text(HEAD_LAND, HEAD_LAND_PLACES)} has a printed "
