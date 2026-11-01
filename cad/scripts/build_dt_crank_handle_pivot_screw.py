@@ -42,6 +42,7 @@ from _rebuild import (
     force_rebuild,
 )
 from _session import run_build
+from _single_limit_tolerance import set_single_limit
 from _sketch import (
     SketchDims,
     add_line_chain,
@@ -63,7 +64,6 @@ from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from dt_crank_handle_pivot_screw_spec import (
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     HEAD_DIA,
     HEAD_LENGTH,
@@ -90,6 +90,7 @@ from dt_crank_handle_pivot_screw_spec import (
     THREAD_MODEL_DIA,
     TIP_CHAMFER,
     TIP_CHAMFER_BAND,
+    TIP_CHAMFER_TOL_TYPE,
     UNIT,
 )
 
@@ -358,59 +359,6 @@ async def build(adapter) -> dict[str, str]:
         "overall length reference",
     )
     stations.record("OverallLength", '"HeadLength" + "ShoulderLength" + "ThreadLength"')
-    # The under-head face located from the TIP, the one faced end every axial
-    # location reads from (MHA-DT-32 re-reviews): the seat is the thread length
-    # from the tip, the under-head face this reference -- the shoulder is
-    # turned to suit the bonded handle -- and the head face the overall.  It
-    # runs from the overall line's tip end to the corner of the under-head
-    # face and the shoulder.  The construction stub that carries that corner
-    # lies on the shoulder's silhouette, so the sheet prints no line of its
-    # own (#290 review of 29af6f44d: a stub across the whole screw read as a
-    # stray centreline).
-    under_head_v = -SHOULDER_R
-    set_sketch_direct_db(adapter, True)
-    under_head_line = check(
-        "under-head location reference line",
-        await adapter.add_line(
-            -2.0 * HEAD_LENGTH, under_head_v, -HEAD_LENGTH, under_head_v
-        ),
-    )
-    set_sketch_direct_db(adapter, False)
-    segment = _early_bound(adapter._sketch_entities[under_head_line], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError("under-head location reference line did not take construction flag")
-    check(
-        "under-head location reference horizontal",
-        await adapter.add_sketch_constraint(under_head_line, None, "horizontal"),
-    )
-    await dimension_between(
-        adapter,
-        f"{overall_line}.start",
-        f"{under_head_line}.end",
-        "vertical_distance",
-        SHOULDER_R,
-        "under-head corner on the shoulder",
-    )
-    stations.record("UnderHeadY", '"ShoulderDia" / 2')
-    await dimension_between(
-        adapter,
-        f"{overall_line}.end",
-        f"{under_head_line}.end",
-        "horizontal_distance",
-        OVERALL_LENGTH - HEAD_LENGTH,
-        "under-head location reference",
-    )
-    stations.record("UnderHeadLocation", '"ShoulderLength" + "ThreadLength"')
-    await dimension_between(
-        adapter,
-        f"{under_head_line}.start",
-        f"{under_head_line}.end",
-        "horizontal_distance",
-        HEAD_LENGTH,
-        "under-head reference stub",
-    )
-    stations.record("UnderHeadStub", '"HeadLength"')
     await ensure_fully_defined(adapter, "station reference sketch")
     check("exit_sketch station reference", await adapter.exit_sketch())
     name_last_feature(adapter, "StationReference")
@@ -444,20 +392,24 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Model-owned bands (drawing-simplicity-policy.md `How the repository
-    # implements the guidelines`): the running-fit shoulder, the tip chamfer
-    # the MHA-DT-32 re-review found could print as nothing, the relief
+    # implements the guidelines`): the running-fit shoulder, the relief
     # diameter that keeps the die's run-out under the thread root and a flat
-    # seat (Codex P1 on #1139), the relief lead that prints as limits in the
-    # relief callout (the model owning its band all the same, Codex P2), and
-    # the thread length that must engage the arm.  The head and slot sizes
-    # print under the title block's bands.
+    # seat (Codex P1 on #1139), the relief lead that prints as limits in its
+    # leader note (the model owning its band all the same, Codex P2), and the
+    # thread length that must engage the arm.  The tip chamfer prints as the
+    # single limit .015 MAX (#290 review of b28d38a16).  The head and slot
+    # sizes print under the title block's bands.
     set_dimension_bilateral_tolerance(
         adapter, "ScrewProfile", "ShoulderDia", *deviations(SHOULDER_DIA_BAND),
         display_unit=UNIT,
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "ScrewProfile", "TipChamfer", *deviations(TIP_CHAMFER_BAND),
-        display_unit=UNIT,
+    set_single_limit(
+        adapter,
+        "ScrewProfile",
+        "TipChamfer",
+        limit=TIP_CHAMFER,
+        band=TIP_CHAMFER_BAND,
+        tol_type=TIP_CHAMFER_TOL_TYPE,
     )
     set_dimension_symmetric_tolerance(
         adapter, "ScrewProfile", "ReliefDia", RELIEF_DIA_TOL, display_unit=UNIT
@@ -546,10 +498,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
+        {"Isometric View Note": ISOMETRIC_VIEW_NOTE},
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     # The drive train places INSTALLED while the part saves on its default, so

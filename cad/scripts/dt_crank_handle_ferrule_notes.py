@@ -61,13 +61,14 @@ BORE_FIT_CALLOUT = "\n".join(
         "DIAMETRAL CLEARANCE",
     )
 )
-# The OD is the 9/16-in rod as supplied (a reference: STOCK, rule 4; the title
-# block's MATERIAL already names the rod), skimmed to the grip contour with
-# the handle after the epoxy cures (user ruling 2026-10-01); the finished size
-# sits on the OD itself (r1-r3 finding 2), with the walls the skim leaves.
+# The OD is the 9/16-in rod as supplied: an untoleranced reference whose
+# supplier tolerance governs (owner rule; #290 reviews asked for a printed
+# band), skimmed to the grip contour with the handle after the epoxy cures
+# (user ruling 2026-10-01); the finished size sits on the OD itself (r1-r3
+# finding 2), with the walls the skim leaves.
 OUTER_DIA_CALLOUT = "\n".join(
     (
-        "STOCK;",
+        "9/16 ROD AS SUPPLIED;",
         f"SKIM TO <MOD-DIAM>{inch_text(INSTALLED_OUTER_DIA, 2)}",
         f"WITH {HANDLE_NUMBER}",
         "AFTER CURE;",

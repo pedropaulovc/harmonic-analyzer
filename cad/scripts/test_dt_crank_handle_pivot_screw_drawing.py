@@ -70,6 +70,7 @@ def test_model_owns_places_and_bands() -> None:
         "HeadDia": 3,
         "HeadLength": 3,
         "ShoulderDia": 3,
+        "ShoulderLength": 2,
         "ThreadLength": 2,
         "ReliefDia": 3,
         "ReliefWidth": 2,
@@ -77,21 +78,15 @@ def test_model_owns_places_and_bands() -> None:
         "SlotWidth": 2,
         "SlotDepth": 2,
         "OverallLength": 2,
-        "UnderHeadLocation": 2,
     }
     # User ruling 2026-09-29 (MHA-DT-32 review): the shoulder is turned to suit
     # the bonded handle, so its length is a reference.
-    assert spec.REFERENCE_DIMENSIONS == {"OverallLength", "UnderHeadLocation"}
-    # Every axial location reads from the tip (re-reviews): the under-head
-    # face is located from it, not sized from the seat.
-    assert "ShoulderDia" in spec.DRAWING_PRECISION_BY_NAME
-    assert "ShoulderLength" not in spec.DRAWING_PRECISION_BY_NAME
+    assert spec.REFERENCE_DIMENSIONS == {"OverallLength", "ShoulderLength"}
     # Every band comes from a named spec constant, never a typed number; the
     # head and slot hold the title block's bands.
     assert model_toleranced_dimensions(part) == {
         ("ScrewProfile", "ShoulderDia"): "*deviations(SHOULDER_DIA_BAND)",
         ("ScrewProfile", "ThreadLength"): "*deviations(THREAD_LENGTH_BAND)",
-        ("ScrewProfile", "TipChamfer"): "*deviations(TIP_CHAMFER_BAND)",
         ("ScrewProfile", "ReliefLead"): "RELIEF_LEAD_TOL",
         ("ScrewProfile", "ReliefDia"): "RELIEF_DIA_TOL",
     }
@@ -132,9 +127,10 @@ def test_geometry_matches_the_u33_ruling() -> None:
     )
     assert spec.SLOT_WEB_MIN > spec.SLOT_DEPTH + spec.SLOT_DEPTH_TOL
     assert spec.SLOT_DEPTH - spec.SLOT_DEPTH_TOL > 0.0
-    # The tip chamfer is banded so it always exists and never cuts past the
-    # thread depth.
-    assert 0.0 < spec.TIP_CHAMFER_MIN < spec.TIP_CHAMFER < spec.TIP_CHAMFER_MAX
+    # The tip chamfer is a single MAX limit that never cuts past the thread
+    # depth (#290 review of b28d38a16).
+    assert spec.TIP_CHAMFER_MAX == spec.TIP_CHAMFER == pytest.approx(0.015 * 25.4)
+    assert spec.TIP_CHAMFER_BAND == (0.0, -spec.TIP_CHAMFER)
     assert spec.THREAD_SIZE == "#4-40"
     assert spec.THREAD_MODEL_DIA == THREAD_MAJOR_MM["#4-40"] == 2.845
     assert spec.THREAD_PITCH == pytest.approx(25.4 / 40.0)
@@ -237,7 +233,7 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     # straight floor past the longest lead keeps 1.5 #4-40 pitches (machinist
     # review of crank-v4-16; local review of 20dac9d3f).
     toleranced = {name for _, name in model_toleranced_dimensions(part)}
-    assert {"ReliefDia", "ReliefLead", "TipChamfer"} <= toleranced
+    assert {"ReliefDia", "ReliefLead"} <= toleranced
     assert "ReliefWidth" not in toleranced
     xx = printed_band_mm(2, unit=spec.UNIT)
     assert spec.RELIEF_WIDTH_MIN == pytest.approx(spec.RELIEF_WIDTH - xx)
@@ -443,12 +439,7 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         assert not (x >= title_block[0] and y <= title_block[1])
     # Picks land on the features they annotate.  The thread callout's leader
     # tip lands on the full-thread portion, never on the relief groove.
-    assert drawing.THREAD_PICK[0] == drawing.THREAD_START_X
-    assert drawing.THREAD_START_X - drawing.TIP_X == pytest.approx(
-        spec.TIP_CHAMFER * drawing.SHEET_SCALE[0] / 1000.0
-    )
-    assert not drawing.RELIEF_END_X <= drawing.THREAD_PICK[0] <= drawing.SEAT_X
-    assert drawing.THREAD_PICK[0] < drawing.RELIEF_END_X
+    assert drawing.THREAD_START_X < drawing.THREAD_PICK[0] < drawing.RELIEF_END_X
     # The relief dimensions sit on the groove, the Ø below the profile and the
     # width above it, both above the first baseline row.
     for name in ("ReliefDia", "ReliefWidth"):
@@ -476,15 +467,8 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     leader_y_at_seat = start_y + t * (end_y - start_y)
     shoulder_bottom = 2.0 * drawing.SIDE_CENTER[1] - drawing.SHOULDER_TOP_Y
     assert shoulder_bottom - leader_y_at_seat >= 0.002
-    # The block stays above the thread-length row's text.
-    assert end_y - drawing.SIDE_KEEP["ThreadLength"][1] >= 0.005
-    # The 45-degree lead rides the Ø callout; only the width stands above.
-    assert "ReliefLead" not in drawing.SIDE_KEEP
-    assert drawing.SIDE_KEEP["ReliefWidth"][1] > drawing.RELIEF_TOP_Y
-    # The thread note stands up and right of its pick, so the leader slants.
-    note_x, note_y = drawing.THREAD_NOTE_XY
-    assert note_x - drawing.THREAD_PICK[0] > 0.010
-    assert note_y - drawing.SIDE_KEEP["ReliefWidth"][1] > 0.015
+    # The block stays above the fitted shoulder length's row.
+    assert end_y - drawing.SIDE_KEEP["ShoulderLength"][1] >= 0.010
     # The slot value stands clear of its 3-mm-apart extension lines.
     assert drawing.END_KEEP["SlotWidth"][1] - drawing.END_CENTER[1] > 0.005
     assert (
@@ -493,7 +477,7 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         < 2.0 * drawing.SIDE_CENTER[1] - drawing.THREAD_TOP_Y  # below the thread
     )
     thread_half = spec.THREAD_MODEL_DIA * drawing.SHEET_SCALE[0] / 2000.0
-    assert abs(drawing.THREAD_PICK[1] - drawing.SIDE_CENTER[1]) < thread_half
+    assert abs(drawing.THREAD_PICK[1] - drawing.SIDE_CENTER[1]) == pytest.approx(thread_half)
     assert drawing.SEAT_X < drawing.FINISH_PICK[0] < drawing.UNDERHEAD_X
     assert drawing.SEAT_X < drawing.CENTERLINE_PICK[0] < drawing.UNDERHEAD_X
     shoulder_dim_x = drawing.SIDE_KEEP["ShoulderDia"][0]

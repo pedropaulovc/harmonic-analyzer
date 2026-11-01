@@ -143,11 +143,14 @@ THREAD_LENGTH = 9.906  # .39
 THREAD_LENGTH_BAND = (0.0, -0.508)  # +.00/-.02
 # 45-degree thread-start chamfer on the tip, inside the thread depth.  Like the
 # relief lead, the model holds the 45 degrees by equation and the print gives
-# the axial leg with an "X 45 DEG" callout.  Banded (MHA-DT-32 re-review): a
-# looser band could print as nothing; +.002/-.004 keeps a real chamfer that
-# never cuts past the thread depth.
-TIP_CHAMFER = 0.3048  # .012
-TIP_CHAMFER_BAND = (0.0508, -0.1016)  # +.002/-.004
+# the axial leg with an "X 45 DEG" callout.  It prints as the single limit
+# .015 MAX (swTolMAX: the modelled leg IS the limit, inside 17/24 H = .0153):
+# it starts the die and stays inside the thread depth, and a die starts on any
+# lead, so nothing needs a minimum (#290 review of b28d38a16 called the
+# +.002/-.004 band over-specification).
+TIP_CHAMFER = 0.381  # .015
+TIP_CHAMFER_BAND = (0.0, -TIP_CHAMFER)  # sharp up to .015
+TIP_CHAMFER_TOL_TYPE = 6  # swTolType_e.swTolMAX
 # The title block states the UN thread class, so the callout names no class.
 THREAD_CALLOUT = f"{THREAD_SIZE} UNC"
 THREADS_PER_IN = 40
@@ -191,8 +194,11 @@ THREAD_FIT_OFFSET_MAX = round(
 # the arm face.
 # Banded (Codex P1 on #1139): a looser relief could stand above the thread
 # root (no die run-out) and, with the lead, reach past the shoulder's seat.
-# Ø.073 +/-.002 keeps the largest relief under the deepest die-cut root
-# estimated above (local reviews of 747487c71 and 21bb244c5).
+# Ø.073 +/-.002 keeps the largest relief, .075, under the deepest die-cut root
+# estimated above, about .0763 (local reviews of 747487c71 and 21bb244c5).  The
+# title block's +/-.005 would allow .078, above that root (the #290 review of
+# b28d38a16 took the root as .078), so the band stays and its callout says
+# what it clears.
 RELIEF_DIA = 1.8542  # .073
 RELIEF_DIA_TOL = 0.0508  # .002
 RELIEF_DIA_MAX = round(RELIEF_DIA + RELIEF_DIA_TOL, 6)
@@ -219,21 +225,21 @@ RELIEF_LEAD_LIMITS = (
 )
 CHAMFER_CALLOUT = "X 45 DEG"
 # Each band tighter than the title block's names what it serves at its
-# callout (#290 review of 29af6f44d, rule 4): the tip chamfer starts the
-# thread in the arm's tapped hole and stays inside the thread depth; the
-# relief clears the die's root and its lead stays inside the arm's tapped
-# mouth, so the seat annulus stays flat.  The 45-degree lead rides the
-# relief's Ø callout rather than a third dimension crowded into the narrow
-# groove at 3:1 (machinist review).
+# callout (#290 review of 29af6f44d, rule 4): the relief clears the die's
+# deepest root and its lead stays inside the arm's tapped thread, so the seat
+# annulus stays flat.  The tip chamfer's single limit starts the die and stays
+# inside the thread depth.  The 45-degree lead takes its own leader note onto
+# the lead (#290 review of b28d38a16: on the relief's Ø callout its leader
+# ended in the groove), printing the limits its model band gives.
 # Rows of 18 characters at most keep each block clear of the extension lines
 # beside it (farm r8 of f5256bf3d).
-TIP_CHAMFER_CALLOUT = f"{CHAMFER_CALLOUT};\nINSIDE THREAD\nDEPTH; STARTS\nMHA-DT-06"
-RELIEF_CALLOUT = "\n".join(
+TIP_CHAMFER_CALLOUT = f"{CHAMFER_CALLOUT};\nSTARTS THE DIE;\nINSIDE THREAD\nDEPTH"
+RELIEF_CALLOUT = "UNDER DIE-CUT ROOT"
+RELIEF_LEAD_NOTE = "\n".join(
     (
-        f"UNDER {THREAD_SIZE} ROOT;",
         f"{inch_text(RELIEF_LEAD_LIMITS[0], 3)}-{inch_text(RELIEF_LEAD_LIMITS[1], 3)} "
         f"{CHAMFER_CALLOUT}",
-        "LEAD INSIDE",
+        "LEAD, INSIDE",
         "MHA-DT-06 THREAD",
     )
 )
@@ -293,10 +299,7 @@ CUP_POCKET_WALL_MIN = round(((CUP_BODY_DIA - CUP_BODY_DIA_TOL) - POCKET_MAX) / 2
 SLOT_WEB_MIN = round(
     HEAD_LENGTH - HEAD_LENGTH_TOL - (SLOT_DEPTH + SLOT_DEPTH_TOL), 6
 )
-TIP_CHAMFER_MIN, TIP_CHAMFER_MAX = (
-    round(TIP_CHAMFER + TIP_CHAMFER_BAND[1], 6),
-    round(TIP_CHAMFER + TIP_CHAMFER_BAND[0], 6),
-)
+TIP_CHAMFER_MAX = TIP_CHAMFER  # the printed single limit
 # Under-head bearing annulus on the cup floor at the worst case: the smallest
 # head over the largest drilled floor hole, less a title-block edge break on
 # each, on the narrow side with the head pushed off-centre as far as its
@@ -387,19 +390,13 @@ ARM_STOCK_THICKNESS_MAX = 2.0 * ARM_STOCK_THICKNESS - ARM_STOCK_THICKNESS_MIN
 FILE_ALLOWANCE_MAX = round(THREAD_LENGTH_MAX - ARM_STOCK_THICKNESS_MIN, 6)
 FILE_ALLOWANCE_MIN = round(FULL_THREAD_REACH_MIN - ARM_STOCK_THICKNESS_MAX, 6)
 # The fitted shoulder, stated once (user ruling 2026-09-29, after the
-# MHA-DT-32 machinist review).  #290: the note states function only; the end
-# play, the seat edge's break and both head bands' reasons print as callouts
-# on what they qualify (review of 29af6f44d: a band's reason belongs at its
-# callout).
-DRAWING_NOTES = "\n".join(
-    (
-        "FACE THE UNDER-HEAD TO SUIT THE BONDED MHA-DT-08: UNDER-HEAD TO SEAT",
-        "  FACE (SHOULDER END, ON MHA-DT-06) = FERRULE FACE TO CUP FLOOR PLUS",
-        "  THE END PLAY.",
-    )
-)
-END_PLAY_CALLOUT = (
-    f"FACED TO SUIT, {inch_text(END_PLAY_RANGE[0], 3)}-"
+# MHA-DT-32 machinist review), on the shoulder length it sets: under-head to
+# seat face is the bonded handle's ferrule arm face to cup floor plus the end
+# play (#290 review of b28d38a16: in a general note the fit-up had no leader
+# and no dimension of its own).  The sheet carries no general note.
+SHOULDER_LENGTH_CALLOUT = (
+    "FACED TO SUIT: MHA-DT-34 ARM FACE TO MHA-DT-35\n"
+    f"FLOOR IN BONDED MHA-DT-08 + {inch_text(END_PLAY_RANGE[0], 3)}-"
     f"{inch_text(END_PLAY_RANGE[1], 3)} END PLAY"
 )
 # The head's bands: its diameter keeps a bearing annulus on the cup floor
@@ -479,20 +476,12 @@ for _ok, _what in (
         "inboard face, so it cannot be filed flush on full thread",
     ),
     (
-        INSTALLED_TIP_CHAMFER < TIP_CHAMFER,
-        "the fitted edge break is not smaller than the as-turned tip chamfer",
-    ),
-    (
         TIP_CHAMFER_MAX <= 0.61343 * THREAD_PITCH,
         f"tip chamfer cuts deeper than the {THREAD_SIZE} thread (17/24 H)",
     ),
     (
         TIP_CHAMFER + RELIEF_WIDTH < THREAD_LENGTH_MIN,
         "tip chamfer and relief leave no full thread",
-    ),
-    (
-        all(len(line) <= 72 for line in DRAWING_NOTES.splitlines()),
-        "an MHA-DT-32 note line is over 72 characters",
     ),
     (HEAD_DIA > HANDLE_BORE_MAX, "head passes through the handle bore"),
     (HEAD_DIA + HEAD_DIA_TOL < STOCK_DIA, "head is not turnable from 1/4-in rod"),
@@ -521,19 +510,20 @@ for _ok, _what in (
     if not _ok:
         raise AssertionError(f"MHA-DT-32: {_what}")
 
-# Every axial LOCATION reads from the TIP, the one faced end (MHA-DT-32
-# re-reviews, 2026-09-29): the seat face (the thread length, with its own band
-# for the engagement check), the under-head face (UnderHeadLocation, a
-# reference: the shoulder is turned to suit the bonded handle) and the head
-# face (the reference overall, for stock cut-off).  The head length, the slot
-# depth, the relief width and the two 45-degree legs are local sizes of their
-# features.  A head-face origin cannot work: the seat is fitted, so the thread
-# length would ride on the handle stack.
+# Axial locations read from the TIP, the one faced end (MHA-DT-32 re-reviews,
+# 2026-09-29): the seat face is the thread length, with its own band for the
+# engagement check.  The under-head face is the fitted shoulder length from
+# the seat, a reference (the shoulder is turned to suit the bonded handle), and
+# the head face the reference overall, for stock cut-off.  The head length, the
+# slot depth, the relief width and the tip chamfer's leg are local sizes of
+# their features.  A head-face origin cannot work: the seat is fitted, so the
+# thread length would ride on the handle stack.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ScrewProfile": {
         "HeadDia",
         "HeadLength",
         "ShoulderDia",
+        "ShoulderLength",
         "ThreadLength",
         "ReliefDia",
         "ReliefWidth",
@@ -541,19 +531,20 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "SlotProfile": {"SlotWidth"},
     "DriverSlot": {"SlotDepth"},
-    "StationReference": {"OverallLength", "UnderHeadLocation"},
+    "StationReference": {"OverallLength"},
 }
 # Decimal places ARE the tolerance (drawing-guidelines.md rule 3 (decimal
 # places carry the tolerance)): the head diameter and length (the cup-floor
 # bearing and recess), the shoulder's running band, the relief diameter and
-# the two 45-degree legs at three; every other size at two, the relief width
-# for the 1.5D engagement rule and the thread length with its own +.00/-.02
-# band; the fitted shoulder length and the overall are references.
+# the tip chamfer's single limit at three; every other size at two, the relief
+# width for the 1.5D engagement rule and the thread length with its own
+# +.00/-.02 band; the fitted shoulder length and the overall are references.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ScrewProfile": {
         "HeadDia": 3,
         "HeadLength": 3,
         "ShoulderDia": 3,
+        "ShoulderLength": 2,
         "ThreadLength": 2,
         "ReliefDia": 3,
         "ReliefWidth": 2,
@@ -561,7 +552,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     },
     "SlotProfile": {"SlotWidth": 2},
     "DriverSlot": {"SlotDepth": 2},
-    "StationReference": {"OverallLength": 2, "UnderHeadLocation": 2},
+    "StationReference": {"OverallLength": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -570,6 +561,6 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked MHA-DT-32 dimension needs authored places")
-REFERENCE_DIMENSIONS = frozenset({"OverallLength", "UnderHeadLocation"})
+REFERENCE_DIMENSIONS = frozenset({"OverallLength", "ShoulderLength"})
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 1:1"
