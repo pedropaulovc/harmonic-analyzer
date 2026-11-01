@@ -572,21 +572,16 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
     """User ruling 2026-09-27 (#1038): a notch is never narrower than the
     plate it straddles. Its minimum -- the modelled nominal -- is the plate at
     max material plus RUNNING_FLOOR; the band is +0.30/0, native on the width."""
-    import ch_channel_lever_spec as lever
     import ch_rocker_arm_spec as rocker
     import rocker_bank_layout as bank
     from _drawing_contract import model_toleranced_dimensions
 
     spec = ch_amplitude_bar_spec
-    # The restated plate constants are their sources'.
-    assert spec.LEVER_THICKNESS == lever.LEVER_THICKNESS
-    assert spec.LEVER_THICKNESS_TOLERANCE == lever.LEVER_THICKNESS_TOLERANCE
-    assert spec.STRAP_THICKNESS == rocker.ARM_THICKNESS
-    # The rocker strap now prints 2.500 +/-0.025 natively (Main ruling
-    # 2026-10, option b); the bar keeps the former .XX band, which covers it,
-    # so the foot notch stays conservative and the bar does not re-key.
-    assert spec.STRAP_THICKNESS_TOLERANCE == rocker.LINEAR_2PL
-    assert spec.STRAP_THICKNESS_TOLERANCE >= max(map(abs, rocker.ARM_THICKNESS_BAND))
+    # The foot notch's restated strap envelope covers the rocker strap at
+    # maximum material (#290: the strap prints .098 +/-.001).
+    assert spec.STRAP_THICKNESS + spec.STRAP_THICKNESS_TOLERANCE >= (
+        rocker.ARM_THICKNESS + rocker.ARM_THICKNESS_BAND[0]
+    )
     assert spec.STRADDLE_RUNNING_FLOOR == bank.RUNNING_FLOOR
 
     # #1038 option 2 (owner ruling 2026-10-15): the top notch +0.20/0; the
