@@ -15,7 +15,7 @@ from __future__ import annotations
 import _config
 from _hole_spec import THREAD_MAJOR_MM
 from _package_units import drawing_unit
-from _printed_tolerance import printed_deviations
+from _printed_tolerance import printed_band_mm, printed_deviations
 from sh_column_clamp_back_geom import (  # noqa: F401
     BLOCK_DEPTH,
     DEPTH,
@@ -29,7 +29,7 @@ from sh_column_clamp_fit import (  # noqa: F401
     BORE_RADIUS_MAX,
     COLUMN_MATE,
     BACK_EAR_WANDER,
-    DEPTH_PLACES,
+    BACK_DEPTH_PLACES,
     EAR_HOLE_CALLOUT_PLACES,
     EAR_HEIGHT_BAND,
     EAR_STATION_BAND,
@@ -69,33 +69,36 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 EAR_STATION_DIMENSIONS = ("EarHole1Z", "EarHole2Z")
 
-# Places and explicit bands on those dimensions; every one is read by a fit
-# or a wall below, so all print .XXX (ruling B2, 2026-10-31).
+# Places and explicit bands on those dimensions.
 # * GripOffset .020 +/-.004 (GRIP_OFFSET_BAND): the grip budget in
 #   sh_column_clamp_fit; the face gap stays open at its least.
-# * Depth .590: the back wall (bore to back face) is GripOffset + Depth less
-#   the largest seated bore radius (WALLS_WORST below).
+# * Depth .59 at the title block's .XX: the back wall (bore to back face) is
+#   GripOffset + Depth less the largest seated bore radius (WALLS_WORST
+#   below), and the tap's wander runs its deepest .60.
 # * EarHole1Z .689 +/-.004 (EAR_STATION_BAND): the ear stations line up with
 #   the front arc's clearance holes (sh_column_clamp_fit.SCREW_FLOAT).
 # * BoreDia prints (Ø1.008) as a reference nominal under its matched
 #   diametral-clearance acceptance on the column.
-# * Width 1.890, AnchorZ .945 and Height .630: outside sizes the ear walls
-#   below read.
+# * Width 1.89 and Height .63: outside sizes at the title block's .XX; the
+#   walls below take their +/-.01.
+# * AnchorZ prints as a reference (.945): half the width, the bore centred on
+#   the block.  The walls charge each side face the .XX +/-.01 about it.
 # * EarHoleHeight .315 +/-.004 (EAR_HEIGHT_BAND): the taps line up with the
 #   front arc's clearance holes across the bar's height too
 #   (sh_column_clamp_fit.EAR_SCREW_MISMATCH_MAX); the walls below take it.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {
-        "Depth": DEPTH_PLACES,
-        "Width": 3,
+        "Depth": BACK_DEPTH_PLACES,
+        "Width": 2,
         "GripOffset": 3,
         "AnchorZ": 3,
     },
-    "Block": {"Height": 3},
+    "Block": {"Height": 2},
     "BoreProfile": {"BoreDia": 3},
     "EarHoles": {"EarHole1Z": 3},
     "EarHeightReference": {"EarHoleHeight": 3},
 }
+REFERENCE_DIMENSIONS = ("BoreDia", "AnchorZ")
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
     for dimensions in DRAWING_PRECISION.values()
@@ -121,9 +124,9 @@ _WIDTH_MIN = (
     )[0]
 )
 _ANCHOR_Z = ARC_WIDTH / 2.0
-_ANCHOR_DEV = printed_deviations(
-    _ANCHOR_Z, DRAWING_PRECISION["BlockProfile"]["AnchorZ"], unit=UNIT
-)
+# The reference centre: the side faces stand the title block's .XX band off it.
+_ANCHOR_BAND = printed_band_mm(2, unit=UNIT)
+_ANCHOR_DEV = (-_ANCHOR_BAND, _ANCHOR_BAND)
 _HEIGHT_MIN = (
     ARC_HEIGHT
     + printed_deviations(ARC_HEIGHT, DRAWING_PRECISION["Block"]["Height"], unit=UNIT)[0]

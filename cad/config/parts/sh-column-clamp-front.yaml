@@ -16,4 +16,4 @@ sh-column-clamp-front:
       kind: "minor"
       where: "the sheet note EAR TO MHA-SH-02 TAP OFFSET UP TO .003 OVER #8 SCREW CLEARANCE"
       finding: "ear-hole-to-tap screw-line stack not held by the loose bands at the worst case, no fit-up adjustment (rules 19, 20)"
-      reason: "the printed +/-.004 ear stations and heights alone spend .0113 (0.287 mm) of the #8 screw's .0160 (0.406 mm) radial clearance in the .196 MIN hole; 0.3 deg drill wander through both arcs (.0036 + .0031) brings the worst offset to .0180 (0.458 mm), .0020 (0.052 mm) over, inside the ruled 0.053 mm (stated rounded up as .003); no slot, oversize or match-drill is added (owner-ruled shortfall)"
+      reason: "the printed +/-.004 ear stations and heights alone spend .0113 (0.287 mm) of the #8 screw's .0160 (0.406 mm) radial clearance in the .196 MIN hole; 0.3 deg drill wander through both arcs (.0036 over the .690 MAX front depth + .0031 over the .60 MAX back depth) brings the worst offset to .0181 (0.459 mm), .0021 (0.0525 mm) over, inside the ruled 0.053 mm (stated rounded up as .003); no slot, oversize or match-drill is added (owner-ruled shortfall)"

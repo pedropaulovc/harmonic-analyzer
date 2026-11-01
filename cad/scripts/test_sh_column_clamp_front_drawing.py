@@ -172,9 +172,17 @@ def test_walls_at_the_largest_column_and_drill_wander() -> None:
     web = _in(0.689 - 0.004) - reach - r_bore
     assert math.isclose(spec.WALLS_WORST["ear to bore"], web)  # 1.851 (.0729)
     assert math.isclose(spec.WALLS_WORST["bar-face wall"], _in(0.680) - r_bore)
+    # The .XX width (1.89 +/-.01) about the reference .945 centre, the side
+    # faces each the .XX band off it.
+    assert math.isclose(
+        spec.WALLS_WORST["ear to near side"], _in(0.935) - _in(0.693) - reach
+    )
     assert math.isclose(
         spec.WALLS_WORST["ear to far side"],
-        _in(1.885) - _in(0.950) - _in(0.693) - reach,
+        _in(1.880) - _in(0.955) - _in(0.693) - reach,
+    )
+    assert math.isclose(
+        spec.WALLS_WORST["ear to top face"], _in(0.620) - _in(0.319) - reach
     )
     assert min(spec.WALLS_WORST.values()) >= _in(0.060)
     # The web reaches the .080 target only on a column under its own Ø1.000
