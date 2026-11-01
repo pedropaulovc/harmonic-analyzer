@@ -167,6 +167,8 @@ def test_note_is_one_short_line_naming_the_end_bracket() -> None:
     assert "\n" not in note and len(note) <= 80
     assert note == note.upper()
     assert "MHA-CH-06-TL-28" in note
+    # The receipt check's pass condition: the bracket's screws pass the holes.
+    assert "#6-32 SCREWS MUST PASS BOTH HOLES" in note
 
 
 def test_sheet_is_the_registered_purchased_part_reference(monkeypatch) -> None:

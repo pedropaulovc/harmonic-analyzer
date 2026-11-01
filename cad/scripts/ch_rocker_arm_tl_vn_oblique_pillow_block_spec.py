@@ -121,10 +121,12 @@ BORE_AREA = math.pi * (BORE_DIA / 2.0) ** 2
 HOLE_VOLUME = math.pi * (HOLE_DIA / 2.0) ** 2 * FOOT_THICK
 VOLUME_MM3 = WIDTH * (BASE_AREA + BOSS_UPPER_AREA - BORE_AREA) - 2.0 * HOLE_VOLUME
 
-# The bolt holes are the interface: check them against the end bracket's
-# tapped holes, named by drawing number.
+# The bolt holes are the interface: on receipt, the end bracket's screws must
+# pass both holes into its taps (the pass condition; machinist review), the
+# bracket named by drawing number.
 DRAWING_NOTES = (
-    "ENVELOPE MODEL: CHECK THE BOLT HOLES AGAINST MHA-CH-06-TL-28 ON RECEIPT."
+    f"ENVELOPE MODEL: {leadscrew.KP08_SCREW} SCREWS MUST PASS BOTH HOLES INTO"
+    " MHA-CH-06-TL-28 TAPS."
 )
 
 # Reference sizes on the plan view (the Front Plane, sketch (u, v) = model
