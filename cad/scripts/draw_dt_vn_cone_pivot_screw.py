@@ -14,6 +14,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _com import _early_bound
+from _drawing_common import rebuild_drawing
 from _supplier_screw_dimensions import annotate_supplier_screw
 from _supplier_screw_layout import supplier_screw_margins
 from _mcmaster_91829a560 import (
@@ -29,6 +30,38 @@ from _mcmaster_91829a560 import (
 SPEC = DRAWINGS_BY_NAME["dt_vn_cone_pivot_screw"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "SHOULDER SCREW, Ø1/4 x 1/4 SHOULDER, #10-24 x 3/8 THREAD"
+# Both diameters lane below FRONT, Ø.190 on the inner lane. Ø.250's stacked
+# limits stand ~8.9 mm above its own line, yet the shared lanes are only
+# ~6.9 mm apart, so its upper limit straddled Ø.190's dimension line (r11
+# review, run 20261101T105537488Z). One drop more puts ~4 mm of paper between
+# Ø.190's line and Ø.250's text; the pre-fit margin reserves it.
+SHOULDER_DIAMETER_DROP_M = 0.006
+
+
+def supplier_margins() -> dict[str, tuple[float, float, float, float]]:
+    margins = supplier_screw_margins(
+        SUPPLIER_REFERENCE_DIMENSIONS,
+        planes=SUPPLIER_REFERENCE_PLANES,
+        sides=SUPPLIER_REFERENCE_SIDES,
+    )
+    left, bottom, right, top = margins["*Front"]
+    return {**margins, "*Front": (left, bottom + SHOULDER_DIAMETER_DROP_M, right, top)}
+
+
+def _lower_shoulder_diameter(adapter: Any, displays: dict[str, Any]) -> None:
+    """Move the whole Ø.250 dimension (line and text) one drop further down."""
+    display = _early_bound(displays["SupplierShoulderDiameter"], "IDisplayDimension")
+    # A model annotation may inherit offset mode; move the line, not text alone.
+    display.OffsetText = False
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    x, y, _z = (float(value) for value in annotation.GetPosition())
+    target = (x, y - SHOULDER_DIAMETER_DROP_M)
+    if not annotation.SetPosition2(*target, 0.0):
+        raise RuntimeError("91829A560: failed to lower the shoulder diameter lane")
+    rebuild_drawing(adapter, label="91829A560 shoulder diameter lane")
+    moved = tuple(float(value) for value in annotation.GetPosition())[:2]
+    if not all(math.isclose(a, b, rel_tol=0.0, abs_tol=5e-4) for a, b in zip(moved, target)):
+        raise RuntimeError(f"91829A560: shoulder diameter lane read back at {moved!r}")
 
 
 def _assert_supplier_bands(displays: dict[str, Any]) -> None:
@@ -67,6 +100,7 @@ async def build(adapter: Any) -> dict[str, str]:
             sides=SUPPLIER_REFERENCE_SIDES,
         )
         _assert_supplier_bands(displays)
+        _lower_shoulder_diameter(adapter, displays)
 
         def assert_bands() -> None:
             from _supplier_screw_dimensions import assert_supplier_screw
@@ -93,11 +127,7 @@ async def build(adapter: Any) -> dict[str, str]:
         SPEC,
         item=ITEM,
         supplier_dimensions=supplier_dimensions,
-        supplier_margins=supplier_screw_margins(
-            SUPPLIER_REFERENCE_DIMENSIONS,
-            planes=SUPPLIER_REFERENCE_PLANES,
-            sides=SUPPLIER_REFERENCE_SIDES,
-        ),
+        supplier_margins=supplier_margins(),
         settled_checks=(assert_settled,),
         unit=part_drawing_unit("dt-vn-cone-pivot-screw"),
     )

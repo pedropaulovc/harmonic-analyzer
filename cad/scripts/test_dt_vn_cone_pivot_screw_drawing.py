@@ -4,7 +4,7 @@ SolidWorks draws the shown construction lines grey OVER the view's edges but
 UNDER the dimension extension lines, which are the same width (FRONT 1:1 of
 run 20261101T085308503Z). So every line must lie under one of the sheet's own
 extension lines; only a witness's start gap may leave a line bare, and then
-only on a visible edge.
+only on a visible edge. The stacked bottom diameters also keep a clear lane.
 """
 
 from __future__ import annotations
@@ -12,7 +12,8 @@ from __future__ import annotations
 import pytest
 
 import _mcmaster_91829a560 as screw
-from _supplier_screw_layout import supplier_screw_lane_plan
+import draw_dt_vn_cone_pivot_screw as draw
+from _supplier_screw_layout import supplier_screw_lane_plan, supplier_screw_margins
 
 ROWS = {name: (value, orientation) for name, value, orientation in screw.SUPPLIER_REFERENCE_DIMENSIONS}
 FAR = 1000.0  # witnesses run on to their lanes, beyond the part
@@ -111,3 +112,56 @@ def test_only_witness_gaps_leave_reference_ink_bare_and_only_on_edges(gap: float
             "SupplierShoulderLength",
         ):
             assert spans == [], name
+
+
+def test_shoulder_diameter_lane_drop_is_reserved_before_the_fit() -> None:
+    base = supplier_screw_margins(
+        screw.SUPPLIER_REFERENCE_DIMENSIONS,
+        planes=screw.SUPPLIER_REFERENCE_PLANES,
+        sides=screw.SUPPLIER_REFERENCE_SIDES,
+    )
+    margins = draw.supplier_margins()
+    assert set(margins) == set(base) == {"*Front"}
+    left, bottom, right, top = base["*Front"]
+    assert margins["*Front"] == (left, bottom + draw.SHOULDER_DIAMETER_DROP_M, right, top)
+    lanes = supplier_screw_lane_plan(
+        screw.SUPPLIER_REFERENCE_DIMENSIONS,
+        planes=screw.SUPPLIER_REFERENCE_PLANES,
+        sides=screw.SUPPLIER_REFERENCE_SIDES,
+    )
+    # Ø.190 inner, Ø.250 outer: the drop separates exactly that stacked pair.
+    assert lanes["SupplierThreadDiameter"] == ("bottom", pytest.approx(0.006))
+    assert lanes["SupplierShoulderDiameter"] == ("bottom", pytest.approx(0.014))
+    assert draw.SHOULDER_DIAMETER_DROP_M > 0.0
+
+
+def test_lowering_moves_the_whole_shoulder_diameter_and_reads_it_back(monkeypatch) -> None:
+    events: list[object] = []
+
+    class Annotation:
+        position = (0.1, 0.05, 0.0)
+
+        def GetPosition(self):
+            return self.position
+
+        def SetPosition2(self, x, y, z):
+            events.append(("set", display.OffsetText, x, y))
+            self.position = (x, y, z)
+            return True
+
+    class Display:
+        OffsetText = True
+
+        def GetAnnotation(self):
+            return annotation
+
+    annotation, display = Annotation(), Display()
+    monkeypatch.setattr(draw, "_early_bound", lambda raw, _interface: raw)
+    monkeypatch.setattr(draw, "rebuild_drawing", lambda _adapter, *, label: events.append("rebuild"))
+    draw._lower_shoulder_diameter(object(), {"SupplierShoulderDiameter": display})
+    # Offset mode off first, so the dimension line moves with its text.
+    assert events == [("set", False, 0.1, pytest.approx(0.05 - draw.SHOULDER_DIAMETER_DROP_M)), "rebuild"]
+
+    annotation.SetPosition2 = lambda *_args: False
+    with pytest.raises(RuntimeError, match="failed to lower"):
+        draw._lower_shoulder_diameter(object(), {"SupplierShoulderDiameter": display})
