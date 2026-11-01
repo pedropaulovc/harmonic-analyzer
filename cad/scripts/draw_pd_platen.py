@@ -682,6 +682,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The title block's THREADS row owns the general thread class (r4).
     omit_title_block_thread_class(socket_callout, label="clip-screw through taps")
+    set_hole_callout_precision(
+        socket_callout, {"hw-thrutapdrldia": 3}, label="clip-screw through taps"
+    )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     add_property_linked_note(adapter, "Right View Note", *RIGHT_NOTE_XY)
     _telemetry.info("platen sheet: views, dimensions and callouts placed")

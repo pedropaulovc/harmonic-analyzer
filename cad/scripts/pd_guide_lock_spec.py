@@ -67,7 +67,6 @@ LOCK_HEIGHT = 9.906  # .39
 # spend.
 LOCK_THICK = 1.5875  # 1/16, extruded +Z
 LOCK_THICK_BAND = 0.127  # +/-.005: the sheet's mill tolerance, supplier's
-LOCK_THICK_FRACTION_DENOMINATOR = 16
 LOCK_STOCK_SKU = "1388K196"
 # One line: SolidWorks keeps a line-broken above-callout but never prints it
 # (draw_pd_transgear_drive_collar; farm run 20261012T002237965Z here).

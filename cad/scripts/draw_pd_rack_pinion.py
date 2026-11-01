@@ -34,7 +34,7 @@ from _drawing_common import (
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -327,6 +327,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="#0-80 transferred disc taps",
     )
     _set_tap_callout_text(tap_callout)
+    set_hole_callout_precision(
+        tap_callout, {"hw-thrutapdrldia": 3}, label="#0-80 transferred disc taps"
+    )
 
     add_property_linked_note(
         adapter, "Gear Data", *GEAR_DATA_XY, char_height=GEAR_DATA_CHAR_HEIGHT

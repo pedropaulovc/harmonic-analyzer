@@ -1061,7 +1061,7 @@ async def build(adapter: Any) -> dict[str, str]:
             label=label,
         )
         _set_tap_callout_text(callout, qualifier, label=label)
-        set_hole_callout_precision(callout, {"hw-tapdrldia": 3}, label=label)
+        set_hole_callout_precision(callout, {"hw-thrutapdrldia": 3}, label=label)
 
     # Sheet 2: the pin bore's projected zone in section D-D, cut from a plan
     # on sheet 1's plan centre (rule 15: its own sheet, not a shrunk view).
