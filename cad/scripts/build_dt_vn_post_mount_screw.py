@@ -14,7 +14,7 @@ reference and each screw is cut to its own hole at assembly.  The build
 proves the dimension and the solid's cut end agree.
 
 The cut end carries no modelled break: the title block's edge break governs
-it, and the retained 0.90D engagement stack spends that general maximum.
+it, and the retained engagement stack spends that general maximum.
 
 The solid carries the modification too (Main's ruling on the cut end):
 cutting to fit removes the factory-chamfered tip.  The shared catalog-only

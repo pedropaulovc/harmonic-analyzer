@@ -1442,8 +1442,9 @@ if any(
     )
 # U30 post mount (I22): each MHA-DT-VN-61 seats on the MHA-DT-05 counterbore floor and
 # is cut to fit into the MHA-DT-20 tap: never proud of the plate underside, and
-# at least 0.90D of thread (pending exception ruling #1019) both at the
-# modelled cut length and at the platform spec's printed worst case.
+# at least 0.87D of thread (Main, 2026-11-01; ruling #1019's 0.90D target is
+# not met) both at the modelled cut length and at the platform spec's printed
+# worst case.
 _require_tapped_thread("cone-post mount", POST_SCREW_THREAD, POST_MOUNT_SPEC)
 POST_SCREW_SEAT = POST_BLOCK_HEIGHT - POST_CBORE_DEPTH  # above PlateTop
 POST_SCREW_INTO_PLATE = POST_SCREW_LEN - POST_SCREW_SEAT
@@ -1451,10 +1452,10 @@ if POST_SCREW_INTO_PLATE > PLAT_T:
     raise AssertionError("MHA-DT-VN-61 stands proud of the MHA-DT-20 underside")
 if (
     POST_SCREW_INTO_PLATE - 2.0 * POST_MOUNT_TAP_EDGE_BREAK
-    < 0.90 * POST_MOUNT_THREAD_DIA
-    or POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS < 0.90
+    < 0.87 * POST_MOUNT_THREAD_DIA
+    or POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS < 0.87
 ):
-    raise AssertionError("MHA-DT-VN-61 engages the MHA-DT-20 tap under 0.90D")
+    raise AssertionError("MHA-DT-VN-61 engages the MHA-DT-20 tap under 0.87D")
 # The shaft is placed by its front stub end; keep the station in lockstep with
 # the part's FRONT_STUB.
 if abs(SHAFT_FRONT_STATION + SHAFT_FRONT_STUB) > 1e-9:

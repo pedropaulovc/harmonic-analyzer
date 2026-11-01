@@ -149,13 +149,8 @@ POST_MOUNT_TAP_DIA = blind_cut_dia_mm(POST_MOUNT_SPEC)
 # thread through the plate, flush to this much short of its underside.
 POST_SCREW_CUT_TO_FIT_SHORT = post_mount.CUT_TO_FIT_SHORT_MM
 POST_MOUNT_THREAD_DIA = 0.25 * 25.4
-# The title block's R0.25/0.25 edge break would take up to 0.25 of thread off
-# each end of the through tap (0.85D worst case, under the audit floor), so the
-# two tapped holes carry a local override: deburr only (Main, 2026-09-24).
-# It is printed under the taps' own callout, not in a general note
-# (machinist review r1: an override belongs on the feature it overrides).
-POST_MOUNT_TAP_EDGE_BREAK = 0.1
-POST_MOUNT_TAP_BREAK_CALLOUT = f"{POST_MOUNT_TAP_EDGE_BREAK:.1f} MAX BREAK EACH END"
+# The taps take the title block's edge break; rule 4 forbids tightening it to rescue thread (machinist review, Main 2026-11-01).
+POST_MOUNT_TAP_EDGE_BREAK = post_mount.PLATE_TAP_EDGE_BREAK_MM  # title block .010 edge break
 # U37 (2026-09-23): the user accepted short engagement for MHA-DT-VN-61 as a named
 # exception to drawing-guidelines.md rule 18 (thread engagement)'s 1.5D; the plate slides on the deck, so no boss can
 # add thread.  Worst case: the thinnest stock plate (U41) less the tap's entry
@@ -190,9 +185,10 @@ POST_MOUNT_ENGAGEMENT_NOTE = (
     f"1/4-20 THREAD ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN."
 )
 
-# Pending exception ruling: MHA-DT-VN-61 engagement (#1019).
+# Pending exception ruling: MHA-DT-VN-61 engagement (#1019).  A MIN never
+# rounds up: the length floors to two places like the diameters.
 POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT = (
-    f"ENGAGEMENT {POST_MOUNT_ENGAGEMENT_WORST:.2f} MIN "
+    f"ENGAGEMENT {math.floor(POST_MOUNT_ENGAGEMENT_WORST * 100.0) / 100.0:.2f} MIN "
     f"({POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D)."
 )
 

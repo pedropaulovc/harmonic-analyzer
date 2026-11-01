@@ -107,7 +107,6 @@ from dt_cone_swing_platform_spec import (
     PLATE_STOCK_CALLOUT,
     PLATE_THICKNESS,
     POST_MOUNT_SPEC,
-    POST_MOUNT_TAP_BREAK_CALLOUT,
     SURFACE_FINISHES,
 )
 from dt_cone_swing_platform_pivot_spec import PIVOT_HOLE_DIA
@@ -498,12 +497,8 @@ FACE_LABELS = (
 )
 # Rows printed under native hole callouts (swDimensionTextCalloutBelow).
 # Each tight band names its mate at its own callout (rule 4; machinist
-# review r1 blocker: the +-0.1 stations named none), and a local override
-# rides the callout of the feature it overrides (rule 7).
-POST_MOUNT_CALLOUT_BELOW = (
-    POST_MOUNT_TAP_BREAK_CALLOUT,
-    POST_MOUNT_LOCATING_CALLOUT,
-)
+# review r1 blocker: the +-0.1 stations named none).
+POST_MOUNT_CALLOUT_BELOW = (POST_MOUNT_LOCATING_CALLOUT,)
 # The post-mount taps' callout over the hole-location plan.  The block is
 # centred on the requested point: r3's four rows ran from the inner border
 # (top 0.2665, ~0.3 mm air) to their underline at 0.2453, 6.6 mm over the
