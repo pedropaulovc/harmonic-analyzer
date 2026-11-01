@@ -63,7 +63,7 @@ from ch_rocker_arm_tl_oblique_feed_nut_spec import (
     WIDTH,
 )
 
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_oblique_feed_nut"]
 PART_STEM = SPEC.artifact_stem
