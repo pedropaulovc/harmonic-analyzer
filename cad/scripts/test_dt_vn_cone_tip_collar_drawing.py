@@ -821,6 +821,11 @@ def test_end_view_projects_with_the_turning_view_and_the_nose_dia_moves_onto_it(
     # Left of the nose's south face, right of FlatDistance's text.
     assert drawing.END_KEEP["FlatDistance"][0] < drawing.NOSE_DIA_ON_SIDE[0]
     assert drawing.NOSE_DIA_ON_SIDE[0] < drawing.SIDE_CENTER[0] - spec.WIDTH * 4 / 2000.0
+    # Farm run 20261101T005319353Z: its text box ran to keep + 18.3 mm and
+    # crossed NoseLength's south extension line at x 182; it ends one text
+    # clearance (1.78 mm) short of it.
+    assert drawing.NOSE_DIA_ON_SIDE[0] + 0.0183 < 0.182 - 0.00178
+    assert not 0.165 + 0.0183 < 0.182 - 0.00178
 
 
 def test_three_place_lengths_state_their_function() -> None:
