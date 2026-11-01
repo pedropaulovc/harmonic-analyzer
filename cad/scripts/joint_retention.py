@@ -243,7 +243,7 @@ RULINGS: dict[str, Ruling] = {
         granted=(
             "user, 2026-10-14, joint-specific drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads) ruling on PR #1436: "
             "no lock; the MHA-PN-VN-52 set screw is an operator adjustment and a light clamp, and the "
-            "v-block's 7.0 tap leaves no room for a jam screw. Period-faithful to the 1898 machine: "
+            "v-block's .367 tap leaves no room for a jam screw. Period-faithful to the 1898 machine: "
             "the plain 91375A105 cup point goes in bare, nothing added to its thread"
         ),
     ),

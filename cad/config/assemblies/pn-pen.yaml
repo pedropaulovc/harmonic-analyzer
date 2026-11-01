@@ -65,4 +65,4 @@ machinist_exceptions:
     kind: "accept"
     where: "the sequence step that runs the MHA-PN-VN-52 cup-point set screw into the v-block's front-face tap onto the rod's pivot end, with nothing on its thread, and the check that the v-block does not turn on the pivot by hand at the 45 deg +/-1 deg yaw (DETAIL C)"
     finding: "the #4-40 cup-point set screw holding the pen yaw is a threaded joint under reversing nib drag with no lock (rule 23)"
-    reason: "owner ruling U-MHA-PN-VN-52-no-lock (user, 2026-10-14, PR #1436; joint_retention.py pn-pen/rod-set-screw-in-v-block): the set screw is the operator's yaw adjustment and a light clamp, re-set when it drifts; the block's .276 tap leaves no room for a second jam screw, and the 1898 machine ran the plain cup point bare (owner-accepted)"
+    reason: "owner ruling U-MHA-PN-VN-52-no-lock (user, 2026-10-14, PR #1436; joint_retention.py pn-pen/rod-set-screw-in-v-block): the set screw is the operator's yaw adjustment and a light clamp, re-set when it drifts; the block's .367 tap leaves no room for a second jam screw, and the 1898 machine ran the plain cup point bare (owner-accepted)"
