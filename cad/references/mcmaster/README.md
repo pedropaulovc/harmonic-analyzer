@@ -310,6 +310,9 @@ lug became integral with TL-32. The following describes the former joint.
   tip chamfer, which the family recipe does not draw. It is NOT replica-gated
   (user ruling, October 17, 2026): the standalone run is catalogue-only (it
   builds the recipe, checks the solid and saves it under `cad/out/reference`).
+  Each is cut to its own counterbore floor at assembly (owner ruling November
+  1, 2026; the jig's step 5), so the jig part passes `cut_length` and the
+  recipe draws the installed screw at that length under the head.
 - [91251A150](https://www.mcmaster.com/91251A150/)
   (`ch-rocker-arm-tl-vn-oblique-kp08-screw`, MHA-CH-06-TL-VN-65, 4 in the oblique
   trammel jig: the fastener table's `KP08_TO_BRACKET` row) was read live on
