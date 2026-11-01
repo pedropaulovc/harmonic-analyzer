@@ -115,16 +115,19 @@ CONE_BOSS_LENGTH = post_envelope.BLOCK_DIA
 #
 # MHA-DT-VN-61 must provide a shank long enough to reach the platform from the
 # counterbore floor, BLOCK_HEIGHT - ATTACHMENT_CBORE_DEPTH.  The unchanged
-# dia .453 x .237 counterbore takes its ASME B18.6.3 fillister head; the
+# dia .453 x .24 counterbore takes its ASME B18.6.3 fillister head; the
 # purchased-stock spec owns the actual head envelope, stock-length,
 # cut-to-fit and engagement guards.  Raising the casting also raises that
 # floor, so the former 3-1/2-inch stock is no longer long enough.
 ATTACHMENT_THRU_DIA = 7.14248
 ATTACHMENT_CBORE_DIA = 11.5062  # .453
 ATTACHMENT_CBORE_DEPTH = POST_MOUNT_COUNTERBORE_DEPTH_MM
-# The mounting counterbores' Hole Wizard callout prints its sizes and depth
-# at three inch places (#290).
+# The mounting counterbores' Hole Wizard callout prints its diameters at
+# three inch places (#290).  The depth only has to sink the fillister head,
+# so it prints .XX (MHA-DT-05 machinist review); the model keeps 6.0198
+# because the screw's cut length closes on it (dt_post_mount_stack).
 MOUNT_HOLE_CALLOUT_PLACES = 3
+MOUNT_CBORE_DEPTH_PLACES = 2
 WEB_FLOOR_MM = WALL_FLOOR_MM
 
 
@@ -239,7 +242,8 @@ JOURNAL_AXIS_HEIGHT_TOLERANCE_MM = 0.254  # +/-.010
 # at its highest (the cone axis at the top of its own band above plus the
 # whole spacing band).  The through holes are drilled (DRILLED HOLES row),
 # their stations and the body height print .XX, the counterbore's diameter
-# and depth three places (its native hole callout), and the boss diameter .XX.
+# three places and its depth .XX (its native hole callout), and the boss
+# diameter .XX.
 _DRILL_OVERSIZE = drilled_oversize_mm(unit=UNIT)
 _CRANK_BORE_R_MAX = (CRANK_BORE_DIA + RUNNING_BORE_BAND[0]) / 2.0
 _CRANK_AXIS_Y_MAX = (
@@ -250,7 +254,7 @@ _BLOCK_TOP_MIN = _printed_limits(BLOCK_HEIGHT, 2)[0]
 _CBORE_CORNER = (
     _HOLE_X_MIN - _CBORE_R_PRINT_MAX,
     _BLOCK_TOP_MIN
-    - _printed_limits(ATTACHMENT_CBORE_DEPTH, 3)[1]
+    - _printed_limits(ATTACHMENT_CBORE_DEPTH, MOUNT_CBORE_DEPTH_PLACES)[1]
     - _CRANK_AXIS_Y_MAX,
 )
 CRANK_BORE_WEBS_WORST = {
