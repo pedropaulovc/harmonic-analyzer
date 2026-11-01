@@ -175,6 +175,10 @@ def test_supplier_references_are_the_drop_in_interface() -> None:
     # Top sketch reads model (x, -z): the pilot's Ø10.2 is the long body's
     # circle in the end view (the spigot is the same diameter, behind it).
     assert spec.PROFILE[1][0] == spec.PROFILE[6][0] == spec.BODY_DIA / 2.0
+    # Hidden behind the flange in that view, the spigot is named on the Ø.
+    assert spec.SUPPLIER_REFERENCE_FORMATS["SupplierBodyDiameter"] == (
+        1, "diameter", None, "BOSS AND SPIGOT",
+    )
     assert chord("SupplierBodyDiameter") == (
         (-spec.BODY_DIA / 2.0, 0.0),
         (spec.BODY_DIA / 2.0, 0.0),

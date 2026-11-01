@@ -173,7 +173,9 @@ SUPPLIER_REFERENCE_FORMATS = {
     "SupplierFlangeThickness": (1, "length", None, None),
     "SupplierSpigotLength": (1, "length", None, None),
     "SupplierFlangeDiameter": (0, "diameter", None, None),
-    "SupplierBodyDiameter": (1, "diameter", None, None),
+    # One Ø10.2 serves the boss and the spigot hidden under the flange: the
+    # callout names both (machinist review: the counterbore's mating Ø).
+    "SupplierBodyDiameter": (1, "diameter", None, "BOSS AND SPIGOT"),
 }
 SUPPLIER_REFERENCE_UNITS = {
     name: "mm" for name, _, _ in SUPPLIER_REFERENCE_DIMENSIONS
