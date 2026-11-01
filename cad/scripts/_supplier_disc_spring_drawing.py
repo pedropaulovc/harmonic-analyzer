@@ -285,7 +285,10 @@ def supplier_disc_spring_dimensions(
             if semantic in ("ID", "OD", "FREE_HEIGHT", "THICKNESS")
             or semantic in application
         }
-    application_labels = {
+    # The two edge-view heights are different supplier quantities: name them.
+    callouts = {
+        "FREE_HEIGHT": "FREE HEIGHT",
+        "THICKNESS": "THICKNESS",
         "WORKING_HEIGHT": "COMPRESSED HEIGHT",
         "WORKING_DEFLECTION": "DEFLECTION",
         "SHAFT_DIA": "FOR SHAFT",
@@ -320,8 +323,8 @@ def supplier_disc_spring_dimensions(
                     "diameter" if semantic in ("ID", "OD", "SHAFT_DIA") else "length"
                 ),
             }
-            if semantic in application_labels:
-                arguments["callout"] = application_labels[semantic]
+            if semantic in callouts:
+                arguments["callout"] = callouts[semantic]
             supplier_reference_dimension(adapter, display, **arguments)
             references.append(
                 (key, SUPPLIER_DIMENSION_NAMES[semantic], arguments, semantic)

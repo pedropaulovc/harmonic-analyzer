@@ -42,11 +42,13 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_hidden_sketches import _show_hidden_owners, curate_view_dimensions
+from _drawing_layout_audit import annotation_display
 from _drawing_leaders import set_near_side_diameter
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DrawingSpec
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_view_display import set_hidden_lines_removed
+from _layout_audit import display_box
 from _purchased_fastener_drawing import (
     _PROPERTIES,
     _SCALES,
@@ -92,9 +94,20 @@ from _supplier_reference_geometry import (
 )
 from _visibility import FeatureWalk, REFERENCE_FEATURE_KINDS
 
-# The wire text block (placed 9 mm under the section circles) ends about
-# 14 mm under them; the sections caption's top hangs 4 mm below that.
-SECTIONS_CAPTION_DROP_M = 0.018
+
+def _view_ink_bottom(adapter: Any, view: Any, bottom: float, *, label: str) -> float:
+    """Lowest sheet y a view draws: its model ink ``bottom`` and its annotations."""
+    for raw in view.GetAnnotations() or ():
+        annotation = _early_bound(raw, "IAnnotation")
+        if int(annotation.Visible) != 1:
+            continue
+        geometry, refused = annotation_display(adapter, annotation)
+        if refused:
+            raise RuntimeError(f"{label}: unreadable annotation ink {refused!r}")
+        ink = display_box(geometry)
+        if ink is not None:
+            bottom = min(bottom, ink.ymin)
+    return bottom
 
 
 def reacquire_supplier_dimensions(
@@ -1313,13 +1326,16 @@ async def build_supplier_spring_drawing(
         ratio = scales[key]
         text = f"{captions[key]}  {ratio[0]}:{ratio[1]}"
         y = cell[1] - (0.016 if key == "free_right" else 0.012)
-        if key.startswith("installed_"):
-            # A small pictorial centred in a tall cell left its caption far
-            # below it: hang the caption just under the view instead.
-            y = max(y, _box(views[key].GetOutline(), label=key)[1] - 0.004)
-        elif maximum and key == "free_right":
-            # Likewise under the wire text block, not at the section cell floor.
-            y = max(y, reference_bounds(key)[1] - SECTIONS_CAPTION_DROP_M)
+        # A small pictorial or thin diagram centred in a tall cell left its
+        # caption far below it: hang each caption just under everything its
+        # view draws, never below the cell floor.
+        model_bottom = (
+            _box(views[key].GetOutline(), label=key)[1]
+            if key.startswith("installed_")
+            else reference_bounds(key)[1]
+        )
+        bottom = _view_ink_bottom(adapter, views[key], model_bottom, label=key)
+        y = max(y, bottom - 0.004)
         note = _literal_note(adapter, text, center[0], y)
         bounds = _box(note.GetExtent(), label=text, kind="note")
         annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
