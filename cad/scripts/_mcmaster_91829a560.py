@@ -50,17 +50,34 @@ SUPPLIER_REFERENCE_DIMENSIONS = (
     ("SupplierThreadLength", -THREAD_LEN, "vertical"),
     ("SupplierThreadDiameter", THREAD_MAJOR, "horizontal"),
 )
+# The shown construction lines print grey OVER model edges but UNDER dimension
+# extension lines of the same width (FRONT 1:1, run 20261101T085308503Z), so
+# none may cross a face or air uncovered. Each lies under one of this sheet's
+# own extension lines:
+# - both chords at y=0 (the head/shoulder junction edge), under the y=0 lines
+#   of HeadHeight (from -HEAD_DIA/2 rightward) and ShoulderLength (leftward);
+# - the thread chord on the shoulder end edge (y=-SHOULDER_LEN), under
+#   ShoulderLength's far line, which reaches x=+THREAD_MAJOR/2;
+# - HeadHeight on the head silhouette, under the head diameter's left line;
+#   ShoulderLength on the shoulder silhouette and ThreadLength below it, under
+#   the shoulder diameter's right line.
+# Only HeadHeight's and ShoulderLength's ~0.76 mm extension-line gap next to
+# y=0 stays bare, inside their silhouette edges. The sides pin every cover.
 SUPPLIER_REFERENCE_STARTS = {
     "SupplierHeadHeight": (-HEAD_DIA / 2.0, 0.0),
     "SupplierHeadDiameter": (-HEAD_DIA / 2.0, 0.0),
     "SupplierShoulderLength": (SHOULDER_DIA / 2.0, 0.0),
-    "SupplierShoulderDiameter": (-SHOULDER_DIA / 2.0, -SHOULDER_LEN / 2.0),
-    "SupplierThreadLength": (THREAD_MAJOR / 2.0, -SHOULDER_LEN),
-    "SupplierThreadDiameter": (-THREAD_MAJOR / 2.0, -SHOULDER_LEN - THREAD_LEN / 2.0),
+    "SupplierShoulderDiameter": (-SHOULDER_DIA / 2.0, 0.0),
+    "SupplierThreadLength": (SHOULDER_DIA / 2.0, -SHOULDER_LEN),
+    "SupplierThreadDiameter": (-THREAD_MAJOR / 2.0, -SHOULDER_LEN),
 }
-SUPPLIER_REFERENCE_PLANES = {"SupplierHeadDiameter": "Top"}
+SUPPLIER_REFERENCE_PLANES = {}
 SUPPLIER_REFERENCE_SIDES = {
+    "SupplierHeadHeight": "right",
+    "SupplierHeadDiameter": "top",
+    "SupplierShoulderLength": "left",
     "SupplierShoulderDiameter": "bottom",
+    "SupplierThreadLength": "right",
     "SupplierThreadDiameter": "bottom",
 }
 SUPPLIER_REFERENCE_FORMATS = {
