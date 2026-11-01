@@ -12,7 +12,7 @@ edgewise strip, its riveted L bracket and the two rivets:
   -129.4) in the bar's lock-free band (y 292.2..314.2) and takes the two
   MHA-SH-VN-52 #4-40 screws into the bar's through taps (x 65.0 / 72.0,
   y 303.234);
-* at the base's +X end a 90 deg bend (inside R.048) raises the EAR rearward
+* at the base's +X end a 90 deg bend (inside R.05) raises the EAR rearward
   (+Z) in the machine YZ plane to EAR_HEIGHT above the bar;
 * the ARM hangs from the ear's lower edge, a strip ARM_W wide in machine Z
   with its thickness in machine XY.  Its mid-plane runs down at X_C, then
@@ -127,9 +127,8 @@ WIDTH = 8.128  # .32
 BASE_Y = (SCREW_Y - SCREW_HOLE_Y, SCREW_Y - SCREW_HOLE_Y + WIDTH)
 BASE_LENGTH = 16.764  # .66: the base's -X end to the ear's outer face
 SCREW_HOLE_DIA = 3.2512  # .128 +.004/0: a #30 drill (.1285), #4 clearance
-INSIDE_BEND_R = 1.2192  # .048: annealed 1095 at 1.5 T
+INSIDE_BEND_R = 1.27  # .05: annealed 1095 at 1.56 T (1.5 T the floor)
 OUTSIDE_BEND_R = INSIDE_BEND_R + SHEET_T
-INSIDE_BEND_R_MAX = 1.4986  # .059
 # The arm's front edge meets the ear's lower edge in a relief radius: the arm
 # flexes hardest at its root.
 ROOT_R = 2.032  # .08

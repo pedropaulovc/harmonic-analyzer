@@ -46,9 +46,13 @@ TAP_Y = 3.556  # .140
 GUIDE_DEPTH_BAND = (0.0, -0.254)  # (upper, lower): +.00/-.01
 GUIDE_DEPTH_PLACES = 2
 # The one-sided band's function, printed at the depth (rule 4): a deeper rail
-# stands the lock-screw heads closer to the hanger's arm plate.
+# stands the lock-screw heads closer to the hanger's arm plate (the .40 MAX);
+# a shallower one would leave the lock seats no stock to face to the fitted
+# lock gap on the bar (the .39 MIN, R9-47; machinist review round 6 read the
+# minimum as unexplained).
 GUIDE_DEPTH_CALLOUT = (
-    f"LOCK-SCREW HEADS\nCLEAR {_config.parts('pd-transgear-arm-plate')['number']}"
+    f"LOCK-SCREW HEADS\nCLEAR {_config.parts('pd-transgear-arm-plate')['number']};\n"
+    f"LOCK SEATS FACED\nTO FIT {_config.parts('pd-support-bar')['number']}"
 )
 
 # The print's dimensions, by owning feature (the build marks exactly these and

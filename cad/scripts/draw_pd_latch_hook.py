@@ -108,6 +108,7 @@ from pd_latch_hook_spec import (
     PIN_STATION_CALLOUT,
     REFERENCE_DIMENSIONS,
     ROUND_CALLOUT,
+    ROUND_REFERENCE,
     SCREW_HOLE_CALLOUT,
     SCREW_HOLE_MATE,
 )
@@ -504,10 +505,12 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     _shorten_radii(adapter, annotations, SHORTENED_RADII)
-    # The far face at the pin (located at fit-up on the pin's axis) and the
-    # flat pattern's bend centrelines print as references.
+    # The far face at the pin (located at fit-up on the pin's axis), the
+    # flat pattern's bend centrelines and the full round's radius (the .45
+    # width sets it) print as references.
     by_name = {dimension_name(adapter, a): a for a in annotations}
-    for name in sorted(REFERENCE_DIMENSIONS | BEND_LINE_DIMENSIONS):
+    references = REFERENCE_DIMENSIONS | BEND_LINE_DIMENSIONS | {ROUND_REFERENCE}
+    for name in sorted(references):
         set_reference_dimension(adapter, by_name[name], label=f"MHA-PD-14 {name}")
     _overall_reference(adapter, right)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):

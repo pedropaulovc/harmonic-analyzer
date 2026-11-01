@@ -72,11 +72,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
-from _fit_deviations import deviations
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _visibility import blank_reference_geometry
 from pd_latch_hook_geometry import (
     ARM_N,
@@ -140,7 +136,6 @@ from pd_latch_hook_geometry import (
     z_local,
 )
 from pd_latch_hook_spec import (
-    BEND_R_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -1027,15 +1022,8 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
-    # The drilled holes and the width take the title block's rows (DRILLED
-    # HOLES, .XX); the inside bend: R.059 the largest the screw head clears.
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "InsideBend",
-        "InsideBendR",
-        *deviations(BEND_R_BAND),
-        display_unit=UNIT,
-    )
+    # The drilled holes, the width and the inside bend radius take the title
+    # block's rows (DRILLED HOLES, .XX).
     # Screw-hole positions from the formed ear and the low-Y edge.
     for feature_name, dimension_names in POSITION_DIMENSIONS.items():
         for dimension_name in dimension_names:

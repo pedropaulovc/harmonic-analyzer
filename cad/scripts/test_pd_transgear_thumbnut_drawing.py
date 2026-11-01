@@ -63,7 +63,10 @@ def test_actual_entry_cones_carry_model_owned_controls() -> None:
     assert spec.CSK_HALF_ANGLE_MIN == pytest.approx(
         spec.CSK_HALF_ANGLE_DEG - angular_band_deg()
     )
-    assert spec.CSK_DIA_TOL_TYPE == 6
+    # Round 6: one MAX the part authors as text; SolidWorks' native swTolMAX
+    # printed a lowercase "max.".
+    assert spec.CSK_DIA_TOL_TYPE == 0
+    assert spec.CSK_DIA_SUFFIX == " MAX"
     # Machinist review: a thread-entry chamfer's MAX needs few places (.XX).
     assert spec.CSK_DIA_PLACES == 2
     assert spec.DRAWING_DIMENSIONS["CountersinkProfile"] == {
@@ -846,57 +849,70 @@ def test_the_thread_callout_stays_inside_the_left_border() -> None:
 
 
 class _CountersinkTolerance:
-    def __init__(self, *, accepts=True, persists=True):
-        self.Type = 0
-        self.low = self.high = 0.0
-        self.accepts, self.persists = accepts, persists
+    """A tolerance that keeps its type, or one stuck at the old swTolMAX."""
 
-    def SetValues(self, low: float, high: float) -> bool:
+    def __init__(self, *, persists=True):
+        self._type = 6
+        self.persists = persists
+
+    @property
+    def Type(self) -> int:
+        return self._type
+
+    @Type.setter
+    def Type(self, value: int) -> None:
         if self.persists:
-            self.low, self.high = low, high
-        return self.accepts
-
-    def GetMinValue(self) -> float:
-        return self.low
-
-    def GetMaxValue(self) -> float:
-        return self.high
+            self._type = value
 
 
-def _apply_countersink_max(monkeypatch, tolerance, *, diameter=None):
+class _CountersinkDisplay:
+    def __init__(self, *, persists=True):
+        self.texts: dict[int, str] = {}
+        self.persists = persists
+
+    def SetText(self, part: int, text: str) -> None:
+        if self.persists:
+            self.texts[part] = text
+
+    def GetText(self, part: int) -> str:
+        return self.texts.get(part, "")
+
+
+def _apply_countersink_max(monkeypatch, tolerance, display=None, *, diameter=None):
+    display = _CountersinkDisplay() if display is None else display
     monkeypatch.setattr(part, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
         part, "_named_dimension",
-        lambda *_args: (object(), SimpleNamespace(
+        lambda *_args: (display, SimpleNamespace(
             SystemValue=(spec.CSK_DIA if diameter is None else diameter) / 1000.0,
             Tolerance=tolerance,
         )),
     )
     part._countersink_max_limit(object(), "CountersinkDia")
+    return display
 
 
-def test_native_countersink_max_owns_real_diameter_envelope(monkeypatch) -> None:
+def test_the_countersink_prints_its_single_max_as_authored_text(monkeypatch) -> None:
     tolerance = _CountersinkTolerance()
-    _apply_countersink_max(monkeypatch, tolerance)
-    assert tolerance.Type == spec.CSK_DIA_TOL_TYPE
-    assert (
-        spec.CSK_DIA + tolerance.low * 1000.0,
-        spec.CSK_DIA + tolerance.high * 1000.0,
-    ) == pytest.approx((spec.THREAD_MAJOR, spec.CSK_DIA))
+    display = _apply_countersink_max(monkeypatch, tolerance)
+    assert tolerance.Type == spec.CSK_DIA_TOL_TYPE == 0
+    assert display.GetText(2) == spec.CSK_DIA_SUFFIX
+    # The modelled size IS the max, and it clears the thread major.
+    assert spec.CSK_DIA > spec.THREAD_MAJOR
 
 
 @pytest.mark.parametrize(
-    "tolerance, diameter, message",
-    [(None, None, "missing"),
-     (_CountersinkTolerance(accepts=False), None, "rejected"),
-     (_CountersinkTolerance(persists=False), None, "persist"),
-     (_CountersinkTolerance(), 6.75, "diameter")],
+    "tolerance, display, diameter, message",
+    [(None, None, None, "missing"),
+     (_CountersinkTolerance(persists=False), None, None, "persist"),
+     (_CountersinkTolerance(), _CountersinkDisplay(persists=False), None, "persist"),
+     (_CountersinkTolerance(), None, 6.75, "diameter")],
 )
 def test_native_countersink_control_refuses_unwritten_or_obsolete_geometry(
-    monkeypatch, tolerance, diameter, message
+    monkeypatch, tolerance, display, diameter, message
 ) -> None:
     with pytest.raises(RuntimeError, match=message):
-        _apply_countersink_max(monkeypatch, tolerance, diameter=diameter)
+        _apply_countersink_max(monkeypatch, tolerance, display, diameter=diameter)
 
 
 def test_build_places_the_cone_angle_on_the_section_after_its_callouts(

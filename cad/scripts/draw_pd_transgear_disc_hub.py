@@ -31,6 +31,7 @@ from typing import Any
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
     view_name,
 )
@@ -42,6 +43,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_detail_crop import native_circle_geometry
@@ -49,6 +51,7 @@ from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
+from _drawing_leaders import set_near_side_diameter
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -162,7 +165,14 @@ FLAT_CALLOUT = "\n".join(
 #   into the screw holes' callout), the screw-hole size (3X,
 #   drilled through the flange) above-right, the flat's distance below-left
 #   (the flat's side, so its dimension line stays clear of the bore's
-#   leader) and the bore below-right, each with its fit callout under it.
+#   leader), each with its fit callout under it.  The bore's size and fit
+#   hang well below-right, one arrow on the bore (near-side): through the
+#   centre its line crossed the bolt circle's and ran almost on the
+#   vertical centreline beside the flat's extension line (machinist review
+#   r6).  SolidWorks lands that arrow on the bore's radius toward the
+#   shelf's near end, the block's lower-left corner, so the corner stands
+#   on the bore's -60° ray, below the oil hole's block: the leader leaves
+#   the bore down-right, clear of both centrelines and the flat's lines.
 # - Edge view: the hub's diameter inline left of the hub front face; the
 #   spigot's and then the flange's inline right of the spigot's end, the
 #   flange's outermost so the spigot's extension lines end inside it, the
@@ -192,10 +202,21 @@ FLAT_CALLOUT = "\n".join(
 #   flange's extension lines; the spigot end's inside the spigot's, between
 #   its upper extension line and its diameter's text, left of that
 #   dimension's line.
+# Estimated (width, height) of the bore's six-row block, as run
+# 20261101T054343686Z printed it.
+BORE_TEXT_BLOCK = (0.046, 0.031)
+_BORE_SHOULDER_DROP = 0.110
+_BORE_SHOULDER = (
+    END_CENTER[0] + _BORE_SHOULDER_DROP / math.tan(math.radians(60.0)),
+    AXIS_Y - _BORE_SHOULDER_DROP,
+)
 END_KEEP = {
     "BoltCircleDia": (END_CENTER[0] - 0.030, AXIS_Y + _FLANGE_R + 0.016),
     "ScrewHoleDia": (END_CENTER[0] + 0.036, AXIS_Y + _FLANGE_R + 0.016),
-    "BoreDia": (END_CENTER[0] + 0.030, AXIS_Y - _FLANGE_R - 0.020),
+    "BoreDia": (
+        _BORE_SHOULDER[0] + BORE_TEXT_BLOCK[0] / 2.0,
+        _BORE_SHOULDER[1] + BORE_TEXT_BLOCK[1] / 2.0,
+    ),
     "FlatToAxis": (END_CENTER[0] - 0.030, AXIS_Y - _FLANGE_R - 0.020),
 }
 _OIL_HOLE_X = _side_x(HUB_FRONT_Z + OIL_HOLE_STATION)
@@ -304,6 +325,16 @@ def _add_bolt_circle_centerline(adapter: Any, view: Any) -> None:
     if font != (0, CENTER_LINE_STYLE, CENTER_LINE_WEIGHT):
         raise RuntimeError(f"hub bolt circle centreline font reads {font!r}")
     draw.ClearSelection2(True)
+
+
+def _set_near_side_bore(adapter: Any, annotations: list[Any]) -> None:
+    """The face view's bore diameter: one arrow on the bore, its leader to
+    the block's shelf, no line through the centre."""
+    matches = [a for a in annotations if dimension_name(adapter, a) == "BoreDia"]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one hub BoreDia dimension, found {len(matches)}")
+    set_near_side_diameter(matches[0], "hub bore near-side leader")
+    rebuild_drawing(adapter, label="hub bore near-side leader")
 
 
 def _datum_a_landing(adapter: Any, view: Any) -> tuple[float, float]:
@@ -595,6 +626,8 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(
                 f"failed to add ASME center marks to the hub {label} view"
             )
+    # The bore's diameter lands one arrow from below-right (machinist review).
+    _set_near_side_bore(adapter, end_annotations)
     # The bolt circle draws as its centreline, the diameter's arrows on it.
     _add_bolt_circle_centerline(adapter, end)
     # Datum A, the bore, on the face view where it shows round.

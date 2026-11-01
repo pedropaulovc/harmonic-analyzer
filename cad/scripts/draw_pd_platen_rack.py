@@ -78,8 +78,9 @@ GEAR_DATA_XY = (0.020, 0.254)
 # of the title block (x 0.216) and above the border.
 NOTES_XY = (0.020, 0.064)
 # Centred under the 4:1 end view (axis x ~0.355), between the BackerDepth
-# dimension line (y ~0.0795) and the title block top (y 0.066).
-END_NOTE_XY = (0.330, 0.074)
+# dimension line (y ~0.0795) and the title block top (y 0.066); left-anchored,
+# its ~62 mm "ENLARGED RIGHT END VIEW" line starts 31 mm left of the axis.
+END_NOTE_XY = (0.324, 0.074)
 ISO_NOTE_XY = (0.104, 0.077)
 
 

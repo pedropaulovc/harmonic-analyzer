@@ -213,7 +213,14 @@ FRONT_KEEP = {
 # The top face's slide roughness on its edge, left of the section line.
 TOP_FINISH_MODEL_X = -178.0
 TOP_FINISH_SYMBOL_XY = (LEFT_END + 0.030, FACE_TOP + 0.014)
-TOP_REASON_TOP = (TOP_FINISH_SYMBOL_XY[0] + 0.003, FACE_TOP + 0.032)
+# Each finish's reason stands left of its symbol at the symbol's foot, its
+# right end ~6 mm short of the leader's knee, so it reads as the symbol's
+# (machinist review round 6: the top one, 18 mm over its symbol, floated).
+REASON_FROM_SYMBOL = (-0.0345, -0.001)
+TOP_REASON_TOP = (
+    TOP_FINISH_SYMBOL_XY[0] + REASON_FROM_SYMBOL[0],
+    TOP_FINISH_SYMBOL_XY[1] + REASON_FROM_SYMBOL[1],
+)
 # Under the length line, left of the round counterbores' callout.
 FACE_CAPTION_TOP = (0.150, FACE_BOTTOM - 4.0 * ROW_STEP - 0.008)
 
@@ -251,7 +258,10 @@ CLAMP_CALLOUT_XY = (_back_x(max(CLAMP_ROUND_X)) - 0.005, BACK_TOP + 0.017)
 FRONT_FINISH_MODEL_XY = (-40.0, 6.0)
 FRONT_FINISH_SYMBOL_XY = (0.192, BACK_TOP + 0.014)
 # Its reason stands left of it, under the face view's caption.
-FRONT_REASON_TOP = (0.1575, BACK_TOP + 0.013)
+FRONT_REASON_TOP = (
+    FRONT_FINISH_SYMBOL_XY[0] + REASON_FROM_SYMBOL[0],
+    FRONT_FINISH_SYMBOL_XY[1] + REASON_FROM_SYMBOL[1],
+)
 # Centre the front caption under the native outer station span, then keep
 # its complete text block right of detail C's native dimension text.
 FRONT_CAPTION_AIR_M = 0.004

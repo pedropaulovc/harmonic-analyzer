@@ -367,6 +367,14 @@ def test_sheet_states_the_cut_and_no_dimension_in_the_registry_names() -> None:
         f"CUT EACH TIP {screw.TIP_BELOW_REAR_FACE_TEXT} BELOW THE MHA-PD-06 DISC "
         "REAR FACE AT ASSEMBLY;"
     ) in flat
-    assert f"BREAK THE CUT END {screw.CUT_END_BREAK_TEXT}." in flat
+    # The cut end's break is the title block's; the note sets no limit.
+    assert flat.endswith("BREAK THE CUT END.")
 
+
+def test_the_sheet_shelves_the_qualified_stock_length() -> None:
+    """The screw is cut at assembly, so the stock length keeps its qualifier;
+    the sheet moves that reference's text off its line (machinist review r5)."""
+    from _mcmaster_91794a055 import SUPPLIER_REFERENCE_FORMATS
+
+    assert SUPPLIER_REFERENCE_FORMATS[drawing.STOCK_LENGTH][3]
 

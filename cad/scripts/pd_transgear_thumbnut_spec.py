@@ -144,8 +144,12 @@ CSK_DIA = (
     / _CSK_SCALE
     * MM_PER_IN
 )  # 4.572 (.18)
-CSK_DIA_TOL_TYPE = 6  # swTolType_e.swTolMAX
-CSK_DIA_DEVIATIONS = (THREAD_MAJOR - CSK_DIA, 0.0)
+# A single limit, the modelled size IS the max: no native tolerance, and the
+# part authors " MAX" as the value's suffix (pd_transgear_pin's seat root),
+# since SolidWorks' native swTolMAX prints a lowercase "max." (machinist
+# review round 6).
+CSK_DIA_TOL_TYPE = 0  # swTolType_e.swTolNONE
+CSK_DIA_SUFFIX = " MAX"
 # The sheet prints the cone's 45° half-angle at the title block's angular
 # row: no mate seats in these thread-entry cones, so no tighter band.
 CSK_INCLUDED_ANGLE_DEG = 90.0

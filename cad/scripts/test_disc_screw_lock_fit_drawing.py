@@ -64,16 +64,17 @@ def test_uncut_stock_tip_stands_proud_of_the_disc_rear_face() -> None:
 
 
 def test_cut_tips_sit_inside_the_disc_and_keep_one_and_a_half_d() -> None:
-    """Cut .000-.008 below the rear face, end broken .004 max: the rear loses
-    the deepest cut plus its break, or the shortest uncut stock's inside
-    stand-off plus its incomplete first thread, whichever is more."""
+    """Cut .000-.008 below the rear face, the end broken to the title block's
+    .010 chamfer max: the rear loses the deepest cut plus its break, or the
+    shortest uncut stock's inside stand-off plus its incomplete first thread,
+    whichever is more."""
     assert screw.TIP_BELOW_REAR_FACE == pytest.approx((0.0, 0.008 * IN))
-    assert screw.CUT_END_BREAK_MAX == pytest.approx(0.004 * IN)
+    assert screw.CUT_END_BREAK_MAX == pytest.approx(0.010 * IN)
     inside = (FLANGE + THREE_PLACE) + (FACE + THREE_PLACE) - (SHANK_LEN - LENGTH_MINUS)
-    rear_loss = max(MOUTH_BREAK, 0.008 * IN + 0.004 * IN, inside + PITCH)
+    rear_loss = max(MOUTH_BREAK, 0.008 * IN + 0.010 * IN, inside + PITCH)
     worst = (FACE - THREE_PLACE) - MOUTH_BREAK - rear_loss
-    assert worst == pytest.approx(2.4003, abs=1e-9)
-    assert worst / MAJOR == pytest.approx(1.575, abs=5e-4)
+    assert worst == pytest.approx(0.091 * IN, abs=1e-9)
+    assert worst / MAJOR == pytest.approx(1.5167, abs=5e-4)
     assert worst >= 1.5 * MAJOR
     assert screw.ENGAGEMENT_WORST == pytest.approx(worst)
     assert screw.ENGAGEMENT_WORST_D >= disc.ENGAGEMENT_FLOOR_D == 1.5
