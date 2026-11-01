@@ -1283,7 +1283,7 @@ _HOLE_CALLOUT_DEFINITION_PARTS = ((5, 1), (6, 2), (7, 3), (8, 4))
 # Hole Wizard callouts print three inch places (#290): the drill and the
 # counterbore's diameter and depth.
 MOUNT_HOLE_PRECISION = dict.fromkeys(
-    ("hw-diam", "hw-cbdiam", "hw-cbdepth"), cone.MOUNT_HOLE_CALLOUT_PLACES
+    ("hw-thruholedia", "hw-cbdia", "hw-cbdepth"), cone.MOUNT_HOLE_CALLOUT_PLACES
 )
 
 

@@ -1260,7 +1260,7 @@ def _print_pivot_band_exactly(display: Any) -> None:
 
 
 # Hole Wizard callouts print three inch places (#290).
-HOLDDOWN_CALLOUT_PRECISION = {"hw-diam": 3, "hw-cbdia": 3, "hw-cbdepth": 3}
+HOLDDOWN_CALLOUT_PRECISION = {"hw-thruholedia": 3, "hw-cbdia": 3, "hw-cbdepth": 3}
 
 
 def _add_holddown_callout(adapter: Any, section: Any) -> Any:
