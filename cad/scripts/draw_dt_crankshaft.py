@@ -918,6 +918,7 @@ def _far_end_rim(adapter: Any, view: Any) -> Any:
     return matches[0]
 
 
+@_telemetry.traced("drawing.crankshaft.finish_leader", label_param="label")
 def _straighten_finish_leader(symbol: Any, *, label: str) -> None:
     """One straight leader ending in a filled arrow on a finish symbol."""
     if symbol is None:
