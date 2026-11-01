@@ -407,10 +407,20 @@ def test_sheet_ink_is_clear_and_the_build_places_what_it_audits() -> None:
         "PinchDepthCenter",
         "Width",
         "FootTapX",
+        "Depth",
     )
-    # d84a42ca7: the 4.875's inside arrows struck its "5"; the plan depth's
-    # three rows fill its span.
-    assert drawing.ARROWS_OUTSIDE == ("SlitW", "Depth", "FootTapZ")
+    # d84a42ca7: the 4.875's inside arrows struck its "5".  The plan depth's
+    # text stands on its offset shelf, so its arrows stand inside and the
+    # line between them meets the shelf's leader (machinist review, PR 2107).
+    assert drawing.ARROWS_OUTSIDE == ("SlitW", "FootTapZ")
+    depth = drawing.sheet_dimension_ink()["Depth"]
+    depth_line = (
+        (drawing.PLAN_DEPTH_LINE_X, drawing._plan_y(drawing.Z_NORTH)),
+        (drawing.PLAN_DEPTH_LINE_X, drawing._plan_y(drawing.Z_SOUTH)),
+    )
+    assert depth_line in depth.lines
+    leader_start = (drawing.PLAN_DEPTH_LINE_X, drawing._plan_y(0.0))
+    assert any(segment[0] == leader_start for segment in depth.lines)
     assert not set(drawing.ARROWS_INSIDE) & set(drawing.ARROWS_OUTSIDE)
 
 
