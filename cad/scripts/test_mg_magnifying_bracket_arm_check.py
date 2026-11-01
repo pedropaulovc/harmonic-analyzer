@@ -165,12 +165,12 @@ def test_shifted_row_uses_nearer_flange_edge_for_prying_and_actual_torque_for_sh
 
 
 def test_prying_demand_bounds_every_accepted_foot_width_and_row_corner() -> None:
-    # The lower-edge ordinate and overall .XXX width are independent controls.
+    # The lower-edge ordinate and overall .XX width are independent controls.
     # Width variation is not a symmetric displacement of both nominal edges.
     rows = (0.189 * IN - joint.POSITION_BAND, 0.189 * IN + joint.POSITION_BAND)
     corner_arms = [
         min(row_from_lower, width - row_from_lower)
-        for width, row_from_lower in itertools.product((0.428 * IN, 0.438 * IN), rows)
+        for width, row_from_lower in itertools.product((0.42 * IN, 0.44 * IN), rows)
     ]
     assert (min(corner_arms), max(corner_arms)) == pytest.approx(rows)
     corner_tensions = [

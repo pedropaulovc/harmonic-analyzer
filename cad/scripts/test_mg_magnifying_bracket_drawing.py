@@ -46,7 +46,7 @@ def test_foot_joins_flush_without_changing_mounting_grip_or_pattern() -> None:
 def test_model_precision_and_functional_bands_have_one_authority() -> None:
     assert spec.DRAWING_PRECISION["Neck"]["NeckThickness"] == 2
     assert spec.DRAWING_PRECISION["FlangeProfile"] == {"FlangeWidth": 2, "FlangeDepth": 3}
-    assert spec.DRAWING_PRECISION["Flange"]["FlangeHeight"] == 3
+    assert spec.DRAWING_PRECISION["Flange"]["FlangeHeight"] == 2
     assert joint.NECK_THICKNESS == 12.5
     # .49 +/-.01 over the 12.5 mm model: .48 is the thinnest accepted neck.
     assert joint.NECK_THICKNESS - joint.NECK_THICKNESS_TOL == pytest.approx(0.48 * 25.4)

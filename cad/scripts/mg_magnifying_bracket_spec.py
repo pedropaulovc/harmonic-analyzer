@@ -28,14 +28,14 @@ DRAWING_DIMENSIONS = {
     "MountingCoordinates": {"MountingX0", "MountingX1", "MountingY0"},
     "TapCoordinates": {"TapFromTip", "TapFromSide"},
 }
-# Inch places. Three on the +/-.002 head and mounting controls, the foot grip
-# and the foot width (flush with the +/-.002 nose); two on the neck (thread
-# engagement), the foot length (mounting walls) and the seat-to-axis reach.
+# Inch places. Three on the +/-.002 head and mounting controls and the foot
+# grip; two on the neck (thread engagement), the foot length and width
+# (mounting walls) and the seat-to-axis reach.
 DRAWING_PRECISION = {
     "NeckProfile": {"NoseR": 3, "SeatToAxis": 2},
     "Neck": {"NeckThickness": 2},
     "FlangeProfile": {"FlangeWidth": 2, "FlangeDepth": 3},
-    "Flange": {"FlangeHeight": 3},
+    "Flange": {"FlangeHeight": 2},
     "MountingCoordinates": {"MountingX0": 3, "MountingX1": 3, "MountingY0": 3},
     "TapCoordinates": {"TapFromTip": 3, "TapFromSide": 3},
 }

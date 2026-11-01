@@ -51,8 +51,8 @@ def test_side_plate_is_flush_and_matches_neck_width_without_moving_the_arm() -> 
     assert bracket.FLANGE_X == joint.SIDE_PLATE_X == (-48.0, bracket.NECK_HALF_X)
     assert bracket.FLANGE_Y == joint.SIDE_PLATE_Y == (-5.5, 5.5)
     assert joint.SIDE_PLATE_HEIGHT == 2.0 * bracket.NOSE_R == 11.0
-    # The 11.0 mm foot prints .433 +/-.005 (#290).
-    assert joint.SIDE_PLATE_HEIGHT_DEVIATIONS == pytest.approx((0.428 * 25.4 - 11.0, 0.438 * 25.4 - 11.0))
+    # The 11.0 mm foot prints .43 at the title block's .XX (#290).
+    assert joint.SIDE_PLATE_HEIGHT_DEVIATIONS == pytest.approx((0.42 * 25.4 - 11.0, 0.44 * 25.4 - 11.0))
     assert bracket.FLANGE_Z == joint.SIDE_PLATE_Z
     back = joint.BRACKET_ORIGIN[2] + bracket.FLANGE_Z[1]
     front = joint.BRACKET_ORIGIN[2] + bracket.FLANGE_Z[0]
@@ -115,7 +115,7 @@ def test_side_by_side_stations_have_head_clearance_and_head_bearing() -> None:
         joint.SIDE_PLATE_HEIGHT + joint.SIDE_PLATE_HEIGHT_DEVIATIONS[0]
         - row_from_lower - joint.POSITION_BAND - head_radius
     )
-    assert (row_from_lower, lower_wall, upper_wall) == pytest.approx((4.79, 2.7892, 0.428 * 25.4 - 4.79 - 2.0008))
+    assert (row_from_lower, lower_wall, upper_wall) == pytest.approx((4.79, 2.7892, 0.42 * 25.4 - 4.79 - 2.0008))
     assert joint.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(min(lower_wall, upper_wall))
     assert joint.HEAD_PROTRUSION == pytest.approx(2.1082)
     # A flush head would run the screw past the tap's full thread.
@@ -138,7 +138,7 @@ def test_accepted_foot_corners_retain_head_bearing_and_clearance_hole_material()
     # opposite edge, not half of each edge about the nominal centreline.
     lower_head_walls, upper_head_walls = [], []
     lower_hole_walls, upper_hole_walls = [], []
-    for width in (0.428 * 25.4, 0.438 * 25.4):
+    for width in (0.42 * 25.4, 0.44 * 25.4):
         for row_from_lower in (4.79 - joint.POSITION_BAND, 4.79 + joint.POSITION_BAND):
             # The 3.8 circle plus its .10 allowance is a conservative screen,
             # not an invented catalog head-major maximum.
@@ -147,9 +147,9 @@ def test_accepted_foot_corners_retain_head_bearing_and_clearance_hole_material()
             # Native 2.591 prints .102 +.004/0: the accepted hole is .106 MAX.
             lower_hole_walls.append(row_from_lower - 0.106 * 25.4 / 2.0)
             upper_hole_walls.append(width - row_from_lower - 0.106 * 25.4 / 2.0)
-    assert (min(lower_head_walls), min(upper_head_walls)) == pytest.approx((2.7892, 0.428 * 25.4 - 6.7908))
+    assert (min(lower_head_walls), min(upper_head_walls)) == pytest.approx((2.7892, 0.42 * 25.4 - 6.7908))
     assert (min(lower_hole_walls), min(upper_hole_walls)) == pytest.approx(
-        (4.7392 - 0.053 * 25.4, 0.428 * 25.4 - 4.8408 - 0.053 * 25.4),
+        (4.7392 - 0.053 * 25.4, 0.42 * 25.4 - 4.8408 - 0.053 * 25.4),
     )
     assert joint.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(
         min(*lower_head_walls, *upper_head_walls),

@@ -223,6 +223,43 @@ def test_tie2_profile_runs_radially_and_ends_in_air() -> None:
     assert low < bearing % 360.0 < high
 
 
+def _inside(polygon: list[tuple[float, float]], point: tuple[float, float]) -> bool:
+    x, y = point
+    inside = False
+    for (x1, y1), (x2, y2) in zip(polygon, polygon[1:] + polygon[:1]):
+        if (y1 > y) != (y2 > y) and x < x1 + (y - y1) * (x2 - x1) / (y2 - y1):
+            inside = not inside
+    return inside
+
+
+def _distance(
+    point: tuple[float, float], a: tuple[float, float], b: tuple[float, float]
+) -> float:
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    t = ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) / (dx * dx + dy * dy)
+    t = max(0.0, min(1.0, t))
+    return math.hypot(point[0] - a[0] - t * dx, point[1] - a[1] - t * dy)
+
+
+def test_tie2_window_shows_the_hole_and_keeps_hatch_off_the_angle_leg() -> None:
+    window = [drawing.tie2_window_point(s, t) for s, t in drawing.TIE2_WINDOW]
+    tie_r = mg_magnifying_wheel_spec.TIE_HOLE_DIA / 2.0
+    # Both cut walls, rim bore to groove bottom, lie inside the window.
+    for r in (rim.RIM_INNER_DIA / 2.0, rim.GROOVE_BOTTOM_DIA / 2.0):
+        along = math.sqrt(r * r - tie_r * tie_r)
+        for across in (-tie_r, tie_r):
+            assert _inside(window, drawing.tie2_window_point(along, across))
+    # The angle's horizontal leg leaves the axis's inner end toward the
+    # 180 deg side and stays clear of the window up to the rim's far wall.
+    x0, y = part._tie2_profile()[0]
+    x1 = -math.sqrt((rim.GROOVE_BOTTOM_DIA / 2.0) ** 2 - y * y)
+    edges = list(zip(window, window[1:] + window[:1]))
+    for k in range(101):
+        point = (x0 + (x1 - x0) * k / 100.0, y)
+        assert not _inside(window, point)
+        assert min(_distance(point, a, b) for a, b in edges) > 0.4
+
+
 @pytest.mark.parametrize(
     ("circle_r", "printed", "fillet_name"),
     [
