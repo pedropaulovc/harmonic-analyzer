@@ -653,7 +653,7 @@ def _assert_dimension_arrow_length(drawing: Any) -> None:
 
 # RV-03's T012 web text stands this far off its dimension line, square to it
 # on the side away from the teeth's +X dimensions: clear of the tip circle.
-WEB_MIN_TEXT_OFFSET = 0.026
+WEB_MIN_TEXT_OFFSET = 0.034  # r4 review: at 0.026 a tooth outline ran through the text
 
 
 def web_min_text_xy() -> tuple[float, float]:
