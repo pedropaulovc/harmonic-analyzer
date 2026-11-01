@@ -10,10 +10,12 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from solidworks_mcp.adapters.sw_type_info import constant
 
 from _com import _early_bound
+from _drawing_dimension_import import _model_item_paths
 from _drawing_dimensions import offset_dimension_text
 from _drawing_hidden_sketches import _show_hidden_owners, curate_view_dimensions
 from _supplier_dimensions import (
@@ -36,33 +38,51 @@ SUPPLIER_MARGINS = {
     "free_top": (0.030, 0.016, 0.045, 0.020),
 }
 # The diagram sketches are construction geometry (the zero-body diagram
-# contract); this SLDDRW prints construction curves as visible outline, as
-# _supplier_wire_stock_drawing does. The installed pictorial keeps its
-# sketches blanked, so only the two diagrams change.
-_CONSTRUCTION_LINE_FONT = (
-    ("swLineFontConstructionCurvesStyle", "swLineCONTINUOUS"),
-    ("swLineFontConstructionCurvesThickness", "swLW_THICK"),
-)
+# contract). Construction curves print continuous in this SLDDRW, as
+# _supplier_wire_stock_drawing does, but that preference leaves them grey and
+# 0.13 mm (farm run 20261101T050059613Z); each diagram's shown sketch also gets
+# the outline's black and Thick weight in its own view, so the roller and pin
+# outlines print as the diagram's edges. The installed pictorial keeps its
+# sketches blanked.
+_CONSTRUCTION_LINE_STYLE = ("swLineFontConstructionCurvesStyle", "swLineCONTINUOUS")
+_OUTLINE_COLOR = 0  # COLORREF black
+_SW_LW_THICK = 2  # swLineWeights_e.swLW_THICK
 
 
-def _construction_curves_as_outline(adapter: Any) -> Callable[[], None]:
+def _construction_curves_continuous(adapter: Any) -> Callable[[], None]:
     extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
     option = constant("swDetailingNoOptionSpecified")
-    settings = tuple(
-        (name, constant(name), constant(value))
-        for name, value in _CONSTRUCTION_LINE_FONT
-    )
+    name, style = _CONSTRUCTION_LINE_STYLE
+    preference, value = constant(name), constant(style)
 
     def readback() -> None:
-        for name, preference, value in settings:
-            if int(extension.GetUserPreferenceInteger(preference, option)) != value:
-                raise RuntimeError(f"chain diagram line font {name} readback differs")
+        if int(extension.GetUserPreferenceInteger(preference, option)) != value:
+            raise RuntimeError(f"chain diagram line font {name} readback differs")
 
-    for name, preference, value in settings:
-        if not extension.SetUserPreferenceInteger(preference, option, value):
-            raise RuntimeError(f"failed to set chain diagram line font {name}")
+    if not extension.SetUserPreferenceInteger(preference, option, value):
+        raise RuntimeError(f"failed to set chain diagram line font {name}")
     readback()
     return readback
+
+
+def _format_as_outline(adapter: Any, view: Any, sketches: tuple[str, ...]) -> None:
+    """Black, Thick line format on each shown sketch, in the active view."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    paths = _model_item_paths(adapter, view)
+    for sketch in sketches:
+        draw.ClearSelection2(True)
+        if not any(
+            draw.Extension.SelectByID2(
+                f"{sketch}@{component}@{in_view}", "SKETCH",
+                0.0, 0.0, 0.0, False, 0, null_callout(), 0,
+            )
+            for component, in_view in paths
+        ):
+            raise RuntimeError(f"cannot select chain diagram sketch {sketch!r}")
+        drawing.SetLineColor(_OUTLINE_COLOR)
+        drawing.SetLineWidth(_SW_LW_THICK)
+        draw.ClearSelection2(True)
 
 
 def prepare_chain_diagrams(
@@ -72,7 +92,7 @@ def prepare_chain_diagrams(
     reference_bounds: Callable[[str], tuple[float, float, float, float]],
 ) -> tuple[Callable[[], None], ...]:
     """Show the source sketch owners before scale selection, not afterward."""
-    line_font = _construction_curves_as_outline(adapter)
+    line_style = _construction_curves_continuous(adapter)
     for key, owners in SOURCE_FEATURES.items():
         view = _early_bound(views[key], "IView")
         if str(view.ReferencedConfiguration) != stock.SUPPLIER_REFERENCE_CONFIGURATION:
@@ -80,7 +100,8 @@ def prepare_chain_diagrams(
         shown = _show_hidden_owners(adapter, view, owners, view_label=key)
         if tuple(shown) != owners:
             raise RuntimeError(f"{key}: supplier diagram sketch is not saved hidden")
-    return (line_font,)
+        _format_as_outline(adapter, view, owners)
+    return (line_style,)
 
 
 def annotate_chain_stock(
