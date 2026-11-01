@@ -127,10 +127,11 @@ _NM_PER_IN_LBF = 4.4482216152605 * 0.0254
 
 
 def _torque(nm: float) -> str:
-    """A tightening torque as the sheet prints it, ``2.8 N·m (24.7 IN·LBF)``:
-    the in·lbf rounded down so it never exceeds the N·m value."""
-    in_lbf = math.floor(round(nm / _NM_PER_IN_LBF * 10.0, 9)) / 10.0
-    return f"{nm:.1f} N·m ({in_lbf:.1f} IN·LBF)"
+    """A tightening torque as the sheet prints it, ``2.8 N·m (25 IN·LBF)``:
+    the N·m source value first, its in·lbf conversion in parentheses rounded
+    to the nearest two significant figures (owner ruling 3, 2026-11-01)."""
+    in_lbf = float(f"{nm / _NM_PER_IN_LBF:.2g}")
+    return f"{nm:.1f} N·m ({in_lbf:g} IN·LBF)"
 
 
 
