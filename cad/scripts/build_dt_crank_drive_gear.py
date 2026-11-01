@@ -62,6 +62,7 @@ from _fit_deviations import deviations
 from _simplified_part import save_simplified_part
 from _gear import build_stock_form_gear, volume_check
 from _part_pmi import author_part_pmi
+from gear_face_band import GEAR_FACE_WIDTH_BAND
 from dt_crank_drive_gear_notes import GEAR_DATA
 from dt_crank_drive_gear_spec import (
     BORE_AF,
@@ -71,7 +72,6 @@ from dt_crank_drive_gear_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FACE_WIDTH,
-    FACE_WIDTH_BAND,
     NATIVE_SWEEP_BOUND_MM,
     OUTSIDE_DIA,
     OUTSIDE_DIA_TOLERANCE_MM,
@@ -279,11 +279,12 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    face_lower, face_upper = deviations(FACE_WIDTH_BAND)
+    face_lower, face_upper = deviations(GEAR_FACE_WIDTH_BAND)
     if face_lower != -face_upper:
         raise AssertionError("the 64T face-width band must be symmetric")
     # The bands are millimetres; UNIT prints them in inches. The face width's
-    # band prints at its nominal's four places, ±.0010 (machinist review).
+    # authored band prints at its nominal's four places, ±.0010 (machinist
+    # review); the spec's FACE_WIDTH_BAND is its limits about the model.
     set_dimension_symmetric_tolerance(
         adapter, "GearBlank", "FaceWidth", face_upper,
         places=DRAWING_PRECISION["GearBlank"]["FaceWidth"], display_unit=UNIT,
