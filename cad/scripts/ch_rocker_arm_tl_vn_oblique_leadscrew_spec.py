@@ -8,8 +8,8 @@ sibling part spec, never retyped.
 
 What it is: a Tr8x2 screw parallel to rail 1, on the rail's column side
 (+lateral), turning in two KP08 pillow blocks. Each block stands on an
-end bracket (TL-28, two off) bolted on base bar 1's top. A flanged brass
-nut, screwed directly to the integral lug of feed block TL-32, drives
+end bracket (TL-28, two off) bolted on base bar 1's top. The shop-made brass
+feed nut (TL-27), screwed to the integral lug of feed block TL-32, drives
 carriage 1. The handwheel
 (``fixtures.trammel-handwheel``) sits on the screw's outboard end, past the
 base bar's far end, so the wheel overhangs it.
@@ -45,7 +45,7 @@ handwheel's bore past its grub and its set-screw flat
 HUB_GAP past the far block: SCREW_LENGTH 410. The stations
 and the screw length are fixed (the drilled parts carry them); self-checks
 guard them against the bought block, so a vendor swap changes the bought
-numbers and TL-32's nut interface only, or trips a check.
+numbers only, or trips a check.
 
 The nut remains attached to the feed block during either feed mode. Align
 the KP08 blocks to the nut at both travel ends before tightening their
@@ -92,7 +92,6 @@ RAIL = 1  # the screw runs beside rail 1 and drives carriage 1
 # Shop-inventory ids (cad/process/shop/inventory.toml); the inventory owns
 # each item's source and SKU.
 SCREW_ID = "fixtures.trammel-tr8-leadscrew"
-NUT_ID = "fixtures.trammel-tr8-flange-nut"
 KP08_ID = "fixtures.trammel-kp08-blocks"
 HANDWHEEL_ID = "fixtures.trammel-handwheel"
 
@@ -102,29 +101,12 @@ HANDWHEEL_ID = "fixtures.trammel-handwheel"
 SCREW_MAJOR_DIA = 8.0
 SCREW_LEAD = 2.0
 SCREW_STOCK_LENGTH = 600.0
-# Flanged brass nut, Zyltech HW-SC-T8x2: flange Ø22 x 3.5, 4 x Ø3.5 THRU on
-# a Ø16 circle at 45°; body Ø10.2, axially a 1.5 spigot, the flange and a 10
-# body: 15 overall.
-NUT_FLANGE_DIA = 22.0
-NUT_FLANGE_THICK = 3.5
-NUT_HOLE_DIA = 3.5
-NUT_HOLE_PCD = 16.0
-NUT_HOLE_ANGLES_DEG = (45.0, 135.0, 225.0, 315.0)
-NUT_BODY_DIA = 10.2
-NUT_LENGTH = 15.0
-NUT_BODY_SHORT = 1.5  # the spigot, in TL-32's -X counterbore
-NUT_BODY_LONG = NUT_LENGTH - NUT_FLANGE_THICK - NUT_BODY_SHORT  # 10, proud on -X
-# US-customary UNC (fastener policy): the flange's Ø3.5 plain holes float a
-# #4-40 (major 2.845) 0.33 a side. Each button head (MHA-CH-06-TL-VN-66)
-# bears directly on the brass flange, no washer (owner ruling 2026-10-20).
-NUT_SCREW = "#4-40"
-# Derived from the nut above, so a vendor swap changes numbers only.
-NUT_SCREW_MAJOR = THREAD_MAJOR_MM[NUT_SCREW]
+# US-customary UNC (fastener policy). Rule 18 at the worst case: the shortest
+# screw (ASME B18.3, -0.03 in up to 1 in long, plus nothing) past the grip,
+# less the screw tip's incomplete threads (rule 18's 1.5 pitches) and the tap
+# mouth's title-block edge break.
 INCH_SCREW_LENGTHS = ("1/4", "5/16", "3/8", "7/16", "1/2", "5/8", "3/4")  # SHCS
-# Rule 18 at the worst case: the shortest screw (ASME B18.3, -0.03 in up to
-# 1 in long, plus nothing) past the grip, less the screw tip's incomplete
-# threads (rule 18's 1.5 pitches) and the tap mouth's title-block edge break.
-SHCS_LENGTH_TOL_MM = 0.03 * INCH  # STANDARD: ASME B18.3 (SHCS, BHCS), to 1 in long
+SHCS_LENGTH_TOL_MM = 0.03 * INCH  # STANDARD: ASME B18.3 (SHCS), to 1 in long
 TAP_MOUTH_BREAK = float(_config.title_block("edge_break")["chamfer_max_mm"])
 _TIP_INCOMPLETE_PITCHES = 1.5  # rule 18
 # Each bought screw is the shortest stock length whose worst-case full thread
@@ -135,8 +117,7 @@ ENGAGEMENT_TARGET_D = 2.0
 
 def full_thread_min(length: str, grip: float, thread: str) -> float:
     """Worst-case full-thread engagement of an inch B18.3 socket screw
-    ``length`` long past ``grip`` (the grip at its nominal: the bought parts
-    state no band)."""
+    ``length`` long past ``grip`` (the grip at its worst case: the caller's)."""
     pitch = INCH / float(thread.rsplit("-", 1)[1])
     return (
         float(Fraction(length)) * INCH
@@ -159,18 +140,6 @@ def _shortest_length(grip: float, thread: str) -> str:
     )
 
 
-# UNVERIFIED: the vendor gives the flange's 3.5 with no band; a thicker flange
-# takes engagement off one for one (ENGAGEMENT_TARGET_D's half diameter).
-NUT_SCREW_GRIP = NUT_FLANGE_THICK  # the head on the flange: 3.5
-NUT_SCREW_LENGTH = _shortest_length(NUT_SCREW_GRIP, NUT_SCREW)  # 1/2
-NUT_SCREW_LENGTH_MM = float(Fraction(NUT_SCREW_LENGTH)) * INCH  # 12.7
-NUT_SCREW_ENGAGEMENT = NUT_SCREW_LENGTH_MM - NUT_SCREW_GRIP  # 9.2 nominal
-NUT_SCREW_FULL_THREAD_MIN = full_thread_min(
-    NUT_SCREW_LENGTH, NUT_SCREW_GRIP, NUT_SCREW
-)  # 7.236, 2.54 D
-# The longest screw (B18.3: never long) on the flange's nominal stops .028
-# inside TL-32's full thread, printed at .XX.
-NUT_SCREW_TAP_DEPTH = 9.906  # .39 full thread
 # KP08 pillow block. Verified: axis height, bolt spacing, length, height, bore.
 KP08_AXIS_HEIGHT = 15.0
 KP08_BOLT_SPACING = 42.0
@@ -476,13 +445,6 @@ if not (
     < BRACKET_THICK
 ):
     raise AssertionError("the bar screws' engagement in the bracket")
-if not (
-    1.5 * NUT_SCREW_MAJOR
-    <= NUT_SCREW_FULL_THREAD_MIN
-    < NUT_SCREW_ENGAGEMENT
-    < NUT_SCREW_TAP_DEPTH
-):
-    raise AssertionError("the nut flange screws' engagement in the feed block")
 if not 1.5 * THREAD_MAJOR_MM[KP08_SCREW] <= KP08_SCREW_FULL_THREAD_MIN:
     raise AssertionError("the KP08 screws' engagement in the end bracket")
 

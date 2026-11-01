@@ -15,7 +15,7 @@ allowed_free_stems:
   - ch-rocker-arm-tl-oblique-feed-lever
   - ch-rocker-arm-tl-vn-oblique-carriage
   - ch-rocker-arm-tl-vn-oblique-cl-dowel
-  - ch-rocker-arm-tl-vn-oblique-leadscrew-nut
+  - ch-rocker-arm-tl-oblique-feed-nut
   - ch-rocker-arm-tl-vn-oblique-carriage-screw
   - ch-rocker-arm-tl-vn-oblique-nut-screw
   - ch-rocker-arm-tl-vn-oblique-riser-screw
@@ -34,7 +34,7 @@ required_free_stems:
   - ch-rocker-arm-tl-oblique-feed-lever
   - ch-rocker-arm-tl-vn-oblique-carriage
   - ch-rocker-arm-tl-vn-oblique-cl-dowel
-  - ch-rocker-arm-tl-vn-oblique-leadscrew-nut
+  - ch-rocker-arm-tl-oblique-feed-nut
   - ch-rocker-arm-tl-vn-oblique-carriage-screw
   - ch-rocker-arm-tl-vn-oblique-nut-screw
   - ch-rocker-arm-tl-vn-oblique-riser-screw
@@ -45,9 +45,9 @@ free_dof: 1
 machinist_exceptions:
   - id: "RV-01"
     kind: "accept"
-    where: "step 7 and F1: four #4-40 X 1/2 button heads directly on the Tr8 nut flange into the integral feed block, 0.4 N·m"
-    finding: "no mechanical lock on the nut-flange screws under reversing nut torque (rule 23)"
-    reason: "The unchanged four-screw flange is a static clamp: its calculated friction-slip margin exceeds 1.5 against the 1 kN hand-abuse nut torque. No operating torque reaches the screws. The owner accepted the #4-40 button-head joint without washers on 2026-10-19/20; the owner-approved 2026-10-23 simplification retains that joint in TL-32, with holes drilled to print rather than transfer spotted. Actual heads must seat flat and clear the nut body before tightening."
+    where: "step 7 and F1: two #4-40 X 3/4 SHCS through the TL-27 feed nut's loose holes into the integral feed block, 0.3 N·m"
+    finding: "no mechanical lock on the feed nut screws under reversing nut torque (rule 23)"
+    reason: "The two-screw TL-27 nut is a static clamp: its calculated friction-slip margin (1.56) exceeds 1.5 against the 1 kN hand-abuse nut torque, so no operating torque reaches the screws. The owner accepted the static clamp without washers for the bought nut's flange on 2026-10-19/20 and replaced that nut with the shop-made TL-27 on 2026-11-01 (item 4); 0.3 N·m keeps each socket head's bearing on the brass under its 17 ksi yield. Holes are drilled to print rather than transfer spotted; the nut's loose holes align it to the leadscrew before tightening."
   - id: "RV-03"
     kind: "accept"
     where: "step 8: the handwheel and KP08 set screws on leadscrew flats, locked with Loctite 222 (low-strength purple) threadlocker"

@@ -1,0 +1,13 @@
+ch-rocker-arm-tl-oblique-feed-nut:
+  title: Rocker Oblique Trammel Feed Nut
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-nn (subsystem-identities.md).
+  # Owner ruling 2026-11-01 (item 4): shop-made, replacing the retired bought
+  # Tr8x2 flange nut MHA-CH-06-TL-VN-55. The Tr8x2 thread runs in the brass.
+  number: MHA-CH-06-TL-27
+  material: BRASS 360-H02 RECT BAR 3/4 x 1-1/4 in
+  material_specification: Brass 360 (C36000) half-hard extruded rectangle bar, ASTM B16, 3/4 x 1-1/4 in (OnlineMetals 1500); height and width as supplied
+  finish: as machined
+  quantity: 1
+  tolerance_class: machined_block
+  process: "saw and face to length; drill letter C and tap Tr8x2 RH through square to the faces; drill the two #4 loose-clearance holes through; break edges"
+  drawing_unit: in

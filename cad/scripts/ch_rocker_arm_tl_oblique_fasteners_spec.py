@@ -30,8 +30,8 @@ Threads are US-customary UNC except the bought carriage's M4 holes.
 The shoulder screw has its own datum-based row: treating its 1.500 shoulder
 as a conventional screw grip would report a false engagement.
 
-Only the feed lever screws use wedge-lock pairs. The four nut screws are
-button heads directly on the brass flange. Hold-down studs retain their loaded
+Only the feed lever screws use wedge-lock pairs. The two feed nut screws bear
+directly on the brass nut. Hold-down studs retain their loaded
 lower ends when shortened. These nominal fit contracts do not certify the jig.
 """
 
@@ -43,6 +43,8 @@ from fractions import Fraction
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
+import ch_rocker_arm_tl_oblique_feed_block_spec as feed_block
+import ch_rocker_arm_tl_oblique_feed_nut_spec as feed_nut
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_riser_spec as riser
@@ -55,7 +57,6 @@ from _printed_tolerance import printed_band_mm
 INCH = trammel.INCH
 RAILS = 2  # one rail, one base bar, one carriage, one pivot block per side
 SHCS = "SHCS"
-BHCS = "BHCS"  # ASME B18.3 button head socket cap screw
 # The riser's countersinks take only the B18.6.3 machine-screw head; a B18.3
 # socket flat head stands proud of them (trammel spec; Codex #1583).
 FLAT_HEAD = "B18.6.3 FLAT HEAD"
@@ -74,7 +75,7 @@ def inch_mm(length: str) -> float:
 class Fastener:
     joint: str
     thread: str  # as printed: "#8-32", "M4"
-    head: str  # SHCS, BHCS or FLAT HEAD
+    head: str  # SHCS or FLAT HEAD
     length: str  # as printed: "3/4" (inch) or "20" (mm)
     count: int
     grip_mm: float  # under the head, before the receiving thread
@@ -179,13 +180,13 @@ KP08_TO_BRACKET = Fastener(
     leadscrew.BRACKET_THICK,  # tapped THRU
 )
 NUT_TO_FEED_BLOCK = Fastener(
-    "Tr8 flanged nut to TL-32 feed block",
-    leadscrew.NUT_SCREW,
-    BHCS,
-    leadscrew.NUT_SCREW_LENGTH,
-    len(leadscrew.NUT_HOLE_ANGLES_DEG),
-    leadscrew.NUT_SCREW_GRIP,  # the button head on the flange
-    leadscrew.NUT_SCREW_TAP_DEPTH,  # blind
+    "TL-27 feed nut to TL-32 feed block",
+    feed_nut.SCREW_THREAD,
+    SHCS,
+    feed_nut.SCREW_LENGTH_TEXT,
+    feed_nut.SCREW_COUNT,
+    feed_nut.LENGTH,  # the head on the nut's outer face
+    feed_block.LUG_WIDTH,  # tapped THRU
 )
 RISER_TO_CARRIER = Fastener(
     "TL-24 riser to TL-21 carrier",
@@ -291,8 +292,8 @@ if abs(RAIL_TO_BAR.engagement_mm - base_bar.RAIL_SCREW_ENGAGEMENT) > 1e-9:
     raise AssertionError("rail screw engagement disagrees with the base bar spec")
 if abs(BRACKET_TO_BAR.engagement_mm - leadscrew.BAR_SCREW_ENGAGEMENT) > 1e-9:
     raise AssertionError("bar screw engagement disagrees with the leadscrew spec")
-if abs(NUT_TO_FEED_BLOCK.engagement_mm - leadscrew.NUT_SCREW_ENGAGEMENT) > 1e-9:
-    raise AssertionError("nut screw engagement disagrees with the leadscrew spec")
+if abs(NUT_TO_FEED_BLOCK.engagement_mm - feed_nut.SCREW_ENGAGEMENT) > 1e-9:
+    raise AssertionError("nut screw engagement disagrees with the feed nut spec")
 if abs(BLOCK_TO_CARRIAGE.engagement_mm - pivot_block.SCREW_REACH) > 1e-9:
     raise AssertionError("carriage screw engagement disagrees with the block spec")
 if abs(RAIL_TO_BAR.length_mm - trammel.RAIL_SCREW_LENGTH) > 1e-9:

@@ -1904,8 +1904,7 @@ def test_block_occurrences_and_integral_nut_axis_match_the_feed_geometry() -> No
     nut_axis = (block.NUT_FACE_X, block.NUT_AXIS_Y, block.NUT_AXIS_Z)
     world = tuple(origin[i] + sum(nut_axis[k] * rows[k][i] for k in range(3)) for i in range(3))
     assert world[2] == pytest.approx(spec.leadscrew.SCREW_AXIS_Z)
-    assert block.NUT_AXIS_Z - spec.leadscrew.NUT_FLANGE_DIA / 2.0 > 0.0
-    assert block.NUT_AXIS_Z + spec.leadscrew.NUT_FLANGE_DIA / 2.0 < block.BLOCK_HEIGHT
+    assert 0.0 <= block.NUT_Z[0] < block.NUT_Z[1] <= block.BLOCK_HEIGHT
 
 
 @pytest.mark.parametrize("sheet", (drawing.PIVOT_SHEET, "LEADSCREW FEED EXPLODED"))

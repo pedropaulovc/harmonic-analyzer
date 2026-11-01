@@ -109,10 +109,7 @@ machinist review once, even though only selected native packages change units.
   The clamp screw selects the purchased sheet's `tall_top` layout: a 96 mm
   outer Top cell retains the existing 46 mm annotation reserve, leaving
   50 mm for the measured native outline. The bottom-row cells' tops and
-  the Isometric's bottom lower 32 mm; other sheets keep `standard`. The
-  TL-VN-55 leadscrew nut, a purchased part sheet, selects `tall_top` too
-  (`build_purchased_part_drawing` passes `view_layout` through), so its
-  annotated end view holds 1:1.
+  the Isometric's bottom lower 32 mm; other sheets keep `standard`.
   Scale selection still tries the existing standard scales against complete
   native outlines,
   without subtracting fixed sheet-space padding. Short clamp-reference text
@@ -145,9 +142,8 @@ machinist review once, even though only selected native packages change units.
   gate 3 in the root `AGENTS.md`).
   Purchased drawings may opt into a recipe-local title-block setup after the
   source links resolve, returning final-rebuild checks through the existing
-  `settled_checks` contract. The TL-VN-55 leadscrew nut opts into
-  `_purchased_title_fit` (as do the catalogued supplier screws): it fits their
-  existing linked Name, Material
+  `settled_checks` contract. The catalogued supplier screws opt into
+  `_purchased_title_fit`: it fits their existing linked Name, Material
   and DWG. NO. notes inside their actual native ruled cells on one row.
   Readable native-height floors are 3 mm for Name/Number and 2 mm for Material;
   an unfit complete value refuses export, never truncates it.
