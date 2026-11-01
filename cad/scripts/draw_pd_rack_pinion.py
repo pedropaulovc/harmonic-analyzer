@@ -157,10 +157,12 @@ FRONT_KEEP = {
     "ToothSpan": (FRONT_CENTER[0], FRONT_CENTER[1] + 0.050),
 }
 # Below the edge-on disc, clear of datum B above and the frame to the right;
-# the text right of the rear face's extension line, so neither line strikes
-# it (machinist review).
+# the whole text block (value and its ~.046-wide callout) stands right of
+# the rear face's extension line, so neither extension line nor the
+# dimension line strikes it (machinist review, r3: centred on the line, the
+# callout straddled both extension lines).
 RIGHT_KEEP = {
-    "FaceWidth": (REAR_FACE_X + 0.010, RIGHT_CENTER[1] - HALF_OD - 0.012),
+    "FaceWidth": (REAR_FACE_X + 0.028, RIGHT_CENTER[1] - HALF_OD - 0.012),
 }
 # The bore's fit stands under its size, on the bore dimension's own leader:
 # a separate fit-note leader converged on the small bore with the size,

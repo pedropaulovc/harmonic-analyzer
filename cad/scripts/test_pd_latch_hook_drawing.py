@@ -58,8 +58,8 @@ def test_the_model_owns_every_band_the_sheet_prints() -> None:
     assert model_toleranced_dimensions(part) == {
         ("InsideBend", "InsideBendR"): "*deviations(BEND_R_BAND)",
         # The position and formed loops share one key (both read below);
-        # the formed loop, the last, takes FORMED_BAND.
-        ("feature_name", "dimension_name"): "FORMED_BAND",
+        # the formed loop, the last, takes FORMED_TOL.
+        ("feature_name", "dimension_name"): "FORMED_TOL",
     }
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "for feature_name, dimension_names in POSITION_DIMENSIONS.items()" in source
@@ -72,6 +72,15 @@ def test_the_model_owns_every_band_the_sheet_prints() -> None:
         assert names <= spec.DRAWING_DIMENSIONS[feature]
     for feature, names in spec.POSITION_DIMENSIONS.items():
         assert set(names) <= spec.DRAWING_DIMENSIONS[feature]
+
+
+def test_the_formed_band_the_assembly_reads_counts_the_xx_rounding() -> None:
+    """The formed features print at .XX ±.02 (review 3); the arm may lie off
+    the model by the band plus each nominal's rounding."""
+    assert set(spec.FORMED_VALUES) == spec.FORMED_DIMENSIONS["ArmProfile"]
+    for value in spec.FORMED_VALUES.values():
+        printed = round(value / 25.4, 2) * 25.4
+        assert abs(printed - value) + spec.FORMED_TOL <= spec.FORMED_BAND + 1e-9
 
 
 def test_the_far_face_prints_as_a_reference_and_the_strip_widths_control() -> None:
@@ -274,14 +283,15 @@ def _texts() -> dict[str, tuple[float, ...]]:
         name: len(text.split("\n")) for name, text in drawing.CALLOUTS_BELOW.items()
     }
     # Printed widths in characters: value and band (".498 ±.002",
-    # "Ø.128 +.004" over "0", "R.048 +.011" over "-.008", ".61").
+    # "Ø.128 +.004" over "0", "R.048 +.011" over "-.008", ".61", "(.58)").
     widths = {
         "ScrewX1": 10, "ScrewX2": 10, "ScrewY": 10, "ScrewDia": 11,
-        "RollStart": 10, "FaceY": 7, "FaceX": 7, "TabEndX": 11,
-        "StraightLen": 11, "PinHoleDia": 5, "RollR": 12, "TabR": 11,
+        "RollStart": 8, "FaceY": 7, "FaceX": 7, "TabEndX": 9,
+        "StraightLen": 9, "PinHoleDia": 5, "RollR": 10, "TabR": 9,
         "Width": 3, "RootR": 4, "RoundR": 5,
-        "FlatLength": 4, "FlatArmW": 3, "FlatLowW": 3,
+        "FlatLength": 4, "FlatArmW": 3, "FlatLowW": 3, "FlatBendC": 5,
         "DevTaper1": 4, "DevTaper2": 4, "DevRoundC": 4,
+        "FlatRollC": 6, "FlatTabC": 5,
         "BaseLength": 3, "EarHeight": 3, "InsideBendR": 11,
     }  # fmt: skip
     keep = {**drawing.FRONT_KEEP, **drawing.RIGHT_KEEP, **drawing.BOTTOM_KEEP}

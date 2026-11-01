@@ -67,7 +67,9 @@ from pd_transgear_thumbnut_spec import (
     HEAD_DIA,
     HEAD_REAR_Y,
     KNURL_CALLOUT,
+    KNURL_DIA_SUFFIX,
     OVERALL_LENGTH,
+    REAR_CSK_APEX_Y,
     TAP_DRILL_DIA,
     TAP_SPEC,
     WAIST_LENGTH,
@@ -160,11 +162,24 @@ SECTION_KEEP = {
     "CountersinkDia": (_section_x(-HEAD_DIA / 2.0) - 0.025, _section_y(0.0) - 0.008),
     "CountersinkHalfAngle": (_section_x(CSK_DIA / 2.0 + 0.6), _section_y(-0.6)),
 }
-COUNTERSINK_ANGLE_TEXT_XY = (SECTION_CENTER[0] + 0.049, _section_y(0.0) - 0.008)
+# The half-angle's text sits inside its own sector, between the axis below
+# the seat and the cone's extension, beyond the arc: text out at the old
+# right-of-the-head spot swung the arc on past the cone into the hatching
+# (machinist review round 3). 40° off the axis keeps its leader right of the
+# cone diameter's extension line.
+COUNTERSINK_APEX_XY = (SECTION_CENTER[0], _section_y(REAR_CSK_APEX_Y))
+_ANGLE_TEXT_RADIUS = 0.024
+_ANGLE_TEXT_FROM_AXIS = math.radians(40.0)
+COUNTERSINK_ANGLE_TEXT_XY = (
+    COUNTERSINK_APEX_XY[0] + _ANGLE_TEXT_RADIUS * math.sin(_ANGLE_TEXT_FROM_AXIS),
+    COUNTERSINK_APEX_XY[1] - _ANGLE_TEXT_RADIUS * math.cos(_ANGLE_TEXT_FROM_AXIS),
+)
 # The baseline lengths' spans hold their text and arrows: inside, so no arrow
 # hangs below the seat face into the cone diameter's "max." (run
-# 20261024T025840809Z).
-ARROWS_INSIDE = ("FlangeLength", "HeadRearY")
+# 20261024T025840809Z).  The knurl diameter's too: arrows outside, its line
+# ran on past the left extension line under the wide knurl callout
+# (machinist review round 3); the Ø.81 span holds its arrows.
+ARROWS_INSIDE = ("FlangeLength", "HeadRearY", "HeadDia")
 _DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
 # The native caption's top centre.  The cone diameter's dimension line runs
 # under its below-callout, 13.5 mm under the seat face (run
@@ -174,9 +189,11 @@ SECTION_CAPTION_XY = (SECTION_CENTER[0], _section_y(0.0) - 0.020)
 # The face view prints only the native thread callout.
 FACE_KEEP: dict[str, tuple[float, float]] = {}
 # Above the knurl diameter, the outermost of the rim's stack: the below lane
-# would run into the dish chord.
+# would run into the dish chord.  "OVER KNURL" is the value's suffix.
 DIMENSION_CALLOUTS_ABOVE = {"HeadDia": KNURL_CALLOUT}
 DIMENSION_CALLOUTS_BELOW = {"CountersinkDia": CSK_QUALIFIER}
+DIMENSION_SUFFIXES = {"HeadDia": KNURL_DIA_SUFFIX}
+_DIMENSION_TEXT_SUFFIX = 2  # swDimensionTextParts_e.swDimensionTextSuffix
 
 
 def _printable_above_callouts(callouts: dict[str, str]) -> dict[str, str]:
@@ -360,8 +377,24 @@ def _omit_thread_class(display: Any) -> None:
         raise RuntimeError(f"thumbnut tap callout still prints its class: {resolved!r}")
 
 
+def _set_dimension_suffixes(adapter: Any, annotations: list[Any]) -> None:
+    """Write each DIMENSION_SUFFIXES text after its value, read back."""
+    remaining = dict(DIMENSION_SUFFIXES)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        text = remaining.pop(dimension_name(adapter, annotation), None)
+        if text is None:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.SetText(_DIMENSION_TEXT_SUFFIX, text)
+        if str(display.GetText(_DIMENSION_TEXT_SUFFIX) or "") != text:
+            raise RuntimeError(f"thumbnut suffix {text!r} did not persist")
+    if remaining:
+        raise RuntimeError(f"no thumbnut dimension for suffixes: {sorted(remaining)}")
+
+
 def _place_countersink_angle(adapter: Any, annotations: list[Any]) -> None:
-    """Keep the native rear cone/axis arc local and move only its text outboard."""
+    """Keep the native rear cone/axis arc local; its text sits in its sector."""
     name = "CountersinkHalfAngle"
     matches = [item for item in annotations if dimension_name(adapter, item) == name]
     if len(matches) != 1:
@@ -408,6 +441,16 @@ def _set_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"no thumbnut dimension to set arrows inside: {sorted(remaining)}")
 
 
+def _sheet_sketch_point(sheet_xy: tuple[float, float]) -> tuple[float, float]:
+    """Sheet-sketch coordinates of a printed sheet point on this 3:1 sheet.
+
+    The sheet sketch draws at the sheet scale: run 20261101T054343686Z
+    passed the projected axis (x 0.110) straight in, and the line printed at
+    x 0.330, three times out, from the top border down onto the isometric
+    (machinist review round 3, the gating finding)."""
+    return (sheet_xy[0] / _S, sheet_xy[1] / _S)
+
+
 def _add_section_axis(adapter: Any, section: Any) -> None:
     """Draw the nut's axis through section A-A, past the seat and the rim.
 
@@ -428,12 +471,11 @@ def _add_section_axis(adapter: Any, section: Any) -> None:
     if abs(ends[0][0] - ends[1][0]) > 1e-6 or ends[1][1] <= ends[0][1]:
         raise RuntimeError(f"thumbnut section axis is not vertical rim up: {ends!r}")
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    # EditSheet makes the line sheet-owned; its ends are already sheet points.
+    # EditSheet makes the line sheet-owned.
     drawing.EditSheet()
     sketch_manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
-    centerline = sketch_manager.CreateCenterLine(
-        ends[0][0], ends[0][1], 0.0, ends[1][0], ends[1][1], 0.0
-    )
+    (x0, y0), (x1, y1) = (_sheet_sketch_point(end) for end in ends)
+    centerline = sketch_manager.CreateCenterLine(x0, y0, 0.0, x1, y1, 0.0)
     if centerline is None:
         raise RuntimeError("failed to create the thumbnut axis in section A-A")
     # A sheet sketch line otherwise prints in the under-defined sketch blue.
@@ -553,6 +595,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, section_annotations, DIMENSION_CALLOUTS_BELOW, location="below"
     )
+    _set_dimension_suffixes(adapter, section_annotations)
     _place_countersink_angle(adapter, section_annotations)
     _set_arrows_inside(adapter, section_annotations)
     position_section_caption(

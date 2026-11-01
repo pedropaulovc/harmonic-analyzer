@@ -5,7 +5,7 @@ in the section's direction and an isometric at 3:1 (the section takes B: A
 names the bore datum). The end view looks at the rear face (*Back), the
 third-angle left view of the section, whose rear face stands left (the
 2026-10-27 ENFORCE review: a nose view there broke the projection). It
-carries the genuine native two-tooth span, bore fit note, finish and datum
+carries the genuine native two-tooth span, finish and datum
 A; the captioned rear-face view below carries the toothspace inspection
 callout on a full-depth flank and the root's MIN across two gap floors; the
 outside view carries the cutter's full-depth station and run-out limit from
@@ -74,7 +74,6 @@ from pd_transgear_disc_hub_spec import OIL_HOLE_DIA, OIL_HOLE_SLEEVE_Z
 from pd_transgear_feed_pinion_spec import (
     BORE_DATUM,
     BORE_DIA,
-    BORE_FIT_CALLOUT,
     BOSS_DIA,
     CUTTER_RUNOUT_MAX,
     DIAMETRAL_PITCH,
@@ -114,8 +113,8 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
-# The end view's section line stands left of the bore fit note's leader.
-# It looks at the rear face (*Back): the section looks along model +X with
+# The end view looks at the rear face (*Back): the section looks along
+# model +X with
 # the rear face left, so its third-angle left view sees the rear face.
 END_VIEW_ORIENTATION = "*Back"
 FRONT_CENTER = (0.080, 0.160)
@@ -174,8 +173,8 @@ def _side_x(z_mm: float) -> float:
     return RIGHT_CENTER[0] + (z_mm - OVERALL_LENGTH / 2.0) * VIEW_SCALE[0] / 1000.0
 
 
-# The end view is pictorial and carries its center mark, the bore fit note,
-# the bore finish and the two-tooth span (its rack mate under its limits).
+# The end view is pictorial and carries its center mark, the bore finish
+# and the two-tooth span (its rack mate under its limits).
 # On the section, the tip and boss diameters print inline on the axis,
 # between their own extension lines and off the part (the crank hub's and
 # the disc hub's layout): the tip left of the rear face, where its witness
@@ -183,8 +182,10 @@ def _side_x(z_mm: float) -> float:
 # under its value.  The flat's distance from the axis hangs below the
 # section right of the nose, its mate under it: the four rows are taller
 # than the flat's depth.  The bore keeps its shelf above-left of the rear
-# face, which holds its two-row band and process callout clear of its own
-# extension lines.  The lengths stay baseline-stacked below from the rear
+# face, which holds its two-row band, process and fit callout clear of its
+# own extension lines (the fit there, not on a separate end-view note: run
+# 20261101T054343686Z's note overlapped the oil hole note's leader extent).
+# The lengths stay baseline-stacked below from the rear
 # face, shortest innermost, so no extension line crosses an inner row; the
 # tooth length's and the flat end's texts, wider than their spans with their
 # mates, stand left of the rear face, clear of every station's extension
@@ -349,18 +350,9 @@ OIL_HOLE_CALLOUT = (OIL_HOLE_EDGE[0] - 0.008 - _OIL_HOLE_NOTE_WIDTH, _SIDE_TOP +
 NOTE_HEIGHT = 0.0025
 
 _BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
-# The finite-form data block uses the upper-left lane.  The bore-fit note
-# stands upper RIGHT of the end view, between it and the section's bore
-# dimension, its leader landing on the bore's 45° point: from the upper
-# left (2026-11-01 review, r3) the leader ran through the tip of the
-# section line's upper "B" arrowhead, which the rear-face end view turns
-# left, under that lane.  From the right it meets neither arrow nor label,
-# and stays above the span's extension lines, which cross the gear on the
-# -45° diagonal below the 45° point.
+# The finite-form data block uses the upper-left lane.
 GEAR_DATA_XY = (0.016, 0.262)
 GEAR_DATA_CHAR_HEIGHT = 0.0025
-BORE_FIT_NOTE = (0.094, 0.204)
-BORE_FIT_CHAR_HEIGHT = 0.0022
 # Separate radial-runout and relative-index controls share one source-linked
 # callout on the real finite tooth flank, not the OD. Its three rows use the
 # standard 3.5 mm font; at x 50 mm its lower-right corner stands up-left of
@@ -384,10 +376,6 @@ TOOTH_EDGE_ATTACH = (
 )
 NOTES_XY = (0.016, TOOTH_EDGE_NOTE_XY[1] - 0.0100)
 TOOTH_SPACE_CALLOUT_CHAR_HEIGHT = 0.0035
-BORE_FIT_ATTACH = (
-    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(45.0)),
-    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(45.0)),
-)
 # The section's native caption, placed by its top centre, sits below the
 # stacked lengths, the overall's two-row callout the lowest.
 SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0548)
@@ -402,8 +390,8 @@ SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0548)
 # from its insertion point in proportion to its text, so its text keeps the
 # note height: at the document's 6.35 mm default (run 20261002T153039266Z)
 # "Ra 1.6" printed 13.5-37.4 mm right of and 10.8-17.2 mm above the point,
-# over the teeth and across the bore fit leader's landing at 135 degrees.  At
-# 2.5 mm the symbol's ink tops out 9 mm below that landing and its text ends
+# over the teeth.  At 2.5 mm the symbol's ink stands well below the bore
+# centre and its text ends
 # 7 mm left of the tip circle.  The leader lands on the bore's 170° point:
 # the nose view once ran the two-tooth span's extension lines along the
 # lower-left diagonal (machinist review, stack6: a -135° finish leader
@@ -897,18 +885,8 @@ async def build(adapter: Any) -> dict[str, str]:
         view=right,
         height=NOTE_HEIGHT,
     )
-    bore_fit = add_leader_note(
-        adapter,
-        BORE_FIT_CALLOUT,
-        text_xy=BORE_FIT_NOTE,
-        attach_xy=BORE_FIT_ATTACH,
-        label="sleeve bore fit",
-        view=front,
-        height=BORE_FIT_CHAR_HEIGHT,
-    )
     adapter.currentModel.GraphicsRedraw2()
     _assert_note_inside_border(oil_note, "oil hole note")
-    _assert_note_inside_border(bore_fit, "bore fit note")
     # The bore is the part's one running surface: its finish is authored on
     # the part and read back here (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
     add_surface_finish(

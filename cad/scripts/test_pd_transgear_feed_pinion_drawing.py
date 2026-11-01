@@ -71,7 +71,9 @@ def test_part_authors_every_callout_on_a_marked_dimension() -> None:
         name: text
         for (_feature, name), text in callouts.CALLOUTS[callouts.CALLOUT_BELOW].items()
     }
-    assert below["BoreDia"] == spec.BORE_PROCESS_CALLOUT
+    assert below["BoreDia"] == spec.BORE_CALLOUT
+    assert spec.BORE_CALLOUT.startswith(spec.BORE_PROCESS_CALLOUT)
+    assert spec.BORE_CALLOUT.endswith(spec.BORE_FIT_CALLOUT)
     for name in ("BossDia", "FlatToAxis", "FaceWidth", "FlatEnd", "OverallLength"):
         assert spec.HUB_NUMBER in below[name], name
     for name in ("OutsideDia", "ToothSpan"):
@@ -606,9 +608,6 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
     boxes["oil hole note"] = _note_box(
         drawing.OIL_HOLE_NOTE, drawing.OIL_HOLE_CALLOUT, height=drawing.NOTE_HEIGHT
     )
-    boxes["bore fit note"] = _note_box(
-        spec.BORE_FIT_CALLOUT, drawing.BORE_FIT_NOTE, height=drawing.BORE_FIT_CHAR_HEIGHT
-    )
     boxes["toothspace callout"] = _note_box(
         spec.TOOTH_SPACE_CALLOUT, drawing.TOOTH_SPACE_CALLOUT_XY,
         height=drawing.TOOTH_SPACE_CALLOUT_CHAR_HEIGHT,
@@ -810,18 +809,6 @@ def test_finish_leader_stays_above_the_span_extension_lines() -> None:
     for x, y in ((sx + _FINISH_SHOULDER_DX, sy), drawing.FINISH_ATTACH):
         # Signed distance above-left of the 45° line through the centre.
         assert ((y - cy) - (x - cx)) / math.sqrt(2.0) > 0.0027 + 0.001
-
-
-def test_bore_fit_leader_passes_clear_of_the_finish() -> None:
-    """Run 20261002T153039266Z's bore fit leader ran through the finish's "Ra
-    1.6" (leader-through-text).  The note stands above its landing, so its
-    leader never dips below the landing, and the finish's whole ink stands
-    several millimetres below it."""
-    landing_y = drawing.BORE_FIT_ATTACH[1]
-    note = _note_box(spec.BORE_FIT_CALLOUT, drawing.BORE_FIT_NOTE)
-    assert note.ymin > landing_y
-    _, _, _, ink_top = _finish_ink()
-    assert landing_y - ink_top >= 0.005
 
 
 def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:

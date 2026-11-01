@@ -208,6 +208,12 @@ DEV_HOLE = DEV_ROLL_END + RUN_ABOVE_HOLE
 DEV_TAB_START = DEV_HOLE + RUN_BELOW_HOLE
 DEV_TAB_END = DEV_TAB_START + TAB_R * _TAB_TURN
 DEV_TIP = DEV_TAB_END - ROUND_TRIM  # the arm's developed length to the round's tip
+# The flat pattern's bend centrelines: the 90 deg bend's from the ear's top
+# edge; the roll's and the tab's from the ear's lower edge (the tab's lies in
+# the full round, which trims the tab's end).
+FLAT_BEND_C = FLAT_EAR + BEND_ALLOWANCE / 2.0
+DEV_ROLL_C = (DEV_ROLL_START + DEV_ROLL_END) / 2.0
+DEV_TAB_C = (DEV_TAB_START + DEV_TAB_END) / 2.0
 
 
 def _dev_at_y(y: float) -> float:

@@ -348,16 +348,17 @@ BORE_DIAMETRAL_CLEARANCE = (
 if BORE_DIAMETRAL_CLEARANCE[0] <= 0.0:
     raise AssertionError(f"sleeve bore binds on the pin: {BORE_DIAMETRAL_CLEARANCE}")
 BORE_PROCESS_CALLOUT = "REAM THRU"
+# The bore's fit prints under its size on the section's own dimension, as
+# the boss's does: a separate fit note crowded the end view (run
+# 20261101T054343686Z failed the layout audit on it).
 BORE_FIT_CALLOUT = "\n".join(
     (
-        "BORE LIMITS GOVERN",
-        f"MATE PIN {PIN_NUMBER}",
-        f"(\N{DIAMETER SIGN}{inch_text(BORE_DIA, 4)} "
-        f"+{inch_text(_PIN_UPPER, 4)}/-{inch_text(-_PIN_LOWER, 4)})",
-        f"(DIA CLR {inch_text(BORE_DIAMETRAL_CLEARANCE[0], 4)}-"
-        f"{inch_text(BORE_DIAMETRAL_CLEARANCE[1], 4)})",
+        f"MATE PIN {PIN_NUMBER},",
+        f"{inch_text(BORE_DIAMETRAL_CLEARANCE[0], 4)}-"
+        f"{inch_text(BORE_DIAMETRAL_CLEARANCE[1], 4)} DIA CLR",
     )
 )
+BORE_CALLOUT = f"{BORE_PROCESS_CALLOUT}\n{BORE_FIT_CALLOUT}"
 
 # --- the hub and disc on the step ------------------------------------------------
 # The hub's spigot seats on the step face and passes the disc's bore; the

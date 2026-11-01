@@ -168,13 +168,13 @@ def _printed_proud_range(pin_length: float, hole_depth: float) -> tuple[float, f
 
 
 # The worst far-face margin this test's restatement finds at the printed
-# reaches, and the retired 3/4 pin's: it barely clears in a 6.30 hole; 0.05
+# reaches, and the retired 3/4 pin's: it barely clears in a 6.20 hole; 0.05
 # deeper it stops short of the face.  #290: the tip station and the hole
-# depth print rounded to .XX inch (reach 0.376 / 0.372), the hook its inch
-# bands (MHA-PD-14).
-_PINNED_FAR_FACE_MARGIN = 0.992
-_PINNED_OLD_PIN_MARGIN = 0.017
-_PINNED_DEEPER_OLD_PIN_MARGIN = -0.033
+# depth print rounded to .XX inch (reach 0.376 / 0.372), the hook its formed
+# .XX ±.02 (FORMED_BAND .024 with the rounding, MHA-PD-14).
+_PINNED_FAR_FACE_MARGIN = 0.890
+_PINNED_OLD_PIN_MARGIN = 0.015
+_PINNED_DEEPER_OLD_PIN_MARGIN = -0.035
 
 
 def _worst_far_face_margin(
@@ -273,13 +273,13 @@ def test_the_latch_pin_full_diameter_passes_the_hook_at_the_printed_tip_band() -
     # The screws' float turns the hook about the pin as well as sliding it,
     # so the drift along U at the hole exceeds the pure slide.
     assert joints.HOOK_DRIFT_ALONG_U > joints.HOOK_SCREW_SHIFT
-    # Negative control: the 3/4 pin barely clears in a 6.30 hole and stops
+    # Negative control: the 3/4 pin barely clears in a 6.20 hole and stops
     # short 0.05 deeper with the bends and the grade; without them it cleared.
-    old = _printed_proud_range(0.75 * 25.4, 6.30)
+    old = _printed_proud_range(0.75 * 25.4, 6.20)
     assert _worst_far_face_margin(printed, old) == pytest.approx(
         _PINNED_OLD_PIN_MARGIN, abs=1e-3
     )
-    deeper = _printed_proud_range(0.75 * 25.4, 6.35)
+    deeper = _printed_proud_range(0.75 * 25.4, 6.25)
     assert _worst_far_face_margin(printed, deeper) == pytest.approx(
         _PINNED_DEEPER_OLD_PIN_MARGIN, abs=1e-3
     )

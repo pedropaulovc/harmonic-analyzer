@@ -5,7 +5,7 @@ PURE DATA, no SolidWorks/COM calls and no ``build_*`` import.  The one
 authority for what two parts cut and must agree on: the brass hub's flange
 (MHA-PD-17, ``transgear_disc_hub_spec``) carries the #51 (.067) clearance
 holes and the reducer disc (MHA-PD-06, ``rack_pinion_spec``) the #0-80 taps;
-the three 91794A055 fillister screws (MHA-PD-VN-55) join them on a Ø.748
+the three 91794A055 fillister screws (MHA-PD-VN-55) join them on a Ø.75
 circle, which keeps the disc's taps .080 clear of its Ø.501 bore at the worst
 case (``rack_pinion_spec`` checks it; the heads stand clear of the Ø.52 hub
 body).  The hub's rear spigot passes the disc's bore and seats on
@@ -47,10 +47,11 @@ SCREW_ANGLES_DEG = (0.0, 120.0, 240.0)
 # The flange's drilled clearance hole the disc's taps are spotted through:
 # a #51 drill.
 SCREW_HOLE_DIA = 1.7018  # .067
-BOLT_CIRCLE_DIA = 18.9992  # .748
-# Printed at .XXX: ±.005 on the diameter is the ±.0025 radial hole-position
-# band every stack of the joint uses (contract §8, "hole position").
-BOLT_CIRCLE_PLACES = 3
+BOLT_CIRCLE_DIA = 19.05  # .75
+# Printed at .XX: ±.01 on the diameter is the ±.005 radial hole-position
+# band every stack of the joint uses (contract §8, "hole position"); the
+# walls hold the .080 target at it, the flange sized to suit.
+BOLT_CIRCLE_PLACES = 2
 BOLT_CIRCLE_POSITION_TOL = printed_band_mm(BOLT_CIRCLE_PLACES, unit=UNIT) / 2.0
 
 if len(SCREW_ANGLES_DEG) != SCREW_COUNT:

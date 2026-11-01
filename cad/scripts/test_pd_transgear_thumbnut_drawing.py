@@ -437,15 +437,31 @@ def test_the_knurl_is_the_designated_wheel() -> None:
 def test_the_knurl_designation_is_authored_where_it_prints() -> None:
     """Run 20261001T154021634Z's machinist review: the sheet showed Ø20.5 and
     no knurl.  The designation rode a two-line above-callout, which SolidWorks
-    stored but did not print; one line in that compartment prints."""
+    stored but did not print; one line in that compartment prints.  Round 3:
+    a callout wider than the Ø.81 span ran the dimension line out under its
+    text, so it fits between the extension lines."""
+    from _layout_geometry import estimate_text_box
+
     above = drawing.DIMENSION_CALLOUTS_ABOVE
     assert spec.KNURL_DESIGNATION in above["HeadDia"]
-    assert "DIA OVER KNURL" in above["HeadDia"]
+    assert "OVER KNURL" in drawing.DIMENSION_SUFFIXES["HeadDia"]
     assert drawing._printable_above_callouts(above) == above
     with pytest.raises(RuntimeError, match="HeadDia"):
         drawing._printable_above_callouts(
             {"HeadDia": f"STRAIGHT KNURL {spec.KNURL_DESIGNATION}\nDIA OVER KNURL"}
         )
+
+    def width(text: str) -> float:
+        box = estimate_text_box(text, anchor=(0.0, 0.0), height=0.0035, reference=5)
+        assert box is not None
+        return box.xmax - box.xmin
+
+    # The estimate reads ~11 % short of the printed ink (round 3's callout:
+    # 0.104 estimated, 0.116 printed), so charge that margin.
+    span = spec.HEAD_DIA * drawing._S / 1000.0
+    assert 1.15 * width(above["HeadDia"]) < span
+    # Negative control: round 3's one-line callout overran the span.
+    assert width("STRAIGHT KNURL 25 TPI, 90° TOOTH; DIA OVER KNURL") > span
 
 
 def test_the_shortest_nut_keeps_full_thread_for_the_stud() -> None:
@@ -498,15 +514,34 @@ def test_the_stem_diameters_print_across_their_own_cut() -> None:
     angle_arc = drawing.SECTION_KEEP["CountersinkHalfAngle"]
     angle_text = drawing.COUNTERSINK_ANGLE_TEXT_XY
     assert dia[0] < drawing.SECTION_CENTER[0] - drawing.HALF_HEAD - 0.020
-    assert angle_text[0] > head_right + 0.010
-    assert dia[1] == angle_text[1] < seat_y
+    assert dia[1] < seat_y
     assert dia[1] > SHEET_INNER_LEFT + 0.020
     # Compact arc anchor just outside the rear cone, not outside the head.
     cone_right = drawing._section_x(spec.CSK_DIA / 2.0)
     assert 0.0 < angle_arc[0] - cone_right < 0.003
     assert 0.0 < seat_y - angle_arc[1] < 0.003
-    apex = (drawing.SECTION_CENTER[0], drawing._section_y(spec.REAR_CSK_APEX_Y))
+    apex = drawing.COUNTERSINK_APEX_XY
+    assert apex == (drawing.SECTION_CENTER[0], drawing._section_y(spec.REAR_CSK_APEX_Y))
     assert math.dist(angle_arc, apex) < 0.015
+
+    def from_axis(point: tuple[float, float]) -> float:
+        """Degrees off the axis below the apex, toward the right-hand cone."""
+        return math.degrees(math.atan2(point[0] - apex[0], apex[1] - point[1]))
+
+    # Round 3: the text sits inside the angle's own sector (axis to cone
+    # extension), beyond the arc and below the seat, so the native arc is
+    # never extended past the cone into the hatching.
+    assert 0.0 < from_axis(angle_text) < spec.CSK_HALF_ANGLE_DEG
+    assert math.dist(angle_text, apex) > math.dist(angle_arc, apex) + 0.005
+    assert drawing.SECTION_CAPTION_XY[1] < angle_text[1] - 0.0035 < angle_text[1] < dia[1]
+    # Its leader leaves the arc right of the cone diameter's extension line.
+    arc_r = math.dist(angle_arc, apex)
+    leader_start_x = apex[0] + arc_r * math.sin(math.radians(from_axis(angle_text)))
+    assert leader_start_x > cone_right
+    # Negative control: round 2's text right of the head sat ~73° off the
+    # axis, so the arc swung on past the 45° cone into the material.
+    round_2_text = (drawing.SECTION_CENTER[0] + 0.049, seat_y - 0.008)
+    assert from_axis(round_2_text) > spec.CSK_HALF_ANGLE_DEG
     # Negative control: 4e9a4df's sheet-outboard anchor grew a >50 mm arc.
     old_arc = (head_right + 0.025, seat_y - 0.008)
     assert math.dist(old_arc, apex) > 0.050
@@ -538,8 +573,22 @@ def test_lengths_read_from_the_seat_face() -> None:
         assert x == pytest.approx(drawing._section_x(-spec.HEAD_DIA / 2.0) - lane)
         assert 0.0 < _section_station(y) < top
     # Run 20261024T025840809Z: an outside arrow hung below the seat into
-    # the cone diameter's "max."; both spans hold their arrows inside.
-    assert drawing.ARROWS_INSIDE == ("FlangeLength", "HeadRearY")
+    # the cone diameter's "max."; both spans hold their arrows inside, and
+    # round 3's knurl diameter, whose outside tail ran under its callout.
+    assert drawing.ARROWS_INSIDE == ("FlangeLength", "HeadRearY", "HeadDia")
+
+
+def test_the_section_axis_is_sketched_at_the_sheet_scale() -> None:
+    """Round 3's gating finding: the projected axis (sheet x 0.110) passed
+    straight into the 3:1 sheet sketch printed at x 0.330, from the top
+    border down onto the isometric.  Sketch points are sheet points over
+    the sheet scale, so the printed line lands back on the section."""
+    end = (drawing.SECTION_CENTER[0], drawing._section_y(-drawing.AXIS_OVERSHOOT_MM))
+    sketch = drawing._sheet_sketch_point(end)
+    printed = (sketch[0] * drawing._S, sketch[1] * drawing._S)
+    assert printed == pytest.approx(end)
+    # Negative control: the unscaled point prints three times out.
+    assert end[0] * drawing._S == pytest.approx(0.330)
 
 
 def test_the_waist_keeps_a_length_at_every_printed_corner(monkeypatch) -> None:

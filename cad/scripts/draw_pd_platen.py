@@ -91,7 +91,9 @@ from pd_platen_spec import (
     PLATE_HEIGHT,
     PLATE_THICKNESS,
     PLATE_WIDTH,
+    SOCKET_BOSS_DIA,
     SOCKET_BOSS_H,
+    SOCKET_BOSS_ROOT_R_MAX,
     SOCKET_SPEC,
     SOCKET_XY,
 )
@@ -132,11 +134,14 @@ ISO_NOTE_XY = (0.338, 0.168)
 RIGHT_NOTE_XY = (0.262, 0.100)
 # Section A-A: a partial cut down the top row's middle guide hole (x =
 # CBORE_SECTION_X, its cutting plane the part's CBORE_SECTION_PLANE) from
-# SECTION_SPAN below the hole's centre to as far above, at 2:1 (40 mm tall),
-# +Y up.  The span sets the cutting-plane line's length on the 1:2 front
-# view: at 4.5 (4.5 mm of line) its two arrows stood side by side and the
-# lower A's apex sat in the upper A's legs (machinist review round 2); at 10
-# the line runs 10 mm, each labelled end ~4 mm clear of the Ø.26 counterbore.
+# SECTION_SPAN_BELOW under the hole's centre to SECTION_SPAN_ABOVE over it,
+# at 2:1 (40 mm tall), +Y up.  The span sets the cutting-plane line's length
+# on the 1:2 front view: at 4.5 + 4.5 (4.5 mm of line) its two arrows stood
+# side by side and the lower A's apex sat in the upper A's legs (machinist
+# review round 2); 20 runs 10 mm.  The upper end stops 0.5 under the clip-
+# screw boss row's foot (its Ø plus the title block's inside-corner round),
+# so no boss seen beyond the plane is cut off by the section's end (round 3:
+# at +10 the top edge ran through a boss and read as its real end).
 # The floor reference stands
 # mid-annulus below the hole (pd_platen_spec), so its value hangs below the
 # cut's lower end, where the dimension line runs under the text: the text
@@ -145,8 +150,17 @@ RIGHT_NOTE_XY = (0.262, 0.100)
 # native caption's top centre stands above the cut.
 SECTION_SCALE = (2, 1)
 _SECTION_S = SECTION_SCALE[0] / SECTION_SCALE[1] / 1000.0
-SECTION_SPAN = 10.0
-SECTION_CENTER = (0.390, 0.114)
+_SECTION_LINE_MM = 20.0
+SECTION_SPAN_ABOVE = (
+    min(y for _, y in SOCKET_XY)
+    - (SOCKET_BOSS_DIA / 2.0 + SOCKET_BOSS_ROOT_R_MAX)
+    - 0.5
+    - CBORE_SECTION_HOLE_Y
+)
+SECTION_SPAN_BELOW = _SECTION_LINE_MM - SECTION_SPAN_ABOVE
+# The hole's axis on the sheet: the cut keeps the box (y 0.094..0.134) the
+# symmetric +-10 cut had, its floor text where it was.
+SECTION_CENTER = (0.390, 0.094 + SECTION_SPAN_BELOW * _SECTION_S)
 SECTION_CAPTION_XY = (0.385, 0.157)
 # The floor value's top row stands 14 mm of sheet under the cut's lower end.
 _SECTION_TEXT_DROP_M = 0.014
@@ -160,14 +174,14 @@ SECTION_TEXT_RIGHT = (
 # at mid-thickness) and the floor value's text, _SECTION_TEXT_DROP_M below
 # the cut and left of the floor (model +Z is sheet +X in the cut).
 SECTION_LINE_MODEL_MM = (
-    (CBORE_SECTION_X, CBORE_SECTION_HOLE_Y - SECTION_SPAN, 0.0),
-    (CBORE_SECTION_X, CBORE_SECTION_HOLE_Y + SECTION_SPAN, 0.0),
+    (CBORE_SECTION_X, CBORE_SECTION_HOLE_Y - SECTION_SPAN_BELOW, 0.0),
+    (CBORE_SECTION_X, CBORE_SECTION_HOLE_Y + SECTION_SPAN_ABOVE, 0.0),
 )
 _SECTION_ANCHOR_MM = (CBORE_SECTION_X, CBORE_SECTION_HOLE_Y, PLATE_THICKNESS / 2.0)
 SECTION_TEXT_MODEL_MM = {
     "CboreFloor": (
         CBORE_SECTION_X,
-        CBORE_SECTION_HOLE_Y - SECTION_SPAN - _SECTION_TEXT_DROP_M / _SECTION_S,
+        CBORE_SECTION_HOLE_Y - SECTION_SPAN_BELOW - _SECTION_TEXT_DROP_M / _SECTION_S,
         PLATE_THICKNESS / 2.0
         + (SECTION_TEXT_RIGHT - _SECTION_TEXT_HALF_WIDTH - SECTION_CENTER[0])
         / _SECTION_S,

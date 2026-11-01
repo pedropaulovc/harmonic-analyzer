@@ -30,7 +30,8 @@ the part by translation to ``PART_ORIGIN_MACHINE``):
 * ``PinHolePlane`` / ``PinHoleProfile`` / ``PinHole``: the pin hole, a
   revolve cut about its axis along U at the pin's height;
 * ``FlatBlank``: the flat pattern, a hidden reference sketch on the Right
-  Plane beside the part (the drawing's thin outline beside the side view).
+  Plane beside the part (the drawing's outline and bend centrelines beside
+  the side view).
 
 Run (SolidWorks already open)::
 
@@ -86,10 +87,13 @@ from pd_latch_hook_geometry import (
     BBOX_X,
     BBOX_Y,
     BBOX_Z,
+    DEV_ROLL_C,
+    DEV_TAB_C,
     DEV_TAPER,
     DEV_TIP,
     EAR_HEIGHT,
     FAR_FACE_STATION,
+    FLAT_BEND_C,
     FLAT_LENGTH,
     INNER_ROLL_END,
     INNER_ROLL_R,
@@ -142,8 +146,8 @@ from pd_latch_hook_spec import (
     DRAWING_PRECISION,
     FLAT_PATTERN_NOTE,
     FLAT_SKETCH,
-    FORMED_BAND,
     FORMED_DIMENSIONS,
+    FORMED_TOL,
     ISOMETRIC_VIEW_NOTE,
     POSITION_DIMENSIONS,
     POSITION_TOL,
@@ -234,6 +238,23 @@ _FLAT = {
 }
 if abs(_FLAT_LOW - _FLAT_FRONT - LIP_W) > 1e-9:
     raise AssertionError("the flat's taper does not step the front edge by LIP_W")
+# The bend centrelines: the ear's bend across the blank, the low edge to the
+# top; the roll's across the arm below the taper, the rear edge to the low
+# front edge; the tab's a chord of the full round (the round trims the tab).
+_TAB_HALF = math.sqrt(ROUND_R**2 - (DEV_TAB_C + _FLAT_ROUND_C[1]) ** 2)
+_FLAT_BENDS = {
+    "bend": ((FLAT_GAP + FLAT_BEND_C, 0.0), (FLAT_GAP + FLAT_BEND_C, WIDTH)),
+    "roll": ((FLAT_GAP, -DEV_ROLL_C), (_FLAT_LOW, -DEV_ROLL_C)),
+    "tab": (
+        (_FLAT_ROUND_C[0] - _TAB_HALF, -DEV_TAB_C),
+        (_FLAT_ROUND_C[0] + _TAB_HALF, -DEV_TAB_C),
+    ),
+}
+if not (
+    _FLAT["root_start"][0] < FLAT_GAP + FLAT_BEND_C < _FLAT["low_end"][0]
+    and DEV_TAPER[1] < DEV_ROLL_C < -_FLAT_ROUND_C[1] < DEV_TAB_C < DEV_TIP
+):
+    raise AssertionError("a flat-pattern bend centreline leaves its edges")
 
 
 async def _relate(adapter, rows) -> None:
@@ -438,14 +459,16 @@ async def _arm_profile(adapter) -> SketchDims:
 
 
 async def _flat_blank(adapter) -> SketchDims:
-    """The flat pattern in the open Right-plane sketch: ordinary sketch
-    geometry, so the drawing draws it as a continuous thin outline (the
-    chain font of construction geometry broke its short edges apart).
+    """The flat pattern in the open Right-plane sketch: its outline ordinary
+    sketch geometry, so the drawing draws it continuous (the chain font of
+    construction geometry broke its short edges apart), and the three bend
+    centrelines construction (chain) lines.
 
-    38 DOF: 9 joins (18); six horizontals/verticals (6); four tangencies (4);
+    50 DOF: 9 joins (18); six horizontals/verticals (6); four tangencies (4);
     the blank's top corner anchored (2); its length and width, the root
     relief radius, the arm's two widths, the taper's two developed stations
-    and the full round's centre (8).
+    and the full round's centre (8); each bend centreline's two ends on its
+    edges, its direction and its station (12).
     """
     dims = SketchDims()
     p = _FLAT
@@ -478,6 +501,10 @@ async def _flat_blank(adapter) -> SketchDims:
     rear = check(
         "flat rear edge", await adapter.add_line(*p["round_rear"], *p["top_rear"])
     )
+    bends = {
+        name: check(f"flat {name} centreline", await adapter.add_centerline(*a, *b))
+        for name, (a, b) in _FLAT_BENDS.items()
+    }
     set_sketch_direct_db(adapter, False)
     await _relate(
         adapter,
@@ -501,6 +528,40 @@ async def _flat_blank(adapter) -> SketchDims:
             ("flat root tangent to the front edge", root, front, "tangent"),
             ("flat round tangent to the front edge", tip, low_front, "tangent"),
             ("flat round tangent to the rear edge", tip, rear, "tangent"),
+            (
+                "flat bend line on the low edge",
+                f"{bends['bend']}.start",
+                low,
+                "coincident",
+            ),
+            (
+                "flat bend line on the top edge",
+                f"{bends['bend']}.end",
+                top,
+                "coincident",
+            ),
+            ("flat bend line vertical", bends["bend"], None, "vertical"),
+            (
+                "flat roll line on the rear edge",
+                f"{bends['roll']}.start",
+                rear,
+                "coincident",
+            ),
+            (
+                "flat roll line on the low front edge",
+                f"{bends['roll']}.end",
+                low_front,
+                "coincident",
+            ),
+            ("flat roll line horizontal", bends["roll"], None, "horizontal"),
+            ("flat tab line on the round", f"{bends['tab']}.start", tip, "coincident"),
+            (
+                "flat tab line across the round",
+                f"{bends['tab']}.end",
+                tip,
+                "coincident",
+            ),
+            ("flat tab line horizontal", bends["tab"], None, "horizontal"),
         ),
     )
     await anchor_point_to_origin(
@@ -548,6 +609,26 @@ async def _flat_blank(adapter) -> SketchDims:
     ):
         await dimension_between(
             adapter, f"{base_end}.end", ref, "vertical_distance", value, name
+        )
+        dims.record(name)
+    await dimension_between(
+        adapter,
+        f"{top}.start",
+        f"{bends['bend']}.end",
+        "horizontal_distance",
+        FLAT_BEND_C,
+        "flat bend centreline",
+    )
+    dims.record("FlatBendC")
+    # Each from the line's front (+x) end, so its extension line runs clear
+    # of the blank: the roll's from the stations' baseline, the tab's chained
+    # on from the full round's centre (sharing that station's extension).
+    for name, ref, line, value in (
+        ("FlatRollC", f"{base_end}.end", bends["roll"], DEV_ROLL_C),
+        ("FlatTabC", f"{tip}.center", bends["tab"], DEV_TAB_C + _FLAT_ROUND_C[1]),
+    ):
+        await dimension_between(
+            adapter, ref, f"{line}.end", "vertical_distance", value, name
         )
         dims.record(name)
     return dims
@@ -973,7 +1054,7 @@ async def build(adapter) -> dict[str, str]:
                 adapter,
                 feature_name,
                 dimension_name,
-                FORMED_BAND,
+                FORMED_TOL,
                 display_unit=UNIT,
             )
     apply_drawing_precision(adapter, DRAWING_PRECISION)

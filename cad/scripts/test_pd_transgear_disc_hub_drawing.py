@@ -109,8 +109,9 @@ def test_the_sheet_prints_the_overall_and_the_flange_never_the_hub_body() -> Non
     assert _places("FlatToAxis") == 4
     assert spec.HUB_DIA == pytest.approx(0.52 * IN) and _places("HubDia") == 2
     assert spec.SPIGOT_DIA == pytest.approx(0.501 * IN) and _places("SpigotDia") == 4
-    assert spec.FLANGE_DIA == pytest.approx(0.990 * IN) and _places("FlangeDia") == 3
-    assert joint.BOLT_CIRCLE_DIA == pytest.approx(0.748 * IN)
+    assert spec.FLANGE_DIA == pytest.approx(1.01 * IN) and _places("FlangeDia") == 2
+    assert joint.BOLT_CIRCLE_DIA == pytest.approx(0.75 * IN)
+    assert joint.BOLT_CIRCLE_PLACES == 2
     assert spec.HUB_BODY_LENGTH == pytest.approx(0.301 * IN)
 
 
@@ -621,7 +622,7 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
 
     assert oil_ligament == pytest.approx(2.822, abs=0.005)
     assert oil_ligament == pytest.approx(spec.OIL_HOLE_LIGAMENT_WORST)
-    assert hole_to_rim == pytest.approx(2.0425, abs=0.005)
+    assert hole_to_rim == pytest.approx(2.146, abs=0.005)
     for wall in (
         hub_wall,
         oil_ligament,
@@ -648,14 +649,16 @@ def test_screw_heads_keep_a_millimetre_of_air_to_the_hub_body() -> None:
 
 def test_retained_outer_envelope_keeps_wall_driver_air_and_screw_margins() -> None:
     """The smaller sleeve-matched bore does not resize the R9-68 envelope:
-    the hub body and spigot retain their diameters, while the screw joint's
-    circle and flange retain the original printed worst-case margins."""
+    the hub body and spigot retain their diameters; the flange is the
+    smallest .XX size whose screw holes keep the wall to its rim with the
+    flange and the circle both at .XX (machinist review: no .XXX held only
+    to rescue that wall)."""
     import pd_rack_pinion_spec as disc
 
     assert spec.HUB_DIA == pytest.approx(0.520 * IN)
     assert spec.SPIGOT_DIA == pytest.approx(0.501 * IN)
-    assert spec.FLANGE_DIA == pytest.approx(0.990 * IN)
-    assert joint.BOLT_CIRCLE_DIA == pytest.approx(0.748 * IN)
+    assert spec.FLANGE_DIA == pytest.approx(1.01 * IN)
+    assert joint.BOLT_CIRCLE_DIA == pytest.approx(0.75 * IN)
     round_wall, flat_wall = spec.body_walls_worst(spec.HUB_DIA)
     assert min(round_wall, flat_wall, spec.SPIGOT_WALL_WORST) >= spec.WALL_FLOOR
     bc = joint.BOLT_CIRCLE_DIA
@@ -663,7 +666,7 @@ def test_retained_outer_envelope_keeps_wall_driver_air_and_screw_margins() -> No
     assert disc.TAP_TO_BORE_WALL_WORST >= disc.WALL_FLOOR
     assert spec.head_air_worst(16.4, 12.4) < spec.HEAD_AIR_MIN
     assert spec.hole_to_rim_worst(spec.FLANGE_DIA, bc) >= spec.WALL_FLOOR
-    assert spec.hole_to_rim_worst(spec.FLANGE_DIA - 0.1, bc) < spec.WALL_FLOOR
+    assert spec.hole_to_rim_worst(spec.FLANGE_DIA - 0.01 * IN, bc) < spec.WALL_FLOOR
     assert spec.hole_to_rim_worst(21.0, 16.4) < spec.WALL_FLOOR
 
 

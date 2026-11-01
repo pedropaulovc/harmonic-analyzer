@@ -31,7 +31,6 @@ from typing import Any
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
-    dimension_name,
     place_view,
     view_name,
 )
@@ -43,15 +42,13 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_detail_crop import native_circle_geometry
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
-from _drawing_gdt import add_feature_control_frame
-from _drawing_leaders import set_near_side_diameter
+from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -59,7 +56,6 @@ from _gear_drawing_entities import visible_circle_edge
 from _gtol_face_read import face_geometry
 from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
-from _native_axis_datum import add_native_axis_datum
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
 from _session import run_build
@@ -67,14 +63,12 @@ import _telemetry
 from pd_rack_pinion_spec import inch_text
 from pd_transgear_disc_hub_geometry import BOLT_CIRCLE_DIA
 from pd_transgear_disc_hub_spec import (
-    BOLT_CIRCLE_CALLOUT,
     BORE_DATUM,
     BORE_DIA,
     BOSS_CLEARANCE_LIMITS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FLANGE_DIA,
-    FLANGE_DIA_CALLOUT,
     FLANGE_THICK_CALLOUT,
     FLAT_CLEARANCE,
     GEOMETRIC_TOLERANCES_IN,
@@ -108,7 +102,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø.990 × .539 part: 3:1 keeps the #0-80 holes, the #57 oil hole and the
+# A Ø1.01 × .539 part: 3:1 keeps the #0-80 holes, the #57 oil hole and the
 # thin flange legible with two views across the landscape sheet.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
@@ -164,7 +158,8 @@ FLAT_CALLOUT = "\n".join(
 # Every size and callout sits outside the silhouettes.
 # - Face view: the bolt circle diameter above-left, its arrows on the
 #   circle's centreline drawn through the three hole centres (machinist
-#   review: with no circle they ended in air), the screw-hole size (3X,
+#   review: with no circle they ended in air; near-side, its shelf ran
+#   into the screw holes' callout), the screw-hole size (3X,
 #   drilled through the flange) above-right, the flat's distance below-left
 #   (the flat's side, so its dimension line stays clear of the bore's
 #   leader) and the bore below-right, each with its fit callout under it.
@@ -226,6 +221,18 @@ SIDE_KEEP = {
         _OIL_HOLE_SHOULDER[1] + OIL_HOLE_TEXT_BLOCK[1] / 2.0,
     ),
 }
+# Datum A on the bore's round side, its symbol right of the flange, in the
+# lane between the face view and the edge view's Ø.52: SolidWorks' own
+# placement of an axis datum put the tag inside the flange, on the
+# lower-left hole (machinist review).  The leader lands on the bore's 15°
+# point, above the face view's horizontal centreline and the lower-right
+# hole's centre mark.
+_BORE_SHEET_R = BORE_DIA / 2.0 * _S
+DATUM_A_LANDING = (
+    END_CENTER[0] + _BORE_SHEET_R * math.cos(math.radians(15.0)),
+    AXIS_Y + _BORE_SHEET_R * math.sin(math.radians(15.0)),
+)
+DATUM_A_SYMBOL = (END_CENTER[0] + _FLANGE_R + 0.014, AXIS_Y + 0.015)
 DIMENSION_CALLOUTS_BELOW = {
     "BoreDia": BORE_CALLOUT,
     "FlatToAxis": FLAT_CALLOUT,
@@ -235,12 +242,8 @@ DIMENSION_CALLOUTS_BELOW = {
     "SpigotLength": SPIGOT_LENGTH_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
     "FlangeThick": FLANGE_THICK_CALLOUT,
-    "FlangeDia": FLANGE_DIA_CALLOUT,
 }
-DIMENSION_CALLOUTS_ABOVE = {
-    "ScrewHoleDia": SCREW_HOLE_CALLOUT_ABOVE,
-    "BoltCircleDia": BOLT_CIRCLE_CALLOUT,
-}
+DIMENSION_CALLOUTS_ABOVE = {"ScrewHoleDia": SCREW_HOLE_CALLOUT_ABOVE}
 # The bolt circle's centreline: thin, black, centre-line font (Y14.2), in
 # the face view's sketch, straight to the database so no inference snaps it
 # onto a hole (draw_ch_connecting_rod's detail fence recipe).
@@ -299,18 +302,6 @@ def _add_bolt_circle_centerline(adapter: Any, view: Any) -> None:
     if font != (0, CENTER_LINE_STYLE, CENTER_LINE_WEIGHT):
         raise RuntimeError(f"hub bolt circle centreline font reads {font!r}")
     draw.ClearSelection2(True)
-
-
-def _set_near_side_bolt_circle(adapter: Any, annotations: list[Any]) -> None:
-    """The bolt circle's diameter: one arrow on the centreline nearest its
-    text, no line through the bore."""
-    matches = [a for a in annotations if dimension_name(adapter, a) == "BoltCircleDia"]
-    if len(matches) != 1:
-        raise RuntimeError(
-            f"expected one BoltCircleDia dimension, found {len(matches)}"
-        )
-    set_near_side_diameter(matches[0], "hub bolt circle near-side leader")
-    rebuild_drawing(adapter, label="hub bolt circle near-side leader")
 
 
 # The two perpendicularity frames attach by entity, not by a sheet pick, and
@@ -587,22 +578,17 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(
                 f"failed to add ASME center marks to the hub {label} view"
             )
-    # The bolt circle draws as its centreline; its diameter lands one arrow
-    # on it nearest the text, no line across the bore (machinist review).
+    # The bolt circle draws as its centreline, the diameter's arrows on it.
     _add_bolt_circle_centerline(adapter, end)
-    _set_near_side_bolt_circle(adapter, end_annotations)
-    # Datum A, the bore, on the face view where it shows round; the view has
-    # no datum tag yet, as the native placement requires.
-    add_native_axis_datum(
+    # Datum A, the bore, on the face view where it shows round.
+    add_datum_feature(
         adapter,
         end,
         entity=visible_circle_edge(adapter, end, BORE_DIA),
-        source_path=SOURCE,
-        radius_m=BORE_DIA / 2000.0,
+        symbol_xy=DATUM_A_SYMBOL,
+        leader_attach_xy=DATUM_A_LANDING,
         datum=BORE_DATUM,
         label="hub bore axis",
-        shoulder=True,
-        stability_tolerance_m=0.0001,
     )
     side_edges = scan_view_edges(side, label="hub edge view rims")
     for frame, key in (

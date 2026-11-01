@@ -20,7 +20,7 @@ import pd_transgear_disc_hub_spec as HUB
 from pd_cluster_stack_band import STACK_NAME
 from pd_rack_pinion_spec import inch_text
 from pd_transgear_feed_pinion_spec import (
-    BORE_PROCESS_CALLOUT,
+    BORE_CALLOUT,
     HUB_NUMBER,
     RACK_NUMBER,
     TEETH,
@@ -77,7 +77,7 @@ ROOT_PREFIX = "ROOT ENVELOPE <MOD-DIAM>"
 CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
     TEXT_PREFIX: {("RootProfile", "RootDia"): ROOT_PREFIX},
     CALLOUT_BELOW: {
-        ("SleeveProfile", "BoreDia"): BORE_PROCESS_CALLOUT,
+        ("SleeveProfile", "BoreDia"): BORE_CALLOUT,
         ("SleeveProfile", "OutsideDia"): MESH_CALLOUT,
         ("SpanProfile", "ToothSpan"): MESH_CALLOUT,
         ("SleeveProfile", "BossDia"): BOSS_CALLOUT,
