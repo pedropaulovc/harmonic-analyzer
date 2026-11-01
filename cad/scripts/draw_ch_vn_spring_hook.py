@@ -37,6 +37,7 @@ from _drawing_dimensions import set_dimension_callouts, set_dimension_precision
 from _drawing_hidden_sketches import curate_view_dimensions as curate_stock_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _drawing_sheet_region import sheet_drawable_region
 from _purchased_fastener_drawing import assert_supplier_view_fits
 from _rebuild import active_configuration_name
@@ -68,6 +69,7 @@ from ch_vn_spring_hook_spec import (
 )
 
 SPEC = DRAWINGS_BY_NAME["ch_vn_spring_hook"]
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SOURCE = SPEC.source
 OUTPUTS = DrawingOutputs(**SPEC.outputs)
 # The finished part is 30.7 x 12.7 mm (1.21 in overall) since its shank carries
