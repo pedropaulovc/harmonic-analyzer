@@ -546,7 +546,9 @@ if (
 # root to the seat face), the land behind the collar (rear face to the
 # outboard journal, inside the bore mouth) and the land past the inboard
 # journal (to the Ø.3125 seat step).  The shank fits the crank hub and carries
-# the ShaftDiaDim band. Both non-mating necks use the title block's .XXX:
+# the ShaftDiaDim band. Both non-mating necks print the core's .375 with an
+# explicit loose ±.010 (the .01 grid's .38 would not be the model, and the
+# title block's .XXX is tighter than a bare neck needs; machinist review):
 # the right imports NeckDiaDim; the left measures the full width between
 # opposite native silhouettes (the hub's fit band would be over-specified).
 SHAFT_CORE_LANDS = (
@@ -557,11 +559,12 @@ SHAFT_CORE_LANDS = (
 if any(start >= end for start, end in SHAFT_CORE_LANDS):
     raise AssertionError("every bare Ø.375 core land must have a length")
 NECK_DIA_PLACES = 3
+NECK_DIA_TOL = 0.254  # ±.010
 # The collar-side neck has no separate authored model dimension to import.
 # Its drawing-only driven linear full-width measurement carries only a native
 # diameter-symbol prefix and the right-hand neck's loose places, not the shank fit.
 DRAWING_REFERENCE_PRECISION = {"OutboardNeckDia": NECK_DIA_PLACES}
-if SHAFT_DIA + printed_band_mm(NECK_DIA_PLACES, unit=UNIT) >= (
+if SHAFT_DIA + NECK_DIA_TOL >= (
     JOURNAL_DIA + JOURNAL_DIA_BAND[1]
 ):
     raise AssertionError("a loose neck must stay under the journal at print-worst")
@@ -663,7 +666,7 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked crankshaft dimension needs authored places")
 # Read-only restatements: the overall is Depth + DomeHeight, and a spherical
 # cap of DomeHeight on the Ø.375 end already fixes its radius.
-REFERENCE_DIMENSIONS = frozenset({"OverallLength", "DomeSphereRadius"})
+REFERENCE_DIMENSIONS = frozenset({"OverallLength", "DomeSphereRadius", "DomeHeight"})
 SPHERICAL_DIMENSIONS = frozenset({"DomeSphereRadius"})
 
 # The native cross-hole callout's process prefix: the drill reads first; the

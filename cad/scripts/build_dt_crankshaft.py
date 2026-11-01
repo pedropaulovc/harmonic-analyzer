@@ -96,6 +96,8 @@ from dt_crankshaft_spec import (
     PIN_HOLE_HEIGHT,
     PINION_SEAT_DIA,
     PINION_SEAT_DIA_BAND,
+    NECK_DIA_PLACES,
+    NECK_DIA_TOL,
     SEAT_COLLAR,
     SEAT_STEP,
     SHAFT_DIA,
@@ -1040,6 +1042,10 @@ async def build(adapter) -> dict[str, str]:
         "PinionSeatDiaDim",
         *deviations(PINION_SEAT_DIA_BAND),
         display_unit=UNIT,
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "PinionSeatProfile", "NeckDiaDim", NECK_DIA_TOL,
+        places=NECK_DIA_PLACES, display_unit=UNIT,
     )
     # The length is unilateral (dt_crankshaft_spec.SHAFT_LENGTH_BAND, the hub
     # air); it prints from the model on the far-end-to-dome-root Depth.

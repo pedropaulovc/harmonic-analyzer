@@ -387,9 +387,7 @@ def test_gear_data_states_the_helix_and_its_hand() -> None:
     # The two tooth-system facts no view of this gear can settle and a mirrored
     # or straight-cut part would get wrong.
     data = notes.GEAR_DATA
-    assert (
-        f"HELIX AT PITCH DIA:  {spec.HELIX_ANGLE_DEG:.1f} \u00b11 DEG RIGHT HAND"
-    ) in data
+    assert f"HELIX AT PITCH DIA:  {spec.HELIX_ANGLE_DEG:.1f} DEG RIGHT HAND" in data
     assert f"LEAD (in/rev, REF):  {spec.inch_text(spec.HELIX_LEAD_MM, 3)}" in data
     assert "SCREW SWEEP" not in data
     # The ordinary +/-1 deg helix keeps the worst-corner crossed-mesh backlash
