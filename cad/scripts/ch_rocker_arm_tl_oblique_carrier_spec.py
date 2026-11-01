@@ -470,11 +470,13 @@ POSITION_BANDED = ("PinSpacing", "A2DX", "A2DY", "B2DX", "B2DY")
 
 # Each spot has its own leader and callout (jig-r3: a "2X" with one leader
 # read as one spot), naming the strap feature it becomes (machinist review
-# mr3: the 3-place stations to it read as functional).
+# mr3: the 3-place stations to it read as functional). CL's is one row: it
+# stands in the shallow band above the 4.154 lane, outside the plate (mr4,
+# rule 14).
 SPOT_CALLOUT = "CENTRE DRILL SPOT"
 SPOT_CALLOUTS = {
     "SpotDia": f"{SPOT_CALLOUT}\nFOR {STRAP_NUMBER} HUB",
-    "SpotDiaCl": f"{SPOT_CALLOUT}\nFOR {STRAP_NUMBER} CL",
+    "SpotDiaCl": f"{SPOT_CALLOUT} FOR {STRAP_NUMBER} CL",
 }
 CALLOUTS_BELOW = {
     "PinHoleDia": PIN_HOLE_CALLOUT,
