@@ -9,7 +9,8 @@ the hub profile, the rim's Ø, the groove and the axial widths in solid lines
 (drawing-guidelines.md rule 9 (show internal shape in solid lines)).  Every size rides the part's marked dimensions; only the rim's axial
 width and the rim-bore round's R (on its cut arc) are added on the sheet.
 The rim's Ø come from a hidden reference sketch in A-A's plane, shown in
-the part while A-A is cut (_drawing_hidden_sketches).
+the part while A-A is cut (_drawing_hidden_sketches).  TIE 2, radial inside
+the rim, shows in a broken-out window on the face (TIE2_WINDOW).
 The bore's and the spigot's mates print on
 their own diameter callouts (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)), and the running bore carries the
 part-owned roughness its fit needs (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
@@ -71,6 +72,7 @@ from _section_axis import position_section_caption
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 from _title_block_units import MM_PER_INCH, render_number
+from _transgear_zone_line import sheet_to_sketch
 from _mg_wheel_rim_geometry import RIM_AXIAL, RIM_INNER_DIA, RIM_OUTER_DIA
 from mg_magnifying_wheel_geom import (
     DRUM_PRESS,
@@ -107,7 +109,11 @@ from mg_magnifying_wheel_spec import (
 )
 from mg_wheel_group import HUB_RUNNING
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    dimension_name,
+    place_view,
+    view_name,
+)
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -242,6 +248,44 @@ _TIE1 = _polar((0.0, 0.0), clock_to_local_deg(TIE1_CLOCK_DEG), TIE1_R)
 _TIE2_OUTWARD = clock_to_local_deg(TIE2_CLOCK_DEG) % 360.0
 _TIE2_INNER = _polar((0.0, 0.0), _TIE2_OUTWARD, RIM_INNER_DIA / 2.0)
 _TIE2_ANGLE_SECTOR = (180.0, _TIE2_OUTWARD)
+# TIE 2 runs inside the rim, so the hidden-lines-removed face view draws
+# none of it.  A broken-out window on its axis cuts the rim at the wheel's
+# mid-plane, the plane of TIE 2's axis and of the sketch its Ø and angle
+# dimension, so both stand on the hole's cut walls (drawing-guidelines.md
+# rule 9 (never dimension to a hidden line)).  The window is (s, t) mm about
+# the hole: s out along its axis, t across it along _TIE2_ACROSS (sheet
+# down-right).  It runs from the rim bore's air past the OD; on the -t side
+# it stays inside the angle's horizontal leg, which leaves the axis's inner
+# end, so the leg crosses no hatch.
+_TIE2_ALONG = (
+    math.cos(math.radians(_TIE2_OUTWARD)),
+    math.sin(math.radians(_TIE2_OUTWARD)),
+)
+_TIE2_ACROSS = (-_TIE2_ALONG[1], _TIE2_ALONG[0])
+TIE2_WINDOW = (
+    (43.4, 0.0),
+    (44.2, -0.95),
+    (47.0, -1.0),
+    (50.2, -0.9),
+    (51.0, 0.0),
+    (50.2, 1.9),
+    (47.0, 2.1),
+    (44.2, 1.9),
+)
+# The face view looks at the hub's back face, the part's nearest, so the
+# window's depth reaches the mid-plane from it; measured from the rim's own
+# face instead it stops HUB_BACK_Z - RIM_AXIAL / 2 short, well inside TIE 2.
+_TIE2_WINDOW_DEPTH = HUB_BACK_Z
+
+
+def tie2_window_point(s: float, t: float) -> tuple[float, float]:
+    """Model (x, y) mm of the TIE 2 window point (s, t)."""
+    return (
+        s * _TIE2_ALONG[0] + t * _TIE2_ACROSS[0],
+        s * _TIE2_ALONG[1] + t * _TIE2_ACROSS[1],
+    )
+
+
 # A leader-borne radius's shoulder starts this far (mm) from its text's
 # centre, on the leader's side (an "R.12 ±.03" block).  SolidWorks draws the
 # leader on the ray from the arc's centre through that shoulder end, and
@@ -447,9 +491,10 @@ _RIM_WIDTH_ROW = _SPOKE_ROW + 0.010
 # Nearest the part the spigot length (".354 +.004/.000"), whose band keeps the
 # drum from standing proud (DRUM_RECESS); then the web's centre plane
 # (".61"), which the rim and its groove share, its extension line rising
-# from the axis left of the spigot step's, so the row above stops short of
-# it; last the overall (".772 ±.003"), which holds the axle's nut stack,
-# left of the back face above the A-A caption.  Each band's need, and the
+# toward the groove (_clear_section_witnesses) left of the spigot step's, so
+# the row above stops short of it; last the overall (".772 ±.003"), which
+# holds the axle's nut stack, left of the back face above the A-A caption.
+# Each band's need, and the
 # plane the .61 locates, stands over its value (CALLOUTS_ABOVE), its text
 # centred clear of the face it leaves.  The two right-hand sizes keep their
 # arrows inside their spans, so no tail reaches a neighbouring extension
@@ -875,6 +920,120 @@ def _dress_fillet_radii(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"no fillet radius to dress: {sorted(remaining)}")
 
 
+# Section A-A shows only hatch on its cut faces (drawing-guidelines.md rule
+# 9).  Two model dimensions' extension lines rise from inside the hub: the
+# spokes' thickness from the seed spoke's root corner, whose arrows land on
+# the spoke beyond the cut at its own row, so it shows none; and the web's
+# centre plane from the origin, whose line starts the document gap past the
+# rim's OD instead, under the groove the plane locates.
+_WITNESS_NONE = 3  # swWitnessLineVisibility_e.swWitnessLineNone
+
+
+def _clear_section_witnesses(adapter: Any, annotations: list[Any]) -> None:
+    """Keep SpokeAxial's and HubFrontZ's extension lines off A-A's cut faces,
+    read back."""
+    named = {
+        dimension_name(adapter, annotation): _early_bound(annotation, "IAnnotation")
+        for annotation in annotations
+    }
+    missing = {"SpokeAxial", "HubFrontZ"} - set(named)
+    if missing:
+        raise RuntimeError(f"no section dimension to clear: {sorted(missing)}")
+    spoke = _early_bound(
+        named["SpokeAxial"].GetSpecificAnnotation(), "IDisplayDimension"
+    )
+    spoke.WitnessVisibility = _WITNESS_NONE
+    if int(spoke.WitnessVisibility) != _WITNESS_NONE:
+        raise RuntimeError("SpokeAxial kept its extension lines")
+    plane = named["HubFrontZ"]
+    display = _early_bound(plane.GetSpecificAnnotation(), "IDisplayDimension")
+    plane_x = _section_x(0.0)
+
+    def plane_witness_start() -> float:
+        tops = [
+            max(a[1], b[1])
+            for a, b in dimension_segments(plane)
+            if abs(a[0] - plane_x) < 1e-4
+            and abs(b[0] - plane_x) < 1e-4
+            and abs(a[1] - b[1]) > 1e-6
+        ]
+        if not tops:
+            raise RuntimeError(f"HubFrontZ: no extension line at x={plane_x:.4f} m")
+        return max(tops)
+
+    before = plane_witness_start()
+    # Which index is the plane's is SOLIDWORKS' to state: try each, keep the
+    # one that moves the plane's line, restore the other.
+    for index in (0, 1):
+        ok, use_doc, old_gap = display.GetWitnessLineGap(index, False, 0.0)
+        if ok is not True:
+            raise RuntimeError(f"HubFrontZ witness {index} gap could not be read")
+        target = SECTION_CENTER[1] - _RIM_R - float(old_gap)
+        gap = float(old_gap) + before - target
+        if display.SetWitnessLineGap(index, False, gap) is not True:
+            raise RuntimeError(f"HubFrontZ witness {index} gap was refused")
+        rebuild_drawing(adapter, label=f"web centre witness {index} gap")
+        start = plane_witness_start()
+        if abs(start - target) < 1e-5:
+            _telemetry.info(
+                f"HubFrontZ: centre-plane witness {index} starts at y={start:.5f} m "
+                f"(was {before:.5f}), gap {gap * 1000.0:.2f} mm"
+            )
+            return
+        if display.SetWitnessLineGap(index, bool(use_doc), float(old_gap)) is not True:
+            raise RuntimeError(f"HubFrontZ witness {index} gap could not be restored")
+        rebuild_drawing(adapter, label=f"web centre witness {index} gap restored")
+    raise RuntimeError(
+        f"HubFrontZ: no witness gap moved the centre-plane line from y={before:.5f} m"
+    )
+
+
+def _break_out_tie2(adapter: Any, front: Any) -> None:
+    """Cut TIE2_WINDOW out of the face view to the mid-plane, read back."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    native = _early_bound(front, "IView")
+    sheet = model_points_in_view(
+        adapter,
+        front,
+        tuple(
+            (*(value / 1000.0 for value in tie2_window_point(s, t)), 0.0)
+            for s, t in TIE2_WINDOW
+        ),
+        label="TIE 2 window",
+    )
+    if not ddoc.ActivateView(view_name(adapter, front)):
+        raise RuntimeError("failed to activate the face view for TIE 2's window")
+    draw.ClearSelection2(True)
+    points = sheet_to_sketch(adapter, front, [*sheet, sheet[0]])
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        spline = manager.CreateSpline(
+            double_array([value for point in points for value in point[:3]])
+        )
+    finally:
+        manager.AddToDB = previous
+    if spline is None:
+        raise RuntimeError("failed to sketch TIE 2's window")
+    selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    data = selection.CreateSelectData()
+    data.View = native
+    if not _early_bound(spline, "ISketchSegment").Select4(False, data):
+        raise RuntimeError("failed to select TIE 2's window")
+    if ddoc.CreateBreakOutSection(_TIE2_WINDOW_DEPTH / 1000.0) is not True:
+        raise RuntimeError("TIE 2's broken-out section was refused")
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="TIE 2 broken-out window")
+    count = int(native.GetBreakOutSectionCount())
+    if count != 1:
+        raise RuntimeError(f"face view holds {count} broken-out sections, not 1")
+    _telemetry.info(
+        f"TIE 2 window cut {_TIE2_WINDOW_DEPTH:g} mm deep from the hub's back face"
+    )
+
+
 def _width_dimension_lines(
     annotation: Any, axis_y: float, half_widths: tuple[float, ...]
 ) -> list[Any]:
@@ -1213,6 +1372,7 @@ async def build(adapter: Any) -> dict[str, str]:
     offset_dimension_text(adapter, annotations, {"SpokeRootWidth": SPOKE_ROOT_TEXT_XY})
     _set_arrows_inside(adapter, annotations)
     _dress_fillet_radii(adapter, annotations)
+    _clear_section_witnesses(adapter, annotations)
     axis, tie1, bore_landing = model_points_in_view(
         adapter,
         front,
@@ -1243,6 +1403,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _assert_face_leaders_clear(adapter, front, annotations, bore_finish, axis=axis)
     _assert_fillet_radii(adapter, front, annotations, bore_finish, axis=axis)
+    _break_out_tie2(adapter, front)
 
     # The rim's axial width across the section between its side faces' cut
     # lines (_RIM_SIDE_POINTS), its text left of the rim's back face on its
