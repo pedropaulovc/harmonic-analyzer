@@ -28,7 +28,7 @@ from gear_face_band import GEAR_FACE_WIDTH_BAND
 import cone_shaft_land_bands
 import gear_seat_fit
 from _package_units import drawing_unit
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import printed_band_mm, printed_deviations
 from _surface_finish import SurfaceFinishControl
 from stock_form_cutter import (
     StockFormProfile,
@@ -70,9 +70,11 @@ HELIX_ANGLE_DEG = cone_line.INCLINE_DEG
 # MHA-DT-05 north feature off it).  The cone set is a solid stack (user ruling
 # 2026-09-28, dt_cone_gear_stack): the 64T grows NORTH until it bears on T120's
 # grown south face, so its face is the gap between the collar and T120,
-# floored to four mm places (a stack closure, so it is not snapped to the
-# inch grid; the sheet prints it rounded at four inch places).
-# dt_cone_gear_stack pins the two faces together.  The band is +/-.001 in.
+# floored to four mm places (a stack closure that T120's face meets exactly,
+# so it is not snapped to the inch grid; the sheet prints it rounded at four
+# inch places).  dt_cone_gear_stack pins the two faces together.  The band is
+# +/-.001 in about the PRINTED .XXXX: FACE_WIDTH_BAND is that band's limits as
+# deviations from the model, the form every stack reads.
 LAYOUT_REFERENCE_FACE_WIDTH = 10.0
 LAYOUT_CENTRE_STATION = (
     cone_line.SHAFT_T120_STATION
@@ -88,7 +90,14 @@ FACE_WIDTH = round(
     - (LAYOUT_CENTRE_STATION - LAYOUT_FACE_WIDTH / 2.0 + SOUTH_FACE_SHIFT_NORTH),
     4,
 )
-FACE_WIDTH_BAND = GEAR_FACE_WIDTH_BAND  # +/-.001 in, the cone gears' own
+FACE_WIDTH_PLACES = 4
+_face_lower, _face_upper = printed_deviations(
+    FACE_WIDTH,
+    FACE_WIDTH_PLACES,
+    (GEAR_FACE_WIDTH_BAND[1], GEAR_FACE_WIDTH_BAND[0]),  # +/-.001 in, the cone gears' own
+    unit=UNIT,
+)
+FACE_WIDTH_BAND = (_face_upper, _face_lower)  # (upper, lower), printed limits
 # The centre sits CENTRE_SHIFT_NORTH north of the 19.9 layout station.
 CENTRE_SHIFT_NORTH = SOUTH_FACE_SHIFT_NORTH + (FACE_WIDTH - LAYOUT_FACE_WIDTH) / 2.0
 if not LAYOUT_FACE_WIDTH - SOUTH_FACE_SHIFT_NORTH < FACE_WIDTH < LAYOUT_FACE_WIDTH:
@@ -389,7 +398,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # .XX band, with no band of its own.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OutsideDiaReference": {"OutsideDia": OUTSIDE_DIA_PLACES},
-    "GearBlank": {"FaceWidth": 4},
+    "GearBlank": {"FaceWidth": FACE_WIDTH_PLACES},
     "BoreProfile": {"BoreDia": 4, "BoreAF": 4},
     "BoreSouthChamfer": {"BoreSouthChamferSize": BORE_SOUTH_CHAMFER_PLACES},
 }
