@@ -1,9 +1,9 @@
 ---
 module: M07
 title: "Mill II — profiling, slots, workholding"
-status: not started      # not started | in progress | competent | applied
+status: in progress      # not started | in progress | competent | applied
 hours_estimated: 20
-hours_actual: 0
+hours_actual: 5
 ---
 
 # M07 — Mill II — profiling, slots, workholding
@@ -51,4 +51,4 @@ Log entries for this module, newest last. Create them with
 
 | date | entry | outcome | hours |
 |---|---|---|---|
-| | | | |
+| 2026-10-30 | [pendant and roughing the base bar to length](../entries/2026-10-30-pendant-and-roughing-base-bar-to-length.md) | scrapped | 5 |

@@ -3,7 +3,7 @@
 Updated as modules and entries land. Numbers come from the entries — don't
 estimate here.
 
-_Last updated: 2026-10-30 (first machining entry: 6 in vise installed on the mill, first cuts on the oblique-jig base bar)._
+_Last updated: 2026-10-31 (second machining entry: pendant working, the oblique-jig base bar scrapped while roughing it to length)._
 
 ## Modules
 
@@ -19,18 +19,18 @@ This table is only the entry-derived hours roll-up.
 | M04 | [Lathe III — parting to length](curriculum/m04-lathe-iii-parting-to-length-and-batch-work.md) | 20 | 0 | 0 |
 | M05 | [Lathe IV — slender work](curriculum/m05-lathe-iv-slender-work-steadies-tapers.md) | 16 | 0 | 0 |
 | M06 | [Mill I — tramming, squaring](curriculum/m06-mill-i-tramming-squaring-edge-finding.md) | 16 | 6.5 | 1 |
-| M07 | [Mill II — profiling, workholding](curriculum/m07-mill-ii-profiling-slots-workholding.md) | 20 | 0 | 0 |
+| M07 | [Mill II — profiling, workholding](curriculum/m07-mill-ii-profiling-slots-workholding.md) | 20 | 5 | 1 |
 | M08 | [Hole patterns and tapping](curriculum/m08-hole-patterns-reaming-and-tapping.md) | 12 | 0 | 0 |
 | M09 | [Dividing head and indexing](curriculum/m09-the-dividing-head-and-indexing.md) | 20 | 0 | 0 |
 | M10 | [Gear cutting](curriculum/m10-gear-cutting-making-the-cutter-then-the-gear.md) | 60+ | 0 | 0 |
 | M11 | [Soldering and finishing](curriculum/m11-soldering-finishing-and-assembly-craft.md) | 16 | 0 | 0 |
-| | **total** | **236+** | **6.5** | **1** |
+| | **total** | **236+** | **11.5** | **2** |
 
 ## Parts made
 
 | part | qty needed | qty made | qty scrapped | first entry |
 |---|---:|---:|---:|---|
-| `ch-rocker-arm-tl-oblique-base-bar` (shop fixture) | 2 | 0 | 0 | [2026-10-29](entries/2026-10-29-vise-install-and-first-cuts.md) |
+| `ch-rocker-arm-tl-oblique-base-bar` (shop fixture) | 2 | 0 | 1 | [2026-10-29](entries/2026-10-29-vise-install-and-first-cuts.md) |
 
 `0 / 146` registered part families started. The inventory and identity lookup
 are documented in the [subsystem identity guide](../cad/docs/subsystem-identities.md);

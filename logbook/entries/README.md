@@ -28,9 +28,16 @@ fabricated observation would poison the whole book.
 - Raw photos and video go outside the repo (`logbook/media/` is gitignored);
   link them. Only frames destined for the book get committed, into
   `book/figures/hand/`.
+- Explanatory sketches (setups, workholding, cutter paths) are drawings, not
+  raw media: commit them as `figures/YYYY-MM-DD-<slug>.png` and embed them in
+  the entry.
+- Advice received after a session goes in an optional
+  `## Advice afterwards (from <who>, not yet tried)` section after `## Open`,
+  never in the observed sections. The next entry says what held up.
 
 ## Index
 
 | date | entry | module | part | outcome | hours |
 |---|---|---|---|---|---:|
 | 2026-10-29 | [Install the 6 in vise and start the oblique-jig base bar](2026-10-29-vise-install-and-first-cuts.md) | M06 | `ch-rocker-arm-tl-oblique-base-bar` | partial | 6.5 |
+| 2026-10-30 | [Get the pendant working, then rough the base bar to length](2026-10-30-pendant-and-roughing-base-bar-to-length.md) | M07 | `ch-rocker-arm-tl-oblique-base-bar` | scrapped | 5.0 |

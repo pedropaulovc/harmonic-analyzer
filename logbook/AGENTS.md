@@ -16,6 +16,15 @@ A machining curriculum and its practice log. Prose only.
 - Write log entries from the user's session notes, following the workflow
   below.
 - Tidy, format and cross-link entries.
+- Draw explanatory sketches (setups, workholding, cutter paths) for an entry
+  and commit them under `entries/figures/YYYY-MM-DD-<slug>.png`. A sketch is a
+  drawing, not a record: it may show a proposed setup, but any number on it
+  that describes what happened must come from the entry.
+- Add the advice the user asks for to an entry, in an
+  `## Advice afterwards (from <who>, not yet tried)` section after `## Open`.
+  It is attributed and marked untried so it is never read as an observation;
+  a later entry records what held up. Mark anything not checked against the
+  user's machine or config `unverified`.
 - Update `progress.md` and `SKILLS.md` from what the entries actually say.
 
 **May not:**
@@ -27,6 +36,8 @@ A machining curriculum and its practice log. Prose only.
 - **Mark a module complete.** Competency is the user's call, made at the
   machine.
 - Soften a failure. If the user says the part was scrapped, it stays scrapped.
+- Put advice or a proposed setup anywhere but the advice section, or present
+  it as something the user did.
 
 ## Writing an entry
 
