@@ -7,9 +7,9 @@ TL-32's lug (``ch_rocker_arm_tl_oblique_feed_nut_spec``).
 Layout (the spec's model frame): ONE Front-plane rectangle from the origin
 corner, extruded +Z by the length; the bore (its letter C tap drill) and the
 two holes are plain circles cut THRU from the seat face, each sketch's
-centre dimensioned from the origin corner. The printed hole stations (the
-first from the bore, the second from the first) live on a hidden reference
-sketch, ``HolePatternReference``, of construction circles on the real ones
+centre dimensioned from the origin corner. The printed hole stations (each
+hole from the bore) live on a hidden reference sketch,
+``HolePatternReference``, of construction circles on the real ones
 (``_oblique_pivot_block_model``'s ``NutPatternReference``); the faced length
 on another, ``NutLengthReference`` (a drawing view cannot attach the
 extrusion's depth; TL-28's ``BracketThickReference``).
@@ -131,8 +131,8 @@ async def _cut_circles(adapter, profile: str, feature: str, circles) -> float:
 
 async def _hole_pattern_reference(adapter) -> None:
     """The hidden sketch carrying the printed hole stations: construction
-    circles on the bore and both holes, the first hole from the bore, the
-    second from the first, all on the bore's line."""
+    circles on the bore and both holes, each hole from the bore, one each
+    side, all on the bore's line."""
     feature = "HolePatternReference"
     dims = SketchDims()
     check(f"create_sketch {feature}", await adapter.create_sketch("Front"))
@@ -149,24 +149,20 @@ async def _hole_pattern_reference(adapter) -> None:
         await adapter.add_sketch_dimension(bore, None, "diameter", spec.BORE_DRILL),
     )
     dims.record("RefBoreDia")
-    base, base_x = bore, spec.BORE_X
-    for index, (x, name) in enumerate(
-        zip(spec.HOLE_X, ("HoleOffset", "HoleSpacing"), strict=True), start=1
-    ):
+    for index, x in enumerate(spec.HOLE_X, start=1):
         hole = await _construction_circle(
             adapter, x, spec.HOLE_Y, spec.HOLE_DIA, f"{feature} hole {index}"
         )
         await anchor_point_to_point(
-            adapter, f"{base}.center", f"{hole}.center", abs(x - base_x), 0.0,
+            adapter, f"{bore}.center", f"{hole}.center", abs(x - spec.BORE_X), 0.0,
             f"{feature} hole {index} station",
         )
-        dims.record(name)
+        dims.record(f"Hole{index}Offset")
         check(
             f"{feature} hole {index} diameter",
             await adapter.add_sketch_dimension(hole, None, "diameter", spec.HOLE_DIA),
         )
         dims.record(f"RefHole{index}Dia")
-        base, base_x = hole, x
     await ensure_fully_defined(adapter, feature)
     check(f"exit_sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)

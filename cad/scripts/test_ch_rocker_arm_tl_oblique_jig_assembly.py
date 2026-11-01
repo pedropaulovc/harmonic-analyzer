@@ -300,7 +300,7 @@ def test_feed_nut_closes_on_the_leadscrew_axis_over_the_lug_taps() -> None:
         feed_block.NUT_FACE_X - feed_nut.LENGTH, feed_block.NUT_AXIS_Y, feed_block.NUT_AXIS_Z,
     ))
     assert spec.frame_point(nut, (feed_nut.BORE_X, feed_nut.BORE_Y, feed_nut.LENGTH)) == pytest.approx(head_face)
-    # Each loose hole sits over a lug tap (ruling B1).
+    # Each loose hole sits over a lug tap (2X .340 from the axis on both).
     taps = sorted(_image(rows, origin, (feed_block.NUT_FACE_X, y, z)) for y, z in feed_block.NUT_HOLES_YZ)
     holes = sorted(spec.frame_point(nut, (x, feed_nut.HOLE_Y, 0.0)) for x in feed_nut.HOLE_X)
     assert [c for p in holes for c in p] == pytest.approx([c for p in taps for c in p], abs=1e-9)

@@ -175,19 +175,20 @@ VIEW_SHEET_REF_OFFSET = (-.010, -.008)
 # right from the bottom face at x 165.7, Y=0 prints at y 223, the lug end
 # (Y -68) at y 87; the leadscrew axis at 190.5,113, the TL-27 nut's two taps
 # on its line at y 95.7 (tap 1, toward the lug end) and 130.3. The axis
-# stands from the lug end / bottom-face corner, tap 1 from the axis and tap 2
-# from tap 1 (ruling B1). Left of the view: the axis's .515 (x 104, as
-# before) and, under the lug end, the 12.400 mm height, its three rows
-# outboard left of the bottom face's extension line, which then stops at the
-# lug end instead of running up the view's edge. Right of the view: the .34
-# and the .680 with its mate row, one lane each, their extension lines
-# leaving the taps' centres to the right. The Ø.340 clearance callout comes
-# in from the upper left, crossing only the view's edge; the tap callout from
-# the lower right onto tap 1's rim, under every right-hand extension line.
+# stands from the lug end / carriage-face corner, each tap .340 from the axis
+# (2X, one each side: no tap on the other). Left of the view: the axis's .515
+# (x 104, as before) and, under the lug end, the 12.400 mm height, its three
+# rows outboard left of the bottom face's extension line, which then stops at
+# the lug end instead of running up the view's edge. Right of the view, clear
+# of its edge (x 214): both taps' .340 on one lane, each with its mate row,
+# centred between the axis's extension line and its own tap's. The Ø.340
+# clearance callout comes in from the upper left, crossing only the view's
+# edge; the tap callout from the lower right onto tap 1's rim, under every
+# right-hand extension line.
 NUT_XY, NUT_SCALE = (.190,.175), (2,1)
 NUT_KEEP = {
     'NutCentreY':(.104,.100),'NutCentreZ':(.134,.0772),
-    'NutTap1Y':(.229,.1044),'NutTapSpacing':(.268,.113),
+    'NutTap1Y':(.247,.1044),'NutTap2Y':(.247,.1216),
     'NutClearanceDia':(.135,.150),
 }
 NUT_CAPTION = 'VIEW D'
@@ -475,7 +476,7 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         _size_note(adapter, caption, VIEW_LETTER_HEIGHT, label='VIEW D caption')
         # The callout reaches tap 1 (toward the lug end) from the lower
         # right, under the taps' right-hand extension lines. The title
-        # block's THREADS row owns the class; the .680 names the mate.
+        # block's THREADS row owns the class; each .340 names the mate.
         y,z = contract.NUT_HOLES_YZ[0]
         rim = contract.NUT_TAP_DRILL/2/math.sqrt(2)
         edge = _project(adapter,nut,(contract.NUT_FACE_X,y-rim,z+rim),'nut tap mouth')

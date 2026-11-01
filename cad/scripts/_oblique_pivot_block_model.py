@@ -311,9 +311,9 @@ async def _plan_datum_reference(adapter, part) -> None:
 async def _nut_pattern_reference(adapter, part) -> None:
     """The hidden nut-face sketch that carries VIEW D's locations: a
     construction line ON the lug end, the leadscrew axis (a circle ON the
-    screw clearance) from that end and the bottom face, the first tap (a
-    circle ON its drill) from the axis and the second from the first, so the
-    pair prints as the TL-27 nut's (ruling B1)."""
+    screw clearance) from that end and the bottom face, and each tap (a
+    circle ON its drill) from the axis, one each side, so the pair prints as
+    the TL-27 nut's (2X .340, no chain)."""
     feature = "NutPatternReference"
     check(f"create_sketch {feature}", await adapter.create_sketch("NutFace"))
     to_sketch = _sketch_mapper(adapter, u_axis=2, v_axis=1, label=feature)
@@ -334,12 +334,9 @@ async def _nut_pattern_reference(adapter, part) -> None:
     axis_uv = at(part.NUT_AXIS_Y, part.NUT_AXIS_Z)
     axis = await _construction_circle(adapter, dims, f"{end}.start", end_start, axis_uv, part.SCREW_CLEARANCE_DIA,
                                       ("NutCentreZ", "NutCentreY", "NutCentreDia"), f"{feature} nut axis")
-    base, base_uv = axis, axis_uv
-    for i, ((y, z), name) in enumerate(zip(part.NUT_HOLES_YZ, ("NutTap1Y", "NutTapSpacing"), strict=True), 1):
-        tap_uv = at(y, z)
-        base = await _construction_circle(adapter, dims, f"{base}.center", base_uv, tap_uv, part.NUT_TAP_DRILL,
-                                          (f"NutTap{i}Z", name, f"NutTap{i}Dia"), f"{feature} tap {i}")
-        base_uv = tap_uv
+    for i, (y, z) in enumerate(part.NUT_HOLES_YZ, 1):
+        await _construction_circle(adapter, dims, f"{axis}.center", axis_uv, at(y, z), part.NUT_TAP_DRILL,
+                                   (f"NutTap{i}Z", f"NutTap{i}Y", f"NutTap{i}Dia"), f"{feature} tap {i}")
     await ensure_fully_defined(adapter, feature)
     check(f"exit_sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)

@@ -49,24 +49,29 @@ def test_tr8_bore_is_letter_c_tapped_through_at_five_turns():
     assert spec.CALLOUTS_BELOW["BoreDia"] == "Tr8x2-7H RH THRU"
 
 
-def test_loose_holes_pair_symmetric_about_the_bore_and_name_their_mate():
+def test_loose_holes_stand_2x_340_from_the_bore_and_name_their_mate():
     assert spec.HOLE_DIA == CLEARANCE_MM[("#4", "loose")]
     assert round(spec.HOLE_DIA / INCH, 3) == 0.144
-    assert spec.HOLE_X == pytest.approx((spec.BORE_X - 0.34 * INCH, spec.BORE_X + 0.34 * INCH))
-    assert spec.HOLE_SPACING == pytest.approx(0.680 * INCH)
+    # Each hole from the bore axis, one each side, never from the other hole
+    # (run 20261101T220223216Z: the chained .63 / .34 / .680 stacked three
+    # bands on the far hole).
+    assert spec.HOLE_OFFSET == pytest.approx(0.340 * INCH)
+    assert spec.HOLE_X == pytest.approx((spec.BORE_X - 0.340 * INCH, spec.BORE_X + 0.340 * INCH))
     assert spec.HOLE_Y == spec.BORE_Y
-    assert spec.DRAWING_PRECISION_BY_NAME["HoleOffset"] == 2
-    assert spec.DRAWING_PRECISION_BY_NAME["HoleSpacing"] == 3
-    assert spec.CALLOUTS_BELOW["HoleSpacing"] == spec.MATE_CALLOUT == "MATCHES TL-32 LUG TAPS"
-    # The loose fit floats a #4 by .016, past the .011 stack of both parts'
-    # printed pairs; the normal Ø.129's .008 would not.
+    assert spec.DRAWING_DIMENSIONS["HolePatternReference"] == {"Hole1Offset", "Hole2Offset"}
+    assert spec.DRAWING_PRECISION_BY_NAME["Hole1Offset"] == spec.DRAWING_PRECISION_BY_NAME["Hole2Offset"] == 3
+    assert spec.CALLOUTS_BELOW["Hole1Offset"] == spec.CALLOUTS_BELOW["Hole2Offset"] == spec.MATE_CALLOUT
+    assert spec.MATE_CALLOUT == "MATCHES TL-32 LUG TAPS"
+    assert round(spec.HOLE_OFFSET_BAND / INCH, 4) == 0.0050
+    # The loose fit floats a #4 by .016, past the .014 stack of both parts'
+    # printed stations; the normal Ø.129's .008 would not.
     assert round(spec.HOLE_FLOAT / INCH, 4) == 0.0160
     assert spec.NORMAL_HOLE_FLOAT < feed_block.FIT_UP_RESIDUAL <= spec.HOLE_FLOAT
 
 
 def test_walls_meet_the_target_at_the_printed_worst_case():
     assert min(spec.WALLS_MM.values()) >= WALL_TARGET_MM
-    assert round(min(spec.WALLS_MM.values()) / INCH, 4) == 0.0837
+    assert round(min(spec.WALLS_MM.values()) / INCH, 4) == 0.0937
 
 
 def test_screws_engage_the_lug_two_diameters_and_stop_inside_it():

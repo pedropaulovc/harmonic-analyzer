@@ -2,13 +2,14 @@ r"""Create the drawing for the oblique-trammel jig's feed nut (MHA-CH-06-TL-27).
 
 One part, one off. A 1-1/4 x 3/4 x .40 brass block at 2:1: the face view
 (*Front, looking at the screw heads' face) carries everything but the length:
-the hole stations over it (the first hole from the bore, the pair's .680 with
-its mate, text clear above its line), the bore's .63 and the stock width
-under it, the bore's .38 and the stock height left of it, the 2X Ø.144
-callout up-right on the +X hole and the Tr8x2 bore callout right of it, each
-leader clear of every extension line; the side view (*Right), projected right
-of the face, carries the faced length over it; the shaded isometric rides top
-right at 1:1. No datums (drawing-guidelines.md rule 5).
+the hole stations over it (each hole 2X .340 from the bore, one each side,
+each with its mate row outboard of its hole), the bore's .63 and the stock
+width under it, the bore's .38 and the stock height left of it, the 2X Ø.144
+callout over the +X mate row on the +X hole and the Tr8x2 bore callout right
+of the face, each leader clear of every extension line; the side view
+(*Right), projected right of the face, carries the faced length over it; the
+shaded isometric rides top right at 1:1. No datums (drawing-guidelines.md
+rule 5).
 
 Run with SolidWorks open::
 
@@ -110,14 +111,12 @@ def text_half_high(rows: int) -> float:
     return ((rows - 1) * ROW_PITCH + 3.5 / _S) / 2.0
 
 
-# Over the face, nearest first: the first hole from the bore, then the pair.
-# The first's text stands over its own line; the pair's two rows are wider
-# than the holes' .680, so they stand outboard left of the -X hole's extension
-# line on the dimension line run out to them (TL-32's 2.44): r2 review, set
-# between the holes, both extension lines' overshoot struck the mate row.
+# Over the face, one lane: each hole's .340 from the bore (2X, one each
+# side). Each mate row is wider than its .340, so the text stands outboard of
+# its own hole's extension line on the dimension line run out to it (TL-32's
+# 2.44): r2 review, set between extension lines, their overshoot struck the
+# mate row.
 _OFFSET_LINE = HEIGHT + FIRST_LANE
-# (r1 audit: one TEXT_GAP left the rows 3.51 mm apart, under one text height.)
-_SPACING_LINE = _OFFSET_LINE + TEXT_DROP + text_half_high(1) + 1.5 * TEXT_GAP
 # Under the face: the bore's station, then the stock width, each text between
 # its extension lines, over its own line. The width's text stands right of
 # the bore's extension line, which ends at the station's line just over it
@@ -130,21 +129,24 @@ _BORE_Y_TEXT = _BORE_Y_LINE - TEXT_GAP - text_half(".38")
 _HEIGHT_LINE = _BORE_Y_TEXT - text_half(".38") - TEXT_GAP
 _HEIGHT_TEXT = _HEIGHT_LINE - TEXT_GAP - text_half(STOCK_CALLOUTS["NutHeight"])
 FACE_KEEP: dict[str, tuple[float, float, float]] = {
-    "HoleOffset": ((HOLE_X[0] + BORE_X) / 2.0, _OFFSET_LINE + TEXT_DROP, LENGTH),
-    "HoleSpacing": (
-        HOLE_X[0] - TEXT_GAP - text_half(MATE_CALLOUT), _SPACING_LINE + TWO_LINE_DROP, LENGTH
+    "Hole1Offset": (
+        HOLE_X[0] - TEXT_GAP - text_half(MATE_CALLOUT), _OFFSET_LINE + TWO_LINE_DROP, LENGTH
+    ),
+    "Hole2Offset": (
+        HOLE_X[1] + TEXT_GAP + text_half(MATE_CALLOUT), _OFFSET_LINE + TWO_LINE_DROP, LENGTH
     ),
     "BoreX": (BORE_X / 2.0, _BORE_X_LINE + TEXT_DROP, LENGTH),
     "NutWidth": ((BORE_X + WIDTH) / 2.0, _WIDTH_LINE + THREE_LINE_DROP, LENGTH),
     "BoreY": (_BORE_Y_TEXT, BORE_Y / 2.0, LENGTH),
     "NutHeight": (_HEIGHT_TEXT, HEIGHT / 2.0, LENGTH),
-    # The +X hole's 2X Ø.144 DRILL THRU up-right, its leader outboard of that
-    # hole's extension line, its shelf a row over the side view's .40 (r2
-    # review: level with it, the shelf ran into that dimension line); the
+    # The +X hole's 2X Ø.144 DRILL THRU over the +X mate row, its left end
+    # over the gap between the two mate rows, its leader down that gap onto
+    # the hole's upper-left rim, its right end short of the side view's .40
+    # (r2 review: level with it, the shelf ran into that dimension line); the
     # bore's two rows right, level with the face's lower edge, its leader in
     # through the +X side under the +X hole and over the stock width's
     # extension line (which runs down from the face).
-    "HoleDia": (HOLE_X[1] + 6.0 + text_half("2X Ø.144 DRILL THRU"), HEIGHT + 14.0, LENGTH),
+    "HoleDia": (HOLE_X[1] + 6.4, HEIGHT + 14.0, LENGTH),
     "BoreDia": (WIDTH + 16.0, 2.0, LENGTH),
 }
 # The side view (*Right): the faced length over it.
