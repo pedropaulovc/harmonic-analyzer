@@ -113,6 +113,24 @@ def test_the_head_land_holds_the_wall_target_at_its_printed_lower_limit() -> Non
     assert lower - 2.0 * edge_break > 0.0
 
 
+def test_the_seat_root_radius_leaves_the_head_a_flat_seat() -> None:
+    """Machinist review round 4: the head's seat gets its own root radius,
+    well inside the .0375 step, so the head still bears on the arm's rear
+    face past the ream mouth's break and its own rim break."""
+    step = (spec.HEAD_DIA - spec.DIA_MAX) / 2.0
+    assert 0.0 < spec.SEAT_FILLET_R < step / 4.0
+    contact = (
+        (spec.HEAD_DIA - printed_band_mm(2, unit=spec.UNIT)) / 2.0
+        - edge_break_chamfer_mm(unit=spec.UNIT)
+        - max(
+            arm.PIN_BORE_DIA_MAX / 2.0 + edge_break_chamfer_mm(unit=spec.UNIT),
+            spec.DIA_MAX / 2.0 + spec.SEAT_FILLET_R,
+        )
+    )
+    assert spec.SEAT_CONTACT_WIDTH_MIN == pytest.approx(contact)
+    assert contact > 0.0
+
+
 def test_the_groove_holds_the_ring_at_every_printed_limit() -> None:
     """The ring grips at the groove's largest Ø and still clears the shank;
     the ring's thickness never binds in the narrowest groove."""

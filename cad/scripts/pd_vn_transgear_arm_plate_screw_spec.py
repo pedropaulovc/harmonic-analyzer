@@ -108,12 +108,12 @@ CUT_END_BREAK_MAX = 0.1016  # .004
 CUT_PROUD_MAX = 0.2032  # .008
 
 # The views show the screw as cut, shorter than the ITEM row's 1 in stock
-# (machinist review round 3); its length is the MHA-PD-00 cut step's.
+# (machinist review round 3); its length is the MHA-PD-00 cut step's.  Three
+# lines: no more fit beside the purchased sheet's general line (rule 7).
 PURCHASED_STOCK_NOTE = "\n".join((
     "CUT TO LENGTH AND BREAK THE CUT END AT ASSEMBLY (MHA-PD-00 CUT STEP,",
     "BEFORE THE GUIDE-LOCK SWEEP), SO THE TIP CLEARS THE SWEEP AND THE",
-    "THREAD STAYS FULLY ENGAGED IN THE MHA-PD-18 ARM.",
-    "THE VIEWS SHOW THE SCREW AS CUT.",
+    "THREAD STAYS FULLY ENGAGED IN THE MHA-PD-18 ARM. VIEWS SHOW IT AS CUT.",
 ))
 
 

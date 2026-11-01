@@ -54,6 +54,7 @@ import _telemetry
 from build_pd_platen_guide import (
     GUIDE_LENGTH,
     HOLE_X as REAR_X,
+    ISOMETRIC_VIEW_SCALE,
     SCREW_STATION_X as FRONT_X,
 )
 from pd_platen_guide_spec import (
@@ -122,15 +123,16 @@ DATUM_B_SYMBOL_X_M = FRONT_LEFT_X_M + (FRONT_X[2] + FRONT_X[3]) / 2000.0
 # The bar-slide finish lands on the bottom edge (model y 0, front face z 0)
 # midway between the A1 and A2 axes, clear of both centre marks. The landing
 # is projected from the model at draw time. The symbol is anchored at its
-# lower-left. At the default text height its "SLIDES ON MHA-PD-07" line stood
-# ~7 mm tall and its long leg crossed its own leader, which dropped from the
-# landing past the symbol's right side (machinist review round 3). At 2.5 mm
-# text (the house finish height, draw_ch_channel_lever) the symbol stands ~7
-# mm tall and right of the landing, so the leader reaches it from the left,
-# clear of the long leg, and its line ends under the tags (box bottom ~100.2
-# mm), left of datum B's tag.
+# lower-left. At the default text height its long leg crossed its own leader,
+# which dropped from the landing past the symbol's right side (machinist
+# review round 3). At 2.5 mm text (the house finish height,
+# draw_ch_channel_lever) right of the landing, the leader reaches it from the
+# left, clear of the long leg. Its "SLIDES ON MHA-PD-07" line tops out ~10 mm
+# above the anchor: anchored at y 0.090 it ran under the A2/A4 tags (box
+# bottom ~99.6 mm) and they printed on "MHA" and "-07" (round 4). At y 0.075
+# it tops out ~85 mm, in the empty field under the front view.
 BAR_SLIDE_STATION_MM = (FRONT_X[0] + REAR_X[0]) / 2.0
-BAR_SLIDE_FINISH_XY = (FRONT_LEFT_X_M + BAR_SLIDE_STATION_MM / 1000.0 + 0.003, 0.090)
+BAR_SLIDE_FINISH_XY = (FRONT_LEFT_X_M + BAR_SLIDE_STATION_MM / 1000.0 + 0.003, 0.075)
 FINISH_CHAR_HEIGHT = 0.0025
 # The position frame names the parts whose holes the 9X taps must match
 # (machinist review round 3: a frame and basic table with no mating pattern
@@ -149,9 +151,13 @@ DEPTH_TEXT_XY = (0.341, 0.085)
 # margin enforced by the sheet audit.
 HOLE_TABLE_X_M = 0.020
 HOLE_TABLE_Y_M = 0.258
-ISO_CENTER = (0.375, 0.150)
-ISO_SCALE = (1, 4)
-ISO_NOTE_XY = (0.342, 0.128)
+# The isometric at 1:2 (~100 x 60 mm) fills the empty field over the right
+# view, right of the hole table (ends x ~0.165) and inside the right border;
+# its note (left-anchored, ~61 mm) stands centred under it, over the right
+# view.
+ISO_CENTER = (0.355, 0.185)
+ISO_SCALE = ISOMETRIC_VIEW_SCALE
+ISO_NOTE_XY = (0.3245, 0.150)
 THREAD_DESIGNATION = f"{TAPPED_HOLE_SPEC.size} UNC-{TAPPED_HOLE_SPEC.thread_class}"
 THREAD_MAJOR_DIA_MM = THREAD_MAJOR_MM[TAPPED_HOLE_SPEC.size]
 THREAD_PITCH_MM = 25.4 / int(TAPPED_HOLE_SPEC.size.rsplit("-", 1)[1])

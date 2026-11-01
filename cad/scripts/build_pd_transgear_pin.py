@@ -77,6 +77,7 @@ from pd_transgear_pin_spec import (
     HEAD_LAND,
     ISOMETRIC_VIEW_NOTE,
     OVERALL_LENGTH,
+    SEAT_FILLET_R,
     SURFACE_FINISHES,
     TIP_DOME_R,
     TIP_DOME_SAG,
@@ -105,7 +106,16 @@ def _cap_volume(sag: float, sphere_r: float) -> float:
 
 V_HEAD_DOME = _cap_volume(HEAD_DOME_SAG, HEAD_DOME_R)
 V_TIP_DOME = _cap_volume(TIP_DOME_SAG, TIP_DOME_R)
-V_TOTAL = V_PROFILE + V_HEAD_DOME + V_TIP_DOME
+# Pappus: the seat root's spandrel r^2 (1 - pi/4), its centroid
+# r (10 - 3 pi) / (3 (4 - pi)) out from the shank, revolved about the axis.
+V_SEAT_FILLET = (
+    2.0
+    * math.pi
+    * (R_SHANK + SEAT_FILLET_R * (10.0 - 3.0 * math.pi) / (3.0 * (4.0 - math.pi)))
+    * SEAT_FILLET_R**2
+    * (1.0 - math.pi / 4.0)
+)
+V_TOTAL = V_PROFILE + V_HEAD_DOME + V_TIP_DOME + V_SEAT_FILLET
 
 
 class StationAnchor(Enum):
@@ -244,6 +254,7 @@ async def build(adapter) -> dict[str, str]:
         ("FrontLand", FRONT_LAND),
         ("HeadDomeSag", HEAD_DOME_SAG),
         ("TipDomeSag", TIP_DOME_SAG),
+        ("SeatRadius", SEAT_FILLET_R),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -349,6 +360,20 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Pin")
     volume = await volume_check(
         adapter, "stepped pin with its groove", V_PROFILE, 0.005 * V_PROFILE
+    )
+
+    # --- Seat root: the tool-nose radius the print allows (R MAX) ---------------
+    # Picked on the circular edge where the shank meets the seat face at
+    # z = 0: the only edge through that point.
+    check(
+        "fillet seat root",
+        await adapter.add_fillet(SEAT_FILLET_R, [[R_SHANK, 0.0, 0.0]]),
+    )
+    name_last_feature(adapter, "SeatFillet")
+    fillet_dim = name_dimensions(adapter, "SeatFillet", ["SeatRadius"])
+    drive_jobs.append((fillet_dim[0], '"SeatRadius"'))
+    volume = await volume_check(
+        adapter, "seat root fillet", volume + V_SEAT_FILLET, 0.005 * V_PROFILE
     )
 
     # --- Spherical ends ----------------------------------------------------------

@@ -7,6 +7,7 @@ import sys
 from typing import Any
 
 import _telemetry
+from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _part_properties import part_drawing_unit
@@ -20,6 +21,9 @@ from _mcmaster_91794a055 import (
     SUPPLIER_REFERENCE_SIDES,
     SUPPLIER_REFERENCE_FORMATS,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_disc_screw"]

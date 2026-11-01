@@ -224,14 +224,15 @@ SIDE_KEEP = {
 # Datum A on the bore's round side, its symbol right of the flange, in the
 # lane between the face view and the edge view's Ø.52: SolidWorks' own
 # placement of an axis datum put the tag inside the flange, on the
-# lower-left hole (machinist review).  The leader lands on the bore's 15°
-# point, above the face view's horizontal centreline and the lower-right
-# hole's centre mark.
-_BORE_SHEET_R = BORE_DIA / 2.0 * _S
-DATUM_A_LANDING = (
-    END_CENTER[0] + _BORE_SHEET_R * math.cos(math.radians(15.0)),
-    AXIS_Y + _BORE_SHEET_R * math.sin(math.radians(15.0)),
-)
+# lower-left hole (machinist review).  The leader lands on the bore's point
+# opposite the flat (model +Y, sheet 3 o'clock), projected from the model so
+# the view's placement cannot move it.  That is the D-bore arc's midpoint:
+# a landing at 15° printed 0.2 mm along the arc, at 15.95° (run
+# 20261101T070124857Z), which fits a snap to the arc's tessellation, its
+# vertices every 303.7°/38 from the flat's corners -- the midpoint is one.
+# The leader climbs from it to the symbol above the lower-right hole's
+# centre mark.
+DATUM_A_MODEL_POINT = (0.0, BORE_DIA / 2000.0, HUB_FRONT_Z / 1000.0)
 DATUM_A_SYMBOL = (END_CENTER[0] + _FLANGE_R + 0.014, AXIS_Y + 0.015)
 DIMENSION_CALLOUTS_BELOW = {
     "BoreDia": BORE_CALLOUT,
@@ -586,7 +587,9 @@ async def build(adapter: Any) -> dict[str, str]:
         end,
         entity=visible_circle_edge(adapter, end, BORE_DIA),
         symbol_xy=DATUM_A_SYMBOL,
-        leader_attach_xy=DATUM_A_LANDING,
+        leader_attach_xy=model_point_in_view(
+            adapter, end, DATUM_A_MODEL_POINT, label="hub datum A landing"
+        ),
         datum=BORE_DATUM,
         label="hub bore axis",
     )
