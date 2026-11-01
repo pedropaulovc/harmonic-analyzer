@@ -564,10 +564,12 @@ def _sibling_view(first, name, configuration="SupplierReference"):
         pytest.param(
             False,
             "free_top",
-            chain_dimensions.SUPPLIER_MARGINS,
+            # A 4 mm TOP lane (the connecting link's margins before it moved
+            # to a 2:1 fit): shorter than the native outline floor.
+            {"free_top": (0.030, 0.016, 0.045, 0.020)},
             ((0.002, 0.001), (0.015, 0.001), (0.015, 0.0025), (0.002, 0.0025)),
             (0.132, 0.004),
-            id="chain-top",
+            id="short-top",
         ),
     ],
 )

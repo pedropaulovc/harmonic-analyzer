@@ -20,7 +20,12 @@ from _supplier_chain_dimensions import (
     annotate_chain_stock,
     prepare_chain_diagrams,
 )
-from _supplier_chain_stock import SUPPLIER_REFERENCE_CONFIGURATION
+from _supplier_chain_stock import (
+    PIN_DIAMETER,
+    PITCH,
+    ROLLER_DIAMETER,
+    SUPPLIER_REFERENCE_CONFIGURATION,
+)
 from _supplier_spring_drawing import build_supplier_spring_drawing
 
 
@@ -29,10 +34,18 @@ PART_STEM = SPEC.artifact_stem
 # Pitch is a native model dimension on the nominal supplier diagram.
 ITEM = "ANSI #25 ROLLER CHAIN"
 # The 40-mm Top band needs room for the actual width gauge, not a 4-mm slot
-# left by the generic family padding. Keep the wider left text shelf reserved.
+# left by the generic family padding. Each diagram centres its own ink in its
+# cell, so the Top cell's centre moves right by the roller circle's offset from
+# the FRONT ink's centre (pin left edge to roller right edge) at the 5:1 fit:
+# the roller-width square then sits over the Ø.130 roller circle (machinist
+# review of 892b7f640). The left lane keeps the width text shelf.
+_TOP_SCALE = 5
+_ROLLER_FROM_FRONT_CENTRE = (
+    PITCH - (PITCH + ROLLER_DIAMETER / 2 - PIN_DIAMETER / 2) / 2
+) / 1000 * _TOP_SCALE
 _CHAIN_SUPPLIER_MARGINS = {
     **SUPPLIER_MARGINS,
-    "free_top": (0.050, 0.010, 0.045, 0.010),
+    "free_top": (0.030 + 2 * _ROLLER_FROM_FRONT_CENTRE, 0.010, 0.030, 0.010),
 }
 _MEMBER_QUANTITIES = _config.parts(SPEC.source.stem)["configuration_quantities"]
 VARIANTS = (

@@ -11,7 +11,9 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
+from solidworks_mcp.adapters.sw_type_info import constant
 
+import _telemetry
 from _com import _early_bound
 from _drawing_dimensions import offset_dimension_text
 from _drawing_hidden_sketches import _show_hidden_owners, curate_view_dimensions
@@ -30,12 +32,85 @@ SOURCE_FEATURES = {
     "free_top": (stock.SECTION_FEATURE,),
 }
 
+# The TOP lane keeps 10 mm above and below the source ink: the connecting
+# link's 8.5 mm pin length then fits at 2:1 in the 40 mm cell, not 1:4.
 SUPPLIER_MARGINS = {
     "free_front": (0.030, 0.020, 0.030, 0.020),
-    "free_top": (0.030, 0.016, 0.045, 0.020),
+    "free_top": (0.030, 0.010, 0.045, 0.010),
 }
+# The diagram sketches are construction geometry (the zero-body diagram
+# contract). Construction curves print continuous in this SLDDRW, as
+# _supplier_wire_stock_drawing does, but that preference leaves them grey and
+# 0.13 mm (farm run 20261101T050059613Z), and a line format on the selected
+# SKETCH does not reach its segments (run 20261101T054738142Z). Each view
+# instance of each diagram segment therefore gets the outline's black and
+# Thick weight, as draw_ch_fulcrum_keeper blackens its reference lines, so
+# the roller and pin outlines print as the diagram's edges. The installed
+# pictorial keeps its sketches blanked.
+_CONSTRUCTION_LINE_STYLE = ("swLineFontConstructionCurvesStyle", "swLineCONTINUOUS")
+_OUTLINE_COLOR = 0  # COLORREF black
+_SW_LW_THICK = 2  # swLineWeights_e.swLW_THICK
 
 
+@_telemetry.traced("drawing.supplier_chain_line_font")
+def _construction_curves_continuous(adapter: Any) -> Callable[[], None]:
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    option = constant("swDetailingNoOptionSpecified")
+    name, style = _CONSTRUCTION_LINE_STYLE
+    preference, value = constant(name), constant(style)
+
+    @_telemetry.traced("drawing.supplier_chain_line_font_readback")
+    def readback() -> None:
+        if int(extension.GetUserPreferenceInteger(preference, option)) != value:
+            raise RuntimeError(f"chain diagram line font {name} readback differs")
+
+    if not extension.SetUserPreferenceInteger(preference, option, value):
+        raise RuntimeError(f"failed to set chain diagram line font {name}")
+    readback()
+    return readback
+
+
+@_telemetry.traced("drawing.supplier_chain_outline")
+def _format_as_outline(adapter: Any, view: Any, sketches: tuple[str, ...]) -> None:
+    """Black, Thick line format on every segment of ``sketches`` in ``view``.
+
+    ``view`` must be the active drawing view.
+    """
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    native = _early_bound(view, "IView")
+    part = _early_bound(native.ReferencedDocument, "IPartDoc")
+    selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    formatted = 0
+    for name in sketches:
+        feature = part.FeatureByName(name)
+        if feature is None:
+            raise RuntimeError(f"chain diagram sketch {name!r} is missing")
+        sketch = _early_bound(
+            _early_bound(feature, "IFeature").GetSpecificFeature2(), "ISketch"
+        )
+        segments = tuple(sketch.GetSketchSegments() or ())
+        if not segments:
+            raise RuntimeError(f"chain diagram sketch {name!r} has no segments")
+        draw.ClearSelection2(True)
+        data = selection.CreateSelectData()
+        data.View = native
+        for index, raw in enumerate(segments):
+            in_view = native.GetCorresponding(_early_bound(raw, "ISketchSegment"))
+            if in_view is None or not _early_bound(in_view, "ISketchSegment").Select4(
+                index > 0, data
+            ):
+                raise RuntimeError(f"cannot select {name!r} segment {index} in its view")
+        if int(selection.GetSelectedObjectCount2(-1)) != len(segments):
+            raise RuntimeError(f"{name!r}: not every segment is selected")
+        drawing.SetLineColor(_OUTLINE_COLOR)
+        drawing.SetLineWidth(_SW_LW_THICK)
+        draw.ClearSelection2(True)
+        formatted += len(segments)
+    _telemetry.annotate(sketches=len(sketches), segments=formatted)
+
+
+@_telemetry.traced("drawing.supplier_chain_prepare")
 def prepare_chain_diagrams(
     adapter: Any,
     views: Mapping[str, Any],
@@ -43,6 +118,7 @@ def prepare_chain_diagrams(
     reference_bounds: Callable[[str], tuple[float, float, float, float]],
 ) -> tuple[Callable[[], None], ...]:
     """Show the source sketch owners before scale selection, not afterward."""
+    line_style = _construction_curves_continuous(adapter)
     for key, owners in SOURCE_FEATURES.items():
         view = _early_bound(views[key], "IView")
         if str(view.ReferencedConfiguration) != stock.SUPPLIER_REFERENCE_CONFIGURATION:
@@ -50,9 +126,11 @@ def prepare_chain_diagrams(
         shown = _show_hidden_owners(adapter, view, owners, view_label=key)
         if tuple(shown) != owners:
             raise RuntimeError(f"{key}: supplier diagram sketch is not saved hidden")
-    return ()
+        _format_as_outline(adapter, view, owners)
+    return (line_style,)
 
 
+@_telemetry.traced("drawing.supplier_chain_dimensions")
 def annotate_chain_stock(
     adapter: Any,
     views: Mapping[str, Any],
@@ -66,11 +144,11 @@ def annotate_chain_stock(
         (
             stock.ROLLER_DIMENSION,
             stock.ROLLER_DIAMETER,
-            3 if connecting else 2,
+            3,
             "diameter",
             "FOR ROLLER" if connecting else "ROLLER",
         ),
-        (stock.PITCH_DIMENSION, stock.PITCH, 3 if connecting else 2, "length", "PITCH"),
+        (stock.PITCH_DIMENSION, stock.PITCH, 3, "length", "PITCH"),
     )
     top = (
         (
@@ -93,6 +171,11 @@ def annotate_chain_stock(
             ),
         )
     expected_by_view = {"free_front": front, "free_top": top}
+    # Sheet-metre x offsets from each TOP dimension line to its shelved text.
+    shelves = {stock.WIDTH_DIMENSION: -0.024}
+    if connecting:
+        shelves[stock.PLATE_DIMENSION] = -0.010
+        shelves[stock.LENGTH_DIMENSION] = 0.024
     options_by_view = {}
     for key, rows in expected_by_view.items():
         view = _early_bound(views[key], "IView")
@@ -107,9 +190,19 @@ def annotate_chain_stock(
         else:
             positions = {stock.WIDTH_DIMENSION: (xmin - 0.014, middle[1])}
             if connecting:
+                # The TOP ink runs roller (x 0) to pin (3 pitches), so the plate
+                # span (1 pitch) is a third of the way across; its outline runs
+                # right of it. The plate dimension line stands 3 mm left of the
+                # span. The span is too short for inside arrows, and left to
+                # itself SolidWorks hung the two-row REF on whichever side it
+                # chose (left at 1:4, over the pin outline at 2:1, run
+                # 20261101T075339529Z), so it is shelved up-left over the
+                # roller, short of the roller-width line, inside the 40 mm
+                # TOP cell.
+                plate_x = xmin + (xmax - xmin) / 3.0
                 positions.update(
                     {
-                        stock.PLATE_DIMENSION: (middle[0], ymax + 0.008),
+                        stock.PLATE_DIMENSION: (plate_x - 0.003, ymax + 0.004),
                         stock.LENGTH_DIMENSION: (xmax + 0.020, middle[1]),
                     }
                 )
@@ -141,14 +234,17 @@ def annotate_chain_stock(
             }
             supplier_reference_dimension(adapter, display, **options[name])
         options_by_view[key] = options
-        if key == "free_top" and not connecting:
-            # Keep the native vertical line/witnesses where curation put them;
-            # shelf the complete two-row width label to their left.
-            width_x, width_y = positions[stock.WIDTH_DIMENSION]
+        if key == "free_top":
+            # Keep the native vertical lines/witnesses where curation put them;
+            # shelf the complete two-row labels off them: width to the left,
+            # plate up-left over the roller, pin length to the right.
             offset_dimension_text(
                 adapter,
                 imported,
-                {stock.WIDTH_DIMENSION: (width_x - 0.024, width_y)},
+                {
+                    name: (positions[name][0] + dx, positions[name][1])
+                    for name, dx in shelves.items()
+                },
             )
 
     expected = {
@@ -165,6 +261,7 @@ def annotate_chain_stock(
         for key, view in views.items()
     }
 
+    @_telemetry.traced("drawing.supplier_chain_settled")
     def settled() -> None:
         found = reacquire_supplier_dimensions(
             adapter,
@@ -187,13 +284,9 @@ def annotate_chain_stock(
                         f"{name}: unprovided supplier tolerance appeared"
                     )
                 assert_supplier_reference_dimension(adapter, display, **presentation)
-                if (
-                    name == stock.WIDTH_DIMENSION
-                    and not connecting
-                    and display.OffsetText is not True
-                ):
+                if name in shelves and display.OffsetText is not True:
                     raise RuntimeError(
-                        f"{name}: roller width text returned to its native dimension line"
+                        f"{name}: supplier text returned to its native dimension line"
                     )
 
     return (settled,)
