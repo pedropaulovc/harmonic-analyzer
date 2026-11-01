@@ -180,15 +180,18 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
     # The diameter approach may cross genuine witness extensions (rule 14),
     # but never a dimension line, another text row or the shoulder's text.
     "PinHoleDia": _xy(-339.0, -106.3),
-    # The spots: each its own diameter callout; HUB's right of its axis
-    # above, CL's in the plate's free band under the pin line (above the
-    # plate the A1 baselines cross CL's old leader), each by Y right/left.
-    # Round 4: the mr3 strap row made HUB's block three rows deep and its
-    # last row sat on the +Y edge (sheet y 217.4); 12 model mm up (6 sheet)
-    # stands it ~5 clear, left of the riser callout (x ~275) and right of
-    # RiserX1's extension line (x ~202).
+    # The spots: each its own diameter callout, both outside the plate
+    # (rule 14). Round 4: the mr3 strap row made HUB's block three rows deep
+    # and its last row sat on the +Y edge (sheet y 217.4); 12 model mm up
+    # (6 sheet) stands it ~5 clear, left of the riser callout (x ~275) and
+    # right of RiserX1's extension line (x ~202). CL's (mr4: inside the
+    # plate) is two rows, its one callout row ~84 wide, centred at sheet
+    # (210.5, 256.5): above the 7.287 text (top ~247) and the 4.154 lane
+    # (y 250), right of the 4.154 text (x ~153) and RiserX2's extension line
+    # (x 162), under the border; its leader runs down-left to the spot,
+    # crossing extension lines and the 7.287 dimension line only.
     "SpotDia": _xy(50.0, 110.0),
-    "SpotDiaCl": _xy(-102.0, -20.8),
+    "SpotDiaCl": _xy(-23.0, 163.0),
     # Carrier r13: a single-row text within its span stands clear of both
     # arrows (3.56 long): at y 192 the 45.53's top arrow ran into it and at
     # 161.5 the 38.00's bottom arrow struck it. HUB's text is at y 189, 3.7
