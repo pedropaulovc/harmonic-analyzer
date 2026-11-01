@@ -282,9 +282,10 @@ SECTION_KEEP_MODEL_MM: dict[str, tuple[float, float, float]] = {
 }
 # Machinist review (3 runs FIX): with its text beside the slab, the chamfer's
 # dimension line ran back along the underside as the text's shelf. The text
-# now hangs under the slab, A1's +X side (sheet ~121..178 x 15..29), on a
+# now hangs under the slab, A1's +X side (sheet ~121..178 x 16.5..30.5,
+# its underline 3.8 mm over the inner border: review at bccedc541), on a
 # short angled OffsetText leader from that line (the text centres on it).
-SECTION_CHAMFER_TEXT_MODEL_MM = (_A1[0] + 10.5, -part_spec.THICKNESS - 4.0, 0.0)
+SECTION_CHAMFER_TEXT_MODEL_MM = (_A1[0] + 10.5, -part_spec.THICKNESS - 3.5, 0.0)
 # The thickness's extension lines from its lane (4 model mm, 12 sheet mm,
 # outside the slab's -X end) stop 1.5 sheet mm short of the slab: sheet m.
 STOCK_WITNESS_MAX_M = (
