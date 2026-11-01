@@ -39,9 +39,11 @@ HUB_SEAT_CALLOUT = "\n".join(
 # hole is in the hub, open toward the arm's outboard face: pressing the hub
 # out slides it off the pin, which then lifts out of the arm's half-hole --
 # the drive-fit pin's way out (#984 machinist review r1, blind-hole finding).
+# The depth only has to take the pin, so it prints at the title block's .XX
+# (machinist review of the first inch sheet: .157 was over-specified).
 SEAM_CALLOUT = "\n".join(
     (
-        f"(<MOD-DIAM>{_inch(AXIAL_PIN_DIA, 3)}) <HOLE-DEPTH> {_inch(AXIAL_PIN_LENGTH, 3)}",
+        f"(<MOD-DIAM>{_inch(AXIAL_PIN_DIA, 3)}) <HOLE-DEPTH> {_inch(AXIAL_PIN_LENGTH, 2)}",
         "MATCH-DRILL/REAM WITH MHA-DT-31 AT ASSEMBLY,",
         "CENTRED ON THE SEAM, FOR MHA-DT-VN-59 AXIAL PIN:",
         "LIGHT DRIVE FIT; PRESSING MHA-DT-31 OUT FREES THE PIN",
