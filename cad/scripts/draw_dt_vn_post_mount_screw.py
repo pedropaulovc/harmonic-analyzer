@@ -138,7 +138,6 @@ from dt_vn_post_mount_screw_spec import (
     FRONT_VIEW_DIMENSIONS,
     HEAD_H_MM,
     SKU,
-    SUPPLIER_MODEL_NOTE,
     SUPPLIER_PRECISION,
     SUPPLIER_PROFILE_DIMENSIONS,
     SUPPLIER_REFERENCE_DIMENSIONS,
@@ -147,7 +146,6 @@ from dt_vn_post_mount_screw_spec import (
     SUPPLIER_STOCK_CONFIGURATION,
     SUPPLIER_STOCK_DIMENSIONS,
     SUPPLIER_STOCK_FEATURE,
-    SUPPLIER_STOCK_NOTE,
     SUPPLIER_STOCK_TITLE,
     SUPPLIER_THREAD_MAJOR_DIMENSION,
     THREAD_DIA_MM,
@@ -184,20 +182,23 @@ FRONT_KEEP = {
 }
 DIMENSION_CALLOUTS = {CUT_LENGTH_DIMENSION: CUT_TO_FIT_CALLOUT}
 
-# The 10:1 tip view (a cropped model view that reads as detail A): its crop
-# centres on the axis 1 mm above the cut end with a 3.6 mm fence, so both
-# ends of the break's radial leg (r 3.075 and 3.175 on the end face) sit
+# The 20:1 tip view (a cropped model view that reads as detail A): its crop
+# centres on the axis 0.5 mm above the cut end with a 3.48 mm fence, so both
+# ends of the break's radial leg (r 3.099 and 3.175 on the end face) sit
 # inside the crop -- a cropped view drops any dimension whose reference lies
-# outside it.  It sits between the Front view and the isometric, above the
-# note block and clear of the title block.  TIP_DETAIL keeps the sheet
-# constants: the crop fence, the label's place and the Front letter's offset.
-DETAIL_SCALE = (10.0, 1.0)
-DETAIL_FENCE_MM = 3.6
-DETAIL_OFFSET_MM = 1.0
+# outside it.  At 20:1 the .003 break is 1.5 mm on paper, so its extension
+# lines visibly land on the break's two edges (10:1 left them 0.76 mm apart,
+# reading as landing on nothing).  It sits between the Front view and the
+# isometric, above the note block and clear of the title block.  TIP_DETAIL
+# keeps the sheet constants: the crop fence, the label's place and the Front
+# letter's offset.
+DETAIL_SCALE = (20.0, 1.0)
+DETAIL_FENCE_MM = 3.48
+DETAIL_OFFSET_MM = 0.5
 # A sheet circle (the tip crop fence, the Front's tip mark) must land within
 # this of its ask, in sheet metres; a snapped circle misses by a millimetre.
 CIRCLE_TOL_M = 0.00005
-DETAIL_CENTER = (0.190, 0.175)
+DETAIL_CENTER = (0.185, 0.192)
 DETAIL_RADIUS = DETAIL_FENCE_MM * DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
 TIP_DETAIL = TrimSheet(
     sheet_scale=SHEET_SCALE,
@@ -208,7 +209,7 @@ TIP_DETAIL = TrimSheet(
     detail_offset_mm=DETAIL_OFFSET_MM,
     detail_label_xy=(
         DETAIL_CENTER[0] - 0.020,
-        DETAIL_CENTER[1] - DETAIL_RADIUS - 0.010,
+        DETAIL_CENTER[1] - DETAIL_RADIUS - 0.007,
     ),
     parent_letter_offset=(0.008, 0.006),
 )
@@ -257,7 +258,9 @@ STOCK_CENTER = (0.235, 0.110)
 STOCK_KEEP = {
     "SupplierStockLength": (0.235, 0.083),
     "SupplierThreadLength": (0.303, 0.151),
-    "SupplierThreadMajor": (0.366, 0.116),
+    # Right of the screw end's extension line (x ~0.343) and below the major's
+    # own extension lines, so its dimension line stops short of the text.
+    "SupplierThreadMajor": (0.366, 0.094),
 }
 STOCK_HEAD_SCALE = (6.0, 1.0)
 STOCK_HEAD_CENTER = (0.100, 0.200)
@@ -274,8 +277,6 @@ STOCK_VIEW_CELL = (0.115, 0.073, 0.410, 0.177)
 STOCK_HEAD_CELL = (0.018, 0.142, 0.193, 0.264)
 STOCK_NOTES = (
     (SUPPLIER_STOCK_TITLE, 0.200, 0.258, (0.195, 0.247, 0.415, 0.264)),
-    (SUPPLIER_STOCK_NOTE, 0.016, 0.062, (0.014, 0.045, 0.2155, 0.065)),
-    (SUPPLIER_MODEL_NOTE, 0.200, 0.225, (0.195, 0.195, 0.415, 0.240)),
     (
         f"SLOT-PLANE HEAD ENVELOPE  SCALE {STOCK_HEAD_SCALE[0]:g}:{STOCK_HEAD_SCALE[1]:g}",
         0.030, 0.139, (0.018, 0.128, 0.193, 0.142),
@@ -1829,7 +1830,6 @@ async def _build_read_only_source(adapter, source_model, source_sha256):
         "Supplier",
         "Supplier SKUs",
         "Manufacturing Notes",
-        "Supplier Geometry Status",
         "Supplier Reference Source",
         "Supplier Reference Title",
     )
