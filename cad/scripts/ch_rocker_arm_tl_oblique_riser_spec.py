@@ -50,7 +50,9 @@ Holes, all THRU from the top face:
 * CL and CR clearance Ø.257 (letter F) at ``CL`` / ``CR`` ⚙: pass the CL
   1/4 dowel (.2503 max) and the CR 1/4-20 clamp screw (.250 major), and leave
   ``CLAMP_BAND_WALLS`` to the self-cut band at the top of the DRILLED HOLES
-  band. The hole cannot grow: the outer band wall sits on the .080 target.
+  band. The outer band wall falls under the .080 target, over the .060
+  floor: a stated shortfall, ``CLAMP_WALL_MIN_TEXT`` on the CL/CR callout
+  (owner ruling 6, 2026-11-01; RV-01).
 
 The self-cut band (not modelled): the jig cuts the riser in place on its first
 passes with the 9/16 riser cutter, leaving an arc band between
@@ -59,8 +61,9 @@ about the arc centre. This part models the faced and milled blank only. The
 screws lie on the band's centreline ``RISER_SCREW_RADIUS`` R808.0 ⚙; the
 rule-17 walls from each countersink mouth (``RISER_CSK_DIA`` ⚙ at its band's
 top, the carrier tap at its station band's edges) to the band edges are
-``RISER_SCREW_WALLS`` ⚙. The CL/CR walls take no position error: the holes
-are spotted from the carrier and the jig makes the cut. The HUB clearance hole
+``RISER_SCREW_WALLS`` ⚙. The CL/CR walls take the carrier stations' error
+about the cut's centre (``CLAMP_STATION_ERROR``): the holes are spotted
+through the carrier's, which its sheet locates from A1. The HUB clearance hole
 severs the band into two halves, each held by two screws.
 
 No tight bands: every hole size is a clearance at title-block tolerance.
@@ -74,7 +77,7 @@ import _config
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
-from _inch_wall_limits import WALL_TARGET_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import angular_band_deg, drilled_oversize_mm, printed_band_mm
 
@@ -182,18 +185,53 @@ for _wall, _mm in WALLS_MM.items():
     if _mm < WALL_TARGET_MM:
         raise AssertionError(f"riser {_wall} wall {_mm:.3f} under rule 17's .080")
 
-# CL and CR sit on the hub radius inside the self-cut band. Spotted from the
-# carrier, cut by the jig: no position error, the drill at its band's top.
+# CL and CR sit on the hub radius inside the self-cut band, the drill at its
+# band's top. Spotted through the carrier's holes, each carries the carrier
+# station's error about the cut's centre C (trammel.ARC_CENTRE): its X and Y
+# title-block bands, X also half the D1 band (C stands D1/2 from A1, as
+# carrier.RISER_WALLS_FROM_A1), each times its direction cosine to C.
 _CLAMP_R_MAX = (CLAMP_DIA + DRILLED_BAND[0]) / 2.0
 _CLAMP_RADIUS = math.dist(trammel.CL, trammel.ARC_CENTRE)
 if abs(math.dist(trammel.CR, trammel.ARC_CENTRE) - _CLAMP_RADIUS) > 1e-9:
     raise AssertionError("CL and CR are not on one radius")
-CLAMP_BAND_WALLS = (
-    _CLAMP_RADIUS - _CLAMP_R_MAX - trammel.RISER_INNER_RADIUS,
-    trammel.RISER_OUTER_RADIUS - _CLAMP_RADIUS - _CLAMP_R_MAX,
+
+
+def _radial_station_error(
+    point: tuple[float, float], x_name: str, y_name: str
+) -> float:
+    """The carrier station's worst radial error about C at ``point``."""
+    places = carrier.DRAWING_PRECISION_BY_NAME
+    x_band = (
+        printed_band_mm(places[x_name], unit=carrier.UNIT) + carrier.POSITION_BAND / 2.0
+    )
+    y_band = printed_band_mm(places[y_name], unit=carrier.UNIT)
+    dx, dy = (abs(p - c) for p, c in zip(point, trammel.ARC_CENTRE, strict=True))
+    return (dx * x_band + dy * y_band) / _CLAMP_RADIUS
+
+
+CLAMP_STATION_ERROR = max(
+    _radial_station_error(trammel.CL, "ClX", "ClY"),
+    _radial_station_error(trammel.CR, "CrX", "CrY"),
 )
-if min(CLAMP_BAND_WALLS) < WALL_TARGET_MM:
-    raise AssertionError("a riser CL/CR hole breaks rule 17's .080 band wall")
+CLAMP_BAND_WALLS = (
+    _CLAMP_RADIUS - _CLAMP_R_MAX - CLAMP_STATION_ERROR - trammel.RISER_INNER_RADIUS,
+    trammel.RISER_OUTER_RADIUS - _CLAMP_RADIUS - _CLAMP_R_MAX - CLAMP_STATION_ERROR,
+)
+# Rule 17 / 20 (owner ruling 6, 2026-11-01, the PN-01 precedent): the outer
+# wall's shortfall under the .080 target, over the .060 floor, is accepted and
+# stated as plain fact on the CL/CR callout, floored to three places (a MIN
+# never rounds up). The window refuses both a wall under the floor and a
+# stale statement once the wall reaches the target.
+if not WALL_FLOOR_MM < min(CLAMP_BAND_WALLS) < WALL_TARGET_MM:
+    raise AssertionError(
+        "the riser CL/CR band wall no longer matches its stated shortfall"
+    )
+CLAMP_WALL_MIN = (
+    math.floor(min(CLAMP_BAND_WALLS) / trammel.INCH * 1000.0 + 1e-9)
+    / 1000.0
+    * trammel.INCH
+)
+CLAMP_WALL_MIN_TEXT = f"WALL {carrier.inch_text(CLAMP_WALL_MIN, 3)} MIN TO CUT EDGE"
 # The smallest drilled hole passes the largest mate.
 CL_DOWEL_MAX = carrier.CL_DOWEL_DIA + carrier.CL_DOWEL_BAND[0]
 CR_SCREW_MAJOR = THREAD_MAJOR_MM[carrier.CR_THREAD]
@@ -315,7 +353,9 @@ HOLE_CALLOUTS = ("ScrewDia", "HubDia", "ClampDia")
 CALLOUTS_BELOW = {
     "ScrewDia": f"DRILL THRU\n{CSK_CALLOUT}\n{LOCATE_CALLOUT}",
     "HubDia": f"DRILL THRU\nHUB HOLE\n{LOCATE_CALLOUT}",
-    "ClampDia": f"DRILL THRU\nCL AND CR HOLES\n{LOCATE_CALLOUT}",
+    "ClampDia": (
+        f"DRILL THRU\nCL AND CR HOLES\n{CLAMP_WALL_MIN_TEXT}\n{LOCATE_CALLOUT}"
+    ),
 }
 
 SURFACE_FINISHES = ()
