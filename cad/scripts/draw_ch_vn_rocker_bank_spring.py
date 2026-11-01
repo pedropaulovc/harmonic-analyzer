@@ -10,6 +10,7 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _supplier_disc_spring_drawing import (
     prepare_supplier_disc_diagram,
@@ -22,6 +23,7 @@ import ch_vn_rocker_bank_spring_spec as supplier_spec
 
 
 SPEC = DRAWINGS_BY_NAME["ch_vn_rocker_bank_spring"]
+MACHINIST_REVIEW = MachinistReviewMode.LEARN
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "WAVE DISC SPRING"
 
