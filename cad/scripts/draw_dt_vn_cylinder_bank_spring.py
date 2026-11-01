@@ -108,11 +108,11 @@ WITNESS_OVERSHOOT_M = 0.001
 # every arrowhead is 3.556 mm long and 0.762 mm wide (GetArrowHeadAtIndex2);
 ARROW_LENGTH_M = 0.003556
 ARROW_WIDTH_M = 0.000762
-# cap height, and the printed width of "(0.050 in)" and of
-# "(Ø0.385 ±0.010 in)" / "(Ø0.500 ±0.010 in)" (their runs' native widths).
+# cap height, and the printed width of "(.050 in)" and of
+# "(Ø.385 ±.010 in)" / "(Ø.500 ±.010 in)" (their runs' native widths).
 TEXT_HEIGHT_M = 0.0035
-HEIGHT_TEXT_WIDTH_M = 0.0227354
-DIAMETER_TEXT_WIDTH_M = 0.0030139 + 0.0052784 + 0.0352139
+HEIGHT_TEXT_WIDTH_M = 0.0201493
+DIAMETER_TEXT_WIDTH_M = 0.0030139 + 0.0052784 + 0.0300417
 
 
 def _centre(bounds: tuple[float, float, float, float]) -> tuple[float, float]:
