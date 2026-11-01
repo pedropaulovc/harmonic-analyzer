@@ -1,7 +1,7 @@
 pn-pen-hanger:
   number: MHA-PN-02
-  material: Low-carbon steel, 1018 or equiv
-  material_specification: "Low-carbon steel, 1018 or equiv"
+  material: Low-carbon steel sheet, 1008/1010 CRS or 1018
+  material_specification: "Low-carbon steel sheet, 1008/1010 CRS or 1018"
   finish: "black oxide per MIL-DTL-13924 Class 1, oil sealed"
   quantity: 1
   tolerance_class: machined_block
