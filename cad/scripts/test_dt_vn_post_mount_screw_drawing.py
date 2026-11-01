@@ -52,7 +52,7 @@ def test_nominal_end_sits_short_of_the_platform_underside() -> None:
     short = GRIP + platform.PLATE_THICKNESS - part.SHANK_LEN
     assert 0.0 <= short <= spec.POST_SCREW_CUT_TO_FIT_SHORT
     engagement = part.SHANK_LEN - GRIP
-    assert engagement / part.SHANK_DIA >= 0.90
+    assert engagement / part.SHANK_DIA >= 0.87
 
 
 def test_supplied_stock_reaches_longest_raised_post_corner() -> None:
@@ -67,7 +67,7 @@ def test_supplied_stock_reaches_longest_raised_post_corner() -> None:
 def test_no_fixed_cut_length_fits_both_in_band_corners() -> None:
     """U27, geometry first: across the printed post and plate bands, the
     never-proud corner (lowest counterbore floor, thin plate) caps a fixed
-    length below what the 0.90D corner (highest floor, after both edge
+    length below what the 0.87D corner (highest floor, after both edge
     breaks) needs.  So no band can go on the print."""
     unit = drawing_unit("parts/dt-cone-pivot-post", _config.parts("dt-cone-pivot-post"))
     places = post.DRAWING_PRECISION_BY_NAME["MainBodyHt"]
@@ -80,7 +80,7 @@ def test_no_fixed_cut_length_fits_both_in_band_corners() -> None:
     assert spec.FIXED_LENGTH_FLUSH_MAX_MM == pytest.approx(low + thin)
     need = (
         high
-        + 0.90 * part.SHANK_DIA
+        + 0.87 * part.SHANK_DIA
         + spec.POST_MOUNT_TAP_EDGE_BREAK
         + spec.CUT_END_BREAK_MAX_MM
     )
@@ -229,11 +229,11 @@ def test_cut_to_fit_allowance_is_exported_once() -> None:
 
 
 def test_cut_end_break_is_the_title_block_edge_break() -> None:
-    """Main's run-7 ruling: no part-local break limit; the engagement stack
-    spends the title block's general chamfer at the cut end, and the
-    platform's tap exit keeps its own deburr."""
+    """Main's run-7 and 2026-11-01 rulings: no part-local break limit at either
+    end; the engagement stack spends the title block's general chamfer at the
+    screw's cut end and at the platform's tap."""
     assert spec.CUT_END_BREAK_MAX_MM == edge_break_chamfer_mm(unit="in")
-    assert spec.POST_MOUNT_TAP_EDGE_BREAK <= 0.1016  # .004 in, a deburr
+    assert spec.POST_MOUNT_TAP_EDGE_BREAK == edge_break_chamfer_mm(unit="in")
 
 
 def test_worst_case_engagement_holds_the_named_minimum() -> None:
@@ -248,8 +248,8 @@ def test_worst_case_engagement_holds_the_named_minimum() -> None:
         - edge_break_chamfer_mm(unit="in")
     )
     assert spec.POST_MOUNT_ENGAGEMENT_WORST == pytest.approx(worst)
-    assert worst / part.SHANK_DIA >= 0.90
-    assert spec.POST_MOUNT_ENGAGEMENT_PRINTED >= 0.90
+    assert worst / part.SHANK_DIA >= 0.87
+    assert spec.POST_MOUNT_ENGAGEMENT_PRINTED >= 0.87
 
 
 def test_catalog_row_is_the_supplied_stock_and_only_the_part_is_cut() -> None:
@@ -345,12 +345,12 @@ def test_the_modelled_length_is_a_cut_the_sheet_accepts() -> None:
 
 
 def test_engagement_exception_is_held_by_the_model() -> None:
-    """The rule-18 shortfall pending #1019 (0.90D) is a model assert on the chain;
-    the sheet prints it on the cut-length callout
+    """The rule-18 shortfall pending #1019 (floor 0.87D) is a model assert on the
+    chain; the sheet prints it on the cut-length callout
     (test_engagement_minimum_prints_on_the_cut_length_callout)."""
-    assert spec.MIN_ENGAGEMENT_DIAMETERS == 0.90
+    assert spec.MIN_ENGAGEMENT_DIAMETERS == 0.87
     assert spec.ENGAGEMENT_NOMINAL_MM == spec.CUT_LENGTH_MM - GRIP
-    assert spec.ENGAGEMENT_NOMINAL_MM / part.SHANK_DIA >= 0.90
+    assert spec.ENGAGEMENT_NOMINAL_MM / part.SHANK_DIA >= 0.87
 
 
 def test_sheet_layout_keeps_notes_clear_of_the_view() -> None:

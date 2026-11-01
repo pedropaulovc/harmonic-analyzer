@@ -878,7 +878,7 @@ JOINTS: tuple[Joint, ...] = (
         ),
         axial_capture=(
             "fillister head on the MHA-DT-05 counterbore floor; thread through the MHA-DT-20 1/4-20 "
-            "through-tap, cut flush to 0.3 short of the underside (0.90D min, pending ruling "
+            "through-tap, cut flush to 0.127 short of the underside (0.87D min, pending ruling "
             "#1019 MHA-DT-VN-61, engagement only); left loose at post-and-tip-block, tightened at "
             "tip-adjuster-set"
         ),
