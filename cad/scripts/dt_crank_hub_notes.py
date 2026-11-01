@@ -28,22 +28,22 @@ def inch_text(value_mm: float, places: int) -> str:
     return f"{value_mm / MM_PER_IN:.{places}f}".removeprefix("0")
 
 
-def seat_callout(mate_name: str, mate: str) -> str:
+def seat_callout(mate: str, name: str = "CRANK ARM") -> str:
     """Hub-seat fit on MHA-DT-31, turned second to press into ``mate``'s bore.
 
     Four lines (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). The seat end flush with ``mate``'s front
     face is the acceptance, naming both faces (machinist review: FACES FLUSH
     named neither); how the hub gets there (an arbor press) is a method, so
-    the sheet does not say it.  The matched mate is named by name and number
-    (rule 4).
+    the sheet does not say it.  ``name`` is the mate's part name, printed with
+    its number (rule 4).
     """
     low, high = SEAT_PRESS_INTERFERENCE
     return "\n".join(
         (
-            f"TURN TO SUIT {mate_name} {mate}",
+            f"TURN TO SUIT {name} {mate}",
             f"BORE FOR LIGHT PRESS: {inch_text(low, 4)}-{inch_text(high, 4)}",
             "DIAMETRAL INTERFERENCE;",
-            f"END FLUSH WITH {mate} FRONT",
+            f"END FLUSH WITH {name} FRONT",
         )
     )
 
@@ -84,7 +84,7 @@ BORE_CALLOUT = (
 )
 # The arm bore is made first and carries the band; this seat is turned to fit
 # it, so its nominal prints as a reference under the match-fit callout.
-SEAT_CALLOUT = seat_callout("CRANK ARM", "MHA-DT-06")
+SEAT_CALLOUT = seat_callout("MHA-DT-06")
 SEAM_CALLOUT = seam_callout("CRANK ARM MHA-DT-06")
 # The cross-hole is drilled, then taper-reamed through hub and shaft together
 # at assembly.  The ream fixes the hub on the shaft for good, so the front
