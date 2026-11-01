@@ -103,6 +103,20 @@ def _readback_environment(monkeypatch, module, views):
     monkeypatch.setattr(
         module, "assert_supplier_reference_dimension", lambda *args, **kwargs: None
     )
+    # Native line font, leader and offset presentation is proven on the farm
+    # sheet and its layout audit, not here.
+    if hasattr(module, "set_near_side_diameter"):
+        monkeypatch.setattr(module, "set_near_side_diameter", lambda *args: None)
+    if hasattr(module, "place_disc_size_texts"):
+        monkeypatch.setattr(
+            module, "_construction_curves_as_outline", lambda adapter: lambda: None
+        )
+        monkeypatch.setattr(
+            module, "place_disc_size_texts", lambda *args, **kwargs: None
+        )
+        monkeypatch.setattr(
+            module, "assert_disc_size_text_clear", lambda *args, **kwargs: None
+        )
 
     def curate(adapter, view, *, keep, **kwargs):
         view.kept_positions = dict(keep)
@@ -476,15 +490,16 @@ def test_disc_stock_and_application_positions_follow_actual_native_ink(
         (0.12 + radius * 1.5 + 0.018, 0.21)
     )
     front_mid_y = 0.10 + (low + high) / 1000
+    # The strip lies right of centre: thickness right, envelope height left.
     assert views["free_front"].kept_positions["SupplierThickness"] == pytest.approx(
-        (0.08 - radius * 2 - 0.018, front_mid_y)
+        (0.08 + radius * 2 + 0.018, front_mid_y)
     )
     assert views["free_front"].kept_positions["SupplierFreeHeight"] == pytest.approx(
-        (0.08 + radius * 2 + 0.018, front_mid_y)
+        (0.08 - radius * 2 - 0.018, front_mid_y)
     )
     if "SHAFT_DIA" in spec.SUPPLIER_APPLICATION_DIMENSIONS:
         assert views["free_top"].kept_positions["SupplierShaftDia"] == pytest.approx(
-            (0.12, 0.21 + radius * 1.5 + 0.010)
+            (0.12 + radius * 1.5 + 0.018, 0.21 - 0.012)
         )
     if "free_right" in views:
         right_mid_y = 0.08 + (baseline + gauge_upper) / 4000
@@ -495,6 +510,18 @@ def test_disc_stock_and_application_positions_follow_actual_native_ink(
             assert views["free_right"].kept_positions[
                 "SupplierWorkingDeflection"
             ] == pytest.approx((0.31 + radius * 0.5 + 0.014, right_mid_y))
+
+
+@pytest.mark.parametrize(
+    "spec", [cylinder, rocker, pivot], ids=["9714K392", "9714K24", "9715K43"]
+)
+def test_disc_thickness_text_side_is_the_strip_side(spec):
+    # Thickness witnesses run from the strip; on the far side they would
+    # cross the whole envelope to reach their dimension line.
+    _envelope, ((strip_left, _low), _upper) = stock._nominal_side_profiles(spec)
+    assert strip_left >= 0.0
+    assert disc.TEXT_SIDES["THICKNESS"] == 1
+    assert disc.TEXT_SIDES["FREE_HEIGHT"] == -1
 
 
 @pytest.mark.parametrize(
@@ -616,10 +643,10 @@ def test_disc_preparation_defers_capture_then_reuses_it_for_fitted_annotations(
         settled_checks=[],
     )
     assert views["free_front"].kept_positions["SupplierThickness"] == pytest.approx(
-        (0.182, 0.15127)
+        (0.2434, 0.15127)
     )
     assert views["free_front"].kept_positions["SupplierFreeHeight"] == pytest.approx(
-        (0.2434, 0.15127)
+        (0.182, 0.15127)
     )
 
 

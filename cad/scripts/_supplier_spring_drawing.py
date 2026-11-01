@@ -42,6 +42,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_hidden_sketches import _show_hidden_owners, curate_view_dimensions
+from _drawing_leaders import set_near_side_diameter
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DrawingSpec
 from _drawing_sheet_region import sheet_drawable_region
@@ -295,6 +296,10 @@ def extension_spring_dimensions(
                 ),
                 **arguments,
             )
+            if name == COIL_OD:
+                # One arrow on the near rim: a line through the centre would
+                # end on the far rim beside the wire section's arrow.
+                set_near_side_diameter(by_name[name], name)
             settings[name] = (arguments, configurations[key])
 
     def settled() -> None:
@@ -1304,6 +1309,10 @@ async def build_supplier_spring_drawing(
         ratio = scales[key]
         text = f"{captions[key]}  {ratio[0]}:{ratio[1]}"
         y = cell[1] - (0.016 if key == "free_right" else 0.012)
+        if key.startswith("installed_"):
+            # A small pictorial centred in a tall cell left its caption far
+            # below it: hang the caption just under the view instead.
+            y = max(y, _box(views[key].GetOutline(), label=key)[1] - 0.004)
         note = _literal_note(adapter, text, center[0], y)
         bounds = _box(note.GetExtent(), label=text, kind="note")
         annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
