@@ -815,5 +815,11 @@ def test_wire_application_instructions_stay_with_the_assembly_consumers():
         in magnifier_steps
     )
     assert "WRAP IT CLOCKWISE DOWN THE MHA-MG-10 DRUM" in magnifier_steps
-    assert "THROUGH THE MHA-PN-07 ADJUSTER STUD EYE" in pen_steps
+    # The pen wire's step names both the wire and the stud whose eye takes it.
+    notes = pen.notes
+    (eye_step,) = [
+        step for step in notes.ASSEMBLY_STEPS
+        if f"(ITEM {notes.ITEM[notes.WIRE]})" in step and " EYE " in step
+    ]
+    assert f"(ITEM {notes.ITEM[notes.STUD]})" in eye_step
     assert "SEAT THE PEN WIRE IN THE MHA-MG-05 WHEEL RIM GROOVE" in pen_steps
