@@ -34,6 +34,10 @@ fabricated observation would poison the whole book.
 - Advice received after a session goes in an optional
   `## Advice afterwards (from <who>, not yet tried)` section after `## Open`,
   never in the observed sections. The next entry says what held up.
+- A deliberate mistake on scrap (a module's controlled mistakes) is logged
+  like any other session, with part `practice`. Say in "What happened" that it
+  was deliberate, what you predicted, and what the wrong way and then the right
+  way looked, sounded and measured like.
 
 ## Index
 

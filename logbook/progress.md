@@ -3,7 +3,7 @@
 Updated as modules and entries land. Numbers come from the entries — don't
 estimate here.
 
-_Last updated: 2026-10-31 (second machining entry: pendant working, the oblique-jig base bar scrapped while roughing it to length)._
+_Last updated: 2026-10-31 (curriculum re-sequenced: the mill track builds the oblique jig first; module estimates revised)._
 
 ## Modules
 
@@ -18,13 +18,13 @@ This table is only the entry-derived hours roll-up.
 | M03 | [Lathe II — drilling, boring, reaming](curriculum/m03-lathe-ii-drilling-boring-reaming.md) | 16 | 0 | 0 |
 | M04 | [Lathe III — parting to length](curriculum/m04-lathe-iii-parting-to-length-and-batch-work.md) | 20 | 0 | 0 |
 | M05 | [Lathe IV — slender work](curriculum/m05-lathe-iv-slender-work-steadies-tapers.md) | 16 | 0 | 0 |
-| M06 | [Mill I — tramming, squaring](curriculum/m06-mill-i-tramming-squaring-edge-finding.md) | 16 | 6.5 | 1 |
-| M07 | [Mill II — profiling, workholding](curriculum/m07-mill-ii-profiling-slots-workholding.md) | 20 | 5 | 1 |
-| M08 | [Hole patterns and tapping](curriculum/m08-hole-patterns-reaming-and-tapping.md) | 12 | 0 | 0 |
+| M06 | [Mill I — tramming, squaring](curriculum/m06-mill-i-tramming-squaring-edge-finding.md) | 24 | 6.5 | 1 |
+| M07 | [Mill II — profiling, workholding](curriculum/m07-mill-ii-profiling-slots-workholding.md) | 28 | 5 | 1 |
+| M08 | [Hole patterns and tapping](curriculum/m08-hole-patterns-reaming-and-tapping.md) | 16 | 0 | 0 |
 | M09 | [Dividing head and indexing](curriculum/m09-the-dividing-head-and-indexing.md) | 20 | 0 | 0 |
 | M10 | [Gear cutting](curriculum/m10-gear-cutting-making-the-cutter-then-the-gear.md) | 60+ | 0 | 0 |
 | M11 | [Soldering and finishing](curriculum/m11-soldering-finishing-and-assembly-craft.md) | 16 | 0 | 0 |
-| | **total** | **236+** | **11.5** | **2** |
+| | **total** | **256+** | **11.5** | **2** |
 
 ## Parts made
 

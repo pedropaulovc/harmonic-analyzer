@@ -33,6 +33,23 @@ hours_actual: 0
 - Chatter: recognising it and the four things that cause it
 - Taper: diagnosing headstock alignment vs tool deflection
 
+## Controlled mistakes
+
+Make each on scrap first, under the
+[rules](README.md#the-twist-break-it-on-purpose-first), then do it right and
+compare.
+
+- **Tool below centre.** Face a scrap end with the tool a little below centre
+  height and look at the pip left in the middle. Set the height right and face
+  it again.
+- **Tool above centre.** Take a light cut with the tool a little high. It rubs
+  instead of cutting; feel and see the difference.
+- **Too much stick-out.** Take the same light finishing cut with the work well
+  out of the chuck, then close in. Listen for chatter and compare the finish.
+- **A finishing pass too shallow.** Take 0.01 mm and then 0.05 mm on brass, and
+  compare the finish and the size you actually got.
+- **Measure it warm.** Turn to size, measure straight away, measure again cold.
+
 ## Now make — the real part this unlocks
 
 **`dt-crank-pin`** and a **`ch-pivot-shaft`** blank — plain turned steel, no bore, no step. The first real parts of the analyzer.
