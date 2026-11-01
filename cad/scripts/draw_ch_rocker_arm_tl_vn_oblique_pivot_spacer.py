@@ -28,21 +28,17 @@ ITEM = '6061 ALUMINUM ROUND SPACER, 3/8 SCREW, 5/8 OD X 5/8 LONG'
 # size already being the supplier's parenthesised reference.
 GENERAL_TEXT = "PURCHASED PART, USED AS SUPPLIED. LOOSE BORE: NOT A LOCATING BUSHING."
 # Every text shelves right of its own witnesses, clear of the lines: the bore
-# on the Top's top lane, the OD on its bottom lane, the length beside it.
-# Front and Top reserve the same left/right space so the fit centres them on
-# one projection line; the unannotated Front's equal top/bottom keeps it
-# level with the Right. The 5/8 x 5/8 part fits at 2:1 in tall_top's 96 mm
-# Top cell with both diameter lanes (standard's 64 mm leaves 28 mm: 1:1).
+# on the Top's top lane, the OD on its bottom lane, the length beside it. Only
+# the Top is annotated; the projection fit centres the Front under it. The
+# 5/8 x 5/8 part fits at 2:1 in tall_top's 96 mm Top cell with both diameter
+# lanes (standard's 64 mm leaves 28 mm: 1:1).
 VIEW_LAYOUT = "tall_top"
 SHELVES = {
     "SupplierBoreDiameter": (True, "right"),
     "SupplierOuterDiameter": (True, "right"),
     "SupplierLength": (False, "right"),
 }
-SUPPLIER_MARGINS = {
-    "*Front": (0.010, 0.010, 0.060, 0.010),
-    "*Top": (0.010, 0.018, 0.060, 0.018),
-}
+SUPPLIER_MARGINS = {"*Top": (0.010, 0.018, 0.060, 0.018)}
 
 
 def _assert_supplier_bands(displays):
