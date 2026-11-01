@@ -511,7 +511,7 @@ requirement(
     precision={"length": part_spec.STATION_PLACES},
 )
 # The +Y side: the width, milled to size from the 1/2 x 6 bar (owner ruling
-# #2083), at the title block's .XX band from the faced -Y side.
+# #2083), a size across both sides at the title block's .XX band.
 requirement(
     "bar_high_side",
     kind="face",
@@ -528,7 +528,6 @@ requirement(
             ("BAR_WIDTH", "WIDTH_PLACES"),
         ),
         "width_nominal": (BAR_WIDTH, ("BAR_WIDTH",)),
-        "width_from": _FROM_LOW_SIDE,
     },
     precision={"width": part_spec.WIDTH_PLACES},
 )
