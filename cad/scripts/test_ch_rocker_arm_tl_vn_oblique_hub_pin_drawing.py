@@ -98,15 +98,16 @@ def test_native_supplier_witness_inventory():
     for name, value, orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS:
         assert value > 0
         assert spec.SUPPLIER_REFERENCE_PLANES[name] == "Top"
-        assert orientation == ("vertical" if name == "SupplierCutLength" else "horizontal")
+        assert orientation == "horizontal"
         assert spec.SUPPLIER_REFERENCE_UNITS[name] == spec.UNIT == "in"
     assert all(lower <= upper for lower, upper in spec.SUPPLIER_REFERENCE_TOLERANCES_MM.values())
-    # Both lines lie on Top-view edges: the diameter on the far end face, the
-    # cut length on the silhouette (Top sketch y is -z; the pin spans z 0..cut).
+    # The diameter's line lies on the Top view's far end-face edge (Top sketch
+    # y is -z; the pin spans z 0..cut). The cut length is the extrusion's own
+    # depth, a shop dimension with no construction line.
     assert spec.SUPPLIER_REFERENCE_STARTS == {
         "SupplierPinDiameter": (-spec.DIA / 2.0, -spec.CUT_LENGTH),
-        "SupplierCutLength": (spec.DIA / 2.0, -spec.CUT_LENGTH),
     }
+    assert spec.CUT_FEATURE == "Pin" and spec.CUT_DIMENSION not in names
 
 
 def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):
@@ -126,9 +127,12 @@ def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):
         monkeypatch.setattr(part, name, AsyncMock())
     saved = AsyncMock(return_value={"part": STEM})
     monkeypatch.setattr(part, "save_part_and_images", saved)
+    cut = []
+    monkeypatch.setattr(part, "_shop_cut_dimension", cut.append)
     adapter = SimpleNamespace(create_part=AsyncMock(), create_axis=AsyncMock())
     assert asyncio.run(part.build(adapter)) == {"part": STEM}
-    assert calls == [('Pin', spec.DIA, 0.0, spec.CUT_LENGTH, {})]
+    assert calls == [(spec.CUT_FEATURE, spec.DIA, 0.0, spec.CUT_LENGTH, {})]
+    assert cut == [adapter]
     axis = adapter.create_axis.call_args.args[0]
     assert axis.mode == "two_planes"
     assert set(axis.planes) == {"Top Plane", "Right Plane"}
