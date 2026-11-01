@@ -13,6 +13,7 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _supplier_extension_spring import SOURCE_FEATURES
 from _supplier_spring_drawing import (
@@ -24,6 +25,7 @@ import ch_vn_channel_spring_installed_spec as supplier
 
 
 SPEC = DRAWINGS_BY_NAME["ch_vn_channel_spring_installed"]
+MACHINIST_REVIEW = MachinistReviewMode.LEARN
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "EXTENSION SPRING, HOOK ENDS"
 PART_STEM = SPEC.artifact_stem
