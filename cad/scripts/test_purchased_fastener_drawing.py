@@ -5119,9 +5119,13 @@ def _supplier_pin_layout_placement(monkeypatch, *, family, outline):
     # returned station drives the real audit consumer against recorded R43 ink.
     monkeypatch.setattr(pins, "scan_view_edges", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(pins, "_axis_circles", lambda *_args, **_kwargs: ())
-    monkeypatch.setattr(pins, "_supplier_length", lambda *_args, **_kwargs: (None, None))
+    length = SimpleNamespace(GetDimension2=lambda _index: SimpleNamespace(FullName="Length@View"))
+    monkeypatch.setattr(pins, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(pins, "_supplier_length", lambda *_args, **_kwargs: (length, None))
     monkeypatch.setattr(pins, "_supplier_diameter", lambda *_args, **_kwargs: (None, None))
     monkeypatch.setattr(pins, "_settled_pin_check", lambda *_args, **_kwargs: lambda: None)
+    if family == "spring":
+        monkeypatch.setattr(pins, "shelve_supplier_text", lambda *_args: {})
     placements = {}
 
     def import_references(_adapter, _view, _source, keep):
@@ -5142,42 +5146,60 @@ def _supplier_pin_layout_placement(monkeypatch, *, family, outline):
     return placements[pins.MATING_HOLE_DIMENSION]
 
 
-def _supplier_spring_pin_imports(monkeypatch, *, limits, precision):
+def _supplier_spring_pin_imports(monkeypatch, *, limits, precision, shelf_error=None):
     import _supplier_pin_drawing as pins
 
+    length = SimpleNamespace(
+        GetDimension2=lambda _index: SimpleNamespace(FullName="SupplierLength@Drawing View1"),
+    )
+    monkeypatch.setattr(pins, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(pins, "scan_view_edges", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(pins, "_axis_circles", lambda *_args, **_kwargs: ())
-    monkeypatch.setattr(pins, "_supplier_length", lambda *_args, **_kwargs: ("length", "length check"))
+    monkeypatch.setattr(pins, "_supplier_length", lambda *_args, **_kwargs: (length, "length check"))
     monkeypatch.setattr(pins, "_supplier_diameter", lambda *_args, **_kwargs: ("diameter", "diameter check"))
-    imports, settled = [], {}
+    imports, settled, events = [], {}, []
 
     def import_references(_adapter, _view, _source, keep):
         imports.append(tuple(keep))
+        events.append("import")
         return {name: (name, f"{name} check") for name in keep}
 
     def settle(_adapter, _views, references, *, expected_count, label):
         settled.update(references=references, expected_count=expected_count, label=label)
-        return lambda: None
+        return lambda: events.append("settled census")
+
+    def shelve(_adapter, displays, shelves):
+        events.append(("shelve", dict(displays), dict(shelves)))
+        return {"stations": "measured"}
+
+    def assert_shelves(_adapter, displays, shelves, stations):
+        events.append(("assert shelves", dict(displays), dict(shelves), stations))
+        if shelf_error is not None:
+            raise RuntimeError(shelf_error)
 
     monkeypatch.setattr(pins, "_import_model_references", import_references)
     monkeypatch.setattr(pins, "_settled_pin_check", settle)
+    monkeypatch.setattr(pins, "shelve_supplier_text", shelve)
+    monkeypatch.setattr(pins, "assert_supplier_shelves", assert_shelves)
     view = SimpleNamespace(GetOutline=lambda: (0.27, 0.13, 0.30, 0.15), Position=(0.2875, 0.143))
     source = SimpleNamespace(
         sku="spring-pin", length_mm=12.7, wall_mm=0.3048, wall_precision=3,
         application_hole_limits=limits, application_hole_precision=precision,
     )
-    pins.add_supplier_spring_pin_dimensions(None, {"*Front": view, "*Right": view}, source)
-    return imports, settled
+    check = pins.add_supplier_spring_pin_dimensions(None, {"*Front": view, "*Right": view}, source)
+    return SimpleNamespace(
+        imports=imports, settled=settled, events=events, length=length, check=check,
+    )
 
 
 def test_supplier_spring_pin_without_application_hole_imports_only_the_wall(monkeypatch):
     import _supplier_pin_drawing as pins
 
-    imports, settled = _supplier_spring_pin_imports(monkeypatch, limits=None, precision=None)
-    assert imports == [(pins.WALL_DIMENSION,)]
-    assert settled == {
+    case = _supplier_spring_pin_imports(monkeypatch, limits=None, precision=None)
+    assert case.imports == [(pins.WALL_DIMENSION,)]
+    assert case.settled == {
         "references": [
-            ("*Right", "diameter", "diameter check"), ("*Front", "length", "length check"),
+            ("*Right", "diameter", "diameter check"), ("*Front", case.length, "length check"),
             ("*Right", pins.WALL_DIMENSION, f"{pins.WALL_DIMENSION} check"),
         ],
         "expected_count": 3, "label": "spring-pin",
@@ -5187,15 +5209,62 @@ def test_supplier_spring_pin_without_application_hole_imports_only_the_wall(monk
 def test_supplier_spring_pin_with_application_hole_still_imports_the_mating_hole(monkeypatch):
     import _supplier_pin_drawing as pins
 
-    imports, settled = _supplier_spring_pin_imports(
+    case = _supplier_spring_pin_imports(
         monkeypatch, limits=(0.062, 0.065), precision=3,
     )
-    assert imports == [(pins.WALL_DIMENSION, pins.MATING_HOLE_DIMENSION)]
-    assert settled["expected_count"] == 4
-    assert settled["references"][2:] == [
+    assert case.imports == [(pins.WALL_DIMENSION, pins.MATING_HOLE_DIMENSION)]
+    assert case.settled["expected_count"] == 4
+    assert case.settled["references"][2:] == [
         ("*Right", pins.WALL_DIMENSION, f"{pins.WALL_DIMENSION} check"),
         ("*Right", pins.MATING_HOLE_DIMENSION, f"{pins.MATING_HOLE_DIMENSION} check"),
     ]
+
+
+@pytest.mark.parametrize("limits,precision", [(None, None), ((0.062, 0.065), 3)],
+                         ids=("strap-pin", "cup-pin"))
+def test_supplier_spring_pin_length_text_shelves_right_and_settles_measured(
+    monkeypatch, limits, precision,
+):
+    """Machinist review: the FRONT length's own line ran through its "(.500)"."""
+    case = _supplier_spring_pin_imports(monkeypatch, limits=limits, precision=precision)
+    name = "SupplierLength@Drawing View1"
+    shelf = ({name: case.length}, {name: (True, "right")})
+    # The shared measured shelf, once, after every reference is in place.
+    assert case.events == ["import", ("shelve", *shelf)]
+    case.check()
+    assert case.events[2:] == [
+        "settled census", ("assert shelves", *shelf, {"stations": "measured"}),
+    ]
+
+
+def test_supplier_spring_pin_settled_check_refuses_a_lost_length_shelf(monkeypatch):
+    case = _supplier_spring_pin_imports(
+        monkeypatch, limits=None, precision=None,
+        shelf_error="SupplierLength@Drawing View1: supplier text shelf is not clear",
+    )
+    with pytest.raises(RuntimeError, match="supplier text shelf is not clear"):
+        case.check()
+
+
+def test_supplier_dowel_length_text_is_not_shelved(monkeypatch):
+    # The dowel's vertical length prints its level text beside the line, clear.
+    import _supplier_pin_drawing as pins
+
+    def forbidden(*_args):
+        raise AssertionError("dowel length text sits beside its vertical line")
+
+    monkeypatch.setattr(pins, "shelve_supplier_text", forbidden)
+    _supplier_pin_layout_placement(
+        monkeypatch, family="dowel", outline=(0.065412, 0.219412, 0.092588, 0.246588),
+    )
+
+
+def test_spring_pin_front_reserves_its_length_shelf_lane():
+    import _supplier_pin_drawing as pins
+    from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
+
+    # The knob-cup pin's "(0.625 in)" printed about 19.5 mm wide at 5:1.
+    assert pins.SPRING_PIN_SUPPLIER_MARGINS["*Front"][2] >= 0.0195 + CLEAR_GAP_M + PLACE_SETTLE_M
 
 
 @pytest.mark.parametrize("limits,precision", [((0.062, 0.065), None), (None, 3)])

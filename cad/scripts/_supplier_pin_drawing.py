@@ -34,6 +34,7 @@ from _supplier_pin_data import (
     declares_application_hole,
 )
 from _supplier_pin_model import _reference_contract, assert_supplier_pin_model_reference
+from _supplier_text_shelf import assert_supplier_shelves, shelve_supplier_text
 
 
 # Planned sheet-space lanes (left, bottom, right, top), before the first fit.
@@ -43,8 +44,10 @@ DOWEL_SUPPLIER_MARGINS = {
     "*Front": (0.035, 0.006, 0.004, 0.006),
     "*Top": (0.003, 0.018, 0.075, 0.012),
 }
+# The spring pin's FRONT right lane holds its length text's shelf: about 21 mm
+# of "(0.625 in)" plus the 2.2 mm shelf gap past the right end witness.
 SPRING_PIN_SUPPLIER_MARGINS = {
-    "*Front": (0.004, 0.024, 0.004, 0.004),
+    "*Front": (0.004, 0.024, 0.030, 0.004),
     "*Right": (0.040, 0.055, 0.095, 0.028),
 }
 
@@ -381,7 +384,21 @@ def add_supplier_spring_pin_dimensions(
     if application_hole:
         hole, hole_check = imported[MATING_HOLE_DIMENSION]
         references.append(("*Right", hole, hole_check))
-    return _settled_pin_check(
+    # Centred on its horizontal dimension line, the FRONT length text sits on
+    # it and the line runs through the bottoms of its parentheses (machinist
+    # review: the strap pin's "(.500)", the knob-cup pin's "(0.625 in)").
+    # Shelve it right of its end witnesses, toward the open space before RIGHT.
+    length_name = str(_early_bound(length.GetDimension2(0), "IDimension").FullName)
+    shelved = {length_name: length}
+    shelves = {length_name: (True, "right")}
+    stations = shelve_supplier_text(adapter, shelved, shelves)
+    settled = _settled_pin_check(
         adapter, views, references,
         expected_count=4 if application_hole else 3, label=source.sku,
     )
+
+    def assert_settled() -> None:
+        settled()
+        assert_supplier_shelves(adapter, shelved, shelves, stations)
+
+    return assert_settled
