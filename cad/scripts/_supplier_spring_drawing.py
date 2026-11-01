@@ -1307,9 +1307,6 @@ async def build_supplier_spring_drawing(
     dimension_checks = (
         supplier_dimensions(adapter, views, reference_bounds=reference_bounds) or ()
     )
-    # The captions read annotation display data: take it from the rebuilt
-    # sheet, not from dimensions placed since the last rebuild.
-    _rebuild(draw, phase="supplier dimensions before captions")
     ddoc = _early_bound(draw, "IDrawingDoc")
     ddoc.ActivateView("")
     if not ddoc.GetEditSheet() or ddoc.ActiveDrawingView is not None:
