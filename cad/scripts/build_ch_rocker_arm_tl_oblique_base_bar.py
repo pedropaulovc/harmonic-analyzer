@@ -46,6 +46,7 @@ from _part_checks import report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
 from _part_pmi import author_part_pmi
 from _part_save import save_part_and_images
+from _metric_vendor_dimension import set_metric_vendor_units
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
@@ -77,6 +78,7 @@ from ch_rocker_arm_tl_oblique_base_bar_spec import (
     HIGH_SIDE_Y,
     ISOMETRIC_VIEW_NOTE,
     LOW_SIDE_Y,
+    METRIC_DIMENSIONS,
     NEAR_SLOT_RISE,
     NEAR_SLOT_X,
     NEAR_SLOT_Y,
@@ -87,8 +89,6 @@ from ch_rocker_arm_tl_oblique_base_bar_spec import (
     SURFACE_FINISHES,
     TAP_DRILL,
     TAP_SPEC,
-    TOLERANCES,
-    UNIT,
     bracket_hole_walls,
 )
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
@@ -492,12 +492,14 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    # The rail holes' tight bands, stations and row, live on the model's own
-    # dimensions.
-    for (feature_name, dimension_name), band in TOLERANCES.items():
+    # The metric vendor lines' stations (the HGR15R rail's holes, the KP08
+    # stations; owner ruling 4) print exact millimetres with their own bands,
+    # authored on the model's own dimensions.
+    for (feature_name, dimension_name), (places, band) in METRIC_DIMENSIONS.items():
         set_dimension_symmetric_tolerance(
-            adapter, feature_name, dimension_name, band, display_unit=UNIT
+            adapter, feature_name, dimension_name, band, display_unit="mm"
         )
+        set_metric_vendor_units(adapter, feature_name, dimension_name, places=places)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

@@ -1501,10 +1501,12 @@ ASSEMBLY_STEPS = (
     f"PRINT-DRILLED SEAT WITH 4 {_NUT_SCREW} {_item(NUT_SCREW)}; "
     "NO TRANSFER SPOTTING. FIT EACH KP08 "
     f"{_item(PILLOW_BLOCK)} WITH 2 {_KP08_SCREW} {_item(PILLOW_BLOCK_SCREW)}, LOOSE.",
+    # The Tr8 screw's stub and the hub's gap close its metric cut along the
+    # KP08 stations: they print exact millimetres (owner ruling 4, 2026-11-01).
     f"8. OIL THE LEADSCREW {_item(LEADSCREW)} WITH ISO VG 32 AND THREAD IT "
-    f"THROUGH THE KP08S AND NUT, {_length(leadscrew.NEAR_STUB, 2)} PAST THE NEAR BLOCK. "
+    f"THROUGH THE KP08S AND NUT, {leadscrew.NEAR_STUB:.1f} MM PAST THE NEAR BLOCK. "
     "COMPLETE F1 (SHEET 8). PUSH THE HANDWHEEL "
-    f"{_item(HANDWHEEL)} ON, HUB {_length(leadscrew.HUB_GAP, 2)} OFF THE FAR BLOCK; "
+    f"{_item(HANDWHEEL)} ON, HUB {leadscrew.HUB_GAP:.1f} MM OFF THE FAR BLOCK; "
     "TIGHTEN ITS AND THE KP08 SET SCREWS ON THE FLATS WITH LOCTITE 222 "
     "THREADLOCKER. THEN COMPLETE F2.",
     "9. REMOVE THE TEMPORARY SHOULDER SCREWS. FIT THE SPACERS AND CARRIER "
