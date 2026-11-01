@@ -57,9 +57,27 @@ hangs beyond the plate.
 from __future__ import annotations
 
 from _drawing_balloons import BalloonAnchor
+from fr_harmonic_base_fasteners import HOLD_DOWN_TAP_DRILL_DIA
+from fr_harmonic_base_spec import STACK_HEIGHT
+from fr_rocker_arm_support_spec import SUPPORT_HOLD_DOWN_XZ
+
+# harmonic-base's frozen point is the -Z extreme of the +X, -Z rocker-support
+# hold-down tap's mouth circle on the deck top, the point the zoomed hit
+# claimed in run 20260928T092244731Z. It is derived from the specs that place
+# that tap, so a resnap moves the point with the edge: the decimal-inch resnap
+# moved the tap 0.01 mm and left the literal (90.360, 50.800, -62.873) off its
+# ink (run 20261101T085934555Z, "not on an edge").
+_BASE_TAP_X, _BASE_TAP_Z = SUPPORT_HOLD_DOWN_XZ[3]
+if not (_BASE_TAP_X > 0.0 and _BASE_TAP_Z < 0.0):
+    raise AssertionError("SUPPORT_HOLD_DOWN_XZ[3] is no longer the +X, -Z tap")
+BASE_ANCHOR_POINT = (
+    _BASE_TAP_X,
+    STACK_HEIGHT,
+    _BASE_TAP_Z - HOLD_DOWN_TAP_DRILL_DIA / 2.0,
+)
 
 FRAME_BALLOON_ANCHORS: dict[str, BalloonAnchor] = {
-    "fr-harmonic-base": BalloonAnchor((90.360, 50.800, -62.873)),
+    "fr-harmonic-base": BalloonAnchor(BASE_ANCHOR_POINT),
     "fr-tube-frame": BalloonAnchor(),
     "fr-vn-tube-frame-cap": BalloonAnchor(),
     "fr-rocker-arm-support": BalloonAnchor(),
