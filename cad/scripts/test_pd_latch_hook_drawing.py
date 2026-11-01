@@ -64,7 +64,7 @@ def test_the_model_owns_every_band_the_sheet_prints() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "for feature_name, dimension_names in POSITION_DIMENSIONS.items()" in source
     assert "for feature_name, dimension_names in FORMED_DIMENSIONS.items()" in source
-    assert min(spec.HOLE_BAND) == 0.0 < max(spec.HOLE_BAND)
+    assert spec.HOLE_GROWTH > 0.0
     assert spec.BEND_R_BAND[0] == pytest.approx(
         geom.INSIDE_BEND_R_MAX - geom.INSIDE_BEND_R
     )

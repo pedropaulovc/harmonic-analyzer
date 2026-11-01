@@ -102,7 +102,8 @@ from pd_latch_hook_bracket_screw_spec import HEAD_DIA, MAJOR_DIA, MAJOR_DIA_MIN
 UNIT = drawing_unit("parts/pd-latch-hook", _config.parts("pd-latch-hook"))
 
 # --- Printed bands -----------------------------------------------------------
-HOLE_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)  # (upper, lower): never under
+# The title block's DRILLED HOLES row: a drilled hole only grows.
+HOLE_GROWTH = drilled_oversize_mm(unit=UNIT)
 HOLE_PLACES = 3
 # The screws' fit (the fixed-fastener stack): each screw stands in its bar
 # tap up to the bar's per-axis band off the model (radial reach hypot(b, b));
@@ -184,7 +185,7 @@ _WIDTH_LOW = printed_deviations(
     WIDTH, WIDTH_PLACES, (-WIDTH_TOL, WIDTH_TOL), unit=UNIT
 )[0]
 _BASE_LOW = _row(BASE_LENGTH, BASE_LENGTH_PLACES)[0]
-_HOLE_GROW = max(HOLE_BAND) / 2.0
+_HOLE_GROW = HOLE_GROWTH / 2.0
 _SCREW_R = SCREW_HOLE_DIA / 2.0
 _PIN_R = PIN_HOLE_DIA / 2.0
 
@@ -264,7 +265,7 @@ HEAD_CLEARANCE_NOMINAL = head_clearance(INSIDE_BEND_R, SHEET_T, 0.0, 0.0)
 # The worst case: the largest bend radius, the thickest sheet, the printed
 # distance from the ear's outer face at its lower limit (the hole nearest the
 # ear), and the largest drilled hole floating over the smallest 2A major.
-HEAD_FLOAT_MAX = (SCREW_HOLE_DIA + max(HOLE_BAND) - MAJOR_DIA_MIN) / 2.0
+HEAD_FLOAT_MAX = (SCREW_HOLE_DIA + HOLE_GROWTH - MAJOR_DIA_MIN) / 2.0
 HEAD_CLEARANCE_WORST = head_clearance(
     INSIDE_BEND_R + BEND_R_BAND[0],
     SHEET_T + SHEET_T_PLUS,
