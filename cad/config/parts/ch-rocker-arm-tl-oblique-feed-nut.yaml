@@ -10,4 +10,10 @@ ch-rocker-arm-tl-oblique-feed-nut:
   quantity: 1
   tolerance_class: machined_block
   process: "saw and face to length; drill letter C and tap Tr8x2 RH through square to the faces; drill the two #4 loose-clearance holes through; break edges"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "the Tr8x2-7H RH THRU bore in the .40 nut"
+      finding: "Tr8 thread engagement .39 min (1.24D) through the nut, under 1.5D (rule 18)"
+      reason: "Owner ruling 2026-11-01: thread engagement below 1.5D with no geometry escape accepted as a minor exception (this package: 1.24D at the .39 minimum length, 1.27D nominal). A longer nut puts the #4-40 heads on its -X face into the near KP08 at the travel stop (1.54 mm at .48 against the 2.5 mm feed gap) and the +X stop has no room; the nut carries hand feed only."
   drawing_unit: in

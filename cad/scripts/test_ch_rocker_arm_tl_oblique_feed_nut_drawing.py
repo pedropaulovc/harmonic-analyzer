@@ -25,7 +25,6 @@ def test_identity_and_stock():
     assert metadata["quantity"] == spec.QUANTITY == 1
     assert spec.UNIT == "in"
     assert "BRASS 360-H02" in metadata["material"]
-    assert "machinist_exceptions" not in metadata
     assert spec.PART_NAME.replace("-", "_") in DRAWINGS_BY_NAME
     # The bar as bought: 3/4 x 1-1/4 at the supplier's bands, faced to .40.
     assert (spec.WIDTH, spec.HEIGHT) == pytest.approx((1.25 * INCH, 0.75 * INCH))
@@ -39,6 +38,13 @@ def test_tr8_bore_is_letter_c_tapped_through_at_five_turns():
     assert spec.BORE_DRILL == pytest.approx(0.242 * INCH)
     assert spec.TR8_D1 < spec.BORE_DRILL < lead.SCREW_MAJOR_DIA - lead.SCREW_LEAD / 2
     assert spec.LENGTH >= 5 * lead.SCREW_LEAD
+    # Under rule 18's 1.5D, accepted by the owner (2026-11-01) as RV-01.
+    engagement_d = spec.LENGTH_MIN / lead.SCREW_MAJOR_DIA
+    assert engagement_d < 1.5
+    (exception,) = _config.parts(spec.PART_NAME)["machinist_exceptions"]
+    assert exception["id"] == "RV-01"
+    assert f"({engagement_d:.2f}D)" in exception["finding"]
+    assert exception["reason"].startswith("Owner ruling 2026-11-01: thread engagement below 1.5D")
     assert (spec.BORE_X, spec.BORE_Y) == pytest.approx((0.63 * INCH, 0.38 * INCH))
     assert spec.CALLOUTS_BELOW["BoreDia"] == "Tr8x2-7H RH THRU"
 
