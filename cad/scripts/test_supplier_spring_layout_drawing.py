@@ -1535,7 +1535,7 @@ def test_supplier_builder_enables_dirty_allowance_only_at_annotation_callback(
         adapter.currentModel = harness.model
         return harness.model
 
-    def drawing(_adapter, *, layout):
+    def drawing(_adapter, *, layout, unit):
         events.append("drawing")
         harness.adapter.currentModel = harness.draw
         return harness.draw, sheet

@@ -546,7 +546,7 @@ def _variant_sheet(monkeypatch, tmp_path, variants, quantities, total):
 
     monkeypatch.setattr(configured, "read_required_properties", required_properties)
 
-    def new_drawing(adapter, *, layout):
+    def new_drawing(adapter, *, layout, unit):
         adapter.currentModel = draw
         return draw, state.sheet
 
@@ -772,8 +772,8 @@ def test_configured_sheet_appends_rework_sheets_before_single_guarded_finalizati
     active = ["HARDWARE"]
     new_drawing = configured.new_project_drawing
 
-    def create(adapter, *, layout):
-        draw, sheet = new_drawing(adapter, layout=layout)
+    def create(adapter, *, layout, unit):
+        draw, sheet = new_drawing(adapter, layout=layout, unit=unit)
         sheet.GetName = lambda: "HARDWARE"
 
         def activate(name):

@@ -41,6 +41,7 @@ async def build_purchased_part_drawing(
     title_block_setup: Callable[[Any], Callable[[], None]] | None = None,
     view_layout: Literal["standard", "supplier_top", "tall_top"] = "standard",
     number_fit: NumberFit = NumberFit.TEMPLATE,
+    unit: str = "mm",
 ) -> dict[str, str]:
     """Front/Top/Right plus Isometric of a purchased part, its note in the footer.
 
@@ -52,6 +53,7 @@ async def build_purchased_part_drawing(
     their source resolves and returns the check to repeat after the final rebuild.
     ``view_layout`` selects the purchased fastener cells, as for fasteners.
     ``number_fit`` opts a long registry number into the DWG. NO. fit.
+    ``unit`` is the part's ``drawing_unit`` (``new_project_drawing``).
     """
     source = spec.source
     if spec.source_kind != "part" or not source.is_file():
@@ -87,6 +89,7 @@ async def build_purchased_part_drawing(
             title_block_setup=title_block_setup,
             number_fit=number_fit,
             view_layout=view_layout,
+            unit=unit,
             source_checkpoint=_supplier_source_checkpoint(
                 adapter,
                 source,

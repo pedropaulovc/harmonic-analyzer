@@ -1574,6 +1574,7 @@ async def build_purchased_spring_drawing(
     configuration: str | None = None,
     settled_checks: Sequence[Callable[[], None]] = (),
     supplier_data: Sequence[str] = (),
+    unit: str = "mm",
 ) -> dict[str, str]:
     """Use spring metadata without treating the part as a catalogued fastener.
 
@@ -1611,6 +1612,7 @@ async def build_purchased_spring_drawing(
             configuration=configuration,
             settled_checks=settled_checks,
             supplier_data=supplier_data,
+            unit=unit,
             source_checkpoint=_supplier_source_checkpoint(
                 adapter,
                 source,
