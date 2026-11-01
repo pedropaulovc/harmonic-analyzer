@@ -12,7 +12,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-import _rack_bore_finish as finish_helper
 import build_pd_rack_pinion as part
 import draw_pd_rack_pinion as drawing
 import pd_rack_pinion_spec as spec
@@ -165,11 +164,15 @@ def test_the_bore_pilots_on_the_hub_spigot_at_every_limit() -> None:
 
 def test_the_bore_front_chamfer_clears_the_spigot_corner() -> None:
     """The flange clamps the front face only if the bore's front chamfer
-    reaches past the hub's spigot-to-flange corner radius."""
+    reaches past the hub's spigot-to-flange corner radius at every limit the
+    title block's .XXX row allows."""
     import pd_transgear_disc_hub_spec as hub
 
+    band = printed_band_mm(3, unit="in")
+    assert spec.BORE_FRONT_CHAMFER_LIMITS == pytest.approx(
+        (spec.BORE_FRONT_CHAMFER - band, spec.BORE_FRONT_CHAMFER + band)
+    )
     assert spec.BORE_FRONT_CHAMFER_LIMITS[0] >= hub.CORNER_RADIUS_MAX
-    assert spec.BORE_FRONT_CHAMFER_NOTE in spec.DRAWING_NOTES.splitlines()
 
 
 def test_thickness_band_is_the_printed_xxx_band() -> None:
@@ -220,8 +223,6 @@ def test_gear_data_block_is_what_the_machinist_needs() -> None:
     assert spec.CUTTER_REFERENCE_TEETH == 135 != spec.TEETH == 150
     assert spec.CUTTER_TOOTH_RANGE == (135, None)
     assert part.GEAR_DATA == data
-    # A shop note states the requirement, not the method or design history.
-    assert spec.DRAWING_NOTES == spec.BORE_FRONT_CHAMFER_NOTE
     assert "CERTIFIED" not in data and "PREMISE" not in data
     assert not hasattr(spec, "PROFILE_SHIFT")
     assert not hasattr(spec, "MESH_PINION_PROFILE_SHIFT")
@@ -517,29 +518,15 @@ def test_tap_leader_lands_on_the_lower_left_tap_and_crosses_no_bore_leader() -> 
         centre[0] + (centre[0] - dim_xy[0]) * bore_r / math.dist(dim_xy, centre),
         centre[1] + (centre[1] - dim_xy[1]) * bore_r / math.dist(dim_xy, centre),
     )
-    finish_attach = (centre[0] + bore_r, centre[1])
-    for other in (
-        (dim_xy, far),
-        (drawing.BORE_FINISH_POSITION, finish_attach),
-    ):
+    # The blank's diameter line runs from its text below-right through the
+    # centre to the far rim, clear of the tap's leader.
+    od_xy = drawing.FRONT_KEEP["OutsideDia"]
+    od_far = (
+        centre[0] + (centre[0] - od_xy[0]) * drawing.HALF_OD / math.dist(od_xy, centre),
+        centre[1] + (centre[1] - od_xy[1]) * drawing.HALF_OD / math.dist(od_xy, centre),
+    )
+    for other in ((dim_xy, far), (od_xy, od_far)):
         assert not _segments_cross(*leader, *other)
-    # The finish leader passes under the 0° tap, not through it.
-    right_tap = (centre[0] + bolt_r, centre[1])
-    finish_leader = (drawing.BORE_FINISH_POSITION, finish_attach)
-    clearance = _distance_to_segment(right_tap, *finish_leader)
-    assert clearance > spec.TAP_DRILL_DIA / 2000.0 + 0.001
-
-
-def test_bore_finish_symbol_stands_clear_of_the_edge_view_thickness() -> None:
-    """19e33c6c2 printed Ra 1.6 into the 3.000."""
-    x, y = drawing.BORE_FINISH_POSITION
-    # The symbol and its "Ra 1.6" run about 45 mm right of and 16 mm above
-    # the insertion point (the farm run's print).
-    symbol_right, symbol_top = x + 0.045, y + 0.016
-    thickness_x, thickness_y = drawing.RIGHT_KEEP["FaceWidth"]
-    # The 3.000 text and its extension lines start at the disc's front face.
-    assert symbol_right < min(drawing.FRONT_FACE_X, thickness_x - 0.006) - 0.010
-    assert symbol_top < drawing.FRONT_CENTER[1] - drawing.HALF_OD
 
 
 def test_model_and_drawing_consume_the_spec_geometry() -> None:
@@ -558,8 +545,10 @@ def test_model_and_drawing_consume_the_spec_geometry() -> None:
     )
     assert part.BORE_DIAMETER == spec.BORE_DIA == hub_geometry.SPIGOT_DIA
     assert drawing.DIMENSION_CALLOUTS == {
-        "BoreDia": f"{spec.BORE_CALLOUT}\n{spec.BORE_FIT_CALLOUT}"
+        "BoreDia": f"{spec.BORE_CALLOUT}\n{spec.BORE_FIT_CALLOUT}",
+        "OutsideDia": spec.MESH_CALLOUT,
     }
+    assert drawing.DIMENSION_CALLOUTS_ABOVE == {"ToothSpan": spec.MESH_CALLOUT}
 
 
 def test_part_config_properties() -> None:
@@ -568,406 +557,6 @@ def test_part_config_properties() -> None:
     config = _config.parts("pd-rack-pinion")
     assert config["material_specification"] == "C36000 free-machining brass"
     assert int(config["quantity"]) == 1
-
-
-def test_surface_finish_is_part_owned_authored_and_consumed() -> None:
-    (control,) = spec.SURFACE_FINISHES
-    assert control.key == "bore"
-    assert control.roughness_um == 1.6
-    assert control.face.diameter_mm == spec.BORE_DIA
-    assert drawing.add_rack_bore_finish is finish_helper.add_rack_bore_finish
-    assert finish_helper.SURFACE_FINISHES is spec.SURFACE_FINISHES
-    assert finish_helper.BORE_DIA == spec.BORE_DIA
-    assert finish_helper.FACE_WIDTH == spec.FACE_WIDTH
-
-
-@pytest.fixture
-def finish_insertion(monkeypatch):
-    """No fake exposes position, endpoint, or reattachment setters."""
-    state = SimpleNamespace(
-        calls=[],
-        data=SimpleNamespace(),
-        select_result=True,
-        selected_count=1,
-        rebuild_result=True,
-        inventory_mode="insert",
-        inventory=[],
-        dangling=False,
-        equality_mode="identity",
-        after_rebuild=None,
-        text_result=True,
-        text_mode="write",
-        texts={},
-        style_result=0,
-        symbol=1,
-        leader_count=1,
-        points=(
-            0.278,
-            0.113,
-            0.0015,
-            0.23,
-            0.15,
-            0.0015,
-            0.222499999953,
-            0.175,
-            0.0015,
-        ),
-        face_result="valid",
-        fail_rebuild_at=None,
-        mutate_rebuild_at=2,
-        activate_result=True,
-    )
-    front = SimpleNamespace(
-        GetAnnotations=lambda: state.inventory, GetName2=lambda: "Front test view"
-    )
-
-    def select(append, data):
-        state.calls.append("select")
-        assert append is False and data is state.data and data.View is front
-        assert (data.X, data.Y, data.Z) == (0.2225, 0.175, spec.FACE_WIDTH / 2000.0)
-        return state.select_result
-
-    edge = SimpleNamespace(Select4=select)
-    state.selected, state.entities, state.types = edge, (edge,), (1,)
-
-    def selected_count(mark):
-        state.calls.append("selection-count")
-        assert mark == -1
-        return state.selected_count
-
-    def selected_object(index, mark):
-        state.calls.append("selected-object")
-        assert (index, mark) == (1, -1)
-        return state.selected
-
-    manager = SimpleNamespace(
-        CreateSelectData=lambda: state.data,
-        GetSelectedObjectCount2=selected_count,
-        GetSelectedObject6=selected_object,
-    )
-
-    def style(*arguments):
-        state.calls.append("style")
-        assert arguments == (2, 0, True, False, False, False)
-        return state.style_result
-
-    annotation = SimpleNamespace(
-        GetType=lambda: 7,
-        SetLeader3=style,
-        GetAttachedEntities3=lambda: state.entities,
-        GetAttachedEntityTypes=lambda: state.types,
-        IsDangling=lambda: state.dangling,
-        GetLeaderCount=lambda: state.leader_count,
-        GetLeaderPointsAtIndex=lambda _index: state.points,
-    )
-    state.annotation = annotation
-
-    def set_text(slot, value):
-        state.calls.append(f"text-{slot}")
-        assert slot == 8 and value == f"Ra {spec.SURFACE_FINISHES[0].roughness_ra}"
-        if state.text_mode == "write":
-            state.texts[slot] = value
-        return state.text_result
-
-    finish = SimpleNamespace(
-        GetAnnotation=lambda: state.annotation,
-        SetText=set_text,
-        GetText=lambda slot: state.texts.get(slot, ""),
-        GetSymbol=lambda: state.symbol,
-    )
-    state.finish = finish
-
-    def insert(*arguments):
-        state.calls.append("insert")
-        assert arguments == (
-            1,
-            2,
-            *drawing.BORE_FINISH_POSITION,
-            0.0,
-            0,
-            10,
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-        )
-        if state.inventory_mode == "insert":
-            state.inventory = [annotation]
-        return state.finish
-
-    def rebuild():
-        state.calls.append("rebuild")
-        if (
-            state.after_rebuild is not None
-            and state.calls.count("rebuild") == state.mutate_rebuild_at
-        ):
-            state.after_rebuild()
-        if state.calls.count("rebuild") == state.fail_rebuild_at:
-            return False
-        return state.rebuild_result
-
-    def clear(all_selections):
-        assert all_selections is True
-        state.calls.append("clear")
-
-    def activate(name):
-        state.calls.append("activate")
-        assert name == front.GetName2()
-        return state.activate_result
-
-    def same(left, right):
-        phase = (
-            "inventory"
-            if right is annotation
-            else "attachment"
-            if "rebuild" in state.calls
-            else "selection"
-        )
-        state.calls.append(f"{phase}-identity")
-        assert right is edge or right is annotation
-        if state.equality_mode == f"unknown-{phase}":
-            return -1
-        return int(left is right)
-
-    model = SimpleNamespace(
-        SelectionManager=manager,
-        ClearSelection2=clear,
-        EditRebuild3=rebuild,
-        Extension=SimpleNamespace(InsertSurfaceFinishSymbol3=insert),
-        ActivateView=activate,
-    )
-    adapter = SimpleNamespace(currentModel=model, swApp=SimpleNamespace(IsSame=same))
-
-    def project(actual_adapter, view, xyz, *, label):
-        state.calls.append("project")
-        assert actual_adapter is adapter and view is front
-        assert xyz == (spec.BORE_DIA / 2000.0, 0.0, spec.FACE_WIDTH / 1000.0)
-        assert label == "rack bore finish semantic rim point"
-        return (0.2225, 0.175)
-
-    def validate(entity, *, entity_type, control, label):
-        state.calls.append("validate-face")
-        assert entity is edge and entity_type == "EDGE"
-        assert control is spec.SURFACE_FINISHES[0]
-        assert label == "rack pinion bore finish"
-        if state.face_result == "reject":
-            raise RuntimeError("test face control mismatch")
-
-    monkeypatch.setattr(finish_helper, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(
-        finish_helper, "_validate_surface_finish_control_face", validate
-    )
-    monkeypatch.setattr(finish_helper, "model_point_in_view", project)
-    state.run = lambda: finish_helper.add_rack_bore_finish(
-        adapter, front, edge, symbol_xy=drawing.BORE_FINISH_POSITION
-    )
-    state.edge = edge
-    return state
-
-
-def test_finish_insertion_validates_face_then_selects_and_inserts_once(
-    finish_insertion,
-):
-    state = finish_insertion
-    assert state.run() is state.finish
-    assert state.calls == [
-        "validate-face",
-        "activate",
-        "clear",
-        "project",
-        "select",
-        "selection-count",
-        "selected-object",
-        "selection-identity",
-        "insert",
-        "rebuild",
-        "text-8",
-        "style",
-        "clear",
-        "rebuild",
-        "inventory-identity",
-        "attachment-identity",
-    ]
-    assert state.entities == (state.edge,) and state.types == (1,)
-    for forbidden in (
-        "SetPosition2",
-        "SetPosition",
-        "SetLeaderAttachmentPointAtIndex",
-        "SetAttachedEntities",
-    ):
-        assert not hasattr(state.annotation, forbidden)
-
-
-def test_finish_face_mismatch_rejected_before_any_selection_or_insertion(
-    finish_insertion,
-):
-    state = finish_insertion
-    state.face_result = "reject"
-    with pytest.raises(RuntimeError, match="face control mismatch"):
-        state.run()
-    assert state.calls == ["validate-face"]
-
-
-@pytest.mark.parametrize(
-    ("field", "value", "message"),
-    [
-        ("activate_result", False, "view activation failed"),
-        ("data", None, "no selection data"),
-        ("select_result", False, "semantic edge selection failed"),
-        ("selected_count", 0, "exactly one selected edge"),
-        ("selected_count", 2, "exactly one selected edge"),
-        ("selected", None, "wrong semantic edge"),
-        ("selected", object(), "wrong semantic edge"),
-        ("equality_mode", "unknown-selection", "wrong semantic edge"),
-    ],
-)
-def test_finish_insertion_rejects_bad_selection_before_insertion(
-    finish_insertion, field, value, message
-):
-    state = finish_insertion
-    setattr(state, field, value)
-    with pytest.raises(RuntimeError, match=message):
-        state.run()
-    assert "insert" not in state.calls and "rebuild" not in state.calls
-
-
-@pytest.mark.parametrize(
-    ("field", "value", "message", "rebuilds"),
-    [
-        ("finish", None, "insertion returned null", 0),
-        ("annotation", None, "no annotation", 1),
-        ("text_result", False, "roughness assignment failed", 1),
-        ("style_result", 1, "leader style failed", 1),
-    ],
-)
-def test_finish_insertion_checks_each_mutation_result(
-    finish_insertion, field, value, message, rebuilds
-):
-    state = finish_insertion
-    setattr(state, field, value)
-    with pytest.raises(RuntimeError, match=message):
-        state.run()
-    assert state.calls.count("insert") == 1 and state.calls.count("rebuild") == rebuilds
-
-
-@pytest.mark.parametrize(
-    ("field", "value", "message"),
-    [
-        ("inventory_mode", "noop", "insertion inventory mismatch"),
-        ("equality_mode", "unknown-inventory", "insertion inventory mismatch"),
-        ("text_mode", "noop", "manufacturing content changed"),
-        ("symbol", 0, "manufacturing content changed"),
-    ],
-)
-def test_finish_insertion_rejects_noops_and_readback_failure(
-    finish_insertion, field, value, message
-):
-    state = finish_insertion
-    setattr(state, field, value)
-    with pytest.raises(RuntimeError, match=message):
-        state.run()
-    assert state.calls.count("insert") == 1 and state.calls.count("rebuild") == 2
-
-
-@pytest.mark.parametrize("phase", [1, 2])
-def test_finish_each_rebuild_result_is_required(finish_insertion, phase):
-    state = finish_insertion
-    state.fail_rebuild_at = phase
-    with pytest.raises(RuntimeError, match="rebuild failed"):
-        state.run()
-    assert state.calls.count("rebuild") == phase
-    if phase == 1:
-        assert "text-8" not in state.calls and "style" not in state.calls
-
-
-@pytest.mark.parametrize("phase", [1, 2])
-@pytest.mark.parametrize(
-    ("field", "value"),
-    [
-        ("entities", ()),
-        ("entities", None),
-        ("entities", (None,)),
-        ("entities", (object(),)),
-        ("entities", (object(), object())),
-        ("types", ()),
-        ("types", None),
-        ("types", (2,)),
-        ("types", (1, 1)),
-        ("equality_mode", "unknown-attachment"),
-        ("dangling", True),
-    ],
-)
-def test_finish_insertion_rechecks_semantic_attachment_after_rebuild(
-    finish_insertion, field, value, phase
-):
-    state = finish_insertion
-    state.mutate_rebuild_at = phase
-    state.after_rebuild = lambda: setattr(state, field, value)
-    with pytest.raises(RuntimeError, match="lost its semantic edge attachment"):
-        state.run()
-    assert state.calls.count("insert") == 1 and state.calls.count("rebuild") == 2
-
-
-@pytest.mark.parametrize(
-    "inventory",
-    [
-        [],
-        [SimpleNamespace(GetType=lambda: 7)],
-        [SimpleNamespace(GetType=lambda: 7), SimpleNamespace(GetType=lambda: 7)],
-    ],
-)
-def test_finish_inventory_after_rebuild_must_be_exact_returned_annotation(
-    finish_insertion, inventory
-):
-    state = finish_insertion
-    state.after_rebuild = lambda: setattr(state, "inventory", inventory)
-    with pytest.raises(RuntimeError, match="insertion inventory mismatch"):
-        state.run()
-
-
-@pytest.mark.parametrize(
-    ("field", "value", "message"),
-    [
-        ("leader_count", 0, "exactly one leader"),
-        ("leader_count", 2, "exactly one leader"),
-        ("points", (), "points are invalid"),
-        ("points", None, "points are invalid"),
-        ("points", (0, 0, 0), "points are invalid"),
-        ("points", (float("nan"), 0, 0, 0.2225, 0.175, 0.0015), "points are invalid"),
-        (
-            "points",
-            (0.278, 0.113, 0, 0.2225, 0.175, float("inf")),
-            "points are invalid",
-        ),
-        ("points", (0.278, 0.113, 0, 0, 0, 0), "off the intended right rim"),
-        (
-            "points",
-            (0.278, 0.113, 0, 0.22250002, 0.175, 0.0015),
-            "off the intended right rim",
-        ),
-        (
-            "points",
-            (0.278, 0.113, 0, 0.2225, 0.17500002, 0.0015),
-            "off the intended right rim",
-        ),
-    ],
-)
-def test_finish_leader_requires_finite_shape_and_exact_right_rim(
-    finish_insertion, field, value, message
-):
-    state = finish_insertion
-    setattr(state, field, value)
-    with pytest.raises(RuntimeError, match=message):
-        state.run()
-
-
-def test_finish_straight_leader_with_native_readback_point_is_valid(finish_insertion):
-    state = finish_insertion
-    state.points = (0.278, 0.113, 0.0015, 0.222499999953, 0.175, 0.0015)
-    assert state.run() is state.finish
 
 
 @pytest.mark.parametrize(

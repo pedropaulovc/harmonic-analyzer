@@ -45,19 +45,19 @@ def _printed_reach(value: float, places: int) -> float:
     return max(abs(d) for d in printed_deviations(value, places, unit=UNIT))
 
 
-# 28 tall (Y), the top edge carrying the hanging platen's top rail at machine
-# y 317.734 and the bottom edge 1.0 above the bottom rail (the paper-drive
-# assembly's GUIDE_Y and BOTTOM_RAIL_CLEARANCE). The rails' screw rows stand
-# ~34 apart in the front photos (ch30 p002: 33-34 by the platen width) and so
-# do the rail centres in the ch22 back photo, so the
-# rails stay put; with 5-tall rails that leaves a 29 channel, which the 22 bar
-# (an earlier low wear-band read) only part filled. The ch30 p002 front view
-# measures the exposed bar right of the platen at ~25.5 tall, and the ch22 back
-# photo's bright band between the rails at ~25 -- both well over 22. One lock
-# plate size then serves both rails (the user's 2026-10-11 ruling: 1 lip +
-# 5 rail + ~3 bar overlap, top and bottom).
-# The frame keeps 28.0 (1.102 printed, model 1.10236).
-BAR_HEIGHT = 28.0
+# The top edge carries the hanging platen's top rail at machine y 317.734 and
+# the bottom edge stands a running clearance above the bottom rail (the
+# paper-drive assembly's GUIDE_Y and BOTTOM_RAIL_CLEARANCE). The rails' screw
+# rows stand ~34 apart in the front photos (ch30 p002: 33-34 by the platen
+# width) and so do the rail centres in the ch22 back photo, so the rails'
+# datum faces stay put. Owner ruling 2026-11-01 (B2): the .29 rails grow into
+# the channel (the bottom rail's datum face sits just over the platen's rack
+# backer), so the bar is 1.010 (it was 28.0): the ch30 p002 front view
+# measures the exposed bar right of the platen at ~25.5 tall and the ch22
+# back photo's bright band between the rails at ~25. One lock plate size
+# serves both rails (the user's 2026-10-11 ruling: lip + rail + bar overlap,
+# top and bottom).
+BAR_HEIGHT = 25.654  # 1.010
 # The bar's .XXX height band: the bottom rail's running clearance under the
 # bar spends it (build_pd_paper_drive_assembly._assert_lock_retention).
 # build_pd_support_bar authors it natively on Height@BarProfile.
@@ -73,7 +73,12 @@ BAR_HEIGHT_BAND = _printed_reach(BAR_HEIGHT, BAR_BAND_PLACES)
 BAR_DEPTH_BAND = _printed_reach(BAR_DEPTH, BAR_BAND_PLACES)
 BACK_FACE_Z = BAR_DEPTH / 2.0
 
-HANGER_TAP_Y = -0.5  # machine y 303.234 on the 303.734 bar centre
+# The column clamps (SH column clamps, machine y 303.734) and the hanger row
+# (machine y 303.234) keep their machine heights under the fixed top edge,
+# 14.0 and 14.5 below it, so in the bar's centred frame they stand below the
+# centre line.
+CLAMP_TAP_Y = BAR_HEIGHT / 2.0 - 14.0
+HANGER_TAP_Y = BAR_HEIGHT / 2.0 - 14.5
 
 # --- MHA-PD-VN-57 pivot tap -------------------------------------------------------
 PIVOT_TAP_X = -58.0

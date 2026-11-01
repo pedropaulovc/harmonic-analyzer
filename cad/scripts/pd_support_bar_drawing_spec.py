@@ -135,11 +135,12 @@ DIMENSION_CALLOUTS = {
     "Height": "MHA-PD-11\nHANGS ON IT",
     "Depth": "MHA-PD-VN-57 TIP RECESS AND\nMHA-SH-VN-52 SCREW TIPS",
     # The two rows print on one line at 1:2 though they are separate rows
-    # (the hanger row from the machine layout, the clamp row at mid-height).
+    # (the hanger row from the machine layout, the clamp row on the SH column
+    # clamps' line, both from the top face the platen hangs on).
     "HangerRowHeight": f"MHA-PD-VN-57 PIVOT AND\n{_HOOK_TAPS},\nNOT ON THE CLAMP ROW",
     # The clamp row's band is the MHA-SH-02 taps' (CLAMP_POSITION_BAND), so
     # its mate stands at the dimension, not only under the hole callout.
-    "ClampRowHeight": "MHA-SH-02\nTAPS AT BAR\nMID-HEIGHT",
+    "ClampRowHeight": "MHA-SH-02\nTAPS",
     "PivotTapStation": "MHA-PD-VN-57 PIVOT",
     "BracketTapStation1": _HOOK_TAPS,
     "BracketTapStation2": _HOOK_TAPS,

@@ -22,8 +22,8 @@ is two Front-plane cuts: the D-bore (its flat on local -Y) forward through
 flange and body, and the round bore back through the spigot.  The three
 screw holes lie on a construction bolt circle whose driving diameter is the
 printed Ø.748.  The radial oil hole is a Top-plane cut toward +Y through one
-wall, centred on the hub body by a construction station line from the hub
-front face (R9-60).  ``Axis1`` is the gear axis (Top Plane ∩ Right Plane);
+wall, at its printed station from the hub front face by a construction
+station line (R9-60).  ``Axis1`` is the gear axis (Top Plane ∩ Right Plane);
 the paper-drive assembly mates it to the sleeve's axis and the Front Plane
 to the disc's front face, unrotated.
 
@@ -79,7 +79,6 @@ from pd_transgear_disc_hub_spec import (
     BORE_DEVIATIONS,
     BORE_DIA,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     FLANGE_DIA,
     FLANGE_THICK,
@@ -278,6 +277,7 @@ async def build(adapter) -> dict[str, str]:
         ("BoltCircleDia", BOLT_CIRCLE_DIA),
         ("ScrewHoleDia", SCREW_HOLE_DIA),
         ("OilHoleDia", OIL_HOLE_DIA),
+        ("OilHoleStation", OIL_HOLE_STATION),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -481,9 +481,8 @@ async def build(adapter) -> dict[str, str]:
 
     # Radial oil hole on +Y, one wall to the bore.  Top-plane sketch (u, v) =
     # model (X, -Z): a construction line on the axis from the hub front face
-    # to the hole centre carries the station, half the hub body (R9-60: the
-    # sheet prints no station; the hole is centred at fit-up); the circle's
-    # centre sits on its end.
+    # to the hole centre carries the printed station (R9-60: match-drilled
+    # at assembly at that station); the circle's centre sits on its end.
     oil = SketchDims()
     check("create_sketch oil hole", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
@@ -509,7 +508,7 @@ async def build(adapter) -> dict[str, str]:
         OIL_HOLE_STATION,
         "oil hole station from the hub front face",
     )
-    oil.record("OilHoleStation", '("HubLength" - "SpigotLength" - "FlangeThick") / 2')
+    oil.record("OilHoleStation", '"OilHoleStation"')
     sketch_mgr = adapter.currentSketchManager
     prev_add_to_db = bool(sketch_mgr.AddToDB)
     sketch_mgr.AddToDB = True
@@ -595,7 +594,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
+    apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
 

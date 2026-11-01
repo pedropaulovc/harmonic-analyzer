@@ -36,23 +36,22 @@ UNIT = drawing_unit("parts/pd-guide-lock", _config.parts("pd-guide-lock"))
 # ENFORCE, PR #1897). The assembly centres the hole pattern, not the plate,
 # on each lock station.
 LOCK_WIDTH = 22.606  # .89, along +X
-# R9-59: the plate laps RAIL_EDGE_LIP past the rail's outer edge, so its screw
-# holes, on the rail's 2.5 mid-line, stand .146 from the guide-side edge and
-# keep the .080 wall target at the printed worst case (PR #1897). The guide's
-# tap row stays on its mid-line.
-HOLE_Y = 3.7084  # .146
-RAIL_EDGE_LIP = HOLE_Y - 2.5
-# .39 along +Y; y = 0 is the guide-side edge. One plate serves both rails
-# (user ruling 2026-10-11): lip + 5 rail + ~3 bar overlap. The 28-tall bar
-# fills the channel to a 1.0 running clearance over the bottom rail
-# (pd_support_bar_spec.BAR_HEIGHT), so the plate overlaps the bar ~3.7 at the
+# R9-59: the plate laps past the rail's outer edge. Its screw holes sit on the
+# rail's tap row, .140 above the rail's datum B (pd_platen_guide_spec.TAP_Y):
+# that is the bottom rail's outer edge and .150 below the top rail's, so at
+# .155 from the guide-side edge the plate laps .015 past the bottom rail and
+# .005 past the top one, and the holes keep the .080 wall target at the
+# printed worst case (PR #1897).
+HOLE_Y = 3.937  # .155
+# .45 along +Y; y = 0 is the guide-side edge. One plate serves both rails
+# (user ruling 2026-10-11): lip + .29 rail + bar overlap. The bar fills the
+# channel to a running clearance over the bottom rail
+# (pd_support_bar_spec.BAR_HEIGHT), so the plate overlaps the bar ~3.9 at the
 # top rail (which hangs on it) and ~2.7 at the bottom rail. The height
-# prints .XX: its least size still overlaps the bar under the 0.5 retention
+# prints .XX: its least size still overlaps the bar over the 0.5 retention
 # floor with the lifted top plates, its largest clears the latch hook and
 # pivot spacer (build_pd_paper_drive_assembly's lock-station sweep).
-# The 15.65 plate (R9-61) spanned the old 7 channel and stood 9.65 over the
-# bar at the top rail, toward the latch hook.
-LOCK_HEIGHT = 9.906  # .39
+LOCK_HEIGHT = 11.43  # .45
 # 2026-10-11 (user): 1/16 in steel sheet, thickness as supplied, e.g. A36
 # precision-ground sheet, McMaster-Carr 1388K196, 1/16 in -.005 to +.005 in
 # (read live 2026-10-11; the family's +/-.003 and +/-.001 grades sit inside
@@ -80,7 +79,7 @@ LOCK_STOCK_CALLOUT = "SHEET AS SUPPLIED"
 CORNER_R = 1.778  # .07
 # Screw-hole layout on the guide-side band (matches the guide's hole pitch:
 # the two stations sit x +-.276 about the hole pattern's centre, the lock
-# station, on the rail's 2.5 mid-line past the lip). R9-49: 1/8 DRILL
+# station, on the rail's tap row past the lip). R9-49: 1/8 DRILL
 # (.125) over the #4-40 majors carries this plate's coordinate bands and
 # the rail taps' Ø.008 position (pd_vn_guide_lock_screw_spec.LOCK_SET_OFFSET);
 # the #4 close .120 left too little.

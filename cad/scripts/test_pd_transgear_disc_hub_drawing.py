@@ -83,8 +83,8 @@ def test_the_sheet_prints_the_overall_and_the_flange_never_the_hub_body() -> Non
     """R9-5 / #2038: the overall (spigot end to hub front) is a printed term
     of the disc cluster stack, .539 at 4 places; the flange .094 is a .XXX
     length and the spigot .144 a stack term; the hub body is their
-    remainder and is not printed.  No oil-hole station prints either: the
-    hole is centred on the hub body when it is match-drilled (R9-60)."""
+    remainder and is not printed.  The oil hole's station prints at .XX
+    from the hub front face (machinist review: "centred" located nothing)."""
     diameters = {
         "FlangeDia",
         "HubDia",
@@ -96,7 +96,8 @@ def test_the_sheet_prints_the_overall_and_the_flange_never_the_hub_body() -> Non
     lengths = (
         set(spec.DRAWING_PRECISION_BY_NAME) - diameters - {"OilHoleDia", "FlatToAxis"}
     )
-    assert lengths == {"HubLength", "FlangeThick", "SpigotLength"}
+    assert lengths == {"HubLength", "FlangeThick", "SpigotLength", "OilHoleStation"}
+    assert _places("OilHoleStation") == 2
     assert spec.REFERENCE_DIMENSIONS == frozenset()
     assert {"HubLength", "SpigotLength"} < set(drawing.SIDE_KEEP)
     assert spec.HUB_LENGTH == cluster_fit.HUB_LENGTH == pytest.approx(0.539 * IN)
@@ -137,7 +138,7 @@ def test_the_overall_and_the_spigot_are_printed_terms_of_the_disc_cluster_stack(
         Path(drawing.__file__).read_text(encoding="utf-8"),
         Path(part.__file__).read_text(encoding="utf-8"),
     )
-    for text in (*callouts.values(), spec.DRAWING_NOTES, *sources):
+    for text in (*callouts.values(), *sources):
         for banned in ("FACED TO FIT", "SET AT ASSEMBLY", "SUPPLY", "step_ref"):
             assert banned not in text
     assert not hasattr(drawing, "FIT_STEP_KEY")
@@ -559,7 +560,6 @@ def test_face_landing_puts_the_leader_at_its_model_x_on_the_projected_line(
 def _sheet_text() -> str:
     return "\n".join(
         (
-            spec.DRAWING_NOTES,
             *drawing.DIMENSION_CALLOUTS_BELOW.values(),
             *drawing.DIMENSION_CALLOUTS_ABOVE.values(),
         )
@@ -599,7 +599,11 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
         - (spec.SPIGOT_LENGTH + PRINTED_LENGTH_BAND_IN)
         - (spec.FLANGE_THICK + _row(_places("FlangeThick")))
     )
-    oil_ligament = body_min / 2.0 - spec.OIL_HOLE_CENTRING_TOL - oil_r
+    station = (
+        spec.OIL_HOLE_STATION - _row(_places("OilHoleStation")),
+        spec.OIL_HOLE_STATION + _row(_places("OilHoleStation")),
+    )
+    oil_ligament = min(station[0], body_min - station[1]) - oil_r
     spigot_wall = (
         spec.SPIGOT_DIA + spec.SPIGOT_DIA_BAND[1] - (spec.BORE_DIA + spec.BORE_BAND[0])
     ) / 2.0
@@ -615,9 +619,9 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
         spec.FLAT_TO_AXIS + spec.FLAT_TO_AXIS_BAND[0]
     )
 
-    assert oil_ligament == pytest.approx(2.890, abs=0.005)
+    assert oil_ligament == pytest.approx(2.822, abs=0.005)
+    assert oil_ligament == pytest.approx(spec.OIL_HOLE_LIGAMENT_WORST)
     assert hole_to_rim == pytest.approx(2.0425, abs=0.005)
-    assert not any("RIM" in line for line in spec.DRAWING_NOTES.splitlines())
     for wall in (
         hub_wall,
         oil_ligament,
@@ -699,16 +703,13 @@ def test_the_wall_gate_refuses_a_coarser_printed_row(monkeypatch) -> None:
         _spec_fresh()
 
 
-def test_the_oil_hole_is_centred_on_the_hub_body_the_lengths_leave() -> None:
-    """R9-8 / R9-60: #57 (.043) on the drilled row, match-drilled through hub
-    and sleeve with the hub seated, centred on the hub body, so its station
-    behind the hub front face follows the printed overall, spigot and
-    flange, not a band of its own."""
+def test_the_oil_hole_station_is_printed_and_clears_both_body_ends() -> None:
+    """R9-8: #57 (.043) on the drilled row, match-drilled through hub and
+    sleeve with the hub seated, at a printed .XX station behind the hub
+    front face; its band and the printed lengths' leave both body ends."""
     assert spec.OIL_HOLE_DIA == pytest.approx(0.043 * IN)
-    # Half the .301 hub body behind the hub front face.
-    assert spec.OIL_HOLE_STATION == pytest.approx(0.1505 * IN)
-    assert spec.OIL_HOLE_Z == pytest.approx(spec.HUB_FRONT_Z + 0.1505 * IN)
-    assert spec.OIL_HOLE_Z == pytest.approx((0.144 - 0.539 + 0.1505) * IN)
+    assert spec.OIL_HOLE_STATION == pytest.approx(0.15 * IN)
+    assert spec.OIL_HOLE_Z == pytest.approx(spec.HUB_FRONT_Z + 0.15 * IN)
     body = (
         spec.HUB_LENGTH
         - PRINTED_LENGTH_BAND_IN
@@ -720,12 +721,13 @@ def test_the_oil_hole_is_centred_on_the_hub_body_the_lengths_leave() -> None:
         - (spec.FLANGE_THICK - _row(_places("FlangeThick"))),
     )
     assert spec.HUB_BODY_LENGTH_RANGE == pytest.approx(body)
+    band = _row(_places("OilHoleStation"))
     assert spec.OIL_HOLE_STATION_RANGE == pytest.approx(
-        (
-            body[0] / 2.0 - spec.OIL_HOLE_CENTRING_TOL,
-            body[1] / 2.0 + spec.OIL_HOLE_CENTRING_TOL,
-        )
+        (spec.OIL_HOLE_STATION - band, spec.OIL_HOLE_STATION + band)
     )
+    oil_r = (spec.OIL_HOLE_DIA + DRILL_PLUS) / 2.0
+    assert spec.OIL_HOLE_STATION_RANGE[0] - oil_r >= WALL_FLOOR
+    assert body[0] - spec.OIL_HOLE_STATION_RANGE[1] - oil_r >= WALL_FLOOR
     # The sleeve drills the same hole: the spigot's end on the step, the
     # hole its station behind the hub front face, over the flat.
     sleeve = cluster_fit.SLEEVE
@@ -747,9 +749,7 @@ def test_the_oil_hole_is_centred_on_the_hub_body_the_lengths_leave() -> None:
 def test_sheet_text_states_facts_not_governance() -> None:
     for word in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "BOOK FIDELITY"):
         assert word not in _sheet_text().upper()
-    notes = spec.DRAWING_NOTES.splitlines()
-    assert len(notes) <= 4
-    assert [line for line in notes if len(line) > 70] == []
+    assert not hasattr(spec, "DRAWING_NOTES")
 
 
 # Dimension text as the fleet's sheets print it: 3.5 mm caps, the advance and
@@ -769,6 +769,7 @@ _NOMINAL = {
     "BoltCircleDia": joint.BOLT_CIRCLE_DIA,
     "ScrewHoleDia": spec.SCREW_HOLE_DIA,
     "OilHoleDia": spec.OIL_HOLE_DIA,
+    "OilHoleStation": spec.OIL_HOLE_STATION,
 }
 # The bore's and the spigot's native bands print beside their values.
 _BANDS = {
@@ -855,15 +856,18 @@ def test_turned_diameters_print_inline_beside_their_own_step_on_the_edge_view() 
         assert boxes[name].gap(edge) >= 0.004, name
     for name in drawing.END_KEEP:
         assert face_gap(boxes[name]) >= 0.004, name
-    # The oil hole's callout stands above the flange's O.D. extension line,
-    # its text ending left of the hub front, where the overall's extension
-    # line rises to its row; the overall stands a row above the two lengths,
-    # which share a row, its text right of the spigot's end.
-    assert boxes["OilHoleDia"].ymin > edge.ymax
-    assert boxes["OilHoleDia"].xmax < drawing.HUB_FRONT_X
+    # The oil hole's size stands straight below the hole, under the part, so
+    # its leader crosses no dimension line; the flange thickness and its
+    # function stand below the part too, between the two.  The station
+    # shares the spigot's row above; the overall stands a row above those,
+    # its text right of the spigot's end.
+    assert boxes["OilHoleDia"].ymax < edge.ymin
+    assert drawing.SIDE_KEEP["OilHoleDia"][0] == pytest.approx(drawing._OIL_HOLE_X)
+    assert boxes["OilHoleDia"].ymax < boxes["FlangeThick"].ymin
+    assert boxes["FlangeThick"].ymax < edge.ymin
     assert boxes["HubLength"].ymin > boxes["SpigotLength"].ymax
     assert boxes["HubLength"].xmin > drawing.SPIGOT_END_X
-    assert drawing.SIDE_KEEP["FlangeThick"][1] == drawing.SIDE_KEEP["SpigotLength"][1]
+    assert drawing.SIDE_KEEP["OilHoleStation"][1] == drawing.SIDE_KEEP["SpigotLength"][1]
     # The spigot's text and callout end clear of the flange's dimension line.
     assert boxes["SpigotDia"].xmax < drawing.SIDE_KEEP["FlangeDia"][0] - 0.004
     clashes = [
@@ -1063,7 +1067,7 @@ def test_every_drive_equation_reproduces_the_modelled_geometry(monkeypatch) -> N
     assert wy1 == pytest.approx(-spec.FLAT_TO_AXIS)
 
     # Oil hole: the station line runs from the hub front face to the hole's
-    # centre, half the hub body behind it.
+    # centre, the printed station behind it.
     (station,) = fake.sketch_lines[5]
     _u0, front_v, _u1, hole_v = fake.lines[station]
     ((_cu, centre_v, oil_r),) = fake.circles
@@ -1071,7 +1075,7 @@ def test_every_drive_equation_reproduces_the_modelled_geometry(monkeypatch) -> N
     assert value("OilHoleProfile", "OilHoleDatum") == pytest.approx(front_v)
     assert value("OilHoleProfile", "OilHoleStation") == pytest.approx(front_v - hole_v)
     assert value("OilHoleProfile", "OilHoleStation") == pytest.approx(
-        spec.HUB_BODY_LENGTH / 2.0
+        spec.OIL_HOLE_STATION
     )
     assert value("OilHoleProfile", "OilHoleDia") == pytest.approx(2.0 * oil_r)
     # The one-wall cut runs a body's width deep.
@@ -1133,9 +1137,7 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
     )
     carried = dict(_part_properties.part_properties(part.PART_NAME))
     stamp = _calls(part.__file__)["apply_drawing_properties"]
-    extra = ast.literal_eval(
-        ast.unparse(stamp.args[2]).replace("DRAWING_NOTES", repr(spec.DRAWING_NOTES))
-    )
+    extra = ast.literal_eval(ast.unparse(stamp.args[2])) if len(stamp.args) > 2 else {}
     stamped: dict[str, str] = {}
     monkeypatch.setattr(
         _drawing_marks,

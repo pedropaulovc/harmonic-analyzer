@@ -402,9 +402,9 @@ def test_sheet_text_names_the_right_parts() -> None:
     # The leader leaves the last row's end, so that row is the longer.
     assert len(hole) < len(drill) <= 70
     assert f"WITH {spec.HUB_NUMBER}" in drill
-    # The hub's sheet locates the match-drilled hole (CENTRED ON HUB BODY).
+    # The hub's sheet locates the match-drilled hole at its printed station.
     assert drill.endswith(f"POSITION SET BY {spec.HUB_NUMBER}")
-    assert "CENTRED ON HUB BODY" in hub.OIL_HOLE_CALLOUT_BELOW
+    assert "OilHoleStation" in hub.DRAWING_PRECISION_BY_NAME
     assert f"MATE PIN {spec.PIN_NUMBER}" in spec.BORE_FIT_CALLOUT
     assert _config.parts("pd-transgear-front-bushing")["number"] == "MHA-PD-25"
 

@@ -6,9 +6,9 @@ platen cannot fall off it: the plate overlaps the guide on one long edge
 (the 2 screw holes) and cantilevers past the bar's back face on the other.
 
 Layout: width along +X, height along +Y from the origin corner, thickness
-extruded +Z; the y = 0 edge is the guide-side edge (screw holes 2.5 above
+extruded +Z; the y = 0 edge is the guide-side edge (screw holes .155 above
 it), and its four plan corners are rounded. Bottom-rail copies mount as
-authored and bridge UP across the 1.0 running clearance onto the bar;
+authored and bridge UP across the running clearance onto the bar;
 top-rail copies are flipped Rz180 by the assembly and hang DOWN over the bar
 the top rail rides on.
 
@@ -68,11 +68,11 @@ MATERIAL = "Plain Carbon Steel"
 # dimensional contract shared with draw_pd_guide_lock.py; re-exported here for
 # build_pd_paper_drive_assembly). One plate serves both rails (user ruling
 # 2026-10-11): R9-59's lip past the rail's outer edge (the screw holes'
-# edge wall) + 5 rail + the overlap behind the bar. The 28-tall bar
-# (pd_support_bar_spec) closes the old 7 open channel to a 1.0 running
-# clearance over the bottom rail and carries the top rail on its top edge, so
-# the .39 plate overlaps the bar ~2.7 at the bottom stations and ~3.7 at the
-# top (2026-07-07 field report: a 12-tall plate across the 7 channel topped
+# edge wall) + the .29 rail + the overlap behind the bar. The bar
+# (pd_support_bar_spec) closes the channel to a running clearance over the
+# bottom rail and carries the top rail on its top edge, so the .45 plate
+# overlaps the bar ~2.7 at the bottom stations and ~3.9 at the top
+# (2026-07-07 field report: a 12-tall plate across the old 7 channel topped
 # out AT the bar's bottom edge and retained nothing at the bottom stations;
 # its 15.65 successor stood 9.65 over the bar at the top, toward the latch
 # hook).

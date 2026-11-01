@@ -137,20 +137,18 @@ from pd_latch_hook_geometry import (
 )
 from pd_latch_hook_spec import (
     BEND_R_BAND,
-    BOTTOM_VIEW_NOTE,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
+    FLAT_PATTERN_NOTE,
     FLAT_SKETCH,
     FORMED_BAND,
     FORMED_DIMENSIONS,
-    HOLE_BAND,
     ISOMETRIC_VIEW_NOTE,
     POSITION_DIMENSIONS,
     POSITION_TOL,
     REFERENCE_SKETCHES,
     UNIT,
-    WIDTH_TOL,
 )
 
 PART_NAME = "pd-latch-hook"
@@ -158,7 +156,7 @@ MATERIAL = "Plain Carbon Steel"  # 1095 spring steel (the registry row names it)
 DRAWING_PROPERTIES = {
     "Manufacturing Notes": DRAWING_NOTES,
     "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-    "Bottom View Note": BOTTOM_VIEW_NOTE,
+    "Flat Pattern Note": FLAT_PATTERN_NOTE,
 }
 
 # The L section in Top-Plane sketch coordinates (x, -z), from the base's -X
@@ -948,23 +946,8 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
-    # Drilled after bending (screw holes) or on the pin (pin hole), never
-    # under size.
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "ScrewHoleProfile",
-        "ScrewDia",
-        *deviations(HOLE_BAND),
-        display_unit=UNIT,
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "PinHoleProfile",
-        "PinHoleDia",
-        *deviations(HOLE_BAND),
-        display_unit=UNIT,
-    )
-    # The inside bend: R.059 the largest the screw head clears.
+    # The drilled holes and the width take the title block's rows (DRILLED
+    # HOLES, .XX); the inside bend: R.059 the largest the screw head clears.
     set_dimension_bilateral_tolerance(
         adapter,
         "InsideBend",
@@ -982,11 +965,6 @@ async def build(adapter) -> dict[str, str]:
                 POSITION_TOL,
                 display_unit=UNIT,
             )
-    # The ear's +Y edge in the guide-lock sweep and the screw holes' y-edge
-    # walls.
-    set_dimension_symmetric_tolerance(
-        adapter, "BaseEar", "Width", WIDTH_TOL, display_unit=UNIT
-    )
     # Every hand-formed arm feature carries the one formed band; the far face
     # at the pin carries none (the sheet prints it as a reference).
     for feature_name, dimension_names in FORMED_DIMENSIONS.items():

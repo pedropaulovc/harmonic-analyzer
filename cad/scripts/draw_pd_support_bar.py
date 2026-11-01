@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the platen support bar (MHA-PD-07).
 
-A 17.8 x 1.102 x .374 steel bar clamped across the frame columns, printed in
+A 17.8 x 1.010 x .374 steel bar clamped across the frame columns, printed in
 decimal inch (#290). Its BACK face
 carries the transgear pivot's #8-32 through tap and the latch hook's two
 #4-40 through taps on one row; its FRONT face, which the platen slides on,
@@ -109,6 +109,7 @@ from pd_support_bar_spec import (
     BRACKET_TAP_CSK_DIA,
     BRACKET_TAP_SPEC,
     BRACKET_TAP_X,
+    CLAMP_TAP_Y,
     HANGER_TAP_Y,
     PIVOT_TAP_X,
 )
@@ -279,7 +280,7 @@ CAPTION_SETTLE_M = 0.0006
 # circle drawn tight round the obround counterbore read as a round
 # counterbore (r7 machinist review).
 DETAIL_SLOT_X = max(CLAMP_SLOT_X)
-DETAIL_FOCUS = (DETAIL_SLOT_X, 0.0, -BAR_DEPTH / 2.0)  # model mm
+DETAIL_FOCUS = (DETAIL_SLOT_X, CLAMP_TAP_Y, -BAR_DEPTH / 2.0)  # model mm
 DETAIL_CENTER = (0.124, 0.048)
 DETAIL_SCALE = (2, 1)
 DETAIL_MM = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0  # sheet metres per mm
@@ -303,7 +304,7 @@ DETAIL_KEEP = {
 # Section B-B cuts the inner slot across the bar, at 1:1 in the sheet's
 # lower-left corner: the counterbore's depth with its text and callout
 # outside the front face the counterbore enters, the caption under it. The
-# depth's line runs at the bar's mid-height, through the counterbore's mouth
+# depth's line runs on the clamp line, through the counterbore's mouth
 # and the through slot, so neither extension line crosses the cut: over the
 # top face (r6) the floor's extension line ran up through the hatch and read
 # as a seam (its 0.13 stroke from the floor's lower corner, PDF paths).
@@ -457,7 +458,7 @@ def _hole_rims(face: Any, back: Any) -> tuple[Any, Any]:
     cbore = (
         scan_view_edges(back, label="support-bar front face")
         .circle_at(
-            (max(CLAMP_ROUND_X), 0.0, -BAR_DEPTH / 2.0),
+            (max(CLAMP_ROUND_X), CLAMP_TAP_Y, -BAR_DEPTH / 2.0),
             CLAMP_CBORE_DIA / 2.0,
             axis=(0.0, 0.0, 1.0),
             label="clamp counterbore rim",
@@ -654,7 +655,7 @@ def _slot_section_keep(adapter: Any, section: Any) -> dict[str, tuple[float, flo
     """Seed the associative depth's line through the open slot; its text is
     subsequently offset right of B-B and below detail C."""
 
-    def point(z: float, y: float = 0.0) -> tuple[float, float]:
+    def point(z: float, y: float = CLAMP_TAP_Y) -> tuple[float, float]:
         return _sheet(adapter, section, (SLOT_SECTION_X, y, z), "section B-B")
 
     front, middle = point(-BAR_DEPTH / 2.0)
@@ -730,9 +731,9 @@ def _slot_section_material_boxes(
     def point(y: float, z: float = 0.0) -> tuple[float, float]:
         return _sheet(adapter, section, (SLOT_SECTION_X, y, z), "B-B material")
 
-    front = point(0.0, -BAR_DEPTH / 2.0)
-    floor = point(0.0, -BAR_DEPTH / 2.0 + CLAMP_CBORE_DEPTH)
-    back = point(0.0, BAR_DEPTH / 2.0)
+    front = point(CLAMP_TAP_Y, -BAR_DEPTH / 2.0)
+    floor = point(CLAMP_TAP_Y, -BAR_DEPTH / 2.0 + CLAMP_CBORE_DEPTH)
+    back = point(CLAMP_TAP_Y, BAR_DEPTH / 2.0)
     xs = [line[0][0] for line in witnesses]
     front_x = min(xs, key=lambda x: abs(x - front[0]))
     floor_x = min(xs, key=lambda x: abs(x - floor[0]))
@@ -744,10 +745,12 @@ def _slot_section_material_boxes(
     rear_min, rear_max = sorted((back[0], floor_x))
     bottom, top = sorted(point(y)[1] for y in (-BAR_HEIGHT / 2.0, BAR_HEIGHT / 2.0))
     slot_bottom, slot_top = sorted(
-        point(y)[1] for y in (-CLAMP_SLOT_WIDTH / 2.0, CLAMP_SLOT_WIDTH / 2.0)
+        point(CLAMP_TAP_Y + y)[1]
+        for y in (-CLAMP_SLOT_WIDTH / 2.0, CLAMP_SLOT_WIDTH / 2.0)
     )
     cbore_bottom, cbore_top = sorted(
-        point(y)[1] for y in (-CLAMP_CBORE_DIA / 2.0, CLAMP_CBORE_DIA / 2.0)
+        point(CLAMP_TAP_Y + y)[1]
+        for y in (-CLAMP_CBORE_DIA / 2.0, CLAMP_CBORE_DIA / 2.0)
     )
     return {
         "upper bar": (xmin, cbore_top, xmax, top),

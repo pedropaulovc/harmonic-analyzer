@@ -56,7 +56,6 @@ from _simplified_part import save_simplified_part
 from _fit_deviations import deviations
 from _gear import build_stock_form_gear, volume_check
 from _holes import wizard_holes
-from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from paper_drive_stock_native import (
     apply_span_limits,
@@ -68,7 +67,6 @@ from pd_rack_pinion_spec import (
     BORE_DIA,
     DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     FACE_WIDTH,
     GEAR_DATA,
@@ -81,7 +79,6 @@ from pd_rack_pinion_spec import (
     SPAN_PREFIX,
     SPAN_TEETH,
     STOCK_PROFILE,
-    SURFACE_FINISHES,
     TAP_CENTRES,
     TAP_DRILL_DIA,
     TAP_SPEC,
@@ -102,12 +99,9 @@ from pd_vn_transgear_disc_screw_spec import ENGAGEMENT_WORST_D
 # tap's lead runs out of the rear face; the losses are the mouths' burr
 # breaks and the cut tip), floored so the MIN never rounds up.
 ENGAGEMENT_WORST_D_PRINTED = math.floor(ENGAGEMENT_WORST_D * 100.0) / 100.0
-MANUFACTURING_NOTES = "\n".join(
-    (
-        DRAWING_NOTES,
-        "#0-80 TAPS FULL THREAD THRU; MHA-PD-VN-55 SCREW ENGAGEMENT "
-        f"{ENGAGEMENT_WORST_D_PRINTED:.2f}D MIN.",
-    )
+MANUFACTURING_NOTES = (
+    "#0-80 TAPS FULL THREAD THRU; MHA-PD-VN-55 SCREW ENGAGEMENT "
+    f"{ENGAGEMENT_WORST_D_PRINTED:.2f}D MIN."
 )
 
 PART_NAME = "pd-rack-pinion"
@@ -288,7 +282,6 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

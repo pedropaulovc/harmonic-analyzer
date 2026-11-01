@@ -62,8 +62,8 @@ from pd_transgear_removable_spec import (
     outside_dia,
 )
 
-# Cached machinist review leaf: LEARN until the sheet reaches SHIP.
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_removable"]
 PART_STEM = SPEC.artifact_stem

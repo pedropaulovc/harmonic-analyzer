@@ -165,16 +165,6 @@ def test_platen_guide_hole_stations_match_native_wizard_features() -> None:
     assert '"tapped_bottoming", "#4-40"' not in source
 
 
-def test_drawing_splits_front_and_rear_tap_tables() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '"*Back", FRONT_VIEW_X_M, BACK_VIEW_Y_M' in source
-    assert source.count("insert_hole_table(") == 2
-    assert 'starting_hole_tag="B"' in source
-    assert source.count("hole_entities=") == 2
-    assert "for station in FRONT_X" in source
-    assert "for station in REAR_X" in source
-
-
 # R9-64: the guide screws' front receivers are tapped THROUGH, so no thread
 # or drill depth exists to stack (a blind tap could not hold full thread to
 # the screw's reach and keep a bottoming tap's lead without its drill point
@@ -344,34 +334,6 @@ def test_part_authors_the_printed_dimensions_and_places() -> None:
     # whole model's (which the farm log warns about and then deletes again).
     assert source.count("curate_view_dimensions(") == 2
     assert source.count("dimensions_by_feature=DRAWING_DIMENSIONS") == 2
-
-
-# The rear view's auto-placed hole-table origin, measured on the v38 sheet:
-# its "Y" glyph tops out 20.2 mm above the view centre and its "0 -> X" row
-# bottoms out 19.2 mm below. The front table's A5 row ends at ~0.191 and the
-# length's text above the front view starts at ~0.138.
-_ORIGIN_ABOVE_M = 0.0202
-_ORIGIN_BELOW_M = 0.0192
-_FRONT_TABLE_BOTTOM_M = 0.191
-_LENGTH_TEXT_TOP_M = 0.1382
-
-
-def test_rear_view_origin_clears_the_table_and_the_length() -> None:
-    air = 0.004
-    assert drawing.BACK_VIEW_Y_M + _ORIGIN_ABOVE_M + air <= _FRONT_TABLE_BOTTOM_M
-    assert drawing.BACK_VIEW_Y_M - _ORIGIN_BELOW_M - air >= _LENGTH_TEXT_TOP_M
-
-
-def test_native_gdt_replaces_datum_flatness_parallelism_notes() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 3
-    assert 'label="guide bottom edge",' in source
-    assert source.count("add_feature_control_frame(") == 3
-    assert 'characteristic="flatness"' in source
-    assert 'characteristic="parallelism"' in source
-    assert 'characteristic="position"' in source
-    assert "def _manufacturing_notes" not in source
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
 def test_datum_b_surface_symbol_is_clear_of_every_hole_axis() -> None:

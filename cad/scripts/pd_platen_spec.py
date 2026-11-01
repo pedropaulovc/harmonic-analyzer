@@ -49,7 +49,7 @@ SOCKET_BOSS_DIA = (
 )
 # 1/4 shank - .032 clip sheet - 3.85 plate: the boss closes the stack so the
 # tip finishes flush (a closure on the kept plate thickness, so it prints
-# .066 rounded). build_pd_platen_clip asserts it against the live screw and sheet.
+# .07 rounded). build_pd_platen_clip asserts it against the live screw and sheet.
 SOCKET_BOSS_H = 1.6872
 SOCKET_THREAD_ENGAGEMENT = PLATE_THICKNESS + SOCKET_BOSS_H
 # Each boss meets the back face in a root round up to the tool-nose radius
@@ -101,10 +101,11 @@ GUIDE_HOLE_X = (
     188.7474,  # 7.431
     242.6716,  # 9.554
 )
-# Bottom / top rail centrelines (machine 318 / 352): the assembly's fixed rail
-# seats and platen bottom set them, so they keep their millimetres and print
-# .512 / 1.850.
-GUIDE_HOLE_Y = (13.0, 47.0)
+# Bottom / top rail tap rows: the assembly's fixed rail seats (machine 283.734
+# / 317.734) plus the rails' .140 tap row (pd_platen_guide_spec.TAP_Y, owner
+# ruling 2026-11-01, B2), less the platen bottom (273.234); they keep those
+# millimetres and print .553 / 1.892.
+GUIDE_HOLE_Y = (14.056, 48.056)
 GUIDE_HOLE_XY = tuple((x, y) for y in GUIDE_HOLE_Y for x in GUIDE_HOLE_X)
 
 # Front-face counterbores recess the stock .183 x .107 fillister heads
@@ -162,7 +163,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # .XXX: it is spent by the paper-drive assembly's disc-to-platen air budget
 # (the back face rides the bar, so the thickness sets the front face).  The
 # boss Ø prints .XX (its wall round the tap, SOCKET_BOSS_WALL_MIN), its height
-# .XXX (the flush-tip closure), the root round its single limit at .XXX.
+# .XX (no mate: the flush tip is nominal and the engagement minimum reads the
+# shortest screw, not the boss), the root round its single limit at .XXX.
 # Every hole coordinate is spent by the fixed-screw float over the clip's and
 # the guides' patterns (test_pd_platen_refit): all .XXX.  The counterbore
 # floor is a reference dimension.
@@ -171,7 +173,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateProfile": {"Width": 2, "Height": 2},
     "Plate": {"Depth": 3},
     "SocketBossProfile": {"Boss2Dia": 2},
-    "SocketBosses": {"BossH": 3},
+    "SocketBosses": {"BossH": 2},
     "SocketBossFillet": {"BossFilletR": 3},
     "Sockets": {name: POSITION_PLACES for name in DRAWING_DIMENSIONS["Sockets"]},
     "GuideHoles": {name: POSITION_PLACES for name in DRAWING_DIMENSIONS["GuideHoles"]},
