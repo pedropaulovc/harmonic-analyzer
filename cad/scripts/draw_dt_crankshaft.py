@@ -1199,6 +1199,18 @@ async def build(adapter: Any) -> dict[str, str]:
             label=f"crankshaft {name}",
             diameter=name in DIAMETER_REFERENCES,
         )
+    # The pin hole's REF Ø keeps its arrows between its extension lines: an
+    # outside arrow's tail ran right into the transfer note's leader (layout
+    # audit of 467913370).
+    (pin_hole,) = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == "PinionPinHoleDia"
+    ]
+    pin_hole_display = _early_bound(pin_hole.GetSpecificAnnotation(), "IDisplayDimension")
+    pin_hole_display.ArrowSide = 0  # swDimArrowsInside
+    if int(pin_hole_display.ArrowSide) != 0:
+        raise RuntimeError("the pin hole's REF Ø did not keep its arrows inside")
 
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; the end view gets the
