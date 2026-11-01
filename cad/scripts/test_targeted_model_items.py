@@ -43,8 +43,9 @@ def test_only_the_features_owning_the_kept_names_are_imported() -> None:
 
 def test_one_feature_is_selected_once_for_all_of_its_kept_names() -> None:
     """Three kept names on one sketch must not become three selections."""
+    profile = {"CrossHoleProfile": {"LowerHoleY", "UpperHoleY", "CrossHoleDia"}}
     assert _drawing_dimension_import._features_owning(
-        fr_tube_frame_spec.DRAWING_DIMENSIONS,
+        {**fr_tube_frame_spec.DRAWING_DIMENSIONS, **profile},
         {"LowerHoleY", "UpperHoleY", "CrossHoleDia"},
         view_label="length",
     ) == ("CrossHoleProfile",)

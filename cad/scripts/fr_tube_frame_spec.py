@@ -42,12 +42,14 @@ CROSS_HOLE_DIAMETER = TUBE_CROSS_HOLE_DIAMETER
 
 # --- Marked-dimension contract: feature -> parametric dimensions kept by the
 # drawing. The hole diameter is shown once with a 2-station THRU BOTH WALLS
-# callout; both axial stations print as REF from the bottom end (the callout
-# names each station's match-drill mate). ---
+# callout naming each station's match-drill mate; neither axial station
+# prints. Both are drilled through the mate's own tapped hole at assembly
+# (MHA-FR-00), so the mate locates them and a printed station sets nothing
+# (ENFORCE review, run 20261101T062233036Z: the upper's 4-place REF gated). ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "AnnulusProfile": {"OuterDia"},
     "Column": {"Length"},
-    "CrossHoleProfile": {"LowerHoleY", "UpperHoleY", "CrossHoleDia"},
+    "CrossHoleProfile": {"CrossHoleDia"},
     "TopEndBreak": {"TopChamfer"},
 }
 
@@ -55,15 +57,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # ), so the MODEL owns them: build_fr_tube_frame applies this map to the .SLDPRT
 # and draw_fr_tube_frame only reads it back. The cut length prints three
 # places: it follows the cap stack on the .001 grid (40.109), and rounding it
-# to .XX would move it by up to .005. The upper station is a REF of
-# MHA-FR-02's match-drilled taps, .72 under that frame's off-grid rail top
-# (39.0755): four places print it equal to the model, never a rounding tie.
-# The lower station is .50 exactly. The cross hole is a .197 drill (title
+# to .XX would move it by up to .005. The cross hole is a .197 drill (title
 # block +.004/0). The top break is a .02 deburr. OuterDia stays at the document
 # default -- it is purchased stock.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Column": {"Length": 3},
-    "CrossHoleProfile": {"LowerHoleY": 2, "UpperHoleY": 4, "CrossHoleDia": 3},
+    "CrossHoleProfile": {"CrossHoleDia": 3},
     "TopEndBreak": {"TopChamfer": 2},
 }
 
@@ -118,6 +117,19 @@ LENGTH_FIT_CALLOUT = "\n".join(
 # were one 280 mm line (layout audit, run 20261023T231525949Z-3bf8c768).
 CROSS_HOLE_CALLOUT = "2 STA; MATCH-DRILL THRU BOTH WALLS AT ASSEMBLY"
 CROSS_HOLE_MATES_SUFFIX = " UPPER WITH MHA-FR-02, LOWER WITH MHA-FR-01"
+
+# The OD reference's fit requirement names both sockets by number and name,
+# read from the registry so the callout cannot drift from those parts' rows.
+# MHA-FR-02's row carries no ``title:`` (and adding one would re-key the top
+# frame's build), so its name is stated here.
+_BASE_ROW = _config.parts("fr-harmonic-base")
+_TOP_ROW = _config.parts("fr-top-frame")
+OD_FIT_SUFFIX = (
+    f")\n{_BASE_ROW['number']} {str(_BASE_ROW['title']).upper()} AND"
+    f"\n{_TOP_ROW['number']} TOP FRAME SOCKETS ARE"
+    "\nMATCH-FIT TO THIS ASSIGNED TUBE"
+    "\nCLOSE HAND-SLIP; NO PERCEPTIBLE ROCK"
+)
 
 END_VIEW_NOTE = "END VIEW SCALE 2:1"
 LENGTH_VIEW_NOTE = "LENGTH VIEW SCALE 1:5"

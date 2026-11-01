@@ -72,6 +72,7 @@ from fr_tube_frame_spec import (
     LENGTH_FIT_CALLOUT,
     LENGTH_SUPPLY_CALLOUT,
     LOWER_CROSS_HOLE_Y,
+    OD_FIT_SUFFIX,
     OUTER_DIA,
     TOP_END_CHAMFER,
 )
@@ -103,16 +104,11 @@ ISO_CENTER = (0.220, 0.280)
 
 # Per-view survivors of the marked-dimension import.
 END_KEEP: dict[str, tuple[float, float]] = {}
-# The three station values park left of the tube, each on its own dimension
-# line, so the lines have to stand far enough apart that no value's text sits
-# in a neighbour's corridor. At 0.036/0.020 the (12.70) text was 23 mm wide
-# across lines 21 mm apart, so BOTH the cut length's and the upper station's
-# lines printed through it (native layout audit: two text-on-line findings and
-# the leader crossing between them).
+# The cut length parks left of the tube; the cross-hole callout stands right
+# of it at the lower station. Neither station prints: each is match-drilled
+# with its mate (CROSS_HOLE_MATES_SUFFIX).
 LENGTH_KEEP = {
     "Length": (LENGTH_CENTER[0] - 0.050, LENGTH_CENTER[1]),
-    "LowerHoleY": (LENGTH_CENTER[0] - 0.025, LENGTH_CENTER[1] - 0.075),
-    "UpperHoleY": (LENGTH_CENTER[0] - 0.015, LENGTH_CENTER[1] + 0.075),
     "CrossHoleDia": (
         LENGTH_CENTER[0] + 0.085,
         LENGTH_CENTER[1] - COLUMN_LENGTH / 10000.0 + LOWER_CROSS_HOLE_Y / 5000.0,
@@ -282,11 +278,7 @@ def _add_outer_diameter_reference(
         label="outer diameter reference",
         diameter=True,
     )
-    od_suffix = (
-        ")\nSOCKETS MHA-FR-01/MHA-FR-02 ARE"
-        "\nMATCH-FIT TO THIS ASSIGNED TUBE"
-        "\nCLOSE HAND-SLIP; NO PERCEPTIBLE ROCK"
-    )
+    od_suffix = OD_FIT_SUFFIX
     display.SetText(2, od_suffix)
     if str(display.GetText(2) or "") != od_suffix:
         raise RuntimeError("OD reference fit text did not persist")
@@ -588,33 +580,31 @@ async def build(adapter: Any) -> dict[str, str]:
     # drawing document's places would print the 40.109 cut length at the
     # wrong grid and ask for a band the match-cut note explicitly refuses.
     assert_imported_precision(adapter, dimensions, IMPORTED_PRECISION)
-    for name in ("Length", "LowerHoleY", "UpperHoleY"):
-        references = [
-            annotation
-            for annotation in dimensions
-            if dimension_name(adapter, annotation) == name
-        ]
-        if len(references) != 1:
-            raise RuntimeError(
-                f"expected one {name} reference dimension, got {len(references)}"
-            )
-        display = set_reference_dimension(
-            adapter,
-            references[0],
-            label=f"{name} reference",
+    references = [
+        annotation
+        for annotation in dimensions
+        if dimension_name(adapter, annotation) == "Length"
+    ]
+    if len(references) != 1:
+        raise RuntimeError(
+            f"expected one Length reference dimension, got {len(references)}"
         )
-        if name == "Length":
-            # The supply minimum and the cut-to-fit stack are the only place
-            # the sheet states them; a dropped SetText must fail the sheet.
-            lanes = {
-                part: str(display.GetText(part) or "").replace("\r\n", "\n")
-                for part in (_CALLOUT_ABOVE, _CALLOUT_BELOW)
-            }
-            if lanes != {
-                _CALLOUT_ABOVE: LENGTH_SUPPLY_CALLOUT,
-                _CALLOUT_BELOW: LENGTH_FIT_CALLOUT,
-            }:
-                raise RuntimeError(f"length supply/cut-to-fit callouts did not persist: {lanes!r}")
+    display = set_reference_dimension(
+        adapter,
+        references[0],
+        label="Length reference",
+    )
+    # The supply minimum and the cut-to-fit stack are the only place the
+    # sheet states them; a dropped SetText must fail the sheet.
+    lanes = {
+        part: str(display.GetText(part) or "").replace("\r\n", "\n")
+        for part in (_CALLOUT_ABOVE, _CALLOUT_BELOW)
+    }
+    if lanes != {
+        _CALLOUT_ABOVE: LENGTH_SUPPLY_CALLOUT,
+        _CALLOUT_BELOW: LENGTH_FIT_CALLOUT,
+    }:
+        raise RuntimeError(f"length supply/cut-to-fit callouts did not persist: {lanes!r}")
     # Single line: the property is the cap's fit requirement (rule 4 names
     # the mate) riding above the native chamfer value.
     cap_acceptance = " ".join(source_properties["Top End Callout"].splitlines())
