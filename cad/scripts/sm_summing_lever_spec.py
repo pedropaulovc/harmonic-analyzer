@@ -184,9 +184,11 @@ HOLE_Z_OFFSET = -3.52825
 # at its printed .XX band. Its top and underside remain the
 # existing spring-eye and jam-nut seats; there is no separate pad or step.
 # All three positive-X rib branches use one tangent wrap/flank/root profile.
-RIB_T = 5.00  # every edge/middle rib extrusion, ordinary .XX title-block band (.20)
+RIB_T = 5.08  # every edge/middle rib extrusion, .20 on the ordinary .XX band
 RIB_WRAP_R = 0.6 * MM_PER_IN  # R15.24 around the unchanged R12.70 pivot
-RIB_REACH = HOLE_X - 4.1  # 35.75 (1.41); clear of the worst nut footprint at X36.449
+# 1.41 on the .XX grid; at its printed MAX (36.068) clear of the worst nut
+# footprint at X36.449.
+RIB_REACH = 35.814  # 1.41 in
 # Modeled at the title block's inside-corner ceiling, R.040 MAX.
 RIB_BLEND_R = inside_corner_radius_mm(unit=UNIT)
 RIB_BLEND_R_PLACES = 3

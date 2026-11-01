@@ -325,9 +325,9 @@ The printed minimum is not a cutting-depth maximum. There is no additional
 finished-cavity envelope or printed wall-acceptance requirement.
 
 The owner's **2026-10-22 plate-tap relocation** makes all three rib extrusions
-**5.00 mm**, printed **.20** under the two-place **±.01 in** band. Both edge ribs
+**5.08 mm**, printed **.20** under the two-place **±.01 in** band. Both edge ribs
 retain their outer faces at **Z=±76.20 mm**; their inner caps are now
-**Z=±71.20 mm**, and the middle rib remains centered on Z=0. One native
+**Z=±71.12 mm**, and the middle rib remains centered on Z=0. One native
 **3X .20** thickness dimension replaces the three separate thickness authorities.
 The separate counter-arm leaf remains **5.08 mm**; it is not a rib extrusion.
 
@@ -403,7 +403,7 @@ web thickness remain; the web top is flush with the coefficient top.
 The boss and counter web still share Y=0, and neither is located from the
 asymmetric 7.00 coefficient plate's midplane.
 
-The source-neighbour intent is **X reach 35.75 mm before the worst nut
+The source-neighbour intent is **X reach 35.814 mm (1.41 in) before the worst nut
 footprint at X36.449 mm**, not a claim of axial separation. Charging the
 printed rib reach (**1.41 ±.01 in**, at most 36.068 mm) gives
 **36.449−36.068 = 0.381 mm** geometric
@@ -411,7 +411,7 @@ X clearance. Native full-interference validation must still qualify the
 rib/nut, screw-head/knife-mount and installed-neighbour clearances.
 
 All three positive-X ribs now share the **R15.24** wrap, tangent flanks and
-**R.040** transitions into the coefficient top/bottom faces at **X=35.75 mm**;
+**R.040** transitions into the coefficient top/bottom faces at **X=35.814 mm**;
 the negative-X middle-rib contour is unchanged. The title block's
 **INSIDE CORNERS R.040 MAX** row controls the roots and blends; no local
 callout repeats that ceiling (drawing-guidelines rule 2). The bounded native

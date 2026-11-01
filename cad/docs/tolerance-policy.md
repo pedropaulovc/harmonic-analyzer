@@ -555,7 +555,7 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   moved only the matched mounting row down **0.71 mm**: receiver coordinates
   are **.1280 ±.0020 in (3.25 ±0.0508 mm) below the actual top**, with bracket holes and screws
   following, while the bracket body/seat and threaded-lever pose remain fixed.
-  All three rib extrusions are **5.00 mm**, printed **.20 ±.01 in** by one native
+  All three rib extrusions are **5.08 mm**, printed **.20 ±.01 in** by one native
   **3X .20** dimension. The drill continues beyond the rib into continuous
   plate material; there is no rib-only drill/thread-depth requirement.
   There is no additional finished-cavity envelope or printed wall acceptance.

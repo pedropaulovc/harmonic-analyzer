@@ -760,7 +760,7 @@ def test_marked_dimensions_are_all_placed_and_their_callouts_land() -> None:
 
 def test_one_three_rib_size_leaves_the_distinct_counter_web_top_flush() -> None:
     spec = sm_summing_lever_spec
-    assert lever_build.RIB_T == spec.RIB_T == 5.00
+    assert lever_build.RIB_T == spec.RIB_T == 5.08
     assert spec.COUNTER_WEB_T == 5.08
     assert spec.COUNTER_WEB_T / 2.0 == spec.COEFFICIENT_TOP_Y == 2.54
     assert spec.COEFFICIENT_T == 7.0
@@ -1867,30 +1867,30 @@ def test_native_rib_end_planes_preserve_uniform_depths_and_fixed_outer_faces(
         return SimpleNamespace(GetSurface=lambda: surface)
 
     planes = {
-        "EdgeRibBack": [-76.2, -71.2],
-        "EdgeRibFront": [71.2, 76.2],
-        "MiddleRib": [-2.5, 2.5],
+        "EdgeRibBack": [-76.2, -71.12],
+        "EdgeRibFront": [71.12, 76.2],
+        "MiddleRib": [-2.54, 2.54],
     }
-    depths = {name: 5.0 for name in planes}
+    depths = {name: 5.08 for name in planes}
     if damage == "outer-caps-absent":
-        planes["EdgeRibBack"] = [-71.2]
-        planes["EdgeRibFront"] = [71.2]
+        planes["EdgeRibBack"] = [-71.12]
+        planes["EdgeRibFront"] = [71.12]
     elif damage == "receiver-depth":
         depths["EdgeRibBack"] = 9.0
     elif damage == "opposite-depth":
-        depths["EdgeRibFront"] = 5.08
+        depths["EdgeRibFront"] = 5.0
     elif damage == "middle-depth":
-        depths["MiddleRib"] = 5.08
+        depths["MiddleRib"] = 5.0
     elif damage == "receiver-entry":
         planes["EdgeRibBack"][0] -= 0.9
     elif damage == "receiver-inner":
         planes["EdgeRibBack"][1] = -67.2
     elif damage == "opposite-inner":
-        planes["EdgeRibFront"][0] = 71.12
+        planes["EdgeRibFront"][0] = 71.2
     elif damage == "middle-inner":
-        planes["MiddleRib"][0] = -2.54
+        planes["MiddleRib"][0] = -2.5
     elif damage == "middle-outer":
-        planes["MiddleRib"][1] = 2.54
+        planes["MiddleRib"][1] = 2.5
     elif damage == "middle-one-cap":
         planes["MiddleRib"] = [-2.5]
     elif damage == "extra":
