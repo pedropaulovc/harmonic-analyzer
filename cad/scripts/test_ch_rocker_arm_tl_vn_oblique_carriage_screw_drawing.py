@@ -131,9 +131,15 @@ def test_modelled_as_cut_to_fit_from_the_bought_screw() -> None:
         spec.SUPPLIER_REFERENCE_FORMATS["SupplierLength"][3]
         == "AS-SUPPLIED STOCK LENGTH"
     )
-    # The stock witness stands clear of the installed solid.
-    assert (
-        spec.SUPPLIER_REFERENCE_STARTS["SupplierLength"][0] < -dims.DIMS.head_dia / 2.0
+    # The stock witness's lane stands left of the solid; its chord runs down
+    # the shank's left edge into the phantom uncut tip (machinist review: a
+    # carrier beside the head printed as a loose dashed line), and the thread
+    # Ø's chord lies on the cut end rather than across the shank.
+    assert spec.SUPPLIER_REFERENCE_SIDES["SupplierLength"] == "left"
+    assert spec.SUPPLIER_REFERENCE_STARTS["SupplierLength"] == (-dims.DIMS.major_dia / 2.0, 0.0)
+    assert spec.SUPPLIER_REFERENCE_STARTS["SupplierThreadDiameter"] == (
+        -dims.DIMS.major_dia / 2.0,
+        -spec.CUT_LENGTH,
     )
     draw_source = (
         Path(part.__file__).parent
@@ -176,3 +182,20 @@ def test_lengths_shelve_either_side_of_the_screw_and_head_height_clears_them() -
     assert drawing.SUPPLIER_MARGINS["*Front"][0] > lanes["SupplierLength"][1] + 0.062
     sides = {name: (m[0], m[2]) for name, m in drawing.SUPPLIER_MARGINS.items()}
     assert sides["*Front"] == sides["*Top"]
+
+
+def test_uncut_tip_phantom_closes_the_stock_witness() -> None:
+    import draw_ch_rocker_arm_tl_vn_oblique_carriage_screw as drawing
+
+    r = dims.DIMS.major_dia / 2000.0
+    cut, stock = -spec.CUT_LENGTH / 1000.0, -dims.DIMS.length / 1000.0
+    ends = drawing._uncut_tip_ends()
+    assert ends == {
+        "left": ((-r, cut, 0.0), (-r, stock, 0.0)),
+        "end": ((-r, stock, 0.0), (r, stock, 0.0)),
+        "right": ((r, stock, 0.0), (r, cut, 0.0)),
+    }
+    # The stock witness's chord ends where the phantom's end line starts.
+    x, y = spec.SUPPLIER_REFERENCE_STARTS["SupplierLength"]
+    assert (x / 1000.0, (y - dims.DIMS.length) / 1000.0, 0.0) == ends["end"][0]
+    assert drawing._PHANTOM_LINE_STYLE == 2  # swLineStyles_e.swLinePHANTOM

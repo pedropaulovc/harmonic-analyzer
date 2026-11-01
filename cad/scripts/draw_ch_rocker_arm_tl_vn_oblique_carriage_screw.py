@@ -17,8 +17,10 @@ from _machinist_review_mode import MachinistReviewMode
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _purchased_title_fit import fit_purchased_title_block
 from _supplier_screw_dimensions import _supplier_top_record, annotate_supplier_screw
+from _drawing_projection import model_points_in_view
 from _supplier_screw_layout import supplier_screw_margins, supplier_top_text_geometry
 from _supplier_text_shelf import assert_supplier_shelves, shelve_supplier_text
+from _transgear_zone_line import require_placed, sketch_lines
 import ch_rocker_arm_tl_vn_oblique_carriage_screw_spec as supplier
 
 
@@ -110,6 +112,58 @@ def _assert_layout(adapter: Any, displays: dict[str, Any], stations: Any) -> Non
         raise RuntimeError(f"{LIFTED}: text is not clear above the head")
 
 
+# The as-supplied screw's uncut tip, below the installed cut end, in phantom
+# (swLineStyles_e.swLinePHANTOM, thin): the 20 mm stock witness's lower
+# extension lands on its end, not in empty space (machinist review, 3/3 runs).
+_PHANTOM_LINE_STYLE = 2
+_THIN_LINE_WEIGHT = 0
+
+
+def _uncut_tip_ends() -> dict[str, tuple[tuple[float, float, float], ...]]:
+    """The uncut tip's sides and end in model metres (Front: x, y, 0)."""
+    r = supplier.DIMS.major_dia / 2000.0
+    cut, stock = -supplier.CUT_LENGTH / 1000.0, -supplier.DIMS.length / 1000.0
+    return {
+        "left": ((-r, cut, 0.0), (-r, stock, 0.0)),
+        "end": ((-r, stock, 0.0), (r, stock, 0.0)),
+        "right": ((r, stock, 0.0), (r, cut, 0.0)),
+    }
+
+
+def _phantom_uncut_tip(adapter: Any, front: Any) -> Any:
+    model_ends = _uncut_tip_ends()
+    keys = list(model_ends)
+    sheet = model_points_in_view(
+        adapter,
+        front,
+        [point for key in keys for point in model_ends[key]],
+        label="carriage screw uncut tip",
+    )
+    sheet_ends = {key: (sheet[2 * i], sheet[2 * i + 1]) for i, key in enumerate(keys)}
+    lines = sketch_lines(
+        adapter,
+        front,
+        sheet_ends,
+        style=_PHANTOM_LINE_STYLE,
+        width=_THIN_LINE_WEIGHT,
+        label="carriage screw uncut tip",
+    )
+    rebuild_drawing(adapter, label="carriage screw uncut tip in phantom")
+    _assert_uncut_tip(adapter, lines, stage="drawn")
+    return lines
+
+
+def _assert_uncut_tip(adapter: Any, lines: Any, *, stage: str) -> None:
+    require_placed(
+        adapter,
+        lines,
+        style=_PHANTOM_LINE_STYLE,
+        width=_THIN_LINE_WEIGHT,
+        label="carriage screw uncut tip",
+        stage=stage,
+    )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     checks = []
 
@@ -131,10 +185,12 @@ async def build(adapter: Any) -> dict[str, str]:
         stations = shelve_supplier_text(adapter, displays, SHELVES)
         _lift_head_height(adapter, displays)
         _assert_layout(adapter, displays, stations)
+        tip = _phantom_uncut_tip(adapter, views["*Front"])
         settled_references = checks[0]
 
         def assert_layout() -> None:
             _assert_layout(adapter, settled_references(), stations)
+            _assert_uncut_tip(adapter, tip, stage="settled")
 
         checks.append(assert_layout)
 
