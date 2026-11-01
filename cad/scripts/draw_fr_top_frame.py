@@ -4137,11 +4137,18 @@ async def build(adapter: Any) -> dict[str, str]:
         label="gooseneck set-screw through-to-bore tap",
         process="TAP",
     )
-    # The #7 tap drill prints three places (.201), as drill diameters do; a
-    # THROUGH tap's drill is <hw-thrutapdrldia> (draw_sh_column_clamp_back).
+    # The #7 tap drill prints three places (.201), as drill diameters do. A
+    # through-tap callout names its drill <hw-tapdrldia> or <hw-thrutapdrldia>
+    # depending on the end condition; the callout text says which.
+    definitions = "\n".join(str(set_tap_callout.GetText(part) or "") for part in (5, 6, 7, 8))
+    drill_variables = [
+        name for name in ("hw-tapdrldia", "hw-thrutapdrldia") if f"<{name}>" in definitions
+    ]
+    if len(drill_variables) != 1:
+        raise RuntimeError(f"gooseneck set-tap callout drill variables: {drill_variables}")
     set_hole_callout_precision(
         set_tap_callout,
-        {"hw-thrutapdrldia": 3},
+        {drill_variables[0]: 3},
         label="gooseneck set-tap drill",
     )
     _checked_dimension(

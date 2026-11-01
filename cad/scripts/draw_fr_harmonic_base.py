@@ -137,6 +137,7 @@ from fr_harmonic_base_spec import (
     PART_SURFACE_FINISHES,
     PIVOT_SEAT_DIMENSIONS,
     STACK_HEIGHT,
+    POCKET_CORNER_FILLET_R,
     POCKET_HALF_X,
     UNIT,
     pivot_seat_step,
@@ -1292,12 +1293,33 @@ LUGS_Y_COLUMNS = (
     ("LongRibY", 54.75, 52.0),
     ("Lug0Y", 76.25, 86.0),
 )
+# The lug-bottoms pointer lands on the front-west lug's own bottom face, inside
+# its rectangle (review e409ce3: at (-200, -109) it ended on the socket boss):
+# midway across the lug's span inside the pocket and midway along the run
+# between the boss rim and the lug's inner face, clear of the R.23 corners.
+_TIP_LUG = next(s for s in CROSS_TAP_LUG_SHAPES if s[1] < 0.0 and s[3] < 0.0)
+_TIP_BOSS = next(s for s in SOCKET_BOSS_SHAPES if s[1] < 0.0 and s[2] < 0.0)
+_LUG_TIP_X = (max(_TIP_LUG[1], -POCKET_HALF_X) + _TIP_LUG[2]) / 2.0
+_LUG_TIP_Z = (
+    _TIP_BOSS[2] + math.sqrt(_TIP_BOSS[3] ** 2 - (_LUG_TIP_X - _TIP_BOSS[1]) ** 2)
+    + _TIP_LUG[4]
+) / 2.0
+if not (
+    math.dist((_LUG_TIP_X, _LUG_TIP_Z), _TIP_BOSS[1:3]) - _TIP_BOSS[3]
+    > POCKET_CORNER_FILLET_R
+    and min(_LUG_TIP_X - max(_TIP_LUG[1], -POCKET_HALF_X), _TIP_LUG[2] - _LUG_TIP_X)
+    > POCKET_CORNER_FILLET_R
+    and _TIP_LUG[4] - _LUG_TIP_Z > POCKET_CORNER_FILLET_R
+):
+    raise AssertionError("lug-bottom leader tip is not on the lug's flat bottom face")
+# A leader ending on a surface takes a dot (ASME Y14.2).
+_DOT_ARROWHEAD = 3  # swArrowStyle_e.swDOT_ARROWHEAD
 # label -> (text, top-left sheet xy, leader tip machine (X, Z)).
 LUGS_LEVEL_NOTES = {
     "cross-tap lug bottoms": (
         "LUG BOTTOMS:\nSECTION B-B, SHEET 3",
         (0.067, 0.071),
-        (-200.0, -109.0),
+        (_LUG_TIP_X, _LUG_TIP_Z),
     ),
 }
 UNDERSIDE_LUGS_KEEP = {
@@ -1862,6 +1884,18 @@ def _center_mark_count(view: Any) -> int:
     return len(
         _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
     )
+
+
+def _dot_leader_terminator(adapter: Any, note: Any, *, label: str) -> None:
+    """End a pointer note's one leader in a dot, and prove it took."""
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    status = annotation.SetArrowHeadStyleAtIndex(0, _DOT_ARROWHEAD)
+    if type(status) is not int or status != 0:
+        raise RuntimeError(f"{label}: SetArrowHeadStyleAtIndex refused a dot ({status!r})")
+    rebuild_drawing(adapter, label=f"{label} dot terminator")
+    style = annotation.GetArrowHeadStyleAtIndex(0)
+    if type(style) is not int or style != _DOT_ARROWHEAD:
+        raise RuntimeError(f"{label}: leader terminator reads {style!r}, not a dot")
 
 
 def _require_single_center_marks(
@@ -2632,7 +2666,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_note(adapter, LUGS_NOTE, *LUGS_NOTE_XY)
     for label, (text, text_xy, tip_mm) in LUGS_LEVEL_NOTES.items():
-        add_leader_note(
+        note = add_leader_note(
             adapter,
             text,
             text_xy=text_xy,
@@ -2640,6 +2674,7 @@ async def build(adapter: Any) -> dict[str, str]:
             label=label,
             view=lugs,
         )
+        _dot_leader_terminator(adapter, note, label=label)
 
     # drawing-simplicity-policy.md `How the repository implements the guidelines`'s proof obligation, now that no sheet code writes places:
     # every imported dimension must still print what its PART authored. A

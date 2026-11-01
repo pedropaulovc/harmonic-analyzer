@@ -3477,6 +3477,38 @@ def test_retained_lug_bottom_is_a_native_model_dimension_not_a_removed_cast_leve
         s[1] + 1.0 < x < s[2] - 1.0 and s[3] + 1.0 < z < s[4] - 1.0
         for s in part.CROSS_TAP_LUG_SHAPES
     )
+    # Review e409ce3: the arrow ended on the socket boss, not the lug face.
+    # The tip clears every boss and the pocket wall by a full corner fillet.
+    fillet = fr_harmonic_base_spec.POCKET_CORNER_FILLET_R
+    assert all(
+        math.dist((x, z), (bx, bz)) - r > fillet
+        for _kind, bx, bz, r in part.SOCKET_BOSS_SHAPES
+    )
+    assert abs(x) < fr_harmonic_base_spec.POCKET_HALF_X - fillet
+    assert sheet._DOT_ARROWHEAD == 3
+
+
+def test_lug_bottom_leader_ends_in_a_verified_dot(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    import draw_fr_harmonic_base as sheet
+
+    calls = []
+
+    def annotation(applied: int):
+        return SimpleNamespace(
+            SetArrowHeadStyleAtIndex=lambda i, s: calls.append((i, s)) or 0,
+            GetArrowHeadStyleAtIndex=lambda i: applied,
+        )
+
+    monkeypatch.setattr(sheet, "_early_bound", lambda value, _name: value)
+    monkeypatch.setattr(sheet, "rebuild_drawing", lambda *_a, **_k: None)
+    note = SimpleNamespace(GetAnnotation=lambda: annotation(3))
+    sheet._dot_leader_terminator(None, note, label="lug")
+    assert calls == [(0, 3)]
+    stale = SimpleNamespace(GetAnnotation=lambda: annotation(1))
+    with pytest.raises(RuntimeError, match="not a dot"):
+        sheet._dot_leader_terminator(None, stale, label="lug")
 
 
 def test_underside_lug_texts_fit_the_border_and_clear_every_retained_baseline() -> None:
