@@ -31,11 +31,9 @@ MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_pivot_screw"]
 ITEM = "18-8 SS SHOULDER SCREW, EXT THREAD, 3/8 X 1-1/2, 5/16-18"
 # The default "VIEWS ARE REFERENCE ONLY" line would read as overriding the one
-# shop dimension (as on the hub pin's sheet).
-GENERAL_TEXT = (
-    "PURCHASED PART; CUT THREAD AND CHAMFER ITS END AT ASSEMBLY, "
-    "OTHER GEOMETRY AS SUPPLIED (REFERENCE)."
-)
+# shop dimension (as on the hub pin's sheet). At most the default cut line's
+# 74 characters: 99 ran to x 237 mm, past the footer's 215.5 (farm round 4).
+GENERAL_TEXT = "PURCHASED PART; CUT THREAD AND CHAMFER END AT ASSEMBLY. REST AS SUPPLIED."
 # tall_top's 96 mm Top cell holds the ~2.3 in cut screw at 1:1.
 VIEW_LAYOUT = "tall_top"
 # Every text shelves right of its own witnesses, clear of the lines: the head
