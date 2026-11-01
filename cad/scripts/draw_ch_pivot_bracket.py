@@ -649,6 +649,12 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=_VIEW_SCALE)
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=_VIEW_SCALE)
+    # The plan shows the crown's tangent seams as grey lines over its outline
+    # (machinist review): hide them.
+    top_view = _early_bound(top, "IView")
+    top_view.SetDisplayTangentEdges2(0)  # swTangentEdgesHidden
+    if int(top_view.GetDisplayTangentEdges2()) != 0:
+        raise RuntimeError("failed to hide the plan's tangent edges")
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=_VIEW_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=_VIEW_SCALE)
     # No view needs hidden lines: the elevation shows the bore in true circle,

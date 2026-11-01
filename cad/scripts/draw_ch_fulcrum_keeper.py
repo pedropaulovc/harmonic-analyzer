@@ -659,7 +659,8 @@ async def build(adapter: Any) -> dict[str, str]:
         tap_callout, SET_SCREW_CALLOUT_PRECISION, label="crown set-screw tap"
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, NOTES_TOP)
-    add_property_linked_note(adapter, "Isometric View Note", 0.310, 0.150)
+    # Just under the pictorial (its bottom ~0.172), not 20 mm below it.
+    add_property_linked_note(adapter, "Isometric View Note", 0.310, 0.163)
 
     return await finalize_drawing(
         adapter,

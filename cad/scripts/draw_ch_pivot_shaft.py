@@ -476,6 +476,11 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pivot bearing finish",
         char_height=FINISH_CHAR_HEIGHT,
     )
+    # Re-assert the detail's hidden-lines-removed display now its annotations
+    # have landed: left as placed, the 5:1 dome printed as straight segments
+    # (machinist review; draw_dt_cone_gear_shaft does the same for its
+    # sections).
+    set_hidden_lines_removed(adapter, detail)
 
     # 0.020: a note is left-aligned on its anchor, so the ink starts here. The
     # bound is the 12.7 mm zone margin (~0.0127); 0.020 clears it, and the
