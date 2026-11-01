@@ -52,9 +52,12 @@ SUPPLIER_MARGINS = {
     "*Front": (0.010, 0.018, 0.060, 0.018),
     "*Top": (0.010, 0.004, 0.060, 0.020),
 }
-# The cut length runs below the shoulder face, the shoulder length above it, so
-# both share the first lane right of the Top view.
-CUT_LANE = 0.006
+# The cut length's text (63 mm wide with its callout row) centres on its line,
+# so the line stands far enough right that the text clears the thread's edge
+# and the shoulder Ø's witness lines (x 94-95 mm), and its outside arrow's
+# tail clears the shoulder Ø text (x 104-128 mm) over the thread end. At the
+# first lane, 6 mm out, it crossed all three (farm round 5 layout audit).
+CUT_LANE = 0.028
 
 
 def _assert_supplier_bands(displays):
