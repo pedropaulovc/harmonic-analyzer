@@ -165,6 +165,7 @@ def annotate_chain_stock(
     # Sheet-metre x offsets from each TOP dimension line to its shelved text.
     shelves = {stock.WIDTH_DIMENSION: -0.024}
     if connecting:
+        shelves[stock.PLATE_DIMENSION] = -0.012
         shelves[stock.LENGTH_DIMENSION] = 0.024
     options_by_view = {}
     for key, rows in expected_by_view.items():
@@ -180,15 +181,15 @@ def annotate_chain_stock(
         else:
             positions = {stock.WIDTH_DIMENSION: (xmin - 0.014, middle[1])}
             if connecting:
-                # The plate span is too short for inside arrows, so its two-row
-                # REF hangs left of the line on a shoulder ~5.6 mm under the
-                # anchor and rises ~3.5 mm above it. At the 2:1 fit its ~20 mm
-                # text ends 6 mm short of the roller-width line, so the shoulder
-                # only has to clear the roller outline, and the text must stay
-                # inside the 40 mm TOP cell (farm run 20261101T063127651Z).
+                # The plate span is too short for inside arrows, and left to
+                # itself SolidWorks hung the two-row REF on whichever side it
+                # chose (left at 1:4, over the pin outline at 2:1, run
+                # 20261101T075339529Z). It is shelved left of its line instead,
+                # above the roller outline, ending 6 mm short of the
+                # roller-width line, inside the 40 mm TOP cell.
                 positions.update(
                     {
-                        stock.PLATE_DIMENSION: (middle[0], ymax + 0.005),
+                        stock.PLATE_DIMENSION: (middle[0], ymax + 0.004),
                         stock.LENGTH_DIMENSION: (xmax + 0.020, middle[1]),
                     }
                 )
@@ -222,8 +223,8 @@ def annotate_chain_stock(
         options_by_view[key] = options
         if key == "free_top":
             # Keep the native vertical lines/witnesses where curation put them;
-            # shelf the complete two-row labels off them, the width to the left
-            # and the pin length to the right, clear of the spans between.
+            # shelf the complete two-row labels off them: width to the left,
+            # plate up-left over the roller, pin length to the right.
             offset_dimension_text(
                 adapter,
                 imported,

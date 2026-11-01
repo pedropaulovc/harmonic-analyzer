@@ -325,7 +325,7 @@ def test_chain_annotation_positions_follow_source_ink_not_stale_outline(
             {
                 chain_stock.PLATE_DIMENSION: (
                     (top_left + top_right) / 2,
-                    y + chain_stock.CONNECTING_PIN_LENGTH / 2000 * ratio + 0.005,
+                    y + chain_stock.CONNECTING_PIN_LENGTH / 2000 * ratio + 0.004,
                 ),
                 chain_stock.LENGTH_DIMENSION: (top_right + 0.020, y),
             }
@@ -335,12 +335,15 @@ def test_chain_annotation_positions_follow_source_ink_not_stale_outline(
         for name, xy in expected.items():
             assert views[key].dimension_positions[name] == pytest.approx(xy)
     if connecting and ratio == 2.0:
-        # At the 2:1 fit the plate REF's shoulder (~5.6 mm under its anchor)
-        # stays above the roller outline, and its ~3.5 mm-high top row inside
-        # a 40 mm cell centred on the ink.
-        plate_y = views["free_top"].dimension_positions[chain_stock.PLATE_DIMENSION][1]
-        assert plate_y - 0.0056 > y + chain_stock.ROLLER_WIDTH / 2000 * ratio + 0.001
-        assert plate_y + 0.0035 < y + 0.020
+        # At the 2:1 fit the shelved two-row plate REF (about 8 mm tall, 20 mm
+        # wide, centred 12 mm left of its line) sits above the roller outline,
+        # short of the roller-width line, inside a 40 mm cell centred on the ink.
+        plate_x, plate_y = views["free_top"].dimension_positions[
+            chain_stock.PLATE_DIMENSION
+        ]
+        assert plate_y - 0.004 > y + chain_stock.ROLLER_WIDTH / 2000 * ratio + 0.001
+        assert plate_y + 0.004 < y + 0.020
+        assert plate_x - 0.012 - 0.010 > top_left - 0.014 + 0.002
     assert not views["installed_iso"].dimension_positions
     settled()
     assert all(view.outline_calls == 0 for view in views.values())
@@ -358,8 +361,8 @@ def test_chain_top_shelves_text_without_moving_native_lines(monkeypatch, connect
     }
     shelves = {chain_stock.WIDTH_DIMENSION: -0.024}
     if connecting:
+        shelves[chain_stock.PLATE_DIMENSION] = -0.012
         shelves[chain_stock.LENGTH_DIMENSION] = 0.024
-        assert by_name[chain_stock.PLATE_DIMENSION].display.OffsetText is False
     for name, dx in shelves.items():
         annotation = by_name[name]
         line = top.dimension_positions[name]
