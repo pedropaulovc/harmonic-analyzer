@@ -7,3 +7,9 @@ pn-pen-v-block:
   tolerance_class: machined_block
   process: "machined (brass)"
   drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "front view, TAP 4-40 UNC INTO PIVOT BORE located .49 from the paper end, .14 past the .35 step: the wall from the thread to the step face over the step's .08, stated by the native .064 MIN TAP WALL dimension (TapWallMin@TapWallReference)"
+      finding: "tap wall to the step face .064 in at the printed worst case (tap station .48, step .36, #4-40 major .1120), under the .080 in target and over the .060 in floor (rule 17)"
+      reason: "rule 17 forbids tightening a band to protect a wall (owner ruling 2026-10-31 on MHA-PN-01, applied here by coordinator InchSmPn); the step can't move toward the paper end (the stirrup slides on the neck with 0.016 mm to spare) and the tap/pivot bore can't move toward the free end (it carries the block toward the recording paper, which keeps 0.071 mm of clearance). The sheet states the worst-case wall as a model-owned single limit, never as note text (pn_pen_v_block_spec.TAP_WALL_MIN_MM, which refuses anything under the .060 floor)"

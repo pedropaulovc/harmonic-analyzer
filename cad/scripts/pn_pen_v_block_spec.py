@@ -326,9 +326,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PivotBoreProfile": {"PivotX", "PivotDia"},
     "PivotReference": {"PivotZ", "PivotChamferSize"},
     "SetScrewHole": {"SetScrewX", "SetScrewY"},
+    "TapWallReference": {"TapWallMin"},
 }
-REFERENCE_SKETCHES = ("ReliefReference", "PivotReference")
-SECTION_REFERENCE_SKETCHES = REFERENCE_SKETCHES
+SECTION_REFERENCE_SKETCHES = ("ReliefReference", "PivotReference")
+# TapWallReference (Front plane) prints in the front view only.
+REFERENCE_SKETCHES = (*SECTION_REFERENCE_SKETCHES, "TapWallReference")
+TAP_WALL_MIN_PLACES = 3
 # Places carry the title block's tolerance (drawing-guidelines.md rule 3).
 # Every station and size a fit, wall or stack reads prints .XX (+/-.01): the
 # outline, the neck faces (the stirrup's window must pass the neck at both
@@ -355,6 +358,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PivotBoreProfile": {"PivotX": 2, "PivotDia": 4},
     "PivotReference": {"PivotZ": 2, "PivotChamferSize": PIVOT_CHAMFER_PLACES},
     "SetScrewHole": {"SetScrewX": 2, "SetScrewY": 2},
+    "TapWallReference": {"TapWallMin": TAP_WALL_MIN_PLACES},
 }
 # The one driven sketch dimension the print shows, parenthesised as a
 # reference (no tolerance): the apex flat's height, which the flanks' angles,
@@ -393,6 +397,7 @@ _PRINTED_VALUES: dict[str, float] = {
     "PivotZ": depth_station(DEPTH_MID_Z),
     "Height": BLOCK_HEIGHT,
     "SetScrewY": SET_SCREW_Y,
+    "SetScrewX": PIVOT_BORE_X,
 }
 
 
@@ -447,6 +452,42 @@ PIVOT_BORE_STEP_CLEARANCE_PRINTED_MIN = (
 )  # 1.441
 if PIVOT_BORE_STEP_CLEARANCE_PRINTED_MIN < 0.0:
     raise AssertionError("at its printed limits the pivot bore breaks the step wall")
+# The tap enters the body's front face just past the step, so over the
+# step's .08 (BODY_SIDE_STEP) its thread stands this wall off the step face.
+# At the printed worst case (the tap station short, the step long)
+# it is .064, under the rule 17 .080 target and over the .060 floor (RV-01):
+# neither can move.  The step can't come toward the paper end (the stirrup
+# slides on the neck with 0.016 mm to spare, pn_pen_carriage_geom), and the
+# bore can't go toward the free end (it carries the block toward the paper:
+# 0.071 mm of the carriage's paper clearance is left).  The sheet states the
+# worst case natively, floored to the micron grid it prints at (rod's recipe).
+_TAP_THREAD_R = THREAD_MAJOR_MM[SET_SCREW_TAP_SPEC.size] / 2.0
+TAP_STEP_WALL_PRINTED_MIN = (
+    (PIVOT_BORE_X + _dev("SetScrewX")[0])
+    - (RELIEF_X0 + _dev("ReliefX0")[1])
+    - _TAP_THREAD_R
+)  # 1.6255
+if TAP_STEP_WALL_PRINTED_MIN < WALL_FLOOR_MM:
+    raise AssertionError("set-screw tap wall to the step under the rule 17 floor")
+TAP_WALL_MIN_MM = round(
+    round(TAP_STEP_WALL_PRINTED_MIN / 25.4, TAP_WALL_MIN_PLACES) * 25.4, 9
+)
+if not math.isclose(TAP_STEP_WALL_PRINTED_MIN, TAP_WALL_MIN_MM, abs_tol=0.001):
+    raise AssertionError("the stated tap wall is not the printed worst case")
+TAP_WALL_MIN_TOL_TYPE = 5  # swTolType_e.swTolMIN
+# The upper deviation reaches the wall's printed maximum (station long, step
+# short).
+_TAP_STEP_WALL_PRINTED_MAX = (
+    (PIVOT_BORE_X + _dev("SetScrewX")[1])
+    - (RELIEF_X0 + _dev("ReliefX0")[0])
+    - _TAP_THREAD_R
+)
+TAP_WALL_MIN_BAND = (round(_TAP_STEP_WALL_PRINTED_MAX - TAP_WALL_MIN_MM, 6), 0.0)
+# The hidden reference line runs -X toward the step from the thread's major
+# diameter on the tap's axis, as long as the stated minimum.
+TAP_WALL_START_X = PIVOT_BORE_X - _TAP_THREAD_R
+if TAP_WALL_START_X - TAP_WALL_MIN_MM <= RELIEF_X0:
+    raise AssertionError("the tap wall reference runs past the step")
 
 
 class SeatedV(NamedTuple):
@@ -612,6 +653,7 @@ PEN_ROD_NUMBER = _config.parts("pn-pen-rod")["number"]
 DIMENSION_CALLOUTS: dict[str, str] = {
     "PivotDia": f"REAM THRU\nSLIP FIT ON\nPEN ROD PIVOT\n{PEN_ROD_NUMBER}",
     "PivotChamferSize": "X 45°",
+    "TapWallMin": "TAP WALL",
 }
 # One row: SolidWorks stores a line break in the above compartment but prints
 # nothing of it, while the dimension line still runs under the unprinted text
