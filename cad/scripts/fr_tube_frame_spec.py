@@ -42,13 +42,12 @@ CROSS_HOLE_DIAMETER = TUBE_CROSS_HOLE_DIAMETER
 
 # --- Marked-dimension contract: feature -> parametric dimensions kept by the
 # drawing. The hole diameter is shown once with a 2-station THRU BOTH WALLS
-# callout. The lower station prints; the upper one prints no number: it is
-# match-drilled from MHA-FR-02's taps (the callout names that mate), whose
-# installed axis lies off the .001 grid. ---
+# callout; both axial stations print as REF from the bottom end (the callout
+# names each station's match-drill mate). ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "AnnulusProfile": {"OuterDia"},
     "Column": {"Length"},
-    "CrossHoleProfile": {"LowerHoleY", "CrossHoleDia"},
+    "CrossHoleProfile": {"LowerHoleY", "UpperHoleY", "CrossHoleDia"},
     "TopEndBreak": {"TopChamfer"},
 }
 
@@ -56,13 +55,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # ), so the MODEL owns them: build_fr_tube_frame applies this map to the .SLDPRT
 # and draw_fr_tube_frame only reads it back. The cut length prints three
 # places: it follows the cap stack on the .001 grid (40.109), and rounding it
-# to .XX would move it by up to .005.
+# to .XX would move it by up to .005. The upper station is a REF of
+# MHA-FR-02's match-drilled taps, .72 under that frame's off-grid rail top
+# (39.0755): four places print it equal to the model, never a rounding tie.
 # The lower station is .50 exactly. The cross hole is a .197 drill (title
 # block +.004/0). The top break is a .02 deburr. OuterDia stays at the document
 # default -- it is purchased stock.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Column": {"Length": 3},
-    "CrossHoleProfile": {"LowerHoleY": 2, "CrossHoleDia": 3},
+    "CrossHoleProfile": {"LowerHoleY": 2, "UpperHoleY": 4, "CrossHoleDia": 3},
     "TopEndBreak": {"TopChamfer": 2},
 }
 

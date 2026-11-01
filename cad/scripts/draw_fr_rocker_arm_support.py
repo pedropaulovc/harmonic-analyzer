@@ -24,6 +24,7 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.sw_type_info import constant
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
@@ -405,6 +406,36 @@ def _name_hole_table_process(adapter: Any, table: Any) -> None:
     if len(sizes) != 1 or "THRU" not in next(iter(sizes)).upper():
         raise RuntimeError(f"hole-table DRILL column holds unexpected sizes: {sizes!r}")
     _telemetry.info(f"hole-table process header {heading!r} over sizes {sizes!r}")
+
+
+# Inch sheets drop the leading zero (ASME Y14.5); the hole table's own
+# document option followed the template and printed 0.563 (machinist review,
+# non-gating). Document Properties > Tables > Hole > Leading zeroes.
+HOLE_TABLE_LEADING_ZERO = "swLeadingZero_DoNotShow"
+HOLE_TABLE_LOC_COLUMNS = (1, 2)
+
+
+def _drop_hole_table_leading_zeros(adapter: Any) -> None:
+    """Set the drawing's hole-table leading-zero option before the table exists."""
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    preference = constant("swDetailingLeadingZero")
+    option = constant("swDetailingHoleTable")
+    value = constant(HOLE_TABLE_LEADING_ZERO)
+    if not extension.SetUserPreferenceInteger(preference, option, value):
+        raise RuntimeError("failed to drop the hole table's leading zeros")
+    if int(extension.GetUserPreferenceInteger(preference, option)) != value:
+        raise RuntimeError("hole-table leading-zero option did not persist")
+
+
+def _assert_no_leading_zero_locations(table: Any) -> None:
+    """Read every LOC cell back: none prints a leading zero."""
+    cells = [
+        str(table.DisplayedText2(row, column, False) or "")
+        for row in range(1, int(table.RowCount))
+        for column in HOLE_TABLE_LOC_COLUMNS
+    ]
+    if any(cell.startswith(("0.", "-0.")) for cell in cells):
+        raise RuntimeError(f"hole-table LOC cells kept a leading zero: {cells!r}")
 
 
 def _bottom_sheet_xy(hole_xz: tuple[float, float]) -> tuple[float, float]:
@@ -942,6 +973,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # ±.005, the base's matching pattern named beside the table — NOT basic:
     # a basic dimension is toleranced only by the frame it feeds, and
     # without one it has no tolerance at all.
+    _drop_hole_table_leading_zeros(adapter)
     hole_table = insert_hole_table(
         adapter,
         bottom,
@@ -960,6 +992,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rocker-arm-support",
     )
     _name_hole_table_process(adapter, hole_table)
+    _assert_no_leading_zero_locations(hole_table)
     if add_note(adapter, HOLE_PATTERN_NOTE, *HOLE_PATTERN_NOTE_XY) is None:
         raise RuntimeError("failed to name the foot holes' mating pattern")
     _mirror_right_end_hole_tags(bottom)

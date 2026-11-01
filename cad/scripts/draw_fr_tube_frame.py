@@ -103,16 +103,16 @@ ISO_CENTER = (0.220, 0.280)
 
 # Per-view survivors of the marked-dimension import.
 END_KEEP: dict[str, tuple[float, float]] = {}
-# The two station values park left of the tube, each on its own dimension
+# The three station values park left of the tube, each on its own dimension
 # line, so the lines have to stand far enough apart that no value's text sits
 # in a neighbour's corridor. At 0.036/0.020 the (12.70) text was 23 mm wide
 # across lines 21 mm apart, so BOTH the cut length's and the upper station's
 # lines printed through it (native layout audit: two text-on-line findings and
-# the leader crossing between them). The upper station prints no number: it
-# is match-drilled from MHA-FR-02 (fr_tube_frame_spec.DRAWING_DIMENSIONS).
+# the leader crossing between them).
 LENGTH_KEEP = {
     "Length": (LENGTH_CENTER[0] - 0.050, LENGTH_CENTER[1]),
     "LowerHoleY": (LENGTH_CENTER[0] - 0.025, LENGTH_CENTER[1] - 0.075),
+    "UpperHoleY": (LENGTH_CENTER[0] - 0.015, LENGTH_CENTER[1] + 0.075),
     "CrossHoleDia": (
         LENGTH_CENTER[0] + 0.085,
         LENGTH_CENTER[1] - COLUMN_LENGTH / 10000.0 + LOWER_CROSS_HOLE_Y / 5000.0,
@@ -436,12 +436,15 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_VIEW_SCALE
     )
-    set_hidden_lines_removed(adapter, iso)
     # The length view shows both stations as visible circles, so dashed bore
     # lines there would say nothing (MR r2): hidden lines removed, BEFORE the
     # chamfer dimension is attached to its silhouettes, so no later display
-    # change regenerates them under it.
-    set_hidden_lines_removed(adapter, length)
+    # change regenerates them under it. The end view joins them (PR #1436
+    # invariant; machinist review: its circles printed as draft polygons):
+    # a precision-quality mode set right after placement, before its OD
+    # reference and centre marks; it ends with hidden lines visible below.
+    for view in (iso, length, end):
+        set_hidden_lines_removed(adapter, view)
 
     curate_view_dimensions(
         adapter,
@@ -545,7 +548,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # drawing document's places would print the 40.109 cut length at the
     # wrong grid and ask for a band the match-cut note explicitly refuses.
     assert_imported_precision(adapter, dimensions, IMPORTED_PRECISION)
-    for name in ("Length", "LowerHoleY"):
+    for name in ("Length", "LowerHoleY", "UpperHoleY"):
         references = [
             annotation
             for annotation in dimensions

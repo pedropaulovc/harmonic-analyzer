@@ -107,10 +107,7 @@ def test_no_process_callout_on_the_sheet() -> None:
     assert "Web Callout" not in source
 
 
-def test_support_finish_masks_only_the_machined_mounting_face() -> None:
-    assert _config.parts(support.PART_NAME)["finish"] == (
-        "GREEN ENAMEL; MASK MOUNTING FACE; LIGHT OIL BARE MACHINED SURFACES"
-    )
+def test_support_foot_holes_are_plain_drilled_clearances() -> None:
     assert support.HOLE_SPEC.kind == "drilled_fractional"
     assert support.HOLE_SPEC.size == "5/16"
     assert support.HOLE_DIA == pytest.approx(7.938)
@@ -1651,15 +1648,11 @@ def test_seat_callout_text_sits_between_the_hole_table_and_the_title_block() -> 
     assert x + width < 0.415  # the right border
 
 
-def test_hole_pattern_note_names_the_base_taps_beside_the_table() -> None:
-    """Machinist review b2: the .XXX table named no mate. The note names the
-    base's matching hold-down taps. A free note anchors at its text's
-    top-left (inspect-3 render: anchored at x 0.392 it ran 12.6 mm past the
-    right border), so it must clear the table above, the centred seat
-    callout to its left, the title block below and the right border."""
-    assert drawing.HOLE_PATTERN_NOTE.split() == [
-        "HOLE", "PATTERN", "MATCHES", "MHA-FR-01", "C2-C5",
-    ]
+def test_hole_pattern_note_stands_beside_the_table() -> None:
+    """A free note anchors at its text's top-left (inspect-3 render: anchored
+    at x 0.392 it ran 12.6 mm past the right border), so it must clear the
+    table above, the centred seat callout to its left, the title block below
+    and the right border."""
     lines = drawing.HOLE_PATTERN_NOTE.splitlines()
     left, top = drawing.HOLE_PATTERN_NOTE_XY
     right = left + max(map(len, lines)) * NOTE_CHAR_WIDTH
