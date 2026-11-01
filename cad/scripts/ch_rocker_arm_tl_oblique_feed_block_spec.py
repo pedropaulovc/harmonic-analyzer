@@ -129,7 +129,8 @@ def _inch_text(value_in: float, places: int) -> str:
 # nut's, so a #4-40 major sits close to the spigot recess at nominal; no
 # recess that still clears the Ø10.2 spigot reaches the .060 floor. Worst
 # case: the recess at its upper .XX limit, each tap off the axis by its
-# 0.13 mm band in both Y and Z.
+# 0.13 mm band in both Y and Z. Declared as the feed block's RV-01 minor
+# (owner exception pending confirmation, 2026-11-01).
 NUT_TAP_MAJOR = THREAD_MAJOR_MM["#4-40"]
 _PATTERN_BAND = METRIC_BAND
 NUT_SEAT_WALL_NOMINAL = NUT_PCD / 2 - NUT_SEAT_DIA / 2 - NUT_TAP_MAJOR / 2
