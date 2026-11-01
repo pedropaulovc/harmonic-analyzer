@@ -102,10 +102,16 @@ def test_native_supplier_witness_inventory():
         assert orientation == ("vertical" if name == "SupplierShoulderLength" else "horizontal")
         assert spec.SUPPLIER_REFERENCE_UNITS[name] == "in"
     assert all(lower <= upper for lower, upper in spec.SUPPLIER_REFERENCE_TOLERANCES_MM.values())
-    # The head hides the shoulder in the head-end Front view: measure it in Top,
-    # at the shoulder's thread-end step, its Ø wider than the thread it clears.
-    assert spec.SUPPLIER_REFERENCE_PLANES["SupplierShoulderDiameter"] == "Top"
-    assert spec.SUPPLIER_REFERENCE_STARTS["SupplierShoulderDiameter"] == (-spec.SHOULDER_DIA / 2.0, 0.0)
+    # Every line lies on a Top-profile edge: the shoulder Ø on the thread-end
+    # step, its Ø wider than the thread it clears; the shoulder length on the
+    # shoulder silhouette; the head Ø on the head's end face (Top sketch y is
+    # -z; the head ends at z = LENGTH). No chord crosses the head-end Front.
+    assert set(spec.SUPPLIER_REFERENCE_PLANES.values()) == {"Top"}
+    assert spec.SUPPLIER_REFERENCE_STARTS == {
+        "SupplierShoulderDiameter": (-spec.SHOULDER_DIA / 2.0, 0.0),
+        "SupplierShoulderLength": (spec.SHOULDER_DIA / 2.0, -spec.SHOULDER_LENGTH),
+        "SupplierHeadDiameter": (-spec.HEAD_DIA / 2.0, -spec.LENGTH),
+    }
     assert spec.SHOULDER_DIA > spec.THREAD_DIA
 
 

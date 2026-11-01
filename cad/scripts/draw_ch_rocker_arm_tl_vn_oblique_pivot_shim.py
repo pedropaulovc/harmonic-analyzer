@@ -21,19 +21,20 @@ MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_pivot_shim"]
 ITEM = 'LOW-CARBON STEEL SHIM, 3/8 X 5/8, .008 THICK'
-# Every text shelves right of its own witnesses, clear of the lines: the bore
-# on the Front's top lane, the OD on its bottom lane, the thickness beside
-# the Top view. Front and Top reserve the same left/right space so the fit
-# centres them on one projection line; the Front's equal top/bottom keeps it
-# level with the unannotated Right. The 5/8 part fits at 2:1.
+# Every text shelves past its own outer witness, clear of the lines: the bore
+# on the Top's top lane, the OD on its bottom lane, both left of the thin
+# strip so the thickness text beside it on the right stays clear of them.
+# Front and Top reserve the same left/right space so the fit centres them on
+# one projection line; the unannotated Front's equal top/bottom keeps it
+# level with the Right. The 5/8 part fits at 2:1.
 SHELVES = {
-    "SupplierBoreDiameter": (True, "right"),
-    "SupplierOuterDiameter": (True, "right"),
+    "SupplierBoreDiameter": (True, "left"),
+    "SupplierOuterDiameter": (True, "left"),
     "SupplierThickness": (False, "right"),
 }
 SUPPLIER_MARGINS = {
-    "*Front": (0.010, 0.018, 0.060, 0.018),
-    "*Top": (0.010, 0.010, 0.060, 0.010),
+    "*Front": (0.060, 0.010, 0.060, 0.010),
+    "*Top": (0.060, 0.018, 0.060, 0.018),
 }
 
 
