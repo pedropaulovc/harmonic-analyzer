@@ -79,11 +79,6 @@ CBORE_FLOOR_REFERENCE = "CboreFloorReference"
 CARRIAGE_THREAD_DEPTH = 5.0  # the HGH15CA's M4 x 5 (vendor)
 CBORE_SECTION_PLANE = "CboreSectionPlane"
 CBORE_SECTION_X = BOLT_X  # B-B cuts the +X hole column
-# B-B's block height: its own sketch on a plane just behind the cut, inside
-# the material B-B keeps (it looks toward -X).
-BLOCK_HEIGHT_REFERENCE = "BlockHeightReference"
-BLOCK_HEIGHT_PLANE = "BlockHeightPlane"
-BLOCK_HEIGHT_SECTION_X = CBORE_SECTION_X - 0.5
 # Hidden construction sketch on the top face: a line on the -X edge and
 # circles on the bore and one hole per column, so the plan's X ordinates start
 # on that edge (rule 10) while staying model dimensions.
@@ -91,7 +86,7 @@ PLAN_DATUM_REFERENCE = "PlanDatumReference"
 PLAN_DATUM_HOLES = ((-BOLT_X, BOLT_Y), (BOLT_X, BOLT_Y))
 DRAWING_VALUES = {
     "BlockLength": BLOCK_LENGTH, "BlockWidth": BLOCK_WIDTH,
-    "BlockHeight": BLOCK_HEIGHT, "SectionBlockHeight": BLOCK_HEIGHT, "BlockSideY": BLOCK_WIDTH / 2,
+    "BlockHeight": BLOCK_HEIGHT, "BlockSideY": BLOCK_WIDTH / 2,
     "BoreDia": BORE_DIA, "TopBoreDepth": BORE_DEPTH,
     "TapDrillDia": PIVOT_TAP_DRILL,
     "CboreFloor": CBORE_FLOOR,
@@ -104,13 +99,13 @@ DRAWING_VALUES = {
 }
 DRAWING_DIMENSIONS = {
     "BlockProfile": ("BlockLength", "BlockWidth", "BlockSideY"),
-    # Marked for B-B's import experiment (farm round 7); not printed.
+    # A-A prints the Block extrusion's own depth: TL-22's B-B never imported
+    # a full-height dimension (farm rounds 1 to 7). TL-32 prints it on B-B.
     "Block": ("BlockHeight",),
     "TopBoreProfile": ("BoreDia",),
     "TopBore": ("TopBoreDepth",),
     "PivotTapProfile": ("TapDrillDia",),
     CBORE_FLOOR_REFERENCE: ("CboreFloor",),
-    BLOCK_HEIGHT_REFERENCE: ("SectionBlockHeight",),
     "CarriageDrillProfile": ("CarriageDrills3Y", "CarriageDrills4Y", "CarriageDrills1Dia"),
     "CarriageCboreProfile": ("CarriageCounterbores3Dia",),
     PLAN_DATUM_REFERENCE: ("PlanBoreX", "PlanHole1X", "PlanHole2X"),
@@ -165,7 +160,8 @@ _CUT_MAX = pivot_screw.CUT_THREAD_LENGTH + printed_band_mm(pivot_screw.CUT_THREA
 PIVOT_THREAD_ENGAGEMENT = pivot_screw.CUT_THREAD_LENGTH - 1.5 * pivot_screw.THREAD_PITCH
 PIVOT_THREAD_ENGAGEMENT_MIN = _CUT_MIN - 1.5 * pivot_screw.THREAD_PITCH
 PIVOT_TIP_CLEARANCE = BLOCK_HEIGHT - BORE_DEPTH - pivot_screw.CUT_THREAD_LENGTH
-PIVOT_TIP_CLEARANCE_MIN = (BLOCK_HEIGHT - _band("SectionBlockHeight")
+# TL-22 prints BlockHeight (A-A), TL-32 SectionBlockHeight (B-B): both .XX.
+PIVOT_TIP_CLEARANCE_MIN = (BLOCK_HEIGHT - _band("BlockHeight")
                            - (BORE_DEPTH + _band("TopBoreDepth")) - _CUT_MAX)
 CALLOUTS_SUFFIX: dict[str, str] = {}
 CALLOUTS_ABOVE = {
@@ -190,7 +186,7 @@ CALLOUTS_BELOW = {
     # (layout audit, farm run 20261031T200222206Z).
     "BlockWidth": "SETS COUNTERBORE\nSIDE WALL",
 }
-REFERENCE_SKETCHES = (CBORE_FLOOR_REFERENCE, BLOCK_HEIGHT_REFERENCE, PLAN_DATUM_REFERENCE)
+REFERENCE_SKETCHES = (CBORE_FLOOR_REFERENCE, PLAN_DATUM_REFERENCE)
 WALLS_MM = {
     "pivot seat to spindle end": BORE_X - BORE_LIMITS[1] / 2 - BLOCK_X0,
     "carriage counterbore to side": BLOCK_WIDTH / 2 - BOLT_Y - CBORE_DIA / 2,
