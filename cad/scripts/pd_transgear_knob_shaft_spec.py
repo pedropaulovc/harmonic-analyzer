@@ -170,6 +170,14 @@ ROOT_DIA = 2.0 * STOCK_PROFILE.root_radius_min_mm
 ROOT_DIA_PLACES = 2
 ROOT_DIA_EXACT_MIN = min(2.0 * p.root_radius_min_mm for p in _PROFILE_CORNERS)
 ROOT_DIA_MIN = math.floor(ROOT_DIA_EXACT_MIN * 10**ROOT_DIA_PLACES) / 10**ROOT_DIA_PLACES
+# The root prints as a native MIN on a hidden Front-plane construction circle
+# (RootProfile), the feed pinion's way: swTolType_e.swTolMIN prints the model
+# value then "min.", so the modelled circle IS the printed limit.  The prefix
+# lane replaces SolidWorks' own diameter symbol, so it carries it; the
+# translated cutter's root arcs are not concentric, so the MIN bounds every
+# root point and names itself an envelope.
+ROOT_DIA_TOL_TYPE = 5  # swTolType_e.swTolMIN
+ROOT_PREFIX = "ROOT ENVELOPE <MOD-DIAM>"
 ROOT_DEPTH_X_MIN = min(
     p.root_point(p.root_half_angle_rad)[0] for p in _PROFILE_CORNERS
 )
@@ -682,7 +690,6 @@ GEAR_DATA = gear_data_note(
             f"SPAN OVER {SPAN_TEETH} TEETH",
             f"{min(SPAN_LIMITS):.{SPAN_PLACES}f}-{max(SPAN_LIMITS):.{SPAN_PLACES}f}",
         ),
-        ("ROOT DIAMETER (mm)", f"{ROOT_DIA_MIN:.{ROOT_DIA_PLACES}f} MIN"),
         ("MATES WITH", f"DISC {DISC_NUMBER}, {DISC_TEETH}T"),
     ]
 )
@@ -734,13 +741,18 @@ GEOMETRIC_CONTROLS = (
 # flat's distance from the axis (FlatToAxis) prints from
 # ``CoreFlatReference``, a hidden Front-plane reference sketch driven by the
 # same ``CoreFlat`` global, in the end view from the tip where the flat
-# shows true.
+# shows true.  The gear's acceptance prints natively in an enlarged view
+# from the tip: ``SpanProfile`` carries the tangent span over two teeth as
+# its driven LIMIT carrier, and ``RootProfile``, a hidden Front-plane
+# construction circle, the root envelope's MIN.
 # ``JournalProfile`` is the revolve behind the teeth.  ``GearBlank`` owns the
 # face width, which is also the straight gaps' depth.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     "CoreFlatProfile": {"FlatEnd", "FlatToolRadius"},
     "CoreFlatReference": {"FlatToAxis"},
+    "SpanProfile": {"ToothSpan"},
+    "RootProfile": {"RootDia"},
     "StudProfile": {
         "CoreDia",
         "CoreFront",
@@ -763,6 +775,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "FlatToolRadius": CORE_FLAT_TOOL_END_RADIUS_PLACES,
     },
     "CoreFlatReference": {"FlatToAxis": CORE_FLAT_PLACES},
+    "SpanProfile": {"ToothSpan": SPAN_PLACES},
+    "RootProfile": {"RootDia": ROOT_DIA_PLACES},
     "StudProfile": {
         "CoreDia": CORE_DIA_PLACES,
         "CoreFront": CORE_FRONT_FROM_F_PLACES,

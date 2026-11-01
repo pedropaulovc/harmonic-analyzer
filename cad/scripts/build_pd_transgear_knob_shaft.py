@@ -102,6 +102,9 @@ from pd_transgear_knob_shaft_spec import (
     PART_DATUMS,
     REAR_END_Z,
     RELIEF_DIA,
+    ROOT_DIA_MIN,
+    ROOT_DIA_TOL_TYPE,
+    ROOT_PREFIX,
     SPAN_DEVIATIONS,
     SPAN_NOMINAL,
     SPAN_PLACES,
@@ -629,6 +632,53 @@ async def _flat_end_view_reference(adapter: Any) -> list[tuple[str, str]]:
     return jobs
 
 
+async def _root_profile(adapter: Any) -> list[tuple[str, str]]:
+    """The root envelope's MIN as a construction circle on F (Front plane).
+
+    The straight gaps run through the whole face, so the view from the tip
+    shows their floors at F, and a Front-plane diameter imports there (the
+    feed pinion's RootProfile).  Construction only: the volume is unchanged.
+    """
+    dims = SketchDims()
+    await _create_sketch(adapter, "Front", "root minimum")
+    circle = await define_circle(
+        adapter,
+        0.0,
+        0.0,
+        ROOT_DIA_MIN / 2.0,
+        "root minimum",
+        dims=dims,
+        names=(None, None, "RootDia"),
+        drives=(None, None, '"RootDia"'),
+    )
+    _as_construction(adapter, circle)
+    await ensure_fully_defined(adapter, "root sketch")
+    check("exit_sketch root", await adapter.exit_sketch())
+    name_last_feature(adapter, "RootProfile")
+    jobs = dims.apply(adapter, "RootProfile")
+    # A standalone sketch saves shown and renders in every assembly; the
+    # drawing still imports its dimension from the hidden sketch.
+    blank_reference_sketches(adapter, ("RootProfile",))
+    return jobs
+
+
+def _apply_root_min(adapter: Any) -> None:
+    """Print RootDia as its MIN: swTolMIN prints the model value then the
+    limit word, so the circle IS the limit and no deviation is authored."""
+    _, dimension = _named_dimension(adapter, "RootProfile", "RootDia")
+    if not math.isclose(float(dimension.SystemValue) * 1000.0, ROOT_DIA_MIN, abs_tol=1e-6):
+        raise RuntimeError("RootDia: the root circle is not the printed MIN")
+    raw_tolerance = dimension.Tolerance
+    if raw_tolerance is None:
+        raise RuntimeError("RootDia: no native tolerance")
+    tolerance = _early_bound(raw_tolerance, "IDimensionTolerance")
+    tolerance.Type = ROOT_DIA_TOL_TYPE
+    if tolerance.SetValues(0.0, 0.0) is not True:
+        raise RuntimeError("RootDia: SetValues rejected the MIN's zero deviations")
+    if int(tolerance.Type) != ROOT_DIA_TOL_TYPE:
+        raise RuntimeError("RootDia: native MIN readback changed")
+
+
 def _apply_native_limits(
     adapter: Any, feature: str, name: str, nominal: float,
     band: tuple[float, float], tolerance_type: int,
@@ -738,6 +788,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for name, value in (
         ("FaceWidth", FACE_WIDTH),
         ("OutsideDia", OUTSIDE_DIA),
+        ("RootDia", ROOT_DIA_MIN),
         ("CoreDia", CORE_DIA),
         ("CoreFront", CORE_FRONT_FROM_F),
         ("FrontReliefDia", FRONT_RELIEF_DIA),
@@ -777,6 +828,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # the run-out clears the neck and D-core at F and the journal at the rear.
     await author_span(adapter, STOCK_PROFILE, SPAN_TEETH, places=SPAN_PLACES)
     drive_jobs += await _flat_end_view_reference(adapter)
+    drive_jobs += await _root_profile(adapter)
 
     stations = (
         ("PinionRear", PINION_REAR_Z, '"FaceWidth"'),
@@ -830,6 +882,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, nominal_mm=SPAN_NOMINAL, deviations=SPAN_DEVIATIONS,
         places=SPAN_PLACES, prefix=SPAN_PREFIX,
     )
+    _apply_root_min(adapter)
+    set_dimension_prefix(adapter, "RootProfile", "RootDia", ROOT_PREFIX)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

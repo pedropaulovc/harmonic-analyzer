@@ -77,7 +77,6 @@ def test_native_stock_source_is_the_selected_15t_48dp_master() -> None:
         f"WHOLE DEPTH (mm, REF):  {spec.WHOLE_DEPTH:.3f}",
         "CUTTER:  #7, 14-16T",
         f"SPAN OVER 2 TEETH:  {lower:.4f}-{upper:.4f}",
-        f"ROOT DIAMETER (mm):  {spec.ROOT_DIA_MIN:.2f} MIN",
         "MATES WITH:  DISC MHA-PD-06, 150T",
     ]
 
@@ -273,16 +272,24 @@ def test_complete_nominal_native_volume_uses_full_face_gaps_and_true_d() -> None
 
 def test_every_native_dimension_is_placed_once_with_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    keeps = (drawing.SIDE_KEEP, drawing.END_KEEP, drawing.DETAIL_KEEP)
+    keeps = (drawing.SIDE_KEEP, drawing.END_KEEP, drawing.DETAIL_KEEP, drawing.ENLARGED_KEEP)
     assert sum(len(keep) for keep in keeps) == len(marked)
     assert set().union(*keeps) == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert spec.DRAWING_DIMENSIONS["CoreFlatProfile"] == {"FlatEnd", "FlatToolRadius"}
     assert spec.DRAWING_DIMENSIONS["CoreFlatReference"] == {"FlatToAxis"}
-    # The span over two teeth prints once, in the gear data block (machinist
-    # review r8: its end-view dimension crossed the bores and the flat).
-    assert "SpanProfile" not in spec.DRAWING_DIMENSIONS
+    # The gear's acceptance prints as native dimensions in the 5:1 view from
+    # the tip (codjiflo P2 on cb74f3d8d): the span over two teeth from its
+    # driven carrier, the root envelope's MIN from its hidden circle.  The
+    # gear data keeps the span's limits beside the cutter, as the feed
+    # pinion's does, and no root row.
+    assert spec.DRAWING_DIMENSIONS["SpanProfile"] == {"ToothSpan"}
+    assert spec.DRAWING_DIMENSIONS["RootProfile"] == {"RootDia"}
+    assert spec.DRAWING_PRECISION["SpanProfile"] == {"ToothSpan": spec.SPAN_PLACES}
+    assert spec.DRAWING_PRECISION["RootProfile"] == {"RootDia": spec.ROOT_DIA_PLACES}
+    assert set(drawing.ENLARGED_KEEP) == {"ToothSpan", "RootDia"}
     assert f"SPAN OVER {spec.SPAN_TEETH} TEETH" in spec.GEAR_DATA
+    assert "ROOT" not in spec.GEAR_DATA
     assert "RootInspectionProfile" not in spec.DRAWING_DIMENSIONS
     assert "TipChamfer" not in marked  # "CHAMFER 45 DEG TO MINOR" sizes it
     assert not {"FullDepth", "CutterRunout"} & marked
@@ -360,7 +367,11 @@ def test_model_bands_and_source_linked_properties() -> None:
         assert control.datums == ("A",)
         assert float(control.tolerance) == spec.CORE_TOTAL_RUNOUT
     assert not hasattr(spec, "ROOT_ACCEPTANCE")
-    assert f"ROOT DIAMETER (mm):  {spec.ROOT_DIA_MIN:.2f} MIN" in spec.GEAR_DATA
+    # swTolType_e.swTolMIN prints the model value then "min.": the circle is
+    # the printed limit, floored from every accepted corner's root.
+    assert spec.ROOT_DIA_TOL_TYPE == 5
+    assert spec.ROOT_DIA_MIN <= spec.ROOT_DIA_EXACT_MIN < spec.ROOT_DIA_MIN + 0.01
+    assert spec.ROOT_PREFIX == "ROOT ENVELOPE <MOD-DIAM>"
 
 
 def test_supported_certified_pin_inspects_all_actual_finite_corners() -> None:
@@ -1065,6 +1076,140 @@ def test_flat_reference_sketch_carries_the_printed_flat_on_the_front_plane(
     assert seat.blank_reference_sketches.call_args.args[1] == ("CoreFlatReference",)
 
 
+def test_root_profile_is_a_hidden_front_plane_circle_at_the_printed_min(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seat = stub_seat(monkeypatch, part, keep=("_root_profile",))
+    seat.check.side_effect = lambda _label, result: result
+    seat.define_circle.return_value = "Circle1"
+    adapter = offline_adapter()
+    asyncio.run(part._root_profile(adapter))
+
+    # On F, where the straight gaps' floors show in the view from the tip;
+    # construction only, driven by its own RootDia global.
+    assert seat._create_sketch.call_args.args[1] == "Front"
+    circle = seat.define_circle.await_args
+    assert circle.args[1:4] == (0.0, 0.0, spec.ROOT_DIA_MIN / 2.0)
+    assert circle.kwargs["names"] == (None, None, "RootDia")
+    assert circle.kwargs["drives"] == (None, None, '"RootDia"')
+    assert seat._as_construction.call_args.args[1] == "Circle1"
+    names = [name for name, _args, _kwargs in seat.mock_calls]
+    assert names.index("name_last_feature") < names.index("blank_reference_sketches")
+    assert seat.name_last_feature.call_args.args[1] == "RootProfile"
+    assert seat.blank_reference_sketches.call_args.args[1] == ("RootProfile",)
+
+
+class _Tolerance:
+    def __init__(self, *, keeps_type: bool = True) -> None:
+        self._type = 2
+        self.keeps_type = keeps_type
+        self.values: tuple[float, float] | None = None
+
+    @property
+    def Type(self) -> int:  # noqa: N802
+        return self._type
+
+    @Type.setter
+    def Type(self, value: int) -> None:  # noqa: N802
+        if self.keeps_type:
+            self._type = value
+
+    def SetValues(self, lower: float, upper: float) -> bool:  # noqa: N802
+        self.values = (lower, upper)
+        return True
+
+
+@pytest.mark.parametrize(
+    ("value_mm", "keeps_type", "message"),
+    [
+        (spec.ROOT_DIA_MIN, True, None),
+        (spec.ROOT_DIA_MIN + 0.01, True, "not the printed MIN"),
+        (spec.ROOT_DIA_MIN, False, "MIN readback changed"),
+    ],
+)
+def test_root_prints_its_modelled_min(
+    monkeypatch: pytest.MonkeyPatch, value_mm: float, keeps_type: bool, message: str | None
+) -> None:
+    tolerance = _Tolerance(keeps_type=keeps_type)
+    dimension = SimpleNamespace(SystemValue=value_mm / 1000.0, Tolerance=tolerance)
+    named: list[tuple[str, str]] = []
+
+    def named_dimension(_adapter, feature, name):
+        named.append((feature, name))
+        return object(), dimension
+
+    monkeypatch.setattr(part, "_named_dimension", named_dimension)
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
+    if message is not None:
+        with pytest.raises(RuntimeError, match=message):
+            part._apply_root_min(object())
+        return
+    part._apply_root_min(object())
+    assert named == [("RootProfile", "RootDia")]
+    assert tolerance.Type == spec.ROOT_DIA_TOL_TYPE == 5
+    assert tolerance.values == (0.0, 0.0)
+
+
+def _enlarged_point(radius_mm: float, model_deg: float) -> tuple[float, float]:
+    """Sheet point of a model point on F in the mirrored 5:1 view."""
+    cx, cy = drawing.ENLARGED_CENTER
+    r = radius_mm * drawing._ES / 1000.0
+    angle = math.radians(model_deg)
+    return cx - r * math.cos(angle), cy + r * math.sin(angle)
+
+
+def test_enlarged_view_fits_the_lower_left_field() -> None:
+    # Under the (70.74) row's line, left of the title block (x 216 mm) and
+    # inside the border (12.7 mm), with the label clear of the gear.
+    cx, cy = drawing.ENLARGED_CENTER
+    r = drawing.ENLARGED_HALF_OD
+    assert r == pytest.approx(spec.OUTSIDE_DIA * 5 / 2000.0)
+    overall_y = drawing.SIDE_KEEP["OverallLength"][1]
+    assert cy + r < overall_y - 0.015
+    assert cy - r > 0.0127 + 0.002
+    assert cx + r < 0.216 - 0.020
+    label_x, label_top = drawing.ENLARGED_LABEL_XY
+    label_width = max(map(len, drawing.ENLARGED_LABEL_TEXT.splitlines())) * 0.0026
+    assert label_x + label_width < cx - r - 0.010
+    assert label_top < overall_y - 0.020
+    assert drawing.ENLARGED_LABEL_TEXT.endswith("SCALE 5 : 1")
+
+
+def test_enlarged_span_stands_out_along_its_bisector_past_the_tips() -> None:
+    # The span's anvils straddle two teeth about a gap pair's bisector
+    # (model 36 deg); the mirrored view prints it at 144 deg.
+    bisector = drawing.SPAN_BISECTOR_SHEET_RAD
+    assert math.degrees(bisector) == pytest.approx(144.0)
+    cx, cy = drawing.ENLARGED_CENTER
+    x, y = drawing.ENLARGED_KEEP["ToothSpan"]
+    out = (x - cx) * math.cos(bisector) + (y - cy) * math.sin(bisector)
+    along = (x - cx) * math.sin(bisector) - (y - cy) * math.cos(bisector)
+    assert out == pytest.approx(0.031)
+    assert out > drawing.ENLARGED_HALF_OD + 0.005
+    # The text stands up and right, away from the bisector's construction
+    # line, and its rows stay under the (70.74) row.
+    assert along > 0.010
+    assert y + 0.006 < drawing.SIDE_KEEP["OverallLength"][1]
+
+
+def test_enlarged_root_leader_runs_out_along_a_gap_bisector() -> None:
+    # Its arrow lands on a gap floor: gaps centre on GAP_AZIMUTH_DEG + k pitches.
+    cx, cy = drawing.ENLARGED_CENTER
+    x, y = drawing.ENLARGED_KEEP["RootDia"]
+    sheet_deg = math.degrees(math.atan2(y - cy, x - cx)) % 360.0
+    model_deg = (180.0 - sheet_deg) % 360.0
+    pitch = 360.0 / spec.TEETH
+    offset = (model_deg - spec.GAP_AZIMUTH_DEG) % pitch
+    assert min(offset, pitch - offset) == pytest.approx(0.0, abs=1e-9)
+    # Lower left, past the tips; its text hangs left of the shoulder, inside
+    # the border and under the label.
+    assert math.hypot(x - cx, y - cy) > drawing.ENLARGED_HALF_OD + 0.010
+    assert x < cx and y < cy
+    text_width = len("ROOT ENVELOPE \u00d86.60 min.") * 0.0026
+    assert x - text_width > 0.0127 + 0.005
+    assert y + 0.003 < drawing.ENLARGED_LABEL_XY[1] - 2 * 0.0045
+
+
 class _NeckView:
     """A recording IView double for detail B's place-move-crop."""
 
@@ -1180,6 +1325,73 @@ def test_neck_detail_fails_loud_when_the_seat_does_not_obey(
         _crop_neck(monkeypatch, _NeckView(**kwargs))
 
 
+class _BackView(_NeckView):
+    """A 5:1 *Back IView double: model +X prints left of the axis."""
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.ScaleRatio = (5.0, 1.0)
+
+
+def _enlarged_seat(monkeypatch, view: _BackView) -> list[tuple]:
+    log: list[tuple] = []
+    offset = (0.020, -0.010)
+
+    def place(_adapter, _source, orientation, x, y, *, scale):
+        log.append(("place", orientation, (x, y), scale))
+        return view
+
+    def model_point(_adapter, _view, point, *, label):
+        handing = 1.0 if view.mirrored else -1.0
+        return (
+            view.Position[0] + offset[0] + handing * 5.0 * point[0],
+            view.Position[1] + offset[1] + 5.0 * point[1],
+        )
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    monkeypatch.setattr(drawing, "double_array", lambda values: tuple(values))
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "model_point_in_view", model_point)
+    return log
+
+
+def test_enlarged_view_is_a_moved_back_view_at_five_to_one(monkeypatch) -> None:
+    view = _BackView()
+    log = _enlarged_seat(monkeypatch, view)
+    adapter = SimpleNamespace(currentModel=_NeckModel())
+    assert drawing._placed_enlarged_view(adapter) is view
+    assert log == [("place", "*Back", drawing.ENLARGED_CENTER, drawing.ENLARGED_SCALE)]
+    assert view.calls == ["SetViewPosition"]
+    tip = _enlarged_point(spec.OUTSIDE_DIA / 2.0, 0.0)
+    assert tip == pytest.approx(
+        (drawing.ENLARGED_CENTER[0] - drawing.ENLARGED_HALF_OD, drawing.ENLARGED_CENTER[1])
+    )
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"moves": False}, "enlarged gear end focus sits at"),
+        ({"mirrored": True}, "enlarged tooth tip sits at"),
+    ],
+)
+def test_enlarged_view_fails_loud_when_the_seat_does_not_obey(
+    monkeypatch, kwargs, message
+) -> None:
+    view = _BackView(**kwargs)
+    _enlarged_seat(monkeypatch, view)
+    with pytest.raises(RuntimeError, match=message):
+        drawing._placed_enlarged_view(SimpleNamespace(currentModel=_NeckModel()))
+
+
+def test_enlarged_view_refuses_another_scale(monkeypatch) -> None:
+    view = _BackView()
+    view.ScaleRatio = (3.0, 1.0)
+    _enlarged_seat(monkeypatch, view)
+    with pytest.raises(RuntimeError, match="enlarged gear end scale"):
+        drawing._placed_enlarged_view(SimpleNamespace(currentModel=_NeckModel()))
+
+
 class _DimensionedView:
     def __init__(self) -> None:
         self.names: list[str] = []
@@ -1232,12 +1444,14 @@ class _BuildRecorder:
         monkeypatch.setattr(drawing, "SOURCE", source)
         self.views: dict[str, SimpleNamespace] = {}
         self.detail = SimpleNamespace(name="detail", ReferencedDocument=object())
+        self.enlarged = SimpleNamespace(name="enlarged", ReferencedDocument=object())
+        self.keeps: dict[str, dict[str, tuple[float, float]]] = {}
         for name in (
             "check", "require_source_control", "stamp_drawing_summary",
             "set_hidden_lines_removed", "set_dimension_callouts",
             "assert_imported_precision", "add_view_centerline", "add_attached_note",
             "add_surface_finish", "add_datum_feature", "add_feature_control_frame",
-            "add_toothspace_callout", "_mark_detail_on_side", "_label_detail",
+            "add_toothspace_callout", "_mark_detail_on_side", "_label_views",
             "add_property_linked_note", "visible_circle_edge",
             "_set_dimension_suffixes", "set_reference_dimension",
         ):
@@ -1254,6 +1468,7 @@ class _BuildRecorder:
         )
         monkeypatch.setattr(drawing, "place_view", self._place)
         monkeypatch.setattr(drawing, "_placed_detail_view", self._placed_detail)
+        monkeypatch.setattr(drawing, "_placed_enlarged_view", self._placed_enlarged)
         monkeypatch.setattr(drawing, "_dimension_then_crop_detail", self._crop_detail)
         monkeypatch.setattr(drawing, "curate_view_dimensions", self._curate)
         monkeypatch.setattr(
@@ -1293,12 +1508,17 @@ class _BuildRecorder:
         self.calls.append(("_placed_detail_view", None))
         return self.detail
 
+    def _placed_enlarged(self, _adapter):
+        self.calls.append(("_placed_enlarged_view", None))
+        return self.enlarged
+
     def _crop_detail(self, _adapter, view):
         self.calls.append(("_dimension_then_crop_detail", view.name))
         return list(drawing.DETAIL_KEEP)
 
     def _curate(self, _adapter, view, *, keep, view_label, dimensions_by_feature):
         self.calls.append(("curate_view_dimensions", view_label))
+        self.keeps[view_label] = keep
         return list(keep)
 
     async def _finalize(self, *_args, **_kwargs):
@@ -1325,6 +1545,18 @@ def test_build_dimensions_the_detail_before_the_side_and_marks_it_last(
     assert seat.index("_placed_detail_view") < seat.index(
         "_dimension_then_crop_detail", "detail"
     ) < seat.index("curate_view_dimensions", "side")
+    # The 5:1 view takes the span and the root, and only it names them.
+    assert seat.index("_placed_enlarged_view") < seat.index(
+        "curate_view_dimensions", "enlarged gear end"
+    )
+    assert seat.keeps["enlarged gear end"] is drawing.ENLARGED_KEEP
+    hidden_lines = [args[1] for args, _kwargs in seat.made["set_hidden_lines_removed"]]
+    assert seat.enlarged in hidden_lines and seat.detail in hidden_lines
+    for label, keep in seat.keeps.items():
+        if label != "enlarged gear end":
+            assert not {"ToothSpan", "RootDia"} & set(keep), label
+    [(precision_args, _kwargs)] = seat.made["assert_imported_precision"]
+    assert {"ToothSpan", "RootDia"} <= set(precision_args[1])
     frames = [which for name, which in seat.calls if name == "add_feature_control_frame"]
     assert frames == ["core_total_runout", "front_neck_total_runout"]
     # Both frames stand in detail B (the core's side-view leader crossed the
@@ -1334,8 +1566,10 @@ def test_build_dimensions_the_detail_before_the_side_and_marks_it_last(
         i for i, (name, _label) in enumerate(seat.calls)
         if name in ("add_feature_control_frame", "add_toothspace_callout")
     )
-    assert last_pick < seat.index("_mark_detail_on_side") < seat.index("_label_detail")
-    assert seat.index("_label_detail") < seat.index("finalize_drawing")
+    assert last_pick < seat.index("_mark_detail_on_side") < seat.index("_label_views")
+    assert seat.index("_label_views") < seat.index("finalize_drawing")
+    [(label_args, _kwargs)] = seat.made["_label_views"]
+    assert label_args[1:] == (seat.detail, seat.views["*Right"], seat.enlarged)
 
 
 def test_build_takes_its_controls_and_callouts_from_the_spec(monkeypatch, tmp_path) -> None:
@@ -1560,13 +1794,23 @@ def test_build_cuts_no_endcut_and_checks_the_full_face_oracle(
     # rebuild that precedes the drive equations.
     assert names.index("author_span") < names.index("_flat_end_view_reference")
     assert names.index("_flat_end_view_reference") < names.index("force_rebuild")
+    # The root's hidden circle is drawn before the drive equations' rebuild,
+    # its MIN applied after the span's limits.
+    assert names.index("_root_profile") < names.index("force_rebuild")
+    assert names.index("apply_span_limits") < names.index("_apply_root_min")
     assert "pattern_stock_feature" not in names
     globals_set = [args[1] for name, args, _kwargs in seat.mock_calls if name == "set_global"]
     assert "FaceWidth" in globals_set
     assert not {"FullDepth", "CutterRunoutMax"} & set(globals_set)
     prefixed = [args[2] for name, args, _kwargs in seat.mock_calls if name == "set_dimension_prefix"]
     assert not {"FullDepth", "CutterRunout"} & set(prefixed)
-    assert prefixed == ["FlatEnd"]  # no REFERENCE ROOT: the root is gear data
+    assert prefixed == ["FlatEnd", "RootDia"]
+    [root_prefix] = [
+        args[1:] for name, args, _kwargs in seat.mock_calls
+        if name == "set_dimension_prefix" and args[2] == "RootDia"
+    ]
+    assert root_prefix == ("RootProfile", "RootDia", spec.ROOT_PREFIX)
+    assert "RootDia" in globals_set
     (saved,) = [args for name, args, _kwargs in seat.mock_calls if name == "save_simplified_part"]
     assert saved[2] == ("StraightToothGap", "StraightToothPattern")
     # The stud sketch keeps two construction witnesses: the tooth-tip blank

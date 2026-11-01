@@ -1,16 +1,17 @@
 r"""Create the manufacturing drawing for the transgear knob shaft (MHA-PD-08).
 
 A turned side view, aligned rear and front end views, a 10:1 detail of the
-front neck, and an isometric.
+front neck, a 5:1 view from the stud tip, and an isometric.
 The side view imports the source-owned turned sizes and unchanged
 stations, and a reference overall length; each tight band names its mate.
 The front end view carries the D-flat's distance from the axis, where the
-flat shows true, and the leadered tooth-edge and bearing-face notes; the
-span over two teeth prints in the gear data block only. The rear view
+flat shows true, and the leadered tooth-edge and bearing-face notes.  The
+5:1 view carries the gear's native acceptance dimensions: the span over two
+teeth (LIMITS) and the root envelope (MIN).  The rear view
 identifies the actual running journal datum. The
-#8-32 thread callout belongs to its real thread blank. Cutter identity, the
-minimum root and approved inspection controls are properties of the saved
-source, never values retyped here.
+#8-32 thread callout belongs to its real thread blank. Cutter identity and
+approved inspection controls are properties of the saved source, never
+values retyped here.
 The source-linked formed-flank callout carries radial TIR, the paid
 pitch-index range at REF pitch diameter, all-space/wrap receiving and the
 certified pin. Neither span thickness nor a pin-centre radius substitutes
@@ -89,6 +90,8 @@ from pd_transgear_knob_shaft_spec import (
     REAR_END_Z,
     SURFACE_FINISHES,
     STOCK_PROFILE,
+    GAP_AZIMUTH_DEG,
+    SPAN_TEETH,
     TOOTH_SPACE_GAUGE_PIN_DIA_MM,
     TOOTH_SPACE_CALLOUT,
     TOOTH_SPACE_CALLOUT_PROPERTY,
@@ -260,6 +263,8 @@ DIMENSION_CALLOUTS_BELOW = {
     "FrontReliefWidth": "FULL D\nTO STEP",
     "FlatEnd": f"FULL FLAT FOR\nCOLLAR {DRIVE_COLLAR_NUMBER}",
     "FrontReliefDia": NECK_DIA_JOBS[1],
+    # The span's LIMITS are set by the disc mesh, like the tooth tips.
+    "ToothSpan": f"MESHES WITH DISC {DISC_NUMBER}",
 }
 # Detail B's neck Ø: its text hangs left of its line under the border.  The
 # whole job statement on one line (~126 mm) would cross the border, and two
@@ -466,6 +471,59 @@ CONTROL_VIEWS = {"core_total_runout": "detail", "front_neck_total_runout": "deta
 TOOTH_SPACE_GAP_INDEX = 9
 TOOTHSPACE_NOTE_XY = (0.330, 0.115)
 
+# --- The gear end, enlarged 5:1 -------------------------------------------------
+# The span over two teeth and the root envelope print as the part's native
+# dimensions (codjiflo P2 on cb74f3d8d: as gear-data text alone no feature
+# dimension carried them).  At 3:1 the span's dimension crossed the bores and
+# the flat (machinist review r8), so both print on a 5:1 *Back view, the
+# front view's direction, in the empty lower-left field (x 13-215 mm, y
+# 13-75 mm: under the (70.74) row, left of the title block).  Its tooth tips
+# reach 22.45 mm round the axis, x 142.5-187.5 and y 15.5-60.5 mm.
+ENLARGED_SCALE = (5, 1)
+_ES = ENLARGED_SCALE[0] / ENLARGED_SCALE[1]
+ENLARGED_CENTER = (0.165, 0.038)
+ENLARGED_HALF_OD = OUTSIDE_DIA * _ES / 2000.0
+ENLARGED_LABEL_TEXT = f"VIEW FROM STUD TIP\nSCALE {ENLARGED_SCALE[0]} : {ENLARGED_SCALE[1]}"
+# Top-left anchor: left of the view, over the root's text, under the
+# gear data block (bottom ~0.083) and the (70.74) row.
+ENLARGED_LABEL_XY = (0.060, 0.052)
+
+
+def _enlarged_sheet_angle(model_deg: float) -> float:
+    """Sheet angle (rad) of a model direction in a *Back view (mirrored x)."""
+    return math.pi - math.radians(model_deg)
+
+
+# The span's anvils straddle SPAN_TEETH teeth about their gaps' bisector
+# (paper_drive_stock_native.author_span), model 36 deg, sheet 144 deg.  Its
+# dimension line stands 31 mm out along that bisector, 8.6 mm past the tips,
+# and its text 15.8 mm along the line up and right, away from the
+# bisector's construction line (to 44.9 mm out), over the teeth.
+SPAN_BISECTOR_SHEET_RAD = _enlarged_sheet_angle(
+    GAP_AZIMUTH_DEG + 180.0 * SPAN_TEETH / TEETH
+)
+_SPAN_LINE_OUT = 0.031
+_SPAN_TEXT_ALONG = 0.0158
+# The root envelope's leader runs out along a gap bisector (model 348 deg,
+# sheet 192 deg), so its arrow lands on a gap floor; the text hangs left of
+# its shoulder, left of the gear and under the label.
+ROOT_LEADER_SHEET_RAD = _enlarged_sheet_angle(GAP_AZIMUTH_DEG + 14 * 360.0 / TEETH)
+_ROOT_TEXT_OUT = 0.040
+ENLARGED_KEEP: dict[str, tuple[float, float]] = {
+    "ToothSpan": (
+        ENLARGED_CENTER[0]
+        + _SPAN_LINE_OUT * math.cos(SPAN_BISECTOR_SHEET_RAD)
+        + _SPAN_TEXT_ALONG * math.sin(SPAN_BISECTOR_SHEET_RAD),
+        ENLARGED_CENTER[1]
+        + _SPAN_LINE_OUT * math.sin(SPAN_BISECTOR_SHEET_RAD)
+        - _SPAN_TEXT_ALONG * math.cos(SPAN_BISECTOR_SHEET_RAD),
+    ),
+    "RootDia": (
+        ENLARGED_CENTER[0] + _ROOT_TEXT_OUT * math.cos(ROOT_LEADER_SHEET_RAD),
+        ENLARGED_CENTER[1] + _ROOT_TEXT_OUT * math.sin(ROOT_LEADER_SHEET_RAD),
+    ),
+}
+
 
 def _activate_view(adapter: Any, view: Any, *, label: str) -> str:
     """Make ``view`` the active view (sketch entities and notes land in it)."""
@@ -512,33 +570,63 @@ def _sketch_circle(
     return circle
 
 
-def _placed_detail_view(adapter: Any) -> Any:
-    """Detail B, uncropped: a 10:1 *Right model view moved so the fence's
-    focus lands on DETAIL_CENTER.  The neck landing is projected too, so a
-    view at another scale or handing than _detail_xy assumes raises."""
+def _moved_model_view(
+    adapter: Any,
+    orientation: str,
+    center: tuple[float, float],
+    scale: tuple[int, int],
+    focus_m: tuple[float, float, float],
+    proof: tuple[tuple[float, float, float], tuple[float, float], str],
+    *,
+    label: str,
+) -> Any:
+    """A model view at ``scale`` moved so ``focus_m`` lands on ``center``.
+
+    ``proof`` (a model point, the sheet point it must land on, its label) is
+    projected too, so a view at another scale or handing than the script's
+    sheet mapping assumes raises."""
     draw = adapter.currentModel
     view = _early_bound(
-        place_view(adapter, str(SOURCE), "*Right", *DETAIL_CENTER, scale=DETAIL_SCALE),
-        "IView",
+        place_view(adapter, str(SOURCE), orientation, *center, scale=scale), "IView"
     )
     ratio = tuple(float(value) for value in view.ScaleRatio)
-    if ratio != tuple(float(value) for value in DETAIL_SCALE):
-        raise RuntimeError(f"neck detail scale {ratio!r}, expected {DETAIL_SCALE!r}")
-    center = model_point_in_view(adapter, view, _DETAIL_FOCUS_M, label="neck detail focus")
+    if ratio != tuple(float(value) for value in scale):
+        raise RuntimeError(f"{label} scale {ratio!r}, expected {scale!r}")
+    found = model_point_in_view(adapter, view, focus_m, label=f"{label} focus")
     position = tuple(float(value) for value in view.Position)
-    target = [position[axis] + DETAIL_CENTER[axis] - center[axis] for axis in range(2)]
+    target = [position[axis] + center[axis] - found[axis] for axis in range(2)]
     if not view.SetViewPosition(double_array(target), False):
-        raise RuntimeError("failed to move the neck detail onto its sheet position")
+        raise RuntimeError(f"failed to move the {label} onto its sheet position")
     draw.EditRebuild3()
-    landing_m = (0.0, _NECK_FLOOR_R / 1000.0, NECK_LANDING_Z_MM / 1000.0)
-    for point, expected, label in (
-        (_DETAIL_FOCUS_M, DETAIL_CENTER, "neck detail focus"),
-        (landing_m, NECK_RUNOUT_LANDING, "neck runout landing"),
-    ):
-        found = model_point_in_view(adapter, view, point, label=label)
+    for point, expected, point_label in ((focus_m, center, f"{label} focus"), proof):
+        found = model_point_in_view(adapter, view, point, label=point_label)
         if math.dist(found, expected) > DETAIL_POSITION_TOL_M:
-            raise RuntimeError(f"{label} sits at {found!r}, not {expected!r}")
+            raise RuntimeError(f"{point_label} sits at {found!r}, not {expected!r}")
     return view
+
+
+def _placed_detail_view(adapter: Any) -> Any:
+    """Detail B, uncropped: a 10:1 *Right model view whose fence focus lands
+    on DETAIL_CENTER, proved by the neck landing (_detail_xy's mapping)."""
+    landing_m = (0.0, _NECK_FLOOR_R / 1000.0, NECK_LANDING_Z_MM / 1000.0)
+    return _moved_model_view(
+        adapter, "*Right", DETAIL_CENTER, DETAIL_SCALE, _DETAIL_FOCUS_M,
+        (landing_m, NECK_RUNOUT_LANDING, "neck runout landing"),
+        label="neck detail",
+    )
+
+
+def _placed_enlarged_view(adapter: Any) -> Any:
+    """The 5:1 *Back view whose axis at F lands on ENLARGED_CENTER, proved by
+    the tip of tooth 0 (model +X): the mirrored view prints it left of the
+    axis, ENLARGED_HALF_OD out, the mapping ENLARGED_KEEP assumes."""
+    tip_m = (OUTSIDE_DIA / 2000.0, 0.0, 0.0)
+    tip_xy = (ENLARGED_CENTER[0] - ENLARGED_HALF_OD, ENLARGED_CENTER[1])
+    return _moved_model_view(
+        adapter, "*Back", ENLARGED_CENTER, ENLARGED_SCALE, (0.0, 0.0, 0.0),
+        (tip_m, tip_xy, "enlarged tooth tip"),
+        label="enlarged gear end",
+    )
 
 
 def _crop_detail_view(adapter: Any, view: Any) -> None:
@@ -656,8 +744,9 @@ def _plain_text(text: str) -> str:
     return " ".join(str(text).split())
 
 
-def _label_detail(adapter: Any, detail: Any, side: Any) -> None:
-    """Label detail B beside its crop and letter its mark on the side view.
+def _label_views(adapter: Any, detail: Any, side: Any, enlarged: Any) -> None:
+    """Label detail B beside its crop, letter its mark on the side view and
+    label the 5:1 view from the stud tip: both differ from the sheet's 3:1.
 
     A note lands in the ACTIVE view, so each view is activated first; a
     note that did not land in its view raises.
@@ -666,10 +755,11 @@ def _label_detail(adapter: Any, detail: Any, side: Any) -> None:
         _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet(), "ISheet"
     )
     if not sheet.SetScale(*SHEET_SCALE, False, False):
-        raise RuntimeError("failed to pin sheet scale before labelling the neck detail")
+        raise RuntimeError("failed to pin sheet scale before labelling the views")
     for view, text, xy, label in (
         (detail, DETAIL_LABEL_TEXT, DETAIL_LABEL_XY, "neck-detail label"),
         (side, DETAIL_LETTER, PARENT_LETTER_XY, "neck-detail letter"),
+        (enlarged, ENLARGED_LABEL_TEXT, ENLARGED_LABEL_XY, "enlarged-view label"),
     ):
         _activate_view(adapter, view, label=label)
         if add_note(adapter, text, *xy) is None:
@@ -807,6 +897,18 @@ async def build(adapter: Any) -> dict[str, str]:
     detail = _placed_detail_view(adapter)
     set_hidden_lines_removed(adapter, detail)
     detail_annotations = _dimension_then_crop_detail(adapter, detail)
+    # The 5:1 view from the tip shows the hidden span and root sketches, in
+    # it alone (curate_view_dimensions shows each per view), and takes their
+    # two dimensions; no other view's keep names them.
+    enlarged = _placed_enlarged_view(adapter)
+    set_hidden_lines_removed(adapter, enlarged)
+    enlarged_annotations = curate_view_dimensions(
+        adapter,
+        enlarged,
+        keep=ENLARGED_KEEP,
+        view_label="enlarged gear end",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
     side_annotations = curate_view_dimensions(
         adapter,
         side,
@@ -821,7 +923,9 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front finite-form inspection",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    annotations = [*side_annotations, *end_annotations, *detail_annotations]
+    annotations = [
+        *side_annotations, *end_annotations, *detail_annotations, *enlarged_annotations,
+    ]
     set_dimension_callouts(
         adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
     )
@@ -922,7 +1026,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The mark and the labels go on once every pick is done, so no
     # coordinate pick in the side view meets the mark circle.
     _mark_detail_on_side(adapter, side)
-    _label_detail(adapter, detail, side)
+    _label_views(adapter, detail, side, enlarged)
     add_property_linked_note(
         adapter, "Gear Data", *GEAR_DATA_XY, char_height=GEAR_DATA_CHAR_HEIGHT
     )
