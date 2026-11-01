@@ -290,7 +290,9 @@ FRONT_KEEP = {
     # One row since the FLUSH rows went (machinist review: the two bands, not
     # the word, define the body and the boss faces): text centred 2.3 mm over
     # its line, as HeadDia's, keeps the line at the three-row callout's 71.6 mm.
-    "MainBodyDia": (0.150, 0.074),
+    # Centred right of the body's edge so its suffix runs into the clear
+    # band between the front view and View C.
+    "MainBodyDia": (0.165, 0.074),
     # A REFERENCE since U31: the crank bore is located from the cone bore
     # (View B), so its height above the foot only follows that chain.
     "CrankAxisY": (0.060, _front_y(CRANK_BORE_HEIGHT / 2.0)),
@@ -564,6 +566,9 @@ DIMENSION_SUFFIXES = {
     "CrankBoreDia": " THRU",
     "HeadDia": " HEAD",
     "ConeBossDia": " CONE BOSS OD",
+    # Why the body holds three places: its lower limit is the mounting holes'
+    # outer wall (MOUNT_OTHER_WEBS_WORST "body foot OD"; machinist review).
+    "MainBodyDia": " SETS MOUNT-HOLE WALL",
 }
 # Diameters given on their circles land one arrow on the near rim, the line
 # kept off the centre: two leaders through one centre crossed there (the
