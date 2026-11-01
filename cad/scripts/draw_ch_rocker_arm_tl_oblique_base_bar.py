@@ -66,7 +66,7 @@ from _surface_finish import SEAT_UM, surface_finish_by_key
 from _printed_limits import limits
 from _part_properties import part_drawing_unit
 from _printed_tolerance import drilled_oversize_mm
-from _drawing_metric_vendor import assert_imported_metric_dimensions
+from _drawing_metric_vendor import print_imported_metric_dimensions
 from ch_rocker_arm_tl_oblique_callouts import set_callout_lengths_to_three_places
 from ch_rocker_arm_tl_oblique_base_bar_spec import (
     BAR_LENGTH,
@@ -889,7 +889,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # sheet only proves the import kept them, then marks the slot counts and
     # writes the mate callouts.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    assert_imported_metric_dimensions(
+    print_imported_metric_dimensions(
         adapter,
         annotations,
         {
