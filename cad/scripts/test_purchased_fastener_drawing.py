@@ -5142,6 +5142,77 @@ def _supplier_pin_layout_placement(monkeypatch, *, family, outline):
     return placements[pins.MATING_HOLE_DIMENSION]
 
 
+def _supplier_spring_pin_imports(monkeypatch, *, limits, precision):
+    import _supplier_pin_drawing as pins
+
+    monkeypatch.setattr(pins, "scan_view_edges", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(pins, "_axis_circles", lambda *_args, **_kwargs: ())
+    monkeypatch.setattr(pins, "_supplier_length", lambda *_args, **_kwargs: ("length", "length check"))
+    monkeypatch.setattr(pins, "_supplier_diameter", lambda *_args, **_kwargs: ("diameter", "diameter check"))
+    imports, settled = [], {}
+
+    def import_references(_adapter, _view, _source, keep):
+        imports.append(tuple(keep))
+        return {name: (name, f"{name} check") for name in keep}
+
+    def settle(_adapter, _views, references, *, expected_count, label):
+        settled.update(references=references, expected_count=expected_count, label=label)
+        return lambda: None
+
+    monkeypatch.setattr(pins, "_import_model_references", import_references)
+    monkeypatch.setattr(pins, "_settled_pin_check", settle)
+    view = SimpleNamespace(GetOutline=lambda: (0.27, 0.13, 0.30, 0.15), Position=(0.2875, 0.143))
+    source = SimpleNamespace(
+        sku="spring-pin", length_mm=12.7, wall_mm=0.3048, wall_precision=3,
+        application_hole_limits=limits, application_hole_precision=precision,
+    )
+    pins.add_supplier_spring_pin_dimensions(None, {"*Front": view, "*Right": view}, source)
+    return imports, settled
+
+
+def test_supplier_spring_pin_without_application_hole_imports_only_the_wall(monkeypatch):
+    import _supplier_pin_drawing as pins
+
+    imports, settled = _supplier_spring_pin_imports(monkeypatch, limits=None, precision=None)
+    assert imports == [(pins.WALL_DIMENSION,)]
+    assert settled == {
+        "references": [
+            ("*Right", "diameter", "diameter check"), ("*Front", "length", "length check"),
+            ("*Right", pins.WALL_DIMENSION, f"{pins.WALL_DIMENSION} check"),
+        ],
+        "expected_count": 3, "label": "spring-pin",
+    }
+
+
+def test_supplier_spring_pin_with_application_hole_still_imports_the_mating_hole(monkeypatch):
+    import _supplier_pin_drawing as pins
+
+    imports, settled = _supplier_spring_pin_imports(
+        monkeypatch, limits=(0.062, 0.065), precision=3,
+    )
+    assert imports == [(pins.WALL_DIMENSION, pins.MATING_HOLE_DIMENSION)]
+    assert settled["expected_count"] == 4
+    assert settled["references"][2:] == [
+        ("*Right", pins.WALL_DIMENSION, f"{pins.WALL_DIMENSION} check"),
+        ("*Right", pins.MATING_HOLE_DIMENSION, f"{pins.MATING_HOLE_DIMENSION} check"),
+    ]
+
+
+@pytest.mark.parametrize("limits,precision", [((0.062, 0.065), None), (None, 3)])
+def test_supplier_spring_pin_refuses_a_half_declared_application_hole(monkeypatch, limits, precision):
+    import _supplier_pin_drawing as pins
+
+    scans = []
+    monkeypatch.setattr(pins, "scan_view_edges", lambda *_args, **_kwargs: scans.append(1))
+    source = SimpleNamespace(
+        sku="spring-pin", length_mm=12.7, wall_mm=0.3048, wall_precision=3,
+        application_hole_limits=limits, application_hole_precision=precision,
+    )
+    with pytest.raises(ValueError, match="incomplete supplier mating-hole reference"):
+        pins.add_supplier_spring_pin_dimensions(None, {"*Front": None, "*Right": None}, source)
+    assert scans == []
+
+
 @pytest.mark.parametrize(
     "family,outline,old_position,text_box,line",
     [
