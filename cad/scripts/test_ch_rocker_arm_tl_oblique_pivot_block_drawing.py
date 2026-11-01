@@ -115,4 +115,4 @@ def test_engagement_shortfall_is_the_declared_minor():
     (engagement,)=_config.parts(spec.PART_NAME)['machinist_exceptions']
     assert (engagement['id'],engagement['kind'])==('RV-01','minor')
     assert spec.ENGAGEMENT_TEXT in engagement['where']
-    assert 'pending confirmation' in engagement['reason']
+    assert 'Owner exception confirmed' in engagement['reason']
