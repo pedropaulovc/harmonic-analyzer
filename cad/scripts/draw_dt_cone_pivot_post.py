@@ -449,12 +449,19 @@ SECTION_KEEP = {
     "ConeBossLen": (0.355, 0.235),
     "ConeBossNorthZ": (0.2325, 0.2544),
 }
+# View C's box runs the post's full height like the elevation's, so the cone
+# axis stands BORE_HEIGHT above the foot on the same vertical scale.
+CONE_AXIS_SHEET_Y = JOURNAL_CENTER[1] + (cone.BORE_HEIGHT - BLOCK_HEIGHT / 2.0) * _S
 # The crank bore is located from the cone bore (U31), so its spacing chains
-# off the cone-axis height on the same dimension line, in the one view that
-# shows both bores.  Its toleranced text stands off the line like 33.37's,
-# between the crank-bore size callout and the section-axes label.
+# off the cone-axis height, in the one view that shows both bores.  Its
+# toleranced text stands off its line on a leader, between the crank-bore
+# size callout and the section-axes label.  The cone-axis height takes its
+# own dimension line out left of the spacing's, its text on that line
+# between the foot and the cone axis: offset above the axis beside the
+# shared line, its jogged leader ran down the spacing's line until it merged
+# with it (r3 machinist review, View C).
 JOURNAL_KEEP = {
-    "JournalAxisY": (0.208, 0.156),
+    "JournalAxisY": (0.188, 0.136),
     "CrankAboveCone": (0.208, 0.170),
     # One row (DIMENSION_SUFFIXES), 3.5 mm tall, centred 1 mm over this y.
     # The bore's five-line block below is centred on ITS y, so its band tops
@@ -498,18 +505,17 @@ JOURNAL_BORE = requirement(
 part_metadata(datums={
     "A": ({"feature": "journal_bore", "surface": "cone journal bore cylinder"}, ("PART_DATUMS",)),
 })
-# Both chained heights share the dimension line at JOURNAL_KEEP's x, and the
-# crank spacing's extension line runs up it past the 33.37's text, so that text
-# must end left of the line.  Its x here is only a start:
-# ``_clear_journal_axis_text`` moves it by the box the layout check itself
-# reads once the sheet is complete.  That box is an estimate (glyph count x
-# height x an advance calibrated from the sheet's notes), so it outruns the
-# printed ink and moves when any note on the sheet changes: leaf w3-1026 read
-# it 34.0 mm wide, the 8f4aea333 control 36.0 mm over 27.1 mm of printed ink.
-# A width fixed from one reading crossed the line on the next.
+# The cone-axis height's text, and with it its own dimension line, must end
+# left of the crank spacing's line where that line runs down past the cone
+# axis.  Its x in JOURNAL_KEEP is only a start: ``_clear_journal_axis_text``
+# moves it by the box the layout check itself reads once the sheet is
+# complete.  That box is an estimate (glyph count x height x an advance
+# calibrated from the sheet's notes), so it outruns the printed ink and moves
+# when any note on the sheet changes: leaf w3-1026 read it 34.0 mm wide, the
+# 8f4aea333 control 36.0 mm over 27.1 mm of printed ink.  A width fixed from
+# one reading crossed the line on the next.
 _TEXT_LINE_CLEARANCE = 0.002
 JOURNAL_TEXT_OFFSETS = {
-    "JournalAxisY": (0.1856, 0.157),
     "CrankAboveCone": (0.193, 0.183),
 }
 # The non-preferred bore limits tell the shop what to inspect without imposing
@@ -1187,9 +1193,10 @@ def _view_outline(view: Any) -> tuple[float, float, float, float]:
 
 
 def journal_axis_text_shift(sheet: Any) -> tuple[Any, float, float]:
-    """The 33.37 text box the layout check reads, the crank spacing line
-    beside it, and the x shift that leaves the box ``_TEXT_LINE_CLEARANCE``
-    left of that line (negative moves it left)."""
+    """The cone-axis height's text box the layout check reads, the crank
+    spacing's dimension line (the vertical that reaches down to the cone
+    axis), and the x shift that leaves the box ``_TEXT_LINE_CLEARANCE`` left
+    of that line (negative moves it left)."""
     from _layout_geometry import union_boxes
 
     texts = [a for a in sheet.annotations if a.label == "JournalAxisY"]
@@ -1210,21 +1217,22 @@ def journal_axis_text_shift(sheet: Any) -> tuple[Any, float, float]:
         for segment in spacings[0].segments
         if abs(segment.x1 - segment.x0) < 1e-9
         and segment.x0 > box.xmin
-        and min(segment.y0, segment.y1) < box.ymax
-        and max(segment.y0, segment.y1) > box.ymin
+        and min(segment.y0, segment.y1) < CONE_AXIS_SHEET_Y + _TEXT_LINE_CLEARANCE
     ]
     if not beside:
         raise RuntimeError(
-            "no vertical CrankAboveCone line beside the JournalAxisY text "
-            f"{box.format_mm()}: the 33.37 placement premise no longer holds"
+            "no vertical CrankAboveCone line down to the cone axis right of "
+            f"the JournalAxisY text {box.format_mm()}: its placement premise "
+            "no longer holds"
         )
     line_x = min(beside)
     return box, line_x, line_x - _TEXT_LINE_CLEARANCE - box.xmax
 
 
 def _clear_journal_axis_text(adapter: Any, journal_annotations: list[Any]) -> None:
-    """Move the 33.37 text so the box the layout check reads on this finished
-    sheet ends ``_TEXT_LINE_CLEARANCE`` left of the crank spacing line."""
+    """Move the cone-axis height's text, and its own dimension line with it,
+    so the box the layout check reads on this finished sheet ends
+    ``_TEXT_LINE_CLEARANCE`` left of the crank spacing line."""
     from diagnostics.drawing_layout_audit import collect_document
 
     sheets = collect_document(adapter)
