@@ -14,6 +14,7 @@ import _telemetry
 from _session import run_build
 from _part_properties import part_drawing_unit
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _supplier_extension_spring import SOURCE_FEATURES
 from _supplier_spring_drawing import (
     build_supplier_spring_drawing,
@@ -22,6 +23,7 @@ from _supplier_spring_drawing import (
 )
 import sm_vn_counter_spring_spec as supplier
 
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["sm_vn_counter_spring"]
 # The footer's ITEM row: the catalogue designation in plain text.
