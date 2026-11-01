@@ -16,7 +16,7 @@ from _fit_ream_h7 import REAM_H7
 from _fit_ream_slide import REAM_SLIDE
 from _fit_deviations import deviations
 from _inch_wall_limits import WALL_FLOOR_MM
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import printed_band_mm, printed_deviations
 
 
 def test_required_drawing_paths() -> None:
@@ -134,7 +134,13 @@ def test_overall_length_is_a_derived_reference_with_spec_owned_places() -> None:
         dt_pinion_bracket_spec.C2C + 2.0 * dt_pinion_bracket_spec.R_END
     )
     assert "OverallLength" not in set(dt_pinion_bracket_spec.DRAWING_PRECISION_BY_NAME)
-    assert dt_pinion_bracket_spec.DRAWING_REFERENCE_PRECISION == 3
+    # The printed reference agrees with the printed C2C and end radii it sums.
+    by_name = dt_pinion_bracket_spec.DRAWING_PRECISION_BY_NAME
+    places = dt_pinion_bracket_spec.DRAWING_REFERENCE_PRECISION
+    total = round(dt_pinion_bracket_spec.C2C / 25.4, by_name["ArborBoreCz"]) + 2.0 * round(
+        dt_pinion_bracket_spec.R_END / 25.4, by_name["BottomCapRadius"]
+    )
+    assert round(total, places) == round(dt_pinion_bracket_spec.OVERALL_LENGTH / 25.4, places)
 
 
 def test_blind_seat_dimensions_are_assigned_to_readable_views() -> None:
@@ -286,7 +292,7 @@ def test_part_config_supplies_the_title_block_fields() -> None:
 def test_set_pin_cross_hole_is_located_by_model_dimensions() -> None:
     # Codex #858 P2, user ruling (a): no location lives in prose.  Through the
     # thickness the model's own CrossHoleCz (half the thickness from broad
-    # face A) prints at .XXX; across the bar the hole's centre sits ON the
+    # face A) prints at .XX; across the bar the hole's centre sits ON the
     # pivot-axis line the side view draws, so it prints no offset.  The r1
     # machinist review (#1007) found the former 3.18 from the pivot-bore wall
     # ran to a hidden line (rule 9), so its hidden reference sketch is gone.
@@ -313,7 +319,7 @@ def test_set_pin_cross_hole_is_located_by_model_dimensions() -> None:
     assert dims["CrossHoleProfile"] == {"CrossHoleDia", "CrossHoleCz"}
     by_name = dt_pinion_bracket_spec.DRAWING_PRECISION_BY_NAME
     assert by_name["CrossHoleDia"] == 4
-    assert by_name["CrossHoleCz"] == 3
+    assert by_name["CrossHoleCz"] == 2
     # The station is the model's relation to its globals, not a typed number,
     # and no hidden sketch is left for a hidden-owner import.
     build_source = inspect.getsource(bracket)
@@ -401,16 +407,16 @@ def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
     hole_height = _GENERAL_GRADE[pin.IMPLIED_ZERO_PLACES]
     assert pin.IMPLIED_ZERO_PLACES == 2
     seat_height = _printed_band("PinSeatCy")
+    cross_lower, cross_upper = printed_deviations(
+        half, geometry.CROSS_HOLE_CZ_PLACES, unit=geometry.UNIT
+    )
     worst = {
         # Cross hole to the far and the near broad face.
         "cross hole far face": thickness_min
-        - (half + _printed_band("CrossHoleCz"))
+        - (half + cross_upper)
         - hole_r
         - _DRILL_ALLOWANCE,
-        "cross hole near face": half
-        - _printed_band("CrossHoleCz")
-        - hole_r
-        - _DRILL_ALLOWANCE,
+        "cross hole near face": half + cross_lower - hole_r - _DRILL_ALLOWANCE,
         # Follower seat to the far and the near broad face.
         "seat far face": thickness_min
         - (half + _printed_band("PinSeatCz"))
@@ -453,6 +459,6 @@ def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
     pin_source = Path(pin.__file__).read_text(encoding="utf-8")
     assert "DOT_X_BAND" not in pin_source and "DOT_XX_BAND" not in pin_source
     # The values the inch sheet leaves (#290).
-    assert math.isclose(worst["cross hole far face"], 3.366, abs_tol=5e-4)
+    assert math.isclose(worst["cross hole far face"], 3.163, abs_tol=5e-4)
     assert math.isclose(worst["seat far face"], 2.192, abs_tol=5e-4)
     assert math.isclose(worst["shaft wall"], 2.085, abs_tol=5e-4)

@@ -29,8 +29,8 @@ UNIT = drawing_unit("parts/dt-pinion-bracket", _config.parts("dt-pinion-bracket"
 # pivot on the lift-rod side, resting on the cam collar (the p.68 arrow).
 # #290: WIDTH, C2C and PIN_DROP are kinematic closures (the strap's swing into
 # mesh, the follower's park gap, the spring blade's flank), so they keep their
-# millimetre nominals and print rounded in inches at three places; every
-# reader judges them at the PRINTED limits.
+# millimetre nominals and print rounded in inches; every reader judges them at
+# the PRINTED limits.
 WIDTH = 15.0
 C2C = 28.0
 # THICKNESS re-derived 2026-10 from ch25 page001_img01, which frames BOTH straps
@@ -70,9 +70,12 @@ OVERALL_LENGTH = C2C + 2.0 * R_END
 # (dt_vn_pinion_strap_pin_spec).  dt_pinion_bracket_spec.DRAWING_PRECISION states them
 # natively from these, so a precision change reaches the web gates by itself
 # (restricted review, ruling 3).
-END_RADIUS_PLACES = 3  # BottomCapRadius / TopCapRadius
-# CrossHoleCz, from broad face A: half the .XXX thickness.  The hole's height
-# prints no offset: its centre sits on the pivot-axis line the flank view
-# draws, an implied zero the webs charge (dt_vn_pinion_strap_pin_spec).
-CROSS_HOLE_CZ_PLACES = 3
+# The end radii are the unmated outline: .XX (R.30), whose band still buries
+# the longest set pin in the narrowest foot (PIN_BURIED_MARGIN).
+END_RADIUS_PLACES = 2  # BottomCapRadius / TopCapRadius
+# CrossHoleCz, from broad face A: half the thickness, at .XX (.18); the far-face
+# web clears the .080 target at that row.  The hole's height prints no offset:
+# its centre sits on the pivot-axis line the flank view draws, an implied zero
+# the webs charge (dt_vn_pinion_strap_pin_spec).
+CROSS_HOLE_CZ_PLACES = 2
 

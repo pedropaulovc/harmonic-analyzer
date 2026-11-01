@@ -38,10 +38,12 @@ ROD_DIA_PLACES = 2  # RodDia
 # bore depth in from the mouth face, which also puts it half the rod's
 # engagement in from the rod's front end (the rod seats on the bore floor).
 # The pin runs along the hub's local X, 3 o'clock to the +Y grip.
-# #290 fit F15: a #52 drill (.0635) through hub and rod, so the 1/16 drill
-# rod pin (.0625 +/-.0003) always slips in before it is peened.
-PIN_HOLE_DIA = 1.6129  # .0635, #52 drill, match-drilled through hub and rod
-PIN_HOLE_DRILL = "#52"  # the drill the fitter names (MHA-DT-00 LEVER PIN SET)
+# #290 fit F15: a .064 drilled hole (DRILLED HOLES +.004/0) through hub and
+# rod, so the 1/16 drill rod pin (.0625 +/-.0003) always slips in before it is
+# peened.
+PIN_HOLE_DIA = 1.6256  # .064, match-drilled through hub and rod
+# The drill dt_drive_train_assembly_sheet names in MHA-DT-00 LEVER PIN SET.
+PIN_HOLE_DRILL = "#52"
 BORE_DEPTH = HUB_LEN - WALL_T  # .32
 PIN_HOLE_FROM_MOUTH = BORE_DEPTH / 2.0  # .16
 PIN_HOLE_Z = HUB_LEN / 2.0 - PIN_HOLE_FROM_MOUTH  # hub-local station, .04

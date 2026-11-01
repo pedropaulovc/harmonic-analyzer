@@ -59,13 +59,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_REFERENCE_DIMENSIONS = frozenset({"RodOverall"})
 
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`); the part authors
-# them and the drawing reads them back.  Four on the banded bearing diameter
-# and the #52 drilled pin hole; two on the length the rig's stacks read, the
-# crown, the reference overall and the pin station, which the lever's
-# mid-engagement sets at assembly.
+# them and the drawing reads them back.  Four on the banded bearing diameter;
+# three on the drilled pin hole, which takes the title block's DRILLED HOLES
+# row (.064, +.004/0); two on the length the rig's stacks read, the crown, the
+# reference overall and the pin station, which the lever's mid-engagement
+# sets at assembly.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "RodProfile": {"RodDia": 4, "RodBody": 2, "CapR": 2, "RodOverall": 2},
-    "PinHoleProfile": {"PinHoleDia": 4, "PinHoleZ": 2},
+    "PinHoleProfile": {"PinHoleDia": 3, "PinHoleZ": 2},
 }
 _PRECISION_NAMES = [
     (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names

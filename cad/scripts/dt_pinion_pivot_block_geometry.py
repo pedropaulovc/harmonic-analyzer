@@ -33,8 +33,9 @@ UNIT = drawing_unit(
 # y -BORE_UP..BLOCK_HEIGHT-BORE_UP, z 0..BLOCK_DEPTH.  (Part -X = machine
 # WEST: the assembly places the block mirrored.)  #290: the envelope and the
 # hold-down stations snap to the .XX grid the sheet prints; the bore height
-# (the drum axis, raised with the bank) and the lift bore's spacing and rise
-# (the cam park-gap closure) keep their millimetre nominals and print at .XXX. ---
+# (the drum axis, raised with the bank) keeps its millimetre nominal and prints
+# .XX; the lift bore's spacing and rise (the cam park-gap closure) keep theirs
+# and print at .XXX. ---
 BLOCK_EAST = 13.97  # .55; pivot bore -> east end: 3.0 web past the east screw hole
 BLOCK_WEST = 25.908  # 1.02; pivot bore -> west end: 4.3 web past the lift bore
 BLOCK_WIDTH = BLOCK_EAST + BLOCK_WEST  # 1.57 (photo ~38-41 mm)

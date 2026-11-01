@@ -149,17 +149,19 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 #
 # #290 inch sheet.  Four places on the three reamed bores and the cross hole,
 # whose +.0015/+.0010, +.0005/.0000 and +.0025/.0000 bands need them.  Three
-# (.XXX, +/-.005) on everything a stack, web or swing reads: PinSeatCy (the
-# follower stud's height above the pivot sets how far the drum swings for a
-# given cam lift), the bore centre distance and end radii (kinematic, and the
-# set pins' buried margin), the bar thickness (the rig's span stack) and the
-# two stations centred on it (the seat and cross-hole webs).  Two (.XX) on
-# the seat depth, which a flat-bottom reamer bottoms out.
+# (.XXX, +/-.005) where a stack or web reads the row, each naming its function
+# at the dimension: PinSeatCy (the follower stud's height above the pivot sets
+# how far the drum swings for a given cam lift), the bar thickness (the axial
+# stack between the MHA-DT-18 blocks) and the seat's station (its far-face web
+# fails at .XX).  Two (.XX) on the rest: the bore centre distance (no check
+# reads its band; at the engaged pose a .010 error moves the mesh centre a
+# quarter of that), the unmated end radii, the cross hole's station and the
+# seat depth, which a flat-bottom reamer bottoms out.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StrapProfile": {
         "PivotBoreDia": 4,
         "ArborBoreDia": 4,
-        "ArborBoreCz": 3,
+        "ArborBoreCz": 2,
         "BottomCapRadius": END_RADIUS_PLACES,
         "TopCapRadius": END_RADIUS_PLACES,
     },
@@ -185,12 +187,12 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
-# The (1.693) overall is a REFERENCE the sheet derives from the outline (C2C
+# The (1.7) overall is a REFERENCE the sheet derives from the outline (C2C
 # plus both end radii), not a model dimension, so no part-side map can hand
 # its decimal places over: the spec owns the digit and the sheet passes it to
-# ``SetPrecision3`` instead of writing a literal (drawing-simplicity-policy.md `How the repository implements the guidelines`).  Three places
-# because the two end radii it sums are three-place dimensions.
-DRAWING_REFERENCE_PRECISION = 3
+# ``SetPrecision3`` instead of writing a literal (drawing-simplicity-policy.md `How the repository implements the guidelines`).  One
+# place: the printed 1.10 + 2 x .30 sums to 1.70, which (1.69) would contradict.
+DRAWING_REFERENCE_PRECISION = 1
 
 
 # The arbor bore runs on the MHA-DT-22 arbor.  The pivot bore takes no

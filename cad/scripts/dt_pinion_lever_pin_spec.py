@@ -19,9 +19,9 @@ LEVER_NUMBER = "MHA-DT-16"
 LIFT_ROD_NUMBER = "MHA-DT-17"
 
 # Stock 1/16 in drill rod, held +/-.0003 as supplied (#290 fit F15).  The pin
-# rides a #52 drilled hole (.0635, title-block DRILLED HOLES +.004/0), so it
-# is retained by the peened heads, not by an interference: the band only says
-# "use the stock", and the largest pin still clears the smallest hole by .0007.
+# rides a .064 drilled hole (title-block DRILLED HOLES +.004/0), so it is
+# retained by the peened heads, not by an interference: the band only says
+# "use the stock", and the largest pin still clears the smallest hole by .0012.
 PIN_DIA_BAND = (0.00762, -0.00762)
 
 # drawing-guidelines.md rule 11 (turned parts read like the lathe) (turned parts): both dimensions live on the revolved half-profile, so

@@ -79,10 +79,11 @@ _AXIS_OFFSET_MAX = max(
 _R_END_LOWER = printed_deviations(R_END, END_RADIUS_PLACES, unit=UNIT)[0]
 
 # Web from the cross hole to the FAR broad face (Codex #858 P2).  MHA-DT-14
-# prints the hole's station from broad face A at .XXX (the model's own
+# prints the hole's station from broad face A at .XX (.18, the model's own
 # CrossHoleCz, half the thickness), so the far face sees the thinnest bar
-# (.XXX minus band) less the station at its maximum, the hole's upper-limit
-# radius and the 0.05 drilled-hole allowance.  The near-face web is larger.
+# (.XXX minus band) less the station at its printed maximum, the hole's
+# upper-limit radius and the 0.05 drilled-hole allowance.  The near-face web
+# is larger.
 STRAP_FACE_WEB_WORST = (
     (THICKNESS + _THICKNESS_LOWER)
     - (THICKNESS / 2.0 + _CROSS_HOLE_CZ_UPPER)

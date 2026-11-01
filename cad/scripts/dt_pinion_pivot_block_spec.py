@@ -99,16 +99,20 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # #290 inch sheet: the part authors each printed dimension's places
 # (build_dt_pinion_pivot_block).  Four on the two reamed bores, whose
-# +.0015/+.0010 band needs them; three on the bore height and the lift bore's
-# spacing and rise, kinematic nominals kept from the millimetre design (the
-# drum axis and the cam park gap); two on the snapped envelope and depth
-# (BLOCK_DEPTH_PLACES, the row the rig's stack reads).
+# +.0015/+.0010 band needs them; three on the lift bore's spacing and rise,
+# kinematic nominals kept from the millimetre design (the cam park-gap
+# closure, named by the spacing's callout); two on the snapped envelope and
+# depth (BLOCK_DEPTH_PLACES, the row the rig's stack reads) and on the pivot
+# bore's height (AnchorZ, .66).  No check reads that height's band: it lifts
+# the whole rig (pivot, lift bore, cam) together, so the park gap holds, and
+# at the engaged pose its .010 moves the mesh centre about 1% of that.  The
+# model keeps its millimetre nominal (the bank's raised axis).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {
         "BlockWidth": 2,
         "BlockHeight": 2,
         "AnchorX": 2,
-        "AnchorZ": 3,
+        "AnchorZ": 2,
         "PivotBoreDia": 4,
         "LiftBoreX": 3,
         "LiftBoreCz": 3,

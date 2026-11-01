@@ -15,8 +15,8 @@ from dt_pinion_lever_geometry import HUB_OD
 from dt_pinion_lever_geometry import UNIT as LEVER_UNIT
 
 UNIT = drawing_unit("parts/dt-pinion-lever-pin", _config.parts("dt-pinion-lever-pin"))
-# 1/16 in drill rod as supplied (vendor size), in the hub's #52 match-drilled
-# hole (dt_pinion_lever_geometry.PIN_HOLE_DIA).
+# 1/16 in drill rod as supplied (vendor size), in the hub's match-drilled hole
+# (dt_pinion_lever_geometry.PIN_HOLE_DIA).
 PIN_DIA = 25.4 / 16.0
 # Codex P1 (#844): cut OVERLENGTH, then trimmed and peened flush at assembly.
 # A pin cut to the hub's own length could be short of each face with nothing

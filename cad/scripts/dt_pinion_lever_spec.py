@@ -92,14 +92,15 @@ REFERENCE_SKETCHES = (
 
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`); the part authors
 # them and the drawing reads them back.  Four on the banded bore (fit F10,
-# .2500 +.0015/+.0010) and on the #52 drilled pin hole (.0635); two, the
-# inch .XX row, everywhere else: the rig's stacks read the grip stations,
-# and no feature on the lever is routine enough for .X.
+# .2500 +.0015/+.0010); three on the drilled pin hole, which takes the title
+# block's DRILLED HOLES row (Ø.064, +.004/0); two, the inch .XX row,
+# everywhere else: the rig's stacks read the grip stations, and no feature on
+# the lever is routine enough for .X.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BarrelProfile": {"HubOd": 2, "HubBore": 4},
     "RodProfile": {"RodTipY": 2, "RodDia": ROD_DIA_PLACES},
     "CapProfile": {"CapR": 2},
-    "PinHoleProfile": {"PinHoleDia": 4},
+    "PinHoleProfile": {"PinHoleDia": 3},
     "GripStationReference": {"GripFromB": GRIP_FROM_B_PLACES},
     "PinHoleStationReference": {"PinHoleFromB": 2},
     "BoreDepthReference": {"BoreDepthFromB": BORE_DEPTH_PLACES},

@@ -22,7 +22,7 @@ pitfall's safe case).
 Volume gate (mm^3): annulus + wall disc + cap (spherical-cap formula)
 + rod cylinder - rod/hub-OD overlap (Simpson over circular segments).
 
-U36 (MHA-DT-30): a #52 pin hole crosses the hub along local X -- 3 o'clock
+U36 (MHA-DT-30): a pin hole crosses the hub along local X -- 3 o'clock
 to the grip -- at mid-engagement (half the bore depth from the mouth face B).  It is
 match-drilled at assembly through the hub and the lift rod; the part carries
 it so the print can call it out and the assembly can seat the pin.

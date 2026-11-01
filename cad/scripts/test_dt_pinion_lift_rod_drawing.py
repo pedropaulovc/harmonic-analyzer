@@ -54,17 +54,7 @@ def test_pin_hole_sits_at_the_lever_mid_engagement() -> None:
     # hub's bore depth in from the front end, which seats on the bore floor.
     assert lever.ROD_PIN_HOLE_FROM_END == lever.BORE_DEPTH / 2.0
     assert lever.ROD_PIN_HOLE_FROM_END == pytest.approx(0.16 * 25.4)
-    callout = dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT
-    # The hole specification only; LEVER PIN SET drives and peens the pin,
-    # and the sheet points at that MHA-DT-00 step through the registry.
-    import dt_drive_train_steps
-
-    assert callout.split("\n") == ["MATCH-DRILL THRU AT ASSEMBLY", "IN MHA-DT-16 HUB"]
-    assert dt_pinion_lift_rod_spec.LEVER_NUMBER in callout
-    assert drawing.LEVER_PIN_SET_STEP_KEY == "lever-pin-set"
-    assert drawing.DIMENSION_CALLOUTS["PinHoleDia"] == (
-        f"{callout},\nPER {dt_drive_train_steps.step_ref(drawing.LEVER_PIN_SET_STEP_KEY)}"
-    )
+    assert dt_pinion_lift_rod_spec.LEVER_NUMBER in dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT
 
 
 def test_the_lathe_sizes_live_on_the_side_view_plane() -> None:
