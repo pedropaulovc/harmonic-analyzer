@@ -231,6 +231,10 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
         "as-bought 7/32 brass rod's supplier tolerance (upper, lower): indexed "
         "for the fixture cross-bore clearance and the turned relief"
     ),
+    ("mg_wheel_axle_spec", "THREAD_LEN_BAND"): (
+        "axle thread length +/-.010 (printed symmetric): indexed for the "
+        "locknut and runout stack corners, not a fit"
+    ),
 }
 
 # (upper, lower) fit bands that no helper reads: the owning module indexes them
