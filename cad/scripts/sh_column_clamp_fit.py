@@ -91,9 +91,13 @@ def note_text(value_in: float) -> str:
     return text[1:] if text.startswith("0.") else text
 
 
-# Both arcs print Depth at three places; both arcs' Hole Wizard callouts print
-# their drill diameters at three places (the front's Ø.196, the back's .136).
-DEPTH_PLACES = 3
+# The front arc's Depth prints .685 at three places (it sets the clamp screws'
+# engagement, and .685 is off the .01 grid); the back arc's .59 Depth prints
+# the title block's .XX, the back wall and the tap's wander taking its +/-.01.
+# Both arcs' Hole Wizard callouts print their drill diameters at three places
+# (the front's Ø.196, the back's .136).
+FRONT_DEPTH_PLACES = 3
+BACK_DEPTH_PLACES = 2
 EAR_HOLE_CALLOUT_PLACES = 3
 
 # (min, max) diametral clearance of EITHER arc's bore on its column,
@@ -184,24 +188,24 @@ EAR_DRILL_DRIFT_PER_MM = math.tan(math.radians(EAR_DRILL_WANDER_DEG))  # 0.00524
 # Each ear hole runs through its arc: the front's clearance hole over the
 # arc's deepest printed Depth, the back's tap over the block's.
 FRONT_EAR_WANDER = EAR_DRILL_DRIFT_PER_MM * (
-    ARC_DEPTH + printed_deviations(ARC_DEPTH, DEPTH_PLACES, unit=UNIT)[1]
+    ARC_DEPTH + printed_deviations(ARC_DEPTH, FRONT_DEPTH_PLACES, unit=UNIT)[1]
 )  # 0.0918
 BACK_EAR_WANDER = EAR_DRILL_DRIFT_PER_MM * (
-    BLOCK_DEPTH + printed_deviations(BLOCK_DEPTH, DEPTH_PLACES, unit=UNIT)[1]
-)  # 0.0791
+    BLOCK_DEPTH + printed_deviations(BLOCK_DEPTH, BACK_DEPTH_PLACES, unit=UNIT)[1]
+)  # 0.0798
 
 # The screw line at its worst: the printed ear mismatch plus both holes'
 # wander, in any direction, against the front hole's float.  Owner-ruled
 # short (above, sh-column-clamp-front RV-02) at up to 0.053 mm: ruled on the
 # 17.9 mm arc as 0.283 + 0.096 + 0.081 = 0.460 against 0.407.  At the inch
-# bands (+/-.004 on the ear stations and heights, depths at .XXX) it is
-# 0.2874 + 0.0918 + 0.0791 = 0.4583 against 0.4064, i.e. 0.0519 mm; the front
-# sheet states it as .003 at its three places (rounded up).  The floor still
-# holds -- the printed bands alone never bind the screw
-# (EAR_SCREW_MISMATCH_MAX < SCREW_FLOAT above) -- and the shortfall may not
-# grow past the ruled value.
+# bands (+/-.004 on the ear stations and heights, the front Depth at .XXX and
+# the back's at .XX) it is 0.2874 + 0.0918 + 0.0798 = 0.4590 against 0.4064,
+# i.e. 0.0525 mm; the front sheet states it as .003 at its three places
+# (rounded up).  The floor still holds -- the printed bands alone never bind
+# the screw (EAR_SCREW_MISMATCH_MAX < SCREW_FLOAT above) -- and the shortfall
+# may not grow past the ruled value.
 SCREW_LINE_DEMAND = EAR_SCREW_MISMATCH_MAX + FRONT_EAR_WANDER + BACK_EAR_WANDER
-SCREW_LINE_SHORTFALL = SCREW_LINE_DEMAND - SCREW_FLOAT  # 0.0519
+SCREW_LINE_SHORTFALL = SCREW_LINE_DEMAND - SCREW_FLOAT  # 0.0525
 SCREW_LINE_SHORTFALL_RULED = 0.053
 if not 0.0 < round(SCREW_LINE_SHORTFALL, 3) <= SCREW_LINE_SHORTFALL_RULED:
     raise AssertionError(

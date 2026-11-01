@@ -144,20 +144,22 @@ def test_column_limit_is_the_a513_dom_table_row() -> None:
 
 def test_walls_at_the_largest_column_and_drill_wander() -> None:
     # Independent oracle from inch literals: the largest A513 column (1.005)
-    # at the loosest .012 clearance, the printed .XXX limits and the +/-.004
+    # at the loosest .012 clearance, the printed .XX limits and the +/-.004
     # bands, and 0.3 deg of drill wander over the through tap's deepest
-    # printed length (.590 + .005).
+    # printed length (.59 + .01).
     r_bore = _in(1.005 + 0.012) / 2.0
-    wander = _in(0.595) * math.tan(math.radians(0.3))
+    wander = _in(0.600) * math.tan(math.radians(0.3))
     reach = 4.166 / 2.0 + wander
-    back_wall = _in(0.020 - 0.004) + _in(0.590 - 0.005) - r_bore
-    assert math.isclose(spec.WALLS_WORST["back wall"], back_wall)  # 2.350 (.0925)
+    back_wall = _in(0.020 - 0.004) + _in(0.590 - 0.010) - r_bore
+    assert math.isclose(spec.WALLS_WORST["back wall"], back_wall)  # 2.2225 (.0875)
     assert math.isclose(
         spec.WALLS_WORST["ear to bore"], _in(0.689 - 0.004) - reach - r_bore
-    )  # 2.321 (.0914), the least wall
+    )  # 2.320 (.0914), the least ear wall
+    # The .XX width (1.89 +/-.01) about the reference .945 centre, the side
+    # faces each the .XX band off it.
     assert math.isclose(
         spec.WALLS_WORST["ear to far side"],
-        _in(1.885) - _in(0.950) - _in(0.693) - reach,
+        _in(1.880) - _in(0.955) - _in(0.693) - reach,
     )
     # Every wall meets the .080 target, so the back wall's old shortfall
     # (sh-column-clamp-back RV-01) is retired and nothing is declared.
@@ -174,15 +176,15 @@ def test_screw_line_shortfall_is_the_owner_ruled_one() -> None:
     float_ = (_in(0.196) - 4.1656) / 2.0  # 0.4064 (.016)
     drift = math.tan(math.radians(0.3))
     mismatch = math.hypot(_in(0.008), _in(0.008))
-    demand = mismatch + (_in(0.690) + _in(0.595)) * drift  # 0.4583
+    demand = mismatch + (_in(0.690) + _in(0.600)) * drift  # 0.4589
     assert math.isclose(fit.SCREW_FLOAT, float_)
     assert math.isclose(fit.SCREW_LINE_DEMAND, demand)
-    assert math.isclose(fit.SCREW_LINE_SHORTFALL, demand - float_)  # 0.0519
+    assert math.isclose(fit.SCREW_LINE_SHORTFALL, demand - float_)  # 0.0525
     # Owner-ruled (sh-column-clamp-front RV-02) as up to 0.053 mm; the +/-.004
     # ear bands keep it inside. The printed bands alone still leave the screw
     # float.
     assert fit.SCREW_LINE_SHORTFALL_RULED == 0.053
-    assert round(demand - float_, 3) == 0.052
+    assert round(demand - float_, 3) == 0.053
     assert mismatch < float_
 
 

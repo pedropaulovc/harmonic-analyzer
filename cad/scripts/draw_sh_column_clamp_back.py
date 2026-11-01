@@ -75,6 +75,7 @@ from sh_column_clamp_back_spec import (
     EAR_HOLE_Z,
     FRONT_ARC_MATE,
     GRIP_OFFSET,
+    REFERENCE_DIMENSIONS,
     TAP_DRILL_DIA,
 )
 
@@ -155,7 +156,6 @@ FACE_KEEP = {
 # Both ear holes stand on the one station and the one height the part prints
 # (EarHole1Z, EarHoleHeight).
 DIMENSION_PREFIXES = {"EarHole1Z": "2X ", "EarHoleHeight": "2X "}
-REFERENCE_DIMENSIONS = ("BoreDia",)
 # The bands that are tighter than the title block name their mate and why
 # (drawing-guidelines.md rule 4): the bore is matched to the purchased column
 # (sh_column_clamp_fit), the bore axis stands off the split face so the clamp
