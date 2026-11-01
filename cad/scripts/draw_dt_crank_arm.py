@@ -308,7 +308,10 @@ _TAP_DRILL_VARIABLES = ("hw-tapdrldia", "hw-thrutapdrldia")
 
 def _tap_drill_precision(display: Any, label: str) -> None:
     """Print the tap callout's drill diameter at three places."""
-    definition = str(_early_bound(display, "IDisplayDimension").GetText(5) or "")
+    native = _early_bound(display, "IDisplayDimension")
+    # swDimensionTextParts_e 5..8: the four definition parts; the drill row
+    # is not in the thread row's part.
+    definition = "\n".join(str(native.GetText(part) or "") for part in (5, 6, 7, 8))
     names = [name for name in _TAP_DRILL_VARIABLES if f"<{name}>" in definition]
     if len(names) != 1:
         raise RuntimeError(f"{label}: no single tap drill variable in {definition!r}")
