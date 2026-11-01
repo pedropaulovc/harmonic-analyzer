@@ -59,8 +59,8 @@ def test_stock_is_the_half_by_one_flat_on_edge() -> None:
     # STOCK and the supplier's band.
     assert spec.STOCK_DIMENSIONS == {"BracketWidth", "BracketThick"}
     assert spec.STOCK_CALLOUTS == {
-        "BracketWidth": "STOCK ±.009",
-        "BracketThick": "STOCK ±.012",
+        "BracketWidth": "STOCK\n±.009",
+        "BracketThick": "STOCK\n±.012",
     }
     assert not spec.STOCK_DIMENSIONS & set(spec.CALLOUTS_BELOW)
     sizes = {"BracketWidth": spec.BRACKET_WIDTH, "BracketThick": spec.BRACKET_THICK}
