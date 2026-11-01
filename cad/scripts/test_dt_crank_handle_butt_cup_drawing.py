@@ -337,11 +337,11 @@ def test_bottom_chamfer_has_real_legs_and_a_sound_root_at_the_new_body(cup_build
 
 
 def test_model_properties_need_no_general_manufacturing_note(cup_build) -> None:
-    # Owner ruling B on #1375 resolves the wall in geometry, not a note or exception.
+    # Owner ruling B on #1375 resolves the wall in geometry, not a note; the
+    # 2026-11-01 ruling accepts its .060 as minor exception RV-01.
     properties = cup_build.helpers["apply_drawing_properties"].call_args.args[2]
     assert properties == {"Isometric View Note": notes.ISOMETRIC_VIEW_NOTE}
     assert not hasattr(notes, "DRAWING_NOTES")
-    assert not _config.parts("dt-crank-handle-butt-cup").get("machinist_exceptions")
 
 
 def test_concave_floor_round_adds_the_exact_revolved_corner_material() -> None:

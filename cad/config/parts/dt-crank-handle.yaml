@@ -7,3 +7,9 @@ dt-crank-handle:
   tolerance_class: visual_noncritical
   process: "turned (wood)"
   drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "tenon callout: WALL .060 MIN"
+      finding: "oak tenon wall over the pivot bore .0602 at the smallest tenon, the largest matched-fit bore and its .004 offset, above the .060 floor and under the .080 target (rule 17)"
+      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions (extends to MHA-DT-08; a larger tenon thins the MHA-DT-34 ferrule, whose walls are already exceptions, and the bore runs on the MHA-DT-32 shoulder)"
