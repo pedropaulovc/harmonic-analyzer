@@ -993,10 +993,12 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_constraint(pin_witness, None, "vertical"),
     )
     # Dimensions in creation order; SketchDims renames them by that order.
+    # Every anchor is named so its drive equation is applied (an unnamed
+    # record drives nothing): the references follow the globals they restate.
     await anchor_point_to_origin(
         adapter, f"{overall_line}.start", 0.0, -SHAFT_DOME_HEIGHT, "dome tip reference"
     )
-    stations.record(None, '"DomeHeight"')
+    stations.record("DomeTipReference", '"DomeHeight"')
     await dimension_between(
         adapter,
         f"{overall_line}.start",
@@ -1032,8 +1034,8 @@ async def build(adapter) -> dict[str, str]:
         PINION_PIN_STATION_Y - PINION_PIN_DIA / 2.0,
         "pinion pin-hole reference start",
     )
-    stations.record(None, '"PinionSeatDia" / 2')
-    stations.record(None, '"PinionPinStation" - "PinionPinDia" / 2')
+    stations.record("PinionPinWitnessRadius", '"PinionSeatDia" / 2')
+    stations.record("PinionPinWitnessStart", '"PinionPinStation" - "PinionPinDia" / 2')
     await dimension_between(
         adapter,
         f"{pin_witness}.start",
