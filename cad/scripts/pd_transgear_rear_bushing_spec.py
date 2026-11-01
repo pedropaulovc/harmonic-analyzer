@@ -6,7 +6,7 @@ shims on the MHA-PD-18 arm's front face and the MHA-PD-10 sleeve's rear face.
 Its length only sets the disc's end float, which the shims close at assembly
 (owner ruling 2026-11-01, #2124): ``transgear_cluster_fit.REAR_BUSHING_LENGTH``
 keeps the unshimmed float over ``transgear_cluster_fit.END_FLOAT_MIN`` at the
-worst case, and its band holds the shim count to the supplier's four.  It
+worst case at the title block's .XXX, which only moves the shim count.  It
 runs free on the pin; the MHA-PD-10 sleeve's rear face turns on its front
 face.  #290: the sheet prints decimal inch; every length is the exact
 millimetre value of its inch nominal.
@@ -53,13 +53,12 @@ WALL_WORST = (
 if WALL_WORST < WALL_TARGET_MM:
     raise AssertionError(f"MHA-PD-24 wall {WALL_WORST:.3f} under {WALL_TARGET_MM}")
 
-# --- Length: the shim count's band (owner ruling 2026-11-01, #2124) -------------
-# The shims under it set the disc's end float; its band only moves the shim
-# count (transgear_cluster_fit.SHIM_COUNT_RANGE, at most SHIM_COUNT_MAX).
+# --- Length: title block (owner ruling 2026-11-01, #2124) -----------------------
+# The shims under it set the disc's end float, so its .XXX band only moves
+# the shim count (transgear_cluster_fit.SHIM_COUNT_RANGE).
 LENGTH = FIT.REAR_BUSHING_LENGTH  # .214
-LENGTH_BAND = FIT.REAR_BUSHING_LENGTH_BAND
 LENGTH_PLACES = FIT.LENGTH_PLACES
-# Rule 4: the band names the stack it serves and where it is shimmed.
+# Rule 4: the length names the stack it serves and where it is shimmed.
 LENGTH_CALLOUT = f"{STACK_NAME},\nSHIMMED AT {STACK_SHEET}"
 
 # The sleeve's rear face turns on the front face and thrusts on it, cluster

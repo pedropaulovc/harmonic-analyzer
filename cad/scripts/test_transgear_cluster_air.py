@@ -29,14 +29,14 @@ def _worst(chain, sign):
 def test_stack_lengths_print_their_bands():
     """The knob train keeps the 0.02 cluster band; the lengths that set the
     collar air or the recess print +/-.001; the rear bushing, which only
-    feeds the shimmed end float, prints the +/-.004 that holds the count."""
+    feeds the shimmed end float, prints at the title block."""
     assert PRINTED_LENGTH_BAND == pytest.approx(0.02)
     assert FIT_LENGTH_BAND_IN == pytest.approx(0.0254)  # .001 in
     for label, _, band in KNOB_TRAIN:
         assert band == pytest.approx(PRINTED_LENGTH_BAND), label
     for label, _, band in FIT_LENGTHS:
         assert band == pytest.approx(FIT_LENGTH_BAND_IN), label
-    assert FIT.LRB[2] == REAR_BUSHING.LENGTH_BAND == pytest.approx(0.004 * 25.4)
+    assert FIT.LRB[2] == printed_band_mm(3, unit=REAR_BUSHING.UNIT)
     assert (FIT.HUB_LENGTH, FIT.FRONT_BUSHING_LENGTH, FIT.REAR_BUSHING_LENGTH) == (
         pytest.approx(13.6906),  # .539
         pytest.approx(5.6388),  # .222

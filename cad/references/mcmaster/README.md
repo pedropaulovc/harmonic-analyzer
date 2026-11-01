@@ -1317,8 +1317,9 @@ Catalog specifications checked on September 10, 2026:
   `diag_build_97431A240.py` draws that law on this ring's catalogue circles.
 
 - [94773A606](https://www.mcmaster.com/94773A606/) (`pd-vn-transgear-cluster-shim`,
-  MHA-PD-VN-68, two in the model, 0 to 4 at fit-up: the family table warns
-  that a stack of more than four may shift) goes on the MHA-PD-23
+  MHA-PD-VN-68, two in the model, 0 to 5 at fit-up; the family table's
+  caution that a stack of more than four may shift is for loose shims on a
+  screw shoulder, and these are captured on the pin) goes on the MHA-PD-23
   pin between the MHA-PD-18 arm's front face and the MHA-PD-24 rear bushing;
   the fitter stacks them until the ring gap matches the MHA-PD-00 setting
   dimension, so no disc-cluster part is faced to fit (owner ruling

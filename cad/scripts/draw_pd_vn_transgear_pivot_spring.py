@@ -21,8 +21,8 @@ from _supplier_spring_drawing import build_supplier_spring_drawing
 from _supplier_spring_reference import SUPPLIER_DIAGRAM_CONFIGURATION
 import pd_vn_transgear_pivot_spring_spec as supplier_spec
 
-# Cached machinist review leaf; ENFORCE once the sheet reaches SHIP.
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_pivot_spring"]
 # The footer's ITEM row: the catalogue designation in plain text.

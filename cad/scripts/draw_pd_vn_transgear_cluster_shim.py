@@ -16,8 +16,8 @@ from _session import run_build
 from _supplier_washer_drawing import supplier_washer_dimensions
 import pd_vn_transgear_cluster_shim_spec as part
 
-# Cached machinist review leaf; ENFORCE once the sheet reaches SHIP.
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_cluster_shim"]
 # The footer's ITEM row: the catalogue designation in plain text.
