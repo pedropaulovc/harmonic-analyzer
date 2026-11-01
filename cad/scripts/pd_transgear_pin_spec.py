@@ -31,7 +31,7 @@ from _gtol_cylinder import CylinderFace
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND_IN
+from pd_cluster_stack_band import FIT_LENGTH_BAND_IN
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 UNIT = drawing_unit("parts/pd-transgear-pin", _config.parts("pd-transgear-pin"))
@@ -108,11 +108,12 @@ SEAT_CONTACT_WIDTH_MIN = round(
 # The groove's FRONT wall is the load wall: the cluster pushed forward bears
 # the front bushing on the ring and the ring on this wall.  Its station from
 # the head's underside is the pin's one functional length: a term of the
-# disc cluster's printed stack (transgear_cluster_fit), so it prints four
-# places at the cluster's band (#2038 owner ruling 2026-10-28, option A).
+# disc cluster's stack (transgear_cluster_fit).  The shims set the end float
+# (owner ruling 2026-11-01, #2124); the station still sets the collar-to-disc
+# air, so it prints +/-.001.
 GROOVE_STATION = 47.244  # 1.860, head underside to the groove's load wall
-GROOVE_STATION_PLACES = 4
-GROOVE_STATION_BAND = PRINTED_LENGTH_BAND_IN
+GROOVE_STATION_PLACES = 3
+GROOVE_STATION_BAND = FIT_LENGTH_BAND_IN
 GROOVE_DIA = RING.GROOVE_DIA
 GROOVE_DIA_BAND = RING.GROOVE_DIA_BAND
 GROOVE_WIDTH = RING.GROOVE_WIDTH

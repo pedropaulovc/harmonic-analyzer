@@ -314,6 +314,14 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Side-Mount External Retaining Ring",
         "97431A240",
     ),
+    # MHA-PD-VN-68 (#2124): the disc cluster's end-float shims, stacked under
+    # the MHA-PD-24 rear bushing at fit-up.
+    "pd-vn-transgear-cluster-shim": _stock(
+        "pd-vn-transgear-cluster-shim",
+        "18-8 Stainless Steel Shim, 1/8 ID x 1/4 OD x .005",
+        "94773A606",
+        material="AISI 304",
+    ),
     # MHA-PD-VN-63: one curved disc spring under the MHA-PD-VN-57 pivot screw's head;
     # high-carbon steel, the library's plain carbon steel.
     "pd-vn-transgear-pivot-spring": _stock(

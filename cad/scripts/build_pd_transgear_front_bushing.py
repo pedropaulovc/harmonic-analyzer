@@ -2,7 +2,7 @@ r"""Reproduction script: transgear front bushing (MHA-PD-25; R9-68; 1 used).
 
 The turned brass ring on the MHA-PD-23 pin between the MHA-PD-10 sleeve's nose
 and the MHA-PD-VN-61 retaining ring (``pd_transgear_front_bushing_spec``).  Its
-length is printed (+/-LENGTH_BAND, a term of the disc cluster stack, #2038).
+length is printed (+/-LENGTH_BAND, a term of the disc cluster stack).
 
 Layout: Front-plane annulus at the origin (O.D., bore) extruded +Z by the
 length, so the nose face is the Front Plane (z = 0) and the ring face is the

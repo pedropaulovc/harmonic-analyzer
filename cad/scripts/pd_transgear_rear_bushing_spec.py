@@ -1,14 +1,14 @@
 r"""MHA-PD-24 transgear-rear-bushing: the brass spacer behind the disc cluster (R9-68).
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure.  A turned brass ring on the MHA-PD-23 pin between the MHA-PD-18 arm's
-front face and the MHA-PD-10 sleeve's rear face.  Its length is printed (#2038
-owner ruling 2026-10-28: nothing in the disc cluster is faced to fit):
-``transgear_cluster_fit.REAR_BUSHING_LENGTH`` holds the disc's end float at
-``transgear_cluster_fit.END_FLOAT_MIN`` at the worst case and places the
-disc's rear face to the platen (``pd_cluster_air``).  It runs free on the
-pin; both faces bear.  #290: the sheet prints decimal inch; every length is
-the exact millimetre value of its inch nominal.
+closure.  A turned brass ring on the MHA-PD-23 pin between the MHA-PD-VN-68
+shims on the MHA-PD-18 arm's front face and the MHA-PD-10 sleeve's rear face.
+Its length only sets the disc's end float, which the shims close at assembly
+(owner ruling 2026-11-01, #2124), so it prints at the title block:
+``transgear_cluster_fit.REAR_BUSHING_LENGTH`` keeps the unshimmed float over
+``transgear_cluster_fit.END_FLOAT_MIN`` at the worst case.  It runs free on
+the pin; both faces bear.  #290: the sheet prints decimal inch; every length
+is the exact millimetre value of its inch nominal.
 
 Part frame: axis local +Z through the origin (``Axis1``); faces at z = 0
 (Front Plane, on the arm's front face) and z = LENGTH (``SleeveFace``, on
@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import _config
 import transgear_cluster_fit as FIT
-from pd_cluster_stack_band import STACK_NAME
 import pd_transgear_pin_spec as PIN
 from _gtol_planar import PlanarFace
 from _inch_wall_limits import WALL_TARGET_MM
@@ -52,15 +51,11 @@ WALL_WORST = (
 if WALL_WORST < WALL_TARGET_MM:
     raise AssertionError(f"MHA-PD-24 wall {WALL_WORST:.3f} under {WALL_TARGET_MM}")
 
-# --- Length: printed (#2038 owner ruling 2026-10-28, option A) --------------------
-# It sets the disc's end float (worst case) and, cluster rearward, where the
-# disc's rear face stands to the platen: a term of the disc cluster's
-# printed stack.
-LENGTH = FIT.REAR_BUSHING_LENGTH  # .222
-LENGTH_BAND = FIT.LENGTH_BAND
+# --- Length: title block (owner ruling 2026-11-01, #2124) -----------------------
+# The shims under it set the disc's end float, so its .XXX band only moves
+# the shim count (transgear_cluster_fit.SHIM_COUNT_RANGE).
+LENGTH = FIT.REAR_BUSHING_LENGTH  # .214
 LENGTH_PLACES = FIT.LENGTH_PLACES
-# Rule 4: the band names the stack it serves and what it sets.
-LENGTH_CALLOUT = f"{STACK_NAME},\nSETS DISC END FLOAT"
 
 SURFACE_FINISHES = (
     SurfaceFinishControl(

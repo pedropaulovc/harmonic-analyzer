@@ -745,6 +745,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_transgear_rear_bushing",  # MHA-PD-24 brass bushing, printed length, reamed bore on the pin; no thread
         "pd_transgear_removable",  # O12 plain bore + 2 drive-pin holes, no thread (build_pd_transgear_removable)
         "pd_vn_transgear_retaining_ring",  # MHA-PD-VN-61 external retaining ring (McMaster 97431A240) in the pin's groove
+        "pd_vn_transgear_cluster_shim",  # MHA-PD-VN-68 shims (McMaster 94773A606) on the pin under the rear bushing; no thread
         "pd_vn_transgear_knob_drive_pin",  # MHA-PD-VN-54 dowel pressed into plain holes, no thread
         "fr_tube_frame",  # columns: socket slip fit; cross holes enlarged so the MHA-FR-VN-53 shank passes "WITHOUT THREAD CONTACT" (MHA-FR-00 STEP 2/5)
         "fr_vn_tube_frame_cap",  # McMaster 9275K141 push-on cap (MHA-FR-00 STEP 7)
@@ -772,6 +773,7 @@ UNTHREADED_STOCK: dict[str, str] = {
     "pd_vn_transgear_latch_pin": "dowel pin pressed into a reamed hole",
     "pd_vn_transgear_arm_plate_locating_pin": "dowel pin pressed into the arm's through ream",
     "pd_vn_transgear_retaining_ring": "external retaining ring fitted sideways in a groove",
+    "pd_vn_transgear_cluster_shim": "shim ring loose on the pin under the rear bushing; no thread",
     "pd_vn_transgear_pivot_spring": "disc spring on the pivot shoulder; no thread",
     "dt_vn_cylinder_bank_spring": "wave disc spring loose on the arbor; no thread",
     "ch_vn_rocker_bank_spring": "wave disc spring loose on the pivot shaft; no thread",

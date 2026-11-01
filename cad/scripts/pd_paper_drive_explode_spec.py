@@ -130,10 +130,13 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
         "z",
         20.0,
     ),
-    # The disc cluster forward along its pin, in the order it comes off.
+    # The disc cluster forward along its pin, in the order it comes off: the
+    # rear bushing with it, then the MHA-PD-VN-68 shims off the arm's front
+    # face into the gap it leaves.
     ExplodeStep(
         "cluster forward",
         (
+            "pd-transgear-rear-bushing",
             "pd-transgear-feed-pinion",
             "pd-rack-pinion",
             "pd-transgear-disc-hub",
@@ -144,6 +147,7 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
         "z",
         -6.0,
     ),
+    ExplodeStep("shims forward", ("pd-vn-transgear-cluster-shim",), "z", -3.0),
     ExplodeStep(
         "disc off the sleeve",
         (
@@ -197,14 +201,13 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
     ),
     ExplodeStep("thumbnut forward", ("pd-transgear-thumbnut",), "z", -20.0),
 )
-# The arm, its pressed pins, the rear bushing on the pin, and the knob shaft
-# with its thrust ring stay put; the moved parts read against them.
+# The arm, its pressed pins and the knob shaft with its thrust ring stay put;
+# the moved parts read against them.
 TRANSGEAR_STATIONARY_STEMS = frozenset(
     {
         "pd-transgear-arm",
         "pd-transgear-pin",
         "pd-vn-transgear-latch-pin",
-        "pd-transgear-rear-bushing",
         "pd-transgear-knob-shaft",
         "pd-transgear-knob-thrust-ring",
     }

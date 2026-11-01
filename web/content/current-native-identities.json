@@ -581,6 +581,17 @@
       ]
     },
     {
+      "sourceStem": "pd-vn-transgear-cluster-shim",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-cluster-shim",
+          "number": "MHA-PD-VN-68"
+        }
+      ]
+    },
+    {
       "sourceStem": "vn-magnifying-bracket-screw",
       "sourceNumber": "MHA-VN-050",
       "identities": [
@@ -1052,7 +1063,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "17ebbe9fd412e9519092357b906cbac1fc12f46a6f74961d44716113ed87ebe7",
+  "currentRegistryMapSha256": "e766c8884b347d0d58b7a85ade149fef46995f2d0750ce03d05792a86a1b6118",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",

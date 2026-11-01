@@ -115,6 +115,7 @@ import pd_latch_hook_geometry as hook_geometry
 import paper_drive_rack_setup as rack_setup
 import pd_paper_drive_assembly_steps as steps
 import pd_paper_drive_knob_setting_spec as knob_setting
+import pd_paper_drive_cluster_float_spec as cluster_float
 import pd_paper_drive_explode_spec as explode
 import pd_platen_guide_spec as platen_guide
 import pd_platen_spec as platen
@@ -458,6 +459,7 @@ CLUSTER_STEMS = frozenset(
         "pd-vn-transgear-disc-screw",
         "pd-transgear-front-bushing",
         "pd-vn-transgear-retaining-ring",
+        "pd-vn-transgear-cluster-shim",
     }
 )
 if not CLUSTER_STEMS < explode.TRANSGEAR_SHOWN_STEMS:
@@ -633,6 +635,50 @@ for _point in (knob_setting.S_XY, knob_setting.K_XY, KNOB_SETTING_TAP_XY):
     ) / 1000.0 >= KNOB_SETTING_RADIUS:
         raise AssertionError("the knob setting circle must frame S, T and K")
 
+# Sheet 6's VIEW E: the cluster's shimmed ring gap, the assembly's hidden
+# ClusterFloatSetting line (pd_paper_drive_cluster_float_spec) between the
+# MHA-PD-VN-61 ring and the MHA-PD-25 front bushing on the pin, seen from the
+# side at 5:1 and cropped to a circle on the gap. It stands in sheet 6's left
+# field, under the knob stack's column and over the reference isometric's
+# caption; the shimming step on sheet 5 cites it.
+CLUSTER_FLOAT_VIEW_NAME = cluster_float.VIEW_NAME
+CLUSTER_FLOAT_ORIENTATION = "*Right"
+CLUSTER_FLOAT_SCALE = (5.0, 1.0)
+CLUSTER_FLOAT_CENTER = (0.110, 0.135)
+CLUSTER_FLOAT_RADIUS = 0.030
+# The crop's model centre (mm): on the gap, a little above the pin's axis.
+CLUSTER_FLOAT_MODEL_CENTRE = (
+    cluster_float.AXIS_XY[0],
+    cluster_float.LINE_Y,
+    cluster_fit.RING_REAR_Z + cluster_float.NOMINAL_MM / 2.0,
+)
+CLUSTER_FLOAT_INSTANCES = frozenset(
+    {
+        "pd-transgear-pin-1",
+        "pd-vn-transgear-retaining-ring-1",
+        "pd-transgear-front-bushing-1",
+        "pd-transgear-feed-pinion-1",
+    }
+)
+CLUSTER_FLOAT_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+CLUSTER_FLOAT_CAPTION = "\n".join(
+    (
+        f"{CLUSTER_FLOAT_VIEW_NAME}, 5:1 (STEP {steps.step_number('disc-cluster-shimmed')})",
+        "RING TO FRONT BUSHING, CLUSTER REARWARD",
+    )
+)
+CLUSTER_FLOAT_CAPTION_XY = (
+    CLUSTER_FLOAT_CENTER[0] - CLUSTER_FLOAT_RADIUS,
+    CLUSTER_FLOAT_CENTER[1] - CLUSTER_FLOAT_RADIUS - 0.004,
+)
+_CLUSTER_FLOAT_TEXT_REACH_MM = math.dist(
+    (cluster_float.TEXT_POINT[1], cluster_float.TEXT_POINT[2]),
+    (CLUSTER_FLOAT_MODEL_CENTRE[1], CLUSTER_FLOAT_MODEL_CENTRE[2]),
+)
+_CLUSTER_FLOAT_M_PER_MM = CLUSTER_FLOAT_SCALE[0] / CLUSTER_FLOAT_SCALE[1] / 1000.0
+if _CLUSTER_FLOAT_TEXT_REACH_MM * _CLUSTER_FLOAT_M_PER_MM >= CLUSTER_FLOAT_RADIUS:
+    raise AssertionError("VIEW E's circle must frame the ring gap's text")
+
 
 def knob_setting_letters(
     s: tuple[float, float],
@@ -762,6 +808,7 @@ BOM_PART_NUMBERS = {
     "pd-transgear-disc-hub": _config.parts("pd-transgear-disc-hub")["number"],
     "pd-transgear-front-bushing": _config.parts("pd-transgear-front-bushing")["number"],
     "pd-vn-transgear-retaining-ring": _config.parts("pd-vn-transgear-retaining-ring")["number"],
+    "pd-vn-transgear-cluster-shim": _config.parts("pd-vn-transgear-cluster-shim")["number"],
     "pd-rack-pinion": _config.parts("pd-rack-pinion")["number"],
     "pd-vn-transgear-disc-screw": _config.parts("pd-vn-transgear-disc-screw")["number"],
     "pd-transgear-knob-shaft": _config.parts("pd-transgear-knob-shaft")["number"],
@@ -810,6 +857,9 @@ _SKU = {
     ][0],
     "pd-vn-transgear-disc-screw": _config.parts("pd-vn-transgear-disc-screw")["supplier_skus"][0],
     "pd-vn-transgear-retaining-ring": _config.parts("pd-vn-transgear-retaining-ring")[
+        "supplier_skus"
+    ][0],
+    "pd-vn-transgear-cluster-shim": _config.parts("pd-vn-transgear-cluster-shim")[
         "supplier_skus"
     ][0],
     "pd-vn-transgear-knob-drive-pin": _config.parts("pd-vn-transgear-knob-drive-pin")[
@@ -880,6 +930,7 @@ BOM_DESCRIPTIONS = {
     "pd-vn-transgear-retaining-ring": (
         f"RETAINING RING, MCMASTER {_SKU['pd-vn-transgear-retaining-ring']}"
     ),
+    "pd-vn-transgear-cluster-shim": f"SHIM, MCMASTER {_SKU['pd-vn-transgear-cluster-shim']}",
     "pd-rack-pinion": (
         f"REDUCER DISC, STOCK {disc.TEETH}T {disc.DIAMETRAL_PITCH:g}DP "
         f"PA{disc.PRESSURE_ANGLE_DEG:g}"
@@ -934,6 +985,8 @@ TRANSGEAR_QUANTITIES = {
     "pd-transgear-disc-hub": 1,
     "pd-transgear-front-bushing": 1,
     "pd-vn-transgear-retaining-ring": 1,
+    # The model's nominal count; the fit-up sets the real one (VIEW E).
+    "pd-vn-transgear-cluster-shim": cluster_fit.SHIM_COUNT_MODEL,
     "pd-rack-pinion": 1,
     "pd-vn-transgear-disc-screw": hub_geometry.SCREW_COUNT,
     "pd-transgear-knob-shaft": 1,
@@ -1001,6 +1054,7 @@ ISO_HIDDEN_STEMS = frozenset(
         "pd-transgear-pin",
         "pd-transgear-front-bushing",
         "pd-vn-transgear-retaining-ring",
+        "pd-vn-transgear-cluster-shim",
     }
 )
 if not explode.TRANSGEAR_SHOWN_STEMS <= set(TRANSGEAR_QUANTITIES):
@@ -1434,15 +1488,6 @@ KNOB_END_FLOAT_RANGE = (
     knob_shaft.END_FLOAT - knob_shaft.END_FLOAT_SET_TOL,
     knob_shaft.END_FLOAT + knob_shaft.END_FLOAT_SET_TOL,
 )
-# The disc's end float as the fitter accepts it: the printed stack's worst
-# case (transgear_cluster_fit.END_FLOAT_RANGE, 0.2013-0.5537) rounded outward
-# to the hundredth, so every cluster made inside its printed bands passes
-# (CodeRabbit on cdf418a1c: printed 0.55, it refused a good one).
-DISC_END_FLOAT_ACCEPT = (
-    math.floor(cluster_fit.END_FLOAT_RANGE[0] * 100.0 + 1e-9) / 100.0,
-    math.ceil(cluster_fit.END_FLOAT_RANGE[1] * 100.0 - 1e-9) / 100.0,
-)
-DISC_END_FLOAT_TEXT = f"{DISC_END_FLOAT_ACCEPT[0]:.2f}-{DISC_END_FLOAT_ACCEPT[1]:.2f}"
 # The platen's screw stations (platen_spec): its front counterbores take the
 # guide screws, its through-taps the clip screws.
 GUIDE_SCREWS = len(platen.GUIDE_HOLE_X) * len(platen.GUIDE_HOLE_Y)
@@ -1616,11 +1661,17 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "DEBURR THE BORE."
         ),
         "disc-cluster-hung": (
-            "OIL THE PIN (LIGHT MACHINE OIL); BUSHINGS AS MADE: "
+            "OIL THE PIN (LIGHT MACHINE OIL); "
             f"{_N['pd-transgear-rear-bushing']} BUSHING ON THE PIN, CLUSTER ON, "
             f"PINION REARWARD; {_N['pd-transgear-front-bushing']} BUSHING ON THE NOSE "
             f"TRAPS HUB AND DISC; {_N['pd-vn-transgear-retaining-ring']} RING SIDEWAYS "
             "IN THE PIN GROOVE."
+        ),
+        "disc-cluster-shimmed": (
+            f"SHIM AT THE ARM FACE: {_N['pd-vn-transgear-cluster-shim']} SHIMS UNDER "
+            f"THE {_N['pd-transgear-rear-bushing']} BUSHING TO {CLUSTER_FLOAT_VIEW_NAME} "
+            f"(SHEET {SHEET_NAMES.index('ASSEMBLY AND FIT-UP (CONT.)') + 1}) END "
+            "FLOAT (FEELER AT THE RING, CLUSTER REARWARD)."
         ),
         "collar-pins-pressed": (
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-knob-drive-pin']} "
@@ -1732,8 +1783,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"{steps.OFFSET_ACCEPT_TOL - collar.FIT_UP_OFFSET_TARGET:.2f} BEHIND "
             f"PASSES); KNOB END FLOAT {knob_lo:.2f} TO {knob_hi:.2f}; "
             f"{sprocket.KNOB_CONFIG} FREE "
-            "UNDER THE NUT; THE HANGER FREE; DISC END FLOAT "
-            f"{DISC_END_FLOAT_TEXT} AND THE DISC TURNS FREE; COLLAR TO DISC "
+            "UNDER THE NUT; THE HANGER FREE; RING GAP PER "
+            f"{CLUSTER_FLOAT_VIEW_NAME} AND THE DISC TURNS FREE; COLLAR TO DISC "
             f"AIR PER STEP {steps.step_number('collar-disc-air-inspected')}, "
             f"{steps.COLLAR_DISC_AIR_TEXT} AT OVERLAP AFTER REFITTING AND LATCHING. "
             "ELSE REPORT: NO FACING OR FITTING."
@@ -3400,6 +3451,80 @@ def _place_knob_setting_view(adapter: Any) -> None:
     )
 
 
+def _place_cluster_float_view(adapter: Any) -> None:
+    """Sheet 6's VIEW E: the pin's front end from the side at 5:1, cropped on
+    the ring gap, carrying the assembly's shimmed ring-gap window
+    (pd_paper_drive_cluster_float_spec) that the shimming step cites."""
+    label = "cluster float view"
+    _activate_sheet(adapter, SHEET_NAMES[5])
+    view = _early_bound(
+        place_view(
+            adapter,
+            str(SOURCE),
+            CLUSTER_FLOAT_ORIENTATION,
+            *CLUSTER_FLOAT_CENTER,
+            scale=CLUSTER_FLOAT_SCALE,
+        ),
+        "IView",
+    )
+    apply_view_configuration(adapter, view, label=label)
+    _isolate_instances(adapter, view, CLUSTER_FLOAT_INSTANCES, label=label)
+    model = tuple(
+        tuple(value / 1000.0 for value in point)
+        for point in (CLUSTER_FLOAT_MODEL_CENTRE, cluster_float.TEXT_POINT)
+    )
+    names = ("ring gap centre", "ring gap text")
+    centre = model_points_in_view(adapter, view, model[:1], label=label, names=names[:1])[0]
+    _shift_view(
+        adapter,
+        view,
+        (CLUSTER_FLOAT_CENTER[0] - centre[0], CLUSTER_FLOAT_CENTER[1] - centre[1]),
+        label=f"{label} centre",
+    )
+    centre, text = model_points_in_view(adapter, view, model, label=label, names=names)
+    if math.dist(centre, CLUSTER_FLOAT_CENTER) > 1e-4:
+        raise RuntimeError(f"{label}: the ring gap sits at {centre!r}")
+    _crop_to_circle(
+        adapter, view, CLUSTER_FLOAT_CENTER, CLUSTER_FLOAT_RADIUS, label=label
+    )
+    set_hidden_lines_removed(adapter, view)
+    _show_base_view_sketches(adapter, view, (cluster_float.FEATURE,), label=label)
+    annotations = curate_view_dimensions(
+        adapter,
+        view,
+        keep={cluster_float.DIMENSION: text},
+        view_label=label,
+        dimensions_by_feature=cluster_float.DRAWING_DIMENSIONS,
+    )
+    assert_imported_precision(
+        adapter, annotations, cluster_float.DRAWING_PRECISION[cluster_float.FEATURE]
+    )
+    imported = [
+        dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
+        for annotation in annotations
+    ]
+    if imported != [cluster_float.DIMENSION]:
+        raise RuntimeError(
+            f"{label} imported {imported}, not {cluster_float.DIMENSION}"
+        )
+    # The gap is about a millimetre on the sheet: arrows outside.
+    display = _early_bound(
+        _early_bound(annotations[0], "IAnnotation").GetSpecificAnnotation(),
+        "IDisplayDimension",
+    )
+    display.ArrowSide = CLUSTER_FLOAT_ARROWS_OUTSIDE
+    if int(display.ArrowSide) != CLUSTER_FLOAT_ARROWS_OUTSIDE:
+        raise RuntimeError(f"{label}: the ring gap kept its arrows inside")
+    rebuild_drawing(adapter, label=f"{label} arrows")
+    _place_sheet_note(
+        adapter,
+        SHEET_NAMES[5],
+        CLUSTER_FLOAT_CAPTION,
+        CLUSTER_FLOAT_CAPTION_XY,
+        label=f"{label} caption",
+    )
+
+
 def _place_fitup_sheets(adapter: Any, step_notes: StepNotes) -> None:
     for sheet_name, notes in (
         (SHEET_NAMES[4], step_notes.fitup_notes),
@@ -3467,6 +3592,7 @@ async def build(adapter: Any) -> dict[str, str]:
     landings += _place_exploded_sheet(adapter, table, items, notes)
     _place_fitup_sheets(adapter, notes)
     _place_knob_setting_view(adapter)
+    _place_cluster_float_view(adapter)
     assert_full_detail_view(adapter, label="paper-drive assembly")
 
     return await finalize_drawing(

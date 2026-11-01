@@ -12,8 +12,8 @@ the hub's own flat and never touches it).  The hub's printed overall leaves
 its front face never proud of the nose (``transgear_cluster_fit.RECESS_RANGE``),
 so the MHA-PD-25 front bushing bears on the nose and traps hub and disc
 against the step.  The rear face runs on the MHA-PD-24 rear bushing; both
-bushings and the hub are printed lengths of the disc cluster's printed stack
-(#2038; ``transgear_cluster_fit``, which reads this module).
+bushings and the hub are lengths of the disc cluster's stack, its end float
+shimmed at assembly (#2124; ``transgear_cluster_fit``, which reads this module).
 
 Local frame: origin on the axis at the sleeve's REAR face, +Z toward the
 machine FRONT.  The teeth occupy z 0..FACE_WIDTH, the boss
@@ -52,7 +52,7 @@ from _printed_tolerance import edge_break_chamfer_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
 from pd_transgear_disc_hub_geometry import SPIGOT_LENGTH, SPIGOT_LENGTH_BAND
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND_IN
+from pd_cluster_stack_band import FIT_LENGTH_BAND_IN
 from paper_drive_stock_envelope import (
     cutter_end_section_area_bounds_mm2,
     cutter_end_volume_bounds_mm3,
@@ -243,20 +243,20 @@ RACK_MESH_EXTENSION = (
 RACK_AXIS_DISTANCE = PITCH_DIA / 2.0 + RACK_MESH_EXTENSION
 
 # --- axial stations from the rear face (z 0) -----------------------------------
-# The overall and the tooth length are terms of the disc cluster's printed
-# stack (transgear_cluster_fit): the overall sets the hub's recess behind the
-# nose, the tooth length's end is the step face the hub's spigot seats on.
-# Both print at the cluster's band (#2038 owner ruling 2026-10-28, option A:
-# nothing in the cluster is faced to fit), at four places to carry it.
+# The overall and the tooth length are terms of the disc cluster's stack
+# (transgear_cluster_fit): the overall sets the hub's recess behind the nose,
+# the tooth length's end is the step face the hub's spigot seats on.  The
+# shims set the end float (owner ruling 2026-11-01, #2124); the recess still
+# needs both, so they print +/-.001.
 # STATION_TOL is the allowance the flat's reach and the hub's flat-end check
 # keep on the sleeve's other stations (R9-5's former overall band).
 STATION_TOL = 0.0508  # .002
-STATION_PLACES = 4
+STATION_PLACES = 3
 FACE_WIDTH = 13.589  # .535, the tooth length: rear face to the step onto the boss
-FACE_WIDTH_PLACES = 4
-FACE_WIDTH_BAND = PRINTED_LENGTH_BAND_IN
+FACE_WIDTH_PLACES = 3
+FACE_WIDTH_BAND = FIT_LENGTH_BAND_IN
 OVERALL_LENGTH = 27.3558  # 1.077
-OVERALL_LENGTH_BAND = PRINTED_LENGTH_BAND_IN
+OVERALL_LENGTH_BAND = FIT_LENGTH_BAND_IN
 
 # --- diameters -----------------------------------------------------------------
 # The boss is the hub's locating fit: turned .313 +.0005/.0000 under the

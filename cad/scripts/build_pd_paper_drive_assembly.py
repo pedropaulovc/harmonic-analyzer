@@ -121,6 +121,7 @@ from _sketch import (
     set_sketch_direct_db,
 )
 import pd_paper_drive_knob_setting_spec as KNOB_SETTING
+import pd_paper_drive_cluster_float_spec as CLUSTER_FLOAT
 from _assembly import (
     _rebuilt_component_name,
     activate_assembly_contract,
@@ -407,6 +408,7 @@ import pd_transgear_pivot_spacer_spec as SPACER  # noqa: E402
 import pd_vn_transgear_pivot_spring_spec as PIVOT_SPRING  # noqa: E402
 import pd_transgear_rear_bushing_spec as REAR_BUSHING  # noqa: E402
 import pd_vn_transgear_retaining_ring_spec as E_RING  # noqa: E402
+import pd_vn_transgear_cluster_shim_spec as CLUSTER_SHIM  # noqa: E402
 import pd_latch_hook_bracket_screw_spec as HOOK_BRACKET_SCREW  # noqa: E402
 import pd_latch_hook_spec as HOOK_SPEC  # noqa: E402
 
@@ -518,20 +520,25 @@ if abs(_pin_hole_n - _pin_hole_offset) > 1e-9 or (
 
 # Disc cluster on the pin MHA-PD-23 at S (R9-68).  The pin is pressed into the
 # arm, its head on the arm's rear face (Ry180: its stations run to machine
-# -Z).  On it, rear to front: the MHA-PD-24 rear bushing on the arm's front
-# face, the MHA-PD-10 feed sleeve (the disc on its round boss, its front face
-# at the D-flat's end wall where the hub's D-bore bears, screwed together),
-# the MHA-PD-25 front bushing on the sleeve's nose and the MHA-PD-VN-61 ring in the
-# pin's groove.  Nothing in the cluster is faced to fit (#2038 owner ruling
-# 2026-10-28): the model carries every printed length at its nominal
+# -Z).  On it, rear to front: the MHA-PD-VN-68 shims on the arm's front face,
+# the MHA-PD-24 rear bushing on them, the MHA-PD-10 feed sleeve (the disc on
+# its round boss, its front face at the D-flat's end wall where the hub's
+# D-bore bears, screwed together), the MHA-PD-25 front bushing on the sleeve's
+# nose and the MHA-PD-VN-61 ring in the pin's groove.  The end float is shimmed
+# at assembly (owner ruling 2026-11-01, #2124): the model carries every
+# printed length at its nominal and the nominal cluster's shim count
 # (transgear_cluster_fit), the cluster rearward with its float open at the ring.
 PIN_Z0 = PIN.HEAD_SEAT_MACHINE_Z  # -116.4625: the head's underside (Ry180)
 if abs(PIN_Z0 - (ARM_Z0 + ARM.THICKNESS)) > 1e-9:
     raise AssertionError("the pin's head is off the arm's rear face")
-REAR_BUSHING_Z0 = CLUSTER.REAR_BUSHING_REAR_Z  # -124.4 (Ry180, to -130.09)
-if abs(REAR_BUSHING_Z0 - ARM_Z0) > 1e-9:
-    raise AssertionError("the rear bushing is off the arm's front face")
-FEED_Z0 = REAR_BUSHING_Z0 - REAR_BUSHING.LENGTH  # -130.09 (Ry180, teeth to -143.69)
+# Rx-90 puts each shim's local +Y forward (-Z): shim i's arm-side face at z0.
+CLUSTER_SHIM_Z0S = tuple(
+    ARM_Z0 - i * CLUSTER_SHIM.THICKNESS for i in range(CLUSTER.SHIM_COUNT_MODEL)
+)
+REAR_BUSHING_Z0 = CLUSTER.REAR_BUSHING_REAR_Z  # on the model's shim stack
+if abs(REAR_BUSHING_Z0 - (ARM_Z0 - CLUSTER.SHIM_STACK_MODEL)) > 1e-9:
+    raise AssertionError("the rear bushing is off the shims on the arm's front face")
+FEED_Z0 = REAR_BUSHING_Z0 - REAR_BUSHING.LENGTH  # (Ry180, teeth forward)
 DISC_Z0 = FEED_Z0 - FEED.DISC_FRONT_STATION  # -147.34: on the hub spigot's flange
 if abs(DISC_Z0 - CLUSTER.DISC_FRONT_Z) > 1e-9:
     raise AssertionError("the disc is off the cluster stack's station")
@@ -643,9 +650,9 @@ if not KNOB_CUP_PIN_Z0 + CUP_PIN.HOLE_MAX / 2.0 < KNOB_SHAFT_REAR_Z:
 
 # F, the knob shaft's 15T front face (the drive collar's seat), stands the
 # plate hub face, thrust ring and 15T chain ahead of the arm's rear face.
-# The disc is no longer fitted to it (#2038): the cluster's printed stack
-# places the disc from the same rear face (transgear_cluster_fit), and the
-# model's m is the cluster rearward, m_fwd plus the end float.
+# The disc is not fitted to it: the cluster's stack places the disc from the
+# same rear face (transgear_cluster_fit), and the model's m is the cluster
+# rearward, m_fwd plus the model's shimmed end float.
 _F_FROM_ARM_Z = (
     ARM_Z0 + ARM.THICKNESS + ARM_PLATE.HUB_FACE_Z - RING.LENGTH - KNOB_SPEC.FACE_WIDTH
 )
@@ -655,20 +662,20 @@ if abs(DISC_Z0 - KNOB_SHAFT_Z0 - CLUSTER.MODEL_M) > 1e-9:
     raise AssertionError("the model's disc is off the cluster stack's station from F")
 # The 150T disc's rear face (the MHA-PD-VN-55 tips sit inside it) to the platen's
 # front face, cluster rearward on the rear bushing: an air stack in the
-# repository's statistical style (pd_cluster_air, #2038 owner ruling
-# 2026-10-28).  From the model's nominal air it closes by the clearances --
-# the platen forward by its fitted float, magnified by its yaw about the
-# bar's end at the near lock; the cluster's tilt on the pin's bore clearance
-# (pivot on the rear bushing's smallest Ø9, over the shortest sleeve) at the
-# disc rim; the hub's rock on the boss at the rim -- and by the printed
-# tolerances: the spacer's length (the arm held on the longest spacer by the
-# MHA-PD-VN-63 spring), the bar's depth, the platen's thickness, the thickest
-# disc, the rear bushing, tooth and spigot lengths (the disc's chain from the
-# arm's front face), the spacer's two faces' squareness tilting the hanger
-# about P (Codex P1 on 6c385465d) at the rim's farthest point from P, the
-# step, spigot-end and flange squareness and the disc's rear-face
-# parallelism at the rim, and the pin's S projected axis zone at the rim
-# (absent from this gate before #2038).
+# repository's statistical style (pd_cluster_air).  From the model's nominal
+# air it closes by the clearances -- the platen forward by its fitted float,
+# magnified by its yaw about the bar's end at the near lock; the cluster's
+# tilt on the pin's bore clearance (pivot on the rear bushing's smallest Ø9,
+# over the shortest sleeve) at the disc rim; the hub's rock on the boss at
+# the rim -- and by the printed tolerances: the spacer's length (the arm held
+# on the longest spacer by the MHA-PD-VN-63 spring), the bar's depth, the
+# platen's thickness, the thickest disc, the shimmed step's sources and the
+# spigot length (the disc's chain from the arm's front face: the shims close
+# the float off the ring's load wall, transgear_cluster_fit.SHIMMED_STEP_TERMS),
+# the spacer's two faces' squareness tilting the hanger about P (Codex P1 on
+# 6c385465d) at the rim's farthest point from P, the step, spigot-end and
+# flange squareness and the disc's rear-face parallelism at the rim, and the
+# pin's S projected axis zone at the rim.
 PLATEN_YAW_LEVER = (BAR_LENGTH / 2.0) / (BAR_LENGTH / 2.0 - LOCK_STATION_X[0])
 # The platen prints its thickness and the rack its backer depth
 # (pd_platen_spec / pd_platen_rack_spec DRAWING_PRECISION).
@@ -754,7 +761,8 @@ PLATEN_AIR = CLUSTER_AIR.AirStack(
         "MHA-PD-07 support bar depth": BAR.BAR_DEPTH_BAND,
         "MHA-PD-02 platen thickness": _PLATEN_THICKNESS_BAND,
         "MHA-PD-06 disc thickness": DISC_SPEC.FACE_WIDTH_MAX - DISC_SPEC.FACE_WIDTH,
-        **{label: band for label, _, band in (CLUSTER.LRB, CLUSTER.TL, CLUSTER.SP)},
+        **dict(CLUSTER.SHIMMED_STEP_TERMS),
+        CLUSTER.SP[0]: CLUSTER.SP[2],
         "MHA-PD-20 spacer rear face perpendicularity": SPACER.REAR_FACE_PERPENDICULARITY
         / SPACER.FACE_PERPENDICULARITY_ZONE_DIA
         * _P_TO_DISC_RIM,
@@ -824,16 +832,20 @@ if FEED.FULL_DEPTH_MIN < RACK_FRONT_FROM_SLEEVE_REAR_WORST:
     )
 # The MHA-PD-24 rear bushing's front face to the MHA-PD-05 rack's back face (its
 # Ø9 .X can reach the rack's crests radially): the arm forward on the
-# shortest spacer, the bar thinnest, the rack thickest, the bushing
-# following the sleeve forward by the cluster's whole end float, and the
-# hanger's tilt at the bushing's far rim.
+# shortest spacer, the bar thinnest, the rack thickest, the bushing (and its
+# shims) following the sleeve forward to the sleeve's most forward rear face,
+# and the hanger's tilt at the bushing's far rim.
 BUSHING_RACK_AIR_NOMINAL = REAR_BUSHING_Z0 - REAR_BUSHING.LENGTH - RACK_BACK_Z  # 2.5
 BUSHING_RACK_AIR_WORST = (
     BUSHING_RACK_AIR_NOMINAL
     - SPACER.LENGTH_BAND
     - BAR.BAR_DEPTH_BAND
     - _RACK_THICKNESS_BAND
-    - (CLUSTER.SLEEVE_REAR_FORWARD_FROM_ARM[1] - REAR_BUSHING.LENGTH)
+    - (
+        CLUSTER.SLEEVE_REAR_FORWARD_FROM_ARM[1]
+        - REAR_BUSHING.LENGTH
+        - CLUSTER.SHIM_STACK_MODEL
+    )
     - HANGER.HANGER_TILT
     * (
         _P_TO_S
@@ -1106,6 +1118,7 @@ CHAIN_PLANE_ENVELOPES = (
         FRONT_BUSHING_Z0,
     ),
     ("rear bushing", STUD_XY, REAR_BUSHING.OD / 2.0, FEED_Z0, REAR_BUSHING_Z0),
+    ("cluster shims", STUD_XY, CLUSTER_SHIM.OD / 2.0, REAR_BUSHING_Z0, ARM_Z0),
     (
         "disc hub",
         STUD_XY,
@@ -1998,11 +2011,11 @@ def _assert_knob_shaft_clearance() -> None:
     air gaps and floats."""
     # R9-68: the collar's rearmost stop is the knob pinion's front face F; with
     # the cluster and disc forward the disc's front face stands m_fwd behind
-    # it.  Its air is the collar stack's (pd_cluster_air, #2038), at its
-    # governing method, from the model's m_fwd: the model's disc sits the
-    # nominal end float rearward of it.
+    # it.  Its air is the collar stack's (pd_cluster_air), at its governing
+    # method, from the model's m_fwd: the model's disc sits the model's
+    # shimmed end float rearward of it.
     collar_disc_air_min = CLUSTER_AIR.COLLAR_AIR_MIN
-    model_m_fwd = DISC_Z0 - CLUSTER.END_FLOAT_NOMINAL - KNOB_SHAFT_Z0
+    model_m_fwd = DISC_Z0 - CLUSTER.END_FLOAT_MODEL - KNOB_SHAFT_Z0
     air = float(CLUSTER_AIRS["collar_air"]) + model_m_fwd - CLUSTER.M_FWD_NOMINAL
     if air < collar_disc_air_min - 1e-9:
         raise AssertionError(
@@ -2438,6 +2451,63 @@ async def _author_knob_setting_reference(adapter) -> None:
                 f"{name}@{spec.FEATURE}: native setting callout reads {actual!r}, "
                 f"not {text!r}"
             )
+    mark_dimensions_for_drawing(
+        adapter, spec.FEATURE, spec.DRAWING_DIMENSIONS[spec.FEATURE]
+    )
+    blank_sketch(adapter, spec.FEATURE)
+    feature = _early_bound(
+        _early_bound(adapter.currentModel, "IAssemblyDoc").FeatureByName(spec.FEATURE),
+        "IFeature",
+    )
+    if int(feature.Visible) != 1:  # swVisibilityStateHide
+        raise RuntimeError(f"{spec.FEATURE} still visible after BlankSketch")
+
+
+async def _author_cluster_float_reference(adapter) -> None:
+    """The cluster's shimmed ring gap as a model dimension (MHA-PD-00 VIEW E):
+    one construction line on the Right plane (sketch u, v = machine -Z, Y)
+    from the ring's rear face rearward along the pin, its length the floor
+    from a global, toleranced +x/-0 to the window's top
+    (pd_paper_drive_cluster_float_spec); marked for the drawing and blanked;
+    no solid or pose changes."""
+    spec = CLUSTER_FLOAT
+    await set_global(adapter, spec.GLOBAL, f"{spec.NOMINAL_MM}mm")
+    dims = SketchDims()
+    check("create cluster float sketch", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    line = check(
+        "cluster float line", await adapter.add_line(*spec.START_UV, *spec.END_UV)
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("cluster float line is not construction")
+    check(
+        "cluster float line along the pin",
+        await adapter.add_sketch_constraint(line, None, "horizontal"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{line}.start", *spec.START_UV, "ring rear face"
+    )
+    dims.record("ClusterFloatRingU")
+    dims.record("ClusterFloatRingV")
+    await dimension_between(
+        adapter, f"{line}.start", f"{line}.end", "horizontal_distance",
+        spec.NOMINAL_MM, spec.DIMENSION,
+    )
+    dims.record(spec.DIMENSION, f'"{spec.GLOBAL}"')
+    await ensure_fully_defined(adapter, "cluster float")
+    check("exit cluster float sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, spec.FEATURE)
+    for name, expression in dims.apply(adapter, spec.FEATURE):
+        await drive_dimension(adapter, name, expression)
+    # The window itself, +x/-0 on the floor: an assembly setting is an
+    # associative model dimension, never a note (#1388).
+    set_dimension_bilateral_tolerance(
+        adapter, spec.FEATURE, spec.DIMENSION, *spec.TOLERANCE_MM, places=spec.PLACES
+    )
+    apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     mark_dimensions_for_drawing(
         adapter, spec.FEATURE, spec.DRAWING_DIMENSIONS[spec.FEATURE]
     )
@@ -3342,8 +3412,18 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 180.0, 0.0],
         ROT_Y_180,
     )
-    # Ry(180): the rear bushing's arm face on the arm's front face, its sleeve
-    # face REAR_BUSHING.LENGTH forward (printed, model at nominal).
+    # MHA-PD-VN-68 (Rx-90: local +Y forward, -Z): the model's nominal shim
+    # count stacked on the arm's front face (the fit-up sets the real count).
+    for shim_z0 in CLUSTER_SHIM_Z0S:
+        await place_component(
+            adapter,
+            "pd-vn-transgear-cluster-shim",
+            [STUD_XY[0], STUD_XY[1], shim_z0],
+            [-90.0, 0.0, 0.0],
+            ROT_X_NEG90,
+        )
+    # Ry(180): the rear bushing's arm face on the shims, its sleeve face
+    # REAR_BUSHING.LENGTH forward (printed, model at nominal).
     await place_component(
         adapter,
         "pd-transgear-rear-bushing",
@@ -3759,6 +3839,8 @@ async def build(adapter) -> dict[str, str]:
     )
     # K's DRO setting from S, for MHA-PD-00's VIEW K (hidden sketch only).
     await _author_knob_setting_reference(adapter)
+    # The cluster's shimmed ring gap, for MHA-PD-00's VIEW E (hidden sketch only).
+    await _author_cluster_float_reference(adapter)
     # Machine coords put the output/paper side at -Z, so SolidWorks' native Front
     # renders the machine BACK (chain and transgear cluster mirrored). Re-base the
     # standard views (same as the top assembly) so the saved doc and the _front

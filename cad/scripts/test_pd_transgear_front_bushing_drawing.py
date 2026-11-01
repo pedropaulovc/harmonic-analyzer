@@ -13,7 +13,7 @@ import _config
 import build_pd_transgear_front_bushing as part
 import draw_pd_transgear_front_bushing as drawing
 import transgear_cluster_fit as fit
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND_IN, STACK_NAME
+from pd_cluster_stack_band import FIT_LENGTH_BAND_IN, STACK_NAME
 import pd_transgear_disc_hub_spec as hub
 import pd_transgear_front_bushing_spec as spec
 import pd_transgear_pin_spec as pin
@@ -135,26 +135,17 @@ def test_the_unchanged_bushing_bears_on_the_smaller_d_flat_sleeve_nose() -> None
     assert fit.RECESS_RANGE[0] >= 0.0
 
 
-def test_the_length_is_a_printed_term_of_the_disc_cluster_stack() -> None:
-    """#2038: printed 4 places, +/-.0007, named on the stack; nothing is faced
-    to fit, set at assembly or supplied as a blank."""
+def test_the_length_is_a_term_of_the_disc_cluster_stack() -> None:
+    """#2124: it sets the collar air, so it prints +/-.001 at 3 places, named
+    on the stack; the shims, not this length, set the end float."""
     assert spec.LENGTH == fit.FRONT_BUSHING_LENGTH
-    assert spec.LENGTH_BAND == fit.LENGTH_BAND == PRINTED_LENGTH_BAND_IN
-    assert spec.LENGTH_PLACES == fit.LENGTH_PLACES == 4
-    assert spec.DRAWING_PRECISION_BY_NAME["RingLength"] == 4
+    assert spec.LENGTH_BAND == fit.LENGTH_BAND == FIT_LENGTH_BAND_IN
+    assert spec.LENGTH_PLACES == fit.LENGTH_PLACES == 3
+    assert spec.DRAWING_PRECISION_BY_NAME["RingLength"] == 3
     assert "RingLength" not in spec.REFERENCE_DIMENSIONS
     callout = drawing.DIMENSION_CALLOUTS["RingLength"]
     assert callout == spec.LENGTH_CALLOUT
     assert STACK_NAME in callout
-    sources = (
-        Path(drawing.__file__).read_text(encoding="utf-8"),
-        Path(part.__file__).read_text(encoding="utf-8"),
-    )
-    for text in (*drawing.DIMENSION_CALLOUTS.values(), *sources):
-        for banned in ("FACED TO FIT", "SET AT ASSEMBLY", "SUPPLY", "step_ref"):
-            assert banned not in text
-    assert not hasattr(drawing, "FIT_STEP_KEY")
-    assert not hasattr(spec, "DRAWING_NOTES")
 
 
 def test_the_bore_and_both_end_faces_run_machined() -> None:

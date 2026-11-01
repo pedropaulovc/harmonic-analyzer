@@ -112,6 +112,7 @@ CONTRACT_TRANSGEAR_QUANTITIES = {
     "pd-transgear-disc-hub": 1,
     "pd-transgear-front-bushing": 1,
     "pd-vn-transgear-retaining-ring": 1,
+    "pd-vn-transgear-cluster-shim": cluster_fit.SHIM_COUNT_MODEL,
     "pd-rack-pinion": 1,
     "pd-vn-transgear-disc-screw": 3,
     "pd-transgear-knob-shaft": 1,
@@ -996,6 +997,7 @@ HIDDEN_BY_THE_ISOMETRIC = {
     "pd-transgear-pin",
     "pd-transgear-front-bushing",
     "pd-vn-transgear-retaining-ring",
+    "pd-vn-transgear-cluster-shim",
 }
 # Hidden in the arm's counterbore from the isometric; Section A-A balloons it.
 BALLOONED_BY_SECTION_A_A = {"pd-vn-transgear-pivot-spring"}
@@ -1556,18 +1558,39 @@ def test_the_collar_is_faced_and_shoulder_seated_before_stud_cut_and_acceptance(
 
 def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
     accepted = _step_body("fitup-accepted")
-    assert f"DISC END FLOAT {drawing.DISC_END_FLOAT_TEXT}" in accepted
-    # Rounded outward: every cluster inside its printed bands passes.
-    low, high = drawing.DISC_END_FLOAT_ACCEPT
-    assert low <= cluster_fit.END_FLOAT_RANGE[0] < low + 0.01
-    assert high - 0.01 < cluster_fit.END_FLOAT_RANGE[1] <= high
-    assert low >= cluster_fit.END_FLOAT_MIN
+    assert f"RING GAP PER {drawing.CLUSTER_FLOAT_VIEW_NAME}" in accepted
     assert "DISC TURNS FREE" in accepted
     for key, bounds in (
         ("collar-pins-pressed", drive_pin.PROUD_RANGE),
         ("latch-pin-pressed", joints.LATCH_PIN_PROUD_RANGE),
     ):
         assert f"{bounds[0]:.2f} TO {bounds[1]:.2f} PROUD" in _step_body(key)
+
+
+def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:
+    """#2124: the ring gap is set with shims under the rear bushing to VIEW
+    E's model dimension; the step prints no value, and the window passes
+    every shimmed cluster and holds the floor."""
+    import pd_paper_drive_cluster_float_spec as cluster_float
+
+    assert steps.step_number("disc-cluster-hung") + 1 == steps.step_number(
+        "disc-cluster-shimmed"
+    )
+    shimmed = _step_body("disc-cluster-shimmed")
+    assert drawing._N["pd-vn-transgear-cluster-shim"] in shimmed
+    assert drawing._N["pd-transgear-rear-bushing"] in shimmed
+    assert drawing.CLUSTER_FLOAT_VIEW_NAME in shimmed and "FEELER" in shimmed
+    assert f"{cluster_fit.END_FLOAT_MIN:.2f}" not in shimmed
+    low = cluster_float.NOMINAL_MM
+    high = low + cluster_float.TOLERANCE_MM[1]
+    assert cluster_float.TOLERANCE_MM[0] == 0.0
+    assert low == cluster_fit.END_FLOAT_MIN == cluster_fit.RING_FLOAT_RANGE[0]
+    assert (
+        cluster_fit.RING_FLOAT_RANGE[1] <= high < cluster_fit.RING_FLOAT_RANGE[1] + 0.01
+    )
+    assert cluster_float.DRAWING_DIMENSIONS == {
+        cluster_float.FEATURE: {cluster_float.DIMENSION}
+    }
 
 
 def test_nothing_in_the_disc_cluster_is_faced_at_assembly() -> None:
@@ -1593,7 +1616,7 @@ def test_nothing_in_the_disc_cluster_is_faced_at_assembly() -> None:
         for number in (hub, *bushings):
             assert f"FACE THE {number}" not in body, key
     hung = _step_body("disc-cluster-hung")
-    assert "BUSHINGS AS MADE" in hung
+    assert "OIL THE PIN" in hung
     for number in bushings:
         assert number in hung
     assert "ON THE NOSE TRAPS HUB AND DISC" in hung
@@ -5086,7 +5109,7 @@ def test_pd_build_settled_checks_reject_native_item_drift_with_good_attachments(
     for name in (
         "_validate_persisted_explode", "_create_sheets", "_place_assembled_sheet",
         "_place_pivot_view", "_place_fitup_sheets", "_place_knob_setting_view",
-        "assert_full_detail_view",
+        "_place_cluster_float_view", "assert_full_detail_view",
     ):
         monkeypatch.setattr(drawing, name, lambda *_, **__: None)
     monkeypatch.setattr(drawing, "_place_bom_sheet", lambda *_: (

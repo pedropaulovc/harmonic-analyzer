@@ -2294,6 +2294,18 @@
           "number": "MHA-CH-06-TL-VN-80"
         }
       ]
+    },
+    {
+      "old_stem": "pd-vn-transgear-cluster-shim",
+      "old_number": null,
+      "introduced": "2026-11-01",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-cluster-shim",
+          "number": "MHA-PD-VN-68"
+        }
+      ]
     }
   ],
   "retired_identities": [

@@ -1251,6 +1251,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="pd_vn_transgear_cluster_shim",
+        part="pd_vn_transgear_cluster_shim",
+        artifact_stem="pd-vn-transgear-cluster-shim",
+        script_name="draw_pd_vn_transgear_cluster_shim.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="pd_vn_transgear_pivot_spring",
         part="pd_vn_transgear_pivot_spring",
         artifact_stem="pd-vn-transgear-pivot-spring",

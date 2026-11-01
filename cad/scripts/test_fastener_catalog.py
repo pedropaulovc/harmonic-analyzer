@@ -50,6 +50,7 @@ _STOCK_REQUIREMENTS = {
     "pd-vn-transgear-latch-pin": (("98381A474",), "MHA-PD-VN-58", 1),
     "pd-vn-transgear-pivot-screw": (("90325A174",), "MHA-PD-VN-57", 1),
     "pd-vn-transgear-retaining-ring": (("97431A240",), "MHA-PD-VN-61", 1),
+    "pd-vn-transgear-cluster-shim": (("94773A606",), "MHA-PD-VN-68", 2),
     "pd-vn-transgear-pivot-spring": (("9715K43",), "MHA-PD-VN-63", 1),
     "dt-vn-cylinder-bank-spring": (("9714K392",), "MHA-DT-VN-68", 1),
     "ch-vn-rocker-bank-spring": (("9714K24",), "MHA-CH-VN-54", 1),

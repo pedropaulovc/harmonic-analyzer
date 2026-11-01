@@ -8,9 +8,3 @@ pd-transgear-pin:
   tolerance_class: machined_block
   process: "turned from bar (steel): turn the head and shank, cut the ring groove, dome both ends"
   drawing_unit: in
-  machinist_exceptions:
-    - id: "RV-01"
-      kind: "accept"
-      where: "main side view, the 1.8600 ±.0007 length from the head underside to the ring load wall of the MHA-PD-VN-61 groove"
-      finding: "tight part band holding the disc-cluster end-float stack instead of a fit-up adjustment (rules 4, 19)"
-      reason: "owner ruling #2038: nothing in the disc cluster is faced or shimmed at assembly, so this length carries the MHA-PD-00 end-float stack; at ±.0007 the worst end float is .0080 (0.2032 mm) against the 0.20 mm floor, and ±.001 falls below it (owner exception, provisional pending confirmation 2026-11-01)"

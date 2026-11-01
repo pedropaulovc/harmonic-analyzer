@@ -31,7 +31,7 @@ Components of a built-up part are the detail parts a finished part may be made f
 | `dt` / `DT` | Drive train | 35 | 15 |
 | `fr` / `FR` | Frame | 5 | 4 |
 | `mg` / `MG` | Magnifier | 10 | 4 |
-| `pd` / `PD` | Paper drive | 23 | 12 |
+| `pd` / `PD` | Paper drive | 23 | 13 |
 | `pn` / `PN` | Pen | 5 | 7 |
 | `ms` / `MS` | Measuring stick | 3 | 1 |
 | `sm` / `SM` | Summing | 4 | 6 |
@@ -387,6 +387,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | — | — | `vn-boss-hook-jam-nut` | MHA-VN-072 | `sm-vn-boss-hook-jam-nut` | MHA-SM-VN-55 |
 | part | — | — | `vn-knife-hanger-washer` (new #10 family) | MHA-VN-060 | `sm-vn-knife-hanger-washer` | MHA-SM-VN-54 |
 | part | — | — | `vn-chain-connecting-link` | MHA-VN-068 | `pd-vn-chain-connecting-link` | MHA-PD-VN-66 |
+| part | — | — | — | — | `pd-vn-transgear-cluster-shim` | MHA-PD-VN-68 |
 | part | `column-clamp-front` | MHA-105 | `sh-column-clamp-front` | MHA-SH-001 | `sh-column-clamp-front` | MHA-SH-01 |
 | part | `column-clamp-back` | MHA-106 | `sh-column-clamp-back` | MHA-SH-002 | `sh-column-clamp-back` | MHA-SH-02 |
 | retired tooling part | — | — | `ch-rocker-arm-tl-vise-stop` | MHA-CH-006-TL-01 | — | MHA-CH-06-TL-01 (retired; never reissued) |
@@ -581,6 +582,7 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | added | `pn-vn-pen-wire` | MHA-PN-VN-57 | ASTM A228 music wire, 0.031 in, cut from the same McMaster-Carr 9666K56 coil; runs from the MHA-MG-05 wheel rim groove to the MHA-PN-07 adjuster stud's eye |
 | added | `pd-vn-chain-connecting-link` | MHA-PD-VN-66 | McMaster 6261K108 clip-retained connecting link that joins the cut 6261K171 chain's two inner-link ends; MHA-PD-VN-51 keeps only the cut chain's 33 outer links |
 | retired | `pd-vn-transgear-pivot-shim` | MHA-PD-VN-67 | 2026-10-31 owner ruling (#290): the MHA-PD-18 spot face is 0.5 shallower (floor 6.4 to 6.9 from the front face), which gives the MHA-PD-VN-63 spring the room the 98055A098 shim restored; no registry, builder or drawing; Number never reissued |
+| added | `pd-vn-transgear-cluster-shim` | MHA-PD-VN-68 | 2026-11-01 owner ruling (#2124): 18-8 stainless shoulder shim, 1/8 ID x 1/4 OD x 0.005 in, McMaster-Carr 94773A606; shimmed between the MHA-PD-18 arm face and the MHA-PD-24 rear bushing to set the disc cluster's end float at assembly, so no cluster part is faced to fit |
 | retired | `ch-rocker-thrust-washer` | MHA-CH-09 | replaced by the purchased MHA-CH-VN-56 rocker thrust washer (owner, 2026-10-15: every washer is a purchased part) |
 | added | `ch-vn-rocker-thrust-washer` | MHA-CH-VN-56 | carbon-steel ring shim, 1/4 ID x 3/8 OD x 0.031 in, McMaster-Carr 3088A429; one each end of the rocker bank on the MHA-CH-05 pivot shaft, the north one against the datum MHA-CH-08 ear |
 | retired | `dt-crank-seat-washer` | MHA-DT-36 | deleted, owner ruling D1 2026-10-15: collar bears on the post boss |

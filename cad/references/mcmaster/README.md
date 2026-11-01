@@ -90,6 +90,7 @@ recipes:
 | 93585A190 | `dt-vn-cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
 | 94025A150 | — (diagnostic recipe; `dt-vn-cone-tip-adjuster` until drawing-guidelines.md rule 18 (thread engagement) E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `dt-vn-cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
+| 94773A606 | `pd-vn-transgear-cluster-shim` (MHA-PD-VN-68; catalogue-only, no vendor model) | Shim for Shortening Screw Shoulders, 18-8 Stainless Steel, 1/8" Shoulder |
 | 93600A189 | `pd-vn-transgear-arm-plate-locating-pin` (catalogue-only; no vendor model) | Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin |
 | 9666K56 | `sh-vn-music-wire` (MHA-SH-VN-56; `LeverWire` and `PenWire` configurations cut from one coil; catalogue-only, no vendor model) | Lubricated 1080 Spring Steel Wire, 0.031 in, 1/4 lb coil |
 | 9714K24 | `ch-vn-rocker-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
@@ -1314,6 +1315,25 @@ Catalog specifications checked on September 10, 2026:
   outline law (harvested on amet October 2, 2026, native SLDPRT SHA-256
   `dc3d0f8549d8851713aa234e24f338e9f0d41dbc96550669c281c99c3d9f4cff`), so
   `diag_build_97431A240.py` draws that law on this ring's catalogue circles.
+
+- [94773A606](https://www.mcmaster.com/94773A606/) (`pd-vn-transgear-cluster-shim`,
+  MHA-PD-VN-68, two in the model, 0 to 5 at fit-up) goes on the MHA-PD-23
+  pin between the MHA-PD-18 arm's front face and the MHA-PD-24 rear bushing;
+  the fitter stacks them until the ring gap matches the MHA-PD-00 setting
+  dimension, so no disc-cluster part is faced to fit (owner ruling
+  2026-11-01, #2124). The product page is login-walled; the values were read
+  live from the family table
+  (<https://www.mcmaster.com/products/arbor-shims/shoulder-diameter~1-8/>,
+  "Shims for Shortening Screw Shoulders", for a 1/8 in shoulder) on
+  November 1, 2026: 18-8 stainless steel, thickness 0.005 in ±0.0005,
+  I.D. 1/8 in 0/+0.012, O.D. 1/4 in −0.005/+0.002, Rockwell B70 minimum,
+  for No. 4 screws, pack of 10. Same-size alternates in that table: 90792A209
+  (316 stainless) and 91124A112 (spring steel, Rockwell C40). The 3/16 in O.D.
+  arbor shims (99040A305, 98126A019, 97022A873, 3088A143) were rejected:
+  they bear on a ring only about 0.02 in wide. Catalogue-only: no vendor
+  model is downloaded, so it has no replica gate;
+  `diag_build_94773A606.py` draws the catalogue washer with the I.D. at
+  mid-band.
 
 - [9715K43](https://www.mcmaster.com/9715K43/) (`pd-vn-transgear-pivot-spring`,
   MHA-PD-VN-63, one) sits on the MHA-PD-VN-57 pivot shoulder screw's shoulder, between

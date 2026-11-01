@@ -30,8 +30,9 @@ hole keeps it to the rim with the flange and the circle both at .XX.
 
 Printed lengths, from the spigot's end and the flange's rear face: the
 overall, spigot end to hub front face, and the spigot (both terms of the
-disc cluster's printed stack, #2038 owner ruling 2026-10-28: nothing in the
-cluster is faced to fit; ``transgear_cluster_fit`` owns the overall), and
+disc cluster's stack, +/-.001 for the collar air and the recess; the shims
+set the end float, owner ruling 2026-11-01, #2124; ``transgear_cluster_fit``
+owns the overall), and
 the flange .094 .XXX (the screw-tip-to-platen stack reads it).  The hub
 body's own length is the remainder and is not printed.  Decimal inch
 (#290): every nominal is the exact millimetre value of its printed inch.
@@ -124,10 +125,10 @@ SPIGOT_DIA_MIN = SPIGOT_DIA + SPIGOT_DIA_BAND[1]
 SPIGOT_LENGTH_MIN = SPIGOT_LENGTH - SPIGOT_LENGTH_BAND
 SPIGOT_LENGTH_MAX = SPIGOT_LENGTH + SPIGOT_LENGTH_BAND
 
-# --- overall: printed (#2038 owner ruling 2026-10-28, option A) ---------------
+# --- overall: +/-.001 (owner ruling 2026-11-01, #2124) ----------------------
 # Spigot end (on the step) to hub front face, a term of the disc cluster's
-# printed stack (transgear_cluster_fit): it leaves the front face never proud
-# of the sleeve's nose at the worst case.
+# stack (transgear_cluster_fit): it sets the collar air and leaves the front
+# face never proud of the sleeve's nose at the worst case.
 HUB_LENGTH = FIT.HUB_LENGTH
 HUB_LENGTH_BAND = FIT.LENGTH_BAND
 HUB_LENGTH_MIN = HUB_LENGTH - HUB_LENGTH_BAND
@@ -503,7 +504,7 @@ OIL_HOLE_CALLOUT_BELOW = "\n".join(
 # flange's lengths from the flange's rear face, the overall, and the oil
 # hole's size and station (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)); face view: the bore and its flat, which only show
 # there, and the screw holes on their bolt circle.  The overall and the
-# spigot print the disc cluster's band (#2038).
+# spigot print the disc cluster's +/-.001.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HubProfile": {
         "FlangeDia",

@@ -17,7 +17,7 @@ z = -FLANGE_THICK..0 and the hub body forward to the hub front face, so
 ``Front Plane`` (z = 0) is the flange's rear face, the one that clamps the
 disc, and the spigot's and flange's printed lengths run from it.  The
 overall, spigot end to hub front face, is printed, as is the spigot length,
-both terms of the disc cluster stack (#2038).  The bore
+both terms of the disc cluster stack.  The bore
 is two Front-plane cuts: the D-bore (its flat on local -Y) forward through
 flange and body, and the round bore back through the spigot.  The three
 screw holes lie on a construction bolt circle whose driving diameter is the
