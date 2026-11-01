@@ -2,7 +2,7 @@
 
 Datasheet-built nominal envelope, as for the bought leadscrew. No vendor
 CAD or unreported edge/socket dimensions are inferred. Axis +Z, origin
-on the bottom face. Supplier sizes and bands are model-owned construction
+on the bottom face. Supplier sizes are model-owned, untoleranced construction
 references in the final part frame, not claims of helical attachment.
 """
 from __future__ import annotations
@@ -17,7 +17,9 @@ from _bought_revolve import stock_properties
 from _check import check
 from _com import _early_bound
 from _custom_properties import apply_custom_properties
+from _dimensions import name_dimensions
 from _document_units import apply_package_model_units
+from _drawing_marks import mark_dimensions_for_drawing
 from _drawing_precision import _named_dimension
 from _fastener_catalog import fastener
 from _feature_tree import name_last_feature
@@ -89,6 +91,21 @@ async def _supplier_references(adapter):
             raise RuntimeError(name + ": source presentation did not persist")
 
 
+def _bore_reference(adapter) -> None:
+    """The ring profile's bore circle is the supplier bore: named, untoleranced, marked."""
+    name_dimensions(adapter, part.BORE_FEATURE, [None, part.BORE_DIMENSION])
+    display, native = _named_dimension(adapter, part.BORE_FEATURE, part.BORE_DIMENSION)
+    if not math.isclose(float(native.SystemValue) * 1000.0, part.ID, abs_tol=1e-5):
+        raise RuntimeError(part.BORE_DIMENSION + ": bore value changed")
+    precision = part.BORE_FORMAT[0]
+    if display.SetPrecision3(precision, -1, -1, -1) != 0:
+        raise RuntimeError(part.BORE_DIMENSION + ": precision rejected")
+    if (int(display.GetPrimaryPrecision2()) != precision
+            or int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0):
+        raise RuntimeError(part.BORE_DIMENSION + ": presentation did not persist")
+    mark_dimensions_for_drawing(adapter, part.BORE_FEATURE, {part.BORE_DIMENSION})
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreateAxisParameters
 
@@ -106,6 +123,7 @@ async def build(adapter) -> dict[str, str]:
     await apply_color(adapter, POLISHED_STEEL)
     apply_custom_properties(adapter, stock_properties(_config.parts(PART_NAME)))
     await _supplier_references(adapter)
+    _bore_reference(adapter)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 
