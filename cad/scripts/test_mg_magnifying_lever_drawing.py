@@ -292,6 +292,9 @@ def test_root_runout_is_wholly_outside_receiver_at_actual_printed_corners() -> N
     assert max(starts) < 0.0
     assert geom.INSTALLED_ROOT_CLEARANCE_MIN == pytest.approx(-max(starts))
     assert spec.SINGLE_LIMITS["ThreadExtent", "IncompleteLength"][0] == joint.INCOMPLETE_THREAD_MAX
+    # The shortest accepted .71 thread (.70) less both .075 incomplete ends.
+    assert spec.FULL_THREAD_MIN == pytest.approx((0.70 - 2.0 * 0.075) * 25.4)
+    assert "FULL THREAD .55 MIN" in spec.LEAD_CALLOUT
 
 
 def test_quarter_inch_body_has_real_drilled_slip_clearance() -> None:
@@ -862,6 +865,7 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
     monkeypatch.setattr(drawing, "curate_view_dimensions", curate_front)
     monkeypatch.setattr(drawing, "model_point_in_view", project)
     monkeypatch.setattr(drawing, "import_cosmetic_threads", lambda *_a: (1, 1))
+    monkeypatch.setattr(drawing, "_show_detail_thread_lines", lambda _a, view: captured.setdefault("thread_lines", view))
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
     for name in ("read_required_properties", "stamp_drawing_summary", "set_hidden_lines_removed", "assert_imported_precision", "add_property_linked_note", "rebuild_drawing"):
         monkeypatch.setattr(drawing, name, lambda *_a, **_kw: None)
@@ -933,9 +937,10 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
         incomplete_xy = annotations["IncompleteLength"].GetPosition()
         tip_x = project(None, detail, (joint.ROD_LENGTH / 1000.0, 0.0, 0.0))[0]
         rows = qualifiers["IncompleteLength"].splitlines()
-        assert " ".join(rows) == "INCOMPLETE THREAD, EACH END" and len(rows) == 2
+        assert rows == spec.LEAD_CALLOUT.splitlines() and len(rows) == 3
         assert incomplete_xy[0] - max(map(len, rows)) * 0.0035 / 2.0 > tip_x
         assert captured["finalize"]["layout"] is drawing.SPEC.layout
+        assert captured["thread_lines"] is detail
     assert hemisphere.selection_attempts == 1
     assert front.entity_kinds == [3, 4]
 
@@ -1739,3 +1744,46 @@ def test_native_thread_census_identifies_each_actual_same_and_self_reader_separa
         else:
             assert after[scalar] == 1
     assert "reader_unavailable" in audit["failed"]
+
+
+@pytest.mark.parametrize("fault", (None, "dashed_layer", "refused", "no_thread"))
+def test_detail_cosmetic_thread_prints_on_a_visible_thin_continuous_layer(monkeypatch, fault) -> None:
+    layers = {}
+
+    def add_layer(name, _description, color, style, width):
+        layers[name] = SimpleNamespace(Visible=False, Style=1 if fault == "dashed_layer" else style, Width=width, color=color)
+        return 1
+
+    manager = SimpleNamespace(GetLayer=lambda name: layers.get(name), AddLayer=add_layer)
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(GetLayerManager=lambda: manager))
+
+    class Annotation:
+        def __init__(self, kind):
+            self.kind, self._layer = kind, ""
+
+        def GetType(self):
+            return self.kind
+
+        @property
+        def Layer(self):
+            return self._layer
+
+        @Layer.setter
+        def Layer(self, value):
+            if fault != "refused":
+                self._layer = value
+
+    thread, note = Annotation(1), Annotation(6)
+    view = SimpleNamespace(GetAnnotations=lambda: (note,) if fault == "no_thread" else (note, thread))
+    rebuilt = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda _a, *, label: rebuilt.append(label))
+    if fault is None:
+        drawing._show_detail_thread_lines(adapter, view)
+        layer = layers[drawing.THREAD_LINE_LAYER]
+        assert (layer.Visible, layer.Style, layer.Width, layer.color) == (True, 0, 0, 0)
+        assert thread.Layer == drawing.THREAD_LINE_LAYER and note.Layer == ""
+        assert rebuilt
+    else:
+        with pytest.raises(RuntimeError, match={"dashed_layer": "thin continuous", "refused": "refused", "no_thread": "shows 0"}[fault]):
+            drawing._show_detail_thread_lines(adapter, view)

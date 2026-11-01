@@ -142,6 +142,20 @@ def test_upper_root_radius_reads_clear_over_the_body() -> None:
     assert math.hypot(spec.SHOULDER_X - fx, y_mm - fy) < drawing.DETAIL_RADIUS_MM
 
 
+def test_dome_radius_leader_lands_on_the_hemisphere_right_of_its_tangent() -> None:
+    """The R text block stands wholly right of the dome's centre, above the
+    axis, so the leader from either its near end or its centre meets the
+    hemisphere's own upper-right quarter, not an arc extension past the top
+    tangent line, and the text reads right of the end."""
+    centre_x = drawing._sheet_x(spec.ROD_LENGTH - spec.DOME_R)
+    tx, ty = drawing.SIDE_KEEP["DomeR"]
+    near_x = tx - drawing.DOME_R_TEXT_HALF_WIDTH
+    assert near_x > drawing.DOME_TIP_X
+    for x in (near_x, tx):
+        angle = math.degrees(math.atan2(ty - drawing.SIDE_CENTER[1], x - centre_x))
+        assert 15.0 <= angle <= 75.0
+
+
 def _fixture_screw_reach() -> tuple[float, float]:
     """Rod stations (from the thread tip) the MHA-MG-06 thumb screw can bear
     on: its axis rides the fixture's hex axis, the hex reaches a corner radius

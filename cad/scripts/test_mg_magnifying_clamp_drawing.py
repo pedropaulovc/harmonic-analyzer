@@ -218,6 +218,32 @@ def test_stock_hex_needs_no_custom_wall_or_envelope_inspection_note() -> None:
     assert "NO CHAMFER OR SPOTFACE AT TAP" in spec.SEAT_NOTE
 
 
+@pytest.mark.parametrize(
+    ("keep", "name", "center", "axes"),
+    (
+        ("TOP_LOCATION_KEEP", "ThumbTapFromDiagonalFlat", "TOP_CENTER", "TOP_AXES"),
+        ("BOTTOM_KEEP", "RodTapFromDiagonalFlat", "BOTTOM_CENTER", "BOTTOM_AXES"),
+    ),
+)
+def test_end_view_tap_location_runs_centre_to_flat_on_its_normal(keep, name, center, axes) -> None:
+    # The measured flat's outward model normal (cos 30 X + sin 30 Z) on the
+    # sheet, from the view's projected model axes.
+    angles = getattr(drawing, axes)
+    normal = tuple(
+        math.cos(math.radians(30.0)) * f(angles["+X"]) + math.sin(math.radians(30.0)) * f(angles["+Z"])
+        for f in (math.cos, math.sin)
+    )
+    cx, cy = getattr(drawing, center)
+    tx, ty = getattr(drawing, keep)[name]
+    off = (tx - cx, ty - cy)
+    # On the normal through the tap centre (no offset along the flat, so no
+    # extension line runs along the flat or through a corner) ...
+    assert abs(off[0] * normal[1] - off[1] * normal[0]) < 1e-9
+    # ... outward, the text >= 5 mm outside the flat.
+    flat = spec.HEX_AF / 2.0 * drawing._S
+    assert off[0] * normal[0] + off[1] * normal[1] - flat >= 0.005
+
+
 def _front_drawing_layout(monkeypatch):
     """Use the real named curation, SetPosition and below-text application."""
     view = SimpleNamespace(GetName2=lambda: "front")

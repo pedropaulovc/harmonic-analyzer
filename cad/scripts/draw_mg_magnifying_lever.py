@@ -65,11 +65,14 @@ DETAIL_RADIUS_MM = 12.5
 # rod, on the side of the callout's native attachment, so the leader does not
 # cross the part. Their actual font, leader and clearance still require native audit.
 # The .71 sits just above the rod's threaded end, short witnesses.
-DETAIL_KEEP = {"ThreadLength": (0.323, 0.209), "IncompleteLength": (0.377, 0.165)}
+DETAIL_KEEP = {"ThreadLength": (0.323, 0.209), "IncompleteLength": (0.381, 0.165)}
 # R24: end the diameter witnesses left of the unchanged finish symbol/leader;
 # keep the qualifier above the screw-seat note and below the free-end note.
 FRONT_KEEP = {"OverallLength": (0.115, 0.088), "RodDia": (0.055, 0.166)}
 DETAIL_THREAD_NOTE_XY = (0.2760, 0.172)
+# Detail A's cosmetic thread prints on a visible thin continuous layer.
+THREAD_LINE_LAYER = "MG-LEVER-THREAD-LINES"
+_COSMETIC_THREAD_ANNOTATION = 1  # swAnnotationType_e.swCosmeticThread
 CALLOUTS = {"IncompleteLength": LEAD_CALLOUT}
 
 
@@ -85,6 +88,41 @@ def _rod_stock_reference(adapter: Any, annotations: list[Any]) -> None:
         presentation="diameter", fraction_denominator=ROD_DIA_FRACTION_DENOMINATOR,
         callout=ROD_DIA_CALLOUT,
     )
+
+
+def _show_detail_thread_lines(adapter: Any, view: Any) -> None:
+    """Show Detail A's cosmetic thread as visible thin continuous lines.
+
+    The default cosmetic-thread font left only faint dashes, so the .71's
+    root witness landed on no visible thread start. The clamp/knife-mount
+    section-thread recipe: the layer state and the annotation's layer read back.
+    """
+    manager = _early_bound(adapter.currentModel.GetLayerManager(), "ILayerMgr")
+    layer = manager.GetLayer(THREAD_LINE_LAYER)
+    if layer is None:
+        # COLORREF black, swLineCONTINUOUS (0), swLW_THIN (0).
+        if int(manager.AddLayer(THREAD_LINE_LAYER, "lever thread lines", 0, 0, 0)) != 1:
+            raise RuntimeError("failed to add the lever thread-line layer")
+        layer = manager.GetLayer(THREAD_LINE_LAYER)
+    layer = _early_bound(layer, "ILayer")
+    layer.Visible = True
+    if not bool(layer.Visible) or int(layer.Style) != 0 or int(layer.Width) != 0:
+        raise RuntimeError(
+            f"lever thread-line layer is not visible thin continuous: "
+            f"visible={layer.Visible!r}, style={layer.Style!r}, width={layer.Width!r}"
+        )
+    shown = 0
+    for raw_annotation in _early_bound(view, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if int(annotation.GetType()) != _COSMETIC_THREAD_ANNOTATION:
+            continue
+        annotation.Layer = THREAD_LINE_LAYER
+        if str(annotation.Layer or "") != THREAD_LINE_LAYER:
+            raise RuntimeError("lever Detail A cosmetic thread refused the thread-line layer")
+        shown += 1
+    if shown != 1:
+        raise RuntimeError(f"lever Detail A shows {shown} cosmetic threads, not its one thread")
+    rebuild_drawing(adapter, label="show lever detail thread lines")
 
 
 def _activate(adapter: Any, view: Any) -> None:
@@ -600,6 +638,7 @@ async def build(adapter: Any) -> dict[str, str]:
     thread_note.Visible = 1  # swAnnotationVisible
     if thread_note.Visible != 1:
         raise RuntimeError("native lever thread-detail callout is not visible")
+    _show_detail_thread_lines(adapter, detail)
     free_end = _free_end_face(adapter, front, annotations)
     add_attached_note(adapter, front, text=FREE_END_CALLOUT, entity=free_end, attached_to=free_end, note_xy=(0.030, 0.185), label="free end hemisphere", entity_type="FACE")
     seat_pick = model_point_in_view(adapter, front, (0.040, ROD_DIA / 4000.0, 0.0), label="whole-body screw seat finish")

@@ -117,6 +117,10 @@ def _sheet_x(model_x_mm: float) -> float:
 TIP_X = _sheet_x(0.0)
 SHOULDER_SHEET_X = _sheet_x(SHOULDER_X)
 DOME_TIP_X = _sheet_x(ROD_LENGTH)
+# The dome's radius text block: its centre this far right of the tip; its
+# widest row, the TANGENT HEMISPHERE callout, measures ~45 mm.
+DOME_R_TEXT_DX = 0.032
+DOME_R_TEXT_HALF_WIDTH = 0.0225
 
 # Side view (drawing-guidelines.md rule 11, turned parts read like the lathe):
 # the body length baselines from the shoulder, its origin circle on the
@@ -130,8 +134,12 @@ SIDE_KEEP = {
     # rod, clear of detail A's rows and of the body length's text; the
     # as-bought rod's supplier REF fraction, its stock band below it.
     "RodDia": (_sheet_x(0.75 * ROD_LENGTH), SIDE_CENTER[1] + 0.020),
-    # Above-right of the dome: the leader lands on its upper quarter.
-    "DomeR": (DOME_TIP_X + 0.012, SIDE_CENTER[1] + 0.017),
+    # Right of the dome's end, the whole "R.11 / TANGENT HEMISPHERE" block
+    # right of the tip: the leader from its near end runs down-left onto the
+    # hemisphere's own upper-right quarter. Centred 12 mm right of the tip,
+    # the block's left end stood left of the dome centre and the arrow fell
+    # on an arc extension past the top tangent line (final2 review).
+    "DomeR": (DOME_TIP_X + DOME_R_TEXT_DX, SIDE_CENTER[1] + 0.014),
 }
 
 # --- Detail A: the threaded end at 8:1 ---------------------------------------
