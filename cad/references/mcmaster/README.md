@@ -575,8 +575,8 @@ Live catalog verification on October 16, 2026:
   bear on the 1/8 in stock flange's front face over plain normal #2 Ø2.591
   thru holes, and the flange prints 3.175 at the title block's .XXX ±0.13.
   Grip 3.175 (3.045 minimum) leaves 4.7625 mm engagement nominal, 3.305 mm
-  worst case (above 1.5D, 3.2766 mm), with a 0.0075 mm minimum screw-tip gap
-  in the native 4.95 ±0.05 full-thread model (printed **4.95 MIN**, not an
+  worst case (above 1.5D, 3.2766 mm), with a 0.0067 mm minimum screw-tip gap
+  in the native 4.95 ±0.0508 full-thread model (printed **.195 MIN**, not an
   upper cutting/thread-extent limit). Brass was rejected: the 90114A brass
   fillister family has no #2-56 × 5/16, and a 3/8 brass screw through a
   3/16 flange kept only a 1.04 shank-shear margin (66.05 MPa against
@@ -585,8 +585,8 @@ Live catalog verification on October 16, 2026:
   fillister family recipe; its derived slot, dome, thread/runout and
   vendor-frame mapping are family assumptions, not verified vendor geometry.
   By explicit owner decision, the receiver uses conventional blind **2-56
-  UNC 2B** taps fastening **MHA-MG-01**, with native **2X Ø1.78 DRILL 6.50**
-  and **4.95 MIN** full thread. There is no additional finished-cavity
+  UNC 2B** taps fastening **MHA-MG-01**, with native **2X Ø.070 DRILL .256**
+  and **.195 MIN** full thread. There is no additional finished-cavity
   envelope or printed wall-acceptance requirement. The pilot and engagement
   proofs below do not establish all physical thread-cut wall thicknesses.
 
@@ -610,30 +610,30 @@ Live catalog verification on October 8, 2026:
   Its worst-case engagement was 3.2975 mm, above 1.5D (3.2766 mm); maximum
   reach 4.825 mm stays below the 4.90 mm minimum full-thread depth. (Superseded
   by 91794A078 above, October 16, 2026.)
-  Current native **4.95 ±0.05 mm** cosmetic-thread metadata is retained for
-  the screw stack, not used as a manufacturing maximum. Printed **4.95 MIN**
+  Current native **4.95 ±0.0508 mm** cosmetic-thread metadata is retained for
+  the screw stack, not used as a manufacturing maximum. Printed **.195 MIN**
   specifies usable full thread without an additional maximum cutting reach.
   The owner's 2026-10-22 relocation retains that screw/grip stack but lowers
   the matched mounting row **0.71 mm**. Both lever taps sit at local
-  **Y=−0.71 mm**, **3.25 ±0.05 mm below the actual coefficient top**; matching
+  **Y=−0.71 mm**, **.1280 ±.0020 in (3.25 ±0.0508 mm) below the actual coefficient top**; matching
   bracket holes and installed screws follow, without moving the L bracket
   body, seat or threaded-lever pose. All three lever rib extrusions are now
-  **5.00 ±0.51 mm**, with end-rib inner caps **Z=±71.20 mm** and outer
-  caps retained at **±76.20 mm**. One native **3X 5.00** dimension sizes them.
+  **5.00 mm**, printed **.20 ±.01 in**, with end-rib inner caps **Z=±71.20 mm** and outer
+  caps retained at **±76.20 mm**. One native **3X .20** dimension sizes them.
   The separate counter-arm leaf remains 5.08 mm.
-  The ordinary **6.50 ±0.51 mm** pilot and 118° point continue into the
+  The **.256 ±.005 in** pilot (6.50 mm model depth) and 118° point continue into the
   connected 7 mm coefficient plate, not a special deep receiver rib.
   `receiver_pilot_material_wall_budget` / `RECEIVER_PILOT_MATERIAL_WALL_MIN`
-  enforce a **≥2 mm pilot-only** material design floor. With printed
-  **Ø1.78 +0.10/0**, the maximum radius is **0.94 mm**; the deepest 0.3°
-  wander is approximately **0.039662 mm**. Actual-top row correlation and the
-  ordinary thickness band leave approximately **2.220338 / 2.210338 mm**
+  enforce a **≥.080 in (2.032 mm) pilot-only** material design floor. With printed
+  **Ø.070 +.004/0**, the maximum radius is **0.9398 mm**; the deepest 0.3°
+  wander is approximately **0.037669 mm**. Actual-top row correlation and the
+  printed thickness limits leave approximately **2.221731 / 2.579731 mm**
   top/bottom pilot walls. `sm_summing_lever_profile.receiver_pilot_wall_budget`
   separately bounds longitudinal rib-profile walls; native trimmed-face
   comparisons subtract **TAP_DRILL_DIA/2**. The native pilot and cosmetic
   threads do not prove exact physical thread-cutting geometry or strength.
   The Ø3.8 head-clearance circle is not a counterbore; its **0.122 mm**
-  minimum radial float exceeds the **0.10 mm** station mismatch. The moved
+  minimum radial float exceeds the **0.1016 mm** station mismatch. The moved
   row's **5.64 ±0.05 mm** lower-edge ordinate leaves **3.64 / 4.55 mm**
   lower/upper head-envelope walls under the retained printed bands; the end
   wall is **7.00 mm**. Native screw-head/knife-mount and rib/nut clearances
@@ -943,13 +943,14 @@ Catalog specifications checked on September 10, 2026:
   accepted practice, not a guaranteed stress or material allowable.
   MHA-SM-00 step 4 cuts each bolt from the 50.8 mm stock to its own
   hole's measured crossbar-underside-to-washer-top stack plus
-  **8.92 ±0.15 mm** under the head (46.70 mm nominal, printed as a
-  reference on the part drawing).
-  Finished-part acceptance retains a threaded tail **MIN 10.62 mm from the cut end**, with
-  **MAX 1 P cut chamfer**, leaving at least 9.561667 mm full-form tail.
+  **.351 ±.006 in** (8.9154 ±0.1524 mm) under the head (46.70 mm nominal, printed
+  (1.84) as a reference on the part drawing).
+  Finished-part acceptance retains a threaded tail **.418 MIN (10.6172 mm)
+  from the cut end**, with **MAX 1 P cut chamfer**, leaving at least
+  9.558867 mm full-form tail.
   These are manufactured acceptance constraints, not vendor grades.
-  Retain the native cut-end prep **RADIAL 0.60 ±0.05 mm ×45 ±1°** and
-  independently inspect the cut bolt's tail and
+  Retain the native cut-end prep **RADIAL .03 ×45°** under the title block's
+  .XX ±.01 in and ±1° rows, and independently inspect the cut bolt's tail and
   #10-24 class 2A thread; none is a new supplied SKU length or tolerance.
   The head bears on the new washer, not the obsolete #6 counterbore floor.
   The head-height drawing reference uses the physical outer hex bearing edge
@@ -1030,12 +1031,12 @@ Catalog specifications checked on September 10, 2026:
   selection and median-plane datum layout require the scoped native proof.
   The washer seats on the **whole faced top**, **36.50 ±0.51 mm
   above the finished crossbar underside**. Cut to the measured stack, the
-  bolt's tip reach is 8.92 ±0.15 mm (8.9173 mm modelled nominal), bounded
-  by 8.77–9.07 mm. Subtracting one #10-24
-  pitch gives minimum full-form engagement 7.711667 mm, above 1.5D =
+  bolt's tip reach is .351 ±.006 in (8.9154 ±0.1524 mm; 8.9173 mm modelled
+  nominal), bounded by 8.763–9.0678 mm. Subtracting one #10-24
+  pitch gives minimum full-form engagement 7.704667 mm, above 1.5D =
   7.239 mm. Full-thread depth **9.65 ±0.13 mm** (MIN 9.52) leaves
-  0.45 mm tip air at maximum reach; the inspected full-form tail leaves
-  9.561667 − 9.07 = 0.491667 mm coverage beyond maximum reach.
+  0.4522 mm tip air at maximum reach; the inspected full-form tail leaves
+  9.558867 − 9.0678 = 0.491067 mm coverage beyond maximum reach.
   These are the stated stack margins, not extra tolerance reserves.
   The receiver's cylindrical drill depth is **11.24 ±0.05 mm**. Its
   corrected crown proof charges physical pilot oversize and point-angle

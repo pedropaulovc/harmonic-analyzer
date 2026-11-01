@@ -315,23 +315,24 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 
 By explicit owner decision, MHA-SM-03's two bracket receivers are conventional
 blind **2-56 UNC 2B** taps fastening **MHA-MG-01**. The native callout prints
-**2X Ø1.78 DRILL 6.50** and **4.95 MIN** full thread, with the concise
-**FASTENS MHA-MG-01** caption. The drill diameter inherits **+0.10/0 mm**
-and the two-place depth inherits the ordinary **±0.51 mm** title-block band;
+**2X Ø.070 DRILL .256** and **.195 MIN** full thread, with the concise
+**FASTENS MHA-MG-01** caption. The drill diameter inherits the **+.004/0 in**
+drilled-hole row and the three-place depth the **.XXX ±.005 in** title-block
+band (6.375–6.629 mm about the 6.50 mm model depth);
 the native cylindrical depth is explicitly symmetric. Native usable
-full-thread metadata remains **4.95 ±0.05 mm** for the screw stack.
+full-thread metadata remains **4.95 ±0.0508 mm** (±.002 in) for the screw stack.
 The printed minimum is not a cutting-depth maximum. There is no additional
 finished-cavity envelope or printed wall-acceptance requirement.
 
 The owner's **2026-10-22 plate-tap relocation** makes all three rib extrusions
-**5.00 mm**, under the ordinary two-place **±0.51 mm** band. Both edge ribs
+**5.00 mm**, printed **.20** under the two-place **±.01 in** band. Both edge ribs
 retain their outer faces at **Z=±76.20 mm**; their inner caps are now
 **Z=±71.20 mm**, and the middle rib remains centered on Z=0. One native
-**3X 5.00** thickness dimension replaces the three separate thickness authorities.
+**3X .20** thickness dimension replaces the three separate thickness authorities.
 The separate counter-arm leaf remains **5.08 mm**; it is not a rib extrusion.
 
 The two receiver axes move down **0.71 mm** to local **Y=−0.71 mm**.
-**ReceiverY0 = 3.25 ±0.05 mm below the actual coefficient top** owns that
+**ReceiverY0 = .1280 ±.0020 in (3.25 ±0.0508 mm) below the actual coefficient top** owns that
 location, not the unchanged hex centre. The matching bracket clearance holes
 and installed MHA-MG-VN-53 screws move by the same delta. Their X stations,
 **13.7 mm** pitch, Z stations, **3.175 mm** flange grip, bracket body/seat,
@@ -342,29 +343,31 @@ The drill continues beyond the 5 mm rib into the continuous 7 mm coefficient
 plate. Requiring either the full thread or pilot point to end inside the rib
 is obsolete. `magnifying_bracket_joint_layout.receiver_pilot_material_wall_budget`
 and `RECEIVER_PILOT_MATERIAL_WALL_MIN` instead enforce the independent
-**≥2.0 mm pilot-only connected-material wall**. The actual-top-referenced row
+**≥.080 in (2.032 mm) pilot-only connected-material wall**. The actual-top-referenced row
 cancels top-face position error; the nearest top and bottom axis floors are
-**3.25−0.05 = 3.20 mm** and **7.00−0.51−3.25−0.05 = 3.19 mm**.
-The printed **Ø1.78 +0.10/0** pilot has maximum radius **0.94 mm**. Its
-118° point and 0.3° drift over the deepest **7.01 mm** cylinder plus point
-give **0.039662 mm** wander, leaving conservative top/bottom pilot walls
-of approximately **2.220338 / 2.210338 mm**. The connected-plate proof takes
+**3.25−0.0508 = 3.1992 mm** and **6.858−3.25−0.0508 = 3.5572 mm**, the second
+at the plate's printed **.27 in** (6.858 mm) minimum.
+The printed **Ø.070 +.004/0** pilot has maximum radius **0.9398 mm**. Its
+118° point and 0.3° drift over the deepest **6.6294 mm** cylinder plus point
+give **0.037669 mm** wander, leaving conservative top/bottom pilot walls
+of approximately **2.221731 / 2.579731 mm**. The connected-plate proof takes
 no helpful rib or root-fillet credit after the inner cap.
 
-The drill lead reserve remains **0.082857 mm**. Usable screw engagement
+The drill lead reserve is **0.467457 mm**. Usable screw engagement
 remains **3.305 mm minimum**, above **1.5D = 3.2766 mm**, and the native
-full-thread metadata retains **0.0075 mm** minimum tip gap. These are
+full-thread metadata retains **0.0067 mm** minimum tip gap. These are
 stack/design checks, not a strength or native-geometry certificate.
 
 `sm_summing_lever_profile.receiver_pilot_wall_budget` /
 `ReceiverPilotWallBudget` independently bound both longitudinal pilot walls
-against `RECEIVER_PILOT_WALL_MIN`, using the actual tangent profile, ordinary
-shape/plate bands, correlated actual-top/free-edge positions, and the printed
+against `RECEIVER_PILOT_WALL_MIN`, using the actual tangent profile, printed
+shape/plate limits, correlated actual-top/free-edge positions, and the printed
 pilot radius plus drill wander. The independent native **PlateTopY** dimension
-takes the full ordinary `.XX` **±0.51 mm** allowance, conservatively covering
-native **0.02 in = 0.508 mm** and printed-nominal rounding. **ReceiverY0**
-remains **±0.05 mm from the actual top**, so top/axis motion stays correlated;
-the independent thickness still takes **±0.51 mm**. The boundary test constructs
+takes **±0.3683 mm**, the larger printed excursion of the sheet's knife-ridge
+(**.404**, `.XXX`) to coefficient-top (**.10**, `.XX`) chain. **ReceiverY0**
+remains **±.002 in (0.0508 mm) from the actual top**, so top/axis motion stays
+correlated; the independent thickness takes its printed **.28 ±.01 in** limits
+(−0.142/+0.366 mm about 7.00). The boundary test constructs
 the permitted common-tangent wall independently and rejects the obsolete
 half-band budget. The native trimmed-face comparison separately uses the
 actual pilot radius, **TAP_DRILL_DIA/2**.
@@ -384,7 +387,7 @@ The approved option A keeps the coefficient plate's **top at local Y=+2.54 mm**
 and makes the entire **X=0..44.45, Z=±76.20 mm** slab **7.00 mm** thick,
 downward to **Y=−4.46 mm**. It is not a recentered 7 mm plate. The separate
 counter-arm web remains **5.08 mm**, centered on Y=0. Every spring station,
-the **Ø0.15 RFS** pattern, the spring-neck top seat and the **MHA-CH-14 nut
+the **Ø.006 RFS** pattern, the spring-neck top seat and the **MHA-CH-14 nut
 underside seats** are unchanged. Only the matched bracket mounting row moves;
 the #1769 bracket body and threaded-lever installation stay fixed. World spring
 top remains **982.24 mm** and nut seat **975.24 mm**.
@@ -392,7 +395,7 @@ The full-width lower face eliminates the integral underside pad and its step.
 
 View G locates the boss's upper axial face at **Y=+9.525 mm** relative to the
 coefficient top at **Y=+2.54 mm**: the actual-edge native vertical dimension
-measures **6.985 mm**, printed **6.99** under the ordinary `.XX` band. Its
+measures **6.985 mm**, printed **.28** under the `.XX` ±.01 in band. Its
 attachments are the boss upper rim and the actual +Z coefficient-top edge,
 with projected +Y checked before annotation and attachment/value rechecked
 after settling. The separate **19.05 mm** boss length and **5.08 mm** counter
@@ -401,17 +404,18 @@ The boss and counter web still share Y=0, and neither is located from the
 asymmetric 7.00 coefficient plate's midplane.
 
 The source-neighbour intent is **X reach 35.75 mm before the worst nut
-footprint at X36.45 mm**, not a claim of axial separation. Charging the
-ordinary rib-reach band gives **36.45−(35.75+0.51) = 0.19 mm** geometric
+footprint at X36.449 mm**, not a claim of axial separation. Charging the
+printed rib reach (**1.41 ±.01 in**, at most 36.068 mm) gives
+**36.449−36.068 = 0.381 mm** geometric
 X clearance. Native full-interference validation must still qualify the
 rib/nut, screw-head/knife-mount and installed-neighbour clearances.
 
 All three positive-X ribs now share the **R15.24** wrap, tangent flanks and
-**R1** transitions into the coefficient top/bottom faces at **X=35.75 mm**;
+**R.040** transitions into the coefficient top/bottom faces at **X=35.75 mm**;
 the negative-X middle-rib contour is unchanged. The title block's
-**INSIDE CORNERS R1.0 MAX** row controls the roots and blends; no local
+**INSIDE CORNERS R.040 MAX** row controls the roots and blends; no local
 callout repeats that ceiling (drawing-guidelines rule 2). The bounded native
-R1 controls and geometry guards cover the modeled profile transitions
+R.040 controls and geometry guards cover the modeled profile transitions
 and rib inner-cap side roots against the plate, pivot cylinder and counter
 web. A fourth family, **CoefficientUndersideRootFillets**, implements the
 owner's **2026-10-21 model-the-blend** decision at the moved lower
@@ -429,13 +433,13 @@ sharp junctions remain outside that proof:
 - Knife-stub-to-end-rib shoulders.
 
 Only these unchanged junctions retain the existing **RV-02** authorization
-from **b2c8d954**: the owner's **2026-10-18 R1.0 MAX** inside-corner ceiling,
+from **b2c8d954**: the owner's **2026-10-18 R.040 MAX** inside-corner ceiling,
 now carried by the shop-wide title-block row. This is carried-forward
 authorization for the listed unchanged junctions, not a new exception or a
 waiver for the changed rib roots. The coefficient underside moved from
 Y=−2.54 to **Y=−4.46 mm**, moving its longitudinal cylinder intersection from
 X≈+12.44 to **X≈+11.89 mm**. That moved junction is excluded from this
-unchanged-only RV-02 carry-forward; it now has an implemented native **R1 MAX**
+unchanged-only RV-02 carry-forward; it now has an implemented native **R.040 MAX**
 fillet contract, not an expanded sharp-corner exception.
 
 The lower-junction picks derive from **sqrt(CylR² − BottomY²), BottomY** and
@@ -444,10 +448,10 @@ the midpoints of the actual two inboard cap intervals:
 three cap-root families, while these mid-run edges still exist. Its added
 native volume must be strictly positive and no more than
 **2R² × (sum of run lengths + 4R)**, including one-radius end-corner
-neighbourhoods; the current upper bound is **282.80 mm³**. Exact six-direction
+neighbourhoods; at R = 1.016 mm the current upper bound is **292.05 mm³**. Exact six-direction
 sheet-body extrema bound every new surface to the lower tangent section
 plus those finite corner neighbourhoods. Both runs must contain native
-**R1 cylinders parallel to Z at the derived tangent centre**; a nonanalytic
+**R.040 cylinders parallel to Z at the derived tangent centre**; a nonanalytic
 corner patch cannot replace a missing run or evade the bounds. The new
 family participates in the existing native radius/MAX-band readback, and
 all four feature-envelope audits run again on the final rebuilt model.
@@ -466,25 +470,25 @@ the source implementation and fail-closed guards do not claim a native pass.
 
 There is no end ledge or reference-only **(0.44)** contract: the former
 pad-step scope and RV-04 ledge exception are removed. The unchanged knife
-roots retain their separate local **R0.5 MAX** debt (#1625); knife
+roots retain their separate local **R.020 MAX** debt (#1625); knife
 material/hardness remains #1611. Neither the retained RV-02 authorization
 nor the changed-rib proof claims that those unchanged junctions are modeled
 with fillets or that the knife roots are manufacturable.
 
 The screw/grip, engagement, tip-gap and bottoming-tap-lead guards are retained.
-The bounded **6.50 ±0.51 mm** drill now runs into the connected coefficient
-plate rather than relying on a special deep rib. Native **4.95 ±0.05 mm**
+The bounded **.256 ±.005 in** drill (6.50 mm model depth) now runs into the connected coefficient
+plate rather than relying on a special deep rib. Native **4.95 ±0.0508 mm**
 full-thread metadata remains a screw-stack input, not a maximum imposed by the
-printed **4.95 MIN**. An unbounded MIN drill remains unacceptable.
+printed **.195 MIN**. An unbounded MIN drill remains unacceptable.
 `magnifying_bracket_joint_layout` owns those stacks and the independent
-pilot-only material budget. The **3.25 ±0.05 mm** actual-top row location
+pilot-only material budget. The **.1280 ±.0020 in** actual-top row location
 places both receiver axes at local **Y=−0.71 mm**; the matched bracket holes
 and screws follow it without shifting any body, seat, spring or threaded-lever pose.
 
 The drawing retains **6 views**, reduced from 9 by removing C-C and H-H and
 combining knife detail D and ridge detail E into **D at 10:1**, with the
-knife dimensions, ridge **R0.1 MAX** and datum A together. The rib-side/profile
-R1 ceiling comes from the title block, not a redundant local VIEW G callout.
+knife dimensions, ridge **R.004 MAX** and datum A together. The rib-side/profile
+R.040 ceiling comes from the title block, not a redundant local VIEW G callout.
 The six views are the sheet-1 top/plan view, VIEW G, sheet-1 standard isometric,
 sheet-2 VIEW F, Detail D, and the existing sheet-2 isometric reoriented to
 underside rear-bottom-right **(+X,−Y,−Z)** at **1:4**. This exposes the receiver
@@ -494,8 +498,8 @@ reentrant rib roots; the standard top isometric does not replace it. Detail D
 cannot be removed merely because the ribs are uniform: it uniquely owns the
 knife envelope, ridge radius and datum. This change simplifies rib dimensions,
 not the actual six-view count.
-`PlateThickness@PlateProfile` remains model-owned at **7.00 mm** under the
-ordinary two-place band. Changes to wording or annotations still require
+`PlateThickness@PlateProfile` remains model-owned at **7.00 mm**, printed
+**.28** under the two-place ±.01 in band. Changes to wording or annotations still require
 fresh native acceptance.
 
 Datum A remains on the actual **−Z knife ridge** in Detail D. The plan's
@@ -546,14 +550,12 @@ The r7 `19X7.06` BASIC-box left-border strike lies in whitespace
 **285.731 mm**); the enlarged PDF is visibly unstruck, so it is unchanged.
 Known edge-missing collector artifacts remain reported, not demoted.
 
-The body-end **PlateLength alone** now requests one decimal place, authored
-on `CoefficientsPlate` in the part and read back immediately after its top-view
-import. This changes the printed nominal **152.40 → 152.4** and ordinary
-title-block band **±0.51 → ±0.8 mm**; nominal geometry, receiver entry-relative
-depths, poses and every other dimension's precision/band remain unchanged.
-The receiver-depth/body-length coupling cancels for the entry-relative stack;
-this does **not** establish complete worst-case axial acceptance under the
-wider manufactured overall-length band. Native precision/ink acceptance
+The part authors every printed decimal place (`sm_summing_lever_spec.DRAWING_PRECISION`)
+and the drawing imports them unchanged; the body-end **PlateLength** is read
+back immediately after its top-view import. It prints **6.00** under the
+two-place **±.01 in** band, which the receiver pilot-material budget charges at
+the opposite end (`PLATE_L_DEVIATIONS`). Nominal geometry, receiver
+entry-relative depths and poses are unchanged. Native precision/ink acceptance
 remains pending with the layout changes above.
 
 **Historical source-only material/gravity estimate (against #1761, b2c8d954,
@@ -587,8 +589,8 @@ probe, not evidence that it has been run for option A.
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`sm-summing-lever`** | machined-from-solid organic first-class lever; uniform 7.00 coefficient slab, retained centered 5.08 counter web | solid pivot cylinder Ø25.4×152.4 (**no bore**); 2× unchanged hex knife trunnions protruding 21.717 each end; 20× #6-32 through-taps in the 7.00 slab @ 7.0565 pitch (Ø2.705 tap drill), anchors locked by underside MHA-CH-14 jam nuts; one #10-24 tap through the Ø19.05×19.05 summation-anchor boss with its retained top jam nut; shared R15.24 tangent positive ribs, bounded R1 MAX side roots/profile blends and a separately bounded lower longitudinal plate/cylinder blend, not general body fillets | delicate knife ridge; slender trunnions and cantilevered faces complicate workholding; small through-taps require controlled tapping; independent pilot wall guards retain the 2 mm pilot floor; unchanged top-plate/cylinder, counter-web/cylinder, boss/counter-web, boss/middle-rib-flank, middle-rib-flank/counter-web and knife-stub shoulder junctions retain baseline RV-02 only; separate knife-root/tool-access debt remains | multiple setups; native/CAM route not yet qualified | **machined from solid**, per registry; preserve all spring/bracket/mount seats; evaluate hardened knife insert separately (§6) |
-| **`sm-knife-mount`** | rectangular block 25.4 ±0.8 wide ×29.6×14.0 (bar/plate), hardened; sizes apply after heat treatment (owner ruling 2026-10-24, H3); **2 identical** | unchanged Ø12.00 +0.03/0 reamed through bore and pose, centre 20.616 BASIC below the top face (`BORE_CY` −5.75 from the knife-edge origin, block top +14.866, clamped to the casting underside); #10-24 UNC-2B bottoming tap on the bore axis: #25 Ø3.7973 under the title-block DRILLED HOLES +0.10/0 row, cylindrical drill depth 11.24 ±0.05, full thread 9.65 ±0.13; fully charged drill-point crown web 2.0077656525, no break-in (conservative proof envelope Ø3.927, above accepted MAX Ø3.8973; point MIN 117°); MHA-SM-VN-53 slip features cut from the top seat to one flat floor 9.5 deep (owner ruling 2026-10-24, T+H3): datum B, a Ø3.25 ±0.02 blind flat-bottom reamed round hole 7.632 +X of the tap axis (5.07 ±0.51 from the +X face; row 7.0 from front face), and datum C, a 3.25 ±0.02 wide slot on the −X dowel, ⌖0.05 to A and B, its half-round end 14.40 ±0.51 from B and open through the −X face; tap ⌖Ø0.14 (the largest two-place zone the bolt float admits) and bore ⌖Ø0.20 to A, B and C, the bore with a composite Ø0.05 orientation refinement to A, B and C (owner ruling 2026-10-27): knife rock 6.319° worst against the 5.0° floor, the far-end offset 0.197223 charging the dowel yaw (its pair shift carrying both datum simulators' ⊥0.015 t/2), the whole Ø0.05 refinement, and the lever ridge's yaw from both bores' Ø0.20 position zones over its 159.32 minimum mouth span; bore floor and pose unchanged | hold the explicit tap/drill depth bands and accepted pilot diameter/point-angle bounds to preserve ≥2.0 crown web; all joint webs ≥2.0 at printed worst cases | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or manual. Modified #10-24 hex-head Bolt MHA-SM-VN-52 (92314A253, cut under head at MHA-SM-00 step 4 to its hole's measured crossbar-underside-to-washer-top stack plus 8.92 ±0.15; 46.70 nominal) and new 18-8 SAE washer MHA-SM-VN-54 (96659A104) clamp the block to the top-frame's integral crossbar through Ø6.045 #10 loose clearance. Crossbar width 25.0 ±0.8, symmetric about X=−15; washer seat on the whole faced top (no SPOTFACE), 36.50 (title-block ±0.51) above faced underside. Nominal reach 8.9173, range 8.77–9.07; full-form engagement MIN 7.711667 ≥7.239, tip air MIN 0.45. Retain removable medium-strength threadlocker. MHA-SM-VN-53 dowels (98381A473, 1/8 ×3/4) press 12.0 to the floors of two Ø3.175 +0/−0.010 blind reams in the crossbar's faced underside (0.0025–0.0177 interference; the +X ream 7.632 ±0.13 from its bolt axis, the −X ream BASIC 15.264 from the +X under ⌖Ø0.05), each pierced by a #51 (Ø1.70) knockout drilled up from its floor on the ream's axis; their 7.05 proud ends slip 0.047–0.093 into the block's B and C, the block fitting either way round. One native linear pattern position control ⌖0.10 to the bar's two-face width median datum D limits X shift to ±0.05, retaining the Z socket station and ≥2.0 webs. The former #6 socket-head counterbore route is obsolete |
+| **`sm-summing-lever`** | machined-from-solid organic first-class lever; uniform 7.00 coefficient slab, retained centered 5.08 counter web | solid pivot cylinder Ø25.4×152.4 (**no bore**); 2× unchanged hex knife trunnions protruding 21.717 each end; 20× #6-32 through-taps in the 7.00 slab @ 7.0565 pitch (Ø2.705 tap drill), anchors locked by underside MHA-CH-14 jam nuts; one #10-24 tap through the Ø19.05×19.05 summation-anchor boss with its retained top jam nut; shared R15.24 tangent positive ribs, bounded R.040 MAX side roots/profile blends and a separately bounded lower longitudinal plate/cylinder blend, not general body fillets | delicate knife ridge; slender trunnions and cantilevered faces complicate workholding; small through-taps require controlled tapping; independent pilot wall guards retain the .080 in (2.032 mm) pilot floor; unchanged top-plate/cylinder, counter-web/cylinder, boss/counter-web, boss/middle-rib-flank, middle-rib-flank/counter-web and knife-stub shoulder junctions retain baseline RV-02 only; separate knife-root/tool-access debt remains | multiple setups; native/CAM route not yet qualified | **machined from solid**, per registry; preserve all spring/bracket/mount seats; evaluate hardened knife insert separately (§6) |
+| **`sm-knife-mount`** | rectangular block 25.4 ±0.8 wide ×29.6×14.0 (bar/plate), hardened; sizes apply after heat treatment (owner ruling 2026-10-24, H3); **2 identical** | unchanged Ø12.00 +0.03/0 reamed through bore and pose, centre 20.616 BASIC below the top face (`BORE_CY` −5.75 from the knife-edge origin, block top +14.866, clamped to the casting underside); #10-24 UNC-2B bottoming tap on the bore axis: #25 Ø3.7973 under the title-block DRILLED HOLES +0.10/0 row, cylindrical drill depth 11.24 ±0.05, full thread 9.65 ±0.13; fully charged drill-point crown web 2.0077656525, no break-in (conservative proof envelope Ø3.927, above accepted MAX Ø3.8973; point MIN 117°); MHA-SM-VN-53 slip features cut from the top seat to one flat floor 9.5 deep (owner ruling 2026-10-24, T+H3): datum B, a Ø3.25 ±0.02 blind flat-bottom reamed round hole 7.632 +X of the tap axis (5.07 ±0.51 from the +X face; row 7.0 from front face), and datum C, a 3.25 ±0.02 wide slot on the −X dowel, ⌖0.05 to A and B, its half-round end 14.40 ±0.51 from B and open through the −X face; tap ⌖Ø0.14 (the largest two-place zone the bolt float admits) and bore ⌖Ø0.20 to A, B and C, the bore with a composite Ø0.05 orientation refinement to A, B and C (owner ruling 2026-10-27): knife rock 6.319° worst against the 5.0° floor, the far-end offset 0.197223 charging the dowel yaw (its pair shift carrying both datum simulators' ⊥0.015 t/2), the whole Ø0.05 refinement, and the lever ridge's yaw from both bores' Ø0.20 position zones over its 159.32 minimum mouth span; bore floor and pose unchanged | hold the explicit tap/drill depth bands and accepted pilot diameter/point-angle bounds to preserve ≥2.0 crown web; all joint webs ≥2.0 at printed worst cases | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or manual. Modified #10-24 hex-head Bolt MHA-SM-VN-52 (92314A253, cut under head at MHA-SM-00 step 4 to its hole's measured crossbar-underside-to-washer-top stack plus .351 ±.006 in (8.9154 ±0.1524); 46.70 nominal, printed (1.84) as a reference) and new 18-8 SAE washer MHA-SM-VN-54 (96659A104) clamp the block to the top-frame's integral crossbar through Ø6.045 #10 loose clearance. Crossbar width 25.0 ±0.8, symmetric about X=−15; washer seat on the whole faced top (no SPOTFACE), 36.50 (title-block ±0.51) above faced underside. Nominal reach 8.9173, range 8.763–9.0678; full-form engagement MIN 7.704667 ≥7.239, tip air MIN 0.4522. Retain removable medium-strength threadlocker. MHA-SM-VN-53 dowels (98381A473, 1/8 ×3/4) press 12.0 to the floors of two Ø3.175 +0/−0.010 blind reams in the crossbar's faced underside (0.0025–0.0177 interference; the +X ream 7.632 ±0.13 from its bolt axis, the −X ream BASIC 15.264 from the +X under ⌖Ø0.05), each pierced by a #51 (Ø1.70) knockout drilled up from its floor on the ream's axis; their 7.05 proud ends slip 0.047–0.093 into the block's B and C, the block fitting either way round. One native linear pattern position control ⌖0.10 to the bar's two-face width median datum D limits X shift to ±0.05, retaining the Z socket station and ≥2.0 webs. The former #6 socket-head counterbore route is obsolete |
 
 The Ø6.045 hanger clearance hole carries a **native explicit +0.13/0
 diameter band** (MIN 6.045, MAX 6.175), not the symmetric general ±0.13
@@ -693,7 +695,7 @@ knife-seat bottoms also stay sharp, as the sheet notes say. No band is
 tightened to recover a break.
 
 The grip no longer sets **MHA-SM-VN-52 thread engagement**: MHA-SM-00 step 4
-cuts each bolt to its own hole's measured stack plus **8.92 ±0.15 mm**
+cuts each bolt to its own hole's measured stack plus **.351 ±.006 in** (8.9154 ±0.1524 mm)
 reach. The crossbar median datum D controls the hanger axes in X only:
 their BASIC X location is on D.
 The socket-to-D locator retains its ordinary location band; the front and
@@ -775,8 +777,8 @@ The resulting point height is 1.2032343475 mm. With drill depth MAX
 leaves **2.0077656525 mm** over the worst-case bore crown (the bore's
 ⌖Ø0.20 charging 0.10 of crown); the spec mirror's rounded top at 14.87
 gives 2.0117656525 mm, not the built guarantee.
-Full thread **9.65 ±0.13 mm** gives MIN 9.52 mm, leaving **0.45 mm** tip air
-under the bolt's 9.07 mm longest fit-up reach. Two printed places do not
+Full thread **9.65 ±0.13 mm** gives MIN 9.52 mm, leaving **0.4522 mm** tip air
+under the bolt's 9.0678 mm longest fit-up reach. Two printed places do not
 loosen it to the general .XX ±0.51 band: that would give a 10.16 mm deepest
 thread, which the drill's 11.19 mm shallowest limit clears by only 1.03 mm,
 under one 1.058333 mm pitch of runout. Drill-minus-full-thread runout is
@@ -787,13 +789,15 @@ under one 1.058333 mm pitch of runout. Drill-minus-full-thread runout is
 retain the supplied head. Leave the supplied length uncut at the bench:
 MHA-SM-00 step 4 seats washer 96659A104 on each crossbar hole's faced top,
 measures crossbar underside to washer top, and cuts the bolt to that plus
-**8.92 ±0.15 mm** under the head (46.70 mm nominal; the drawing prints it as
-a reference). Restore the cut-end chamfer to **RADIAL 0.60 ±0.05 mm
-×45 ±1°**, and deburr the thread start. Retain the conservative inspection
+**.351 ±.006 in** (8.9154 ±0.1524 mm) under the head (46.70 mm nominal; the
+drawing prints it as the reference (1.84)). Restore the cut-end chamfer to
+**RADIAL .03 ×45°** under the title block's **.XX ±.01 in** and **±1°** rows,
+and deburr the thread start. Retain the conservative inspection
 limit **MAX 1 P incomplete tip** (P = 1.058333 mm). The minimum radial
-chamfer gives tip-flat Ø3.726, below the #25 drill Ø3.797; the maximum
-axial chamfer extent is about 0.673 mm, below 1 P. Retain **MIN 10.62 mm
-threaded tail from the cut end**, giving useful full form ≥9.561667 mm
+chamfer (0.508 mm) gives tip-flat Ø3.7846 on the largest class 2A major
+(4.8006 mm), below the #25 drill Ø3.797; the maximum axial chamfer extent is
+about 1.052 mm, below 1 P. Retain **.418 MIN (10.6172 mm) threaded tail from
+the cut end**, giving useful full form ≥9.558867 mm
 after the MAX 1 P chamfer. Check the retained #10-24 class 2A thread with
 a GO gauge. These are manufactured acceptances; the live SKU omits
 dimensional tolerances and a conformity standard. Nominal head AF 7.9375 mm
@@ -814,11 +818,11 @@ against the actual top-face edge: each washer bears wholly on the faced top,
 inside the crossbar's 1/16 in × 45° top-rim break (printed 1.6 X 45 DEG),
 charged at its print-worst leg of 2.4 mm. No neck or radial-play inspection is added.
 Over the printed grip (35.99–37.01 mm) and washer (0.9144–1.651 mm) the cut
-ranges 45.6744–47.731 mm, leaving at least 3.069 mm of the 50.8 mm stock to
+ranges 45.6674–47.7288 mm, leaving at least 3.0712 mm of the 50.8 mm stock to
 remove with its factory end; inspect the cut bolt's threaded tail and thread
 gauge acceptance rather than treating these as new SKU dimensions or vendor
 tolerances. Useful-tail coverage beyond maximum reach is
-9.561667 − 9.07 = 0.491667 mm.
+9.558867 − 9.0678 = 0.491067 mm.
 See [live vendor evidence](../references/mcmaster/README.md).
 
 This route is shop documentation, not a certified generated traveler.
