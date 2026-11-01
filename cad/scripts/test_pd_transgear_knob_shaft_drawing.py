@@ -278,7 +278,7 @@ def test_every_native_dimension_is_placed_once_with_model_places() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert spec.DRAWING_DIMENSIONS["CoreFlatProfile"] == {"FlatEnd", "FlatToolRadius"}
     assert spec.DRAWING_DIMENSIONS["CoreFlatReference"] == {"FlatToAxis"}
-    # The gear's acceptance prints as native dimensions in the 5:1 view from
+    # The gear's acceptance prints as native dimensions in the 4:1 view from
     # the tip (codjiflo P2 on cb74f3d8d): the span over two teeth from its
     # driven carrier, the root envelope's MIN from its hidden circle.  The
     # gear data keeps the span's limits beside the cutter, as the feed
@@ -1151,7 +1151,7 @@ def test_root_prints_its_modelled_min(
 
 
 def _enlarged_point(radius_mm: float, model_deg: float) -> tuple[float, float]:
-    """Sheet point of a model point on F in the mirrored 5:1 view."""
+    """Sheet point of a model point on F in the mirrored 4:1 view."""
     cx, cy = drawing.ENLARGED_CENTER
     r = radius_mm * drawing._ES / 1000.0
     angle = math.radians(model_deg)
@@ -1163,7 +1163,7 @@ def test_enlarged_view_fits_the_lower_left_field() -> None:
     # inside the border (12.7 mm), with the label clear of the gear.
     cx, cy = drawing.ENLARGED_CENTER
     r = drawing.ENLARGED_HALF_OD
-    assert r == pytest.approx(spec.OUTSIDE_DIA * 5 / 2000.0)
+    assert r == pytest.approx(spec.OUTSIDE_DIA * 4 / 2000.0)
     overall_y = drawing.SIDE_KEEP["OverallLength"][1]
     assert cy + r < overall_y - 0.015
     assert cy - r > 0.0127 + 0.002
@@ -1172,7 +1172,7 @@ def test_enlarged_view_fits_the_lower_left_field() -> None:
     label_width = max(map(len, drawing.ENLARGED_LABEL_TEXT.splitlines())) * 0.0026
     assert label_x + label_width < cx - r - 0.010
     assert label_top < overall_y - 0.020
-    assert drawing.ENLARGED_LABEL_TEXT.endswith("SCALE 5 : 1")
+    assert drawing.ENLARGED_LABEL_TEXT.endswith("SCALE 4 : 1")
 
 
 def test_enlarged_span_stands_out_along_its_bisector_past_the_tips() -> None:
@@ -1184,12 +1184,18 @@ def test_enlarged_span_stands_out_along_its_bisector_past_the_tips() -> None:
     x, y = drawing.ENLARGED_KEEP["ToothSpan"]
     out = (x - cx) * math.cos(bisector) + (y - cy) * math.sin(bisector)
     along = (x - cx) * math.sin(bisector) - (y - cy) * math.cos(bisector)
-    assert out == pytest.approx(0.031)
+    assert out == pytest.approx(0.026)
     assert out > drawing.ENLARGED_HALF_OD + 0.005
-    # The text stands up and right, away from the bisector's construction
-    # line, and its rows stay under the (70.74) row.
+    # The text stands up and right, past the end of the bisector's
+    # construction line (2 blank radii out).  Its block (limits and mate
+    # row) printed 6.7 mm under to 7.3 mm over its point in run
+    # 20261101T210436532Z, where its top stood 1.52 mm under the (70.74)
+    # text (from 77.8 mm; the audit needs 1.78).
     assert along > 0.010
-    assert y + 0.006 < drawing.SIDE_KEEP["OverallLength"][1]
+    assert y + 0.0073 < 0.0778 - 0.003
+    bisector_end = spec.OUTSIDE_DIA * drawing._ES / 1000.0  # two blank radii
+    assert y - 0.0067 > cy + bisector_end * math.sin(bisector) + 0.003
+    assert y - 0.0067 > cy + drawing.ENLARGED_HALF_OD + 0.005
 
 
 def test_enlarged_root_leader_runs_out_along_a_gap_bisector() -> None:
@@ -1201,12 +1207,16 @@ def test_enlarged_root_leader_runs_out_along_a_gap_bisector() -> None:
     pitch = 360.0 / spec.TEETH
     offset = (model_deg - spec.GAP_AZIMUTH_DEG) % pitch
     assert min(offset, pitch - offset) == pytest.approx(0.0, abs=1e-9)
-    # Lower left, past the tips; its text hangs left of the shoulder, inside
-    # the border and under the label.
+    # Lower left, past the tips.  Its one-line text, 63.1 mm wide in run
+    # 20261101T210436532Z, is centred on its point (there it ran into the
+    # teeth): it ends 10 mm left of the gear, inside the border, under the
+    # label.
     assert math.hypot(x - cx, y - cy) > drawing.ENLARGED_HALF_OD + 0.010
     assert x < cx and y < cy
-    text_width = len("ROOT ENVELOPE \u00d86.60 min.") * 0.0026
-    assert x - text_width > 0.0127 + 0.005
+    half_text = 0.0631 / 2.0
+    assert x + half_text < cx - drawing.ENLARGED_HALF_OD - 0.005
+    assert x - half_text > 0.0127 + 0.005
+    assert y - 0.002 > 0.0127 + 0.005
     assert y + 0.003 < drawing.ENLARGED_LABEL_XY[1] - 2 * 0.0045
 
 
@@ -1326,11 +1336,11 @@ def test_neck_detail_fails_loud_when_the_seat_does_not_obey(
 
 
 class _BackView(_NeckView):
-    """A 5:1 *Back IView double: model +X prints left of the axis."""
+    """An enlarged *Back IView double: model +X prints left of the axis."""
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.ScaleRatio = (5.0, 1.0)
+        self.ScaleRatio = tuple(float(value) for value in drawing.ENLARGED_SCALE)
 
 
 def _enlarged_seat(monkeypatch, view: _BackView) -> list[tuple]:
@@ -1344,8 +1354,8 @@ def _enlarged_seat(monkeypatch, view: _BackView) -> list[tuple]:
     def model_point(_adapter, _view, point, *, label):
         handing = 1.0 if view.mirrored else -1.0
         return (
-            view.Position[0] + offset[0] + handing * 5.0 * point[0],
-            view.Position[1] + offset[1] + 5.0 * point[1],
+            view.Position[0] + offset[0] + handing * drawing._ES * point[0],
+            view.Position[1] + offset[1] + drawing._ES * point[1],
         )
 
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
@@ -1355,7 +1365,7 @@ def _enlarged_seat(monkeypatch, view: _BackView) -> list[tuple]:
     return log
 
 
-def test_enlarged_view_is_a_moved_back_view_at_five_to_one(monkeypatch) -> None:
+def test_enlarged_view_is_a_moved_back_view_at_its_scale(monkeypatch) -> None:
     view = _BackView()
     log = _enlarged_seat(monkeypatch, view)
     adapter = SimpleNamespace(currentModel=_NeckModel())
@@ -1545,7 +1555,7 @@ def test_build_dimensions_the_detail_before_the_side_and_marks_it_last(
     assert seat.index("_placed_detail_view") < seat.index(
         "_dimension_then_crop_detail", "detail"
     ) < seat.index("curate_view_dimensions", "side")
-    # The 5:1 view takes the span and the root, and only it names them.
+    # The 4:1 view takes the span and the root, and only it names them.
     assert seat.index("_placed_enlarged_view") < seat.index(
         "curate_view_dimensions", "enlarged gear end"
     )

@@ -1,12 +1,12 @@
 r"""Create the manufacturing drawing for the transgear knob shaft (MHA-PD-08).
 
 A turned side view, aligned rear and front end views, a 10:1 detail of the
-front neck, a 5:1 view from the stud tip, and an isometric.
+front neck, a 4:1 view from the stud tip, and an isometric.
 The side view imports the source-owned turned sizes and unchanged
 stations, and a reference overall length; each tight band names its mate.
 The front end view carries the D-flat's distance from the axis, where the
 flat shows true, and the leadered tooth-edge and bearing-face notes.  The
-5:1 view carries the gear's native acceptance dimensions: the span over two
+4:1 view carries the gear's native acceptance dimensions: the span over two
 teeth (LIMITS) and the root envelope (MIN).  The rear view
 identifies the actual running journal datum. The
 #8-32 thread callout belongs to its real thread blank. Cutter identity and
@@ -471,17 +471,19 @@ CONTROL_VIEWS = {"core_total_runout": "detail", "front_neck_total_runout": "deta
 TOOTH_SPACE_GAP_INDEX = 9
 TOOTHSPACE_NOTE_XY = (0.330, 0.115)
 
-# --- The gear end, enlarged 5:1 -------------------------------------------------
+# --- The gear end, enlarged 4:1 -------------------------------------------------
 # The span over two teeth and the root envelope print as the part's native
 # dimensions (codjiflo P2 on cb74f3d8d: as gear-data text alone no feature
 # dimension carried them).  At 3:1 the span's dimension crossed the bores and
-# the flat (machinist review r8), so both print on a 5:1 *Back view, the
-# front view's direction, in the empty lower-left field (x 13-215 mm, y
-# 13-75 mm: under the (70.74) row, left of the title block).  Its tooth tips
-# reach 22.45 mm round the axis, x 142.5-187.5 and y 15.5-60.5 mm.
-ENLARGED_SCALE = (5, 1)
+# the flat (machinist review r8), so both print on an enlarged *Back view,
+# the front view's direction, in the empty lower-left field (x 13-215 mm, y
+# 13-75 mm: under the (70.74) row, left of the title block).  At 5:1 (run
+# 20261101T210436532Z) the span's limits stood 1.5 mm under the (70.74) text
+# and the root's 63 mm text, centred on its point, ran into the teeth; at 4:1
+# the tooth tips reach 17.96 mm round the axis, x 142-178 and y 18-54 mm.
+ENLARGED_SCALE = (4, 1)
 _ES = ENLARGED_SCALE[0] / ENLARGED_SCALE[1]
-ENLARGED_CENTER = (0.165, 0.038)
+ENLARGED_CENTER = (0.160, 0.036)
 ENLARGED_HALF_OD = OUTSIDE_DIA * _ES / 2000.0
 ENLARGED_LABEL_TEXT = f"VIEW FROM STUD TIP\nSCALE {ENLARGED_SCALE[0]} : {ENLARGED_SCALE[1]}"
 # Top-left anchor: left of the view, over the root's text, under the
@@ -496,19 +498,23 @@ def _enlarged_sheet_angle(model_deg: float) -> float:
 
 # The span's anvils straddle SPAN_TEETH teeth about their gaps' bisector
 # (paper_drive_stock_native.author_span), model 36 deg, sheet 144 deg.  Its
-# dimension line stands 31 mm out along that bisector, 8.6 mm past the tips,
-# and its text 15.8 mm along the line up and right, away from the
-# bisector's construction line (to 44.9 mm out), over the teeth.
+# dimension line stands 26 mm out along that bisector, 8 mm past the tips,
+# and its text 19.8 mm along the line up and right, over the teeth: the
+# block (limits and mate row) runs ~6.7 mm under to ~7.3 mm over its point
+# (run 20261101T210436532Z), so it tops out 3.2 mm under the (70.74) text
+# (from 77.8 mm) and stands 3.5 mm over the end of the bisector's
+# construction line (35.9 mm out), which struck the mate row at 5:1.
 SPAN_BISECTOR_SHEET_RAD = _enlarged_sheet_angle(
     GAP_AZIMUTH_DEG + 180.0 * SPAN_TEETH / TEETH
 )
-_SPAN_LINE_OUT = 0.031
-_SPAN_TEXT_ALONG = 0.0158
+_SPAN_LINE_OUT = 0.026
+_SPAN_TEXT_ALONG = 0.0198
 # The root envelope's leader runs out along a gap bisector (model 348 deg,
-# sheet 192 deg), so its arrow lands on a gap floor; the text hangs left of
-# its shoulder, left of the gear and under the label.
+# sheet 192 deg), so its arrow lands on a gap floor.  Its one-line text
+# (63 mm) is centred on its point, so the point stands far enough out that
+# the text ends 10 mm left of the teeth, under the label.
 ROOT_LEADER_SHEET_RAD = _enlarged_sheet_angle(GAP_AZIMUTH_DEG + 14 * 360.0 / TEETH)
-_ROOT_TEXT_OUT = 0.040
+_ROOT_TEXT_OUT = 0.0565
 ENLARGED_KEEP: dict[str, tuple[float, float]] = {
     "ToothSpan": (
         ENLARGED_CENTER[0]
@@ -617,7 +623,7 @@ def _placed_detail_view(adapter: Any) -> Any:
 
 
 def _placed_enlarged_view(adapter: Any) -> Any:
-    """The 5:1 *Back view whose axis at F lands on ENLARGED_CENTER, proved by
+    """The 4:1 *Back view whose axis at F lands on ENLARGED_CENTER, proved by
     the tip of tooth 0 (model +X): the mirrored view prints it left of the
     axis, ENLARGED_HALF_OD out, the mapping ENLARGED_KEEP assumes."""
     tip_m = (OUTSIDE_DIA / 2000.0, 0.0, 0.0)
@@ -746,7 +752,7 @@ def _plain_text(text: str) -> str:
 
 def _label_views(adapter: Any, detail: Any, side: Any, enlarged: Any) -> None:
     """Label detail B beside its crop, letter its mark on the side view and
-    label the 5:1 view from the stud tip: both differ from the sheet's 3:1.
+    label the 4:1 view from the stud tip: both differ from the sheet's 3:1.
 
     A note lands in the ACTIVE view, so each view is activated first; a
     note that did not land in its view raises.
@@ -897,7 +903,7 @@ async def build(adapter: Any) -> dict[str, str]:
     detail = _placed_detail_view(adapter)
     set_hidden_lines_removed(adapter, detail)
     detail_annotations = _dimension_then_crop_detail(adapter, detail)
-    # The 5:1 view from the tip shows the hidden span and root sketches, in
+    # The 4:1 view from the tip shows the hidden span and root sketches, in
     # it alone (curate_view_dimensions shows each per view), and takes their
     # two dimensions; no other view's keep names them.
     enlarged = _placed_enlarged_view(adapter)
