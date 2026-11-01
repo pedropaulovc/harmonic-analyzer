@@ -486,6 +486,18 @@ def _shank_tangent_pairs() -> set[frozenset[str]]:
     return pairs
 
 
+def test_cosmetic_thread_runs_from_the_tip_chamfer_to_the_full_thread_station():
+    # Seeded on the chamfer/body edge, on the body's radius, it ends where the
+    # sheet's full-thread limit stands: the thread lines and the station agree.
+    x, y, z = part.THREAD_EDGE_POINT
+    assert (x, y) == (0.0, geom.BODY_DIA / 2.0)
+    assert -z == pytest.approx(geom.LENGTH - geom.TIP_CHAMFER)
+    assert -z - part.COSMETIC_THREAD_DEPTH == pytest.approx(
+        geom.FULL_THREAD_STATION_MAX
+    )
+    assert geom.FULL_THREAD_STATION_MAX > geom.PLAIN_LENGTH_MIN
+
+
 def test_shank_profile_is_corner_plain_body_and_tip() -> None:
     body_r = geom.BODY_DIA / 2.0
     corner_r = geom.UNDERHEAD_CORNER_R

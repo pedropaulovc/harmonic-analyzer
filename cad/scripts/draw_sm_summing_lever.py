@@ -885,6 +885,38 @@ def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
     return tuple(value / 1000.0 for value in point_mm)
 
 
+# Datum C's tag hangs below the coefficient top's extension line, right of the
+# plate's free end in VIEW G: above it, the boss top's .28 witness runs 3.5 mm
+# over the plate top; below, the field clears VIEW G's label.
+PLATE_TOP_DATUM_OFFSET = (0.0105, -0.0035)
+
+
+def _plate_top_datum(adapter: Any, front: Any) -> Any:
+    """Datum C on the coefficient-plate top, edge-on in VIEW G: the face the 20
+    spring taps run through clocks their pattern about A (machinist review
+    e1d24c9: A|B left rotation about the knife-edge axis free)."""
+    mid = ((RIB_REACH + PLATE_W) / 2.0, COEFFICIENT_TOP_Y, PLATE_L / 2.0)
+    end = (PLATE_W, COEFFICIENT_TOP_Y, PLATE_L / 2.0)
+    plate = scan_view_edges(front, label="VIEW G datum C").exact_line_through(
+        mid, label="coefficient top end edge",
+    )
+    mid_xy, end_xy = model_points_in_view(
+        adapter, front, (_metres(mid), _metres(end)), label="datum C",
+    )
+    outward = math.copysign(1.0, end_xy[0] - mid_xy[0])
+    return add_datum_feature(
+        adapter,
+        front,
+        edge_entity=plate.edge,
+        symbol_xy=(
+            end_xy[0] + outward * PLATE_TOP_DATUM_OFFSET[0],
+            end_xy[1] + PLATE_TOP_DATUM_OFFSET[1],
+        ),
+        datum="C",
+        label="coefficient-plate top face",
+    )
+
+
 def _set_witness_gap(display: Any, index: int, gap: float, *, label: str) -> None:
     """A local native gap, never a document-wide setting or a hidden witness."""
     if display.SetWitnessLineGap(index, False, gap) is not True:
@@ -1925,6 +1957,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*front_annotations, *top_annotations], label="lever geometry",
     )
     check_boss_faces = _boss_face_location_check(adapter, front)
+    _plate_top_datum(adapter, front)
     _clear_plate_width_witnesses(adapter, top, top_annotations)
     # The boss's Ø19.05 takes one arrow on its near rim, no line through the
     # centre: there it crossed the anchor tap callout's leader, which runs
@@ -2042,8 +2075,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # Anchor-tap pattern control: datum B on the plate end the seed hole is
-    # located from, BASIC row-X / start-Z / pitch coordinates off A|B, a
-    # native thread callout, and a 20X position frame -- the inspectable
+    # located from, BASIC row-X / start-Z / pitch coordinates off A|B, datum C
+    # (VIEW G) clocking the pattern about A, a native thread callout, and a
+    # 20X position frame -- the inspectable
     # pattern definition (the notes no longer carry these numbers as prose).
     # The plan prints model +Z DOWN the sheet, so the end at the bottom of the
     # view is the +Z end: the seed hole (HOLE_Z_LAST, HOLE_END_OFFSET_LAST off
@@ -2253,7 +2287,7 @@ async def build(adapter: Any) -> dict[str, str]:
         frame_xy=(0.2133, 0.199),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_IN["spring-hole pattern position"],
-        datums=("A", "B"),
+        datums=("A", "B", "C"),
         diameter=True,
         quantity="20X",
         label="spring-hole pattern position",

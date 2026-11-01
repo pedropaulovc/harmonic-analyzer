@@ -52,6 +52,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
@@ -521,6 +522,27 @@ def _dress_underhead_corner(
     )
 
 
+def _show_shank_thread(adapter: Any, view: Any, label: str) -> None:
+    """Import the part's one cosmetic 1/4-28 into ``view`` and hide its
+    automatic callout: the sheet's attached THREAD_CALLOUT is the one callout
+    (draw_mg_magnifying_lever._hide_other_thread_callouts)."""
+    seeds, instances = import_cosmetic_threads(adapter, view)
+    if (seeds, instances) != (1, 1):
+        raise RuntimeError(
+            f"MHA-SM-04 {label} cosmetic threads: seeds/instances="
+            f"{(seeds, instances)!r}, expected (1, 1)"
+        )
+    thread = _early_bound(_early_bound(view, "IView").GetFirstCThread(), "ICThread")
+    note = thread.ThreadCallout
+    if note is not None:
+        annotation = _early_bound(
+            _early_bound(note, "INote").GetAnnotation(), "IAnnotation"
+        )
+        annotation.Visible = 3  # swAnnotationHidden; drawing-local only
+        if annotation.Visible != 3:
+            raise RuntimeError(f"MHA-SM-04 {label}: automatic thread callout shows")
+
+
 def _verify_source_dimensions(model: Any) -> None:
     """The unprinted callout controls, read from the opened source part."""
     for full_name, expected in SOURCE_ONLY_DIMENSIONS.items():
@@ -676,6 +698,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    # The shank's thread: thin minor-diameter lines on the side view and the
+    # shaded thread on the isometric (ASME Y14.6 simplified representation).
+    _show_shank_thread(adapter, side, "side view")
+    _show_shank_thread(adapter, iso, "isometric")
 
     return await finalize_drawing(
         adapter,

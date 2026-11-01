@@ -1484,6 +1484,36 @@ def test_datum_a_attaches_the_actual_visible_back_knife_round(monkeypatch) -> No
     assert definition["position_tolerance_m"] == 0.003
 
 
+def test_datum_c_is_the_coefficient_top_the_spring_taps_pierce(monkeypatch) -> None:
+    """C is the plate top edge-on in VIEW G, tagged outboard of the free end."""
+    calls = []
+    edge, front = object(), object()
+    spec = sm_summing_lever_spec
+
+    def exact_line_through(point, *, label):
+        assert point[1] == spec.COEFFICIENT_TOP_Y
+        assert spec.RIB_REACH < point[0] < spec.PLATE_W
+        return SimpleNamespace(edge=edge)
+
+    monkeypatch.setattr(
+        drawing, "scan_view_edges",
+        lambda view, **kwargs: SimpleNamespace(exact_line_through=exact_line_through),
+    )
+    monkeypatch.setattr(
+        drawing, "model_points_in_view",
+        lambda adapter, view, points, **kwargs: [(0.25 + x, 0.236) for x, _y, _z in points],
+    )
+    monkeypatch.setattr(drawing, "add_datum_feature", lambda *args, **kwargs: calls.append((args, kwargs)))
+    drawing._plate_top_datum(object(), front)
+    (args, definition), = calls
+    assert args[1] is front
+    assert definition["edge_entity"] is edge and definition["datum"] == "C"
+    end_x = 0.25 + spec.PLATE_W / 1000.0
+    assert definition["symbol_xy"][0] > end_x  # off the part, on the extension
+    assert definition["symbol_xy"][1] < 0.236  # below the line, under the boss witness
+
+
+
 def test_the_ridge_callouts_fit_detail_d() -> None:
     """Reflow preserves every word while the complete projected blocks fit."""
     right = notes.DIMENSION_CALLOUTS_BELOW["RidgeFromRight"]

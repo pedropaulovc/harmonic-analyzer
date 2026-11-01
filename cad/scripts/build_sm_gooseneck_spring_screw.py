@@ -90,6 +90,8 @@ from sm_gooseneck_spring_screw_geom import (
     PLAIN_LENGTH_MIN_TOL_TYPE,
     SLOT_DEPTH,
     SLOT_WIDTH,
+    THREAD,
+    THREAD_SIZE,
     TIP_CHAMFER,
     UNDERHEAD_CORNER_R,
     UNDERHEAD_CORNER_R_BAND,
@@ -161,6 +163,14 @@ if not (
     < LENGTH - TIP_CHAMFER
 ):
     raise AssertionError("station witnesses overlap or leave the plain body")
+# The cosmetic thread (model x, y, z in mm; the shank runs down -Z): seeded on
+# the circular edge where the tip chamfer meets the body, run toward the head
+# to the full-thread station's MAX, so its end line stands on that station's
+# witness.
+THREAD_EDGE_POINT = (0.0, BODY_R, -(LENGTH - TIP_CHAMFER))
+COSMETIC_THREAD_DEPTH = LENGTH - TIP_CHAMFER - FULL_THREAD_STATION_MAX
+if not 0.0 < COSMETIC_THREAD_DEPTH < LENGTH - TIP_CHAMFER - PLAIN_LENGTH_MIN:
+    raise AssertionError("cosmetic thread leaves the threaded body")
 
 # Head: the flat-topped cylinder less the relief chamfer's corner triangle
 # (centroid HEAD_R - HEAD_RELIEF_CHAMFER/3).
@@ -278,6 +288,7 @@ def _author_dimension_callouts(adapter) -> None:
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
+        AddThreadParameters,
         CreatePlaneParameters,
         ExtrusionParameters,
         RevolveParameters,
@@ -644,12 +655,32 @@ async def build(adapter) -> dict[str, str]:
     for dimension, expression in drive_jobs:
         await drive_dimension(adapter, dimension, expression)
     await force_rebuild(adapter)
-    await _volume_check(
+    driven = await _volume_check(
         adapter,
         "driven slotted cheese-head screw (equations neutral)",
         V_FINAL,
         0.02 * V_SLOT,
     )
+
+    # Cosmetic 1/4-28 from the tip chamfer's major-diameter edge back to the
+    # full-thread station's MAX, so the side view draws the thread's minor
+    # lines (ASME Y14.6 simplified) and the shaded isometric shows the thread
+    # the callout names (build_mg_magnifying_vertical_rod).  It cuts nothing;
+    # the calibrated sizes (springs.yaml upper_support) are untouched.
+    adapter._zoom_to_fit(adapter.currentModel)
+    check(
+        f"cosmetic thread {THREAD}",
+        await adapter.add_thread(
+            AddThreadParameters(
+                edge_point=list(THREAD_EDGE_POINT),
+                standard="ansi_inch",
+                size=THREAD_SIZE,
+                end_type="blind",
+                depth=COSMETIC_THREAD_DEPTH,
+            )
+        ),
+    )
+    await _volume_check(adapter, "cosmetic thread cuts nothing", driven, 1e-6)
     bodies = tuple(
         _early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or ()
     )
