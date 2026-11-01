@@ -17,8 +17,11 @@ def test_identity_stock_and_common_pivot_interface():
     assert metadata['quantity']==spec.QUANTITY==1
     assert spec.UNIT=='in'
     # The tap-to-recess wall shortfall (owner exception pending) and the
-    # metric vendor stations (owner ruling 4B) are the declared minors.
-    wall,metric=metadata['machinist_exceptions']
+    # metric vendor stations (owner ruling 4B) and the M4 carriage engagement
+    # (the jig's RV-05) are the declared minors.
+    wall,metric,engagement=metadata['machinist_exceptions']
+    assert (engagement['id'],engagement['kind'])==('RV-03','minor')
+    assert pivot.ENGAGEMENT_TEXT in engagement['where']
     assert (metric['id'],metric['kind'])==('RV-02','minor')
     assert 'ruling 4B' in metric['reason']
     assert (wall['id'],wall['kind'])==('RV-01','minor')
