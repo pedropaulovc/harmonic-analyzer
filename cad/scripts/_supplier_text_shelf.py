@@ -25,6 +25,7 @@ from _drawing_common import rebuild_drawing
 from _supplier_dimensions import _LINEAR_TYPES
 from _supplier_screw_dimensions import _supplier_top_record
 from _supplier_screw_layout import supplier_top_text_geometry
+import _telemetry
 
 # name -> (dimension line is horizontal, shelf side past the outer witness)
 Shelves = Mapping[str, tuple[bool, Literal["left", "right"]]]
@@ -78,6 +79,7 @@ def _struck(actual: Mapping[str, Any], horizontal: bool) -> bool:
     )
 
 
+@_telemetry.traced("drawing.supplier_struck_text")
 def struck_supplier_text(
     adapter: Any, views: Mapping[str, Any]
 ) -> tuple[dict[str, Any], dict[str, tuple[bool, Literal["left", "right"]]]]:
@@ -94,6 +96,7 @@ def struck_supplier_text(
     displays: dict[str, Any] = {}
     shelves: dict[str, tuple[bool, Literal["left", "right"]]] = {}
     centred: dict[tuple[str, bool], list[tuple[float, str]]] = {}
+    inspected = 0
     for key, view in views.items():
         view = _early_bound(view, "IView")
         outline = tuple(float(value) for value in view.GetOutline())
@@ -107,6 +110,7 @@ def struck_supplier_text(
             )
             if int(display.Type2) not in _LINEAR_TYPES:
                 continue
+            inspected += 1
             record = _supplier_top_record(adapter, display)
             arrows = (record.get("display") or {}).get("arrows") or ()
             horizontal = (
@@ -130,6 +134,9 @@ def struck_supplier_text(
     for lanes in centred.values():
         for lane, (_, name) in enumerate(sorted(lanes)):
             shelves[name] = (True, "left" if lane % 2 else "right")
+    _telemetry.annotate(
+        sheet_views=len(views), linear_dimensions=inspected, struck=len(displays)
+    )
     return displays, shelves
 
 
