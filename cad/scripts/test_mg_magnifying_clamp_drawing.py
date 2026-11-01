@@ -52,7 +52,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     kept = set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP) | set(drawing.RIGHT_LOCATION_KEEP) | set(drawing.TOP_LOCATION_KEEP) | set(drawing.BOTTOM_KEEP)
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
-    assert spec.DRAWING_PRECISION["HexProfile"]["HexAf"] == 2
+    assert spec.STOCK_REFERENCE_DIMENSION == "HexAf"
 
 
 def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
@@ -62,7 +62,7 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
 
     assert geom.HEX_AF == pytest.approx(0.5 * 25.4)
     assert geom.BLOCK_DEPTH == pytest.approx(geom.HEX_AC)
-    assert (geom.LEVER_BORE_Y, geom.BLOCK_HEIGHT) == (19.95, 29.50)
+    assert (geom.LEVER_BORE_Y, geom.BLOCK_HEIGHT) == (19.95, pytest.approx(1.16 * 25.4))
     for gone in ("BLOCK_WIDTH", "ROD_BORE_DIA", "ROD_BORE_X"):
         assert not hasattr(geom, gone)
     assembly = Path(part.__file__).with_name("build_mg_magnifier_assembly.py").read_text(
@@ -74,7 +74,7 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
 
 def test_worst_case_walls_and_engagement_hold_the_contract() -> None:
     for name, (nominal, worst) in spec.DERIVED_WALL_BOUNDS.items():
-        assert worst >= spec.WALL_FLOOR, name
+        assert worst >= spec.WALL_TARGET, name
         assert nominal >= worst, name
     assert spec.DERIVED_WALL_BOUNDS["rod-tap drill point to the lever bore"][1] == pytest.approx(
         spec.ROD_TAP_FLOOR_WALL_WORST
@@ -83,15 +83,15 @@ def test_worst_case_walls_and_engagement_hold_the_contract() -> None:
     # from the SAME actual flat; HEX size/angles, not custom notes, own form.
     import mg_magnifying_clamp_geom as geom
 
+    band = 0.254  # .010
     entry_errors = [
         abs(tap_error - bore_error)
-        for tap_error, bore_error in itertools.product((-0.51, 0.51), repeat=2)
+        for tap_error, bore_error in itertools.product((-band, band), repeat=2)
     ]
     assert geom.TAP_TO_BORE_ENTRY_Z_MAX == pytest.approx(max(entry_errors))
-    assert geom.BORE_FULL_ANGULAR == pytest.approx(17.0 * math.tan(math.radians(0.3)))
-    assert spec.BORE_TO_FLAT_WALL_WORST == pytest.approx(1.644216032066)
-    assert spec.WALL_FLOOR < spec.BORE_TO_FLAT_WALL_WORST < spec.WALL_TARGET
-    assert spec.ROD_TAP_FLOOR_WALL_WORST == pytest.approx(2.081671433941)
+    assert geom.BORE_FULL_ANGULAR == pytest.approx(0.66 * 25.4 * math.tan(math.radians(0.3)))
+    assert spec.BORE_TO_FLAT_WALL_WORST == pytest.approx(2.273871621267826)
+    assert spec.ROD_TAP_FLOOR_WALL_WORST == pytest.approx(3.253726449848782)
     assert spec.THUMB_ENGAGEMENT_WORST >= joint.ENGAGEMENT_MIN
     assert joint.ENGAGEMENT_WORST >= joint.ENGAGEMENT_MIN
     assert spec.TAP_REACH_NEEDED <= spec.PLUG_TAP_USABLE_LENGTH
@@ -107,8 +107,9 @@ def test_ordinary_hex_angular_corners_fit_the_derived_whole_body_envelope() -> N
     # Opposite pairs take every ordinary size corner; each of six face normals
     # independently takes its +/-1-degree corner. Retain only real vertices.
     largest = 0.0
-    drift = (geom.BLOCK_HEIGHT + 0.51) * math.tan(math.radians(1.0))
-    for sizes in itertools.product((12.19, 13.21), repeat=3):
+    height_band, af_band = 0.254, 0.127  # .XX height; assumed supplier ±.005 flats
+    drift = (geom.BLOCK_HEIGHT + height_band) * math.tan(math.radians(1.0))
+    for sizes in itertools.product((12.7 - af_band, 12.7 + af_band), repeat=3):
         for errors in itertools.product((-1.0, 1.0), repeat=6):
             faces = [
                 (math.cos(math.radians(60.0 * index + errors[index])),
@@ -131,17 +132,18 @@ def test_ordinary_hex_angular_corners_fit_the_derived_whole_body_envelope() -> N
                            for (x1, z1), (x2, z2) in itertools.combinations(vertices, 2))
             largest = max(largest, diameter + 2.0 * drift)
     assert largest <= geom.STOCK_ENVELOPE_MAX
-    assert geom.STOCK_ENVELOPE_MAX == pytest.approx(17.0)
+    assert geom.STOCK_ENVELOPE_MAX == pytest.approx(0.66 * 25.4)
     assert largest > 15.0  # Nominal regular corners are not the body guarantee.
 
 
-def test_loose_hex_bore_wall_may_miss_target_without_crossing_policy_floor() -> None:
+def test_hex_bore_wall_holds_the_target_at_the_ordinary_bands() -> None:
     import mg_magnifying_clamp_geom as geom
 
-    opposite_flat, furthest_axis, cut_radius = 12.19, 6.86, 6.60 / 2.0
-    relative_runoff = 17.0 * math.tan(math.radians(1.0 + 0.3))
+    opposite_flat, furthest_axis = 12.7 - 0.127, 6.35 + 0.254
+    cut_radius = (geom.LEVER_BORE_DIA + 0.1016) / 2.0
+    relative_runoff = geom.STOCK_ENVELOPE_MAX * math.tan(math.radians(1.0 + 0.3))
     wall = opposite_flat - furthest_axis - cut_radius - relative_runoff
-    assert 1.5 < wall < 2.0
+    assert wall >= geom.WALL_TARGET
     assert wall == pytest.approx(geom.BORE_TO_FLAT_WALL_WORST)
 
 
@@ -149,13 +151,15 @@ def test_vertical_bore_wander_is_spent_in_both_dependent_stacks() -> None:
     import mg_magnifying_clamp_geom as geom
     from _printed_tolerance import printed_band_mm
 
-    band = printed_band_mm(geom.HEIGHT_PLACES)
-    radius_max = (geom.LEVER_BORE_DIA + 0.10) / 2.0
+    band = printed_band_mm(geom.HEIGHT_PLACES, unit="in")
+    radius_max = (geom.LEVER_BORE_DIA + 0.1016) / 2.0
     slope = math.tan(math.radians(0.3))
     # Spend the entire calculated full-height extent; no perfect-hex
     # midpoint or symmetric station is credited.
-    wander = 17.0 * slope
-    floor = geom.LEVER_BORE_Y - band - radius_max - joint.ROD_TAP_DRILL_DEPTH_MAX - geom.ROD_TAP_DRILL_POINT - wander
+    wander = geom.STOCK_ENVELOPE_MAX * slope
+    # The exempt 19.95 bore height prints .79; its limits are that number's.
+    bore_y_min = 0.79 * 25.4 - band
+    floor = bore_y_min - radius_max - joint.ROD_TAP_DRILL_DEPTH_MAX - geom.ROD_TAP_DRILL_POINT - wander
     assert floor == pytest.approx(geom.ROD_TAP_FLOOR_WALL_WORST)
     assert geom.BORE_FULL_ANGULAR == pytest.approx(wander)
     assert floor >= geom.WALL_TARGET
@@ -169,15 +173,16 @@ def test_installed_thumb_full_overlap_includes_actual_male_tip_and_seating() -> 
     from _printed_tolerance import printed_band_mm
     from mg_lever_thread_joint import ROD_DIA, ROD_DIA_BAND
 
-    band = printed_band_mm(geom.HEIGHT_PLACES)
+    band = printed_band_mm(geom.HEIGHT_PLACES, unit="in")
+    bore_y_low = 0.79 * 25.4 - band  # the exempt bore height prints .79
     overlaps, collar_gaps = [], []
     # Actual parallel-cylinder sections at all height/diameter/angle corners.
     # Include every extreme seating, even the conservative upper bore cap:
     # this must not rely on a centreline or perfectly bottom-seated rod.
     for height, bore_y, bore_dia, rod_dia, drift, angle, seat in itertools.product(
         (geom.BLOCK_HEIGHT - band, geom.BLOCK_HEIGHT + band),
-        (geom.LEVER_BORE_Y - band, geom.LEVER_BORE_Y + band),
-        (geom.LEVER_BORE_DIA, geom.LEVER_BORE_DIA + 0.10),
+        (bore_y_low, bore_y_low + 2.0 * band),
+        (geom.LEVER_BORE_DIA, geom.LEVER_BORE_DIA + 0.1016),
         (ROD_DIA + ROD_DIA_BAND[1], ROD_DIA),
         (-geom.BORE_FULL_ANGULAR, geom.BORE_FULL_ANGULAR),
         (-geom.THUMB_CONTACT_ANGLE_MAX, 0.0, geom.THUMB_CONTACT_ANGLE_MAX),
@@ -190,7 +195,7 @@ def test_installed_thumb_full_overlap_includes_actual_male_tip_and_seating() -> 
         miss = max(geom.THUMB_CONTACT_Z_MAX + rb * sec - rr - TIP_FLAT_R, 0.0)
         chord_loss = rr - math.sqrt(rr**2 - miss**2)
         contact = cy + seat * (rb - rr) * sec + rr * sec + TIP_FLAT_R * slope
-        female = (cy + rb * sec + (joint.THREAD_MAJOR / 2.0 + 0.025) * slope, height - geom.EDGE_BREAK)
+        female = (cy + rb * sec + (joint.THREAD_MAJOR / 2.0 + geom.TAP_OVERSIZE_R) * slope, height - geom.EDGE_BREAK)
         male = (contact + TIP_CHAMFER, contact - chord_loss - 2.0 * TIP_FLAT_R * slope + SHANK_LEN * math.cos(angle))
         overlaps.append(min(female[1], male[1]) - max(female[0], male[0]))
         collar_gaps.append(male[1] - height - COLLAR_DIA / 2.0 * abs(math.sin(angle)))
@@ -198,24 +203,45 @@ def test_installed_thumb_full_overlap_includes_actual_male_tip_and_seating() -> 
     assert min(overlaps) >= joint.ENGAGEMENT_MIN
     assert min(collar_gaps) >= geom.THUMB_COLLAR_CLEARANCE_MIN - 1e-9
     assert geom.THUMB_COLLAR_CLEARANCE_MIN > 0.0
-    # Pre-fix mutation: an accepted bottom-seated part at the old height loses
-    # 1.5D once the REAL male tip chamfer is removed from the full interval.
-    contact = geom.LEVER_BORE_Y + band + geom.BORE_FULL_ANGULAR + ROD_DIA - geom.LEVER_BORE_DIA / 2.0
-    old_overlap = (28.95 - band - geom.EDGE_BREAK) - (contact + TIP_CHAMFER)
-    assert old_overlap < joint.ENGAGEMENT_MIN
 
 
-def test_ordinary_hex_size_needs_no_custom_wall_or_envelope_inspection_note() -> None:
-    from _printed_tolerance import printed_band_mm
-
-    band = printed_band_mm(spec.HEX_AF_PLACES)
-    assert (spec.HEX_AF - band, spec.HEX_AF + band) == pytest.approx((12.19, 13.21))
-    assert spec.HEX_AF_PREFIX == "HEX "
+def test_stock_hex_needs_no_custom_wall_or_envelope_inspection_note() -> None:
+    # As-bought 1/2 hex: an exact fraction, judged at an assumed ±.005 supply.
+    assert spec.HEX_AF == pytest.approx(25.4 / spec.HEX_AF_FRACTION_DENOMINATOR)
+    assert spec.HEX_STOCK_AF_BAND == pytest.approx(0.005 * 25.4)
+    # The sheet prints the same supplier band the wall checks assume.
+    assert spec.HEX_AF_CALLOUT.endswith(f"<MOD-PM>{spec.HEX_STOCK_AF_BAND / 25.4:.3f}".replace("0.", "."))
     assert spec.LEVER_BORE_CALLOUT.splitlines() == [
         "DRILL THRU CORNERS", "SLIP ON 1/4 IN LEVER MHA-MG-03",
     ]
     assert spec.SEAT_NOTE.startswith("MHA-MG-04 SHOULDER SEAT")
     assert "NO CHAMFER OR SPOTFACE AT TAP" in spec.SEAT_NOTE
+
+
+@pytest.mark.parametrize(
+    ("keep", "name", "center", "axes"),
+    (
+        ("TOP_LOCATION_KEEP", "ThumbTapFromDiagonalFlat", "TOP_CENTER", "TOP_AXES"),
+        ("BOTTOM_KEEP", "RodTapFromDiagonalFlat", "BOTTOM_CENTER", "BOTTOM_AXES"),
+    ),
+)
+def test_end_view_tap_location_runs_centre_to_flat_on_its_normal(keep, name, center, axes) -> None:
+    # The measured flat's outward model normal (cos 30 X + sin 30 Z) on the
+    # sheet, from the view's projected model axes.
+    angles = getattr(drawing, axes)
+    normal = tuple(
+        math.cos(math.radians(30.0)) * f(angles["+X"]) + math.sin(math.radians(30.0)) * f(angles["+Z"])
+        for f in (math.cos, math.sin)
+    )
+    cx, cy = getattr(drawing, center)
+    tx, ty = getattr(drawing, keep)[name]
+    off = (tx - cx, ty - cy)
+    # On the normal through the tap centre (no offset along the flat, so no
+    # extension line runs along the flat or through a corner) ...
+    assert abs(off[0] * normal[1] - off[1] * normal[0]) < 1e-9
+    # ... outward, the text >= 5 mm outside the flat.
+    flat = spec.HEX_AF / 2.0 * drawing._S
+    assert off[0] * normal[0] + off[1] * normal[1] - flat >= 0.005
 
 
 def _front_drawing_layout(monkeypatch):
@@ -389,7 +415,9 @@ def test_no_gdt_one_section_and_native_tap_callouts() -> None:
     assert "_solid_line_hatch" not in source
     # Both #4-40 taps print native Hole Wizard callouts at the .XX depth places.
     assert source.count("add_native_hole_callout(") == 2
-    assert set(spec.TAP_CALLOUT_PRECISION.values()) == {joint.HOLE_DEPTH_PLACES}
+    # The tap drill Ø prints .XXX, its depths .XX.
+    assert spec.TAP_CALLOUT_PRECISION["hw-tapdrldia"] == 3
+    assert {places for name, places in spec.TAP_CALLOUT_PRECISION.items() if name != "hw-tapdrldia"} == {joint.HOLE_DEPTH_PLACES}
 
 
 class _Extension:
@@ -574,10 +602,10 @@ class _AfTolerance:
 class _AfDisplay:
     def __init__(self, dimension, annotation):
         self.dimension, self.annotation = dimension, annotation
-        self.ShowParenthesis, self.places, self.tolerance_places = False, 2, 2
+        self.ShowParenthesis, self.places, self.tolerance_places = False, 3, 3
         self.text, self.precision_calls, self.stale_precision = "", [], False
         self.precision_status = 0
-        self.prefix, self.suffix = "HEX ", ""
+        self.prefix, self.suffix = "", ""
 
     def GetDimension2(self, configuration):
         assert configuration == 0
@@ -651,20 +679,32 @@ def _af_fixture(monkeypatch):
         assert (feature, dimension) == ("HexProfile", "HexAf")
         return source_display, source_dimension
 
+    # The sheet dresses the imported AF as the supplier REF "(1/2 in)", its
+    # stock form and supplier band below.
+    imported_display.prefix, imported_display.suffix = "(", " in)"
+    imported_display.text = spec.HEX_AF_CALLOUT
+    supplier_checks = []
+
+    def supplier_assert(adapter_, display, **reference):
+        supplier_checks.append((display, reference))
+        if reference != drawing.HEX_AF_REFERENCE or (display.prefix, display.suffix, display.text) != ("(", " in)", reference["callout"]):
+            raise RuntimeError("HexAf: supplier REF presentation differs")
+
     for module in (part, drawing):
         monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(part, "_named_dimension", named)
+    monkeypatch.setattr(drawing, "assert_supplier_reference_dimension", supplier_assert)
     monkeypatch.setattr(drawing._telemetry, "info", lambda message, **fields: records.append((message, fields)))
     return SimpleNamespace(
         adapter=adapter, model=model, view=view, points=points,
         source_annotation=source_annotation, source_dimension=source_dimension,
         source_display=source_display, tolerance=tolerance,
         annotation=imported_annotation, dimension=imported_dimension, display=imported_display,
-        records=records, same_calls=same_calls,
+        records=records, same_calls=same_calls, supplier_checks=supplier_checks,
     )
 
 
-def test_native_af_authoring_uses_ordinary_default_not_inactive_native_limits(monkeypatch):
+def test_native_af_authoring_leaves_the_stock_size_untoleranced(monkeypatch):
     state = _af_fixture(monkeypatch)
     state.tolerance.Type = 4
     inactive = (state.tolerance.minimum, state.tolerance.maximum)
@@ -673,18 +713,12 @@ def test_native_af_authoring_uses_ordinary_default_not_inactive_native_limits(mo
     state.source_display.prefix, state.source_display.suffix = "OLD", "OLD"
     part._author_stock_af(state.adapter)
     assert state.tolerance.Type == 0
-    assert state.source_display.precision_calls == [(2, -1, 2, -1)]
-    assert state.source_display.places == state.source_display.tolerance_places == 2
+    assert state.source_display.precision_calls == [(3, -1, 3, -1)]
+    assert state.source_display.places == 3
     assert state.source_display.ShowParenthesis is False
     assert (state.tolerance.minimum, state.tolerance.maximum) == inactive
-    assert state.source_display.GetText(1) == "HEX "
+    assert state.source_display.GetText(1) == ""
     assert state.source_display.GetText(2) == ""
-    # NONE makes these stored getters inactive; their nonzero values cannot
-    # masquerade as the title-block's ordinary receiving limits.
-    from _printed_tolerance import printed_band_mm
-    band = printed_band_mm(state.source_display.GetPrimaryPrecision2())
-    nominal = state.source_dimension.SystemValue * 1000.0
-    assert (nominal - band, nominal + band) == pytest.approx((12.19, 13.21))
     assert all(point._oleobj_.calls for point in state.points)
 
 
@@ -695,54 +729,22 @@ def test_native_af_authoring_refuses_failed_or_nonpersistent_native_writes(monke
     state.tolerance.refuse_type = fault == "stale-type"
     state.source_display.stale_precision = fault == "stale-precision"
     state.source_display.precision_status = 1 if fault == "precision-status" else 0
-    state.source_display.places = state.source_display.tolerance_places = 3
+    state.source_display.places = state.source_display.tolerance_places = 2
     with pytest.raises(RuntimeError):
         part._author_stock_af(state.adapter)
 
 
 @pytest.mark.parametrize("field,value", (
-    ("places", 3), ("tolerance_places", -2), ("ShowParenthesis", True),
     ("SystemValue", 0.0128), ("Type", 4),
     ("FullName", "Wrong@HexProfile@actual-clamp.Part"),
 ))
-def test_native_af_readback_refuses_changed_acceptance(monkeypatch, field, value):
+def test_native_af_readback_refuses_changed_stock_size(monkeypatch, field, value):
     state = _af_fixture(monkeypatch)
-    target = state.display if hasattr(state.display, field) else state.dimension if hasattr(state.dimension, field) else state.tolerance
+    target = state.dimension if hasattr(state.dimension, field) else state.tolerance
     setattr(target, field, value)
     with pytest.raises(RuntimeError, match="HexAf"):
         part._assert_stock_af(state.display, state.dimension, stage="after-rebuild")
     assert state.records[-1][1]["operation_stage"] == "after-rebuild"
-
-
-@pytest.mark.parametrize("prefix,suffix", (("(", ")"), ("(", ""), ("", ")")))
-@pytest.mark.parametrize("target,stage", (
-    ("source", "HexAf.source-authored"),
-    ("source", "HexAf.imported"),
-    ("import", "HexAf.imported"),
-    ("source", "HexAf.after-final-rebuild"),
-    ("import", "HexAf.after-final-rebuild"),
-))
-def test_native_af_rejects_stale_reference_affixes_with_parenthesis_property_false(monkeypatch, prefix, suffix, target, stage):
-    state = _af_fixture(monkeypatch)
-
-    def accept():
-        if stage == "HexAf.source-authored":
-            part._assert_stock_af_source(state.adapter, stage=stage)
-        else:
-            drawing._assert_stock_af_import(state.adapter, state.view, state.annotation, stage=stage)
-
-    accept()  # The ordinary non-reference HEX size is allowed.
-    display = state.source_display if target == "source" else state.display
-    # Exercise the same independent native text parts as set_reference_dimension.
-    display.SetText(1, prefix)
-    display.SetText(2, suffix)
-    assert display.ShowParenthesis is False
-    with pytest.raises(RuntimeError, match="native reference affix remained"):
-        accept()
-    expected_stage = f"{stage}.source" if target == "source" and stage != "HexAf.source-authored" else stage
-    assert state.records[-1][1]["operation_stage"] == expected_stage
-    assert f"'prefix': {prefix!r}" in state.records[-1][1]["native_measurement"]
-    assert f"'suffix': {suffix!r}" in state.records[-1][1]["native_measurement"]
 
 
 @pytest.mark.parametrize("fault", ("count", "null", "type", "dangling", "alias", "owner", "span", "normal-offset", "capability"))
@@ -771,16 +773,16 @@ def test_native_af_source_requires_actual_distinct_opposite_flat_endpoints(monke
         part._assert_stock_af_source(state.adapter, stage="source-rebuilt")
 
 
-def test_native_af_import_keeps_hex_size_on_actual_source_dimension_and_top_view(monkeypatch):
+def test_native_af_import_keeps_stock_ref_on_actual_source_dimension_and_top_view(monkeypatch):
     state = _af_fixture(monkeypatch)
     drawing._assert_stock_af_import(state.adapter, state.view, state.annotation, stage="after-final-rebuild")
-    assert state.display.GetText(1) == "HEX "
-    assert state.display.GetText(4) == ""
+    assert state.supplier_checks == [(state.display, drawing.HEX_AF_REFERENCE)]
+    assert state.display.GetText(4) == spec.HEX_AF_CALLOUT
     assert any(left is state.dimension and right is state.source_dimension for left, right in state.same_calls)
     assert any(left is state.annotation.Owner and right is state.view for left, right in state.same_calls)
 
 
-def test_native_top_af_placement_preserves_source_hex_size_and_ownership(monkeypatch):
+def test_native_top_af_placement_preserves_source_stock_size_and_ownership(monkeypatch):
     state = _af_fixture(monkeypatch)
     state.dimension.Name = "HexAf"
     state.display.GetDimension = lambda: state.dimension
@@ -820,11 +822,11 @@ def test_native_top_af_placement_preserves_source_hex_size_and_ownership(monkeyp
     assert curated == [state.annotation]
     # Assert the settled consumer readback, not a rebuild call-count contract.
     assert state.annotation.GetPosition() == (0.152, 0.255, 0.0)
-    assert state.display.GetText(1) == "HEX "
-    assert state.display.GetText(4) == ""
+    assert state.display.GetText(1) == "("
+    assert state.display.GetText(4) == spec.HEX_AF_CALLOUT
     assert before == (state.dimension.SystemValue, state.tolerance.minimum, state.tolerance.maximum,
                       state.annotation.Owner, tuple(state.points))
-    assert state.display.GetPrimaryPrecision2() == state.display.GetPrimaryTolPrecision2() == 2
+    assert state.display.GetPrimaryPrecision2() == 3
     assert state.display.ShowParenthesis is False
 
 
@@ -1149,33 +1151,40 @@ def test_location_sources_select_finite_stock_boundaries_and_actual_entry_rims(m
 def test_actual_thumb_drill_cone_clears_both_walls_over_its_finite_length() -> None:
     import mg_magnifying_clamp_geom as geom
 
-    slope, band = math.tan(math.radians(0.3)), 0.51
+    slope, band = math.tan(math.radians(0.3)), 0.254
     bore_r = geom.LEVER_BORE_DIA / 2.0
-    drill_r = (geom.ROD_TAP_DRILL_DIA + 0.10) / 2.0
+    drill_r = (geom.ROD_TAP_DRILL_DIA + 0.1016) / 2.0
     point = drill_r / math.tan(math.radians(59.0))
-    depth = geom.THUMB_TAP_DRILL_DEPTH + band + point
+    # Height 1.16, bore height .79 and drill depth .37, each at its printed
+    # .XX limit (the exempt bore height and the drill depth print rounded).
+    top_min = 1.16 * 25.4 - band - (0.79 * 25.4 + band)
+    top_max = 1.16 * 25.4 + band - (0.79 * 25.4 - band)
+    depth_min, depth_max = 0.37 * 25.4 - band, 0.37 * 25.4 + band
     bore_wander = geom.STOCK_ENVELOPE_MAX * slope
     # Two independent common-flat .XX locations, then actual angular travel.
-    relative_offset = 1.02 + depth * slope + bore_wander
+    relative_offset = 2.0 * band + (depth_max + point) * slope + bore_wander
 
-    def clearance(distance):
+    def far_clearance(distance):
         actual_radius = drill_r * (1.0 - distance / point)
-        return math.sqrt(bore_r**2 - (relative_offset + actual_radius)**2) - 3.0 * band - bore_wander - distance
+        chord = math.sqrt(bore_r**2 - (relative_offset + actual_radius) ** 2)
+        return top_min + chord - depth_max - bore_wander - distance
 
-    endpoints = (clearance(0.0), clearance(point))
+    chord = math.sqrt(bore_r**2 - (relative_offset + drill_r) ** 2)
+    near = depth_min - (top_max - chord) - bore_wander
+    endpoints = (far_clearance(0.0), far_clearance(point))
     # The chord is concave, and the cone radius is affine: its whole
     # continuous minimum lies at an endpoint. Interior probes catch an
     # implementation accidentally retaining full radius at the point.
-    assert all(clearance(point * step / 200.0) >= min(endpoints) - 1e-9 for step in range(201))
-    assert spec.THUMB_DRILL_NEAR_CLEAR == pytest.approx(endpoints[0])
+    assert all(far_clearance(point * step / 200.0) >= min(endpoints) - 1e-9 for step in range(201))
+    assert spec.THUMB_DRILL_NEAR_CLEAR == pytest.approx(near)
     assert spec.THUMB_DRILL_FAR_CYLINDER_CLEAR == pytest.approx(endpoints[0])
     assert spec.THUMB_DRILL_FAR_POINT_CLEAR == pytest.approx(endpoints[1])
     assert spec.THUMB_DRILL_FAR_CLEAR == pytest.approx(min(endpoints))
-    assert min(endpoints) > 0.0
+    assert near > 0.0 and min(endpoints) > 0.0
     # Mutation control: falsely extending the full drill cylinder through
-    # the point loses >0.7 mm and must NOT define the real point clearance.
+    # the point loses >0.4 mm and must NOT define the real point clearance.
     cylinder_to_tip = endpoints[0] - point
-    assert spec.THUMB_DRILL_FAR_CLEAR > cylinder_to_tip + 0.7
+    assert spec.THUMB_DRILL_FAR_CLEAR > cylinder_to_tip + 0.4
 
 
 @pytest.mark.parametrize("mode", ("retained", "lost-source", "underdefined", "extra-segment", "wrong-distance", "reference-ink"))
@@ -2660,32 +2669,6 @@ def test_unrelated_suppressed_distance_cannot_veto_or_replace_requested_constrai
         assert requested_row["identity_matches"] is True
         assert requested_row["alignment"]["aligned"] is True
         assert fields["relation_readback_error"] == "None"
-
-
-def test_common_flat_cutover_changes_the_accepted_set_without_tightening_dot_xx() -> None:
-    import mg_magnifying_clamp_geom as geom
-
-    low, high = 6.35 - 0.51, 6.35 + 0.51
-    assert spec.LOCATION_PLACES == 2 and spec.LOCATION_BAND == pytest.approx(0.51)
-    assert geom.TAP_TO_BORE_ENTRY_Z_MAX == pytest.approx(high - low)
-
-    def old_accepts(bore, tap, radius):
-        return low <= bore <= high and abs(bore + radius - tap - 3.25) <= 1.02 + 1e-12
-
-    def new_accepts(bore, tap):
-        return low <= bore <= high and low <= tap <= high
-
-    assert old_accepts(6.35, 7.37, 3.25) and not new_accepts(6.35, 7.37)
-    assert new_accepts(high, low) and not old_accepts(high, low, 3.30)
-    # All three positions are independently accepted, not an implied coincidence.
-    assert max(abs(tap - bore) for tap, bore in itertools.product((low, high), repeat=2)) == pytest.approx(1.02)
-    assert geom.BLOCK_HEIGHT == 29.50 and geom.LEVER_BORE_Y == 19.95
-    assert spec.THUMB_ENGAGEMENT_WORST == pytest.approx(4.392416639654)
-    assert spec.ROD_TAP_FLOOR_WALL_WORST == pytest.approx(2.081671433941)
-    assert spec.TAP_REACH_NEEDED <= spec.PLUG_TAP_USABLE_LENGTH
-    assert spec.TAP_STOP_WINDOW > 0.0
-    assert spec.THUMB_DRILL_NEAR_CLEAR > 0.0
-    assert spec.THUMB_DRILL_FAR_POINT_CLEAR > 0.0
 
 
 def _flat_group_fixture(monkeypatch):

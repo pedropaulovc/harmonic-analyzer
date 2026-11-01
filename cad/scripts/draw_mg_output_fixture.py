@@ -16,16 +16,18 @@ from the spigot face and the bore's Ø.  The groove's root Ø nests inside
 the spigot's, right of the face, each a dimension line standing across its
 diameter, and the groove's R LIMIT, FULL R on its own row under it, reads
 between them and the face, over the root Ø's text.  The shoulder's inside
-corner prints no size: the title block's INSIDE CORNERS R1.0 MAX governs it
+corner prints no size: the title block's INSIDE CORNERS row governs it
 (nothing seats on the shoulder).  The end view looks at the spigot face: its ``*Right``
 orientation is turned by the measured projected axes until -Z points up,
 matching the side view, and -Y points right.  Its origin is pinned to the
-side view's origin height.  The flats' stock reference, (11.113), stands
-vertically, and the #4-40 native callout states the controlling drill depth,
-the reference thread depth, (10.1), and, on its own row under the thread,
-FULL THREAD TO ROD BORE.  One native centreline identifies the rod bore's Y
-axis through the corners, independently of the axial tap's small centre
-mark.  Hidden lines stay off: the standard holes' callouts define them.
+side view's origin height.  The flats' stock reference, (7/16") over its
+supplier band, stands vertically, and the #4-40 native callout states the
+controlling drill depth,
+the reference thread depth in brackets, and, on its own row under the
+thread, FULL THREAD TO ROD BORE.  One native centreline identifies the rod
+bore's Y axis through the corners, independently of the axial tap's small
+centre mark.  Hidden lines stay off: the standard holes' callouts define
+them.  The sheet prints decimal inch (the part's ``drawing_unit: in``).
 
 Run with SolidWorks open::
 
@@ -71,8 +73,13 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _part_properties import part_drawing_unit
+from _supplier_dimensions import (
+    assert_supplier_reference_dimension,
+    supplier_reference_dimension,
+)
+from _title_block_units import render_number
 from _drawing_leaders import Segment, dimension_segments, distance_to_point, segments_cross
-from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME, layout_report_path
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
@@ -106,9 +113,12 @@ from mg_output_fixture_spec import (
     GROOVE_RADIUS_MIN,
     GROOVE_RADIUS_TOL_TYPE,
     GROOVE_STATION,
+    HEX_AF_CALLOUT,
+    HEX_AF_FRACTION_DENOMINATOR,
     LIMIT_BANDS,
     REFERENCE_DIMENSIONS,
     ROD_BORE_CALLOUT,
+    STOCK_REFERENCE_DIMENSION,
     TAP_CALLOUT_PRECISION,
     TAP_DEPTH_PLACES,
     TAP_DRILL_DEPTH_VARIABLE,
@@ -116,6 +126,7 @@ from mg_output_fixture_spec import (
     TAP_PROCESS,
     TAP_SPEC,
     TAP_THREAD_DEPTH_VARIABLE,
+    UNIT,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -141,11 +152,12 @@ _S = SHEET_SCALE[0] / SHEET_SCALE[1]
 # Left of the old 125 mm: the radius text now reads right of the spigot face,
 # so the two turned Ø stand further out, clear of the end view's AF.
 SIDE_CENTER = (0.115, 0.180)
-END_CENTER = (0.262, SIDE_CENTER[1])
+# 10 mm right of r12's 0.262: the flats' REF now carries its supplier band
+# on two callout rows, and their widest row needs the room left of the hex.
+END_CENTER = (0.272, SIDE_CENTER[1])
 # Low right, over the title block: the end view's tap callout runs out to
 # the right at the hole's height, above it.
 ISO_CENTER = (0.372, 0.115)
-NOTES_XY = (0.016, 0.078)
 # The side view is centred on the part's axial extent.
 _AXIAL_MID = (FREE_END_X + SPIGOT_FACE_X) / 2.0
 _HALF_AF = HEX_AF / 2.0
@@ -170,10 +182,21 @@ _SIDE_BOTTOM = _side_y(-_HALF_AF)
 # used to hold each text clear of the lines beside it; the layout audit's
 # text-on-line gate (_enforce_fixture_text_on_line) is the proof.
 _GLYPH_PITCH = 0.0298 / 13
-# A turned Ø prints a space, Ø, the .XX value and a space; the spigot's
-# (Ø10.10) is the wider of the two.
+
+
+def printed_text(value_mm: float, places: int) -> str:
+    """``value_mm`` as the inch sheet prints it at ``places``: rounded half
+    away from zero (set_units_inch), leading zero suppressed."""
+    scaled = math.floor(abs(value_mm) / 25.4 * 10**places + 0.5 + 1e-9) / 10**places
+    return render_number(scaled, UNIT, places)
+
+
+# A turned Ø prints a space, Ø, the .XX inch value and a space; both turned
+# Ø print the same number of glyphs.
 TURNED_DIA_GLYPHS = 3 + len(
-    f"{max(SPIGOT_DIA, GROOVE_ROOT_DIA):.{DRAWING_PRECISION_BY_NAME['SpigotDia']}f}"
+    printed_text(
+        max(SPIGOT_DIA, GROOVE_ROOT_DIA), DRAWING_PRECISION_BY_NAME["SpigotDia"]
+    )
 )
 TURNED_DIA_TEXT_HALF_WIDTH = TURNED_DIA_GLYPHS * _GLYPH_PITCH / 2.0
 # Upper bounds from the larger banded, reamed callout (27.5 x 14.6 mm) this
@@ -223,7 +246,7 @@ RADIUS_STATION_CLEARANCE = 0.002
 # the text; this only sizes it).  Under them the dimension's own callout row
 # reads FULL R (owner ruling, review r5): the widest of the three rows.
 RADIUS_GLYPHS = 1 + max(
-    len(f"{value:.{DRAWING_PRECISION_BY_NAME['GrooveRadius']}f}")
+    len(printed_text(value, DRAWING_PRECISION_BY_NAME["GrooveRadius"]))
     for value in (GROOVE_RADIUS, GROOVE_RADIUS_MIN)
 )
 RADIUS_CALLOUT_GLYPHS = len(GROOVE_RADIUS_CALLOUT)
@@ -291,9 +314,9 @@ _GROOVE_ROOT_DIA_X = (
 _SPIGOT_ROW = _SIDE_BOTTOM - 0.010
 _UNDER_ROW = _SIDE_BOTTOM - 0.022
 # The groove's station reads over the spigot.  The shoulder's inside corner
-# prints no size (ENFORCE review 2026-10-24, rule 4: the bare R0.2 MAX named
+# prints no size (ENFORCE review 2026-10-24, rule 4: a bare MAX radius named
 # no mate, and nothing seats on the shoulder): the title block's INSIDE
-# CORNERS R1.0 MAX governs it.
+# CORNERS row governs it.
 _GROOVE_STATION_TEXT_Y = _SIDE_TOP + 0.012
 SIDE_KEEP = {
     "RodBoreDia": (_HEX_MID_X, _SIDE_TOP + 0.011),
@@ -349,8 +372,19 @@ EXTENSION_START_GAP = 0.001
 # vertical stock reference, away from the tap's right-running leader.
 _END_HALF_HEIGHT = HEX_AF / 2.0 * _S / 1000.0
 _END_HALF_WIDTH = HEX_CORNER_RADIUS * _S / 1000.0
+# The flats print as the stock's fraction, (7/16"), over the callout rows
+# naming the stock and its supplier band (HEX_AF_CALLOUT); SolidWorks
+# centres the block on the keep.  The fraction's bar is a display line of
+# the dimension too: strokes wholly inside the text's box are its ink, not
+# dimension geometry.
+_AF_TEXT_ROWS = ('(7/16")', *HEX_AF_CALLOUT.split("\n"))
+_AF_TEXT_HALF_WIDTH = max(len(row) for row in _AF_TEXT_ROWS) * _GLYPH_PITCH / 2.0
+_AF_TEXT_HALF_HEIGHT = len(_AF_TEXT_ROWS) * CALLOUT_ROW_PITCH / 2.0 + 0.002
 END_KEEP = {
-    "HexAf": (END_CENTER[0] - _END_HALF_WIDTH - 0.013, END_CENTER[1]),
+    "HexAf": (
+        END_CENTER[0] - _END_HALF_WIDTH - _AF_TEXT_HALF_WIDTH - 0.003,
+        END_CENTER[1],
+    ),
 }
 # The tap callout reads right of the end view at the hole's height.  Its
 # shoulder clears the corner and the small tap cross; AF witnesses run left.
@@ -484,9 +518,20 @@ def _end_af_ink_problem(
         if abs(x0 - line_x) <= slop and abs(x1 - line_x) <= slop:
             line_ys += [y0, y1]
             continue
+        keep_x, keep_y = END_KEEP["HexAf"]
+        if all(
+            abs(x - keep_x) <= _AF_TEXT_HALF_WIDTH
+            and abs(y - keep_y) <= _AF_TEXT_HALF_HEIGHT
+            for x, y in ((x0, y0), (x1, y1))
+        ):
+            continue
         matching = [flat for flat in flats if max(abs(y0 - flat[1]), abs(y1 - flat[1])) <= slop]
         if not matching:
-            return "stroke is neither the vertical AF line nor a flat witness"
+            return (
+                f"stroke ({x0 * 1000:.2f}, {y0 * 1000:.2f})-({x1 * 1000:.2f}, "
+                f"{y1 * 1000:.2f}) mm is neither the vertical AF line, its text "
+                "nor a flat witness"
+            )
         witnesses[matching[0]] += [x0, x1]
     low, high = sorted(flat[1] for flat in flats)
     if not line_ys or max(abs(min(line_ys) - low), abs(max(line_ys) - high)) > slop:
@@ -501,10 +546,22 @@ def _end_af_ink_problem(
     return None
 
 
+# The flats as bought: the stock's exact 7/16 in fraction, a native REF, the
+# supplier's band on its callout rows, never a size the shop holds.
+HEX_AF_REFERENCE = {
+    "units": "in",
+    "precision": DRAWING_PRECISION_BY_NAME[STOCK_REFERENCE_DIMENSION],
+    "expected_mm": HEX_AF,
+    "fraction_denominator": HEX_AF_FRACTION_DENOMINATOR,
+    "callout": HEX_AF_CALLOUT,
+}
+
+
 def _prove_end_stock_reference(adapter: Any, view: Any, annotation: Any) -> None:
     display = _model_display(annotation, "HexAf", "HexProfile", HEX_AF)
-    if (str(display.GetText(1)), str(display.GetText(2))) != ("(", ")"):
-        raise RuntimeError("HexAf lost its linear stock-reference brackets")
+    assert_supplier_reference_dimension(
+        adapter, display, label="MHA-MG-06 HexAf stock reference", **HEX_AF_REFERENCE
+    )
     flats = tuple(
         model_point_in_view(adapter, view, point, label="HexAf flat witness")
         for point in (
@@ -735,9 +792,9 @@ def _single_arrow_tip(display: Any, label: str) -> tuple[float, float]:
 
 def _states_depth(text: str, depth_mm: float, *, reference: bool) -> bool:
     """Whether ``text`` prints ``depth_mm`` at the tap's depth places as a
-    whole number (10.1 is not 110.1 or 10.15): in reference brackets, (10.1),
+    whole number (.40 is not 1.40 or .405): in reference brackets, (.40),
     when ``reference``, else bare."""
-    printed = re.escape(f"{depth_mm:.{TAP_DEPTH_PLACES}f}")
+    printed = re.escape(printed_text(depth_mm, TAP_DEPTH_PLACES))
     number = rf"(?<![\d.]){printed}(?!\d)"
     if reference:
         return re.search(rf"\(\s*{number}\s*\)", text) is not None
@@ -747,7 +804,7 @@ def _states_depth(text: str, depth_mm: float, *, reference: bool) -> bool:
 def _tap_callout_resolved(resolved_parts: dict[int, str]) -> bool:
     """Whether the thumb-screw tap's callout reads as a blind tap into the
     bore: the prefix row opens with the process and carries the thread, its
-    class and its nominal thread depth as a reference, (10.1), never bare;
+    class and its nominal thread depth as a reference, in brackets, never bare;
     the below row, under it, the thread's extent, FULL THREAD TO ROD BORE,
     stated nowhere else; the drill row its controlling depth, bare; nothing
     is banded; and nothing says THRU (the tap stops in the bore, short of its
@@ -896,8 +953,9 @@ def _check_tap_callout(display: Any) -> None:
         raise RuntimeError(
             f"thumb-screw tap callout does not state {TAP_PROCESS} "
             f"{_TAP_THREAD_TEXT}-{TAP_SPEC.thread_class} to "
-            f"({TAP_LENGTH:.{TAP_DEPTH_PLACES}f}) REF over a bare "
-            f"{TAP_DRILL_DEPTH:.{TAP_DEPTH_PLACES}f} drill, {TAP_EXTENT_CALLOUT} "
+            f"({printed_text(TAP_LENGTH, TAP_DEPTH_PLACES)}) REF over a bare "
+            f"{printed_text(TAP_DRILL_DEPTH, TAP_DEPTH_PLACES)} drill, "
+            f"{TAP_EXTENT_CALLOUT} "
             f"under the thread: {resolved!r}"
         )
     _telemetry.success(f"thumb-screw tap callout reads {resolved!r}")
@@ -1056,7 +1114,7 @@ def _prove_tap_centre_mark(adapter: Any, view: Any, drill_edge: Any) -> Any:
 
 
 def _is_rod_bore_cylinder(parameters: tuple[float, ...]) -> bool:
-    """Only the Ø5.2 Y-axis bore, never the X-axis tap/spigot."""
+    """Only the rod's Y-axis bore, never the X-axis tap/spigot."""
     return (
         len(parameters) == 7
         and all(math.isfinite(v) for v in parameters)
@@ -1281,18 +1339,20 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("mg-output-fixture"),
     )
     stamp_drawing_summary(
         adapter,
@@ -1339,9 +1399,9 @@ async def build(adapter: Any) -> dict[str, str]:
         side_annotations,
         {"RodBoreDia": ROD_BORE_CALLOUT, "GrooveRadius": GROOVE_RADIUS_CALLOUT},
     )
-    # The flats are the bar's as supplied: a stock reference, not a size the
-    # shop holds to three places.  The overall length is the part's driven
-    # sum of the bore's two stations: a reference, never a third control.
+    # The flats are the bar's as supplied: the stock's fraction REF, not a
+    # size the shop holds.  The overall length is the part's driven sum of
+    # the bore's two stations: a reference, never a third control.
     side_by_name = {dimension_name(adapter, a): a for a in side_annotations}
     end_by_name = {dimension_name(adapter, a): a for a in end_annotations}
     by_name = {**side_by_name, **end_by_name}
@@ -1349,13 +1409,21 @@ async def build(adapter: Any) -> dict[str, str]:
         set_reference_dimension(
             adapter, by_name[name], label=f"MHA-MG-06 {name} reference"
         )
+    supplier_reference_dimension(
+        adapter,
+        _model_display(
+            by_name[STOCK_REFERENCE_DIMENSION], "HexAf", "HexProfile", HEX_AF
+        ),
+        label="MHA-MG-06 HexAf stock reference",
+        **HEX_AF_REFERENCE,
+    )
     if not auto_center_marks(adapter, side, holes=True, size=0.0025):
         raise RuntimeError("failed to add the rod bore's center mark to the side view")
     # The tap drill's edge on the spigot face: the one visible circle of the
     # Hole Wizard feature from the end.  Its axis carries the view's one
     # centre mark, and the native callout prints the drill row, under it the
-    # process on the thread row, and under that the thread's extent; both
-    # depths print at one place, the thread's bracketed as REF.
+    # process on the thread row, and under that the thread's extent; the drill
+    # Ø prints three places, both depths two, the thread's bracketed as REF.
     tap_drill = visible_circle_edge(adapter, end, TAP_DRILL_DIA)
     tap_mark = _prove_tap_centre_mark(adapter, end, tap_drill)
     bore_axis, bore_face = _add_rod_bore_axis(adapter, end, tap_mark)
@@ -1384,7 +1452,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, side, side_by_name["GrooveRadius"], side_by_name["GrooveStation"]
     )
     _prove_groove_root_diameter(side_by_name["GrooveRootDia"])
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     artifacts = await finalize_drawing(
         adapter,

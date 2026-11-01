@@ -81,10 +81,8 @@ from _dimensions import drive_dimension, set_global
 from _session import run_build
 from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision, _named_dimension
-from _drawing_tolerances import (
-    set_dimension_symmetric_tolerance,
-    _set_tolerance_precision,
-)
+from _drawing_tolerances import set_dimension_symmetric_tolerance
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _assembly_named_views import name_standard_views
 from _gtol_face_read import face_geometry
@@ -201,7 +199,7 @@ LEVER_ROD_Y = 979.7
 # large. The drum route's rim/spoke/boss clearance is proved in XY by
 # sh_vn_music_wire_lever_geom.RUN_GAPS; the bracket arm reaches back to the unchanged
 # plate flange (magnifying_bracket_joint_layout).
-LEVER_ROD_Z = -173.51
+LEVER_ROD_Z = -173.5192
 from sh_vn_music_wire_lever_geom import DRUM_END_Z as LEVER_WIRE_DRUM_Z  # noqa: E402
 
 assert math.isclose(LEVER_ROD_Z, LEVER_WIRE_DRUM_Z, abs_tol=1e-9), (
@@ -567,17 +565,16 @@ async def _author_axle_stack_reference(adapter) -> None:
     for name, expression in dims.apply(adapter, spec.FEATURE):
         await drive_dimension(adapter, name, expression)
     for name, band in spec.DIMENSION_TOLERANCES.items():
-        set_dimension_symmetric_tolerance(adapter, spec.FEATURE, name, band)
-        display, _ = _named_dimension(adapter, spec.FEATURE, name)
-        _set_tolerance_precision(
-            display,
-            (-band, band),
-            display_unit="mm",
-            label=f"axle stack {name}",
+        set_dimension_symmetric_tolerance(
+            adapter,
+            spec.FEATURE,
+            name,
+            band,
             places=spec.TOLERANCE_PRECISION,
+            display_unit=spec.UNIT,
         )
     for name in sorted(spec.REFERENCE_DIMENSIONS):
-        # A reference nominal, (38.10), through the native prefix/suffix
+        # A reference nominal, (1.500), through the native prefix/suffix
         # channel around the live value (ShowParenthesis can read True and
         # print bare); no band: the callout states its acceptance.
         display, dimension = _named_dimension(adapter, spec.FEATURE, name)
@@ -790,6 +787,7 @@ async def build(adapter) -> dict[str, str]:
     # call: each freed DOF is recorded (never authored) and persisted below.
     reset_dof_manifest()
     check("create_assembly", await adapter.create_assembly())
+    apply_package_model_units(adapter, stack_spec.UNIT, label=ASM_NAME)
 
     # --- wheel bar + clamp ---------------------------------------------------
     # FIRST so the auto-fixed assembly seed is structure, not the mated lever

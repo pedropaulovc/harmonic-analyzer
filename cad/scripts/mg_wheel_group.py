@@ -27,14 +27,13 @@ import mg_wheel_bar_geom as _bar
 import mg_vn_wheel_axle_back_washer_spec as _back
 import mg_vn_wheel_axle_front_washer_spec as _front
 import mg_vn_wheel_axle_nut_spec as _nut
-from _printed_tolerance import printed_band_mm
 from _recording_geometry import PEN_Z_MID
 from _mg_wheel_rim_geometry import RIM_WIRE_R
 
 # --- the endshake: set at assembly with the nut, by feeler ------------------------
-ENDSHAKE = 0.10  # modelled
-ENDSHAKE_MIN = 0.05
-ENDSHAKE_MAX = 0.15
+ENDSHAKE = 0.1016  # .004, modelled
+ENDSHAKE_MIN = 0.0508  # .002
+ENDSHAKE_MAX = 0.1524  # .006
 
 # --- nominal stations (d) ------------------------------------------------------------
 SPACER_D = 0.0
@@ -59,51 +58,45 @@ if not math.isclose(_SPOKE_MID_Z, WHEEL_MID_Z, abs_tol=1e-9):
 # --- stack corners (the printed and catalogue bands) -----------------------------------
 # The pin is pressed to a gauge from the bar's FRONT face, so the bar's depth
 # is not in the stack; it sets only where the back end lands
-# (mg_wheel_axle_spec.BACK_END_PROUD_MAX / BACK_END_SUNK_MAX). The spacer
-# stands between the bar and the hub, so its band is.
-_SPACER = (
-    _spacer.LENGTH - _spacer.LENGTH_BAND,
-    _spacer.LENGTH + _spacer.LENGTH_BAND,
-)
-_GAUGE = (
-    _pin.PRESS_GAUGE - _pin.PRESS_GAUGE_TOL,
-    _pin.PRESS_GAUGE + _pin.PRESS_GAUGE_TOL,
-)
+# (mg_wheel_axle_spec.BACK_END_SUNK_MIN / BACK_END_SUNK_MAX). The spacer
+# stands between the bar and the hub, so its band is. The spacer, the gauge
+# and the hub keep millimetre nominals and print rounded: each term is its
+# printed limits.
+_SPACER = _spacer.LENGTH_LIMITS
+_GAUGE = _pin.PRESS_GAUGE_LIMITS
 _BACK = (_back.THICKNESS_MIN, _back.THICKNESS_MAX)
-_HUB = (
-    _wheel.HUB_LEN + _wheel.HUB_LEN_BAND[1],
-    _wheel.HUB_LEN + _wheel.HUB_LEN_BAND[0],
-)
+_HUB = _wheel.HUB_LEN_LIMITS
 # Step to thread end: printed from the gauged step itself, so its own band
 # is the whole of it (the shank's tolerance only places the back end).
 _THREAD = (
     _pin.THREAD_LEN + _pin.THREAD_LEN_BAND[1],
     _pin.THREAD_LEN + _pin.THREAD_LEN_BAND[0],
-)  # 7.95 .. 8.45
+)  # .313 .. .333
 _FRONT = (_front.THICKNESS_MIN, _front.THICKNESS_MAX)
 _NUTS = (2.0 * _nut.THICKNESS_MIN, 2.0 * _nut.THICKNESS_MAX)
 
 # (a) The pin's shank-to-thread step stays inside the hub's front face, so the
 # wheel runs on the full shank and the front washer sits on the thread.
-STEP_INSIDE_HUB = (_SPACER[0] + _BACK[0] + _HUB[0]) - _GAUGE[1]  # 0.657
+STEP_INSIDE_HUB = (_SPACER[0] + _BACK[0] + _HUB[0]) - _GAUGE[1]  # .028
 # (b) The locknut sits on FULL thread (drawing-guidelines.md rule 18 (thread engagement) counts full threads only): the
 # thread less the incomplete pitch the dome cuts runs past its outer face,
 # and the first nut's inner face sits past the step's thread relief (or the
 # die's run-out, were the relief cut narrower than the die's lead).
 LOCKNUT_THREAD_MARGIN = (_GAUGE[0] + _THREAD[0] - _pin.TIP_INCOMPLETE) - (
     _SPACER[1] + _BACK[1] + _HUB[1] + ENDSHAKE_MAX + _FRONT[1] + _NUTS[1]
-)  # 0.002
+)  # .000
 NUT_RUNOUT_MARGIN = (_SPACER[0] + _BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0]) - (
     _GAUGE[1] + _pin.FULL_THREAD_FROM_STEP_MAX
-)  # 0.064
-# (c) At most 2.9 of thread, incomplete pitch included, stands past the
-# locknut: the user's option (c) of 2026-10-12, superseding the rev-10
-# "dome + 1.3 at every corner" (the washers' and nuts' catalogue bands alone
-# put the floor at 2.305 with the thread length exact) and the ~1.46 nominal.
+)  # .005
+# (c) At most .114 of thread, incomplete pitch included, stands past the
+# locknut: the user's option (c) of 2026-10-12 (2.9 mm, floored to the inch
+# grid), superseding the rev-10 "dome + 1.3 at every corner" (the washers'
+# and nuts' catalogue bands alone set a floor near it with the thread length
+# exact).
 THREAD_PAST_LOCKNUT_MAX = (_GAUGE[1] + _THREAD[1]) - (
     _SPACER[0] + _BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0] + _NUTS[0]
-)  # 2.867
-THREAD_PAST_LOCKNUT_NOMINAL = _pin.THREAD_END_Y - LOCKNUT_FACE_D  # 1.687
+)  # .111
+THREAD_PAST_LOCKNUT_NOMINAL = _pin.THREAD_END_Y - LOCKNUT_FACE_D  # .066
 if STEP_INSIDE_HUB <= 0.0:
     raise AssertionError(f"pin step clears the hub front face: {STEP_INSIDE_HUB:.4f}")
 if LOCKNUT_THREAD_MARGIN < 0.0:
@@ -124,12 +117,13 @@ _PIN = (_pin.PIN_DIA - _pin.PIN_DIA_TOL, _pin.PIN_DIA + _pin.PIN_DIA_TOL)
 BAR_PRESS = (
     _PIN[0] - (_bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[0]),
     _PIN[1] - (_bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[1]),
-)  # 0.010 .. 0.030
-# Matched running fit (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the wheel's bore is reamed to this
-# diametral clearance on its finished axle, the range the round-15 band gave.
-HUB_RUNNING = (0.033, 0.053)
+)  # .0003 .. .0012
+# Running fit (drawing-guidelines.md rule 4 (tighten only for function, and
+# name the mate)): the wheel's owned-reamer .1885 bore (+.0005/0) on the
+# drill rod's supplier band.
+HUB_RUNNING = (0.02032, 0.04318)  # (.0008, .0017)
 # The largest finished bore: the loosest clearance on the largest pin.
-WHEEL_BORE_MAX = _PIN[1] + HUB_RUNNING[1]  # 4.8205
+WHEEL_BORE_MAX = _PIN[1] + HUB_RUNNING[1]  # .1894
 if min(BAR_PRESS) <= 0.0:
     raise AssertionError(f"pin is not a press fit in the bar: {BAR_PRESS}")
 if min(HUB_RUNNING) <= 0.0:
@@ -165,13 +159,13 @@ PEN_WIRE_WRAP_DEG = 360.0 + _wheel.TIE2_CLOCK_DEG  # 317
 PEN_WIRE_WRAP_LEFT_DEG = PEN_WIRE_WRAP_DEG - CW_MAX_DEG  # 270.2
 # Lever wire: from its drum tangent clockwise down to TIE 1 at 8 o'clock.
 # Turning counter-clockwise (pen up: the lever pulls) unwinds it.  The wire's
-# contact arc is judged at the worst printed case: on the smallest drum (.X)
+# contact arc is judged at the worst printed case: on the smallest drum (.XX)
 # the tangent from the hook lands latest, and the wire leaves the drum
 # tangentially to reach TIE 1 standing outboard of it, at the hole's
 # farthest axis offset (the wire may lie anywhere in the smallest drilled
 # hole's slack), its clock angle shifted by that offset too.
 _HOOK_V = (_lever.HOOK_X - _lever.WHEEL_X, _lever.HOOK_Y - _lever.WHEEL_BAR_Y)
-_WIRE_R_MIN = _wheel.DRUM_WIRE_R_RANGE[0]  # 9.45
+_WIRE_R_MIN = _wheel.DRUM_WIRE_R_RANGE[0]
 _TANGENT_CLOCK_MIN = 180.0 - math.degrees(
     math.atan2(_HOOK_V[1], _HOOK_V[0]) + math.acos(_WIRE_R_MIN / math.hypot(*_HOOK_V))
 )
@@ -182,15 +176,15 @@ _TIE1_REACH_MAX = (
 )
 LEVER_WIRE_DEPARTURE_DEG = math.degrees(
     math.acos(_WIRE_R_MIN / _TIE1_REACH_MAX)
-)  # 38.4
+)  # 33.9
 _TIE1_CLOCK_SHIFT_DEG = math.degrees(math.asin(_wheel.TIE1_OFFSET_MAX / _wheel.TIE1_R))
 LEVER_WIRE_WRAP_DEG = (
     _TANGENT_CLOCK_MIN
     - _wheel.TIE1_CLOCK_DEG
     - LEVER_WIRE_DEPARTURE_DEG
     - _TIE1_CLOCK_SHIFT_DEG
-)  # 122.3
-LEVER_WIRE_WRAP_LEFT_DEG = LEVER_WIRE_WRAP_DEG - CCW_MAX_DEG  # 75.4
+)  # 128.7
+LEVER_WIRE_WRAP_LEFT_DEG = LEVER_WIRE_WRAP_DEG - CCW_MAX_DEG  # 81.7
 for _label, _left in (
     ("pen wire", PEN_WIRE_WRAP_LEFT_DEG),
     ("lever wire", LEVER_WIRE_WRAP_LEFT_DEG),
@@ -207,10 +201,8 @@ for _label, _left in (
 # twisted turn beside it (1.5 wire dia from the hole centre), about the hole's
 # exit at its farthest axis offset (printed station, angle and drill wander).
 TAIL_ENVELOPE_R = 1.5 * _lever.WIRE_DIA + _wheel.TIE1_OFFSET_MAX
-_STACK_OD_MAX = max(
-    _back.OD, _spacer.OD + printed_band_mm(_spacer.OD_PLACES)
-)  # 11.8, the spacer at its .X limit
-TAIL_STACK_CLEARANCE = _wheel.TIE1_R - TAIL_ENVELOPE_R - _STACK_OD_MAX / 2.0  # 3.1
+_STACK_OD_MAX = max(_back.OD, _spacer.OD_MAX)  # the spacer at its .XX limit
+TAIL_STACK_CLEARANCE = _wheel.TIE1_R - TAIL_ENVELOPE_R - _STACK_OD_MAX / 2.0
 if TAIL_STACK_CLEARANCE <= 0.0:
     raise AssertionError(
         f"TIE 1 tail reaches the back washer or spacer: {TAIL_STACK_CLEARANCE:.3f}"

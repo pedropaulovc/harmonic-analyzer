@@ -4,5 +4,6 @@ mg-magnifying-wheel:
   finish: BLACK ENAMEL; MASK BORE, SPIGOT, HUB ENDS, RIM AND GROOVE; OIL BARE SURFACES
   quantity: 1
   tolerance_class: machined_block
+  drawing_unit: in
   fit_class: shaft_in_bushing
   process: "gray-iron casting: face and turn the boss and drum spigot, ream the bore, turn the rim and its wire groove, drill the two tie holes"

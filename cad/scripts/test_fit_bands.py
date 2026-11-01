@@ -227,12 +227,28 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
         "McMaster 9714K24's catalogue OD tolerance (plus, minus): indexed for "
         "the largest spring under the hub's O10.2"
     ),
+    ("mg_magnifying_vertical_rod_geom", "ROD_DIA_BAND"): (
+        "as-bought 7/32 brass rod's supplier tolerance (upper, lower): indexed "
+        "for the fixture cross-bore clearance and the turned relief"
+    ),
 }
 
 # (upper, lower) fit bands that no helper reads: the owning module indexes them
 # to print or derive limits. An inverted one prints wrong limits, so they get
 # the same check as a helper-fed band.
 INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
+    ("mg_wheel_axle_spec", "THREAD_LEN_BAND"): (
+        "equal band indexed into the native symmetric (+/-) tolerance"
+    ),
+    ("mg_magnifying_wheel_geom", "HUB_LEN_BAND"): (
+        "equal band indexed into the native symmetric (+/-) tolerance"
+    ),
+    ("_mg_wheel_rim_geometry", "GROOVE_R_BAND"): (
+        "equal band indexed into the native symmetric (+/-) tolerance"
+    ),
+    ("_mg_wheel_rim_geometry", "GROOVE_BOTTOM_BAND"): (
+        "equal band indexed into the native symmetric (+/-) tolerance"
+    ),
     ("dt_alignment_pinion_spec", "BASE_TANGENT_SPAN_BAND"): (
         "indexed into the span-measurement note text"
     ),

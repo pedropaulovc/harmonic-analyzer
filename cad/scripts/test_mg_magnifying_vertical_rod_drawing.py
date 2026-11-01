@@ -15,34 +15,36 @@ from _printed_tolerance import printed_band_mm
 
 
 def test_rod_is_the_threaded_bar_of_the_joint_contract() -> None:
-    assert (spec.ROD_DIA, spec.ROD_LENGTH) == (5.0, 132.5)
-    assert spec.BODY_LENGTH == 125.0
+    # As-bought 7/32 brass rod; the shoulder station keeps its 7.50 mm model.
+    assert spec.ROD_DIA == pytest.approx(7.0 / 32.0 * 25.4)
+    # The sheet prints the supplier band the fits are judged at.
+    assert spec.ROD_DIA_CALLOUT.endswith(f"<MOD-PM>{geom.ROD_DIA_BAND[0] / 25.4:.3f}".replace("0.", "."))
+    assert spec.ROD_LENGTH == pytest.approx(spec.SHOULDER_X + spec.BODY_LENGTH)
     assert spec.SHOULDER_X == spec.ROD_THREAD_LEN == joint.ROD_THREAD_LEN == 7.50
-    assert spec.ROD_THREAD_LEN_BAND == joint.ROD_THREAD_LEN_BAND == (0.25, -0.25)
     # The relief mates with nothing (r1): its width at the title block's .XX
     # band, its Ø as the single limit MAX (the model value is the limit).
-    assert (spec.RELIEF_WIDTH, joint.RELIEF_WIDTH_PLACES) == (1.50, 2)
-    assert joint.PRINTED_XX_BAND == printed_band_mm(joint.RELIEF_WIDTH_PLACES)
-    assert (joint.RELIEF_WIDTH_MIN, joint.RELIEF_WIDTH_MAX) == pytest.approx((0.99, 2.01))
-    assert spec.RELIEF_DIA == joint.RELIEF_DIA_MAX == 1.85
+    band = printed_band_mm(joint.RELIEF_WIDTH_PLACES, unit="in")
+    assert joint.PRINTED_XX_BAND == pytest.approx(band)
+    assert (joint.RELIEF_WIDTH_MIN, joint.RELIEF_WIDTH_MAX) == pytest.approx(
+        (spec.RELIEF_WIDTH - band, spec.RELIEF_WIDTH + band)
+    )
+    assert spec.RELIEF_DIA == joint.RELIEF_DIA_MAX
     assert spec.RELIEF_DIA_TOL_TYPE == 6  # swTolType_e.swTolMAX
     assert spec.THREAD == "#4-40"
     assert spec.THREAD_MAJOR == pytest.approx(2.845, abs=1e-3)
     assert spec.TIP_CHAMFER == pytest.approx(
         (spec.THREAD_MAJOR - spec.THREAD_BASIC_MINOR) / 2.0
     )
-    assert spec.RELIEF_START_X == pytest.approx(7.50 - 1.50)
+    assert spec.RELIEF_START_X == pytest.approx(spec.SHOULDER_X - spec.RELIEF_WIDTH)
     # Full thread only (rule 18): one pitch at the tip, the run-out in the
     # relief; the worst-case engagement holds 1.5D.
     assert spec.FULL_THREAD_START_X == pytest.approx(0.635)
     assert spec.FULL_THREAD_END_X == pytest.approx(spec.RELIEF_START_X)
-    assert joint.ENGAGEMENT_WORST == pytest.approx(7.25 - 2.01 - 0.635)
     assert joint.ENGAGEMENT_WORST >= joint.ENGAGEMENT_MIN == pytest.approx(4.2675)
     assert joint.RELIEF_WIDTH_MIN >= joint.DIE_RUNOUT
     assert joint.RELIEF_DIA_MAX <= joint.THREAD_ROOT_2A_MIN
     assert geom.SEAT_LAND_WORST >= geom.SEAT_LAND_MIN
-    # Both relief roots "R0.2 MAX" (r2): the model at the printed limit.
-    assert spec.RELIEF_ROOT_R == joint.RELIEF_ROOT_R == 0.2
+    assert spec.RELIEF_ROOT_R == joint.RELIEF_ROOT_R
 
 
 def test_relief_root_volume_matches_the_revolved_spandrels() -> None:
@@ -74,7 +76,7 @@ def test_profile_volume_matches_the_stepped_rod_and_dome() -> None:
 
 
 def test_relief_root_radius_reads_clear_in_detail_a() -> None:
-    """The "2X R0.2 MAX" stands under the thread, opposite the shoulder's
+    """The "2X R MAX" stands under the thread, opposite the shoulder's
     lower root arc; its leader toward the root centre passes under the Ø's
     lower arrow stub and the Ø's line stays off the thread-side root."""
     x_mm, y_mm = drawing.RELIEF_ROOT_CENTRE_MM
@@ -110,6 +112,50 @@ def test_relief_root_radius_reads_clear_in_detail_a() -> None:
     assert math.hypot(spec.SHOULDER_X - fx, y_mm - fy) < drawing.DETAIL_RADIUS_MM
 
 
+def test_upper_root_radius_reads_clear_over_the_body() -> None:
+    """Landed on the mirror-image upper root, the "2X R MAX" stands over the
+    body just right of the shoulder: its leader from the text's left end
+    toward the root centre stays between the Ø's line and the shoulder face,
+    and the text clears the body and the Ø's value."""
+    x_mm, y_mm = drawing.UPPER_RELIEF_ROOT_CENTRE_MM
+    assert (x_mm, y_mm) == pytest.approx(
+        (spec.SHOULDER_X - spec.RELIEF_ROOT_R, spec.RELIEF_DIA / 2.0 + spec.RELIEF_ROOT_R)
+    )
+    cx, cy = drawing._detail_xy(x_mm, y_mm)
+    tx, ty = drawing.UPPER_ROOT_KEEP["ReliefRootR"]
+    end_x = tx - 0.011  # the text's left end, ~11 mm from its centre
+    body_top = drawing._detail_xy(0.0, spec.ROD_DIA / 2.0)[1]
+    shoulder_x = drawing.DETAIL_SHOULDER_X
+    dia_x, dia_y = drawing.DETAIL_KEEP["ReliefDia"]
+    # The leader reaches the body's top >= 2 mm left of the shoulder face,
+    # and stays >= 3 mm right of the Ø's line all the way down.
+    leader_x = end_x + (cx - end_x) * (ty - body_top) / (ty - cy)
+    assert shoulder_x - leader_x >= 0.002
+    assert min(end_x, cx) - dia_x >= 0.003
+    # The tip lands on the circle's upper half, facing the text.
+    assert ty > cy
+    # Text >= 6 mm over the body and >= 10 mm under the Ø's value.
+    assert ty - body_top >= 0.006
+    assert dia_y - ty >= 0.010
+    # The fence keeps the upper root.
+    fx, fy = drawing.DETAIL_FOCUS_MM
+    assert math.hypot(spec.SHOULDER_X - fx, y_mm - fy) < drawing.DETAIL_RADIUS_MM
+
+
+def test_dome_radius_leader_lands_on_the_hemisphere_right_of_its_tangent() -> None:
+    """The R text block stands wholly right of the dome's centre, above the
+    axis, so the leader from either its near end or its centre meets the
+    hemisphere's own upper-right quarter, not an arc extension past the top
+    tangent line, and the text reads right of the end."""
+    centre_x = drawing._sheet_x(spec.ROD_LENGTH - spec.DOME_R)
+    tx, ty = drawing.SIDE_KEEP["DomeR"]
+    near_x = tx - drawing.DOME_R_TEXT_HALF_WIDTH
+    assert near_x > drawing.DOME_TIP_X
+    for x in (near_x, tx):
+        angle = math.degrees(math.atan2(ty - drawing.SIDE_CENTER[1], x - centre_x))
+        assert 15.0 <= angle <= 75.0
+
+
 def _fixture_screw_reach() -> tuple[float, float]:
     """Rod stations (from the thread tip) the MHA-MG-06 thumb screw can bear
     on: its axis rides the fixture's hex axis, the hex reaches a corner radius
@@ -127,35 +173,24 @@ def _fixture_screw_reach() -> tuple[float, float]:
     )
 
 
-def test_body_cylinder_is_the_fixture_thumb_screw_seat() -> None:
-    """Owner ruling 2026-10-17 (rule 6, a static seat, Ra 3.2): MHA-MG-06's
-    axial thumb screw (MHA-SH-VN-55) locks the fixture wherever the operator
-    sets it along the rod (ch. 20 p. 46). Its reach lies on the body's one Ø5
-    cylinder and covers nearly all of it, so the control qualifies that whole
-    face, with no zone lengths. No MHA-MG-02 screw bears on the rod."""
+def test_fixture_thumb_screw_bears_on_the_as_bought_body() -> None:
+    """MHA-MG-06's axial thumb screw (MHA-SH-VN-55) locks the fixture wherever
+    the operator sets it along the rod (ch. 20 p. 46). Its reach lies on the
+    body's one 7/32 cylinder and covers nearly all of it. No MHA-MG-02 screw
+    bears on the rod."""
     import build_mg_magnifier_assembly as assembly
     import mg_magnifying_clamp_geom as clamp
     import mg_output_fixture_geom as fixture
-    from _gtol_cylinder import CylinderFace
-    from _surface_finish import SEAT, SEAT_UM, SurfaceFinishControl, surface_finish_by_key
 
-    assert spec.SURFACE_FINISHES == (
-        SurfaceFinishControl("screw_seat", SEAT_UM, CylinderFace(spec.ROD_DIA)),
-    )
-    control = surface_finish_by_key(spec.SURFACE_FINISHES, "screw_seat")
-    assert control.roughness_ra == SEAT == "3.2"
-    # The Ø5 body, shoulder to dome tangent, is the part's only Ø5 cylinder.
+    # The body, shoulder to dome tangent, is the part's only full-Ø cylinder.
     assert spec.RELIEF_DIA < spec.THREAD_MAJOR < spec.ROD_DIA
     body = (spec.SHOULDER_X, spec.ROD_LENGTH - spec.DOME_R)
     reach = _fixture_screw_reach()
     assert body[0] < reach[0] < reach[1] < body[1]
-    assert reach[0] - spec.SHOULDER_X == pytest.approx(4.993, abs=1e-3)
-    assert spec.ROD_LENGTH - reach[1] == pytest.approx(7.493, abs=1e-3)
     assert (reach[1] - reach[0]) / (body[1] - body[0]) > 0.9
-    # The compensated installation keeps the hook fixed, 47.55 under the tip.
-    # under the thread tip, its tip tangent to the rod.
+    # The compensated installation keeps the hook fixed under the thread tip,
+    # the screw's tip tangent to the rod.
     station = assembly.VROD_TOP_Y - fixture.FIXTURE_AXIS_Y
-    assert station == pytest.approx(47.55, abs=1e-9)
     half = fixture.HEX_CORNER_RADIUS
     assert body[0] + half <= station <= body[1] - half
     assert assembly.FIXTURE_SCREW_TIP_X == spec.ROD_DIA / 2.0
@@ -166,42 +201,6 @@ def test_body_cylinder_is_the_fixture_thumb_screw_seat() -> None:
         clamp.BLOCK_HEIGHT - clamp.LEVER_BORE_Y
     )
     assert spec.SHOULDER_X < clamp.LEVER_BORE_Y - clamp.LEVER_BORE_DIA / 2.0
-
-
-def test_seat_finish_reason_reads_at_its_symbol() -> None:
-    """The symbol lands on the body's top silhouette inside the screw's reach;
-    its reason reads on the symbol's own row, just right of its "Ra 3.2" (r4
-    review: a label floating near detail A did not read as the symbol's),
-    clear of detail A's stack and of the Ø value. Ink sizes are the r5 farm
-    render's (20261017T070700133Z) measures against each anchor."""
-    pick_x, pick_y = drawing.SEAT_FINISH_PICK
-    assert pick_y == pytest.approx(
-        drawing.SIDE_CENTER[1] + spec.ROD_DIA / 2.0 * drawing._S / 1000.0
-    )
-    model_x = (pick_x - drawing.SIDE_CENTER[0]) * 1000.0 / drawing._S + drawing._MID_X
-    reach = _fixture_screw_reach()
-    assert reach[0] < model_x < reach[1]
-    symbol_x, symbol_y = drawing.SEAT_FINISH_SYMBOL
-    reason_x, reason_y = drawing.SEAT_REASON_XY
-    assert pick_y < symbol_y and abs(symbol_x - pick_x) < 0.005
-    # The symbol's "Ra 3.2" ends 14.9 mm right of its anchor and spans 3.7..
-    # 7.0 mm over it; the reason (a note: position = top-left) prints 3.9 mm
-    # tall and 2.8 mm a character.
-    ra_right = symbol_x + 0.0149
-    ra_mid_y = symbol_y + (0.0037 + 0.0070) / 2.0
-    reason_right = reason_x + 0.0028 * len(spec.SEAT_FINISH_REASON)
-    reason_mid_y = reason_y - 0.0039 / 2.0
-    assert 0.001 < reason_x - ra_right < 0.005  # beside it, not touching
-    assert abs(reason_mid_y - ra_mid_y) < 0.001  # on its row
-    # Clear of the Ø value's text (~12.5 mm left of its dimension line).
-    assert reason_right < drawing.SIDE_KEEP["RodDia"][0] - 0.0125 - 0.010
-    # The symbol's leader shoulder (~5 mm left of its anchor) stands right of
-    # detail A's shoulder extension line, and its top (8 mm over the anchor)
-    # under the detail's thread-length row (dimension line ~33 mm under the
-    # crop's bottom).
-    assert symbol_x - 0.005 > drawing.DETAIL_SHOULDER_X + 0.008
-    assert symbol_y + 0.008 < drawing._DETAIL_BOTTOM - 0.030
-    assert reason_y < drawing._DETAIL_BOTTOM - 0.030
 
 
 def test_detail_crop_contains_the_tip_and_shoulder() -> None:

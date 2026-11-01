@@ -13,6 +13,9 @@ import mg_wheel_bar_callouts as callouts
 import mg_wheel_bar_spec
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _title_block_units import render_number
+
+IN = 25.4
 
 
 def test_required_drawing_paths() -> None:
@@ -38,11 +41,11 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
     # FREE geom module, so a print-note edit cannot enter the assembly recipe.
     import mg_wheel_bar_geom as geom
 
-    assert (geom.BAR_SIDE, BAR_DEPTH, geom.BAR_LENGTH) == (11.0, 9.5, 234.0)
+    assert (geom.BAR_SIDE, geom.BAR_LENGTH) == pytest.approx((0.43 * IN, 234.0))
     # The row stays 5.0 under the top face the strap and the top assembly
     # read; the extra height lies below it.
     assert geom.BAR_TOP_ABOVE_ROW == 5.0
-    assert geom.BORE_ROW_HEIGHT == geom.BAR_SIDE - geom.BAR_TOP_ABOVE_ROW == 6.0
+    assert geom.BORE_ROW_HEIGHT == geom.BAR_SIDE - geom.BAR_TOP_ABOVE_ROW
     assert geom.CLAMP_HOLE_X == (70.5, 105.5)
     assembly = (
         Path(part.__file__)
@@ -66,13 +69,14 @@ def test_hanger_clearance_preserves_a_tolerance_safe_end_ligament() -> None:
         - geom.PEN_HANGER_STATION_TOL
         - part.PEN_HANGER_HOLE_DIA_TOL / 2.0
     )
-    assert minimum_wall == pytest.approx(2.154)
+    # The station prints .20 (+/-.01) for its 5.0: its least is 4.826.
+    assert minimum_wall == pytest.approx(2.714 - (5.0 - 0.19 * IN) - 0.004 * IN / 2.0)
     assert minimum_wall >= geom.PEN_HANGER_MIN_END_WALL
 
     # The former station passed a >0 guard with only 0.214 mm of material.
     with pytest.raises(AssertionError):
         geom.require_hanger_end_wall(-114.5, hole_dia, part.PEN_HANGER_HOLE_DIA_TOL)
-    # A nominal wall above 2 mm must still fail if tolerances consume the reserve.
+    # A nominal wall above .080 must still fail if tolerances consume the reserve.
     with pytest.raises(AssertionError):
         geom.require_hanger_end_wall(-112.664, hole_dia, part.PEN_HANGER_HOLE_DIA_TOL)
 
@@ -144,7 +148,7 @@ def test_the_sheet_carries_no_general_notes() -> None:
 
 def test_part_authored_callouts_name_each_band_s_mate() -> None:
     import _config
-    from mg_wheel_axle_spec import BACK_END_PROUD_MAX, BACK_END_SUNK_MAX
+    from mg_wheel_axle_spec import BACK_END_SUNK_MAX, BACK_END_SUNK_MIN
     from mg_wheel_group import BAR_PRESS
 
     assert callouts.authored_by_name() == {
@@ -155,20 +159,23 @@ def test_part_authored_callouts_name_each_band_s_mate() -> None:
     # The literals keep the wheel group and the axle out of the part recipe;
     # the mate is named by its number (rule 4).
     axle = _config.parts("mg-wheel-axle")["number"]
+    press = "-".join(render_number(value / IN, "in", 4) for value in BAR_PRESS)
     assert callouts.AXLE_BORE_CALLOUT == (
         f"REAM THRU\nPRESS FIT {axle} AXLE\n"
-        f"{BAR_PRESS[0]:.3f}-{BAR_PRESS[1]:.3f} DIAMETRAL\nINTERFERENCE\n"
-        "WALL 1.56 MIN"
+        f"{press} DIAMETRAL\nINTERFERENCE\n"
+        "WALL .074 MIN"
     )
+    sunk = [
+        render_number(v / IN, "in", 3) for v in (BACK_END_SUNK_MIN, BACK_END_SUNK_MAX)
+    ]
     assert callouts.BAR_DEPTH_CALLOUT == (
-        f"{axle} AXLE BACK END\n"
-        f"{BACK_END_PROUD_MAX:.2f} PROUD TO {BACK_END_SUNK_MAX:.2f} SUNK"
+        f"{axle} AXLE BACK END\n{sunk[0]} TO {sunk[1]} SUNK"
     )
     assert callouts.CLAMP_ROW_CALLOUT.startswith("2X CLAMP HOLES")
     assert "MHA-SH-02" in callouts.CLAMP_ROW_CALLOUT
     assert "DIAMETRAL INTERFERENCE" in callouts.AXLE_BORE_CALLOUT.replace("\n", " ")
-    assert callouts.CLAMP_HOLE_CALLOUT == "LOCATE TO MHA-SH-02 TAPS\nWALL 1.73 MIN"
-    assert callouts.HANGER_HOLE_CALLOUT == "WALL 1.60 MIN"
+    assert callouts.CLAMP_HOLE_CALLOUT == "LOCATE TO MHA-SH-02 TAPS\nWALL .068 MIN"
+    assert callouts.HANGER_HOLE_CALLOUT == "WALL .076 MIN"
     texts = [*callouts.authored_by_name().values()]
     for lanes in texts:
         for text in lanes.values():
@@ -196,85 +203,80 @@ def test_clamp_position_band_is_the_mha_sh_02_tap_stack() -> None:
     def bar_zone(b: float) -> float:
         return 2.0 * math.hypot(b, b)
 
-    # The widest .XX band whose zone, with the taps', stays inside the float.
+    # The widest .XXX band whose zone, with the taps', stays inside the float.
     assert bar_zone(band) + tap_zone <= hole_float
-    assert bar_zone(band + 0.01) + tap_zone > hole_float
-    assert mg_wheel_bar_spec.CLAMP_POSITION_PLACES == 2
-    assert round(band, 2) == band
+    assert bar_zone(band + 0.001 * IN) + tap_zone > hole_float
+    assert mg_wheel_bar_spec.CLAMP_POSITION_PLACES == 3
+    assert round(band / IN, 3) * IN == pytest.approx(band)
+    # The row and stations keep millimetre nominals: the band holds at the
+    # limits their rounded values print.
+    from _printed_tolerance import printed_deviations
+
+    worst = max(
+        abs(deviation)
+        for nominal in (geom.BAR_TOP_ABOVE_ROW, *geom.CLAMP_STATIONS)
+        for deviation in printed_deviations(nominal, 3, (-band, band), unit="in")
+    )
+    assert bar_zone(worst) + tap_zone <= hole_float
 
 
 def test_every_wall_is_stated_at_the_full_worst_case() -> None:
     import math
 
     import mg_wheel_bar_geom as geom
-    from _column_clamp_interface import BAR_DEPTH
 
     assert geom.AXLE_BORE_X == -56.0 == geom.WHEEL_X - geom.WHEEL_BAR_X0
     assert mg_wheel_bar_spec.AXLE_BORE_STATION == 61.0
     assert (
         mg_wheel_bar_spec.AXLE_BORE_STATION == geom.AXLE_BORE_X + geom.BAR_LENGTH / 2.0
     )
-    # The height has no band: the title block's .X (+/-0.8) governs it. The
-    # hanger hole and the axle bore sit at the title block's .XX (+/-0.51)
-    # from the top face, the clamp pair at the taps' +/-0.18. Each wall also
-    # loses 0.3 deg run-off over the 9.6 deepest bar (the holes are drilled on
-    # the mill into faces cut earlier) and a 0.25 break on each of its two
-    # exposed edges.
-    side_min = geom.BAR_SIDE - 0.8
-    drop = mg_wheel_bar_spec.BORE_ROW_FROM_TOP
-    assert drop == geom.BAR_TOP_ABOVE_ROW
-    runoff = (BAR_DEPTH + 0.1) * math.tan(math.radians(0.3))
-    assert runoff == pytest.approx(0.0503, abs=1e-4)
-    losses = runoff + 2 * 0.25
+    # The height prints .43 (+/-.01). The hanger hole and the axle bore sit at
+    # the title block's .XX from the top face: their 5.0 prints .20, so the
+    # row lies 4.826-5.334; the clamp pair's prints .197 at the taps' +/-.007.
+    # Each wall also loses 0.3 deg run-off over the deepest bar (.374 + .004;
+    # the holes are drilled on the mill into faces cut earlier) and an R.010
+    # break on each of its two exposed edges.
+    side_min = (0.43 - 0.01) * IN
+    row = ((0.20 - 0.01) * IN, (0.20 + 0.01) * IN)
+    clamp_row = ((0.197 - 0.007) * IN, (0.197 + 0.007) * IN)
+    assert mg_wheel_bar_spec.BORE_ROW_FROM_TOP == geom.BAR_TOP_ABOVE_ROW
+    runoff = (0.374 + 0.004) * IN * math.tan(math.radians(0.3))
+    losses = runoff + 2 * 0.010 * IN
     bores = {
-        "axle bore": ((geom.AXLE_BORE_DIA + geom.AXLE_BORE_BAND[0]) / 2.0, 0.51),
-        "hanger hole": (
-            (geom.PEN_HANGER_HOLE_DIA + geom.DRILLED_HOLE_PLUS) / 2.0,
-            0.51,
-        ),
-        "clamp holes": (
-            (geom.CLAMP_HOLE_DIA + geom.DRILLED_HOLE_PLUS) / 2.0,
-            mg_wheel_bar_spec.CLAMP_POSITION_BAND,
-        ),
+        "axle bore": ((0.1865 + 0.0005) * IN / 2.0, row),
+        "hanger hole": ((geom.PEN_HANGER_HOLE_DIA + 0.004 * IN) / 2.0, row),
+        "clamp holes": ((geom.CLAMP_HOLE_DIA + 0.004 * IN) / 2.0, clamp_row),
     }
     walls = {
-        **{f"{b} top": drop - band - r - losses for b, (r, band) in bores.items()},
+        **{f"{b} top": low - r - losses for b, (r, (low, _high)) in bores.items()},
         **{
-            f"{b} bottom": side_min - drop - band - r - losses
-            for b, (r, band) in bores.items()
+            f"{b} bottom": side_min - high - r - losses
+            for b, (r, (_low, high)) in bores.items()
         },
-        "hanger hole end": geom.HANGER_STATION
-        - 0.51
-        - bores["hanger hole"][0]
-        - losses,
+        "hanger hole end": (0.20 - 0.01) * IN - bores["hanger hole"][0] - losses,
     }
     assert walls == pytest.approx(mg_wheel_bar_spec.BORE_ROW_WALLS)
-    # Owner ruling 2026-10-26 (#1532): these seven, each under the 2.0 target
-    # and over the 1.5 floor, are owner-accepted minors.
-    assert walls == pytest.approx(
-        {
-            "axle bore top": 1.566,
-            "hanger hole top": 1.604,
-            "clamp holes top": 1.731,
-            "axle bore bottom": 1.766,
-            "hanger hole bottom": 1.804,
-            "clamp holes bottom": 1.931,
-            "hanger hole end": 1.604,
-        },
-        abs=1e-3,
-    )
-    assert all(1.5 <= wall < 2.0 for wall in walls.values())
-    assert mg_wheel_bar_spec.WALL_CALLOUT_MIN == {
-        "axle bore": 1.56,
-        "hanger hole": 1.60,
-        "clamp holes": 1.73,
+    # Every wall holds the .060 floor; the bottom walls meet the .080 target.
+    # The top walls and the hanger end wall stay under it: owner ruling
+    # 2026-10-26 (#1532) accepts those four as minors.
+    assert all(wall >= 0.060 * IN for wall in walls.values())
+    minors = {name for name, wall in walls.items() if wall < 0.080 * IN}
+    assert minors == {
+        "axle bore top",
+        "hanger hole top",
+        "clamp holes top",
+        "hanger hole end",
     }
-    # The photographed 10 bar leaves the walls under the bores under the
-    # floor: the height grew rather than a band tightening.
-    for b, (r, band) in bores.items():
-        assert 10.0 - 0.8 - drop - band - r - losses < 1.5, b
-    radius, band = bores["clamp holes"]
-    assert 10.0 - 0.8 - drop - band - radius - losses == pytest.approx(0.931, abs=1e-3)
+    assert set(mg_wheel_bar_spec.MINOR_WALLS) == minors
+    assert mg_wheel_bar_spec.WALL_CALLOUT_MIN_IN == {
+        "axle bore": 0.074,
+        "hanger hole": 0.076,
+        "clamp holes": 0.068,
+    }
+    # The photographed 10 mm bar would leave the walls under the bores under
+    # the floor: the height grew rather than a band tightening.
+    for b, (r, (_low, high)) in bores.items():
+        assert 10.0 - 0.01 * IN - high - r - losses < 0.060 * IN, b
 
 
 def test_every_wall_is_an_owner_declared_minor_stated_on_the_sheet() -> None:
@@ -284,13 +286,13 @@ def test_every_wall_is_an_owner_declared_minor_stated_on_the_sheet() -> None:
     from machinist_exceptions import load_exceptions
 
     declared = load_exceptions(_config.CONFIG_DIR, "mg_wheel_bar", "part")
-    assert len(declared) == len(mg_wheel_bar_spec.BORE_ROW_WALLS) == 7
+    assert len(declared) == len(mg_wheel_bar_spec.MINOR_WALLS) == 4
     texts = {
         "axle bore": callouts.AXLE_BORE_CALLOUT,
         "hanger hole": callouts.HANGER_HOLE_CALLOUT,
         "clamp holes": callouts.CLAMP_HOLE_CALLOUT,
     }
-    for wall, value in mg_wheel_bar_spec.BORE_ROW_WALLS.items():
+    for wall, value in mg_wheel_bar_spec.MINOR_WALLS.items():
         matches = [entry for entry in declared if f"({wall} wall" in entry.where]
         assert len(matches) == 1, wall
         (entry,) = matches
@@ -298,7 +300,8 @@ def test_every_wall_is_an_owner_declared_minor_stated_on_the_sheet() -> None:
         row = callouts.callout_rows(texts[bore])[-1]
         assert entry.kind == "minor"
         assert row in entry.where
-        assert f"{math.floor(value * 100) / 100:.2f}" in entry.finding
+        floored = math.floor(value / IN * 1000 + 1e-9) / 1000
+        assert render_number(floored, "in", 3) in entry.finding
         assert "rule 17" in entry.finding
         assert entry.reason.startswith("owner ruling 2026-10-26 (#1532)")
 
@@ -310,18 +313,18 @@ def test_axle_bore_is_a_marked_reamed_cut() -> None:
     }
     assert drawing.DRAWING_PRECISION_BY_NAME == {
         "Length": 1,
-        "Side": 1,
-        "AxleBoreDia": 3,
+        "Side": 2,
+        "AxleBoreDia": 4,
         "AxleBoreStation": 2,
-        "BarDepth": 2,
+        "BarDepth": 3,
         "BoreRowFromTop": 2,
-        "ClampRowFromTop": 2,
+        "ClampRowFromTop": 3,
         "HangerStation": 2,
-        "ClampStation1": 2,
-        "ClampStation2": 2,
+        "ClampStation1": 3,
+        "ClampStation2": 3,
     }
     assert model_toleranced_dimensions(part) == {
-        ("Bar", "BarDepth"): "*deviations(BAR_DEPTH_BAND)",
+        ("Bar", "BarDepth"): "BAR_DEPTH_BAND[0]",
         ("AxleBoreProfile", "AxleBoreDia"): "*deviations(AXLE_BORE_BAND)",
         ("BoreRowReference", "ClampRowFromTop"): "CLAMP_POSITION_BAND",
         ("BoreRowReference", "ClampStation1"): "CLAMP_POSITION_BAND",

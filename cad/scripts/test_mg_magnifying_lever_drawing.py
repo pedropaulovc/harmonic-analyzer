@@ -6,7 +6,6 @@ import asyncio
 import itertools
 import json
 import math
-import runpy
 from types import SimpleNamespace
 
 import pytest
@@ -41,22 +40,6 @@ from _layout_geometry import (
     find_text_on_line,
     find_text_on_text,
 )
-
-
-def test_ordinary_overall_and_thread_bands_follow_the_actual_printed_title_block(monkeypatch) -> None:
-    import _config
-
-    original = _config.title_block
-
-    def title_block(name, *, unit="mm"):
-        row = original(name, unit=unit)
-        bands = {"linear_1pl": 0.9, "linear_2pl": 0.61}
-        return {**row, "band_mm": bands[name]} if name in bands else row
-
-    monkeypatch.setattr(_config, "title_block", title_block)
-    loaded = runpy.run_path(joint.__file__)
-    assert loaded["ROD_LENGTH_TOL"] == pytest.approx(0.9)
-    assert loaded["THREAD_LENGTH_TOL"] == pytest.approx(0.61)
 
 
 def _physical_projection_fixture(monkeypatch, tmp_path):
@@ -269,10 +252,11 @@ def test_native_tip_projection_guarantees_full_overlap_independently_of_part_len
     assert installed.INSTALLED_FULL_ENGAGEMENT_MIN >= joint.REQUIRED_FULL_ENGAGEMENT
     assert installed.THREAD_PROJECTION - installed.THREAD_PROJECTION_TOL > 0.0
     assert installed.INSTALLED_FULL_ENGAGEMENT_MIN == pytest.approx(min(overlaps))
-    assert joint.NECK_THICKNESS_TOL == 0.8
-    assert installed.INSTALLED_FULL_ENGAGEMENT_MIN == pytest.approx(10.017234843104717)
-    assert geom.INSTALLED_ROOT_CLEARANCE_MIN == pytest.approx(0.525)
-    assert geom.operating_clamp_radius_band() == pytest.approx((83.920, 165.0, 193.115))
+    # The neck prints .49 +/-.01 over its 12.5 mm model; the wider side is charged.
+    assert joint.NECK_THICKNESS - joint.NECK_THICKNESS_TOL == pytest.approx(0.48 * 25.4)
+    assert installed.INSTALLED_FULL_ENGAGEMENT_MIN == pytest.approx(10.736950600594392)
+    assert geom.INSTALLED_ROOT_CLEARANCE_MIN == pytest.approx(1.543)
+    assert geom.operating_clamp_radius_band() == pytest.approx((82.980, 165.0, 194.265))
 
 
 def test_tip_chamfer_loss_is_additive_to_the_incomplete_thread_limit() -> None:
@@ -283,7 +267,7 @@ def test_tip_chamfer_loss_is_additive_to_the_incomplete_thread_limit() -> None:
     assert joint.CHAMFER_LEG_MAX > joint.TIP_CHAMFER_MAX
     assert joint.TIP_CHAMFER + joint.TIP_CHAMFER_BAND[1] == pytest.approx(0.0)
     assert joint.TIP_CHAMFER + joint.TIP_CHAMFER_BAND[0] == pytest.approx(joint.TIP_CHAMFER_MAX)
-    assert joint.THREAD_LENGTH_TOL == pytest.approx(joint.printed_band_mm(spec.DRAWING_PRECISION["ThreadExtent"]["ThreadLength"]))
+    assert joint.THREAD_LENGTH_TOL == pytest.approx(joint.printed_band_mm(spec.DRAWING_PRECISION["ThreadExtent"]["ThreadLength"], unit=spec.UNIT))
     assert fitted_without_tip - fitted == pytest.approx(joint.CHAMFER_LEG_MAX)
 
 
@@ -308,16 +292,22 @@ def test_root_runout_is_wholly_outside_receiver_at_actual_printed_corners() -> N
     assert max(starts) < 0.0
     assert geom.INSTALLED_ROOT_CLEARANCE_MIN == pytest.approx(-max(starts))
     assert spec.SINGLE_LIMITS["ThreadExtent", "IncompleteLength"][0] == joint.INCOMPLETE_THREAD_MAX
+    # The shortest accepted .71 thread (.70) less both .075 incomplete ends.
+    assert spec.FULL_THREAD_MIN == pytest.approx((0.70 - 2.0 * 0.075) * 25.4)
+    assert "FULL THREAD .55 MIN" in spec.LEAD_CALLOUT
 
 
 def test_quarter_inch_body_has_real_drilled_slip_clearance() -> None:
     stock_low = joint.ROD_DIA + joint.ROD_DIA_BAND[1]
     stock_high = joint.ROD_DIA + joint.ROD_DIA_BAND[0]
     minimum = clamp.LEVER_BORE_DIA - stock_high
-    maximum = clamp.LEVER_BORE_DIA + drilled_oversize_mm() - stock_low
-    assert minimum == pytest.approx(0.15)
-    assert maximum == pytest.approx(0.30)
+    maximum = clamp.LEVER_BORE_DIA + drilled_oversize_mm(unit=clamp.UNIT) - stock_low
+    # Letter F (.257 +.004/0) over the 1/4 rod's .000/-.002.
+    assert minimum == pytest.approx(0.007 * 25.4)
+    assert maximum == pytest.approx(0.013 * 25.4)
     assert minimum > 0.0 and maximum < 0.5
+    # The sheet's stated clearance is that same fit.
+    assert spec.ROD_BORE_CLEARANCE == pytest.approx((minimum, maximum))
 
 
 def test_clamp_entire_bore_stays_on_plain_body_at_nominal_travel_limits() -> None:
@@ -875,6 +865,7 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
     monkeypatch.setattr(drawing, "curate_view_dimensions", curate_front)
     monkeypatch.setattr(drawing, "model_point_in_view", project)
     monkeypatch.setattr(drawing, "import_cosmetic_threads", lambda *_a: (1, 1))
+    monkeypatch.setattr(drawing, "_sketch_thread_lines", lambda _a, view, *, label: captured.setdefault("thread_lines", []).append((view, label)))
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
     for name in ("read_required_properties", "stamp_drawing_summary", "set_hidden_lines_removed", "assert_imported_precision", "add_property_linked_note", "rebuild_drawing"):
         monkeypatch.setattr(drawing, name, lambda *_a, **_kw: None)
@@ -882,6 +873,12 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
     monkeypatch.setattr(drawing, "_circle", lambda *_a, mark=False: None if mark else trace.append("crop boundary"))
     monkeypatch.setattr(drawing, "_note", lambda _a, view, text, xy: captured.setdefault("notes", []).append((view, text, xy)))
     monkeypatch.setattr(drawing, "add_surface_finish", lambda _a, view, **kwargs: captured.update(finish=(view, kwargs)))
+
+    def stock_reference(_adapter, display, **kwargs):
+        captured["stock"] = kwargs
+        display.SetText(4, kwargs["callout"])
+
+    monkeypatch.setattr(drawing, "supplier_reference_dimension", stock_reference)
 
     def attach(_adapter, view, **kwargs):
         assert kwargs["text"] == spec.FREE_END_CALLOUT and view is front
@@ -908,7 +905,9 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
         assert captured["imports"] == [(detail, ("ThreadExtent",)), (front, ("RodProfile",))]
         assert deleted == ["TipChamfer"] and annotations["TipChamfer"].position is None
         fit = qualifiers["RodDia"]
-        assert "MHA-MG-02 CLAMP BORE" in fit and "SLIDING FIT" in fit and "BRASS" not in fit
+        assert fit == spec.ROD_DIA_CALLOUT and "BRASS" not in fit
+        stock = captured["stock"]
+        assert (stock["units"], stock["expected_mm"], stock["fraction_denominator"]) == ("in", joint.ROD_DIA, 4)
         assert {name: dimension.SystemValue * 1000.0 for name, dimension in dimensions.items()} == pytest.approx(values)
         assert captured["finish"][0] is front
         assert captured["finish"][1]["control"] is spec.SURFACE_FINISHES[0]
@@ -938,9 +937,10 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
         incomplete_xy = annotations["IncompleteLength"].GetPosition()
         tip_x = project(None, detail, (joint.ROD_LENGTH / 1000.0, 0.0, 0.0))[0]
         rows = qualifiers["IncompleteLength"].splitlines()
-        assert " ".join(rows) == "INCOMPLETE THREAD, EACH END" and len(rows) == 2
+        assert rows == spec.LEAD_CALLOUT.splitlines() and len(rows) == 3
         assert incomplete_xy[0] - max(map(len, rows)) * 0.0035 / 2.0 > tip_x
         assert captured["finalize"]["layout"] is drawing.SPEC.layout
+        assert captured["thread_lines"] == [(detail, "Detail A"), (front, "front")]
     assert hemisphere.selection_attempts == 1
     assert front.entity_kinds == [3, 4]
 
@@ -985,20 +985,38 @@ def _assert_detail_thread_ink_routes(annotations, native_note, project, detail):
             Segment(root[0], ly - 0.0027781, tip[0], ly - 0.0027781, "dim-line"),
         ),
     )
+    # Under the rod, the incomplete-thread witnesses run down from the rod to
+    # their dimension line below the qualifier station; charge them to 10 mm
+    # below that station.
+    ix, iy, _z = annotations["IncompleteLength"].GetPosition()
+    bottom = -values["RodDia"] / 2.0
+    incomplete = AnnotationGeometry(
+        label="IncompleteLength", kind="dim", owner="detail",
+        segments=tuple(
+            Segment(px, py - 0.001, px, iy - 0.010, "ext-line")
+            for px, py in (
+                project(None, detail, (values["OverallLength"] - values["IncompleteLength"], bottom, 0.0)),
+                project(None, detail, (values["OverallLength"], bottom, 0.0)),
+            )
+        ),
+    )
     # The R10 unwrapped mate/BRACKET row spans64.3701mm. It crosses the
-    # source-derived tip witness at this recipe station; do not lose this control.
+    # source-derived incomplete-thread witness at this station; keep the control.
     unwrapped = AnnotationGeometry(
         label="native detail thread", kind="note", owner="detail",
         text_boxes=(Box(x + 0.0002567, rows[1].ymin, x + 0.0646268, rows[1].ymax),),
     )
-    before = SheetGeometry("Sheet1", template.width_m, template.height_m, region, annotations=(length, unwrapped))
+    before = SheetGeometry("Sheet1", template.width_m, template.height_m, region, annotations=(length, incomplete, unwrapped))
     assert any(item.a == unwrapped.label for item in find_text_on_line(before))
     wrapped = AnnotationGeometry(label=unwrapped.label, kind="note", owner="detail", text_boxes=rows)
-    after = SheetGeometry("Sheet1", template.width_m, template.height_m, region, annotations=(length, wrapped))
+    after = SheetGeometry("Sheet1", template.width_m, template.height_m, region, annotations=(length, incomplete, wrapped))
     assert find_text_on_line(after) == []
     assert find_text_on_text(after) == []
     assert find_border_breaches(after) == []
-    assert min(segment_box_distance(witness, row) for witness in length.segments[:2] for row in rows) >= ARROW_TEXT_CLEARANCE_M
+    # The rows sit wholly under the rod: the leader rises to its near edge.
+    assert max(row.ymax for row in rows) < project(None, detail, (0.0, bottom, 0.0))[1]
+    witnesses = (*length.segments[:2], *incomplete.segments)
+    assert min(segment_box_distance(witness, row) for witness in witnesses for row in rows) >= ARROW_TEXT_CLEARANCE_M
 
 
 
@@ -1025,16 +1043,20 @@ def _assert_finish_ink_routes(annotations, finish, seat_note_xy, project, front)
     witness_x = project(None, front, (diameter / 2.0, 0.0, 0.0))[0] + 0.001
     upper, lower = body_y + diameter / 2.0, body_y - diameter / 2.0
 
+    # Measured R24 ink: an 86.9 mm block for the 34-glyph "MHA-MG-02 CLAMP
+    # BORE - SLIDING FIT" row; the stated-clearance row scales it by glyphs.
+    width = 0.0868955 * max(map(len, spec.ROD_DIA_CALLOUT.splitlines())) / 34
+
     def diameter_ink(x, y):
         underline = y - 0.0100819
         return AnnotationGeometry(
             label="RodDia", kind="dim", owner="front",
             text_boxes=(Box(x + 0.0002566, y - 0.009148,
-                            x + 0.0868955, y + 0.0100555),),
+                            x + width, y + 0.0100555),),
             segments=(
                 Segment(witness_x, lower, x + 0.001, lower, "ext-line"),
                 Segment(witness_x, upper, x + 0.001, upper, "ext-line"),
-                Segment(x + 0.0869701, underline, x, underline, "dim-line"),
+                Segment(x + width + 0.0000746, underline, x, underline, "dim-line"),
                 Segment(x, underline, x, upper, "dim-line"),
                 Segment(x, lower, x, lower - diameter, "dim-line"),
             ),
@@ -1062,12 +1084,23 @@ def _assert_finish_ink_routes(annotations, finish, seat_note_xy, project, front)
     assert crossing.kind == "leader-crosses-line"
     assert crossing.at_mm == pytest.approx((70.67076771867922, 123.175))
 
-    # Keep the proven native finish station, physical landing and mate label.
-    assert finish["symbol_xy"] == pytest.approx((0.06125, 0.140))
+    # Keep the proven native finish x, physical landing and mate label; the
+    # symbol and its label sit 2.5 mm under the measured R24 station.
+    drop = 0.140 - finish["symbol_xy"][1]
+    assert finish["symbol_xy"] == pytest.approx((0.06125, 0.1375))
     assert finish["leader_attach_xy"] == pytest.approx(
         project(None, front, (0.040, diameter / 4.0, 0.0))
     )
-    assert seat_note_xy == pytest.approx((0.05875, 0.153))
+    assert seat_note_xy == pytest.approx((0.05875, 0.153 - drop))
+    new_finish = AnnotationGeometry(
+        label=old_finish.label, kind="surface-finish", owner="front",
+        text_boxes=(Box(0.0665535, 0.1442383 - drop, 0.0759737, 0.146785 - drop),),
+        segments=tuple(
+            Segment(x0, y0 - drop, x1, y1 if kind == "leader" else y1 - drop, kind)
+            for x0, y0, x1, y1, kind in finish_strokes
+        ),
+        exact=True,
+    )
     dx, dy, _z = annotations["RodDia"].GetPosition()
     rod_dia = diameter_ink(dx, dy)
     nx, ny = seat_note_xy
@@ -1091,19 +1124,20 @@ def _assert_finish_ink_routes(annotations, finish, seat_note_xy, project, front)
         segments=(Segment(0.0291609, 0.183542, 0.0335495, 0.1169481, "leader"),),
         exact=True,
     )
-    after = sheet(rod_dia, old_finish, seat_label, thread_note, parent_a, free_end)
+    after = sheet(rod_dia, new_finish, seat_label, thread_note, parent_a, free_end)
     assert find_leader_across_lines(after) == []
     assert find_text_on_line(after) == []
     assert find_text_on_text(after) == []
     assert find_leader_through_text(after) == []
     assert find_border_breaches(after) == []
-    moved = {rod_dia.label}
+    moved = {rod_dia.label, new_finish.label, seat_label.label}
     for check in (find_text_clearance, find_text_separation):
         assert not [
             item for item in check(after) if item.a in moved or item.b in moved
         ]
-    assert min(min(line.x0, line.x1) for line in old_finish.segments) - (dx + 0.001) > 0.003
-    assert dy - 0.0100819 - seat_label.text_boxes[0].ymax > 0.0029
+    assert min(min(line.x0, line.x1) for line in new_finish.segments) - (dx + 0.001) > 0.003
+    # The seat label stands 5 mm clear of the callout's underline, not a third row.
+    assert dy - 0.0100819 - seat_label.text_boxes[0].ymax > 0.005
     assert rod_dia.text_boxes[0].ymin - seat_label.text_boxes[0].ymax > 0.0038
     assert free_end.text_boxes[0].ymin - rod_dia.text_boxes[0].ymax > 0.0053
 
@@ -1710,3 +1744,65 @@ def test_native_thread_census_identifies_each_actual_same_and_self_reader_separa
         else:
             assert after[scalar] == 1
     assert "reader_unavailable" in audit["failed"]
+
+
+@pytest.mark.parametrize("fault", (None, "refused", "snapped"))
+def test_thread_limit_and_minor_lines_are_sketched_where_the_thread_length_starts(monkeypatch, fault) -> None:
+    # Simplified external thread: the limit line sits at ThreadLength's root
+    # witness across the major diameter; minor lines run from it to the tip.
+    limit, upper, lower = drawing.THREAD_LINES_MM
+    assert limit == ((joint.ROD_LENGTH - joint.THREAD_LENGTH, -joint.ROD_DIA / 2.0), (joint.ROD_LENGTH - joint.THREAD_LENGTH, joint.ROD_DIA / 2.0))
+    assert 2.0 * drawing.THREAD_MINOR_R == pytest.approx((0.25 - 1.299038 / 20.0) * 25.4)
+    assert upper == ((limit[0][0], drawing.THREAD_MINOR_R), (joint.ROD_LENGTH, drawing.THREAD_MINOR_R))
+    assert lower == ((limit[0][0], -drawing.THREAD_MINOR_R), (joint.ROD_LENGTH, -drawing.THREAD_MINOR_R))
+
+    def project(_adapter, _view, point, **_kwargs):
+        return (drawing.DETAIL_CENTER[0] + (point[0] - drawing.DETAIL_FOCUS[0]) * 3.0, drawing.DETAIL_CENTER[1] + point[1] * 3.0)
+
+    class Transform:
+        def __init__(self, sign):
+            self.sign = sign
+
+        def Inverse(self):
+            return Transform(-self.sign)
+
+    def create_point(values):
+        def multiply(transform):
+            return SimpleNamespace(ArrayData=(values[0] - transform.sign * 0.3, values[1] - transform.sign * 0.2, values[2]))
+        return SimpleNamespace(MultiplyTransform=multiply)
+
+    created = []
+
+    def create_line(x0, y0, z0, x1, y1, z1):
+        if fault == "refused":
+            return None
+        nudge = 0.0001 if fault == "snapped" and not created else 0.0
+        created.append(((x0, y0), (x1, y1)))
+        start, end = SimpleNamespace(X=x0 + nudge, Y=y0, Z=z0), SimpleNamespace(X=x1, Y=y1, Z=z1)
+        return SimpleNamespace(GetStartPoint2=lambda: start, GetEndPoint2=lambda: end)
+
+    manager = SimpleNamespace(AddToDB=False, CreateLine=create_line)
+    view = SimpleNamespace(GetSketch=lambda: SimpleNamespace(ModelToSketchTransform=Transform(1.0)))
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(GetMathUtility=lambda: SimpleNamespace(CreatePoint=create_point)),
+        currentModel=SimpleNamespace(SketchManager=manager, ClearSelection2=lambda _all: None),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "double_array", list)
+    monkeypatch.setattr(drawing, "_activate", lambda *_a: None)
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
+    if fault is None:
+        drawing._sketch_thread_lines(adapter, view, label="Detail A")
+        sheet = [(x + 0.3, y + 0.2) for line in created for x, y in line]
+        root_witness_x = project(None, view, ((joint.ROD_LENGTH - joint.THREAD_LENGTH) / 1000.0, 0.0, 0.0))[0]
+        # The limit line runs across the rod at the .71's root witness.
+        assert [value for point in sheet[:2] for value in point] == pytest.approx(
+            [root_witness_x, 0.190 - 3 * joint.ROD_DIA / 2000.0, root_witness_x, 0.190 + 3 * joint.ROD_DIA / 2000.0]
+        )
+        assert [sheet[i][0] for i in (0, 2, 4)] == pytest.approx([root_witness_x] * 3)
+        assert manager.AddToDB is False
+    else:
+        with pytest.raises(RuntimeError, match="could not sketch" if fault == "refused" else "read back"):
+            drawing._sketch_thread_lines(adapter, view, label="Detail A")
+        assert manager.AddToDB is False

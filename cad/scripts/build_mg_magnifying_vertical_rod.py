@@ -3,24 +3,24 @@ r"""Reproduction script: magnifying-lever vertical rod (book ch. 20, pp. 46-49).
 The smaller vertical brass rod that hangs from the clamp block on the
 magnifying lever; the output fixture slides on it and the wire to the
 magnifying wheel hooks below. #1559: its top end is a #4-40 thread turned
-down from the Ø5 bar, with a relief at the shoulder; it screws into the
+down from the bar, with a relief at the shoulder; it screws into the
 clamp's bottom-face tap until the shoulder seats (``mg_rod_clamp_joint``).
 The bottom end is a full hemisphere.
 
 Layout: rod axis local +X, origin at the thread tip on the axis (the
 assembly turns +X straight down). Stations: tip chamfer to TIP_CHAMFER,
 thread at the basic major to RELIEF_START_X, relief to the shoulder at
-SHOULDER_X (both its internal corners filleted R0.2 MAX, ReliefRoots), Ø5
+SHOULDER_X (both its internal corners filleted R.008 MAX, ReliefRoots), the
 body to the dome's tip at ROD_LENGTH.
 
 Built as ONE Front-plane revolve (RodProfile -> Rod): every printed diameter
 and length is a named dimension in that sketch, the thread length and the
 body length both from the shoulder, so the drawing inserts them as model
 items (mg_magnifying_vertical_rod_spec.DRAWING_DIMENSIONS). The overall is a
-driven reference dimension shown "(132.5)". The #4-40 end carries a cosmetic
-thread so the pictorial matches the callout. The Ø5 body cylinder, where the
-output fixture's thumb screw bears wherever the fixture is set, carries its
-Ra 3.2 seat finish as native model PMI (SURFACE_FINISHES).
+driven reference dimension shown in parentheses. The part is an IPS document
+(the sheet prints decimal inch, #290). The #4-40 end carries a cosmetic
+thread so the pictorial matches the callout. The body is as-bought 7/32 in
+brass rod: the sheet prints its Ø as a supplier REF fraction.
 
 Run (SolidWorks already open)::
 
@@ -38,7 +38,6 @@ from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
-from _part_pmi import author_part_pmi
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -56,8 +55,8 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import _named_dimension, apply_drawing_precision
-from _drawing_tolerances import set_dimension_bilateral_tolerance
-from _fit_deviations import deviations
+from _document_units import apply_package_model_units
+from _part_properties import part_drawing_unit
 import _telemetry
 from mg_magnifying_vertical_rod_spec import (
     BODY_LENGTH,
@@ -72,10 +71,8 @@ from mg_magnifying_vertical_rod_spec import (
     ROD_DIA,
     ROD_LENGTH,
     ROD_THREAD_LEN,
-    ROD_THREAD_LEN_BAND,
     SHOULDER_X,
     SINGLE_LIMITS,
-    SURFACE_FINISHES,
     THREAD,
     THREAD_BASIC_MINOR,
     THREAD_MAJOR,
@@ -134,7 +131,7 @@ def _single_limits(adapter) -> None:
 
 
 def _author_reference_dimensions(adapter) -> None:
-    """Show each driven dimension as a reference: no tolerance, "(132.5)"
+    """Show each driven dimension as a reference: no tolerance, in parentheses
     (build_pn_pen_v_block._author_reference_dimensions)."""
     for feature_name, dimension_name in REFERENCE_DIMENSIONS:
         display, dimension = _named_dimension(adapter, feature_name, dimension_name)
@@ -159,6 +156,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import AddThreadParameters, RevolveParameters
 
     check("create_part", await adapter.create_part())
+    # The registry row's IPS document units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -180,7 +179,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Half-section about local +X (Front sketch u, v = model x, y): tip on the
     # axis, 45 deg chamfer to the basic minor, thread at the basic major,
-    # relief, shoulder, Ø5 body, bottom hemisphere back to the axis.
+    # relief, shoulder, body, bottom hemisphere back to the axis.
     profile = SketchDims()
     check("create_sketch rod profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -275,7 +274,7 @@ async def build(adapter) -> dict[str, str]:
     )
     profile.record("RodDia", '"RodDia"')
     # The overall, tip to dome tip: made before the body length (so it never
-    # over-defines) and turned driven at once, a "(132.5)" reference.
+    # over-defines) and turned driven at once, a parenthesised reference.
     overall = await dimension_between(
         adapter,
         f"{chamfer}.start",
@@ -311,12 +310,12 @@ async def build(adapter) -> dict[str, str]:
 
     # The relief's two internal corners (rules 11 and 16), ONE fillet over
     # both circular edges, each picked on the floor's radius at its corner:
-    # the shoulder's at SHOULDER_X (the shoulder's outer edge 1.58 away), the
-    # thread end's at RELIEF_START_X (the step's outer edge 0.50 away). The
-    # shoulder's comes FIRST: the drawing's inserted radius lands on the first
-    # pick's edge (draw_mg_magnifying_vertical_rod's detail A lays its leader
-    # out for that root). The two add ~0.1 mm^3 to ~2440 mm^3: the gate
-    # checks no step was eaten.
+    # the shoulder's at SHOULDER_X (the shoulder's outer edge 1.86 mm away),
+    # the thread end's at RELIEF_START_X (the step's outer edge 0.51 mm away).
+    # The shoulder's comes FIRST: the drawing's inserted radius lands on the
+    # first pick's edge (draw_mg_magnifying_vertical_rod's detail A lays its
+    # leader out for that root). The two add ~0.1 mm^3 to ~3050 mm^3: the
+    # gate checks no step was eaten.
     check(
         "fillet relief roots",
         await adapter.add_fillet(
@@ -361,18 +360,12 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    set_dimension_bilateral_tolerance(
-        adapter, "RodProfile", "ThreadLength", *deviations(ROD_THREAD_LEN_BAND)
-    )
     _single_limits(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _author_reference_dimensions(adapter)
-    # The body's thumb-screw seat finish is native model PMI on its cylinder;
-    # the side view prints the same control.
-    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME, {"Iso View Note": ISO_VIEW_NOTE})
     return await save_part_and_images(adapter, PART_NAME)
 

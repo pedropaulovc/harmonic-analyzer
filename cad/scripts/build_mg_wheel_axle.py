@@ -36,8 +36,10 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -60,11 +62,7 @@ from _drawing_precision import (
     _named_dimensions,
     apply_drawing_precision,
 )
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
-from _fit_deviations import deviations
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _part_pmi import author_part_pmi
 import _telemetry
 import mg_wheel_axle_callouts as callouts
@@ -75,7 +73,6 @@ from mg_wheel_axle_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     PIN_DIA,
-    PIN_DIA_TOL,
     PIN_LEN,
     PRESS_GAUGE,
     SHANK_LEN,
@@ -93,6 +90,7 @@ from mg_wheel_axle_spec import (
     RELIEF_WIDTH,
     TOL_TYPE_LIMIT,
     TIP_Y,
+    UNIT,
 )
 
 PART_NAME = "mg-wheel-axle"
@@ -172,7 +170,9 @@ def _limit_pairs(adapter) -> None:
         display.SetPrecision3(-1, -1, places, -1)
         if int(display.GetPrimaryTolPrecision2()) != places:
             raise RuntimeError(f"{label}: LIMIT precision did not persist")
-        _telemetry.success(f"{label}: LIMIT {high:.{places}f}/{low:.{places}f}")
+        _telemetry.success(
+            f"{label}: LIMIT {high / 25.4:.{places}f}/{low / 25.4:.{places}f} in"
+        )
 
 
 @_telemetry.traced("wheel_axle.author_callouts")
@@ -201,6 +201,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import AddThreadParameters, RevolveParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -389,9 +391,14 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    set_dimension_symmetric_tolerance(adapter, "PinProfile", "PinDia", PIN_DIA_TOL)
-    set_dimension_bilateral_tolerance(
-        adapter, "PinProfile", "ThreadLength", *deviations(THREAD_LEN_BAND)
+    # Equal deviations print as one symmetric +/- band.
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "PinProfile",
+        "ThreadLength",
+        THREAD_LEN_BAND[0],
+        places=DRAWING_PRECISION["PinProfile"]["ThreadLength"],
+        display_unit=UNIT,
     )
     _single_limits(adapter)
     _limit_pairs(adapter)

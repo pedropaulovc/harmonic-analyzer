@@ -565,7 +565,7 @@ def test_bracket_receiver_retains_the_blind_native_contract_and_final_proof() ->
     assert part.TAP_SPEC.size == "#2-56"
     assert part.TAP_SPEC.depth_mm == 6.50
     assert part.TAP_SPEC.overrides_mm["ThreadDepth"] == 4.95
-    assert joint.THREAD_DEPTH_BAND == 0.05
+    assert joint.THREAD_DEPTH_BAND == 0.0508
     assert joint.DRILL_DEPTH_DEVIATIONS == (-0.51, 0.51)  # ordinary .XX width
     assert "PlateThickness" in drawing.BACK_KEEP
     assert "EdgeRibThickness" in drawing.TOP_KEEP
@@ -603,8 +603,8 @@ def test_receiver_pilot_continues_from_uniform_rib_into_connected_plate() -> Non
         spec.COEFFICIENT_T - joint.LINEAR_BAND - joint.RECEIVER_ROW_FROM_TOP
         - joint.POSITION_BAND - drill_radius_max - wander
     )
-    assert upper_plate_wall == pytest.approx(2.220338, abs=1e-6)
-    assert lower_plate_wall == pytest.approx(2.210338, abs=1e-6)
+    assert upper_plate_wall == pytest.approx(2.219538, abs=1e-6)
+    assert lower_plate_wall == pytest.approx(2.209538, abs=1e-6)
     assert joint.receiver_pilot_material_wall_budget() == pytest.approx(
         min(upper_plate_wall, lower_plate_wall),
     )
@@ -1655,8 +1655,8 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
     # Subfeatures are not FeatureByName-reachable and both threads are "D1":
     # band the exact native objects found in the walk, never a by-name lookup.
     assert held == [
-        (True, thread, (-0.05, 0.05), "D1@Hole Thread22"),
-        (True, thread_b, (-0.05, 0.05), "D1@Hole Thread23"),
+        (True, thread, (-0.0508, 0.0508), "D1@Hole Thread22"),
+        (True, thread_b, (-0.0508, 0.0508), "D1@Hole Thread23"),
         (True, drill, (-0.51, 0.51), "Tap Drill Depth@Sketch14"),
     ]
     assert (drill.Name, thread.Name, thread_b.Name, unrelated.Name) == (

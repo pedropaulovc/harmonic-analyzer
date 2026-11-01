@@ -15,6 +15,7 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, set_global
+from _document_units import apply_package_model_units
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_precision import _named_dimension, apply_drawing_precision
@@ -23,13 +24,14 @@ from _feature_tree import name_last_feature
 from _fit_deviations import deviations
 from _part_checks import report_mass_properties, volume_check
 from _part_pmi import author_part_pmi
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import SketchDims, add_line_chain, anchor_point_to_origin, blank_reference_sketches, dimension_between, ensure_fully_defined, set_sketch_direct_db
-from mg_lever_thread_joint import INCOMPLETE_THREAD_MAX, ROD_DIA, ROD_DIA_BAND, ROD_LENGTH, THREAD, THREAD_LENGTH, THREAD_ROOT_X, TIP_CHAMFER, TIP_CHAMFER_BAND, TIP_CHAMFER_MAX
+from mg_lever_thread_joint import INCOMPLETE_THREAD_MAX, ROD_DIA, ROD_LENGTH, THREAD, THREAD_LENGTH, THREAD_ROOT_X, TIP_CHAMFER, TIP_CHAMFER_BAND, TIP_CHAMFER_MAX
 from mg_magnifying_lever_geom import KNIFE_LOCAL_X, KNIFE_LOCAL_Y
-from mg_magnifying_lever_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, ISO_VIEW_NOTE, SINGLE_LIMITS, SURFACE_FINISHES, THREAD_CALLOUT
+from mg_magnifying_lever_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, ISO_VIEW_NOTE, SINGLE_LIMITS, SURFACE_FINISHES, THREAD_CALLOUT, UNIT
 
 PART_NAME = "mg-magnifying-lever"
 MATERIAL = "Brass"
@@ -131,6 +133,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import AddThreadParameters, RevolveParameters
 
     check("create part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     for name, value in (("RodDia", ROD_DIA), ("RodLength", ROD_LENGTH), ("ThreadLength", THREAD_LENGTH), ("TipChamfer", TIP_CHAMFER)):
         await set_global(adapter, name, f"{value}mm")
     jobs = []
@@ -177,8 +181,8 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError("native lever thread returned no feature name")
     await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "rod axis")
     await name_bore_axis(adapter, "Right Plane", KNIFE_LOCAL_X, "Top Plane", KNIFE_LOCAL_Y, "knife axis")
-    set_dimension_bilateral_tolerance(adapter, "RodProfile", "RodDia", *deviations(ROD_DIA_BAND))
-    set_dimension_bilateral_tolerance(adapter, "RodProfile", "TipChamfer", *deviations(TIP_CHAMFER_BAND))
+    # The rod diameter is as-bought stock: untoleranced, the sheet prints it REF.
+    set_dimension_bilateral_tolerance(adapter, "RodProfile", "TipChamfer", *deviations(TIP_CHAMFER_BAND), display_unit=UNIT)
     # The hidden native distance owns the footer ceiling without changing the
     # nominal profile. The joint separately charges the ordinary angle band.
     _, chamfer_dimension = _named_dimension(adapter, "RodProfile", "TipChamfer")

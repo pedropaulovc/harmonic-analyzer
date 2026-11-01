@@ -4,32 +4,36 @@ PURE DATA, no SolidWorks/COM imports.  The shape is
 ``mg_magnifying_clamp_geom``'s (the assembly, the error budget and the web
 export read that module, not this one); this module owns the printed contract:
 the nominal walls, ordinary native dimensional bands, plug-tap reach and
-sheet text. The ordinary HEX size and default drawn angles govern all
-three opposed-flat pairs over the full length.
+sheet text. The 1/2 in hex is as-bought stock: its across-flats prints as an
+untoleranced REF fraction, and the supplier governs it.
 
 The heights run from the bottom shoulder-seat face. An actual diagonal-flat
 distance and a location from the SAME actual Z flat locate each tap entry.
 The bore uses that common Z-flat baseline and its own bottom-seat height.
-There is no separate finished 2 MIN wall or 15 MAX envelope requirement.
-Rule 17's 2 mm target and 1.5 mm floor are engineering checks; ordinary HEX
-acceptance is not a certificate for unconstrained as-supplied stock.
+There is no separate finished wall or envelope requirement. The sheet prints
+decimal inch (#290); rule 17's .080 in target is an engineering check every
+wall meets at the printed worst case, with the flats at an assumed supplier
+band (``HEX_STOCK_AF_BAND``).
 """
 
 from __future__ import annotations
 
 import math
 
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
 from mg_magnifying_clamp_geom import (  # noqa: F401 (re-export)
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
     BORE_FULL_ANGULAR,
     BORE_TO_FLAT_WALL_WORST,
+    BORE_Y_DEVIATIONS,
     DRILL_WANDER_DEG,
     EDGE_BREAK,
     HEIGHT_PLACES,
     HEX_AC,
     HEX_AF,
+    HEX_AF_FRACTION_DENOMINATOR,
+    HEX_STOCK_AF_BAND,
     LEVER_BORE_DIA,
     LEVER_BORE_Y,
     LOCATION_BAND,
@@ -38,12 +42,16 @@ from mg_magnifying_clamp_geom import (  # noqa: F401 (re-export)
     ROD_TAP_DRILL_DIA,
     ROD_TAP_DRILL_POINT,
     ROD_TAP_FLOOR_WALL_WORST,
+    TAP_OVERSIZE_R,
     THUMB_ENGAGEMENT_WORST,
     STOCK_ENVELOPE_MAX,
     THUMB_TAP_DRILL_DEPTH,
     THUMB_TAP_LENGTH,
     THUMB_TAP_SPEC,
     TOP_TO_BORE,
+    TOP_TO_BORE_MAX,
+    TOP_TO_BORE_MIN,
+    UNIT,
     WALL_TARGET,
     WALL_FLOOR,
     TAP_TO_BORE_ENTRY_Z_MAX,
@@ -64,22 +72,31 @@ from mg_rod_clamp_joint import (  # noqa: F401 (re-export)
 
 
 # --- Places each printed dimension carries ----------------------------------
-# The native, non-reference AF uses the ordinary title-block .XX band.
-HEX_AF_PLACES = 2
-# The drilled lever bore uses .XX and the DRILLED HOLES +0.10/0 row.
-LEVER_BORE_DIA_PLACES = 2
+# The as-bought AF: a stock REF dressed as the exact 1/2 in fraction on the
+# sheet; its places are the model's, unused by a fraction.
+HEX_AF_PLACES = 3
+STOCK_REFERENCE_DIMENSION = "HexAf"
+# Under the REF: the stock form and the supplier's across-flats band the wall
+# checks assume (<MOD-PM> is SolidWorks' ±).
+_STOCK_BAND_TEXT = f"{HEX_STOCK_AF_BAND / 25.4:.3f}".lstrip("0")
+HEX_AF_CALLOUT = f"HEX, AS-SUPPLIED STOCK <MOD-PM>{_STOCK_BAND_TEXT}"
+# The drilled lever bore prints its F drill at .XXX with the DRILLED HOLES
+# +.004/0 row.
+LEVER_BORE_DIA_PLACES = 3
+# Every Hole Wizard tap-drill diameter prints .XXX; tap depths print .XX.
+HOLE_CALLOUT_DIA_PLACES = 3
 
 # --- Printed limits ----------------------------------------------------------
-_HEIGHT_BAND = printed_band_mm(HEIGHT_PLACES)  # 0.51 on the height and the bore's
-_DEPTH_BAND = printed_band_mm(HOLE_DEPTH_PLACES)  # 0.51 on both taps' depths
+_HEIGHT_BAND = printed_band_mm(HEIGHT_PLACES, unit=UNIT)
+# The thumb tap's drill depth is the exempt bore height's derivative, so it
+# prints rounded (.37) and its limits come from that printed number.
+THUMB_DRILL_DEPTH_DEVIATIONS = printed_deviations(
+    THUMB_TAP_DRILL_DEPTH, HOLE_DEPTH_PLACES, unit=UNIT
+)
 _LEVER_BORE_R_MIN = LEVER_BORE_DIA / 2.0
-_LEVER_BORE_R_MAX = (LEVER_BORE_DIA + drilled_oversize_mm()) / 2.0
-_DRILL_R_MAX = (ROD_TAP_DRILL_DIA + drilled_oversize_mm()) / 2.0
-# Normal-shop cutting allowance for plug-reach arithmetic, not an ASME
-# maximum internal-root limit or a custom thread inspection requirement.
-_TAP_OVERSIZE_R = 0.025
-_THREAD_R_MAX = THREAD_MAJOR / 2.0 + _TAP_OVERSIZE_R
-
+_LEVER_BORE_R_MAX = (LEVER_BORE_DIA + drilled_oversize_mm(unit=UNIT)) / 2.0
+_DRILL_R_MAX = (ROD_TAP_DRILL_DIA + drilled_oversize_mm(unit=UNIT)) / 2.0
+_THREAD_R_MAX = THREAD_MAJOR / 2.0 + TAP_OVERSIZE_R
 
 # Realistic drill run-off is additional to the ordinary entry locations.
 # Standard thread roots retain the same shop-cut allowance below; it is not
@@ -87,7 +104,7 @@ _THREAD_R_MAX = THREAD_MAJOR / 2.0 + _TAP_OVERSIZE_R
 _DRILL_SLOPE = math.tan(math.radians(DRILL_WANDER_DEG))
 
 
-# --- Derived dimensional walls, judged against the policy FLOOR --------------
+# --- Derived dimensional walls, judged against the rule 17 .080 in TARGET ----
 DERIVED_WALL_BOUNDS: dict[str, tuple[float, float]] = {
     "lever bore to the nonintersecting flats": (
         HEX_AF / 2.0 - LEVER_BORE_DIA / 2.0,
@@ -102,10 +119,10 @@ DERIVED_WALL_BOUNDS: dict[str, tuple[float, float]] = {
     ),
 }
 for _name, (_nominal, _worst) in DERIVED_WALL_BOUNDS.items():
-    if _worst < WALL_FLOOR - 1e-9:
+    if _worst < WALL_TARGET - 1e-9:
         raise AssertionError(
             f"MHA-MG-02 {_name} wall {_worst:.3f} at the printed worst case is "
-            f"under the {WALL_FLOOR} policy floor"
+            f"under the {WALL_TARGET} policy target"
         )
 
 
@@ -120,8 +137,8 @@ if abs(PLUG_TAP_CHAMFER_THREADS[1] * THREAD_PITCH - PLUG_TAP_LEAD) > 1e-9:
 # Bound run-off to the entire plug, including its lead in the bore's air.
 _TAP_BORE_ANGULAR = BORE_FULL_ANGULAR
 _TAP_RELATIVE_Z_MAX = TAP_TO_BORE_ENTRY_Z_MAX + PLUG_TAP_USABLE_LENGTH * _DRILL_SLOPE + _TAP_BORE_ANGULAR
-_TOP_TO_AXIS_MAX = TOP_TO_BORE + 2.0 * _HEIGHT_BAND + _TAP_BORE_ANGULAR
-_TOP_TO_AXIS_MIN = TOP_TO_BORE - 2.0 * _HEIGHT_BAND - _TAP_BORE_ANGULAR
+_TOP_TO_AXIS_MAX = TOP_TO_BORE_MAX + _TAP_BORE_ANGULAR
+_TOP_TO_AXIS_MIN = TOP_TO_BORE_MIN - _TAP_BORE_ANGULAR
 _THREAD_HALF_CHORD = math.sqrt(_LEVER_BORE_R_MIN**2 - (_THREAD_R_MAX + _TAP_RELATIVE_Z_MAX)**2)
 # The deepest wall the thread crosses, and the far wall's nearest point.
 TAP_WALL_DEEPEST = _TOP_TO_AXIS_MAX - _THREAD_HALF_CHORD
@@ -147,14 +164,18 @@ if THUMB_ENGAGEMENT_WORST < ENGAGEMENT_MIN - 1e-9:
 
 # Model the real finite 118-degree point, not a full cylinder extended to
 # the tip. Such a surrogate goes negative for 1/2 stock despite a clear cone.
-_DRILL_POINT_DEPTH_MAX = THUMB_TAP_DRILL_DEPTH + _DEPTH_BAND + ROD_TAP_DRILL_POINT
+_DRILL_DEPTH_MIN = THUMB_TAP_DRILL_DEPTH + THUMB_DRILL_DEPTH_DEVIATIONS[0]
+_DRILL_DEPTH_MAX = THUMB_TAP_DRILL_DEPTH + THUMB_DRILL_DEPTH_DEVIATIONS[1]
+_DRILL_POINT_DEPTH_MAX = _DRILL_DEPTH_MAX + ROD_TAP_DRILL_POINT
 _DRILL_BORE_ANGULAR = BORE_FULL_ANGULAR
 _DRILL_RELATIVE_Z_MAX = TAP_TO_BORE_ENTRY_Z_MAX + _DRILL_POINT_DEPTH_MAX * _DRILL_SLOPE + _DRILL_BORE_ANGULAR
 _DRILL_HALF_CHORD = math.sqrt(_LEVER_BORE_R_MIN**2 - (_DRILL_R_MAX + _DRILL_RELATIVE_Z_MAX)**2)
-THUMB_DRILL_NEAR_CLEAR = _DRILL_HALF_CHORD - 3.0 * _HEIGHT_BAND - _DRILL_BORE_ANGULAR
-THUMB_DRILL_FAR_CYLINDER_CLEAR = THUMB_DRILL_NEAR_CLEAR
-THUMB_DRILL_FAR_POINT_CLEAR = math.sqrt(_LEVER_BORE_R_MIN**2 - _DRILL_RELATIVE_Z_MAX**2) - 3.0 * _HEIGHT_BAND - _DRILL_BORE_ANGULAR - ROD_TAP_DRILL_POINT
-# Along the finite cone s, sqrt(rb²-(offset+r(s))²)-3L-w-s is concave:
+# The shallowest drill against the highest near wall; the deepest against the
+# lowest far wall (heights, bore height and depth each at their printed limit).
+THUMB_DRILL_NEAR_CLEAR = _DRILL_DEPTH_MIN - (TOP_TO_BORE_MAX - _DRILL_HALF_CHORD) - _DRILL_BORE_ANGULAR
+THUMB_DRILL_FAR_CYLINDER_CLEAR = TOP_TO_BORE_MIN + _DRILL_HALF_CHORD - _DRILL_DEPTH_MAX - _DRILL_BORE_ANGULAR
+THUMB_DRILL_FAR_POINT_CLEAR = TOP_TO_BORE_MIN + math.sqrt(_LEVER_BORE_R_MIN**2 - _DRILL_RELATIVE_Z_MAX**2) - _DRILL_POINT_DEPTH_MAX - _DRILL_BORE_ANGULAR
+# Along the finite cone s, sqrt(rb²-(offset+r(s))²)-L-w-s is concave:
 # r(s) is affine, so checking BOTH endpoints bounds the whole cone.
 THUMB_DRILL_FAR_CLEAR = min(THUMB_DRILL_FAR_CYLINDER_CLEAR, THUMB_DRILL_FAR_POINT_CLEAR)
 if not THUMB_DRILL_NEAR_CLEAR > 0.0:
@@ -164,7 +185,7 @@ if not THUMB_DRILL_FAR_CLEAR > 0.0:
 # The rod tap's drill and thread both fit the plug tap's reach from the face.
 if not ROD_TAP_THREAD_DEPTH_MAX + PLUG_TAP_LEAD <= PLUG_TAP_USABLE_LENGTH + 1e-9:
     raise AssertionError("MHA-MG-02 rod tap is deeper than the plug tap reaches")
-if not ROD_TAP_DRILL_DEPTH_MAX < LEVER_BORE_Y - _HEIGHT_BAND - _LEVER_BORE_R_MAX - BORE_FULL_ANGULAR:
+if not ROD_TAP_DRILL_DEPTH_MAX < LEVER_BORE_Y + BORE_Y_DEVIATIONS[0] - _LEVER_BORE_R_MAX - BORE_FULL_ANGULAR:
     raise AssertionError("MHA-MG-02 rod tap drill reaches the lever bore")
 
 # --- Squareness ----------------------------------------------------------------
@@ -182,8 +203,8 @@ if not ROD_TAP_DRILL_DEPTH_MAX < LEVER_BORE_Y - _HEIGHT_BAND - _LEVER_BORE_R_MAX
 # --- Marked model dimensions and the places the model authors on them --------
 # Five ordinary native location measurements remain authoritative even when
 # the three common-flat values print as one explicitly grouped dimension.
-# The native HEX size applies to the complete ordinary hex profile; the
-# drawing adds no bespoke receiving-envelope or finished-wall inspection.
+# The 1/2 in stock REF covers the complete hex profile; the drawing adds no
+# bespoke receiving-envelope or finished-wall inspection.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HexProfile": {"HexAf": HEX_AF_PLACES},
     "Block": {"Height": HEIGHT_PLACES},
@@ -219,16 +240,17 @@ LEVER_BORE_CALLOUT = "DRILL THRU CORNERS\nSLIP ON 1/4 IN LEVER MHA-MG-03"
 # Ahead of each native thread row.
 THUMB_TAP_PROCESS = "TAP INTO BORE; MHA-SH-VN-55"
 ROD_TAP_PROCESS = "TAP"
-# Native Hole Wizard depth variables; both taps print their depths at .XX,
-# the thumb tap's thread depth bracketed REF (the bore ends the thread).
+# Native Hole Wizard variables: both taps print the tap drill's Ø at .XXX and
+# their depths at .XX, the thumb tap's thread depth bracketed REF (the bore
+# ends the thread).
+TAP_DRILL_DIA_VARIABLE = "hw-tapdrldia"
 TAP_DRILL_DEPTH_VARIABLE = "hw-tapdrldepth"
 TAP_THREAD_DEPTH_VARIABLE = "hw-threaddepth"
 TAP_CALLOUT_PRECISION = {
+    TAP_DRILL_DIA_VARIABLE: HOLE_CALLOUT_DIA_PLACES,
     TAP_DRILL_DEPTH_VARIABLE: HOLE_DEPTH_PLACES,
     TAP_THREAD_DEPTH_VARIABLE: HOLE_DEPTH_PLACES,
 }
-# Native model-owned prefix: one HEX size, all three opposed-flat pairs.
-HEX_AF_PREFIX = "HEX "
 # The MHA-MG-04 shoulder's face, flagged on Section A-A's bottom line.
 SEAT_NOTE = "MHA-MG-04 SHOULDER SEAT: NO CHAMFER OR SPOTFACE AT TAP"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

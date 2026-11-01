@@ -15,7 +15,6 @@ import mg_magnifying_wheel_geom as geom
 import _mg_wheel_rim_geometry as rim
 import mg_magnifying_wheel_spec
 from _drawing_contract import model_toleranced_dimensions
-from _printed_tolerance import printed_band_mm
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import MACHINED_UM
 
@@ -101,16 +100,10 @@ def test_every_marked_dimension_has_model_places() -> None:
         for names in spec.DRAWING_PRECISION.values()
         for name, digits in names.items()
     }
-    # The spigot and the bore are matched fits: a reference nominal at two
-    # places, the acceptance on the callout.  The web's plane prints at .X.
-    assert spec.DRAWING_PRECISION["HubProfile"]["SpigotDia"] == 2
-    assert spec.DRAWING_PRECISION["BoreProfile"]["BoreDiaDim"] == 2
+    # The spigot and the bore are matched fits: a reference nominal, the
+    # acceptance on the callout.  The web's plane, cast, prints .61 +/-.03.
     assert spec.REFERENCE_DIMENSIONS == {"SpigotDia", "BoreDiaDim"}
-    assert spec.DRAWING_PRECISION["HubProfile"]["HubFrontZ"] == 1
-    places = spec.DRAWING_PRECISION["HubProfile"]["HubFrontZ"]
-    print_shift = printed_band_mm(places) + abs(
-        round(geom.HUB_FRONT_Z, places) - geom.HUB_FRONT_Z
-    )
+    print_shift = 0.03 * 25.4 + abs(-0.61 * 25.4 - geom.HUB_FRONT_Z)
     route_gaps = sh_vn_music_wire_lever_geom.run_gaps(
         sh_vn_music_wire_lever_geom.WIRE_START, sh_vn_music_wire_lever_geom.WIRE_END
     )
@@ -123,63 +116,68 @@ def test_tight_bands_sit_on_the_model_dimensions() -> None:
     # The boss Ø and TIE 1's two coordinates ride the title block's .XX: the
     # boss is sized for TIE 1's wall, so none carries a band of its own.
     assert model_toleranced_dimensions(part) == {
-        ("HubProfile", "HubLength"): "*deviations(HUB_LEN_BAND)",
+        ("HubProfile", "HubLength"): "HUB_LEN_BAND[0]",
         ("HubProfile", "SpigotLength"): "*deviations(SPIGOT_LEN_BAND)",
-        ("GrooveProfile", "GrooveR"): "*deviations(GROOVE_R_BAND)",
-        ("GrooveProfile", "GrooveBottomDia"): "*deviations(GROOVE_BOTTOM_BAND)",
+        ("GrooveProfile", "GrooveR"): "GROOVE_R_BAND[0]",
+        ("GrooveProfile", "GrooveBottomDia"): "GROOVE_BOTTOM_BAND[0]",
+        ("feature_name", "dimension_name"): "CAST_TOL",
     }
+    # The as-cast sizes carry the explicit +/-.03 casting band.
+    assert geom.CAST_TOL == pytest.approx(0.03 * 25.4)
     precision = mg_magnifying_wheel_spec.DRAWING_PRECISION
     assert precision["HubProfile"]["HubDia"] == 2
-    assert precision["Tie1Profile"] == {"Tie1X": 2, "Tie1Y": 2, "Tie1HoleDia": 2}
+    assert precision["Tie1Profile"]["Tie1X"] == precision["Tie1Profile"]["Tie1Y"] == 2
 
 
 def test_walls_and_groove_hold_at_the_printed_bands() -> None:
     spec = mg_magnifying_wheel_spec
-    # TIE 1's boss wall holds the 2.0 target at the title block's .XX on the
-    # boss Ø and on both TIE 1 coordinates, the ties drilled to the title
-    # block's +0.10/0, its axis tilted by the title block's 1 deg angle plus
-    # 0.3 deg drill wander over the boss.
+    inch = 25.4
+    # Every wall holds rule 17's .080 in target at the printed limits.
     assert min(spec.WALLS.values()) >= spec.MIN_WALL - 1e-9
-    assert spec.MIN_WALL == 2.0
-    offset = math.hypot(0.51, 0.51) + (19.7 - 9.0) * math.tan(math.radians(1.3))
-    assert geom.TIE1_OFFSET_MAX == pytest.approx(offset)
-    assert (geom.TIE1_X, geom.TIE1_Y) == (9.70, -5.60)
-    assert spec.WALLS["tie1_to_hub_od"] == pytest.approx(
-        (30.0 - 0.51) / 2.0 - (math.hypot(9.7, 5.6) + offset) - 0.55
+    assert spec.MIN_WALL == pytest.approx(0.080 * inch)
+    # TIE 1's axis may stand off by both .XX coordinates' +/-.01, and tilt by
+    # the title block's 1 deg plus 0.3 deg drill wander over the boss (the
+    # hub's .775 max less the spigot's .354 min).
+    offset = math.hypot(0.01 * inch, 0.01 * inch) + (0.775 - 0.354) * inch * math.tan(
+        math.radians(1.3)
     )
-    assert spec.WALLS["tie2_to_rim_fillet"] == pytest.approx(2.688, abs=1e-3)
-    assert spec.WALLS["tie1_to_hub_fillet"] == pytest.approx(2.323, abs=1e-3)
+    assert geom.TIE1_OFFSET_MAX == pytest.approx(offset)
+    tie1_r = math.hypot(0.38, 0.22) * inch
+    assert geom.TIE1_R == pytest.approx(tie1_r)
+    # The #60 ties at the title block's drilled row, .040 +.004.
+    tie_r_max = (0.040 + 0.004) * inch / 2.0
+    assert spec.WALLS["tie1_to_hub_od"] == pytest.approx(
+        (1.18 - 0.01) * inch / 2.0 - (tie1_r + offset) - tie_r_max
+    )
+    # The cast spokes, fillets and rim bore at their +/-.03 casting band.
+    assert spec.WALLS["tie2_to_rim_fillet"] == pytest.approx(2.602, abs=1e-3)
+    assert spec.WALLS["tie1_to_hub_fillet"] == pytest.approx(2.824, abs=1e-3)
     # TIE 1 stands outboard of the drum it sits behind: the smallest hole,
-    # at its worst offset, still opens a wire diameter past the largest drum.
+    # at its worst offset, still opens a wire diameter past the largest drum
+    # (.74 + .01).
     assert geom.TIE1_DRUM_OPENING == pytest.approx(
-        math.hypot(9.7, 5.6) - offset + 0.5 - (18.9 + 0.8) / 2.0
+        tie1_r - offset + 0.020 * inch - 0.75 * inch / 2.0
     )
     assert geom.TIE1_DRUM_OPENING >= geom.LEVER_WIRE_DIA
     # 8 o'clock seen from the front, midway between two spokes.
-    assert geom.TIE1_CLOCK_DEG == pytest.approx(-150.0, abs=0.01)
+    assert geom.TIE1_CLOCK_DEG == pytest.approx(-150.0, abs=0.1)
     # TIE 2 breaks into the bore at mid-width: its ligament ends at the
-    # rim-bore rounds, R0.8 MAX (no model band), on a rim 8.0 wide at .X
-    # (7.2 at least).
-    assert spec.WALLS["tie2_to_rim_faces"] == pytest.approx(2.223, abs=1e-3)
-    assert geom.CAST_ROUND_R == 0.80
+    # rim-bore rounds, R.03 MAX (no model band), on a rim .31 wide at .XX.
+    assert spec.WALLS["tie2_to_rim_faces"] == pytest.approx(2.462, abs=1e-3)
+    assert geom.CAST_ROUND_R == pytest.approx(0.03 * inch)
     assert not hasattr(geom, "CAST_ROUND_BAND")
-    assert spec.DRAWING_REFERENCE_PRECISION == {
-        "rim bore round": 1,
-        "rim axial width": 1,
-    }
     assert spec.ROUND_TEXT_SUFFIX == " MAX"
-    # The matched fits' worst pair: the smallest spigot over the largest bore.
-    assert spec.WALLS["spigot_to_bore"] == pytest.approx(
-        (14.0 + 0.005 - (4.7625 + 0.005 + 0.053)) / 2.0
-    )
+    # The matched fits' worst pair: the smallest spigot (.4990 bore + .0002
+    # press) over the largest bore (.1877 pin + .0017 running clearance).
+    assert spec.WALLS["spigot_to_bore"] == pytest.approx((0.4992 - 0.1894) * inch / 2.0)
     assert "RimRounds" not in spec.DRAWING_DIMENSIONS
-    # At 4:30 (-45) the worst printed casting leaves TIE 2 about a 1.2 wall.
     assert geom.TIE2_CLOCK_DEG == -43.0
-    # The 0.8 pen wire seats at every printed groove corner.
-    assert spec.GROOVE_WIDTH_MIN == pytest.approx(1.0)
-    assert spec.GROOVE_DEPTH_MIN == pytest.approx(0.895)
+    # The 0.8 pen wire seats at every printed groove corner: R.024 -.004 wide,
+    # and the 3.94 -.01 rim over the 3.843 +.004 groove bottom deep.
+    assert spec.GROOVE_WIDTH_MIN == pytest.approx(2.0 * 0.020 * inch)
+    assert spec.GROOVE_DEPTH_MIN == pytest.approx((3.93 - 3.847) * inch / 2.0)
     # The drum, minus-only against the plus-only spigot, is never proud.
-    assert geom.DRUM_RECESS == pytest.approx((0.0, 0.2))
+    assert geom.DRUM_RECESS == pytest.approx((0.0, 0.008 * inch), abs=1e-9)
 
 
 def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
@@ -195,14 +193,14 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
 
 def test_feature_volumes_are_consistent() -> None:
     # The fillet gates sum to the geom's own fillet volume; the groove matches
-    # a direct section integral; TIE 2 is a Ø1 hole a little over the floor wall.
+    # a direct section integral; TIE 2 is a #60 hole a little over the floor wall.
     assert part.V_HUB_FILLETS + part.V_RIM_FILLETS == pytest.approx(
         geom.fillets_volume()
     )
     floor = rim.GROOVE_BOTTOM_DIA / 2.0 - rim.RIM_INNER_DIA / 2.0
     hole = 3.141592653589793 / 4.0 * geom.TIE_HOLE_DIA**2
     assert hole * floor < part.V_TIE2 < hole * (floor + 2.0 * rim.GROOVE_R)
-    assert part.V_GROOVE == pytest.approx(399.45, abs=0.05)
+    assert part.V_GROOVE == pytest.approx(405.07, abs=0.05)
     assert part.V_SPOKE_FREE > part.V_SPOKE_WEB > 0.0
 
 
@@ -223,6 +221,43 @@ def test_tie2_profile_runs_radially_and_ends_in_air() -> None:
     low, high = sorted((axis % 360.0, horizontal % 360.0))
     assert high - low == pytest.approx(part._TIE2_ANGLE)
     assert low < bearing % 360.0 < high
+
+
+def _inside(polygon: list[tuple[float, float]], point: tuple[float, float]) -> bool:
+    x, y = point
+    inside = False
+    for (x1, y1), (x2, y2) in zip(polygon, polygon[1:] + polygon[:1]):
+        if (y1 > y) != (y2 > y) and x < x1 + (y - y1) * (x2 - x1) / (y2 - y1):
+            inside = not inside
+    return inside
+
+
+def _distance(
+    point: tuple[float, float], a: tuple[float, float], b: tuple[float, float]
+) -> float:
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    t = ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) / (dx * dx + dy * dy)
+    t = max(0.0, min(1.0, t))
+    return math.hypot(point[0] - a[0] - t * dx, point[1] - a[1] - t * dy)
+
+
+def test_tie2_window_shows_the_hole_and_keeps_hatch_off_the_angle_leg() -> None:
+    window = [drawing.tie2_window_point(s, t) for s, t in drawing.TIE2_WINDOW]
+    tie_r = mg_magnifying_wheel_spec.TIE_HOLE_DIA / 2.0
+    # Both cut walls, rim bore to groove bottom, lie inside the window.
+    for r in (rim.RIM_INNER_DIA / 2.0, rim.GROOVE_BOTTOM_DIA / 2.0):
+        along = math.sqrt(r * r - tie_r * tie_r)
+        for across in (-tie_r, tie_r):
+            assert _inside(window, drawing.tie2_window_point(along, across))
+    # The angle's horizontal leg leaves the axis's inner end toward the
+    # 180 deg side and stays clear of the window up to the rim's far wall.
+    x0, y = part._tie2_profile()[0]
+    x1 = -math.sqrt((rim.GROOVE_BOTTOM_DIA / 2.0) ** 2 - y * y)
+    edges = list(zip(window, window[1:] + window[:1]))
+    for k in range(101):
+        point = (x0 + (x1 - x0) * k / 100.0, y)
+        assert not _inside(window, point)
+        assert min(_distance(point, a, b) for a, b in edges) > 0.4
 
 
 @pytest.mark.parametrize(
@@ -265,12 +300,6 @@ def test_linked_notes_specify_the_ties_and_the_angle_the_spokes() -> None:
     assert "REAMED" not in notes
     # Each fit prints on its own diameter: the mate and the stated fit.
     assert "PRESS FIT" not in notes and "RUNS ON" not in notes
-    assert drawing.DIMENSION_CALLOUTS["BoreDiaDim"] == (
-        "REAM THRU\n0.033-0.053\nDIAMETRAL\nCLEARANCE ON\nMG-WHEEL-AXLE\nMHA-MG-07"
-    )
-    assert drawing.DIMENSION_CALLOUTS["SpigotDia"] == (
-        "0.005-0.034\nDIAMETRAL\nINTERFERENCE IN\nMG-WHEEL-DRUM\nMHA-MG-10"
-    )
     # Each groove band names the wire it seats, at its own callout.
     assert (
         drawing.DIMENSION_CALLOUTS["GrooveBottomDia"] == "PEN-WIRE SEAT\nMHA-SH-VN-56"

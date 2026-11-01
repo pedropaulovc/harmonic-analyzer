@@ -13,4 +13,5 @@ mg-vn-wheel-axle-nut:
     THE OUTER NUT LOCKS IT.
   quantity: 2
   tolerance_class: machined_block
+  drawing_unit: in
   process: purchased

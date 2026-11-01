@@ -1,7 +1,7 @@
 r"""Reproduction script: magnifying wheel (book ch. 21, pp. 50-53).
 
 A gray cast-iron spider: a turned Ø100 rim on six tapered cast spokes and a
-turned Ø30 hub boss. The boss carries an integral Ø14.0 spigot on its front
+turned Ø30 hub boss. The boss carries an integral Ø.499 spigot on its front
 (pen) side, on which the MHA-MG-10 brass drum is pressed. The lever wire wraps
 the drum, the pen wire runs in the rim's U-groove: the wire-centre radii
 49.2 / 9.85 give the wheel's 5x magnification. TIE 1 (lever wire) is an axial
@@ -28,8 +28,10 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import _feature_by_name, name_last_feature
 from _part_checks import measure_check, report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -57,7 +59,10 @@ from _drawing_marks import (
 )
 from _drawing_precision import apply_drawing_precision
 from _drawing_prefix import set_dimension_prefix
-from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _drawing_tolerances import (
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
@@ -74,6 +79,7 @@ from _mg_wheel_rim_geometry import (
 from mg_magnifying_wheel_geom import (
     BORE_DIA,
     CAST_ROUND_R,
+    CAST_TOL,
     HUB_BACK_Z,
     HUB_DIA,
     HUB_FILLET_R,
@@ -101,8 +107,10 @@ from mg_magnifying_wheel_geom import (
     fillets_volume,
     side_meets_circle,
     spoke_half_width,
+    UNIT,
 )
 from mg_magnifying_wheel_spec import (
+    CAST_DIMENSIONS,
     DIAMETER_REFERENCE,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -535,6 +543,8 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -679,7 +689,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Hub: ONE stepped half-profile on the Right plane (sketch x -> model -Z):
-    # the Ø25 boss from its back face to the step, then the Ø14.0 spigot to its
+    # the Ø30 boss from its back face to the step, then the Ø.499 spigot to its
     # front face, revolved about the axis line.
     hub_sd = SketchDims()
     back_x, step_x, front_x = -HUB_BACK_Z, -HUB_STEP_Z, -HUB_FRONT_Z
@@ -787,9 +797,9 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += await _diameter_reference(adapter)
     drive_jobs += await _spoke_reference(adapter)
 
-    # Cast fillets where each spoke side meets the boss (R3) and the rim (R4),
-    # picked mid-height on every junction edge, the edge the face view prints
-    # first; then the R0.80 rounds on the rim bore's two edges, picked between
+    # Cast fillets where each spoke side meets the boss (R.12) and the rim
+    # (R.16), picked mid-height on every junction edge, the edge the face view
+    # prints first; then the R.03 rounds on the rim bore's two edges, picked between
     # the 0 and 60 deg spokes.
     await _fillet(
         adapter,
@@ -1102,25 +1112,51 @@ async def build(adapter) -> dict[str, str]:
     # drawing-simplicity-policy.md `How the repository implements the guidelines`: the tight bands sit on the model dimensions,
     # the places on every marked one.  The spigot and the bore are matched
     # fits (mg_magnifying_wheel_spec.REFERENCE_DIMENSIONS): no band.  The
-    # boss Ø rides the title block (mg_magnifying_wheel_geom.HUB_DIA).
-    set_dimension_bilateral_tolerance(
-        adapter, "HubProfile", "HubLength", *deviations(HUB_LEN_BAND)
+    # boss Ø rides the title block (mg_magnifying_wheel_geom.HUB_DIA).  The
+    # bands are millimetres; UNIT prints them in inches.  Equal deviations
+    # print as one symmetric +/- band.
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "HubProfile",
+        "HubLength",
+        HUB_LEN_BAND[0],
+        places=DRAWING_PRECISION["HubProfile"]["HubLength"],
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "HubProfile", "SpigotLength", *deviations(SPIGOT_LEN_BAND)
+        adapter,
+        "HubProfile",
+        "SpigotLength",
+        *deviations(SPIGOT_LEN_BAND),
+        display_unit=UNIT,
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "GrooveProfile", "GrooveR", *deviations(GROOVE_R_BAND)
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "GrooveProfile",
+        "GrooveR",
+        GROOVE_R_BAND[0],
+        places=DRAWING_PRECISION["GrooveProfile"]["GrooveR"],
+        display_unit=UNIT,
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "GrooveProfile", "GrooveBottomDia", *deviations(GROOVE_BOTTOM_BAND)
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "GrooveProfile",
+        "GrooveBottomDia",
+        GROOVE_BOTTOM_BAND[0],
+        places=DRAWING_PRECISION["GrooveProfile"]["GrooveBottomDia"],
+        display_unit=UNIT,
     )
+    # The as-cast sizes carry the casting band (mg_magnifying_wheel_spec).
+    for feature_name, dimension_names in CAST_DIMENSIONS.items():
+        for dimension_name in sorted(dimension_names):
+            set_dimension_symmetric_tolerance(
+                adapter, feature_name, dimension_name, CAST_TOL, display_unit=UNIT
+            )
     # The tie holes are drilled: the title block's DRILLED HOLES row governs
     # their size, and TIE 1's radius rides the title block's .XX.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    # A diametric linear dimension prints no Ø of its own (farm run f4472703
-    # printed "100.00" and "88.0"): the native symbol token supplies it
-    # (build_dt_pinion_arbor's journal references).
+    # A diametric linear dimension prints no Ø of its own: the native symbol
+    # token supplies it (build_dt_pinion_arbor's journal references).
     for name in sorted(DRAWING_DIMENSIONS[DIAMETER_REFERENCE]):
         set_dimension_prefix(adapter, DIAMETER_REFERENCE, name, "<MOD-DIAM>")
     set_dimension_prefix(adapter, SPOKE_REFERENCE, "SpokePitch", SPOKE_PITCH_PREFIX)

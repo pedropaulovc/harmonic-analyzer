@@ -27,27 +27,33 @@ def _spring_compliance_along_wire() -> float:
     return moment_arm**2 / stiffness
 
 
+IN = 25.4
+# The nose and tap controls print .217 +/-.002 over the 5.50 mm model nose.
+_NOSE_LOCATION = (2.0 * (0.215 * IN - 5.5), 2.0 * (0.219 * IN - 5.5))
+
+
 def test_neck_load_uses_current_mounting_seat_and_wire_plane() -> None:
     assert arm.NECK == joint.BRACKET_ORIGIN
-    assert arm.ARM_SPAN == pytest.approx(97.965)
+    # Seat 3.95 +.01, both nose controls at .219, grip .125 -.005.
+    assert arm.ARM_SPAN == pytest.approx(3.96 * IN + _NOSE_LOCATION[1] - 0.120 * IN)
     assert arm.ARM_SPAN > joint.SIDE_PLATE_Z[0]
-    assert arm.ARM_B == thread.NECK_THICKNESS - thread.NECK_THICKNESS_TOL == 11.7
-    assert arm.ARM_H == 2.0 * (thread.NOSE_R - thread.NOSE_R_TOL) == 10.9
+    assert arm.ARM_B == pytest.approx(0.48 * IN)  # neck .49 -.01
+    assert arm.ARM_H == pytest.approx(2.0 * 0.215 * IN)  # nose R.217 -.002
     assert arm.NECK[2] == wire.HOOK_Z == wire.DRUM_END_Z
     assert arm.HOOK == (wire.HOOK_X, wire.HOOK_Y, wire.HOOK_Z)
 
 
 def test_arm_section_and_span_bound_every_accepted_size_corner() -> None:
     for width, radius, seat, grip, nose_location in itertools.product(
-        (11.7, 13.3), (5.45, 5.55), (99.89, 100.91),
-        (3.045, 3.305), (-0.10, 0.10),
+        (0.48 * IN, 0.50 * IN), (0.215 * IN, 0.219 * IN), (3.94 * IN, 3.96 * IN),
+        (0.120 * IN, 0.130 * IN), _NOSE_LOCATION,
     ):
         height = 2.0 * radius
         assert arm.I_VERTICAL <= width * height**3 / 12.0 + 1e-9
         assert arm.I_LATERAL <= height * width**3 / 12.0 + 1e-9
         assert arm.ARM_SPAN >= seat - grip + nose_location - 1e-9
-    assert bracket_spec.DRAWING_PRECISION["Neck"]["NeckThickness"] == 1
-    assert arm.AXIS_TO_SEAT_MAX == pytest.approx(101.01)
+    assert bracket_spec.DRAWING_PRECISION["Neck"]["NeckThickness"] == 2
+    assert arm.AXIS_TO_SEAT_MAX == pytest.approx(3.96 * IN + _NOSE_LOCATION[1])
 
 
 def test_loads_follow_actual_force_direction_and_scale_linearly() -> None:
@@ -68,16 +74,16 @@ def test_gravity_moment_bounds_every_accepted_free_tip_in_the_fitted_frame() -> 
         )
     ]
     farthest_tip = max(free_tip_offsets)
-    assert farthest_tip == pytest.approx(161.710)
+    assert farthest_tip == pytest.approx(160.796)
     assert arm.LEVER_GROUP_ARM_X == pytest.approx(farthest_tip)
-    # The former fixed-tip arm misses an accepted fitted rod by 1.710 mm.
+    # The former fixed-tip arm misses an accepted fitted rod by 0.796 mm.
     assert farthest_tip > thread.ROD_LENGTH - thread.NECK_THICKNESS / 2.0 - lever.THREAD_PROJECTION
     assert arm.joint_load(0.0, 1.0) == pytest.approx((0.0, -1.0, -farthest_tip))
 
 
 def test_relocated_row_changes_joint_reference_not_neck_hook_or_body_pose() -> None:
-    assert arm.NECK == (40.0, 979.7, -173.51)
-    assert arm.HOOK == pytest.approx((150.0 - math.hypot(8.95, 4.5), 919.7, -173.51))
+    assert arm.NECK == (40.0, 979.7, -173.5192)
+    assert arm.HOOK == pytest.approx((150.0 - math.hypot(8.95, 4.5), 919.7, -173.5192))
     assert joint.SIDE_PLATE_MACHINE_X == (-8.0, 46.25)
     assert joint.SIDE_PLATE_Y == (-5.5, 5.5)
     assert joint.SIDE_PLATE_FRONT_Z == pytest.approx(
@@ -129,13 +135,13 @@ def test_shifted_row_uses_nearer_flange_edge_for_prying_and_actual_torque_for_sh
     )
     nominal_edge = min(arm.JOINT[1] - lower, upper - arm.JOINT[1])
     assert nominal_edge == pytest.approx(4.79)
-    row_from_lower = arm.JOINT[1] - lower
+    # The 4.79 mm ordinate prints .189 with the shared mounting band.
+    row_min, row_max = (0.189 * IN - joint.POSITION_BAND, 0.189 * IN + joint.POSITION_BAND)
     nearest_edge = min(
-        row_from_lower - joint.POSITION_BAND,
-        joint.SIDE_PLATE_HEIGHT + joint.SIDE_PLATE_HEIGHT_DEVIATIONS[0]
-        - row_from_lower - joint.POSITION_BAND,
+        row_min,
+        joint.SIDE_PLATE_HEIGHT + joint.SIDE_PLATE_HEIGHT_DEVIATIONS[0] - row_max,
     )
-    assert nearest_edge == pytest.approx(4.74)
+    assert nearest_edge == pytest.approx(row_min)
     assert arm.JOINT_PRYING_ARM_Y == pytest.approx(nearest_edge)
     expected_tension = (
         abs(arm.JOINT_MX) / (2.0 * nearest_edge)
@@ -159,15 +165,14 @@ def test_shifted_row_uses_nearer_flange_edge_for_prying_and_actual_torque_for_sh
 
 
 def test_prying_demand_bounds_every_accepted_foot_width_and_row_corner() -> None:
-    # The lower-edge ordinate and overall .X width are independent controls.
+    # The lower-edge ordinate and overall .XX width are independent controls.
     # Width variation is not a symmetric displacement of both nominal edges.
+    rows = (0.189 * IN - joint.POSITION_BAND, 0.189 * IN + joint.POSITION_BAND)
     corner_arms = [
         min(row_from_lower, width - row_from_lower)
-        for width, row_from_lower in itertools.product(
-            (10.2, 11.8), (4.74, 4.84),
-        )
+        for width, row_from_lower in itertools.product((0.42 * IN, 0.44 * IN), rows)
     ]
-    assert (min(corner_arms), max(corner_arms)) == pytest.approx((4.74, 4.84))
+    assert (min(corner_arms), max(corner_arms)) == pytest.approx(rows)
     corner_tensions = [
         abs(arm.JOINT_MX) / (2.0 * edge_arm)
         + abs(arm.JOINT_MY) / 13.7

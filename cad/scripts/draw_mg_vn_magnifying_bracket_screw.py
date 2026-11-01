@@ -10,6 +10,7 @@ import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _inch_fraction import inch_fraction
+from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _supplier_screw_dimensions import annotate_supplier_screw
 from _supplier_screw_layout import supplier_screw_margins
@@ -67,6 +68,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         supplier_dimensions=supplier_dimensions,
         settled_checks=(assert_supplier_dimensions_settled,),
+        unit=part_drawing_unit("mg-vn-magnifying-bracket-screw"),
     )
 
 
