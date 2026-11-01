@@ -6,11 +6,11 @@ import math
 import sys
 
 from solidworks_mcp.adapters.solidworks.drawing import iter_views
-from solidworks_mcp.adapters.sw_type_info import constant
 
 import _telemetry
 import ch_rocker_arm_tl_vn_oblique_hub_pin_spec as part
 from _com import _early_bound
+from _construction_line_font import _construction_curves_as_outline
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_centerline import add_view_centerline
 from _drawing_projection import model_point_in_view
@@ -43,32 +43,8 @@ SUPPLIER_MARGINS = {"*Top": (0.010, 0.016, 0.060, 0.010)}
 CUT_LANE = 0.006
 # The Ø carrier lies on the Top's end-face edge. Construction curves print as
 # continuous thick lines on this sheet (DP_LineFont, this SLDDRW only), so
-# the carrier prints as that edge, not a grey chain over it.
-_CONSTRUCTION_LINE_FONT = (
-    ("swLineFontConstructionCurvesStyle", "swLineCONTINUOUS"),
-    ("swLineFontConstructionCurvesThickness", "swLW_THICK"),
-)
-
-
-def _construction_curves_as_outline(adapter):
-    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
-    option = constant("swDetailingNoOptionSpecified")
-    settings = tuple(
-        (name, constant(name), constant(value)) for name, value in _CONSTRUCTION_LINE_FONT
-    )
-
-    def readback() -> None:
-        for name, preference, value in settings:
-            if int(extension.GetUserPreferenceInteger(preference, option)) != value:
-                raise RuntimeError(f"hub pin line font {name} readback differs")
-
-    for name, preference, value in settings:
-        if not extension.SetUserPreferenceInteger(preference, option, value):
-            raise RuntimeError(f"failed to set hub pin line font {name}")
-    readback()
-    return readback
-
-
+# the carrier prints as that edge, not a grey chain over it
+# (``_construction_line_font``).
 def _assert_shop_dimension(display) -> None:
     """The cut is the shop's size: a plain two-place value, no reference marks."""
     display = _early_bound(display, "IDisplayDimension")
