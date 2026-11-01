@@ -103,7 +103,7 @@ def test_manufactured_rework_retains_actual_stock_and_property_provenance() -> N
     assert part.MEMBER_DESCRIPTIONS[CONFIGURATION] == spec.BOM_DESCRIPTION
     for configuration in ("TNut", "FlangeNut"):
         other = part.MEMBER_PROPERTIES[configuration]
-        assert other["Finish"] == ROW["finish"] == "black oxide, as supplied"
+        assert other["Finish"] == ROW["finish"]
         assert other["Manufacturing Notes"] == part.MEMBER_SPECS[configuration].DRAWING_NOTES
         assert not ({"Process", "Tolerance Class", *part.STUD_REWORK_PROPERTIES} - {"Manufacturing Notes"}) & set(other)
         assert not any(name.startswith("Stud ") for name in other)

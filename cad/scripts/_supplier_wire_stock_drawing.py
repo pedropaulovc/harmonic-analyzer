@@ -16,6 +16,7 @@ from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
 from _mcmaster_9666k56 import DIA
 from _mcmaster_9666k56_reference import (
+    SUPPLIER_DIAMETER_CALLOUT,
     SUPPLIER_DIAMETER_PRECISION,
     SUPPLIER_REFERENCE_CONFIGURATION,
     SUPPLIER_REFERENCE_DIMENSION,
@@ -115,6 +116,7 @@ def add_wire_section(adapter, source) -> Callable[[], None]:
         "expected_mm": DIA,
         "presentation": "diameter",
         "configuration": SUPPLIER_REFERENCE_CONFIGURATION,
+        "callout": SUPPLIER_DIAMETER_CALLOUT,
     }
     supplier_reference_dimension(adapter, display, **options)
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
