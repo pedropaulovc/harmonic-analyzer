@@ -986,6 +986,20 @@ def test_crank_bore_thru_rides_the_size_line_so_the_mate_line_stays_narrow() -> 
     assert drawing.DIMENSION_CALLOUTS["CrankBoreDia"] == "RUNS ON MHA-DT-11"
 
 
+def test_crank_bore_mate_line_stands_clear_of_the_head_height_extension() -> None:
+    """Machinist review of farm run 20261101T142805608Z: the RUNS ON
+    MHA-DT-11 underline sat 0.8 mm over HeadHt's upper extension line (the
+    head's top edge), parallel to it.  That render put the underline 7.31 mm
+    under the requested y and the box 2.6 mm past its 156.3 mm right end, at
+    x 0.1330; View C's nearest text (the 1.697 block) starts at 180.6 mm and
+    the crowding check asks one 15 mm text height of air."""
+    x, y = drawing.FRONT_KEEP["CrankBoreDia"]
+    underline_y = y - 0.00731
+    assert underline_y - drawing._front_y(spec.BLOCK_HEIGHT) >= 0.0025
+    box_right = 0.1563 + (x - 0.1330) + 0.0026
+    assert 0.1806 - box_right >= 0.015
+
+
 def test_mounting_hole_callout_says_drill_above_its_through_row() -> None:
     # r5 machinist review (rule 12): "2X Ø7.14 THRU ALL" left drill or ream unsaid.
     native = {

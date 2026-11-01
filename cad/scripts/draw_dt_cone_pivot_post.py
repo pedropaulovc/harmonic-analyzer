@@ -315,9 +315,16 @@ FRONT_KEEP = {
     # crank-bore Ra's leader crossed the left one (r9 leader-crosses-leader).
     # The inch ream's four-place band widened the box to x 109.3..160.3 mm,
     # 12.66 mm from View C's 38.10 (#290 batch 0 view-crowding): 1.4 mm
-    # left, and 1.5 mm down so the 13° extension line, which ends at y 171.6,
-    # stops above the text's left end.
-    "CrankBoreDia": (0.1330, 0.1675),
+    # left, and 1.5 mm down.  At (0.1330, 0.1675) (farm run
+    # 20261101T142805608Z, machinist review) the mate line's underline
+    # printed 7.31 mm under the given y, 0.8 mm over the head's top edge and
+    # HeadHt's upper extension line, parallel to both.  4 mm right and
+    # 2.25 mm up stand it ~3 mm over them: the Ø keeps ~2 mm under the 13°
+    # arc, whose extension line (ending at x 109.9, y 171.6) now stops ~6 mm
+    # left of the text, and the box ends ~16 mm short of View C's nearest
+    # text (the 1.697 block from x 180.6), over the 15 mm text height the
+    # crowding check asks.
+    "CrankBoreDia": (0.1370, 0.16975),
 }
 
 # The plan's angled ray is the cone bore's axis; its basic 13° runs to it
