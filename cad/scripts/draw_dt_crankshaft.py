@@ -1477,7 +1477,10 @@ def _assert_neck_right_advance(
     if len(lines) != 3 or len(shelves) != 1 or any(
         line.x0 != line.x1 and line.y0 != line.y1 for line in lines
     ):
-        raise RuntimeError(f"{label}: expected the three ordinary native diameter primitives")
+        raise RuntimeError(
+            f"{label}: expected the three ordinary native diameter primitives, got "
+            f"{[(line.x0, line.y0, line.x1, line.y1) for line in lines]!r}"
+        )
     shelf = shelves[0]
     x = OUTBOARD_NECK_DIAMETER_XY[0]
     roof = _sheet_y(JOURNAL_DIA / 2.0)
