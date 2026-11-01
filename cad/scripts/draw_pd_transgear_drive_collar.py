@@ -138,9 +138,13 @@ END_KEEP = {
 # body's left of the rear witness, which struck it inside its own span
 # (baseline run 20261031T145011192Z). The overall reference reads above
 # the section. The rear entry break stands left of the rear face at the
-# chamfered bore edge, its dimension line in the bore's air, so its
-# witnesses stay short. Both diameters read right of the pilot face, each
-# mate callout clear of the other.
+# chamfered bore edge. Its dimension line runs under the callout's last row,
+# 22 mm below the text's top; with the top at the bore edge that line landed
+# 4 mm into the hatched wall under the D-flat (sheet y 152.4 mm against the
+# flat at 156.4, run 20261101T183557651Z review). 8 mm higher it runs in the
+# bore's air between the flat and the axis, and the block's top stays 4 mm
+# under the bore callout's shelf (206.7 mm). Both diameters read right of the
+# pilot face, each mate callout clear of the other.
 _LENGTH_ROW_Y = SIDE_CENTER[1] - HALF_OD - 0.006
 _BORE_EDGE_Y = SIDE_CENTER[1] + BORE_DIA * _S / 2000.0
 SIDE_KEEP = {
@@ -148,7 +152,7 @@ SIDE_KEEP = {
     "CollarLength": (_REAR_X - 0.018, _LENGTH_ROW_Y),
     "CollarDia": (_PILOT_X + 0.069, SIDE_CENTER[1]),
     "PilotDia": (_PILOT_X + 0.022, SIDE_CENTER[1]),
-    "BoreEntryBreak": (_REAR_X - 0.031, _BORE_EDGE_Y - 0.0012),
+    "BoreEntryBreak": (_REAR_X - 0.031, _BORE_EDGE_Y + 0.0068),
 }
 OVERALL_TEXT_XY = ((_REAR_X + _SEAT_X) / 2.0, SIDE_CENTER[1] + HALF_OD + 0.010)
 # Physical annular end-face picks, outside the actual rear entry relief and
