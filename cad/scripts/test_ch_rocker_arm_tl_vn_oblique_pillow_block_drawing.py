@@ -244,11 +244,10 @@ def test_plan_view_carries_the_receipt_check_reference_sizes() -> None:
         "SupplierBoltSpacing": "top",
         "SupplierBoltHoleDiameter": "left",
     }
-    # Every text clear of its own lines: the hole's left, the spacing right.
-    assert draw.SHELVES == {
-        "SupplierBoltHoleDiameter": (False, "left"),
-        "SupplierBoltSpacing": (True, "right"),
-    }
+    # The hole's text shelves left, clear of its witnesses; the spacing's stays
+    # centred in a break of its line (no offset leader doubling the line).
+    assert draw.SHELVES == {"SupplierBoltHoleDiameter": (False, "left")}
+    assert (draw.BROKEN_LINE, draw.BROKEN_LINE_ALIGNED_TEXT) == ("SupplierBoltSpacing", 3)
     left, bottom, right, top = draw.SUPPLIER_MARGINS["*Front"]
     # The hole text's left reserve; the plan view (55 x 13 at 2:1 plus 11.176
     # mm of native padding) still fits the 180 mm cell beside it.
