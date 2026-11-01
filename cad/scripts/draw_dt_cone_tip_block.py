@@ -173,8 +173,10 @@ ROUND_OUT = 0.0001
 # so the leader drops to 37 deg (3.5).  Every degree shallower slides the
 # right-hand views ~1.2 mm further right.  Hole callouts' extents (every
 # line plus the shoulder) are measured on the I31 render like the rest of the
-# sheet's ink (see "Sheet ink audit").
-ADJUSTER_CALLOUT_EXTENT = (0.0295, 0.0086, 0.0278, 0.0078)
+# sheet's ink (see "Sheet ink audit"), except the right end: on the c289ee94
+# render the shoulder ran 29.0 mm right of the callout's point, 1.2 mm past
+# I31's 27.8, and stopped 0.3 mm short of the right view's north face.
+ADJUSTER_CALLOUT_EXTENT = (0.0295, 0.0086, 0.0290, 0.0078)
 # The name's ink from its upper-left corner (287c: 36.3 x 3.4 mm).
 ADJUSTER_ENTRY_EXTENT = (0.0, 0.0036, 0.0365, 0.0)
 ADJUSTER_LEADER_ANGLE = math.radians(37.0)
@@ -197,13 +199,20 @@ ADJUSTER_CALLOUT_Y = ADJUSTER_SHOULDER_Y + ADJUSTER_CALLOUT_EXTENT[1]
 ADJUSTER_ENTRY_DX = _ADJUSTER_SHOULDER_DX + (
     ADJUSTER_CALLOUT_EXTENT[0] + ADJUSTER_CALLOUT_EXTENT[2] - ADJUSTER_ENTRY_EXTENT[2]
 ) / 2.0
-# The right view's north face stands a text clearance past the callout's right
-# end.  (I31, 7ab69742b: at x 0.166 the callout's longest line ran over that
-# face; the right view slid 5 mm then, the removed views with it.)  The
-# removed views B and C keep the row's 72 mm pitch, so the gaps to their
-# right keep their measured air.
+# The right view's north face stands ADJUSTER_VIEW_AIR past the callout's
+# right end.  (I31, 7ab69742b: at x 0.166 the callout's longest line ran over
+# that face; the right view slid 5 mm then, the removed views with it.  Blind
+# machinist review of c289ee94: a text clearance of air read as the callout
+# pressing against the view, so the air is 3 mm.)  The removed views B and C
+# keep the row's 72 mm pitch, so the gaps to their right keep their measured
+# air.
+ADJUSTER_VIEW_AIR = 0.003
 _RIGHT_NORTH_FACE_X = (
-    FRONT_CENTER[0] + ADJUSTER_CALLOUT_DX + ADJUSTER_CALLOUT_EXTENT[2] + TEXT_CLEARANCE + ROUND_OUT
+    FRONT_CENTER[0]
+    + ADJUSTER_CALLOUT_DX
+    + ADJUSTER_CALLOUT_EXTENT[2]
+    + ADJUSTER_VIEW_AIR
+    + ROUND_OUT
 )
 VIEW_ROW_PITCH = 0.072
 RIGHT_CENTER = (_RIGHT_NORTH_FACE_X + Z_NORTH * _S, FRONT_CENTER[1])
@@ -431,9 +440,13 @@ FOOT_TAP_CALLOUT_XY = (FOOT_TAP_CENTER[0] + 0.0373, _bottom_y(Z_NORTH) + 0.0100)
 # front view (287c) its "Ra 3.2" stood 0.2 mm off an arrow, and no leader can
 # reach that foot without crossing the width's extension or dimension line.
 # VIEW C shows the same foot edge-on with nothing dimensioned under it.
+# Blind machinist review of c289ee94: 13 mm under the foot its shoulder
+# printed 1.2 mm over the title block's top line and read as touching it;
+# 11.5 mm splits the air, ~2.7 mm to that line and ~2.5 mm from the symbol's
+# top to the foot.
 FOOT_FINISH_CENTER = BACK_CENTER
 FOOT_FINISH_DX = 0.034
-FOOT_FINISH_DROP = 0.013
+FOOT_FINISH_DROP = 0.0115
 
 
 def _adjuster_axis_keep(
