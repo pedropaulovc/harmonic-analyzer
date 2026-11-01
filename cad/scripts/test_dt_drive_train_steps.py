@@ -138,6 +138,14 @@ def test_post_screws_keep_spec_owned_stock_and_cut_to_fit_acceptance() -> None:
         <= screw.POST_SCREW_CUT_TO_FIT_SHORT
     )
     assert drawing.POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT in fitup
+    from machinist_exceptions import load_exceptions
+
+    declared = {
+        entry.id: entry
+        for entry in load_exceptions(_config.CONFIG_DIR, "dt_drive_train_assembly", "assembly")
+    }
+    assert declared["DT-02"].kind == "minor"
+    assert drawing.POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT in declared["DT-02"].where
 
 
 def test_crank_fit_reads_t120_before_the_full_turn_and_retention_drilling() -> None:
