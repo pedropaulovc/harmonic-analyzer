@@ -74,14 +74,14 @@ def test_the_model_owns_every_band_the_sheet_prints() -> None:
         assert set(names) <= spec.DRAWING_DIMENSIONS[feature]
 
 
-def test_the_far_face_and_strip_widths_print_as_references() -> None:
+def test_the_far_face_prints_as_a_reference_and_the_strip_widths_control() -> None:
     """Review-3 #3: the match-drilled hole's far face is set at fit-up, so
     its X and Y print in parentheses with no band; the straight's length
-    still controls the formed straight and keeps the formed band.  The flat
-    pattern's strip widths follow from the ear and front-edge heights, so
-    they are references too."""
-    assert spec.FACE_REFERENCES <= spec.DRAWING_DIMENSIONS["ArmProfile"]
-    assert spec.FLAT_WIDTH_REFERENCES <= spec.DRAWING_DIMENSIONS[spec.FLAT_SKETCH]
+    still controls the formed straight and keeps the formed band.  The arm's
+    strip widths control the front edge (review 2), not references."""
+    assert spec.REFERENCE_DIMENSIONS <= spec.DRAWING_DIMENSIONS["ArmProfile"]
+    assert spec.ARM_WIDTH_DIMENSIONS <= spec.DRAWING_DIMENSIONS[spec.FLAT_SKETCH]
+    assert not spec.ARM_WIDTH_DIMENSIONS & spec.REFERENCE_DIMENSIONS
     assert not spec.REFERENCE_DIMENSIONS & spec.FORMED_DIMENSIONS["ArmProfile"]
     assert "StraightLen" in spec.FORMED_DIMENSIONS["ArmProfile"]
     assert not any(
@@ -279,8 +279,8 @@ def _texts() -> dict[str, tuple[float, ...]]:
         "ScrewX1": 10, "ScrewX2": 10, "ScrewY": 10, "ScrewDia": 11,
         "RollStart": 10, "FaceY": 7, "FaceX": 7, "TabEndX": 11,
         "StraightLen": 11, "PinHoleDia": 5, "RollR": 12, "TabR": 11,
-        "Width": 3, "ArmFrontZ": 3, "ArmLowZ": 3, "RootR": 4, "RoundR": 5,
-        "FlatLength": 4, "FlatArmW": 5, "FlatLowW": 5,
+        "Width": 3, "RootR": 4, "RoundR": 5,
+        "FlatLength": 4, "FlatArmW": 3, "FlatLowW": 3,
         "DevTaper1": 4, "DevTaper2": 4, "DevRoundC": 4,
         "BaseLength": 3, "EarHeight": 3, "InsideBendR": 11,
     }  # fmt: skip

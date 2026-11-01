@@ -84,6 +84,7 @@ from pd_vn_transgear_pivot_screw_spec import (
     HEAD_H,
     SHOULDER_END_Y,
     SHOULDER_DIA,
+    SHOULDER_LEN,
     SKU,
     SOCKET_AF,
     SUPPLIER_DRAWING_DIMENSIONS,
@@ -97,8 +98,8 @@ from pd_vn_transgear_pivot_screw_spec import (
     TIP_Y,
 )
 
-# Cached machinist review leaf: LEARN until the sheet reaches SHIP.
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_pivot_screw"]
 SOURCE = SPEC.source
@@ -175,6 +176,17 @@ _MARK_ARM_M = 0.003
 # and no outside arrow tail strikes the text's shelf.
 _TAIL_COLUMN_GAP_M = 0.008
 _DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
+# Machinist review r2 (minor, all runs): the shoulder's two supplier
+# reference lines printed as a grey dash-dot across mid-shoulder and dashes
+# over its flank.  They now lie on outline edges (the head's bearing face and
+# the shoulder's flank, SUPPLIER_REFERENCE_STARTS) and draw in the outline's
+# black, so they ARE those edges (draw_dt_pinion_arbor's recipe).
+_REFERENCE_WITNESS_COLOR = 0  # COLORREF black, the outline's colour.
+_SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
+_SHOULDER_WITNESS_LENGTHS = {
+    "SupplierShoulderDiameter": SHOULDER_DIA,
+    "SupplierShoulderLength": SHOULDER_LEN,
+}
 # The cutting controls verify_machining_controls re-reads. CutLength, the
 # fit-up length, still drives the facing cut but prints as a reference.
 EXPECTED_CONTROLS = {
@@ -424,6 +436,49 @@ def _add_supplier_references(adapter: Any, front: Any, top: Any) -> dict[str, An
             adapter, annotation.GetSpecificAnnotation(), name
         )
     return authored
+
+
+def _blacken_shoulder_witnesses(adapter: Any, front: Any) -> None:
+    """Draw the shoulder's two supplier reference lines in the outline's black.
+
+    Each is the SupplierReference sketch's one construction segment of its
+    size's length, mapped into Front (the model entity, never a point pick);
+    both lie on outline edges, so in black they print as those edges.
+    """
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    native = _early_bound(front, "IView")
+    if not drawing.ActivateView(view_name(adapter, front)):
+        raise RuntimeError("cannot activate Front for the shoulder reference lines")
+    model = native.ReferencedDocument
+    feature = None if model is None else _early_bound(model, "IPartDoc").FeatureByName("SupplierReference")
+    if feature is None:
+        raise RuntimeError("Front's model has no SupplierReference sketch")
+    sketch = _early_bound(_early_bound(feature, "IFeature").GetSpecificFeature2(), "ISketch")
+    segments = [_early_bound(raw, "ISketchSegment") for raw in sketch.GetSketchSegments() or ()]
+    selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    for name, length_mm in _SHOULDER_WITNESS_LENGTHS.items():
+        matches = [
+            segment for segment in segments
+            if bool(segment.ConstructionGeometry)
+            and abs(float(segment.GetLength()) * 1000.0 - length_mm) <= 0.01
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(f"{name}: {len(matches)} construction segments match its length")
+        in_view = native.GetCorresponding(matches[0])
+        if in_view is None:
+            raise RuntimeError(f"{name}: the reference line has no instance in Front")
+        draw.ClearSelection2(True)
+        data = selection.CreateSelectData()
+        data.View = front
+        if not _early_bound(in_view, "ISketchSegment").Select4(False, data):
+            raise RuntimeError(f"{name}: cannot select the reference line in Front")
+        if int(selection.GetSelectedObjectType3(1, -1)) != _SW_SEL_EXT_SKETCH_SEGS:
+            raise RuntimeError(f"{name}: the reference line pick resolved to another entity")
+        drawing.SetLineColor(_REFERENCE_WITNESS_COLOR)
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+
 
 
 @_telemetry.traced("drawing.pivot_stock_length_entities")
@@ -2047,6 +2102,7 @@ async def build(adapter: Any) -> dict[str, str]:
         {"ChamferWidth": CHAMFER_TEXT_XY, "CutLength": CUT_LENGTH_TEXT_XY},
     )
     supplier_refs = _add_supplier_references(adapter, front, top)
+    _blacken_shoulder_witnesses(adapter, front)
     tail_check, tail_frame = _move_tail_column(
         adapter, by_name["ThreadLengthMin"], supplier_refs["SupplierThreadMajor"],
     )

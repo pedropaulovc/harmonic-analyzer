@@ -238,7 +238,11 @@ SUPPLIER_REFERENCE_STARTS = {
         -THREAD_MAJOR / 2,
         SHOULDER_END_Y - (FULL_THREAD_START + FITTED_THREAD_LEN) / 2,
     ),
-    "SupplierShoulderDiameter": (-SHOULDER_DIA / 2, -SHOULDER_LEN / 2),
+    # On the head's bearing face (y 0), whose outline edge spans the shoulder:
+    # the drawing draws this line and the length's (on the shoulder's flank)
+    # in the outline's black, so neither prints as a stray centreline
+    # (machinist review r2, minor, all runs).
+    "SupplierShoulderDiameter": (-SHOULDER_DIA / 2, 0.0),
     "SupplierShoulderLength": (SHOULDER_DIA / 2, SHOULDER_END_Y),
 }
 SUPPLIER_DRAWING_DIMENSIONS = {

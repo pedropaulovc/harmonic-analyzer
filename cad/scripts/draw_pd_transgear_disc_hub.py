@@ -28,7 +28,13 @@ import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+    view_name,
+)
 
 from _check import check
 from _com import _early_bound
@@ -37,13 +43,16 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_detail_crop import native_circle_geometry
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
 from _drawing_gdt import add_feature_control_frame
-from _drawing_projection import model_points_in_view
+from _drawing_leaders import set_near_side_diameter
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
@@ -56,13 +65,16 @@ from _part_properties import part_drawing_unit
 from _session import run_build
 import _telemetry
 from pd_rack_pinion_spec import inch_text
+from pd_transgear_disc_hub_geometry import BOLT_CIRCLE_DIA
 from pd_transgear_disc_hub_spec import (
+    BOLT_CIRCLE_CALLOUT,
     BORE_DATUM,
     BORE_DIA,
     BOSS_CLEARANCE_LIMITS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FLANGE_DIA,
+    FLANGE_DIA_CALLOUT,
     FLANGE_THICK_CALLOUT,
     FLAT_CLEARANCE,
     GEOMETRIC_TOLERANCES_IN,
@@ -81,8 +93,8 @@ from pd_transgear_disc_hub_spec import (
 )
 
 
-# Cached machinist review leaf: LEARN until the sheet reaches SHIP.
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_disc_hub"]
 PART_STEM = SPEC.artifact_stem
@@ -150,7 +162,9 @@ FLAT_CALLOUT = "\n".join(
 )
 
 # Every size and callout sits outside the silhouettes.
-# - Face view: the bolt circle diameter above-left, the screw-hole size (3X,
+# - Face view: the bolt circle diameter above-left, its arrows on the
+#   circle's centreline drawn through the three hole centres (machinist
+#   review: with no circle they ended in air), the screw-hole size (3X,
 #   drilled through the flange) above-right, the flat's distance below-left
 #   (the flat's side, so its dimension line stays clear of the bore's
 #   leader) and the bore below-right, each with its fit callout under it.
@@ -169,11 +183,14 @@ FLAT_CALLOUT = "\n".join(
 #   extension line.  Its ends are the spigot's and the hub's +X corners, so
 #   from a row above its extension lines rise off the part; from below they
 #   ran down across the hub front and the spigot end.  Below the part: the
-#   flange's thickness, its text and reach callout right of the flange and
-#   under the flange's frame, and the oil hole's size with its match-drill
-#   callout straight under the hole, so its leader rises to the hole
-#   crossing no dimension (machinist review: from above it crossed the
-#   overall's dimension line).
+#   flange's thickness, its text and reach callout wholly right of the
+#   flange's extension lines (machinist review: they ran through the text),
+#   under the flange's frame; and the oil hole's size with its match-drill
+#   callout below-left of the hole, its block ending left of the hole so its
+#   leader leaves the block's lower-right corner (SolidWorks' shoulder) and
+#   rises almost straight to the hole through the hub's underside, crossing
+#   no dimension (machinist review: from a block centred under the hole the
+#   leader left its right end and ran through the flange thickness).
 # - The two perpendicularity frames stand right of the spigot's end, each
 #   level with its leader's landing so the leader runs square onto its face's
 #   line: the flange's below the spigot, between the spigot's and the
@@ -187,16 +204,27 @@ END_KEEP = {
     "FlatToAxis": (END_CENTER[0] - 0.030, AXIS_Y - _FLANGE_R - 0.020),
 }
 _OIL_HOLE_X = _side_x(HUB_FRONT_Z + OIL_HOLE_STATION)
+# Estimated (width, height) of the oil hole's and the flange thickness's
+# text blocks (3.5 mm caps, 2.61 mm advance).
+OIL_HOLE_TEXT_BLOCK = (0.066, 0.028)
+FLANGE_THICK_TEXT_BLOCK = (0.047, 0.017)
+_OIL_HOLE_SHOULDER = (_OIL_HOLE_X - 0.002, AXIS_Y - _FLANGE_R - 0.033)
 SIDE_KEEP = {
     "HubDia": (HUB_FRONT_X - 0.014, AXIS_Y),
     "SpigotDia": (SPIGOT_END_X + 0.040, AXIS_Y - 0.003),
     # Clear the spigot's whole fit-callout box, not just its dimension line.
     "FlangeDia": (SPIGOT_END_X + 0.083, AXIS_Y),
-    "FlangeThick": (_side_x(0.0) + 0.010, AXIS_Y - _FLANGE_R - 0.012),
+    "FlangeThick": (
+        _side_x(0.0) + 0.004 + FLANGE_THICK_TEXT_BLOCK[0] / 2.0,
+        AXIS_Y - _FLANGE_R - 0.014,
+    ),
     "OilHoleStation": ((HUB_FRONT_X + _OIL_HOLE_X) / 2.0, AXIS_Y + _FLANGE_R + 0.009),
     "SpigotLength": (SPIGOT_END_X + 0.026, AXIS_Y + _FLANGE_R + 0.009),
     "HubLength": (SPIGOT_END_X + 0.056, AXIS_Y + _FLANGE_R + 0.026),
-    "OilHoleDia": (_OIL_HOLE_X, AXIS_Y - _FLANGE_R - 0.031),
+    "OilHoleDia": (
+        _OIL_HOLE_SHOULDER[0] - OIL_HOLE_TEXT_BLOCK[0] / 2.0,
+        _OIL_HOLE_SHOULDER[1] + OIL_HOLE_TEXT_BLOCK[1] / 2.0,
+    ),
 }
 DIMENSION_CALLOUTS_BELOW = {
     "BoreDia": BORE_CALLOUT,
@@ -207,8 +235,83 @@ DIMENSION_CALLOUTS_BELOW = {
     "SpigotLength": SPIGOT_LENGTH_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
     "FlangeThick": FLANGE_THICK_CALLOUT,
+    "FlangeDia": FLANGE_DIA_CALLOUT,
 }
-DIMENSION_CALLOUTS_ABOVE = {"ScrewHoleDia": SCREW_HOLE_CALLOUT_ABOVE}
+DIMENSION_CALLOUTS_ABOVE = {
+    "ScrewHoleDia": SCREW_HOLE_CALLOUT_ABOVE,
+    "BoltCircleDia": BOLT_CIRCLE_CALLOUT,
+}
+# The bolt circle's centreline: thin, black, centre-line font (Y14.2), in
+# the face view's sketch, straight to the database so no inference snaps it
+# onto a hole (draw_ch_connecting_rod's detail fence recipe).
+CENTER_LINE_STYLE = 4  # swLineStyles_e.swLineCENTER
+CENTER_LINE_WEIGHT = 0  # swLineWeights_e.swLW_THIN
+
+
+def _add_bolt_circle_centerline(adapter: Any, view: Any) -> None:
+    """Draw the screw holes' bolt circle as a centreline circle on the face
+    view and read its centre and radius back."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    native = _early_bound(view, "IView")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate the hub face view for its bolt circle")
+    draw.ClearSelection2(True)
+    centre = model_point_in_view(
+        adapter, view, (0.0, 0.0, HUB_FRONT_Z / 1000.0), label="hub bolt circle centre"
+    )
+    radius = BOLT_CIRCLE_DIA / 2.0 * _S
+    sketch = _early_bound(native.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (centre, (centre[0] + radius, centre[1])):
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        circle = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if circle is None:
+        raise RuntimeError("failed to sketch the hub bolt circle centreline")
+    placed_centre, placed_radius = native_circle_geometry(
+        circle, label="hub bolt circle"
+    )
+    if math.dist(placed_centre[:2], points[0][:2]) > 1e-9 or not math.isclose(
+        placed_radius, math.dist(points[0][:2], points[1][:2]), abs_tol=1e-9
+    ):
+        raise RuntimeError(
+            "the hub bolt circle centreline moved from where it was placed"
+        )
+    segment = _early_bound(circle, "ISketchSegment")
+    # COLORREF black: a view sketch line otherwise prints in the sketch's
+    # grey or under-defined blue, which reads as a hidden line.
+    segment.Color = 0
+    segment.Style = CENTER_LINE_STYLE
+    segment.Width = CENTER_LINE_WEIGHT
+    font = (int(segment.Color), int(segment.Style), int(segment.Width))
+    if font != (0, CENTER_LINE_STYLE, CENTER_LINE_WEIGHT):
+        raise RuntimeError(f"hub bolt circle centreline font reads {font!r}")
+    draw.ClearSelection2(True)
+
+
+def _set_near_side_bolt_circle(adapter: Any, annotations: list[Any]) -> None:
+    """The bolt circle's diameter: one arrow on the centreline nearest its
+    text, no line through the bore."""
+    matches = [a for a in annotations if dimension_name(adapter, a) == "BoltCircleDia"]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"expected one BoltCircleDia dimension, found {len(matches)}"
+        )
+    set_near_side_diameter(matches[0], "hub bolt circle near-side leader")
+    rebuild_drawing(adapter, label="hub bolt circle near-side leader")
+
 
 # The two perpendicularity frames attach by entity, not by a sheet pick, and
 # to the controlled FACE, not to its rim.  A face seen edge-on draws as its
@@ -484,6 +587,10 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(
                 f"failed to add ASME center marks to the hub {label} view"
             )
+    # The bolt circle draws as its centreline; its diameter lands one arrow
+    # on it nearest the text, no line across the bore (machinist review).
+    _add_bolt_circle_centerline(adapter, end)
+    _set_near_side_bolt_circle(adapter, end_annotations)
     # Datum A, the bore, on the face view where it shows round; the view has
     # no datum tag yet, as the native placement requires.
     add_native_axis_datum(

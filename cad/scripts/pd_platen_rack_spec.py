@@ -63,7 +63,7 @@ if DP != PURCHASED_RACK_DP or PA_DEG != PURCHASED_RACK_PA_DEG:
 
 CUT_LENGTH_MM = PLATE_WIDTH
 BAR_LENGTH = CUT_LENGTH_MM  # rack and backer end flush with the platen
-BAR_HEIGHT = 12.0  # accepted exposed band below the guide rail; prints (.472) REF
+BAR_HEIGHT = 12.0  # accepted exposed band below the guide rail; prints (.47) REF
 BAR_THICKNESS = 6.0  # accepted edge-on photo envelope; prints .24
 RACK_HEIGHT = PURCHASED_RACK_HEIGHT_IN * MM_PER_IN
 RACK_THICKNESS = PURCHASED_RACK_FACE_WIDTH_IN * MM_PER_IN
@@ -621,7 +621,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # and the rack's offset on it set no mate (the mesh is set at assembly), so
 # they print .XX too; the window's cut-end section maxima and the rear
 # bushing's air to the rack are paid at those printed limits.
-# The purchased 3/16 strip prints its exact decimal as a reference.
+# The purchased 3/16 strip prints its exact decimal as a reference. The
+# overall height is a reference sum of the .XX backer and that strip, so it
+# prints .XX too: at .XXX its (.472) disagreed with .28 + (.1875) on the
+# sheet (machinist review round 2).
 _PLACES = {
     "Length": 2,
     "BackerDepth": 2,
@@ -629,7 +632,7 @@ _PLACES = {
     "RackHeight": 4,
     "RackInset": 2,
     "SeamHeight": 2,
-    "OverallHeight": 3,
+    "OverallHeight": 2,
 }
 DRAWING_PRECISION = {
     feature: {name: _PLACES[name] for name in names}

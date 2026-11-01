@@ -220,7 +220,7 @@ from pd_platen_spec import (  # noqa: E402
     PLATE_THICKNESS,
     PLATE_WIDTH,
     SOCKET_BOSS_DIA as PLATEN_SOCKET_BOSS_DIA,
-    SOCKET_BOSS_FILLET_R as PLATEN_BOSS_FILLET_R,
+    SOCKET_BOSS_ROOT_R_MAX as PLATEN_BOSS_ROOT_R_MAX,
     SOCKET_BOSS_H as PLATEN_BOSS_H,
     SOCKET_SPEC as PLATEN_SOCKET_SPEC,
     SOCKET_THREAD_ENGAGEMENT as PLATEN_SOCKET_ENGAGEMENT,
@@ -1455,10 +1455,7 @@ def _latch_hook_sections() -> list[tuple[str, tuple[float, float, float, float]]
     ear_rear = printed_deviations(
         HOOK.EAR_HEIGHT, HOOK_SPEC.EAR_HEIGHT_PLACES, unit=HOOK_SPEC.UNIT
     )[1]
-    arm_forward = max(
-        -printed_deviations(HOOK.z_local(z), HOOK_SPEC.ARM_BAND_PLACES, unit=HOOK_SPEC.UNIT)[0]
-        for z in (HOOK.Z_FRONT, HOOK.Z_FRONT_LOW)
-    )
+    arm_forward = HOOK_SPEC.ARM_FRONT_FORWARD
     bend = math.radians(HOOK_SPEC.BEND_TOL_DEG)
     ear_lift = HOOK.EAR_HEIGHT * (1.0 - math.cos(bend))
     sections: list[tuple[str, tuple[float, float, float, float]]] = [
@@ -1621,10 +1618,11 @@ def _assert_lock_station_sweep() -> None:
     # The clip-screw socket bosses ride the platen back too, SOCKET_BOSS_H
     # proud of it, their screw tips flush in them; the thinnest bar carries
     # the back rearward. Each boss takes its printed Ø (on the radius), the
-    # root round's foot on the back face beyond it, and its station sideways,
+    # root round's foot on the back face beyond it at the title block's
+    # inside-corner limit, and its station sideways,
     # and rearward the tallest boss, or the tip left proud of the shortest one
     # by a thin plate.
-    boss_r = PLATEN_SOCKET_BOSS_DIA / 2.0 + PLATEN_BOSS_FILLET_R
+    boss_r = PLATEN_SOCKET_BOSS_DIA / 2.0 + PLATEN_BOSS_ROOT_R_MAX
     boss_dy = printed_deviations(
         PLATEN_SOCKET_BOSS_DIA, PLATEN_PRECISION["Boss2Dia"], unit=PLATEN_UNIT
     )[1] / 2.0 + max(

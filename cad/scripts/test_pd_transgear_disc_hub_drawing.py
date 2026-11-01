@@ -107,7 +107,7 @@ def test_the_sheet_prints_the_overall_and_the_flange_never_the_hub_body() -> Non
     assert spec.BORE_DIA == spec.SLEEVE.BOSS_DIA and _places("BoreDia") == 4
     assert spec.FLAT_TO_AXIS == spec.SLEEVE.FLAT_TO_AXIS
     assert _places("FlatToAxis") == 4
-    assert spec.HUB_DIA == pytest.approx(0.520 * IN) and _places("HubDia") == 3
+    assert spec.HUB_DIA == pytest.approx(0.52 * IN) and _places("HubDia") == 2
     assert spec.SPIGOT_DIA == pytest.approx(0.501 * IN) and _places("SpigotDia") == 4
     assert spec.FLANGE_DIA == pytest.approx(0.990 * IN) and _places("FlangeDia") == 3
     assert joint.BOLT_CIRCLE_DIA == pytest.approx(0.748 * IN)
@@ -856,14 +856,22 @@ def test_turned_diameters_print_inline_beside_their_own_step_on_the_edge_view() 
         assert boxes[name].gap(edge) >= 0.004, name
     for name in drawing.END_KEEP:
         assert face_gap(boxes[name]) >= 0.004, name
-    # The oil hole's size stands straight below the hole, under the part, so
-    # its leader crosses no dimension line; the flange thickness and its
-    # function stand below the part too, between the two.  The station
-    # shares the spigot's row above; the overall stands a row above those,
-    # its text right of the spigot's end.
+    # The oil hole's size stands below-left of the hole, under the part, its
+    # block ending left of the hole, so its leader rises almost straight to
+    # the hole from the block's lower-right corner, inside the hub body's
+    # length, crossing no dimension line.  The flange thickness and its
+    # function stand below the part wholly right of the flange's extension
+    # lines.  The station shares the spigot's row above; the overall stands
+    # a row above those, its text right of the spigot's end.
+    hole_x = drawing._OIL_HOLE_X
+    shoulder = drawing._OIL_HOLE_SHOULDER
     assert boxes["OilHoleDia"].ymax < edge.ymin
-    assert drawing.SIDE_KEEP["OilHoleDia"][0] == pytest.approx(drawing._OIL_HOLE_X)
-    assert boxes["OilHoleDia"].ymax < boxes["FlangeThick"].ymin
+    assert boxes["OilHoleDia"].xmax <= shoulder[0] + 1e-9 < hole_x
+    hub_bottom = axis_y - spec.HUB_DIA / 2.0 * s
+    t = (hub_bottom - shoulder[1]) / (axis_y - shoulder[1])
+    crossing_x = shoulder[0] + t * (hole_x - shoulder[0])
+    assert drawing.HUB_FRONT_X + 0.002 < crossing_x < drawing._side_x(-spec.FLANGE_THICK)
+    assert boxes["FlangeThick"].xmin > drawing._side_x(0.0) + 0.002
     assert boxes["FlangeThick"].ymax < edge.ymin
     assert boxes["HubLength"].ymin > boxes["SpigotLength"].ymax
     assert boxes["HubLength"].xmin > drawing.SPIGOT_END_X

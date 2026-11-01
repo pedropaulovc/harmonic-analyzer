@@ -48,9 +48,11 @@ SUPPLIER_REFERENCE_PLANES = {
     "SupplierHeadHeight": "Top",
     "SupplierThreadDiameter": "Top",
 }
+# The thread's label reads as the footer's ITEM line does (machinist review
+# round 2: "2-56" on the view, "#2-56" in the ITEM row).
 SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (2, "length", None, None),
     "SupplierHeadHeight": (3, "length", None, None),
     "SupplierHeadDiameter": (3, "diameter", None, None),
-    "SupplierThreadDiameter": (3, "diameter", None, "2-56"),
+    "SupplierThreadDiameter": (3, "diameter", None, THREAD),
 }

@@ -51,17 +51,12 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_tolerances import set_dimension_bilateral_tolerance
-from _drawing_prefix import set_dimension_prefix
 from _simplified_part import save_simplified_part
 from _fit_deviations import deviations
 from _gear import build_stock_form_gear, volume_check
 from _holes import wizard_holes
 from _visibility import blank_reference_geometry
-from paper_drive_stock_native import (
-    apply_span_limits,
-    author_root_envelope,
-    author_span,
-)
+from paper_drive_stock_native import apply_span_limits, author_span
 from pd_rack_pinion_spec import (
     BORE_DEVIATIONS,
     BORE_DIA,
@@ -94,15 +89,6 @@ from pd_transgear_disc_hub_geometry import (
     BOLT_CIRCLE_Y_FACTOR,
 )
 from pd_vn_transgear_disc_screw_spec import ENGAGEMENT_WORST_D
-
-# The MHA-PD-VN-55 screw's worst full-thread engagement in the through taps (the
-# tap's lead runs out of the rear face; the losses are the mouths' burr
-# breaks and the cut tip), floored so the MIN never rounds up.
-ENGAGEMENT_WORST_D_PRINTED = math.floor(ENGAGEMENT_WORST_D * 100.0) / 100.0
-MANUFACTURING_NOTES = (
-    "#0-80 TAPS FULL THREAD THRU; MHA-PD-VN-55 SCREW ENGAGEMENT "
-    f"{ENGAGEMENT_WORST_D_PRINTED:.2f}D MIN."
-)
 
 PART_NAME = "pd-rack-pinion"
 MATERIAL = "Brass"  # ch. 23 photos: brass
@@ -244,10 +230,6 @@ async def build(adapter) -> dict[str, str]:
     # Hidden but still selectable by name for the assembly's mates.
     blank_reference_geometry(adapter, ((gear_axis, "AXIS"),))
     await author_span(adapter, STOCK_PROFILE, SPAN_TEETH, places=SPAN_PLACES, unit=UNIT)
-    await author_root_envelope(adapter, STOCK_PROFILE)
-    set_dimension_prefix(
-        adapter, "RootInspectionProfile", "RootEnvelope", "AXIS ROOT "
-    )
     await volume_check(adapter, "inspection sketches neutral", expected, 0.01 * V_BORE)
 
     await apply_material(adapter, MATERIAL)
@@ -287,7 +269,6 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {
             "Gear Data": GEAR_DATA,
-            "Manufacturing Notes": MANUFACTURING_NOTES,
             TOOTH_SPACE_CALLOUT_PROPERTY: TOOTH_SPACE_CALLOUT,
         },
     )

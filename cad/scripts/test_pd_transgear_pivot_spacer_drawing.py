@@ -48,9 +48,9 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
         for feature, names in spec.DRAWING_DIMENSIONS.items()
         for name in names
     }
-    # The length and bore hold their own bands at .XXXX; the O.D., an outside
-    # profile no stack reads, takes the loosest row (.XX inch, rule 4).
-    assert spec.DRAWING_PRECISION_BY_NAME == {"RingOd": 2, "BoreDia": 4, "RingLength": 4}
+    # The length (on the .001 grid) and the bore hold their own bands; the
+    # O.D., an outside profile no stack reads, takes the loosest row (.XX).
+    assert spec.DRAWING_PRECISION_BY_NAME == {"RingOd": 2, "BoreDia": 4, "RingLength": 3}
 
 
 def test_the_length_and_the_bore_carry_their_bands_on_the_model() -> None:

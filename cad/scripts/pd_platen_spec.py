@@ -22,7 +22,7 @@ import _config
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import printed_deviations
+from _printed_tolerance import inside_corner_radius_mm, printed_deviations
 from sh_vn_brass_fillister_screw_spec import HEAD_H as FILLISTER_HEAD_H
 
 UNIT = drawing_unit("parts/pd-platen", _config.parts("pd-platen"))
@@ -52,16 +52,16 @@ SOCKET_BOSS_DIA = (
 # .07 rounded). build_pd_platen_clip asserts it against the live screw and sheet.
 SOCKET_BOSS_H = 1.6872
 SOCKET_THREAD_ENGAGEMENT = PLATE_THICKNESS + SOCKET_BOSS_H
-# Each boss meets the back face in a root round up to the tool-nose radius
-# the print allows (r7 review: a bare corner left the root unstated).  It
-# prints as the single limit "4X R.020 MAX"; swTolMAX prints the nominal, so
-# the model carries the limit (pn_pen_rod_spec's shoulder root).  The round
-# stands .020 out from the boss on the back face, where nothing rides
-# (build_pd_paper_drive_assembly's lock-station sweep grows each boss by it).
-SOCKET_BOSS_FILLET_R = 0.508  # .020
-# (upper, lower) deviations: the nominal IS the limit, down to sharp.
-SOCKET_BOSS_FILLET_BAND = (0.0, -SOCKET_BOSS_FILLET_R)
-SOCKET_BOSS_FILLET_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "4X R.020 MAX"
+# Each boss meets the back face in a root round. Nothing seats on that corner
+# (only the clip-screw tips ride the back there), so the title block's INSIDE
+# CORNERS limit governs it unprinted (machinist review round 2: a tighter
+# printed R.020 MAX only narrowed the cutter choice). The model carries a
+# round inside that limit; the paper-drive assembly's lock-station sweep grows
+# each boss by the limit, not the model's round.
+SOCKET_BOSS_FILLET_R = 0.508  # .020, modelled
+SOCKET_BOSS_ROOT_R_MAX = inside_corner_radius_mm(unit=UNIT)
+if SOCKET_BOSS_FILLET_R > SOCKET_BOSS_ROOT_R_MAX:
+    raise AssertionError("modelled boss root round exceeds the title block's limit")
 # Each socket's distance in from its side edge, on both sides: the clip's
 # hole row (.145 from its outer edge, build_pd_platen_clip) plus .025, so the
 # clip's outer edge stays on the plate at the printed worst case and its
@@ -78,10 +78,6 @@ SOCKET_XY = (
     (PLATE_WIDTH - SOCKET_X, 58.4422),
     (PLATE_WIDTH - SOCKET_X, 127.6318),
 )
-# The one printed root round: the upper boss nearest the right view's eye
-# (+X), whose root silhouette that view shows; the other three are a second
-# feature on the same global.
-SOCKET_BOSS_FILLET_PRINTED_XY = SOCKET_XY[3]
 
 # Guide-screw through-holes: 2 rows of 5 (heads on the front face, shanks
 # into the guide rails on the back). ONE counterbored #4 fillister Hole
@@ -145,7 +141,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Plate": {"Depth"},
     "SocketBossProfile": {"Boss2Dia"},
     "SocketBosses": {"BossH"},
-    "SocketBossFillet": {"BossFilletR"},
     "Sockets": {"Socket1X", "Socket1Y", "Socket2Y", "Socket3X"},
     "GuideHoles": {
         "Guide1X",
@@ -164,7 +159,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # (the back face rides the bar, so the thickness sets the front face).  The
 # boss Ø prints .XX (its wall round the tap, SOCKET_BOSS_WALL_MIN), its height
 # .XX (no mate: the flush tip is nominal and the engagement minimum reads the
-# shortest screw, not the boss), the root round its single limit at .XXX.
+# shortest screw, not the boss); its root round is the title block's.
 # Every hole coordinate is spent by the fixed-screw float over the clip's and
 # the guides' patterns (test_pd_platen_refit): all .XXX.  The counterbore
 # floor is a reference dimension.
@@ -174,7 +169,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Plate": {"Depth": 3},
     "SocketBossProfile": {"Boss2Dia": 2},
     "SocketBosses": {"BossH": 2},
-    "SocketBossFillet": {"BossFilletR": 3},
     "Sockets": {name: POSITION_PLACES for name in DRAWING_DIMENSIONS["Sockets"]},
     "GuideHoles": {name: POSITION_PLACES for name in DRAWING_DIMENSIONS["GuideHoles"]},
     "CboreFloorReference": {"CboreFloor": 3},

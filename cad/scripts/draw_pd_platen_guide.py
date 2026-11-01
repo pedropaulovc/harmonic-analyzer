@@ -66,8 +66,8 @@ from pd_platen_guide_spec import (
 )
 
 
-# Cached machinist review leaf: LEARN until the sheet reaches SHIP.
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_platen_guide"]
 PART_STEM = SPEC.artifact_stem
@@ -94,19 +94,39 @@ FRONT_HOLE_Y_M = FRONT_BOTTOM_Y_M + TAP_Y / 1000.0
 # table locates them; no second (rear) face view.
 HOLE_STATIONS_MM = tuple(sorted(FRONT_X + REAR_X))
 # Each tag stands just under the bar, right of its hole, on a short leader to
-# the rim: off the outline and the centre marks.
+# the rim: off the outline and the centre marks. A tag's text runs ~5.7 mm
+# right of that, past the next hole of a 7.0 pitch pair, where the next tag's
+# leader ran through it (farm layout audit after B2: A7 through A6). So in a
+# close run every other tag stands above the bar instead.
 HOLE_TAG_DX_M = 0.0015
 HOLE_TAG_Y_M = FRONT_BOTTOM_Y_M - 0.0025
+HOLE_TAG_ABOVE_Y_M = FRONT_BOTTOM_Y_M + GUIDE_HEIGHT / 1000.0 + 0.0061
+HOLE_TAG_CLEAR_MM = 9.0
+
+
+def _tags_above(stations: tuple[float, ...]) -> frozenset[float]:
+    """The stations whose tag stands above the bar: in each run closer than
+    HOLE_TAG_CLEAR_MM, every other tag after the first."""
+    above: set[float] = set()
+    for previous, station in zip(stations, stations[1:]):
+        if station - previous < HOLE_TAG_CLEAR_MM and previous not in above:
+            above.add(station)
+    return frozenset(above)
+
+
+HOLE_TAGS_ABOVE = _tags_above(HOLE_STATIONS_MM)
 # Put datum B's symbol midway between the A3/A4 hole axes, clear of both.
 DATUM_B_SYMBOL_X_M = FRONT_LEFT_X_M + (FRONT_X[2] + FRONT_X[3]) / 2000.0
 # The bar-slide finish lands on the bottom edge (model y 0, front face z 0)
-# midway between the A1 and B1 axes, clear of both centre marks. The landing
-# is projected from the model at draw time. The symbol
-# (anchored at its lower-left, boxed ~39 mm wide by the audit) sits below the
-# view, right of the hole-table origin's "0 -> X" row (ends ~0.078) and left
-# of datum B's tag.
+# midway between the A1 and A2 axes, clear of both centre marks. The landing
+# is projected from the model at draw time. The symbol is anchored at its
+# lower-left; its "SLIDES ON MHA-PD-07" line stands ~20 mm above that anchor
+# and runs ~90 mm right (farm layout audit after B2: at y 0.086 it sat at
+# y 105.8..112.3 mm, across the tags' leaders). At y 0.068 the line ends under
+# the tags (box bottom ~100.2 mm) and left of datum B's tag, right of the
+# hole-table origin's "0 -> X" row (ends ~0.078).
 BAR_SLIDE_STATION_MM = (FRONT_X[0] + REAR_X[0]) / 2.0
-BAR_SLIDE_FINISH_XY = (FRONT_LEFT_X_M + BAR_SLIDE_STATION_MM / 1000.0 - 0.006, 0.086)
+BAR_SLIDE_FINISH_XY = (FRONT_LEFT_X_M + BAR_SLIDE_STATION_MM / 1000.0 - 0.006, 0.068)
 # The table fits above the front view; 0.020 also clears the 12.7 mm zone
 # margin enforced by the sheet audit.
 HOLE_TABLE_X_M = 0.020
@@ -200,10 +220,12 @@ def _place_hole_tags(view: Any, table: Any) -> None:
             continue
         if tag in moved:
             raise RuntimeError(f"duplicate native hole tag {tag}")
-        hole_x = FRONT_LEFT_X_M + stations_by_tag[tag] / 1000.0
+        station = stations_by_tag[tag]
+        hole_x = FRONT_LEFT_X_M + station / 1000.0
+        tag_y = HOLE_TAG_ABOVE_Y_M if station in HOLE_TAGS_ABOVE else HOLE_TAG_Y_M
         if annotation.SetLeader3(1, 0, True, False, False, False) != 0:
             raise RuntimeError(f"failed to give native hole tag {tag} a leader")
-        if not annotation.SetPosition2(hole_x + HOLE_TAG_DX_M, HOLE_TAG_Y_M, 0.0):
+        if not annotation.SetPosition2(hole_x + HOLE_TAG_DX_M, tag_y, 0.0):
             raise RuntimeError(f"failed to reposition native hole tag {tag}")
         points = tuple(float(v) for v in annotation.GetLeaderPointsAtIndex(0) or ())
         if len(points) < 6 or math.dist(points[-3:-1], (hole_x, FRONT_HOLE_Y_M)) > (

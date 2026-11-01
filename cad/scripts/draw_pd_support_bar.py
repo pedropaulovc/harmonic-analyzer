@@ -195,9 +195,12 @@ def _back_x(model_x: float) -> float:
 # pivot's Ø and countersink stand right of it, the Ø higher and further left
 # (its leader passes left of the countersink's text, slanting off the line);
 # the latch-hook taps' callout (high) and countersink (low) stand right of the
-# pivot's, their leaders between the two pairs.  Move that pair 8 mm farther
-# right for the full pivot vendor-number row, keeping the hook leader left of
-# its own countersink text instead of widening a text/leader allowance.
+# pivot's, their leaders between the two pairs.  The pivot's countersink text
+# stands 7 mm right of the Ø's left end: nearer, both leaders left their
+# shelves on one slope and ran to the hole as one line (machinist review
+# round 2); here the countersink's runs ~26 deg off vertical, the Ø's ~13.
+# The hook pair stands 6 mm farther right with it, so the hook callout's
+# leader still passes ~3 mm under the pivot countersink's text.
 ROW_STEP = 0.013
 FRONT_KEEP = {
     "PivotTapStation": (LEFT_END + 0.042, FACE_BOTTOM - ROW_STEP),
@@ -206,10 +209,10 @@ FRONT_KEEP = {
     "Length": (FACE_CENTER[0], FACE_BOTTOM - 4.0 * ROW_STEP),
     "HangerRowHeight": (RIGHT_END + 0.022, FACE_BOTTOM - 0.010),
     "PivotTapDrillDia": (_face_x(PIVOT_TAP_X) + 0.032, FACE_TOP + 0.030),
-    "PivotCskDia": (_face_x(PIVOT_TAP_X) + 0.039, FACE_TOP + 0.014),
-    "BracketCskDia": (_face_x(BRACKET_TAP_X[0]) + 0.067, FACE_TOP + 0.014),
+    "PivotCskDia": (_face_x(PIVOT_TAP_X) + 0.042, FACE_TOP + 0.014),
+    "BracketCskDia": (_face_x(BRACKET_TAP_X[0]) + 0.073, FACE_TOP + 0.014),
 }
-BRACKET_CALLOUT_XY = (_face_x(BRACKET_TAP_X[1]) + 0.064, FACE_TOP + 0.031)
+BRACKET_CALLOUT_XY = (_face_x(BRACKET_TAP_X[1]) + 0.070, FACE_TOP + 0.031)
 # The top face's slide roughness on its edge, left of the section line.
 TOP_FINISH_MODEL_X = -178.0
 TOP_FINISH_SYMBOL_XY = (LEFT_END + 0.030, FACE_TOP + 0.014)
@@ -299,7 +302,6 @@ DETAIL_KEEP = {
     "ClampSlotCboreWidth": (DETAIL_CENTER[0] - 0.017, DETAIL_CENTER[1] + 0.020),
     "ClampSlotWidth": (DETAIL_CENTER[0] + 0.026, DETAIL_CENTER[1] - 0.014),
     "ClampSlotTravel": (DETAIL_CENTER[0] + 0.015, DETAIL_CENTER[1] - 0.020),
-    "ClampSlotCboreTravel": (DETAIL_CENTER[0] + 0.015, DETAIL_CENTER[1] + 0.021),
 }
 # Section B-B cuts the inner slot across the bar, at 1:1 in the sheet's
 # lower-left corner: the counterbore's depth with its text and callout

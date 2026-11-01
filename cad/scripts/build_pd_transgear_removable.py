@@ -93,7 +93,7 @@ from _drawing_precision import (
 )
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
+from _drawing_tolerances import _set_tolerance_precision, set_dimension_symmetric_tolerance
 from _fit_deviations import deviations
 from _simplified_part import save_simplified_part
 from _grouped_bom_properties import apply_grouped_bom_properties
@@ -131,7 +131,7 @@ if any(abs(x) > 1e-9 for x, _y in PIN_HOLE_CENTRES):
     raise AssertionError("drive-pin holes must sit on local +/-Y")
 
 
-_TOL_BILAT = 2  # swTolType_e.swTolBILAT
+_TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 _TOL_SYMMETRIC = 4  # swTolType_e.swTolSYMMETRIC
 
 
@@ -160,10 +160,33 @@ def family_bands() -> dict[tuple[str, str], tuple[int, float, float]]:
     and the pin holes), as the build sets them below."""
     pin = (_TOL_SYMMETRIC, -spec.PIN_LOCATION_TOL, spec.PIN_LOCATION_TOL)
     return {
-        ("BlankProfile", "BlankWidth"): (_TOL_BILAT, *deviations(spec.PLATE_PRINTED_BAND)),
+        ("BlankProfile", "BlankWidth"): (_TOL_LIMIT, *deviations(spec.PLATE_PRINTED_BAND)),
         ("BorePinsProfile", "PinPosY"): pin,
         ("BorePinsProfile", "PinNegY"): pin,
     }
+
+
+def _plate_limits(adapter) -> None:
+    """The supplied plate's thickness as native LIMITs (.110/.107): a zero
+    upper deviation printed bilateral read ".000" with no sign (machinist
+    review round 2); the limits say the same with nothing to misread."""
+    label = "BlankWidth@BlankProfile"
+    display, dimension = _named_dimension(adapter, "BlankProfile", "BlankWidth")
+    lower, upper = deviations(spec.PLATE_PRINTED_BAND)
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = _TOL_LIMIT
+    if tolerance.SetValues(lower / 1000.0, upper / 1000.0) is not True:
+        raise RuntimeError(f"{label}: LIMIT deviations were rejected")
+    if (
+        int(tolerance.Type) != _TOL_LIMIT
+        or abs(float(tolerance.GetMinValue()) - lower / 1000.0) > 1e-12
+        or abs(float(tolerance.GetMaxValue()) - upper / 1000.0) > 1e-12
+    ):
+        raise RuntimeError(f"{label}: LIMIT tolerance readback changed")
+    _set_tolerance_precision(
+        display, (lower, upper), display_unit=spec.UNIT, label=label,
+        places=spec.PLATE_PLACES,
+    )
 
 
 async def assert_bands_in_every_configuration(adapter) -> None:
@@ -1125,10 +1148,7 @@ async def build(adapter) -> dict[str, str]:
     # its printed band and each machined pin centre holds its location band.
     # Bore and pin-hole sizes are drilled (the title block's DRILLED HOLES
     # row governs them). The places are the part's (drawing-simplicity-policy.md `How the repository implements the guidelines`).
-    set_dimension_bilateral_tolerance(
-        adapter, "BlankProfile", "BlankWidth", *deviations(spec.PLATE_PRINTED_BAND),
-        display_unit=spec.UNIT,
-    )
+    _plate_limits(adapter)
     for name in ("PinPosY", "PinNegY"):
         set_dimension_symmetric_tolerance(
             adapter, "BorePinsProfile", name, spec.PIN_LOCATION_TOL,

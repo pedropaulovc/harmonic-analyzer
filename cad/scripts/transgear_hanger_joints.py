@@ -124,13 +124,13 @@ SPRING_ROOM_MIN = (
     + PIVOT.SHOULDER_LEN_LIMITS[0]
     - (SPACER.LENGTH + SPACER.LENGTH_BAND)
     - (ARM.SPOT_FACE_FLOOR_FROM_FRONT + ARM.SPOT_FACE_FLOOR_BAND)
-)  # 0.696
+)  # 0.693
 SPRING_ROOM_MAX = (
     PIVOT.SHOULDER_LEN
     + PIVOT.SHOULDER_LEN_LIMITS[1]
     - (SPACER.LENGTH - SPACER.LENGTH_BAND)
     - (ARM.SPOT_FACE_FLOOR_FROM_FRONT - ARM.SPOT_FACE_FLOOR_BAND)
-)  # 0.955
+)  # 0.957
 if not SPRING.WORKING_HEIGHT <= SPRING_ROOM_MIN < SPRING_ROOM_MAX < SPRING.FREE_HEIGHT:
     raise AssertionError(
         f"MHA-PD-VN-63 room {SPRING_ROOM_MIN:.4f}..{SPRING_ROOM_MAX:.4f} leaves the "
@@ -142,7 +142,7 @@ if abs(SPRING.MODEL_HEIGHT - SPRING_ROOM_NOMINAL) > 1e-9:
 SPRING_PRELOAD_N = (
     SPRING.RATE_N_PER_MM * (SPRING.FREE_HEIGHT - SPRING_ROOM_MAX),
     SPRING.RATE_N_PER_MM * (SPRING.FREE_HEIGHT - SPRING_ROOM_MIN),
-)  # 18.8 .. 39.2
+)  # 18.6 .. 39.4
 
 # --- Seated spacer face-grade enclosure --------------------------------------
 # These are the spacer's geometric grades, conditional on staying seated.

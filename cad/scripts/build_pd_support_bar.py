@@ -592,7 +592,10 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
     row from the left bar end through each hole to a rise at the right end
     that drops from the top face to the row, so the stations read from the
     end and the row's height from the top face. Every dimension is driven
-    from the bar globals (``row_equations``)."""
+    from the bar globals (``row_equations``). The rise lies on the bar's end
+    edge, so it is a plain sketch line, which prints inside that edge's
+    heavier stroke; as construction geometry its grey dashes showed along the
+    end (machinist review round 2)."""
     feature = row.feature
     rise_x = BAR_LENGTH / 2.0
     row_y = row.row_y
@@ -611,7 +614,6 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
         for index, (x0, x1) in enumerate(zip(row_xs, row_xs[1:]))
     ]
     set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, rise, f"{feature} rise")
     check(
         f"{feature} rise vertical",
         await adapter.add_sketch_constraint(rise, None, "vertical"),

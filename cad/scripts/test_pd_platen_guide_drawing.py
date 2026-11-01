@@ -297,6 +297,21 @@ def test_bar_slide_face_carries_the_only_roughness_symbol() -> None:
     ) in source
 
 
+def test_no_tag_text_reaches_the_next_hole_on_its_side_of_the_bar() -> None:
+    """Farm layout audit after B2: a tag's text (~5.7 mm right of its 1.5 mm
+    offset) ran past the next hole of a 7.0 pitch pair, so that hole's tag
+    leader struck it. Tags on one side of the bar keep the next hole on that
+    side clear of the text."""
+    tag_text_reach_mm = drawing.HOLE_TAG_DX_M * 1000.0 + 5.7
+    for above in (True, False):
+        side = [
+            s for s in drawing.HOLE_STATIONS_MM if (s in drawing.HOLE_TAGS_ABOVE) is above
+        ]
+        for left, right in zip(side, side[1:]):
+            assert right - left > tag_text_reach_mm + 1.0, (left, right)
+    assert drawing.HOLE_TAG_ABOVE_Y_M > drawing.FRONT_BOTTOM_Y_M + 0.007366
+
+
 def test_part_authors_the_printed_dimensions_and_places() -> None:
     from pd_platen_guide_spec import (
         DRAWING_DIMENSIONS,
