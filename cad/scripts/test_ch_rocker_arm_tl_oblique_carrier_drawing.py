@@ -236,10 +236,25 @@ def test_spot_stations_print_from_the_hidden_reference_sketch() -> None:
         "ClY",
     }
     # jig-r3: each spot has its own leader and callout, no "2X".
-    assert spec.CALLOUTS_BELOW["SpotDia"] == spec.CALLOUTS_BELOW["SpotDiaCl"]
-    assert "2X" not in spec.CALLOUTS_BELOW["SpotDia"]
+    for name in ("SpotDia", "SpotDiaCl"):
+        assert "2X" not in spec.CALLOUTS_BELOW[name]
     assert set(spec.CALLOUT_SUFFIXES) == {"SpotDia", "SpotDiaCl"}
     assert not any("Plane" in feature for feature in spec.DRAWING_DIMENSIONS)
+
+
+def test_hub_station_moves_the_strap_pivot_inside_its_top_edge_band() -> None:
+    """The HUB sits on the arcs' centreline, so its Y station moves the
+    strap's pivot radially 1:1 against the R800 edge; its print band must
+    stay strictly inside half the strap's one-sided top-edge band."""
+    import ch_rocker_arm_spec as rocker
+
+    assert spec.HUB[0] == trammel.ARC_CENTRE[0] == 0.0
+    half = (max(rocker.TOP_EDGE_BAND) - min(rocker.TOP_EDGE_BAND)) / 2.0
+    places = spec.DRAWING_PRECISION_BY_NAME["HubY"]
+    assert spec.HUB_RADIAL_BAND == pytest.approx(printed_band_mm(places, unit=spec.UNIT))
+    assert spec.HUB_RADIAL_BAND < half
+    # One place fewer would take the whole half band.
+    assert printed_band_mm(places - 1, unit=spec.UNIT) >= half
 
 
 def test_pin_chamfer_retains_the_spacer_thrust_seat() -> None:
