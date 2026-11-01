@@ -349,13 +349,17 @@ FERRULE_ARM_FACE_WALL_ACCEPTED_MM = 1.25
 TENON_END_GAP_MIN = round(
     (FERRULE_LENGTH - _GENERAL_2PL) - (TENON_LENGTH + _GENERAL_2PL), 6
 )
-# Oak between the smallest tenon and the largest reamed pivot bore.
-TENON_WALL_MIN = (
-    (TENON_DIA_MIN - (PIVOT_BORE_DIA + PIVOT_BORE_BAND[0])) / 2.0 - BORE_ECCENTRICITY
-)
+# The largest bore the printed matched fit allows: the sheet prints the bore
+# as a reference over .0050-.0075 diametral clearance on the shoulder, so the
+# shoulder's .156 max plus .0075 governs, not the reamer's .1615 (local
+# Codex review of 049cf9829).  MHA-DT-32's spec checks this equals its
+# SHOULDER_DIA_MAX + DIAMETRAL_CLEARANCE_MAX.
+PIVOT_BORE_FIT_MAX = 4.1529  # .1635
+# Oak between the smallest tenon and the largest fitted pivot bore.
+TENON_WALL_MIN = (TENON_DIA_MIN - PIVOT_BORE_FIT_MAX) / 2.0 - BORE_ECCENTRICITY
 # Oak at the waist over the largest bore, the waist turned its .XX band small.
 WAIST_WALL_MIN = (
-    (2.0 * WAIST_R - _GENERAL_2PL) - (PIVOT_BORE_DIA + PIVOT_BORE_BAND[0])
+    (2.0 * WAIST_R - _GENERAL_2PL) - PIVOT_BORE_FIT_MAX
 ) / 2.0 - BORE_ECCENTRICITY
 
 for _ok, _what in (

@@ -54,6 +54,7 @@ from dt_crank_handle_spec import (
     HANDLE_LENGTH,
     PIVOT_BORE_BAND,
     PIVOT_BORE_DIA,
+    PIVOT_BORE_FIT_MAX,
 )
 from dt_crank_hub_geometry import (
     ARM_STOCK_THICKNESS,
@@ -441,6 +442,10 @@ for _ok, _what in (
         "the modelled end play is outside the fitted band",
     ),
     (DIAMETRAL_CLEARANCE_MIN > 0.0, "shoulder can bind in the oak bore"),
+    (
+        abs(PIVOT_BORE_FIT_MAX - (SHOULDER_DIA_MAX + DIAMETRAL_CLEARANCE_MAX)) < 1e-6,
+        "MHA-DT-08's tenon walls read a bore other than the printed fit's largest",
+    ),
     (
         RELIEF_DIA_MAX <= min(THREAD_MINOR_BASIC_ROOT, THREAD_MINOR_UNR_2A_MAX),
         f"relief floor stands above the {THREAD_SIZE} external minor diameter",
