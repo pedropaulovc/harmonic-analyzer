@@ -121,7 +121,9 @@ BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0
 #   The two banded lengths carry the mate they serve under their text.  The
 #   seat and station row stands above the relief's: the overall's stacked
 #   +/- band reached the shared row's extension lines (farm run
-#   20261031T205208603Z).
+#   20261031T205208603Z).  The overall's text stands clear under the
+#   relief's dimension line, which read into it (machinist review, farm run
+#   20261031T233549214Z).
 # - Relief and barrel diameters: left of the inboard end, the relief nearer.
 #   Seat diameter: between the profile and the end view, its value and
 #   light-press callout above.
@@ -133,11 +135,13 @@ BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0
 #   on the end view (*Bottom turned half a turn), on the horizontal
 #   centreline.  Its value and callout print right of the big end's extension
 #   line, above the bore callout and below the isometric's label.
-_ROW_Y = (0.120, 0.108)
+_ROW_Y = (0.120, 0.102)
 _STATION_ROW_Y = _ROW_Y[0] + 0.006
 END_KEEP = {
     "BoreDia": (END_CENTER[0] + 0.070, END_CENTER[1] - 0.020),
-    "PinProud": (END_CENTER[0] + 0.065, END_CENTER[1] + 0.014),
+    # Three callout lines: 4 mm lower than the two-line block of farm run
+    # 20261031T233549214Z, so its value line keeps clear of the iso label.
+    "PinProud": (END_CENTER[0] + 0.065, END_CENTER[1] + 0.010),
 }
 # The hub's half of the seam is the arc bulging from the seat edge toward the
 # bore; the callout attaches 45 degrees up its right flank.

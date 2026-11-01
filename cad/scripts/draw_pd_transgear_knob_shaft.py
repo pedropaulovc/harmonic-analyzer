@@ -65,7 +65,6 @@ from pd_transgear_knob_shaft_spec import (
     DRIVE_COLLAR_NUMBER,
     CORE_DIA,
     CORE_FRONT_Z,
-    CORE_REAR_Z,
     CUTTER_NUMBER,
     FRONT_CORNER_RADIUS,
     FRONT_RELIEF_DIA,
@@ -157,7 +156,11 @@ _ROW_Y = tuple(SIDE_CENTER[1] - HALF_OD - 0.016 - i * _ROW_PITCH for i in range(
 ARM_PLATE_NUMBER = _config.parts("pd-transgear-arm-plate")["number"]
 KNOB_CUP_NUMBER = _config.parts("pd-transgear-knob-cup")["number"]
 THUMBNUT_NUMBER = _config.parts("pd-transgear-thumbnut")["number"]
-COLLAR_SLIDING_FIT = f"SLIDING FIT IN\nDRIVE COLLAR\n{DRIVE_COLLAR_NUMBER} D-BORE"
+# The flat's limits hang right of their line, every row centred on the
+# shoulder under the widest: at 16 characters ("MHA-PD-22 D-BORE") that
+# shoulder ran 251.2 -> 294.5 mm, over the tip's witness lines at 289.1 (run
+# 20261031T233549214Z), so no row runs past 12 characters (~33 mm).
+COLLAR_SLIDING_FIT = f"SLIDES IN\nDRIVE COLLAR\n{DRIVE_COLLAR_NUMBER}"
 # An above callout prints only as ONE line (a line break there is stored but
 # never printed: farm run 20261031T205208603Z's four mate callouts went
 # unmatched), set as one run centred on its dimension's text: 40 characters
@@ -200,7 +203,9 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     "PlainCore": ((F_X + THREAD_END_X) / 2.0, _ROW_Y[1]),
     "JournalLength": ((PINION_REAR_X + REAR_X) / 2.0, _ROW_Y[0]),
     "TipStation": ((F_X + TIP_X) / 2.0, _ROW_Y[2]),
-    "FlatToAxis": (CORE_END_X + 0.018, SIDE_CENTER[1] - HALF_OD - 0.004),
+    # Its upper limit's top stood at 155.4 mm, on the thread blank's lower
+    # outline (153.9) in that run; 4.5 mm lower it stands 3 mm under it.
+    "FlatToAxis": (CORE_END_X + 0.018, SIDE_CENTER[1] - HALF_OD - 0.0085),
     # Reference overall, tip face to rear face, on the last row: under the
     # face width's callout and clear of the gear data block's right edge.
     "OverallLength": ((REAR_X + TIP_X) / 2.0, _ROW_Y[5]),
@@ -230,8 +235,10 @@ DIMENSION_CALLOUTS_BELOW = {
     "JournalLength": f"SETS PIN WALL IN\nKNOB CUP {KNOB_CUP_NUMBER}",
 }
 # Detail B's neck Ø: its text hangs left of its line under the border, so
-# its reason runs on the same line, into the empty space left of it.
-DIMENSION_SUFFIXES = {"FrontReliefDia": f" CLEARS DRIVE COLLAR {DRIVE_COLLAR_NUMBER}"}
+# its reason runs on the same line, into the empty space left of it: 30
+# characters start at x ~23.6 mm, 10.9 mm inside the border (the 36 of run
+# 20261031T233549214Z crossed it by 5.7 mm).
+DIMENSION_SUFFIXES = {"FrontReliefDia": f" CLEARS COLLAR {DRIVE_COLLAR_NUMBER}"}
 # Reference sizes (parenthesized): the overall, and the thread blank the
 # #8-32 UNC-2A class governs.  Name -> diameter glyph.
 REFERENCE_DIMENSIONS = {"OverallLength": False, "ThreadBlankDia": True}
@@ -264,14 +271,6 @@ GEAR_DATA_XY = (0.016, 0.118)
 GEAR_DATA_CHAR_HEIGHT = 0.0025
 NOTES_XY = (0.016, 0.070)
 DATUM_A_SYMBOL = (END_CENTER[0] - 0.017, END_CENTER[1] - 0.018)
-# The core frame sits low over the thread blank, under the blank's Ø text;
-# its leader runs to the core's front quarter (run 12: from above it crossed
-# the blank's Ø and thread callout texts).
-CORE_RUNOUT_LANDING = (
-    _sheet_x(CORE_REAR_Z + 0.75 * (CORE_FRONT_Z - CORE_REAR_Z)),
-    _sheet_y(CORE_DIA / 2.0),
-)
-CORE_RUNOUT_FRAME = (THREAD_END_X + 0.0066, SIDE_CENTER[1] + 0.0155)
 
 # --- Detail B: the front neck at 10:1 -----------------------------------------
 # At 3:1 the 0.400 neck is 1.2 mm of sheet: its Ø, width, corner R and
@@ -336,6 +335,21 @@ NECK_RUNOUT_LANDING = _detail_xy(NECK_LANDING_Z_MM, _NECK_FLOOR_R)
 NECK_RUNOUT_FRAME = (
     NECK_RUNOUT_LANDING[0] - _FRAME_SHOULDER - _FRAME_WIDTH, _FRAME_ROW_TOP
 )
+# The core frame also stands in detail B: in the side view every route to
+# the core crossed a Ø line (main and run 20261031T233549214Z: its leader
+# from over the thread blank crossed the relief's line at x 238.6; from the
+# left it would cross the core's or the pinion's).  It lands on the core's
+# round top 0.8 behind F, inside the crop (2.60 from the focus), right of
+# the neck Ø's line, and stands right of the crop at the neck frame's
+# height, its box left of the relief's mate callout (x >= 169.8 mm) and its
+# shoulder on the box's left, so the leader descends 7.75 mm over 18.2 mm
+# into the crop.
+CORE_LANDING_Z_MM = -0.8
+CORE_RUNOUT_LANDING = _detail_xy(CORE_LANDING_Z_MM, CORE_DIA / 2.0)
+CORE_RUNOUT_FRAME = (
+    CORE_RUNOUT_LANDING[0] + _FRAME_SHOULDER + 0.0182,
+    _DETAIL_TOP + 0.0095,
+)
 DETAIL_KEEP: dict[str, tuple[float, float]] = {
     # Its line rises through the neck's air 0.27 from F, 1.2 mm right of the
     # frame's leader and short of the core corner's tangent (0.30), past the
@@ -352,8 +366,10 @@ DETAIL_KEEP: dict[str, tuple[float, float]] = {
     "FrontReliefWidth": (_STEP_X + 0.0078, _DETAIL_BOTTOM - 0.007),
     # Left of the crop: the leader runs from the corner 12-24 deg below
     # level, inside the corner's own quadrant, through the pinion's blank
-    # interior under its root and over the axis.
-    "FrontCornerRadius": (_CORNER_CENTER[0] - 0.0325, _CORNER_CENTER[1] - 0.006),
+    # interior under its root and over the axis.  Its 23.5 mm text, centred
+    # on the keep, ends 2.5 mm short of the crop circle (at 32.5 mm in, run
+    # 20261031T233549214Z, the circle crossed its last letter).
+    "FrontCornerRadius": (_CORNER_CENTER[0] - 0.0365, _CORNER_CENTER[1] - 0.006),
     # The D-flat tool's end from F, a row under the neck width's: its
     # prefixed text (~43 mm, centred on the keep) stands left of F's witness
     # line, right of the journal finish symbol's leader (x <= 0.050) and
@@ -367,9 +383,11 @@ DETAIL_KEEP: dict[str, tuple[float, float]] = {
 # Top-left anchors.  The label stands left of the crop, 3 mm under the
 # corner R's text (its limits print to 5 mm under its point).
 DETAIL_LABEL_XY = (0.042, _CORNER_CENTER[1] - 0.014)
-# The mark's "B" stands under the pinion, between the tooth-tip Ø's lower arrow
-# (x 0.2056) and F's witness lines (x 0.2144), clear of the mark circle.
-PARENT_LETTER_XY = (F_X - 0.0057, SIDE_CENTER[1] - HALF_OD - 0.0025)
+# The mark's "B" stands under the pinion, right of the face width's rear
+# witness line (x 199.7 mm) and 7 mm left of the tooth-tip Ø's lower arrow,
+# which now stands just behind F (run 20261031T233549214Z: at F - 5.7 mm
+# the "B" stood 1.4 mm from that arrow), clear of the mark circle.
+PARENT_LETTER_XY = (PINION_REAR_X + 0.007, SIDE_CENTER[1] - HALF_OD - 0.0025)
 
 # Each frame's leader landing on its surface's upper outline, and the frame.
 # The neck's straight floor is 0.2 mm long between its two R0.10 corner tori,
@@ -381,7 +399,7 @@ CONTROL_ATTACHMENTS = {
     "core_total_runout": (CORE_RUNOUT_LANDING, CORE_RUNOUT_FRAME),
     "front_neck_total_runout": (NECK_RUNOUT_LANDING, NECK_RUNOUT_FRAME),
 }
-CONTROL_VIEWS = {"core_total_runout": "side", "front_neck_total_runout": "detail"}
+CONTROL_VIEWS = {"core_total_runout": "detail", "front_neck_total_runout": "detail"}
 # Lower right: the gauge gap is TOOTH_SPACE_GAP_INDEX pitches round from
 # the first, so its landing sits low right of the front view, away from the
 # tooth span's contacts, bisector and witness lines, and the note's leader

@@ -263,7 +263,7 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
         "TURN TO SUIT MHA-DT-06 BORE",
         f"FOR LIGHT PRESS: {low:.3f}-{high:.3f}",
         "DIAMETRAL INTERFERENCE;",
-        "FACES FLUSH",
+        "END FLUSH WITH MHA-DT-06 FRONT",
     ]
     assert "MATCH-FIT" not in seat
     # The arm bore is made first; the hub seat is turned to suit it, so its
@@ -275,13 +275,18 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     # Size first, then the process, in the order the work is done.
     assert seam.splitlines()[0] == "(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0"
     assert "O'CLOCK" not in seam
+    # The blind pin makes hub and arm a permanent pair, serviced at the taper
+    # pin (owner ruling 2026-11-01).
+    assert seam.splitlines()[-1] == "PERMANENT PAIR; SERVICE AT MHA-DT-09"
     # The taper-pin cross-hole names both mates and the fit on its callout,
     # after the front face is set flush with the datum it is reamed at.
     cross_hole = dt_crank_hub_notes.CROSS_HOLE_CALLOUT
     assert "MHA-DT-09" in cross_hole and "MHA-DT-11" in cross_hole
     assert "LIGHT DRIVE FIT" in cross_hole
-    flush = cross_hole.index("FRONT FACE FLUSH")
-    assert flush < cross_hole.index("TAPER-REAM")
+    flush = cross_hole.index("SEAT END FLUSH")
+    assert flush < cross_hole.index("TAPER-REAM") and "AT ASSEMBLY" in cross_hole
+    # The pin-proud MIN names the ream it limits.
+    assert "TAPER-REAM" in dt_crank_hub_notes.PIN_PROUD_CALLOUT
     # The bore band governs; the clearance is a reference restatement.
     assert dt_crank_hub_notes.BORE_CALLOUT.splitlines()[1].startswith("(")
 

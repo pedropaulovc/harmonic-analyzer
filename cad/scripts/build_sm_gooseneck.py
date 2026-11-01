@@ -65,6 +65,7 @@ from _drawing_precision import (
     _named_dimensions,
     apply_drawing_precision,
 )
+from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import _set_tolerance_precision
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
@@ -1030,6 +1031,9 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _author_dimension_callouts(adapter)
     _author_reference_dimensions(adapter)
+    # A sketch-only diametric dimension prints no Ø of its own (farm run
+    # 20261031T233549214Z printed "(12.70)"); the revolve's sleeve Ø does.
+    set_dimension_prefix(adapter, "TubeOdReference", "TubeOdRef", "<MOD-DIAM>")
     # The reference sketches own printed dimensions and only reference lines:
     # hide them so no assembly instance renders them (#880).  The drawing shows
     # them per view through _drawing_hidden_sketches to import those dimensions.
