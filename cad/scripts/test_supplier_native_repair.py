@@ -28,7 +28,11 @@ def _pin_import_case(monkeypatch, kind, *, defect=None):
         wall_mm=0.381, wall_precision=3,
         application_hole_limits=(0.09375, 0.0945),
         application_hole_precision=4, application_hole_center=(2.0, 0.0),
+        sheet_unit="mm",
     )
+    # The sheet the drawing opened; a mismatch with the part's declared unit
+    # is refused before anything is imported.
+    monkeypatch.setattr(drawing, "sheet_units", lambda _adapter: "in" if defect == "sheet_unit" else "mm")
     # Expected metadata is independent of the production contract/formatter.
     feature, name, value_mm, precision, band, callout = {
         "diameter": (source_helpers.DIAMETER_FEATURE, "SupplierPinDiameter", 2.38125,
@@ -185,7 +189,7 @@ def test_pin_import_uses_local_presentation_and_actual_view_witnesses_without_so
     assert case.source_snapshot() == before
 
 
-@pytest.mark.parametrize("defect", ("source_value", "source_format", "source_band", "source_geometry"))
+@pytest.mark.parametrize("defect", ("source_value", "source_format", "source_band", "source_geometry", "sheet_unit"))
 def test_pin_invalid_original_is_rejected_before_import(monkeypatch, defect):
     case = _pin_import_case(monkeypatch, "diameter", defect=defect)
     with pytest.raises(RuntimeError):

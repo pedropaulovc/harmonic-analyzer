@@ -22,6 +22,7 @@ from _drawing_projection import model_points_in_view
 from _drawing_precision import _named_dimensions
 from _supplier_dimensions import (
     assert_supplier_reference_dimension,
+    sheet_units,
     supplier_reference_dimension,
 )
 from _supplier_pin_data import (
@@ -254,6 +255,12 @@ def _import_model_references(
     model = view.ReferencedDocument
     if model is None or model == "":
         raise RuntimeError(f"{source.sku}: imported references have no source part")
+    # The part wrote its reference suffix for source.sheet_unit.
+    if sheet_units(adapter) != source.sheet_unit:
+        raise RuntimeError(
+            f"{source.sku}: sheet unit {sheet_units(adapter)} != source sheet_unit "
+            f"{source.sheet_unit}"
+        )
     owners = {name: feature for feature, names in REFERENCE_DIMENSIONS.items() for name in names}
     if set(keep) - owners.keys():
         raise ValueError(f"{source.sku}: unknown required model reference")
