@@ -39,6 +39,16 @@ get anywhere else.**
 - Material: N pieces used, N scrapped
 - Tooling: anything broken or worn out
 
+## Open
+
+- What's left to do, measure or decide.
+
+## Advice afterwards (from <who>, not yet tried)
+
+Optional. Advice asked for after the session, attributed and untried; the next
+entry says what held up. Embed sketches from `figures/`. Mark anything not
+checked against the machine or config `unverified`.
+
 ## Follows up to
 
 - Module: `../curriculum/mXX-....md`
