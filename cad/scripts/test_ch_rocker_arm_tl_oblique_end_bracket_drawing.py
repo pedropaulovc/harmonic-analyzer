@@ -88,7 +88,7 @@ def test_kp08_taps_land_on_the_blocks_bolt_spacing_about_the_screw() -> None:
     assert spec.KP08_TAP_BAND == printed_band_mm(3, unit="mm")
     assert "set_metric_vendor_units(" in Path(part.__file__).read_text(encoding="utf-8")
     sheet = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "assert_imported_metric_dimensions(" in sheet
+    assert "print_imported_metric_dimensions(" in sheet
     for hole in holes:
         x = hole["at"][0]
         assert hole["station"] == pytest.approx([x - 0.13, x + 0.13])
