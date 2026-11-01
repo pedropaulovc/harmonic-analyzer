@@ -786,6 +786,71 @@ def test_vertical_dia_shoulders_cross_no_other_dia_line() -> None:
     assert run_right > drawing.SIDE_KEEP["CoreDia"][0]
 
 
+def test_core_frame_stands_in_detail_b_clear_of_every_dia_line() -> None:
+    # Main and run 20261031T233549214Z: from over the thread blank the core
+    # frame's leader (240.2, 172.0) -> (229.5, 167.3) mm crossed the relief
+    # Ø's line at x 238.6; in detail B it reaches the core from the right.
+    assert drawing.CONTROL_VIEWS == {
+        "core_total_runout": "detail",
+        "front_neck_total_runout": "detail",
+    }
+    landing, (frame_x, frame_top) = drawing.CONTROL_ATTACHMENTS["core_total_runout"]
+    center, crop = drawing.DETAIL_CENTER, drawing.DETAIL_CROP_RADIUS
+    # On the core's round top, behind its step, inside the crop.
+    assert -spec.FRONT_RELIEF_WIDTH > drawing.CORE_LANDING_Z_MM
+    assert landing[1] == pytest.approx(drawing._detail_xy(0.0, spec.CORE_DIA / 2.0)[1])
+    assert math.dist(landing, center) < crop - 0.0005
+    # The neck Ø's line rises left of the leader, which descends from the
+    # shoulder on the box's left.
+    assert landing[0] > drawing.DETAIL_KEEP["FrontReliefDia"][0] + 0.003
+    shoulder_x = frame_x - drawing._FRAME_SHOULDER
+    mid = frame_top - drawing._FRAME_HEIGHT / 2.0
+    assert shoulder_x > landing[0] and mid > landing[1]
+    # The box stands right of the crop, left of the relief's block, over
+    # the journal's, and under the border.
+    assert frame_x - drawing._FRAME_SHOULDER > center[0] + 0.020
+    assert frame_x + drawing._FRAME_WIDTH < _dia_block("ReliefDia")[1] - 0.002
+    assert frame_top - drawing._FRAME_HEIGHT > _dia_block("JournalDia")[4] + 0.010
+    assert frame_top < 0.2667 - 0.004
+    # Negative control: the side view's frame over the thread blank put its
+    # shoulder right of the relief's line and its landing left of it.
+    relief_x = drawing.SIDE_KEEP["ReliefDia"][0]
+    assert drawing.CORE_END_X < relief_x < drawing.THREAD_END_X + 0.0003
+
+
+def test_run_233549_text_clears_the_border_lines_and_labels() -> None:
+    # The neck Ø's one line hangs left of its keep at 2.75 mm a character
+    # (36 characters read [7.0, 106.1] mm): it starts inside the border.
+    char_w = (0.1061 - 0.0070) / 36
+    text = f"\N{DIAMETER SIGN}3.950{drawing.DIMENSION_SUFFIXES['FrontReliefDia']}"
+    left = drawing.DETAIL_KEEP["FrontReliefDia"][0] - len(text) * char_w
+    assert left > 0.0127 + 0.005
+    assert drawing.DETAIL_KEEP["FrontReliefDia"][0] - 36 * char_w < 0.0127
+    # The corner R's 23.5 mm text, centred on its keep, ends short of the
+    # crop circle at its own height (run: the circle crossed its last letter).
+    center, crop = drawing.DETAIL_CENTER, drawing.DETAIL_CROP_RADIUS
+    x, y = drawing.DETAIL_KEEP["FrontCornerRadius"]
+    low = y - 0.0019
+    circle_x = center[0] - math.sqrt(crop**2 - (low - center[1]) ** 2)
+    assert x + 0.01175 < circle_x - 0.002
+    assert x + 0.004 + 0.01175 > circle_x - 0.002  # the run's keep
+    # The flat's rows stay within 12 characters, so the shoulder under them
+    # ends short of the tip's witness lines; the block's top (12.9 mm over
+    # the keep in the run) stands under the thread blank's lower outline.
+    rows = drawing.COLLAR_SLIDING_FIT.splitlines()
+    assert max(map(len, rows)) <= 12
+    fx, fy = drawing.SIDE_KEEP["FlatToAxis"]
+    assert fx + 12 * 0.0027 < drawing.TIP_X - 0.003
+    blank_bottom = drawing._sheet_y(-spec.THREAD_BLANK_DIA / 2.0)
+    assert fy + 0.0129 < blank_bottom - 0.002
+    assert fy + 0.0045 + 0.0129 > blank_bottom  # the run's keep
+    # The mark's "B" (2 mm wide) stands between the face width's rear
+    # witness line and the tooth-tip Ø's lower arrow, 2 mm clear of each.
+    bx = drawing.PARENT_LETTER_XY[0]
+    assert drawing.PINION_REAR_X + 0.002 < bx
+    assert bx + 0.002 + 0.002 < drawing.SIDE_KEEP["OutsideDia"][0] - 0.0004 - 0.002
+
+
 class _NeckView:
     """A recording IView double for detail B's place-move-crop."""
 
@@ -1042,7 +1107,9 @@ def test_build_dimensions_the_detail_before_the_side_and_marks_it_last(
     ) < seat.index("curate_view_dimensions", "side")
     frames = [which for name, which in seat.calls if name == "add_feature_control_frame"]
     assert frames == ["core_total_runout", "front_neck_total_runout"]
-    assert seat.frame_views == ["*Right", "detail"]
+    # Both frames stand in detail B (the core's side-view leader crossed the
+    # relief Ø's line).
+    assert seat.frame_views == ["detail", "detail"]
     last_pick = max(
         i for i, (name, _label) in enumerate(seat.calls)
         if name in ("add_feature_control_frame", "add_toothspace_callout")
