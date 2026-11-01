@@ -12,7 +12,9 @@ TL-28 mate), and both slots' stations, rises, width and centre-to-centre run
 centreline, carries the faced thickness and both faced seats' Ra 125 µin
 under their one reason; the shaded isometric rides bottom left under the
 plan's stack, left of the title block. The sheet prints decimal inch
-(#290); the model keeps its millimetre nominals.
+(#290); the model keeps its millimetre nominals. The rail holes' and the
+brackets' stations belong to metric vendor lines (HGR15R, KP08) and print
+exact millimetres, labelled mm (owner ruling 4, 2026-11-01).
 
 Run with SolidWorks open::
 
@@ -64,6 +66,7 @@ from _surface_finish import SEAT_UM, surface_finish_by_key
 from _printed_limits import limits
 from _part_properties import part_drawing_unit
 from _printed_tolerance import drilled_oversize_mm
+from _metric_vendor_dimension import assert_imported_metric_dimensions
 from ch_rocker_arm_tl_oblique_callouts import set_callout_lengths_to_three_places
 from ch_rocker_arm_tl_oblique_base_bar_spec import (
     BAR_LENGTH,
@@ -79,6 +82,7 @@ from ch_rocker_arm_tl_oblique_base_bar_spec import (
     FAR_SLOT_Y,
     HIGH_SIDE_Y,
     LOW_SIDE_Y,
+    METRIC_DIMENSIONS,
     NEAR_SLOT_RISE,
     NEAR_SLOT_X,
     RAIL_HOLE_X,
@@ -191,19 +195,20 @@ def _below_line(k: int) -> float:
 
 
 # The plan: the rail-hole stations stack above it from the end face, nearest
-# first (DRO absolutes), each in its own lane; the outermost (400.00) carries
-# the mate on a second line, the only lane no extension line crosses. The
-# 40.00 span is shorter than its text, so its text sits outside it, between
-# holes 1 and 2, clear of the end face's extension line (r1 printed it across
-# that line).
+# first (DRO absolutes), each in its own lane; the outermost (400.00 ±0.08 mm)
+# carries the mate on a second line, the only lane no extension line crosses.
+# The 40.00 span is shorter than its text, so its text sits outside it. The
+# millimetre label (owner ruling 4) left it too wide for the gap between holes
+# 1 and 2, so it stands left of the end face's extension line, where no other
+# line runs (r1 printed it across that line).
 #
 # Below it, nearest first: the near slot's width (its extension lines then
 # cross no other dimension), the near slot's station, the near bracket row's
 # station, the far slot's, the far row's, the length. A span shorter than
 # its text prints the text beside it, clear of both extension lines (r2
 # struck "2X 13.50" and "20.9" with their own lines): the near station's
-# right of the slot's centre line; the near row's station sits at its
-# span's right end, clear of the slot's lines. The width's "2X 13.50 THRU"
+# right of the slot's centre line; the near row's (57.000 ±0.13 mm, wider
+# than its span) right of its own extension line. The width's "2X 13.50 THRU"
 # (r5: the slots' depth) sits right of the near row's extension line, which
 # runs down through lane 0 too close to the slot for the text to fit
 # between them (Y14.5 lets an extension line cross a dimension line).
@@ -237,7 +242,9 @@ _FAR_RISE_TEXT_HALF = 0.0055  # "4.90": the r6 sheet's "23.0" was 8.8 wide
 _RAIL_ROW_TEXT_HALF = 0.0195
 # "5.50", four glyphs at 2.6 (the #290 "(5-1/2 in)" over "STOCK" was 0.0104).
 _BAR_WIDTH_TEXT_HALF = 0.0055
-_BRACKET_NEAR_X_TEXT_HALF = 0.0055  # "2.244"
+# The metric vendor stations at about 2.6 a glyph (owner ruling 4).
+_RAIL_HOLE_1_TEXT_HALF = 0.0182  # "40.00 ±0.08 mm", 14 glyphs
+_BRACKET_NEAR_X_TEXT_HALF = 0.0195  # "57.000 ±0.13 mm", 15 glyphs
 _BRACKET_ROW_TEXT_HALF = 0.0070  # "2.425": "61.400" was 13.9 wide on the c4-r9 sheet
 _BRACKET_OUTER_TEXT_BELOW = 0.004  # "6.400"'s centre under the bar's -Y edge
 # SolidWorks sets an outside text right of its own line on a shoulder: the
@@ -292,7 +299,7 @@ _BRACKET_ROW_TEXT_Y = (
 )
 _LAST_HOLE = len(RAIL_HOLE_X)
 _HOLE_TEXT_X = (
-    (RAIL_HOLE_X[0] + RAIL_HOLE_X[1]) / 2.0,
+    -(_TEXT_GAP + _RAIL_HOLE_1_TEXT_HALF) * 1000.0 / _S,  # left of the end face
     *(x / 2.0 for x in RAIL_HOLE_X[1:]),
 )
 FRONT_KEEP = {
@@ -318,7 +325,7 @@ FRONT_KEEP = {
         _below_line(1) + TEXT_DROP,
     ),
     "BracketHole1X": (
-        _sheet_x(FRONT_CENTER, BRACKET_NEAR_X) - _TEXT_GAP - _BRACKET_NEAR_X_TEXT_HALF,
+        _sheet_x(FRONT_CENTER, BRACKET_NEAR_X) + _TEXT_GAP + _BRACKET_NEAR_X_TEXT_HALF,
         _below_line(2) + TEXT_DROP,
     ),
     "FarSlotX": (_sheet_x(FRONT_CENTER, FAR_SLOT_X / 2.0), _below_line(3) + TEXT_DROP),
@@ -647,13 +654,16 @@ for _index, _x in enumerate(part_spec.RAIL_HOLE_X, start=1):
     )
 
 _BRACKET_PLACES = part_spec.BRACKET_HOLE_PLACES
+_STATION_PLACES = part_spec.BRACKET_STATION_PLACES
+_STATION_BAND = (part_spec.BRACKET_STATION_BAND, -part_spec.BRACKET_STATION_BAND)
 _CBORE_PLACES = part_spec.BRACKET_CBORE_PLACES
 _BRACKET_DIA_PRINTED = _printed(BRACKET_HOLE_DIA, _CALLOUT_PLACES)
 _FROM_UNDERSIDE = ([0.0, 0.0, 1.0], ("__frame__",))
 _BRACKET_SOURCE = (("ch_rocker_arm_tl_vn_oblique_leadscrew_spec", "BASE_BAR_HOLES"),)
 for _index, (_x, _y) in enumerate(BRACKET_HOLES, start=1):
-    # Stations from the spindle-end face, rows from the faced -Y side, at
-    # .XXX: each row holds TL-28's four taps inside the screws' float.
+    # Stations from the spindle-end face (the KP08's, exact millimetres with
+    # their own band), rows from the faced -Y side at .XXX: each row holds
+    # TL-28's four taps inside the screws' float.
     requirement(
         f"bracket_hole_{_index}",
         kind="hole",
@@ -663,8 +673,8 @@ for _index, (_x, _y) in enumerate(BRACKET_HOLES, start=1):
             "at": ([_x, _y, 0.0], _BRACKET_SOURCE),
             "axis": _FROM_UNDERSIDE,
             "station": (
-                _limits(_x, _BRACKET_PLACES),
-                (*_BRACKET_SOURCE, "BRACKET_HOLE_PLACES"),
+                limits(_x, _STATION_PLACES, _STATION_BAND),
+                (*_BRACKET_SOURCE, "BRACKET_STATION_PLACES", "BRACKET_STATION_BAND"),
             ),
             "station_nominal": (_x, _BRACKET_SOURCE),
             "height": (
@@ -690,7 +700,7 @@ for _index, (_x, _y) in enumerate(BRACKET_HOLES, start=1):
             ),
         },
         precision={
-            "station": _BRACKET_PLACES,
+            "station": _STATION_PLACES,
             "height": _BRACKET_PLACES,
             "dia": _CALLOUT_PLACES,
         },
@@ -880,6 +890,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # sheet only proves the import kept them, then marks the slot counts and
     # writes the mate callouts.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    assert_imported_metric_dimensions(
+        adapter,
+        annotations,
+        {
+            name: places
+            for (_feature, name), (places, _band) in METRIC_DIMENSIONS.items()
+        },
+    )
     _set_dimension_text(adapter, annotations, DIMENSION_TEXT)
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
 
