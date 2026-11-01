@@ -199,13 +199,14 @@ RELIEF_DIA_TEXT_XY = (
 END_KEEP = {
     "SlotWidth": (END_CENTER[0] + 0.022, END_CENTER[1] + 0.010),
 }
-# The thread callout lands on the full thread's lower silhouette 3 mm in from
-# the tip chamfer, from below and right, under the thread and clear of the
-# chamfer's extension lines: above the thread, its leader ran through where
-# the relief lead's note now stands (#290 review of b28d38a16).
-THREAD_PICK = (THREAD_START_X + 0.003, THREAD_BOTTOM_Y)
-# Its 9-character text (24 mm) ends left of the relief Ø's leader.
-THREAD_NOTE_XY = (THREAD_START_X + 0.0056, SIDE_CENTER[1] - 0.0095)
+# The thread callout lands on the full thread's lower silhouette just in from
+# the tip chamfer, from below: above the thread, its leader ran through where
+# the relief lead's note now stands (#290 review of b28d38a16).  Its
+# 9-character text (23.5 mm on farm r10 of 4e4991e0a) stands 15 mm below the
+# axis between the chamfer's extension line and the seat face's, which it
+# crossed when it started 5.6 mm in from the thread start (r10).
+THREAD_PICK = (THREAD_START_X + 0.0015, THREAD_BOTTOM_Y)
+THREAD_NOTE_XY = (THREAD_START_X + 0.0026, SIDE_CENTER[1] - 0.015)
 # The 45-degree relief lead's own note (#290 review of b28d38a16), on the
 # lead's upper silhouette.  The lead faces up and left, so the note stands up
 # and left with its 18-character rows (46 mm) ending 15 mm left of the relief
