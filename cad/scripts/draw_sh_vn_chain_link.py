@@ -28,9 +28,6 @@ from _supplier_chain_stock import (
     SUPPLIER_REFERENCE_CONFIGURATION,
 )
 from _supplier_spring_drawing import build_supplier_spring_drawing
-from _machinist_review_mode import MachinistReviewMode
-
-MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["sh_vn_chain_link"]
