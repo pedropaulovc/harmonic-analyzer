@@ -6850,33 +6850,6 @@ def test_supplier_unknown_or_unsupported_row_units_fail_before_native_access(uni
             operation(None, {}, **options)
 
 
-def test_metric_flange_nut_supplier_lanes_leave_a_fittable_end_view():
-    import ch_rocker_arm_tl_vn_oblique_leadscrew_nut_spec as supplier
-    from _supplier_screw_layout import supplier_screw_margins
-
-    margins = supplier_screw_margins(
-        supplier.SUPPLIER_REFERENCE_DIMENSIONS,
-        planes=supplier.SUPPLIER_REFERENCE_PLANES,
-        sides=supplier.SUPPLIER_REFERENCE_SIDES,
-    )
-    cells = purchased.fastener_view_cells(
-        purchased.view_band_bottom(
-            supplier.DRAWING_NOTES,
-            label="metric flange nut",
-            supplier_data=("SOURCE NOMINALS; INTERNAL THREAD NOT MODELLED.",),
-        )
-    )
-    fitted = purchased.supplier_fit_cells(cells, margins, label="metric flange nut")
-    end_cell = next(bounds for name, _center, bounds in fitted if name == "*Top")
-    # A positive cell alone is insufficient: even the smallest permitted scale
-    # must retain the real flange envelope plus native-view padding.
-    smallest_ratio = min(
-        numerator / denominator for numerator, denominator in purchased._SCALES
-    )
-    required_span = supplier.FLANGE_DIA / 1000.0 * smallest_ratio + 0.002
-    assert min(end_cell[2] - end_cell[0], end_cell[3] - end_cell[1]) >= required_span
-
-
 class _SupplierReadOnlyDocument(_Model):
     """Method-shaped IModelDoc2 getters; no source save/flag-clear operations."""
 

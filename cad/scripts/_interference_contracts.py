@@ -907,14 +907,17 @@ JIG_RAIL_SCREW_THREAD = (4.1656, 3.454, 9.35)  # #8-32 into each base bar
 JIG_BRACKET_SCREW_THREAD = (4.1656, 3.454, 8.7376)  # #8-32 into a end bracket
 JIG_CARRIAGE_SCREW_THREAD = (4.0, 3.242, 4.8006)  # M4 cut to fit .189 into each HGH15 carriage from the .570 floor
 JIG_PILLOW_BLOCK_SCREW_THREAD = (3.5052, 2.705, 10.875)  # #6-32 into a end bracket
-JIG_NUT_SCREW_THREAD = (2.8448, 2.261, 9.2)  # #4-40 into feed block
+JIG_NUT_SCREW_THREAD = (2.8448, 2.261, 8.89)  # #4-40 X 3/4 past the .40 nut into the feed block
 JIG_RISER_SCREW_THREAD = (2.8448, 2.261, 10.334168)  # #4-40 into the carrier past the .24 riser's Ø.25 CSK
 JIG_CLAMP_SCREW_THREAD = (6.35, 5.105, 11.938)  # 1/4-20 through the .47 carrier
 JIG_LEVER_SCREW_THREAD = (7.9375, 6.528, 10.414)  # 5/16-18 into the carrier
 JIG_PIVOT_SCREW_THREAD = (7.9375, 6.528, 14.478)  # 5/16-18 cut to .570 below shoulder-end floor
 JIG_T_NUT_THREAD = (12.7, 10.716, 14.0)  # 1/2-13 stud in its T-nut
 JIG_FLANGE_NUT_THREAD = (12.7, 10.716, 13.0)  # 1/2-13 stud in its flange nut
-JIG_LEADSCREW_NUT_THREAD = (8.0, 6.0, 15.0)  # Tr8 screw in its flanged nut
+# The Tr8 screw in the shop-made TL-27 nut's Ø.242 tap drill, .40 long. The
+# nut touches nothing else over the carriage's travel (the jig spec's
+# ``feed_nut_travel_gaps``), so no other pair names it.
+JIG_FEED_NUT_THREAD = (8.0, 6.147, 10.16)
 _ROCKER_OBLIQUE_JIG_ALLOWED_PAIRS = {
     frozenset((f"{_JIG_VENDOR}-hub-pin-1", f"{_JIG}-carrier-1")): (
         1.10 * math.pi * JIG_HUB_PIN_SEAT[0] ** 2 * JIG_HUB_PIN_SEAT[1] / 4.0
@@ -976,7 +979,7 @@ _ROCKER_OBLIQUE_JIG_ALLOWED_PAIRS = {
     ),
     **_numbered_pairs(
         f"{_JIG_VENDOR}-nut-screw",
-        range(1, 5),
+        range(1, 3),
         f"{_JIG}-feed-block",
         _smooth_annulus_limit_mm3(*JIG_NUT_SCREW_THREAD),
     ),
@@ -1013,10 +1016,10 @@ _ROCKER_OBLIQUE_JIG_ALLOWED_PAIRS = {
         second_number=None,
     ),
     **_numbered_pairs(
-        f"{_JIG_VENDOR}-leadscrew-nut",
+        f"{_JIG}-feed-nut",
         range(1, 2),
         f"{_JIG_VENDOR}-leadscrew",
-        _smooth_annulus_limit_mm3(*JIG_LEADSCREW_NUT_THREAD),
+        _smooth_annulus_limit_mm3(*JIG_FEED_NUT_THREAD),
     ),
     **_numbered_pairs(
         f"{_JIG_VENDOR}-pivot-screw",

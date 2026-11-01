@@ -118,7 +118,7 @@ _PARTS = (
     ("ch-rocker-arm-tl-vn-oblique-carriage", "ch-rocker-arm-tl-vn-oblique-carriage"),
     ("ch-rocker-arm-tl-vn-oblique-cl-dowel", "ch-rocker-arm-tl-vn-oblique-cl-dowel"),
     ("ch-rocker-arm-tl-vn-oblique-leadscrew", "ch-rocker-arm-tl-vn-oblique-leadscrew"),
-    ("ch-rocker-arm-tl-vn-oblique-leadscrew-nut", "ch-rocker-arm-tl-vn-oblique-leadscrew-nut"),
+    ("ch-rocker-arm-tl-oblique-feed-nut", "ch-rocker-arm-tl-oblique-feed-nut"),
     ("ch-rocker-arm-tl-vn-oblique-pillow-block", "ch-rocker-arm-tl-vn-oblique-pillow-block"),
     ("ch-rocker-arm-tl-vn-oblique-handwheel", "ch-rocker-arm-tl-vn-oblique-handwheel"),
     ("sh-vn-clamping-kit-hardware", "sh-vn-clamping-kit-hardware--HoldDownStud"),
