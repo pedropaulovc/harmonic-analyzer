@@ -557,3 +557,29 @@ def test_pin_proud_min_lands_on_the_phantom_big_end() -> None:
     assert barrel_r - 0.5 < stub_x < barrel_r
     assert stub_x < barrel_r + PIN_PROUD
     assert "PIN_STUB_X = math.sqrt(BARREL_R**2 - PIN_BIG_END_R**2)" in build
+
+
+def test_pin_proud_callout_names_the_phantom_pin_and_ring() -> None:
+    # r7 review (run 20261101T022045634Z): the dashed box and the ring were
+    # unnamed; rule 4 wants the mate's name with its number.
+    text = " ".join(dt_crank_hub_notes.PIN_PROUD_CALLOUT.split())
+    for part in ("MHA-DT-09 TAPER PIN BIG END", "(PHANTOM)", "KEEPER RING MHA-DT-27"):
+        assert part in text
+    lines = dt_crank_hub_notes.PIN_PROUD_CALLOUT.splitlines()
+    assert len(lines) == 4 and max(map(len, lines)) <= 29
+    # The widest line (2.5 mm a glyph) starts right of the phantom big end.
+    big_end_right = drawing.END_CENTER[0] + (geometry.HUB_BARREL_DIA / 2.0 + 4.45) * drawing._S
+    left = drawing.END_KEEP["PinProud"][0] - max(map(len, lines)) * 0.0025 / 2.0
+    assert left - big_end_right >= 0.00178
+
+
+def test_cross_hole_station_prints_its_origin_at_the_shoulder() -> None:
+    # r7 review: 5.60 read as chained from 8.0; the origin circle marks the
+    # arm shoulder it is measured from.
+    assert drawing.ORIGIN_DIMENSIONS == {"ServicePinFromShoulder": drawing.SHOULDER_X}
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source[source.index("async def build") :]
+    assert body.index("set_reference_dimensions(adapter, annotations") < body.index(
+        "_set_dimension_origin("
+    )
+    assert "display.SetArrowHeadStyle2(False, *attempt)" in source
