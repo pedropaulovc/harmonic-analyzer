@@ -33,9 +33,11 @@ SOURCE_FEATURES = {
     "free_top": (stock.SECTION_FEATURE,),
 }
 
+# The TOP lane keeps 10 mm above and below the source ink: the connecting
+# link's 8.5 mm pin length then fits at 2:1 in the 40 mm cell, not 1:4.
 SUPPLIER_MARGINS = {
     "free_front": (0.030, 0.020, 0.030, 0.020),
-    "free_top": (0.030, 0.016, 0.045, 0.020),
+    "free_top": (0.030, 0.010, 0.045, 0.010),
 }
 # The diagram sketches are construction geometry (the zero-body diagram
 # contract). Construction curves print continuous in this SLDDRW, as
@@ -164,12 +166,16 @@ def annotate_chain_stock(
             if connecting:
                 # The plate span is too short for inside arrows, so its REF
                 # hangs left of the line on a shoulder ~5.6 mm under the text
-                # anchor, out across the roller-width line and its 6.35 mm
-                # outside-arrow stub.  At ymax + 15 mm the shoulder clears that
-                # stub (the pin length bounds ymax) whatever the REF's width.
+                # anchor, out across the roller-width line and that line's
+                # 6.35 mm outside-arrow stub. Anchor it 14 mm above the roller
+                # width's top (the pin length sets ymax), so the shoulder
+                # clears the stub at any fitted scale.
+                width_top = middle[1] + (ymax - middle[1]) * (
+                    stock.ROLLER_WIDTH / stock.CONNECTING_PIN_LENGTH
+                )
                 positions.update(
                     {
-                        stock.PLATE_DIMENSION: (middle[0], ymax + 0.015),
+                        stock.PLATE_DIMENSION: (middle[0], width_top + 0.014),
                         stock.LENGTH_DIMENSION: (xmax + 0.020, middle[1]),
                     }
                 )

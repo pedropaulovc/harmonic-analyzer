@@ -105,9 +105,16 @@ def _chain_sheet(
         (0.001, -chain_stock.ROLLER_DIAMETER / 2000),
         (0.001 + 2 * chain_stock.PITCH / 1000, chain_stock.ROLLER_DIAMETER / 2000),
     )
+    # The TOP ink: the roller outline alone, or roller to pin outline, whose
+    # pin length sets the height.
+    top_width, top_height = (
+        (2 * chain_stock.PITCH, chain_stock.CONNECTING_PIN_LENGTH)
+        if connecting
+        else (chain_stock.ROLLER_DIAMETER, chain_stock.ROLLER_WIDTH)
+    )
     views["free_top"].source_points = (
-        (0.002, -chain_stock.PLATE_THICKNESS / 1000),
-        (0.002 + chain_stock.ROLLER_WIDTH / 1000, chain_stock.PLATE_THICKNESS / 1000),
+        (0.002, -top_height / 2000),
+        (0.002 + top_width / 1000, top_height / 2000),
     )
     for view in views.values():
         view.Position = position
@@ -309,15 +316,15 @@ def test_chain_annotation_positions_follow_source_ink_not_stale_outline(
         ),
     }
     top_left = x + 0.002 * ratio
-    top_right = top_left + chain_stock.ROLLER_WIDTH / 1000 * ratio
+    top_right = top_left + (
+        2 * chain_stock.PITCH if connecting else chain_stock.ROLLER_DIAMETER
+    ) / 1000 * ratio
     expected_top = {chain_stock.WIDTH_DIMENSION: (top_left - 0.014, y)}
+    width_top = y + chain_stock.ROLLER_WIDTH / 2000 * ratio
     if connecting:
         expected_top.update(
             {
-                chain_stock.PLATE_DIMENSION: (
-                    (top_left + top_right) / 2,
-                    y + chain_stock.PLATE_THICKNESS / 1000 * ratio + 0.015,
-                ),
+                chain_stock.PLATE_DIMENSION: ((top_left + top_right) / 2, width_top + 0.014),
                 chain_stock.LENGTH_DIMENSION: (top_right + 0.020, y),
             }
         )
@@ -325,6 +332,11 @@ def test_chain_annotation_positions_follow_source_ink_not_stale_outline(
         assert set(views[key].dimension_positions) == set(expected)
         for name, xy in expected.items():
             assert views[key].dimension_positions[name] == pytest.approx(xy)
+    if connecting:
+        # The plate REF's shoulder (~5.6 mm under its anchor) stays above the
+        # roller-width line's 6.35 mm outside-arrow stub at either scale.
+        plate_y = views["free_top"].dimension_positions[chain_stock.PLATE_DIMENSION][1]
+        assert plate_y - 0.0056 >= width_top + 0.00635 + 0.001
     assert not views["installed_iso"].dimension_positions
     settled()
     assert all(view.outline_calls == 0 for view in views.values())
@@ -368,6 +380,18 @@ def test_chain_top_fit_lane_accommodates_five_to_one_source_gauge():
     available_height = top[3] - top[1]
     assert chain_stock.ROLLER_WIDTH / 1000 * 5 < available_height
     assert chain_stock.ROLLER_WIDTH / 1000 * 8 > available_height
+
+
+def test_connecting_link_top_fit_lane_accommodates_two_to_one_pin_length():
+    cells = supplier_drawing.supplier_fit_cells(
+        supplier_drawing.supplier_state_cells(0.08, maximum=False),
+        chain_dimensions.SUPPLIER_MARGINS,
+        label="connecting link reference",
+    )
+    top = next(box for name, _center, box in cells if name == "free_top")
+    available_height = top[3] - top[1]
+    assert chain_stock.CONNECTING_PIN_LENGTH / 1000 * 2 < available_height
+    assert chain_stock.CONNECTING_PIN_LENGTH / 1000 * 4 > available_height
 
 
 def test_wire_nominal_cannot_be_read_from_the_installed_envelope(monkeypatch):
