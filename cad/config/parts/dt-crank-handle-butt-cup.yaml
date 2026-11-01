@@ -10,3 +10,9 @@ dt-crank-handle-butt-cup:
   tolerance_class: machined_block
   process: "turned (steel); epoxied flush in the MHA-DT-08 butt counterbore; face left flat, the oak's end round turned clear of it"
   drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "pocket bore callout: WALL .060 MIN"
+      finding: "steel pocket wall .060 at the smallest body and largest pocket, at the .060 floor and under the .080 target (rule 17)"
+      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions (extends to MHA-DT-35; the MHA-DT-32 head fixes the pocket, and a body large enough for .080 takes the MHA-DT-08 butt wall under target; body sized to the floor by owner ruling B on #1375)"

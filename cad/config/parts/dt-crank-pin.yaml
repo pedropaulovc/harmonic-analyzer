@@ -8,3 +8,9 @@ dt-crank-pin:
   fit_class: fastener_clearance
   process: "machined (steel)"
   drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "#45 ring-hole callout: WEB .065 MIN"
+      finding: "cross-hole web .065 at the smallest printed taper section, above the .060 floor and under the .080 target (rule 17)"
+      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions (extends to MHA-DT-09 and closes #989 as accepted; the hole carries the .040 MHA-DT-27 keeper ring with air, and nearer the big end it runs into the hub)"

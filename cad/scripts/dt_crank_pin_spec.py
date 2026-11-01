@@ -77,8 +77,8 @@ CROSS_HOLE_WEB_MIN = round(
 )
 # The shortfall is stated under the hole's own Ø callout (rule 20), flagged
 # where it applies (rule 7); the review files it as a non-gating shortfall.
-# Pending exception ruling: MHA-DT-09 cross-hole web (#989; the 2026-09-30
-# acceptance from #1140 was reset to pending on 2026-10-11).
+# Owner ruling 2026-11-01 accepts it as minor exception RV-01 in
+# dt-crank-pin.yaml (#989).
 CROSS_HOLE_WEB_CALLOUT = (
     f"WEB {render_number(round(CROSS_HOLE_WEB_MIN / 25.4, 3), 'in', 3)} MIN"
 )
