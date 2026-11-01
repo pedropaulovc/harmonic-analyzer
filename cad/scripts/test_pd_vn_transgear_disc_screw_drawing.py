@@ -363,12 +363,13 @@ def test_sheet_states_the_cut_and_no_dimension_in_the_registry_names() -> None:
     assert len(lines) <= 4
     assert all(len(line) <= 70 for line in lines), lines
     flat = " ".join(lines)
-    assert (
+    assert flat.endswith(
         f"CUT EACH TIP {screw.TIP_BELOW_REAR_FACE_TEXT} BELOW THE MHA-PD-06 DISC "
-        "REAR FACE AT ASSEMBLY;"
-    ) in flat
-    # The cut end's break is the title block's; the note sets no limit.
-    assert flat.endswith("BREAK THE CUT END.")
+        "REAR FACE AT ASSEMBLY."
+    )
+    # The cut end's break is the title block's edge break; the note repeats
+    # nothing of it (machinist review r8).
+    assert "BREAK" not in flat
 
 
 def test_the_cut_screw_carries_no_stock_length_reference() -> None:
