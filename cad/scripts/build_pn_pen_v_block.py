@@ -49,6 +49,9 @@ Features, in tree order:
   the section's cutting plane (the bond cradle's recipe): the drawing cuts the
   section while the part shows them, which is how a section imports a hidden
   sketch's dims.
+* ``TapWallReference`` (Front plane, sketch (u, v) = model (X, Y)), hidden:
+  the set-screw tap's wall to the step face (RV-01), a native MIN single
+  limit the front view prints.
 
 Run (SolidWorks already open)::
 
@@ -122,6 +125,10 @@ from pn_pen_v_block_spec import (
     RELIEF_Z0,
     RELIEF_Z1,
     SET_SCREW_TAP_SPEC,
+    TAP_WALL_MIN_BAND,
+    TAP_WALL_MIN_MM,
+    TAP_WALL_MIN_TOL_TYPE,
+    TAP_WALL_START_X,
     SET_SCREW_Y,
     UNIT,
     V_FLANK_ANGLE_DEG,
@@ -790,8 +797,37 @@ async def _pivot_reference(adapter) -> list[tuple[str, str]]:
     ]
 
 
+async def _tap_wall_reference(adapter) -> None:
+    """RV-01's accepted wall from the set-screw tap to the step face, stated
+    natively: a hidden construction line on the Front plane at the tap's
+    height, running -X toward the step from the thread's major diameter, as
+    long as the printed minimum, so its driving dimension prints ".064 MIN"
+    once _single_limits types it (build_pn_pen_frame's recipe)."""
+    feature = "TapWallReference"
+    check(f"create sketch {feature}", await adapter.create_sketch("Front"))
+    start = (TAP_WALL_START_X, SET_SCREW_Y)
+    line = await _construction_chord(
+        adapter, feature, start, (start[0] - TAP_WALL_MIN_MM, start[1])
+    )
+    check(feature, await adapter.add_sketch_constraint(line, None, "horizontal"))
+    await dimension_between(
+        adapter,
+        f"{line}.start",
+        f"{line}.end",
+        "horizontal_distance",
+        TAP_WALL_MIN_MM,
+        feature,
+    )
+    await anchor_point_to_origin(adapter, f"{line}.start", *start, feature)
+    await ensure_fully_defined(adapter, feature)
+    check(f"exit sketch {feature}", await adapter.exit_sketch())
+    name_last_feature(adapter, feature)
+    name_dimensions(adapter, feature, ["TapWallMin", "TapWallX", "TapWallY"])
+
+
 # (feature, dimension, the limit the model carries, its native band,
-# swTolType_e, the word it prints): the pivot bore's chamfer has a floor.
+# swTolType_e, the word it prints): the pivot bore's chamfer and the tap's
+# wall to the step have floors.
 _SINGLE_LIMITS = (
     (
         "PivotReference",
@@ -799,6 +835,14 @@ _SINGLE_LIMITS = (
         PIVOT_BORE_TOP_CHAMFER,
         PIVOT_CHAMFER_BAND,
         PIVOT_CHAMFER_TOL_TYPE,
+        "MIN",
+    ),
+    (
+        "TapWallReference",
+        "TapWallMin",
+        TAP_WALL_MIN_MM,
+        TAP_WALL_MIN_BAND,
+        TAP_WALL_MIN_TOL_TYPE,
         "MIN",
     ),
 )
@@ -1156,6 +1200,7 @@ async def build(adapter) -> dict[str, str]:
     await _section_plane(adapter)
     drive_jobs += await _relief_reference(adapter)
     drive_jobs += await _pivot_reference(adapter)
+    await _tap_wall_reference(adapter)
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just

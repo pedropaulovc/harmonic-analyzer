@@ -948,12 +948,22 @@ def test_v_dimension_text_stays_off_the_part_in_the_end_view() -> None:
     assert _DRAWING_SOURCE.index("_place_flank_angle(adapter, annotations)") > (
         _DRAWING_SOURCE.index('(right, RIGHT_KEEP, "paper end")')
     )
-    # The flat's width: its line over the top face, its text under the tap's
-    # callout rows (~0.249 / 0.255, from ~0.247).
+    # The flat's width: under the flat, inside the V's opening, so its
+    # extension lines drop through air (round 3 review: over the view they
+    # crossed the whole end face).  Its text (~7 x 3.5 mm) and its line
+    # (~3.3 mm under the keep, arrows ~3 mm past the extension lines) stay
+    # between the flanks and over the bottom face.
     width_x, width_y = keep["VFlatWidth"]
     assert width_x == pytest.approx(drawing._rz(drawing._CZ))
-    assert width_y - 0.0033 > drawing._ry(spec.BLOCK_HEIGHT) + 0.004
-    assert width_y + 0.0017 < drawing.TAP_CALLOUT_XY[1] - 0.003 - 0.005
+    flat_y = drawing._ry(spec.V_FLAT_Y)
+    line_y = width_y - 0.0033
+    assert width_y + 0.0017 < flat_y - 0.003
+    assert line_y > drawing._ry(0.0) + 0.005
+    flat_half = spec.V_FLAT_WIDTH / 2.0 * drawing._S
+    # 45 degree flanks: the opening's half-width grows by the drop under the
+    # flat.
+    assert flat_half + (flat_y - (width_y + 0.0017)) > 0.0035 + 0.002
+    assert flat_half + (flat_y - line_y) > flat_half + 0.003 + 0.002
     # The flat's height: right of the body's back face, inside the gap to
     # section A-A.
     height_x, height_y = keep["VFlatY"]
@@ -1213,3 +1223,76 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert "brass" in str(registry["material_specification"]).lower()
     assert "bright brass" in str(registry["finish"]).lower()
     assert int(registry["quantity"]) == 1
+
+
+def test_set_screw_tap_wall_to_the_step_is_stated_at_its_printed_worst_case() -> None:
+    # Rule 17: over the step's .08 the #4-40 thread (major .112) stands off
+    # the step face by the station gap less its major radius.  At the
+    # printed worst case (tap station .48, step .36) that is .064: over the
+    # floor, under the target (RV-01), stated natively as .064 MIN.
+    import pn_pen_carriage_geom as carriage
+    import pn_pen_frame_spec as frame
+    from _hole_spec import THREAD_MAJOR_MM
+    from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+    from _recording_geometry import PAPER_FRONT_Z
+
+    band = 0.01 * 25.4
+    major_r = THREAD_MAJOR_MM[spec.SET_SCREW_TAP_SPEC.size] / 2.0
+    wall = (spec.PIVOT_BORE_X - band) - (spec.RELIEF_X0 + band) - major_r
+    assert wall == pytest.approx(0.064 * 25.4, abs=0.001)
+    assert WALL_FLOOR_MM <= wall < WALL_TARGET_MM
+    assert spec.TAP_WALL_MIN_MM == pytest.approx(0.064 * 25.4)
+    assert spec.TAP_WALL_MIN_MM == pytest.approx(wall, abs=0.001)
+    assert spec.TAP_WALL_MIN_TOL_TYPE == 5  # swTolType_e.swTolMIN
+    assert spec.TAP_WALL_MIN_BAND[1] == 0.0
+    assert spec.TAP_WALL_MIN_MM + spec.TAP_WALL_MIN_BAND[0] == pytest.approx(
+        (spec.PIVOT_BORE_X + band) - (spec.RELIEF_X0 - band) - major_r
+    )
+    # The reference line runs from the thread's major diameter toward the
+    # step and stops short of it.
+    assert spec.TAP_WALL_START_X == pytest.approx(spec.PIVOT_BORE_X - major_r)
+    assert spec.TAP_WALL_START_X - spec.TAP_WALL_MIN_MM > spec.RELIEF_X0
+    # Why the geometry stays: reaching the target needs this much more gap
+    # between the tap and the step.  The step can't come toward the paper end
+    # (the stirrup slides on the neck with less slack), and moving the bore
+    # toward the free end carries the stirrup toward the paper by the shift
+    # times cos(yaw), more than the paper clearance left.
+    shortfall = WALL_TARGET_MM - wall
+    neck_slack = spec.RELIEF_X0 - (
+        carriage.FRAME_X0_LOCAL + frame.FRAME_DEPTH + 4.0 * carriage.CLEARANCE
+    )
+    paper_slack = (PAPER_FRONT_Z - 2.0 * carriage.CLEARANCE) - max(
+        carriage.paper_side_points().values()
+    )
+    yaw = math.radians(carriage.PEN_BLOCK_YAW_DEG)
+    assert 0.0 <= neck_slack < shortfall
+    assert 0.0 <= paper_slack < shortfall * math.cos(yaw)
+
+
+def test_tap_wall_stands_under_the_front_view_clear_of_every_line() -> None:
+    # The reference line lies at the tap's height between the thread and the
+    # step; its line stands under the bottom face, between the station's
+    # extension lines (the tap's axis, the paper end) and over the station's
+    # row.  Its two-row text (~21 x 9 mm, value over the anchor, TAP WALL
+    # under) is offset on a leader right of the extension lines, clear of the
+    # view, the station's text and its paper-end extension line.
+    start, end = (
+        drawing._fx(spec.TAP_WALL_START_X),
+        drawing._fx(spec.TAP_WALL_START_X - spec.TAP_WALL_MIN_MM),
+    )
+    line_x, line_y = drawing.FRONT_KEEP["TapWallMin"]
+    assert line_x == pytest.approx((start + end) / 2.0)
+    assert drawing._fx(spec.PIVOT_BORE_X) + 0.004 < start < end < drawing._fx(0.0)
+    bottom = drawing._fy(0.0)
+    station_y = drawing.FRONT_KEEP["SetScrewX"][1]
+    assert station_y + 0.0017 < line_y - 0.0033 - 0.005
+    assert line_y < bottom - 0.004
+    x, y = drawing.TAP_WALL_TEXT_XY
+    half_w = 0.0105
+    assert x - half_w > end + 0.003 + 0.002  # past the line's outside arrow
+    assert x + half_w < drawing._fx(0.0) - 0.005
+    assert y + 0.0035 < bottom - 0.003
+    assert y - 0.0045 > station_y + 0.0017 + 0.005
+    # The station row clears the bottom view's top (body front face) edge.
+    assert station_y - 0.0033 - 0.004 > drawing._bz(spec.BODY_Z0)
+    assert "_offset_tap_wall_text(adapter, annotations)" in _DRAWING_SOURCE
