@@ -62,7 +62,8 @@ NUT_MACHINE_Z = trammel.CARRIAGE_TOP_Z + NUT_AXIS_Z
 PLAN_DATUM_REFERENCE = pivot.PLAN_DATUM_REFERENCE
 CBORE_FLOOR_REFERENCE = pivot.CBORE_FLOOR_REFERENCE
 # B-B prints the block height from the floor sketch's interior line (TL-22,
-# whose B-B never imported it, prints the Block extrusion's depth on A-A).
+# whose sections never imported it, prints the Block extrusion's depth on a
+# standard Right view).
 DRAWING_VALUES = {k: v for k, v in pivot.DRAWING_VALUES.items() if k != "BlockHeight"} | {
     "SectionBlockHeight": BLOCK_HEIGHT,
     "LugWidth": LUG_WIDTH, "PlanLugX": LUG_X0 - BLOCK_X0,
