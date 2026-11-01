@@ -16,7 +16,12 @@ def test_identity_stock_and_common_pivot_interface():
     assert metadata['number']=='MHA-CH-06-TL-32'
     assert metadata['quantity']==spec.QUANTITY==1
     assert spec.UNIT=='in'
-    assert not metadata.get('machinist_exceptions')
+    # The tap-to-recess wall shortfall is the one declared exception, a
+    # minor naming the sheet's own WALL row (owner exception pending).
+    (wall,)=metadata['machinist_exceptions']
+    assert (wall['id'],wall['kind'])==('RV-01','minor')
+    assert spec.NUT_SEAT_WALL_TEXT in wall['where']
+    assert 'pending confirmation' in wall['reason']
     assert spec.BLOCK_HEIGHT==pivot.BLOCK_HEIGHT
     assert (spec.BLOCK_X0,spec.BLOCK_X1,spec.BLOCK_WIDTH)==(pivot.BLOCK_X0,pivot.BLOCK_X1,pivot.BLOCK_WIDTH)
     assert math.isclose(spec.LUG_X0-spec.BLOCK_X0,spec.PLAN_LUG_X)
