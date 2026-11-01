@@ -40,6 +40,9 @@ from _supplier_washer_model import (
 import _telemetry
 
 
+_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+
+
 @dataclass(frozen=True)
 class _WasherReference:
     view: Any
@@ -102,6 +105,23 @@ def _native_diameter(
     display = _early_bound(display, "IDisplayDimension")
     _assert_rim(adapter, display, rim, label=label)
     return display
+
+
+def _bore_leader_from_outside(display: Any) -> None:
+    """One arrow on the near bore rim, landed from outside the bore.
+
+    A two-arrow bore line runs through the shared centre and crosses the OD's
+    line there; this open leader stops at the bore rim instead.
+    """
+    display.ArrowSide = _ARROWS_OUTSIDE
+    display.SetSecondArrow(False, False)
+    display.SolidLeader = False
+    if (
+        int(display.ArrowSide) != _ARROWS_OUTSIDE
+        or display.GetUseDocSecondArrow() or display.GetSecondArrow()
+        or display.SolidLeader
+    ):
+        raise RuntimeError(f"{BORE_DIAMETER}: kept a centre-crossing diameter line")
 
 
 def _reference(
@@ -383,6 +403,7 @@ def supplier_washer_dimensions(
                                          callout=bore_callout if label == BORE_DIAMETER else None))
             displays[label] = display
 
+    _bore_leader_from_outside(displays[BORE_DIAMETER])
     thickness_stations = _position_washer_text(adapter, face, displays)
 
     def settled_check() -> None:
