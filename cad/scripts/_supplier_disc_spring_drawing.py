@@ -26,7 +26,11 @@ from _supplier_spring_drawing import (
     reacquire_supplier_dimensions,
 )
 from _supplier_spring_reference import SUPPLIER_DIAGRAM_CONFIGURATION
-from _supplier_wire_stock_drawing import _construction_curves_as_outline
+from _supplier_wire_stock_drawing import (
+    _CENTER_MARK_ANNOTATION,
+    _construction_curves_as_outline,
+    _delete_center_marks,
+)
 from vn_disc_spring_supplier_stock import (
     SUPPLIER_DIMENSION_NAMES,
     SUPPLIER_DIMENSIONS_BY_FEATURE,
@@ -53,6 +57,9 @@ TEXT_SIDES = {
 ARROW_REACH_M = 0.003556 + 0.000762 / 2.0
 # The shaft text's bottom, this far over the plan centre (above the OD text).
 SHAFT_TEXT_RISE_M = 0.006
+# Edge-on diagrams: the template's centre cross lies along the thin edge view
+# and prints as dashes inside it, a hidden line to the reader.
+EDGE_VIEWS = ("free_front", "free_right")
 
 
 def supplier_disc_reference_features(spec: Any) -> dict[str, tuple[str, ...]]:
@@ -297,6 +304,11 @@ def supplier_disc_spring_dimensions(
             )
             placed.append((key, semantic, display))
     place_disc_size_texts(adapter, placed, source_bounds, label=spec.SKU)
+    edge_views = [key for key in EDGE_VIEWS if key in views]
+    for key in edge_views:
+        _delete_center_marks(
+            adapter, views[key], label=f"{spec.SKU} {key} edge-view centre mark"
+        )
 
     expected = {key: {} for key in views}
     configurations = {
@@ -316,6 +328,11 @@ def supplier_disc_spring_dimensions(
     def check_settled_references() -> None:
         if len(references) != 4 + len(application):
             raise RuntimeError(f"{spec.SKU}: supplier stock/application sizes missing")
+        for key in edge_views:
+            if views[key].GetAnnotationsByType(_CENTER_MARK_ANNOTATION):
+                raise RuntimeError(
+                    f"{spec.SKU} {key}: edge view regained a centre mark"
+                )
         displays = reacquire_supplier_dimensions(
             adapter,
             views,

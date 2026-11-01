@@ -92,6 +92,10 @@ from _supplier_reference_geometry import (
 )
 from _visibility import FeatureWalk, REFERENCE_FEATURE_KINDS
 
+# The wire text block (placed 9 mm under the section circles) ends about
+# 14 mm under them; the sections caption's top hangs 4 mm below that.
+SECTIONS_CAPTION_DROP_M = 0.018
+
 
 def reacquire_supplier_dimensions(
     adapter: Any,
@@ -1313,6 +1317,9 @@ async def build_supplier_spring_drawing(
             # A small pictorial centred in a tall cell left its caption far
             # below it: hang the caption just under the view instead.
             y = max(y, _box(views[key].GetOutline(), label=key)[1] - 0.004)
+        elif maximum and key == "free_right":
+            # Likewise under the wire text block, not at the section cell floor.
+            y = max(y, reference_bounds(key)[1] - SECTIONS_CAPTION_DROP_M)
         note = _literal_note(adapter, text, center[0], y)
         bounds = _box(note.GetExtent(), label=text, kind="note")
         annotation = _early_bound(note.GetAnnotation(), "IAnnotation")

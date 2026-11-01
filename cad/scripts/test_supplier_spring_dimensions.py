@@ -36,6 +36,9 @@ class _View:
     def GetDisplayDimensionCount(self):
         return len(self.annotations)
 
+    def GetAnnotationsByType(self, kind):
+        return ()
+
     def GetOutline(self):
         raise AssertionError("supplier source ink must not use a padded GetOutline")
 
@@ -108,6 +111,9 @@ def _readback_environment(monkeypatch, module, views):
     if hasattr(module, "set_near_side_diameter"):
         monkeypatch.setattr(module, "set_near_side_diameter", lambda *args: None)
     if hasattr(module, "place_disc_size_texts"):
+        monkeypatch.setattr(
+            module, "_delete_center_marks", lambda *args, **kwargs: None
+        )
         monkeypatch.setattr(
             module, "_construction_curves_as_outline", lambda adapter: lambda: None
         )
@@ -522,6 +528,31 @@ def test_disc_thickness_text_side_is_the_strip_side(spec):
     assert strip_left >= 0.0
     assert disc.TEXT_SIDES["THICKNESS"] == 1
     assert disc.TEXT_SIDES["FREE_HEIGHT"] == -1
+
+
+@pytest.mark.parametrize("spec", [rocker, pivot], ids=["9714K24", "9715K43"])
+def test_disc_edge_views_drop_their_centre_cross_and_keep_it_dropped(monkeypatch, spec):
+    views = _disc_views(spec)
+    _readback_environment(monkeypatch, disc, views)
+    deleted = []
+    monkeypatch.setattr(
+        disc,
+        "_delete_center_marks",
+        lambda adapter, view, label: deleted.append(view.name),
+    )
+    checks = []
+    disc.supplier_disc_spring_dimensions(
+        object(),
+        views,
+        spec=spec,
+        reference_bounds=_captured_reference_bounds(views),
+        settled_checks=checks,
+    )
+    edge_views = {"free_front", "free_right"}.intersection(views)
+    assert sorted(deleted) == sorted(views[key].name for key in edge_views)
+    views["free_front"].GetAnnotationsByType = lambda kind: (object(),)
+    with pytest.raises(RuntimeError, match="regained a centre mark"):
+        checks[0]()
 
 
 @pytest.mark.parametrize(
