@@ -607,7 +607,7 @@ def test_metric_vendor_stations_are_model_authored_in_mm() -> None:
     assert "METRIC_DIMENSIONS.items()" in build
     assert "TOLERANCES" not in build
     sheet = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "assert_imported_metric_dimensions(" in sheet
+    assert "print_imported_metric_dimensions(" in sheet
 
 
 def test_notes_follow_the_simplicity_policy() -> None:
