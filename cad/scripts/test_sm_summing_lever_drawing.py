@@ -173,7 +173,7 @@ def _native_boss_face_location(monkeypatch, identity):
     state = SimpleNamespace(
         edges=[lower, wrong_axis, inboard, plate, upper],
         attached=(upper.edge, plate.edge), value=(spec.ANCHOR_H / 2.0 - spec.COEFFICIENT_TOP_Y) / 1000.0,
-        sign=1.0, projection_factor=1.0, precision=2, document_precision=2, refuse_precision=False,
+        sign=1.0, projection_factor=1.0, precision=2, document_precision=2,
         tolerance=SimpleNamespace(Type=0), activate=True, sheets=[], picks=[], projections=[],
     )
     annotation = SimpleNamespace(
@@ -189,7 +189,6 @@ def _native_boss_face_location(monkeypatch, identity):
     display = SimpleNamespace(
         GetDimension2=lambda _index: dimension, GetAnnotation=lambda: annotation,
         GetPrimaryPrecision2=lambda: state.precision,
-        SetPrecision3=lambda places, *_rest: state.refuse_precision or setattr(state, "precision", places),
     )
 
     def activate(sheet):
@@ -257,7 +256,7 @@ def test_boss_face_location_rechecks_native_authority(monkeypatch, identity, set
     elif damage == "value":
         case.state.value += 0.0001
     elif damage == "precision":
-        case.state.precision, case.state.refuse_precision = 1, True
+        case.state.precision = 1
     elif damage == "tolerance":
         case.state.tolerance.Type = 2
     else:
@@ -266,19 +265,23 @@ def test_boss_face_location_rechecks_native_authority(monkeypatch, identity, set
         check()
 
 
-def test_boss_face_location_refuses_inherited_document_precision(monkeypatch, identity):
+@pytest.mark.parametrize("places", [1, 2, 3])
+def test_boss_face_location_reads_document_precision_when_inherited(monkeypatch, identity, places):
     case = _native_boss_face_location(monkeypatch, identity)
-    check = case.capture()
     case.state.precision = -2
-    with pytest.raises(RuntimeError):
-        check()
+    case.state.document_precision = places
+    if places == 2:
+        case.capture()()
+    else:
+        with pytest.raises(RuntimeError):
+            case.capture()
 
 
 def _native_knife_height(monkeypatch, identity):
     spec = sm_summing_lever_spec
     state = SimpleNamespace(
         selected=[], picks=[], placements=[], value=(spec.HEX_H / 2.0 - spec.COEFFICIENT_TOP_Y) / 1000.0,
-        precision=-2, document_precision=2, refuse_precision=False, tolerance=SimpleNamespace(Type=0),
+        precision=2, document_precision=2, tolerance=SimpleNamespace(Type=0),
         activate=True, missing=False, dangling=False, source_y=spec.HEX_H / 2000.0,
         view_activate=True, refuse_pick=None, extra_pick_after=None, null_dimension=False,
     )
@@ -321,7 +324,6 @@ def _native_knife_height(monkeypatch, identity):
     display = SimpleNamespace(
         GetDimension2=lambda _index: NativeDimension(), GetAnnotation=lambda: annotation,
         GetPrimaryPrecision2=lambda: state.precision,
-        SetPrecision3=lambda places, *_rest: state.refuse_precision or setattr(state, "precision", places),
     )
     state.inventory, state.annotation_count = [annotation], 1
     view.GetAnnotationCount = lambda: state.annotation_count
@@ -369,9 +371,10 @@ def test_knife_height_is_a_native_point_to_actual_plate_top_dimension(monkeypatc
     assert case.state.picks == ["height.end", "plate top"]
     assert case.state.placements == [(*drawing.KNIFE_HEIGHT_LOCATION_XY, 0.0)]
     assert case.state.value * 1000.0 == pytest.approx(2.594)
-    assert case.state.precision == 2  # .10, the title block's .XX
-    case.state.precision = 3
-    with pytest.raises(RuntimeError, match=r"\.XX"):
+    case.state.precision = -2
+    check()  # ordinary precision may follow the existing document
+    case.state.document_precision = 3
+    with pytest.raises(RuntimeError, match="two-place"):
         check()
 
 
@@ -437,7 +440,7 @@ def test_knife_height_refuses_wrong_reference_or_lost_native_authority(monkeypat
     elif damage == "band":
         case.state.tolerance.Type = 2
     elif damage == "precision":
-        case.state.precision, case.state.refuse_precision = 3, True
+        case.state.precision = 3
     elif damage == "owner":
         case.annotation.Owner = object()
     elif damage == "hidden":

@@ -103,7 +103,6 @@ from sm_summing_lever_notes import (
     DIMENSION_CALLOUTS_ABOVE,
     DIMENSION_CALLOUTS_BELOW,
     DRAWING_DIMENSIONS,
-    FACE_LOCATION_PLACES,
     FRONT_VIEW_LETTER,
     SPRING_TAP_CALLOUT_PROCESS,
     SPRING_TAP_PRECISION,
@@ -297,10 +296,6 @@ def _boss_face_location_check(adapter: Any, front: Any) -> Callable[[], None]:
         text_xy=BOSS_FACE_LOCATION_XY, label=label, orientation="vertical",
         entities=(boss.edge, plate.edge),
     )
-    # The .275 prints .28 under the title block's .XX.
-    set_dimension_display_precision(
-        adapter, "drawing", label, FACE_LOCATION_PLACES, display=dimension,
-    )
 
     def check_faces() -> None:
         drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
@@ -315,8 +310,12 @@ def _boss_face_location_check(adapter: Any, front: Any) -> Callable[[], None]:
         native = _early_bound(display.GetDimension2(0), "IDimension")
         tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
         places = display.GetPrimaryPrecision2()
-        if places != FACE_LOCATION_PLACES or tolerance.Type != 0:  # title block, no band
-            raise RuntimeError(f"{label}: lost its .XX title-block control")
+        if places == -2:  # swPrecisionFollowsDocumentSetting
+            extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+            # Same linear-document precision readback as draw_ch_pivot_bracket.
+            places = extension.GetUserPreferenceInteger(24, 206)
+        if places != 2 or tolerance.Type != 0:  # ordinary .XX, no explicit band
+            raise RuntimeError(f"{label}: lost ordinary two-place title-block control")
         _telemetry.success(f"{label}: native face-attached {measured:.6f} mm at .XX")
 
     check_faces()
@@ -428,10 +427,6 @@ def _knife_height_location_check(adapter: Any, back: Any) -> Callable[[], None]:
         raise RuntimeError(f"{label}: native vertical dimension was not created")
     display = _early_bound(raw_dimension, "IDisplayDimension")
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
-    # The ridge-to-top .102 prints .10 under the title block's .XX.
-    set_dimension_display_precision(
-        adapter, "drawing", label, FACE_LOCATION_PLACES, display=display,
-    )
 
     def check_height() -> None:
         if drawing.ActivateSheet(SHEET_NAMES[1]) is not True:
@@ -453,8 +448,11 @@ def _knife_height_location_check(adapter: Any, back: Any) -> Callable[[], None]:
         native = _early_bound(display.GetDimension2(0), "IDimension")
         tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
         places = display.GetPrimaryPrecision2()
-        if places != FACE_LOCATION_PLACES or tolerance.Type != 0:
-            raise RuntimeError(f"{label}: lost its .XX title-block control")
+        if places == -2:
+            extension = _early_bound(draw.Extension, "IModelDocExtension")
+            places = extension.GetUserPreferenceInteger(24, 206)
+        if places != 2 or tolerance.Type != 0:
+            raise RuntimeError(f"{label}: lost ordinary two-place title-block control")
         _telemetry.success(f"{label}: native sharp/face-attached {measured:.6f} mm at .XX")
 
     check_height()

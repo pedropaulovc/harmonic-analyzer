@@ -151,11 +151,10 @@ SPRING_TAP_CALLOUT_PROCESS = "THREAD THRU COEFFICIENT PLATE\n"
 # --- Decimal places of the sheet's own (drawing-side) dimensions, #290. ---
 # The spring pattern's BASIC row X, start Z and pitch are calibrated stations
 # (1.5689 / .5022 / .2778): four places hold them to under .00005 in.  The
-# boss-top (.28) and knife-ridge (.10) locations of the coefficient top take
-# the title block's .XX, as do the 3.00 anchor X/Z: their printed limits stay
+# boss-top (.28) and knife-ridge (.10) locations of the coefficient top follow
+# the document's .XX, as do the 3.00 anchor X/Z: their printed limits stay
 # inside every check (sm_summing_lever_profile.PLATE_TOP_Y_ALLOWANCE).
 BASIC_PLACES = 4
-FACE_LOCATION_PLACES = 2
 # Every Hole Wizard callout prints .XXX, the #36 and #25 tap drills too
 # (.107, .150).  Both are THRU ALL taps, whose native drill variable is
 # <hw-thrutapdrldia>; only the blind bracket taps carry <hw-tapdrldia> and
