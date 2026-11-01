@@ -808,6 +808,23 @@ def _assert_detail_settled(adapter: Any, detail: Any, named: dict[str, Any]) -> 
     _assert_relief_root_landing(adapter, detail, named)
 
 
+# swSFSymType_e.swSFBasic: the any-process symbol (open vee, no bar).
+SF_ANY_PROCESS = 0
+
+
+def _set_any_process_finish(adapter: Any, symbol: Any, *, label: str) -> None:
+    """The journal is the drill rod's ground surface as bought, so its Ra 63
+    is met by any process: the material-removal-required form asked the shop
+    to cut it (final machinist review, run 20261101T084513228Z;
+    draw_dt_cone_swing_platform._set_any_process_finish)."""
+    native = _early_bound(symbol, "ISFSymbol")
+    if not native.SetSymbol(SF_ANY_PROCESS, 0, False):
+        raise RuntimeError(f"failed to set the any-process finish symbol ({label})")
+    rebuild_drawing(adapter, label=f"{label} any-process symbol")
+    if int(native.GetSymbol()) != SF_ANY_PROCESS:
+        raise RuntimeError(f"any-process finish symbol did not persist ({label})")
+
+
 def _hide_side_thread_callout(adapter: Any, side: Any) -> None:
     """Keep the side view's thread ink; the attached THREAD_CALLOUT note stays
     the one controlling callout (draw_mg_magnifying_lever's
@@ -937,7 +954,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="wheel axle thread callout",
         entity_type="SILHOUETTE",
     )
-    add_surface_finish(
+    journal_finish = add_surface_finish(
         adapter,
         side,
         edge_xy=spt(*JOURNAL_FINISH_PICK),
@@ -948,6 +965,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="wheel axle journal finish",
         char_height=FINISH_CHAR_HEIGHT,
     )
+    _set_any_process_finish(adapter, journal_finish, label="wheel axle journal finish")
     # The mark and the labels go on once every pick is done, so no
     # coordinate pick in the side view meets the mark circle.
     _mark_detail_on_side(adapter, side)
