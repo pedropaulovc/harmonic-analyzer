@@ -500,13 +500,12 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     assert drawing.SEAT_X < shoulder_dim_x < drawing.UNDERHEAD_X
     assert abs(drawing.CENTERLINE_PICK[0] - shoulder_dim_x) > 0.010
     assert abs(drawing.FINISH_PICK[0] - shoulder_dim_x) > 0.010
-    # The seat-break note lands on the seat face's outer edge, outside the
-    # relief lead's edge that projects onto the same line.
-    scale = drawing.SHEET_SCALE[0] / 1000.0
-    lead_r = (spec.RELIEF_DIA / 2.0 + spec.RELIEF_LEAD) * scale
-    assert drawing.SEAT_EDGE_PICK[0] == drawing.SEAT_X
-    pick_r = drawing.SEAT_EDGE_PICK[1] - drawing.SIDE_CENTER[1]
-    assert lead_r + 0.001 < pick_r < drawing.SHOULDER_TOP_Y - drawing.SIDE_CENTER[1]
+    # The seat-break note lands on the shoulder's silhouette beside the seat
+    # corner, clear of the shoulder Ø's dimension line, and its leader rises
+    # right of the relief width's text.
+    assert drawing.SEAT_EDGE_PICK[1] == drawing.SHOULDER_TOP_Y
+    assert drawing.SEAT_X < drawing.SEAT_EDGE_PICK[0] < shoulder_dim_x - 0.010
+    assert drawing.SEAT_EDGE_NOTE_XY[0] > drawing.SEAT_EDGE_PICK[0]
 
 
 def test_printed_material_fits_one_title_block_line() -> None:

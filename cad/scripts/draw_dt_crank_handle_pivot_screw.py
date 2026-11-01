@@ -146,8 +146,10 @@ _ROW_Y = (SIDE_CENTER[1] - 0.034, SIDE_CENTER[1] - 0.049, SIDE_CENTER[1] - 0.064
 SIDE_KEEP = {
     "ThreadLength": ((TIP_X + SEAT_X) / 2.0, _ROW_Y[0]),
     # Right of the head face, outside its extension lines, so its callout
-    # stands clear of them and of the under-head and overall extension lines.
-    "HeadLength": (HEAD_FACE_X + 0.020, _ROW_Y[0]),
+    # stands clear of them and of the under-head and overall extension lines
+    # (farm r8 of f5256bf3d: at + 0.020 the 43-mm block's left end crossed
+    # the head face's extension line).
+    "HeadLength": (HEAD_FACE_X + 0.026, _ROW_Y[0]),
     # The under-head face located from the tip, like every axial location.
     "UnderHeadLocation": ((TIP_X + UNDERHEAD_X) / 2.0, _ROW_Y[1]),
     "OverallLength": ((TIP_X + HEAD_FACE_X) / 2.0, _ROW_Y[2]),
@@ -176,12 +178,12 @@ SIDE_KEEP = {
 # anchor is the CENTRE of the Ø line's bottom edge and the callout is centred
 # under it (a dimension exposes no GetExtent), measured on farm run 69a2f961's
 # render: the underline, where the leader lands, sits 5.6 mm below the anchor.
-# Farm r3 of 29af6f44d rendered the inch callout at 2.08 mm a character, so
-# its 23-character rows span 48 mm.  The text's left edge stands 3.5 mm right
+# Farm r8 of f5256bf3d rendered the inch callout at 2.5 mm a character, so
+# its 18-character rows span 46 mm.  The text's left edge stands 3.5 mm right
 # of the seat face, and 21 mm below the axis the leader drops steeply enough
 # to pass under the seat-face corner rather than through the shoulder.  The
 # shoulder Ø's arrow is right of it.
-RELIEF_DIA_TEXT_WIDTH = 0.048
+RELIEF_DIA_TEXT_WIDTH = 0.046
 RELIEF_DIA_TEXT_UNDERLINE_DROP = 0.0056
 RELIEF_DIA_TEXT_CLEARANCE = 0.0035
 RELIEF_DIA_TEXT_XY = (
@@ -208,12 +210,12 @@ FINISH_PICK = (UNDERHEAD_X - 0.040, SHOULDER_TOP_Y)
 FINISH_SYMBOL = (UNDERHEAD_X - 0.030, SIDE_CENTER[1] + 0.030)
 # A point on the shoulder face, clear of the Ø dimension line.
 CENTERLINE_PICK = (UNDERHEAD_X - 0.080, SIDE_CENTER[1] + 0.003)
-# The seat edge's break note lands on the shoulder's seat-face edge, near
-# its outer corner (the relief lead's edge on the same line ends at 62 % of
-# the shoulder radius), from up and right, above the relief width and the
-# shoulder Ø's callout blocks.  At + 0.010 its leader ran through the thread
-# note's right end (farm r4 of d7fcd19ce).
-SEAT_EDGE_PICK = (SEAT_X, SIDE_CENTER[1] + 0.9 * (SHOULDER_TOP_Y - SIDE_CENTER[1]))
+# The seat edge's break note lands on the shoulder's silhouette just right of
+# its seat-face corner, from up and right, above the relief width and the
+# shoulder Ø's callout blocks: landing on the seat face itself, its leader
+# crossed the relief width's dimension line (farm r8 of f5256bf3d), and at
+# x + 0.010 it ran through the thread note's right end (farm r4 of d7fcd19ce).
+SEAT_EDGE_PICK = (SEAT_X + 0.006, SHOULDER_TOP_Y)
 SEAT_EDGE_NOTE_XY = (SEAT_X + 0.020, SIDE_CENTER[1] + 0.060)
 ISO_NOTE_XY = (0.352, 0.200)
 # Bottom-left, above the title-block line, like the other crank sheets.
@@ -336,6 +338,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_xy=SEAT_EDGE_PICK,
         note_xy=SEAT_EDGE_NOTE_XY,
         label="MHA-DT-32 seat edge break",
+        entity_type="SILHOUETTE",
     )
     add_surface_finish(
         adapter,
