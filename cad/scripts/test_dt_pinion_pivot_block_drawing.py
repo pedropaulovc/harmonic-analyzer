@@ -316,7 +316,7 @@ def test_rig_layout_shaft_and_rod_are_set_back_flush() -> None:
     assert rig.LEVER_SEAT_PROUD - 1e-9 <= proud <= rig.LEVER_SEAT_PROUD + 0.254
     # Both are budgeted on the worst fitted stack (their own tests); at
     # nominal each stands that allowance proud of the front block.
-    assert (SHAFT_LEN, ROD_LEN) == pytest.approx((7.29 * 25.4, 7.72 * 25.4))
+    assert (SHAFT_LEN, ROD_LEN) == pytest.approx((7.27 * 25.4, 7.70 * 25.4))
 
 
 def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
@@ -495,7 +495,7 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
     # hub rides the lift rod, which the blocks carry off the shaft axis.
     longest_shaft = rig.TORQUE_SHAFT_LEN + xx_in
     shortest_outer = 2.0 * (depth - xx_in) + rig.INNER_SPAN - growth
-    assert longest_shaft - shortest_outer == pytest.approx(2.947, abs=5e-3)
+    assert longest_shaft - shortest_outer == pytest.approx(1.837, abs=5e-3)
     hub_clear = (
         math.hypot(LIFT_BORE_SPACING, LIFT_BORE_RISE) - (HUB_OD + SHAFT_DIA) / 2.0
     )

@@ -557,10 +557,10 @@ def test_j19_keeps_its_full_face_at_the_worst_stack() -> None:
     )
     assert slack >= RIG.RIG_MARGIN_SPARE, slack
     assert math.isclose(slack, drive.J0_SLACK_WORST, abs_tol=1e-9)
-    assert math.isclose(slack, 2.803, abs_tol=5e-4)
-    # Positive control: without the bank terms the row read 2.976 (163435c4f)
-    # on the 3.0 face; the .118 in face (#290) frees its 0.0028.
-    assert math.isclose(slack + g0_south, 2.979, abs_tol=5e-4)
+    assert math.isclose(slack, 3.4051, abs_tol=5e-4)
+    # Positive control: without the bank terms the row read 3.5785 on the 3.0
+    # face with the inch drum (#290); the .118 in face frees its 0.0028.
+    assert math.isclose(slack + g0_south, 3.5813, abs_tol=5e-4)
 
 
 def test_rig_set_leaf_d_derives_the_shift_and_books_the_743_terms() -> None:
@@ -930,7 +930,7 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
 
     assert not hasattr(RIG, "STACK_BAND")  # the stacks name every term
     assert (RIG.TORQUE_SHAFT_LEN, RIG.LIFT_ROD_LEN) == pytest.approx(
-        (7.29 * 25.4, 7.72 * 25.4)
+        (7.27 * 25.4, 7.70 * 25.4)
     )
     assert math.isclose(RIG.BACK_COLLAR_GAP_MAX, 1.00, abs_tol=1e-9)
     bearing_min = math.inf
@@ -967,7 +967,7 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
     assert math.isclose(
         bearing_min, sum(RIG.TORQUE_SHAFT_BEARING_STACK.values()), abs_tol=1e-9
     )
-    assert math.isclose(bearing_min, 10.245, abs_tol=5e-3)
+    assert math.isclose(bearing_min, 10.227, abs_tol=5e-3)
     assert hub_margin_min >= RIG.HUB_STOP_MARGIN - 1e-9
     assert math.isclose(
         hub_margin_min,
@@ -978,7 +978,7 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
     )
     # The rod is sized by the seat (#290: the .XX length band left the lever's
     # air to the shaft far more than it needs), to the .01 in above it.
-    assert math.isclose(hub_margin_min, 0.709, abs_tol=5e-3)
+    assert math.isclose(hub_margin_min, 0.691, abs_tol=5e-3)
     assert sum(RIG.lift_rod_seat_stack(RIG.LIFT_ROD_LEN - 0.254).values()) < (
         RIG.LEVER_SEAT_MIN + RIG.RIG_MARGIN_SPARE
     )
@@ -1083,7 +1083,7 @@ def test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack() -> None:
 def test_torque_shaft_length_band_clears_both_ends() -> None:
     # MHA-DT-19 at the title-block .XX band (U27, #290), set back-flush: at the
     # shortest stack (both blocks thin, Codex #854 P1) the longest shaft's
-    # body end stands 2.95 proud of the front block, and its SR crown .05
+    # body end stands 1.84 proud of the front block, and its SR crown .05
     # beyond that (Codex #837 P1).
     import dt_arbor_pedestal_spec as ped
     import dt_pinion_lever_geometry as lever
@@ -1103,15 +1103,15 @@ def test_torque_shaft_length_band_clears_both_ends() -> None:
     )
     shortest_outer = rig.FRONT_BLOCK_Z0 + shrink
     proud = shortest_outer - front_end
-    assert math.isclose(proud, 2.947, abs_tol=5e-3)
-    assert math.isclose(proud + CAP_SAG, 4.217, abs_tol=5e-3)
+    assert math.isclose(proud, 1.837, abs_tol=5e-3)
+    assert math.isclose(proud + CAP_SAG, 3.107, abs_tol=5e-3)
     assert math.isclose(
         max(outer for _i, outer, _t in _stack_vertices()), shortest_outer, abs_tol=1e-9
     )
     # Option E-a: pinned to the straps, the shaft rides the cluster's end play
     # from its back-flush drilling station to the front stop.
-    assert math.isclose(proud + _P_MAX, 3.297, abs_tol=5e-3)
-    assert math.isclose(proud + _P_MAX + CAP_SAG, 4.567, abs_tol=5e-3)
+    assert math.isclose(proud + _P_MAX, 2.187, abs_tol=5e-3)
+    assert math.isclose(proud + _P_MAX + CAP_SAG, 3.457, abs_tol=5e-3)
     # Its back end then sits P_MAX inside the back block, bearing
     # test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack.
     # South of the front block nothing stands on the shaft's axis at any z.

@@ -645,7 +645,7 @@ sections:
         - 'cone_line exact tracking retains sin i = 1.5875/7.0565 and tan(cone half-angle) = 1.5875/6.875611681880 = tan i, making the drum-side generator parallel to the drum axis. GEAR_AXIS_SHIFT = −33.114642580298 mm; dt_cone_gear_shaft_spec.gear_faces owns touching solid faces. Earlier y = 90.518 was the lower-axis layout.'
         - low
       - - Cylinder arbor (stationary)
-        - 'x = −60.393602135, y = 95.25; cylindrical span z −82.364312220..+82.509687780 (164.87 mm), domes 1.524 mm (.06 in) proud of each end. Stationary plain-bore support stations follow cylinder_bank_layout; earlier y = 90.518 belonged to the lower-axis design.'
+        - 'x = −60.393602135, y = 95.25; cylindrical span z −82.524312220..+82.669687780 (165.19 mm), domes 1.524 mm (.06 in) proud of each end. Stationary plain-bore support stations follow cylinder_bank_layout; earlier y = 90.518 belonged to the lower-axis design.'
         - ch30 GT supplies historical topology; cone_line and cylinder_bank_layout own current placement and strap-to-strap cut length
         - med (derived current layout)
       - - Cylinder gear j
@@ -2068,7 +2068,7 @@ sections:
         - scaled
         - med
       - - Engage lever rest and throw (2026-09 photo correction)
-        - 'Ø6.096 ×86.106 lever, parked +10° toward machine −X; source-law eccentric-cam rotation −76.829° carries it through vertical to −66.829° toward +X at engagement. Ø14.6 ×9 collar, eccentricity 2.0, source thin-side wall 2.100 and sub-flush M2.5 screw; 2.2425 parked tip gap / 40.566667 engaged centre use the finite 26T/55T stock forms at 48DP PA20, not root-tip seating.'
+        - 'Ø6.096 ×86.106 lever, parked +10° toward machine −X; source-law eccentric-cam rotation −76.808° carries it through vertical to −66.808° toward +X at engagement. Ø14.6 ×9 collar, eccentricity 2.0, source thin-side wall 2.100 and sub-flush M2.5 screw; 2.2425 parked tip gap / 40.566667 engaged centre use the finite 26T/55T stock forms at 48DP PA20, not root-tip seating.'
         - —
         - 'Historical ch25 p.68 pair: page002_img08 approximately +10° parked and page002_img07 approximately −76° engaged. Current nominal linkage/whole-process-blank results are recorded in dimensions.yaml and consumed by the rig readers, not a new historical photo measurement or qualification. Former ideal-48DP −80.813° / −70.813° and shallow-root DP49.82 −82.023° / −72.023° belong to earlier reconstructions.'
         - scaled + derived current reader
@@ -2103,14 +2103,14 @@ sections:
       establishes the level-inboard topology; the selected finite stock forms,
       common 4.732 mm raise, user-authoritative 32T count and U28 2.2425 mm
       parked tip gap now own the derived location. Current nominal layout in
-      dimensions.yaml / the pure rig readers has axis (−17.129, 95.25), from
-      X_DRUM plus drum radius 32.207, pinion radius 8.815 and parked gap 2.2425;
+      dimensions.yaml / the pure rig readers has axis (−17.130, 95.25), from
+      X_DRUM plus drum radius 32.207, pinion radius 8.814 and parked gap 2.2425;
       former axis (−16.876, 90.518) / radii 32.279 and 8.996 were ideal-tooth
-      lower-rig references. Drum z −70.390..+72.810 (143.2 face, all 20
-      stations), integral steel arbor/head root z −130.690..+95.472,
-      head/crossrod axis z −137.192, and separate MHA-DT-15 crossrod at +65°.
+      lower-rig references. Drum z −70.446..+72.810 (143.256 face, all 20
+      stations), integral steel arbor/head root z −130.746..+95.416,
+      head/crossrod axis z −137.248, and separate MHA-DT-15 crossrod at +65°.
       Straps: 15 wide × 8.9916 thick with R7.5 ends, plain (no cam relief), pivot
-      (−13.165, 67.532), bore-to-bore c2c 28.0, parked at an 8.139° lean; the
+      (−13.166, 67.532), bore-to-bore c2c 28.0, parked at an 8.139° lean; the
       former pivot (−12.912, 62.8) belonged to the lower ideal-tooth rig. The swing
       rides the setup DOF (a freed operational DOF, its angle drive spec recorded
       in the DOF manifest; articulated by the mobility probe / motion drives).
@@ -2118,12 +2118,12 @@ sections:
       foot on the base east of it, and presses the swing to the disengaged rest —
       parked-pose clearances asserted in `build_dt_drive_train_assembly`
       (`SPRING_*`). The engage path is the p.69 cam: the lift rod rides the
-      blocks' other bores at (5.335, 69.692); former (5.588, 64.960) belonged
+      blocks' other bores at (5.334, 69.692); former (5.588, 64.960) belonged
       to the lower ideal-tooth rig. Each strap tail carries a Ø3.970
       follower pin (table row above), bonded into its blind seat, that the
       rod's eccentric collar lifts. The collar is Ø14.6 with a 2.0 eccentricity
       and keeps a 2.100 thin-side wall. Current nominal parked surface gap is
-      0.176; dimensions.yaml records −76.829° cam rotation, 1.922 mm engaged
+      0.176; dimensions.yaml records −76.808° cam rotation, 1.922 mm engaged
       authority and 2.739 mm follower projection beyond contact. Former
       −80.813° / 1.760 / 2.623 results describe the earlier ideal-tooth rig.
       The assembly's CAM_* and segment-distance guards consume current readers;
