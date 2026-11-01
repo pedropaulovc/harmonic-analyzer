@@ -98,7 +98,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "EarHoles": {"EarHole1Z": 3},
     "EarHeightReference": {"EarHoleHeight": 3},
 }
-REFERENCE_DIMENSIONS = ("BoreDia", "AnchorZ")
+# Reference dimensions: the bore's diameter "(Ø1.008)" and the AnchorZ
+# distance, a plain "(.945)".
+REFERENCE_DIMENSIONS = ("BoreDia",)
+LINEAR_REFERENCE_DIMENSIONS = ("AnchorZ",)
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
     for dimensions in DRAWING_PRECISION.values()
