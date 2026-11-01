@@ -57,14 +57,12 @@ CLAMP_CBORE_DEPTH_PLACES = 2
 # Every native Hole Wizard length (the round counterbores' Ø, depth) prints
 # .XXX, under the title block's DRILLED HOLES row.
 CLAMP_HOLE_CALLOUT_PLACES = 3
-# By native Hole Wizard variable: the round counterbores' Ø's and depth, the
-# latch-hook taps' drill.
+# By native Hole Wizard variable: the round counterbores' Ø's and depth.
 CLAMP_CALLOUT_PRECISION = {
     "hw-thruholedia": CLAMP_HOLE_CALLOUT_PLACES,
     "hw-cbdia": CLAMP_HOLE_CALLOUT_PLACES,
     "hw-cbdepth": CLAMP_CBORE_DEPTH_PLACES,
 }
-BRACKET_TAP_CALLOUT_PRECISION = {"hw-thrutapdrldia": 3}
 # The west slots' runs need .XXX to close the column-pitch stack, and their
 # width carries the drilled holes' +.004/0 at .XXX. Their counterbore width
 # carries explicit asymmetric limits: the minimum (.330) clears the head's
@@ -90,7 +88,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Bar": {"Depth"},
     "HangerRowReference": {"HangerRowHeight", *HANGER_STATION_NAMES},
     "ClampRowReference": {"ClampRowHeight", *CLAMP_STATION_NAMES},
-    "PivotTapProfile": {"PivotTapDrillDia"},
+    # The pivot and hook taps print once each, on their countersinks'
+    # stacked callouts (below); the tap drill is the TAP size's.
     "CountersinkReference": {"PivotCskDia", "BracketCskDia"},
     "ClampSlotProfile": {"ClampSlotWidth", "ClampSlotTravel"},
     # The counterbore's run is the slot's: one .118 between the shared end
@@ -112,7 +111,6 @@ SHEET_PRECISION: dict[str, dict[str, int]] = {
         "ClampRowHeight": CLAMP_POSITION_PLACES,
         **dict.fromkeys(CLAMP_STATION_NAMES, CLAMP_POSITION_PLACES),
     },
-    "PivotTapProfile": {"PivotTapDrillDia": 3},
     "CountersinkReference": {"PivotCskDia": 3, "BracketCskDia": 3},
     "ClampSlotProfile": {
         "ClampSlotWidth": CLAMP_SLOT_WIDTH_PLACES,
@@ -145,14 +143,15 @@ DIMENSION_CALLOUTS = {
     "PivotTapStation": "MHA-PD-VN-57 PIVOT",
     "BracketTapStation1": _HOOK_TAPS,
     "BracketTapStation2": _HOOK_TAPS,
-    # The thread class is the title block's (rule 2).
-    "PivotTapDrillDia": f"TAP {PIVOT_TAP_THREAD} UNC THRU",
-    # The historical 24-character lane predates the full vendor number;
-    # draw_pd_support_bar now moves both hook callouts right of this text.
-    # One hole countersunk on both faces: no "2X", which on the hook taps'
-    # callout counts holes (r6 machinist review, rule 12).
-    "PivotCskDia": f"{_CSK} BOTH FACES,\nMHA-PD-VN-57 BEARS OUTSIDE",
-    "BracketCskDia": f"2X {_CSK}\nBOTH FACES, {BRACKET_TAP_SPEC.size} TAPS",
+    # One stacked callout per hole or pattern, on its countersink's MAX Ø
+    # (machinist review round 5: a separate tap callout per hole put two
+    # leaders on one small hole, arrowheads stacked): the tap line above, the
+    # "90° CSK" prefix (DIMENSION_PREFIXES) before the Ø, the faces and the
+    # function below. The thread class is the title block's (rule 2). The
+    # pivot is one hole countersunk on both faces: no "2X", which on the hook
+    # taps' callout counts holes (r6 machinist review, rule 12).
+    "PivotCskDia": "BOTH FACES,\nMHA-PD-VN-57 BEARS OUTSIDE",
+    "BracketCskDia": "BOTH FACES",
     # The west slots (rule 4: each band names its mate): the slots' run and
     # stations take up the pitch of the MHA-SH-02 clamp taps the screws land
     # in (build_pd_support_bar.clamp_slot_closure_margin), and the whole
@@ -180,10 +179,18 @@ DIMENSION_CALLOUTS = {
     "ClampSlotCboreWidth": "CLEARS SLIDING\nMHA-SH-VN-53",
     "ClampSlotCboreDepth": "MHA-SH-VN-53\nHEADS BELOW\nSLIDE FACE",
 }
-# The slot widths' count: both west slots share one detail.
+# Above the countersinks' Ø: the tap each callout carries (DIMENSION_CALLOUTS).
+DIMENSION_CALLOUTS_ABOVE = {
+    "PivotCskDia": f"TAP {PIVOT_TAP_THREAD} UNC THRU",
+    "BracketCskDia": f"2X TAP {BRACKET_TAP_SPEC.size} UNC THRU",
+}
+# The slot widths' count: both west slots share one detail. The countersinks'
+# Ø reads as the countersink's in its stacked tap callout.
 DIMENSION_PREFIXES = {
     ("ClampSlotProfile", "ClampSlotWidth"): "2X ",
     ("ClampSlotCboreProfile", "ClampSlotCboreWidth"): "2X ",
+    ("CountersinkReference", "PivotCskDia"): f"{_CSK} ",
+    ("CountersinkReference", "BracketCskDia"): f"{_CSK} ",
 }
 # Under the round counterbores' native callout: the taps the holes' banded
 # row height and stations locate to (rule 4: the tight band names its mate, as

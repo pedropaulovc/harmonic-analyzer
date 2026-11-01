@@ -898,7 +898,10 @@ async def build(adapter) -> dict[str, str]:
 
     # Drawing references, hidden in the part (blank_reference_sketches) and
     # shown per view by the drawing: the countersinks' MAX diameters on the
-    # back face, and each hole row's stations and height.
+    # back face, and each hole row's stations and height. The hook pair's
+    # circle is on its right-hand hole (BRACKET_TAP_X[1]): its stacked callout
+    # stands to the right, so the leader never crosses the other hole
+    # (draw_pd_support_bar.FRONT_KEEP).
     countersinks = SketchDims()
     check("create_sketch CountersinkReference", await adapter.create_sketch("BackFace"))
     for x, dia, label, names in (
@@ -909,7 +912,7 @@ async def build(adapter) -> dict[str, str]:
             ("PivotCskX", "PivotCskY", "PivotCskDia"),
         ),
         (
-            BRACKET_TAP_X[0],
+            BRACKET_TAP_X[1],
             BRACKET_TAP_CSK_DIA,
             "bracket countersink",
             ("BracketCskX", "BracketCskY", "BracketCskDia"),

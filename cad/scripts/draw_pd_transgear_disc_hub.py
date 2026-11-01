@@ -224,15 +224,16 @@ SIDE_KEEP = {
 # Datum A on the bore's round side, its symbol right of the flange, in the
 # lane between the face view and the edge view's Ø.52: SolidWorks' own
 # placement of an axis datum put the tag inside the flange, on the
-# lower-left hole (machinist review).  The leader lands on the bore's point
-# opposite the flat (model +Y, sheet 3 o'clock), projected from the model so
-# the view's placement cannot move it.  That is the D-bore arc's midpoint:
-# a landing at 15° printed 0.2 mm along the arc, at 15.95° (run
-# 20261101T070124857Z), which fits a snap to the arc's tessellation, its
-# vertices every 303.7°/38 from the flat's corners -- the midpoint is one.
-# The leader climbs from it to the symbol above the lower-right hole's
-# centre mark.
-DATUM_A_MODEL_POINT = (0.0, BORE_DIA / 2000.0, HUB_FRONT_Z / 1000.0)
+# lower-left hole (machinist review).  Once the symbol moves, SolidWorks
+# re-solves the triangle onto the bore circle on the RADIAL line from the
+# bore centre toward the symbol, whatever landing was requested: with the
+# symbol at atan2(.015, _FLANGE_R + .014) = 15.95°, a 15° request printed
+# at 15.95° (run 20261101T070124857Z), and a 0° request still printed its
+# tip there, the readback's nearest point being the triangle's base corner
+# 1.4 mm along the tangent (run 20261101T082409337Z).  So the landing is
+# requested at that radial projection itself (_datum_a_landing).  The
+# leader climbs from it to the symbol above the lower-right hole's centre
+# mark, on the bore's round side, far from the flat's corners.
 DATUM_A_SYMBOL = (END_CENTER[0] + _FLANGE_R + 0.014, AXIS_Y + 0.015)
 DIMENSION_CALLOUTS_BELOW = {
     "BoreDia": BORE_CALLOUT,
@@ -303,6 +304,21 @@ def _add_bolt_circle_centerline(adapter: Any, view: Any) -> None:
     if font != (0, CENTER_LINE_STYLE, CENTER_LINE_WEIGHT):
         raise RuntimeError(f"hub bolt circle centreline font reads {font!r}")
     draw.ClearSelection2(True)
+
+
+def _datum_a_landing(adapter: Any, view: Any) -> tuple[float, float]:
+    """The bore circle's point on the ray from the projected bore centre
+    toward datum A's symbol: where SolidWorks re-solves the triangle."""
+    centre = model_point_in_view(
+        adapter, view, (0.0, 0.0, HUB_FRONT_Z / 1000.0), label="hub bore centre"
+    )
+    dx = DATUM_A_SYMBOL[0] - centre[0]
+    dy = DATUM_A_SYMBOL[1] - centre[1]
+    reach = math.hypot(dx, dy)
+    radius = BORE_DIA / 2.0 * _S
+    if not reach > radius:
+        raise RuntimeError(f"hub datum A symbol {DATUM_A_SYMBOL!r} is inside the bore")
+    return (centre[0] + radius * dx / reach, centre[1] + radius * dy / reach)
 
 
 # The two perpendicularity frames attach by entity, not by a sheet pick, and
@@ -587,9 +603,7 @@ async def build(adapter: Any) -> dict[str, str]:
         end,
         entity=visible_circle_edge(adapter, end, BORE_DIA),
         symbol_xy=DATUM_A_SYMBOL,
-        leader_attach_xy=model_point_in_view(
-            adapter, end, DATUM_A_MODEL_POINT, label="hub datum A landing"
-        ),
+        leader_attach_xy=_datum_a_landing(adapter, end),
         datum=BORE_DATUM,
         label="hub bore axis",
     )

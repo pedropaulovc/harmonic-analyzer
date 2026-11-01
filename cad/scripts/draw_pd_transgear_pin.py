@@ -164,10 +164,11 @@ SIDE_KEEP = {
     # the one controlled length at that end, under the station's three-row
     # callout.
     "TipDomeZ": ((SEAT_X + TIP_X) / 2.0, _ROW_Y - 0.027),
-    # The seat root's R MAX and its callout under the profile, left of the
-    # seat's extension line (the station's and the head land's) and right of
-    # the shank Ø's lower arrow and the groove width's block.
-    "SeatRadius": (SEAT_X - 0.028, SIDE_CENTER[1] - 0.018),
+    # The seat root's one-line R MAX just under the shank, its right end
+    # short of the seat's extension line (the 1.8600's, 2.02's and .09's),
+    # so its shelf and leader rise to the lower corner crossing nothing and
+    # stay above the (.03) and the station's row (round-5 review).
+    "SeatRadius": (SEAT_X - 0.025, SIDE_CENTER[1] - 0.010),
 }
 # The callouts and the dome heights' reference parentheses are authored on
 # the part's dimensions (``pd_transgear_pin_callouts``); the sheet only

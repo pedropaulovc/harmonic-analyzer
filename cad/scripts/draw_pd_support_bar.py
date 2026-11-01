@@ -85,7 +85,6 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
-from _hole_spec import blind_cut_dia_mm
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
 from _layout_audit import display_box
@@ -106,8 +105,6 @@ from _column_clamp_interface import BAR_DEPTH
 from pd_support_bar_spec import (
     BACK_FACE_Z,
     BAR_HEIGHT,
-    BRACKET_TAP_CSK_DIA,
-    BRACKET_TAP_SPEC,
     BRACKET_TAP_X,
     CLAMP_TAP_Y,
     HANGER_TAP_Y,
@@ -115,10 +112,10 @@ from pd_support_bar_spec import (
 )
 from pd_support_bar_drawing_spec import (
     BACK_VIEW_CAPTION,
-    BRACKET_TAP_CALLOUT_PRECISION,
     CLAMP_CALLOUT_PRECISION,
     CLAMP_CBORE_CALLOUT,
     DIMENSION_CALLOUTS,
+    DIMENSION_CALLOUTS_ABOVE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FACE_VIEW_CAPTION,
@@ -191,16 +188,18 @@ def _back_x(model_x: float) -> float:
 # outermost; their texts step right so none crosses a longer row's extension
 # line, and stand clear of the pivot station's. The row's height (from the
 # top face, its rise on the right end) stands off the right end. The section
-# line runs up through the pivot, its arrows and letters left of it, so the
-# pivot's Ø and countersink stand right of it, the Ø higher and further left
-# (its leader passes left of the countersink's text, slanting off the line);
-# the latch-hook taps' callout (high) and countersink (low) stand right of the
-# pivot's, their leaders between the two pairs.  The pivot's countersink text
-# stands 7 mm right of the Ø's left end: nearer, both leaders left their
-# shelves on one slope and ran to the hole as one line (machinist review
-# round 2); here the countersink's runs ~26 deg off vertical, the Ø's ~13.
-# The hook pair stands 6 mm farther right with it, so the hook callout's
-# leader still passes ~3 mm under the pivot countersink's text.
+# line runs up through the pivot, its arrows and letters left of it.
+# The pivot and the latch-hook pair each take ONE stacked callout on their
+# countersink's Ø (tap line, CSK Ø, faces and function; machinist review
+# round 5: a tap callout and a countersink callout per hole put two leaders
+# and stacked arrowheads on each small hole, the pair's both on the left
+# hole, the pivot's on the A-A line). Each block (keep = its centre) stands
+# right of its hole, its bottom shelf ~6 mm over the top face, ~13 mm over
+# the hole: the pivot's left end 25 mm right of its hole, so the leader
+# meets the countersink ~62 deg off the A-A line; the pair's, on the right
+# hole (the reference circle's, build_pd_support_bar), 31 mm right of it, so
+# its leader never crosses the left hole and its block starts ~3 mm past
+# the pivot block's right end (its widest row ~69 mm, the pair's ~54 mm).
 ROW_STEP = 0.013
 FRONT_KEEP = {
     "PivotTapStation": (LEFT_END + 0.042, FACE_BOTTOM - ROW_STEP),
@@ -208,11 +207,9 @@ FRONT_KEEP = {
     "BracketTapStation2": (LEFT_END + 0.118, FACE_BOTTOM - 3.0 * ROW_STEP),
     "Length": (FACE_CENTER[0], FACE_BOTTOM - 4.0 * ROW_STEP),
     "HangerRowHeight": (RIGHT_END + 0.022, FACE_BOTTOM - 0.010),
-    "PivotTapDrillDia": (_face_x(PIVOT_TAP_X) + 0.032, FACE_TOP + 0.030),
-    "PivotCskDia": (_face_x(PIVOT_TAP_X) + 0.042, FACE_TOP + 0.014),
-    "BracketCskDia": (_face_x(BRACKET_TAP_X[0]) + 0.073, FACE_TOP + 0.014),
+    "PivotCskDia": (_face_x(PIVOT_TAP_X) + 0.059, FACE_TOP + 0.017),
+    "BracketCskDia": (_face_x(BRACKET_TAP_X[1]) + 0.058, FACE_TOP + 0.0145),
 }
-BRACKET_CALLOUT_XY = (_face_x(BRACKET_TAP_X[1]) + 0.070, FACE_TOP + 0.031)
 # The top face's slide roughness on its edge, left of the section line.
 TOP_FINISH_MODEL_X = -178.0
 TOP_FINISH_SYMBOL_XY = (LEFT_END + 0.030, FACE_TOP + 0.014)
@@ -439,25 +436,10 @@ def _move_caption(
         raise RuntimeError("view caption lost its native view-label fields")
 
 
-def _hole_rims(face: Any, back: Any) -> tuple[Any, Any]:
-    """The first latch-hook tap's drill edge under its back-face countersink
-    (a Hole Wizard tap edge, so its callout is native) and the inner east
-    clamp counterbore's rim on the front face (the round pair's Hole Wizard
-    feature; the west pair are slots)."""
-    tap_dia = blind_cut_dia_mm(BRACKET_TAP_SPEC)
-    tap_csk_depth = (BRACKET_TAP_CSK_DIA - tap_dia) / 2.0
-    tap = (
-        scan_view_edges(face, label="support-bar back face")
-        .circle_at(
-            (BRACKET_TAP_X[0], HANGER_TAP_Y, BACK_FACE_Z - tap_csk_depth),
-            tap_dia / 2.0,
-            axis=(0.0, 0.0, 1.0),
-            label="latch-hook tap edge",
-            radius_tol_mm=0.025,
-        )
-        .edge
-    )
-    cbore = (
+def _cbore_rim(back: Any) -> Any:
+    """The inner east clamp counterbore's rim on the front face (the round
+    pair's Hole Wizard feature; the west pair are slots)."""
+    return (
         scan_view_edges(back, label="support-bar front face")
         .circle_at(
             (max(CLAMP_ROUND_X), CLAMP_TAP_Y, -BAR_DEPTH / 2.0),
@@ -468,7 +450,6 @@ def _hole_rims(face: Any, back: Any) -> tuple[Any, Any]:
         )
         .edge
     )
-    return tap, cbore
 
 
 def _activate(adapter: Any, view: Any, *, label: str) -> None:
@@ -1190,32 +1171,6 @@ def _assert_slot_marker_clear(
     )
 
 
-_THREAD_CLASS_TOKEN = " <hw-threadclass>"
-
-
-def _drop_thread_class(adapter: Any, display: Any) -> None:
-    """Drop the Hole Wizard's thread-class token from the native TAP
-    callout's definition (rule 2: the title block's THREADS row carries the
-    class); the other tokens stay live (draw_sm_knife_mount precedent). The
-    tap drill prints .XXX."""
-    set_hole_callout_precision(
-        display, BRACKET_TAP_CALLOUT_PRECISION, label="latch-hook base taps"
-    )
-    display = _early_bound(display, "IDisplayDimension")
-    before = str(display.GetText(5) or "")  # swDimensionTextPrefixDefinition
-    if before.count(_THREAD_CLASS_TOKEN) != 1:
-        raise RuntimeError(
-            f"latch-hook tap callout has no lone class token: {before!r}"
-        )
-    wanted = before.replace(_THREAD_CLASS_TOKEN, "")
-    display.SetText(1, wanted)
-    if str(display.GetText(5) or "") != wanted:
-        raise RuntimeError(
-            f"latch-hook tap callout class did not drop: {display.GetText(5)!r}"
-        )
-    rebuild_drawing(adapter, label="latch-hook tap callout class")
-
-
 def _name_clamp_screws(display: Any) -> None:
     """Hang the back-arc taps the holes locate to and the screws' part number
     under the counterbores' native callout; its sizes print .XXX, its depth
@@ -1408,29 +1363,20 @@ async def build(adapter: Any) -> dict[str, str]:
         *slot_section_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(
+        adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
+    )
     # Places (and so each dimension's band or limit) are authored on the part;
     # the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     # Detail C's label and mark go on once every import is done, so nothing of
     # the front-face view's own sketch is near an import.
     _label_slot_detail(adapter, detail, back)
-    tap_edge, cbore_edge = _hole_rims(face, back)
-    _drop_thread_class(
-        adapter,
-        add_native_hole_callout(
-            adapter,
-            face,
-            edge=tap_edge,
-            callout_xy=BRACKET_CALLOUT_XY,
-            label="latch-hook base taps",
-            process="TAP",
-        ),
-    )
     _name_clamp_screws(
         add_native_hole_callout(
             adapter,
             back,
-            edge=cbore_edge,
+            edge=_cbore_rim(back),
             callout_xy=CLAMP_CALLOUT_XY,
             label="clamp-screw counterbores",
             process="DRILL, C'BORE",
@@ -1464,8 +1410,8 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
-    # The native TAP callout restates the taps, so the Hole Wizard's own
-    # "Tapped Hole" note is the one redundant automatic note.
+    # The countersinks' stacked callouts restate the taps, so the Hole
+    # Wizard's own "Tapped Hole" note is the one redundant automatic note.
     return await finalize_drawing(
         adapter,
         OUTPUTS,
