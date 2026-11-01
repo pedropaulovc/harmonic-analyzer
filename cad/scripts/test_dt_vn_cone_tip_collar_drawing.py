@@ -806,6 +806,23 @@ def test_ream_callout_carries_the_bore_fit_statement() -> None:
     assert '"Installation Notes"' not in source
 
 
+def test_end_view_projects_with_the_turning_view_and_the_nose_dia_moves_onto_it() -> None:
+    """r4 review: the end view put the flat facing the turning view's reader
+    while the turning view drew it at the bottom; Ø6.40 sat only on the end
+    view (rule 11); 3.500's extension lines struck its function line."""
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert (
+        'for view, label in ((end, "end view"), (side, "turning view"), '
+        '(tap, "radial tap view")):\n        _quarter_turn(adapter, view, label)'
+    ) in source
+    assert "_horizontal_axis" not in source
+    assert "move_model_dimension(adapter, nose_donors[0], side, NOSE_DIA_ON_SIDE" in source
+    assert 'set_dimension_callouts(adapter, side_marks, above, location="above")' in source
+    # Left of the nose's south face, right of FlatDistance's text.
+    assert drawing.END_KEEP["FlatDistance"][0] < drawing.NOSE_DIA_ON_SIDE[0]
+    assert drawing.NOSE_DIA_ON_SIDE[0] < drawing.SIDE_CENTER[0] - spec.WIDTH * 4 / 2000.0
+
+
 def test_three_place_lengths_state_their_function() -> None:
     """Main's machinist review: 11.500, 3.500 and 7.500 had no stated function.
     They hold the tap's walls; at .XX those walls fall below the floor."""
