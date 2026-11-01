@@ -92,30 +92,12 @@ HAND = "right"
 
 # Current primary page + live 600 mm selection verified 2026-10-21; selecting
 # that option changes the displayed SKU from HW-SC-T8x2-P to HW-SC-T8x2-600.
-# These source gauges are isolated from the cut/flatted installed solid.
+# The drawing prints the stock's length, nominal major and pitch as reference
+# text in its note block, not as a gauge sketch (machinist review).
 SUPPLIER_PRODUCT_URL = (
     "https://www.zyltech.com/"
     "8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/"
 )
-SUPPLIER_STOCK_CONFIGURATION = "SUPPLIER_REFERENCE_STOCK"
-SUPPLIER_REFERENCE_DIMENSIONS = (
-    ("SupplierStockLength", STOCK_LENGTH, "horizontal"),
-    ("SupplierStockDiameter", MAJOR_DIA, "vertical"),
-    ("SupplierThreadPitch", PITCH, "horizontal"),
-)
-SUPPLIER_REFERENCE_STARTS = {
-    "SupplierStockLength": (-STOCK_LENGTH / 2.0, 0.0),
-    "SupplierStockDiameter": (0.0, -MAJOR_DIA / 2.0),
-    "SupplierThreadPitch": (-PITCH / 2.0, 12.0),
-}
-SUPPLIER_REFERENCE_FORMATS = {
-    "SupplierStockLength": (0, "length", None, "AS PURCHASED"),
-    "SupplierStockDiameter": (0, "diameter", None, "NOMINAL MAJOR"),
-    "SupplierThreadPitch": (0, "length", None, "PITCH; NO HELIX"),
-}
-SUPPLIER_REFERENCE_UNITS = {
-    name: "mm" for name, _, _ in SUPPLIER_REFERENCE_DIMENSIONS
-}
 
 # The cut length prints as a native one-place dimension (410.0), so the title
 # block's .X row is its band; the self-checks below show the feed absorbs it.

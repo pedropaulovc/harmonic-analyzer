@@ -1643,12 +1643,13 @@ thread-minor bore is a modelling contract, not an unpublished supplier size.
 No standard-only socket depths, Phillips-recess dimensions, nut bore limits,
 or omitted edge details were promoted to supplier evidence.
 
-The screw's `SUPPLIER_REFERENCE_STOCK` configuration contains only native
-construction gauges for the purchased length, nominal major and pitch. Its
-separately labelled drawing inset is not a replacement solid, helix or
-manufacturing control. The installed 410-mm cut length and five flats retain
-their existing native fabrication dimensions. All fourteen targets retain
-their prior solids, materials and installation geometry.
+The screw's purchased length, nominal major and pitch print as millimetre
+reference text in its drawing's note block (they were a native gauge inset,
+which machinist review found read as a confusing pseudo-view). They are not a
+replacement solid, helix or manufacturing control. The installed 410-mm cut
+length and five flats retain their existing native fabrication dimensions.
+All fourteen targets retain their prior solids, materials and installation
+geometry.
 
 Raw primary responses, current-variant selections, source engineering images,
 URLs, scrape IDs, retrieval errors and immutable SHA-256 hashes are preserved
