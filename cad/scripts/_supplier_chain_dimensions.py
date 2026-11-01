@@ -52,12 +52,14 @@ _OUTLINE_COLOR = 0  # COLORREF black
 _SW_LW_THICK = 2  # swLineWeights_e.swLW_THICK
 
 
+@_telemetry.traced("drawing.supplier_chain_line_font")
 def _construction_curves_continuous(adapter: Any) -> Callable[[], None]:
     extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
     option = constant("swDetailingNoOptionSpecified")
     name, style = _CONSTRUCTION_LINE_STYLE
     preference, value = constant(name), constant(style)
 
+    @_telemetry.traced("drawing.supplier_chain_line_font_readback")
     def readback() -> None:
         if int(extension.GetUserPreferenceInteger(preference, option)) != value:
             raise RuntimeError(f"chain diagram line font {name} readback differs")
@@ -108,6 +110,7 @@ def _format_as_outline(adapter: Any, view: Any, sketches: tuple[str, ...]) -> No
     _telemetry.annotate(sketches=len(sketches), segments=formatted)
 
 
+@_telemetry.traced("drawing.supplier_chain_prepare")
 def prepare_chain_diagrams(
     adapter: Any,
     views: Mapping[str, Any],
@@ -127,6 +130,7 @@ def prepare_chain_diagrams(
     return (line_style,)
 
 
+@_telemetry.traced("drawing.supplier_chain_dimensions")
 def annotate_chain_stock(
     adapter: Any,
     views: Mapping[str, Any],
@@ -257,6 +261,7 @@ def annotate_chain_stock(
         for key, view in views.items()
     }
 
+    @_telemetry.traced("drawing.supplier_chain_settled")
     def settled() -> None:
         found = reacquire_supplier_dimensions(
             adapter,

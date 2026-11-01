@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import _telemetry
 from _check import check
 from _com import _early_bound
 from _drawing_marks import mark_dimensions_for_drawing
@@ -62,13 +63,14 @@ def _construction(adapter: Any, entity: str) -> None:
         raise RuntimeError(f"{entity}: supplier diagram must be construction-only")
 
 
+@_telemetry.traced("part.supplier_chain_front")
 async def _reference_front(adapter: Any) -> str:
     """Two nominal section circles; origin-to-centre dimension is their pitch.
 
-    The circles are the pin and roller outlines. There is no plate profile:
-    the supplier gives no plate height. The origin is the first section
-    centre, so the second centre's driving station is also the native
-    centre-to-centre pitch. No duplicate carrier is needed.
+    The circles are the pin and roller outlines; the plate's section is drawn
+    only in the TOP sections. The origin is the first section centre, so the
+    second centre's driving station is also the native centre-to-centre
+    pitch. No duplicate carrier is needed.
     """
     check("create supplier chain nominal front", await adapter.create_sketch("Front"))
     dims = SketchDims()
@@ -90,6 +92,7 @@ async def _reference_front(adapter: Any) -> str:
     return FRONT_FEATURE
 
 
+@_telemetry.traced("part.supplier_chain_sections")
 async def _reference_sections(adapter: Any, *, connecting: bool) -> str:
     """Separate nominal sections, not dimensions on the installed stand-in.
 
