@@ -27,6 +27,7 @@ from _drawing_common import (
 from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,
+    set_reference_dimension,
     set_reference_dimensions,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
@@ -47,6 +48,7 @@ from dt_crank_hub_notes import (
     RELIEF_LENGTH_CALLOUT,
     SEAM_CALLOUT,
     SEAT_CALLOUT,
+    SEAT_LENGTH_CALLOUT,
 )
 from dt_crank_hub_spec import (
     AXIAL_PIN_DIA,
@@ -127,6 +129,9 @@ BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0
 #   rows below the profile; the toleranced overall, front face to rear
 #   face, on the row below them.  The barrel is the remainder, not printed.
 #   The two banded lengths carry the mate they serve under their text.  The
+#   seat length is a fit-up reference: its value and three-line callout
+#   print right of the outboard end, short of the end view, where the
+#   overall's text below cannot reach them.  The
 #   seat and station row stands above the relief's: the overall's stacked
 #   +/- band reached the shared row's extension lines (farm run
 #   20261031T205208603Z).  The overall's text stands clear under the
@@ -156,10 +161,13 @@ END_KEEP = {
     "PinProud": (END_CENTER[0] + 0.072, END_CENTER[1] + 0.014),
 }
 # The cross-hole station is measured from the arm shoulder it must stay clear
-# of (dt_crank_hub_geometry), not chained from 8.0: its arrowhead there is
-# the ASME dimension-origin circle (r7 review of farm run
-# 20261101T022045634Z; draw_mg_wheel_axle's idiom).
+# of (dt_crank_hub_geometry): its arrowhead there is the ASME
+# dimension-origin circle (r7 review of farm run 20261101T022045634Z;
+# draw_mg_wheel_axle's idiom), and the seat length behind it is a fit-up
+# reference (8.0), so nothing chains through a toleranced 8.0 (owner ruling
+# 2026-11-01 on the r9 review).
 ORIGIN_DIMENSIONS = {"ServicePinFromShoulder": SHOULDER_X}
+REFERENCE_LENGTHS = ("SeatLength",)
 _ORIGIN_ARROWHEAD = 4  # swArrowStyle_e.swORIGIN_ARROWHEAD
 _CLOSED_ARROWHEAD = 1  # swArrowStyle_e.swCLOSED_ARROWHEAD
 # The hub's half of the seam is the arc bulging from the seat edge toward the
@@ -174,8 +182,11 @@ SEAM_EDGE_PICK = (
 # far end and crossed both its own text and the bore leader (run a2e1cd67).
 SEAM_CALLOUT_XY = (0.303, 0.105)
 SIDE_KEEP = {
-    "SeatLength": ((OUTBOARD_X + SHOULDER_X) / 2.0, _STATION_ROW_Y),
-    "ServicePinFromShoulder": ((SHOULDER_X + SERVICE_PIN_CENTER[0]) / 2.0, _STATION_ROW_Y),
+    "SeatLength": (OUTBOARD_X + 0.020, _STATION_ROW_Y),
+    "ServicePinFromShoulder": (
+        (SHOULDER_X + SERVICE_PIN_CENTER[0]) / 2.0,
+        _STATION_ROW_Y,
+    ),
     "HubLength": ((OUTBOARD_X + INBOARD_X) / 2.0, _ROW_Y[1]),
     # Its toleranced text and callout are wider than the relief: they print
     # outside the span, left of the rear face, the dimension line running out
@@ -190,6 +201,7 @@ ISO_NOTE_XY = (0.345, 0.195)
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "SeatDia": SEAT_CALLOUT,
+    "SeatLength": SEAT_LENGTH_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
     "ReliefLength": RELIEF_LENGTH_CALLOUT,
     "PinProud": PIN_PROUD_CALLOUT,
@@ -322,10 +334,19 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_reference_dimensions(adapter, annotations, REFERENCE_DIMENSIONS)
+    for name in REFERENCE_LENGTHS:
+        matches = [a for a in annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"expected one crank-hub {name} dimension, got {len(matches)}"
+            )
+        set_reference_dimension(adapter, matches[0], label=f"crank hub {name}")
     for name, origin_x in ORIGIN_DIMENSIONS.items():
         matches = [a for a in annotations if dimension_name(adapter, a) == name]
         if len(matches) != 1:
-            raise RuntimeError(f"expected one crank-hub {name} dimension, got {len(matches)}")
+            raise RuntimeError(
+                f"expected one crank-hub {name} dimension, got {len(matches)}"
+            )
         _set_dimension_origin(
             adapter, matches[0], origin_x=origin_x, label=f"crank hub {name}"
         )

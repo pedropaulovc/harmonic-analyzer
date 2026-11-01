@@ -56,15 +56,15 @@ def seam_callout(mate: str, pin: str = "MHA-DT-VN-59") -> str:
     part name (MHA-DT-06 machinist review, 2026-09-29).  On the hub's print
     the seat callout names ``mate`` in full; the four-row limit leaves this
     one no room (r7 review of farm run 20261101T022045634Z).  The blind pin
-    makes hub and ``mate`` a permanent pair, serviced at the MHA-DT-09 taper
-    pin (owner ruling 2026-11-01, machinist review: no knockout).
+    makes hub and ``mate`` a permanent pair, taken apart at the MHA-DT-09
+    taper pin (owner rulings 2026-11-01; r9 review: say it plainly).
     """
     return "\n".join(
         (
-            f"(<MOD-DIAM>{AXIAL_PIN_DIA:.1f}) <HOLE-DEPTH> {AXIAL_PIN_LENGTH:.1f}",
-            f"ON SEAM, MATCH-DRILL/REAM WITH {mate}",
-            f"AT ASSEMBLY, {pin} LIGHT DRIVE FIT;",
-            "PERMANENT PAIR; SERVICE AT MHA-DT-09",
+            f"(<MOD-DIAM>{AXIAL_PIN_DIA:.1f}) <HOLE-DEPTH> {AXIAL_PIN_LENGTH:.1f} ON SEAM, MATCH-DRILL/REAM",
+            f"WITH {mate} AT ASSEMBLY; {pin}",
+            "LIGHT DRIVE FIT, PERMANENT PAIR;",
+            "DISASSEMBLE AT TAPER PIN MHA-DT-09",
         )
     )
 
@@ -80,6 +80,12 @@ BORE_CALLOUT = (
 # it, so its nominal prints as a reference under the match-fit callout.
 SEAT_CALLOUT = seat_callout("MHA-DT-06")
 SEAM_CALLOUT = seam_callout("MHA-DT-06")
+# The seat length is the arm's thickness as made, not a turned size: the
+# seat end finishes flush with the arm, so the shoulder the MHA-DT-09
+# station is measured from is wherever the arm puts it (owner ruling
+# 2026-11-01; r9 review: 8.0 at .X read against the flush condition).  Its
+# nominal prints as a reference over this.
+SEAT_LENGTH_CALLOUT = "TO SUIT\nCRANK ARM,\nEND FLUSH"
 # The cross-hole is drilled, then taper-reamed through hub and shaft together
 # at assembly.  The ream fixes the hub on the shaft for good, so the front
 # face -- the seat end, named on the sheet -- is set flush

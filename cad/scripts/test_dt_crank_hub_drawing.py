@@ -273,11 +273,17 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     assert "MHA-DT-06" in seam and "MHA-DT-VN-59" in seam and "LIGHT DRIVE FIT" in seam
     assert "AT ASSEMBLY" in seam and "SEAM" in seam
     # Size first, then the process, in the order the work is done.
-    assert seam.splitlines()[0] == "(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0"
+    assert seam.splitlines()[0].startswith("(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0")
     assert "O'CLOCK" not in seam
-    # The blind pin makes hub and arm a permanent pair, serviced at the taper
-    # pin (owner ruling 2026-11-01).
-    assert seam.splitlines()[-1] == "PERMANENT PAIR; SERVICE AT MHA-DT-09"
+    # The blind pin makes hub and arm a permanent pair, taken apart at the
+    # taper pin (owner rulings 2026-11-01).
+    assert "PERMANENT PAIR" in _flat(seam)
+    assert "MHA-DT-09" in seam.splitlines()[-1]
+    # The seat length is the arm's, a fit-up reference whose callout names
+    # the arm (owner ruling 2026-11-01 on the r9 review).
+    assert drawing.REFERENCE_LENGTHS == ("SeatLength",)
+    assert drawing.DIMENSION_CALLOUTS["SeatLength"] == dt_crank_hub_notes.SEAT_LENGTH_CALLOUT
+    assert "CRANK ARM" in _flat(dt_crank_hub_notes.SEAT_LENGTH_CALLOUT)
     # The taper-pin cross-hole names both mates and the fit on its callout,
     # after the front face is set flush with the datum it is reamed at.
     cross_hole = dt_crank_hub_notes.CROSS_HOLE_CALLOUT
@@ -416,6 +422,12 @@ def test_callouts_stand_clear_of_views_and_each_other() -> None:
     # clear of the six-o'clock seam and its callout.
     assert bore_x - half(dt_crank_hub_notes.BORE_CALLOUT) > end_right
     assert bore_y < drawing.END_CENTER[1]
+    # The fit-up seat length prints right of the outboard end with its
+    # callout, short of the end view.
+    seat_len_x, _ = drawing.SIDE_KEEP["SeatLength"]
+    seat_len_half = half(dt_crank_hub_notes.SEAT_LENGTH_CALLOUT)
+    assert drawing.OUTBOARD_X < seat_len_x - seat_len_half
+    assert seat_len_x + seat_len_half < end_left
     assert seat_block[1] < drawing.ISO_NOTE_XY[0] and end_left > drawing.OUTBOARD_X
     # Both turned diameters stand left of the inboard end, the relief's nearer,
     # their values side by side on the axis without touching.
