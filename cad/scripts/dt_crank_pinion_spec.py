@@ -116,9 +116,13 @@ _RAW_SPANS = tuple(
 BASE_TANGENT_SPAN_MM = _PITCH_PROBE.tangent_span_mm(
     BASE_TANGENT_SPAN_TEETH, normal_plane=True
 )
-BASE_TANGENT_SPAN_LIMITS_MM = (
-    math.floor(min(_RAW_SPANS) * _SPAN_SCALE) / _SPAN_SCALE,
-    math.ceil(max(_RAW_SPANS) * _SPAN_SCALE) / _SPAN_SCALE,
+# Both ends rounded UP onto the inch grid the sheet prints them at: the
+# lower end inward (an accepted part keeps the source's thinnest tooth), the
+# upper end outward so the modelled nominal -- the source's thickest tooth,
+# zero upper deviation -- stays inside the printed acceptance.
+BASE_TANGENT_SPAN_LIMITS_MM = tuple(
+    math.ceil(round(span / MM_PER_IN * _SPAN_SCALE, 6)) / _SPAN_SCALE * MM_PER_IN
+    for span in (min(_RAW_SPANS), max(_RAW_SPANS))
 )
 _INVERSE_BRACKET = (
     min(_RAW_TRANSLATIONS) - MODULE_MM / 100.0,
