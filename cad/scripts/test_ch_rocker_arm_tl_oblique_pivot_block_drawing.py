@@ -22,8 +22,9 @@ def test_rectangular_rail_two_block_and_new_stock():
     metadata=_config.parts(spec.PART_NAME)
     assert metadata['number']=='MHA-CH-06-TL-22'
     assert metadata['quantity']==spec.QUANTITY==1
-    # Every counterbore wall now meets the inch target: no exception survives.
-    assert not metadata.get('machinist_exceptions')
+    # Every counterbore wall meets the inch target; the one exception is the
+    # M4 engagement (test_engagement_shortfall_is_the_declared_minor).
+    assert [row['id'] for row in metadata['machinist_exceptions']]==['RV-01']
 
 
 def test_pivot_shoulder_bottoms_with_full_form_thread_engagement():
@@ -108,3 +109,10 @@ def test_block_height_prints_on_a_right_view_level_with_the_plan():
     assert set(drawing.RIGHT_KEEP)=={'BlockHeight'}
     assert 'BlockHeight' in spec.DRAWING_DIMENSIONS['Block']
     assert 'BlockHeight' not in drawing.SIDE_KEEP
+
+
+def test_engagement_shortfall_is_the_declared_minor():
+    (engagement,)=_config.parts(spec.PART_NAME)['machinist_exceptions']
+    assert (engagement['id'],engagement['kind'])==('RV-01','minor')
+    assert spec.ENGAGEMENT_TEXT in engagement['where']
+    assert 'pending confirmation' in engagement['reason']
