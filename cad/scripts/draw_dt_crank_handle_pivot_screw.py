@@ -211,9 +211,10 @@ CENTERLINE_PICK = (UNDERHEAD_X - 0.080, SIDE_CENTER[1] + 0.003)
 # The seat edge's break note lands on the shoulder's seat-face edge, near
 # its outer corner (the relief lead's edge on the same line ends at 62 % of
 # the shoulder radius), from up and right, above the relief width and the
-# shoulder Ø's callout blocks.
+# shoulder Ø's callout blocks.  At + 0.010 its leader ran through the thread
+# note's right end (farm r4 of d7fcd19ce).
 SEAT_EDGE_PICK = (SEAT_X, SIDE_CENTER[1] + 0.9 * (SHOULDER_TOP_Y - SIDE_CENTER[1]))
-SEAT_EDGE_NOTE_XY = (SEAT_X + 0.010, SIDE_CENTER[1] + 0.060)
+SEAT_EDGE_NOTE_XY = (SEAT_X + 0.020, SIDE_CENTER[1] + 0.060)
 ISO_NOTE_XY = (0.352, 0.200)
 # Bottom-left, above the title-block line, like the other crank sheets.
 NOTES_XY = (0.016, 0.070)
