@@ -148,6 +148,9 @@ def _size_text_move(
     arrowhead plus the arrow-to-text clearance; the shaft gauge's text sits
     over the plan centre. A height's offset text goes a clear gap beyond its
     own dimension line, witnesses and arrows (the washer thickness pattern).
+    The application gauge cell has no room beside its wide planes for a
+    stacked callout, so its text sits over the highest plane's arrow,
+    centred on its own dimension line.
     """
     reader = _Reader(adapter)
     record = _dump_annotation(reader, display.GetAnnotation())
@@ -175,6 +178,9 @@ def _size_text_move(
         return position, dx, dy
     lines = supplier_top_text_geometry(record, horizontal=False)
     gap = CLEAR_GAP_M + PLACE_SETTLE_M
+    if key == "free_right":
+        dx = lines["tips"][0][0] - (text.xmin + text.xmax) / 2.0
+        return position, dx, bounds[key][3] + ARROW_REACH_M + gap - text.ymin
     if side > 0:
         return position, lines["right"] + gap - text.xmin, 0.0
     return position, lines["left"] - gap - text.xmax, 0.0
@@ -219,13 +225,17 @@ def assert_disc_size_text_clear(
     *,
     label: str,
 ) -> None:
-    """Settled text still clear on its side (and the shaft text over centre)."""
+    """Settled text still clear of its lines (shaft and gauge texts over them)."""
     _position, dx, dy = _size_text_move(
         adapter, key, semantic, display, bounds, label=label
     )
-    if TEXT_SIDES[semantic] * dx > PLACE_SETTLE_M or (
-        semantic == "SHAFT_DIA" and dy > PLACE_SETTLE_M
-    ):
+    if key == "free_right":
+        unclear = abs(dx) > PLACE_SETTLE_M or dy > PLACE_SETTLE_M
+    else:
+        unclear = TEXT_SIDES[semantic] * dx > PLACE_SETTLE_M or (
+            semantic == "SHAFT_DIA" and dy > PLACE_SETTLE_M
+        )
+    if unclear:
         raise RuntimeError(
             f"{label} {semantic}: settled size text is not clear of its lines "
             f"(needs {dx * 1000:.2f}, {dy * 1000:.2f} mm)"
