@@ -1656,6 +1656,22 @@ def test_post_mount_class_override_preserves_native_thread_rows(monkeypatch, sta
     )
 
 
+def test_post_mount_tap_drill_prints_three_inch_places() -> None:
+    """Rule 3 (machinist review of run 20261101T085308503Z): Ø.20 -> Ø.201."""
+    assert drawing.POST_MOUNT_CALLOUT_PRECISION == {"hw-thrutapdrldia": 3}
+    places = drawing.POST_MOUNT_CALLOUT_PRECISION["hw-thrutapdrldia"]
+    assert f"{spec.POST_MOUNT_TAP_DIA / 25.4:.{places}f}" == "0.201"
+    source = ast.parse(Path(drawing.__file__).read_text())
+    assert any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "set_hole_callout_precision"
+        and [getattr(arg, "id", None) for arg in node.args]
+        == ["post_mount_callout", "POST_MOUNT_CALLOUT_PRECISION"]
+        for node in ast.walk(source)
+    )
+
+
 def test_post_mount_class_override_refuses_a_nondefault_class_before_native_edit(
     monkeypatch,
 ) -> None:

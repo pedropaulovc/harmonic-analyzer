@@ -1261,6 +1261,9 @@ def _print_pivot_band_exactly(display: Any) -> None:
 
 # Hole Wizard callouts print three inch places (#290).
 HOLDDOWN_CALLOUT_PRECISION = {"hw-thruholedia": 3, "hw-cbdia": 3, "hw-cbdepth": 3}
+# The through taps' drill prints .201, not .20 (rule 3; machinist review of
+# run 20261101T085308503Z).
+POST_MOUNT_CALLOUT_PRECISION = {"hw-thrutapdrldia": 3}
 
 
 def _add_holddown_callout(adapter: Any, section: Any) -> Any:
@@ -2276,6 +2279,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="v2 post-mount tapped holes",
     )
     _omit_post_mount_thread_class(post_mount_callout)
+    set_hole_callout_precision(
+        post_mount_callout, POST_MOUNT_CALLOUT_PRECISION, label="v2 post-mount tapped holes"
+    )
     rebuild_drawing(adapter, label="plan hole callout rows")
     # The section shows the top seat at its head and the base slide at its
     # foot.  Arrows land mid-face so neither symbol reads as controlling a
