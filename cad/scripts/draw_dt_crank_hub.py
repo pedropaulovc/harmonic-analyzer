@@ -26,9 +26,12 @@ from _drawing_common import (
 )
 from _drawing_dimensions import (
     assert_imported_precision,
+    set_arc_endpoints_to_center,
     set_dimension_callouts,
+    set_reference_dimension,
     set_reference_dimensions,
 )
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_attached_note
@@ -36,6 +39,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm, drill_process
+from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
@@ -63,6 +67,8 @@ from dt_crank_hub_spec import (
     SERVICE_PIN_STATION,
 )
 
+
+MACHINIST_REVIEW = MachinistReviewMode.LEARN
 
 SPEC = DRAWINGS_BY_NAME["dt_crank_hub"]
 PART_STEM = SPEC.artifact_stem
@@ -163,6 +169,14 @@ END_KEEP = {
 ORIGIN_DIMENSIONS = {"ServicePinFromShoulder": SHOULDER_X}
 _ORIGIN_ARROWHEAD = 4  # swArrowStyle_e.swORIGIN_ARROWHEAD
 _CLOSED_ARROWHEAD = 1  # swArrowStyle_e.swCLOSED_ARROWHEAD
+# The same station from the faced outboard end, as a reference on its own
+# row under the chain: the machinist's baseline, while the shoulder stays the
+# toleranced origin (machinist review of the inch sheet, r1 and r3).
+STATION_REF_PICKS = (
+    (OUTBOARD_X, SIDE_CENTER[1] - 0.010),
+    (SERVICE_PIN_CENTER[0], SERVICE_PIN_CENTER[1] - SERVICE_PIN_DIA / 2.0 * _S),
+)
+STATION_REF_TEXT_XY = ((OUTBOARD_X + SERVICE_PIN_CENTER[0]) / 2.0, 0.113)
 # The hub's half of the seam is the arc bulging from the seat edge toward the
 # bore; the callout attaches 45 degrees up its right flank.
 SEAM_CENTER = (END_CENTER[0], END_CENTER[1] - AXIAL_PIN_RADIUS_FROM_AXIS * _S)
@@ -338,6 +352,32 @@ async def build(adapter: Any) -> dict[str, str]:
         _set_dimension_origin(
             adapter, matches[0], origin_x=origin_x, label=f"crank hub {name}"
         )
+    station_ref = add_edge_dimension(
+        adapter,
+        right,
+        p0=STATION_REF_PICKS[0],
+        p1=STATION_REF_PICKS[1],
+        text_xy=STATION_REF_TEXT_XY,
+        label="crank hub cross-hole station reference",
+        orientation="horizontal",
+    )
+    set_arc_endpoints_to_center(
+        adapter, station_ref, label="crank hub cross-hole station reference"
+    )
+    # Value-only: the end face and the cross-hole are the only edges at
+    # these picks; the station value is the proof.
+    assert_dimension_measures(
+        adapter,
+        station_ref,
+        expected_mm=SERVICE_PIN_STATION,
+        label="crank hub cross-hole station reference",
+    )
+    station_ref = _early_bound(station_ref, "IDisplayDimension")
+    if station_ref.SetPrecision3(2, -1, -1, -1) != 0:
+        raise RuntimeError("crank hub cross-hole station reference: precision rejected")
+    set_reference_dimension(
+        adapter, station_ref.GetAnnotation(), label="crank hub cross-hole station reference"
+    )
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to crank-hub end view")
