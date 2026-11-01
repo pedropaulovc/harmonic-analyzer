@@ -6,7 +6,7 @@ ch-rocker-arm-tl-oblique-feed-block:
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
-  process: "Integral rail-1 nut lug; drill all four nut taps to print, not match-drilled. Keep carriage counterbore floors .614 above the bottom; pivot seat reamed .3760-.3765, .359 deep from top with a 5/16-18 tapped through hole below."
+  process: "Integral rail-1 nut lug; drill all four nut taps to print, not match-drilled. Keep carriage counterbore floors .570 above the bottom; pivot seat reamed .3760-.3765, .359 deep from top with a 5/16-18 tapped through hole below."
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"

@@ -58,5 +58,10 @@ machinist_exceptions:
     where: "P2: the two 5/16-18 shoulder screws seated in block counterbores, Loctite 222 and 4.0 N·m"
     finding: "pivot shoulder screws use threadlocker without a separate mechanical thread lock (rule 23)"
     reason: "The owner-approved 2026-10-23 plain-pivot contract explicitly chooses Loctite 222 and torque. Each screw shoulder bottoms in its counterbore, leaving measured .002–.010 carrier running clearance; the head, thread, block and carriage form the positive lift-capture path. This is not whole-jig load certification."
+  - id: "RV-05"
+    kind: "accept"
+    where: "Step 5: each M4 X 20 SHCS cut to its own counterbore floor height + .189, engaging .183-.195 of the HGH15CA carriage's M4 x 5"
+    finding: "carriage screw engagement .183 min (4.65 mm, 1.16D), under rule 18's 1.5D"
+    reason: "The bought HGH15CA carriage's vendor M4 holes are 5 mm deep, so no M4 reaches 1.5D (6.0 mm). Owner ruling 2026-11-01, option A (owner timeout; recommended option applied): the TL-22/TL-32 counterbore floor drops .614 to .570 and each screw is cut to fit its own floor at assembly (rule 19), so the reach carries only the ±.005 cut and the .001 reading, 1.16D minimum against the 0.96D (.151) the uncut screw left. Owner exception pending confirmation."
 # drawing_unit: the jig sheet, its TOL_* rows and the saved model's units (#290).
 drawing_unit: in
