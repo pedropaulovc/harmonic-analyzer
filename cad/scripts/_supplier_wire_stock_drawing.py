@@ -37,8 +37,11 @@ STOCK_SCALE = (20, 1)
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 # Sheet metres: the circle (15.7 mm at 20:1) centred left of the title block,
 # its Ø text up-right on the leader, the view label under the padded outline.
+# The two-line REF (Ø, then PER SUPPLIER) hangs its shoulder under the second
+# line: at y .183 that shoulder ran across the circle's top (177.9 mm), so the
+# text sits 6 mm higher.
 STOCK_CENTER = (0.150, 0.170)
-STOCK_TEXT = (0.175, 0.183)
+STOCK_TEXT = (0.175, 0.189)
 # An unhatched end view, not a section: the sheet has no cutting plane.
 STOCK_LABEL = f"WIRE END VIEW SCALE {STOCK_SCALE[0]}:{STOCK_SCALE[1]}"
 STOCK_LABEL_XY = (0.121, 0.152)

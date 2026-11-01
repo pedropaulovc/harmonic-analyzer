@@ -18,6 +18,7 @@ from typing import Any
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note, dimension_name, iter_views, place_view, view_name,
 )
+import _config
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -95,6 +96,13 @@ END_KEEP: dict[str, tuple[float, float]] = {}
 # no duplicate imported chamfer dimension is printed in the end view.
 END_VIEW_LABEL = "CUT END VIEW"
 END_VIEW_LABEL_XY = (0.092, 0.224)
+# Sheet 1's item caption, in the same top band; right of the cut-end view.
+ITEM_LABEL = (
+    f"{VARIANTS[0][1]}  QTY "
+    f"{int(_config.parts(SOURCE.stem)['configuration_quantities'][stud.CONFIGURATION])}"
+    " INSTALLED"
+)
+ITEM_LABEL_XY = (0.150, 0.262)
 STOCK_NOTE_XY = (0.025, 0.077)
 THREAD_NOTE_XY = (0.065, 0.180)
 THREAD_CALLOUT = f"{stud.THREAD}\nEXISTING THREAD\nNOT MODELLED"
@@ -625,6 +633,8 @@ def append_stud_rework_sheets(adapter: Any) -> tuple[Callable[[], None], ...]:
     set_machining_callouts(adapter, annotations)
     if add_note(adapter, END_VIEW_LABEL, *END_VIEW_LABEL_XY) is None:
         raise RuntimeError("failed to label the permanent stud cut-end view")
+    if add_note(adapter, ITEM_LABEL, *ITEM_LABEL_XY) is None:
+        raise RuntimeError("failed to label the stud REWORK sheet's item")
     settled_notes = add_rework_notes(adapter, front)
     add_property_linked_note(
         adapter, f"{stud.CONFIGURATION} Rework Stock Note", *STOCK_NOTE_XY
