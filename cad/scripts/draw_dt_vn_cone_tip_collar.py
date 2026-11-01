@@ -23,7 +23,7 @@ from _drawing_common import (
     read_required_properties, rebuild_drawing, stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import assert_imported_precision, move_model_dimension, set_dimension_callouts
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
@@ -70,9 +70,20 @@ SIDE_CENTER = (0.205, 0.170)
 TAP_CENTER = (0.065, 0.238)
 TAP_SCALE = spec.RADIAL_TAP_VIEW_SCALE
 ISO_CENTER = (0.345, 0.210)
-# FlatDistance reads between its extension lines, off the bore's centre line
-# (main's review: the line at x 80 mm struck the second '0' of 7.00).
-END_KEEP = {"NoseDia": (0.027, 0.165), "FlatDistance": (0.094, 0.112)}
+# Third angle: the turning view (*Front) and this end view (*Bottom, looking
+# up the axis at the nose end) both take a quarter turn clockwise
+# (_quarter_turn), so model +X, the flat's side, faces sheet DOWN in both and
+# the end view projects on the left of the turning view, which shows the nose
+# end on its left (r4 review: unturned, the end view put the flat on its
+# right, facing the turning view's reader, while the turning view drew it at
+# the bottom). FlatDistance is then vertical, axis (y 170 mm) to flat (y 142):
+# its text right of the view (x <= 115), between the views. NoseDia is
+# imported here only as the donor that moves onto the turning view.
+END_KEEP = {"NoseDia": (0.027, 0.165), "FlatDistance": (0.125, 0.156)}
+# Rule 11 (r4 review): the nose diameter across the nose on the turning view,
+# its dimension line left of the nose's south face (x 182, y 157-183), clear
+# of FlatDistance's text and below NoseLength's.
+NOSE_DIA_ON_SIDE = (0.165, SIDE_CENTER[1])
 # CollarDia is a turned-profile sketch dimension, native to the side view.
 # Farm 20261031T205208603Z: the nose spans x 182-196 mm and the body x 196-228,
 # y 135-205; NoseLength's south extension line runs x 182, y 169-213.
@@ -82,10 +93,11 @@ END_KEEP = {"NoseDia": (0.027, 0.165), "FlatDistance": (0.094, 0.112)}
 # passes NoseLength's text at x ~230. At (165, 198) it crossed NoseLength's
 # extension line; at (282, 205), CollarDia's dimension line (main's review).
 # The function lines of CollarWidth and NoseLength
-# (spec.AXIAL_FUNCTION_CALLOUTS) stack on their values: CollarWidth's into the
-# open field below, NoseLength's up, centred between its extension lines: at
-# x 182 its 53.5 mm block ([153.6, 207.1] mm) stood 5.7 mm from the tap
-# callout ([94.4, 150.4] x [226.2, 235.3] mm), under one text height.
+# (spec.AXIAL_FUNCTION_CALLOUTS): CollarWidth's below its value, into the
+# open field under the view; NoseLength's ABOVE its value, out of its
+# extension lines' reach, centred between them: at x 182 its 53.5 mm block
+# ([153.6, 207.1] mm) stood 5.7 mm from the tap callout ([94.4, 150.4] x
+# [226.2, 235.3] mm), under one text height.
 SIDE_KEEP = {"CollarWidth": (0.205, 0.110), "CollarDia": (0.250, SIDE_CENTER[1]),
              "NoseLength": (0.189, 0.218), "ShoulderRadius": (0.262, 0.232)}
 # TapStation reads right of the tap centre's extension line, under the hole
@@ -241,12 +253,13 @@ def _configuration(adapter, views, name):
     rebuild_drawing(adapter, label=f"collar {name} views")
 
 
-def _horizontal_axis(adapter, view):
+def _quarter_turn(adapter, view, label):
+    """Turn ``view`` a quarter clockwise, so model +X faces sheet down."""
     native = _early_bound(view, "IView")
     native.Angle = -math.pi / 2.0
     if abs(float(native.Angle) + math.pi / 2.0) > 1e-9:
-        raise RuntimeError("collar axis is not horizontal on the turning view")
-    rebuild_drawing(adapter, label="collar turning orientation")
+        raise RuntimeError(f"collar {label} did not keep its quarter turn")
+    rebuild_drawing(adapter, label=f"collar {label} orientation")
 
 
 def _precision(keep):
@@ -494,18 +507,28 @@ async def build(adapter: Any) -> dict[str, str]:
     tap = place_view(adapter, str(SOURCE), "*Right", *TAP_CENTER, scale=TAP_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
     _configuration(adapter, (end, side, tap, iso), "Collar")
-    _horizontal_axis(adapter, side)
-    _horizontal_axis(adapter, tap)
+    for view, label in ((end, "end view"), (side, "turning view"), (tap, "radial tap view")):
+        _quarter_turn(adapter, view, label)
     for view in (end, side, tap, iso):
         set_hidden_lines_removed(adapter, view)
     end_marks = curate_view_dimensions(adapter, end, keep=END_KEEP,
                                       view_label="collar end", dimensions_by_feature=spec.DRAWING_DIMENSIONS)
     side_marks = curate_view_dimensions(adapter, side, keep=SIDE_KEEP,
                                        view_label="collar turning view", dimensions_by_feature=spec.DRAWING_DIMENSIONS)
-    marks = end_marks + side_marks
+    nose_donors = [a for a in end_marks if dimension_name(adapter, a) == "NoseDia"]
+    if len(nose_donors) != 1:
+        raise RuntimeError("expected one collar nose diameter donor dimension")
+    nose_dia = move_model_dimension(adapter, nose_donors[0], side, NOSE_DIA_ON_SIDE, source_view=end)
+    end_marks = [a for a in end_marks if dimension_name(adapter, a) != "NoseDia"]
+    marks = [*end_marks, *side_marks, nose_dia]
     assert_imported_precision(adapter, marks, _precision(END_KEEP | SIDE_KEEP))
     _assert_functional_dimension_types(adapter, side_marks, SIDE_DIMENSION_TYPES)
-    set_dimension_callouts(adapter, side_marks, _function_callouts(SIDE_KEEP))
+    side_callouts = _function_callouts(SIDE_KEEP)
+    # Above its value: below it, 3.500's two extension lines ran up through
+    # the function line (r4 review).
+    above = {"NoseLength": side_callouts.pop("NoseLength")}
+    set_dimension_callouts(adapter, side_marks, side_callouts)
+    set_dimension_callouts(adapter, side_marks, above, location="above")
     tap_marks = curate_view_dimensions(
         adapter, tap, keep=TAP_KEEP, view_label="collar radial tap station",
         dimensions_by_feature=spec.DRAWING_DIMENSIONS,
