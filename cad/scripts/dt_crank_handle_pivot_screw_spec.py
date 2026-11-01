@@ -28,6 +28,7 @@ from __future__ import annotations
 import math
 
 import _config
+from _fit_deviations import deviations
 from _gtol_cylinder import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
@@ -262,7 +263,11 @@ def _limits(nominal: float, band: tuple[float, float]) -> tuple[float, float]:
 
 SHOULDER_DIA_MIN, SHOULDER_DIA_MAX = _limits(SHOULDER_DIA, SHOULDER_DIA_BAND)
 THREAD_LENGTH_MIN, THREAD_LENGTH_MAX = _limits(THREAD_LENGTH, THREAD_LENGTH_BAND)
-HANDLE_BORE_MIN, HANDLE_BORE_MAX = _limits(PIVOT_BORE_DIA, PIVOT_BORE_BAND)
+# The handle's printed bore is a reference over this running clearance
+# (MHA-DT-08), so the reamer's band reaches the checks only here.
+_BORE_LOWER, _BORE_UPPER = deviations(PIVOT_BORE_BAND)
+HANDLE_BORE_MIN = round(PIVOT_BORE_DIA + _BORE_LOWER, 6)
+HANDLE_BORE_MAX = round(PIVOT_BORE_DIA + _BORE_UPPER, 6)
 
 # Head top below the cup's face at nominal: the head reads recessed in
 # the cup (the photographs).
