@@ -42,7 +42,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-from mg_lever_thread_joint import INCOMPLETE_THREAD_MAX, ROD_DIA, ROD_LENGTH, THREAD_LENGTH, TIP_CHAMFER
+from mg_lever_thread_joint import INCOMPLETE_THREAD_MAX, PITCH, ROD_DIA, ROD_LENGTH, THREAD_LENGTH, THREAD_ROOT_X, TIP_CHAMFER
 from mg_magnifying_lever_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, FREE_END_CALLOUT, LEAD_CALLOUT, PRINT_THREAD_CALLOUT, ROD_DIA_CALLOUT, ROD_DIA_FRACTION_DENOMINATOR, SCREW_SEAT_CALLOUT, SURFACE_FINISHES, THREAD_CALLOUT
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -70,9 +70,17 @@ DETAIL_KEEP = {"ThreadLength": (0.323, 0.209), "IncompleteLength": (0.381, 0.165
 # keep the qualifier above the screw-seat note and below the free-end note.
 FRONT_KEEP = {"OverallLength": (0.115, 0.088), "RodDia": (0.055, 0.166)}
 DETAIL_THREAD_NOTE_XY = (0.2760, 0.172)
-# Detail A's cosmetic thread prints on a visible thin continuous layer.
-THREAD_LINE_LAYER = "MG-LEVER-THREAD-LINES"
-_COSMETIC_THREAD_ANNOTATION = 1  # swAnnotationType_e.swCosmeticThread
+# ASME Y14.6 simplified external thread, sketched in the view: a thin
+# thread-limit line across the major diameter where ThreadLength's root
+# witness leaves the rod, and thin minor-diameter lines from it to the tip.
+# The HLR cosmetic thread printed neither (minor lines lie behind the rod's
+# near surface). Model mm, from the same constants that build the part.
+THREAD_MINOR_R = (ROD_DIA - 1.299038 * PITCH) / 2.0  # ASME B1.1 basic minor
+THREAD_LINES_MM = (
+    ((THREAD_ROOT_X, -ROD_DIA / 2.0), (THREAD_ROOT_X, ROD_DIA / 2.0)),
+    ((THREAD_ROOT_X, THREAD_MINOR_R), (ROD_LENGTH, THREAD_MINOR_R)),
+    ((THREAD_ROOT_X, -THREAD_MINOR_R), (ROD_LENGTH, -THREAD_MINOR_R)),
+)
 CALLOUTS = {"IncompleteLength": LEAD_CALLOUT}
 
 
@@ -90,39 +98,50 @@ def _rod_stock_reference(adapter: Any, annotations: list[Any]) -> None:
     )
 
 
-def _show_detail_thread_lines(adapter: Any, view: Any) -> None:
-    """Show Detail A's cosmetic thread as visible thin continuous lines.
+def _sketch_thread_lines(adapter: Any, view: Any, *, label: str) -> None:
+    """Sketch THREAD_LINES_MM into ``view`` as thin lines, read back on the sheet."""
+    _activate(adapter, view)
+    native = _early_bound(view, "IView")
+    sheet_lines = [
+        tuple(model_point_in_view(adapter, view, (x / 1000.0, y / 1000.0, 0.0), label=f"{label} thread line") for x, y in line)
+        for line in THREAD_LINES_MM
+    ]
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
 
-    The default cosmetic-thread font left only faint dashes, so the .71's
-    root witness landed on no visible thread start. The clamp/knife-mount
-    section-thread recipe: the layer state and the annotation's layer read back.
-    """
-    manager = _early_bound(adapter.currentModel.GetLayerManager(), "ILayerMgr")
-    layer = manager.GetLayer(THREAD_LINE_LAYER)
-    if layer is None:
-        # COLORREF black, swLineCONTINUOUS (0), swLW_THIN (0).
-        if int(manager.AddLayer(THREAD_LINE_LAYER, "lever thread lines", 0, 0, 0)) != 1:
-            raise RuntimeError("failed to add the lever thread-line layer")
-        layer = manager.GetLayer(THREAD_LINE_LAYER)
-    layer = _early_bound(layer, "ILayer")
-    layer.Visible = True
-    if not bool(layer.Visible) or int(layer.Style) != 0 or int(layer.Width) != 0:
-        raise RuntimeError(
-            f"lever thread-line layer is not visible thin continuous: "
-            f"visible={layer.Visible!r}, style={layer.Style!r}, width={layer.Width!r}"
+    def mapped(xyz: tuple[float, ...], transform: Any) -> tuple[float, ...]:
+        point = _early_bound(utility.CreatePoint(double_array(list(xyz))), "IMathPoint")
+        return tuple(float(value) for value in _early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData)
+
+    to_sketch = _early_bound(_early_bound(native.GetSketch(), "ISketch").ModelToSketchTransform, "IMathTransform")
+    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    previous = bool(manager.AddToDB)
+    manager.AddToDB = True  # no inference snap onto the rod's edges
+    segments = []
+    try:
+        for start, end in sheet_lines:
+            segment = manager.CreateLine(*mapped((*start, 0.0), to_sketch), *mapped((*end, 0.0), to_sketch))
+            if segment is None:
+                raise RuntimeError(f"could not sketch the lever {label} thread line")
+            segments.append(segment)
+    finally:
+        manager.AddToDB = previous
+    adapter.currentModel.ClearSelection2(True)
+    rebuild_drawing(adapter, label=f"sketch lever {label} thread lines")
+    to_sheet = _early_bound(
+        _early_bound(_early_bound(native.GetSketch(), "ISketch").ModelToSketchTransform, "IMathTransform").Inverse(),
+        "IMathTransform",
+    )
+    ends = [
+        mapped((point.X, point.Y, point.Z), to_sheet)[:2]
+        for segment in segments
+        for point in (
+            _early_bound(_early_bound(segment, "ISketchLine").GetStartPoint2(), "ISketchPoint"),
+            _early_bound(_early_bound(segment, "ISketchLine").GetEndPoint2(), "ISketchPoint"),
         )
-    shown = 0
-    for raw_annotation in _early_bound(view, "IView").GetAnnotations() or ():
-        annotation = _early_bound(raw_annotation, "IAnnotation")
-        if int(annotation.GetType()) != _COSMETIC_THREAD_ANNOTATION:
-            continue
-        annotation.Layer = THREAD_LINE_LAYER
-        if str(annotation.Layer or "") != THREAD_LINE_LAYER:
-            raise RuntimeError("lever Detail A cosmetic thread refused the thread-line layer")
-        shown += 1
-    if shown != 1:
-        raise RuntimeError(f"lever Detail A shows {shown} cosmetic threads, not its one thread")
-    rebuild_drawing(adapter, label="show lever detail thread lines")
+    ]
+    expected = [xy for line in sheet_lines for xy in line]
+    if len(ends) != len(expected) or any(math.dist(got, want) > 1e-6 for got, want in zip(ends, expected)):
+        raise RuntimeError(f"lever {label} thread lines read back {ends}, not {expected}")
 
 
 def _activate(adapter: Any, view: Any) -> None:
@@ -638,7 +657,8 @@ async def build(adapter: Any) -> dict[str, str]:
     thread_note.Visible = 1  # swAnnotationVisible
     if thread_note.Visible != 1:
         raise RuntimeError("native lever thread-detail callout is not visible")
-    _show_detail_thread_lines(adapter, detail)
+    _sketch_thread_lines(adapter, detail, label="Detail A")
+    _sketch_thread_lines(adapter, front, label="front")
     free_end = _free_end_face(adapter, front, annotations)
     add_attached_note(adapter, front, text=FREE_END_CALLOUT, entity=free_end, attached_to=free_end, note_xy=(0.030, 0.185), label="free end hemisphere", entity_type="FACE")
     seat_pick = model_point_in_view(adapter, front, (0.040, ROD_DIA / 4000.0, 0.0), label="whole-body screw seat finish")
