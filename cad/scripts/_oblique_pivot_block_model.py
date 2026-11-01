@@ -176,14 +176,19 @@ async def _cbore_floor_reference(adapter) -> list[tuple[str, str]]:
         f"{feature} floor height",
     )
     dims.record("CboreFloor", '"CboreFloor"')
-    # The block height on the +Y face, where B-B prints it: the Block
-    # extrusion's own depth does not import into a removed section.
-    side_foot = to_sketch((spec.CBORE_SECTION_X, spec.BLOCK_WIDTH / 2.0, 0.0))
-    side_top = to_sketch((spec.CBORE_SECTION_X, spec.BLOCK_WIDTH / 2.0, spec.BLOCK_HEIGHT))
+    # The block height, printed on B-B: the Block extrusion's own depth does
+    # not import into a removed section. Its line stands strictly inside the
+    # cut face, midway between the counterbore wall and the +Y face: ON that
+    # face (the section's silhouette edge) TL-22's B-B imported CboreFloor
+    # but dropped this dimension (farm rounds 1 and 3), while TL-32's
+    # imported both from the same sketch.
+    y_side = (BOLT_Y + spec.CBORE_DIA / 2.0 + spec.BLOCK_WIDTH / 2.0) / 2.0
+    side_foot = to_sketch((spec.CBORE_SECTION_X, y_side, 0.0))
+    side_top = to_sketch((spec.CBORE_SECTION_X, y_side, spec.BLOCK_HEIGHT))
     side = await _construction(adapter, adapter.add_line(side_foot[0], side_foot[1], side_top[0], side_top[1]),
-                               f"{feature} +Y face")
-    check(f"{feature} +Y face along Z", await adapter.add_sketch_constraint(side, None, "horizontal"))
-    await anchor_point_to_origin(adapter, f"{side}.start", *side_foot, f"{feature} +Y face foot")
+                               f"{feature} block height")
+    check(f"{feature} block height along Z", await adapter.add_sketch_constraint(side, None, "horizontal"))
+    await anchor_point_to_origin(adapter, f"{side}.start", *side_foot, f"{feature} block height foot")
     dims.record("SectionSideY")
     await dimension_between(adapter, f"{side}.start", f"{side}.end", "horizontal_distance",
                             spec.BLOCK_HEIGHT, f"{feature} block height")
@@ -384,7 +389,7 @@ async def build_block_model(adapter, part) -> None:
         name_last_feature(adapter,"NutFace")
         blank_reference_geometry(adapter,(("NutFace","PLANE"),))
         for profile,dia,depth,feature,names in (
-            ("NutSeatProfile",part.NUT_SEAT_DIA,part.NUT_SPIGOT_DEPTH,"NutSeat",("NutAxisZ","NutAxisY","NutSeatDia")),
+            ("NutSeatProfile",part.NUT_SEAT_DIA,part.NUT_RECESS_DEPTH,"NutSeat",("NutAxisZ","NutAxisY","NutSeatDia")),
             ("NutClearanceProfile",part.SCREW_CLEARANCE_DIA,part.LUG_WIDTH*2,"NutClearance",("NutClearanceZ","NutClearanceY","NutClearanceDia")),
         ):
             await _circles(adapter,"NutFace",part.NUT_FACE_X,profile,
@@ -399,7 +404,7 @@ async def build_block_model(adapter, part) -> None:
                              for i in range(1,5)])
         # Drill-to-print pattern dimensions on the physical face; no transfer spotting.
         expected -= math.pi*(part.SCREW_CLEARANCE_DIA/2)**2*part.LUG_WIDTH
-        expected -= math.pi*((part.NUT_SEAT_DIA/2)**2-(part.SCREW_CLEARANCE_DIA/2)**2)*part.NUT_SPIGOT_DEPTH
+        expected -= math.pi*((part.NUT_SEAT_DIA/2)**2-(part.SCREW_CLEARANCE_DIA/2)**2)*part.NUT_RECESS_DEPTH
         from _holes import blind_hole_volume_mm3
         expected -= 4*blind_hole_volume_mm3(part.NUT_TAP_DRILL,part.NUT_TAP_DRILL_DEPTH)
         await _nut_pattern_reference(adapter, part)

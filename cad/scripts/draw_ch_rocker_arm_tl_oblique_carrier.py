@@ -1091,9 +1091,9 @@ async def build(adapter: Any) -> dict[str, str]:
     _assert_ream_control(adapter, ream[0])
 
     # Native Hole Wizard callouts, no process words (the base bar's TL-20
-    # convention: "4X Ø2.26 THRU ALL / #4-40 UNC THRU ALL"); the riser taps'
-    # add the function their 3-place stations serve (rule 4), the lever taps
-    # their full-thread shortfall (rule 20).
+    # convention: "4X Ø2.26 THRU ALL / #4-40 UNC THRU ALL"); the CR and riser
+    # taps add the function their 3-place stations serve (rule 4; machinist
+    # review mr3 for CR), the lever taps their full-thread shortfall (rule 20).
     for label, xy, drill, (x, y), thread, function in (
         (
             "CR clamp tap",
@@ -1101,7 +1101,7 @@ async def build(adapter: Any) -> dict[str, str]:
             part_spec.CR_TAP_DRILL,
             part_spec.CR,
             part_spec.CR_THREAD,
-            None,
+            part_spec.CR_TAP_CALLOUT,
         ),
         (
             "riser screw taps",

@@ -18,6 +18,10 @@ from _supplier_screw_dimensions import annotate_supplier_screw, assert_supplier_
 from _supplier_text_shelf import assert_supplier_shelves, shelve_supplier_text
 from _part_properties import part_drawing_unit
 import ch_rocker_arm_tl_vn_oblique_cl_dowel_spec as part
+from _machinist_review_mode import MachinistReviewMode
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_cl_dowel"]
 # The footer's ITEM row: the catalogue designation in plain text.
