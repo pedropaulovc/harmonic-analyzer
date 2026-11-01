@@ -499,22 +499,29 @@ def _enlarged_sheet_angle(model_deg: float) -> float:
 # The span's anvils straddle SPAN_TEETH teeth about their gaps' bisector
 # (paper_drive_stock_native.author_span), model 36 deg, sheet 144 deg.  Its
 # dimension line stands 26 mm out along that bisector, 8 mm past the tips,
-# and its text 19.8 mm along the line up and right, over the teeth: the
+# and its text 18.5 mm along the line up and right, over the teeth: the
 # block (limits and mate row) runs ~6.7 mm under to ~7.3 mm over its point
-# (run 20261101T210436532Z), so it tops out 3.2 mm under the (70.74) text
-# (from 77.8 mm) and stands 3.5 mm over the end of the bisector's
-# construction line (35.9 mm out), which struck the mate row at 5:1.
+# (run 20261101T210436532Z).  At 19.8 mm (run 20261101T214844567Z) it
+# topped out 3.22 mm under the (70.74) text (from 77.8 mm), close enough to
+# read as one callout (the audit wants 3.57); here it stands ~4.3 mm under
+# it and ~2.4 mm over the end of the bisector's construction line (35.9 mm
+# out), which struck the mate row at 5:1.
 SPAN_BISECTOR_SHEET_RAD = _enlarged_sheet_angle(
     GAP_AZIMUTH_DEG + 180.0 * SPAN_TEETH / TEETH
 )
 _SPAN_LINE_OUT = 0.026
-_SPAN_TEXT_ALONG = 0.0198
-# The root envelope's leader runs out along a gap bisector (model 348 deg,
-# sheet 192 deg), so its arrow lands on a gap floor.  Its one-line text
-# (63 mm) is centred on its point, so the point stands far enough out that
-# the text ends 10 mm left of the teeth, under the label.
+_SPAN_TEXT_ALONG = 0.0185
+# The root envelope's one-line text (63 mm) is centred on its point; its
+# leader runs from the shoulder under the text's right end (35 mm right of
+# and 3 mm under the point, run 20261101T214844567Z) toward the axis, so it
+# arrives along a gap bisector (sheet 216 deg, model 324) and its arrow lands
+# on a gap floor.  The point stands out along sheet 192 deg (model 348, also
+# a gap), far enough that the text ends 10 mm left of the teeth, under the
+# label.
 ROOT_LEADER_SHEET_RAD = _enlarged_sheet_angle(GAP_AZIMUTH_DEG + 14 * 360.0 / TEETH)
 _ROOT_TEXT_OUT = 0.0565
+# The root leader's shoulder end, from the root text's point (that run).
+ROOT_SHOULDER_FROM_TEXT = (0.0350, -0.00305)
 ENLARGED_KEEP: dict[str, tuple[float, float]] = {
     "ToothSpan": (
         ENLARGED_CENTER[0]

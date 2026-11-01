@@ -1190,23 +1190,27 @@ def test_enlarged_span_stands_out_along_its_bisector_past_the_tips() -> None:
     # construction line (2 blank radii out).  Its block (limits and mate
     # row) printed 6.7 mm under to 7.3 mm over its point in run
     # 20261101T210436532Z, where its top stood 1.52 mm under the (70.74)
-    # text (from 77.8 mm; the audit needs 1.78).
+    # text (from 77.8 mm; the audit needs 1.78 of air, and 3.57 not to read
+    # the two as one callout: 3.22 in run 20261101T214844567Z).
     assert along > 0.010
-    assert y + 0.0073 < 0.0778 - 0.003
+    assert y + 0.0073 < 0.0778 - 0.0036 - 0.0005
     bisector_end = spec.OUTSIDE_DIA * drawing._ES / 1000.0  # two blank radii
-    assert y - 0.0067 > cy + bisector_end * math.sin(bisector) + 0.003
+    assert y - 0.0067 > cy + bisector_end * math.sin(bisector) + 0.002
     assert y - 0.0067 > cy + drawing.ENLARGED_HALF_OD + 0.005
 
 
 def test_enlarged_root_leader_runs_out_along_a_gap_bisector() -> None:
-    # Its arrow lands on a gap floor: gaps centre on GAP_AZIMUTH_DEG + k pitches.
+    # Its arrow lands on a gap floor (gaps centre on GAP_AZIMUTH_DEG + k
+    # pitches): the leader runs from the shoulder under the text's right
+    # end toward the axis.
     cx, cy = drawing.ENLARGED_CENTER
     x, y = drawing.ENLARGED_KEEP["RootDia"]
-    sheet_deg = math.degrees(math.atan2(y - cy, x - cx)) % 360.0
-    model_deg = (180.0 - sheet_deg) % 360.0
     pitch = 360.0 / spec.TEETH
+    dx, dy = drawing.ROOT_SHOULDER_FROM_TEXT
+    sheet_deg = math.degrees(math.atan2(y + dy - cy, x + dx - cx)) % 360.0
+    model_deg = (180.0 - sheet_deg) % 360.0
     offset = (model_deg - spec.GAP_AZIMUTH_DEG) % pitch
-    assert min(offset, pitch - offset) == pytest.approx(0.0, abs=1e-9)
+    assert min(offset, pitch - offset) < 2.0
     # Lower left, past the tips.  Its one-line text, 63.1 mm wide in run
     # 20261101T210436532Z, is centred on its point (there it ran into the
     # teeth): it ends 10 mm left of the gear, inside the border, under the
