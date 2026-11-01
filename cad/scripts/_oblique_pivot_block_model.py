@@ -107,7 +107,7 @@ def _as_construction(adapter: Any, entity_id: str) -> None:
     if not bool(segment.ConstructionGeometry):
         raise RuntimeError(f"{entity_id} did not take the construction flag")
 
-async def _cbore_floor_reference(adapter) -> list[tuple[str, str]]:
+async def _cbore_floor_reference(adapter, part) -> list[tuple[str, str]]:
     """The hidden sketch carrying the printed counterbore floor height.
 
     Section B-B cuts along Y through the (+13, +13) counterbore (along X its
@@ -176,50 +176,26 @@ async def _cbore_floor_reference(adapter) -> list[tuple[str, str]]:
         f"{feature} floor height",
     )
     dims.record("CboreFloor", '"CboreFloor"')
+    if "SectionBlockHeight" in part.DRAWING_DIMENSIONS[feature]:
+        # TL-32 prints the block height on B-B. Its line stands inside the
+        # cut face, midway between the counterbore wall and the +Y face.
+        # TL-22's B-B never imported it, on or behind the cut plane (farm
+        # rounds 1 to 7), so TL-22 prints the Block extrusion's depth on A-A.
+        y_side = (BOLT_Y + spec.CBORE_DIA / 2.0 + spec.BLOCK_WIDTH / 2.0) / 2.0
+        side_foot = to_sketch((spec.CBORE_SECTION_X, y_side, 0.0))
+        side_top = to_sketch((spec.CBORE_SECTION_X, y_side, spec.BLOCK_HEIGHT))
+        side = await _construction(adapter, adapter.add_line(side_foot[0], side_foot[1], side_top[0], side_top[1]),
+                                   f"{feature} block height")
+        check(f"{feature} block height along Z", await adapter.add_sketch_constraint(side, None, "horizontal"))
+        await anchor_point_to_origin(adapter, f"{side}.start", *side_foot, f"{feature} block height foot")
+        dims.record("SectionSideY")
+        await dimension_between(adapter, f"{side}.start", f"{side}.end", "horizontal_distance",
+                                spec.BLOCK_HEIGHT, f"{feature} block height")
+        dims.record("SectionBlockHeight")
     await ensure_fully_defined(adapter, feature)
     check(f"exit_sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
     return jobs + dims.apply(adapter, feature)
-
-async def _block_height_reference(adapter) -> None:
-    """The hidden sketch carrying the block height B-B prints, on its own
-    plane 0.5 mm behind the cut (B-B looks toward -X, so X < BoltX is the
-    material it keeps): on the cut plane itself, in ``CboreFloorReference``,
-    TL-22's B-B never imported it (farm rounds 1 to 6) while TL-32's did. One
-    construction line from the carriage seat to the top face, midway between
-    the counterbore wall and the +Y face, clear of every feature at X = 13.
-    """
-    from solidworks_mcp.adapters.base import CreatePlaneParameters
-
-    plane, feature, x = spec.BLOCK_HEIGHT_PLANE, spec.BLOCK_HEIGHT_REFERENCE, spec.BLOCK_HEIGHT_SECTION_X
-    check(
-        f"create_plane {plane}",
-        await adapter.create_plane(CreatePlaneParameters(mode="offset", base_plane="Right Plane", offset=x)),
-    )
-    name_last_feature(adapter, plane)
-    blank_reference_geometry(adapter, ((plane, "PLANE"),))
-    check(f"create_sketch {feature}", await adapter.create_sketch(plane))
-    # A Right-plane sketch reads (u, v) = model (-Z, Y) (build_pd_platen).
-    to_sketch = _sketch_mapper(adapter, u_axis=2, v_axis=1, label=feature)
-    origin = to_sketch((x, 0.0, 0.0))
-    if origin != (0.0, 0.0):
-        raise RuntimeError(f"{feature}: sketch origin maps to {origin}")
-    y_side = (BOLT_Y + spec.CBORE_DIA / 2.0 + spec.BLOCK_WIDTH / 2.0) / 2.0
-    foot = to_sketch((x, y_side, 0.0))
-    top = to_sketch((x, y_side, spec.BLOCK_HEIGHT))
-    side = await _construction(adapter, adapter.add_line(foot[0], foot[1], top[0], top[1]),
-                               f"{feature} block height")
-    check(f"{feature} block height along Z", await adapter.add_sketch_constraint(side, None, "horizontal"))
-    dims = SketchDims()
-    await anchor_point_to_origin(adapter, f"{side}.start", *foot, f"{feature} block height foot")
-    dims.record("SectionSideY")
-    await dimension_between(adapter, f"{side}.start", f"{side}.end", "horizontal_distance",
-                            spec.BLOCK_HEIGHT, f"{feature} block height")
-    dims.record("SectionBlockHeight")
-    await ensure_fully_defined(adapter, feature)
-    check(f"exit_sketch {feature}", await adapter.exit_sketch())
-    name_last_feature(adapter, feature)
-    dims.apply(adapter, feature)
 
 
 async def _rectangle(adapter, name, bounds, names, *, anchor=0):
@@ -411,8 +387,7 @@ async def build_block_model(adapter, part) -> None:
         name_last_feature(adapter,feature)
     expected -= 4*math.pi*((spec.HOLE_DIA/2)**2*spec.CBORE_FLOOR+(spec.CBORE_DIA/2)**2*spec.CBORE_DEPTH)
     # Preserve the native carriage-floor reference on the actual section plane.
-    await _cbore_floor_reference(adapter)
-    await _block_height_reference(adapter)
+    await _cbore_floor_reference(adapter, part)
     await _plan_datum_reference(adapter, part)
     if hasattr(part,"NUT_FACE_X"):
         check("nut face plane",await adapter.create_plane(CreatePlaneParameters(mode="offset",base_plane="Right Plane",offset=part.NUT_FACE_X)))
