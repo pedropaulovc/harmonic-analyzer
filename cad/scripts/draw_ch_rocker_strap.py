@@ -99,7 +99,7 @@ ISO_SCALE = (1, 2)
 FRONT_CENTER = (0.185, 0.185)
 RIGHT_CENTER = (0.385, FRONT_CENTER[1])  # projected: same row as the front
 ISO_CENTER = (0.135, 0.082)
-ISO_CAPTION_XY = (0.025, 0.064)
+ISO_CAPTION_XY = (0.105, 0.052)  # centred under the pictorial's low end
 NOTES_XY = (0.020, 0.040)
 
 
