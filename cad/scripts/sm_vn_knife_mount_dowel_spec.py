@@ -34,12 +34,14 @@ from __future__ import annotations
 
 import math
 
+import _config
 from _mcmaster_98381a473 import (
     DIA_BAND_IN,
     ENDS,
     DOWEL_SIZE,
     MM_PER_IN,
 )
+from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
 from _supplier_pin_data import SupplierPinReference
 
@@ -260,6 +262,10 @@ if SLIP_ENGAGEMENT_D_MIN < PRESS_ENGAGEMENT_MIN_D:
 # ``build_sm_summing_assembly`` (KNIFE_DOWEL_TILT_CHARGED_DEG <
 # KNIFE_DOWEL_TILT_ALLOWED_DEG).
 
+# The pin's own sheet unit (#290 drawing_unit): an inch sheet's UNIT: IN
+# names the supplier REFs' unit, so they close without the inch suffix.
+SHEET_UNIT = drawing_unit("parts/sm-vn-knife-mount-dowel", _config.parts("sm-vn-knife-mount-dowel"))
+
 # McMaster engineering drawing inspected 2026-10-19; supplier information
 # only. Installation/finished controls above are intentionally unchanged.
 SUPPLIER_REFERENCE = SupplierPinReference(
@@ -271,4 +277,5 @@ SUPPLIER_REFERENCE = SupplierPinReference(
     diameter_precision=4,
     length_precision=2,
     diameter_band=(0.0001, 0.0003),
+    sheet_unit=SHEET_UNIT,
 )

@@ -2922,6 +2922,7 @@ def test_config_deps_are_fine_grained():
         "parts/_defaults.yaml",
         "parts/sm-summing-lever.yaml",
         "parts/sm-vn-knife-hanger-stud.yaml",
+        "parts/sm-vn-knife-mount-dowel.yaml",
     }
     assert not any(
         t.startswith("parts/") and t not in drawing_unit_rows for t in frame_recipe
