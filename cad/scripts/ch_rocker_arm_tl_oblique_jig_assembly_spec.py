@@ -1457,8 +1457,10 @@ def _item(stem: str) -> str:
     return f"(ITEM {ITEM_NUMBERS[stem]})"
 
 
-# TL-21 supplies centre spots; fit doc F16 (HUB, the purchased .4000 reamer)
-# and F19 (CL, the owned .2490 reamer) size the finished holes.
+# TL-21 supplies the CL spot; the HUB is drilled in situ from the apex
+# (owner ruling 5, option A, 2026-11-01: carrier HUB_RADIAL_STACK). Fit doc
+# F16 (HUB, the purchased .4000 reamer) and F19 (CL, the owned .2490 reamer)
+# size the finished holes.
 _HUB_HOLE = (
     f"HUB Ø{_length(carrier.HUB_HOLE_LIMITS[0], 4)}-"
     f"{_length(carrier.HUB_HOLE_LIMITS[1], 4)} THRU, BONDED LOCATOR "
@@ -1514,10 +1516,14 @@ ASSEMBLY_STEPS = (
     "H THROUGH THE COMPLETE INNER-PASS HAND SWEEP USING THE HANDWHEEL.",
     # The carrier stays on its A1/B1 seats from step 9 to 13A: HUB and CL are
     # finished in place on the running jig (carrier spec) and nothing removes
-    # it before 13A.
+    # it before 13A. The HUB is set from the spindle origin (the apex) by
+    # the printed offset, so the pin spacing moves it with the cut.
     f"10. WITH THE CARRIER {_item(CARRIER)} STILL ON A1/B1 THROUGH STEP 11, "
-    "DRILL AND REAM THE HUB AND CL HOLES OFF THEIR SPOTS, IN ONE SETUP "
-    f"SQUARE TO THE CARRIER TOP: {_HUB_HOLE}; {_CL_HOLE}.",
+    "FEED IT TO THE SYMMETRIC POSITION AND RUN THE TABLE UNTIL THE DRO READS "
+    f"X 0, Y {_length(carrier.HUB_OFFSET_PRINTED, carrier.HUB_OFFSET_PLACES)} "
+    f"±{_length(carrier.HUB_OFFSET_BAND, carrier.HUB_OFFSET_PLACES)}. "
+    "MATCH-DRILL AND REAM THE HUB THERE, THEN THE CL HOLE OFF ITS SPOT, IN "
+    f"ONE SETUP SQUARE TO THE CARRIER TOP: {_HUB_HOLE}; {_CL_HOLE}.",
     "11. CLAMP THE RISER ON THE CARRIER AND SPOT ITS "
     f"{len(riser.SCREW_HOLES) + 3} HOLES FROM BELOW THROUGH THE FINISHED CARRIER "
     "HOLES; FINISH TO MHA-CH-06-TL-24 AND FIT WITH "
