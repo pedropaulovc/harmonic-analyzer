@@ -259,10 +259,11 @@ def test_hub_station_moves_the_strap_pivot_inside_its_top_edge_band() -> None:
 
 def test_three_place_hub_and_cr_stations_state_true_functions() -> None:
     """mr4: 8.861 and CR's 15.195/1.156 printed 3-place with no stated
-    function. HubX puts the HUB on the A1-B1 midline; CR is CL mirrored about
-    that line, so the CR callout (whose lanes hold no row) names it."""
-    a1, b1 = spec.PIN_HOLES["A1"], spec.PIN_HOLES["B1"]
-    assert spec.HUB[0] == pytest.approx((a1[0] + b1[0]) / 2.0)
+    function. HubX runs to the HUB spot (mr8: named by the spot's callout,
+    not the undefined A1-B1); CR is CL mirrored about the tap axis, so the
+    CR callout (whose lanes hold no row) names it."""
+    assert spec.STATIONS["HubX"] == spec.HUB
+    assert spec.HUB[0] == trammel.ARC_CENTRE[0] == 0.0
     assert spec.CR == pytest.approx((-spec.CL[0], spec.CL[1]))
 
 
