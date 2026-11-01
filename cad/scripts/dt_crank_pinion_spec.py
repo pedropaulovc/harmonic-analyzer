@@ -429,15 +429,17 @@ if (
 # The print locates the match-drilled hole from the boss's north face, the
 # faced end whose wall the hole must keep (drawing-guidelines.md rule 10: a
 # centre from a real feature, never "mid-length" in words; machinist review
-# r1 of #1652). At that dimension's own .XXX row the hole still keeps the W15
-# floor to the north face.
+# r1 of #1652). It carries the layout allowance the boss length budgets as
+# its own band, and at that band the hole still keeps the W15 floor to the
+# north face.
 PIN_FROM_BOSS_END = BOSS_LENGTH / 2.0
 PIN_FROM_BOSS_END_PLACES = BOSS_LENGTH_PLACES + 1
+PIN_FROM_BOSS_END_TOL = PIN_STATION_LAYOUT_ALLOWANCE_MM
 if not prints_exactly(PIN_FROM_BOSS_END, PIN_FROM_BOSS_END_PLACES):
     raise AssertionError("the pin's station from the boss end does not print exactly")
 PIN_FROM_BOSS_END_LIGAMENT_WORST = (
     PIN_FROM_BOSS_END
-    - printed_band_mm(PIN_FROM_BOSS_END_PLACES, unit=UNIT)
+    - PIN_FROM_BOSS_END_TOL
     - PIN_DIA / 2.0
     - _PIN_HOLE_RADIUS_GROWTH
 )
@@ -677,9 +679,6 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
 
 
 
-# The title block's edge break would erase fine tooth edges; this is the
-# part-specific override, not a duplicate instruction for cutting the teeth.
-TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
 # The drive-train fit-up may turn the band down past its printed band (the
 # T120 feeler check, MHA-DT-00's crank step), and only when the band itself
 # fails that check (a shoulder failure is the shoulder's to correct); the
@@ -717,7 +716,7 @@ TOOTH_RUNOUT_NOTE = (
 )
 if not BOSS_DIA <= ROOT_DIA_MIN:
     raise AssertionError("the 16T boss must be turned to the root for the cutter runout")
-DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, TOOTH_RUNOUT_NOTE))
+DRAWING_NOTES = TOOTH_RUNOUT_NOTE
 # The MHA-DT-00 crank step's T120 check (user, 2026-09-30, #1154), printed by
 # draw_dt_drive_train_assembly: the pinion on its seat feeler, MHA-DT-10 and T120
 # pushed toward each other (taking up every running play), turned by hand and
