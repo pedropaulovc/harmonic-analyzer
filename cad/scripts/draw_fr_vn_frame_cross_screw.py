@@ -21,6 +21,9 @@ from _mcmaster_90280a837 import (
     SUPPLIER_REFERENCE_SIDES,
     SUPPLIER_REFERENCE_STARTS,
 )
+from _machinist_review_mode import MachinistReviewMode
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["fr_vn_frame_cross_screw"]
