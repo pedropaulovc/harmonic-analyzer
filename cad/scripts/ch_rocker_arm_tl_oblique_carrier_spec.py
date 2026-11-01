@@ -287,8 +287,17 @@ CR_HEAD_DIA_MAX = 0.375 * trammel.INCH  # ASME B18.3 1/4 SHCS
 CR_HEAD_CLEAR_DIA = 12.0  # clears both cutter paths
 if CR_HEAD_DIA_MAX > CR_HEAD_CLEAR_DIA:
     raise AssertionError("the CR clamp screw head fouls a cutter path")
-# Machinist review mr3: the tap names what its kinematic station serves.
-CR_TAP_CALLOUT = f"CLAMPS {STRAP_NUMBER}"
+# Machinist review mr3: the tap names what its kinematic station serves; mr4:
+# and why its 15.195 and 1.156 are 3-place: CR is CL mirrored about the tap
+# axis (the strap blank's two end-waste stations on the hub radius). The
+# callout carries it for both: the CrY lane has no room for a row (between the
+# pin line and CR, the HUB lane 9.5 sheet mm right), and a row on the CrX lane
+# would cross the RiserX2R and CrX extension lines, 20.6 sheet mm apart.
+CR_STATION_FUNCTION = "MIRRORS CL STATION"
+CR_TAP_CALLOUT = f"CLAMPS {STRAP_NUMBER}\n{CR_STATION_FUNCTION}"
+# mr4: HubX's 8.861 is 3-place because it puts the HUB spot (and the lever
+# taps) on the A1-B1 midline, the cut's centre line.
+HUB_STATION_CALLOUT = "MIDWAY A1-B1"
 
 RISER_SCREWS = trammel.RISER_SCREWS
 RISER_THREAD = "#4-40"
@@ -488,6 +497,7 @@ CALLOUTS_BELOW = {
     **SPOT_CALLOUTS,
     "PinChamferSize": PIN_CHAMFER_CALLOUT,
     **{name: RISER_STATION_CALLOUT for name in RISER_STATIONS},
+    "HubX": HUB_STATION_CALLOUT,
 }
 _SPOT_SUFFIX = f" X {SPOT_ANGLE:.0f}\u00b0"
 CALLOUT_SUFFIXES = {"SpotDia": _SPOT_SUFFIX, "SpotDiaCl": _SPOT_SUFFIX}

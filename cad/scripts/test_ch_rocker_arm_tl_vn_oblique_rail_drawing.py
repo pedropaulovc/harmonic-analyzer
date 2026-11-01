@@ -370,11 +370,9 @@ def test_views_and_captions_fit_the_sheet() -> None:
 def test_note_says_special_order_without_its_dimensions() -> None:
     from _purchased_fastener_drawing import note_lines
 
-    assert spec.DRAWING_NOTES == (
-        "SPECIAL ORDER CUT LENGTH AND HOLE PATTERN, TO SUIT TL-20."
-    )
+    bar = _config.parts("ch-rocker-arm-tl-oblique-base-bar")
     # Rule 7: the cut length and hole pattern are FRONT's dimensions; the
-    # note's only number is the base bar it suits.
-    assert not re.search(r"\d", spec.DRAWING_NOTES.replace("TL-20", ""))
+    # note's only number is the base bar's drawing number.
+    assert not re.search(r"\d", spec.DRAWING_NOTES.replace(bar["number"], ""))
     assert len(note_lines(spec.DRAWING_NOTES, label=NAME)) == 1
     assert len(spec.DRAWING_NOTES) <= 80

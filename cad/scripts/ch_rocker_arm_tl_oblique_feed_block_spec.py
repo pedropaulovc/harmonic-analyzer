@@ -83,9 +83,11 @@ DRAWING_DIMENSIONS = dict(pivot.DRAWING_DIMENSIONS) | {
 # in X/Y on its bracket, never in Z.
 NUT_PATTERN_PLACES = 3
 NUT_SEAT_PLACES = 2
+# The leadscrew clearance is drilled: inch drill sizes print three places.
+THREE_PLACE_DIMENSIONS = pivot.THREE_PLACE_DIMENSIONS | {"NutClearanceDia"}
 DRAWING_PRECISION = dict(pivot.DRAWING_PRECISION) | {
     feature: {
-        name: (3 if name in pivot.THREE_PLACE_DIMENSIONS or feature == "NutPatternReference" else 2)
+        name: (3 if name in THREE_PLACE_DIMENSIONS or feature == "NutPatternReference" else 2)
         for name in DRAWING_DIMENSIONS[feature]
     }
     for feature in (PLAN_DATUM_REFERENCE, "LugProfile", "NutSeatProfile", "NutClearanceProfile", "NutPatternReference")
