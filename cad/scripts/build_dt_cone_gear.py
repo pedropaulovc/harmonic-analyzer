@@ -258,6 +258,7 @@ async def _author_gap_floor_reference(adapter: Any) -> SketchDims:
     return floor
 
 
+@_telemetry.traced("part.cone_gear.t012_web_reference")
 async def _author_web_reference(adapter: Any) -> None:
     """RV-03's accepted T012 web, stated natively (rule 20): a construction
     ray from the axis to the largest printed T012 bore, then the web itself,

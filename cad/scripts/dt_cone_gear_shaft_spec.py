@@ -8,6 +8,7 @@ import cone_line
 import dt_cone_pivot_post_spec
 import dt_cone_tip_block_spec
 
+from _fit_deviations import deviations
 from _gtol_cylinder import CylinderFace
 from _inch_wall_limits import WALL_FLOOR_MM
 from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm, printed_deviations
@@ -445,6 +446,11 @@ SECTION_KNOBS = tuple(
 # geometry, round root and flat root alike, and dimensioned once, not written
 # as a process note.
 FILLET_RADIUS = 0.1016  # .004
+# The setback books the root's run at its printed maximum, so the radius
+# carries its own band, R.004 +.000/-.002: never over .004 (the title block's
+# +-.005 would let a .009 root reach the smaller gear; Codjiflo P2 on #2107)
+# and never sharp.
+FILLET_R_BAND = (0.0, -0.0508)  # (upper, lower): +.000/-.002 in
 # Three identical land-step roots (the collar's roots stay sharp,
 # build_dt_cone_gear_shaft), one fillet feature, one radius dimension.
 FILLET_CALLOUT = "3X"
@@ -587,13 +593,20 @@ _LENGTH_NOMINALS = {
     "CollarWidth": COLLAR_THICKNESS,
     "ShoulderR": FILLET_RADIUS,
 }
+# Lengths that carry their own band instead of the title block's.
+_LENGTH_BANDS = {"ShoulderR": FILLET_R_BAND}
 
 
 def printed_length_deviations(name: str) -> tuple[float, float]:
     """(lower, upper) mm about the model of a marked length's printed limits:
-    the inch value the sheet prints, with its title-block band."""
+    the inch value the sheet prints, with its own band or the title block's."""
+    band = _LENGTH_BANDS.get(name)
+    if band is None:
+        return printed_deviations(
+            _LENGTH_NOMINALS[name], DRAWING_PRECISION_BY_NAME[name], unit=UNIT
+        )
     return printed_deviations(
-        _LENGTH_NOMINALS[name], DRAWING_PRECISION_BY_NAME[name], unit=UNIT
+        _LENGTH_NOMINALS[name], DRAWING_PRECISION_BY_NAME[name], deviations(band), unit=UNIT
     )
 
 
@@ -622,7 +635,7 @@ if JOURNAL_SUPPORT_SPAN_MIN_MM <= 0.0:
 # The setback proof (user ruling 2026-09-28).  Each step and its root fillet
 # must stay south of the smaller gear's south face -- the larger gear's north
 # face -- with the stack pushed onto the collar at its shortest: the step at
-# the north end of its printed limits, the fillet's .004 run
+# the north end of its printed limits, the fillet's R.004 +.000 run
 # along the smaller land, the collar web's printed short limit (the stack
 # stands on the collar's north face, the steps are measured from its south
 # face), the stack's own shortfall up to that face
@@ -637,7 +650,7 @@ for _name, _j, _end in zip(("Sec1End", "Sec2End", "Sec3End"), SEAT_STEP_GEARS, S
         raise AssertionError(f"{_name} is not one setback behind gear {_j}'s north face")
     _terms = {
         "step band": printed_length_deviations(_name)[1],
-        "fillet": FILLET_RADIUS,
+        "fillet": FILLET_RADIUS + printed_length_deviations("ShoulderR")[1],
         "collar band": -printed_length_deviations("CollarWidth")[0],
         "stack": -face_band(_j, "north")[1],
         "spare": MARGIN_SPARE,

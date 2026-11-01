@@ -98,6 +98,7 @@ from dt_cone_gear_shaft_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     FILLET_RADIUS,
+    FILLET_R_BAND,
     FLAT_AF_BAND,
     FLAT_LANDS,
     FLAT_OFFSETS,
@@ -401,6 +402,15 @@ async def build(adapter) -> dict[str, str]:
             places=DRAWING_PRECISION[f"Sec{land}FlatProfile"][f"Sec{land}AF"],
             display_unit=UNIT,
         )
+    # The step roots' R.004 +.000/-.002: the setback books its maximum.
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "ShoulderFillets",
+        "ShoulderR",
+        *deviations(FILLET_R_BAND),
+        places=DRAWING_PRECISION["ShoulderFillets"]["ShoulderR"],
+        display_unit=UNIT,
+    )
     # Display precision is model-owned too (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

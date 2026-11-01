@@ -79,6 +79,7 @@ def test_section_fits_are_toleranced_on_the_model() -> None:
     assert model_toleranced_dimensions(part) == {
         ("f'Sec{section}Profile'", "f'Sec{section}Dia'"): "*deviations(band)",
         ("f'Sec{land}FlatProfile'", "f'Sec{land}AF'"): "*deviations(FLAT_AF_BAND)",
+        ("ShoulderFillets", "ShoulderR"): "*deviations(FILLET_R_BAND)",
     }
 
 
@@ -1288,6 +1289,11 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     # Its run along the smaller land is booked in every step's setback.
     for budget in dt_cone_gear_shaft_spec.SEAT_STEP_BUDGET.values():
         assert budget["fillet"] == dt_cone_gear_shaft_spec.FILLET_RADIUS
+    # Its own band, never the title block's +-.005: the setback books the
+    # printed maximum, which is the model radius, and the root is never sharp.
+    assert dt_cone_gear_shaft_spec.printed_length_deviations("ShoulderR") == pytest.approx(
+        (-0.0508, 0.0)
+    )
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "add_fillet(FILLET_RADIUS, fillet_edges, propagate=False)" in source
     assert 'name_last_feature(adapter, "ShoulderFillets")' in source
