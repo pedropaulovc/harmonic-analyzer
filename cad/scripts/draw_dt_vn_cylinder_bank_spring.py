@@ -113,6 +113,8 @@ ARROW_WIDTH_M = 0.000762
 TEXT_HEIGHT_M = 0.0035
 HEIGHT_TEXT_WIDTH_M = 0.0201493
 DIAMETER_TEXT_WIDTH_M = 0.0030139 + 0.0052784 + 0.0300417
+# swLeaderLineVisibility_e.swLeaderLineNone.
+LEADER_LINE_NONE = 3
 
 
 def _centre(bounds: tuple[float, float, float, float]) -> tuple[float, float]:
@@ -264,6 +266,13 @@ def place_size_texts(
         set_near_side_diameter(
             displays[name].GetAnnotation(), f"{supplier_spec.SKU} {name}"
         )
+        # The near-side style still drew the OD's diametral line from its
+        # pick point out under its text (inch sheet, probe runs
+        # 20261101T080511257Z / 20261101T085835012Z); none keeps the arrow,
+        # bend and shelf.
+        _early_bound(displays[name], "IDisplayDimension").LeaderVisibility = (
+            LEADER_LINE_NONE
+        )
     for name, (x, y) in positions.items():
         annotation = _early_bound(displays[name].GetAnnotation(), "IAnnotation")
         if not annotation.SetPosition2(x, y, 0.0):
@@ -390,6 +399,12 @@ def supplier_dimensions(
                 label=name,
             )
             _assert_source_band(display, field)
+        for name in TEXT_SIDES["free_top"]:
+            display = _early_bound(displays[name], "IDisplayDimension")
+            if int(display.LeaderVisibility) != LEADER_LINE_NONE:
+                raise RuntimeError(
+                    f"{supplier_spec.SKU} {name}: diametral leader line is showing"
+                )
 
     settled_checks.append(check_settled_references)
 

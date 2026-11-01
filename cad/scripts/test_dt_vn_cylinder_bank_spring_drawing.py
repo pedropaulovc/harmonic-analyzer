@@ -355,9 +355,16 @@ def test_sizes_import_at_their_stations_and_settle_under_the_shared_contract(
         calls.append(("import", dict(stations)))
         return references
 
+    leaders = {"SupplierID": drawing.LEADER_LINE_NONE, "SupplierOD": drawing.LEADER_LINE_NONE}
+
     def reacquire(_adapter, views, *, expected, configurations):
         calls.append(("reacquire", expected, configurations))
-        return {name: name for _key, name, _args, _field in references}
+        return {
+            name: SimpleNamespace(LeaderVisibility=leaders.get(name))
+            for _key, name, _args, _field in references
+        }
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda display, _kind: display)
 
     monkeypatch.setattr(drawing, "_import_sizes", import_sizes)
     monkeypatch.setattr(
@@ -409,6 +416,9 @@ def test_sizes_import_at_their_stations_and_settle_under_the_shared_contract(
     }
     assert configurations["installed_iso"] == "Default"
     assert len(asserted) == 3 * len(references)
+    leaders["SupplierOD"] = 0
+    with pytest.raises(RuntimeError, match="SupplierOD: diametral leader line is showing"):
+        check()
 
 
 def test_size_text_positions_come_from_the_spec_sizes_and_view_scale() -> None:
@@ -504,6 +514,8 @@ def test_each_size_text_is_one_position_write_inside_one_span(
         def __setattr__(self, key, value):
             if key == "OffsetText":
                 calls.append(("offset", self.name, value))
+            if key == "LeaderVisibility":
+                calls.append(("leaders", self.name, value))
             super().__setattr__(key, value)
 
         def GetAnnotation(self):
@@ -528,7 +540,11 @@ def test_each_size_text_is_one_position_write_inside_one_span(
         "set_near_side_diameter",
         lambda annotation, _label: calls.append(("near side", annotation.name)),
     )
-    monkeypatch.setattr(drawing, "_early_bound", lambda display, _kind: write(display))
+    monkeypatch.setattr(
+        drawing,
+        "_early_bound",
+        lambda display, kind: display if kind == "IDisplayDimension" else write(display),
+    )
     bounds = {"free_front": FRONT_BOUNDS, "free_top": PLAN_BOUNDS}
     name = "drawing.cylinder_bank_spring.size_texts"
 
@@ -552,7 +568,9 @@ def test_each_size_text_is_one_position_write_inside_one_span(
         == [
             ("offset", "SupplierFreeHeight", True),
             ("near side", "SupplierID"),
+            ("leaders", "SupplierID", drawing.LEADER_LINE_NONE),
             ("near side", "SupplierOD"),
+            ("leaders", "SupplierOD", drawing.LEADER_LINE_NONE),
         ]
     )
     assert len(writes) == 3 and all(inside == [name] for *_, inside in writes)
