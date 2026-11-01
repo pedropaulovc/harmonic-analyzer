@@ -982,10 +982,10 @@ def _assert_spring_mount(
         )
         - ch_anchor_jam_nut_spec.OD_MAX
     )
-    if nut_gap < spring_mounts.MIN_CLEARANCE_MM:
+    if nut_gap < ch_anchor_jam_nut_spec.NEIGHBOUR_CLEARANCE:
         raise RuntimeError(
             f"neighbouring channel anchor jam nuts clear by {nut_gap:.4f} mm, "
-            f"under {spring_mounts.MIN_CLEARANCE_MM} mm"
+            f"under {ch_anchor_jam_nut_spec.NEIGHBOUR_CLEARANCE} mm"
         )
     spring_bottom = (
         pose.lower_eye_xy[1] - uy * spring_stock.COIL_MEAN_RADIUS_MM - wire_r

@@ -18,4 +18,4 @@ ch-anchor-jam-nut:
       kind: "minor"
       where: "side view, above the O.D.: WALL .060 MIN"
       finding: "wall from the #6-32 major to the O.D. below the .080 target (rule 17)"
-      reason: "owner ruling 2026-10-17: the twenty nuts stand side by side at the .278 channel pitch, so the O.D. band sits between the .060 wall floor and the 0.25 mm modelling clearance to the neighbouring MHA-CH-14; .060 MIN at the smallest printed O.D. holds the rule 17 floor, and a jam nut that carries no load needs no more"
+      reason: "owner ruling 2026-10-17: the twenty nuts stand side by side at the .278 channel pitch, so the O.D. band sits between the .060 wall floor and the 0.249 mm clearance to the neighbouring MHA-CH-14 under the Ø.006 tap position zone; .060 MIN at the smallest printed O.D. holds the rule 17 floor, and a jam nut that carries no load needs no more"
