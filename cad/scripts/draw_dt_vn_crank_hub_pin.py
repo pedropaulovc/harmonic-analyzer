@@ -1,7 +1,8 @@
 r"""Create the curated manufacturing drawing for MHA-DT-VN-59.
 
-The pin is a plain straight gauge pin.  Its two native dimensions define the
-part; the linked assembly note defines the match-reamed light drive fit and
+The pin is a McMaster-Carr 98381A487 dowel cut to length.  Its diameter
+prints as the supplier's fraction reference, its length at the title block's
+.XX; the linked assembly note defines the match-reamed light drive fit and
 six-o'clock axial installation without inventing independent receiver sizes.
 """
 
@@ -11,9 +12,14 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
 
 from _check import check
+from _com import _early_bound
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -23,18 +29,21 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_reference_dimensions
+from _drawing_dimensions import assert_imported_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
+from _supplier_dimensions import supplier_reference_dimension
 import _telemetry
 from dt_vn_crank_hub_pin_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIN_DIA,
-    REFERENCE_DIMENSIONS,
+    STOCK_FRACTION_DENOMINATOR,
+    STOCK_FRACTION_DIMENSIONS,
 )
 
 
@@ -87,7 +96,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -115,7 +128,19 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    set_reference_dimensions(adapter, annotations, REFERENCE_DIMENSIONS)
+    for name, value_mm in STOCK_FRACTION_DIMENSIONS.items():
+        matches = [a for a in annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one MHA-DT-VN-59 {name}, got {len(matches)}")
+        supplier_reference_dimension(
+            adapter,
+            _early_bound(matches[0], "IAnnotation").GetSpecificAnnotation(),
+            label=f"MHA-DT-VN-59 supplied {name}",
+            units="in",
+            precision=0,
+            expected_mm=value_mm,
+            fraction_denominator=STOCK_FRACTION_DENOMINATOR,
+        )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to MHA-DT-VN-59 end view")
     add_view_centerline(

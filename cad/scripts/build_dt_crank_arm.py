@@ -57,7 +57,6 @@ from dt_crank_arm_spec import (
     ARM_THICKNESS,
     ARM_WIDTH,
     AXIAL_PIN_DIA,
-    AXIAL_PIN_LENGTH,
     AXIAL_PIN_X,
     AXIAL_PIN_Y,
     DRAWING_NOTES,
@@ -71,6 +70,7 @@ from dt_crank_arm_spec import (
     HANDLE_PIVOT_HOLE_SPEC,
     HUB_SEAT_DIA,
     ISOMETRIC_VIEW_NOTE,
+    SEAM_DEPTH,
     SURFACE_FINISHES,
 )
 from crank_native_acceptance import assert_signed_circle_center
@@ -116,7 +116,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ArmThickness", f"{ARM_THICKNESS}mm")
     await set_global(adapter, "HubSeatDia", f"{HUB_SEAT_DIA}mm")
     await set_global(adapter, "AxialPinDia", f"{AXIAL_PIN_DIA}mm")
-    await set_global(adapter, "AxialPinLength", f"{AXIAL_PIN_LENGTH}mm")
+    await set_global(adapter, "SeamDepth", f"{SEAM_DEPTH}mm")
     await set_global(adapter, "FiducialDia", f"{FIDUCIAL_MODEL_DIA}mm")
     await set_global(adapter, "FiducialDepth", f"{FIDUCIAL_MODEL_DEPTH}mm")
     # Sketch distance dimensions are unsigned magnitudes; the negative seeded
@@ -332,7 +332,7 @@ async def build(adapter) -> dict[str, str]:
     check(
         "cut axial seam groove",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=AXIAL_PIN_LENGTH)
+            ExtrusionParameters(depth=SEAM_DEPTH)
         ),
     )
     name_last_feature(adapter, "AxialPinGroove")
@@ -340,7 +340,7 @@ async def build(adapter) -> dict[str, str]:
     expected_arm_groove = (
         math.pi * (AXIAL_PIN_DIA / 2.0) ** 2
         - lens_area(AXIAL_PIN_DIA / 2.0, HUB_SEAT_DIA / 2.0)
-    ) * AXIAL_PIN_LENGTH
+    ) * SEAM_DEPTH
     if abs((before_axial_groove - vol) - expected_arm_groove) > max(
         0.5, 0.02 * expected_arm_groove
     ):

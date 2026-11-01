@@ -29,8 +29,8 @@ def test_required_drawing_paths() -> None:
 
 def test_arm_is_a_matched_receiver_for_the_separate_hub() -> None:
     assert spec.ARM_WIDTH == geometry.ARM_WIDTH == pytest.approx(25.4)
-    assert spec.ARM_THICKNESS == geometry.ARM_THICKNESS == 8.0
-    assert spec.HUB_SEAT_DIA == geometry.HUB_SEAT_DIA == 19.4
+    assert spec.ARM_THICKNESS == geometry.ARM_THICKNESS == pytest.approx(7.9375)
+    assert spec.HUB_SEAT_DIA == geometry.HUB_SEAT_DIA == pytest.approx(0.76 * 25.4)
     assert spec.HALF_WIDTH == pytest.approx(12.7)
     # The arm bore is made first; the hub is turned to suit it for the F10
     # light press, .0004-.0012 in diametral.
@@ -39,13 +39,17 @@ def test_arm_is_a_matched_receiver_for_the_separate_hub() -> None:
     assert not hasattr(spec, "PIN_HOLE_SPEC")
 
 
-def test_axial_seam_key_is_six_oclock_and_stops_halfway_through_arm() -> None:
-    assert spec.AXIAL_PIN_DIA == geometry.AXIAL_PIN_DIA == 4.0
-    assert spec.AXIAL_PIN_LENGTH == geometry.AXIAL_PIN_LENGTH == spec.ARM_THICKNESS / 2.0
-    assert spec.AXIAL_PIN_X == geometry.AXIAL_PIN_RADIUS_FROM_AXIS == 9.7
+def test_axial_seam_key_is_six_oclock_and_the_cut_pin_seats_flush() -> None:
+    assert spec.AXIAL_PIN_DIA == geometry.AXIAL_PIN_DIA == pytest.approx(5 / 32 * 25.4)
+    # The seam runs deeper than the cut pin at every printed limit, and stops
+    # inside the thinnest arm.
+    band = geometry.GENERAL_2PL_TOL_MM
+    assert spec.SEAM_DEPTH - band >= geometry.AXIAL_PIN_LENGTH + band - 1e-9
+    assert spec.SEAM_DEPTH + band < geometry.ARM_STOCK_THICKNESS_MIN
+    assert spec.AXIAL_PIN_X == geometry.AXIAL_PIN_RADIUS_FROM_AXIS == spec.HUB_SEAT_DIA / 2.0
     assert spec.AXIAL_PIN_Y == 0.0
     assert drive.CRANK_HUB_PIN_ORIGIN == pytest.approx(
-        [drive.X_CRANK, drive.Y_CRANK - 9.7, drive.CRANK_FACE_Z]
+        [drive.X_CRANK, drive.Y_CRANK - spec.AXIAL_PIN_X, drive.CRANK_FACE_Z]
     )
     assert drive.CRANK_HUB_PIN_ROWS == drive.IDENTITY
 
@@ -131,14 +135,15 @@ def test_anchor_callout_defers_thread_class_to_title_block() -> None:
 def test_assembly_keeps_common_face_and_established_inboard_stations() -> None:
     assert drive.CRANK_FACE_Z == -183.0
     assert drive.CRANKSHAFT_Z0 == drive.CRANK_HUB_Z0 == drive.CRANK_ARM_Z0 == -183.0
-    assert drive.CRANK_ARM_ORIGIN_Z == -175.0
-    # MHA-DT-09 moved 1.6 inboard with the drawing-guidelines.md rule 17 (walls and webs) hub station (13.6).
-    assert drive.CRANK_PIN_Z == pytest.approx(-169.4)
-    # The hub rear reaches the removable: 0.7 air to its front face.
-    assert drive.CRANK_HUB_REAR_Z == pytest.approx(-157.8)
+    assert drive.CRANK_ARM_ORIGIN_Z == pytest.approx(-183.0 + spec.ARM_THICKNESS)
+    # MHA-DT-09 stands the hub's .22 station behind the arm shoulder.
+    assert drive.CRANK_PIN_Z == pytest.approx(-183.0 + 7.9375 + 5.588)
+    # The hub rear reaches the removable: the .990 hub's 0.754 air to its
+    # front face.
+    assert drive.CRANK_HUB_REAR_Z == pytest.approx(-183.0 + 25.146)
     assert (
         seat_geometry.BAND_FRONT_Z - drive.CRANK_HUB_REAR_Z
-        == pytest.approx(0.7)
+        == pytest.approx(0.754)
     )
     # Owner ruling D1 (2026-10-15): the shaft end stands proud of the pinion's
     # north face by the spec's stack, past the match-drilled pin.
@@ -376,9 +381,8 @@ def _thinnest_accepted_arm() -> float:
     A toleranced 8.0 takes the title block's .X band. A reference (8.0) under
     the "AS SUPPLIED" stock line leaves the bar's own mill tolerance.
     """
-    if "Depth" in getattr(spec, "REFERENCE_DIMENSIONS", frozenset()):
-        return geometry.ARM_STOCK_THICKNESS_MIN
-    return spec.ARM_THICKNESS - geometry.GENERAL_1PL_TOL_MM
+    assert "Depth" in spec.STOCK_FRACTION_DIMENSIONS
+    return geometry.ARM_STOCK_THICKNESS_MIN
 
 
 def test_engagement_rule_holds_at_the_thinnest_accepted_arm() -> None:
@@ -397,10 +401,13 @@ def test_engagement_rule_holds_at_the_thinnest_accepted_arm() -> None:
     assert screw.FULL_THREAD_WORST == pytest.approx(worst)
 
 
-def test_arm_thickness_prints_as_a_reference_to_the_supplied_stock() -> None:
-    # The stock line governs the thickness (the U41 platform precedent), so
-    # the 8.0 is parenthesised rather than taking the .X band.
-    assert spec.REFERENCE_DIMENSIONS == {"Depth"}
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_named(adapter, right_annotations, name)" in source
-    assert 'label="arm stock thickness"' in source
+def test_arm_stock_sizes_print_as_supplier_fractions() -> None:
+    # The stock line governs width and thickness (the U41 platform
+    # precedent), so neither takes a title-block band.
+    assert spec.STOCK_FRACTION_DIMENSIONS == {
+        "Width": spec.ARM_WIDTH,
+        "Depth": spec.ARM_THICKNESS,
+    }
+    for value_mm in spec.STOCK_FRACTION_DIMENSIONS.values():
+        sixteenths = value_mm / 25.4 * spec.STOCK_FRACTION_DENOMINATOR
+        assert sixteenths == pytest.approx(round(sixteenths))

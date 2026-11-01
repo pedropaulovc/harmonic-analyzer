@@ -26,6 +26,7 @@ without SolidWorks in ~1 s.
 from __future__ import annotations
 
 import _config
+import dt_crank_hub_geometry
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
@@ -33,20 +34,22 @@ from _printed_tolerance import edge_break_chamfer_mm, printed_deviations
 from _surface_finish import SurfaceFinishControl
 from dt_crank_handle_pivot_screw_spec import THREAD_SIZE as PIVOT_SCREW_THREAD_SIZE
 from dt_crank_hub_geometry import (
-    ARM_THICKNESS,  # noqa: F401 -- re-exported to the build and the drive train
+    ARM_THICKNESS,
     ARM_WIDTH,
     AXIAL_PIN_DIA,  # noqa: F401 -- re-exported to the build and drawing
-    AXIAL_PIN_LENGTH,  # noqa: F401 -- re-exported to the build
     AXIAL_PIN_RADIUS_FROM_AXIS,
     FIDUCIAL_MODEL_DEPTH,  # noqa: F401 -- re-exported to the build
     FIDUCIAL_MODEL_DIA,  # noqa: F401 -- re-exported to the build and drawing
     HUB_SEAT_DIA,
+    SEAM_DEPTH,  # noqa: F401 -- re-exported to the build
 )
 
 # Issue #290: the sheet prints decimal inch (``drawing_unit: in``).  Lengths
 # stay physical millimetres, each arm-owned nominal the exact decimal of its
 # printed inch value.
 UNIT = drawing_unit("parts/dt-crank-arm", _config.parts("dt-crank-arm"))
+if UNIT != dt_crank_hub_geometry.UNIT:
+    raise AssertionError("the matched arm and hub print in different units")
 EDGE_BREAK_MAX_MM = edge_break_chamfer_mm(unit=UNIT)
 
 
@@ -125,14 +128,12 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 ARM_END_X = ARM_C2C + END_RADIUS
 HALF_WIDTH = ARM_WIDTH / 2.0
 
-# The thickness prints as a reference under the stock line's "AS SUPPLIED":
-# the bar's mill tolerance governs it, not a title-block band, which would
-# accept a thinner arm and a short MHA-DT-32 engagement (Codex #892; the U41
-# platform precedent).  The width is the same bar's as-rolled 1 in, printed
-# as the supplier's fraction (STOCK_FRACTION_DENOMINATOR).
-REFERENCE_DIMENSIONS = {"Depth"}
+# Width and thickness are the bar's as rolled, printed as the supplier's
+# fractions under the stock line's "AS SUPPLIED": the mill tolerance governs
+# them, not a title-block band, which would accept a thinner arm and a short
+# MHA-DT-32 engagement (Codex #892; the U41 platform precedent).
 STOCK_FRACTION_DENOMINATOR = 16
-STOCK_FRACTION_DIMENSIONS = {"Width": ARM_WIDTH}
+STOCK_FRACTION_DIMENSIONS = {"Width": ARM_WIDTH, "Depth": ARM_THICKNESS}
 
 # Marked dimensions imported by the drawing.  The axial seam groove is an
 # assembly-match feature, so its representation geometry carries no

@@ -4,11 +4,14 @@ The outboard photograph supplies only unitless proportions.  Scaling its
 3.14:2.60:1.65:0.59 arm/hub/shaft/key-pin ratios to the authoritative 3/8-in
 shaft gives 18.13:15.01:9.525:3.405 mm, which left a 0.5-mm hub wall between
 the seam pin and the bore.  User ruling U29 (2026-09-23) enlarges the outboard
-set about the fixed shaft instead: hub and seam pin 1.3x (Ø19.4 seat, 0.1
-under the photograph's 19.5; Ø4 dowel stock) and the arm unmachined 1-in
-cold-finished flat bar (25.4).  The arm-to-hub width ratio is therefore a named
-deviation from the photograph (``ARM_TO_HUB_RATIO`` vs
+set about the fixed shaft instead: hub and seam pin 1.3x (Ø.76 seat, under
+the photograph's 19.5 mm; 5/32-in dowel stock) and the arm unmachined
+1 x 5/16-in cold-finished flat bar.  The arm-to-hub width ratio is therefore a
+named deviation from the photograph (``ARM_TO_HUB_RATIO`` vs
 ``PHOTO_ARM_TO_HUB_RATIO``).
+
+Issue #290: the arm and hub print decimal inch.  Lengths stay physical
+millimetres, each printed nominal the exact decimal of its inch value.
 
 Local axial station zero is the common outboard plane: the through hub and
 crank arm are flush there, the shaft cylinder terminates there, and only the
@@ -22,7 +25,16 @@ from fractions import Fraction
 
 import _config
 import _sprocket_seat_geometry as seat_geometry
+from _inch_wall_limits import WALL_TARGET_MM
+from _package_units import drawing_unit
+from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
 from dt_crank_pin_spec import BIG_END_DIA as SERVICE_PIN_BIG_END_DIA
+
+# The matched arm/hub set prints in the hub's unit; dt_crank_arm_spec asserts
+# the arm agrees.
+UNIT = drawing_unit("parts/dt-crank-hub", _config.parts("dt-crank-hub"))
+GENERAL_2PL_TOL_MM = printed_band_mm(2, unit=UNIT)
+EDGE_BREAK_MAX_MM = edge_break_chamfer_mm(unit=UNIT)
 
 
 MM_PER_IN = 25.4
@@ -41,7 +53,6 @@ OUTBOARD_SCALE = 1.3
 ARM_WIDTH = 1.0 * MM_PER_IN
 ARM_STOCK_MILL_MINUS_IN = Fraction(4, 1000)
 ARM_WIDTH_STOCK_MINUS = float(ARM_STOCK_MILL_MINUS_IN) * MM_PER_IN
-ARM_THICKNESS = 8.0
 # The bar's as-supplied thickness, which the tapped MHA-DT-32 pivot engages
 # (dt_crank_handle_pivot_screw_spec) and the arm's stock note names
 # (dt_crank_arm_spec).  It lives here, below both, because the screw's worst-case
@@ -57,18 +68,19 @@ ARM_STOCK_THICKNESS = float(ARM_STOCK_THICKNESS_IN) * MM_PER_IN
 # 2026-09-25; ARM_STOCK_MILL_MINUS_IN above).  The minus side is what
 # engagement stacks read.
 ARM_STOCK_THICKNESS_MIN = float(ARM_STOCK_THICKNESS_IN - ARM_STOCK_MILL_MINUS_IN) * MM_PER_IN
+ARM_STOCK_THICKNESS_MAX = float(ARM_STOCK_THICKNESS_IN + ARM_STOCK_MILL_MINUS_IN) * MM_PER_IN
+ARM_THICKNESS = ARM_STOCK_THICKNESS
 # The photograph gives 19.5 at the U29 enlargement.  MHA-DT-06 bores the seat
-# first at the title block's .X band and MHA-DT-31 is turned to suit it, so the
-# bore's printed limits are the seat's real limits.  At the sourced 0.004-in
-# width tolerance, a 19.5 bore at +0.8 leaves the arm cheek 1.999 -- under
-# U29's 2.0 -- so the seat is drawn 0.1 under the photograph: a named
-# deviation, inside the photograph's own rounding.
+# first at the title block's .XX band and MHA-DT-31 is turned to suit it, so
+# the bore's printed limits are the seat's real limits.  The seat is drawn
+# .76, under the photograph: a named deviation, inside the photograph's own
+# rounding, that keeps the arm cheek and the seam web over the rule-17 wall.
 PHOTO_HUB_SEAT_DIA = round(PHOTO_HUB * PHOTO_MM_PER_UNIT * OUTBOARD_SCALE, 1)
-HUB_SEAT_DIA = round(PHOTO_HUB_SEAT_DIA - 0.1, 1)
+HUB_SEAT_DIA = 19.304  # .76
 HUB_SEAT_LENGTH = ARM_THICKNESS
 # Seat-in-arm press (B1, Main 2026-09-25): the seat is turned to suit the
 # MHA-DT-06 bore as measured, for a light press.  A 1018 hub in a 1018 arm,
-# 8.0 long and keyed by MHA-DT-VN-59 on the seam, needs the press only to hold the
+# 5/16 long and keyed by MHA-DT-VN-59 on the seam, needs the press only to hold the
 # hub square and stop it turning while the seam is match-drilled.  The band
 # sits inside ISO 286 H7/p6 at 18-30 mm (0.001-0.035 diametral, the
 # locational-interference fit); its line-to-line end is raised to 0.010
@@ -77,27 +89,24 @@ HUB_SEAT_LENGTH = ARM_THICKNESS
 SEAT_PRESS_INTERFERENCE = (0.01016, 0.03048)  # diametral (min, max): .0004-.0012 in
 # CONTRACT-crank MHA-DT-31: the barrel behind the arm (observed Ø≈20, review
 # Q4) is turned to its own size, narrower than the 1-in arm, and the hub
-# runs 17.2 from the arm shoulder to a flat rear face 0.7 clear of the
-# MHA-PD-09 removable, which it keeps from walking forward (the drive train
-# asserts the air against _sprocket_seat_geometry).  It followed the seat
-# face 1.8 forward (user ruling 2026-09-30): 19 -> 17.2.  Its front face is
-# the shoulder the arm is pressed to: R9-38 took it Ø20.6 -> Ø22.25 at .XX so
-# the shoulder keeps its land (SHOULDER_LAND_WORST_MIN) over the largest
-# seat the press can turn, after both edge breaks.
-HUB_BARREL_DIA = 22.25
-HUB_SHOULDER_TO_REAR = 17.2
+# runs from the arm shoulder to a flat rear face clear of the MHA-PD-09
+# removable, which it keeps from walking forward (the drive train asserts the
+# air against _sprocket_seat_geometry).  Its front face is the shoulder the
+# arm is pressed to: R9-38 sized it at .XX so the shoulder keeps its land
+# (SHOULDER_LAND_WORST_MIN) over the largest seat the press can turn, after
+# both edge breaks.
+HUB_BARREL_DIA = 22.352  # .88
 # The #25 plates wrapping the crank T12 overhang the removable's front face
-# toward the hub, so the rear end is turned down to a Ø16.5 relief the plates
+# toward the hub, so the rear end is turned down to a relief the plates
 # pass over; the barrel's rear shoulder stands ahead of the link.  The drive
 # train asserts the radial and axial air from these names (RELIEF_STATION is
 # the shoulder's local station; its machine z is the drive train's
 # crank-face datum plus it); dt_crank_hub_notes carries the axial stack.
-RELIEF_DIA = 16.5
-# Printed from the rear face at .XX.  Only its short side is functional:
-# with the hub length below it places the shoulder the chain must clear, so
-# it may come out RELIEF_LENGTH_TOL short; long, it only moves the shoulder
-# away from the chain, so that side is the title block's (RELIEF_LENGTH_BAND).
-RELIEF_LENGTH_TOL = 0.05
+RELIEF_DIA = 16.51  # .65
+# Printed from the rear face at the title block's .XX: with the hub length
+# below it places the shoulder the chain must clear, so it may come out
+# RELIEF_LENGTH_TOL short.
+RELIEF_LENGTH_TOL = GENERAL_2PL_TOL_MM
 # Stack A, a bought ANSI #25 chain floated frontmost against the relief
 # shoulder, has two poses.  Seated, the wheel's rear face is on the shaft's
 # seat face.  Floated, the wheel has walked forward off its drive pins onto
@@ -111,29 +120,25 @@ RELIEF_LENGTH_TOL = 0.05
 # PR1 accepted before the float was counted (Main, PR1 Codex review 2).
 CHAIN_SHOULDER_AIR_MIN = 0.2135
 _PLATE_MIN = seat_geometry.PLATE + min(seat_geometry.PLATE_BAND)
-RELIEF_LENGTH = round(
-    math.ceil(
-        round(
-            (CHAIN_SHOULDER_AIR_MIN + seat_geometry.CHAIN_REACH_FRONT - _PLATE_MIN) * 100,
-            6,
-        )
-    )
+_RELIEF_LENGTH_MIN = CHAIN_SHOULDER_AIR_MIN + seat_geometry.CHAIN_REACH_FRONT - _PLATE_MIN
+RELIEF_LENGTH = (
+    math.ceil(round((_RELIEF_LENGTH_MIN + RELIEF_LENGTH_TOL) / MM_PER_IN * 100, 6))
     / 100
-    + RELIEF_LENGTH_TOL,
-    2,
-)  # 3.85
-HUB_BARREL_LENGTH = round(HUB_SHOULDER_TO_REAR - RELIEF_LENGTH, 6)
-HUB_LENGTH = HUB_SEAT_LENGTH + HUB_SHOULDER_TO_REAR
+    * MM_PER_IN
+)  # .16
 # The hub prints its overall length, front face to rear face, at .XX.  The
 # fitter sets the front face flush with the crankshaft's dome root
 # (CRANK_FACE_Z) before the MHA-DT-09 match-ream, so this length (not the arm's
-# stock thickness) places the rear face: the 0.7 air to the removable and, with
+# stock thickness) places the rear face: the air to the removable and, with
 # the relief, the chain's air to the shoulder.  Only its long side is
-# functional: at +0.10 the worst hub-to-T12 air is 0.10 and the drive-pin
-# tips' 0.146, which +0.51 would close.  Short, it only opens those airs, so
-# that side is the title block's (HUB_LENGTH_BAND; owner ruling 2026-10-31,
-# machinist review of main 31cea0b73).
-HUB_LENGTH_TOL = 0.10
+# functional: at +.004 the worst hub-to-T12 air and the drive-pin tips' stay
+# open, which the title block's +.01 would all but close.  Short, it only
+# opens those airs, so that side is the title block's (HUB_LENGTH_BAND;
+# owner ruling 2026-10-31, machinist review of main 31cea0b73).
+HUB_LENGTH = 25.146  # .99
+HUB_LENGTH_TOL = 0.1016  # .004
+HUB_SHOULDER_TO_REAR = HUB_LENGTH - HUB_SEAT_LENGTH
+HUB_BARREL_LENGTH = round(HUB_SHOULDER_TO_REAR - RELIEF_LENGTH, 6)
 RELIEF_STATION = round(HUB_LENGTH - RELIEF_LENGTH, 6)
 HUB_SHOULDER_STATION = HUB_SEAT_LENGTH
 
@@ -180,10 +185,10 @@ def chain_shoulder_axial_air(
 ARM_TO_HUB_RATIO = ARM_WIDTH / HUB_SEAT_DIA
 PHOTO_ARM_TO_HUB_RATIO = PHOTO_ARM / PHOTO_HUB
 
-# MHA-DT-09's match-ream is fully behind the 8-mm arm, located from the arm
+# MHA-DT-09's match-ream is fully behind the 5/16 arm, located from the arm
 # shoulder it must not break into; the barrel -- printed from the shoulder --
 # carries the 1:48 ream at that station: drawing-guidelines.md rule 17 (walls and webs) ligaments below.
-SERVICE_PIN_FROM_SHOULDER = 5.6
+SERVICE_PIN_FROM_SHOULDER = 5.588  # .22
 SERVICE_PIN_STATION = HUB_SEAT_LENGTH + SERVICE_PIN_FROM_SHOULDER
 CRANK_FACE_SHIFT = ARM_THICKNESS
 
@@ -203,13 +208,21 @@ HUB_BORE_BAND = (
     0.0,
 )
 
-# MHA-DT-VN-59 is an axial seam pin at six o'clock in the outboard view, cut from
-# Ø4 m6 dowel stock (1.3x the photograph's 3.405 is 4.43; 4 mm is the stock
-# size below it).  It is match-drilled/reamed through both parts with its axis
-# on the nominal hub-seat seam, parallel to the crankshaft.
-AXIAL_PIN_DIA = 4.0
-AXIAL_PIN_DIA_STOCK_MAX = 4.012
-AXIAL_PIN_LENGTH = ARM_THICKNESS / 2.0
+# MHA-DT-VN-59 is an axial seam pin at six o'clock in the outboard view, cut
+# from a 5/32 x 1/2 alloy-steel dowel pin (McMaster-Carr 98381A487, Ø.1563
+# +.0001/+.0003; 1.3x the photograph's 3.405 is 4.43, and 5/32 is the stock
+# size below it).  It is match-drilled/reamed into both parts with its axis on
+# the nominal hub-seat seam, parallel to the crankshaft, and driven flush with
+# the outboard face: the hole runs deeper than the cut pin at every printed
+# limit, so the pin always seats before it bottoms.
+AXIAL_PIN_DIA = 3.96875  # 5/32
+AXIAL_PIN_DIA_STOCK_MAX = 3.97637  # .1563 + .0003
+AXIAL_PIN_LENGTH = 3.81  # .15, cut length
+SEAM_DEPTH = 4.318  # .17
+if SEAM_DEPTH - GENERAL_2PL_TOL_MM < AXIAL_PIN_LENGTH + GENERAL_2PL_TOL_MM - 1e-9:
+    raise AssertionError("MHA-DT-VN-59 can bottom before it is flush")
+if SEAM_DEPTH + GENERAL_2PL_TOL_MM >= ARM_STOCK_THICKNESS_MIN:
+    raise AssertionError("the MHA-DT-VN-59 seam breaks through the arm")
 AXIAL_PIN_RADIUS_FROM_AXIS = HUB_SEAT_DIA / 2.0
 
 # The dome is integral to MHA-DT-11 and cannot exceed the cylindrical shaft
@@ -223,43 +236,33 @@ SHAFT_FIDUCIAL_RADIUS = 2.5
 # U27: the two thin walls of the matched arm/hub/pin set -- the hub web between
 # the seam pin and the bore, and the arm cheek around the hub seat -- are judged
 # at the worst case of the printed bands after both edge breaks.  The seat's
-# printed band is MHA-DT-06's .X bore; MHA-DT-31's seat is turned to suit it for a
+# printed band is MHA-DT-06's .XX bore; MHA-DT-31's seat is turned to suit it for a
 # press, so it is never under the bore's minimum.
-WALL_TARGET_MM = 2.0
-GENERAL_1PL_TOL_MM = round(
-    float(_config.title_block("linear_1pl")["value_in"]) * MM_PER_IN, 1
-)
-EDGE_BREAK_MAX_MM = float(_config.title_block("edge_break")["chamfer_max_mm"])
-HUB_SEAT_DIA_MIN_GENERAL = HUB_SEAT_DIA - GENERAL_1PL_TOL_MM
-HUB_SEAT_DIA_MAX_GENERAL = HUB_SEAT_DIA + GENERAL_1PL_TOL_MM
+HUB_SEAT_DIA_MIN_GENERAL = HUB_SEAT_DIA - GENERAL_2PL_TOL_MM
+HUB_SEAT_DIA_MAX_GENERAL = HUB_SEAT_DIA + GENERAL_2PL_TOL_MM
 HUB_BORE_DIA_MAX = HUB_BORE_DIA + HUB_BORE_BAND[0]
-GENERAL_2PL_TOL_MM = round(
-    float(_config.title_block("linear_2pl")["value_in"]) * MM_PER_IN, 2
-)
-# The two printed axial bands, (upper, lower): each functional on one side
-# only, the title block's .XX on the other (see HUB_LENGTH_TOL).
+# The printed overall, (upper, lower): functional on its long side only, the
+# title block's .XX on the other (see HUB_LENGTH_TOL).
 HUB_LENGTH_BAND = (HUB_LENGTH_TOL, -GENERAL_2PL_TOL_MM)
-RELIEF_LENGTH_BAND = (GENERAL_2PL_TOL_MM, -RELIEF_LENGTH_TOL)
 # drawing-guidelines.md rule 17 (walls and webs) (U27): MHA-DT-09 ream ligaments at the worst case of the printed
 # bands.  The ream never exceeds the pin's big end, which stands proud of the
 # hub.  Ahead of it the arm shoulder: the .XX station printed from it.  Behind
 # it the relief shoulder, which the print places from the front face through
 # the .XX overall and the .XX relief back from the rear face, while the ream
-# is placed through the .X seat length and the .XX station.
+# is placed through the .XX seat length and the .XX station.
 SERVICE_PIN_REAM_RADIUS_MAX = SERVICE_PIN_BIG_END_DIA / 2.0
 SERVICE_PIN_SHOULDER_LIGAMENT_WORST_MM = (
     SERVICE_PIN_FROM_SHOULDER - SERVICE_PIN_REAM_RADIUS_MAX - GENERAL_2PL_TOL_MM
 )
 SERVICE_PIN_REAR_LIGAMENT_WORST_MM = (
     (HUB_LENGTH + HUB_LENGTH_BAND[1])
-    - (RELIEF_LENGTH + RELIEF_LENGTH_BAND[0])
-    - (HUB_SEAT_LENGTH + GENERAL_1PL_TOL_MM)
+    - (RELIEF_LENGTH + RELIEF_LENGTH_TOL)
+    - (HUB_SEAT_LENGTH + GENERAL_2PL_TOL_MM)
     - (SERVICE_PIN_FROM_SHOULDER + GENERAL_2PL_TOL_MM)
     - SERVICE_PIN_REAM_RADIUS_MAX
 )
-# The relief is a clearance diameter at the title block's .XX band (R9-37:
-# a real #25 plate on the T12 floated on its pins keeps 0.23 off it, 0.08 at
-# .X): the largest it can come out is what the #25 plates must clear, the
+# The relief is a clearance diameter at the title block's .XX band (R9-37):
+# the largest it can come out is what the #25 plates must clear, the
 # smallest is the relief's wall over the bore.
 RELIEF_DIA_MAX = RELIEF_DIA + GENERAL_2PL_TOL_MM
 # The hub rides the shaft in its clearance bore, pinned wherever the

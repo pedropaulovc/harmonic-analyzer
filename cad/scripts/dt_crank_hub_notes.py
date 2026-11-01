@@ -15,11 +15,17 @@ from __future__ import annotations
 
 from dt_crank_hub_geometry import (
     AXIAL_PIN_DIA,
-    AXIAL_PIN_LENGTH,
+    MM_PER_IN,
+    SEAM_DEPTH,
     SEAT_PRESS_INTERFERENCE,
     SHAFT_CLEARANCE_MAX,
     SHAFT_CLEARANCE_MIN,
 )
+
+
+def inch_text(value_mm: float, places: int) -> str:
+    """``value_mm`` as the inch sheet prints it, without a leading zero."""
+    return f"{value_mm / MM_PER_IN:.{places}f}".removeprefix("0")
 
 
 def seat_callout(mate: str) -> str:
@@ -34,7 +40,7 @@ def seat_callout(mate: str) -> str:
     return "\n".join(
         (
             f"TURN TO SUIT {mate} BORE",
-            f"FOR LIGHT PRESS: {low:.3f}-{high:.3f}",
+            f"FOR LIGHT PRESS: {inch_text(low, 4)}-{inch_text(high, 4)}",
             "DIAMETRAL INTERFERENCE;",
             f"END FLUSH WITH {mate} FRONT",
         )
@@ -54,11 +60,12 @@ def seam_callout(mate: str, pin: str = "MHA-DT-VN-59") -> str:
     ``pin`` names the pin as the sheet identifies it; the arm's print adds its
     part name (MHA-DT-06 machinist review, 2026-09-29).  The blind pin makes
     hub and ``mate`` a permanent pair, serviced at the MHA-DT-09 taper pin
-    (owner ruling 2026-11-01, machinist review: no knockout).
+    (owner ruling 2026-11-01, machinist review: no knockout).  The depth only
+    has to take the cut pin, so it prints at the title block's .XX.
     """
     return "\n".join(
         (
-            f"(<MOD-DIAM>{AXIAL_PIN_DIA:.1f}) <HOLE-DEPTH> {AXIAL_PIN_LENGTH:.1f}",
+            f"(<MOD-DIAM>{inch_text(AXIAL_PIN_DIA, 3)}) <HOLE-DEPTH> {inch_text(SEAM_DEPTH, 2)}",
             f"ON SEAM, MATCH-DRILL/REAM WITH {mate}",
             f"AT ASSEMBLY, {pin} LIGHT DRIVE FIT;",
             "PERMANENT PAIR; SERVICE AT MHA-DT-09",
@@ -70,7 +77,7 @@ def seam_callout(mate: str, pin: str = "MHA-DT-VN-59") -> str:
 # reference restatement.
 BORE_CALLOUT = (
     "REAM THRU\n"
-    f"({SHAFT_CLEARANCE_MIN:.4f}-{SHAFT_CLEARANCE_MAX:.4f} DIAMETRAL\n"
+    f"({inch_text(SHAFT_CLEARANCE_MIN, 4)}-{inch_text(SHAFT_CLEARANCE_MAX, 4)} DIAMETRAL\n"
     "CLEARANCE ON MHA-DT-11)"
 )
 # The arm bore is made first and carries the band; this seat is turned to fit
@@ -128,9 +135,9 @@ RELIEF_LENGTH_CALLOUT = "CLEARS #25 CHAIN ON\nSPROCKET MHA-PD-09"
 # overall length -- not the arm's stock thickness -- places its rear face.
 #   Links:
 #     crank face                    CRANK_FACE_Z                     -183
-#     hub overall, front to rear    HUB_LENGTH + HUB_LENGTH_BAND     25.2 +0.10/-0.51
-#     relief, back from rear face   RELIEF_LENGTH + RELIEF_LENGTH_BAND
-#                                                                    3.85 +0.51/-0.05
+#     hub overall, front to rear    HUB_LENGTH + HUB_LENGTH_BAND     25.146 +0.1016/-0.254
+#     relief, back from rear face   RELIEF_LENGTH +/- RELIEF_LENGTH_TOL
+#                                                                    4.064 +/-0.254
 #     removable seat face           transgear_removable_spec.SEAT_FACE_Z
 #                                   + crankshaft_spec.SEAT_COLLAR_BAND
 #                                                                    -154.3 +0.1/-0.5
@@ -144,19 +151,19 @@ RELIEF_LENGTH_CALLOUT = "CLEARS #25 CHAIN ON\nSPROCKET MHA-PD-09"
 #        (SEAT_FACE_Z + min(SEAT_COLLAR_BAND) - CHAIN_REACH_FRONT)
 #        - (CRANK_FACE_Z + HUB_LENGTH + HUB_LENGTH_TOL
 #           - (RELIEF_LENGTH - RELIEF_LENGTH_TOL))
-#        = (-154.3 - 0.5 - 6.2865) - (-183 + 25.30 - 3.80)
-#        = -161.0865 - (-161.50)                  = 0.4135  (nominal 1.0635)
+#        = (-154.3 - 0.5 - 6.2865) - (-183 + 25.2476 - 3.81)
+#        = -161.0865 - (-161.5624)                = 0.4759  (nominal 1.3315)
 #      floated, the wheel walked forward off its pins onto the hub rear face
 #      (the hub and seat stations cancel):
 #        (RELIEF_LENGTH - RELIEF_LENGTH_TOL) + (PLATE + min(PLATE_BAND))
 #        - CHAIN_REACH_FRONT
-#        = 3.80 + 2.70 - 6.2865                   = 0.2135  (nominal 0.3635)
-#      The floated pose governs and sizes the relief: 3.6 left it -0.0365.
+#        = 3.81 + 2.70 - 6.2865                   = 0.2235  (nominal 0.5775)
+#      The floated pose governs and sizes the relief: .15 would leave it -0.0305.
 #   B  hub rear face -> T12 front face:
 #        (SEAT_FACE_Z + min(SEAT_COLLAR_BAND) - (PLATE + max(PLATE_BAND)))
 #        - (CRANK_FACE_Z + HUB_LENGTH + HUB_LENGTH_TOL)
-#        = (-154.3 - 0.5 - 2.8) - (-183 + 25.30)
-#        = -157.6 - (-157.70)                     = 0.10    (nominal 0.7)
+#        = (-154.3 - 0.5 - 2.8) - (-183 + 25.2476)
+#        = -157.6 - (-157.7524)                   = 0.1524  (nominal 0.754)
 #   Worst case: A seated and B with the seat collar at its forward limit and
 #   the hub long, A with the relief short, B with the plate thick; A floated
 #   with the relief short and the plate thin.

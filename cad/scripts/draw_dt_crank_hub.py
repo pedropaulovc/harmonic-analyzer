@@ -30,12 +30,13 @@ from _drawing_dimensions import (
     set_reference_dimensions,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm, drill_process
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -271,7 +272,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -344,6 +349,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="MHA-DT-09 hub pilot",
         process=drill_process(SERVICE_PIN_HOLE_SPEC),
     )
+    # The drilled size prints .XXX, the Hole Wizard callout's places.
+    set_hole_callout_precision(cross_hole, {"hw-diam": 3}, label="MHA-DT-09 hub pilot")
     _set_callout_below(cross_hole, CROSS_HOLE_CALLOUT, "MHA-DT-09 hub pilot")
     add_attached_note(
         adapter,

@@ -94,7 +94,6 @@ from dt_crank_arm_spec import (
     HALF_WIDTH,
     HANDLE_PIVOT_HOLE_SPEC,
     HUB_SEAT_DIA,
-    REFERENCE_DIMENSIONS,
     STOCK_FRACTION_DENOMINATOR,
     STOCK_FRACTION_DIMENSIONS,
 )
@@ -443,14 +442,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # The part authored every displayed decimal place.  The hub seat bore
     # is a two-place .XX size: MHA-DT-31 is turned to suit it.
     assert_imported_precision(adapter, imported_annotations, DRAWING_PRECISION_BY_NAME)
-    # The thickness is the supplied stock's (the stock note governs it).
-    for name in sorted(REFERENCE_DIMENSIONS):
-        set_reference_dimension(
-            adapter, _named(adapter, right_annotations, name), label="arm stock thickness"
-        )
-    # The bar's as-rolled width: the supplier's fraction, its tolerance governs.
+    # The bar's as-rolled width and thickness: the supplier's fractions, its
+    # tolerance governs (the stock note).
     for name, value_mm in STOCK_FRACTION_DIMENSIONS.items():
-        annotation = _early_bound(_named(adapter, front_annotations, name), "IAnnotation")
+        annotation = _early_bound(_named(adapter, imported_annotations, name), "IAnnotation")
         supplier_reference_dimension(
             adapter,
             annotation.GetSpecificAnnotation(),

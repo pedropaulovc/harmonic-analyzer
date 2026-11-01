@@ -2,8 +2,8 @@ r"""Build the MHA-DT-VN-59 axial crank-arm-to-hub seam pin.
 
 The flat-ended cylinder runs on local +Z from the outboard face.  In the drive
 train +Z is parallel to the crankshaft and the pin sits at six o'clock, half in
-the arm and half in the hub-seat seam.  Its length is shared geometry:
-``ARM_THICKNESS / 2``.
+the arm and half in the hub-seat seam.  It is a McMaster-Carr 98381A487 dowel
+cut to ``AXIAL_PIN_LENGTH``, shorter than the seam is deep.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import sys
 from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
+from _document_units import apply_package_model_units
 from _dimensions import drive_dimension, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
@@ -37,6 +38,7 @@ from dt_vn_crank_hub_pin_spec import (
     DRAWING_PRECISION,
     PIN_DIA,
     PIN_LEN,
+    UNIT,
 )
 
 
@@ -50,6 +52,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import RevolveParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, UNIT, label=PART_NAME)
     await set_global(adapter, "PinDia", f"{PIN_DIA}mm")
     await set_global(adapter, "PinLen", f"{PIN_LEN}mm")
 

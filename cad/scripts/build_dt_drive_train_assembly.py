@@ -490,7 +490,6 @@ PINION_SEED_DEG = tooth_in_gap_seed_deg(PITCH_ALPHA64, PITCH_ALPHA16) + _config.
 # ARBOR_SOUTH_Z / ARBOR_LENGTH (the cylinder arbor) follow from the pedestal
 # strap faces and are defined with them below (U34b/U34c).
 from dt_crank_hub_geometry import (  # noqa: E402
-    AXIAL_PIN_LENGTH,
     AXIAL_PIN_RADIUS_FROM_AXIS,
     HUB_BARREL_DIA,
     HUB_LENGTH,
@@ -564,14 +563,17 @@ if abs((CRANKSHAFT_Z0 + SEAT_COLLAR) - seat_geometry.SEAT_FACE_Z) > 1e-9:
         "crankshaft SeatCollar datum off _sprocket_seat_geometry.SEAT_FACE_Z"
     )
 # The hub rear face is what stops the removable walking forward once the
-# taper pin is in: the contract's 0.7 axial air, derived from both parts.
-# The seat station's functional band moves the wheel against the hub; at its
+# taper pin is in: the contract's axial air, derived from both parts (0.7 at
+# the 25.2 metric hub; 0.754 at the .990 inch hub, #290).  The seat
+# station's functional band moves the wheel against the hub; at its
 # most-forward limit the air must still be open.
+CRANK_HUB_SPROCKET_AIR_CONTRACT = 0.754
 CRANK_HUB_SPROCKET_AIR = seat_geometry.BAND_FRONT_Z - CRANK_HUB_REAR_Z
 CRANK_HUB_SPROCKET_AIR_WORST = CRANK_HUB_SPROCKET_AIR + min(SEAT_COLLAR_BAND)
-if abs(CRANK_HUB_SPROCKET_AIR - 0.7) > 1e-9:
+if abs(CRANK_HUB_SPROCKET_AIR - CRANK_HUB_SPROCKET_AIR_CONTRACT) > 1e-9:
     raise AssertionError(
-        f"crank hub rear/sprocket air {CRANK_HUB_SPROCKET_AIR:.3f} left the contracted 0.7"
+        f"crank hub rear/sprocket air {CRANK_HUB_SPROCKET_AIR:.3f} left the contracted "
+        f"{CRANK_HUB_SPROCKET_AIR_CONTRACT}"
     )
 if CRANK_HUB_SPROCKET_AIR_WORST <= 0.0:
     raise AssertionError(
@@ -876,8 +878,6 @@ if abs((CRANKSHAFT_Z0 + PIN_HOLE_HEIGHT) - CRANK_PIN_Z) > 1e-6:
     raise AssertionError("shaft and hub MHA-DT-09 stations do not coincide")
 if CRANK_PIN_X0 + CRANK_PIN_LENGTH < X_CRANK + HUB_BARREL_DIA / 2.0 + 2.0:
     raise AssertionError("crank pin does not run out the far side of the hub")
-if abs(AXIAL_PIN_LENGTH - ARM_THICKNESS / 2.0) > 1e-9:
-    raise AssertionError("MHA-DT-VN-59 no longer has half-arm-thickness engagement")
 # Keeper-ring anchor (ch11 p.14): the arm's front (south, machine -z) face is
 # CRANK_ARM_Z0; arm local (x, y) -> machine (X_CRANK - y, Y_CRANK - x) (the
 # placed rows: local +x -> -Y, local +y -> -X). The brass eyelet's tail lies

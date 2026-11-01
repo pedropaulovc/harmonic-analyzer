@@ -7,17 +7,9 @@ Imported ONLY by ``draw_crank_arm`` and its offline test (codex #361; see
 from __future__ import annotations
 
 from dt_crank_handle_pivot_screw_spec import TAPPED_MOUTH_DIA_MAX
-from dt_crank_hub_geometry import (
-    AXIAL_PIN_DIA,
-    AXIAL_PIN_LENGTH,
-    MM_PER_IN,
-    SEAT_PRESS_INTERFERENCE,
-)
-
-
-def _inch(value_mm: float, places: int) -> str:
-    """``value_mm`` as the inch sheet prints it, without a leading zero."""
-    return f"{value_mm / MM_PER_IN:.{places}f}".removeprefix("0")
+from dt_crank_hub_geometry import SEAT_PRESS_INTERFERENCE
+from dt_crank_hub_notes import inch_text as _inch
+from dt_crank_hub_notes import seam_callout
 
 
 # Short lines: the callout is centred under the diameter, so its widest line
@@ -35,20 +27,9 @@ HUB_SEAT_CALLOUT = "\n".join(
     )
 )
 # The MHA-DT-VN-59 seam is match-drilled with the hub at assembly; its callout
-# sits on the seam itself with the pin's nominal size and depth.  Half the
-# hole is in the hub, open toward the arm's outboard face: pressing the hub
-# out slides it off the pin, which then lifts out of the arm's half-hole --
-# the drive-fit pin's way out (#984 machinist review r1, blind-hole finding).
-# The depth only has to take the pin, so it prints at the title block's .XX
-# (machinist review of the first inch sheet: .157 was over-specified).
-SEAM_CALLOUT = "\n".join(
-    (
-        f"(<MOD-DIAM>{_inch(AXIAL_PIN_DIA, 3)}) <HOLE-DEPTH> {_inch(AXIAL_PIN_LENGTH, 2)}",
-        "MATCH-DRILL/REAM WITH MHA-DT-31 AT ASSEMBLY,",
-        "CENTRED ON THE SEAM, FOR MHA-DT-VN-59 AXIAL PIN:",
-        "LIGHT DRIVE FIT; PRESSING MHA-DT-31 OUT FREES THE PIN",
-    )
-)
+# sits on the seam itself, the same requirement the hub's sheet prints (the
+# blind pin makes the pair permanent; owner ruling 2026-11-01).
+SEAM_CALLOUT = seam_callout("MHA-DT-31", "MHA-DT-VN-59 AXIAL PIN")
 # The handle-pivot tap's mouth limit rides its own callout, under the native
 # size, on the face the front view shows: the MHA-DT-32 shoulder seats
 # round it (#984 machinist review r1: as a general note it named neither of

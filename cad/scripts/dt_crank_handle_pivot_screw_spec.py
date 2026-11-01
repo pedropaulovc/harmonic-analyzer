@@ -57,10 +57,10 @@ from dt_crank_handle_spec import (
 )
 from dt_crank_hub_geometry import (
     ARM_STOCK_THICKNESS,
+    ARM_STOCK_THICKNESS_MAX,
     ARM_STOCK_THICKNESS_MIN,
     ARM_THICKNESS,
     EDGE_BREAK_MAX_MM as ARM_EDGE_BREAK_MAX_MM,
-    GENERAL_1PL_TOL_MM as ARM_GENERAL_1PL_TOL_MM,
     MM_PER_IN,
 )
 
@@ -321,10 +321,9 @@ ENGAGEMENT_FLOOR = ENGAGEMENT_RULE_D * THREAD_MODEL_DIA
 # The arm is 5/16-in cold-finished flat bar left at stock thickness
 # (dt_crank_hub_geometry.ARM_STOCK_THICKNESS).  Its sheet prints the thickness
 # as a reference to that stock (Codex #892: a toleranced 8.0 took the .X band
-# and accepted a 7.2 arm, 1.02D), so the thinnest accepted arm is the mill's
-# ARM_STOCK_THICKNESS_MIN.  The thick side keeps the arm sheet's .X band as a
-# bound on what the model allows.
-ARM_PRINTED_THICKNESS_MAX = ARM_THICKNESS + ARM_GENERAL_1PL_TOL_MM
+# and accepted a 7.2 arm, 1.02D), so the accepted arm runs the mill's
+# ARM_STOCK_THICKNESS_MIN to ARM_STOCK_THICKNESS_MAX.
+ARM_PRINTED_THICKNESS_MAX = ARM_STOCK_THICKNESS_MAX
 # The relief width is a routine .XX size; the #4-40 thread clears the 1.5D
 # rule with it at .XX (asserted below).
 RELIEF_WIDTH_MAX = round(RELIEF_WIDTH + _GENERAL_2PL, 6)

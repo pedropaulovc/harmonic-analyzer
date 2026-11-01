@@ -278,9 +278,9 @@ def test_engagement_meets_the_1_5d_rule_governed_by_the_stock_arm() -> None:
         spec.FULL_THREAD_WORST / 2.845, abs=1e-4
     )
     assert spec.ENGAGEMENT_GOVERNED_BY == "arm"
-    # Arm at its printed maximum: the arm still governs.
+    # Arm at the mill's thickest stock: the arm still governs.
     assert spec.ARM_PRINTED_THICKNESS_MAX == pytest.approx(
-        geometry.ARM_THICKNESS + geometry.GENERAL_1PL_TOL_MM
+        geometry.ARM_STOCK_THICKNESS + 0.004 * 25.4
     )
     assert spec.FULL_THREAD_WORST_PRINTED_ARM == pytest.approx(
         min(spec.FULL_THREAD_REACH_MIN, spec.ARM_PRINTED_THICKNESS_MAX - spec.TAP_EXIT_BREAK)

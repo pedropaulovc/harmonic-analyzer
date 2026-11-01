@@ -1,12 +1,12 @@
 r"""Build separate through hub MHA-DT-31.
 
-The local +Y axis runs inboard from the arm's outboard face.  The O19.4 seat is
-flush through the 8-mm arm; the O22.25 rear barrel supplies the inboard shoulder
+The local +Y axis runs inboard from the arm's outboard face.  The Ø.76 seat is
+flush through the 5/16 arm; the Ø.88 rear barrel supplies the inboard shoulder
 and carries the removable MHA-DT-09 hub-to-shaft cross-hole, located from that
-shoulder; behind it a O16.5 relief turned to the rear face lets the #25 chain
+shoulder; behind it a Ø.65 relief turned to the rear face lets the #25 chain
 plates wrapping the crank T12 pass.  MHA-DT-VN-59 is an axial
-seam groove at local +Z (six o'clock after assembly), match-reamed through arm
-and hub for only half the arm thickness.
+seam groove at local +Z (six o'clock after assembly), match-reamed into arm
+and hub to SEAM_DEPTH, deeper than the cut pin.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ import sys
 import _telemetry
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
+from _document_units import apply_package_model_units
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
@@ -49,9 +50,9 @@ from _visibility import blank_reference_geometry
 from dt_crank_hub_geometry import (
     AXIAL_PIN_DIA,
     HUB_LENGTH_BAND,
-    AXIAL_PIN_LENGTH,
     AXIAL_PIN_RADIUS_FROM_AXIS,
-    RELIEF_LENGTH_BAND,
+    SEAM_DEPTH,
+    UNIT,
 )
 from crank_native_acceptance import assert_signed_circle_center
 from dt_crank_hub_spec import (
@@ -91,7 +92,7 @@ V_BODY = math.pi * (
     + RELIEF_R**2 * RELIEF_LENGTH
 )
 V_BORE = math.pi * BORE_R**2 * HUB_LENGTH
-V_SEAM_GROOVE = lens_area(PIN_R, SEAT_R) * AXIAL_PIN_LENGTH
+V_SEAM_GROOVE = lens_area(PIN_R, SEAT_R) * SEAM_DEPTH
 # The MHA-DT-09 big end drawn in phantom on the end view (r5 review: the
 # PinProud MIN's outer extension line ended in air, nothing drawn there):
 # its silhouette leaves the barrel's outline at PIN_STUB_X off the axis.
@@ -209,6 +210,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, UNIT, label=PART_NAME)
     for name, value in (
         ("HubLength", HUB_LENGTH),
         ("SeatLength", HUB_SEAT_LENGTH),
@@ -219,7 +221,7 @@ async def build(adapter) -> dict[str, str]:
         ("BoreDia", HUB_BORE_DIA),
         ("ServicePinFromShoulder", SERVICE_PIN_FROM_SHOULDER),
         ("AxialPinDia", AXIAL_PIN_DIA),
-        ("AxialPinLength", AXIAL_PIN_LENGTH),
+        ("SeamDepth", SEAM_DEPTH),
         # The MHA-DT-09 ream's acceptance: a limit, not geometry, so only the
         # hidden reference line carries it.
         ("PinProud", PIN_PROUD),
@@ -359,7 +361,7 @@ async def build(adapter) -> dict[str, str]:
     check(
         "cut axial seam groove",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=AXIAL_PIN_LENGTH, reverse_direction=True)
+            ExtrusionParameters(depth=SEAM_DEPTH, reverse_direction=True)
         ),
     )
     name_last_feature(adapter, "AxialPinGroove")
@@ -476,17 +478,19 @@ async def build(adapter) -> dict[str, str]:
         axis_expected_components_mm={0: 0.0, 2: AXIAL_PIN_RADIUS_FROM_AXIS},
     )
     set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreDia", *deviations(HUB_BORE_BAND)
+        adapter, "BoreProfile", "BoreDia", *deviations(HUB_BORE_BAND), display_unit=UNIT
     )
-    # The overall and the relief length place the relief shoulder and the
-    # rear face the #25 chain and the removable clear, so each carries its
-    # functional limit on the side that closes an air, the title block's on
-    # the other (dt_crank_hub_geometry).
+    # The overall places the rear face the removable and the drive-pin tips
+    # clear, so it carries its functional limit on the side that closes an
+    # air and keeps the .XX band's -.010 on the other (dt_crank_hub_geometry),
+    # printed at the nominal's three places.
     set_dimension_bilateral_tolerance(
-        adapter, "HubProfile", "HubLength", *deviations(HUB_LENGTH_BAND)
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "HubProfile", "ReliefLength", *deviations(RELIEF_LENGTH_BAND)
+        adapter,
+        "HubProfile",
+        "HubLength",
+        *deviations(HUB_LENGTH_BAND),
+        places=DRAWING_PRECISION["HubProfile"]["HubLength"],
+        display_unit=UNIT,
     )
     set_single_limit(
         adapter,
