@@ -394,6 +394,6 @@ def test_isometric_fills_the_right_of_the_sheet_at_full_size() -> None:
 
 def test_notes_carry_no_dimensions() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
-    assert len([line for line in lines if not line.startswith(" ")]) <= 4
+    assert len(lines) <= 4  # rule 7: at most four short lines
     for line in lines:
         assert not re.search(r"\d\.\d|\+/-|±", line), line
