@@ -721,12 +721,17 @@ GEOMETRIC_CONTROLS = (
 # (OverallLength, a reference), drawing-simplicity-policy.md `How the
 # repository implements the guidelines`'s reference-sketch allowance, so every
 # turned size imports natively beside its axial extent.  ``CoreFlatProfile``
-# carries the D-flat and its in-air tool end (FlatEnd, FlatToolRadius).
+# carries the D-flat's in-air tool end (FlatEnd, FlatToolRadius).  The
+# flat's distance from the axis (FlatToAxis) prints from
+# ``CoreFlatReference``, a hidden Front-plane reference sketch driven by the
+# same ``CoreFlat`` global, in the end view from the tip where the flat
+# shows true.
 # ``JournalProfile`` is the revolve behind the teeth.  ``GearBlank`` owns the
 # face width, which is also the straight gaps' depth.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
-    "CoreFlatProfile": {"FlatToAxis", "FlatEnd", "FlatToolRadius"},
+    "CoreFlatProfile": {"FlatEnd", "FlatToolRadius"},
+    "CoreFlatReference": {"FlatToAxis"},
     "SpanProfile": {"ToothSpan"},
     "StudProfile": {
         "CoreDia",
@@ -746,10 +751,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": FACE_WIDTH_PLACES},
     "CoreFlatProfile": {
-        "FlatToAxis": CORE_FLAT_PLACES,
         "FlatEnd": CORE_FLAT_CUT_END_PLACES,
         "FlatToolRadius": CORE_FLAT_TOOL_END_RADIUS_PLACES,
     },
+    "CoreFlatReference": {"FlatToAxis": CORE_FLAT_PLACES},
     "SpanProfile": {"ToothSpan": SPAN_PLACES},
     "StudProfile": {
         "CoreDia": CORE_DIA_PLACES,
