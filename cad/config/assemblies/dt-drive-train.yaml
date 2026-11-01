@@ -104,3 +104,8 @@ machinist_exceptions:
     where: "sheet 11 step 23 and sheet 13 check 4: MHA-DT-VN-52 shoulder screw run into its blind #10-24 MHA-FR-01 pivot seat, shoulder seated hard, MHA-DT-20 swinging on its oiled shoulder"
     finding: "threaded joint under operating load without a lock (rule 23)"
     reason: "temporary, pending owner confirmation (#1179): the receiver is the MHA-FR-01 base (joint_retention.py ha-harmonic-analyzer/cone-pivot-screw-in-base), whose blind seat under a bottomed shoulder leaves nothing this assembly can stake, nut or pin; every lock #1179 lists (a through tap with a jam nut or staked mouth underneath, a cross pin through the base boss, a keyed washer pinned to the base) is a base change. MHA-DT-VN-51 clamps the swing in the saved and running pose; it is loosened only for checks 4 and 5"
+  - id: "DT-02"
+    kind: "minor"
+    where: "sheet 7 step 2: 2X MHA-DT-VN-61 1/4-20 screws cut to fit into the MHA-DT-20 taps, ENGAGEMENT 5.58 MIN (0.87D)."
+    finding: "thread engagement below 1.5D (rule 18)"
+    reason: "Owner ruling 2026-11-01: MHA-DT-VN-61 post-mount thread engagement 0.87D MIN (0.88D after #2107) accepted as a minor exception; #1019's 0.90D target not met. The same joint is MHA-DT-VN-61's RV-01"
