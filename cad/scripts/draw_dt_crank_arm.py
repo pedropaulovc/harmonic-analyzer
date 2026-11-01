@@ -301,8 +301,18 @@ DIMENSION_CALLOUTS = {"HubSeatDia": HUB_SEAT_CALLOUT}
 # farm iter 2, rule 14).
 ARROWS_INSIDE = ("FiducialX", "FiducialY")
 _DIM_ARROWS_INSIDE = 0
-# Both taps' native callouts print their tap drill .XXX.
-TAP_CALLOUT_PRECISION = {"hw-tapdrldia": 3}
+# Both taps print their drill size .XXX.  The native variable is
+# <hw-tapdrldia>, or <hw-thrutapdrldia> on a THRU tap (draw_pn_pen_v_block).
+_TAP_DRILL_VARIABLES = ("hw-tapdrldia", "hw-thrutapdrldia")
+
+
+def _tap_drill_precision(display: Any, label: str) -> None:
+    """Print the tap callout's drill diameter at three places."""
+    definition = str(_early_bound(display, "IDisplayDimension").GetText(5) or "")
+    names = [name for name in _TAP_DRILL_VARIABLES if f"<{name}>" in definition]
+    if len(names) != 1:
+        raise RuntimeError(f"{label}: no single tap drill variable in {definition!r}")
+    set_hole_callout_precision(display, {names[0]: 3}, label=label)
 
 
 def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
@@ -477,7 +487,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="anchor tap",
     )
     _omit_title_block_thread_class(anchor_callout)
-    set_hole_callout_precision(anchor_callout, TAP_CALLOUT_PRECISION, label="anchor tap")
+    _tap_drill_precision(anchor_callout, "anchor tap")
     # The true overall (boss extreme to handle-end extreme), as a reference
     # below the pivot station so nobody saws the stock a radius short
     # (Harvey #25).  Both ends are arcs, each picked on its outer flank and
@@ -534,9 +544,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="handle pivot tap",
     )
     _omit_title_block_thread_class(pivot_callout)
-    set_hole_callout_precision(
-        pivot_callout, TAP_CALLOUT_PRECISION, label="handle pivot tap"
-    )
+    _tap_drill_precision(pivot_callout, "handle pivot tap")
     _append_callout_rows(pivot_callout, PIVOT_TAP_ROWS)
     pivot_annotation = _early_bound(pivot_callout, "IDisplayDimension").GetAnnotation()
     set_near_side_diameter(pivot_annotation, "handle pivot tap")
