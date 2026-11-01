@@ -596,7 +596,7 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
         (-130.0, 40.0),
         # View F holds the sheet's left band: the lower frame sits under the
         # strap's right half, between the D and E detail letters.
-        ((0.130, 0.211), (0.207, 0.163)),
+        ((0.130, 0.211), (0.197, 0.163)),
         (".020", "0"),
         (ch_rocker_arm_notes.TOP_EDGE_MATE_CALLOUT, ""),
     ):
@@ -1188,7 +1188,7 @@ def test_native_profile_guard_logs_actual_position_frame_and_leaders(native_prof
     case.bottom.position = (0.021, 0.130, 0.00125)  # request != native readback
     drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
     text = "\n".join(case.logs)
-    assert "requested_frame_mm=(207.0, 163.0)" in text
+    assert "requested_frame_mm=(197.0, 163.0)" in text
     assert "actual_GetPosition_mm=(21.0, 130.0, 1.25)" in text
     assert "native_frame_ink_bbox_mm=" in text
     assert "native_leader_points_mm=" in text
@@ -2229,7 +2229,7 @@ def test_detail_d_leaders_use_four_separate_quadrants(bound, monkeypatch) -> Non
     assert quadrants == [0, 1, 2, 3]
     assert math.dist(rim, _PIVOT_CENTRE) == pytest.approx(_DETAIL_BORE_R)
     assert symbol[0] > rim[0] and symbol[1] < rim[1]
-    assert drawing.HUB_KEEP["PivotDia"] == (0.120, 0.086)
+    assert drawing.HUB_KEEP["PivotDia"] == (0.117, 0.086)
     assert drawing.HUB_KEEP["HubDia"] == (0.212, 0.108)
 
 
@@ -3297,8 +3297,9 @@ def test_hub_root_prints_the_part_max_limit_with_a_trimmed_leader(native_hub_roo
     drawing._dress_hub_root(native_hub_root.adapter, native_hub_root.annotations)
     display = native_hub_root.display
     assert display.ArcExtensionLineOrOppositeSide is False
-    # The part owns the value, its MAX type and the 2X; the sheet writes none.
-    assert display.writes == []
+    # The part owns the value, its MAX type and the 2X; the sheet adds only
+    # the mate the limit protects.
+    assert display.writes == [(4, ch_rocker_arm_notes.HUB_ROOT_CALLOUT)]
     assert ch_rocker_arm_notes.HUB_ROOT_R_BAND == (0.0, -ch_rocker_arm_spec.HUB_ROOT_RADIUS_MAX)
 
 
