@@ -82,36 +82,41 @@ if not (
 # Callouts the PART authors on its dimensions, below the value (the drawing
 # imports and reads them back; a drawing-side SetText can write through to
 # the part, #1942).  The counterbore's MIN limits (Ø, depth) and its axis
-# clear MHA-SM-04's thread run-out (sm_gooseneck_spring_joint), so the floor
-# corner's callout, beside the depth and the Ø, names the mate (rule 4;
-# machinist review of e487a1bb4).  Each 0.10 band's MAX has its own job,
-# stated where it is read (owner ruling via Main on machinist review r7 of
-# farm run 20261101T022045634Z: keep both bands, state each max's job): the
-# Ø's max holds the wall stated under the head Ø ("AT C'BORE MAX"), the
-# depth's max the tap drill's deepest point (the tap block).  The Ø's block
-# stands between its own extension lines, 21.0 mm apart at 3:1: its stacked
-# LIMIT pair and the axis's two rows, ~19.3 mm of ink (r7: the pair and one
-# row inked 13.7 mm, rows 5.6 mm apart).  A single value with three rows,
-# ~20.4 mm, was struck by the lower line (machinist review of cca02b34c);
-# set below them, its text ran off the sheet's left edge (farm run
-# 20261028T072132691Z).  So the wall it leaves rides under the head Ø, its
-# outer bound, in the open space below the section.
+# clear MHA-SM-04's thread run-out (sm_gooseneck_spring_joint).  Each 0.10
+# band names its mate and each MAX its job on its own callout (rule 4; owner
+# ruling via Main on machinist review r7 of farm run 20261101T022045634Z:
+# keep both bands, state each max's job; r8, farm run 20261101T035809796Z:
+# the Ø's own callout named neither).  The Ø's max holds the wall stated
+# under the head Ø ("AT C'BORE MAX"), the depth's max the tap drill's deepest
+# point (the tap block).  The Ø's block stands between its own extension
+# lines, 21.0 mm apart at 3:1: its stacked LIMIT pair and two rows, which r8
+# inked y 190.4-209.6 mm between lines at 189.5 and 210.5.  A single value
+# with three rows, ~20.4 mm, was struck by the lower line (machinist review
+# of cca02b34c); set below them, its text ran off the sheet's left edge
+# (farm run 20261028T072132691Z).  So the Ø's two rows carry its mate and
+# max, the axis limit moves to the floor corner's block (room for a third
+# row between the Ø's upper dimension line and the depth's shoulder), and
+# the wall rides under the head Ø, its outer bound.
 SCREW_NUMBER = str(_config.parts("sm-gooseneck-spring-screw")["number"])
 COUNTERBORE_WALL_CALLOUT = f"C'BORE WALL {COUNTERBORE_WALL_CALLOUT_MIN:.2f} MIN"
+# ~53.6 and ~56.4 mm in Century Gothic; centred on the Ø's line at x 45 mm,
+# x ~16.5-73.5 mm: inside the left border (12.7) and short of the c'bore
+# mouth (75.0).  "WALL" is the C'BORE WALL row under the head Ø.
+COUNTERBORE_DIA_CALLOUT = f"MIN CLEARS {SCREW_NUMBER}\nRUN-OUT; MAX SETS WALL"
 # A radial offset between two named axes (machinist review r7: "WITHIN"
-# said neither radial nor diametral); two rows, each no wider than r7's
-# 54.8 mm axis row, between the sheet's left border and the end face.
+# said neither radial nor diametral).
 COUNTERBORE_AXIS_CALLOUT = (
     f"C'BORE AXIS TO TAP AXIS\n{COUNTERBORE_AXIS_OFFSET_MAX:.2f} MAX RADIAL"
 )
-# The floor corner's own native "R0.10 MAX" names the corner it limits.
-COUNTERBORE_FLOOR_CALLOUT = f"FLOOR CORNER, CLEARS\n{SCREW_NUMBER} RUN-OUT"
-# No row wider than the axis rows: each block stands between the sheet's left
-# border and the end face (farm run 20261028T062539287Z: "CLEARS MHA-SM-04
-# RUN-OUT" crossed the border).
-if max(map(len, COUNTERBORE_FLOOR_CALLOUT.splitlines())) > max(
-    map(len, COUNTERBORE_AXIS_CALLOUT.splitlines())
-):
+# The floor corner's native "R0.10 MAX" names the corner it limits; its row
+# says why, the Ø and depth beside it naming whose run-out.
+COUNTERBORE_FLOOR_CALLOUT = f"CLEARS RUN-OUT;\n{COUNTERBORE_AXIS_CALLOUT}"
+# No row longer than r8's 23-character axis row (55.5 mm): each block stands
+# between the sheet's left border and the end face (farm run
+# 20261028T062539287Z: "CLEARS MHA-SM-04 RUN-OUT" crossed the border).
+COUNTERBORE_ROW_MAX_CHARS = 23
+_COUNTERBORE_ROWS = f"{COUNTERBORE_DIA_CALLOUT}\n{COUNTERBORE_FLOOR_CALLOUT}"
+if max(map(len, _COUNTERBORE_ROWS.splitlines())) > COUNTERBORE_ROW_MAX_CHARS:
     raise AssertionError("a counterbore callout row is wider than its axis row")
 PLUG_DIA_CALLOUT = (
     f"FLUSH WITH TUBE OD,\nNO STEP\n{COUNTERBORE_WALL_CALLOUT}\nAT C'BORE MAX"
@@ -145,7 +150,7 @@ DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
         "PlugShankDia": SHANK_FIT_CALLOUT,
     },
     "CounterboreProfile": {
-        "CounterboreDia": COUNTERBORE_AXIS_CALLOUT,
+        "CounterboreDia": COUNTERBORE_DIA_CALLOUT,
         "CounterboreFloorCornerR": COUNTERBORE_FLOOR_CALLOUT,
     },
 }
@@ -187,9 +192,11 @@ DIMENSION_CALLOUTS_ABOVE_BY_NAME: dict[str, str] = {
 # (sm_gooseneck_spring_joint.DRILL_WANDER_MAX).  Four rows in all (the layout
 # audit's tall-block limit: a fifth row gated, farm run 20261028T005208028Z).
 TAP_CALLOUT_PRECISION = {"hw-threaddepth": 2, "hw-tapdrldepth": 2}
+# The thread axis's limit is a radial offset from the tube's OD axis, worded
+# as the counterbore's (r7 review: "+/-" named no zone and no surface).
 TAP_CALLOUT_BELOW = (
     f"FOR {SCREW_NUMBER}; DEEPEST DRILL AT C'BORE MAX\n"
-    f"THREAD AXIS TO TUBE AXIS +/-{THREAD_AXIS_OFFSET_MAX:.2f}"
+    f"THREAD AXIS TO TUBE OD AXIS {THREAD_AXIS_OFFSET_MAX:.2f} MAX RADIAL"
 )
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
@@ -275,7 +282,7 @@ DRAWING_NOTES = "\n".join(
     (
         f"1. TUBE {TUBE_STOCK_SIZE}, {STOCK_SUPPLIER} {TUBE_STOCK_SKU}; "
         f"SLEEVE {SLEEVE_STOCK_SIZE}, {SLEEVE_STOCK_SKU}",
-        "2. AS SUPPLIED, SUPPLIER TOLERANCE; SLEEVE: CONTINUOUS BRAZE FILLET EACH END.",
+        "2. BOTH AS SUPPLIED, SUPPLIER TOL.; SLEEVE: CONTINUOUS BRAZE FILLET EACH END.",
         "3. BRAZE BAg-7 (AWS A5.8); END PIECE: FULL-PENETRATION BRAZE OR LOCTITE 638.",
         "4. JOIN END PIECE, COOL OR FULLY CURE, THEN BEND: OVALITY 5% MAX, NO KINKS.",
     )

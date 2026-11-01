@@ -291,7 +291,9 @@ def _author_reference_dimensions(adapter) -> None:
             display, _dimension = resolved[name]
             display.ShowParenthesis = True
             if not bool(display.ShowParenthesis):
-                raise RuntimeError(f"{name}@{feature}: reference parentheses did not persist")
+                raise RuntimeError(
+                    f"{name}@{feature}: reference parentheses did not persist"
+                )
 
 
 async def _tube_od_reference(adapter) -> list[tuple[str, str]]:
@@ -354,22 +356,24 @@ async def _tube_od_reference(adapter) -> list[tuple[str, str]]:
     return dims.apply(adapter, "TubeOdReference")
 
 
-# OverallReference's leg line: this long on the bare leg's outer silhouette,
-# ending at the bend's entry tangent (the reach's witness point).
-_OVERALL_LEG_SPAN = 10.0
+# OverallReference's witness stubs: this long (1 mm on the 1:3 sheet), each on
+# a drawn edge and ending at the witness point, so the edge's own ink covers
+# the phantom.  A full-length arm line over the end piece's top outline read
+# as a stray dashed line (machinist review r8, farm run 20261101T035809796Z).
+_OVERALL_STUB = 3.0
 
 
 async def _overall_reference(adapter) -> list[tuple[str, str]]:
     """The bent form's overall height and reach, as references: 417.1 and
     27.16 stop at the bend's tangents, so the finished part had no size to
     check from its faces (machinist review r5 of farm run
-    20261101T004958072Z).  A hidden Front-plane sketch of three construction
+    20261101T004958072Z).  A hidden Front-plane sketch of four construction
     lines, each on a drawn edge: the foot face from the axis to the sleeve's
-    outer corner, the bare leg's outer silhouette up to the bend's entry
-    tangent, and the arm's top silhouette from the end face to the bend's
-    exit tangent.  OverallHeight runs from the foot face to the arm's top,
-    OverallReach from the end face to the leg's outer side.  Returns the
-    deferred drive jobs."""
+    outer corner, a stub of the bare leg's outer silhouette ending at the
+    bend's entry tangent, and two stubs of the arm's top silhouette, one from
+    the end face, one ending at the bend's exit tangent.  OverallHeight runs
+    from the foot face to the arm's top, OverallReach from the end face to the
+    leg's outer side.  Returns the deferred drive jobs."""
     top = ARM_Y + TUBE_DIA / 2.0
     leg_x = TUBE_DIA / 2.0
     dims = SketchDims()
@@ -383,19 +387,24 @@ async def _overall_reference(adapter) -> list[tuple[str, str]]:
             await adapter.add_line(0.0, LEG_BOTTOM, SLEEVE_DIA / 2.0, LEG_BOTTOM),
         )
         leg = check(
-            "overall reference leg line",
-            await adapter.add_line(leg_x, LEG_TOP - _OVERALL_LEG_SPAN, leg_x, LEG_TOP),
+            "overall reference leg stub",
+            await adapter.add_line(leg_x, LEG_TOP - _OVERALL_STUB, leg_x, LEG_TOP),
         )
-        arm = check(
-            "overall reference arm line",
-            await adapter.add_line(ARM_END_X, top, -BEND_R, top),
+        arm_end = check(
+            "overall reference end-face stub",
+            await adapter.add_line(ARM_END_X, top, ARM_END_X + _OVERALL_STUB, top),
+        )
+        arm_tangent = check(
+            "overall reference arm tangent stub",
+            await adapter.add_line(-BEND_R - _OVERALL_STUB, top, -BEND_R, top),
         )
     finally:
         set_sketch_direct_db(adapter, False)
     for line, relation in (
         (foot, "horizontal"),
         (leg, "vertical"),
-        (arm, "horizontal"),
+        (arm_end, "horizontal"),
+        (arm_tangent, "horizontal"),
     ):
         _construction(adapter, line, "overall reference")
         check(
@@ -425,24 +434,44 @@ async def _overall_reference(adapter) -> list[tuple[str, str]]:
         f"{leg}.start",
         f"{leg}.end",
         "vertical_distance",
-        _OVERALL_LEG_SPAN,
-        "overall reference leg line",
+        _OVERALL_STUB,
+        "overall reference leg stub",
     )
-    dims.record("OverallLegSpan")
+    dims.record("OverallLegStub")
     await dimension_between(
         adapter,
-        f"{arm}.end",
+        f"{arm_tangent}.end",
         "origin",
         "horizontal_distance",
         BEND_R,
         "overall reference arm tangent",
     )
     dims.record("OverallArmTangentX", '"BendR"')
-    # The two printed dimensions fix the arm line's height and end.
+    for stub, name in (
+        (arm_tangent, "OverallArmTangentStub"),
+        (arm_end, "OverallArmEndStub"),
+    ):
+        await dimension_between(
+            adapter,
+            f"{stub}.start",
+            f"{stub}.end",
+            "horizontal_distance",
+            _OVERALL_STUB,
+            f"overall reference {name}",
+        )
+        dims.record(name)
+    # Both arm stubs lie on the arm's top; the two printed dimensions fix
+    # that height and the end face's station.
+    check(
+        "overall reference arm stubs level",
+        await adapter.add_sketch_constraint(
+            f"{arm_end}.start", f"{arm_tangent}.end", "horizontal_points"
+        ),
+    )
     await dimension_between(
         adapter,
         f"{foot}.end",
-        f"{arm}.end",
+        f"{arm_tangent}.end",
         "vertical_distance",
         top - LEG_BOTTOM,
         "overall height",
@@ -450,7 +479,7 @@ async def _overall_reference(adapter) -> list[tuple[str, str]]:
     dims.record("OverallHeight", '"ArmY" + "TubeDia" / 2 - "LegBottom"')
     await dimension_between(
         adapter,
-        f"{arm}.start",
+        f"{arm_end}.start",
         f"{leg}.end",
         "horizontal_distance",
         leg_x - ARM_END_X,
