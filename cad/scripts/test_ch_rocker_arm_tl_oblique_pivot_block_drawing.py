@@ -92,3 +92,11 @@ def test_drawing_has_only_pivot_and_carriage_sections_under_enforcement():
     assert 'pivot shoulder seat' in source
     assert 'add_feature_control_frame' not in source
     assert 'create_section_view' in source
+
+
+def test_block_height_prints_on_a_right_view_level_with_the_plan():
+    import draw_ch_rocker_arm_tl_oblique_pivot_block as drawing
+    assert drawing.RIGHT_XY[1]==drawing.PLAN_XY[1]
+    assert set(drawing.RIGHT_KEEP)=={'BlockHeight'}
+    assert 'BlockHeight' in spec.DRAWING_DIMENSIONS['Block']
+    assert 'BlockHeight' not in drawing.SIDE_KEEP
