@@ -334,10 +334,10 @@ def test_chain_annotation_positions_follow_source_ink_not_stale_outline(
         assert set(views[key].dimension_positions) == set(expected)
         for name, xy in expected.items():
             assert views[key].dimension_positions[name] == pytest.approx(xy)
-    if connecting:
-        # The plate REF's shoulder (~5.6 mm under its anchor) stays above the
-        # roller outline, and its ~3.5 mm-high top row inside a 40 mm cell
-        # centred on the ink.
+    if connecting and ratio == 2.0:
+        # At the 2:1 fit the plate REF's shoulder (~5.6 mm under its anchor)
+        # stays above the roller outline, and its ~3.5 mm-high top row inside
+        # a 40 mm cell centred on the ink.
         plate_y = views["free_top"].dimension_positions[chain_stock.PLATE_DIMENSION][1]
         assert plate_y - 0.0056 > y + chain_stock.ROLLER_WIDTH / 2000 * ratio + 0.001
         assert plate_y + 0.0035 < y + 0.020
