@@ -72,15 +72,14 @@ def _construction_curves_as_outline(adapter) -> Callable[[], None]:
     return readback
 
 
-def _delete_center_marks(
-    adapter, view, label: str = "supplier wire section centre mark"
-) -> None:
+def _delete_center_marks(adapter, view) -> None:
     """Delete the template's mark on the stock circle and read none back.
 
     Its arms scale with the 20:1 view (50 mm cross plus 8 mm extensions) and
     run off the sheet. The circle locates nothing; the native diameter is the
     replacement datum.
     """
+    label = "supplier wire section centre mark"
     marks = tuple(view.GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ())
     if not marks:
         _telemetry.info(f"{label}: none drawn")

@@ -26,11 +26,7 @@ from _supplier_spring_drawing import (
     reacquire_supplier_dimensions,
 )
 from _supplier_spring_reference import SUPPLIER_DIAGRAM_CONFIGURATION
-from _supplier_wire_stock_drawing import (
-    _CENTER_MARK_ANNOTATION,
-    _construction_curves_as_outline,
-    _delete_center_marks,
-)
+from _supplier_wire_stock_drawing import _construction_curves_as_outline
 from vn_disc_spring_supplier_stock import (
     SUPPLIER_DIMENSION_NAMES,
     SUPPLIER_DIMENSIONS_BY_FEATURE,
@@ -60,6 +56,24 @@ SHAFT_TEXT_RISE_M = 0.006
 # Edge-on diagrams: the template's centre cross lies along the thin edge view
 # and prints as dashes inside it, a hidden line to the reader.
 EDGE_VIEWS = ("free_front", "free_right")
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
+
+
+def _delete_center_marks(adapter: Any, view: Any, *, label: str) -> None:
+    """Delete every centre mark in an edge view and read none back."""
+    marks = tuple(view.GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ())
+    if not marks:
+        return
+    draw = adapter.currentModel
+    draw.ClearSelection2(True)
+    for index, mark in enumerate(marks):
+        if not _early_bound(mark, "IAnnotation").Select2(index > 0, 0):
+            raise RuntimeError(f"cannot select {label}")
+    draw.EditDelete()  # VT_VOID: the re-read below is the proof
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label=f"delete {label}")
+    if view.GetAnnotationsByType(_CENTER_MARK_ANNOTATION):
+        raise RuntimeError(f"{label} survived deletion")
 
 
 def supplier_disc_reference_features(spec: Any) -> dict[str, tuple[str, ...]]:
