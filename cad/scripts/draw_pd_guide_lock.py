@@ -51,7 +51,6 @@ from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
 from _session import run_build
-from _supplier_dimensions import supplier_reference_dimension
 import _telemetry
 from pd_guide_lock_spec import (
     DRAWING_PRECISION_BY_NAME,
@@ -61,7 +60,6 @@ from pd_guide_lock_spec import (
     LOCK_HEIGHT,
     LOCK_STOCK_CALLOUT,
     LOCK_THICK,
-    LOCK_THICK_FRACTION_DENOMINATOR,
     LOCK_WIDTH,
 )
 
@@ -158,6 +156,8 @@ DIMENSION_CALLOUTS = {"Depth": LOCK_STOCK_CALLOUT}
 # The 1/16 sheet's thickness is stock: a fraction REF, the supplier's band
 # governs it (#290).
 THICKNESS_DIMENSION = "Depth"
+THICKNESS_PREFIX = "1/16 ("
+THICKNESS_SUFFIX = ")"
 # The 1/8 drill's Ø prints .XXX, as every native Hole Wizard length.
 HOLE_CALLOUT_PRECISION = {"hw-diam": HOLE_LOCATION_PLACES}
 # The bent leader elbows at the text's LEFT end and enters hole 2 from its
@@ -215,20 +215,24 @@ def _set_dimension_prefixes(
 
 
 def _thickness_reference(adapter: Any, annotations: list[Any]) -> None:
-    """Print the 1/16 sheet's thickness as its supplier fraction, REF."""
+    """Print the 1/16 sheet's thickness as its stock fraction with the
+    native value in parentheses, REF (the transgear arm's stock idiom)."""
     for raw in annotations:
         annotation = _early_bound(raw, "IAnnotation")
         if dimension_name(adapter, annotation) != THICKNESS_DIMENSION:
             continue
-        supplier_reference_dimension(
-            adapter,
-            annotation.GetSpecificAnnotation(),
-            label="guide-lock sheet thickness",
-            units="in",
-            precision=DRAWING_PRECISION_BY_NAME[THICKNESS_DIMENSION],
-            expected_mm=LOCK_THICK,
-            fraction_denominator=LOCK_THICK_FRACTION_DENOMINATOR,
-        )
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        if abs(float(dimension.SystemValue) - LOCK_THICK / 1000.0) > 1e-9:
+            raise RuntimeError(
+                f"guide-lock thickness {float(dimension.SystemValue)!r} m "
+                f"is not the sheet's {LOCK_THICK} mm"
+            )
+        display.SetText(1, THICKNESS_PREFIX)  # swDimensionTextPrefix
+        display.SetText(2, THICKNESS_SUFFIX)  # swDimensionTextSuffix
+        readback = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+        if readback != (THICKNESS_PREFIX, THICKNESS_SUFFIX):
+            raise RuntimeError(f"guide-lock thickness text did not persist: {readback!r}")
         return
     raise RuntimeError("guide-lock sheet thickness was not imported")
 

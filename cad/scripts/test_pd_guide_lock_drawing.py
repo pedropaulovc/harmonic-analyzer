@@ -331,7 +331,6 @@ def test_the_plate_is_1_16_sheet_under_its_own_mill_band() -> None:
     import _config
 
     assert pd_guide_lock_spec.LOCK_THICK == pytest.approx(25.4 / 16.0)
-    assert pd_guide_lock_spec.LOCK_THICK_FRACTION_DENOMINATOR == 16
     assert pd_guide_lock_spec.LOCK_THICK_BAND == pytest.approx(0.005 * 25.4)
     assert drawing.DIMENSION_CALLOUTS == {
         "Depth": pd_guide_lock_spec.LOCK_STOCK_CALLOUT

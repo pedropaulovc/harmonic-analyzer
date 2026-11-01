@@ -64,7 +64,7 @@ CLAMP_CALLOUT_PRECISION = {
     "hw-cbdia": CLAMP_HOLE_CALLOUT_PLACES,
     "hw-cbdepth": CLAMP_CBORE_DEPTH_PLACES,
 }
-BRACKET_TAP_CALLOUT_PRECISION = {"hw-tapdrldia": 3}
+BRACKET_TAP_CALLOUT_PRECISION = {"hw-thrutapdrldia": 3}
 # The west slots' runs need .XXX to close the column-pitch stack, and their
 # width carries the drilled holes' +.004/0 at .XXX. Their counterbore width
 # carries explicit asymmetric limits: the minimum (.330) clears the head's
