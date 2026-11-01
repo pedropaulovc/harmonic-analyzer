@@ -105,7 +105,6 @@ from dt_cone_gear_spec import (
     custom_six_form_points_mm,
     custom_six_gap_half_angle_rad,
     stock_form_profile,
-    web_reference_mm,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
