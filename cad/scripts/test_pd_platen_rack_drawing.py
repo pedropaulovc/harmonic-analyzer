@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import importlib
 import math
-import re
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -236,7 +235,6 @@ def test_sheet_has_aligned_clean_views_and_a_legible_stepped_end() -> None:
 def test_purchase_and_joint_properties_do_not_prescribe_tooth_manufacture() -> None:
     assert builder.GEAR_DATA is spec.GEAR_DATA
     assert builder.PURCHASED_RACK_NOTE is spec.PURCHASED_RACK_NOTE
-    assert builder.INCOMING_RACK_INSPECTION_NOTE is spec.INCOMING_RACK_INSPECTION_NOTE
     assert spec.PURCHASED_RACK_NOTE in spec.GEAR_DATA
     assert builder.DRAWING_NOTES is spec.DRAWING_NOTES
     assert builder.MATERIAL == spec.PURCHASED_RACK_MATERIAL
@@ -251,12 +249,7 @@ def test_purchase_and_joint_properties_do_not_prescribe_tooth_manufacture() -> N
     assert "SOFT-SOLDERED" in spec.DRAWING_NOTES
     assert "PHASE NOT CONTROLLED" in spec.DRAWING_NOTES
     assert "SET MESH AT ASSEMBLY" in spec.DRAWING_NOTES
-    assert sum(
-        len(block.splitlines())
-        for block in (
-            spec.GEAR_DATA, spec.INCOMING_RACK_INSPECTION_NOTE, spec.DRAWING_NOTES
-        )
-    ) <= 4
+    assert sum(len(block.splitlines()) for block in (spec.GEAR_DATA, spec.DRAWING_NOTES)) <= 4
     text = "\n".join(
         (spec.PURCHASED_RACK_NOTE, spec.GEAR_DATA, spec.DRAWING_NOTES)
     ).upper()
@@ -286,19 +279,6 @@ def test_purchase_and_joint_properties_do_not_prescribe_tooth_manufacture() -> N
     )["rack-soldered"]
     for method in ("WIRE", "SECANT", "INDICATOR", "U +/-"):
         assert method not in soldered
-
-
-def test_incoming_rack_note_is_the_two_stock_sizes() -> None:
-    # The sheet's inch maxima never admit more than the receiving check's
-    # millimetre limits, and give away less than .0001 in.
-    note = spec.INCOMING_RACK_INSPECTION_NOTE
-    printed = [float(value) * 25.4 for value in re.findall(r"(\.\d+) MAX", note)]
-    limits = [quality.rack_stock_height_max_mm(), quality.rack_face_width_max_mm()]
-    assert len(printed) == 2
-    for shown, limit in zip(printed, limits, strict=True):
-        assert limit - 0.0001 * 25.4 < shown <= limit
-    for metrology in ("INDEX", "LEAD", "REJECT", "USABLE GAPS"):
-        assert metrology not in note
 
 
 def test_rack_index_and_face_lead_fit_the_feed_opposite_flank_budget() -> None:

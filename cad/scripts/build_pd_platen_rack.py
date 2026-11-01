@@ -87,7 +87,6 @@ from pd_platen_rack_spec import (
     GAP_AREA,
     GAP_COUNT,
     GEAR_DATA,
-    INCOMING_RACK_INSPECTION_NOTE,
     ISOMETRIC_VIEW_NOTE,
     PITCH,
     PITCH_LINE_Y,
@@ -368,7 +367,6 @@ async def build(adapter) -> dict[str, str]:
         {
             "Gear Data": GEAR_DATA,
             "Purchased Rack": PURCHASED_RACK_NOTE,
-            "Incoming Rack Inspection": INCOMING_RACK_INSPECTION_NOTE,
             "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Enlarged End View Note": ENLARGED_END_VIEW_NOTE,

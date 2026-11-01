@@ -64,7 +64,7 @@ if DP != PURCHASED_RACK_DP or PA_DEG != PURCHASED_RACK_PA_DEG:
 CUT_LENGTH_MM = PLATE_WIDTH
 BAR_LENGTH = CUT_LENGTH_MM  # rack and backer end flush with the platen
 BAR_HEIGHT = 12.0  # accepted exposed band below the guide rail; prints (.472) REF
-BAR_THICKNESS = 6.0  # accepted edge-on photo envelope; prints .236
+BAR_THICKNESS = 6.0  # accepted edge-on photo envelope; prints .24
 RACK_HEIGHT = PURCHASED_RACK_HEIGHT_IN * MM_PER_IN
 RACK_THICKNESS = PURCHASED_RACK_FACE_WIDTH_IN * MM_PER_IN
 BACKER_HEIGHT = BAR_HEIGHT - RACK_HEIGHT
@@ -617,17 +617,18 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "OverallHeightReference": {"OverallHeight"},
 }
 # The cut length serves no fit but bounds the operating window
-# (paper_drive_rack_travel), so it prints .XX; the backer's sizes and the
-# rack's inset on it print .XXX, the rounding of their kept millimetres staying
-# well inside the band, and the cut-end section maxima are paid at those bands.
+# (paper_drive_rack_travel), so it prints .XX. The backer's height and width
+# and the rack's offset on it set no mate (the mesh is set at assembly), so
+# they print .XX too; the window's cut-end section maxima and the rear
+# bushing's air to the rack are paid at those printed limits.
 # The purchased 3/16 strip prints its exact decimal as a reference.
 _PLACES = {
     "Length": 2,
-    "BackerDepth": 3,
+    "BackerDepth": 2,
     "RackDepth": 4,
     "RackHeight": 4,
-    "RackInset": 3,
-    "SeamHeight": 3,
+    "RackInset": 2,
+    "SeamHeight": 2,
     "OverallHeight": 3,
 }
 DRAWING_PRECISION = {
@@ -663,18 +664,10 @@ PURCHASED_RACK_NOTE = (
 )
 # The material is the title block's; the note does not repeat it.
 GEAR_DATA = f"{PURCHASED_RACK_NOTE}; {DP:g} DP, {PA_DEG:g}\N{DEGREE SIGN} PA"
-# A purchased rack is received by its two stock sizes; its pitch accuracy is
-# the catalogue part's, checked only by the running mesh at assembly.  The
-# millimetre receiving maxima print in inches floored to four places, so the
-# sheet never admits more than the checker does.
-def _inch_max(value_mm: float) -> str:
-    return f"{math.floor(value_mm / MM_PER_IN * 1e4 + 1e-9) / 1e4:.4f}".lstrip("0")
-
-
-INCOMING_RACK_INSPECTION_NOTE = (
-    f"STOCK HEIGHT {_inch_max(quality.rack_stock_height_max_mm())} MAX; "
-    f"FACE WIDTH {_inch_max(quality.rack_face_width_max_mm())} MAX"
-)
+# A purchased rack is received by its catalogue identity and (.1875) REF
+# sizes; its pitch accuracy is the catalogue part's, checked only by the
+# running mesh at assembly. The receiving stock-size maxima stay internal
+# (_gear_quality), like the measurement uncertainties: never printed.
 DRAWING_NOTES = "\n".join(
     (
         "SOFT-SOLDERED RACK/BACKER JOINT; ENDS FLUSH",

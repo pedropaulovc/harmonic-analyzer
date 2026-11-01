@@ -784,7 +784,12 @@ RACK_FRONT_FROM_SLEEVE_REAR_WORST = (
     - HANGER_TILT_AT_DISC_RIM
     + HANGER_TILT_AT_FEED_TIPS
     - PLATE_THICKNESS
-    - RACK_TEETH_Z_INSET
+    - (
+        RACK_TEETH_Z_INSET
+        + printed_deviations(
+            RACK_TEETH_Z_INSET, RACK_PRECISION["RackInset"], unit=RACK_UNIT
+        )[0]
+    )
 )
 if FEED.FULL_DEPTH_MIN < RACK_FRONT_FROM_SLEEVE_REAR_WORST:
     raise AssertionError(
