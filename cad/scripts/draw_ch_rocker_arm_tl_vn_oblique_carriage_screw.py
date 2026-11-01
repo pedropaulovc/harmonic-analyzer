@@ -32,6 +32,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         SPEC,
         item=ITEM,
+        cut_to_suit=True,
         title_block_setup=partial(
             fit_purchased_title_block, spec=SPEC, material_property="Material"
         ),
