@@ -192,16 +192,14 @@ THREAD_FIT_OFFSET_MAX = round(
 # RELIEF_WIDTH of the threaded section, against the seat face, so the die's
 # incomplete lead threads run out into air and the shoulder pulls down tight on
 # the arm face.
-# Banded (Codex P1 on #1139): a looser relief could stand above the thread
-# root (no die run-out) and, with the lead, reach past the shoulder's seat.
-# Ø.073 +/-.002 keeps the largest relief, .075, under the deepest die-cut root
-# estimated above, about .0763 (local reviews of 747487c71 and 21bb244c5).  The
-# title block's +/-.005 would allow .078, above that root (the #290 review of
-# b28d38a16 took the root as .078), so the band stays and its callout says
-# what it clears.
-RELIEF_DIA = 1.8542  # .073
-RELIEF_DIA_TOL = 0.0508  # .002
-RELIEF_DIA_MAX = round(RELIEF_DIA + RELIEF_DIA_TOL, 6)
+# At the title block's .XXX band (#290 review of d72bdd039: a ±.002 band
+# named no mate): Ø.070 ±.005 keeps the largest relief, .075, under the
+# deepest die-cut root estimated above, about .0763, as the old Ø.073 ±.002
+# did (Codex P1 on #1139: a looser relief could stand above the root and,
+# with the lead, reach past the shoulder's seat).  The smallest, .065, is the
+# neck the area note below allows for.
+RELIEF_DIA = 1.778  # .070
+RELIEF_DIA_MAX = round(RELIEF_DIA + _GENERAL_3PL, 6)
 # Routine at .XX (the MHA-DT-32 machinist review of crank-v4-16 called a
 # tighter band over-specification): the straight floor past the longest lead
 # keeps 1.5 #4-40 pitches of die run-out (local review of 20dac9d3f: the lead
@@ -225,16 +223,17 @@ RELIEF_LEAD_LIMITS = (
 )
 CHAMFER_CALLOUT = "X 45 DEG"
 # Each band tighter than the title block's names what it serves at its
-# callout (#290 review of 29af6f44d, rule 4): the relief clears the die's
-# deepest root and its lead stays inside the arm's tapped thread, so the seat
-# annulus stays flat.  The tip chamfer's single limit starts the die and stays
-# inside the thread depth.  The 45-degree lead takes its own leader note onto
-# the lead (#290 review of b28d38a16: on the relief's Ø callout its leader
-# ended in the groove), printing the limits its model band gives.
+# callout (#290 review of 29af6f44d, rule 4): the relief lead stays inside
+# the arm's tapped thread, so the seat annulus stays flat.  The tip chamfer's
+# single limit is the thread start (#290 review of d72bdd039: functional
+# words, not the die).  The relief prints at the title block's band and says
+# what it clears.  The 45-degree lead takes its own leader note onto the lead
+# (#290 review of b28d38a16: on the relief's Ø callout its leader ended in
+# the groove), printing the limits its model band gives.
 # Rows of 18 characters at most keep each block clear of the extension lines
 # beside it (farm r8 of f5256bf3d).
-TIP_CHAMFER_CALLOUT = f"{CHAMFER_CALLOUT};\nSTARTS THE DIE;\nINSIDE THREAD\nDEPTH"
-RELIEF_CALLOUT = "UNDER DIE-CUT ROOT"
+TIP_CHAMFER_CALLOUT = f"{CHAMFER_CALLOUT};\nTHREAD START"
+RELIEF_CALLOUT = "UNDER THREAD ROOT"
 RELIEF_LEAD_NOTE = "\n".join(
     (
         f"{inch_text(RELIEF_LEAD_LIMITS[0], 3)}-{inch_text(RELIEF_LEAD_LIMITS[1], 3)} "
@@ -391,12 +390,15 @@ FILE_ALLOWANCE_MAX = round(THREAD_LENGTH_MAX - ARM_STOCK_THICKNESS_MIN, 6)
 FILE_ALLOWANCE_MIN = round(FULL_THREAD_REACH_MIN - ARM_STOCK_THICKNESS_MAX, 6)
 # The fitted shoulder, stated once (user ruling 2026-09-29, after the
 # MHA-DT-32 machinist review), on the shoulder length it sets: under-head to
-# seat face is the bonded handle's ferrule arm face to cup floor plus the end
-# play (#290 review of b28d38a16: in a general note the fit-up had no leader
-# and no dimension of its own).  The sheet carries no general note.
+# seat face is the bonded handle's ferrule outer face to cup floor plus the
+# end play (#290 review of b28d38a16: in a general note the fit-up had no
+# leader and no dimension of its own).  The handle is measured, not the arm:
+# the shoulder seats on the arm face and the handle runs between it and the
+# head (#290 review of d72bdd039 read "ARM FACE" on the ferrule as a second
+# arm face).  The sheet carries no general note.
 SHOULDER_LENGTH_CALLOUT = (
-    "FACED TO SUIT: MHA-DT-34 ARM FACE TO MHA-DT-35\n"
-    f"FLOOR IN BONDED MHA-DT-08 + {inch_text(END_PLAY_RANGE[0], 3)}-"
+    "FACED TO SUIT BONDED MHA-DT-08: MHA-DT-34 OUTER\n"
+    f"FACE TO MHA-DT-35 FLOOR + {inch_text(END_PLAY_RANGE[0], 3)}-"
     f"{inch_text(END_PLAY_RANGE[1], 3)} END PLAY"
 )
 # The head's bands: its diameter keeps a bearing annulus on the cup floor
@@ -424,10 +426,11 @@ SEAT_FLAT_ANNULUS_AREA = math.pi / 4.0 * (SHOULDER_DIA**2 - TAPPED_MOUTH_DIA_MAX
 SEAT_FLAT_ANNULUS_AREA_MIN = (
     math.pi / 4.0 * (SEAT_CONTACT_OUTER_DIA_MIN**2 - SEAT_CONTACT_INNER_DIA**2)
 )
-# The relief neck is the screw's weakest section: pi/4 x .073^2 = 2.70 mm^2
+# The relief neck is the screw's weakest section: pi/4 x .070^2 = 2.48 mm^2
 # against the #4-40 UNC tensile stress area of 0.00604 in^2 = 3.90 mm^2, about
-# 69 percent.  Seating torque is therefore limited by the neck, not the thread;
-# the handle's working load is a hand grip and never loads it axially.
+# 64 percent (55 percent at the smallest, .065).  Seating torque is therefore
+# limited by the neck, not the thread; the handle's working load is a hand
+# grip and never loads it axially.
 NECK_AREA = math.pi / 4.0 * RELIEF_DIA**2
 TENSILE_STRESS_AREA = 0.00604 * MM_PER_IN**2
 NECK_TO_STRESS_AREA = NECK_AREA / TENSILE_STRESS_AREA
