@@ -13,3 +13,9 @@ ch-rocker-hub:
   tolerance_class: machined_block
   drawing_unit: in
   process: "turned from 1018 round: land turned to its press band, bore drilled and length parted off long; pressed into MHA-CH-13, then bore and length finished on MHA-CH-06"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "face view, the \u00d8.246 supply bore callout: WALL .075 MIN"
+      finding: "wall from the largest supply bore to the smallest press-fit land below the .080 target (rule 17)"
+      reason: "owner ruling 2026-11-01 (#290): .075 MIN between the \u00d8.4009 least land and the \u00d8.250 largest letter-D drill (DRILLED HOLES +.004) stays above the .060 floor; the bore is a supply size reamed to its finished size after joining (MHA-CH-06), and the letter-D drill leaves the stock the ream needs"

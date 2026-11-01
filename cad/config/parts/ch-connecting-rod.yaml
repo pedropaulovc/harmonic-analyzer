@@ -18,7 +18,7 @@ ch-connecting-rod:
       kind: "minor"
       where: "DETAIL C, the near tine .067 ±.002 (2X), its callout naming the TINE WALL"
       finding: "fork tine wall .065 at its printed lower limit, below the .080 in target (rules 17, 20)"
-      reason: "each gap between neighbouring 2.5 mm rocker arms at the 7.0565 channel pitch holds one tine of each adjacent rod, so the tine is pitch-bound; .065 (1.651 mm) MIN at the worst printed limits stays above the .060 floor; the same wall the owner accepted as 1.65 MIN under the metric 1.5 floor (owner-ruled shortfall)"
+      reason: "owner ruling 2026-11-01 (#290): each gap between neighbouring .098 rocker arms at the .2778 channel pitch holds one tine of each adjacent rod, so the tine is pitch-bound; .065 MIN at the worst printed limits stays above the .060 floor"
     - id: "RV-03"
       kind: "accept"
       where: "front view, boxed .16 BASIC from datum A (the bore axis) to datum B (the shank's left flank)"

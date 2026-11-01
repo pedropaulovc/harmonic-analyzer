@@ -112,7 +112,13 @@ def test_every_band_is_native_and_named() -> None:
     # The supply length's single MIN limit (build_ch_rod_pivot_pin precedent).
     assert "tolerance.Type = SUPPLY_LENGTH_TOL_TYPE" in build
     assert "tolerance.SetValues(0.0, 0.0)" in build
-    assert notes.SUPPLY_BORE_CALLOUT.splitlines() == ["DRILL THRU", "SUPPLY SIZE"]
+    assert notes.SUPPLY_BORE_CALLOUT.splitlines() == [
+        "DRILL THRU",
+        "SUPPLY SIZE",
+        "WALL .075 MIN",
+    ]
+    # The stated wall is the spec's worst case, rounded down (rule 20).
+    assert 0.075 <= spec.SUPPLY_WALL_MIN / 25.4 < 0.076
 
 
 def test_drawing_quality_and_no_gdt() -> None:

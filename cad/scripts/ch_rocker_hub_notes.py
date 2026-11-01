@@ -9,8 +9,10 @@ wording edit never touches the supply sizes. Imported ONLY by
 
 from __future__ import annotations
 
+import math
+
 from ch_rocker_hub_fit import INTERFERENCE_TEXT
-from ch_rocker_hub_spec import NUMBER, ROCKER_NUMBER, STRAP_NUMBER
+from ch_rocker_hub_spec import NUMBER, ROCKER_NUMBER, STRAP_NUMBER, SUPPLY_WALL_MIN
 
 # --- Drawing contract (drawing-simplicity-policy.md `How the repository
 # implements the guidelines`: the PART owns places and bands). The land and the
@@ -41,8 +43,11 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 # drawing-guidelines.md rule 4: the press band names its mate and the fit.
 LAND_CALLOUT = f"PRESS FIT IN {STRAP_NUMBER} STRAP HOLE\n{INTERFERENCE_TEXT}"
 # rule 19: the bore and the length are supply sizes; the note says where the
-# finished ones are.
-SUPPLY_BORE_CALLOUT = "DRILL THRU\nSUPPLY SIZE"
+# finished ones are. Rule 20: the supply wall is under the .080 target (owner
+# ruling 2026-11-01, RV-01), so the bore states it, rounded down.
+_SUPPLY_WALL_IN = math.floor(SUPPLY_WALL_MIN / 25.4 * 1000.0) / 1000.0
+SUPPLY_WALL_TEXT = f"WALL {_SUPPLY_WALL_IN:.3f} MIN".replace("0.", ".", 1)
+SUPPLY_BORE_CALLOUT = f"DRILL THRU\nSUPPLY SIZE\n{SUPPLY_WALL_TEXT}"
 SUPPLY_LENGTH_PREFIX = "SUPPLY "
 
 # drawing-guidelines.md rule 7: one line a machinist cannot read off the views.
