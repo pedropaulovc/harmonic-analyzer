@@ -10,8 +10,9 @@ Every value comes from the part specs and the calculator
 dimension is retyped here.
 
 The table's engagement is nominal screw/receiver overlap, capped by receiver
-depth, not full-thread engagement at tolerance limits. Protrusion is bought
-length minus grip minus receiver depth: past the far face for a THRU tap,
+depth, not full-thread engagement at tolerance limits. Protrusion is installed
+length (bought, or cut at assembly) minus grip minus receiver depth: past the
+far face for a THRU tap,
 past the full thread for a blind one. A through-tip may project only into
 the stated free clearance. Individual screw/washer specs own tolerance
 bands, incomplete threads and neighboring geometry; the nominal table
@@ -19,7 +20,8 @@ alone does not certify worst-case fit.
 
 Nominal engagement is at least 1.5 diameters except on two joints:
 
-* Carriage (M4 x 20): the HGH15CA's M4 x 5 holes limit it to 4.4 (1.1 D).
+* Carriage (M4 x 20, each cut to fit its own counterbore at assembly): the
+  HGH15CA's M4 x 5 holes limit it to 4.80 (1.2 D).
 * Feed lever (5/16-18 x 1): nominal engagement is 10.4 (1.3 D).
   The lever-washer spec records the worst-case engagement and possible
   stand-out; the nominal table alone does not bound either.
@@ -82,6 +84,9 @@ class Fastener:
     # Free space past a THRU tap's far face that the tip may stand into; 0:
     # the tip stops inside the receiving thread.
     tip_clearance_mm: float = 0.0
+    # Cut to fit at assembly: the installed length under the head; None when
+    # the screw goes in as bought.
+    cut_length_mm: float | None = None
 
     @property
     def metric(self) -> bool:
@@ -90,6 +95,10 @@ class Fastener:
     @property
     def length_mm(self) -> float:
         return float(self.length) if self.metric else inch_mm(self.length)
+
+    @property
+    def installed_length_mm(self) -> float:
+        return self.length_mm if self.cut_length_mm is None else self.cut_length_mm
 
     @property
     def major_mm(self) -> float:
@@ -103,11 +112,11 @@ class Fastener:
     @property
     def engagement_mm(self) -> float:
         # A tip standing past a THRU tap engages only the tap's depth.
-        return min(self.length_mm - self.grip_mm, self.thread_depth_mm)
+        return min(self.installed_length_mm - self.grip_mm, self.thread_depth_mm)
 
     @property
     def protrusion_mm(self) -> float:
-        return self.length_mm - self.grip_mm - self.thread_depth_mm
+        return self.installed_length_mm - self.grip_mm - self.thread_depth_mm
 
 
 @dataclass(frozen=True)
@@ -158,6 +167,7 @@ BLOCK_TO_CARRIAGE = Fastener(
     pivot_block.CARRIAGE_THREAD_DEPTH,  # the carriage's M4 x 5
     min_engagement_d=1.1,
     note="the carriage maker's M4 x 5 holes limit the engagement",
+    cut_length_mm=pivot_block.SCREW_CUT_LENGTH,  # owner ruling 2026-11-01
 )
 KP08_TO_BRACKET = Fastener(
     "KP08 pillow block to TL-28 end bracket",
@@ -283,7 +293,7 @@ if abs(BRACKET_TO_BAR.engagement_mm - leadscrew.BAR_SCREW_ENGAGEMENT) > 1e-9:
     raise AssertionError("bar screw engagement disagrees with the leadscrew spec")
 if abs(NUT_TO_FEED_BLOCK.engagement_mm - leadscrew.NUT_SCREW_ENGAGEMENT) > 1e-9:
     raise AssertionError("nut screw engagement disagrees with the leadscrew spec")
-if abs(BLOCK_TO_CARRIAGE.engagement_mm - (pivot_block.SCREW_LENGTH - pivot_block.CBORE_FLOOR)) > 1e-9:
+if abs(BLOCK_TO_CARRIAGE.engagement_mm - pivot_block.SCREW_REACH) > 1e-9:
     raise AssertionError("carriage screw engagement disagrees with the block spec")
 if abs(RAIL_TO_BAR.length_mm - trammel.RAIL_SCREW_LENGTH) > 1e-9:
     raise AssertionError("the rail screw's printed length is not the calculator's")
