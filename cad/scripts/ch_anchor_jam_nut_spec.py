@@ -59,15 +59,18 @@ TAP_SPEC = HoleSpec("tapped", THREAD)
 THREAD_MAJOR = THREAD_MAJOR_MM[THREAD]
 
 MIN_WALL = WALL_FLOOR_MM  # drawing-guidelines.md rule 17 floor (.060)
-NEIGHBOUR_CLEARANCE = 0.25  # spring_mount_geom.MIN_CLEARANCE_MM (asserted there)
+# spring_mount_geom.MIN_CLEARANCE_MM (0.25) less 0.001: under the lever's
+# Ø.006 tap position zone the .002 O.D. band leaves 0.2493 (owner ruling).
+NEIGHBOUR_CLEARANCE = 0.249
 
 OD = 6.604  # .260
 OD_PLACES = 3
-# Explicit, not the .XXX row: the band must sit inside [wall floor, neighbour
-# clearance] = [6.553, 6.6565] (.2580-.2621) at the Ø0.15 pattern zone, and
-# the title block's ±.005 does not.  ±.001 also keeps the neighbour clear at
-# the lever's tighter Ø.006 zone.
-OD_BAND = 0.0254  # .001
+# Explicit, not the .XXX row. The O.D. window runs from the wall floor,
+# THREAD_MAJOR + 2 * MIN_WALL = 6.5532 (.2580), to the neighbour gap,
+# CHANNEL_PITCH - zone - NEIGHBOUR_CLEARANCE = 6.6541 (.2620) at the lever's
+# Ø.006 tap position zone: .004 wide, so the title block's ±.005 cannot fit
+# and ±.002 fills it.
+OD_BAND = 0.0508  # .002
 if OD_BAND >= printed_band_mm(OD_PLACES, unit=UNIT):
     raise AssertionError("the O.D. band is no tighter than the title block's")
 OD_MAX = OD + OD_BAND
@@ -135,11 +138,10 @@ def _inch_min(value_mm: float, places: int) -> str:
 
 # The O.D.'s band is bounded both ways (reviews r8/r9 read it as a clearance
 # size only): the wall to the thread, printed as a fact above the value, and
-# the neighbouring nut, named with its pitch below it -- twenty nuts stand
-# side by side and the 0.25 mm gap holds only inside the explicit band.
+# the neighbouring nut, named as the mate below it (rule 4) -- twenty nuts
+# stand side by side and the neighbour gap holds only inside the band.
 OD_WALL_CALLOUT = f"WALL {_inch_min(WALL_WORST, 3)} MIN"
-_PITCH_TEXT = f"{CHANNEL_PITCH / 25.4:.3f}".removeprefix("0")
-OD_CALLOUT = f"CLEARS ADJACENT MHA-CH-14 AT {_PITCH_TEXT} PITCH"
+OD_CALLOUT = "CLEARS ADJACENT CHANNEL'S MHA-CH-14 NUT"
 # A jam nut is thin by kind, and the stock anchor's shank caps it: the full
 # thread it carries at its thinnest, less the incomplete thread a through tap
 # leaves, falls short of 1.5D and the sheet states it as a fact.
