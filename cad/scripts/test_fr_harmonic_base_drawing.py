@@ -5308,9 +5308,12 @@ def test_default_class_omission_preserves_quantity_min_depth_native_tokens_and_p
     )
     assert "<hw-threaddepth>" in display.GetText(6)
     sheet._check_cross_tap_callout(display)
+    assert sheet.CROSS_TAP_CALLOUT_PRECISION == {
+        "hw-tapdrldia": 3, "hw-tapdrldepth": 2, "hw-threaddepth": 2,
+    }
     depth = next(v for v in display.variables if v.VariableName == "hw-tapdrldepth")
-    depth.Precision = 2
-    with pytest.raises(RuntimeError, match="prints 2 decimals, not 3"):
+    depth.Precision = 3
+    with pytest.raises(RuntimeError, match="prints 3 decimals, not 2"):
         sheet._check_cross_tap_callout(display)
 
 

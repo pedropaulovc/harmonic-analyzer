@@ -508,8 +508,11 @@ _CRITICAL_HOLE_TAG_STATIONS = (
     *sorted(HOLE_XZ, key=lambda xz: math.dist(xz, PIVOT_SCREW_XZ))[:2],
 )
 _TABLE_LOCATION_TOLERANCE_MM = 0.02
-# Every native cross-tap length prints .XXX (the pilot's Hole Wizard places).
-CROSS_TAP_CALLOUT_PRECISION = {"hw-tapdrldia": 3, "hw-tapdrldepth": 3, "hw-threaddepth": 3}
+# The tap drill prints its .XXX drill size; its MIN depth and the full-thread
+# depth print .XX (machinist review at 1db35fba4: only a continuous lead
+# through both walls is stated, which the .010 band serves; the bottoming
+# lead is proven at that band in fr_harmonic_base_fasteners).
+CROSS_TAP_CALLOUT_PRECISION = {"hw-tapdrldia": 3, "hw-tapdrldepth": 2, "hw-threaddepth": 2}
 
 # Hole-table origin is the finished plate's lower-left theoretical sharp
 # corner. The physical corner is filleted, so the native table is seeded from
@@ -2462,8 +2465,8 @@ async def build(adapter: Any) -> dict[str, str]:
         process=CROSS_TAP_PROCESS,
     )
     _set_cross_tap_callout_text(tap_callout)
-    # Every Hole Wizard length prints .XXX, the MIN drill depth included
-    # (per-variable, see set_hole_callout_precision).
+    # The drill size prints .XXX and both depths .XX, the MIN drill depth
+    # included (per-variable, see set_hole_callout_precision).
     set_hole_callout_precision(
         tap_callout, CROSS_TAP_CALLOUT_PRECISION, label="base cross-tap drill depth"
     )

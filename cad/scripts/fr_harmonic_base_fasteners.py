@@ -56,9 +56,10 @@ BASE_CROSS_TAP_SPEC = HoleSpec(
     thread_class="2B", overrides_mm={"ThreadDepth": CASTING_FULL_THREAD_DEPTH},
 )
 BASE_CROSS_TAP_DRILL_DIA = TAP_DRILL_MM[BASE_CROSS_TAP_SPEC.size]
-# The callout prints its depths .XXX.
+# The callout prints both depths .XX: the drill depth is a MIN, so only the
+# full thread's .010 band eats the lead (1.93 - 1.82 = .11 >= two pitches).
 if CASTING_TAP_DRILL_DEPTH - (
-    CASTING_FULL_THREAD_DEPTH + printed_band_mm(3, unit=UNIT)
+    CASTING_FULL_THREAD_DEPTH + printed_band_mm(2, unit=UNIT)
 ) < 2.0 * IN / 32.0 - 1e-9:
     raise AssertionError("base cross tap lacks two-pitch bottoming-tap lead")
 

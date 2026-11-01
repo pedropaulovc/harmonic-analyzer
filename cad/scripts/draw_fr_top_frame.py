@@ -578,7 +578,8 @@ HUB_BOTTOM_NOTE = "BOTTOM VIEW\nBAR/GUSSET BOTTOMS AT\nSEATS SHARP"
 HUB_DETAIL_CENTER = (0.300, 0.174)
 HUB_DETAIL_SCALE = (2, 1)
 HUB_DETAIL_CAPTION_XY = (0.300, 0.090)
-HUB_BOSS_DIA_TEXT_XY = (0.210, 0.100)
+# 5 mm right of its first stand: F-F's grip value row ends 3 mm short of it.
+HUB_BOSS_DIA_TEXT_XY = (0.215, 0.100)
 # The 28.0 rail pad, RibProfile's native width (a Top-plane sketch, so it
 # imports into this view from below), where its two faces are drawn: farm
 # run 20261027T195317391Z measured them on J at y 146.0 and 202.0 mm, x
@@ -658,9 +659,10 @@ def _hanger_section_xy(x: float, y: float) -> tuple[float, float]:
     )
 
 
-# Right of the profile, nested: the 36.50 grip, its text on its line 3.2 mm
-# right of the gussets' cut end, then the depth all four reams share, its
-# text beside its line clear of both (HANGER_PIN_DEPTH_OFFSET_XY).  The grip's
+# Right of the profile, nested: the 36.50 grip, its line 3.2 mm right of the
+# gussets' cut end and its text on a stub above the depth's
+# (HANGER_GRIP_OFFSET_XY), then the depth all four reams share, its text
+# beside its line clear of both (HANGER_PIN_DEPTH_OFFSET_XY).  The grip's
 # extension lines leave from its attachment beyond the profile's right end
 # (x 149.5 mm on farm run 20261027T143609236Z, when it stood left of the
 # profile and they ran across the whole underside), so on the right they no
@@ -747,11 +749,22 @@ HANGER_PERP_FRAME_QUANTITY = "4X"
 # both from one selection).  Since the faced top, the ream sketch's
 # diameter has not reached F-F, which sees the reams edge-on, even imported
 # apart from the grip (d8fac576, leaf 20261014T212023Z-1-90af84a0).
-# The grip prints bare under the title block's .XX band (owner ruling
-# 2026-10-18: MHA-SM-VN-52 is cut to the measured grip at SM-00).
+# The grip prints under the title block's .XXX band (owner ruling
+# 2026-10-18: MHA-SM-VN-52 is cut to the measured grip at SM-00) and names
+# the bolt whose grip it is (machinist review: a three-place size states
+# its function).  Its two rows are wider than the 14.7 mm between the
+# profile and the depth's rows, so they park on a stub above the depth's
+# ".47": the native linear OffsetText form (rows centred on the offset x,
+# the value's baseline on the offset y, the underline the widest row's
+# width 5.56 mm under it) puts the 46.1 mm row at x 160.5..206.6 on
+# y 88.0, 2.3 over the ".47" and 2.9 under the boss's Ø1.18 underline, and
+# the value 4.0 under the reams' station underline (y 100.4) and 3.0 left
+# of the Ø1.18 row.  The stub climbs from the grip line's mid (x 158.15).
+HANGER_GRIP_CALLOUT = "MHA-SM-VN-52 GRIP"
+HANGER_GRIP_OFFSET_XY = (0.18355, 0.0936)
 HANGER_SECTION_CALLOUTS = {
     "HangerPinHoleDepth": HANGER_PIN_DEPTH_CALLOUT,
-    "HangerGrip": "",
+    "HangerGrip": HANGER_GRIP_CALLOUT,
 }
 HANGER_SECTION_CAPTION_XY = (0.120, 0.031)
 # Sheet 6, UNDERSIDE locator (1:3, model x right and z up from the view
@@ -1398,7 +1411,7 @@ def _require_model_hanger_grip(adapter: Any, dimensions: list[Any]) -> Any:
 
     Read-only. The model owns the dimension -- the crossbar's full-height
     extrude depth, driven by RingHeight -- and authors no band on it: the
-    title block's .XX band governs (owner ruling 2026-10-18: MHA-SM-VN-52 is
+    title block's .XXX band governs (owner ruling 2026-10-18: MHA-SM-VN-52 is
     cut to the measured grip at SM-00).  A lost association, a drifted value
     or a band of its own raises here.
     """
@@ -2363,7 +2376,11 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
     _require_model_hanger_grip(adapter, dimensions)
     set_dimension_callouts(adapter, dimensions, HANGER_SECTION_CALLOUTS)
     offset_dimension_text(
-        adapter, dimensions, {"HangerPinHoleDepth": HANGER_PIN_DEPTH_OFFSET_XY}
+        adapter, dimensions,
+        {
+            "HangerPinHoleDepth": HANGER_PIN_DEPTH_OFFSET_XY,
+            "HangerGrip": HANGER_GRIP_OFFSET_XY,
+        },
     )
     # Datum A on the faced underside's edge and the reams' perpendicularity
     # to it (HANGER_PERP_FRAME_XY): the -X frames on the locator keep B|C.
@@ -3967,9 +3984,11 @@ async def build(adapter: Any) -> dict[str, str]:
         # requirement, no tool named (machinist review r1).
         process=CROSS_TAP_CALLOUT,
     )
+    # Drill diameters print three places (.159, the #21), the depths .XX.
     set_hole_callout_precision(
-        cross_tap_callout, {"hw-tapdrldepth": 2, "hw-threaddepth": 2},
-        label="cross tap depths",
+        cross_tap_callout,
+        {"hw-tapdrldia": 3, "hw-tapdrldepth": 2, "hw-threaddepth": 2},
+        label="cross tap drill and depths",
     )
     _checked_dimension(
         adapter, detail_front,
@@ -4067,7 +4086,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, hub_top,
         p0=(-COLUMN_X, HALF_H+BOSS_ABOVE, FRONT_COLUMN_Z),
         p1=(GOOSENECK_X, HALF_H, GOOSENECK_Z),
-        text_xy=(0.040, 0.225), label="hub from left front socket",
+        # x 36.5, not 40: the qualifier's "MHA-SM-00" row ended 0.34 mm from
+        # view G's letter (farm 1db35fba4 read "MHA-SM-00G"); 3.5 mm left
+        # leaves 3.8 of air and 6.9 to the sheet border.
+        text_xy=(0.0365, 0.225), label="hub from left front socket",
         expected_mm=GOOSENECK_Z-FRONT_COLUMN_Z, orientation="vertical",
         center=True, entities=(left_socket_edge, gooseneck_edge),
         # The summing axis's station, flowing through at .XXX (machinist
@@ -4097,7 +4119,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ).edge
     if rail_top_edge is None:
         raise RuntimeError("left view has no exact upper rail edge at the gooseneck station")
-    add_native_hole_callout(
+    set_tap_callout = add_native_hole_callout(
         adapter,
         detail_left,
         edge=set_tap_edge,
@@ -4114,6 +4136,13 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         label="gooseneck set-screw through-to-bore tap",
         process="TAP",
+    )
+    # The #7 tap drill prints three places (.201), as drill diameters do; a
+    # THROUGH tap's drill is <hw-thrutapdrldia> (draw_sh_column_clamp_back).
+    set_hole_callout_precision(
+        set_tap_callout,
+        {"hw-thrutapdrldia": 3},
+        label="gooseneck set-tap drill",
     )
     _checked_dimension(
         adapter, detail_left,

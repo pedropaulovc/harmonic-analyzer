@@ -499,7 +499,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "RibProfile": {"RibWidth": 2},
     "SetBossProfile": {"SetBossWidth": 2},
     "SetSpotProfile": {"SetSpotDia": 2},
-    "GooseneckProfile": {"GnDia": 2},
+    "GooseneckProfile": {"GnDia": 3},  # a drill diameter: .670
     "CapRecessProfile": {"CapRecessDia": 3},
     "CapRecesses": {"CapRecessDepth": 3},
     "HangerPinProfile": {"HangerPinHoleDia": HANGER_PIN_HOLE_DIA_PLACES},

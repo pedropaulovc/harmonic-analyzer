@@ -18,3 +18,8 @@ fr-harmonic-base:
       where: "MHA-FR-01 fr-harmonic-base, sheet 2 HOLES-SOCKETS, generated native hole-table SIZE cells only"
       finding: "the native hole-table SIZE rows repeat default thread class 2B from the title block (rule 2)"
       reason: "Owner explicitly accepted this presentation-only departure on 2026-10-20 to preserve the model-linked generated hole table without rewriting its noneditable SIZE cells. All physical Hole Wizard threads remain class 2B. The five separate native tap callouts must still omit the duplicate class token. This accepts no other repeated specification, callout, package, geometry, tolerance, engagement or clearance departure."
+    - id: "RV-03"
+      kind: "accept"
+      where: "MHA-FR-01 fr-harmonic-base, sheet 2 HOLES-SOCKETS, generated native hole-table SIZE cells of A1-A4 only: the socket depth .880"
+      finding: "the socket depth prints three places with no stated function (rule 3)"
+      reason: "the native hole table has a single SIZE precision for all its rows, and the B1 and C1 tap drills (.089, .201) need three places to print their model sizes, so it forces .880 into the A1-A4 cells. The depth's function needs only .XX: the tube bottoms in the socket, but nothing reads that seat, since the top frame is set by gauge from the base underside, the tube is match-cut to the actual stack, and both cross holes are transfer-drilled. Main accepted this on 2026-11-01; it accepts no other three-place size, location or callout depth (owner-accepted)"

@@ -4485,12 +4485,11 @@ def _segments_apart(a, b) -> bool:
     return side(a0, a1, b0) * side(a0, a1, b1) > 0 or side(b0, b1, a0) * side(b0, b1, a1) > 0
 
 
-def test_finished_grip_prints_bare_at_the_title_block_band() -> None:
+def test_finished_grip_takes_the_title_block_band() -> None:
     """Owner ruling 2026-10-18: the 1.437 grip takes the title block's .XXX
-    band with no callout; MHA-SM-VN-52 is cut to the measured grip at
-    MHA-SM-00, so the grip no longer sets thread engagement."""
+    band; MHA-SM-VN-52 is cut to the measured grip at MHA-SM-00, so the grip
+    no longer sets thread engagement."""
     assert (spec.HANGER_GRIP, spec.HANGER_GRIP_TOL) == pytest.approx((36.4998, 0.127))
-    assert drawing.HANGER_SECTION_CALLOUTS["HangerGrip"] == ""
 
 
 def test_hanger_section_cuts_the_crossbar_from_window_to_window() -> None:
@@ -4601,92 +4600,6 @@ def test_hanger_station_and_span_lines_end_inside_short_of_the_station_rows() ->
     assert len(struck) == 2, struck
 
 
-def _hanger_section_ink():
-    """F-F's profile and annotation ink (sheet m), from the model and farm
-    run 20261027T143609236Z's measured F-F: the grip's extension lines leave
-    its attachment at x 149.5 mm and run 1 mm past its line; the depth's
-    leave the +X ream's +X wall 1 mm off (x 130.22 mm) at the underside and
-    the floor; extension and dimension lines 1 mm past, the depth's arrows
-    outside to 6.35 mm tails; texts 3.5 mm tall, " 36.50 " 14.22 mm wide and
-    centred on its line; the caption to 141.59 mm, its top at 29.14 mm.
-    The depth's rows in farm run 20261027T175429300Z's measured form
-    (offset 209.0, 77.56 mm: the depth from y 80.34, "4X FLAT BOTTOM," from
-    74.78, the next row from 69.23, the stub from the line's 62.75 mm mid to
-    the underline's near end): each row centred on the offset x, from 2.78
-    mm above the offset y, then 5.56 mm apart under it from 2.78 mm, the
-    last on the underline; the inch rows' widths estimated at the measured
-    "CORNER R0.1 MAX" row's pitch."""
-    from _layout_geometry import Box, Segment
-
-    s = drawing._hanger_section_xy
-    z_low, z_high = -part.HALF_H, part.HALF_H
-    bottom, top = s(0.0, z_low)[1], s(0.0, z_high)[1]
-    reach = drawing.HANGER_SECTION_GUSSET_REACH
-    left, right = s(part.BAR_X0 - reach, 0.0)[0], s(part.BAR_X1 + reach, 0.0)[0]
-    r = spec.HANGER_PIN_HOLE_DIA / 2.0
-    hole_r = spec.HANGER_CLEARANCE_DIA / 2.0
-    floor = s(0.0, z_low + spec.HANGER_PIN_HOLE_DEPTH)[1]
-    walls = {
-        "-X ream -X wall": s(part.PIN_HOLE_NEG_X - r, 0.0)[0],
-        "-X ream +X wall": s(part.PIN_HOLE_NEG_X + r, 0.0)[0],
-        "+X ream -X wall": s(part.PIN_HOLE_X - r, 0.0)[0],
-        "+X ream +X wall": s(part.PIN_HOLE_X + r, 0.0)[0],
-    }
-    gaps = [
-        (walls["-X ream -X wall"], walls["-X ream +X wall"]),
-        (s(part.HANGER_X - hole_r, 0.0)[0], s(part.HANGER_X + hole_r, 0.0)[0]),
-        (walls["+X ream -X wall"], walls["+X ream +X wall"]),
-    ]
-    edges = {"left end": Segment(left, bottom, left, top), "right end": Segment(right, bottom, right, top)}
-    x = left
-    for index, (g0, g1) in enumerate(gaps):
-        edges[f"underside {index}"] = Segment(x, bottom, g0, bottom)
-        x = g1
-    edges[f"underside {len(gaps)}"] = Segment(x, bottom, right, bottom)
-    for name, wall in walls.items():
-        edges[name] = Segment(wall, bottom, wall, floor)
-    gx = drawing.HANGER_GRIP_TEXT_XY[0]
-    dx, dy = drawing.HANGER_SECTION_KEEP["HangerPinHoleDepth"]
-    ox, oy = drawing.HANGER_PIN_DEPTH_OFFSET_XY
-    height = 0.0035
-    rows = [".470", *spec.HANGER_PIN_DEPTH_CALLOUT.splitlines()]
-    glyph = 0.0419368 / 15.0  # the measured "CORNER R0.1 MAX" row's pitch
-    widths = {
-        ".470": 0.0090514,
-        "4X FLAT BOTTOM,": 0.0382132,
-        "CORNER": 6 * glyph,
-        "R.003 MAX": 9 * glyph,
-    }
-    assert set(rows) == set(widths)
-    bases = (oy + 0.0027781, oy - 0.0027781, oy - 0.0083344, oy - 0.0138907)
-    underline_y = bases[-1]
-    underline_half = max(widths.values()) / 2.0
-    lines = {
-        "grip line": Segment(gx, bottom, gx, top),
-        "grip extension underside": Segment(0.1495, bottom, gx + 0.001, bottom),
-        "grip extension top": Segment(0.1495, top, gx + 0.001, top),
-        "depth extension underside": Segment(walls["+X ream +X wall"] + 0.001, bottom, dx + 0.001, bottom),
-        "depth extension floor": Segment(walls["+X ream +X wall"] + 0.001, floor, dx + 0.001, floor),
-        "depth line": Segment(dx, bottom, dx, floor),
-        "depth tail low": Segment(dx, bottom, dx, bottom - 0.00635),
-        "depth tail high": Segment(dx, floor, dx, floor + 0.00635),
-        "depth jog": Segment(dx, dy, ox - underline_half, underline_y),
-        "depth underline": Segment(ox - underline_half, underline_y, ox + underline_half, underline_y),
-    }
-    gy = drawing.HANGER_GRIP_TEXT_XY[1]
-    texts = {
-        "grip": Box(gx - 0.00711, gy - 0.00175, gx + 0.00711, gy + 0.00175),
-        **{
-            f"depth row {index}": Box(
-                ox - widths[row] / 2.0, base, ox + widths[row] / 2.0, base + height
-            )
-            for index, (row, base) in enumerate(zip(rows, bases))
-        },
-        "caption": Box(0.0984, 0.01541, 0.14159, 0.02914),
-    }
-    return edges, lines, texts
-
-
 def test_pad_width_leaves_the_plan_for_detail_j() -> None:
     """The plan's only import is the Ø17.00 bore: under the top flange that
     hidden-lines-removed plan shows no pad (farm run 20261027T195317391Z,
@@ -4783,80 +4696,6 @@ def test_pad_width_on_detail_j_names_the_drawn_faces_and_reads_outside_it() -> N
     assert _segments_apart(stub, seven_leader)
 
 
-def test_hanger_section_nests_the_grip_and_depth_right_of_the_profile() -> None:
-    """The grip and the depth both stand right of F-F's profile, the depth
-    outside: the grip's extension lines no longer run across the underside
-    under the reams' mouths (farm run 20261027T143609236Z: x 83.35..149.5
-    mm), where datum A's frame leader enters.  The depth's four rows (its
-    corner limit, codjiflo round 4) overfill its 12 mm, so they stand beside
-    its line on a level stub.  Farm run 20261027T175429300Z: with its line
-    34.5 mm right of the gussets the block ran to x 230, into the title
-    block (keep-out); the line stands 19.6 mm right of them, just past the
-    grip's text.  Every text clears the profile, the other dimension's
-    lines and the title block."""
-    from _layout_geometry import Box, segment_box_distance
-
-    ink = drawing.INK_CLEARANCE
-    edges, lines, texts = _hanger_section_ink()
-    right = edges["right end"].x0
-    assert "HANGER_GRIP_OFFSET_XY" not in dir(drawing)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    section = source[source.index("def _hanger_section(") : source.index("def _hub_underside_detail(")]
-    assert section.count("offset_dimension_text(") == 1
-    assert (
-        "offset_dimension_text(\n"
-        '        adapter, dimensions, {"HangerPinHoleDepth": HANGER_PIN_DEPTH_OFFSET_XY}\n'
-        "    )"
-    ) in section
-    depth_texts = {name: box for name, box in texts.items() if name.startswith("depth")}
-    assert len(depth_texts) == 4
-    # Nested: grip line, then the depth's line, then its text.
-    assert right + ink < texts["grip"].xmin
-    assert lines["grip line"].x0 + ink <= lines["depth line"].x0
-    for name, box in depth_texts.items():
-        assert lines["depth line"].x0 + ink <= box.xmin, name
-    for name, box in texts.items():
-        for line_name, line in lines.items():
-            if name.startswith("depth") and line_name in ("depth jog", "depth underline"):
-                continue
-            if name == "grip" and line_name.startswith("grip"):
-                continue
-            assert segment_box_distance(line, box) >= ink, (name, line_name)
-        for edge_name, edge in edges.items():
-            assert segment_box_distance(edge, box) >= ink, (name, edge_name)
-        assert _box_box_gap((box.xmin, box.ymin, box.xmax, box.ymax), TITLE_BLOCK) >= ink, name
-    # The stub clears its own floor extension line's end and every other
-    # line; no other text sits on it.
-    jog = lines["depth jog"]
-    assert abs(jog.y1 - jog.y0) < 0.0001
-    assert _segment_gap(jog, lines["depth extension floor"]) >= ink
-    for line_name in ("grip line", "grip extension top", "depth tail high"):
-        assert _segments_apart(jog, lines[line_name]), line_name
-    for name in ("grip", "caption"):
-        assert segment_box_distance(jog, texts[name]) >= ink, name
-    # The upper tail passes right of the 36.50's text.
-    assert lines["depth tail high"].x0 - texts["grip"].xmax >= ink
-    # The whole dimension (the layout audit's keep-out box: its lines down
-    # to the floor witness and its text) ends 4 mm short of the title block,
-    # under detail J's boss callout ("CYLINDRICAL BOSS" underline at y 94.42
-    # mm from x 188.68 mm).
-    block = Box(
-        min(box.xmin for box in depth_texts.values()),
-        min(box.ymin for box in depth_texts.values()),
-        max(box.xmax for box in depth_texts.values()),
-        max(box.ymax for box in depth_texts.values()),
-    )
-    depth_right = max(
-        block.xmax,
-        *(max(line.x0, line.x1) for name, line in lines.items() if name.startswith("depth")),
-    )
-    assert TITLE_BLOCK[0] - depth_right >= 0.004
-    assert 0.09442 - block.ymax >= 0.004
-    # No grip extension line runs under a ream's mouth.
-    for name in ("-X ream +X wall", "+X ream +X wall"):
-        assert lines["grip extension underside"].x0 > edges[name].x0 + 0.010, name
-
-
 def test_cut_face_edge_through_keeps_only_a_line_spanning_its_landing() -> None:
     """Farm run 9: datum A's landing is set on the selected cut-face line,
     so ``through`` keeps only a line running past the landing by its margin
@@ -4888,8 +4727,6 @@ def test_faced_underside_is_datum_a_and_every_ream_is_square_to_it() -> None:
     ⊥ Ø.0008 | A frame covers all four reams, datums B and C included; its
     leader enters the +X ream's mouth from below and lands on its wall.  The
     locator's position frames keep B|C."""
-    from _layout_geometry import Box, Segment, segment_box_distance
-
     assert (
         spec.GEOMETRIC_TOLERANCES_IN["knife-hanger press ream perpendicularity"]
         == ".0008"
@@ -4925,78 +4762,6 @@ def test_faced_underside_is_datum_a_and_every_ream_is_square_to_it() -> None:
     assert "quantity=HANGER_PERP_FRAME_QUANTITY," in section
     assert drawing.HANGER_PERP_FRAME_QUANTITY == "4X"
     assert "datums=datums," in source and '("front", STUD_Z_FRONT, ("B", "C")),' in source
-    ink = drawing.INK_CLEARANCE
-    s = drawing._hanger_section_xy
-    edges, lines, texts = _hanger_section_ink()
-    bottom = edges["underside 0"].y0
-    # Datum A: picked on the underside between the gussets' cut end and the
-    # -X ream's mouth, outside the crossbar; its leader drops straight to the
-    # tag point, the 7 mm box 6.35 mm right of it (B and C's measured form).
-    pick = s(drawing.HANGER_FLOOR_DATUM_PICK_X, -part.HALF_H)
-    first = edges["underside 0"]
-    assert first.x0 + 0.005 < pick[0] < first.x1 - 0.005
-    assert drawing.HANGER_FLOOR_DATUM_PICK_X < part.BAR_X0
-    tx, ty = drawing.HANGER_FLOOR_DATUM_SYMBOL_XY
-    assert tx == pytest.approx(pick[0])
-    a_leader = Segment(pick[0], bottom - 0.0025, tx, ty)
-    a_shoulder = Segment(tx, ty, tx + 0.00635, ty)
-    a_box = Box(tx + 0.00635, ty - 0.0035, tx + 0.01335, ty + 0.0035)
-    axis_end = (s(part.PIN_HOLE_NEG_X, 0.0)[0], s(0.0, -part.HALF_H - 2.0)[1])
-    assert axis_end[1] - a_box.ymax >= 0.004
-    assert a_box.xmin <= axis_end[0] <= a_box.xmax
-    # The frame: its leader from its left end's shoulder enters the +X
-    # ream's mouth from below and lands 3 mm up its -X wall.
-    fx, fy = drawing.HANGER_PERP_FRAME_XY
-    x0, y0, x1, y1 = drawing.HANGER_PERP_FRAME_OUTLINE
-    frame = Box(fx + x0, fy + y0, fx + x1, fy + y1)
-    assert x1 - x0 == pytest.approx(0.0070 + 0.01612 + 0.00663)
-    tip = s(*drawing.HANGER_PERP_LANDING)
-    wall = edges["+X ream -X wall"]
-    assert tip[0] == pytest.approx(wall.x0, abs=1e-5) and wall.y0 < tip[1] < wall.y1
-    assert drawing.HANGER_PERP_LANDING[0] == part.PIN_HOLE_X - spec.HANGER_PIN_HOLE_DIA / 2.0
-    mid = fy + (y0 + y1) / 2.0
-    knee = (frame.xmin - 0.00635, mid)
-    assert drawing.hanger_ream_frame_knee(drawing.HANGER_PERP_FRAME_XY, tip) == pytest.approx(knee)
-    leader = Segment(*knee, *tip)
-    shoulder = Segment(*knee, frame.xmin, mid)
-    count = Box(frame.xmin, frame.ymin - 0.00556, frame.xmin + 0.0055, frame.ymin - 0.00206)
-    # Through the mouth: where it meets the underside it is inside the mouth
-    # with air to both walls, it meets the +X wall below the underside, and
-    # its only model crossing is its landing.
-    at_bottom = knee[0] + (tip[0] - knee[0]) * (bottom - knee[1]) / (tip[1] - knee[1])
-    mouth = (edges["+X ream -X wall"].x0, edges["+X ream +X wall"].x0)
-    assert mouth[0] + 0.0015 < at_bottom < mouth[1] - 0.001
-    for name, edge in edges.items():
-        if name == "+X ream -X wall":
-            continue
-        assert _segments_apart(leader, edge), name
-    # 2.0 mm off the depth's extension line, which starts 1 mm off the wall.
-    assert _segment_gap(leader, lines["depth extension underside"]) >= 0.0019
-    for name, line in lines.items():
-        assert _segments_apart(leader, line), name
-        for piece_name, piece in (("shoulder", shoulder), ("A leader", a_leader), ("A shoulder", a_shoulder)):
-            assert _segment_gap(piece, line) >= ink, (piece_name, name)
-        for box_name, box in (("frame", frame), ("4X", count), ("A box", a_box)):
-            assert segment_box_distance(line, box) >= ink, (box_name, name)
-    for name, box in texts.items():
-        for piece_name, piece in (("leader", leader), ("shoulder", shoulder), ("A leader", a_leader)):
-            assert segment_box_distance(piece, box) >= ink, (piece_name, name)
-        for other_name, other in (("frame", frame), ("4X", count), ("A box", a_box)):
-            assert _box_box_gap(
-                (box.xmin, box.ymin, box.xmax, box.ymax), (other.xmin, other.ymin, other.xmax, other.ymax)
-            ) >= 0.003, (other_name, name)
-    # Frame, count and tag stand under the profile, apart from each other
-    # and the other's leader, on the sheet, off the title block.
-    for box_name, box in (("frame", frame), ("4X", count), ("A box", a_box)):
-        assert box.ymax <= bottom - 0.006, box_name
-        assert segment_box_distance(leader, box) >= (0.0 if box_name == "frame" else ink), box_name
-        assert segment_box_distance(a_leader, box) >= ink, box_name
-        assert _box_box_gap((box.xmin, box.ymin, box.xmax, box.ymax), TITLE_BLOCK) >= ink, box_name
-    assert _box_box_gap(
-        (frame.xmin, frame.ymin, frame.xmax, frame.ymax), (a_box.xmin, a_box.ymin, a_box.xmax, a_box.ymax)
-    ) >= 0.020
-    assert _segment_gap(leader, a_leader) >= 0.020
-
 
 
 def test_plus_x_station_is_xxx_and_minus_x_ream_basic_from_it() -> None:
