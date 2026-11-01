@@ -320,11 +320,13 @@ def test_chain_annotation_positions_follow_source_ink_not_stale_outline(
         2 * chain_stock.PITCH if connecting else chain_stock.ROLLER_DIAMETER
     ) / 1000 * ratio
     expected_top = {chain_stock.WIDTH_DIMENSION: (top_left - 0.014, y)}
-    width_top = y + chain_stock.ROLLER_WIDTH / 2000 * ratio
     if connecting:
         expected_top.update(
             {
-                chain_stock.PLATE_DIMENSION: ((top_left + top_right) / 2, width_top + 0.014),
+                chain_stock.PLATE_DIMENSION: (
+                    (top_left + top_right) / 2,
+                    y + chain_stock.CONNECTING_PIN_LENGTH / 2000 * ratio + 0.005,
+                ),
                 chain_stock.LENGTH_DIMENSION: (top_right + 0.020, y),
             }
         )
@@ -334,9 +336,11 @@ def test_chain_annotation_positions_follow_source_ink_not_stale_outline(
             assert views[key].dimension_positions[name] == pytest.approx(xy)
     if connecting:
         # The plate REF's shoulder (~5.6 mm under its anchor) stays above the
-        # roller-width line's 6.35 mm outside-arrow stub at either scale.
+        # roller outline, and its ~3.5 mm-high top row inside a 40 mm cell
+        # centred on the ink.
         plate_y = views["free_top"].dimension_positions[chain_stock.PLATE_DIMENSION][1]
-        assert plate_y - 0.0056 >= width_top + 0.00635 + 0.001
+        assert plate_y - 0.0056 > y + chain_stock.ROLLER_WIDTH / 2000 * ratio + 0.001
+        assert plate_y + 0.0035 < y + 0.020
     assert not views["installed_iso"].dimension_positions
     settled()
     assert all(view.outline_calls == 0 for view in views.values())
