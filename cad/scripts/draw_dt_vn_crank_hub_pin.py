@@ -49,7 +49,7 @@ from dt_vn_crank_hub_pin_spec import (
 )
 
 
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["dt_vn_crank_hub_pin"]
 PART_STEM = SPEC.artifact_stem
