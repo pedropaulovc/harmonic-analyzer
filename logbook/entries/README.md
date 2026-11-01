@@ -28,6 +28,12 @@ fabricated observation would poison the whole book.
 - Raw photos and video go outside the repo (`logbook/media/` is gitignored);
   link them. Only frames destined for the book get committed, into
   `book/figures/hand/`.
+- Explanatory sketches (setups, workholding, cutter paths) are drawings, not
+  raw media: commit them as `figures/YYYY-MM-DD-<slug>.png` and embed them in
+  the entry.
+- Advice received after a session goes in an optional
+  `## Advice afterwards (from <who>, not yet tried)` section after `## Open`,
+  never in the observed sections. The next entry says what held up.
 
 ## Index
 
