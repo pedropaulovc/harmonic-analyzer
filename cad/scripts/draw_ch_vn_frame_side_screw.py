@@ -9,6 +9,7 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _supplier_screw_dimensions import annotate_supplier_screw
@@ -23,6 +24,7 @@ from _mcmaster_91794a080 import (
 
 
 SPEC = DRAWINGS_BY_NAME["ch_vn_frame_side_screw"]
+MACHINIST_REVIEW = MachinistReviewMode.LEARN
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "#2-56 x 7/16 FILLISTER HEAD SLOTTED SCREW"
 
