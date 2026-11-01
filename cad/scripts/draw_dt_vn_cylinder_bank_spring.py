@@ -260,24 +260,16 @@ def place_size_texts(
     )
     for name in TEXT_SIDES["free_front"]:
         displays[name].OffsetText = True
-    def place(names: Any) -> None:
-        for name in names:
-            x, y = positions[name]
-            annotation = _early_bound(displays[name].GetAnnotation(), "IAnnotation")
-            if not annotation.SetPosition2(x, y, 0.0):
-                raise RuntimeError(
-                    f"{supplier_spec.SKU} {name}: text placement was rejected"
-                )
-
-    place(positions)
-    # Style the diameters at their final text place, then place them again:
-    # styled at the import station, the inch OD kept a second straight line
-    # from its import pick through its moved text (run 20261101T041608219Z).
     for name in TEXT_SIDES["free_top"]:
         set_near_side_diameter(
             displays[name].GetAnnotation(), f"{supplier_spec.SKU} {name}"
         )
-    place(TEXT_SIDES["free_top"])
+    for name, (x, y) in positions.items():
+        annotation = _early_bound(displays[name].GetAnnotation(), "IAnnotation")
+        if not annotation.SetPosition2(x, y, 0.0):
+            raise RuntimeError(
+                f"{supplier_spec.SKU} {name}: text placement was rejected"
+            )
     _telemetry.info(
         f"{supplier_spec.SKU}: size texts placed "
         + ", ".join(
