@@ -67,7 +67,6 @@ from dt_crank_hub_spec import (
     HUB_SEAT_LENGTH,
     ISOMETRIC_VIEW_NOTE,
     PIN_PROUD_MIN_BAND,
-    SERVICE_PIN_FROM_SHOULDER,
     SERVICE_PIN_HOLE_SPEC,
     SERVICE_PIN_STATION,
     SURFACE_FINISHES,
@@ -219,7 +218,7 @@ async def build(adapter) -> dict[str, str]:
         ("ReliefLength", RELIEF_LENGTH),
         ("ReliefDia", RELIEF_DIA),
         ("BoreDia", HUB_BORE_DIA),
-        ("ServicePinFromShoulder", SERVICE_PIN_FROM_SHOULDER),
+        ("ServicePinStation", SERVICE_PIN_STATION),
         ("AxialPinDia", AXIAL_PIN_DIA),
         ("SeamDepth", SEAM_DEPTH),
         # The MHA-DT-09 ream's acceptance: a limit, not geometry, so only the
@@ -373,8 +372,8 @@ async def build(adapter) -> dict[str, str]:
     )
     # Inboard shoulder and the plane locating the MHA-DT-09 match-ream station.
     # The plane offset is not printable through a drawing view (targeted import
-    # selects sketches/body features); it is driven from the same two globals
-    # as the printed shoulder-to-pin dimension on the reference sketch below.
+    # selects sketches/body features); it is driven from the same global as
+    # the printed station dimension on the reference sketch below.
     for plane_name, station in (
         ("ArmShoulder", HUB_SEAT_LENGTH),
         ("ServicePinStationPlane", SERVICE_PIN_STATION),
@@ -388,7 +387,7 @@ async def build(adapter) -> dict[str, str]:
         name_last_feature(adapter, plane_name)
         if plane_name == "ServicePinStationPlane":
             dimensions = name_dimensions(adapter, plane_name, ["ServicePinStationPlaneOffset"])
-            drive_jobs.append((dimensions[0], '"SeatLength" + "ServicePinFromShoulder"'))
+            drive_jobs.append((dimensions[0], '"ServicePinStation"'))
 
     wizard_hole_on_cylinder(
         adapter,
@@ -404,21 +403,21 @@ async def build(adapter) -> dict[str, str]:
         f"{final_volume:.1f} mm^3"
     )
     # Drawing-only station reference on the hub axis, printing the MHA-DT-09
-    # station from the arm shoulder it must not break into (drawing-guidelines.md rule 17 (walls and webs)).
+    # station from the faced outboard end (the machinist's baseline; the
+    # shoulder ligament is the drawing-guidelines.md rule 17 (walls and webs)
+    # stack in dt_crank_hub_geometry).
     # Keeping the construction line under the view centreline avoids extra
     # printed geometry while giving targeted model-item import a real sketch
     # owner.  It sits on the Right plane because the *Right side view prints
     # it; every reference sketch that imports natively sits on the plane of
     # its view.  On the Front plane the sketch was selected but its dimension
     # never arrived (run 20260922T020620997Z-4a7ef16e).  Right (u, v) -> (-Z, Y).
-    # The line starts at the shoulder; that locating dimension is driven by
-    # SeatLength and is not printed (the profile's SeatLength is).
     station = SketchDims()
     check("create_sketch service pin station", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     station_line = check(
         "service pin station reference line",
-        await adapter.add_line(0.0, HUB_SEAT_LENGTH, 0.0, SERVICE_PIN_STATION),
+        await adapter.add_line(0.0, 0.0, 0.0, SERVICE_PIN_STATION),
     )
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[station_line], "ISketchSegment")
@@ -433,19 +432,18 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         f"{station_line}.start",
         0.0,
-        HUB_SEAT_LENGTH,
-        "service pin station reference at the shoulder",
+        0.0,
+        "service pin station reference at the outboard face",
     )
-    station.record("ShoulderStationReference", '"SeatLength"')
     await dimension_between(
         adapter,
         f"{station_line}.start",
         f"{station_line}.end",
         "vertical_distance",
-        SERVICE_PIN_FROM_SHOULDER,
-        "service pin station from shoulder",
+        SERVICE_PIN_STATION,
+        "service pin station from the outboard face",
     )
-    station.record("ServicePinFromShoulder", '"ServicePinFromShoulder"')
+    station.record("ServicePinStation", '"ServicePinStation"')
     await ensure_fully_defined(adapter, "service pin station reference sketch")
     check("exit_sketch service pin station", await adapter.exit_sketch())
     name_last_feature(adapter, "ServicePinStationReference")

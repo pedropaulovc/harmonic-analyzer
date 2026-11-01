@@ -58,7 +58,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "ReliefDia",
     },
     "BoreProfile": {"BoreDia"},
-    "ServicePinStationReference": {"ServicePinFromShoulder"},
+    "ServicePinStationReference": {"ServicePinStation"},
     "PinProudReference": {"PinProud"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
@@ -83,9 +83,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ReliefDia": 2,
     },
     "BoreProfile": {"BoreDia": 4},  # 9.5504, .376 in
-    # Two places: the .XX band is what keeps the MHA-DT-09 ream's ligament to
-    # the arm shoulder over the rule-17 wall (dt_crank_hub_geometry, drawing-guidelines.md rule 17 (walls and webs)).
-    "ServicePinStationReference": {"ServicePinFromShoulder": 2},
+    # Two places from the faced outboard end: with the seat length's .XX, the
+    # band is what keeps the MHA-DT-09 ream's ligament to the arm shoulder
+    # over the rule-17 wall (dt_crank_hub_geometry, drawing-guidelines.md rule 17 (walls and webs)).
+    "ServicePinStationReference": {"ServicePinStation": 2},
     "PinProudReference": {"PinProud": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {

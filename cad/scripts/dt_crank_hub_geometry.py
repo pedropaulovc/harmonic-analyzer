@@ -185,11 +185,13 @@ def chain_shoulder_axial_air(
 ARM_TO_HUB_RATIO = ARM_WIDTH / HUB_SEAT_DIA
 PHOTO_ARM_TO_HUB_RATIO = PHOTO_ARM / PHOTO_HUB
 
-# MHA-DT-09's match-ream is fully behind the 5/16 arm, located from the arm
-# shoulder it must not break into; the barrel -- printed from the shoulder --
-# carries the 1:48 ream at that station: drawing-guidelines.md rule 17 (walls and webs) ligaments below.
-SERVICE_PIN_FROM_SHOULDER = 5.588  # .22
-SERVICE_PIN_STATION = HUB_SEAT_LENGTH + SERVICE_PIN_FROM_SHOULDER
+# MHA-DT-09's match-ream is fully behind the 5/16 arm, clear of the arm
+# shoulder it must not break into; the barrel carries the 1:48 ream at that
+# station, printed from the faced outboard end (the machinist's baseline,
+# machinist review of the inch sheet): drawing-guidelines.md rule 17 (walls
+# and webs) ligaments below.
+SERVICE_PIN_STATION = 13.462  # .53
+SERVICE_PIN_FROM_SHOULDER = SERVICE_PIN_STATION - HUB_SEAT_LENGTH
 CRANK_FACE_SHIFT = ARM_THICKNESS
 
 # Shared shaft-in-bushing fit class, re-expressed as a bore nominal/band against
@@ -246,19 +248,20 @@ HUB_BORE_DIA_MAX = HUB_BORE_DIA + HUB_BORE_BAND[0]
 HUB_LENGTH_BAND = (HUB_LENGTH_TOL, -GENERAL_2PL_TOL_MM)
 # drawing-guidelines.md rule 17 (walls and webs) (U27): MHA-DT-09 ream ligaments at the worst case of the printed
 # bands.  The ream never exceeds the pin's big end, which stands proud of the
-# hub.  Ahead of it the arm shoulder: the .XX station printed from it.  Behind
+# hub.  The ream is placed from the front face by the .XX station; ahead of it
+# the arm shoulder, placed from the same face by the .XX seat length.  Behind
 # it the relief shoulder, which the print places from the front face through
-# the .XX overall and the .XX relief back from the rear face, while the ream
-# is placed through the .XX seat length and the .XX station.
+# the .XX overall and the .XX relief back from the rear face.
 SERVICE_PIN_REAM_RADIUS_MAX = SERVICE_PIN_BIG_END_DIA / 2.0
 SERVICE_PIN_SHOULDER_LIGAMENT_WORST_MM = (
-    SERVICE_PIN_FROM_SHOULDER - SERVICE_PIN_REAM_RADIUS_MAX - GENERAL_2PL_TOL_MM
+    (SERVICE_PIN_STATION - GENERAL_2PL_TOL_MM)
+    - (HUB_SEAT_LENGTH + GENERAL_2PL_TOL_MM)
+    - SERVICE_PIN_REAM_RADIUS_MAX
 )
 SERVICE_PIN_REAR_LIGAMENT_WORST_MM = (
     (HUB_LENGTH + HUB_LENGTH_BAND[1])
     - (RELIEF_LENGTH + RELIEF_LENGTH_TOL)
-    - (HUB_SEAT_LENGTH + GENERAL_2PL_TOL_MM)
-    - (SERVICE_PIN_FROM_SHOULDER + GENERAL_2PL_TOL_MM)
+    - (SERVICE_PIN_STATION + GENERAL_2PL_TOL_MM)
     - SERVICE_PIN_REAM_RADIUS_MAX
 )
 # The relief is a clearance diameter at the title block's .XX band (R9-37):

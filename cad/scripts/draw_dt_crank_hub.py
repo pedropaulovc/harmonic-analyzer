@@ -9,7 +9,6 @@ from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
-    dimension_name,
     place_view,
 )
 
@@ -21,17 +20,13 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimensions import (
     assert_imported_precision,
-    set_arc_endpoints_to_center,
     set_dimension_callouts,
-    set_reference_dimension,
     set_reference_dimensions,
 )
-from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_attached_note
@@ -129,8 +124,9 @@ BARREL_BOTTOM = _sheet_y(HUB_BARREL_DIA / 2.0)
 # inside its circle sees no face (run 20260923T023246758Z-97bfca38).
 BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0.015)
 # Every size and callout sits outside the silhouettes.
-# - Lengths: the seat from the faced outboard end, the MHA-DT-09 station from
-#   the arm shoulder (drawing-guidelines.md rule 17 (walls and webs)) and the relief from the rear face on
+# - Lengths: the seat and the MHA-DT-09 station from the faced outboard end
+#   (the station's ligament to the shoulder is drawing-guidelines.md rule 17
+#   (walls and webs)) and the relief from the rear face on
 #   rows below the profile; the toleranced overall, front face to rear
 #   face, on the row below them.  The barrel is the remainder, not printed.
 #   The two banded lengths carry the mate they serve under their text.  The
@@ -162,21 +158,6 @@ END_KEEP = {
     # big end (x <= END_CENTER + 31.2 mm).
     "PinProud": (END_CENTER[0] + 0.072, END_CENTER[1] + 0.014),
 }
-# The cross-hole station is measured from the arm shoulder it must stay clear
-# of (dt_crank_hub_geometry), not chained from 8.0: its arrowhead there is
-# the ASME dimension-origin circle (r7 review of farm run
-# 20261101T022045634Z; draw_mg_wheel_axle's idiom).
-ORIGIN_DIMENSIONS = {"ServicePinFromShoulder": SHOULDER_X}
-_ORIGIN_ARROWHEAD = 4  # swArrowStyle_e.swORIGIN_ARROWHEAD
-_CLOSED_ARROWHEAD = 1  # swArrowStyle_e.swCLOSED_ARROWHEAD
-# The same station from the faced outboard end, as a reference on its own
-# row under the chain: the machinist's baseline, while the shoulder stays the
-# toleranced origin (machinist review of the inch sheet, r1 and r3).
-STATION_REF_PICKS = (
-    (OUTBOARD_X, SIDE_CENTER[1] - 0.010),
-    (SERVICE_PIN_CENTER[0], SERVICE_PIN_CENTER[1] - SERVICE_PIN_DIA / 2.0 * _S),
-)
-STATION_REF_TEXT_XY = ((OUTBOARD_X + SERVICE_PIN_CENTER[0]) / 2.0, 0.113)
 # The hub's half of the seam is the arc bulging from the seat edge toward the
 # bore; the callout attaches 45 degrees up its right flank.
 SEAM_CENTER = (END_CENTER[0], END_CENTER[1] - AXIAL_PIN_RADIUS_FROM_AXIS * _S)
@@ -190,7 +171,9 @@ SEAM_EDGE_PICK = (
 SEAM_CALLOUT_XY = (0.303, 0.105)
 SIDE_KEEP = {
     "SeatLength": ((OUTBOARD_X + SHOULDER_X) / 2.0, _STATION_ROW_Y),
-    "ServicePinFromShoulder": ((SHOULDER_X + SERVICE_PIN_CENTER[0]) / 2.0, _STATION_ROW_Y),
+    # The station from the same faced end, on its own row under the seat's
+    # (machinist review of the inch sheet: no chain through the shoulder).
+    "ServicePinStation": ((OUTBOARD_X + SERVICE_PIN_CENTER[0]) / 2.0, 0.113),
     # The toleranced .990 and its two-line callout fill the span between its
     # extension lines and sat on its own dimension line (machinist review of
     # the inch sheet, r2): they print right of the outboard face instead, the
@@ -228,45 +211,6 @@ def _set_callout_below(display: Any, text: str, label: str) -> None:
     if applied.replace("\r", "") != text:
         raise RuntimeError(f"{label}: callout-below text did not persist: {applied!r}")
 
-
-def _arrowheads(annotation: Any, label: str) -> list[tuple[float, int]]:
-    """Each arrowhead's tip x on the sheet and its style (draw_mg_wheel_axle)."""
-    data = annotation.GetDisplayData()
-    if data is None:
-        raise RuntimeError(f"{label} has no display data")
-    data = _early_bound(data, "IDisplayData")
-    heads = []
-    for index in range(int(data.GetArrowHeadCount() or 0)):
-        values = [float(value) for value in (data.GetArrowHeadAtIndex2(index) or ())]
-        if len(values) < 9:
-            raise RuntimeError(f"{label} arrowhead {index} is incomplete: {values!r}")
-        heads.append((values[0], round(values[8])))
-    if len(heads) != 2:
-        raise RuntimeError(f"{label} has {len(heads)} arrowheads, expected 2")
-    return heads
-
-
-def _set_dimension_origin(
-    adapter: Any, annotation: Any, *, origin_x: float, label: str
-) -> None:
-    """Put the dimension-origin circle on the arrowhead at ``origin_x``, read
-    back from the ink (draw_mg_wheel_axle)."""
-    annotation = _early_bound(annotation, "IAnnotation")
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    heads = _arrowheads(annotation, label)
-    near = min(range(2), key=lambda index: abs(heads[index][0] - origin_x))
-    styles = [_CLOSED_ARROWHEAD, _CLOSED_ARROWHEAD]
-    styles[near] = _ORIGIN_ARROWHEAD
-    for attempt in (styles, styles[::-1]):
-        if not display.SetArrowHeadStyle2(False, *attempt):
-            raise RuntimeError(f"failed to set the {label} arrowhead styles")
-        rebuild_drawing(adapter, label=f"{label} dimension origin")
-        heads = _arrowheads(annotation, label)
-        at_origin = min(heads, key=lambda head: abs(head[0] - origin_x))
-        far = max(heads, key=lambda head: abs(head[0] - origin_x))
-        if (at_origin[1], far[1]) == (_ORIGIN_ARROWHEAD, _CLOSED_ARROWHEAD):
-            return
-    raise RuntimeError(f"{label} origin circle is not at the shoulder: {heads!r}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -345,39 +289,6 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_reference_dimensions(adapter, annotations, REFERENCE_DIMENSIONS)
-    for name, origin_x in ORIGIN_DIMENSIONS.items():
-        matches = [a for a in annotations if dimension_name(adapter, a) == name]
-        if len(matches) != 1:
-            raise RuntimeError(f"expected one crank-hub {name} dimension, got {len(matches)}")
-        _set_dimension_origin(
-            adapter, matches[0], origin_x=origin_x, label=f"crank hub {name}"
-        )
-    station_ref = add_edge_dimension(
-        adapter,
-        right,
-        p0=STATION_REF_PICKS[0],
-        p1=STATION_REF_PICKS[1],
-        text_xy=STATION_REF_TEXT_XY,
-        label="crank hub cross-hole station reference",
-        orientation="horizontal",
-    )
-    set_arc_endpoints_to_center(
-        adapter, station_ref, label="crank hub cross-hole station reference"
-    )
-    # Value-only: the end face and the cross-hole are the only edges at
-    # these picks; the station value is the proof.
-    assert_dimension_measures(
-        adapter,
-        station_ref,
-        expected_mm=SERVICE_PIN_STATION,
-        label="crank hub cross-hole station reference",
-    )
-    station_ref = _early_bound(station_ref, "IDisplayDimension")
-    if station_ref.SetPrecision3(2, -1, -1, -1) != 0:
-        raise RuntimeError("crank hub cross-hole station reference: precision rejected")
-    set_reference_dimension(
-        adapter, station_ref.GetAnnotation(), label="crank hub cross-hole station reference"
-    )
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to crank-hub end view")
