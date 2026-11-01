@@ -107,9 +107,14 @@ def annotate_chain_stock(
         else:
             positions = {stock.WIDTH_DIMENSION: (xmin - 0.014, middle[1])}
             if connecting:
+                # The plate span is too short for inside arrows, so its REF
+                # hangs left of the line on a shoulder ~5.6 mm under the text
+                # anchor, out across the roller-width line and its 6.35 mm
+                # outside-arrow stub.  At ymax + 15 mm the shoulder clears that
+                # stub (the pin length bounds ymax) whatever the REF's width.
                 positions.update(
                     {
-                        stock.PLATE_DIMENSION: (middle[0], ymax + 0.008),
+                        stock.PLATE_DIMENSION: (middle[0], ymax + 0.015),
                         stock.LENGTH_DIMENSION: (xmax + 0.020, middle[1]),
                     }
                 )

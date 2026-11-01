@@ -316,7 +316,7 @@ def test_chain_annotation_positions_follow_source_ink_not_stale_outline(
             {
                 chain_stock.PLATE_DIMENSION: (
                     (top_left + top_right) / 2,
-                    y + chain_stock.PLATE_THICKNESS / 1000 * ratio + 0.008,
+                    y + chain_stock.PLATE_THICKNESS / 1000 * ratio + 0.015,
                 ),
                 chain_stock.LENGTH_DIMENSION: (top_right + 0.020, y),
             }
