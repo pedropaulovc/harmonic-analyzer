@@ -42,8 +42,9 @@ def test_part_registry_row_is_the_made_screw() -> None:
     # A critical grade (rule 2): the clamp's strength case needs hardened
     # 4140's yield (sm_gooseneck_spring_screw_spec.YIELD_MPA, McMaster
     # 6818T53); the print states the strength the SF assumes (codjiflo P2
-    # round 4 on #1997).
-    for grade in ("4140", "HRC 32", "1/2 in", f"{spec.YIELD_MPA:.0f} MPa"):
+    # round 4 on #1997), in ksi on the inch sheet.
+    ksi = f"{spec.YIELD_MPA / 6.89475729:.0f} ksi"
+    for grade in ("4140", "HRC 32", "1/2 in", ksi):
         assert grade in row["material"]
         assert grade in row["material_specification"]
     assert spec.YIELD_MPA == pytest.approx(130_000.0 * 0.00689475729)

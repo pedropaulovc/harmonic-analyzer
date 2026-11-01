@@ -2127,7 +2127,9 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         p0=ridge_dim_edge,
         p1=seed_rim_right,
-        text_xy=(0.248, 0.0723),
+        # The four-place boxed 1.5689 is wider than the mm 39.85 was: at 0.248
+        # its box touched the hole column's extension line (machinist review).
+        text_xy=(0.243, 0.0723),
         label="spring-hole row X",
         orientation="horizontal",
         entity_types=ridge_entity_types,
