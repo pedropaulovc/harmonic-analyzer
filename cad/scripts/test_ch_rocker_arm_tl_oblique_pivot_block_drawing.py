@@ -43,15 +43,23 @@ def test_pivot_shoulder_bottoms_with_full_form_thread_engagement():
     assert spec.PIVOT_LOCATING_CLEARANCE_MAX<=0.0025*INCH+1e-9
 
 
-def test_carriage_pattern_floor_and_vendor_thread_bottom_are_unchanged():
+def test_carriage_screws_cut_to_fit_from_the_lowered_floor():
     assert set(spec.BOLT_POINTS)=={(-13,-13),(-13,13),(13,-13),(13,13)}
     assert tuple(2*x for x in (spec.BOLT_X,spec.BOLT_Y))==trammel.CARRIAGE_BOLT_SPAN
     assert 4.0<spec.HOLE_DIA<spec.CBORE_DIA
     assert math.isclose(spec.CBORE_DEPTH,spec.BLOCK_HEIGHT-spec.CBORE_FLOOR)
-    # The M4 x 20 reaches 1.1D nominally and never bottoms in the M4 x 5.
-    assert spec.SCREW_LENGTH-spec.CBORE_FLOOR>=1.1*4.0
-    assert spec.ENGAGEMENT_MIN>=3.8
+    # Owner ruling 2026-11-01 (option A): floor .570, each M4 x 20 cut to its
+    # floor plus .189 (±.005 cut, .001 reading): .183 MIN (1.16D), never
+    # bottoming in the M4 x 5, and every cut fits the shortest bought screw.
+    assert math.isclose(spec.CBORE_FLOOR,.570*INCH)
+    assert math.isclose(spec.SCREW_REACH,.189*INCH)
+    assert math.isclose(spec.SCREW_CUT_LENGTH,(.570+.189)*INCH)
+    assert math.isclose(spec.ENGAGEMENT_MIN,.183*INCH)
+    assert spec.ENGAGEMENT_TEXT=='.183'
+    assert spec.ENGAGEMENT_MIN>=1.16*4.0
     assert spec.ENGAGEMENT_MAX<=spec.CARRIAGE_THREAD_DEPTH-.045+1e-9
+    assert spec.SCREW_CUT_LENGTH_MAX<spec.SCREW_LENGTH-spec.SCREW_LENGTH_TOL
+    assert spec.CALLOUTS_BELOW['CboreFloor']=='M4 CUT TO FIT:\n.183 MIN ENGAGEMENT'
     assert spec.DRAWING_PRECISION[spec.CBORE_FLOOR_REFERENCE]['CboreFloor']==3
     assert spec.CBORE_FLOOR-printed_band_mm(3,unit=spec.UNIT)>0
 
