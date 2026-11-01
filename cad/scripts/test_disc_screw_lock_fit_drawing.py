@@ -35,9 +35,15 @@ THREE_PLACE = printed_band_mm(3, unit="in")
 MOUTH_BREAK = 0.004 * IN
 
 
-def _inch_window(text: str) -> tuple[float, ...]:
-    """A printed inch window or limit (``.000-.008``) as millimetres."""
-    return tuple(float(v) * IN for v in text.split("-"))
+def _mm_window(text: str) -> tuple[float, ...]:
+    """A printed mm window (``0.00-0.20``) as millimetres."""
+    return tuple(float(v) for v in text.split("-"))
+
+
+def _inside(printed: tuple[float, ...], limits: tuple[float, float], step: float) -> None:
+    """The mm sheet prints the inch window rounded inward by under one step."""
+    assert limits[0] <= printed[0] < limits[0] + step
+    assert limits[1] - step < printed[1] <= limits[1]
 
 
 def _exec_fresh(module) -> None:
@@ -172,21 +178,21 @@ def test_fit_up_adjustments_are_complete_and_ordered_before_installation() -> No
 
     lock_step = printed_step("lock-seats-faced")
     float_window = re.search(
-        r"\bFACE LOCK SEATS TO (\d*\.\d+-\d*\.\d+) IN PLATEN FLOAT\b",
+        r"\bFACE LOCK SEATS TO (\d*\.\d+-\d*\.\d+) PLATEN FLOAT\b",
         lock_step,
     )
     assert float_window is not None
-    assert _inch_window(float_window.group(1)) == pytest.approx(guide.LOCK_GAP_FIT)
+    _inside(_mm_window(float_window.group(1)), guide.LOCK_GAP_FIT, 0.001)
     assert re.search(r"\bELSE\b.*\bSTOP\b.*\bREPORT\b", lock_step)
 
     cut_step = printed_step("disc-screws-cut")
     assert drawing.BOM_PART_NUMBERS["pd-vn-transgear-disc-screw"] in cut_step
     tip_window = re.search(
-        r"\bCUT\b.*\bTIPS (\d*\.\d+-\d*\.\d+)(?: IN)? BELOW DISC REAR FACE\b",
+        r"\bCUT\b.*\bTIPS (\d*\.\d+-\d*\.\d+) BELOW DISC REAR FACE\b",
         cut_step,
     )
     assert tip_window is not None
-    assert _inch_window(tip_window.group(1)) == pytest.approx(screw.TIP_BELOW_REAR_FACE)
-    cut_break = re.search(r"\bBREAK (\d*\.\d+)(?: IN)? MAX\b", cut_step)
-    assert cut_break is not None
-    assert float(cut_break.group(1)) * IN == pytest.approx(screw.CUT_END_BREAK_MAX)
+    _inside(_mm_window(tip_window.group(1)), screw.TIP_BELOW_REAR_FACE, 0.01)
+    # The cut end's break is the title block's edge break, so no limit here.
+    assert re.search(r"\bBREAK THE CUT END\.", cut_step)
+    assert " IN " not in f" {cut_step} " and " IN " not in f" {lock_step} "

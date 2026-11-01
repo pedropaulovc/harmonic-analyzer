@@ -83,11 +83,6 @@ if {f: set(d) for f, d in DRAWING_PRECISION.items()} != DRAWING_DIMENSIONS:
 # the platen can come forward toward the 120T disc. The as-made gap is never
 # under the max (build_pd_platen_guide asserts it), so the facing always cuts.
 LOCK_GAP_FIT = (0.0508, 0.2286)  # .002, .009
-# Printed on the paper-drive assembly sheet (still millimetres), so it names
-# its unit: the feelers are inch.
-LOCK_GAP_FIT_TEXT = (
-    "-".join(f"{gap / 25.4:.3f}".lstrip("0") for gap in LOCK_GAP_FIT) + " IN"
-)
 
 
 # Manufacturing GD&T limits consumed by the part's drawing projection: the
