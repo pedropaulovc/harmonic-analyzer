@@ -504,7 +504,9 @@ SECTION_KEEP = {
         _section_x(HUB_FRONT_Z) + 0.0072,
         SECTION_CENTER[1] - SPIGOT_DIA / 2000.0 - 0.012 + _TEXT_LINE / 2.0,
     ),
-    "SpokeAxial": _beside(_section_x(HUB_BACK_Z), -1, 3, _SPOKE_ROW + _ONE_LINE_UP),
+    # Its ".16 ±.03" centred eight characters off the back face, so the web's
+    # outline clears its last digit.
+    "SpokeAxial": _beside(_section_x(HUB_BACK_Z), -1, 8, _SPOKE_ROW + _ONE_LINE_UP),
     "SpigotLength": _beside(
         _section_x(HUB_FRONT_Z),
         1,
@@ -522,14 +524,17 @@ SECTION_KEEP = {
         _section_x(HUB_BACK_Z),
         -1,
         len(HUB_LENGTH_CALLOUT) + _CALLOUT_MARGIN_CHARS,
-        _HUB_ROWS[2] + _STACK_UP + _ABOVE_UP,
+        _HUB_ROWS[2] + _ONE_LINE_UP + _ABOVE_UP,
     ),
     # The groove's R up right, its leader down-left onto the groove at 35
     # deg, so the stub it draws past the arc leaves the rim's back face above
     # the rim width's extension line; its shoulder over the top of the
-    # rim-bore round's R block (ROUND_TEXT_XY) by the layout audit's text
-    # separation (3.57 mm), moved up and right along that bearing.
-    "GrooveR": (SECTION_CENTER[0] + 0.0344, SECTION_CENTER[1] + 0.0701),
+    # rim-bore round's R block (ROUND_TEXT_XY).  Its one-line ± band leaves
+    # the shoulder where the stacked band's block put it.
+    "GrooveR": (
+        SECTION_CENTER[0] + 0.0344,
+        SECTION_CENTER[1] + 0.0701 - (_STACK_UP - _ONE_LINE_UP),
+    ),
 }
 # The rim's two Ø, imported from the hidden DIAMETER_REFERENCE sketch in
 # A-A's plane (mg_magnifying_wheel_spec): the rim bore's between its extension
@@ -548,17 +553,19 @@ SECTION_DIAMETER_KEEP = {
 # the cut keep the wheel's Z, and the axis keeps the pick off them.
 # Its callout stands right, between the spigot's Ø block and the groove's R:
 # the value on its point and the two callout lines under it, the shoulder
-# under the last (5.6 mm a line).  The shoulder runs 1.8 mm under the arc's
-# centre, so the radial leader lands on the arc 20 deg below the side face's
+# under the last (5.6 mm a line), its top about 4.75 mm under the groove R's
+# shoulder.  The shoulder runs 4.3 mm under the arc's centre and 8 mm right,
+# so the radial leader lands on the arc about 28 deg below the side face's
 # tangent and crosses the rim's front face above the top of the rim width's
-# extension line.  The groove bottom's Ø holds the left.
+# extension line (a landing past about 40 deg below crosses that line).  The
+# groove bottom's Ø holds the left.
 _ROUND_ARC_CENTER = (
     0.0,
     RIM_INNER_DIA / 2.0 + CAST_ROUND_R,
     -(RIM_AXIAL / 2.0 - CAST_ROUND_R),
 )
 _CUT_NORMAL = (1.0, 0.0, 0.0)
-ROUND_TEXT_XY = (SECTION_CENTER[0] + 0.0292, SECTION_CENTER[1] + 0.0542)
+ROUND_TEXT_XY = (SECTION_CENTER[0] + 0.0322, SECTION_CENTER[1] + 0.0517)
 # The R's single limit holds TIE 2's wall to the rim's side faces
 # (mg_magnifying_wheel_spec.TIE2_FACE_WALL), so the callout says so.
 ROUND_CALLOUT = "2X RIM BORE EDGES\nHOLDS TIE 2 WALL"

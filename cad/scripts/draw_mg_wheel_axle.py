@@ -147,9 +147,10 @@ SIDE_KEEP = {
     "ThreadLength": (STEP_X - 0.004 - _THREAD_BLOCK_HALF, _ROW_Y[1]),
     "PinLength": ((BACK_X + TIP_X) / 2.0, _ROW_Y[2]),
     # The shank's dimension line crosses the shank near the step; its text
-    # runs left from the line, the fit callout's three lines under it, so the
-    # block stands high enough to keep them off the shank and over the Ra.
-    "PinDia": (STEP_X - 0.030, SIDE_CENTER[1] + 0.052),
+    # runs left from the line, the stock-and-fit callout's five lines under
+    # it, so the block stands high enough to keep them off the shank and over
+    # the Ra (two rows, 9 mm, higher than the three-line callout stood).
+    "PinDia": (STEP_X - 0.030, SIDE_CENTER[1] + 0.061),
     # Above-right of the tip: the leader lands on the dome's upper half, clear
     # of the overall's extension line dropping from the tip, and under the
     # thread callout.

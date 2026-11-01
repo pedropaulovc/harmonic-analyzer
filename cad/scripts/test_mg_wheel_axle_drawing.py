@@ -213,7 +213,7 @@ def test_journal_finish_and_no_gdt() -> None:
         ("mg_axle_journal", MACHINED_UM)
     ]
     pin_words = callouts.PIN_DIA_CALLOUT.split()
-    assert "MG-MAGNIFYING-WHEEL" in pin_words and "RUNS" in pin_words
+    assert "MG-MAGNIFYING-WHEEL" in pin_words and "RUNNING" in pin_words
 
 
 def test_thread_callout_and_no_general_notes() -> None:
@@ -226,12 +226,22 @@ def test_thread_callout_and_no_general_notes() -> None:
     assert "Manufacturing Notes" not in source
     assert not hasattr(spec, "DRAWING_NOTES")
     assert "Manufacturing Notes" not in Path(part.__file__).read_text(encoding="utf-8")
-    # The Ø callout names both fits: the press into the bar's reamed bore,
-    # at that bore's limits, and the wheel running on the shank.
+    # The stock Ø states the drill rod's limits and both fits: the press into
+    # the bar's reamed bore, at that bore's limits, and the wheel running on
+    # the shank, each matching the wheel group's proofs.
     words = " ".join(callouts.PIN_DIA_CALLOUT.split())
-    for required in ("PRESS FIT", "MG-WHEEL-BAR", ".1865-.1870"):
+    for required in (
+        ".1873-.1877",
+        ".0003-.0012 DIAMETRAL INTERFERENCE",
+        "MG-WHEEL-BAR <MOD-DIAM>.1865-.1870",
+        ".0008-.0017 RUNNING CLEARANCE",
+        "MG-MAGNIFYING-WHEEL",
+    ):
         assert required in words, required
-    assert "MG-MAGNIFYING-WHEEL" in words
+    assert callouts.PRESS_LIMITS == pytest.approx(group.BAR_PRESS)
+    assert callouts.RUNNING_CLEARANCE_TEXT == "-".join(
+        f"{value / 25.4:.4f}".lstrip("0") for value in group.HUB_RUNNING
+    )
 
 
 def test_callouts_are_part_authored_and_only_read_by_the_sheet() -> None:

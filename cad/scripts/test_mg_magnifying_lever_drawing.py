@@ -303,6 +303,8 @@ def test_quarter_inch_body_has_real_drilled_slip_clearance() -> None:
     assert minimum == pytest.approx(0.007 * 25.4)
     assert maximum == pytest.approx(0.013 * 25.4)
     assert minimum > 0.0 and maximum < 0.5
+    # The sheet's stated clearance is that same fit.
+    assert spec.ROD_BORE_CLEARANCE == pytest.approx((minimum, maximum))
 
 
 def test_clamp_entire_bore_stays_on_plain_body_at_nominal_travel_limits() -> None:
@@ -899,7 +901,7 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
         assert captured["imports"] == [(detail, ("ThreadExtent",)), (front, ("RodProfile",))]
         assert deleted == ["TipChamfer"] and annotations["TipChamfer"].position is None
         fit = qualifiers["RodDia"]
-        assert "MHA-MG-02 CLAMP BORE" in fit and "SLIDING FIT" in fit and "BRASS" not in fit
+        assert fit == spec.ROD_DIA_CALLOUT and "BRASS" not in fit
         stock = captured["stock"]
         assert (stock["units"], stock["expected_mm"], stock["fraction_denominator"]) == ("in", joint.ROD_DIA, 4)
         assert {name: dimension.SystemValue * 1000.0 for name, dimension in dimensions.items()} == pytest.approx(values)
@@ -1036,16 +1038,20 @@ def _assert_finish_ink_routes(annotations, finish, seat_note_xy, project, front)
     witness_x = project(None, front, (diameter / 2.0, 0.0, 0.0))[0] + 0.001
     upper, lower = body_y + diameter / 2.0, body_y - diameter / 2.0
 
+    # Measured R24 ink: an 86.9 mm block for the 34-glyph "MHA-MG-02 CLAMP
+    # BORE - SLIDING FIT" row; the stated-clearance row scales it by glyphs.
+    width = 0.0868955 * max(map(len, spec.ROD_DIA_CALLOUT.splitlines())) / 34
+
     def diameter_ink(x, y):
         underline = y - 0.0100819
         return AnnotationGeometry(
             label="RodDia", kind="dim", owner="front",
             text_boxes=(Box(x + 0.0002566, y - 0.009148,
-                            x + 0.0868955, y + 0.0100555),),
+                            x + width, y + 0.0100555),),
             segments=(
                 Segment(witness_x, lower, x + 0.001, lower, "ext-line"),
                 Segment(witness_x, upper, x + 0.001, upper, "ext-line"),
-                Segment(x + 0.0869701, underline, x, underline, "dim-line"),
+                Segment(x + width + 0.0000746, underline, x, underline, "dim-line"),
                 Segment(x, underline, x, upper, "dim-line"),
                 Segment(x, lower, x, lower - diameter, "dim-line"),
             ),
