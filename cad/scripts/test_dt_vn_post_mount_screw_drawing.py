@@ -483,7 +483,7 @@ def test_tip_view_prints_the_band_max_as_a_single_limit() -> None:
 def test_tip_detail_geometry_keeps_the_break_inside_its_crop() -> None:
     """A detail drops any dimension whose reference lies outside its crop:
     both ends of the break's radial leg must sit inside the fence."""
-    assert drawing.DETAIL_SCALE == (10.0, 1.0)
+    assert drawing.DETAIL_SCALE == (20.0, 1.0)
     reference_y = -spec.CUT_LENGTH_MM + drawing.DETAIL_OFFSET_MM
     assert drawing.TIP_DETAIL.detail_reference_mm == (0.0, reference_y, 0.0)
     for radius in (spec.MAJOR_RADIUS_MM, spec.MAJOR_RADIUS_MM - spec.CUT_END_BREAK_MM):
@@ -503,7 +503,7 @@ def test_tip_detail_layout_is_clear() -> None:
     template = DRAWING_TEMPLATES[drawing.SPEC.layout]
     cx, cy = drawing.DETAIL_CENTER
     r = drawing.DETAIL_RADIUS
-    assert r == pytest.approx(drawing.DETAIL_FENCE_MM * 10.0 / 1000.0)
+    assert r == pytest.approx(drawing.DETAIL_FENCE_MM * 20.0 / 1000.0)
     # Inside the frame.
     assert cy + r < template.height_m - DETAIL_BORDER_MARGIN
     # Right of the Front view's head, left of the isometric's head.
@@ -598,7 +598,7 @@ class _SeatView:
         self.name = name
         self.seat = seat
         self.cropped = cropped
-        self.ScaleRatio = (10.0, 1.0)
+        self.ScaleRatio = drawing.DETAIL_SCALE
         self.Position = (0.2, 0.6)
 
     def SetViewPosition(self, position, move_children):
@@ -958,14 +958,14 @@ def test_break_text_move_is_bounded(monkeypatch) -> None:
 
 def test_tip_view_label_is_owned_by_the_tip_view(monkeypatch) -> None:
     seat, tip, _front, _placed = _tip_seat(monkeypatch)
-    assert drawing.TIP_VIEW_LABEL == "DETAIL A  SCALE 10:1"
+    assert drawing.TIP_VIEW_LABEL == "DETAIL A  SCALE 20:1"
     drawing.label_tip_view(seat, tip)
     assert [(n.owner, n.text) for n in seat.notes] == [
-        ("Drawing View3", "DETAIL A  SCALE 10:1")
+        ("Drawing View3", "DETAIL A  SCALE 20:1")
     ]
     x, y = drawing.TIP_DETAIL.detail_label_xy
     assert (
-        "note", "Drawing View3", "DETAIL A  SCALE 10:1", round(x, 9), round(y, 9)
+        "note", "Drawing View3", "DETAIL A  SCALE 20:1", round(x, 9), round(y, 9)
     ) in seat.log
 
 
@@ -976,7 +976,7 @@ def test_tip_view_label_tolerates_another_note_on_the_view(monkeypatch) -> None:
     seat.notes.append(_Note("DRAWING VIEW3", "Drawing View3"))
     drawing.label_tip_view(seat, tip)
     texts = [n.text for n in seat.notes if n.owner == "Drawing View3"]
-    assert texts.count("DETAIL A  SCALE 10:1") == 1
+    assert texts.count("DETAIL A  SCALE 20:1") == 1
 
 
 
@@ -1631,7 +1631,7 @@ def test_final_supplier_labels_accept_native_line_endings_but_not_changed_text(m
         contract["configuration"] == drawing.SUPPLIER_STOCK_CONFIGURATION
         for _, contract in seat.presentations
     )
-    seat.state.text = seat.state.text.replace("NO SOLID GEOMETRY", "SOLID GEOMETRY")
+    seat.state.text = seat.state.text.replace("REFERENCE ONLY", "REFERENCE")
     with pytest.raises(RuntimeError, match="source label changed"):
         drawing._check_supplier_stock(seat.adapter, *seat.views, seat.notes, seat.capture)
 

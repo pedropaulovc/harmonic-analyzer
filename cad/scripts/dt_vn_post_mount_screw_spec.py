@@ -78,18 +78,11 @@ THREAD_DIA_MM, STOCK_LENGTH_MM, HEAD_H_MM, _HEAD_DIA, _PITCH = FILLISTER_SIZE
 # Head OD .414, height .237 and original length 4.000 match source upper limits.
 SUPPLIER_STOCK_CONFIGURATION = "SupplierMaxLimitEnvelope"
 SUPPLIER_STOCK_FEATURE = "SupplierMaxLimitProfile"
+# Sheet 2's one caption: the views are the supplier's limits, for reference
+# only; sheet 1 alone controls the finished screw.
 SUPPLIER_STOCK_TITLE = (
     "SUPPLIER MAXIMUM-LIMIT ENVELOPE\n"
-    "NOT INSTALLED / NO SOLID GEOMETRY"
-)
-SUPPLIER_STOCK_NOTE = (
-    "UPPER-LIMIT CORNER, NOT A SUPPLIER NOMINAL.\n"
-    "CROWN CURVATURE / SHANK BAND UNSPECIFIED.\n"
-    "FINISHED CUT / FIT CONTROLS REMAIN ON SHEET 1."
-)
-SUPPLIER_MODEL_NOTE = (
-    "CURRENT SOLID HAS DIFFERENT SKIRT / SLOT.\n"
-    "SOURCE LIMITS APPLY ONLY TO THE SEPARATE SHEET-2 DIAGRAM."
+    "REFERENCE ONLY"
 )
 _R = SUPPLIER_HEAD_OD.envelope_mm / 2.0
 _H = SUPPLIER_HEAD_HEIGHT.envelope_mm
@@ -154,7 +147,7 @@ SUPPLIER_PROFILE_DIMENSIONS = (
 # this reference measures those diagram vertices, never the installed helix.
 SUPPLIER_THREAD_MAJOR_DIMENSION = SupplierProfileDimension(
     "SupplierThreadMajor", None, (12, 13), 12, "diameter",
-    callout=f"NOMINAL THREAD MAJOR\n{SUPPLIER_THREAD}\nNOT A SOURCE DIAMETER BAND",
+    callout=SUPPLIER_THREAD,
     nominal_mm=THREAD_DIA_MM,
 )
 SUPPLIER_REFERENCE_DIMENSIONS = (

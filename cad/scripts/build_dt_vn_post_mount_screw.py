@@ -90,7 +90,6 @@ from dt_vn_post_mount_screw_spec import (
     REFERENCE_SKETCHES,
     SKU,
     STOCK_LENGTH_MM,
-    SUPPLIER_MODEL_NOTE,
     SUPPLIER_PRECISION,
     SUPPLIER_REFERENCE_DIMENSIONS,
     SUPPLIER_PROFILE_MM,
@@ -561,7 +560,6 @@ def _manufacturing_controls(adapter) -> None:
     apply_drawing_properties(
         adapter, PART_NAME, {
             "Manufacturing Notes": MANUFACTURING_NOTES,
-            "Supplier Geometry Status": SUPPLIER_MODEL_NOTE,
             "Supplier Reference Source": SUPPLIER_SOURCE,
             "Supplier Reference Title": SUPPLIER_STOCK_TITLE,
         }
