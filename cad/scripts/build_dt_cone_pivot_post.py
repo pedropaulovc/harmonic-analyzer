@@ -88,7 +88,6 @@ from dt_cone_pivot_post_spec import (
     HEAD_DIA,
     HEAD_HEIGHT,
     INCLINE_DEG,
-    JOURNAL_AXIS_HEIGHT_TOLERANCE_MM,
     JOURNAL_REFERENCE_LENGTH,
     JOURNAL_REFERENCE_X,
     JOURNAL_REFERENCE_Z,
@@ -934,15 +933,6 @@ async def build(adapter: Any) -> dict[str, str]:
         "BoreSpacingReference",
         "CrankAboveCone",
         *deviations(CRANK_ABOVE_CONE_BAND),
-        display_unit=UNIT,
-    )
-    # The cup-capture band on the cone-axis height (derivation in
-    # dt_cone_pivot_post_spec.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM).
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "ConeBossProfile",
-        "JournalAxisY",
-        JOURNAL_AXIS_HEIGHT_TOLERANCE_MM,
         display_unit=UNIT,
     )
     # The collar thrust face's station from the post axis: the half

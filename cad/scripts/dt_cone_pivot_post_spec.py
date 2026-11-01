@@ -231,9 +231,10 @@ CRANK_ABOVE_CONE_BAND = (0.3556, 0.0)  # +.014/.000
 # height; at the shaft's tip MHA-DT-21 stands directly on the same platform top
 # (user ruling 2026-09-29, no shim), so the tip's stub must enter the
 # adjuster's cup on this band plus the block's AxisHeight band (the plate top
-# is common to both and cancels).  The height carries its own symmetric band;
-# build_dt_drive_train_assembly asserts the capture closes.
-JOURNAL_AXIS_HEIGHT_TOLERANCE_MM = 0.254  # +/-.010
+# is common to both and cancels).  The height takes the title block's .XX
+# band, printed by the general tolerance rather than repeated on the dimension
+# (machinist review); build_dt_drive_train_assembly asserts the capture closes.
+JOURNAL_AXIS_HEIGHT_TOLERANCE_MM = printed_band_mm(2, unit=UNIT)  # +/-.010
 
 # Webs around the Ø.4500 crank bore, at print-worst (drawing-guidelines.md
 # rule 17 (walls and webs); the inch floor).  The bore is centred on the
