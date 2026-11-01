@@ -322,7 +322,7 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
 
 
 @pytest.mark.parametrize("part_spec", (spec, pinion_spec))
-def test_exact_stock_span_limits_book_printed_corners_without_tightening(part_spec) -> None:
+def test_exact_stock_span_limits_book_printed_corners_on_the_inch_grid(part_spec) -> None:
     from stock_form_cutter import translation_for_pitch_tooth_thickness
 
     profile = part_spec.STOCK_PROFILE
@@ -347,13 +347,21 @@ def test_exact_stock_span_limits_book_printed_corners_without_tightening(part_sp
     )
     scale = 10**part_spec.BASE_TANGENT_SPAN_PLACES
     lower, upper = part_spec.BASE_TANGENT_SPAN_LIMITS_MM
-    assert (lower, upper) == (
-        math.floor(min(raw_spans) * scale) / scale,
-        math.ceil(max(raw_spans) * scale) / scale,
+    # Both ends rounded UP onto the printed inch grid: the lower never admits
+    # a tooth thinner than the source allows, the upper keeps the nominal (the
+    # thickest source tooth) accepted (codjiflo review of a9b4ad8a9).
+    assert (lower, upper) == tuple(
+        math.ceil(round(raw / part_spec.MM_PER_IN * scale, 6)) / scale * part_spec.MM_PER_IN
+        for raw in (min(raw_spans), max(raw_spans))
     )
+    assert min(raw_spans) <= lower and max(raw_spans) <= upper
     nominal = profile.tangent_span_mm(part_spec.BASE_TANGENT_SPAN_TEETH, normal_plane=True)
     assert lower <= nominal <= upper
-    assert lower <= round(nominal, part_spec.BASE_TANGENT_SPAN_PLACES) <= upper
+    printed = notes.accept_limits_text(part_spec.BASE_TANGENT_SPAN_LIMITS_MM, 4)
+    printed_low, printed_high = (
+        float(value) * part_spec.MM_PER_IN for value in printed.split(" TO ")
+    )
+    assert printed_low <= nominal <= printed_high
     assert part_spec.BASE_TANGENT_SPAN_MM == pytest.approx(nominal)
     assert len(part_spec.STOCK_PROFILE_CORNERS) == 2 * 2
     for label, corner in part_spec.STOCK_PROFILE_CORNERS:
