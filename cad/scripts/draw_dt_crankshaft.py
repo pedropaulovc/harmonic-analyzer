@@ -72,11 +72,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-from build_dt_crankshaft import (
-    PINION_PIN_CLOCKING_DEG,
-    PINION_PIN_DIA,
-    PINION_PIN_STATION_Y,
-)
+from build_dt_crankshaft import PINION_PIN_DIA, PINION_PIN_STATION_Y
 from dt_crank_drive_gear_spec import inch_text
 from dt_crank_pinion_spec import CRANKSHAFT_PIN_HOLE_PROCESS
 from dt_crankshaft_notes import (
@@ -424,14 +420,13 @@ FIDUCIAL_NOTE_XY = (0.0145, 0.152)
 # window instead (run1b-e7fd1a2ec: the leader tip, not the text, read 0.3 mm
 # under the floor).
 PINION_PIN_X = _sheet_x(PINION_PIN_STATION_Y)
-# The leader lands on the rim's paper-right extreme, so from the note it runs
-# right of the REF Ø's extension lines, which stand on the rim's width (layout
-# audit of bb0779352: landed lower-left, it crossed the right one).  The
-# visible rim's centre sits R*sin(clocking) above the axis.
-PINION_PIN_LEADER_LANDING = (
-    PINION_PIN_X + PINION_PIN_DIA / 2.0 * _S / 1000.0,
-    _sheet_y(PINION_SEAT_DIA / 2.0 * math.sin(math.radians(PINION_PIN_CLOCKING_DEG))),
-)
+# The leader lands on the right of the rim, so from the note it runs right of
+# the REF Ø's extension lines, which stand on the rim's width (layout audit of
+# bb0779352: landed lower-left, it crossed the right one).  The rim edge this
+# picks is the saddle's far lobe, not the outline circle; SolidWorks snapped a
+# landing at the circle's right extreme to (+2.0, +0.55) mm from the hole's
+# station on the axis (run 20261101T171554477Z-3604067c), so it lands there.
+PINION_PIN_LEADER_LANDING = (PINION_PIN_X + 0.0020, SIDE_CENTER[1] + 0.00055)
 # High in its field (top row ~4.5 mm under the border), so the right neck's
 # Ø9.5 and the Ø9.000's block stand under it, and its leader to the hole
 # passes right of the Ø9.000's block.
