@@ -189,8 +189,8 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     # hangs LEFT of it (the pinion's and core's, run 20261001T085006647Z), and
     # the blank's banded text and shoulder run 27.5 mm (19e33c6c2: from the
     # blank's mid the shoulder crossed the relief's line).  9 mm in from the
-    # chamfer the line stands clear of the core runout frame below the text
-    # and stays 9 mm off the thread callout's leader to the chamfer.
+    # chamfer the line stays 9 mm off the thread callout's leader to the
+    # chamfer.
     "ThreadBlankDia": (CHAMFER_START_X - 0.009, _ABOVE_Y),
     # 4 mm left of mid-journal, right of detail B's crop: its one-line run
     # hangs right of the line and ends 6.7 mm short of the pinion's line.
@@ -205,7 +205,10 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     "TipStation": ((F_X + TIP_X) / 2.0, _ROW_Y[2]),
     # Its upper limit's top stood at 155.4 mm, on the thread blank's lower
     # outline (153.9) in that run; 4.5 mm lower it stands 3 mm under it.
-    "FlatToAxis": (CORE_END_X + 0.018, SIDE_CENTER[1] - HALF_OD - 0.0085),
+    # At CORE_END_X + 18 mm the "0.000" (29.3 mm right of the keep) ran
+    # into the thread blank Ø's lower arrow at 279.0 (run
+    # 20261101T004958072Z); 5 mm left it ends 3.5 mm short of it.
+    "FlatToAxis": (CORE_END_X + 0.013, SIDE_CENTER[1] - HALF_OD - 0.0085),
     # Reference overall, tip face to rear face, on the last row: under the
     # face width's callout and clear of the gear data block's right edge.
     "OverallLength": ((REAR_X + TIP_X) / 2.0, _ROW_Y[5]),
@@ -256,13 +259,17 @@ THREAD_NOTE_XY = ((THREAD_END_X + CHAMFER_START_X) / 2.0, _ABOVE_Y + 0.020)
 TIP_CHAMFER_NOTE = TIP_CHAMFER_CALLOUT.replace(" TO ", "\nTO ")
 CHAMFER_PICK = (CHAMFER_START_X, SIDE_CENTER[1] - 0.002)
 CHAMFER_NOTE_XY = (TIP_X + 0.004, SIDE_CENTER[1] - HALF_OD - 0.002)
-# The running journal owns the one finish.
-JOURNAL_FINISH_SYMBOL = (END_CENTER[0] + 0.008, END_CENTER[1] + HALF_OD + 0.012)
-_JOURNAL_R = JOURNAL_DIA * _S / 2000.0
-JOURNAL_FINISH_ATTACH = (
-    END_CENTER[0] + _JOURNAL_R * 0.5,
-    END_CENTER[1] + _JOURNAL_R * 3.0**0.5 / 2.0,
-)
+# The running journal owns the one finish, in the side view where the
+# journal reads alone: in the rear end view its leader landed where the
+# journal circle meets the teeth and read as a finish on the teeth
+# (machinist review r5).  The native symbol's V tip stands at its position,
+# its leader runs 6.35 mm level toward the landing then to it, and its
+# "Ra" text tops out ~10.3 mm over the tip (run 20261101T004958072Z's end
+# view symbol).  Under the journal's left half the symbol stands 3 mm
+# below the outline, right of the rear witness line (76.9 mm) and left of
+# the journal Ø's lower arrow (134.4 mm) and the 40.938 text (from 129.8).
+JOURNAL_FINISH_PICK = (REAR_X + 0.018, _sheet_y(-JOURNAL_DIA / 2.0))
+JOURNAL_FINISH_SYMBOL = (REAR_X + 0.023, JOURNAL_FINISH_PICK[1] - 0.0135)
 # A point on the journal's face for the turning axis.
 CENTERLINE_PICK = ((PINION_REAR_X + REAR_X) / 2.0, SIDE_CENTER[1] + 0.003)
 # Lower left, under the journal's 40.938 row (y 0.133) and over the notes
@@ -294,8 +301,8 @@ DETAIL_FOCUS_MM = (-FRONT_RELIEF_WIDTH / 2.0, -0.1)
 _DETAIL_FOCUS_M = (0.0, DETAIL_FOCUS_MM[1] / 1000.0, DETAIL_FOCUS_MM[0] / 1000.0)
 DETAIL_RADIUS_MM = 2.7
 DETAIL_CROP_RADIUS = DETAIL_RADIUS_MM * _DS / 1000.0
-# Upper left, over the journal: x 0.078-0.132 clears the end view's journal
-# finish symbol (x <= 0.068) and the journal Ø's witness line (x 0.1364);
+# Upper left, over the journal: x 0.078-0.132 clears the end view (x <=
+# 0.064) and the journal Ø's witness line (x 0.1364);
 # y 0.196-0.250 stands over the journal Ø's text (top 0.193) and leaves the
 # frame row under the border (0.2667).
 DETAIL_CENTER = (0.105, 0.223)
@@ -372,12 +379,12 @@ DETAIL_KEEP: dict[str, tuple[float, float]] = {
     "FrontCornerRadius": (_CORNER_CENTER[0] - 0.0365, _CORNER_CENTER[1] - 0.006),
     # The D-flat tool's end from F, a row under the neck width's: its
     # prefixed text (~43 mm, centred on the keep) stands left of F's witness
-    # line, right of the journal finish symbol's leader (x <= 0.050) and
-    # over the journal's outline (top 0.169).
+    # line, right of the end view's teeth (top 0.1735) and over the
+    # journal's outline (top 0.169).
     "FlatEnd": (_F_DETAIL_X - 0.0265, _DETAIL_BOTTOM - 0.018),
     # Left of the crop, level with the tool's end arc (centre ~0.105, 0.2018):
     # the leader enters the arc's own quadrant from the left, under the
-    # detail label and over the journal finish symbol.
+    # detail label.
     "FlatToolRadius": (_F_DETAIL_X - 0.031, _DETAIL_BOTTOM + 0.007),
 }
 # Top-left anchors.  The label stands left of the crop, 3 mm under the
@@ -762,12 +769,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # The one running surface, authored on the part and read back (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
     add_surface_finish(
         adapter,
-        end,
+        side,
+        edge_xy=JOURNAL_FINISH_PICK,
         symbol_xy=JOURNAL_FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "journal"),
         label="journal finish",
-        entity=visible_circle_edge(adapter, end, JOURNAL_DIA),
-        leader_attach_xy=JOURNAL_FINISH_ATTACH,
+        entity_type="SILHOUETTE",
+        leader_attach_xy=JOURNAL_FINISH_PICK,
         char_height=0.0025,
     )
     # The saved source owns datum/control semantics. The drawing attaches
