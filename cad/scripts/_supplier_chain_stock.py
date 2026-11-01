@@ -1,5 +1,9 @@
 """Construction-only supplier stock diagrams, never installed chain geometry.
 
+The diagrams are construction sketches (the shared zero-body diagram contract);
+the chain drawings print construction curves at visible-edge weight, so the
+roller and pin outlines read as the diagram's edges.
+
 6261K171 is the configurable family; its 6261K401 graphic is an eleven-foot
 example. The inspected 6261K281 native/STEP is the family's ONE-foot selection,
 not this project's two-foot purchase. Only family cross-sections and pitch are
@@ -17,12 +21,14 @@ from _drawing_marks import mark_dimensions_for_drawing
 from _feature_tree import name_last_feature
 from _sketch import (
     SketchDims,
+    add_line_chain,
     anchor_point_to_origin,
     blank_reference_sketches,
     dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
 )
+from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
 from _supplier_spring_reference import ReferenceState, add_supplier_reference_configurations
 
@@ -57,9 +63,10 @@ def _construction(adapter: Any, entity: str) -> None:
 async def _reference_front(adapter: Any) -> str:
     """Two nominal section circles; origin-to-centre dimension is their pitch.
 
-    These are deliberately NOT a plate profile or a pin/roller assembly. The
-    origin is the first section centre, so the second centre's driving station
-    is also the native centre-to-centre pitch. No duplicate carrier is needed.
+    The circles are the pin and roller outlines. There is no plate profile:
+    the supplier gives no plate height. The origin is the first section
+    centre, so the second centre's driving station is also the native
+    centre-to-centre pitch. No duplicate carrier is needed.
     """
     check("create supplier chain nominal front", await adapter.create_sketch("Front"))
     dims = SketchDims()
@@ -82,15 +89,32 @@ async def _reference_front(adapter: Any) -> str:
 
 
 async def _reference_sections(adapter: Any, *, connecting: bool) -> str:
-    """Separate nominal spans, not dimensions on the installed stand-in."""
-    rows = [(WIDTH_DIMENSION, 0.0, ROLLER_WIDTH)]
+    """Separate nominal spans, not dimensions on the installed stand-in.
+
+    The roller and pin spans are one side of their supplier outline, a
+    rectangle as wide as the roller or pin diameter (drawn away from the span's
+    own dimension side), so the extension lines start on printed edges. The
+    supplier gives no plate length, so the plate stays a bare thickness span.
+    """
+    rows = [(WIDTH_DIMENSION, 0.0, ROLLER_WIDTH, ROLLER_DIAMETER)]
     if connecting:
-        rows.extend(((PLATE_DIMENSION, PITCH, PLATE_THICKNESS),
-                     (LENGTH_DIMENSION, 2.0 * PITCH, CONNECTING_PIN_LENGTH)))
+        rows.extend(((PLATE_DIMENSION, PITCH, PLATE_THICKNESS, None),
+                     (LENGTH_DIMENSION, 2.0 * PITCH, CONNECTING_PIN_LENGTH, -PIN_DIAMETER)))
     check("create supplier chain nominal sections", await adapter.create_sketch("Top"))
     dims = SketchDims()
-    for name, x, length in rows:
+    for name, x, length, outline in rows:
         y0, y1 = -length / 2.0, length / 2.0
+        anchors = [f"{name}StartX"] if x else []
+        if outline is not None:
+            points = [(x, y0), (x, y1), (x + outline, y1), (x + outline, y0)]
+            lines = await add_line_chain(adapter, points)
+            for line in lines:
+                _construction(adapter, line)
+            await define_rectilinear_chain(
+                adapter, lines, points, label=name, dims=dims,
+                names=[name, f"{name}Outline", *anchors, f"{name}StartY"],
+            )
+            continue
         set_sketch_direct_db(adapter, True)
         try:
             line = check(name, await adapter.add_line(x, y0, x, y1))
@@ -103,9 +127,8 @@ async def _reference_sections(adapter: Any, *, connecting: bool) -> str:
         )
         dims.record(name)
         await anchor_point_to_origin(adapter, f"{line}.start", x, y0, name)
-        if x:
-            dims.record(f"{name}StartX")
-        dims.record(f"{name}StartY")
+        for anchor in (*anchors, f"{name}StartY"):
+            dims.record(anchor)
     await ensure_fully_defined(adapter, SECTION_FEATURE)
     check("exit supplier chain nominal sections", await adapter.exit_sketch())
     name_last_feature(adapter, SECTION_FEATURE)

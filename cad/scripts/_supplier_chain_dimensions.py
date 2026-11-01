@@ -11,6 +11,7 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
+from solidworks_mcp.adapters.sw_type_info import constant
 
 from _com import _early_bound
 from _drawing_dimensions import offset_dimension_text
@@ -34,6 +35,34 @@ SUPPLIER_MARGINS = {
     "free_front": (0.030, 0.020, 0.030, 0.020),
     "free_top": (0.030, 0.016, 0.045, 0.020),
 }
+# The diagram sketches are construction geometry (the zero-body diagram
+# contract); this SLDDRW prints construction curves as visible outline, as
+# _supplier_wire_stock_drawing does. The installed pictorial keeps its
+# sketches blanked, so only the two diagrams change.
+_CONSTRUCTION_LINE_FONT = (
+    ("swLineFontConstructionCurvesStyle", "swLineCONTINUOUS"),
+    ("swLineFontConstructionCurvesThickness", "swLW_THICK"),
+)
+
+
+def _construction_curves_as_outline(adapter: Any) -> Callable[[], None]:
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    option = constant("swDetailingNoOptionSpecified")
+    settings = tuple(
+        (name, constant(name), constant(value))
+        for name, value in _CONSTRUCTION_LINE_FONT
+    )
+
+    def readback() -> None:
+        for name, preference, value in settings:
+            if int(extension.GetUserPreferenceInteger(preference, option)) != value:
+                raise RuntimeError(f"chain diagram line font {name} readback differs")
+
+    for name, preference, value in settings:
+        if not extension.SetUserPreferenceInteger(preference, option, value):
+            raise RuntimeError(f"failed to set chain diagram line font {name}")
+    readback()
+    return readback
 
 
 def prepare_chain_diagrams(
@@ -43,6 +72,7 @@ def prepare_chain_diagrams(
     reference_bounds: Callable[[str], tuple[float, float, float, float]],
 ) -> tuple[Callable[[], None], ...]:
     """Show the source sketch owners before scale selection, not afterward."""
+    line_font = _construction_curves_as_outline(adapter)
     for key, owners in SOURCE_FEATURES.items():
         view = _early_bound(views[key], "IView")
         if str(view.ReferencedConfiguration) != stock.SUPPLIER_REFERENCE_CONFIGURATION:
@@ -50,7 +80,7 @@ def prepare_chain_diagrams(
         shown = _show_hidden_owners(adapter, view, owners, view_label=key)
         if tuple(shown) != owners:
             raise RuntimeError(f"{key}: supplier diagram sketch is not saved hidden")
-    return ()
+    return (line_font,)
 
 
 def annotate_chain_stock(
