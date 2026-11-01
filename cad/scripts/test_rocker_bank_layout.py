@@ -34,7 +34,7 @@ def test_hub_length_is_the_station_pitch_and_only_comes_out_long() -> None:
         _config.machine("channels", "station_pitch_mm"), abs=1e-9
     )
     upper, lower = arm.HUB_LENGTH_BAND
-    assert lower == 0.0 < upper == pytest.approx(0.05)
+    assert lower == 0.0 < upper == pytest.approx(0.0508)
     assert bank.STACK_L20 == pytest.approx(bank.COUNT * arm.HUB_LENGTH)
     # #948 ruling R tightened the acceptance to +.004/0 in (a fit-up re-face).
     assert bank.STACK_L20_ACCEPT == pytest.approx(
@@ -189,20 +189,20 @@ def test_shaft_is_a_plain_rod_spanning_both_ears() -> None:
 
 
 def test_hub_keeps_its_od_over_each_wall_floor_and_the_washer_rides_the_shaft() -> None:
-    """The hub retains O10.20; PR #1354 includes coaxial eccentricity in the
+    """The hub keeps Ø.400 (#290); PR #1354 includes coaxial eccentricity in the
     hub's own rule-12 diameter floor, without changing the nominal. The
     purchased washer's catalogue bore floor is the shaft's nominal, so it
     slides on the h-band shaft at worst line on line, and its OD stays under
     the hub's."""
-    assert arm.LINEAR_2PL == pytest.approx(_BAND_2PL)
-    assert arm.HUB_DIA == pytest.approx(10.20)
+    assert arm.LINEAR_2PL == pytest.approx(printed_band_mm(2, unit=arm.UNIT))
+    assert arm.HUB_DIA == pytest.approx(10.16)
     bore_max = arm.PIVOT_HOLE_DIA + arm.PIVOT_HOLE_BAND[0]
     eccentricity = arm.HUB_COAXIALITY_DIA / 2.0
-    required_od = bore_max + 2.0 * (arm.RULE12_WALL_FLOOR + eccentricity) + _BAND_2PL
+    required_od = bore_max + 2.0 * (arm.RULE12_WALL_FLOOR + eccentricity) + arm.LINEAR_2PL
     ceiling = math.ceil(round(required_od * 100.0, 9)) / 100.0
-    assert required_od == pytest.approx(10.138)
+    assert required_od == pytest.approx(9.9314)
     assert arm.HUB_DIA >= arm.HUB_DIA_MIN == pytest.approx(ceiling)
-    assert arm.HUB_DIA_MIN == pytest.approx(10.14)
+    assert arm.HUB_DIA_MIN == pytest.approx(9.94)
     assert washer.ID_MIN == pytest.approx(shaft.SHAFT_DIA + shaft.SHAFT_DIA_BAND[0])
     assert washer.ID_MIN <= washer.ID <= washer.ID_MAX
     assert washer.OD_MAX < arm.HUB_DIA_MIN
@@ -210,44 +210,44 @@ def test_hub_keeps_its_od_over_each_wall_floor_and_the_washer_rides_the_shaft() 
 
 def test_hub_wall_covers_the_worst_printed_limits_and_eccentricity() -> None:
     """The minimum on the sheet is a physical wall, not the raw class band."""
-    places = arm_notes.DEFAULT_DRAWING_PRECISION
-    printed_band = printed_band_mm(places)
-    assert printed_band == pytest.approx(0.51)
-    od = round(arm.HUB_DIA, places)
-    bore_max = round(arm.PIVOT_HOLE_DIA, places) + arm.PIVOT_HOLE_BAND[0]
+    from _inch_wall_limits import WALL_TARGET_MM
+
+    places = arm_notes.DRAWING_PRECISION["HubProfile"]["HubDia"]
+    printed_band = printed_band_mm(places, unit=arm.UNIT)
+    assert printed_band == pytest.approx(0.254)
+    od = round(arm.HUB_DIA / 25.4, places) * 25.4
+    bore_max = arm.PIVOT_HOLE_DIA + arm.PIVOT_HOLE_BAND[0]
     eccentricity = arm.HUB_COAXIALITY_DIA / 2.0
-    assert od == pytest.approx(10.20)
-    assert bore_max == pytest.approx(6.53)
-    assert arm.HUB_COAXIALITY_DIA == pytest.approx(0.10)
-    assert eccentricity == pytest.approx(0.05)
+    assert od == pytest.approx(10.16)
+    assert bore_max == pytest.approx(6.5278)
+    assert arm.HUB_COAXIALITY_DIA == pytest.approx(0.1016)
     wall = (od - printed_band - bore_max) / 2.0 - eccentricity
-    raw_class_wall = (od - _BAND_2PL - bore_max) / 2.0 - eccentricity
-    assert raw_class_wall == pytest.approx(1.531)
-    assert wall == pytest.approx(1.53)
-    assert arm.RULE12_WALL_FLOOR <= wall < 2.0
-    scale = 10**places
-    stated_wall = math.floor(wall * scale + 1e-9) / scale
+    assert wall == pytest.approx(1.6383)
+    # Named exception (RV-03): above the .060 floor, under the .080 target.
+    assert arm.RULE12_WALL_FLOOR <= wall < WALL_TARGET_MM
+    stated_wall = math.floor(wall / 25.4 * 1000 + 1e-9) / 1000 * 25.4
     assert arm_notes.HUB_WALL_MIN == pytest.approx(stated_wall)
     assert stated_wall <= wall + 1e-9
-    assert arm_notes.HUB_WALL_NOTE == f"HUB WALL {stated_wall:.{places}f} MIN"
+    assert arm_notes.HUB_WALL_NOTE == f"HUB WALL {arm.inch_text(stated_wall, 3)} MIN"
     assert arm_notes.HUB_WALL_NOTE in arm_notes.DRAWING_NOTES
     # The eccentricity is the hub OD's printed position zone to A.
-    assert float(arm.GEOMETRIC_TOLERANCES_MM["hub OD position to bore"]) == arm.HUB_COAXIALITY_DIA
-    # The spec's pessimistic hundredth-mm ceiling also covers the rounded
-    # printed class; lowering that floor by one printed step does not.
+    assert arm.GEOMETRIC_TOLERANCES_MM["hub OD position to bore"] == pytest.approx(
+        arm.HUB_COAXIALITY_DIA
+    )
+    # The spec's pessimistic hundredth-mm ceiling covers the printed class;
+    # lowering that floor by one hundredth does not.
     floor_wall = (arm.HUB_DIA_MIN - printed_band - bore_max) / 2.0 - eccentricity
     assert floor_wall >= arm.RULE12_WALL_FLOOR - 1e-9
-    step = 1.0 / scale
-    assert floor_wall - step / 2.0 < arm.RULE12_WALL_FLOOR
+    assert floor_wall - 0.01 / 2.0 < arm.RULE12_WALL_FLOOR
     # R9's inherited Ø0.50 zone is unsafe at the unchanged nominal OD.
     old_coaxiality = 0.50
     old_wall = (od - printed_band - bore_max) / 2.0 - old_coaxiality / 2.0
-    assert old_wall == pytest.approx(1.33)
+    assert old_wall == pytest.approx(1.4391)
     assert old_wall < arm.RULE12_WALL_FLOOR
-    # Omitting eccentricity recreates the old floor, which cannot meet 1.5.
+    # Omitting eccentricity recreates the old floor, which cannot meet the floor.
     old_floor = math.ceil(
-        round((bore_max + 2.0 * arm.RULE12_WALL_FLOOR + _BAND_2PL) * scale, 9)
-    ) / scale
+        round((bore_max + 2.0 * arm.RULE12_WALL_FLOOR + arm.LINEAR_2PL) * 100, 9)
+    ) / 100
     assert (old_floor - printed_band - bore_max) / 2.0 - eccentricity < (
         arm.RULE12_WALL_FLOOR
     )
@@ -401,7 +401,7 @@ def test_bar_foot_cheeks_clear_the_hub_at_the_worst_case(
     rocker's top edge at its lowest, and the hub at maximum material and off
     the bore axis by the printed coaxiality's radius. The one-sided bands
     (user ruling 2026-09-26) put no term on the notch or the edge; PR #1354's
-    spec-owned Ø0.10 coaxiality spends 0.05 of the air."""
+    spec-owned Ø.004 coaxiality spends .002 of the air."""
     # (upper, lower) deviations: the notch deepens by its upper one, the edge
     # drops by its lower one.
     notch_deeper = bar.BOTTOM_NOTCH_DEPTH_BAND[0]
@@ -410,31 +410,33 @@ def test_bar_foot_cheeks_clear_the_hub_at_the_worst_case(
     worst = _cheek_cap(monkeypatch, notch_deeper, edge_lower)
     nominal = _cheek_cap(monkeypatch, 0.0, 0.0)
     assert worst == pytest.approx(nominal - notch_deeper - edge_lower, abs=1e-6)
-    hub_max_material_r = (arm.HUB_DIA + _BAND_2PL) / 2.0
-    # O10.20 keeps ~0.29 of air at maximum material on the bore axis: the cap
-    # (Ø11.29) is nominal geometry, so the bands above are what hold it.
-    assert worst - hub_max_material_r == pytest.approx(0.291, abs=5e-3)
+    hub_max_material_r = (arm.HUB_DIA + arm.LINEAR_2PL) / 2.0
+    # Ø.400 keeps ~0.44 of air at maximum material on the bore axis: the cap
+    # is nominal geometry, so the bands above are what hold it.
+    assert worst - hub_max_material_r == pytest.approx(0.438, abs=5e-3)
     eccentricity = arm.HUB_COAXIALITY_DIA / 2.0
     hub_top = hub_max_material_r + eccentricity
     clearance = worst - hub_top
     assert clearance >= 0.0
-    assert clearance == pytest.approx(0.241, abs=5e-3)
+    assert clearance == pytest.approx(0.387, abs=5e-3)
     places = arm_notes.DRAWING_PRECISION["HubProfile"]["HubDia"]
-    printed_od_band = printed_band_mm(places)
-    printed_hub_max_material_r = (round(arm.HUB_DIA, places) + printed_od_band) / 2.0
+    printed_od_band = printed_band_mm(places, unit=arm.UNIT)
+    printed_hub_max_material_r = (
+        round(arm.HUB_DIA / 25.4, places) * 25.4 + printed_od_band
+    ) / 2.0
     printed_clearance = worst - (printed_hub_max_material_r + eccentricity)
     assert printed_clearance >= 0.0
     assert clearance - printed_clearance == pytest.approx(
-        (printed_od_band - _BAND_2PL) / 2.0
+        (printed_od_band - arm.LINEAR_2PL) / 2.0
     )
     # This is the source-derived OD ceiling behind the named wall exception.
     nominal_od_ceiling = 2.0 * (worst - eccentricity) - printed_od_band
     assert arm.HUB_DIA <= nominal_od_ceiling
     assert nominal_od_ceiling - arm.HUB_DIA == pytest.approx(2.0 * printed_clearance)
-    # Tightening Ø0.50 to Ø0.10 recovers 0.20 radial clearance without
+    # Tightening Ø0.50 to Ø.004 recovers ~0.2 radial clearance without
     # changing any nominal geometry or legitimate tolerance band.
     old_clearance = worst - (hub_max_material_r + 0.50 / 2.0)
-    assert old_clearance == pytest.approx(0.041, abs=5e-3)
+    assert old_clearance == pytest.approx(0.188, abs=5e-3)
     assert clearance - old_clearance == pytest.approx(
         (0.50 - arm.HUB_COAXIALITY_DIA) / 2.0
     )
@@ -448,9 +450,8 @@ def test_bar_foot_cheeks_clear_the_hub_at_the_worst_case(
     fault_clearance = worst - (printed_hub_max_material_r + looser / 2.0)
     assert fault_clearance == pytest.approx(-eccentricity)
     assert fault_clearance < 0.0
-    # Bilateral .XX on either formerly one-sided feature also closes the air.
-    assert _cheek_cap(monkeypatch, _BAND_2PL, 0.0) - hub_top < 0.0
-    assert _cheek_cap(monkeypatch, 0.0, _BAND_2PL) - hub_top < 0.0
+    # Bilateral .XX on both formerly one-sided features closes the air.
+    assert _cheek_cap(monkeypatch, arm.LINEAR_2PL, arm.LINEAR_2PL) - hub_top < 0.0
     # The washer's edge, off the axis by its bore's float on the thinnest shaft.
     washer_float = (washer.ID_MAX - (shaft.SHAFT_DIA + shaft.SHAFT_DIA_BAND[1])) / 2.0
     assert washer.OD_MAX / 2.0 + washer_float <= hub_max_material_r
@@ -470,7 +471,7 @@ def test_hub_root_fillet_clears_a_cheek_running_on_the_strap_face(
     )
     places = arm_notes.DRAWING_PRECISION["HubProfile"]["HubDia"]
     hub_top = (
-        round(arm.HUB_DIA, places) + printed_band_mm(places)
+        round(arm.HUB_DIA / 25.4, places) * 25.4 + printed_band_mm(places, unit=arm.UNIT)
     ) / 2.0 + arm.HUB_COAXIALITY_DIA / 2.0
     air = worst - hub_top
     radius = arm.HUB_ROOT_RADIUS_MAX
@@ -492,17 +493,17 @@ def test_hub_root_fillet_clears_a_cheek_running_on_the_strap_face(
     assert arm_notes.HUB_ROOT_R_TOL_TYPE == 6  # swTolType_e.swTolMAX
 
 
-def test_the_one_sided_bands_lift_the_bar_at_most_1_mm_at_rest(
+def test_the_one_sided_bands_lift_the_bar_about_1_mm_at_rest(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The shallow-notch and high-edge limits can only lift a bar: at most
-    1.0 at rest, a steady ~0.45 deg on its channel lever, and at most 0.0036
+    1.008 at rest, a steady ~0.45 deg on its channel lever, and at most 0.0036
     of fundamental at any station (0.04 % of the d = 88 term), from the exact
     chain in error_budget (rocker_arm_spec states both)."""
     notch_shallower = -bar.BOTTOM_NOTCH_DEPTH_BAND[1]
     edge_higher = arm.TOP_EDGE_BAND[0]
     lift = notch_shallower + edge_higher
-    assert lift == pytest.approx(1.0)
+    assert lift == pytest.approx(1.008)
     with monkeypatch.context() as patch:
         base = ck.solve_state(0.0)
         patch.setattr(ck, "_CONTACT_OFF_Y", ck._CONTACT_OFF_Y - notch_shallower)
