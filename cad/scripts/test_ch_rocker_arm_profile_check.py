@@ -126,7 +126,7 @@ _ROCKER_BOT_END = (rocker.BOT_END_X, _ROCKER_BOT_END_Y - rocker_interface.PIVOT_
 _ROCKER_CENTRE_Y = rocker_interface.CENTER_Y - rocker_interface.PIVOT_MID_Y
 _ZONE = rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]
 _MID_ZONE = _ZONE / 2.0
-# #1545 (approved 2026-10-15): of the rocker's 0.25 half-zone either side of
+# #1545 (approved 2026-10-15): of the rocker's half-zone either side of
 # the aim, filing to the scribed line keeps at least this much.
 _FILING_RESIDUAL = 0.09
 
@@ -225,7 +225,7 @@ def test_pivot_pin_registration_and_acceptance_fit_a_quarter_of_the_rocker_zone(
     pivot; with the template's own DTI acceptance it stays inside the
     quarter of the rocker's arc zone the gauge may spend, centred on the aim."""
     hole = (check.PIVOT_HOLE_DIA, check.PIVOT_HOLE_DIA + check.PIVOT_HOLE_BAND[0])
-    assert hole == pytest.approx((6.5, 6.515))
+    assert hole == pytest.approx((6.5024, 6.51764))
     rocker_bore = (
         rocker.PIVOT_HOLE_DIA + rocker.PIVOT_HOLE_BAND[1],
         rocker.PIVOT_HOLE_DIA + rocker.PIVOT_HOLE_BAND[0],
@@ -236,7 +236,7 @@ def test_pivot_pin_registration_and_acceptance_fit_a_quarter_of_the_rocker_zone(
         rocker_bore[1] - check.PIN_GAUGE_MIN
     ) / 2.0
     assert check.LOCATOR_REGISTRATION_MAX >= registration
-    assert check.LOCATOR_REGISTRATION_MAX == pytest.approx(0.0262)
+    assert check.LOCATOR_REGISTRATION_MAX == pytest.approx(0.0265)
     assert check.DTI_ACCEPTANCE + registration <= 0.25 * _ZONE / 2.0 + 1e-9
 
 

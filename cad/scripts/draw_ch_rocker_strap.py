@@ -1,16 +1,17 @@
 r"""Create the manufacturing drawing for the rocker strap (MHA-CH-13).
 
-Under ``cad/docs/drawing-guidelines.md``: the flat strap of the built-up rocker
-arm MHA-CH-06 (``ch_rocker_strap_spec``), every size a native model dimension
-of its one profile sketch, located from the Ø10.200 H7 hub hole's centre
-(rule 10): the top edge's height over the hole with the MHA-CH-06 band and
-mate, the R800 top edge (its centre, ~808 mm off the sheet, stated on it as
-above the hole), the bottom edge's depth under the hole, both tip corners'
-and both taper feet's offsets, and the 2X radial tip land; the parenthesised
-overall length across the tip corners ties the two offsets together (rule 10:
-the overall size is conspicuous). The hole's H7 band
-names the MHA-CH-12 hub and the fit (rule 4) and keeps both its edges sharp
-(the title block's break would groove the pressed root); the 2.500 thickness,
+Under ``cad/docs/drawing-guidelines.md``, in decimal inch (the part's
+``drawing_unit: in``): the flat strap of the built-up rocker arm MHA-CH-06
+(``ch_rocker_strap_spec``), every size a native model dimension of its one
+profile sketch, located from the Ø.4000 hub hole's centre (rule 10): the top
+edge's height over the hole with the MHA-CH-06 band and mate, the R31.5 top
+edge (its centre, ~32 in off the sheet, stated on it as above the hole), the
+bottom edge's depth under the hole, both tip corners' and both taper feet's
+offsets, and the 2X radial tip land; the parenthesised overall length across
+the tip corners ties the two offsets together (rule 10: the overall size is
+conspicuous). The hole's press band names the MHA-CH-12 hub and the fit
+(rule 4) and keeps both its edges sharp (the title block's break would groove
+the pressed root); the thickness,
 on the end view, names the rod fork it runs in. One property-linked note names
 the joint the finish field's "after joining" refers to. No datums, no frames,
 no roughness symbol (rule 6: a pressed bore carries none). The decimal places
@@ -53,6 +54,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _part_properties import part_drawing_unit
 from _session import run_build
 from ch_rocker_strap_notes import (
     DIMENSION_CALLOUTS,
@@ -158,8 +160,8 @@ ARC_RADIUS_NAMES = ("TopRadius",)
 
 
 def _exterior_radius_leaders(adapter: Any, annotations: list[Any]) -> None:
-    """Exterior leader on the R800 (draw_ch_rocker_arm._dress_arc_radii): the
-    ~808 mm centre is off the sheet, so no centre-directed leader."""
+    """Exterior leader on the top radius (draw_ch_rocker_arm._dress_arc_radii):
+    the ~32 in centre is off the sheet, so no centre-directed leader."""
     remaining = set(ARC_RADIUS_NAMES)
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
@@ -265,7 +267,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("ch-rocker-strap"),
     )
     stamp_drawing_summary(
         adapter,
@@ -274,7 +280,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Strap Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker strap; 1018 flat; hub hole H7",
+            3: "rocker strap; 1018 flat; hub hole press fit",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

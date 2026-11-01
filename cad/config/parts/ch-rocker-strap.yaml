@@ -5,11 +5,16 @@ ch-rocker-strap:
   # test_part_coverage counts it reachable through that part.
   component_of: ch-rocker-arm
   material: Plain Carbon Steel
-  material_specification: AISI 1018 flat, 3 x 40 mm
+  material_specification: AISI 1018 CF flat, 1/8 x 2 REF
+  # Stock: OnlineMetals 4808, 1/8 x 2 in 1018 cold-finish flat. Live page read
+  # 2026-10-31: thickness .125, width 2, alloy 1018, cold finish, ASTM A108,
+  # MTR available, 12-144 in lengths or custom cut (+/-.125 in cut length);
+  # no thickness or width tolerance stated.
   # Black oxide once, on the joined MHA-CH-06, after its bore and length are
   # finished; note 2 names the joint ("on joined MHA-CH-06" read as an
   # unexplained second joint to the r1 machinist review).
   finish: black oxide after joining
   quantity: 20
   tolerance_class: machined_block
-  process: "1018 flat 3 x 40 mm (OnlineMetals 22381) milled to the 2.5 thickness; hub hole reamed H7; outline milled; MHA-CH-12 pressed in, then finished on MHA-CH-06"
+  drawing_unit: in
+  process: "1018 cold-finish flat 1/8 x 2 in (OnlineMetals 4808) milled to the finished thickness; hub hole reamed; outline milled; MHA-CH-12 pressed in, then finished on MHA-CH-06"

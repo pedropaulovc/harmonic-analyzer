@@ -37,12 +37,15 @@ from __future__ import annotations
 import math
 import tomllib
 
-import _config
 import ch_rocker_arm_spec as rocker
 import _rocker_interface as rocker_interface
 import draw_ch_rocker_arm as drawing
 from _hole_spec import blind_cut_dia_mm
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    drilled_undersize_mm,
+    printed_band_mm,
+)
 from _process_plans import PROCESS_ROOT
 
 INCH = 25.4
@@ -81,13 +84,13 @@ _XY = tuple[float, float]
 R_TOP = rocker.R_TOP
 R_BOTTOM = rocker_interface.R_BOTTOM
 _ROCKER_ZONE = rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]
-_MID_ZONE = _ROCKER_ZONE / 2.0  # 0.25 into the material on the lower outline
+_MID_ZONE = _ROCKER_ZONE / 2.0  # 0.254 into the material on the lower outline
 # The aim: the middle of the rocker's one-sided top-edge band.
 _ROCKER_TOP_LOW = rocker.TOP_EDGE_ABOVE_PIVOT + rocker.TOP_EDGE_BAND[1]
 _ROCKER_TOP_HIGH = rocker.TOP_EDGE_ABOVE_PIVOT + rocker.TOP_EDGE_BAND[0]
-TOP_ABOVE_PIVOT = round((_ROCKER_TOP_LOW + _ROCKER_TOP_HIGH) / 2.0, 2)  # 8.25
-CENTER_Y = TOP_ABOVE_PIVOT + R_TOP  # 808.25
-BOTTOM_BELOW_PIVOT = round(R_BOTTOM - CENTER_Y, 2)  # 7.75
+TOP_ABOVE_PIVOT = round((_ROCKER_TOP_LOW + _ROCKER_TOP_HIGH) / 2.0, 3)  # 8.254
+CENTER_Y = TOP_ABOVE_PIVOT + R_TOP  # 808.254
+BOTTOM_BELOW_PIVOT = round(R_BOTTOM - CENTER_Y, 3)  # 7.746
 if abs(R_BOTTOM - R_TOP - rocker_interface.ARM_DEPTH) > 1e-9:
     raise AssertionError("rocker arcs are no longer ARM_DEPTH apart")
 if abs(TOP_ABOVE_PIVOT + BOTTOM_BELOW_PIVOT - rocker_interface.ARM_DEPTH) > 1e-9:
@@ -195,13 +198,13 @@ THICK = 3.175
 # rod slot with pins in both.
 DTI_ACCEPTANCE = 0.03
 
-# Pivot locating hole: the rocker's Ø6.5 bore, reamed to H7 (+0.015/0) so one
-# bought 0.2558 in Class X minus pin gauge (gauges.vermont-class-x-2558-minus:
+# Pivot locating hole: the rocker's Ø.256 bore size, reamed +.0006/.0000 so
+# one bought 0.2558 in Class X minus pin gauge (gauges.vermont-class-x-2558-minus:
 # 0.25576-0.25580 in, 6.4963-6.4973) locates it in the arm's bore. The shop's
 # 0.001 in Class ZZ set stops at 0.2550, whose play alone is 0.0505;
 # auto-selected 2026-10-15 after review timeout, Pedro may revisit.
 PIVOT_HOLE_DIA = rocker.PIVOT_HOLE_DIA
-PIVOT_HOLE_BAND = (0.015, 0.0)
+PIVOT_HOLE_BAND = (0.01524, 0.0)  # +.0006/.0000
 PIN_GAUGE_IN = 0.2558
 PIN_GAUGE_CLASS_X_IN = 0.00004  # Class X tolerance, minus direction
 PIN_GAUGE_MIN = (PIN_GAUGE_IN - PIN_GAUGE_CLASS_X_IN) * INCH  # 6.4963
@@ -223,10 +226,10 @@ LOCATOR_REGISTRATION_MAX = (
         )
     )
     / 1e4
-)  # 0.0262 = 0.0094 template + 0.0169 rocker, rounded up
+)  # 0.0265 = 0.0107 template + 0.0158 rocker, rounded up
 
 # Rod-pin slot: the template's clocking. The rocker's datum C is its #47
-# rod-pin hole (MHA-CH-06, Ø0.20 position to A|B). The pivot pin alone leaves
+# rod-pin hole (MHA-CH-06, Ø.008 position to A|B). The pivot pin alone leaves
 # the template free to turn about the pivot; a pin gauge in the arm's rod-pin
 # hole, through a slot at that hole's BASIC station, clocks it. The slot runs
 # radially from the pivot, so the hole's radial position error and the pin's
@@ -246,23 +249,22 @@ ROD_PIN_GAUGE_IN = 0.0780
 ROD_PIN_CLASS_ZZ_IN = 0.0002
 ROD_PIN_MAX = ROD_PIN_GAUGE_IN * INCH  # 1.98120
 ROD_PIN_MIN = (ROD_PIN_GAUGE_IN - ROD_PIN_CLASS_ZZ_IN) * INCH  # 1.97612
-# The rocker's #47 hole at the title block's drilled-hole band.
-_DRILLED = _config.title_block("drilled_hole")
+# The rocker's #47 hole at its sheet's drilled-hole band.
 _ROD_HOLE_DIA = blind_cut_dia_mm(rocker.ROD_HOLE_SPEC)
-_ROD_HOLE_LOW = _ROD_HOLE_DIA - float(_DRILLED["minus_mm"])  # 1.994
-_ROD_HOLE_HIGH = _ROD_HOLE_DIA + float(_DRILLED["plus_mm"])  # 2.094
+_ROD_HOLE_LOW = _ROD_HOLE_DIA - drilled_undersize_mm(unit=rocker.UNIT)  # 1.994
+_ROD_HOLE_HIGH = _ROD_HOLE_DIA + drilled_oversize_mm(unit=rocker.UNIT)  # 2.0956
 if not ROD_PIN_MAX < _ROD_HOLE_LOW <= (ROD_PIN_GAUGE_IN + 0.001) * INCH:
     raise AssertionError("the rod-hole pin is no longer the set's largest that enters")
-# The slot is an H7 width on that pin (ISO 286, 1-3 mm: +0.010/0).
-ROD_SLOT_WIDTH = 1.983
-ROD_SLOT_WIDTH_BAND = (0.010, 0.0)  # (upper, lower)
+# The slot is a matched width on that pin: .078 +.0004/+.0001.
+ROD_SLOT_WIDTH = 1.9812  # .078
+ROD_SLOT_WIDTH_BAND = (0.01016, 0.00254)  # (upper, lower)
 ROD_SLOT_WIDTH_MIN = ROD_SLOT_WIDTH + ROD_SLOT_WIDTH_BAND[1]
 ROD_SLOT_WIDTH_MAX = ROD_SLOT_WIDTH + ROD_SLOT_WIDTH_BAND[0]
 if ROD_SLOT_WIDTH_MIN - ROD_PIN_MAX <= 0.0:
     raise AssertionError("the rod-hole pin does not enter the smallest slot")
 ROD_HOLE_RADIAL = float(rocker.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"]) / 2.0
-ROD_HOLE_PLAY = (_ROD_HOLE_HIGH - ROD_PIN_MIN) / 2.0  # 0.0589
-ROD_SLOT_PLAY = (ROD_SLOT_WIDTH_MAX - ROD_PIN_MIN) / 2.0  # 0.0084
+ROD_HOLE_PLAY = (_ROD_HOLE_HIGH - ROD_PIN_MIN) / 2.0  # 0.0597
+ROD_SLOT_PLAY = (ROD_SLOT_WIDTH_MAX - ROD_PIN_MIN) / 2.0  # 0.0076
 # The slot's 0.75 run (inventory gauges.arm-outline-template; formerly
 # ROD_SLOT_FLAT, three places) must admit the pin at the rocker's worst
 # radial position error and play, so the radial slot absorbs that error and

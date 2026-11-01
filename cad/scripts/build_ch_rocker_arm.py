@@ -18,7 +18,7 @@ sketch:
     not a 3D chamfer feature.
 
 The perpendicular top-to-bottom DEPTH stays 16 mm (p.29 end-face callout); the
-plate THICKNESS (Z) stays 2.5 mm (p.27 callout).
+plate THICKNESS (Z) is the p.27 callout's 2.5 mm on the inch grid, .098.
 
 Mid-pivot SEESAW, symmetric about the pivot. The 11.5" top span was measured
 manually from the ch.30 back view (supersedes the p.29 broadside photo-scaled
@@ -73,8 +73,10 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
+from _document_units import apply_package_model_units
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
+from _part_properties import part_drawing_unit
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_dimension_insert import add_angular_reference_dimension
 from _drawing_prefix import set_dimension_prefix
@@ -103,21 +105,22 @@ from ch_rocker_arm_spec import (
     HUB_LENGTH_BAND,
     HUB_ROOT_RADIUS_MAX,
     PIVOT_HOLE_BAND,
+    PIVOT_HOLE_DIA,
     ROD_HOLE_SPEC,
     SURFACE_FINISHES,
     TOP_EDGE_ABOVE_PIVOT,
     TOP_EDGE_BAND,
+    UNIT,
 )
 import _config
 
 PART_NAME = "ch-rocker-arm"
 MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
-ARM_THICKNESS = 2.5  # ch14: p.27 photo callout (plate thickness, Z)
+ARM_THICKNESS = 2.4892  # .098; ch14: p.27 photo callout 2.5 mm (plate thickness, Z)
 TOP_ARC_LEN = 292.1  # top edge arc length = 11.5" (ch.30 back view, manual)
 BOT_ARC_LEN = 266.7  # bottom edge arc length = 10.5" (ch.30 back-view sketch)
 TIP_FACE = 5.588  # 0.22" tip face, PERPENDICULAR to the top edge (ch.30 sketch)
-PIVOT_HOLE_DIA = 6.5  # rides the 6.35 pivot shaft (DIMENSIONS.md ch14, derived)
 # The hub length IS the station pitch: hub faces of neighbouring arms touch.
 if abs(HUB_LENGTH - _config.machine("channels", "station_pitch_mm")) > 1e-6:
     raise AssertionError("ch_rocker_arm_spec.HUB_LENGTH must equal the channel station pitch")
@@ -253,7 +256,7 @@ V_HUB_ROOT = 2.0 * 2.0 * math.pi * _HUB_ROOT_CENTROID_R * _HUB_ROOT_SECTION
 
 
 def _hub_root_radius_max_limit(adapter) -> None:
-    """HubRootRadius as the single limit "R0.2 MAX" carrying the band's
+    """HubRootRadius as the single limit "R.008 MAX" carrying the band's
     deviations (build_ch_pivot_bracket._corner_radius_max_limit's recipe)."""
     lower, upper = deviations(HUB_ROOT_R_BAND)
     _, dimension = _named_dimension(adapter, "HubRoot", "HubRootRadius")
@@ -311,6 +314,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs: named globals in the equation manager that drive every
     # sketch dimension below. A GUI fine-tune edits THESE (Tools > Equations) --
@@ -496,7 +500,7 @@ async def build(adapter) -> dict[str, str]:
     v_strap = _strap_area() * ARM_THICKNESS
     await volume_check(adapter, "strap", v_strap, 0.01 * v_strap)
 
-    # Integral pivot hub (2026-09-02, ch14 p.28): a O10 boss coaxial with the
+    # Integral pivot hub (2026-09-02, ch14 p.28): a Ø.400 boss coaxial with the
     # pivot bore, HUB_LENGTH long mid-plane (= the station pitch), so it stands
     # HUB_PROUD of each strap face and touches the neighbour arms' hubs. The
     # circle (r 5 about (0, ArmDepth/2)) lies inside the 16-deep strap, so the
@@ -657,7 +661,7 @@ async def build(adapter) -> dict[str, str]:
         drive_b='"CenterY"', drive_jobs=drive_jobs,
     )
 
-    # The pivot bore runs the full hub length; the rod bore only the 2.5 strap.
+    # The pivot bore runs the full hub length; the rod bore only the strap.
     rod_dia = blind_cut_dia_mm(ROD_HOLE_SPEC)
     v_pivot = math.pi * (PIVOT_HOLE_DIA / 2.0) ** 2 * HUB_LENGTH
     v_rod = math.pi * (rod_dia / 2.0) ** 2 * ARM_THICKNESS
@@ -690,22 +694,26 @@ async def build(adapter) -> dict[str, str]:
     strap_lower, strap_upper = deviations(ARM_THICKNESS_BAND)
     if strap_lower != -strap_upper:
         raise AssertionError("ch_rocker_arm_spec.ARM_THICKNESS_BAND must be symmetric")
-    set_dimension_symmetric_tolerance(adapter, "Strap", "StrapThickness", strap_upper)
-    # The hub length only comes out long (#743 PR2): three places hold it.
+    set_dimension_symmetric_tolerance(
+        adapter, "Strap", "StrapThickness", strap_upper, display_unit=UNIT
+    )
+    # The hub length only comes out long (#743 PR2): four places hold it.
     set_dimension_bilateral_tolerance(
-        adapter, "Hub", "HubLength", *deviations(HUB_LENGTH_BAND)
+        adapter, "Hub", "HubLength", *deviations(HUB_LENGTH_BAND), display_unit=UNIT
     )
     # The top edge may only come out high (ch_rocker_arm_spec.TOP_EDGE_BAND).
     set_dimension_bilateral_tolerance(
-        adapter, "TopEdgeReference", "TopAbovePivot", *deviations(TOP_EDGE_BAND)
+        adapter, "TopEdgeReference", "TopAbovePivot", *deviations(TOP_EDGE_BAND),
+        display_unit=UNIT,
     )
-    # The hub roots print as the single limit "2X R0.2 MAX": both strap faces.
+    # The hub roots print as the single limit "2X R.008 MAX": both strap faces.
     _hub_root_radius_max_limit(adapter)
     set_dimension_prefix(adapter, "HubRoot", "HubRootRadius", HUB_ROOT_PREFIX)
-    # The reamed pivot bore's band rides its O6.50 natively (drawing-guidelines.md rule 3 (decimal places carry the tolerance));
+    # The reamed pivot bore's band rides its Ø.2560 natively (drawing-guidelines.md rule 3 (decimal places carry the tolerance));
     # note 6 keeps only the REAM process word.
     set_dimension_bilateral_tolerance(
-        adapter, "PivotHoleProfile", "PivotDia", *deviations(PIVOT_HOLE_BAND)
+        adapter, "PivotHoleProfile", "PivotDia", *deviations(PIVOT_HOLE_BAND),
+        display_unit=UNIT,
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
