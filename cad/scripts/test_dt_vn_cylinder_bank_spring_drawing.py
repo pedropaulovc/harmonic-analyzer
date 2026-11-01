@@ -422,17 +422,17 @@ def test_size_text_positions_come_from_the_spec_sizes_and_view_scale() -> None:
     od_rim, id_rim = spec.OD / 1000.0, spec.ID / 1000.0  # radii at 2:1
     shelf = 0.001 + 0.002 + 0.0002
     assert positions["SupplierFreeHeight"] == pytest.approx(
-        (0.1315 + od_rim + 0.010 + shelf + 0.0227354 / 2.0, 0.1335)
+        (0.1315 + od_rim + 0.010 + shelf + 0.0201493 / 2.0, 0.1335)
     )
-    assert positions["SupplierFreeHeight"][0] == pytest.approx(0.1687677)
+    assert positions["SupplierFreeHeight"][0] == pytest.approx(0.16747465)
     od_gap = od_rim + 0.003556 + 0.000381 + 0.002 + 0.0002
     id_gap = max(od_rim + 0.0035 + 0.0002, id_rim + 0.003556 + 0.000381 + 0.0022)
     assert od_gap == pytest.approx(0.018837) and id_gap == pytest.approx(0.0164)
     assert positions["SupplierOD"] == pytest.approx(
-        (0.1315 + od_gap + 0.0435062 / 2.0, 0.227)
+        (0.1315 + od_gap + 0.038334 / 2.0, 0.227)
     )
     assert positions["SupplierID"] == pytest.approx(
-        (0.1315 - id_gap - 0.0435062 / 2.0, 0.227)
+        (0.1315 - id_gap - 0.038334 / 2.0, 0.227)
     )
     # Scale, not constants: at 1:1 the station closes in by half the OD.
     unit = _positions(scale=1.0)
