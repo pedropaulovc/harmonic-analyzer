@@ -77,4 +77,16 @@ class SupplierPinReference:
         This offset is diagram placement only. The circle is a supplier
         application reference, not another body or a hole cut in the pin.
         """
-        return (3.0 * self.diameter_mm, 0.0)
+        return (3.0 * self.diameter_mm, 0.0)
+
+
+def declares_application_hole(source: SupplierPinReference) -> bool:
+    """Whether a spring pin carries the supplier application (mating) hole.
+
+    Both application fields or neither: a pin whose mating parts' own sheets
+    specify its holes omits the circle, which reads as a second pin feature.
+    """
+    limits, precision = source.application_hole_limits, source.application_hole_precision
+    if (limits is None) != (precision is None):
+        raise ValueError(f"{source.sku}: incomplete supplier mating-hole reference")
+    return limits is not None

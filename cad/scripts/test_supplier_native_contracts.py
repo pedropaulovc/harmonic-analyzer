@@ -368,3 +368,144 @@ def test_pin_reference_suffix_follows_the_declared_sheet_unit(units, sheet_unit,
 
     source = SimpleNamespace(units=units, sheet_unit=sheet_unit)
     assert pins._reference_suffix(source) == suffix
+
+
+def _spring_pin_source(*, limits=(0.062, 0.065), precision=3):
+    from _supplier_pin_data import SupplierPinReference
+
+    return SupplierPinReference(
+        sku="spring-pin", units="in", diameter_mm=1.5875, length_mm=12.7,
+        diameter_nominal=0.063, diameter_precision=3, length_precision=3,
+        wall_mm=0.3048, wall_precision=3,
+        application_hole_limits=limits, application_hole_precision=precision,
+        sheet_unit="in",
+    )
+
+
+def _author_spring_pin(monkeypatch, source):
+    import asyncio
+
+    import _supplier_pin_model as pins
+
+    events = []
+
+    async def create_sketch(plane):
+        events.append(("sketch", plane))
+        return _result()
+
+    async def define_circle(_adapter, x, y, radius, *_args, **_kwargs):
+        events.append(("circle", x, y, radius))
+        return "circle"
+
+    async def nothing(*_args, **_kwargs):
+        return None
+
+    async def line_chain(*_args, **_kwargs):
+        return ("wall",)
+
+    async def constraint(*_args, **_kwargs):
+        return _result()
+
+    adapter = SimpleNamespace(
+        currentModel=object(), create_sketch=create_sketch,
+        exit_sketch=lambda: constraint(), add_sketch_constraint=constraint,
+    )
+    monkeypatch.setattr(pins, "add_line_chain", line_chain)
+    monkeypatch.setattr(pins, "anchor_point_to_origin", nothing)
+    monkeypatch.setattr(pins, "dimension_between", nothing)
+    monkeypatch.setattr(pins, "ensure_fully_defined", nothing)
+    monkeypatch.setattr(pins, "define_circle", define_circle)
+    monkeypatch.setattr(pins, "_construction", lambda *_args: None)
+    monkeypatch.setattr(pins, "_finish_reference",
+                        lambda _adapter, _dims, feature, _source: events.append(("finish", feature)))
+    monkeypatch.setattr(pins, "blank_reference_sketches",
+                        lambda _adapter, names: events.append(("blank", tuple(names))))
+    monkeypatch.setattr(pins, "assert_supplier_spring_pin_references",
+                        lambda *_args: events.append(("readback",)))
+    asyncio.run(pins.author_supplier_spring_pin_references(adapter, source))
+    return events
+
+
+def test_spring_pin_without_an_application_hole_authors_only_the_wall(monkeypatch):
+    import _supplier_pin_model as pins
+
+    events = _author_spring_pin(monkeypatch, _spring_pin_source(limits=None, precision=None))
+    assert events == [
+        ("sketch", "Right"), ("finish", pins.WALL_FEATURE),
+        ("blank", (pins.WALL_FEATURE,)), ("readback",),
+    ]
+
+
+def test_spring_pin_with_an_application_hole_still_authors_the_mating_hole(monkeypatch):
+    import _supplier_pin_model as pins
+
+    source = _spring_pin_source()
+    events = _author_spring_pin(monkeypatch, source)
+    assert events == [
+        ("sketch", "Right"), ("finish", pins.WALL_FEATURE),
+        ("sketch", "Right"), ("circle", *source.application_hole_center, 0.062 * 25.4 / 2.0),
+        ("finish", pins.MATING_HOLE_FEATURE),
+        ("blank", (pins.WALL_FEATURE, pins.MATING_HOLE_FEATURE)), ("readback",),
+    ]
+
+
+@pytest.mark.parametrize("limits,precision", [((0.062, 0.065), None), (None, 3)])
+def test_half_declared_application_hole_is_refused_before_authoring(monkeypatch, limits, precision):
+    import _supplier_pin_model as pins
+
+    source = _spring_pin_source(limits=limits, precision=precision)
+    with pytest.raises(ValueError, match="incomplete supplier mating-hole reference"):
+        _author_spring_pin(monkeypatch, source)
+    with pytest.raises(ValueError, match="incomplete supplier mating-hole reference"):
+        pins._reference_contract(source, pins.MATING_HOLE_FEATURE)
+
+
+def test_undeclared_application_hole_has_no_mating_hole_contract():
+    import _supplier_pin_model as pins
+
+    with pytest.raises(ValueError, match="no supplier mating-hole reference is declared"):
+        pins._reference_contract(
+            _spring_pin_source(limits=None, precision=None), pins.MATING_HOLE_FEATURE,
+        )
+
+
+def _spring_pin_readback(monkeypatch, source, features):
+    import _supplier_pin_model as pins
+
+    checked = []
+    model = SimpleNamespace(
+        FeatureByName=lambda name: SimpleNamespace(name=name) if name in features else None,
+    )
+    monkeypatch.setattr(pins, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(pins, "_named_dimensions",
+                        lambda _adapter, _feature, names, **_kwargs: {name: (name, None) for name in names})
+    monkeypatch.setattr(pins, "assert_supplier_pin_model_reference",
+                        lambda _adapter, _model, display, feature, _source, **_kwargs:
+                        checked.append((feature, display)))
+    pins.assert_supplier_spring_pin_references(None, model, source)
+    return checked
+
+
+def test_spring_pin_readback_checks_only_the_declared_references(monkeypatch):
+    import _supplier_pin_model as pins
+
+    both = (pins.WALL_FEATURE, pins.MATING_HOLE_FEATURE)
+    assert _spring_pin_readback(monkeypatch, _spring_pin_source(), both) == [
+        (pins.WALL_FEATURE, pins.WALL_DIMENSION),
+        (pins.MATING_HOLE_FEATURE, pins.MATING_HOLE_DIMENSION),
+    ]
+    undeclared = _spring_pin_source(limits=None, precision=None)
+    assert _spring_pin_readback(monkeypatch, undeclared, (pins.WALL_FEATURE,)) == [
+        (pins.WALL_FEATURE, pins.WALL_DIMENSION),
+    ]
+    with pytest.raises(RuntimeError, match="undeclared supplier mating-hole reference"):
+        _spring_pin_readback(monkeypatch, undeclared, both)
+
+
+def test_strap_pin_declares_no_application_hole_and_the_cup_pin_keeps_its_own():
+    from _supplier_pin_data import declares_application_hole
+    import dt_vn_pinion_strap_pin_spec as strap_pin
+    import pd_vn_transgear_knob_cup_pin_spec as cup_pin
+
+    assert not declares_application_hole(strap_pin.SUPPLIER_REFERENCE)
+    assert declares_application_hole(cup_pin.SUPPLIER_REFERENCE)

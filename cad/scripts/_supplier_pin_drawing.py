@@ -31,6 +31,7 @@ from _supplier_pin_data import (
     REFERENCE_DIMENSIONS,
     WALL_DIMENSION,
     SupplierPinReference,
+    declares_application_hole,
 )
 from _supplier_pin_model import _reference_contract, assert_supplier_pin_model_reference
 
@@ -344,12 +345,10 @@ def add_supplier_dowel_dimensions(
 def add_supplier_spring_pin_dimensions(
     adapter: Any, views: dict[str, Any], source: SupplierPinReference
 ) -> Callable[[], None]:
-    """Import wall/application read-only; author only bandless OD and length."""
-    if (
-        source.wall_mm is None or source.wall_precision is None
-        or source.application_hole_limits is None or source.application_hole_precision is None
-    ):
+    """Import wall and any application hole read-only; author only bandless OD and length."""
+    if source.wall_mm is None or source.wall_precision is None:
         raise ValueError(f"{source.sku}: incomplete spring-pin source references")
+    application_hole = declares_application_hole(source)
     front = views["*Front"]
     circles = _axis_circles(scan_view_edges(front, label=f"{source.sku} spring pin"), 0, label=source.sku)
     right = views["*Right"]
@@ -358,7 +357,7 @@ def add_supplier_spring_pin_dimensions(
     )
     outline = tuple(float(value) for value in right.GetOutline())
     # Below left of the end view: the WALL text sits up-left with its line
-    # over the rim and the mating hole's diagram and label sit right, so the
+    # over the rim and any mating hole's diagram and label sit right, so the
     # Ø leader crosses neither (machinist review of dt_vn_pinion_strap_pin:
     # up-right, it crossed the WALL line at its arrowhead).
     diameter, diameter_check = _supplier_diameter(
@@ -370,20 +369,19 @@ def add_supplier_spring_pin_dimensions(
         stations=(-source.length_mm / 2.0, source.length_mm / 2.0),
     )
     center = tuple(float(value) for value in right.Position)
-    imported = _import_model_references(
-        adapter, right, source,
-        {
-            WALL_DIMENSION: (center[0] - 0.022, center[1] + 0.018),
-            MATING_HOLE_DIMENSION: (center[0] + 0.064, center[1] - 0.031),
-        },
-    )
+    keep = {WALL_DIMENSION: (center[0] - 0.022, center[1] + 0.018)}
+    if application_hole:
+        keep[MATING_HOLE_DIMENSION] = (center[0] + 0.064, center[1] - 0.031)
+    imported = _import_model_references(adapter, right, source, keep)
     wall, wall_check = imported[WALL_DIMENSION]
-    hole, hole_check = imported[MATING_HOLE_DIMENSION]
+    references = [
+        ("*Right", diameter, diameter_check), ("*Front", length, length_check),
+        ("*Right", wall, wall_check),
+    ]
+    if application_hole:
+        hole, hole_check = imported[MATING_HOLE_DIMENSION]
+        references.append(("*Right", hole, hole_check))
     return _settled_pin_check(
-        adapter, views,
-        [
-            ("*Right", diameter, diameter_check), ("*Front", length, length_check),
-            ("*Right", wall, wall_check), ("*Right", hole, hole_check),
-        ],
-        expected_count=4, label=source.sku,
+        adapter, views, references,
+        expected_count=4 if application_hole else 3, label=source.sku,
     )

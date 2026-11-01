@@ -164,8 +164,7 @@ if PIN_DRIVE_SHARE_MAX > 2.0 * PIN_SUB_FLUSH_MAX:
     raise AssertionError("the widest foot cannot hold the shortest pin in the window")
 
 # Inspected McMaster engineering drawing, 2026-10-19. The .063 print is
-# three-place presentation of the exact installed 1/16 cylinder; the
-# supplier's hole range belongs to a separate MATING HOLE reference.
+# three-place presentation of the exact installed 1/16 cylinder.
 # The pin's own sheet unit (#290 drawing_unit), which drops the supplier REFs'
 # " in" on an inch sheet (_supplier_pin_model._reference_suffix).
 SHEET_UNIT = drawing_unit("parts/dt-vn-pinion-strap-pin", _config.parts("dt-vn-pinion-strap-pin"))
@@ -179,7 +178,7 @@ SUPPLIER_REFERENCE = SupplierPinReference(
     length_precision=3,
     wall_mm=WALL_T,
     wall_precision=3,
-    application_hole_limits=(0.062, 0.065),
-    application_hole_precision=3,
+    # No application hole: the MHA-DT-14 strap and MHA-DT-19 shaft sheets specify
+    # the holes; machinist review read the loose circle as a second pin feature.
     sheet_unit=SHEET_UNIT,
 )
