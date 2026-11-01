@@ -212,9 +212,6 @@ AXIAL_PIN_DIA_STOCK_MAX = 4.012
 AXIAL_PIN_LENGTH = ARM_THICKNESS / 2.0
 AXIAL_PIN_RADIUS_FROM_AXIS = HUB_SEAT_DIA / 2.0
 
-# The dome is integral to MHA-DT-11 and cannot exceed the cylindrical shaft
-# diameter: the crank assembly must withdraw through the MHA-DT-31 through bore.
-SHAFT_DOME_HEIGHT = 2.0
 FIDUCIAL_MODEL_DIA = 0.8
 FIDUCIAL_MODEL_DEPTH = 0.2
 ARM_FIDUCIAL_RADIUS = (ARM_WIDTH + HUB_SEAT_DIA) / 4.0

@@ -41,9 +41,15 @@ from dt_crank_hub_geometry import (
     SERVICE_PIN_STATION,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
-    SHAFT_DOME_HEIGHT,  # noqa: F401 -- re-exported to the drawing contract
     SHAFT_FIDUCIAL_RADIUS,  # noqa: F401 -- re-exported to the drawing contract
 )
+
+# The dome is a non-functional end form: .08 at the title block's .XX (the
+# model is the print), a cap that stays inside the Ø.375 so the crank
+# assembly withdraws through the MHA-DT-31 bore.
+SHAFT_DOME_HEIGHT = 0.08 * 25.4
+if not 0.0 < SHAFT_DOME_HEIGHT <= SHAFT_DIA / 2.0:
+    raise AssertionError("the crankshaft's end crown must be a dome, never past a hemisphere")
 
 
 # #290: the registry row's drawing_unit (in) is this sheet's unit; the bands,
@@ -597,7 +603,8 @@ SURFACE_FINISHES = (
 # measure from the dome root, so the far-end stations, the overall and the
 # dome's spherical radius live on a construction-only StationReference sketch
 # driven by the same globals (no geometry).  Depth (far end to dome root) and
-# DomeHeight complete the chain; the overall and SR are references.
+# DomeHeight (.XX, the title block's band) complete the chain; the overall and
+# SR are references.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDiaDim"},
     "Shaft": {"Depth"},
@@ -630,7 +637,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ShaftProfile": {"ShaftDiaDim": 4},
     "Shaft": {"Depth": dt_crank_pinion_spec.SHAFT_LENGTH_PLACES},
-    "ShaftDomeProfile": {"DomeHeight": 3},
+    "ShaftDomeProfile": {"DomeHeight": 2},
     "JournalProfile": {"JournalDiaDim": 4},  # 11.4046, .449 in
     "ReliefProfile": {"ReliefDiaDim": RELIEF_DIA_PLACES},
     "PinionSeatProfile": {"PinionSeatDiaDim": 4, "NeckDiaDim": NECK_DIA_PLACES},
@@ -663,7 +670,7 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked crankshaft dimension needs authored places")
 # Read-only restatements: the overall is Depth + DomeHeight, and a spherical
 # cap of DomeHeight on the Ø.375 end already fixes its radius.
-REFERENCE_DIMENSIONS = frozenset({"OverallLength", "DomeSphereRadius", "DomeHeight"})
+REFERENCE_DIMENSIONS = frozenset({"OverallLength", "DomeSphereRadius"})
 SPHERICAL_DIMENSIONS = frozenset({"DomeSphereRadius"})
 
 # The native cross-hole callout's process prefix: the drill reads first; the

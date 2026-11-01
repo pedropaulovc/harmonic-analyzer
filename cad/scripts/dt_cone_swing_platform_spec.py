@@ -101,12 +101,7 @@ def crank_gear_platform_budget() -> dict[str, float]:
     overhang = (
         upper(cone_shaft.COLLAR_THICKNESS, cone_shaft.DRAWING_PRECISION_BY_NAME["CollarWidth"])
         + gear64.FACE_WIDTH
-        + printed_deviations(
-            gear64.FACE_WIDTH,
-            gear64.DRAWING_PRECISION_BY_NAME["FaceWidth"],
-            (gear64.FACE_WIDTH_BAND[1], gear64.FACE_WIDTH_BAND[0]),
-            unit=gear64.UNIT,
-        )[1]
+        + gear64.FACE_WIDTH_BAND[0]
         + CONE_FLOAT_NORTH
     )
     running = cone_shaft.JOURNAL_DIAMETRAL_CLEARANCE_MM[1]
