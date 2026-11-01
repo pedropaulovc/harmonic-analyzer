@@ -30,7 +30,7 @@ def test_identity_stock_and_common_pivot_interface():
 def test_flipped_nut_face_and_spigot_seat_are_fully_inside_lug():
     assert spec.NUT_FACE_X==spec.LUG_X0
     assert spec.NUT_AXIS_Y==-lead.SCREW_LATERAL
-    assert spec.NUT_SPIGOT_DEPTH==lead.NUT_BODY_SHORT
+    assert spec.NUT_RECESS_DEPTH-printed_band_mm(2,unit=spec.UNIT)>lead.NUT_BODY_SHORT
     assert spec.SCREW_CLEARANCE_DIA-printed_band_mm(2,unit=spec.UNIT)>lead.SCREW_MAJOR_DIA
     assert math.isclose(spec.NUT_MACHINE_Z,lead.SCREW_AXIS_Z,abs_tol=1e-9)
     # The flange lands wholly on the lug face, between bottom and top.

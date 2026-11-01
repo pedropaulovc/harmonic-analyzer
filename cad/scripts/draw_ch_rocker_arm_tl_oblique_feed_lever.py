@@ -50,6 +50,7 @@ import ch_rocker_arm_tl_oblique_feed_lever_spec as part_spec
 from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits
 from _supplier_dimensions import supplier_reference_dimension
+from _supplier_text_shelf import assert_supplier_shelves, shelve_supplier_text
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_oblique_feed_lever_spec import (
@@ -117,6 +118,13 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
 FRONT_KEEP: dict[str, tuple[float, float, float]] = {
     "LeverThick": (LEVER_LENGTH + 14.0, _H / 2.0, 0.0),
 }
+# The 1/2 thickness's stacked "(1/2 in)" over "STOCK" is taller than its
+# span: centred on its line, the numerator sat on the upper witness (layout
+# audit e5a5f5c19, extension-through-own-text). The text alone shelves right
+# of its witnesses and arrows at the same height, as the CL dowel's
+# references do (draw_ch_rocker_arm_tl_vn_oblique_cl_dowel); the native line
+# and witnesses stay where the import put them.
+SHELVES = {"LeverThick": (False, "right")}
 # The hole callout's leader picks hole 2's far edge; its text stands above
 # the view over the lever's inner half.
 HOLE_EDGE_MODEL = (HOLE_X[1] + 0.6 * _R, _H, -HOLE_Y - 0.8 * _R)
@@ -263,9 +271,10 @@ def _set_dimension_prefixes(
 _STOCK_SIZES = {"LeverWidth": LEVER_WIDTH, "LeverThick": LEVER_THICK}
 
 
-def _stock_references(adapter: Any, annotations: list[Any]) -> None:
+def _stock_references(adapter: Any, annotations: list[Any]) -> dict[str, Any]:
     """The as-bought width and thickness print as REF stock fractions over
     STOCK (#290, draw_mg_magnifying_lever's rod stock)."""
+    displays: dict[str, Any] = {}
     by_name: dict[str, list[Any]] = {}
     for item in annotations:
         by_name.setdefault(dimension_name(adapter, item), []).append(item)
@@ -287,6 +296,8 @@ def _stock_references(adapter: Any, annotations: list[Any]) -> None:
             fraction_denominator=STOCK_FRACTION_DENOMINATORS[name],
             callout=STOCK_CALLOUT,
         )
+        displays[name] = display
+    return displays
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -353,7 +364,12 @@ async def build(adapter: Any) -> dict[str, str]:
     # them, then writes the prefixes and the stock references.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
-    _stock_references(adapter, annotations)
+    stock = _stock_references(adapter, annotations)
+    shelved = {name: stock[name] for name in SHELVES}
+    stations = shelve_supplier_text(adapter, shelved, SHELVES)
+
+    def assert_shelves() -> None:
+        assert_supplier_shelves(adapter, shelved, SHELVES, stations)
 
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the feed lever")
@@ -376,6 +392,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Rocker Oblique Trammel Feed Lever Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(assert_shelves,),
     )
 
 

@@ -8,9 +8,9 @@ pattern holds to the spigot recess it surrounds.
 
 Issue #290: the sheet prints decimal inch. The lug outline, the recess and the
 screw clearance sit on the inch grid; the Tr8 nut's interface does not: its
-Ø16 PCD, Ø10.2 spigot and 1.5 spigot length are the vendor's, and the nut
-axis closes on the leadscrew's (``NUT_AXIS_Y`` from its lateral,
-``NUT_AXIS_Z`` = its height over the carriage top).
+Ø16 PCD and Ø10.2 spigot are the vendor's, and the nut axis closes on the
+leadscrew's (``NUT_AXIS_Y`` from its lateral, ``NUT_AXIS_Z`` = its height
+over the carriage top).
 """
 from __future__ import annotations
 import math
@@ -43,7 +43,7 @@ LUG_LENGTH = LUG_Y1 - LUG_Y0
 NUT_FACE_X = LUG_X0
 NUT_AXIS_Y = -lead.SCREW_LATERAL
 NUT_AXIS_Z = 12.4  # the leadscrew axis over the carriage top (checked below)
-NUT_SPIGOT_DEPTH = lead.NUT_BODY_SHORT  # the bought nut's 1.5 spigot
+NUT_RECESS_DEPTH = 1.778  # .07: clears the bought nut's 1.5 spigot at .06 min
 NUT_SEAT_DIA = 10.668  # .42, clears the Ø10.2 spigot
 SCREW_CLEARANCE_DIA = 8.636  # .34, clears the Tr8 major
 NUT_PCD = lead.NUT_HOLE_PCD  # the bought nut's Ø16
@@ -51,8 +51,8 @@ NUT_PATTERN_ANGLE = 45.0
 NUT_HOLE_OFFSET = NUT_PCD / (2 * math.sqrt(2))
 NUT_HOLES_YZ = tuple((NUT_AXIS_Y + dy * NUT_HOLE_OFFSET, NUT_AXIS_Z + dz * NUT_HOLE_OFFSET)
                      for dy in (-1, 1) for dz in (-1, 1))
-SCREW_TAP_DEPTH = lead.NUT_SCREW_TAP_DEPTH
-NUT_TAP_DRILL_DEPTH = 11.9888  # .472
+SCREW_TAP_DEPTH = lead.NUT_SCREW_TAP_DEPTH  # .39
+NUT_TAP_DRILL_DEPTH = 11.938  # .47
 NUT_TAP_DRILL = TAP_DRILL_MM["#4-40"]
 NUT_TAP_SPEC = HoleSpec("tapped", "#4-40", end="blind", depth_mm=NUT_TAP_DRILL_DEPTH,
                         overrides_mm={"ThreadDepth": SCREW_TAP_DEPTH})
@@ -78,6 +78,9 @@ DRAWING_DIMENSIONS = dict(pivot.DRAWING_DIMENSIONS) | {
     "NutPatternReference": NUT_PATTERN_PRINTED,
 }
 # The nut axis and its pattern are the bought nut's interface: three places.
+# The axis is the leadscrew's closure (not on the .01 grid) and its height
+# has only the spigot's float in the recess to take up error: KP08 floats
+# in X/Y on its bracket, never in Z.
 NUT_PATTERN_PLACES = 3
 NUT_SEAT_PLACES = 2
 DRAWING_PRECISION = dict(pivot.DRAWING_PRECISION) | {
@@ -93,8 +96,9 @@ DRAWING_PRECISION_BY_NAME = {
 }
 assert DRAWING_PRECISION_BY_NAME["NutTap3Z"] == DRAWING_PRECISION_BY_NAME["NutCentreY"] == NUT_PATTERN_PLACES
 assert DRAWING_PRECISION_BY_NAME["NutSeatDia"] == NUT_SEAT_PLACES
-# The #4-40 taps' Hole Wizard callout prints its drill and depths at three places.
-NUT_TAP_CALLOUT_PRECISION = dict.fromkeys(("hw-tapdrldia", "hw-tapdrldepth", "hw-threaddepth"), 3)
+# The #4-40 taps' Hole Wizard callout: the number drill at three places, the
+# drill and thread depths at the title block's two.
+NUT_TAP_CALLOUT_PRECISION = {"hw-tapdrldia": 3, "hw-tapdrldepth": 2, "hw-threaddepth": 2}
 
 
 def _inch_text(value_in: float, places: int) -> str:
@@ -120,17 +124,22 @@ NUT_SEAT_WALL_MIN = (
 NUT_SEAT_WALL_TEXT = f"WALL {_inch_text(math.floor(NUT_SEAT_WALL_MIN / 25.4 * 1000) / 1000, 3)} MIN TO 4-40 TAPS"
 assert 0.0 < NUT_SEAT_WALL_MIN < NUT_SEAT_WALL_NOMINAL < WALL_FLOOR_MM
 assert NUT_PCD / 2 - lead.NUT_BODY_DIA / 2 - NUT_TAP_MAJOR / 2 < WALL_FLOOR_MM
-# The recess clears the bought spigot at its least size; the bore clears the screw.
+# The recess clears the bought spigot at its least size and depth; the bore
+# clears the screw.
 assert NUT_SEAT_DIA - printed_band_mm(NUT_SEAT_PLACES, unit=UNIT) > lead.NUT_BODY_DIA
+assert NUT_RECESS_DEPTH - printed_band_mm(NUT_SEAT_PLACES, unit=UNIT) > lead.NUT_BODY_SHORT
 assert SCREW_CLEARANCE_DIA - printed_band_mm(2, unit=UNIT) > lead.SCREW_MAJOR_DIA
+# The flange screws stop inside the full thread at its shallowest.
+assert SCREW_TAP_DEPTH - printed_band_mm(2, unit=UNIT) > lead.NUT_SCREW_ENGAGEMENT
 CALLOUTS_SUFFIX = dict(pivot.CALLOUTS_SUFFIX) | {
-    "NutSeatDia": f" <HOLE-DEPTH> {_inch_text(NUT_SPIGOT_DEPTH / 25.4, 3)}",
+    "NutSeatDia": f" <HOLE-DEPTH> {_inch_text(NUT_RECESS_DEPTH / 25.4, NUT_SEAT_PLACES)}",
 }
 CALLOUTS_ABOVE = dict(pivot.CALLOUTS_ABOVE) | {"NutClearanceDia": "DRILL THRU"}
 CALLOUTS_BELOW = dict(pivot.CALLOUTS_BELOW) | {
     "NutSeatDia": f"SPIGOT CLEARANCE: TL-VN-55 NUT\n{NUT_SEAT_WALL_TEXT}",
     "NutClearanceDia": "LEADSCREW CLEARANCE",
-    "NutCentreZ": "FROM BOTTOM FACE",
+    "NutCentreZ": "FROM BOTTOM FACE\nON KP08 LEADSCREW AXIS",
+    "NutCentreY": "ON LEADSCREW AXIS",
 }
 NUT_FLANGE_MATE_TEXT = "MATCHES TL-VN-55 NUT FLANGE"
 REFERENCE_SKETCHES = pivot.REFERENCE_SKETCHES + ("NutPatternReference",)
