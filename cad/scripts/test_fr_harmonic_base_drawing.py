@@ -2163,14 +2163,15 @@ def test_hole_table_notes_ride_in_custom_column_only(pivot_tag, merged) -> None:
     assert width == pytest.approx(native_width)
     assert set(sheet.PIVOT_SEAT_CALLOUTS.values()) == {sheet.PIVOT_SEAT_FLAG}
     assert [row[:4] for row in table.cells] == native
-    # The pivot cites note 1; the hold-downs, lock and stop name their mate;
-    # the four sockets carry their own fit note and stay blank here.
+    # The pivot cites note 1; every other .XXX-located row names the part
+    # whose pattern it matches (review b12: the sockets match MHA-FR-02).
     row_of = {table.station_tags[station]: station for station in table.station_tags}
     expected_notes = {
         sheet.PIVOT_SCREW_XZ: "SEE NOTE 1",
         sheet.LOCK_KNOB_XZ: "MHA-DT-20",
         sheet.STOP_SCREW_XZ: "MHA-DT-20",
         **dict.fromkeys(sheet.HOLE_XZ, "MHA-FR-05"),
+        **dict.fromkeys(sheet.COLUMN_SOCKET_XZ, "MHA-FR-02"),
     }
     assert [row[4] for row in table.cells] == [
         sheet.HOLE_TABLE_NOTE_COLUMN
@@ -2178,7 +2179,7 @@ def test_hole_table_notes_ride_in_custom_column_only(pivot_tag, merged) -> None:
         else expected_notes.get(row_of[row[0]], "")
         for index, row in enumerate(table.cells)
     ]
-    assert sum(1 for row in table.cells[1:] if row[4] == "") == 4
+    assert all(row[4] for row in table.cells[1:])
     assert table.widths[0] == sheet.HOLE_TABLE_TAG_WIDTH
     assert table.widths[1] == table.widths[2] >= sheet.HOLE_TABLE_MIN_LOCATION_WIDTH
     assert table.widths[3] == 0.0628
@@ -2755,6 +2756,10 @@ def test_cross_tap_xs_are_baselines_from_the_flange_edge_on_the_front_view() -> 
     # are also the table's A1/A2 and A3/A4 X LOCs from the same flange edge.
     assert part.BOTTOM_LENGTH / 2.0 - part.COLUMN_X == pytest.approx(1.244 * 25.4, abs=0.003)
     assert part.BOTTOM_LENGTH / 2.0 + part.COLUMN_X == pytest.approx(16.756 * 25.4, abs=0.003)
+    # Review b12: the .XXX baselines state their function, the socket axes,
+    # in one callout above the far baseline (the near one's lane is the view).
+    assert sheet.CROSS_TAP_AXIS_CALLOUTS == {"CrossTapFarX": "4X TAPS ON SOCKET AXES"}
+    assert not set(sheet.CROSS_TAP_AXIS_CALLOUTS) & set(sheet.HOLE_SIDE_CALLOUTS)
 
 
 def test_deck_land_worst_case_is_proven_instead_of_noted() -> None:

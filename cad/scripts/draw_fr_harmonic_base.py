@@ -383,6 +383,8 @@ PIVOT_SEAT_CALLOUTS = dict.fromkeys(PIVOT_SEAT_DIMENSIONS, PIVOT_SEAT_FLAG)
 # columns' slack, so the table keeps its native extent beside the notes lane.
 # Review b2: the other .XXX-located taps name the part whose pattern they
 # match -- the four MHA-FR-05 hold-downs and MHA-DT-20's lock and stop.
+# Review b12: the A1-A4 sockets name MHA-FR-02, whose four column sockets
+# their pattern matches so the tubes stand parallel.
 HOLE_TABLE_NOTE_COLUMN = "NOTE"
 HOLE_TABLE_NOTE_COLUMN_WIDTH = 0.029  # SEE NOTE 1 prints ~24.7 mm
 HOLE_TABLE_ROW_NOTES: dict[tuple[float, float], str] = {
@@ -390,8 +392,9 @@ HOLE_TABLE_ROW_NOTES: dict[tuple[float, float], str] = {
     LOCK_KNOB_XZ: "MHA-DT-20",
     STOP_SCREW_XZ: "MHA-DT-20",
     **dict.fromkeys(HOLE_XZ, "MHA-FR-05"),
+    **dict.fromkeys(COLUMN_SOCKET_XZ, "MHA-FR-02"),
 }
-if len(HOLE_TABLE_ROW_NOTES) != 3 + len(HOLE_XZ) or max(
+if len(HOLE_TABLE_ROW_NOTES) != 3 + len(HOLE_XZ) + len(COLUMN_SOCKET_XZ) or max(
     map(len, HOLE_TABLE_ROW_NOTES.values())
 ) > len(PIVOT_SEAT_FLAG):
     raise AssertionError("hole-table notes overlap or outgrow the NOTE column")
@@ -462,6 +465,11 @@ HOLE_SIDE_CALLOUTS = {
     "SpotFaceDia": "4X SPOTFACE\nCROSS-SCREW HOLES\nFRONT/REAR",
     "CrossScrewAxisHeight": HEIGHT_REFERENCE_CALLOUTS["CrossScrewAxisHeight"],
 }
+# Review b12: the two cross-tap baselines print .XXX because the taps sit on
+# the A1-A4 socket axes (the column stations MHA-FR-02 matches). One line
+# above the far baseline's text states it for both: it sits between that
+# text and the view's bottom edge, right of the near baseline's witness.
+CROSS_TAP_AXIS_CALLOUTS = {"CrossTapFarX": "4X TAPS ON SOCKET AXES"}
 
 # Layout belongs to physical model X/Z stations, never generated tag letters.
 # Keep the proven anchors when native size families merge or re-letter.
@@ -2351,6 +2359,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_callouts(adapter, section_dimensions, SECTION_CALLOUTS)
     set_dimension_callouts(adapter, hole_side_dimensions, HOLE_SIDE_CALLOUTS)
+    set_dimension_callouts(
+        adapter, hole_side_dimensions, CROSS_TAP_AXIS_CALLOUTS, location="above"
+    )
     # No root-radius callout: a 0.5 mm internal root at the pad-to-flange
     # junction is not measurable with hobby-shop kit, so the model keeps its
     # fillet and the deck cutter's own corner radius defines it (2026-09
