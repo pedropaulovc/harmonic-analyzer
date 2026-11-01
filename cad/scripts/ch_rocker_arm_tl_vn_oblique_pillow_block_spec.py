@@ -127,6 +127,38 @@ DRAWING_NOTES = (
     "ENVELOPE MODEL: CHECK THE BOLT HOLES AGAINST MHA-CH-06-TL-28 ON RECEIPT."
 )
 
+# Reference sizes on the plan view (the Front Plane, sketch (u, v) = model
+# (X, Y)): the listing's bolt-hole spacing and overall length, and C4's bolt
+# hole, the receipt check's three numbers. Each construction chord lies on a
+# visible edge or a hole's centre-mark arm: the spacing on the foot's +Y edge
+# (its witnesses rise through the hole centres), the length on the -Y edge,
+# the hole across the -X hole's centre. Nothing else is published as a size a
+# substitute must match.
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierBoltSpacing", BOLT_SPACING, "horizontal"),
+    ("SupplierLength", LENGTH, "horizontal"),
+    ("SupplierBoltHoleDiameter", HOLE_DIA, "vertical"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierBoltSpacing": (HOLE_X[0], WIDTH / 2.0),
+    "SupplierLength": (-LENGTH / 2.0, -WIDTH / 2.0),
+    "SupplierBoltHoleDiameter": (HOLE_X[0], -HOLE_DIA / 2.0),
+}
+SUPPLIER_REFERENCE_PLANES: dict[str, str] = {}
+SUPPLIER_REFERENCE_SIDES = {
+    "SupplierBoltSpacing": "top",
+    "SupplierLength": "bottom",
+    "SupplierBoltHoleDiameter": "left",
+}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierBoltSpacing": (0, "length", None, None),
+    "SupplierLength": (0, "length", None, None),
+    "SupplierBoltHoleDiameter": (1, "diameter", None, "2X"),
+}
+SUPPLIER_REFERENCE_UNITS = {
+    name: "mm" for name, _, _ in SUPPLIER_REFERENCE_DIMENSIONS
+}
+
 # --- Import-time checks --------------------------------------------------------------
 if not BOSS_RADIUS < LENGTH / 2.0:
     raise ValueError("KP08: the boss must be narrower than the foot")
