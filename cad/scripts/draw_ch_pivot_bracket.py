@@ -43,7 +43,7 @@ from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_projection import model_points_in_view
 from _drawing_view_display import set_hidden_lines_removed
@@ -255,6 +255,8 @@ RIGHT_KEEP_NAMES = ("CornerRadius",)
 # class is the title block's. The arch's lift gives the tap 1.5D of full
 # thread (ch_pivot_bracket_spec), so the callout states no shortfall.
 SET_SCREW_PROCESS = "TAP"
+# Hole Wizard callouts print three places on the inch sheet.
+SET_SCREW_CALLOUT_PRECISION = {"hw-tapdrldia": 3}
 SET_SCREW_EXTENT = "TO BORE"
 # Centre of the native tap callout's text, above the plan's left half: its
 # leader drops from the block's right end through the plan's top edge to the
@@ -746,6 +748,9 @@ async def build(adapter: Any) -> dict[str, str]:
         process=SET_SCREW_PROCESS,
     )
     _set_tap_callout_text(tap_callout)
+    set_hole_callout_precision(
+        tap_callout, SET_SCREW_CALLOUT_PRECISION, label="apex set-screw tap"
+    )
     # Re-assert the display mode now the last annotation has landed: an
     # annotation attached after placement can leave a view's edge set
     # unregenerated, and only a real mode change rebuilds it.
