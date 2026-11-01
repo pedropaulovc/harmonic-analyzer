@@ -10,12 +10,10 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from solidworks_mcp.adapters.sw_type_info import constant
 
 from _com import _early_bound
-from _drawing_dimension_import import _model_item_paths
 from _drawing_dimensions import offset_dimension_text
 from _drawing_hidden_sketches import _show_hidden_owners, curate_view_dimensions
 from _supplier_dimensions import (
@@ -42,10 +40,12 @@ SUPPLIER_MARGINS = {
 # The diagram sketches are construction geometry (the zero-body diagram
 # contract). Construction curves print continuous in this SLDDRW, as
 # _supplier_wire_stock_drawing does, but that preference leaves them grey and
-# 0.13 mm (farm run 20261101T050059613Z); each diagram's shown sketch also gets
-# the outline's black and Thick weight in its own view, so the roller and pin
-# outlines print as the diagram's edges. The installed pictorial keeps its
-# sketches blanked.
+# 0.13 mm (farm run 20261101T050059613Z), and a line format on the selected
+# SKETCH does not reach its segments (run 20261101T054738142Z). Each view
+# instance of each diagram segment therefore gets the outline's black and
+# Thick weight, as draw_ch_fulcrum_keeper blackens its reference lines, so
+# the roller and pin outlines print as the diagram's edges. The installed
+# pictorial keeps its sketches blanked.
 _CONSTRUCTION_LINE_STYLE = ("swLineFontConstructionCurvesStyle", "swLineCONTINUOUS")
 _OUTLINE_COLOR = 0  # COLORREF black
 _SW_LW_THICK = 2  # swLineWeights_e.swLW_THICK
@@ -68,20 +68,36 @@ def _construction_curves_continuous(adapter: Any) -> Callable[[], None]:
 
 
 def _format_as_outline(adapter: Any, view: Any, sketches: tuple[str, ...]) -> None:
-    """Black, Thick line format on each shown sketch, in the active view."""
+    """Black, Thick line format on every segment of ``sketches`` in ``view``.
+
+    ``view`` must be the active drawing view.
+    """
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
-    paths = _model_item_paths(adapter, view)
-    for sketch in sketches:
+    native = _early_bound(view, "IView")
+    part = _early_bound(native.ReferencedDocument, "IPartDoc")
+    selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    for name in sketches:
+        feature = part.FeatureByName(name)
+        if feature is None:
+            raise RuntimeError(f"chain diagram sketch {name!r} is missing")
+        sketch = _early_bound(
+            _early_bound(feature, "IFeature").GetSpecificFeature2(), "ISketch"
+        )
+        segments = tuple(sketch.GetSketchSegments() or ())
+        if not segments:
+            raise RuntimeError(f"chain diagram sketch {name!r} has no segments")
         draw.ClearSelection2(True)
-        if not any(
-            draw.Extension.SelectByID2(
-                f"{sketch}@{component}@{in_view}", "SKETCH",
-                0.0, 0.0, 0.0, False, 0, null_callout(), 0,
-            )
-            for component, in_view in paths
-        ):
-            raise RuntimeError(f"cannot select chain diagram sketch {sketch!r}")
+        data = selection.CreateSelectData()
+        data.View = native
+        for index, raw in enumerate(segments):
+            in_view = native.GetCorresponding(_early_bound(raw, "ISketchSegment"))
+            if in_view is None or not _early_bound(in_view, "ISketchSegment").Select4(
+                index > 0, data
+            ):
+                raise RuntimeError(f"cannot select {name!r} segment {index} in its view")
+        if int(selection.GetSelectedObjectCount2(-1)) != len(segments):
+            raise RuntimeError(f"{name!r}: not every segment is selected")
         drawing.SetLineColor(_OUTLINE_COLOR)
         drawing.SetLineWidth(_SW_LW_THICK)
         draw.ClearSelection2(True)
