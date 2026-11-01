@@ -848,7 +848,29 @@ def test_north_cone_boss_end_carries_the_running_finish() -> None:
     assert machine_normal[2] > 0.9
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'surface_finish_by_key(SURFACE_FINISHES, "cone_boss_north_face")' in source
-    assert "len(surface_boxes) != len(SURFACE_FINISHES)" in source
+    assert "len(surface_boxes) != expected_surface_boxes" in source
+
+
+def test_foot_seat_mate_rides_its_ra_symbol_not_a_loose_note() -> None:
+    """PR #2107 machinist review (clarity, gating): the foot's mate stood in a
+    loose general note, not on the callout it explains; it prints over the
+    foot seat's Ra, and the sheet carries no general note."""
+    foot = surface_finish_by_key(spec.SURFACE_FINISHES, "foot_seat")
+    assert foot.production_method == spec.FOOT_SEAT_FINISH_TARGET == "SEATS ON MHA-DT-20"
+    assert spec.DRAWING_NOTES == ""
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '"Manufacturing Notes"' not in source
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "foot_seat")' in source
+
+
+def test_body_diameter_claims_no_unmeasurable_flushness() -> None:
+    """PR #2107 machinist review (clarity): FLUSH WITH CONE BOSS FACES was not
+    guaranteed by Ø1.654's and the .827 station's printed limits; each band
+    governs its own surface (crank_boss_rim proves the 64T clear of both)."""
+    assert "MainBodyDia" not in drawing.DIMENSION_CALLOUTS
+    assert not [
+        text for text in drawing.DIMENSION_CALLOUTS.values() if "FLUSH" in text
+    ]
 
 
 def test_plan_angle_is_basic_and_prints_the_model_angle() -> None:
@@ -1123,11 +1145,6 @@ def test_point_relations_use_the_point_relation_types() -> None:
     assert '"origin", "horizontal_points"' in source
 
 
-def _datum_b_frame_clears_the_notes(tag_y: float) -> bool:
-    frame_bottom = tag_y - drawing._DATUM_TAG_FRAME_HEIGHT
-    return frame_bottom >= drawing.NOTES_ANCHOR[1] + drawing._DATUM_NOTES_CLEARANCE - 1e-12
-
-
 def _journal_sheet(text_box, spacing_segments):
     return SimpleNamespace(
         annotations=(
@@ -1150,13 +1167,9 @@ _CONTROL_TEXT = layout.Box(0.1720, 0.1542, 0.2080, 0.1577)
 _SPACING_LINE = layout.Segment(0.2080, 0.1504, 0.2080, 0.1700, "line")
 
 
-def test_datum_b_frame_clears_what_crossed_it() -> None:
-    """Leaf w3-1026 (layout check with #1026's degenerate-line fix): datum B's
-    frame sat on the manufacturing notes.  The placement now derives from the
-    measured extents; the old one is the positive control."""
-    assert not _datum_b_frame_clears_the_notes(drawing._front_y(-9.0))
-    assert _datum_b_frame_clears_the_notes(drawing.DATUM_B_TAG_XY[1])
-    # Still below the foot seat it tags.
+def test_datum_b_tag_sits_under_the_foot_seat() -> None:
+    """Datum B's tag point stands under the foot seat it tags, so its leader
+    reaches the seat."""
     assert drawing.DATUM_B_TAG_XY[1] < drawing._front_y(0.0)
 
 
