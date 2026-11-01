@@ -4,8 +4,9 @@ Datasheet-built nominal envelope, as for the bought leadscrew. No vendor
 CAD or unreported edge/socket dimensions are inferred. Axis +Z, origin
 on the shoulder end face; the nominal 5/16-18 thread envelope extends -Z,
 at the shop-cut length its depth carries (``CutThreadLength``, the sheet's one
-shop dimension). Supplier sizes and bands are model-owned construction
-references in the final part frame, not claims of helical attachment.
+shop dimension), its end chamfered as the shop leaves it. Supplier sizes and
+bands are model-owned construction references in a Right-plane sketch, in the
+final part frame, not claims of helical attachment.
 """
 from __future__ import annotations
 
@@ -29,19 +30,23 @@ from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _session import run_build
-from _sketch import ensure_fully_defined
+from _sketch import SketchDims, blank_reference_sketches, ensure_fully_defined
 from _sketch_circle import define_circle
 from _supplier_limits import set_supplier_limits
-from _supplier_screw_reference import add_supplier_reference_sketch
-from _supplier_screw_reference_names import FEATURE_BY_PLANE
+from _supplier_screw_reference import _linear
 from _visibility import blank_reference_geometry
 
 PART_NAME = "ch-rocker-arm-tl-vn-oblique-pivot-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 AXIS_NAME = "PivotAxis"
-MODEL_VOLUME = math.pi / 4.0 * (part.SHOULDER_DIA**2 * part.SHOULDER_LENGTH + part.HEAD_DIA**2 * part.HEAD_HEIGHT + part.THREAD_DIA**2 * part.THREAD_LENGTH)
-_UNIT_CODES = {"mm": 0, "in": 3}  # swLengthUnit_e: swMM, swINCHES
+MODEL_VOLUME = (
+    math.pi / 4.0 * (part.SHOULDER_DIA**2 * part.SHOULDER_LENGTH
+                     + part.HEAD_DIA**2 * part.HEAD_HEIGHT
+                     + part.THREAD_DIA**2 * part.THREAD_LENGTH)
+    # The 45 deg end chamfer's ring: leg^2 / 2 about radius r - leg / 3.
+    - math.pi * part.CUT_CHAMFER**2 * (part.THREAD_DIA / 2.0 - part.CUT_CHAMFER / 3.0)
+)
 
 
 async def _ring(adapter, name, od, bore, length, *, offset=0.0, reverse=False):
@@ -78,49 +83,39 @@ def _shop_cut_dimension(adapter) -> None:
         raise RuntimeError(part.CUT_DIMENSION + ": precision rejected")
     display.SetText(4, part.CUT_CALLOUT)
     if (int(display.GetPrimaryPrecision2()) != part.CUT_THREAD_PLACES
-            or str(display.GetText(4) or "") != part.CUT_CALLOUT
+            or str(display.GetText(4) or "").replace("\r\n", "\n") != part.CUT_CALLOUT
             or int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0):
         raise RuntimeError(part.CUT_DIMENSION + ": shop presentation did not persist")
     mark_dimensions_for_drawing(adapter, part.CUT_FEATURE, {part.CUT_DIMENSION})
 
 
 async def _supplier_references(adapter):
-    await add_supplier_reference_sketch(
-        adapter, part.SUPPLIER_REFERENCE_DIMENSIONS,
-        starts=part.SUPPLIER_REFERENCE_STARTS,
-        planes=part.SUPPLIER_REFERENCE_PLANES,
-    )
-    for name, (lower, upper) in part.SUPPLIER_REFERENCE_TOLERANCES_MM.items():
-        feature = FEATURE_BY_PLANE[part.SUPPLIER_REFERENCE_PLANES[name]]
+    """Right-plane construction carriers (sketch x is model -z), marked for drawing."""
+    feature = part.REFERENCE_FEATURE
+    check(f"create {feature}", await adapter.create_sketch("Right"))
+    recorded = SketchDims()
+    for name, value, orientation in part.REFERENCE_DIMENSIONS:
+        await _linear(adapter, recorded, name, value, orientation, part.REFERENCE_STARTS[name])
+    await ensure_fully_defined(adapter, feature)
+    check(f"exit {feature}", await adapter.exit_sketch())
+    name_last_feature(adapter, feature)
+    recorded.apply(adapter, feature)
+    for name, (lower, upper) in part.REFERENCE_TOLERANCES_MM.items():
         set_supplier_limits(adapter, feature, name, lower, upper)
-    for name, value, _orientation in part.SUPPLIER_REFERENCE_DIMENSIONS:
-        feature = FEATURE_BY_PLANE[part.SUPPLIER_REFERENCE_PLANES[name]]
+    for name, value, _orientation in part.REFERENCE_DIMENSIONS:
         display, native = _named_dimension(adapter, feature, name)
-        precision, presentation, _denominator, callout = part.SUPPLIER_REFERENCE_FORMATS[name]
-        unit = part.SUPPLIER_REFERENCE_UNITS[name]
         if not math.isclose(float(native.SystemValue) * 1000.0, value, abs_tol=1e-5):
             raise RuntimeError(name + ": nominal carrier value changed")
-        if display.SetUnits2(False, _UNIT_CODES[unit], 1, 0, False, 0) != 0:
-            raise RuntimeError(name + ": source units rejected")
-        banded = name in part.SUPPLIER_REFERENCE_TOLERANCES_MM
+        precision = part.REFERENCE_FORMATS[name][0]
+        banded = name in part.REFERENCE_TOLERANCES_MM
         if display.SetPrecision3(precision, -1, precision if banded else -1, -1) != 0:
             raise RuntimeError(name + ": source precision rejected")
-        prefix = "(<MOD-DIAM>" if presentation == "diameter" else "("
-        suffix = f" {unit})"
-        display.ShowParenthesis = False
-        display.SetText(1, prefix)
-        display.SetText(2, suffix)
-        display.SetText(4, callout)
-        if (display.GetUseDocUnits() or int(display.GetUnits()) != _UNIT_CODES[unit]
-            or int(display.GetPrimaryPrecision2()) != precision
-            or display.ShowParenthesis or display.GetOverride()
-            or not display.ShowDimensionValue
-            or str(display.GetText(1) or "") != prefix
-            or str(display.GetText(2) or "") != suffix
-            or str(display.GetText(4) or "") != callout
+        if (int(display.GetPrimaryPrecision2()) != precision
             or (banded and int(display.GetPrimaryTolPrecision2()) != precision)
             or (not banded and int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0)):
             raise RuntimeError(name + ": source presentation did not persist")
+    mark_dimensions_for_drawing(adapter, feature, {name for name, _, _ in part.REFERENCE_DIMENSIONS})
+    blank_reference_sketches(adapter, (feature,))
 
 
 async def build(adapter) -> dict[str, str]:
@@ -131,6 +126,10 @@ async def build(adapter) -> dict[str, str]:
     await _ring(adapter, "Shoulder", part.SHOULDER_DIA, 0.0, part.SHOULDER_LENGTH)
     await _ring(adapter, "Head", part.HEAD_DIA, 0.0, part.HEAD_HEIGHT, offset=part.SHOULDER_LENGTH)
     await _ring(adapter, part.CUT_FEATURE, part.THREAD_DIA, 0.0, part.THREAD_LENGTH, reverse=True)
+    check("chamfer thread end", await adapter.add_chamfer(
+        part.CUT_CHAMFER, [[part.THREAD_DIA / 2.0, 0.0, -part.THREAD_LENGTH]]
+    ))
+    name_last_feature(adapter, "ThreadEndChamfer")
     check("publish axis", await adapter.create_axis(CreateAxisParameters(
         mode="two_planes", planes=["Top Plane", "Right Plane"]
     )))

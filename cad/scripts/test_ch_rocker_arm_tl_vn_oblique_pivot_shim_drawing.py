@@ -82,12 +82,16 @@ def test_native_supplier_witness_inventory():
         assert orientation == ("vertical" if name == "SupplierThickness" else "horizontal")
         assert spec.SUPPLIER_REFERENCE_UNITS[name] == "in"
     assert all(lower <= upper for lower, upper in spec.SUPPLIER_REFERENCE_TOLERANCES_MM.values())
-    # Every line lies on a Top-view edge: each chord on a face, the thickness
-    # on the OD silhouette (Top sketch y is -z; the shim spans z 0..THICKNESS).
-    starts = spec.SUPPLIER_REFERENCE_STARTS
-    assert starts["SupplierBoreDiameter"] == (-spec.ID / 2.0, 0.0)
-    assert starts["SupplierOuterDiameter"] == (-spec.OD / 2.0, -spec.THICKNESS)
-    assert starts["SupplierThickness"] == (spec.OD / 2.0, -spec.THICKNESS)
+    # Every line lies on a Top-view edge: the OD chord on the z = THICKNESS
+    # face, the thickness on the OD silhouette (Top sketch y is -z). The bore
+    # is the ring profile's bore circle, dimensioned on the Front's visible bore.
+    assert spec.SUPPLIER_REFERENCE_STARTS == {
+        "SupplierOuterDiameter": (-spec.OD / 2.0, -spec.THICKNESS),
+        "SupplierThickness": (spec.OD / 2.0, -spec.THICKNESS),
+    }
+    assert spec.BORE_FEATURE == "RingProfile" and spec.BORE_DIMENSION not in names
+    assert spec.BORE_FORMAT == (3, "diameter", None, "BORE")
+    assert spec.BORE_TOLERANCE_MM[0] <= spec.BORE_TOLERANCE_MM[1]
 
 
 def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):
@@ -107,9 +111,12 @@ def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):
         monkeypatch.setattr(part, name, AsyncMock())
     saved = AsyncMock(return_value={"part": STEM})
     monkeypatch.setattr(part, "save_part_and_images", saved)
+    bore = []
+    monkeypatch.setattr(part, "_bore_reference", bore.append)
     adapter = SimpleNamespace(create_part=AsyncMock(), create_axis=AsyncMock())
     assert asyncio.run(part.build(adapter)) == {"part": STEM}
     assert calls == [("Ring", spec.OD, spec.ID, spec.THICKNESS, {})]
+    assert bore == [adapter]
     axis = adapter.create_axis.call_args.args[0]
     assert axis.mode == "two_planes"
     assert set(axis.planes) == {"Top Plane", "Right Plane"}

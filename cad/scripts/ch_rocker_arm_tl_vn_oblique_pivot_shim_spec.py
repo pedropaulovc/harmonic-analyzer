@@ -36,22 +36,25 @@ FIT_SKUS = {4: "SHIM-0375-004", 8: SKU, 20: "SHIM-0375-020"}
 FIT_THICKNESS_BANDS = {4: (0.0127, -0.0127), 8: THICKNESS_BAND, 20: (0.0254, -0.0254)}
 LENGTH = THICKNESS
 
-# Every carrier lies on a Top-view edge, so its construction line prints under
-# the outline: the bore on the z = 0 face (the view's upper edge), the OD on
-# the z = THICKNESS face (its lower edge), the thickness on the OD silhouette.
-# The Front (bore) view shows no chord across the rings.
-SUPPLIER_REFERENCE_DIMENSIONS = (('SupplierBoreDiameter', ID, 'horizontal'), ('SupplierOuterDiameter', OD, 'horizontal'), ('SupplierThickness', THICKNESS, 'vertical'))
-SUPPLIER_REFERENCE_STARTS = {'SupplierBoreDiameter': (-ID / 2.0, 0.0), 'SupplierOuterDiameter': (-OD / 2.0, -THICKNESS), 'SupplierThickness': (OD / 2.0, -THICKNESS)}
-SUPPLIER_REFERENCE_PLANES = {'SupplierBoreDiameter': 'Top', 'SupplierOuterDiameter': 'Top', 'SupplierThickness': 'Top'}
+# The OD and thickness carriers lie on Top-view edges, so their construction
+# lines print under the outline: the OD on the z = THICKNESS face (the view's
+# lower edge), the thickness on the OD silhouette.
+SUPPLIER_REFERENCE_DIMENSIONS = (('SupplierOuterDiameter', OD, 'horizontal'), ('SupplierThickness', THICKNESS, 'vertical'))
+SUPPLIER_REFERENCE_STARTS = {'SupplierOuterDiameter': (-OD / 2.0, -THICKNESS), 'SupplierThickness': (OD / 2.0, -THICKNESS)}
+SUPPLIER_REFERENCE_PLANES = {'SupplierOuterDiameter': 'Top', 'SupplierThickness': 'Top'}
 # Bands print as stacked limits (max over min) inside one parenthesis.
-SUPPLIER_REFERENCE_FORMATS = {'SupplierBoreDiameter': (3, 'diameter', None, 'BORE'), 'SupplierOuterDiameter': (3, 'diameter', None, 'OUTSIDE'), 'SupplierThickness': (4, 'length', None, 'THICKNESS')}
-# The bore takes the top lane, the OD the bottom: each shelved text stays clear
-# of the other's witnesses. The thickness sits right of the Top view.
-SUPPLIER_REFERENCE_SIDES = {'SupplierBoreDiameter': 'top', 'SupplierOuterDiameter': 'bottom', 'SupplierThickness': 'right'}
-SUPPLIER_REFERENCE_UNITS = {'SupplierBoreDiameter': 'in', 'SupplierOuterDiameter': 'in', 'SupplierThickness': 'in'}
+SUPPLIER_REFERENCE_FORMATS = {'SupplierOuterDiameter': (3, 'diameter', None, 'OUTSIDE'), 'SupplierThickness': (4, 'length', None, 'THICKNESS')}
+# The OD takes the bottom lane; the thickness sits right of the Top view.
+SUPPLIER_REFERENCE_SIDES = {'SupplierOuterDiameter': 'bottom', 'SupplierThickness': 'right'}
+SUPPLIER_REFERENCE_UNITS = {'SupplierOuterDiameter': 'in', 'SupplierThickness': 'in'}
 SUPPLIER_REFERENCE_TOLERANCES_MM = {
-    'SupplierBoreDiameter': deviations(ID_BAND),
     'SupplierOuterDiameter': deviations(OD_BAND),
     'SupplierThickness': deviations(THICKNESS_BAND),
 }
+# The bore is the ring profile's own bore-circle diameter, printed on the
+# Front (end) view's visible bore circle: the edge-on Top view shows no bore.
+BORE_FEATURE = "RingProfile"
+BORE_DIMENSION = "SupplierBoreDiameter"
+BORE_FORMAT = (3, "diameter", None, "BORE")
+BORE_TOLERANCE_MM = deviations(ID_BAND)
 SUPPLIER_DATA = ('MODEL: FIVE .008 SHIMS PER PIVOT, NOMINAL.', 'FITTING STOCK: SHIM-0375-004 (.004), SHIM-0375-020 (.020).', 'SELECT AT ASSEMBLY TO THE JIG RUNNING-GAP REQUIREMENT.')
