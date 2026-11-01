@@ -308,7 +308,7 @@ def test_pin_presentation_refusal_names_first_actual_field_without_reading_later
     source = SimpleNamespace(
         sku="supplier-pin", units="in", diameter_mm=2.38125, diameter_precision=3,
         diameter_band=(-0.01, 0.01), diameter_uses_limits=False,
-        diameter_deviations_mm=(-0.01, 0.01),
+        diameter_deviations_mm=(-0.01, 0.01), sheet_unit="mm",
     )
     native = SimpleNamespace(SystemValue=source.diameter_mm / 1000.0)
     fields = {
@@ -358,3 +358,13 @@ def test_pin_presentation_refusal_names_first_actual_field_without_reading_later
         pins.assert_supplier_pin_model_reference(
             None, model, Display(), pins.DIAMETER_FEATURE, source, view=None,
         )
+
+
+@pytest.mark.parametrize("units,sheet_unit,suffix", [
+    ("in", "in", ")"), ("in", "mm", " in)"), ("mm", "in", " mm)"), ("mm", "mm", " mm)"),
+])
+def test_pin_reference_suffix_follows_the_declared_sheet_unit(units, sheet_unit, suffix):
+    import _supplier_pin_model as pins
+
+    source = SimpleNamespace(units=units, sheet_unit=sheet_unit)
+    assert pins._reference_suffix(source) == suffix
