@@ -166,6 +166,17 @@ def test_engagement_minimum_prints_on_the_cut_length_callout() -> None:
     assert callout.splitlines()[-1] == fact
 
 
+def test_engagement_shortfall_is_declared_for_the_blind_reviewer() -> None:
+    """A stated shortfall with no package-local declaration gates like a
+    blocker; RV-01 names the fact the sheet prints, as a minor."""
+    from machinist_exceptions import load_exceptions
+
+    (entry,) = load_exceptions(_config.CONFIG_DIR, "dt_vn_post_mount_screw", "part")
+    assert (entry.id, entry.kind) == ("RV-01", "minor")
+    assert f"ENGAGEMENT {spec.POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN" in entry.where
+    assert "rule 18" in entry.finding
+
+
 # Words that cite the exception's LABEL rather than state its fact (Main's
 # fleet ruling on the Codex P2): no rule, ruling, policy or exception words,
 # and no user-ruling ids such as "U37c".
