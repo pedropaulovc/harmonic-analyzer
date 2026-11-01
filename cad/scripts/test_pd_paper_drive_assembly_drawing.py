@@ -1070,28 +1070,25 @@ def test_the_transgear_explode_views_fit_their_fields_at_the_bom_configuration()
     assert knob[2] < cluster[0]
     assert knob[1] > template.title_block_top_m
     # Run 20261024T025815061Z's 1:1 knob-stack outline (its projected box,
-    # 247.3 x 226.8 mm) and the cluster's box from the builder's stations
-    # (137.6 x 132.0 mm, grown by the pin's rearward throw along the
-    # isometric's Z, which draws 1/sqrt(2) across and 1/sqrt(6) up), at the
-    # sheet's scale with both rings, fit.
+    # 247.3 x 226.8 mm) and the cluster's width from the builder's stations
+    # (137.6 mm), each grown by the pin's rearward throw along the
+    # isometric's Z (1/sqrt(2) across, 1/sqrt(6) up: the pin's head is the
+    # view's rearmost point).  The cluster's height is native: round 12 read
+    # its ring 147.4 mm tall (to 0.1 mm) at a 12 mm throw, so the throw now
+    # must leave the ring a millimetre short of its field.
     scale = drawing.TRANSGEAR_EXPLODED_SCALE[0] / drawing.TRANSGEAR_EXPLODED_SCALE[1]
     reach = 2 * drawing.BALLOON_RING_REACH
     pin_throw = sum(
         step.distance_mm for step in explode.TRANSGEAR_STEPS
         if "pd-transgear-pin" in step.stems
     ) / 1000.0
-    for (width, height), (left, bottom, right, top) in (
-        ((0.2473, 0.2268), knob),
-        (
-            (
-                0.1376 + pin_throw / math.sqrt(2.0),
-                0.1320 + pin_throw / math.sqrt(6.0),
-            ),
-            cluster,
-        ),
+    cluster_height = (0.14745 - reach) / scale + (pin_throw - 0.012) / math.sqrt(6.0)
+    for (width, height), (left, bottom, right, top), margin in (
+        ((0.2473, 0.2268), knob, 0.0),
+        ((0.1376 + pin_throw / math.sqrt(2.0), cluster_height), cluster, 0.001),
     ):
-        assert width * scale + reach < right - left
-        assert height * scale + reach < top - bottom
+        assert width * scale + reach < right - left - margin
+        assert height * scale + reach < top - bottom - margin
     for group in drawing.TRANSGEAR_EXPLODED_GROUPS:
         left, bottom, right, top = group.ring_limits
         assert left < group.center[0] < right and bottom < group.center[1] < top
