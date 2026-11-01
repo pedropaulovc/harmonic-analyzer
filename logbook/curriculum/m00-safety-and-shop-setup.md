@@ -43,6 +43,26 @@ manufacturer manual before doing machine-specific setup or operation on the lath
 - Emergency stop reachable from where you actually stand
 - Fire: what to do about a magnesium-free but oil-soaked chip pan
 
+## Controlled mistakes
+
+Make each on scrap first, under the
+[rules](README.md#the-twist-break-it-on-purpose-first), then do it right and
+compare.
+
+- **The e-stop out of reach.** Stand where you actually work on the next job
+  and time how long it takes to hit the stop. Move the stop or the pendant
+  until it is under your hand, then time it again.
+- **Chips left to pile.** Run one job without clearing chips and see where
+  they go: the ways, the vise, the floor, your shoes. Then set up chip control
+  and run the same job again.
+- **No routine.** Start a session without the clean, oil and check card and
+  note what you had to stop and look for. On 2026-10-29 time went on hunting
+  for a wrench.
+
+The dangerous mistakes in this project are not staged: gloves at the lathe, a
+chuck key left in, work held by a burr. They are described here and never
+made on purpose.
+
 ## Now make — the real part this unlocks
 
 Nothing yet — this module buys the right to start.

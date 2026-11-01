@@ -3,9 +3,10 @@
 I am a software engineer. I designed this machine in CAD without ever having cut
 metal. Before I can write a machining book, I have to become a machinist.
 
-This directory is that process. It holds a beginner's lathe and milling course,
-sized to exactly what this project needs, plus the log of actually working
-through it.
+This directory is that process. Its goal is to learn hobby machining skills by
+building the harmonic analyzer. It holds a beginner's lathe and milling
+course, sized to exactly what this project needs, plus the log of actually
+working through it.
 
 The primary goal is my own competence. The book is downstream: every chapter in
 [`book/`](../book/README.md) Part III gets written from the module here that
@@ -25,20 +26,29 @@ and measurements; use the guide when comparing them with current CAD.
 
 | path | what |
 |---|---|
-| [`curriculum/`](curriculum/README.md) | The course. Twelve modules, M00 to M11, each ending by cutting a real part of the analyzer. |
+| [`curriculum/`](curriculum/README.md) | The course. Twelve modules, M00 to M11, each motivated by and ending with a real part of the analyzer or of a jig used to build it. |
 | [`entries/`](entries/README.md) | Dated practice log. One entry per session: what I set out to do, what happened, what it cost. |
 | [`SKILLS.md`](SKILLS.md) | The matrix. Skill, module, parts it unlocks, book chapter it feeds. |
 | [`progress.md`](progress.md) | Derived roll-ups of hours, parts made, scrap and current technical blockers. |
 
 ## How the course is built
 
-Every module ends by making a real part of the machine. No practice pieces for
-their own sake. If a module can't be closed by cutting something the analyzer
-needs, it doesn't belong in the course.
+Every module starts from a part the build needs and ends by making it. That
+part is either in the analyzer or in the shop tooling, the jigs and fixtures,
+made to build it. No practice pieces for their own sake. If a module can't be
+closed by making something the build needs, it doesn't belong in the course.
 
 Modules are ordered by what the build needs next rather than by textbook order.
 Parting off to a length tolerance comes early because thirty-eight bushings
-whose lengths set the channel pitch come early.
+whose lengths set the channel pitch come early. The mill track opens on the
+rocker arm's oblique jig, because rocker arms can't be cut without it and its
+parts teach the beginner mill skills in order.
+
+Every module also makes its common mistakes on purpose first: on scrap, with a
+small cut, one change at a time, before doing the job right. You only recognize
+a cut going wrong once you have seen one go wrong. The
+[rules](curriculum/README.md#the-twist-break-it-on-purpose-first) are in the
+curriculum.
 
 Competency is measured, not felt. Each module has a check with a number in it,
 like "hold ±0.02 mm across five consecutive parts", instead of "feel confident

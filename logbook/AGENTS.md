@@ -12,7 +12,14 @@ A machining curriculum and its practice log. Prose only.
   `references/gears-and-gear-cutting/`, and write them into a module **with the
   citation attached**.
 - Derive which parts a module unlocks from `cad/scripts/build_*.py`,
-  `cad/config/parts/*.yaml` and `cad/docs/machining-dfm.md`.
+  `cad/config/parts/*.yaml` and `cad/docs/machining-dfm.md`. Shop tooling
+  (`*-tl-*` jigs and fixtures) counts as a module's part when the build needs
+  it.
+- Propose controlled mistakes for a module, within the
+  [rules](curriculum/README.md#the-twist-break-it-on-purpose-first): on scrap,
+  low energy, one variable changed from a known-good setup. Never propose one
+  that could throw the work or the tool, or that puts hands, gloves or sleeves
+  near rotation; describe that mistake instead of staging it.
 - Write log entries from the user's session notes, following the workflow
   below.
 - Tidy, format and cross-link entries.
@@ -69,8 +76,9 @@ The user hands over a session as bullet points or loosely organized notes.
 ## Curriculum module format
 
 Every module has, in this order: objectives · prerequisites · references ·
-practice · **the real part it unlocks** · competency check (with a number) ·
-estimated hours · status. Keep it. The book's Part III chapters are generated
+practice · controlled mistakes · **the part that motivates it** ("now make") ·
+competency check (with a number) · notes · sessions, with estimated hours and
+status in the frontmatter. Keep it. The book's Part III chapters are generated
 from this structure, and a module missing its "now make" has no place in a
 course built around a machine.
 

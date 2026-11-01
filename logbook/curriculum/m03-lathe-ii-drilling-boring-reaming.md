@@ -34,6 +34,23 @@ hours_actual: 0
   (Ø6.5 bore on a Ø6.35 shaft — 0.075 mm per side). Get this distinction right
   before you bore anything; halving it is a seized fit and doubling it is slop.
 
+## Controlled mistakes
+
+Make each on scrap first, under the
+[rules](README.md#the-twist-break-it-on-purpose-first), then do it right and
+compare.
+
+- **No centre drill.** Drill one scrap hole straight off the face and one after
+  centre drilling, then measure how far each wandered from centre.
+- **The radial/diametral mix-up.** Bore a scrap bushing to Ø6.425, treating
+  0.075 mm as the whole clearance, and try it on a Ø6.35 shaft. Then bore one
+  to Ø6.5. Feel the tight fit beside the running fit before boring a real one.
+- **No spring pass.** Bore a scrap hole without a spring pass and measure the
+  taper or bellmouth along it. Add the spring pass and measure again.
+- **Wrong reaming allowance.** Ream one scrap hole with almost no stock left
+  and one with too much. Compare size and finish with a hole left at the
+  handbook allowance. Never reverse the reamer, not even on scrap.
+
 ## Now make — the real part this unlocks
 
 One **`pivot-bushing`**: Ø10.0 OD, Ø6.5 through bore, running on the Ø6.35 pivot shaft.

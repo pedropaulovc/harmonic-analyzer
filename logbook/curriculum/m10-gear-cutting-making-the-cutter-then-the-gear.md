@@ -38,6 +38,20 @@ hours_actual: 0
 - Inspection: over-pins, runout on a mandrel, meshing a pair
 - The helical 64T crank gear: why it needs a spiral-capable universal head geared to the table (`cad/docs/machining-dfm.md`, cutter plan)
 
+## Controlled mistakes
+
+Make each on scrap first, under the
+[rules](README.md#the-twist-break-it-on-purpose-first), then do it right and
+compare.
+
+- **The wrong cutter number.** On a practice brass blank, cut a few teeth with
+  the cutter one number off for the tooth count. Mesh them with a correct gear
+  and look at the contact.
+- **Too shallow.** Cut a practice blank short of full depth and feel the mesh
+  bind.
+- **Blank runout.** Cut a practice blank on a mandrel with measurable runout
+  and see how the tooth depth varies around it.
+
 ## Now make — the real part this unlocks
 
 **`dt-cone-gear` T120** first (largest, most forgiving), then the `dt-cylinder-gear` ×20, then down the cone set toward T006.
