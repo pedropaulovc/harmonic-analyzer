@@ -449,9 +449,12 @@ if DRIVE_PIN_SPIGOT_RIM_WORST >= WALL_FLOOR_MM:
     raise AssertionError("the rim meets the floor now: retire RV-02")
 if DRIVE_PIN_SPIGOT_RIM_WORST <= 0.0:
     raise AssertionError("the drive-pin holes break out of the spigot at print-worst")
+# Pin spacing errors: this shaft's two centres at its band, the wheel's two
+# holes at the wheel's own band (until the shared band moves, they differ).
 DRIVE_PIN_SPACING_ERROR_MAX = 2.0 * DRIVE_PIN_OFFSET_TOL
+_WHEEL_SPACING_ERROR_MAX = 2.0 * seat_geometry.DRIVE_PIN_OFFSET_TOL
 if (
-    2.0 * DRIVE_PIN_SPACING_ERROR_MAX
+    DRIVE_PIN_SPACING_ERROR_MAX + _WHEEL_SPACING_ERROR_MAX
     >= seat_geometry.PIN_HOLE_DIA - _DOWEL_OD[1]
 ):
     raise AssertionError("shaft + wheel pin spacing error exceeds the slip clearance")
