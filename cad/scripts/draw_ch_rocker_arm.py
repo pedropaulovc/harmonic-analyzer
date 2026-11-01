@@ -7,10 +7,12 @@ Dimension import and curation live in ``_drawing_dimension_import``.
 Exported shared profile-radius values and citations belong to
 ``_rocker_interface.CURVE_RADIUS``; the full part spec owns only local geometry.
 
-The strap is a long thin curved seesaw (~292 mm tip to tip, 16 mm deep, 2.5 mm
-thick). The front carries the BASIC arc system and A-to-pin coordinates;
-parent-linked D (4:1) and E (2:1) carry the hub and rod-end controls. The
-3:1 view F carries thickness/hub width; the 1:4 isometric supplements them.
+The strap is a long thin curved seesaw (~292 mm tip to tip, 16 mm deep, .098
+in thick). The sheet prints decimal inch (the part's ``drawing_unit: in``);
+the model keeps its millimetre nominals. The front carries the BASIC arc
+system and A-to-pin coordinates; parent-linked D (4:1) and E (2:1) carry the
+hub and rod-end controls. The 3:1 view F carries thickness/hub width; the 1:4
+isometric supplements them.
 
 Run with SolidWorks open::
 
@@ -43,8 +45,8 @@ import ch_rocker_arm_notes as rocker_notes
 import ch_rocker_arm_spec as rocker
 import _rocker_interface as rocker_interface
 from _feature_requirements import part_metadata, requirement
-from _printed_limits import drilled_limits as _drilled_band
 from _printed_limits import limits as _band
+from _printed_tolerance import drilled_oversize_mm, drilled_undersize_mm
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _gtol_torus import TorusFace
@@ -83,7 +85,7 @@ from _drawing_gdt import add_datum_feature, add_feature_control_frame, add_frame
 # The part saves TopEdgeReference hidden (#880): this form shows it in the
 # view that imports its dimension.
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_layout_audit import _DISPLAY_PRIMITIVES, _Reader, _dump_annotation, _dump_display
 from _drawing_layout_collect import check_drawing_layout
 from _drawing_leader_notes import add_leader_note
@@ -93,6 +95,7 @@ from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _drawing_projection import model_points_in_view
 from _drawing_selection import _select_view_entity
 from _drawing_sheet_region import sheet_drawable_region
+from _part_properties import part_drawing_unit
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _gear_drawing_entities import visible_circle_edge
 from _layout_audit import (
@@ -127,7 +130,7 @@ from _rocker_interface import CENTER_Y, PIVOT_MID_Y, R_BOTTOM, ROD_HOLE_X, ROD_H
 from ch_rocker_arm_spec import (
     ARM_THICKNESS,
     BOT_END_X,
-    GEOMETRIC_TOLERANCES_MM,
+    GEOMETRIC_TOLERANCES_IN,
     HUB_DIA,
     PIVOT_HOLE_DIA,
     PIVOT_HOLE_BAND,
@@ -140,7 +143,9 @@ from ch_rocker_arm_spec import (
     TOP_EDGE_BAND,
     TOP_END_X,
     TOP_END_Y,
+    UNIT,
     _ALPHA_TOP,
+    inch_text,
 )
 
 
@@ -161,6 +166,20 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 2.0)  # 1:2
 
 _ROD_HOLE_DIA = blind_cut_dia_mm(ROD_HOLE_SPEC)
+# Hole Wizard drill diameters print three places on the inch sheet (rule 3).
+_DRILL_P = 3
+_DRILLED_BAND = (drilled_oversize_mm(unit=UNIT), -drilled_undersize_mm(unit=UNIT))
+# Geometric-frame zones print three places.
+_FRAME_P = 3
+_PIVOT_P = rocker_notes.DRAWING_PRECISION["PivotHoleProfile"]["PivotDia"]
+_RADIUS_P = rocker_notes.DRAWING_PRECISION["StrapProfile"]["TopRadius"]
+# The sheet's own dimensions (the BASIC land, taper and pin stations from A,
+# the overall width) are kinematic values: three inch places keep each within
+# .0005 of the model.
+SHEET_DECIMALS = 3
+ROD_CALLOUT_PRECISION = {"hw-diam": _DRILL_P}
+# Names the lower arc each taper-foot BASIC lands on.
+TAPER_LABEL = f"R{inch_text(R_BOTTOM, _RADIUS_P)}/TAPER"
 
 _P = rocker_notes.DEFAULT_DRAWING_PRECISION
 _AXIS = ((0.0, 0.0, 1.0), ("__frame__",))
@@ -186,17 +205,17 @@ ROD_HOLE = requirement(
     requirements=("at", "dia", "thru", "position_dia"), fields={
         "at": ([rocker_interface.ROD_HOLE_X, rocker_interface.ROD_HOLE_Y, 0.0], (("_rocker_interface", "ROD_HOLE_X"), ("_rocker_interface", "ROD_HOLE_Y"))),
         "axis": _AXIS, "drill": (rocker.ROD_HOLE_SPEC.size, ("ROD_HOLE_SPEC",)),
-        "dia": (_drilled_band(blind_cut_dia_mm(rocker.ROD_HOLE_SPEC), _P), ("ROD_HOLE_SPEC", ("_hole_spec", "NUMBER_DRILL_MM"), ("_drawing_hole_callout", "add_native_hole_callout"))),
+        "dia": (_band(blind_cut_dia_mm(rocker.ROD_HOLE_SPEC), _DRILL_P, _DRILLED_BAND), ("ROD_HOLE_SPEC", "UNIT", ("_hole_spec", "NUMBER_DRILL_MM"), ("_drawing_hole_callout", "add_native_hole_callout"))),
         "nominal_dia": (blind_cut_dia_mm(rocker.ROD_HOLE_SPEC), ("ROD_HOLE_SPEC", ("_hole_spec", "NUMBER_DRILL_MM"))),
         "thru": (rocker.ROD_HOLE_SPEC.end == "through_all", ("ROD_HOLE_SPEC", ("_drawing_hole_callout", "add_native_hole_callout"))),
         "position_dia": (float(rocker.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"]), ("GEOMETRIC_TOLERANCES_MM",)),
         # Datum C clocks the arm from the rod pin, which sets the arm's angle
         # (Pedro, option 4). Its own position can only refer to A|B: rotation
-        # about A is free, so the Ø0.20 holds its distance from A.
+        # about A is free, so the Ø.008 holds its distance from A.
         "position_datums": (["A", "B"], (("draw_ch_rocker_arm", "build"),)),
         "dimension_type": ("basic", (("draw_ch_rocker_arm", "build"),)),
         "datum": ("C", (("draw_ch_rocker_arm", "build"),)),
-    }, precision={"at": "unknown", "dia": _P, "position_dia": _P},
+    }, precision={"at": "unknown", "dia": _DRILL_P, "position_dia": _FRAME_P},
 )
 HUB_CENTER = (0.180, 0.095)
 END_CENTER = (0.330, 0.110)
@@ -259,6 +278,18 @@ ARC_PROFILE_ZONE_MM = f"{TOP_EDGE_BAND[0]:g}"
 ARC_PROFILE_OUTSIDE_MM = {
     "TopRadius": ARC_PROFILE_ZONE_MM,
     "BottomRadius": f"{TOP_EDGE_BAND[1]:g}",
+}
+
+
+def _zone_text(zone_mm: str) -> str:
+    """A frame zone (mm) as the inch sheet prints it; a nil zone is a bare 0."""
+    return inch_text(float(zone_mm), _FRAME_P) if float(zone_mm) else "0"
+
+
+# The frames' own printed text, decimal inch; the zone is the spec's FCF row.
+ARC_PROFILE_ZONE_TEXT = rocker.GEOMETRIC_TOLERANCES_IN["top edge surface profile"]
+ARC_PROFILE_OUTSIDE_TEXT = {
+    frame: _zone_text(zone) for frame, zone in ARC_PROFILE_OUTSIDE_MM.items()
 }
 ARC_PROFILE_DATUMS = ("A", "B", "C")
 
@@ -372,7 +403,7 @@ def _least_tip_land_mm() -> float:
     zone, tilted too, so each line's two ends move independently between the
     zone's outside and inside limits, and the top arc between its own. The
     length is near-linear in those five offsets, so the least is at a vertex:
-    the taper tilted in by the whole zone at the land's foot only (4.979).
+    the taper tilted in by the whole zone at the land's foot only (4.969).
     prechips 0.1.2's ``tilt_across`` takes this as the land_angle extent (C2).
     """
     zone, lower_outside = TOP_EDGE_BAND
@@ -408,7 +439,7 @@ def _least_tip_land_mm() -> float:
     return min(lengths)
 
 
-TIP_LAND_LEAST_MM = math.floor(_least_tip_land_mm() * 1e3) / 1e3  # 4.979
+TIP_LAND_LEAST_MM = math.floor(_least_tip_land_mm() * 1e3) / 1e3  # 4.969
 
 # A printed profile frame as prechips 0.1.2 reads it (docs/features.md, Surface
 # profiles): t, U and the datum frame are the frame's own printed strings. The
@@ -1734,12 +1765,12 @@ PIVOT_BORE = requirement(
     "pivot_bore", kind="hole", faces=(CylinderFace(rocker.PIVOT_HOLE_DIA),),
     requirements=("dia", "thru", "finish_ra", "process"), fields={
         "at": _CENTRE, "axis": _AXIS,
-        "dia": (_band(rocker.PIVOT_HOLE_DIA, _P, rocker.PIVOT_HOLE_BAND), ("PIVOT_HOLE_DIA", "PIVOT_HOLE_BAND")),
+        "dia": (_band(rocker.PIVOT_HOLE_DIA, _PIVOT_P, rocker.PIVOT_HOLE_BAND), ("PIVOT_HOLE_DIA", "PIVOT_HOLE_BAND")),
         "nominal_dia": (rocker.PIVOT_HOLE_DIA, ("PIVOT_HOLE_DIA",)),
         "thru": (True, (("draw_ch_rocker_arm", "_dress_detail_dimensions"),)),
         "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
         "process": ("ream", (("draw_ch_rocker_arm", "_dress_detail_dimensions"),)), "datum": ("A", (("draw_ch_rocker_arm", "build"),)),
-    }, precision={"dia": _P, "finish_ra": 1},
+    }, precision={"dia": _PIVOT_P, "finish_ra": 1},
 )
 
 part_metadata(
@@ -1910,14 +1941,14 @@ TOP_EDGE = requirement(
         "radius": (rocker_interface.CURVE_RADIUS, (("_rocker_interface", "CURVE_RADIUS"), ("draw_ch_rocker_arm", "_basic_profile_dimensions"))), "radius_nominal": (rocker_interface.CURVE_RADIUS, (("_rocker_interface", "CURVE_RADIUS"),)),
         "dimension_type": ("basic", (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
         # The printed frame, kept whole as text; the zone below is what reads it.
-        "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_MM} U{ARC_PROFILE_OUTSIDE_MM['TopRadius']} TO {'|'.join(ARC_PROFILE_DATUMS)}", ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "_add_arc_profiles"))),
+        "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_TEXT} U{ARC_PROFILE_OUTSIDE_TEXT['TopRadius']} TO {'|'.join(ARC_PROFILE_DATUMS)}", ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "_add_arc_profiles"))),
         # Material added on the top edge moves it toward the arc centre.
         **_profile_zone("TopRadius", {"radius": "decreases", "height_above_pivot": "increases"}, (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
         "arc_len": (rocker.TOP_ARC_LEN, ("TOP_ARC_LEN",)),
         "arc_centre": ([0.0, rocker_interface.CENTER_Y, 0.0], (("_rocker_interface", "CENTER_Y"),)),
         "centre_from_pivot_ref": (rocker_interface.CENTER_Y - rocker_interface.PIVOT_MID_Y, (("_rocker_interface", "CENTER_Y"), ("_rocker_interface", "PIVOT_MID_Y"))),
         "end": (list(_TOP), ("TOP_END_X", "TOP_END_Y")),
-    }, precision={"height_above_pivot": _TOP_P, "radius": _P},
+    }, precision={"height_above_pivot": _TOP_P, "radius": _RADIUS_P},
 )
 # One Ⓤ0 zone over the lower outline between J and K: the R816 arc, both
 # tapers and both tip lands, all filed to the one scribed line (option 4).
@@ -1927,7 +1958,7 @@ PROFILE_OUTER = requirement(
         "bottom_radius": (rocker_interface.R_BOTTOM, (("_rocker_interface", "R_BOTTOM"), ("draw_ch_rocker_arm", "_basic_profile_dimensions"))),
         "bottom_radius_nominal": (rocker_interface.R_BOTTOM, (("_rocker_interface", "R_BOTTOM"),)),
         "dimension_type": ("basic", (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
-        "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_MM} U{ARC_PROFILE_OUTSIDE_MM['BottomRadius']} TO {'|'.join(ARC_PROFILE_DATUMS)}, BETWEEN {PROFILE_BETWEEN[0]} AND {PROFILE_BETWEEN[1]}", ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "_add_arc_profiles"))),
+        "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_TEXT} U{ARC_PROFILE_OUTSIDE_TEXT['BottomRadius']} TO {'|'.join(ARC_PROFILE_DATUMS)}, BETWEEN {PROFILE_BETWEEN[0]} AND {PROFILE_BETWEEN[1]}", ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "_add_arc_profiles"))),
         # Material added on the lower outline moves it away from the arc centre.
         # The tip lands declare this same zone themselves (see the tip-land loop).
         **_profile_zone("BottomRadius", {"bottom_radius": "increases"}, (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
@@ -1936,19 +1967,19 @@ PROFILE_OUTER = requirement(
         "mirror_symmetric": (True, (("draw_ch_rocker_arm", "_add_rocker_outline_dimensions"), ("draw_ch_rocker_arm", "_dress_detail_dimensions"))), "depth_ref": (rocker_interface.ARM_DEPTH, (("_rocker_interface", "ARM_DEPTH"),)),
         "bottom_end": (list(_BOTTOM), ("BOT_END_X", ("_rocker_interface", "R_BOTTOM"), ("_rocker_interface", "CENTER_Y"))),
         "radial_tip_end": (list(_TIP), ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", ("_rocker_interface", "CURVE_RADIUS"), ("_rocker_interface", "CENTER_Y"))),
-    }, precision={"bottom_radius": _P},
+    }, precision={"bottom_radius": _RADIUS_P},
 )
 HUB_OD = requirement(
     "hub_od", kind="boss", faces=(CylinderFace(rocker.HUB_DIA),),
     requirements=("dia", "coaxiality_dia"), fields={
         "at": _CENTRE, "axis": _AXIS,
-        "dia": (_band(rocker.HUB_DIA, _P), ("HUB_DIA",)),
+        "dia": (_band(rocker.HUB_DIA, _P, (rocker.LINEAR_2PL, -rocker.LINEAR_2PL)), ("HUB_DIA", "LINEAR_2PL")),
         "dia_nominal": (rocker.HUB_DIA, ("HUB_DIA",)),
         # A position frame to A under the Ø10.20 in detail D carries the zone.
         "coaxiality_dia": (rocker.HUB_COAXIALITY_DIA, ("HUB_COAXIALITY_DIA", ("draw_ch_rocker_arm", "_hub_position_frame"))),
         "coaxial_to": ("pivot_bore", (("draw_ch_rocker_arm", "_hub_position_frame"),)),
         "position_datums": (["A"], (("draw_ch_rocker_arm", "_hub_position_frame"),)),
-    }, precision={"dia": _P, "coaxiality_dia": _P},
+    }, precision={"dia": _P, "coaxiality_dia": _FRAME_P},
 )
 # The Ø10.20's attached position frame takes its leader shoulder and lifts the
 # value ~11 mm above the requested point (main-r1 farm screen: from 0.122 onto
@@ -2301,8 +2332,8 @@ def _add_rocker_outline_dimensions(
     # The taper's foot is a J↔K profile station: BASIC, the zone is its band.
     set_basic_dimension(adapter, taper_dimension, label="taper intersection X")
     taper_dimension = _early_bound(taper_dimension, "IDisplayDimension")
-    taper_dimension.SetText(4, "R816/TAPER")
-    if str(taper_dimension.GetText(4) or "") != "R816/TAPER":
+    taper_dimension.SetText(4, TAPER_LABEL)
+    if str(taper_dimension.GetText(4) or "") != TAPER_LABEL:
         raise RuntimeError("taper endpoint identity label did not persist")
     taper_dimension.MaxWitnessLineLength = TAPER_WITNESS_LENGTH
     if (not _native_finite_scalar(taper_dimension.MaxWitnessLineLength)
@@ -2331,8 +2362,8 @@ def _add_rocker_outline_dimensions(
     )
     set_basic_dimension(adapter, left_taper_dimension, label="left taper intersection X")
     left_taper_dimension = _early_bound(left_taper_dimension, "IDisplayDimension")
-    left_taper_dimension.SetText(4, "R816/TAPER")
-    if str(left_taper_dimension.GetText(4) or "") != "R816/TAPER":
+    left_taper_dimension.SetText(4, TAPER_LABEL)
+    if str(left_taper_dimension.GetText(4) or "") != TAPER_LABEL:
         raise RuntimeError("left taper endpoint identity label did not persist")
     left_taper_dimension.MaxWitnessLineLength = TAPER_WITNESS_LENGTH
     if (not _native_finite_scalar(left_taper_dimension.MaxWitnessLineLength)
@@ -2709,7 +2740,7 @@ def _strap_position_frame(adapter: Any, view: Any, strap_thickness: Any) -> Any:
     (_hub_face_basic)."""
     return _dimension_position_frame(
         adapter, view, strap_thickness, label="strap position to G",
-        tolerance=GEOMETRIC_TOLERANCES_MM["strap position to hub"],
+        tolerance=GEOMETRIC_TOLERANCES_IN["strap position to hub"],
         datums=tuple(STRAP_FACES.fields["position_datums"][0]),
     )
 
@@ -2986,7 +3017,7 @@ def _hub_position_frame(adapter: Any, hub: Any, hub_dia: Any) -> Any:
     zone the hub wall minimum is computed with (regate-r1 #2, not a note)."""
     return _dimension_position_frame(
         adapter, hub, hub_dia, label="hub OD position to A",
-        tolerance=GEOMETRIC_TOLERANCES_MM["hub OD position to bore"],
+        tolerance=GEOMETRIC_TOLERANCES_IN["hub OD position to bore"],
         datums=tuple(HUB_OD.fields["position_datums"][0]), diameter=True,
     )
 
@@ -3047,8 +3078,8 @@ def _add_arc_profiles(adapter: Any, front: Any) -> dict[str, Any]:
             leader_attach_xy=landing,
             frame_xy=ARC_PROFILE_FRAME_XY[name],
             characteristic="profile_surface",
-            tolerance=ARC_PROFILE_ZONE_MM,
-            outside_disposition=ARC_PROFILE_OUTSIDE_MM[name],
+            tolerance=GEOMETRIC_TOLERANCES_IN["top edge surface profile"],
+            outside_disposition=ARC_PROFILE_OUTSIDE_TEXT[name],
             datums=ARC_PROFILE_DATUMS,
             # The amplitude bar's foot rides the top edge (rule 4: name the mate).
             quantity=rocker_notes.TOP_EDGE_MATE_CALLOUT if name == "TopRadius" else "",
@@ -3920,7 +3951,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout,
+        unit=part_drawing_unit("ch-rocker-arm"), decimals=SHEET_DECIMALS,
     )
     stamp_drawing_summary(
         adapter,
@@ -4079,6 +4111,7 @@ async def build(adapter: Any) -> dict[str, str]:
         process=rocker_notes.ROD_PIN_MATE_CALLOUT + "\n" + drill_process(ROD_HOLE_SPEC) + "\n",
     )
     _require_rod_through_callout(rod_callout)
+    set_hole_callout_precision(rod_callout, ROD_CALLOUT_PRECISION, label="rod-pin hole")
 
     _add_pin_coordinates(adapter, front)
 
@@ -4149,7 +4182,7 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=rod_position_landing,
         frame_xy=FCF_XY,
         characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["rod-pin hole position"],
+        tolerance=GEOMETRIC_TOLERANCES_IN["rod-pin hole position"],
         datums=tuple(ROD_HOLE.fields["position_datums"][0]),
         diameter=True,
         label="rod-pin hole position",

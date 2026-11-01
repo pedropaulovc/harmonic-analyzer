@@ -11,4 +11,5 @@ ch-rocker-hub:
   finish: black oxide after joining
   quantity: 20
   tolerance_class: machined_block
-  process: "turned from 1018 round: land turned to the r6 press band, bore drilled and length parted off long; pressed into MHA-CH-13, then bore and length finished on MHA-CH-06"
+  drawing_unit: in
+  process: "turned from 1018 round: land turned to its press band, bore drilled and length parted off long; pressed into MHA-CH-13, then bore and length finished on MHA-CH-06"

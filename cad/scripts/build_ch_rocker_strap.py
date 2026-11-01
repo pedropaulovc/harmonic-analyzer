@@ -2,9 +2,10 @@ r"""Reproduction script: rocker strap (MHA-CH-13; 20 used, one per rocker arm).
 
 The flat 1018 strap of the built-up rocker arm MHA-CH-06
 (``ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE``): the finished part's outline
--- the R800 top edge, the concentric R816 bottom edge, the tip lands radial to
-their shared centre and the tapered end faces (``build_ch_rocker_arm``'s strap
-profile) -- at the finished 2.5 thickness, with the Ø10.20 H7 hole the
+-- the top edge on the R31.5 arc, the concentric bottom edge, the tip lands
+radial to their shared centre and the tapered end faces
+(``build_ch_rocker_arm``'s strap profile) -- at the finished thickness, with
+the Ø.400 reamed hole the
 MHA-CH-12 hub is pressed into (``ch_rocker_hub_fit``). The #47 rod-pin hole is
 drilled after joining, so it is not here (``ch_rocker_strap_spec``).
 
@@ -13,7 +14,7 @@ side, the hub hole PIVOT_MID_Y up), extruded mid-plane in Z. ONE sketch,
 ``StrapProfile``, holds the outline and the hole, so every printed location
 runs from the hole's centre: a construction line on the mirror axis, from the
 bottom edge through the hole's centre to the top edge, carries both edges'
-heights from the hole and puts the arcs' centre on that axis (the R816 is
+heights from the hole and puts the arcs' centre on that axis (the bottom radius is
 then derived, never printed); the tip lands' outer corners and the taper feet
 are dimensioned across from the hole's centre.
 
@@ -31,6 +32,7 @@ from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -45,6 +47,7 @@ from _drawing_tolerances import (
 from _feature_tree import name_last_feature
 from _fit_deviations import deviations
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
@@ -84,6 +87,7 @@ from ch_rocker_strap_spec import (
     TOP_EDGE_BAND,
     TOP_END_X,
     TOP_END_Y,
+    UNIT,
     strap_area,
 )
 
@@ -105,6 +109,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations); the mm suffix is load-bearing (INCH
     # document). The tip and taper offsets are the trig-derived vertices of
@@ -285,21 +290,35 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Native bands: the thickness ±0.025 (the finished part's, the faces are
-    # not cut again), the hub hole H7, the top edge +0.50/0 over the hole and
-    # the bottom edge 0/-0.50 under it.
+    # Native bands: the thickness (the finished part's, the faces are not cut
+    # again), the hub hole's press band, the top edge's one-sided plus over the
+    # hole and the bottom edge's one-sided minus under it.
     strap_lower, strap_upper = deviations(ARM_THICKNESS_BAND)
     if strap_lower != -strap_upper:
         raise AssertionError("ch_rocker_arm_spec.ARM_THICKNESS_BAND must be symmetric")
-    set_dimension_symmetric_tolerance(adapter, "Strap", "StrapThickness", strap_upper)
-    set_dimension_bilateral_tolerance(
-        adapter, "StrapProfile", "HoleDia", *deviations(STRAP_HOLE_BAND)
+    set_dimension_symmetric_tolerance(
+        adapter, "Strap", "StrapThickness", strap_upper, display_unit=UNIT
     )
     set_dimension_bilateral_tolerance(
-        adapter, "StrapProfile", "TopAbovePivot", *deviations(TOP_EDGE_BAND)
+        adapter,
+        "StrapProfile",
+        "HoleDia",
+        *deviations(STRAP_HOLE_BAND),
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "StrapProfile", "BottomBelowPivot", *deviations(BOTTOM_EDGE_BAND)
+        adapter,
+        "StrapProfile",
+        "TopAbovePivot",
+        *deviations(TOP_EDGE_BAND),
+        display_unit=UNIT,
+    )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "StrapProfile",
+        "BottomBelowPivot",
+        *deviations(BOTTOM_EDGE_BAND),
+        display_unit=UNIT,
     )
     set_dimension_prefix(adapter, "StrapProfile", "RodTipLen", TIP_LAND_PREFIX)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
