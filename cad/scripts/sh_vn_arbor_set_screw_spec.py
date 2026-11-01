@@ -60,5 +60,5 @@ SUPPLIER_REFERENCE_SIDES = {}
 SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (2, "length", None, None),
     "SupplierThreadDiameter": (3, "diameter", None, "4-40"),
-    "SupplierDriveWidth": (2, "length", None, None),
+    "SupplierDriveWidth": (3, "length", None, "HEX SOCKET"),
 }

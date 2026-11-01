@@ -27,10 +27,12 @@ ITEM = "#4-40 x 1/4 SOCKET SET SCREW, CUP POINT"
 # that left 12 mm, so the 1/4 in screw fit only at 1:4. The taller supplier
 # Top cell leaves 18 mm and fits 2:1.
 VIEW_LAYOUT = "supplier_top"
-# Both spans are shorter than their text, so the witnesses ran through it:
-# shelve the text past its outer witness.
+# Each span is shorter than its text, so the witnesses ran through it: shelve
+# the text past its outer witness. The thread diameter's two-line text (with
+# 4-40 below) sits on the Top's upper lane, the hex socket on its lower one.
 SHELVES = {
     "SupplierLength": (False, "right"),
+    "SupplierThreadDiameter": (True, "right"),
     "SupplierDriveWidth": (True, "right"),
 }
 
