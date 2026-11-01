@@ -36,9 +36,13 @@ FIT_SKUS = {4: "SHIM-0375-004", 8: SKU, 20: "SHIM-0375-020"}
 FIT_THICKNESS_BANDS = {4: (0.0127, -0.0127), 8: THICKNESS_BAND, 20: (0.0254, -0.0254)}
 LENGTH = THICKNESS
 
+# Every carrier lies on a Top-view edge, so its construction line prints under
+# the outline: the bore on the z = 0 face (the view's upper edge), the OD on
+# the z = THICKNESS face (its lower edge), the thickness on the OD silhouette.
+# The Front (bore) view shows no chord across the rings.
 SUPPLIER_REFERENCE_DIMENSIONS = (('SupplierBoreDiameter', ID, 'horizontal'), ('SupplierOuterDiameter', OD, 'horizontal'), ('SupplierThickness', THICKNESS, 'vertical'))
-SUPPLIER_REFERENCE_STARTS = {'SupplierBoreDiameter': (-ID / 2.0, 0.0), 'SupplierOuterDiameter': (-OD / 2.0, 0.0), 'SupplierThickness': (0.0, -THICKNESS)}
-SUPPLIER_REFERENCE_PLANES = {'SupplierBoreDiameter': 'Front', 'SupplierOuterDiameter': 'Front', 'SupplierThickness': 'Top'}
+SUPPLIER_REFERENCE_STARTS = {'SupplierBoreDiameter': (-ID / 2.0, 0.0), 'SupplierOuterDiameter': (-OD / 2.0, -THICKNESS), 'SupplierThickness': (OD / 2.0, -THICKNESS)}
+SUPPLIER_REFERENCE_PLANES = {'SupplierBoreDiameter': 'Top', 'SupplierOuterDiameter': 'Top', 'SupplierThickness': 'Top'}
 # Bands print as stacked limits (max over min) inside one parenthesis.
 SUPPLIER_REFERENCE_FORMATS = {'SupplierBoreDiameter': (3, 'diameter', None, 'BORE'), 'SupplierOuterDiameter': (3, 'diameter', None, 'OUTSIDE'), 'SupplierThickness': (4, 'length', None, 'THICKNESS')}
 # The bore takes the top lane, the OD the bottom: each shelved text stays clear

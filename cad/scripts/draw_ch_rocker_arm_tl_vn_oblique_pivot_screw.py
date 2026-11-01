@@ -15,6 +15,7 @@ from solidworks_mcp.adapters.solidworks.drawing import iter_views
 import _telemetry
 import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as part
 from _com import _early_bound
+from _drawing_centerline import add_view_centerline
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -36,21 +37,22 @@ ITEM = "18-8 SS SHOULDER SCREW, EXT THREAD, 3/8 X 1-1/2, 5/16-18"
 GENERAL_TEXT = "PURCHASED PART; CUT THREAD AND CHAMFER END AT ASSEMBLY. REST AS SUPPLIED."
 # tall_top's 96 mm Top cell holds the ~2.3 in cut screw at 1:1.
 VIEW_LAYOUT = "tall_top"
-# Every text shelves right of its own witnesses, clear of the lines: the head
-# Ø on the Front's bottom lane, the shoulder Ø on the Top's top lane (past the
-# thread end), the shoulder length beside the Top. Front and Top reserve the
-# same left/right space so the fit centres them on one projection line; the
-# Front's equal top/bottom keeps it level with the unannotated Right.
+# Every text shelves right of its own witnesses, clear of the lines: the
+# shoulder Ø on the Top's top lane (past the thread end), the head Ø on its
+# bottom lane (under the head), the shoulder length beside the Top. Front and
+# Top reserve the same left/right space so the fit centres them on one
+# projection line; the unannotated Front's equal top/bottom keeps it level
+# with the Right.
 SHELVES = {
     "SupplierShoulderDiameter": (True, "right"),
     "SupplierHeadDiameter": (True, "right"),
     "SupplierShoulderLength": (False, "right"),
 }
-# The Top reserves only the shoulder Ø shelf's ink over its thread end, and no
-# bottom lane (its caption sits under the cell).
+# The Top's bottom lane holds the head Ø's two rows; with the shoulder Ø's
+# three over the thread end, the ~2.3 in screw still fits the 96 mm cell at 1:1.
 SUPPLIER_MARGINS = {
-    "*Front": (0.010, 0.018, 0.060, 0.018),
-    "*Top": (0.010, 0.004, 0.060, 0.020),
+    "*Front": (0.010, 0.010, 0.060, 0.010),
+    "*Top": (0.010, 0.014, 0.060, 0.020),
 }
 # The cut length's text (63 mm wide with its callout row) centres on its line,
 # so the line stands far enough right that the text clears the thread's edge
@@ -150,6 +152,17 @@ async def build(adapter) -> dict[str, str]:
         _assert_supplier_bands(displays)
         stations = shelve_supplier_text(adapter, displays, SHELVES)
         _assert_shop_dimension(_place_cut(adapter, views["*Top"]))
+        # The shoulder length's line lies on the silhouette, so the Top
+        # carries its axis as a native centerline, picked on the shoulder face.
+        top = views["*Top"]
+        add_view_centerline(
+            adapter, top, label="pivot screw TOP axis",
+            face_xy=model_point_in_view(
+                adapter, top,
+                (0.0, part.SHOULDER_DIA / 2000.0, part.SHOULDER_LENGTH / 2000.0),
+                label="pivot screw TOP shoulder face",
+            ),
+        )
 
         def assert_references():
             fresh = assert_supplier_screw(
