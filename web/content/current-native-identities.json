@@ -861,13 +861,6 @@
       "number": "MHA-CH-06-TL-VN-54"
     },
     {
-      "sourceStem": "ch-rocker-arm-tl-oblique-leadscrew-nut",
-      "sourceNumber": "MHA-CH-006-TL-35",
-      "parent": "ch-rocker-arm-tl-oblique-jig",
-      "stem": "ch-rocker-arm-tl-vn-oblique-leadscrew-nut",
-      "number": "MHA-CH-06-TL-VN-55"
-    },
-    {
       "sourceStem": "ch-rocker-arm-tl-oblique-pillow-block",
       "sourceNumber": "MHA-CH-006-TL-36",
       "parent": "ch-rocker-arm-tl-oblique-jig",
@@ -1052,7 +1045,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "d815a7a675829b775c5baee7269695b9b8390feba563dd93e95620db0156b8b3",
+  "currentRegistryMapSha256": "1da3d61fc1f7ea268de2200648472efb56aa4d2f5aa4e28a239e2ad423792c75",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",
@@ -2254,6 +2247,16 @@
         }
       ],
       "kind": "assembly"
+    },
+    {
+      "sourceStem": "ch-rocker-arm-tl-oblique-feed-nut",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-feed-nut",
+          "number": "MHA-CH-06-TL-27"
+        }
+      ]
     }
   ],
   "archivedNumbers": [
