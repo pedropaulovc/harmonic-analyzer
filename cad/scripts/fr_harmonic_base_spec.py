@@ -33,16 +33,16 @@ TOP_THICKNESS = 1.5 * MM_PER_IN  # 38.1
 # The sockets sit at x = +/-COLUMN_X and z = +/-COLUMN_Z (7.756 / 4.410 once the
 # frame column snap lands; 7.7559 / 4.4094 until then), so a pad centred on
 # the part origin leaves an EQUAL socket-to-pad-edge land on all four sides at
-# TOP_WIDTH = TOP_LENGTH - 2 * (COLUMN_X - COLUMN_Z): 10.808 on the .001 grid,
-# exact for the snapped stations and within .0005 of exact for the current
-# ones. The former 10.5 in pad left 1.6 mm of land in Z against 5.5 in X, and
+# TOP_WIDTH = TOP_LENGTH - 2 * (COLUMN_X - COLUMN_Z) = 10.808; the pad takes
+# the nearest .01 width, 10.81, so the lands differ by .001 (.0015 before the
+# snap). The former 10.5 in pad left 1.6 mm of land in Z against 5.5 in X, and
 # the 2026-09 blind machinist review rejected that asymmetry as a blocker: no
 # tolerance stack behind the hole-table coordinate scheme can hold the minimum
-# finished land off a 1.6 mm nominal. build_fr_harmonic_base asserts the land
-# is equal on both axes to the .001 grid and proves its worst case.
-TOP_WIDTH = 274.5232  # 10.808
+# finished land off a 1.6 mm nominal. build_fr_harmonic_base asserts the lands
+# equal to within half a .01 step and proves each axis's worst case.
+TOP_WIDTH = 274.574  # 10.81
 # The flange keeps the same 0.25 in reveal per side that it has in X.
-BOTTOM_WIDTH = TOP_WIDTH + (BOTTOM_LENGTH - TOP_LENGTH)  # 11.308
+BOTTOM_WIDTH = TOP_WIDTH + (BOTTOM_LENGTH - TOP_LENGTH)  # 11.31
 BOTTOM_FRONT_Z = -BOTTOM_WIDTH / 2.0
 BOTTOM_REAR_Z = BOTTOM_WIDTH / 2.0
 BOTTOM_CENTER_Z = (BOTTOM_FRONT_Z + BOTTOM_REAR_Z) / 2.0
@@ -59,14 +59,14 @@ DECK_RISE = 3.048  # .12
 GREEN_TOP = STACK_HEIGHT - DECK_RISE  # 1.88: green land, socket mouths
 DECK_LENGTH = 334.264  # 13.16 (the nameplate's west edge is .16 inside)
 DECK_LAND = 7.112  # .28 green land in front of and behind the deck (z)
-DECK_WIDTH = TOP_WIDTH - 2.0 * DECK_LAND  # 10.248
+DECK_WIDTH = TOP_WIDTH - 2.0 * DECK_LAND  # 10.25
 DECK_HALF_X = DECK_LENGTH / 2.0
 DECK_HALF_Z = DECK_WIDTH / 2.0
 # Plan corners 1/4 in, the casting's rounded-corner language (the photographed
-# black panel reads round-cornered); the top edge takes a .031 x 45 break,
-# half the plates' .063 rim break, so most of the .12 step stays square.
+# black panel reads round-cornered); the top edge takes a .03 x 45 break,
+# half the plates' .06 rim break, so most of the .12 step stays square.
 DECK_CORNER_R = 0.25 * MM_PER_IN  # 6.35
-DECK_EDGE_BREAK = 0.7874  # .031 legs
+DECK_EDGE_BREAK = 0.762  # .03 legs
 
 # Underside lightening (same ruling): one cored pocket from the underside
 # inside a POCKET_WALL perimeter wall, its ceiling POCKET_SKIN under the deck
@@ -92,12 +92,12 @@ RIB_RELIEF = 3.048  # .12 rib bottoms clear the bench by this much
 SOCKET_BOSS_DIA = 41.402  # 1.63
 CROSS_TAP_LUG_BOTTOM_Y = 26.416  # 1.04
 CROSS_TAP_LUG_WIDTH = 27.0
-# The lugs' inner faces are fabricated stations on the .001 grid (Lug1X/Lug3X
-# and Lug1Y/Lug0Y print them), independent of the column line: inner X .315
-# inside the snapped column line, and the unprinted length runs from the inner
-# Z face to the column line.
-CROSS_TAP_LUG_INNER_X = 189.0014  # 7.441
-CROSS_TAP_LUG_INNER_Z = 75.0062  # 2.953
+# The lugs' inner faces are fabricated stations on the .01 grid (Lug1X/Lug3X
+# 1.56 / 16.44 and Lug1Y/Lug0Y 2.70 / 8.61 print them), independent of the
+# column line: inner X .316 inside the snapped column line, and the unprinted
+# length runs from the inner Z face to the column line.
+CROSS_TAP_LUG_INNER_X = 188.976  # 7.44
+CROSS_TAP_LUG_INNER_Z = 75.057  # 2.955
 CROSS_TAP_LUG_LENGTH = abs(FRAME_FRONT_COLUMN_Z) - CROSS_TAP_LUG_INNER_Z
 # ONE radius for every vertical reentrant pocket corner: the socket-boss
 # junctions (PocketFillets) and the rib/lug corners (PocketCornerFillets)
@@ -270,21 +270,22 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`), so the MODEL
 # owns them: build_fr_harmonic_base applies this map to the .SLDPRT and
-# draw_fr_harmonic_base only reads it back. Sizes print the title block's .XX;
-# a dimension prints .XXX where its nominal derives from the .001-grid column
-# stations (the pad and flange widths, the cross-tap and lug stations, the
-# long rib's station), where a fit needs it (the spotface) or where the
-# edge-break legs .063/.031 need it. No fabricated dimension prints .X.
+# draw_fr_harmonic_base only reads it back. Sizes, plain chamfers and the
+# underside lug/rib/pocket stations print the title block's .XX; a dimension
+# prints .XXX only where its nominal is a .001-grid frame column station (the
+# cross-tap Xs), where a fit needs it (the spotface) or where another
+# subsystem's band reads it (the pivot seat offsets). No fabricated dimension
+# prints .X.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "BottomProfile": {"BottomLen": 2, "BottomWid": 3},
-    "TopProfile": {"TopLen": 2, "TopWid": 3},
+    "BottomProfile": {"BottomLen": 2, "BottomWid": 2},
+    "TopProfile": {"TopLen": 2, "TopWid": 2},
     "BottomPlate": {"BottomThickness": 2},
     "PadCorners": {"PadCornerRadius": 2},
     "FlangeCorners": {"FlangeCornerRadius": 2},
-    "DeckProfile": {"DeckLen": 2, "DeckWid": 3},
+    "DeckProfile": {"DeckLen": 2, "DeckWid": 2},
     "Deck": {"DeckRise": 2},
     "DeckCorners": {"DeckCornerRadius": 2},
-    "DeckEdgeBreak": {"DeckEdgeChamfer": 3},
+    "DeckEdgeBreak": {"DeckEdgeChamfer": 2},
     "HeightReference": dict.fromkeys(HEIGHT_REFERENCE_DIMENSIONS, 2),
     "CrossTapReference": {"CrossTapX": 3, "CrossTapFarX": 3},
     "PlanReference": {
@@ -297,16 +298,16 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     },
     # Flow-through offsets from the MHA-DT-02 seats, with their own band.
     "PivotSeatReference": dict.fromkeys(PIVOT_SEAT_DIMENSIONS, 3),
-    "TopRimBreaks": {"TopRimChamfer": 3},
-    "BottomEdgeBreak": {"BottomEdgeChamfer": 3},
+    "TopRimBreaks": {"TopRimChamfer": 2},
+    "BottomEdgeBreak": {"BottomEdgeChamfer": 2},
     "BaseSpotFaceRearProfile": {"SpotFaceDia": 3},
     "BaseSpotFaceRear": {"SpotFaceDepth": 3},
-    "PocketProfile": {"PocketLen": 2, "PocketWid": 3},
+    "PocketProfile": {"PocketLen": 2, "PocketWid": 2},
     "Pocket": {"PocketDepth": 2},
     "SocketBossProfile": {"SocketBossDia": 2},
     "LongRibProfile": {
         "LongRibThickness": 2,
-        **dict.fromkeys(UNDERSIDE_LOCATION_DIMENSIONS["LongRibProfile"], 3),
+        **dict.fromkeys(UNDERSIDE_LOCATION_DIMENSIONS["LongRibProfile"], 2),
     },
     "CrossRibProfile": {
         "CrossRibThickness": 2,
@@ -314,7 +315,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     },
     "LongRib": {"RibRelief": 2},
     "CrossTapLugProfile": dict.fromkeys(
-        UNDERSIDE_LOCATION_DIMENSIONS["CrossTapLugProfile"], 3
+        UNDERSIDE_LOCATION_DIMENSIONS["CrossTapLugProfile"], 2
     ),
     "CrossTapLugs": {"LugBottom": 2},
     "PocketFillets": {"PocketFilletRadius": 2},

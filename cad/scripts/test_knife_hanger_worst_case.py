@@ -508,12 +508,12 @@ def test_the_crossbar_webs_hold_round_the_press_reams_and_knockouts() -> None:
     assert stations == pytest.approx((-22.62, -7.38))
     assert build_fr_top_frame.PIN_HOLE_X == pytest.approx(-7.38)
     assert build_fr_top_frame.BAR_X1 - build_fr_top_frame.BAR_X0 == pytest.approx(
-        24.9936
+        25.146
     )
     assert (
         build_fr_top_frame.BAR_X1 + build_fr_top_frame.BAR_X0
     ) / 2.0 == pytest.approx(-15.0)
-    assert build_fr_top_frame.HANGER_BAR_HALF_WIDTH_MIN == pytest.approx(12.4333)
+    assert build_fr_top_frame.HANGER_BAR_HALF_WIDTH_MIN == pytest.approx(12.446)
     assert top_frame.HANGER_CROSSBAR_CENTER_TOL == pytest.approx(0.0508)
     assert (top_frame.HANGER_PIN_HOLE_DIA, top_frame.HANGER_PIN_HOLE_DIA_BAND) == (
         dowel.PRESS_HOLE_DIA,
@@ -530,9 +530,9 @@ def test_the_crossbar_webs_hold_round_the_press_reams_and_knockouts() -> None:
     assert not hasattr(top_frame, "HANGER_PIN_NEG_STATION_TOL")
     assert not hasattr(build_fr_top_frame, "NEG_PIN_HOLE_BAR_WALL")
     walls = {
-        "ream to bar face": (build_fr_top_frame.PIN_HOLE_BAR_WALL, 2.965112),
+        "ream to bar face": (build_fr_top_frame.PIN_HOLE_BAR_WALL, 2.977812),
         "ream to screw hole": (build_fr_top_frame.PIN_HOLE_SCREW_WALL, 2.685475),
-        "knockout to bar face": (build_fr_top_frame.KNOCKOUT_BAR_WALL, 3.386961),
+        "knockout to bar face": (build_fr_top_frame.KNOCKOUT_BAR_WALL, 3.399661),
         "knockout to screw hole": (build_fr_top_frame.KNOCKOUT_SCREW_WALL, 2.979382),
     }
     for label, (wall, expected) in walls.items():

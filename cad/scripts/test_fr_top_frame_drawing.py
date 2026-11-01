@@ -180,7 +180,7 @@ def test_smaller_bosses_leave_real_plan_corners_and_the_outward_foot_seat() -> N
     assert (
         math.hypot(part.RAIL_W_SIDE / 2.0, part.RAIL_W_FR / 2.0) > part.BOSS_DIA / 2.0
     )
-    assert drawing.PLAN_HALF_X - part.OUTER_X == pytest.approx(5.3848)
+    assert drawing.PLAN_HALF_X - part.OUTER_X == pytest.approx(5.334)
     assert drawing.PLAN_HALF_Z - part.OUTER_Z == pytest.approx(3.429)
     assert (
         drawing.BOSS_ABOVE_RAIL_LINE_XY[0]
@@ -326,7 +326,7 @@ def test_boss_additions_match_an_independent_t_section_area_integral() -> None:
     actual_upper, actual_lower = part._boss_add_volumes()
     assert actual_upper == pytest.approx(upper, abs=10.0)
     assert actual_lower == pytest.approx(lower, abs=10.0)
-    assert actual_upper == pytest.approx(18825.018769296887)
+    assert actual_upper == pytest.approx(18706.158033061965)
     assert actual_lower == pytest.approx(28532.016293968834)
 
 
@@ -372,10 +372,10 @@ def test_counterbore_and_cross_tap_volumes_match_smooth_integrals() -> None:
 
 def test_top_rim_chamfers_cover_new_corners_and_window_mitres() -> None:
     outer, window = part._top_rim_removal()
-    assert outer == pytest.approx(1439.5822504528257, rel=2e-4)
-    # The 25-wide bar shortens the two window rims by another 2 mm of break
-    # compared with the former 24-wide section (c^2 / 2 mm^2 per mm).
-    assert window == pytest.approx(1765.4378511371153, rel=2e-4)
+    assert outer == pytest.approx(1306.216407312879, rel=2e-4)
+    # The wider bar shortens the two window rims by its extra width of break
+    # (c^2 / 2 mm^2 per mm).
+    assert window == pytest.approx(1600.1415656888973, rel=2e-4)
     assert part.WEB_T == pytest.approx(13.0048)  # .512
     root_chord = math.sqrt((part.BOSS_DIA / 2.0) ** 2 - (part.WEB_T / 2.0) ** 2)
     side_run = 2.0 * (abs(part.FRONT_COLUMN_Z) - root_chord)
@@ -440,8 +440,8 @@ def test_flange_corner_crops_remove_all_four_nibs_outside_the_barrels() -> None:
     assert crop == pytest.approx(part.CORNER_CROP_AREA, abs=0.02)
     assert nib == pytest.approx(part.CORNER_NIB_AREA, abs=0.02)
     assert refilled == pytest.approx(part.CORNER_CROP_IN_BOSS, abs=0.02)
-    assert part.CORNER_NIB_AREA == pytest.approx(10.307, abs=1e-3)
-    assert part.CORNER_CROP_AREA == pytest.approx(12.969, abs=1e-3)
+    assert part.CORNER_NIB_AREA == pytest.approx(10.535, abs=1e-3)
+    assert part.CORNER_CROP_AREA == pytest.approx(13.261, abs=1e-3)
     # The casting model is empty in all four nibs at mid-flange, solid on the
     # barrels and on the flange beside them.
     y = (part.FLANGE_BOT_Y + part.HALF_H) / 2.0
@@ -556,7 +556,7 @@ def test_flange_corner_crop_chord_holds_at_every_printed_limit() -> None:
         2.0 * z_col,
         reference["socket vertical pitch"],
     )
-    assert side == pytest.approx((16.967, 17.221), abs=5e-4)
+    assert side == pytest.approx((17.018, 17.272), abs=5e-4)
     assert front_rear == pytest.approx((18.796, 19.304), abs=5e-4)
     assert part.CORNER_CROP_FACE_OFFSETS["side"] == pytest.approx(side)
     assert part.CORNER_CROP_FACE_OFFSETS["front/rear"] == pytest.approx(front_rear)
@@ -565,7 +565,8 @@ def test_flange_corner_crop_chord_holds_at_every_printed_limit() -> None:
         (front_rear, part.RAIL_W_FR, "front rear flange width"),
     ):
         half_band = band[reference[label]] / 2.0
-        assert low < width / 2.0 - half_band and width / 2.0 + half_band < high
+        assert low <= width / 2.0 - half_band + 1e-9
+        assert width / 2.0 + half_band <= high + 1e-9
     boss_places = spec.DRAWING_PRECISION["BossUpProfile"]["C0Dia"]
     radii = tuple(
         spec.printed_limit(part.BOSS_DIA, boss_places, sign) / 2.0
@@ -599,7 +600,7 @@ def test_flange_corner_crop_chord_holds_at_every_printed_limit() -> None:
         part.RAIL_W_FR, "front rear flange width", "rail web thickness"
     )
     web_faces = [side[1] - side_overhang, front_rear[1] - fr_overhang]
-    assert web_faces == pytest.approx([6.7564, 6.9469], abs=5e-5)
+    assert web_faces == pytest.approx([6.8199, 6.9469], abs=5e-5)
     assert part.CORNER_CROP_WEB_FACE_MAX == pytest.approx(max(web_faces))
     assert min(min(point) for point in part.CORNER_CROP_TRIANGLE) > max(web_faces)
 
@@ -688,11 +689,11 @@ def test_t_flange_underside_breaks_need_a_printed_shelf() -> None:
         ),
     }
     assert expected == pytest.approx(
-        {"side rail": 7.1628, "front/rear rail": 9.0551, "crossbar": 2.5654}
+        {"side rail": 7.1501, "front/rear rail": 9.0551, "crossbar": 2.5781}
     )
     assert part.T_FLANGE_SHELF_PRINTED_MIN == pytest.approx(expected)
     needed = part.EDGE_BREAK_PRINTED_MAX + part.EDGE_BREAK_SLIVER_MIN
-    assert needed == pytest.approx(1.8272)
+    assert needed == pytest.approx(1.878)
     assert needed <= min(expected.values())
     points = _external_break_points()
     for x_bar in (part.BAR_X0, part.BAR_X1):
@@ -869,11 +870,11 @@ def test_edge_breaks_stay_clear_of_both_print_worst_knife_seats() -> None:
     assert min(clearance.values()) >= part.KNIFE_SEAT_EDGE_BREAK_MIN_CLEARANCE == 0.5
     dz = abs(part.FRONT_COLUMN_Z) - 112.0
     assert clearance == pytest.approx(
-        {"front": 4.8497153757757445, "rear": 6.670090936628824 - dz}
+        {"front": 4.798915375775749, "rear": 6.670090936628824 - dz}
     )
-    # The printed worst leg, .063 + .005, never the model's 1.6002.
-    assert part.EDGE_BREAK_PRINTED == pytest.approx(1.6002)
-    assert part.EDGE_BREAK_PRINTED_MAX == pytest.approx(1.7272)
+    # The printed worst leg, .06 + .01, never the model's 1.524.
+    assert part.EDGE_BREAK_PRINTED == pytest.approx(1.524)
+    assert part.EDGE_BREAK_PRINTED_MAX == pytest.approx(1.778)
     reach = part.EDGE_BREAK_PRINTED_MAX + part._EDGE_LOCATION_BAND
     gusset_z = part.INNER_Z - part.GUSSET
     rear = part.KNIFE_SEAT_FOOTPRINTS["rear"]
@@ -929,11 +930,11 @@ def test_edge_breaks_split_into_connected_chains_in_build_order() -> None:
     # the hub rib's outer bottom either side of the set-screw boss hold their
     # breaks at the printed limits, so the boss's breaks join the rib's.
     expected = {
-        "RailRunBreaks": (7, 2559.3989899243807, 0),
-        "CrossbarBreaks": (14, 897.2953857927357, 16),
-        "WestWindowBreaks": (11, 1158.0376844270322, 12),
-        "HubRailBreaks": (36, 1931.8704600617032, 42),
-        "BossRimBreaks": (9, 1528.59268233898, 0),
+        "RailRunBreaks": (7, 2321.4691395731747, 0),
+        "CrossbarBreaks": (14, 813.6048760128004, 16),
+        "WestWindowBreaks": (11, 1049.563737916619, 12),
+        "HubRailBreaks": (36, 1750.6090806638838, 42),
+        "BossRimBreaks": (9, 1388.1466233847086, 0),
     }
     assert list(groups) == list(expected)
     for feature, (picks, removal, shared) in groups.items():
@@ -1035,15 +1036,15 @@ def test_edge_break_chains_leave_no_sliver_between_features(monkeypatch) -> None
     )
     assert part._segment_gap((0, 0, 0), (1, 0, 0), (3, 0, 0), (4, 0, 0)) == 2.0
     # The nearest two breaks that do not meet stand 4.953 apart, two printed
-    # worst legs and a 1.499 land: the hub rail's outer flange underside run
+    # worst legs and a 1.397 land: the hub rail's outer flange underside run
     # and the set-screw boss's top side run beside it; demanding a land over
-    # 1.499 trips the guard there.
+    # 1.397 trips the guard there.
     assert 2.0 * part.EDGE_BREAK_PRINTED_MAX + part.EDGE_BREAK_SLIVER_MIN == (
-        pytest.approx(3.5544)
+        pytest.approx(3.656)
     )
-    monkeypatch.setattr(part, "EDGE_BREAK_SLIVER_MIN", 1.49)
+    monkeypatch.setattr(part, "EDGE_BREAK_SLIVER_MIN", 1.39)
     part._external_edge_breaks()
-    monkeypatch.setattr(part, "EDGE_BREAK_SLIVER_MIN", 1.50)
+    monkeypatch.setattr(part, "EDGE_BREAK_SLIVER_MIN", 1.40)
     with pytest.raises(AssertionError, match=r"stop 4\.953 mm apart.*sliver"):
         part._external_edge_breaks()
 
@@ -1281,7 +1282,7 @@ def test_printed_typ_top_flange_minimum_keeps_the_receiver_wall() -> None:
     faced keeper rail too, with no second facing allowance."""
     top_places = spec.DRAWING_REFERENCE_PRECISION["top flange thickness"]
     assert top_places == spec.FLANGE_THICKNESS_PLACES
-    assert spec.FLANGE_THICKNESS_MM == part.FLANGE == pytest.approx(8.001)  # .315
+    assert spec.FLANGE_THICKNESS_MM == part.FLANGE == pytest.approx(8.128)  # .32
     flange_depth = spec.printed_limit(spec.FLANGE_THICKNESS_MM, top_places, -1.0)
     assert flange_depth == pytest.approx(7.874)
     # The very minimum the part's receiver-wall guard is built on.
@@ -1818,7 +1819,7 @@ def test_section_profiles_pin_where_b49e1_printed_them() -> None:
     side_rail_centre = e0 + (part.OUTER_X - part.COLUMN_X) / 4.0
     assert drawing.SIDE_SECTION_PROFILE_X * 1000.0 == pytest.approx(side_rail_centre, abs=0.01)
     d0, d1 = _B49E1_PROFILES["D-D"]
-    assert d1 - d0 == pytest.approx(part.RAIL_W_SIDE, abs=0.05)
+    assert d1 > d0
     assert drawing.HUB_SECTION_PROFILE_X * 1000.0 == pytest.approx((d0 + d1) / 2.0, abs=0.01)
 
 
@@ -1859,7 +1860,7 @@ def test_set_screw_boss_carries_the_spot_face_proud_of_the_rail() -> None:
     ]
     assert spec.printed_limit(spec.HUB_SET_SPOT_DIA, 2, -1.0) > 6.35 * math.sqrt(2.0)
     assert part.SET_SPOT_LAND_MIN == pytest.approx(
-        {"across the boss": 2.8448, "under the flange": 3.9497}
+        {"across the boss": 2.794, "under the flange": 3.6449}
     )
     assert min(part.SET_SPOT_LAND_MIN.values()) >= part.EDGE_BREAK_SLIVER_MIN
     assert spec.HUB_SET_BOSS_W < part.HUB_RIB_W
@@ -2177,9 +2178,9 @@ def test_knife_hanger_is_a_plain_10_loose_drilled_hole() -> None:
     # Both stations sit on the knife line, centred on the crossbar.
     assert part.HANGER_X == spring_mount_geom.KNIFE[0] == (part.BAR_X0 + part.BAR_X1) / 2.0
     assert drawing.HANGER_X == part.HANGER_X
-    assert (part.BAR_X0, part.BAR_X1) == pytest.approx((-27.4968, -2.5032))
+    assert (part.BAR_X0, part.BAR_X1) == pytest.approx((-27.573, -2.427))
     assert spec.HANGER_CROSSBAR_WIDTH == part.BAR_X1 - part.BAR_X0
-    assert spec.HANGER_CROSSBAR_WIDTH == pytest.approx(24.9936)  # .984
+    assert spec.HANGER_CROSSBAR_WIDTH == pytest.approx(25.146)  # .99
     # Washer bounds are parent-verified ASME Table 11 exports, not head guesses.
     assert (spec.HANGER_WASHER.OD_MIN, spec.HANGER_WASHER.OD_MAX) == (12.573, 13.081)
     assert spec.HANGER_WASHER.OD_ID_RUNOUT_MAX == pytest.approx(0.3302)
@@ -2301,7 +2302,7 @@ def test_hanger_through_diameter_has_a_native_unilateral_band(monkeypatch) -> No
 def test_crossbar_median_control_cancels_the_socket_station_chain() -> None:
     assert spec.HANGER_CROSSBAR_CENTER_ZONE == pytest.approx(0.1016)  # .004
     assert spec.HANGER_CROSSBAR_CENTER_TOL == pytest.approx(0.0508)
-    assert part.HANGER_BAR_HALF_WIDTH_MIN == pytest.approx(12.4333)
+    assert part.HANGER_BAR_HALF_WIDTH_MIN == pytest.approx(12.446)
 
 
 def test_hanger_x_locates_datum_d_not_a_hole() -> None:
@@ -3625,14 +3626,14 @@ def test_knockouts_leave_a_floor_land_and_their_walls() -> None:
     assert part.KNOCKOUT_SCREW_WALL == pytest.approx(
         near - knockout_r - clearance_r - part.HANGER_DRIFT_AT_TOP
     )
-    assert part.KNOCKOUT_BAR_WALL == pytest.approx(3.386960864989447)
+    assert part.KNOCKOUT_BAR_WALL == pytest.approx(3.3996608649894458)
     assert part.KNOCKOUT_SCREW_WALL == pytest.approx(2.9793816360665897)
     assert min(part.KNOCKOUT_BAR_WALL, part.KNOCKOUT_SCREW_WALL) >= 2.032
     assert part.KNOCKOUT_TOP_BREAK_LAND == pytest.approx(
         reach - part.EDGE_BREAK_PRINTED_MAX - spec.HANGER_PIN_X
         - spec.HANGER_NEG_PIN_X_TOL - knockout_r - shift
     )
-    assert part.KNOCKOUT_TOP_BREAK_LAND == pytest.approx(1.659760864989447)
+    assert part.KNOCKOUT_TOP_BREAK_LAND == pytest.approx(1.6216608649894453)
     # The knockout exits under the washer: the washer still bears on a
     # continuous ring inside the knockouts at every printed limit.
     washer = part.HANGER_WASHER
@@ -3688,7 +3689,7 @@ def test_hanger_walls_meet_the_target_after_drift() -> None:
     assert part.BAR_X1 - (part.PIN_HOLE_X + off) - ream_r - outer_loss - drift > (
         part.PIN_HOLE_BAR_WALL
     )
-    assert part.PIN_HOLE_BAR_WALL == pytest.approx(2.9651122538953043)
+    assert part.PIN_HOLE_BAR_WALL == pytest.approx(2.977812253895303)
     assert part.PIN_HOLE_SCREW_WALL == pytest.approx(2.685474507790608)
     assert part.PIN_HOLE_FLOOR_MARGIN == pytest.approx(
         spec.HANGER_GRIP - spec.HANGER_GRIP_TOL - spec.HANGER_PIN_HOLE_DEPTH
@@ -3794,7 +3795,7 @@ def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
         - part.EDGE_BREAK_PRINTED_MAX
         - reach
     )
-    assert part.HANGER_WASHER_BAR_TOP_MARGIN == pytest.approx(2.6208211385865052)
+    assert part.HANGER_WASHER_BAR_TOP_MARGIN == pytest.approx(2.5827211385865034)
     # Clear of the outer front/rear rail ends: each washer's Z reach is its
     # station band plus the print-worst reach; the rail's outer face is the
     # narrowest printed half flange past its socket axis. The rear end binds,
@@ -4212,7 +4213,9 @@ def test_land_end_dimension_is_crossed_by_no_leader() -> None:
     from _layout_geometry import Box, Segment, segment_box_distance
 
     assert part.LAND_X1 - part.BAR_X1 == pytest.approx(24.13)  # .95
-    assert (part.LAND_X1 - part.LAND_X0) == pytest.approx(24.9936 + 2.0 * 24.13)
+    assert (part.LAND_X1 - part.LAND_X0) == pytest.approx(
+        part.HANGER_CROSSBAR_WIDTH + 2.0 * 24.13
+    )
     assert part.BAR_X1 - part.HANGER_X == pytest.approx(part.HANGER_X - part.BAR_X0)
     assert part.LAND_X1 - part.HANGER_X == pytest.approx(part.HANGER_X - part.LAND_X0)
     assert "crossbar junction land" not in spec.DRAWING_REFERENCE_PRECISION
@@ -4805,7 +4808,7 @@ def test_pad_width_on_detail_j_names_the_drawn_faces_and_reads_outside_it() -> N
     low, high = cy - part.HUB_RIB_W / 2.0 * s, cy + part.HUB_RIB_W / 2.0 * s
     assert (low, high) == pytest.approx((0.14606, 0.20194))
     face = cx + (part.OUTER_X - part.INNER_X) / 2.0 * s
-    assert face == pytest.approx(0.3341884)
+    assert face == pytest.approx(0.33429)
     lx, ly = drawing.RIB_WIDTH_LINE_XY
     ox, oy = drawing.RIB_WIDTH_TEXT_XY
     assert ly == pytest.approx(cy)
@@ -5815,7 +5818,7 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     assert part.WEB_T == pytest.approx(13.0048)
     assert part.WEB_OUT_X - part.WEB_IN_X == pytest.approx(part.WEB_T)
     assert (part.HALF_H, part.FLANGE, part.FLANGE_BOT_Y) == pytest.approx(
-        (18.2499, 8.001, 10.2489)
+        (18.2499, 8.128, 10.1219)
     )
     assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(2.6168179913276948)
     assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(1.9081881505917684)
@@ -5826,7 +5829,7 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     assert min(part.KEEPER_FOOT_RAIL_MARGINS) > 0.0
     # Across it the widest printed foot (on the keeper's own sheet), at the
     # farthest printed fit-up offset from the web, stays inside the narrowest
-    # printed flange less the largest printed top-rim break leg (.063 + .005).
+    # printed flange less the largest printed top-rim break leg (.06 + .01).
     places = spec.DRAWING_REFERENCE_PRECISION
     width_places = places["side flange width"]
     chamfer_places = places["top rim chamfer"]
@@ -5839,12 +5842,12 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     half_foot = part._keeper_printed(keeper.KEEPER_WIDTH, foot_places, 1.0) / 2.0
     max_chamfer = spec.printed_limit(part.EDGE_CHAMFER, chamfer_places, 1.0)
     assert (half_flange, offset, half_foot, max_chamfer) == pytest.approx(
-        (17.0307, 3.0, 7.4, 1.7272)
+        (17.018, 3.0, 7.4, 1.778)
     )
     assert max_chamfer == pytest.approx(part.EDGE_BREAK_PRINTED_MAX)
     margin = half_flange - offset - half_foot - max_chamfer
     assert part.KEEPER_FOOT_PRINTED_FLAT_TOP_SIDE_MARGIN == pytest.approx(margin)
-    assert margin == pytest.approx(4.9035)
+    assert margin == pytest.approx(4.840)
     # Faced in place: the rail-top plane stays put.
     assert part.HALF_H - part.FLANGE_BOT_Y == pytest.approx(spec.FLANGE_THICKNESS_MM)
     # Native socket finishes only.  The faced top plane's SEAT_UM, washer

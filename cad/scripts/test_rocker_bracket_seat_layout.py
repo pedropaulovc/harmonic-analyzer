@@ -69,10 +69,10 @@ def test_seat_stack_margins() -> None:
     assert seats.ENGAGEMENT_MIN == pytest.approx(7.801, abs=1e-3)
     assert seats.ENGAGEMENT_MIN >= 1.5 * seats.SCREW_MAJOR_DIA
     assert seats.SEAT_THREAD_DEPTH - seats.LINEAR_1PL - seats.SCREW_REACH_MAX == (
-        pytest.approx(0.323, abs=1e-3)
+        pytest.approx(0.501, abs=1e-3)
     )
-    assert seats.SEAT_THREAD_DEPTH == pytest.approx(0.453 * 25.4)
-    assert seats.SEAT_DRILL_DEPTH == pytest.approx(0.579 * 25.4)
+    assert seats.SEAT_THREAD_DEPTH == pytest.approx(0.46 * 25.4)
+    assert seats.SEAT_DRILL_DEPTH == pytest.approx(0.59 * 25.4)
     assert seats.SEAT_DRILL_NAME == "#29"
 
 
@@ -213,11 +213,10 @@ def test_hold_down_station_is_given_from_the_ears_inboard_face() -> None:
 
 
 def test_one_foot_fits_both_ends_of_the_support_and_places_its_hole() -> None:
-    """#1341 option A: one bracket on both sides. Its foot ends flush with
-    the nearer (south) support end face and 1.61 short of the north one; the
-    free run is too short (8-thick ears beside the 1/32 thrust washers) to
-    centre the hole, so it sits mid-way between the head-to-ear and seat
-    end-wall limits, a window both sides share."""
+    """#1341 option A: one bracket on both sides. Its foot keeps its #1371
+    17.79 and stops short of both support end faces of the 7.12 support (the
+    nearer, south one by 0.18); the hole keeps its 12.4 station inside the
+    window both sides share (head to ear, seat end wall)."""
     assert sides.OUTBOARD_SIGN == {"S": -1.0, "N": 1.0}
     support_end = {
         name: support_spec.SUPPORT_WORLD_Z
@@ -228,12 +227,9 @@ def test_one_foot_fits_both_ends_of_the_support_and_places_its_hole() -> None:
         name: sides.MOUNT_Z[name] + sides.OUTBOARD_SIGN[name] * sides.FOOT_Z1
         for name in sides.SIDES
     }
-    assert foot_end["S"] == pytest.approx(support_end["S"])
-    assert round(support_end["N"] - foot_end["N"], 2) == 1.61
+    assert round(abs(support_end["S"] - foot_end["S"]), 2) == 0.18
+    assert round(abs(support_end["N"] - foot_end["N"]), 2) == 1.79
     assert sides.HOLE_Z_MIN <= sides.HOLE_Z <= sides.HOLE_Z_MAX
-    # Mid-window, the printed station rounded to one place (#1371 review).
-    mid = (sides.HOLE_Z_MIN + sides.HOLE_Z_MAX) / 2.0
-    assert sides.HOLE_STATION == pytest.approx(round(mid - bracket.FOOT_Z0, 1))
     assert (round(sides.FOOT_LEN, 2), round(sides.HOLE_STATION, 2)) == (17.79, 12.4)
 
 
@@ -241,15 +237,14 @@ def test_support_length_keeps_the_foot_end_wall() -> None:
     """User ruling 2026-10-14 (#954 machinist review): the foot length rides
     the title block and the foot grew to keep its hole's end wall; the
     #1371 review sent the hole station to the title block the same way. The
-    support widened with it (now 7.106) so the foot stays flush with its
-    south end."""
+    support (now 7.12) must at least reach the foot's end."""
     assert 2.0 * support_spec.SUPPORT_HALF_MACHINE_Z == sides.SUPPORT_LENGTH
-    assert sides.SUPPORT_LENGTH == pytest.approx(7.106 * 25.4)
+    assert sides.SUPPORT_LENGTH == pytest.approx(7.12 * 25.4)
     assert support.BOSS_DEPTH == pytest.approx(sides.SUPPORT_LENGTH)
     assert sides.HOLE_LIGAMENTS_MIN["foot end"] >= bracket.LIGAMENT_TARGET
     assert bracket.STATION_BAND == bracket.FOOT_LEN_BAND == 0.508
-    shorter = sides.SUPPORT_LENGTH - 0.1
-    assert not sides._foot_fits(shorter)
+    assert sides._foot_fits(180.5)
+    assert not sides._foot_fits(180.4)
 
 
 def test_screw_heads_keep_air_to_the_ear_and_the_foot_end() -> None:

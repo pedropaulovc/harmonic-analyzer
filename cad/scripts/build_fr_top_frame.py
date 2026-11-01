@@ -9,8 +9,8 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
 * Rail band y 999.7058..1036.2058 (H 36.4998 = 1.437; the old 41-tall band
   top 1040.7 was the BOSS top -- the rail top face is 4.4958 lower). Assembly
   inserts the part at ring mid-plane TOP_FRAME_MID_Y = 1017.9558.
-* Side rails (along Z at x +/-197.0024) 34.1884 (1.346) wide -> outer faces
-  x +/-214.0966, window x +/-179.9082. Front/rear rails (along X at
+* Side rails (along Z at x +/-197.0024) 34.29 (1.35) wide -> outer faces
+  x +/-214.1474, window x +/-179.8574. Front/rear rails (along X at
   z -/+112.014) 38.1 (1.50) wide -> outer faces z -/+131.064, window z -/+92.964.
 * Corner bosses O44.958 (1.77) spanning y 993.3558..1040.7016 (proud .177
   above the rail top, hanging .25 below the underside). All four upper/lower
@@ -24,9 +24,9 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   rulings 2026-10-11 and 2026-10-14, one linked manufacturing note), the
   keeper rail flat within the keeper-owned 0.04 zone so both keeper feet
   land on one face wherever fit-up puts them. The nominal rail-top plane
-  stays fixed; the H-H top flange thickness (TYP, .XXX, minimum 7.874) is
+  stays fixed; the H-H top flange thickness (TYP, .XX, minimum 7.874) is
   the finished flange under it.
-* Integral crossbar 24.9936 (.984) wide, centred on the knife line x -15.0,
+* Integral crossbar 25.146 (.99) wide, centred on the knife line x -15.0,
   spanning the window along Z, flush with BOTH faces at its junctions (the
   faced underside 999.7058 is the knife-mount seat plane), with 18.034 (.71)
   plan gussets at all four rail
@@ -38,7 +38,7 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   coaxiality the title block's implied +/-.005, charged in the floor land
   (.0124, accepted as RV-06 by owner ruling 2026-10-27). Over its middle
   (|z| <= 68.834, short of the knife-mount seats) the bar is a T like the
-  rails: the .984-wide, .315-tall top flange over a .512 web centred on the
+  rails: the .99-wide, .32-tall top flange over a .512 web centred on the
   knife line through the
   underside, with R.12 roots.
 * Every face on the underside plane 999.7058 between the bosses -- rail web
@@ -66,15 +66,15 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   2026-10-12), spot-faced .83 from the bore axis, and a 1/4-20 tap from
   the spot face to the bore for the square-head set screw (book p.45: "a
   square-head screw pinches the post in its socket").
-* Webbed faces (T-rail section): a .315-tall full-thickness top flange, then
+* Webbed faces (T-rail section): a .32-tall full-thickness top flange, then
   the web thins to .512 centred on each rail and STAYS thin through the
   bottom edge. The former photo-read 12.7 web is thickened for the keeper
   receivers' printed-band plus drill-wander stack; full-thickness lands remain
   at the bosses, hub rib and crossbar junctions.
 * Finishing (chamfer external, fillet internal): R.12 cast fillets along
   the internal web/flange T-roots (both shelves of every rail and the
-  crossbar web, ch19 img04's panel blends), 1/16 in x 45 breaks (the
-  base's, printed .063; user ruling 2026-10-14) on the top-face rims --
+  crossbar web, ch19 img04's panel blends), .06 x 45 breaks (the base's
+  1/16 in, printed .06 at .XX) on the top-face rims --
   outer rail rim and both window rims -- then on every other external
   convex edge (flange undersides, web bottoms, lands, crossbar, hub rib,
   boss rims), and .040 x 45 lead-ins on the bore TOP ends
@@ -299,7 +299,7 @@ MATERIAL = "Gray Cast Iron"  # green-painted casting like the base
 # provenance-checked against.
 FRAME_CENTER_Z = FRAME_COLUMN_Z_CENTER  # 0.0
 
-RAIL_W_SIDE = 34.1884  # 1.346 side rails, along Z (GT corner rescale 221.5 -> 214.1)
+RAIL_W_SIDE = 34.29  # 1.35 side rails, along Z (GT corner rescale 221.5 -> 214.1)
 RAIL_W_FR = 38.1  # 1.50 front/rear rails, along X (GT z-corner rescale 137.4 -> 131)
 
 BOSS_BELOW = 6.35  # .25 boss hang below the underside (p006 read 5.7-7)
@@ -442,7 +442,7 @@ LAND_MARGIN = 6.096  # .24 land pad past each gusset leg
 LAND_X0 = BAR_X0 - GUSSET - LAND_MARGIN  # -51.6268; crossbar junction land pads
 LAND_X1 = BAR_X1 + GUSSET + LAND_MARGIN  # +21.6268; front/rear inner faces
 # Crossbar T-section: over the middle of the bar (|z| <= BAR_POCKET_Z) the
-# crossbar keeps its 25-wide, FLANGE-tall top flange and below it thins to a
+# crossbar keeps its .99-wide, FLANGE-tall top flange and below it thins to a
 # WEB_T web centred on the knife line, through the underside. Two flanking
 # pockets cut it out of the full-height bar; they stop .24 short of the
 # gusset legs (z +/-74.93) so the full-depth ends, which carry every hanger
@@ -627,12 +627,12 @@ THROUGH_CUT_DEPTH = 110.0  # mid-plane total; > boss stack (47.3)
 # the spec's) on EVERY external convex edge, top and bottom, except where an
 # edge cannot take it (_external_edge_breaks).
 ROOT_FILLET_R = 3.048  # .12 internal web/flange T-root blends (cast root, ch19 img04)
-# The sheet prints the leg at the top rim break's places (.063, the base's
-# rim break) under that row's band: every guard charges the printed worst leg
-# (1.7272), never the model's; picks and volumes use the model's.
+# The sheet prints the leg at the top rim break's places (.06 at .XX, the
+# non-functional break's grid) under that row's band: every guard charges the
+# printed worst leg (1.778), never the model's; picks and volumes use the model's.
 _EDGE_BREAK_PLACES = DRAWING_REFERENCE_PRECISION["top rim chamfer"]
-EDGE_BREAK_PRINTED = _printed_nominal(EDGE_CHAMFER, _EDGE_BREAK_PLACES)  # 1.6002
-EDGE_BREAK_PRINTED_MAX = _printed_limit(EDGE_CHAMFER, _EDGE_BREAK_PLACES, 1.0)  # 1.7272
+EDGE_BREAK_PRINTED = _printed_nominal(EDGE_CHAMFER, _EDGE_BREAK_PLACES)  # 1.524
+EDGE_BREAK_PRINTED_MAX = _printed_limit(EDGE_CHAMFER, _EDGE_BREAK_PLACES, 1.0)  # 1.778
 # Least land two separate edge-break features may leave between their faces.
 EDGE_BREAK_SLIVER_MIN = 0.1
 # Print-worst reach of a finished edge-break band into the underside: the
@@ -688,8 +688,8 @@ for _label, _land in SET_SPOT_LAND_MIN.items():
 # narrow, for the printed worst break (_external_edge_breaks).
 # A T flange's underside break needs that leg and the sliver land on the
 # flat between the flange's outer face and its R.12 web root: the least
-# printed overhang less the largest printed root. The rails keep 7.163 and
-# 9.055, the .984-wide crossbar 2.565, so every flange underside is broken.
+# printed overhang less the largest printed root. The rails keep 7.150 and
+# 9.055, the .99-wide crossbar 2.578, so every flange underside is broken.
 _ROOT_R_PRINTED_MAX = _printed_limit(
     ROOT_FILLET_R, DRAWING_REFERENCE_PRECISION["T rail root radius"], 1.0
 )  # 3.302
@@ -697,7 +697,7 @@ T_FLANGE_SHELF_PRINTED_MIN = {
     "side rail": _t_flange_overhang_printed_min(
         RAIL_W_SIDE, "side flange width", "side rail web thickness"
     )
-    - _ROOT_R_PRINTED_MAX,  # 7.163
+    - _ROOT_R_PRINTED_MAX,  # 7.150
     "front/rear rail": _t_flange_overhang_printed_min(
         RAIL_W_FR, "front rear flange width", "rail web thickness"
     )
@@ -705,7 +705,7 @@ T_FLANGE_SHELF_PRINTED_MIN = {
     "crossbar": _t_flange_overhang_printed_min(
         BAR_X1 - BAR_X0, "crossbar flange width", "crossbar web thickness"
     )
-    - _ROOT_R_PRINTED_MAX,  # 2.565
+    - _ROOT_R_PRINTED_MAX,  # 2.578
 }
 # The hub rib's outer bottom either side of the set-screw boss runs 4.953
 # nominal; the narrowest rib (centred on the bore) less the widest boss
@@ -720,7 +720,7 @@ HUB_RIB_STUB_PRINTED_MIN = (
         HUB_SET_BOSS_W, DRAWING_PRECISION["SetBossProfile"]["SetBossWidth"], 1.0
     )
 ) / 2.0  # 4.699
-HUB_RIB_STUB_LAND_MIN = HUB_RIB_STUB_PRINTED_MIN - EDGE_BREAK_PRINTED_MAX  # 2.972
+HUB_RIB_STUB_LAND_MIN = HUB_RIB_STUB_PRINTED_MIN - EDGE_BREAK_PRINTED_MAX  # 2.921
 if HUB_RIB_STUB_LAND_MIN < EDGE_BREAK_SLIVER_MIN:
     raise AssertionError(
         "hub rib corner break runs into the set-screw boss's side: land "
@@ -1011,7 +1011,7 @@ for _label, _value in BAR_POCKET_HOLE_WALLS.items():
 # round hole's slip (codjiflo round 2).
 # _external_edge_breaks keeps every finished edge-break band 0.5 off both hulls.
 # The front hull overhangs the crossbar's sharp sides short of the gusset
-# legs (the 25.4-wide block on the 25-wide bar); that overhang is not a break.
+# legs (the 25.4-wide block on the 25.146-wide bar); that overhang is not a break.
 def _convex_hull(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
     """Counter-clockwise convex hull (monotone chain) of plan points."""
     ordered = sorted(set(points))

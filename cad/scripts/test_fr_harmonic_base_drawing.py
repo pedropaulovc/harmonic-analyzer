@@ -2150,67 +2150,78 @@ class _NativeHoleTable:
 
 @pytest.mark.parametrize("pivot_tag", ("D1", "Q7", "B12"))
 @pytest.mark.parametrize("merged", (False, True))
-def test_pivot_table_row_carries_note_flag_in_custom_column_only(pivot_tag, merged) -> None:
+def test_hole_table_notes_ride_in_custom_column_only(pivot_tag, merged) -> None:
     import draw_fr_harmonic_base as sheet
 
     table = _NativeHoleTable(pivot_tag=pivot_tag, merged=merged)
     native = [list(row) for row in table.cells]
     native_width = sum(table.widths)
-    generated, width = sheet._flag_pivot_seat_table_row(table)
+    generated, width = sheet._annotate_hole_table_rows(table)
 
     assert len(generated) == len(sheet.TABLE_HOLES) + 1 == 12
     assert generated == tuple(tuple(row) for row in native)
     assert width == pytest.approx(native_width)
     assert set(sheet.PIVOT_SEAT_CALLOUTS.values()) == {sheet.PIVOT_SEAT_FLAG}
     assert [row[:4] for row in table.cells] == native
+    # The pivot cites note 1; the hold-downs, lock and stop name their mate;
+    # the four sockets carry their own fit note and stay blank here.
+    row_of = {table.station_tags[station]: station for station in table.station_tags}
+    expected_notes = {
+        sheet.PIVOT_SCREW_XZ: "SEE NOTE 1",
+        sheet.LOCK_KNOB_XZ: "MHA-DT-20",
+        sheet.STOP_SCREW_XZ: "MHA-DT-20",
+        **dict.fromkeys(sheet.HOLE_XZ, "MHA-FR-05"),
+    }
     assert [row[4] for row in table.cells] == [
-        sheet.PIVOT_SEAT_TABLE_COLUMN if index == 0 else
-        sheet.PIVOT_SEAT_FLAG if index == table.pivot_row else ""
-        for index in range(table.RowCount)
+        sheet.HOLE_TABLE_NOTE_COLUMN
+        if index == 0
+        else expected_notes.get(row_of[row[0]], "")
+        for index, row in enumerate(table.cells)
     ]
+    assert sum(1 for row in table.cells[1:] if row[4] == "") == 4
     assert table.widths[0] == sheet.HOLE_TABLE_TAG_WIDTH
     assert table.widths[1] == table.widths[2] >= sheet.HOLE_TABLE_MIN_LOCATION_WIDTH
     assert table.widths[3] == 0.0628
-    assert table.widths[4] == sheet.PIVOT_SEAT_TABLE_COLUMN_WIDTH
+    assert table.widths[4] == sheet.HOLE_TABLE_NOTE_COLUMN_WIDTH
     assert sum(table.widths) == pytest.approx(native_width, abs=1e-9)
-    sheet._check_pivot_seat_table_row(table, generated, width)
+    sheet._check_hole_table_notes(table, generated, width)
 
 
 @pytest.mark.parametrize(
     ("refuse", "message"),
     (
-        ("insert", "refused the pivot NOTE column"),
+        ("insert", "refused the NOTE column"),
         ("title", "NOTE column title did not set"),
-        ("editable", "pivot NOTE cell is not editable"),
+        ("editable", "NOTE cell at row \\d+ is not editable"),
         ("text", "NOTE column did not persist"),
         ("width", "width did not persist"),
     ),
 )
-def test_pivot_table_flag_refuses_unconfirmed_native_state(refuse, message) -> None:
+def test_hole_table_notes_refuse_unconfirmed_native_state(refuse, message) -> None:
     import draw_fr_harmonic_base as sheet
 
     with pytest.raises(RuntimeError, match=message):
-        sheet._flag_pivot_seat_table_row(_NativeHoleTable(refuse=refuse))
+        sheet._annotate_hole_table_rows(_NativeHoleTable(refuse=refuse))
 
 
 @pytest.mark.parametrize("pivot_rows", (0, 2))
-def test_pivot_table_flag_requires_unique_physical_pivot_before_insertion(pivot_rows) -> None:
+def test_hole_table_notes_require_unique_physical_pivot_before_insertion(pivot_rows) -> None:
     import draw_fr_harmonic_base as sheet
 
     table = _NativeHoleTable()
     pivot = list(table.cells[table.pivot_row])
     table.cells[table.pivot_row:table.pivot_row + 1] = [pivot] * pivot_rows
     with pytest.raises(RuntimeError, match="station/row bijection"):
-        sheet._flag_pivot_seat_table_row(table)
+        sheet._annotate_hole_table_rows(table)
     assert table.ColumnCount == 4
 
 
-def test_pivot_table_flag_refuses_insufficient_column_slack() -> None:
+def test_hole_table_notes_refuse_insufficient_column_slack() -> None:
     import draw_fr_harmonic_base as sheet
 
     table = _NativeHoleTable(widths=(0.012, 0.022, 0.022, 0.0628))
     with pytest.raises(RuntimeError, match="slack cannot hold"):
-        sheet._flag_pivot_seat_table_row(table)
+        sheet._annotate_hole_table_rows(table)
     assert table.ColumnCount == 4
 
 
@@ -2227,14 +2238,14 @@ def test_pivot_table_flag_refuses_insufficient_column_slack() -> None:
         (lambda table: [row.pop() for row in table.cells], "lost or duplicated"),
     ),
 )
-def test_pivot_table_flag_rebuild_readback_refuses_drift(mutate, message) -> None:
+def test_hole_table_notes_rebuild_readback_refuses_drift(mutate, message) -> None:
     import draw_fr_harmonic_base as sheet
 
     table = _NativeHoleTable()
-    generated, width = sheet._flag_pivot_seat_table_row(table)
+    generated, width = sheet._annotate_hole_table_rows(table)
     mutate(table)
     with pytest.raises(RuntimeError, match=message):
-        sheet._check_pivot_seat_table_row(table, generated, width)
+        sheet._check_hole_table_notes(table, generated, width)
 
 
 @pytest.mark.parametrize("merged", (False, True))
@@ -2383,7 +2394,7 @@ def test_native_tag_layout_follows_physical_stations_with_shuffled_families(
     import draw_fr_harmonic_base as sheet
 
     table = _NativeHoleTable(merged=merged, pivot_tag=pivot_tag)
-    generated, width = sheet._flag_pivot_seat_table_row(table)
+    generated, width = sheet._annotate_hole_table_rows(table)
     view, by_station, _annotations = _native_tag_view(monkeypatch, table)
     before = [list(row) for row in table.cells]
     sheet._spread_hole_tags(view, table)
@@ -2397,7 +2408,7 @@ def test_native_tag_layout_follows_physical_stations_with_shuffled_families(
         position = sheet.HOLE_TAG_STATION_POSITIONS.get(station)
         assert annotation.position == ((*position, 0.0) if position else None)
         assert annotation.leader_reads == int(station in sheet._CRITICAL_HOLE_TAG_STATIONS)
-    sheet._check_pivot_seat_table_row(table, generated, width)
+    sheet._check_hole_table_notes(table, generated, width)
 
 
 def test_native_tag_layout_and_pivot_flag_follow_all_eleven_renamed_tags(monkeypatch) -> None:
@@ -2408,7 +2419,7 @@ def test_native_tag_layout_and_pivot_flag_follow_all_eleven_renamed_tags(monkeyp
     for row in table.cells[1:]:
         row[0] = renamed[row[0]]
     table.station_tags = {station: renamed[tag] for station, tag in table.station_tags.items()}
-    generated, width = sheet._flag_pivot_seat_table_row(table)
+    generated, width = sheet._annotate_hole_table_rows(table)
     view, by_station, _annotations = _native_tag_view(monkeypatch, table)
     sheet._spread_hole_tags(view, table)
     for station, position in sheet.HOLE_TAG_STATION_POSITIONS.items():
@@ -2416,7 +2427,7 @@ def test_native_tag_layout_and_pivot_flag_follow_all_eleven_renamed_tags(monkeyp
     pivot = sheet._hole_table_station_rows(table)[sheet.PIVOT_SCREW_XZ]
     assert table.cells[pivot.index][4] == sheet.PIVOT_SEAT_FLAG
     assert pivot.tag in sheet.pivot_seat_step(pivot.tag)
-    sheet._check_pivot_seat_table_row(table, generated, width)
+    sheet._check_hole_table_notes(table, generated, width)
 
 
 @pytest.mark.parametrize("fault", ("missing", "duplicate", "extra", "wrong-type"))
@@ -2750,29 +2761,150 @@ def test_deck_land_worst_case_is_proven_instead_of_noted() -> None:
     # hb-render-4 eye pass: the MIN land note put a dimension in a note.
     assert not hasattr(fr_harmonic_base_spec, "DRAWING_NOTES")
     # The bore now opens on the green land and reaches the pad's outer edge,
-    # whose 1/16 in break (and its general band) is the land's last bite.
-    # The nominal follows the column line: 12.4968 on both axes once the column
-    # snap lands, 12.4992 / 12.5108 (inside the .0005 equal-land grid) before.
+    # whose .06 break (and its general band) is the land's last bite.
+    # The nominal follows the column line and the .01-grid pad: 12.4968 / 12.5222
+    # once the column snap lands, 12.4992 / 12.5362 before (equal to .005).
     lands = {"x": part.COLUMN_SOCKET_LAND_X, "z": part.COLUMN_SOCKET_LAND_Z}
+    assert abs(lands["x"] - lands["z"]) <= 0.0015 * 25.4
     for axis, stack in part.COLUMN_SOCKET_LAND_STACKS.items():
         assert stack["nominal"] == pytest.approx(lands[axis])
-        assert stack["nominal"] == pytest.approx(12.4968, abs=0.015)
+        assert stack["nominal"] == pytest.approx(12.5165, abs=0.021)
         assert {name: v for name, v in stack.items() if name != "nominal"} == pytest.approx({
             "flange length": -0.127,
             "pad length": -0.127,
             "bore location": -0.254,
             "matched bore": -0.2492,
             "bore edge break": -0.254,
-            "pad edge chamfer": -1.8542,
+            "pad edge chamfer": -1.778,
         })
-        assert sum(stack.values()) == pytest.approx(stack["nominal"] - 2.8654)
+        assert sum(stack.values()) == pytest.approx(stack["nominal"] - 2.7892)
     # The same stack on the rejected 1.6 mm pad land would fail the .040 MIN.
     assert sum(part.column_socket_land_stack(1.6).values()) < part.COLUMN_SOCKET_LAND_MIN
     # Main's rider: the bore ceiling is a functional judgement, so the
     # stack reports how much bore the land could still absorb.
-    assert part.COLUMN_SOCKET_BREAK_EVEN_BORE == pytest.approx(43.2308, abs=0.006)
+    assert part.COLUMN_SOCKET_BREAK_EVEN_BORE == pytest.approx(43.3832, abs=0.006)
     rejected = part.column_socket_land_stack(1.6)
     assert part.column_socket_break_even_bore(rejected) < part.COLUMN_SOCKET_MATCH_BORE_MAX
+
+
+def test_review_b2_dimensions_print_xx_and_sit_on_the_01_grid() -> None:
+    # Review b2 gated the .XXX widths, pocket width, lug/rib stations and
+    # chamfers as over-specification. Each now prints .XX, so its model
+    # value must BE the printed .01 value.
+    spec = fr_harmonic_base_spec
+    places = spec.DRAWING_PRECISION
+    for feature, name in (
+        ("BottomProfile", "BottomWid"),
+        ("TopProfile", "TopWid"),
+        ("DeckProfile", "DeckWid"),
+        ("PocketProfile", "PocketWid"),
+        ("DeckEdgeBreak", "DeckEdgeChamfer"),
+        ("TopRimBreaks", "TopRimChamfer"),
+        ("BottomEdgeBreak", "BottomEdgeChamfer"),
+        ("LongRibProfile", "LongRibY"),
+        *(("CrossTapLugProfile", n) for n in ("Lug1X", "Lug3X", "Lug1Y", "Lug0Y")),
+    ):
+        assert places[feature][name] == 2, name
+    printed = {
+        "BottomWid": (spec.BOTTOM_WIDTH, 11.31),
+        "TopWid": (spec.TOP_WIDTH, 10.81),
+        "DeckWid": (spec.DECK_WIDTH, 10.25),
+        "PocketWid": (2.0 * spec.POCKET_HALF_Z, 9.87),
+        "DeckEdgeChamfer": (spec.DECK_EDGE_BREAK, 0.03),
+        "RimChamfer": (part.RIM_CHAMFER, 0.06),
+        "Lug1X": (part.BOTTOM_LENGTH / 2.0 - spec.CROSS_TAP_LUG_INNER_X, 1.56),
+        "Lug3X": (part.BOTTOM_LENGTH / 2.0 + spec.CROSS_TAP_LUG_INNER_X, 16.44),
+        "Lug1Y": (spec.BOTTOM_WIDTH / 2.0 - spec.CROSS_TAP_LUG_INNER_Z, 2.70),
+        "Lug0Y": (spec.BOTTOM_WIDTH / 2.0 + spec.CROSS_TAP_LUG_INNER_Z, 8.61),
+        "LongRibY": (spec.BOTTOM_WIDTH / 2.0 - part.LONG_RIB_SHAPE[4], 5.46),
+    }
+    for name, (model_mm, inches) in printed.items():
+        assert model_mm == pytest.approx(inches * 25.4, abs=1e-9), name
+    # The pad's equal-land width is 10.808 exactly; the .01 pad leaves the
+    # lands within .0015 of each other, under half a .01 step.
+    assert abs(part.COLUMN_SOCKET_LAND_X - part.COLUMN_SOCKET_LAND_Z) <= 0.005 * 25.4
+
+
+def test_base_tolerances_print_in_sheet_inch_at_the_nominal_places() -> None:
+    # Review b2: ".483 +-.0020" -- the mm default gave the .002 band four places.
+    from pathlib import Path
+
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    block = source[source.index('        "BaseSpotFaceRear",\n        "SpotFaceDepth",'):]
+    block = block[: block.index("# Every pocket corner fillet")]
+    assert block.count("display_unit=UNIT") == 2
+    assert 'places=DRAWING_PRECISION["BaseSpotFaceRear"]["SpotFaceDepth"]' in block
+    assert 'places=DRAWING_PRECISION["PivotSeatReference"][dimension_name]' in block
+    assert set(fr_harmonic_base_spec.DRAWING_PRECISION["PivotSeatReference"].values()) == {3}
+
+
+def _caption_section(*linked: str):
+    from types import SimpleNamespace
+
+    notes = [SimpleNamespace(PropertyLinkedText=text) for text in linked]
+    return SimpleNamespace(GetNotes=lambda: notes)
+
+
+def test_section_captions_must_carry_the_rotation_scale_compartment(monkeypatch) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    monkeypatch.setattr(sheet, "_early_bound", lambda value, _name: value)
+    good = _caption_section("<VLNAME><VLLABEL>\r\n<VLSCALE><VLSCALEV>", "other")
+    sheet._require_section_caption_scale(None, good, label="A-A")
+    bad = (("<VLNAME><VLLABEL>",), ("<VLLABEL><VLSCALEV>",) * 2, ())
+    for linked in bad:
+        with pytest.raises(RuntimeError, match="lacks the scale compartment"):
+            section = _caption_section(*linked)
+            sheet._require_section_caption_scale(None, section, label="A-A")
+
+
+def test_section_a_is_cut_off_sheet_scale_and_both_captions_are_checked() -> None:
+    from pathlib import Path
+
+    import draw_fr_harmonic_base as sheet
+
+    assert sheet.SECTION_CAPTION_SHEET_SCALE != sheet.SHEET_SCALE
+    source = Path(sheet.__file__).read_text(encoding="utf-8")
+    off_scale = "_set_active_sheet_scale(adapter, SECTION_CAPTION_SHEET_SCALE)"
+    pinned = "_set_active_sheet_scale(adapter, SHEET_SCALE)"
+    a_cut = source.index('section_label="A",')
+    assert source.rindex(off_scale, 0, a_cut) > source.rindex("hole_side = ", 0, a_cut)
+    after_a = source[a_cut:]
+    a_check = '_require_section_caption_scale(adapter, section, label="section A-A")'
+    assert after_a.index(pinned) < after_a.index(a_check)
+    b_cut = source.index('section_label="B",')
+    bottom_mapped = "_require_bottom_view_mapping(adapter, bottom)"
+    assert source.rindex(pinned, 0, b_cut) > source.rindex(bottom_mapped, 0, b_cut)
+    b_check = '(adapter, underside_section, label="section B-B")'
+    assert "_require_section_caption_scale" + b_check in source
+
+
+def _scaled_sheet(properties):
+    from types import SimpleNamespace
+
+    calls = []
+    sheet = SimpleNamespace(
+        SetScale=lambda *args: calls.append(args) or True,
+        GetProperties2=lambda: properties(calls),
+        GetName=lambda: "HOLES-SOCKETS",
+    )
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(GetCurrentSheet=lambda: sheet),
+        _get_attr_or_call=lambda obj, name: getattr(obj, name)(),
+    )
+    return adapter, calls
+
+
+def test_sheet_scale_setter_requires_native_readback(monkeypatch) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    monkeypatch.setattr(sheet, "_early_bound", lambda value, _name: value)
+    adapter, calls = _scaled_sheet(lambda calls: (0, 0, *calls[-1][:2], False))
+    sheet._set_active_sheet_scale(adapter, (1, 1))
+    assert calls == [(1.0, 1.0, False, False)]
+    stale, _ = _scaled_sheet(lambda _calls: (0, 0, 1.0, 4.0, False))
+    with pytest.raises(RuntimeError, match="scale did not persist"):
+        sheet._set_active_sheet_scale(stale, (1, 1))
 
 
 def test_retained_pocket_walls_socket_bosses_and_cross_tap_lugs_keep_their_contracts() -> None:
@@ -4601,7 +4733,7 @@ def test_shifted_cross_rib_volume_and_all_eighteen_skin_only_cut_footprints() ->
         2.0 * spec.POCKET_HALF_Z * spec.RIB_THICKNESS - spec.RIB_THICKNESS**2
     ) * (spec.POCKET_CEILING_Y - spec.RIB_RELIEF)
     assert cross_volume == pytest.approx(expected_cross)
-    assert cross_volume == pytest.approx(82985.6554)
+    assert cross_volume == pytest.approx(83003.1666)
 
 
 @pytest.mark.parametrize(
@@ -4648,11 +4780,11 @@ def test_native_rib_controls_require_full_height_crossing_end_joins_and_open_old
 ) -> None:
     spec = fr_harmonic_base_spec
     expected = (
-        (11.049, -62.6618, 47.752), (11.049, 62.6618, 47.752),
+        (11.049, -62.6745, 47.752), (11.049, 62.6745, 47.752),
         (-105.156, 0.0, 47.752), (105.156, 0.0, 47.752),
         (11.049, 0.0, 47.752),
-        (11.049, -128.3081, 50.8), (11.049, 128.3081, 50.8),
-        (1.143, -62.6618, 12.954), (1.143, 62.6618, 12.954),
+        (11.049, -128.3335, 50.8), (11.049, 128.3335, 50.8),
+        (1.143, -62.6745, 12.954), (1.143, 62.6745, 12.954),
     )
     dimensions = {}
     monkeypatch.setattr(
@@ -4679,7 +4811,7 @@ def test_native_rib_controls_require_full_height_crossing_end_joins_and_open_old
     assert dimensions == pytest.approx({
         "CrossRibX@CrossRibProfile": 234.696,
         "CrossRibThickness@CrossRibProfile": 9.906,
-        "CrossRibLength@CrossRibProfile": 262.5852,
+        "CrossRibLength@CrossRibProfile": 262.636,
         "CrossRibHeight@CrossRib": 34.798,
         "CrossRibRelief@CrossRib": 3.048,
     })

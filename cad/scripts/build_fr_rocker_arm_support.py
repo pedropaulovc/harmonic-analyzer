@@ -34,8 +34,8 @@ Geometry (mm), source casting with the corrected top-down hold-down interface
 Z = wall thickness):
 
 * **Wall** -- trapezoid, wide foot ``Z ±31.75`` at ``Y=-88.9`` tapering to
-  ``Z ±8.382`` (.330) at ``Y=+88.9``; mid-plane extrude 180.4924 (7.106,
-  ``X ±90.2462``): the source's 177.8, widened .053 an end for the pivot
+  ``Z ±8.382`` (.330) at ``Y=+88.9``; mid-plane extrude 180.848 (7.12,
+  ``X ±90.424``): the source's 177.8, widened .06 an end for the pivot
   brackets' feet (``fr_rocker_arm_support_spec.SUPPORT_HALF_MACHINE_Z``).
 * **CavityCut** -- 127 mm cavity square (``±63.5``), Through-All-Both -> the
   central cavity, leaving 6.35 mm shell walls (whole ``CavityProfile``).
@@ -165,7 +165,7 @@ MATERIAL = "Gray Cast Iron"
 # fr_rocker_arm_support_section_spec's (pure data, so the base, frame, drive
 # train and drawing spec read them without importing this COM script). On the
 # Right plane: sketch-x -> model Z (taper), sketch-y -> model Y (height).
-BOSS_DEPTH = 2.0 * SUPPORT_HALF_MACHINE_Z  # mid-plane extrude along X (180.4924, 7.106)
+BOSS_DEPTH = 2.0 * SUPPORT_HALF_MACHINE_Z  # mid-plane extrude along X (180.848, 7.12)
 # The source casting's length. The window and the cavity cut through the
 # wall's thickness inside the side posts, so the longer wall only thickens
 # both posts: every stage's measured volume gains the trapezoid's area times
@@ -342,14 +342,14 @@ RIM_CHAMFER_PLACES = 2
 # MHA-CH-08 seat stations (rocker_bracket_seat_layout), which flow through
 # from the channel and may sit off the .001 grid.
 SEAT_STATION_PLACES = 3
-# The cavity's and the pocket's end locations come off the 7.106 length's
-# half (3.553) and sit on the .001 grid (1.053, .303), so they print .XXX; the
-# top and bottom locations, the web's location across the base and each
-# top-flat edge off its nearer web face are .XX (1.00, .25, 1.00, .08). The
-# bracket feet stand on the flat and the transferred seats follow them, so
-# the flat holds the seats' threads clear of the web's faces (owner Q13d,
-# rocker_bracket_seat_layout's web-wall stack).
-END_LOCATION_PLACES = 3
+# The cavity's and the pocket's end locations come off the 7.12 length's
+# half (3.56) less the centred 5.00 and 6.50 squares' halves (1.06, .31),
+# all .XX; the top and bottom locations, the web's location across the base
+# and each top-flat edge off its nearer web face are .XX too (1.00, .25,
+# 1.00, .08). The bracket feet stand on the flat and the transferred seats
+# follow them, so the flat holds the seats' threads clear of the web's faces
+# (owner Q13d, rocker_bracket_seat_layout's web-wall stack).
+END_LOCATION_PLACES = 2
 HEIGHT_LOCATION_PLACES = 2
 SECTION_LOCATION_PLACES = WEB_PLACES
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
@@ -459,9 +459,9 @@ SEAT_STATION_DRIVES = {
 # face from its edge (the profile's sharp, under the rim chamfer).
 REFERENCE_CHORD = 1.0
 REFERENCE_EDGE_STATION = 5.0
-CAVITY_END_STATION = BOSS_DEPTH / 2.0 - CAV  # 26.7462, 1.053
+CAVITY_END_STATION = BOSS_DEPTH / 2.0 - CAV  # 26.924, 1.06
 CAVITY_TOP_STATION = HALF_Y - CAV  # 25.4, 1.00
-POCKET_END_STATION = BOSS_DEPTH / 2.0 - BIG  # 7.6962, .303
+POCKET_END_STATION = BOSS_DEPTH / 2.0 - BIG  # 7.874, .31
 POCKET_BOTTOM_STATION = HALF_Y - BIG  # 6.35, .25
 WEB_FACE_STATION = WIDE - WEB  # 25.4, 1.00
 LOCATION_DRIVES = {

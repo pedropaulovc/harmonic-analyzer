@@ -253,8 +253,8 @@ MATERIAL = "Gray Cast Iron"  # see _appearance.apply_material docstring
 # = 18.1 x 11.0 in (annotated); the length keeps the legacy 18.0 in and the
 # thicknesses come from the legacy HarmonicBase.cs (photo-verify M2 note). The
 # DEPTH deliberately no longer follows the 28 cm callout: fr_harmonic_base_spec
-# widens the pad to 10.808 (slab 11.308, same 0.25 in reveal per side) so the
-# socket-to-pad-edge land is equal on both axes -- asserted below.
+# widens the pad to 10.81 (slab 11.31, same 0.25 in reveal per side) so the
+# socket-to-pad-edge land is equal on both axes to half a .01 step -- asserted below.
 IN = 25.4
 # The minimum land between neighbouring cavities, bores and edges (.040).
 LAND_FLOOR_MM = 1.016
@@ -277,7 +277,7 @@ HOLE_XZ = SUPPORT_HOLD_DOWN_XZ
 
 # Edge finishing (chamfer external, fillet internal).
 # The machined plate gets 45-degree edge breaks on every external edge: the
-# exposed top rims and the underside rim at .063 legs (single-pass mill/file
+# exposed top rims and the underside rim at .06 legs (single-pass mill/file
 # breaks). The one internal
 # wall junction -- the pad side walls meeting the flange top face -- carries a
 # 0.5 root fillet, which is NOT a print requirement: a 0.5 mm internal root
@@ -286,7 +286,7 @@ HOLE_XZ = SUPPORT_HOLD_DOWN_XZ
 # and the deck cutter's own corner defines it (2026-09 review). Every
 # mechanism hole sits >= 26 from every plate edge; the closest seats to a deck
 # edge are the nameplate taps (NAMEPLATE_SCREW_XZ), about .3 inside the
-# deck's west edge -- clear of its .031 break, so no break touches a seat.
+# deck's west edge -- clear of its .03 break, so no break touches a seat.
 # Plan corners are ROUNDED, not chamfered (2026-09 photo re-derive): every
 # ch30 plate (p002/p003 front corners, p006 rear) shows the casting's vertical
 # corners as one large radius running the full height, flange and pad
@@ -294,7 +294,7 @@ HOLE_XZ = SUPPORT_HOLD_DOWN_XZ
 # two arcs stay concentric across the .25 reveal.
 FLANGE_CORNER_R = 22.352  # .88
 PAD_CORNER_R = FLANGE_CORNER_R - (BOTTOM_LENGTH - TOP_LENGTH) / 2.0  # .63
-RIM_CHAMFER = 1.6002  # .063 legs, top rims + underside rim
+RIM_CHAMFER = 1.524  # .06 legs, top rims + underside rim
 PAD_ROOT_R = 0.5  # pad-to-flange root fillet; modelled, never called out
 
 # Black deck + green land (user ruling 2026-10-09; ch11 p.21, ch13 p.25 and
@@ -458,10 +458,10 @@ if COLUMN_SOCKET_NEAREST_OCCUPANT_WALL < LAND_FLOOR_MM:
     )
 # Nominal model-space land from each bore to the pad edge, on the green top
 # the sockets open on (user ruling 2026-10-09). Its worst case is proven
-# below. TOP_WIDTH is sized so this land is EQUAL on both axes to the .001
-# grid (half a step, .0005): the 2026-09 blind machinist review rejected the
-# former 10.5 in pad, whose land in Z could not survive the coordinate stack
-# while every table dimension stayed in tolerance.
+# below. TOP_WIDTH is sized so this land is EQUAL on both axes to half a .01
+# step (.005): the 2026-09 blind machinist review rejected the former 10.5 in
+# pad, whose land in Z could not survive the coordinate stack while every
+# table dimension stayed in tolerance.
 COLUMN_SOCKET_LAND_X = min(
     TOP_LENGTH / 2.0 - abs(x) - COLUMN_SOCKET_DIAMETER / 2.0
     for x, _z in COLUMN_SOCKET_XZ
@@ -470,7 +470,7 @@ COLUMN_SOCKET_LAND_Z = min(
     TOP_WIDTH / 2.0 - abs(z) - COLUMN_SOCKET_DIAMETER / 2.0
     for _x, z in COLUMN_SOCKET_XZ
 )
-if abs(COLUMN_SOCKET_LAND_X - COLUMN_SOCKET_LAND_Z) > 0.0005 * MM_PER_IN:
+if abs(COLUMN_SOCKET_LAND_X - COLUMN_SOCKET_LAND_Z) > 0.005 * MM_PER_IN:
     raise AssertionError(
         "base socket land is not equal on both axes: "
         f"x={COLUMN_SOCKET_LAND_X}, z={COLUMN_SOCKET_LAND_Z}"
@@ -2842,15 +2842,24 @@ async def build(adapter) -> dict[str, str]:
     # dimension whose band is not the title block's: a spotface may run deep,
     # never shallow, or the screw head rocks on an unfaced ring.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    # Tolerances print in the sheet's inch at the nominal's places: in mm a
+    # .002 band needs four (0.0508), which printed ".483 +-.0020".
     set_dimension_bilateral_tolerance(
         adapter,
         "BaseSpotFaceRear",
         "SpotFaceDepth",
         *deviations(SPOTFACE_DEPTH_BAND_MM),
+        places=DRAWING_PRECISION["BaseSpotFaceRear"]["SpotFaceDepth"],
+        display_unit=UNIT,
     )
     for dimension_name in PIVOT_SEAT_DIMENSIONS:
         set_dimension_symmetric_tolerance(
-            adapter, "PivotSeatReference", dimension_name, PIVOT_SEAT_POSITION_BAND_MM
+            adapter,
+            "PivotSeatReference",
+            dimension_name,
+            PIVOT_SEAT_POSITION_BAND_MM,
+            places=DRAWING_PRECISION["PivotSeatReference"][dimension_name],
+            display_unit=UNIT,
         )
     # Every pocket corner fillet prints as one single limit, "R.23 MAX":
     # swTolMAX prints the nominal then MAX, so the modelled radius IS the max.

@@ -60,10 +60,10 @@ FRONT_COLUMN_Z = FRAME_FRONT_COLUMN_Z  # -112.014
 REAR_COLUMN_Z = FRAME_REAR_COLUMN_Z  # +112.014
 RING_HEIGHT = 36.4998  # 1.437 rail band (ch30 p002 36.7 / p006 37.0 / ch19 img03 35.6)
 HALF_H = RING_HEIGHT / 2.0  # 18.2499; band local y -18.2499..+18.2499
-HANGER_CROSSBAR_WIDTH = 24.9936  # .984
-HANGER_CROSSBAR_WIDTH_PLACES = 3
-FLANGE_THICKNESS_MM = 8.001  # .315 final top flange, including the faced right rail top
-FLANGE_THICKNESS_PLACES = 3
+HANGER_CROSSBAR_WIDTH = 25.146  # .99
+HANGER_CROSSBAR_WIDTH_PLACES = 2
+FLANGE_THICKNESS_MM = 8.128  # .32 final top flange, including the faced right rail top
+FLANGE_THICKNESS_PLACES = 2
 BOSS_ABOVE = 4.4958  # .177 boss proud of the rail top (corner-crop step)
 BOSS_DIA = (
     44.958  # 1.77 user ruling: all four upper/lower bosses clear the outward keeper feet
@@ -527,17 +527,20 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     # Sheet 1, GEOMETRY: envelope, windows, T-rail section H-H and side
     # section E-E with the crossbar T and its pockets -- cast stock under the
     # title block's general band.  The X-direction envelope and windows stand
-    # off the 15.512 socket pitch and the knife line, so they print .XXX.
+    # off the 15.512 socket pitch and the knife line, so they print .XXX as
+    # those stations flow through; the webs print the receiver walls' .512
+    # (KEEPER_TAP_*_WALL_MARGIN reads it), and the pocket depth is the .XXX
+    # grip less the flange.
     "overall casting width": 3,
     "overall casting depth": 2,
-    "side flange width": 3,
+    "side flange width": 2,
     "left window clear width": 3,
     "right window clear width": 3,
     "crossbar flange width": HANGER_CROSSBAR_WIDTH_PLACES,
     "rail web thickness": 3,
     "front rear flange width": 2,
     "top flange thickness": FLANGE_THICKNESS_PLACES,
-    "top rim chamfer": 3,
+    "top rim chamfer": 2,
     "T rail root radius": 2,
     "side rail web thickness": 3,
     "crossbar web thickness": 3,
@@ -683,9 +686,11 @@ HANGER_PIN_FLOOR_FILLET_LIFT_MAX = KNIFE_DOWEL.PRESS_FLOOR_LIFT_MAX
 # Owner ruling 2026-10-18 (exception RV-02, #1625): the cast inside corners
 # the model leaves sharp (window corners, flange junctions) take the casting's
 # own root radius at most; the R.12 T-roots are dimensioned (the "UNLESS
-# NOTED").  No geometry change.  #290: the 1/16 in break prints .063, the
-# model snapped to it (owner ruling B6).
-EDGE_CHAMFER = 1.6002  # .063 legs
+# NOTED").  No geometry change.  #290: the 1/16 in break is non-functional
+# stock relief, so it prints .06 at .XX with the model on it (Main's
+# fleet-wide ruling; it supersedes B6's .063): every clearance that charges
+# its leg holds at .06 + .01 (build_fr_top_frame.EDGE_BREAK_PRINTED_MAX).
+EDGE_CHAMFER = 1.524  # .06 legs
 INSIDE_CORNER_R_MAX = 3.048  # .12
 _EDGE_CHAMFER_TEXT = render_number(
     EDGE_CHAMFER / IN, UNIT, DRAWING_REFERENCE_PRECISION["top rim chamfer"]

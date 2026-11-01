@@ -172,6 +172,15 @@ SHEET_NAMES = ("GEOMETRY", "HOLES-SOCKETS", "UNDERSIDE", "UNDERSIDE-LUGS")
 # a document preference, so it labels every section: sheet 3's B-B is cut on
 # a vertical line too and the build proves it turns the same way.
 SECTION_LABEL_SCALE_TEXT = "ROTATED 90 DEG CW  SCALE"
+# A native section caption carries its scale compartment -- the only place
+# the rotation text rides -- only when the view's scale differs from the
+# sheet's AT CREATION (_section_axis.position_section_caption). A-A is drawn
+# at its sheet's own 1:4, so it was captioned only while the sheet scale had
+# drifted off 1:4; the inch build's drift landed on 1:4 and review b2 found
+# "ROTATED 90 DEG CW  SCALE 1 : 4" gone. A-A is therefore cut with its sheet
+# held at this scale and the sheet restored straight after; B-B (1:2) is cut
+# with its sheet pinned at the printed 1:4. Both captions are then checked.
+SECTION_CAPTION_SHEET_SCALE = (1.0, 1.0)
 
 if abs((BOTTOM_REAR_Z - BOTTOM_FRONT_Z) - BOTTOM_WIDTH) > 1e-12:
     raise AssertionError("base drawing extents disagree with the overall depth")
@@ -371,8 +380,20 @@ PIVOT_SEAT_CALLOUTS = dict.fromkeys(PIVOT_SEAT_DIMENSIONS, PIVOT_SEAT_FLAG)
 # flag sits in a custom NOTE column after SIZE and D1's X/Y stay the native
 # model-linked values. The column takes its width from the TAG and LOC
 # columns' slack, so the table keeps its native extent beside the notes lane.
-PIVOT_SEAT_TABLE_COLUMN = "NOTE"
-PIVOT_SEAT_TABLE_COLUMN_WIDTH = 0.029  # SEE NOTE 1 prints ~24.7 mm
+# Review b2: the other .XXX-located taps name the part whose pattern they
+# match -- the four MHA-FR-05 hold-downs and MHA-DT-20's lock and stop.
+HOLE_TABLE_NOTE_COLUMN = "NOTE"
+HOLE_TABLE_NOTE_COLUMN_WIDTH = 0.029  # SEE NOTE 1 prints ~24.7 mm
+HOLE_TABLE_ROW_NOTES: dict[tuple[float, float], str] = {
+    PIVOT_SCREW_XZ: PIVOT_SEAT_FLAG,
+    LOCK_KNOB_XZ: "MHA-DT-20",
+    STOP_SCREW_XZ: "MHA-DT-20",
+    **dict.fromkeys(HOLE_XZ, "MHA-FR-05"),
+}
+if len(HOLE_TABLE_ROW_NOTES) != 3 + len(HOLE_XZ) or max(
+    map(len, HOLE_TABLE_ROW_NOTES.values())
+) > len(PIVOT_SEAT_FLAG):
+    raise AssertionError("hole-table notes overlap or outgrow the NOTE column")
 HOLE_TABLE_TAG_WIDTH = 0.013
 HOLE_TABLE_MIN_LOCATION_WIDTH = 0.018  # 425.60 / Y LOC print ~14 mm
 _INSERT_COLUMN_AFTER = 3  # swTableItemInsertPosition_After
@@ -890,66 +911,70 @@ def _hole_table_station_rows(table: Any) -> dict[tuple[float, float], _HoleTable
     return resolved
 
 
-def _flag_pivot_seat_table_row(table: Any) -> tuple[tuple[tuple[str, ...], ...], float]:
-    """Flag the physical pivot's generated hole-table row in a custom NOTE column.
+def _annotate_hole_table_rows(table: Any) -> tuple[tuple[tuple[str, ...], ...], float]:
+    """Write HOLE_TABLE_ROW_NOTES into a custom NOTE column of the generated table.
 
     Returns the generated TAG/X LOC/Y LOC/SIZE cells and the native table
-    width, which the flag must leave unchanged through every rebuild.
+    width, which the notes must leave unchanged through every rebuild.
     """
     if int(table.ColumnCount) != 4:
-        raise RuntimeError("pivot table flag expects the native four-column hole table")
-    pivot = _hole_table_station_rows(table)[PIVOT_SCREW_XZ]
+        raise RuntimeError("hole-table notes expect the native four-column hole table")
+    stations = _hole_table_station_rows(table)
     generated = _table_cells(table, 4)
-    row = pivot.index
     widths = tuple(float(table.GetColumnWidth(column)) for column in range(4))
     location_width = (
-        sum(widths[:3]) - HOLE_TABLE_TAG_WIDTH - PIVOT_SEAT_TABLE_COLUMN_WIDTH
+        sum(widths[:3]) - HOLE_TABLE_TAG_WIDTH - HOLE_TABLE_NOTE_COLUMN_WIDTH
     ) / 2.0
     if location_width < HOLE_TABLE_MIN_LOCATION_WIDTH:
         raise RuntimeError(
-            f"hole-table TAG/LOC slack cannot hold the pivot NOTE column: widths={widths!r}"
+            f"hole-table TAG/LOC slack cannot hold the NOTE column: widths={widths!r}"
         )
-    if table.InsertColumn2(
-        _INSERT_COLUMN_AFTER, 3, PIVOT_SEAT_TABLE_COLUMN, _INSERT_COLUMN_DEFAULT_WIDTH
-    ) is not True:
-        raise RuntimeError("native hole table refused the pivot NOTE column")
-    if table.SetColumnTitle2(4, PIVOT_SEAT_TABLE_COLUMN, False) is not True:
+    inserted = table.InsertColumn2(
+        _INSERT_COLUMN_AFTER, 3, HOLE_TABLE_NOTE_COLUMN, _INSERT_COLUMN_DEFAULT_WIDTH
+    )
+    if inserted is not True:
+        raise RuntimeError("native hole table refused the NOTE column")
+    if table.SetColumnTitle2(4, HOLE_TABLE_NOTE_COLUMN, False) is not True:
         raise RuntimeError("native hole-table NOTE column title did not set")
-    if table.IsCellTextEditable(row, 4) is not True:
-        raise RuntimeError("native hole-table pivot NOTE cell is not editable")
-    table.SetText2(row, 4, False, PIVOT_SEAT_FLAG)
+    for station, note in HOLE_TABLE_ROW_NOTES.items():
+        row = stations[station].index
+        if table.IsCellTextEditable(row, 4) is not True:
+            raise RuntimeError(f"native hole-table NOTE cell at row {row} is not editable")
+        table.SetText2(row, 4, False, note)
     for column, width in (
         (0, HOLE_TABLE_TAG_WIDTH),
         (1, location_width),
         (2, location_width),
-        (4, PIVOT_SEAT_TABLE_COLUMN_WIDTH),
+        (4, HOLE_TABLE_NOTE_COLUMN_WIDTH),
     ):
         actual = float(table.SetColumnWidth(column, width, _TABLE_SIZE_CAN_CHANGE))
         if abs(actual - width) > 1e-6:
             raise RuntimeError(f"hole-table column {column} width did not persist: {actual!r}")
-    _check_pivot_seat_table_row(table, generated, sum(widths))
+    _check_hole_table_notes(table, generated, sum(widths))
     _telemetry.info(
-        f"pivot hole-table flag: tag={pivot.tag}, row={row}, column_type={table.GetColumnType2(4, False)!r}, "
+        f"hole-table notes: rows={ {stations[s].tag: n for s, n in HOLE_TABLE_ROW_NOTES.items()}!r}, "
+        f"column_type={table.GetColumnType2(4, False)!r}, "
         f"native_widths_mm={tuple(round(w * 1000.0, 3) for w in widths)!r}, "
         f"location_width_mm={location_width * 1000.0:.3f}"
     )
     return generated, sum(widths)
 
 
-def _check_pivot_seat_table_row(
+def _check_hole_table_notes(
     table: Any, generated: tuple[tuple[str, ...], ...], width: float
 ) -> None:
-    """Only the custom column changed: pivot flagged, generated cells and extent kept."""
+    """Only the custom column changed: rows noted, generated cells and extent kept."""
     if int(table.ColumnCount) != 5:
-        raise RuntimeError("hole table lost or duplicated the pivot NOTE column")
+        raise RuntimeError("hole table lost or duplicated the NOTE column")
     cells = _table_cells(table, 5)
     if tuple(row[:4] for row in cells) != generated:
-        raise RuntimeError(f"pivot NOTE column changed generated hole-table cells: {cells!r}")
-    pivot = _hole_table_station_rows(table)[PIVOT_SCREW_XZ]
+        raise RuntimeError(f"NOTE column changed generated hole-table cells: {cells!r}")
+    stations = _hole_table_station_rows(table)
+    notes = {
+        stations[station].index: note for station, note in HOLE_TABLE_ROW_NOTES.items()
+    }
     expected = tuple(
-        PIVOT_SEAT_TABLE_COLUMN if index == 0
-        else PIVOT_SEAT_FLAG if index == pivot.index
-        else ""
+        HOLE_TABLE_NOTE_COLUMN if index == 0 else notes.get(index, "")
         for index, row in enumerate(cells)
     )
     actual = tuple(row[4].upper() if index == 0 else row[4] for index, row in enumerate(cells))
@@ -958,7 +983,7 @@ def _check_pivot_seat_table_row(
     actual_width = sum(float(table.GetColumnWidth(column)) for column in range(5))
     if abs(actual_width - width) > 1e-5:
         raise RuntimeError(
-            f"pivot NOTE column changed the hole-table width: {actual_width!r} != {width!r}"
+            f"NOTE column changed the hole-table width: {actual_width!r} != {width!r}"
         )
 
 
@@ -1807,6 +1832,37 @@ def _turn_underside_section_clockwise(adapter: Any, section: Any) -> None:
         )
 
 
+def _set_active_sheet_scale(adapter: Any, scale: tuple[float, float]) -> None:
+    """Set the active sheet's scale and verify it persisted natively."""
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+    if sheet is None:
+        raise RuntimeError("no active sheet to scale before a section")
+    name = str(adapter._get_attr_or_call(sheet, "GetName") or "")
+    wanted = (float(scale[0]), float(scale[1]))
+    if not sheet.SetScale(wanted[0], wanted[1], False, False):
+        raise RuntimeError(f"failed to set sheet {name!r} to {wanted[0]:g}:{wanted[1]:g}")
+    properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
+    if len(properties) < 4 or (float(properties[2]), float(properties[3])) != wanted:
+        raise RuntimeError(f"sheet {name!r} scale did not persist: {properties!r}")
+
+
+def _require_section_caption_scale(adapter: Any, section: Any, *, label: str) -> None:
+    """The section's one native caption must carry the scale compartment that
+    prints SECTION_LABEL_SCALE_TEXT."""
+    notes = [
+        _early_bound(raw, "INote")
+        for raw in (_early_bound(section, "IView").GetNotes() or ())
+    ]
+    linked = [str(note.PropertyLinkedText or "") for note in notes]
+    captions = [text for text in linked if "<VLLABEL>" in text]
+    if len(captions) != 1 or "<VLSCALEV>" not in captions[0]:
+        raise RuntimeError(
+            f"{label} caption lacks the scale compartment that prints "
+            f"{SECTION_LABEL_SCALE_TEXT!r}: linked notes {linked!r}"
+        )
+
+
 _TEXT_OBSTACLE_KINDS = ("note ", "label ", "table ", "origin ", "section ")
 
 
@@ -2192,6 +2248,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, str(SOURCE), "*Front", *HOLE_SIDE_CENTER, scale=SHEET_SCALE
     )
     section_line_x = _plan_xy(COLUMN_X, 0.0, center=HOLE_TOP_CENTER)[0]
+    _set_active_sheet_scale(adapter, SECTION_CAPTION_SHEET_SCALE)
     section = create_section_view(
         adapter,
         hole_top,
@@ -2202,6 +2259,8 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         label="base column-socket section",
     )
+    _set_active_sheet_scale(adapter, SHEET_SCALE)
+    _require_section_caption_scale(adapter, section, label="section A-A")
     # drawing-guidelines.md rule 12 (hole and slot callouts say what to do) again: the hole table plus the cross-tap and spotface callouts
     # define every hole on this sheet, and section A-A shows the socket, its
     # depth and the cross tap through it in SOLID lines, so no view here needs
@@ -2299,7 +2358,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("base hole table did not retain individual coordinate tags")
     if int(hole_table.RowCount) != len(TABLE_HOLES) + 1:
         raise RuntimeError("combining base hole sizes changed individual table rows")
-    table_flag = _flag_pivot_seat_table_row(hole_table)
+    table_flag = _annotate_hole_table_rows(hole_table)
     for row in range(int(hole_table.RowCount)):
         hole_table.SetRowHeight(row, 0.007, 0)
     table_height = sum(
@@ -2311,7 +2370,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     drawing_model.EditRebuild3()
     _spread_hole_tags(hole_top, hole_table)
-    _check_pivot_seat_table_row(hole_table, *table_flag)
+    _check_hole_table_notes(hole_table, *table_flag)
     pivot_tag = _hole_table_station_rows(hole_table)[PIVOT_SCREW_XZ].tag
     add_note(adapter, pivot_seat_step(pivot_tag), *PIVOT_SEAT_NOTE_XY)
     _attached_note(
@@ -2476,6 +2535,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _require_bottom_view_mapping(adapter, bottom)
     cut_line_x = _bottom_xy(UNDERSIDE_CUT_X, 0.0)[0]
+    _set_active_sheet_scale(adapter, SHEET_SCALE)
     underside_section = create_section_view(
         adapter,
         bottom,
@@ -2486,6 +2546,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=UNDERSIDE_SECTION_SCALE,
         label="base underside section",
     )
+    _require_section_caption_scale(adapter, underside_section, label="section B-B")
     _turn_underside_section_clockwise(adapter, underside_section)
     for view in (bottom, underside_section):
         set_hidden_lines_removed(adapter, view)
@@ -2601,7 +2662,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
         # The export prints the table the last rebuild leaves.
-        settled_checks=(lambda: _check_pivot_seat_table_row(hole_table, *table_flag),),
+        settled_checks=(lambda: _check_hole_table_notes(hole_table, *table_flag),),
     )
 
 

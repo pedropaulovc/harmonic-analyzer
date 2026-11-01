@@ -610,7 +610,7 @@ HUB_GUSSET_T_OFFSET_XY = (0.390, 0.243)
 # downward, left of both, and passes under nothing.  The dimension line runs
 # at y 145 between them, arrows inside (8 mm), the text parked right on a jog
 # where the 73.0's block stood.
-LAND_END_TEXT_XY = (0.11319, 0.145)
+LAND_END_TEXT_XY = (0.11321, 0.145)
 LAND_TEXT_OFFSET_XY = (0.155, 0.145)
 LAND_END_CALLOUT = "4X LAND END FROM\nCROSSBAR FACE, EACH SIDE"
 # The faced underside plane's linked note C (top-left point).  The bands
@@ -731,7 +731,10 @@ HANGER_SECTION_KEEP = {
 # farm run 20261027T143609236Z's position frames: 7.0 + 16.12 + 6.63 mm.
 HANGER_FLOOR_DATUM = "A"
 HANGER_FLOOR_DATUM_PICK_X = BAR_X0 - 7.5
-HANGER_FLOOR_DATUM_SYMBOL_XY = (0.100, 0.047)
+HANGER_FLOOR_DATUM_SYMBOL_XY = (
+    _hanger_section_xy(HANGER_FLOOR_DATUM_PICK_X, 0.0)[0],
+    0.047,
+)
 HANGER_PERP_LANDING = (PIN_HOLE_X - HANGER_PIN_HOLE_DIA / 2.0, -HALF_H + 3.0)
 HANGER_PERP_FRAME_XY = (0.14335, 0.0455)
 HANGER_PERP_FRAME_OUTLINE = (0.0, -0.0070, 0.02975, 0.0)

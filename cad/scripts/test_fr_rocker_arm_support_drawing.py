@@ -70,8 +70,7 @@ def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
     }
     assert set(drawing.PART_PRECISION) == part_owned
     assert drawing.DIMENSION_PRECISION == {
-        **dict.fromkeys(expected - part_owned - {"Depth"}, 2),
-        "Depth": 3,
+        **dict.fromkeys(expected - part_owned, 2),
         "WebThickness": 2,
         "FootThickness": 2,
     }
@@ -149,12 +148,12 @@ def test_native_hole_table_covers_every_foot_hole() -> None:
         -support.WIDE,
     )
     # The table prints inch LOC cells from the -X end face and the -Z foot
-    # edge: 3.553 -/+ 2.375 and 1.250 +/- .687.
+    # edge: 3.56 -/+ 2.375 and 1.250 +/- .687.
     printed_in = {
         (round(x / 25.4, 9), round(z / 25.4, 9))
         for x, z in drawing.EXPECTED_HOLE_TABLE_LOCATIONS_MM
     }
-    assert printed_in == {(5.928, 1.937), (1.178, 1.937), (5.928, 0.563), (1.178, 0.563)}
+    assert printed_in == {(5.935, 1.937), (1.185, 1.937), (5.935, 0.563), (1.185, 0.563)}
     points = {drawing._bottom_sheet_xy(hole) for hole in expected_holes}
     assert len(points) == 4
     half_w = support.BOSS_DEPTH / 2.0 * drawing.VIEW_SCALE / 1000.0
@@ -479,7 +478,7 @@ def test_window_is_the_source_square_with_rails_as_deep_as_the_foot() -> None:
 
 def test_web_volume_deltas_are_the_closed_forms() -> None:
     """The source casting's native targets plus the .50 web's deltas, the
-    longer wall's (7.106 for the source's 7.000) and the .330 top's: the
+    longer wall's (7.12 for the source's 7.000) and the .330 top's: the
     window and cavity cut inside the side posts, so every stage gains the
     trapezoid's area times the added length; the narrower top changes the
     thickness every through cut removes."""
@@ -602,9 +601,9 @@ def test_bracket_seats_sit_under_the_bracket_holes() -> None:
 
     assert seats.SEAT_SPEC.kind == "tapped_bottoming"
     assert seats.SEAT_SPEC.size == seats.SCREW_THREAD == "#8-32"
-    assert seats.SEAT_SPEC.depth_mm == seats.SEAT_DRILL_DEPTH == pytest.approx(0.579 * 25.4)
+    assert seats.SEAT_SPEC.depth_mm == seats.SEAT_DRILL_DEPTH == pytest.approx(0.59 * 25.4)
     assert seats.SEAT_SPEC.overrides_mm == {"ThreadDepth": seats.SEAT_THREAD_DEPTH}
-    assert seats.SEAT_THREAD_DEPTH == pytest.approx(0.453 * 25.4)
+    assert seats.SEAT_THREAD_DEPTH == pytest.approx(0.46 * 25.4)
     assert len(seats.SEAT_MACHINE_XZ) == len(sides.SIDES) == 2
     assert [z for _, z in seats.SEAT_MACHINE_XZ] == pytest.approx(
         [
@@ -627,8 +626,10 @@ def test_bracket_screw_stack_holds_at_the_printed_worst_case() -> None:
     assert seats.SCREW_REACH_MIN == pytest.approx(15.875 - 0.76 - seats.FOOT_H_RANGE[1])
     assert seats.SCREW_REACH_MAX == pytest.approx(15.875 - seats.FOOT_H_RANGE[0])
     assert seats.ENGAGEMENT_MIN >= 1.5 * seats.SCREW_MAJOR_DIA
-    # The seat depths print .XXX on the inch sheet.
-    depth = printed_band_mm(3, unit=placement.UNIT)
+    # The seat depths print .XX on the inch sheet.
+    assert drawing.SEAT_CALLOUT_PRECISION["hw-tapdrldepth"] == 2
+    assert drawing.SEAT_CALLOUT_PRECISION["hw-threaddepth"] == 2
+    depth = printed_band_mm(2, unit=placement.UNIT)
     edge = edge_break_chamfer_mm(unit=placement.UNIT)
     assert seats.SEAT_THREAD_DEPTH - depth >= seats.SCREW_REACH_MAX + edge
     assert seats.SEAT_DRILL_DEPTH - depth >= seats.SEAT_THREAD_DEPTH + depth + 2 * 25.4 / 32
@@ -761,9 +762,9 @@ def test_part_owned_places_are_the_parts_and_the_sheet_reads_them_back(
         "RimChamferSize": 2,
         "SeatEastStation": 3,
         "SeatWestStation": 3,
-        "CavityEndStation": 3,
+        "CavityEndStation": 2,
         "CavityTopStation": 2,
-        "PocketEndStation": 3,
+        "PocketEndStation": 2,
         "PocketBottomStation": 2,
         "WebFaceStation": 2,
         "TopFlatPlusZStation": seats.TOP_FLAT_PLACES,
@@ -915,8 +916,8 @@ def test_seat_station_drives_end_on_the_seats_for_any_wall_width_or_seat_edit(
             assert side * (anchor - station) == pytest.approx(seat_on[side])
     # The finding's case: the REF tracks the 2.0 longer wall.
     values = {"WallWidth": support.BOSS_DEPTH + 2.0, **nominal}
-    assert f"{_evaluate_equation(jobs[f'SeatEastStation@{sketch}'], values):.2f}" == (
-        "6.39"
+    assert _evaluate_equation(jobs[f"SeatEastStation@{sketch}"], values) == (
+        pytest.approx(support.BOSS_DEPTH / 2.0 + 1.0 - max(seat_x))
     )
 
 
@@ -1124,8 +1125,8 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
         if name in drawing.PART_PRECISION
     }
     assert printed == {
-        "CavityEndStation": "1.053",
-        "PocketEndStation": "0.303",
+        "CavityEndStation": "1.06",
+        "PocketEndStation": "0.31",
         "CavityTopStation": "1.00",
         "PocketBottomStation": "0.25",
         "WebFaceStation": "1.00",
@@ -1266,8 +1267,8 @@ def test_section_locations_stand_off_the_section_and_its_texts() -> None:
     front_bottom = drawing.FRONT_CENTER[1] - support.HALF_Y * scale
     front_left = drawing.FRONT_CENTER[0] - support.BOSS_DEPTH / 2.0 * scale
     front_top = drawing.FRONT_CENTER[1] + support.HALF_Y * scale
-    pocket = _text_box(".303\nBOTH SIDES", drawing.FRONT_KEEP["PocketEndStation"])
-    cavity = _text_box("1.053", drawing.FRONT_KEEP["CavityEndStation"])
+    pocket = _text_box(".31\nBOTH SIDES", drawing.FRONT_KEEP["PocketEndStation"])
+    cavity = _text_box("1.06", drawing.FRONT_KEEP["CavityEndStation"])
     cavity_top = _text_box("1.00", drawing.FRONT_KEEP["CavityTopStation"])
     assert pocket[2] < front_left and cavity_top[2] < front_left
     # r6 review: the pockets' 6.35 up from the mounting face, left of the
@@ -1297,7 +1298,7 @@ def test_section_locations_stand_off_the_section_and_its_texts() -> None:
     for a, b in ((pocket, cavity), (pocket, cavity_top), (cavity, cavity_top)):
         assert _boxes_clear(a, b, 0.002)
     for other in (
-        _text_box("7.106", drawing.FRONT_KEEP["Depth"]),
+        _text_box("7.12", drawing.FRONT_KEEP["Depth"]),
         _text_box("R.25\n8X", drawing.FRONT_KEEP["PocketRadius"]),
         _text_box("6.50\nSQ POCKET BOTH SIDES", drawing.FRONT_KEEP["WinWidth"]),
     ):
@@ -1508,7 +1509,7 @@ def test_cavity_radius_callout_sits_on_its_corner_bisector_outside_the_view() ->
     assert label[0] > front_right + 0.003
     for other in (
         _rim_chamfer_box(),
-        _text_box("7.106", drawing.FRONT_KEEP["Depth"]),
+        _text_box("7.12", drawing.FRONT_KEEP["Depth"]),
     ):
         assert _boxes_clear(label, other, 0.003)
 
@@ -1644,6 +1645,22 @@ def test_seat_callout_text_sits_between_the_hole_table_and_the_title_block() -> 
     assert y + half_h < view_b_bottom - 0.003
     assert x - width > drawing.BOTTOM_CENTER[0] + support.BOSS_DEPTH / 2 * scale
     assert x + width < 0.415  # the right border
+
+
+def test_hole_pattern_note_names_the_base_taps_beside_the_table() -> None:
+    """Machinist review b2: the .XXX table named no mate. The note names the
+    base's matching hold-down taps and stands clear of the table, the seat
+    callout (at its widest either side of its x), the title block and the
+    right border."""
+    assert drawing.HOLE_PATTERN_NOTE.split() == [
+        "HOLE", "PATTERN", "MATCHES", "MHA-FR-01", "C2-C5",
+    ]
+    note = _text_box(drawing.HOLE_PATTERN_NOTE, drawing.HOLE_PATTERN_NOTE_XY)
+    callout_x = drawing.SEAT_CALLOUT_XY[0]
+    assert note[0] > callout_x + 24 * NOTE_CHAR_WIDTH + 0.002
+    assert note[3] < HOLE_TABLE_BOTTOM - 0.002
+    assert note[1] > TITLE_BLOCK_TOP + 0.002
+    assert note[2] < 0.415 - 0.001  # the right border
 
 
 def test_view_b_arrow_looks_down_on_the_rail_from_above_the_front_view() -> None:
