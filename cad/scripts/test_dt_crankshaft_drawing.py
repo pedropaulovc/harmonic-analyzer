@@ -205,7 +205,7 @@ def test_spigot_rim_is_the_shortfall_the_sheet_states() -> None:
     printed = re.search(r"SPIGOT RIM (\d+\.\d\d) MIN\.", notes.DRIVE_PIN_CALLOUT)
     assert printed
     assert float(printed.group(1)) == rim
-    assert spec.DRIVE_PIN_SPIGOT_RIM == pytest.approx(nominal)
+    assert _floor_2(nominal) == spec.DRIVE_PIN_SPIGOT_RIM
 
 
 def test_drive_pin_depth_prints_its_band_after_the_native_depth() -> None:

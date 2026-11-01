@@ -14,7 +14,7 @@ import pd_transgear_disc_hub_spec as HUB
 import pd_transgear_front_bushing_spec as FRONT_BUSHING
 import pd_transgear_rear_bushing_spec as REAR_BUSHING
 import transgear_cluster_fit as FIT
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND, PRINTED_LENGTH_BAND_IN
 
 TIGHTENED = (FIT.PH, FIT.TR, FIT.FW, FIT.GS, FIT.OL, FIT.TL, FIT.SP)
 PRINTED_LENGTHS = (FIT.LHUB, FIT.LFB, FIT.LRB)
@@ -25,14 +25,17 @@ def _worst(chain, sign):
 
 
 def test_ruled_lengths_print_at_the_cluster_band():
-    assert PRINTED_LENGTH_BAND == pytest.approx(0.01778)  # .0007 in
+    assert PRINTED_LENGTH_BAND == pytest.approx(0.02)
+    assert PRINTED_LENGTH_BAND_IN == pytest.approx(0.01778)  # .0007 in
     assert (FIT.HUB_LENGTH, FIT.FRONT_BUSHING_LENGTH, FIT.REAR_BUSHING_LENGTH) == (
         pytest.approx(13.6906),  # .539
         pytest.approx(5.6388),  # .222
         pytest.approx(5.6388),  # .222
     )
     for label, _, band in (*TIGHTENED, *PRINTED_LENGTHS):
-        assert band == pytest.approx(PRINTED_LENGTH_BAND), label
+        assert band in (
+            pytest.approx(PRINTED_LENGTH_BAND), pytest.approx(PRINTED_LENGTH_BAND_IN)
+        ), label
     assert HUB.HUB_LENGTH == FIT.HUB_LENGTH
     assert FRONT_BUSHING.LENGTH == FIT.FRONT_BUSHING_LENGTH
     assert REAR_BUSHING.LENGTH == FIT.REAR_BUSHING_LENGTH
@@ -97,7 +100,7 @@ def test_forward_stop_chain_pivots_on_the_pin_load_wall():
     assert AIR.DISC_STOP_R == pytest.approx(min(HUB.SEAT_CONTACT_R, hub_face, nose))
     cock = math.atan(
         FIT.BORE_DIAMETRAL_CLEARANCE[1]
-        / (FRONT_BUSHING.LENGTH - PRINTED_LENGTH_BAND - 2.0 * brk)
+        / (FRONT_BUSHING.LENGTH - PRINTED_LENGTH_BAND_IN - 2.0 * brk)
     )
     wall = FRONT_BUSHING.PIN.DIA_MIN / 2.0 - brk
     term = AIR.COLLAR_AIR.terms["front bushing and ring cocking on the pin"]

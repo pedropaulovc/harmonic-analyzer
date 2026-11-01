@@ -102,8 +102,8 @@ def test_web_worst_case_is_the_printed_limits() -> None:
     web = (
         seat_geometry.PIN_CIRCLE_DIA / 2.0
         - spec.PIN_LOCATION_TOL
-        - (seat_geometry.PIN_HOLE_DIA + oversize) / 2.0
-        - (seat_geometry.BORE_DIA + oversize) / 2.0
+        - (spec.PIN_HOLE_DIA + oversize) / 2.0
+        - (spec.BORE_DIA + oversize) / 2.0
     ) / 25.4
     assert notes.BORE_PIN_WEB_WORST_IN <= web < notes.BORE_PIN_WEB_WORST_IN + 0.001
     assert 0.0 < notes.BORE_PIN_WEB_WORST_IN * 25.4 < seat_geometry.BORE_PIN_WEB

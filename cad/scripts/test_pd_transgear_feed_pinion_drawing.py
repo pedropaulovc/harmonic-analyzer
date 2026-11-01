@@ -32,7 +32,7 @@ from _printed_tolerance import (
     inside_corner_radius_mm,
     printed_band_mm,
 )
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND, STACK_NAME
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND_IN, STACK_NAME
 from paper_drive_stock_inspection import (
     span_contact_points_mm,
     toothspace_gauge_contact_mm,
@@ -106,7 +106,7 @@ def test_bands_come_from_named_spec_constants() -> None:
     # the disc cluster stack's band, the tip class, the boss's and the flat's
     # bands print four places, where the inch title block has no row, so
     # each carries its own explicit band.
-    assert spec.OVERALL_LENGTH_BAND == spec.FACE_WIDTH_BAND == PRINTED_LENGTH_BAND
+    assert spec.OVERALL_LENGTH_BAND == spec.FACE_WIDTH_BAND == PRINTED_LENGTH_BAND_IN
     by_name = spec.DRAWING_PRECISION_BY_NAME
     assert spec.STATION_PLACES == spec.FACE_WIDTH_PLACES == 4
     for name in ("OutsideDia", "BossDia", "FlatToAxis"):

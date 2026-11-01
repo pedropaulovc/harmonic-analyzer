@@ -52,7 +52,7 @@ from _printed_tolerance import edge_break_chamfer_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
 from pd_transgear_disc_hub_geometry import SPIGOT_LENGTH, SPIGOT_LENGTH_BAND
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND_IN
 from paper_drive_stock_envelope import (
     cutter_end_section_area_bounds_mm2,
     cutter_end_volume_bounds_mm3,
@@ -254,9 +254,9 @@ STATION_TOL = 0.0508  # .002
 STATION_PLACES = 4
 FACE_WIDTH = 13.589  # .535, the tooth length: rear face to the step onto the boss
 FACE_WIDTH_PLACES = 4
-FACE_WIDTH_BAND = PRINTED_LENGTH_BAND
+FACE_WIDTH_BAND = PRINTED_LENGTH_BAND_IN
 OVERALL_LENGTH = 27.3558  # 1.077
-OVERALL_LENGTH_BAND = PRINTED_LENGTH_BAND
+OVERALL_LENGTH_BAND = PRINTED_LENGTH_BAND_IN
 
 # --- diameters -----------------------------------------------------------------
 # The boss is the hub's locating fit: turned .313 +.0005/.0000 under the

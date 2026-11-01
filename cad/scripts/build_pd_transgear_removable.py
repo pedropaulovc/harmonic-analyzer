@@ -709,8 +709,8 @@ async def build(adapter) -> dict[str, str]:
     # 25.4x. The blank's outside diameter is NOT a knob here: it is
     # config-driven by the "Ra" equation link below.
     await set_global_mm(adapter, "Plate", f"{seat_geometry.PLATE}mm")
-    await set_global_mm(adapter, "BoreDia", f"{seat_geometry.BORE_DIA}mm")
-    await set_global_mm(adapter, "PinHoleDia", f"{seat_geometry.PIN_HOLE_DIA}mm")
+    await set_global_mm(adapter, "BoreDia", f"{spec.BORE_DIA}mm")
+    await set_global_mm(adapter, "PinHoleDia", f"{spec.PIN_HOLE_DIA}mm")
     await set_global_mm(adapter, "PinCircleRadius", f"{seat_geometry.PIN_CIRCLE_RADIUS}mm")
 
     # Drive equations are recorded per sketch as the dims are created and applied
@@ -935,7 +935,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         0.0,
         0.0,
-        seat_geometry.BORE_DIA / 2.0,
+        spec.BORE_DIA / 2.0,
         "bore",
         dims=bore_pins,
         names=("BoreCx", "BoreCy", "BoreDiaDim"),
@@ -947,7 +947,7 @@ async def build(adapter) -> dict[str, str]:
             adapter,
             x,
             y,
-            seat_geometry.PIN_HOLE_DIA / 2.0,
+            spec.PIN_HOLE_DIA / 2.0,
             f"pin hole {label}",
             dims=bore_pins,
             names=(f"{label}X", f"{label}Y", f"{label}Dia"),

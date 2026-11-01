@@ -49,7 +49,7 @@ import pd_transgear_knob_shaft_spec as KNOB_SHAFT
 import pd_transgear_knob_thrust_ring_spec as KNOB_RING
 import pd_transgear_pin_spec as PIN
 import pd_vn_transgear_retaining_ring_spec as RING
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND_IN
 
 # --- the three printed cluster lengths (owner ruling 2026-10-28, #2038) ---------
 # Collar air 0.10 MIN statistically sets the front bushing; the end float's
@@ -60,7 +60,7 @@ from pd_cluster_stack_band import PRINTED_LENGTH_BAND
 # REAM_SLIDE running fits cock the sleeve and the front bushing more than the
 # metric G7 did, so the front bushing grew .002 (raising m_fwd) and the rear
 # bushing gave the same .002 back to the end float.
-LENGTH_BAND = PRINTED_LENGTH_BAND
+LENGTH_BAND = PRINTED_LENGTH_BAND_IN  # the inch hub and bushings
 LENGTH_PLACES = 4
 HUB_LENGTH = 13.6906  # .539
 FRONT_BUSHING_LENGTH = 5.6388  # .222

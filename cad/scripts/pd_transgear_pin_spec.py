@@ -31,7 +31,7 @@ from _gtol_cylinder import CylinderFace
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND
+from pd_cluster_stack_band import PRINTED_LENGTH_BAND_IN
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 UNIT = drawing_unit("parts/pd-transgear-pin", _config.parts("pd-transgear-pin"))
@@ -93,7 +93,7 @@ HEAD_HEIGHT = HEAD_LAND + HEAD_DOME_SAG  # proud of the arm's rear face
 # places at the cluster's band (#2038 owner ruling 2026-10-28, option A).
 GROOVE_STATION = 47.244  # 1.860, head underside to the groove's load wall
 GROOVE_STATION_PLACES = 4
-GROOVE_STATION_BAND = PRINTED_LENGTH_BAND
+GROOVE_STATION_BAND = PRINTED_LENGTH_BAND_IN
 GROOVE_DIA = RING.GROOVE_DIA
 GROOVE_DIA_BAND = RING.GROOVE_DIA_BAND
 GROOVE_WIDTH = RING.GROOVE_WIDTH
