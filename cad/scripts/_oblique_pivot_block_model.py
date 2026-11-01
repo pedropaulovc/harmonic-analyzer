@@ -14,7 +14,8 @@ from _dimensions import name_dimensions
 from _document_units import apply_package_model_units
 from _drawing_marks import clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
+from _metric_vendor_dimension import set_metric_vendor_units
 from _feature_tree import name_last_feature
 from _fit_deviations import deviations
 from _holes import wizard_holes
@@ -422,6 +423,11 @@ async def build_block_model(adapter, part) -> None:
     set_dimension_bilateral_tolerance(adapter,"TopBoreProfile","BoreDia",*deviations(spec.BORE_BAND),
                                       places=spec.BORE_PLACES,display_unit=spec.UNIT)
     apply_drawing_precision(adapter,part.DRAWING_PRECISION)
+    # TL-32's Tr8/KP08 vendor-line dimensions print exact millimetres with
+    # their own bands (owner ruling 4).
+    for (feature_name,dimension_name),(places,band) in getattr(part,"METRIC_DIMENSIONS",{}).items():
+        set_dimension_symmetric_tolerance(adapter,feature_name,dimension_name,band,display_unit="mm")
+        set_metric_vendor_units(adapter,feature_name,dimension_name,places=places)
     # Thread identity and fit/process qualifiers belong to the saved model.
     from _drawing_precision import _named_dimension
     for channel,callouts in ((2,part.CALLOUTS_SUFFIX),(3,part.CALLOUTS_ABOVE),(4,part.CALLOUTS_BELOW)):
