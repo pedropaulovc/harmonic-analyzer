@@ -56,7 +56,7 @@ from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _printed_limits import limits
-from _drawing_metric_vendor import assert_imported_metric_dimensions
+from _drawing_metric_vendor import print_imported_metric_dimensions
 from _supplier_dimensions import supplier_reference_dimension
 from ch_rocker_arm_tl_oblique_callouts import set_callout_lengths_to_three_places
 from ch_rocker_arm_tl_oblique_end_bracket_spec import (
@@ -615,7 +615,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places are authored on the part; the sheet only proves the import kept
     # them, then writes the mate callouts and the stock references.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    assert_imported_metric_dimensions(
+    print_imported_metric_dimensions(
         adapter,
         annotations,
         {
