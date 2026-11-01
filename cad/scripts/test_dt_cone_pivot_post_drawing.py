@@ -522,12 +522,15 @@ def test_nothing_else_on_the_casting_carries_a_band() -> None:
     The cast body, head and boss diameters and the mounting-hole stations
     are not accuracy features (cad/docs/tolerance-policy.md, "Result"), so the
     part must not author a tolerance on them at all: the title block's general
-    grade is the whole specification.  The symmetric bands are the cone-axis
-    height and the collar thrust face's station.
+    grade is the whole specification.  The one symmetric band is the collar
+    thrust face's station; the cone-axis height's capture band is the title
+    block's .XX (machinist review: an explicit ±.01 repeated it).
     """
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert source.count("set_dimension_bilateral_tolerance(") == 3
-    assert source.count("set_dimension_symmetric_tolerance(") == 2
+    assert source.count("set_dimension_symmetric_tolerance(") == 1
+    assert spec.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM == pytest.approx(0.254)
+    assert "JOURNAL_AXIS_HEIGHT_TOLERANCE_MM" not in source
     assert source.count("deviations(RUNNING_BORE_BAND)") == 1
     assert source.count("deviations(JOURNAL_BORE_BAND)") == 1
     assert source.count("deviations(CRANK_ABOVE_CONE_BAND)") == 1
