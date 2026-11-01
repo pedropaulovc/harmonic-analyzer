@@ -12,11 +12,6 @@ from __future__ import annotations
 import _config
 
 
-# The rate check's two inside-hook lengths and its pins, inch (the sheet's
-# unit), both inside the 9432K31's free-to-maximum range.
-_QC_LENGTH_1_IN = 2.40
-_QC_LENGTH_2_IN = 3.20
-_QC_PIN_DIA_IN = 0.08
 _MATCHED_SET_SIZE = len(_config.channels())
 # Owner ruling relayed with the machinist-review fleet pass: order twice the
 # set from one lot; if the lot cannot supply a matched set, select from
@@ -27,19 +22,13 @@ _MATCH_TOLERANCE_PERCENT = float(
 )
 
 
-def _in(value: float) -> str:
-    """Inch print text, leading zero suppressed."""
-    return f"{value:.2f}".removeprefix("0")
-
-
+# Function only: the rate is measured between any two inside-hook lengths
+# within the free and maximum lengths the sheet dimensions natively.
 DRAWING_NOTES = "\n".join(
     (
         f"MATCHED SET: ORDER {_ORDER_QUANTITY} FROM ONE LOT; KEEP {_MATCHED_SET_SIZE} "
-        "WHOSE RATE (F2-F1)/(L2-L1)",
-        f"IS WITHIN \u00b1{_MATCH_TOLERANCE_PERCENT:.2f}% OF THEIR MEAN, "
-        "FOR EQUAL FORCE IN EVERY CHANNEL.",
-        f"F1/F2 AT L1/L2 = {_in(_QC_LENGTH_1_IN)}/{_in(_QC_LENGTH_2_IN)} INSIDE HOOKS; "
-        f"\u00d8{_in(_QC_PIN_DIA_IN)} PINS AT "
-        f"{_in(_QC_LENGTH_1_IN - _QC_PIN_DIA_IN)}/{_in(_QC_LENGTH_2_IN - _QC_PIN_DIA_IN)} C-C.",
+        "WHOSE RATE, MEASURED",
+        "BETWEEN TWO LENGTHS WITHIN THE FREE AND MAXIMUM SHOWN, IS WITHIN",
+        f"\u00b1{_MATCH_TOLERANCE_PERCENT:.2f}% OF THEIR MEAN, FOR EQUAL FORCE IN EVERY CHANNEL.",
     )
 )
