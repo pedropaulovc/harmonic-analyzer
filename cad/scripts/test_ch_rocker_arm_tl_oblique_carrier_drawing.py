@@ -63,7 +63,6 @@ def test_every_calculator_position_is_the_calculators() -> None:
         "pin_hole_b1": trammel.B1,
         "pin_hole_a2": trammel.A2,
         "pin_hole_b2": trammel.B2,
-        "hub_spot": trammel.HUB,
         "cl_spot": trammel.CL,
         "cr_tap_1": trammel.CR,
         **{
@@ -74,7 +73,9 @@ def test_every_calculator_position_is_the_calculators() -> None:
     for name, point in expected.items():
         assert _at(features[name]) == tuple(point), name
     assert spec.PIN_HOLES == trammel.PIN_HOLES
-    assert (spec.HUB, spec.CL, spec.CR) == (trammel.HUB, trammel.CL, trammel.CR)
+    assert (spec.CL, spec.CR) == (trammel.CL, trammel.CR)
+    # Owner ruling 5: the HUB is drilled in situ at assembly, not on TL-21.
+    assert "hub_spot" not in features and set(spec.SPOTS) == {"Cl"}
     assert spec.RISER_SCREWS == trammel.RISER_SCREWS
     assert spec.D1 == trammel.D1
     assert math.isclose(-spec.A2_DX, (trammel.D2 - trammel.D1) / 2.0)
@@ -100,15 +101,15 @@ def test_pin_chain_runs_from_a1_b1_with_banded_mates() -> None:
     assert spec.DX_CALLOUT == spec.DY_CALLOUT == "SETS R816 ON\nMHA-CH-13"
     for text in spec.CALLOUTS_BELOW.values():
         assert "ERROR" not in text and "1:1" not in text
-    # The tap axis (lever taps and HUB) is located from A1, the X datum, at
-    # HubX's places: HubX prints it from A1 to the HUB spot (driven equal to
+    # The lever taps' axis is located from A1, the X datum, at LeverX's
+    # places: LeverX prints it from A1 to the upper lever tap (driven equal to
     # A1X, the model's unprinted driver).
     a1 = features["pin_hole_a1"]
-    places = spec.DRAWING_PRECISION_BY_NAME["HubX"]
+    places = spec.DRAWING_PRECISION_BY_NAME["LeverX"]
     assert a1["station_nominal"] == pytest.approx(_printed(abs(trammel.A1[0]), places))
     assert a1["precision"]["station"] == places
     assert "A1X" not in spec.DRAWING_DIMENSIONS["PinHoleProfile"]
-    assert "HubX" in spec.DRAWING_DIMENSIONS[spec.STATION_REFERENCE]
+    assert "LeverX" in spec.DRAWING_DIMENSIONS[spec.STATION_REFERENCE]
     assert set(spec.POSITION_BANDED) <= set(spec.CALLOUTS_BELOW)
     toleranced = model_toleranced_dimensions(part)
     assert toleranced[("PinHoleProfile", "PinHoleDia")] == "*deviations(PIN_HOLE_BAND)"
@@ -229,41 +230,58 @@ def test_bottom_face_preserves_the_finished_plate_thickness() -> None:
 
 def test_spot_stations_print_from_the_hidden_reference_sketch() -> None:
     """A reference plane cannot be imported into a drawing (farm jig-r1)."""
-    assert spec.DRAWING_DIMENSIONS[spec.SPOT_REFERENCE] == {
-        "SpotDia",
-        "SpotDiaCl",
-        "HubY",
-        "ClY",
-    }
-    # jig-r3: each spot has its own leader and callout, no "2X".
-    for name in ("SpotDia", "SpotDiaCl"):
-        assert "2X" not in spec.CALLOUTS_BELOW[name]
-    assert set(spec.CALLOUT_SUFFIXES) == {"SpotDia", "SpotDiaCl"}
+    assert spec.DRAWING_DIMENSIONS[spec.SPOT_REFERENCE] == {"SpotDia", "ClY"}
+    # jig-r3: the spot has its own leader and callout, no "2X".
+    assert "2X" not in spec.CALLOUTS_BELOW["SpotDia"]
+    assert spec.CALLOUTS_BELOW["SpotDia"] == "SPOT FOR\nMHA-CH-13 CL"
+    assert set(spec.CALLOUT_SUFFIXES) == {"SpotDia"}
     assert not any("Plane" in feature for feature in spec.DRAWING_DIMENSIONS)
 
 
-def test_hub_station_moves_the_strap_pivot_inside_its_top_edge_band() -> None:
-    """The HUB sits on the arcs' centreline, so its Y station moves the
-    strap's pivot radially 1:1 against the R800 edge; its print band must
-    stay strictly inside half the strap's one-sided top-edge band."""
+def test_in_situ_hub_fit_up_closes_inside_the_strap_top_edge_band() -> None:
+    """Owner ruling 5 (option A, 2026-11-01). The HUB on the arcs' centreline
+    moves the strap's pivot radially 1:1 against the R800 edge. Drilled in
+    situ from the apex (the spindle origin) +Y by HUB_OFFSET, the pin spacing
+    moves it with the cut; what reaches the edge at the worst case is the
+    DRO setting of the printed offset and the carrier's shift on its pins
+    (rule 19: a fit-up that covers the whole range, never root-sum-square)."""
     import ch_rocker_arm_spec as rocker
 
-    assert spec.HUB[0] == trammel.ARC_CENTRE[0] == 0.0
+    assert trammel.HUB[0] == trammel.ARC_CENTRE[0] == 0.0
+    assert trammel.HUB[1] - trammel.APEX_Y == pytest.approx(trammel.HUB_OFFSET)
     half = (max(rocker.TOP_EDGE_BAND) - min(rocker.TOP_EDGE_BAND)) / 2.0
-    places = spec.DRAWING_PRECISION_BY_NAME["HubY"]
-    assert spec.HUB_RADIAL_BAND == pytest.approx(printed_band_mm(places, unit=spec.UNIT))
-    assert spec.HUB_RADIAL_BAND < half
-    # One place fewer would take the whole half band.
-    assert printed_band_mm(places - 1, unit=spec.UNIT) >= half
+    assert half == pytest.approx(0.25)
+    # The setting: the printed .5123 at a .0001 DRO, held to ±.0005.
+    assert spec.inch_text(spec.HUB_OFFSET_PRINTED, spec.HUB_OFFSET_PLACES) == ".5123"
+    assert spec.HUB_OFFSET_BAND == pytest.approx(0.0005 * trammel.INCH)
+    # The shift: the widest pin clearance, x 1.77 on R.
+    shift = trammel.RADIUS_PER_SPACING * spec.PIN_CLEARANCE_MAX
+    worst = (
+        spec.HUB_OFFSET_BAND + abs(spec.HUB_OFFSET_PRINTED - trammel.HUB_OFFSET) + shift
+    )
+    assert spec.HUB_RADIAL_STACK == pytest.approx(worst)
+    assert f"{spec.HUB_RADIAL_STACK:.3f}" == "0.125"
+    assert spec.HUB_RADIAL_STACK < half
+    # The printed spot it replaces failed: the .XXX station band, the shift
+    # and the D1 band x 1.77 came to 0.275 (owner packet, item 5).
+    printed = (
+        printed_band_mm(3, unit=spec.UNIT)
+        + shift
+        + trammel.RADIUS_PER_SPACING * spec.POSITION_BAND
+    )
+    assert printed == pytest.approx(0.275, abs=0.001)
+    assert printed > half
 
 
-def test_three_place_hub_and_cr_stations_state_true_functions() -> None:
+def test_three_place_lever_and_cr_stations_state_true_functions() -> None:
     """mr4: 8.861 and CR's 15.195/1.156 printed 3-place with no stated
-    function. HubX runs to the HUB spot (mr8: named by the spot's callout,
-    not the undefined A1-B1); CR is CL mirrored about the tap axis, so the
-    CR callout (whose lanes hold no row) names it."""
-    assert spec.STATIONS["HubX"] == spec.HUB
-    assert spec.HUB[0] == trammel.ARC_CENTRE[0] == 0.0
+    function. LeverX runs to the upper lever tap (mr8: named by the feature
+    it locates); CR is CL mirrored about the tap axis, so the CR callout
+    (whose lanes hold no row) names it."""
+    assert spec.STATIONS["LeverX"] == spec.LEVER_HOLES[0]
+    assert spec.CALLOUTS_BELOW["LeverX"] == "LEVER TAPS"
+    # Its row is no wider than the "TO HUB SPOT" it replaced (LeverX's lane).
+    assert len(spec.LEVER_STATION_CALLOUT) <= len("TO HUB SPOT")
     assert spec.CR == pytest.approx((-spec.CL[0], spec.CL[1]))
 
 
@@ -413,7 +431,7 @@ def test_riser_tap_stations_print_their_walls_band_and_name_the_riser() -> None:
     # From A1 the station error about the cut's centre adds half the D1 band.
     assert WALL_TARGET_MM <= spec.RISER_WALLS_FROM_A1 < min(trammel.RISER_SCREW_WALLS)
     # Four rows (the native two and these two), ~4.5 mm each, centred on the
-    # anchor: under the border, over the HUB spot's callout.
+    # anchor: under the border.
     rows = 2 + len(spec.RISER_TAP_CALLOUT.splitlines())
     x, y = (value * 1000.0 for value in drawing.RISER_CALLOUT_XY)
     assert y + 4.5 * rows / 2.0 + 3.0 < _BORDER[3]
@@ -451,17 +469,17 @@ def test_every_x_station_is_a_baseline_from_a1() -> None:
         for name in names
         if "X" in name
     }
-    # The pin chain stays on the pin-hole sketch, A1 its root; the tap axis
-    # prints from A1 as a station (HubX), not as the unprinted A1X.
+    # The pin chain stays on the pin-hole sketch, A1 its root; the lever taps'
+    # axis prints from A1 as a station (LeverX), not as the unprinted A1X.
     assert other_x == {"A2DX", "B2DX"}
     assert "PlateHalfLength" not in spec.DRAWING_DIMENSIONS["PlateProfile"]
     assert spec.DRAWING_DIMENSIONS["CrTap"] == {"CrY"}
     assert spec.STATION_REFERENCE in spec.REFERENCE_SKETCHES
     assert spec.STATIONS["EdgeX"] == (spec.OUTLINE_X[0], spec.OUTLINE_Y[0])
     assert spec.STATIONS["ClX"] == spec.CL and spec.STATIONS["CrX"] == spec.CR
-    assert spec.STATIONS["HubX"] == spec.HUB
+    assert spec.STATIONS["LeverX"] == spec.LEVER_HOLES[0]
     features = _features()
-    located = ("hub_spot", "cl_spot", "cr_tap_1", "lever_tap_1", "lever_tap_2")
+    located = ("cl_spot", "cr_tap_1", "lever_tap_1", "lever_tap_2")
     for name in located + tuple(f"riser_tap_{i}" for i in range(1, 5)):
         feature = features[name]
         places = feature["precision"]["station"]
@@ -469,15 +487,14 @@ def test_every_x_station_is_a_baseline_from_a1() -> None:
         assert feature["station_nominal"] == pytest.approx(
             _printed(_at(feature)[0] - a1x, places)
         ), name
-    # The tap axis prints once, as HubX: its point on the HUB spot, so its
-    # extension line rises through the lever taps to it (machinist review
-    # 54e5c9a: A1X's line stopped at the pin line, short of HUB).
-    hub_x = features["hub_spot"]["station_nominal"]
-    assert features["lever_tap_1"]["station_nominal"] == hub_x
-    assert hub_x == features["pin_hole_a1"]["station_nominal"]
+    # The lever taps' axis prints once, as LeverX: its point on the upper
+    # tap, so its extension line rises through both taps (machinist review
+    # 54e5c9a: A1X's line stopped at the pin line).
+    lever_x = features["lever_tap_1"]["station_nominal"]
+    assert features["lever_tap_2"]["station_nominal"] == lever_x
+    assert lever_x == features["pin_hole_a1"]["station_nominal"]
     stations = inspect.getsource(part._station_reference)
-    assert '"HubX": _pin_dim("A1X")' in stations
-    assert '"HubX": f\'"HubY@{SPOT_REFERENCE}"\'' in stations
+    assert '"LeverX": _pin_dim("A1X")' in stations
     # Each origin-based placement evaluates to the feature's |X| from its
     # printed station less A1X.
     values = {"A1X@PinHoleProfile": abs(a1x)} | {
@@ -485,7 +502,7 @@ def test_every_x_station_is_a_baseline_from_a1() -> None:
         for name, (x, _y) in spec.STATIONS.items()
     }
     for name, (x, _y) in spec.STATIONS.items():
-        if name in ("EdgeX", "HubX"):
+        if name in ("EdgeX", "LeverX"):
             continue
         expression = part._origin_x(name)
         for key, value in values.items():
@@ -569,7 +586,7 @@ def test_every_location_text_stands_outside_the_outline() -> None:
     holes and each other. Every top-view text but the diameters stands
     outside it, in its lane (CL's spot callout stands in the plate's free
     band under the pin line)."""
-    diameters = {"PinHoleDia", "SpotDia", "SpotDiaCl"}
+    diameters = {"PinHoleDia", "SpotDia"}
     x0, y0 = _on_sheet(spec.OUTLINE_X[0], spec.OUTLINE_Y[0])
     x1, y1 = _on_sheet(spec.OUTLINE_X[1], spec.OUTLINE_Y[1])
     for name in set(drawing.TOP_KEEP) - diameters:
@@ -592,17 +609,13 @@ def test_single_row_y_texts_clear_their_arrows_and_neighbours() -> None:
     (3.56 long) when the span holds them inside, and clear of the outline and
     the next lane's dimension line."""
     arrow, half_h, half_w = 3.56, 1.75, 6.45
-    spans = {
-        "HubY": spec.HUB[1],
-        "LeverY2": spec.LEVER_HOLES[1][1],
-    }
+    spans = {"LeverY2": spec.LEVER_HOLES[1][1]}
     for name, far in spans.items():
         _tx, ty = _top_text(name)
         y_pin, y_far = sorted((_on_sheet(0.0, 0.0)[1], _on_sheet(0.0, far)[1]))
         assert y_pin + arrow + 1.0 < ty - half_h, name
         assert ty + half_h + 1.0 < y_far - arrow, name
-    # The right lanes' neighbours: HUB over CR, the 38.00 under the 22.00.
-    assert _top_text("HubY")[1] - _top_text("CrY")[1] > 2 * half_h + 1.5
+    # The right lanes' neighbours: the 38.00 under the 22.00.
     assert _top_text("LeverY1")[1] - _top_text("LeverY2")[1] > 2 * half_h + 1.5
     cl_x, _cl_y = _top_text("ClY")
     outline_left_x = _on_sheet(spec.OUTLINE_X[0], 0.0)[0]

@@ -1,10 +1,11 @@
 r"""Create the drawing for the oblique-trammel jig's carrier plate (MHA-CH-06-TL-21).
 
-The top view at 1:2 carries the outline, the reamed pin holes, the two
-centre-drill spots and every tap station. Position chains (rule 10, one
-datum per view): X from A1's axis, the left lower ream that carries the
-±0.02 pair: the left end 34.9 from it, the tap axis (lever taps and HUB)
-225.07, B1 by the spacing and every spot and tap by its own baseline
+The top view at 1:2 carries the outline, the reamed pin holes, the CL
+centre-drill spot and every tap station (the HUB is drilled in situ at
+assembly, MHA-CH-06-TL-00 step 10). Position chains (rule 10, one datum per
+view): X from A1's axis, the left lower ream that carries the ±0.02 pair:
+the left end 34.9 from it, the lever taps' axis 225.07, B1 by the spacing
+and every spot and tap by its own baseline
 (the part's hidden StationReference); Y from the A1-B1 pin line (the reamed
 pair's own axes), 45.00 above the -Y edge. Every location dimension stands
 outside the outline in its own lane: X stations above and below, Y stations
@@ -118,8 +119,8 @@ def _xy(x: float, y: float) -> tuple[float, float, float]:
 # baselines from A1 (rule 10, one datum per view), below and above (the
 # A1-baseline note at TOP_KEEP). Carrier r11: the 45.53 HUB and 44.287 riser
 # extension lines ran 0.62 apart on the left and the 130.0 width's line ran
-# through the B2DY text, so HUB moved to the right lanes, the width innermost
-# and B2DY beside it, and the riser stations name the riser
+# through the B2DY text, so the width stands innermost right and B2DY beside
+# it, and the riser stations name the riser
 # (RISER_STATION_CALLOUT). Carrier r13: the CL 29.35 text (centred on its
 # lane, 12.9 wide) touched the outline at x 92, so its lane stands at x 83 and
 # A2DY's at 74.5, the text 2 clear of both.
@@ -151,13 +152,13 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
     "PlateWidth": _xy(_RIGHT[0], -8.0),
     "PlateNearY": _xy(_LEFT[4], -24.0),
     "EdgeX": _xy(-242.5, -120.4),  # lane y 112
-    # The pin chain: the tap axis and B1 from A1, A2/B2 from A1/B1. The tap
-    # axis's station stands on the HUB spot, so its extension line rises
-    # from this lane through both lever taps to the spot (machinist review
-    # 54e5c9a: A1X's stopped at the pin line, short of HUB). mr4: its
-    # function row (~28 wide) on the lane, ~5 right of A1's extension line,
-    # the value row 4 under the ClX lane's dimension line.
-    "HubX": _xy(-187.0, -74.84),  # lane y 132
+    # The pin chain: the lever taps' axis and B1 from A1, A2/B2 from A1/B1.
+    # The axis's station stands on the upper lever tap, so its extension line
+    # rises from this lane through both taps (machinist review 54e5c9a: A1X's
+    # stopped at the pin line). mr4: its function row on the lane, ~5 right
+    # of A1's extension line, no wider than the former 11-character row; the
+    # value row 4 under the ClX lane's dimension line.
+    "LeverX": _xy(-187.0, -74.84),  # lane y 132
     "PinSpacing": _xy(172.0, -170.3),  # lane y 81.5
     # Its text 4 sheet mm right of A1's extension line, which now rises past
     # it to the R2 lane.
@@ -182,25 +183,15 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
     # The diameter approach may cross genuine witness extensions (rule 14),
     # but never a dimension line, another text row or the shoulder's text.
     "PinHoleDia": _xy(-339.0, -106.3),
-    # The spots: each its own diameter callout, both outside the plate
-    # (rule 14). Round 4: the mr3 strap row made HUB's block three rows deep
-    # and its last row sat on the +Y edge (sheet y 217.4); 12 model mm up
-    # (6 sheet) stands it ~5 clear, left of the riser callout (x ~275) and
-    # right of RiserX1's extension line (x ~202). CL's (mr8: from above the
-    # 4.154 lane its leader crossed the 7.287 dimension line) three rows,
-    # ~31 wide, centred at sheet (182.25, 228.2): its shelf ~2.8 over the +Y
-    # edge, its top ~2.3 under the 7.287 lane (238.5), ~4.4 inside the RiserX2
-    # (162.5) and RiserX1 (202.0) extension lines. Every route from above
-    # that lane crosses it (or, past its end, overruns the 10 mm leader
-    # detour); this leader runs down-left ~36 over the part (detour ~8),
-    # crossing extension lines only.
-    "SpotDia": _xy(50.0, 110.0),
-    "SpotDiaCl": _xy(-79.5, 106.4),
-    # Carrier r13: a single-row text within its span stands clear of both
-    # arrows (3.56 long): at y 192 the 45.53's top arrow ran into it and at
-    # 161.5 the 38.00's bottom arrow struck it. HUB's text is at y 189, 3.7
-    # over CR's (181.5); the 38.00's at 163.5, 2.5 under the 22.00's (169.5).
-    "HubY": _xy(_RIGHT[3], 28.0),
+    # The spot: its own diameter callout outside the plate (rule 14). Its
+    # three rows (mr8: from above the 4.154 lane its leader crossed the 7.287
+    # dimension line), ~31 wide, centred at sheet (182.25, 228.2): its shelf
+    # ~2.8 over the +Y edge, its top ~2.3 under the 7.287 lane (238.5), ~4.4
+    # inside the RiserX2 (162.5) and RiserX1 (202.0) extension lines. Every
+    # route from above that lane crosses it (or, past its end, overruns the
+    # 10 mm leader detour); this leader runs down-left ~36 over the part
+    # (detour ~8), crossing extension lines only.
+    "SpotDia": _xy(-79.5, 106.4),
     "ClX": _xy(-193.0, -54.4),  # lane y 145
     "ClY": _xy(_LEFT[0], 14.0),
     # The taps: the riser stations above and below (A1-baseline note), their
@@ -305,7 +296,7 @@ SECTION_CAPTION_XY = (0.043, 0.052)
 # Sheet metres: each callout block's centre; its leader lands on the near end
 # of the first line. CR up-right into the margin above the right lanes, its
 # four rows (the native two and CR_TAP_CALLOUT's two, mr4) ~219..241; the
-# risers from the outermost +X screw straight up, right of the HUB callout,
+# risers from the outermost +X screw straight up,
 # their four rows (the native two and RISER_TAP_CALLOUT's two) ~238..258,
 # under the border; the feed lever (the -Y hole) down-left, its three rows
 # (with LEVER_TAP_CALLOUT) between the CrX and ClX lanes.
@@ -314,8 +305,8 @@ CR_CALLOUT_XY = (0.377, 0.230)
 # screw 4 then passes clear right of the Ø3.00 spot text.
 RISER_CALLOUT_XY = (0.312, 0.248)
 # The lever callout 2.5 mm right of 0.179 (round 8): its bottom row and
-# shoulder (sheet x ~147..218) then stand ~2.6 clear of HubX's MIDWAY A1-B1
-# row (right end x 144.3), its shoulder ~4 short of HubX's extension line.
+# shoulder (sheet x ~147..218) then stand ~2.6 clear of LeverX's function
+# row (right end x 144.3), its shoulder ~4 short of LeverX's extension line.
 LEVER_CALLOUT_XY = (0.1815, 0.143)
 
 part_metadata(
@@ -381,14 +372,14 @@ requirement(
 # The pin chain's tight bands, each on its printed (rounded) nominal: B1 from
 # A1 by the spacing; A2/B2 from A1/B1 by (dX, dY).
 _CHAIN_PLACES = part_spec.DRAWING_PRECISION_BY_NAME["PinSpacing"]
-_STATION_PLACES = part_spec.DRAWING_PRECISION_BY_NAME["HubX"]
+_STATION_PLACES = part_spec.DRAWING_PRECISION_BY_NAME["LeverX"]
 _BAND = (part_spec.POSITION_BAND, -part_spec.POSITION_BAND)
 _D1 = _printed(part_spec.D1, _CHAIN_PLACES)
 _DX = _printed(abs(part_spec.A2_DX), _CHAIN_PLACES)
 _DY = _printed(part_spec.A2_DY, _CHAIN_PLACES)
-# A1, the X datum, from the tap axis (the model origin's X) at the title
-# block's .XXX band: the print's HubX (driven equal to A1X) runs from A1 to
-# the HUB spot, its extension line through the lever taps.
+# A1, the X datum, from the lever taps' axis (the model origin's X) at the
+# title block's .XXX band: the print's LeverX (driven equal to A1X) runs from
+# A1 to the upper lever tap, its extension line through both taps.
 _A1X = _printed(abs(_A1[0]), _STATION_PLACES)
 
 
@@ -399,8 +390,8 @@ def _from_a1(x: float, places: int) -> float:
 
 _CHAIN: dict[str, dict[str, tuple[Any, tuple[Any, ...]]]] = {
     "A1": {
-        "station": (_limits(abs(_A1[0]), _STATION_PLACES), ("PIN_HOLES", "STATIONS", "HUB")),
-        "station_nominal": (_A1X, ("PIN_HOLES", "STATIONS", "HUB")),
+        "station": (_limits(abs(_A1[0]), _STATION_PLACES), ("PIN_HOLES", "STATIONS")),
+        "station_nominal": (_A1X, ("PIN_HOLES", "STATIONS")),
     },
     "B1": {
         "station": (limits(_D1, _CHAIN_PLACES, _BAND), ("D1", "POSITION_BAND")),
@@ -468,7 +459,7 @@ for _prefix, (_x, _y) in part_spec.SPOTS.items():
         # The printed stations are inspected too (Codex #1582).
         requirements=("dia", "angle_deg", "station", "height"),
         fields={
-            "at": ([_x, 0.0, -_y], ("SPOTS", "HUB", "CL")),
+            "at": ([_x, 0.0, -_y], ("SPOTS", "CL")),
             "dia": (_limits(part_spec.SPOT_DIA, _SPOT_DIA_PLACES), ("SPOT_DIA",)),
             "dia_nominal": (part_spec.SPOT_DIA, ("SPOT_DIA",)),
             "angle_deg": (part_spec.SPOT_ANGLE, ("SPOT_ANGLE", "CALLOUT_SUFFIXES")),
@@ -506,7 +497,7 @@ _TAPS = (
         part_spec.RISER_STATION_PLACES,
     ),
     (
-        # On the tap axis: HubX's extension line is their X station.
+        # On the tap axis: LeverX's extension line is their X station.
         "lever_tap",
         part_spec.LEVER_HOLES,
         part_spec.LEVER_THREAD,
@@ -1146,7 +1137,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     on_top = _view_mapper(adapter, top)
-    # The spot heights and Ø3 live on SpotReference and every X station from
+    # The spot's height and Ø3 live on SpotReference and every X station from
     # A1 on StationReference, sketches the part saves hidden:
     # _drawing_hidden_sketches shows them in the view that imports them.
     annotations = hidden_sketches.curate_view_dimensions(
