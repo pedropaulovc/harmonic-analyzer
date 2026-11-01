@@ -19,7 +19,8 @@ CUT_TO_FIT_SHORT_MM = 0.127  # .005 in
 # platform's engagement stack spends it at the plate underside.
 SCREW_CUT_END_BREAK_MM = 0.254  # .010 in
 # MHA-DT-20's tapped post holes take its title block's general edge break at
-# both ends: no local deburr limit (Main, 2026-11-01; ruling #1019 stays open).
+# both ends: no local deburr limit (Main, 2026-11-01; owner accepted the 0.87D
+# this leaves, MHA-DT-VN-61's RV-01).
 PLATE_TAP_EDGE_BREAK_MM = 0.254  # .010 in
 # MHA-DT-VN-61 prints its reference cut length in inches at these places (#290).
 CUT_LENGTH_PLACES = 2
