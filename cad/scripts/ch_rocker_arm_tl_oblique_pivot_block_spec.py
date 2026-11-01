@@ -17,6 +17,10 @@ metric shop tap becomes an extended-thread 5/16-18 precision shoulder screw): a
 .375 REAM_SLIDE seat on the owned .3760 reamer, and a 5/16-18 tap through
 below it. The shop cuts the screw's thread to length so that its full-form
 engagement meets 1.5D and its tip stands inside the block at every band.
+
+The four M4 carriage screws are cut to fit at assembly (owner ruling
+2026-11-01, option A): each is cut to its own measured counterbore floor, so
+its reach into the HGH15CA's 5 mm deep M4 holes carries only the cut band.
 """
 from __future__ import annotations
 
@@ -70,10 +74,11 @@ BOLT_X = BOLT_Y = 13.0  # HGH15CA 26 x 26 M4 pattern (vendor)
 BOLT_POINTS = tuple((x, y) for x in (-BOLT_X, BOLT_X) for y in (-BOLT_Y, BOLT_Y))
 HOLE_DIA = 4.572  # .18, M4 clearance
 CBORE_DIA = 7.874  # .31, M4 socket head
-# .614: the M4 x 20 keeps its 1.1D nominal reach (20 mm less .614 in is at
-# least 4.4 mm) and, long and floor-low at their bands, still stops short of
-# the M4 x 5 thread end.
-CBORE_FLOOR = 15.5956  # .614
+# .570 (owner ruling 2026-11-01, option A): every M4 x 20 is cut to its own
+# counterbore at assembly (rule 19), so the floor sits low enough that the
+# longest cut a high floor needs is still shorter than the shortest bought
+# screw.
+CBORE_FLOOR = 14.478  # .570
 CBORE_DEPTH = BLOCK_HEIGHT - CBORE_FLOOR
 CBORE_FLOOR_REFERENCE = "CboreFloorReference"
 CARRIAGE_THREAD_DEPTH = 5.0  # the HGH15CA's M4 x 5 (vendor)
@@ -147,10 +152,21 @@ _ROW_BAND = max(_band(name) for name in ("CarriageDrills3Y", "CarriageDrills4Y")
 CBORE_END_WALL_MIN = BLOCK_X1 - BOLT_X - _CBORE_R_MAX - _band("BlockLength") - _band("PlanHole2X")
 CBORE_SIDE_WALL_MIN = (BLOCK_WIDTH / 2 - BOLT_Y - _CBORE_R_MAX - _ROW_BAND
                        - _band("BlockWidth") - _band("BlockSideY"))
-# The M4 x 20 carriage screws' reach into the HGH15CA's M4 x 5 holes.
-SCREW_LENGTH, SCREW_LENGTH_TOL = 20.0, 0.42
-ENGAGEMENT_MIN = SCREW_LENGTH - SCREW_LENGTH_TOL - CBORE_FLOOR - _band("CboreFloor")
-ENGAGEMENT_MAX = SCREW_LENGTH + SCREW_LENGTH_TOL - CBORE_FLOOR + _band("CboreFloor")
+# The M4 x 20 carriage screws' reach into the HGH15CA's M4 x 5 holes. No
+# bought length band reaches 1.5D short of the thread end, so each screw is
+# cut to fit (rule 19): the fitter measures its counterbore floor's height to
+# .001 and cuts the screw to that height plus SCREW_REACH, ±.005 under the
+# head. The reach then carries only the cut band and the reading, never the
+# bought ±0.42 or the floor's own band.
+SCREW_LENGTH, SCREW_LENGTH_TOL = 20.0, 0.42  # as bought
+SCREW_REACH = 4.8006  # .189 into the carriage
+SCREW_CUT_BAND = printed_band_mm(3, unit=UNIT)  # ±.005
+SCREW_MEASURE_BAND = 0.0254  # the .001 floor reading
+SCREW_CUT_LENGTH = CBORE_FLOOR + SCREW_REACH  # .759 at the nominal floor: the model
+ENGAGEMENT_MIN = SCREW_REACH - SCREW_CUT_BAND - SCREW_MEASURE_BAND  # .183, 1.16D
+ENGAGEMENT_MAX = SCREW_REACH + SCREW_CUT_BAND + SCREW_MEASURE_BAND
+SCREW_CUT_LENGTH_MAX = (CBORE_FLOOR + _band("CboreFloor") + SCREW_MEASURE_BAND
+                        + SCREW_REACH + SCREW_CUT_BAND)
 ENGAGEMENT_TEXT = f"{math.floor(ENGAGEMENT_MIN / 25.4 * 1000.0) / 1000.0:.3f}".lstrip("0")
 # The cut screw in its tap: full-form engagement (rule 18) is the cut thread
 # less 1.5 incomplete pitches; the tip stands inside the block at every band
@@ -178,7 +194,7 @@ CALLOUTS_BELOW = {
     # Under the value, two rows, right of B-B (an above-text newline dropped
     # the note, farm run 20261027T175531766Z): the block height's extension
     # lines pass left of it.
-    "CboreFloor": f"M4x20 IN HGH15CA:\n{ENGAGEMENT_TEXT} MIN ENGAGEMENT",
+    "CboreFloor": f"M4 CUT TO FIT:\n{ENGAGEMENT_TEXT} MIN ENGAGEMENT",
     "BlockLength": "SETS COUNTERBORE END WALL",
     # Two narrow rows between the row (CarriageDrills3Y/4Y) values and the
     # BlockSideY and TL-32 PlanOverallY dimension lines (x 231 and 285 on TL-32's
@@ -196,9 +212,13 @@ WALLS_MM = {
 assert min(WALLS_MM.values()) >= WALL_TARGET_MM
 assert CBORE_END_WALL_MIN >= WALL_TARGET_MM
 assert CBORE_SIDE_WALL_MIN >= WALL_TARGET_MM
-# 0.045: the worst-case reach margin, the long screw at the low floor still
+# 0.045: the worst-case reach margin, the long cut on a misread floor still
 # stopping short of the carriage's M4 x 5 thread end.
-assert 3.8 <= round(ENGAGEMENT_MIN, 6) <= round(ENGAGEMENT_MAX, 6) <= CARRIAGE_THREAD_DEPTH - 0.045
+assert ENGAGEMENT_MIN <= ENGAGEMENT_MAX <= CARRIAGE_THREAD_DEPTH - 0.045
+# The owner-accepted reach (jig assembly RV-05), above the 1.1D it replaces.
+assert ENGAGEMENT_MIN >= 1.16 * 4.0
+# Every screw a high floor needs is still cut from the shortest bought one.
+assert SCREW_CUT_LENGTH_MAX < SCREW_LENGTH - SCREW_LENGTH_TOL
 assert PIVOT_TAP_DRILL < BORE_LIMITS[0]
 # Rule 18 at the worst case, and the tip inside the block (.011 minimum).
 assert PIVOT_THREAD_ENGAGEMENT_MIN >= 1.5 * pivot_screw.THREAD_DIA

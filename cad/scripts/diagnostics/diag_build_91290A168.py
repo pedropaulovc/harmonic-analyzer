@@ -17,6 +17,11 @@ sane and saves it under cad/out/reference for inspection.
 Frame: axis +Y, head up, bearing face (head underside) at y = 0, tip at
 y = -length.
 
+Cut to fit (optional ``cut_length``; MHA-CH-06-TL-VN-64, owner ruling
+2026-11-01): a screw cut at assembly is drawn as installed, the same recipe
+at the cut length under the head, its 0.75P tip chamfer standing for the
+broken cut end.
+
 Run standalone (SolidWorks open)::
 
     uv run python cad\scripts\diagnostics\diag_build_91290A168.py
@@ -25,6 +30,7 @@ Run standalone (SolidWorks open)::
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -38,8 +44,15 @@ from diagnostics.diag_mcmaster_socket_head import (  # noqa: E402
 
 
 @stock_recipe("91290A168", threaded=True)
-async def build_91290A168(adapter, truth=None):
-    await build_socket_head(adapter, DIMS)
+async def build_91290A168(adapter, truth=None, cut_length: float | None = None):
+    if cut_length is None:
+        await build_socket_head(adapter, DIMS)
+        return
+    if not 0.0 < cut_length < DIMS.length:
+        raise ValueError(
+            f"91290A168: a {cut_length} mm cut is not inside the {DIMS.length} mm screw"
+        )
+    await build_socket_head(adapter, replace(DIMS, length=cut_length))
 
 
 async def build_catalog(adapter) -> dict[str, str]:

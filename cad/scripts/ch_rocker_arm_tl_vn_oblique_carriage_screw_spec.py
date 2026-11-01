@@ -24,9 +24,16 @@ Sources:
   2026-10-17).  The recipe is ``diagnostics/diag_build_91290A168.py``; its
   standalone run is catalog-only.
 
+Cut to fit (owner ruling 2026-11-01, option A): each screw is cut at assembly
+to its own counterbore floor (MHA-CH-06-TL-00 step 5; the pivot block spec's
+``SCREW_REACH``), so the part is modelled as installed, ``CUT_LENGTH`` under
+the head at the nominal .570 floor (``build_91290A168(cut_length=...)``). The
+sheet prints that length as a reference, cut to fit, and the as-supplied 20 mm
+as a separate stock witness beside the solid.
+
 Part frame: screw axis local +Y through the origin, published as
 ``ScrewAxis`` (Front ∩ Right); the bearing face (head underside) at y = 0 (the Top Plane), the tip at
-y = -length.  Mate the Top Plane to the head's seat, the floor of TL-22's counterbore.
+y = -CUT_LENGTH.  Mate the Top Plane to the head's seat, the floor of TL-22's counterbore.
 """
 
 from __future__ import annotations
@@ -48,6 +55,9 @@ if abs(DIMS.major_dia - ROW.major_mm) > 1e-3:
     raise AssertionError(
         f"{SKU}: major {DIMS.major_dia}, the row's thread is {ROW.major_mm}"
     )
+CUT_LENGTH = ROW.cut_length_mm  # 19.28, .570 floor + .189 reach
+if not 0.0 < CUT_LENGTH < DIMS.length:
+    raise AssertionError(f"{SKU}: a {CUT_LENGTH} mm cut is not inside the bought screw")
 
 # Exact-current product table and engineering drawing read 2026-10-21.
 # Hidden nominal source references, not physical-edge/replica assertions.
@@ -58,7 +68,11 @@ SUPPLIER_DRAWING_URL = (
     "https://www.mcmaster.com/mvC/Library/CAD2/20260302/12D8C87B/"
     "91290A168_Black-Oxide%20Alloy%20Steel%20Socket%20Head%20ScrewX.GIF"
 )
+# The installed screw is cut to fit: its length on the solid prints as a
+# reference (CutLength), and the as-supplied 20 mm is a SEPARATE stock witness
+# left of the solid, labelled as stock (the 91794A055 cut-to-fit idiom).
 SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("CutLength", -CUT_LENGTH, "vertical"),
     ("SupplierLength", -DIMS.length, "vertical"),
     ("SupplierHeadDiameter", DIMS.head_dia, "horizontal"),
     ("SupplierHeadHeight", DIMS.head_h, "vertical"),
@@ -66,10 +80,11 @@ SUPPLIER_REFERENCE_DIMENSIONS = (
     ("SupplierDriveWidth", DIMS.socket_af, "horizontal"),
 )
 SUPPLIER_REFERENCE_STARTS = {
-    "SupplierLength": (DIMS.major_dia / 2.0, 0.0),
+    "CutLength": (DIMS.major_dia / 2.0, 0.0),
+    "SupplierLength": (-DIMS.head_dia, 0.0),
     "SupplierHeadDiameter": (-DIMS.head_dia / 2.0, 0.0),
     "SupplierHeadHeight": (DIMS.head_dia / 2.0, 0.0),
-    "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, -DIMS.length / 2.0),
+    "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, -CUT_LENGTH / 2.0),
     "SupplierDriveWidth": (-DIMS.socket_af / 2.0, 0.0),
 }
 SUPPLIER_REFERENCE_PLANES = {
@@ -77,14 +92,16 @@ SUPPLIER_REFERENCE_PLANES = {
     "SupplierDriveWidth": "Top",
 }
 SUPPLIER_REFERENCE_SIDES = {
-    "SupplierLength": "right",
+    "CutLength": "right",
+    "SupplierLength": "left",
     "SupplierHeadDiameter": "top",
     "SupplierHeadHeight": "left",
     "SupplierThreadDiameter": "bottom",
     "SupplierDriveWidth": "bottom",
 }
 SUPPLIER_REFERENCE_FORMATS = {
-    "SupplierLength": (0, "length", None, None),
+    "CutLength": (2, "length", None, "CUT TO FIT"),
+    "SupplierLength": (0, "length", None, "AS-SUPPLIED STOCK LENGTH"),
     "SupplierHeadDiameter": (0, "diameter", None, None),
     "SupplierHeadHeight": (0, "length", None, None),
     "SupplierThreadDiameter": (0, "diameter", None, "M4 x 0.7"),

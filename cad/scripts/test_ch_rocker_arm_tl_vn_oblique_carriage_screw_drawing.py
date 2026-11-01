@@ -33,7 +33,11 @@ def test_catalogue_row_is_the_registered_mcmaster_screw() -> None:
     assert row["number"] == "MHA-CH-06-TL-VN-64"
     assert row["process"] == "purchased"
     assert spec.SKU in row["material_specification"]
-    assert "installation_notes" not in row
+    # Cut to fit at assembly (owner ruling 2026-11-01): the note names the
+    # jig step that owns the fit-up, the general line says "cut at assembly".
+    assert row["installation_notes"].strip() == (
+        "CUT EACH TO ITS OWN COUNTERBORE FLOOR PER MHA-CH-06-TL-00 STEP 5."
+    )
     for key in ("title", "stock_name", "supplier", "finish"):
         assert not any(ch.isdigit() for ch in row[key]), key
     metadata = recipe_declaration(spec.SKU, recipe.build_91290A168)
@@ -98,6 +102,44 @@ def test_frame_puts_the_bearing_face_at_y0() -> None:
     assert d.tip_y == pytest.approx(-spec.ROW.length_mm)
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'screw_axis_planes=("Front Plane", "Right Plane")' in source
+
+
+def test_modelled_as_cut_to_fit_from_the_bought_screw() -> None:
+    """Owner ruling 2026-11-01 (option A): each screw is cut to its own
+    counterbore floor, so the part is the installed cut screw at the nominal
+    .570 floor, the sheet's length a reference and the 20 mm a stock witness."""
+    import ch_rocker_arm_tl_oblique_pivot_block_spec as block
+
+    assert (
+        spec.CUT_LENGTH
+        == spec.ROW.cut_length_mm
+        == pytest.approx(block.CBORE_FLOOR + block.SCREW_REACH)
+    )
+    assert spec.CUT_LENGTH == pytest.approx((0.570 + 0.189) * IN)
+    assert block.SCREW_CUT_LENGTH_MAX < dims.DIMS.length - block.SCREW_LENGTH_TOL
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'parameters={"cut_length": supplier.CUT_LENGTH}' in source
+    recipe_source = Path(recipe.__file__).read_text(encoding="utf-8")
+    assert (
+        "build_socket_head(adapter, replace(DIMS, length=cut_length))" in recipe_source
+    )
+    references = {name: value for name, value, _ in spec.SUPPLIER_REFERENCE_DIMENSIONS}
+    assert references["CutLength"] == -spec.CUT_LENGTH
+    assert references["SupplierLength"] == -dims.DIMS.length
+    assert spec.SUPPLIER_REFERENCE_FORMATS["CutLength"][3] == "CUT TO FIT"
+    assert (
+        spec.SUPPLIER_REFERENCE_FORMATS["SupplierLength"][3]
+        == "AS-SUPPLIED STOCK LENGTH"
+    )
+    # The stock witness stands clear of the installed solid.
+    assert (
+        spec.SUPPLIER_REFERENCE_STARTS["SupplierLength"][0] < -dims.DIMS.head_dia / 2.0
+    )
+    draw_source = (
+        Path(part.__file__).parent
+        / "draw_ch_rocker_arm_tl_vn_oblique_carriage_screw.py"
+    ).read_text(encoding="utf-8")
+    assert "cut_to_suit=True" in draw_source
 
 
 def test_purchased_sheet_documents_the_built_part() -> None:

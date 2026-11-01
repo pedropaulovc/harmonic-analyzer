@@ -1188,8 +1188,8 @@ FASTENER_TABLE = {
     ),
     "BLOCK_TO_CARRIAGE": (
         "M4 X 20 SHCS", 8,
-        pivot_block.SCREW_LENGTH - pivot_block.CBORE_FLOOR,
-        pivot_block.SCREW_LENGTH - pivot_block.CBORE_FLOOR - pivot_block.CARRIAGE_THREAD_DEPTH,
+        pivot_block.SCREW_REACH,
+        pivot_block.SCREW_REACH - pivot_block.CARRIAGE_THREAD_DEPTH,
     ),
     "KP08_TO_BRACKET": ("#6-32 X 5/8 SHCS", 4, 10.875, -14.525),
     "NUT_TO_FEED_BLOCK": ("#4-40 X 1/2 BHCS", 4, 9.2, 9.2 - feed_block.SCREW_TAP_DEPTH),
@@ -1242,12 +1242,16 @@ def test_fastener_table_engagement_and_protrusion() -> None:
         fasteners.BLOCK_TO_CARRIAGE.joint,
         fasteners.LEVER_TO_CARRIER.joint,
     }
-    # The M4 x 20 reaches from the .614 counterbore floor, 1.1D nominal and
-    # short of the carriage's M4 x 5 thread end.
-    assert fasteners.BLOCK_TO_CARRIAGE.engagement_mm == pytest.approx(
-        pivot_block.SCREW_LENGTH - pivot_block.CBORE_FLOOR
+    # Each M4 x 20 is cut to fit .189 past its own .570 counterbore floor
+    # (owner ruling 2026-11-01): 1.2D nominal, short of the M4 x 5 thread end.
+    assert fasteners.BLOCK_TO_CARRIAGE.cut_length_mm == pytest.approx(
+        pivot_block.CBORE_FLOOR + pivot_block.SCREW_REACH
     )
-    assert 1.1 * 4.0 <= fasteners.BLOCK_TO_CARRIAGE.engagement_mm < pivot_block.CARRIAGE_THREAD_DEPTH
+    assert fasteners.BLOCK_TO_CARRIAGE.engagement_mm == pytest.approx(pivot_block.SCREW_REACH)
+    assert 1.2 * 4.0 <= fasteners.BLOCK_TO_CARRIAGE.engagement_mm < pivot_block.CARRIAGE_THREAD_DEPTH
+    assert [row for row in fasteners.FASTENERS if row.cut_length_mm is not None] == [
+        fasteners.BLOCK_TO_CARRIAGE
+    ]
     # A 1-1/8 in lever screw would stand out of the carrier's underside.
     assert (
         fasteners.inch_mm("1-1/8") - fasteners.LEVER_TO_CARRIER.grip_mm
@@ -1271,6 +1275,31 @@ def test_fastener_table_engagement_and_protrusion() -> None:
     )
     assert fasteners.HOLD_DOWN_STUD_THREAD == "1/2-13"
     assert fasteners.HOLD_DOWN_STUD_COUNT == 4
+
+
+def test_carriage_screws_are_cut_to_fit_under_a_pending_owner_exception() -> None:
+    """Owner ruling 2026-11-01 (option A): step 5 measures each counterbore
+    floor and cuts each M4 x 20 to it; RV-05 accepts the 1.16D reach."""
+    from _paths import CAD_ROOT
+    from machinist_exceptions import load_exceptions
+
+    step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("5. "))
+    assert (
+        "MEASURE EACH BLOCK'S 4 COUNTERBORE FLOOR HEIGHTS ABOVE ITS BOTTOM TO .001. "
+        f"CUT EACH M4 X 20 SHCS {spec._item(spec.CARRIAGE_SCREW)} TO ITS OWN FLOOR "
+        "HEIGHT + .189 (+/-.005) UNDER THE HEAD;"
+    ) in step
+    assert "EACH TIP ENGAGES .183-.195 OF THE CARRIAGE'S M4 X 5 AND NEVER BOTTOMS." in step
+    entries = {
+        entry.id: entry
+        for entry in load_exceptions(CAD_ROOT / "config", "ch_rocker_arm_tl_oblique_jig_assembly", "assembly")
+    }
+    reach = entries["RV-05"]
+    assert reach.kind == "accept"
+    assert "+ .189" in reach.where and ".183-.195" in reach.where
+    assert "1.16D" in reach.finding
+    assert "pending confirmation" in reach.reason
+
 
 
 def test_turned_over_bar_counterbores_clear_the_flange_nuts() -> None:

@@ -13,4 +13,8 @@ ch-rocker-arm-tl-vn-oblique-carriage-screw:
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: purchased
+  # Each screw is cut to its own counterbore floor (owner ruling 2026-11-01);
+  # the fit-up lives in the jig assembly's step 5.
+  installation_notes: |
+    CUT EACH TO ITS OWN COUNTERBORE FLOOR PER MHA-CH-06-TL-00 STEP 5.
   drawing_unit: mm
