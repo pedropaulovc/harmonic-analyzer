@@ -40,8 +40,9 @@ fabrication sheet, a metric-only vendor line's dimension (HGR15R, KP08, Tr8)
 keeps its exact millimetres: the builder gives the model dimension its own
 symmetric band (`set_dimension_symmetric_tolerance(display_unit="mm")`) and
 `_metric_vendor_dimension.set_metric_vendor_units` prints it in mm labelled
-`mm`; the draw script proves the import kept that with
-`assert_imported_metric_dimensions`.
+`mm` in the model; the imported dimension takes the sheet's document units,
+so the draw script prints it in mm again and reads it back with
+`_drawing_metric_vendor.print_imported_metric_dimensions`.
 
 A converted package's builder selects the model's document units with
 `_document_units.apply_package_model_units` right after `create_part` or

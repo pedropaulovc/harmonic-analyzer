@@ -9,7 +9,9 @@ dimension carries its own symmetric band in mm, set beside this helper with
 ``_drawing_tolerances.set_dimension_symmetric_tolerance(display_unit="mm")``.
 
 The part authors the presentation on its model dimension (units, places,
-suffix); the sheet imports it and only proves it survived.
+suffix); an imported dimension keeps the places and suffix but takes the
+sheet's document units, so ``_drawing_metric_vendor`` sets millimetres on the
+sheet and reads them back.
 """
 
 from __future__ import annotations
