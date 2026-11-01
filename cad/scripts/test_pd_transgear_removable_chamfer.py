@@ -72,10 +72,7 @@ def _assert_sections(points: dict[str, part.Point], teeth: int) -> None:
         assert math.degrees(
             math.atan(abs((tip[1] - inner[1]) / (tip[0] - inner[0])))
         ) == pytest.approx(spec.CHAMFER_FACE_ANGLE_DEG)
-        assert (
-            inner[0]
-            > seat_geometry.PIN_CIRCLE_RADIUS + spec.PIN_HOLE_DIA / 2.0
-        )
+        assert inner[0] > seat_geometry.PIN_CIRCLE_RADIUS + spec.PIN_HOLE_DIA / 2.0
     # The overrun triangles themselves remain disjoint, not just their in-part portions.
     assert points["rear_tip"][1] < points["front_tip"][1]
 

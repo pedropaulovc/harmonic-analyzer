@@ -34,7 +34,8 @@ def test_ruled_lengths_print_at_the_cluster_band():
     )
     for label, _, band in (*TIGHTENED, *PRINTED_LENGTHS):
         assert band in (
-            pytest.approx(PRINTED_LENGTH_BAND), pytest.approx(PRINTED_LENGTH_BAND_IN)
+            pytest.approx(PRINTED_LENGTH_BAND),
+            pytest.approx(PRINTED_LENGTH_BAND_IN),
         ), label
     assert HUB.HUB_LENGTH == FIT.HUB_LENGTH
     assert FRONT_BUSHING.LENGTH == FIT.FRONT_BUSHING_LENGTH
