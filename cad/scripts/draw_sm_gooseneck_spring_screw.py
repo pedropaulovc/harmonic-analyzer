@@ -522,6 +522,9 @@ def _dress_underhead_corner(
     )
 
 
+@_telemetry.traced(
+    "drawing.sm_gooseneck_spring_screw.shank_thread", label_param="label"
+)
 def _show_shank_thread(adapter: Any, view: Any, label: str) -> None:
     """Import the part's one cosmetic 1/4-28 into ``view`` and hide its
     automatic callout: the sheet's attached THREAD_CALLOUT is the one callout
