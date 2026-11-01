@@ -25,7 +25,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _machinist_review_mode import MachinistReviewMode
 from _oblique_block_drawing import draw_block
 from _paths import CAD_ROOT
-from _metric_vendor_dimension import assert_imported_metric_dimensions
+from _drawing_metric_vendor import assert_imported_metric_dimensions
 from _part_properties import part_drawing_unit
 import _telemetry
 from _session import run_build

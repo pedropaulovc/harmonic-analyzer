@@ -14,11 +14,7 @@ suffix); the sheet imports it and only proves it survived.
 
 from __future__ import annotations
 
-from typing import Any, Iterable
-
-from solidworks_mcp.adapters.solidworks.drawing import (
-    dimension_name as _annotation_name,
-)
+from typing import Any
 
 import _telemetry
 from _com import _early_bound
@@ -61,30 +57,4 @@ def set_metric_vendor_units(
         raise RuntimeError(
             f"{label}: millimetre presentation did not persist: "
             f"{_presentation(display)!r} != {expected!r}"
-        )
-
-
-@_telemetry.traced("drawing.metric_vendor_dimensions")
-def assert_imported_metric_dimensions(
-    adapter: Any, annotations: Iterable[Any], places: dict[str, int]
-) -> None:
-    """Prove each named imported dimension still prints mm at its places with
-    the ``mm`` label; an unmatched name is an error."""
-    remaining = dict(places)
-    for raw in annotations:
-        annotation = _early_bound(raw, "IAnnotation")
-        name = _annotation_name(adapter, annotation)
-        digits = remaining.pop(name, None)
-        if digits is None:
-            continue
-        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        expected = (False, _SW_MM, digits, MM_SUFFIX)
-        if _presentation(display) != expected:
-            raise RuntimeError(
-                f"imported dimension {name!r} lost its millimetre presentation: "
-                f"{_presentation(display)!r} != {expected!r}; rebuild the source part"
-            )
-    if remaining:
-        raise RuntimeError(
-            f"metric dimensions never reached the sheet: {sorted(remaining)}"
         )
