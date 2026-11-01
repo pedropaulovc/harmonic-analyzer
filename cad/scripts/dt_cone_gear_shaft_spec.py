@@ -170,14 +170,17 @@ if THRUST_RING_MIN - 2.0 * THRUST_EDGE_BREAK_MAX < THRUST_RING_FLOOR - 1e-9:
 COLLAR_ROOT_RADIUS_MAX = 0.0508  # .002
 # The callout under the collar's reference diameter: the stock statement in
 # the U41 plate's form ("1/4 PLATE AS SUPPLIED"), so the bar size stays out
-# of the MATERIAL cell, the collar's own edge break, tighter than the title
-# block's, its root limit, and the reason for both: the faces are seats
-# (machinist review r1, run 20261018T054926125Z: a tight break and a sharp
-# root need their function at the callout).
+# of the MATERIAL cell, then each tighter-than-title-block limit followed by
+# its reason (machinist review r1, run 20261018T054926125Z: a tight break and
+# a sharp root need their function at the callout).  The edge break keeps the
+# MHA-DT-05 thrust ring above its floor (above); "SEATS" alone did not say
+# why the OD edge matters, since the 64T's seat annulus sits inside it
+# (machinist review, PR #2107).  The roots' reason is that both faces seat.
 COLLAR_STOCK_CALLOUT = "\n".join(
     (
         "5/8 BAR AS SUPPLIED",
         f"EDGE BREAK {inch_text(THRUST_EDGE_BREAK_MAX, 3)} MAX",
+        "FOR MHA-DT-05 THRUST RING",
         f"ROOTS R{inch_text(COLLAR_ROOT_RADIUS_MAX, 3)} MAX",
         "SEATS MHA-DT-05 AND 64T",
     )

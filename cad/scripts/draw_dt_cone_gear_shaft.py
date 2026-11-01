@@ -254,8 +254,8 @@ DIAMETER_TEXT_WIDTH = 0.032
 # what the three-place steps and web locate (machinist review r1).
 DIMENSION_SUFFIXES = {**SEAT_MATE_SUFFIXES, **LENGTH_FUNCTION_SUFFIXES}
 # The collar prints its reference diameter over the stock statement, its
-# break, root limit and their reason, lines as wide as "5/8 BAR AS SUPPLIED"
-# or wider.  At LENGTH_CHAR_WIDTH a line
+# break and root limit, each with its reason, lines as wide as "5/8 BAR AS
+# SUPPLIED" or wider.  At LENGTH_CHAR_WIDTH a line
 # that long is wider than the whole journal land, so hanging right from its
 # rim arrow the block ran under the pivot-journal finish and that finish's
 # leader crossed it (final877 eye pass).  The build lifts the block above the
