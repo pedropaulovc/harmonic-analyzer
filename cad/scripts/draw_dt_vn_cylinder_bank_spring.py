@@ -44,6 +44,7 @@ from _layout_geometry import ARROW_TEXT_CLEARANCE_M
 from _part_properties import part_drawing_unit
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
@@ -64,6 +65,7 @@ from vn_disc_spring_supplier_stock import (
 )
 
 
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SPEC = DRAWINGS_BY_NAME["dt_vn_cylinder_bank_spring"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "WAVE DISC SPRING"
@@ -320,6 +322,9 @@ def _import_sizes(
                 "configuration": configuration,
                 "precision": supplier_spec.SUPPLIER_DRAWING_PRECISION[field],
                 "presentation": "diameter" if field in ("ID", "OD") else "length",
+                # A wave spring's .050 could be read as its strip; the
+                # catalogue's figure is the free height (machinist review).
+                "callout": "FREE" if field == "FREE_HEIGHT" else None,
             }
             supplier_reference_dimension(
                 adapter,
