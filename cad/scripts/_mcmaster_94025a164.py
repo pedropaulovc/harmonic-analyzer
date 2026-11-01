@@ -69,12 +69,24 @@ SUPPLIER_REFERENCE_DIMENSIONS = (
     ("SupplierLength", SS_LEN, "vertical"),
     ("SupplierThreadDiameter", 2.0 * SS_MAJOR_R, "horizontal"),
 )
+# The shown construction lines print grey over model edges but under dimension
+# extension lines of the same width, so each lies under one of this sheet's
+# own extension lines (FRONT 4:1; gap ~0.76 sheet mm = 0.19 model mm):
+# - the diameter chord on the slot-end face (y=0), under the length's lower
+#   extension line, which runs left across that end from x=+SS_MAJOR_R;
+# - the length on the right crest line, under the diameter's right extension
+#   line, which rises from that end face to the top lane.
+# Only the two extension-line gaps at the slot end's chamfered right corner
+# stay bare (0.19 model mm each, in the chamfer's air).
 SUPPLIER_REFERENCE_STARTS = {
     "SupplierLength": (SS_MAJOR_R, 0.0),
-    "SupplierThreadDiameter": (-SS_MAJOR_R, SS_LEN / 2.0),
+    "SupplierThreadDiameter": (-SS_MAJOR_R, 0.0),
 }
 SUPPLIER_REFERENCE_PLANES = {}
-SUPPLIER_REFERENCE_SIDES = {}
+SUPPLIER_REFERENCE_SIDES = {
+    "SupplierLength": "left",
+    "SupplierThreadDiameter": "top",
+}
 SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (3, "length", None, None),
     "SupplierThreadDiameter": (3, "diameter", None, "10-32"),

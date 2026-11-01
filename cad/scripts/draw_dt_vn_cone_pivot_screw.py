@@ -38,6 +38,18 @@ ITEM = "SHOULDER SCREW, Ø1/4 x 1/4 SHOULDER, #10-24 x 3/8 THREAD"
 # review, run 20261101T105537488Z). One drop more puts ~4 mm of paper between
 # Ø.190's line and Ø.250's text; the pre-fit margin reserves it.
 SHOULDER_DIAMETER_DROP_M = 0.006
+# Right lanes: (.188) at 6 mm, (.375) at 14 mm. Both texts shelve right of
+# their lanes with the arrows outside, and (.188)'s shelf reaches ~24 mm out,
+# so (.375)'s upper arrow line rose into it and its lower one ended on the
+# Ø.190 text (~18 mm out) (r13 review, run 20261101T142805608Z). At 28 mm the
+# (.375) lane clears both; the pre-fit margin reserves the shift.
+THREAD_LENGTH_SHIFT_M = 0.014
+# name -> (dx, dy) sheet metres, applied to the whole dimension before the
+# purchased builder shelves struck text.
+LANE_MOVES = {
+    "SupplierShoulderDiameter": (0.0, -SHOULDER_DIAMETER_DROP_M),
+    "SupplierThreadLength": (THREAD_LENGTH_SHIFT_M, 0.0),
+}
 
 
 def supplier_margins() -> dict[str, tuple[float, float, float, float]]:
@@ -47,23 +59,34 @@ def supplier_margins() -> dict[str, tuple[float, float, float, float]]:
         sides=SUPPLIER_REFERENCE_SIDES,
     )
     left, bottom, right, top = margins["*Front"]
-    return {**margins, "*Front": (left, bottom + SHOULDER_DIAMETER_DROP_M, right, top)}
+    return {
+        **margins,
+        "*Front": (
+            left,
+            bottom + SHOULDER_DIAMETER_DROP_M,
+            right + THREAD_LENGTH_SHIFT_M,
+            top,
+        ),
+    }
 
 
-def _lower_shoulder_diameter(adapter: Any, displays: dict[str, Any]) -> None:
-    """Move the whole Ø.250 dimension (line and text) one drop further down."""
-    display = _early_bound(displays["SupplierShoulderDiameter"], "IDisplayDimension")
-    # A model annotation may inherit offset mode; move the line, not text alone.
-    display.OffsetText = False
-    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
-    x, y, _z = (float(value) for value in annotation.GetPosition())
-    target = (x, y - SHOULDER_DIAMETER_DROP_M)
-    if not annotation.SetPosition2(*target, 0.0):
-        raise RuntimeError("91829A560: failed to lower the shoulder diameter lane")
-    rebuild_drawing(adapter, label="91829A560 shoulder diameter lane")
-    moved = tuple(float(value) for value in annotation.GetPosition())[:2]
-    if not all(math.isclose(a, b, rel_tol=0.0, abs_tol=5e-4) for a, b in zip(moved, target)):
-        raise RuntimeError(f"91829A560: shoulder diameter lane read back at {moved!r}")
+def _move_lanes(adapter: Any, displays: dict[str, Any]) -> None:
+    """Move each whole dimension (line and text) by its sheet offset."""
+    targets = {}
+    for name, (dx, dy) in LANE_MOVES.items():
+        display = _early_bound(displays[name], "IDisplayDimension")
+        # A model annotation may inherit offset mode; move the line, not text alone.
+        display.OffsetText = False
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        x, y, _z = (float(value) for value in annotation.GetPosition())
+        targets[name] = (annotation, (x + dx, y + dy))
+        if not annotation.SetPosition2(*targets[name][1], 0.0):
+            raise RuntimeError(f"91829A560: failed to move {name} to its lane")
+    rebuild_drawing(adapter, label="91829A560 supplier lanes")
+    for name, (annotation, target) in targets.items():
+        moved = tuple(float(value) for value in annotation.GetPosition())[:2]
+        if not all(math.isclose(a, b, rel_tol=0.0, abs_tol=5e-4) for a, b in zip(moved, target)):
+            raise RuntimeError(f"91829A560: {name} lane read back at {moved!r}")
 
 
 def _assert_supplier_bands(displays: dict[str, Any]) -> None:
@@ -102,7 +125,7 @@ async def build(adapter: Any) -> dict[str, str]:
             sides=SUPPLIER_REFERENCE_SIDES,
         )
         _assert_supplier_bands(displays)
-        _lower_shoulder_diameter(adapter, displays)
+        _move_lanes(adapter, displays)
 
         def assert_bands() -> None:
             from _supplier_screw_dimensions import assert_supplier_screw
