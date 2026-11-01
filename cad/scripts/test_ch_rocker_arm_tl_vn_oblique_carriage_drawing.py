@@ -294,6 +294,7 @@ def test_spec_is_pure_data() -> None:
     imports = set(re.findall(r"^(?:from|import) (\S+)", source, re.MULTILINE))
     assert imports <= {
         "__future__",
+        "_config",
         "math",
         "ch_rocker_arm_tl_oblique_pivot_block_spec",
         "ch_rocker_arm_tl_vn_oblique_rail_spec",
@@ -350,5 +351,16 @@ def test_sheet_is_the_registered_purchased_part_reference(monkeypatch) -> None:
     assert spec.MAKER_PART in draw.ITEM
 
 
-def test_note_carries_no_numbers() -> None:
-    assert not re.search(r"\d", spec.DRAWING_NOTES)
+def test_note_names_the_rail_by_its_registry_drawing_number() -> None:
+    """Machinist review: the mounting note named the rail only in words."""
+    number = _config.parts("ch-rocker-arm-tl-vn-oblique-rail")["number"]
+    assert spec.RAIL_NUMBER == number
+    assert spec.DRAWING_NOTES == (
+        f"MOUNT ON THE OBLIQUE TRAMMEL RAIL {number}; GREASE THROUGH THE END NIPPLE."
+    )
+    # The number is the only digits the note carries, read from the registry.
+    assert not re.search(r"\d", spec.DRAWING_NOTES.replace(number, ""))
+    source = Path(spec.__file__).read_text(encoding="utf-8")
+    note_source = source[source.index("RAIL_NUMBER = ") :]
+    assert '_config.parts("ch-rocker-arm-tl-vn-oblique-rail")["number"]' in note_source
+    assert number not in note_source
