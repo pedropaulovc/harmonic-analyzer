@@ -585,7 +585,7 @@ Live catalog verification on October 16, 2026:
   fillister family recipe; its derived slot, dome, thread/runout and
   vendor-frame mapping are family assumptions, not verified vendor geometry.
   By explicit owner decision, the receiver uses conventional blind **2-56
-  UNC 2B** taps fastening **MHA-MG-01**, with native **2X Ø.070 DRILL .256**
+  UNC 2B** taps fastening **MHA-MG-01**, with native **2X Ø.070 DRILL .26**
   and **.195 MIN** full thread. There is no additional finished-cavity
   envelope or printed wall-acceptance requirement. The pilot and engagement
   proofs below do not establish all physical thread-cut wall thicknesses.
@@ -621,13 +621,13 @@ Live catalog verification on October 8, 2026:
   **5.00 mm**, printed **.20 ±.01 in**, with end-rib inner caps **Z=±71.20 mm** and outer
   caps retained at **±76.20 mm**. One native **3X .20** dimension sizes them.
   The separate counter-arm leaf remains 5.08 mm.
-  The **.256 ±.005 in** pilot (6.50 mm model depth) and 118° point continue into the
+  The **.26 ±.01 in** pilot (6.604 mm model depth) and 118° point continue into the
   connected 7 mm coefficient plate, not a special deep receiver rib.
   `receiver_pilot_material_wall_budget` / `RECEIVER_PILOT_MATERIAL_WALL_MIN`
   enforce a **≥.080 in (2.032 mm) pilot-only** material design floor. With printed
   **Ø.070 +.004/0**, the maximum radius is **0.9398 mm**; the deepest 0.3°
-  wander is approximately **0.037669 mm**. Actual-top row correlation and the
-  printed thickness limits leave approximately **2.221731 / 2.579731 mm**
+  wander is approximately **0.038865 mm**. Actual-top row correlation and the
+  printed thickness limits leave approximately **2.220535 / 2.578535 mm**
   top/bottom pilot walls. `sm_summing_lever_profile.receiver_pilot_wall_budget`
   separately bounds longitudinal rib-profile walls; native trimmed-face
   comparisons subtract **TAP_DRILL_DIA/2**. The native pilot and cosmetic

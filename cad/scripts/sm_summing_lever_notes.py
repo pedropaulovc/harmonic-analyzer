@@ -158,16 +158,19 @@ SPRING_TAP_CALLOUT_PROCESS = "THREAD THRU COEFFICIENT PLATE\n"
 # stay inside every check (sm_summing_lever_profile.PLATE_TOP_Y_ALLOWANCE).
 BASIC_PLACES = 4
 SPRING_ROW_LOCATORS = ("SpringRowX", "SpringStartZ", "SpringPitch")
-# Every Hole Wizard callout prints .XXX, the #36 and #25 tap drills too
-# (.107, .150).  Both are THRU ALL taps, whose native drill variable is
+# Every Hole Wizard drill diameter prints .XXX, the #36 and #25 tap drills
+# too (.107, .150).  Both are THRU ALL taps, whose native drill variable is
 # <hw-thrutapdrldia>; only the blind bracket taps carry <hw-tapdrldia> and
 # the two depth lengths.
 SPRING_TAP_PRECISION = {"hw-thrutapdrldia": 3}
 COUNTER_TAP_PRECISION = {"hw-thrutapdrldia": 3}
-BRACKET_TAP_PRECISION = dict.fromkeys(
-    ("hw-tapdrldia", "hw-tapdrldepth", "hw-threaddepth"),
-    3,
-)
+# The blind bracket taps' routine drill depth prints .XX (rule 3); its
+# diameter and the full-thread MIN keep three places.
+BRACKET_TAP_PRECISION = {
+    "hw-tapdrldia": 3,
+    "hw-tapdrldepth": 2,
+    "hw-threaddepth": 3,
+}
 # The receiver coordinates (1.1201 / .5807 / .1280) stand off the bracket's
 # millimetre stations: four places hold them.
 RECEIVER_COORDINATE_PLACES = 4

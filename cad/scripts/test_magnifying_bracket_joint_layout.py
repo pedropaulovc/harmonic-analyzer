@@ -173,23 +173,23 @@ def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
     assert joint.ENGAGEMENT_MIN >= 1.5 * joint.SCREW_MAJOR_DIA
     assert joint.TAP_SPEC.thread_class == "2B"
     assert joint.TAP_SPEC.end == "blind"
-    assert joint.TAP_SPEC.depth_mm == joint.DRILL_DEPTH == 6.50
+    assert joint.TAP_SPEC.depth_mm == joint.DRILL_DEPTH == 6.604
     assert joint.TAP_SPEC.overrides_mm["ThreadDepth"] == joint.THREAD_DEPTH == 4.95
     assert joint.THREAD_DEPTH_BAND == 0.0508
     assert lever.RIB_T == 5.08
     assert joint.LEVER_FRONT_LOCAL_Z + lever.RIB_T == pytest.approx(-71.12)
     assert lever.RIB_T - joint.LINEAR_BAND < joint.THREAD_DEPTH
     assert joint.SCREW_TIP_GAP_MIN == pytest.approx(0.0067)
-    # The lever prints the drill depth .256 +/-.005 about the 6.50 model depth.
-    assert joint.DRILL_DEPTH_DEVIATIONS == pytest.approx((-0.1246, 0.1294))
-    assert joint.DRILL_DEPTH_MIN == pytest.approx(6.3754)
-    assert joint.DRILL_DEPTH_MAX == pytest.approx(6.6294)
-    assert joint.TAP_LEAD_MARGIN_MIN == pytest.approx(0.467457142857)
+    # The lever prints the drill depth .26 +/-.01 about the 6.604 model depth.
+    assert joint.DRILL_DEPTH_DEVIATIONS == pytest.approx((-0.254, 0.254))
+    assert joint.DRILL_DEPTH_MIN == pytest.approx(6.35)
+    assert joint.DRILL_DEPTH_MAX == pytest.approx(6.858)
+    assert joint.TAP_LEAD_MARGIN_MIN == pytest.approx(0.442057142857)
     # Both the pilot cylinder and point run beyond the rib into the plate.
     assert joint.DRILL_DEPTH_MIN > lever.RIB_T + lever.RIB_T_DEVIATIONS[1]
     assert joint.DRILL_POINT_DEPTH_MAX == pytest.approx(0.9398 * 0.60086)
-    assert joint.DRILL_WANDER_MAX == pytest.approx(0.0376685021)
-    assert joint.RECEIVER_PILOT_MATERIAL_WALL_MIN == pytest.approx(2.2217314979)
+    assert joint.DRILL_WANDER_MAX == pytest.approx(0.0388654599)
+    assert joint.RECEIVER_PILOT_MATERIAL_WALL_MIN == pytest.approx(2.2205345401)
 
 
 def _joint_with_values(**values):
@@ -365,7 +365,7 @@ def _printed_material_budget_oracle() -> tuple[float, float, float, float]:
 
 def test_printed_pilot_has_continuous_material_beyond_every_uniform_rib() -> None:
     walls = _printed_material_budget_oracle()
-    assert walls[:2] == pytest.approx((2.2217314979, 2.5797314979))
+    assert walls[:2] == pytest.approx((2.2205345401, 2.5785345401))
     assert min(walls) == pytest.approx(joint.receiver_pilot_material_wall_budget(), abs=1e-12)
     assert joint.RECEIVER_PILOT_MATERIAL_WALL_MIN == pytest.approx(min(walls), abs=1e-12)
     assert min(walls) >= joint.RECEIVER_PILOT_WALL_MIN == pytest.approx(2.032)

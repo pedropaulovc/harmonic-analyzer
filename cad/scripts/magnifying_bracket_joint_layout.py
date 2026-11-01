@@ -86,7 +86,7 @@ HEAD_PROTRUSION = SCREW_HEAD_HEIGHT
 # Explicit native 3.175 +/-0.13 preserves the accepted screw-grip interval.
 FLANGE_THICKNESS_BAND = FOOT_GRIP_TOL
 
-# The receiver continues from the uniform 5 mm entry rib into the connected
+# The receiver continues from the uniform 5.08 mm entry rib into the connected
 # 7 mm coefficient plate. Neither usable thread nor the drill point is required
 # to stop inside the rib. Ordinary printed depths remain independently bounded.
 # #290: the receiver taps and coordinates print on the lever's decimal-inch
@@ -97,12 +97,14 @@ THREAD_DEPTH_BAND = 0.0508  # native metadata only; the drawing prints .195 MIN
 LINEAR_BAND = printed_band_mm(2)  # PRINTED title-block .XX band, not the unrounded .02 in
 POSITION_BAND = 0.0508
 DRILLED_DIAMETER_PLUS = drilled_oversize_mm()
-# The lever sheet prints each receiver Hole Wizard length at three places
-# under its own title block: the drill depth's acceptance follows the printed
-# rounded depth, the pilot its drilled-hole row.
+# The lever sheet prints the receiver tap drill's diameter at three places
+# (its drilled-hole row sizes the pilot) but the routine tap-drill depth at
+# two (rule 3: .26 +/-.01; no function asks for more, rule 4).  The depth's
+# acceptance follows its printed rounded value.
 RECEIVER_HOLE_PLACES = 3
+RECEIVER_DRILL_DEPTH_PLACES = 2
 RECEIVER_DRILLED_DIAMETER_PLUS = drilled_oversize_mm(unit=lever.UNIT)
-DRILL_DEPTH_BAND = printed_band_mm(RECEIVER_HOLE_PLACES, unit=lever.UNIT)
+DRILL_DEPTH_BAND = printed_band_mm(RECEIVER_DRILL_DEPTH_PLACES, unit=lever.UNIT)
 # Engineering floor for the printed pilot, not the finished thread cavity:
 # the lever's rule-17 wall target on its inch sheet.
 RECEIVER_PILOT_WALL_MIN = WALL_TARGET_MM
@@ -118,9 +120,9 @@ ENGAGEMENT_MIN = (
 )
 SCREW_REACH_MAX = ENGAGEMENT + GRIP_BAND
 THREAD_DEPTH = 4.95
-DRILL_DEPTH = 6.50
+DRILL_DEPTH = 6.604  # .26 in, on its printed grid (rule 3)
 DRILL_DEPTH_DEVIATIONS = printed_deviations(  # (lower, upper), mm
-    DRILL_DEPTH, RECEIVER_HOLE_PLACES, unit=lever.UNIT,
+    DRILL_DEPTH, RECEIVER_DRILL_DEPTH_PLACES, unit=lever.UNIT,
 )
 DRILL_DEPTH_MIN = DRILL_DEPTH + DRILL_DEPTH_DEVIATIONS[0]
 DRILL_DEPTH_MAX = DRILL_DEPTH + DRILL_DEPTH_DEVIATIONS[1]

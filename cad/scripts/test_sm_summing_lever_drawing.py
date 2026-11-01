@@ -563,11 +563,11 @@ def test_bracket_receiver_retains_the_blind_native_contract_and_final_proof() ->
     assert (part.TAP_SPEC.kind, part.TAP_SPEC.end) == ("tapped_bottoming", "blind")
     # Native depth/band behavior is exercised by the adapter tests below.
     assert part.TAP_SPEC.size == "#2-56"
-    assert part.TAP_SPEC.depth_mm == 6.50
+    assert part.TAP_SPEC.depth_mm == 6.604
     assert part.TAP_SPEC.overrides_mm["ThreadDepth"] == 4.95
     assert joint.THREAD_DEPTH_BAND == 0.0508
-    # Printed .256 +/-.005 (the lever's .XXX row) about the 6.50 model depth.
-    assert joint.DRILL_DEPTH_DEVIATIONS == pytest.approx((-0.1246, 0.1294))
+    # Printed .26 +/-.01 (the lever's .XX row) about the 6.604 model depth.
+    assert joint.DRILL_DEPTH_DEVIATIONS == pytest.approx((-0.254, 0.254))
     assert "PlateThickness" in drawing.BACK_KEEP
     assert "EdgeRibThickness" in drawing.TOP_KEEP
     order = [_call_name(call) for call in _calls_in_order(_builder_function("build"))]
@@ -602,8 +602,8 @@ def test_receiver_pilot_continues_from_uniform_rib_into_connected_plate() -> Non
         spec.COEFFICIENT_T + spec.COEFFICIENT_T_DEVIATIONS[0] - joint.RECEIVER_ROW_FROM_TOP
         - joint.POSITION_BAND - drill_radius_max - wander
     )
-    assert upper_plate_wall == pytest.approx(2.221731, abs=1e-6)
-    assert lower_plate_wall == pytest.approx(2.579731, abs=1e-6)
+    assert upper_plate_wall == pytest.approx(2.220535, abs=1e-6)
+    assert lower_plate_wall == pytest.approx(2.578535, abs=1e-6)
     assert joint.receiver_pilot_material_wall_budget() == pytest.approx(
         min(upper_plate_wall, lower_plate_wall),
     )
@@ -1606,7 +1606,7 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
 
     # Native shape observed on the farm (2026-10-09): the tap drill depth lives
     # on a sketch subfeature, and each hole gets its own cosmetic thread.
-    drill = Dimension("Tap Drill Depth", "Sketch14", 6.50)
+    drill = Dimension("Tap Drill Depth", "Sketch14", 6.604)
     thread = Dimension("D1", "Hole Thread22", 4.95)
     thread_b = Dimension("D1", "Hole Thread23", 4.95)
     unrelated = Dimension("Depth", "ReferencePlane", 4.95)
@@ -1637,8 +1637,8 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
     held = []
     monkeypatch.setattr(
         part, "_band_held_dimension",
-        lambda display, dimension, band, label: held.append(
-            (display.GetDimension2(0) is dimension, dimension, band, label)
+        lambda display, dimension, band, label, *, places: held.append(
+            (display.GetDimension2(0) is dimension, dimension, band, label, places)
         ),
     )
     inventory = []
@@ -1647,9 +1647,9 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
     # Subfeatures are not FeatureByName-reachable and both threads are "D1":
     # band the exact native objects found in the walk, never a by-name lookup.
     assert held == [
-        (True, thread, (-0.0508, 0.0508), "D1@Hole Thread22"),
-        (True, thread_b, (-0.0508, 0.0508), "D1@Hole Thread23"),
-        (True, drill, (-0.127, 0.127), "Tap Drill Depth@Sketch14"),
+        (True, thread, (-0.0508, 0.0508), "D1@Hole Thread22", 3),
+        (True, thread_b, (-0.0508, 0.0508), "D1@Hole Thread23", 3),
+        (True, drill, (-0.254, 0.254), "Tap Drill Depth@Sketch14", 2),
     ]
     assert (drill.Name, thread.Name, thread_b.Name, unrelated.Name) == (
         "Tap Drill Depth", "D1", "D1", "Depth"
@@ -1696,7 +1696,7 @@ def test_receiver_native_drill_band_is_explicit_symmetric_ordinary_width(monkeyp
     tolerance = Tolerance()
     display = SimpleNamespace(
         SetPrecision3=lambda *args: True,
-        GetPrimaryPrecision2=lambda: 3,
+        GetPrimaryPrecision2=lambda: 2,
     )
     monkeypatch.setattr(_com, "_bind", lambda value, _kind: value)
     monkeypatch.setattr(_com, "_early_bound", lambda value, _kind: value)
@@ -1704,9 +1704,10 @@ def test_receiver_native_drill_band_is_explicit_symmetric_ordinary_width(monkeyp
     lever_build._band_held_dimension(
         display, SimpleNamespace(Tolerance=tolerance),
         (-joint.DRILL_DEPTH_BAND, joint.DRILL_DEPTH_BAND), "native receiver drill",
+        places=joint.RECEIVER_DRILL_DEPTH_PLACES,
     )
     assert tolerance.Type == 4  # swTolSYMMETRIC, not bilateral or MIN
-    assert (tolerance.lower, tolerance.upper) == pytest.approx((-0.000127, 0.000127))
+    assert (tolerance.lower, tolerance.upper) == pytest.approx((-0.000254, 0.000254))
 
 
 @pytest.fixture
@@ -1736,7 +1737,7 @@ def bracket_depth_callout(monkeypatch):
         return SimpleNamespace(raw=SimpleNamespace(_oleobj_=metadata), metadata=metadata, length=length)
 
     thread = native("hw-threaddepth", 4.95)
-    drill = native("hw-tapdrldepth", 6.50)
+    drill = native("hw-tapdrldepth", 6.604)
     unrelated = native("hw-threaddia", 2.1844)
     variables = [unrelated.raw, thread.raw, drill.raw]
     dispatched = []
@@ -1765,19 +1766,19 @@ def bracket_depth_callout(monkeypatch):
     )
 
 
-def test_bracket_depth_callout_inherits_printed_three_place_band(bracket_depth_callout) -> None:
+def test_bracket_depth_callout_inherits_printed_two_place_band(bracket_depth_callout) -> None:
     import magnifying_bracket_joint_layout as joint
 
     case = bracket_depth_callout
     unrelated_before = (dict(case.unrelated.metadata.values), dict(case.unrelated.length.values))
     case.dress()
     assert case.drill.metadata.ToleranceType == 0  # swTolNONE: title-block presentation
-    assert case.drill.length.Precision == 3
-    assert case.drill.length.Length == pytest.approx(0.00650)
+    assert case.drill.length.Precision == 2
+    assert case.drill.length.Length == pytest.approx(0.006604)
     # NONE hides the native variable's unused tolerance fields; dressing must
     # not write them or assume SOLIDWORKS retains hidden deviations.
     assert case.drill.metadata.writes == [("ToleranceType", 0)]
-    assert case.drill.length.writes == [("Precision", 3)]
+    assert case.drill.length.writes == [("Precision", 2)]
     assert case.thread.metadata.ToleranceType == 5  # swTolMIN, not a bilateral thread depth
     assert case.thread.length.Length == pytest.approx(0.00495)
     assert case.thread.length.writes == []
@@ -1788,13 +1789,13 @@ def test_bracket_depth_callout_inherits_printed_three_place_band(bracket_depth_c
     assert case.dispatched == [case.unrelated.metadata, case.thread.metadata, case.drill.metadata]
 
     # Derive the effective band from the printed inch nominal and the actual
-    # sheet row: .256 +/-.005.
+    # sheet row: .26 +/-.01.
     printed_in = f"{case.drill.length.Length / 0.0254:.{case.drill.length.Precision}f}"
-    assert printed_in == "0.256"
-    printed_band = printed_band_mm(3, unit="in")
+    assert printed_in == "0.26"
+    printed_band = printed_band_mm(2, unit="in")
     printed_mm = float(printed_in) * 25.4
     effective_limits = (printed_mm - printed_band, printed_mm + printed_band)
-    assert effective_limits == pytest.approx((6.3754, 6.6294))
+    assert effective_limits == pytest.approx((6.35, 6.858))
     physical_limits = tuple(joint.DRILL_DEPTH + delta for delta in joint.DRILL_DEPTH_DEVIATIONS)
     assert effective_limits == pytest.approx(physical_limits)
 

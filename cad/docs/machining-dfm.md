@@ -315,10 +315,10 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 
 By explicit owner decision, MHA-SM-03's two bracket receivers are conventional
 blind **2-56 UNC 2B** taps fastening **MHA-MG-01**. The native callout prints
-**2X Ø.070 DRILL .256** and **.195 MIN** full thread, with the concise
+**2X Ø.070 DRILL .26** and **.195 MIN** full thread, with the concise
 **FASTENS MHA-MG-01** caption. The drill diameter inherits the **+.004/0 in**
-drilled-hole row and the three-place depth the **.XXX ±.005 in** title-block
-band (6.375–6.629 mm about the 6.50 mm model depth);
+drilled-hole row and the routine two-place depth the **.XX ±.01 in** title-block
+band (6.350–6.858 mm about the 6.604 mm model depth);
 the native cylindrical depth is explicitly symmetric. Native usable
 full-thread metadata remains **4.95 ±0.0508 mm** (±.002 in) for the screw stack.
 The printed minimum is not a cutting-depth maximum. There is no additional
@@ -348,12 +348,12 @@ cancels top-face position error; the nearest top and bottom axis floors are
 **3.25−0.0508 = 3.1992 mm** and **6.858−3.25−0.0508 = 3.5572 mm**, the second
 at the plate's printed **.27 in** (6.858 mm) minimum.
 The printed **Ø.070 +.004/0** pilot has maximum radius **0.9398 mm**. Its
-118° point and 0.3° drift over the deepest **6.6294 mm** cylinder plus point
-give **0.037669 mm** wander, leaving conservative top/bottom pilot walls
-of approximately **2.221731 / 2.579731 mm**. The connected-plate proof takes
+118° point and 0.3° drift over the deepest **6.858 mm** cylinder plus point
+give **0.038865 mm** wander, leaving conservative top/bottom pilot walls
+of approximately **2.220535 / 2.578535 mm**. The connected-plate proof takes
 no helpful rib or root-fillet credit after the inner cap.
 
-The drill lead reserve is **0.467457 mm**. Usable screw engagement
+The drill lead reserve is **0.442057 mm**. Usable screw engagement
 remains **3.305 mm minimum**, above **1.5D = 3.2766 mm**, and the native
 full-thread metadata retains **0.0067 mm** minimum tip gap. These are
 stack/design checks, not a strength or native-geometry certificate.
@@ -476,7 +476,7 @@ nor the changed-rib proof claims that those unchanged junctions are modeled
 with fillets or that the knife roots are manufacturable.
 
 The screw/grip, engagement, tip-gap and bottoming-tap-lead guards are retained.
-The bounded **.256 ±.005 in** drill (6.50 mm model depth) now runs into the connected coefficient
+The bounded **.26 ±.01 in** drill (6.604 mm model depth) now runs into the connected coefficient
 plate rather than relying on a special deep rib. Native **4.95 ±0.0508 mm**
 full-thread metadata remains a screw-stack input, not a maximum imposed by the
 printed **.195 MIN**. An unbounded MIN drill remains unacceptable.

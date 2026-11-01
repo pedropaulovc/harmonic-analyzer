@@ -83,10 +83,10 @@ def test_uniform_ribs_and_relocated_row_preserve_other_installed_interfaces() ->
     assert tuple(point[0] for point in joint.LEVER_HOLE_POINTS) == (16.0, 29.7)
     assert all(point[1] == pytest.approx(-0.71) for point in joint.LEVER_HOLE_POINTS)
     assert all(point[2] == pytest.approx(-76.2) for point in joint.LEVER_HOLE_POINTS)
-    assert (spec.RIB_T, joint.DRILL_DEPTH, joint.THREAD_DEPTH) == (5.08, 6.5, 4.95)
+    assert (spec.RIB_T, joint.DRILL_DEPTH, joint.THREAD_DEPTH) == (5.08, 6.604, 4.95)
     assert joint.LEVER_FRONT_LOCAL_Z + spec.RIB_T == pytest.approx(-71.12)
     assert joint.DRILL_DEPTH_MIN > spec.RIB_T + spec.RIB_T_DEVIATIONS[1]
-    assert joint.DRILL_DEPTH_DEVIATIONS == pytest.approx((-0.1246, 0.1294))
+    assert joint.DRILL_DEPTH_DEVIATIONS == pytest.approx((-0.254, 0.254))
     assert joint.BRACKET_ORIGIN == (40.0, 979.7, -173.51)
     assert spec.HOLE_X - (joint.TAP_DRILL_DIA + joint.RECEIVER_DRILLED_DIAMETER_PLUS) / 2.0 > spec.RIB_REACH
 
