@@ -235,18 +235,14 @@ def test_hidden_reference_dimensions_reach_their_views() -> None:
     )
 
 
-def test_relief_corners_carry_the_largest_radius_the_grip_allows() -> None:
-    assert spec.RELIEF_CORNER_R == 1.016  # .04
-    assert spec._GRIP_GAP_AT_BOTTOM - spec.RELIEF_CORNER_R >= 0.25
-    assert spec.DIMENSION_PREFIXES == {
-        ("VGrooveProfile", "VFlankAngle"): "2X ",
-        ("VApexFillets", "VApexFilletR"): "2X R",
-        ("ReliefProfile", "ReliefCornerR"): "2X R",
-    }
-    assert (
-        "set_dimension_prefix(adapter, feature_name, dimension_name, prefix)"
-        in _PART_SOURCE
-    )
+def test_relief_corners_clear_the_grip_at_the_title_block_corner() -> None:
+    # The relief's step corners print no radius: the title block's INSIDE
+    # CORNERS R.040 MAX governs them, and at that limit they still clear the
+    # grip (machinist review 8c9a0a7: "2X R.04" read beside R.040 MAX).
+    assert spec.INSIDE_CORNER_R_MAX == pytest.approx(0.040 * 25.4)
+    assert spec.RELIEF_CORNER_R <= spec.INSIDE_CORNER_R_MAX
+    assert spec._GRIP_GAP_AT_BOTTOM - spec.INSIDE_CORNER_R_MAX >= 0.25
+    assert "ReliefCornerR" not in spec.DRAWING_DIMENSIONS["ReliefProfile"]
     assert '"tangent"' in _PART_SOURCE and '"radial"' in _PART_SOURCE
 
 
@@ -392,7 +388,7 @@ def _printed_seats() -> list[dict[str, float]]:
     z1_devs = _printed_devs(station(spec.V_MOUTH_Z1), "VMouthZ1")
     width_devs = _printed_devs(spec.V_FLAT_WIDTH, "VFlatWidth")
     return [
-        _seat_by_bisector(z0, z1, front, back, width, spec.V_APEX_FILLET_R)
+        _seat_by_bisector(z0, z1, front, back, width, spec.INSIDE_CORNER_R_MAX)
         for z0 in (spec.V_MOUTH_Z0 + dev for dev in z0_devs)
         for z1 in (spec.V_MOUTH_Z1 + dev for dev in z1_devs)
         for front in angles
@@ -551,33 +547,6 @@ def test_bottom_view_prints_the_neck_step_where_it_is_an_outline_change() -> Non
     for name, span in zip(order, spans, strict=True):
         assert drawing._fx(span) + 0.005 < keep[name][0] < paper_end - 0.005, name
     assert at_paper_end > rows[0] + 0.0017 + 0.005
-    # The relief corner's radius over the view, in the air in front of the
-    # block: its text (~16 mm) over the datum's extension line, under the
-    # front view's tap station (line ~0.141; its extension lines end ~0.139
-    # at x 0.105 / 0.155); its radial leader, from the shoulder 3.3 mm left
-    # of the text and ~2.5 mm under its keep, meets the front corner's arc
-    # (which turns from the step's line to the wall's, 0..90 deg about its
-    # centre) near its middle, crossing the neck's front edge clear of the
-    # step's corner.
-    text_x, text_y = keep["ReliefCornerR"]
-    half_r_text = 0.0079
-    assert text_y - 0.0018 > front + 0.003
-    assert text_y + 0.0017 < 0.141 - 0.004
-    assert text_x + half_r_text < paper_end - 0.003
-    assert text_x - half_r_text > drawing._fx(spec.RELIEF_X0)
-    centre_r = (
-        drawing._fx(spec.RELIEF_X0 + spec.RELIEF_CORNER_R),
-        drawing._bz(spec.RELIEF_Z0 + spec.RELIEF_CORNER_R),
-    )
-    shoulder = (text_x - half_r_text - 0.0033, text_y - 0.0025)
-    bearing = math.degrees(
-        math.atan2(shoulder[1] - centre_r[1], shoulder[0] - centre_r[0])
-    )
-    assert 40.0 < bearing < 60.0
-    at_neck_front = centre_r[0] + (neck_front - centre_r[1]) / math.tan(
-        math.radians(bearing)
-    )
-    assert at_neck_front > drawing._fx(spec.RELIEF_X0) + 0.002
 
 
 def test_section_looks_the_same_way_as_the_paper_end_view() -> None:
@@ -887,75 +856,37 @@ def test_v_is_its_flank_angles_mouth_and_apex_flat_with_a_reference_height() -> 
     assert points[0][1] > 0.0 > points[1][1]
 
 
-def test_apex_flat_corners_are_rounds_at_a_max_limit_clear_of_the_grip() -> None:
+def test_apex_flat_rounds_clear_the_grip_at_the_title_block_corner() -> None:
     # Blind re-review (rule 16): the flat met the flanks in sharp internal
-    # corners.  Each takes any chamfer-mill tip or end-mill corner up to
-    # R.020, printed "2X R.020 MAX": swTolMAX prints the nominal, so the model
-    # carries the limit and its band runs from sharp to it.
+    # corners.  They print no radius: at the title block's INSIDE CORNERS
+    # R.040 MAX the grip still clears the rounds and seats on the straight
+    # flanks, so nothing needs a tighter limit (machinist review 8c9a0a7).
+    # The model carries a .020 chamfer-mill tip.
     assert spec.V_APEX_FILLET_R == 0.508  # .020
-    assert spec.V_APEX_FILLET_BAND == (0.0, -spec.V_APEX_FILLET_R)
-    assert spec.V_APEX_FILLET_TOL_TYPE == 6  # swTolMAX
-    assert spec.DRAWING_DIMENSIONS["VApexFillets"] == {"VApexFilletR"}
-    assert spec.DRAWING_PRECISION["VApexFillets"]["VApexFilletR"] == 3
-    assert (
-        "VApexFillets",
-        "VApexFilletR",
-        spec.V_APEX_FILLET_R,
-        spec.V_APEX_FILLET_BAND,
-        spec.V_APEX_FILLET_TOL_TYPE,
-        "MAX",
-    ) in part._SINGLE_LIMITS
-    # The build rounds both flat edges mid-neck, at the limit, from a global.
+    assert spec.V_APEX_FILLET_R <= spec.INSIDE_CORNER_R_MAX
+    assert "VApexFillets" not in spec.DRAWING_DIMENSIONS
+    # The build rounds both flat edges mid-neck from a global.
     assert "await adapter.add_fillet(\n            V_APEX_FILLET_R," in _PART_SOURCE
     assert '("VApexFilletR", V_APEX_FILLET_R)' in _PART_SOURCE
     assert "(fillet_dim[0], '\"VApexFilletR\"')" in _PART_SOURCE
-    # Worst case: the rounds at R.020, each flank's angle, each mouth edge and
-    # the flat at their printed limits.  The grip clears the rounds by 0.96
+    # Worst case: the rounds at R.040, each flank's angle, each mouth edge and
+    # the flat at their printed limits.  The grip clears the rounds by 0.85
     # (the flat by 0.96), and the narrowest flat still runs straight between
     # the two tangent points.
     seats = _printed_seats()
     clearance = spec.V_APEX_FILLET_GRIP_CLEARANCE_PRINTED_MIN
-    assert clearance == pytest.approx(0.956, abs=1e-3)
+    assert clearance == pytest.approx(0.849, abs=1e-3)
     assert clearance == pytest.approx(min(seat["round"] for seat in seats), abs=1e-6)
     assert min(clearance, spec.V_FLAT_GRIP_CLEARANCE_PRINTED_MIN) >= 0.25
     straight = spec.V_FLAT_STRAIGHT_PRINTED_MIN
     assert straight == pytest.approx(min(seat["straight"] for seat in seats))
-    assert straight == pytest.approx(1.347, abs=1e-3)
+    assert straight == pytest.approx(0.915, abs=1e-3)
     # The rounds' section and the groove's finished section feed the volumes.
     assert spec.V_APEX_FILLET_AREA == pytest.approx(
         2.0 * 0.508**2 * (math.tan(math.pi / 8.0) - math.pi / 8.0)
     )
     assert spec.V_GROOVE_SECTION == pytest.approx(
         spec.V_GROOVE_AREA - spec.V_APEX_FILLET_AREA
-    )
-
-
-def test_apex_round_radius_text_stays_off_the_part_in_the_end_view() -> None:
-    # Rule 14: over the top face, up the back round's bisector so the radial
-    # leader lands square on its arc; right of the flat width's outside arrow,
-    # under the tap's callout rows (from ~0.247), left of section A-A.
-    keep = drawing.RIGHT_KEEP
-    x, y = keep["VApexFilletR"]
-    half_text = 0.014  # "2X R.020 MAX", 12 characters at ~2.3 mm
-    assert y - 0.0018 > drawing._ry(spec.BLOCK_HEIGHT) + 0.008
-    assert y + 0.0017 < drawing.TAP_CALLOUT_XY[1] - 0.003 - 0.004
-    assert (
-        x - half_text > drawing._rz(spec.DEPTH_MID_Z + spec.V_FLAT_WIDTH / 2.0) + 0.01
-    )
-    assert x + half_text < drawing._sz(spec.BODY_Z0) - 0.025
-    bearing = math.degrees(
-        math.atan2(y - drawing._ROUND_CENTRE[1], x - drawing._ROUND_CENTRE[0])
-    )
-    assert bearing == pytest.approx(67.5)
-    assert drawing._ROUND_CENTRE == pytest.approx(
-        (
-            drawing._rz(
-                spec.DEPTH_MID_Z
-                + spec.V_FLAT_WIDTH / 2.0
-                - spec.V_APEX_FILLET_R * math.tan(math.pi / 8.0)
-            ),
-            drawing._ry(spec.V_FLAT_Y - spec.V_APEX_FILLET_R),
-        )
     )
 
 
