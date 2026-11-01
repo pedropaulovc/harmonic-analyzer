@@ -66,8 +66,8 @@ def seam_callout(mate: str, pin: str = "AXIAL PIN MHA-DT-VN-59") -> str:
     return "\n".join(
         (
             f"(<MOD-DIAM>{inch_text(AXIAL_PIN_DIA, 3)}) <HOLE-DEPTH> {inch_text(SEAM_DEPTH, 2)}"
-            " ON SEAM,",
-            f"MATCH-DRILL/REAM WITH {mate} AT ASSEMBLY;",
+            " ON SEAM, MATCH-DRILL/REAM",
+            f"WITH {mate} AT ASSEMBLY;",
             f"{pin} LIGHT DRIVE FIT;",
             "PERMANENT PAIR; SERVICE AT MHA-DT-09",
         )
