@@ -78,6 +78,7 @@ from _drawing_detail_crop import native_circle_geometry, _transform_point
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
+from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _drawing_view_display import set_hidden_lines_removed
 from _drawing_sheets import create_blank_drawing_sheets
@@ -124,6 +125,9 @@ from dt_vn_post_mount_screw_spec import (
     SUPPLIER_STOCK_TITLE,
     SUPPLIER_THREAD_MAJOR_DIMENSION,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["dt_vn_post_mount_screw"]
 PART_STEM = SPEC.artifact_stem
