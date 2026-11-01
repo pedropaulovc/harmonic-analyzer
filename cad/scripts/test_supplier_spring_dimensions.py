@@ -499,7 +499,7 @@ def test_disc_stock_and_application_positions_follow_actual_native_ink(
     )
     if "SHAFT_DIA" in spec.SUPPLIER_APPLICATION_DIMENSIONS:
         assert views["free_top"].kept_positions["SupplierShaftDia"] == pytest.approx(
-            (0.12 + radius * 1.5 + 0.018, 0.21 - 0.012)
+            (0.12 + radius * 1.5 + 0.018, 0.21 + 0.012)
         )
     if "free_right" in views:
         right_mid_y = 0.08 + (baseline + gauge_upper) / 4000

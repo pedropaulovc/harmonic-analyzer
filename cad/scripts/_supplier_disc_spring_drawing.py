@@ -35,8 +35,9 @@ from vn_disc_spring_supplier_stock import (
 
 # Which side of its diagram each size's text hangs on (-1 left, +1 right).
 # The flat strip lies right of centre, so its thickness takes the right; the
-# full-width envelope height takes the left. The shaft gauge hangs below the
-# OD text on the right, so no two plan leaders share a quadrant.
+# full-width envelope height takes the left. The shaft gauge hangs above the
+# OD text on the right (the plan's reserved top lane), so no two plan leaders
+# share a quadrant.
 TEXT_SIDES = {
     "ID": -1,
     "OD": 1,
@@ -50,8 +51,8 @@ TEXT_SIDES = {
 # draw_dt_vn_cylinder_bank_spring): the farthest an outside arrow on a rim
 # reaches beyond it, whatever angle its leader takes.
 ARROW_REACH_M = 0.003556 + 0.000762 / 2.0
-# The shaft text's top, this far under the plan centre (below the OD text).
-SHAFT_TEXT_DROP_M = 0.006
+# The shaft text's bottom, this far over the plan centre (above the OD text).
+SHAFT_TEXT_RISE_M = 0.006
 
 
 def supplier_disc_reference_features(spec: Any) -> dict[str, tuple[str, ...]]:
@@ -123,8 +124,8 @@ def _size_text_move(
     """Native position and the move that puts the text clear on its side.
 
     A plan diameter's near edge goes past the OD rim by its own outside
-    arrowhead plus the arrow-to-text clearance; the shaft gauge's text hangs
-    under the plan centre. A height's offset text goes a clear gap beyond its
+    arrowhead plus the arrow-to-text clearance; the shaft gauge's text sits
+    over the plan centre. A height's offset text goes a clear gap beyond its
     own dimension line, witnesses and arrows (the washer thickness pattern).
     """
     reader = _Reader(adapter)
@@ -147,7 +148,7 @@ def _size_text_move(
         )
         dx = cx + side * reach - (text.xmin if side > 0 else text.xmax)
         if semantic == "SHAFT_DIA":
-            dy = cy - SHAFT_TEXT_DROP_M - text.ymax
+            dy = cy + SHAFT_TEXT_RISE_M - text.ymin
         else:
             dy = cy - (text.ymin + text.ymax) / 2.0
         return position, dx, dy
@@ -197,12 +198,12 @@ def assert_disc_size_text_clear(
     *,
     label: str,
 ) -> None:
-    """Settled text still clear on its side (and the shaft text under centre)."""
+    """Settled text still clear on its side (and the shaft text over centre)."""
     _position, dx, dy = _size_text_move(
         adapter, key, semantic, display, bounds, label=label
     )
     if TEXT_SIDES[semantic] * dx > PLACE_SETTLE_M or (
-        semantic == "SHAFT_DIA" and dy < -PLACE_SETTLE_M
+        semantic == "SHAFT_DIA" and dy > PLACE_SETTLE_M
     ):
         raise RuntimeError(
             f"{label} {semantic}: settled size text is not clear of its lines "
@@ -247,7 +248,7 @@ def supplier_disc_spring_dimensions(
         placements[key] = {
             semantic: (
                 x1 + stations[key] if TEXT_SIDES[semantic] > 0 else x0 - stations[key],
-                (y0 + y1) / 2.0 - (0.012 if semantic == "SHAFT_DIA" else 0.0),
+                (y0 + y1) / 2.0 + (0.012 if semantic == "SHAFT_DIA" else 0.0),
             )
             for semantic in semantics
             if semantic in ("ID", "OD", "FREE_HEIGHT", "THICKNESS")
