@@ -202,11 +202,12 @@ STOCK_NOTES = (
         f"SLOT-PLANE HEAD ENVELOPE  SCALE {STOCK_HEAD_SCALE[0]:g}:{STOCK_HEAD_SCALE[1]:g}",
         0.030, 0.139, (0.018, 0.128, 0.193, 0.142),
     ),
-    # Directly over the full view's head end, left of the 1.500 thread
-    # dimension's extension line (x ~0.266) and above the head (y ~0.121).
+    # Over the full view's plain shank, right of the 6:1 head view's
+    # uncropped outline (x ~0.155), left of the 1.500 thread dimension's
+    # extension line (x ~0.266) and above the shank (y ~0.121).
     (
         f"FULL SOURCE-STOCK ENVELOPE  SCALE {STOCK_SCALE[0]:g}:{STOCK_SCALE[1]:g}",
-        0.150, 0.137, (0.145, 0.126, 0.262, 0.139),
+        0.158, 0.137, (0.156, 0.126, 0.262, 0.139),
     ),
 )
 
