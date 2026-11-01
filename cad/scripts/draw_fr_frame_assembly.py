@@ -632,26 +632,6 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         target_x_m=-_LEFT_COLUMN_X_M,
         label="finished cap top",
     )
-    overall = _add_entity_height_dimension(
-        adapter,
-        front,
-        base_bottom,
-        cap_top,
-        text_xy=OVERALL_HEIGHT_TEXT_XY,
-        label="finished frame overall height",
-    )
-    overall = _checked_linear_dimension(
-        adapter,
-        overall,
-        expected_mm=CAP_TOP_Y,
-        places=HEIGHT_PLACES,
-        label="finished frame overall height",
-    )
-    overall = set_reference_dimension(
-        adapter,
-        _early_bound(overall, "IDisplayDimension").GetAnnotation(),
-        label="finished frame overall height reference",
-    )
 
     # The setting is the assembly's own TopAxisSetting dimension, shown in
     # this view and imported with its band.
@@ -697,6 +677,26 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         screw_axis,
         TOP_AXIS_HEIGHT_SUFFIX,
         label="installed top cross-screw axis height",
+    )
+    overall = _add_entity_height_dimension(
+        adapter,
+        front,
+        base_bottom,
+        cap_top,
+        text_xy=OVERALL_HEIGHT_TEXT_XY,
+        label="finished frame overall height",
+    )
+    overall = _checked_linear_dimension(
+        adapter,
+        overall,
+        expected_mm=CAP_TOP_Y,
+        places=HEIGHT_PLACES,
+        label="finished frame overall height",
+    )
+    overall = set_reference_dimension(
+        adapter,
+        _early_bound(overall, "IDisplayDimension").GetAnnotation(),
+        label="finished frame overall height reference",
     )
 
     # An outside dimension can put its text to either side of the requested
