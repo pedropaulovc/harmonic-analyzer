@@ -58,7 +58,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _gtol_face_resolve import resolve_faces
-from _gtol_planar import PlanarFace
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -100,6 +100,9 @@ from pd_transgear_knob_shaft_spec import (
     TIP_STATION,
     TIP_Z,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_knob_shaft"]
 PART_STEM = SPEC.artifact_stem
@@ -309,7 +312,6 @@ DATUM_A_SYMBOL = (END_CENTER[0] - 0.017, END_CENTER[1] - 0.018)
 TOOTH_EDGE_LEADER_NOTE = "\n".join(textwrap.wrap(TOOTH_EDGE_NOTE, 23))
 TOOTH_EDGE_TOOTH = 5
 TOOTH_EDGE_NOTE_XY = (0.345, 0.200)
-BEARING_FACE = PlanarFace((0.0, 0.0, -1.0), 0.0)
 BEARING_LANDING_RADIUS_MM = 2.9
 BEARING_LANDING_DEG = 155.0
 BEARING_NOTE_XY = (0.356, 0.183)
@@ -684,7 +686,7 @@ def _set_dimension_suffixes(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"dimension suffixes not applied: {sorted(remaining)}")
 
 
-def _add_shop_notes(adapter: Any, front: Any, bearing_face: Any) -> None:
+def _add_shop_notes(adapter: Any, front: Any) -> None:
     """Leader the edge-break note to a tooth tip and the bearing note to F's
     face, both in the front end view (TOOTH_EDGE_NOTE_XY, BEARING_NOTE_XY)."""
     tip_r = OUTSIDE_DIA / 2000.0
@@ -703,11 +705,11 @@ def _add_shop_notes(adapter: Any, front: Any, bearing_face: Any) -> None:
         note_xy=TOOTH_EDGE_NOTE_XY,
         label="MHA-PD-08 tooth edge note",
     )
-    # F is picked at the landing like draw_mg_magnifying_lever's seat finish
-    # (SelectByID2 FACE at a projected model point), and the note must then
-    # be attached to the resolved face.  Run 20261101T061718881Z: selected
-    # directly (IEntity.Select4) with a preset landing, the view's selection
-    # never read IsSame to the part's face, so add_attached_note refused it.
+    # F is picked at its landing like the tooth tip above: in the front end
+    # view the only face at BEARING_LANDING_RADIUS_MM is F, between the core
+    # and the tooth roots.  The resolved source face read IsSame to neither a
+    # direct selection (run 20261101T061718881Z) nor the face the pick
+    # attached (run 20261101T074739942Z), so the pick alone places it.
     face_r = BEARING_LANDING_RADIUS_MM / 1000.0
     angle = math.radians(BEARING_LANDING_DEG)
     landing = model_point_in_view(
@@ -722,7 +724,6 @@ def _add_shop_notes(adapter: Any, front: Any, bearing_face: Any) -> None:
         text=BEARING_FACE_NOTE,
         entity_xy=landing,
         entity_type="FACE",
-        attached_to=bearing_face,
         note_xy=BEARING_NOTE_XY,
         label="MHA-PD-08 bearing face note",
     )
@@ -876,8 +877,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     control_faces = resolve_faces(
         part_model,
-        {key: control.face for key, control in controls.items()}
-        | {"bearing_face": BEARING_FACE},
+        {key: control.face for key, control in controls.items()},
     )
     views = {"side": side, "detail": detail}
     for (key,) in (("core_total_runout",), ("front_neck_total_runout",)):
@@ -904,7 +904,7 @@ async def build(adapter: Any) -> dict[str, str]:
         property_name=TOOTH_SPACE_CALLOUT_PROPERTY,
         note_xy=TOOTHSPACE_NOTE_XY,
     )
-    _add_shop_notes(adapter, front, control_faces["bearing_face"])
+    _add_shop_notes(adapter, front)
     # The mark and the labels go on once every pick is done, so no
     # coordinate pick in the side view meets the mark circle.
     _mark_detail_on_side(adapter, side)

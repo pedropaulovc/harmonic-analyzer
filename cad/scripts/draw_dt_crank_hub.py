@@ -37,6 +37,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm, drill_process
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -64,6 +65,9 @@ from dt_crank_hub_spec import (
     SERVICE_PIN_STATION,
 )
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["dt_crank_hub"]
 PART_STEM = SPEC.artifact_stem
@@ -182,7 +186,9 @@ SEAM_EDGE_PICK = (
 # far end and crossed both its own text and the bore leader (run a2e1cd67).
 SEAM_CALLOUT_XY = (0.303, 0.105)
 SIDE_KEEP = {
-    "SeatLength": (OUTBOARD_X + 0.020, _STATION_ROW_Y),
+    # Right of the seat diameter's dimension line (OUTBOARD_X + 0.020), which
+    # crossed its text there (farm run 20261101T074739942Z).
+    "SeatLength": (OUTBOARD_X + 0.029, _STATION_ROW_Y),
     "ServicePinFromShoulder": (
         (SHOULDER_X + SERVICE_PIN_CENTER[0]) / 2.0,
         _STATION_ROW_Y,

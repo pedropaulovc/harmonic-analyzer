@@ -68,6 +68,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _holes import DIAMETER_TOLERANCE_MM, _verify_tap_metadata
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _section_axis import position_section_caption
 from _session import run_build
@@ -102,6 +103,9 @@ from sm_gooseneck_spring_joint import (
     TAP_THREAD_DEPTH_FROM_FLOOR,
 )
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["sm_gooseneck"]
 PART_STEM = SPEC.artifact_stem

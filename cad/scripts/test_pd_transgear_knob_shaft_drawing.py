@@ -968,8 +968,6 @@ def test_run_035809_shop_notes_land_on_their_features() -> None:
     # under the edge-break note and right of the gear.
     r = drawing.BEARING_LANDING_RADIUS_MM
     assert spec.CORE_DIA / 2.0 + 0.2 < r < spec.ROOT_DIA_EXACT_MIN / 2.0 - 0.2
-    assert drawing.BEARING_FACE.normal == (0.0, 0.0, -1.0)
-    assert drawing.BEARING_FACE.offset_mm == 0.0
     landing = _front_view_point(r, drawing.BEARING_LANDING_DEG)
     bx, btop = drawing.BEARING_NOTE_XY
     blines = spec.BEARING_FACE_NOTE.splitlines()
@@ -1387,11 +1385,8 @@ def test_build_takes_its_controls_and_callouts_from_the_spec(monkeypatch, tmp_pa
     tip = (tip_r * math.cos(angle), tip_r * math.sin(angle))
     assert tooth["entity_xy"] == pytest.approx(tip)
     assert tooth["note_xy"] == drawing.TOOTH_EDGE_NOTE_XY
-    # Run 20261101T061718881Z: a directly selected face with a preset landing
-    # never read IsSame to the part's face; F is picked at the landing and
-    # the note must resolve to it.
+    # F is picked at its landing in the front end view, the tooth note's way.
     assert bearing["entity_type"] == "FACE"
-    assert bearing["attached_to"] == "bearing_face"
     assert "entity" not in bearing and "leader_attach_xy" not in bearing
     face = math.radians(drawing.BEARING_LANDING_DEG)
     face_r = drawing.BEARING_LANDING_RADIUS_MM / 1000.0

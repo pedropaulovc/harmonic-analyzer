@@ -428,6 +428,9 @@ def test_callouts_stand_clear_of_views_and_each_other() -> None:
     seat_len_half = half(dt_crank_hub_notes.SEAT_LENGTH_CALLOUT)
     assert drawing.OUTBOARD_X < seat_len_x - seat_len_half
     assert seat_len_x + seat_len_half < end_left
+    # Its value stands clear of the seat diameter's dimension line above.
+    value_half = len("(8.0)") * char_w / 2.0
+    assert seat_len_x - value_half - drawing.SIDE_KEEP["SeatDia"][0] > 0.002
     assert seat_block[1] < drawing.ISO_NOTE_XY[0] and end_left > drawing.OUTBOARD_X
     # Both turned diameters stand left of the inboard end, the relief's nearer,
     # their values side by side on the axis without touching.
