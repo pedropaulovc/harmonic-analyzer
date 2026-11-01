@@ -36,9 +36,9 @@ def test_required_drawing_paths_and_registry_row() -> None:
 
 
 def test_pin_fills_the_match_drilled_hole_and_spans_the_hub() -> None:
-    # #290 fit F15: the 1/16 drill rod (+/-.0003) slips into the #52 hole.
+    # #290 fit F15: the 1/16 drill rod (+/-.0003) slips into the .064 hole.
     assert spec.PIN_DIA == 25.4 / 16.0
-    assert lever.PIN_HOLE_DIA == pytest.approx(0.0635 * 25.4)
+    assert lever.PIN_HOLE_DIA == pytest.approx(0.064 * 25.4)
     assert spec.PIN_DIA_BAND == pytest.approx((0.0003 * 25.4, -0.0003 * 25.4))
     assert spec.PIN_DIA + spec.PIN_DIA_BAND[0] < lever.PIN_HOLE_DIA
     # Codex P1 (#844): the SHORTEST printed pin still stands a peen allowance

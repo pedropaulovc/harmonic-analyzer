@@ -1246,7 +1246,7 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     # Option E-a: the pin's west end faces the MHA-DT-23 cam collar, whose air
     # to the strap foot is 0.38 at the printed worst case.  The longest pin
     # (B18.8.2 length +/-0.010 in) fits inside the narrowest strap foot (the
-    # .XXX end-cap radius at its minimum), so driven flush-or-below on the west
+    # .XX end-cap radius at its minimum), so driven flush-or-below on the west
     # edge it is buried on the east edge too: it can never eat that air.
     import dt_vn_pinion_strap_pin_spec as pin
 
@@ -1256,7 +1256,7 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     assert 0.062 * 25.4 <= pin.HOLE_DIA
     assert pin.HOLE_MAX <= 0.065 * 25.4
     assert math.isclose(pin.PIN_CENTRED_SUB_FLUSH, 1.016, abs_tol=1e-9)
-    # R7.5 prints .295 (7.493), less the .XXX row (#290).
+    # R7.5 prints .30 (7.62), less the .XX row (#290).
     assert math.isclose(pin.STRAP_FOOT_MIN_WIDTH, 2.0 * (0.290 * 25.4))
     assert pin.PIN_LEN + pin.PIN_LEN_BAND <= pin.STRAP_FOOT_MIN_WIDTH
     assert pin.PIN_BURIED_MARGIN >= 0.4
@@ -1289,10 +1289,10 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     # Engagement in each strap wall past the pivot bore.
     assert pin.PIN_LEN / 2.0 - drive.STRAP_PIVOT_BORE / 2.0 >= 3.0
     # U27 webs: strap faces and follower seat at the .080 target (the far
-    # strap face against the .XXX-printed station, Codex #858 P2); the shaft
+    # strap face against the .XX-printed station, Codex #858 P2); the shaft
     # ligament at the implied zero's .XX offset (#290: .X is kept for features
     # no check reads) clears the .080 target, and a 0.25 V-block set-up too.
-    assert math.isclose(pin.STRAP_FACE_WEB_WORST, 3.366, abs_tol=5e-4)
+    assert math.isclose(pin.STRAP_FACE_WEB_WORST, 3.163, abs_tol=5e-4)
     assert pin.STRAP_FACE_WEB_WORST >= WALL_TARGET_MM
     assert pin.FOLLOWER_SEAT_LIGAMENT >= WALL_TARGET_MM
     assert math.isclose(pin.SHAFT_LIGAMENT_WORST, 2.085, abs_tol=5e-4)

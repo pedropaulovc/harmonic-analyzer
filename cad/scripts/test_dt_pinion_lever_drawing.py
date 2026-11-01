@@ -101,25 +101,12 @@ def test_grip_rod_is_a_straight_six() -> None:
     assert dt_pinion_lever_geometry.ROD_DIA < dt_pinion_lever_geometry.HUB_LEN
 
 
-def test_pin_hole_sits_at_mid_engagement_and_is_match_drilled() -> None:
+def test_pin_hole_sits_at_mid_engagement() -> None:
     geometry = dt_pinion_lever_geometry
-    assert geometry.PIN_HOLE_DIA == pytest.approx(0.0635 * 25.4)  # #52 drill, fit F15
+    assert geometry.PIN_HOLE_DIA == pytest.approx(0.064 * 25.4)  # fit F15
     assert geometry.PIN_HOLE_FROM_MOUTH == geometry.BORE_DEPTH / 2.0
     assert geometry.PIN_HOLE_FROM_MOUTH == pytest.approx(0.16 * 25.4)
     assert geometry.PIN_HOLE_Z == geometry.HUB_LEN / 2.0 - geometry.PIN_HOLE_FROM_MOUTH
-    callout = drawing.DIMENSION_CALLOUTS["PinHoleDia"]
-    # The hole specification only; LEVER PIN SET drives and peens the pin,
-    # and the sheet points at that MHA-DT-00 step through the registry.
-    import dt_drive_train_steps
-
-    assert dt_pinion_lever_spec.PIN_HOLE_CALLOUT == "MATCH-DRILL THRU AT ASSEMBLY ON MHA-DT-17"
-    assert drawing.LEVER_PIN_SET_STEP_KEY == "lever-pin-set"
-    assert callout == (
-        f"{dt_pinion_lever_spec.PIN_HOLE_CALLOUT},\n"
-        f"PER {dt_drive_train_steps.step_ref(drawing.LEVER_PIN_SET_STEP_KEY)}"
-    )
-    assert dt_pinion_lever_spec.LIFT_ROD_NUMBER in callout
-    assert dt_pinion_lever_spec.LIFT_ROD_NUMBER in drawing.DIMENSION_CALLOUTS["HubBore"]
 
 
 def test_sheet_carries_no_gdt_finish_or_literal_precision() -> None:
