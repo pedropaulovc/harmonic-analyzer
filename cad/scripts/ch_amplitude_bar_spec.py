@@ -13,16 +13,18 @@ this module, so drawing data here would re-key them on every sheet edit.
 from __future__ import annotations
 import math
 
+# The top notch's plate.
+from ch_channel_lever_spec import LEVER_THICKNESS, LEVER_THICKNESS_TOLERANCE
+
 
 MM_PER_IN = 25.4
 
-# --- The plates the notches straddle (restated, not imported: the channel and
-# rocker-bank closures import this module, so it reads no other part's spec;
-# test_ch_amplitude_bar_drawing pins each to its source). ---
-LEVER_THICKNESS = 3.0  # ch_channel_lever_spec.LEVER_THICKNESS (the top notch's)
-LEVER_THICKNESS_TOLERANCE = 0.05  # ch_channel_lever_spec.LEVER_THICKNESS_TOLERANCE
-STRAP_THICKNESS = 2.5  # ch_rocker_arm_spec.ARM_THICKNESS (the foot notch's)
-STRAP_THICKNESS_TOLERANCE = 0.508  # ch_rocker_arm_spec.LINEAR_2PL: "STRAP 2.50" at .XX
+# --- The foot notch's plate, the rocker strap: a conservative envelope over
+# ch_rocker_arm_spec's .098 +/-.001 strap (the former 2.50 at .XX), kept so the
+# foot notch does not re-key; test_ch_amplitude_bar_drawing checks it covers
+# the strap at maximum material. ---
+STRAP_THICKNESS = 2.5
+STRAP_THICKNESS_TOLERANCE = 0.508
 STRADDLE_RUNNING_FLOOR = 0.10  # rocker_bank_layout.RUNNING_FLOOR, oiled steel faces
 
 
@@ -53,7 +55,7 @@ BAR_STOCK_UNDERSIZE = 0.002 * MM_PER_IN  # 0.051
 # so a notch is never narrower than its plate. The 0.25 novice spare
 # (rocker_bank_layout.MARGIN_SPARE) is deliberately left out.
 # The top notch (owner ruling 2026-10-15, #1038 option 2): the lever plate
-# prints 3.00 +/-0.05, so the notch is 3.15 +0.20/0, and the bar-to-bar side
+# prints .118 +/-.002, so the notch is 3.15 +0.20/0, and the bar-to-bar side
 # gap (pitch 7.0565 - bar 6.35 = 0.7065) holds the running floor with this
 # float, both ledges' and both plate offsets' bands in it
 # (ch_bar_pivot_pin_spec.joint_budget). The foot notch keeps the interim

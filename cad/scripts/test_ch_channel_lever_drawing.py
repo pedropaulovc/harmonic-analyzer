@@ -15,6 +15,8 @@ import draw_ch_channel_lever as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
+from _inch_wall_limits import WALL_TARGET_MM
+from _printed_tolerance import printed_deviations
 
 
 def test_required_drawing_paths() -> None:
@@ -79,24 +81,32 @@ def test_every_tight_band_names_its_mate_or_function() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     for label in drawing.HOLE_MATES:
         assert f'_callout, label="{label}")' in source
-    assert drawing._CLEARANCE_LEAST == pytest.approx(0.15)
-    assert drawing._CLEARANCE_MOST == pytest.approx(0.20032)
+    # .256 +.0010/.0000 on the .250 (.0000/-.0008) shaft: .0060-.0078 in.
+    assert drawing._CLEARANCE_LEAST == pytest.approx(0.1524)
+    assert drawing._CLEARANCE_MOST == pytest.approx(0.19812)
 
 
 def test_walls_clear_the_floor_at_worst_case() -> None:
     assert spec.TIP_ARC_CX == spec.LEVER_SPRING_X
     assert spec.TIP_RADIUS == spec.BAR_TALL / 2.0
     for wall, value in spec.WALL_MIN.items():
-        assert value >= spec.WALL_FLOOR, wall
+        assert value >= WALL_TARGET_MM, wall
     # The concentric full round leaves the same nominal wall to the tip.
     nominal = spec.TIP_RADIUS - blind_cut_dia_mm(spec.SPRING_EYE_HOLE_SPEC) / 2.0
-    assert nominal == pytest.approx(3.48, abs=0.01)
+    assert nominal == pytest.approx(3.44, abs=0.01)
 
 
 def test_twenty_long_hubs_still_float_between_the_keepers() -> None:
     stations = drawing.STATIONS
-    printed_max = round(spec.HUB_LENGTH, 2) + spec.HUB_LENGTH_BAND[0]
-    growth = stations * (printed_max - spec.HUB_LENGTH)
+    # The pitch prints .278 (7.0612) +.001/.000: each hub may come out the
+    # printed maximum, past the 7.0565 model.
+    _lower, upper = printed_deviations(
+        spec.HUB_LENGTH,
+        notes.DRAWING_PRECISION["Hub"]["HubLength"],
+        (spec.HUB_LENGTH_BAND[1], spec.HUB_LENGTH_BAND[0]),
+        unit=spec.UNIT,
+    )
+    growth = stations * upper
     assert spec.HUB_LENGTH_BAND[1] == 0.0  # ch_bar_pivot_pin_spec's pitch minimum
     assert growth < sum(assembly.KEEPER_HUB_FLOAT)
 
@@ -107,7 +117,7 @@ def test_plate_band_is_the_notch_allowance() -> None:
 
 def test_plate_is_located_from_one_hub_face() -> None:
     assert spec.PLATE_OFFSET == pytest.approx((spec.HUB_LENGTH - spec.LEVER_THICKNESS) / 2.0)
-    assert notes.DRAWING_PRECISION["PlateOffsetReference"] == {"PlateOffset": 2}
+    assert notes.DRAWING_PRECISION["PlateOffsetReference"] == {"PlateOffset": 3}
     assert lever.PLATE_OFFSET_SKETCH == "PlateOffsetReference"
     # The line runs from the hub face to the plate face on the hub silhouette.
     start, end = lever._PLATE_OFFSET_START, lever._PLATE_OFFSET_END
@@ -118,7 +128,7 @@ def test_plate_is_located_from_one_hub_face() -> None:
 def test_draw_view_math_matches_the_spec() -> None:
     assert drawing._BAR_PIN_DIA == blind_cut_dia_mm(spec.BAR_PIN_HOLE_SPEC)
     assert drawing._SPRING_HOLE_DIA == blind_cut_dia_mm(spec.SPRING_EYE_HOLE_SPEC)
-    assert spec.TIP_END_X == pytest.approx(180.55)
+    assert spec.TIP_END_X == pytest.approx(180.511)
 
 
 def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:

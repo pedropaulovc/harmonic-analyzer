@@ -7,8 +7,9 @@ placement of those dimensions, the function each tight band serves, the hole
 callouts, the bore's roughness and one reference overall length.
 Sheet/template and export behaviour lives in ``_drawing_common``.
 
-The lever is a long thin third-class lever (186.6 mm over the hub, 11.0 mm
-tall, 3.0 mm thick).  The sheet runs at 1:1: the front view carries the
+The lever is a long thin third-class lever (7.34 in over the hub, .43 in
+tall, .118 in thick); the sheet prints decimal inch (the part's
+``drawing_unit: in``).  The sheet runs at 1:1: the front view carries the
 profile, bore, hub, both arms from the fulcrum bore and the overall length;
 the top view the plate thickness and the hub length; a 1:2 isometric.
 
@@ -50,11 +51,12 @@ from _drawing_dimensions import (
 )
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_finish import add_surface_finish
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm, drill_process
 from _machinist_review_mode import MachinistReviewMode
@@ -141,12 +143,18 @@ STATIONS = _config.machine("channels", "count")
 _CLEARANCE_LEAST = (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1]) - (SHAFT_DIA + SHAFT_DIA_BAND[0])
 _CLEARANCE_MOST = (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0]) - (SHAFT_DIA + SHAFT_DIA_BAND[1])
 
+
+def _inch(value_mm: float) -> str:
+    """Four-place inch text, no leading zero (.0060)."""
+    return f"{value_mm / 25.4:.4f}".removeprefix("0")
+
+
 # The bar-to-hub roots are inside corners: the title block's INSIDE CORNERS
-# R1.0 MAX row controls them, so no callout repeats it (rule 2; review r1-r3).
+# row controls them, so no callout repeats it (rule 2; review r1-r3).
 FRONT_CALLOUTS = {
     "FulcrumDia": (
         f"REAM THRU; RUNS ON\nSHAFT {SHAFT_NUMBER},"
-        f" {_CLEARANCE_LEAST:.2f}-{_CLEARANCE_MOST:.2f}\nDIAMETRAL CLEARANCE"
+        f" {_inch(_CLEARANCE_LEAST)}-{_inch(_CLEARANCE_MOST)}\nDIAMETRAL CLEARANCE"
     ),
     "BarHeight": "FULL R AT TIP",
     "BarPinCx": "SETS LEVER RATIO",
@@ -158,6 +166,8 @@ HOLE_MATES = {
     "bar-pin hole": f"RUNS ON PIN\n{PIN_NUMBER}",
     "spring-eye hole": f"HOOKS SPRING\n{SPRING_NUMBER}",
 }
+# Each drilled hole's native size prints .XXX.
+HOLE_PRECISION = {"hw-diam": 3}
 TOP_CALLOUTS = {
     "LeverThick": f"SLIDING FIT IN NOTCH\nOF {BAR_NUMBER}",
     "PlateOffset": f"LOCATES {BAR_NUMBER} NOTCH;\nSETS GAP TO NEXT BAR",
@@ -217,7 +227,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("ch-channel-lever"),
     )
     stamp_drawing_summary(
         adapter,
@@ -232,7 +246,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
-    # The integral Ø12 x 7.06 fulcrum hub hides the whole 3 x 11 plate section
+    # The integral Ø.47 x .278 fulcrum hub hides the whole plate section
     # in an end view, so the plate thickness and the hub length read here.
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
@@ -275,7 +289,7 @@ async def build(adapter: Any) -> dict[str, str]:
             **DRAWING_PRECISION["PlateOffsetReference"],
         },
     )
-    # Native, the Ø12.0 line runs rim to rim through the hub centre and
+    # Native, the Ø.47 line runs rim to rim through the hub centre and
     # crosses the REAM leader there (review r3): one arrow on the near rim.
     hub_dia = [a for a in front_annotations if dimension_name(adapter, a) == "HubDia"]
     if len(hub_dia) != 1:
@@ -338,6 +352,7 @@ async def build(adapter: Any) -> dict[str, str]:
         process=drill_process(BAR_PIN_HOLE_SPEC) + "\n",
     )
     _name_hole_mate(bar_pin_callout, label="bar-pin hole")
+    set_hole_callout_precision(bar_pin_callout, HOLE_PRECISION, label="bar-pin hole")
     spring_callout = add_native_hole_callout(
         adapter,
         front,
@@ -347,6 +362,7 @@ async def build(adapter: Any) -> dict[str, str]:
         process=drill_process(SPRING_EYE_HOLE_SPEC) + "\n",
     )
     _name_hole_mate(spring_callout, label="spring-eye hole")
+    set_hole_callout_precision(spring_callout, HOLE_PRECISION, label="spring-eye hole")
     rebuild_drawing(adapter, label="hole callout mates")
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
