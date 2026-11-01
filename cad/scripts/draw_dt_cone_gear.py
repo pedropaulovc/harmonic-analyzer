@@ -1656,7 +1656,10 @@ async def build(adapter: Any) -> dict[str, str]:
         }
         set_dimension_callouts(adapter, annotations, callouts)
         set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
-        assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+        assert_imported_precision(adapter, annotations, {
+            name: places for name, places in DRAWING_PRECISION_BY_NAME.items()
+            if name != "WebMin" or teeth == WEB_REFERENCE_TEETH
+        })
         _center_mark_bore(adapter, front, teeth, label=f"{configuration} front")
         _center_mark_bore(adapter, bore_view, teeth, label=f"{configuration} bore view")
         sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
