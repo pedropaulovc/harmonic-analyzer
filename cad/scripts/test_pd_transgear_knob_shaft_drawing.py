@@ -851,6 +851,30 @@ def test_run_233549_text_clears_the_border_lines_and_labels() -> None:
     assert bx + 0.002 + 0.002 < drawing.SIDE_KEEP["OutsideDia"][0] - 0.0004 - 0.002
 
 
+def test_run_004958_journal_finish_and_flat_limit_stand_clear() -> None:
+    # The finish lands on the journal's lower outline, mid-left, where no
+    # tooth, line or text is near (machinist review r5: in the end view it
+    # landed where the journal circle meets the teeth).
+    px, py = drawing.JOURNAL_FINISH_PICK
+    assert py == pytest.approx(drawing._sheet_y(-spec.JOURNAL_DIA / 2.0))
+    assert drawing.REAR_X < px < drawing.PINION_REAR_X
+    # The symbol (V tip at its position, ~16.7 mm wide, text ~10.3 mm over
+    # the tip; its leader runs 6.35 mm level toward the landing) stands
+    # under the outline, right of the rear witness line and left of the
+    # journal Ø's lower arrow and the 40.938 text.
+    sx, sy = drawing.JOURNAL_FINISH_SYMBOL
+    assert sy + 0.0103 < py - 0.002
+    assert sx - 0.0064 > drawing.REAR_X + 0.002
+    assert sx - 0.0022 + 0.0167 < drawing.SIDE_KEEP["JournalDia"][0] - 0.002
+    assert sx - 0.0022 + 0.0167 < drawing.SIDE_KEEP["JournalLength"][0] - 0.0085 - 0.002
+    # The flat's "0.000" (ends 29.3 mm right of its keep in the run) stops
+    # short of the thread blank Ø's lower arrow; the run's keep struck it.
+    fx = drawing.SIDE_KEEP["FlatToAxis"][0]
+    blank_line = drawing.SIDE_KEEP["ThreadBlankDia"][0]
+    assert fx + 0.0293 < blank_line - 0.002
+    assert drawing.CORE_END_X + 0.018 + 0.0293 > blank_line  # the run's keep
+
+
 class _NeckView:
     """A recording IView double for detail B's place-move-crop."""
 
@@ -1156,8 +1180,14 @@ def test_build_takes_its_controls_and_callouts_from_the_spec(monkeypatch, tmp_pa
     # The thread and the tip chamfer each carry one attached callout.
     texts = [kwargs["text"] for _args, kwargs in seat.made["add_attached_note"]]
     assert texts == [spec.THREAD_CALLOUT, drawing.TIP_CHAMFER_NOTE]
-    finishes = [kwargs["label"] for _args, kwargs in seat.made["add_surface_finish"]]
-    assert finishes == ["journal finish"]
+    # The journal's finish lands on the journal's own side-view silhouette,
+    # not on the end view's circle among the teeth.
+    [(finish_args, finish)] = seat.made["add_surface_finish"]
+    assert finish["label"] == "journal finish"
+    assert finish_args[1].name == "*Right"
+    assert finish["entity_type"] == "SILHOUETTE"
+    assert finish["edge_xy"] == drawing.JOURNAL_FINISH_PICK
+    assert finish["leader_attach_xy"] == drawing.JOURNAL_FINISH_PICK
 
 
 def test_neck_detail_fails_loud_when_the_crop_takes_a_dimension(monkeypatch) -> None:
