@@ -41,6 +41,7 @@ from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
 from _drawing_hidden_sketches import _show_hidden_owners, curate_view_dimensions
 from _drawing_leaders import set_near_side_diameter
 from _layout_geometry import ARROW_TEXT_CLEARANCE_M
+from _part_properties import part_drawing_unit
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _supplier_dimensions import (
@@ -409,6 +410,7 @@ async def build(adapter: Any) -> dict[str, str]:
         supplier_dimensions=partial(supplier_dimensions, settled_checks=settled_checks),
         installed_caption="INSTALLED ENVELOPE",
         settled_checks=settled_checks,
+        unit=part_drawing_unit("dt-vn-cylinder-bank-spring"),
     )
 
 
