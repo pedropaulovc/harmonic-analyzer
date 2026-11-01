@@ -704,7 +704,9 @@ async def build(adapter: Any) -> dict[str, str]:
         process=SET_SCREW_PROCESS,
     )
     _set_tap_callout_text(tap_callout)
-    set_hole_callout_precision(tap_callout, SET_SCREW_PRECISION, label="apex set-screw tap")
+    set_hole_callout_precision(
+        tap_callout, SET_SCREW_PRECISION, label="apex set-screw tap"
+    )
     _prove_set_screw_callout_clear(adapter, tap_callout)
     # Re-assert the display mode now the last annotation has landed: an
     # annotation attached after placement can leave a view's edge set
