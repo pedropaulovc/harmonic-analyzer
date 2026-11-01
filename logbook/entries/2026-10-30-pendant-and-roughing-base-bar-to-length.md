@@ -23,10 +23,12 @@ Continues [2026-10-29](2026-10-29-vise-install-and-first-cuts.md).
   how hard I could push the machine. Tap Magic as the cutting fluid.
 - **Control:** CNCjs on the laptop, the pendant as the handwheel, and the EL400
   simulator as the DRO. Spindle speed set by hand on the knob.
-- **Speeds and feeds:** I asked Claude. It suggested starting side roughing at
-  1700 rpm, 400 mm/min, 0.500 in axial depth and 0.060 in radial step-over,
-  and full-width slotting at 1500 rpm and 230 mm/min. It said to use
-  conventional milling if the machine still had backlashy lead screws.
+- **Speeds and feeds (suggested, not what I ran):** I asked Claude. It
+  suggested starting side roughing at 1700 rpm, 400 mm/min, 0.500 in axial
+  depth and 0.060 in radial step-over, and full-width slotting at 1500 rpm and
+  230 mm/min. It said to use conventional milling if the machine still had
+  backlashy lead screws. What I actually ran is in the table below; my
+  starting depth and step-over weren't recorded.
 
 ## Operations
 
@@ -156,8 +158,8 @@ machine yet; the next entry will say what held up.
   X. Check the real X travel first.
 - **Op 20, ends and faces in the vise (panel C).** At 5½ in wide the bar fits
   the 5¾ in vise. Lay it flat on parallels with the end just past the side of
-  the jaws and a jack under the far end; square both ends to 440, then face
-  both sides to 12.0. Standing the bar on its end is out: 443 mm is more than
+  the jaws and a jack under the far end; square both ends to 440 mm, then face
+  both sides to 12.0 mm. Standing the bar on its end is out: 443 mm is more than
   the 17 in spindle-to-table maximum.
 - **Climb or conventional.** With the spindle running forward, picture the
   cutter's travel along the part: part on the left is conventional, on the
@@ -172,13 +174,16 @@ machine yet; the next entry will say what held up.
   target − actual = allowance, split it into rough passes plus a finish pass,
   tape the sheet to the machine, zero on the edge and cut to an absolute
   coordinate instead of counting increments.
-- **Escape drill.** If it rings or grabs: feed stop (the pendant stop), then Z
-  up. Never back off sideways while the cutter is in the cut. Practise it dry.
+- **Escape drill.** If it rings or grabs: press the pendant stop and wait until
+  all motion has stopped, then retract Z. Never back off sideways while the
+  cutter is in the cut. Practise it dry.
 - **Collet grip.** Wipe oil and Tap Magic off the collet and shank, tighten the
   drawbar properly, and mark the shank at the collet face to see any creep.
   Keep stick-out short; a 2- or 3-flute end mill clears aluminium chips better.
 - **Power feed without overrun.** An incremental MDI move in CNCjs
-  (`G91 G1 X-50 F400`, then `G90`) gives an exact distance at a set feed with
+  (`G21 G91 G1 X-50 F400`, then `G90`, plus `G20` if I was in inch mode;
+  `G21` makes it 50 mm at 400 mm/min whatever mode was active) gives an exact
+  distance at a set feed with
   nothing queued. If the pendant can send `$J=` jog commands, FluidNC can
   cancel a jog on release (unverified against my config).
 - **Screen off.** Set the laptop's screen and sleep timers to Never while
