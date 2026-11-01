@@ -319,12 +319,19 @@ JOURNAL_REFERENCE_X = JOURNAL_REFERENCE_LENGTH * math.sin(math.radians(INCLINE_D
 JOURNAL_REFERENCE_Z = JOURNAL_REFERENCE_LENGTH * math.cos(math.radians(INCLINE_DEG))
 CRANK_BOSS_NEAR_Z = abs(CRANK_BOSS_START_Z)
 
+# The foot seat's symbol names the mate it seats on (rule 7, say why at the
+# callout), as pd_transgear_front_bushing names its thrust faces' mates.
+FOOT_SEAT_FINISH_TARGET = "SEATS ON MHA-DT-20"
 SURFACE_FINISHES = (
     # The post is a casting that may be left as-cast everywhere else; the
     # faces that MUST be cut say so on the face (the title block's surface row
     # is the process statement "CAST/MACHINED", not a grade).
     SurfaceFinishControl(
-        "foot_seat", SEAT_UM, PlanarFace((0, -1, 0), 0.0), display_unit=UNIT
+        "foot_seat",
+        SEAT_UM,
+        PlanarFace((0, -1, 0), 0.0),
+        production_method=FOOT_SEAT_FINISH_TARGET,
+        display_unit=UNIT,
     ),
     # The crankshaft MHA-DT-11 runs in the crank bore, so it is a running
     # journal (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)), like the cone bore.
@@ -429,12 +436,13 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
-# The note names the locating mate (rule 20); the inside-corner ceiling remains
-# solely in the title block. Every size, band and finish remains on a
+# No general note: the foot's mate rides its Ra symbol (FOOT_SEAT_FINISH_TARGET,
+# rule 7: the reason on the callout it explains), and the inside-corner ceiling
+# remains solely in the title block.  Every size, band and finish remains on a
 # dimension or native symbol (drawing-guidelines.md rule 2 (the title block is
 # the general specification) and rule 7 (notes: few, flagged, never a
 # method)).  No wall falls short of the rule-17 target, so none is stated.
-DRAWING_NOTES = "FOOT SEATS ON MHA-DT-20."
+DRAWING_NOTES = ""
 
 # One frame, on the drawing-simplicity-policy.md `GD&T allowlist (rule 5)` allowlist since #906 (USER RULING 2026-09-26,
 # option ii): the crank bore's orientation to the cone journal.  The 16T:64T
