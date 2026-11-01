@@ -173,19 +173,21 @@ VIEW_ARROW_RUN = .015
 # (Y -68) at y 87; taps at x 179.2/201.8, y 101.7/124.3; nut axis 190.5,113;
 # section line C across the lug along y 113 (x 161.7..218.3), its arrows up
 # with the letters above them. The axis stands from the lug end / bottom-face
-# corner, the taps from the axis. Y lanes left of the view, 12 mm apart so
-# the short spans' outside arrow tails miss the neighbouring texts; Z lanes
-# above the taps, under the step (y 183), the two 5.657 texts outside their
-# 11.3 mm spans. The clearance callouts and the tap callout leave the axis to
-# the right, between the taps (45 deg pattern); the Ø10.50's leader rises
-# from its rim over C's right letter. The axis texts carry their function
-# rows (59 mm and 47 mm wide): .488's ends 4 mm left of the bottom face's
-# line at x 165.6, .515's 3 mm left of .223's lower arrow at x 156.6 (farm
-# round 4 layout audit).
+# corner, the taps from the axis. The tap rows chain from the axis on one Y
+# lane (x 146), each 31.5 mm "5.657 ±.13 mm" text outside its 11.3 mm span
+# (above the upper row, below the lower) and 3.9 mm left of the view's edge
+# at x 165.6; the axis's .515 stands left of them (x 104), its 47 mm text
+# 2.7 mm clear of theirs (farm run 20261101T112747102Z layout audit: the mm
+# texts on the old 12 mm-apart lanes crossed each other's lanes, the view
+# edge and C's letter). Z lanes above the taps, under the step (y 183), the
+# two 5.657 texts outside their 11.3 mm spans and clear of the view's edges.
+# The clearance callouts and the tap callout leave the axis to the right,
+# between the taps (45 deg pattern); the Ø10.50's leader rises from its rim
+# over C's right letter.
 NUT_XY, NUT_SCALE = (.190,.175), (2,1)
 NUT_KEEP = {
-    'NutCentreY':(.130,.100),'NutTap1Y':(.157,.1073),'NutTap3Y':(.145,.1187),
-    'NutCentreZ':(.132,.175),'NutTap3Z':(.150,.160),'NutTap4Z':(.2225,.160),
+    'NutCentreY':(.104,.100),'NutTap1Y':(.146,.0975),'NutTap3Y':(.146,.1285),
+    'NutCentreZ':(.132,.175),'NutTap3Z':(.1465,.160),'NutTap4Z':(.2335,.160),
     'NutClearanceDia':(.250,.101),'NutSeatDia':(.258,.140),
 }
 NUT_CAPTION = 'VIEW D'
