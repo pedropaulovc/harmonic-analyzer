@@ -33,6 +33,7 @@ from _drawing_dimensions import assert_imported_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
@@ -42,10 +43,13 @@ from dt_vn_crank_hub_pin_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIN_DIA,
+    PIN_DIA_CALLOUT,
     STOCK_FRACTION_DENOMINATOR,
     STOCK_FRACTION_DIMENSIONS,
 )
 
+
+MACHINIST_REVIEW = MachinistReviewMode.LEARN
 
 SPEC = DRAWINGS_BY_NAME["dt_vn_crank_hub_pin"]
 PART_STEM = SPEC.artifact_stem
@@ -65,8 +69,10 @@ FRONT_CENTER = (0.095, 0.180)
 RIGHT_CENTER = (0.225, 0.180)
 ISO_CENTER = (0.355, 0.180)
 HALF_DIA = PIN_DIA * VIEW_SCALE[0] / 2000.0
+# The diameter's three-line fit callout hangs under its value, so the value
+# sits high enough for the block to clear the side view's top edge.
 RIGHT_KEEP = {
-    "PinDia": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] + HALF_DIA + 0.016),
+    "PinDia": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] + HALF_DIA + 0.030),
     "PinLen": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_DIA - 0.016),
 }
 
@@ -141,6 +147,7 @@ async def build(adapter: Any) -> dict[str, str]:
             expected_mm=value_mm,
             presentation="diameter",
             fraction_denominator=STOCK_FRACTION_DENOMINATOR,
+            callout=PIN_DIA_CALLOUT,
         )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to MHA-DT-VN-59 end view")

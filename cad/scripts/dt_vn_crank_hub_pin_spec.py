@@ -35,11 +35,14 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 ):
     raise AssertionError("every marked MHA-DT-VN-59 dimension needs authored places")
 
-DRAWING_NOTES = "\n".join(
+# The fit, its mates (by name and number, rule 4) and the flush acceptance sit
+# under the diameter they govern; the seam's match-drill/ream is the arm's and
+# hub's callout, and the .17 seam keeps the cut pin out of the hub bore.
+PIN_DIA_CALLOUT = "\n".join(
     (
-        "MATCH-DRILL/REAM MHA-DT-06 ARM AND MHA-DT-31 HUB AT SIX O'CLOCK TO",
-        "LIGHT DRIVE FIT ON ACTUAL MHA-DT-VN-59 PIN; DRIVE AXIALLY FROM OUTBOARD FACE;",
-        "OUTER END FLUSH. PIN SHALL NOT ENTER HUB BORE.",
-        f"CUT FROM McMASTER-CARR {SKU} DOWEL PIN; DIAMETER AS SUPPLIED.",
+        "LIGHT DRIVE FIT IN SEAM OF CRANK ARM",
+        "MHA-DT-06 AND CRANK HUB MHA-DT-31;",
+        "OUTER END FLUSH WITH THEIR FRONT FACES",
     )
 )
+DRAWING_NOTES = f"CUT FROM McMASTER-CARR {SKU} DOWEL PIN; DIAMETER AS SUPPLIED."
