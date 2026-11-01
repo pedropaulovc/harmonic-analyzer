@@ -45,13 +45,13 @@ OUTBOARD_SIGN = {
     name: (1.0 if mount_z > STACK_MID_Z else -1.0) for name, mount_z in MOUNT_Z.items()
 }
 
-# The support (MHA-FR-05) prints on its own sheet: its length's .X band and
+# The support (MHA-FR-05) prints on its own sheet: its length's .XX band and
 # its rule-17 wall target are its unit's (rocker_bracket_seat_layout reads
 # both from here).
 SUPPORT_UNIT = drawing_unit(
     "parts/fr-rocker-arm-support", _config.parts("fr-rocker-arm-support")
 )
-SUPPORT_LENGTH_BAND = printed_band_mm(1, unit=SUPPORT_UNIT)
+SUPPORT_LENGTH_BAND = printed_band_mm(2, unit=SUPPORT_UNIT)
 SUPPORT_WALL_TARGET = 2.0
 SUPPORT_LENGTH = 2.0 * SUPPORT_HALF_MACHINE_Z
 # The bracket's foot length and hold-down station print at .XX inch.
@@ -91,11 +91,11 @@ def _hole_z_max(support_end_z: float) -> float:
     )
 
 
-def _hole_z(support_end_z: float) -> float:
-    """Mid-window, the printed station (from the ear's inboard face) rounded
-    to the .XX grid, a plain nominal for a clearance hole (#1371 review)."""
-    target = (HOLE_Z_MIN + _hole_z_max(support_end_z)) / 2.0
-    return round((target - _bracket.FOOT_Z0) / _GRID_MM) * _GRID_MM + _bracket.FOOT_Z0
+# The printed hold-down station from the ear's inboard face, .49: a plain
+# .XX nominal for a clearance hole (#1371 review), held fixed so a support
+# length change moves neither this hole, its sheet nor the frame's seat
+# holes. The window checks below guard it.
+HOLE_STATION = 49 * _GRID_MM
 
 
 def _foot_z1(support_end_z: float) -> float:
@@ -109,7 +109,7 @@ def _foot_fits(length: float) -> bool:
     """A foot at the nearer end face of a support ``length`` long takes its
     hold-down hole inside the window with the wall target to the foot end."""
     support_end_z = min(_support_end_z(length).values())
-    hole_z = _hole_z(support_end_z)
+    hole_z = _bracket.FOOT_Z0 + HOLE_STATION
     return (
         HOLE_Z_MIN <= hole_z <= _hole_z_max(support_end_z)
         and _bracket.hole_ligaments_min(hole_z, _foot_z1(support_end_z))["foot end"]
@@ -136,9 +136,7 @@ if HOLE_Z_MAX <= HOLE_Z_MIN:
         "the foot has no hold-down station clearing both the ear and the"
         f" seat's end wall ({HOLE_Z_MIN:.2f} .. {HOLE_Z_MAX:.2f})"
     )
-HOLE_Z = _hole_z(_NEAR_END_Z)
-# The printed station: the hole from the ear's inboard face (.49).
-HOLE_STATION = HOLE_Z - _bracket.FOOT_Z0
+HOLE_Z = _bracket.FOOT_Z0 + HOLE_STATION
 HOLE_MACHINE_Z = {name: MOUNT_Z[name] + OUTBOARD_SIGN[name] * HOLE_Z for name in SIDES}
 
 HOLE_LIGAMENTS_MIN = _bracket.hole_ligaments_min(HOLE_Z, FOOT_Z1)
