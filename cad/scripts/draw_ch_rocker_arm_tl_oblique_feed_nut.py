@@ -57,6 +57,7 @@ from ch_rocker_arm_tl_oblique_feed_nut_spec import (
     HEIGHT,
     HOLE_X,
     LENGTH,
+    MATE_CALLOUT,
     STOCK_CALLOUTS,
     STOCK_FRACTION_DENOMINATORS,
     WIDTH,
@@ -109,9 +110,11 @@ def text_half_high(rows: int) -> float:
     return ((rows - 1) * ROW_PITCH + 3.5 / _S) / 2.0
 
 
-# Over the face, nearest first: the first hole from the bore, then the pair
-# with its mate row; each text stands over its own line, so no extension line
-# reaches it.
+# Over the face, nearest first: the first hole from the bore, then the pair.
+# The first's text stands over its own line; the pair's two rows are wider
+# than the holes' .680, so they stand outboard left of the -X hole's extension
+# line on the dimension line run out to them (TL-32's 2.44): r2 review, set
+# between the holes, both extension lines' overshoot struck the mate row.
 _OFFSET_LINE = HEIGHT + FIRST_LANE
 # (r1 audit: one TEXT_GAP left the rows 3.51 mm apart, under one text height.)
 _SPACING_LINE = _OFFSET_LINE + TEXT_DROP + text_half_high(1) + 1.5 * TEXT_GAP
@@ -128,16 +131,20 @@ _HEIGHT_LINE = _BORE_Y_TEXT - text_half(".38") - TEXT_GAP
 _HEIGHT_TEXT = _HEIGHT_LINE - TEXT_GAP - text_half(STOCK_CALLOUTS["NutHeight"])
 FACE_KEEP: dict[str, tuple[float, float, float]] = {
     "HoleOffset": ((HOLE_X[0] + BORE_X) / 2.0, _OFFSET_LINE + TEXT_DROP, LENGTH),
-    "HoleSpacing": (BORE_X, _SPACING_LINE + TWO_LINE_DROP, LENGTH),
+    "HoleSpacing": (
+        HOLE_X[0] - TEXT_GAP - text_half(MATE_CALLOUT), _SPACING_LINE + TWO_LINE_DROP, LENGTH
+    ),
     "BoreX": (BORE_X / 2.0, _BORE_X_LINE + TEXT_DROP, LENGTH),
     "NutWidth": ((BORE_X + WIDTH) / 2.0, _WIDTH_LINE + THREE_LINE_DROP, LENGTH),
     "BoreY": (_BORE_Y_TEXT, BORE_Y / 2.0, LENGTH),
     "NutHeight": (_HEIGHT_TEXT, HEIGHT / 2.0, LENGTH),
     # The +X hole's 2X Ø.144 DRILL THRU up-right, its leader outboard of that
-    # hole's extension line; the bore's two rows right, level with the face's
-    # lower edge, its leader in through the +X side under the +X hole and
-    # over the stock width's extension line (which runs down from the face).
-    "HoleDia": (HOLE_X[1] + 10.0 + text_half("2X Ø.144 DRILL THRU"), HEIGHT + 5.5, LENGTH),
+    # hole's extension line, its shelf a row over the side view's .40 (r2
+    # review: level with it, the shelf ran into that dimension line); the
+    # bore's two rows right, level with the face's lower edge, its leader in
+    # through the +X side under the +X hole and over the stock width's
+    # extension line (which runs down from the face).
+    "HoleDia": (HOLE_X[1] + 6.0 + text_half("2X Ø.144 DRILL THRU"), HEIGHT + 14.0, LENGTH),
     "BoreDia": (WIDTH + 16.0, 2.0, LENGTH),
 }
 # The side view (*Right): the faced length over it.

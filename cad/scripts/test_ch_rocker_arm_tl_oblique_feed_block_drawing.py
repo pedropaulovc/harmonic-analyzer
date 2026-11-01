@@ -72,6 +72,7 @@ def test_nut_taps_are_the_tl27_pair_on_the_axis_line():
     assert spec.CALLOUTS_BELOW['NutTapSpacing']=='MATCHES TL-27 FEED NUT'
     # r1 review: the .515 names its mate; the D arrow says where VIEW D prints.
     assert spec.CALLOUTS_BELOW['NutCentreY']=='ON KP08 LEADSCREW AXIS'
+    assert spec.CALLOUTS_BELOW['NutCentreZ']=='FROM CARRIAGE FACE\nON KP08 LEADSCREW AXIS'
     source=(Path(__file__).parent/'draw_ch_rocker_arm_tl_oblique_pivot_block.py').read_text(encoding='utf-8')
     assert "VIEW_SHEET_REF = '(SHEET 2)'" in source
 

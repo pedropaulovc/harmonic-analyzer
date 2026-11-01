@@ -119,7 +119,9 @@ CALLOUTS_ABOVE = dict(pivot.CALLOUTS_ABOVE) | {"NutClearanceDia": "DRILL THRU"}
 NUT_MATE_TEXT = "MATCHES TL-27 FEED NUT"
 CALLOUTS_BELOW = dict(pivot.CALLOUTS_BELOW) | {
     "NutClearanceDia": "LEADSCREW CLEARANCE",
-    "NutCentreZ": "FROM BOTTOM FACE\nON KP08 LEADSCREW AXIS",
+    # r2 review: "BOTTOM" named no face a view defines; the face the
+    # counterbored screws pull onto the HGH15CA carriage does.
+    "NutCentreZ": "FROM CARRIAGE FACE\nON KP08 LEADSCREW AXIS",
     "NutCentreY": "ON KP08 LEADSCREW AXIS",
     "NutTapSpacing": NUT_MATE_TEXT,
 }
