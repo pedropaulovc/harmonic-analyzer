@@ -83,7 +83,6 @@ from _drawing_hole_callout import (
 from _drawing_leader_notes import add_leader_note
 from _drawing_leaders import set_near_side_diameter
 from _part_properties import part_drawing_unit
-from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
@@ -170,19 +169,11 @@ def _front_x(model_x: float) -> float:
     return FRONT_CENTER[0] + model_x * _S
 
 
-# The manufacturing notes hang from their top-left anchor and grow down.
-NOTES_ANCHOR = (0.014, 0.0555)
 # Datum B tags the foot seat below the elevation, and its frame hangs 7.0 mm
 # down from the tag point (measured on leaf w3-1026: point at 60.0 mm, frame
-# 53.0..60.0).  At model y -9 the frame sat on the notes' first line; the tag
-# point now sits a frame height plus clearance above the notes' top, still
-# below the foot (model y 0) so the leader reaches the seat.
-_DATUM_TAG_FRAME_HEIGHT = 0.007
-_DATUM_NOTES_CLEARANCE = 0.0015
-DATUM_B_TAG_XY = (
-    _front_x(-16.0),
-    NOTES_ANCHOR[1] + _DATUM_TAG_FRAME_HEIGHT + _DATUM_NOTES_CLEARANCE,
-)
+# 53.0..60.0).  The tag point stands just under the foot (model y 0) so the
+# leader reaches the seat.
+DATUM_B_TAG_XY = (_front_x(-16.0), 0.064)
 if not DATUM_B_TAG_XY[1] < _front_y(0.0):
     raise AssertionError("datum B's tag no longer sits below the foot seat it tags")
 
@@ -296,7 +287,10 @@ def _size_requirement(
 
 FRONT_KEEP = {
     "MainBodyHt": (0.040, FRONT_CENTER[1]),
-    "MainBodyDia": (0.150, 0.080),
+    # One row since the FLUSH rows went (machinist review: the two bands, not
+    # the word, define the body and the boss faces): text centred 2.3 mm over
+    # its line, as HeadDia's, keeps the line at the three-row callout's 71.6 mm.
+    "MainBodyDia": (0.150, 0.074),
     # A REFERENCE since U31: the crank bore is located from the cone bore
     # (View B), so its height above the foot only follows that chain.
     "CrankAxisY": (0.060, _front_y(CRANK_BORE_HEIGHT / 2.0)),
@@ -543,13 +537,15 @@ JOURNAL_TEXT_OFFSETS = {
 # they set (MHA-DT-05 inch machinist review): the crank boss's north face
 # sets the 16T's feeler seat and its length the crankshaft collar's seat on
 # the south face; the cone boss's face-to-face is the cone shaft's bearing
-# length, and the body is turned flush with those faces (one harvested size).
+# length.  The body's Ø and the boss faces' station are each their own band:
+# the 64T's print-worst clearance takes each separately (crank_boss_rim), so
+# no flushness between them is asked (machinist review: FLUSH was not
+# measurable within the two printed limits).
 # Two of them keep their old footprint (r5 layout gate): the face station's
 # two rows of at most ten characters, its dimension line otherwise dropping
 # onto the counterbore callout's leader, and the face-to-face's one row, two
 # rows standing it through the sheet's top border.
 DIMENSION_CALLOUTS = {
-    "MainBodyDia": "FLUSH WITH CONE\nBOSS FACES",
     "CrankBossDia": "CRANK BOSS",
     "CrankBossLen": "CRANK BOSS\nLENGTH, SEATS\nMHA-DT-11 COLLAR",
     "CrankBossStartZ": "FACE SETS\nMHA-DT-10",
@@ -1526,10 +1522,15 @@ def _assert_native_layout(
         if annotation.kind == "surface-finish"
         for box in annotation.text_boxes
     ]
-    if len(surface_boxes) != len(SURFACE_FINISHES):
+    # One Ra text per symbol, plus the mate text a symbol prints over its Ra
+    # (the foot seat's FOOT_SEAT_FINISH_TARGET, on the symbol's own display).
+    expected_surface_boxes = sum(
+        2 if control.production_method else 1 for control in SURFACE_FINISHES
+    )
+    if len(surface_boxes) != expected_surface_boxes:
         raise RuntimeError(
-            f"cone pivot post must expose {len(SURFACE_FINISHES)} native Ra "
-            f"text boxes: {len(surface_boxes)}"
+            f"cone pivot post must expose {expected_surface_boxes} native Ra "
+            f"and mate text boxes: {len(surface_boxes)}"
         )
     own_overlaps = {}
     for label in ("JournalAxisY", "CrankAboveCone"):
@@ -1605,14 +1606,12 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
     )
     face_evidence = _model_face_evidence(adapter.currentModel)
@@ -1804,7 +1803,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # mounting-hole exit rims project onto the same line, so the hit-test has
     # nothing unambiguous to return), so the rim is found by its geometry --
     # the ONE circular edge of body radius centred at y=0.  Its leader lands
-    # on the seat's left quarter while the symbol sits clear of the body at right.
+    # on the seat's left quarter while the symbol sits clear of the body at
+    # right, its mate (SEATS ON MHA-DT-20) printed over the Ra.
     add_surface_finish(
         adapter,
         front,
@@ -1949,9 +1949,6 @@ async def build(adapter: Any) -> dict[str, str]:
         0.202,
         0.104,
     )
-    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method) caps the block at four lines (about 18 mm); the anchor keeps the
-    # r7 clearance to the bottom inner border.
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_ANCHOR)
     # Last of the notes: a view-owned note leaves its view active, and a
     # sheet note inserted after it joins that view (the notes block did, and
     # crowded datum B across views: r14 view-crowding).
