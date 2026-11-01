@@ -186,14 +186,16 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
     # (rule 14). Round 4: the mr3 strap row made HUB's block three rows deep
     # and its last row sat on the +Y edge (sheet y 217.4); 12 model mm up
     # (6 sheet) stands it ~5 clear, left of the riser callout (x ~275) and
-    # right of RiserX1's extension line (x ~202). CL's (mr4: inside the
-    # plate) is two rows, its one callout row ~84 wide, centred at sheet
-    # (210.5, 256.5): above the 7.287 text (top ~247) and the 4.154 lane
-    # (y 250), right of the 4.154 text (x ~153) and RiserX2's extension line
-    # (x 162), under the border; its leader runs down-left to the spot,
-    # crossing extension lines and the 7.287 dimension line only.
+    # right of RiserX1's extension line (x ~202). CL's (mr8: from above the
+    # 4.154 lane its leader crossed the 7.287 dimension line) three rows,
+    # ~31 wide, centred at sheet (182.25, 228.2): its shelf ~2.8 over the +Y
+    # edge, its top ~2.3 under the 7.287 lane (238.5), ~4.4 inside the RiserX2
+    # (162.5) and RiserX1 (202.0) extension lines. Every route from above
+    # that lane crosses it (or, past its end, overruns the 10 mm leader
+    # detour); this leader runs down-left ~36 over the part (detour ~8),
+    # crossing extension lines only.
     "SpotDia": _xy(50.0, 110.0),
-    "SpotDiaCl": _xy(-23.0, 163.0),
+    "SpotDiaCl": _xy(-79.5, 106.4),
     # Carrier r13: a single-row text within its span stands clear of both
     # arrows (3.56 long): at y 192 the 45.53's top arrow ran into it and at
     # 161.5 the 38.00's bottom arrow struck it. HUB's text is at y 189, 3.7
@@ -311,7 +313,10 @@ CR_CALLOUT_XY = (0.377, 0.230)
 # The riser callout 2 mm right of jig-r10's 0.310: its leader from riser
 # screw 4 then passes clear right of the Ø3.00 spot text.
 RISER_CALLOUT_XY = (0.312, 0.248)
-LEVER_CALLOUT_XY = (0.179, 0.143)
+# The lever callout 2.5 mm right of 0.179 (round 8): its bottom row and
+# shoulder (sheet x ~147..218) then stand ~2.6 clear of HubX's MIDWAY A1-B1
+# row (right end x 144.3), its shoulder ~4 short of HubX's extension line.
+LEVER_CALLOUT_XY = (0.1815, 0.143)
 
 part_metadata(
     precision_sources=(

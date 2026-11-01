@@ -9,8 +9,9 @@ ch-rocker-arm-tl-oblique-base-bar:
   # bandsaw rip (owner ruling #2083): no grade or temper is functional, so
   # the title block names the aluminium flat-bar family (rule 2; machinist
   # review ENFORCE); the owned OnlineMetals 1173 6061-T6511 1/2 x 6 bar is
-  # the source.
-  material: ALUMINUM FLAT BAR, MILLED FROM 1/2 x 6 in
+  # the source. The title-block cell holds one line, so the material names
+  # the bar it is cut from; the milled 5.50 width prints on the sheet.
+  material: ALUMINUM FLAT BAR 1/2 x 6 in
   material_specification: Aluminum flat bar milled from 1/2 x 6 in (e.g. 6061-T6511, owned OnlineMetals 1173); both large faces faced to .47, width milled to 5.50
   finish: as machined
   quantity: 2
