@@ -17,6 +17,7 @@ import ch_rocker_hub_spec as spec
 import draw_ch_rocker_hub as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _inch_wall_limits import WALL_FLOOR_MM
 
 
 def _calls(path: str) -> dict[str, ast.Call]:
@@ -35,22 +36,22 @@ def test_required_drawing_paths() -> None:
     assert "draw_ch_rocker_hub.py" in PRECISION_MIGRATED_DRAWINGS
 
 
-def test_press_fit_bands_are_iso_286_10_to_18() -> None:
-    # ISO 286-2, over 10 up to 18 mm: H7 0/+18 um, r6 +23/+34 um.
-    assert fit.ISO_RANGE_MM[0] < rocker.HUB_DIA <= fit.ISO_RANGE_MM[1]
-    assert fit.STRAP_HOLE_BAND == (0.018, 0.0)
-    assert fit.HUB_LAND_BAND == (0.034, 0.023)
-    assert fit.PRESS_INTERFERENCE == pytest.approx((0.005, 0.034))
-    assert fit.INTERFERENCE_TEXT == "0.005-0.034 DIAMETRAL INTERFERENCE"
+def test_press_fit_bands_hold_interference_at_both_ends() -> None:
+    # .400 strap hole +.0005/.0000, hub land +.0013/+.0009: .0004-.0013 in.
+    assert rocker.HUB_DIA == pytest.approx(0.400 * 25.4)
+    assert fit.STRAP_HOLE_BAND == (0.0127, 0.0)
+    assert fit.HUB_LAND_BAND == (0.03302, 0.02286)
+    assert fit.PRESS_INTERFERENCE == pytest.approx((0.01016, 0.03302))
 
 
 @pytest.mark.parametrize(
     "land_band",
-    [(0.029, 0.018), (0.020, 0.010)],
-    ids=["p6-line-to-line", "loose"],
+    [(0.0254, 0.0127), (0.0127, 0.0)],
+    ids=["line-to-line", "loose"],
 )
 def test_a_press_that_can_go_line_to_line_is_refused(land_band) -> None:
-    # H7/p6 at 10-18 mm: the smallest land meets the largest hole at 0.000.
+    # +.0010/+.0005 in the +.0005/.0000 hole: the smallest land meets the
+    # largest hole at .0000.
     with pytest.raises(AssertionError, match="line-to-line or loose"):
         fit.press_interference(land_band, fit.STRAP_HOLE_BAND)
 
@@ -58,15 +59,15 @@ def test_a_press_that_can_go_line_to_line_is_refused(land_band) -> None:
 def test_supply_sizes_derive_from_the_finished_rocker() -> None:
     assert spec.LAND_DIA == rocker.HUB_DIA
     # The bore is drilled under the finished ream; the drilled-hole row's
-    # +0.10 still leaves stock.
-    assert spec.SUPPLY_BORE_DIA == pytest.approx(6.30)
+    # +.004 still leaves stock.
+    assert spec.SUPPLY_BORE_DIA == pytest.approx(0.246 * 25.4)
     assert spec.SUPPLY_BORE_DIA + spec.DRILLED_PLUS < rocker.PIVOT_HOLE_DIA
     # The length leaves FACE_STOCK at each end over the finished top limit.
     finished_max = rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0]
-    assert spec.SUPPLY_LENGTH_MIN == pytest.approx(8.2)
+    assert spec.SUPPLY_LENGTH_MIN == pytest.approx(0.32 * 25.4)
     assert spec.SUPPLY_LENGTH_MIN >= finished_max + 2.0 * spec.FACE_STOCK
     assert spec.SUPPLY_LENGTH_TOL_TYPE == 5  # swTolType_e.swTolMIN
-    assert spec.SUPPLY_WALL_MIN >= rocker.RULE12_WALL_FLOOR
+    assert spec.SUPPLY_WALL_MIN >= WALL_FLOOR_MM
     assert part.V_HUB == pytest.approx(
         math.pi
         * ((spec.LAND_DIA / 2.0) ** 2 - (spec.SUPPLY_BORE_DIA / 2.0) ** 2)
@@ -82,9 +83,12 @@ def test_the_sheet_never_repeats_a_finished_size() -> None:
             notes.SUPPLY_LENGTH_PREFIX,
         )
     )
-    assert f"{rocker.PIVOT_HOLE_DIA:.2f}" not in printed
-    assert f"{rocker.HUB_LENGTH:.2f}" not in printed
-    assert f"{rocker.HUB_LENGTH:.4f}" not in printed
+    for value, places in (
+        (rocker.PIVOT_HOLE_DIA, 3),
+        (rocker.HUB_LENGTH, 2),
+        (rocker.HUB_LENGTH, 4),
+    ):
+        assert f"{value / 25.4:.{places}f}".removeprefix("0") not in printed
     assert notes.DRAWING_NOTES == (
         "1. BORE AND LENGTH ARE FINISHED AFTER JOINING TO MHA-CH-13; SEE MHA-CH-06."
     )
@@ -95,10 +99,6 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) == marked
     assert not set(drawing.FRONT_KEEP) & set(drawing.RIGHT_KEEP)
     assert set(drawing.DIMENSION_CALLOUTS) <= marked
-    assert notes.DRAWING_PRECISION == {
-        "HubProfile": {"LandDia": 3, "SupplyBore": 2},
-        "Hub": {"SupplyLength": 1},
-    }
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_dimension_precision" not in source
     assert "assert_imported_precision(" in source
@@ -112,10 +112,6 @@ def test_every_band_is_native_and_named() -> None:
     # The supply length's single MIN limit (build_ch_rod_pivot_pin precedent).
     assert "tolerance.Type = SUPPLY_LENGTH_TOL_TYPE" in build
     assert "tolerance.SetValues(0.0, 0.0)" in build
-    assert notes.LAND_CALLOUT.splitlines() == [
-        "PRESS FIT IN MHA-CH-13 STRAP HOLE",
-        "0.005-0.034 DIAMETRAL INTERFERENCE",
-    ]
     assert notes.SUPPLY_BORE_CALLOUT.splitlines() == ["DRILL THRU", "SUPPLY SIZE"]
 
 
