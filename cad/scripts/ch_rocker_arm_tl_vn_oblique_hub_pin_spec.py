@@ -51,26 +51,21 @@ if abs(_cut_in - round(_cut_in, CUT_PLACES)) > 1e-9:
 if not CUT_LENGTH < SUPPLY_LENGTH:
     raise AssertionError("the hub pin cut length exceeds the 2 in supply")
 
-SUPPLIER_REFERENCE_DIMENSIONS = (
-    ("SupplierPinDiameter", DIA, "horizontal"),
-    ("SupplierCutLength", CUT_LENGTH, "vertical"),
-)
-# Both carriers lie on Top-view edges, so their construction lines print under
-# the outline: the diameter on the z = CUT_LENGTH end face (the view's lower
-# edge), the cut length on the OD silhouette. The Front (end) view shows no
-# chord across the pin.
-SUPPLIER_REFERENCE_STARTS = {
-    "SupplierPinDiameter": (-DIA / 2.0, -CUT_LENGTH),
-    "SupplierCutLength": (DIA / 2.0, -CUT_LENGTH),
-}
-SUPPLIER_REFERENCE_PLANES = {"SupplierPinDiameter": "Top", "SupplierCutLength": "Top"}
-SUPPLIER_REFERENCE_FORMATS = {
-    "SupplierPinDiameter": (4, "diameter", None, "GAUGE PIN"),
-    "SupplierCutLength": (CUT_PLACES, "length", None, "CUT LENGTH"),
-}
-# Diameter text shelves right of its bottom lane; the cut length sits right of the Top view.
-SUPPLIER_REFERENCE_SIDES = {"SupplierPinDiameter": "bottom", "SupplierCutLength": "right"}
-SUPPLIER_REFERENCE_UNITS = {"SupplierPinDiameter": "in", "SupplierCutLength": "in"}
+# The one supplier reference: the diameter's carrier lies on the Top view's
+# z = CUT_LENGTH end-face edge (the view's lower edge), so its construction
+# line prints under the outline and the Front (end) view shows no chord.
+SUPPLIER_REFERENCE_DIMENSIONS = (("SupplierPinDiameter", DIA, "horizontal"),)
+SUPPLIER_REFERENCE_STARTS = {"SupplierPinDiameter": (-DIA / 2.0, -CUT_LENGTH)}
+SUPPLIER_REFERENCE_PLANES = {"SupplierPinDiameter": "Top"}
+SUPPLIER_REFERENCE_FORMATS = {"SupplierPinDiameter": (4, "diameter", None, "GAUGE PIN")}
+# Diameter text shelves right of its bottom lane.
+SUPPLIER_REFERENCE_SIDES = {"SupplierPinDiameter": "bottom"}
+SUPPLIER_REFERENCE_UNITS = {"SupplierPinDiameter": "in"}
+# The shop cut is the pin extrusion's own depth, between its end faces, printed
+# plain in the Top view beside the silhouette (no construction line).
+CUT_FEATURE = "Pin"
+CUT_DIMENSION = "CutLength"
+CUT_CALLOUT = "CUT LENGTH"
 SUPPLIER_REFERENCE_TOLERANCES_MM: dict[str, tuple[float, float]] = {}
 # Requirements live in the registry installation note; no supplier data lines.
 SUPPLIER_DATA: tuple[str, ...] = ()
