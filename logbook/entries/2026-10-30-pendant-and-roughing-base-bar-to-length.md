@@ -135,6 +135,55 @@ Next time: follow the plan.
   oblique jig.
 - Move the vise so Y can reach the part's top-left corner, then re-indicate it.
 
+## Advice afterwards (from Claude, not yet tried)
+
+I asked Claude for advice after the session. None of this has been tried at the
+machine yet; the next entry will say what held up.
+
+![Setups for the base bar: what I did, op 10 width on the table, op 20 in the vise](figures/2026-10-30-base-bar-setups.png)
+
+- **Workholding caused the ringing.** The cut was high above the jaws on a
+  1/2 in plate, and the end hung past the side of the vise. Both contributed
+  (panel A). Lowering the spindle speed is a fine-tune once the setup is stiff,
+  not a fix for a floppy one.
+- **Op 10, width first, on the table (panel B).** Lay the bar flat on two
+  parallels running along its length, set about 20 mm back from the near edge,
+  and strap-clamp it on the far half so nothing is in the cutter's path. Cut
+  the near long edge with the side of the cutter: axial depth is the whole
+  12.7 mm thickness (cutter bottom just below the bar, never stepping down in
+  Z), radial bites of 1–2 mm into the edge, 12.7 mm in all (152.4 → 139.7),
+  with the last ~0.5 mm as a finish pass. Each pass runs the 443 mm length in
+  X. Check the real X travel first.
+- **Op 20, ends and faces in the vise (panel C).** At 5½ in wide the bar fits
+  the 5¾ in vise. Lay it flat on parallels with the end just past the side of
+  the jaws and a jack under the far end; square both ends to 440, then face
+  both sides to 12.0. Standing the bar on its end is out: 443 mm is more than
+  the 17 in spindle-to-table maximum.
+- **Climb or conventional.** With the spindle running forward, picture the
+  cutter's travel along the part: part on the left is conventional, on the
+  right is climb. On the near edge in op 10 that means the cutter travels right
+  (jog +X, the table moves left). On the right-hand end in op 20, the cutter
+  travels away from me (jog +Y, the table moves toward me).
+- **Axes.** Every axis describes the cutter moving relative to the part. +Y
+  moves the table toward me, which is the cutter moving away; +Z is also the
+  cutter moving away from the part.
+- **Plan on paper and cut to coordinates.** 443 → 440 mm was only 3 mm; one
+  0.150 in pass was more than the whole allowance. Measure first, write
+  target − actual = allowance, split it into rough passes plus a finish pass,
+  tape the sheet to the machine, zero on the edge and cut to an absolute
+  coordinate instead of counting increments.
+- **Escape drill.** If it rings or grabs: feed stop (the pendant stop), then Z
+  up. Never back off sideways while the cutter is in the cut. Practise it dry.
+- **Collet grip.** Wipe oil and Tap Magic off the collet and shank, tighten the
+  drawbar properly, and mark the shank at the collet face to see any creep.
+  Keep stick-out short; a 2- or 3-flute end mill clears aluminium chips better.
+- **Power feed without overrun.** An incremental MDI move in CNCjs
+  (`G91 G1 X-50 F400`, then `G90`) gives an exact distance at a set feed with
+  nothing queued. If the pendant can send `$J=` jog commands, FluidNC can
+  cancel a jog on release (unverified against my config).
+- **Screen off.** Set the laptop's screen and sleep timers to Never while
+  plugged in and turn off USB selective suspend (unverified).
+
 ## Follows up to
 
 - Module: [`../curriculum/m07-mill-ii-profiling-slots-workholding.md`](../curriculum/m07-mill-ii-profiling-slots-workholding.md)
