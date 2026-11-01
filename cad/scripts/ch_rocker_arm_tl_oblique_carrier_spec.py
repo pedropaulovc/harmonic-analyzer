@@ -305,6 +305,10 @@ CR_TAP_CALLOUT = f"CLAMPS {STRAP_NUMBER}\n{CR_STATION_FUNCTION}"
 # mr8: named by the feature it locates on the sheet, its row no wider than
 # the 11-character one it replaced (draw: LeverX's lane).
 LEVER_STATION_CALLOUT = "LEVER TAPS"
+# Final review: the taps stand on the kinematic tap axis (8.861 from A1,
+# exempt from snapping) but the lever needs no .XXX band, so the station
+# prints its own two-place band (rule 3), set on the model dimension.
+LEVER_STATION_BAND = _XX
 
 RISER_SCREWS = trammel.RISER_SCREWS
 RISER_THREAD = "#4-40"
