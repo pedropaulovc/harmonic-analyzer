@@ -17,7 +17,7 @@ dt-vn-post-mount-screw:
       kind: "minor"
       where: "sheet 1 side view, the (3.74) cut-to-fit note: ENGAGEMENT 0.87D MIN"
       finding: "thread engagement below 1.5D (rule 18)"
-      reason: "owner exception pending confirmation (#1019): the screw runs into MHA-DT-20's 1/4 plate, tapped through as supplied with the title block's .010 edge break at both tap ends, and its cut end sits flush to .005 short of the underside; 0.87D MIN is the full thread left at the thinnest plate (5.585 mm = 0.8795D, floored), under #1019's 0.90D target"
+      reason: "Owner ruling 2026-11-01: MHA-DT-VN-61 post-mount thread engagement 0.87D MIN (0.88D after #2107) accepted as a minor exception; #1019's 0.90D target not met. The screw runs into MHA-DT-20's 1/4 plate, tapped through as supplied with the title block's .010 edge break at both tap ends, and its cut end sits flush to .005 short of the underside; 0.87D MIN is the full thread left at the thinnest plate (5.585 mm = 0.8795D, floored)"
   # Modified purchased part: cut to matched-hole fit and deburr.
   # dt_vn_post_mount_screw_spec owns the raised post's 3.74 in reference cut length.
   # Cut each screw to its matched post/platform hole, never proud;

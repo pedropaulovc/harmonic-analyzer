@@ -11,10 +11,10 @@ length both stays flush and keeps the engagement minimum (U27 check below),
 so the length prints as a REFERENCE and each screw is cut to its own hole at
 assembly.
 
-The engagement this leaves falls short of drawing guideline rule 18 and is
-pending the user's ruling in #1019. The sheet states it as a plain
-fact, "ENGAGEMENT 0.87D MIN", the last line of the cut-length callout
-(CUT_TO_FIT_CALLOUT), formatted from the floored worst case
+The engagement this leaves falls short of drawing guideline rule 18; the owner
+accepted 0.87D MIN as a minor exception on 2026-11-01 (RV-01). The sheet
+states it as a plain fact, "ENGAGEMENT 0.87D MIN", the last line of the
+cut-length callout (CUT_TO_FIT_CALLOUT), formatted from the floored worst case
 POST_MOUNT_ENGAGEMENT_PRINTED; the asserts below still guard that value and
 the nominal chain.
 """
@@ -228,8 +228,8 @@ if FACTORY_THREAD_START_MM >= FLOOR_LOW_MM:
     raise ValueError("the plain shank reaches the platform's tapped hole")
 PLATE_THICK_MM = platform.PLATE_THICKNESS + PLATE_STOCK_BAND_MM
 
-# Pending ruling #1019 against rule 18: its 0.90D target is not met; Main's
-# 2026-11-01 ruling sets the floor at the rule-18 audit's 0.87D.
+# Rule 18 wants 1.5D and #1019's 0.90D target is not met; the owner ruling of
+# 2026-11-01 (RV-01) accepts the rule-18 audit's 0.87D floor.
 MIN_ENGAGEMENT_DIAMETERS = 0.87
 MIN_ENGAGEMENT_MM = MIN_ENGAGEMENT_DIAMETERS * THREAD_DIA_MM
 # Corner 1, never proud: lowest floor on the thinnest plate.  A fixed length
@@ -290,7 +290,7 @@ if not 0.0 <= CUT_SHORT_NOMINAL_MM <= POST_SCREW_CUT_TO_FIT_SHORT:
         f"{POST_SCREW_CUT_TO_FIT_SHORT} short"
     )
 
-# The shortfall pending ruling #1019, cut to fit: unlike the fixed-length
+# The owner-accepted shortfall (RV-01), cut to fit: unlike the fixed-length
 # corner above, the floor drops out (each screw is cut to its own hole), so
 # the plate limits it -- the thinnest stock, the full fit-to-hole allowance,
 # and both breaks at their maximum. The platform's tap-exit deburr and this
@@ -321,9 +321,8 @@ if POST_MOUNT_ENGAGEMENT_PRINTED < MIN_ENGAGEMENT_DIAMETERS:
 # the sheet states the FACT -- the worst-case engagement, floored above --
 # never its label (no rule number, ruling id, EXCEPTION or ACCEPTED).
 # Provenance stays here: the User's U37c/U41 ruling admits short engagement
-# under the 1.5D rule; Main's 2026-11-01 ruling floors it at 0.87D.  The
-# wording follows S1's drive-train step ("ENGAGEMENT 0.87D MIN.").
-# Pending exception ruling: MHA-DT-VN-61 engagement (#1019).
+# under the 1.5D rule; the owner ruling of 2026-11-01 (RV-01) accepts 0.87D.
+# The wording follows S1's drive-train step ("ENGAGEMENT 0.87D MIN.").
 CUT_TO_FIT_CALLOUT = (
     "CUT TO FIT AT ASSEMBLY\n"
     f"END FLUSH TO {inch_text(POST_SCREW_CUT_TO_FIT_SHORT, CUT_TO_FIT_SHORT_PLACES)} SHORT\n"
