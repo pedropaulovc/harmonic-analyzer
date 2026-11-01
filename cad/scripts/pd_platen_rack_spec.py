@@ -670,12 +670,16 @@ GEAR_DATA = f"{PURCHASED_RACK_NOTE}; {DP:g} DP, {PA_DEG:g}\N{DEGREE SIGN} PA"
 # A purchased rack is received by its catalogue identity and (.1875) REF
 # sizes; its pitch accuracy is the catalogue part's, checked only by the
 # running mesh at assembly. The receiving stock-size maxima stay internal
-# (_gear_quality), like the measurement uncertainties: never printed.
+# (_gear_quality), like the measurement uncertainties: never printed. The
+# joint names its solder family (machinist review round 6), no alloy ratio:
+# notes carry no numbers.
 DRAWING_NOTES = "\n".join(
     (
-        "SOFT-SOLDERED RACK/BACKER JOINT; ENDS FLUSH",
+        "SOFT-SOLDERED (TIN-LEAD OR LEAD-FREE) RACK/BACKER JOINT; ENDS FLUSH",
         "END TOOTH PHASE NOT CONTROLLED; SET MESH AT ASSEMBLY",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
-ENLARGED_END_VIEW_NOTE = "ENLARGED END VIEW SCALE 4:1"
+# The *Right view: the front view's right end, so the .02 offset's side reads
+# from the title (machinist review round 6: "END VIEW" named no end).
+ENLARGED_END_VIEW_NOTE = "ENLARGED RIGHT END VIEW SCALE 4:1"

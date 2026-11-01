@@ -115,7 +115,6 @@ from pd_support_bar_drawing_spec import (
     ISOMETRIC_VIEW_NOTE,
     SHEET_PRECISION,
     SURFACE_FINISHES,
-    TOL_MAX,
 )
 
 PART_NAME = "pd-support-bar"
@@ -661,23 +660,32 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
     return dims.apply(adapter, feature)
 
 
-def _single_limit(
-    adapter, feature: str, name: str, nominal: float, tol_type: int
-) -> None:
-    """A dimension printed as a single MIN or MAX limit: SOLIDWORKS prints the
-    nominal then the limit word, so the model value is the limit itself."""
+_TOL_NONE = 0  # swTolType_e.swTolNONE
+_TEXT_SUFFIX = 2  # swDimensionTextSuffix
+MAX_SUFFIX = " MAX"
+
+
+def _max_limit(adapter, feature: str, name: str, nominal: float) -> None:
+    """A dimension printed as a single MAX limit, "Ø.169 MAX": the model value
+    is the limit itself, the limit word an authored suffix
+    (pd_transgear_pin_callouts.SEAT_FILLET_SUFFIX); SolidWorks' native
+    swTolMAX prints "max." (machinist review round 6)."""
     label = f"{name}@{feature}"
-    _, dimension = _named_dimension(adapter, feature, name)
+    display, dimension = _named_dimension(adapter, feature, name)
     if not math.isclose(float(dimension.SystemValue), nominal / 1000.0, abs_tol=1e-9):
         raise RuntimeError(
             f"{label}: nominal {float(dimension.SystemValue) * 1000.0:.7f} is not "
             f"the limit {nominal:.7f}"
         )
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = tol_type
-    if not tolerance.SetValues(0.0, 0.0) or int(tolerance.Type) != tol_type:
-        raise RuntimeError(f"{label}: cannot retain the single limit {tol_type}")
-    _telemetry.success(f"{label}: single limit (swTolType {tol_type})")
+    tolerance.Type = _TOL_NONE
+    if int(tolerance.Type) != _TOL_NONE:
+        raise RuntimeError(f"{label}: tolerance did not clear")
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetText(_TEXT_SUFFIX, MAX_SUFFIX)  # void; the readback is the proof
+    if str(display.GetText(_TEXT_SUFFIX) or "") != MAX_SUFFIX:
+        raise RuntimeError(f"{label}: MAX suffix did not persist")
+    _telemetry.success(f"{label}: single MAX limit as text")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -978,12 +986,8 @@ async def build(adapter) -> dict[str, str]:
             CLAMP_POSITION_BAND,
             display_unit=UNIT,
         )
-    _single_limit(
-        adapter, "CountersinkReference", "PivotCskDia", PIVOT_TAP_CSK_DIA, TOL_MAX
-    )
-    _single_limit(
-        adapter, "CountersinkReference", "BracketCskDia", BRACKET_TAP_CSK_DIA, TOL_MAX
-    )
+    _max_limit(adapter, "CountersinkReference", "PivotCskDia", PIVOT_TAP_CSK_DIA)
+    _max_limit(adapter, "CountersinkReference", "BracketCskDia", BRACKET_TAP_CSK_DIA)
     # The milled west slots' width carries the drilled holes' limits (it is
     # their float the closure and head checks above spend); both slots share
     # one detail, so their widths print their count.

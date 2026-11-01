@@ -51,12 +51,11 @@ def test_every_marked_dimension_has_one_placement_and_model_places() -> None:
 
 
 def test_the_model_owns_every_band_the_sheet_prints() -> None:
-    """The inside bend up to the largest the screw head clears; the screw
-    positions their own ± band; every formed arm feature the formed band.
-    The far face at the pin carries none (a reference).  Everything else,
-    the drilled holes and the width included, takes its title-block row."""
+    """The screw positions their own ± band; every formed arm feature the
+    formed band.  The far face at the pin carries none (a reference).
+    Everything else, the drilled holes, the width and the inside bend
+    radius included, takes its title-block row."""
     assert model_toleranced_dimensions(part) == {
-        ("InsideBend", "InsideBendR"): "*deviations(BEND_R_BAND)",
         # The position and formed loops share one key (both read below);
         # the formed loop, the last, takes FORMED_TOL.
         ("feature_name", "dimension_name"): "FORMED_TOL",
@@ -65,9 +64,9 @@ def test_the_model_owns_every_band_the_sheet_prints() -> None:
     assert "for feature_name, dimension_names in POSITION_DIMENSIONS.items()" in source
     assert "for feature_name, dimension_names in FORMED_DIMENSIONS.items()" in source
     assert spec.HOLE_GROWTH > 0.0
-    assert spec.BEND_R_BAND[0] == pytest.approx(
-        geom.INSIDE_BEND_R_MAX - geom.INSIDE_BEND_R
-    )
+    # R.05 at the .XX row: R.06 at the top, R.04 (1.25 T) at the bottom.
+    assert geom.INSIDE_BEND_R == pytest.approx(0.050 * 25.4)
+    assert spec.INSIDE_BEND_R_MAX == pytest.approx(0.060 * 25.4)
     for feature, names in spec.FORMED_DIMENSIONS.items():
         assert names <= spec.DRAWING_DIMENSIONS[feature]
     for feature, names in spec.POSITION_DIMENSIONS.items():
@@ -125,7 +124,7 @@ def test_the_screw_head_clears_the_inside_bend_at_the_worst_case() -> None:
     assert spec.HEAD_FLOAT_MAX > 0.0
     # More bend radius or more float only eats the clearance.
     base = spec.head_clearance(geom.INSIDE_BEND_R, geom.SHEET_T, 0.0, 0.0)
-    assert spec.head_clearance(geom.INSIDE_BEND_R_MAX, geom.SHEET_T, 0.0, 0.0) < base
+    assert spec.head_clearance(spec.INSIDE_BEND_R_MAX, geom.SHEET_T, 0.0, 0.0) < base
     assert spec.head_clearance(geom.INSIDE_BEND_R, geom.SHEET_T, 0.0, 0.1) < base
 
 
@@ -283,16 +282,16 @@ def _texts() -> dict[str, tuple[float, ...]]:
         name: len(text.split("\n")) for name, text in drawing.CALLOUTS_BELOW.items()
     }
     # Printed widths in characters: value and band (".498 ±.002",
-    # "Ø.128 +.004" over "0", "R.048 +.011" over "-.008", ".61", "(.58)").
+    # "Ø.128 +.004" over "0", "(R.225)", ".61", "(.58)").
     widths = {
         "ScrewX1": 10, "ScrewX2": 10, "ScrewY": 10, "ScrewDia": 11,
         "RollStart": 8, "FaceY": 7, "FaceX": 7, "TabEndX": 9,
         "StraightLen": 9, "PinHoleDia": 5, "RollR": 10, "TabR": 9,
-        "Width": 3, "RootR": 4, "RoundR": 5,
+        "Width": 3, "RootR": 4, "RoundR": 7,
         "FlatLength": 4, "FlatArmW": 3, "FlatLowW": 3, "FlatBendC": 5,
         "DevTaper1": 4, "DevTaper2": 4, "DevRoundC": 4,
         "FlatRollC": 6, "FlatTabC": 5,
-        "BaseLength": 3, "EarHeight": 3, "InsideBendR": 11,
+        "BaseLength": 3, "EarHeight": 3, "InsideBendR": 4,
     }  # fmt: skip
     keep = {**drawing.FRONT_KEEP, **drawing.RIGHT_KEEP, **drawing.BOTTOM_KEEP}
     assert set(widths) == set(keep)

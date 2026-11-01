@@ -37,8 +37,9 @@ length here stays physical millimetres.  How the sheet locates things:
 * the ear height at .XX and the arm's two strip widths (above and below the
   taper, from the ear's top edge) at .XX on the flat pattern: the pin hole's
   walls and the lock sweep;
-* the inside bend radius R.048 +.011/-.008 (R.059 the largest the screw
-  head clears); the 90 deg bend at the title block's angular row;
+* the inside bend radius R.05 at the .XX row (INSIDE_BEND_R_MAX, R.06, the
+  screw-head clearance reads); the 90 deg bend at the title block's angular
+  row;
 * every formed arm feature (roll, straight, tab) ±FORMED_TOL at .XX, the
   radii to the inside surface; the far face at the pin, located in X and Y
   from the origin, only as a reference (REFERENCE_DIMENSIONS): a hand-rolled
@@ -89,7 +90,6 @@ from pd_latch_hook_geometry import (
     EAR_HEIGHT,
     INNER_ROLL_R,
     INSIDE_BEND_R,
-    INSIDE_BEND_R_MAX,
     LOW_W,
     OUTER_ROLL_END,
     OUTER_ROLL_START,
@@ -154,11 +154,9 @@ FORMED_BAND = max(
 # station, so the formed band, not a printed coordinate band, is what the
 # hanger joints' far-face margin spends along U.
 BEND_TOL_DEG = angular_band_deg(unit=UNIT)  # the ear's 90 deg bend, title block
-BEND_R_PLACES = 3
-# (upper, lower): R.048 +.011/-.008, R.040 .. R.059.
-BEND_R_BAND = (INSIDE_BEND_R_MAX - INSIDE_BEND_R, -0.2032)
+BEND_R_PLACES = 2  # the inside bend radius, the title block's .XX row
 ROOT_R_PLACES = 2
-ROUND_R_PLACES = 3  # the full round, half the .45 low band
+ROUND_R_PLACES = 3  # the full round's reference, half the .45 low band
 FLAT_PLACES = 2  # the flat pattern's lengths
 
 WALL_TARGET = WALL_TARGET_MM
@@ -299,12 +297,14 @@ def head_clearance(
 
 
 HEAD_CLEARANCE_NOMINAL = head_clearance(INSIDE_BEND_R, SHEET_T, 0.0, 0.0)
+# The largest inside bend radius the sheet allows: R.05 at the .XX row.
+INSIDE_BEND_R_MAX = INSIDE_BEND_R + _row(INSIDE_BEND_R, BEND_R_PLACES)[1]
 # The worst case: the largest bend radius, the thickest sheet, the printed
 # distance from the ear's outer face at its lower limit (the hole nearest the
 # ear), and the largest drilled hole floating over the smallest 2A major.
 HEAD_FLOAT_MAX = (SCREW_HOLE_DIA + HOLE_GROWTH - MAJOR_DIA_MIN) / 2.0
 HEAD_CLEARANCE_WORST = head_clearance(
-    INSIDE_BEND_R + BEND_R_BAND[0],
+    INSIDE_BEND_R_MAX,
     SHEET_T + SHEET_T_PLUS,
     -_position(-SCREW_HOLE_X[1])[0],
     HEAD_FLOAT_MAX,
@@ -372,6 +372,9 @@ ARM_WIDTH_DIMENSIONS = frozenset({"FlatArmW", "FlatLowW"})
 # references, the bend's from the ear's top edge, the roll's from the
 # stations' baseline, the tab's chained on from the full round's centre.
 BEND_LINE_DIMENSIONS = frozenset({"FlatBendC", "FlatRollC", "FlatTabC"})
+# The full round's radius follows from the .45 low width it rounds (review
+# 6: printed bare it took the .XXX row's tighter band), so a reference.
+ROUND_REFERENCE = "RoundR"
 POSITION_DIMENSIONS: dict[str, tuple[str, ...]] = {
     "ScrewHoleProfile": ("ScrewX1", "ScrewX2", "ScrewY"),
 }

@@ -100,10 +100,11 @@ def test_the_tap_mouths_lose_only_their_breaks_counted_from_the_drill() -> None:
         disc_screw.TIP_BELOW_REAR_FACE[1] + disc_screw.CUT_END_BREAK_MAX,
         disc_screw.STOCK_TIP_INSIDE_REAR_MAX + spec.SCREW_PITCH,
     )
-    assert rear == pytest.approx(0.3683, abs=1e-4)
+    # The deepest cut (.008) plus the title block's .010 break governs.
+    assert rear == pytest.approx(0.4572, abs=1e-4)
     worst = spec.FACE_WIDTH_MIN - spec.MOUTH_BREAK_MAX - rear
     assert disc_screw.ENGAGEMENT_WORST == pytest.approx(worst)
-    assert worst == pytest.approx(2.4003, abs=1e-4)
+    assert worst == pytest.approx(2.3114, abs=1e-4)
     assert worst / spec.TAP_MAJOR >= spec.ENGAGEMENT_FLOOR_D
     # The old Ø1.7 +0.10/0 countersink, charged to the drill, fell short.
     old_loss = (1.8 - spec.TAP_DRILL_DIA) / 2.0

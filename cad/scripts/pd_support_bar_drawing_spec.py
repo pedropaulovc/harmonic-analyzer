@@ -42,10 +42,6 @@ from pd_support_bar_spec import (
     UNIT,
 )
 
-# SOLIDWORKS swTolType_e single limits: the nominal prints followed by MIN or
-# MAX, so the model value is the limit itself.
-TOL_MIN = 5  # swTolMIN
-TOL_MAX = 6  # swTolMAX
 # The clamp holes' row height and stations print .XXX: their position band
 # (build_pd_support_bar.CLAMP_POSITION_BAND) is the MHA-SH-02 back-arc taps'
 # fixed-fastener stack, which the title block's .XX ±.01 would overrun.
@@ -185,12 +181,14 @@ DIMENSION_CALLOUTS_ABOVE = {
     "BracketCskDia": f"2X TAP {BRACKET_TAP_SPEC.size} UNC THRU",
 }
 # The slot widths' count: both west slots share one detail. The countersinks'
-# Ø reads as the countersink's in its stacked tap callout.
+# Ø reads as the countersink's in its stacked tap callout; a diameter's prefix
+# replaces its native Ø token, so the prefix restates it (round 6 printed
+# "90° CSK .169" with no Ø).
 DIMENSION_PREFIXES = {
     ("ClampSlotProfile", "ClampSlotWidth"): "2X ",
     ("ClampSlotCboreProfile", "ClampSlotCboreWidth"): "2X ",
-    ("CountersinkReference", "PivotCskDia"): f"{_CSK} ",
-    ("CountersinkReference", "BracketCskDia"): f"{_CSK} ",
+    ("CountersinkReference", "PivotCskDia"): f"{_CSK} <MOD-DIAM>",
+    ("CountersinkReference", "BracketCskDia"): f"{_CSK} <MOD-DIAM>",
 }
 # Under the round counterbores' native callout: the taps the holes' banded
 # row height and stations locate to (rule 4: the tight band names its mate, as

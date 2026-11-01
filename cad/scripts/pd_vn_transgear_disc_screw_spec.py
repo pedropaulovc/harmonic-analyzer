@@ -46,7 +46,7 @@ from _mcmaster_91794a055 import (
     SKU,
     THREAD as THREAD,
 )
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
 from pd_rack_pinion_spec import (
     ENGAGEMENT_FLOOR_D,
     FACE_WIDTH,
@@ -142,15 +142,17 @@ if TIP_CHAMFER > FIRST_THREAD_LOSS:
 # The platen slides close behind the 150T disc, and the longest stock on the
 # thinnest flange and disc stands STOCK_TIP_PROUD_MAX (.048) proud of the
 # disc's rear face.  So each tip is cut at assembly to sit this far under
-# the rear face, (min, max), the cut end broken 45 deg CUT_END_BREAK_MAX at
-# most.  A stock tip already inside the window stays uncut.
+# the rear face, (min, max), and the cut end broken.  A stock tip already
+# inside the window stays uncut.
 TIP_BELOW_REAR_FACE = (0.0, 0.2032)  # .000-.008
 TIP_BELOW_REAR_FACE_TEXT = (
     f"{inch_text(TIP_BELOW_REAR_FACE[0], 3)}-{inch_text(TIP_BELOW_REAR_FACE[1], 3)}"
 )
-CUT_END_BREAK_MAX = 0.1016  # .004
-# What the A06 cut step and the part sheet print for it.
-CUT_END_BREAK_TEXT = f"{inch_text(CUT_END_BREAK_MAX, 3)} MAX"
+# The cut end's break is the title block's (.010 chamfer max): the worst
+# engagement holds 1.5D with it (machinist review r6: a tighter .004 had no
+# reason), so the sheet states no limit of its own.  The model and the
+# engagement stack carry that maximum.
+CUT_END_BREAK_MAX = edge_break_chamfer_mm(unit="in")
 # The model is the installed screw, its tip mid-window under the nominal
 # flange and disc: .094 + .118 - .004 = .208.  Placement, interference and
 # the assembly's tip checks read LENGTH.

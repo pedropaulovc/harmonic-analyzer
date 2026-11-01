@@ -143,10 +143,12 @@ FCF_MATE_NOTE = (
     f"{_config.parts('pd-guide-lock')['number']} HOLES"
 )
 FCF_MATE_NOTE_XY = (0.141, 0.1285)
-# The right view's depth: its text stack left of the extension lines (x 0.365
-# and 0.375) and 21 mm under the view, under the height's ".29" (bottom ~0.108)
-# and datum A's tag (bottom 0.1065).
-DEPTH_TEXT_XY = (0.341, 0.085)
+# The right view's depth: its text stack (keep = its centre) left of the
+# extension lines (x 0.365 and 0.375), under the height's ".29" (bottom
+# ~0.108) and datum A's tag (bottom 0.1065). Its six rows (~30 mm; round 6's
+# four spanned 0.075..0.095 about 0.085) span ~0.073..0.103, over the title
+# block (top 0.066).
+DEPTH_TEXT_XY = (0.341, 0.088)
 # The table fits above the front view; 0.020 also clears the 12.7 mm zone
 # margin enforced by the sheet audit.
 HOLE_TABLE_X_M = 0.020
