@@ -23,7 +23,7 @@ import ch_vn_rocker_bank_spring_spec as supplier_spec
 
 
 SPEC = DRAWINGS_BY_NAME["ch_vn_rocker_bank_spring"]
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "WAVE DISC SPRING"
 

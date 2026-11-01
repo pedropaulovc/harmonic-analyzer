@@ -25,7 +25,7 @@ import ch_vn_channel_spring_installed_spec as supplier
 
 
 SPEC = DRAWINGS_BY_NAME["ch_vn_channel_spring_installed"]
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "EXTENSION SPRING, HOOK ENDS"
 PART_STEM = SPEC.artifact_stem
