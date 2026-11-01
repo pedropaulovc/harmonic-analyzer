@@ -529,3 +529,31 @@ def test_service_pin_station_reference_is_saved_hidden_and_imported_per_view() -
     assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
     assert "    curate_view_dimensions,\n" not in source.replace("\r\n", "\n")
     assert "ServicePinStationReference" in dt_crank_hub_spec.DRAWING_DIMENSIONS
+
+
+def test_pin_proud_min_lands_on_the_phantom_big_end() -> None:
+    # r5 review (run 20261101T004958072Z): the 4.45 MIN's outer extension line
+    # ended in air. The reference sketch draws MHA-DT-09's proud big end as
+    # construction (phantom on the sheet) round the line's outer end: its face
+    # centred on the line's end, stubs back to the barrel's outline.
+    import dt_crank_pin_spec
+    from dt_crank_pin_ring_spec import PIN_PROUD
+
+    build = Path(drawing.__file__).with_name("build_dt_crank_hub.py").read_text(encoding="utf-8")
+    sketch = build[
+        build.index("async def _pin_proud_reference") : build.index('name_last_feature(adapter, "PinProudReference")')
+    ]
+    assert 'await adapter.add_line(-BARREL_R, 0.0, tip, 0.0)' in sketch
+    assert "(tip, PIN_BIG_END_R),\n                (tip, -PIN_BIG_END_R)," in sketch.replace("\r\n", "\n")
+    assert 'add_sketch_constraint(f"{line}.end", face, "midpoint")' in sketch
+    assert "segment.ConstructionGeometry = True" in sketch
+    assert '["PinProud", "PinProudBarrel", "PinBigEnd", "PinBigEndStub"]' in build
+    # Only the MIN prints; the outline's own dimensions stay unmarked.
+    assert dt_crank_hub_spec.DRAWING_DIMENSIONS["PinProudReference"] == {"PinProud"}
+    # The stubs leave the barrel's outline, and the face stands clear of it.
+    barrel_r = geometry.HUB_BARREL_DIA / 2.0
+    big_end_r = dt_crank_pin_spec.BIG_END_DIA / 2.0
+    stub_x = (barrel_r**2 - big_end_r**2) ** 0.5
+    assert barrel_r - 0.5 < stub_x < barrel_r
+    assert stub_x < barrel_r + PIN_PROUD
+    assert "PIN_STUB_X = math.sqrt(BARREL_R**2 - PIN_BIG_END_R**2)" in build
