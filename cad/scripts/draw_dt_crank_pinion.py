@@ -285,9 +285,9 @@ RIGHT_KEEP = {
         SHOULDER_RADIUS_ELBOW[1] + RADIUS_SHOULDER_DROP,
     ),
 }
-# The section caption sits under the section's left half, below the overall
-# length and clear of the general note to its left and the title block.
-SECTION_CAPTION_XY = (0.178, 0.081)
+# The section caption sits under the section, between the overall length's
+# extension lines and below its text, above the title block.
+SECTION_CAPTION_XY = (0.205, 0.074)
 DIMENSION_TEXT_LINE_GAP = 0.0005
 # The boss diameter's text is centred on its dimension line; it read 13.1 mm
 # wide on the f0c105531 render. Its right edge plus a clearance bounds where
