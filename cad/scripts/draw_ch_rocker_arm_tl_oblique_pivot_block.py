@@ -340,46 +340,6 @@ def _place_caption(adapter, view, target, letter: str, sheet_scale) -> None:
     _telemetry.info(f'{label}: box {extent!r}')
 
 
-def _log_sheet_dimensions(adapter, view, feature: str) -> None:
-    """DIAGNOSTIC (TL-22 B-B drops SectionBlockHeight, farm rounds 1, 3, 4):
-    every view's display dimensions, hidden ones included, with their
-    annotation Visible, and the source sketch's own dimensions with their
-    drawing marks, in one log line before B-B's import."""
-    def safe(read):
-        try:
-            return read()
-        except Exception as error:  # a diagnostic never stops the build
-            return f'<{type(error).__name__}>'
-    views = {}
-    raw = _early_bound(adapter.currentModel, 'IDrawingDoc').GetFirstView()
-    while raw is not None:
-        typed = _early_bound(raw, 'IView')
-        rows = []
-        display = typed.GetFirstDisplayDimension5()
-        while display is not None:
-            display = _early_bound(display, 'IDisplayDimension')
-            rows.append((safe(lambda d=display: str(_early_bound(d.GetDimension2(0), 'IDimension').FullName)),
-                         safe(lambda d=display: int(_early_bound(d.GetAnnotation(), 'IAnnotation').Visible))))
-            display = display.GetNext5()
-        views[str(typed.GetName2())] = rows
-        raw = typed.GetNextView()
-    def source_rows():
-        model = _early_bound(_early_bound(view, 'IView').ReferencedDocument, 'IPartDoc')
-        sketch = _early_bound(model.FeatureByName(feature), 'IFeature')
-        rows = []
-        display = sketch.GetFirstDisplayDimension()
-        while display is not None:
-            typed = _early_bound(display, 'IDisplayDimension')
-            dimension = _early_bound(typed.GetDimension2(0), 'IDimension')
-            rows.append((safe(lambda d=dimension: str(d.FullName)), safe(lambda d=dimension: int(d.DrivenState)),
-                         safe(lambda d=typed: bool(d.MarkedForDrawing)),
-                         safe(lambda d=dimension: round(float(d.SystemValue) * 1000, 4))))
-            display = sketch.GetNextDisplayDimension(display)
-        return rows
-    _telemetry.info(f'B-B diagnostic: sheet dimensions by view {views!r}; {feature} source '
-                    f'(name, driven state, marked, mm) {safe(source_rows)!r}')
-
-
 def _set_section_arrows(adapter) -> None:
     """Set this document's cutting-line arrow sizes, read back, raise on
     mismatch (draw_dt_cone_gear_shaft._pin_witness_line_extension)."""
@@ -483,25 +443,23 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
                                 section_label='B',scale=(1,1),partial=True,
                                 label='carriage counterbore floor')
     # Both blocks print B-B as its cut face only (rule 9), the top face's +Y
-    # corner where the full B-B put it. Its block-height line stands inside
-    # the cut face (_oblique_pivot_block_model._cbore_floor_reference).
+    # corner where the full B-B put it. The block height comes from its own
+    # sketch just behind the cut (_oblique_pivot_block_model
+    # ._block_height_reference): on the cut plane it never imported into
+    # TL-22's B-B (farm rounds 1 to 6), marked, driving and unduplicated.
     _cut_face_only(adapter, floor, 'B', (x, part.BLOCK_WIDTH/2, contract.BLOCK_HEIGHT),
                    (FLOOR_XY[0]-contract.BLOCK_HEIGHT/2000, FLOOR_XY[1]+part.BLOCK_WIDTH/2000),
                    (FLOOR_XY[0], FLOOR_XY[1]-part.BLOCK_WIDTH/2000-SECTION_CAPTION_GAP), SHEET_SCALE)
     row_4y = _project(adapter,plan,(part.BLOCK_X1,part.BOLT_Y,contract.BLOCK_HEIGHT),'row 4Y')
     _fit_section_letters(adapter, side, (floor,), below_y=row_4y[1])
-    _log_sheet_dimensions(adapter, floor, part.CBORE_FLOOR_REFERENCE)
     try:
         annotations += curate_view_dimensions(adapter,floor,keep=FLOOR_KEEP,view_label='B-B floor',
                          dimensions_by_feature=contract.DRAWING_DIMENSIONS)
     except RuntimeError:
-        # DIAGNOSTIC: does a rebuilt view or the entire-model import deliver it?
-        from _drawing_dimension_import import insert_feature_dimensions, insert_marked_dimensions
-        adapter.currentModel.EditRebuild3()
-        again = insert_feature_dimensions(adapter, floor, [part.CBORE_FLOOR_REFERENCE])
-        _telemetry.info(f'B-B diagnostic: targeted import after rebuild {[n for n, _ in again]!r}')
-        whole = [dimension_name(adapter, a) for a in insert_marked_dimensions(adapter, floor)]
-        _telemetry.info(f'B-B diagnostic: entire-model import {whole!r}')
+        # EXPERIMENT (farm round 7): does the Block extrusion's own depth import?
+        from _drawing_dimension_import import insert_feature_dimensions
+        probe = insert_feature_dimensions(adapter, floor, ['Block'])
+        _telemetry.info(f'B-B experiment: Block feature import {[name for name, _ in probe]!r}')
         raise
     set_hidden_lines_removed(adapter,iso)
     sheet_scales = None
