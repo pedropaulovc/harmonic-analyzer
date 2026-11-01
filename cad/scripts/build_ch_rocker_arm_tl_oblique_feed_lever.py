@@ -87,15 +87,6 @@ V_HOLES = len(HOLE_X) * math.pi * _R_HOLE**2 * LEVER_THICK
 V_CORNER = (CORNER_R**2 - math.pi * CORNER_R**2 / 4.0) * LEVER_THICK
 
 
-def _as_construction(adapter, entity_id: str) -> None:
-    """Flag a registered sketch line as construction geometry (rebind to the
-    base ISketchSegment, which declares ``ConstructionGeometry``)."""
-    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError(f"{entity_id} did not take the construction flag")
-
-
 def _require_one_solid_body(adapter, *, label: str) -> None:
     bodies = tuple(
         _early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or ()
@@ -253,8 +244,10 @@ async def build(adapter) -> dict[str, str]:
     # Farm r1 (#290): the extrusion's imported depth has no sound drawing-view
     # attachment, so _supplier_dimensions refuses to dress it as the STOCK
     # reference; a sketch dimension attaches to its witness line (the base
-    # bar's BarWidth, _supplier_washer_model's thickness witness). One
-    # construction line up the grip end on the Front plane, the front view's.
+    # bar's BarWidth, _supplier_washer_model's thickness witness). One plain
+    # sketch line up the grip end on the Front plane, the front view's: it
+    # lies on the end's edge, where a construction line's dash font printed
+    # over the outline (end bracket, machinist review mr4).
     thick = SketchDims()
     check("create_sketch thickness reference", await adapter.create_sketch("Front"))
     to_front = _sketch_mapper(adapter, u_axis=0, v_axis=1, label="thickness reference")
@@ -263,7 +256,6 @@ async def build(adapter) -> dict[str, str]:
     set_sketch_direct_db(adapter, True)
     witness = check("thickness witness line", await adapter.add_line(*foot, *top))
     set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, witness)
     await anchor_point_to_origin(
         adapter, f"{witness}.start", *foot, "thickness witness foot"
     )

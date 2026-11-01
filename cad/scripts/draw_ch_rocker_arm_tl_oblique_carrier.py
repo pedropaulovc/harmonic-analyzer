@@ -154,8 +154,10 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
     # The pin chain: the tap axis and B1 from A1, A2/B2 from A1/B1. The tap
     # axis's station stands on the HUB spot, so its extension line rises
     # from this lane through both lever taps to the spot (machinist review
-    # 54e5c9a: A1X's stopped at the pin line, short of HUB).
-    "HubX": _xy(-191.0, -80.4),  # lane y 132
+    # 54e5c9a: A1X's stopped at the pin line, short of HUB). mr4: its
+    # function row (~28 wide) on the lane, ~5 right of A1's extension line,
+    # the value row 4 under the ClX lane's dimension line.
+    "HubX": _xy(-187.0, -74.84),  # lane y 132
     "PinSpacing": _xy(172.0, -170.3),  # lane y 81.5
     # Its text 4 sheet mm right of A1's extension line, which now rises past
     # it to the R2 lane.
@@ -250,6 +252,28 @@ SECTION_CROP_MODEL_MM = (
     (_A1[0] - _SECTION_HALF, -part_spec.THICKNESS - 1.0, 0.0),
     (_A1[0] + _SECTION_HALF, 1.0, 0.0),
 )
+# Machinist review mr4: the cropped slab's square hatch ends read as the
+# part's own ends. A long-break line (thin, one Z: draw_fr_nameplate's
+# SECTION_BREAK) stands on each crop edge across the cut, past the top and
+# bottom faces by _SECTION_BREAK_OVERRUN (inside the fence's 1 mm), its Z at
+# mid-thickness, one tip each side of the edge (model mm on the cut plane).
+# At -X the thickness's witness lines stop 1.5 sheet mm short of it.
+_SECTION_BREAK_OVERRUN = 0.6
+_SECTION_BREAK_MID = -part_spec.THICKNESS / 2.0
+SECTION_BREAKS = tuple(
+    tuple(
+        (x + dx, y, 0.0)
+        for dx, y in (
+            (0.0, _SECTION_BREAK_OVERRUN),
+            (0.0, _SECTION_BREAK_MID + 1.5),
+            (1.0, _SECTION_BREAK_MID + 0.75),
+            (-1.0, _SECTION_BREAK_MID - 0.75),
+            (0.0, _SECTION_BREAK_MID - 1.5),
+            (0.0, -part_spec.THICKNESS - _SECTION_BREAK_OVERRUN),
+        )
+    )
+    for x in (_A1[0] - _SECTION_HALF, _A1[0] + _SECTION_HALF)
+)
 _SECTION_ANCHOR_MM = (_A1[0], -part_spec.THICKNESS / 2.0, 0.0)
 # Carrier r13 (4:1) squeezed the slab between the 260.0/520.0 lanes and the
 # border, its caption cut off from it by the 520.0's extension line and the
@@ -277,7 +301,8 @@ STOCK_WITNESS_MAX_M = (
 SECTION_CAPTION_XY = (0.043, 0.052)
 
 # Sheet metres: each callout block's centre; its leader lands on the near end
-# of the first line. CR up-right into the margin above the right lanes; the
+# of the first line. CR up-right into the margin above the right lanes, its
+# four rows (the native two and CR_TAP_CALLOUT's two, mr4) ~219..241; the
 # risers from the outermost +X screw straight up, right of the HUB callout,
 # their four rows (the native two and RISER_TAP_CALLOUT's two) ~238..258,
 # under the border; the feed lever (the -Y hole) down-left, its three rows
@@ -833,18 +858,8 @@ def _crop_section(adapter: Any, section: Any) -> None:
         raise RuntimeError("failed to activate carrier section A-A for its crop")
     draw.ClearSelection2(True)
     before = tuple(float(value) for value in native.GetOutline())
-    sketch = _early_bound(native.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    corners = []
-    for x, y in sheet_corners:
-        point = _early_bound(
-            math_utility.CreatePoint(double_array([float(x), float(y), 0.0])),
-            "IMathPoint",
-        )
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        corners.append(tuple(float(value) for value in projected.ArrayData))
     sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    corners = _view_sketch_points(adapter, native, sheet_corners)
     segments = tuple(
         sketch_manager.CreateCornerRectangle(*corners[0], *corners[1]) or ()
     )
@@ -890,6 +905,58 @@ def _crop_section(adapter: Any, section: Any) -> None:
             f"fence: status {status}, outline {before!r} -> {outline!r}, "
             f"fence corners {sheet_corners!r}"
         )
+
+
+def _view_sketch_points(
+    adapter: Any, native: Any, sheet_points: list[tuple[float, float]]
+) -> list[tuple[float, ...]]:
+    """Sheet points (metres) in the active view's own sketch frame, through
+    its ModelToSketchTransform."""
+    sketch = _early_bound(native.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in sheet_points:
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([float(x), float(y), 0.0])),
+            "IMathPoint",
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    return points
+
+
+def _sketch_section_breaks(adapter: Any, section: Any) -> None:
+    """Draw SECTION_BREAKS into A-A's own sketch as thin lines
+    (draw_fr_nameplate ``_sketch_section_break``). AddToDB keeps sketch
+    inference from snapping the short Z segments onto the cut face's edges."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    native = _early_bound(section, "IView")
+    if not ddoc.ActivateView(view_name(adapter, native)):
+        raise RuntimeError("failed to activate carrier section A-A for its break lines")
+    draw.ClearSelection2(True)
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    try:
+        for end, polyline in enumerate(SECTION_BREAKS):
+            sheet_points = model_points_in_view(
+                adapter,
+                native,
+                [_metres(point) for point in polyline],
+                label=f"carrier section A-A break line {end}",
+            )
+            points = _view_sketch_points(adapter, native, sheet_points)
+            for index in range(len(points) - 1):
+                if sketch_manager.CreateLine(*points[index], *points[index + 1]) is None:
+                    raise RuntimeError(
+                        f"carrier section A-A break line {end} segment {index} failed"
+                    )
+    finally:
+        sketch_manager.AddToDB = previous_add_to_db
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="carrier section A-A break lines")
 
 
 def _centre_section(adapter: Any, section: Any) -> None:
@@ -1017,6 +1084,7 @@ def _pin_section(adapter: Any, source_model: Any, top: Any) -> tuple[list[Any], 
             label="section A-A chamfer text",
         )
         offset_dimension_text(adapter, annotations, {"PinChamferSize": chamfer_text})
+    _sketch_section_breaks(adapter, section)
     position_section_caption(
         adapter, section, SECTION_CAPTION_XY, label="carrier section A-A"
     )

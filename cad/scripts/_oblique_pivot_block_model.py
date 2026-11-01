@@ -222,14 +222,16 @@ async def _block_height_reference(adapter) -> None:
     dims.apply(adapter, feature)
 
 
-async def _rectangle(adapter, name, bounds, names):
+async def _rectangle(adapter, name, bounds, names, *, anchor=0):
+    """``anchor`` indexes the origin-anchored corner: (x0,y0), (x1,y0), (x1,y1),
+    (x0,y1)."""
     check(name, await adapter.create_sketch("Front"))
     at = _xy_mapper(adapter, 0.0, name)
     x0, x1, y0, y1 = bounds
     points = [at(x0,y0),at(x1,y0),at(x1,y1),at(x0,y1)]
     dims = SketchDims()
     lines = await add_line_chain(adapter, points)
-    await define_rectilinear_chain(adapter, lines, points, label=name, dims=dims, names=names)
+    await define_rectilinear_chain(adapter, lines, points, anchor=anchor, label=name, dims=dims, names=names)
     await ensure_fully_defined(adapter, name)
     check(name, await adapter.exit_sketch())
     name_last_feature(adapter, name)
@@ -368,8 +370,11 @@ async def build_block_model(adapter, part) -> None:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
     check("create part", await adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(part.PART_NAME), label=part.PART_NAME)
+    # Anchored at the +X/-Y corner, where the printed BlockSideY's witness
+    # starts: from the -X corner its extension line ran the whole -Y edge and,
+    # on TL-32, across the lug's top face (round-5 review).
     await _rectangle(adapter,"BlockProfile",(part.BLOCK_X0,part.BLOCK_X1,-part.BLOCK_WIDTH/2,part.BLOCK_WIDTH/2),
-                     ["BlockLength","BlockWidth","BlockEndX","BlockSideY"])
+                     ["BlockLength","BlockWidth","BlockEndX","BlockSideY"], anchor=1)
     check("block",await adapter.create_extrusion(ExtrusionParameters(depth=part.BLOCK_HEIGHT)))
     name_last_feature(adapter,"Block")
     name_dimensions(adapter,"Block",["BlockHeight"])

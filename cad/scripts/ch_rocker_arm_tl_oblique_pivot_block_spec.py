@@ -116,10 +116,12 @@ DRAWING_DIMENSIONS = {
     PLAN_DATUM_REFERENCE: ("PlanBoreX", "PlanHole1X", "PlanHole2X"),
 }
 # Three places: the carriage pattern's fits, the seat depth and counterbore
-# floor that set the stacks, and the tap drill's letter size.
+# floor that set the stacks, the tap drill's letter size, and the drilled
+# clearance holes (inch drill sizes print three places; the DRILLED HOLES row
+# bands them).
 THREE_PLACE_DIMENSIONS = frozenset({
     "CboreFloor", "TopBoreDepth", "TapDrillDia", "CarriageDrills3Y", "CarriageDrills4Y",
-    "PlanHole1X", "PlanHole2X",
+    "PlanHole1X", "PlanHole2X", "CarriageDrills1Dia",
 })
 
 

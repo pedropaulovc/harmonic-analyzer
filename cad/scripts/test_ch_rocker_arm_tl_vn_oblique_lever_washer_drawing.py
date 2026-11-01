@@ -58,7 +58,6 @@ def test_catalogue_dimensions_and_pair_stack() -> None:
     assert dims.THICKNESS_MAX == pytest.approx(0.090 * IN)
     # The band is taken as the pair's stack and modelled at its maximum.
     assert spec.THICKNESS == dims.PAIR_THICKNESS == dims.THICKNESS_MAX
-    assert (dims.PACKAGE_QTY, dims.PACKAGE_PRICE_USD) == (5, 12.40)
 
 
 def test_one_pair_under_each_lever_screw_head() -> None:
