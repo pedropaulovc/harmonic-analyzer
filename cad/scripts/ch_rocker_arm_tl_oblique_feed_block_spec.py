@@ -10,7 +10,9 @@ Issue #290: the sheet prints decimal inch. The lug outline, the recess and the
 screw clearance sit on the inch grid; the Tr8 nut's interface does not: its
 Ø16 PCD and Ø10.2 spigot are the vendor's, and the nut axis closes on the
 leadscrew's (``NUT_AXIS_Y`` from its lateral, ``NUT_AXIS_Z`` = its height
-over the carriage top).
+over the carriage top). The axis height and the flange's tap pattern belong to
+that metric-only vendor line, so they print exact millimetres, labelled mm
+(owner ruling 4, 2026-11-01; ``METRIC_DIMENSIONS``).
 """
 from __future__ import annotations
 import math
@@ -86,9 +88,17 @@ DRAWING_DIMENSIONS = {k: v for k, v in pivot.DRAWING_DIMENSIONS.items() if k != 
 # The nut axis and its pattern are the bought nut's interface: three places.
 # The axis is the leadscrew's closure (not on the .01 grid) and its height
 # has only the spigot's float in the recess to take up error: KP08 floats
-# in X/Y on its bracket, never in Z.
+# in X/Y on its bracket, never in Z. The axis height and the tap pattern are
+# the Tr8/KP08 vendor line's: exact millimetres with the millimetre title
+# block's three-place band (owner ruling 4).
 NUT_PATTERN_PLACES = 3
 NUT_SEAT_PLACES = 2
+METRIC_UNIT = "mm"
+METRIC_BAND = printed_band_mm(NUT_PATTERN_PLACES, unit=METRIC_UNIT)  # 0.13
+METRIC_DIMENSIONS = {
+    ("NutPatternReference", name): (NUT_PATTERN_PLACES, METRIC_BAND)
+    for name in ("NutCentreZ", "NutTap3Z", "NutTap4Z", "NutTap1Y", "NutTap3Y")
+}
 # The leadscrew clearance is drilled: inch drill sizes print three places.
 THREE_PLACE_DIMENSIONS = pivot.THREE_PLACE_DIMENSIONS | {"NutClearanceDia"}
 DRAWING_PRECISION = {k: v for k, v in pivot.DRAWING_PRECISION.items() if k != "Block"} | {
@@ -118,10 +128,10 @@ def _inch_text(value_in: float, places: int) -> str:
 # Rule 17 shortfall, stated on the sheet (rule 20): the Ø16 PCD is the bought
 # nut's, so a #4-40 major sits close to the spigot recess at nominal; no
 # recess that still clears the Ø10.2 spigot reaches the .060 floor. Worst
-# case: the recess at its upper .XX limit, each tap off the axis by its .XXX
-# band in both Y and Z.
+# case: the recess at its upper .XX limit, each tap off the axis by its
+# 0.13 mm band in both Y and Z.
 NUT_TAP_MAJOR = THREAD_MAJOR_MM["#4-40"]
-_PATTERN_BAND = printed_band_mm(NUT_PATTERN_PLACES, unit=UNIT)
+_PATTERN_BAND = METRIC_BAND
 NUT_SEAT_WALL_NOMINAL = NUT_PCD / 2 - NUT_SEAT_DIA / 2 - NUT_TAP_MAJOR / 2
 NUT_SEAT_WALL_MIN = (
     NUT_PCD / 2
