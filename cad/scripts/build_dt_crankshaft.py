@@ -416,6 +416,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PinionSeatStep", f"{SEAT_STEP}mm")
     await set_global(adapter, "PinHoleHeight", f"{PIN_HOLE_HEIGHT}mm")
     await set_global(adapter, "PinionPinStation", f"{PINION_PIN_STATION_Y}mm")
+    await set_global(adapter, "PinionPinDia", f"{PINION_PIN_DIA}mm")
     await set_global(adapter, "DomeHeight", f"{SHAFT_DOME_HEIGHT}mm")
     await set_global(adapter, "FiducialDia", f"{FIDUCIAL_MODEL_DIA}mm")
     await set_global(adapter, "FiducialDepth", f"{FIDUCIAL_MODEL_DEPTH}mm")
@@ -939,8 +940,21 @@ async def build(adapter) -> dict[str, str]:
             -SHAFT_DOME_HEIGHT,
         ),
     )
+    # The 16T retention-pin cross-hole's size: a witness across the hole's
+    # span along the axis, on the seat's printed-up silhouette (no ink), so its
+    # REF Ø prints natively over the hole (a Hole Wizard callout cannot bind
+    # the clocked hole's saddle rim).
+    pin_witness = check(
+        "pinion pin-hole reference line",
+        await adapter.add_line(
+            -PINION_SEAT_DIA / 2.0,
+            PINION_PIN_STATION_Y - PINION_PIN_DIA / 2.0,
+            -PINION_SEAT_DIA / 2.0,
+            PINION_PIN_STATION_Y + PINION_PIN_DIA / 2.0,
+        ),
+    )
     set_sketch_direct_db(adapter, False)
-    for entity in (overall_line, *station_lines.values(), dome_arc):
+    for entity in (overall_line, *station_lines.values(), dome_arc, pin_witness):
         segment = _early_bound(adapter._sketch_entities[entity], "ISketchSegment")
         segment.ConstructionGeometry = True
         if not bool(segment.ConstructionGeometry):
@@ -973,6 +987,10 @@ async def build(adapter) -> dict[str, str]:
     check(
         "dome radius reference starts at the dome root",
         await adapter.add_sketch_constraint(f"{dome_arc}.start", "origin", "horizontal_points"),
+    )
+    check(
+        "pinion pin-hole reference vertical",
+        await adapter.add_sketch_constraint(pin_witness, None, "vertical"),
     )
     # Dimensions in creation order; SketchDims renames them by that order.
     await anchor_point_to_origin(
@@ -1007,6 +1025,24 @@ async def build(adapter) -> dict[str, str]:
         '("ShaftDia" / 2 * "ShaftDia" / 2 + "DomeHeight" * "DomeHeight") '
         '/ (2 * "DomeHeight")',
     )
+    await anchor_point_to_origin(
+        adapter,
+        f"{pin_witness}.start",
+        -PINION_SEAT_DIA / 2.0,
+        PINION_PIN_STATION_Y - PINION_PIN_DIA / 2.0,
+        "pinion pin-hole reference start",
+    )
+    stations.record(None, '"PinionSeatDia" / 2')
+    stations.record(None, '"PinionPinStation" - "PinionPinDia" / 2')
+    await dimension_between(
+        adapter,
+        f"{pin_witness}.start",
+        f"{pin_witness}.end",
+        "vertical_distance",
+        PINION_PIN_DIA,
+        "pinion pin-hole reference",
+    )
+    stations.record("PinionPinHoleDia", '"PinionPinDia"')
     await ensure_fully_defined(adapter, "station reference sketch")
     check("exit_sketch station reference", await adapter.exit_sketch())
     name_last_feature(adapter, "StationReference")

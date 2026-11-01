@@ -50,6 +50,9 @@ PINION_SEAT_MATE = "IN MHA-DT-10"
 # The one Ø.375 ±.010 covers both bare necks; the callout names where they are.
 NECKS = "2X"
 NECK_LANDS = "BEHIND COLLAR\nAND AT SEAT STEP"
+# The 16T pin cross-hole's REF Ø names the pin it is reamed to fit; the
+# transfer note says how (dt_crank_pinion_spec.CRANKSHAFT_PIN_HOLE_PROCESS).
+PIN_HOLE_MATE = "FITS\nMHA-DT-29"
 # The spigot's diameter (under it, never over) and its length from the seat
 # face both keep the #25 chain wrapping MHA-PD-09 clear (dt_crankshaft_spec).
 SPIGOT_AIR = "#25 CHAIN AIR"
