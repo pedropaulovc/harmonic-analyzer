@@ -861,10 +861,10 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
     pilot = changed.ASSEMBLY_STEPS[0]
     assert "PILOT DIA .070 THROUGH PLATE" in pilot
     assert "OPEN ITS HOLES TO DIA .096" in pilot
-    assert f"{drill_depth} CYLINDRICAL DEPTH INTO BLOCK" in pilot
+    # The block's tapped-hole callout carries the depths; the step names it.
+    assert drill_depth not in pilot and thread_depth not in pilot
     assert "DEPTH EXCLUDES PLATE" in pilot
     assert "BOTTOMING-TAP" in pilot
-    assert f"{thread_depth} FULL THREAD DEPTH INTO BLOCK" in pilot
     assert changed.PLATE_SCREW_TAP_RESERVE == pytest.approx(
         float(thread_depth) * 25.4 - changed.PLATE_SCREW_ENGAGED
     )
