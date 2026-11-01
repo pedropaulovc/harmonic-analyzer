@@ -102,9 +102,12 @@ ROW_DIMENSIONS = ('CarriageDrills3Y','CarriageDrills4Y')
 # left of x .120, or the leader to its right end crosses its last letters
 # (farm run 20261024T133158704Z).
 # A-A is centred on its cut span (X -46..+24), the block's own centre, so its
-# -X face lands at x 139 under the plan's. The block height prints on B-B.
+# -X face lands at x 139 under the plan's. On TL-22 it also prints the block
+# height (the Block extrusion's depth): its B-B never imported a full-height
+# dimension (farm rounds 1 to 7). Its line stands 12.6 mm right of the +X
+# face (x 201.4), clear of the title block's top (y 64.8) under the view.
 SIDE_XY = (.170,.080)
-SIDE_KEEP = {'TopBoreDepth':(.120,.088),'TapDrillDia':(.084,.070)}
+SIDE_KEEP = {'TopBoreDepth':(.120,.088),'TapDrillDia':(.084,.070),'BlockHeight':(.214,.080)}
 SEAT_DEPTH_TEXT_XY = (.078,.104)
 # B-B: Y up, its +Y face (Y 20) at y 142.5, Z across with the top face toward
 # the plan (x 322.85) and the carriage seat at x 347.15; the caption ends
@@ -117,7 +120,8 @@ SEAT_DEPTH_TEXT_XY = (.078,.104)
 # 13.5 mm over the +Y face (at 8.5 mm the line ran along the face, farm run
 # 20261027T181901497Z).
 FLOOR_XY = (.335,.1225)
-FLOOR_KEEP = {'CboreFloor':(.380,.156),'SectionBlockHeight':(.335,.172)}
+FLOOR_KEEP = {'CboreFloor':(.380,.156)}
+FEED_FLOOR_KEEP = FLOOR_KEEP | {'SectionBlockHeight':(.335,.172)}
 # The section letters print smaller than the document default, and the
 # cutting-line arrows shorter, so A's right letter, past the block's +X edge,
 # ends under row 4Y's extension line (y 218): at the template's arrows its
@@ -408,9 +412,10 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     create_blank_drawing_sheets(adapter,sheets,label='block sheets')
     drawing = _early_bound(drawing,'IDrawingDoc')
     drawing.ActivateSheet(sheets[0])
-    plan_xy, plan_keep, side_xy, side_keep, seat_text_xy, iso_xy, iso_scale = (
-        (FEED_PLAN_XY, FEED_PLAN_KEEP, FEED_SIDE_XY, FEED_SIDE_KEEP, FEED_SEAT_DEPTH_TEXT_XY, FEED_ISO_XY, FEED_ISO_SCALE)
-        if is_feed else (PLAN_XY, PLAN_KEEP, SIDE_XY, SIDE_KEEP, SEAT_DEPTH_TEXT_XY, ISO_XY, ISO_SCALE))
+    plan_xy, plan_keep, side_xy, side_keep, seat_text_xy, iso_xy, iso_scale, floor_keep = (
+        (FEED_PLAN_XY, FEED_PLAN_KEEP, FEED_SIDE_XY, FEED_SIDE_KEEP, FEED_SEAT_DEPTH_TEXT_XY, FEED_ISO_XY, FEED_ISO_SCALE,
+         FEED_FLOOR_KEEP)
+        if is_feed else (PLAN_XY, PLAN_KEEP, SIDE_XY, SIDE_KEEP, SEAT_DEPTH_TEXT_XY, ISO_XY, ISO_SCALE, FLOOR_KEEP))
     plan = place_view(adapter,str(source),'*Front',*plan_xy,scale=SHEET_SCALE)
     # Each cutting line runs so its arrows point away from the section it
     # names (third-angle): A-A below the plan looks up, B-B right of it looks
@@ -443,24 +448,15 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
                                 section_label='B',scale=(1,1),partial=True,
                                 label='carriage counterbore floor')
     # Both blocks print B-B as its cut face only (rule 9), the top face's +Y
-    # corner where the full B-B put it. The block height comes from its own
-    # sketch just behind the cut (_oblique_pivot_block_model
-    # ._block_height_reference): on the cut plane it never imported into
-    # TL-22's B-B (farm rounds 1 to 6), marked, driving and unduplicated.
+    # corner where the full B-B put it. TL-32's B-B also prints the block
+    # height (CboreFloorReference's interior line); TL-22 prints it on A-A.
     _cut_face_only(adapter, floor, 'B', (x, part.BLOCK_WIDTH/2, contract.BLOCK_HEIGHT),
                    (FLOOR_XY[0]-contract.BLOCK_HEIGHT/2000, FLOOR_XY[1]+part.BLOCK_WIDTH/2000),
                    (FLOOR_XY[0], FLOOR_XY[1]-part.BLOCK_WIDTH/2000-SECTION_CAPTION_GAP), SHEET_SCALE)
     row_4y = _project(adapter,plan,(part.BLOCK_X1,part.BOLT_Y,contract.BLOCK_HEIGHT),'row 4Y')
     _fit_section_letters(adapter, side, (floor,), below_y=row_4y[1])
-    try:
-        annotations += curate_view_dimensions(adapter,floor,keep=FLOOR_KEEP,view_label='B-B floor',
-                         dimensions_by_feature=contract.DRAWING_DIMENSIONS)
-    except RuntimeError:
-        # EXPERIMENT (farm round 7): does the Block extrusion's own depth import?
-        from _drawing_dimension_import import insert_feature_dimensions
-        probe = insert_feature_dimensions(adapter, floor, ['Block'])
-        _telemetry.info(f'B-B experiment: Block feature import {[name for name, _ in probe]!r}')
-        raise
+    annotations += curate_view_dimensions(adapter,floor,keep=floor_keep,view_label='B-B floor',
+                     dimensions_by_feature=contract.DRAWING_DIMENSIONS)
     set_hidden_lines_removed(adapter,iso)
     sheet_scales = None
     if is_feed:
@@ -510,7 +506,7 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         sheet_scales = {sheets[0]: SHEET_SCALE, sheets[1]: NUT_SCALE}
     # Every printed dimension keeps its part-authored places; the repeated
     # row/column locations left off the sheet print nothing to check.
-    kept = {*plan_keep, *side_keep, *FLOOR_KEEP, *(NUT_KEEP if is_feed else ())}
+    kept = {*plan_keep, *side_keep, *floor_keep, *(NUT_KEEP if is_feed else ())}
     precision = {name:places for dims in contract.DRAWING_PRECISION.values()
                  for name,places in dims.items() if name in kept}
     assert_imported_precision(adapter,annotations,precision)
