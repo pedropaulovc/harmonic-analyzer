@@ -527,7 +527,13 @@ for _stem, _points, _thread, _drill, _spec_name, _places, _y_places in _TAPS:
                 "dia_nominal": (_drill_printed, (_spec_name,)),
                 "thru": (True, (_spec_name,)),
                 "station": (
-                    _limits(_x - _A1[0], _places),
+                    limits(
+                        _from_a1(_x, _places),  # on its printed nominal, like _BAND
+                        _places,
+                        (part_spec.LEVER_STATION_BAND, -part_spec.LEVER_STATION_BAND),
+                    )
+                    if _stem == "lever_tap"
+                    else _limits(_x - _A1[0], _places),
                     (_spec_name, "PIN_HOLES"),
                 ),
                 "station_nominal": (_from_a1(_x, _places), (_spec_name, "PIN_HOLES")),
