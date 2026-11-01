@@ -66,11 +66,14 @@ def test_screw_heads_keep_a_gap() -> None:
 def test_stock_is_half_by_one_inch_flat_sawn_to_length() -> None:
     assert (spec.LEVER_THICK, spec.LEVER_WIDTH) == (12.7, 25.4)
     # #290: the sawn length prints as modelled at .X; the stock sizes print
-    # their supplier fractions as references over STOCK.
+    # their supplier fractions as references over STOCK and the supplier's band.
     assert spec.UNIT == "in"
     assert _on_grid(spec.LEVER_LENGTH, spec.SIZE_PLACES)
     assert spec.STOCK_DIMENSIONS == {"LeverWidth", "LeverThick"}
-    assert spec.STOCK_CALLOUT == "STOCK"
+    assert spec.STOCK_CALLOUTS == {
+        "LeverWidth": "STOCK\n±.012",
+        "LeverThick": "STOCK\n±.009",
+    }
     assert not hasattr(spec, "CALLOUTS_BELOW")
     sizes = {"LeverWidth": spec.LEVER_WIDTH, "LeverThick": spec.LEVER_THICK}
     for name, denominator in spec.STOCK_FRACTION_DENOMINATORS.items():

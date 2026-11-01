@@ -40,6 +40,8 @@ def test_catalogue_row_is_the_registered_mcmaster_screw() -> None:
     )
     for key in ("title", "stock_name", "supplier", "finish"):
         assert not any(ch.isdigit() for ch in row[key]), key
+    # The cut end is bare steel; the finish cell says how to protect it.
+    assert row["finish"] == "black oxide as supplied; oil the cut end"
     metadata = recipe_declaration(spec.SKU, recipe.build_91290A168)
     assert metadata.module == recipe.__name__
     assert getattr(recipe, metadata.callable_name) is recipe.build_91290A168

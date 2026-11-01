@@ -168,6 +168,7 @@ def test_spec_is_pure_data() -> None:
     imports = re.findall(r"^(?:from|import) (\S+)", source, re.MULTILINE)
     assert set(imports) <= {
         "__future__",
+        "_config",
         "math",
         "ch_rocker_arm_tl_vn_oblique_leadscrew_spec",
     }
@@ -196,7 +197,11 @@ def test_sheet_is_the_registered_purchased_part_reference(monkeypatch) -> None:
     assert "HANDWHEEL" in draw.ITEM
 
 
-def test_note_is_one_short_line_without_numbers() -> None:
+def test_note_is_one_short_line_naming_the_leadscrew_by_its_drawing_number() -> None:
     note = spec.DRAWING_NOTES
+    number = _config.parts("ch-rocker-arm-tl-vn-oblique-leadscrew")["number"]
+    assert spec.LEADSCREW_NUMBER == number
     assert "\n" not in note and len(note) <= 80
-    assert not re.search(r"\d", note)
+    assert f"LEADSCREW {number}" in note
+    # The number is the only digits the note carries.
+    assert not re.search(r"\d", note.replace(number, ""))
