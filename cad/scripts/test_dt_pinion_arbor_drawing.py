@@ -302,8 +302,16 @@ def test_every_printed_value_is_exact_at_its_authored_inch_places() -> None:
         places = spec.DRAWING_PRECISION_BY_NAME[name]
         inches = value / 25.4
         assert inches == pytest.approx(round(inches, places), abs=1e-9), name
-    # No .X anywhere: every stack on the sheet reads these lengths.
-    assert min(spec.DRAWING_PRECISION_BY_NAME.values()) == 2
+    # No toleranced .X anywhere: every stack on the sheet reads these lengths.
+    # The overall is an untoleranced REF at one place, (9.6), so its rounded
+    # chain cannot disagree with it.
+    toleranced = {
+        name: places
+        for name, places in spec.DRAWING_PRECISION_BY_NAME.items()
+        if name != "OverallLen"
+    }
+    assert min(toleranced.values()) == 2
+    assert spec.DRAWING_PRECISION_BY_NAME["OverallLen"] == 1
 
 
 def test_each_land_diameter_is_measured_a_short_extension_from_its_line() -> None:
