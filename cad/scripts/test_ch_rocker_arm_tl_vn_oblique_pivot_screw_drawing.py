@@ -12,16 +12,17 @@ import build_ch_rocker_arm_tl_vn_oblique_pivot_screw as part
 import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as spec
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
-from _supplier_screw_reference_names import FEATURE_BY_PLANE
+from _printed_tolerance import printed_band_mm
 
 STEM = "ch-rocker-arm-tl-vn-oblique-pivot-screw"
 
 
-def test_envelope_volume_has_all_three_supplied_sections():
+def test_envelope_volume_has_all_three_supplied_sections_less_the_end_chamfer():
+    ring = math.pi * spec.CUT_CHAMFER**2 * (spec.THREAD_DIA / 2.0 - spec.CUT_CHAMFER / 3.0)
     assert part.MODEL_VOLUME == pytest.approx(
         math.pi / 4.0 * (spec.SHOULDER_DIA**2 * spec.SHOULDER_LENGTH
                          + spec.HEAD_DIA**2 * spec.HEAD_HEIGHT
-                         + spec.THREAD_DIA**2 * spec.CUT_THREAD_LENGTH)
+                         + spec.THREAD_DIA**2 * spec.CUT_THREAD_LENGTH) - ring
     )
 
 
@@ -88,31 +89,37 @@ def test_supplier_dimensions_and_physical_contract():
 
 
 def test_native_supplier_witness_inventory():
-    names = {name for name, _, _ in spec.SUPPLIER_REFERENCE_DIMENSIONS}
-    assert len(names) == len(spec.SUPPLIER_REFERENCE_DIMENSIONS)
-    assert names == set(spec.SUPPLIER_REFERENCE_STARTS) == set(spec.SUPPLIER_REFERENCE_PLANES)
-    assert names == set(spec.SUPPLIER_REFERENCE_FORMATS) == set(spec.SUPPLIER_REFERENCE_UNITS)
-    assert names == set(spec.SUPPLIER_REFERENCE_SIDES)
-    assert set(spec.SUPPLIER_REFERENCE_TOLERANCES_MM) <= names
-    for name, value, orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS:
+    names = {name for name, _, _ in spec.REFERENCE_DIMENSIONS}
+    assert len(names) == len(spec.REFERENCE_DIMENSIONS)
+    assert names == set(spec.REFERENCE_STARTS) == set(spec.REFERENCE_FORMATS)
+    assert set(spec.REFERENCE_TOLERANCES_MM) <= names
+    for name, value, orientation in spec.REFERENCE_DIMENSIONS:
         assert value > 0
-        plane = spec.SUPPLIER_REFERENCE_PLANES[name]
-        assert plane in FEATURE_BY_PLANE
-        # Diameters are horizontal chords; only the shoulder length is axial.
-        assert orientation == ("vertical" if name == "SupplierShoulderLength" else "horizontal")
-        assert spec.SUPPLIER_REFERENCE_UNITS[name] == "in"
-    assert all(lower <= upper for lower, upper in spec.SUPPLIER_REFERENCE_TOLERANCES_MM.values())
-    # Every line lies on a Top-profile edge: the shoulder Ø on the thread-end
-    # step, its Ø wider than the thread it clears; the shoulder length on the
-    # shoulder silhouette; the head Ø on the head's end face (Top sketch y is
-    # -z; the head ends at z = LENGTH). No chord crosses the head-end Front.
-    assert set(spec.SUPPLIER_REFERENCE_PLANES.values()) == {"Top"}
-    assert spec.SUPPLIER_REFERENCE_STARTS == {
-        "SupplierShoulderDiameter": (-spec.SHOULDER_DIA / 2.0, 0.0),
-        "SupplierShoulderLength": (spec.SHOULDER_DIA / 2.0, -spec.SHOULDER_LENGTH),
-        "SupplierHeadDiameter": (-spec.HEAD_DIA / 2.0, -spec.LENGTH),
+        # Diameters stand across the horizontal axis; only the shoulder length runs along it.
+        assert orientation == ("horizontal" if name == "SupplierShoulderLength" else "vertical")
+    assert all(lower <= upper for lower, upper in spec.REFERENCE_TOLERANCES_MM.values())
+    # Every line lies on a Right-view edge (Right sketch x is model -z): the
+    # shoulder Ø on the thread-end step, the shoulder length on the shoulder's
+    # upper silhouette, the head Ø on the head's end face (z = LENGTH).
+    assert spec.REFERENCE_STARTS == {
+        "SupplierShoulderDiameter": (0.0, -spec.SHOULDER_DIA / 2.0),
+        "SupplierShoulderLength": (-spec.SHOULDER_LENGTH, spec.SHOULDER_DIA / 2.0),
+        "SupplierHeadDiameter": (-spec.LENGTH, -spec.HEAD_DIA / 2.0),
     }
     assert spec.SHOULDER_DIA > spec.THREAD_DIA
+
+
+def test_cut_length_names_its_three_place_reason_and_sized_chamfer():
+    import ch_rocker_arm_tl_oblique_pivot_block_spec as block
+
+    assert spec.CUT_THREAD_PLACES == 3
+    # A .XX cut would let TL-22's tip clearance fall under its .011 floor.
+    loose = (block.PIVOT_TIP_CLEARANCE_MIN + printed_band_mm(3, unit="in")
+             - printed_band_mm(2, unit="in"))
+    assert loose < 0.011 * 25.4 - 1e-9 <= block.PIVOT_TIP_CLEARANCE_MIN
+    assert "CHAMFER END .03 X 45°" in spec.CUT_CALLOUT
+    assert "TL-22" in spec.CUT_CALLOUT
+    assert spec.CUT_CHAMFER == pytest.approx(0.03 * 25.4)
 
 
 def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):
@@ -133,13 +140,18 @@ def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):
         monkeypatch.setattr(part, name, AsyncMock())
     saved = AsyncMock(return_value={"part": STEM})
     monkeypatch.setattr(part, "save_part_and_images", saved)
-    adapter = SimpleNamespace(create_part=AsyncMock(), create_axis=AsyncMock())
+    adapter = SimpleNamespace(
+        create_part=AsyncMock(), create_axis=AsyncMock(), add_chamfer=AsyncMock(),
+    )
     assert asyncio.run(part.build(adapter)) == {"part": STEM}
     assert calls == [
         ("Shoulder", spec.SHOULDER_DIA, 0.0, spec.SHOULDER_LENGTH, {}),
         ("Head", spec.HEAD_DIA, 0.0, spec.HEAD_HEIGHT, {"offset": spec.SHOULDER_LENGTH}),
         (spec.CUT_FEATURE, spec.THREAD_DIA, 0.0, spec.CUT_THREAD_LENGTH, {"reverse": True}),
     ]
+    adapter.add_chamfer.assert_awaited_once_with(
+        spec.CUT_CHAMFER, [[spec.THREAD_DIA / 2.0, 0.0, -spec.CUT_THREAD_LENGTH]]
+    )
     axis = adapter.create_axis.call_args.args[0]
     assert axis.mode == "two_planes"
     assert set(axis.planes) == {"Top Plane", "Right Plane"}
