@@ -392,6 +392,26 @@ def test_chain_top_fit_lane_accommodates_five_to_one_source_gauge():
     assert chain_stock.ROLLER_WIDTH / 1000 * 8 > available_height
 
 
+def test_chain_top_roller_square_projects_over_front_roller_circle():
+    import draw_sh_vn_chain_link as chain_drawing
+
+    cells = {
+        name: center
+        for name, center, _box in supplier_drawing.supplier_fit_cells(
+            supplier_drawing.supplier_state_cells(0.08, maximum=False),
+            chain_drawing._CHAIN_SUPPLIER_MARGINS,
+            label="chain reference",
+        )
+    }
+    # Each diagram's ink is centred in its cell: FRONT runs pin left edge to
+    # roller right edge, TOP is the roller square alone (both at 5:1).
+    front_ink_centre = (
+        -chain_stock.PIN_DIAMETER / 2 + chain_stock.PITCH + chain_stock.ROLLER_DIAMETER / 2
+    ) / 2
+    roller_x = cells["free_front"][0] + (chain_stock.PITCH - front_ink_centre) / 1000 * 5
+    assert cells["free_top"][0] == pytest.approx(roller_x)
+
+
 def test_connecting_link_top_fit_lane_accommodates_two_to_one_pin_length():
     cells = supplier_drawing.supplier_fit_cells(
         supplier_drawing.supplier_state_cells(0.08, maximum=False),
