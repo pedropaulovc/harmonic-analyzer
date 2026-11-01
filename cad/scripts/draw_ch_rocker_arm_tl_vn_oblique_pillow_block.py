@@ -1,8 +1,8 @@
 """Create the four-view purchased-reference sheet for the AMPEC KP08 pillow block (MHA-CH-06-TL-VN-56).
 
 Identification and its receipt-check reference sizes: the part as installed,
-its stock and ordering SKU, and the bolt-hole spacing, bolt hole and overall
-length on the plan view; no fabrication dimensions.
+its stock and ordering SKU, and the bolt-hole spacing and bolt hole on the
+plan view; no fabrication dimensions.
 """
 
 from __future__ import annotations
@@ -30,8 +30,13 @@ PART_STEM = SPEC.artifact_stem
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "KP08 PILLOW BLOCK, 8 MM BORE, SET-SCREW INSERT BEARING"
 # The bolt hole's two-line text is wider than its 9 mm span at 2:1; centred
-# on its line it would sit across its own witnesses, so it shelves left.
-SHELVES = {"SupplierBoltHoleDiameter": (False, "left")}
+# on its line it would sit across its own witnesses, so it shelves left. The
+# spacing's text centred on its line had the line run into its parentheses
+# (machinist review, 3/3 runs); it shelves right, past its right witness.
+SHELVES = {
+    "SupplierBoltHoleDiameter": (False, "left"),
+    "SupplierBoltSpacing": (True, "right"),
+}
 
 
 # The hole's shelved text reaches 26 mm past its 6 mm lane: the lane plan's

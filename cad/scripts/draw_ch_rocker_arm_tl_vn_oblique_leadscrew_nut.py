@@ -11,6 +11,7 @@ import argparse
 import math
 import sys
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from functools import partial
 from math import isfinite
 from typing import Any
@@ -72,7 +73,6 @@ TEXT_SHELVES = {
     "SupplierSpigotLength": "right",
     "SupplierBodyDiameter": "right",
     "SupplierFlangeDiameter": "right",
-    "SupplierMountingHoleDiameter": "right",
 }
 _HORIZONTAL = {
     name: orientation == "horizontal"
@@ -85,18 +85,44 @@ _HORIZONTAL = {
 LOWERED = "SupplierSpigotLength"
 ARROWS_INSIDE = ("SupplierLength",)
 _DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
-# The bolt pattern: a centreline circle through the four hole centres in the
-# end view, its diameter a reference on that circle (machinist review: a
-# floating linear (Ø16 mm) between empty extension lines read as nothing).
-# The leader reaches the circle at 160°, between the 135° hole and the
-# horizontal centreline, and the text stands left of the flange.
+
+
+@dataclass(frozen=True)
+class DiameterLeader:
+    """A reference Ø on its circle: format, value, leader and text placement.
+
+    The leader leaves its circle's centre at ``leader_deg`` (sheet, CCW from
+    +X); the text anchor stands ``text_radius_m`` out along it, on ``side``
+    of the flange.
+    """
+
+    format: tuple[int, str, int | None, str | None]
+    expected_mm: float
+    leader_deg: float
+    text_radius_m: float
+    side: str
+
+
+# The end view's two diameters print on their circles (machinist review):
+# - the bolt pattern on a centreline circle through the four hole centres
+#   (a floating linear (Ø16 mm) between empty extension lines read as
+#   nothing); its leader meets the circle at 160°, between the 135° hole and
+#   the horizontal centreline, the text left of the flange;
+# - the 4X hole on the lower-right hole's own rim (a vertical linear between
+#   tangent extension lines read as indirect), its leader out at -20°, the
+#   text right of the flange and above the Ø10.2 shelf.
 PITCH_CIRCLE = "SupplierHolePitchDiameter"
-PITCH_CIRCLE_FORMAT = (0, "diameter", None, "PCD")
-PITCH_LEADER_DEG = 160.0
-PITCH_TEXT_RADIUS_M = 0.032
-# swDimensionType_e.swDiameterDimension: the end view's one diameter-type
-# display (its imported sizes are linear chords).
-_DIAMETER_DIMENSION = 6
+HOLE = "SupplierMountingHoleDiameter"
+DIAMETER_LEADERS = {
+    PITCH_CIRCLE: DiameterLeader(
+        (0, "diameter", None, "PCD"), supplier.HOLE_PCD, 160.0, 0.032, "left"
+    ),
+    HOLE: DiameterLeader(
+        (1, "diameter", None, "4X"), supplier.HOLE_DIA, -20.0, 0.020, "right"
+    ),
+}
+_DIAMETER_TYPES = (6, 15)  # swDimensionType_e diameter displays
+_SEL_EDGES = 1  # swSelectType_e.swSelEDGES
 
 
 def projection_margins(
@@ -127,7 +153,7 @@ def balanced_columns(
     """Widen each view's smaller left/right reserve to its larger one.
 
     Front's right carries two lanes (the spigot inside the overall length)
-    and Top's left the pitch circle's text, which no lane reserves.
+    and its left one, so the left widens to match.
     """
     balanced = {}
     for name, (left, bottom, right, top) in margins.items():
@@ -286,93 +312,145 @@ def _add_pitch_circle(adapter: Any, view: Any) -> Any:
     return segment
 
 
-def _pitch_text_box(adapter: Any, display: Any) -> Any:
+def _text_box(adapter: Any, display: Any, label: str) -> Any:
     texts = (_supplier_top_record(adapter, display).get("display") or {}).get("texts")
     box = display_box({"texts": texts or ()})
     if box is None:
-        raise RuntimeError(f"{PITCH_CIRCLE}: no measured text")
+        raise RuntimeError(f"{label}: no measured text")
     return box
 
 
-def _pitch_text_clearance(adapter: Any, view: Any, display: Any) -> float:
-    """Gap from the PCD text's right edge to the flange's left rim."""
+def _flange_clearance(adapter: Any, view: Any, display: Any, name: str) -> float:
+    """Gap from a leader's text to the flange rim on its side of the view."""
     centre, _radius = _pitch_circle_sheet(adapter, view)
-    rim = centre[0] - supplier.FLANGE_DIA / 2000.0 * float(
-        _early_bound(view, "IView").ScaleDecimal
-    )
-    return rim - _pitch_text_box(adapter, display).xmax
+    rim = supplier.FLANGE_DIA / 2000.0 * float(_early_bound(view, "IView").ScaleDecimal)
+    box = _text_box(adapter, display, name)
+    if DIAMETER_LEADERS[name].side == "left":
+        return centre[0] - rim - box.xmax
+    return box.xmin - (centre[0] + rim)
 
 
-def _reference_settings() -> dict[str, Any]:
-    precision, presentation, fraction, callout = PITCH_CIRCLE_FORMAT
+def _reference_settings(name: str) -> dict[str, Any]:
+    leader = DIAMETER_LEADERS[name]
+    precision, presentation, fraction, callout = leader.format
     return {
-        "label": PITCH_CIRCLE,
+        "label": name,
         "units": "mm",
         "precision": precision,
-        "expected_mm": supplier.HOLE_PCD,
+        "expected_mm": leader.expected_mm,
         "presentation": presentation,
         "fraction_denominator": fraction,
         "callout": callout,
     }
 
 
-def _dimension_pitch_circle(adapter: Any, view: Any, segment: Any) -> Any:
-    """(Ø16 mm) PCD on the circle: one arrow at the leader's rim, text left."""
-    centre, _radius = _pitch_circle_sheet(adapter, view)
-    angle = math.radians(PITCH_LEADER_DEG)
+def _leader_hole_sheet(adapter: Any, view: Any) -> tuple[float, float]:
+    """The hole the 4X leader lands on: the end view's lower-right one."""
+    holes = model_points_in_view(
+        adapter,
+        view,
+        [(x / 1000.0, 0.0, z / 1000.0) for x, z in supplier.HOLE_CENTRES],
+        label="nut flange hole centres",
+    )
+    return max(holes, key=lambda hole: hole[0] - hole[1])
+
+
+def _select_pitch_circle(adapter: Any, view: Any, segment: Any) -> None:
+    selection = _early_bound(
+        adapter.currentModel.SelectionManager, "ISelectionMgr"
+    ).CreateSelectData()
+    selection.View = view
+    if not segment.Select4(False, selection):
+        raise RuntimeError("failed to select the nut pitch circle")
+
+
+def _select_hole_edge(adapter: Any, view: Any) -> None:
+    """Pick the lower-right hole's own edge on its leader side; prove it."""
+    centre = _leader_hole_sheet(adapter, view)
+    radius = supplier.HOLE_DIA / 2000.0 * float(_early_bound(view, "IView").ScaleDecimal)
+    angle = math.radians(DIAMETER_LEADERS[HOLE].leader_deg)
+    pick = (centre[0] + radius * math.cos(angle), centre[1] + radius * math.sin(angle))
+    model = adapter.currentModel
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    if not extension.SelectByID2("", "EDGE", *pick, 0.0, False, 0, None, 0):
+        raise RuntimeError(f"{HOLE}: no edge at the hole rim {pick!r}")
+    manager = _early_bound(model.SelectionManager, "ISelectionMgr")
+    if int(manager.GetSelectedObjectType3(1, -1)) != _SEL_EDGES:
+        raise RuntimeError(f"{HOLE}: the rim pick is not an edge")
+    curve = _early_bound(
+        _early_bound(manager.GetSelectedObject6(1, -1), "IEdge").GetCurve(), "ICurve"
+    )
+    if not curve.IsCircle() or not math.isclose(
+        float(curve.CircleParams[6]) * 2000.0, supplier.HOLE_DIA, abs_tol=1e-6
+    ):
+        raise RuntimeError(f"{HOLE}: the rim pick is not a Ø{supplier.HOLE_DIA} hole edge")
+
+
+def _dimension_diameter(adapter: Any, view: Any, name: str, select: Any) -> Any:
+    """A reference Ø on its circle: one arrow at the rim, text off the flange."""
+    leader = DIAMETER_LEADERS[name]
+    origin = (
+        _pitch_circle_sheet(adapter, view)[0]
+        if name == PITCH_CIRCLE
+        else _leader_hole_sheet(adapter, view)
+    )
+    angle = math.radians(leader.leader_deg)
     at = (
-        centre[0] + PITCH_TEXT_RADIUS_M * math.cos(angle),
-        centre[1] + PITCH_TEXT_RADIUS_M * math.sin(angle),
+        origin[0] + leader.text_radius_m * math.cos(angle),
+        origin[1] + leader.text_radius_m * math.sin(angle),
     )
     model = adapter.currentModel
     with dimension_input_suppressed(adapter):
         if not _early_bound(model, "IDrawingDoc").ActivateView(view_name(adapter, view)):
-            raise RuntimeError("failed to activate the nut end view to dimension its PCD")
-        selection = _early_bound(model.SelectionManager, "ISelectionMgr").CreateSelectData()
-        selection.View = view
-        if not segment.Select4(False, selection):
-            raise RuntimeError("failed to select the nut pitch circle")
+            raise RuntimeError(f"failed to activate the nut end view to dimension {name}")
+        model.ClearSelection2(True)
+        select()
         display = model.AddDiameterDimension2(*at, 0.0)
         model.ClearSelection2(True)
     if display is None:
-        raise RuntimeError("failed to dimension the nut pitch circle")
+        raise RuntimeError(f"failed to dimension {name}")
     display = _early_bound(display, "IDisplayDimension")
-    set_near_side_diameter(display.GetAnnotation(), PITCH_CIRCLE)
-    display = supplier_reference_dimension(adapter, display, **_reference_settings())
-    rebuild_drawing(adapter, label="nut pitch circle dimensioned")
-    # Keep the text a clear gap left of the flange whatever its native width.
-    shift = CLEAR_GAP_M + PLACE_SETTLE_M - _pitch_text_clearance(adapter, view, display)
+    set_near_side_diameter(display.GetAnnotation(), name)
+    display = supplier_reference_dimension(adapter, display, **_reference_settings(name))
+    rebuild_drawing(adapter, label=f"nut {name} dimensioned")
+    # Keep the text a clear gap off the flange whatever its native width.
+    shift = CLEAR_GAP_M + PLACE_SETTLE_M - _flange_clearance(adapter, view, display, name)
     if shift > 0.0:
         annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
         x, y, _z = (float(value) for value in annotation.GetPosition())
-        if not annotation.SetPosition2(x - shift, y, 0.0):
-            raise RuntimeError(f"{PITCH_CIRCLE}: failed to move its text off the flange")
-        rebuild_drawing(adapter, label="nut pitch circle text clear of the flange")
+        dx = -shift if leader.side == "left" else shift
+        if not annotation.SetPosition2(x + dx, y, 0.0):
+            raise RuntimeError(f"{name}: failed to move its text off the flange")
+        rebuild_drawing(adapter, label=f"nut {name} text clear of the flange")
     return display
 
 
-def _settled_pitch_dimension(view: Any) -> Any:
-    """Reacquire the end view's one diameter-type dimension: the PCD."""
+def _settled_diameter(view: Any, name: str) -> Any:
+    """Reacquire the end view's one diameter-type dimension of this size."""
+    expected = DIAMETER_LEADERS[name].expected_mm
     found = []
     display = _early_bound(view, "IView").GetFirstDisplayDimension6()
     while display is not None:
         display = _early_bound(display, "IDisplayDimension")
-        if int(display.Type2) == _DIAMETER_DIMENSION:
-            found.append(display)
+        if int(display.Type2) in _DIAMETER_TYPES:
+            native = _early_bound(display.GetDimension2(0), "IDimension")
+            if math.isclose(abs(float(native.SystemValue)) * 1000.0, expected, abs_tol=1e-5):
+                found.append(display)
         display = display.GetNext5()
     if len(found) != 1:
-        raise RuntimeError(f"{PITCH_CIRCLE}: end view must carry one diameter dimension")
+        raise RuntimeError(f"{name}: end view must carry one Ø{expected} diameter")
     return found[0]
 
 
-def _assert_pitch_circle(adapter: Any, view: Any, segment: Any) -> None:
+def _assert_diameters(adapter: Any, view: Any, segment: Any) -> None:
     font = (int(segment.Color), int(segment.Style), int(segment.Width))
     if font != (0, CENTER_LINE_STYLE, CENTER_LINE_WEIGHT):
         raise RuntimeError(f"nut pitch circle font reads {font!r}, not a black centreline")
-    display = _settled_pitch_dimension(view)
-    assert_supplier_reference_dimension(adapter, display, **_reference_settings())
-    if _pitch_text_clearance(adapter, view, display) < CLEAR_GAP_M:
-        raise RuntimeError(f"{PITCH_CIRCLE}: text is not clear of the flange")
+    for name in DIAMETER_LEADERS:
+        display = _settled_diameter(view, name)
+        assert_supplier_reference_dimension(adapter, display, **_reference_settings(name))
+        if _flange_clearance(adapter, view, display, name) < CLEAR_GAP_M:
+            raise RuntimeError(f"{name}: text is not clear of the flange")
 
 
 def _assert_hidden_lines_removed(views: Mapping[str, Any]) -> None:
@@ -409,8 +487,11 @@ def _annotate(
     _assert_front_layout(adapter, displays)
     end = views["*Top"]
     circle = _add_pitch_circle(adapter, end)
-    _dimension_pitch_circle(adapter, end, circle)
-    _assert_pitch_circle(adapter, end, circle)
+    _dimension_diameter(
+        adapter, end, PITCH_CIRCLE, partial(_select_pitch_circle, adapter, end, circle)
+    )
+    _dimension_diameter(adapter, end, HOLE, partial(_select_hole_edge, adapter, end))
+    _assert_diameters(adapter, end, circle)
     [reference_check] = reference_checks
 
     # The final check reacquires every native reference, then re-proves the
@@ -419,7 +500,7 @@ def _annotate(
         settled = reference_check()
         _assert_text_shelves(adapter, settled, stations)
         _assert_front_layout(adapter, settled)
-        _assert_pitch_circle(adapter, end, circle)
+        _assert_diameters(adapter, end, circle)
 
     checks.append(assert_references)
     checks.append(partial(_assert_hidden_lines_removed, dict(views)))

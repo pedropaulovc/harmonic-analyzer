@@ -134,15 +134,14 @@ def test_supplier_references_are_the_drop_in_interface() -> None:
         "SupplierSpigotLength": (spec.SPIGOT_LENGTH, "vertical"),
         "SupplierBodyDiameter": (spec.BODY_DIA, "horizontal"),
         "SupplierFlangeDiameter": (spec.FLANGE_DIA, "horizontal"),
-        "SupplierMountingHoleDiameter": (spec.HOLE_DIA, "vertical"),
     }
     assert set(spec.SUPPLIER_REFERENCE_STARTS) == set(rows) == set(spec.SUPPLIER_REFERENCE_FORMATS)
-    # The end view carries every diameter; the bolt pattern is the drawing's
-    # pitch circle, not a chord. The side view carries only the lengths.
+    # The end view carries the flange OD and pilot as chords; the bolt pattern
+    # and the hole size print on their circles (the drawing's diameter
+    # leaders). The side view carries only the lengths.
     assert spec.SUPPLIER_REFERENCE_PLANES == {
         "SupplierFlangeDiameter": "Top",
         "SupplierBodyDiameter": "Top",
-        "SupplierMountingHoleDiameter": "Top",
     }
     assert spec.SUPPLIER_REFERENCE_SIDES == {
         "SupplierLength": "right",
@@ -186,10 +185,6 @@ def test_supplier_references_are_the_drop_in_interface() -> None:
         (-spec.FLANGE_DIA / 2.0, 0.0),
         (spec.FLANGE_DIA / 2.0, 0.0),
     )
-    (hx, hy0), (_, hy1) = chord("SupplierMountingHoleDiameter")
-    centre_x, centre_z = spec.HOLE_CENTRES[0]
-    assert hx == centre_x
-    assert (hy0 + hy1) / 2.0 == pytest.approx(-centre_z, abs=1e-12)
 
 
 def test_note_names_the_short_spigot_for_the_counterbore() -> None:
@@ -197,20 +192,30 @@ def test_note_names_the_short_spigot_for_the_counterbore() -> None:
     assert spec.SPIGOT_LENGTH < spec.BODY_LONG
 
 
-def test_pitch_circle_is_a_centreline_circle_dimensioned_as_a_reference_pcd() -> None:
+def test_pitch_circle_and_hole_print_reference_diameters_on_their_circles() -> None:
     from _transgear_zone_line import CENTER_LINE_STYLE
 
-    assert "SupplierHolePitchDiameter" not in spec.SUPPLIER_REFERENCE_FORMATS
-    assert draw.PITCH_CIRCLE_FORMAT == (0, "diameter", None, "PCD")
-    settings = draw._reference_settings()
-    assert settings["expected_mm"] == spec.HOLE_PCD
-    assert (settings["units"], settings["callout"]) == ("mm", "PCD")
+    for name in (draw.PITCH_CIRCLE, draw.HOLE):
+        assert name not in spec.SUPPLIER_REFERENCE_FORMATS
+    pcd, hole = draw.DIAMETER_LEADERS[draw.PITCH_CIRCLE], draw.DIAMETER_LEADERS[draw.HOLE]
+    assert (pcd.format, pcd.expected_mm) == ((0, "diameter", None, "PCD"), spec.HOLE_PCD)
+    assert (hole.format, hole.expected_mm) == ((1, "diameter", None, "4X"), spec.HOLE_DIA)
+    for name, callout in ((draw.PITCH_CIRCLE, "PCD"), (draw.HOLE, "4X")):
+        settings = draw._reference_settings(name)
+        assert (settings["units"], settings["callout"]) == ("mm", callout)
     assert CENTER_LINE_STYLE == 4  # swLineStyles_e.swLineCENTER
-    # The leader lands between the 135° hole (±12.5° of arc at R8) and the
+    # The PCD leader lands between the 135° hole (±12.5° of arc at R8) and the
     # horizontal centreline, the text left of the flange.
     half = math.degrees(math.asin(spec.HOLE_DIA / spec.HOLE_PCD))
-    assert 135.0 + half < draw.PITCH_LEADER_DEG < 180.0
-    assert draw.PITCH_TEXT_RADIUS_M * 1000.0 > spec.FLANGE_DIA / 2.0
+    assert 135.0 + half < pcd.leader_deg < 180.0 and pcd.side == "left"
+    assert pcd.text_radius_m * 1000.0 > spec.FLANGE_DIA / 2.0
+    # The hole's leader leaves its lower-right hole outward and right, its
+    # text clear of the flange rim.
+    assert -45.0 < hole.leader_deg < 0.0 and hole.side == "right"
+    reach = spec.HOLE_PCD / 2.0 * math.cos(math.radians(45.0)) + hole.text_radius_m * 1000.0 * math.cos(
+        math.radians(hole.leader_deg)
+    )
+    assert reach > spec.FLANGE_DIA / 2.0
     # Every hole centre lies on the circle the drawing draws.
     for x, z in spec.HOLE_CENTRES:
         assert math.hypot(x, z) == pytest.approx(spec.HOLE_PCD / 2.0)
@@ -262,7 +267,7 @@ def test_shelf_gap_measures_clearance_on_the_shelf_side() -> None:
     assert draw._shelf_gap("SupplierFlangeThickness", actual) == pytest.approx(0.002)
     text = SimpleNamespace(xmin=0.135, xmax=0.160)
     actual = {"left": 0.118, "right": 0.133, "text": text}
-    assert draw._shelf_gap("SupplierMountingHoleDiameter", actual) == pytest.approx(0.002)
+    assert draw._shelf_gap("SupplierLength", actual) == pytest.approx(0.002)
 
 
 def test_sheet_fits_its_title_cells_and_selects_the_tall_top_layout() -> None:
@@ -403,9 +408,10 @@ def _fitted_cells(
 def test_front_keeps_the_projection_axes_of_top_and_right() -> None:
     margins, fitted = _fitted_cells()
     # Front: 34 mm columns (the right's two lanes, the left balanced to it),
-    # 20 mm text room above and below; Top: 26 mm, the left for the PCD text.
+    # 20 mm text room above and below; Top: lanes above and below only (its
+    # two diameter leaders' texts stand inside the 180 mm cell either side).
     assert margins["*Front"] == pytest.approx((0.034, 0.020, 0.034, 0.020))
-    assert margins["*Top"] == pytest.approx((0.026, 0.026, 0.026, 0.026))
+    assert margins["*Top"] == pytest.approx((0.020, 0.026, 0.020, 0.026))
     assert draw.projection_margins(margins) == margins
     # The builder centres each outline on its fitted cell's centre: Front and
     # the unannotated Right share a row centre, Front and Top a column centre.

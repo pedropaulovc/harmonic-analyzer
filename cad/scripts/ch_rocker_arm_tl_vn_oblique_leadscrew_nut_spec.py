@@ -134,20 +134,19 @@ SUPPLIER_DRAWING_URLS = (
 # carries only the vertical lengths (20 + 20 + 26.176 <= 73; the right side's
 # two lanes reserve 34 mm, the drawing balances the left to match) and every
 # diameter is read on the end view: the flange OD above it, the pilot (the long
-# body's Ø10.2, the spigot's too) below, the hole size to the right. The bolt
-# pattern is not a chord: the drawing draws the pitch circle through the four
-# hole centres and dimensions it there (``draw_*``'s pitch circle, HOLE_PCD).
-# The overall length runs on the axis, the spigot on its own visible edge; the
-# two end-view diameters run along its horizontal centreline. Hidden
-# construction chords print where an edge or a centreline already is, never
-# across a face.
+# body's Ø10.2, the spigot's too) below. The bolt pattern and the hole size are
+# not chords: the drawing draws the pitch circle through the four hole centres
+# and dimensions it there (HOLE_PCD), and puts the 4X hole size on one hole's
+# own rim (HOLE_DIA). The overall length runs on the axis, the spigot on its
+# own visible edge; the two end-view diameters run along its horizontal
+# centreline. Hidden construction chords print where an edge or a centreline
+# already is, never across a face.
 SUPPLIER_REFERENCE_DIMENSIONS = (
     ("SupplierLength", LENGTH, "vertical"),
     ("SupplierFlangeThickness", FLANGE_THICK, "vertical"),
     ("SupplierSpigotLength", SPIGOT_LENGTH, "vertical"),
     ("SupplierFlangeDiameter", FLANGE_DIA, "horizontal"),
     ("SupplierBodyDiameter", BODY_DIA, "horizontal"),
-    ("SupplierMountingHoleDiameter", HOLE_DIA, "vertical"),
 )
 SUPPLIER_REFERENCE_STARTS = {
     "SupplierLength": (0.0, -SPIGOT_LENGTH),
@@ -155,15 +154,10 @@ SUPPLIER_REFERENCE_STARTS = {
     "SupplierSpigotLength": (BODY_DIA / 2.0, -SPIGOT_LENGTH),
     "SupplierFlangeDiameter": (-FLANGE_DIA / 2.0, 0.0),
     "SupplierBodyDiameter": (-BODY_DIA / 2.0, 0.0),
-    "SupplierMountingHoleDiameter": (
-        HOLE_CENTRES[0][0],
-        -HOLE_CENTRES[0][1] - HOLE_DIA / 2.0,
-    ),
 }
 SUPPLIER_REFERENCE_PLANES = {
     "SupplierFlangeDiameter": "Top",
     "SupplierBodyDiameter": "Top",
-    "SupplierMountingHoleDiameter": "Top",
 }
 # The spigot nests inside the overall length on the right, on the spigot's
 # own side of the flange; the flange thickness keeps the left.
@@ -180,7 +174,6 @@ SUPPLIER_REFERENCE_FORMATS = {
     "SupplierSpigotLength": (1, "length", None, None),
     "SupplierFlangeDiameter": (0, "diameter", None, None),
     "SupplierBodyDiameter": (1, "diameter", None, None),
-    "SupplierMountingHoleDiameter": (1, "diameter", None, "4X"),
 }
 SUPPLIER_REFERENCE_UNITS = {
     name: "mm" for name, _, _ in SUPPLIER_REFERENCE_DIMENSIONS
