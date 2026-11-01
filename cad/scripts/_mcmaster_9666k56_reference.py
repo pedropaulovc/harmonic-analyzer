@@ -10,8 +10,9 @@ SUPPLIER_DRAWING_URL = (
     "9666K56_Lubricated%201080%20Spring%20Steel%20WireX.GIF"
 )
 SUPPLIER_DIAMETER_PRECISION = 3
-# The REF carries no band of its own; the catalogue (+/-.001) governs it.
-SUPPLIER_DIAMETER_CALLOUT = "PER McMASTER-CARR 9666K56"
+# The REF carries no band of its own; the catalogue (+/-.001) governs it. The
+# sheet's purchased-wire note names McMaster-Carr 9666K56 once.
+SUPPLIER_DIAMETER_CALLOUT = "PER SUPPLIER"
 SUPPLIER_REFERENCE_CONFIGURATION = "SUPPLIER_REFERENCE"
 SUPPLIER_REFERENCE_FEATURE = "SupplierStockCrossSection"
 SUPPLIER_REFERENCE_DIMENSION = "SupplierStockDia"
