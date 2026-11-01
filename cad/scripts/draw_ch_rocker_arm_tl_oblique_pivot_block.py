@@ -176,8 +176,9 @@ VIEW_ARROW_RUN = .015
 # corner, the taps from the axis. The tap rows chain from the axis on one Y
 # lane (x 146), each 31.5 mm "5.657 ±.13 mm" text outside its 11.3 mm span
 # (above the upper row, below the lower) and 3.9 mm left of the view's edge
-# at x 165.6; the axis's .515 stands left of them (x 104), its 47 mm text
-# 2.7 mm clear of theirs (farm run 20261101T112747102Z layout audit: the mm
+# at x 165.6; the axis's .515 stands left of them (x 104), the lower 5.657
+# under its text, 2.3 mm over the bottom face's line (farm runs
+# 20261101T112747102Z and 20261101T124314565Z layout audits: the mm
 # texts on the old 12 mm-apart lanes crossed each other's lanes, the view
 # edge and C's letter). Z lanes above the taps, under the step (y 183), the
 # two 5.657 texts outside their 11.3 mm spans and clear of the view's edges.
@@ -186,7 +187,7 @@ VIEW_ARROW_RUN = .015
 # over C's right letter.
 NUT_XY, NUT_SCALE = (.190,.175), (2,1)
 NUT_KEEP = {
-    'NutCentreY':(.104,.100),'NutTap1Y':(.146,.0975),'NutTap3Y':(.146,.1285),
+    'NutCentreY':(.104,.100),'NutTap1Y':(.146,.0910),'NutTap3Y':(.146,.1285),
     'NutCentreZ':(.132,.175),'NutTap3Z':(.1465,.160),'NutTap4Z':(.2335,.160),
     'NutClearanceDia':(.250,.101),'NutSeatDia':(.258,.140),
 }
