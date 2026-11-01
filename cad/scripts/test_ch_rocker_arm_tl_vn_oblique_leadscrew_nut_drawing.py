@@ -64,7 +64,7 @@ def test_frame_puts_the_flange_feed_block_face_at_zero() -> None:
     assert flange == [0.0, spec.FLANGE_THICK]
     # TL-32 seats the spigot in its -X face; the long body stays proud.
     assert feed_block.NUT_FACE_X == feed_block.LUG_X0
-    assert feed_block.NUT_SPIGOT_DEPTH == spec.SPIGOT_LENGTH
+    assert feed_block.NUT_RECESS_DEPTH > spec.SPIGOT_LENGTH
     assert feed_block.NUT_SEAT_DIA > spec.BODY_DIA
 
 
