@@ -838,6 +838,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="ch_rocker_arm_tl_oblique_feed_nut",
+        part="ch_rocker_arm_tl_oblique_feed_nut",
+        artifact_stem="ch-rocker-arm-tl-oblique-feed-nut",
+        script_name="draw_ch_rocker_arm_tl_oblique_feed_nut.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="ch_rocker_arm_tl_oblique_feed_block",
         part="ch_rocker_arm_tl_oblique_feed_block",
         artifact_stem="ch-rocker-arm-tl-oblique-feed-block",
@@ -870,13 +877,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="ch_rocker_arm_tl_vn_oblique_leadscrew",
         artifact_stem="ch-rocker-arm-tl-vn-oblique-leadscrew",
         script_name="draw_ch_rocker_arm_tl_vn_oblique_leadscrew.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
-        name="ch_rocker_arm_tl_vn_oblique_leadscrew_nut",
-        part="ch_rocker_arm_tl_vn_oblique_leadscrew_nut",
-        artifact_stem="ch-rocker-arm-tl-vn-oblique-leadscrew-nut",
-        script_name="draw_ch_rocker_arm_tl_vn_oblique_leadscrew_nut.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

@@ -40,6 +40,7 @@ recipes:
 | 90760A140 | `sm-vn-boss-hook-jam-nut` (MHA-SM-VN-55; catalogue-only, no vendor model) | Zinc-Plated Steel Narrow-Profile Hex Nut |
 | 91247A720 | — (diagnostic recipe; a former `sm-vn-knife-hanger-stud`) | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 91251A108 | `dt-vn-cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
+| 91251A113 | `ch-rocker-arm-tl-vn-oblique-nut-screw` (MHA-CH-06-TL-VN-66; shop fixture; catalogue-only, live listing read 2026-11-01, product page login-walled, no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A157 | — (catalogue-only diagnostic recipe; former `sm-vn-knife-hanger-stud`) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A188 | — (retired TL-VN-63, 2026-10-23; former catalogue-only diagnostic recipe removed) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A196 | `ch-rocker-arm-tl-vn-oblique-bracket-screw` (MHA-CH-06-TL-VN-62; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
@@ -1603,6 +1604,9 @@ login-wall observations above for source access, not their historical CAD or
 replica-gate provenance. No supplier models or engineering images are tracked.
 The `block-screw` and `block-washer` rows were retired on 2026-10-23; their
 rows below preserve the dated source readings, not current jig registrations.
+So do the `nut-screw` and `leadscrew-nut` rows: on 2026-11-01 the shop-made
+TL-27 feed nut retired TL-VN-55 and TL-VN-66 became McMaster 91251A113
+(#4-40 x 3/4 SHCS, two off).
 
 | target suffix at source date | exact SKU at source date | primary size coverage |
 |---|---|---|

@@ -1,150 +1,108 @@
-"""Offline contracts for the MHA-CH-06-TL-VN-66 leadscrew nut screw (Olander 4C50BHCA)."""
+"""Offline contracts for the MHA-CH-06-TL-VN-66 feed nut screw (McMaster 91251A113)."""
 
 from __future__ import annotations
 
-import math
 from pathlib import Path
 
 import pytest
 
 import _config
-import _olander_4c50bhca as dims
+import _mcmaster_91251a113 as dims
 import build_ch_rocker_arm_tl_vn_oblique_nut_screw as part
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
-import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
+import ch_rocker_arm_tl_oblique_feed_block_spec as feed_block
+import ch_rocker_arm_tl_oblique_feed_nut_spec as feed_nut
 import ch_rocker_arm_tl_vn_oblique_nut_screw_spec as spec
-from _button_head_dimensions import ButtonHeadScrew
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
+from _socket_head_dimensions import SocketHeadScrew
 from _stock_recipe import recipe_declaration
 from _test_stock_recipes import discovered_recipes
-from diagnostics import diag_build_4C50BHCA as recipe
+from diagnostics import diag_build_91251A113 as recipe
 
 STEM = "ch-rocker-arm-tl-vn-oblique-nut-screw"
 IN = 25.4
 
 
-def test_catalogue_row_is_the_registered_olander_screw() -> None:
+def test_catalogue_row_is_the_registered_mcmaster_screw() -> None:
     row = _config.parts(STEM)
     stock = FASTENERS[STEM]
     assert part.SPEC is stock
     assert part.PART_NAME == STEM
-    assert stock.skus == tuple(row["supplier_skus"]) == (spec.SKU,) == ("4C50BHCA",)
-    assert stock.supplier == row["supplier"] == "Olander"
+    assert stock.skus == tuple(row["supplier_skus"]) == (spec.SKU,) == ("91251A113",)
+    assert stock.supplier == row["supplier"] == "McMaster-Carr"
     assert stock.stock_name == row["stock_name"]
     assert stock.material == row["material"]
     assert row["number"] == "MHA-CH-06-TL-VN-66"
     assert row["process"] == "purchased"
     assert spec.SKU in row["material_specification"]
-    # McMaster is a cross-reference only, never the supplier.
-    assert spec.MCMASTER_XREF == "91255A110"
-    assert spec.MCMASTER_XREF in row["material_specification"]
     assert "installation_notes" not in row
     for key in ("title", "stock_name", "supplier", "finish"):
         assert not any(ch.isdigit() for ch in row[key]), key
-    metadata = recipe_declaration(spec.SKU, recipe.build_4C50BHCA)
+    metadata = recipe_declaration(spec.SKU, recipe.build_91251A113)
     assert discovered_recipes()[spec.SKU] == metadata
     assert metadata.module == recipe.__name__
-    assert getattr(recipe, metadata.callable_name) is recipe.build_4C50BHCA
+    assert getattr(recipe, metadata.callable_name) is recipe.build_91251A113
     assert metadata.threaded is True
 
 
 def test_quantity_thread_and_length_are_the_fastener_tables() -> None:
     row = fasteners.NUT_TO_FEED_BLOCK
     assert spec.ROW is row
-    assert int(_config.parts(STEM)["quantity"]) == spec.QUANTITY == row.count
-    assert (dims.THREAD, dims.LENGTH_TEXT, fasteners.BHCS) == (
+    assert int(_config.parts(STEM)["quantity"]) == spec.QUANTITY == row.count == 2
+    assert (dims.THREAD, dims.LENGTH_TEXT, fasteners.SHCS) == (
         row.thread,
         row.length,
         row.head,
     )
     assert dims.DIMS.length == pytest.approx(row.length_mm)
     assert dims.DIMS.major_dia == pytest.approx(row.major_mm, abs=1e-3)
-    assert spec.CALLOUT == fasteners.callout(row) == "#4-40 X 1/2 BHCS"
-    # The head bears on the flange: no washer in the grip.
-    assert row.grip_mm == leadscrew.NUT_FLANGE_THICK
+    assert spec.CALLOUT == fasteners.callout(row) == "#4-40 X 3/4 SHCS"
+    # The head on the nut's outer face; the thread into the lug's THRU tap.
+    assert row.grip_mm == feed_nut.LENGTH
+    assert row.thread_depth_mm == feed_block.LUG_WIDTH
 
 
 def test_standalone_recipe_run_is_catalog_only() -> None:
+    from diagnostics.diag_build_mcmaster import REGISTRY
+
+    assert REGISTRY[spec.SKU] is recipe.build_91251A113
     assert not hasattr(recipe, "_com_map")
 
 
 def test_no_vendor_model_is_tracked() -> None:
     root = Path(__file__).resolve().parents[2]
-    for code in (spec.SKU, spec.MCMASTER_XREF):
-        assert not list(root.glob(f"cad/references/**/{code}*.SLDPRT"))
+    assert not list(root.glob(f"cad/references/**/{spec.SKU}*.SLDPRT"))
 
 
-def test_dimension_record_is_the_listings_maximum_head() -> None:
+def test_dimension_record_is_the_live_listings() -> None:
     d = dims.DIMS
-    assert type(d) is ButtonHeadScrew
-    assert d.head_dia == pytest.approx(0.213 * IN)
-    assert d.head_h == pytest.approx(0.059 * IN)
-    assert spec.HEAD_DIA_MIN == pytest.approx(0.201 * IN)
-    assert d.hex_af == pytest.approx(0.0625 * IN)
+    assert type(d) is SocketHeadScrew
+    assert d.major_dia == pytest.approx(0.112 * IN)
+    assert d.length == pytest.approx(0.75 * IN)
+    assert d.head_dia == pytest.approx(0.183 * IN)
+    assert d.head_h == pytest.approx(0.112 * IN)
+    assert d.socket_af == pytest.approx(3.0 / 32.0 * IN)
+    assert (dims.PACK_QUANTITY, dims.PACK_PRICE_USD) == (100, 12.19)
+    # ASME B18.3 Table 1, #4: A min .176, transition diameter max .141.
+    assert spec.HEAD_DIA_MIN == pytest.approx(0.176 * IN)
+    assert spec.FILLET_DIA_MAX == pytest.approx(0.141 * IN)
 
 
-def test_socket_is_at_the_standards_minimum_key_engagement() -> None:
-    # ASME B18.3 Table 11, #4 button head: T 0.035 min; the family law's
-    # 0.55 H (0.0325) would sit under it. The law's other SKU keeps it.
-    import _mcmaster_91255a106
-
-    assert dims.DIMS.socket_depth == pytest.approx(0.035 * IN)
-    assert 0.55 * dims.DIMS.head_h < dims.DIMS.socket_depth
-    legacy = _mcmaster_91255a106.DIMS
-    assert legacy.key_engagement is None
-    assert legacy.socket_depth == pytest.approx(0.55 * legacy.head_h)
-
-
-def test_underhead_fillet_is_a_standard_concave_quarter_at_f_max() -> None:
-    start, end, mid, chain = recipe.underhead_fillet_profile()
-    major_r = dims.DIMS.major_dia / 2.0
-    # Tangent to the bearing face at F max, to the major diameter R below it.
-    assert start == pytest.approx((spec.FILLET_DIA_MAX / 2.0, 0.0))
-    assert end == pytest.approx((major_r, -dims.FILLET_R))
-    centre = (major_r + dims.FILLET_R, -dims.FILLET_R)
-    for point in (start, end, mid):
-        assert math.dist(point, centre) == pytest.approx(dims.FILLET_R)
-    # Concave: the arc bows toward the shank-to-face corner, inside its chord.
-    corner = (major_r, 0.0)
-    chord_mid = ((start[0] + end[0]) / 2.0, (start[1] + end[1]) / 2.0)
-    assert math.dist(mid, corner) < math.dist(chord_mid, corner)
-    assert dims.FILLET_R >= 0.004 * IN
-    assert spec.FILLET_DIA_MAX == pytest.approx(0.132 * IN)
-    # The closing chain starts at the arc's end and returns to its start.
-    assert chain[0] == end and chain[-1] == start
-    runout = chain[1]
-    assert runout[0] == pytest.approx(dims.DIMS.root_r)
-    assert end[1] - runout[1] == pytest.approx(end[0] - runout[0])  # 45 deg
-    # Within B18.3 note 4's two pitches of unthreaded length under the head.
-    assert -runout[1] < 2.0 * dims.DIMS.pitch
-
-
-def test_underhead_fillet_contains_the_recipes_thread_neck() -> None:
-    _start, _end, _mid, chain = recipe.underhead_fillet_profile()
+def test_frame_puts_the_bearing_face_at_y0() -> None:
     d = dims.DIMS
-    neck_r = d.neck_dia / 2.0
-    neck_h = neck_r - d.root_r
-    runout_y = chain[1][1]
-    assert runout_y <= -neck_h
-
-    def envelope(y: float) -> float:  # fillet revolve's radius at depth y <= 0
-        if y >= -dims.FILLET_R:
-            dy = y + dims.FILLET_R
-            return (
-                d.major_dia / 2.0 + dims.FILLET_R - math.sqrt(dims.FILLET_R**2 - dy**2)
-            )
-        return d.major_dia / 2.0 - (-dims.FILLET_R - y)
-
-    for step in range(11):
-        y = -neck_h * step / 10.0
-        assert envelope(y) >= neck_r + y - 1e-9  # the 45 deg neck cone
+    assert d.underside_y == 0.0
+    assert d.top_y == pytest.approx(d.head_h)
+    assert d.tip_y == pytest.approx(-spec.ROW.length_mm)
 
 
-def test_underhead_fillet_clears_the_nut_flange_hole() -> None:
-    # The fillet seats inside the flange's plain hole, so the head bears flat.
-    assert spec.FILLET_DIA_MAX < leadscrew.NUT_HOLE_DIA
-    assert spec.FILLET_DIA_MAX / 2.0 < dims.DIMS.bearing_edge_r
+def test_head_seats_flat_on_the_brass_nut() -> None:
+    # The transition seats inside the loose hole; the least head covers the
+    # largest drilled hole with land to bear on.
+    assert spec.FILLET_DIA_MAX < feed_nut.HOLE_DIA
+    land = (spec.HEAD_DIA_MIN - feed_nut.HOLE_DIA - feed_nut.DRILLED_OVERSIZE) / 2.0
+    assert feed_nut.HEAD_BEARING_LAND_MIN == pytest.approx(land)
+    assert land > 0.3
 
 
 def test_purchased_sheet_documents_the_built_part() -> None:

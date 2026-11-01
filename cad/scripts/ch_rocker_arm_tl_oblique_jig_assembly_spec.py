@@ -23,7 +23,7 @@ The carrier turns directly on purchased shoulder screws. Their shoulders
 bottom in the blocks' counterbores, not on the carrier, and their heads
 positively capture it without clamping its running faces.
 
-The leadscrew axis is raised (``leadscrew``). The flanged nut seats directly in the
+The leadscrew axis is raised (``leadscrew``). The shop-made feed nut (TL-27) screws directly to the
 feed-block lug. KP08 mounting-hole float aligns the screw at both travel ends;
 there is no detachable bracket or transfer-spotted interface.
 
@@ -83,7 +83,7 @@ import sh_vn_clamping_kit_flange_nut_spec as flange_nut
 import ch_rocker_arm_tl_vn_oblique_handwheel_spec as handwheel
 import sh_vn_clamping_kit_hold_down_stud_spec as hold_down_stud
 import ch_rocker_arm_tl_vn_oblique_hub_pin_spec as hub_pin
-import ch_rocker_arm_tl_vn_oblique_leadscrew_nut_spec as leadscrew_nut
+import ch_rocker_arm_tl_oblique_feed_nut_spec as feed_nut
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_feed_block_spec as feed_block
 import ch_rocker_arm_tl_vn_oblique_leadscrew_stock_spec as leadscrew_stock
@@ -146,13 +146,13 @@ RISER = "ch-rocker-arm-tl-oblique-riser"
 HUB_PIN = "ch-rocker-arm-tl-vn-oblique-hub-pin"
 FEED_LEVER = "ch-rocker-arm-tl-oblique-feed-lever"
 END_BRACKET = leadscrew.END_BRACKET
+FEED_NUT = feed_nut.PART_NAME
 # Bought hardware (parent-scoped TL-VN and shared SH-VN-57; VN-72 retired),
 # every member modelled and mated.
 RAIL = "ch-rocker-arm-tl-vn-oblique-rail"
 CARRIAGE = "ch-rocker-arm-tl-vn-oblique-carriage"
 CL_DOWEL = "ch-rocker-arm-tl-vn-oblique-cl-dowel"
 LEADSCREW = "ch-rocker-arm-tl-vn-oblique-leadscrew"
-LEADSCREW_NUT = "ch-rocker-arm-tl-vn-oblique-leadscrew-nut"
 PILLOW_BLOCK = "ch-rocker-arm-tl-vn-oblique-pillow-block"
 HANDWHEEL = "ch-rocker-arm-tl-vn-oblique-handwheel"
 CLAMPING_KIT = "sh-vn-clamping-kit-hardware"
@@ -188,7 +188,7 @@ QUANTITIES = {
     CARRIAGE: fasteners.RAILS,
     CL_DOWEL: cl_dowel.QUANTITY,
     LEADSCREW: leadscrew_stock.QUANTITY,
-    LEADSCREW_NUT: leadscrew_nut.QUANTITY,
+    FEED_NUT: feed_nut.QUANTITY,
     PILLOW_BLOCK: pillow_block.QUANTITY,
     HANDWHEEL: handwheel.QUANTITY,
     HOLD_DOWN_STUD: hold_down_stud.QUANTITY,
@@ -223,7 +223,7 @@ BOM_ORDER = (
     CARRIAGE,
     CL_DOWEL,
     LEADSCREW,
-    LEADSCREW_NUT,
+    FEED_NUT,
     PILLOW_BLOCK,
     HANDWHEEL,
     HOLD_DOWN_STUD,
@@ -557,20 +557,28 @@ HANDWHEEL_PLACEMENTS = (
         FEED_ROWS,
     ),
 )
-# The nut flange seats on the integral lug's -X face, its body proud toward
-# the spindle; the four button heads bear directly on the brass flange.
-NUT_ROWS: Rows = ((0.0, 1.0, 0.0), (-1.0, 0.0, 0.0), (0.0, 0.0, 1.0))
-LEADSCREW_NUT_PLACEMENTS = (
+# The shop-made TL-27 nut seats on the integral lug's -X face, proud toward
+# the spindle, its bore on the leadscrew axis: its +X runs along the block's
+# -Y (toward the lug end), +Y up, +Z along -X; its frame's origin is the
+# seat face's -X/bottom corner. The two socket heads bear directly on its
+# far face, each screw's +Y (head) along the block's -X.
+FEED_NUT_ROWS: Rows = ((0.0, -1.0, 0.0), (0.0, 0.0, 1.0), (-1.0, 0.0, 0.0))
+FEED_NUT_PLACEMENTS = (
     compose(
         FEED_BLOCK_PLACEMENTS[0],
-        (feed_block.NUT_FACE_X, feed_block.NUT_AXIS_Y, feed_block.NUT_AXIS_Z),
-        NUT_ROWS,
+        (
+            feed_block.NUT_FACE_X,
+            feed_block.NUT_AXIS_Y + feed_nut.BORE_X,
+            feed_block.NUT_AXIS_Z - feed_nut.BORE_Y,
+        ),
+        FEED_NUT_ROWS,
     ),
 )
+NUT_ROWS: Rows = ((0.0, 1.0, 0.0), (-1.0, 0.0, 0.0), (0.0, 0.0, 1.0))
 NUT_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     compose(
         FEED_BLOCK_PLACEMENTS[0],
-        (feed_block.NUT_FACE_X - leadscrew_nut.FLANGE_THICK, y, z),
+        (feed_block.NUT_FACE_X - feed_nut.LENGTH, y, z),
         NUT_ROWS,
     )
     for y, z in feed_block.NUT_HOLES_YZ
@@ -765,7 +773,7 @@ PLACEMENTS: dict[str, tuple[Placement, ...]] = {
     CARRIAGE: CARRIAGE_PLACEMENTS,
     CL_DOWEL: CL_DOWEL_PLACEMENTS,
     LEADSCREW: LEADSCREW_PLACEMENTS,
-    LEADSCREW_NUT: LEADSCREW_NUT_PLACEMENTS,
+    FEED_NUT: FEED_NUT_PLACEMENTS,
     PILLOW_BLOCK: PILLOW_BLOCK_PLACEMENTS,
     HANDWHEEL: HANDWHEEL_PLACEMENTS,
     HOLD_DOWN_STUD: HOLD_DOWN_STUD_PLACEMENTS,
@@ -816,8 +824,8 @@ LOCKED_TO: dict[str, tuple[tuple[str, int], ...]] = {
     PIVOT_SPACER: _SUPPORT_PARENTS,
     PIVOT_SHIM: tuple(parent for parent in _SUPPORT_PARENTS for _ in range(pivot_shim.PER_SUPPORT)),
     CARRIAGE_SCREW: tuple(parent for parent in _SUPPORT_PARENTS for _ in pivot_block.BOLT_POINTS),
-    LEADSCREW_NUT: ((FEED_BLOCK, 0),),
-    NUT_SCREW: tuple((FEED_BLOCK, 0) for _ in leadscrew_nut.HOLE_ANGLES_DEG),
+    FEED_NUT: ((FEED_BLOCK, 0),),
+    NUT_SCREW: tuple((FEED_BLOCK, 0) for _ in feed_block.NUT_HOLES_YZ),
     RISER: ((CARRIER, 0),),
     RISER_SCREW: tuple((CARRIER, 0) for _ in trammel.RISER_SCREWS),
     HUB_PIN: ((CARRIER, 0),),
@@ -892,7 +900,7 @@ BOM_DESCRIPTIONS = {
     CL_DOWEL: "DOWEL PIN 1/4 X 1, CL LOCATOR",
     # Vendor-metric rows keep their millimetres, labelled (#290).
     LEADSCREW: f"TR8X2 LEADSCREW, {leadscrew_stock.LENGTH:.0f} MM LONG",
-    LEADSCREW_NUT: "TR8X2 FLANGED NUT, BRASS",
+    FEED_NUT: "FEED NUT",
     PILLOW_BLOCK: f"PILLOW BLOCK, {leadscrew.KP08_BORE:.0f} MM BORE, SET SCREWS",
     HANDWHEEL: f"HANDWHEEL {leadscrew.HANDWHEEL_WHEEL_DIA:.0f} MM DIA, 8 MM BORE",
     HOLD_DOWN_STUD: hold_down_stud.BOM_DESCRIPTION,
@@ -928,7 +936,7 @@ _CARRIER_RIDERS = (
     LEVER_SCREW,
     LEVER_LOCK_WASHER,
 )
-_BLOCK_RIDERS = (CARRIAGE_SCREW, LEADSCREW_NUT, NUT_SCREW, PIVOT_SHIM, PIVOT_SPACER)
+_BLOCK_RIDERS = (CARRIAGE_SCREW, FEED_NUT, NUT_SCREW, PIVOT_SHIM, PIVOT_SPACER)
 EXPLODE_STEPS = (
     ("shoulder screws withdraw", (PIVOT_SCREW,), "z", 250.0),
     ("spacers lift off", (PIVOT_SPACER,), "z", 45.0),
@@ -1311,46 +1319,42 @@ PIVOT_THREAD_STRIP_N = (
 if PIVOT_SCREW_PRELOAD_N > PIVOT_THREAD_STRIP_N / _STRIP_SAFETY:
     raise ValueError("pivot seating torque exceeds the receiver-thread basis")
 
-# --- The nut screws: their torque; the nut's flange a static clamp ---------------
-# LOAD_CASES: the four #4-40 screws clamp the brass flange to the feed block.
-# The nut's reaction to the screw's turning reverses with the handwheel; the
-# flange's clamp friction carries it with margin, so the flange never slips
-# and no operating torque reaches the screws: a static clamp (rule 23's last
-# bullet). The owner ruled the static clamp on the M3 joint (2026-10-17,
-# TL-00 review jbf-r17) and accepted it again for the #4-40 joint (issue
-# #1630, 2026-10-19; the jig's exception RV-01): no lock. Each head is a
-# #4-40 button head (owner ruling 2026-10-20: button heads, no washers),
-# bearing directly on the brass flange beside the nut's Ø10.2 body.
-# Engagement: worst-case full thread in the feed-block lug.
+# --- The nut screws: their torque; the feed nut a static clamp -----------------
+# LOAD_CASES: the two #4-40 X 3/4 SHCS clamp the shop-made TL-27 brass nut to
+# the feed-block lug (owner ruling 2026-11-01, item 4). The nut's reaction to
+# the screw's turning reverses with the handwheel; its clamp friction on the
+# lug carries it with margin, so the nut never shifts in its loose holes and
+# no operating torque reaches the screws: a static clamp (rule 23's last
+# bullet), as the owner ruled for the bought nut's flange before it (TL-00
+# review jbf-r17; issue #1630): no lock. The socket heads bear on the brass.
+# Engagement: worst-case full thread in the lug's THRU tap.
 _NUT_SCREW_STRIP_N = (
     0.75
     * math.pi
     * fasteners.NUT_TO_FEED_BLOCK.major_mm
-    * leadscrew.NUT_SCREW_FULL_THREAD_MIN
+    * feed_nut.SCREW_FULL_THREAD_MIN
     * _AL_SHEAR_ULTIMATE_MPA
 )
-# The head bears on the brass flange round its Ø3.5 hole. The vendor gives
-# no temper, so the softest: C36000 free-cutting brass, O60 soft anneal,
-# yield 18 ksi = 124 MPa (SOURCED: Copper Development Association C36000
-# data). Nominal matching hole axes and head runout set this reference ring;
-# the purchased flange hole/PCD limits are unpublished. Drill-to-print mounting
-# therefore still requires the actual heads to seat flat and clear the body.
-_BRASS_YIELD_MPA = 124.0
-_NUT_HEAD_OFFSET = nut_screw.HEAD_RUNOUT_FIM / 2.0
-_NUT_SCREW_BEARING_OD = nut_screw.HEAD_DIA_MIN - 2.0 * _NUT_HEAD_OFFSET
-_NUT_SCREW_FLANGE_BEARING_MM2 = (
-    math.pi / 4.0 * (_NUT_SCREW_BEARING_OD**2 - leadscrew_nut.HOLE_DIA**2)
+# Each head bears on the nut round its loose hole: the head's least diameter,
+# concentric, on the largest drilled hole. Brass 360-H02 (half hard), yield
+# 17 ksi = 117.2 MPa (SOURCED: OnlineMetals #1500 listing, 2026-11-01).
+_BRASS_YIELD_MPA = 17_000.0 * 0.006894757
+_NUT_SCREW_BEARING_MM2 = (
+    math.pi
+    / 4.0
+    * (nut_screw.HEAD_DIA_MIN**2 - (feed_nut.HOLE_DIA + feed_nut.DRILLED_OVERSIZE) ** 2)
 )
 _NUT_SCREW_PRELOAD_CAP_N = min(
     _NUT_SCREW_STRIP_N / _STRIP_SAFETY,
-    _BRASS_YIELD_MPA * _NUT_SCREW_FLANGE_BEARING_MM2,
+    _BRASS_YIELD_MPA * _NUT_SCREW_BEARING_MM2,
 )
-# The owner's torque (2026-10-19, issue #1630, kept 2026-10-20): 0.4 N·m.
-NUT_SCREW_TORQUE_NM = 0.4
+# 0.3 N·m keeps the heads' bearing under the brass's yield (ruling of
+# 2026-11-01 on the shop-made nut).
+NUT_SCREW_TORQUE_NM = 0.3
 NUT_SCREW_PRELOAD_N = NUT_SCREW_TORQUE_NM / (
     _NUT_FACTOR * fasteners.NUT_TO_FEED_BLOCK.major_mm / 1000.0
-)  # 703
-NUT_SCREW_FLANGE_BEARING_MPA = NUT_SCREW_PRELOAD_N / _NUT_SCREW_FLANGE_BEARING_MM2
+)  # 527
+NUT_SCREW_BEARING_MPA = NUT_SCREW_PRELOAD_N / _NUT_SCREW_BEARING_MM2
 if NUT_SCREW_PRELOAD_N > _NUT_SCREW_PRELOAD_CAP_N:
     raise ValueError(
         f"nut screws at {NUT_SCREW_TORQUE_NM} N·m preload {NUT_SCREW_PRELOAD_N:.0f} N, "
@@ -1358,27 +1362,11 @@ if NUT_SCREW_PRELOAD_N > _NUT_SCREW_PRELOAD_CAP_N:
     )
 # The screw: the preload's stress on the #4-40 tensile stress area
 # (0.00604 in², ASME B1.1) stays under half the alloy steel socket screw's
-# 120,000 psi (SOURCED: Reli-Tool's 91255A110 cross-reference listing, ASTM
-# F835).
+# 170,000 psi (SOURCED: McMaster-Carr 91251A listing, ASTM A574).
 _NUT_SCREW_STRESS_AREA_MM2 = 0.00604 * trammel.INCH**2
-_F835_TENSILE_MPA = 120_000.0 * 0.006894757
-if not NUT_SCREW_PRELOAD_N / _NUT_SCREW_STRESS_AREA_MM2 < 0.5 * _F835_TENSILE_MPA:
+_SHCS_TENSILE_MPA = 170_000.0 * 0.006894757
+if not NUT_SCREW_PRELOAD_N / _NUT_SCREW_STRESS_AREA_MM2 < 0.5 * _SHCS_TENSILE_MPA:
     raise ValueError(f"nut screw preload {NUT_SCREW_PRELOAD_N:.0f} N overloads it")
-# Nominal head/fillet checks use the bought flange's stated dimensions and
-# head runout. Unpublished flange/PCD limits and print-drilled pattern error
-# are not a worst-case certificate: F1 requires actual flat head seating.
-NUT_SCREW_FILLET_MARGIN = (
-    leadscrew_nut.HOLE_DIA / 2.0
-    - nut_screw.FILLET_DIA_MAX / 2.0
-)
-NUT_SCREW_HEAD_TO_BODY = (
-    leadscrew_nut.HOLE_PCD / 2.0
-    - leadscrew_nut.BODY_DIA / 2.0
-    - nut_screw.DIMS.head_dia / 2.0
-    - _NUT_HEAD_OFFSET
-)
-if not (NUT_SCREW_FILLET_MARGIN > 0.0 and NUT_SCREW_HEAD_TO_BODY > 0.0):
-    raise ValueError("a nut screw's button head does not seat flat on the flange")
 # The nut's torque at the 1 kN hand-abuse thrust (leadscrew LOAD_CASES):
 # T = F d2/2 tan(lead + friction), the oiled thread above.
 NUT_ABUSE_TORQUE_NM = (
@@ -1387,21 +1375,21 @@ NUT_ABUSE_TORQUE_NM = (
     / 2000.0
     * math.tan(_LEAD_ANGLE + _FRICTION_ANGLE)
 )
-# The flange's slip torque: the screws' clamp at the Ø16 circle, brass on
-# as-machined 6061, μ 0.15 .. 0.20.
-_FLANGE_SLIP_FRICTION = (0.15, 0.20)
-NUT_FLANGE_SLIP_NM = tuple(
+# The nut's slip torque: the screws' clamp at their .34 from the axis, brass
+# on as-machined 6061, μ 0.15 .. 0.20.
+_NUT_SLIP_FRICTION = (0.15, 0.20)
+NUT_SLIP_NM = tuple(
     fasteners.NUT_TO_FEED_BLOCK.count
     * NUT_SCREW_PRELOAD_N
     * friction
-    * leadscrew_nut.HOLE_PCD
-    / 2000.0
-    for friction in _FLANGE_SLIP_FRICTION
+    * feed_nut.HOLE_OFFSET
+    / 1000.0
+    for friction in _NUT_SLIP_FRICTION
 )
-NUT_FLANGE_SLIP_MARGIN = NUT_FLANGE_SLIP_NM[0] / NUT_ABUSE_TORQUE_NM
-if NUT_FLANGE_SLIP_MARGIN < leadscrew.SLIP_MARGIN_MIN:
+NUT_SLIP_MARGIN = NUT_SLIP_NM[0] / NUT_ABUSE_TORQUE_NM
+if NUT_SLIP_MARGIN < leadscrew.SLIP_MARGIN_MIN:
     raise ValueError(
-        f"the nut flange slips at {NUT_FLANGE_SLIP_NM[0]:.1f} N·m, under "
+        f"the feed nut slips at {NUT_SLIP_NM[0]:.2f} N·m, under "
         f"{leadscrew.SLIP_MARGIN_MIN} x the nut's {NUT_ABUSE_TORQUE_NM:.2f} N·m"
     )
 _NUT_TORQUE = _torque(NUT_SCREW_TORQUE_NM)
@@ -1507,8 +1495,8 @@ ASSEMBLY_STEPS = (
     "SLIDE THE CARRIAGE UNTIL ITS SCREW SHOULDER CENTRES IN X UNDER A "
     "SPINDLE-MOUNTED INDICATOR AND TAP THE BAR UNTIL IT CENTRES IN Y; "
     "TIGHTEN THE HOLD-DOWN NUTS AND READ EACH STATION AGAIN.",
-    f"7. FIT THE FLANGED NUT {_item(LEADSCREW_NUT)} IN THE FEED BLOCK'S "
-    f"PRINT-DRILLED SEAT WITH 4 {_NUT_SCREW} {_item(NUT_SCREW)}; "
+    f"7. FIT THE FEED NUT {_item(FEED_NUT)} ON THE FEED BLOCK LUG'S "
+    f"PRINT-DRILLED TAPS WITH 2 {_NUT_SCREW} {_item(NUT_SCREW)}, FINGER TIGHT; "
     "NO TRANSFER SPOTTING. FIT EACH KP08 "
     f"{_item(PILLOW_BLOCK)} WITH 2 {_KP08_SCREW} {_item(PILLOW_BLOCK_SCREW)}, LOOSE.",
     # The Tr8 screw's stub and the hub's gap close its metric cut along the
@@ -1600,8 +1588,9 @@ PIVOT_SHIM_STOCK_NOTE = "\n".join((
     ) + ".",
 ))
 KP08_ALIGNMENT_STEPS = (
-    f"F1. BEFORE TIGHTENING, CHECK ALL FOUR NUT BUTTON HEADS SEAT FLAT "
-    f"AND CLEAR THE NUT BODY; TIGHTEN TO {_NUT_TORQUE}. THE KP08S FLOAT "
+    "F1. WITH THE LEADSCREW THREADED THROUGH THE NUT, TIGHTEN BOTH NUT "
+    f"SCREWS TO {_NUT_TORQUE}: THE NUT'S LOOSE HOLES LET IT ALIGN TO THE "
+    "SCREW. THE KP08S FLOAT "
     "IN THEIR MOUNTING HOLES. MOVE THE FEED CARRIAGE TO EACH TRAVEL "
     "END IN TURN AND ALIGN EACH KP08 TO THE FIXED NUT WITHOUT FORCING "
     "THE SCREW; TIGHTEN THE KP08 MOUNTING SCREWS.",
@@ -1751,7 +1740,7 @@ def _component_local_boxes() -> dict[str, Box3]:
     Purchased dimensions without published limits remain nominal references.
     These envelopes do not replace the native whole-model interference gates.
     """
-    nut_radius = leadscrew_nut.FLANGE_DIA / 2.0
+    nut_box = ((0.0, feed_nut.WIDTH), (0.0, feed_nut.HEIGHT), (0.0, feed_nut.LENGTH_MAX))
     boxes = {
         BASE_BAR: ((0.0, base_bar.BAR_LENGTH), (base_bar.LOW_SIDE_Y, base_bar.HIGH_SIDE_Y), (0.0, base_bar.BAR_THICK)),
         RAIL: ((0.0, guide_rail.LENGTH), (-guide_rail.WIDTH / 2.0, guide_rail.WIDTH / 2.0), (0.0, guide_rail.HEIGHT)),
@@ -1768,7 +1757,7 @@ def _component_local_boxes() -> dict[str, Box3]:
         CL_DOWEL: _axis_y_box(cl_dowel.DIA_MAX / 2.0, 0.0, cl_dowel.LENGTH),
         END_BRACKET: ((0.0, leadscrew.BRACKET_LENGTH), (-leadscrew.BRACKET_WIDTH / 2.0, leadscrew.BRACKET_WIDTH / 2.0), (0.0, leadscrew.BRACKET_THICK)),
         LEADSCREW: _axis_y_box(leadscrew_stock.MAJOR_DIA / 2.0, 0.0, leadscrew_stock.LENGTH),
-        LEADSCREW_NUT: _axis_y_box(nut_radius, -leadscrew_nut.SPIGOT_LENGTH, leadscrew_nut.FAR_END_Y),
+        FEED_NUT: nut_box,
         PILLOW_BLOCK: ((-pillow_block.LENGTH / 2.0, pillow_block.LENGTH / 2.0), (-pillow_block.WIDTH / 2.0, pillow_block.WIDTH / 2.0), (0.0, pillow_block.HEIGHT)),
         HANDWHEEL: _axis_y_box(handwheel.SWEEP_R, 0.0, handwheel.LENGTH),
         HOLD_DOWN_STUD: _axis_y_box(hold_down_stud.RADIUS, 0.0, hold_down_stud.LENGTH),
@@ -1797,7 +1786,7 @@ def _component_label(stem: str, index: int) -> str:
         PIVOT_SHIM: "pivot shim",
         CARRIER: "carrier", RISER: "riser", FEED_LEVER: "feed lever",
         HUB_PIN: "HUB locator", CL_DOWEL: "CL dowel",
-        LEADSCREW_NUT: "leadscrew nut",
+        FEED_NUT: "feed nut",
         LEADSCREW: "screw", HANDWHEEL: "handwheel",
         END_BRACKET: "end bracket", PILLOW_BLOCK: "pillow block",
         HOLD_DOWN_STUD: "hold-down stud", T_NUT: "T-nut", FLANGE_NUT: "flange nut",
@@ -1858,6 +1847,46 @@ def _component_records(
             else:
                 records[label] = (stem, index, points)
     return records
+
+
+def feed_nut_travel_gaps() -> dict[str, float]:
+    """Least gap (mm) from the TL-27 feed nut and its screws, swept along
+    rail 1 over carriage 1's whole travel, to each occurrence they could meet.
+
+    Stationary items (all but the leadscrew they thread) are boxed in rail 1's
+    frame: exact for the rail-1 feed items, conservative for the rest. The
+    carrier branch rotates above them about machine Z, so its gap is the
+    machine-Z one. The nut overhangs the lug end by ``feed_block.NUT_OVERHANG``.
+    """
+    records = _component_records()
+    origin = trammel.rail_point(leadscrew.RAIL, 0.0)
+    dx, dy = rail_direction(leadscrew.RAIL)
+
+    def rail_box(points: list[Point3]) -> Box3:
+        local = [
+            ((x - origin[0]) * dx + (y - origin[1]) * dy, (y - origin[1]) * dx - (x - origin[0]) * dy, z)
+            for x, y, z in points
+        ]
+        return tuple((min(p[a] for p in local), max(p[a] for p in local)) for a in range(3))
+
+    riders = [rail_box(points) for stem, _index, points in records.values() if stem in (FEED_NUT, NUT_SCREW)]
+    swept = (
+        (min(b[0][0] for b in riders) + trammel.CARRIAGE_TRAVEL[0] - CARRIAGE_STATION,
+         max(b[0][1] for b in riders) + trammel.CARRIAGE_TRAVEL[1] - CARRIAGE_STATION),
+        (min(b[1][0] for b in riders), max(b[1][1] for b in riders)),
+        (min(b[2][0] for b in riders), max(b[2][1] for b in riders)),
+    )
+    gaps = {}
+    for label, (stem, index, points) in records.items():
+        if stem in MOVING:
+            if _motion_root(stem, index)[0] == CARRIER:
+                gaps[label] = min(p[2] for p in points) - swept[2][1]
+        elif stem != LEADSCREW:
+            box = rail_box(points)
+            gaps[label] = max(
+                max(box[a][0] - swept[a][1], swept[a][0] - box[a][1]) for a in range(3)
+            )
+    return gaps
 
 
 def _model_extent() -> tuple[

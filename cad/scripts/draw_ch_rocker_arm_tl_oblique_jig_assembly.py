@@ -160,7 +160,7 @@ CLUSTERS = (
             spec.END_BRACKET,
             spec.FEED_BLOCK,
             spec.LEADSCREW,
-            spec.LEADSCREW_NUT,
+            spec.FEED_NUT,
             spec.PILLOW_BLOCK,
             spec.HANDWHEEL,
             spec.BRACKET_SCREW,
@@ -451,8 +451,8 @@ PART_ROWS = {
     "ch-rocker-arm-tl-vn-oblique-leadscrew": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-leadscrew"
     ),
-    "ch-rocker-arm-tl-vn-oblique-leadscrew-nut": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-leadscrew-nut"
+    "ch-rocker-arm-tl-oblique-feed-nut": _config.parts(
+        "ch-rocker-arm-tl-oblique-feed-nut"
     ),
     "ch-rocker-arm-tl-vn-oblique-pillow-block": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-pillow-block"

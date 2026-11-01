@@ -19,7 +19,7 @@ from _drawing_common import (DrawingOutputs, finalize_drawing, new_project_drawi
                              remove_notes_matching)
 from _drawing_dimensions import assert_imported_precision, dimension_name, offset_dimension_text
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -36,6 +36,7 @@ from _session import run_build
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 import ch_rocker_arm_tl_oblique_pivot_block_spec as part
+from ch_rocker_arm_tl_oblique_callouts import set_callout_lengths_to_three_places
 
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
@@ -133,10 +134,7 @@ FEED_FLOOR_KEEP = FLOOR_KEEP | {'SectionBlockHeight':(.335,.172)}
 # ends under row 4Y's extension line (y 218): at the template's arrows its
 # foot stood ~15.5 mm above the line whatever the letter height (farm run
 # 20261027T175531766Z). swUserPreferenceDoubleValue_e (swconst.tlb R2026x),
-# document scope: section arrowhead length, arrow width, arrow length. C's
-# letters, over the nut axis in VIEW D, fit under the +Y taps' extension
-# line (y 124.3) the same way: at 4.5 mm arrows a 4.5 mm letter's top stood
-# 11.8 mm over its line (farm run 20261027T181901497Z), 0.5 mm into it.
+# document scope: section arrowhead length, arrow width, arrow length.
 SECTION_LETTER_HEIGHTS = (.005, .0045, .004, .0035, .003)
 SECTION_LETTER_CLEARANCE = .001
 _PREF_SECTION_ARROW = {27: .0025, 28: .001, 29: .0035}
@@ -170,42 +168,28 @@ VIEW_LETTER_HEIGHT = .005
 VIEW_ARROW_RUN = .015
 # Nut interface, VIEW D, *Left at 2:1 on a 2:1 sheet, at .190,.175: Z runs
 # right from the bottom face at x 165.7, Y=0 prints at y 223, the lug end
-# (Y -68) at y 87; taps at x 179.2/201.8, y 101.7/124.3; nut axis 190.5,113;
-# section line C across the lug along y 113 (x 161.7..218.3), its arrows up
-# with the letters above them. The axis stands from the lug end / bottom-face
-# corner, the taps from the axis. The tap rows chain from the axis on one Y
-# lane (x 146), each 31.5 mm "5.657 ±.13 mm" text outside its 11.3 mm span
-# (above the upper row, below the lower) and 3.9 mm left of the view's edge
-# at x 165.6; the axis's .515 stands left of them (x 104), the lower 5.657
-# under its text, 2.3 mm over the bottom face's line (farm runs
-# 20261101T112747102Z and 20261101T124314565Z layout audits: the mm
-# texts on the old 12 mm-apart lanes crossed each other's lanes, the view
-# edge and C's letter). Z lanes above the taps, under the step (y 183), the
-# two 5.657 texts outside their 11.3 mm spans and clear of the view's edges.
-# The clearance callouts and the tap callout leave the axis to the right,
-# between the taps (45 deg pattern); the Ø10.50's leader rises from its rim
-# over C's right letter. The clearance callout stands 3 mm higher than the
-# tap callout's 2.3 mm under it (review of farm run 20261101T134214144Z).
+# (Y -68) at y 87; the leadscrew axis at 190.5,113, the TL-27 nut's two taps
+# on its line at y 95.7 (tap 1, toward the lug end) and 130.3. The axis
+# stands from the lug end / bottom-face corner, tap 1 from the axis and tap 2
+# from tap 1 (ruling B1). Left of the view: the axis's .515 (x 104, as
+# before) and, under the lug end, the 12.400 mm height, its three rows
+# outboard left of the bottom face's extension line, which then stops at the
+# lug end instead of running up the view's edge. Right of the view: the .34
+# and the .680 with its mate row, one lane each, their extension lines
+# leaving the taps' centres to the right. The Ø.340 clearance callout comes
+# in from the upper left, crossing only the view's edge; the tap callout from
+# the lower right onto tap 1's rim, under every right-hand extension line.
 NUT_XY, NUT_SCALE = (.190,.175), (2,1)
 NUT_KEEP = {
-    'NutCentreY':(.104,.100),'NutTap1Y':(.146,.0910),'NutTap3Y':(.146,.1285),
-    'NutCentreZ':(.132,.175),'NutTap3Z':(.1465,.160),'NutTap4Z':(.2335,.160),
-    'NutClearanceDia':(.250,.104),'NutSeatDia':(.258,.140),
+    'NutCentreY':(.104,.100),'NutCentreZ':(.134,.0772),
+    'NutTap1Y':(.229,.1044),'NutTapSpacing':(.268,.113),
+    'NutClearanceDia':(.135,.150),
 }
 NUT_CAPTION = 'VIEW D'
-NUT_CAPTION_XY = (.166,.078)
-# C-C: the removed section across the lug at the nut axis, at the sheet's
-# 2:1, hatched: the lug's whole cross-section (Z 0..24.3 across, X 18.5
-# tall), the Ø8.50 through it and the Ø10.50 recess floor that its callout
-# gives the depth of. A cut along the lug ending inside it read as a short
-# block with a real end face (review of farm run 20261027T181901497Z). Its
-# arrows point up, so it stands BELOW VIEW D (third angle), left of the VIEW
-# D caption, its own caption ~15..26 mm under it, above the border.
-NUT_SECTION_XY = (.085,.062)
-NUT_CUT_OVERRUN = 2
+NUT_CAPTION_XY = (.190,.058)
 # TL-32's cut-face sections hang their captions 6 mm under the face.
 SECTION_CAPTION_GAP = .006
-NUT_CALLOUT_XY = (.265,.084)
+NUT_CALLOUT_XY = (.240,.085)
 NUT_ISO_XY = (.380,.215)
 _ARROWS_INSIDE = 0  # swDimArrowsInside
 _WITNESS_NONE = 3  # swWitnessLineVisibility_e.swWitnessLineNone
@@ -244,18 +228,6 @@ def _hide_witness_lines(adapter, annotations, name) -> None:
     if int(display.WitnessVisibility) != _WITNESS_NONE:
         raise RuntimeError(f'{name}: extension lines still shown')
     rebuild_drawing(adapter, label='tap drill extension lines hidden')
-
-
-def _append_callout_row(display, row: str, *, label: str) -> None:
-    """Add ``row`` under a native hole callout's thread row (draw_dt_crank_arm)."""
-    native = _early_bound(display, 'IDisplayDimension')
-    definition = str(native.GetText(5) or '')  # swDimensionTextPrefixDefinition
-    if not definition.strip():
-        raise RuntimeError(f'{label}: hole callout has no definition to extend')
-    extended = definition.rstrip() + '\n' + row
-    native.SetText(1, extended)
-    if str(native.GetText(5) or '') != extended:
-        raise RuntimeError(f'{label}: hole callout row did not persist: {native.GetText(5)!r}')
 
 
 def _size_note(adapter, note, height: float, *, label: str) -> None:
@@ -336,9 +308,10 @@ def _place_caption(adapter, view, target, letter: str, sheet_scale) -> None:
         raise RuntimeError(f'expected one native {label}, found {len(notes)} notes')
     note = _early_bound(notes[0], 'INote')
     annotation = _early_bound(note.GetAnnotation(), 'IAnnotation')
-    # On the 2:1 sheet the caption steps ~0.48 mm at a time: C-C's top swung
-    # between 0.26 mm under and 0.21 mm over its target for ten passes (farm
-    # run 20261027T200846410Z), so half a millimetre is landed.
+    # On the 2:1 sheet the caption steps ~0.48 mm at a time: a section
+    # caption's top swung between 0.26 mm under and 0.21 mm over its target
+    # for ten passes (farm run 20261027T200846410Z), so half a millimetre is
+    # landed.
     for attempt in range(6):
         extent = [float(v) for v in note.GetExtent()]
         error = (target[0] - (extent[0] + extent[3]) / 2, target[1] - extent[4])
@@ -491,36 +464,17 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         if caption is None:
             raise RuntimeError('failed to insert the VIEW D caption')
         _size_note(adapter, caption, VIEW_LETTER_HEIGHT, label='VIEW D caption')
-        # The removed section crosses the lug at the nut axis, past both
-        # faces; the recess depth prints on the Ø10.50 callout.
-        section_c = create_section_view(adapter,nut,
-            line_start=_project(adapter,nut,(contract.NUT_FACE_X,contract.NUT_AXIS_Y,
-                                             contract.BLOCK_HEIGHT+NUT_CUT_OVERRUN),'nut cut start'),
-            line_end=_project(adapter,nut,(contract.NUT_FACE_X,contract.NUT_AXIS_Y,-NUT_CUT_OVERRUN),
-                              'nut cut end'),
-            view_xy=NUT_SECTION_XY,section_label='C',scale=NUT_SCALE,partial=True,
-            label='nut spigot recess')
-        tap_row = _project(adapter,nut,(contract.NUT_FACE_X,max(y for y,_z in contract.NUT_HOLES_YZ),
-                                        contract.NUT_AXIS_Z),'+Y nut tap row')
-        _cut_face_only(adapter, section_c, 'C',
-                       ((contract.LUG_X0+contract.LUG_X1)/2, contract.NUT_AXIS_Y, contract.BLOCK_HEIGHT/2),
-                       NUT_SECTION_XY,
-                       (NUT_SECTION_XY[0],
-                        NUT_SECTION_XY[1]-(contract.LUG_X1-contract.LUG_X0)*NUT_SCALE[0]/NUT_SCALE[1]/2000
-                        -SECTION_CAPTION_GAP), NUT_SCALE)
-        _fit_section_letters(adapter, section_c, (), below_y=tap_row[1])
-        # The callout picks the +Z column's lower tap, under section line C
-        # at the nut axis, so its short leader from the lower right crosses
-        # neither the line nor its letters. The title block's THREADS row owns
-        # the class; the mate row names the bought nut the pattern serves.
-        y,z = contract.NUT_HOLES_YZ[1]
-        edge = _project(adapter,nut,(contract.NUT_FACE_X,y+contract.NUT_TAP_DRILL/2,z),'nut tap mouth')
+        # The callout reaches tap 1 (toward the lug end) from the lower
+        # right, under the taps' right-hand extension lines. The title
+        # block's THREADS row owns the class; the .680 names the mate.
+        y,z = contract.NUT_HOLES_YZ[0]
+        rim = contract.NUT_TAP_DRILL/2/math.sqrt(2)
+        edge = _project(adapter,nut,(contract.NUT_FACE_X,y-rim,z+rim),'nut tap mouth')
         taps = add_native_hole_callout(adapter,nut,edge_xy=edge,callout_xy=NUT_CALLOUT_XY,
-                                       label='four nut flange taps')
-        omit_title_block_thread_class(taps, label='four nut flange taps')
-        _append_callout_row(taps, contract.NUT_FLANGE_MATE_TEXT, label='four nut flange taps')
-        set_hole_callout_precision(taps, contract.NUT_TAP_CALLOUT_PRECISION, label='four nut flange taps')
-        rebuild_drawing(adapter, label='nut flange tap callout rows')
+                                       label='feed nut screw taps')
+        omit_title_block_thread_class(taps, label='feed nut screw taps')
+        set_callout_lengths_to_three_places(taps, label='feed nut screw taps')
+        rebuild_drawing(adapter, label='feed nut screw tap callout')
         annotations += nut_annotations
         sheet_scales = {sheets[0]: SHEET_SCALE, sheets[1]: NUT_SCALE}
     # Every printed dimension keeps its part-authored places; the repeated
