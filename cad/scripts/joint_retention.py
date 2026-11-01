@@ -247,6 +247,15 @@ RULINGS: dict[str, Ruling] = {
             "the plain 91375A105 cup point goes in bare, nothing added to its thread"
         ),
     ),
+    "U-MHA-PN-VN-51-no-lock": Ruling(
+        joint="pn-pen/thumb-screw-in-stirrup",
+        granted=(
+            "user, 2026-11-01, joint-specific drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads) ruling on PR #2119: "
+            "'Owner ruling 2026-11-01: MHA-PN-VN-51 knurled thumb screw is an operator adjustment, slackened "
+            "at every marker change; no lock (as U-MHA-PN-VN-52)'. The 99607A213 thumb screw stays "
+            "finger-tight and bare in the stirrup's bottom-rail tap"
+        ),
+    ),
     "U-MHA-MG-03-no-lock": Ruling(
         joint="mg-magnifier/lever-in-bracket",
         granted=(
@@ -1688,6 +1697,7 @@ JOINTS: tuple[Joint, ...] = (
         lock_part="",
         lock_binds=(),
         lock_step="",
+        exception="U-MHA-PN-VN-51-no-lock",
         evidence=(
             "build_pn_pen_assembly.py: module docstring ('pn-vn-pen-set-screw (the thumb screw) threads up "
             "through its bottom rail and presses the grip into the V'), RIDERS lock_mate (CAD only); "
@@ -1712,7 +1722,7 @@ JOINTS: tuple[Joint, ...] = (
         ),
         axial_capture=(
             "#4-40 x 3/16 cup point (91375A105) in the block's front-face tap, recessed below the face, its "
-            "cup biting the Ø4 pivot end inside the pivot bore and carrying the hanging carriage; the "
+            "cup biting the Ø.126 pivot end inside the pivot bore and carrying the hanging carriage; the "
             "square's shoulder seats on the block top and sets the height"
         ),
         lock=Lock.NONE,
@@ -1723,7 +1733,7 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "pn_pen_v_block_spec.py SET_SCREW_TAP_SPEC HoleSpec('tapped', '#4-40', end='through_next'), "
             "SET_SCREW_Y/PIVOT_BORE_X; pn_pen_carriage_geom.py ROD_SET_SCREW_POS (cup on the bore wall); "
-            "build_pn_pen_assembly.py RIDERS lock_mate; pn-vn-pen-rod-set-screw.yaml (91375A105). The 7.0 "
+            "build_pn_pen_assembly.py RIDERS lock_mate; pn-vn-pen-rod-set-screw.yaml (91375A105). The .367 "
             "tap holds the 4.76 screw with no room for a second jam screw; the user waived "
             "drawing-guidelines.md rule 23 for this joint (U-MHA-PN-VN-52-no-lock)"
         ),

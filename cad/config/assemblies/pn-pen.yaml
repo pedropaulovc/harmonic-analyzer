@@ -66,3 +66,8 @@ machinist_exceptions:
     where: "the sequence step that runs the MHA-PN-VN-52 cup-point set screw into the v-block's front-face tap onto the rod's pivot end, with nothing on its thread, and the check that the v-block does not turn on the pivot by hand at the 45 deg +/-1 deg yaw (DETAIL C)"
     finding: "the #4-40 cup-point set screw holding the pen yaw is a threaded joint under reversing nib drag with no lock (rule 23)"
     reason: "owner ruling U-MHA-PN-VN-52-no-lock (user, 2026-10-14, PR #1436; joint_retention.py pn-pen/rod-set-screw-in-v-block): the set screw is the operator's yaw adjustment and a light clamp, re-set when it drifts; the block's .367 tap leaves no room for a second jam screw, and the 1898 machine ran the plain cup point bare (owner-accepted)"
+  - id: "RV-02"
+    kind: "accept"
+    where: "DETAIL D and the steps and AS SHIPPED note that set the MHA-PN-VN-51 knurled thumb screw FINGER-TIGHT in the stirrup's bottom-rail tap, its tip clamping the marker grip into the V, with no lock and no thread locker"
+    finding: "the #4-40 knurled thumb screw riding the reciprocating carriage is a threaded joint under reversing nib drag with no lock (rule 23)"
+    reason: "Owner ruling 2026-11-01: MHA-PN-VN-51 knurled thumb screw is an operator adjustment, slackened at every marker change; no lock (as U-MHA-PN-VN-52). Recorded as U-MHA-PN-VN-51-no-lock (joint_retention.py pn-pen/thumb-screw-in-stirrup)"
