@@ -23,8 +23,10 @@ from _com import _early_bound
 from _session import run_build
 from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
 from _drawing_common import rebuild_drawing
+from _drawing_edges import visible_view_entities
 from _drawing_leaders import set_near_side_diameter
 from _drawing_projection import model_point_in_view, model_points_in_view
+from _drawing_selection import _select_view_entity
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_audit import display_box
 from _machinist_review_mode import MachinistReviewMode
@@ -122,7 +124,6 @@ DIAMETER_LEADERS = {
     ),
 }
 _DIAMETER_TYPES = (6, 15)  # swDimensionType_e diameter displays
-_SEL_EDGES = 1  # swSelectType_e.swSelEDGES
 
 
 def projection_margins(
@@ -344,15 +345,21 @@ def _reference_settings(name: str) -> dict[str, Any]:
     }
 
 
-def _leader_hole_sheet(adapter: Any, view: Any) -> tuple[float, float]:
-    """The hole the 4X leader lands on: the end view's lower-right one."""
+def _leader_hole(adapter: Any, view: Any) -> tuple[tuple[float, float], tuple[float, float]]:
+    """The hole the 4X leader lands on, the end view's lower-right one: its
+    model (x, z) and its sheet centre."""
     holes = model_points_in_view(
         adapter,
         view,
         [(x / 1000.0, 0.0, z / 1000.0) for x, z in supplier.HOLE_CENTRES],
         label="nut flange hole centres",
     )
-    return max(holes, key=lambda hole: hole[0] - hole[1])
+    index = max(range(len(holes)), key=lambda i: holes[i][0] - holes[i][1])
+    return supplier.HOLE_CENTRES[index], holes[index]
+
+
+def _leader_hole_sheet(adapter: Any, view: Any) -> tuple[float, float]:
+    return _leader_hole(adapter, view)[1]
 
 
 def _select_pitch_circle(adapter: Any, view: Any, segment: Any) -> None:
@@ -364,26 +371,42 @@ def _select_pitch_circle(adapter: Any, view: Any, segment: Any) -> None:
         raise RuntimeError("failed to select the nut pitch circle")
 
 
+def _hole_rim(adapter: Any, view: Any) -> Any:
+    """The lower-right hole's own native rim edge in the end view.
+
+    A sheet-coordinate EDGE hit-test on the rim picked a non-edge (farm run
+    20261101T135739954Z); resolve the visible circular edge itself. Both
+    flange-face rims project onto one circle, so either serves.
+    """
+    (x, z), _sheet = _leader_hole(adapter, view)
+    radius = supplier.HOLE_DIA / 2000.0
+    matches = []
+    for raw_edge in visible_view_entities(view, 1, label=f"{HOLE} rim"):
+        edge = _early_bound(raw_edge, "IEdge")
+        raw_curve = edge.GetCurve()
+        if raw_curve is None:
+            continue
+        curve = _early_bound(raw_curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = tuple(float(value) for value in curve.CircleParams or ())
+        if (
+            len(params) == 7
+            and math.isclose(params[0], x / 1000.0, abs_tol=1e-9)
+            and math.isclose(params[2], z / 1000.0, abs_tol=1e-9)
+            and math.isclose(abs(params[4]), 1.0, abs_tol=1e-9)
+            and math.isclose(params[6], radius, abs_tol=1e-9)
+        ):
+            matches.append(edge)
+    if not matches:
+        raise RuntimeError(f"{HOLE}: no visible Ø{supplier.HOLE_DIA} rim at hole ({x}, {z})")
+    return matches[0]
+
+
 def _select_hole_edge(adapter: Any, view: Any) -> None:
-    """Pick the lower-right hole's own edge on its leader side; prove it."""
-    centre = _leader_hole_sheet(adapter, view)
-    radius = supplier.HOLE_DIA / 2000.0 * float(_early_bound(view, "IView").ScaleDecimal)
-    angle = math.radians(DIAMETER_LEADERS[HOLE].leader_deg)
-    pick = (centre[0] + radius * math.cos(angle), centre[1] + radius * math.sin(angle))
-    model = adapter.currentModel
-    extension = _early_bound(model.Extension, "IModelDocExtension")
-    if not extension.SelectByID2("", "EDGE", *pick, 0.0, False, 0, None, 0):
-        raise RuntimeError(f"{HOLE}: no edge at the hole rim {pick!r}")
-    manager = _early_bound(model.SelectionManager, "ISelectionMgr")
-    if int(manager.GetSelectedObjectType3(1, -1)) != _SEL_EDGES:
-        raise RuntimeError(f"{HOLE}: the rim pick is not an edge")
-    curve = _early_bound(
-        _early_bound(manager.GetSelectedObject6(1, -1), "IEdge").GetCurve(), "ICurve"
+    _select_view_entity(
+        adapter, view, "EDGE", None, label=f"{HOLE} rim", entity=_hole_rim(adapter, view)
     )
-    if not curve.IsCircle() or not math.isclose(
-        float(curve.CircleParams[6]) * 2000.0, supplier.HOLE_DIA, abs_tol=1e-6
-    ):
-        raise RuntimeError(f"{HOLE}: the rim pick is not a Ø{supplier.HOLE_DIA} hole edge")
 
 
 def _dimension_diameter(adapter: Any, view: Any, name: str, select: Any) -> Any:
