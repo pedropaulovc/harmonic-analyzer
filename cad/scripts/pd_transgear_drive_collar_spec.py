@@ -500,10 +500,16 @@ PIN_LOCATION_CALLOUT = f"LOCATES SPROCKET\n{SPROCKET_NUMBER}"
 PILOT_DIA_CALLOUT = f"CLEARS\nSPROCKET\n{SPROCKET_NUMBER} BORE"
 OD_CALLOUT = f"CLEARS #25\nCHAIN ON\n{SPROCKET_NUMBER} T12"
 # The rear D entry clears the shaft's root corner so the rear face seats on
-# F; it is cut on the rear end only, after that face is faced to fit.
+# F; it is cut on the rear end only, after that face is faced to fit.  The
+# band's MAX has its own job, said on the callout (review of farm run
+# 20261101T111956470Z: an upper limit nothing on the sheet needs): the flat's
+# largest leg stays inside the smallest bore radius (0.259 of 0.27), so the
+# entry keeps its D.  Rows stay within the 21 characters that end left of the
+# section's bore edge.
 BORE_ENTRY_BREAK_CALLOUT = (
     f"X {BORE_ENTRY_BREAK_ANGLE_DEG:g} DEG, BOTH LEGS\nREAR END ARC AND FLAT\n"
-    f"AFTER REAR FACE FIT\nCLEARS {SHAFT_NUMBER} KNOB\nSHAFT ROOT CORNER"
+    f"AFTER REAR FACE FIT\nCLEARS {SHAFT_NUMBER} KNOB\nSHAFT ROOT CORNER;\n"
+    "MAX KEEPS D AT ENTRY"
 )
 # The overall, pilot front face to rear face, prints as a .X reference.
 OVERALL_LENGTH = LENGTH + PILOT_LENGTH

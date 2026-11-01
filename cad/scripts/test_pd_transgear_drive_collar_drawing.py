@@ -912,6 +912,9 @@ def test_native_rear_entry_has_both_actual_legs_on_both_d_edges(monkeypatch) -> 
     assert "REAR END ARC AND FLAT" in callout
     assert "AFTER REAR FACE FIT" in callout
     assert "MHA-PD-08" in callout
+    # The MAX's own job, so the band's upper limit is not read as idle.
+    assert callout.splitlines()[-1].startswith("MAX ")
+    assert max(map(len, callout.splitlines())) <= 21
     assert spec.BORE_ENTRY_BREAK_ANGLE_BAND_DEG == _config.title_block("angular")["value_deg"]
     assert spec.BORE_ENTRY_BREAK_ANGLE_LIMITS == pytest.approx((44.0, 46.0))
     assert spec.BORE_ENTRY_BREAK_LEG_MIN == pytest.approx(0.144853316221)

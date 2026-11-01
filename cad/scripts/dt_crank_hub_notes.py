@@ -90,7 +90,8 @@ SEAM_CALLOUT = seam_callout("MHA-DT-06")
 SEAT_LENGTH_CALLOUT = "TO SUIT\nCRANK ARM,\nEND FLUSH"
 # The cross-hole is drilled, then taper-reamed through hub and shaft together
 # at assembly.  The ream fixes the hub on the shaft for good, so the front
-# face -- the seat end, named on the sheet -- is set flush
+# face -- the crank-arm end, named on the sheet by what it carries (review of
+# farm run 20261101T111956470Z: SEAT END named no face) -- is set flush
 # with the crankshaft's dome root first -- the crank face, CRANK_FACE_Z, where
 # the 3/8 in cylinder meets the dome; the dome stands proud of the hub (the
 # arm front is already flush with the hub front from the seat press).  The
@@ -102,7 +103,7 @@ SEAT_LENGTH_CALLOUT = "TO SUIT\nCRANK ARM,\nEND FLUSH"
 FRONT_FACE_DATUM = "MHA-DT-11 DOME ROOT"
 CROSS_HOLE_CALLOUT = "\n".join(
     (
-        "SEAT END FLUSH WITH CRANKSHAFT",
+        "CRANK-ARM END FLUSH WITH CRANKSHAFT",
         "MHA-DT-11 DOME ROOT; AT ASSEMBLY,",
         "MATCH TAPER-REAM 1:48 WITH IT FOR",
         "TAPER PIN MHA-DT-09: LIGHT DRIVE FIT",

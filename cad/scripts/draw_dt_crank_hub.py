@@ -218,7 +218,7 @@ def _set_callout_below(display: Any, text: str, label: str) -> None:
     """Put the matched-operation prose UNDER a native hole callout.
 
     The drill size reads first, in the order the work is done; the fit and
-    mate prose follows in the callout-below compartment (the Ø9.550 bore
+    mate prose follows in the callout-below compartment (the Ø9.55 bore
     callout's order).  ``SetText`` reports nothing, so it is read back.
     """
     display = _early_bound(display, "IDisplayDimension")

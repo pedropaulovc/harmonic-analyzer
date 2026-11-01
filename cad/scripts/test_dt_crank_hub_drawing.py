@@ -289,7 +289,7 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     cross_hole = dt_crank_hub_notes.CROSS_HOLE_CALLOUT
     assert "MHA-DT-09" in cross_hole and "MHA-DT-11" in cross_hole
     assert "LIGHT DRIVE FIT" in cross_hole
-    flush = cross_hole.index("SEAT END FLUSH")
+    flush = cross_hole.index("CRANK-ARM END FLUSH")
     assert flush < cross_hole.index("TAPER-REAM") and "AT ASSEMBLY" in cross_hole
     # The pin-proud MIN names the ream it limits.
     assert "TAPER-REAM" in dt_crank_hub_notes.PIN_PROUD_CALLOUT
