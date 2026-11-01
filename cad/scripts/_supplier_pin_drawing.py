@@ -357,9 +357,13 @@ def add_supplier_spring_pin_dimensions(
         scan_view_edges(right, label=f"{source.sku} spring-pin end"), 0, label=source.sku
     )
     outline = tuple(float(value) for value in right.GetOutline())
+    # Below left of the end view: the WALL text sits up-left with its line
+    # over the rim and the mating hole's diagram and label sit right, so the
+    # Ø leader crosses neither (machinist review of dt_vn_pinion_strap_pin:
+    # up-right, it crossed the WALL line at its arrowhead).
     diameter, diameter_check = _supplier_diameter(
         adapter, right, end_circles, source,
-        text_xy=(outline[2] + 0.015, outline[3] + 0.014),
+        text_xy=(outline[0] - 0.015, outline[1] - 0.014),
     )
     length, length_check = _supplier_length(
         adapter, front, circles, source, axis=0,
