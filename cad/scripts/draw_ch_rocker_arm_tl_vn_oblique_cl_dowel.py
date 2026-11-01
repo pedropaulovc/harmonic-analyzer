@@ -11,6 +11,8 @@ from collections.abc import Callable
 import _telemetry
 from _com import _early_bound
 from _session import run_build
+from _drawing_centerline import add_view_centerline
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import NumberFit, build_purchased_fastener_drawing
 from _supplier_pin_model import _cylinder_radii_mm
@@ -28,16 +30,16 @@ SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_cl_dowel"]
 ITEM = "1/4 X 1 ALLOY STEEL DOWEL PIN (ASME B18.8.2)"
 # Machinist review mr1 (rule 14): centred on their short spans, the texts ran
 # across their own witnesses and, for the 1 in length, over the pin. Each now
-# shelves past its outer witness: the diameter right of the Top circle, the
-# length left of its lane on the Front. Front and Top reserve the same
+# shelves past its outer witness on the Front: the diameter right of its
+# bottom lane, the length left of its lane. Front and Top reserve the same
 # left/right space so the fit keeps them on one projection line.
 SHELVES = {
     "SupplierDowelDiameter": (True, "right"),
     "SupplierDowelLength": (False, "left"),
 }
 SUPPLIER_MARGINS = {
-    "*Top": (0.070, 0.026, 0.065, 0.020),
-    "*Front": (0.070, 0.020, 0.065, 0.020),
+    "*Top": (0.070, 0.010, 0.065, 0.010),
+    "*Front": (0.070, 0.026, 0.065, 0.020),
 }
 
 
@@ -84,6 +86,17 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         _assert_supplier_bands(displays)
         stations = shelve_supplier_text(adapter, displays, SHELVES)
+        # The length's line lies on the silhouette, so the Front carries the
+        # axis as a native centerline, picked on the pin face at mid-length
+        # (frame: axis +Y from the chamfered end).
+        front = views["*Front"]
+        add_view_centerline(
+            adapter, front, label="CL dowel FRONT axis",
+            face_xy=model_point_in_view(
+                adapter, front, (0.0, part.LENGTH / 2000.0, part.DIA / 2000.0),
+                label="CL dowel FRONT face",
+            ),
+        )
 
         def assert_references() -> None:
             fresh = assert_supplier_screw(

@@ -16,7 +16,6 @@ import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import ch_rocker_arm_tl_vn_oblique_hub_pin_spec as spec
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
-from _supplier_screw_reference_names import FEATURE_BY_PLANE
 
 STEM = "ch-rocker-arm-tl-vn-oblique-hub-pin"
 INCH = 25.4
@@ -98,11 +97,16 @@ def test_native_supplier_witness_inventory():
     assert set(spec.SUPPLIER_REFERENCE_TOLERANCES_MM) <= names
     for name, value, orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS:
         assert value > 0
-        plane = spec.SUPPLIER_REFERENCE_PLANES[name]
-        assert plane in FEATURE_BY_PLANE
-        assert orientation == ("horizontal" if plane == "Front" else "vertical")
+        assert spec.SUPPLIER_REFERENCE_PLANES[name] == "Top"
+        assert orientation == ("vertical" if name == "SupplierCutLength" else "horizontal")
         assert spec.SUPPLIER_REFERENCE_UNITS[name] == spec.UNIT == "in"
     assert all(lower <= upper for lower, upper in spec.SUPPLIER_REFERENCE_TOLERANCES_MM.values())
+    # Both lines lie on Top-view edges: the diameter on the far end face, the
+    # cut length on the silhouette (Top sketch y is -z; the pin spans z 0..cut).
+    assert spec.SUPPLIER_REFERENCE_STARTS == {
+        "SupplierPinDiameter": (-spec.DIA / 2.0, -spec.CUT_LENGTH),
+        "SupplierCutLength": (spec.DIA / 2.0, -spec.CUT_LENGTH),
+    }
 
 
 def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):

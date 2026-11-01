@@ -72,18 +72,25 @@ INTERFERENCE = carrier.CL_DOWEL_INTERFERENCE  # diametral (min, max)
 DIA_MAX = DIA + max(DIA_BAND)  # .2503
 DIA_MIN = DIA + min(DIA_BAND)  # .2501
 
+# The pressed end's lead-in that grips nothing: the chamfer.
+LEAD_IN = ENDS.chamfer_len(DIA)  # .0262
+
 # The supplier table's nominal 1/4 and 1 print as untoleranced references;
-# the table's diameter band is quoted on the sheet's supplier line.
+# the table's diameter band is quoted on the sheet's supplier line. Both
+# carriers lie on Front-view edges, so their construction lines print under
+# the outline: the diameter on the chamfer's edge with the cylinder (y =
+# LEAD_IN), the length on the left silhouette. The Top (end) view shows no
+# chord across the pin.
 SUPPLIER_REFERENCE_DIMENSIONS = (
     ("SupplierDowelDiameter", DIA, "horizontal"),
     ("SupplierDowelLength", LENGTH, "vertical"),
 )
 SUPPLIER_REFERENCE_STARTS = {
-    "SupplierDowelDiameter": (-DIA / 2.0, 0.0),
-    "SupplierDowelLength": (0.0, 0.0),
+    "SupplierDowelDiameter": (-DIA / 2.0, LEAD_IN),
+    "SupplierDowelLength": (-DIA / 2.0, 0.0),
 }
 SUPPLIER_REFERENCE_PLANES = {
-    "SupplierDowelDiameter": "Top",
+    "SupplierDowelDiameter": "Front",
     "SupplierDowelLength": "Front",
 }
 SUPPLIER_REFERENCE_SIDES = {
@@ -103,8 +110,6 @@ SUPPLIER_DATA = (
     "DIAMETER +.0001/+.0003 OVER NOMINAL; ROUND / CHAMFER ENDS.",
     "SUPPLIER LENGTH TOLERANCE NOT STATED.",
 )
-# The pressed end's lead-in that grips nothing: the chamfer.
-LEAD_IN = ENDS.chamfer_len(DIA)  # .0262
 # The round end's corner: the cylinder stops ROUND_H short of the far face.
 ROUND_H = ENDS.crown_r  # .031
 

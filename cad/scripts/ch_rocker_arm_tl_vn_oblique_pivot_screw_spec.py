@@ -49,10 +49,13 @@ LENGTH = SHOULDER_LENGTH + HEAD_HEIGHT
 assert CUT_THREAD_LENGTH < SUPPLIED_THREAD_LENGTH
 
 # The head and thread sizes are stated in SUPPLIER_DATA, not as more chords on
-# the small screw. The banded shoulder prints as stacked limits. The shoulder Ø
-# is hidden behind the head in the head-end Front view, so it is measured in the
-# Top profile at the shoulder's thread-end step (z = 0), its witnesses rising
-# clear past the narrower 5/16 thread to the top lane.
+# the small screw. The banded shoulder prints as stacked limits. Every carrier
+# lies on a Top-profile edge, so its construction line prints under the
+# outline: the shoulder Ø on the shoulder's thread-end step (z = 0), its
+# witnesses rising clear past the narrower 5/16 thread to the top lane; the
+# shoulder length on the shoulder's silhouette; the head Ø on the head's end
+# face (z = LENGTH), its witnesses dropping to the bottom lane. The head-end
+# Front view shows no chord across the head.
 SUPPLIER_REFERENCE_DIMENSIONS = (
     ("SupplierShoulderDiameter", SHOULDER_DIA, "horizontal"),
     ("SupplierShoulderLength", SHOULDER_LENGTH, "vertical"),
@@ -60,12 +63,12 @@ SUPPLIER_REFERENCE_DIMENSIONS = (
 )
 SUPPLIER_REFERENCE_STARTS = {
     "SupplierShoulderDiameter": (-SHOULDER_DIA / 2.0, 0.0),
-    "SupplierShoulderLength": (0.0, -SHOULDER_LENGTH),
-    "SupplierHeadDiameter": (-HEAD_DIA / 2.0, 0.0),
+    "SupplierShoulderLength": (SHOULDER_DIA / 2.0, -SHOULDER_LENGTH),
+    "SupplierHeadDiameter": (-HEAD_DIA / 2.0, -LENGTH),
 }
 SUPPLIER_REFERENCE_PLANES = {
     "SupplierShoulderDiameter": "Top", "SupplierShoulderLength": "Top",
-    "SupplierHeadDiameter": "Front",
+    "SupplierHeadDiameter": "Top",
 }
 SUPPLIER_REFERENCE_FORMATS = {
     "SupplierShoulderDiameter": (4, "diameter", None, "SHOULDER"),

@@ -12,7 +12,6 @@ import build_ch_rocker_arm_tl_vn_oblique_pivot_shim as part
 import ch_rocker_arm_tl_vn_oblique_pivot_shim_spec as spec
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
-from _supplier_screw_reference_names import FEATURE_BY_PLANE
 
 STEM = "ch-rocker-arm-tl-vn-oblique-pivot-shim"
 
@@ -79,11 +78,16 @@ def test_native_supplier_witness_inventory():
     assert set(spec.SUPPLIER_REFERENCE_TOLERANCES_MM) <= names
     for name, value, orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS:
         assert value > 0
-        plane = spec.SUPPLIER_REFERENCE_PLANES[name]
-        assert plane in FEATURE_BY_PLANE
-        assert orientation == ("horizontal" if plane == "Front" else "vertical")
+        assert spec.SUPPLIER_REFERENCE_PLANES[name] == "Top"
+        assert orientation == ("vertical" if name == "SupplierThickness" else "horizontal")
         assert spec.SUPPLIER_REFERENCE_UNITS[name] == "in"
     assert all(lower <= upper for lower, upper in spec.SUPPLIER_REFERENCE_TOLERANCES_MM.values())
+    # Every line lies on a Top-view edge: each chord on a face, the thickness
+    # on the OD silhouette (Top sketch y is -z; the shim spans z 0..THICKNESS).
+    starts = spec.SUPPLIER_REFERENCE_STARTS
+    assert starts["SupplierBoreDiameter"] == (-spec.ID / 2.0, 0.0)
+    assert starts["SupplierOuterDiameter"] == (-spec.OD / 2.0, -spec.THICKNESS)
+    assert starts["SupplierThickness"] == (spec.OD / 2.0, -spec.THICKNESS)
 
 
 def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):

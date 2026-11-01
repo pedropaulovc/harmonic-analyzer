@@ -172,7 +172,7 @@ SUPPLIER_REFERENCE_STARTS = {
     "SupplierLength": (DIMS.major_dia / 2.0, 0.0),
     "SupplierHeadDiameter": (-DIMS.head_dia / 2.0, 0.0),
     "SupplierHeadHeight": (DIMS.head_dia / 2.0, 0.0),
-    "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, -DIMS.length / 2.0),
+    "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, 0.0),  # on the bearing-face edge
     "SupplierDriveWidth": (-DIMS.socket_af / 2.0, 0.0),
 }
 SUPPLIER_REFERENCE_PLANES = {

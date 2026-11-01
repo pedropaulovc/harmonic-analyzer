@@ -28,18 +28,20 @@ ITEM = '6061 ALUMINUM ROUND SPACER, 3/8 SCREW, 5/8 OD X 5/8 LONG'
 # size already being the supplier's parenthesised reference.
 GENERAL_TEXT = "PURCHASED PART, USED AS SUPPLIED. LOOSE BORE: NOT A LOCATING BUSHING."
 # Every text shelves right of its own witnesses, clear of the lines: the bore
-# on the Front's top lane, the OD on its bottom lane, the length beside
-# the Top view. Front and Top reserve the same left/right space so the fit
-# centres them on one projection line; the Front's equal top/bottom keeps it
-# level with the unannotated Right. The 5/8 x 5/8 part fits at 2:1.
+# on the Top's top lane, the OD on its bottom lane, the length beside it.
+# Front and Top reserve the same left/right space so the fit centres them on
+# one projection line; the unannotated Front's equal top/bottom keeps it
+# level with the Right. The 5/8 x 5/8 part fits at 2:1 in tall_top's 96 mm
+# Top cell with both diameter lanes (standard's 64 mm leaves 28 mm: 1:1).
+VIEW_LAYOUT = "tall_top"
 SHELVES = {
     "SupplierBoreDiameter": (True, "right"),
     "SupplierOuterDiameter": (True, "right"),
     "SupplierLength": (False, "right"),
 }
 SUPPLIER_MARGINS = {
-    "*Front": (0.010, 0.018, 0.060, 0.018),
-    "*Top": (0.010, 0.010, 0.060, 0.010),
+    "*Front": (0.010, 0.010, 0.060, 0.010),
+    "*Top": (0.010, 0.018, 0.060, 0.018),
 }
 
 
@@ -75,16 +77,20 @@ async def build(adapter) -> dict[str, str]:
         )
         _assert_supplier_bands(displays)
         stations = shelve_supplier_text(adapter, displays, SHELVES)
-        # The RIGHT side view carries the axis as the TOP view does; picked on
-        # the OD face at mid-length (frame: axis +Z from the bottom face).
-        right = views["*Right"]
-        add_view_centerline(
-            adapter, right, label="spacer RIGHT axis",
-            face_xy=model_point_in_view(
-                adapter, right, (part.OD / 2000.0, 0.0, part.LENGTH / 2000.0),
-                label="spacer RIGHT OD face",
-            ),
-        )
+        # The side views carry the axis as native centerlines, picked on the
+        # OD face at mid-length (frame: axis +Z from the bottom face); the
+        # length's line lies on the Top's silhouette, not the axis.
+        for orientation, normal in (("*Top", (0.0, 1.0)), ("*Right", (1.0, 0.0))):
+            view = views[orientation]
+            add_view_centerline(
+                adapter, view, label=f"spacer {orientation[1:].upper()} axis",
+                face_xy=model_point_in_view(
+                    adapter, view,
+                    (normal[0] * part.OD / 2000.0, normal[1] * part.OD / 2000.0,
+                     part.LENGTH / 2000.0),
+                    label=f"spacer {orientation[1:].upper()} OD face",
+                ),
+            )
 
         def assert_references():
             fresh = assert_supplier_screw(
@@ -105,7 +111,7 @@ async def build(adapter) -> dict[str, str]:
 
     return await build_purchased_fastener_drawing(
         adapter, SPEC, item=ITEM, number_fit=NumberFit.SHRINK_TO_CELL,
-        general_text=GENERAL_TEXT,
+        general_text=GENERAL_TEXT, view_layout=VIEW_LAYOUT,
         supplier_dimensions=supplier_dimensions,
         supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_supplier_dimensions,),

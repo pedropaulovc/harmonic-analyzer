@@ -32,9 +32,13 @@ OD_BAND = (0.127, -0.127)  # +/-.005
 LENGTH = 15.875  # .625
 LENGTH_BAND = (0.127, -0.127)  # +/-.005
 
+# Every carrier lies on a Top-view edge, so its construction line prints under
+# the outline: the bore on the z = 0 end face (the view's upper edge), the OD
+# on the z = LENGTH face (its lower edge), the length on the OD silhouette. The
+# Front (bore) view shows no chord across the rings.
 SUPPLIER_REFERENCE_DIMENSIONS = (('SupplierBoreDiameter', ID, 'horizontal'), ('SupplierOuterDiameter', OD, 'horizontal'), ('SupplierLength', LENGTH, 'vertical'))
-SUPPLIER_REFERENCE_STARTS = {'SupplierBoreDiameter': (-ID / 2.0, 0.0), 'SupplierOuterDiameter': (-OD / 2.0, 0.0), 'SupplierLength': (0.0, -LENGTH)}
-SUPPLIER_REFERENCE_PLANES = {'SupplierBoreDiameter': 'Front', 'SupplierOuterDiameter': 'Front', 'SupplierLength': 'Top'}
+SUPPLIER_REFERENCE_STARTS = {'SupplierBoreDiameter': (-ID / 2.0, 0.0), 'SupplierOuterDiameter': (-OD / 2.0, -LENGTH), 'SupplierLength': (OD / 2.0, -LENGTH)}
+SUPPLIER_REFERENCE_PLANES = {'SupplierBoreDiameter': 'Top', 'SupplierOuterDiameter': 'Top', 'SupplierLength': 'Top'}
 # Bands print as stacked limits (max over min) inside one parenthesis.
 SUPPLIER_REFERENCE_FORMATS = {'SupplierBoreDiameter': (3, 'diameter', None, 'BORE'), 'SupplierOuterDiameter': (3, 'diameter', None, 'OUTSIDE'), 'SupplierLength': (3, 'length', None, 'LENGTH')}
 # The bore takes the top lane, the OD the bottom: each shelved text stays clear

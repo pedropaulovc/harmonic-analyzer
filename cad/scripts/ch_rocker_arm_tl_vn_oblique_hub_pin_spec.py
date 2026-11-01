@@ -55,11 +55,15 @@ SUPPLIER_REFERENCE_DIMENSIONS = (
     ("SupplierPinDiameter", DIA, "horizontal"),
     ("SupplierCutLength", CUT_LENGTH, "vertical"),
 )
+# Both carriers lie on Top-view edges, so their construction lines print under
+# the outline: the diameter on the z = CUT_LENGTH end face (the view's lower
+# edge), the cut length on the OD silhouette. The Front (end) view shows no
+# chord across the pin.
 SUPPLIER_REFERENCE_STARTS = {
-    "SupplierPinDiameter": (-DIA / 2.0, 0.0),
-    "SupplierCutLength": (0.0, -CUT_LENGTH),
+    "SupplierPinDiameter": (-DIA / 2.0, -CUT_LENGTH),
+    "SupplierCutLength": (DIA / 2.0, -CUT_LENGTH),
 }
-SUPPLIER_REFERENCE_PLANES = {"SupplierPinDiameter": "Front", "SupplierCutLength": "Top"}
+SUPPLIER_REFERENCE_PLANES = {"SupplierPinDiameter": "Top", "SupplierCutLength": "Top"}
 SUPPLIER_REFERENCE_FORMATS = {
     "SupplierPinDiameter": (4, "diameter", None, "GAUGE PIN"),
     "SupplierCutLength": (CUT_PLACES, "length", None, "CUT LENGTH"),

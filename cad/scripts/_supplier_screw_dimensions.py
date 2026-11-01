@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from functools import partial
 from math import isfinite
 from pathlib import Path
@@ -888,8 +888,12 @@ def assert_supplier_screw(
     _bindings: Mapping[str, tuple[str, str, str]] | None = None,
     layout: Literal["standard", "supplier_top", "tall_top"] = "standard",
     shelf_stations: Mapping[str, Mapping[str, Any]] | None = None,
+    shop: Collection[str] = (),
 ) -> dict[str, Any]:
-    """Reacquire final native carriers and refuse missing, duplicate or alien ink."""
+    """Reacquire final native carriers and refuse missing, duplicate or alien ink.
+
+    ``shop`` names carriers printed as plain shop sizes; the caller checks them.
+    """
     planes = planes or {}
     units = units or {}
     supplier_screw_lane_plan(dimensions, planes=planes)
@@ -939,6 +943,8 @@ def assert_supplier_screw(
             if len(identity) < 2 or identity[1] not in FEATURE_BY_PLANE.values():
                 continue
             name, feature = identity[:2]
+            if name in shop:
+                continue
             if name not in expected:
                 raise RuntimeError(f"unexpected settled supplier reference {full_name}")
             plane = planes.get(name, "Front")

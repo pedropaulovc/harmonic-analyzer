@@ -184,7 +184,8 @@ SUPPLIER_REFERENCE_DIMENSIONS = (
 SUPPLIER_REFERENCE_STARTS = {
     "SupplierLength": (DIMS.major_dia / 2.0, 0.0),
     "SupplierHeadDiameter": (-DIMS.head_dia / 2.0, 0.0),
-    "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, -DIMS.length / 2.0),
+    # On the head cone's edge with the major, not across the shank.
+    "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, -DIMS.junction_depth),
 }
 SUPPLIER_REFERENCE_PLANES = {"SupplierHeadDiameter": "Top"}
 SUPPLIER_REFERENCE_SIDES = {
