@@ -284,5 +284,7 @@ def test_printed_shortfalls_are_owner_declared_minors() -> None:
     assert "rule 17" in wall.finding
     assert engagement.reason.startswith("owner ruling 2026-10-17")
     # The inch wall (.0605 at the .060 floor) is the owner's 2026-11-01 ruling.
-    assert wall.reason.startswith("owner ruling 2026-11-01")
+    assert wall.reason.startswith(
+        "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target"
+    )
     assert "coordinator ruling" not in Path(spec.__file__).read_text(encoding="utf-8")
