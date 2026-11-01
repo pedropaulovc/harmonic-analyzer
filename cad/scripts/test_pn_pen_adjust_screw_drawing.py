@@ -140,6 +140,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
             "PlainDia",
         },
         "EyeStationReference": {"EyeFromHeadEnd"},
+        "ShoulderFillet": {"ShoulderRadius"},
     }
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.SIDE_KEEP) == marked
@@ -154,26 +155,32 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "OverallLength": 2,
         "PlainDia": 3,
         "EyeFromHeadEnd": 2,
+        "ShoulderRadius": 3,
     }
 
 
-def test_shoulder_root_corner_is_governed_by_the_title_block() -> None:
-    """Rule 16: the shank-to-head corner is a modelled fillet, not sharp.
-    Nothing seats on the head's underside (the jam nut bears on the rod top
-    and never reaches the shoulder), so it prints no size: the title block's
-    INSIDE CORNERS R.040 MAX governs it, and at that limit the die keeps a
-    pitch of worst-case run-out and the fillet ends inside the head."""
+def test_shoulder_root_prints_the_title_block_max_radius() -> None:
+    """Rules 11 and 16: the shank-to-head corner is a modelled fillet whose
+    size prints natively as R MAX. Nothing seats on the head's underside (the
+    jam nut bears on the rod top and never reaches the shoulder), so the
+    limit is the title block's INSIDE CORNERS R.040, the model stands at it,
+    and at that limit the die keeps a pitch of worst-case run-out and the
+    fillet ends inside the head."""
     import pn_vn_pen_adjust_nut_spec as jam_nut
     from _printed_tolerance import printed_band_mm
 
     band = printed_band_mm(2, unit=spec.UNIT)
-    corner_max = spec.SHOULDER_CORNER_R_MAX
-    assert corner_max == pytest.approx(0.040 * 25.4)
-    assert 0.0 < spec.SHOULDER_FILLET_R <= corner_max
+    assert spec.SHOULDER_CORNER_R_MAX == pytest.approx(0.040 * 25.4)
+    assert spec.SHOULDER_FILLET_R == spec.SHOULDER_CORNER_R_MAX
+    assert spec.SHOULDER_FILLET_BAND == (0.0, -spec.SHOULDER_FILLET_R)
+    assert spec.SHOULDER_FILLET_TOL_TYPE == 6  # swTolMAX
+    assert spec.SHOULDER_FILLET_PLACES == 3
     limit = spec.PLAIN_SHANK_MIN - spec.THREAD_PITCH
     assert spec.SHOULDER_FILLET_R_LIMIT == pytest.approx(limit)
-    assert corner_max <= limit
-    assert spec.THREAD_MAJOR / 2.0 + corner_max < (spec.HEAD_DIA - band) / 2.0
+    assert spec.SHOULDER_FILLET_R <= limit
+    assert spec.THREAD_MAJOR / 2.0 + spec.SHOULDER_FILLET_R < (
+        (spec.HEAD_DIA - band) / 2.0
+    )
     shortest_shank = (spec.OVERALL_LENGTH + spec.OVERALL_DEVIATIONS[0]) - (
         spec.HEAD_HEIGHT + band
     )
@@ -181,7 +188,21 @@ def test_shoulder_root_corner_is_governed_by_the_title_block() -> None:
         shortest_shank - pn_pen_rod_spec.STUD_TAP_SPEC.depth_mm
     )
     assert spec.SHOULDER_OVER_ROD_TOP_MIN > jam_nut.THICKNESS
-    assert "ShoulderFillet" not in spec.DRAWING_DIMENSIONS
+    assert "ShoulderRadius" not in spec.DIMENSION_CALLOUTS
+    source = _source(part)
+    assert "tolerance.Type = SHOULDER_FILLET_TOL_TYPE" in source
+    build_body = source[source.index("async def build(") :]
+    assert build_body.index(
+        "apply_drawing_precision(adapter, DRAWING_PRECISION)"
+    ) < build_body.index("_shoulder_fillet_max_limit(adapter)")
+    # The sheet proves the import kept the MAX type and the radial form, and
+    # lays the radius out for whichever corner arc SolidWorks hung it on.
+    draw_source = _source(drawing)
+    assert "_dress_shoulder_radius(adapter, drawing_model, by_name, spt)" in (
+        draw_source
+    )
+    assert "int(tolerance.Type) != SHOULDER_FILLET_TOL_TYPE" in draw_source
+    assert set(drawing.UPPER_ARC_KEEP) == {"ShoulderRadius", "PlainDia"}
 
 
 def test_plain_shank_diameter_prints_as_a_reference() -> None:
@@ -376,8 +397,8 @@ def test_volumes_are_analytic() -> None:
     spandrel = r_fillet**2 * (1.0 - math.pi / 4.0)
     centroid_r = r_thread + r_fillet * (10.0 - 3.0 * math.pi) / (3.0 * (4.0 - math.pi))
     assert part.V_FILLET == pytest.approx(2.0 * math.pi * centroid_r * spandrel)
-    # A sliver (~0.04 mm^3) of a ~260 mm^3 stud.
-    assert 0.0 < part.V_FILLET < 0.1
+    # About 1.4 mm^3 of a ~260 mm^3 stud at R.040.
+    assert 0.0 < part.V_FILLET < 2.0
     assert part.V_TOTAL == pytest.approx(stud + part.V_FILLET - part.V_EYE)
     source = _source(part)
     assert 'volume_check(adapter, "stud", V_STUD,' in source
