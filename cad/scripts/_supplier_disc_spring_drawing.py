@@ -51,8 +51,9 @@ TEXT_SIDES = {
 # draw_dt_vn_cylinder_bank_spring): the farthest an outside arrow on a rim
 # reaches beyond it, whatever angle its leader takes.
 ARROW_REACH_M = 0.003556 + 0.000762 / 2.0
-# The shaft text's bottom, this far over the plan centre (above the OD text).
-SHAFT_TEXT_RISE_M = 0.006
+# The shaft text's bottom, this far over the plan centre: clear of the OD
+# text by more than the audit's one-callout separation (4.5 mm at 6 mm).
+SHAFT_TEXT_RISE_M = 0.0075
 # Edge-on diagrams: the template's centre cross lies along the thin edge view
 # and prints as dashes inside it, a hidden line to the reader.
 EDGE_VIEWS = ("free_front", "free_right")
@@ -149,8 +150,8 @@ def _size_text_move(
     over the plan centre. A height's offset text goes a clear gap beyond its
     own dimension line, witnesses and arrows (the washer thickness pattern).
     The application gauge cell has no room beside its wide planes for a
-    stacked callout, so its text sits over the highest plane's arrow,
-    centred on its own dimension line.
+    stacked callout, so its text runs along its own dimension line to just
+    over the highest plane's arrow.
     """
     reader = _Reader(adapter)
     record = _dump_annotation(reader, display.GetAnnotation())
@@ -196,14 +197,16 @@ def place_disc_size_texts(
     """Move each size text off every line it would sit on.
 
     Plan diameters take one near-side arrow (no line through the shared
-    centre, so concentric leaders cannot cross). Thin heights take native
-    offset text, which keeps the dimension line at its station and lets the
-    position write move only the text.
+    centre, so concentric leaders cannot cross). Thin edge-view heights take
+    native offset text, which keeps the dimension line at its station and
+    lets the position write move only the text. A gauge height's text moves
+    along its own line instead: an offset connector to the gap between its
+    outside arrows ended in mid-air.
     """
     for key, semantic, display in placed:
         if key == "free_top":
             set_near_side_diameter(display.GetAnnotation(), f"{label} {semantic}")
-        else:
+        elif key != "free_right":
             display.OffsetText = True
     rebuild_drawing(adapter, label=f"{label} disc size styles")
     for key, semantic, display in placed:
