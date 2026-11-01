@@ -72,7 +72,10 @@ REFERENCE_STARTS = {
 }
 REFERENCE_FORMATS = {
     "SupplierShoulderDiameter": (4, "diameter", None, "SHOULDER"),
-    "SupplierShoulderLength": (3, "length", None, "SHOULDER LENGTH"),
+    # No callout: the bare (1.500) fits between its witnesses; with
+    # SHOULDER LENGTH its 51 mm text overhung the 38 mm span and shelved off
+    # the Right cell.
+    "SupplierShoulderLength": (3, "length", None, None),
     "SupplierHeadDiameter": (3, "diameter", None, "HEAD"),
 }
 REFERENCE_TOLERANCES_MM = {
@@ -83,10 +86,18 @@ REFERENCE_TOLERANCES_MM = {
 CUT_FEATURE = "ThreadEnvelope"
 CUT_DIMENSION = "CutThreadLength"
 _CHAMFER_IN = f"{CUT_CHAMFER / INCH:.2f}".removeprefix("0")
-CUT_CALLOUT = (
-    "CUT THREAD FROM SHOULDER\n"
-    f"CHAMFER END {_CHAMFER_IN} X 45°\n"
-    "TIP STAYS .011 MIN INSIDE TL-22"
+# The value and a one-word callout sit on the dimension line between the
+# shoulder and the thread end (no wider than that 14.5 mm span). The cut's
+# function, which keeps .570 at three places, and the end chamfer's size are a
+# leadered note right of the thread end (machinist review: text shelved under
+# the head read as a head size, and the mate needs its full name). At most 27
+# characters a row, so the note fits between the tip and the Right cell's edge.
+CUT_CALLOUT = "CUT"
+CUT_NOTE = (
+    "CUT THREAD AT .570;\n"
+    f"CHAMFER {_CHAMFER_IN} X 45°\n"
+    "TIP STAYS .011 MIN INSIDE\n"
+    "MHA-CH-06-TL-22 PIVOT BLOCK"
 )
 THREAD_NOTE = f"{THREAD} UNC-2A\n(AS SUPPLIED)"
 SUPPLIER_DATA = (
