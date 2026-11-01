@@ -781,8 +781,9 @@ def link_volume(steps: int = 72) -> float:
 
 # The purchased-part identification sheets (build_purchased_part_drawing).
 # One short line each: the sheet reserves ~0.19 m for the note (the first cut,
-# 94 characters, ran 0.204 m and failed drawing:keeper_chain).
-CHAIN_DRAWING_NOTES = f"CUT TO {BEAD_COUNT} BEADS ({CHAIN_LENGTH:.0f} MM); CLOSED BY MHA-DT-VN-66."
+# 94 characters, ran 0.204 m and failed drawing:keeper_chain).  The bead count
+# is the cut; the note carries no dimension (#290).
+CHAIN_DRAWING_NOTES = f"CUT TO {BEAD_COUNT} BEADS; CLOSED BY MHA-DT-VN-66."
 LINK_DRAWING_NOTES = "JOINS THE MHA-DT-VN-65 ENDS: ONE BEAD PER DOME."
 
 # The chain part's own frame: machine axes, origin on its first bead (the

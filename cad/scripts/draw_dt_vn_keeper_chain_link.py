@@ -13,6 +13,7 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _purchased_part_drawing import build_purchased_part_drawing
 
 
@@ -24,7 +25,7 @@ PART_STEM = SPEC.artifact_stem
 
 async def build(adapter: Any) -> dict[str, str]:
     return await build_purchased_part_drawing(
-        adapter, SPEC, item=ITEM
+        adapter, SPEC, item=ITEM, unit=part_drawing_unit(PART_STEM)
     )
 
 
