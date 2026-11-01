@@ -24,7 +24,7 @@ sm-summing-lever:
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "the knife-seat and 20-hole spring-pattern position frame (Ø.006 RFS)"
+      where: "the knife-seat and 20-hole spring-pattern position frame (Ø.006 RFS to A|B|C; datum C, the coefficient-plate top the taps run through, clocks the pattern about A)"
       finding: "pattern position frame over-specified (rule 5)"
       reason: "one pattern control keeps the 20 channels spring geometry consistent; its Ø.006 zone, tightened from Ø.012 by owner ruling on code review C06, keeps neighbouring MHA-CH-14 jam nuts .010 apart with both taps at their worst (owner-accepted)"
     # Carry forward b2c8d954 RV-02 only at the unchanged junctions below.
