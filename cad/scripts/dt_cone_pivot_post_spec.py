@@ -107,7 +107,11 @@ CONE_AXIS_VIEW = "CONE JOURNAL"
 BORE_HEIGHT = cone_axis.CONE_AXIS_HEIGHT_MM
 CONE_BOSS_DIA = 17.272  # .68
 BORE_DIA = 12.2682  # .483 in
-CONE_BOSS_LENGTH = post_envelope.BLOCK_DIA
+# The harvested 1.654 face-to-face: MHA-DT-04's bearing length, which the
+# cone shaft's stations and the gear stack close on.  It is its own value, not
+# the body's Ø: the Ø1.65 body (dt_cone_post_envelope.BLOCK_DIA) sits on the
+# .XX grid, so each boss end stands ~.002 proud of the body's tangent line.
+CONE_BOSS_LENGTH = 42.011
 
 # Two vertical ANSI-inch 1/4 Fillister Head Screw counterbores in the top face.
 # Ry(180) maps part-local +X to machine -X, so the assembly intentionally mates
@@ -190,8 +194,9 @@ if CONE_BOSS_NORTH_STATION_TOLERANCE_MM > _CONE_BOSS_HALF_BAND:
 # Growing the 86 mm feature-sum reference adds only the body column less the
 # two through drills.  The head shell's height and the contained boss/pad/bore
 # intersections are unchanged; the builder independently recomputes them.
-# The constant is that sum at the 86 mm reference for the inch sizes (#290).
-HARVESTED_VOLUME_MM3 = 112_123.5736 + math.pi * (
+# The constant is that sum at the 86 mm reference for the inch sizes (#290)
+# and the Ø41.91 body (112 123.5736 at the harvested Ø42.011).
+HARVESTED_VOLUME_MM3 = 111_752.8114 + math.pi * (
     (post_envelope.BLOCK_DIA / 2.0) ** 2 - 2.0 * (ATTACHMENT_THRU_DIA / 2.0) ** 2
 ) * (BLOCK_HEIGHT - 86.0)
 HARVESTED_MASS_KG = HARVESTED_VOLUME_MM3 * 7.20e-6
@@ -290,7 +295,7 @@ for _name, _web in CRANK_BORE_WEBS_WORST.items():
 # the loosest title-block angular row on the cone axis; its BASIC angle and
 # angularity frame are tighter, so this overbounds the printed corner.
 MOUNT_OTHER_WEBS_WORST = {
-    "body foot OD": _printed_limits(post_envelope.BLOCK_DIA, 3)[0] / 2.0
+    "body foot OD": _printed_limits(post_envelope.BLOCK_DIA, 2)[0] / 2.0
     - _printed_limits(ATTACHMENT_X, 2)[1]
     - (ATTACHMENT_THRU_DIA + _DRILL_OVERSIZE) / 2.0,
     "inclined cone bore": _HOLE_X_MIN
@@ -390,12 +395,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # band (.X +/-.1, .XX +/-.01, .XXX +/-.005 in), so the PART owns them and the
 # sheet only proves they survived the import (drawing-simplicity-policy.md `How the repository implements the guidelines`).
 # Nothing prints .X: every size below feeds a wall, web or stack check.  The
-# head, the body height, the boss diameters, the mounting-hole stations and
-# the cone-axis height (its own band) take two.  The foot OD and the cone boss
-# length share the harvested 1.654 (the boss spans the body), so they take
-# three; the shaft collar bears on the boss's north face, half the length's
-# band off the post centre, and that half lands on the cone-tip adjuster's
-# engagement (build_dt_drive_train_assembly.TIP_EMBED_WORST_MM).  The crank
+# body and head diameters, the body height, the boss diameters, the
+# mounting-hole stations and the cone-axis height (its own band) take two:
+# the body's Ø1.65 is a cast size whose .XX band still leaves the mounting
+# holes' outer wall over the floor (MOUNT_OTHER_WEBS_WORST), so rule 17
+# gives it no tighter band.  The cone boss length is the harvested 1.654
+# MHA-DT-04 bearing length, three places; the shaft collar bears on the
+# boss's north face, half the length's band off the post centre, and that
+# half lands on the cone-tip adjuster's engagement
+# (build_dt_drive_train_assembly.TIP_EMBED_WORST_MM).  The crank
 # boss length is Pedro's 2.836 in source dimension, three places.  The
 # crank-axis height (a reference), the crank-above-cone spacing and the crank
 # boss's machined north-face station (the 16T's seat) are mesh closures
@@ -404,7 +412,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # angular band.  The two reamed running bores take four, the places their
 # size limits are written in.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "MainBodyProfile": {"MainBodyDia": 3},
+    "MainBodyProfile": {"MainBodyDia": 2},
     "MainBody": {"MainBodyHt": 2},
     "HeadProfile": {"HeadDia": 2},
     "Head": {"HeadHt": 2},

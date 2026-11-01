@@ -41,8 +41,8 @@ ON_SURFACE_MM = 0.02
 def post_features_at(point: tuple[float, float, float]) -> tuple[str, ...]:
     """Every MHA-DT-05 surface a point (crank_boss_rim's frame, mm) lies on.
 
-    A corner lies on several and a flush pair (the cone boss's end faces are
-    tangent to the Ø42 body) can tie, so this names all of them, never a pick.
+    A corner lies on several, and features can tie, so this names all of
+    them, never a pick.
     """
     x, y, z = point
     tol = ON_SURFACE_MM

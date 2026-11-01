@@ -34,7 +34,11 @@ def test_required_drawing_paths() -> None:
 
 
 def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> None:
-    assert BLOCK_DIA == 42.011
+    # The cast body sits on the .XX grid (1.65 in, machinist review: rule 17
+    # gives it no band tighter than the title block's); the cone boss keeps
+    # the harvested 1.654 face-to-face the cone shaft and gear stack close on.
+    assert BLOCK_DIA == 41.91
+    assert spec.CONE_BOSS_LENGTH == 42.011
     assert (spec.HEAD_DIA, spec.HEAD_HEIGHT) == (42.672, 26.67)
     assert spec.HEAD_BASE_Y == pytest.approx(spec.BLOCK_HEIGHT - spec.HEAD_HEIGHT)
     assert (spec.CRANK_BOSS_DIA, spec.CRANK_BORE_DIA, spec.CRANK_BORE_OFFSET) == (
@@ -467,9 +471,9 @@ def test_part_owns_every_printed_decimal_place() -> None:
         *spec.DRAWING_DIMENSIONS.values()
     )
     assert "draw_dt_cone_pivot_post.py" in PRECISION_MIGRATED_DRAWINGS
-    # The bores earn extra places for their limits, the shared 1.654 foot
-    # and boss length and the closures print .XXX, and the basic plan
-    # angle prints the model's exact value (#906, it feeds the frame).
+    # The bores earn extra places for their limits, the harvested 1.654 boss
+    # length and the closures print .XXX, and the basic plan angle prints the
+    # model's exact value (#906, it feeds the frame).
     assert {
         name
         for name, places in spec.DRAWING_PRECISION_BY_NAME.items()
@@ -478,7 +482,6 @@ def test_part_owns_every_printed_decimal_place() -> None:
         "CrankBoreDia",
         "JournalBoreDia",
         "InclineAngle",
-        "MainBodyDia",
         "ConeBossLen",
         "CrankBossLen",
         "CrankAxisY",
@@ -868,12 +871,43 @@ def test_foot_seat_mate_rides_its_ra_symbol_not_a_loose_note() -> None:
 
 def test_body_diameter_claims_no_unmeasurable_flushness() -> None:
     """PR #2107 machinist review (clarity): FLUSH WITH CONE BOSS FACES was not
-    guaranteed by Ø1.654's and the .827 station's printed limits; each band
+    guaranteed by the body Ø's and the .827 station's printed limits; each band
     governs its own surface (crank_boss_rim proves the 64T clear of both)."""
     assert "MainBodyDia" not in drawing.DIMENSION_CALLOUTS
     assert not [
         text for text in drawing.DIMENSION_CALLOUTS.values() if "FLUSH" in text
     ]
+
+
+def test_body_diameter_takes_the_title_block_band() -> None:
+    """MHA-DT-05 machinist review (gating, rule 17): Ø1.654 printed three
+    places only because the harvested 42.011 sat off the .XX grid, and its
+    suffix said the band protected the mounting holes' wall.  The cast body
+    is Ø1.65 at .XX; the wall still clears the floor at that band's minimum."""
+    assert spec.DRAWING_PRECISION_BY_NAME["MainBodyDia"] == 2
+    assert round(BLOCK_DIA / 25.4, 2) == pytest.approx(BLOCK_DIA / 25.4, abs=1e-9)
+    assert "MainBodyDia" not in drawing.DIMENSION_SUFFIXES
+    assert drawing.FRONT_KEEP["MainBodyDia"] == (0.150, 0.074)
+    assert spec.MOUNT_OTHER_WEBS_WORST["body foot OD"] == pytest.approx(
+        spec._printed_limits(BLOCK_DIA, 2)[0] / 2.0
+        - spec._printed_limits(spec.ATTACHMENT_X, 2)[1]
+        - (spec.ATTACHMENT_THRU_DIA + spec._DRILL_OVERSIZE) / 2.0
+    )
+    assert spec.MOUNT_OTHER_WEBS_WORST["body foot OD"] >= spec.WEB_FLOOR_MM
+
+
+def test_one_cone_boss_diameter_counts_both_bosses() -> None:
+    """MHA-DT-05 machinist review: SECTION A-A shows a boss at each end of the
+    cone bore, and the one Ø printed nowhere said it sized both."""
+    assert drawing.DIMENSION_PREFIXES == {"ConeBossDia": "2X "}
+    assert drawing._DIMENSION_TEXT_PREFIX == 1
+    # A custom prefix replaces the automatic Ø, so the count keeps its token.
+    assert drawing.counted_diameter_prefix("2X ", "") == "2X <MOD-DIAM>"
+    assert drawing.counted_diameter_prefix("2X ", "<MOD-DIAM>") == "2X <MOD-DIAM>"
+    with pytest.raises(RuntimeError, match="already carries 2X"):
+        drawing.counted_diameter_prefix("2X ", "2X <MOD-DIAM>")
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_set_dimension_prefixes(adapter, annotations)" in source
 
 
 def test_plan_angle_is_basic_and_prints_the_model_angle() -> None:
