@@ -11,6 +11,7 @@ import _telemetry
 from _com import _early_bound
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _supplier_nut_drawing import add_supplier_nut_dimensions
@@ -18,6 +19,8 @@ from _supplier_screw_layout import supplier_screw_margins
 from _supplier_text_shelf import assert_supplier_shelves, shelve_supplier_text
 import sm_vn_boss_hook_jam_nut_spec as supplier
 
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["sm_vn_boss_hook_jam_nut"]
 ITEM = "#10-24 NARROW-PROFILE HEX NUT"

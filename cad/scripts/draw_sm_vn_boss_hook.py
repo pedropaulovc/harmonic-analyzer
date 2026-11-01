@@ -25,6 +25,7 @@ from _drawing_hidden_sketches import (
 )
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _drawing_sheet_region import sheet_drawable_region
 from _purchased_fastener_drawing import _box, _inside, assert_supplier_view_fits
@@ -54,6 +55,8 @@ from sm_vn_boss_hook_spec import (
     SUPPLIER_THREAD_DIMENSIONS,
     SUPPLIER_THREAD_FEATURE,
 )
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["sm_vn_boss_hook"]
 SOURCE = SPEC.source

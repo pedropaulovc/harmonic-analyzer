@@ -53,6 +53,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_serialized_note_identity import capture_serialized_note_name
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _mcmaster_92314a253 import DIMS as _SUPPLIER_DIMS
 from _layout_audit import annotation_geometry, calibrate_sheet_advance, display_box
 from _layout_geometry import Box, segment_box_distance
@@ -85,6 +86,8 @@ from sm_vn_knife_hanger_stud_spec import (
     THREAD_LENGTH_MIN,
     UNIT,
 )
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["sm_vn_knife_hanger_stud"]
 SOURCE = SPEC.source
