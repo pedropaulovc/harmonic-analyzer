@@ -158,14 +158,18 @@ POST_MOUNT_TAP_EDGE_BREAK = 0.1
 POST_MOUNT_TAP_BREAK_CALLOUT = f"{POST_MOUNT_TAP_EDGE_BREAK:.1f} MAX BREAK EACH END"
 # U37 (2026-09-23): the user accepted short engagement for MHA-DT-VN-61 as a named
 # exception to drawing-guidelines.md rule 18 (thread engagement)'s 1.5D; the plate slides on the deck, so no boss can
-# add thread.  Worst case: the thinnest stock plate (U41) less the cut-to-fit
-# allowance and the break at both ends of the tap, counted as MHA-DT-32 counts
-# its exit break.  A MIN never rounds up, so the print floors to two places.
+# add thread.  Worst case: the thinnest stock plate (U41) less the tap's entry
+# break at the top and, at the underside, whichever reaches further: the tap's
+# exit break, or the cut-to-fit allowance plus the screw's own cut-end break.
+# A MIN never rounds up, so the print floors to two places.
 POST_MOUNT_ENGAGEMENT_WORST = round(
     PLATE_THICKNESS
     - PLATE_STOCK_BAND
-    - POST_SCREW_CUT_TO_FIT_SHORT
-    - 2.0 * POST_MOUNT_TAP_EDGE_BREAK,
+    - POST_MOUNT_TAP_EDGE_BREAK
+    - max(
+        POST_MOUNT_TAP_EDGE_BREAK,
+        POST_SCREW_CUT_TO_FIT_SHORT + post_mount.SCREW_CUT_END_BREAK_MM,
+    ),
     6,
 )
 POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS = (
