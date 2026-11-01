@@ -52,10 +52,13 @@ STARTS = {
     ),
 }
 # The .125 in head and collar heights print wider than their spans: shelve
-# them past their own witnesses, right, into free sheet.
+# them past their own witnesses, right, into free sheet. Centred on its line,
+# the head diameter's closing paren crowded the knurl outline (6988bc2
+# review): its text shelves left, away from the head, at its own height.
 SHELVES = {
     "SupplierHeadHeight": (True, "right"),
     "SupplierCollarHeight": (True, "right"),
+    "SupplierHeadDiameter": (False, "left"),
 }
 
 

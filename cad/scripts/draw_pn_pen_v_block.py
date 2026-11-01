@@ -275,8 +275,8 @@ FRONT_KEEP = {
 #   y ~0.234; text ~0.2355..0.239), its extension lines rising from the
 #   flat's ends (x 0.228 / 0.236) across the end face: 8 mm under the tap's
 #   callout (from y ~0.247).
-# * the flat's height, a reference "(.196)", right of the view (x
-#   ~0.283..0.294), 12 mm clear of section A-A (from x 0.306).
+# * the flat's height, a reference "(.20)", right of the view (x
+#   ~0.283..0.292), 12 mm clear of section A-A (from x 0.306).
 # * the apex rounds' "2X R.020 MAX" over the view, 70 mm up the back round's
 #   bisector (67.5 deg) from its centre (x 0.2352, y 0.174), so the radial
 #   leader meets the arc square on and crosses only the end face: its text
@@ -392,7 +392,7 @@ BOTTOM_KEEP = {
 #   text right put the line's end 1 mm off it).  The line runs under the
 #   whole text block, out to the far end of its widest row, the one-row
 #   "CLEARS ROD ... FILLET" above (~72 mm).  Centred 21 mm left of the rim
-#   (x 0.338) the "0.3 min." / "X 45 DEG" rows (~24 mm) end 6 mm short of
+#   (x 0.338) the "0.3 min." / "X 45°" rows (~24 mm) end 6 mm short of
 #   the extension lines and the line runs x ~0.302..0.364 at y ~0.2425, 4.8
 #   mm over PivotZ's "11.1" (top 0.2377) and 8 mm over both of its extension
 #   lines' tops (0.2345), crossing neither; the block (keep y 0.251, rows

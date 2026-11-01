@@ -853,7 +853,7 @@ def _single_limits(adapter) -> None:
 
 
 def _author_reference_dimensions(adapter) -> None:
-    """Show each driven dimension as a reference: no tolerance, "(.196)"
+    """Show each driven dimension as a reference: no tolerance, "(.20)"
     (build_ms_stop_block._author_plate_location_references' recipe)."""
     for feature_name, dimension_name in REFERENCE_DIMENSIONS:
         display, dimension = _named_dimension(adapter, feature_name, dimension_name)

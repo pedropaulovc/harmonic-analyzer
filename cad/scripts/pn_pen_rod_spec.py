@@ -78,10 +78,36 @@ STUD_ENGAGEMENT = 3.2
 TOTAL_LENGTH = SQUARE_LENGTH + PIVOT_LENGTH
 
 _WALL = (ROD_SECTION + SECTION_BAND[1] - THREAD_MAJOR_MM[STUD_THREAD]) / 2.0
-# drawing-guidelines.md rule 17 (walls and webs): 1.714, between the .060
-# floor and the .080 target.
+# drawing-guidelines.md rule 17 (walls and webs): .0675 to each flat of the
+# smallest square, between the .060 floor and the .080 target: RV-01 in
+# pn-pen-rod.yaml (owner ruling 2026-10-31: no thread is smaller and the
+# V-block fixes the square, and rule 17 forbids tightening its band).
 if _WALL < WALL_FLOOR_MM:
     raise AssertionError(f"rod stud tap leaves a {_WALL:.3f} mm wall")
+# The sheet states that wall natively on the end view (rule 20), as
+# pn_pen_frame_spec states the frame's: a hidden reference line in the
+# shoulder plane runs from the thread's major diameter toward a flat, as long
+# as the printed minimum, and its dimension prints ".067 MIN" over TAP WALL.
+# The minimum rounds DOWN to its places (.0675 would round up to .068, over
+# the worst case).
+TAP_WALL_MIN_PLACES = 3
+TAP_WALL_MIN_MM = round(
+    math.floor(_WALL / 25.4 * 10**TAP_WALL_MIN_PLACES) / 10**TAP_WALL_MIN_PLACES * 25.4,
+    9,
+)
+if not WALL_FLOOR_MM <= TAP_WALL_MIN_MM <= _WALL < TAP_WALL_MIN_MM + 0.0254:
+    raise AssertionError("the stated tap wall is not the printed worst case")
+TAP_WALL_MIN_TOL_TYPE = 5  # swTolType_e.swTolMIN
+# A MIN single limit whose upper deviation reaches the wall on the largest
+# square.
+_WALL_MAX = (ROD_SECTION + SECTION_BAND[0] - THREAD_MAJOR_MM[STUD_THREAD]) / 2.0
+TAP_WALL_MIN_BAND = (round(_WALL_MAX - TAP_WALL_MIN_MM, 6), 0.0)
+TAP_WALL_CALLOUT = "TAP WALL"
+# The reference line starts on the thread's major diameter, on the axis's
+# side of the flat it runs toward.
+TAP_WALL_START_R = THREAD_MAJOR_MM[STUD_THREAD] / 2.0
+if TAP_WALL_START_R + TAP_WALL_MIN_MM >= (ROD_SECTION + SECTION_BAND[1]) / 2.0:
+    raise AssertionError("the tap wall reference runs out of the square")
 if STUD_ENGAGEMENT < 1.5 * THREAD_MAJOR_MM[STUD_THREAD]:  # rule 18
     raise AssertionError("adjuster stud engagement is under 1.5 D")
 if STUD_ENGAGEMENT >= STUD_TAP_SPEC.overrides_mm["ThreadDepth"]:
@@ -121,26 +147,30 @@ DRAWING_REFERENCE_PRECISION = 2
 # the pivot's length and banded diameter, and the shoulder root's MAX radius.
 # End view (5:1) of the tapped top face: the square's banded depth, which the
 # SQ in its callout makes the size of both flats (Section and Depth are one
-# "RodSection" global, so the model holds the square), and the stud-tap
-# wizard callout.  Section keeps its model band but is not printed: one SQ
-# size defines a square (fr_rocker_arm_support's WinWidth "SQ POCKET").
+# "RodSection" global, so the model holds the square), the stud-tap wizard
+# callout, and RV-01's tap wall (TapWallMin on the hidden TapWallReference).
+# Section keeps its model band but is not printed: one SQ size defines a
+# square (fr_rocker_arm_support's WinWidth "SQ POCKET").
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RodProfile": {"Length"},
     "Rod": {"Depth"},
     "PivotProfile": {"PivotDia"},
     "Pivot": {"PivotLength"},
     "ShoulderFillet": {"ShoulderRadius"},
+    "TapWallReference": {"TapWallMin"},
 }
 # Places (drawing-guidelines.md rule 3): the banded square and pivot print at
 # their bands' places (.XXX, .XXXX); the square's length (the guide
 # engagement) and the pivot's length (clear of the v-block relief roof) print
-# the title block's .XX; the shoulder radius prints its MAX limit at three.
+# the title block's .XX; the shoulder radius prints its MAX limit at three,
+# the tap wall its MIN limit at three.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "RodProfile": {"Length": 2},
     "Rod": {"Depth": 3},
     "PivotProfile": {"PivotDia": 4},
     "Pivot": {"PivotLength": 2},
     "ShoulderFillet": {"ShoulderRadius": SHOULDER_FILLET_PLACES},
+    "TapWallReference": {"TapWallMin": TAP_WALL_MIN_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -162,11 +192,13 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
 if DRAWING_BANDS[("RodProfile", "Section")] != DRAWING_BANDS[("Rod", "Depth")]:
     raise AssertionError("one SQ size can only state a square whose flats share a band")
 # Every tight band names its mate on the dimension it governs (rule 4); the
-# shoulder radius names the part its seat face lands on.
+# shoulder radius names the part its seat face lands on, the tap wall what
+# it is.
 DIMENSION_CALLOUTS: dict[str, str] = {
     "Depth": f"SQ, SLIDING FIT IN PEN\nHANGER {PEN_HANGER_NUMBER} GUIDES",
     "PivotDia": f"SLIP FIT IN PEN V-BLOCK\n{PEN_V_BLOCK_NUMBER} PIVOT BORE",
     "ShoulderRadius": f"SEATS ON PEN V-BLOCK\n{PEN_V_BLOCK_NUMBER}",
+    "TapWallMin": TAP_WALL_CALLOUT,
 }
 
 # The 5:1 end view stands off projection (under the side view, rescaled), so

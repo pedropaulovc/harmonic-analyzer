@@ -30,10 +30,21 @@ SPEC = DRAWINGS_BY_NAME["pn_vn_pen_rod_set_screw"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "#4-40 x 3/16 SOCKET SET SCREW, CUP POINT"
 # The diameter and drive texts are as wide as their spans: shelve them past
-# their own witnesses. The 3/16 length keeps its centred text.
+# their own witnesses. The 3/16 length keeps its centred text. The thread
+# text shelves left: shelved right, its dimension line ran under it out to
+# the length's lane, and the length's upper arrow tail ended on it
+# (6988bc2 review).
 SHELVES = {
-    "SupplierThreadDiameter": (True, "right"),
+    "SupplierThreadDiameter": (True, "left"),
     "SupplierDriveWidth": (True, "right"),
+}
+# At 2:1 the hex socket reads as a plain circle: name what the .05 measures.
+FORMATS = {
+    **SUPPLIER_REFERENCE_FORMATS,
+    "SupplierDriveWidth": (
+        *SUPPLIER_REFERENCE_FORMATS["SupplierDriveWidth"][:3],
+        "HEX SOCKET AF",
+    ),
 }
 
 
@@ -52,7 +63,7 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter,
             views_by_orientation,
             dimensions=SUPPLIER_REFERENCE_DIMENSIONS,
-            formats=SUPPLIER_REFERENCE_FORMATS,
+            formats=FORMATS,
             starts=SUPPLIER_REFERENCE_STARTS,
             planes=SUPPLIER_REFERENCE_PLANES,
             sides=SUPPLIER_REFERENCE_SIDES,
