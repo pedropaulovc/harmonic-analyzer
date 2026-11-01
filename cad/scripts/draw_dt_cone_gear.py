@@ -1649,7 +1649,12 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label=f"{configuration} right",
         )
         annotations = [*bore_annotations, *front_annotations, *right_annotations]
-        set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+        # RV-03's web dimension shows on the T012 sheet only (front_keep).
+        callouts = {
+            name: text for name, text in DIMENSION_CALLOUTS.items()
+            if name != "WebMin" or teeth == WEB_REFERENCE_TEETH
+        }
+        set_dimension_callouts(adapter, annotations, callouts)
         set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
         assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
         _center_mark_bore(adapter, front, teeth, label=f"{configuration} front")
