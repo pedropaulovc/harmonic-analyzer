@@ -96,11 +96,11 @@ def annotate_chain_stock(
         (
             stock.ROLLER_DIMENSION,
             stock.ROLLER_DIAMETER,
-            3 if connecting else 2,
+            3,
             "diameter",
             "FOR ROLLER" if connecting else "ROLLER",
         ),
-        (stock.PITCH_DIMENSION, stock.PITCH, 3 if connecting else 2, "length", "PITCH"),
+        (stock.PITCH_DIMENSION, stock.PITCH, 3, "length", "PITCH"),
     )
     top = (
         (
