@@ -440,9 +440,8 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
                                 section_label='B',scale=(1,1),partial=True,
                                 label='carriage counterbore floor')
     # Both blocks print B-B as its cut face only (rule 9), the top face's +Y
-    # corner where the full B-B put it. On TL-22's full section the B-B import
-    # delivered CboreFloor but not SectionBlockHeight (farm round 1 at
-    # 9b49bcc), while TL-32's cut-face B-B imported both from the same sketch.
+    # corner where the full B-B put it. Its block-height line stands inside
+    # the cut face (_oblique_pivot_block_model._cbore_floor_reference).
     _cut_face_only(adapter, floor, 'B', (x, part.BLOCK_WIDTH/2, contract.BLOCK_HEIGHT),
                    (FLOOR_XY[0]-contract.BLOCK_HEIGHT/2000, FLOOR_XY[1]+part.BLOCK_WIDTH/2000),
                    (FLOOR_XY[0], FLOOR_XY[1]-part.BLOCK_WIDTH/2000-SECTION_CAPTION_GAP), SHEET_SCALE)
