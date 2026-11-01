@@ -64,9 +64,11 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 # line break in the ABOVE compartment but never prints it
 # (draw_pd_transgear_pin._printable_above_callouts).
 PIN_DIA_FRACTION_DENOMINATOR = 64  # 5/64 drill rod
+# The supplier's grind tolerance travels with the as-bought REF.
+STOCK_TOLERANCE_IN = f"\u00b1{pin.PIN_DIA_TOLERANCE / 25.4:.4f}".replace("0.", ".")
 PIN_DIA_CALLOUT = "\n".join(
     (
-        "DRILL ROD, AS SUPPLIED",
+        f"DRILL ROD {STOCK_TOLERANCE_IN}, AS SUPPLIED",
         "PRESS FIT IN MHA-CH-03 FORK HOLE",
         "RUNNING FIT IN MHA-CH-06 #47 HOLE",
     )
