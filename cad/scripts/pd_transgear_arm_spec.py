@@ -204,14 +204,18 @@ PLATE_TAP_EDGE_BREAK_CALLOUT = (
 )
 # Where each projected zone starts and which way it runs, at the feature
 # (machinist review, rule 7; it was general note 1): the sheet draws each
-# zone as a heavy chain line from front face A (z = 0) along the hole's
-# axis and dimensions its height (ASME Y14.5-2018: the extent and direction
-# of a projected zone, a dimensioned chain line on the hole's axis). Model
-# +Z runs rearward. The plate taps' zones run rearward, through the arm into
-# the MHA-PD-19 plate past the seated screw-head contact
-# (transgear_hanger_joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM, from A);
-# the pin bore's runs forward to the chain plane
-# (paper_drive_arm_registration.S_PROJECTED_HEIGHT_MM). The sheet carries no
+# zone as a heavy chain line on the hole's axis, from the face its mating
+# part seats on, outward, and dimensions its height (ASME Y14.5-2018: the
+# extent and direction of a projected zone, a dimensioned chain line on the
+# hole's axis). Model +Z runs rearward. The plate taps' zones start at the
+# rear face, where the MHA-PD-19 plate seats, and run rearward into it, past
+# the seated screw-head contact
+# (transgear_hanger_joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM, from A,
+# lies inside it); the pin bore's starts at face A and runs forward to the
+# chain plane (paper_drive_arm_registration.S_PROJECTED_HEIGHT_MM).
+# Machinist review r7 (clarity, gating): drawn from face A, the taps' chain
+# ran through the arm and did not read as projecting out of one face.  The
+# tilt checks read the full heights either way.  The sheet carries no
 # general notes: the matched-pair setting and fit-up check are MHA-PD-00's
 # steps, and the match-drill rides the locating holes' callout.
 PROJECTED_ZONE_REARWARD = 1.0
@@ -222,6 +226,11 @@ PROJECTED_ZONE_DIRECTION: dict[str, float] = {
         for index in range(1, len(PLATE_TAP_STATIONS) + 1)
     },
     "feed_stud_projected_axis": PROJECTED_ZONE_FORWARD,
+}
+# The model z of the face each zone starts on.
+PROJECTED_ZONE_START_Z: dict[str, float] = {
+    key: THICKNESS if direction == PROJECTED_ZONE_REARWARD else 0.0
+    for key, direction in PROJECTED_ZONE_DIRECTION.items()
 }
 if set(PROJECTED_ZONE_DIRECTION) != {
     control.key for control in GEOMETRIC_CONTROLS

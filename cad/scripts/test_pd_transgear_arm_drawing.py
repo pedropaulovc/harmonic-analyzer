@@ -771,15 +771,16 @@ def test_the_locating_dowels_punch_out_from_the_front() -> None:
     assert geometry.LOCATOR_FULL_CYLINDER_SPAN_MIN_MM == pytest.approx(thinnest - 2.0 * front_break)
 
 
-def test_each_projected_zone_is_a_dimensioned_chain_line_from_face_a_on_its_side() -> None:
+def test_each_projected_zone_is_a_dimensioned_chain_line_from_its_mating_face() -> None:
     """Machinist review of f4a5f03a1 (clarity, rule 7; all three runs): the
     frames gave each zone's height, but where it starts and which way it
-    runs (from face A: taps rearward, pin bore forward) was printed only in
-    general note 1. Each zone is drawn at its feature as a chain line from
-    face A on its own side, dimensioned with its height as the frame prints
-    it, and the note is gone. Review of d5d1298b0: the pin bore's 32.6 rose
-    through the plan's dimension lines (gating), so it is drawn in section
-    D-D; the taps' dimension line runs on their zone's own ends; no MIN."""
+    runs was printed only in general note 1. Each zone is drawn at its
+    feature as a chain line on its own side, dimensioned with its height as
+    the frame prints it, and the note is gone. Review of d5d1298b0: the pin
+    bore's 32.6 rose through the plan's dimension lines (gating), so it is
+    drawn in section D-D; no MIN. Review r7 (gating): each zone starts at the
+    face its mating part seats on and runs outward, clear of the part (the
+    taps' ran through the stock from face A), and D-D names its face."""
     import paper_drive_arm_registration as registration
 
     projected = {
@@ -796,18 +797,19 @@ def test_each_projected_zone_is_a_dimensioned_chain_line_from_face_a_on_its_side
     taps = [key for key in projected if key.startswith("plate_tap_")]
     assert len(taps) == len(geometry.PLATE_TAP_STATIONS)
     for key in taps:
-        # Rearward, into the MHA-PD-19 plate (seated on the rear face), past
+        # Rearward from the rear face, where the MHA-PD-19 plate seats, past
         # the seated screw head's contact.
         assert spec.PROJECTED_ZONE_DIRECTION[key] == spec.PROJECTED_ZONE_REARWARD
+        assert spec.PROJECTED_ZONE_START_Z[key] == geometry.THICKNESS
         height = projected[key].projected_zone_height_mm
-        assert height > geometry.THICKNESS
-        assert height >= joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM
+        assert geometry.THICKNESS + height >= joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM
     # The pin bore's runs forward, to the chain plane in front of face A
     # (machine +Z runs rearward too).
     assert (
         registration.CHAIN_PLANE_MACHINE_Z_LIMITS_MM[0] < registration.ARM_FRONT_MACHINE_Z_MM
     )
     assert spec.PROJECTED_ZONE_DIRECTION["feed_stud_projected_axis"] == spec.PROJECTED_ZONE_FORWARD
+    assert spec.PROJECTED_ZONE_START_Z["feed_stud_projected_axis"] == 0.0
     assert (
         projected["feed_stud_projected_axis"].projected_zone_height_mm
         == registration.S_PROJECTED_HEIGHT_MM
@@ -833,17 +835,15 @@ def test_each_projected_zone_is_a_dimensioned_chain_line_from_face_a_on_its_side
         assert inches == pytest.approx(round(inches, spec.DRAWING_REFERENCE_PRECISION), abs=1e-9)
         assert control.projection_unit == "in"
     assert not hasattr(spec, "PROJECTED_ZONE_HEIGHT_SUFFIX")
-    # Section A-A (2:1, face A up): the taps' dimension line runs inside tap
-    # 1's hole beside its chain line, so its arrows land on the zone's own
-    # ends; the "2X" value stands below the rear face, between the taps,
-    # above the zones' far ends.
+    # Section A-A (2:1, face A up): the taps' dimension line runs beside tap
+    # 1's chain line, below the rear face, so its arrows land on the zone's
+    # own ends; the "2X" value stands between the taps, within the zones.
     tap = drawing.PROJECTED_ZONE_CHAINS["plate_tap_1_position"]
-    drill_r = drawing._PLATE_DRILL_R * drawing._S / 1000.0
     assert tap.dimension is not None and tap.dimension[1] == 0.0
-    assert 0.001 <= abs(tap.dimension[0]) <= drill_r - 0.0015
-    face_a_y = drawing.SECTION_CENTER[1] + geometry.THICKNESS * drawing._S / 2000.0
+    assert tap.dimension[0] >= 0.001
+    assert tap.face_callout == ""
     rear_y = drawing.SECTION_CENTER[1] - geometry.THICKNESS * drawing._S / 2000.0
-    tap_end_y = face_a_y - projected["plate_tap_1_position"].projected_zone_height_mm * drawing._S / 1000.0
+    tap_end_y = rear_y - projected["plate_tap_1_position"].projected_zone_height_mm * drawing._S / 1000.0
     assert tap.text_xy is not None
     assert tap_end_y < tap.text_xy[1] < rear_y - 0.004
     tap_x = [drawing._front_x(station) for station in geometry.PLATE_TAP_STATIONS]
@@ -866,8 +866,10 @@ def test_each_projected_zone_is_a_dimensioned_chain_line_from_face_a_on_its_side
     assert axis_y + half + 0.020 < plan_bottom
     pin = drawing.PROJECTED_ZONE_CHAINS["feed_stud_projected_axis"]
     assert pin.dimension is not None and pin.dimension[0] == 0.0
-    # Its dimension line clears the bore's mouth, beside the cut face.
+    # Its dimension line clears the bore's mouth, beside the cut face; no
+    # datum tag stands in D-D, so the value names its start face.
     assert geometry.PIN_BORE_DIA * drawing._S / 2000.0 < pin.dimension[1] < half
+    assert pin.face_callout
     caption_top = axis_y - half - drawing._PIN_CAPTION_GAP_M
     title_block_top = 0.065
     assert caption_top - 0.016 > title_block_top + 0.005

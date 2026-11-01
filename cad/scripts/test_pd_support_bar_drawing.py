@@ -504,13 +504,14 @@ def test_slot_views_frame_the_slots() -> None:
     assert drawing.SLOT_SECTION_CAPTION_XY[1] < bottom
     # Detail C's slot-width text stands under the slot's lower edge, right of
     # the crop circle (inside its 4.98 span its own dimension line struck it,
-    # r4 review), and the label right of that.
+    # r4 review); the label stands over the detail, centred on it (round 7:
+    # right of the slot-width text it sat against the title block).
     radius = drawing.DETAIL_RADIUS_MM * drawing.DETAIL_MM
     width_x, width_y = drawing.DETAIL_KEEP["ClampSlotWidth"]
     assert width_x > drawing.DETAIL_CENTER[0] + radius
     edge = drawing.DETAIL_CENTER[1] - part.CLAMP_SLOT_WIDTH * drawing.DETAIL_MM / 2.0
     assert width_y < edge
-    assert drawing.DETAIL_LABEL_XY[0] > width_x
+    assert drawing.DETAIL_LABEL_XY[0] == drawing.DETAIL_CENTER[0]
     # Its letter stands off the bar, past the end and under the clamp row's
     # extension line, right of the row height's dimension line: over the
     # outer slot it printed on section B-B's upper letter (r4 review).
@@ -526,7 +527,7 @@ def test_slot_views_frame_the_slots() -> None:
         drawing.DETAIL_CENTER[1] + part.CLAMP_SLOT_CBORE_WIDTH * drawing.DETAIL_MM / 2.0
     )
     assert cbore_y > cbore_edge
-    assert drawing.DETAIL_LABEL_XY[1] > drawing.DETAIL_KEEP["ClampSlotWidth"][1]
+    assert drawing.DETAIL_LABEL_XY[1] > drawing.DETAIL_CENTER[1] + radius
 
 
 @pytest.mark.parametrize("collision", ["clear", "text", "leader", "station"])

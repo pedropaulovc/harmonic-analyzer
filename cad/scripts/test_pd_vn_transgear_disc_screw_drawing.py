@@ -371,10 +371,20 @@ def test_sheet_states_the_cut_and_no_dimension_in_the_registry_names() -> None:
     assert flat.endswith("BREAK THE CUT END.")
 
 
-def test_the_sheet_shelves_the_qualified_stock_length() -> None:
-    """The screw is cut at assembly, so the stock length keeps its qualifier;
-    the sheet moves that reference's text off its line (machinist review r5)."""
-    from _mcmaster_91794a055 import SUPPLIER_REFERENCE_FORMATS
+def test_the_cut_screw_carries_no_stock_length_reference() -> None:
+    """The views show the screw as cut, so neither the part nor the sheet
+    carries the supplier's .25 stock length (machinist review r7: it landed
+    below the drawn tip on a witness belonging to no feature); the ITEM row
+    names the 1/4 stock, every other supplier reference stays."""
+    import _mcmaster_91794a055 as supplier
 
-    assert SUPPLIER_REFERENCE_FORMATS[drawing.STOCK_LENGTH][3]
+    names = {name for name, _value, _orientation in drawing.SUPPLIER_REFERENCE_DIMENSIONS}
+    assert names == {
+        name for name, _value, _orientation in supplier.SUPPLIER_REFERENCE_DIMENSIONS
+    } - {"SupplierStockLength"}
+    assert drawing.SUPPLIER_REFERENCE_DIMENSIONS is part.SUPPLIER_REFERENCE_DIMENSIONS
+    assert set(drawing.SUPPLIER_REFERENCE_FORMATS) == names
+    assert set(drawing.SUPPLIER_REFERENCE_STARTS) <= names
+    assert "x 1/4" in drawing.ITEM
+    assert supplier.SHANK_LEN == pytest.approx(0.25 * 25.4)
 
