@@ -15,7 +15,7 @@ only note says the undimensioned purchased geometry is reference.  No
 installation sequence or rule number is printed: the sequence is an MHA-DT-00
 assembly step (Main's eye pass of warm-c486, drawing-guidelines.md rule 7
 (notes: few, flagged, never a method)).  The engagement minimum prints as a
-plain fact, "ENGAGEMENT 0.87D MIN", on the cut-length callout's last line,
+plain fact, "ENGAGEMENT 0.88D MIN", on the cut-length callout's last line,
 never in a note; the spec's asserts still guard its value.
 
 The separate supplier maximum-limit sheet is a construction-only source
