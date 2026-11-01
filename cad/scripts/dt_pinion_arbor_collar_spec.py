@@ -234,12 +234,15 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 # station.  The front strap, journaled between the collar and the drum, is
 # trapped the same way, so it follows the collar on before the bond.
 COLLAR_NUMBER = "MHA-DT-33"
+# The step prints on MHA-DT-00, still a millimetre sheet (#290 converts it
+# last), so the spread is written in mm, rounded down so the print is never
+# looser than the computed limit (codex review).
 ASSEMBLY_STEP = "\n".join(
     (
         f"BEFORE THE DRUM BOND: SLIDE {COLLAR_NUMBER} ONTO {ARBOR_NUMBER} FROM ITS",
         f"BACK CROWN END TO THE PIN STATION; DRIVE {PIN_NUMBER} THRU BOTH, BOTH ENDS",
         "SUB-FLUSH AND THEIR DEPTHS BELOW THE OD WITHIN "
-        f"{PIN_END_DEPTH_SPREAD_MAX / 25.4:.2f} OF EACH OTHER;".replace(" 0.", " ."),
+        f"{math.floor(PIN_END_DEPTH_SPREAD_MAX * 10.0) / 10.0:.1f} OF EACH OTHER;",
         f"THEN SLIDE THE FRONT {STRAP_NUMBER} ON BEHIND IT.",
     )
 )
