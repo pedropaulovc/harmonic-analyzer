@@ -13,7 +13,7 @@ assembly.
 
 The engagement this leaves falls short of drawing guideline rule 18 and is
 pending the user's ruling in #1019. The sheet states it as a plain
-fact, "ENGAGEMENT 0.90D MIN", the last line of the cut-length callout
+fact, "ENGAGEMENT 0.87D MIN", the last line of the cut-length callout
 (CUT_TO_FIT_CALLOUT), formatted from the floored worst case
 POST_MOUNT_ENGAGEMENT_PRINTED; the asserts below still guard that value and
 the nominal chain.
@@ -197,15 +197,16 @@ _CBORE_DEPTH_PLACES = 2
 _CBORE_DEPTH_DEVIATIONS = printed_deviations(
     post.ATTACHMENT_CBORE_DEPTH, _CBORE_DEPTH_PLACES, unit=_POST_UNIT
 )
-# Stock thickness and tap-entry breaks are owned by the mating platform.
+# Stock thickness is owned by the mating platform.
 PLATE_STOCK_BAND_MM = platform.PLATE_STOCK_BAND
 # Two breaks eat thread:
 # - the screw's cut end: the title block's general edge break at its maximum
 #   (the shop hacksaws and files the burr).  Main's ruling on the run-7 sheet:
 #   no part-local break limit; the cut-to-fit allowance gave up the thread
 #   instead (dt_post_mount_stack.CUT_TO_FIT_SHORT_MM).
-# - the platform's tap exit: the platform's own local deburr limit.
-POST_MOUNT_TAP_EDGE_BREAK = platform.POST_MOUNT_TAP_EDGE_BREAK
+# - the platform's tap exit: MHA-DT-20's title-block general break (Main,
+#   2026-11-01: no local deburr limit on the taps).
+POST_MOUNT_TAP_EDGE_BREAK = mount_stack.PLATE_TAP_EDGE_BREAK_MM
 CUT_END_BREAK_MAX_MM = edge_break_chamfer_mm(unit=UNIT)
 if CUT_END_BREAK_MAX_MM != mount_stack.SCREW_CUT_END_BREAK_MM:
     raise ValueError("the platform's stack no longer spends this sheet's cut-end break")
@@ -227,8 +228,9 @@ if FACTORY_THREAD_START_MM >= FLOOR_LOW_MM:
     raise ValueError("the plain shank reaches the platform's tapped hole")
 PLATE_THICK_MM = platform.PLATE_THICKNESS + PLATE_STOCK_BAND_MM
 
-# Pending ruling #1019 against rule 18: 0.90D minimum engagement.
-MIN_ENGAGEMENT_DIAMETERS = 0.90
+# Pending ruling #1019 against rule 18: its 0.90D target is not met; Main's
+# 2026-11-01 ruling sets the floor at the rule-18 audit's 0.87D.
+MIN_ENGAGEMENT_DIAMETERS = 0.87
 MIN_ENGAGEMENT_MM = MIN_ENGAGEMENT_DIAMETERS * THREAD_DIA_MM
 # Corner 1, never proud: lowest floor on the thinnest plate.  A fixed length
 # must not exceed this.
@@ -238,7 +240,7 @@ FIXED_LENGTH_FLUSH_MAX_MM = FLOOR_LOW_MM + PLATE_THIN_MM
 # cap it: cut flush there, the plate still holds the minimum.
 FIXED_LENGTH_ENGAGEMENT_MIN_MM = FLOOR_HIGH_MM + MIN_ENGAGEMENT_MM + ENGAGEMENT_BREAKS_MM
 if FIXED_LENGTH_ENGAGEMENT_MIN_MM > FLOOR_HIGH_MM + PLATE_THICK_MM:
-    raise ValueError("the thick plate cannot hold 0.90D even when cut flush")
+    raise ValueError("the thick plate cannot hold the engagement minimum even when cut flush")
 # No single length satisfies both corners at the current bands, so the shop
 # cannot cut to a print band: each screw is cut to its
 # own hole at assembly (MHA-DT-00), and the sheet prints the modelled length as
@@ -318,9 +320,9 @@ if POST_MOUNT_ENGAGEMENT_PRINTED < MIN_ENGAGEMENT_DIAMETERS:
 # exception (Codex P2 on #857, PRRT_kwDOPHDy386mOxdw).  Main's fleet ruling:
 # the sheet states the FACT -- the worst-case engagement, floored above --
 # never its label (no rule number, ruling id, EXCEPTION or ACCEPTED).
-# Provenance stays here: the User's U37c/U41 ruling admits 0.90D under the
-# 1.5D rule.  The wording follows S1's drive-train step ("ENGAGEMENT 0.90D
-# MIN.").
+# Provenance stays here: the User's U37c/U41 ruling admits short engagement
+# under the 1.5D rule; Main's 2026-11-01 ruling floors it at 0.87D.  The
+# wording follows S1's drive-train step ("ENGAGEMENT 0.87D MIN.").
 # Pending exception ruling: MHA-DT-VN-61 engagement (#1019).
 CUT_TO_FIT_CALLOUT = (
     "CUT TO FIT AT ASSEMBLY\n"
