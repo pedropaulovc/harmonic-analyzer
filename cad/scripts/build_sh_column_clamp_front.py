@@ -61,8 +61,14 @@ async def build(adapter) -> dict[str, str]:
     # bands (sh_column_clamp_fit) and every printed dimension's places live on
     # the model, then mark exactly the print's dimensions and stamp the
     # make-critical title-block properties.
+    # The band prints at the nominal's three places (.945 +/-.010).
     set_dimension_symmetric_tolerance(
-        adapter, "BlockProfile", "AnchorZ", ANCHOR_Z_BAND, display_unit=UNIT
+        adapter,
+        "BlockProfile",
+        "AnchorZ",
+        ANCHOR_Z_BAND,
+        places=DRAWING_PRECISION["BlockProfile"]["AnchorZ"],
+        display_unit=UNIT,
     )
     for dimension_name in EAR_STATION_DIMENSIONS:
         set_dimension_symmetric_tolerance(
