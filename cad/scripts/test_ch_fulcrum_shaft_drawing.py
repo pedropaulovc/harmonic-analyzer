@@ -192,6 +192,11 @@ def test_side_view_texts_stand_clear_of_extension_lines() -> None:
     assert drawing.SHAFT_DIA_CALLOUT_ROWS.splitlines() == [
         f"{line}  " for line in ch_fulcrum_shaft_spec.SHAFT_DIA_CALLOUT.splitlines()
     ]
+    # #2108 review: the S of SETS met the across-flat block's vertical line
+    # on its left; every row there leads with one space of ink air.
+    assert drawing.ACROSS_FLAT_CALLOUT_ROWS.splitlines() == [
+        f" {line}" for line in ch_fulcrum_shaft_spec.ACROSS_FLAT_CALLOUT.splitlines()
+    ]
 
 
 def test_three_place_sizes_name_their_mates() -> None:
@@ -210,7 +215,7 @@ def test_three_place_sizes_name_their_mates() -> None:
     assert "MHA-CH-VN-55" in spec.ACROSS_FLAT_CALLOUT
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert '"ShaftDia": SHAFT_DIA_CALLOUT_ROWS' in source
-    assert '"AcrossFlat": ACROSS_FLAT_CALLOUT' in source
+    assert '"AcrossFlat": ACROSS_FLAT_CALLOUT_ROWS' in source
     assert "1/4 IN GROUND STOCK OK." in spec.DRAWING_NOTES
 
 
