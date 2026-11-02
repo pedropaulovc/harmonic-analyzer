@@ -149,11 +149,14 @@ def test_knob_stack_rows_follow_the_shaft_cup_collar_and_nut() -> None:
     assert allowed[pair] == pytest.approx(1.10 * (tube - in_journal), rel=1e-4)
     assert not any("knob-retaining-screw" in name for p in allowed for name in p)
 
-    # Stud tip less the nut's pilot seat at the nominal fitted body length.
-    # The collar's rear face reacts directly on F, so no gap or transverse
-    # pin supplies axial capture; the nominal overlap is all on the blank.
+    # Stud tip less the nut's pilot seat at the model's fitted body length
+    # (F to the seat face; the .243 nominal collar leaves its remainder as
+    # air at F). The nominal overlap is all on the blank.
+    import build_pd_paper_drive_assembly as assembly
+
     collar = _collar()
-    nut_engaged = shaft.TIP_STATION - collar.LENGTH - collar.PILOT_LENGTH
+    fitted = assembly.KNOB_COLLAR_FITTED_LENGTH
+    nut_engaged = shaft.TIP_STATION - fitted - collar.PILOT_LENGTH
     assert collar.PILOT_LENGTH == pytest.approx(removable.PLATE + collar.PILOT_PROUD)
     assert collar.BODY_REAR_FACE_FROM_F == 0.0
     assert shaft.TIP_STATION - nut_engaged > shaft.PLAIN_CORE

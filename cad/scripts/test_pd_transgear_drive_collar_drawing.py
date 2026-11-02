@@ -459,7 +459,7 @@ def test_the_thumbnut_bears_on_the_pilot_and_the_knob_wheel_floats() -> None:
 
 
 def test_body_rear_face_reacts_at_f_over_the_whole_fitted_domain() -> None:
-    assert spec.LENGTH == pytest.approx(6.1891)
+    assert spec.LENGTH == pytest.approx(6.1722)
     assert (spec.LENGTH_FITTED_MIN, spec.LENGTH_FITTED_MAX) == pytest.approx((3.8862, 6.8834))
     assert spec.BODY_REAR_FACE_FROM_F == 0.0
     assert spec.BODY_BLANK_LENGTH_MIN >= spec.LENGTH_FITTED_MAX + spec.FACING_ALLOWANCE

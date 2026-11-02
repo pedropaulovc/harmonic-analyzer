@@ -188,7 +188,7 @@ def test_shortened_drive_face_is_real_not_old_full_core_length():
     assert collar.D_DRIVE_AREA_MIN == pytest.approx(6.991639285135482)
     assert shaft.FRONT_RELIEF_AREA_MIN == pytest.approx(math.pi * 3.81**2 / 4.0)
     assert collar.D_DRIVE_AREA_MIN > 0.0
-    assert collar.LENGTH == collar.SET_NOMINAL == 6.1891
+    assert collar.LENGTH == collar.SET_NOMINAL == 6.1722
     assert (collar.LENGTH_FITTED_MIN, collar.LENGTH_FITTED_MAX) == (3.8862, 6.8834)
     assert collar.BODY_BLANK_LENGTH_MIN >= collar.LENGTH_FITTED_MAX + collar.FACING_ALLOWANCE
     assert collar.BODY_REAR_FACE_FROM_F == 0.0

@@ -630,10 +630,11 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         1.10 * 0.00809042475,
     ),
     # MHA-PD-13's #8-32 tap drill 3.454 on MHA-PD-08's Ø4.064 thread blank:
-    # at the nominal fitted collar length 6.1891, whose rear face reacts on F,
-    # the nut seats on the pilot 2.9016 in front of the wheel seat. The overlap
-    # is 23.876 - 6.1891 - 2.9016 = 14.7853, entirely on the blank, which
-    # starts 7.62 in front of F, behind the nut's seat at 9.0907.
+    # at the model's fitted collar length 6.1891 (F to the seat face; the .243
+    # collar's remainder is air at F), the nut seats on the pilot 2.9016 in
+    # front of the wheel seat. The overlap is 23.876 - 6.1891 - 2.9016 =
+    # 14.7853, entirely on the blank, which starts 7.62 in front of F, behind
+    # the nut's seat at 9.0907.
     frozenset(
         ("pd-transgear-thumbnut-1", "pd-transgear-knob-shaft-1")
     ): _smooth_annulus_limit_mm3(4.064, 3.454, 23.876 - 6.1891 - 2.9016),

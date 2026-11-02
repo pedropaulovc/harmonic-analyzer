@@ -120,10 +120,11 @@ UNIT = drawing_unit(
 WALL_FLOOR = WALL_FLOOR_MM
 
 # --- Existing body: fitted rear-face reaction, unchanged wheel-seat station --
-# The model's fitted nominal closes the seat face on F
-# (transgear_cluster_fit.F_Z - SEAT_FACE_Z): a kinematic closure, not
-# snapped; it prints REF (.244) and the fit window governs.
-SET_NOMINAL = 6.1891
+# .243 is the authored set length (owner/Main ruling; FR and MG planes key on
+# it), not the .244 snap of F - SEAT_FACE_Z (6.1891). The collar is faced to
+# fit, so the model leaves the 0.0169 remainder as air at F
+# (build_pd_paper_drive_assembly.KNOB_COLLAR_REAR_GAP, a distance mate).
+SET_NOMINAL = 6.1722  # .243
 SEAT_MIN_FROM_F = 3.8862  # .153
 SEAT_MAX_FROM_F = 6.8834  # .271
 LENGTH = SET_NOMINAL  # REF fitted nominal; never a title-block band

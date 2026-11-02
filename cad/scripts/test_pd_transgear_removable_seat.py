@@ -209,8 +209,8 @@ def test_knob_pin_tip_stays_inside_the_thinnest_wheel_under_the_thumbnut() -> No
 def test_knob_pin_pressed_end_stays_inside_the_collar() -> None:
     # Nominal: the set body less (4.7625 - 2.4).  Worst: the longest 3/16
     # dowel set lowest in the shortest fitted body.
-    assert collar.LENGTH == pytest.approx(6.1891)
-    assert collar.PIN_REAR_INSET == pytest.approx(3.8266)
+    assert collar.LENGTH == pytest.approx(6.1722)
+    assert collar.PIN_REAR_INSET == pytest.approx(3.8097)
     assert collar.PIN_REAR_INSET_WORST == pytest.approx(1.1811)
     # Negative control: the crank's 1/4 dowel set to the same stop in the
     # same shortest collar would stand out of its rear face toward the 12T.

@@ -275,17 +275,24 @@ def test_printed_countersink_angle_reaches_the_engagement_refusal(monkeypatch) -
             _reloaded_collar(patch, nut, "REAR_THREAD_LOSS", shallow.REAR_THREAD_LOSS)
 
 
-def test_native_placement_metadata_seats_the_actual_collar_rear_face_on_f() -> None:
-    """Saved nominal poses, not a claim that native mates have been observed."""
+def test_native_placement_leaves_the_faced_remainder_as_air_at_f() -> None:
+    """Saved nominal poses, not a claim that native mates have been observed.
+    The .243 collar sits on the seat face; F stands the facing's remainder
+    behind its rear, never overlapping, and the fitted body is in its window."""
     import build_pd_paper_drive_assembly as assembly
 
     assert assembly.KNOB_COLLAR_Z0 == pytest.approx(removable.SEAT_FACE_Z)
     assert assembly.KNOB_COLLAR_REAR_Z == pytest.approx(
         assembly.KNOB_COLLAR_Z0 + collar.LENGTH
     )
-    assert assembly.KNOB_COLLAR_REAR_Z == pytest.approx(assembly.KNOB_SHAFT_Z0)
-    assert assembly.KNOB_SHAFT_Z0 - assembly.KNOB_COLLAR_Z0 == pytest.approx(
-        collar.LENGTH
+    assert assembly.KNOB_COLLAR_REAR_GAP == pytest.approx(0.0169)
+    assert assembly.KNOB_SHAFT_Z0 - assembly.KNOB_COLLAR_REAR_Z == pytest.approx(
+        assembly.KNOB_COLLAR_REAR_GAP
+    )
+    assert (
+        collar.LENGTH_FITTED_MIN
+        <= assembly.KNOB_COLLAR_FITTED_LENGTH
+        <= collar.LENGTH_FITTED_MAX
     )
 
 
