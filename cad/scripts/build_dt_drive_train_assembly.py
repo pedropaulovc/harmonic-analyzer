@@ -336,6 +336,7 @@ from dt_crank_drive_gear_spec import (  # noqa: E402
     SOUTH_FACE_SHIFT_NORTH as GEAR64_SOUTH_FACE_SHIFT_NORTH,
 )
 from dt_crank_pinion_spec import FACE_WIDTH as PINION_FACE  # noqa: E402
+from dt_crank_pinion_spec import UNIT as PINION_UNIT  # noqa: E402
 
 # Mesh anchor: X_PITCH is every cone gear's pitch-section x at the
 # contact azimuth. The oblique crossing dives (DRUM_FACE/2)*tan(i) past
@@ -1848,9 +1849,12 @@ from gear_seat_fit import GEAR_SEAT_CLEARANCE  # noqa: E402
 
 # (lower, upper) deviation of each moving surface from the model; + is north
 # (crank +Z, cone +station), or up for the crank height.
-_PINION_FACE_BAND = printed_deviations(PINION_FACE, PINION_FACE_WIDTH_PLACES, PINION_FACE_LIMITS)
+_PINION_FACE_BAND = printed_deviations(
+    PINION_FACE, PINION_FACE_WIDTH_PLACES, PINION_FACE_LIMITS, unit=PINION_UNIT
+)
 _PINION_SHOULDER_BAND = printed_deviations(
-    PINION_SHOULDER_LENGTH, PINION_DRAWING_PRECISION["ShoulderLength"], PINION_SHOULDER_LIMITS
+    PINION_SHOULDER_LENGTH, PINION_DRAWING_PRECISION["ShoulderLength"], PINION_SHOULDER_LIMITS,
+    unit=PINION_UNIT,
 )
 _PINION_TIP_RADIUS_BAND = tuple(
     d / 2.0
@@ -1858,12 +1862,14 @@ _PINION_TIP_RADIUS_BAND = tuple(
         PINION_OUTSIDE_DIA,
         PINION_DRAWING_PRECISION["OutsideDia"],
         (-PINION_OUTSIDE_DIA_TOLERANCE, PINION_OUTSIDE_DIA_TOLERANCE),
+        unit=PINION_UNIT,
     )
 )
 _PINION_TURNED_DIA_BAND = printed_deviations(
     PINION_TURNED_DIA,
     PINION_DRAWING_PRECISION["TurnedDia"],
     (-PINION_TURNED_DIA_TOLERANCE, PINION_TURNED_DIA_TOLERANCE),
+    unit=PINION_UNIT,
 )
 # Only the turned band's largest radius can close on T120.
 _PINION_TURNED_RADIUS_UP = _PINION_TURNED_DIA_BAND[1] / 2.0
@@ -2288,7 +2294,9 @@ _PINION_NORTH_Z_MIN = (
     + PINION_SEAT_FEELER
     + min(PINION_END_PLAY)
     + PINION_OVERALL_LENGTH
-    + min(printed_deviations(PINION_OVERALL_LENGTH, PINION_OVERALL_LENGTH_PLACES))
+    + min(
+        printed_deviations(PINION_OVERALL_LENGTH, PINION_OVERALL_LENGTH_PLACES, unit=PINION_UNIT)
+    )
 )
 CRANK_SHAFT_END_RADIUS_MAX = (CS_PINION_SEAT_DIA + max(CS_PINION_SEAT_DIA_BAND)) / 2.0
 _END_SHIFT, _END_DY = _cone_corners(_CONE_FLOATS, _CRANK_HEIGHT_BAND)

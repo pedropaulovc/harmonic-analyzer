@@ -1,11 +1,12 @@
 dt-crank-pinion:
   number: MHA-DT-10
-  material: SAE 1018 CF bar, ASTM A108-24
-  material_specification: SAE 1018 CF bar, ASTM A108-24
+  material: LOW-CARBON STEEL, E.G. 1018 CF
+  material_specification: LOW-CARBON STEEL, E.G. 1018 CF
   finish: oiled
   quantity: 1
   tolerance_class: machined_block
   fit_class: gear_mesh
+  drawing_unit: in
   process: "gear cutting: 16T normal-24DP PA20 straight-spur milling with the finite 14T stock form, cutter #7 (14-16T)"
   # Face, shoulder and north band follow the current dt_crank_pinion_spec.
   # SDP/SI S1086Z-024S016 is a pitch/count candidate, not a cutter-native drop-in.

@@ -11,7 +11,9 @@ The decimal places are the PART's (``crank_pinion_pin_spec.DRAWING_PRECISION``,
 applied natively by ``build_crank_pinion_pin``); this script only reads them
 back off the sheet.
 
-Drawn 8:1 -- a 3.175 x 13.51 pin is a matchstick on a B sheet at anything less.
+Drawn 8:1 -- a 1/8 x .56 pin is a matchstick on a B sheet at anything less.
+The sheet prints decimal inch (the part's ``drawing_unit: in``); the rod's
+diameter is its as-bought fraction, a reference.
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -39,13 +42,17 @@ from _drawing_dimensions import assert_imported_precision
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
+from _supplier_dimensions import supplier_reference_dimension
 import _telemetry
 from dt_crank_pinion_pin_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIN_DIA,
+    PIN_DIA_CALLOUT,
+    PIN_DIA_FRACTION_DENOMINATOR,
     PIN_LEN,
 )
 
@@ -77,9 +84,10 @@ HALF_LEN = PIN_LEN * VIEW_SCALE[0] / 2000.0  # 0.054
 # Side view (a *Right view lays model +Z to the left; a plain pin has no end
 # to prefer): the diameter above the view, its dimension line left of centre
 # so the axis-centerline pick at the view's middle lands on bare face; the
-# length below.
+# length below. The diameter's two callout lines hang under its value, so the
+# value stands a line higher than the length's offset.
 RIGHT_KEEP = {
-    "PinDia": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] + HALF_DIA + 0.016),
+    "PinDia": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] + HALF_DIA + 0.022),
     "PinLen": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_DIA - 0.016),
 }
 
@@ -107,7 +115,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -139,6 +151,23 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, right_annotations, DRAWING_PRECISION_BY_NAME)
+    # The rod's as-bought diameter: a fraction reference, supplier tolerance.
+    (pin_dia,) = (
+        annotation
+        for annotation in right_annotations
+        if dimension_name(adapter, annotation) == "PinDia"
+    )
+    supplier_reference_dimension(
+        adapter,
+        pin_dia.GetSpecificAnnotation(),
+        label="crank pinion pin rod diameter",
+        units="in",
+        precision=DRAWING_PRECISION_BY_NAME["PinDia"],
+        expected_mm=PIN_DIA,
+        presentation="diameter",
+        fraction_denominator=PIN_DIA_FRACTION_DENOMINATOR,
+        callout=PIN_DIA_CALLOUT,
+    )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pin end view")
     # The side view is a rectangle: its axis centerline says which pair of

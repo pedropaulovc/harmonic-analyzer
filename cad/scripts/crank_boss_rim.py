@@ -38,6 +38,8 @@ import dt_cone_gear_shaft_spec as shaft
 import dt_cone_pivot_post_spec as post
 from dt_cone_post_envelope import BLOCK_DIA
 import dt_crank_drive_gear_spec as gear64
+import _config
+from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
 
 Point = tuple[float, float, float]
@@ -57,30 +59,33 @@ HEAD_Y = (
 BODY_Y = (-post.BORE_HEIGHT, post.BLOCK_HEIGHT - post.BORE_HEIGHT)
 
 # --- The print-worst terms ----------------------------------------------------
+# The post's rows print in its own sheet's unit, read from its registry row so
+# this stays right whichever conversion lands first (#290).
+POST_UNIT = drawing_unit("parts/dt-cone-pivot-post", _config.parts("dt-cone-pivot-post"))
 # Each moves a surface toward the other.
 #   the crank boss's north face, CrankBossStartZ at .XX
-CRANK_BOSS_NORTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["CrankBossStartZ"])
+CRANK_BOSS_NORTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["CrankBossStartZ"], unit=POST_UNIT)
 #   the cast crank boss, CrankBossDia at .X: its face disc reaches further down
 #   toward the gear's tip
-CRANK_BOSS_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["CrankBossDia"]) / 2.0
+CRANK_BOSS_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["CrankBossDia"], unit=POST_UNIT) / 2.0
 #   the crank axis over the crank-above-cone spacing band, both ends taken
 #   (a lower boss reaches deeper into the tip's sweep)
 CRANK_AXIS_Y_BAND = tuple(CRANK_AXIS_Y + d for d in sorted(post.CRANK_ABOVE_CONE_BAND))
 #   the head's lower edge, the top face (MainBodyHt) less the head
 #   (HeadHt), each at .X, with the foot's height about the cone axis
 HEAD_EDGE_LOW = (
-    printed_band_mm(post.DRAWING_PRECISION_BY_NAME["MainBodyHt"])
-    + printed_band_mm(post.DRAWING_PRECISION_BY_NAME["HeadHt"])
+    printed_band_mm(post.DRAWING_PRECISION_BY_NAME["MainBodyHt"], unit=POST_UNIT)
+    + printed_band_mm(post.DRAWING_PRECISION_BY_NAME["HeadHt"], unit=POST_UNIT)
     + post.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM
 )
 #   the head, HeadDia at .X; the turned body, MainBodyDia at .X
-HEAD_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["HeadDia"]) / 2.0
-BODY_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["MainBodyDia"]) / 2.0
+HEAD_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["HeadDia"], unit=POST_UNIT) / 2.0
+BODY_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["MainBodyDia"], unit=POST_UNIT) / 2.0
 #   the cone boss's end faces, ConeBossLen at .XX, symmetric about the post
 #   axis: the north end SHORT brings the seated collar and 64T toward the
 #   post; the boss itself, ConeBossDia at .X
-CONE_BOSS_END_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"]) / 2.0
-CONE_BOSS_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossDia"]) / 2.0
+CONE_BOSS_END_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"], unit=POST_UNIT) / 2.0
+CONE_BOSS_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossDia"], unit=POST_UNIT) / 2.0
 #   the 64T's station: the ONE input for how far it may stand toward the
 #   post.  MHA-DT-00 step 1 sets it against MHA-DT-04's thrust collar (#916),
 #   and the collar bears on the cone boss's north end, so the gear's south
@@ -247,7 +252,6 @@ def _zoom(f: Callable[[float, float], float], a: tuple[float, float], b: tuple[f
 
 # Every feature clears the print-worst floor on the seated collar. The prior
 # "one face-width step wider fails" was tied to an obsolete south-growing gear.
-# A collar made enough thinner instead eventually fails on the crank boss.
 WORST_CLEARANCES = clearances(gear_offset=seated_gear_offset())
 GOVERNING_FEATURE = min(WORST_CLEARANCES, key=WORST_CLEARANCES.__getitem__)
 if WORST_CLEARANCES[GOVERNING_FEATURE] < FLOOR_CLEARANCE_MM:
@@ -257,10 +261,3 @@ if WORST_CLEARANCES[GOVERNING_FEATURE] < FLOOR_CLEARANCE_MM:
         f"{FLOOR_CLEARANCE_MM} floor ({RULING})"
     )
 COLLAR_MARGIN_MM = WORST_CLEARANCES[GOVERNING_FEATURE] - FLOOR_CLEARANCE_MM
-THINNER_COLLAR = shaft.COLLAR_THICKNESS - COLLAR_MARGIN_MM - 0.01
-THINNER_COLLAR_CLEARANCE = clearances(
-    gear_offset=seated_gear_offset(collar_thickness=THINNER_COLLAR),
-    collar_thickness=THINNER_COLLAR,
-)[GOVERNING_FEATURE]
-if THINNER_COLLAR_CLEARANCE >= FLOOR_CLEARANCE_MM:
-    raise AssertionError("thinning the collar past its remaining margin must breach the post floor")

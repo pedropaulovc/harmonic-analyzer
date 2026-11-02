@@ -20,7 +20,8 @@ natively by ``build_crank_pinion``); this script only reads them back off the
 sheet.
 
 Drawn 3:1: the longitudinal section and its diameter/length dimensions
-clear the end view and isometric at this common sheet scale.
+clear the end view and isometric at this common sheet scale. The sheet
+prints decimal inch (the part's ``drawing_unit: in``).
 """
 
 from __future__ import annotations
@@ -65,6 +66,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -81,7 +83,6 @@ from dt_crank_pinion_spec import (
     OUTSIDE_DIA,
     OVERALL_LENGTH,
     PIN_HOLE_PROCESS,
-    PIN_STATION,
     SHOULDER_LENGTH,
     SHOULDER_RADIUS,
     SHOULDER_RADIUS_TOL_TYPE,
@@ -237,26 +238,26 @@ _FACE_WIDTH_TEXT_X = _side_x(OVERALL_LENGTH) + 0.030
 # turned diameter's block grows left from its leader, so it rises clear of
 # the gear data's long rows.
 _TOP_ROW_Y = _SIDE_TOP + 0.065
-# The tooth-face shoulder's R0.4 MAX (machinist review of 88d48ad2a7b4, rules
+# The tooth-face shoulder's R.016 MAX (machinist review of 88d48ad2a7b4, rules
 # 11 and 16), laid out like draw_mg_output_fixture's shoulder radius: the
 # arc's centre is up-right of the upper corner, the leader rises from the arc
 # nearly plumb, 3 mm right of that centre, to an elbow in the open air over
-# the turned band.  The limit is tighter than the title block's R1.0 inside
+# the turned band.  The limit is tighter than the title block's R.040 inside
 # corners because the MHA-DT-07 64T's tooth tips run over the corner at the
 # drive train's worst axial pose (dt_crank_pinion_spec.SHOULDER_RADIUS), so
 # its callout names that mate (machinist review of 2056e3344, rule 4): a
-# three-row block, R0.4 MAX / MHA-DT-07 / TIP CLR, whose widest row (the part
+# three-row block, R.016 MAX / MHA-DT-07 / TIP CLR, whose widest row (the part
 # number, 24.28 mm on that sheet) centres SHOULDER_RADIUS_RUN_IN right of the
 # elbow and whose middle stands RADIUS_SHOULDER_DROP, half the block's
-# 5.56 mm rows, over its shoulder.  The elbow stands 17 mm over the tooth
+# 5.56 mm rows, over its shoulder.  The elbow stands 26 mm over the tooth
 # tips, so the wider block's shoulder still ends 3 mm left of the pin hole's
-# line.  The leader crosses only the turned diameter's upper extension line;
+# line, which the inch boss's shorter pin-to-end span steepens (#290).  The leader crosses only the turned diameter's upper extension line;
 # the turned diameter's line stands 9 mm left of the elbow.
 SHOULDER_ARC_CENTRE = (
     _side_x(FACE_WIDTH + SHOULDER_RADIUS),
     RIGHT_CENTER[1] + HALF_BOSS + SHOULDER_RADIUS * VIEW_SCALE[0] / 1000.0,
 )
-SHOULDER_RADIUS_ELBOW = (SHOULDER_ARC_CENTRE[0] + 0.003, _SIDE_TOP + 0.017)
+SHOULDER_RADIUS_ELBOW = (SHOULDER_ARC_CENTRE[0] + 0.003, _SIDE_TOP + 0.026)
 SHOULDER_RADIUS_CALLOUT = "\n".join((MESH_GEAR_NUMBER, "TIP CLR"))
 SHOULDER_RADIUS_ROWS = 3
 SHOULDER_RADIUS_TEXT_HALF_WIDTH = 0.02428 / 2.0
@@ -272,12 +273,11 @@ RIGHT_KEEP = {
     "OutsideDia": (_side_x(0.0) - 0.003, _SIDE_TOP + 0.027),
     "TurnedDia": (_side_x(SHOULDER_LENGTH + 1.5), _TOP_ROW_Y),
     "BossDia": (BOSS_DIA_TEXT_X, RIGHT_CENTER[1]),
-    "PinHoleDia": (0.325, _TOP_ROW_Y),
+    "PinHoleDia": (0.322, _TOP_ROW_Y),
     "ShoulderLength": (_LENGTH_TEXT_X, _SIDE_BOTTOM - 0.019),
-    "PinFromBossEnd": (
-        (_side_x(PIN_STATION) + _side_x(OVERALL_LENGTH)) / 2.0,
-        _SIDE_BOTTOM - 0.006,
-    ),
+    # The banded text is wider than the hole-to-end span: it stands outside,
+    # right of the end face's extension line, so neither line strikes it.
+    "PinFromBossEnd": (_side_x(OVERALL_LENGTH) + 0.016, _SIDE_BOTTOM - 0.006),
     "FaceWidth": (_FACE_WIDTH_TEXT_X, _SIDE_BOTTOM - 0.026),
     "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.043),
     "ShoulderRadius": (
@@ -285,8 +285,10 @@ RIGHT_KEEP = {
         SHOULDER_RADIUS_ELBOW[1] + RADIUS_SHOULDER_DROP,
     ),
 }
-# The section caption sits right of the face width's callout block.
-SECTION_CAPTION_XY = (0.335, 0.085)
+# The caption's top centre: under the section, its top 3 mm below the overall
+# length's extension-line ends (74.9 mm on run 7), its right edge (centre +
+# 22.6 mm) 3.4 mm left of the title block (x 216 mm).
+SECTION_CAPTION_XY = (0.190, 0.072)
 DIMENSION_TEXT_LINE_GAP = 0.0005
 # The boss diameter's text is centred on its dimension line; it read 13.1 mm
 # wide on the f0c105531 render. Its right edge plus a clearance bounds where
@@ -497,7 +499,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
