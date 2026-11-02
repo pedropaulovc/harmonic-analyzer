@@ -3485,13 +3485,13 @@ if SPRING_TO_LIFT_ROD < 0.25:
 # five weight volumes remain analytic, and drum/brackets use mesh volumes.
 # This preserves #859's hybrid method (03b51bce2), not native COM mass metrology.
 # Brass is 8500 nominal / 8800 corner; steel is 7800 kg/m^3.
-# Re-measured 2026-10-31 from farm run
-# 20261031T210436787Z-74a9f52cf0e94170a8462db37d885876 (#290 step 3, the
-# pinion rig on the inch grid: 1/4 handle rod, 5/32 follower, snapped arbor,
-# collar, pivot shaft and bracket); the moments rose 0.33% parked, 0.08% engaged.
+# Re-measured 2026-11-02 from farm run
+# 20261102T205633192Z-0bb64c777ad54039bee8b67b49966c9d (#290 step 3, the
+# pinion rig on the inch grid, with the strap on the .XX grid at .36 and the
+# pivot shaft lengthened to match); the moments rose 0.16% parked and engaged.
 # Install the measured basis AND frozen fingerprint together (DEVELOPING.md).
-SWING_GRAVITY_NMM = (14.392044339791319, 24.491092879992657)
-SWING_GRAVITY_CORNER_NMM = (14.675559045589983, 24.967823426492025)
+SWING_GRAVITY_NMM = (14.415037327816785, 24.529755623146762)
+SWING_GRAVITY_CORNER_NMM = (14.69855203361545, 25.00648616964613)
 # The basis those moments were computed at: part -> (count, volume mm^3,
 # density kg/m^3). The measured basis and fingerprint deliberately stay frozen:
 # the support-layout regression names both moment constants when
@@ -3499,13 +3499,13 @@ SWING_GRAVITY_CORNER_NMM = (14.675559045589983, 24.967823426492025)
 SWING_GRAVITY_BASIS = {
     "dt-alignment-pinion": (1, 24311.47711833662, 8500.0),
     "dt-pinion-arbor": (1, 13573.853062566704, 7800.0),
-    "dt-pinion-pivot-shaft": (1, 5881.487907488445, 7800.0),
-    "dt-pinion-bracket": (2, 4565.858344938974, 7800.0),
+    "dt-pinion-pivot-shaft": (1, 5897.57586994979, 7800.0),
+    "dt-pinion-bracket": (2, 4644.392411286894, 7800.0),
     "dt-pinion-arbor-collar": (1, 2113.391953300099, 7800.0),
     "dt-pinion-handle": (1, 2059.2591950522306, 7800.0),
     "dt-pinion-cam-pin": (2, 253.14809801839277, 7800.0),
 }
-SWING_GRAVITY_MASS_G = 466.1223945395745
+SWING_GRAVITY_MASS_G = 467.4730120818005
 # Frozen governing dimensions of the accepted native-STL calibration, never
 # live config aliases.
 SWING_GRAVITY_FINGERPRINT = {
@@ -3529,13 +3529,13 @@ SWING_GRAVITY_FINGERPRINT = {
     "dt-pinion-bracket": {
         "WIDTH": 15.0,
         "C2C": 28.0,
-        "THICKNESS": 8.9916,
+        "THICKNESS": 9.144,
         "PIVOT_BORE": 6.35,
         "ARBOR_BORE": 7.9375,
         "PIN_BORE": 3.9878,
         "PIN_SEAT": 4.064,
         "PIN_DROP": -7.0,
-        "CROSS_HOLE_CZ": 4.4958,
+        "CROSS_HOLE_CZ": 4.572,
     },
 }
 if (

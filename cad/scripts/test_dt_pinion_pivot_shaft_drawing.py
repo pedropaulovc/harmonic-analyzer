@@ -96,7 +96,11 @@ def test_running_fit_names_its_mate_and_the_sheet_carries_no_gdt() -> None:
     assert "add_feature_control_frame(" not in source
     assert "add_datum_feature(" not in source
     assert not hasattr(dt_pinion_pivot_shaft_spec, "GEOMETRIC_TOLERANCES_MM")
-    assert 'entity_type="SILHOUETTE"' in source
+    # The Ra rides the controlled model FACE, its leader landing on the upper
+    # flank: a hit-tested silhouette re-solved onto another face (#2106 r3).
+    assert 'entity_type="FACE"' in source
+    assert "leader_attach_xy=BEARING_FINISH_EDGE" in source
+    assert drawing.BEARING_FINISH_EDGE[1] == drawing.SHAFT_UPPER_FLANK_Y
     assert "char_height=FINISH_CHAR_HEIGHT" in source
     # The diameter stands outside the front end, short of DETAIL A's fence
     # (inside the border: left of the back end it ran over it, r3); the
