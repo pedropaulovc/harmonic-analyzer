@@ -37,19 +37,18 @@ THICKNESS_MAX = DIMS.thickness_max
 BOTTOM_Y = 0.0
 TOP_Y = THICKNESS
 
-# The catalogue's limits print as supplier references; the solid is the
-# bore band's middle at the nominal thickness.
+# The sheet prints the catalogue sizes as untoleranced REF (the catalogue
+# governs); the solid is the bore band's middle at the nominal thickness.
 SUPPLIER_UNITS = "in"
 DRAWING_REFERENCE_PRECISION = {
     "supplier outer diameter": 3,
     "supplier bore diameter": 3,
     "supplier thickness": 4,
 }
-SUPPLIER_TOLERANCES = {
-    "supplier outer diameter": (OD_MIN, OD_MAX, "limits"),
-    "supplier bore diameter": (ID_MIN, ID_MAX, "limits"),
-    "supplier thickness": (THICKNESS_MIN, THICKNESS_MAX, "symmetric"),
-}
+# Supplier sizes the part witnesses natively; all print untoleranced REF.
+SUPPLIER_MODEL_REFERENCES = (
+    "supplier outer diameter", "supplier bore diameter", "supplier thickness",
+)
 
 REFERENCE_SKETCHES = (
     "SupplierWasherFaceReference",

@@ -41,7 +41,7 @@ async def _build_with_supplier_references(adapter, truth=None):
         units=part.SUPPLIER_UNITS,
         sheet_units=part_drawing_unit(PART_NAME),
         precision=part.DRAWING_REFERENCE_PRECISION,
-        bands=part.SUPPLIER_TOLERANCES,
+        references=part.SUPPLIER_MODEL_REFERENCES,
     )
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
 

@@ -40,7 +40,7 @@ def _supplier_dimensions(adapter: Any, views: dict[str, Any]) -> Callable[[], No
         thickness_mm=part.THICKNESS,
         units=part.SUPPLIER_UNITS,
         precision=part.DRAWING_REFERENCE_PRECISION,
-        bands=part.SUPPLIER_TOLERANCES,
+        model_references=part.SUPPLIER_MODEL_REFERENCES,
     )
 
 
