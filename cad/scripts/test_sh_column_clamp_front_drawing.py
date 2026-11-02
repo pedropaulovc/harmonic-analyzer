@@ -51,7 +51,6 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         set(drawing.DIMENSION_CALLOUTS)
         | set(drawing.DIMENSION_PREFIXES)
         | set(drawing.REFERENCE_DIMENSIONS)
-        | set(drawing.LINEAR_REFERENCE_DIMENSIONS)
     )
     assert annotated <= kept
 
@@ -173,8 +172,11 @@ def test_walls_at_the_largest_column_and_drill_wander() -> None:
     web = _in(0.689 - 0.004) - reach - r_bore
     assert math.isclose(spec.WALLS_WORST["ear to bore"], web)  # 1.851 (.0729)
     assert math.isclose(spec.WALLS_WORST["bar-face wall"], _in(0.680) - r_bore)
-    # The .XX width (1.89 +/-.01) about the reference .945 centre, the side
-    # faces each the .XX band off it.
+    # The .XX width (1.89 +/-.01) about the .945 +/-.010 AnchorZ centre:
+    # the bore's one lateral locator carries its own band, which the near
+    # side wall charges.
+    assert math.isclose(spec.ANCHOR_Z_BAND, _in(0.010))
+    assert "AnchorZ" not in spec.REFERENCE_DIMENSIONS
     assert math.isclose(
         spec.WALLS_WORST["ear to near side"], _in(0.935) - _in(0.693) - reach
     )

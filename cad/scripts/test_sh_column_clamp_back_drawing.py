@@ -48,7 +48,6 @@ def test_marked_dimensions_are_exactly_the_kept_set() -> None:
         set(drawing.DIMENSION_CALLOUTS)
         | set(drawing.DIMENSION_PREFIXES)
         | set(drawing.REFERENCE_DIMENSIONS)
-        | set(drawing.LINEAR_REFERENCE_DIMENSIONS)
     )
     assert annotated <= kept
     assert set(spec.EAR_STATION_DIMENSIONS) >= set(spec.DRAWING_DIMENSIONS["EarHoles"])
@@ -156,8 +155,11 @@ def test_walls_at_the_largest_column_and_drill_wander() -> None:
     assert math.isclose(
         spec.WALLS_WORST["ear to bore"], _in(0.689 - 0.004) - reach - r_bore
     )  # 2.320 (.0914), the least ear wall
-    # The .XX width (1.89 +/-.01) about the reference .945 centre, the side
-    # faces each the .XX band off it.
+    # The .XX width (1.89 +/-.01) about the .945 +/-.010 AnchorZ centre:
+    # the bore's one lateral locator carries its own band, which the near
+    # side wall charges.
+    assert math.isclose(spec.ANCHOR_Z_BAND, _in(0.010))
+    assert "AnchorZ" not in spec.REFERENCE_DIMENSIONS
     assert math.isclose(
         spec.WALLS_WORST["ear to far side"],
         _in(1.880) - _in(0.955) - _in(0.693) - reach,

@@ -86,8 +86,10 @@ EAR_STATION_DIMENSIONS = ("EarHole1Z", "EarHole2Z")
 #   grip budget spends at most .012 per bore).
 # * Width 1.89 and Height .63: outside sizes at the title block's .XX; the
 #   walls below take their +/-.01.
-# * AnchorZ prints as a reference (.945): half the width, the bore centred on
-#   the block.  The walls charge each side face the .XX +/-.01 about it.
+# * AnchorZ .945 +/-.010 (ANCHOR_Z_BAND): the bore axis from the near side
+#   face, half the width.  It is the only lateral locator of the bore and
+#   ears, so it carries the .XX-wide band the side walls below charge; the
+#   nominal keeps three places because half of 1.89 is off the .01 grid.
 # * EarHoleHeight .315 +/-.004 (EAR_HEIGHT_BAND): the clearance holes line up
 #   with the back arc's taps across the bar's height too
 #   (sh_column_clamp_fit.EAR_SCREW_MISMATCH_MAX); the walls below take it.
@@ -98,10 +100,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "EarHoles": {"EarHole1Z": 3},
     "EarHeightReference": {"EarHoleHeight": 3},
 }
-# Reference dimensions: the bore's diameter "(Ø1.008)" and the AnchorZ
-# distance, a plain "(.945)".
+# Reference dimension: the bore's diameter "(Ø1.008)".
 REFERENCE_DIMENSIONS = ("BoreDia",)
-LINEAR_REFERENCE_DIMENSIONS = ("AnchorZ",)
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
     for dimensions in DRAWING_PRECISION.values()
@@ -127,9 +127,10 @@ _WIDTH_MIN = (
     )[0]
 )
 _ANCHOR_Z = ARC_WIDTH / 2.0
-# The reference centre: the side faces stand the title block's .XX band off it.
-_ANCHOR_BAND = printed_band_mm(2, unit=UNIT)
-_ANCHOR_DEV = (-_ANCHOR_BAND, _ANCHOR_BAND)
+# The near side face stands the AnchorZ band off the bore axis; the far one
+# also takes the Width band.
+ANCHOR_Z_BAND = printed_band_mm(2, unit=UNIT)
+_ANCHOR_DEV = (-ANCHOR_Z_BAND, ANCHOR_Z_BAND)
 _HEIGHT_MIN = (
     ARC_HEIGHT
     + printed_deviations(ARC_HEIGHT, DRAWING_PRECISION["Block"]["Height"], unit=UNIT)[0]

@@ -28,6 +28,7 @@ from _drawing_precision import apply_drawing_precision
 from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _column_clamp_interface import ARC_DEPTH
 from sh_column_clamp_front_spec import (
+    ANCHOR_Z_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -56,9 +57,13 @@ async def build(adapter) -> dict[str, str]:
     )
     # Manufacturing drawing support, applied to the unsaved model the shared
     # builder leaves behind and saved ONCE below (as build_sh_column_clamp_back
-    # does): the ear stations' and the ears' height bands (sh_column_clamp_fit)
-    # and every printed dimension's places live on the model, then mark exactly
-    # the print's dimensions and stamp the make-critical title-block properties.
+    # does): the bore's lateral locator, the ear stations' and the ears' height
+    # bands (sh_column_clamp_fit) and every printed dimension's places live on
+    # the model, then mark exactly the print's dimensions and stamp the
+    # make-critical title-block properties.
+    set_dimension_symmetric_tolerance(
+        adapter, "BlockProfile", "AnchorZ", ANCHOR_Z_BAND, display_unit=UNIT
+    )
     for dimension_name in EAR_STATION_DIMENSIONS:
         set_dimension_symmetric_tolerance(
             adapter, "EarHoles", dimension_name, EAR_STATION_BAND, display_unit=UNIT

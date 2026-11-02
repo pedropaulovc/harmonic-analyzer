@@ -29,6 +29,7 @@ from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _part_save import save_part_and_images
 from _session import run_build
 from sh_column_clamp_back_spec import (
+    ANCHOR_Z_BAND,
     DEPTH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -56,11 +57,15 @@ async def build(adapter) -> dict[str, str]:
     )
     # Manufacturing drawing support, applied to the unsaved model the shared
     # builder leaves behind and saved ONCE below: the explicit bands (the grip
-    # offset, the ear stations and the ears' height, sh_column_clamp_fit) and
-    # every printed dimension's places live on the model, then mark exactly
-    # the print's dimensions and stamp the make-critical title-block properties.
+    # offset, the bore's lateral locator, the ear stations and the ears'
+    # height, sh_column_clamp_fit) and every printed dimension's places live
+    # on the model, then mark exactly the print's dimensions and stamp the
+    # make-critical title-block properties.
     set_dimension_symmetric_tolerance(
         adapter, "BlockProfile", "GripOffset", GRIP_OFFSET_BAND, display_unit=UNIT
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "BlockProfile", "AnchorZ", ANCHOR_Z_BAND, display_unit=UNIT
     )
     for dimension_name in EAR_STATION_DIMENSIONS:
         set_dimension_symmetric_tolerance(
