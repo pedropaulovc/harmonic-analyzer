@@ -33,7 +33,10 @@ from __future__ import annotations
 
 import math
 
+import _config
+from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm, printed_deviations
+from _title_block_units import LENGTH_UNITS
 from _cone_axis_constants import MECHANISM_Z_SHIFT
 from cylinder_bank_layout import (
     G0_FRONT_SOUTH_STACK as _BANK_G0_FRONT_SOUTH_STACK,
@@ -41,6 +44,7 @@ from cylinder_bank_layout import (
 )
 from dt_pinion_bracket_geometry import THICKNESS as STRAP_T
 from dt_pinion_bracket_geometry import THICKNESS_PLACES as STRAP_T_PLACES
+from dt_pinion_bracket_geometry import UNIT as STRAP_UNIT
 from dt_pinion_cam_geometry import CAM_LEN
 from dt_pinion_lever_geometry import BORE_DEPTH as LEVER_BORE_DEPTH
 from dt_pinion_lever_geometry import BORE_DEPTH_PLACES as LEVER_BORE_DEPTH_PLACES
@@ -48,13 +52,16 @@ from dt_pinion_lever_geometry import GRIP_FROM_B_PLACES as LEVER_GRIP_FROM_B_PLA
 from dt_pinion_lever_geometry import HUB_LEN as LEVER_HUB_LEN
 from dt_pinion_lever_geometry import ROD_DIA as LEVER_ROD_DIA
 from dt_pinion_lever_geometry import ROD_DIA_PLACES as LEVER_ROD_DIA_PLACES
+from dt_pinion_lever_geometry import UNIT as LEVER_UNIT
 from dt_pinion_lever_geometry import WALL_T as LEVER_WALL_T
 from dt_pinion_pivot_block_geometry import (
     BLOCK_DEPTH,
     BLOCK_DEPTH_BAND as BLOCK_DEPTH_BAND,
     BLOCK_DEPTH_PLACES,
+    UNIT as BLOCK_UNIT,
 )
 from dt_pinion_spring_section import PAD_WIDTH as SPRING_PAD_WIDTH
+from dt_pinion_spring_section import UNIT as SPRING_UNIT
 from dt_pinion_spring_section import WIDTH as SPRING_W
 from dt_pinion_spring_section import WIDTH_PLACES as SPRING_W_PLACES
 
@@ -113,9 +120,10 @@ def leaf_pair(setting: float) -> tuple[float, ...]:
 # trapped between the straps' inner faces, and at the drilling set-up it sits
 # hard on the back strap, so the back stop sets its station (61.55 from the
 # MHA-DT-22 head shoulder, ruling (c)'s bond station).
-DRUM_LEN = 143.2
-DRUM_LEN_PLACES = 1  # FaceWidth prints .X (dt_alignment_pinion_spec)
-DRUM_LEN_BAND = printed_band_mm(DRUM_LEN_PLACES)  # 0.8
+DRUM_LEN = 143.256  # 5.64 in
+DRUM_LEN_PLACES = 2  # FaceWidth prints .XX (dt_alignment_pinion_spec)
+DRUM_LEN_UNIT = "in"  # dt_alignment_pinion_spec.UNIT, by the same lockstep
+DRUM_LEN_BAND = printed_band_mm(DRUM_LEN_PLACES, unit=DRUM_LEN_UNIT)  # .01 in
 
 # The rig's axial datum (user ruling, 2026-09-25, P1-2): the base seats are
 # transferred from the blocks, so nothing in the frame fixes the rig along z
@@ -147,7 +155,9 @@ DRUM_BACK_ADVANCE_STACK = {
 }
 DRUM_BACK_ADVANCE_OPEN_TERMS: tuple[str, ...] = ()  # bank held south; set follows actual g19
 DRUM_FRONT_RETREAT_STACK = {
-    "MHA-DT-01 drum length .X": -printed_deviations(DRUM_LEN, DRUM_LEN_PLACES)[0],
+    "MHA-DT-01 drum length .XX": -printed_deviations(
+        DRUM_LEN, DRUM_LEN_PLACES, unit=DRUM_LEN_UNIT
+    )[0],
     "rig-set leaf D, thickest setting": FEELER_SET_ERROR,
 }
 # g0's front face south of the rig's g19-based set: gears 1-19 long inside
@@ -197,33 +207,40 @@ if abs(INNER_SPAN - _SOLID_SPAN) > 1e-9:
 
 # Worst fitted stack (Codex #854 P1).  The span between the blocks is two
 # straps, the drum, its end shim and the feeler, each inside its own printed
-# band -- the straps' and the drum's .X (U27: never tightened to .XX for
-# this), the shim's and the feeler's ruled band -- and each block adds its own
-# .XX depth.  The stacks
+# band -- the straps' .XXX and the drum's own row, the shim's and the
+# feeler's ruled band -- and each block adds its own .XX depth.  The stacks
 # below carry every term by name; nothing sums them into one symmetric band.
 # The torque shaft and the lift rod are set back-flush, so those terms land
 # at their front ends and size both lengths.
 
 # Torque shaft and lift rod: back ends flush with the back block's outer face,
-# both printed at .X (title-block +/-0.8, U27) and rounded UP.
-LENGTH_PLACES = 1
-LENGTH_BAND = printed_band_mm(LENGTH_PLACES)  # 0.8
+# both printed at .XX (#290: the stacks read them, so never .X) and rounded UP
+# to that grid.  The two sheets share one unit.
+LENGTH_UNIT = drawing_unit("parts/dt-pinion-lift-rod", _config.parts("dt-pinion-lift-rod"))
+if LENGTH_UNIT != drawing_unit(
+    "parts/dt-pinion-pivot-shaft", _config.parts("dt-pinion-pivot-shaft")
+):
+    raise AssertionError("the torque shaft and lift rod sheets print different units")
+LENGTH_PLACES = 2
+LENGTH_BAND = printed_band_mm(LENGTH_PLACES, unit=LENGTH_UNIT)  # .01 in
+_LENGTH_STEP = LENGTH_UNITS[LENGTH_UNIT] / 10**LENGTH_PLACES
 
 # Each term reads the deviation the part's sheet PRINTS (_printed_tolerance):
 # the thickest strap, the longest drum and the deepest block lengthen the stack.
-_STRAP_T_UPPER = printed_deviations(STRAP_T, STRAP_T_PLACES)[1]
-_DRUM_LEN_UPPER = printed_deviations(DRUM_LEN, DRUM_LEN_PLACES)[1]
-_BLOCK_DEPTH_UPPER = printed_deviations(BLOCK_DEPTH, BLOCK_DEPTH_PLACES)[1]
+_STRAP_T_UPPER = printed_deviations(STRAP_T, STRAP_T_PLACES, unit=STRAP_UNIT)[1]
+_DRUM_LEN_UPPER = printed_deviations(DRUM_LEN, DRUM_LEN_PLACES, unit=DRUM_LEN_UNIT)[1]
+_BLOCK_DEPTH_UPPER = printed_deviations(BLOCK_DEPTH, BLOCK_DEPTH_PLACES, unit=BLOCK_UNIT)[1]
 
 
-def _up_to_tenth(length: float) -> float:
-    return math.ceil(length * 10.0 - 1e-6) / 10.0
+def _up_to_grid(length: float) -> float:
+    """``length`` rounded UP to the shaft and rod sheets' printed grid."""
+    return round(math.ceil(length / _LENGTH_STEP - 1e-6) * _LENGTH_STEP, 9)
 
 
 # The shortest shaft in the longest stack must still bear
 # FRONT_BLOCK_MIN_BEARING of the front block's bore (drawing-guidelines.md rule 18 (thread engagement)'s 1.5 D on the
 # 1/4 in shaft), and BLOCK_BEARING_MARGIN more (Main, #858: rounding the
-# length to its .X place had left 0.09).  Set back-flush, the shaft's front
+# length to its printed place had left 0.09).  Set back-flush, the shaft's front
 # end reaches past the back block and the inner span into the front block;
 # each term below names the dimension that moves it and the part that prints
 # it (the W15 stack pattern).
@@ -237,10 +254,12 @@ def torque_shaft_bearing_stack(shaft_len: float) -> dict[str, float]:
         "nominal (shaft - back block - inner span)": shaft_len
         - BLOCK_DEPTH
         - INNER_SPAN,
-        "MHA-DT-19 shaft length .X": printed_deviations(shaft_len, LENGTH_PLACES)[0],
+        "MHA-DT-19 shaft length .XX": printed_deviations(
+            shaft_len, LENGTH_PLACES, unit=LENGTH_UNIT
+        )[0],
         "MHA-DT-18 back block depth .XX": -_BLOCK_DEPTH_UPPER,
-        "MHA-DT-14 strap thickness .X (2 straps)": -2.0 * _STRAP_T_UPPER,
-        "MHA-DT-01 drum length .X": -_DRUM_LEN_UPPER,
+        "MHA-DT-14 strap thickness .XXX (2 straps)": -2.0 * _STRAP_T_UPPER,
+        "MHA-DT-01 drum length .XX": -_DRUM_LEN_UPPER,
         "MHA-DT-00 front block feeler band": -FRONT_BLOCK_FEELER_BAND,
         "MHA-DT-19 drum end shim set error": -DRUM_END_SHIM_SET_ERROR,
         "MHA-DT-19 rear end flush set": -FLUSH_SET_ERROR,
@@ -253,7 +272,7 @@ def _stack_text(stack: dict[str, float]) -> str:
 
 
 _FRONT_BEARING_REQUIRED = FRONT_BLOCK_MIN_BEARING + BLOCK_BEARING_MARGIN
-TORQUE_SHAFT_LEN = _up_to_tenth(
+TORQUE_SHAFT_LEN = _up_to_grid(
     _FRONT_BEARING_REQUIRED - sum(torque_shaft_bearing_stack(0.0).values())
 )
 TORQUE_SHAFT_BEARING_STACK = torque_shaft_bearing_stack(TORQUE_SHAFT_LEN)
@@ -290,7 +309,7 @@ def torque_shaft_back_bearing_stack() -> dict[str, float]:
     return {
         "MHA-DT-18 back block depth": BLOCK_DEPTH,
         "MHA-DT-18 back block depth .XX": printed_deviations(
-            BLOCK_DEPTH, BLOCK_DEPTH_PLACES
+            BLOCK_DEPTH, BLOCK_DEPTH_PLACES, unit=BLOCK_UNIT
         )[0],
         "MHA-DT-00 feeler, widest (the E-a shaft's end play)": -(
             FRONT_BLOCK_FEELER + FRONT_BLOCK_FEELER_BAND
@@ -328,9 +347,9 @@ if BACK_COLLAR_LEAF_F < smallest_leaf_setting(
     raise AssertionError("the back-collar leaf no longer covers its floor and spare")
 BACK_COLLAR_GAP_MIN = BACK_COLLAR_LEAF_F - FEELER_SET_ERROR  # 0.80
 BACK_COLLAR_GAP_MAX = BACK_COLLAR_LEAF_F + FEELER_SET_ERROR  # 1.00
-_STRAP_T_LOWER = printed_deviations(STRAP_T, STRAP_T_PLACES)[0]
-BACK_CAM_PIN_STATION = CAM_LEN + BACK_COLLAR_LEAF_F - STRAP_T / 2.0  # 5.40
-LEVER_SEAT_MIN = LEVER_BORE_DEPTH + BACK_COLLAR_GAP_MAX + HUB_STOP_MARGIN  # 9.25
+_STRAP_T_LOWER = printed_deviations(STRAP_T, STRAP_T_PLACES, unit=STRAP_UNIT)[0]
+BACK_CAM_PIN_STATION = CAM_LEN + BACK_COLLAR_LEAF_F - STRAP_T / 2.0  # 5.404
+LEVER_SEAT_MIN = LEVER_BORE_DEPTH + BACK_COLLAR_GAP_MAX + HUB_STOP_MARGIN  # 9.378
 
 
 def lift_rod_seat_stack(rod_len: float) -> dict[str, float]:
@@ -339,10 +358,12 @@ def lift_rod_seat_stack(rod_len: float) -> dict[str, float]:
         "nominal (rod - both blocks - inner span)": rod_len
         - 2.0 * BLOCK_DEPTH
         - INNER_SPAN,
-        "MHA-DT-17 rod length .X": printed_deviations(rod_len, LENGTH_PLACES)[0],
+        "MHA-DT-17 rod length .XX": printed_deviations(
+            rod_len, LENGTH_PLACES, unit=LENGTH_UNIT
+        )[0],
         "MHA-DT-18 block depth .XX (2 blocks)": -2.0 * _BLOCK_DEPTH_UPPER,
-        "MHA-DT-14 strap thickness .X (2 straps)": -2.0 * _STRAP_T_UPPER,
-        "MHA-DT-01 drum length .X": -_DRUM_LEN_UPPER,
+        "MHA-DT-14 strap thickness .XXX (2 straps)": -2.0 * _STRAP_T_UPPER,
+        "MHA-DT-01 drum length .XX": -_DRUM_LEN_UPPER,
         "MHA-DT-00 front block feeler band": -FRONT_BLOCK_FEELER_BAND,
         "MHA-DT-19 drum end shim set error": -DRUM_END_SHIM_SET_ERROR,
     }
@@ -362,22 +383,24 @@ LEVER_PLANE_NORTH_FROM_ROD_END = (
 
 def _lever_arm_stack(direction: str) -> dict[str, float]:
     """The grip arm's own printed bands, toward ``direction``."""
-    bore = printed_deviations(LEVER_BORE_DEPTH, LEVER_BORE_DEPTH_PLACES)
-    grip = printed_deviations(LEVER_HUB_LEN / 2.0, LEVER_GRIP_FROM_B_PLACES)
-    arm = printed_deviations(LEVER_ROD_DIA, LEVER_ROD_DIA_PLACES)
+    bore = printed_deviations(LEVER_BORE_DEPTH, LEVER_BORE_DEPTH_PLACES, unit=LEVER_UNIT)
+    grip = printed_deviations(
+        LEVER_HUB_LEN / 2.0, LEVER_GRIP_FROM_B_PLACES, unit=LEVER_UNIT
+    )
+    arm = printed_deviations(LEVER_ROD_DIA, LEVER_ROD_DIA_PLACES, unit=LEVER_UNIT)
     return {
-        "MHA-DT-16 bore depth .X": -bore[0] if direction == "south" else bore[1],
+        "MHA-DT-16 bore depth .XX": -bore[0] if direction == "south" else bore[1],
         "MHA-DT-16 grip from face B .XX": grip[1] if direction == "south" else -grip[0],
-        "MHA-DT-16 arm dia .X, half": arm[1] / 2.0,
+        "MHA-DT-16 arm dia .XX, half": arm[1] / 2.0,
     }
 
 
 def lever_north_travel_stack(rod_len: float) -> dict[str, float]:
     """Worst-case travel of the lever's throw plane north of the pose."""
     return {
-        "MHA-DT-17 rod length .X (shortest)": -printed_deviations(rod_len, LENGTH_PLACES)[
-            0
-        ],
+        "MHA-DT-17 rod length .XX (shortest)": -printed_deviations(
+            rod_len, LENGTH_PLACES, unit=LENGTH_UNIT
+        )[0],
         "MHA-DT-17 floated north to the back collar": BACK_COLLAR_GAP_MAX,
         **_lever_arm_stack("north"),
     }
@@ -386,9 +409,9 @@ def lever_north_travel_stack(rod_len: float) -> dict[str, float]:
 def lever_south_travel_stack(rod_len: float) -> dict[str, float]:
     """Worst-case travel of the lever's throw plane south of the pose."""
     return {
-        "MHA-DT-17 rod length .X (longest)": printed_deviations(rod_len, LENGTH_PLACES)[
-            1
-        ],
+        "MHA-DT-17 rod length .XX (longest)": printed_deviations(
+            rod_len, LENGTH_PLACES, unit=LENGTH_UNIT
+        )[1],
         "MHA-DT-17 floated south to the front collar (widest feeler)": (
             FRONT_BLOCK_FEELER + FRONT_BLOCK_FEELER_BAND
         ),
@@ -397,9 +420,9 @@ def lever_south_travel_stack(rod_len: float) -> dict[str, float]:
 
 
 SHAFT_FRONT_SOUTH_TRAVEL_STACK = {
-    "MHA-DT-19 length .X (longest)": printed_deviations(TORQUE_SHAFT_LEN, LENGTH_PLACES)[
-        1
-    ],
+    "MHA-DT-19 length .XX (longest)": printed_deviations(
+        TORQUE_SHAFT_LEN, LENGTH_PLACES, unit=LENGTH_UNIT
+    )[1],
     "MHA-DT-00 feeler, widest (the pinned cluster runs forward)": (
         FRONT_BLOCK_FEELER + FRONT_BLOCK_FEELER_BAND
     ),
@@ -424,7 +447,7 @@ def lever_to_shaft_front_worst(rod_len: float) -> float:
 # shaft to 0.14 -- Main, restricted review of #858).
 _LEVER_SEAT_REQUIRED = LEVER_SEAT_MIN + RIG_MARGIN_SPARE
 _LEVER_AIR_REQUIRED = LEVER_THROW_MIN_AIR + RIG_MARGIN_SPARE
-LIFT_ROD_LEN = _up_to_tenth(
+LIFT_ROD_LEN = _up_to_grid(
     max(
         _LEVER_SEAT_REQUIRED - sum(lift_rod_seat_stack(0.0).values()),
         _LEVER_AIR_REQUIRED - lever_to_shaft_front_worst(0.0),
@@ -477,7 +500,7 @@ SPRING_BLADE_ON_FLANK_WORST = (
     SPRING_BLADE_INSET
     + _STRAP_T_LOWER
     - FEELER_SET_ERROR
-    - printed_deviations(SPRING_W, SPRING_W_PLACES)[1]
+    - printed_deviations(SPRING_W, SPRING_W_PLACES, unit=SPRING_UNIT)[1]
 )
 SPRING_PAD_TO_BLOCK_WORST = SPRING_PAD_LEAF - FEELER_SET_ERROR  # 0.55
 for _name, _worst, _floor in (

@@ -8,8 +8,10 @@ import cone_line
 import dt_cone_pivot_post_spec
 import dt_cone_tip_block_spec
 
+from _fit_deviations import deviations
 from _gtol_cylinder import CylinderFace
-from _printed_tolerance import printed_band_mm
+from _inch_wall_limits import WALL_FLOOR_MM
+from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm, printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 from dt_cone_gear_spec import FACE_WIDTH as CONE_GEAR_FACE_WIDTH, SEAT_PITCH, outside_dia_mm
@@ -26,8 +28,10 @@ from cone_shaft_land_bands import (  # noqa: F401  re-exported for the shaft bui
     SECTION_DIA_BANDS,
     SECTION_FLAT_AF,
     TERMINAL_DIA_IN,
+    TERMINAL_DIA_MM,
     TERMINAL_DIA_PLACES,
     TERMINAL_FLAT_EDGE_BREAK_MAX,
+    UNIT,
 )
 from cone_stack_end_play import COLLAR_FEELER, MARGIN_SPARE, SHAFT_END_PLAY
 from dt_vn_cone_tip_collar_spec import WIDTH as TIP_COLLAR_WIDTH
@@ -42,11 +46,21 @@ from gear_seat_fit import flat_bore_af_band, seat_bore_band
 
 MM_PER_IN = 25.4
 
+
+def inch_text(value_mm: float, places: int) -> str:
+    """``value_mm`` as decimal-inch print text: ``.004``, ``1.69``."""
+    text = f"{value_mm / MM_PER_IN:.{places}f}"
+    return text[1:] if text.startswith("0.") else text
+
+
 # The manually rederived v2 pivot post has a .483 in bearing bore spanning
-# 42.011 mm along the cone axis.  The shaft begins 1.0 mm proud of the post's
-# front face, so the integral journal is one millimetre longer than the post
-# body; it is turned .0005 in under the bore nominal (.4825 in), so the bore's
-# +.0010/+.0005 band closes the shaft_in_bushing class on its SHAFT_H band.
+# 42.011 mm along the cone axis.  The shaft begins just proud of the post's
+# front face: the integral journal is turned 1.70 in long (#290: the old
+# 1.0 mm-proud 43.011 snapped up to the printed .XX grid, so the stub still
+# stands the assembly's 1.0 mm proud), JOURNAL_PROUD longer
+# than the post body.  It is turned .0005 in under the bore nominal (.4825
+# in), so the bore's +.0010/+.0005 band closes the shaft_in_bushing class on
+# its SHAFT_H band.
 JOURNAL_BORE_DIA = dt_cone_pivot_post_spec.BORE_DIA
 JOURNAL_CLEARANCE = 0.0127
 JOURNAL_DIA = JOURNAL_BORE_DIA - JOURNAL_CLEARANCE
@@ -55,8 +69,12 @@ JOURNAL_DIAMETRAL_CLEARANCE_MM = (
     JOURNAL_BORE_DIA + POST_JOURNAL_BORE_BAND[1] - JOURNAL_DIA - RUNNING_DIA_BAND[0],
     JOURNAL_BORE_DIA + POST_JOURNAL_BORE_BAND[0] - JOURNAL_DIA - RUNNING_DIA_BAND[1],
 )
-JOURNAL_PROUD = 1.0
-JOURNAL_END = dt_cone_pivot_post_spec.CONE_BOSS_LENGTH + JOURNAL_PROUD
+JOURNAL_END = 43.18  # 1.70
+JOURNAL_PROUD = JOURNAL_END - dt_cone_pivot_post_spec.CONE_BOSS_LENGTH
+if not 1.0 <= JOURNAL_PROUD <= 1.5:
+    raise AssertionError(
+        f"the journal stands {JOURNAL_PROUD:.3f} proud of the post body, outside 1.0..1.5"
+    )
 
 # The post's cone station and boss length locate its front face.  The shaft
 # end is JOURNAL_PROUD south of that face; the part origin is that end.
@@ -72,12 +90,13 @@ FRONT_STUB = (
 # boss 1.681 further on.  An integral collar fills that gap: its south face
 # bears on the post's north boss face (flush with the journal end) and the
 # gear stack is pushed onto its north face (dt_cone_gear_stack).  The collar
-# bears on the boss annulus outside the Ø12.2808 bore and inside the Ø17.2
+# bears on the boss annulus outside the .483 in bore and inside the Ø17.2
 # boss.
 #
 # The 64T's SOUTH face sits SOUTH_FACE_SHIFT_NORTH north of where the 8.0
 # layout face on the 19.9 station put it (#1126), so the collar is the 1.681
-# web under that layout face plus the shift: 3.181, above drawing-guidelines.md rule 17 (walls and webs)'s 2.0 target
+# web under that layout face plus the shift: 3.181 (a stack closure, printed
+# .125 at .XXX), above drawing-guidelines.md rule 17 (walls and webs)'s .080 in target
 # at its low limit.  The solid stack (user ruling 2026-09-28) grows the 64T
 # NORTH from that face to bear on T120, so the collar does not move.  The 64T
 # centre is the drive-train's physical 64T station (the shaft tests pin the
@@ -115,25 +134,28 @@ if (
 # The shaft is turned from this bar, so the collar is also its largest
 # diameter.  ASTM A108 cold-finished rounds take ASTM A29's cold-drawn size
 # tolerance: over 1/2 through 1 in, +0 / -0.002 in.
-STOCK_DIA = 0.625 * MM_PER_IN
-STOCK_DIA_BAND = (0.0, -0.002 * MM_PER_IN)
+STOCK_DIA = 15.875  # 5/8
+STOCK_DIA_BAND = (0.0, -0.0508)  # +0/-.002 in
 COLLAR_DIA = STOCK_DIA
 # The thrust ring: the collar's south face on the post boss, between the bore
-# and the collar OD.  Held to drawing-guidelines.md rule 17 (walls and webs)'s 1.5 floor (user ruling 2026-09-26)
-# with BOTH bounding edges broken at the worst case: the collar's OD edge and
-# the post's bore rim.  The title block's 0.25 break would take the 1.77 ring
-# to 1.27, so both edges print a smaller break, derived from
-# ring - 2 x break >= floor and rounded DOWN to one printable place (0.1):
-# the collar under its stock callout, the post's journal rims in the post
-# sheet's journal note (draw_dt_cone_pivot_post.JOURNAL_NOTE).  Sizing the ring
-# for two 0.25 breaks instead needs ring >= 2.0, an 11/16 bar, which the
-# user's ruling (5/8 bar as supplied) rules out.
-THRUST_RING_FLOOR = 1.5
+# and the collar OD.  Held to drawing-guidelines.md rule 17 (walls and webs)'s
+# .060 in floor (user ruling 2026-09-26; #290 inch floor) with BOTH bounding
+# edges broken at the worst case: the collar's OD edge and the post's bore
+# rim.  The title block's .010 break would take the .070 ring to .050, so both
+# edges print a smaller break, derived from ring - 2 x break >= floor and
+# rounded DOWN to the printed .001 in grid: the collar under its stock
+# callout, the post's journal rims in the post sheet's journal note
+# (draw_dt_cone_pivot_post.JOURNAL_NOTE).  Sizing the ring for two .010
+# breaks instead needs a larger bar, which the user's ruling (5/8 bar as
+# supplied) rules out.
+THRUST_RING_FLOOR = WALL_FLOOR_MM
 THRUST_RING_MIN = (
     (STOCK_DIA + STOCK_DIA_BAND[1]) - (JOURNAL_BORE_DIA + POST_JOURNAL_BORE_BAND[0])
 ) / 2.0
-THRUST_EDGE_BREAK_MAX = (
-    math.floor((THRUST_RING_MIN - THRUST_RING_FLOOR) / 2.0 * 10.0 + 1e-9) / 10.0
+THRUST_EDGE_BREAK_MAX = round(
+    math.floor((THRUST_RING_MIN - THRUST_RING_FLOOR) / 2.0 / MM_PER_IN * 1e3 + 1e-9)
+    / 1e3 * MM_PER_IN,
+    9,
 )
 if THRUST_RING_MIN - 2.0 * THRUST_EDGE_BREAK_MAX < THRUST_RING_FLOOR - 1e-9:
     raise AssertionError(
@@ -144,33 +166,36 @@ if THRUST_RING_MIN - 2.0 * THRUST_EDGE_BREAK_MAX < THRUST_RING_FLOOR - 1e-9:
 # on the MHA-DT-05 boss round the journal rim, its north face carries the
 # 64T.  The 64T clears any root under its 1.0 bore chamfer; the post's rim
 # break has no minimum, so the root's limit is the one a sharp rim still
-# seats against: an R0.05 root stands a sharp rim off the face by under
-# 0.01 at the journal's mean clearance.  A hand-ground tool nose holds it.
-COLLAR_ROOT_RADIUS_MAX = 0.05
+# seats against: an R.002 root stands a sharp rim off the face by under
+# .0004 at the journal's mean clearance.  A hand-ground tool nose holds it.
+COLLAR_ROOT_RADIUS_MAX = 0.0508  # .002
 # The callout under the collar's reference diameter: the stock statement in
 # the U41 plate's form ("1/4 PLATE AS SUPPLIED"), so the bar size stays out
-# of the MATERIAL cell, the collar's own edge break, tighter than the title
-# block's, its root limit, and the reason for both: the faces are seats
-# (machinist review r1, run 20261018T054926125Z: a tight break and a sharp
-# root need their function at the callout).
+# of the MATERIAL cell, then each tighter-than-title-block limit followed by
+# its reason (machinist review r1, run 20261018T054926125Z: a tight break and
+# a sharp root need their function at the callout).  The edge break keeps the
+# MHA-DT-05 thrust ring above its floor (above); "SEATS" alone did not say
+# why the OD edge matters, since the 64T's seat annulus sits inside it
+# (machinist review, PR #2107).  The roots' reason is that both faces seat.
 COLLAR_STOCK_CALLOUT = "\n".join(
     (
         "5/8 BAR AS SUPPLIED",
-        f"EDGE BREAK {THRUST_EDGE_BREAK_MAX:.1f} MAX",
-        f"ROOTS R{COLLAR_ROOT_RADIUS_MAX:.2f} MAX",
+        f"EDGE BREAK {inch_text(THRUST_EDGE_BREAK_MAX, 3)} MAX",
+        "FOR MHA-DT-05 THRUST RING",
+        f"ROOTS R{inch_text(COLLAR_ROOT_RADIUS_MAX, 3)} MAX",
         "SEATS MHA-DT-05 AND 64T",
     )
 )
 # The same break on the post's journal rims, the ring's other bounding edge;
 # the post sheet prints it with the journal size.
-POST_JOURNAL_RIM_BREAK = f"RIMS BREAK {THRUST_EDGE_BREAK_MAX:.1f} MAX"
+POST_JOURNAL_RIM_BREAK = f"RIMS BREAK {inch_text(THRUST_EDGE_BREAK_MAX, 3)} MAX"
 # The terminal flat's two long torque corners stay sharp in the model; their
 # break limit is a drawing requirement, printed above the terminal across-flat
 # (draw_dt_cone_gear_shaft).  cone_shaft_land_bands derives the number.  One
 # line: SolidWorks stores an above callout's line break but prints none of it
 # (run 20261010T071427837Z).  No process word: the limit is the requirement
 # (machinist review r1).
-TORQUE_CORNER_CALLOUT = f"CORNERS {TERMINAL_FLAT_EDGE_BREAK_MAX:.2f} MAX"
+TORQUE_CORNER_CALLOUT = f"CORNERS {inch_text(TERMINAL_FLAT_EDGE_BREAK_MAX, 3)} MAX"
 
 
 def _gear(teeth: int) -> str:
@@ -301,7 +326,7 @@ def seat_step_station(j: int) -> float:
 
 
 # U40 moved the terminal land start under T018. The cutter-native redesign
-# keeps that station and substitutes the authoritative 1/32 in terminal
+# keeps that station and substitutes the authoritative .031 in terminal
 # diameter, shared by T012, T006 and the stack collar.
 TIP_LAND_START_STATION = seat_step_station(17)
 TIP_STUB_START_STATION = TIP_LAND_START_STATION
@@ -312,17 +337,26 @@ TIP_STUB_LENGTH = T006_TIP_STATION - TIP_STUB_START_STATION
 # size lives in cone_shaft_land_bands and the gear family checks its web
 # against the current cutter-owned printed MIN floors, not an old snapshot.
 # Tailstock support remains required for the now more slender terminal land.
-# Diameters decrease toward the tip for tip-first assembly.
-SECTIONS: tuple[tuple[float, float], ...] = (
-    (JOURNAL_DIA / MM_PER_IN, JOURNAL_END),  # integral v2-post bearing journal
-    (0.375, FRONT_STUB + seat_step_station(15)),  # 64T + T120..T030 seats
-    (0.25, FRONT_STUB + seat_step_station(16)),  # T024 seat
-    (0.125, FRONT_STUB + TIP_LAND_START_STATION),  # T018 seat
-    (TERMINAL_DIA_IN, FRONT_STUB + T006_TIP_STATION),  # T012/T006, collar, tip
+# Diameters decrease toward the tip for tip-first assembly.  The stations
+# are the gear stack's (closures): only the journal's end is a fabricated
+# length, snapped above.
+SECTION_DIAS: tuple[float, ...] = (
+    JOURNAL_DIA,  # integral v2-post bearing journal, .4825
+    9.525,  # 3/8: 64T + T120..T030 seats
+    6.35,  # 1/4: T024 seat
+    3.175,  # 1/8: T018 seat
+    TERMINAL_DIA_MM,  # .031: T012/T006, collar, tip
 )
-
-SECTION_DIAS = tuple(dia_in * MM_PER_IN for dia_in, _end in SECTIONS)
-SECTION_ENDS = tuple(end for _dia_in, end in SECTIONS)
+SECTION_ENDS: tuple[float, ...] = (
+    JOURNAL_END,
+    FRONT_STUB + seat_step_station(15),
+    FRONT_STUB + seat_step_station(16),
+    FRONT_STUB + TIP_LAND_START_STATION,
+    FRONT_STUB + T006_TIP_STATION,
+)
+SECTIONS: tuple[tuple[float, float], ...] = tuple(
+    (dia / MM_PER_IN, end) for dia, end in zip(SECTION_DIAS, SECTION_ENDS, strict=True)
+)
 SHAFT_LENGTH = SECTION_ENDS[-1]
 def validate_gear_loading_clearances() -> None:
     """Require accepted physical tips before a native shaft build starts.
@@ -405,18 +439,23 @@ SECTION_KNOBS = tuple(
 # Step root radius.  Each step sits inside the larger gear's bore, one
 # SEAT_STEP_SETBACK behind the smaller gear's south face, so the root can be
 # neither a sharp corner (a stress riser at the smallest section of a slender
-# shaft) nor a radius that reaches the smaller gear: the fillet stands 0.10
+# shaft) nor a radius that reaches the smaller gear: the fillet stands .004
 # proud of the smaller land -- more than that gear's radial clearance on
 # either the round or the flat -- so its axial run is booked in the setback
-# (the proof below).  R0.10 is the standard tool nose radius.  Modelled as
+# (the proof below).  R.004 is the standard tool nose radius.  Modelled as
 # geometry, round root and flat root alike, and dimensioned once, not written
 # as a process note.
-FILLET_RADIUS = 0.10
+FILLET_RADIUS = 0.1016  # .004
+# The setback books the root's run at its printed maximum, so the radius
+# carries its own band, R.004 +.000/-.002: never over .004 (the title block's
+# +-.005 would let a .009 root reach the smaller gear; Codjiflo P2 on #2107)
+# and never sharp.
+FILLET_R_BAND = (0.0, -0.0508)  # (upper, lower): +.000/-.002 in
 # Three identical land-step roots (the collar's roots stay sharp,
 # build_dt_cone_gear_shaft), one fillet feature, one radius dimension.
 FILLET_CALLOUT = "3X"
 
-# Surface texture, on the one land that runs: the Ø12.2308 journal turns in
+# Surface texture, on the one land that runs: the .4825 journal turns in
 # the pivot post bore.  Every other land only carries parts locked to the
 # shaft -- the gears slide on and are driven by the flats, the MHA-DT-VN-54
 # collar is screwed to the terminal flat -- and the tip bears on the
@@ -424,7 +463,9 @@ FILLET_CALLOUT = "3X"
 # title-block process row (drawing-guidelines.md rule 6; machinist review
 # r5, 20261018T080102803Z, which found the tip land's Ra 1.6 unexplained).
 SURFACE_FINISHES = (
-    SurfaceFinishControl("pivot_journal", MACHINED_UM, CylinderFace(JOURNAL_DIA)),
+    SurfaceFinishControl(
+        "pivot_journal", MACHINED_UM, CylinderFace(JOURNAL_DIA), display_unit=UNIT
+    ),
 )
 
 # What the native dimensions cannot say.  The seats, flats, steps and web
@@ -479,42 +520,40 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 
 # Display precision is a MODEL property (drawing-simplicity-policy.md `How the repository implements the guidelines`):
-# the part build stamps it and the sheet only reads it back.
+# the part build stamps it and the sheet only reads it back.  Decimal inch
+# (#290).
 #
-# Diameters and across-flats: three places.  Each carries its named band
+# Diameters and across-flats: four places.  Each carries its named band
 # (SECTION_DIA_BANDS, FLAT_AF_BAND), so their places are only the number's
 # spelling.
 #
 # Land steps Sec1End..Sec3End: three places, which is the title-block .XXX
-# general grade (+-0.13) and no explicit band.  This is a location
+# general grade (+-.005) and no explicit band.  This is a location
 # requirement, not a spelling: each step sits SEAT_STEP_SETBACK behind the
-# smaller gear's south face, and the proof below books the step's band with
-# the collar's, the stack's and the fillet's in that 1.0; the .XX grade
-# (+-0.51) alone would take half of it.
+# smaller gear's south face, and the proof below books the step's printed
+# limit with the collar's, the stack's and the fillet's in that 1.0 mm; the
+# .XX grade (+-.01) alone would take half of it.
 #
 # Tip station Sec4End (collar face to the tip): two places, the title
-# block's .XX grade (+-0.51), by user ruling 2026-09-29.  The tip block is
+# block's .XX grade (+-.01), by user ruling 2026-09-29.  The tip block is
 # fixed by its hold-down, so this band lands on the adjuster's embed;
 # build_dt_drive_train_assembly closes that stack by the block's depth and the
 # 1.0D adjuster engagement instead of a tighter length.  Journal length
-# Sec0End (collar face back to the front stub): one place, the routine grade
-# the fleet's plain lengths print; it only sets how far the stub stands proud
-# of the post's south face.  Step radius: two places; nothing depends on it
-# beyond the setback proof.
+# Sec0End (collar face back to the front stub): two places, the .XX grade,
+# since the journal's guaranteed bearing span below reads it (never .X).
+# Step radius: three places; nothing depends on it beyond the setback proof.
 #
 # Collar (#914): the diameter is the bar's as supplied (STOCK_DIA), so it
-# prints as a two-place reference, 15.88, the bar's own size; the web
-# prints three places because it is the 64T's station toward MHA-DT-05
-# (crank_boss_rim.GEAR64_STATION_TOWARD_POST) and the gear stack's origin:
-# at .XX the station term grows from 0.53 to 0.91 and the widest face holding
-# the post floor falls from 6.5 to 6.2.
+# prints as the 5/8 fraction reference, the bar's own size; the web prints
+# three places because it is the 64T's station toward MHA-DT-05
+# (crank_boss_rim.GEAR64_STATION_TOWARD_POST) and the gear stack's origin.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Sec0Profile": {"Sec0Dia": LAND_DIA_PLACES[0]},
     "Sec1Profile": {"Sec1Dia": LAND_DIA_PLACES[1]},
     "Sec2Profile": {"Sec2Dia": LAND_DIA_PLACES[2]},
     "Sec3Profile": {"Sec3Dia": LAND_DIA_PLACES[3]},
     "Sec4Profile": {"Sec4Dia": LAND_DIA_PLACES[4]},
-    "Sec0": {"Sec0End": 1},
+    "Sec0": {"Sec0End": 2},
     "Sec1": {"Sec1End": 3},
     "Sec2": {"Sec2End": 3},
     "Sec3": {"Sec3End": 3},
@@ -523,14 +562,16 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Sec2FlatProfile": {"Sec2AF": LAND_AF_PLACES[2]},
     "Sec3FlatProfile": {"Sec3AF": LAND_AF_PLACES[3]},
     "Sec4FlatProfile": {"Sec4AF": LAND_AF_PLACES[4]},
-    "ShoulderFillets": {"ShoulderR": 2},
-    "CollarProfile": {"CollarDia": 2},
+    "ShoulderFillets": {"ShoulderR": 3},
+    "CollarProfile": {"CollarDia": 3},
     "Collar": {"CollarWidth": 3},
 }
+# The collar's stock reference prints as the bar's fraction.
+COLLAR_DIA_FRACTION_DENOMINATOR = 8
 # The front-to-tip overall (#917 R5 (a)) is the sheet's one reference
-# dimension, the read-only sum of the journal and the tip station: one place,
-# the grade of the journal it sums.
-DRAWING_REFERENCE_PRECISION = 1
+# dimension, the read-only sum of the journal and the tip station: two
+# places, the grade of the lengths it sums.
+DRAWING_REFERENCE_PRECISION = 2
 
 _PRECISION_NAMES = [
     (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
@@ -547,21 +588,42 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
 
+_LENGTH_NOMINALS = {
+    **{f"Sec{i}End": knob for i, knob in enumerate(SECTION_KNOBS)},
+    "CollarWidth": COLLAR_THICKNESS,
+    "ShoulderR": FILLET_RADIUS,
+}
+
+
+def printed_length_deviations(name: str) -> tuple[float, float]:
+    """(lower, upper) mm about the model of a marked length's printed limits:
+    the inch value the sheet prints, with its own band (the step roots) or the
+    title block's."""
+    if name == "ShoulderR":
+        return printed_deviations(
+            FILLET_RADIUS, DRAWING_PRECISION_BY_NAME[name], deviations(FILLET_R_BAND), unit=UNIT
+        )
+    return printed_deviations(
+        _LENGTH_NOMINALS[name], DRAWING_PRECISION_BY_NAME[name], unit=UNIT
+    )
+
+
 def printed_band(name: str) -> float:
-    """The title-block band a marked length prints at its own places."""
-    return printed_band_mm(DRAWING_PRECISION_BY_NAME[name])
+    """The farther printed limit of a marked length from its model value: the
+    title-block band plus the inch rounding of the printed nominal."""
+    return max(abs(deviation) for deviation in printed_length_deviations(name))
 
 
 # Guaranteed cylindrical support across the ENTIRE retained shaft stroke.
 # The integral collar starts seated on the actual post north face; north q
 # withdraws the shaft's free end into the bore. Both bore rims and ordinary
 # shaft-end break remove support; the shorter COMPLETE overlap controls cock.
-JOURNAL_FREE_END_BREAK_MAX_MM = 0.25
+JOURNAL_FREE_END_BREAK_MAX_MM = edge_break_chamfer_mm(unit=UNIT)
 JOURNAL_SUPPORT_SPAN_MIN_MM = min(
     dt_cone_pivot_post_spec.CONE_BOSS_LENGTH
-    - printed_band_mm(dt_cone_pivot_post_spec.DRAWING_PRECISION_BY_NAME["ConeBossLen"])
+    - printed_band_mm(dt_cone_pivot_post_spec.DRAWING_PRECISION_BY_NAME["ConeBossLen"], unit=dt_cone_pivot_post_spec.UNIT)
     - 2.0 * THRUST_EDGE_BREAK_MAX,
-    JOURNAL_END - printed_band("Sec0End")
+    JOURNAL_END + printed_length_deviations("Sec0End")[0]
     - JOURNAL_FREE_END_BREAK_MAX_MM - THRUST_EDGE_BREAK_MAX - SHAFT_END_PLAY[1],
 )
 if JOURNAL_SUPPORT_SPAN_MIN_MM <= 0.0:
@@ -571,11 +633,12 @@ if JOURNAL_SUPPORT_SPAN_MIN_MM <= 0.0:
 # The setback proof (user ruling 2026-09-28).  Each step and its root fillet
 # must stay south of the smaller gear's south face -- the larger gear's north
 # face -- with the stack pushed onto the collar at its shortest: the step at
-# the north end of its printed band, the fillet's 0.10 run
-# along the smaller land, the collar web's printed band (the stack stands on
-# the collar's north face, the steps are measured from its south face), the
-# stack's own shortfall up to that face (dt_cone_gear_stack.face_band) and the
-# fleet's MARGIN_SPARE.  The fillet runs the same 0.10 along the flat's root
+# the north end of its printed limits, the fillet's R.004 +.000 run
+# along the smaller land, the collar web's printed short limit (the stack
+# stands on the collar's north face, the steps are measured from its south
+# face), the stack's own shortfall up to that face
+# (dt_cone_gear_stack.face_band) and the fleet's MARGIN_SPARE.  The fillet
+# runs the same .004 along the flat's root
 # as along the round's, so the one budget covers the smaller gear's round
 # bore and its flat alike.  In service the stack only floats north, off the
 # step.
@@ -584,9 +647,9 @@ for _name, _j, _end in zip(("Sec1End", "Sec2End", "Sec3End"), SEAT_STEP_GEARS, S
     if abs(_end - FRONT_STUB - seat_step_station(_j)) > 1e-9:
         raise AssertionError(f"{_name} is not one setback behind gear {_j}'s north face")
     _terms = {
-        "step band": printed_band(_name),
-        "fillet": FILLET_RADIUS,
-        "collar band": printed_band("CollarWidth"),
+        "step band": printed_length_deviations(_name)[1],
+        "fillet": FILLET_RADIUS + printed_length_deviations("ShoulderR")[1],
+        "collar band": -printed_length_deviations("CollarWidth")[0],
         "stack": -face_band(_j, "north")[1],
         "spare": MARGIN_SPARE,
     }

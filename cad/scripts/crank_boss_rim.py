@@ -94,7 +94,7 @@ CONE_BOSS_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossDia"]
 #   each; collar_contacts below reads their sum) and only ever opening, so
 #   they add nothing toward the post. The stack is the boss end SHORT by
 #   its row and the collar thin by its own (Main's ruling (b), 2026-09-27).
-COLLAR_WIDTH_SHORT = printed_band_mm(shaft.DRAWING_PRECISION_BY_NAME["CollarWidth"])
+COLLAR_WIDTH_SHORT = -shaft.printed_length_deviations("CollarWidth")[0]
 GEAR64_STATION_TOWARD_POST = CONE_BOSS_END_GROWTH + COLLAR_WIDTH_SHORT
 #   FaceWidth's ±0.025 extends NORTH of the seated south face and does not
 #   consume any margin to the post; only the collar and MHA-DT-05 bands do.

@@ -8,19 +8,24 @@ both parts; the pin slips into them and its peened heads retain it (#1064).
 
 from __future__ import annotations
 
+import _config
+from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
-from dt_pinion_lever_geometry import HUB_OD, PIN_HOLE_DIA
+from dt_pinion_lever_geometry import HUB_OD
+from dt_pinion_lever_geometry import UNIT as LEVER_UNIT
 
-PIN_DIA = PIN_HOLE_DIA  # 1/16 in drill rod, in its match-drilled hole
+UNIT = drawing_unit("parts/dt-pinion-lever-pin", _config.parts("dt-pinion-lever-pin"))
+# 1/16 in drill rod as supplied (vendor size), in the hub's match-drilled hole
+# (dt_pinion_lever_geometry.PIN_HOLE_DIA).
+PIN_DIA = 25.4 / 16.0
 # Codex P1 (#844): cut OVERLENGTH, then trimmed and peened flush at assembly.
-# A pin cut to the hub's 13.0 at .X could be 12.2 in a 13.8 hub -- 0.8 short
-# of each face with nothing left to peen.  Both lengths print at .X (+/-0.8),
-# so the shortest pin still stands PEEN_ALLOWANCE proud of each face of the
-# largest hub.
-HUB_OD_BAND = printed_band_mm(1)  # MHA-DT-16 HubOd prints .X
-PIN_LEN_BAND = printed_band_mm(1)  # the cut length prints .X
+# A pin cut to the hub's own length could be short of each face with nothing
+# left to peen.  Both lengths print at .XX, so the shortest pin still stands
+# PEEN_ALLOWANCE proud of each face of the largest hub.
+HUB_OD_BAND = printed_band_mm(2, unit=LEVER_UNIT)  # MHA-DT-16 HubOd prints .XX
+PIN_LEN_BAND = printed_band_mm(2, unit=UNIT)  # the cut length prints .XX
 PEEN_ALLOWANCE = 0.5  # minimum stock proud of each hub face, per end
-PIN_LEN = 16.0
+PIN_LEN = 16.002  # .63
 if PIN_LEN - PIN_LEN_BAND < HUB_OD + HUB_OD_BAND + 2.0 * PEEN_ALLOWANCE:
     raise AssertionError("shortest pin cannot be peened flush on the largest hub")
 

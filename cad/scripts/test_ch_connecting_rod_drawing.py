@@ -241,7 +241,7 @@ def test_every_tight_band_names_its_mate() -> None:
 
     spec = ch_connecting_rod_spec
     least, most = spec.STRAP_DIAMETRAL_CLEARANCE
-    assert (least, most) == pytest.approx((0.20, 0.35))
+    assert (least, most) == pytest.approx((0.193, 0.3438))
     bore = drawing.FRONT_CALLOUTS["StrapBoreDia"]
     assert bore.startswith("BORE")
     assert drawing.CAM_NUMBER in bore

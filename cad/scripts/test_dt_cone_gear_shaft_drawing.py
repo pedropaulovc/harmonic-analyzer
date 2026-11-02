@@ -79,6 +79,7 @@ def test_section_fits_are_toleranced_on_the_model() -> None:
     assert model_toleranced_dimensions(part) == {
         ("f'Sec{section}Profile'", "f'Sec{section}Dia'"): "*deviations(band)",
         ("f'Sec{land}FlatProfile'", "f'Sec{land}AF'"): "*deviations(FLAT_AF_BAND)",
+        ("ShoulderFillets", "ShoulderR"): "*deviations(FILLET_R_BAND)",
     }
 
 
@@ -91,14 +92,14 @@ def test_terminal_torque_corners_are_a_drawing_break_limit_not_geometry():
         lands.TERMINAL_HALF_CHORD_MIN_MM - lands.TERMINAL_FLAT_EDGE_BREAK_MAX
     )
     assert collar.SCREW_LANDING_MARGIN_MM > 0.0
-    # ... and the title block's R0.25 would lose the landing: the override is real.
-    widened = collar.SCREW_LANDING_MARGIN_MM + lands.TERMINAL_FLAT_EDGE_BREAK_MAX - 0.25
+    # ... and the title block's R.010 would lose the landing: the override is real.
+    widened = collar.SCREW_LANDING_MARGIN_MM + lands.TERMINAL_FLAT_EDGE_BREAK_MAX - 0.254
     assert widened < 0.0
     # The model keeps the corners sharp; the limit is printed once, above the
     # terminal across-flat.
     assert "TerminalFlatEdgeBreak" not in dt_cone_gear_shaft_spec.DRAWING_DIMENSIONS
     callout = drawing.TORQUE_CORNER_CALLOUT
-    assert f"{lands.TERMINAL_FLAT_EDGE_BREAK_MAX:.2f} MAX" in callout
+    assert f"{dt_cone_gear_shaft_spec.inch_text(lands.TERMINAL_FLAT_EDGE_BREAK_MAX, 3)} MAX" in callout
     # Run 20261010T071427837Z: the two-line above callout was in COM but not
     # in the PDF.  One line, behind main's printable-above guard.
     assert drawing._printable_above_callouts({"Sec4AF": callout})
@@ -273,29 +274,29 @@ def test_display_precision_is_owned_by_the_part() -> None:
     # are only spelling.  The stations carry no band, so their places ARE the
     # grade they are held to: three for the land steps booked in the setback;
     # two for the tip (user ruling 2026-09-29), whose .XX band the cone-tip
-    # adjuster's embed window absorbs (build_drive_train_assembly); one for the
-    # journal length, which nothing seats against.
+    # adjuster's embed window absorbs (build_drive_train_assembly), and for
+    # the journal length, which the bearing-span proof reads.
     by_name = dt_cone_gear_shaft_spec.DRAWING_PRECISION_BY_NAME
     assert by_name == {
         "Sec0Dia": 4,
-        "Sec1Dia": 3,
-        "Sec2Dia": 3,
-        "Sec3Dia": 3,
-        "Sec4Dia": 3,
-        "Sec0End": 1,
+        "Sec1Dia": 4,
+        "Sec2Dia": 4,
+        "Sec3Dia": 4,
+        "Sec4Dia": 4,
+        "Sec0End": 2,
         "Sec1End": 3,
         "Sec2End": 3,
         "Sec3End": 3,
         "Sec4End": 2,
-        "Sec1AF": 3,
-        "Sec2AF": 3,
-        "Sec3AF": 3,
-        "Sec4AF": 3,
-        "ShoulderR": 2,
+        "Sec1AF": 4,
+        "Sec2AF": 4,
+        "Sec3AF": 4,
+        "Sec4AF": 4,
+        "ShoulderR": 3,
         # #914: the collar web is the 64T's station toward MHA-DT-05, so it
         # prints .XXX (crank_boss_rim).  The collar diameter is the bar's as
-        # supplied, a two-place reference (15.88).
-        "CollarDia": 2,
+        # supplied, a 5/8 fraction reference.
+        "CollarDia": 3,
         "CollarWidth": 3,
     }
     # drawing-guidelines.md rule 17 (walls and webs): the web holds the 2.0 target at the low limit it prints.
@@ -304,11 +305,11 @@ def test_display_precision_is_owned_by_the_part() -> None:
 
 
 def _band(places: int) -> float:
-    """The title-block band a length prints at ``places``."""
-    return printed_band_mm(places)
+    """The title-block band a length prints at ``places`` (decimal inch)."""
+    return printed_band_mm(places, unit="in")
 
 
-def _setback_margin(j: int, step_band: float) -> float:
+def _setback_margin(j: int, step_band: float, collar_band: float | None = None) -> float:
     """What the setback leaves when the step behind gear j's north face and
     its root reach north, the collar is short, the stack is short onto the
     collar and the fleet spare is held."""
@@ -316,7 +317,7 @@ def _setback_margin(j: int, step_band: float) -> float:
     return spec.SEAT_STEP_SETBACK - (
         step_band
         + spec.FILLET_RADIUS
-        + _band(3)  # the collar web prints .XXX
+        + (_band(3) if collar_band is None else collar_band)  # the collar web prints .XXX
         - dt_cone_gear_stack.face_band(j, "north")[1]
         + cone_stack_end_play.MARGIN_SPARE
     )
@@ -347,15 +348,19 @@ def test_the_gears_are_a_touching_stack_on_the_collar() -> None:
 def test_each_step_sits_one_setback_inside_the_larger_gear() -> None:
     """The steps T030|T024, T024|T018 and T018|T012 sit 1.0 south of the
     smaller gear's south face, inside the larger gear, and at print-worst
-    the step and its root stay south of the smaller gear (margins 0.065,
-    0.090, 0.115 with the .XXX step band)."""
+    the step and its root stay south of the smaller gear (margins 0.072,
+    0.089, 0.107 with the .XXX step at its printed inch limits)."""
     spec = dt_cone_gear_shaft_spec
     for name, j, end in zip(("Sec1End", "Sec2End", "Sec3End"), (15, 16, 17), spec.SECTION_ENDS[1:4]):
         station = end - spec.FRONT_STUB
         south, north = spec.gear_faces(j)
         assert station == pytest.approx(north - 1.0), name
         assert south < station - _band(3) and station + _band(3) + spec.FILLET_RADIUS < north
-        margin = _setback_margin(j, _band(spec.DRAWING_PRECISION_BY_NAME[name]))
+        margin = _setback_margin(
+            j,
+            spec.printed_length_deviations(name)[1],
+            -spec.printed_length_deviations("CollarWidth")[0],
+        )
         assert margin >= 0.0, name
         assert spec.SEAT_STEP_BUDGET[name]["margin"] == pytest.approx(margin), name
 
@@ -530,16 +535,16 @@ def test_the_collar_callout_read_guard_takes_the_whole_block() -> None:
     """The measured block must be all its lines, not the value line alone:
     the render's width per character of its widest line (mha014-1, widest
     "5/8 BAR AS SUPPLIED") at today's widest line passes the guard, a
-    "(Ø15.88)"-only box does not."""
+    "(Ø5/8 in)"-only box does not."""
     assert drawing.COLLAR_CALLOUT_LINES == (
-        "(Ø15.88)",
+        "(Ø5/8 in)",
         *dt_cone_gear_shaft_spec.COLLAR_STOCK_CALLOUT.split("\n"),
     )
     x0, _y0, x1, _y1 = _MHA014_COLLAR_TEXT
     per_char = (x1 - x0) / len("5/8 BAR AS SUPPLIED")
     widest = max(len(line) for line in drawing.COLLAR_CALLOUT_LINES)
     assert per_char * widest >= drawing.COLLAR_CALLOUT_MIN_READ
-    value_line_only = len("(Ø15.88)") * drawing.LENGTH_CHAR_WIDTH
+    value_line_only = len("(Ø5/8 in)") * drawing.LENGTH_CHAR_WIDTH
     assert value_line_only < drawing.COLLAR_CALLOUT_MIN_READ
 
 
@@ -1122,7 +1127,7 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     assert dt_cone_gear_shaft_spec.JOURNAL_BORE_DIA == pytest.approx(12.2682)
     assert dt_cone_gear_shaft_spec.JOURNAL_CLEARANCE == pytest.approx(0.0127)
     assert dt_cone_gear_shaft_spec.JOURNAL_DIA == pytest.approx(12.2555)
-    assert dt_cone_gear_shaft_spec.JOURNAL_END == pytest.approx(43.011)
+    assert dt_cone_gear_shaft_spec.JOURNAL_END == pytest.approx(43.18)
     assert dias[-1] == cone_shaft_land_bands.TERMINAL_DIA_MM
     assert dias[:-1] == pytest.approx((12.2555, 9.525, 6.35, 3.175))
     assert dt_cone_gear_shaft_spec.FRONT_STUB == pytest.approx(
@@ -1280,10 +1285,15 @@ def test_each_flat_is_cut_over_exactly_its_land(monkeypatch) -> None:
 
 def test_shoulder_roots_are_modelled_not_noted() -> None:
     """The root radius is geometry with a size, not a sentence in a note block."""
-    assert dt_cone_gear_shaft_spec.FILLET_RADIUS == pytest.approx(0.10)
+    assert dt_cone_gear_shaft_spec.FILLET_RADIUS == pytest.approx(0.1016)
     # Its run along the smaller land is booked in every step's setback.
     for budget in dt_cone_gear_shaft_spec.SEAT_STEP_BUDGET.values():
         assert budget["fillet"] == dt_cone_gear_shaft_spec.FILLET_RADIUS
+    # Its own band, never the title block's +-.005: the setback books the
+    # printed maximum, which is the model radius, and the root is never sharp.
+    assert dt_cone_gear_shaft_spec.printed_length_deviations("ShoulderR") == pytest.approx(
+        (-0.0508, 0.0)
+    )
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "add_fillet(FILLET_RADIUS, fillet_edges, propagate=False)" in source
     assert 'name_last_feature(adapter, "ShoulderFillets")' in source
@@ -1652,13 +1662,13 @@ def test_the_collar_is_the_bar_as_supplied_and_its_thrust_ring_holds_the_floor()
     widest = post.BORE_DIA + spec.POST_JOURNAL_BORE_BAND[0]
     ring = (thinnest - widest) / 2.0
     assert spec.THRUST_RING_MIN == pytest.approx(ring)
-    # the title block's 0.25 break on both edges would take it under the floor
-    assert ring - 2.0 * 0.25 < spec.THRUST_RING_FLOOR
-    # the printed break is the largest one-place value that keeps the floor
+    # the title block's .010 break on both edges would take it under the floor
+    assert ring - 2.0 * 0.254 < spec.THRUST_RING_FLOOR
+    # the printed break is the largest three-place inch value that keeps the floor
     breaks = spec.THRUST_EDGE_BREAK_MAX
     assert ring - 2.0 * breaks >= spec.THRUST_RING_FLOOR
-    assert ring - 2.0 * (breaks + 0.1) < spec.THRUST_RING_FLOOR
-    assert breaks == pytest.approx(round(breaks, 1))
+    assert ring - 2.0 * (breaks + 0.0254) < spec.THRUST_RING_FLOOR
+    assert breaks / 25.4 == pytest.approx(round(breaks / 25.4, 3))
     # the thickest bar still bears inside the boss: no overhang toward the post body
     assert spec.STOCK_DIA + spec.STOCK_DIA_BAND[0] < post.CONE_BOSS_DIA
 
@@ -1671,13 +1681,18 @@ def test_the_sheet_states_the_collar_as_stock_with_its_break() -> None:
     assert drawing.DIMENSION_CALLOUTS["CollarDia"] is spec.COLLAR_STOCK_CALLOUT
     callout = spec.COLLAR_STOCK_CALLOUT.upper()
     assert "5/8" in callout and "AS SUPPLIED" in callout
-    assert f"{spec.THRUST_EDGE_BREAK_MAX:.1f} MAX" in callout
+    assert f"{spec.inch_text(spec.THRUST_EDGE_BREAK_MAX, 3)} MAX" in callout
+    # PR #2107 review: the tight OD break names its function, the thrust ring
+    # on MHA-DT-05 that its rule-17 floor holds, on the line after it.
+    lines = callout.split("\n")
+    break_line = lines.index(f"EDGE BREAK {spec.inch_text(spec.THRUST_EDGE_BREAK_MAX, 3)} MAX")
+    assert lines[break_line + 1] == "FOR MHA-DT-05 THRUST RING"
     # Machinist review r1: the sharp roots get a limit and both their reason.
-    assert f"ROOTS R{spec.COLLAR_ROOT_RADIUS_MAX:.2f} MAX" in callout
+    assert f"ROOTS R{spec.inch_text(spec.COLLAR_ROOT_RADIUS_MAX, 3)} MAX" in callout
     assert "SEATS MHA-DT-05 AND 64T" in callout
     assert spec.COLLAR_ROOT_RADIUS_MAX < spec.THRUST_EDGE_BREAK_MAX
-    assert spec.DRAWING_PRECISION["CollarProfile"]["CollarDia"] == 2
-    assert f"{spec.COLLAR_DIA:.2f}" == "15.88"
+    assert spec.DRAWING_PRECISION["CollarProfile"]["CollarDia"] == 3
+    assert spec.COLLAR_DIA == pytest.approx(0.625 * 25.4)
 
 
 def _stubbed_build(monkeypatch):
@@ -1866,7 +1881,7 @@ def test_one_length_origin_is_the_collar_face() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME["Sec4End"] == 2
     # The front-to-tip overall and supplementary setup measurements are
     # read-only references; their places are handed over by the spec.
-    assert spec.DRAWING_REFERENCE_PRECISION == 1
+    assert spec.DRAWING_REFERENCE_PRECISION == 2
 
 
 class _Curve:
@@ -2059,7 +2074,7 @@ def test_setup_sheet_measures_exact_native_edges(monkeypatch) -> None:
         assert display.precision == dt_cone_gear_shaft_spec.DRAWING_REFERENCE_PRECISION
         measured.append(display.native.SystemValue * 1000.0)
     assert measured[:3] == pytest.approx((116.234, 123.110, 129.986), abs=0.001)
-    assert measured[3] == pytest.approx(163.60, abs=0.005)
+    assert measured[3] == pytest.approx(163.61, abs=0.005)
     assert fixture.origin_note.call_args.kwargs["entity"] is fixture.seat
     assert fixture.origin_note.call_args.kwargs["attached_to"] is fixture.seat
 

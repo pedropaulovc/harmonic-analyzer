@@ -41,8 +41,10 @@ from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
 from _drawing_hidden_sketches import _show_hidden_owners, curate_view_dimensions
 from _drawing_leaders import set_near_side_diameter
 from _layout_geometry import ARROW_TEXT_CLEARANCE_M
+from _part_properties import part_drawing_unit
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
@@ -53,7 +55,7 @@ from _supplier_spring_drawing import (
     reacquire_supplier_dimensions,
 )
 from _supplier_spring_reference import SUPPLIER_DIAGRAM_CONFIGURATION
-from _supplier_wire_stock_drawing import _construction_curves_as_outline
+from _construction_line_font import _construction_curves_as_outline
 import dt_vn_cylinder_bank_spring_spec as supplier_spec
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from vn_disc_spring_supplier_stock import (
@@ -63,6 +65,7 @@ from vn_disc_spring_supplier_stock import (
 )
 
 
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SPEC = DRAWINGS_BY_NAME["dt_vn_cylinder_bank_spring"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "WAVE DISC SPRING"
@@ -107,11 +110,13 @@ WITNESS_OVERSHOOT_M = 0.001
 # every arrowhead is 3.556 mm long and 0.762 mm wide (GetArrowHeadAtIndex2);
 ARROW_LENGTH_M = 0.003556
 ARROW_WIDTH_M = 0.000762
-# cap height, and the printed width of "(0.050 in)" and of
-# "(Ø0.385 ±0.010 in)" / "(Ø0.500 ±0.010 in)" (their runs' native widths).
+# cap height, and the printed width of "(.050 in)" and of
+# "(Ø.385 ±.010 in)" / "(Ø.500 ±.010 in)" (their runs' native widths).
 TEXT_HEIGHT_M = 0.0035
-HEIGHT_TEXT_WIDTH_M = 0.0227354
-DIAMETER_TEXT_WIDTH_M = 0.0030139 + 0.0052784 + 0.0352139
+HEIGHT_TEXT_WIDTH_M = 0.0201493
+DIAMETER_TEXT_WIDTH_M = 0.0030139 + 0.0052784 + 0.0300417
+# swLeaderLineVisibility_e.swLeaderLineNone.
+LEADER_LINE_NONE = 3
 
 
 def _centre(bounds: tuple[float, float, float, float]) -> tuple[float, float]:
@@ -263,6 +268,13 @@ def place_size_texts(
         set_near_side_diameter(
             displays[name].GetAnnotation(), f"{supplier_spec.SKU} {name}"
         )
+        # The near-side style still drew the OD's diametral line from its
+        # pick point out under its text (inch sheet, probe runs
+        # 20261101T080511257Z / 20261101T085835012Z); none keeps the arrow,
+        # bend and shelf.
+        _early_bound(displays[name], "IDisplayDimension").LeaderVisibility = (
+            LEADER_LINE_NONE
+        )
     for name, (x, y) in positions.items():
         annotation = _early_bound(displays[name].GetAnnotation(), "IAnnotation")
         if not annotation.SetPosition2(x, y, 0.0):
@@ -310,6 +322,9 @@ def _import_sizes(
                 "configuration": configuration,
                 "precision": supplier_spec.SUPPLIER_DRAWING_PRECISION[field],
                 "presentation": "diameter" if field in ("ID", "OD") else "length",
+                # A wave spring's .050 could be read as its strip; the
+                # catalogue's figure is the free height (machinist review).
+                "callout": "FREE" if field == "FREE_HEIGHT" else None,
             }
             supplier_reference_dimension(
                 adapter,
@@ -389,6 +404,12 @@ def supplier_dimensions(
                 label=name,
             )
             _assert_source_band(display, field)
+        for name in TEXT_SIDES["free_top"]:
+            display = _early_bound(displays[name], "IDisplayDimension")
+            if int(display.LeaderVisibility) != LEADER_LINE_NONE:
+                raise RuntimeError(
+                    f"{supplier_spec.SKU} {name}: diametral leader line is showing"
+                )
 
     settled_checks.append(check_settled_references)
 
@@ -409,6 +430,7 @@ async def build(adapter: Any) -> dict[str, str]:
         supplier_dimensions=partial(supplier_dimensions, settled_checks=settled_checks),
         installed_caption="INSTALLED ENVELOPE",
         settled_checks=settled_checks,
+        unit=part_drawing_unit("dt-vn-cylinder-bank-spring"),
     )
 
 

@@ -43,6 +43,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _part_properties import part_drawing_unit
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
@@ -68,6 +69,7 @@ from dt_cone_tip_block_spec import (
     SLIT_DEPTH,
     SLIT_W,
     SURFACE_FINISHES,
+    length_text,
     printed_value_text,
 )
 
@@ -171,8 +173,10 @@ ROUND_OUT = 0.0001
 # so the leader drops to 37 deg (3.5).  Every degree shallower slides the
 # right-hand views ~1.2 mm further right.  Hole callouts' extents (every
 # line plus the shoulder) are measured on the I31 render like the rest of the
-# sheet's ink (see "Sheet ink audit").
-ADJUSTER_CALLOUT_EXTENT = (0.0295, 0.0086, 0.0278, 0.0078)
+# sheet's ink (see "Sheet ink audit"), except the right end: on the c289ee94
+# render the shoulder ran 29.0 mm right of the callout's point, 1.2 mm past
+# I31's 27.8, and stopped 0.3 mm short of the right view's north face.
+ADJUSTER_CALLOUT_EXTENT = (0.0295, 0.0086, 0.0290, 0.0078)
 # The name's ink from its upper-left corner (287c: 36.3 x 3.4 mm).
 ADJUSTER_ENTRY_EXTENT = (0.0, 0.0036, 0.0365, 0.0)
 ADJUSTER_LEADER_ANGLE = math.radians(37.0)
@@ -195,13 +199,20 @@ ADJUSTER_CALLOUT_Y = ADJUSTER_SHOULDER_Y + ADJUSTER_CALLOUT_EXTENT[1]
 ADJUSTER_ENTRY_DX = _ADJUSTER_SHOULDER_DX + (
     ADJUSTER_CALLOUT_EXTENT[0] + ADJUSTER_CALLOUT_EXTENT[2] - ADJUSTER_ENTRY_EXTENT[2]
 ) / 2.0
-# The right view's north face stands a text clearance past the callout's right
-# end.  (I31, 7ab69742b: at x 0.166 the callout's longest line ran over that
-# face; the right view slid 5 mm then, the removed views with it.)  The
-# removed views B and C keep the row's 72 mm pitch, so the gaps to their
-# right keep their measured air.
+# The right view's north face stands ADJUSTER_VIEW_AIR past the callout's
+# right end.  (I31, 7ab69742b: at x 0.166 the callout's longest line ran over
+# that face; the right view slid 5 mm then, the removed views with it.  Blind
+# machinist review of c289ee94: a text clearance of air read as the callout
+# pressing against the view, so the air is 3 mm.)  The removed views B and C
+# keep the row's 72 mm pitch, so the gaps to their right keep their measured
+# air.
+ADJUSTER_VIEW_AIR = 0.003
 _RIGHT_NORTH_FACE_X = (
-    FRONT_CENTER[0] + ADJUSTER_CALLOUT_DX + ADJUSTER_CALLOUT_EXTENT[2] + TEXT_CLEARANCE + ROUND_OUT
+    FRONT_CENTER[0]
+    + ADJUSTER_CALLOUT_DX
+    + ADJUSTER_CALLOUT_EXTENT[2]
+    + ADJUSTER_VIEW_AIR
+    + ROUND_OUT
 )
 VIEW_ROW_PITCH = 0.072
 RIGHT_CENTER = (_RIGHT_NORTH_FACE_X + Z_NORTH * _S, FRONT_CENTER[1])
@@ -292,21 +303,25 @@ FRONT_KEEP = {
 # both.
 PASSAGE_CENTER_RISE = 0.0212 + TWO_ROW_LINE_DROP
 # swDimensionArrowsSide_e, set rather than left to the document's smart
-# arrows: swDimArrowsOutside = 1, swDimArrowsInside = 0.  The plan depth's
-# value and mate rows and the 4.875's short span leave no room for inside arrows
-# (d84a42ca7: the 4.875's line and arrows struck its "5"); outside, a
-# vertical dimension prints no line between them.
-ARROWS_OUTSIDE = ("SlitW", "Depth", "FootTapZ")
+# arrows: swDimArrowsOutside = 1, swDimArrowsInside = 0.  The 4.875's short
+# span leaves no room for inside arrows (d84a42ca7: the 4.875's line and
+# arrows struck its "5"); outside, a vertical dimension prints no line
+# between them.
+ARROWS_OUTSIDE = ("SlitW", "FootTapZ")
 # The pinch depth's span holds its two 3.4 mm
 # arrows: with no outside tail right of the hole-centre witness, the pinch
 # clearance callout's leader passes there (leader-crosses-line, af13c8ff8).
 # The width and FootTapX hold theirs inside too, so no tail runs toward the
-# bottom view's callout.
+# bottom view's callout.  The plan depth's text stands on its offset shelf,
+# so its 19.3 mm span holds both arrows and the line joining them, which the
+# shelf's leader meets (machinist review of PR 2107: with outside arrows the
+# leader ended in empty space between the witnesses).
 ARROWS_INSIDE = (
     "PinchHeight",
     "PinchDepthCenter",
     "Width",
     "FootTapX",
+    "Depth",
 )
 _DIM_ARROWS_OUTSIDE = 1
 _DIM_ARROWS_INSIDE = 0
@@ -401,11 +416,26 @@ VIEW_C_ARROW = (
 # far left, but the north-face witness rises from the hole's height, not the
 # block's top (af13c8ff8 print), so that leader crossed it
 # (leader-crosses-line).  At 2:1 the pinch depth's line spans far enough
-# that a leader from the text's right end still crossed it, so the text now
-# reaches 3.5 mm past the hole centre: its leader drops from the shoulder's
-# right end to the hole, right of the hole-centre witness and the line's
-# arrow.
-PINCH_CLEARANCE_CALLOUT_XY = (RIGHT_CENTER[0] + 0.0035 - 0.0264, 0.2013)
+# that a leader from the text's right end still crossed it, so the text
+# reaches past the hole centre: its leader drops from the shoulder's right
+# end to the hole, right of the hole-centre witness and the line's arrow.
+# Blind machinist review of e2cfa0d03: 3.5 mm past the centre the leader
+# fell 8 deg off vertical, on the hole's vertical centreline, and read as
+# it.  The shoulder's right end now stands far enough right that the leader
+# meets the rim PINCH_CLEARANCE_LEADER_ANGLE off vertical (17.4 mm past the
+# centre); it still enters through the view's top, under a millimetre
+# longer over the part than the hole's approach from the south face.  The
+# literals are PINCH_CLEARANCE_CALLOUT_EXTENT's drop (0.0030) and right
+# reach (0.0264), defined with the other callout extents below.
+PINCH_CLEARANCE_CALLOUT_Y = 0.2013
+PINCH_CLEARANCE_LEADER_ANGLE = math.radians(35.0)
+_PINCH_CLEARANCE_SHOULDER_DX = (
+    PINCH_CLEARANCE_CALLOUT_Y - 0.0030 - _elevation_y(PINCH_HEIGHT, RIGHT_CENTER)
+) * math.tan(PINCH_CLEARANCE_LEADER_ANGLE)
+PINCH_CLEARANCE_CALLOUT_XY = (
+    RIGHT_CENTER[0] + _PINCH_CLEARANCE_SHOULDER_DX - 0.0264,
+    PINCH_CLEARANCE_CALLOUT_Y,
+)
 # The pinch thread callout stands above VIEW B, its shoulder's left end far
 # enough right of the hole that the leader drops steeply through the 2:1
 # view's top (16 mm right of centre ran 4.2 mm longer than the hole's
@@ -425,9 +455,13 @@ FOOT_TAP_CALLOUT_XY = (FOOT_TAP_CENTER[0] + 0.0373, _bottom_y(Z_NORTH) + 0.0100)
 # front view (287c) its "Ra 3.2" stood 0.2 mm off an arrow, and no leader can
 # reach that foot without crossing the width's extension or dimension line.
 # VIEW C shows the same foot edge-on with nothing dimensioned under it.
+# Blind machinist review of c289ee94: 13 mm under the foot its shoulder
+# printed 1.2 mm over the title block's top line and read as touching it;
+# 11.5 mm splits the air, ~2.7 mm to that line and ~2.5 mm from the symbol's
+# top to the foot.
 FOOT_FINISH_CENTER = BACK_CENTER
 FOOT_FINISH_DX = 0.034
-FOOT_FINISH_DROP = 0.013
+FOOT_FINISH_DROP = 0.0115
 
 
 def _adjuster_axis_keep(
@@ -876,10 +910,17 @@ def sheet_dimension_ink(
     }
     # The offset shelf belongs to the same native dimension.  Keep its text
     # and connecting run in this recipe's ink model, not at the import seed.
+    # Offset, the value no longer breaks the line: it runs whole between the
+    # inside arrows, and the shelf's leader leaves its midpoint.
     depth = ink["Depth"]
+    witnesses = depth.lines[:2]
     ink["Depth"] = DimensionInk(
         (
-            *depth.lines,
+            *witnesses,
+            (
+                (PLAN_DEPTH_LINE_X, _plan_y(Z_NORTH)),
+                (PLAN_DEPTH_LINE_X, _plan_y(Z_SOUTH)),
+            ),
             (
                 (PLAN_DEPTH_LINE_X, _plan_y(0.0)),
                 (texts["Depth"][0], TOP_TEXT_OFFSETS["Depth"][1]),
@@ -1291,7 +1332,7 @@ def _pinch_clearance_callout_resolved(resolved_parts: dict[int, str]) -> bool:
     return (
         joined.count(PINCH_CLEARANCE_EXTENT_TEXT) == 1
         and "<HOLE-DEPTH>" not in joined
-        and f"{PINCH_CLEARANCE_DIA:.2f}" in joined
+        and length_text(PINCH_CLEARANCE_DIA, HOLE_CALLOUT_PLACES) in joined
     )
 
 
@@ -1335,15 +1376,20 @@ def _pinch_thread_callout_resolved(resolved_parts: dict[int, str]) -> bool:
 # drawing-guidelines.md rule 12 (hole and slot callouts say what to do): a blind tap states its full-thread depth, and here its
 # tap-drill depth too, which sets the lead the tap needs past the thread.
 # Both print at FOOT_DEPTH_PLACES, the general band the spec's reach and lead
-# stacks read, not the native two places.
+# stacks read, as does the tap drill's size: every Hole Wizard callout prints
+# three inch places (#290).
+HOLE_CALLOUT_PLACES = 3
 FOOT_TAP_DEPTH_PRECISION = {
+    "hw-tapdrldia": HOLE_CALLOUT_PLACES,
     "hw-threaddepth": FOOT_DEPTH_PLACES,
     "hw-tapdrldepth": FOOT_DEPTH_PLACES,
 }
+THRU_TAP_DRILL_PRECISION = {"hw-thrutapdrldia": HOLE_CALLOUT_PLACES}
+PINCH_CLEARANCE_PRECISION = {"hw-diam": HOLE_CALLOUT_PLACES}
 
 
 def _states_depth(text: str, depth_mm: float) -> bool:
-    printed = re.escape(f"{depth_mm:.{FOOT_DEPTH_PLACES}f}")
+    printed = re.escape(length_text(depth_mm, FOOT_DEPTH_PLACES))
     return re.search(rf"(?<![\d.]){printed}(?!\d)", text) is not None
 
 
@@ -1403,9 +1449,8 @@ def _check_foot_tap_callout(display: Any) -> None:
 
 # E11/W1: the through thread's two countersinks are one chamfer feature; the
 # callout names them under the thread line, so the hole reads in one place.
-ADJUSTER_CSK_QUALIFIER = (
-    f"90\u00b0 CSK \u00d8{ADJUSTER_BORE_DIA + 2.0 * ADJUSTER_CSK:.1f} BOTH ENDS"
-)
+_CSK_DIA_TEXT = length_text(ADJUSTER_BORE_DIA + 2.0 * ADJUSTER_CSK, HOLE_CALLOUT_PLACES)
+ADJUSTER_CSK_QUALIFIER = f"90\u00b0 CSK \u00d8{_CSK_DIA_TEXT} BOTH ENDS"
 
 
 def _adjuster_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
@@ -1551,7 +1596,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("dt-cone-tip-block"),
     )
     stamp_drawing_summary(
         adapter,
@@ -1701,6 +1750,9 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=_adjuster_callout_xy(adjuster_center),
         label="through adjuster thread",
     )
+    set_hole_callout_precision(
+        adjuster_callout, THRU_TAP_DRILL_PRECISION, label="through adjuster thread"
+    )
     _set_adjuster_callout_text(adjuster_callout)
     pinch_clearance_callout = add_native_hole_callout(
         adapter,
@@ -1709,6 +1761,9 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=PINCH_CLEARANCE_CALLOUT_XY,
         label="pinch entry-jaw clearance",
     )
+    set_hole_callout_precision(
+        pinch_clearance_callout, PINCH_CLEARANCE_PRECISION, label="pinch entry-jaw clearance"
+    )
     _set_pinch_clearance_callout_text(pinch_clearance_callout)
     pinch_thread_callout = add_native_hole_callout(
         adapter,
@@ -1716,6 +1771,9 @@ async def build(adapter: Any) -> dict[str, str]:
         edge=pinch_thread_edge,
         callout_xy=PINCH_THREAD_CALLOUT_XY,
         label="pinch opposite-jaw thread",
+    )
+    set_hole_callout_precision(
+        pinch_thread_callout, THRU_TAP_DRILL_PRECISION, label="pinch opposite-jaw thread"
     )
     _set_pinch_thread_callout_text(pinch_thread_callout)
     foot_tap_callout = add_native_hole_callout(
@@ -1727,7 +1785,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _set_foot_tap_callout_text(foot_tap_callout)
     set_hole_callout_precision(
-        foot_tap_callout, FOOT_TAP_DEPTH_PRECISION, label="hold-down foot tap depths"
+        foot_tap_callout, FOOT_TAP_DEPTH_PRECISION, label="hold-down foot tap sizes"
     )
     _check_foot_tap_callout(foot_tap_callout)
     _audit_isometric_annotation_provenance(adapter, iso)

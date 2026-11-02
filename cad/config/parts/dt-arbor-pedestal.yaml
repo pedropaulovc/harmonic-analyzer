@@ -6,3 +6,4 @@ dt-arbor-pedestal:
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
   process: "machined from solid stock or casting"
+  drawing_unit: in

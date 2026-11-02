@@ -158,7 +158,7 @@ from _sketch import (
 import dt_cylinder_bank_setting_spec as bank_settings
 from _rebuild import force_rebuild
 from _session import run_build
-from _printed_tolerance import drilled_oversize_mm, printed_deviations
+from _printed_tolerance import angular_band_deg, drilled_oversize_mm, printed_deviations
 from _transforms import ROT_X_NEG90, ROT_Y_180, compose_rows, euler_from_rows
 from channel_frame_geom import (
     CAM_SHAFT_XY,
@@ -704,6 +704,7 @@ if abs(SEAT_PIN.DIA - seat_geometry.DRIVE_PIN_DIA) > 1e-12:
     raise AssertionError("crank-seat-drive-pin is not the removable's drive pin")
 from dt_cylinder_end_disc_spec import (  # noqa: E402
     OUTSIDE_DIA_PLACES as END_DISC_OD_PLACES,
+    UNIT as END_DISC_UNIT,
     WASHER_OD as END_DISC_DIA,
     WASHER_THICK as END_DISC_THICK,
 )
@@ -1046,7 +1047,7 @@ from dt_cone_swing_platform_spec import (  # noqa: E402
     POST_MOUNT_STATION_TOL_MM as PLAT_POST_MOUNT_STATION_TOL_MM,
     POST_MOUNT_TAP_EDGE_BREAK,
     POST_MOUNT_THREAD_DIA,
-
+    UNIT as PLAT_UNIT,
 )
 from dt_cone_swing_platform_pivot_spec import (  # noqa: E402
     PIVOT_HOLE_BAND as PLAT_PIVOT_HOLE_BAND,
@@ -1139,6 +1140,7 @@ from dt_alignment_pinion_spec import (  # noqa: E402
 )
 from dt_pinion_arbor_geometry import (  # noqa: E402
     CROSS_HOLE_DIA as ARBOR_CROSS_HOLE_DIA,
+    CROSS_HOLE_STATION_BAND as ARBOR_CROSS_HOLE_STATION_BAND,
     DRUM_STATION_BAND as ARBOR_DRUM_STATION_BAND,
     BACK_JOURNAL_Z as ARBOR_BACK_JOURNAL_Z,
     DRUM_STATION as ARBOR_DRUM_STATION,
@@ -1161,6 +1163,7 @@ from dt_pinion_arbor_geometry import (  # noqa: E402
     NECK_LEN_PLACES as ARBOR_NECK_LEN_PLACES,
     PIN_Z as ARBOR_PIN_Z,
     SHAFT_DIA as ARBOR_DIA,
+    UNIT as ARBOR_UNIT,
 )
 from dt_pinion_arbor_collar_geometry import (  # noqa: E402
     COLLAR_LEN as ARBOR_COLLAR_LEN,
@@ -1178,6 +1181,7 @@ from dt_pinion_bracket_geometry import (  # noqa: E402
     R_END as STRAP_R_END,
     THICKNESS as STRAP_T,
     THICKNESS_PLACES as STRAP_T_PLACES,
+    UNIT as STRAP_UNIT,
 )
 from dt_pinion_pivot_block_geometry import (  # noqa: E402
     BLOCK_DEPTH,
@@ -1249,6 +1253,7 @@ from dt_pinion_spring_geometry import (  # noqa: E402
 from dt_pinion_spring_section import (  # noqa: E402
     THICK as SPRING_T,
     THICK_BAND as SPRING_T_BAND,
+    UNIT as SPRING_UNIT,
     WIDTH as SPRING_W,
     WIDTH_PLACES as SPRING_W_PLACES,
 )
@@ -1285,6 +1290,7 @@ from dt_cone_pivot_post_spec import (  # noqa: E402
     ATTACHMENT_THRU_DIA as POST_ATTACHMENT_THRU_DIA,
     DRAWING_PRECISION_BY_NAME as POST_DRAWING_PRECISION,
     JOURNAL_AXIS_HEIGHT_TOLERANCE_MM as POST_JOURNAL_AXIS_HEIGHT_TOLERANCE_MM,
+    UNIT as POST_UNIT,
 )
 import crank_boss_rim  # noqa: E402
 import gear64_post_measure  # noqa: E402
@@ -1353,6 +1359,7 @@ from dt_cone_gear_shaft_spec import (  # noqa: E402
     TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET as SHAFT_TIP_BLOCK_NORTH_OFFSET,
     TIP_COLLAR_END_STATION as SHAFT_TIP_COLLAR_END,
     TIP_COLLAR_START_STATION as SHAFT_TIP_COLLAR_START,
+    UNIT as SHAFT_UNIT,
     printed_band as shaft_printed_band,
 )
 import dt_cone_gear_stack  # noqa: E402
@@ -1438,8 +1445,9 @@ if any(
     )
 # U30 post mount (I22): each MHA-DT-VN-61 seats on the MHA-DT-05 counterbore floor and
 # is cut to fit into the MHA-DT-20 tap: never proud of the plate underside, and
-# at least 0.90D of thread (pending exception ruling #1019) both at the
-# modelled cut length and at the platform spec's printed worst case.
+# at least 0.87D of thread (owner ruling 2026-11-01, MHA-DT-VN-61's RV-01;
+# #1019's 0.90D target is not met) both at the modelled cut length and at the
+# platform spec's printed worst case.
 _require_tapped_thread("cone-post mount", POST_SCREW_THREAD, POST_MOUNT_SPEC)
 POST_SCREW_SEAT = POST_BLOCK_HEIGHT - POST_CBORE_DEPTH  # above PlateTop
 POST_SCREW_INTO_PLATE = POST_SCREW_LEN - POST_SCREW_SEAT
@@ -1447,10 +1455,10 @@ if POST_SCREW_INTO_PLATE > PLAT_T:
     raise AssertionError("MHA-DT-VN-61 stands proud of the MHA-DT-20 underside")
 if (
     POST_SCREW_INTO_PLATE - 2.0 * POST_MOUNT_TAP_EDGE_BREAK
-    < 0.90 * POST_MOUNT_THREAD_DIA
-    or POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS < 0.90
+    < 0.87 * POST_MOUNT_THREAD_DIA
+    or POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS < 0.87
 ):
-    raise AssertionError("MHA-DT-VN-61 engages the MHA-DT-20 tap under 0.90D")
+    raise AssertionError("MHA-DT-VN-61 engages the MHA-DT-20 tap under 0.87D")
 # The shaft is placed by its front stub end; keep the station in lockstep with
 # the part's FRONT_STUB.
 if abs(SHAFT_FRONT_STATION + SHAFT_FRONT_STUB) > 1e-9:
@@ -1549,7 +1557,7 @@ def tip_block_print_worst_containment_mm(half_widths: dict[str, float]) -> float
 # closes by print tolerance.  The screw floats in its drilled close-clearance
 # hole; the hole's two stations from the pivot bore (HoldDownX, HoldDownZ)
 # and the tap's two stations carry explicit +/-0.10 bands.
-_DRILLED_HOLE_PLUS_MM = drilled_oversize_mm()
+_DRILLED_HOLE_PLUS_MM = drilled_oversize_mm(unit=PLAT_UNIT)
 HOLDDOWN_SCREW_FLOAT_MM = (
     PLAT_HOLDDOWN_CLEARANCE_DIA + _DRILLED_HOLE_PLUS_MM - HOLDDOWN_SHANK_DIA
 ) / 2.0
@@ -1874,20 +1882,21 @@ _PINION_TURNED_DIA_BAND = printed_deviations(
 # Only the turned band's largest radius can close on T120.
 _PINION_TURNED_RADIUS_UP = _PINION_TURNED_DIA_BAND[1] / 2.0
 _BOSS_NORTH_BAND = printed_deviations(
-    POST_CRANK_BOSS_NORTH_FACE, POST_DRAWING_PRECISION["CrankBossStartZ"]
+    POST_CRANK_BOSS_NORTH_FACE, POST_DRAWING_PRECISION["CrankBossStartZ"], unit=POST_UNIT
 )
 _CONE_BOSS_NORTH_BAND = tuple(
     d / 2.0
-    for d in printed_deviations(POST_CONE_BOSS_LENGTH, POST_DRAWING_PRECISION["ConeBossLen"])
+    for d in printed_deviations(POST_CONE_BOSS_LENGTH, POST_DRAWING_PRECISION["ConeBossLen"], unit=POST_UNIT)
 )
 _COLLAR_WIDTH_BAND = printed_deviations(
-    SHAFT_COLLAR_THICKNESS, SHAFT_DRAWING_PRECISION["CollarWidth"]
+    SHAFT_COLLAR_THICKNESS, SHAFT_DRAWING_PRECISION["CollarWidth"], unit=SHAFT_UNIT
 )
 _GEAR64_FACE_LIMITS = deviations(GEAR64_FACE_WIDTH_BAND)
 _CRANK_HEIGHT_BAND = printed_deviations(
     POST_CRANK_ABOVE_CONE,
     POST_DRAWING_PRECISION["CrankAboveCone"],
     deviations(POST_CRANK_ABOVE_CONE_BAND),
+    unit=POST_UNIT,
 )
 # The crank's end play: set on the feeler, or run south onto the boss.
 PINION_END_PLAY = (-PINION_SEAT_FEELER, 0.0)
@@ -2668,7 +2677,7 @@ TIP_COLLAR_WORST_AIR = tip_collar_worst_air_mm(TIP_COLLAR_AIR_BAND_MM)
 # post turns on its screws' clearance until the tip sits in the cup: that
 # capacity must cover the whole error.
 _POST_TO_TIP = TIP_BLOCK_STATION - POST_STATION
-_ANGULAR_DEG = float(_config.title_block("angular")["value_deg"])
+_ANGULAR_DEG = angular_band_deg(unit=POST_UNIT)
 TIP_LATERAL_ERROR_MM = (
     PLAT_POST_MOUNT_STATION_TOL_MM
     + _POST_TO_TIP
@@ -3151,7 +3160,7 @@ else:
     )
 # Where the rod plane shares the collar's z band, the Ø15 collar -- not the
 # Ø5/16 shaft -- is what the lever passes.
-_LEV_ROD_Z = (LEVER_Z - 3.0, LEVER_Z + 3.0)
+_LEV_ROD_Z = (LEVER_Z - LEVER_ROD_DIA / 2.0, LEVER_Z + LEVER_ROD_DIA / 2.0)
 _ARBOR_DIA_AT_LEVER = (
     ARBOR_COLLAR_OD
     if _LEV_ROD_Z[0] < ARBOR_COLLAR_Z[1] + 0.25 and _LEV_ROD_Z[1] > ARBOR_COLLAR_Z[0] - 0.25
@@ -3278,10 +3287,10 @@ if SPRING_FOOT_TAN_X - (SPRING_HOLE_X + FSCREW_HEAD_DIA / 2.0) < 0.25:
 # authored pose) the collar top hovers a designed ~0.15 under the pin (exact
 # tangency tips the interference gate on FP noise -- the PR5 gap lesson); the
 # return spring holds the strap west on it.
-# U27: the drill-rod stud slips into the H7 seat line-to-line and is bonded
-# (LOCTITE 638), so the nominal solids touch without overlapping.
-if abs(FPIN_DIA - STRAP_PIN_BORE) > 1e-9:
-    raise AssertionError("follower pin nominal is not line-to-line with its seat")
+# U27: the drill-rod stud slips into the reamed seat and is bonded (LOCTITE
+# 638); #290's .1563 rod in the .157 seat leaves the nominal solids apart.
+if not 0.0 < STRAP_PIN_BORE - FPIN_DIA < 0.25:
+    raise AssertionError("follower pin nominal does not slip into its seat")
 if abs(FPIN_SEAT - FPIN_SEAT_LEN) > 1e-9:
     raise AssertionError("pin SEAT_LEN disagrees with the bracket PIN_SEAT")
 # U27 slip fit: the set-screwed cam needs only 0.02-0.10 diametral clearance on
@@ -3488,23 +3497,31 @@ if SPRING_TO_LIFT_ROD < 0.25:
 # five weight volumes remain analytic, and drum/brackets use mesh volumes.
 # This preserves #859's hybrid method (03b51bce2), not native COM mass metrology.
 # Brass is 8500 nominal / 8800 corner; steel is 7800 kg/m^3.
+# Re-measured 2026-10-31 from farm run
+# 20261031T210436787Z-74a9f52cf0e94170a8462db37d885876 (#290 step 3, the
+# pinion rig on the inch grid: 1/4 handle rod, 5/32 follower, snapped arbor,
+# collar, pivot shaft and bracket); the moments rose 0.33% parked, 0.08% engaged.
+# Re-measured 2026-11-01 from farm run
+# 20261101T110527232Z-7e524f17033b4b3d919642ad76d4f62f (1282900ad, #290 step 3
+# on #2106: the 5.64 in drum, .XX tip and the 7.27 torque shaft); the moments
+# rose 0.015% parked and fell 0.004% engaged.
 # Install the measured basis AND frozen fingerprint together (DEVELOPING.md).
-SWING_GRAVITY_NMM = (14.344071560016907, 24.47085794188977)
-SWING_GRAVITY_CORNER_NMM = (14.62758626581557, 24.948506912130078)
+SWING_GRAVITY_NMM = (14.394208212998771, 24.49022953670801)
+SWING_GRAVITY_CORNER_NMM = (14.677799292439323, 24.96700238142453)
 # The basis those moments were computed at: part -> (count, volume mm^3,
 # density kg/m^3). The measured basis and fingerprint deliberately stay frozen:
 # the support-layout regression names both moment constants when
 # any current part's analytic volume, material or governing dimensions move.
 SWING_GRAVITY_BASIS = {
-    "dt-alignment-pinion": (1, 24311.47711833662, 8500.0),
-    "dt-pinion-arbor": (1, 13656.94007311105, 7800.0),
-    "dt-pinion-pivot-shaft": (1, 5937.0169027658985, 7800.0),
-    "dt-pinion-bracket": (2, 4570.677659216507, 7800.0),
-    "dt-pinion-arbor-collar": (1, 2148.918136013478, 7800.0),
-    "dt-pinion-handle": (1, 1837.831702350029, 7800.0),
-    "dt-pinion-cam-pin": (2, 256.62204310603346, 7800.0),
+    "dt-alignment-pinion": (1, 24318.026182668003, 8500.0),
+    "dt-pinion-arbor": (1, 13573.853062566704, 7800.0),
+    "dt-pinion-pivot-shaft": (1, 5865.3999450270985, 7800.0),
+    "dt-pinion-bracket": (2, 4565.858344938974, 7800.0),
+    "dt-pinion-arbor-collar": (1, 2113.391953300099, 7800.0),
+    "dt-pinion-handle": (1, 2059.2591950522306, 7800.0),
+    "dt-pinion-cam-pin": (2, 253.14809801839277, 7800.0),
 }
-SWING_GRAVITY_MASS_G = 465.88294401316836
+SWING_GRAVITY_MASS_G = 466.05257547919274
 # Frozen governing dimensions of the accepted native-STL calibration, never
 # live config aliases.
 SWING_GRAVITY_FINGERPRINT = {
@@ -3512,15 +3529,15 @@ SWING_GRAVITY_FINGERPRINT = {
         "TEETH": 32,
         "DIAMETRAL_PITCH": 48.0,
         "PRESSURE_ANGLE_DEG": 20.0,
-        "FACE_WIDTH": 143.2,
+        "FACE_WIDTH": 143.256,
         "BORE_DIA": 7.9375,
         "CUTTER_REFERENCE_TEETH": 26,
         "CUTTER_RADIAL_TRANSLATION_MM": 1.5874999999999986,
         "PITCH_TOOTH_THICKNESS_MM": 0.8293770709126581,
         "SUPPORT_OUTSIDE_DIA_MM": 17.979877681931494,
-        "OUTSIDE_DIA": 17.63,
-        "WHOLE_DEPTH": 1.0097916666666675,
-        "MAX_CUT_DEPTH_MM": 1.0111012137912878,
+        "OUTSIDE_DIA": 17.6276,
+        "WHOLE_DEPTH": 1.0085916666666686,
+        "MAX_CUT_DEPTH_MM": 1.0099012137912888,
         "BASE_TANGENT_SPAN": 4.141050235926491,
         "ROOT_MIN_DIA_MM": 15.607797572417423,
         "ROOT_MAX_DIA_MM": 15.610416666666664,
@@ -3528,13 +3545,13 @@ SWING_GRAVITY_FINGERPRINT = {
     "dt-pinion-bracket": {
         "WIDTH": 15.0,
         "C2C": 28.0,
-        "THICKNESS": 9.0,
+        "THICKNESS": 8.9916,
         "PIVOT_BORE": 6.35,
         "ARBOR_BORE": 7.9375,
-        "PIN_BORE": 4.0,
-        "PIN_SEAT": 4.0,
+        "PIN_BORE": 3.9878,
+        "PIN_SEAT": 4.064,
         "PIN_DROP": -7.0,
-        "CROSS_HOLE_CZ": 4.5,
+        "CROSS_HOLE_CZ": 4.4958,
     },
 }
 if (
@@ -3552,7 +3569,7 @@ _STRESS_SF = 1.5  # on yield, at the stiff corner
 # thickness excess.  Soft: thinnest, narrowest strip.  Stiff: thickest strip.
 # Each is then walked over every formed corner (below).
 _SPR_T_LO, _SPR_T_HI = (SPRING_T + _d for _d in deviations(SPRING_T_BAND))
-_SPR_W_LO = SPRING_W + printed_deviations(SPRING_W, SPRING_W_PLACES)[0]
+_SPR_W_LO = SPRING_W + printed_deviations(SPRING_W, SPRING_W_PLACES, unit=SPRING_UNIT)[0]
 _SPR_STEPS = 1 + math.ceil(math.degrees(_PHI_ENG) / 0.25)
 _SPR_BLADE_SAMPLES = 16
 _SPR_CREST_OUTER_R = SPR_R_KINK + SPRING_T  # the crest's contact-face radius
@@ -3802,7 +3819,9 @@ def _lower(value: float, places: int) -> float:
 
 ARBOR_SOUTH_TRAVEL_STACK = {
     **RIG.DRUM_BACK_ADVANCE_STACK,
-    "MHA-DT-01 drum length .X (longest)": _upper(RIG.DRUM_LEN, RIG.DRUM_LEN_PLACES),
+    "MHA-DT-01 drum length .XX (longest)": printed_deviations(
+        RIG.DRUM_LEN, RIG.DRUM_LEN_PLACES, unit=RIG.DRUM_LEN_UNIT
+    )[1],
     "MHA-DT-22 drum station .X (deepest)": ARBOR_DRUM_STATION_BAND,
 }
 ARBOR_NORTH_TRAVEL_STACK = {
@@ -3820,22 +3839,25 @@ if abs(_LEV_Z[1] - (LIFT_ROD_Z0 + RIG.LEVER_PLANE_NORTH_FROM_ROD_END)) > 1e-9:
     raise AssertionError("the lever throw plane drifted from the rig layout's")
 GRIP_ROD_SOUTH_TRAVEL_STACK = {
     **ARBOR_SOUTH_TRAVEL_STACK,
-    "MHA-DT-22 head length .X, half (crossrod centred)": _upper(
-        ARBOR_HEAD_LEN, ARBOR_HEAD_LEN_PLACES
-    )
-    / 2.0,
+    # The crossrod is located off the head's rear face by its own .XX station
+    # (CrossHoleFromHeadRear), not centred on the head (Codjiflo on #2106).
+    "MHA-DT-22 cross-hole station .XX": ARBOR_CROSS_HOLE_STATION_BAND,
     "MHA-DT-15 crossrod dia, half": HANDLE_ROD_DIA_BAND[0] / 2.0,
 }
 GRIP_HEAD_SOUTH_TRAVEL_STACK = {
     **ARBOR_SOUTH_TRAVEL_STACK,
-    "MHA-DT-22 head length .X": _upper(ARBOR_HEAD_LEN, ARBOR_HEAD_LEN_PLACES),
-    "MHA-DT-22 front crown sag .X": _upper(
-        ARBOR_HEAD_CAP_SAG, ARBOR_HEAD_CAP_SAG_PLACES
-    ),
+    "MHA-DT-22 head length .X": printed_deviations(
+        ARBOR_HEAD_LEN, ARBOR_HEAD_LEN_PLACES, unit=ARBOR_UNIT
+    )[1],
+    "MHA-DT-22 front crown sag .X": printed_deviations(
+        ARBOR_HEAD_CAP_SAG, ARBOR_HEAD_CAP_SAG_PLACES, unit=ARBOR_UNIT
+    )[1],
 }
 GRIP_HEAD_NORTH_TRAVEL_STACK = {
     **ARBOR_NORTH_TRAVEL_STACK,
-    "MHA-DT-22 neck length .XX": _upper(ARBOR_NECK_LEN, ARBOR_NECK_LEN_PLACES),
+    "MHA-DT-22 neck length .XX": printed_deviations(
+        ARBOR_NECK_LEN, ARBOR_NECK_LEN_PLACES, unit=ARBOR_UNIT
+    )[1],
 }
 # Radial envelope of the alignment drum against the enlarged south end disc.
 # DiscDia's own precision selects its actual ordinary title-block band.
@@ -3843,7 +3865,10 @@ DRUM_TIP_TO_END_DISC_STACK = {
     "MHA-DT-01 critical tip, half": (
         _ALIGNMENT_PINION.outside_dia_limits_mm()[1] / 2.0 - TIP_APINION
     ),
-    "end disc dia, general band, half": _upper(END_DISC_DIA, END_DISC_OD_PLACES) / 2.0,
+    "end disc dia, general band, half": printed_deviations(
+        END_DISC_DIA, END_DISC_OD_PLACES, unit=END_DISC_UNIT
+    )[1]
+    / 2.0,
 }
 
 
@@ -3854,9 +3879,13 @@ DRUM_TIP_TO_END_DISC_STACK = {
 # strip's front edge south, toward the gear.
 SPRING_TO_J19_STACK = {
     "rig-set leaf D, thinnest setting": RIG.FEELER_SET_ERROR,
-    "MHA-DT-14 strap thickness .X, thinnest": _lower(STRAP_T, STRAP_T_PLACES),
+    "MHA-DT-14 strap thickness .XXX, thinnest": -printed_deviations(
+        STRAP_T, STRAP_T_PLACES, unit=STRAP_UNIT
+    )[0],
     "spring pad leaf, thickest setting": RIG.FEELER_SET_ERROR,
-    "MHA-DT-24 strip width .XX, widest": _upper(SPRING_W, SPRING_W_PLACES),
+    "MHA-DT-24 strip width .XX, widest": printed_deviations(
+        SPRING_W, SPRING_W_PLACES, unit=SPRING_UNIT
+    )[1],
 }
 
 

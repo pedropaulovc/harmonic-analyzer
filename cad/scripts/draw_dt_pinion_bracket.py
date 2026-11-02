@@ -11,16 +11,16 @@ bracket carries no datums and no feature-control frames, and it carries no
 manufacturing-note block either -- the outline, the hole callouts (each fitted
 bore naming its mate and fit), one roughness symbol and the title block say
 everything.  Three bands survive, one per fitted bore, each from a named fit
-class, plus the follower seat's station and the cross hole's pin band.
+class, plus the cross hole's pin band.  Decimal-inch sheet (#290).
 
 Two orthographic views at the 2:1 sheet scale, a follower-seat section, plus
 the isometric:
 
 * FRONT -- the strap face: both bores, both end radii and follower-seat height.
-* LEFT -- the seat flank, where the blind O4 seat mouth is a SOLID circle:
+* LEFT -- the seat flank, where the blind follower seat mouth is a SOLID circle:
   its size, its station through the bar and the bar thickness; plus the
-  (43.0) overall as a reference, so nobody saws the bar short of the two
-  end radii the 28.00 centre distance does not include.  The option E-a
+  overall as a reference, so nobody saws the bar short of the two end radii
+  the bore centre distance does not include.  The option E-a
   set-pin cross hole's mouth is a solid circle here too, located by its
   station from broad face A, its centre on the pivot-axis line the view draws.
 * SECTION B-B -- a cut through the follower-seat axis showing its legitimate
@@ -66,6 +66,7 @@ from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -80,7 +81,6 @@ from dt_pinion_bracket_spec import (
     OVERALL_LENGTH,
     PIN_DROP,
     PIN_SEAT_DEPTH_CALLOUT,
-    PIN_SEAT_WALL_CALLOUT,
     R_END,
     SURFACE_FINISHES,
 )
@@ -233,14 +233,18 @@ DIMENSION_CALLOUTS = {
     # The two held locations name what they serve (rules 3 and 4): the
     # follower's height sets the drum's swing for a given cam lift
     # (DRAWING_PRECISION), and the seat's station keeps it mid-bar
-    # (PIN_SEAT_WEB_WORST, user ruling (a)).  SOLIDWORKS starts the 7.000's
-    # text at its bent dimension line, so that leg touched the leading S of
-    # SETS (r3 review, rule 14); the leading spaces stand the rows off it.
+    # (PIN_SEAT_WEB_WORST, user ruling (a)).  SOLIDWORKS starts the follower
+    # height's text at its bent dimension line, so that leg touched the leading
+    # S of SETS (r3 review, rule 14); the leading spaces stand the rows off it.
     "PinSeatCy": "   SETS FOLLOWER HEIGHT\n   ON MHA-DT-23 CAM",
-    # The station's band leaves the far-face wall under rule 17's 2.0 target.
-    # Emits the fact declared by RV-01 (owner ruling (a)), from the spec.
-    "PinSeatCz": "CENTRES MHA-DT-25\nFOLLOWER IN BAR\n" + PIN_SEAT_WALL_CALLOUT,
+    "PinSeatCz": "CENTRES MHA-DT-25\nFOLLOWER IN BAR",
 }
+# The bar thickness is held at .XXX for the axial stack it closes: two straps,
+# the drum, its shim and feeler fill the span between the MHA-DT-18 blocks
+# (pinion_rig_layout).  Above the value, on one line (a multi-line
+# above-callout does not print, draw_dt_pinion_pivot_block): below it the rows
+# would run across both thickness witnesses and the seat station's.
+CALLOUTS_ABOVE = {"Depth": "AXIAL STACK IN MHA-DT-18 SPAN"}
 
 
 def _overall_reference(adapter: Any, left: Any) -> None:
@@ -324,7 +328,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("dt-pinion-bracket"),
     )
     create_blank_drawing_sheets(
         adapter, SHEET_NAMES, label="pinion bracket drawing package"
@@ -412,6 +420,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     annotations = [*front_annotations, *left_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(adapter, left_annotations, CALLOUTS_ABOVE, location="above")
     assert_imported_precision(
         adapter, [*annotations, seat_depth], DRAWING_PRECISION_BY_NAME
     )

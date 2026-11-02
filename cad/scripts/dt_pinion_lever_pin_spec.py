@@ -13,16 +13,16 @@ drawing's coordinate math (``test_dt_pinion_lever_pin_drawing.py``).
 from __future__ import annotations
 
 from dt_pinion_lever_pin_geometry import PIN_DIA as PIN_DIA, PIN_LEN as PIN_LEN
+from dt_pinion_lever_pin_geometry import UNIT as UNIT
 
 LEVER_NUMBER = "MHA-DT-16"
 LIFT_ROD_NUMBER = "MHA-DT-17"
 
-# Stock 1/16 in drill rod (h9 in the drill-rod catalogues).  The pin rides a
-# drilled hole (title-block DRILLED HOLES +0.10/0), so it is retained by the
-# peened heads, not by an interference: the band only says "use the stock",
-# and its zero upper deviation keeps the pin no larger than the smallest hole
-# the 1/16 drill leaves.
-PIN_DIA_BAND = (0.0, -0.03)
+# Stock 1/16 in drill rod, held +/-.0003 as supplied (#290 fit F15).  The pin
+# rides a .064 drilled hole (title-block DRILLED HOLES +.004/0), so it is
+# retained by the peened heads, not by an interference: the band only says
+# "use the stock", and the largest pin still clears the smallest hole by .0012.
+PIN_DIA_BAND = (0.00762, -0.00762)
 
 # drawing-guidelines.md rule 11 (turned parts read like the lathe) (turned parts): both dimensions live on the revolved half-profile, so
 # the diameter prints on the side view beside the length, not on the end view
@@ -31,11 +31,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia", "PinLen"},
 }
 
-# Decimal places ARE the tolerance statement (drawing-guidelines.md rule 3 (decimal places carry the tolerance)).  Three on the
-# 1/16 in stock diameter so the printed nominal is the drill rod's own 1.588;
-# one on the overlength cut, which assembly trims and peens flush anyway.
+# Decimal places ARE the tolerance statement (drawing-guidelines.md rule 3 (decimal places carry the tolerance)).  Four on the
+# 1/16 in stock diameter so the printed nominal is the drill rod's own .0625;
+# two on the overlength cut, which assembly trims and peens flush anyway.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "PinProfile": {"PinDia": 3, "PinLen": 1},
+    "PinProfile": {"PinDia": 4, "PinLen": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

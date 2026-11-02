@@ -1,7 +1,8 @@
 r"""Create the curated machinist drawing for the pinion cam-follower pin.
 
-A short Ø4 drill-rod stud with a shallow domed outer end, bonded into the
-MHA-DT-14 strap's follower seat.  The sheet runs at 8:1 so the 20.8-long pin
+A short 5/32 drill-rod stud with a shallow domed outer end, bonded into the
+MHA-DT-14 strap's follower seat (decimal-inch sheet, #290).  The sheet runs
+at 8:1 so the short pin
 reads at arm's length.  The side view lies as the pin is turned (drawing-guidelines.md rule 11 (turned parts read like the lathe)) and
 carries every dimension: the diameter, the length, the crown radius and a
 reference overall.  The end view projects to its left (third angle), and a
@@ -50,6 +51,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -230,7 +232,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("dt-pinion-cam-pin"),
     )
     stamp_drawing_summary(
         adapter,

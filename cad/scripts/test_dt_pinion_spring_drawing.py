@@ -15,12 +15,13 @@ import dt_pinion_spring_section as section
 import dt_pinion_spring_spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _printed_tolerance import printed_band_mm, printed_deviations
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
 from machinist_exceptions import load_exceptions
 
-_XX_BAND = printed_band_mm(2)
-_HOLE_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
-_WEB_TARGET = 2.0  # U27: machined webs >= 2.0 at the printed worst case
+_XX_BAND = printed_band_mm(2, unit="in")
+_HOLE_OVERSIZE = drilled_oversize_mm(unit="in")
+_WEB_TARGET = WALL_TARGET_MM  # machined webs >= .080 at the printed worst case
 
 
 class _MarkDisplay:
@@ -152,10 +153,11 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 
 
 def test_preload_setting_formed_features_carry_the_formed_band() -> None:
-    # Main's r6 ruling (c): the hand-formed profile prints one place.  The
-    # dimensions that set the crest's preload carry the +/-0.5 band the drive
-    # train's corner walk books; the flick's two ride the .X row (PR #1675).
-    assert dt_pinion_spring_spec.FORMED_TOLERANCE_MM == 0.5
+    # Main's r6 ruling (c): the dimensions that set the crest's preload carry
+    # the +/-.020 band the drive train's corner walk books, at .XXX (their
+    # millimetre nominals are kept); the flick's two ride the .XX and angular
+    # rows (PR #1675, #290).
+    assert dt_pinion_spring_spec.FORMED_TOLERANCE_MM == pytest.approx(0.020 * 25.4)
     assert model_toleranced_dimensions(spring) == {
         ("feature_name", "name"): "FORMED_TOLERANCE_MM"
     }
@@ -164,13 +166,15 @@ def test_preload_setting_formed_features_carry_the_formed_band() -> None:
     assert not banded & {"FlatLen", dt_pinion_spring_spec.FREE_KINK_ANGLE}
     for name in banded:
         assert "MHA-DT-14" in drawing.DIMENSION_CALLOUTS[name]
-    formed = set().union(*dt_pinion_spring_spec.FORMED_DIMENSIONS.values())
     precision = dt_pinion_spring_spec.DRAWING_PRECISION_BY_NAME
-    linear = formed - {dt_pinion_spring_spec.FREE_KINK_ANGLE}
-    assert {name: precision[name] for name in linear} == dict.fromkeys(linear, 1)
+    assert {name: precision[name] for name in banded} == dict.fromkeys(banded, 3)
+    assert precision["FlatLen"] == 2
     assert precision[dt_pinion_spring_spec.FREE_KINK_ANGLE] == 0
-    for name in ("PadWidth", "PadReliefR", "PadLen"):
-        assert precision[name] == 2
+    assert (precision["PadWidth"], precision["PadLen"], precision["PadReliefR"]) == (
+        2,
+        2,
+        3,
+    )
     source = Path(spring.__file__).read_text(encoding="utf-8")
     assert "_pad_relief_max_limit(adapter)" in source
 
@@ -229,12 +233,12 @@ def test_pad_webs_clear_two_millimetres_at_the_printed_worst_case() -> None:
     # The bend's clearance leaves the web to the wing's corner under target
     # but over rule 17's 1.5 floor at .XX: printed on PadLen (rule 20),
     # rounded down.
-    assert geometry.PAD_HOLE_WEB_MIN == math.floor(min(toward.values()) * 100) / 100
-    assert geometry.PAD_HOLE_WEB_MIN == pytest.approx(1.54)
-    assert 1.5 <= geometry.PAD_HOLE_WEB_MIN < _WEB_TARGET
-    assert drawing.DIMENSION_CALLOUTS["PadLen"] == (
-        f"HOLE WEB {geometry.PAD_HOLE_WEB_MIN:.2f} MIN"
+    assert geometry.PAD_HOLE_WEB_MIN == pytest.approx(
+        math.floor(min(toward.values()) / 0.0254) * 0.0254
     )
+    assert geometry.PAD_HOLE_WEB_MIN == pytest.approx(0.076 * 25.4)
+    assert WALL_FLOOR_MM <= geometry.PAD_HOLE_WEB_MIN < _WEB_TARGET
+    assert drawing.DIMENSION_CALLOUTS["PadLen"] == "HOLE WEB .076 MIN"
 
 
 def test_owner_exception_matches_only_the_stated_hole_web() -> None:
@@ -243,9 +247,9 @@ def test_owner_exception_matches_only_the_stated_hole_web() -> None:
     )
     assert (exception.id, exception.kind) == ("RV-01", "minor")
     assert dt_pinion_spring_spec.PAD_LEN_CALLOUT in exception.where
-    assert f"{geometry.PAD_HOLE_WEB_MIN:.2f} mm minimum" in exception.finding
+    assert ".076 in minimum" in exception.finding
     assert "PAD_HOLE_WEB_MIN" in exception.reason
-    assert 1.5 <= geometry.PAD_HOLE_WEB_MIN < _WEB_TARGET
+    assert WALL_FLOOR_MM <= geometry.PAD_HOLE_WEB_MIN < _WEB_TARGET
 
 
 def test_pad_wing_and_its_round_clear_the_bend_at_the_printed_worst_case() -> None:
@@ -254,22 +258,22 @@ def test_pad_wing_and_its_round_clear_the_bend_at_the_printed_worst_case() -> No
     # the bend -- both from the hole's axis, at the title-block .XX row (r13:
     # a tight .XXX band rescuing the web is not allowed, rules 4 and 17).
     assert geometry.PAD_LEN_PLACES == 2
-    longest = geometry.PAD_WING_FROM_HOLE + printed_band_mm(geometry.PAD_LEN_PLACES)
+    longest = geometry.PAD_WING_FROM_HOLE + _XX_BAND
     nearest_bend = geometry.FOOT_FROM_HOLE - geometry.FORMED_BAND_MM
     assert longest + geometry.PAD_RELIEF_R <= nearest_bend + 1e-9
-    assert geometry.PAD_WING_FROM_HOLE == pytest.approx(3.74)
-    assert geometry.PAD_WING_LEN == pytest.approx(8.24)
+    assert geometry.PAD_WING_FROM_HOLE == pytest.approx(0.15 * 25.4)
+    assert geometry.PAD_WING_LEN == pytest.approx(0.33 * 25.4)
     # Positive control: from the free end, the hole's band would join the chain
-    # and leave the web under the floor.
+    # and leave the web under the target.
     from_end = (
         geometry.FOOT_LEN
         - geometry.FORMED_BAND_MM
-        - 2 * printed_band_mm(2)
+        - 2 * _XX_BAND
         - geometry.PAD_RELIEF_R
-        - (geometry.HOLE_FROM_END + printed_band_mm(2))
+        - (geometry.HOLE_FROM_END + _XX_BAND)
         - (geometry.HOLE_DIA + _HOLE_OVERSIZE) / 2.0
     )
-    assert from_end < 1.5
+    assert from_end < _WEB_TARGET
 
 
 def test_screw_head_still_bears_on_the_shortened_wing() -> None:
@@ -280,9 +284,9 @@ def test_screw_head_still_bears_on_the_shortened_wing() -> None:
     # case (wing short, the hole nearest the strip edge) the head's rim stays
     # well inside the wing's edge.
     head_r = HEAD_DIA / 2.0
-    wing_short = geometry.PAD_WING_FROM_HOLE - printed_band_mm(geometry.PAD_LEN_PLACES)
+    wing_short = geometry.PAD_WING_FROM_HOLE - _XX_BAND
     margin = wing_short - head_r
-    assert margin == pytest.approx(0.906, abs=0.01)
+    assert margin == pytest.approx(1.232, abs=0.01)
     assert margin >= 0.5
 
 
@@ -310,7 +314,7 @@ def test_screw_stands_outboard_east_of_the_back_strap() -> None:
     assert geometry.HOLE_X - geometry.PIVOT_LX == pytest.approx(20.0)
     flank = geometry.PIVOT_LX + geometry.STRAP_HALF_WIDTH
     assert geometry.FOOT_END[0] > geometry.HOLE_X > geometry.FOOT_TAN[0] > flank
-    assert geometry.FOOT_END[0] - geometry.HOLE_X == geometry.HOLE_FROM_END
+    assert geometry.FOOT_END[0] - geometry.HOLE_X == pytest.approx(geometry.HOLE_FROM_END)
     assert geometry.FOOT_LEN == geometry.PAD_LEN + geometry.FOOT_FLAT
 
 
@@ -799,7 +803,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     # stock callout stays in the material specification.
     assert len(spec["material"]) <= 30
     assert "17-7 PH" in spec["material"] and "Cond C" in spec["material"]
-    assert "0.015 in (0.381 mm)" in spec["material_specification"]
+    assert "0.015 in +/-0.00075 in" in spec["material_specification"]
     assert spec["finish"]
     assert int(spec["quantity"]) == 1
 
@@ -814,7 +818,9 @@ def test_registry_names_the_stock_the_section_models() -> None:
     assert section.THICK == pytest.approx(0.015 * 25.4)
     assert section.THICK_BAND == pytest.approx((0.00075 * 25.4, -0.00075 * 25.4))
     assert section.WIDTH == pytest.approx(0.25 * 25.4)
-    assert printed_deviations(section.WIDTH, section.WIDTH_PLACES) == pytest.approx(
+    assert printed_deviations(
+        section.WIDTH, section.WIDTH_PLACES, unit=section.UNIT
+    ) == pytest.approx(
         (-_XX_BAND, _XX_BAND), abs=0.005
     )
     assert spring.MATERIAL == "AISI 304"  # the library's stainless stand-in

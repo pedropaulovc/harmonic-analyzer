@@ -8,13 +8,22 @@ the arbor's printed pin station, fixes it there.  Its inboard face then
 stands clear of the front MHA-DT-14 strap's outer face at every corner of the
 printed bands, so it never locates anything: if the drum's Loctite 638 bond
 ever let go, it stops the arbor walking north (toward the back) after the
-gap closes.  U27: the gap grows to absorb the .X bands, none is tightened.
+gap closes.  U27: the gap grows to absorb the bands, none is tightened.
 """
 
 from __future__ import annotations
 
 import math
 from itertools import product
+
+import _config
+from _package_units import drawing_unit
+from _inch_wall_limits import WALL_TARGET_MM
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    drilled_undersize_mm,
+    printed_band_mm,
+)
 
 import dt_vn_pinion_strap_pin_spec as _pin
 from dt_pinion_arbor_collar_geometry import (
@@ -29,7 +38,6 @@ from dt_pinion_arbor_spec import (
     DRUM_STATION,
     DRUM_STATION_BAND,
     END_PLAY,
-    LINEAR_X_BAND,
     PIN_STATION_BAND,
     PIN_STATION_FROM_HEAD_REAR,
     SHAFT_DIA,
@@ -45,21 +53,27 @@ from pinion_rig_layout import RIG_MARGIN_SPARE
 PIN_HOLE = _pin.HOLE_DIA
 PIN_HOLE_BAND = _pin.HOLE_BAND
 PIN_HOLE_MAX = _pin.HOLE_MAX
-PIN_LEN = _pin.PIN_LEN  # 1/2 in: 1.15 sub-flush each side of the Ø15 OD
+PIN_LEN = _pin.PIN_LEN  # 1/2 in: .045 sub-flush each side of the Ø.59 OD
 PIN_LEN_TOL = _pin.PIN_LEN_BAND
 
 ARBOR_NUMBER = "MHA-DT-22"
 STRAP_NUMBER = "MHA-DT-14"
+# #290: the registry row's drawing_unit (in) is this sheet's unit.
+UNIT = drawing_unit(
+    "parts/dt-pinion-arbor-collar", _config.parts("dt-pinion-arbor-collar")
+)
 # Drilled 5/16 slide fit over the 5/16 arbor (-.0004/-.0038 in, lands
 # -.0004/-.0012 in).
-# The title block's DRILLED HOLES row (+0.10/0) governs it and is NOT printed
+# The title block's DRILLED HOLES row (+.004/0) governs it and is NOT printed
 # on the dimension (drawing-guidelines.md rule 2 (the title block is the general specification)); the band is restated here only for the
-# stacks below, and a test pins it to title_block.yaml's drilled_hole row.
-BORE_BAND = (0.10, 0.0)  # (upper, lower) deviations
-OD_BAND = LINEAR_X_BAND
-LEN_BAND = LINEAR_X_BAND
-# PinHoleCz prints at one place from one end face, independently of Depth.
-PIN_HOLE_Z_BAND = LINEAR_X_BAND
+# stacks below.
+BORE_BAND = (drilled_oversize_mm(unit=UNIT), -drilled_undersize_mm(unit=UNIT))
+# The OD, the length and the pin station all feed a wall or the strap gap, so
+# each prints at the title block's .XX.
+OD_BAND = printed_band_mm(2, unit=UNIT)
+LEN_BAND = printed_band_mm(2, unit=UNIT)
+# PinHoleCz prints from one end face, independently of Depth.
+PIN_HOLE_Z_BAND = printed_band_mm(2, unit=UNIT)
 
 
 def pin_to_face_distances() -> tuple[float, float]:
@@ -131,15 +145,17 @@ if GAP_MIN < GAP_REQUIRED - 1e-9:
         f"collar gap to the front strap {GAP_MIN:.3f} under {GAP_REQUIRED}"
     )
 
-# drawing-guidelines.md rule 17 (walls and webs) webs at the printed worst case (U27 target 2.0, floor 1.5).
+# drawing-guidelines.md rule 17 (walls and webs) webs at the printed worst case (.080 in target).
 COLLAR_WALL_WORST = (COLLAR_OD - OD_BAND - (BORE + BORE_BAND[0])) / 2.0
 PIN_TO_END_WEB_WORST = PIN_TO_FACE_MIN - PIN_HOLE_MAX / 2.0
 for _name, _web in (
     ("collar wall", COLLAR_WALL_WORST),
     ("pin hole to collar end face", PIN_TO_END_WEB_WORST),
 ):
-    if _web < 2.0:
-        raise AssertionError(f"{_name} web {_web:.2f} is under the 2.0 target")
+    if _web < WALL_TARGET_MM:
+        raise AssertionError(
+            f"{_name} web {_web:.3f} is under the {WALL_TARGET_MM} target"
+        )
 
 # The pin is never proud of the smallest OD, and still crosses the largest
 # bore into both walls.
@@ -147,20 +163,25 @@ PIN_SUB_FLUSH_WORST = (COLLAR_OD - OD_BAND - (PIN_LEN + PIN_LEN_TOL)) / 2.0
 # The drive's acceptance (Codex #860, PRRT_kwDOPHDy386mWhrK).  SUB-FLUSH alone
 # lets the largest collar hold the shortest pin nearly flush at one end and
 # OD - L = 3.354 down at the other, 0.496 past the bore.  A one-sided "0 TO x
-# BELOW" window cannot fit the .X OD band: x must reach half the largest
+# BELOW" window cannot fit the OD band: x must reach half the largest
 # OD - L to hold every pin, yet the smallest OD with an end x down leaves
 # under the floor.  So the acceptance bounds the difference between the two
 # end depths: with it under D, the deeper end sits at most D / 2 past centred,
-# and the far wall keeps (L - D - bore) / 2 at any OD.  D is the loosest 0.1
+# and the far wall keeps (L - D - bore) / 2 at any OD.  D is the loosest .01 in
 # step that holds the rig's one-pin-diameter grip (dt_vn_pinion_strap_pin_spec).
 PIN_WALL_ENGAGEMENT_FLOOR = _pin.PIN_WALL_ENGAGEMENT_FLOOR
 _PIN_LEN_MIN = PIN_LEN - PIN_LEN_TOL
 _BORE_MAX = BORE + BORE_BAND[0]
+PIN_END_DEPTH_SPREAD_STEP = 0.254  # .01 in
 PIN_END_DEPTH_SPREAD_MAX = (
     math.floor(
-        round((_PIN_LEN_MIN - _BORE_MAX - 2.0 * PIN_WALL_ENGAGEMENT_FLOOR) * 10.0, 9)
+        round(
+            (_PIN_LEN_MIN - _BORE_MAX - 2.0 * PIN_WALL_ENGAGEMENT_FLOOR)
+            / PIN_END_DEPTH_SPREAD_STEP,
+            9,
+        )
     )
-    / 10.0
+    * PIN_END_DEPTH_SPREAD_STEP
 )
 PIN_WALL_ENGAGEMENT_WORST = (_PIN_LEN_MIN - PIN_END_DEPTH_SPREAD_MAX - _BORE_MAX) / 2.0
 if PIN_SUB_FLUSH_WORST <= 0.0:
@@ -179,16 +200,17 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # drawing-guidelines.md rule 11 (turned parts read like the lathe): the pin station is printed from a finished end face.
     "PinHoleProfile": {"PinHoleDia", "PinHoleCz"},
 }
-# The MODEL owns every printed place (drawing-simplicity-policy.md `How the repository implements the guidelines`).  Two on the two drilled
-# fits (their bands ride the dimensions), one everywhere else.
+# The MODEL owns every printed place (drawing-simplicity-policy.md `How the repository implements the guidelines`).  #290 inch places:
+# four on the 1/16 pin hole (its +.0025/.0000 band rides the dimension),
+# three on the 5/16 drilled bore (the drill grid, drawing-guidelines rule 3;
+# the callout names the 5/16 drill, which governs the hole), and the
+# title block's .XX on the OD, length and pin station, which the walls and
+# the strap gap read.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "CollarProfile": {"CollarOd": 1},
-    # Two places, the drill grid (drawing-guidelines rule 3); the callout
-    # names the 5/16 drill, which governs the hole (machinist review, #290
-    # batch 0: Ø7.9375 read as a precision no drill holds).
-    "BoreProfile": {"BoreDia": 2},
-    "Collar": {"Depth": 1},
-    "PinHoleProfile": {"PinHoleDia": 2, "PinHoleCz": 1},
+    "CollarProfile": {"CollarOd": 2},
+    "BoreProfile": {"BoreDia": 3},
+    "Collar": {"Depth": 2},
+    "PinHoleProfile": {"PinHoleDia": 4, "PinHoleCz": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -208,16 +230,19 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 
 # The rig's first assembly step (Codex #860, PRRT_kwDOPHDy386mTbe7).  The
 # collar reaches the pin station only from the arbor's back crown end: its
-# Ø5/16 bore passes neither the Ø15 head nor a drum already bonded at the drum
+# Ø5/16 bore passes neither the Ø.59 head nor a drum already bonded at the drum
 # station.  The front strap, journaled between the collar and the drum, is
 # trapped the same way, so it follows the collar on before the bond.
 COLLAR_NUMBER = "MHA-DT-33"
+# The step prints on MHA-DT-00, still a millimetre sheet (#290 converts it
+# last), so the spread is written in mm, rounded down so the print is never
+# looser than the computed limit (codex review).
 ASSEMBLY_STEP = "\n".join(
     (
         f"BEFORE THE DRUM BOND: SLIDE {COLLAR_NUMBER} ONTO {ARBOR_NUMBER} FROM ITS",
         f"BACK CROWN END TO THE PIN STATION; DRIVE {PIN_NUMBER} THRU BOTH, BOTH ENDS",
         "SUB-FLUSH AND THEIR DEPTHS BELOW THE OD WITHIN "
-        f"{PIN_END_DEPTH_SPREAD_MAX:.1f} OF EACH OTHER;",
+        f"{math.floor(PIN_END_DEPTH_SPREAD_MAX * 10.0) / 10.0:.1f} OF EACH OTHER;",
         f"THEN SLIDE THE FRONT {STRAP_NUMBER} ON BEHIND IT.",
     )
 )

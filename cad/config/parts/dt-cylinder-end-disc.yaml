@@ -7,3 +7,4 @@ dt-cylinder-end-disc:
   tolerance_class: machined_block
   quantity: 1
   process: "turned (brass)"
+  drawing_unit: in

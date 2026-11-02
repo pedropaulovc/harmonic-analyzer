@@ -61,7 +61,11 @@ from _drawing_dimensions import (
 )
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
-from _drawing_hole_callout import add_native_hole_callout, compose_hole_callout_prefix
+from _drawing_hole_callout import (
+    add_native_hole_callout,
+    compose_hole_callout_prefix,
+    set_hole_callout_precision,
+)
 from _drawing_tolerances import _tolerance_places
 from _drawing_layout_collect import check_drawing_layout
 from _drawing_leader_notes import add_leader_note
@@ -77,6 +81,7 @@ from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
+from _part_properties import part_drawing_unit
 from _surface_finish import surface_finish_by_key
 import _telemetry
 import build_dt_cone_swing_platform as _part
@@ -107,8 +112,8 @@ from dt_cone_swing_platform_spec import (
     PLATE_STOCK_CALLOUT,
     PLATE_THICKNESS,
     POST_MOUNT_SPEC,
-    POST_MOUNT_TAP_BREAK_CALLOUT,
     SURFACE_FINISHES,
+    UNIT,
 )
 from dt_cone_swing_platform_pivot_spec import PIVOT_HOLE_DIA
 
@@ -498,12 +503,8 @@ FACE_LABELS = (
 )
 # Rows printed under native hole callouts (swDimensionTextCalloutBelow).
 # Each tight band names its mate at its own callout (rule 4; machinist
-# review r1 blocker: the +-0.1 stations named none), and a local override
-# rides the callout of the feature it overrides (rule 7).
-POST_MOUNT_CALLOUT_BELOW = (
-    POST_MOUNT_TAP_BREAK_CALLOUT,
-    POST_MOUNT_LOCATING_CALLOUT,
-)
+# review r1 blocker: the +-0.1 stations named none).
+POST_MOUNT_CALLOUT_BELOW = (POST_MOUNT_LOCATING_CALLOUT,)
 # The post-mount taps' callout over the hole-location plan.  The block is
 # centred on the requested point: r3's four rows ran from the inner border
 # (top 0.2665, ~0.3 mm air) to their underline at 0.2453, 6.6 mm over the
@@ -1235,25 +1236,34 @@ def _rewrite_hole_callout(
 
 
 def _print_pivot_band_exactly(display: Any) -> None:
-    """Print the pivot ream's band at the places it needs, natively.
+    """Print the pivot ream's size and band at the places they need, natively.
 
     The callout's ``<hw-diam>`` shows the Hole Wizard feature's band at the
-    template's two tolerance places, so the inch H7 band (+0.0127/0) read
-    "+0.01/0.00" (machinist review, #290 batch 0).  ``SetPrecision3`` cannot
-    set a hole callout's tolerance places; ``ICalloutLengthVariable`` can.
+    template's tolerance places, so the H7 band read "+.00/.00".
+    ``SetPrecision3`` cannot set a hole callout's places;
+    ``ICalloutLengthVariable`` can: the reamed .2500 and its band print the
+    band's four places.
     """
     from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415
 
-    places = _tolerance_places(*_part.PIVOT_HOLE_BAND, display_unit="mm")
+    places = _tolerance_places(*_part.PIVOT_HOLE_BAND, display_unit=UNIT)
     for raw in display.GetHoleCalloutVariables() or ():
         if str(dynamic_dispatch(raw._oleobj_).VariableName) != "hw-diam":
             continue
         length = _early_bound(raw, "ICalloutLengthVariable")
+        length.Precision = places
         length.TolerancePrecision = places
-        if int(length.TolerancePrecision) != places:
-            raise RuntimeError("pivot reamed bore: tolerance places did not persist")
+        if (int(length.Precision), int(length.TolerancePrecision)) != (places, places):
+            raise RuntimeError("pivot reamed bore: places did not persist")
         return
     raise RuntimeError("pivot reamed bore: callout has no <hw-diam> variable")
+
+
+# Hole Wizard callouts print three inch places (#290).
+HOLDDOWN_CALLOUT_PRECISION = {"hw-thruholedia": 3, "hw-cbdia": 3, "hw-cbdepth": 3}
+# The through taps' drill prints .201, not .20 (rule 3; machinist review of
+# run 20261101T085308503Z).
+POST_MOUNT_CALLOUT_PRECISION = {"hw-thrutapdrldia": 3}
 
 
 def _add_holddown_callout(adapter: Any, section: Any) -> Any:
@@ -1282,6 +1292,9 @@ def _add_holddown_callout(adapter: Any, section: Any) -> Any:
         display,
         holddown_callout_definitions,
         label="tip-block hold-down counterbored hole",
+    )
+    set_hole_callout_precision(
+        display, HOLDDOWN_CALLOUT_PRECISION, label="tip-block hold-down counterbored hole"
     )
     rebuild_drawing(adapter, label="hold-down callout rows")
     return display
@@ -1993,7 +2006,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("dt-cone-swing-platform"),
     )
     create_blank_drawing_sheets(
         adapter, SHEET_NAMES, label="cone swing platform package"
@@ -2262,6 +2279,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="v2 post-mount tapped holes",
     )
     _omit_post_mount_thread_class(post_mount_callout)
+    set_hole_callout_precision(
+        post_mount_callout, POST_MOUNT_CALLOUT_PRECISION, label="v2 post-mount tapped holes"
+    )
     rebuild_drawing(adapter, label="plan hole callout rows")
     # The section shows the top seat at its head and the base slide at its
     # foot.  Arrows land mid-face so neither symbol reads as controlling a
@@ -2340,15 +2360,10 @@ async def build(adapter: Any) -> dict[str, str]:
         str(thickness_reference.GetText(2)),
     ) != ("(", ")"):
         raise RuntimeError("stock plate thickness reference state did not persist")
-    for name, feature_name, radius_m in (
-        ("CornerSWR", "CornerSW", 0.005),
-        ("CornerNWR", "CornerNW", 0.008),
-        ("CornerNER", "CornerNE", 0.010),
-        ("CornerSER", "CornerSE", 0.012),
-    ):
+    for label, _x, _z, radius in _part.PLATE_CORNERS:
         _assert_corner_radius_attachment(
             adapter, profile, profile_annotations,
-            name=name, feature_name=feature_name, radius_m=radius_m,
+            name=f"Corner{label}R", feature_name=f"Corner{label}", radius_m=radius / 1000.0,
         )
     if cut.GetDisplayOnlySurfaceCut() is not True:
         raise RuntimeError("pivot section lost its cut-only display after annotation")

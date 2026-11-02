@@ -2357,13 +2357,7 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
     {
         "_printed_tolerance",
         "sm_vn_boss_hook_spec",
-        "build_dt_drive_train_assembly",
         "build_fr_harmonic_base",
-        "dt_cone_pivot_post_spec",
-        "dt_cone_swing_platform_checks",
-        "dt_cone_swing_platform_spec",
-        # Drilled-hole and angular rows size the collar-to-bank air stack.
-        "dt_tip_collar_air",
         # Angular row sets the through tap's angle in the screw landing gate.
         "dt_vn_cone_tip_collar_spec",
         "dt_crank_hub_geometry",
@@ -2389,7 +2383,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         # held inside the knife edge's free-rock floor.
         "sm_summing_assembly_sheet",
         "pd_vn_guide_lock_screw_spec",
-        "dt_vn_post_mount_screw_spec",
         "ch_vn_spring_hook_spec",
         "pd_transgear_disc_hub_spec",
         "pd_transgear_removable_notes",

@@ -11,8 +11,11 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _com import _early_bound
+from _drawing_common import rebuild_drawing
 from _supplier_screw_dimensions import annotate_supplier_screw
 from _supplier_screw_layout import supplier_screw_margins
 from _mcmaster_91829a560 import (
@@ -25,9 +28,65 @@ from _mcmaster_91829a560 import (
 )
 
 
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SPEC = DRAWINGS_BY_NAME["dt_vn_cone_pivot_screw"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "SHOULDER SCREW, Ø1/4 x 1/4 SHOULDER, #10-24 x 3/8 THREAD"
+# Both diameters lane below FRONT, Ø.190 on the inner lane. Ø.250's stacked
+# limits stand ~8.9 mm above its own line, yet the shared lanes are only
+# ~6.9 mm apart, so its upper limit straddled Ø.190's dimension line (r11
+# review, run 20261101T105537488Z). One drop more puts ~4 mm of paper between
+# Ø.190's line and Ø.250's text; the pre-fit margin reserves it.
+SHOULDER_DIAMETER_DROP_M = 0.006
+# Right lanes: (.188) at 6 mm, (.375) at 14 mm. Both texts shelve right of
+# their lanes with the arrows outside, and (.188)'s shelf reaches ~24 mm out,
+# so (.375)'s upper arrow line rose into it and its lower one ended on the
+# Ø.190 text (~18 mm out) (r13 review, run 20261101T142805608Z). At 28 mm the
+# (.375) lane clears both; the pre-fit margin reserves the shift.
+THREAD_LENGTH_SHIFT_M = 0.014
+# name -> (dx, dy) sheet metres, applied to the whole dimension before the
+# purchased builder shelves struck text.
+LANE_MOVES = {
+    "SupplierShoulderDiameter": (0.0, -SHOULDER_DIAMETER_DROP_M),
+    "SupplierThreadLength": (THREAD_LENGTH_SHIFT_M, 0.0),
+}
+
+
+def supplier_margins() -> dict[str, tuple[float, float, float, float]]:
+    margins = supplier_screw_margins(
+        SUPPLIER_REFERENCE_DIMENSIONS,
+        planes=SUPPLIER_REFERENCE_PLANES,
+        sides=SUPPLIER_REFERENCE_SIDES,
+    )
+    left, bottom, right, top = margins["*Front"]
+    return {
+        **margins,
+        "*Front": (
+            left,
+            bottom + SHOULDER_DIAMETER_DROP_M,
+            right + THREAD_LENGTH_SHIFT_M,
+            top,
+        ),
+    }
+
+
+def _move_lanes(adapter: Any, displays: dict[str, Any]) -> None:
+    """Move each whole dimension (line and text) by its sheet offset."""
+    targets = {}
+    for name, (dx, dy) in LANE_MOVES.items():
+        display = _early_bound(displays[name], "IDisplayDimension")
+        # A model annotation may inherit offset mode; move the line, not text alone.
+        display.OffsetText = False
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        x, y, _z = (float(value) for value in annotation.GetPosition())
+        targets[name] = (annotation, (x + dx, y + dy))
+        if not annotation.SetPosition2(*targets[name][1], 0.0):
+            raise RuntimeError(f"91829A560: failed to move {name} to its lane")
+    rebuild_drawing(adapter, label="91829A560 supplier lanes")
+    for name, (annotation, target) in targets.items():
+        moved = tuple(float(value) for value in annotation.GetPosition())[:2]
+        if not all(math.isclose(a, b, rel_tol=0.0, abs_tol=5e-4) for a, b in zip(moved, target)):
+            raise RuntimeError(f"91829A560: {name} lane read back at {moved!r}")
 
 
 def _assert_supplier_bands(displays: dict[str, Any]) -> None:
@@ -66,6 +125,7 @@ async def build(adapter: Any) -> dict[str, str]:
             sides=SUPPLIER_REFERENCE_SIDES,
         )
         _assert_supplier_bands(displays)
+        _move_lanes(adapter, displays)
 
         def assert_bands() -> None:
             from _supplier_screw_dimensions import assert_supplier_screw
@@ -92,12 +152,9 @@ async def build(adapter: Any) -> dict[str, str]:
         SPEC,
         item=ITEM,
         supplier_dimensions=supplier_dimensions,
-        supplier_margins=supplier_screw_margins(
-            SUPPLIER_REFERENCE_DIMENSIONS,
-            planes=SUPPLIER_REFERENCE_PLANES,
-            sides=SUPPLIER_REFERENCE_SIDES,
-        ),
+        supplier_margins=supplier_margins(),
         settled_checks=(assert_settled,),
+        unit=part_drawing_unit("dt-vn-cone-pivot-screw"),
     )
 
 

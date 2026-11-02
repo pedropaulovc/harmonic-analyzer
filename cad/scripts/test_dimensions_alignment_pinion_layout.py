@@ -101,10 +101,6 @@ def _section_mm(value: float) -> str:
     return text + "0" if text.endswith(".") else text
 
 
-def test_the_spring_pad_the_record_calls_square_is_square() -> None:
-    assert spring.PAD_LEN == spring.PAD_WIDTH
-
-
 def _expected_fragments() -> list[str]:
     authority = (dt.FPIN_DIA + dt.CAM_OD) / 2.0 - dt._D_ENG
     follower_reserve = dt._FPIN_TIP_S - dt._S_CAM_ENG
@@ -115,7 +111,7 @@ def _expected_fragments() -> list[str]:
         f"drum radius {dt.TIP_DRUM120:.3f}, pinion radius {dt.TIP_APINION:.3f} "
         f"and parked gap {dt.APINION_GAP}",
         f"Drum z {_mm(dt.APINION_Z_FRONT)}..+{dt.APINION_Z_BACK:.3f}",
-        f"({dt.APINION_Z_BACK - dt.APINION_Z_FRONT:.1f} face",
+        f"({dt.APINION_Z_BACK - dt.APINION_Z_FRONT:.3f} face",
         f"root z {_mm(dt.ARBOR_Z0)}..+{dt.ARBOR_Z0 + ARBOR_LEN:.3f}",
         f"head/crossrod axis z {_mm(dt.HANDLE_Z)}",
         f"crossrod at +{dt.HANDLE_TILT_DEG:g}°",
@@ -140,7 +136,7 @@ def _expected_fragments() -> list[str]:
         # reader-derived; its historical material interpretation is independent.
         f"{spring.THICK:g} ×{_section_mm(spring.WIDTH)} ",
         f"{spring.SCREW_EAST_OF_PIVOT:.1f} EAST of pivot",
-        f"{spring.PAD_LEN:g} square pad",
+        f"{spring.PAD_LEN:g} × {spring.PAD_WIDTH:g} pad",
         f"{spring.CONTACT_T:.1f} up strap",
     ]
 

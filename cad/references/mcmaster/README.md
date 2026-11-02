@@ -1689,6 +1689,15 @@ The shared pin stations reserve room for the dressed reference text: dowel
 diameters clear the end-view center marks, and spring-pin application-hole
 labels sit to the right of their circle so the leader approaches outside the
 multiline qualifier. These are drawing-only moves within the existing lanes.
+A spring pin whose mating parts' own sheets specify its holes declares no
+application hole (`dt-vn-pinion-strap-pin`: the loose circle read as a second
+pin feature). Its model authors no `SupplierMatingHoleReference`, the readback
+refuses a stale one, and its drawing imports only the wall reference.
+A spring pin's FRONT length text, centred on its horizontal dimension line,
+printed with that line through its parentheses; it now takes the shared
+measured text shelf (`_supplier_text_shelf`) right of its end witnesses, in a
+reserved FRONT right lane, and the settled check rereads that shelf. A dowel's
+vertical length text already sits beside its line and is not shelved.
 
 Read-only supplier presentation refusals identify the first mismatched field
 and its actual/expected values, preserving native getter order and stopping

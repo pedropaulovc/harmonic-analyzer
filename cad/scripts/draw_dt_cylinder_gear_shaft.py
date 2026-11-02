@@ -37,6 +37,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -205,7 +206,7 @@ def _move_dimension(
 
 
 def _set_spherical_reference(adapter: Any, annotation: Any, *, label: str) -> None:
-    """Print the dome's model radius as the ASME spherical reference ``(SR8.3)``.
+    """Print the dome's model radius as the ASME spherical reference ``(SR.32)``.
 
     The radius is read-only: a spherical cap of the printed dome height on the
     toleranced diameter already fixes it. Whatever radius prefix the display
@@ -257,7 +258,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("dt-cylinder-gear-shaft"),
     )
     stamp_drawing_summary(
         adapter,

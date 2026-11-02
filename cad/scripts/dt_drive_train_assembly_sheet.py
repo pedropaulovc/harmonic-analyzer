@@ -9,7 +9,6 @@ import dt_crank_handle_spec as _handle
 import dt_crank_pinion_spec as pinion
 import dt_pinion_lever_geometry as _lever
 import dt_pinion_lever_pin_spec as _lever_pin
-from _inch_fraction import inch_fraction
 
 # Owner ruling 2026-10-24 (#1900): MHA-DT-34 cures on a mandrel through the
 # MHA-DT-08 pivot bore.  Step 7 prints the requirement, the bore's offset off
@@ -38,7 +37,7 @@ T120_FITUP_ASSEMBLY_CHECK = "\n".join(
 LEVER_PIN_HOLE_FIT = "\n".join(
     (
         f"HOLE AT {_lever_pin.LEVER_NUMBER}'S PRINTED STATION: "
-        f"{inch_fraction(_lever.PIN_HOLE_DIA, what='lever pin hole')} IN DRILL THRU;",
+        f"{_lever.PIN_HOLE_DRILL} DRILL THRU;",
         f"{_lever_pin.PIN_NUMBER} SLIP FIT.",
     )
 )

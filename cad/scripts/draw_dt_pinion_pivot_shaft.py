@@ -1,7 +1,7 @@
 r"""Create the curated machinist drawing for the pinion strap torque shaft
 (MHA-DT-19).
 
-A plain Ø6.35 steel shaft with a shallow spherical crown at each end, drawn
+A plain 1/4 in steel shaft with a shallow spherical crown at each end, drawn
 like the MHA-CH-05 pivot shaft: one 1:1 side view carries the diameter, the
 body length, the overall length (reference) and the match-drilled pin holes,
 a 5:1 detail carries the crown, and a 1:2 isometric stays clear of the title
@@ -49,6 +49,7 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -348,7 +349,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,

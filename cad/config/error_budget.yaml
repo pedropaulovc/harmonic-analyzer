@@ -136,7 +136,7 @@ monte_carlo:
 # `quantity`: which transfer quantity the deviation perturbs.
 critical_features:
   cam_eccentricity:
-    tolerance: 0.025
+    tolerance: 0.0254  # +/-.0010 in on the MHA-DT-12 print
     nominal: dt_cylinder_gear_spec.ECCENTRICITY
     quantity: gain
     class: channel

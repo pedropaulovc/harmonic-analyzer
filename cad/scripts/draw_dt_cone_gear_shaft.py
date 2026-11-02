@@ -90,15 +90,19 @@ from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _layout_geometry import estimate_text_box
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
+from _supplier_dimensions import supplier_reference_dimension
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_cone_gear_shaft_spec import (
     COLLAR_DIA,
+    COLLAR_DIA_FRACTION_DENOMINATOR,
     COLLAR_END_STATION,
     COLLAR_STOCK_CALLOUT,
     DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     FILLET_CALLOUT,
     FLAT_LANDS,
@@ -184,7 +188,11 @@ DONOR_CENTER = (0.360, 0.090)
 # render had the web text touch that line), far enough left for its function
 # suffix (LENGTH_FUNCTION_SUFFIXES) to end clear of it.  The one radius rides
 # above the 3/8-to-1/4 in step it attaches to (the fillet's first edge),
-# right of the Ø6.350 line.
+# right of the Ø.2500 line.  With its stacked +.000/-.002 band its text is
+# 23.4 mm wide and its shoulder 25.4 mm, so it stands 0.4 mm nearer that line
+# than the bare MAX text did: the text ends 2.2 mm short of section A-A's upper
+# arrow (the layout proof's 2 mm gap; final3 read 1.8 at +0.010) and the
+# shoulder starts 0.7 mm right of the Ø.2500 line (r16 crossed it at +0.0085).
 SIDE_KEEP = {
     "CollarWidth": (0.1740, 0.1355),
     "Sec0End": (0.2311, 0.1355),
@@ -192,7 +200,7 @@ SIDE_KEEP = {
     "Sec2End": (0.1464, 0.1195),
     "Sec3End": (0.1429, 0.1115),
     "Sec4End": (0.1314, 0.1035),
-    "ShoulderR": (BIG_END_X - SECTION_ENDS[1] / 1000.0 + 0.010, 0.1640),
+    "ShoulderR": (BIG_END_X - SECTION_ENDS[1] / 1000.0 + 0.0096, 0.1640),
 }
 OVERALL_REFERENCE_TEXT_XY = (0.1515, 0.0795)
 # Sheet width of one length digit or point at the dimension font (the 916a
@@ -250,14 +258,14 @@ DIAMETER_TEXT_WIDTH = 0.032
 # what the three-place steps and web locate (machinist review r1).
 DIMENSION_SUFFIXES = {**SEAT_MATE_SUFFIXES, **LENGTH_FUNCTION_SUFFIXES}
 # The collar prints its reference diameter over the stock statement, its
-# break, root limit and their reason, lines as wide as "5/8 BAR AS SUPPLIED"
-# or wider.  At LENGTH_CHAR_WIDTH a line
+# break and root limit, each with its reason, lines as wide as "5/8 BAR AS
+# SUPPLIED" or wider.  At LENGTH_CHAR_WIDTH a line
 # that long is wider than the whole journal land, so hanging right from its
 # rim arrow the block ran under the pivot-journal finish and that finish's
 # leader crossed it (final877 eye pass).  The build lifts the block above the
 # finish symbol, from its measured ink (_clear_collar_callout); the dimension
 # line stays on the ring and simply runs longer.
-COLLAR_CALLOUT_LINES = (f"(Ø{COLLAR_DIA:.2f})", *COLLAR_STOCK_CALLOUT.split("\n"))
+COLLAR_CALLOUT_LINES = ("(Ø5/8 in)", *COLLAR_STOCK_CALLOUT.split("\n"))
 COLLAR_CALLOUT_WIDTH = max(len(line) for line in COLLAR_CALLOUT_LINES) * LENGTH_CHAR_WIDTH
 # A measured block narrower than this is a misread (a box around the value
 # line alone), not a layout: the proof refuses it rather than clearing it.
@@ -1540,7 +1548,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("dt-cone-gear-shaft"),
     )
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="cone gear shaft package")
     drawing = _early_bound(drawing_model, "IDrawingDoc")
@@ -1598,8 +1610,17 @@ async def build(adapter: Any) -> dict[str, str]:
         if name in NEAR_SIDE_DIAMETERS:
             set_near_side_diameter(moved, f"{name} near-side diameter")
         if name in REFERENCE_DIAMETERS:
-            set_reference_dimension(
-                adapter, moved, label=f"{name} stock reference", diameter=True
+            # The bar's own size as supplied: an untoleranced 5/8 fraction
+            # reference; its stock statement rides below (DIMENSION_CALLOUTS).
+            supplier_reference_dimension(
+                adapter,
+                _early_bound(moved, "IAnnotation").GetSpecificAnnotation(),
+                label=f"{name} stock reference",
+                units="in",
+                precision=DRAWING_PRECISION_BY_NAME[name],
+                expected_mm=COLLAR_DIA,
+                presentation="diameter",
+                fraction_denominator=COLLAR_DIA_FRACTION_DENOMINATOR,
             )
         annotations.append(moved)
     # Every diameter is now native to the view that shows its shoulder; an

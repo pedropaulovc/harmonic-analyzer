@@ -34,11 +34,15 @@ def test_required_drawing_paths() -> None:
 
 
 def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> None:
-    assert BLOCK_DIA == 42.011
-    assert (spec.HEAD_DIA, spec.HEAD_HEIGHT) == (42.7506, 26.6)
+    # The cast body sits on the .XX grid (1.65 in, machinist review: rule 17
+    # gives it no band tighter than the title block's); the cone boss keeps
+    # the harvested 1.654 face-to-face the cone shaft and gear stack close on.
+    assert BLOCK_DIA == 41.91
+    assert spec.CONE_BOSS_LENGTH == 42.011
+    assert (spec.HEAD_DIA, spec.HEAD_HEIGHT) == (42.672, 26.67)
     assert spec.HEAD_BASE_Y == pytest.approx(spec.BLOCK_HEIGHT - spec.HEAD_HEIGHT)
     assert (spec.CRANK_BOSS_DIA, spec.CRANK_BORE_DIA, spec.CRANK_BORE_OFFSET) == (
-        21.93,
+        21.844,
         11.43,
         0.0,
     )
@@ -57,16 +61,17 @@ def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> Non
     )
     assert spec.CRANK_BOSS_HEAD_MARGIN_MM > 0.0
     assert spec.CRANK_BOSS_LENGTH_IN == 2.8360
-    # v36 (user ruling 2026-09-28): the boss starts on the head's tangent
-    # plane and runs the harvested 2.8360 in from there.
-    assert spec.CRANK_BOSS_NORTH_FACE == spec.HEAD_DIA / 2.0 == 21.3753
+    # v36 (user ruling 2026-09-28): the boss starts on the harvested head's
+    # tangent plane and runs the harvested 2.8360 in from there; the .XX head
+    # leaves that face (the 16T seat) where it was.
+    assert spec.CRANK_BOSS_NORTH_FACE == 21.3753 >= spec.HEAD_DIA / 2.0
     assert spec.CRANK_BOSS_START_Z == -21.3753
     assert round(spec.CRANK_BOSS_END_Z, 4) == 50.6591
     assert spec.CRANK_BOSS_LENGTH == pytest.approx(2.8360 * 25.4)
     from _cone_axis_constants import CONE_AXIS_HEIGHT_MM
     from dt_post_mount_stack import POST_BODY_HEIGHT_MM
 
-    assert (spec.CONE_BOSS_DIA, spec.BORE_DIA) == (17.2, 12.2682)
+    assert (spec.CONE_BOSS_DIA, spec.BORE_DIA) == (17.272, 12.2682)
     assert spec.BORE_HEIGHT == CONE_AXIS_HEIGHT_MM
     assert spec.BLOCK_HEIGHT == POST_BODY_HEIGHT_MM
     assert spec.INCLINE_DEG == _config.machine("cone_incline", "derived_incline_deg")
@@ -74,7 +79,7 @@ def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> Non
         spec.ATTACHMENT_THRU_DIA,
         spec.ATTACHMENT_CBORE_DIA,
         spec.ATTACHMENT_CBORE_DEPTH,
-    ) == (7.14248, 11.50874, 6.0198)
+    ) == (7.14248, 11.5062, 6.0198)
     assert spec.ATTACHMENT_SPACING == 2.0 * spec.ATTACHMENT_X
     # The final volume is the per-feature sum the build checks natively; a
     # constant that drifts from the features (the 2026-09-21 unbored-boss
@@ -150,21 +155,19 @@ def test_current_manufacturing_plan_tracks_post_geometry_without_changing_toolin
     assert plan["construction"] == "one_piece"
 
 
-def test_mounting_counterbores_take_the_last_printable_head_wall_station() -> None:
-    """The Ø42.8 head retains 1.5 mm at the counterbores' printed corners."""
-    assert spec.DRAWING_PRECISION_BY_NAME["HeadDia"] == 1
+def test_mounting_counterbores_keep_the_wall_target_to_the_head() -> None:
+    """The Ø1.68 head keeps the .080 in target at the counterbores' printed
+    corners (#290: the mm sheet's .X head left only the 1.5 mm floor)."""
+    assert spec.DRAWING_PRECISION_BY_NAME["HeadDia"] == 2
     assert spec.DRAWING_PRECISION_BY_NAME["MountWestX"] == 2
     assert spec.DRAWING_PRECISION_BY_NAME["MountEastX"] == 2
-    head_radius_min = (round(spec.HEAD_DIA, 1) - spec.printed_band_mm(1)) / 2.0
-    cbore_radius_max = (
-        round(spec.ATTACHMENT_CBORE_DIA, 2) + spec.printed_band_mm(2)
-    ) / 2.0
-    wall = head_radius_min - (spec.ATTACHMENT_X + spec.printed_band_mm(2)) - cbore_radius_max
-    assert spec.ATTACHMENT_X == pytest.approx(12.98)
-    assert spec.ATTACHMENT_SPACING == pytest.approx(25.96)
+    head_radius_min = (spec.HEAD_DIA - 0.254) / 2.0
+    cbore_radius_max = (spec.ATTACHMENT_CBORE_DIA + 0.127) / 2.0
+    wall = head_radius_min - (spec.ATTACHMENT_X + 0.254) - cbore_radius_max
+    assert spec.ATTACHMENT_X == pytest.approx(12.954)
+    assert spec.ATTACHMENT_SPACING == pytest.approx(25.908)
     assert wall == pytest.approx(spec.MOUNT_HEAD_WEB_WORST)
-    assert wall >= spec.WEB_FLOOR_MM - 1e-9
-    assert wall - 0.01 < spec.WEB_FLOOR_MM
+    assert wall >= 2.032 - 1e-9
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
@@ -468,13 +471,24 @@ def test_part_owns_every_printed_decimal_place() -> None:
         *spec.DRAWING_DIMENSIONS.values()
     )
     assert "draw_dt_cone_pivot_post.py" in PRECISION_MIGRATED_DRAWINGS
-    # Only the two bores earn a third place, for their limits; the basic plan
-    # angle prints the model's exact value (#906, it feeds the frame).
+    # The bores earn extra places for their limits, the harvested 1.654 boss
+    # length and the closures print .XXX, and the basic plan angle prints the
+    # model's exact value (#906, it feeds the frame).
     assert {
         name
         for name, places in spec.DRAWING_PRECISION_BY_NAME.items()
         if places >= 3
-    } == {"CrankBoreDia", "JournalBoreDia", "InclineAngle"}
+    } == {
+        "CrankBoreDia",
+        "JournalBoreDia",
+        "InclineAngle",
+        "ConeBossLen",
+        "CrankBossLen",
+        "CrankAxisY",
+        "CrankAboveCone",
+        "ConeBossNorthZ",
+        "CrankBossStartZ",
+    }
 
 
 def test_running_bores_close_the_configured_fit_class() -> None:
@@ -511,12 +525,15 @@ def test_nothing_else_on_the_casting_carries_a_band() -> None:
     The cast body, head and boss diameters and the mounting-hole stations
     are not accuracy features (cad/docs/tolerance-policy.md, "Result"), so the
     part must not author a tolerance on them at all: the title block's general
-    grade is the whole specification.  The symmetric bands are the cone-axis
-    height and the collar thrust face's station.
+    grade is the whole specification.  The one symmetric band is the collar
+    thrust face's station; the cone-axis height's capture band is the title
+    block's .XX (machinist review: an explicit ±.01 repeated it).
     """
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert source.count("set_dimension_bilateral_tolerance(") == 3
-    assert source.count("set_dimension_symmetric_tolerance(") == 2
+    assert source.count("set_dimension_symmetric_tolerance(") == 1
+    assert spec.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM == pytest.approx(0.254)
+    assert "JOURNAL_AXIS_HEIGHT_TOLERANCE_MM" not in source
     assert source.count("deviations(RUNNING_BORE_BAND)") == 1
     assert source.count("deviations(JOURNAL_BORE_BAND)") == 1
     assert source.count("deviations(CRANK_ABOVE_CONE_BAND)") == 1
@@ -605,12 +622,12 @@ def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
     assert frame.characteristic == "angularity"
     assert frame.tolerance_zone == "diametral"
     assert frame.datums == ("A", "B")
-    assert frame.tolerance == f"{spec.CRANK_BORE_ANGULARITY_MM:.2f}" == "0.10"
+    assert frame.tolerance == spec.CRANK_BORE_ANGULARITY_IN == ".004"
     assert frame.face == CylinderFace(
         spec.CRANK_BORE_DIA, contains_y_mm=spec.CRANK_BORE_HEIGHT
     )
-    # The zone spans the boss: 0.0795 deg over its 72.03.
-    assert round(spec.CRANK_BORE_ANGLE_LIMIT_DEG, 4) == 0.0795
+    # The zone spans the boss: 0.0808 deg over its 72.03.
+    assert round(spec.CRANK_BORE_ANGLE_LIMIT_DEG, 4) == 0.0808
     assert part.PART_DATUMS is spec.PART_DATUMS
     assert part.GEOMETRIC_CONTROLS is spec.GEOMETRIC_CONTROLS
     exceptions = {
@@ -764,7 +781,6 @@ def test_part_config_is_a_machined_casting() -> None:
     finish = str(config["finish"])
     assert "RAL 6005" in finish
     assert "SSPC-SP 3" in finish
-    assert "50-75 um DFT" in finish
     assert "MASK MACHINED FACES" in finish
     assert "OIL BARE FACES ISO VG 32" in finish
     assert config["process"] == "machined from solid stock or casting"
@@ -780,14 +796,14 @@ def test_journal_rims_print_the_thrust_ring_break() -> None:
     import dt_cone_gear_shaft_spec as shaft
 
     break_max = shaft.THRUST_EDGE_BREAK_MAX
-    assert f"RIMS BREAK {break_max:.1f} MAX" == shaft.POST_JOURNAL_RIM_BREAK
+    assert f"RIMS BREAK {shaft.inch_text(break_max, 3)} MAX" == shaft.POST_JOURNAL_RIM_BREAK
     bore_callout = drawing.DIMENSION_CALLOUTS["JournalBoreDia"]
     # r16 (rules 4 and 7): the tighter break carries its reason under it.
     assert bore_callout.splitlines()[-2:] == [
         shaft.POST_JOURNAL_RIM_BREAK,
         "FOR COLLAR SEAT",
     ]
-    assert f"EDGE BREAK {break_max:.1f} MAX" in shaft.COLLAR_STOCK_CALLOUT
+    assert f"EDGE BREAK {shaft.inch_text(break_max, 3)} MAX" in shaft.COLLAR_STOCK_CALLOUT
     ring = shaft.THRUST_RING_MIN
     assert ring - 2.0 * break_max >= shaft.THRUST_RING_FLOOR
     # the title block's general break on the rim would not hold the floor
@@ -838,7 +854,60 @@ def test_north_cone_boss_end_carries_the_running_finish() -> None:
     assert machine_normal[2] > 0.9
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'surface_finish_by_key(SURFACE_FINISHES, "cone_boss_north_face")' in source
-    assert "len(surface_boxes) != len(SURFACE_FINISHES)" in source
+    assert "len(surface_boxes) != expected_surface_boxes" in source
+
+
+def test_foot_seat_mate_rides_its_ra_symbol_not_a_loose_note() -> None:
+    """PR #2107 machinist review (clarity, gating): the foot's mate stood in a
+    loose general note, not on the callout it explains; it prints over the
+    foot seat's Ra, and the sheet carries no general note."""
+    foot = surface_finish_by_key(spec.SURFACE_FINISHES, "foot_seat")
+    assert foot.production_method == spec.FOOT_SEAT_FINISH_TARGET == "SEATS ON MHA-DT-20"
+    assert spec.DRAWING_NOTES == ""
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '"Manufacturing Notes"' not in source
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "foot_seat")' in source
+
+
+def test_body_diameter_claims_no_unmeasurable_flushness() -> None:
+    """PR #2107 machinist review (clarity): FLUSH WITH CONE BOSS FACES was not
+    guaranteed by the body Ø's and the .827 station's printed limits; each band
+    governs its own surface (crank_boss_rim proves the 64T clear of both)."""
+    assert "MainBodyDia" not in drawing.DIMENSION_CALLOUTS
+    assert not [
+        text for text in drawing.DIMENSION_CALLOUTS.values() if "FLUSH" in text
+    ]
+
+
+def test_body_diameter_takes_the_title_block_band() -> None:
+    """MHA-DT-05 machinist review (gating, rule 17): Ø1.654 printed three
+    places only because the harvested 42.011 sat off the .XX grid, and its
+    suffix said the band protected the mounting holes' wall.  The cast body
+    is Ø1.65 at .XX; the wall still clears the floor at that band's minimum."""
+    assert spec.DRAWING_PRECISION_BY_NAME["MainBodyDia"] == 2
+    assert round(BLOCK_DIA / 25.4, 2) == pytest.approx(BLOCK_DIA / 25.4, abs=1e-9)
+    assert "MainBodyDia" not in drawing.DIMENSION_SUFFIXES
+    assert drawing.FRONT_KEEP["MainBodyDia"] == (0.150, 0.074)
+    assert spec.MOUNT_OTHER_WEBS_WORST["body foot OD"] == pytest.approx(
+        spec._printed_limits(BLOCK_DIA, 2)[0] / 2.0
+        - spec._printed_limits(spec.ATTACHMENT_X, 2)[1]
+        - (spec.ATTACHMENT_THRU_DIA + spec._DRILL_OVERSIZE) / 2.0
+    )
+    assert spec.MOUNT_OTHER_WEBS_WORST["body foot OD"] >= spec.WEB_FLOOR_MM
+
+
+def test_one_cone_boss_diameter_counts_both_bosses() -> None:
+    """MHA-DT-05 machinist review: SECTION A-A shows a boss at each end of the
+    cone bore, and the one Ø printed nowhere said it sized both."""
+    assert drawing.DIMENSION_PREFIXES == {"ConeBossDia": "2X "}
+    assert drawing._DIMENSION_TEXT_PREFIX == 1
+    # A custom prefix replaces the automatic Ø, so the count keeps its token.
+    assert drawing.counted_diameter_prefix("2X ", "") == "2X <MOD-DIAM>"
+    assert drawing.counted_diameter_prefix("2X ", "<MOD-DIAM>") == "2X <MOD-DIAM>"
+    with pytest.raises(RuntimeError, match="already carries 2X"):
+        drawing.counted_diameter_prefix("2X ", "2X <MOD-DIAM>")
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_set_dimension_prefixes(adapter, annotations)" in source
 
 
 def test_plan_angle_is_basic_and_prints_the_model_angle() -> None:
@@ -915,6 +984,20 @@ def test_crank_bore_thru_rides_the_size_line_so_the_mate_line_stays_narrow() -> 
     """r4 view-crowding: "THRU, RUNS ON ..." below the size reached the 38.10."""
     assert drawing.DIMENSION_SUFFIXES["CrankBoreDia"] == " THRU"
     assert drawing.DIMENSION_CALLOUTS["CrankBoreDia"] == "RUNS ON MHA-DT-11"
+
+
+def test_crank_bore_mate_line_stands_clear_of_the_head_height_extension() -> None:
+    """Machinist review of farm run 20261101T142805608Z: the RUNS ON
+    MHA-DT-11 underline sat 0.8 mm over HeadHt's upper extension line (the
+    head's top edge), parallel to it.  That render put the underline 7.31 mm
+    under the requested y and the box 2.6 mm past its 156.3 mm right end, at
+    x 0.1330; View C's nearest text (the 1.697 block) starts at 180.6 mm and
+    the crowding check asks one 15 mm text height of air."""
+    x, y = drawing.FRONT_KEEP["CrankBoreDia"]
+    underline_y = y - 0.00731
+    assert underline_y - drawing._front_y(spec.BLOCK_HEIGHT) >= 0.0025
+    box_right = 0.1563 + (x - 0.1330) + 0.0026
+    assert 0.1806 - box_right >= 0.015
 
 
 def test_mounting_hole_callout_says_drill_above_its_through_row() -> None:
@@ -1067,8 +1150,11 @@ def test_crank_bore_is_located_from_the_cone_bore_and_never_binds() -> None:
     assert spec.CRANK_ABOVE_CONE == pytest.approx(
         _config.machine("gear_train", "crank_axis_height_mm") - spec.BORE_HEIGHT
     )
-    assert spec.CRANK_ABOVE_CONE_BAND == (0.37, 0.0)
-    assert crank_mesh_stack.SPACING_PRINTED == round(spec.CRANK_ABOVE_CONE, 2)
+    assert spec.CRANK_ABOVE_CONE_BAND == (0.3556, 0.0)
+    places = spec.DRAWING_PRECISION_BY_NAME["CrankAboveCone"]
+    assert crank_mesh_stack.SPACING_PRINTED == pytest.approx(
+        round(spec.CRANK_ABOVE_CONE / 25.4, places) * 25.4
+    )
     assert abs(crank_mesh_stack.FRAME_DY - spec.CRANK_ABOVE_CONE) < 1e-9
     assert crank_mesh_stack.standard_check().backlash_min_mm > 0.0
     # The foot-to-crank height stays on the front view only as a reference.
@@ -1110,11 +1196,6 @@ def test_point_relations_use_the_point_relation_types() -> None:
     assert '"origin", "horizontal_points"' in source
 
 
-def _datum_b_frame_clears_the_notes(tag_y: float) -> bool:
-    frame_bottom = tag_y - drawing._DATUM_TAG_FRAME_HEIGHT
-    return frame_bottom >= drawing.NOTES_ANCHOR[1] + drawing._DATUM_NOTES_CLEARANCE - 1e-12
-
-
 def _journal_sheet(text_box, spacing_segments):
     return SimpleNamespace(
         annotations=(
@@ -1137,13 +1218,9 @@ _CONTROL_TEXT = layout.Box(0.1720, 0.1542, 0.2080, 0.1577)
 _SPACING_LINE = layout.Segment(0.2080, 0.1504, 0.2080, 0.1700, "line")
 
 
-def test_datum_b_frame_clears_what_crossed_it() -> None:
-    """Leaf w3-1026 (layout check with #1026's degenerate-line fix): datum B's
-    frame sat on the manufacturing notes.  The placement now derives from the
-    measured extents; the old one is the positive control."""
-    assert not _datum_b_frame_clears_the_notes(drawing._front_y(-9.0))
-    assert _datum_b_frame_clears_the_notes(drawing.DATUM_B_TAG_XY[1])
-    # Still below the foot seat it tags.
+def test_datum_b_tag_sits_under_the_foot_seat() -> None:
+    """Datum B's tag point stands under the foot seat it tags, so its leader
+    reaches the seat."""
     assert drawing.DATUM_B_TAG_XY[1] < drawing._front_y(0.0)
 
 
@@ -1166,12 +1243,13 @@ def test_33_37_text_is_placed_from_the_box_the_check_reads() -> None:
     assert shift == pytest.approx(0.005)
 
 
-def test_33_37_text_takes_the_nearest_line_beside_it() -> None:
-    """Only a vertical line that runs alongside the text and lies right of its
-    left edge bounds it; the nearest such line wins."""
+def test_33_37_text_takes_the_nearest_line_down_to_the_cone_axis() -> None:
+    """Only a vertical line that reaches down to the cone axis and lies right
+    of the text's left edge bounds it (the spacing's own offset-text leader
+    stays above the crank axis); the nearest such line wins."""
     segments = [
-        # Below the text: does not run alongside it.
-        layout.Segment(0.2000, 0.1400, 0.2000, 0.1530, "line"),
+        # Above the cone axis: the spacing text's leader, not its line.
+        layout.Segment(0.2000, 0.1720, 0.2000, 0.1830, "line"),
         # Left of the text's left edge.
         layout.Segment(0.1700, 0.1500, 0.1700, 0.1700, "line"),
         # Horizontal.
@@ -1186,8 +1264,22 @@ def test_33_37_text_takes_the_nearest_line_beside_it() -> None:
 
 
 def test_33_37_placement_fails_loud_without_its_line() -> None:
-    """With no spacing line alongside, the placement premise is gone: it must
-    raise rather than leave the text wherever it landed."""
-    below = layout.Segment(0.2080, 0.1400, 0.2080, 0.1530, "line")
+    """With no spacing line down to the cone axis, the placement premise is
+    gone: it must raise rather than leave the text wherever it landed."""
+    above = layout.Segment(0.2080, 0.1720, 0.2080, 0.1830, "line")
     with pytest.raises(RuntimeError, match="no vertical CrankAboveCone line"):
-        drawing.journal_axis_text_shift(_journal_sheet(_CONTROL_TEXT, [below]))
+        drawing.journal_axis_text_shift(_journal_sheet(_CONTROL_TEXT, [above]))
+
+
+def test_cone_axis_height_stands_on_its_own_line_clear_of_the_spacing() -> None:
+    """r3 (View C): the 1.50's text, offset onto the line it shared with the
+    1.697, dropped a jogged leader down that line until the two merged.  Its
+    own line now stands well left of the spacing's, its text on that line
+    between the foot and the cone axis."""
+    assert "JournalAxisY" not in drawing.JOURNAL_TEXT_OFFSETS
+    x, y = drawing.JOURNAL_KEEP["JournalAxisY"]
+    assert x < drawing.JOURNAL_KEEP["CrankAboveCone"][0] - 0.010
+    foot_y = drawing.CONE_AXIS_SHEET_Y - spec.BORE_HEIGHT / 1000.0
+    assert foot_y + 0.010 < y < drawing.CONE_AXIS_SHEET_Y - 0.010
+    # The control sheet's spacing line starts at the cone axis.
+    assert drawing.CONE_AXIS_SHEET_Y == pytest.approx(_SPACING_LINE.y0, abs=5e-4)

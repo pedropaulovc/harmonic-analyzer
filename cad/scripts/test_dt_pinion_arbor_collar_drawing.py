@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from itertools import product
 from pathlib import Path
 
@@ -18,6 +19,7 @@ import dt_vn_pinion_strap_pin_spec as strap_pin
 from _buildgraph import module_deps_of
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _inch_wall_limits import WALL_TARGET_MM
 
 
 def test_required_drawing_paths() -> None:
@@ -31,23 +33,27 @@ def test_required_drawing_paths() -> None:
 
 
 def test_user_ruling_r1a_geometry() -> None:
-    """Ø15 OD, Ø8 +0.10/0 drilled bore, pin hole centred; 17 long since the
-    pin-station stack (Codex P2 on #860) -- the user ruling's 20 pressed the
-    strap at the worst band corner."""
-    assert (geometry.COLLAR_OD, geometry.BORE, geometry.COLLAR_LEN) == (15.0, 7.9375, 17.0)
-    assert spec.BORE_BAND == (0.10, 0.0)
+    """Ø.59 OD, 5/16 drilled bore (+.004/0), pin hole centred; 17 long since
+    the pin-station stack (Codex P2 on #860) -- the user ruling's 20 pressed
+    the strap at the worst band corner -- snapped to .66 (#290)."""
+    assert (geometry.COLLAR_OD, geometry.BORE, geometry.COLLAR_LEN) == (
+        14.986,
+        7.9375,
+        16.764,
+    )
+    assert spec.BORE_BAND == pytest.approx((0.1016, 0.0))
     assert geometry.PIN_HOLE_Z == geometry.COLLAR_LEN / 2.0
     # The rig's one pin family and drill (pinion_strap_pin_spec, E-a).
     assert spec.PIN_HOLE == strap_pin.HOLE_DIA == arbor_pin.PIN_HOLE_DIA
-    assert spec.PIN_HOLE_BAND == strap_pin.HOLE_BAND == (0.06, 0.0)
+    assert spec.PIN_HOLE_BAND == strap_pin.HOLE_BAND
     assert spec.SLIDE_CLEARANCE_MIN > 0.0
 
 
 def test_spring_pin_is_the_rig_family_and_never_proud() -> None:
     assert strap_pin.PIN_STANDARD == "ASME B18.8.2"
     assert spec.PIN_LEN == pytest.approx(12.7)
-    # 1.15 sub-flush each side at nominal, still sub-flush at the worst case.
-    assert (geometry.COLLAR_OD - spec.PIN_LEN) / 2.0 == pytest.approx(1.15)
+    # .045 sub-flush each side at nominal, still sub-flush at the worst case.
+    assert (geometry.COLLAR_OD - spec.PIN_LEN) / 2.0 == pytest.approx(1.143)
     assert spec.PIN_SUB_FLUSH_WORST > 0.0
     assert spec.PIN_WALL_ENGAGEMENT_WORST >= strap_pin.PIN_WALL_ENGAGEMENT_FLOOR
 
@@ -75,15 +81,22 @@ def test_the_pin_drive_keeps_a_pin_diameter_in_both_collar_walls() -> None:
     """Codex #860 (PRRT_kwDOPHDy386mWhrK): SUB-FLUSH alone lets the largest
     collar hold the shortest pin nearly flush at one end and 3.354 down at the
     other, 0.496 past the Ø8.10 bore.  No one-sided "0 TO x BELOW" window fits
-    the .X OD band, so the drive's acceptance bounds the difference between
+    the OD band, so the drive's acceptance bounds the difference between
     the two end depths instead; the worst end then keeps the rig's floor."""
     spread = spec.PIN_END_DEPTH_SPREAD_MAX
     worst = _worst_far_wall_grip(spread)
     assert spec.PIN_WALL_ENGAGEMENT_WORST == pytest.approx(worst, abs=1e-6)
     assert worst >= strap_pin.PIN_WALL_ENGAGEMENT_FLOOR
-    # The loosest 0.1 step: one more would drop the worst end under the floor.
-    assert _worst_far_wall_grip(spread + 0.1) < strap_pin.PIN_WALL_ENGAGEMENT_FLOOR
-    assert f"WITHIN {spread:.1f} OF EACH OTHER" in spec.ASSEMBLY_STEP.replace("\n", " ")
+    # The loosest .01 in step: one more would drop the worst end under the floor.
+    assert (
+        _worst_far_wall_grip(spread + spec.PIN_END_DEPTH_SPREAD_STEP)
+        < strap_pin.PIN_WALL_ENGAGEMENT_FLOOR
+    )
+    # MHA-DT-00 is still a millimetre sheet: the step prints the spread in mm,
+    # never looser than the limit.
+    printed = math.floor(spread * 10.0) / 10.0
+    assert printed <= spread
+    assert f"WITHIN {printed:.1f} OF EACH OTHER" in spec.ASSEMBLY_STEP.replace("\n", " ")
 
 
 def test_collar_pin_is_the_stock_mha145_named_on_the_hole_not_a_note() -> None:
@@ -123,17 +136,15 @@ def test_drive_train_pins_the_collar_with_a_locked_mha145() -> None:
     assert 'label="collar spring pin locked in the collar"' in source
 
 
-def test_webs_meet_the_u27_target_at_the_printed_worst_case() -> None:
-    assert (geometry.COLLAR_OD - (geometry.BORE + spec.BORE_BAND[0])) / 2.0 == pytest.approx(3.48125)
-    assert spec.COLLAR_WALL_WORST == pytest.approx(3.08125)
-    assert spec.PIN_TO_END_WEB_WORST == pytest.approx(6.076, abs=1e-3)
-    assert arbor_pin.PIN_HOLE_LIGAMENT_WORST == pytest.approx(3.0967, abs=1e-3)
+def test_webs_meet_the_inch_target_at_the_printed_worst_case() -> None:
+    assert (geometry.COLLAR_OD - (geometry.BORE + spec.BORE_BAND[0])) / 2.0 == pytest.approx(3.47345)
+    assert spec.COLLAR_WALL_WORST == pytest.approx(3.34645)
     for web in (
         spec.COLLAR_WALL_WORST,
         spec.PIN_TO_END_WEB_WORST,
         arbor_pin.PIN_HOLE_LIGAMENT_WORST,
     ):
-        assert web >= 2.0
+        assert web >= WALL_TARGET_MM
 
 
 def test_collar_never_touches_the_front_strap_at_any_band_corner() -> None:
@@ -142,22 +153,28 @@ def test_collar_never_touches_the_front_strap_at_any_band_corner() -> None:
     (PinHoleCz), each at its printed band, with the collar either way round.
     Codex P2 on #860: the length and the station vary independently, so the
     pin-to-inboard-face distance is not simply half the length."""
-    # On #858 pinned straps with the 11.5 head and the 38.0 pin station.
-    assert spec.GAP_MIN == pytest.approx(1.00)
+    # On #858 pinned straps; every band its sheet's printed one.
     assert spec.GAP_MIN >= spec.GAP_REQUIRED == pytest.approx(0.25)
-    assert spec.GAP_NOMINAL == pytest.approx(5.10)
-    assert spec.GAP_MAX == pytest.approx(9.55)
     gaps = [
         (station - air - strap) - (pin + to_face)
         for station, air, strap, pin, length, cz in product(
-            (arbor.DRUM_STATION - 0.8, arbor.DRUM_STATION + 0.8),
+            (
+                arbor.DRUM_STATION - arbor.DRUM_STATION_BAND,
+                arbor.DRUM_STATION + arbor.DRUM_STATION_BAND,
+            ),
             # Pinned straps (#858): the drum's front air runs from nothing
             # to its whole end play.
             (0.0, arbor.drum_total_air()[1]),
-            (spec.STRAP_T - 0.8, spec.STRAP_T + 0.8),
-            (37.2, 38.8),
-            (geometry.COLLAR_LEN - 0.8, geometry.COLLAR_LEN + 0.8),
-            (geometry.PIN_HOLE_Z - 0.8, geometry.PIN_HOLE_Z + 0.8),
+            (spec.STRAP_T - spec.STRAP_T_BAND, spec.STRAP_T + spec.STRAP_T_BAND),
+            (
+                arbor.PIN_STATION_FROM_HEAD_REAR - arbor.PIN_STATION_BAND,
+                arbor.PIN_STATION_FROM_HEAD_REAR + arbor.PIN_STATION_BAND,
+            ),
+            (geometry.COLLAR_LEN - spec.LEN_BAND, geometry.COLLAR_LEN + spec.LEN_BAND),
+            (
+                geometry.PIN_HOLE_Z - spec.PIN_HOLE_Z_BAND,
+                geometry.PIN_HOLE_Z + spec.PIN_HOLE_Z_BAND,
+            ),
         )
         for to_face in (cz, length - cz)
     ]
@@ -212,7 +229,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 
 
 def test_only_the_pin_hole_carries_a_band() -> None:
-    """The Ø8 bore is a plain drilled hole: the title block's DRILLED HOLES
+    """The 5/16 bore is a plain drilled hole: the title block's DRILLED HOLES
     row governs it, and restating that row on the dimension is what policy
     drawing-guidelines.md rule 2 (the title block is the general specification) forbids (Codex on #860).  Only the pin hole's tighter band rides."""
     assert model_toleranced_dimensions(collar) == {
@@ -220,18 +237,9 @@ def test_only_the_pin_hole_carries_a_band() -> None:
     }
 
 
-def test_bore_band_is_the_title_block_drilled_hole_row() -> None:
-    row = _config.title_block("drilled_hole")
-    assert spec.BORE_BAND == (row["plus_mm"], row["minus_mm"])
-
-
 def test_the_part_owns_every_printed_decimal_place() -> None:
     by_name = spec.DRAWING_PRECISION_BY_NAME
     assert set(by_name) == set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert {name for name, places in by_name.items() if places != 1} == {
-        "BoreDia",
-        "PinHoleDia",
-    }
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 

@@ -23,12 +23,14 @@ import dt_cone_swing_platform_geometry as geometry
 import dt_cone_swing_platform_spec as spec
 import dt_cone_swing_platform_checks as checks
 import dt_cone_tip_block_spec as block
+import dt_post_mount_stack as post_mount
 from dt_cone_post_envelope import BLOCK_DIA
 import draw_dt_cone_swing_platform as drawing
 import pytest
 from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, blind_cut_dia_mm
-from _printed_tolerance import printed_band_mm
+from _inch_wall_limits import WALL_TARGET_MM
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _surface_finish import MACHINED_UM, SEAT_UM
 
 
@@ -48,8 +50,8 @@ def test_every_marked_model_dimension_has_one_view_and_native_precision() -> Non
     assert kept == marked
     assert sum(len(names) for names in view_sets) == len(kept)
     assert set(drawing_spec.DRAWING_PRECISION_BY_NAME) == marked
-    assert drawing_spec.DRAWING_PRECISION_BY_NAME["PlateLenDim"] == 1
-    assert set(drawing_spec.DRAWING_PRECISION_BY_NAME.values()) == {1, 2}
+    assert drawing_spec.DRAWING_PRECISION_BY_NAME["PlateLenDim"] == 2
+    assert set(drawing_spec.DRAWING_PRECISION_BY_NAME.values()) == {2, 3}
 
 
 def test_pivot_is_the_reamed_h7_bore_on_the_stock_shoulder() -> None:
@@ -118,12 +120,12 @@ def test_plate_and_nonfit_features_remain_at_general_grade() -> None:
     assert "oil seal" in str(registry["finish"]).lower()
     assert int(registry["quantity"]) == 1
     assert drawing_spec.DRAWING_PRECISION["Plate"]["PlateThk"] == 2
-    assert drawing_spec.DRAWING_PRECISION["PivotBearingRelief"]["PivotBearingReliefDepth"] == 2
+    assert drawing_spec.DRAWING_PRECISION["PivotBearingRelief"]["PivotBearingReliefDepth"] == 3
     assert drawing_spec.DRAWING_PRECISION["PostMountHoles"] == {
-        "PostMountWestX": 2,
-        "PostMountWestZ": 2,
-        "PostMountEastX": 2,
-        "PostMountEastZ": 2,
+        "PostMountWestX": 3,
+        "PostMountWestZ": 3,
+        "PostMountEastX": 3,
+        "PostMountEastZ": 3,
     }
 
 
@@ -133,15 +135,19 @@ def test_plate_and_nonfit_features_remain_at_general_grade() -> None:
 
 def test_geometry_cascade_and_interference_guards_stay_explicit() -> None:
     assert geometry.POST_LOCAL_Z == cone_line.POST_STATION - cone_line.PIVOT_STATION
-    assert geometry.PLATE_SOUTH_Z == pytest.approx(
+    assert geometry.PLATE_SOUTH_Z <= (
         geometry.POST_LOCAL_Z - spec.POST_BLOCK_DIA / 2.0 - geometry.POST_SOUTH_MARGIN
     )
     assert part.PLATE_LEN == pytest.approx(
         geometry.NORTH_OVERHANG - geometry.PLATE_SOUTH_Z
     )
+    # The 1.65 post body (#290, was the harvested 42.011) keeps the 9.11 plate
+    # (PLATE_LEN rounds up to the .01 in grid), so the platform outline and
+    # the harmonic base's swing-stop seat that follows it stay put.
+    assert (geometry.PLATE_LEN, geometry.PLATE_SOUTH_Z) == pytest.approx((231.394, -224.282))
     assert geometry.POST_MAIN_DIA == spec.POST_BLOCK_DIA
     assert checks.POST_FOOT_CONTAINMENT >= 0.25
-    assert spec.PIVOT_BEARING_RELIEF_DIAMETER == pytest.approx(10.50)
+    assert spec.PIVOT_BEARING_RELIEF_DIAMETER == pytest.approx(10.668)
     assert part.PLATE_T - spec.PIVOT_BEARING_THICKNESS == pytest.approx(
         spec.PIVOT_BEARING_RELIEF_DEPTH
     )
@@ -445,8 +451,8 @@ def test_notch_diameter_saved_text_envelope_clears_the_actual_left_outline() -> 
 
 
 def test_disengaged_collar_margin_survives_general_bands() -> None:
-    """Linear worst case at .X plate outline and .XX base holes keeps 2.0 mm (U27)."""
-    general, base_axis = printed_band_mm(1), printed_band_mm(2)
+    """Linear worst case at the .XX plate outline and the base holes keeps 2.0 mm (U27)."""
+    general, base_axis = printed_band_mm(2, unit=spec.UNIT), printed_band_mm(2)
     east_slope = (part.EAST_HALF_S - part.HALF_WIDTH_N) / part.PLATE_LEN
     stop_x = -(part.HALF_WIDTH_N + east_slope * (part.NORTH_OVERHANG - geometry.STOP_LOCAL_Z))
     normal = (-1.0, east_slope)
@@ -462,7 +468,7 @@ def test_disengaged_collar_margin_survives_general_bands() -> None:
         east_edge + west_edge + stop_hole + stud_hole + diameters
     )
     assert worst >= 2.0
-    assert set(drawing_spec.DRAWING_PRECISION["PlateProfile"].values()) == {1}
+    assert set(drawing_spec.DRAWING_PRECISION["PlateProfile"].values()) == {2}
 
 
 def _boxes_overlap(a: tuple[float, ...], b: tuple[float, ...]) -> bool:
@@ -579,36 +585,40 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     """Codex review of 68565ace (B1): the sheet must state MHA-DT-VN-61's exception.
 
     U37 accepts short engagement for the 1/4-20 post screws. The printed worst
-    case is the thinnest stock plate (U41 band), less the 0.3 cut-to-fit
-    allowance and the local 0.1 break at each end of the tap, floored:
-    5.72 mm = 0.90D, never under the drawing-guidelines.md rule 18 (thread engagement) audit's E7 floor of 0.87D.
+    case is the thinnest stock plate (U41 band), less the title block's .010
+    tap-entry break and, at the underside, the .005 cut-to-fit allowance plus
+    the screw's .010 cut-end break (it outreaches the tap's .010 exit break),
+    floored, never under the drawing-guidelines.md rule 18 (thread engagement)
+    audit's E7 floor of 0.87D.
     """
-    worst = (
+    # To the micron, as the spec rounds it, so a float sum a hair under an
+    # exact hundredth does not floor one place low.
+    worst = round(
         spec.PLATE_THICKNESS
         - spec.PLATE_STOCK_BAND
-        - spec.POST_SCREW_CUT_TO_FIT_SHORT
-        - 2.0 * spec.POST_MOUNT_TAP_EDGE_BREAK
+        - spec.POST_MOUNT_TAP_EDGE_BREAK
+        - (spec.POST_SCREW_CUT_TO_FIT_SHORT + 0.254),
+        6,
     )
+    assert spec.POST_SCREW_CUT_TO_FIT_SHORT + 0.254 > spec.POST_MOUNT_TAP_EDGE_BREAK
     assert spec.POST_MOUNT_ENGAGEMENT_WORST == pytest.approx(worst)
     diameters = worst / (0.25 * 25.4)
     printed = math.floor(diameters * 100.0) / 100.0
     assert printed <= diameters and printed >= 0.87
-    assert f"{printed:.2f}" == "0.90"
+    assert spec.POST_MOUNT_ENGAGEMENT_PRINTED == printed
     assert spec.POST_MOUNT_ENGAGEMENT_NOTE == (
         f"1/4-20 THREAD ENGAGEMENT {printed:.2f}D MIN."
     )
-    # The break the derivation counts is the break the tap callout allows
-    # (rule 7: a local override rides its feature's callout, machinist review
-    # r1), under the thread on the plan.
-    assert spec.POST_MOUNT_TAP_EDGE_BREAK == 0.1
-    assert spec.POST_MOUNT_TAP_BREAK_CALLOUT == "0.1 MAX BREAK EACH END"
-    assert drawing.POST_MOUNT_CALLOUT_BELOW[0] == spec.POST_MOUNT_TAP_BREAK_CALLOUT
-    # Positive control: the title block's 0.25 break at both ends would print
-    # under the audit floor, which is why the override exists.
-    title_block = (
-        spec.PLATE_THICKNESS - spec.PLATE_STOCK_BAND - spec.POST_SCREW_CUT_TO_FIT_SHORT - 0.5
-    ) / (0.25 * 25.4)
-    assert title_block < 0.87
+    # The stated shortfall is declared for the blind reviewer, as a minor.
+    from machinist_exceptions import load_exceptions
+
+    (entry,) = load_exceptions(_config.CONFIG_DIR, "dt_cone_swing_platform", "part")
+    assert (entry.id, entry.kind) == ("RV-01", "minor")
+    assert spec.POST_MOUNT_ENGAGEMENT_NOTE in entry.where
+    # The taps take the title block's edge break: no local override rides
+    # their callout (Main, 2026-11-01).
+    assert spec.POST_MOUNT_TAP_EDGE_BREAK == post_mount.PLATE_TAP_EDGE_BREAK_MM
+    assert not any("BREAK" in row for row in drawing.POST_MOUNT_CALLOUT_BELOW)
     # The note sits in the empty band above the title block (2.5 mm text,
     # ~1.93 mm a character, 4.4 mm a line).
     x, y = drawing.ENGAGEMENT_NOTE_XY
@@ -1102,7 +1112,7 @@ def test_holddown_section_arrows_clear_the_profile_plan() -> None:
 
 def test_holddown_hole_is_the_ruled_counterbore_for_the_tip_block_screw() -> None:
     """One #4 socket-head counterbore, close clearance, drilled from under,
-    10.45 south of the pivot and 1.00 to -x of the cone axis, the block's
+    .409 south of the pivot and .04 to -x of the cone axis, the block's
     foot tap offset the same way, so the block itself stays centred."""
     import dt_cone_tip_block_spec as block
 
@@ -1114,9 +1124,9 @@ def test_holddown_hole_is_the_ruled_counterbore_for_the_tip_block_screw() -> Non
         "CounterBoreDepth": spec.HOLDDOWN_CBORE_DEPTH,
     }
     assert spec.HOLDDOWN_CLEARANCE_DIA == pytest.approx(3.048)
-    assert spec.HOLDDOWN_LOCAL_X == -1.0
+    assert spec.HOLDDOWN_LOCAL_X == -1.016
     assert spec.HOLDDOWN_LOCAL_Z == -block.TIP_BLOCK_PIVOT_OFFSET
-    assert spec.HOLDDOWN_LOCAL_Z == pytest.approx(-10.45)
+    assert spec.HOLDDOWN_LOCAL_Z == pytest.approx(-10.3886)
     assert block.FOOT_TAP_OFFSET_X == spec.HOLDDOWN_LOCAL_X
 
 
@@ -1130,9 +1140,9 @@ def test_holddown_x_is_a_banded_dimension_hanging_right_of_detail_b() -> None:
     strip and label, its line clear of the hole's rim and the pivot relief."""
     assert drawing_spec.DRAWING_PRECISION["HoldDownHole"] == {
         "HoldDownX": 2,
-        "HoldDownZ": 2,
+        "HoldDownZ": 3,
     }
-    assert spec.HOLDDOWN_STATION_TOL_MM == 0.10
+    assert spec.HOLDDOWN_STATION_TOL_MM == 0.1016
     text = _holddown_x_text_box()
     cx, cy = drawing.DETAIL_CENTER
     for corner_x in (text[0], text[2]):
@@ -1155,20 +1165,21 @@ def test_holddown_x_is_a_banded_dimension_hanging_right_of_detail_b() -> None:
 
 
 def test_holddown_print_worst_stack_keeps_its_margins() -> None:
-    """At .XX (+/-0.51) and the drilled +0.10: head recess under the slide
-    face, head clearance, bearing beside the hole, the counterbore-floor
-    ledge and every web to a neighbour (U27 2.0)."""
-    xx = printed_band_mm(2)
+    """At the counterbore callout's .XXX and the drilled oversize: head recess
+    under the slide face, head clearance, bearing beside the hole, the
+    counterbore-floor ledge and every web to a neighbour (the wall target)."""
+    xxx = printed_band_mm(3, unit=spec.UNIT)
     head_d, head_h = 0.183 * 25.4, 0.112 * 25.4
-    assert spec.HOLDDOWN_CBORE_DEPTH - xx - head_h >= 0.1
-    assert spec.HOLDDOWN_CBORE_DIA - xx - head_d >= 0.25
-    assert (head_d - (spec.HOLDDOWN_CLEARANCE_DIA + 0.10)) / 2.0 >= 0.5
+    assert spec.HOLDDOWN_CBORE_DEPTH - xxx - head_h >= 0.1
+    assert spec.HOLDDOWN_CBORE_DIA - xxx - head_d >= 0.25
+    drilled = drilled_oversize_mm(unit=spec.UNIT)
+    assert (head_d - (spec.HOLDDOWN_CLEARANCE_DIA + drilled)) / 2.0 >= 0.5
     ledge_min = (
-        spec.PLATE_THICKNESS - spec.PLATE_STOCK_BAND - (spec.HOLDDOWN_CBORE_DEPTH + xx)
+        spec.PLATE_THICKNESS - spec.PLATE_STOCK_BAND - (spec.HOLDDOWN_CBORE_DEPTH + xxx)
     )
     assert spec.HOLDDOWN_LEDGE_RANGE[0] == pytest.approx(ledge_min)
-    assert ledge_min >= 2.0
-    assert min(checks.HOLDDOWN_WEBS.values()) >= 2.0
+    assert ledge_min >= WALL_TARGET_MM
+    assert min(checks.HOLDDOWN_WEBS.values()) >= WALL_TARGET_MM
 
 
 def _exec_mutated(module, replacements: dict[str, str]):
@@ -1187,10 +1198,10 @@ def _exec_mutated(module, replacements: dict[str, str]):
 @pytest.mark.parametrize(
     ("replacements", "message"),
     [
-        ({"HOLDDOWN_CBORE_DEPTH = 3.50": "HOLDDOWN_CBORE_DEPTH = 3.20"}, "stand proud"),
-        ({"HOLDDOWN_CBORE_DIA = 5.56": "HOLDDOWN_CBORE_DIA = 5.20"}, "does not clear"),
+        ({"HOLDDOWN_CBORE_DEPTH = 3.5052": "HOLDDOWN_CBORE_DEPTH = 3.00"}, "stand proud"),
+        ({"HOLDDOWN_CBORE_DIA = 5.5626": "HOLDDOWN_CBORE_DIA = 4.90"}, "does not clear"),
         ({"HOLDDOWN_SCREW_HEAD_DIA = 0.183": "HOLDDOWN_SCREW_HEAD_DIA = 0.160"}, "bears on"),
-        ({"HOLDDOWN_CBORE_DEPTH = 3.50": "HOLDDOWN_CBORE_DEPTH = 4.20"}, "ledge"),
+        ({"HOLDDOWN_CBORE_DEPTH = 3.5052": "HOLDDOWN_CBORE_DEPTH = 4.20"}, "ledge"),
     ],
 )
 def test_holddown_guards_refuse_a_spec_that_fails_at_print_worst(
@@ -1208,7 +1219,7 @@ def test_holddown_guards_refuse_a_spec_that_fails_at_print_worst(
             "HOLDDOWN_LOCAL_Z = -dt_cone_tip_block_spec.TIP_BLOCK_PIVOT_OFFSET",
             "HOLDDOWN_LOCAL_Z = -6.00",
         ),  # onto the pivot
-        ("HOLDDOWN_LOCAL_X = -1.0", "HOLDDOWN_LOCAL_X = 6.0"),  # to the west edge
+        ("HOLDDOWN_LOCAL_X = -1.016", "HOLDDOWN_LOCAL_X = 6.0"),  # to the west edge
     ],
 )
 def test_holddown_web_guard_refuses_a_station_that_crowds_a_neighbour(
@@ -1649,6 +1660,22 @@ def test_post_mount_class_override_preserves_native_thread_rows(monkeypatch, sta
     )
 
 
+def test_post_mount_tap_drill_prints_three_inch_places() -> None:
+    """Rule 3 (machinist review of run 20261101T085308503Z): Ø.20 -> Ø.201."""
+    assert drawing.POST_MOUNT_CALLOUT_PRECISION == {"hw-thrutapdrldia": 3}
+    places = drawing.POST_MOUNT_CALLOUT_PRECISION["hw-thrutapdrldia"]
+    assert f"{spec.POST_MOUNT_TAP_DIA / 25.4:.{places}f}" == "0.201"
+    source = ast.parse(Path(drawing.__file__).read_text())
+    assert any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "set_hole_callout_precision"
+        and [getattr(arg, "id", None) for arg in node.args]
+        == ["post_mount_callout", "POST_MOUNT_CALLOUT_PRECISION"]
+        for node in ast.walk(source)
+    )
+
+
 def test_post_mount_class_override_refuses_a_nondefault_class_before_native_edit(
     monkeypatch,
 ) -> None:
@@ -1666,7 +1693,7 @@ def test_tight_bands_name_their_mates_on_their_callouts() -> None:
     """Rule 4: the reamed bore and both +-0.1 hole groups name the part that
     makes the tolerance necessary, each at its own callout (r1 blocker)."""
     assert drawing.PIVOT_BORE_CALLOUT_BELOW == ("RUNNING FIT ON MHA-DT-VN-52 SHOULDER",)
-    assert "MHA-DT-05" in drawing.POST_MOUNT_CALLOUT_BELOW[1]
+    assert "MHA-DT-05" in drawing.POST_MOUNT_CALLOUT_BELOW[0]
     assert "MHA-DT-21" in drawing.HOLDDOWN_CALLOUT_BELOW[1]
     pivot = drawing.callout_below_definitions(
         {5: "REAM <MOD-DIAM><hw-diam>", 6: "", 7: "", 8: ""},

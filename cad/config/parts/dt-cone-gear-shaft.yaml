@@ -8,12 +8,13 @@ dt-cone-gear-shaft:
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
   process: "turned stepped shaft with integral bearing journal and thrust collar (steel); 5/8 in cold-finished round bar, collar OD as supplied"
+  drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "sheet 1, the terminal (tip) land: Ø0.794 0/-0.02 about 33.6 long (L/D about 42), its through-length D-flat AF 0.420 0/-0.01 in section D-D, and CORNERS 0.02 MAX above that across-flat"
+      where: "sheet 1, the terminal (tip) land: Ø.0310 +.0000/-.0008 about 1.32 long (L/D about 43), its through-length D-flat AF .0170 +.0000/-.0004 in section D-D, and CORNERS .001 MAX above that across-flat"
       finding: "slender tip land and its flat unbuildable or unreliable as one integral piece (rules 16, 21)"
-      reason: "owner rulings U40 2026-09-23 (the terminal land is turned integral with tailstock support) and 2026-09-28 (every gear land, terminal included, carries one flat); 1/32 in is cutter-native for the 48DP T006/T012 webs (#1272); the 0.02 corner limit keeps the MHA-DT-VN-54 set screw landing on the flat; temporary: two-piece and pinion-wire alternatives await an owner ruling in #1649"
+      reason: "owner rulings U40 2026-09-23 (the terminal land is turned integral with tailstock support) and 2026-09-28 (every gear land, terminal included, carries one flat); the .031 in land (1/32 snapped to .031 for the .0320 micro reamer, #290) is cutter-native for the 48DP T006/T012 webs (#1272); the .001 corner limit keeps the MHA-DT-VN-54 set screw landing on the flat; temporary: two-piece and pinion-wire alternatives await an owner ruling in #1649"
     - id: "RV-02"
       kind: "accept"
       where: "sheet 1, note: TURN THE TIP LAND WITH TAILSTOCK SUPPORT."

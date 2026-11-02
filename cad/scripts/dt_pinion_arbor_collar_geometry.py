@@ -14,12 +14,13 @@ to manufacturing-sheet text cannot invalidate the drive-train assembly recipe.
 
 from __future__ import annotations
 
-COLLAR_OD = 15.0  # the integral head's Ø15, the photographed sleeve
+COLLAR_OD = 14.986  # .59, the integral head's Ø.59, the photographed sleeve
 # 17 long (was 20, Codex P2 on #860): the pin station and the length are
-# printed at .X independently and the collar fits either way round, so the
-# pin-to-inboard-face distance spans 1.6 either side of half the length.  At
-# 20 the worst corner pressed the front strap; 17 keeps every corner clear
-# (dt_pinion_arbor_collar_spec.collar_strap_gaps) with no band tightened (U27).
-COLLAR_LEN = 17.0
+# printed independently and the collar fits either way round, so the
+# pin-to-inboard-face distance spans both bands either side of half the
+# length.  At 20 the worst corner pressed the front strap; 17 kept every corner
+# clear (dt_pinion_arbor_collar_spec.collar_strap_gaps) with no band tightened
+# (U27).  #290: snapped to .66 so the centred pin station prints .33 at .XX.
+COLLAR_LEN = 16.764  # .66
 BORE = 7.9375  # 5/16 drill, title-block drilled band: a slide fit over the 5/16 arbor
-PIN_HOLE_Z = COLLAR_LEN / 2.0  # centred on the length, from either face
+PIN_HOLE_Z = COLLAR_LEN / 2.0  # .33, centred on the length, from either face

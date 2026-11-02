@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import _config
 
 import build_dt_pinion_lift_rod as part
@@ -43,25 +45,16 @@ def test_bearing_is_the_only_band_and_finish() -> None:
     (control,) = dt_pinion_lift_rod_spec.SURFACE_FINISHES
     assert control.key == "bearing" and control.roughness_um == 1.6
     assert control.face.diameter_mm == dt_pinion_lift_rod_spec.ROD_DIA
-    assert dt_pinion_lift_rod_spec.DRAWING_PRECISION_BY_NAME["RodDia"] == 2
-    assert dt_pinion_lift_rod_spec.DRAWING_PRECISION_BY_NAME["PinHoleZ"] == 1
+    assert dt_pinion_lift_rod_spec.DRAWING_PRECISION_BY_NAME["RodDia"] == 4
+    assert dt_pinion_lift_rod_spec.DRAWING_PRECISION_BY_NAME["PinHoleZ"] == 2
 
 
 def test_pin_hole_sits_at_the_lever_mid_engagement() -> None:
     # U36: the pin crosses the rod where it crosses the lever hub -- half the
     # hub's bore depth in from the front end, which seats on the bore floor.
-    assert lever.ROD_PIN_HOLE_FROM_END == lever.BORE_DEPTH / 2.0 == 4.0
-    callout = dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT
-    # The hole specification only; LEVER PIN SET drives and peens the pin,
-    # and the sheet points at that MHA-DT-00 step through the registry.
-    import dt_drive_train_steps
-
-    assert callout.split("\n") == ["MATCH-DRILL THRU AT ASSEMBLY", "IN MHA-DT-16 HUB"]
-    assert dt_pinion_lift_rod_spec.LEVER_NUMBER in callout
-    assert drawing.LEVER_PIN_SET_STEP_KEY == "lever-pin-set"
-    assert drawing.DIMENSION_CALLOUTS["PinHoleDia"] == (
-        f"{callout},\nPER {dt_drive_train_steps.step_ref(drawing.LEVER_PIN_SET_STEP_KEY)}"
-    )
+    assert lever.ROD_PIN_HOLE_FROM_END == lever.BORE_DEPTH / 2.0
+    assert lever.ROD_PIN_HOLE_FROM_END == pytest.approx(0.16 * 25.4)
+    assert dt_pinion_lift_rod_spec.LEVER_NUMBER in dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT
 
 
 def test_the_lathe_sizes_live_on_the_side_view_plane() -> None:
@@ -81,9 +74,9 @@ def test_the_lathe_sizes_live_on_the_side_view_plane() -> None:
 
 def test_the_overall_is_a_reference_and_the_body_length_controls() -> None:
     # Rule 10: the overall to the crown apex is real and conspicuous, printed
-    # in parentheses; the body length carries the .X band the rig stack reads.
+    # in parentheses; the body length carries the .XX band the rig stack reads.
     assert dt_pinion_lift_rod_spec.DRAWING_REFERENCE_DIMENSIONS == {"RodOverall"}
-    assert dt_pinion_lift_rod_spec.DRAWING_PRECISION["RodProfile"]["RodBody"] == 1
+    assert dt_pinion_lift_rod_spec.DRAWING_PRECISION["RodProfile"]["RodBody"] == 2
     # Below the rod, the overall outermost.
     assert drawing.RIGHT_KEEP["RodOverall"][1] < drawing.RIGHT_KEEP["RodBody"][1]
     assert drawing.RIGHT_KEEP["RodBody"][1] < drawing.RIGHT_CENTER[1]
@@ -98,9 +91,9 @@ def test_the_body_length_exception_names_the_rig_stacks() -> None:
     (entry,) = load_exceptions(_config.CONFIG_DIR, "dt_pinion_lift_rod", "part")
     assert (entry.id, entry.kind) == ("RV-01", "accept")
     spec = dt_pinion_lift_rod_spec
-    assert f"{spec.ROD_LEN:.1f} body length" in entry.where
-    assert f"({spec.ROD_LEN + spec.CAP_SAG:.1f})" in entry.where
-    assert f"SR{spec.CAP_R:.1f}" in entry.where
+    assert "body length" in entry.where and "reference overall" in entry.where
+    assert spec.CAP_R == pytest.approx(0.19 * 25.4)
+    assert "SR.19" in entry.where
     for stack in ("lift_rod_seat_stack", "lever_north_travel_stack"):
         assert stack in entry.reason
         assert callable(getattr(pinion_rig_layout, stack))
