@@ -31,6 +31,7 @@ import rocker_bank_layout as bank
 from _export_feature_faces import FeatureFaceError, face_name
 from _feature_requirements import declaration_calls, discover_parts, metadata_for, requirements_for, source_tree
 from _gtol_face import FaceGeometry
+from _printed_tolerance import drilled_oversize_mm, edge_break_radius_mm, printed_band_mm
 
 
 def _fresh_draw(monkeypatch, stem: str):
@@ -656,12 +657,9 @@ def test_cone_native_tolerances_angularity_and_exact_datums() -> None:
     assert "position_dia" not in crank
     assert "height" not in crank["requirements"]
     assert "unknown" in features["journal_bore"]["requirements"]
-    drilled = _config.title_block("drilled_hole")
+    # The inch sheet's DRILLED HOLES row: +.004/0 about the exact drill size.
     assert features["mount_west"]["dia"] == pytest.approx(
-        [
-            cone.ATTACHMENT_THRU_DIA - float(drilled["minus_mm"]),
-            cone.ATTACHMENT_THRU_DIA + float(drilled["plus_mm"]),
-        ],
+        [cone.ATTACHMENT_THRU_DIA, cone.ATTACHMENT_THRU_DIA + 0.004 * 25.4],
         rel=0.0,
         abs=1e-12,
     )
@@ -693,6 +691,33 @@ def test_mount_stations_lie_in_their_own_signed_bands_and_mirror() -> None:
         assert hole["station_nominal"] == hole["at"][0]
     assert west["station_nominal"] < 0 < east["station_nominal"]
     assert west["station"] == [-value for value in reversed(east["station"])]
+
+
+def test_cone_general_limits_are_the_inch_sheets_printed_limits() -> None:
+    manifest = exporter.requirement_manifest("dt_cone_pivot_post")
+    head = manifest["features"]["head"]
+    # HEAD_DIA 42.672 prints 1.68 at .XX on the inch sheet: ±.01 in about it.
+    assert head["dia_nominal"] == cone.HEAD_DIA == 42.672
+    assert head["dia"] == pytest.approx([1.67 * 25.4, 1.69 * 25.4], rel=0.0, abs=1e-9)
+    # A 43.0 mm head fails the printed 1.68 ±.01, so the contract refuses it too.
+    assert not head["dia"][0] <= 43.0 <= head["dia"][1]
+    general = manifest["general_tolerances"]
+    assert general["linear_2pl"] == printed_band_mm(2, unit="in") == pytest.approx(0.254)
+    assert general["drilled_hole_plus"] == drilled_oversize_mm(unit="in") == pytest.approx(0.1016)
+    assert general["edge_break_r"] == edge_break_radius_mm(unit="in") == pytest.approx(0.254)
+    assert "harmonic-analyzer/cad/config/title_block.yaml:in.linear_2pl.band_in" in general["cite"]["linear_2pl"]
+    assert "harmonic-analyzer/cad/config/title_block.yaml:in.linear_2pl.band_in" in head["cite"]["dia"]
+    assert manifest["notes"]["edge_break"] == "REMOVE BURRS AND BREAK SHARP EDGES R.010 OR CHAMFER .010 MAX"
+
+
+def test_millimetre_package_keeps_its_millimetre_general_rows() -> None:
+    manifest = exporter.requirement_manifest("ch_rocker_arm")
+    general = manifest["general_tolerances"]
+    assert [general[key] for key in ("linear_1pl", "linear_2pl", "linear_3pl", "drilled_hole_plus", "edge_break_r", "chamfer_max")] == [
+        0.8, 0.51, 0.13, 0.1, 0.25, 0.25,
+    ]
+    assert general["cite"]["linear_2pl"] == ["harmonic-analyzer/cad/config/title_block.yaml:linear_2pl.band_mm"]
+    assert manifest["notes"]["edge_break"] == "REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX"
 
 
 def test_shaft_axial_extents_tile_the_turned_axis() -> None:
