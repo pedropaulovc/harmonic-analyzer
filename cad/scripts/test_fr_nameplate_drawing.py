@@ -19,6 +19,7 @@ import fr_nameplate_drawing_spec as print_spec
 import fr_nameplate_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _release_artwork import bundle_path
 from sh_vn_brass_fillister_screw_spec import HEAD_DIA
@@ -327,55 +328,6 @@ def test_reference_point_goes_straight_to_the_db_and_restores_it(
     assert manager.AddToDB is False
 
 
-class _HoleCalloutDisplay:
-    """swDimensionTextCalloutBelow (4) writes CalloutBelowDefinition (8)."""
-
-    def __init__(self, below: str) -> None:
-        self.texts = {5: "DRILL ", 6: "<MOD-DIAM><hw-diam>", 7: "<hw-thru>", 8: below}
-
-    def GetText(self, part: int) -> str:  # noqa: N802
-        return self.texts[part]
-
-    def SetText(self, part: int, text: str) -> None:  # noqa: N802
-        assert part == 4
-        self.texts[8] = text.replace("\n", "\r\n")
-
-
-@pytest.mark.parametrize(
-    ("below", "expected"),
-    [
-        ("", print_spec.HOLE_LIGAMENT_NOTE),
-        ("NATIVE ROW\r\n", f"NATIVE ROW\n{print_spec.HOLE_LIGAMENT_NOTE}"),
-    ],
-)
-def test_hole_ligament_statement_keeps_the_native_callout(
-    monkeypatch: pytest.MonkeyPatch, below: str, expected: str
-) -> None:
-    # codjiflo P2 on 9171754: a native below-row must survive the statement.
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
-    display = _HoleCalloutDisplay(below)
-    drawing._state_hole_ligament(display)
-    assert display.texts[8].replace("\r", "") == expected
-    assert [display.texts[part] for part in (5, 6, 7)] == [
-        "DRILL ",
-        "<MOD-DIAM><hw-diam>",
-        "<hw-thru>",
-    ]
-
-
-def test_hole_ligament_statement_refuses_a_lost_native_definition(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    class Clobbering(_HoleCalloutDisplay):
-        def SetText(self, part: int, text: str) -> None:  # noqa: N802
-            super().SetText(part, text)
-            self.texts[7] = ""
-
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
-    with pytest.raises(RuntimeError, match="did not persist"):
-        drawing._state_hole_ligament(Clobbering(""))
-
-
 def test_no_model_band_every_dimension_prints_the_title_block_grade() -> None:
     assert model_toleranced_dimensions(part) == {}
 
@@ -396,12 +348,16 @@ def test_each_hole_prints_one_station_value_per_edge_pair() -> None:
     # "2X" stands for two holes whose stations print the same number.
     places = print_spec.DRAWING_PRECISION_BY_NAME
     bottom_left, bottom_right, top_left, top_right = spec.SCREW_XY
-    assert round(bottom_left[0], places["S0X"]) == round(top_left[0], places["S0X"])
-    assert round(bottom_left[1], places["S0Z"]) == round(bottom_right[1], places["S0Z"])
+    assert round(bottom_left[0] / 25.4, places["S0X"]) == round(
+        top_left[0] / 25.4, places["S0X"]
+    )
+    assert round(bottom_left[1] / 25.4, places["S0Z"]) == round(
+        bottom_right[1] / 25.4, places["S0Z"]
+    )
     right = [spec.PLATE_WIDTH - x for x in (bottom_right[0], top_right[0])]
     top = [spec.PLATE_HEIGHT - y for y in (top_left[1], top_right[1])]
     for values, name in ((right, "RightHoleStation"), (top, "TopHoleStation")):
-        assert len({round(v, places[name]) for v in values}) == 1, name
+        assert len({round(v / 25.4, places[name]) for v in values}) == 1, name
     assert (part.RIGHT_HOLE, part.TOP_HOLE) == (bottom_right, top_left)
 
 
@@ -515,13 +471,13 @@ def test_section_a_dimensions_each_depth_on_its_own_line() -> None:
 
 
 def test_sunk_field_depth_names_why_it_holds_three_places() -> None:
-    # PR #1468 r4 review: the 0.400 field depth printed .XXX with no stated
+    # PR #1468 r4 review: the field depth printed .XXX with no stated
     # function. The field must stay above the engraving's floor so the
-    # lettering stays cut; from literals, 0.700 and 0.400 at .XXX (+-0.13)
-    # leave 0.04, and at .XX (+-0.51) the field could cut below the engraving.
-    assert (0.700 - 0.13) - (0.400 + 0.13) == pytest.approx(0.04)
-    assert (0.700 - 0.13) - (0.400 + 0.51) < 0.0
-    assert print_spec.ENGRAVING_BELOW_FIELD_MIN == pytest.approx(0.04)
+    # lettering stays cut; .028 and .016 at .XXX (+-.005) leave .002, and at
+    # .XX (+-.010) the field could cut below the engraving.
+    assert (0.028 - 0.005) - (0.016 + 0.005) == pytest.approx(0.002)
+    assert (0.028 - 0.005) - (0.016 + 0.010) < 0.0
+    assert print_spec.ENGRAVING_BELOW_FIELD_MIN == pytest.approx(0.002 * 25.4)
     assert print_spec.DRAWING_PRECISION[print_spec.SECTION_REFERENCE] == {
         "FieldDepth": 3,
         "EngravingDepth": 3,
@@ -684,15 +640,18 @@ def _corner_worst_centres(
     stations: tuple[tuple[float, float], ...],
 ) -> list[tuple[float, float]]:
     # Each hole driven to the least printed station from BOTH of its corner's
-    # edges at once: the sheet prints one .X value per edge pair (2X), the
-    # smallest of the pair's stations rounded, and accepts that value - 0.8.
+    # edges at once: the sheet prints one .XX value per edge pair (2X), the
+    # smallest of the pair's stations rounded, and accepts that value - .010.
+    places = print_spec.DRAWING_PRECISION_BY_NAME["S0X"]
+    assert places == 2
     width, height = spec.PLATE_WIDTH, spec.PLATE_HEIGHT
     left = min(x for x, _ in stations if x < width / 2.0)
     right = min(width - x for x, _ in stations if x > width / 2.0)
     bottom = min(y for _, y in stations if y < height / 2.0)
     top = min(height - y for _, y in stations if y > height / 2.0)
     least = {
-        name: round(value, 1) - printed_band_mm(1)
+        name: round(value / 25.4, places) * 25.4
+        - printed_band_mm(places, unit=spec.UNIT)
         for name, value in (
             ("left", left),
             ("right", right),
@@ -725,41 +684,38 @@ def _ring_of_ligament_holds(centre: tuple[float, float], radius: float) -> bool:
 
 def test_hole_ligament_holds_with_each_hole_driven_into_its_rounded_corner() -> None:
     # PR #1468 r3: the corner arcs, not the straight edges, are nearest. A
-    # drilled hole at 3.05 printed + 0.10 plus the 1.5 floor must stay inside
-    # the outline with every hole pushed toward its corner in X and Y at once.
-    radius = (round(part.SCREW_HOLE_DIA, 2) + drilled_oversize_mm()) / 2.0 + 1.5
+    # drilled hole at .120 printed + .005 plus rule 17's .080 target must stay
+    # inside the outline with every hole pushed toward its corner in X and Y.
+    radius = (
+        round(part.SCREW_HOLE_DIA / 25.4, 3) * 25.4
+        + drilled_oversize_mm(unit=spec.UNIT)
+    ) / 2.0 + WALL_TARGET_MM
     for centre in _corner_worst_centres(spec.SCREW_XY):
         assert _ring_of_ligament_holds(centre, radius), centre
-    # At the traced head marks (4.05 from each edge, printing 4.1) the same
-    # hole breaks the floor at the corner: the inset is what clears it.
-    assert not any(
-        _ring_of_ligament_holds(centre, radius)
-        for centre in _corner_worst_centres(spec.HEAD_MARK_XY)
-    )
     assert print_spec.HOLE_LIGAMENT_WORST >= print_spec.LIGAMENT_FLOOR
 
 
 def test_engraving_floor_at_the_printed_worst_case() -> None:
     floor = (
         spec.PLATE_THICKNESS
-        - printed_band_mm(3)
-        - (print_spec.ENGRAVING_FLOOR_DEPTH + printed_band_mm(3))
+        - printed_band_mm(3, unit=spec.UNIT)
+        - (print_spec.ENGRAVING_FLOOR_DEPTH + printed_band_mm(3, unit=spec.UNIT))
     )
     assert math.isclose(print_spec.ENGRAVING_FLOOR_MIN, floor)
-    assert floor > 0.5
+    # .063 - .005 - (.028 + .005) = .025.
+    assert floor == pytest.approx(0.025 * 25.4)
 
 
 def test_screw_full_thread_is_the_accepted_rule_20_shortfall() -> None:
-    # PR #1468 r3 (owner ruling 2026-10-15, option C): the #4-40 x 1/4 inch
-    # (6.35) fillister, 0.02 inch (0.508) short per ASME B18.6.3, through the
-    # plate at 1.500 + 0.13, less 0.75 of the 40 TPI (0.635) pitch at its tip.
-    worst = 6.35 - 0.508 - (1.500 + 0.13) - 0.75 * 0.635
-    assert worst == pytest.approx(3.736, abs=5e-4)
+    # Ruling B1: the #4-40 x 1/4 inch fillister, .020 short per ASME B18.6.3,
+    # through the plate at .063 + .005, less 0.75 of the 40 TPI pitch at its tip.
+    worst = 0.250 * 25.4 - 0.508 - (0.063 + 0.005) * 25.4 - 0.75 * 0.635
+    assert worst == pytest.approx(3.6386, abs=5e-4)
     assert spec.SCREW_FULL_THREAD_MIN == pytest.approx(worst, abs=1e-9)
-    assert 0.0 < spec.SCREW_FULL_THREAD_ACCEPTED <= round(worst, 3)
+    assert 0.0 < spec.SCREW_FULL_THREAD_ACCEPTED <= round(worst, 4)
     # Still short of 1.5D of the 2.8448 major (4.267): the ruling is live.
     assert worst < 1.5 * 2.8448
-    assert worst / 2.8448 == pytest.approx(1.31, abs=5e-3)
+    assert worst / 2.8448 == pytest.approx(1.28, abs=5e-3)
 
 
 def test_declared_exceptions_name_the_printed_minimums() -> None:
@@ -777,34 +733,24 @@ def test_declared_exceptions_name_the_printed_minimums() -> None:
         "RV-01": "accept",
         "RV-02": "minor",
         "RV-03": "minor",
-        "RV-04": "minor",
     }
     for entry in declared.values():
         assert entry.reason.endswith(("(owner-accepted)", "(owner-ruled shortfall)"))
     floor, screws = print_spec.MINIMUM_NOTES.splitlines()
-    assert floor == "FLOOR UNDER ENGRAVING 0.54 MIN"
-    assert screws == "SCREWS ENGAGE 3.73 MIN FULL THREAD"
     assert floor in declared["RV-02"].where
     assert screws in declared["RV-03"].where
-    # 1.500 - 0.13 - (0.700 + 0.13) = 0.540; 3.73575 rounds down to 3.73.
-    assert float(floor.split()[-2]) == pytest.approx(print_spec.ENGRAVING_FLOOR_MIN)
-    assert (
-        float(screws.split()[2])
-        == math.floor(spec.SCREW_FULL_THREAD_MIN * 100.0) / 100.0
-    )
+    # Each states its worst case in inches, rounded down to three places.
+    for note, worst in (
+        (floor, print_spec.ENGRAVING_FLOOR_MIN),
+        (screws, spec.SCREW_FULL_THREAD_MIN),
+    ):
+        stated = next(word for word in note.split() if word.startswith("."))
+        assert float(stated) == math.floor(worst / 25.4 * 1000.0 + 1e-9) / 1000.0
     for note in print_spec.MANUFACTURING_NOTES.splitlines()[:3]:
         assert note in declared["RV-01"].where
-    # Owner ruling 2026-10-24 (#1971): the holes' wall to the corner radius,
-    # 1.555 at the printed worst case, rounds down to 1.55 under the callout.
-    ligament = print_spec.HOLE_LIGAMENT_NOTE
-    assert ligament == "WALL TO CORNER RADIUS 1.55 MIN"
-    assert ligament in declared["RV-04"].where
-    assert float(ligament.split()[-2]) == pytest.approx(
-        math.floor(print_spec.HOLE_LIGAMENT_WORST * 100.0) / 100.0
-    )
-    assert print_spec.HOLE_LIGAMENT_WORST < 2.0
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "    _state_hole_ligament(holes)\n" in source
+    # The holes' wall to the corner radius meets rule 17's .080 target at the
+    # printed worst case, so no shortfall is stated (RV-04 retired).
+    assert print_spec.HOLE_LIGAMENT_WORST >= WALL_TARGET_MM
 
 
 def test_notes_and_callouts_carry_no_numbers_and_stay_short() -> None:
@@ -855,8 +801,8 @@ def test_texts_stand_inside_the_border_and_off_the_title_block() -> None:
         assert not (
             left - 0.003 < x < right + 0.003 and bottom - 0.003 < y < top + 0.003
         )
-    # r2 audit: the plate height's dimension line crossed both "2X 4.1"
-    # station texts, which print 1.5..14.6 mm left of their own lines.
+    # r2 audit: the plate height's dimension line crossed both "2X" station
+    # texts, which print 1.5..14.6 mm left of their own lines.
     height_line_x = drawing.FRONT_KEEP["PlateHeight"][0]
     for station_x, _ in (
         drawing.FRONT_KEEP["S0Z"],

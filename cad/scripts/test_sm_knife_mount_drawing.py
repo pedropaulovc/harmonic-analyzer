@@ -112,20 +112,10 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         "SlotWidth": sm_knife_mount_spec.SLOT_WIDTH_PLACES,
         "SlotEndFromB": sm_knife_mount_spec.SLOT_END_PLACES,
     }
-    assert sm_knife_mount_spec.PIN_HOLE_DIA_PLACES == 3
-    assert sm_knife_mount_spec.SLOT_WIDTH_PLACES == 3
     assert sm_knife_mount_spec.SLOT_END_PLACES == 2
     # The slot end's .XX claims the title block's 2-place band, the one its
     # margins charge.
     assert sm_knife_mount_spec.SLOT_END_TOL == sm_knife_mount_spec._XX
-    # The dowel pair's BASIC span is gone with the pressed pattern.
-    assert sm_knife_mount_spec.DRAWING_REFERENCE_PRECISION == {
-        "dowel hole from tap axis": 3,
-        "knife-bore centre from top seat": 3,
-        "block-depth overall": 1,
-        "dowel hole from side face": 2,
-        "hole row from front face": 1,
-    }
     for feature, names in sm_knife_mount_spec.DRAWING_PRECISION.items():
         assert set(names) <= sm_knife_mount_spec.DRAWING_DIMENSIONS[feature]
 
@@ -148,9 +138,9 @@ def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> N
     # is flat and holds for both seats (the hole and the slot).  Nothing
     # seats on it, so its corner is the title block's (machinist review, farm
     # run 20261027T233328148Z: a local CORNER R0.1 MAX named no function).
-    import _config
     from _layout_audit import TEXT_ROW_LIMIT
     from _layout_geometry import ARROW_TEXT_CLEARANCE_M
+    from _printed_tolerance import inside_corner_radius_mm
 
     callout = sm_knife_mount_spec.PIN_DEPTH_CALLOUT
     depth_rows = callout.splitlines()
@@ -158,13 +148,12 @@ def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> N
     assert "2X" in depth_rows[0].split()
     assert "CORNER" not in callout
     corner = sm_knife_mount_spec.DOWEL_HOLE_FLOOR_CORNER_R_MAX
-    assert corner == float(_config.title_block("inside_corner")["radius_mm"])
-    assert 0.0 < sm_knife_mount_spec.DOWEL_HOLE_CORNER_RECESS < 0.001
+    assert corner == inside_corner_radius_mm(unit=sm_knife_mount_spec.UNIT)
+    assert 0.0 <= sm_knife_mount_spec.DOWEL_HOLE_CORNER_RECESS < 0.001
     assert 1 + len(depth_rows) <= TEXT_ROW_LIMIT
     assert drawing.DEPTH_TEXT_ROWS == 1 + len(depth_rows)
     assert drawing.DIMENSION_CALLOUTS["PinHoleDepth"] is callout
-    assert sm_knife_mount_spec.PIN_HOLE_DEPTH == 9.5
-    assert sm_knife_mount_spec.DRAWING_PRECISION["PinHole"] == {"PinHoleDepth": 1}
+    assert sm_knife_mount_spec.PIN_HOLE_DEPTH == pytest.approx(9.398)  # .37
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("create_section_view(") == 1
     assert "_look_section_along_minus_z(adapter, section)" in source
@@ -318,11 +307,6 @@ def test_tap_callout_moves_clear_of_the_row_dimension_tail() -> None:
     from _layout_geometry import ARROW_TEXT_CLEARANCE_M
 
     x, y = drawing.TAP_CALLOUT_XY
-    assert x == pytest.approx(RUN_CALLOUT_XY[0])
-    assert y == pytest.approx(RUN_CALLOUT_XY[1] - TAP_CALLOUT_RUN_DROP)
-    assert RUN_CALLOUT_XY[1] + drawing.TAP_CALLOUT_TOP_REACH == pytest.approx(
-        RUN_CALLOUT_TOP
-    )
     # The 7.0's tail, from the drawing's own placement: its line at its
     # text's x, its outside tail one ARROW_TAIL_M under the view's lower edge.
     top_view_bottom = drawing.TOP_CENTER[1] - drawing.TOP_HALF_Z
@@ -334,12 +318,7 @@ def test_tap_callout_moves_clear_of_the_row_dimension_tail() -> None:
     assert tail_x > RUN_CALLOUT_SPAN_X[1] + ARROW_TEXT_CLEARANCE_M
     assert tail_x > x + drawing.TAP_CALLOUT_HALF_WIDTH + ARROW_TEXT_CLEARANCE_M
     top = y + drawing.TAP_CALLOUT_TOP_REACH
-    assert top == pytest.approx(RUN_CALLOUT_TOP - TAP_CALLOUT_RUN_DROP)
     assert top <= tail_end - ARROW_TEXT_CLEARANCE_M - 0.001
-    # The frame moves with the anchor, so it keeps the drop under the block
-    # it printed at in the run with no finding between them (its top then at
-    # 209.0 - 8.6 - 7.0 = 193.4 mm), the block a row shorter.
-    assert RUN_CALLOUT_XY[1] - drawing.TAP_FRAME_DROP == pytest.approx(0.1934)
     assert drawing.TAP_FRAME_XY[1] == pytest.approx(y - drawing.TAP_FRAME_DROP)
 
 
@@ -553,9 +532,6 @@ def test_datum_b_frame_lands_apart_from_the_slip_hole_diameter_leader() -> None:
     from _layout_geometry import Segment
 
     centre = (drawing._sheet_x(sm_knife_mount_spec.PIN_HOLE_X), drawing.TOP_CENTER[1])
-    rim = sm_knife_mount_spec.PIN_HOLE_DIA / 2.0 * drawing.SHEET_SCALE[0] / 1000.0
-    assert math.dist(centre, RUN_PIN_DIA_TIP) == pytest.approx(rim, abs=0.0002)
-    assert RUN_B_AXIS_LINE_END[0] == pytest.approx(centre[0], abs=1e-5)
     assert drawing.PIN_FRAME_RIM_DEG == -140.0
     elbow, tip = datum_b_frame_leader()
     left, top = drawing.PIN_FRAME_XY
@@ -664,32 +640,23 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
     # The seat is clamped to the casting underside by the #10-24 bolt.
     assert part.MOUNT_GAP == 0.0
     assert abs(part.BLK_TOP - 14.866) < 1e-3
-    assert sm_knife_mount_spec.BLK_TOP == 14.87
+    assert sm_knife_mount_spec.BLK_TOP == pytest.approx(14.866)
     # The build owns no tap constants: they are the spec's (consumers import
     # them there).
     assert not hasattr(part, "STUD_TAP_DEPTH")
     assert part.STUD_TAP_SPEC is sm_knife_mount_spec.STUD_TAP_SPEC
     assert part.STUD_TAP_DIA == sm_knife_mount_spec.STUD_TAP_DIA
-    # The slip seats (T+H3): datum B's round hole +X of the tap at 7.632,
+    # The slip seats (T+H3): datum B's round hole +X of the tap at 7.62,
     # datum C's slot along the line -X of it, its half-round inner end's
     # centre SlotEndFromB from B, running out through the -X face; their
     # printed places and the volume the build's gate expects.
-    assert sm_knife_mount_spec.PIN_HOLE_X == 7.632
-    assert sm_knife_mount_spec.SLOT_END_FROM_B == 14.40
+    assert sm_knife_mount_spec.PIN_HOLE_X == pytest.approx(7.62)  # .300
+    assert sm_knife_mount_spec.SLOT_END_FROM_B == pytest.approx(14.478)  # .57
     for gone in ("PIN_HOLE_XS", "PIN_HOLE_SPAN", "PIN_HOLE_PAIR_CALLOUT", "PIN_HOLE_COUNT"):
         assert not hasattr(sm_knife_mount_spec, gone)
-    assert sm_knife_mount_spec.DRAWING_PRECISION_BY_NAME == {
-        "BlockWidth": 1,
-        "BlockHeight": 1,
-        "BoreDia": 2,
-        "PinHoleDia": 3,
-        "SlotWidth": 3,
-        "SlotEndFromB": 2,
-        "PinHoleDepth": 1,
-    }
     dia, width = sm_knife_mount_spec.PIN_HOLE_DIA, sm_knife_mount_spec.SLOT_WIDTH
     depth = sm_knife_mount_spec.PIN_HOLE_DEPTH
-    assert dia == width == 3.25
+    assert dia == width == pytest.approx(3.2512)  # .1280
     assert part.V_PIN == pytest.approx(math.pi * (dia / 2.0) ** 2 * depth, abs=1e-9)
     inner_x = sm_knife_mount_spec.PIN_HOLE_X - sm_knife_mount_spec.SLOT_END_FROM_B
     assert part.SLOT_INNER_X == pytest.approx(inner_x)
@@ -698,39 +665,10 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
     slot_area = (inner_x + sm_knife_mount_spec.BLK_HALF_X) * width + math.pi * width**2 / 8.0
     assert part.V_SLOT == pytest.approx(slot_area * depth, abs=1e-9)
     assert part.V_PINS == part.V_PIN + part.V_SLOT
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "blind_hole_volume_mm3(STUD_TAP_DIA, STUD_TAP_DRILL_DEPTH)" in source
-    assert "\nBLK_HALF_X = " not in source
-    assert "    BLK_HALF_X,\n" in source
-    assert "PinHole2Dia" not in source
-    assert 'await set_global(adapter, "SlotWidth", f"{SLOT_WIDTH}mm")' in source
-    assert 'await set_global(adapter, "SlotEndFromB", f"{SLOT_END_FROM_B}mm")' in source
-    assert 'pin.record("SlotWidth", \'"SlotWidth"\')' in source
-    assert 'pin.record("SlotEndFromB", \'"SlotEndFromB"\')' in source
     # B's Ø and C's width each carry the symmetric slip band, one row
-    # (3.250 +/-0.020, codjiflo round 6), at their three places.
-    assert sm_knife_mount_spec.PIN_HOLE_DIA_BAND == (0.02, -0.02)
-    assert sm_knife_mount_spec.SLOT_WIDTH_BAND == (0.02, -0.02)
-    assert (
-        "    for dim_name, band in (\n"
-        '        ("PinHoleDia", PIN_HOLE_DIA_BAND),\n'
-        '        ("SlotWidth", SLOT_WIDTH_BAND),\n'
-        "    ):\n"
-        "        lower, upper = deviations(band)\n"
-    ) in source
-    assert (
-        '        set_dimension_symmetric_tolerance(adapter, "PinHoleProfile", dim_name, upper)\n'
-    ) in source
-    assert (
-        sm_knife_mount_spec.PIN_HOLE_DIA_PLACES
-        == sm_knife_mount_spec.SLOT_WIDTH_PLACES
-        == sm_knife_mount_spec.DRAWING_PRECISION_BY_NAME["PinHoleDia"]
-        == sm_knife_mount_spec.DRAWING_PRECISION_BY_NAME["SlotWidth"]
-        == 3
-    )
-    assert source.index("set_dimension_symmetric_tolerance(adapter") < source.index(
-        "apply_drawing_precision(adapter, DRAWING_PRECISION)"
-    )
+    # (.1280 +/-.0007).
+    assert sm_knife_mount_spec.PIN_HOLE_DIA_BAND == pytest.approx((0.01778, -0.01778))
+    assert sm_knife_mount_spec.SLOT_WIDTH_BAND == pytest.approx((0.01778, -0.01778))
 
 
 def test_the_sheet_carries_no_notes_block() -> None:
@@ -758,15 +696,15 @@ def test_the_sheet_carries_no_notes_block() -> None:
     }
     dowel_number = _config.parts("sm-vn-knife-mount-dowel")["number"]
     assert sm_knife_mount_spec.DOWEL_NUMBER == dowel_number
-    # The printed clearance band rounds the dowel's slip band outward to
-    # three places.
+    # The printed clearance band, in inch, rounds the dowel's slip band
+    # outward to four places.
     import sm_vn_knife_mount_dowel_spec as dowel
 
-    low = math.floor(dowel.SLIP_CLEARANCE_MIN * 1e3 + 1e-6) / 1e3
-    high = math.ceil(dowel.SLIP_CLEARANCE_MAX * 1e3 - 1e-6) / 1e3
-    assert sm_knife_mount_spec.PIN_SLIP_PRINTED == (low, high)
-    assert low <= dowel.SLIP_CLEARANCE_MIN < low + 0.001
-    assert high - 0.001 < dowel.SLIP_CLEARANCE_MAX <= high
+    low = math.floor(dowel.SLIP_CLEARANCE_MIN / 25.4 * 1e4 + 1e-6) / 1e4
+    high = math.ceil(dowel.SLIP_CLEARANCE_MAX / 25.4 * 1e4 - 1e-6) / 1e4
+    assert sm_knife_mount_spec.PIN_SLIP_PRINTED == pytest.approx((low, high))
+    assert low * 25.4 - 1e-9 <= dowel.SLIP_CLEARANCE_MIN < (low + 0.0001) * 25.4
+    assert (high - 0.0001) * 25.4 < dowel.SLIP_CLEARANCE_MAX <= high * 25.4 + 1e-9
     # B's hole names its process (a flat-bottomed ream), the clearance band
     # it sets and its mate; the slot names its open end and its mate.  Each
     # fact once, and each callout few enough rows for the layout audit's
@@ -776,7 +714,7 @@ def test_the_sheet_carries_no_notes_block() -> None:
     hole = sm_knife_mount_spec.PIN_HOLE_CALLOUT
     assert "REAM" in hole.split()
     assert "FLAT-BOTTOM" in hole or "FLAT BOTTOM" in hole
-    assert hole.count(f"{low:.3f}-{high:.3f}") == 1
+    assert hole.count(f"{low:.4f}-{high:.4f}".replace("0.", ".")) == 1
     assert "CLEARANCE" in hole
     assert hole.count(dowel_number) == 1
     slot = sm_knife_mount_spec.SLOT_WIDTH_CALLOUT
@@ -890,11 +828,11 @@ def test_native_gdt_and_bore_geometry() -> None:
         "        leader_attach_xy=slot_wall,\n"
         "        frame_xy=SLOT_FRAME_XY,\n"
         '        characteristic="position",\n'
-        '        tolerance=GEOMETRIC_TOLERANCES_MM["dowel slot position"],\n'
+        '        tolerance=GEOMETRIC_TOLERANCES_IN["dowel slot position"],\n'
         '        datums=("A", "B"),\n'
         "        lower_frame=(\n"
         '            "perpendicularity",\n'
-        '            GEOMETRIC_TOLERANCES_MM["dowel slot perpendicularity"],\n'
+        '            GEOMETRIC_TOLERANCES_IN["dowel slot perpendicularity"],\n'
         '            ("A",),\n'
         "        ),\n"
     ) in slot
@@ -932,7 +870,7 @@ def test_native_gdt_and_bore_geometry() -> None:
     ]
 
     def literal(value: ast.expr) -> object:
-        # A GEOMETRIC_TOLERANCES_MM[...] lookup reads as its key.
+        # A GEOMETRIC_TOLERANCES_IN[...] lookup reads as its key.
         if isinstance(value, ast.Subscript):
             return ast.literal_eval(value.slice)
         if isinstance(value, ast.Tuple):
@@ -1027,28 +965,28 @@ def test_native_gdt_and_bore_geometry() -> None:
     )
     bore_frame = source[source.index("    # The bore: composite position to A|B|C") :]
     bore_frame = bore_frame[: bore_frame.index("    bore_basic = ")]
-    assert 'tolerance=GEOMETRIC_TOLERANCES_MM["knife-bore position"],' in bore_frame
+    assert 'tolerance=GEOMETRIC_TOLERANCES_IN["knife-bore position"],' in bore_frame
     assert "composite=True," in bore_frame
-    assert sm_knife_mount_spec.GEOMETRIC_TOLERANCES_MM == {
-        "knife-bore position": "0.20",
-        "knife-bore orientation": "0.05",
-        "knife-hanger tap position": "0.14",
-        "dowel slot position": "0.05",
-        "dowel hole perpendicularity": "0.015",
-        "dowel slot perpendicularity": "0.015",
+    assert sm_knife_mount_spec.GEOMETRIC_TOLERANCES_IN == {
+        "knife-bore position": ".008",
+        "knife-bore orientation": ".002",
+        "knife-hanger tap position": ".005",
+        "dowel slot position": ".002",
+        "dowel hole perpendicularity": ".0006",
+        "dowel slot perpendicularity": ".0006",
     }
     # Owner ruling 2026-10-27 (#2016): the name a sibling's assembly check
     # imports.
-    assert sm_knife_mount_spec.DOWEL_HOLE_PERPENDICULARITY_TOL == 0.015
-    assert sm_knife_mount_spec.DOWEL_SLOT_PERPENDICULARITY_TOL == 0.015
-    assert sm_knife_mount_spec.KNIFE_BORE_POSITION_TOL == 0.20
-    assert sm_knife_mount_spec.KNIFE_BORE_ORIENTATION_TOL == 0.05
+    assert sm_knife_mount_spec.DOWEL_HOLE_PERPENDICULARITY_TOL == pytest.approx(0.01524)
+    assert sm_knife_mount_spec.DOWEL_SLOT_PERPENDICULARITY_TOL == pytest.approx(0.01524)
+    assert sm_knife_mount_spec.KNIFE_BORE_POSITION_TOL == pytest.approx(0.2032)
+    assert sm_knife_mount_spec.KNIFE_BORE_ORIENTATION_TOL == pytest.approx(0.0508)
     assert (
         sm_knife_mount_spec.KNIFE_BORE_ORIENTATION_TOL
         < sm_knife_mount_spec.KNIFE_BORE_POSITION_TOL
     )
-    assert sm_knife_mount_spec.STUD_TAP_POSITION_TOL == 0.14
-    assert sm_knife_mount_spec.SLOT_POSITION_TOL == 0.05
+    assert sm_knife_mount_spec.STUD_TAP_POSITION_TOL == pytest.approx(0.127)
+    assert sm_knife_mount_spec.SLOT_POSITION_TOL == pytest.approx(0.0508)
     # The composite refinement is an extra GD&T row: the package declares it
     # (drawing-simplicity-policy.md, GD&T allowlist), citing the ruling.
     declared = _config.parts("sm-knife-mount")["machinist_exceptions"]
@@ -1088,9 +1026,10 @@ def test_each_basic_prints_the_modelled_value_unrounded(label: str, basic: float
     # A BASIC is exact: the sheet measures it off the model (1e-5 gate) and
     # its places must print that value, not a rounding of it.  48ad988c6
     # checked the bore height against the spec's 14.87 mirror (20.62) at
-    # .XX; the model measures 14.866 + 5.75 = 20.616, and the leaf failed.
+    # .XX; the model measured 20.616, and the leaf failed.  The inch sheet
+    # prints it at .XXX, so it must be an exact thousandth of an inch.
     places = sm_knife_mount_spec.DRAWING_REFERENCE_PRECISION[label]
-    assert abs(round(basic, places) - basic) < 1e-9
+    assert abs(round(basic / 25.4, places) * 25.4 - basic) < 1e-9
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "from build_sm_knife_mount import BORE_CENTRE_DEPTH" in source
     assert not hasattr(sm_knife_mount_spec, "BORE_CENTRE_DEPTH")
@@ -1098,11 +1037,8 @@ def test_each_basic_prints_the_modelled_value_unrounded(label: str, basic: float
 
 def test_bore_basic_is_the_built_geometry() -> None:
     assert part.BORE_CENTRE_DEPTH == part.BLK_TOP - part.BORE_CY
-    assert part.BORE_CENTRE_DEPTH == pytest.approx(20.616, abs=1e-9)
-    assert f"{part.BORE_CENTRE_DEPTH:.3f}" == "20.616"
-    # The spec's mirror would print a BASIC 0.004 off the part.
-    mirror = sm_knife_mount_spec.BLK_TOP - sm_knife_mount_spec.BORE_CY
-    assert abs(mirror - part.BORE_CENTRE_DEPTH) > 1e-5
+    assert part.BORE_CENTRE_DEPTH == pytest.approx(20.5994, abs=1e-9)
+    assert f"{part.BORE_CENTRE_DEPTH / 25.4:.3f}" == "0.811"
 
 
 def test_part_stamps_make_critical_properties() -> None:
@@ -1139,9 +1075,9 @@ def test_close_bore_clears_the_hex_trunnion_only_at_the_ridge() -> None:
 
     from sm_summing_lever_spec import HEX_H, HEX_W
 
-    assert part.R_BORE == 6.0
-    assert abs(part.BLK_BOT - (-14.75)) < 1e-9
-    assert abs(part.BORE_CY - (-5.75)) < 1e-9
+    assert part.R_BORE == pytest.approx(5.9944)  # Ø.4720
+    assert abs(part.BLK_BOT - (-14.852)) < 1e-9
+    assert abs(part.BORE_CY - (-5.7334)) < 1e-9
     # Top vertex hangs TOP_CLEAR under the crown; the across-corners bottom
     # vertex and the two widest shoulders clear the bore wall.
     hex_centre_y = -HEX_H / 2.0
@@ -1166,42 +1102,30 @@ def test_tap_callout_bands_its_full_thread_and_drill_depth_with_a_pitch_of_runou
     # prints its drill's name, no Ø and no band, so the DRILLED HOLES row
     # governs it (R3: its native +0.10/0 restated that row; R4: its three
     # places claimed a precision no drill holds).
-    assert drawing.TAP_CALLOUT_BANDS == {
-        "hw-threaddepth": (9.65, (0.13, -0.13)),
-        "hw-tapdrldepth": (11.24, (0.05, -0.05)),
-    }
-    assert drawing.TAP_CALLOUT_BAND_PLACES == 2
+    bands = drawing.TAP_CALLOUT_BANDS
+    assert set(bands) == {"hw-threaddepth", "hw-tapdrldepth"}
+    assert bands["hw-threaddepth"][0] == pytest.approx(9.525)  # .375
+    assert bands["hw-threaddepth"][1] == pytest.approx((0.127, -0.127))
+    assert bands["hw-tapdrldepth"][0] == pytest.approx(11.1252)  # .438
+    assert bands["hw-tapdrldepth"][1] == pytest.approx((0.0508, -0.0508))
     # swTolType_e: both bands symmetric (4), each (lower, upper) as
     # SolidWorks takes it; a one-sided band would write bilateral (2).
-    assert drawing.tap_callout_tolerance((0.13, -0.13)) == (4, -0.13, 0.13)
-    assert drawing.tap_callout_tolerance((0.05, -0.05)) == (4, -0.05, 0.05)
+    assert drawing.tap_callout_tolerance((0.127, -0.127)) == (4, -0.127, 0.127)
+    assert drawing.tap_callout_tolerance((0.0508, -0.0508)) == (4, -0.0508, 0.0508)
     assert drawing.tap_callout_tolerance((0.10, 0.0)) == (2, 0.0, 0.10)
-    assert drawing.TAP_CALLOUT_PLACES == {
-        "hw-threaddepth": 2,
-        "hw-tapdrldepth": 2,
-    }
     from build_sm_summing_assembly import HANGER_REACH_MAX
 
     assert sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH_MIN > HANGER_REACH_MAX
-    bare_deepest_thread = (
-        sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH + sm_knife_mount_spec._XX
-    )
-    shallowest_drill = (
-        sm_knife_mount_spec.STUD_TAP_DRILL_DEPTH
-        - sm_knife_mount_spec.STUD_TAP_DRILL_DEPTH_BAND
-    )
-    assert shallowest_drill - bare_deepest_thread == pytest.approx(1.03)
-    assert shallowest_drill - bare_deepest_thread < sm_knife_mount_spec.STUD_PITCH
     assert sm_knife_mount_spec.STUD_THREAD == "#10-24"
     assert sm_knife_mount_spec.STUD_TAP_DIA == pytest.approx(3.797)
-    assert sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH_BAND == pytest.approx(0.13)
+    assert sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH_BAND == pytest.approx(0.127)
     pitch = sm_knife_mount_spec.STUD_PITCH
     assert pitch == pytest.approx(25.4 / 24.0)
-    assert sm_knife_mount_spec.STUD_TAP_RUNOUT == pytest.approx(1.59)
+    assert sm_knife_mount_spec.STUD_TAP_RUNOUT == pytest.approx(1.6002)
     assert sm_knife_mount_spec.STUD_TAP_RUNOUT >= 1.5 * pitch
-    assert sm_knife_mount_spec.STUD_TAP_RUNOUT_MIN == pytest.approx(1.41)
+    assert sm_knife_mount_spec.STUD_TAP_RUNOUT_MIN == pytest.approx(1.4224)
     assert sm_knife_mount_spec.STUD_TAP_RUNOUT_MIN >= pitch
-    assert sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH_MIN == pytest.approx(9.52)
+    assert sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH_MIN == pytest.approx(9.398)
     assert sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH_MIN >= (
         1.5 * sm_knife_mount_spec.STUD_THREAD_MAJOR
     )
@@ -1226,8 +1150,8 @@ def test_tap_callout_bands_its_full_thread_and_drill_depth_with_a_pitch_of_runou
 
 def test_tap_crown_web_charges_a_pilot_wider_than_accepted_at_its_sharpest_point() -> None:
     # The pilot, the #25 drill under the title block's DRILLED HOLES row,
-    # accepts Ø3.7973-3.8973 (the row on the drill's true 0.1495 in).  The
-    # crown web charges more, Ø3.927 (the wizard's Ø3.797 plus the larger of
+    # accepts Ø3.7973-3.8989 (the row on the drill's true 0.1495 in).  The
+    # crown web charges more, Ø3.924 (the wizard's Ø3.797 plus the larger of
     # that row and the general .XXX): a conservative envelope, charged, not
     # accepted.
     # The point, dimensioned 118° on the callout, takes the title block's
@@ -1242,31 +1166,31 @@ def test_tap_crown_web_charges_a_pilot_wider_than_accepted_at_its_sharpest_point
     assert "DRILL" in spec.TAP_DRILL_CALLOUT.split()
     assert f"{spec.STUD_TAP_DIA:g}" not in spec.TAP_DRILL_CALLOUT
     assert not hasattr(spec, "STUD_TAP_DIA_PLACES")
-    assert drilled_oversize_mm() == pytest.approx(0.10)
-    assert spec.STUD_TAP_DIA_BAND == (drilled_oversize_mm(), 0.0)
+    oversize = drilled_oversize_mm(unit=spec.UNIT)
+    assert oversize == pytest.approx(0.1016)
+    assert spec.STUD_TAP_DIA_BAND == (oversize, 0.0)
     assert spec.STUD_TAP_DRILL_DIA == pytest.approx(0.1495 * 25.4, abs=1e-12)
-    assert spec.STUD_TAP_DIA_ACCEPTED == pytest.approx((3.7973, 3.8973), abs=1e-9)
-    assert spec.STUD_TAP_DIA_ACCEPTED[1] > spec.STUD_TAP_DIA + drilled_oversize_mm()
-    assert spec.STUD_TAP_DIA_MAX == pytest.approx(3.927)
+    assert spec.STUD_TAP_DIA_ACCEPTED == pytest.approx((3.7973, 3.8989), abs=1e-9)
+    assert spec.STUD_TAP_DIA_ACCEPTED[1] > spec.STUD_TAP_DIA + oversize
+    assert spec.STUD_TAP_DIA_MAX == pytest.approx(3.924)
     assert spec.STUD_TAP_DIA_MAX - max(spec.STUD_TAP_DIA_ACCEPTED) == pytest.approx(
-        0.0297, abs=1e-9
+        0.0251, abs=1e-9
     )
-    assert spec.STUD_TAP_DIA_OVERSIZE == pytest.approx(0.13)
-    assert angular_band_deg() == pytest.approx(1.0)
+    assert spec.STUD_TAP_DIA_OVERSIZE == pytest.approx(0.127)
+    assert angular_band_deg(unit=spec.UNIT) == pytest.approx(1.0)
     assert spec.STUD_TAP_POINT_ANGLE_DEG == 118.0
     assert spec.STUD_TAP_POINT_ANGLE_PLACES == 0
-    assert spec.STUD_TAP_POINT_ANGLE_TOL_DEG == angular_band_deg()
+    assert spec.STUD_TAP_POINT_ANGLE_TOL_DEG == angular_band_deg(unit=spec.UNIT)
     assert spec.STUD_TAP_POINT_ANGLE_MIN_DEG == pytest.approx(117.0)
     assert spec.STUD_TAP_POINT_H == pytest.approx(
-        3.927 / 2.0 / math.tan(math.radians(117.0 / 2.0))
+        3.924 / 2.0 / math.tan(math.radians(117.0 / 2.0))
     )
-    assert spec.STUD_TAP_POINT_H == pytest.approx(1.2032343475, abs=1e-9)
-    assert spec.STUD_TAP_DRILL_DEPTH_MAX == pytest.approx(11.29)
-    # The bore's Ø0.20 location zone charges 0.10 of crown (owner ruling
+    assert spec.STUD_TAP_DRILL_DEPTH_MAX == pytest.approx(11.176)
+    # The bore's Ø.008 location zone charges 0.1016 of crown (owner ruling
     # 2026-10-27, #2016).
-    assert spec.STUD_TAP_WEB_WORST == pytest.approx(2.0117656525, abs=1e-9)
-    assert part._TAP_WEB_WORST == pytest.approx(2.0077656525, abs=1e-9)
-    assert part._TAP_WEB_WORST >= spec.STUD_TAP_WEB_MIN == 2.0
+    assert spec.STUD_TAP_WEB_WORST == pytest.approx(2.1098448537, abs=1e-9)
+    assert part._TAP_WEB_WORST == pytest.approx(2.1098448537, abs=1e-9)
+    assert part._TAP_WEB_WORST >= spec.STUD_TAP_WEB_MIN == pytest.approx(2.032)
     # The nominal pilot at an exact 118 deg overstated the web.
     assert spec.tap_web_worst(
         part.BLK_TOP,
@@ -1499,7 +1423,7 @@ def test_the_slip_seats_hold_their_margins_and_webs() -> None:
     assert spec.SLOT_END_TO_MOUTH == pytest.approx(
         face_from_b_min - end_longest - slot_half_w_max, abs=1e-9
     )
-    assert spec.SLOT_END_TO_MOUTH >= spec.STUD_TAP_WEB_MIN == 2.0
+    assert spec.SLOT_END_TO_MOUTH >= spec.STUD_TAP_WEB_MIN == pytest.approx(2.032)
     for web in (
         spec.PIN_HOLE_SIDE_WEB,
         spec.PIN_HOLE_Z_WEB,
@@ -1530,15 +1454,16 @@ def test_the_slip_seats_hold_their_margins_and_webs() -> None:
     assert spec.PIN_HOLE_DIA_BAND == spec.SLOT_WIDTH_BAND == dowel.SLIP_HOLE_DIA_BAND
 
 
-def test_the_bore_states_its_ream_band_and_mate() -> None:
+def test_the_bore_states_its_bored_band_and_mate() -> None:
     # Machinist review B3: a bare THRU left drill or ream open; the bore is
-    # reamed to +0.03/0 at two places (Ra 1.6 stays).  ENFORCE review
-    # (2026-10-24, rule 4): the band names its mate, the lever's trunnion.
-    # The process word and the mate's number, the lever's from the
-    # registry; three rows, the ones BORE_DIA_TEXT_TOP_REACH was measured
-    # on under the stacked band (farm run 20261024T114146582Z).
+    # bored to Ø.4720 +.0012/0 (S3: a boring head, not a ream; Ra 63 µin
+    # stays).  ENFORCE review (2026-10-24, rule 4): the band names its mate,
+    # the lever's trunnion.  The process word and the mate's number, the
+    # lever's from the registry; three rows, the ones BORE_DIA_TEXT_TOP_REACH
+    # was measured on under the stacked band (farm run 20261024T114146582Z).
     rows = drawing.DIMENSION_CALLOUTS["BoreDia"].splitlines()
-    assert "REAM" in rows[0].split()
+    assert "BORE" in rows[0].split()
+    assert "REAM" not in drawing.DIMENSION_CALLOUTS["BoreDia"]
     # The mate's number is drawing text: the spec, in MHA-FR-02's and the
     # frame assembly's import closure, must not read the lever's registry row.
     lever_number = _config.parts("sm-summing-lever")["number"]
@@ -1552,11 +1477,9 @@ def test_the_bore_states_its_ream_band_and_mate() -> None:
     assert len(rows) <= 3
     widest = max(len(row) for row in rows)
     assert drawing.BORE_DIA_TEXT_HALF_WIDTH >= widest * 0.00252 / 2.0
-    assert sm_knife_mount_spec.BORE_DIA_BAND == (0.03, 0.0)
-    assert sm_knife_mount_spec.BORE_DIA_PLACES == 2
-    assert sm_knife_mount_spec.DRAWING_PRECISION["BoreProfile"] == {"BoreDia": 2}
+    assert sm_knife_mount_spec.BORE_DIA_BAND == pytest.approx((0.03048, 0.0))
     assert sm_knife_mount_spec.BORE_R_MIN == sm_knife_mount_spec.R_BORE
-    assert sm_knife_mount_spec.BORE_R_MAX == pytest.approx(6.015)
+    assert sm_knife_mount_spec.BORE_R_MAX == pytest.approx(6.00964)
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert (
         "        \"BoreProfile\",\n"

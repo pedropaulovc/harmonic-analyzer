@@ -42,9 +42,9 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
   reclosed rod-pin hole 125.890 out reaches the cam centre at -52.990, rods plumb; the old
   "arbor 47.5 + 25.4 rod lever" chain died with the ch30 re-anchor).
   Inserted at its exact authored transform and locked to the fixed base.
-* top-frame x1: the green one-piece casting at mid-plane Y = 1017.95 (side
-  rails 34.2 wide / front-rear rails 38 wide x 36.5 tall, band
-  y 999.7..1036.2; corner bosses Ø45 rise to 1040.7), bored around the
+* top-frame x1: the green one-piece casting at mid-plane Y = 1017.9499 (side
+  rails 34.2 wide / front-rear rails 38 wide x 1.437 tall, band
+  y 999.7..1036.1998; corner bosses Ø45 rise to 1040.77), bored around the
   four columns; its east rail (-X) carries the gooseneck hub and its west
   rail top face seats the fulcrum-keeper feet (ch-channel.SLDASM).
 * tube-frame-cap x4: intact stock McMaster 9275K141 push-on caps seated on the
@@ -65,8 +65,8 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
 
 Hold-down: four stock 1/4-20 UNC-2A hex-head screws install from the top,
 through the support foot's 5/16 clearance drills, into through 1/4-20 UNC-2B
-seats in the base. The foot pattern transforms from local X +/-60.32,
-Z +/-17.46 to machine x 55.44/90.36, z -60.32/+60.32 (the base's shared
+seats in the base. The foot pattern transforms from local X +/-2.375,
+Z +/-.687 to machine x 2.183/3.557, z -2.375/+2.375 in (the base's shared
 SUPPORT_HOLD_DOWN_XZ contract). Each McMaster 92240A540 screw bears on the
 bottom of its exact vendor-modeled 0.277813 mm under-head washer transition,
 crosses the 6.35 mm foot, and inserts 12.422187 mm into the base receiver.
@@ -99,11 +99,24 @@ import _telemetry
 from _check import check
 from _com import _early_bound
 from _custom_properties import apply_custom_properties
+from _document_units import apply_package_model_units
 from _paths import OUT_SLDPRT
 from _session import run_build
-from _drawing_marks import DRAWN_BY
+from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
+from _drawing_precision import apply_drawing_precision
+from _drawing_tolerances import set_dimension_symmetric_tolerance
+from _feature_tree import name_last_feature
 from _printed_tolerance import printed_deviations
 from _simplified_names import simplified_name
+from _assembly_contract import assembly_contract
+from _sketch import (
+    SketchDims,
+    anchor_point_to_origin,
+    blank_sketch,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _assembly import (
     activate_assembly_contract,
     assembly_title_properties,
@@ -159,6 +172,7 @@ from fr_nameplate_spec import (
     PLATE_THICKNESS as NAMEPLATE_THICKNESS,
     PLATE_THICKNESS_PRECISION as NAMEPLATE_THICKNESS_PRECISION,
     SCREW_FULL_THREAD_MIN as NAMEPLATE_STOCK_FULL_THREAD_MIN,
+    UNIT as NAMEPLATE_UNIT,
 )
 from fr_rocker_arm_support_section_spec import FOOT_THICKNESS as LAG_FOOT_THICKNESS
 from fr_rocker_arm_support_spec import (
@@ -198,11 +212,17 @@ from fr_frame_attachment_spec import (
     CASTING_FULL_THREAD_DEPTH,
     COLUMN_BOTTOM_Y,
     COLUMN_SOCKET_DIAMETER,
+    TOP_AXIS_HEIGHT_BAND_MM,
+    TOP_AXIS_HEIGHT_DIMENSION,
+    TOP_AXIS_HEIGHT_PLACES,
+    TOP_AXIS_SETTING_FEATURE,
+    TOP_FRAME_MID_Y,
     TOP_SCREW_SEAT_Z,
     TOP_SCREW_Y,
     TUBE_CROSS_HOLE_DIAMETER,
 )
 from fr_harmonic_base_spec import STACK_HEIGHT
+from frame_column_stations import COLUMN_X
 from fr_vn_tube_frame_cap_spec import (
     INSIDE_HEIGHT as CAP_INSIDE_HEIGHT,
     TOTAL_HEIGHT as CAP_TOTAL_HEIGHT,
@@ -213,7 +233,6 @@ ASM_NAME = "fr-frame"
 FRAME_EXPLODED = "FRAME_EXPLODED"
 
 BASE_TOP_Y = STACK_HEIGHT
-COLUMN_X = 197.0
 FRONT_COLUMN_Z = FRAME_FRONT_COLUMN_Z
 REAR_COLUMN_Z = FRAME_REAR_COLUMN_Z
 SUPPORT_X = SUPPORT_WORLD_X  # rocker pivot x: the seesaw mid-span (ch30 GT arm-end
@@ -271,14 +290,12 @@ LAG_BASE_THREAD_FITS = tuple(
     for xz in LAG_SCREW_XZ
 )
 
-TOP_FRAME_MID_Y = TOP_SCREW_Y
-
 # --- Frame cross-screw stack -------------------------------------------------
 # The stock screw origin is its under-head seat and its shank runs along local
 # -Y. Front placements rotate it toward +Z; rear placements toward -Z. Each
-# 44.45-mm shank crosses the near casting, both Ø5 tube walls, and at least one
-# major diameter of far casting while retaining 1.55 mm of full thread beyond
-# the tip in the 46-mm interrupted tap.
+# 1.750-in shank crosses the near casting, both Ø.197 tube walls, and at least
+# one major diameter of far casting while retaining .060 of full thread beyond
+# the tip in the 1.81-deep interrupted tap.
 COLUMN_RADIUS = COLUMN_OUTER_DIA / 2.0
 SOCKET_RADIUS = COLUMN_SOCKET_DIAMETER / 2.0
 BASE_CROSS_SCREW_TIP_Z = BASE_SCREW_SEAT_Z - CROSS_SCREW_SHANK_LEN
@@ -320,7 +337,7 @@ if not math.isclose(CAP_MOUTH_Y + CAP_TOTAL_HEIGHT, CAP_TOP_Y, abs_tol=1e-9):
 #
 # gooseneck-set-screw: 1x McMaster 91410A540 1/4-20 x 3/4 square-head cup-point
 # set screw gripping the gooseneck post through the casting's east-hub boss,
-# axis along X at (y TOP_FRAME_MID_Y, z 3.088 -- the hub/post centreline).
+# axis along X at (y TOP_SCREW_Y, z 3.088 -- the hub/post centreline).
 # Entered through the boss's spot face x -218.0 (21.0 from the bore axis):
 # local +Y -> -X (rot_z_rows(90), euler [0,0,90]) points the exact stock shank
 # inboard while retaining its cup tip at x -205.15, 0.21 clear (outboard) of
@@ -381,7 +398,7 @@ if NAMEPLATE_SCREW_SHANK_LEN < NAMEPLATE_THICKNESS + 2.0:
 # NOT a claim that the installed female overlap reaches 1.5D. The original
 # shortfall calculation did not deduct the unchanged female entrance break.
 _NAMEPLATE_THICKNESS_LOW = printed_deviations(
-    NAMEPLATE_THICKNESS, NAMEPLATE_THICKNESS_PRECISION,
+    NAMEPLATE_THICKNESS, NAMEPLATE_THICKNESS_PRECISION, unit=NAMEPLATE_UNIT,
 )[0]
 NAMEPLATE_SCREW_MAX_INSERTION = (
     NAMEPLATE_SCREW_SHANK_LEN - NAMEPLATE_THICKNESS - _NAMEPLATE_THICKNESS_LOW
@@ -516,9 +533,10 @@ def _create_frame_explode(adapter: Any, configuration_name: str) -> None:
         ("support lifts from deck", [*groups["fr-rocker-arm-support"], *groups["fr-vn-lag-screw"]], "y", 0.035),
         ("support moves beside base", [*groups["fr-rocker-arm-support"], *groups["fr-vn-lag-screw"]], "x", -0.320),
         ("support screws withdraw", groups["fr-vn-lag-screw"], "y", 0.050),
-        ("nameplate lifts from deck", [*groups["fr-nameplate"], *groups["sh-vn-brass-fillister-screw"]], "y", 0.025),
+        # At 1:8 a 25 mm lift printed the plate as if seated in its deck pocket.
+        ("nameplate lifts from deck", [*groups["fr-nameplate"], *groups["sh-vn-brass-fillister-screw"]], "y", 0.075),
         ("nameplate moves beside base", [*groups["fr-nameplate"], *groups["sh-vn-brass-fillister-screw"]], "x", 0.080),
-        ("nameplate screws withdraw", groups["sh-vn-brass-fillister-screw"], "y", 0.035),
+        ("nameplate screws withdraw", groups["sh-vn-brass-fillister-screw"], "y", 0.050),
     )
     # Reuse the native assembly axes already used by component patterns. Unlike
     # manipulator indices, Mark=2 direction entities are independent of each
@@ -668,6 +686,63 @@ def _create_frame_explode(adapter: Any, configuration_name: str) -> None:
     _telemetry.success(f"{view_name}: 12 native steps verified in world space; all 29 instances restored")
 
 
+async def _author_top_axis_setting(adapter: Any) -> None:
+    """MHA-FR-00 step 3's controlling height: a vertical construction line on
+    the Front plane (sketch u, v = machine X, Y) up the +X column's axis, from
+    the base underside to the top cross-bore axis. Its length carries the
+    setting's band and places for the drawing to import. No solid or pose
+    edits; the sketch is blanked."""
+    dims = SketchDims()
+    check("create top-axis setting sketch", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    line = check(
+        "top-axis setting line",
+        await adapter.add_line(COLUMN_X, 0.0, COLUMN_X, TOP_SCREW_Y),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("top-axis setting line is not construction")
+    check(
+        "top-axis setting vertical",
+        await adapter.add_sketch_constraint(line, None, "vertical"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{line}.start", COLUMN_X, 0.0, "base underside on the column axis"
+    )
+    dims.record("TopAxisColumnX")
+    await dimension_between(
+        adapter,
+        f"{line}.start",
+        f"{line}.end",
+        "vertical_distance",
+        TOP_SCREW_Y,
+        "top cross-bore axis above the base underside",
+    )
+    dims.record(TOP_AXIS_HEIGHT_DIMENSION)
+    await ensure_fully_defined(adapter, "top-axis setting")
+    check("exit top-axis setting sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, TOP_AXIS_SETTING_FEATURE)
+    dims.apply(adapter, TOP_AXIS_SETTING_FEATURE)
+    set_dimension_symmetric_tolerance(
+        adapter,
+        TOP_AXIS_SETTING_FEATURE,
+        TOP_AXIS_HEIGHT_DIMENSION,
+        TOP_AXIS_HEIGHT_BAND_MM,
+        places=TOP_AXIS_HEIGHT_PLACES,
+        display_unit=assembly_contract(ASM_NAME).drawing_unit,
+    )
+    apply_drawing_precision(
+        adapter,
+        {TOP_AXIS_SETTING_FEATURE: {TOP_AXIS_HEIGHT_DIMENSION: TOP_AXIS_HEIGHT_PLACES}},
+    )
+    mark_dimensions_for_drawing(
+        adapter, TOP_AXIS_SETTING_FEATURE, {TOP_AXIS_HEIGHT_DIMENSION}
+    )
+    blank_sketch(adapter, TOP_AXIS_SETTING_FEATURE)
+
+
 async def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
@@ -684,6 +759,7 @@ async def build(adapter) -> dict[str, str]:
     top_frame_path = _part("fr-top-frame")
 
     check("create_assembly", await adapter.create_assembly())
+    apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
 
     # Base: first insert is auto-fixed by SolidWorks.
     res = await adapter.insert_component(InsertComponentParameters(file_path=base_path))
@@ -812,7 +888,7 @@ async def build(adapter) -> dict[str, str]:
         "lag-screw hold-down grid",
     )
 
-    # Top-frame casting clamped around the four columns, mid-plane y 1017.95.
+    # Top-frame casting clamped around the four columns, at its insert plane.
     target = [0.0, TOP_FRAME_MID_Y, 0.0]
     res = await adapter.insert_component(
         InsertComponentParameters(file_path=top_frame_path, position=target)
@@ -937,7 +1013,7 @@ async def build(adapter) -> dict[str, str]:
     # Gooseneck set screw: 1/4-20 x 3/4 square head through the hub boss's tap
     # hole along +X at the hub centreline; tip 0.21 clear of the Ø15.875 sleeve
     # (see SET_SCREW_* constants). Same fix-all treatment.
-    set_target = [SET_SCREW_UNDER_HEAD_X, TOP_FRAME_MID_Y, GOOSENECK_HUB_Z]
+    set_target = [SET_SCREW_UNDER_HEAD_X, TOP_SCREW_Y, GOOSENECK_HUB_Z]
     set_rows = rot_z_rows(90.0)
     set_screw = await place_component(
         adapter,
@@ -961,6 +1037,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
     )
+    await _author_top_axis_setting(adapter)
     # Title-block identity for the assembly drawing (draw_fr_frame_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry;

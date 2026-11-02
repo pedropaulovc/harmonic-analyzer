@@ -1686,8 +1686,8 @@ def test_spare_sprocket_transformed_underside_contacts_base_deck(monkeypatch):
     top = _spare_world_point(monkeypatch, [0.0, 0.0, seat_geometry.PLATE])
     assert underside[1] == pytest.approx(base.STACK_HEIGHT, rel=0, abs=1e-9)
     assert top[1] == pytest.approx(base.STACK_HEIGHT + seat_geometry.PLATE, rel=0, abs=1e-9)
-    assert (underside[0], underside[2]) == (140.0, -75.0)
-    assert (top[0], top[2]) == (140.0, -75.0)
+    assert (underside[0], underside[2]) == (140.0, -75.1)
+    assert (top[0], top[2]) == (140.0, -75.1)
 
 
 def test_spare_t18_footprint_is_on_the_flat_deck(monkeypatch):

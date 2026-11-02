@@ -12,7 +12,7 @@ Fit (owner-ratified 2026-10-15, fr-harmonic-base RV-01): the base's four
 (drawing-guidelines.md rule 19 (absorb stacks at fit-up)), so the plate's
 holes need only keep their head on the raised border and a real edge
 ligament. Each hole locates from its two adjacent plate edges at the title
-block's one-place grade; the corner profile, the sunk field and the engraving
+block's three-place grade; the corner profile, the sunk field and the engraving
 are the vendored DXF contours the build imports, named on the sheet rather
 than redrawn as dimensions.
 """
@@ -23,11 +23,12 @@ import math
 
 from _dxf_text import read_lwpolylines
 from _hole_spec import CLEARANCE_MM
+from _inch_wall_limits import WALL_TARGET_MM
 from _paths import REFERENCES_DIR
 from _printed_tolerance import drilled_oversize_mm, printed_deviations
 from _release_artwork import bundle_path
 import fr_nameplate_spec as nameplate
-from fr_nameplate_spec import PLATE_HEIGHT, PLATE_THICKNESS, PLATE_WIDTH, SCREW_XY
+from fr_nameplate_spec import PLATE_HEIGHT, PLATE_THICKNESS, PLATE_WIDTH, SCREW_XY, UNIT
 
 # --- Model dimensions the print shows: feature -> parametric names. The slab's
 # extrude depth is the plate thickness; the Hole Wizard placement sketch
@@ -51,20 +52,22 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     SECTION_REFERENCE: {"FieldDepth", "EngravingDepth"},
 }
 
-# Places. The engraving is incised 0.300 below the 0.400 sunk field, so the
-# thinnest floor left under it is the thickness less 0.700: the thickness and
-# both depths print .XXX so that floor is a measured number, not a .X guess
-# (Main ruling 2026-10-14; the floor's shortfall under rule 17's 1.5 floor is
+# Places. The engraving is incised .012 below the .016 sunk field, so the
+# thinnest floor left under it is the thickness less .028: the thickness and
+# both depths print .XXX so that floor is a measured number
+# (Main ruling 2026-10-14; the floor's shortfall under rule 17's .060 floor is
 # stated on the sheet, MINIMUM_NOTES). The outline and the hole stations
-# print .X: the base is spotted through the plate.
+# print .XX: the outline DXF defines the profile, and the base is spotted
+# through the plate at assembly, so no fit or stack reads either closer; the
+# hole ligament holds rule 17's .080 at the .XX band (HOLE_LIGAMENT_WORST).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateSlab": {"PlateThick": nameplate.PLATE_THICKNESS_PRECISION},
-    "ScrewHoles": {"S0X": 1, "S0Z": 1},
+    "ScrewHoles": {"S0X": 2, "S0Z": 2},
     FACE_REFERENCE: {
-        "PlateWidth": 1,
-        "PlateHeight": 1,
-        "RightHoleStation": 1,
-        "TopHoleStation": 1,
+        "PlateWidth": 2,
+        "PlateHeight": 2,
+        "RightHoleStation": 2,
+        "TopHoleStation": 2,
     },
     SECTION_REFERENCE: {"FieldDepth": 3, "EngravingDepth": 3},
 }
@@ -87,12 +90,12 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {"floor under engraving": 3}
 # Section A-A's depths from the decorated face: the sunk field, then every
 # engraved groove (border pinstripe and field lettering alike) to one floor.
 # The floor left under the engraving prints as a reference at its nominal
-# (0.800); its worst case at the printed bands, ENGRAVING_FLOOR_MIN (0.540),
-# sits under rule 17's 1.5 floor as a decorative exception, not a structural
+# (.035); its worst case at the printed bands, ENGRAVING_FLOOR_MIN (.025),
+# sits under rule 17's .060 floor as a decorative exception, not a structural
 # wall (user ruling 2026-10-14; declared as fr-nameplate machinist exception
 # RV-02), and the sheet states it as a minimum in MINIMUM_NOTES.
-FIELD_DEPTH = 0.4
-ENGRAVING_FLOOR_DEPTH = 0.7
+FIELD_DEPTH = 0.4064  # .016
+ENGRAVING_FLOOR_DEPTH = 0.7112  # .028
 FLOOR_UNDER_ENGRAVING = PLATE_THICKNESS - ENGRAVING_FLOOR_DEPTH
 
 # Section A-A cuts the whole plate at SECTION_Y (plate-local), in the gap
@@ -118,14 +121,15 @@ SECTION_REFERENCE_POINTS: dict[str, tuple[float, float]] = {
 }
 ENGRAVING_FLOOR_MIN = (
     PLATE_THICKNESS
-    + printed_deviations(PLATE_THICKNESS, DRAWING_PRECISION["PlateSlab"]["PlateThick"])[
-        0
-    ]
+    + printed_deviations(
+        PLATE_THICKNESS, DRAWING_PRECISION["PlateSlab"]["PlateThick"], unit=UNIT
+    )[0]
     - (
         ENGRAVING_FLOOR_DEPTH
         + printed_deviations(
             ENGRAVING_FLOOR_DEPTH,
             DRAWING_PRECISION[SECTION_REFERENCE]["EngravingDepth"],
+            unit=UNIT,
         )[1]
     )
 )
@@ -137,19 +141,21 @@ if ENGRAVING_FLOOR_MIN <= 0.0:
 # The sunk field's one job is to stay above the engraving's floor, so the
 # lettering cut into the field stays incised (PR #1468 r4 review: the .XXX
 # field depth carried no stated function; its callout now names it). Both
-# depths print .XXX: the engraving floor sits 0.300 under the field nominal
-# and ENGRAVING_BELOW_FIELD_MIN (0.040) at the printed bands. At the .XX
-# row's +-0.51 the field could cut deeper than the engraving and erase it,
+# depths print .XXX: the engraving floor sits .012 under the field nominal
+# and ENGRAVING_BELOW_FIELD_MIN (.002) at the printed bands. At the .XX
+# row's +-.01 the field could cut deeper than the engraving and erase it,
 # so the field's three places are the function's, not an over-specification.
 ENGRAVING_BELOW_FIELD_MIN = (
     ENGRAVING_FLOOR_DEPTH
     + printed_deviations(
-        ENGRAVING_FLOOR_DEPTH, DRAWING_PRECISION[SECTION_REFERENCE]["EngravingDepth"]
+        ENGRAVING_FLOOR_DEPTH,
+        DRAWING_PRECISION[SECTION_REFERENCE]["EngravingDepth"],
+        unit=UNIT,
     )[0]
     - (
         FIELD_DEPTH
         + printed_deviations(
-            FIELD_DEPTH, DRAWING_PRECISION[SECTION_REFERENCE]["FieldDepth"]
+            FIELD_DEPTH, DRAWING_PRECISION[SECTION_REFERENCE]["FieldDepth"], unit=UNIT
         )[1]
     )
 )
@@ -186,19 +192,17 @@ _STATION_PLACES = {
 }
 
 # Edge ligaments at the printed worst case (drawing-guidelines.md rule 17's
-# 1.5 floor), measured to the vendored outline itself: each hole is concentric
+# .080 target), measured to the vendored outline itself: each hole is concentric
 # with a rounded corner, so the corner arc, not a straight edge, is nearest
 # when the shop drills both stations at their minima (PR #1468 r3 review).
 # Each hole locates from its corner's two edges, so its accepted centres are
 # the rectangle of the two printed station limits in that corner's DXF frame.
 # The outline is convex (asserted), and distance to a convex boundary is
 # concave inside it, so the least distance over a rectangle lies at one of its
-# four vertices. The largest hole is the callout's printed .XX diameter (never
-# under the model's) plus the DRILLED HOLES allowance.
-LIGAMENT_FLOOR = 1.5
-_HOLE_R_MAX = (
-    max(SCREW_HOLE_DIA, round(SCREW_HOLE_DIA, 2)) + drilled_oversize_mm()
-) / 2.0
+# four vertices. The largest hole is the callout's .120 (exactly the model's)
+# plus the DRILLED HOLES allowance.
+LIGAMENT_FLOOR = WALL_TARGET_MM
+_HOLE_R_MAX = (SCREW_HOLE_DIA + drilled_oversize_mm(unit=UNIT)) / 2.0
 _OUTLINE_TEXT = (REFERENCES_DIR / OUTLINE_DXF_NAME).read_text(encoding="ascii")
 _OUTLINE = read_lwpolylines(_OUTLINE_TEXT[_OUTLINE_TEXT.find("\nENTITIES\n") :])[0][0]
 _TURNS = [
@@ -228,7 +232,7 @@ def _outline_distance(point: tuple[float, float]) -> float:
 
 def _station_limits(edge: str) -> tuple[float, float]:
     station = HOLE_EDGE_STATIONS[edge]
-    lower, upper = printed_deviations(station, _STATION_PLACES[edge])
+    lower, upper = printed_deviations(station, _STATION_PLACES[edge], unit=UNIT)
     return station + lower, station + upper
 
 
@@ -257,7 +261,10 @@ if HOLE_LIGAMENT_WORST < LIGAMENT_FLOOR:
 # The largest station shift any accepted plate may show, for the head-on-border
 # check the offline test runs against the vendored field contour.
 HOLE_STATION_SHIFT_MAX = max(
-    max(abs(value) for value in printed_deviations(station, _STATION_PLACES[edge]))
+    max(
+        abs(value)
+        for value in printed_deviations(station, _STATION_PLACES[edge], unit=UNIT)
+    )
     for edge, station in HOLE_EDGE_STATIONS.items()
 )
 
@@ -269,10 +276,10 @@ DIMENSION_PREFIXES = {
 }
 DIMENSION_CALLOUTS = {"PlateThick": "SETS FLOOR UNDER ENGRAVING"}
 # Two rows of at most 18 characters, so even a block left-aligned on the
-# field's dimension line stays inside the border. "DEPTH" ties the 0.400 to
+# field's dimension line stays inside the border. "DEPTH" ties the .016 to
 # the face it is measured from; the second row gives its function (PR #1468
 # r6 review: "SUNK FIELD / ABOVE ENGRAVING" could read as the field standing
-# 0.400 above the engraving floor).
+# .016 above the engraving floor).
 FIELD_DEPTH_CALLOUT = "SUNK FIELD DEPTH\nENGRAVING BELOW IT"
 ENGRAVING_DEPTH_CALLOUT = "ALL ENGRAVING"
 SECTION_CALLOUTS = {
@@ -283,9 +290,10 @@ FLOOR_UNDER_ENGRAVING_CALLOUT = "FLOOR UNDER ENGRAVING"
 HOLE_CALLOUT_PROCESS = "DRILL"
 
 
-def _stated_minimum(value: float) -> str:
-    """A worst-case minimum at two places, rounded DOWN: never overstated."""
-    return f"{math.floor(value * 100.0 + 1e-9) / 100.0:.2f}"
+def _stated_minimum(value_mm: float) -> str:
+    """A worst-case minimum in inches at three places, rounded DOWN: never overstated."""
+    text = f"{math.floor(value_mm / 25.4 * 1000.0 + 1e-9) / 1000.0:.3f}"
+    return text[1:] if text.startswith("0.") else text
 
 
 # The two stated shortfalls, plain facts below the screw-head note:
@@ -296,13 +304,6 @@ SCREW_ENGAGEMENT_NOTE = (
     f"SCREWS ENGAGE {_stated_minimum(nameplate.SCREW_FULL_THREAD_MIN)} MIN FULL THREAD"
 )
 MINIMUM_NOTES = "\n".join((FLOOR_MINIMUM_NOTE, SCREW_ENGAGEMENT_NOTE))
-
-# The screw holes' wall to the outline's corner radius at the printed worst
-# case (HOLE_LIGAMENT_WORST, 1.555), under rule 17's 2.0 target: stated under
-# the holes' own callout, the dt-crankshaft rim's pattern.
-# Emits approved declaration fr-nameplate RV-04 (owner ruling 2026-10-24,
-# #1971).
-HOLE_LIGAMENT_NOTE = f"WALL TO CORNER RADIUS {_stated_minimum(HOLE_LIGAMENT_WORST)} MIN"
 
 # The DXF rows: fr-nameplate machinist exception RV-01 (the outline, the sunk
 # field and the engraving are the release bundle's DXF artwork, not

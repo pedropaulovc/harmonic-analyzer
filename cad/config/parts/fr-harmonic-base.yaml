@@ -5,15 +5,21 @@ fr-harmonic-base:
   finish: "ALKYD PRIME/ENAMEL: RAL6000 BODY; BLACK DECK/UNDERSIDE; MASK+OIL BORES/THREADS/ID"
   quantity: 1
   tolerance_class: machined_block
+  drawing_unit: in
   process: "machined from solid stock or casting"
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
       where: "the 4X nameplate tap callout TRANSFER FROM MHA-FR-04 AT ASSEMBLY; on the four #4-40 MHA-FR-04 seats, which print no station"
       finding: "fit-up at assembly (rule 19)"
-      reason: "the #4 close holes in MHA-FR-04 float only 0.203 diametral over the #4-40 major, against about 3.7 demanded by the plate's .X hole stations and a .XX tap station here (2 x sqrt 2 x (0.8 + 0.51)); the four taps are spotted and tapped through the actual plate's holes at assembly, so that stack never forms (owner-accepted)"
+      reason: "the #4 close holes in MHA-FR-04 float only .008 diametral over the #4-40 major, against about .042 demanded by the plate's .XX hole stations and a .XXX tap station here (2 x sqrt 2 x (.010 + .005)); the four taps are spotted and tapped through the actual plate's holes at assembly, so that stack never forms (owner-accepted)"
     - id: "RV-02"
       kind: "accept"
       where: "MHA-FR-01 fr-harmonic-base, sheet 2 HOLES-SOCKETS, generated native hole-table SIZE cells only"
       finding: "the native hole-table SIZE rows repeat default thread class 2B from the title block (rule 2)"
       reason: "Owner explicitly accepted this presentation-only departure on 2026-10-20 to preserve the model-linked generated hole table without rewriting its noneditable SIZE cells. All physical Hole Wizard threads remain class 2B. The five separate native tap callouts must still omit the duplicate class token. This accepts no other repeated specification, callout, package, geometry, tolerance, engagement or clearance departure."
+    - id: "RV-03"
+      kind: "accept"
+      where: "MHA-FR-01 fr-harmonic-base, sheet 2 HOLES-SOCKETS, generated native hole-table SIZE cells of A1-A4 only: the socket depth .880"
+      finding: "the socket depth prints three places with no stated function (rule 3)"
+      reason: "the native hole table has a single SIZE precision for all its rows, and the B1 and C1 tap drills (.089, .201) need three places to print their model sizes, so it forces .880 into the A1-A4 cells. The depth's function needs only .XX: the tube bottoms in the socket, but nothing reads that seat, since the top frame is set by gauge from the base underside, the tube is match-cut to the actual stack, and both cross holes are transfer-drilled. Main accepted this on 2026-11-01; it accepts no other three-place size, location or callout depth (owner-accepted)"

@@ -338,8 +338,8 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "in the knife mount's round hole and slot"
     ),
     ("fr_top_frame_spec", "HANGER_CLEARANCE_DIA_BAND"): (
-        "the native +0.13/0 float-hole diameter: indexed into its printed "
-        "minimum/maximum and written to both model and callout tolerances"
+        "the title-block DRILLED HOLES +.004/0 float-hole diameter: indexed into "
+        "its accepted minimum/maximum, without a redundant explicit callout band"
     ),
     ("sm_knife_mount_spec", "STUD_TAP_DIA_BAND"): (
         "the title-block DRILLED HOLES +0.10/0 tap-pilot diameter: indexed into "

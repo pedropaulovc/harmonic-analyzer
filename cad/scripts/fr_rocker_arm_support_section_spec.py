@@ -18,7 +18,7 @@ height with the foot at -HALF_Y, Z the wall thickness.
 from __future__ import annotations
 
 WIDE = 31.75  # foot half-width (local Z) at y = -HALF_Y
-NARROW = 8.4665  # top half-width (local Z) at y = +HALF_Y
+NARROW = 8.382  # .330: top half-width (local Z) at y = +HALF_Y; each flat edge .080 off its web face
 HALF_Y = 88.9  # trapezoid half-height (Y); the foot is the -Y face at y = -HALF_Y
 BIG = 82.55  # 165.1 mm square half (Cut-Extrude3/4)
 FOOT_THICKNESS = HALF_Y - BIG

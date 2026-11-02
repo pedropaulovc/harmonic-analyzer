@@ -15,22 +15,23 @@ others:
   screw stations it drops the four ``sh-vn-brass-fillister-screw`` components onto.
 
 Mount transform (user ruling 2026-10-09; ch. 26 p.71 and ch. 30 p002/p003/p006):
-the brass plate's outline IS the traced DXF outer edge, uniformly enlarged to
-100 mm wide (height about 45.33 mm). It lies FLAT on the WEST (+X) end of the
-black base deck, decorated side up, read by an operator standing west of it.
+the brass plate's outline IS the traced DXF outer edge, scaled to the
+3.95 x 1.79 in envelope (the #290 inch rebake). It lies FLAT on the WEST
+(+X) end of the black base deck, decorated side up, read by an operator
+standing west of it.
 
 The part's decorated face is its FRONT face (+Z local; ``build_fr_nameplate``
 extrudes the body in -Z so the engraving is frontmost and reads with no
 mirror). ``MOUNT_ROWS`` (euler [-90, 90, 0]) lays it flat on the WEST end:
 local +Z (decorated front) -> +Y so the engraving faces up; local +Y (text
 height) -> -X so the text top faces the machine interior and reads upright to
-a west operator; local +X (text length, 100) -> -Z so the line runs
-front-back; the 1.5 body (local -Z) drops onto the deck. The placed point is
-the part origin CORNER (decorated face, x=0/y=0): Y 52.3 lays the decorated
-face on top with the 1.5 body resting on the deck (50.8); Z 50 centres the
-100 mm line at z 0; X 163.0 sets the plate's west edge 4.0 inside the black
-deck's west edge at x 167.0. The plate spans x about 117.67..163.0, clear of
-the rocker-arm-support foot at x 41.15..104.65.
+a west operator; local +X (text length, 3.95) -> -Z so the line runs
+front-back; the .063 body (local -Z) drops onto the deck. The placed point is
+the part origin CORNER (decorated face, x=0/y=0): Y 2.063 lays the decorated
+face on top with the .063 body resting on the deck (2.000); Z 1.975 centres
+the 3.95 line at z 0; X 6.42 sets the plate's west edge .16 inside the black
+deck's west edge at x 6.58. The plate spans x 4.63..6.42, clear of the
+rocker-arm-support foot.
 
 Row convention (``_transforms.rows_from_euler`` / ``assert_component_placed``):
 ``MOUNT_ROWS[i]`` is the machine image of local axis ``i``, so a plate-local
@@ -40,18 +41,20 @@ asserts the literal rows against ``rows_from_euler(MOUNT_EULER)`` at import.
 
 from __future__ import annotations
 
-import math
-
+import _config
 import sh_vn_brass_fillister_screw_spec as _screw
+from _package_units import drawing_unit
 from _printed_tolerance import printed_deviations
 
+# The sheet prints decimal inch (issue #290, ``drawing_unit: in``).
+UNIT = drawing_unit("parts/fr-nameplate", _config.parts("fr-nameplate"))
+
 # --- Photo-traced DXF measurements BEFORE the 2026-10-09 rebake (mm). ---
-# The brief's 39.892 was rounded; preserve the measured outer-loop height and
-# uniformly scale every contour. These data need no DXF/CAD dependency at import.
+# The brief's 39.892 was rounded; preserve the measured outer-loop height.
+# These data need no DXF/CAD dependency at import.
 DXF_OUTER_ORIGIN = (5.999999999999993, 7.5538435420827525)
 DXF_OUTER_WIDTH = 88.0
 DXF_OUTER_HEIGHT = 39.8923129158345
-DXF_SCALE = 100.0 / DXF_OUTER_WIDTH
 DXF_SCREW_XY = (
     (9.566587580494442, 11.120346180985667),
     (90.43341063179248, 11.120530788933703),
@@ -60,9 +63,15 @@ DXF_SCREW_XY = (
 )
 
 # --- Plate envelope (build_fr_nameplate owns the rest of the plate geometry). ---
-PLATE_WIDTH = DXF_OUTER_WIDTH * DXF_SCALE
-PLATE_HEIGHT = DXF_OUTER_HEIGHT * DXF_SCALE
-PLATE_THICKNESS = 1.5  # thin brass plate; p.71 edge read (low)
+# The #290 rebake scales the traced artwork to an envelope on the .01 grid:
+# the outline DXF defines the profile, so its overall sizes print .XX (no fit
+# or stack reads them). 3.95 x 1.79 is the .01 pair nearest the traced aspect;
+# each axis takes its own scale, 0.035 % apart, invisible in the traced art.
+PLATE_WIDTH = 100.33  # 3.95
+PLATE_HEIGHT = 45.466  # 1.79
+DXF_SCALE_X = PLATE_WIDTH / DXF_OUTER_WIDTH
+DXF_SCALE_Y = PLATE_HEIGHT / DXF_OUTER_HEIGHT
+PLATE_THICKNESS = 1.6002  # .063 C260 sheet (OnlineMetals 23624)
 PLATE_THICKNESS_PRECISION = 3
 
 # Shared mechanical installation limits, formerly drawing-only. RV-03 in the
@@ -77,11 +86,12 @@ SCREW_FULL_THREAD_MIN = (
     - SCREW_LENGTH_SHORT_ALLOWANCE
     - (
         PLATE_THICKNESS
-        + printed_deviations(PLATE_THICKNESS, PLATE_THICKNESS_PRECISION)[1]
+        + printed_deviations(PLATE_THICKNESS, PLATE_THICKNESS_PRECISION, unit=UNIT)[1]
     )
     - SCREW_TIP_INCOMPLETE
 )
-SCREW_FULL_THREAD_ACCEPTED = 3.736
+# RV-03: .143 MIN (1.28D), below the 1.31D accepted for the former 1.5 mm plate.
+SCREW_FULL_THREAD_ACCEPTED = 3.6322  # .143
 if not (
     0.0
     < SCREW_FULL_THREAD_ACCEPTED
@@ -95,36 +105,31 @@ if not (
     )
 
 # Four slotted screw-head marks in the traced DXF, measured at each mark's
-# combined contour bbox centre. Preserve their slight asymmetry rather than a
-# single nominal inset. The raised border's notches keep the heads off the
-# recessed field.
+# combined contour bbox centre. The raised border's notches keep the heads
+# off the recessed field.
 HEAD_MARK_XY = tuple(
-    ((x - DXF_OUTER_ORIGIN[0]) * DXF_SCALE, (y - DXF_OUTER_ORIGIN[1]) * DXF_SCALE)
+    ((x - DXF_OUTER_ORIGIN[0]) * DXF_SCALE_X, (y - DXF_OUTER_ORIGIN[1]) * DXF_SCALE_Y)
     for x, y in DXF_SCREW_XY
 )
-# Owner ruling 2026-10-15: nameplate holes and frame taps moved inward for
-# corner ligament (PR #1468 r3 review). Each hole sits concentric with the
-# outline's rounded corner, so at the head marks a hole drilled at both
-# printed .X station minima (4.1 - 0.8 = 3.3 from each edge) leaves only
-# 1.41 to the corner arc (rule 17's floor is 1.5). Moving each hole
-# SCREW_INSET toward the plate centre in x and y lifts every station past
-# 4.15, so it prints 4.2 and its minimum is 3.4: 1.56 to the arc
-# (fr_nameplate_drawing_spec.HOLE_LIGAMENT_WORST measures it on the DXF).
-# 0.0972 is the least inset that does it; 0.1 keeps the stations off the .X
-# rounding knife-edge without a band. The heads (R2.32) still cover the
-# engraved marks (R2.16 + 0.14 offset). The base's through seats derive from
-# these stations through MOUNT_HOLE_XZ, so they move with them.
-SCREW_INSET = 0.1
-SCREW_XY = tuple(
-    (
-        x + math.copysign(SCREW_INSET, PLATE_WIDTH / 2.0 - x),
-        y + math.copysign(SCREW_INSET, PLATE_HEIGHT / 2.0 - y),
-    )
-    for x, y in HEAD_MARK_XY
+# Owner ruling 2026-10-15: nameplate holes and frame taps sit on the engraved
+# head marks' corners for corner ligament (PR #1468 r3 review), each hole
+# concentric with the outline's rounded corner. Every station prints .16 from
+# its two edges, on the traced marks to within .0003: drilled at both printed
+# station minima (.15) the hole keeps rule 17's .080 wall to the corner arc
+# (fr_nameplate_drawing_spec.HOLE_LIGAMENT_WORST measures it on the DXF), and
+# the heads cover the engraved marks. The base's through seats are spotted
+# through the plate at assembly and derive from these stations through
+# MOUNT_HOLE_XZ, so no receiver reads the stations closer than .XX.
+SCREW_STATION = 4.064  # .16
+SCREW_XY = (
+    (SCREW_STATION, SCREW_STATION),
+    (PLATE_WIDTH - SCREW_STATION, SCREW_STATION),
+    (SCREW_STATION, PLATE_HEIGHT - SCREW_STATION),
+    (PLATE_WIDTH - SCREW_STATION, PLATE_HEIGHT - SCREW_STATION),
 )
 
 # --- Mount transform in the machine frame (see the module docstring). ---
-MOUNT_POS = [163.0, 52.3, 50.0]
+MOUNT_POS = [163.068, 52.4002, 50.165]  # 6.42, 2.063, 1.975
 MOUNT_EULER = [-90.0, 90.0, 0.0]
 MOUNT_ROWS = [[0.0, 0.0, -1.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
 

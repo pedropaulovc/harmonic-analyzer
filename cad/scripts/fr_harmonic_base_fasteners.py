@@ -13,9 +13,10 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-import _config
 import dt_swing_stop_screw_spec as stop_stock
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import (
+    drilled_oversize_mm, edge_break_chamfer_mm, edge_break_radius_mm, printed_band_mm,
+)
 import fr_nameplate_spec
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 from dt_arbor_pedestal_spec import FOOT_HEIGHT as PEDESTAL_FLANGE_THICKNESS
@@ -29,8 +30,10 @@ from fr_vn_lag_screw_spec import (
     SHANK_LEN as HOLD_DOWN_SCREW_LEN,
 )
 from fr_rocker_arm_support_section_spec import FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS
+from fr_rocker_arm_support_spec import UNIT as SUPPORT_UNIT
 from fr_frame_attachment_spec import CASTING_FULL_THREAD_DEPTH, CASTING_TAP_DRILL_DEPTH
 from fr_harmonic_base_spec import (
+    LINEAR_BAND_MM, UNIT,
     COLUMN_SOCKET_XZ, CROSS_RIB_CENTER_X, CROSS_TAP_LUG_BOTTOM_Y, CROSS_TAP_LUG_INNER_X,
     CROSS_TAP_LUG_LENGTH, CROSS_TAP_LUG_WIDTH, DECK_HALF_X, DECK_HALF_Z,
     POCKET_CEILING_Y, POCKET_CORNER_FILLET_R, POCKET_HALF_X,
@@ -39,24 +42,24 @@ from fr_harmonic_base_spec import (
 
 IN = 25.4
 
-EDGE_BREAK_MAX_MM = max(
-    float(_config.title_block("edge_break")[key])
-    for key in ("radius_mm", "chamfer_max_mm")
-)
+EDGE_BREAK_MAX_MM = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
 # The deck elevation is GreenTopHeight + DeckRise; the ceiling is PocketDepth.
-# All three print .X independently. Skin is currently a reference difference,
+# All three print .XX independently. Skin is currently a reference difference,
 # not a directly toleranced skin dimension. Do not book only one of these bands.
-DECK_HEIGHT_BAND_MM = 2.0 * printed_band_mm(1)
-POCKET_CEILING_BAND_MM = printed_band_mm(1)
-STOP_PLATE_THICKNESS_ALLOWANCE_MM = IN * float(_config.title_block("linear_2pl")["value_in"])
+DECK_HEIGHT_BAND_MM = 2.0 * LINEAR_BAND_MM
+POCKET_CEILING_BAND_MM = LINEAR_BAND_MM
+# The swing platform's thickness prints .XX on its own (MHA-DT, mm) sheet.
+STOP_PLATE_THICKNESS_ALLOWANCE_MM = printed_band_mm(2)
 
 BASE_CROSS_TAP_SPEC = HoleSpec(
     "tapped_bottoming", "#10-32", end="blind", depth_mm=CASTING_TAP_DRILL_DEPTH,
     thread_class="2B", overrides_mm={"ThreadDepth": CASTING_FULL_THREAD_DEPTH},
 )
 BASE_CROSS_TAP_DRILL_DIA = TAP_DRILL_MM[BASE_CROSS_TAP_SPEC.size]
+# The callout prints both depths .XX: the drill depth is a MIN, so only the
+# full thread's .010 band eats the lead (1.93 - 1.82 = .11 >= two pitches).
 if CASTING_TAP_DRILL_DEPTH - (
-    CASTING_FULL_THREAD_DEPTH + printed_band_mm(2)
+    CASTING_FULL_THREAD_DEPTH + printed_band_mm(2, unit=UNIT)
 ) < 2.0 * IN / 32.0 - 1e-9:
     raise AssertionError("base cross tap lacks two-pitch bottoming-tap lead")
 
@@ -68,10 +71,12 @@ HOLD_DOWN_PITCH = IN / 20.0
 HOLD_DOWN_ENGAGEMENT = (
     HOLD_DOWN_SCREW_LEN - SUPPORT_FOOT_THICKNESS - HOLD_DOWN_BEARING_OFFSET
 )
+# The support foot's thickness prints .XX on the MHA-FR-05 sheet.
 HOLD_DOWN_INSERTION_MIN_MM = (
-    HOLD_DOWN_ENGAGEMENT - HOLD_DOWN_LENGTH_SHORT_ALLOWANCE - printed_band_mm(2)
+    HOLD_DOWN_ENGAGEMENT - HOLD_DOWN_LENGTH_SHORT_ALLOWANCE
+    - printed_band_mm(2, unit=SUPPORT_UNIT)
 )
-HOLD_DOWN_INSERTION_MAX_MM = HOLD_DOWN_ENGAGEMENT + printed_band_mm(2)
+HOLD_DOWN_INSERTION_MAX_MM = HOLD_DOWN_ENGAGEMENT + printed_band_mm(2, unit=SUPPORT_UNIT)
 HOLD_DOWN_SEAT_SPEC = HoleSpec("tapped", HOLD_DOWN_THREAD, thread_class=HOLD_DOWN_THREAD_CLASS)
 HOLD_DOWN_TAP_DRILL_DIA = TAP_DRILL_MM[HOLD_DOWN_THREAD]
 PEDESTAL_SCREW_ENGAGEMENT = PEDESTAL_SCREW_LEN - PEDESTAL_FLANGE_THICKNESS
@@ -264,7 +269,7 @@ def through_seat_pocket_clearances_mm(
     smaller patches inside them and never licenses a new horizontal root.
     A positive result proves open air, not a material-wall policy waiver.
     Structural walls/fillets keep their independent existing minimum checks;
-    the moved block-seat interface additionally requires 2 mm of clear air.
+    the moved block-seat interface additionally requires .080 of clear air.
     """
     if len(xz) != 2 or len(envelope_xz) != 2 or not all(
         math.isfinite(v) for v in (*xz, *envelope_xz)
@@ -272,11 +277,13 @@ def through_seat_pocket_clearances_mm(
         raise ValueError("finite station and nonnegative transfer bounds required")
     if seat.kind not in ("tapped", "tapped_bottoming") or seat.end != "through_all":
         raise AssertionError("pocket clearance requires a through-all tapped seat")
-    band = printed_band_mm(1)
-    # All these locations/sizes print at least .X; .XX is bounded too.
+    band = LINEAR_BAND_MM
+    # All these locations/sizes print .XX or .XXX; the .XX band bounds them.
     relative = 3.0 * (band + 0.05)
     hx, hz = (bound + relative for bound in envelope_xz)
-    radius = max(THREAD_MAJOR_MM[seat.size], TAP_DRILL_MM[seat.size] + 0.10) / 2.0
+    radius = max(
+        THREAD_MAJOR_MM[seat.size], TAP_DRILL_MM[seat.size] + drilled_oversize_mm(unit=UNIT)
+    ) / 2.0
     radius += EDGE_BREAK_MAX_MM
     x, z = xz
 
@@ -369,7 +376,7 @@ def through_seat_material(
         math.isfinite(v) for v in (*xz, *envelope_xz)
     ) or min(envelope_xz) < 0:
         raise ValueError("finite station and nonnegative transfer bounds required")
-    band = printed_band_mm(1)
+    band = LINEAR_BAND_MM
     radius = THREAD_MAJOR_MM[seat.size] / 2.0
     hx, hz = (radius + band + bound for bound in envelope_xz)
     x, z = xz
@@ -382,7 +389,7 @@ def through_seat_material(
     for region in _RETAINED_REGIONS:
         if region[0] == "rect":
             _, x0, x1, z0, z1, bottom = region
-            outline = 2.0 * band  # located face plus its full .X size band
+            outline = 2.0 * band  # located face plus its full .XX size band
             contains = x - hx >= x0 + outline and x + hx <= x1 - outline and (
                 z - hz >= z0 + outline and z + hz <= z1 - outline
             )

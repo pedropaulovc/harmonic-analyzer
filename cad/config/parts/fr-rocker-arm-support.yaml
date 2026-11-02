@@ -1,7 +1,8 @@
 fr-rocker-arm-support:
   number: MHA-FR-05
   material_family: ferrous_noncritical
-  finish: GREEN ENAMEL; MASK MOUNTING FACE; LIGHT OIL BARE MACHINED SURFACES
+  finish: GREEN ENAMEL; MASK BASE (Ra 125) AND TOP SEAT FACES; LIGHT OIL BARE MACHINED SURFACES
   quantity: 1
   tolerance_class: machined_block
+  drawing_unit: in
   process: "machined from solid stock or casting"

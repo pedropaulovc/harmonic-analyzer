@@ -1,7 +1,7 @@
 """SolidWorks-free integrity guards for the photo-traced nameplate contours.
 
 The 2026-10-09 ruling makes the original outer ribbon's OUTER edge the plate
-outline, uniformly scaled to 100 mm wide. That edge is imported for the slab;
+outline, scaled to 3.938 x 1.785 in. That edge is imported for the slab;
 the ribbon itself is omitted from the engraving so it cannot nick the plate.
 The recessed field follows the notched pinstripe INNER edge, copied into its
 own single-loop DXF. Screw holes sit just inside the traced head marks and
@@ -25,6 +25,8 @@ import pytest
 import _dxf_text as dxf
 import build_fr_nameplate as part
 import fr_nameplate_spec as spec
+from _inch_wall_limits import WALL_TARGET_MM
+from fr_harmonic_base_spec import DECK_LENGTH
 from sh_vn_brass_fillister_screw_spec import HEAD_DIA
 
 
@@ -89,8 +91,9 @@ def test_plate_outline_is_the_scaled_dxf_outer_edge():
     assert bounds == pytest.approx(
         (0.0, 0.0, spec.PLATE_WIDTH, spec.PLATE_HEIGHT), abs=1e-9
     )
-    assert spec.PLATE_WIDTH == spec.DXF_OUTER_WIDTH * spec.DXF_SCALE
-    assert spec.PLATE_HEIGHT == spec.DXF_OUTER_HEIGHT * spec.DXF_SCALE
+    # Rebaked per axis so both edges land on the .001 inch grid.
+    assert spec.PLATE_WIDTH == spec.DXF_OUTER_WIDTH * spec.DXF_SCALE_X
+    assert spec.PLATE_HEIGHT == spec.DXF_OUTER_HEIGHT * spec.DXF_SCALE_Y
     assert abs(dxf.signed_area(outline)) == pytest.approx(
         part.OUTLINE_AREA_MM2, abs=1e-8
     )
@@ -126,10 +129,10 @@ def test_field_is_exactly_the_pinstripe_inner_edge_and_has_pinned_area():
     assert all(dxf.point_in_ring(outline, point) for point in field)
 
 
-def test_screw_stations_sit_the_inset_off_the_dxf_head_marks():
-    # Owner ruling 2026-10-15: each hole moved SCREW_INSET toward the plate
-    # centre in x and y from its traced head mark, and the head still covers
-    # the engraved mark.
+def test_screw_stations_sit_on_the_dxf_head_marks():
+    # Each hole sits on its traced head mark at the .16 station from both
+    # edges (within .0001 in), concentric with the outline's rounded corner,
+    # and the head covers the engraved mark.
     rings = _rings(part.ENGRAVING_DXF)
     assert len(spec.SCREW_XY) == len(spec.HEAD_MARK_XY) == 4
     for (sx, sy), mark_xy in zip(spec.SCREW_XY, spec.HEAD_MARK_XY, strict=True):
@@ -145,10 +148,8 @@ def test_screw_stations_sit_the_inset_off_the_dxf_head_marks():
         x0, y0, x1, y1 = dxf.bbox(mark)
         centre = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
         assert math.dist(centre, mark_xy) < 0.01, (mark_xy, centre)
-        toward_centre_x = math.copysign(1.0, spec.PLATE_WIDTH / 2.0 - centre[0])
-        toward_centre_y = math.copysign(1.0, spec.PLATE_HEIGHT / 2.0 - centre[1])
-        assert sx - centre[0] == pytest.approx(toward_centre_x * 0.1, abs=0.01)
-        assert sy - centre[1] == pytest.approx(toward_centre_y * 0.1, abs=0.01)
+        assert sx == pytest.approx(centre[0], abs=0.003)
+        assert sy == pytest.approx(centre[1], abs=0.003)
         reach = max(math.dist((sx, sy), point) for ring in mark for point in ring)
         assert reach < HEAD_DIA / 2.0, (sx, sy, reach)
 
@@ -171,7 +172,7 @@ def test_screw_holes_and_heads_stay_on_the_raised_plate_border():
             min(hx, spec.PLATE_WIDTH - hx, hy, spec.PLATE_HEIGHT - hy)
             - part.SCREW_HOLE_DIA / 2.0
         )
-        assert ligament >= 1.5, (hx, hy, ligament)
+        assert ligament >= WALL_TARGET_MM, (hx, hy, ligament)
 
 
 def test_mount_contract_puts_the_plate_flat_on_the_west_deck():
@@ -188,7 +189,10 @@ def test_mount_contract_puts_the_plate_flat_on_the_west_deck():
         for x in (0.0, spec.PLATE_WIDTH)
         for y in (0.0, spec.PLATE_HEIGHT)
     ]
-    assert max(point[0] for point in corners) == pytest.approx(167.0 - 4.0)
+    # .160 in from the deck's west end (DECK_LENGTH / 2).
+    assert max(point[0] for point in corners) == pytest.approx(
+        DECK_LENGTH / 2.0 - 4.064
+    )
     assert min(point[0] for point in corners) > 104.65  # rocker-arm support's west edge
     assert min(point[2] for point in corners) == pytest.approx(
         -max(point[2] for point in corners)

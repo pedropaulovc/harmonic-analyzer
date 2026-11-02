@@ -82,8 +82,8 @@ SCREW_MAJOR_DIA = THREAD_MAJOR_MM[SCREW_THREAD]
 SCREW_PITCH = 25.4 / float(SCREW_THREAD.rsplit("-", 1)[1])
 SCREW_TIP_CHAMFER = 0.7 * SCREW_PITCH  # 45 deg x 0.7P point (the vendor model)
 
-SEAT_THREAD_DEPTH = 11.5  # .X
-SEAT_DRILL_DEPTH = 14.7  # .X
+SEAT_THREAD_DEPTH = 11.684  # .46
+SEAT_DRILL_DEPTH = 14.986  # .59
 SEAT_SPEC = HoleSpec(
     "tapped_bottoming",
     SCREW_THREAD,
