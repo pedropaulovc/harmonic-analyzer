@@ -107,9 +107,11 @@ def test_no_process_callout_on_the_sheet() -> None:
     assert "Web Callout" not in source
 
 
-def test_support_finish_masks_only_the_machined_mounting_face() -> None:
+def test_support_finish_masks_both_mating_faces() -> None:
+    # #2108 review: the base underside seats on the harmonic base and the
+    # top face under the MHA-CH-08 feet; the finish names both.
     assert _config.parts(support.PART_NAME)["finish"] == (
-        "GREEN ENAMEL; MASK MOUNTING FACE; LIGHT OIL BARE MACHINED SURFACES"
+        "GREEN ENAMEL; MASK FOOT UNDERSIDE AND MHA-CH-08 SEAT; OIL BARE FACES"
     )
     assert support.HOLE_SPEC.kind == "drilled_fractional"
     assert support.HOLE_SPEC.size == "5/16"
