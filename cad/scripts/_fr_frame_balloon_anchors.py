@@ -39,7 +39,7 @@ hit result choosing the instance, so the pin makes that choice instead.
 
 The nameplate screw is pinned to fillister-screw-2, the plate's front west
 corner (``nameplate_spec.MOUNT_HOLE_XZ[1]``). The explode withdraws the four
-screws 35 mm straight up off the lifted plate, and in the isometric the
+screws 50 mm straight up off the lifted plate, and in the isometric the
 first screw's corner is the plate's nearest: its screw hangs over the
 engraving, where run 20260928T194845954Z-44f5de00de924735961d14f4aad40337
 ballooned its head among the letters and the leader read as the nameplate's.

@@ -533,9 +533,10 @@ def _create_frame_explode(adapter: Any, configuration_name: str) -> None:
         ("support lifts from deck", [*groups["fr-rocker-arm-support"], *groups["fr-vn-lag-screw"]], "y", 0.035),
         ("support moves beside base", [*groups["fr-rocker-arm-support"], *groups["fr-vn-lag-screw"]], "x", -0.320),
         ("support screws withdraw", groups["fr-vn-lag-screw"], "y", 0.050),
-        ("nameplate lifts from deck", [*groups["fr-nameplate"], *groups["sh-vn-brass-fillister-screw"]], "y", 0.025),
+        # At 1:8 a 25 mm lift printed the plate as if seated in its deck pocket.
+        ("nameplate lifts from deck", [*groups["fr-nameplate"], *groups["sh-vn-brass-fillister-screw"]], "y", 0.075),
         ("nameplate moves beside base", [*groups["fr-nameplate"], *groups["sh-vn-brass-fillister-screw"]], "x", 0.080),
-        ("nameplate screws withdraw", groups["sh-vn-brass-fillister-screw"], "y", 0.035),
+        ("nameplate screws withdraw", groups["sh-vn-brass-fillister-screw"], "y", 0.050),
     )
     # Reuse the native assembly axes already used by component patterns. Unlike
     # manipulator indices, Mark=2 direction entities are independent of each
