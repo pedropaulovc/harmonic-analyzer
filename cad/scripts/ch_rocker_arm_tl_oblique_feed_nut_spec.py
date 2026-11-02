@@ -89,6 +89,10 @@ LENGTH_MAX = LENGTH + LENGTH_BAND
 # Five turns of the Tr8x2's lead at the nominal length (ruling A1).
 if LENGTH < 5.0 * leadscrew.SCREW_LEAD:
     raise AssertionError("the feed nut is shorter than five Tr8 turns")
+# The Tr8 engages the nut's whole length: .39 min, 1.24D, under rule 18's
+# 1.5D (owner ruling 2026-11-01, RV-01). Rule 20: the callout says so.
+TR8_ENGAGEMENT_D = LENGTH_MIN / leadscrew.SCREW_MAJOR_DIA
+TR8_ENGAGEMENT_TEXT = f"ENGAGES {LENGTH_MIN / INCH:.2f} MIN ({TR8_ENGAGEMENT_D:.2f}D)".replace("0.", ".", 1)
 
 # --- The Tr8x2 RH bore ------------------------------------------------------------
 BORE_X = 0.63 * INCH  # 16.002 from the -X side
@@ -203,7 +207,7 @@ for _name, _value in (
 CALLOUTS_PREFIX = {"HoleDia": "2X <MOD-DIAM>"}
 CALLOUTS_SUFFIX = {"BoreDia": " DRILL THRU", "HoleDia": " DRILL THRU"}
 CALLOUTS_BELOW = {
-    "BoreDia": f"{BORE_THREAD} THRU",
+    "BoreDia": f"{BORE_THREAD} THRU\n{TR8_ENGAGEMENT_TEXT}",
     "Hole1Offset": MATE_CALLOUT,
     "Hole2Offset": MATE_CALLOUT,
 }
