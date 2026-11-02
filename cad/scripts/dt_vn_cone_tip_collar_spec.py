@@ -1,4 +1,4 @@
-"""Custom MHA-DT-VN-54 stack collar and its stock set screw, mm.
+"""Custom MHA-DT-VN-54 stack collar and its stock set screw (model mm, sheet inch).
 
 9414T1 was the historical 1/16-inch collar, not a 1/32-inch product. Live
 McMaster 1/32-inch collars (6435K234, 6436K236, 6157K64; 2026-10-08) are
@@ -24,10 +24,13 @@ import math
 import _config
 
 from _hole_spec import HoleSpec, TAP_DRILL_MM
-from _printed_tolerance import printed_band_mm
+from _package_units import drawing_unit
+from _printed_tolerance import printed_band_mm, printed_deviations
+from _title_block_units import LENGTH_UNITS, render_number
 from cone_shaft_land_bands import (
     RUNNING_DIA_BAND,
     TERMINAL_DIA_MM,
+    TERMINAL_DIA_PLACES,
     TERMINAL_FINISHED_DIA_LIMITS_MM,
     TERMINAL_FINISHED_AF_LIMITS_MM,
     TERMINAL_FLAT_AF_MM,
@@ -35,6 +38,7 @@ from cone_shaft_land_bands import (
     TERMINAL_FLAT_EDGE_BREAK_MAX,
     TERMINAL_HALF_CHORD_MIN_MM,
     TIP_COLLAR_AXIAL_PLACES,
+    tip_collar_axial_band_mm,
     TIP_COLLAR_MAX_RADIAL_FLOAT_MM,
     TIP_COLLAR_WIDTH_MM,
     TIP_COLLAR_MIN_RADIAL_FLOAT_MM,
@@ -44,6 +48,24 @@ from cone_shaft_land_bands import (
     TIP_COLLAR_FREE_EDGE_BREAK_MAX_MM,
 )
 from gear_seat_fit import seat_bore_band
+
+# #290: the sheet unit the registry row declares; every band below is read
+# for it (owner waiver: the sheet keeps its .XXX lengths; review stays off).
+UNIT = drawing_unit(
+    "parts/dt-vn-cone-tip-collar", _config.parts("dt-vn-cone-tip-collar")
+)
+_PER_UNIT = LENGTH_UNITS[UNIT]
+
+
+def _ceil_printed(value_mm: float, places: int) -> float:
+    """The least size on the sheet's grid at ``places`` not below ``value_mm``."""
+    return math.ceil(value_mm / _PER_UNIT * 10**places - 1e-9) / 10**places * _PER_UNIT
+
+
+def length_text(value_mm: float, places: int) -> str:
+    """A length as the sheet prints it at ``places``, in its unit."""
+    return render_number(round(value_mm / _PER_UNIT, places), UNIT, places)
+
 
 IN = 25.4
 STOCK_DIA = 3.0 * IN / 4.0
@@ -60,30 +82,34 @@ BORE_DIA_BAND = seat_bore_band(RUNNING_DIA_BAND)
 BORE_DIA_PLACES = 4
 BORE_MODEL_DIA_MM = TERMINAL_PRINTED_DIA_MM + sum(BORE_DIA_BAND) / 2.0
 BORE_MODEL_DIA_BAND = tuple(value - sum(BORE_DIA_BAND) / 2.0 for value in BORE_DIA_BAND)
-BORE_PRINTED_DIA_MM = round(BORE_MODEL_DIA_MM, BORE_DIA_PLACES)
-if abs(BORE_PRINTED_DIA_MM - BORE_MODEL_DIA_MM) > 1e-9:
-    raise AssertionError("collar bore nominal does not print exactly at BORE_DIA_PLACES")
+BORE_PRINTED_DIA_MM = BORE_MODEL_DIA_MM + printed_deviations(
+    BORE_MODEL_DIA_MM, TERMINAL_DIA_PLACES, (0.0, 0.0), unit=UNIT,
+)[0]
 BORE_FINISHED_DIA_LIMITS_MM = (
     BORE_PRINTED_DIA_MM + BORE_MODEL_DIA_BAND[1],
     BORE_PRINTED_DIA_MM + BORE_MODEL_DIA_BAND[0],
 )
 INSTALLED_BORE_AXIS_OFFSET_MM = (BORE_MODEL_DIA_MM - TERMINAL_DIA_MM) / 2.0
-NOSE_DIA = 6.40
+# Collar-owned sizes sit on the sheet's inch grid at their places, so the
+# printed number is the model: the nose prints .25.
+NOSE_DIA = 0.25 * IN
 NOSE_LENGTH = TIP_COLLAR_NOSE_LENGTH_MM
 WIDTH = TIP_COLLAR_WIDTH_MM
 WIDTH_BAND_MM = TIP_COLLAR_WIDTH_BAND_MM
 TAP_STATION = TIP_COLLAR_TAP_STATION_MM
-# The turned shoulder's tool-nose root prints R0.25 MAX: any root from sharp
-# up to 0.25 is good, and the collar air stack (dt_tip_collar_air) books 0.25.
-SHOULDER_ROOT_RADIUS = 0.25
+# The turned shoulder's tool-nose root prints R.01 MAX: any root from sharp
+# up to .01 is good, and the collar air stack (dt_tip_collar_air) books it.
+SHOULDER_ROOT_RADIUS = 0.01 * IN
 # The title block's free-edge break: the wall, thread and contact budgets
 # book it, but the model leaves the edges sharp (the title block prints it).
 EDGE_BREAK = TIP_COLLAR_FREE_EDGE_BREAK_MAX_MM
-FLAT_DISTANCE = 7.0
-ROUTINE_BAND_MM = printed_band_mm(2)
+FLAT_DISTANCE = 0.28 * IN
+ROUTINE_BAND_MM = printed_band_mm(2, unit=UNIT)
 # Width, nose and tap station: the title block's .XXX (cone_shaft_land_bands).
+# Their mm nominals belong to the cone stack and sit off the inch grid, so
+# each books its own band with its printed rounding (worst side).
 AXIAL_PLACES = TIP_COLLAR_AXIAL_PLACES
-AXIAL_BAND_MM = printed_band_mm(AXIAL_PLACES)
+NOSE_LENGTH_BAND_MM = tip_collar_axial_band_mm(NOSE_LENGTH)
 WALL_TARGET_MM = 2.0
 
 BOM_DESCRIPTION = str(_config.parts("dt-vn-cone-tip-collar")["description"])
@@ -147,14 +173,14 @@ SET_SCREW_HOLE = HoleSpec("tapped", SET_SCREW_THREAD)
 # limit, authored as a native MAX gauge diameter and printed beside the tap,
 # so the envelope the wall budget books (WORST_WALLS_MM) is one the sheet
 # enforces (Codjiflo review of #2101; the machinist review that asked to
-# drop it is waived on this sheet).  Book its rounded PRINTED maximum.
-THREAD_ENVELOPE_DIA = math.ceil((
-    0.0772 * IN + 0.64951905 * SET_SCREW_PITCH + 0.10
-) * 100.0) / 100.0
+# drop it is waived on this sheet).  Book its rounded PRINTED maximum: the
+# sharp-V root of the largest 2B pitch diameter, ceiled on the sheet's .XX
+# grid (.0888 in prints .09 MAX, which leaves the tap .0012 in over it).
+THREAD_ENVELOPE_DIA = _ceil_printed(0.0772 * IN + 0.64951905 * SET_SCREW_PITCH, 2)
 # The tap is located by its .XXX station from the south face; its centring
 # on the bore axis is implied, not dimensioned, so it is booked at .XX. Its
 # squareness to the mounting flat is the title block's angle.
-TAP_STATION_BAND_MM = AXIAL_BAND_MM
+TAP_STATION_BAND_MM = tip_collar_axial_band_mm(TAP_STATION)
 TAP_LATERAL_BAND_MM = ROUTINE_BAND_MM
 TAP_ANGLE_RAD = math.radians(float(_config.title_block("angular")["value_deg"]))
 # The stock screw rocks in its 3A/2B play over the least full engagement the
@@ -163,7 +189,7 @@ SET_SCREW_MAX_AXIS_ANGLE_RAD = TAP_ANGLE_RAD + math.atan(
     2.0 * SET_SCREW_THREAD_RADIAL_PLAY_MM / REQUIRED_FULL_ENGAGEMENT_MM
 )
 # The smallest shop-readable custom body that retains the 2.0 wall target at
-# every printed limit.
+# every printed limit: ceiled on the sheet's .XX grid, it prints its model.
 BODY_RADIUS_REQUIREMENTS_MM = {
     "round bore wall": BORE_FINISHED_DIA_LIMITS_MM[1]/2.0 + 2.0*EDGE_BREAK + WALL_TARGET_MM,
     "tap to flat side rims": math.hypot(
@@ -171,7 +197,7 @@ BODY_RADIUS_REQUIREMENTS_MM = {
         WALL_TARGET_MM+THREAD_ENVELOPE_DIA/2.0+EDGE_BREAK+TAP_LATERAL_BAND_MM,
     ),
 }
-OUTER_DIA = math.ceil((2.0*max(BODY_RADIUS_REQUIREMENTS_MM.values())+ROUTINE_BAND_MM)*100.0)/100.0
+OUTER_DIA = _ceil_printed(2.0*max(BODY_RADIUS_REQUIREMENTS_MM.values())+ROUTINE_BAND_MM, 2)
 
 _BORE_MAX = BORE_FINISHED_DIA_LIMITS_MM[1]
 _LAND_MIN = TERMINAL_FINISHED_DIA_LIMITS_MM[0]
@@ -233,7 +259,8 @@ WORST_WALLS_MM = {
         - 2.0 * EDGE_BREAK,
     # The station is from the south face; the shoulder and north face move
     # independently on their own bands.
-    "tap to south shoulder": TAP_STATION - TAP_STATION_BAND_MM - NOSE_LENGTH - AXIAL_BAND_MM
+    "tap to south shoulder": TAP_STATION - TAP_STATION_BAND_MM
+        - NOSE_LENGTH - NOSE_LENGTH_BAND_MM
         - _THREAD_R - EDGE_BREAK - _TAP_AXIAL_DRIFT_MAX,
     "tap to north face": WIDTH - WIDTH_BAND_MM - TAP_STATION - TAP_STATION_BAND_MM
         - _THREAD_R - EDGE_BREAK - _TAP_AXIAL_DRIFT_MAX,
@@ -300,7 +327,7 @@ if SCREW_LANDING_MARGIN_MM <= 0.0:
 if WORST_SOCKET_ACCESS_MM <= 0.0:
     raise AssertionError("stock screw socket is buried below the mounting flat")
 
-# Supply size only: the turned Ø17.48 body is the dimensioned OD.
+# Supply size only: the turned body's printed OD is the dimensioned size.
 DRAWING_NOTES = "SUPPLY 3/4 ROUND BAR."
 # INSTALLATION_NOTES is the bore's fit statement, printed in its REAM callout
 # (rule 4: a tight band names its mate at its callout), not as a sheet note:
@@ -316,10 +343,16 @@ if abs(JOURNAL_CLEARANCE_MM[0] - 2.0 * TIP_COLLAR_MIN_RADIAL_FLOAT_MM) > 1e-9 or
     JOURNAL_CLEARANCE_MM[1] - 2.0 * TIP_COLLAR_MAX_RADIAL_FLOAT_MM
 ) > 1e-9:
     raise AssertionError("printed collar journal clearance diverged from the retention float")
+_JOURNAL_TEXT = tuple(
+    length_text(value, TERMINAL_DIA_PLACES) for value in TERMINAL_FINISHED_DIA_LIMITS_MM
+)
+_CLEARANCE_TEXT = tuple(
+    length_text(value, TERMINAL_DIA_PLACES) for value in JOURNAL_CLEARANCE_MM
+)
 INSTALLATION_NOTES = "\n".join((
     f"FITS {JOURNAL_PART_NUMBER} TERMINAL JOURNAL \u00d8"
-    f"{TERMINAL_FINISHED_DIA_LIMITS_MM[0]:.5f} TO {TERMINAL_FINISHED_DIA_LIMITS_MM[1]:.5f};",
-    f"DIAMETRAL CLEARANCE {JOURNAL_CLEARANCE_MM[0]:.5f} TO {JOURNAL_CLEARANCE_MM[1]:.5f}.",
+    f"{_JOURNAL_TEXT[0]} TO {_JOURNAL_TEXT[1]};",
+    f"DIAMETRAL CLEARANCE {_CLEARANCE_TEXT[0]} TO {_CLEARANCE_TEXT[1]}.",
 ))
 BORE_CALLOUT = f"REAM THRU\n{INSTALLATION_NOTES}"
 # The .XXX width, nose length and tap station hold the tapped hole's walls to

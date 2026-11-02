@@ -92,9 +92,12 @@ def test_terminal_torque_corners_are_a_drawing_break_limit_not_geometry():
         lands.TERMINAL_HALF_CHORD_MIN_MM - lands.TERMINAL_FLAT_EDGE_BREAK_MAX
     )
     assert collar.SCREW_LANDING_MARGIN_MM > 0.0
-    # ... and the title block's R.010 would lose the landing: the override is real.
+    # ... and the title block's R.010 corners would cost the landing that
+    # much. Since the collar sheet prints inch (#290) its tap centring books
+    # the inch .XX band (.010, not 0.51 mm), so the landing would survive
+    # even R.010; the .001 MAX stays the shaft sheet's own (stricter) limit.
     widened = collar.SCREW_LANDING_MARGIN_MM + lands.TERMINAL_FLAT_EDGE_BREAK_MAX - 0.254
-    assert widened < 0.0
+    assert 0.0 < widened < collar.SCREW_LANDING_MARGIN_MM
     # The model keeps the corners sharp; the limit is printed once, above the
     # terminal across-flat.
     assert "TerminalFlatEdgeBreak" not in dt_cone_gear_shaft_spec.DRAWING_DIMENSIONS

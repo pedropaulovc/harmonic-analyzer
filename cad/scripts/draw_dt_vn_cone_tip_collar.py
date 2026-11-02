@@ -25,10 +25,11 @@ from _drawing_common import (
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, move_model_dimension, set_dimension_callouts
 import _drawing_hidden_sketches as hidden_sketches
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _layout_geometry import format_findings
@@ -64,7 +65,7 @@ SIDE_CENTER = (0.205, 0.170)
 # top border by 3.2 and 8.8 mm, its note sat on NoseLength's lines, and the
 # root gauge and position leaders ran through the hole callout (run 14 at
 # 7fda4144f). Offsets below are from TAP_CENTER. The view spans +/-11.5 x
-# +/-17.48 mm at 2:1. Run 14 put the tap mouth at (+3.3, +1.8) mm, the callout
+# +/-16.76 mm at 2:1. Run 14 put the tap mouth at (+3.3, +1.8) mm, the callout
 # text at [-39, -1] x [-5.6, -2.1] mm from its callout point, and the view
 # note's 62 x 4.3 mm box with its left/top corner at the note point.
 TAP_CENTER = (0.065, 0.238)
@@ -116,6 +117,9 @@ TAP_KEEP = {
 # Right of the view: the hole callout's text starting past the view's right
 # edge. The view note goes over the view, 3.7 mm inside the top border.
 TAP_CALLOUT_XY = (TAP_CENTER[0] + 0.0553, TAP_CENTER[1] - 0.0062)
+# The tap drill's size prints three inch places, as every Hole Wizard callout
+# on an inch sheet does (#290, draw_dt_cone_tip_block).
+TAP_CALLOUT_PRECISION = {"hw-thrutapdrldia": 3}
 TAP_NOTE_XY = (TAP_CENTER[0] - 0.030, TAP_CENTER[1] + 0.025)
 # Lower left, under the end view whose bore it enlarges, in the field the
 # assembly-procedure notes left: between the isometric and the title block
@@ -522,6 +526,7 @@ async def build(adapter: Any) -> dict[str, str]:
                  "Radial Tap View Note", "Bore View Note", "Supplier Reference Title"))
     drawing, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="collar and stock set screw")
     if not _early_bound(drawing, "IDrawingDoc").ActivateSheet(SHEET_NAMES[0]):
@@ -590,6 +595,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, tap,
         edge_xy=tap_rim,
         callout_xy=TAP_CALLOUT_XY, label="custom collar through set screw tap",
+    )
+    set_hole_callout_precision(
+        callout, TAP_CALLOUT_PRECISION, label="custom collar through set screw tap",
     )
     callout_name = str(_early_bound(
         _early_bound(callout, "IDisplayDimension").GetAnnotation(), "IAnnotation",
