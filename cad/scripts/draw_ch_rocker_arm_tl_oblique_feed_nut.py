@@ -5,7 +5,7 @@ One part, one off. A 1-1/4 x 3/4 x .40 brass block at 2:1: the face view
 the hole stations over it (each hole 2X .340 from the bore, one each side,
 each with its mate row outboard of its hole), the bore's .63 and the stock
 width under it, the bore's .38 and the stock height left of it, the 2X Ø.144
-callout over the +X mate row on the +X hole and the Tr8x2 bore callout right
+callout on the +X hole and the Tr8x2 bore callout under it, both right
 of the face, each leader clear of every extension line; the side view
 (*Right), projected right of the face, carries the faced length over it; the
 shaded isometric rides top right at 1:1. No datums (drawing-guidelines.md
@@ -139,14 +139,15 @@ FACE_KEEP: dict[str, tuple[float, float, float]] = {
     "NutWidth": ((BORE_X + WIDTH) / 2.0, _WIDTH_LINE + THREE_LINE_DROP, LENGTH),
     "BoreY": (_BORE_Y_TEXT, BORE_Y / 2.0, LENGTH),
     "NutHeight": (_HEIGHT_TEXT, HEIGHT / 2.0, LENGTH),
-    # The +X hole's 2X Ø.144 DRILL THRU over the +X mate row, its left end
-    # over the gap between the two mate rows, its leader down that gap onto
-    # the hole's upper-left rim, its right end short of the side view's .40
-    # (r2 review: level with it, the shelf ran into that dimension line); the
-    # bore's two rows right, level with the face's lower edge, its leader in
-    # through the +X side under the +X hole and over the stock width's
-    # extension line (which runs down from the face).
-    "HoleDia": (HOLE_X[1] + 6.4, HEIGHT + 14.0, LENGTH),
+    # Right of the face, under the dimension lanes (feed-nut2 r1 review: from
+    # above, the leader crossed the +X .340's dimension line): the +X hole's
+    # 2X Ø.144 DRILL THRU in the face's upper half, its leader in through the
+    # +X side onto that hole's upper-right rim, clear of every extension
+    # line; the bore's two rows under it, level with the face's lower edge,
+    # its leader in through the +X side under the +X hole and over the stock
+    # width's extension line (which runs down from the face). Both end short
+    # of the side view.
+    "HoleDia": (WIDTH + 2.5 + text_half("2X Ø.144 DRILL THRU"), HEIGHT - 4.0, LENGTH),
     "BoreDia": (WIDTH + 16.0, 2.0, LENGTH),
 }
 # The side view (*Right): the faced length over it.
