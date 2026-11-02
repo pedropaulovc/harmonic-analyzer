@@ -3367,6 +3367,95 @@ vendor = "LittleMachineShop"
 sku = 2881
 by = "photo+lms-package"
 
+# 2026-11-01 workholding order (Pedro): in the cart at JB Tools and Taytools, not yet
+# received. Catalogue values only; no possession, receipt metrology or fit is asserted.
+# Second matched pair, joinable with fixtures.blocks-123-hardware-taytools.
+[fixtures.blocks-123-taytools-241362]
+name = "Taytools 1-2-3 blocks, matched pair, 23 hole"
+kind = "blocks_123"
+make = "Taytools"
+sku = 241362
+source = "https://taytools.com/taytools-1-2-3-blocks-matched-pair-hardened-tool-steel-multiple-hole-configurations"
+present = false
+verify = true
+pieces = 2
+size_in = [1, 2, 3]
+material = "hardened tool steel, RC 56-60"
+purchase = "1 pair Taytools 241362 (style 23 Hole), USD 22.99, in the cart 2026-11-01."
+note = "Read live 2026-11-01: hardened tool steel RC 56-60, ground on all six sides, size and flatness/parallelism within +/-0.0001 in, squareness within 0.0003 in per inch, pair matched within 0.0002 in. 23 through holes: 5 tapped 3/8-16, 18 untapped 0.340 in (older Taytools product page). No hole passes a 1/2-13 clamping-kit stud."
+cite = ["Taytools 1-2-3 Blocks, Pair https://taytools.com/taytools-1-2-3-blocks-matched-pair-hardened-tool-steel-multiple-hole-configurations read live 2026-11-01: SKU 241362 style 23 Hole, USD 22.99; RC 56-60, +/-0.0001 in size and flatness, 0.0003 in/in squareness, pairs matched 0.0002 in", "Taytools 23 Hole 1-2-3 Blocks https://taytools.com/products/taytools-1-2-3-matched-pair-1-2-3-23-holes-hardened-steel (via search 2026-11-01): 23 x 0.340 in through holes, 5 tapped 3/8-16"]
+
+[fixtures.blocks-123-hardware-taytools]
+name = "Taytools 1-2-3 block attachment hardware kit"
+kind = "block_joining_kit"
+make = "Taytools"
+sku = "123BlockHardware"
+source = "https://taytools.com/taytools-123-block-attachment-hardware-kit"
+present = false
+verify = true
+pieces = 2
+included = ["two 8-32 threaded dowels, 5/16 in dia x 7/8 in", "two through-hole dowels for 8-32 screws, 5/16 in dia x 7/8 in", "two each 8-32 socket head cap screws, 1-1/2, 2 and 2-1/2 in", "one 9/64 in hex key"]
+purchase = "2 kits Taytools 123BlockHardware, USD 12.99 each (USD 25.98), in the cart 2026-11-01."
+note = "Read live 2026-11-01: joins two 23-hole 1-2-3 blocks with all hardware buried in the holes and faces flush; only the 23 Hole style is compatible. Contents listed per kit (included); two kits ordered."
+cite = ["Taytools 1-2-3 Block Attachment Hardware Kit https://taytools.com/taytools-123-block-attachment-hardware-kit read live 2026-11-01: SKU 123BlockHardware, USD 12.99; 2 x 8-32 threaded dowels and 2 x through dowels 7/8 x 5/16 in, 8-32 SHCS 2 each 1-1/2, 2, 2-1/2 in, 9/64 in hex key"]
+
+[fixtures.screw-jacks-hhip-3901-0076]
+name = "HHIP 3901-0076 adjustable screw jack, 23-30 mm"
+kind = "screw_jack"
+make = "HHIP"
+sku = "3901-0076"
+source = "https://www.jbtools.com/hhip-23-30mm-adjustable-screw-jack-3901-0076/"
+present = false
+verify = true
+pieces = 2
+range_mm = [23.0, 30.0]
+material = "tool steel"
+purchase = "2 x HHIP 3901-0076 at JB Tools, USD 7.11 each (USD 14.22), in the cart 2026-11-01."
+note = "Read live 2026-11-01: 23-30 mm adjustable range, M16 thread, 34 mm body diameter, 2 ton capacity, tool steel, no lock nut. Sets a 1 in parallel height (25.4 mm) with the screw near its low end."
+cite = ["JB Tools HHIP 3901-0076 https://www.jbtools.com/hhip-23-30mm-adjustable-screw-jack-3901-0076/ read live 2026-11-01: 23-30 mm, M16, H 30 mm, h 23 mm, D 34 mm, USD 7.11", "HHIP catalogue p.253 adjustable screw jacks table (JB Tools product image, read 2026-11-01): 3901-0076 0.90-1.18 in, 2 tons"]
+
+[fixtures.machinists-jacks-hhip-3900-0070]
+name = "HHIP 3900-0070 machinist's jack, 3-4 in"
+kind = "screw_jack"
+make = "HHIP"
+sku = "3900-0070"
+source = "https://www.jbtools.com/hhip-machinists-jack-3900-0070/"
+present = false
+verify = true
+pieces = 2
+range_in = [3.0, 4.0]
+material = "cast steel"
+purchase = "2 x HHIP 3900-0070 at JB Tools, USD 8.92 each (USD 17.84), in the cart 2026-11-01."
+note = "Read live 2026-11-01: 3-4 in range (76.2-101.6 mm) with 1 in screw adjustment, tilting swivel head, adjustable pin and lock nut, heavy cast steel, 3/8-16 threads, tested lifting capacity about 1,000 lb."
+cite = ["JB Tools HHIP 3900-0070 https://www.jbtools.com/hhip-machinists-jack-3900-0070/ read live 2026-11-01: 3-4 in range, 1 in adjustment, 3/8-16, about 1,000 lb, USD 8.92"]
+
+[fixtures.jack-screw-set-hhip-3900-0266]
+name = "HHIP 3900-0266 Little Giant style jack screw set, 2-1/4 to 3-3/8 in"
+kind = "jack_screw_set"
+make = "HHIP"
+sku = "3900-0266"
+source = "https://www.jbtools.com/hhip-2-1-4-to-3-3-8-little-giant-style-jack-screw-set-3900-0266/"
+present = false
+verify = true
+pieces = 6
+range_in = [2.25, 3.375]
+purchase = "1 x HHIP 3900-0266 at JB Tools, USD 34.44, in the cart 2026-11-01."
+note = "Read live 2026-11-01: lift range 2-1/4 to 3-3/8 in (57.2-85.7 mm), 6 pieces, for levelling work on planer beds and drills. The catalogue photo shows a screw with tommy bar, a body, an extension ring and interchangeable heads; the listing does not itemise the pieces."
+cite = ["JB Tools HHIP 3900-0266 https://www.jbtools.com/hhip-2-1-4-to-3-3-8-little-giant-style-jack-screw-set-3900-0266/ read live 2026-11-01: USD 34.44", "HHIP catalogue p.253 Little Giant style jack screw sets table (JB Tools product image, read 2026-11-01): 3900-0266 lift range 2-1/4 to 3-3/8 in, 6 pieces"]
+
+[fixtures.work-stop-hhip-3900-2125]
+name = "HHIP 3900-2125 universal work stop"
+kind = "work_stop"
+make = "HHIP"
+sku = "3900-2125"
+source = "https://www.jbtools.com/hhip-universal-work-stop-3900-2125/"
+present = false
+verify = true
+material = "hardened tool steel"
+purchase = "1 x HHIP 3900-2125 at JB Tools, USD 19.27, in the cart 2026-11-01."
+note = "Read live 2026-11-01: base 5/8 x 2 x 4-3/8 in with one 1/2 in hole, column 5/8 x 6-1/4 in, rod 3/8 x 10 in in a set-screw clamp block, hardened tool steel. Check on receipt whether the 1/2 in base hole passes a 1/2-13 clamping-kit stud."
+cite = ["JB Tools HHIP 3900-2125 https://www.jbtools.com/hhip-universal-work-stop-3900-2125/ read live 2026-11-01: base 5/8 x 2 x 4-3/8 in, hole 1/2 in, column 5/8 x 6-1/4 in, rod 3/8 x 10 in, USD 19.27"]
+
 [fixtures.v-blocks]
 name = "Generic matched hardened-steel 3 x 2 x 1.5-inch 90-degree V-block pair with clamps"
 kind = "v_blocks"
@@ -3401,14 +3490,31 @@ capacity_min_mm = { value = 6, measured = { status = "measured", by = "placehold
 # Basis: fixtures.v-blocks.capacity_max_mm: Generic practical maximum clamped round-bar support diameter estimate.
 capacity_max_mm = { value = 38, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "calipers and ground test pins, seating under clamp" } }
 
+# Owned (Pedro 2026-11-01), alongside fixtures.clamping-kit-pm-52pcck-14mm.
+[fixtures.clamping-kit-lms-1268]
+name = "LittleMachineShop 1268 clamping kit, 1/2 in T-slot, 58 pieces"
+kind = "clamping_kit"
+make = "LittleMachineShop"
+sku = 1268
+source = "https://littlemachineshop.com/products/clamping-kit-1-2-t-slot"
+present = true
+verify = true
+pieces = 58
+stud = "3/8-16"
+t_slot_in = "1/2"
+included = ["24 x 3/8-16 studs", "12 step blocks in pairs", "6 T-slot nuts", "6 flange nuts", "4 coupling nuts", "6 step clamps", "wall-mount rack"]
+note = "Read live 2026-11-01: nuts fit T-slots 0.495-0.55 in (12.57-13.97 mm) wide at the top; nominal T-nut 0.49 in neck, 0.88 x 0.88 in foot 0.28 in thick, 0.50 in overall. In the PM-30MV's 14 mm slot (manual p6 section, not measured) the neck has about 1.5 mm side play and the foot clears the 25 x 10 mm undercut. The 3/8-16 studs match the tapped holes of both 1-2-3 block pairs and the 3900-0070 jacks, and pass the 3900-2125 work stop's 1/2 in base hole."
+cite = ["LittleMachineShop 1268 https://littlemachineshop.com/products/clamping-kit-1-2-t-slot read live 2026-11-01: 58 pieces, 3/8-16 studs, 1/2 in T-slot, range 0.495-0.55 in, USD 89.95", "LittleMachineShop T-slot nut 1/2 in drawing https://littlemachineshop.com/cdn/shop/files/t-slot-nut-1-2.400.jpg read 2026-11-01: B 0.49 in, C 0.50 in, D 0.28 in, E 0.88 in, 3/8-16, all nominal"]
+
 [fixtures.clamping-kit-pm-52pcck-14mm]
 kind = "clamping_kit"
 pieces = 52
 stud = "1/2-13"
 t_slot_in = "9/16"
+present = true
 verify = true
-purchase = "1 x Precision Matthews 52PCCK-9/16-14mm clamping kit; $79.99 vendor listing, possession unconfirmed."
-note = "PM-30MV-compatible 14 mm T-nuts; purchase candidate, not confirmed possession."
+purchase = "1 x Precision Matthews 52PCCK-9/16-14mm clamping kit; $79.99 vendor listing. Owned (Pedro 2026-11-01)."
+note = "PM-30MV-compatible 14 mm T-nuts. Owned alongside fixtures.clamping-kit-lms-1268 (Pedro 2026-11-01); the strap members below remain generic estimates, not this kit's measured parts."
 cite = ["Precision Matthews 52PCCK-9/16-14mm https://www.precisionmatthews.com/products/52pcck-9-16-14mm read 2026-10-16: 52 pieces, 1/2-13 studs, 14 mm / 9/16 in T-nuts, $79.99"]
 
 [fixtures.clamping-kit-pm-52pcck-14mm.source]
@@ -5363,6 +5469,21 @@ make = "TEKTON"
 source = "https://www.tekton.com/hammers/dead-blow-hammers (soft face, 8-88 oz range), read 2026-10-15"
 # Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "kitchen scale"; weight_lb is a plain number in the schema.
 weight_lb = 1.0
+
+# 2026-11-01 order (Pedro), in the cart at Taytools, not yet received.
+[tools.dead-blow-mallet-taytools-28oz]
+name = "Taytools 28 oz dead blow mallet"
+kind = "hammer"
+make = "Taytools"
+sku = "A15F18"
+source = "https://taytools.com/products/28-dead-blow-mallet-non-marring-soft-faces"
+present = false
+verify = true
+weight_lb = 1.75
+material = "steel shot-filled head, nitrile rubber faces"
+purchase = "1 x Taytools A15F18, USD 22.99, in the cart 2026-11-01."
+note = "Read live 2026-11-01: 28 oz, 11-1/2 in long, 2 in head diameter, steel shot-filled head with non-marring nitrile faces, -4 to 194 F."
+cite = ["Taytools 28oz. Dead Blow Mallet https://taytools.com/products/28-dead-blow-mallet-non-marring-soft-faces (via search 2026-11-01): A15F18, 11-1/2 in long, 2 in head, nitrile, USD 22.99"]
 
 # Drives pins and studs in and out of reamed and drilled holes.
 [tools.pin-punch-set-starrett-s565pc]
