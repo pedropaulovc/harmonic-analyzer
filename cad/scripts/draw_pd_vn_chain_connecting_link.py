@@ -25,8 +25,8 @@ from _supplier_chain_dimensions import (
 from _supplier_chain_stock import SUPPLIER_REFERENCE_CONFIGURATION
 from _supplier_spring_drawing import build_supplier_spring_drawing
 
-# Cached machinist review leaf: warnings only until the sheet ships.
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_vn_chain_connecting_link"]
 PART_STEM = SPEC.artifact_stem
