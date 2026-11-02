@@ -374,7 +374,7 @@ def _spring_pin_source(*, limits=(0.062, 0.065), precision=3):
 
     return SupplierPinReference(
         sku="spring-pin", units="in", diameter_mm=1.5875, length_mm=12.7,
-        diameter_nominal=0.063, diameter_precision=3, length_precision=3,
+        diameter_precision=3, length_precision=3,
         wall_mm=0.3048, wall_precision=3,
         application_hole_limits=limits, application_hole_precision=precision,
         sheet_unit="in",
