@@ -80,7 +80,7 @@ from _sketch import (
     ensure_fully_defined,
 )
 from _sketch_circle import define_circle
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _document_units import apply_package_model_units
@@ -99,6 +99,7 @@ from dt_cone_gear_shaft_spec import (
     DRAWING_PRECISION,
     FILLET_RADIUS,
     FILLET_R_BAND,
+    FILLET_R_TOL_TYPE,
     FLAT_AF_BAND,
     FLAT_LANDS,
     FLAT_OFFSETS,
@@ -402,7 +403,10 @@ async def build(adapter) -> dict[str, str]:
             places=DRAWING_PRECISION[f"Sec{land}FlatProfile"][f"Sec{land}AF"],
             display_unit=UNIT,
         )
-    # The step roots' R.004 +.000/-.002: the setback books its maximum.
+    # The step roots' single limit R.004 MAX: the band (0/-R) stays on the
+    # native tolerance as the model's record; swTolMAX prints the model value
+    # then MAX, so the setback books the printed maximum
+    # (build_dt_cylinder_gear._notch_width_max_limit's recipe).
     set_dimension_bilateral_tolerance(
         adapter,
         "ShoulderFillets",
@@ -411,6 +415,7 @@ async def build(adapter) -> dict[str, str]:
         places=DRAWING_PRECISION["ShoulderFillets"]["ShoulderR"],
         display_unit=UNIT,
     )
+    _shoulder_root_max_limit(adapter)
     # Display precision is model-owned too (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
@@ -421,6 +426,17 @@ async def build(adapter) -> dict[str, str]:
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
     return await save_part_and_images(adapter, PART_NAME)
+
+
+@_telemetry.traced("part.cone_gear_shaft.shoulder_root_max")
+def _shoulder_root_max_limit(adapter: Any) -> None:
+    """ShoulderR as the single limit "R.004 MAX" (dt_cone_gear_shaft_spec.
+    FILLET_R_TOL_TYPE): swTolMAX prints the model value then MAX."""
+    _, dimension = _named_dimension(adapter, "ShoulderFillets", "ShoulderR")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = FILLET_R_TOL_TYPE
+    if int(tolerance.Type) != FILLET_R_TOL_TYPE:
+        raise RuntimeError("ShoulderR@ShoulderFillets: swTolMAX did not persist")
 
 
 def _flat_start_station(land: int) -> float:

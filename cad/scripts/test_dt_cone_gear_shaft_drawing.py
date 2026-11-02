@@ -1292,15 +1292,18 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     # Its run along the smaller land is booked in every step's setback.
     for budget in dt_cone_gear_shaft_spec.SEAT_STEP_BUDGET.values():
         assert budget["fillet"] == dt_cone_gear_shaft_spec.FILLET_RADIUS
-    # Its own band, never the title block's +-.005: the setback books the
-    # printed maximum, which is the model radius, and the root is never sharp.
+    # A single limit, R.004 MAX, never the title block's +-.005: the setback
+    # books the printed maximum, which is the model radius.
     assert dt_cone_gear_shaft_spec.printed_length_deviations("ShoulderR") == pytest.approx(
-        (-0.0508, 0.0)
+        (-0.1016, 0.0)
     )
+    assert dt_cone_gear_shaft_spec.FILLET_R_TOL_TYPE == 6  # swTolMAX
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "add_fillet(FILLET_RADIUS, fillet_edges, propagate=False)" in source
     assert 'name_last_feature(adapter, "ShoulderFillets")' in source
     assert 'name_dimensions(adapter, "ShoulderFillets", ["ShoulderR"])' in source
+    assert "tolerance.Type = FILLET_R_TOL_TYPE" in source
+    assert "_shoulder_root_max_limit(adapter)" in source
     # One feature, one dimension, one quantity prefix -- not three dimensions
     # (the gear-seat steps; the collar's roots stay sharp, #914).
     assert drawing.DIMENSION_CALLOUTS["ShoulderR"] == "3X"
@@ -1733,6 +1736,7 @@ def _stubbed_build(monkeypatch):
     stubs["add_line_chain"].side_effect = lambda _a, points, close=True: [
         f"L{k}" for k in range(len(points) if close else len(points) - 1)
     ]
+    monkeypatch.setattr(part, "_shoulder_root_max_limit", lambda _a: None)
     gated_after: list[int] = []
     monkeypatch.setattr(
         part,
