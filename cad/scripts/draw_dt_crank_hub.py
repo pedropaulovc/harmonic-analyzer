@@ -12,6 +12,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     place_view,
 )
+from solidworks_mcp.adapters.sw_type_info import constant
 
 from _check import check
 from _com import _early_bound
@@ -164,6 +165,15 @@ END_KEEP = {
     # big end (x <= END_CENTER + 31.2 mm).
     "PinProud": (END_CENTER[0] + 0.072, END_CENTER[1] + 0.014),
 }
+# The MHA-DT-09 big end is construction geometry in the hub's reference
+# sketch. The default construction font prints it as even dashes, which read
+# as hidden lines of the hub (Opus review at 7fe9d97bd: a dashed box outside
+# the part). Phantom (long-short-short), thin, marks it as an adjacent part.
+# Only this sheet's document preference changes.
+PIN_BIG_END_LINE_FONT = (
+    ("swLineFontConstructionCurvesStyle", "swLinePHANTOM"),
+    ("swLineFontConstructionCurvesThickness", "swLW_THIN"),
+)
 # The cross-hole station is measured from the arm shoulder it must stay clear
 # of (dt_crank_hub_geometry): its arrowhead there is the ASME
 # dimension-origin circle (r7 review of farm run 20261101T022045634Z;
@@ -187,8 +197,10 @@ SEAM_EDGE_PICK = (
 SEAM_CALLOUT_XY = (0.303, 0.105)
 SIDE_KEEP = {
     # Right of the seat diameter's dimension line (OUTBOARD_X + 0.020), which
-    # crossed its text there (farm run 20261101T074739942Z).
-    "SeatLength": (OUTBOARD_X + 0.029, _STATION_ROW_Y),
+    # crossed its text there (farm run 20261101T074739942Z). The whole block
+    # starts right of that line, so none of it sits under the line's lower
+    # arrow (Opus review at 7fe9d97bd), and ends short of the end view.
+    "SeatLength": (OUTBOARD_X + 0.034, _STATION_ROW_Y),
     "ServicePinFromShoulder": (
         (SHOULDER_X + SERVICE_PIN_CENTER[0]) / 2.0,
         _STATION_ROW_Y,
@@ -226,6 +238,18 @@ def _set_callout_below(display: Any, text: str, label: str) -> None:
     applied = str(display.GetText(4) or "")
     if applied.replace("\r", "") != text:
         raise RuntimeError(f"{label}: callout-below text did not persist: {applied!r}")
+
+
+def _construction_curves_as_phantom(model: Any) -> None:
+    """Print this drawing's construction curves (the pin's big end) in phantom."""
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    option = constant("swDetailingNoOptionSpecified")
+    for name, value in PIN_BIG_END_LINE_FONT:
+        preference, wanted = constant(name), constant(value)
+        if not extension.SetUserPreferenceInteger(preference, option, wanted):
+            raise RuntimeError(f"failed to set crank-hub {name}")
+        if int(extension.GetUserPreferenceInteger(preference, option)) != wanted:
+            raise RuntimeError(f"crank-hub {name} readback differs")
 
 
 def _arrowheads(annotation: Any, label: str) -> list[tuple[float, int]]:
@@ -295,6 +319,7 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    _construction_curves_as_phantom(drawing_model)
     stamp_drawing_summary(
         adapter,
         drawing_model,

@@ -433,6 +433,9 @@ def test_callouts_stand_clear_of_views_and_each_other() -> None:
     # Its value stands clear of the seat diameter's dimension line above.
     value_half = len("(8.0)") * char_w / 2.0
     assert seat_len_x - value_half - drawing.SIDE_KEEP["SeatDia"][0] > 0.002
+    # The whole block starts right of that line, so none of it sits under the
+    # line's lower arrow (Opus review at 7fe9d97bd).
+    assert seat_len_x - seat_len_half > drawing.SIDE_KEEP["SeatDia"][0]
     assert seat_block[1] < drawing.ISO_NOTE_XY[0] and end_left > drawing.OUTBOARD_X
     # Both turned diameters stand left of the inboard end, the relief's nearer,
     # their values side by side on the axis without touching.
