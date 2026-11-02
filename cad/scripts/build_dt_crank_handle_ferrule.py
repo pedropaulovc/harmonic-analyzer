@@ -28,8 +28,10 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import (
     active_configuration_name,
@@ -48,13 +50,11 @@ from _sketch import (
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _configuration_material import require_material_in_every_configuration
 from _grouped_bom_properties import apply_grouped_bom_properties
 from solidworks_mcp.adapters.com_variant import bstr_array
 from dt_crank_handle_ferrule_spec import (
     BORE_DIA,
-    BORE_DIA_TOL,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     INSTALLED_CONFIG,
@@ -82,6 +82,8 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # The mm suffix is load-bearing: the equation manager reads bare numbers in
     # document units (see build_dt_crankshaft).
     for name, value in (
@@ -168,11 +170,10 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven brass ferrule (equations neutral)", V_FERRULE, 0.005 * V_FERRULE
     )
 
-    # The model-owned band (drawing-simplicity-policy.md `How the repository implements the guidelines`): the bore, which the oak tenon
-    # is turned to suit, holds both the MHA-DT-08 seat and the oak round the
-    # pivot bore.  The OD is the rod as supplied, skimmed at assembly; the
-    # handle's end play is fitted on the MHA-DT-32 shoulder.
-    set_dimension_symmetric_tolerance(adapter, "FerruleProfile", "BoreDia", BORE_DIA_TOL)
+    # The bore, which the oak tenon is turned to suit, holds both the MHA-DT-08
+    # seat and the oak round the pivot bore at the title block's .XXX band.
+    # The OD is the rod as supplied, skimmed at assembly; the handle's end
+    # play is fitted on the MHA-DT-32 shoulder.
     # Every model edit precedes the INSTALLED split, so the split copies a
     # finished default (the MHA-DT-30 lesson).
     await apply_material(adapter, MATERIAL)

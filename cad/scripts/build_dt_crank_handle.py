@@ -18,7 +18,7 @@ seat on the arm), so the oak starts at the tenon end, short of it.  One
 revolve carries the tenon, its 45-degree root relief into the shoulder (owner
 ruling 2026-10-24, #1900), the reamed bore, the grip and the counterbore, the
 tenon root and the counterbore's floor corner rounded in the profile to their
-single-limit R0.3 MAX (owner ruling A on #1661).  The profile is defined by
+single-limit R.012 MAX (owner ruling A on #1661).  The profile is defined by
 what the sheet prints -- stations from the tenon end face, the shoulder,
 waist, swell and crest diameters and the end round -- with the waist and
 swell centres on their stations; the tangencies fix the other four radii,
@@ -40,8 +40,10 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -55,10 +57,7 @@ from _sketch import (
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _fit_deviations import deviations
 from _saved_part_guard import require_saved_drawing_properties
 
@@ -91,7 +90,6 @@ from dt_crank_handle_spec import (  # noqa: E402
     OAK_END_X,
     PEAK_R,
     PEAK_X,
-    PIVOT_BORE_BAND,
     PIVOT_BORE_DIA,
     S_CONCAVE_CENTER,
     S_CONCAVE_R,
@@ -110,6 +108,7 @@ from dt_crank_handle_spec import (  # noqa: E402
     WAIST_X,
     WOOD_LENGTH,
     profile_radius,
+    UNIT,
 )
 
 # The tenon root (owner ruling 2026-10-24, #1900): a 45-degree relief cone
@@ -218,16 +217,15 @@ def _make_driven(adapter, dimension_id: str, label: str) -> None:
         raise RuntimeError(f"{label}: dimension did not become driven")
 
 
-# The two R0.3 MAX inside corners as solved: the counterbore's floor round
+# The two R.012 MAX inside corners as solved: the counterbore's floor round
 # turns 90 degrees and the tenon root 135 degrees, into the relief's corner.
-# Their 270- and 225-degree complements read 1.414 and 1.178 long.
 INSIDE_CORNER_ARC_LENGTHS = tuple(
     sorted((INSIDE_CORNER_R_MAX * math.pi / 2.0, ROOT_ARC_LENGTH))
 )
 
 
 def _check_root_arc_sweep(adapter) -> None:
-    """Read the rebuilt HandleProfile's R0.3 arcs back and require the
+    """Read the rebuilt HandleProfile's inside-corner arcs back and require the
     floor round's quarter and the tenon root's 135-degree sweep."""
     part = _early_bound(adapter.currentModel, "IPartDoc")
     feature = _early_bound(part.FeatureByName("HandleProfile"), "IFeature")
@@ -286,6 +284,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import RevolveParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -646,9 +646,9 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven crank handle (equations neutral)", V_HANDLE, 0.002 * V_HANDLE
     )
     # The volume gate cannot tell the root round's 135-degree sweep from its
-    # 225-degree complement (about one revolved R0.3 disk, inside 0.2 %), so
-    # read the saved profile's root arc back after the equation-driven rebuild
-    # (codjiflo on PR #1989).
+    # 225-degree complement (about one revolved inside-corner disk, inside
+    # 0.2 %), so read the saved profile's root arc back after the
+    # equation-driven rebuild (codjiflo on PR #1989).
     _check_root_arc_sweep(adapter)
 
     # Named bore/central axis for view-independent assembly mate
@@ -657,19 +657,18 @@ async def build(adapter) -> dict[str, str]:
 
     # Manufacturing drawing support: the model owns every printed band
     # (drawing-simplicity-policy.md `How the repository implements the guidelines`):
-    # the reamed bore's, and the root relief's, which keeps the root round
-    # behind the ferrule's seat face and the ferrule its shoulder; and the
-    # places every mark prints with.  The tenon and the counterbore are fitted
-    # to the parts they take; the two inside corners carry their single MAX
-    # limit.
-    set_dimension_bilateral_tolerance(
+    # the root relief's, which keeps the root round behind the ferrule's seat
+    # face and the ferrule its shoulder; and the places every mark prints
+    # with.  The reamed bore, the tenon and the counterbore print as
+    # references under their fit callouts; the two inside corners carry their
+    # single MAX limit.
+    set_dimension_symmetric_tolerance(
         adapter,
         "HandleProfile",
-        "PivotBoreDia",
-        *deviations(PIVOT_BORE_BAND),
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "HandleProfile", "TenonRootRelief", TENON_ROOT_RELIEF_TOL
+        "TenonRootRelief",
+        TENON_ROOT_RELIEF_TOL,
+        places=3,
+        display_unit=UNIT,
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

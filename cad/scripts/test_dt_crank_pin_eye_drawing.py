@@ -48,8 +48,8 @@ def test_bead_chain_passes_the_smallest_printed_loop() -> None:
     # at, not just at nominal (drawing-guidelines.md: controlled limits must
     # produce the fit).
     places = notes.DRAWING_PRECISION_BY_NAME["LoopID"]
-    band = printed_band_mm(places)
-    smallest = round(notes.LOOP_ID, places) - band
+    band = printed_band_mm(places, unit=spec.UNIT)
+    smallest = round(notes.LOOP_ID / 25.4, places) * 25.4 - band
     assert spec.LOOP_ID_MIN == pytest.approx(smallest)
     assert (smallest - chain.BEAD_DIA) / 2.0 >= chain.EYE_BEAD_PASS_AIR
 

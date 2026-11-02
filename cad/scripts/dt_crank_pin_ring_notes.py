@@ -8,8 +8,8 @@ import the spec, so prose there would re-key them on every drawing edit.
 Imported ONLY by ``build_dt_crank_pin_ring``, ``draw_dt_crank_pin_ring`` and
 the offline tests.
 
-The ring is ``visual_noncritical``: every printed value takes the title
-block's one-place band (drawing-guidelines.md rule 3). The ring's inside
+The ring is ``visual_noncritical``: on its decimal-inch sheet (#290) the inside
+diameter takes the title block's .XX band (drawing-guidelines.md rule 3). The ring's inside
 diameter is the one controlling size, on the blanked ``RingReference`` sketch
 in the ring's own plane, because a torus has no edge to dimension
 (drawing-simplicity-policy.md: a value no feature dimension carries is
@@ -42,9 +42,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "JointProfile": {"JointDia"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "WireProfile": {"WireDia": 1},
+    "WireProfile": {"WireDia": 3},
     "RingReference": {"RingID": ring.RING_ID_PLACES},
-    "JointProfile": {"JointDia": 1},
+    "JointProfile": {"JointDia": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: decimals
@@ -52,8 +52,10 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, decimals in dimensions.items()
 }
 REFERENCE_DIMENSIONS = frozenset({"WireDia", "JointDia"})
+# The wire is bought stock: an untoleranced reference whose supplier tolerance
+# governs (owner rule; #290 reviews asked for a printed band).
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "WireDia": "WIRE",
+    "WireDia": "WIRE AS SUPPLIED;\nSUPPLIER TOLERANCE",
     "JointDia": "SILVER-SOLDER JOINT",
 }
 if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(

@@ -15,11 +15,14 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _purchased_part_drawing import build_purchased_part_drawing
 from _supplier_keeper_dimensions import annotate_keeper_bead
 
 
 SPEC = DRAWINGS_BY_NAME["dt_vn_keeper_chain"]
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "BEAD CHAIN, TRADE SIZE 3"
 PART_STEM = SPEC.artifact_stem
@@ -36,6 +39,7 @@ async def build(adapter: Any) -> dict[str, str]:
         supplier_dimensions=add_dimensions,
         supplier_margins={"*Front": (0.0, 0.0, 0.040, 0.020)},
         settled_checks=settled_checks,
+        unit=part_drawing_unit(PART_STEM),
     )
 
 

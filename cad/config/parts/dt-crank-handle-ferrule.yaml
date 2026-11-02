@@ -8,14 +8,15 @@ dt-crank-handle-ferrule:
   quantity: 1
   tolerance_class: machined_block
   process: "bored and parted from 9/16 in rod (brass), OD as supplied; epoxied on the MHA-DT-08 tenon and skimmed to the grip contour with it"
+  drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
-      where: "section A-A, the O.D. callout: WALL 1.50 MIN AT SEAT FACE"
-      finding: "skimmed brass wall at the seat face, bore mouth broken, 1.50 min, below the 2.0 mm target (rule 17)"
-      reason: "owner ruling 2026-10-24 (#1900, option 4): the ring cures on a mandrel through the MHA-DT-08 pivot bore (its bore within 0.10 of that axis, MHA-DT-00 step 7) and the MHA-DT-08 tenon root is relieved into its shoulder, so the seat mouth takes only the 0.25 edge break; the OD's seat-end edge is the skim line shared with the oak shoulder and takes none. The .X skim at its smallest, 0.10 skim wander, the 0.10 offset, the largest bore and the 0.25 break leave 1.50, on the 1.5 floor. The 2.0 target needs a 5/8 in rod and a Ø14 skim, which changes the grip's look and feel"
+      where: "section A-A, the O.D. callout: WALL .068 MIN AT SEAT FACE"
+      finding: "skimmed brass wall at the seat face, bore mouth broken, .068 min, below the .080 target (rule 17)"
+      reason: "owner ruling 2026-10-24 (#1900, option 4): the ring cures on a mandrel through the MHA-DT-08 pivot bore (its bore within .004 of that axis, MHA-DT-00 step 7) and the MHA-DT-08 tenon root is relieved into its shoulder, so the seat mouth takes only the .010 edge break; the OD's seat-end edge is the skim line shared with the oak shoulder and takes none. The .XX skim at its smallest, .004 skim wander, the .004 offset, the largest bore and the .010 break leave .068, over the .060 floor. The .080 target needs a 5/8 in rod and a larger skim, which changes the grip's look and feel"
     - id: "RV-02"
       kind: "minor"
-      where: "section A-A, the O.D. callout: WALL 1.25 MIN AT ARM FACE"
-      finding: "skimmed brass wall at the arm face plane, bore mouth and O.D. edge both broken, 1.25 min, below the 1.5 mm floor (rule 17)"
-      reason: "owner ruling 2026-10-26 (#1900, arm face): at the arm face both edges are exposed and each takes the title block's 0.25 break, so the 1.75 thin-side wall of RV-01's stack keeps 1.75 - 0.25 - 0.25 = 1.25 at the face plane; accepted as the extension of the option-4 ruling to that face"
+      where: "section A-A, the O.D. callout: WALL .058 MIN AT ARM FACE"
+      finding: "skimmed brass wall at the arm face plane, bore mouth and O.D. edge both broken, .058 min, below the .060 floor (rule 17)"
+      reason: "owner ruling 2026-10-26 (#1900, arm face): at the arm face both edges are exposed and each takes the title block's .010 break, so the .078 thin-side wall of RV-01's stack keeps .078 - .010 - .010 = .058 at the face plane, more than the .049 the ruling accepted; accepted as the extension of the option-4 ruling to that face"

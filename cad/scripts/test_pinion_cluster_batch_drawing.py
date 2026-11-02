@@ -911,10 +911,10 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     shaft_pair = frozenset(("dt-crank-pin-1", "dt-crankshaft-1"))
     # The CONTRACT-crank hub barrel (Ø22.25 since R9-38) sets the MHA-DT-09
     # pilot spans: a longer hub chord, and the shaft crossing further down
-    # the taper. #1140 stood the pin 0.6 further proud (PIN_PROUD 4.45,
-    # keeper-ring hole at 3.7), so a thinner stretch of the taper sits in
-    # both receivers.
-    assert 111.2 < crank_allowed[hub_pair] < 111.8
+    # the taper. #1140 stood the pin further proud, and #290's inch keeper
+    # ring (PIN_PROUD 4.572, keeper-ring hole at .15 in) a little more, so a
+    # thinner stretch of the taper sits in both receivers.
+    assert 110.9 < crank_allowed[hub_pair] < 111.5
     assert 55.1 < crank_allowed[shaft_pair] < 55.6
     # MHA-CH-11: each 5/64 bar pivot pin pressed into its bar's Ø1.9558 ream
     # through both top-notch cheeks (6.35 bar less the 3.15 notch), and

@@ -10,4 +10,5 @@ dt-vn-keeper-chain:
   quantity: 1
   tolerance_class: visual_noncritical
   process: purchased
+  drawing_unit: in
   # Cut to dt_vn_keeper_chain_spec.BEAD_COUNT beads; 3/32 in beads, 20 lbf.

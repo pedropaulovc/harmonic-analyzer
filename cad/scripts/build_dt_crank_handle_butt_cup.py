@@ -29,8 +29,10 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -51,17 +53,16 @@ from dt_crank_handle_butt_cup_spec import (
     BODY_CHAMFER,
     BODY_CHAMFER_TOL,
     BODY_DIA,
-    BODY_DIA_TOL,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FLOOR_HOLE_DIA,
     OVERALL_LENGTH,
     POCKET_DEPTH,
-    POCKET_DEPTH_TOL,
     POCKET_DIA,
     POCKET_FLOOR_CORNER_R_BAND,
     POCKET_FLOOR_CORNER_R_MAX,
     POCKET_FLOOR_CORNER_R_TOL_TYPE,
+    UNIT,
 )
 
 PART_NAME = "dt-crank-handle-butt-cup"
@@ -120,6 +121,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import RevolveParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # The mm suffix is load-bearing: the equation manager reads bare numbers in
     # document units (see build_dt_crankshaft).
     for name, value in (
@@ -281,17 +284,13 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven butt cup (equations neutral)", V_CUP, 0.005 * V_CUP
     )
 
-    # The model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the body diameter that holds the
-    # pocket wall, the pocket depth that keeps the MHA-DT-32 head below the
-    # face, and the bottom chamfer that clears the MHA-DT-08 floor corner.
-    # Every other size is routine (.X); the pocket is bored to suit the
-    # head's diameter.
-    set_dimension_symmetric_tolerance(adapter, "CupProfile", "BodyDia", BODY_DIA_TOL)
+    # The model-owned band (drawing-simplicity-policy.md `How the repository
+    # implements the guidelines`): the bottom chamfer that clears the
+    # MHA-DT-08 floor corner.  The body diameter that holds the pocket wall and
+    # the pocket depth that keeps the MHA-DT-32 head below the face print at
+    # .XXX under the title block's band; the pocket is bored to suit the head.
     set_dimension_symmetric_tolerance(
-        adapter, "CupProfile", "PocketDepth", POCKET_DEPTH_TOL
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "CupProfile", "BodyChamfer", BODY_CHAMFER_TOL
+        adapter, "CupProfile", "BodyChamfer", BODY_CHAMFER_TOL, display_unit=UNIT
     )
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)

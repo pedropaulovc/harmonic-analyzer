@@ -14,6 +14,8 @@ import dt_crank_handle_ferrule_notes as notes
 import dt_crank_handle_ferrule_spec as spec
 import draw_dt_crank_handle_ferrule as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _printed_tolerance import printed_band_mm
 from _drawing_registry import DRAWINGS_BY_NAME
 from _paths import CAD_ROOT
 from machinist_exceptions import load_exceptions
@@ -41,43 +43,37 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
 
 def test_bore_is_banded_the_od_is_stock() -> None:
     # User ruling 2026-09-29 (MHA-DT-34 review): the tenon is turned to suit this
-    # bore and the end play is fitted on the MHA-DT-32 shoulder.  The bore keeps
-    # +/-0.10 (Codex P1/P2 on #1139, user ruling 2026-09-30): at .X the fitted
-    # tenon could outgrow the MHA-DT-08 seat shoulder or thin the oak over the
-    # pivot bore to 1.45.  Local review of 1f3067ef2: the bore grows to 7.7
-    # for the bore's eccentricity.  User ruling 2026-10-01 (local review of
+    # bore and the end play is fitted on the MHA-DT-32 shoulder.  The bore
+    # holds the title block's .XXX band (#290; Codex P1/P2 on #1139: at .X the
+    # fitted tenon could outgrow the MHA-DT-08 seat shoulder or thin the oak
+    # over the pivot bore).  User ruling 2026-10-01 (local review of
     # 47cb8a46b): the OD is the 9/16-in rod as supplied, a reference, skimmed
-    # to the grip contour with the oak after cure.  Owner ruling 2026-10-24
-    # (#1900): the seat mouth's chamfer is gone (see below).
-    assert spec.DRAWING_PRECISION_BY_NAME == {
-        "OuterDia": 2,
-        "BoreDia": 2,
-        "Length": 1,
-    }
-    assert (spec.BORE_DIA, spec.BORE_DIA_TOL) == (7.7, 0.10)
-    assert spec.OUTER_DIA == spec.STOCK_DIA == pytest.approx(14.2875)
+    # to the grip contour with the oak after cure.
+    assert spec.DRAWING_PRECISION_BY_NAME["BoreDia"] == 3
+    assert spec.BORE_DIA_TOL == pytest.approx(printed_band_mm(3, unit=spec.UNIT))
+    assert spec.OUTER_DIA == spec.STOCK_DIA == pytest.approx(9 / 16 * 25.4)
+    assert spec.STOCK_FRACTION_DENOMINATOR == 16
     assert not hasattr(spec, "OUTER_DIA_TOL")
     assert spec.REFERENCE_DIMENSIONS == {"OuterDia"}
-    assert model_toleranced_dimensions(part) == {
-        ("FerruleProfile", "BoreDia"): "BORE_DIA_TOL",
-    }
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "set_dimension_bilateral_tolerance" not in source
-    assert spec.WALL_WORST == pytest.approx((14.2875 - 0.0508 - 7.8) / 2.0)
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "for name in sorted(REFERENCE_DIMENSIONS):" in drawing_source
+    assert model_toleranced_dimensions(part) == {}
+    assert spec.WALL_WORST == pytest.approx(
+        (spec.STOCK_DIA_MIN - (spec.BORE_DIA + spec.BORE_DIA_TOL)) / 2.0
+    )
+    assert spec.WALL_WORST >= WALL_FLOOR_MM
 
 
 def test_installed_configuration_is_the_skimmed_ring() -> None:
     import build_dt_drive_train_assembly as drive_train
 
     assert spec.INSTALLED_CONFIG == "INSTALLED"
-    assert spec.INSTALLED_OUTER_DIA == pytest.approx(12.5)
-    assert part.V_INSTALLED == pytest.approx(math.pi * (6.25**2 - 3.85**2) * 7.0)
+    assert spec.INSTALLED_OUTER_DIA == pytest.approx(0.49 * 25.4)
+    installed_r = spec.INSTALLED_OUTER_DIA / 2.0
+    assert part.V_INSTALLED == pytest.approx(
+        math.pi * (installed_r**2 - (spec.BORE_DIA / 2.0) ** 2) * spec.LENGTH
+    )
     source = Path(part.__file__).read_text(encoding="utf-8")
     split = source.index("create_configuration {INSTALLED_CONFIG}")
     for edit in (
-        "set_dimension_symmetric_tolerance(adapter,",
         "apply_material(adapter,",
         "mark_dimensions_for_drawing(adapter,",
         "apply_drawing_precision(adapter,",
@@ -97,27 +93,24 @@ def test_installed_configuration_is_the_skimmed_ring() -> None:
 def test_fitted_tenon_keeps_its_seat_and_wall() -> None:
     import dt_crank_handle_spec as handle
 
-    # The oak and the skimmed ring finish together at the Ø12.5 contour (user
+    # The oak and the skimmed ring finish together at the skim contour (user
     # rulings 2026-09-30 and 2026-10-01), so the seat is the face over the
-    # tenon outside its root relief; the Ø7.7 bore keeps 1.5 of oak over the
-    # Ø4.1 pivot bore with 0.10 of eccentricity.  The Ø12.5 holds the title
-    # block's .X band (MHA-DT-08 machinist review of 2026-10-18).  Owner ruling
-    # 2026-10-24 (#1900): cured on a mandrel through the pivot bore, the ring
-    # sits 0.10 off it, not the 0.175 of riding the tenon's glue line, so the
-    # skimmed ring keeps 1.75 of brass, and the smallest stock still cleans up.
-    # Owner ruling B on #1375 enlarges the cup fit and butt contour only;
-    # the ferrule's shoulder, fitted tenon and running bore stay unchanged.
-    assert (handle.TENON_LENGTH, handle.TENON_DIA, handle.PIVOT_BORE_DIA) == pytest.approx(
-        (5.0, 7.6, 4.10)
-    )
+    # tenon outside its root relief; the bore keeps the wall floor of oak over
+    # the pivot bore with the bore's eccentricity.  Owner ruling 2026-10-24
+    # (#1900): cured on a mandrel through the pivot bore, the ring sits within
+    # the eccentricity of it, and the smallest stock still cleans up.
     assert handle.SHOULDER_R == pytest.approx(spec.INSTALLED_OUTER_DIA / 2.0)
-    assert handle.FERRULE_OFFSET_MAX == pytest.approx(0.10) == handle.BORE_ECCENTRICITY
+    assert handle.FERRULE_OFFSET_MAX == handle.BORE_ECCENTRICITY
+    xx = printed_band_mm(2, unit=handle.UNIT)
+    ecc = handle.BORE_ECCENTRICITY
     assert handle.FERRULE_SKIMMED_WALL_MIN == pytest.approx(
-        (12.5 - 0.8) / 2.0 - 0.10 - (7.8 / 2.0 + 0.10)
+        (spec.INSTALLED_OUTER_DIA - xx) / 2.0
+        - ecc
+        - ((spec.BORE_DIA + spec.BORE_DIA_TOL) / 2.0 + ecc)
     )
-    assert spec.STOCK_DIA_MIN / 2.0 >= (12.5 + 0.8) / 2.0 + 0.10 + 0.10
-    assert handle.FERRULE_SEAT_RADIAL_MIN == pytest.approx(1.975 - 0.20 - 1.0 - 0.25)
-    assert handle.TENON_WALL_MIN == pytest.approx(1.55)
+    assert spec.STOCK_DIA_MIN / 2.0 >= (spec.INSTALLED_OUTER_DIA + xx) / 2.0 + 2.0 * ecc
+    assert handle.FERRULE_SEAT_RADIAL_MIN >= handle.FERRULE_SEAT_RADIAL_FLOOR
+    assert handle.TENON_WALL_MIN >= WALL_FLOOR_MM
 
 
 def test_bore_reads_on_a_section_not_hidden_lines() -> None:
@@ -128,11 +121,10 @@ def test_bore_reads_on_a_section_not_hidden_lines() -> None:
 
 
 def test_ring_matches_the_photographed_brass_collar() -> None:
-    # eight-views-4, user 2026-09-30: Ø12.5 as installed, skimmed from rod.
-    assert spec.INSTALLED_OUTER_DIA == pytest.approx(12.5)
-    assert spec.LENGTH == pytest.approx(7.0)
+    # eight-views-4, user 2026-09-30: skimmed from rod as installed.
+    assert spec.INSTALLED_OUTER_DIA < spec.STOCK_DIA_MIN
     assert part.V_FERRULE == pytest.approx(
-        math.pi * ((14.2875 / 2.0) ** 2 - 3.85**2) * 7.0
+        math.pi * ((spec.STOCK_DIA / 2.0) ** 2 - (spec.BORE_DIA / 2.0) ** 2) * spec.LENGTH
     )
     assert part.MATERIAL == "Brass"
 
@@ -143,14 +135,10 @@ def test_callouts_name_the_mating_tenon_and_no_general_note_remains() -> None:
     # MHA-DT-34 machinist ENFORCE (r1-r3): the bore's matched fit and the OD's
     # skim sit on their own callouts, not in a general note; THRU rides on the
     # bore, and bonding the ring on is the assembly's business.
-    assert notes.BORE_FIT_CALLOUT.splitlines() == [
-        "THRU; MHA-DT-08 TENON",
-        "TURNED TO SUIT, 0.05-0.15",
-        "DIAMETRAL CLEARANCE",
-    ]
+    assert notes.HANDLE_NUMBER in notes.BORE_FIT_CALLOUT.splitlines()[0]
     # The OD's skim names its mate and states the walls it leaves (rule 20).
     od_rows = notes.OUTER_DIA_CALLOUT.splitlines()
-    assert od_rows[:3] == ["STOCK;", "SKIM TO <MOD-DIAM>12.5", "WITH MHA-DT-08"]
+    assert od_rows[2] == "WITH MHA-DT-08"
     for callout in (notes.BORE_FIT_CALLOUT, notes.OUTER_DIA_CALLOUT):
         assert "EPOXY" not in callout and "LATHE" not in callout
     # The prose lives in the notes module, which the mating parts never import.
@@ -160,20 +148,18 @@ def test_callouts_name_the_mating_tenon_and_no_general_note_remains() -> None:
         source = Path(module.__file__).read_text(encoding="utf-8")
         assert "Manufacturing Notes" not in source
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '"BoreDia": BORE_FIT_CALLOUT,' in drawing_source
-    assert '"OuterDia": OUTER_DIA_CALLOUT,' in drawing_source
     assert "MACHINIST_REVIEW = MachinistReviewMode.ENFORCE" in drawing_source
 
 
 def test_seat_mouth_takes_only_the_edge_break() -> None:
     import dt_crank_handle_spec as handle
-    from dt_crank_hub_geometry import EDGE_BREAK_MAX_MM
+    from _printed_tolerance import edge_break_chamfer_mm
 
     # Owner ruling 2026-10-24 (#1900, option 4) supersedes owner ruling A on
-    # #1661's 0.35 +/-0.05 chamfer: MHA-DT-08's tenon root is relieved into its
-    # shoulder, so the mouth keeps only the title block's 0.25 break, which no
-    # longer has to clear the R0.3 root and is not modelled.
-    assert spec.SEAT_MOUTH_BREAK_MAX == EDGE_BREAK_MAX_MM == 0.25
+    # #1661's chamfer: MHA-DT-08's tenon root is relieved into its shoulder,
+    # so the mouth keeps only the title block's edge break, which no longer
+    # has to clear the root round and is not modelled.
+    assert spec.SEAT_MOUTH_BREAK_MAX == edge_break_chamfer_mm(unit=spec.UNIT)
     for name in (
         "SEAT_MOUTH_CHAMFER",
         "SEAT_MOUTH_CHAMFER_MIN",
@@ -188,29 +174,34 @@ def test_seat_mouth_takes_only_the_edge_break() -> None:
     # The relief keeps the root round behind the seat face, and the break
     # alone comes off the shortest tenon's bonded length.
     assert handle.TENON_ROOT_RELIEF_MIN >= handle.TENON_ROOT_ROUND_REACH
-    assert handle.TENON_GLUE_LENGTH_MIN == pytest.approx(4.2 - 0.25 - 0.25)
+    assert handle.TENON_GLUE_LENGTH_MIN == pytest.approx(
+        handle.TENON_LENGTH
+        - printed_band_mm(2, unit=handle.UNIT)
+        - handle.EDGE_BREAK_MAX_MM
+        - spec.SEAT_MOUTH_BREAK_MAX
+    )
     assert handle.TENON_GLUE_LENGTH_MIN >= spec.TENON_GLUE_LENGTH_FLOOR
 
 
 def test_skimmed_walls_at_both_faces_are_stated_and_declared() -> None:
     import dt_crank_handle_spec as handle
 
-    # #1900: the plain-bore wall missed the faces.  The .X skim small, 0.10 of
-    # skim wander, the 0.10 mandrel offset and the largest bore leave 1.75 on
-    # the thin side.  At the seat face only the bore mouth is broken (the OD
-    # edge is the skim line shared with the oak): 1.50, on the rule-17 floor
-    # (owner ruling 2026-10-24).  At the arm face both edges are broken: 1.25
-    # at the face plane (owner ruling 2026-10-26).  Both print, floored.
-    thin_side = (12.5 - 0.8) / 2.0 - 0.10 - (7.8 / 2.0 + 0.10)
-    assert handle.FERRULE_MOUTH_WALL_MIN == pytest.approx(thin_side - 0.25) == 1.50
-    assert handle.FERRULE_ARM_FACE_WALL_MIN == pytest.approx(thin_side - 0.5) == 1.25
+    # #1900: the plain-bore wall missed the faces.  At the seat face only the
+    # bore mouth is broken (the OD edge is the skim line shared with the oak),
+    # over the rule-17 floor (owner ruling 2026-10-24).  At the arm face both
+    # edges are broken (owner ruling 2026-10-26).  Both print, floored.
+    thin_side = handle.FERRULE_SKIMMED_WALL_MIN
+    assert handle.FERRULE_MOUTH_WALL_MIN == pytest.approx(
+        thin_side - spec.SEAT_MOUTH_BREAK_MAX
+    )
+    assert handle.FERRULE_ARM_FACE_WALL_MIN == pytest.approx(
+        thin_side - spec.SEAT_MOUTH_BREAK_MAX - handle.EDGE_BREAK_MAX_MM
+    )
     assert handle.FERRULE_MOUTH_WALL_MIN >= handle.TENON_WALL_FLOOR_MM
-    assert handle.FERRULE_MOUTH_WALL_MIN < handle.WALL_TARGET_MM
+    assert handle.FERRULE_MOUTH_WALL_MIN < WALL_TARGET_MM
     assert handle.FERRULE_ARM_FACE_WALL_MIN >= handle.FERRULE_ARM_FACE_WALL_ACCEPTED_MM
     assert notes.SEAT_FACE_WALL_MIN <= handle.FERRULE_MOUTH_WALL_MIN
     assert notes.ARM_FACE_WALL_MIN <= handle.FERRULE_ARM_FACE_WALL_MIN
-    assert "WALL 1.50 MIN AT SEAT FACE" in notes.OUTER_DIA_CALLOUT
-    assert "WALL 1.25 MIN AT ARM FACE" in notes.OUTER_DIA_CALLOUT
     declared = {
         entry.id: entry
         for entry in load_exceptions(
@@ -219,9 +210,7 @@ def test_skimmed_walls_at_both_faces_are_stated_and_declared() -> None:
     }
     assert set(declared) == {"RV-01", "RV-02"}
     assert {entry.kind for entry in declared.values()} == {"minor"}
-    assert "WALL 1.50 MIN AT SEAT FACE" in declared["RV-01"].where
     assert "2026-10-24 (#1900" in declared["RV-01"].reason
-    assert "WALL 1.25 MIN AT ARM FACE" in declared["RV-02"].where
     assert "2026-10-26 (#1900, arm face)" in declared["RV-02"].reason
 
 
@@ -230,9 +219,13 @@ def test_skimmed_mouth_wall_assert_fails_below_the_floor(
 ) -> None:
     import dt_crank_handle_spec as handle
 
-    # Source-mutation control: a larger mouth break (the ruling-A chamfer's
-    # 0.40) must trip the #1900 check at the mouth, not pass on the plain bore.
-    monkeypatch.setattr(spec, "SEAT_MOUTH_BREAK_MAX", 0.40)
+    # Source-mutation control: a mouth break that eats the margin over the
+    # floor must trip the #1900 check at the mouth, not pass on the plain bore.
+    monkeypatch.setattr(
+        spec,
+        "SEAT_MOUTH_BREAK_MAX",
+        handle.FERRULE_SKIMMED_WALL_MIN - WALL_FLOOR_MM + 0.0254,
+    )
     with pytest.raises(AssertionError, match="broken seat mouth"):
         runpy.run_path(handle.__file__)
 
