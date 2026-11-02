@@ -170,13 +170,16 @@ LOCATOR_PRESS_INTERFERENCE = (
 )
 if LOCATOR_PRESS_INTERFERENCE[0] <= 0.0:
     raise AssertionError("the MHA-PD-18 locating ream loses MHA-PD-VN-64's press")
+# Three lines here, two more for the match-drill on the sheet: five under the
+# stacked-band value, none wider than the match-drill's 36 characters (six
+# lines ran the block from the border to the arm's edge: machinist review
+# of 2cb922430).
 LOCATOR_CALLOUT = "\n".join((
-    "2X REAM THRU",
+    f"2X REAM THRU, DOWEL {LOCATOR_PIN.PART_NUMBER}",
+    f"PRESS FIT {_inch(_floor_mm(LOCATOR_PRESS_INTERFERENCE[0], 4), 4)}/"
+    f"{_inch(_ceil_mm(LOCATOR_PRESS_INTERFERENCE[1], 4), 4)} INTERFERENCE",
     f"MOUTH BREAKS {_inch(_floor_mm(LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM, 3), 3)}"
     " MAX: DOWEL GRIP",
-    f"PRESS FIT DOWEL {LOCATOR_PIN.PART_NUMBER}",
-    f"{_inch(_floor_mm(LOCATOR_PRESS_INTERFERENCE[0], 4), 4)}/"
-    f"{_inch(_ceil_mm(LOCATOR_PRESS_INTERFERENCE[1], 4), 4)} INTERFERENCE",
 ))
 # Machinist review (rule 16): a pressed dowel needs a way out. The reams run
 # through, and the dowel pressed from the rear to its proud set stops short
