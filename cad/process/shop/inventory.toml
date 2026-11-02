@@ -3490,14 +3490,31 @@ capacity_min_mm = { value = 6, measured = { status = "measured", by = "placehold
 # Basis: fixtures.v-blocks.capacity_max_mm: Generic practical maximum clamped round-bar support diameter estimate.
 capacity_max_mm = { value = 38, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "calipers and ground test pins, seating under clamp" } }
 
+# Owned (Pedro 2026-11-01), alongside fixtures.clamping-kit-pm-52pcck-14mm.
+[fixtures.clamping-kit-lms-1268]
+name = "LittleMachineShop 1268 clamping kit, 1/2 in T-slot, 58 pieces"
+kind = "clamping_kit"
+make = "LittleMachineShop"
+sku = 1268
+source = "https://littlemachineshop.com/products/clamping-kit-1-2-t-slot"
+present = true
+verify = true
+pieces = 58
+stud = "3/8-16"
+t_slot_in = "1/2"
+included = ["24 x 3/8-16 studs", "12 step blocks in pairs", "6 T-slot nuts", "6 flange nuts", "4 coupling nuts", "6 step clamps", "wall-mount rack"]
+note = "Read live 2026-11-01: nuts fit T-slots 0.495-0.55 in (12.57-13.97 mm) wide at the top; nominal T-nut 0.49 in neck, 0.88 x 0.88 in foot 0.28 in thick, 0.50 in overall. In the PM-30MV's 14 mm slot (manual p6 section, not measured) the neck has about 1.5 mm side play and the foot clears the 25 x 10 mm undercut. The 3/8-16 studs match the tapped holes of both 1-2-3 block pairs and the 3900-0070 jacks, and pass the 3900-2125 work stop's 1/2 in base hole."
+cite = ["LittleMachineShop 1268 https://littlemachineshop.com/products/clamping-kit-1-2-t-slot read live 2026-11-01: 58 pieces, 3/8-16 studs, 1/2 in T-slot, range 0.495-0.55 in, USD 89.95", "LittleMachineShop T-slot nut 1/2 in drawing https://littlemachineshop.com/cdn/shop/files/t-slot-nut-1-2.400.jpg read 2026-11-01: B 0.49 in, C 0.50 in, D 0.28 in, E 0.88 in, 3/8-16, all nominal"]
+
 [fixtures.clamping-kit-pm-52pcck-14mm]
 kind = "clamping_kit"
 pieces = 52
 stud = "1/2-13"
 t_slot_in = "9/16"
+present = true
 verify = true
-purchase = "1 x Precision Matthews 52PCCK-9/16-14mm clamping kit; $79.99 vendor listing, possession unconfirmed."
-note = "PM-30MV-compatible 14 mm T-nuts; purchase candidate, not confirmed possession."
+purchase = "1 x Precision Matthews 52PCCK-9/16-14mm clamping kit; $79.99 vendor listing. Owned (Pedro 2026-11-01)."
+note = "PM-30MV-compatible 14 mm T-nuts. Owned alongside fixtures.clamping-kit-lms-1268 (Pedro 2026-11-01); the strap members below remain generic estimates, not this kit's measured parts."
 cite = ["Precision Matthews 52PCCK-9/16-14mm https://www.precisionmatthews.com/products/52pcck-9-16-14mm read 2026-10-16: 52 pieces, 1/2-13 studs, 14 mm / 9/16 in T-nuts, $79.99"]
 
 [fixtures.clamping-kit-pm-52pcck-14mm.source]
