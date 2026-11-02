@@ -220,7 +220,8 @@ def test_the_countersink_callout_names_no_hole_size() -> None:
 def test_the_three_place_section_sizes_name_their_function() -> None:
     """Rule 3: a three-place size states its function; the notch depth only
     wraps the arm's edge and prints two places."""
-    assert drawing.SECTION_CALLOUTS["ThicknessOverArm"] == "SETS SCREW REACH\nIN ARM MHA-PD-18"
+    assert drawing.SECTION_CALLOUTS["ThicknessOverArm"] == "SETS SCREW\nREACH IN ARM\nMHA-PD-18"
+    assert max(map(len, drawing.SECTION_CALLOUTS["ThicknessOverArm"].splitlines())) <= 12
     assert spec.DRAWING_PRECISION_BY_NAME["ThicknessOverArm"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["NotchDepth"] == 2
     assert round(geometry.NOTCH_DEPTH / 25.4, 2) == pytest.approx(geometry.NOTCH_DEPTH / 25.4)
@@ -621,7 +622,7 @@ def test_section_stations_are_a_baseline_from_the_mounting_face() -> None:
     }
     for name, station in stations.items():
         if name == "ThicknessOverArm":
-            assert keep[name][2] > geometry.BOSS_FACE_Z, name
+            assert keep[name][2] >= geometry.BOSS_FACE_Z + 12.0, name
         else:
             assert keep[name][2] == pytest.approx(station / 2.0), name
         assert keep[name][1] > geometry.arm_upper_edge_y(0.0), name

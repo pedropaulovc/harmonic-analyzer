@@ -241,7 +241,9 @@ HUB_STATION_CALLOUT = f"SETS 12T PLANE\nAND COLLAR AIR\nOF {KNOB_SHAFT_NUMBER}"
 HUB_TO_BOSS_CALLOUT = f"SETS CUP {KNOB_CUP_NUMBER}\nON SHAFT {KNOB_SHAFT_NUMBER}"
 # The over-arm thickness bounds the countersink floor and the screw's thread
 # reach into the arm (transgear_hanger_joints._PLATE_MIN/_PLATE_MAX): .XXX.
-THICKNESS_CALLOUT = f"SETS SCREW REACH\nIN ARM {ARM_NUMBER}"
+# Three short lines (12 characters at most), so the block stands clear of
+# the hub-to-boss dimension's boss-face witness line.
+THICKNESS_CALLOUT = f"SETS SCREW\nREACH IN ARM\n{ARM_NUMBER}"
 
 # Two sheets (drawing-guidelines.md rule 15): the rear face's plan with the
 # isometric and section D-D through the screw holes, then mounting face A's

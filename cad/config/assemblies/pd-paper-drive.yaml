@@ -25,6 +25,10 @@ flip_invert:
   # disc" in the PR #196 real-train rework; same mate, same learned side.
   # Latent until 2026-07-07's full paper-drive rebuild re-keyed it.)
   - reducer disc axial
+  # The .243 collar's 0.0169 air at F (#290): run 20261102T151544062Z's
+  # sign-rule side put F 0.0169 inside the collar rear, under the 0.5 mm
+  # flip-miss gate; _assert_knob_collar_capture caught it.
+  - gear front F behind the nominal collar rear
 allowed_free_stems:
   - sh-vn-brass-fillister-screw
   - pd-vn-platen-clip-screw  # MHA-PD-VN-65 clip screws ride the platen

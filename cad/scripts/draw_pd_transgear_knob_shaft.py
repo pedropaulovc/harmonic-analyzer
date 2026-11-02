@@ -86,6 +86,7 @@ from pd_transgear_knob_shaft_spec import (
     PLAIN_CORE,
     PRESSURE_ANGLE_DEG,
     GEOMETRIC_CONTROLS,
+    GEOMETRIC_TOLERANCES_IN,
     GEOMETRIC_TOLERANCES_MM,
     PART_DATUMS,
     REAR_END_Z,
@@ -1023,7 +1024,7 @@ async def build(adapter: Any) -> dict[str, str]:
             leader_attach_xy=landing,
             frame_xy=frame_xy,
             characteristic=control.characteristic,
-            tolerance=GEOMETRIC_TOLERANCES_MM[key],
+            tolerance=GEOMETRIC_TOLERANCES_IN[key],  # the printed inch text
             datums=control.datums,
             diameter=control.tolerance_zone == "diametral",
             entity_type="FACE",
