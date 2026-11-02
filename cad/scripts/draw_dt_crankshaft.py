@@ -261,8 +261,11 @@ SIDE_KEEP = {
     # Its dimension line sits above where the transfer note's leader passes
     # the right arrow's tail (layout audit of 467913370: lower, the tail
     # crossed the leader; arrows inside read as a valueless dimension --
-    # machinist review of 73164fd46).
-    "PinionPinHoleDia": (_sheet_x(PINION_PIN_STATION_Y) - 0.013, 0.2145),
+    # machinist review of 73164fd46).  The text stands 2.5 mm further left
+    # than the arrowhead's reach and prints in a break of its line: on the
+    # unbroken line the parentheses sat on the line and the left arrowhead ran
+    # into ")" (machinist review of eead13f8e; #1660 r8's fix).
+    "PinionPinHoleDia": (_sheet_x(PINION_PIN_STATION_Y) - 0.0155, 0.2145),
 }
 # A dragged diameter prints its dimension line at the requested X with the
 # text running to its RIGHT (run 20260923T030252135Z-49e46990).  Its
@@ -421,6 +424,7 @@ FIDUCIAL_NOTE_XY = (0.0145, 0.152)
 # window instead (run1b-e7fd1a2ec: the leader tip, not the text, read 0.3 mm
 # under the floor).
 PINION_PIN_X = _sheet_x(PINION_PIN_STATION_Y)
+BROKEN_LINE_ALIGNED_TEXT = 3  # swDisplayDimensionLeaderText_e.swBrokenLeaderAlignedText
 # The leader lands on the right of the rim, so from the note it runs right of
 # the REF Ø's extension lines, which stand on the rim's width (layout audit of
 # bb0779352: landed lower-left, it crossed the right one).  The rim edge this
@@ -503,6 +507,15 @@ def _set_dimension_suffixes(
             raise RuntimeError(f"{name}: suffix did not persist: {applied!r}")
     if remaining:
         raise RuntimeError(f"dimension suffixes not applied: {sorted(remaining)}")
+
+
+def _break_line_at_text(annotation: Any, *, label: str) -> None:
+    """Print the value in a break of its dimension line, clear of the line."""
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if display.SetBrokenLeader2(False, BROKEN_LINE_ALIGNED_TEXT) != 0:
+        raise RuntimeError(f"{label}: failed to break the dimension line")
+    if int(display.GetBrokenLeader2()) != BROKEN_LINE_ALIGNED_TEXT:
+        raise RuntimeError(f"{label}: broken dimension line did not persist")
 
 
 # Format-definition parts of a display dimension and the writable part each
@@ -1201,6 +1214,12 @@ async def build(adapter: Any) -> dict[str, str]:
             label=f"crankshaft {name}",
             diameter=name in DIAMETER_REFERENCES,
         )
+    (pin_hole_ref,) = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == "PinionPinHoleDia"
+    ]
+    _break_line_at_text(pin_hole_ref, label="crankshaft PinionPinHoleDia")
 
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; the end view gets the
