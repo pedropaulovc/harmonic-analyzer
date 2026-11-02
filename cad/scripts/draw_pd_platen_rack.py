@@ -29,13 +29,14 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import assert_imported_precision
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edge_dimensions import assert_dimension_measures
 from _drawing_notes import add_property_linked_note
 from _drawing_view_display import set_hidden_lines_removed
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from pd_platen_rack_spec import (
+    DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_NOMINALS_MM,
     DRAWING_PRECISION_BY_NAME,
@@ -197,6 +198,8 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
+    # Above the value: the end view's outline sits just under both REF lines.
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="above")
     # Showing EndStockProfile prints the section's real stock outline and seam;
     # it remains hidden in the source part and in the isometric/assembly views.
     for property_name, position in (

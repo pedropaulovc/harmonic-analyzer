@@ -669,10 +669,27 @@ PURCHASED_RACK_NOTE = (
 GEAR_DATA = f"{PURCHASED_RACK_NOTE}; {DP:g} DP, {PA_DEG:g}\N{DEGREE SIGN} PA"
 # A purchased rack is received by its catalogue identity and (.1875) REF
 # sizes; its pitch accuracy is the catalogue part's, checked only by the
-# running mesh at assembly. The receiving stock-size maxima stay internal
-# (_gear_quality), like the measurement uncertainties: never printed. The
-# joint names its solder family (machinist review round 6), no alloy ratio:
-# notes carry no numbers.
+# running mesh at assembly. The joint names its solder family (machinist
+# review round 6), no alloy ratio: notes carry no numbers.
+
+
+def _receiving_ceiling_text(limit_mm: float) -> str:
+    """An incoming maximum at the stock REF's places, rounded down so the
+    print never admits a section the cut-end envelope refuses."""
+    scale = 10**_PLACES["RackHeight"]
+    value = math.floor(round(limit_mm / MM_PER_IN * scale, 9)) / scale
+    return f"RECEIVE {value:.{_PLACES['RackHeight']}f} MAX".replace(" 0.", " .")
+
+
+# The two stock sizes carry their receiving maxima as callout text on the
+# native REF dimensions (delegated ruling 2026-11-02, Main; owner review
+# #2144): the rack-travel cut-end reserve
+# (paper_drive_geom.feed_rack_cut_end_section_maxima_mm) is paid at these
+# ceilings, so a larger section must be rejected on receipt.
+DIMENSION_CALLOUTS = {
+    "RackHeight": _receiving_ceiling_text(quality.rack_stock_height_max_mm()),
+    "RackDepth": _receiving_ceiling_text(quality.rack_face_width_max_mm()),
+}
 DRAWING_NOTES = "\n".join(
     (
         "SOFT-SOLDERED (TIN-LEAD OR LEAD-FREE) RACK/BACKER JOINT; ENDS FLUSH",

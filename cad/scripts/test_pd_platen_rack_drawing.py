@@ -825,3 +825,20 @@ def test_short_or_wrong_side_secant_is_not_a_direction_or_calibration_fallback(
         spec.require_rack_working_side_secant_angle_band_rad(
             readings=(first, second), flank_kind="left-flank",
         )
+
+
+def test_the_stock_refs_carry_the_receiving_ceilings_the_cut_end_reserve_uses() -> None:
+    ceilings = {
+        "RackHeight": quality.rack_stock_height_max_mm(),
+        "RackDepth": quality.rack_face_width_max_mm(),
+    }
+    assert set(spec.DIMENSION_CALLOUTS) == set(ceilings)
+    assert set(ceilings) <= spec.DRAWING_REFERENCE_DIMENSIONS
+    step = 10.0 ** -spec.DRAWING_PRECISION_BY_NAME["RackHeight"]
+    for name, ceiling_mm in ceilings.items():
+        printed = float(spec.DIMENSION_CALLOUTS[name].split()[1])
+        # Rounded down: never admits a section above the ceiling, never
+        # rejects one more than a print step below it.
+        assert printed * 25.4 <= ceiling_mm
+        assert printed + step > ceiling_mm / 25.4
+        assert printed > spec.RACK_HEIGHT / 25.4
