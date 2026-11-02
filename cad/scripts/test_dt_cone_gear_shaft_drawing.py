@@ -1354,6 +1354,10 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     # the fit those names need is stated once, under the gear key (r4b).
     assert notes.splitlines()[1] == dt_cone_gear_shaft_spec.FLAT_FIT_NOTE
     assert "SLIDING FIT" in dt_cone_gear_shaft_spec.FLAT_FIT_NOTE
+    # The step roots' tight band names what it serves once, in the note block
+    # (the radius text has no room for it): the smaller gear's bore it clears.
+    assert notes.splitlines()[2] == dt_cone_gear_shaft_spec.FILLET_FUNCTION_NOTE
+    assert "GEAR'S BORE" in dt_cone_gear_shaft_spec.FILLET_FUNCTION_NOTE
     # The extension lines stop short of every across-flat's text foot.
     assert 0.0 < drawing.WITNESS_LINE_EXTENSION <= 0.0005
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
