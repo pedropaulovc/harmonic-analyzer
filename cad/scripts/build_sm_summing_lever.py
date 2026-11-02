@@ -63,6 +63,7 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import math
+import re
 import sys
 
 import _telemetry
@@ -266,6 +267,15 @@ if (
 
 # Spring-hole Z stations (world Z); the Top-plane sketch maps world Z to -sketchY.
 HOLE_Z = [CHANNEL_Z0 + CHANNEL_PITCH * j + HOLE_Z_OFFSET for j in range(HOLE_COUNT)]
+# The spring-tap pattern's equation drives: the seed's row X and station and
+# the pattern's spacing.  The plan's hidden locators (_spring_row_coordinates)
+# are driven by the same expressions, so a Tools > Equations edit to any of
+# these globals moves the holes and the printed BASICs together.
+SPRING_ROW_X_EXPR = '"HoleX"'
+SPRING_SEED_STATION_EXPR = (
+    f'"ChannelZ0" + {HOLE_COUNT - 1} * "ChannelPitch" + "HoleZOffset"'
+)
+SPRING_PITCH_EXPR = '"ChannelPitch"'
 
 # Assembly-facing exports (build_sm_summing_assembly imports these).
 SPIN_REF_X = TIP_X  # local X of the summation-anchor tap = counter-spring ref
@@ -465,11 +475,8 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
         expect_dia_mm=seed_dia,
         placement_dims=[
             (
-                ("HoleSeedX", '"HoleX"'),
-                (
-                    "HoleSeedStation",
-                    f'"ChannelZ0" + {HOLE_COUNT - 1} * "ChannelPitch" + "HoleZOffset"',
-                ),
+                ("HoleSeedX", SPRING_ROW_X_EXPR),
+                ("HoleSeedStation", SPRING_SEED_STATION_EXPR),
             )
         ],
     )
@@ -494,7 +501,7 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     # live, not inert (the measuring-stick TickPattern Codex P2). The spacing
     # is D3 (D1 is the pattern's direction-reference length, NOT the pitch);
     # D3 == as-built CHANNEL_PITCH, so it stays neutral.
-    drive_jobs.append(("D3@SpringHolePattern", '"ChannelPitch"'))
+    drive_jobs.append(("D3@SpringHolePattern", SPRING_PITCH_EXPR))
     await volume_check(
         adapter,
         "spring-hole field",
@@ -2092,6 +2099,78 @@ async def _receiver_coordinate_dimensions(adapter) -> None:
     model.ClearSelection2(True)
 
 
+# The globals the spring row's drives read, as ``build`` sets them (mm).
+SPRING_ROW_GLOBALS_MM = {
+    "PlateL": PLATE_L,
+    "HexDepth": HEX_DEPTH,
+    "HoleX": HOLE_X,
+    "ChannelZ0": CHANNEL_Z0,
+    "ChannelPitch": CHANNEL_PITCH,
+    "HoleZOffset": HOLE_Z_OFFSET,
+}
+
+
+def _evaluate_drive(expression: str, values: dict[str, float]) -> float:
+    """An equation-manager expression (arithmetic over quoted globals)."""
+    python = re.sub(r'"([^"]+)"', lambda name: f"({values[name.group(1)]!r})", expression)
+    return float(eval(python, {"__builtins__": {}}))
+
+
+def _assert_spring_row_equations(adapter, drives: list[tuple[str, str]]) -> None:
+    """Native readback of the spring row's drive equations after a rebuild.
+
+    Each drive is in the equation manager with its recorded expression; that
+    expression over the model's own global values is the equation's value
+    (every expression is first-degree in length, so the manager's display
+    unit cancels); the dimension's SystemValue is the expression over the
+    built globals; and the pitch is the live pattern's spacing."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    manager = _early_bound(model.GetEquationMgr(), "IEquationMgr")
+    rows: dict[str, tuple[int, str]] = {}
+    for index in range(int(_read_member(manager, "GetCount") or 0)):
+        left, _, right = str(manager.Equation(index) or "").partition("=")
+        rows[left.strip().strip('"')] = (index, "".join(right.split()))
+
+    def value(name: str) -> float:
+        if name not in rows:
+            raise RuntimeError(f"no equation drives {name}")
+        index = rows[name][0]
+        evaluated = float(manager.Value(index))
+        if int(manager.Status) != index:
+            raise RuntimeError(f"equation for {name} does not evaluate")
+        return evaluated
+
+    model_globals = {name: value(name) for name in SPRING_ROW_GLOBALS_MM}
+    system_mm: dict[str, float] = {}
+    for dim_name, expression in drives:
+        native = value(dim_name)
+        if rows[dim_name][1] != "".join(expression.split()):
+            raise RuntimeError(f"{dim_name}: equation reads {rows[dim_name][1]!r}")
+        from_globals = _evaluate_drive(expression, model_globals)
+        if not math.isclose(from_globals, native, rel_tol=1e-6, abs_tol=1e-9):
+            raise RuntimeError(
+                f"{dim_name}: {expression} over the model globals is "
+                f"{from_globals!r}, its equation evaluates {native!r}"
+            )
+        leaf, _, owner = dim_name.partition("@")
+        _, dimension = _named_dimension(adapter, owner, leaf)
+        system_mm[leaf] = float(dimension.SystemValue) * 1000.0
+        expected = _evaluate_drive(expression, SPRING_ROW_GLOBALS_MM)
+        if not math.isclose(system_mm[leaf], expected, abs_tol=1e-6):
+            raise RuntimeError(
+                f"{dim_name}: SystemValue {system_mm[leaf]!r} mm, its "
+                f"expression {expression} evaluates {expected!r} mm"
+            )
+    pattern = _early_bound(model.FeatureByName("SpringHolePattern"), "IFeature")
+    spacing = float(_early_bound(pattern.Parameter("D3"), "IDimension").SystemValue)
+    if not math.isclose(system_mm["SpringPitch"], spacing * 1000.0, abs_tol=1e-6):
+        raise RuntimeError(
+            f"SpringPitch {system_mm['SpringPitch']!r} mm is not the pattern's "
+            f"spacing {spacing * 1000.0!r} mm"
+        )
+    _telemetry.success(f"spring-row locators equation-driven: {system_mm}")
+
+
 async def _spring_row_coordinates(adapter) -> None:
     """Native BASIC locators of the 20X spring-tap pattern for the plan.
 
@@ -2102,8 +2181,10 @@ async def _spring_row_coordinates(adapter) -> None:
     ridge centreline beyond the -Z stub, along the +Z end edge, and along each
     tap's row inside its drill.  The part owns their BASIC type, four places
     and the 19X count (rule 3); the sketch is saved hidden and the plan shows
-    it (``_drawing_hidden_sketches``).  The Top-plane sketch maps world Z to
-    -sketchY."""
+    it (``_drawing_hidden_sketches``).  The locators and the plate-end and
+    ridge stations they run from are driven by the pattern's own expressions
+    (``SPRING_*_EXPR``), so an Equations edit moves holes and locators
+    together.  The Top-plane sketch maps world Z to -sketchY."""
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
     check("spring-row coordinate sketch", await adapter.create_sketch("Top"))
@@ -2144,7 +2225,7 @@ async def _spring_row_coordinates(adapter) -> None:
     await anchor_point_to_origin(
         adapter, f"{ridge_mark}.start", *ridge, "spring-row ridge station"
     )
-    dimensions.record("SpringRowRidgeZ", None)
+    dimensions.record("SpringRowRidgeZ", '"PlateL" / 2 + 0.3 * "HexDepth"')
     check(
         "spring-row end mark horizontal",
         await adapter.add_sketch_constraint(end_mark, None, "horizontal"),
@@ -2158,7 +2239,7 @@ async def _spring_row_coordinates(adapter) -> None:
         adapter, f"{end_mark}.start", *end, "spring-row plate end"
     )
     dimensions.record("SpringRowEndX", None)
-    dimensions.record("SpringRowEndZ", None)
+    dimensions.record("SpringRowEndZ", '"PlateL" / 2')
     for label, mark in (("seed", seed_mark), ("second", second_mark)):
         check(
             f"spring-row {label} mark horizontal",
@@ -2173,12 +2254,12 @@ async def _spring_row_coordinates(adapter) -> None:
         adapter, f"{ridge_mark}.start", f"{seed_mark}.start", "horizontal_distance",
         HOLE_X, "spring-hole row X",
     )
-    dimensions.record("SpringRowX", None)
+    dimensions.record("SpringRowX", SPRING_ROW_X_EXPR)
     await dimension_between(
         adapter, f"{end_mark}.start", f"{seed_mark}.start", "vertical_distance",
         HOLE_END_OFFSET_LAST, "spring-hole start Z",
     )
-    dimensions.record("SpringStartZ", None)
+    dimensions.record("SpringStartZ", f'"PlateL" / 2 - ({SPRING_SEED_STATION_EXPR})')
     check(
         "spring-row second station on the row",
         await adapter.add_sketch_constraint(
@@ -2189,11 +2270,15 @@ async def _spring_row_coordinates(adapter) -> None:
         adapter, f"{seed_mark}.start", f"{second_mark}.start", "vertical_distance",
         CHANNEL_PITCH, "spring-hole pitch",
     )
-    dimensions.record("SpringPitch", None)
+    dimensions.record("SpringPitch", SPRING_PITCH_EXPR)
     await ensure_fully_defined(adapter, "spring-row coordinate sketch")
     check("exit spring-row coordinate sketch", await adapter.exit_sketch())
     name_last_feature(adapter, "SpringRowCoordinates")
-    dimensions.apply(adapter, "SpringRowCoordinates")
+    drives = dimensions.apply(adapter, "SpringRowCoordinates")
+    for dim_name, expr in drives:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    _assert_spring_row_equations(adapter, drives)
     for name in SPRING_ROW_LOCATORS:
         set_dimension_basic_tolerance(adapter, "SpringRowCoordinates", name)
         set_dimension_display_precision(
