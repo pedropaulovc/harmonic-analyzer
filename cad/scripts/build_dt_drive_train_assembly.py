@@ -1139,6 +1139,7 @@ from dt_alignment_pinion_spec import (  # noqa: E402
 )
 from dt_pinion_arbor_geometry import (  # noqa: E402
     CROSS_HOLE_DIA as ARBOR_CROSS_HOLE_DIA,
+    CROSS_HOLE_STATION_BAND as ARBOR_CROSS_HOLE_STATION_BAND,
     DRUM_STATION_BAND as ARBOR_DRUM_STATION_BAND,
     BACK_JOURNAL_Z as ARBOR_BACK_JOURNAL_Z,
     DRUM_STATION as ARBOR_DRUM_STATION,
@@ -3820,10 +3821,9 @@ if abs(_LEV_Z[1] - (LIFT_ROD_Z0 + RIG.LEVER_PLANE_NORTH_FROM_ROD_END)) > 1e-9:
     raise AssertionError("the lever throw plane drifted from the rig layout's")
 GRIP_ROD_SOUTH_TRAVEL_STACK = {
     **ARBOR_SOUTH_TRAVEL_STACK,
-    "MHA-DT-22 head length .X, half (crossrod centred)": printed_deviations(
-        ARBOR_HEAD_LEN, ARBOR_HEAD_LEN_PLACES, unit=ARBOR_UNIT
-    )[1]
-    / 2.0,
+    # The crossrod is located off the head's rear face by its own .XX station
+    # (CrossHoleFromHeadRear), not centred on the head (Codjiflo on #2106).
+    "MHA-DT-22 cross-hole station .XX": ARBOR_CROSS_HOLE_STATION_BAND,
     "MHA-DT-15 crossrod dia, half": HANDLE_ROD_DIA_BAND[0] / 2.0,
 }
 GRIP_HEAD_SOUTH_TRAVEL_STACK = {

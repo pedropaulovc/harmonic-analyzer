@@ -697,6 +697,15 @@ def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
         drive.RIG_MARGINS["grip crossrod to the crank chain wheel"][0]
         >= 0.25 + RIG.RIG_MARGIN_SPARE
     )
+    # The crossrod rides on its own .XX station off the head's rear face, so the
+    # rod's travel books that station's band, not half the head length's.
+    import dt_pinion_arbor_geometry as arbor
+
+    assert (
+        drive.GRIP_ROD_SOUTH_TRAVEL_STACK["MHA-DT-22 cross-hole station .XX"]
+        == arbor.CROSS_HOLE_STATION_BAND
+    )
+    assert not any("head length" in k for k in drive.GRIP_ROD_SOUTH_TRAVEL_STACK)
     # 21.06 at the 11.5 head (afe7ea283): its crown sits 0.5 further forward.
     assert drive._GRIP_HEAD_Z[0] - (drive.CRANK_ARM_Z0 + drive.ARM_THICKNESS) >= 21.0
     # The base deck's north edge still stands far past the rod's reach.
