@@ -75,15 +75,16 @@ OUTPUTS = DrawingOutputs(
 
 # The 31.75 x 19.05 face at 2:1 spans sheet x 118.25..181.75, y 155.95..194.05
 # about FACE_CENTER; the bore lands at 150.25, 175.25, the holes at x 133.0 and
-# 167.5. The side view projects right of it on the same centreline, clear of
-# the bore callout (x 192..236, y 155..165) left of it. The 1:1
-# isometric and its note stand top right, above the title block.
+# 167.5. The side view projects right of it on the same centreline (x
+# 254.8..275.2), clear of the two hole callouts left of it (x 184..244: the
+# bore's engagement row, about 54 mm, is the widest). The 1:1 isometric and
+# its note stand top right, above the title block.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 ISO_SCALE = (1, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
 FACE_CENTER = (0.150, 0.175)
-SIDE_CENTER = (0.255, FACE_CENTER[1])
+SIDE_CENTER = (0.265, FACE_CENTER[1])
 ISO_CENTER = (0.345, 0.225)
 ISO_NOTE_XY = (0.320, 0.190)
 
@@ -144,12 +145,15 @@ FACE_KEEP: dict[str, tuple[float, float, float]] = {
     # 2X Ø.144 DRILL THRU in the face's upper half, its leader in through the
     # +X side onto that hole's upper-right rim, clear of every extension
     # line; the bore's three rows under it (the engagement row, rule 20, is
-    # the widest: 23 glyphs, about 54 mm), level with the face's lower edge,
-    # its leader in through the +X side under the +X hole and over the stock
-    # width's extension line (which runs down from the face). Both end short
-    # of the side view (x 245).
+    # the widest: 23 glyphs, about 54 mm), its shelf just over the face's
+    # lower edge, its leader in through the +X side under the +X hole and
+    # over the stock width's extension line (which runs down from the face).
+    # Both end short of the side view (x 255).
     "HoleDia": (WIDTH + 2.5 + text_half("2X Ø.144 DRILL THRU"), HEIGHT - 4.0, LENGTH),
-    "BoreDia": (WIDTH + 15.0, 2.0, LENGTH),
+    # The bore's shelf starts about 3 mm left of its text and sits under its
+    # last row: at (WIDTH + 15, 2.0) it ran under the face and crossed the
+    # stock width's extension line (feed-nut2 r5 audit).
+    "BoreDia": (WIDTH + 16.5, 4.8, LENGTH),
 }
 # The side view (*Right): the faced length over it.
 SIDE_KEEP: dict[str, tuple[float, float, float]] = {
