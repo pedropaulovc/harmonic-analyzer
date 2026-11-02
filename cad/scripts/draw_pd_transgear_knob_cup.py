@@ -49,13 +49,14 @@ from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _section_axis import create_section_axis_centerline, position_section_caption
+from _part_properties import part_drawing_unit
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from pd_paper_drive_assembly_steps import step_ref
 from pd_transgear_knob_cup_spec import (
     BORE_DIA,
-    BORE_JOURNAL_CLEARANCE,
+    BORE_CLEARANCE_TEXT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     LENGTH,
@@ -117,7 +118,7 @@ PIN_NUMBER = _config.parts("pd-vn-transgear-knob-cup-pin")["number"]
 # setting before it is pinned (machinist review: the band named no mate).
 BORE_CALLOUT = (
     f"REAM THRU; SLIDES ON\n{SHAFT_NUMBER} JOURNAL,\n"
-    f"{min(BORE_JOURNAL_CLEARANCE):.4f}-{max(BORE_JOURNAL_CLEARANCE):.4f}\n"
+    f"{BORE_CLEARANCE_TEXT}\n"
     "DIAMETRAL CLEARANCE"
 )
 DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
@@ -285,7 +286,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,

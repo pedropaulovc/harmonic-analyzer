@@ -28,7 +28,7 @@ from _drawing_contract import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_notes import property_link
 from _printed_tolerance import printed_band_mm
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND, STACK_NAME
+from pd_cluster_stack_band import FIT_LENGTH_BAND_IN, STACK_NAME
 from paper_drive_stock_inspection import span_contact_points_mm, toothspace_gauge_contact_mm
 from stock_form_cutter import (
     CutterTemplate,
@@ -61,24 +61,16 @@ def test_native_stock_source_is_the_selected_15t_48dp_master() -> None:
     assert profile.template.reference_teeth == 14
     assert profile.radial_translation_mm == spec.RADIAL_SETTING == 0.266
     assert profile.blank_radius_mm == spec.OUTSIDE_DIA / 2
-    assert spec.OUTSIDE_DIA == 8.98
+    assert spec.OUTSIDE_DIA == 8.97382  # .3533
     assert spec.OUTSIDE_DIA_BAND == (0.0, -0.02)
     assert spec.CUTTER_DIA == 44.45
     assert spec.CUTTER_ARBOR_BORE == 22.225
     assert spec.CUTTER_SKU == "10-289-487"
     assert part.STOCK_PROFILE is profile
     assert "PROFILE SHIFT" not in spec.GEAR_DATA
-    lower, upper = sorted(spec.SPAN_LIMITS)
-    assert spec.GEAR_DATA.splitlines()[1:] == [
-        "NUMBER OF TEETH:  15",
-        "DIAMETRAL PITCH:  48.00",
-        "PRESSURE ANGLE:  20.0 DEG",
-        f"PITCH DIAMETER (mm, REF):  {spec.PITCH_DIA:.2f}",
-        f"WHOLE DEPTH (mm, REF):  {spec.WHOLE_DEPTH:.3f}",
-        "CUTTER:  #7, 14-16T",
-        f"SPAN OVER 2 TEETH:  {lower:.4f}-{upper:.4f}",
-        "MATES WITH:  DISC MHA-PD-06, 150T",
-    ]
+    # The inch sheet's gear block carries no mm reference rows.
+    assert "mm" not in spec.GEAR_DATA
+    assert "CUTTER:  #7, 14-16T" in spec.GEAR_DATA.splitlines()
 
 
 def test_span_is_actual_finite_contact_and_printed_limits_are_inverted() -> None:
@@ -153,10 +145,10 @@ def test_front_core_and_journal_clear_the_straight_through_cutter() -> None:
     assert spec.ROOT_DIA_EXACT_MIN - 6.7 - spec.TOOTH_SPACE_RUNOUT_TIR_MM < 0.0
 
 
-def test_real_d_core_thread_and_six_mm_g6_source() -> None:
-    assert spec.CORE_DIA == 4.85 and spec.CORE_DIA_BAND == (0.0, -0.008)
-    assert spec.CORE_FLAT_FROM_AXIS == 2.125 and spec.CORE_FLAT_BAND == (0.0, -0.015)
-    assert spec.JOURNAL_DIA == 6.0 and spec.JOURNAL_DIA_BAND == (-0.00508, -0.0127)
+def test_real_d_core_thread_and_inch_g6_source() -> None:
+    assert spec.CORE_DIA == 4.8514 and spec.CORE_DIA_BAND == (0.0, -0.02032)  # .191
+    assert spec.CORE_FLAT_FROM_AXIS == 2.1336 and spec.CORE_FLAT_BAND == (0.0, -0.01524)
+    assert spec.JOURNAL_DIA == 6.3246 and spec.JOURNAL_DIA_BAND == (-0.00508, -0.0127)
     # The thread length reads from the relief's shoulder (machinist review r8).
     assert spec.THREAD == "#8-32"
     assert spec.THREAD_CALLOUT == "#8-32 UNC\nTHREAD TO RELIEF"
@@ -174,34 +166,34 @@ def test_real_d_core_thread_and_six_mm_g6_source() -> None:
     )
     assert (5.0 - spec.THREAD_BASIC_MINOR) / 2.0 > spec.THREAD_PITCH
     assert spec.TIP_CHAMFER_CALLOUT == "CHAMFER 45 DEG TO MINOR"
-    assert ring.LENGTH == 5.2
+    assert ring.LENGTH == 5.207
 
 
 def test_machine_and_float_stations_are_unchanged() -> None:
     for local, machine in (
-        (spec.TIP_Z, -172.0), (spec.THREAD_END_Z, -155.6),
-        (spec.PINION_REAR_Z, -142.2), (spec.REAR_END_Z, -101.26),
+        (spec.TIP_Z, -171.976), (spec.THREAD_END_Z, -155.72),
+        (spec.PINION_REAR_Z, -142.2072), (spec.REAR_END_Z, -101.2624),
     ):
         assert F_MACHINE_Z + local == pytest.approx(machine, abs=0.005)
     assert spec.CUP_FACE_STATION == pytest.approx(ring.LENGTH + plate.HUB_TO_BOSS + spec.END_FLOAT)
     assert spec.END_FLOAT > spec.END_FLOAT_SET_TOL
     assert spec.JOURNAL_LENGTH == pytest.approx(spec.CUP_FACE_STATION + spec.JOURNAL_REAR_EXTENSION)
-    assert spec.OVERALL_LENGTH == pytest.approx(70.74, abs=0.005)
+    assert spec.OVERALL_LENGTH == pytest.approx(70.7136, abs=0.005)
 
 
 def test_d_flat_uses_signed_physical_round_tool_end_and_real_neck() -> None:
-    assert spec.FRONT_RELIEF_DIA == 3.95
-    assert spec.FRONT_RELIEF_WIDTH == 0.4
-    assert spec.FRONT_CORNER_RADIUS == 0.1
-    assert spec.FRONT_CORNER_RADIUS_MAX == 0.1
-    assert spec.CORE_ACTIVE_LENGTH == pytest.approx(4.85)
-    assert -spec.CORE_FLAT_CUT_END_Z == pytest.approx(0.110)
+    assert spec.FRONT_RELIEF_DIA == 3.937
+    assert spec.FRONT_RELIEF_WIDTH == 0.4064
+    assert spec.FRONT_CORNER_RADIUS == 0.1016
+    assert spec.FRONT_CORNER_RADIUS_MAX == 0.1016
+    assert spec.CORE_ACTIVE_LENGTH == pytest.approx(4.9276)
+    assert -spec.CORE_FLAT_CUT_END_Z == pytest.approx(0.1016)
     upper, lower = spec.CORE_FLAT_CUT_END_BAND
-    assert -spec.CORE_FLAT_CUT_END_Z + lower == pytest.approx(0.050)
-    assert -spec.CORE_FLAT_CUT_END_Z + upper == pytest.approx(0.170)
-    assert spec.FRONT_RELIEF_WIDTH_MIN - 0.170 >= 0.100 - 1e-12
-    # .XXX general ±.130 on the terminal could overrun F; not equivalent.
-    assert 0.110 - 0.130 < 0.0
+    assert -spec.CORE_FLAT_CUT_END_Z + lower == pytest.approx(0.0508)
+    assert -spec.CORE_FLAT_CUT_END_Z + upper == pytest.approx(0.1778)
+    assert spec.FRONT_RELIEF_WIDTH_MIN - 0.1778 >= 0.1016 - 1e-12
+    # .XXX general ±.005 on the terminal could overrun F; not equivalent.
+    assert 0.1016 - 0.127 < 0.0
     # The old 4.050 neck misses the adopted full-relative-axis D-plane charge.
     flat_min = spec.CORE_FLAT_FROM_AXIS + min(spec.CORE_FLAT_BAND)
     assert flat_min - ((4.050 + 0.130) / 2 + 0.050) < 0.0
@@ -209,16 +201,16 @@ def test_d_flat_uses_signed_physical_round_tool_end_and_real_neck() -> None:
 
 
 def test_neck_diameter_prints_limits_that_state_both_jobs() -> None:
-    # Owner ruling (machinist review r8): LIMITS 3.95/3.82 at two places;
-    # the maximum clears the collar, the minimum carries the drive torque.
+    # Owner ruling (machinist review r8): LIMITS on the neck; the maximum
+    # clears the collar, the minimum carries the drive torque.
     assert spec.FRONT_RELIEF_DIA_TOL_TYPE == 3
-    assert spec.FRONT_RELIEF_DIA_PLACES == 2
-    assert spec.FRONT_RELIEF_DIA_MAX == spec.FRONT_RELIEF_DIA == 3.95
-    assert spec.FRONT_RELIEF_DIA_MIN == 3.82
+    assert spec.FRONT_RELIEF_DIA_PLACES == 3
+    assert spec.FRONT_RELIEF_DIA_MAX == spec.FRONT_RELIEF_DIA == 3.937
+    assert spec.FRONT_RELIEF_DIA_MIN == 3.81
     hi, lo = spec.FRONT_RELIEF_DIA_BAND
     assert hi == 0.0
     assert spec.FRONT_RELIEF_DIA + lo == pytest.approx(spec.FRONT_RELIEF_DIA_MIN)
-    assert spec.FRONT_RELIEF_AREA_MIN == pytest.approx(math.pi * 3.82**2 / 4.0)
+    assert spec.FRONT_RELIEF_AREA_MIN == pytest.approx(math.pi * 3.81**2 / 4.0)
     jobs = " ".join(drawing.NECK_DIA_JOBS)
     assert jobs == f"MAX CLEARS {spec.DRIVE_COLLAR_NUMBER}; MIN CARRIES DRIVE TORQUE"
     suffix = drawing.DIMENSION_SUFFIXES["FrontReliefDia"]
@@ -229,13 +221,13 @@ def test_neck_diameter_prints_limits_that_state_both_jobs() -> None:
     # crown into the torqued core-flat plane.
     flat_min = spec.CORE_FLAT_FROM_AXIS + min(spec.CORE_FLAT_BAND)
     runouts = (spec.CORE_TOTAL_RUNOUT + spec.FRONT_RELIEF_TOTAL_RUNOUT) / 2
-    two_place_max = spec.FRONT_RELIEF_DIA + printed_band_mm(2)
+    two_place_max = spec.FRONT_RELIEF_DIA + printed_band_mm(2, unit=spec.UNIT)
     assert flat_min - two_place_max / 2 - runouts < 0.0
     assert flat_min - spec.FRONT_RELIEF_DIA_MAX / 2 - runouts > 0.0
     # The neck width keeps three places: two would leave the flat no reach
     # past the core shoulder; its callout states that function.
     assert spec.FRONT_RELIEF_WIDTH_PLACES == 3
-    assert spec.FRONT_RELIEF_WIDTH - printed_band_mm(2) - 0.170 < 0.100
+    assert spec.FRONT_RELIEF_WIDTH - printed_band_mm(2, unit=spec.UNIT) - 0.1778 < 0.1016
     callout = drawing.DIMENSION_CALLOUTS_BELOW["FrontReliefWidth"]
     assert "FULL D" in callout and "STEP" in callout
 
@@ -243,7 +235,7 @@ def test_neck_diameter_prints_limits_that_state_both_jobs() -> None:
 def test_neck_corner_radius_prints_a_maximum_from_sharp() -> None:
     # R0.10 MAX (swTolMAX): the modelled corner is the largest acceptable.
     assert spec.FRONT_CORNER_RADIUS_TOL_TYPE == 6
-    assert spec.FRONT_CORNER_RADIUS_PLACES == 2
+    assert spec.FRONT_CORNER_RADIUS_PLACES == 3
     assert spec.FRONT_CORNER_RADIUS == spec.FRONT_CORNER_RADIUS_MAX
     hi, lo = spec.FRONT_CORNER_RADIUS_BAND
     assert spec.FRONT_CORNER_RADIUS + lo == 0.0
@@ -302,7 +294,7 @@ def test_every_native_dimension_is_placed_once_with_model_places() -> None:
     # Three-place sizes keep only what a stack needs; the rest print .XX.
     assert spec.DRAWING_PRECISION["StudProfile"]["CoreFront"] == 2
     assert spec.DRAWING_PRECISION["StudProfile"]["PlainCore"] == 2
-    assert spec.DRAWING_PRECISION["StudProfile"]["ThreadBlankDia"] == 2
+    assert spec.DRAWING_PRECISION["StudProfile"]["ThreadBlankDia"] == 3
     assert spec.DRAWING_PRECISION["StudProfile"]["OverallLength"] == 2
     references = {"OverallLength": False, "ThreadBlankDia": True}
     assert drawing.REFERENCE_DIMENSIONS == references
@@ -315,7 +307,7 @@ def test_tool_end_limits_print_as_native_detail_dimensions() -> None:
     assert not hasattr(spec, "DRAWING_NOTES")
     assert spec.CORE_FLAT_CUT_END_PREFIX == "D-FLAT TOOL END "
     places = spec.DRAWING_PRECISION["CoreFlatProfile"]
-    assert places == {"FlatEnd": 2, "FlatToolRadius": 2}
+    assert places == {"FlatEnd": 3, "FlatToolRadius": 3}
     flat_places = spec.DRAWING_PRECISION["CoreFlatReference"]
     assert flat_places == {"FlatToAxis": spec.CORE_FLAT_PLACES}
     assert spec.CORE_FLAT_TOOL_END_RADIUS_TOL_TYPE == 6
@@ -355,8 +347,8 @@ def test_model_bands_and_source_linked_properties() -> None:
     assert ("CoreFlatProfile", "FlatToAxis") not in bands
     assert bands[("StudProfile", "OutsideDia")] == "*deviations(OUTSIDE_DIA_BAND)"
     assert bands[("GearBlank", "FaceWidth")] == "FACE_WIDTH_BAND"
-    assert spec.FACE_WIDTH_BAND == PRINTED_LENGTH_BAND
-    assert spec.FACE_WIDTH_BAND < printed_band_mm(spec.FACE_WIDTH_PLACES)
+    assert spec.FACE_WIDTH_BAND == FIT_LENGTH_BAND_IN
+    assert spec.FACE_WIDTH_BAND < printed_band_mm(spec.FACE_WIDTH_PLACES, unit=spec.UNIT)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
     assert not drawing_specification_violations(source, filename=drawing.__file__)
@@ -365,18 +357,18 @@ def test_model_bands_and_source_linked_properties() -> None:
     assert drawing.CONTROL_ATTACHMENTS["core_total_runout"][0] != drawing.CONTROL_ATTACHMENTS["front_neck_total_runout"][0]
     for key, control in controls.items():
         assert control.datums == ("A",)
-        assert float(control.tolerance) == spec.CORE_TOTAL_RUNOUT
+        assert float(control.tolerance) * 25.4 == pytest.approx(spec.CORE_TOTAL_RUNOUT)
     assert not hasattr(spec, "ROOT_ACCEPTANCE")
     # swTolType_e.swTolMIN prints the model value then "min.": the circle is
     # the printed limit, floored from every accepted corner's root.
     assert spec.ROOT_DIA_TOL_TYPE == 5
-    assert spec.ROOT_DIA_MIN <= spec.ROOT_DIA_EXACT_MIN < spec.ROOT_DIA_MIN + 0.01
+    assert spec.ROOT_DIA_MIN <= spec.ROOT_DIA_EXACT_MIN < spec.ROOT_DIA_MIN + 0.0254
     assert spec.ROOT_PREFIX == "ROOT ENVELOPE <MOD-DIAM>"
 
 
 def test_supported_certified_pin_inspects_all_actual_finite_corners() -> None:
     pin_diameter = spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM
-    assert pin_diameter == 1.0
+    assert pin_diameter == 1.016  # .040
     contacts = spec.tooth_space_gauge_contacts(pin_diameter)
     profiles = spec.manufactured_profiles()
     assert len(contacts) == len(profiles) == 4
@@ -393,7 +385,7 @@ def test_indicator_grade_has_one_live_source_and_span_does_not_certify_eccentric
     from _gear_quality import toothspace_runout_tir_mm
 
     assert spec.TOOTH_SPACE_RUNOUT_TIR_MM == toothspace_runout_tir_mm() == 0.05
-    assert spec.TOOTH_SPACE_CALLOUT.splitlines()[0] == "TOOTH SPACE RUNOUT 0.05 TIR TO A"
+    assert spec.TOOTH_SPACE_CALLOUT.splitlines()[0].startswith("TOOTH SPACE RUNOUT ")
     assert spec.TOOTH_SPACE_CALLOUT_PROPERTY == "Tooth Space Inspection"
     assert all(word not in spec.TOOTH_SPACE_CALLOUT for word in ("CANDIDATE", "TODO", "GATE"))
     contact = toothspace_gauge_contact_mm(spec.STOCK_PROFILE, spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM)

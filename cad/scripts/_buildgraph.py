@@ -2382,8 +2382,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         # held inside the knife edge's free-rock floor.
         "sm_summing_assembly_sheet",
         "dt_vn_post_mount_screw_spec",
-        # Edge-break row sizes the knob tip.
-        "pd_transgear_knob_shaft_spec",
     }
 )
 

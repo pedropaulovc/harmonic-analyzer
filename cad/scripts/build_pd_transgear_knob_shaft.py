@@ -52,9 +52,11 @@ from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension
 from _drawing_prefix import set_dimension_prefix
 from _simplified_part import save_simplified_part
 from _sketch_circle import define_circle
+from _document_units import apply_package_model_units
 from _fit_deviations import deviations
 from _gear import ToothedDisc
 from _part_pmi import author_part_pmi
+from _part_properties import part_drawing_unit
 from _visibility import blank_reference_geometry
 from paper_drive_stock_native import (
     apply_span_limits,
@@ -120,6 +122,7 @@ from pd_transgear_knob_shaft_spec import (
     TIP_Z,
     TOOTH_SPACE_CALLOUT,
     TOOTH_SPACE_CALLOUT_PROPERTY,
+    UNIT,
     expected_volume_bounds_mm3,
 )
 
@@ -685,7 +688,7 @@ def _apply_native_limits(
 ) -> None:
     """Print an actual driving feature dimension as lower/upper LIMITS."""
     lower, upper = deviations(band)
-    set_dimension_bilateral_tolerance(adapter, feature, name, lower, upper)
+    set_dimension_bilateral_tolerance(adapter, feature, name, lower, upper, display_unit=UNIT)
     _, dimension = _named_dimension(adapter, feature, name)
     if not math.isclose(float(dimension.SystemValue) * 1000.0, nominal, abs_tol=1e-6):
         raise RuntimeError(f"{name}: actual controlled feature nominal changed")
@@ -783,6 +786,8 @@ async def build(adapter: Any) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # Linear globals retain an explicit mm suffix in the inch source model.
     # The finite tooth master is literal source geometry, not an editable x.
     for name, value in (
@@ -826,7 +831,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Both cutter terminals are genuinely empty by the pure envelope proofs:
     # the run-out clears the neck and D-core at F and the journal at the rear.
-    await author_span(adapter, STOCK_PROFILE, SPAN_TEETH, places=SPAN_PLACES)
+    await author_span(adapter, STOCK_PROFILE, SPAN_TEETH, places=SPAN_PLACES, unit=UNIT)
     drive_jobs += await _flat_end_view_reference(adapter)
     drive_jobs += await _root_profile(adapter)
 
@@ -861,18 +866,22 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # The 15T's face width: a disc-cluster stack term at the cluster's band.
-    set_dimension_symmetric_tolerance(adapter, "GearBlank", "FaceWidth", FACE_WIDTH_BAND)
-    set_dimension_bilateral_tolerance(
-        adapter, "StudProfile", "CoreDia", *deviations(CORE_DIA_BAND)
+    set_dimension_symmetric_tolerance(
+        adapter, "GearBlank", "FaceWidth", FACE_WIDTH_BAND, display_unit=UNIT
     )
     set_dimension_bilateral_tolerance(
-        adapter, "JournalProfile", "JournalDia", *deviations(JOURNAL_DIA_BAND)
+        adapter, "StudProfile", "CoreDia", *deviations(CORE_DIA_BAND), display_unit=UNIT
     )
     set_dimension_bilateral_tolerance(
-        adapter, "StudProfile", "OutsideDia", *deviations(OUTSIDE_DIA_BAND)
+        adapter, "JournalProfile", "JournalDia", *deviations(JOURNAL_DIA_BAND),
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "CoreFlatReference", "FlatToAxis", *deviations(CORE_FLAT_BAND)
+        adapter, "StudProfile", "OutsideDia", *deviations(OUTSIDE_DIA_BAND), display_unit=UNIT
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "CoreFlatReference", "FlatToAxis", *deviations(CORE_FLAT_BAND),
+        display_unit=UNIT,
     )
     _apply_neck_and_flat_limits(adapter)
     set_dimension_prefix(
@@ -880,7 +889,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     apply_span_limits(
         adapter, nominal_mm=SPAN_NOMINAL, deviations=SPAN_DEVIATIONS,
-        places=SPAN_PLACES, prefix=SPAN_PREFIX,
+        places=SPAN_PLACES, prefix=SPAN_PREFIX, unit=UNIT,
     )
     _apply_root_min(adapter)
     set_dimension_prefix(adapter, "RootProfile", "RootDia", ROOT_PREFIX)

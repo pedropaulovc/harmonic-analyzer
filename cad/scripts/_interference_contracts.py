@@ -54,7 +54,6 @@ from dt_swing_stop_screw_spec import THREAD as _STOP_THREAD
 from _sprocket_seat_geometry import DRIVE_PIN_DIA as _SEAT_PIN_DIA
 from _sprocket_seat_geometry import DRIVE_PIN_HOLE_DIA as _SEAT_PIN_HOLE_DIA
 from dt_vn_crank_seat_drive_pin_spec import PRESS_DEPTH as _CRANK_SEAT_PIN_DEPTH
-from pd_vn_transgear_knob_drive_pin_spec import PRESS_DEPTH as _KNOB_SEAT_PIN_DEPTH
 from dt_pinion_pivot_block_geometry import BLOCK_HEIGHT as _PINION_BLOCK_HEIGHT
 from dt_vn_slotted_screw_spec import SHANK_DIA as _BLOCK_SCREW_DIA
 from dt_vn_slotted_screw_spec import SHANK_LEN as _BLOCK_SCREW_LENGTH
@@ -458,7 +457,7 @@ def _cross_pin_overlap_mm3(pin_od: float, pin_id: float, shaft_d: float) -> floa
 # (its ends stay inside the cup's O.D.).
 _CUP_PIN_OD = 25.4 / 16.0
 _CUP_PIN_ID = _CUP_PIN_OD - 2.0 * 0.012 * 25.4
-_CUP_PIN_JOURNAL_MM3 = _cross_pin_overlap_mm3(_CUP_PIN_OD, _CUP_PIN_ID, 6.0)
+_CUP_PIN_JOURNAL_MM3 = _cross_pin_overlap_mm3(_CUP_PIN_OD, _CUP_PIN_ID, 6.3246)
 _CUP_PIN_CUP_MM3 = (
     math.pi / 4.0 * (_CUP_PIN_OD**2 - _CUP_PIN_ID**2) * (5.0 * 25.4 / 8.0)
     - _CUP_PIN_JOURNAL_MM3
@@ -484,8 +483,8 @@ _RING_PRONG_SHARE = 3.0 * math.atan(0.75) / (2.0 * math.pi)
 # reads as contact: the MHA-PD-17 hub's D-bore on the sleeve's Ø9 boss and
 # D-flat, the MHA-PD-VN-58 dowel in the arm's Ø3.175 ream, the sleeve and both
 # bushings on the MHA-PD-23 pin (Ø3.9), the disc bore on the boss (Ø9), the
-# knob journal in the plate bore (Ø6), the D-collar bore on the core
-# (Ø4.9), the MHA-PD-VN-54 dowels in the T24's Ø2.5 holes, every screw in its
+# knob journal in the plate bore (Ø6.3246), the D-collar bore on the core
+# (Ø4.8768), the MHA-PD-VN-54 dowels in the T24's Ø2.5 holes, every screw in its
 # clearance hole, and the MHA-PD-14 latch hook: its base on the bar's back
 # face under the MHA-PD-VN-59 heads, their shanks through its Ø3.2 holes, and
 # the MHA-PD-VN-58 pin through its Ø3.3 pin hole.
@@ -547,14 +546,14 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         second_number=2,
     ),
     # MHA-PD-VN-56 #8-32 x 5/8 (pd_vn_transgear_arm_plate_screw_spec; from the top of the
-    # oval head's bevel, flush in the plate's countersink) through the 5.0
-    # plate's Ø4.5 clearance, cut flush with the arm's front face (R9-44): the
-    # cut length 12.9375 - 5.0 = the arm's 7.9375 in its #29 through tap.
+    # oval head's bevel, flush in the plate's countersink) through the 5.0038
+    # plate's Ø5.7912 clearance, cut flush with the arm's front face (R9-44): the
+    # cut length 12.9413 - 5.0038 = the arm's 7.9375 in its #29 through tap.
     **_numbered_pairs(
         "pd-vn-transgear-arm-plate-screw",
         range(1, 3),
         "pd-transgear-arm",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 12.9375 - 5.0),
+        _smooth_annulus_limit_mm3(4.1656, 3.454, 12.9413 - 5.0038),
     ),
     # MHA-PD-VN-57 (pd_vn_transgear_pivot_screw_spec, 90325A174 faced to fit) in the
     # support bar's THROUGH #8-32 tap: its fitted 9.1444 thread less the 1.1938
@@ -581,15 +580,15 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         3.175, 3.1496, 7.9375
     ),
     # The two MHA-PD-VN-64 dowels (pd_vn_transgear_arm_plate_locating_pin_spec,
-    # Ø2.0 model) pressed into the arm's Ø1.995 through reams
+    # 3/32 = Ø2.38125 model) pressed into the arm's Ø2.3622 through reams
     # (pd_transgear_arm_geometry); _transgear_arm_plate_locating_interface
-    # owns the 1.70 proud set in their 6.0 - 1.70 insertion: the press.
-    # They slip in the plate's Ø2.015 holes, so that pair has no row.
+    # owns the 1.7018 proud set in their 7.9375 - 1.7018 insertion: the press.
+    # They slip in the plate's Ø2.4003 holes, so that pair has no row.
     **_numbered_pairs(
         "pd-vn-transgear-arm-plate-locating-pin",
         range(1, 3),
         "pd-transgear-arm",
-        _smooth_annulus_limit_mm3(2.0, 1.995, 6.0 - 1.70),
+        _smooth_annulus_limit_mm3(2.38125, 2.3622, 7.9375 - 1.7018),
     ),
     # MHA-PD-20 (pd_transgear_pivot_spacer_spec, Ø.1850 ream) pressed on the
     # MHA-PD-VN-57 Ø4.7625 shoulder over its whole 5.0 length (R9-71): the press.
@@ -630,24 +629,24 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         "pd-transgear-arm-plate",
         1.10 * 0.00809042475,
     ),
-    # MHA-PD-13's #8-32 tap drill 3.454 on MHA-PD-08's Ø4.070 thread blank:
-    # at the nominal fitted collar length 6.2, whose rear face reacts on F,
-    # the nut seats on the pilot 2.9 in front of the wheel seat. The overlap
-    # is 23.9 - 6.2 - 2.9 = 14.8, entirely on the blank, which starts 7.5
-    # in front of F, behind the nut's seat at 9.1.
+    # MHA-PD-13's #8-32 tap drill 3.454 on MHA-PD-08's Ø4.064 thread blank:
+    # at the nominal fitted collar length 6.1891, whose rear face reacts on F,
+    # the nut seats on the pilot 2.9016 in front of the wheel seat. The overlap
+    # is 23.876 - 6.1891 - 2.9016 = 14.7853, entirely on the blank, which
+    # starts 7.62 in front of F, behind the nut's seat at 9.0907.
     frozenset(
         ("pd-transgear-thumbnut-1", "pd-transgear-knob-shaft-1")
-    ): _smooth_annulus_limit_mm3(4.070, 3.454, 23.9 - 6.2 - 2.9),
+    ): _smooth_annulus_limit_mm3(4.064, 3.454, 23.876 - 6.1891 - 2.9016),
     # The two MHA-PD-VN-54 dowels pressed into the MHA-PD-22 collar's through reams,
     # the crank-seat twin (the collar's PIN_HOLE_DIA is the seat interface's
-    # DRIVE_PIN_HOLE_DIA): the pin's length behind the seat face.
+    # DRIVE_PIN_HOLE_DIA): the pin's length behind the seat face, 2.3625
+    # (pd_vn_transgear_knob_drive_pin_spec.PRESS_DEPTH; a literal, so the
+    # assemblies do not re-key on that purchased pin's registry row).
     **_numbered_pairs(
         "pd-vn-transgear-knob-drive-pin",
         range(1, 3),
         "pd-transgear-drive-collar",
-        _smooth_annulus_limit_mm3(
-            _SEAT_PIN_DIA, _SEAT_PIN_HOLE_DIA, _KNOB_SEAT_PIN_DEPTH
-        ),
+        _smooth_annulus_limit_mm3(_SEAT_PIN_DIA, _SEAT_PIN_HOLE_DIA, 2.3625),
     ),
     # Chain-mesh contact at the closing station: the MHA-PD-VN-66 connecting
     # link closes the chain at station 67, whose forward pin is pin 0 on the

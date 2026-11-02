@@ -6,4 +6,5 @@ pd-transgear-knob-thrust-ring:
   finish: bright machined, oiled
   quantity: 1
   tolerance_class: machined_block
+  drawing_unit: in
   process: "turned from bar (brass): drill the bore, face both ends to length"

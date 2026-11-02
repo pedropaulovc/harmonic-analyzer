@@ -179,15 +179,15 @@ def test_knob_pin_holes_obey_the_wall_floor_or_run_through() -> None:
     # Blind in the 4.000 collar it would leave 1.6375, over the floor.
     assert collar.pin_hole_meets_wall_floor(collar.LENGTH, old_depth)
     # A blind hole is fine exactly at the floor, and not a hair under it.
-    assert collar.pin_hole_meets_wall_floor(3.6, 3.6 - 1.5)
-    assert not collar.pin_hole_meets_wall_floor(3.6, 3.6 - 1.49)
+    assert collar.pin_hole_meets_wall_floor(3.6, 3.6 - collar.WALL_FLOOR)
+    assert not collar.pin_hole_meets_wall_floor(3.6, 3.6 - collar.WALL_FLOOR + 0.01)
 
 
 def test_knob_pin_tip_stays_inside_the_thinnest_wheel_under_the_thumbnut() -> None:
-    # The press stop sets the tip at 2.4 +/-0.10; the thinnest wheel is 2.7.
-    assert knob_pin.PROUD_RANGE == pytest.approx((2.30, 2.50))
+    # The press stop sets the tip at .091-.098; the thinnest wheel is 2.7.
+    assert knob_pin.PROUD_RANGE == pytest.approx((2.3114, 2.4892))
     assert knob_pin.THINNEST_PLATE == pytest.approx(2.7)
-    assert knob_pin.TIP_INSET_WORST == pytest.approx(0.20)
+    assert knob_pin.TIP_INSET_WORST == pytest.approx(0.2108)
     assert knob_pin.checked_tip_inset(2.7 - knob_pin.TIP_INSET_MIN, 2.7) == (
         pytest.approx(knob_pin.TIP_INSET_MIN)
     )
@@ -207,27 +207,25 @@ def test_knob_pin_tip_stays_inside_the_thinnest_wheel_under_the_thumbnut() -> No
 
 
 def test_knob_pin_pressed_end_stays_inside_the_collar() -> None:
-    # Nominal: 6.2 - (4.7625 - 2.4) on the 6.2 set body.  Worst: the longest
-    # 3/16 dowel set lowest in the shortest fitted body:
-    # 3.87 - (4.7625 + 0.254 - 2.30).
-    assert collar.LENGTH == pytest.approx(6.2)
-    assert collar.PIN_REAR_INSET == pytest.approx(3.8375)
-    assert collar.PIN_REAR_INSET_WORST == pytest.approx(1.1535)
+    # Nominal: the set body less (4.7625 - 2.4).  Worst: the longest 3/16
+    # dowel set lowest in the shortest fitted body.
+    assert collar.LENGTH == pytest.approx(6.1891)
+    assert collar.PIN_REAR_INSET == pytest.approx(3.8266)
+    assert collar.PIN_REAR_INSET_WORST == pytest.approx(1.1811)
     # Negative control: the crank's 1/4 dowel set to the same stop in the
     # same shortest collar would stand out of its rear face toward the 12T.
     assert collar.pin_rear_inset(
         collar.LENGTH_FITTED_MIN,
         crank_pin.LENGTH + seat_geometry.DRIVE_PIN_LENGTH_GRADE,
         min(knob_pin.PROUD_RANGE),
-    ) == pytest.approx(-0.434)
+    ) == pytest.approx(-0.4064)
 
 
 def test_knob_pin_sheet_prints_the_press_stop_range() -> None:
     notes = " ".join(
         _config.parts("pd-vn-transgear-knob-drive-pin")["installation_notes"].split()
     )
-    low, high = knob_pin.PROUD_RANGE
-    assert f"{low:.2f}-{high:.2f} PROUD OF THE SEAT FACE" in notes
+    assert f"{knob_pin.PROUD_TEXT} PROUD OF THE SEAT FACE" in notes
 
 
 _CRANK_SEAT = dict(

@@ -38,8 +38,10 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _document_units import apply_package_model_units
 from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _part_pmi import author_part_pmi
+from _part_properties import part_drawing_unit
 from pd_transgear_knob_thrust_ring_spec import (
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
@@ -49,6 +51,7 @@ from pd_transgear_knob_thrust_ring_spec import (
     LENGTH_TOL,
     OD,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 PART_NAME = "pd-transgear-knob-thrust-ring"
@@ -77,6 +80,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -147,7 +152,9 @@ async def build(adapter) -> dict[str, str]:
     # The bore carries no band of its own: its DRILL THRU callout takes the
     # title block's DRILLED HOLES row (spec ID_BAND).
     # The forward stop of the knob's end float: its explicit band.
-    set_dimension_symmetric_tolerance(adapter, "Ring", "RingLength", LENGTH_TOL)
+    set_dimension_symmetric_tolerance(
+        adapter, "Ring", "RingLength", LENGTH_TOL, display_unit=UNIT
+    )
     _author_dimension_callouts(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
