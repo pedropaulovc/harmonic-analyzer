@@ -837,3 +837,20 @@ def test_every_inside_radius_meets_the_17_7_ph_bend_minimum() -> None:
     # The larger bend keeps the blade inside O5's 9-13 deg only with the bend
     # starting at the pad's edge.
     assert geometry.FOOT_FLAT == 0.0
+
+
+def test_clearance_hole_callout_prints_the_title_block_drilled_hole_places() -> None:
+    # Codjiflo on #2106: the Hole Wizard callout's drill size is the one
+    # value this sheet cannot carry as a part-side model dimension, so the
+    # drawing sets its ICalloutLengthVariable precision natively.  What it
+    # applies is the spec's contract, and that contract is the places the
+    # inch title block's DRILLED HOLES tolerance is stated at (+.004/0).
+    from _title_block_units import LENGTH_UNITS, quantity
+
+    unit = dt_pinion_spring_spec.UNIT
+    assert unit == "in"
+    row = _config.title_block("drilled_hole", unit=unit)
+    _plus, row_unit, digits = quantity("drilled_hole", row, "plus", LENGTH_UNITS)
+    assert row_unit == unit
+    assert drawing.HOLE_CALLOUT_PRECISION == dt_pinion_spring_spec.HOLE_CALLOUT_PRECISION
+    assert dt_pinion_spring_spec.HOLE_CALLOUT_PRECISION == digits == 3

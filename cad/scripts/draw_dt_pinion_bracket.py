@@ -81,7 +81,6 @@ from dt_pinion_bracket_spec import (
     OVERALL_LENGTH,
     PIN_DROP,
     PIN_SEAT_DEPTH_CALLOUT,
-    PIN_SEAT_WALL_CALLOUT,
     R_END,
     SURFACE_FINISHES,
 )
@@ -238,10 +237,7 @@ DIMENSION_CALLOUTS = {
     # height's text at its bent dimension line, so that leg touched the leading
     # S of SETS (r3 review, rule 14); the leading spaces stand the rows off it.
     "PinSeatCy": "   SETS FOLLOWER HEIGHT\n   ON MHA-DT-23 CAM",
-    # The seat's far-face web is under rule 17's .080 target at the strap's
-    # loose .XX thickness: the sheet states the fact RV-01 declares, from the
-    # spec.
-    "PinSeatCz": "CENTRES MHA-DT-25\nFOLLOWER IN BAR\n" + PIN_SEAT_WALL_CALLOUT,
+    "PinSeatCz": "CENTRES MHA-DT-25\nFOLLOWER IN BAR",
 }
 
 
