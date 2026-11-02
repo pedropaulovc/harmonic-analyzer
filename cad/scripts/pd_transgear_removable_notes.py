@@ -40,8 +40,8 @@ def _inch(value_mm: float, places: int) -> str:
 
 
 # The shortfall prints as a plain fact; its governance is RV-01 in
-# pd-transgear-removable.yaml (owner ruling 2026-11-01, accepted until
-# D14/#1381), never the sheet.
+# pd-transgear-removable.yaml (owner ruling 2026-11-01: a permanent minor
+# exception, revisit in #2141), never the sheet.
 BORE_PIN_WEB_NOTE = (
     f"BORE TO DRIVE-PIN HOLE WEB {_inch(BORE_PIN_WEB_WORST_IN * _IN, 3)} MIN."
 )

@@ -14,4 +14,4 @@ pd-transgear-removable:
       kind: "minor"
       where: "the BORE TO DRIVE-PIN HOLE WEB .018 MIN note"
       finding: "bore-to-drive-pin web below the .060 floor (rule 17)"
-      reason: "Owner ruling 2026-11-01: accepted until D14/#1381. The Ø.406 bore and the #40 drive-pin holes on R.2756 come from the shared sprocket seat (_sprocket_seat_geometry); .024 nominal, .018 MIN with both holes drilled oversize and the pin at its full location band (#1377)"
+      reason: "Owner ruling 2026-11-01: shared #25 sprocket-seat geometry; accepted as a permanent minor exception (revisit in #2141). The Ø.406 bore and the #40 drive-pin holes on R.2756 come from the shared sprocket seat (_sprocket_seat_geometry); .024 nominal, .018 MIN with both holes drilled oversize and the pin at its full location band (#1377)"
