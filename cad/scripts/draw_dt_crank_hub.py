@@ -12,6 +12,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     place_view,
 )
+from solidworks_mcp.adapters.sw_type_info import constant
 
 from _check import check
 from _com import _early_bound
@@ -229,6 +230,20 @@ def _set_callout_below(display: Any, text: str, label: str) -> None:
         raise RuntimeError(f"{label}: callout-below text did not persist: {applied!r}")
 
 
+def _construction_curves_in_phantom(adapter: Any) -> None:
+    """Print this sheet's construction curves -- MHA-DT-09's big end round
+    the PinProud MIN on the end view -- in the phantom line font, the ASME
+    font for an adjacent part (review of farm run 20261102T004131857Z: a MIN
+    to a dashed outline reads as hidden geometry).  A drawing document
+    preference, so it changes this SLDDRW only."""
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    option = constant("swDetailingNoOptionSpecified")
+    preference = constant("swLineFontConstructionCurvesStyle")
+    phantom = constant("swLinePHANTOM")
+    if not extension.SetUserPreferenceInteger(preference, option, phantom):
+        raise RuntimeError("failed to set the crank-hub construction line font")
+    if int(extension.GetUserPreferenceInteger(preference, option)) != phantom:
+        raise RuntimeError("crank-hub construction line font readback differs")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -288,6 +303,7 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
+    _construction_curves_in_phantom(adapter)
 
     front_annotations = curate_view_dimensions(
         adapter,

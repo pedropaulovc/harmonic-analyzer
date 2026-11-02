@@ -570,14 +570,11 @@ def test_pin_proud_min_lands_on_the_phantom_big_end() -> None:
 
 
 def test_pin_proud_callout_names_the_pin_big_end_and_ring() -> None:
-    # r7 review (run 20261101T022045634Z): the dashed box and the ring were
-    # unnamed; rule 4 wants the mate's name with its number.  No line type is
-    # named: the outline prints in the view's dashed style, which the review
-    # of farm run 20261101T130334243Z read against "(PHANTOM)".
+    # r7 review (run 20261101T022045634Z): the outlined big end and the ring
+    # were unnamed; rule 4 wants the mate's name with its number.
     text = " ".join(dt_crank_hub_notes.PIN_PROUD_CALLOUT.split())
     for part in ("MHA-DT-09 TAPER PIN BIG END", "KEEPER RING MHA-DT-27"):
         assert part in text
-    assert "PHANTOM" not in text
     lines = dt_crank_hub_notes.PIN_PROUD_CALLOUT.splitlines()
     assert len(lines) == 4 and max(map(len, lines)) <= 29
     # The widest line (2.5 mm a glyph) starts right of the phantom big end.
