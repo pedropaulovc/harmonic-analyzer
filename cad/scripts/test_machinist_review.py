@@ -6108,22 +6108,38 @@ def test_failed_routed_successor_does_not_inherit_predecessor_execution_evidence
                for route in provenance["routes"][:-1])
 
 
+class _OmpVersionProcess:
+    """In-process `omp --version` child: a real interpreter's cold start can
+    exceed the 1 s preflight budget on a loaded host. ``output=None`` never
+    answers until killed."""
+
+    def __init__(self, output, exit_code=0):
+        self.output, self.exit_code = output, exit_code
+        self.returncode = None
+        self.killed = asyncio.Event()
+
+    async def communicate(self):
+        if self.output is None:
+            await self.killed.wait()
+            self.returncode = 1
+            return b"", b""
+        self.returncode = self.exit_code
+        return self.output, b""
+
+    def kill(self):
+        self.killed.set()
+
+
 @pytest.mark.parametrize("version", ["17.4.0", "18.6.99", "unknown", "failed", "silent"])
-def test_omp_unsupported_version_fails_before_broker_or_prompt(tmp_path, monkeypatch, version):
+def test_omp_unsupported_version_fails_before_broker_or_prompt(monkeypatch, version):
     import machinist_review_transport as transport
-    script = tmp_path / "version_fixture.py"
-    script.write_text(
-        "import sys, time\n"
-        "assert sys.argv[1] == '--version'\n"
-        + ("time.sleep(20)\n" if version == "silent" else f"print({'omp/' + version!r}, flush=True)\n")
-        + ("sys.exit(1)\n" if version == "failed" else ""),
-        encoding="utf-8",
-    )
     processes, native = [], []
-    original = asyncio.create_subprocess_exec
     async def spawn(executable, *arguments, **kwargs):
-        assert arguments == ("--version",)
-        process = await original(sys.executable, str(script), *arguments, **kwargs)
+        assert executable == sys.executable and arguments == ("--version",)
+        process = _OmpVersionProcess(
+            None if version == "silent" else f"omp/{version}\n".encode(),
+            exit_code=1 if version == "failed" else 0,
+        )
         processes.append(process)
         return process
     def forbidden_broker(*args, **kwargs):
@@ -6142,6 +6158,7 @@ def test_omp_unsupported_version_fails_before_broker_or_prompt(tmp_path, monkeyp
         asyncio.run(invoke())
     if version == "silent":
         assert caught.value.phase == "OMP version preflight"
+        assert processes[0].killed.is_set()
     else:
         assert caught.value.category == "configuration_error"
         assert ">=18.7.0" in str(caught.value)
@@ -6150,14 +6167,11 @@ def test_omp_unsupported_version_fails_before_broker_or_prompt(tmp_path, monkeyp
 
 
 @pytest.mark.parametrize("version", ["18.7.0", "18.11.0", "19.0.0"])
-def test_omp_supported_version_preflight_records_version(tmp_path, monkeypatch, version):
+def test_omp_supported_version_preflight_records_version(monkeypatch, version):
     import machinist_review_transport as transport
-    script = tmp_path / "version_fixture.py"
-    script.write_text(f"print({'omp/' + version!r})\n", encoding="utf-8")
-    original = asyncio.create_subprocess_exec
     async def spawn(executable, *arguments, **kwargs):
         assert arguments == ("--version",)
-        return await original(sys.executable, str(script), *arguments, **kwargs)
+        return _OmpVersionProcess(f"omp/{version}\n".encode())
     monkeypatch.setattr(transport.asyncio, "create_subprocess_exec", spawn)
     provenance, native = {"routes": [{"transport": "omp", "outcome": "started"}]}, []
     asyncio.run(transport._omp_version(
