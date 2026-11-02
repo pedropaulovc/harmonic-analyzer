@@ -1390,12 +1390,86 @@ def test_step_10_states_the_in_situ_hub_fit_up() -> None:
     step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("10. "))
     assert "THE DRO READS X 0, Y .5123 ±.0005" in step
     assert "MATCH-DRILL AND REAM THE HUB THERE" in step
-    hub_pin = f"(ITEM {spec.ITEM_NUMBERS[spec.HUB_PIN]})"
-    assert f"HUB Ø.4000-.4005 THRU, BONDED LOCATOR {hub_pin}" in step
+    hub_pin = f"HUB LOCATOR PIN (ITEM {spec.ITEM_NUMBERS[spec.HUB_PIN]})"
+    assert f"HUB Ø.4000-.4005 THRU, FOR THE {hub_pin}, BONDED AT STEP 11" in step
     assert "THEIR SPOTS" not in step and "THE CL HOLE OFF ITS SPOT" in step
     assert spec.carrier.HUB_RADIAL_STACK < 0.25
 
 
+def test_steps_10_and_11_name_item_9_as_its_bom_row() -> None:
+    """Review jig-asm r2/r3: one name for item 9 across BOM and steps."""
+    assert spec.BOM_DESCRIPTIONS[spec.HUB_PIN] == "HUB LOCATOR PIN"
+    cited = f"HUB LOCATOR PIN (ITEM {spec.ITEM_NUMBERS[spec.HUB_PIN]})"
+    for number in ("10. ", "11. "):
+        step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith(number))
+        assert cited in step
+        assert "GAUGE PIN" not in step and "BONDED LOCATOR" not in step
+
+
+def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
+    """Review jig-asm r1 (rule 24): one general note for the screws and nuts
+    whose steps give no torque, with no invented figure."""
+    torqued = {
+        spec.BRACKET_SCREW: "1. ",
+        spec.LEVER_SCREW: "12. ",
+        spec.PIVOT_SCREW: "P2. ",
+        spec.NUT_SCREW: "F1. ",
+    }
+    steps = (*spec.ASSEMBLY_STEPS, *spec.PIVOT_FIT_STEPS, *spec.KP08_ALIGNMENT_STEPS)
+    for label in torqued.values():
+        step = next(text for text in steps if text.startswith(label))
+        assert "N·m" in step
+    threaded = {
+        spec.RAIL_SCREW, spec.BRACKET_SCREW, spec.CARRIAGE_SCREW,
+        spec.PILLOW_BLOCK_SCREW, spec.NUT_SCREW, spec.RISER_SCREW,
+        spec.CLAMP_SCREW, spec.LEVER_SCREW, spec.PIVOT_SCREW, spec.FLANGE_NUT,
+    }
+    assert set(spec.SNUG_FASTENERS) == threaded - set(torqued)
+    note = spec.GENERAL_TORQUE_NOTE
+    assert note == (
+        "TORQUE WHERE NO STEP STATES ONE (ITEMS 21, 22, 24, 25, 27 AND 28): "
+        "RUN EACH SCREW OR NUT IN SNUG BY HAND ON A STANDARD-LENGTH HEX KEY "
+        "OR WRENCH, NO EXTENSION."
+    )
+    assert sorted(int(spec.ITEM_NUMBERS[s]) for s in spec.SNUG_FASTENERS) == [
+        21, 22, 24, 25, 27, 28
+    ]
+
+
+def test_sweep_limits_are_witness_marked_and_every_pass_runs_mark_to_mark() -> None:
+    """Review jig-asm r2: step 6 and HD3 set each pin at each sweep limit as at
+    a station and mark the bars; step 9, HD1 and HD4 sweep to those marks."""
+    hundredth = spec.trammel.INCH / 100.0
+    gap = spec.leadscrew.FEED_GAP
+    for name, (lo, hi) in spec.SWEEP_LIMITS.items():
+        exact_lo, exact_hi = spec.trammel.PIN_TRAVEL[name]
+        assert exact_lo - hundredth < lo <= exact_lo
+        assert exact_hi <= hi < exact_hi + hundredth
+        for s in (lo, hi):
+            centre = s - spec.trammel.PIN_OFFSET
+            lo_s, hi_s = spec.trammel.CARRIAGE_S_RANGE
+            assert lo_s <= centre <= hi_s
+            travel = spec.trammel.CARRIAGE_TRAVEL
+            assert travel[0] - gap < centre < travel[1] + gap
+    header, *rows = spec.SWEEP_NOTE_LINES
+    assert header.startswith(
+        "SWEEP LIMITS, EACH PIN AT S: INNER 2.96 TO 14.87, OUTER 3.06 TO 15.33;"
+    )
+    assert "WITNESS-MARK" in header and "MARK TO MARK" in header
+    assert [row.split(":")[0] for row in rows] == [
+        "S  2.96", "S  3.06", "S 14.87", "S 15.33"
+    ]
+    assert rows[0] == spec._station_row(spec.SWEEP_LIMITS["inner"][0])
+    steps = {
+        text.split(". ", 1)[0]: text
+        for text in (*spec.ASSEMBLY_STEPS, *spec.HOLD_DOWN_STEPS)
+    }
+    assert "SET EACH SWEEP LIMIT (SHEET 1) THE SAME WAY" in steps["6"]
+    assert "WITNESS-MARK EACH BAR AT ITS CARRIAGE'S SPINDLE-END FACE" in steps["6"]
+    assert "RENEW THE SWEEP-LIMIT MARKS" in steps["HD3"]
+    assert "MARK TO MARK (STEP 6)" in steps["9"]
+    assert "COMPLETE PASSES, MARK TO MARK" in steps["HD1"]
+    assert "COMPLETE PASS TO THE HD3 MARKS" in steps["HD4"]
 
 
 def test_lever_screw_torque_is_capped_by_the_carrier_thread() -> None:
