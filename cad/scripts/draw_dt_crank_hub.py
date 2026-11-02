@@ -12,7 +12,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     place_view,
 )
-from solidworks_mcp.adapters.sw_type_info import constant
 
 from _check import check
 from _com import _early_bound
@@ -46,7 +45,6 @@ from dt_crank_hub_notes import (
     BORE_CALLOUT,
     CROSS_HOLE_CALLOUT,
     HUB_LENGTH_CALLOUT,
-    PIN_PROUD_CALLOUT,
     RELIEF_LENGTH_CALLOUT,
     SEAM_CALLOUT,
     SEAT_CALLOUT,
@@ -147,25 +145,17 @@ BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0
 #   light-press callout above.
 # - Cross-hole callout: above the barrel, its leader rising almost straight
 #   from the hole's top rim, clear of the barrel diameter's extension lines.
+#   It carries the ream's acceptance in words: MHA-DT-09's driven big end
+#   stands proud of the barrel (review of farm run 20261102T004131857Z: a
+#   MIN dimensioned to an outline of another part).
 # - Bore callout: right of the end view, its leader entering the bore from the
 #   right, clear of the six-o'clock seam; the seam callout below the end view.
-# - MHA-DT-09 big end's MIN proud: the pin's big end (model -X) is paper-right
-#   on the end view (*Bottom turned half a turn), on the horizontal
-#   centreline.  Its value and callout print right of the big end's extension
-#   line, above the bore callout and below the isometric's label.
 # The overall's row stands under the seat length's three-line fit-up callout,
 # which hangs right of the outboard end over the overall's text.
 _ROW_Y = (0.120, 0.090)
 _STATION_ROW_Y = _ROW_Y[0] + 0.006
 END_KEEP = {
     "BoreDia": (END_CENTER[0] + 0.070, END_CENTER[1] - 0.020),
-    # Four callout lines (r7 review: name the phantom, the pin and the ring).
-    # The block stacks up from the dimension line (farm run
-    # 20261101T035809796Z: value top at y 186.9 mm), so its height sets how
-    # close it comes to the isometric's label; 7 mm further right than the
-    # three-line block, so the wider block's left edge clears the phantom
-    # big end (x <= END_CENTER + 31.2 mm).
-    "PinProud": (END_CENTER[0] + 0.072, END_CENTER[1] + 0.014),
 }
 # The seat length is a fit-up reference (the seat is turned to suit the arm,
 # end flush; owner ruling 2026-11-01 on the r9 review), so nothing chains
@@ -212,7 +202,6 @@ DIMENSION_CALLOUTS = {
     "SeatLength": SEAT_LENGTH_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
     "ReliefLength": RELIEF_LENGTH_CALLOUT,
-    "PinProud": PIN_PROUD_CALLOUT,
 }
 
 
@@ -228,22 +217,6 @@ def _set_callout_below(display: Any, text: str, label: str) -> None:
     applied = str(display.GetText(4) or "")
     if applied.replace("\r", "") != text:
         raise RuntimeError(f"{label}: callout-below text did not persist: {applied!r}")
-
-
-def _construction_curves_in_phantom(adapter: Any) -> None:
-    """Print this sheet's construction curves -- MHA-DT-09's big end round
-    the PinProud MIN on the end view -- in the phantom line font, the ASME
-    font for an adjacent part (review of farm run 20261102T004131857Z: a MIN
-    to a dashed outline reads as hidden geometry).  A drawing document
-    preference, so it changes this SLDDRW only."""
-    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
-    option = constant("swDetailingNoOptionSpecified")
-    preference = constant("swLineFontConstructionCurvesStyle")
-    phantom = constant("swLinePHANTOM")
-    if not extension.SetUserPreferenceInteger(preference, option, phantom):
-        raise RuntimeError("failed to set the crank-hub construction line font")
-    if int(extension.GetUserPreferenceInteger(preference, option)) != phantom:
-        raise RuntimeError("crank-hub construction line font readback differs")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -303,7 +276,6 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
-    _construction_curves_in_phantom(adapter)
 
     front_annotations = curate_view_dimensions(
         adapter,
