@@ -2026,7 +2026,9 @@ HUB_LENGTH_TEXT = (
 # Half a row up for that fourth row keeps the line (~0.142) where it was; the
 # widest row ("MHA-CH-00 STEP 1") clears the hub end.
 HUB_LENGTH_TEXT_XY = (0.040, 0.1578)
-HUB_ROOT_TEXT_XY = (0.047, 0.199)
+# The value plus two rows (#2136 r3: with three rows its top met the strap's
+# position frame), centred under that frame and left of the hub end.
+HUB_ROOT_TEXT_XY = (0.041, 0.199)
 # Datum G is the hub's -Z end face (#1579 owner ruling, option 1): the face
 # each arm registers on in the 20X stack, one a shop can set up on, where the
 # hub-width centre plane it replaces could only be derived. The strap frame's

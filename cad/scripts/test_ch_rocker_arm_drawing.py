@@ -1553,10 +1553,12 @@ def test_view_f_size_blocks_stand_left_of_the_view_on_the_strap_and_under_it() -
     # the strap's position frame (one ~5 mm row under its line), over the hub
     # block and the hub top, and left of the hub end, so its leader runs
     # short down-right to the +Z root corner it measures, crossing no part.
-    root_x, root_y = drawing.HUB_ROOT_TEXT_XY
-    root_text = f"{ch_rocker_arm_notes.HUB_ROOT_PREFIX}{ch_rocker_arm_spec.HUB_ROOT_RADIUS_MAX:.1f} MAX"
-    half_w = len(root_text) * CAPTION_CHAR_WIDTH / 2.0
-    root = Box(root_x - half_w, root_y - 0.00175, root_x + half_w, root_y + 0.00175)
+    # The whole block counts: value row plus the callout's rows (#2136 r3:
+    # the three-row callout's top met the frame).
+    root_text = f"{ch_rocker_arm_notes.HUB_ROOT_PREFIX}{ch_rocker_arm_spec.HUB_ROOT_RADIUS_MAX:.3f} MAX"
+    root = _callout_block(drawing.HUB_ROOT_TEXT_XY, ch_rocker_arm_notes.HUB_ROOT_CALLOUT)
+    root_half_w = len(root_text) * CAPTION_CHAR_WIDTH / 2.0
+    assert root.xmax - root.xmin >= 2 * root_half_w
     assert root.xmin - DRAWABLE.xmin >= 0.005
     assert hub_end_x - root.xmax >= 0.002
     assert (strap.ymin - 0.005) - root.ymax >= 0.003
