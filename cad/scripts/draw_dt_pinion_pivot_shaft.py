@@ -48,6 +48,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _gtol_face_resolve import resolve_faces
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
@@ -201,17 +202,29 @@ DETAIL_KEEP = {
     ),
 }
 
-# Ra on the running face, the body both pivot-block bores run on. A revolved
-# flank is a drawing SILHOUETTE, not a model edge, so the pick names that
-# entity type; the straight leader keeps off the geometry. The UPPER flank,
-# as on MHA-CH-05: on the lower one (r2, swmaker000005) the symbol re-solved
-# onto a silhouette of another face and the attachment check failed. Left of
-# the body length's callout and right of the back pin hole. Note text height,
-# as on the other part sheets: at the template default the symbol printed
-# about twice the text height (#1015).
+# Ra on the running face, the body both pivot-block bores run on. The symbol
+# is attached to that controlled cylindrical model FACE, resolved on the
+# referenced part, and its leader lands on the upper flank: a hit-tested
+# flank SILHOUETTE re-solved onto another face after insertion on both
+# flanks (r2 lower, swmaker000005; the .36-strap shaft's upper, #2106 r3,
+# swmaker00000f; same_entity=False), as on MHA-DT-27's shank. Left of the
+# body length's callout and right of the back pin hole. Note text height, as
+# on the other part sheets: at the template default the symbol printed about
+# twice the text height (#1015).
 FINISH_CHAR_HEIGHT = 0.0025
 BEARING_FINISH_EDGE = (PROFILE_CENTER[0] - 0.055, SHAFT_UPPER_FLANK_Y)
 BEARING_FINISH_SYMBOL = (BEARING_FINISH_EDGE[0], SHAFT_UPPER_FLANK_Y + 0.013)
+
+
+def _bearing_face(view: Any) -> Any:
+    """The body's one controlled cylindrical model face, for a FACE finish:
+    resolved on the part ``view`` references, not hit-tested as a
+    silhouette."""
+    document = _early_bound(
+        _early_bound(view, "IView").ReferencedDocument, "IModelDoc2"
+    )
+    control = surface_finish_by_key(SURFACE_FINISHES, "bearing")
+    return resolve_faces(document, {control.key: control.face})[control.key]
 
 
 def _front_end_detail(adapter: Any, profile: Any) -> Any:
@@ -430,8 +443,9 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         profile,
-        edge_xy=BEARING_FINISH_EDGE,
-        entity_type="SILHOUETTE",
+        entity=_bearing_face(profile),
+        entity_type="FACE",
+        leader_attach_xy=BEARING_FINISH_EDGE,
         symbol_xy=BEARING_FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="pinion pivot bearing finish",
