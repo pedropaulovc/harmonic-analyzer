@@ -188,16 +188,22 @@ VIEW_SHEET_REF_OFFSET = (-.010, -.008)
 NUT_XY, NUT_SCALE = (.190,.175), (2,1)
 NUT_KEEP = {
     'NutCentreY':(.104,.100),'NutCentreZ':(.134,.0772),
-    'NutTap1Y':(.247,.1044),'NutTap2Y':(.247,.1216),
+    # Arrows outside, each .340 on its own lane, the second's lane right of
+    # the first's text, so neither line's arrow run reaches the other's text
+    # (feed-nut2: on one lane the runs struck the texts, and arrows inside
+    # touched them).
+    'NutTap1Y':(.247,.1044),'NutTap2Y':(.282,.1216),
     'NutClearanceDia':(.135,.150),
 }
 NUT_CAPTION = 'VIEW D'
 NUT_CAPTION_XY = (.178,.058)  # the note's left edge; centred under the view
 # TL-32's cut-face sections hang their captions 6 mm under the face.
 SECTION_CAPTION_GAP = .006
-NUT_CALLOUT_XY = (.240,.085)
+# Under tap 1's lane's arrow run (which reaches y 89).
+NUT_CALLOUT_XY = (.240,.080)
 NUT_ISO_XY = (.380,.215)
 _ARROWS_INSIDE = 0  # swDimArrowsInside
+_ARROWS_OUTSIDE = 1  # swDimArrowsOutside
 _WITNESS_NONE = 3  # swWitnessLineVisibility_e.swWitnessLineNone
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 
@@ -220,12 +226,12 @@ def _displays(adapter, annotations, names) -> dict[str, Any]:
     return found
 
 
-def _arrows_inside(adapter, annotations, names) -> None:
+def _set_arrow_side(adapter, annotations, names, side) -> None:
     for name, display in _displays(adapter, annotations, names).items():
-        display.ArrowSide = _ARROWS_INSIDE
-        if int(display.ArrowSide) != _ARROWS_INSIDE:
-            raise RuntimeError(f'{name}: arrows did not move inside')
-    rebuild_drawing(adapter, label='block row arrows inside')
+        display.ArrowSide = side
+        if int(display.ArrowSide) != side:
+            raise RuntimeError(f'{name}: arrows did not move to side {side}')
+    rebuild_drawing(adapter, label=f'arrow side {side}')
 
 
 def _hide_witness_lines(adapter, annotations, name) -> None:
@@ -423,13 +429,13 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     set_hidden_lines_removed(adapter,plan)
     plan_annotations = curate_view_dimensions(adapter,plan,keep=plan_keep,view_label='plan',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
-    _arrows_inside(adapter, plan_annotations, ROW_DIMENSIONS + (('LugWidth',) if is_feed else ()))
+    _set_arrow_side(adapter, plan_annotations, ROW_DIMENSIONS + (('LugWidth',) if is_feed else ()), _ARROWS_INSIDE)
     set_hidden_lines_removed(adapter,side)
     side_annotations = curate_view_dimensions(adapter,side,keep=side_keep,view_label='pivot section direction',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
     if is_feed:
         _hide_witness_lines(adapter, side_annotations, 'TapDrillDia')
-    _arrows_inside(adapter, side_annotations, ('TopBoreDepth',))
+    _set_arrow_side(adapter, side_annotations, ('TopBoreDepth',), _ARROWS_INSIDE)
     offset_dimension_text(adapter, side_annotations, {'TopBoreDepth': seat_text_xy})
     offset_dimension_text(adapter, plan_annotations, {'BlockLength': BLOCK_LENGTH_TEXT_XY})
     annotations = plan_annotations + side_annotations
@@ -468,9 +474,9 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         set_hidden_lines_removed(adapter,nut_iso)
         nut_annotations = curate_view_dimensions(adapter,nut,keep=NUT_KEEP,view_label='nut face',
                       dimensions_by_feature=contract.DRAWING_DIMENSIONS)
-        # One lane, end to end at the axis: smart arrows put each .340's
-        # outside, past the axis into the other's text (feed-nut2 r1 audit).
-        _arrows_inside(adapter, nut_annotations, ('NutTap1Y', 'NutTap2Y'))
+        # Held outside, read back: on their staggered lanes (NUT_KEEP) the
+        # arrow runs pass clear of the other .340's text.
+        _set_arrow_side(adapter, nut_annotations, ('NutTap1Y', 'NutTap2Y'), _ARROWS_OUTSIDE)
         print_imported_metric_dimensions(adapter, nut_annotations,
                                           {name: places for (_, name), (places, _) in contract.METRIC_DIMENSIONS.items()})
         caption = add_note(adapter, NUT_CAPTION, *NUT_CAPTION_XY)

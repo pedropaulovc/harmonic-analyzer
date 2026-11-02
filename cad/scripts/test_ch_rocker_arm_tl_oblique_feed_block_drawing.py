@@ -73,6 +73,9 @@ def test_nut_taps_are_the_tl27_pair_on_the_axis_line():
     assert spec.CALLOUTS_BELOW['NutCentreZ']=='FROM CARRIAGE FACE\nON KP08 LEADSCREW AXIS'
     source=(Path(__file__).parent/'draw_ch_rocker_arm_tl_oblique_pivot_block.py').read_text(encoding='utf-8')
     assert "VIEW_SHEET_REF = '(SHEET 2)'" in source
+    # Each .340's arrows held outside, on staggered lanes (feed-nut2 r2 review:
+    # inside, the arrowheads touched the mate rows).
+    assert "_set_arrow_side(adapter, nut_annotations, ('NutTap1Y', 'NutTap2Y'), _ARROWS_OUTSIDE)" in source
 
 
 def test_loose_nut_holes_absorb_both_printed_stations():
