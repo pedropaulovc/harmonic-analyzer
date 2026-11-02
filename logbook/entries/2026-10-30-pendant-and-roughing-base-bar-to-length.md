@@ -152,34 +152,45 @@ machine yet; the next entry will say what held up.
   thick and 6 in long in matched pairs, so they can't run the 443 mm length.
   Stand the 1 in pair crosswise, one 30–40 mm in from each end, with their near
   ends 20 mm back from the near edge so the cutter never reaches them; they
-  stick out about 20 mm past the far edge. Put a 1 in support under the middle:
-  a 1-2-3 block lying flat is exactly the parallels' height. Strap-clamp the
-  far half, each strap over a parallel, so nothing is in the cutter's path. Cut
-  the near long edge with the side of the cutter: axial depth is the whole
+  stick out about 20 mm past the far edge. Put an
+  [HHIP 3901-0076 screw jack](https://www.jbtools.com/hhip-23-30mm-adjustable-screw-jack-3901-0076/)
+  (23–30 mm, 34 mm base) under the middle on solid table, not across a
+  T-slot, and run it up by hand until it just touches the bar at 25.4 mm.
+  Strap-clamp the far half, each strap over a parallel, so nothing is in the
+  cutter's path. Cut the near long edge with the side of the cutter: axial
+  depth is the whole
   12.7 mm thickness (cutter bottom just below the bar, never stepping down in
   Z), radial bites of 1–2 mm into the edge, 12.7 mm in all (152.4 → 139.7),
   with the last ~0.5 mm as a finish pass. Each pass runs the 443 mm length in
   X. Check the real X travel first.
 - **Op 10 stops (panel B).** Friction alone holds the bar against the cut, and
   conventional milling along the near edge pushes it away from me and to the
-  right. Clamp 1-2-3 blocks stood 2 in tall against the far edge, beside the
-  parallels, and a step block or spare parallel against the back half of the
-  right-hand end, so the cutter still runs off the end. Clamp each stop to the
-  table on its own; a stop that is only pushed against the bar gets shoved
-  aside. The new edge comes out straight along X whatever angle the bar sits
-  at; a skewed bar only makes the width taper against the as-extruded far
-  edge. If an even width matters, indicate the far edge along X before the
-  stops go on. Order: parallels and middle support, bar, straps snug,
-  indicate, stops clamped, middle support just touching (never lifting the
-  bar), straps tight, then run the whole pass in the air with the spindle off
-  to check the collet clears the straps and the end stop. (Unverified: whether
-  I have a third 1-2-3 block for the middle, or a screw jack that sets as low
-  as 1 in.)
+  right. Clamp both 1-2-3 blocks, stood 2 in tall, against the far edge beside
+  the parallels: two solid faces stop the bar sliding and turning. At the
+  right-hand end, set an
+  [HHIP 3900-2125 universal work stop](https://www.jbtools.com/hhip-universal-work-stop-3900-2125/)
+  with its rod on the back half of the end face, so the cutter still runs off
+  the end: clamp block all the way down (rod about 27–30 mm up; check it lands
+  on the 25.4–38.1 mm edge), as little rod sticking out as possible, both set
+  screws tight. Its single 3/8 in rod is too springy for the far edge. Clamp
+  each stop to the table on its own; a stop that is only pushed against the
+  bar gets shoved aside. The new edge comes out straight along X whatever
+  angle the bar sits at; a skewed bar only makes the width taper against the
+  as-extruded far edge. If an even width matters, indicate the far edge along
+  X before the stops go on. Order: parallels and jack, bar, straps snug,
+  indicate, stops clamped, jack just touching (never lifting the bar), straps
+  tight, then run the whole pass in the air with the spindle off to check the
+  collet clears the straps and the work stop's column. (Unverified: neither
+  the jack nor the work stop is in hand yet, and the work stop's 1/2 in base
+  hole may be too tight for a 1/2-13 kit stud.)
 - **Op 20, ends and faces in the vise (panel C).** At 5½ in wide the bar fits
   the 5¾ in vise. Lay it flat on parallels with the op 10 edge against the
   fixed jaw, the end just past the side of the jaws and a jack under the far
-  end; square both ends to 440 mm, so they come out square to the machined
-  edge, then face both sides to 12.0 mm. Standing the bar on its end is out:
+  end. The op 10 jack tops out at 30 mm; the bar's underside is about
+  86–99 mm up (vise bed 73.3 mm with the swivel base off, plus the
+  parallels), which the HHIP 3901-0078 (70–100 mm) covers. Square both ends
+  to 440 mm, so they come out square to the machined edge, then face both
+  sides to 12.0 mm. Standing the bar on its end is out:
   443 mm is more than the 17 in spindle-to-table maximum.
 - **Climb or conventional.** With the spindle running forward, picture the
   cutter's travel along the part: part on the left is conventional, on the
